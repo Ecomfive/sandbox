@@ -92,3 +92,26 @@ export async function crearTareaDeAlerta(datos: { dropshipperId: string; tipo: T
   revalidatePath("/crm-dropshippers/tareas");
   return { ok: true };
 }
+
+/**
+ * «Lo lleva» (fase 2, 30 oct 2026): Dirección elige quién del equipo lleva a un dropshipper (`dropshippers.responsable_id`). De ahí sale la
+ * cartera de cada persona en Dirección › Equipo; un caso escalado de ese dropshipper también le crea la tarea a esa persona. `null` lo quita.
+ */
+export async function asignarResponsable(dropshipperId: string, perfilId: string | null): Promise<{ ok: true } | { error: string }> {
+  const u = await usuarioDireccion();
+  if (!u) return { error: "Solo Dirección puede asignar quién lleva a un dropshipper." };
+  if (!ES_ID(dropshipperId) || (perfilId !== null && !ES_ID(perfilId))) return { error: "Datos no válidos." };
+  const supabase = createServiceClient();
+  const [{ data: d }, { data: p }] = await Promise.all([
+    supabase.from("dropshippers").select("nombre, responsable_id").eq("id", dropshipperId).maybeSingle(),
+    perfilId ? supabase.from("perfiles").select("nombre, email, activo").eq("id", perfilId).maybeSingle() : Promise.resolve({ data: null }),
+  ]);
+  if (!d) return { error: "Ese dropshipper ya no existe." };
+  if (perfilId && !p?.activo) return { error: "Esa persona no está activa." };
+  if (d.responsable_id === perfilId) return { ok: true };
+  const { error } = await supabase.from("dropshippers").update({ responsable_id: perfilId }).eq("id", dropshipperId);
+  if (error) return { error: "No se pudo guardar." };
+  await registrarAuditoria({ accion: "crm_responsable_dropshipper", entidad: "dropshippers", entidadId: dropshipperId, detalle: `${d.nombre}: lo lleva ${p ? p.nombre || p.email : "nadie"}` });
+  revalidatePath(RUTA);
+  return { ok: true };
+}

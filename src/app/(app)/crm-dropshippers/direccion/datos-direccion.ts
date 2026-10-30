@@ -11,7 +11,10 @@ export interface FilaDireccion {
   nombre: string;
   /** Tipo de cliente (regular, vip, black), el que calcula el sistema o se fijó a mano. */
   nivel: string;
+  /** Quién lo lleva: el elegido en Dirección o, si no hay, quien tiene asignado su chat. */
   responsable: string | null;
+  /** El elegido en Dirección (`dropshippers.responsable_id`), para el selector «Lo lleva». */
+  responsableId: string | null;
   salud: Salud;
   segmento: Segmento;
   ultimoPedido: string | null;
@@ -121,6 +124,7 @@ export async function cargarDireccion(supabase: SupabaseClient, paisId: string):
       nombre: d.nombre,
       nivel: d.nivel,
       responsable,
+      responsableId: d.responsable_id,
       salud: calcularSalud(p, hoy, refVip),
       segmento: segmentoDe(p, hoy),
       ultimoPedido: p.ultimoPedido,
