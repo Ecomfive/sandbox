@@ -400,15 +400,18 @@ export function Bandeja({
   const [soloMios, setSoloMios] = useState(false);
   // La vista elegida se recuerda en el navegador. Sin elección guardada, Atención abre en el tablero: es su bandeja de entrada (30 oct 2026,
   // pedido de Hernán); las demás áreas, en la lista. Si no se puede leer, lo mismo.
-  useEffect(() => {
+  const vistaInicial = useCallback((): "lista" | "tablero" => {
     let guardada: string | null = null;
     try {
       guardada = window.localStorage.getItem(CLAVE_VISTA);
     } catch {
       // Sin almacenamiento: lo de cada área.
     }
-    if (guardada === "tablero" || (guardada !== "lista" && miArea === "atencion")) setVistaBandeja("tablero");
+    return guardada === "tablero" || (guardada !== "lista" && miArea === "atencion") ? "tablero" : "lista";
   }, [miArea]);
+  useEffect(() => {
+    if (vistaInicial() === "tablero") setVistaBandeja("tablero");
+  }, [vistaInicial]);
   function cambiarVista(v: "lista" | "tablero") {
     setVistaBandeja(v);
     try {
@@ -416,6 +419,13 @@ export function Bandeja({
     } catch {
       // Sin almacenamiento: vale solo hasta recargar.
     }
+  }
+  // «Ver como»: Atención se ve en su tablero, como la ve Atención. Al volver a «Mi vista» la bandeja queda como al entrar (la vista guardada o la
+  // del área propia; para Dirección, la lista con un panel por área), no en el tablero de un área sin chats (30 oct 2026, pedido de Hernán).
+  function cambiarVerComo(area: AreaCrm | null) {
+    setVerComo(area);
+    if (area === "atencion") setVistaBandeja("tablero");
+    if (!area) setVistaBandeja(vistaInicial());
   }
   const [elegido, setElegido] = useState<string | null>(abrirInicial);
   const [chat, setChat] = useState<ChatAbierto | null>(null);
@@ -1336,7 +1346,7 @@ export function Bandeja({
           </span>
           <button
             type="button"
-            onClick={() => setVerComo(null)}
+            onClick={() => cambiarVerComo(null)}
             className={`h-9 flex-none rounded-lg bg-[var(--wa-texto)] px-3.5 text-[13px] font-semibold text-[var(--wa-fondo)] hover:opacity-90 ${anilloFoco}`}
           >
             Volver a mi vista
@@ -1372,12 +1382,7 @@ export function Bandeja({
             Ver como
             <select
               value={verComo ?? ""}
-              onChange={(e) => {
-                const area = (e.target.value || null) as AreaCrm | null;
-                setVerComo(area);
-                // «Ver como» Atención la muestra tal como la ve Atención: en el tablero.
-                if (area === "atencion") setVistaBandeja("tablero");
-              }}
+              onChange={(e) => cambiarVerComo((e.target.value || null) as AreaCrm | null)}
               title="Ver la bandeja tal como la ve un área, para revisarla sin entrar con su usuario"
               className={`h-10 rounded-lg px-2 text-[13px] font-semibold text-[var(--wa-texto)] ${verComo ? "border border-[var(--wa-texto)] bg-[var(--wa-fondo)]" : "border-0 bg-[var(--wa-panel)]"} ${anilloFoco}`}
             >
