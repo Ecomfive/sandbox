@@ -1284,20 +1284,23 @@ export function Bandeja({
     <div className="bandeja-wa flex min-h-[640px] flex-col gap-3 text-[var(--wa-texto)] lg:h-[calc(100vh-200px)]">
       {/* El globo de la pestaña sigue lo que la bandeja va leyendo (los chats sin responder de todas las áreas que ve la persona). */}
       <ContadorPestana href="/crm-dropshippers/bandeja" cantidad={datos.conversaciones.filter((c) => !c.interno && sinResponder(c)).length} />
-      {/* «Ver como»: qué se está mirando y cómo volver. */}
+      {/* «Ver como»: qué se está mirando y cómo volver. Neutro, sin el verde de WhatsApp (30 oct 2026, pedido de Hernán: «ese verde no me gusta»). */}
       {verComo && (
-        <div role="status" className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border border-[var(--wa-acento)] bg-[var(--wa-acento-suave)] px-3.5 py-2 text-[13px] text-[var(--wa-acento-suave-texto)]">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-            <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
-            <circle cx="12" cy="12" r="3" />
-          </svg>
-          <span className="min-w-0 flex-1">
-            <strong>Estás viendo la bandeja como la ve {areaChat(verComo).etiqueta}</strong>: sus chats, su orden, sus filtros y su tablero. Es para revisar: lo que abras no se marca leído y para contestar hay que «Intervenir».
+        <div role="status" className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-[var(--wa-borde)] bg-[var(--wa-panel)] px-4 py-2.5 text-[13px] text-[var(--wa-sec)]">
+          <span className="inline-flex flex-none items-center gap-1.5 rounded-full bg-[var(--wa-texto)] px-2.5 py-1 text-xs font-semibold text-[var(--wa-fondo)]">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+              <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+            Viendo como {areaChat(verComo).etiqueta}
+          </span>
+          <span className="min-w-[14rem] flex-1">
+            Sus chats, su orden, sus filtros y su tablero. Solo para revisar: lo que abras no se marca leído y para contestar hay que «Intervenir».
           </span>
           <button
             type="button"
             onClick={() => setVerComo(null)}
-            className={`h-8 rounded-md border border-[var(--wa-acento)] bg-[var(--wa-fondo)] px-3 text-[13px] font-semibold text-[var(--wa-texto)] hover:bg-[var(--wa-hover)] ${anilloFoco}`}
+            className={`h-9 flex-none rounded-lg bg-[var(--wa-texto)] px-3.5 text-[13px] font-semibold text-[var(--wa-fondo)] hover:opacity-90 ${anilloFoco}`}
           >
             Volver a mi vista
           </button>
@@ -1339,7 +1342,7 @@ export function Bandeja({
                 if (area === "atencion") setVistaBandeja("tablero");
               }}
               title="Ver la bandeja tal como la ve un área, para revisarla sin entrar con su usuario"
-              className={`h-10 rounded-lg border-0 px-2 text-[13px] font-semibold ${verComo ? "bg-[var(--wa-acento-suave)] text-[var(--wa-acento-suave-texto)]" : "bg-[var(--wa-panel)] text-[var(--wa-texto)]"} ${anilloFoco}`}
+              className={`h-10 rounded-lg px-2 text-[13px] font-semibold text-[var(--wa-texto)] ${verComo ? "border border-[var(--wa-texto)] bg-[var(--wa-fondo)]" : "border-0 bg-[var(--wa-panel)]"} ${anilloFoco}`}
             >
               <option value="">Mi vista (todas mis áreas)</option>
               {misAreas
