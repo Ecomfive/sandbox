@@ -1,6 +1,7 @@
 import type { VendeEn } from "@/lib/whatsapp/origen-chat";
 import { FASES } from "@/lib/crm/areas";
 import { SIN_VALOR, type DefTabla } from "@/lib/tabla/motor";
+import type { CambioTipo } from "@/lib/crm/cambio-tipo";
 
 /** Un usuario de una plataforma (Dropi, Boxful, EFI) vinculado a un dropshipper. */
 export interface CuentaVinculada {
@@ -110,6 +111,8 @@ export interface FilaDropshipper {
   nivel: string;
   /** El tipo lo fijó una persona: el cálculo automático no lo toca (migración 0196). */
   nivelManual: boolean;
+  /** El último cambio de tipo, si sigue en el nivel al que llegó: la flecha de «subió» o «bajó» junto a la pastilla. */
+  cambioTipo: CambioTipo | null;
   /** Promedio de pedidos al mes de los últimos 3 meses, sin cancelados (de él sale el tipo automático). */
   promedioPedidosMes: number | null;
   responsable: string | null;

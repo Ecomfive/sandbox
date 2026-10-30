@@ -1228,6 +1228,10 @@ convenciones técnicas del código.
   **Automático** (migración 0196): `crm_recalcular_tipo_cliente()` (la llama `ingerirPedidos` después de `crm_sincronizar_ordenes`) pone `promedio_pedidos_mes` = pedidos de 90 días
   sin cancelados × 30 ÷ días con pedidos (30 a 90), **por país** con los umbrales de `crm_tipo_cliente_umbrales` (Configuración › «Tipo de cliente del CRM»,
   `guardarUmbralesTipoCliente`; 500 y 1 000 de entrada), y el tipo más alto entre sus países; deja auditoría «Sistema». `nivel_manual` (pastilla o «Editar») lo fija; «Automático» lo suelta.
+  **Todo junto al nombre del chat** (30 oct 2026, pedido de Alcides): `DatosEnLaCabecera` (`bandeja/ficha-chat.tsx`) pone en la barra del nombre el tipo de cliente
+  editable (`TipoCliente`; sin ficha cargada, `PastillaTipo soloDestacados`), el estado, «Captado el…» y `EquipoDelChat`; la ficha ya no los repite ni muestra las tiendas de ClickUp.
+  **Flecha de subió/bajó** (`FlechaCambioTipo`, `tipo-cliente.tsx`): `FilaDropshipper.cambioTipo` = `cambioDeTipo` (`src/lib/crm/cambio-tipo.ts`, con prueba) sobre las líneas
+  `tipo_cliente_dropshipper` de la auditoría (`obtenerDatosCrm`); solo si sigue en el nivel al que llegó.
   **Quién atiende, en globitos** (29 oct 2026, pedido de Alcides): arriba de la ficha del chat, `EquipoDelChat` (`ficha-chat.tsx`) dibuja «Lo atiende»
   (`quienesAtienden`, `src/lib/crm/respondieron.ts`, con prueba: quien lo lleva o intervino + la persona cuyo cargo es del área del chat) y «Respondieron» con
   `GloboPersona` / `GloboCelular` (`bandeja/globo-persona.tsx`: foto de `perfiles.avatar_url` o iniciales, tooltip «Nombre · Cargo»). `MensajeVista.autorFoto`,

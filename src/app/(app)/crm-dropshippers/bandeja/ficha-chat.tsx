@@ -15,7 +15,7 @@ import { etiquetaEstado } from "../def-crm";
 import { DesempenoDropshipper } from "../desempeno-dropshipper";
 import { AccionesCrm, CasosAbiertos, DatosDropshipper, tonoEstado } from "../ficha-lateral";
 import { RecomendacionesDropshipper } from "../recomendaciones-dropshipper";
-import { TipoCliente } from "../tipo-cliente";
+import { PastillaTipo, TipoCliente } from "../tipo-cliente";
 import { VentasDropiDropshipperBloque } from "../ventas-dropi-dropshipper";
 import { PastillaVendeEn } from "./vende-en";
 import { ActividadDelClienteFicha } from "./actividad-cliente";
@@ -102,7 +102,7 @@ function EquipoDelChat({ sel, respondieron }: { sel: ConversacionVista; respondi
   const asignada = sel.asignadaA ? { nombre: sel.asignadaA, cargo: sel.asignadaCargo, foto: sel.asignadaFoto } : null;
   const atienden = quienesAtienden(asignada, respondieron, sel.area, DESDE_EL_CELULAR);
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[12.5px] text-[var(--wa-sec)]">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-normal text-[var(--wa-sec)]">
       <span className="flex items-center gap-1.5">
         <span>Lo atiende</span>
         {atienden.length ? (
@@ -128,6 +128,47 @@ function EquipoDelChat({ sel, respondieron }: { sel: ConversacionVista; respondi
 }
 
 /**
+ * Lo del dropshipper que va en la barra del nombre del chat (30 oct 2026, pedido de Alcides, para dejar más espacio en la ficha): su tipo de cliente
+ * (se cambia ahí mismo, con la flecha si subió o bajó), su estado, cuándo se captó y quién lo atiende.
+ */
+export function DatosEnLaCabecera({
+  sel,
+  ficha,
+  respondieron,
+  alGuardarCrm,
+}: {
+  sel: ConversacionVista;
+  ficha: FichaCrmChat | "cargando" | "error" | null;
+  respondieron: QuienRespondio[];
+  alGuardarCrm: () => void;
+}) {
+  const datos = ficha && typeof ficha === "object" ? ficha : null;
+  const d = datos?.d ?? null;
+  const acceso = datos?.acceso ?? null;
+  return (
+    <>
+      {d ? (
+        <TipoCliente
+          key={`tipo-${d.id}-${d.nivel}`}
+          dropshipperId={d.id}
+          nivel={d.nivel}
+          manual={d.nivelManual}
+          promedio={d.promedioPedidosMes}
+          cambio={d.cambioTipo}
+          puede={!!acceso && (acceso.escribeAtencion || acceso.escribeComercial)}
+          alCambiar={alGuardarCrm}
+        />
+      ) : (
+        sel.vip && <PastillaTipo nivel={sel.tipoCliente} soloDestacados />
+      )}
+      {d && <Pastilla tono={tonoEstado(d.estado)}>{etiquetaEstado(d.estado)}</Pastilla>}
+      {d?.ingreso && <span className="text-xs font-normal whitespace-nowrap text-muted-foreground">Captado el {formatearFecha(d.ingreso)}</span>}
+      {!sel.interno && <EquipoDelChat sel={sel} respondieron={respondieron} />}
+    </>
+  );
+}
+
+/**
  * La ficha del dropshipper en la ventana del chat de la Bandeja (29 oct 2026, pedido de Hernán sobre su referencia): arriba sus pastillas,
  * la fase y una fila de botones (los del chat: Tomar, Marcar resuelta…; los del CRM: Nuevo caso, Pedido, Nota…; y los demás del chat), y debajo
  * pestañas con todo lo del CRM. Sin dropshipper vinculado, solo lo que sale del chat y cómo vincularlo.
@@ -142,7 +183,6 @@ export function FichaDelChat({
   accionesChat,
   etiquetas,
   accionesExtra,
-  respondieron,
   versionEquipo,
   alAbrirVincular,
   alVinculado,
@@ -159,8 +199,6 @@ export function FichaDelChat({
   /** Las etiquetas del chat (como en ClickUp), arriba de todo. */
   etiquetas: ReactNode;
   accionesExtra: AccionExtra[];
-  /** Quién del equipo le escribió al dropshipper en este chat y con qué cargo (su puesto o su área; la más reciente primero). */
-  respondieron: QuienRespondio[];
   versionEquipo: string;
   alAbrirVincular: () => void;
   alVinculado: (mensaje: string) => void;
@@ -194,22 +232,15 @@ export function FichaDelChat({
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
       <div className="flex flex-col gap-3 border-b border-[var(--wa-borde)] px-5 pt-3.5 pb-4">
         {etiquetas}
-        {d && (
+        {/* Estado, tipo de cliente, «Captado el…» y quién lo atiende van en la barra del nombre (30 oct 2026, pedido de Alcides); las tiendas de ClickUp ya no se muestran. */}
+        {abiertos.length > 0 && (
           <div className="flex flex-wrap items-center gap-1.5">
-            <Pastilla tono={tonoEstado(d.estado)}>{etiquetaEstado(d.estado)}</Pastilla>
-            <TipoCliente key={`tipo-${d.id}`} dropshipperId={d.id} nivel={d.nivel} manual={d.nivelManual} promedio={d.promedioPedidosMes} puede={!!acceso && (acceso.escribeAtencion || acceso.escribeComercial)} alCambiar={guardado} />
-            {abiertos.length > 0 && (
-              <Pastilla>
-                <Punto />
-                {abiertos.length} {abiertos.length === 1 ? "caso abierto" : "casos abiertos"}
-              </Pastilla>
-            )}
-            <span className="text-[12.5px] text-[var(--wa-sec)]">
-              {[d.paises.join(", "), d.tiendas.join(", "), d.ingreso ? `Captado el ${formatearFecha(d.ingreso)}` : null].filter(Boolean).join(" · ")}
-            </span>
+            <Pastilla>
+              <Punto />
+              {abiertos.length} {abiertos.length === 1 ? "caso abierto" : "casos abiertos"}
+            </Pastilla>
           </div>
         )}
-        <EquipoDelChat sel={sel} respondieron={respondieron} />
         <div className="grid grid-cols-[repeat(auto-fill,minmax(76px,1fr))] gap-1.5">
           {accionesChat}
           {escribe && <BotonNuevaTarea conversacionId={sel.id} nombre={sel.nombre} clase={claseBotonFicha} alCreada={() => setVersionTareas((v) => v + 1)} alAviso={alAviso} />}
