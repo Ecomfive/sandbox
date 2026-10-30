@@ -16,12 +16,12 @@ import { abrirConversacion, cambiarEstadoConversacion, fichaCrmDelChat, conectar
 import type { FichaCrmChat } from "./actions";
 import type { ConversacionVista, DatosBandeja, MensajeVista, ResumenDropshipper, VistaPreviaMensaje } from "./datos-bandeja";
 import { guardarColorEtiquetaChat, guardarEtiquetasChat } from "./etiquetas-actions";
+import { PastillaTipo } from "../tipo-cliente";
 import { VendeEnChat } from "./vende-en";
 import { colorFoto, iniciales } from "./globo-persona";
 import { EtiquetasChat, PastillasEtiquetas, SelectorEtiquetasChat, type ManejoEtiquetas } from "./etiquetas-chat";
 import { claseBotonFicha, claseBotonFichaPrincipal, FichaDelChat, type OpcionMas } from "./ficha-chat";
 import { reaccionarAMensaje } from "./reaccion-actions";
-import { cambiarVip } from "../tareas/actions";
 import { VistaPreviaChat } from "./vista-previa-chat";
 import { VentanaVincular } from "./vincular-chat";
 import { ACEPTAR_ENVIO, EnviarArchivo } from "./enviar-archivo";
@@ -240,8 +240,8 @@ function IconoEstado({ clase, signo, texto }: { clase: string; signo: string; te
 }
 
 /** «VIP»: un dropshipper de los que más pedidos mueven (29 oct 2026), para saber con quién se trata. */
-function EtiquetaVip() {
-  return <span className="inline-flex flex-none items-center rounded-full bg-[var(--wa-texto)] px-1.5 py-px text-[10.5px] font-bold tracking-wide text-[var(--wa-fondo)]">VIP</span>;
+function EtiquetaVip({ tipo }: { tipo: string | null }) {
+  return <PastillaTipo nivel={tipo} soloDestacados />;
 }
 
 /** La etiqueta de color de un área, con su punto. */
@@ -959,7 +959,7 @@ export function Bandeja({
           <span className="flex min-w-0 flex-1 flex-col gap-0.5">
             <span className="flex items-center gap-1.5">
               <span className="min-w-0 truncate text-[14px] font-semibold">{c.nombre}</span>
-              {c.vip && <EtiquetaVip />}
+              {c.vip && <EtiquetaVip tipo={c.tipoCliente} />}
               {subio && <span className="flex-none rounded-full bg-destructive/10 px-1.5 text-[10.5px] font-bold text-destructive">subió</span>}
               {c.noLeidos > 0 && (
                 <span className="ml-auto flex h-[18px] min-w-[18px] flex-none items-center justify-center rounded-full bg-[var(--wa-acento)] px-1 text-[11px] font-semibold text-[var(--wa-acento-texto)] tabular-nums">
@@ -1000,7 +1000,7 @@ export function Bandeja({
       <>
         <span className="flex items-baseline gap-2">
           <span className="min-w-0 flex-1 truncate text-[16px]">{c.nombre}</span>
-          {c.vip && <EtiquetaVip />}
+          {c.vip && <EtiquetaVip tipo={c.tipoCliente} />}
           <span className={`flex-none text-xs tabular-nums ${c.noLeidos ? "font-semibold text-[var(--wa-acento)]" : "text-[var(--wa-sec)]"}`}>{enNavegador ? horaCorta(c.ultimoMensajeEn) : ""}</span>
         </span>
         <span className="flex items-center gap-1.5 text-sm text-[var(--wa-sec)]">
@@ -1153,23 +1153,6 @@ export function Bandeja({
                 alPulsar: () => accion(() => marcarChatBorradoEnApp(sel.id, !sel.borradaEnApp), sel.borradaEnApp ? "Quitaste la marca." : "Marcado: se borró en la app de WhatsApp Business. Aquí se conserva todo."),
               },
               ...(sel.borradoPendiente ? [] : [{ texto: "Pedir borrar el chat", alPulsar: () => setBorrar({ tipo: "chat" }) }]),
-            ]
-          : []),
-        ...(verDropshipper && fichaDelChat && typeof fichaDelChat === "object" && (fichaDelChat.acceso.escribeAtencion || fichaDelChat.acceso.escribeComercial)
-          ? [
-              {
-                texto: fichaDelChat.d.nivel === "vip" ? "Quitar VIP" : "Marcar como VIP",
-                alPulsar: () => {
-                  const vip = fichaDelChat.d.nivel !== "vip";
-                  const id = sel.id;
-                  empezar(async () => {
-                    const r = await cambiarVip(fichaDelChat.d.id, vip).catch(() => ({ error: "No se pudo cambiar el nivel." }));
-                    mostrarToast("error" in r ? r.error : vip ? "Marcado como VIP: se ve en la lista de chats y en su ficha." : "Ya no es VIP.", "error" in r ? "destructive" : undefined);
-                    setVersionCrm((v) => v + 1);
-                    await refrescar(id);
-                  });
-                },
-              },
             ]
           : []),
         ...(verDropshipper
@@ -1459,7 +1442,7 @@ export function Bandeja({
                   </span>
                 </span>
               </span>
-              {sel.vip && <EtiquetaVip />}
+              {sel.vip && <EtiquetaVip tipo={sel.tipoCliente} />}
               <EtiquetaArea area={sel.area} />
               {/* Dónde vende (29 oct 2026, pedido de Alcides): sus plataformas por país, puestas a mano o de sus cuentas; y los países de su ficha que aún no tienen plataforma. */}
               <VendeEnChat

@@ -12,10 +12,11 @@ import { MasIcon } from "@/lib/nav-icons";
 import { ActividadDropshipper } from "../actividad-dropshipper";
 import { SeguimientosDropshipper } from "../areas-ficha";
 import { CuentasDropshipper } from "../cuentas-dropshipper";
-import { etiquetaEstado, etiquetaNivel } from "../def-crm";
+import { etiquetaEstado } from "../def-crm";
 import { DesempenoDropshipper } from "../desempeno-dropshipper";
 import { AccionesCrm, CasosAbiertos, DatosDropshipper, tonoEstado } from "../ficha-lateral";
 import { RecomendacionesDropshipper } from "../recomendaciones-dropshipper";
+import { TipoCliente } from "../tipo-cliente";
 import { VentasDropiDropshipperBloque } from "../ventas-dropi-dropshipper";
 import { ActividadDelClienteFicha } from "./actividad-cliente";
 import { ActividadDelEquipoFicha } from "./actividad-equipo";
@@ -236,7 +237,7 @@ export function FichaDelChat({
         {d && (
           <div className="flex flex-wrap items-center gap-1.5">
             <Pastilla tono={tonoEstado(d.estado)}>{etiquetaEstado(d.estado)}</Pastilla>
-            <Pastilla tono={d.nivel === "vip" ? "oscuro" : "neutro"}>{etiquetaNivel(d.nivel)}</Pastilla>
+            <TipoCliente key={`tipo-${d.id}`} dropshipperId={d.id} nivel={d.nivel} puede={!!acceso && (acceso.escribeAtencion || acceso.escribeComercial)} alCambiar={guardado} />
             {abiertos.length > 0 && (
               <Pastilla>
                 <Punto />
