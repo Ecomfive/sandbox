@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { anilloFoco, fieldClassSm } from "@/components/ui/field";
-import { formatearMoneda } from "@/lib/formato";
-import { obtenerDesempeno, type DesempenoPais, type ProductoVendido } from "./actions";
+import { formatearFecha, formatearMoneda } from "@/lib/formato";
+import type { Desempeno } from "./desempeno-datos";
 import { nombrePais } from "./def-crm";
 
 const PERIODOS = [
@@ -45,7 +45,11 @@ export function DesempenoDropshipper({ dropshipperId, tieneCuentas }: { dropship
   const [periodo, setPeriodo] = useState<(typeof PERIODOS)[number]["id"]>("mes");
   const [desde, setDesde] = useState(inicioDelMes);
   const [hasta, setHasta] = useState(() => aIso(new Date()));
-  const [datos, setDatos] = useState<{ paises: DesempenoPais[]; productos: ProductoVendido[] } | "error" | null>(null);
+  const [datos, setDatos] = useState<Desempeno | "error" | null>(null);
+  // El período que muestran las cifras: mientras llega el nuevo, las de antes se ven atenuadas con «Cargando…».
+  const [mostrado, setMostrado] = useState<string | null>(null);
+  const pedido = `${desde}|${hasta}`;
+  const cargando = datos === null || mostrado !== pedido;
 
   function elegir(id: (typeof PERIODOS)[number]["id"]) {
     setPeriodo(id);
@@ -58,13 +62,23 @@ export function DesempenoDropshipper({ dropshipperId, tieneCuentas }: { dropship
 
   useEffect(() => {
     if (!tieneCuentas || !desde || !hasta || desde > hasta) return;
-    let vigente = true;
-    obtenerDesempeno(dropshipperId, desde, hasta)
-      .then((r) => vigente && setDatos("error" in r ? "error" : r))
-      .catch(() => vigente && setDatos("error"));
-    return () => {
-      vigente = false;
-    };
+    // Una ruta y no una acción del servidor: las acciones de la página van en fila y esta esperaba detrás de las otras lecturas de la
+    // ficha, así que los botones parecían no hacer nada (29 oct 2026).
+    const control = new AbortController();
+    const q = new URLSearchParams({ d: dropshipperId, desde, hasta });
+    fetch(`/api/crm/desempeno?${q}`, { signal: control.signal, cache: "no-store" })
+      .then(async (r) => {
+        const json = (await r.json().catch(() => null)) as Desempeno | { error: string } | null;
+        setDatos(!r.ok || !json || "error" in json ? "error" : json);
+        setMostrado(`${desde}|${hasta}`);
+      })
+      .catch((e) => {
+        if (control.signal.aborted) return;
+        console.error(e);
+        setDatos("error");
+        setMostrado(`${desde}|${hasta}`);
+      });
+    return () => control.abort();
   }, [dropshipperId, desde, hasta, tieneCuentas]);
 
   if (!tieneCuentas) {
@@ -101,14 +115,17 @@ export function DesempenoDropshipper({ dropshipperId, tieneCuentas }: { dropship
         </div>
       )}
 
-      {datos === null && <p className="m-0 text-[13px] text-muted-foreground">Cargando…</p>}
+      <p className="m-0 text-xs text-muted-foreground tabular-nums" aria-live="polite">
+        {desde > hasta ? "La fecha «Desde» va después de «Hasta»." : `Del ${formatearFecha(desde)} al ${formatearFecha(hasta)}`}
+        {cargando && desde <= hasta ? " · Cargando…" : ""}
+      </p>
       {datos === "error" && (
         <p role="alert" className="m-0 text-[13px] text-destructive">
           No se pudo cargar el desempeño.
         </p>
       )}
       {datos && datos !== "error" && (
-        <>
+        <div className={`flex flex-col gap-3 transition-opacity ${cargando ? "opacity-50" : ""}`} aria-busy={cargando}>
           {datos.paises.length === 0 ? (
             <p className="m-0 text-[13px] text-muted-foreground">Sin pedidos en este período.</p>
           ) : (
@@ -145,7 +162,7 @@ export function DesempenoDropshipper({ dropshipperId, tieneCuentas }: { dropship
               </ul>
             </div>
           )}
-        </>
+        </div>
       )}
     </div>
   );
