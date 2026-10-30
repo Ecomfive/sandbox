@@ -23,6 +23,7 @@ import { abrirChatInterno } from "./interno-actions";
 import { BotonWhatsappInterno } from "./interno";
 import { colorFoto, iniciales } from "./globo-persona";
 import { EtiquetasChat, PastillasEtiquetas, SelectorEtiquetasChat, type ManejoEtiquetas } from "./etiquetas-chat";
+import { transcribirAudio } from "./transcripcion-actions";
 import { BotonBarra, DatosEnLaCabecera, FichaDelChat, type AccionExtra } from "./ficha-chat";
 import { reaccionarAMensaje } from "./reaccion-actions";
 import { VistaPreviaChat } from "./vista-previa-chat";
@@ -259,8 +260,51 @@ function EtiquetaArea({ area }: { area: AreaCrm }) {
   );
 }
 
+/**
+ * La transcripción de un audio (30 oct 2026, pedido de Jhokser): si ya la tiene, el texto bajo el audio; si no y se puede, el botón «Transcribir», que pide la
+ * transcripción a la IA (cuesta un poco de crédito: queda guardada para todos y no se vuelve a pagar).
+ */
+function TranscripcionAudio({ m, puede }: { m: MensajeVista; puede: boolean }) {
+  const [texto, setTexto] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [transcribiendo, empezar] = useTransition();
+  const actual = m.transcripcion ?? texto;
+  if (actual)
+    return (
+      <span className="mt-1 mb-0.5 block max-w-[34ch] border-l-2 border-[var(--wa-acento)] pl-2 text-[13.5px] leading-[18px]">
+        <span className="block text-[11.5px] font-semibold text-[var(--wa-sec)]">Transcripción</span>
+        <span className="whitespace-pre-wrap break-words">{actual}</span>
+      </span>
+    );
+  if (!puede) return null;
+  return (
+    <span className="mt-0.5 mb-0.5 flex flex-col items-start gap-0.5">
+      <button
+        type="button"
+        disabled={transcribiendo}
+        onClick={() =>
+          empezar(async () => {
+            setError(null);
+            const r = await transcribirAudio(m.id).catch(() => ({ error: "No se pudo transcribir." }));
+            if ("error" in r) setError(r.error);
+            else setTexto(r.texto);
+          })
+        }
+        className={`rounded text-[12.5px] font-medium text-[var(--wa-acento)] hover:underline disabled:opacity-60 ${anilloFoco}`}
+      >
+        {transcribiendo ? "Transcribiendo…" : "Transcribir"}
+      </button>
+      {error && (
+        <span role="alert" className="text-[12px] text-destructive">
+          {error}
+        </span>
+      )}
+    </span>
+  );
+}
+
 /** El contenido de un mensaje: su texto y, si trae un archivo, la foto, el audio, el video o el enlace para bajarlo. */
-function Contenido({ m }: { m: MensajeVista }) {
+function Contenido({ m, puedeTranscribir = false }: { m: MensajeVista; puedeTranscribir?: boolean }) {
   const src = `/api/whatsapp/media/${m.id}`;
   // Una foto se abre en un visor sobre la misma página (centrada, con su texto y «Descargar»), no en una pestaña con la imagen suelta.
   const [ampliada, setAmpliada] = useState(false);
@@ -277,6 +321,7 @@ function Contenido({ m }: { m: MensajeVista }) {
       )}
       {m.conArchivo && m.tipo === "sticker" && <img src={src} alt="Sticker" loading="lazy" className="h-28 w-28 object-contain" />}
       {m.conArchivo && m.tipo === "audio" && <audio controls preload="none" src={src} className="max-w-full" />}
+      {m.conArchivo && m.tipo === "audio" && <TranscripcionAudio m={m} puede={puedeTranscribir} />}
       {m.conArchivo && m.tipo === "video" && m.mediaNombre?.startsWith("gif-") && <video autoPlay loop muted playsInline preload="auto" src={src} aria-label="GIF" className="max-h-60 max-w-full rounded-md" />}
       {m.conArchivo && m.tipo === "video" && !m.mediaNombre?.startsWith("gif-") && <video controls preload="none" src={src} className="max-h-72 max-w-full rounded-md" />}
       {m.conArchivo && m.tipo === "documento" && (
@@ -1677,6 +1722,7 @@ export function Bandeja({
                           <Burbuja
                             m={m}
                             seguido={seguido}
+                            puedeTranscribir={escribe && !esLocal(m)}
                             reacciones={conReacciones?.reacciones.get(m.id)}
                             alPedirBorrar={escribe && !mirando && !esLocal(m) ? (x) => setBorrar({ tipo: "mensaje", mensajeId: x.id, resumen: vistaPreviaTexto(x.texto) || `(${x.tipo})` }) : undefined}
                             alGuardarRapida={escribe && !mirando ? guardarComoRapida : undefined}
@@ -2136,9 +2182,12 @@ function Burbuja({
   alGuardarRapida,
   alReaccionar,
   alReintentar,
+  puedeTranscribir,
 }: {
   m: MensajeVista;
   seguido: boolean;
+  /** Muestra «Transcribir» en un audio (se puede escribir en el CRM y el mensaje ya está guardado). */
+  puedeTranscribir?: boolean;
   /** Reaccionar a este mensaje con un emoji (vacío = quitar la reacción del equipo); solo si se puede. */
   alReaccionar?: (emoji: string) => void;
   /** Las reacciones a este mensaje (una por lado), que se dibujan sobre su borde de abajo, como en WhatsApp. */
@@ -2168,7 +2217,7 @@ function Burbuja({
           Nota privada{m.autor ? ` · ${m.autor}` : ""}
           {m.autor && m.autorCargo ? ` (${m.autorCargo})` : ""}
         </span>
-        <Contenido m={m} />
+        <Contenido m={m} puedeTranscribir={puedeTranscribir} />
         <span className="float-right mt-1.5 -mb-1 ml-2.5 text-[11px] text-[var(--wa-nota-acento)]">
           {horaMensaje(m.momento)}
           {m.estado === "enviando" && " · Guardando…"}
@@ -2209,7 +2258,7 @@ function Burbuja({
           {m.autorCargo && <span className="font-normal"> · {m.autorCargo}</span>}
         </span>
       )}
-      <Contenido m={m} />
+      <Contenido m={m} puedeTranscribir={puedeTranscribir} />
       {m.eliminadoEnWhatsapp && (
         <span className="mt-1 block text-[11.5px] font-medium text-[var(--wa-sec)] italic">
           {nuestro ? "Se eliminó desde la app de WhatsApp Business (Meta no dice quién). Aquí se conserva." : "Lo eliminó en WhatsApp quien lo mandó. Aquí se conserva."}
