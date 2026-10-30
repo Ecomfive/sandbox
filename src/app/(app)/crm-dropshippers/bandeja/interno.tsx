@@ -9,8 +9,8 @@ import type { AreaCrm } from "@/lib/crm/areas";
 type NumeroEmpresa = { id: string; nombre: string; area: AreaCrm };
 
 /**
- * «WhatsApp interno» (29 oct 2026, pedido de Alcides): un botón en la ventana del chat que abre el chat por WhatsApp entre los números de la empresa
- * (Atención ↔ Comercial), sin perder el chat del cliente (se vuelve con «Volver a …»). Se elige desde qué número se escribe y a cuál.
+ * «Chat interno» (29 oct 2026, pedido de Alcides): un botón en la ventana del chat que abre el chat entre las áreas de la empresa (Atención ↔ Comercial ↔ Dirección),
+ * sin perder el chat del cliente (se vuelve con «Volver a …»). Desde el 30 oct 2026 se escribe por notas dentro del sistema, no por WhatsApp. Se elige desde qué número se escribe y a cuál.
  */
 export function BotonWhatsappInterno({
   numeros,
@@ -38,11 +38,11 @@ export function BotonWhatsappInterno({
   const total = pares.reduce((t, p) => t + sinLeer(p.desde.id, p.hacia.nombre), 0);
   return (
     <>
-      <Tooltip texto="WhatsApp interno">
+      <Tooltip texto="Chat interno entre áreas">
         <button
           ref={boton}
           type="button"
-          aria-label={total ? `WhatsApp interno entre áreas, ${total} sin leer` : "WhatsApp interno entre áreas"}
+          aria-label={total ? `Chat interno entre áreas, ${total} sin leer` : "Chat interno entre áreas"}
           aria-haspopup="dialog"
           aria-expanded={abierto}
           disabled={ocupado}
@@ -53,7 +53,7 @@ export function BotonWhatsappInterno({
             <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
             <path d="M9 11h.01M12 11h.01M15 11h.01" />
           </svg>
-          <span className={conTexto ? "" : "hidden sm:inline"}>{conTexto ? "WhatsApp interno" : "Interno"}</span>
+          <span className={conTexto ? "" : "hidden sm:inline"}>{conTexto ? "Chat interno" : "Interno"}</span>
           {total > 0 && (
             <span aria-hidden="true" className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--wa-acento,#25d366)] px-1.5 text-[11px] font-semibold text-white tabular-nums">
               {total}
@@ -62,8 +62,8 @@ export function BotonWhatsappInterno({
         </button>
       </Tooltip>
       {abierto && (
-        <PanelCelda ancla={boton} etiqueta="WhatsApp interno" ancho={260} alCerrar={(m) => (setAbierto(false), m === "escape" && boton.current?.focus())}>
-          <p className="m-0 px-3 pt-2.5 pb-1 text-xs text-muted-foreground">Escribir por WhatsApp a otra área</p>
+        <PanelCelda ancla={boton} etiqueta="Chat interno" ancho={260} alCerrar={(m) => (setAbierto(false), m === "escape" && boton.current?.focus())}>
+          <p className="m-0 px-3 pt-2.5 pb-1 text-xs text-muted-foreground">Escribir a otra área</p>
           <ul className="m-0 flex list-none flex-col gap-0.5 p-1.5 pt-0">
             {pares.map(({ desde, hacia }) => (
               <li key={`${desde.id}-${hacia.id}`}>
