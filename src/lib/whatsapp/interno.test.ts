@@ -25,7 +25,8 @@ describe("WhatsApp interno", () => {
   });
 
   it("es una de las plantillas sugeridas, con el nombre que se compara", () => {
-    assert.ok(PLANTILLAS_SUGERIDAS.some((p) => p.nombre === PLANTILLA_INTERNA && p.grupo === "interno"));
+    assert.ok(PLANTILLAS_SUGERIDAS.some((p) => p.nombre === PLANTILLA_INTERNA && p.grupo === "primer_contacto"));
+    assert.equal(PLANTILLA_INTERNA, "primer_contacto");
   });
 
   it("pone la predeterminada primero y respeta el orden de las demás", () => {
@@ -37,11 +38,11 @@ describe("WhatsApp interno", () => {
     assert.deepEqual(orden, ["c", "a", "b"]);
   });
 
-  it("llena «Área que escribe» con el área del número que manda, y nada más", () => {
-    assert.equal(sugeridoParaVariable("Área que escribe", true, "atencion"), "Atención");
-    assert.equal(sugeridoParaVariable("  área que escribe ", true, "direccion"), "Dirección");
-    assert.equal(sugeridoParaVariable("Mensaje", true, "atencion"), "");
-    assert.equal(sugeridoParaVariable("Área que escribe", false, "atencion"), "");
-    assert.equal(sugeridoParaVariable("Área que escribe", true, "otra"), "");
+  it("llena «Nombre del asesor» con quien escribe, y nada más", () => {
+    assert.equal(sugeridoParaVariable("Nombre del asesor", true, "Nicole Muñoz"), "Nicole Muñoz");
+    assert.equal(sugeridoParaVariable("  nombre del asesor ", true, "  Jhokser "), "Jhokser");
+    assert.equal(sugeridoParaVariable("Motivo del contacto", true, "Nicole"), "");
+    assert.equal(sugeridoParaVariable("Nombre del asesor", false, "Nicole"), "");
+    assert.equal(sugeridoParaVariable("Nombre del asesor", true, null), "");
   });
 });
