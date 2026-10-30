@@ -26,7 +26,7 @@ import { colorFoto, iniciales } from "./globo-persona";
 import { EtiquetasChat, PastillasEtiquetas, SelectorEtiquetasChat, type ManejoEtiquetas } from "./etiquetas-chat";
 import { transcribirAudio } from "./transcripcion-actions";
 import { BotonBarra, DatosEnLaCabecera, FichaDelChat, type AccionExtra } from "./ficha-chat";
-import { reaccionarInterno } from "./interno-actions";
+import { borrarMensajeInterno, reaccionarInterno } from "./interno-actions";
 import { reaccionarAMensaje } from "./reaccion-actions";
 import { VistaPreviaChat } from "./vista-previa-chat";
 import { VentanaVincular } from "./vincular-chat";
@@ -771,6 +771,16 @@ export function Bandeja({
     const r = await (esInterno ? reaccionarInterno : reaccionarAMensaje)(sel.id, m.id, emoji).catch(() => ({ error: "No se pudo reaccionar. Inténtalo de nuevo." }));
     if ("error" in r) mostrarToast(r.error, "destructive");
     await refrescar(sel.id);
+  }
+
+  /** Borra un mensaje del chat interno sin pedir autorización: desaparece al momento y, si el servidor no lo borra, vuelve a aparecer. */
+  async function borrarInterno(m: MensajeVista) {
+    if (!sel) return;
+    const chatId = sel.id;
+    setChat((c) => (c && c.id === chatId ? { ...c, mensajes: c.mensajes.filter((x) => x.id !== m.id) } : c));
+    const r = await borrarMensajeInterno(chatId, m.id).catch(() => ({ error: "No se pudo borrar. Inténtalo de nuevo." }));
+    if ("error" in r) mostrarToast(r.error, "destructive");
+    await refrescar(chatId);
   }
 
   function mandar() {
@@ -1790,7 +1800,8 @@ export function Bandeja({
                             interna={esInterno ? { miId } : undefined}
                             puedeTranscribir={escribe && !esLocal(m)}
                             reacciones={conReacciones?.reacciones.get(m.id)}
-                            alPedirBorrar={escribe && !mirando && !esLocal(m) ? (x) => setBorrar({ tipo: "mensaje", mensajeId: x.id, resumen: vistaPreviaTexto(x.texto) || `(${x.tipo})` }) : undefined}
+                            alBorrarDirecto={esInterno && escribe && !esLocal(m) && !!m.autorId && m.autorId === miId ? () => void borrarInterno(m) : undefined}
+                            alPedirBorrar={!esInterno && escribe && !mirando && !esLocal(m) ? (x) => setBorrar({ tipo: "mensaje", mensajeId: x.id, resumen: vistaPreviaTexto(x.texto) || `(${x.tipo})` }) : undefined}
                             alGuardarRapida={escribe && !mirando ? guardarComoRapida : undefined}
                             // Se reacciona a lo que ya tiene su id en WhatsApp, con la ventana de 24 h abierta y no solo supervisando.
                             alReaccionar={escribe && !mirando && (esInterno || ventana) && !esLocal(m) && !m.importado && m.waId && m.estado !== "fallido" && !(esInterno && esAvisoDelSistema(m.texto)) ? (emoji) => void reaccionar(m, emoji) : undefined}
@@ -2145,6 +2156,50 @@ export function Bandeja({
  * pegado al anterior del mismo lado, sin colita.
  */
 /** El botón de la esquina de cada mensaje (se ve al pasar el cursor o al enfocarlo con el teclado): pide borrarlo, no lo borra. */
+/**
+ * Borrar un mensaje del chat interno, sin pedir autorización (30 oct 2026): la papelera pide una confirmación en la misma burbuja («¿Borrar? Borrar · No») antes de ocultarlo.
+ * Escape cancela.
+ */
+function BorrarMensajeInterno({ alBorrar }: { alBorrar: () => void }) {
+  const [confirmando, setConfirmando] = useState(false);
+  if (confirmando)
+    return (
+      <span
+        role="group"
+        aria-label="Confirmar borrar este mensaje"
+        onKeyDown={(e) => {
+          if (e.key === "Escape") setConfirmando(false);
+        }}
+        className="absolute top-1 right-1 z-[2] flex items-center gap-1 rounded-full bg-[var(--wa-fondo)] px-2 py-0.5 text-[12px] shadow-[0_1px_2px_var(--wa-sombra)]"
+      >
+        <span className="text-[var(--wa-sec)]">¿Borrar?</span>
+        <button
+          type="button"
+          onClick={() => {
+            setConfirmando(false);
+            alBorrar();
+          }}
+          className={`rounded-full px-1.5 font-semibold text-destructive hover:underline ${anilloFoco}`}
+        >
+          Borrar
+        </button>
+        <button type="button" onClick={() => setConfirmando(false)} className={`rounded-full px-1.5 font-semibold text-[var(--wa-sec)] hover:underline ${anilloFoco}`}>
+          No
+        </button>
+      </span>
+    );
+  return (
+    <button
+      type="button"
+      onClick={() => setConfirmando(true)}
+      aria-label="Borrar este mensaje"
+      className={`absolute top-1 right-1 flex h-6 w-6 items-center justify-center rounded-full bg-[var(--wa-fondo)] text-[var(--wa-sec)] opacity-0 shadow-[0_1px_2px_var(--wa-sombra)] group-hover:opacity-100 hover:text-destructive focus-visible:opacity-100 ${anilloFoco}`}
+    >
+      <PapeleraIcon aria-hidden="true" className="h-3 w-3" />
+    </button>
+  );
+}
+
 function BotonBorrarMensaje({ alPulsar }: { alPulsar: () => void }) {
   return (
     <button
@@ -2249,6 +2304,7 @@ function Burbuja({
   seguido,
   reacciones,
   alPedirBorrar,
+  alBorrarDirecto,
   alGuardarRapida,
   alReaccionar,
   alReintentar,
@@ -2266,6 +2322,8 @@ function Burbuja({
   /** Las reacciones a este mensaje (una por lado), que se dibujan sobre su borde de abajo, como en WhatsApp. */
   reacciones?: ReaccionVista[];
   alPedirBorrar?: (m: MensajeVista) => void;
+  /** Chat interno: borrar este mensaje sin pedir autorización (solo los propios). */
+  alBorrarDirecto?: () => void;
   alGuardarRapida?: (texto: string) => void;
   /** Un mensaje que no salió (mostrado al momento de enviar): vuelve a mandarlo. */
   alReintentar?: () => void;
@@ -2304,7 +2362,7 @@ function Burbuja({
           </span>
         )}
         {alReaccionar && <ReaccionarMensaje nuestro={mio} actual={miReaccion(reacciones)} alElegir={alReaccionar} />}
-        {alPedirBorrar && !m.borradoPendiente && <BotonBorrarMensaje alPulsar={() => alPedirBorrar(m)} />}
+        {alBorrarDirecto && <BorrarMensajeInterno alBorrar={alBorrarDirecto} />}
         {!mio && !seguido && (
           <span className="mb-0.5 block text-[12.5px] font-semibold text-[var(--wa-autor)]">
             {m.autor ?? "Alguien del equipo"}
