@@ -1,12 +1,14 @@
 "use client";
 
-import { useId, useRef, useState, useTransition } from "react";
+import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { anilloFoco, fieldClassSm } from "@/components/ui/field";
 import { formatearFecha } from "@/lib/formato";
 import { LapizIcon } from "@/lib/nav-icons";
 import { Tooltip } from "@/components/ui/tooltip";
 import { CAMPOS_DATO, NUMERO_REGISTRADO, type CampoDato } from "@/lib/crm/dato-dropshipper";
-import { cambiarDatoDropshipper } from "./dato-actions";
+import { textoParaBuscar, type CiudadSugerida } from "@/lib/crm/ciudades";
+import { bandera } from "@/lib/whatsapp/origen-chat";
+import { buscarCiudades, cambiarDatoDropshipper } from "./dato-actions";
 import { ESTADOS, etiquetaEstado } from "./def-crm";
 
 const TIPO: Record<CampoDato, string> = { nombre: "text", estado: "select", telefono: "tel", tiendas: "text", ciudad: "text", ingreso: "date", productos: "text", correo: "email" };
@@ -127,6 +129,26 @@ export function DatoEditable({ dropshipperId, campo, inicial, puede }: { dropshi
     }
   };
 
+  // La ciudad lleva su lista de sugerencias, que no puede ir dentro de la etiqueta del campo.
+  if (campo === "ciudad")
+    return (
+      <span className="flex flex-col gap-1">
+        <CampoCiudad
+          borrador={borrador}
+          setBorrador={setBorrador}
+          alGuardar={(texto, enfocar) => guardar(enfocar, texto)}
+          alCancelar={() => cerrar(true)}
+          ocupado={ocupado}
+          idError={error ? idError : undefined}
+        />
+        {error && (
+          <span id={idError} role="alert" className="text-xs text-destructive">
+            {error}
+          </span>
+        )}
+      </span>
+    );
+
   return (
     <span className="flex flex-col gap-1">
       <label className="flex min-w-0">
@@ -178,6 +200,135 @@ export function DatoEditable({ dropshipperId, campo, inicial, puede }: { dropshi
           {error}
         </span>
       )}
+    </span>
+  );
+}
+
+/**
+ * El campo «Ciudad» con sugerencias (30 oct 2026, pedido de Alcides): al escribir «Cali» propone «Santiago de Cali, Colombia» (y las demás que se llamen
+ * así, primero las de los países donde trabajamos). Flechas y Enter eligen; pulsar una la guarda; Escape cierra la lista y, otra vez, cancela. Si no se
+ * elige ninguna, se guarda lo escrito, como antes.
+ */
+function CampoCiudad({
+  borrador,
+  setBorrador,
+  alGuardar,
+  alCancelar,
+  ocupado,
+  idError,
+}: {
+  borrador: string;
+  setBorrador: (v: string) => void;
+  alGuardar: (texto: string, enfocar: boolean) => void;
+  alCancelar: () => void;
+  ocupado: boolean;
+  idError?: string;
+}) {
+  const [ciudades, setCiudades] = useState<CiudadSugerida[]>([]);
+  const [activa, setActiva] = useState(-1);
+  const [abierta, setAbierta] = useState(false);
+  const [aviso, setAviso] = useState<string | null>(null);
+  const idLista = useId();
+  // Lo que se buscó por última vez: una respuesta vieja que llega tarde no pisa la nueva.
+  const ultima = useRef("");
+
+  useEffect(() => {
+    const texto = textoParaBuscar(borrador);
+    if (!texto || !abierta) return;
+    const espera = setTimeout(() => {
+      ultima.current = texto;
+      buscarCiudades(texto)
+        .then((r) => {
+          if (ultima.current !== texto) return;
+          if ("error" in r) {
+            setAviso(r.error);
+            setCiudades([]);
+          } else {
+            setAviso(null);
+            setCiudades(r.ciudades);
+          }
+          setActiva(-1);
+        })
+        .catch(() => undefined);
+    }, 300);
+    return () => clearTimeout(espera);
+  }, [borrador, abierta]);
+
+  const visibles = abierta && textoParaBuscar(borrador) ? ciudades : [];
+  const elegir = (c: CiudadSugerida) => {
+    setBorrador(c.etiqueta);
+    setAbierta(false);
+    alGuardar(c.etiqueta, true);
+  };
+
+  return (
+    <span className="flex w-full min-w-0 flex-col gap-1">
+      <input
+        type="text"
+        role="combobox"
+        aria-label="Ciudad"
+        aria-expanded={visibles.length > 0}
+        aria-controls={idLista}
+        aria-autocomplete="list"
+        aria-activedescendant={activa >= 0 && visibles[activa] ? `${idLista}-${activa}` : undefined}
+        aria-describedby={idError}
+        aria-invalid={idError ? true : undefined}
+        value={borrador}
+        onChange={(e) => {
+          setBorrador(e.target.value);
+          setAbierta(true);
+        }}
+        onBlur={() => alGuardar(borrador, false)}
+        placeholder="Ej: Cali, Colombia"
+        autoFocus
+        autoComplete="off"
+        readOnly={ocupado}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowDown" && visibles.length) {
+            e.preventDefault();
+            setActiva((i) => (i + 1) % visibles.length);
+          } else if (e.key === "ArrowUp" && visibles.length) {
+            e.preventDefault();
+            setActiva((i) => (i <= 0 ? visibles.length - 1 : i - 1));
+          } else if (e.key === "Enter") {
+            e.preventDefault();
+            if (activa >= 0 && visibles[activa]) elegir(visibles[activa]);
+            else alGuardar(borrador, true);
+          } else if (e.key === "Escape") {
+            e.preventDefault();
+            e.stopPropagation();
+            if (visibles.length) setAbierta(false);
+            else alCancelar();
+          }
+        }}
+        className={`${fieldClassSm} -my-1 w-full min-w-0 text-[13px]`}
+      />
+      <ul id={idLista} role="listbox" aria-label="Ciudades" className={visibles.length ? "m-0 mt-1 list-none overflow-hidden rounded-md border border-border-control bg-card p-0.5" : "hidden"}>
+        {visibles.map((c, i) => (
+          <li
+            key={`${c.etiqueta}|${c.region ?? ""}`}
+            id={`${idLista}-${i}`}
+            role="option"
+            aria-selected={i === activa}
+            // Se elige con el ratón sin que el campo pierda el foco (si no, el blur guardaría lo escrito antes de elegir).
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => elegir(c)}
+            onMouseEnter={() => setActiva(i)}
+            className={`flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-[13px] ${i === activa ? "bg-muted" : ""}`}
+          >
+            <span aria-hidden="true">{bandera(c.codigo)}</span>
+            <span className="min-w-0 truncate">
+              {c.nombre}
+              <span className="text-muted-foreground">
+                {" · "}
+                {c.region ? `${c.region}, ` : ""}
+                {c.pais}
+              </span>
+            </span>
+          </li>
+        ))}
+      </ul>
+      {aviso && abierta && <span className="text-xs text-muted-foreground">{aviso}</span>}
     </span>
   );
 }
