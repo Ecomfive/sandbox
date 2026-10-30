@@ -1206,7 +1206,8 @@ convenciones técnicas del código.
   «Dónde vende» no usa `plataformas` (la de Configuración y Retiros). Se crea, renombra y borra desde el selector (`crearPlataformaVenta`, `renombrarPlataformaVenta`,
   `eliminarPlataformaVenta`); cada pastilla tiene ✕ y quitar lo de una cuenta vinculada guarda una fila `oculto` (la cuenta no se toca; `dondeVende` la salta). Junto al nombre del chat, `VendeEnChat` (`bandeja/vende-en.tsx`, como las etiquetas: país con su
   bandera y plataformas de `plataformas`; lo de una cuenta vinculada no se quita) guarda con `cambiarVendeEn` (`vende-en-actions.ts`: escribir en el área del chat, chat con
-  dropshipper, auditoría `vende_en_dropshipper`). La lista de chats muestra las banderas. Sin la 0193, solo lo de las cuentas.
+  dropshipper, auditoría `vende_en_dropshipper`). La lista de chats muestra las banderas. El bloque «Dónde vende» de la ficha del chat y la columna «Vende en» de la lista del CRM
+  (`FilaDropshipper.vendeEn`, `obtenerDatosCrm`) muestran lo mismo con `PastillaVendeEn`/`bandera`, nunca las tiendas de ClickUp ni «Dropi PA» (29 oct 2026). Sin la 0193, solo lo de las cuentas.
   **La Actividad se ve como en Compras** (29 oct 2026): sin `Seccion` ni `Bloque` alrededor (trae su propio encabezado), con los colores del sistema dentro del chat, y cada cambio con
   su autor aparte (`ItemLinea.autor`/`detalle`).
   **Una sola Actividad** (29 oct 2026, pedido de Alcides): con dropshipper, la ficha del chat solo trae «Actividad» (`ActividadDropshipper`), y `obtenerLineaDeTiempo`

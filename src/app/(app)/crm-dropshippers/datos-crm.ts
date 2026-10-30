@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AreaCrm } from "@/lib/crm/areas";
 import { conversacionesOcultas } from "@/lib/whatsapp/ocultos";
+import { dondeVende } from "@/lib/whatsapp/origen-chat";
+import { traerTodasConError } from "@/lib/supabase/paginar";
 import { diasEntre, type ChatDropshipper, type FilaCaso, type FilaDropshipper, type ResumenCrm } from "./def-crm";
 
 export interface DatosCrm {
@@ -88,13 +90,28 @@ export async function obtenerDatosCrm(supabase: SupabaseClient, paisId: string, 
     )
     .eq("pais_id", paisId);
 
-  const [conCuentas, { data: sumas }, { data: casosBd }, chats] = await Promise.all([
+  // «Dónde vende» puesto a mano o quitado en el chat (migraciones 0193 y 0194). Sin ellas, solo lo de sus cuentas.
+  const consultaVendeEn = (desde: number, hasta: number) => {
+    const q = supabase.from("dropshipper_vende_en").select("dropshipper_id, oculto, crm_plataformas_venta(nombre), paises(codigo)");
+    return (soloId ? q.eq("dropshipper_id", soloId) : q).order("dropshipper_id").range(desde, hasta);
+  };
+
+  const [conCuentas, { data: sumas }, { data: casosBd }, chats, vendeEnBd] = await Promise.all([
     consultaDropshippers(true),
     // Una fila por dropshipper y país: las ventas de este país no se mezclan con las de otro (otra moneda).
     soloId ? consultaSumas.eq("id", soloId) : consultaSumas,
     (soloId ? consultaCasos.eq("dropshipper_id", soloId) : consultaCasos).order("abierto_en", { ascending: false }).limit(500),
     cargarChats(supabase, areasWhatsapp, soloId),
+    traerTodasConError<Record<string, unknown>>(consultaVendeEn),
   ]);
+  const vendeEnManual = new Map<string, { plataforma: string; pais: string; oculto: boolean }[]>();
+  for (const m of vendeEnBd.data ?? []) {
+    const plataforma = uno<{ nombre: string }>(m.crm_plataformas_venta as Relacion<{ nombre: string }>)?.nombre;
+    const pais = uno<{ codigo: string }>(m.paises as Relacion<{ codigo: string }>)?.codigo;
+    if (!plataforma || !pais) continue;
+    const id = m.dropshipper_id as string;
+    vendeEnManual.set(id, [...(vendeEnManual.get(id) ?? []), { plataforma, pais, oculto: !!m.oculto }]);
+  }
 
   // Plan B: si la migración 0065 (cuentas vinculadas) todavía no se corrió, el directorio se lee sin ellas.
   const filas = (conCuentas.error ? (await consultaDropshippers(false)).data : conCuentas.data) as unknown as
@@ -148,6 +165,7 @@ export async function obtenerDatosCrm(supabase: SupabaseClient, paisId: string, 
       etapa: d.etapa ?? null,
       productos: d.productos ?? [],
       plataformas: [],
+      vendeEn: [],
       notas: d.notas,
       // La serie de seis meses de la ficha se pide al abrirla cuando haya pedidos reales (fase siguiente).
       pedidosPorMes: [],
@@ -155,7 +173,13 @@ export async function obtenerDatosCrm(supabase: SupabaseClient, paisId: string, 
     };
   });
 
-  for (const d of dropshippers) d.plataformas = [...new Set(d.cuentas.map((c) => c.plataforma))];
+  for (const d of dropshippers) {
+    d.plataformas = [...new Set(d.cuentas.map((c) => c.plataforma))];
+    d.vendeEn = dondeVende(
+      d.cuentas.map((c) => ({ plataforma: c.plataforma === "—" ? null : c.plataforma, pais: c.codigoPais === "—" ? null : c.codigoPais })),
+      vendeEnManual.get(d.id) ?? [],
+    );
+  }
 
   const ahora = Date.now();
   const casos: FilaCaso[] = (casosBd ?? []).map((c) => ({

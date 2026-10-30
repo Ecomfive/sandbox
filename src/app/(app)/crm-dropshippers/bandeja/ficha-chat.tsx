@@ -18,6 +18,7 @@ import { AccionesCrm, CasosAbiertos, DatosDropshipper, tonoEstado } from "../fic
 import { RecomendacionesDropshipper } from "../recomendaciones-dropshipper";
 import { TipoCliente } from "../tipo-cliente";
 import { VentasDropiDropshipperBloque } from "../ventas-dropi-dropshipper";
+import { PastillaVendeEn } from "./vende-en";
 import { ActividadDelClienteFicha } from "./actividad-cliente";
 import { ActividadDelEquipoFicha } from "./actividad-equipo";
 import type { FichaCrmChat } from "./actions";
@@ -291,14 +292,14 @@ export function FichaDelChat({
                   <CuentasDropshipper key={`cuentas-${d.id}`} d={d} codigoPais={datos.codigoPais} puedeEscribir={acceso.escribeAtencion} />
                 </Seccion>
                 {dropshipper && (
+                  // La plataforma con la bandera del país donde vende («🇵🇦 Dropi»), lo mismo que junto al nombre del chat; no las tiendas que vinieron de
+                  // ClickUp (29 oct 2026, pedido de Alcides). Se edita con el lápiz de arriba.
                   <Seccion titulo="Dónde vende">
                     <div className="flex flex-wrap gap-1.5">
-                      {[...dropshipper.tiendas, ...dropshipper.cuentas].map((t) => (
-                        <span key={t} className="rounded-md bg-[var(--wa-panel)] px-2 py-0.5 text-[13px]">
-                          {t}
-                        </span>
+                      {sel.vendeEn.map((v) => (
+                        <PastillaVendeEn key={`${v.plataforma}|${v.pais}`} v={v} />
                       ))}
-                      {!dropshipper.tiendas.length && !dropshipper.cuentas.length && <span className="text-[13px] text-[var(--wa-sec)]">Sin tiendas ni cuentas vinculadas.</span>}
+                      {!sel.vendeEn.length && <span className="text-[13px] text-[var(--wa-sec)]">Sin plataformas. Agrégalas con el lápiz junto al nombre del chat.</span>}
                     </div>
                   </Seccion>
                 )}
