@@ -74,9 +74,9 @@ export interface FilaPublicacion {
   fechaPublicacion: string | null;
   ultimaRevision: string | null;
   proximaRevision: string | null;
-  /** La fecha anotada antes (ClickUp o a mano). Se usa solo si Dropi todavía no registró ningún cambio. */
+  /** La fecha anotada (ClickUp, al actualizar desde Dropi, al republicar o al aplicar un precio). La ficha la usa si es más nueva. */
   ultimoCambioPrecio: string | null;
-  /** El último cambio de precio que se vio en Dropi (fecha, de cuánto a cuánto), o null si no se vio ninguno. */
+  /** El último cambio de precio con montos: el que vio la lectura del catálogo o el aplicado desde el sistema, o null si no hay. */
   cambioPrecioDropi: CambioPrecio | null;
   /** Desde cuándo se lee el catálogo de Dropi del país (antes de esa fecha no se pueden ver cambios). */
   lecturaDropiDesde: string | null;

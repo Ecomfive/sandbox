@@ -270,6 +270,12 @@ export function FormularioCompra({
               etiqueta="Foto real del producto"
               valorInicial={compra?.fotoUrl ?? null}
               alCambiarSubiendo={setSubiendoFoto}
+              // Quitar o cambiar la foto solo mueve el estado del campo (el input oculto no lanza ningún evento): hay que avisarlo
+              // para que aparezca «Guardar cambios».
+              alCambiar={() => {
+                setModificado(true);
+                alModificar?.();
+              }}
               prepararSubida={prepararSubidaFotoCompra}
               subirDesdeUrl={subirFotoCompraDesdeUrl}
               // Al crear, la imagen se suelta en cualquier parte del panel; en la ficha, sobre el cuadro (los comentarios
