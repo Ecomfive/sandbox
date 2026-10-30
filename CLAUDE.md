@@ -1662,6 +1662,11 @@ convenciones técnicas del código.
   pueden **modificar** Compras y ven el país (`armarPersonasConAcceso`); vuelve a tener stock → se cierra sola (`volvio_stock`). Compras la revisa
   (`revisarAlertaSinStock`: Comprar / Hay inventario manual / No reponer + nota, auditoría `revisar_sin_stock`). Cuenta en «Hoy», «Avisos» y el menú
   (`PendientesHoy.sinStockPorRevisar`). La primera lectura abre una alerta por cada producto que ya estaba sin stock.
+  **Globo en la pestaña** (30 oct 2026, pedido de Hernán: el número de «Compras» en el menú no decía de qué pestaña era): `compras/layout.tsx`
+  pone `<ContadorPestana href="/compras/sin-stock" cargar={contarSinStockPorRevisar} />` en todas las pestañas de Compras (acción en
+  `sin-stock/actions.ts`: alertas abiertas del país de la barra, la misma cuenta del menú) y la página «Sin stock» lo dice al momento con
+  `cantidad` (baja al revisar). Además, el número del menú dice de dónde sale al pasar el cursor (`textoDeDonde` en `contadores-menu.ts`,
+  `DE_DONDE` por página; también lo lee el lector de pantalla): «12 pendientes: productos sin stock por revisar, en la pestaña «Sin stock»».
 - **Compras › Dashboard** (`/compras/dashboard`, `dashboard-compras.tsx`): toda la operación a la vez con **filtros que se
   cruzan** (fechas de creación, país, proveedor, vía, tienda, responsable, etapa, solo abiertas): pulsar un mes de la gráfica,
   una etapa o una fila de «Comparar por» pone ese filtro y lo vuelve a quitar; los filtros activos se ven como chips.
