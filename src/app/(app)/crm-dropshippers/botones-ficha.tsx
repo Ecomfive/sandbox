@@ -67,6 +67,15 @@ export function FilaBotones({ children, className }: { children: ReactNode; clas
   );
 }
 
+/** Cuántos de los más usados llevan su nombre en la barra del chat; los demás van solo con su ícono (30 oct 2026, pedido de Alcides). */
+export const CON_NOMBRE = 4;
+
+/** La posición del botón en su fila (0 = el de más a la derecha, el más usado), o `null` fuera de una `FilaBotones`. */
+export function usePosicionBoton(id: string): number | null {
+  const fila = useContext(Contexto);
+  return fila ? (fila.orden.get(id) ?? BOTONES_FICHA.length) : null;
+}
+
 /** Un botón de la fila, con su sitio según el uso. Cada pulsación (que no esté apagada) suma uno a su cuenta. Fuera de una `FilaBotones` no hace nada. */
 export function ItemFila({ id, children }: { id: string; children: ReactNode }) {
   const fila = useContext(Contexto);
