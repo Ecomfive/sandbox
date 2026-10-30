@@ -2109,6 +2109,9 @@ convenciones técnicas del código.
   Compras) en la ficha del CRM y en la del chat de la bandeja; `actividad-dropshipper-actions.ts` usa el motor de `lib/comentarios` (tablas
   `dropshipper_comentarios`/`_adjuntos`/`_comentario_reacciones`, bucket `crm-dropshippers`) y toma los cambios de `obtenerLineaDeTiempo`,
   que ya filtra por área. Los comentarios los ve todo el que abre el CRM.
+  **«Desempeño en la plataforma»** (`desempeno-dropshipper.tsx`) lee por la ruta `GET /api/crm/desempeno` (`leerDesempeno`, `desempeno-datos.ts`), no por una
+  acción del servidor: las acciones de la página van en fila y, en la ficha, el cambio de período esperaba detrás de las demás lecturas (29 oct 2026). Muestra
+  «Del … al …» y «Cargando…» con las cifras de antes atenuadas.
   **Datos editables en la ficha** (29 oct 2026, pedido de Alcides): en el bloque «Datos» (`DatosDropshipper`, `ficha-lateral.tsx`, también en la ficha del chat)
   Ciudad, Ingreso (`fecha_ingreso`) y Correo se editan con el lápiz (`DatoEditable`, `dato-editable.tsx`; `cambiarDatoDropshipper`, `dato-actions.ts`;
   reglas en `src/lib/crm/dato-dropshipper.ts`, con prueba; auditoría `editar_dropshipper` con antes/después). Ya no se muestran Etapa, Notas ni
