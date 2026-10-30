@@ -3,6 +3,7 @@
 import { duracionCorta, META_RESPUESTA_MIN, tonoRespuesta, type FilaEquipo, type TonoTiempo } from "@/lib/crm/equipo";
 import { nPedidos } from "@/lib/crm/salud";
 import type { DatosEquipo } from "./datos-equipo";
+import { rutaVista } from "./ruta";
 import { Barra, ChipEnlace, Cifra, Cifras, SUAVE_TONO, TEXTO_TONO, Tarjeta, type TonoDireccion } from "./piezas-direccion";
 
 const AREA: Record<string, string> = { atencion: "Atención", comercial: "Comercial", direccion: "Dirección" };
@@ -91,7 +92,7 @@ export function VistaEquipo({ datos, periodos, codigoPais }: { datos: DatosEquip
     <>
       <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Periodo">
         {periodos.map((d) => (
-          <ChipEnlace key={d} href={`/crm-dropshippers/direccion?vista=equipo&dias=${d}`} activo={d === datos.dias}>
+          <ChipEnlace key={d} href={rutaVista("equipo", { dias: d })} activo={d === datos.dias}>
             Últimos {d} días
           </ChipEnlace>
         ))}

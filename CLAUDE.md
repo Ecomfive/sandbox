@@ -1015,11 +1015,15 @@ convenciones técnicas del código.
   [WHATSAPP-META.md](WHATSAPP-META.md). Boceto del rediseño del CRM: https://claude.ai/artifact/KsHUH4WKPkcFpqYsdFjESf
   **Dirección y KPIs** (migración 0164, 27 oct 2026): área `direccion` (módulo `crm-direccion`, el CEO) para números cuyos chats solo ve
   él; `areasVisibles` le da las tres áreas. Coexistencia: el webhook guarda los `smb_message_echoes` (lo mandado desde la app del celular)
-  como salientes con `whatsapp_registrar_saliente_celular` (autor «Desde el celular»). Pestaña **KPIs de atención**
-  (`/crm-dropshippers/kpis`, oculta sin `crm-direccion` en el layout): la función `whatsapp_kpis(p_desde, p_areas)` devuelve por número,
-  por persona y por día las consultas (primer entrante tras un saliente), sin responder y la mediana hasta la primera respuesta.
-  **Panel de Dirección** (migración 0197, 30 oct 2026, fase 1 del panel del CEO; prototipo en https://claude.ai/artifact/EgMSyATkMEUXzk9LsX8Wkj): pestaña
-  `/crm-dropshippers/direccion` (oculta sin `crm-direccion` en el layout, como KPIs). `crm_salud_dropshippers(p_pais)` da por dropshipper los
+  como salientes con `whatsapp_registrar_saliente_celular` (autor «Desde el celular»). **KPIs de atención**: la función
+  `whatsapp_kpis(p_desde, p_areas)` devuelve por número, por persona y por día las consultas (primer entrante tras un saliente), sin
+  responder y la mediana hasta la primera respuesta; se ven en la pestaña «KPIs de atención» de la Bandeja de Dirección (`kpis/vista-kpis.tsx`).
+  **Bandeja de Dirección** (30 oct 2026, pedido de Hernán): quien tiene `crm-direccion` abre en `/crm-dropshippers/bandeja` el panel de
+  Dirección con el diseño del prototipo (`direccion/ruta.ts` › `VISTAS_DIRECCION`, `?vista=`: clientes —sin `vista`—, productos, entregas,
+  equipo, duplicados, automatizaciones, kpis y chats = la bandeja de WhatsApp; `?abrir=` va directo a chats). `direccion/contenido-direccion.tsx`
+  carga cada vista. Las pestañas `/crm-dropshippers/direccion` y `/crm-dropshippers/kpis` ya no existen: sus páginas redirigen ahí.
+  **Panel de Dirección** (migración 0197, 30 oct 2026, fase 1 del panel del CEO; prototipo en https://claude.ai/artifact/EgMSyATkMEUXzk9LsX8Wkj):
+  hoy, la Bandeja de Dirección. `crm_salud_dropshippers(p_pais)` da por dropshipper los
   pedidos de 14/30 días y los anteriores, primer y último pedido y entregados/devueltos de 60 días (sin cancelados, por `dropshipper_cuentas`);
   `crm_pedidos_semanales`. El puntaje, el segmento y las alertas son de `src/lib/crm/salud.ts` (puro, con pruebas). «Atendida» y «Crear tarea»
   (`direccion/actions.ts`, solo `escribeDireccion`) guardan en `crm_alertas_atendidas` (7 días); la tarea va con `origen = 'alerta'`. **Diseño** (30 oct 2026, pedido de Hernán: «que se vea como el prototipo»): piezas de

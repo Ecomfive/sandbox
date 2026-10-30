@@ -7,6 +7,7 @@ import { anilloFoco } from "@/components/ui/field";
 import { entregasPor, MIN_CERRADOS, sumarEntregas, TASA_BUENA, TASA_REGULAR, tonoEntrega, type Entregas, type FilaEntregas, type TonoEntrega } from "@/lib/crm/automatizar";
 import { ETIQUETA_SEGMENTO, nPedidos } from "@/lib/crm/salud";
 import type { FilaDireccion } from "./datos-direccion";
+import { rutaVista } from "./ruta";
 import { Chip, ChipEnlace, Cifra, Cifras, Insignia, type TonoDireccion } from "./piezas-direccion";
 
 const KPI: Record<TonoEntrega, TonoDireccion> = { exito: "exito", aviso: "aviso", peligro: "peligro", neutro: "neutro" };
@@ -41,7 +42,7 @@ export function VistaEntregas({ filas, clientes, dias, periodos, codigoPais }: {
     <>
       <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Periodo">
         {periodos.map((d) => (
-          <ChipEnlace key={d} href={`/crm-dropshippers/direccion?vista=entregas&dias=${d}`} activo={d === dias}>
+          <ChipEnlace key={d} href={rutaVista("entregas", { dias: d })} activo={d === dias}>
             Últimos {d} días
           </ChipEnlace>
         ))}
