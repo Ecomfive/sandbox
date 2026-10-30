@@ -99,6 +99,13 @@ export function areaPropia(acceso: AccesoCrm): AreaCrm {
  */
 export const supervisaArea = (acceso: AccesoCrm, area: AreaCrm) => area !== areaPropia(acceso);
 
+/**
+ * A quién se le borra de verdad lo que se borra en WhatsApp Business (pedido de Jhokser, 30 oct 2026): a quien tiene **únicamente Atención** (Nicole y su equipo) un mensaje
+ * borrado «para todos» o un chat borrado en la app **desaparece**, como en WhatsApp. Comercial, Dirección y los administradores (que tienen las tres áreas) lo siguen viendo
+ * intacto, con su marca de borrado. Lo decide el servidor: a Atención ni siquiera viaja.
+ */
+export const pierdeLoBorrado = (acceso: AccesoCrm) => acceso.atencion && !acceso.comercial && !acceso.direccion;
+
 /** Acciones de la auditoría que son del trabajo comercial y no se muestran a Atención. */
 export const ACCIONES_COMERCIALES = [
   "crear_seguimiento_dropshipper",
