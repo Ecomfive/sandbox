@@ -12,6 +12,7 @@ import { bandera, nombrePais } from "@/lib/whatsapp/origen-chat";
 import { CANAL_BANDEJA, EVENTO_NOVEDAD } from "@/lib/whatsapp/canal-bandeja";
 import { HORAS_VENTANA, textoVentana } from "@/lib/whatsapp/ventana";
 import type { AreaCrm } from "@/lib/crm/areas";
+import type { SalaInterna } from "@/lib/crm/chat-interno";
 import { quienesRespondieron } from "@/lib/crm/respondieron";
 import { abrirConversacion, cambiarEstadoConversacion, fichaCrmDelChat, conectarWebhook360, marcarChatLeido, enviarWhatsapp, intervenirConversacion, mensajesAnteriores, notaWhatsapp, marcarChatBorradoEnApp, pasarConversacionDeArea, tomarConversacion, vistaPreviaChat } from "./actions";
 import type { FichaCrmChat } from "./actions";
@@ -20,7 +21,7 @@ import { guardarColorEtiquetaChat, guardarEtiquetasChat } from "./etiquetas-acti
 import { PastillaTipo } from "../tipo-cliente";
 import { VendeEnChat } from "./vende-en";
 import { abrirChatInterno, enviarMensajeInterno } from "./interno-actions";
-import { BotonWhatsappInterno } from "./interno";
+import { BotonChatInterno } from "./interno";
 import { colorFoto, iniciales } from "./globo-persona";
 import { EtiquetasChat, PastillasEtiquetas, SelectorEtiquetasChat, type ManejoEtiquetas } from "./etiquetas-chat";
 import { transcribirAudio } from "./transcripcion-actions";
@@ -28,7 +29,7 @@ import { BotonBarra, DatosEnLaCabecera, FichaDelChat, type AccionExtra } from ".
 import { reaccionarAMensaje } from "./reaccion-actions";
 import { VistaPreviaChat } from "./vista-previa-chat";
 import { VentanaVincular } from "./vincular-chat";
-import { ACEPTAR_ENVIO, EnviarArchivo } from "./enviar-archivo";
+import { ACEPTAR_ENVIO, ACEPTAR_INTERNO, EnviarArchivo } from "./enviar-archivo";
 import { Expresiones } from "./expresiones";
 import { GrabarVoz } from "./grabar-voz";
 import { EditorNombreContacto } from "./nombre-contacto";
@@ -653,7 +654,7 @@ export function Bandeja({
   }, [borrador]);
 
   const numeroDe = useMemo(() => new Map(datos.numeros.map((n) => [n.id, n])), [datos.numeros]);
-  const chatsInternos = useMemo(() => datos.conversaciones.filter((c) => c.interno).map((c) => ({ numeroId: c.numeroId, nombre: c.nombre, noLeidos: c.noLeidos })), [datos.conversaciones]);
+  const chatsInternos = useMemo(() => datos.conversaciones.filter((c) => c.interno && c.salaInterna).map((c) => ({ sala: c.salaInterna as string, noLeidos: c.noLeidos })), [datos.conversaciones]);
   // Los chats internos (WhatsApp entre áreas) no son clientes: no van en las listas ni en los conteos; se abren con «Interno».
   const delNumero = useMemo(() => datos.conversaciones.filter((c) => !c.interno && (numero === "todos" || c.numeroId === numero)), [datos.conversaciones, numero]);
   // Los filtros cuentan los chats de todos los paneles que se ven.
@@ -741,10 +742,10 @@ export function Bandeja({
   function soltarArchivos(lista: FileList) {
     const f = lista[0];
     if (!f || !sel) return;
-    if (sel.interno) return mostrarToast("En el chat interno solo se escriben mensajes de texto.", "destructive");
+    if (sel.interno && !/^(image\/(jpeg|png)|audio\/)/.test(f.type) && !/\.(jpe?g|png|mp3|m4a|aac|ogg|wav)$/i.test(f.name)) return mostrarToast("En el chat interno solo se mandan fotos y audios.", "destructive");
     if (mirando) return mostrarToast("Estás supervisando este chat: para mandarle un archivo, toca «Intervenir».", "destructive");
     if (!escribe) return mostrarToast("No tienes permiso para escribir en este chat.", "destructive");
-    if (!ventana) return mostrarToast("Pasaron más de 24 h desde su último mensaje: por WhatsApp solo se le puede escribir con una plantilla aprobada.", "destructive");
+    if (!ventana && !sel.interno) return mostrarToast("Pasaron más de 24 h desde su último mensaje: por WhatsApp solo se le puede escribir con una plantilla aprobada.", "destructive");
     if (lista.length > 1) mostrarToast("Se manda un archivo a la vez: va el primero.");
     setModo("responder");
     setArchivo(f);
@@ -936,9 +937,9 @@ export function Bandeja({
   // «WhatsApp interno»: el chat del cliente al que se vuelve después de escribirle a la otra área.
   const [volverA, setVolverA] = useState<string | null>(null);
   const [abriendoInterno, setAbriendoInterno] = useState(false);
-  async function abrirInterno(desdeId: string, haciaId: string) {
+  async function abrirInterno(sala: SalaInterna) {
     setAbriendoInterno(true);
-    const r = await abrirChatInterno(desdeId, haciaId).catch(() => ({ error: "No se pudo abrir el chat interno." }));
+    const r = await abrirChatInterno(sala).catch(() => ({ error: "No se pudo abrir el chat interno." }));
     setAbriendoInterno(false);
     if ("error" in r) return mostrarToast(r.error, "destructive");
     const actual = datos.conversaciones.find((c) => c.id === elegido);
@@ -1346,9 +1347,9 @@ export function Bandeja({
             </button>
           ))}
         </div>
-        {escribe && datos.numerosEmpresa.length > 1 && (
+        {escribe && (
           <span className="ml-auto">
-            <BotonWhatsappInterno numeros={datos.numerosEmpresa} areas={areas} alElegir={(d, h) => void abrirInterno(d, h)} ocupado={abriendoInterno} internos={chatsInternos} conTexto />
+            <BotonChatInterno miArea={miArea} alElegir={(s) => void abrirInterno(s)} ocupado={abriendoInterno} internos={chatsInternos} conTexto />
           </span>
         )}
         {escribe && (
@@ -1586,7 +1587,7 @@ export function Bandeja({
           }
           navegacion={
             <>
-              {escribe && datos.numerosEmpresa.length > 1 && <BotonWhatsappInterno numeros={datos.numerosEmpresa} areas={areas} alElegir={(d, h) => void abrirInterno(d, h)} ocupado={abriendoInterno} internos={chatsInternos} />}
+              {escribe && <BotonChatInterno miArea={miArea} alElegir={(s) => void abrirInterno(s)} ocupado={abriendoInterno} internos={chatsInternos} />}
               {sel.interno && volverA && datos.conversaciones.some((c) => c.id === volverA) && (
                 <button
                   type="button"
@@ -1826,12 +1827,12 @@ export function Bandeja({
                       </div>
                     )}
                     <div className="flex items-end gap-2 px-3 py-2">
-                      {!esNota && !esInterno && (
+                      {!esNota && (
                         <>
                           <input
                             ref={inputArchivo}
                             type="file"
-                            accept={ACEPTAR_ENVIO}
+                            accept={esInterno ? ACEPTAR_INTERNO : ACEPTAR_ENVIO}
                             className="sr-only"
                             tabIndex={-1}
                             aria-label="Elegir el archivo que se va a mandar"
@@ -1841,19 +1842,22 @@ export function Bandeja({
                               if (f) setArchivo(f);
                             }}
                           />
-                          <button type="button" disabled={bloqueado || enviando} onClick={() => inputArchivo.current?.click()} aria-label="Adjuntar una foto, audio, video o documento" title="Adjuntar un archivo" className={`${botonIcono} mb-px`}>
+                          <button type="button" disabled={bloqueado || enviando} onClick={() => inputArchivo.current?.click()} aria-label={esInterno ? "Adjuntar una foto o un audio" : "Adjuntar una foto, audio, video o documento"} title="Adjuntar un archivo" className={`${botonIcono} mb-px`}>
                             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                               <path d="m21 11.5-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.9-8.9a3.7 3.7 0 0 1 5.2 5.2l-8.9 8.9a1.8 1.8 0 0 1-2.6-2.6l8.2-8.2" />
                             </svg>
                           </button>
                           <GrabarVoz deshabilitado={bloqueado || enviando} alGrabado={setArchivo} />
-                          <Expresiones
-                            conversacionId={sel.id}
-                            deshabilitado={bloqueado || enviando}
-                            alEmoji={insertarEmoji}
-                            alEnviado={() => void refrescar(sel.id)}
-                            alError={(mensaje) => mostrarToast(mensaje, "destructive")}
-                          />
+                          {/* Emojis, GIF y stickers salen por WhatsApp: no van en el chat interno. */}
+                          {!esInterno && (
+                            <Expresiones
+                              conversacionId={sel.id}
+                              deshabilitado={bloqueado || enviando}
+                              alEmoji={insertarEmoji}
+                              alEnviado={() => void refrescar(sel.id)}
+                              alError={(mensaje) => mostrarToast(mensaje, "destructive")}
+                            />
+                          )}
                         </>
                       )}
                       <label className="flex min-w-0 flex-1">
@@ -1867,7 +1871,7 @@ export function Bandeja({
                           onChange={(e) => setBorrador(e.target.value)}
                           onPaste={(e) => {
                             const pegado = e.clipboardData.files[0];
-                            if (pegado && !esNota && !esInterno && !bloqueado && /^image\//.test(pegado.type)) {
+                            if (pegado && !esNota && !bloqueado && /^image\/(jpeg|png)$/.test(pegado.type)) {
                               e.preventDefault();
                               setArchivo(pegado);
                             }
@@ -1998,6 +2002,7 @@ export function Bandeja({
       {archivo && sel && (
         <EnviarArchivo
           conversacionId={sel.id}
+          interno={sel.interno}
           nombre={sel.nombre}
           archivo={archivo}
           alCerrar={() => setArchivo(null)}

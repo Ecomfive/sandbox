@@ -4,38 +4,34 @@ import { useRef, useState } from "react";
 import { claseOpcionPanel, PanelCelda } from "@/app/(app)/compras/panel-celda";
 import { anilloFoco } from "@/components/ui/field";
 import { Tooltip } from "@/components/ui/tooltip";
-import type { AreaCrm } from "@/lib/crm/areas";
-
-type NumeroEmpresa = { id: string; nombre: string; area: AreaCrm };
+import { opcionesDeSalas, type AreaChat, type SalaInterna } from "@/lib/crm/chat-interno";
 
 /**
- * «Chat interno» (29 oct 2026, pedido de Alcides): un botón en la ventana del chat que abre el chat entre las áreas de la empresa (Atención ↔ Comercial ↔ Dirección),
- * sin perder el chat del cliente (se vuelve con «Volver a …»). Desde el 30 oct 2026 se escribe por notas dentro del sistema, no por WhatsApp. Se elige desde qué número se escribe y a cuál.
+ * «Chat interno» (29 oct 2026, pedido de Alcides; por salas desde el 30 oct 2026, pedido de Jhokser): un botón que abre el chat entre las áreas de la empresa sin perder el chat del
+ * cliente (se vuelve con «Volver a …»). Cada quien elige **con quién habla**: cada una de las otras áreas (Atención, Comercial, Dirección) o todas a la vez, y entra a su copia de
+ * esa sala. Cada opción dice cuántos mensajes tiene sin leer. Se escribe dentro del sistema, no por WhatsApp.
  */
-export function BotonWhatsappInterno({
-  numeros,
-  areas,
+export function BotonChatInterno({
+  miArea,
   alElegir,
   ocupado,
   internos = [],
   conTexto = false,
 }: {
-  numeros: NumeroEmpresa[];
-  /** Las áreas que ve la persona: puede escribir desde los números de esas áreas (el servidor lo vuelve a revisar). */
-  areas: AreaCrm[];
-  alElegir: (desdeId: string, haciaId: string) => void;
+  /** El área de la persona: decide con quién puede hablar. */
+  miArea: AreaChat;
+  alElegir: (sala: SalaInterna) => void;
   ocupado: boolean;
-  /** Los chats internos que ya existen, con sus mensajes sin leer (para el contador y para cada opción). */
-  internos?: { numeroId: string; nombre: string; noLeidos: number }[];
-  /** Con el texto «WhatsApp interno» al lado (en la barra de la bandeja). */
+  /** Las salas que ya existen para esta persona, con sus mensajes sin leer (para el contador y para cada opción). */
+  internos?: { sala: string; noLeidos: number }[];
+  /** Con el texto «Chat interno» al lado (en la barra de la bandeja). */
   conTexto?: boolean;
 }) {
   const [abierto, setAbierto] = useState(false);
   const boton = useRef<HTMLButtonElement>(null);
-  const pares = numeros.filter((d) => areas.includes(d.area)).flatMap((d) => numeros.filter((h) => h.id !== d.id).map((h) => ({ desde: d, hacia: h })));
-  if (!pares.length) return null;
-  const sinLeer = (desdeId: string, haciaNombre: string) => internos.filter((c) => c.numeroId === desdeId && c.nombre === haciaNombre).reduce((t, c) => t + c.noLeidos, 0);
-  const total = pares.reduce((t, p) => t + sinLeer(p.desde.id, p.hacia.nombre), 0);
+  const opciones = opcionesDeSalas(miArea);
+  const sinLeer = (sala: string) => internos.filter((c) => c.sala === sala).reduce((t, c) => t + c.noLeidos, 0);
+  const total = opciones.reduce((t, o) => t + sinLeer(o.sala), 0);
   return (
     <>
       <Tooltip texto="Chat interno entre áreas">
@@ -62,24 +58,24 @@ export function BotonWhatsappInterno({
         </button>
       </Tooltip>
       {abierto && (
-        <PanelCelda ancla={boton} etiqueta="Chat interno" ancho={260} alCerrar={(m) => (setAbierto(false), m === "escape" && boton.current?.focus())}>
-          <p className="m-0 px-3 pt-2.5 pb-1 text-xs text-muted-foreground">Escribir a otra área</p>
+        <PanelCelda ancla={boton} etiqueta="Chat interno" ancho={280} alCerrar={(m) => (setAbierto(false), m === "escape" && boton.current?.focus())}>
+          <p className="m-0 px-3 pt-2.5 pb-1 text-xs text-muted-foreground">¿Con quién quieres hablar?</p>
           <ul className="m-0 flex list-none flex-col gap-0.5 p-1.5 pt-0">
-            {pares.map(({ desde, hacia }) => (
-              <li key={`${desde.id}-${hacia.id}`}>
+            {opciones.map((o) => (
+              <li key={o.sala}>
                 <button
                   type="button"
                   onClick={() => {
                     setAbierto(false);
-                    alElegir(desde.id, hacia.id);
+                    alElegir(o.sala);
                   }}
                   className={`${claseOpcionPanel} hover:bg-muted ${anilloFoco}`}
                 >
                   <span className="flex flex-col">
-                    <span className="font-medium">A {hacia.nombre}</span>
-                    <span className="text-xs text-muted-foreground">Desde {desde.nombre}</span>
+                    <span className="font-medium">{o.etiqueta}</span>
+                    <span className="text-xs text-muted-foreground">{o.detalle}</span>
                   </span>
-                  {sinLeer(desde.id, hacia.nombre) > 0 && <span className="text-xs font-semibold text-primario tabular-nums">{sinLeer(desde.id, hacia.nombre)} sin leer</span>}
+                  {sinLeer(o.sala) > 0 && <span className="text-xs font-semibold text-primario tabular-nums">{sinLeer(o.sala)} sin leer</span>}
                 </button>
               </li>
             ))}

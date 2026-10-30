@@ -3,6 +3,7 @@
 
 import { registrarAuditoria } from "@/lib/auditoria";
 import { accesoCrm, supervisaArea, type AreaCrm } from "@/lib/crm/areas";
+import { esTelefonoInterno } from "@/lib/crm/chat-interno";
 import { createServiceClient } from "@/lib/supabase/server";
 import { avisarBandeja } from "@/lib/whatsapp/aviso-bandeja";
 import { enviarArchivoWhatsapp, subirMedioWhatsapp } from "@/lib/whatsapp/api";
@@ -37,6 +38,7 @@ export async function chatParaEnviar(id: string): Promise<ChatParaEnviar | { err
   const supabase = createServiceClient();
   const c = await conversacionPermitida(supabase, id, u, true);
   if (!c) return { error: "Esa conversación no existe o no es de tu área." };
+  if (esTelefonoInterno(c.telefono)) return { error: "Este es un chat interno: se escribe dentro del sistema, no por WhatsApp." };
   const supervisando = avisoSupervision(u, c);
   if (supervisando) return { error: supervisando };
   if (minutosVentana(c.ultimoEntranteEn) <= 0) return { error: "Pasaron más de 24 h desde su último mensaje: por WhatsApp solo se le puede escribir con una plantilla aprobada." };

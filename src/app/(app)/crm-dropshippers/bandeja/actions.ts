@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { getUsuarioActual } from "@/lib/auth";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { accesoCrm, supervisaArea, pierdeLoBorrado, type AccesoCrm, type AreaCrm } from "@/lib/crm/areas";
+import { esTelefonoInterno } from "@/lib/crm/chat-interno";
 import { getPaisActual } from "@/lib/pais";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { nombreArchivoSeguro } from "@/lib/seguridad/ruta-almacen";
@@ -158,6 +159,7 @@ export async function enviarWhatsapp(id: string, texto: string): Promise<{ ok: t
   const supabase = createServiceClient();
   const c = await conversacionPermitida(supabase, id, u, true);
   if (!c) return { error: "Esa conversación no existe o no es de tu área." };
+  if (esTelefonoInterno(c.telefono)) return { error: "Este es un chat interno: se escribe dentro del sistema, no por WhatsApp." };
   const supervisando = avisoSupervision(u, c);
   if (supervisando) return { error: supervisando };
   if (minutosVentana(c.ultimoEntranteEn) <= 0) return { error: "Pasaron más de 24 h desde su último mensaje: por WhatsApp solo se le puede escribir con una plantilla aprobada." };
@@ -519,6 +521,7 @@ export async function enviarPlantillaConversacion(id: string, plantillaId: strin
   const supabase = createServiceClient();
   const c = await conversacionPermitida(supabase, id, u, true);
   if (!c) return { error: "Esa conversación no existe o no es de tu área." };
+  if (esTelefonoInterno(c.telefono)) return { error: "Este es un chat interno: se escribe dentro del sistema, no por WhatsApp." };
   const supervisando = avisoSupervision(u, c);
   if (supervisando) return { error: supervisando };
   const { data } = await supabase.from("whatsapp_plantillas").select(COLUMNAS_PLANTILLA).eq("id", plantillaId).maybeSingle();
