@@ -8,8 +8,8 @@ import type { Categoria, VariablePlantilla } from "./plantillas";
 
 /**
  * «retomar»: para volver a hablar con alguien. «llegada»: avisar a quien preguntó por un producto que ya llegó o que su fecha cambió (la tarea
- * «Avisar cuando llegue»). «interno»: el «WhatsApp interno» entre los números de la empresa, cuando pasaron 24 horas sin escribirse.
- * «primer_contacto»: escribirle por primera vez a alguien que aceptó recibir mensajes («Nuevo contacto» de la bandeja).
+ * «Avisar cuando llegue»). «interno»: el «WhatsApp interno» entre los números de la empresa (Atención, Comercial y Dirección), cuando pasaron 24 horas sin escribirse.
+ * «primer_contacto»: escribirle por primera vez a alguien que aceptó recibir mensajes («Nuevo contacto» de la bandeja); también es la predeterminada del «WhatsApp interno» como primer mensaje.
  */
 export type GrupoSugerida = "retomar" | "llegada" | "interno" | "primer_contacto";
 
@@ -35,7 +35,7 @@ export const PLANTILLAS_SUGERIDAS: PlantillaSugerida[] = [
     nombre: "primer_contacto",
     titulo: "Primer contacto con permiso",
     categoria: "utility",
-    paraQue: "Para escribirle por primera vez a alguien que aceptó recibir mensajes (desde «Nuevo contacto» de la bandeja).",
+    paraQue: "Para escribirle por primera vez a alguien que aceptó recibir mensajes (desde «Nuevo contacto» de la bandeja). En el «WhatsApp interno» es la predeterminada del primer mensaje.",
     cuerpo: "Hola {{1}}, te escribe {{2}} del equipo de Ecomfive. Te contactamos por lo siguiente: {{3}}. ¿Te parece bien que sigamos la conversación por este medio?",
     botones: ["Sí, escríbeme", "No, gracias"],
     variables: [
@@ -160,7 +160,7 @@ export const PLANTILLAS_SUGERIDAS: PlantillaSugerida[] = [
     nombre: "mensaje_interno",
     titulo: "Mensaje interno entre áreas",
     categoria: "utility",
-    paraQue: "Para el «WhatsApp interno» entre Atención y Comercial cuando pasaron 24 horas sin escribirse.",
+    paraQue: "Para el «WhatsApp interno» entre los números de Atención, Comercial y Dirección: cuando pasaron 24 horas sin escribirse.",
     cuerpo: "Hola, tienes un mensaje interno de {{1}} en el sistema de Ecomfive: «{{2}}». Responde a este mensaje para seguir la conversación.",
     botones: [],
     variables: [
