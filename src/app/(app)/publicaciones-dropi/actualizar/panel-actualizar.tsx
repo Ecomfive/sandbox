@@ -11,11 +11,11 @@ import type { Corrida, UltimaParte } from "./datos";
 
 type EstadoExtension = "buscando" | "lista" | "no_instalada" | "recargar";
 /** Los países que se actualizan desde aquí con la cuenta de proveedor. */
-type PaisProveedor = "pa" | "cr";
-const PAISES: PaisProveedor[] = ["pa", "cr"];
+type PaisProveedor = "pa" | "cr" | "mx";
+const PAISES: PaisProveedor[] = ["pa", "cr", "mx"];
 
-/** Costa Rica llegó a la extensión en la 0.3.0 (28 oct 2026): una anterior no sabe de ese país y no responde por él. */
-const VERSION_PARA: Record<PaisProveedor, string> = { pa: "0.0.0", cr: "0.3.0" };
+/** Costa Rica llegó a la extensión en la 0.3.0 (28 oct 2026) y México en la 0.4.0 (30 oct 2026): una anterior no sabe de ese país. */
+const VERSION_PARA: Record<PaisProveedor, string> = { pa: "0.0.0", cr: "0.3.0", mx: "0.4.0" };
 /** «0.2.3» es anterior a «0.3.0». */
 const versionAnterior = (tiene: string | null, pide: string) => {
   if (!tiene) return false;
@@ -71,19 +71,20 @@ function textoAvance(lector: ClaveLector, a: AvanceLector | null): string {
  * la última vez, y el botón que lo corre con la extensión «Ecomfive · Dropi». Mientras corre: el avance de cada parte y, si falta
  * iniciar sesión, la pestaña de Dropi al frente y un aviso; al entrar, sigue sola. La que manda es esta página: si se recarga (o se
  * recarga la extensión) a medias, al volver la retoma sola con la barra y lo que está haciendo (27 oct 2026, pedido de Hernán).
- * Costa Rica (28 oct 2026): su propia tarjeta y sus propias partes; cada lector usa la pestaña y la sesión de su país. Cada país se
+ * Costa Rica (28 oct 2026) y México (30 oct 2026, con su cuenta de proveedor): su propia tarjeta y sus propias partes; cada lector usa la
+ * pestaña y la sesión de su país. Cada país se
  * actualiza por separado (Hernán: los dos juntos es mucha carga y tarda mucho más), con su botón; no hay «Actualizar todo».
  */
 export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponible: boolean; corridas: Corrida[]; ultima: Partial<Record<ClaveParte, UltimaParte>> }) {
   const router = useRouter();
   const [extension, setExtension] = useState<EstadoExtension>("buscando");
   const [version, setVersion] = useState<string | null>(null);
-  const [sesiones, setSesiones] = useState<Record<PaisProveedor, SesionDropi | null>>({ pa: null, cr: null });
+  const [sesiones, setSesiones] = useState<Record<PaisProveedor, SesionDropi | null>>({ pa: null, cr: null, mx: null });
   /** Por qué no se pudo revisar la sesión de un país (la extensión no respondió); antes se callaba y la tarjeta quedaba en «Revisando…». */
-  const [fallos, setFallos] = useState<Record<PaisProveedor, string | null>>({ pa: null, cr: null });
+  const [fallos, setFallos] = useState<Record<PaisProveedor, string | null>>({ pa: null, cr: null, mx: null });
   const [corriendo, setCorriendo] = useState<Corriendo | null>(null);
   const [eligiendo, setEligiendo] = useState(false);
-  const [elegidos, setElegidos] = useState<ClaveLector[]>([...LECTORES_PAIS.pa, ...LECTORES_PAIS.cr]);
+  const [elegidos, setElegidos] = useState<ClaveLector[]>([...LECTORES_PAIS.pa, ...LECTORES_PAIS.cr, ...LECTORES_PAIS.mx]);
   const [error, setError] = useState<string | null>(null);
   const detener = useRef(false);
   // Mientras arranca (antes de que el servidor responda) los botones ya no sirven: un doble clic arrancaba dos.
@@ -201,9 +202,10 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
               subida = s.subida;
             }
             for (const p of suyas) ponerPaso(p, { estado: "leyendo", detalle: "Leyendo en Dropi…" });
-            // La primera vez que se leen los pedidos de un país, o con «Traer historial», desde su fecha de arranque (Costa Rica: 1 abr 2026).
+            // La primera vez que se leen los pedidos de un país, o con «Traer historial», desde su fecha de arranque (Costa Rica: 1 abr 2026;
+            // México: 1 jul 2024).
             const primera =
-              lector.startsWith("proveedor") && (historial.current === pais || !ultima[pais === "pa" ? "pedidos" : "pedidos_cr"]) ? diasPrimeraLectura(pais) : null;
+              lector.startsWith("proveedor") && (historial.current === pais || !ultima[pais === "pa" ? "pedidos" : (`pedidos_${pais}` as ClaveParte)]) ? diasPrimeraLectura(pais) : null;
             await pedirExtension({ tipo: "lanzar", lector, subida, dias: primera }, 45000);
           } else {
             for (const p of suyas) ponerPaso(p, { estado: "leyendo", detalle: "Leyendo en Dropi…" });
@@ -432,7 +434,7 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
             fallo={fallos[p]}
             historial={
               PRIMERA_LECTURA_DESDE[p] && extension === "lista" && !ocupado
-                ? { desde: PRIMERA_LECTURA_DESDE[p]!, alPulsar: () => void actualizar([p === "pa" ? "proveedor" : "proveedor_cr"], p) }
+                ? { desde: PRIMERA_LECTURA_DESDE[p]!, alPulsar: () => void actualizar([p === "pa" ? "proveedor" : (`proveedor_${p}` as ClaveLector)], p) }
                 : null
             }
             extensionVieja={extension === "lista" && versionAnterior(version, VERSION_PARA[p]) ? { tiene: version ?? "", pide: VERSION_PARA[p] } : null}
@@ -446,19 +448,13 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
                 : undefined
             }
             alRevisar={extension === "lista" ? () => void revisarSesion(p, false).catch(() => null) : undefined}
-            que={p === "cr" && !ultima.stock_cr ? "Pedidos (desde el 1 de septiembre), cartera, retiros, stock y ventas · la primera vez crea sus publicaciones" : "Pedidos, cartera, retiros, stock y ventas"}
+            que={
+              p !== "pa" && PRIMERA_LECTURA_DESDE[p] && !ultima[`pedidos_${p}` as ClaveParte]
+                ? `La primera vez trae todo el historial: pedidos y cartera desde el ${new Date(`${PRIMERA_LECTURA_DESDE[p]}T12:00:00`).toLocaleDateString("es-PA", { day: "numeric", month: "long", year: "numeric" })}, retiros, stock y ventas · tarda más`
+                : "Pedidos, cartera, retiros, stock y ventas"
+            }
           />
         ))}
-        <div className="flex flex-col gap-3 rounded-2xl border border-dashed border-border bg-card px-5 py-4">
-          <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted text-sm font-bold">MX</span>
-            <div className="flex flex-col">
-              <span className="font-semibold">México y competencia de Panamá</span>
-              <span className="text-sm text-muted-foreground">Siguiente etapa</span>
-            </div>
-          </div>
-          <span className="text-sm text-muted-foreground">Los proveedores de Scraping (México) y la competencia del catálogo de Panamá siguen por ahora con la tarea programada de las 5:00.</span>
-        </div>
       </div>
 
       <section aria-labelledby="que-se-actualiza" className="overflow-hidden rounded-2xl border border-border bg-card">

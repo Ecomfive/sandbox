@@ -556,8 +556,15 @@ convenciones técnicas del código.
   `CDN_FOTOS_DROPI` (el proxy `api/publicaciones-dropi/foto`, Descubrir proveedores, Scraping) sigue solo con Panamá.
   **México** (28 oct 2026, Hernán: «lo mismo que Panamá y Costa Rica»): la cuenta de **proveedor** de app.dropi.mx se lee desde el
   navegador integrado con `scripts/dropi-diario.ts subida mx` / `cargar mx` y `scripts/ventas-dropi.ts subida mx` / `cargar mx` (la de
-  dropshipper de «Descubrir proveedores» sigue en Chrome con la extensión: las dos no caben en el mismo navegador, por eso México no
-  tiene tarjeta en «Actualizar datos»). Hora de México UTC−6 (`dropiDiario`, `OFFSET_HORAS`, `HORAS_DETRAS_UTC`, `creado_dropi`), pesos
+  dropshipper de «Descubrir proveedores» sigue en Chrome con la extensión: las dos no caben en el mismo navegador). **Desde el 30 oct 2026
+  México tiene su tarjeta en «Actualizar datos»** (Hernán: lo mismo que Panamá, sin el scraping, «no lo necesitamos»): `CUENTAS.mx` es la
+  cuenta de proveedor, lectores `proveedor_mx` y `ventas_mx` (extensión **0.4.0**, `VERSION_PARA.mx`), partes `pedidos_mx`…`ventas_mx`,
+  botón «Actualizar México» y «Abrir Dropi» en su tarjeta. **La primera corrida trae todo el historial** (Hernán): `PRIMERA_LECTURA_DESDE.mx`
+  = 2024-07-01 (su primera venta en el historial de existencias es del 4 jul 2024) y «Traer historial» en su tarjeta; el máximo de días
+  pasó de 400 a `MAX_DIAS_LECTURA` = 1000 (también en `fondo.js`). Al 30 oct 2026 Costa Rica tenía pedidos solo desde el 31 ago (cartera desde el
+  25 abr): falta pulsar su «Traer historial» (desde el 1 abr 2026). Se quitó la tarjeta
+  «México y competencia de Panamá». «Descubrir proveedores» sigue pidiendo una sesión de **dropshipper** (`CUENTA_CATALOGO_MX`,
+  `sesionCatalogoMx`): es el mismo dominio, así que en un Chrome está una u otra. Hora de México UTC−6 (`dropiDiario`, `OFFSET_HORAS`, `HORAS_DETRAS_UTC`, `creado_dropi`), pesos
   en `formatearMoneda` (`formato.ts`) y en Gestión de IDs (`monedaPublicaciones`: MXN con su valor en dólares). Las fotos de México
   están en el CDN de Panamá (`cdnDeRuta` ya lo cubre). La primera lectura trae 60 días y crea sus publicaciones (como Costa Rica). Su cuenta de extracción de proveedor (`cuentas_extraccion`, que pide `ingerirPedidos`) la agrega la
   migración 0176 (29 oct 2026; en producción ya estaba puesta a mano desde la primera carga). Desde el 29 oct 2026 México se

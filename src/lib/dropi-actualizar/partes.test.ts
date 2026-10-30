@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { CUENTAS, LECTORES, LECTORES_PAIS, PARTES, archivoSubido, diasPrimeraLectura, lectoresDe, puedeActualizarDropi, sesionValida } from "./partes";
+import { CUENTAS, LECTORES, LECTORES_PAIS, MAX_DIAS_LECTURA, PARTES, archivoSubido, diasPrimeraLectura, lectoresDe, puedeActualizarDropi, sesionCatalogoMx, sesionValida } from "./partes";
 
 const ext = (f: string) => readFileSync(`extension/ecomfive-dropi/${f}`, "utf8");
 
@@ -50,9 +50,25 @@ test("la sesión de Panamá tiene que ser la de proveedor ECOMFIVE y no estar po
   assert.equal(sesionValida("pa", { ...base, tienda: "OTRA" }, ahora), "otra_cuenta");
   assert.equal(sesionValida("pa", { ...base, vence: "2026-10-26T15:00:30Z" }, ahora), "vencida");
   assert.equal(CUENTAS.pa.origen, "https://app.dropi.pa");
-  // México: cualquier cuenta que no sea de proveedor (la de proveedor no ve el catálogo).
-  assert.equal(sesionValida("mx", { hay: true, tipoUsuario: "DROPSHIPPER", tienda: null, vence: null }, ahora), "ok");
-  assert.equal(sesionValida("mx", { hay: true, tipoUsuario: "SUPPLIER", tienda: "X", vence: null }, ahora), "otra_cuenta");
+  // «Descubrir proveedores» de México: cualquier cuenta que no sea de proveedor (la de proveedor no ve el catálogo).
+  assert.equal(sesionCatalogoMx({ hay: true, tipoUsuario: "DROPSHIPPER", tienda: null, vence: null }, ahora), "ok");
+  assert.equal(sesionCatalogoMx({ hay: true, tipoUsuario: "SUPPLIER", tienda: "X", vence: null }, ahora), "otra_cuenta");
+});
+
+test("México en «Actualizar datos»: la cuenta de proveedor de app.dropi.mx, sus partes y sus archivos", () => {
+  const mx = PARTES.filter((p) => p.pais === "mx");
+  assert.deepEqual(mx.map((p) => p.tipo), ["pedidos", "cartera", "retiros", "stock", "ventas"]);
+  assert.deepEqual(lectoresDe(mx.map((p) => p.clave)), LECTORES_PAIS.mx);
+  assert.equal(CUENTAS.mx.origen, "https://app.dropi.mx");
+  assert.equal(archivoSubido("proveedor_mx", "pedidos"), "pedidosmx");
+  assert.match(`${archivoSubido("ventas_mx", "movimientos")}.json`, /^[a-z]+\.json$/);
+  const ahora = Date.parse("2026-10-30T15:00:00Z");
+  assert.equal(sesionValida("mx", { hay: true, tipoUsuario: "SUPPLIER", tienda: "ECOMFIVE", vence: null }, ahora), "ok");
+  assert.equal(sesionValida("mx", { hay: true, tipoUsuario: "DROPSHIPPER", tienda: null, vence: null }, ahora), "otra_cuenta");
+  // La primera vez (y «Traer historial») trae todo: desde el 1 de julio de 2024.
+  assert.deepEqual(diasPrimeraLectura("mx", new Date("2026-10-30T15:00:00Z")), { pedidos: 852, cartera: 852 });
+  // La extensión acepta los mismos días como máximo.
+  assert.ok(ext("fondo.js").includes(`x <= ${MAX_DIAS_LECTURA}`));
 });
 
 test("Costa Rica: sus partes, sus lectores en app.dropi.cr y sus archivos con otro nombre que los de Panamá", () => {
