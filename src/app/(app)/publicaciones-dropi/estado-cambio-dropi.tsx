@@ -1,4 +1,5 @@
 import type { CambioDropiVista } from "@/lib/publicaciones/cambios-dropi";
+import { republicacionSinTocarDropi } from "@/lib/publicaciones/republicar-dropi";
 import { codigoBodega } from "@/lib/publicaciones/sincronizar-dropi";
 
 const fecha = (iso: string) => new Date(iso).toLocaleString("es-PA", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone: "America/Panama" });
@@ -158,9 +159,11 @@ function EstadoRepublicar({ c }: { c: CambioDropiVista }) {
   return (
     <span className="flex items-center gap-1.5 text-xs text-destructive">
       <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-destructive" />
-      {c.estado === "error"
-        ? `No se pudo republicar en Dropi: ${c.error ?? "sin detalle"} Se sigue desde ahí al pulsar «Aplicar en Dropi».`
-        : "Republicación pendiente: pulsa «Aplicar en Dropi» con Dropi abierto."}
+      {c.estado === "error" && republicacionSinTocarDropi(c.error, c.nuevoDropiId)
+        ? `Esta no se republica desde el sistema: ${c.error} Dropi no se tocó. Republícala a mano en Dropi y quítala de la cola con «Deshacer» en «Cambios pendientes para Dropi»; la nueva aparece en «Sin publicación», donde se crea copiando los datos de esta.`
+        : c.estado === "error"
+          ? `No se pudo republicar en Dropi: ${c.error ?? "sin detalle"} Se sigue desde ahí al pulsar «Aplicar en Dropi».`
+          : "Republicación pendiente: pulsa «Aplicar en Dropi» con Dropi abierto."}
     </span>
   );
 }

@@ -48,6 +48,27 @@ export function armarProductoNuevo(
 }
 
 /**
+ * Los errores con que el favorito se detiene ANTES de crear nada en Dropi (lee el producto y ve que no se puede republicar desde aquí: variaciones,
+ * la B280, unidades privatizadas, porcentajes, otro proveedor). Con uno de estos y sin `nuevo_dropi_id`, Dropi no se tocó: la republicación se puede
+ * quitar de la cola y hacer a mano (30 oct 2026: Nicole no podía sacar la de la rodillera con variaciones, que fallaba en cada «Aplicar en Dropi»).
+ */
+export const ERRORES_ANTES_DE_DROPI = [
+  "Tiene variaciones",
+  "Tiene stock en una bodega que no es de ECOMFIVE",
+  "Tiene unidades privatizadas",
+  "Tiene porcentajes por dropshipper",
+  "Ese producto no es de este proveedor en Dropi",
+  "Dropi no devolvió el producto.",
+] as const;
+
+/** Si una republicación que falló no llegó a tocar Dropi (ver `ERRORES_ANTES_DE_DROPI`). */
+export function republicacionSinTocarDropi(error: string | null | undefined, nuevoDropiId: unknown): boolean {
+  if (nuevoDropiId !== null && nuevoDropiId !== undefined && nuevoDropiId !== "") return false;
+  const e = String(error ?? "").trim();
+  return ERRORES_ANTES_DE_DROPI.some((p) => e.startsWith(p));
+}
+
+/**
  * El `PUT api/products/<id>` que mueve stock, como el «Stock» de la pantalla de Dropi: `movimientos` = unidades por bodega
  * (positivas = entrada, negativas = salida) y `concepto` = el motivo que pide Dropi. Lo demás va igual que el guardado.
  */

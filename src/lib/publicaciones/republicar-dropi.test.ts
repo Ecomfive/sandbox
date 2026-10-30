@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { ARMAR_JS, marcadorAplicarDropi } from "./marcador-aplicar-dropi";
-import { armarMovimientoStock, armarProductoNuevo, CDN_FOTOS_DROPI, fotosParaCopiar, REPUBLICAR_JS, stockPorBodega } from "./republicar-dropi";
+import { armarMovimientoStock, armarProductoNuevo, CDN_FOTOS_DROPI, fotosParaCopiar, REPUBLICAR_JS, republicacionSinTocarDropi, stockPorBodega } from "./republicar-dropi";
 
 type Obj = Record<string, unknown>;
 const delFavorito = new Function(`${ARMAR_JS};${REPUBLICAR_JS}; return { nuevo, mover, stockDe, fotosDe };`)() as {
@@ -47,6 +47,24 @@ test("no se republica: con variaciones, con stock en la B280, con privados o con
   assert.match(String((armarProductoNuevo({ ...veganic, private_product_inventories: [{ stock: 5, deleted_at: null }] }, bp) as { error: string }).error), /privatizadas/);
   assert.ok("cuerpo" in armarProductoNuevo({ ...veganic, private_product_inventories: [{ stock: 5, deleted_at: "2026-10-01" }] }, bp));
   assert.ok("error" in armarProductoNuevo({ ...veganic, user_profit_percentage_product: [{ user_id: 9 }] }, bp));
+});
+
+test("una republicación detenida antes de crear nada en Dropi se reconoce (se puede quitar de la cola y hacer a mano)", () => {
+  const errores = [
+    armarProductoNuevo({ ...veganic, type: "VARIABLE" }, bp),
+    armarProductoNuevo({ ...veganic, warehouse_product: [{ warehouse_id: 280, stock: 10, warehouse: { id: 280, name: "Bodega Dropi Panama" } }] }, bp),
+    armarProductoNuevo({ ...veganic, private_product_inventories: [{ stock: 5, deleted_at: null }] }, bp),
+    armarProductoNuevo({ ...veganic, user_profit_percentage_product: [{ user_id: 9 }] }, bp),
+  ].map((r) => (r as { error: string }).error);
+  for (const e of errores) assert.equal(republicacionSinTocarDropi(e, null), true, e);
+  assert.equal(republicacionSinTocarDropi("Ese producto no es de este proveedor en Dropi.", null), true);
+  // Con producto nuevo creado, o con un error de después de crearlo, no.
+  assert.equal(republicacionSinTocarDropi("Tiene variaciones: cámbialo a mano en Dropi.", 12345), false);
+  assert.equal(republicacionSinTocarDropi("Dropi no devolvió el ID del producto nuevo (respondió 200).", null), false);
+  assert.equal(republicacionSinTocarDropi("Dropi respondió 500.", null), false);
+  assert.equal(republicacionSinTocarDropi(null, null), false);
+  // El favorito usa los mismos textos.
+  for (const e of errores) assert.ok(ARMAR_JS.includes(e.slice(0, 20)) || REPUBLICAR_JS.includes(e.slice(0, 20)), e);
 });
 
 test("mover stock: salida del viejo con su concepto, entrada en el nuevo aunque la bodega no tenga stock todavía", () => {
