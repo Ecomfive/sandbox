@@ -16,6 +16,8 @@ import { VistaDuplicados } from "./vista-duplicados";
 import { VistaEntregas } from "./vista-entregas";
 import { VistaEquipo } from "./vista-equipo";
 import { VistaProductos } from "./vista-productos";
+import { VistaResumen, type ResumenAtencion, type ResumenStock } from "./vista-resumen";
+import type { DatosProductos } from "./datos-productos";
 
 const PERIODOS_EQUIPO = [7, 30, 90];
 const PERIODOS_ENTREGAS = [30, 60, 90];
@@ -31,6 +33,32 @@ export function EncabezadoBandejaDireccion({ vista, pais }: { vista: VistaDirecc
   return <EncabezadoDireccion subtitulo={`${pais} · pedidos de Dropi de las cuentas vinculadas`} activa={vista} vistas={VISTAS_DIRECCION.map((v) => ({ ...v, href: rutaVista(v.valor) }))} />;
 }
 
+/** El stock que se acaba, resumido para el Resumen: no viaja la lista de clientes de cada producto (la página pesaba ~750 KB). */
+function stockDe(d: DatosProductos): ResumenStock {
+  const seAcaban = d.productos.filter((p) => p.estado === "agotado" || p.estado === "se_acaba");
+  return {
+    productos: seAcaban.length,
+    clientes: new Set(seAcaban.flatMap((p) => p.clientes.map((c) => c.dropshipperId))).size,
+    top: seAcaban.slice(0, 5).map((p) => ({ productoId: p.productoId, nombre: p.nombre, dropshippers: p.dropshippers, pedidos: p.pedidos, stock: p.stock, diasInventario: p.diasInventario, estado: p.estado, camino: p.camino })),
+  };
+}
+
+/** Lo de la atención para el Resumen, de lo que devuelve `whatsapp_kpis` por área (la mediana, pesada por las consultas respondidas). */
+function atencionDe(data: unknown): ResumenAtencion | null {
+  const areas = ((data ?? {}) as { areas?: { consultas: number; sin_responder: number; en_15_min: number; mediana_min: number | null }[] }).areas;
+  if (!areas) return null;
+  const consultas = areas.reduce((s, a) => s + Number(a.consultas), 0);
+  const sinResponder = areas.reduce((s, a) => s + Number(a.sin_responder), 0);
+  const conMediana = areas.filter((a) => a.mediana_min !== null && Number(a.consultas) - Number(a.sin_responder) > 0);
+  const peso = conMediana.reduce((s, a) => s + Number(a.consultas) - Number(a.sin_responder), 0);
+  return {
+    consultas,
+    sinResponder,
+    en15: areas.reduce((s, a) => s + Number(a.en_15_min), 0),
+    medianaMin: peso ? conMediana.reduce((s, a) => s + Number(a.mediana_min) * (Number(a.consultas) - Number(a.sin_responder)), 0) / peso : null,
+  };
+}
+
 /** El periodo de una vista: el de la dirección si es uno de los que ofrece, si no el de siempre. */
 function periodoDe(vista: VistaDireccion, dias: unknown): number {
   const periodos = vista === "entregas" ? PERIODOS_ENTREGAS : vista === "kpis" ? PERIODOS_KPIS : PERIODOS_EQUIPO;
@@ -42,7 +70,8 @@ function periodoDe(vista: VistaDireccion, dias: unknown): number {
 /**
  * El panel de Dirección (módulo `crm-direccion`), que desde el 30 oct 2026 es la Bandeja de Dirección (pedido de Hernán: antes eran las pestañas
  * «Dirección» y «KPIs de atención» del CRM): el encabezado con sus pestañas y el contenido de la vista. Vistas:
- *  - Resumen (con el diseño del prototipo): las cifras de la cartera, «Qué atender hoy», la salud y los pedidos por semana.
+ *  - Resumen (30 oct 2026, pedido de Hernán: paneles con gráficas para decidir, no listas): las cifras clave, los pedidos por semana, el estado de
+ *    la cartera, dónde está el riesgo, los que más piden, qué atender hoy, el stock que se acaba, las entregas y la atención por WhatsApp.
  *  - Clientes (fase 1): los chips de estado y la lista de clientes con su ficha al lado (lo que vende y qué recomendarle, fase 3). Abre con el
  *    estado (`segmento`) o el cliente (`cliente`) que se eligió en el Resumen.
  *  - Productos (fase 3), Entregas (fase 4), Equipo (fase 2), Duplicados (fase 4) y Automatizaciones (fase 4).
@@ -67,14 +96,16 @@ export async function ContenidoDireccion({
   const cliente = typeof clienteParam === "string" && ES_ID.test(clienteParam) ? clienteParam : null;
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
-  const kpis = vista === "kpis" ? await supabase.rpc("whatsapp_kpis", { p_desde: desdeHace(dias), p_areas: areasVisibles(accesoCrm(usuario)) }) : null;
+  // El Resumen también lleva la atención de los últimos 7 días.
+  const kpis =
+    vista === "kpis" || vista === "resumen" ? await supabase.rpc("whatsapp_kpis", { p_desde: desdeHace(vista === "resumen" ? 7 : dias), p_areas: areasVisibles(accesoCrm(usuario)) }) : null;
   const datos = vista === "kpis" ? null : await cargarDireccion(supabase, pais.id);
   const ok = !!datos && !("error" in datos);
   const filas = ok ? datos.filas : [];
   const [equipo, productos, entregas, duplicados, secuencia] = await Promise.all([
     vista === "equipo" && ok ? cargarEquipo(supabase, dias, filas) : null,
-    (vista === "clientes" || vista === "productos") && ok ? cargarProductos(supabase, pais.id, usuario, filas.map((f) => f.id)) : null,
-    vista === "entregas" ? cargarEntregas(supabase, pais.id, dias) : null,
+    (vista === "clientes" || vista === "productos" || vista === "resumen") && ok ? cargarProductos(supabase, pais.id, usuario, filas.map((f) => f.id)) : null,
+    vista === "entregas" || vista === "resumen" ? cargarEntregas(supabase, pais.id, vista === "resumen" ? 60 : dias) : null,
     vista === "duplicados" ? cargarDuplicados(supabase) : null,
     vista === "automatizaciones" ? cargarSecuenciaAlta(supabase) : null,
   ]);
@@ -105,7 +136,15 @@ export async function ContenidoDireccion({
         />
       );
     if (vista === "resumen")
-      return <PanelDireccion key="resumen" modo="resumen" segmentoInicial={null} clienteInicial={null} datos={datos} productos={null} codigoPais={pais.codigo} escribe={escribe} usuarioId={usuario.id} />;
+      return (
+        <VistaResumen
+          datos={datos}
+          stock={productos && !("error" in productos) ? stockDe(productos) : null}
+          entregas={Array.isArray(entregas) ? entregas : null}
+          atencion={kpis?.error ? null : atencionDe(kpis?.data)}
+          codigoPais={pais.codigo}
+        />
+      );
     if (vista === "clientes")
       return (
         // La `key` arma el panel de nuevo con el estado o el cliente elegidos en el Resumen (si no, React guarda el estado de antes).
