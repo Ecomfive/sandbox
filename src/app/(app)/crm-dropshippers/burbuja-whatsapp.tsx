@@ -5,7 +5,7 @@ import { useRef, useState, useSyncExternalStore, type KeyboardEvent, type Pointe
 import { anilloFoco } from "@/components/ui/field";
 import { Tooltip } from "@/components/ui/tooltip";
 
-const TAM = 56;
+const TAM = 48;
 const MARGEN = 8;
 const PASO_TECLADO = 24;
 const CLAVE = "crm-burbuja-whatsapp-v1";
@@ -38,12 +38,16 @@ function guardar(p: Pos) {
   }
 }
 
-/** El glifo de la bandeja: un globo de chat con un auricular, en el verde de la bandeja. */
+/** El glifo de la bandeja: un globo de chat blanco, con su colita, y un auricular del verde de la bandeja recortado en él. */
 function GloboConAuricular() {
   return (
-    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M21 12a9 9 0 0 1-13.4 7.8L3 21l1.3-4.4A9 9 0 1 1 21 12Z" />
-      <path d="M9.4 8.2c.2 3 2.6 5.6 5.7 6.4.8.2 1.6-.2 2-.9.1-.2 0-.5-.2-.6l-1.5-.9c-.2-.1-.5-.1-.6.1l-.6.7c-1.4-.5-2.7-1.8-3.2-3.2l.7-.6c.2-.1.2-.4.1-.6l-.9-1.5c-.1-.2-.4-.3-.6-.2-.6.4-.9 1.2-.7 2.3Z" fill="currentColor" stroke="none" />
+    <svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Z" fill="currentColor" />
+      <path
+        transform="translate(-0.9 0.3)"
+        d="M9.4 8.2c.2 3 2.6 5.6 5.7 6.4.8.2 1.6-.2 2-.9.1-.2 0-.5-.2-.6l-1.5-.9c-.2-.1-.5-.1-.6.1l-.6.7c-1.4-.5-2.7-1.8-3.2-3.2l.7-.6c.2-.1.2-.4.1-.6l-.9-1.5c-.1-.2-.4-.3-.6-.2-.6.4-.9 1.2-.7 2.3Z"
+        fill="var(--wa-acento)"
+      />
     </svg>
   );
 }
@@ -127,12 +131,12 @@ function Burbuja({ sinResponder }: { sinResponder: number }) {
               huboArrastre.current = false;
             }
           }}
-          className={`relative flex touch-none select-none items-center justify-center rounded-full bg-[var(--wa-acento)] text-[var(--wa-acento-texto)] shadow-lg ring-1 ring-black/10 hover:brightness-110 active:cursor-grabbing ${anilloFoco}`}
+          className={`relative flex touch-none select-none items-center justify-center rounded-full bg-[var(--wa-acento)] text-[var(--wa-acento-texto)] shadow-md ring-1 ring-black/10 transition-transform hover:scale-105 active:cursor-grabbing ${anilloFoco}`}
           style={{ width: TAM, height: TAM, cursor: "grab" }}
         >
           <GloboConAuricular />
           {sinResponder > 0 && (
-            <span className="absolute -right-1 -top-1 flex h-6 min-w-6 items-center justify-center rounded-full bg-destructive px-1.5 text-xs font-bold tabular-nums text-white ring-2 ring-background">
+            <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 text-[11px] font-bold leading-none tabular-nums text-white ring-2 ring-background">
               {sinResponder > 99 ? "99+" : sinResponder}
             </span>
           )}
