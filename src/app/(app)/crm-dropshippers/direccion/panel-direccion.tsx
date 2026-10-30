@@ -357,8 +357,10 @@ export function PanelDireccion({
           </div>
         </div>
 
-        <div className="flex flex-wrap items-start gap-5">
-          <div className="min-w-0 flex-[999_1_560px] overflow-hidden rounded-xl border border-border bg-card">
+        {/* La ficha del cliente, más ancha que la lista (30 oct 2026, pedido de Hernán): en pantalla grande toma el 42 % (mínimo 460 px) y se
+            queda a la vista al bajar por la lista. */}
+        <div className={`grid grid-cols-1 items-start gap-5 ${seleccionado ? "xl:grid-cols-[minmax(0,1fr)_minmax(460px,42%)]" : ""}`}>
+          <div className="min-w-0 overflow-hidden rounded-xl border border-border bg-card">
             <div className="overflow-x-auto">
               <table className="w-full min-w-[48rem] border-collapse text-sm">
                 <thead>
@@ -498,7 +500,7 @@ function FichaCliente({
 }) {
   const tono = tonoPuntaje(f.salud.puntaje);
   return (
-    <aside id="ficha-cliente" aria-label={`Ficha de ${f.nombre}`} className="flex min-w-0 flex-[1_1_340px] scroll-mt-4 flex-col gap-5 rounded-xl border border-border bg-card p-5">
+    <aside id="ficha-cliente" aria-label={`Ficha de ${f.nombre}`} className="flex min-w-0 scroll-mt-4 flex-col gap-5 rounded-xl border border-border bg-card p-5 sm:p-6 xl:sticky xl:top-4 xl:max-h-[calc(100vh-2rem)] xl:overflow-y-auto">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="m-0 text-xl font-bold">{f.nombre}</h2>
@@ -531,7 +533,7 @@ function FichaCliente({
       </div>
 
       {f.salud.factores.length > 0 && (
-        <div className="flex flex-col gap-2.5">
+        <div className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
           {f.salud.factores.map((x) => (
             <div key={x.clave} className="flex flex-col gap-1">
               <div className="flex justify-between gap-2 text-[13px]">
@@ -586,7 +588,7 @@ function FichaCliente({
       <LoLleva f={f} personas={personas} escribe={escribe} />
 
       {extra && (
-        <>
+        <div className="grid grid-cols-1 items-start gap-5 2xl:grid-cols-2">
           <div className="flex flex-col gap-2">
             <h3 className="m-0 text-sm font-semibold">Lo que vende (30 días)</h3>
             {extra.vende.length === 0 ? (
@@ -625,7 +627,7 @@ function FichaCliente({
               ))
             )}
           </div>
-        </>
+        </div>
       )}
 
       <Link href={`/crm-dropshippers?abrir=${f.id}`} className={`text-sm font-semibold text-primario hover:underline ${anilloFoco}`}>
