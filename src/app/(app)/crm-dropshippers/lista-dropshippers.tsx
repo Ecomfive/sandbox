@@ -3,6 +3,7 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { ListaDatos } from "@/components/tabla/lista-datos";
+import { ContadorPestana } from "@/components/migas/contador-pestana";
 import type { AccesoCrm } from "@/lib/crm/areas";
 import { AlertaIcon, CalendarioIcon, ChatIcon, DropshipperIcon, EnlaceIcon, EstadoIcon, PersonaIcon, VentasIcon } from "@/lib/nav-icons";
 import type { NombreFilas } from "@/lib/tabla/pie";
@@ -76,6 +77,7 @@ export function ListaDropshippers({
   );
   return (
     <>
+      <ContadorPestana href="/crm-dropshippers/bandeja" cantidad={sinResponder} />
       <BurbujaWhatsapp sinResponder={sinResponder} />
       <TableroCrm dropshippers={dropshippers} casos={casos} />
       <ListaDatos
