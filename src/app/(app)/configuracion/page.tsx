@@ -7,6 +7,7 @@ import type { FilaCuenta } from "../retiros/cuentas/def-cuentas";
 import { TablaCuentasConfiguracion } from "../retiros/cuentas/tabla-cuentas";
 import { TablaPlataformas } from "./tabla-plataformas";
 import { TablaPaises } from "./tabla-paises";
+import { UmbralesTipoCliente } from "./umbrales-tipo-cliente";
 
 export const metadata = { title: "Configuración" };
 
@@ -23,7 +24,7 @@ export default async function ConfiguracionPage() {
   const consultarCuentas = (columnas: string) =>
     supabase.from("cuentas_retiro").select(columnas).eq("pais_id", pais.id).order("creado_en", { ascending: false });
 
-  const [{ data: paisPlataformas }, cuentasConBinance, { data: todosLosPaises }, { data: correlativos }] = await Promise.all([
+  const [{ data: paisPlataformas }, cuentasConBinance, { data: todosLosPaises }, { data: correlativos }, umbralesR] = await Promise.all([
     supabase
       .from("pais_plataformas")
       .select("id, disponible_para_retiro, plataformas(nombre)")
@@ -31,6 +32,8 @@ export default async function ConfiguracionPage() {
     consultarCuentas(`${COLUMNAS_CUENTA}, datos_binance`),
     supabase.from("paises").select("id, codigo, nombre").order("nombre"),
     supabase.from("wms_compras_correlativo").select("clave, prefijo, ultimo"),
+    // Umbrales del tipo de cliente del CRM (migración 0196). Sin ella, la sección no sale.
+    supabase.from("crm_tipo_cliente_umbrales").select("pais_id, vip_desde, black_desde"),
   ]);
   const cuentas = (cuentasConBinance.error ? (await consultarCuentas(COLUMNAS_CUENTA)).data : cuentasConBinance.data) as unknown as
     | FilaCuenta[]
@@ -58,6 +61,19 @@ export default async function ConfiguracionPage() {
           puedeEscribir={puedeEscribir}
         />
       </div>
+
+      {!umbralesR.error && (
+        <div id="tipo-cliente" className="flex flex-col gap-3">
+          <h2 className="text-sm font-semibold tracking-tight">Tipo de cliente del CRM (pedidos al mes)</h2>
+          <UmbralesTipoCliente
+            puedeEscribir={puedeEscribir}
+            umbrales={((todosLosPaises ?? []) as { id: string; codigo: string; nombre: string }[]).map((p) => {
+              const u = (umbralesR.data ?? []).find((x) => x.pais_id === p.id);
+              return { paisId: p.id, codigo: p.codigo, nombre: p.nombre, vipDesde: Number(u?.vip_desde ?? 500), blackDesde: Number(u?.black_desde ?? 1000) };
+            })}
+          />
+        </div>
+      )}
 
       <div className="flex flex-col gap-3">
         <h2 className="text-sm font-semibold tracking-tight">Plataformas para crear retiros</h2>

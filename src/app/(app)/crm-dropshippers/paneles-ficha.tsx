@@ -1,20 +1,17 @@
 "use client";
 
 import { useState, type ComponentType } from "react";
-import { CampoMenciones } from "@/components/ui/campo-menciones";
 import { Campo } from "@/components/ui/campo-ficha";
 import { anilloFoco, fieldClass } from "@/components/ui/field";
 import { FichaCrear } from "@/components/ui/ficha-crear";
 import { Seccion } from "@/components/ui/seccion-ficha";
-import { AlertaIcon, CalendarioIcon, DropshipperIcon, EtiquetaIcon, PedidoIcon, PersonaIcon, SugerenciaIcon } from "@/lib/nav-icons";
+import { AlertaIcon, DropshipperIcon, EtiquetaIcon, PersonaIcon, SugerenciaIcon } from "@/lib/nav-icons";
 import { recomendarProducto } from "../sugerencias-clientes/actions";
 import { FichaSugerencia } from "../sugerencias-clientes/ficha-sugerencia";
-import type { AccesoCrm } from "@/lib/crm/areas";
 import { CampoTiendas } from "./campo-tiendas";
-import { crearCaso, crearPedidoManual, editarDropshipper, registrarInteraccion } from "./actions";
-import { CANALES, ESTADOS, ESTADOS_PEDIDO, NIVELES, PRIORIDADES, TIPOS_CASO, TIPOS_INTERACCION, nombrePais, type FilaDropshipper } from "./def-crm";
+import { crearCaso, editarDropshipper } from "./actions";
+import { CANALES, ESTADOS, NIVELES, PRIORIDADES, TIPOS_CASO, nombrePais, type FilaDropshipper } from "./def-crm";
 
-const hoy = () => new Date().toLocaleDateString("en-CA"); // AAAA-MM-DD en la hora de quien lo usa
 
 /** Los datos mínimos de un dropshipper para elegirlo en una lista. */
 export interface OpcionDropshipper {
@@ -152,120 +149,6 @@ export function PanelCaso({ d, dropshippers, codigoPais, alGuardar }: { d?: Fila
   );
 }
 
-/** Registrar a mano un pedido del dropshipper. */
-export function PanelPedido({ d, codigoPais, alGuardar }: { d: FilaDropshipper; codigoPais: string; alGuardar?: () => void }) {
-  return (
-    <FichaCrear
-      alGuardar={alGuardar}
-      titulo="Nuevo pedido"
-      etiquetaCrear="Registrar pedido"
-      action={crearPedidoManual}
-      mensajeExito="Pedido registrado"
-      ocultos={{ dropshipper_id: d.id }}
-      boton={(abrir) => <BotonAccion texto="Pedido" icono={PedidoIcon} alHacerClic={abrir} />}
-    >
-      {({ faltante, invalido }) => (
-        <Seccion icono={PedidoIcon} titulo="Pedido">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Campo etiqueta="Fecha" id="campo-fecha-pedido" obligatorio faltante={faltante}>
-              <input
-                id="campo-fecha-pedido"
-                type="date"
-                name="fecha"
-                required
-                data-enfocar
-                aria-invalid={invalido("campo-fecha-pedido")}
-                defaultValue={hoy()}
-                className={`${fieldClass} w-full`}
-              />
-            </Campo>
-            <Campo etiqueta="Monto" id="campo-monto-pedido" obligatorio faltante={faltante}>
-              <input
-                id="campo-monto-pedido"
-                type="number"
-                name="monto"
-                required
-                min="0"
-                step="0.01"
-                inputMode="decimal"
-                aria-invalid={invalido("campo-monto-pedido")}
-                placeholder="Ej: 45.50"
-                className={`${fieldClass} w-full`}
-              />
-            </Campo>
-            <Campo etiqueta="N.º de pedido" id="campo-numero-pedido">
-              <input id="campo-numero-pedido" type="text" name="numero" autoComplete="off" placeholder="Ej: 48213" className={`${fieldClass} w-full`} />
-            </Campo>
-            <Campo etiqueta="Estado" id="campo-estado-pedido">
-              <select id="campo-estado-pedido" name="estado" defaultValue="pendiente" className={`${fieldClass} w-full`}>
-                <Opciones lista={ESTADOS_PEDIDO} />
-              </select>
-            </Campo>
-          </div>
-          <CampoPais id="campo-pais-pedido" paises={d.paises} inicial={codigoPais} />
-        </Seccion>
-      )}
-    </FichaCrear>
-  );
-}
-
-/** Una nota o contacto con el dropshipper (llamada, WhatsApp…): queda en su historial de interacciones. */
-export function PanelNota({ d, acceso, alGuardar }: { d: FilaDropshipper; acceso: AccesoCrm; alGuardar?: () => void }) {
-  return (
-    <FichaCrear
-      alGuardar={alGuardar}
-      titulo="Nueva nota"
-      etiquetaCrear="Guardar nota"
-      action={registrarInteraccion}
-      mensajeExito="Nota guardada"
-      ocultos={{ dropshipper_id: d.id }}
-      boton={(abrir) => <BotonAccion texto="Nota" icono={EtiquetaIcon} alHacerClic={abrir} />}
-    >
-      {({ faltante, invalido }) => (
-        <Seccion icono={CalendarioIcon} titulo="Nota">
-          {acceso.escribeComercial && (
-            <Campo etiqueta="Área" id="campo-area-nota">
-              <select id="campo-area-nota" name="area" defaultValue="comercial" className={`${fieldClass} w-full`}>
-                <option value="comercial">Comercial (privada)</option>
-                <option value="atencion">Atención</option>
-              </select>
-            </Campo>
-          )}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Campo etiqueta="Tipo" id="campo-tipo-nota">
-              <select id="campo-tipo-nota" name="tipo" defaultValue="whatsapp" className={`${fieldClass} w-full`}>
-                <Opciones lista={TIPOS_INTERACCION} />
-              </select>
-            </Campo>
-            <Campo etiqueta="Fecha" id="campo-fecha-nota" obligatorio faltante={faltante}>
-              <input
-                id="campo-fecha-nota"
-                type="date"
-                name="fecha"
-                required
-                aria-invalid={invalido("campo-fecha-nota")}
-                defaultValue={hoy()}
-                className={`${fieldClass} w-full`}
-              />
-            </Campo>
-          </div>
-          <Campo etiqueta="Nota" id="campo-texto-nota" obligatorio faltante={faltante}>
-            <CampoMenciones
-              id="campo-texto-nota"
-              name="nota"
-              required
-              filas={4}
-              enfocar
-              ariaInvalid={invalido("campo-texto-nota")}
-              placeholder="Ej: Confirmó que empieza a enviar pedidos la próxima semana (usa @ para etiquetar a alguien)"
-            />
-          </Campo>
-        </Seccion>
-      )}
-    </FichaCrear>
-  );
-}
-
 /**
  * «Recomendar»: el cliente nos recomienda un producto y Atención lo registra aquí. Llega a Testing Lab › Sugerencias de
  * clientes con su código SUG- sin que quien lo carga necesite ese módulo.
@@ -315,7 +198,7 @@ export function PanelEditar({ d, alGuardar }: { d: FilaDropshipper; alGuardar?: 
                   <Opciones lista={ESTADOS} />
                 </select>
               </Campo>
-              <Campo etiqueta="Nivel" id="campo-nivel-editar">
+              <Campo etiqueta="Tipo de cliente" id="campo-nivel-editar">
                 <select id="campo-nivel-editar" name="nivel" defaultValue={d.nivel} className={`${fieldClass} w-full`}>
                   <Opciones lista={NIVELES} />
                 </select>
@@ -349,9 +232,6 @@ export function PanelEditar({ d, alGuardar }: { d: FilaDropshipper; alGuardar?: 
           <Seccion icono={EtiquetaIcon} titulo="Detalle">
             <Campo etiqueta="Productos (separados por coma)" id="campo-productos-editar">
               <input id="campo-productos-editar" type="text" name="productos" autoComplete="off" defaultValue={d.productos.join(", ")} className={`${fieldClass} w-full`} />
-            </Campo>
-            <Campo etiqueta="Notas" id="campo-notas-editar">
-              <textarea id="campo-notas-editar" name="notas" rows={4} defaultValue={d.notas ?? ""} className={`${fieldClass} w-full resize-y`} />
             </Campo>
           </Seccion>
         </>

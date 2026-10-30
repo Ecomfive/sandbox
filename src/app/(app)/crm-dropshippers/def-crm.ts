@@ -1,3 +1,4 @@
+import type { VendeEn } from "@/lib/whatsapp/origen-chat";
 import { FASES } from "@/lib/crm/areas";
 import { SIN_VALOR, type DefTabla } from "@/lib/tabla/motor";
 
@@ -16,10 +17,11 @@ export const ESTADOS = [
   { valor: "inactivo", etiqueta: "Inactivo" },
 ] as const;
 
+/** El «Tipo de cliente» (migración 0195, 29 oct 2026): Rookie (el normal; se guarda `regular`), VIP y Black, el más alto. */
 export const NIVELES = [
-  { valor: "nuevo", etiqueta: "Nuevo" },
-  { valor: "regular", etiqueta: "Regular" },
+  { valor: "regular", etiqueta: "Rookie" },
   { valor: "vip", etiqueta: "VIP" },
+  { valor: "black", etiqueta: "Black" },
 ] as const;
 
 export const TIPOS_CASO = [
@@ -106,6 +108,10 @@ export interface FilaDropshipper {
   tieneTelefono: boolean;
   estado: string;
   nivel: string;
+  /** El tipo lo fijó una persona: el cálculo automático no lo toca (migración 0196). */
+  nivelManual: boolean;
+  /** Promedio de pedidos al mes de los últimos 3 meses, sin cancelados (de él sale el tipo automático). */
+  promedioPedidosMes: number | null;
   responsable: string | null;
   /** País de donde es (código ISO de 2 letras, «CO»), según su teléfono; null si no se sabe. */
   paisOrigen: string | null;
@@ -127,6 +133,8 @@ export interface FilaDropshipper {
   cuentas: CuentaVinculada[];
   /** Plataformas donde vende con nosotros, según sus cuentas vinculadas («Dropi»). */
   plataformas: string[];
+  /** Dónde vende: plataforma y país (bandera), de sus cuentas vinculadas y lo puesto a mano en «Dónde vende» del chat (migraciones 0193 y 0194). */
+  vendeEn: VendeEn[];
   /** Captación: captado, en onboarding o activo. */
   fase: string;
   /** Líder comercial que lo lleva (id de perfil), si hay. */
@@ -267,15 +275,7 @@ export const DEF_DROPSHIPPERS: DefTabla<FilaDropshipper> = {
       valores: (d) => [d.nivel],
       opciones: () => NIVELES.map((n) => ({ valor: n.valor, etiqueta: n.etiqueta })),
       agrupable: true,
-      ordenGrupos: ["vip", "regular", "nuevo"],
-    },
-    {
-      id: "responsable",
-      etiqueta: "Responsable",
-      tipo: "seleccion",
-      valores: (d) => [d.responsable ?? SIN_VALOR],
-      etiquetaSinValor: "Sin responsable",
-      agrupable: true,
+      ordenGrupos: ["black", "vip", "regular"],
     },
     {
       id: "venta",

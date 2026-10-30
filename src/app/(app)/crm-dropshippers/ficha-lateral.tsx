@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { Tooltip } from "@/components/ui/tooltip";
 import { anilloFoco } from "@/components/ui/field";
-import { formatearFecha, formatearMoneda } from "@/lib/formato";
 import {
   AlertaIcon,
   ChatIcon,
@@ -15,58 +14,32 @@ import {
   PersonaIcon,
   SugerenciaIcon,
 } from "@/lib/nav-icons";
-import { etiquetaFase, type AccesoCrm } from "@/lib/crm/areas";
+import type { AccesoCrm } from "@/lib/crm/areas";
 import { ActividadDropshipper } from "./actividad-dropshipper";
-import { BotonEscalar, PanelFase, PanelSeguimiento, SeguimientosDropshipper } from "./areas-ficha";
+import { BotonEscalar, PanelSeguimiento, SeguimientosDropshipper } from "./areas-ficha";
 import { MostrarTelefono } from "./mostrar-telefono";
+import { DatoEditable } from "./dato-editable";
 import { CuentasDropshipper } from "./cuentas-dropshipper";
 import { DesempenoDropshipper } from "./desempeno-dropshipper";
 import { VentasDropiDropshipperBloque } from "./ventas-dropi-dropshipper";
-import { PanelCaso, PanelEditar, PanelNota, PanelPedido, PanelRecomendar } from "./paneles-ficha";
+import { PanelCaso, PanelEditar, PanelRecomendar } from "./paneles-ficha";
 import { RecomendacionesDropshipper } from "./recomendaciones-dropshipper";
 import { ConversacionWhatsapp } from "./conversacion-whatsapp";
 import { EtiquetasDropshipper } from "./etiquetas-dropshipper";
+import { TipoCliente } from "./tipo-cliente";
 import {
   etiquetaAntiguedad,
   etiquetaCanal,
   etiquetaEstado,
   etiquetaEstadoCaso,
-  etiquetaNivel,
   etiquetaTipoCaso,
   etiquetaUltimoPedido,
-  montoCorto,
   type FilaCaso,
   type FilaDropshipper,
 } from "./def-crm";
 import { Etiqueta, Pastilla, Punto } from "@/components/panel/piezas-panel";
 
 export const tonoEstado = (estado: string) => (estado === "activo" ? "exito" : estado === "prospecto" ? "aviso" : "neutro");
-
-const MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
-
-/** Pedidos de los últimos seis meses; el mes en curso va en oscuro. */
-function GraficaPedidos({ serie, hoy }: { serie: number[]; hoy: string }) {
-  const mesActual = Number(hoy.slice(5, 7)) - 1;
-  const maximo = Math.max(...serie, 1);
-  return (
-    <figure className="m-0">
-      <div role="img" aria-label={`Pedidos de los últimos seis meses: ${serie.join(", ")}`} className="flex h-16 items-end gap-3">
-        {serie.map((v, i) => (
-          <div key={i} className="flex h-full flex-1 flex-col justify-end">
-            <div className={`w-full rounded-[3px] ${i === serie.length - 1 ? "bg-foreground-soft" : "bg-accent"}`} style={{ height: `${Math.max(4, (v / maximo) * 100)}%` }} />
-          </div>
-        ))}
-      </div>
-      <div aria-hidden="true" className="mt-1 flex gap-3 text-[10px] text-muted-foreground">
-        {serie.map((_, i) => (
-          <span key={i} className="flex-1 text-center">
-            {MESES_CORTOS[(mesActual - (serie.length - 1 - i) + 12) % 12]}
-          </span>
-        ))}
-      </div>
-    </figure>
-  );
-}
 
 export function Bloque({ icono: Icono, titulo, children }: { icono: typeof PersonaIcon; titulo: string; children: ReactNode }) {
   return (
@@ -110,8 +83,7 @@ export function ContenidoFichaDropshipper({ d, casos, codigoPais, hoy, acceso }:
       <div className="flex flex-col gap-2 border-b border-border p-3.5">
         <div className="flex flex-wrap gap-1.5">
           <Pastilla tono={tonoEstado(d.estado)}>{etiquetaEstado(d.estado)}</Pastilla>
-          <Pastilla tono={d.nivel === "vip" ? "oscuro" : "neutro"}>{etiquetaNivel(d.nivel)}</Pastilla>
-          {d.fase !== "activo" && <Pastilla tono="aviso">{etiquetaFase(d.fase)}</Pastilla>}
+          <TipoCliente key={`tipo-${d.id}`} dropshipperId={d.id} nivel={d.nivel} manual={d.nivelManual} promedio={d.promedioPedidosMes} puede={acceso.escribeAtencion || acceso.escribeComercial} />
           {abiertos.length > 0 && (
             <Pastilla>
               <Punto />
@@ -146,10 +118,6 @@ export function ContenidoFichaDropshipper({ d, casos, codigoPais, hoy, acceso }:
 
       <Bloque icono={ChatIcon} titulo="Conversación de WhatsApp">
         <ConversacionWhatsapp key={`chat-${d.id}`} dropshipperId={d.id} />
-      </Bloque>
-
-      <Bloque icono={EstadoIcon} titulo="Desempeño">
-        <CifrasDelMes d={d} codigoPais={codigoPais} hoy={hoy} />
       </Bloque>
 
       {abiertos.length > 0 && (
@@ -190,51 +158,21 @@ export function ContenidoFichaDropshipper({ d, casos, codigoPais, hoy, acceso }:
   );
 }
 
-/** Los botones de la ficha que abren una ventana del CRM (caso, pedido, nota, recomendar, editar; seguimiento y fase en Comercial). */
+/**
+ * Los botones de la ficha que abren una ventana del CRM: caso, recomendar y editar; seguimiento en Comercial. Sin «Pedido», «Nota» ni «Fase»
+ * (29 oct 2026, pedido de Alcides): lo que se anotaba en una nota va como comentario en la Actividad.
+ */
 export function AccionesCrm({ d, codigoPais, acceso, alGuardar }: { d: FilaDropshipper; codigoPais: string; acceso: AccesoCrm; alGuardar: () => void }) {
   return (
     <>
       {acceso.escribeAtencion && (
         <>
           <PanelCaso key={`caso-${d.id}`} d={d} codigoPais={codigoPais} alGuardar={alGuardar} />
-          <PanelPedido key={`pedido-${d.id}`} d={d} codigoPais={codigoPais} alGuardar={alGuardar} />
-          <PanelNota key={`nota-${d.id}`} d={d} acceso={acceso} alGuardar={alGuardar} />
           <PanelRecomendar key={`recomendar-${d.id}`} d={d} alGuardar={alGuardar} />
           <PanelEditar key={`editar-${d.id}`} d={d} alGuardar={alGuardar} />
         </>
       )}
-      {acceso.escribeComercial && (
-        <>
-          <PanelSeguimiento key={`seg-${d.id}`} d={d} alGuardar={alGuardar} />
-          <PanelFase key={`fase-${d.id}`} d={d} alGuardar={alGuardar} />
-        </>
-      )}
-    </>
-  );
-}
-
-/** Pedidos y ventas del mes, el último pedido y la gráfica de seis meses. */
-export function CifrasDelMes({ d, codigoPais, hoy }: { d: FilaDropshipper; codigoPais: string; hoy: string }) {
-  return (
-    <>
-      <div className="mb-3 grid grid-cols-3 gap-2">
-        {[
-          ["Pedidos mes", d.pedidosMes ? String(d.pedidosMes) : "—"],
-          ["Ventas mes", d.ventasMes ? montoCorto(d.ventasMes, codigoPais) : "—"],
-          ["Último pedido", etiquetaUltimoPedido(d.ultimoPedido, hoy)],
-        ].map(([titulo, valor]) => (
-          <div key={titulo} className="min-w-0 rounded-lg border border-border px-2.5 py-2">
-            <p className="m-0 text-[11.5px] text-muted-foreground">{titulo}</p>
-            <p className="m-0 truncate text-base font-semibold tabular-nums">{valor}</p>
-          </div>
-        ))}
-      </div>
-      {d.pedidosPorMes.length > 0 && d.pedidosMes > 0 ? (
-        <GraficaPedidos serie={d.pedidosPorMes} hoy={hoy} />
-      ) : (
-        <p className="m-0 text-xs text-muted-foreground">Todavía no tiene pedidos registrados este mes.</p>
-      )}
-      {d.ventasMes > 0 && <p className="mt-2 mb-0 text-xs text-muted-foreground tabular-nums">Ventas exactas: {formatearMoneda(d.ventasMes, codigoPais)}</p>}
+      {acceso.escribeComercial && <PanelSeguimiento key={`seg-${d.id}`} d={d} alGuardar={alGuardar} />}
     </>
   );
 }
@@ -264,23 +202,24 @@ export function CasosAbiertos({ abiertos, acceso }: { abiertos: FilaCaso[]; acce
 }
 
 /**
- * Sus datos: teléfono (con «Mostrar número»), ciudad, ingreso, responsable, etiquetas (editables, como en ClickUp)… En la ficha del chat
- * `conEtiquetas` va en falso: ahí las mismas etiquetas se editan arriba de todo.
+ * Sus datos: teléfono (con «Mostrar número»), ciudad, ingreso, último pedido, etiquetas (editables, como en ClickUp)… Ciudad, ingreso y
+ * correo se cambian ahí mismo con el lápiz (`DatoEditable`). Etapa, notas y responsable (lo que venía de ClickUp) ya no se muestran
+ * (29 oct 2026, pedido de Alcides). En la ficha del chat `conEtiquetas` va en falso: ahí las mismas etiquetas se editan arriba de todo.
  */
 export function DatosDropshipper({ d, hoy, acceso, conEtiquetas = true }: { d: FilaDropshipper; hoy: string; acceso: AccesoCrm; conEtiquetas?: boolean }) {
+  const dato = (campo: "ciudad" | "ingreso" | "correo", inicial: string | null) => (
+    <DatoEditable key={`${campo}-${d.id}`} dropshipperId={d.id} campo={campo} inicial={inicial} puede={acceso.escribeAtencion} />
+  );
   return (
     <dl className="m-0 grid grid-cols-[7.5rem_minmax(0,1fr)] gap-x-2.5 gap-y-1.5 text-[13px]">
       {[
         ...(d.tieneTelefono && acceso.verTelefonos ? [["Teléfono", <MostrarTelefono key="t" tipo="dropshipper" id={d.id} puede />]] : []),
-        ["Ciudad", d.ciudad ?? "—"],
-        ["Ingreso", d.ingreso ? formatearFecha(d.ingreso) : "—"],
-        ["Responsable", d.responsable ?? "Sin asignar"],
+        ["Ciudad", dato("ciudad", d.ciudad)],
+        ["Ingreso", dato("ingreso", d.ingreso)],
         ["Último pedido", etiquetaUltimoPedido(d.ultimoPedido, hoy)],
-        ...(d.etapa ? [["Etapa", d.etapa]] : []),
         ...(d.productos.length ? [["Productos", d.productos.map((p) => <Etiqueta key={p}>{p}</Etiqueta>)]] : []),
         ...(conEtiquetas ? [["Etiquetas", <EtiquetasDropshipper key={`etiquetas-${d.id}`} dropshipperId={d.id} iniciales={d.etiquetas} puedeEscribir={acceso.escribeAtencion} />]] : []),
-        ...(d.email ? [["Correo", d.email]] : []),
-        ...(d.notas ? [["Notas", d.notas]] : []),
+        ["Correo", dato("correo", d.email)],
       ].map(([titulo, valor]) => (
         <div key={String(titulo)} className="contents">
           <dt className="text-muted-foreground">{titulo}</dt>

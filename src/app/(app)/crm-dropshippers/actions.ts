@@ -9,7 +9,7 @@ import { mencionadosValidos, notificarMenciones } from "@/lib/menciones";
 import { ACCIONES_COMERCIALES, FASES, MODULO_ATENCION, MODULO_COMERCIAL, accesoCrm, areaParaNota, areasVisibles, etiquetaFase } from "@/lib/crm/areas";
 import { normalizarTelefono } from "@/lib/crm/telefono";
 import { enlazarChatsPorTelefono, telefonoDeOtro } from "@/lib/whatsapp/vinculo";
-import { CANALES, ESTADOS, ESTADOS_PEDIDO, NIVELES, PRIORIDADES, TIPOS_CASO, etiquetaEstado, etiquetaNivel, etiquetaTipo } from "./def-crm";
+import { CANALES, ESTADOS, NIVELES, PRIORIDADES, TIPOS_CASO, etiquetaEstado, etiquetaNivel, etiquetaTipo } from "./def-crm";
 
 /** Devuelve el error como valor, no lo lanza: en producción Next.js oculta el mensaje de una excepción de una acción. */
 export async function crearDropshipper(formData: FormData): Promise<{ error?: string }> {
@@ -190,38 +190,6 @@ export async function crearCaso(formData: FormData): Promise<{ error?: string }>
   return {};
 }
 
-/** Registra a mano un pedido de un dropshipper (hasta que Dropi los traiga solo). */
-export async function crearPedidoManual(formData: FormData): Promise<{ error?: string }> {
-  await requireModuloEscritura("crm-dropshippers");
-  const dropshipper_id = texto(formData, "dropshipper_id");
-  const numero = texto(formData, "numero") || null;
-  const fecha = texto(formData, "fecha");
-  const estado = texto(formData, "estado");
-  const monto = Number(texto(formData, "monto").replace(",", "."));
-
-  if (!ES_ID(dropshipper_id)) return { error: "Elige el dropshipper." };
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha) || Number.isNaN(Date.parse(fecha))) return { error: "Escribe la fecha del pedido." };
-  if (!Number.isFinite(monto) || monto < 0 || monto > 1e9) return { error: "El monto debe ser un número mayor o igual a cero." };
-  if (!esUnoDe(ESTADOS_PEDIDO, estado)) return { error: "Elige el estado del pedido." };
-
-  const supabase = createServiceClient();
-  const pais = await resolverPais(supabase, dropshipper_id, texto(formData, "pais"));
-  if ("error" in pais) return { error: pais.error };
-
-  const { error } = await supabase
-    .from("pedidos_dropshipper")
-    .insert({ dropshipper_id, pais_id: pais.id, numero, fecha, monto, estado, origen: "manual" });
-  if (error) return { error: "No se pudo guardar el pedido." };
-  await registrarAuditoria({
-    accion: "crear_pedido_dropshipper",
-    entidad: "dropshippers",
-    entidadId: dropshipper_id,
-    detalle: `pedido=${numero ?? "—"} monto=${monto}`,
-  });
-  revalidatePath("/crm-dropshippers", "layout");
-  return {};
-}
-
 const lista = (valor: string, max: number) =>
   [...new Set(valor.split(",").map((e) => e.trim()).filter(Boolean))].slice(0, max);
 
@@ -235,14 +203,15 @@ export async function editarDropshipper(formData: FormData): Promise<{ error?: s
   const tiendas = listaTiendas(formData);
   const ciudad = texto(formData, "ciudad") || null;
   const contacto_email = texto(formData, "contacto_email").toLowerCase() || null;
-  const notas = texto(formData, "notas") || null;
+  // Las notas de ClickUp ya no se muestran ni se editan (29 oct 2026): solo se tocan si vienen en el formulario, para no borrarlas.
+  const notas = formData.has("notas") ? texto(formData, "notas") || null : undefined;
   // Las etiquetas se editan aparte (`guardarEtiquetasDropshipper`): solo se tocan si vienen en el formulario.
   const etiquetas = formData.has("etiquetas") ? lista(texto(formData, "etiquetas"), 30) : undefined;
   const productos = lista(texto(formData, "productos"), 60);
 
   if (!ES_ID(id)) return { error: "Dropshipper no válido." };
   if (!nombre) return { error: "Escribe el nombre del dropshipper." };
-  if (!esUnoDe(ESTADOS, estado) || !esUnoDe(NIVELES, nivel)) return { error: "Revisa el estado y el nivel." };
+  if (!esUnoDe(ESTADOS, estado) || !esUnoDe(NIVELES, nivel)) return { error: "Revisa el estado y el tipo de cliente." };
   if (contacto_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contacto_email)) return { error: "El correo no es válido." };
 
   const supabase = createServiceClient();
@@ -277,12 +246,14 @@ export async function editarDropshipper(formData: FormData): Promise<{ error?: s
       nombre,
       estado,
       nivel,
+      // Cambiar el tipo en «Editar» lo fija a mano: el cálculo automático (migración 0196) ya no lo mueve.
+      ...(actual.nivel !== nivel ? { nivel_manual: true } : {}),
       tienda: tiendas[0] ?? null,
       tiendas,
       ciudad,
       contacto_email,
       contacto_telefono,
-      notas,
+      ...(notas !== undefined ? { notas } : {}),
       ...(etiquetas !== undefined ? { etiquetas } : {}),
       productos,
       ...(pais_origen !== undefined ? { pais_origen } : {}),
@@ -299,8 +270,8 @@ export async function editarDropshipper(formData: FormData): Promise<{ error?: s
     despues.Estado = etiquetaEstado(estado);
   }
   if (actual.nivel !== nivel) {
-    antes.Nivel = etiquetaNivel(actual.nivel);
-    despues.Nivel = etiquetaNivel(nivel);
+    antes["Tipo de cliente"] = etiquetaNivel(actual.nivel);
+    despues["Tipo de cliente"] = etiquetaNivel(nivel);
   }
   const cambioDeEstado = Object.keys(despues).length > 0;
   await registrarAuditoria({
@@ -419,71 +390,6 @@ export async function desvincularCuenta(cuentaId: string): Promise<{ error?: str
   });
   revalidatePath("/crm-dropshippers", "layout");
   return {};
-}
-
-export interface DesempenoPais {
-  codigoPais: string;
-  pedidos: number;
-  despachados: number;
-  entregados: number;
-  devueltos: number;
-  cancelados: number;
-  conNovedad: number;
-  ventas: number;
-}
-export interface ProductoVendido {
-  producto: string;
-  sku: string | null;
-  unidades: number;
-  entregadas: number;
-}
-
-const FECHA_ISO = /^\d{4}-\d{2}-\d{2}$/;
-
-/**
- * Lo que hizo un dropshipper en Dropi (u otra plataforma vinculada) entre dos fechas: guías, despachadas, entregadas,
- * tasa de entrega y productos. Las sumas las hace Postgres (`crm_desempeno`, `crm_productos_vendidos`). Es una lectura:
- * basta poder abrir el CRM. Devuelve el error como valor.
- */
-export async function obtenerDesempeno(
-  dropshipperId: string,
-  desde: string,
-  hasta: string,
-): Promise<{ paises: DesempenoPais[]; productos: ProductoVendido[] } | { error: string }> {
-  await requireModulo("crm-dropshippers");
-  if (!ES_ID(dropshipperId)) return { error: "Dropshipper no válido." };
-  if (!FECHA_ISO.test(desde) || !FECHA_ISO.test(hasta) || Number.isNaN(Date.parse(desde)) || Number.isNaN(Date.parse(hasta))) {
-    return { error: "Las fechas no son válidas." };
-  }
-  if (desde > hasta) return { error: "La fecha de inicio es posterior a la final." };
-  if (Date.parse(hasta) - Date.parse(desde) > 3 * 366 * 86_400_000) return { error: "Elige un período de hasta 3 años." };
-
-  const supabase = createServiceClient();
-  const [resumen, productos, paises] = await Promise.all([
-    supabase.rpc("crm_desempeno", { p_dropshipper: dropshipperId, p_desde: desde, p_hasta: hasta }),
-    supabase.rpc("crm_productos_vendidos", { p_dropshipper: dropshipperId, p_desde: desde, p_hasta: hasta }),
-    supabase.from("paises").select("id, codigo"),
-  ]);
-  if (resumen.error || productos.error) return { error: "No se pudo cargar el desempeño." };
-  const codigo = new Map((paises.data ?? []).map((p) => [p.id as string, p.codigo as string]));
-  return {
-    paises: (resumen.data ?? []).map((r: Record<string, unknown>) => ({
-      codigoPais: codigo.get(r.pais_id as string) ?? "—",
-      pedidos: Number(r.pedidos),
-      despachados: Number(r.despachados),
-      entregados: Number(r.entregados),
-      devueltos: Number(r.devueltos),
-      cancelados: Number(r.cancelados),
-      conNovedad: Number(r.con_novedad),
-      ventas: Number(r.ventas),
-    })),
-    productos: (productos.data ?? []).map((p: Record<string, unknown>) => ({
-      producto: String(p.producto),
-      sku: (p.sku as string | null) ?? null,
-      unidades: Number(p.unidades),
-      entregadas: Number(p.entregadas),
-    })),
-  };
 }
 
 // ---- Áreas: seguimientos comerciales, escalar un caso, captación y línea de tiempo por área ----

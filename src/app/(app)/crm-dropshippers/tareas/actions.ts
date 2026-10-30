@@ -14,6 +14,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { asegurarBorradoresDeLlegada, enviarBorradoresDeLlegada } from "@/lib/whatsapp/plantillas-llegada";
 import { areasDe, conversacionPermitida, usuarioBandeja } from "../bandeja/datos-bandeja";
 import { paisDelChat } from "../bandeja/pais-chat";
+import { NIVELES, etiquetaNivel } from "../def-crm";
 
 // Tareas del CRM (29 oct 2026, pedido de Hernán): las del chat de WhatsApp (avisar una llegada, hablar con alguien en una fecha) y los
 // seguimientos comerciales, en un solo panel. La tarea de un chat queda a cargo de quien lleva el chat (si nadie, de quien la crea).
@@ -97,7 +98,7 @@ function vista(f: Fila, u: UsuarioActual, hoy: string): TareaVista {
     esMia: f.responsable_id === u.id,
     puedeCompletar: puedeCompletar(f, u),
     cliente: d?.nombre ?? c?.nombre_personalizado ?? c?.nombre_perfil ?? null,
-    vip: d?.nivel === "vip",
+    vip: d?.nivel === "vip" || d?.nivel === "black",
     dropshipperId: f.dropshipper_id,
     conversacionId: f.conversacion_id,
     producto: uno(f.skus_maestros)?.nombre ?? null,
@@ -232,16 +233,39 @@ export async function completarTarea(id: string, hecha: boolean): Promise<{ ok: 
   return { ok: true };
 }
 
-/** Marca o quita «VIP» a un dropshipper (los que más pedidos mueven), desde la ficha del chat. Sin VIP queda «Regular». */
-export async function cambiarVip(dropshipperId: string, vip: boolean): Promise<{ ok: true } | { error: string }> {
+/**
+ * Cambia el «Tipo de cliente» de un dropshipper: ROOKIE, VIP o BLACK puesto a mano (queda fijo: el cálculo automático no lo toca), o `"auto"`, que lo
+ * suelta y lo recalcula con el promedio de pedidos de los últimos 3 meses (migración 0196). Queda en la Actividad con lo de antes y lo de después.
+ */
+export async function cambiarTipoCliente(dropshipperId: string, nivel: string): Promise<{ ok: true; nivel: string; manual: boolean } | { error: string }> {
   const u = await usuarioBandeja(false);
   if (!u) return { error: "No tienes acceso." };
   const a = accesoCrm(u);
-  if (!a.escribeAtencion && !a.escribeComercial) return { error: "No tienes permiso para cambiar el nivel." };
+  if (!a.escribeAtencion && !a.escribeComercial) return { error: "No tienes permiso para cambiar el tipo de cliente." };
   if (!ES_ID(dropshipperId)) return { error: "Dropshipper no válido." };
-  const { data, error } = await createServiceClient().from("dropshippers").update({ nivel: vip ? "vip" : "regular" }).eq("id", dropshipperId).select("nombre").maybeSingle();
-  if (error || !data) return { error: "No se pudo cambiar el nivel." };
-  await registrarAuditoria({ accion: vip ? "marcar_vip_dropshipper" : "quitar_vip_dropshipper", entidad: "dropshippers", entidadId: dropshipperId, detalle: String(data.nombre ?? "") });
+  const auto = nivel === "auto";
+  if (!auto && !NIVELES.some((n) => n.valor === nivel)) return { error: "Elige ROOKIE, VIP o BLACK." };
+  const supabase = createServiceClient();
+  const { data: antes, error: errorAntes } = await supabase.from("dropshippers").select("nivel, nivel_manual").eq("id", dropshipperId).maybeSingle();
+  if (errorAntes) return { error: "Falta correr en Supabase la migración 0196 (tipo de cliente automático)." };
+  if (!antes) return { error: "No se encontró el dropshipper." };
+  const { error } = await supabase.from("dropshippers").update(auto ? { nivel_manual: false } : { nivel, nivel_manual: true }).eq("id", dropshipperId);
+  if (error) return { error: "No se pudo cambiar el tipo de cliente." };
+  let final = nivel;
+  if (auto) {
+    // El cálculo automático deja su propia línea en la Actividad si cambia el tipo.
+    await supabase.rpc("crm_recalcular_tipo_cliente");
+    const { data } = await supabase.from("dropshippers").select("nivel").eq("id", dropshipperId).maybeSingle();
+    final = (data?.nivel as string) ?? (antes.nivel as string);
+  }
+  await registrarAuditoria({
+    accion: "tipo_cliente_dropshipper",
+    entidad: "dropshippers",
+    entidadId: dropshipperId,
+    detalle: auto ? "Vuelve a calcularse solo con el promedio de pedidos" : "Fijado a mano",
+    antes: { "Tipo de cliente": `${etiquetaNivel(antes.nivel as string)}${antes.nivel_manual ? " (a mano)" : " (automático)"}` },
+    despues: { "Tipo de cliente": `${etiquetaNivel(final)}${auto ? " (automático)" : " (a mano)"}` },
+  });
   revalidatePath("/crm-dropshippers", "layout");
-  return { ok: true };
+  return { ok: true, nivel: final, manual: !auto };
 }

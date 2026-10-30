@@ -2,7 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element -- fotos que llegan por WhatsApp, servidas por /api/whatsapp/media */
 import Link from "next/link";
-import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition, type MouseEvent as EventoRaton, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition, type MouseEvent as EventoRaton } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { VisorImagen } from "@/components/ui/visor-imagen";
@@ -16,12 +16,14 @@ import { abrirConversacion, cambiarEstadoConversacion, fichaCrmDelChat, conectar
 import type { FichaCrmChat } from "./actions";
 import type { ConversacionVista, DatosBandeja, MensajeVista, ResumenDropshipper, VistaPreviaMensaje } from "./datos-bandeja";
 import { guardarColorEtiquetaChat, guardarEtiquetasChat } from "./etiquetas-actions";
+import { PastillaTipo } from "../tipo-cliente";
 import { VendeEnChat } from "./vende-en";
+import { abrirChatInterno } from "./interno-actions";
+import { BotonWhatsappInterno } from "./interno";
 import { colorFoto, iniciales } from "./globo-persona";
 import { EtiquetasChat, PastillasEtiquetas, SelectorEtiquetasChat, type ManejoEtiquetas } from "./etiquetas-chat";
-import { claseBotonFicha, claseBotonFichaPrincipal, FichaDelChat, type OpcionMas } from "./ficha-chat";
+import { claseBotonFicha, claseBotonFichaPrincipal, FichaDelChat, type AccionExtra } from "./ficha-chat";
 import { reaccionarAMensaje } from "./reaccion-actions";
-import { cambiarVip } from "../tareas/actions";
 import { VistaPreviaChat } from "./vista-previa-chat";
 import { VentanaVincular } from "./vincular-chat";
 import { ACEPTAR_ENVIO, EnviarArchivo } from "./enviar-archivo";
@@ -36,7 +38,7 @@ import { ImportarChat } from "./importar-chat";
 import { NuevoContacto } from "./nuevo-contacto";
 import { PedirBorrado, type QueBorrar } from "./pedir-borrado";
 import { MostrarTelefono } from "../mostrar-telefono";
-import { ChatIcon, CheckIcon, FlechaAbajoIcon, FlechaArribaIcon, PapeleraIcon, PersonaIcon, ReactivarIcon } from "@/lib/nav-icons";
+import { ActualizarIcon, ArchivarIcon, ChatIcon, CheckIcon, ConectadoIcon, DescargarIcon, DesconectadoIcon, FlechaAbajoIcon, FlechaArribaIcon, PapeleraIcon, PersonaIcon, ReactivarIcon } from "@/lib/nav-icons";
 import { Ventana } from "@/components/ui/ventana";
 import { BotonNavegar } from "../ficha-lateral";
 import { vistaPreviaTexto } from "@/lib/whatsapp/borrado";
@@ -241,8 +243,8 @@ function IconoEstado({ clase, signo, texto }: { clase: string; signo: string; te
 }
 
 /** «VIP»: un dropshipper de los que más pedidos mueven (29 oct 2026), para saber con quién se trata. */
-function EtiquetaVip() {
-  return <span className="inline-flex flex-none items-center rounded-full bg-[var(--wa-texto)] px-1.5 py-px text-[10.5px] font-bold tracking-wide text-[var(--wa-fondo)]">VIP</span>;
+function EtiquetaVip({ tipo }: { tipo: string | null }) {
+  return <PastillaTipo nivel={tipo} soloDestacados />;
 }
 
 /** La etiqueta de color de un área, con su punto. */
@@ -603,7 +605,9 @@ export function Bandeja({
   }, [borrador]);
 
   const numeroDe = useMemo(() => new Map(datos.numeros.map((n) => [n.id, n])), [datos.numeros]);
-  const delNumero = useMemo(() => datos.conversaciones.filter((c) => numero === "todos" || c.numeroId === numero), [datos.conversaciones, numero]);
+  const chatsInternos = useMemo(() => datos.conversaciones.filter((c) => c.interno).map((c) => ({ numeroId: c.numeroId, nombre: c.nombre, noLeidos: c.noLeidos })), [datos.conversaciones]);
+  // Los chats internos (WhatsApp entre áreas) no son clientes: no van en las listas ni en los conteos; se abren con «Interno».
+  const delNumero = useMemo(() => datos.conversaciones.filter((c) => !c.interno && (numero === "todos" || c.numeroId === numero)), [datos.conversaciones, numero]);
   // Los filtros cuentan los chats de todos los paneles que se ven.
   const opciones: { id: Filtro; texto: string; cuenta: number }[] = [
     { id: "sinResponder", texto: "Sin responder", cuenta: delNumero.filter(sinResponder).length },
@@ -667,7 +671,6 @@ export function Bandeja({
   const mensajes = chat && sel && chat.id === sel.id ? chat.mensajes : null;
   // Las reacciones no son mensajes sueltos: van sobre el mensaje al que se reaccionó, como en WhatsApp (29 oct 2026).
   const conReacciones = mensajes ? agruparReacciones(mensajes) : null;
-  const cambiosDeArea = (mensajes ?? []).filter((m) => m.direccion === "nota" && ES_CAMBIO_DE_AREA.test(m.texto ?? ""));
 
   /** Escribe un emoji donde está el cursor (o al final) y deja el cursor justo después. */
   function insertarEmoji(emoji: string) {
@@ -876,6 +879,23 @@ export function Bandeja({
   }
 
   /** Abre un chat en su ventana: queda leído (en el panel propio; supervisando, no) y se ve el chat primero. */
+  // «WhatsApp interno»: el chat del cliente al que se vuelve después de escribirle a la otra área.
+  const [volverA, setVolverA] = useState<string | null>(null);
+  const [abriendoInterno, setAbriendoInterno] = useState(false);
+  async function abrirInterno(desdeId: string, haciaId: string) {
+    setAbriendoInterno(true);
+    const r = await abrirChatInterno(desdeId, haciaId).catch(() => ({ error: "No se pudo abrir el chat interno." }));
+    setAbriendoInterno(false);
+    if ("error" in r) return mostrarToast(r.error, "destructive");
+    const actual = datos.conversaciones.find((c) => c.id === elegido);
+    if (actual && !actual.interno) setVolverA(actual.id);
+    ocultarVistaPrevia();
+    setElegido(r.id);
+    setChat(null);
+    setEditandoNombre(null);
+    await refrescar(r.id);
+  }
+
   function abrirChat(c: ConversacionVista) {
     ocultarVistaPrevia();
     setElegido(c.id);
@@ -962,7 +982,7 @@ export function Bandeja({
           <span className="flex min-w-0 flex-1 flex-col gap-0.5">
             <span className="flex items-center gap-1.5">
               <span className="min-w-0 truncate text-[14px] font-semibold">{c.nombre}</span>
-              {c.vip && <EtiquetaVip />}
+              {c.vip && <EtiquetaVip tipo={c.tipoCliente} />}
               {subio && <span className="flex-none rounded-full bg-destructive/10 px-1.5 text-[10.5px] font-bold text-destructive">subió</span>}
               {c.noLeidos > 0 && (
                 <span className="ml-auto flex h-[18px] min-w-[18px] flex-none items-center justify-center rounded-full bg-[var(--wa-acento)] px-1 text-[11px] font-semibold text-[var(--wa-acento-texto)] tabular-nums">
@@ -1003,7 +1023,7 @@ export function Bandeja({
       <>
         <span className="flex items-baseline gap-2">
           <span className="min-w-0 flex-1 truncate text-[16px]">{c.nombre}</span>
-          {c.vip && <EtiquetaVip />}
+          {c.vip && <EtiquetaVip tipo={c.tipoCliente} />}
           <span className={`flex-none text-xs tabular-nums ${c.noLeidos ? "font-semibold text-[var(--wa-acento)]" : "text-[var(--wa-sec)]"}`}>{enNavegador ? horaCorta(c.ultimoMensajeEn) : ""}</span>
         </span>
         <span className="flex items-center gap-1.5 text-sm text-[var(--wa-sec)]">
@@ -1142,46 +1162,31 @@ export function Bandeja({
       )
     ) : null;
 
-  // «Más»: lo que antes estaba en la cabecera del chat y en la ficha del costado.
-  const opcionesMas: OpcionMas[] = !sel
+  // Los demás botones del chat, en la misma fila (antes iban en un menú «Más»).
+  const accionesExtra: AccionExtra[] = !sel
     ? []
     : [
-        { texto: "Marcar como no leído", alPulsar: () => marcarLeido(sel, false) },
+        { texto: "Marcar como no leído", corto: "No leído", icono: ChatIcon, alPulsar: () => marcarLeido(sel, false) },
         ...(escribe && !mirando
           ? [
-              ...AREAS_CHAT.filter((a) => a.valor !== sel.area).map((a) => ({ texto: `Pasar a ${a.etiqueta}`, alPulsar: () => pasarA(a.valor) })),
-              { texto: "Importar chat del celular", alPulsar: () => setImportar({ conversacion: sel }) },
+              ...AREAS_CHAT.filter((a) => a.valor !== sel.area).map((a) => ({ texto: `Pasar el chat a ${a.etiqueta}`, corto: `A ${a.etiqueta}`, icono: ActualizarIcon, alPulsar: () => pasarA(a.valor) })),
+              { texto: "Importar chat del celular", corto: "Importar", icono: DescargarIcon, alPulsar: () => setImportar({ conversacion: sel }) },
               {
                 texto: sel.borradaEnApp ? "Quitar marca de borrado" : "Marcar borrado en la app",
+                corto: sel.borradaEnApp ? "Quitar marca" : "Borrado en app",
+                icono: ArchivarIcon,
                 alPulsar: () => accion(() => marcarChatBorradoEnApp(sel.id, !sel.borradaEnApp), sel.borradaEnApp ? "Quitaste la marca." : "Marcado: se borró en la app de WhatsApp Business. Aquí se conserva todo."),
               },
-              ...(sel.borradoPendiente ? [] : [{ texto: "Pedir borrar el chat", alPulsar: () => setBorrar({ tipo: "chat" }) }]),
-            ]
-          : []),
-        ...(verDropshipper && fichaDelChat && typeof fichaDelChat === "object" && (fichaDelChat.acceso.escribeAtencion || fichaDelChat.acceso.escribeComercial)
-          ? [
-              {
-                texto: fichaDelChat.d.nivel === "vip" ? "Quitar VIP" : "Marcar como VIP",
-                alPulsar: () => {
-                  const vip = fichaDelChat.d.nivel !== "vip";
-                  const id = sel.id;
-                  empezar(async () => {
-                    const r = await cambiarVip(fichaDelChat.d.id, vip).catch(() => ({ error: "No se pudo cambiar el nivel." }));
-                    mostrarToast("error" in r ? r.error : vip ? "Marcado como VIP: se ve en la lista de chats y en su ficha." : "Ya no es VIP.", "error" in r ? "destructive" : undefined);
-                    setVersionCrm((v) => v + 1);
-                    await refrescar(id);
-                  });
-                },
-              },
+              ...(sel.borradoPendiente ? [] : [{ texto: "Pedir borrar el chat", corto: "Pedir borrar", icono: PapeleraIcon, alPulsar: () => setBorrar({ tipo: "chat" }) }]),
             ]
           : []),
         ...(verDropshipper
           ? // Sin «Abrir su ficha en el CRM» (29 oct 2026, pedido de Alcides): la ficha completa ya se ve aquí.
             escribe
-            ? [{ texto: "No es este dropshipper", alPulsar: () => setVincular(true) }]
+            ? [{ texto: "No es este dropshipper: vincular otro", corto: "No es este", icono: DesconectadoIcon, alPulsar: () => setVincular(true) }]
             : []
           : escribe && !sel.dropshipperId
-            ? [{ texto: "Vincular a un dropshipper", alPulsar: () => setVincular(true) }]
+            ? [{ texto: "Vincular a un dropshipper", corto: "Vincular", icono: ConectadoIcon, alPulsar: () => setVincular(true) }]
             : []),
       ];
 
@@ -1276,11 +1281,16 @@ export function Bandeja({
             </button>
           ))}
         </div>
+        {escribe && datos.numerosEmpresa.length > 1 && (
+          <span className="ml-auto">
+            <BotonWhatsappInterno numeros={datos.numerosEmpresa} areas={areas} alElegir={(d, h) => void abrirInterno(d, h)} ocupado={abriendoInterno} internos={chatsInternos} conTexto />
+          </span>
+        )}
         {escribe && (
           <button
             type="button"
             onClick={() => setNuevoContacto(true)}
-            className={`ml-auto inline-flex min-h-9 items-center gap-2 rounded-lg bg-[var(--wa-acento)] px-3.5 text-[13px] font-semibold text-[var(--wa-acento-texto)] hover:opacity-90 ${anilloFoco}`}
+            className={`${datos.numerosEmpresa.length > 1 ? "" : "ml-auto"} inline-flex min-h-9 items-center gap-2 rounded-lg bg-[var(--wa-acento)] px-3.5 text-[13px] font-semibold text-[var(--wa-acento-texto)] hover:opacity-90 ${anilloFoco}`}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M12 5v14M5 12h14" />
@@ -1474,8 +1484,9 @@ export function Bandeja({
                   </span>
                 </span>
               </span>
-              {sel.vip && <EtiquetaVip />}
+              {sel.vip && <EtiquetaVip tipo={sel.tipoCliente} />}
               <EtiquetaArea area={sel.area} />
+              {sel.interno && <span className="rounded-full bg-azul-soft px-2 py-px text-[11.5px] font-semibold text-azul">WhatsApp interno</span>}
               {/* Dónde vende (29 oct 2026, pedido de Alcides): sus plataformas por país, puestas a mano o de sus cuentas; y los países de su ficha que aún no tienen plataforma. */}
               <VendeEnChat
                 key={`vende-${sel.id}`}
@@ -1510,6 +1521,20 @@ export function Bandeja({
           }
           navegacion={
             <>
+              {escribe && datos.numerosEmpresa.length > 1 && <BotonWhatsappInterno numeros={datos.numerosEmpresa} areas={areas} alElegir={(d, h) => void abrirInterno(d, h)} ocupado={abriendoInterno} internos={chatsInternos} />}
+              {sel.interno && volverA && datos.conversaciones.some((c) => c.id === volverA) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const c = datos.conversaciones.find((x) => x.id === volverA);
+                    setVolverA(null);
+                    if (c) abrirChat(c);
+                  }}
+                  className={`inline-flex h-9 items-center gap-1 rounded-md px-2.5 text-[13px] font-medium text-primario hover:bg-muted ${anilloFoco}`}
+                >
+                  ← Volver a {datos.conversaciones.find((c) => c.id === volverA)?.nombre}
+                </button>
+              )}
               <BotonNavegar texto="Chat anterior" icono={FlechaArribaIcon} activo={!!chatAnterior} alHacerClic={() => chatAnterior && abrirChat(chatAnterior)} />
               <BotonNavegar texto="Chat siguiente" icono={FlechaAbajoIcon} activo={!!chatSiguiente} alHacerClic={() => chatSiguiente && abrirChat(chatSiguiente)} />
             </>
@@ -1518,7 +1543,7 @@ export function Bandeja({
           <div className="bandeja-wa @container flex min-h-0 flex-1 flex-col bg-[var(--wa-fondo)] text-[var(--wa-texto)]">
             {/* La ficha del dropshipper siempre se ve con el chat (29 oct 2026, pedido de Alcides): al lado si caben, y si la ventana es angosta, arriba del chat. */}
             <div className="flex min-h-0 flex-1 flex-col @4xl:flex-row">
-              <div className="flex max-h-[45%] min-h-0 min-w-0 flex-none flex-col @4xl:max-h-none @4xl:flex-1">
+              <div className={`${sel.interno ? "hidden" : "flex"} max-h-[45%] min-h-0 min-w-0 flex-none flex-col @4xl:max-h-none @4xl:flex-1`}>
                 <FichaDelChat
                   sel={sel}
                   dropshipper={verDropshipper ?? null}
@@ -1528,17 +1553,7 @@ export function Bandeja({
                   mirando={mirando}
                   accionesChat={accionesChat}
                   etiquetas={<EtiquetasChat key={sel.id} conversacionId={sel.id} etiquetas={sel.etiquetas} manejo={manejoEtiquetas} escribe={escribe} />}
-                  opcionesMas={opcionesMas}
-                  areaDelChat={
-                    <Bloque titulo="Área del chat">
-                      <span className="self-start">
-                        <EtiquetaArea area={sel.area} />
-                      </span>
-                      <div className="flex flex-col gap-1 text-[12.5px] text-[var(--wa-sec)]">
-                        {cambiosDeArea.length ? cambiosDeArea.map((m) => <span key={m.id}>{`${m.texto} · ${horaCorta(m.momento)}`}</span>) : <span>Entró a {areaChat(sel.area).etiqueta} con su primer mensaje.</span>}
-                      </div>
-                    </Bloque>
-                  }
+                  accionesExtra={accionesExtra}
                   respondieron={quienesRespondieron(mensajes ?? [])}
                   versionEquipo={`${(mensajes ?? []).filter((m) => m.direccion !== "entrante").length}|${sel.nombrePersonalizado ?? ""}|${sel.dropshipperId ?? ""}|${sel.area}|${sel.estado}|${sel.asignadaA ?? ""}`}
                   alAbrirVincular={() => setVincular(true)}
@@ -1551,7 +1566,7 @@ export function Bandeja({
               </div>
               <section
                 aria-label={`Conversación con ${sel.nombre}`}
-                className={`relative flex min-h-0 w-full min-w-0 flex-1 flex-col border-t border-[var(--wa-borde)] @4xl:w-[46%] @4xl:border-t-0 @4xl:max-w-[720px] @4xl:flex-none @4xl:border-l @4xl:border-[var(--wa-borde)]`}
+                className={`relative flex min-h-0 w-full min-w-0 flex-1 flex-col border-t border-[var(--wa-borde)] ${sel.interno ? "@4xl:border-t-0" : "@4xl:w-[46%] @4xl:border-t-0 @4xl:max-w-[720px] @4xl:flex-none @4xl:border-l @4xl:border-[var(--wa-borde)]"}`}
                 onDragEnter={(e) => {
                   if (!traeArchivos(e)) return;
                   e.preventDefault();
@@ -1988,16 +2003,6 @@ export function Bandeja({
           }}
         />
       )}
-    </div>
-  );
-}
-
-/** Un bloque de la ficha, separado del siguiente con la franja gris de WhatsApp. */
-function Bloque({ titulo, children }: { titulo: string; children: ReactNode }) {
-  return (
-    <div className="flex flex-col gap-2 border-b-8 border-[var(--wa-panel)] px-5 py-4">
-      <h3 className="m-0 text-[13px] font-normal text-[var(--wa-sec)]">{titulo}</h3>
-      {children}
     </div>
   );
 }

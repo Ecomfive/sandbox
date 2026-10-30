@@ -29,6 +29,8 @@ export interface ConversacionVista {
   codigo: string | null;
   /** Su dropshipper es VIP (de los que más pedidos mueven; se marca en el CRM o en «Más» de la ficha del chat). */
   vip: boolean;
+  /** Su tipo de cliente (Rookie `regular`, VIP o Black), del dropshipper vinculado. */
+  tipoCliente: string | null;
   tiendas: string[];
   asignadaA: string | null;
   asignadaAId: string | null;
@@ -51,6 +53,8 @@ export interface ConversacionVista {
   paises: string[];
   /** Dónde vende: plataforma y país, de sus cuentas vinculadas y lo puesto a mano en el chat (migración 0193). */
   vendeEn: VendeEn[];
+  /** Es un chat entre dos números de la empresa («WhatsApp interno»): no es un cliente y no sale en la lista ni en los conteos. */
+  interno: boolean;
   /** Sus etiquetas, como en ClickUp: las del dropshipper si el chat tiene uno; si no, las del chat (migración 0185). */
   etiquetas: string[];
   /** Desde cuándo espera respuesta: su primer mensaje sin contestar (migración 0189). Sin la migración, null y se usa `ultimoEntranteEn`. */
@@ -69,6 +73,8 @@ export interface MotivoVista {
 /** Lo que carga la Bandeja: los números, los chats y el color elegido de cada etiqueta (por su nombre). */
 export interface DatosBandeja {
   numeros: NumeroVista[];
+  /** Todos los números activos de la empresa (sin el número), para el «WhatsApp interno» entre áreas. */
+  numerosEmpresa: { id: string; nombre: string; area: AreaCrm }[];
   conversaciones: ConversacionVista[];
   colores: Record<string, string>;
 }
@@ -147,17 +153,20 @@ export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosC
   const numerosR = await supabase.from("whatsapp_numeros").select("id, nombre, numero, area").eq("activo", true).order("nombre");
   if (numerosR.error) return null;
   const numeros = (numerosR.data ?? []) as NumeroVista[];
-  if (!numeros.length) return { numeros, conversaciones: [], colores: {} };
+  if (!numeros.length) return { numeros, numerosEmpresa: [], conversaciones: [], colores: {} };
   const { data } = await supabase
     .from("whatsapp_conversaciones")
     .select(
-      "id, numero_id, area, nombre_perfil, dropshipper_id, asignada_a, estado, no_leidos, ultimo_entrante_en, ultimo_mensaje_en, ultimo_texto, ultimo_de, dropshippers(nombre, codigo, tiendas, tienda, nivel, etiquetas, dropshipper_paises(paises(codigo)), dropshipper_cuentas(plataformas(nombre), paises(codigo))), perfiles:asignada_a(nombre, avatar_url)",
+      "id, numero_id, area, telefono, nombre_perfil, dropshipper_id, asignada_a, estado, no_leidos, ultimo_entrante_en, ultimo_mensaje_en, ultimo_texto, ultimo_de, dropshippers(nombre, codigo, tiendas, tienda, nivel, etiquetas, dropshipper_paises(paises(codigo)), dropshipper_cuentas(plataformas(nombre), paises(codigo))), perfiles:asignada_a(nombre, avatar_url)",
     )
     .in("area", areas)
     // Solo los chats de los números activos: uno desactivado (el de prueba del sandbox, 28 oct 2026) sale de la bandeja con sus chats.
     .in("numero_id", numeros.map((n) => n.id))
     .order("ultimo_mensaje_en", { ascending: false, nullsFirst: false })
     .limit(300);
+  // Los números de la empresa, en dígitos: un chat con uno de ellos es interno (el número de la otra área). El teléfono no viaja a la pantalla.
+  const digitos = (t: unknown) => String(t ?? "").replace(/\D/g, "");
+  const empresa = new Map(numeros.filter((n) => digitos(n.numero).length >= 7).map((n) => [digitos(n.numero), n]));
   const conversaciones: ConversacionVista[] = (data ?? []).map((c) => {
     const d = uno(c.dropshippers as Uno<{ nombre: string; codigo: string | null; tiendas: string[] | null; tienda: string | null; nivel: string | null; etiquetas: string[] | null;
       dropshipper_paises?: { paises: Uno<{ codigo: string }> }[];
@@ -167,11 +176,13 @@ export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosC
     return {
       id: c.id as string,
       numeroId: c.numero_id as string,
-      nombre: d?.nombre ?? (c.nombre_perfil as string | null) ?? nombreSinNumero(c.id as string),
+      nombre: empresa.get(digitos(c.telefono))?.nombre ?? d?.nombre ?? (c.nombre_perfil as string | null) ?? nombreSinNumero(c.id as string),
       nombrePerfil: (c.nombre_perfil as string | null) ?? null,
       dropshipperId: (c.dropshipper_id as string | null) ?? null,
       codigo: d?.codigo ?? null,
-      vip: d?.nivel === "vip",
+      // Black cuenta como VIP para el plazo de respuesta.
+      vip: d?.nivel === "vip" || d?.nivel === "black",
+      tipoCliente: d?.nivel ?? null,
       tiendas: d?.tiendas?.length ? d.tiendas : d?.tienda ? [d.tienda] : [],
       asignadaA: uno(c.perfiles as Uno<{ nombre: string | null }>)?.nombre ?? null,
       asignadaAId: (c.asignada_a as string | null) ?? null,
@@ -191,6 +202,7 @@ export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosC
       etiquetas: d ? (d.etiquetas ?? []) : [],
       esperandoDesde: null,
       motivo: null,
+      interno: empresa.has(digitos(c.telefono)),
       vendeEn: dondeVende(cuentas, []),
       paises: paisesDondeVende((d?.dropshipper_paises ?? []).map((x) => uno(x.paises)?.codigo ?? null), cuentas.filter((x): x is { plataforma: string | null; pais: string } => !!x.pais)),
     };
@@ -269,7 +281,12 @@ export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosC
   const [ocultas, pendientes] = await Promise.all([conversacionesOcultas(supabase), borradosPendientes(supabase)]);
   for (const c of conversaciones) c.borradoPendiente = pendientes.chats.has(c.id);
   // Solo se ofrecen los números de las áreas de la persona (Atención no ve el de Comercial ni su selector). Los chats ya salen por su área, venga del número que venga.
-  return { numeros: numerosDeAreas(numeros, areas), conversaciones: conversaciones.filter((c) => !ocultas.has(c.id)), colores };
+  return {
+    numeros: numerosDeAreas(numeros, areas),
+    numerosEmpresa: numeros.map((n) => ({ id: n.id, nombre: n.nombre, area: n.area })),
+    conversaciones: conversaciones.filter((c) => !ocultas.has(c.id)),
+    colores,
+  };
 }
 
 /**

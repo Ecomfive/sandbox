@@ -6,8 +6,12 @@
 
 import type { Categoria, VariablePlantilla } from "./plantillas";
 
-/** «retomar»: para volver a hablar con alguien. «llegada»: avisar a quien preguntó por un producto que ya llegó o que su fecha cambió (la tarea «Avisar cuando llegue»). */
-export type GrupoSugerida = "retomar" | "llegada" | "primer_contacto";
+/**
+ * «retomar»: para volver a hablar con alguien. «llegada»: avisar a quien preguntó por un producto que ya llegó o que su fecha cambió (la tarea
+ * «Avisar cuando llegue»). «interno»: el «WhatsApp interno» entre los números de la empresa, cuando pasaron 24 horas sin escribirse.
+ * «primer_contacto»: escribirle por primera vez a alguien que aceptó recibir mensajes («Nuevo contacto» de la bandeja).
+ */
+export type GrupoSugerida = "retomar" | "llegada" | "interno" | "primer_contacto";
 
 export interface PlantillaSugerida {
   clave: string;
@@ -148,6 +152,20 @@ export const PLANTILLAS_SUGERIDAS: PlantillaSugerida[] = [
       { campo: "primer_nombre", ejemplo: "María" },
       { campo: "manual", ejemplo: "Crema reparadora", etiqueta: "Producto" },
       { campo: "manual", ejemplo: "12 de noviembre", etiqueta: "Nueva fecha" },
+    ],
+  },
+  {
+    clave: "mensaje_interno",
+    grupo: "interno",
+    nombre: "mensaje_interno",
+    titulo: "Mensaje interno entre áreas",
+    categoria: "utility",
+    paraQue: "Para el «WhatsApp interno» entre Atención y Comercial cuando pasaron 24 horas sin escribirse.",
+    cuerpo: "Hola, tienes un mensaje interno de {{1}} en el sistema de Ecomfive: «{{2}}». Responde a este mensaje para seguir la conversación.",
+    botones: [],
+    variables: [
+      { campo: "manual", ejemplo: "Atención al cliente", etiqueta: "Área que escribe" },
+      { campo: "manual", ejemplo: "Revisa el caso del cliente DS-0038, por favor", etiqueta: "Mensaje" },
     ],
   },
 ];
