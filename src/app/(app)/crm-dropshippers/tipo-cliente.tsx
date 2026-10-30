@@ -7,9 +7,9 @@ import { useToast } from "@/components/ui/toast";
 import { cambiarTipoCliente } from "./tareas/actions";
 import { NIVELES, etiquetaNivel } from "./def-crm";
 
-/** El color de cada tipo: Rookie neutro, VIP dorado y Black negro (los rellenos salen de los tokens: en el tema oscuro se invierten). */
+/** El color de cada tipo: Rookie azul claro, VIP dorado y Black negro (los rellenos salen de los tokens: en el tema oscuro se invierten). */
 const CLASE: Record<string, string> = {
-  regular: "border border-border-control bg-card text-foreground",
+  regular: "bg-azul-soft text-azul",
   vip: "bg-warning-soft text-warning",
   black: "bg-foreground text-background",
 };
@@ -18,7 +18,7 @@ const CLASE: Record<string, string> = {
 export function PastillaTipo({ nivel, soloDestacados = false }: { nivel: string | null | undefined; soloDestacados?: boolean }) {
   const n = nivel ?? "regular";
   if (soloDestacados && n !== "vip" && n !== "black") return null;
-  return <span className={`inline-flex flex-none items-center rounded-full px-1.5 py-px text-[10.5px] font-bold tracking-wide ${CLASE[n] ?? CLASE.regular}`}>{etiquetaNivel(n)}</span>;
+  return <span className={`inline-flex flex-none items-center rounded-full px-1.5 py-px text-[10.5px] font-bold tracking-wide uppercase ${CLASE[n] ?? CLASE.regular}`}>{etiquetaNivel(n)}</span>;
 }
 
 /**
@@ -59,7 +59,7 @@ export function TipoCliente({ dropshipperId, nivel, puede, alCambiar }: { dropsh
         aria-expanded={abierto}
         aria-label={`Tipo de cliente: ${etiquetaNivel(actual)}. Cambiar`}
         onClick={() => setAbierto((x) => !x)}
-        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11.5px] font-bold tracking-wide ${CLASE[actual] ?? CLASE.regular} ${anilloFoco}`}
+        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11.5px] font-bold tracking-wide uppercase ${CLASE[actual] ?? CLASE.regular} ${anilloFoco}`}
       >
         {etiquetaNivel(actual)}
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
