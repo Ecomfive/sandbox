@@ -5,6 +5,7 @@ import { CabeceraTarjeta, Pastilla } from "@/components/panel/piezas-panel";
 import { anilloFoco } from "@/components/ui/field";
 import { KpiCard, KpiGrid, type Tono } from "@/components/ui/kpi-card";
 import { duracionCorta, META_RESPUESTA_MIN, tonoRespuesta, type FilaEquipo, type TonoTiempo } from "@/lib/crm/equipo";
+import { nPedidos } from "@/lib/crm/salud";
 import type { DatosEquipo } from "./datos-equipo";
 
 const AREA: Record<string, string> = { atencion: "Atención", comercial: "Comercial", direccion: "Dirección" };
@@ -61,7 +62,7 @@ function TarjetaPersona({ p }: { p: FilaEquipo }) {
               {p.cartera} dropshippers · {p.carteraActivos} activos
               {p.carteraEnRiesgo > 0 && <span className="text-warning"> · {p.carteraEnRiesgo} en riesgo o dormidos</span>}
               <span className="block text-xs text-muted-foreground">
-                {p.pedidos30.toLocaleString("es")} pedidos en 30 días{c ? ` (${c})` : ""}
+                {nPedidos(p.pedidos30)} en 30 días{c ? ` (${c})` : ""}
               </span>
             </>
           ) : (

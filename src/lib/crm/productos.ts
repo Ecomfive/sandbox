@@ -1,3 +1,5 @@
+import { nPedidos } from "./salud";
+
 /**
  * Productos de la cartera para el panel de Dirección (30 oct 2026, fase 3: vender más). Cruza lo que vende cada dropshipper (sus pedidos de
  * Dropi por producto, `crm_productos_por_dropshipper`, migraciones 0198 y 0201) con el stock de cada producto en Dropi y lo que viene en camino
@@ -130,7 +132,7 @@ export function recomendados(dropshipperId: string, productos: ProductoCartera[]
       stock: p.stock,
       razon:
         deParecidos >= 2
-          ? `Lo venden ${deParecidos} dropshippers que venden lo mismo que él (${p.pedidos} pedidos en 30 días)`
-          : `Lo venden ${p.dropshippers} dropshippers (${p.pedidos} pedidos en 30 días)`,
+          ? `Lo venden ${deParecidos} dropshippers que venden lo mismo que él (${nPedidos(p.pedidos)} en 30 días)`
+          : `Lo venden ${p.dropshippers} dropshippers (${nPedidos(p.pedidos)} en 30 días)`,
     }));
 }
