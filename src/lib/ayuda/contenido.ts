@@ -606,6 +606,17 @@ export const GUIAS: GuiaModulo[] = [
         ],
       },
       {
+        titulo: "Panel de Dirección (CEO): salud de la cartera y qué atender hoy",
+        pasos: [
+          "Pestaña «Dirección» del CRM (/crm-dropshippers/direccion), solo para quien tiene «CRM: dirección (CEO)». Comercial y Atención no la ven y sus chats y pantallas no cambian. Muestra el país elegido arriba, con los pedidos de Dropi de cada dropshipper que tiene su cuenta vinculada (sin cancelados).",
+          "Arriba, los indicadores: la cartera con cuenta de Dropi (y cuántos del país no tienen cuenta vinculada), Activos, En riesgo, Dormidos (21 a 59 días sin pedir), Sin pedidos y los pedidos de 30 días frente a los 30 anteriores. Pulsar uno filtra la lista de clientes de abajo.",
+          "«Qué atender hoy» es la cola de alertas, las urgentes primero: Caída de pedidos (pidió al menos 40 % menos en los últimos 14 días que en los 14 anteriores, o lleva 10 a 20 días sin pedir cuando antes pedía seguido), Dormido, Devoluciones altas (25 % o más de los pedidos cerrados en 60 días) y Sin primer pedido (entró hace 7 a 45 días y no ha pedido). Cada una dice qué pasó y qué se sugiere hacer.",
+          "En cada alerta: «Ver ficha» abre el dropshipper; «Crear tarea» se la pasa a alguien del equipo con fecha (le llega el aviso y la ve en Tareas); «Atendida» la saca de la cola por 7 días (si sigue igual, vuelve).",
+          "Salud de 0 a 100 de cada dropshipper: cuándo pidió por última vez (35 %), cuántos pedidos hizo en 30 días comparado con el umbral VIP del país (25 %), si sube o baja frente a los 30 días anteriores (25 %) y qué parte de sus pedidos se entrega (15 %). 70 o más es Sano, 40 a 69 Atención y menos de 40 Crítico. En la lista de clientes, pulsa el nombre para ver de dónde sale su puntaje.",
+          "El tipo de cliente (VIP, BLACK) ya se calcula solo con sus pedidos (Configuración › Tipo de cliente); el panel lo muestra junto al nombre.",
+        ],
+      },
+      {
         titulo: "Conectar un número de WhatsApp (una vez, administración)",
         pasos: [
           "Hace falta la API oficial de WhatsApp (WhatsApp Cloud API) de Meta: una app de Meta tipo Empresa con el producto WhatsApp, la cuenta de WhatsApp Business de la empresa y el número agregado ahí.",
@@ -733,6 +744,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-10-30", titulo: "Panel de Dirección en el CRM (solo CEO)", texto: "El CRM tiene una pestaña nueva, «Dirección», solo para quien tiene «CRM: dirección (CEO)». Muestra la salud de 0 a 100 de cada dropshipper según sus pedidos de Dropi, la cola «Qué atender hoy» (caídas de pedidos, dormidos, devoluciones altas y los que no hacen su primer pedido) y los pedidos por semana. Desde cada alerta se crea una tarea para alguien del equipo o se marca atendida. Los chats y las pantallas de Comercial y Atención no cambian.", modulo: "crm-dropshippers", href: "/crm-dropshippers/direccion" },
   { fecha: "2026-10-30", titulo: "La bandeja de WhatsApp ahora es una burbuja que se mueve", texto: "En la lista de dropshippers del CRM, el botón grande «Bandeja de WhatsApp» se cambió por una burbuja verde flotante. Lleva a la bandeja con un clic y muestra en rojo cuántos chats esperan respuesta. Se queda fija al bajar la lista y la puedes arrastrar a donde no estorbe (con el ratón o el dedo; con el teclado, Mayús + flechas). Se acuerda de dónde la dejaste en tu navegador." },
   { fecha: "2026-10-30", titulo: "Gestión de IDs Dropi: el candado también quita la privatización", texto: "El candado de cada fila va abierto en un ID público (sirve para privatizarlo) y cerrado, en morado, en un ID privado. En un privado, el candado cerrado deja pendiente «Quitar privatización»: con «Aplicar en Dropi» se le saca el stock al privado, se le quita el correo del dropshipper, esas unidades vuelven al ID público que elijas y el privado queda archivado. Ya no hace falta entrar a Dropi ni cambiar el stock del público a mano.", modulo: "publicaciones-dropi", href: "/publicaciones-dropi" },
   { fecha: "2026-10-30", titulo: "Último cambio de precio, también el que se aplica desde el sistema", texto: "En Gestión de IDs Dropi, la ficha de cada publicación (bloque «Precio y margen») muestra el último cambio de precio con la fecha y de cuánto a cuánto. Ahora incluye los precios que se cambian desde el sistema y se aplican con «Aplicar en Dropi»: se ven al momento, con quién lo pidió, sin esperar a la lectura del catálogo de Dropi.", modulo: "publicaciones-dropi", href: "/publicaciones-dropi" },

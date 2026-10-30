@@ -65,8 +65,8 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     ? [
         ...pestanasOcultasDe(usuario.afinado),
         ...(esAdministrador(usuario) ? [] : PESTANAS_SOLO_ADMIN),
-        // Los KPIs de atención son del CEO (módulo crm-direccion).
-        ...(usuario.modulos.includes(MODULO_DIRECCION) ? [] : ["/crm-dropshippers/kpis"]),
+        // Los KPIs de atención y el panel de Dirección son del CEO (módulo crm-direccion).
+        ...(usuario.modulos.includes(MODULO_DIRECCION) ? [] : ["/crm-dropshippers/kpis", "/crm-dropshippers/direccion"]),
       ]
     : [];
   const paginas = paginasBuscables(areas, usuario?.modulos ?? null, pestanasOcultas);

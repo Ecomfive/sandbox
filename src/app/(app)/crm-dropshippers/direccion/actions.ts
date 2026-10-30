@@ -1,0 +1,94 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { registrarAuditoria } from "@/lib/auditoria";
+import { getUsuarioActual, type UsuarioActual } from "@/lib/auth";
+import { accesoCrm } from "@/lib/crm/areas";
+import { DIAS_ATENDIDA, ETIQUETA_ALERTA, SUGERENCIA_ALERTA, type TipoAlerta } from "@/lib/crm/salud";
+import { avisarTarea } from "@/lib/crm/tareas-servidor";
+import { getPaisActual } from "@/lib/pais";
+import { createServiceClient } from "@/lib/supabase/server";
+
+const RUTA = "/crm-dropshippers/direccion";
+const ES_ID = (v: unknown): v is string => typeof v === "string" && /^[0-9a-fA-F-]{8,64}$/.test(v);
+const TIPOS: TipoAlerta[] = ["caida", "dormido", "devoluciones", "sin_primer_pedido"];
+const FECHA = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Solo Dirección (`crm-direccion`) con escritura atiende alertas y crea tareas desde ellas. */
+async function usuarioDireccion(): Promise<UsuarioActual | null> {
+  const u = await getUsuarioActual();
+  return u && accesoCrm(u).escribeDireccion ? u : null;
+}
+
+function hastaDentroDe(dias: number): string {
+  const d = new Date(Date.now() + dias * 86_400_000);
+  return d.toLocaleDateString("en-CA", { timeZone: "America/Panama" });
+}
+
+/** «Atendida»: la alerta deja de salir en la cola por 7 días (si sigue igual después, vuelve). */
+export async function atenderAlerta(dropshipperId: string, tipo: TipoAlerta): Promise<{ ok: true } | { error: string }> {
+  const u = await usuarioDireccion();
+  if (!u) return { error: "Solo Dirección puede atender alertas." };
+  if (!ES_ID(dropshipperId) || !TIPOS.includes(tipo)) return { error: "Alerta no válida." };
+  const supabase = createServiceClient();
+  const pais = await getPaisActual(supabase);
+  const { data: d } = await supabase.from("dropshippers").select("nombre").eq("id", dropshipperId).maybeSingle();
+  if (!d) return { error: "Ese dropshipper ya no existe." };
+  const { error } = await supabase.from("crm_alertas_atendidas").insert({
+    dropshipper_id: dropshipperId,
+    pais_id: pais.id,
+    tipo,
+    como: "atendida",
+    hasta: hastaDentroDe(DIAS_ATENDIDA),
+    atendida_por: u.id,
+    atendida_por_nombre: u.nombre || u.email,
+  });
+  if (error) return { error: "No se pudo guardar. ¿Falta correr la migración 0197?" };
+  await registrarAuditoria({ accion: "crm_alerta_atendida", entidad: "dropshippers", entidadId: dropshipperId, detalle: `${ETIQUETA_ALERTA[tipo]} · ${d.nombre} (${pais.codigo})` });
+  revalidatePath(RUTA);
+  return { ok: true };
+}
+
+/**
+ * «Crear tarea» desde una alerta: una tarea del CRM para la persona elegida (le llega el aviso en la campana), unida al chat del dropshipper si
+ * tiene. La alerta queda atendida 7 días.
+ */
+export async function crearTareaDeAlerta(datos: { dropshipperId: string; tipo: TipoAlerta; responsableId: string; vence: string; texto: string }): Promise<{ ok: true } | { error: string }> {
+  const u = await usuarioDireccion();
+  if (!u) return { error: "Solo Dirección puede crear tareas desde las alertas." };
+  if (!ES_ID(datos.dropshipperId) || !TIPOS.includes(datos.tipo) || !ES_ID(datos.responsableId)) return { error: "Datos no válidos." };
+  if (!FECHA.test(datos.vence) || Number.isNaN(Date.parse(datos.vence))) return { error: "La fecha no es válida." };
+  const supabase = createServiceClient();
+  const pais = await getPaisActual(supabase);
+  const [{ data: d }, { data: resp }, { data: chat }] = await Promise.all([
+    supabase.from("dropshippers").select("nombre").eq("id", datos.dropshipperId).maybeSingle(),
+    supabase.from("perfiles").select("id, activo").eq("id", datos.responsableId).maybeSingle(),
+    supabase.from("whatsapp_conversaciones").select("id").eq("dropshipper_id", datos.dropshipperId).is("oculta_en", null).order("ultimo_mensaje_en", { ascending: false, nullsFirst: false }).limit(1).maybeSingle(),
+  ]);
+  if (!d) return { error: "Ese dropshipper ya no existe." };
+  if (!resp?.activo) return { error: "Esa persona no está activa." };
+  const titulo = `${ETIQUETA_ALERTA[datos.tipo]}: ${d.nombre}`.slice(0, 200);
+  const detalle = `${datos.texto.trim().slice(0, 600)}\n${SUGERENCIA_ALERTA[datos.tipo]}`;
+  const { data: tarea, error } = await supabase
+    .from("tareas_dropshipper")
+    .insert({ dropshipper_id: datos.dropshipperId, conversacion_id: chat?.id ?? null, titulo, detalle, vence: datos.vence, origen: "alerta", responsable_id: datos.responsableId, creado_por: u.id })
+    .select("id")
+    .single();
+  if (error || !tarea) return { error: "No se pudo crear la tarea. ¿Falta correr la migración 0197?" };
+  await supabase.from("crm_alertas_atendidas").insert({
+    dropshipper_id: datos.dropshipperId,
+    pais_id: pais.id,
+    tipo: datos.tipo,
+    como: "tarea",
+    tarea_id: tarea.id,
+    hasta: hastaDentroDe(DIAS_ATENDIDA),
+    atendida_por: u.id,
+    atendida_por_nombre: u.nombre || u.email,
+  });
+  if (datos.responsableId !== u.id)
+    await avisarTarea(supabase, { usuarioId: datos.responsableId, titulo, cliente: d.nombre, conversacionId: chat?.id ?? null, motivo: "asignada", autor: { id: u.id, nombre: u.nombre ?? null } });
+  await registrarAuditoria({ accion: "crear_tarea_crm", entidad: "dropshippers", entidadId: datos.dropshipperId, detalle: `${titulo} (desde Dirección, ${pais.codigo})` });
+  revalidatePath(RUTA);
+  revalidatePath("/crm-dropshippers/tareas");
+  return { ok: true };
+}
