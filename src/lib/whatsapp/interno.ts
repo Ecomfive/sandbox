@@ -1,15 +1,13 @@
 /**
  * «WhatsApp interno» (30 oct 2026, vuelve a ser por WhatsApp a pedido de Jhokser): el chat de un número de la empresa con el de otra área. Es WhatsApp de verdad, así que el primer
- * mensaje —y cualquiera pasadas 24 h sin respuesta— tiene que ser una plantilla aprobada; para eso la plantilla «Mensaje interno entre áreas» sale como la predeterminada.
+ * mensaje —y cualquiera pasadas 24 h sin respuesta— tiene que ser una plantilla aprobada; para eso «Primer contacto con permiso» (`primer_contacto`) sale como la predeterminada.
  */
 
-/** El nombre de la plantilla que se ofrece primero en un chat interno (`PLANTILLAS_SUGERIDAS`, clave `mensaje_interno`). */
-export const PLANTILLA_INTERNA = "mensaje_interno";
+/** El nombre de la plantilla que se ofrece primero en un chat interno (`PLANTILLAS_SUGERIDAS`, clave `primer_contacto`: la misma de «Nuevo contacto»). */
+export const PLANTILLA_INTERNA = "primer_contacto";
 
-/** La etiqueta de la variable de esa plantilla que dice quién escribe: se llena sola con el área del número que manda. */
-export const ETIQUETA_AREA_QUE_ESCRIBE = "área que escribe";
-
-const NOMBRE_DEL_AREA: Record<string, string> = { atencion: "Atención", comercial: "Comercial", direccion: "Dirección" };
+/** La etiqueta de la variable de esa plantilla que dice quién escribe: se llena sola con el nombre de la persona que está escribiendo. */
+export const ETIQUETA_NOMBRE_DEL_ASESOR = "nombre del asesor";
 
 export const digitosDe = (texto: unknown) => String(texto ?? "").replace(/\D/g, "");
 
@@ -27,9 +25,9 @@ export function conPredeterminadaPrimero<T extends { predeterminada: boolean }>(
   return [...plantillas.filter((p) => p.predeterminada), ...plantillas.filter((p) => !p.predeterminada)];
 }
 
-/** Lo que ya se sabe de una variable que se escribe al enviar: en la plantilla interna, «Área que escribe» es el área del número que manda. */
-export function sugeridoParaVariable(etiqueta: string | null | undefined, interno: boolean, areaQueEscribe: string | null | undefined): string {
+/** Lo que ya se sabe de una variable que se escribe al enviar: en la plantilla predeterminada, «Nombre del asesor» es quien está escribiendo. */
+export function sugeridoParaVariable(etiqueta: string | null | undefined, interno: boolean, nombreDeQuienEscribe: string | null | undefined): string {
   if (!interno) return "";
-  if (String(etiqueta ?? "").trim().toLowerCase() !== ETIQUETA_AREA_QUE_ESCRIBE) return "";
-  return NOMBRE_DEL_AREA[String(areaQueEscribe ?? "")] ?? "";
+  if (String(etiqueta ?? "").trim().toLowerCase() !== ETIQUETA_NOMBRE_DEL_ASESOR) return "";
+  return String(nombreDeQuienEscribe ?? "").trim();
 }
