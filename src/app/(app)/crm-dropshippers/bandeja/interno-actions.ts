@@ -41,7 +41,7 @@ export async function abrirChatInterno(desdeId: string, haciaId: string): Promis
 
 /**
  * Un mensaje del chat interno (30 oct 2026, pedido de Jhokser): **se guarda como nota en el sistema y no sale por WhatsApp**, así no pesan las reglas de Meta (la
- * ventana de 24 h, las plantillas, el primer contacto, el costo y la calidad del número). `whatsapp_enviar_interno` (migración 0201) lo guarda, en una sola transacción,
+ * ventana de 24 h, las plantillas, el primer contacto, el costo y la calidad del número). `whatsapp_enviar_interno` (migración 0202) lo guarda, en una sola transacción,
  * en las dos conversaciones del chat —la de quien escribe y su espejo en el otro número— y en la del otro lado lo cuenta como no leído. Hay que poder escribir en el
  * área de este chat y que sea un chat entre dos números de la empresa. Devuelve el error como valor.
  */
@@ -56,7 +56,7 @@ export async function enviarMensajeInterno(id: string, texto: string): Promise<{
   const { data, error } = await supabase.rpc("whatsapp_enviar_interno", { p_conversacion: id, p_texto: cuerpo, p_autor_id: u.id, p_autor_nombre: u.nombre || u.email });
   if (error) {
     if (/no_es_chat_interno/.test(error.message)) return { error: "Este no es un chat interno." };
-    if (/whatsapp_enviar_interno|schema cache|does not exist/i.test(error.message)) return { error: "Falta correr la migración 0201 (chat interno)." };
+    if (/whatsapp_enviar_interno|schema cache|does not exist/i.test(error.message)) return { error: "Falta correr la migración 0202 (chat interno)." };
     return { error: "No se pudo mandar el mensaje." };
   }
   const fila = (Array.isArray(data) ? data[0] : data) as { o_mensaje?: string; o_momento?: string } | null;

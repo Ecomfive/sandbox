@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { alertasDe, calcularSalud, compararAlertas, segmentoDe, type Prioridad, type Salud, type Segmento, type TipoAlerta } from "@/lib/crm/salud";
-import { traerTodasLasFilas } from "@/lib/supabase/paginar";
+import { traerTodasConError, traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { personasConModulos } from "@/lib/whatsapp/personas-crm";
 import { MODULO_ATENCION } from "@/lib/crm/areas";
 
@@ -72,7 +72,7 @@ interface FilaSalud {
 export async function cargarDireccion(supabase: SupabaseClient, paisId: string): Promise<DatosDireccion | { error: string }> {
   const hoy = hoyPanama();
   const [salud, semanas, cuentas, enPais, umbral, atendidas, perfiles, personas] = await Promise.all([
-    supabase.rpc("crm_salud_dropshippers", { p_pais: paisId }),
+    traerTodasConError<FilaSalud>((d, h) => supabase.rpc("crm_salud_dropshippers", { p_pais: paisId }).order("dropshipper_id").range(d, h)),
     supabase.rpc("crm_pedidos_semanales", { p_pais: paisId, p_semanas: 8 }),
     traerTodasLasFilas<{ dropshipper_id: string }>((d, h) => supabase.from("dropshipper_cuentas").select("dropshipper_id").eq("pais_id", paisId).order("id").range(d, h)),
     traerTodasLasFilas<{ dropshipper_id: string }>((d, h) => supabase.from("dropshipper_paises").select("dropshipper_id").eq("pais_id", paisId).order("dropshipper_id").range(d, h)),
@@ -84,7 +84,7 @@ export async function cargarDireccion(supabase: SupabaseClient, paisId: string):
   if (salud.error || semanas.error || atendidas.error) return { error: "Falta correr la migración 0197 (panel de Dirección) en la base." };
 
   const conCuenta = new Set(cuentas.map((c) => c.dropshipper_id));
-  const porId = new Map(((salud.data ?? []) as FilaSalud[]).map((f) => [f.dropshipper_id, f]));
+  const porId = new Map((salud.data ?? []).map((f) => [f.dropshipper_id, f]));
   const ids = [...new Set([...conCuenta, ...porId.keys()])];
   const ds = await traerTodasLasFilas<{ id: string; codigo: string; nombre: string; nivel: string; responsable_id: string | null; fecha_ingreso: string | null; captado_en: string | null }>(
     (d, h) => supabase.from("dropshippers").select("id, codigo, nombre, nivel, responsable_id, fecha_ingreso, captado_en").order("id").range(d, h),
