@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { Tooltip } from "@/components/ui/tooltip";
 import { anilloFoco } from "@/components/ui/field";
-import { formatearFecha } from "@/lib/formato";
 import {
   AlertaIcon,
   ChatIcon,
@@ -19,6 +18,7 @@ import type { AccesoCrm } from "@/lib/crm/areas";
 import { ActividadDropshipper } from "./actividad-dropshipper";
 import { BotonEscalar, PanelSeguimiento, SeguimientosDropshipper } from "./areas-ficha";
 import { MostrarTelefono } from "./mostrar-telefono";
+import { DatoEditable } from "./dato-editable";
 import { CuentasDropshipper } from "./cuentas-dropshipper";
 import { DesempenoDropshipper } from "./desempeno-dropshipper";
 import { VentasDropiDropshipperBloque } from "./ventas-dropi-dropshipper";
@@ -202,23 +202,24 @@ export function CasosAbiertos({ abiertos, acceso }: { abiertos: FilaCaso[]; acce
 }
 
 /**
- * Sus datos: teléfono (con «Mostrar número»), ciudad, ingreso, responsable, etiquetas (editables, como en ClickUp)… En la ficha del chat
- * `conEtiquetas` va en falso: ahí las mismas etiquetas se editan arriba de todo.
+ * Sus datos: teléfono (con «Mostrar número»), ciudad, ingreso, último pedido, etiquetas (editables, como en ClickUp)… Ciudad, ingreso y
+ * correo se cambian ahí mismo con el lápiz (`DatoEditable`). Etapa, notas y responsable (lo que venía de ClickUp) ya no se muestran
+ * (29 oct 2026, pedido de Alcides). En la ficha del chat `conEtiquetas` va en falso: ahí las mismas etiquetas se editan arriba de todo.
  */
 export function DatosDropshipper({ d, hoy, acceso, conEtiquetas = true }: { d: FilaDropshipper; hoy: string; acceso: AccesoCrm; conEtiquetas?: boolean }) {
+  const dato = (campo: "ciudad" | "ingreso" | "correo", inicial: string | null) => (
+    <DatoEditable key={`${campo}-${d.id}`} dropshipperId={d.id} campo={campo} inicial={inicial} puede={acceso.escribeAtencion} />
+  );
   return (
     <dl className="m-0 grid grid-cols-[7.5rem_minmax(0,1fr)] gap-x-2.5 gap-y-1.5 text-[13px]">
       {[
         ...(d.tieneTelefono && acceso.verTelefonos ? [["Teléfono", <MostrarTelefono key="t" tipo="dropshipper" id={d.id} puede />]] : []),
-        ["Ciudad", d.ciudad ?? "—"],
-        ["Ingreso", d.ingreso ? formatearFecha(d.ingreso) : "—"],
-        ["Responsable", d.responsable ?? "Sin asignar"],
+        ["Ciudad", dato("ciudad", d.ciudad)],
+        ["Ingreso", dato("ingreso", d.ingreso)],
         ["Último pedido", etiquetaUltimoPedido(d.ultimoPedido, hoy)],
-        ...(d.etapa ? [["Etapa", d.etapa]] : []),
         ...(d.productos.length ? [["Productos", d.productos.map((p) => <Etiqueta key={p}>{p}</Etiqueta>)]] : []),
         ...(conEtiquetas ? [["Etiquetas", <EtiquetasDropshipper key={`etiquetas-${d.id}`} dropshipperId={d.id} iniciales={d.etiquetas} puedeEscribir={acceso.escribeAtencion} />]] : []),
-        ...(d.email ? [["Correo", d.email]] : []),
-        ...(d.notas ? [["Notas", d.notas]] : []),
+        ["Correo", dato("correo", d.email)],
       ].map(([titulo, valor]) => (
         <div key={String(titulo)} className="contents">
           <dt className="text-muted-foreground">{titulo}</dt>

@@ -203,7 +203,8 @@ export async function editarDropshipper(formData: FormData): Promise<{ error?: s
   const tiendas = listaTiendas(formData);
   const ciudad = texto(formData, "ciudad") || null;
   const contacto_email = texto(formData, "contacto_email").toLowerCase() || null;
-  const notas = texto(formData, "notas") || null;
+  // Las notas de ClickUp ya no se muestran ni se editan (29 oct 2026): solo se tocan si vienen en el formulario, para no borrarlas.
+  const notas = formData.has("notas") ? texto(formData, "notas") || null : undefined;
   // Las etiquetas se editan aparte (`guardarEtiquetasDropshipper`): solo se tocan si vienen en el formulario.
   const etiquetas = formData.has("etiquetas") ? lista(texto(formData, "etiquetas"), 30) : undefined;
   const productos = lista(texto(formData, "productos"), 60);
@@ -250,7 +251,7 @@ export async function editarDropshipper(formData: FormData): Promise<{ error?: s
       ciudad,
       contacto_email,
       contacto_telefono,
-      notas,
+      ...(notas !== undefined ? { notas } : {}),
       ...(etiquetas !== undefined ? { etiquetas } : {}),
       productos,
       ...(pais_origen !== undefined ? { pais_origen } : {}),

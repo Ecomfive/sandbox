@@ -233,9 +233,6 @@ export function PanelEditar({ d, alGuardar }: { d: FilaDropshipper; alGuardar?: 
             <Campo etiqueta="Productos (separados por coma)" id="campo-productos-editar">
               <input id="campo-productos-editar" type="text" name="productos" autoComplete="off" defaultValue={d.productos.join(", ")} className={`${fieldClass} w-full`} />
             </Campo>
-            <Campo etiqueta="Notas" id="campo-notas-editar">
-              <textarea id="campo-notas-editar" name="notas" rows={4} defaultValue={d.notas ?? ""} className={`${fieldClass} w-full resize-y`} />
-            </Campo>
           </Seccion>
         </>
       )}
