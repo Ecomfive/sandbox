@@ -1018,6 +1018,12 @@ convenciones técnicas del código.
   como salientes con `whatsapp_registrar_saliente_celular` (autor «Desde el celular»). Pestaña **KPIs de atención**
   (`/crm-dropshippers/kpis`, oculta sin `crm-direccion` en el layout): la función `whatsapp_kpis(p_desde, p_areas)` devuelve por número,
   por persona y por día las consultas (primer entrante tras un saliente), sin responder y la mediana hasta la primera respuesta.
+  **Panel de Dirección** (migración 0197, 30 oct 2026, fase 1 del panel del CEO; prototipo en https://claude.ai/artifact/EgMSyATkMEUXzk9LsX8Wkj): pestaña
+  `/crm-dropshippers/direccion` (oculta sin `crm-direccion` en el layout, como KPIs). `crm_salud_dropshippers(p_pais)` da por dropshipper los
+  pedidos de 14/30 días y los anteriores, primer y último pedido y entregados/devueltos de 60 días (sin cancelados, por `dropshipper_cuentas`);
+  `crm_pedidos_semanales`. El puntaje, el segmento y las alertas son de `src/lib/crm/salud.ts` (puro, con pruebas). «Atendida» y «Crear tarea»
+  (`direccion/actions.ts`, solo `escribeDireccion`) guardan en `crm_alertas_atendidas` (7 días); la tarea va con `origen = 'alerta'`. Para «Sin
+  primer pedido» se usa `fecha_ingreso`/`captado_en`, nunca `creado_en` (los de ClickUp se crearon todos al importarlos). No toca la Bandeja.
   **360dialog y un solo número** (migración 0168, 28 oct 2026): el área es de cada conversación (`whatsapp_conversaciones.area`; un
   trigger le pone la del número al crearla) y se cambia con `pasarConversacionDeArea` (botón «Pasar a otra área» del chat, nota + auditoría). Todo
   filtro de áreas del CRM va por `whatsapp_conversaciones.area`, no por la del número. **Paneles y supervisión** (29 oct 2026, pedido de
