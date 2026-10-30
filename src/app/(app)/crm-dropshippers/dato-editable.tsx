@@ -21,6 +21,23 @@ const EJEMPLO: Record<CampoDato, string> = {
   correo: "Ej: nombre@correo.com",
 };
 
+/** Tiendas y productos se ven como pastillas, una por elemento, en vez de un párrafo separado por comas (30 oct 2026, pedido de Alcides). */
+const EN_PASTILLAS: CampoDato[] = ["tiendas", "productos"];
+
+function Valor({ campo, valor }: { campo: CampoDato; valor: string | null }) {
+  if (valor && EN_PASTILLAS.includes(campo))
+    return (
+      <span className="flex min-w-0 flex-wrap gap-1">
+        {valor.split(", ").map((v) => (
+          <span key={v} className="rounded-md border border-border bg-card px-1.5 py-px text-[12px] leading-snug">
+            {v}
+          </span>
+        ))}
+      </span>
+    );
+  return <span className={`min-w-0 break-words ${valor ? "" : "text-muted-foreground"}`}>{mostrar(campo, valor)}</span>;
+}
+
 function mostrar(campo: CampoDato, valor: string | null): string {
   if (!valor) return "—";
   if (campo === "ingreso") return formatearFecha(valor);
@@ -49,7 +66,7 @@ export function DatoEditable({ dropshipperId, campo, inicial, puede }: { dropshi
   const idError = useId();
   const nombre = CAMPOS_DATO[campo].etiqueta.toLowerCase();
 
-  if (!puede) return <span className="break-words">{mostrar(campo, valor)}</span>;
+  if (!puede) return <Valor campo={campo} valor={valor} />;
 
   function abrir() {
     // El número de WhatsApp no se enseña: se escribe el nuevo desde cero.
@@ -86,7 +103,7 @@ export function DatoEditable({ dropshipperId, campo, inicial, puede }: { dropshi
           onClick={abrir}
           className={`group -mx-1.5 -my-0.5 inline-flex max-w-full items-start gap-1 rounded px-1.5 py-0.5 text-left hover:bg-muted ${anilloFoco}`}
         >
-          <span className={`min-w-0 break-words ${valor ? "" : "text-muted-foreground"}`}>{mostrar(campo, valor)}</span>
+          <Valor campo={campo} valor={valor} />
           <LapizIcon width={12} height={12} aria-hidden="true" className="mt-[3px] flex-none text-muted-foreground opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100" />
         </button>
       </Tooltip>
