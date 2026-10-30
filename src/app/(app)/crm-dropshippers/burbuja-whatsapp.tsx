@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState, useSyncExternalStore, type KeyboardEvent, type PointerEvent } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent, type PointerEvent } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { Tooltip } from "@/components/ui/tooltip";
 
@@ -54,7 +54,8 @@ function GloboConAuricular() {
 
 /**
  * La burbuja flotante de la bandeja de WhatsApp (30 oct 2026, pedido de Jhokser; reemplaza el botón grande de arriba de la lista del CRM): lleva a la bandeja
- * y muestra cuántos chats esperan respuesta. Se queda fija en la pantalla al bajar la lista y se arrastra a donde no estorbe (con el ratón, el dedo o, con el foco,
+ * y muestra cuántos chats esperan respuesta. **Solo aparece cuando la pestaña «Bandeja de WhatsApp» (la de arriba, con su globo) sale de la pantalla** al bajar la
+ * lista; arriba del todo, donde la pestaña se ve, no hace falta y se esconde. Se queda fija en la pantalla al bajar la lista y se arrastra a donde no estorbe (con el ratón, el dedo o, con el foco,
  * Mayús + flechas); el sitio queda recordado en este navegador. Un clic sin arrastrar abre la bandeja.
  */
 export function BurbujaWhatsapp({ sinResponder }: { sinResponder: number }) {
@@ -70,6 +71,18 @@ export function BurbujaWhatsapp({ sinResponder }: { sinResponder: number }) {
 function Burbuja({ sinResponder }: { sinResponder: number }) {
   const [pos, setPos] = useState<Pos>(posicionInicial);
   const posRef = useRef(pos);
+  // Si la pestaña de la bandeja se ve en pantalla, la burbuja sobra. Arranca escondida (sin parpadeo) hasta saberlo; si no hay pestaña, se muestra.
+  const [pestanaALaVista, setPestanaALaVista] = useState(true);
+  useEffect(() => {
+    const pestana = document.querySelector('nav[aria-label^="Secciones de"] a[href="/crm-dropshippers/bandeja"]');
+    if (!pestana) {
+      const t = requestAnimationFrame(() => setPestanaALaVista(false));
+      return () => cancelAnimationFrame(t);
+    }
+    const mirador = new IntersectionObserver(([e]) => setPestanaALaVista(e.isIntersecting));
+    mirador.observe(pestana);
+    return () => mirador.disconnect();
+  }, []);
   const arrastre = useRef<{ id: number; dx: number; dy: number; x0: number; y0: number; movido: boolean } | null>(null);
   // Tras arrastrar, el clic que sigue al soltar no debe abrir la bandeja.
   const huboArrastre = useRef(false);
@@ -114,7 +127,11 @@ function Burbuja({ sinResponder }: { sinResponder: number }) {
 
   return (
     // Por encima de la lista y su barra (z-20) y por debajo de las fichas y ventanas (z-40).
-    <div className="bandeja-wa fixed z-30" style={{ left: pos.x, top: pos.y, width: TAM, height: TAM }}>
+    <div
+      className={`bandeja-wa fixed z-30 transition-[opacity,transform] duration-200 motion-reduce:transition-none ${pestanaALaVista ? "pointer-events-none scale-75 opacity-0" : ""}`}
+      style={{ left: pos.x, top: pos.y, width: TAM, height: TAM }}
+      inert={pestanaALaVista || undefined}
+    >
       <Tooltip texto="Bandeja de WhatsApp · arrástrala si estorba">
         <Link
           href="/crm-dropshippers/bandeja"
