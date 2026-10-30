@@ -23,7 +23,7 @@ import { abrirChatInterno } from "./interno-actions";
 import { BotonWhatsappInterno } from "./interno";
 import { colorFoto, iniciales } from "./globo-persona";
 import { EtiquetasChat, PastillasEtiquetas, SelectorEtiquetasChat, type ManejoEtiquetas } from "./etiquetas-chat";
-import { claseBotonFicha, claseBotonFichaPrincipal, FichaDelChat, type AccionExtra } from "./ficha-chat";
+import { claseBotonFicha, claseBotonFichaPrincipal, DatosEnLaCabecera, FichaDelChat, type AccionExtra } from "./ficha-chat";
 import { reaccionarAMensaje } from "./reaccion-actions";
 import { VistaPreviaChat } from "./vista-previa-chat";
 import { VentanaVincular } from "./vincular-chat";
@@ -1484,7 +1484,7 @@ export function Bandeja({
                   </span>
                 </span>
               </span>
-              {sel.vip && <EtiquetaVip tipo={sel.tipoCliente} />}
+              <DatosEnLaCabecera sel={sel} ficha={fichaDelChat} respondieron={quienesRespondieron(mensajes ?? [])} alGuardarCrm={() => setVersionCrm((v) => v + 1)} />
               <EtiquetaArea area={sel.area} />
               {sel.interno && <span className="rounded-full bg-azul-soft px-2 py-px text-[11.5px] font-semibold text-azul">WhatsApp interno</span>}
               {/* Dónde vende (29 oct 2026, pedido de Alcides): sus plataformas por país, puestas a mano o de sus cuentas; y los países de su ficha que aún no tienen plataforma. */}
@@ -1554,7 +1554,6 @@ export function Bandeja({
                   accionesChat={accionesChat}
                   etiquetas={<EtiquetasChat key={sel.id} conversacionId={sel.id} etiquetas={sel.etiquetas} manejo={manejoEtiquetas} escribe={escribe} />}
                   accionesExtra={accionesExtra}
-                  respondieron={quienesRespondieron(mensajes ?? [])}
                   versionEquipo={`${(mensajes ?? []).filter((m) => m.direccion !== "entrante").length}|${sel.nombrePersonalizado ?? ""}|${sel.dropshipperId ?? ""}|${sel.area}|${sel.estado}|${sel.asignadaA ?? ""}`}
                   alAbrirVincular={() => setVincular(true)}
                   alVinculado={(mensaje) => {

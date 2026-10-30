@@ -83,7 +83,7 @@ export function ContenidoFichaDropshipper({ d, casos, codigoPais, hoy, acceso }:
       <div className="flex flex-col gap-2 border-b border-border p-3.5">
         <div className="flex flex-wrap gap-1.5">
           <Pastilla tono={tonoEstado(d.estado)}>{etiquetaEstado(d.estado)}</Pastilla>
-          <TipoCliente key={`tipo-${d.id}`} dropshipperId={d.id} nivel={d.nivel} manual={d.nivelManual} promedio={d.promedioPedidosMes} puede={acceso.escribeAtencion || acceso.escribeComercial} />
+          <TipoCliente key={`tipo-${d.id}`} dropshipperId={d.id} nivel={d.nivel} manual={d.nivelManual} promedio={d.promedioPedidosMes} cambio={d.cambioTipo} puede={acceso.escribeAtencion || acceso.escribeComercial} />
           {abiertos.length > 0 && (
             <Pastilla>
               <Punto />
