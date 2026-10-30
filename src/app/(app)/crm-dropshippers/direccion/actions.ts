@@ -147,3 +147,38 @@ export async function contactosParaLista(ids: string[], segmento: string): Promi
   });
   return { conTelefono, contactos: filas.map((f) => ({ id: f.id, correo: f.contacto_email, telefono: conTelefono ? f.contacto_telefono : null })) };
 }
+
+/**
+ * El interruptor de la secuencia de alta (Dirección › Automatizaciones, fase 4). Al encenderla empieza a contar desde ese momento: solo los
+ * dropshippers que se creen después reciben sus tareas (día 1, 3, 7 y 14). `responsableId`: para quién van las de los que nadie lleva.
+ */
+export async function guardarSecuenciaAlta(encendida: boolean, responsableId: string | null): Promise<{ ok: true } | { error: string }> {
+  const u = await usuarioDireccion();
+  if (!u) return { error: "Solo Dirección puede cambiar las automatizaciones." };
+  if (responsableId !== null && !ES_ID(responsableId)) return { error: "Persona no válida." };
+  if (encendida && !responsableId) return { error: "Elige para quién van las tareas de los dropshippers que nadie lleva." };
+  const supabase = createServiceClient();
+  if (responsableId) {
+    const { data: p } = await supabase.from("perfiles").select("activo").eq("id", responsableId).maybeSingle();
+    if (!p?.activo) return { error: "Esa persona no está activa." };
+  }
+  const { data: antes } = await supabase.from("crm_automatizaciones").select("encendida, encendida_en").eq("clave", "secuencia_alta").maybeSingle();
+  if (!antes) return { error: "Falta correr la migración 0205 en la base." };
+  const { error } = await supabase
+    .from("crm_automatizaciones")
+    .update({
+      encendida,
+      config: { responsable_id: responsableId },
+      // Al encenderla de nuevo, vuelve a contar desde ahora (no se crean tareas a los que entraron mientras estaba apagada).
+      encendida_en: encendida ? (antes.encendida ? antes.encendida_en : new Date().toISOString()) : antes.encendida_en,
+      actualizado_por: u.id,
+      actualizado_por_nombre: u.nombre || u.email,
+      actualizado_en: new Date().toISOString(),
+    })
+    .eq("clave", "secuencia_alta");
+  if (error) return { error: "No se pudo guardar." };
+  await registrarAuditoria({ accion: "crm_secuencia_alta", entidad: "crm_automatizaciones", entidadId: "secuencia_alta", detalle: encendida ? "Secuencia de alta encendida" : "Secuencia de alta apagada" });
+  revalidatePath(RUTA);
+  return { ok: true };
+}
+
