@@ -8,7 +8,7 @@ import { anilloFoco, fieldClass, labelClassSm } from "@/components/ui/field";
 import { ContenidoKpi, claseKpi, type Tono } from "@/components/ui/kpi-card";
 import { useToast } from "@/components/ui/toast";
 import { Ventana } from "@/components/ui/ventana";
-import { ETIQUETA_ALERTA, ETIQUETA_BANDA, ETIQUETA_SEGMENTO, SUGERENCIA_ALERTA, type Banda, type Prioridad, type Segmento, type TipoAlerta } from "@/lib/crm/salud";
+import { ETIQUETA_ALERTA, ETIQUETA_BANDA, ETIQUETA_SEGMENTO, nPedidos, SUGERENCIA_ALERTA, type Banda, type Prioridad, type Segmento, type TipoAlerta } from "@/lib/crm/salud";
 import { asignarResponsable, atenderAlerta, crearTareaDeAlerta } from "./actions";
 import type { AlertaDireccion, DatosDireccion, FilaDireccion } from "./datos-direccion";
 import type { DatosProductos } from "./datos-productos";
@@ -447,7 +447,7 @@ function VendeYRecomendados({ extra }: { extra: DatosProductos["porCliente"][str
             {extra.vende.map((v) => (
               <li key={v.productoId} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5">
                 <span className="min-w-0">
-                  {v.nombre} <span className="text-xs text-muted-foreground">· {v.pedidos} pedidos ({Math.round(v.parte * 100)} %)</span>
+                  {v.nombre} <span className="text-xs text-muted-foreground">· {nPedidos(v.pedidos)} ({Math.round(v.parte * 100)} %)</span>
                 </span>
                 <span className="flex flex-wrap items-center gap-1.5 text-xs">
                   <Pastilla tono={TONO_STOCK[v.estado]}>

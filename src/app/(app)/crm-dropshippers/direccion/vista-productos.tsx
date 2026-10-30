@@ -7,7 +7,7 @@ import { anilloFoco, fieldClass, labelClassSm } from "@/components/ui/field";
 import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
 import { useToast } from "@/components/ui/toast";
 import { DIAS_SE_ACABA, ETIQUETA_ESTADO_STOCK, type EstadoStock, type ProductoCartera } from "@/lib/crm/productos";
-import { ETIQUETA_SEGMENTO } from "@/lib/crm/salud";
+import { ETIQUETA_SEGMENTO, nPedidos } from "@/lib/crm/salud";
 import type { FilaDireccion } from "./datos-direccion";
 import type { DatosProductos } from "./datos-productos";
 import { descargarLista } from "./lista-csv";
@@ -155,7 +155,7 @@ export function VistaProductos({ datos, clientes, codigoPais }: { datos: DatosPr
                                       {f?.nombre ?? "Dropshipper"} <span className="text-xs text-muted-foreground">{f?.codigo}</span>
                                     </Link>
                                     <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-                                      {c.pedidos} pedidos{f ? ` · ${ETIQUETA_SEGMENTO[f.segmento]}` : ""}
+                                      {nPedidos(c.pedidos)}{f ? ` · ${ETIQUETA_SEGMENTO[f.segmento]}` : ""}
                                     </span>
                                   </li>
                                 );

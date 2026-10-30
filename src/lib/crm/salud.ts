@@ -60,6 +60,9 @@ export const SUGERENCIA_ALERTA: Record<TipoAlerta, string> = {
   sin_primer_pedido: "Acompañarle a publicar su primer producto.",
 };
 
+/** «1 pedido», «12 pedidos», «1.250 pedidos». */
+export const nPedidos = (n: number) => `${n.toLocaleString("es")} ${n === 1 ? "pedido" : "pedidos"}`;
+
 /** Días que una alerta atendida no vuelve a salir. */
 export const DIAS_ATENDIDA = 7;
 
@@ -93,7 +96,7 @@ export function calcularSalud(p: PedidosDropshipper, hoy: string, refVolumen: nu
   const cambio = p.pedidos30Antes ? p.pedidos30 / p.pedidos30Antes - 1 : null;
   const factores: Factor[] = [
     { clave: "recencia", etiqueta: "Recencia", valor: recencia, peso: PESOS.recencia, detalle: dias === 0 ? "Pidió hoy" : dias === 1 ? "Pidió ayer" : `Último pedido hace ${dias} días` },
-    { clave: "volumen", etiqueta: "Volumen", valor: volumen, peso: PESOS.volumen, detalle: `${p.pedidos30} pedidos en 30 días (VIP desde ${refVolumen} al mes)` },
+    { clave: "volumen", etiqueta: "Volumen", valor: volumen, peso: PESOS.volumen, detalle: `${nPedidos(p.pedidos30)} en 30 días (VIP desde ${refVolumen} al mes)` },
     {
       clave: "tendencia",
       etiqueta: "Tendencia",
@@ -102,7 +105,7 @@ export function calcularSalud(p: PedidosDropshipper, hoy: string, refVolumen: nu
       detalle: !conHistoria
         ? "Todavía sin 30 días anteriores para comparar"
         : cambio === null
-          ? `${p.pedidos30} pedidos; en los 30 días anteriores no pidió`
+          ? `${nPedidos(p.pedidos30)}; en los 30 días anteriores no pidió`
           : `${cambio >= 0 ? "+" : "−"}${pct(Math.abs(cambio))} frente a los 30 días anteriores (${p.pedidos30} y ${p.pedidos30Antes})`,
     },
     {
