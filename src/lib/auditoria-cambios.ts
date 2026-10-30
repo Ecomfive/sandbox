@@ -212,7 +212,7 @@ export const ETIQUETA_ACCION: Record<string, string> = {
   etiquetas_dropshipper: "Cambió las etiquetas del dropshipper",
   vende_en_dropshipper: "Dónde vende",
   tipo_cliente_dropshipper: "Cambió el tipo de cliente",
-  abrir_chat_interno: "Abrió un chat de WhatsApp interno",
+  abrir_chat_interno: "Abrió un chat interno entre áreas",
   umbrales_tipo_cliente: "Cambió los umbrales del tipo de cliente",
   crear_plataforma_venta: "Agregó una plataforma a «Dónde vende»",
   renombrar_plataforma_venta: "Corrigió el nombre de una plataforma de «Dónde vende»",
