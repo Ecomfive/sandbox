@@ -22,7 +22,7 @@ test("la recencia baja a 0 a los 30 días y la tendencia no cuenta sin historia"
   const viejo = calcularSalud({ ...base, ultimoPedido: "2026-09-30", pedidos14: 0, pedidos30: 0 }, HOY, 500);
   assert.equal(viejo.factores.find((f) => f.clave === "recencia")?.valor, 0);
   assert.equal(viejo.banda, "critico");
-  const nuevo = calcularSalud({ ...base, primerPedido: "2026-10-10" }, HOY, 500);
+  const nuevo = calcularSalud({ ...base, primerPedido: "2026-10-10", pedidos14Antes: 3 }, HOY, 500);
   assert.equal(nuevo.factores.find((f) => f.clave === "tendencia")?.valor, null);
 });
 
@@ -80,3 +80,17 @@ test("la cola pone primero las urgentes y, entre iguales, la de más pedidos", (
   ].sort(compararAlertas);
   assert.deepEqual(l.map((x) => x.peso), [5, 90, 50]);
 });
+
+test("una caída reciente baja la tendencia y no deja salir «Sano» (el caso de Jose Sinisterra)", () => {
+  const jose = { pedidos14: 238, pedidos14Antes: 480, pedidos30: 822, pedidos30Antes: 504, primerPedido: "2026-08-30", ultimoPedido: HOY, entregados60: 959, devueltos60: 178 };
+  const s = calcularSalud(jose, HOY, 500);
+  const t = s.factores.find((f) => f.clave === "tendencia");
+  assert.ok((t?.valor ?? 100) < 20, String(t?.valor));
+  assert.match(t?.detalle ?? "", /14 días/);
+  assert.equal(s.puntaje, 69);
+  assert.equal(s.banda, "atencion");
+  assert.match(s.tope ?? "", /caída/);
+  // Sin caída no hay tope.
+  assert.equal(calcularSalud(base, HOY, 500).tope, null);
+});
+
