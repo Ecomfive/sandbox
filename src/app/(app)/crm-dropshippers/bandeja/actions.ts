@@ -450,9 +450,9 @@ export interface PlantillaParaEnviar {
   faltante: string | null;
   /** Ya se le mandó esta misma plantilla en las últimas 24 h. */
   yaEnviada: boolean;
-  /** La que se ofrece primero: en un «WhatsApp interno», «Mensaje interno entre áreas». */
+  /** La que se ofrece primero: en un «WhatsApp interno», «Primer contacto con permiso» (`primer_contacto`). */
   predeterminada: boolean;
-  /** Lo que ya se sabe de cada variable que se escribe al enviar (en la interna, el área que escribe); vacío si no se sabe. */
+  /** Lo que ya se sabe de cada variable que se escribe al enviar (en la predeterminada, el nombre del asesor); vacío si no se sabe. */
   sugeridos: string[];
 }
 
@@ -478,7 +478,7 @@ export async function plantillasParaConversacion(id: string): Promise<{ plantill
   const aprobadas = (data ?? []) as PlantillaGuardada[];
   if (!aprobadas.length) return { plantillas: [] };
   const persona = await personaDeLaConversacion(supabase, id);
-  // «WhatsApp interno»: si el teléfono del chat es otro número de la empresa, la plantilla «Mensaje interno entre áreas» sale primero y con el área que escribe ya puesta.
+  // «WhatsApp interno»: si el teléfono del chat es otro número de la empresa, la plantilla «Primer contacto con permiso» sale primero y con el nombre de quien escribe ya puesto.
   const { data: numerosEmpresa } = await supabase.from("whatsapp_numeros").select("numero").eq("activo", true);
   const interno = esNumeroDeLaEmpresa(chat.telefono, (numerosEmpresa ?? []) as { numero: string | null }[]);
   const desde = new Date(Date.now() - 24 * 3_600_000).toISOString();
@@ -511,7 +511,7 @@ export async function plantillasParaConversacion(id: string): Promise<{ plantill
         faltante: "error" in automaticas ? automaticas.error : null,
         yaEnviada: yaMandadas.has(p.id),
         predeterminada: esPlantillaPredeterminada(p.nombre, interno),
-        sugeridos: variables.map((v) => (v.campo === "manual" ? sugeridoParaVariable(v.etiqueta, esPlantillaPredeterminada(p.nombre, interno), chat.area) : "")),
+        sugeridos: variables.map((v) => (v.campo === "manual" ? sugeridoParaVariable(v.etiqueta, esPlantillaPredeterminada(p.nombre, interno), u.nombre || "") : "")),
       };
     });
   return { plantillas: conPredeterminadaPrimero(lista) };
