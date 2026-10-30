@@ -4,7 +4,7 @@ import { headers } from "next/headers";
 import { getUsuarioActual } from "@/lib/auth";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { accesoCrm, supervisaArea, pierdeLoBorrado, type AccesoCrm, type AreaCrm } from "@/lib/crm/areas";
-import { esTelefonoInterno } from "@/lib/crm/chat-interno";
+import { conPredeterminadaPrimero, esNumeroDeLaEmpresa, esPlantillaPredeterminada, sugeridoParaVariable } from "@/lib/whatsapp/interno";
 import { getPaisActual } from "@/lib/pais";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { nombreArchivoSeguro } from "@/lib/seguridad/ruta-almacen";
@@ -159,7 +159,6 @@ export async function enviarWhatsapp(id: string, texto: string): Promise<{ ok: t
   const supabase = createServiceClient();
   const c = await conversacionPermitida(supabase, id, u, true);
   if (!c) return { error: "Esa conversación no existe o no es de tu área." };
-  if (esTelefonoInterno(c.telefono)) return { error: "Este es un chat interno: se escribe dentro del sistema, no por WhatsApp." };
   const supervisando = avisoSupervision(u, c);
   if (supervisando) return { error: supervisando };
   if (minutosVentana(c.ultimoEntranteEn) <= 0) return { error: "Pasaron más de 24 h desde su último mensaje: por WhatsApp solo se le puede escribir con una plantilla aprobada." };
@@ -451,6 +450,10 @@ export interface PlantillaParaEnviar {
   faltante: string | null;
   /** Ya se le mandó esta misma plantilla en las últimas 24 h. */
   yaEnviada: boolean;
+  /** La que se ofrece primero: en un «WhatsApp interno», «Mensaje interno entre áreas». */
+  predeterminada: boolean;
+  /** Lo que ya se sabe de cada variable que se escribe al enviar (en la interna, el área que escribe); vacío si no se sabe. */
+  sugeridos: string[];
 }
 
 type UnoDs<T> = T | T[] | null;
@@ -468,12 +471,16 @@ export async function plantillasParaConversacion(id: string): Promise<{ plantill
   const u = await usuarioBandeja(true);
   if (!u) return { error: "No tienes permiso para escribir en el CRM." };
   const supabase = createServiceClient();
-  if (!(await conversacionPermitida(supabase, id, u, true))) return { error: "Esa conversación no existe o no es de tu área." };
+  const chat = await conversacionPermitida(supabase, id, u, true);
+  if (!chat) return { error: "Esa conversación no existe o no es de tu área." };
   const { data, error } = await supabase.from("whatsapp_plantillas").select(COLUMNAS_PLANTILLA).eq("estado", "aprobada").order("nombre");
   if (error) return { error: "Falta correr la migración 0170 (plantillas de WhatsApp)." };
   const aprobadas = (data ?? []) as PlantillaGuardada[];
   if (!aprobadas.length) return { plantillas: [] };
   const persona = await personaDeLaConversacion(supabase, id);
+  // «WhatsApp interno»: si el teléfono del chat es otro número de la empresa, la plantilla «Mensaje interno entre áreas» sale primero y con el área que escribe ya puesta.
+  const { data: numerosEmpresa } = await supabase.from("whatsapp_numeros").select("numero").eq("activo", true);
+  const interno = esNumeroDeLaEmpresa(chat.telefono, (numerosEmpresa ?? []) as { numero: string | null }[]);
   const desde = new Date(Date.now() - 24 * 3_600_000).toISOString();
   const { data: previas } = await supabase
     .from("whatsapp_mensajes")
@@ -483,8 +490,7 @@ export async function plantillasParaConversacion(id: string): Promise<{ plantill
     .gte("momento", desde)
     .in("plantilla_id", aprobadas.map((p) => p.id));
   const yaMandadas = new Set((previas ?? []).map((m) => m.plantilla_id as string));
-  return {
-    plantillas: aprobadas.map((p) => {
+  const lista = aprobadas.map((p) => {
       const variables = p.variables ?? [];
       const automaticas = resolverVariables(variables.filter((v) => v.campo !== "manual"), persona);
       return {
@@ -504,9 +510,11 @@ export async function plantillasParaConversacion(id: string): Promise<{ plantill
         etiquetas: variables.map((v) => v.etiqueta?.trim() || ""),
         faltante: "error" in automaticas ? automaticas.error : null,
         yaEnviada: yaMandadas.has(p.id),
+        predeterminada: esPlantillaPredeterminada(p.nombre, interno),
+        sugeridos: variables.map((v) => (v.campo === "manual" ? sugeridoParaVariable(v.etiqueta, esPlantillaPredeterminada(p.nombre, interno), chat.area) : "")),
       };
-    }),
-  };
+    });
+  return { plantillas: conPredeterminadaPrimero(lista) };
 }
 
 /**
@@ -521,7 +529,6 @@ export async function enviarPlantillaConversacion(id: string, plantillaId: strin
   const supabase = createServiceClient();
   const c = await conversacionPermitida(supabase, id, u, true);
   if (!c) return { error: "Esa conversación no existe o no es de tu área." };
-  if (esTelefonoInterno(c.telefono)) return { error: "Este es un chat interno: se escribe dentro del sistema, no por WhatsApp." };
   const supervisando = avisoSupervision(u, c);
   if (supervisando) return { error: supervisando };
   const { data } = await supabase.from("whatsapp_plantillas").select(COLUMNAS_PLANTILLA).eq("id", plantillaId).maybeSingle();

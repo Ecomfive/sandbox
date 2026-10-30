@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getUsuarioActual, type UsuarioActual } from "@/lib/auth";
-import { areaPropiaDeChat, esTelefonoInterno, salaDeTelefono } from "@/lib/crm/chat-interno";
+import { esTelefonoInterno } from "@/lib/crm/chat-interno";
 import { accesoCrm, areasVisibles, escribeEnArea, MODULO_ATENCION, MODULO_COMERCIAL, MODULO_DIRECCION, numerosDeAreas, pierdeLoBorrado, type AreaCrm, type PermisosCrm } from "@/lib/crm/areas";
 import { chatVisibleParaAtencion, mensajeVisibleParaAtencion } from "@/lib/whatsapp/borrados-atencion";
 import { areaDeModulos, cargoDePersona } from "@/lib/crm/respondieron";
@@ -55,29 +55,14 @@ export interface ConversacionVista {
   paises: string[];
   /** Dónde vende: plataforma y país, de sus cuentas vinculadas y lo puesto a mano en el chat (migración 0193). */
   vendeEn: VendeEn[];
-  /** Es un chat interno entre áreas (una sala, o el de dos números de la 0202): no es un cliente y no sale en la lista ni en los conteos. */
+  /** Es un chat entre dos números de la empresa («WhatsApp interno»): no es un cliente y no sale en la lista ni en los conteos. */
   interno: boolean;
-  /** En un chat interno, la sala a la que pertenece (`ac`, `ad`, `cd` o `acd`); null si no es de una sala. */
-  salaInterna: string | null;
-  /** En un chat interno con mensajes sin leer, quién los mandó (el más reciente primero); vacío en los demás. */
-  pendientesDe: RemitenteInterno[];
   /** Sus etiquetas, como en ClickUp: las del dropshipper si el chat tiene uno; si no, las del chat (migración 0185). */
   etiquetas: string[];
   /** Desde cuándo espera respuesta: su primer mensaje sin contestar (migración 0189). Sin la migración, null y se usa `ultimoEntranteEn`. */
   esperandoDesde: string | null;
   /** El motivo del chat (migración 0189): lo lee la IA o lo corrige el equipo. Decide el plazo y el orden de la lista. */
   motivo: MotivoVista | null;
-}
-
-/** Quien mandó mensajes que la persona todavía no lee en el chat interno (30 oct 2026, pedido de Hernán): su globito va en el botón «Chat interno». */
-export interface RemitenteInterno {
-  /** Su id en el sistema; null si el mensaje no tiene autor. */
-  id: string | null;
-  nombre: string;
-  /** Su foto (Usuarios), si tiene. */
-  foto: string | null;
-  /** Cuántos de sus mensajes están sin leer. */
-  mensajes: number;
 }
 
 export interface MotivoVista {
@@ -110,8 +95,6 @@ export interface MensajeVista {
   autorCargo: string | null;
   /** La foto del autor en el sistema (Usuarios), para su globito. */
   autorFoto: string | null;
-  /** Quién lo escribió (su id): en el chat interno decide de qué lado va cada mensaje. */
-  autorId?: string | null;
   momento: string;
   /** Vino de un chat exportado desde el celular («Importar chat», wa_id «import:…»), no por el webhook. */
   importado: boolean;
@@ -172,7 +155,6 @@ export const areasDe = (u: PermisosCrm): AreaCrm[] => areasVisibles(accesoCrm(u)
 export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosCrm): Promise<DatosBandeja | null> {
   const areas = areasDe(usuario);
   const sinBorrados = pierdeLoBorrado(accesoCrm(usuario));
-  const miAreaChat = areaPropiaDeChat(accesoCrm(usuario));
   const numerosR = await supabase.from("whatsapp_numeros").select("id, nombre, numero, area").eq("activo", true).order("nombre");
   if (numerosR.error) return null;
   const numeros = (numerosR.data ?? []) as NumeroVista[];
@@ -225,17 +207,13 @@ export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosC
       etiquetas: d ? (d.etiquetas ?? []) : [],
       esperandoDesde: null,
       motivo: null,
-      interno: empresa.has(digitos(c.telefono)) || esTelefonoInterno(c.telefono as string),
-      salaInterna: salaDeTelefono(c.telefono as string)?.sala ?? null,
-      pendientesDe: [],
+      interno: empresa.has(digitos(c.telefono)),
       vendeEn: dondeVende(cuentas, []),
       paises: paisesDondeVende((d?.dropshipper_paises ?? []).map((x) => uno(x.paises)?.codigo ?? null), cuentas.filter((x): x is { plataforma: string | null; pais: string } => !!x.pais)),
     };
   });
-  // Las salas del chat interno: cada quien ve solo la copia de su propia área (Comercial no lee lo que Atención habla con Dirección).
-  const copiasPropias = new Set((data ?? []).filter((c) => salaDeTelefono(c.telefono as string)?.area === miAreaChat).map((c) => c.id as string));
-  // Quién mandó lo que está sin leer en las salas propias, para los globitos del botón «Chat interno».
-  await remitentesSinLeer(supabase, conversaciones.filter((c) => c.salaInterna && copiasPropias.has(c.id) && c.noLeidos > 0));
+  // Las salas de notas del chat interno (30 oct 2026, ya no se usan; el chat interno volvió a ser por WhatsApp) quedan guardadas pero no se muestran.
+  const salasViejas = new Set((data ?? []).filter((c) => esTelefonoInterno(c.telefono as string)).map((c) => c.id as string));
   // Las que alguien marcó como borradas en la app de WhatsApp Business (migración 0171). Sin la columna, ninguna.
   const marcadas = await supabase.from("whatsapp_conversaciones").select("id, borrada_en_app_en, borrada_en_app_por").not("borrada_en_app_en", "is", null);
   if (!marcadas.error) {
@@ -315,7 +293,7 @@ export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosC
     numerosEmpresa: numeros.map((n) => ({ id: n.id, nombre: n.nombre, area: n.area })),
     // Lo borrado en la app de WhatsApp Business: a quien tiene solo Atención el chat marcado desaparece (y no ve la marca); los demás lo ven intacto, con su marca.
     conversaciones: conversaciones
-      .filter((c) => !ocultas.has(c.id) && (!c.salaInterna || copiasPropias.has(c.id)) && (!sinBorrados || chatVisibleParaAtencion(c.ultimoMensajeEn, c.borradaEnApp?.en ?? null)))
+      .filter((c) => !ocultas.has(c.id) && !salasViejas.has(c.id) && (!sinBorrados || chatVisibleParaAtencion(c.ultimoMensajeEn, c.borradaEnApp?.en ?? null)))
       .map((c) => (sinBorrados && c.borradaEnApp ? { ...c, borradaEnApp: null } : c)),
     colores,
   };
@@ -341,9 +319,8 @@ export async function conversacionPermitida(
   const numero = uno(data?.whatsapp_numeros as Uno<{ phone_number_id: string; numero: string | null }>);
   const area = data?.area as AreaCrm | undefined;
   if (!data || !numero || !area || !areasDe(usuario).includes(area)) return null;
-  // Una sala del chat interno es solo de su área: Comercial no abre la copia de Atención ni al revés, aunque supervise sus chats.
-  const sala = salaDeTelefono(data.telefono as string);
-  if (esTelefonoInterno(data.telefono as string) && (!sala || sala.area !== areaPropiaDeChat(accesoCrm(usuario)))) return null;
+  // Una sala de notas vieja del chat interno ya no se abre.
+  if (esTelefonoInterno(data.telefono as string)) return null;
   if (escribe && !escribeEnArea(accesoCrm(usuario), area)) return null;
   return {
     id: data.id as string,
@@ -356,40 +333,6 @@ export async function conversacionPermitida(
     // El número de la empresa: con varios números en 360dialog, decide con qué clave se manda (proveedor.ts).
     numeroEmpresa: numero.numero ?? null,
   };
-}
-
-/**
- * Quién mandó los mensajes sin leer de cada sala del chat interno (30 oct 2026, pedido de Hernán): los últimos `noLeidos` mensajes de la copia propia (sin las reacciones), agrupados
- * por persona, el más reciente primero, con su foto. Son pocas salas (hasta cuatro) y pocos mensajes, así que va una consulta por sala.
- */
-async function remitentesSinLeer(supabase: SupabaseClient, chats: ConversacionVista[]): Promise<void> {
-  if (!chats.length) return;
-  const porChat = await Promise.all(
-    chats.map((c) =>
-      supabase
-        .from("whatsapp_mensajes")
-        .select("autor_id, autor_nombre")
-        .eq("conversacion_id", c.id)
-        .neq("tipo", "reaccion")
-        .order("momento", { ascending: false })
-        .limit(Math.min(c.noLeidos, 50)),
-    ),
-  );
-  const ids = [...new Set(porChat.flatMap((r) => (r.data ?? []).map((m) => m.autor_id as string | null)).filter((x): x is string => !!x))];
-  const fotosR = ids.length ? await supabase.from("perfiles").select("id, avatar_url").in("id", ids) : null;
-  const fotos = new Map((fotosR?.data ?? []).map((p) => [p.id as string, (p.avatar_url as string | null) ?? null]));
-  chats.forEach((c, i) => {
-    const grupos = new Map<string, RemitenteInterno>();
-    for (const m of porChat[i].data ?? []) {
-      const id = (m.autor_id as string | null) ?? null;
-      const nombre = ((m.autor_nombre as string | null) ?? "").trim() || "Alguien del equipo";
-      const clave = id ?? `nombre:${nombre}`;
-      const g = grupos.get(clave);
-      if (g) g.mensajes++;
-      else grupos.set(clave, { id, nombre, foto: id ? (fotos.get(id) ?? null) : null, mensajes: 1 });
-    }
-    c.pendientesDe = [...grupos.values()];
-  });
 }
 
 /** El cargo de cada persona del CRM, guardado unos minutos: la bandeja se refresca cada 8 s y los puestos y permisos casi no cambian. */
@@ -494,7 +437,6 @@ export async function cargarConversacion(
       autor: (m.autor_nombre as string | null) ?? null,
       autorCargo: (m.autor_id && cargos.get(m.autor_id as string)) || null,
       autorFoto: (m.autor_id && fotos.get(m.autor_id as string)) || null,
-      autorId: (m.autor_id as string | null) ?? null,
       momento: m.momento as string,
       importado: String(m.wa_id ?? "").startsWith("import:"),
       eliminadoEnWhatsapp: eliminados.has(m.id as string),

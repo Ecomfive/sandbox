@@ -12,7 +12,6 @@ import { bandera, nombrePais } from "@/lib/whatsapp/origen-chat";
 import { CANAL_BANDEJA, EVENTO_NOVEDAD } from "@/lib/whatsapp/canal-bandeja";
 import { HORAS_VENTANA, textoVentana } from "@/lib/whatsapp/ventana";
 import type { AreaCrm } from "@/lib/crm/areas";
-import type { SalaInterna } from "@/lib/crm/chat-interno";
 import { quienesRespondieron } from "@/lib/crm/respondieron";
 import { abrirConversacion, cambiarEstadoConversacion, fichaCrmDelChat, conectarWebhook360, marcarChatLeido, enviarWhatsapp, intervenirConversacion, mensajesAnteriores, notaWhatsapp, marcarChatBorradoEnApp, pasarConversacionDeArea, tomarConversacion, vistaPreviaChat } from "./actions";
 import type { FichaCrmChat } from "./actions";
@@ -20,17 +19,16 @@ import type { ConversacionVista, DatosBandeja, MensajeVista, ResumenDropshipper,
 import { guardarColorEtiquetaChat, guardarEtiquetasChat } from "./etiquetas-actions";
 import { PastillaTipo } from "../tipo-cliente";
 import { VendeEnChat } from "./vende-en";
-import { abrirChatInterno, enviarMensajeInterno } from "./interno-actions";
-import { BotonChatInterno } from "./interno";
+import { abrirChatInterno } from "./interno-actions";
+import { BotonWhatsappInterno } from "./interno";
 import { colorFoto, iniciales } from "./globo-persona";
 import { EtiquetasChat, PastillasEtiquetas, SelectorEtiquetasChat, type ManejoEtiquetas } from "./etiquetas-chat";
 import { transcribirAudio } from "./transcripcion-actions";
 import { BotonBarra, DatosEnLaCabecera, FichaDelChat, type AccionExtra } from "./ficha-chat";
-import { borrarMensajeInterno, reaccionarInterno } from "./interno-actions";
 import { reaccionarAMensaje } from "./reaccion-actions";
 import { VistaPreviaChat } from "./vista-previa-chat";
 import { VentanaVincular } from "./vincular-chat";
-import { ACEPTAR_ENVIO, ACEPTAR_INTERNO, EnviarArchivo } from "./enviar-archivo";
+import { ACEPTAR_ENVIO, EnviarArchivo } from "./enviar-archivo";
 import { Expresiones } from "./expresiones";
 import { GrabarVoz } from "./grabar-voz";
 import { EditorNombreContacto } from "./nombre-contacto";
@@ -46,7 +44,7 @@ import { ActualizarIcon, ArchivarIcon, ChatIcon, CheckIcon, ConectadoIcon, Desca
 import { Ventana } from "@/components/ui/ventana";
 import { BotonNavegar } from "../ficha-lateral";
 import { vistaPreviaTexto } from "@/lib/whatsapp/borrado";
-import { agruparReacciones, agruparReaccionesInternas, miReaccion, REACCIONES_RAPIDAS, type ReaccionVista } from "@/lib/whatsapp/reacciones";
+import { agruparReacciones, miReaccion, REACCIONES_RAPIDAS, type ReaccionVista } from "@/lib/whatsapp/reacciones";
 import { COLUMNAS_TABLERO, GRUPOS, grupoPorId, ordenarPorUrgencia, plazoDelChat, repartirTablero, textoPlazo, type ColumnaTablero, type GrupoMotivo } from "@/lib/whatsapp/prioridad";
 import { cambiarMotivoChat, clasificarChatsPendientes } from "./motivo-actions";
 
@@ -665,11 +663,8 @@ export function Bandeja({
   }, [borrador]);
 
   const numeroDe = useMemo(() => new Map(datos.numeros.map((n) => [n.id, n])), [datos.numeros]);
-  const chatsInternos = useMemo(
-    () => datos.conversaciones.filter((c) => c.interno && c.salaInterna).map((c) => ({ sala: c.salaInterna as string, noLeidos: c.noLeidos, remitentes: c.pendientesDe ?? [] })),
-    [datos.conversaciones],
-  );
-  // Los chats internos (WhatsApp entre áreas) no son clientes: no van en las listas ni en los conteos; se abren con «Interno». Solo los de los
+  const chatsInternos = useMemo(() => datos.conversaciones.filter((c) => c.interno).map((c) => ({ numeroId: c.numeroId, nombre: c.nombre, noLeidos: c.noLeidos })), [datos.conversaciones]);
+  // Los chats internos (WhatsApp entre los números de la empresa) no son clientes: no van en las listas ni en los conteos; se abren con «WhatsApp interno». Solo los de los
   // paneles a la vista: con «Ver como», los conteos de los filtros son los de esa área, como los ve ella.
   const delNumero = useMemo(
     () => datos.conversaciones.filter((c) => !c.interno && areas.includes(c.area) && (numero === "todos" || c.numeroId === numero)),
@@ -732,15 +727,12 @@ export function Bandeja({
   }, [ultimoEntranteSel]);
   // Supervisión: un chat de otro panel se mira sin dejar rastro; para responderle al dropshipper hay que «Intervenir» (queda a su cargo).
   const supervisando = !!sel && sel.area !== miArea;
-  // El chat interno (entre las áreas) va por notas dentro del sistema, no por WhatsApp: no hay ventana de 24 h, ni plantillas, ni supervisión, ni «Nota privada».
-  const esInterno = !!sel?.interno;
-  const mirando = !esInterno && supervisando && sel?.asignadaAId !== miId;
-  const esNota = !esInterno && (modo === "nota" || mirando);
-  const bloqueado = !escribe || (!esNota && !esInterno && !ventana);
+  const mirando = supervisando && sel?.asignadaAId !== miId;
+  const esNota = modo === "nota" || mirando;
+  const bloqueado = !escribe || (!esNota && !ventana);
   const mensajes = chat && sel && chat.id === sel.id ? chat.mensajes : null;
   // Las reacciones no son mensajes sueltos: van sobre el mensaje al que se reaccionó, como en WhatsApp (29 oct 2026).
-  // En el chat interno cada persona reacciona por su cuenta y sobre un mensaje puede haber varios emojis, cada uno con quiénes lo pusieron.
-  const conReacciones = mensajes ? (esInterno ? agruparReaccionesInternas(mensajes, miId) : agruparReacciones(mensajes)) : null;
+  const conReacciones = mensajes ? agruparReacciones(mensajes) : null;
 
   /** Escribe un emoji donde está el cursor (o al final) y deja el cursor justo después. */
   function insertarEmoji(emoji: string) {
@@ -761,10 +753,9 @@ export function Bandeja({
   function soltarArchivos(lista: FileList) {
     const f = lista[0];
     if (!f || !sel) return;
-    if (sel.interno && /^video\//.test(f.type)) return mostrarToast("En el chat interno se mandan fotos, audios y documentos (no videos).", "destructive");
     if (mirando) return mostrarToast("Estás supervisando este chat: para mandarle un archivo, toca «Intervenir».", "destructive");
     if (!escribe) return mostrarToast("No tienes permiso para escribir en este chat.", "destructive");
-    if (!ventana && !sel.interno) return mostrarToast("Pasaron más de 24 h desde su último mensaje: por WhatsApp solo se le puede escribir con una plantilla aprobada.", "destructive");
+    if (!ventana) return mostrarToast("Pasaron más de 24 h desde su último mensaje: por WhatsApp solo se le puede escribir con una plantilla aprobada.", "destructive");
     if (lista.length > 1) mostrarToast("Se manda un archivo a la vez: va el primero.");
     setModo("responder");
     setArchivo(f);
@@ -774,19 +765,9 @@ export function Bandeja({
   /** Reacciona con un emoji a un mensaje del chat (o quita la reacción con un emoji vacío) y vuelve a pedir el chat para verla puesta. */
   async function reaccionar(m: MensajeVista, emoji: string) {
     if (!sel) return;
-    const r = await (esInterno ? reaccionarInterno : reaccionarAMensaje)(sel.id, m.id, emoji).catch(() => ({ error: "No se pudo reaccionar. Inténtalo de nuevo." }));
+    const r = await reaccionarAMensaje(sel.id, m.id, emoji).catch(() => ({ error: "No se pudo reaccionar. Inténtalo de nuevo." }));
     if ("error" in r) mostrarToast(r.error, "destructive");
     await refrescar(sel.id);
-  }
-
-  /** Borra un mensaje del chat interno sin pedir autorización: desaparece al momento y, si el servidor no lo borra, vuelve a aparecer. */
-  async function borrarInterno(m: MensajeVista) {
-    if (!sel) return;
-    const chatId = sel.id;
-    setChat((c) => (c && c.id === chatId ? { ...c, mensajes: c.mensajes.filter((x) => x.id !== m.id) } : c));
-    const r = await borrarMensajeInterno(chatId, m.id).catch(() => ({ error: "No se pudo borrar. Inténtalo de nuevo." }));
-    if ("error" in r) mostrarToast(r.error, "destructive");
-    await refrescar(chatId);
   }
 
   function mandar() {
@@ -801,12 +782,9 @@ export function Bandeja({
    * `reemplaza`: el que falló y se reintenta.
    */
   function enviarTexto(chatId: string, texto: string, nota: boolean, reemplaza?: string) {
-    // En un chat interno el mensaje se guarda como nota en las dos áreas (sin pasar por WhatsApp).
-    const interno = !!datos.conversaciones.find((c) => c.id === chatId)?.interno;
     const local: MensajeVista = {
       id: idLocal(),
-      autorId: interno ? miId : null,
-      direccion: nota || interno ? "nota" : "saliente",
+      direccion: nota ? "nota" : "saliente",
       tipo: "texto",
       texto: texto.trim(),
       mediaNombre: null,
@@ -822,7 +800,7 @@ export function Bandeja({
       borradoPendiente: false,
     };
     setChat((c) => (c && c.id === chatId ? { ...c, mensajes: [...c.mensajes.filter((m) => m.id !== reemplaza), local] } : c));
-    void (interno ? enviarMensajeInterno(chatId, texto) : nota ? notaWhatsapp(chatId, texto) : enviarWhatsapp(chatId, texto))
+    void (nota ? notaWhatsapp(chatId, texto) : enviarWhatsapp(chatId, texto))
       .catch(() => ({ error: "No se pudo. Inténtalo de nuevo." }))
       .then((r) => {
         if ("error" in r) mostrarToast(r.error, "destructive");
@@ -966,9 +944,9 @@ export function Bandeja({
   // «WhatsApp interno»: el chat del cliente al que se vuelve después de escribirle a la otra área.
   const [volverA, setVolverA] = useState<string | null>(null);
   const [abriendoInterno, setAbriendoInterno] = useState(false);
-  async function abrirInterno(sala: SalaInterna) {
+  async function abrirInterno(desdeId: string, haciaId: string) {
     setAbriendoInterno(true);
-    const r = await abrirChatInterno(sala).catch(() => ({ error: "No se pudo abrir el chat interno." }));
+    const r = await abrirChatInterno(desdeId, haciaId).catch(() => ({ error: "No se pudo abrir el chat interno." }));
     setAbriendoInterno(false);
     if ("error" in r) return mostrarToast(r.error, "destructive");
     const actual = datos.conversaciones.find((c) => c.id === elegido);
@@ -1476,9 +1454,9 @@ export function Bandeja({
             </button>
           ))}
         </div>
-        {escribe && (
+        {escribe && datos.numerosEmpresa.length > 1 && (
           <span className="ml-auto">
-            <BotonChatInterno miArea={miArea} alElegir={(s) => void abrirInterno(s)} ocupado={abriendoInterno} internos={chatsInternos} conTexto />
+            <BotonWhatsappInterno numeros={datos.numerosEmpresa} areas={areas} alElegir={(d, h) => void abrirInterno(d, h)} ocupado={abriendoInterno} internos={chatsInternos} conTexto />
           </span>
         )}
         {escribe && (
@@ -1701,7 +1679,7 @@ export function Bandeja({
               </span>
               <DatosEnLaCabecera sel={sel} ficha={fichaDelChat} respondieron={quienesRespondieron(mensajes ?? [])} alGuardarCrm={() => setVersionCrm((v) => v + 1)} />
               <EtiquetaArea area={sel.area} />
-              {sel.interno && <span className="rounded-full bg-azul-soft px-2 py-px text-[11.5px] font-semibold text-azul">Chat interno</span>}
+              {sel.interno && <span className="rounded-full bg-azul-soft px-2 py-px text-[11.5px] font-semibold text-azul">WhatsApp interno</span>}
               {/* Dónde vende (29 oct 2026, pedido de Alcides): sus plataformas por país, puestas a mano o de sus cuentas; y los países de su ficha que aún no tienen plataforma. */}
               <VendeEnChat
                 key={`vende-${sel.id}`}
@@ -1736,7 +1714,7 @@ export function Bandeja({
           }
           navegacion={
             <>
-              {escribe && <BotonChatInterno miArea={miArea} alElegir={(s) => void abrirInterno(s)} ocupado={abriendoInterno} internos={chatsInternos} />}
+              {escribe && datos.numerosEmpresa.length > 1 && <BotonWhatsappInterno numeros={datos.numerosEmpresa} areas={areas} alElegir={(d, h) => void abrirInterno(d, h)} ocupado={abriendoInterno} internos={chatsInternos} />}
               {sel.interno && volverA && datos.conversaciones.some((c) => c.id === volverA) && (
                 <button
                   type="button"
@@ -1821,12 +1799,7 @@ export function Bandeja({
                   </div>
                 )}
                 <div ref={chatRef} className="bandeja-wa-chat flex flex-1 flex-col overflow-y-auto px-[5%] pt-3 pb-2">
-                  {esInterno && (
-                    <p className="m-0 mb-2 max-w-[560px] self-center rounded-lg bg-[var(--wa-aviso)] px-3 py-1.5 text-center text-[12.5px] text-[var(--wa-sec)] shadow-[0_1px_0.5px_var(--wa-sombra)]">
-                      Chat interno: se escribe aquí, dentro del sistema. No sale por WhatsApp, así que no hay ventana de 24 h ni plantillas.
-                    </p>
-                  )}
-                  {enNavegador && !esInterno && (
+                  {enNavegador && (
                     <>
                       <p
                         className={`m-0 mb-2 max-w-[560px] self-center rounded-lg px-3 py-1.5 text-center text-[12.5px] shadow-[0_1px_0.5px_var(--wa-sombra)] ${
@@ -1884,14 +1857,12 @@ export function Bandeja({
                           <Burbuja
                             m={m}
                             seguido={seguido}
-                            interna={esInterno ? { miId } : undefined}
                             puedeTranscribir={escribe && !esLocal(m)}
                             reacciones={conReacciones?.reacciones.get(m.id)}
-                            alBorrarDirecto={esInterno && escribe && !esLocal(m) && !!m.autorId && m.autorId === miId ? () => void borrarInterno(m) : undefined}
-                            alPedirBorrar={!esInterno && escribe && !mirando && !esLocal(m) ? (x) => setBorrar({ tipo: "mensaje", mensajeId: x.id, resumen: vistaPreviaTexto(x.texto) || `(${x.tipo})` }) : undefined}
+                            alPedirBorrar={escribe && !mirando && !esLocal(m) ? (x) => setBorrar({ tipo: "mensaje", mensajeId: x.id, resumen: vistaPreviaTexto(x.texto) || `(${x.tipo})` }) : undefined}
                             alGuardarRapida={escribe && !mirando ? guardarComoRapida : undefined}
                             // Se reacciona a lo que ya tiene su id en WhatsApp, con la ventana de 24 h abierta y no solo supervisando.
-                            alReaccionar={escribe && !mirando && (esInterno || ventana) && !esLocal(m) && !m.importado && m.waId && m.estado !== "fallido" && !(esInterno && esAvisoDelSistema(m.texto)) ? (emoji) => void reaccionar(m, emoji) : undefined}
+                            alReaccionar={escribe && !mirando && ventana && !esLocal(m) && !m.importado && m.waId && m.estado !== "fallido" ? (emoji) => void reaccionar(m, emoji) : undefined}
                             // Solo se reintenta lo que no salió: «Se envió, pero no se pudo guardar» ya le llegó al dropshipper.
                             alReintentar={esLocal(m) && m.estado === "fallido" && !/^Se envió/.test(m.error ?? "") && m.texto ? () => enviarTexto(sel.id, m.texto ?? "", m.direccion === "nota", m.id) : undefined}
                           />
@@ -1914,10 +1885,11 @@ export function Bandeja({
                       </p>
                     )}
                     {/* Fuera de las 24 h el cuadro de texto está apagado: se avisa aquí mismo y se ofrecen las plantillas que Meta ya aprobó (30 oct 2026). */}
-                    {enNavegador && !ventana && escribe && !mirando && !esNota && !esInterno && (
+                    {enNavegador && !ventana && escribe && !mirando && !esNota && (
                       <PlantillasEnLinea
                         key={sel.id}
                         conversacionId={sel.id}
+                        interno={sel.interno}
                         alElegir={(id) => {
                           setPlantillaInicial(id);
                           setVerPlantillas(true);
@@ -1929,7 +1901,7 @@ export function Bandeja({
                       />
                     )}
                     {/* Arriba, si va como mensaje o como nota privada y, escribiendo un mensaje, los mensajes rápidos: así el cuadro de texto queda ancho. */}
-                    {!esInterno && (!mirando || (!esNota && !bloqueado)) && (
+                    {(!mirando || (!esNota && !bloqueado)) && (
                       <div className="flex items-center gap-2 px-3 pt-2">
                         {!mirando && (
                           <div role="group" aria-label="Tipo de mensaje" className="flex flex-none rounded-full bg-[var(--wa-fondo)] p-[3px]">
@@ -1982,7 +1954,7 @@ export function Bandeja({
                           <input
                             ref={inputArchivo}
                             type="file"
-                            accept={esInterno ? ACEPTAR_INTERNO : ACEPTAR_ENVIO}
+                            accept={ACEPTAR_ENVIO}
                             className="sr-only"
                             tabIndex={-1}
                             aria-label="Elegir el archivo que se va a mandar"
@@ -1992,22 +1964,19 @@ export function Bandeja({
                               if (f) setArchivo(f);
                             }}
                           />
-                          <button type="button" disabled={bloqueado || enviando} onClick={() => inputArchivo.current?.click()} aria-label={esInterno ? "Adjuntar una foto, un audio o un documento" : "Adjuntar una foto, audio, video o documento"} title="Adjuntar un archivo" className={`${botonIcono} mb-px`}>
+                          <button type="button" disabled={bloqueado || enviando} onClick={() => inputArchivo.current?.click()} aria-label="Adjuntar una foto, audio, video o documento" title="Adjuntar un archivo" className={`${botonIcono} mb-px`}>
                             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                               <path d="m21 11.5-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.9-8.9a3.7 3.7 0 0 1 5.2 5.2l-8.9 8.9a1.8 1.8 0 0 1-2.6-2.6l8.2-8.2" />
                             </svg>
                           </button>
                           <GrabarVoz deshabilitado={bloqueado || enviando} alGrabado={setArchivo} />
-                          {/* Emojis, GIF y stickers salen por WhatsApp: no van en el chat interno. */}
-                          {!esInterno && (
-                            <Expresiones
-                              conversacionId={sel.id}
-                              deshabilitado={bloqueado || enviando}
-                              alEmoji={insertarEmoji}
-                              alEnviado={() => void refrescar(sel.id)}
-                              alError={(mensaje) => mostrarToast(mensaje, "destructive")}
-                            />
-                          )}
+                          <Expresiones
+                            conversacionId={sel.id}
+                            deshabilitado={bloqueado || enviando}
+                            alEmoji={insertarEmoji}
+                            alEnviado={() => void refrescar(sel.id)}
+                            alError={(mensaje) => mostrarToast(mensaje, "destructive")}
+                          />
                         </>
                       )}
                       <label className="flex min-w-0 flex-1">
@@ -2033,7 +2002,7 @@ export function Bandeja({
                               mandar();
                             }
                           }}
-                          placeholder={esNota ? "Nota para el equipo. El dropshipper no la ve." : esInterno ? `Escribe un mensaje para ${sel.nombre}` : ventana ? "Escribe un mensaje" : "Fuera de las 24 h: hace falta una plantilla aprobada"}
+                          placeholder={esNota ? "Nota para el equipo. El dropshipper no la ve." : ventana ? "Escribe un mensaje" : "Fuera de las 24 h: hace falta una plantilla aprobada"}
                           className={`min-h-[42px] w-full resize-none rounded-lg border-0 px-3.5 py-[10px] text-[15px] leading-[22px] outline-none placeholder:text-[var(--wa-sec)] focus-visible:ring-2 focus-visible:ring-[var(--wa-acento)] disabled:opacity-60 ${
                             esNota ? "bg-[var(--wa-nota)] text-[var(--wa-nota-texto)]" : "bg-[var(--wa-fondo)] text-[var(--wa-texto)]"
                           }`}
@@ -2152,7 +2121,6 @@ export function Bandeja({
       {archivo && sel && (
         <EnviarArchivo
           conversacionId={sel.id}
-          interno={sel.interno}
           nombre={sel.nombre}
           archivo={archivo}
           alCerrar={() => setArchivo(null)}
@@ -2243,50 +2211,6 @@ export function Bandeja({
  * pegado al anterior del mismo lado, sin colita.
  */
 /** El botón de la esquina de cada mensaje (se ve al pasar el cursor o al enfocarlo con el teclado): pide borrarlo, no lo borra. */
-/**
- * Borrar un mensaje del chat interno, sin pedir autorización (30 oct 2026): la papelera pide una confirmación en la misma burbuja («¿Borrar? Borrar · No») antes de ocultarlo.
- * Escape cancela.
- */
-function BorrarMensajeInterno({ alBorrar }: { alBorrar: () => void }) {
-  const [confirmando, setConfirmando] = useState(false);
-  if (confirmando)
-    return (
-      <span
-        role="group"
-        aria-label="Confirmar borrar este mensaje"
-        onKeyDown={(e) => {
-          if (e.key === "Escape") setConfirmando(false);
-        }}
-        className="absolute top-1 right-1 z-[2] flex items-center gap-1 rounded-full bg-[var(--wa-fondo)] px-2 py-0.5 text-[12px] shadow-[0_1px_2px_var(--wa-sombra)]"
-      >
-        <span className="text-[var(--wa-sec)]">¿Borrar?</span>
-        <button
-          type="button"
-          onClick={() => {
-            setConfirmando(false);
-            alBorrar();
-          }}
-          className={`rounded-full px-1.5 font-semibold text-destructive hover:underline ${anilloFoco}`}
-        >
-          Borrar
-        </button>
-        <button type="button" onClick={() => setConfirmando(false)} className={`rounded-full px-1.5 font-semibold text-[var(--wa-sec)] hover:underline ${anilloFoco}`}>
-          No
-        </button>
-      </span>
-    );
-  return (
-    <button
-      type="button"
-      onClick={() => setConfirmando(true)}
-      aria-label="Borrar este mensaje"
-      className={`absolute top-1 right-1 flex h-6 w-6 items-center justify-center rounded-full bg-[var(--wa-fondo)] text-[var(--wa-sec)] opacity-0 shadow-[0_1px_2px_var(--wa-sombra)] group-hover:opacity-100 hover:text-destructive focus-visible:opacity-100 ${anilloFoco}`}
-    >
-      <PapeleraIcon aria-hidden="true" className="h-3 w-3" />
-    </button>
-  );
-}
-
 function BotonBorrarMensaje({ alPulsar }: { alPulsar: () => void }) {
   return (
     <button
@@ -2391,17 +2315,13 @@ function Burbuja({
   seguido,
   reacciones,
   alPedirBorrar,
-  alBorrarDirecto,
   alGuardarRapida,
   alReaccionar,
   alReintentar,
-  interna,
   puedeTranscribir,
 }: {
   m: MensajeVista;
   seguido: boolean;
-  /** Dentro de un chat interno entre áreas: las notas se dibujan como mensajes (los míos a la derecha, los de las demás personas a la izquierda). */
-  interna?: { miId: string };
   /** Muestra «Transcribir» en un audio (se puede escribir en el CRM y el mensaje ya está guardado). */
   puedeTranscribir?: boolean;
   /** Reaccionar a este mensaje con un emoji (vacío = quitar la reacción del equipo); solo si se puede. */
@@ -2409,8 +2329,6 @@ function Burbuja({
   /** Las reacciones a este mensaje (una por lado), que se dibujan sobre su borde de abajo, como en WhatsApp. */
   reacciones?: ReaccionVista[];
   alPedirBorrar?: (m: MensajeVista) => void;
-  /** Chat interno: borrar este mensaje sin pedir autorización (solo los propios). */
-  alBorrarDirecto?: () => void;
   alGuardarRapida?: (texto: string) => void;
   /** Un mensaje que no salió (mostrado al momento de enviar): vuelve a mandarlo. */
   alReintentar?: () => void;
@@ -2423,48 +2341,6 @@ function Burbuja({
     );
   }
   const margen = seguido ? "mt-0.5" : "mt-2";
-  if (m.direccion === "nota" && interna) {
-    const mio = !!m.autorId && m.autorId === interna.miId;
-    const conReaccion = !!reacciones?.length;
-    return (
-      <div
-        className={`${margen} ${conReaccion ? "mb-4" : ""} group relative max-w-[min(70%,560px)] rounded-lg px-2.5 pt-1.5 pb-2 text-[14.2px] leading-[19px] shadow-[0_1px_0.5px_var(--wa-sombra)] ${seguido ? "" : mio ? "rounded-tr-none" : "rounded-tl-none"} ${
-          mio ? "self-end bg-[var(--wa-saliente)]" : "self-start bg-[var(--wa-entrante)]"
-        }`}
-      >
-        {conReaccion && (
-          // Cada emoji con cuántas personas lo pusieron; quiénes, en su descripción.
-          <span
-            role="img"
-            aria-label={`Reacciones: ${reacciones!.map((r) => `${r.emoji} de ${(r.autores ?? []).join(", ")}`).join("; ")}`}
-            title={reacciones!.map((r) => `${r.emoji} ${(r.autores ?? []).join(", ")}`).join("\n")}
-            className={`absolute -bottom-3.5 ${mio ? "right-2" : "left-2"} z-[1] flex items-center gap-1 rounded-full border border-[var(--wa-borde)] bg-[var(--wa-entrante)] px-1.5 py-0.5 text-[14px] leading-none shadow-[0_1px_0.5px_var(--wa-sombra)]`}
-          >
-            {reacciones!.map((r) => (
-              <span key={r.emoji} aria-hidden="true">
-                {r.emoji}
-                {(r.autores?.length ?? 0) > 1 && <span className="ml-0.5 text-[11px] text-[var(--wa-sec)]">{r.autores!.length}</span>}
-              </span>
-            ))}
-          </span>
-        )}
-        {alReaccionar && <ReaccionarMensaje nuestro={mio} actual={miReaccion(reacciones)} alElegir={alReaccionar} />}
-        {alBorrarDirecto && <BorrarMensajeInterno alBorrar={alBorrarDirecto} />}
-        {!mio && !seguido && (
-          <span className="mb-0.5 block text-[12.5px] font-semibold text-[var(--wa-autor)]">
-            {m.autor ?? "Alguien del equipo"}
-            {m.autorCargo && <span className="font-normal"> · {m.autorCargo}</span>}
-          </span>
-        )}
-        <Contenido m={m} puedeTranscribir={puedeTranscribir} />
-        <span className="float-right mt-1.5 -mb-1 ml-2.5 text-[11px] text-[var(--wa-sec)]">
-          {horaMensaje(m.momento)}
-          {m.estado === "enviando" && " · Enviando…"}
-        </span>
-        <Fallo m={m} alReintentar={alReintentar} />
-      </div>
-    );
-  }
   if (m.direccion === "nota") {
     return (
       <div className={`${margen} group relative max-w-[min(65%,560px)] self-end rounded-lg border border-dashed border-[var(--wa-nota-borde)] bg-[var(--wa-nota)] px-2.5 pt-1.5 pb-2 text-[14px] leading-[19px] text-[var(--wa-nota-texto)]`}>

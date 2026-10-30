@@ -8,7 +8,7 @@ import type { Categoria, VariablePlantilla } from "./plantillas";
 
 /**
  * «retomar»: para volver a hablar con alguien. «llegada»: avisar a quien preguntó por un producto que ya llegó o que su fecha cambió (la tarea
- * «Avisar cuando llegue»). «interno»: el «WhatsApp interno» entre los números de la empresa, cuando pasaron 24 horas sin escribirse.
+ * «Avisar cuando llegue»). «interno»: el «WhatsApp interno» entre los números de la empresa (Atención, Comercial y Dirección): es el primer mensaje, y el de cuando pasaron 24 horas sin escribirse; en ese chat sale como la predeterminada.
  * «primer_contacto»: escribirle por primera vez a alguien que aceptó recibir mensajes («Nuevo contacto» de la bandeja).
  */
 export type GrupoSugerida = "retomar" | "llegada" | "interno" | "primer_contacto";
@@ -160,7 +160,7 @@ export const PLANTILLAS_SUGERIDAS: PlantillaSugerida[] = [
     nombre: "mensaje_interno",
     titulo: "Mensaje interno entre áreas",
     categoria: "utility",
-    paraQue: "Para el «WhatsApp interno» entre Atención y Comercial cuando pasaron 24 horas sin escribirse.",
+    paraQue: "Para el «WhatsApp interno» entre los números de Atención, Comercial y Dirección: el primer mensaje y cuando pasaron 24 horas sin escribirse. En ese chat es la predeterminada.",
     cuerpo: "Hola, tienes un mensaje interno de {{1}} en el sistema de Ecomfive: «{{2}}». Responde a este mensaje para seguir la conversación.",
     botones: [],
     variables: [

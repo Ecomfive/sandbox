@@ -10,19 +10,12 @@ export interface MensajeConReaccion {
   waId?: string | null;
   /** En una reacción, el `waId` del mensaje reaccionado (migración 0186); null en las de antes. */
   reaccionA?: string | null;
-  /** Quién la escribió (chat interno: las reacciones son de cada persona). */
-  autorId?: string | null;
-  autor?: string | null;
 }
 
 /** Una reacción puesta sobre un mensaje: el emoji y de qué lado vino (el dropshipper o la empresa). */
 export interface ReaccionVista {
   emoji: string;
   direccion: "entrante" | "saliente";
-  /** Chat interno: quiénes pusieron este emoji (por su nombre); sin esto, es la del dropshipper o la de la empresa. */
-  autores?: string[];
-  /** Chat interno: la persona que mira es una de las que lo pusieron. */
-  mia?: boolean;
 }
 
 /**
@@ -66,45 +59,6 @@ export function agruparReacciones<M extends MensajeConReaccion>(mensajes: M[]): 
   return { visibles, reacciones };
 }
 
-/**
- * Lo mismo para un chat interno entre áreas (30 oct 2026, pedido de Jhokser): ahí cada persona reacciona por su cuenta, así que sobre un mensaje puede haber varios emojis y cada uno
- * dice quiénes lo pusieron. Una persona tiene una sola reacción por mensaje (la última; una sin emoji la quita). Las reacciones van sobre el mensaje cuyo `waId` es su
- * `reaccionA` (cada copia del mensaje en cada área tiene el suyo) y no se dibujan como mensajes sueltos. Los emojis salen del más puesto al menos puesto.
- */
-export function agruparReaccionesInternas<M extends MensajeConReaccion>(mensajes: M[], miId: string): { visibles: M[]; reacciones: Map<string, ReaccionVista[]> } {
-  const porWaId = new Map<string, M>();
-  for (const m of mensajes) if (m.tipo !== "reaccion" && m.waId) porWaId.set(m.waId, m);
-  // Por mensaje y por persona, su última reacción (en orden de llegada).
-  const ultima = new Map<string, Map<string, { emoji: string | null; nombre: string; id: string | null }>>();
-  const visibles: M[] = [];
-  for (const m of mensajes) {
-    if (m.tipo !== "reaccion") {
-      visibles.push(m);
-      continue;
-    }
-    const destino = m.reaccionA ? porWaId.get(m.reaccionA) : undefined;
-    if (!destino) continue;
-    const quien = m.autorId ?? m.autor ?? "?";
-    const personas = ultima.get(destino.id) ?? new Map();
-    personas.set(quien, { emoji: m.texto?.trim() || null, nombre: m.autor ?? "Alguien del equipo", id: m.autorId ?? null });
-    ultima.set(destino.id, personas);
-  }
-  const reacciones = new Map<string, ReaccionVista[]>();
-  for (const [id, personas] of ultima) {
-    const porEmoji = new Map<string, ReaccionVista>();
-    for (const p of personas.values()) {
-      if (!p.emoji) continue;
-      const g = porEmoji.get(p.emoji) ?? { emoji: p.emoji, direccion: "saliente" as const, autores: [], mia: false };
-      g.autores!.push(p.nombre);
-      if (p.id && p.id === miId) g.mia = true;
-      porEmoji.set(p.emoji, g);
-    }
-    const lista = [...porEmoji.values()].sort((a, b) => b.autores!.length - a.autores!.length);
-    if (lista.length) reacciones.set(id, lista);
-  }
-  return { visibles, reacciones };
-}
-
 /** Las reacciones rápidas que se ofrecen al pasar el cursor sobre un mensaje (las mismas seis que WhatsApp). */
 export const REACCIONES_RAPIDAS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 
@@ -122,4 +76,4 @@ export function emojiDeReaccion(texto: unknown): string | null {
 }
 
 /** El emoji con que el equipo reaccionó a un mensaje, si lo hizo (para marcarlo en la barra y quitarlo al volver a pulsarlo). */
-export const miReaccion = (reacciones: readonly ReaccionVista[] | undefined): string | null => reacciones?.find((r) => r.mia ?? r.direccion === "saliente")?.emoji ?? null;
+export const miReaccion = (reacciones: readonly ReaccionVista[] | undefined): string | null => reacciones?.find((r) => r.direccion === "saliente")?.emoji ?? null;

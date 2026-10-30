@@ -20,8 +20,7 @@ export async function archivoDeMensaje(supabase: SupabaseClient, m: MensajeConAr
   // Un archivo de un chat importado del celular (bandeja › «Importar chat», migración 0169) o mandado desde aquí: vive en el bucket, en la carpeta del chat.
   if (mediaId.startsWith("storage:")) {
     const ruta = mediaId.slice(8);
-    // Las del chat interno están en `interno/` (una sola copia para las salas de todas las áreas); las demás, en la carpeta de su chat.
-    if (!(ruta.startsWith(`${m.conversacion_id}/`) || ruta.startsWith("interno/")) || ruta.includes("..")) return { estado: 404, mensaje: "Not Found" };
+    if (!ruta.startsWith(`${m.conversacion_id}/`) || ruta.includes("..")) return { estado: 404, mensaje: "Not Found" };
     const { data: archivo } = await supabase.storage.from("whatsapp-importados").download(ruta);
     if (!archivo || archivo.size > maxBytes) return { estado: 410, mensaje: "Archivo no disponible." };
     const bytes = new Uint8Array(await archivo.arrayBuffer());
