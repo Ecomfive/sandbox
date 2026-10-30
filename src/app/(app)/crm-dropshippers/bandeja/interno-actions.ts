@@ -2,7 +2,8 @@
 
 import { registrarAuditoria } from "@/lib/auditoria";
 import { accesoCrm, escribeEnArea } from "@/lib/crm/areas";
-import { areaPropiaDeChat, AREAS_DE_SALA, esSala, etiquetaDeSala, telefonoDeSala } from "@/lib/crm/chat-interno";
+import { areaPropiaDeChat, AREAS_DE_SALA, esSala, esTelefonoInterno, etiquetaDeSala, salaDeTelefono, telefonoDeSala } from "@/lib/crm/chat-interno";
+import { esAdministrador } from "@/lib/permisos/acceso";
 import { nombreArchivoSeguro } from "@/lib/seguridad/ruta-almacen";
 import { emojiDeReaccion } from "@/lib/whatsapp/reacciones";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -90,6 +91,49 @@ export async function enviarMensajeInterno(id: string, texto: string): Promise<G
   if (!cuerpo) return { error: "Escribe el mensaje." };
   if (cuerpo.length > 4096) return { error: "El mensaje es muy largo (máximo 4096 caracteres)." };
   return guardarInterno(id, { texto: cuerpo });
+}
+
+/**
+ * Borrar un mensaje del chat interno **sin pedir autorización** (30 oct 2026, pedido de Jhokser): en WhatsApp borrar se pide y lo autoriza el jefe, pero el chat interno es del
+ * equipo y no sale a ningún cliente. Lo borra quien lo escribió (o un administrador): se **oculta** —la base no deja borrar de verdad— en la copia de cada área de la sala, y un
+ * administrador lo puede recuperar en CRM › Borrados. Las copias de un mismo mensaje se reconocen porque se guardaron en el mismo instante, de la misma persona y del mismo tipo.
+ * Los archivos (fotos, audios, documentos) dejan de entregarse. Queda en la auditoría.
+ */
+export async function borrarMensajeInterno(id: string, mensajeId: string): Promise<{ ok: true } | { error: string }> {
+  if (!/^[0-9a-f-]{36}$/i.test(String(mensajeId))) return { error: "Mensaje no válido." };
+  const u = await usuarioBandeja(true);
+  if (!u) return { error: "No tienes permiso para escribir en el CRM." };
+  const supabase = createServiceClient();
+  if (!(await conversacionPermitida(supabase, id, u, true))) return { error: "Esa conversación no existe o no es de tu área." };
+  const { data: chat } = await supabase.from("whatsapp_conversaciones").select("telefono").eq("id", id).maybeSingle();
+  const telefono = (chat?.telefono as string | null) ?? "";
+  if (!esTelefonoInterno(telefono)) return { error: "Este no es un chat interno." };
+  const { data: m } = await supabase.from("whatsapp_mensajes").select("id, tipo, autor_id, momento, oculto_en").eq("id", mensajeId).eq("conversacion_id", id).maybeSingle();
+  if (!m || m.tipo === "reaccion") return { error: "Ese mensaje no está en este chat." };
+  if (m.oculto_en) return { ok: true };
+  if (!m.autor_id) return { error: "Ese mensaje lo escribió el sistema: no se borra." };
+  if (m.autor_id !== u.id && !esAdministrador(u)) return { error: "Solo puedes borrar tus propios mensajes." };
+
+  // Las copias del mensaje en las demás áreas de la sala (la de este chat, siempre).
+  const sala = salaDeTelefono(telefono)?.sala ?? null;
+  let copias = [id];
+  if (sala) {
+    const { data: hermanas } = await supabase.from("whatsapp_conversaciones").select("id").like("telefono", `interno:${sala}:%`);
+    copias = [...new Set([id, ...(hermanas ?? []).map((h) => h.id as string)])];
+  }
+  const { data: ocultos, error } = await supabase
+    .from("whatsapp_mensajes")
+    .update({ oculto_en: new Date().toISOString(), oculto_por: `${u.nombre || u.email} lo borró del chat interno` })
+    .in("conversacion_id", copias)
+    .eq("momento", m.momento as string)
+    .eq("autor_id", m.autor_id as string)
+    .eq("tipo", m.tipo as string)
+    .is("oculto_en", null)
+    .select("id");
+  if (error || !ocultos?.length) return { error: error?.code === "42703" ? "Falta correr la migración 0172 (borrado con autorización)." : "No se pudo borrar el mensaje." };
+  await registrarAuditoria({ accion: "borrar_mensaje_interno", entidad: "whatsapp_conversaciones", entidadId: id, detalle: `Mensaje del chat interno (${m.tipo as string})` });
+  await avisarBandeja();
+  return { ok: true };
 }
 
 /**
