@@ -195,8 +195,9 @@ function Palomitas({ estado }: { estado: string }) {
 }
 
 /** La foto redonda de un chat: sus iniciales sobre su color. */
-function Foto({ nombre, tam }: { nombre: string; tam: "lista" | "cabecera" | "ficha" }) {
-  const medida = tam === "ficha" ? "h-[120px] w-[120px] text-[40px]" : tam === "cabecera" ? "h-10 w-10 text-[15px]" : "h-[49px] w-[49px] text-[17px]";
+function Foto({ nombre, tam }: { nombre: string; tam: "lista" | "cabecera" | "ficha" | "tarjeta" }) {
+  const medida =
+    tam === "ficha" ? "h-[120px] w-[120px] text-[40px]" : tam === "cabecera" ? "h-10 w-10 text-[15px]" : tam === "tarjeta" ? "h-[38px] w-[38px] text-[13px]" : "h-[49px] w-[49px] text-[17px]";
   return (
     <span aria-hidden="true" style={{ backgroundColor: colorFoto(nombre) }} className={`flex flex-none items-center justify-center rounded-full font-semibold text-white ${medida}`}>
       {iniciales(nombre)}
@@ -232,19 +233,8 @@ const COLOR_COLUMNA: Record<ColumnaTablero, string> = { por_atender: "#D92D20", 
 /** Dónde se recuerda si esta persona usa la lista o el tablero (solo en su navegador). */
 const CLAVE_VISTA = "bandeja-whatsapp-vista";
 
-/**
- * El estado de un chat en su tarjeta del tablero, como un círculo de color: «!» rojo vencido, «!» ámbar por vencer, verde a tiempo, «–» gris sin plazo y «✓» contestado.
- * La clase de color es la de su espera (`esperaConPlazo`).
- */
-function IconoEstado({ clase, signo, texto }: { clase: string; signo: string; texto: string }) {
-  return (
-    <span role="img" aria-label={texto} title={texto} className={`flex h-[22px] w-[22px] flex-none items-center justify-center rounded-full bg-current ${clase}`}>
-      <span aria-hidden="true" className="text-[12px] leading-none font-extrabold text-white">
-        {signo}
-      </span>
-    </span>
-  );
-}
+/** El color del punto de cada motivo en la tarjeta del tablero, como en el prototipo. */
+const COLOR_MOTIVO: Record<string, string> = { queja: "#D92D20", pedido: "#F79009", pagos: "#EAAA08", consulta: "#2E90FA", comercial: "#12B76A", otro: "#98A2B3" };
 
 /** «VIP»: un dropshipper de los que más pedidos mueven (29 oct 2026), para saber con quién se trata. */
 function EtiquetaVip({ tipo }: { tipo: string | null }) {
@@ -1037,86 +1027,89 @@ export function Bandeja({
   }
 
   /**
-   * Un chat en su tarjeta del tablero: nombre, motivo y último mensaje, quién lo lleva, el plazo y su estado.
-   * Se abre como en la lista y el clic derecho da el mismo menú. Debajo, los botones de su columna, como en el prototipo
-   * (https://claude.ai/artifact/WhfJpQZQf6AdvSxsmzfZFa, 30 oct 2026): Por atender → «Responder»; En conversación → «Ver chat» y «Resolver»
-   * (pasa a Cerrados); Cerrados → «Ver chat» y «Reabrir». Resolver y reabrir los ve quien puede escribir en el CRM (el servidor comprueba que pueda en el área
-   * del chat: Dirección, también en los de Comercial y Atención; 30 oct 2026, pedido de Hernán). También en «Ver como»: así se ve lo mismo que ve esa área.
+   * Un chat en su tarjeta del tablero, como en el prototipo (https://claude.ai/artifact/WhfJpQZQf6AdvSxsmzfZFa, 30 oct 2026): su foto, nombre, VIP
+   * y hora; el último mensaje; el motivo con su color, cuánto espera (o cuándo se contestó o resolvió) y quién lo lleva; y, dentro de la tarjeta,
+   * los botones de su columna: Por atender → «Responder»; En conversación → «Ver chat» y «Resolver» (pasa a Cerrados); Cerrados → «Ver chat» y
+   * «Reabrir». Resolver y reabrir los ve quien puede escribir en el CRM (el servidor comprueba el área; Dirección, en todas), también en «Ver como».
+   * Pulsar la tarjeta abre el chat como en la lista y el clic derecho da el mismo menú.
    */
   function tarjetaChat(c: ConversacionVista, columna: ColumnaTablero) {
     const puedeCambiar = escribe;
-    const claseBoton = `inline-flex h-8 items-center rounded-md px-2.5 text-[12.5px] font-semibold ${anilloFoco}`;
+    const claseBoton = `inline-flex min-h-9 items-center rounded-lg px-3 text-[12.5px] font-semibold ${anilloFoco}`;
     const principal = `${claseBoton} bg-[var(--wa-acento)] text-[var(--wa-acento-texto)] hover:opacity-90 disabled:opacity-60`;
     const secundario = `${claseBoton} border border-[var(--wa-borde)] bg-[var(--wa-fondo)] text-[var(--wa-texto)] hover:bg-[var(--wa-hover)] disabled:opacity-60`;
     const espera = enNavegador ? esperaConPlazo(c) : null;
     const grupo = grupoPorId(c.motivo?.grupo);
-    const estado = espera
-      ? espera.plazo === "Sin plazo"
-        ? { signo: "–", texto: "Sin plazo" }
-        : espera.plazo?.startsWith("Venció")
-          ? { signo: "!", texto: "Plazo vencido" }
-          : espera.clase.includes("warning")
-            ? { signo: "!", texto: "Por vencer" }
-            : { signo: "", texto: espera.plazo ? "A tiempo" : "Esperando respuesta" }
-      : c.estado === "resuelta"
-        ? { signo: "✓", texto: "Resuelto" }
-        : { signo: "✓", texto: "Contestado" };
+    const hora = enNavegador ? horaCorta(c.ultimoMensajeEn) : "";
+    const vencido = !!espera?.plazo?.startsWith("Venció");
+    // Lo de abajo, como en el prototipo: «Venció hace…» en rojo; «Espera 22 min · vence en 8 min»; o cuándo se contestó o resolvió.
+    const meta = espera
+      ? vencido
+        ? (espera.plazo ?? "")
+        : `Espera ${espera.texto}${espera.plazo && espera.plazo !== "Sin plazo" ? ` · ${espera.plazo.toLowerCase()}` : " · sin plazo"}`
+      : `${c.estado === "resuelta" ? "Resuelto" : "Respondido"}${hora ? ` ${hora}` : ""}`;
+    const elegida = c.id === elegido;
     return (
       <li key={c.id} onContextMenu={(e) => abrirMenuChat(e, c)}>
-        <button
-          type="button"
-          onClick={() => abrirChat(c)}
-          aria-current={c.id === elegido ? "true" : undefined}
-          className={`flex w-full items-start gap-2.5 rounded-lg border border-[var(--wa-borde)] px-3 py-2.5 text-left ${c.id === elegido ? "bg-[var(--wa-sel)]" : "bg-[var(--wa-fondo)] hover:border-[var(--wa-sec)]"} ${anilloFoco}`}
+        <article
+          className={`flex flex-col gap-2.5 rounded-xl border bg-[var(--wa-fondo)] p-3 ${elegida ? "border-[var(--wa-acento)] shadow-[0_0_0_1px_var(--wa-acento),0_6px_16px_rgba(16,24,40,0.12)]" : "border-[var(--wa-borde)] hover:border-[var(--wa-sec)]"}`}
         >
-          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span className="flex items-center gap-1.5">
-              <span className="min-w-0 truncate text-[14px] font-semibold">{c.nombre}</span>
-              {c.vip && <EtiquetaVip tipo={c.tipoCliente} />}
-              {c.noLeidos > 0 && (
-                <span className="ml-auto flex h-[18px] min-w-[18px] flex-none items-center justify-center rounded-full bg-[var(--wa-acento)] px-1 text-[11px] font-semibold text-[var(--wa-acento-texto)] tabular-nums">
-                  {c.noLeidos}
-                  <span className="sr-only"> sin leer</span>
+          <button type="button" onClick={() => abrirChat(c)} aria-current={elegida ? "true" : undefined} className={`flex w-full flex-col gap-2.5 rounded-lg text-left ${anilloFoco}`}>
+            <span className="flex items-start gap-2.5">
+              <Foto nombre={c.nombre} tam="tarjeta" />
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="flex items-center gap-2">
+                  <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">{c.nombre}</span>
+                  {c.vip && <EtiquetaVip tipo={c.tipoCliente} />}
+                  {c.noLeidos > 0 && (
+                    <span className="flex h-[18px] min-w-[18px] flex-none items-center justify-center rounded-full bg-[var(--wa-acento)] px-1 text-[11px] font-semibold text-[var(--wa-acento-texto)] tabular-nums">
+                      {c.noLeidos}
+                      <span className="sr-only"> sin leer</span>
+                    </span>
+                  )}
+                  <span className="flex-none text-[11.5px] text-[var(--wa-sec)] tabular-nums">{hora}</span>
                 </span>
-              )}
-            </span>
-            <span className="truncate text-[12.5px] text-[var(--wa-sec)]" title={c.motivo?.resumen ?? undefined}>
-              {grupo ? `${grupo.corto} · ` : ""}
-              {c.ultimoTexto ?? ""}
-            </span>
-            <span className="mt-1 flex items-center gap-1.5 text-[12px]">
-              <BurbujaPersona nombre={c.asignadaA} vacio />
-              <span className="min-w-0 truncate text-[var(--wa-sec)]">{c.asignadaA ?? "Sin asignar"}</span>
-              <span className={`ml-auto flex-none font-semibold tabular-nums ${espera ? espera.clase : "text-[var(--wa-sec)]"}`}>
-                {espera ? (espera.plazo && espera.plazo !== "Sin plazo" ? espera.plazo : `Espera ${espera.texto}`) : enNavegador ? horaCorta(c.ultimoMensajeEn) : ""}
+                <span className="truncate text-[13px] text-[var(--wa-sec)]" title={c.motivo?.resumen ?? undefined}>
+                  {c.ultimoTexto ?? ""}
+                </span>
               </span>
             </span>
-          </span>
-          <IconoEstado clase={espera ? espera.clase : "text-[var(--wa-sec)]"} signo={estado.signo} texto={estado.texto} />
-        </button>
-        <span className="mt-1.5 flex flex-wrap gap-1.5 px-0.5">
-          {columna === "por_atender" ? (
-            <button type="button" onClick={() => abrirChat(c)} className={principal}>
-              Responder
-            </button>
-          ) : (
-            <>
-              <button type="button" onClick={() => abrirChat(c)} className={secundario}>
-                Ver chat
+            <span className="flex items-center gap-2">
+              <span
+                title={grupo ? `${grupo.etiqueta}${c.motivo?.resumen ? `: ${c.motivo.resumen}` : ""}` : "Todavía sin motivo"}
+                className="inline-flex flex-none items-center gap-1.5 rounded-full border border-[var(--wa-borde)] px-2 py-0.5 text-[11.5px] font-medium text-[var(--wa-texto)]"
+              >
+                <span aria-hidden="true" className="h-2 w-2 rounded-full" style={{ backgroundColor: grupo ? COLOR_MOTIVO[grupo.id] : "#98A2B3" }} />
+                {grupo?.corto ?? "Sin motivo"}
+              </span>
+              <span className={`min-w-0 flex-1 truncate text-[12px] tabular-nums ${espera ? `${espera.clase} ${vencido ? "font-bold" : "font-medium"}` : "font-medium text-[var(--wa-sec)]"}`}>{meta}</span>
+              <BurbujaPersona nombre={c.asignadaA} />
+            </span>
+          </button>
+          <span className="flex flex-wrap gap-1.5">
+            {columna === "por_atender" ? (
+              <button type="button" onClick={() => abrirChat(c)} className={principal}>
+                Responder
               </button>
-              {puedeCambiar && columna === "en_conversacion" && (
-                <button type="button" disabled={enviando} onClick={() => cambiarDesdeTablero(c, "resuelta")} className={principal}>
-                  Resolver
+            ) : (
+              <>
+                <button type="button" onClick={() => abrirChat(c)} className={secundario}>
+                  Ver chat
                 </button>
-              )}
-              {puedeCambiar && columna === "cerrados" && (
-                <button type="button" disabled={enviando} onClick={() => cambiarDesdeTablero(c, "abierta")} className={secundario}>
-                  Reabrir
-                </button>
-              )}
-            </>
-          )}
-        </span>
+                {puedeCambiar && columna === "en_conversacion" && (
+                  <button type="button" disabled={enviando} onClick={() => cambiarDesdeTablero(c, "resuelta")} className={principal}>
+                    Resolver
+                  </button>
+                )}
+                {puedeCambiar && columna === "cerrados" && (
+                  <button type="button" disabled={enviando} onClick={() => cambiarDesdeTablero(c, "abierta")} className={secundario}>
+                    Reabrir
+                  </button>
+                )}
+              </>
+            )}
+          </span>
+        </article>
       </li>
     );
   }
@@ -1436,13 +1429,27 @@ export function Bandeja({
           </label>
         )}
         {enTablero && (
-          <label className="flex h-10 items-center gap-2 text-[13px] text-[var(--wa-sec)]">
-            Ver
-            <select value={soloMios ? "mios" : "todos"} onChange={(e) => setSoloMios(e.target.value === "mios")} className={`h-10 rounded-lg border-0 bg-[var(--wa-panel)] px-2 text-[13px] font-semibold text-[var(--wa-texto)] ${anilloFoco}`}>
-              <option value="todos">Todo el equipo</option>
-              <option value="mios">Mis chats</option>
-            </select>
-          </label>
+          <div role="group" aria-label="De quién son los chats" className="flex flex-none gap-1.5">
+            {(
+              [
+                ["mios", "Míos"],
+                ["todos", "Todos"],
+              ] as const
+            ).map(([v, texto]) => {
+              const activo = (v === "mios") === soloMios;
+              return (
+                <button
+                  key={v}
+                  type="button"
+                  aria-pressed={activo}
+                  onClick={() => setSoloMios(v === "mios")}
+                  className={`h-10 rounded-full px-3.5 text-sm ${activo ? "bg-[var(--wa-acento-suave)] font-semibold text-[var(--wa-acento-suave-texto)]" : "bg-[var(--wa-panel)] text-[var(--wa-texto)] hover:bg-[var(--wa-hover)]"} ${anilloFoco}`}
+                >
+                  {texto}
+                </button>
+              );
+            })}
+          </div>
         )}
         <div role="group" aria-label="Qué conversaciones ver" className={`flex flex-wrap gap-1.5 ${enTablero ? "hidden" : ""}`}>
           {opciones.map((o) => (
@@ -1500,53 +1507,73 @@ export function Bandeja({
           const vencidos = conEspera.filter((e) => e?.plazo?.startsWith("Venció")).length;
           const porVencer = conEspera.filter((e) => e && !e.plazo?.startsWith("Venció") && e.clase.includes("warning")).length;
           const sinMotivo = delNumero.filter((c) => c.area === areaTablero && sinResponder(c) && !c.motivo).length;
+          // Como en el prototipo: junto al área, su número de WhatsApp.
+          const numerosArea = datos.numeros
+            .filter((n) => n.area === areaTablero)
+            .map((n) => n.nombre)
+            .join(" · ");
           return (
-            <section aria-label={`Tablero de ${areaChat(areaTablero).etiqueta}`} className="flex max-h-[80vh] min-h-[420px] flex-1 flex-col overflow-hidden rounded-[14px] border border-[var(--wa-borde)] bg-[var(--wa-fondo)] lg:max-h-none lg:min-h-0">
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-[var(--wa-borde)] px-4 py-3">
+            <section aria-label={`Tablero de ${areaChat(areaTablero).etiqueta}`} className="flex max-h-[80vh] min-h-[420px] flex-1 flex-col gap-3.5 lg:max-h-none lg:min-h-0">
+              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
                 <span aria-hidden="true" className={`h-2.5 w-2.5 flex-none rounded-full bg-current ${colorDeArea(areaTablero)}`} />
                 <h2 className="m-0 text-[17px] font-bold">{areaChat(areaTablero).etiqueta}</h2>
-                <span className="text-[13px] text-[var(--wa-sec)]">
-                  {pendientes.length} por atender
-                  {vencidos > 0 && <strong className="text-destructive"> · {vencidos} {vencidos === 1 ? "vencido" : "vencidos"}</strong>}
-                  {porVencer > 0 && <strong className="text-warning"> · {porVencer} por vencer</strong>}
-                </span>
-                {escribe && sinMotivo > 0 && (
-                  <button
-                    type="button"
-                    disabled={clasificando}
-                    onClick={clasificarPendientes}
-                    title="La IA lee por qué escribe cada chat que espera respuesta sin motivo: así se ordena por urgencia en Por atender."
-                    className={`ml-auto rounded-full border border-[var(--wa-borde)] px-2.5 py-0.5 text-xs font-semibold text-[var(--wa-texto)] hover:bg-[var(--wa-hover)] disabled:opacity-60 ${anilloFoco}`}
-                  >
-                    {clasificando ? "Leyendo motivos…" : `Leer motivos con IA (${sinMotivo})`}
-                  </button>
+                {numerosArea && <span className="text-[13px] text-[var(--wa-sec)]">{numerosArea}</span>}
+                {(vencidos > 0 || porVencer > 0) && (
+                  <span className="text-[13px]">
+                    {vencidos > 0 && (
+                      <strong className="text-destructive">
+                        {vencidos} {vencidos === 1 ? "vencido" : "vencidos"}
+                      </strong>
+                    )}
+                    {vencidos > 0 && porVencer > 0 && " · "}
+                    {porVencer > 0 && <strong className="text-warning">{porVencer} por vencer</strong>}
+                  </span>
                 )}
+                <span className="ml-auto flex flex-wrap items-center gap-2">
+                  {escribe && sinMotivo > 0 && (
+                    <button
+                      type="button"
+                      disabled={clasificando}
+                      onClick={clasificarPendientes}
+                      title="La IA lee por qué escribe cada chat que espera respuesta sin motivo: así se ordena por urgencia en Por atender."
+                      className={`rounded-full border border-[var(--wa-borde)] px-2.5 py-1 text-xs font-semibold text-[var(--wa-texto)] hover:bg-[var(--wa-hover)] disabled:opacity-60 ${anilloFoco}`}
+                    >
+                      {clasificando ? "Leyendo motivos…" : `Leer motivos con IA (${sinMotivo})`}
+                    </button>
+                  )}
+                  <span className="rounded-full bg-[var(--wa-acento)] px-2.5 py-1 text-xs font-bold text-[var(--wa-acento-texto)]">{pendientes.length} sin responder</span>
+                </span>
               </div>
-              <div className="min-h-0 flex-1 overflow-x-auto bg-[var(--wa-panel)]">
-                <div className="grid h-full min-w-[840px] grid-cols-3">
+              <div className="min-h-0 flex-1 overflow-x-auto">
+                <div className="grid h-full min-w-[840px] grid-cols-3 gap-4">
                   {tablero.map((col) => {
-                    // «Por atender» va por urgencia: cuántos se vencieron; las demás dicen qué significan.
                     const venc = enNavegador && col.id === "por_atender" ? col.chats.filter((c) => esperaConPlazo(c)?.plazo?.startsWith("Venció")).length : 0;
-                    const resumen = venc ? `${venc} ${venc === 1 ? "vencido" : "vencidos"}` : col.detalle;
                     return (
-                      <div key={col.id} className="flex min-h-0 flex-col border-r border-[var(--wa-borde)] last:border-r-0">
-                        <div className="border-b border-[var(--wa-borde)] bg-[var(--wa-fondo)] px-3.5 pt-2.5 pb-2" style={{ borderTop: `3px solid ${COLOR_COLUMNA[col.id]}` }}>
-                          <h3 className="m-0 text-[15px] font-bold">{col.etiqueta}</h3>
-                          <span className="text-[12px] text-[var(--wa-sec)]">
-                            {col.chats.length} {col.chats.length === 1 ? "chat" : "chats"}
-                            {resumen && ` · ${resumen}`}
-                          </span>
+                      <section key={col.id} aria-label={col.etiqueta} className="flex min-h-0 flex-col rounded-[14px] bg-[var(--wa-panel)]" style={{ borderTop: `4px solid ${COLOR_COLUMNA[col.id]}` }}>
+                        <div className="flex flex-col gap-0.5 px-3.5 pt-3.5 pb-2.5">
+                          <div className="flex items-center gap-2">
+                            <h3 className="m-0 text-[15px] font-bold">{col.etiqueta}</h3>
+                            <span className="inline-flex h-[22px] min-w-[22px] items-center justify-center rounded-full border border-[var(--wa-borde)] bg-[var(--wa-fondo)] px-1.5 text-xs font-bold text-[var(--wa-texto)] tabular-nums">
+                              {col.chats.length}
+                            </span>
+                            {venc > 0 && (
+                              <span className="text-xs font-bold text-destructive">
+                                {venc} {venc === 1 ? "vencido" : "vencidos"}
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[12px] text-[var(--wa-sec)]">{col.detalle}</span>
                         </div>
-                        <ul className="m-0 flex min-h-0 flex-1 list-none flex-col gap-2 overflow-y-auto p-2.5">
+                        <ul className="m-0 flex min-h-0 flex-1 list-none flex-col gap-2.5 overflow-y-auto px-2.5 pb-3">
                           {col.chats.map((c) => tarjetaChat(c, col.id))}
-                          {!col.chats.length && <li className="px-2 py-6 text-center text-[13px] text-[var(--wa-sec)]">Nada aquí.</li>}
+                          {!col.chats.length && <li className="px-1 py-2 text-[13px] text-[var(--wa-sec)]">Nada por aquí.</li>}
                         </ul>
-                      </div>
+                      </section>
                     );
                   })}
                 </div>
               </div>
-              {areaTablero !== miArea && <p className="m-0 border-t border-[var(--wa-borde)] bg-[var(--wa-panel)] px-4 py-2 text-xs text-[var(--wa-sec)]">Supervisión: lo que abras aquí no se marca leído</p>}
+              {areaTablero !== miArea && <p className="m-0 text-xs text-[var(--wa-sec)]">Supervisión: lo que abras aquí no se marca leído.</p>}
             </section>
           );
         })()}
