@@ -2,14 +2,17 @@
 
 import Link from "next/link";
 import { useState, type ComponentType, type ReactNode, type SVGProps } from "react";
+import { DestinoEnSitio, EnSitio } from "@/components/ui/en-sitio";
 import { anilloFoco } from "@/components/ui/field";
 import { Pastilla, Punto } from "@/components/panel/piezas-panel";
 import type { AccesoCrm } from "@/lib/crm/areas";
+import type { BotonFicha } from "@/lib/crm/botones-ficha";
 import { quienesAtienden, type QuienRespondio } from "@/lib/crm/respondieron";
 import { DESDE_EL_CELULAR } from "@/lib/whatsapp/actividad-equipo";
 import { formatearFecha } from "@/lib/formato";
 import { Tooltip } from "@/components/ui/tooltip";
 import { ActividadDropshipper } from "../actividad-dropshipper";
+import { FilaBotones, ItemFila } from "../botones-ficha";
 import { CuentasDropshipper } from "../cuentas-dropshipper";
 import { etiquetaEstado } from "../def-crm";
 import { DesempenoDropshipper } from "../desempeno-dropshipper";
@@ -53,6 +56,8 @@ export const claseBotonFichaPrincipal = `flex flex-col items-center gap-0.5 roun
 
 /** Un botón más de la fila (pasar de área, importar, marcar borrado…): `corto` va en el botón y `texto` en el globo. */
 export interface AccionExtra {
+  /** Para ordenar el botón según su uso (`BOTONES_FICHA`). */
+  id: BotonFicha;
   texto: string;
   corto: string;
   icono: ComponentType<SVGProps<SVGSVGElement>>;
@@ -77,13 +82,15 @@ function Seccion({ titulo, children }: { titulo: string; children: ReactNode }) 
 function BotonesExtra({ acciones }: { acciones: AccionExtra[] }) {
   return (
     <>
-      {acciones.map(({ texto, corto, icono: Icono, alPulsar }) => (
-        <Tooltip key={texto} texto={texto}>
-          <button type="button" onClick={alPulsar} className={`${claseBotonFicha} w-full`}>
-            <Icono className="h-4 w-4" aria-hidden="true" />
-            <span className="leading-tight">{corto}</span>
-          </button>
-        </Tooltip>
+      {acciones.map(({ id, texto, corto, icono: Icono, alPulsar }) => (
+        <ItemFila key={texto} id={id}>
+          <Tooltip texto={texto}>
+            <button type="button" onClick={alPulsar} className={`${claseBotonFicha} w-full`}>
+              <Icono className="h-4 w-4" aria-hidden="true" />
+              <span className="leading-tight">{corto}</span>
+            </button>
+          </Tooltip>
+        </ItemFila>
       ))}
     </>
   );
@@ -241,12 +248,16 @@ export function FichaDelChat({
             </Pastilla>
           </div>
         )}
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(76px,1fr))] gap-1.5">
-          {accionesChat}
-          {escribe && <BotonNuevaTarea conversacionId={sel.id} nombre={sel.nombre} clase={claseBotonFicha} alCreada={() => setVersionTareas((v) => v + 1)} alAviso={alAviso} />}
-          {d && acceso && <AccionesCrm d={d} codigoPais={datos!.codigoPais} acceso={acceso} alGuardar={guardado} />}
-          <BotonesExtra acciones={accionesExtra} />
-        </div>
+        {/* Los botones, de derecha a izquierda según su uso (los más usados a la derecha). Tarea, Nuevo caso y Recomendar abren su formulario justo debajo, en el mismo lugar, para poder copiar del chat y de la ficha. */}
+        <EnSitio key={sel.id}>
+          <FilaBotones className="grid grid-cols-[repeat(auto-fill,minmax(76px,1fr))] gap-1.5">
+            {accionesChat}
+            {escribe && <BotonNuevaTarea conversacionId={sel.id} nombre={sel.nombre} clase={claseBotonFicha} alCreada={() => setVersionTareas((v) => v + 1)} alAviso={alAviso} />}
+            {d && acceso && <AccionesCrm d={d} codigoPais={datos!.codigoPais} acceso={acceso} alGuardar={guardado} />}
+            <BotonesExtra acciones={accionesExtra} />
+          </FilaBotones>
+          <DestinoEnSitio />
+        </EnSitio>
       </div>
 
       <nav aria-label="Ir a una parte de la ficha" className="sticky top-0 z-[2] flex gap-1 overflow-x-auto border-b border-[var(--wa-borde)] bg-[var(--wa-fondo)] px-3 [scrollbar-width:none]">
