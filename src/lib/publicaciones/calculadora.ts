@@ -47,7 +47,7 @@ export function textoWhatsapp(
   p: { nombre: string; idDropi?: string | null; costeReal?: number | null },
   d: DatosCalculo,
   r: ResultadoCalculo,
-  /** Cómo escribir los montos (Costa Rica en colones, 28 oct 2026); en dólares por omisión. El coste real (de Compras) va siempre en dólares. */
+  /** Cómo escribir los montos (Costa Rica: en dólares con los colones entre paréntesis, 31 oct 2026); en dólares por omisión. El coste real (de Compras) va siempre en dólares. */
   monto: (n: number) => string = usd,
 ): string {
   const nombre = p.nombre.trim().replace(/\*/g, "");
