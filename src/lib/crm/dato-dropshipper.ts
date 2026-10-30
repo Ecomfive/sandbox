@@ -44,6 +44,9 @@ export const esCampoDato = (v: unknown): v is CampoDato => typeof v === "string"
 
 const MAX_CIUDAD = 80;
 const MAX_CORREO = 120;
+const MAX_CORREOS = 10;
+/** Un correo, sin espacios, comillas ni comas (así se puede buscar en la base sin limpiarlo más). */
+const ES_CORREO = /^[a-z0-9._%+-]+@[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/;
 const MAX_NOMBRE = 120;
 const MAX_TIENDAS = 20;
 const MAX_PRODUCTOS = 60;
@@ -70,10 +73,14 @@ export function normalizarDato(campo: CampoDato, valor: string, hoy: string): { 
     return { valor: limpio };
   }
   if (campo === "correo") {
-    const correo = limpio.toLowerCase();
-    if (correo.length > MAX_CORREO || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) return { error: "El correo no es válido." };
-    return { valor: correo };
+    // Varios correos (30 oct 2026, pedido de Alcides; migración 0206): separados por coma, el primero es el principal.
+    const correos = listaDeTexto(limpio.toLowerCase(), MAX_CORREOS, MAX_CORREO);
+    if (!correos.length) return { valor: null };
+    const malo = correos.find((c) => !ES_CORREO.test(c));
+    if (malo) return { error: `«${malo}» no es un correo válido.` };
+    return { valor: correos.join(", ") };
   }
+
   if (!/^\d{4}-\d{2}-\d{2}$/.test(limpio)) return { error: "La fecha de ingreso no es válida." };
   const fecha = new Date(`${limpio}T00:00:00Z`);
   if (Number.isNaN(fecha.getTime()) || fecha.toISOString().slice(0, 10) !== limpio) return { error: "La fecha de ingreso no es válida." };

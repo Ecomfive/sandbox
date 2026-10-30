@@ -105,6 +105,8 @@ export interface FilaDropshipper {
   tiendas: string[];
   ciudad: string | null;
   email: string | null;
+  /** Todos sus correos, el principal (`email`) primero; los demás de `dropshipper_correos` (migración 0206). */
+  correos: string[];
   /** Tiene WhatsApp guardado. El número no viaja a la pantalla: se pide con «Mostrar número». */
   tieneTelefono: boolean;
   estado: string;

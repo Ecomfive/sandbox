@@ -22,7 +22,7 @@ const ES_ID = (v: string) => /^[0-9a-fA-F-]{8,64}$/.test(v);
  * puede repetir en otro dropshipper, enlaza los chats de ese número y **nunca se escribe en la auditoría ni vuelve a la pantalla**.
  */
 export async function cambiarDatoDropshipper(id: string, campo: string, valor: string): Promise<{ error: string } | { valor: string | null }> {
-  await requireModuloEscritura(MODULO_ATENCION);
+  const usuario = await requireModuloEscritura(MODULO_ATENCION);
   if (!ES_ID(String(id))) return { error: "Dropshipper no válido." };
   if (!esCampoDato(campo)) return { error: "Ese dato no se puede cambiar aquí." };
   const limpio = normalizarDato(campo, String(valor ?? ""), hoyPanama());
@@ -53,7 +53,25 @@ export async function cambiarDatoDropshipper(id: string, campo: string, valor: s
   }
 
   const lista = limpio.valor ? limpio.valor.split(", ") : [];
-  const antesTexto = campo === "telefono" ? null : Array.isArray(fila[columna]) ? (fila[columna] as string[]).join(", ") || null : ((fila[columna] as string | null) ?? null) || null;
+
+  // Los correos (30 oct 2026, pedido de Alcides; migración 0206): el primero es el principal (`contacto_email`) y los demás van en `dropshipper_correos`.
+  // Cada correo es de un solo dropshipper, para poder reconocer con él sus cuentas en cada plataforma.
+  let otrosCorreos: string[] | null = null;
+  if (campo === "correo") {
+    const guardados = await supabase.from("dropshipper_correos").select("correo").eq("dropshipper_id", id).order("creado_en");
+    otrosCorreos = guardados.error ? null : (guardados.data ?? []).map((c) => c.correo as string);
+    if (otrosCorreos === null && lista.length > 1) return { error: "Para guardar más de un correo falta correr la migración 0206 en Supabase." };
+    if (lista.length) {
+      const [principalAjeno, otroAjeno] = await Promise.all([
+        supabase.from("dropshippers").select("contacto_email").in("contacto_email", lista).neq("id", id).limit(1),
+        otrosCorreos === null ? Promise.resolve({ data: [] as { correo: string }[] }) : supabase.from("dropshipper_correos").select("correo").in("correo", lista).neq("dropshipper_id", id).limit(1),
+      ]);
+      const ajeno = (principalAjeno.data?.[0]?.contacto_email as string | undefined) ?? (otroAjeno.data?.[0]?.correo as string | undefined);
+      if (ajeno) return { error: `«${ajeno}» ya es el correo de otro dropshipper.` };
+    }
+  }
+  const antesCorreos = campo === "correo" ? [fila.contacto_email as string | null, ...(otrosCorreos ?? [])].filter(Boolean).join(", ") || null : null;
+  const antesTexto = campo === "correo" ? antesCorreos : campo === "telefono" ? null : Array.isArray(fila[columna]) ? (fila[columna] as string[]).join(", ") || null : ((fila[columna] as string | null) ?? null) || null;
   if (campo !== "telefono" && antesTexto === limpio.valor) return { valor: limpio.valor };
 
   const cambio: Record<string, unknown> =
@@ -63,9 +81,22 @@ export async function cambiarDatoDropshipper(id: string, campo: string, valor: s
         ? { tienda: lista[0] ?? null, tiendas: lista }
         : campo === "productos"
           ? { productos: lista }
-          : { [columna]: limpio.valor };
+          : campo === "correo"
+            ? { contacto_email: lista[0] ?? null }
+            : { [columna]: limpio.valor };
   const { error } = await supabase.from("dropshippers").update(cambio).eq("id", id);
   if (error) return { error: error.code === "23505" ? "Ya hay un dropshipper con ese WhatsApp." : "No se pudo guardar." };
+
+  // Los demás correos se reemplazan por los de la lista (sin el principal).
+  if (campo === "correo" && otrosCorreos !== null) {
+    const borrar = await supabase.from("dropshipper_correos").delete().eq("dropshipper_id", id);
+    if (borrar.error) return { error: "No se pudieron guardar los demás correos." };
+    const otros = lista.slice(1);
+    if (otros.length) {
+      const poner = await supabase.from("dropshipper_correos").insert(otros.map((correo) => ({ dropshipper_id: id, correo, creado_por: usuario.nombre || usuario.email })));
+      if (poner.error) return { error: poner.error.code === "23505" ? "Uno de los correos ya es de otro dropshipper." : "No se pudieron guardar los demás correos." };
+    }
+  }
 
   // Los chats sin enlazar de ese número quedan enlazados desde ahora, sin esperar a su próximo mensaje.
   if (telefono && (await enlazarChatsPorTelefono(supabase, id, telefono.e164)) > 0) revalidatePath("/crm-dropshippers/bandeja");
