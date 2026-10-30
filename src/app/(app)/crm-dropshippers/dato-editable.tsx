@@ -1,23 +1,23 @@
 "use client";
 
 import { useId, useRef, useState, useTransition } from "react";
-import { Tooltip } from "@/components/ui/tooltip";
 import { anilloFoco, fieldClassSm } from "@/components/ui/field";
 import { formatearFecha } from "@/lib/formato";
 import { LapizIcon } from "@/lib/nav-icons";
+import { Tooltip } from "@/components/ui/tooltip";
 import { CAMPOS_DATO, type CampoDato } from "@/lib/crm/dato-dropshipper";
 import { cambiarDatoDropshipper } from "./dato-actions";
 
-const botonMini = `flex h-6 w-6 flex-none items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50 ${anilloFoco}`;
 const TIPO: Record<CampoDato, string> = { ciudad: "text", ingreso: "date", correo: "email" };
 const EJEMPLO: Record<CampoDato, string> = { ciudad: "Ej: Ciudad de Panamá", ingreso: "", correo: "Ej: nombre@correo.com" };
 
 const mostrar = (campo: CampoDato, valor: string | null) => (valor ? (campo === "ingreso" ? formatearFecha(valor) : valor) : "—");
 
 /**
- * Un dato del bloque «Datos» que se cambia ahí mismo: el lápiz lo vuelve un campo; Enter o la palomita guardan, Escape o la X lo
- * dejan como estaba, y vaciarlo quita el dato. No es un `<form>` porque el bloque puede ir dentro de otro formulario. Sin permiso de
- * escritura solo se lee. El valor guardado se queda en la ficha aunque la fila no se vuelva a pedir (la ficha del chat).
+ * Un dato del bloque «Datos» que se cambia ahí mismo, como una celda de Compras (29 oct 2026, pedido de Alcides): se ve como texto, al pasar el
+ * cursor se marca y sale el lápiz, y un clic lo vuelve un campo. Enter o pulsar fuera guardan, Escape lo deja como estaba, y vaciarlo quita el
+ * dato. No es un `<form>` porque el bloque puede ir dentro de otro formulario. Sin permiso de escritura solo se lee. El valor guardado se queda
+ * en la ficha aunque la fila no se vuelva a pedir (la ficha del chat).
  */
 export function DatoEditable({ dropshipperId, campo, inicial, puede }: { dropshipperId: string; campo: CampoDato; inicial: string | null; puede: boolean }) {
   const [valor, setValor] = useState(inicial);
@@ -25,7 +25,9 @@ export function DatoEditable({ dropshipperId, campo, inicial, puede }: { dropshi
   const [borrador, setBorrador] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [ocupado, empezar] = useTransition();
-  const lapiz = useRef<HTMLButtonElement>(null);
+  const boton = useRef<HTMLButtonElement>(null);
+  // Ya se cerró (Escape, o ya se guardó): el blur que llega al quitar el campo no debe guardar otra vez.
+  const descartar = useRef(false);
   const idError = useId();
   const nombre = CAMPOS_DATO[campo].etiqueta.toLowerCase();
 
@@ -34,79 +36,69 @@ export function DatoEditable({ dropshipperId, campo, inicial, puede }: { dropshi
   function abrir() {
     setBorrador(valor ?? "");
     setError(null);
+    descartar.current = false;
     setEditando(true);
   }
-  function cerrar() {
+  function cerrar(enfocar: boolean) {
+    descartar.current = true;
     setEditando(false);
     setError(null);
-    requestAnimationFrame(() => lapiz.current?.focus());
+    if (enfocar) requestAnimationFrame(() => boton.current?.focus());
   }
-  function guardar() {
-    if (ocupado) return;
-    if (borrador.trim() === (valor ?? "")) return cerrar();
+  function guardar(enfocar: boolean) {
+    if (ocupado || descartar.current) return;
+    if (borrador.trim() === (valor ?? "")) return cerrar(enfocar);
     setError(null);
     empezar(async () => {
       const r = await cambiarDatoDropshipper(dropshipperId, campo, borrador).catch(() => ({ error: "No se pudo guardar." }));
       if ("error" in r) return setError(r.error);
       setValor(r.valor);
-      cerrar();
+      cerrar(enfocar);
     });
   }
 
   if (!editando)
     return (
-      <span className="inline-flex max-w-full items-start gap-1">
-        <span className="min-w-0 break-words">{mostrar(campo, valor)}</span>
-        <Tooltip texto={`Editar ${nombre}`}>
-          <button ref={lapiz} type="button" onClick={abrir} aria-label={`Editar ${nombre}`} className={`${botonMini} -my-0.5`}>
-            <LapizIcon width={13} height={13} aria-hidden="true" />
-          </button>
-        </Tooltip>
-      </span>
+      <Tooltip texto={`Editar ${nombre}`}>
+        <button
+          ref={boton}
+          type="button"
+          onClick={abrir}
+          className={`group -mx-1.5 -my-0.5 inline-flex max-w-full items-start gap-1 rounded px-1.5 py-0.5 text-left hover:bg-muted ${anilloFoco}`}
+        >
+          <span className={`min-w-0 break-words ${valor ? "" : "text-muted-foreground"}`}>{mostrar(campo, valor)}</span>
+          <LapizIcon width={12} height={12} aria-hidden="true" className="mt-[3px] flex-none text-muted-foreground opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100" />
+        </button>
+      </Tooltip>
     );
 
   return (
     <span className="flex flex-col gap-1">
-      <span className="flex items-center gap-1">
-        <label className="flex min-w-0 flex-1">
-          <span className="sr-only">{CAMPOS_DATO[campo].etiqueta}</span>
-          <input
-            type={TIPO[campo]}
-            value={borrador}
-            onChange={(e) => setBorrador(e.target.value)}
-            placeholder={EJEMPLO[campo] || undefined}
-            autoFocus
-            disabled={ocupado}
-            aria-invalid={error ? true : undefined}
-            aria-describedby={error ? idError : undefined}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                guardar();
-              } else if (e.key === "Escape") {
-                e.preventDefault();
-                e.stopPropagation();
-                cerrar();
-              }
-            }}
-            className={`${fieldClassSm} w-full min-w-0 text-[13px]`}
-          />
-        </label>
-        <Tooltip texto="Guardar">
-          <button type="button" onClick={guardar} disabled={ocupado} aria-label={`Guardar ${nombre}`} className={botonMini}>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="m5 12 5 5L20 7" />
-            </svg>
-          </button>
-        </Tooltip>
-        <Tooltip texto="Cancelar">
-          <button type="button" onClick={cerrar} disabled={ocupado} aria-label={`Cancelar el cambio de ${nombre}`} className={botonMini}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
-              <path d="M6 6l12 12M18 6 6 18" />
-            </svg>
-          </button>
-        </Tooltip>
-      </span>
+      <label className="flex min-w-0">
+        <span className="sr-only">{CAMPOS_DATO[campo].etiqueta}</span>
+        <input
+          type={TIPO[campo]}
+          value={borrador}
+          onChange={(e) => setBorrador(e.target.value)}
+          onBlur={() => guardar(false)}
+          placeholder={EJEMPLO[campo] || undefined}
+          autoFocus
+          readOnly={ocupado}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? idError : undefined}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              guardar(true);
+            } else if (e.key === "Escape") {
+              e.preventDefault();
+              e.stopPropagation();
+              cerrar(true);
+            }
+          }}
+          className={`${fieldClassSm} -my-1 w-full min-w-0 text-[13px]`}
+        />
+      </label>
       {error && (
         <span id={idError} role="alert" className="text-xs text-destructive">
           {error}
