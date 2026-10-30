@@ -4,6 +4,7 @@ import { registrarAuditoria } from "@/lib/auditoria";
 import { accesoCrm, escribeEnArea } from "@/lib/crm/areas";
 import { areaPropiaDeChat, AREAS_DE_SALA, esSala, etiquetaDeSala, telefonoDeSala } from "@/lib/crm/chat-interno";
 import { nombreArchivoSeguro } from "@/lib/seguridad/ruta-almacen";
+import { emojiDeReaccion } from "@/lib/whatsapp/reacciones";
 import { createServiceClient } from "@/lib/supabase/server";
 import { detectarArchivoWhatsapp, MAX_BYTES_ENVIO } from "@/lib/whatsapp/archivos";
 import { avisarBandeja } from "@/lib/whatsapp/aviso-bandeja";
@@ -46,11 +47,12 @@ export async function abrirChatInterno(sala: string): Promise<{ id: string } | {
   return { id: nueva.id as string };
 }
 
-/** Lo que dice `whatsapp_enviar_interno` (migración 0203) cuando falla, en palabras. */
+/** Lo que dicen `whatsapp_enviar_interno` y `whatsapp_reaccionar_interno` (migraciones 0203 y 0204) cuando fallan, en palabras. */
 function errorInterno(mensaje: string): string {
   if (/no_es_chat_interno|sala_no_valida/.test(mensaje)) return "Este no es un chat interno.";
-  if (/tipo_no_valido|falta_archivo/.test(mensaje)) return "En el chat interno solo se mandan texto, fotos y audios.";
-  if (/whatsapp_enviar_interno|schema cache|does not exist/i.test(mensaje)) return "Falta correr la migración 0203 (chat interno por salas).";
+  if (/mensaje_sin_reaccion/.test(mensaje)) return "A ese mensaje no se puede reaccionar (es anterior a las reacciones del chat interno).";
+  if (/tipo_no_valido|falta_archivo/.test(mensaje)) return "En el chat interno solo se mandan texto, fotos, audios y documentos.";
+  if (/whatsapp_enviar_interno|whatsapp_reaccionar_interno|schema cache|does not exist/i.test(mensaje)) return "Falta correr la migración 0204 (documentos, reacciones y salas de un área del chat interno).";
   return "No se pudo mandar el mensaje.";
 }
 
@@ -60,7 +62,7 @@ type Guardado = { ok: true; mensajeId: string; momento: string } | { error: stri
  * Guarda un mensaje del chat interno: **no sale por WhatsApp**, así no pesan las reglas de Meta (la ventana de 24 h, las plantillas, el primer contacto, el costo y la calidad del
  * número). `whatsapp_enviar_interno` (migración 0203) lo guarda, en una sola transacción, en la copia de cada área de la sala y en las de las otras áreas lo cuenta como no leído.
  */
-async function guardarInterno(id: string, args: { texto: string; tipo?: "texto" | "imagen" | "audio"; mediaId?: string; mime?: string; nombre?: string }): Promise<Guardado> {
+async function guardarInterno(id: string, args: { texto: string; tipo?: "texto" | "imagen" | "audio" | "documento"; mediaId?: string; mime?: string; nombre?: string }): Promise<Guardado> {
   const u = await usuarioBandeja(true);
   if (!u) return { error: "No tienes permiso para escribir en el CRM." };
   const supabase = createServiceClient();
@@ -91,7 +93,31 @@ export async function enviarMensajeInterno(id: string, texto: string): Promise<G
 }
 
 /**
- * Primer paso de mandar una foto o un audio por el chat interno: el permiso firmado para que el navegador lo suba directo al almacén (una acción del servidor no admite archivos
+ * Reaccionar a un mensaje del chat interno con un emoji (30 oct 2026, pedido de Jhokser); un emoji vacío quita la reacción propia. Cada persona tiene la suya, y se guarda en la copia de
+ * cada área de la sala (`whatsapp_reaccionar_interno`, migración 0204). No sale por WhatsApp, así que no hay ventana de 24 h; hay que poder escribir en el chat.
+ */
+export async function reaccionarInterno(id: string, mensajeId: string, emoji: string): Promise<{ ok: true } | { error: string }> {
+  if (!/^[0-9a-f-]{36}$/i.test(String(mensajeId))) return { error: "Mensaje no válido." };
+  const limpio = emojiDeReaccion(emoji);
+  if (limpio === null) return { error: "Elige un emoji para reaccionar." };
+  const u = await usuarioBandeja(true);
+  if (!u) return { error: "No tienes permiso para escribir en el CRM." };
+  const supabase = createServiceClient();
+  if (!(await conversacionPermitida(supabase, id, u, true))) return { error: "Esa conversación no existe o no es de tu área." };
+  const { error } = await supabase.rpc("whatsapp_reaccionar_interno", {
+    p_conversacion: id,
+    p_mensaje: mensajeId,
+    p_emoji: limpio,
+    p_autor_id: u.id,
+    p_autor_nombre: u.nombre || u.email,
+  });
+  if (error) return { error: errorInterno(error.message) };
+  await avisarBandeja();
+  return { ok: true };
+}
+
+/**
+ * Primer paso de mandar una foto, un audio o un documento por el chat interno: el permiso firmado para que el navegador lo suba directo al almacén (una acción del servidor no admite archivos
  * grandes). Va a `interno/<uuid>-nombre`: una sola copia que ven todas las áreas de la sala. Todavía no se manda nada: `enviarArchivoInterno` revisa el contenido.
  */
 export async function prepararArchivoInterno(id: string, nombre: string, tamano: number): Promise<{ ruta: string; token: string } | { error: string }> {
@@ -108,8 +134,9 @@ export async function prepararArchivoInterno(id: string, nombre: string, tamano:
 }
 
 /**
- * Segundo paso: guarda en el chat interno la foto o el audio que el navegador ya subió. Se revisa **por su contenido** que sea una foto (JPG o PNG) o un audio (nunca por su nombre
- * ni su tipo) y que no pese de más; con un texto al pie en las fotos. Si algo falla, el archivo subido se borra.
+ * Segundo paso: guarda en el chat interno la foto, el audio o el documento que el navegador ya subió. Se revisa **por su contenido** que sea una foto (JPG o PNG), un audio o un
+ * documento (PDF, Word, Excel, PowerPoint o texto; nunca por su nombre ni su tipo) y que no pese de más; con un texto al pie en las fotos y los documentos. Un video no se acepta.
+ * Si algo falla, el archivo subido se borra.
  */
 export async function enviarArchivoInterno(id: string, ruta: string, nombre: string, texto: string): Promise<Guardado> {
   if (typeof ruta !== "string" || !/^interno\/[0-9a-f-]{36}-[^/]+$/i.test(ruta) || ruta.includes("..")) return { error: "Archivo no válido." };
@@ -133,11 +160,11 @@ export async function enviarArchivoInterno(id: string, ruta: string, nombre: str
     await quitar();
     return { error: clase.error };
   }
-  if (clase.tipo !== "imagen" && clase.tipo !== "audio") {
+  if (clase.tipo !== "imagen" && clase.tipo !== "audio" && clase.tipo !== "documento") {
     await quitar();
-    return { error: "En el chat interno solo se mandan fotos y audios." };
+    return { error: "En el chat interno se mandan fotos, audios y documentos." };
   }
-  const pie = clase.tipo === "imagen" ? String(texto ?? "").trim().slice(0, 1024) : "";
+  const pie = clase.tipo === "audio" ? "" : String(texto ?? "").trim().slice(0, 1024);
   const r = await guardarInterno(id, { texto: pie, tipo: clase.tipo, mediaId: `storage:${ruta}`, mime: clase.mime, nombre: nombreMostrado });
   if ("error" in r) await quitar();
   return r;

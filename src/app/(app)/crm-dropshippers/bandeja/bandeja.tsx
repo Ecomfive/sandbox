@@ -26,6 +26,7 @@ import { colorFoto, iniciales } from "./globo-persona";
 import { EtiquetasChat, PastillasEtiquetas, SelectorEtiquetasChat, type ManejoEtiquetas } from "./etiquetas-chat";
 import { transcribirAudio } from "./transcripcion-actions";
 import { BotonBarra, DatosEnLaCabecera, FichaDelChat, type AccionExtra } from "./ficha-chat";
+import { reaccionarInterno } from "./interno-actions";
 import { reaccionarAMensaje } from "./reaccion-actions";
 import { VistaPreviaChat } from "./vista-previa-chat";
 import { VentanaVincular } from "./vincular-chat";
@@ -45,7 +46,7 @@ import { ActualizarIcon, ArchivarIcon, ChatIcon, CheckIcon, ConectadoIcon, Desca
 import { Ventana } from "@/components/ui/ventana";
 import { BotonNavegar } from "../ficha-lateral";
 import { vistaPreviaTexto } from "@/lib/whatsapp/borrado";
-import { agruparReacciones, miReaccion, REACCIONES_RAPIDAS, type ReaccionVista } from "@/lib/whatsapp/reacciones";
+import { agruparReacciones, agruparReaccionesInternas, miReaccion, REACCIONES_RAPIDAS, type ReaccionVista } from "@/lib/whatsapp/reacciones";
 import { COLUMNAS_TABLERO, GRUPOS, grupoPorId, ordenarPorUrgencia, plazoDelChat, repartirTablero, textoPlazo, type ColumnaTablero, type GrupoMotivo } from "@/lib/whatsapp/prioridad";
 import { cambiarMotivoChat, clasificarChatsPendientes } from "./motivo-actions";
 
@@ -732,7 +733,8 @@ export function Bandeja({
   const bloqueado = !escribe || (!esNota && !esInterno && !ventana);
   const mensajes = chat && sel && chat.id === sel.id ? chat.mensajes : null;
   // Las reacciones no son mensajes sueltos: van sobre el mensaje al que se reaccionó, como en WhatsApp (29 oct 2026).
-  const conReacciones = mensajes ? agruparReacciones(mensajes) : null;
+  // En el chat interno cada persona reacciona por su cuenta y sobre un mensaje puede haber varios emojis, cada uno con quiénes lo pusieron.
+  const conReacciones = mensajes ? (esInterno ? agruparReaccionesInternas(mensajes, miId) : agruparReacciones(mensajes)) : null;
 
   /** Escribe un emoji donde está el cursor (o al final) y deja el cursor justo después. */
   function insertarEmoji(emoji: string) {
@@ -753,7 +755,7 @@ export function Bandeja({
   function soltarArchivos(lista: FileList) {
     const f = lista[0];
     if (!f || !sel) return;
-    if (sel.interno && !/^(image\/(jpeg|png)|audio\/)/.test(f.type) && !/\.(jpe?g|png|mp3|m4a|aac|ogg|wav)$/i.test(f.name)) return mostrarToast("En el chat interno solo se mandan fotos y audios.", "destructive");
+    if (sel.interno && /^video\//.test(f.type)) return mostrarToast("En el chat interno se mandan fotos, audios y documentos (no videos).", "destructive");
     if (mirando) return mostrarToast("Estás supervisando este chat: para mandarle un archivo, toca «Intervenir».", "destructive");
     if (!escribe) return mostrarToast("No tienes permiso para escribir en este chat.", "destructive");
     if (!ventana && !sel.interno) return mostrarToast("Pasaron más de 24 h desde su último mensaje: por WhatsApp solo se le puede escribir con una plantilla aprobada.", "destructive");
@@ -766,7 +768,7 @@ export function Bandeja({
   /** Reacciona con un emoji a un mensaje del chat (o quita la reacción con un emoji vacío) y vuelve a pedir el chat para verla puesta. */
   async function reaccionar(m: MensajeVista, emoji: string) {
     if (!sel) return;
-    const r = await reaccionarAMensaje(sel.id, m.id, emoji).catch(() => ({ error: "No se pudo reaccionar. Inténtalo de nuevo." }));
+    const r = await (esInterno ? reaccionarInterno : reaccionarAMensaje)(sel.id, m.id, emoji).catch(() => ({ error: "No se pudo reaccionar. Inténtalo de nuevo." }));
     if ("error" in r) mostrarToast(r.error, "destructive");
     await refrescar(sel.id);
   }
@@ -1791,7 +1793,7 @@ export function Bandeja({
                             alPedirBorrar={escribe && !mirando && !esLocal(m) ? (x) => setBorrar({ tipo: "mensaje", mensajeId: x.id, resumen: vistaPreviaTexto(x.texto) || `(${x.tipo})` }) : undefined}
                             alGuardarRapida={escribe && !mirando ? guardarComoRapida : undefined}
                             // Se reacciona a lo que ya tiene su id en WhatsApp, con la ventana de 24 h abierta y no solo supervisando.
-                            alReaccionar={escribe && !mirando && ventana && !esLocal(m) && !m.importado && m.waId && m.estado !== "fallido" ? (emoji) => void reaccionar(m, emoji) : undefined}
+                            alReaccionar={escribe && !mirando && (esInterno || ventana) && !esLocal(m) && !m.importado && m.waId && m.estado !== "fallido" && !(esInterno && esAvisoDelSistema(m.texto)) ? (emoji) => void reaccionar(m, emoji) : undefined}
                             // Solo se reintenta lo que no salió: «Se envió, pero no se pudo guardar» ya le llegó al dropshipper.
                             alReintentar={esLocal(m) && m.estado === "fallido" && !/^Se envió/.test(m.error ?? "") && m.texto ? () => enviarTexto(sel.id, m.texto ?? "", m.direccion === "nota", m.id) : undefined}
                           />
@@ -1892,7 +1894,7 @@ export function Bandeja({
                               if (f) setArchivo(f);
                             }}
                           />
-                          <button type="button" disabled={bloqueado || enviando} onClick={() => inputArchivo.current?.click()} aria-label={esInterno ? "Adjuntar una foto o un audio" : "Adjuntar una foto, audio, video o documento"} title="Adjuntar un archivo" className={`${botonIcono} mb-px`}>
+                          <button type="button" disabled={bloqueado || enviando} onClick={() => inputArchivo.current?.click()} aria-label={esInterno ? "Adjuntar una foto, un audio o un documento" : "Adjuntar una foto, audio, video o documento"} title="Adjuntar un archivo" className={`${botonIcono} mb-px`}>
                             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                               <path d="m21 11.5-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.9-8.9a3.7 3.7 0 0 1 5.2 5.2l-8.9 8.9a1.8 1.8 0 0 1-2.6-2.6l8.2-8.2" />
                             </svg>
@@ -2278,12 +2280,30 @@ function Burbuja({
   const margen = seguido ? "mt-0.5" : "mt-2";
   if (m.direccion === "nota" && interna) {
     const mio = !!m.autorId && m.autorId === interna.miId;
+    const conReaccion = !!reacciones?.length;
     return (
       <div
-        className={`${margen} group relative max-w-[min(70%,560px)] rounded-lg px-2.5 pt-1.5 pb-2 text-[14.2px] leading-[19px] shadow-[0_1px_0.5px_var(--wa-sombra)] ${seguido ? "" : mio ? "rounded-tr-none" : "rounded-tl-none"} ${
+        className={`${margen} ${conReaccion ? "mb-4" : ""} group relative max-w-[min(70%,560px)] rounded-lg px-2.5 pt-1.5 pb-2 text-[14.2px] leading-[19px] shadow-[0_1px_0.5px_var(--wa-sombra)] ${seguido ? "" : mio ? "rounded-tr-none" : "rounded-tl-none"} ${
           mio ? "self-end bg-[var(--wa-saliente)]" : "self-start bg-[var(--wa-entrante)]"
         }`}
       >
+        {conReaccion && (
+          // Cada emoji con cuántas personas lo pusieron; quiénes, en su descripción.
+          <span
+            role="img"
+            aria-label={`Reacciones: ${reacciones!.map((r) => `${r.emoji} de ${(r.autores ?? []).join(", ")}`).join("; ")}`}
+            title={reacciones!.map((r) => `${r.emoji} ${(r.autores ?? []).join(", ")}`).join("\n")}
+            className={`absolute -bottom-3.5 ${mio ? "right-2" : "left-2"} z-[1] flex items-center gap-1 rounded-full border border-[var(--wa-borde)] bg-[var(--wa-entrante)] px-1.5 py-0.5 text-[14px] leading-none shadow-[0_1px_0.5px_var(--wa-sombra)]`}
+          >
+            {reacciones!.map((r) => (
+              <span key={r.emoji} aria-hidden="true">
+                {r.emoji}
+                {(r.autores?.length ?? 0) > 1 && <span className="ml-0.5 text-[11px] text-[var(--wa-sec)]">{r.autores!.length}</span>}
+              </span>
+            ))}
+          </span>
+        )}
+        {alReaccionar && <ReaccionarMensaje nuestro={mio} actual={miReaccion(reacciones)} alElegir={alReaccionar} />}
         {alPedirBorrar && !m.borradoPendiente && <BotonBorrarMensaje alPulsar={() => alPedirBorrar(m)} />}
         {!mio && !seguido && (
           <span className="mb-0.5 block text-[12.5px] font-semibold text-[var(--wa-autor)]">
@@ -2291,7 +2311,7 @@ function Burbuja({
             {m.autorCargo && <span className="font-normal"> · {m.autorCargo}</span>}
           </span>
         )}
-        <Contenido m={m} />
+        <Contenido m={m} puedeTranscribir={puedeTranscribir} />
         <span className="float-right mt-1.5 -mb-1 ml-2.5 text-[11px] text-[var(--wa-sec)]">
           {horaMensaje(m.momento)}
           {m.estado === "enviando" && " · Enviando…"}
