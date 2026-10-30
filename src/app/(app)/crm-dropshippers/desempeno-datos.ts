@@ -13,6 +13,8 @@ export interface DesempenoPais {
 export interface ProductoVendido {
   producto: string;
   sku: string | null;
+  /** Su ID en la plataforma («7820»; «7820, 8701» si el mismo nombre tuvo dos). Null sin la migración 0198 o si el pedido no lo traía. */
+  ids: string | null;
   unidades: number;
   entregadas: number;
 }
@@ -58,6 +60,7 @@ export async function leerDesempeno(dropshipperId: string, desde: string, hasta:
     productos: (productos.data ?? []).map((p: Record<string, unknown>) => ({
       producto: String(p.producto),
       sku: (p.sku as string | null) ?? null,
+      ids: (p.ids as string | null | undefined) ?? null,
       unidades: Number(p.unidades),
       entregadas: Number(p.entregadas),
     })),
