@@ -5,6 +5,8 @@
  * regla de cada uno, que el servidor vuelve a aplicar (`cambiarDatoDropshipper`).
  */
 
+import { tiendaGuardada } from "./tiendas";
+
 export type CampoDato = "nombre" | "estado" | "telefono" | "tiendas" | "ciudad" | "ingreso" | "productos" | "correo";
 
 export const CAMPOS_DATO: Record<CampoDato, { columna: string; etiqueta: string }> = {
@@ -59,7 +61,8 @@ export function normalizarDato(campo: CampoDato, valor: string, hoy: string): { 
   if (campo === "telefono") return limpio ? { valor: limpio } : { error: "Escribe el número con el prefijo del país, p. ej. +57 300 111 2233." };
   if (!limpio) return { valor: null };
   if (campo === "tiendas" || campo === "productos") {
-    const lista = campo === "tiendas" ? listaDeTexto(limpio, MAX_TIENDAS, 200) : listaDeTexto(limpio, MAX_PRODUCTOS, 120);
+    // Una tienda puede ser un enlace («mitienda.com»): se guarda completo («https://mitienda.com/») para abrirla desde la ficha.
+    const lista = campo === "tiendas" ? listaDeTexto(listaDeTexto(limpio, MAX_TIENDAS, 200).map(tiendaGuardada).join(","), MAX_TIENDAS, 200) : listaDeTexto(limpio, MAX_PRODUCTOS, 120);
     return { valor: lista.length ? lista.join(", ") : null };
   }
   if (campo === "ciudad") {

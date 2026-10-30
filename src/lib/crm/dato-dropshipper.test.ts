@@ -55,3 +55,7 @@ test("tiendas y productos: lista separada por comas, sin vacíos ni repetidos", 
   assert.deepEqual(normalizarDato("productos", "Crema, Aceite", HOY), { valor: "Crema, Aceite" });
   assert.deepEqual(listaDeTexto("a, b, c, d", 2, 10), ["a", "b"]);
 });
+
+test("tiendas: un enlace se guarda completo y un nombre tal cual", () => {
+  assert.deepEqual(normalizarDato("tiendas", "Innovalabs, mitienda.com", HOY), { valor: "Innovalabs, https://mitienda.com/" });
+});
