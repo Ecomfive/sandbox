@@ -214,11 +214,12 @@ describe("lo que dice Meta", () => {
 });
 
 describe("plantillas sugeridas", () => {
-  it("son 8 (5 para retomar y 3 de aviso de llegada), con nombres distintos que acepta Meta", () => {
-    assert.equal(PLANTILLAS_SUGERIDAS.length, 8);
+  it("son 9 (5 para retomar, 3 de aviso de llegada y 1 interna), con nombres distintos que acepta Meta", () => {
+    assert.equal(PLANTILLAS_SUGERIDAS.length, 9);
     assert.equal(PLANTILLAS_SUGERIDAS.filter((p) => p.grupo === "retomar").length, 5);
-    assert.equal(new Set(PLANTILLAS_SUGERIDAS.map((p) => p.nombre)).size, 8);
-    assert.equal(new Set(PLANTILLAS_SUGERIDAS.map((p) => p.clave)).size, 8);
+    assert.equal(PLANTILLAS_SUGERIDAS.filter((p) => p.grupo === "interno").length, 1);
+    assert.equal(new Set(PLANTILLAS_SUGERIDAS.map((p) => p.nombre)).size, 9);
+    assert.equal(new Set(PLANTILLAS_SUGERIDAS.map((p) => p.clave)).size, 9);
   });
   for (const p of PLANTILLAS_SUGERIDAS) {
     it(`${p.nombre}: pasa la revisión sin errores ni avisos`, () => {
