@@ -149,6 +149,20 @@ export function guiasPorMes(filas: PedidosMes[], meses: string[]): Map<string, n
   return por;
 }
 
+/**
+ * Desde qué mes hay guías en las series: el índice del primer mes (en el orden de `meses`) en que alguien tiene alguna, y cuántos meses de datos hay desde ahí
+ * hasta hoy. Sirve para avisar cuando un periodo largo (6 o 12 meses) llega más atrás que los datos y por eso se parece al corto. Sin guías: `null`.
+ */
+export function cobertura(porMes: Map<string, number[]>, meses: string[]): { desde: string; meses: number } | null {
+  let primero = -1;
+  for (const v of porMes.values()) {
+    const i = v.findIndex((x) => x > 0);
+    if (i >= 0 && (primero < 0 || i < primero)) primero = i;
+  }
+  if (primero < 0 || primero >= meses.length) return null;
+  return { desde: meses[primero], meses: meses.length - primero };
+}
+
 /** El análisis con solo los últimos `k` de los meses de las series (k ≤ largo de las series). */
 export function paretoDe(porMes: Map<string, number[]>, k: number): ResultadoPareto {
   const items: ItemPareto[] = [];
