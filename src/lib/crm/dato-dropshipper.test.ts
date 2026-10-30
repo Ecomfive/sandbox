@@ -1,11 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { esCampoDato, normalizarDato } from "./dato-dropshipper";
+import { esCampoDato, listaDeTexto, normalizarDato } from "./dato-dropshipper";
 
 const HOY = "2026-10-29";
 
 test("vacío es quitar el dato", () => {
-  for (const campo of ["ciudad", "ingreso", "correo"] as const) assert.deepEqual(normalizarDato(campo, "   ", HOY), { valor: null });
+  for (const campo of ["ciudad", "ingreso", "correo", "tiendas", "productos"] as const) assert.deepEqual(normalizarDato(campo, "   ", HOY), { valor: null });
 });
 
 test("ciudad: quita espacios de más y pone un tope", () => {
@@ -31,4 +31,27 @@ test("solo se aceptan los campos editables", () => {
   assert.ok(esCampoDato("ciudad"));
   assert.ok(!esCampoDato("notas"));
   assert.ok(!esCampoDato("toString"));
+});
+
+test("nombre: no puede quedar vacío y se limpia", () => {
+  assert.deepEqual(normalizarDato("nombre", "  Ana   Pérez ", HOY), { valor: "Ana Pérez" });
+  assert.ok("error" in normalizarDato("nombre", "   ", HOY));
+  assert.ok("error" in normalizarDato("nombre", "a".repeat(121), HOY));
+});
+
+test("estado: solo uno de la lista", () => {
+  assert.deepEqual(normalizarDato("estado", "inactivo", HOY), { valor: "inactivo" });
+  assert.ok("error" in normalizarDato("estado", "vip", HOY));
+  assert.ok("error" in normalizarDato("estado", "", HOY));
+});
+
+test("WhatsApp: vacío no borra el número", () => {
+  assert.deepEqual(normalizarDato("telefono", " +57 300 111 2233 ", HOY), { valor: "+57 300 111 2233" });
+  assert.ok("error" in normalizarDato("telefono", "  ", HOY));
+});
+
+test("tiendas y productos: lista separada por comas, sin vacíos ni repetidos", () => {
+  assert.deepEqual(normalizarDato("tiendas", "Yappea,  yappea , Clovin web,, ", HOY), { valor: "Yappea, Clovin web" });
+  assert.deepEqual(normalizarDato("productos", "Crema, Aceite", HOY), { valor: "Crema, Aceite" });
+  assert.deepEqual(listaDeTexto("a, b, c, d", 2, 10), ["a", "b"]);
 });

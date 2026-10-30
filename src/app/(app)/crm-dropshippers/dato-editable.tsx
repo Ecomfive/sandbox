@@ -5,19 +5,37 @@ import { anilloFoco, fieldClassSm } from "@/components/ui/field";
 import { formatearFecha } from "@/lib/formato";
 import { LapizIcon } from "@/lib/nav-icons";
 import { Tooltip } from "@/components/ui/tooltip";
-import { CAMPOS_DATO, type CampoDato } from "@/lib/crm/dato-dropshipper";
+import { CAMPOS_DATO, NUMERO_REGISTRADO, type CampoDato } from "@/lib/crm/dato-dropshipper";
 import { cambiarDatoDropshipper } from "./dato-actions";
+import { ESTADOS, etiquetaEstado } from "./def-crm";
 
-const TIPO: Record<CampoDato, string> = { ciudad: "text", ingreso: "date", correo: "email" };
-const EJEMPLO: Record<CampoDato, string> = { ciudad: "Ej: Ciudad de Panamá", ingreso: "", correo: "Ej: nombre@correo.com" };
+const TIPO: Record<CampoDato, string> = { nombre: "text", estado: "select", telefono: "tel", tiendas: "text", ciudad: "text", ingreso: "date", productos: "text", correo: "email" };
+const EJEMPLO: Record<CampoDato, string> = {
+  nombre: "Ej: Ana Pérez",
+  estado: "",
+  telefono: "Nuevo número con prefijo, ej: +57 300 111 2233",
+  tiendas: "Separadas por coma, ej: Yappea, Clovin web",
+  ciudad: "Ej: Ciudad de Panamá",
+  ingreso: "",
+  productos: "Separados por coma, ej: Crema, Aceite",
+  correo: "Ej: nombre@correo.com",
+};
 
-const mostrar = (campo: CampoDato, valor: string | null) => (valor ? (campo === "ingreso" ? formatearFecha(valor) : valor) : "—");
+function mostrar(campo: CampoDato, valor: string | null): string {
+  if (!valor) return "—";
+  if (campo === "ingreso") return formatearFecha(valor);
+  if (campo === "estado") return etiquetaEstado(valor);
+  if (campo === "telefono") return valor === NUMERO_REGISTRADO ? "Registrado" : "—";
+  return valor;
+}
 
 /**
- * Un dato del bloque «Datos» que se cambia ahí mismo, como una celda de Compras (29 oct 2026, pedido de Alcides): se ve como texto, al pasar el
- * cursor se marca y sale el lápiz, y un clic lo vuelve un campo. Enter o pulsar fuera guardan, Escape lo deja como estaba, y vaciarlo quita el
- * dato. No es un `<form>` porque el bloque puede ir dentro de otro formulario. Sin permiso de escritura solo se lee. El valor guardado se queda
- * en la ficha aunque la fila no se vuelva a pedir (la ficha del chat).
+ * Un dato del bloque «Datos» que se cambia ahí mismo, como una celda de Compras (29 oct 2026, pedido de Alcides; desde el 30 oct 2026 también el nombre, el
+ * estado, el WhatsApp, las tiendas y los productos, y ya no hay un botón «Editar» aparte): se ve como texto, al pasar el cursor se marca y sale el lápiz, y un
+ * clic lo vuelve un campo. Enter o pulsar fuera guardan, Escape lo deja como estaba, y vaciarlo quita el dato (el nombre, el estado y el WhatsApp no se
+ * pueden dejar vacíos). El estado es una lista: al elegir uno se guarda. El WhatsApp nunca se muestra: el campo arranca vacío y solo recibe el número nuevo.
+ * No es un `<form>` porque el bloque puede ir dentro de otro formulario. Sin permiso de escritura solo se lee. El valor guardado se queda en la ficha
+ * aunque la fila no se vuelva a pedir (la ficha del chat).
  */
 export function DatoEditable({ dropshipperId, campo, inicial, puede }: { dropshipperId: string; campo: CampoDato; inicial: string | null; puede: boolean }) {
   const [valor, setValor] = useState(inicial);
@@ -34,7 +52,8 @@ export function DatoEditable({ dropshipperId, campo, inicial, puede }: { dropshi
   if (!puede) return <span className="break-words">{mostrar(campo, valor)}</span>;
 
   function abrir() {
-    setBorrador(valor ?? "");
+    // El número de WhatsApp no se enseña: se escribe el nuevo desde cero.
+    setBorrador(campo === "telefono" ? "" : (valor ?? ""));
     setError(null);
     descartar.current = false;
     setEditando(true);
@@ -45,12 +64,13 @@ export function DatoEditable({ dropshipperId, campo, inicial, puede }: { dropshi
     setError(null);
     if (enfocar) requestAnimationFrame(() => boton.current?.focus());
   }
-  function guardar(enfocar: boolean) {
+  function guardar(enfocar: boolean, texto = borrador) {
     if (ocupado || descartar.current) return;
-    if (borrador.trim() === (valor ?? "")) return cerrar(enfocar);
+    // Sin cambios (o, en el WhatsApp, sin escribir nada: vacío no borra el número) no se guarda.
+    if (campo === "telefono" ? !texto.trim() : texto.trim() === (valor ?? "")) return cerrar(enfocar);
     setError(null);
     empezar(async () => {
-      const r = await cambiarDatoDropshipper(dropshipperId, campo, borrador).catch(() => ({ error: "No se pudo guardar." }));
+      const r = await cambiarDatoDropshipper(dropshipperId, campo, texto).catch(() => ({ error: "No se pudo guardar." }));
       if ("error" in r) return setError(r.error);
       setValor(r.valor);
       cerrar(enfocar);
@@ -72,32 +92,62 @@ export function DatoEditable({ dropshipperId, campo, inicial, puede }: { dropshi
       </Tooltip>
     );
 
+  const alTeclear = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      guardar(true);
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation();
+      cerrar(true);
+    }
+  };
+
   return (
     <span className="flex flex-col gap-1">
       <label className="flex min-w-0">
         <span className="sr-only">{CAMPOS_DATO[campo].etiqueta}</span>
-        <input
-          type={TIPO[campo]}
-          value={borrador}
-          onChange={(e) => setBorrador(e.target.value)}
-          onBlur={() => guardar(false)}
-          placeholder={EJEMPLO[campo] || undefined}
-          autoFocus
-          readOnly={ocupado}
-          aria-invalid={error ? true : undefined}
-          aria-describedby={error ? idError : undefined}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              guardar(true);
-            } else if (e.key === "Escape") {
-              e.preventDefault();
-              e.stopPropagation();
-              cerrar(true);
-            }
-          }}
-          className={`${fieldClassSm} -my-1 w-full min-w-0 text-[13px]`}
-        />
+        {TIPO[campo] === "select" ? (
+          <select
+            value={borrador}
+            autoFocus
+            disabled={ocupado}
+            onChange={(e) => {
+              setBorrador(e.target.value);
+              guardar(true, e.target.value);
+            }}
+            onBlur={() => guardar(false)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                e.preventDefault();
+                e.stopPropagation();
+                cerrar(true);
+              }
+            }}
+            className={`${fieldClassSm} -my-1 w-full min-w-0 text-[13px]`}
+          >
+            {ESTADOS.map((o) => (
+              <option key={o.valor} value={o.valor}>
+                {o.etiqueta}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <input
+            type={TIPO[campo]}
+            value={borrador}
+            onChange={(e) => setBorrador(e.target.value)}
+            onBlur={() => guardar(false)}
+            placeholder={EJEMPLO[campo] || undefined}
+            autoFocus
+            autoComplete="off"
+            readOnly={ocupado}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? idError : undefined}
+            onKeyDown={alTeclear}
+            className={`${fieldClassSm} -my-1 w-full min-w-0 text-[13px]`}
+          />
+        )}
       </label>
       {error && (
         <span id={idError} role="alert" className="text-xs text-destructive">
