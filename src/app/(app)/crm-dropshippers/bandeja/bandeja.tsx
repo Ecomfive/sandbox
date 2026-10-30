@@ -2,7 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element -- fotos que llegan por WhatsApp, servidas por /api/whatsapp/media */
 import Link from "next/link";
-import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition, type MouseEvent as EventoRaton, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition, type MouseEvent as EventoRaton } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { VisorImagen } from "@/components/ui/visor-imagen";
@@ -664,7 +664,6 @@ export function Bandeja({
   const mensajes = chat && sel && chat.id === sel.id ? chat.mensajes : null;
   // Las reacciones no son mensajes sueltos: van sobre el mensaje al que se reaccionó, como en WhatsApp (29 oct 2026).
   const conReacciones = mensajes ? agruparReacciones(mensajes) : null;
-  const cambiosDeArea = (mensajes ?? []).filter((m) => m.direccion === "nota" && ES_CAMBIO_DE_AREA.test(m.texto ?? ""));
 
   /** Escribe un emoji donde está el cursor (o al final) y deja el cursor justo después. */
   function insertarEmoji(emoji: string) {
@@ -1497,16 +1496,6 @@ export function Bandeja({
                   accionesChat={accionesChat}
                   etiquetas={<EtiquetasChat key={sel.id} conversacionId={sel.id} etiquetas={sel.etiquetas} manejo={manejoEtiquetas} escribe={escribe} />}
                   opcionesMas={opcionesMas}
-                  areaDelChat={
-                    <Bloque titulo="Área del chat">
-                      <span className="self-start">
-                        <EtiquetaArea area={sel.area} />
-                      </span>
-                      <div className="flex flex-col gap-1 text-[12.5px] text-[var(--wa-sec)]">
-                        {cambiosDeArea.length ? cambiosDeArea.map((m) => <span key={m.id}>{`${m.texto} · ${horaCorta(m.momento)}`}</span>) : <span>Entró a {areaChat(sel.area).etiqueta} con su primer mensaje.</span>}
-                      </div>
-                    </Bloque>
-                  }
                   respondieron={quienesRespondieron(mensajes ?? [])}
                   versionEquipo={`${(mensajes ?? []).filter((m) => m.direccion !== "entrante").length}|${sel.nombrePersonalizado ?? ""}|${sel.dropshipperId ?? ""}|${sel.area}|${sel.estado}|${sel.asignadaA ?? ""}`}
                   alAbrirVincular={() => setVincular(true)}
@@ -1940,16 +1929,6 @@ export function Bandeja({
           }}
         />
       )}
-    </div>
-  );
-}
-
-/** Un bloque de la ficha, separado del siguiente con la franja gris de WhatsApp. */
-function Bloque({ titulo, children }: { titulo: string; children: ReactNode }) {
-  return (
-    <div className="flex flex-col gap-2 border-b-8 border-[var(--wa-panel)] px-5 py-4">
-      <h3 className="m-0 text-[13px] font-normal text-[var(--wa-sec)]">{titulo}</h3>
-      {children}
     </div>
   );
 }
