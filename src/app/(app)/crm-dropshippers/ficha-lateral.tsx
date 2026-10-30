@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { Tooltip } from "@/components/ui/tooltip";
 import { anilloFoco } from "@/components/ui/field";
-import { formatearFecha, formatearMoneda } from "@/lib/formato";
+import { formatearFecha } from "@/lib/formato";
 import {
   AlertaIcon,
   ChatIcon,
@@ -34,39 +34,12 @@ import {
   etiquetaNivel,
   etiquetaTipoCaso,
   etiquetaUltimoPedido,
-  montoCorto,
   type FilaCaso,
   type FilaDropshipper,
 } from "./def-crm";
 import { Etiqueta, Pastilla, Punto } from "@/components/panel/piezas-panel";
 
 export const tonoEstado = (estado: string) => (estado === "activo" ? "exito" : estado === "prospecto" ? "aviso" : "neutro");
-
-const MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
-
-/** Pedidos de los últimos seis meses; el mes en curso va en oscuro. */
-function GraficaPedidos({ serie, hoy }: { serie: number[]; hoy: string }) {
-  const mesActual = Number(hoy.slice(5, 7)) - 1;
-  const maximo = Math.max(...serie, 1);
-  return (
-    <figure className="m-0">
-      <div role="img" aria-label={`Pedidos de los últimos seis meses: ${serie.join(", ")}`} className="flex h-16 items-end gap-3">
-        {serie.map((v, i) => (
-          <div key={i} className="flex h-full flex-1 flex-col justify-end">
-            <div className={`w-full rounded-[3px] ${i === serie.length - 1 ? "bg-foreground-soft" : "bg-accent"}`} style={{ height: `${Math.max(4, (v / maximo) * 100)}%` }} />
-          </div>
-        ))}
-      </div>
-      <div aria-hidden="true" className="mt-1 flex gap-3 text-[10px] text-muted-foreground">
-        {serie.map((_, i) => (
-          <span key={i} className="flex-1 text-center">
-            {MESES_CORTOS[(mesActual - (serie.length - 1 - i) + 12) % 12]}
-          </span>
-        ))}
-      </div>
-    </figure>
-  );
-}
 
 export function Bloque({ icono: Icono, titulo, children }: { icono: typeof PersonaIcon; titulo: string; children: ReactNode }) {
   return (
@@ -147,10 +120,6 @@ export function ContenidoFichaDropshipper({ d, casos, codigoPais, hoy, acceso }:
         <ConversacionWhatsapp key={`chat-${d.id}`} dropshipperId={d.id} />
       </Bloque>
 
-      <Bloque icono={EstadoIcon} titulo="Desempeño">
-        <CifrasDelMes d={d} codigoPais={codigoPais} hoy={hoy} />
-      </Bloque>
-
       {abiertos.length > 0 && (
         <Bloque icono={AlertaIcon} titulo="Casos abiertos">
           <CasosAbiertos abiertos={abiertos} acceso={acceso} />
@@ -204,32 +173,6 @@ export function AccionesCrm({ d, codigoPais, acceso, alGuardar }: { d: FilaDrops
         </>
       )}
       {acceso.escribeComercial && <PanelSeguimiento key={`seg-${d.id}`} d={d} alGuardar={alGuardar} />}
-    </>
-  );
-}
-
-/** Pedidos y ventas del mes, el último pedido y la gráfica de seis meses. */
-export function CifrasDelMes({ d, codigoPais, hoy }: { d: FilaDropshipper; codigoPais: string; hoy: string }) {
-  return (
-    <>
-      <div className="mb-3 grid grid-cols-3 gap-2">
-        {[
-          ["Pedidos mes", d.pedidosMes ? String(d.pedidosMes) : "—"],
-          ["Ventas mes", d.ventasMes ? montoCorto(d.ventasMes, codigoPais) : "—"],
-          ["Último pedido", etiquetaUltimoPedido(d.ultimoPedido, hoy)],
-        ].map(([titulo, valor]) => (
-          <div key={titulo} className="min-w-0 rounded-lg border border-border px-2.5 py-2">
-            <p className="m-0 text-[11.5px] text-muted-foreground">{titulo}</p>
-            <p className="m-0 truncate text-base font-semibold tabular-nums">{valor}</p>
-          </div>
-        ))}
-      </div>
-      {d.pedidosPorMes.length > 0 && d.pedidosMes > 0 ? (
-        <GraficaPedidos serie={d.pedidosPorMes} hoy={hoy} />
-      ) : (
-        <p className="m-0 text-xs text-muted-foreground">Todavía no tiene pedidos registrados este mes.</p>
-      )}
-      {d.ventasMes > 0 && <p className="mt-2 mb-0 text-xs text-muted-foreground tabular-nums">Ventas exactas: {formatearMoneda(d.ventasMes, codigoPais)}</p>}
     </>
   );
 }

@@ -7,6 +7,8 @@ import { obtenerDesempeno, type DesempenoPais, type ProductoVendido } from "./ac
 import { nombrePais } from "./def-crm";
 
 const PERIODOS = [
+  // «Este mes» (29 oct 2026, pedido de Alcides): reemplaza al bloque «Este mes» de la ficha; va primero y es el de entrada.
+  { id: "mes", etiqueta: "Este mes", dias: -1 },
   { id: "7", etiqueta: "7 días", dias: 7 },
   { id: "14", etiqueta: "14 días", dias: 14 },
   { id: "30", etiqueta: "30 días", dias: 30 },
@@ -17,6 +19,11 @@ const PERIODOS = [
 /** AAAA-MM-DD en la hora de quien mira (no en UTC: de noche «hoy» en UTC ya es mañana). */
 const aIso = (d: Date) => d.toLocaleDateString("en-CA");
 const haceDias = (n: number) => aIso(new Date(Date.now() - (n - 1) * 86_400_000));
+/** El primer día del mes en curso, en la hora de quien mira. */
+const inicioDelMes = () => {
+  const h = new Date();
+  return aIso(new Date(h.getFullYear(), h.getMonth(), 1));
+};
 
 const porcentaje = (parte: number, total: number) => (total > 0 ? `${Math.round((parte / total) * 1000) / 10} %` : "—");
 
@@ -35,16 +42,16 @@ function Cifra({ titulo, valor, destacada }: { titulo: string; valor: string | n
  * (otra moneda). Despachada = ya salió de la bodega; tasa de entrega = entregadas ÷ despachadas.
  */
 export function DesempenoDropshipper({ dropshipperId, tieneCuentas }: { dropshipperId: string; tieneCuentas: boolean }) {
-  const [periodo, setPeriodo] = useState<(typeof PERIODOS)[number]["id"]>("30");
-  const [desde, setDesde] = useState(() => haceDias(30));
+  const [periodo, setPeriodo] = useState<(typeof PERIODOS)[number]["id"]>("mes");
+  const [desde, setDesde] = useState(inicioDelMes);
   const [hasta, setHasta] = useState(() => aIso(new Date()));
   const [datos, setDatos] = useState<{ paises: DesempenoPais[]; productos: ProductoVendido[] } | "error" | null>(null);
 
   function elegir(id: (typeof PERIODOS)[number]["id"]) {
     setPeriodo(id);
     const p = PERIODOS.find((x) => x.id === id);
-    if (p && p.dias > 0) {
-      setDesde(haceDias(p.dias));
+    if (p && p.dias !== 0) {
+      setDesde(p.dias < 0 ? inicioDelMes() : haceDias(p.dias));
       setHasta(aIso(new Date()));
     }
   }
