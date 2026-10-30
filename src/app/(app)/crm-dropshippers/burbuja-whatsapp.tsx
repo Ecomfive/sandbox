@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState, useSyncExternalStore, type KeyboardEvent, type PointerEvent } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent, type PointerEvent } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { Tooltip } from "@/components/ui/tooltip";
 
-const TAM = 56;
+const TAM = 48;
 const MARGEN = 8;
 const PASO_TECLADO = 24;
 const CLAVE = "crm-burbuja-whatsapp-v1";
@@ -38,19 +38,24 @@ function guardar(p: Pos) {
   }
 }
 
-/** El glifo de la bandeja: un globo de chat con un auricular, en el verde de la bandeja. */
+/** El glifo de la bandeja: un globo de chat blanco, con su colita, y un auricular del verde de la bandeja recortado en él. */
 function GloboConAuricular() {
   return (
-    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M21 12a9 9 0 0 1-13.4 7.8L3 21l1.3-4.4A9 9 0 1 1 21 12Z" />
-      <path d="M9.4 8.2c.2 3 2.6 5.6 5.7 6.4.8.2 1.6-.2 2-.9.1-.2 0-.5-.2-.6l-1.5-.9c-.2-.1-.5-.1-.6.1l-.6.7c-1.4-.5-2.7-1.8-3.2-3.2l.7-.6c.2-.1.2-.4.1-.6l-.9-1.5c-.1-.2-.4-.3-.6-.2-.6.4-.9 1.2-.7 2.3Z" fill="currentColor" stroke="none" />
+    <svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Z" fill="currentColor" />
+      <path
+        transform="translate(-0.9 0.3)"
+        d="M9.4 8.2c.2 3 2.6 5.6 5.7 6.4.8.2 1.6-.2 2-.9.1-.2 0-.5-.2-.6l-1.5-.9c-.2-.1-.5-.1-.6.1l-.6.7c-1.4-.5-2.7-1.8-3.2-3.2l.7-.6c.2-.1.2-.4.1-.6l-.9-1.5c-.1-.2-.4-.3-.6-.2-.6.4-.9 1.2-.7 2.3Z"
+        fill="var(--wa-acento)"
+      />
     </svg>
   );
 }
 
 /**
  * La burbuja flotante de la bandeja de WhatsApp (30 oct 2026, pedido de Jhokser; reemplaza el botón grande de arriba de la lista del CRM): lleva a la bandeja
- * y muestra cuántos chats esperan respuesta. Se queda fija en la pantalla al bajar la lista y se arrastra a donde no estorbe (con el ratón, el dedo o, con el foco,
+ * y muestra cuántos chats esperan respuesta. **Solo aparece cuando la pestaña «Bandeja de WhatsApp» (la de arriba, con su globo) sale de la pantalla** al bajar la
+ * lista; arriba del todo, donde la pestaña se ve, no hace falta y se esconde. Se queda fija en la pantalla al bajar la lista y se arrastra a donde no estorbe (con el ratón, el dedo o, con el foco,
  * Mayús + flechas); el sitio queda recordado en este navegador. Un clic sin arrastrar abre la bandeja.
  */
 export function BurbujaWhatsapp({ sinResponder }: { sinResponder: number }) {
@@ -66,6 +71,18 @@ export function BurbujaWhatsapp({ sinResponder }: { sinResponder: number }) {
 function Burbuja({ sinResponder }: { sinResponder: number }) {
   const [pos, setPos] = useState<Pos>(posicionInicial);
   const posRef = useRef(pos);
+  // Si la pestaña de la bandeja se ve en pantalla, la burbuja sobra. Arranca escondida (sin parpadeo) hasta saberlo; si no hay pestaña, se muestra.
+  const [pestanaALaVista, setPestanaALaVista] = useState(true);
+  useEffect(() => {
+    const pestana = document.querySelector('nav[aria-label^="Secciones de"] a[href="/crm-dropshippers/bandeja"]');
+    if (!pestana) {
+      const t = requestAnimationFrame(() => setPestanaALaVista(false));
+      return () => cancelAnimationFrame(t);
+    }
+    const mirador = new IntersectionObserver(([e]) => setPestanaALaVista(e.isIntersecting));
+    mirador.observe(pestana);
+    return () => mirador.disconnect();
+  }, []);
   const arrastre = useRef<{ id: number; dx: number; dy: number; x0: number; y0: number; movido: boolean } | null>(null);
   // Tras arrastrar, el clic que sigue al soltar no debe abrir la bandeja.
   const huboArrastre = useRef(false);
@@ -110,7 +127,11 @@ function Burbuja({ sinResponder }: { sinResponder: number }) {
 
   return (
     // Por encima de la lista y su barra (z-20) y por debajo de las fichas y ventanas (z-40).
-    <div className="bandeja-wa fixed z-30" style={{ left: pos.x, top: pos.y, width: TAM, height: TAM }}>
+    <div
+      className={`bandeja-wa fixed z-30 transition-[opacity,transform] duration-200 motion-reduce:transition-none ${pestanaALaVista ? "pointer-events-none scale-75 opacity-0" : ""}`}
+      style={{ left: pos.x, top: pos.y, width: TAM, height: TAM }}
+      inert={pestanaALaVista || undefined}
+    >
       <Tooltip texto="Bandeja de WhatsApp · arrástrala si estorba">
         <Link
           href="/crm-dropshippers/bandeja"
@@ -127,12 +148,12 @@ function Burbuja({ sinResponder }: { sinResponder: number }) {
               huboArrastre.current = false;
             }
           }}
-          className={`relative flex touch-none select-none items-center justify-center rounded-full bg-[var(--wa-acento)] text-[var(--wa-acento-texto)] shadow-lg ring-1 ring-black/10 hover:brightness-110 active:cursor-grabbing ${anilloFoco}`}
+          className={`relative flex touch-none select-none items-center justify-center rounded-full bg-[var(--wa-acento)] text-[var(--wa-acento-texto)] shadow-md ring-1 ring-black/10 transition-transform hover:scale-105 active:cursor-grabbing ${anilloFoco}`}
           style={{ width: TAM, height: TAM, cursor: "grab" }}
         >
           <GloboConAuricular />
           {sinResponder > 0 && (
-            <span className="absolute -right-1 -top-1 flex h-6 min-w-6 items-center justify-center rounded-full bg-destructive px-1.5 text-xs font-bold tabular-nums text-white ring-2 ring-background">
+            <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 text-[11px] font-bold leading-none tabular-nums text-white ring-2 ring-background">
               {sinResponder > 99 ? "99+" : sinResponder}
             </span>
           )}

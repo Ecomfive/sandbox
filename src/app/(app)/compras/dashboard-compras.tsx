@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState, type ReactNode } from "react";
 import { Bar, BarChart, CartesianGrid, ComposedChart, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { BotonBarra, CabeceraTarjeta, Indicador, Punto, Segmentado, claseTd, claseTh } from "@/components/panel/piezas-panel";
+import { BotonBarra, CabeceraTarjeta, Indicador, TableroIndicadores, Punto, Segmentado, claseTd, claseTh } from "@/components/panel/piezas-panel";
 import { anilloFoco } from "@/components/ui/field";
 import { etiquetaEstado, etiquetaEtapa, etiquetaVia, ETAPAS_COMPRA, numeroOC, type FilaCompra } from "./def-compras";
 import {
@@ -382,23 +382,21 @@ export function DashboardCompras({
         </div>
       )}
 
-      <section aria-label="Indicadores" className="marco-neon overflow-hidden rounded-[10px] border border-border bg-card">
-        <div className="flex flex-wrap">
-          <Indicador titulo="Compras" valor={entero(k.compras)} detalle={`${entero(k.abiertas)} abiertas · ${entero(k.transito)} en tránsito`} />
-          <Indicador titulo="Pagado a proveedores" valor={usd(k.pagado, true)} detalle={k.costoUnidad !== null ? `${usd(k.costoUnidad)} por unidad` : "—"} />
-          <Indicador titulo="Unidades" valor={entero(k.unidades)} detalle="en las compras filtradas" />
-          <Indicador titulo="Ciclo completo" valor={dias(k.ciclo)} detalle="mediana, de crear a completar" />
-          <Indicador titulo="Tránsito" valor={`${dias(k.transitoMar)} / ${dias(k.transitoAire)}`} detalle="marítimo / aéreo (mediana)" />
-          <Indicador
-            titulo="A tiempo"
-            punto={k.aTiempo === null ? undefined : k.aTiempo >= 85 ? "exito" : "aviso"}
-            valor={k.aTiempo === null ? "—" : `${Math.round(k.aTiempo)} %`}
-            detalle={`de ${entero(k.llegadas)} llegadas`}
-          />
-          <Indicador titulo="Atrasadas" punto={k.atrasadas ? "peligro" : undefined} valor={entero(k.atrasadas)} detalle="más de lo normal en tránsito" href={`/compras/lista?${vista === "todos" ? "" : `ver=${vista}&`}grupo=atrasadas`} />
-          <Indicador titulo="Fallas" punto={k.inconvenientes + k.descartadas ? "aviso" : undefined} valor={entero(k.inconvenientes + k.descartadas)} detalle={`${k.inconvenientes} inconvenientes · ${k.descartadas} descartadas`} />
-        </div>
-      </section>
+      <TableroIndicadores etiqueta="Indicadores">
+        <Indicador titulo="Compras" valor={entero(k.compras)} detalle={`${entero(k.abiertas)} abiertas · ${entero(k.transito)} en tránsito`} />
+        <Indicador titulo="Pagado a proveedores" valor={usd(k.pagado, true)} detalle={k.costoUnidad !== null ? `${usd(k.costoUnidad)} por unidad` : "—"} />
+        <Indicador titulo="Unidades" valor={entero(k.unidades)} detalle="en las compras filtradas" />
+        <Indicador titulo="Ciclo completo" valor={dias(k.ciclo)} detalle="mediana, de crear a completar" />
+        <Indicador titulo="Tránsito" valor={`${dias(k.transitoMar)} / ${dias(k.transitoAire)}`} detalle="marítimo / aéreo (mediana)" />
+        <Indicador
+          titulo="A tiempo"
+          punto={k.aTiempo === null ? undefined : k.aTiempo >= 85 ? "exito" : "aviso"}
+          valor={k.aTiempo === null ? "—" : `${Math.round(k.aTiempo)} %`}
+          detalle={`de ${entero(k.llegadas)} llegadas`}
+        />
+        <Indicador titulo="Atrasadas" punto={k.atrasadas ? "peligro" : undefined} valor={entero(k.atrasadas)} detalle="más de lo normal en tránsito" href={`/compras/lista?${vista === "todos" ? "" : `ver=${vista}&`}grupo=atrasadas`} />
+        <Indicador titulo="Fallas" punto={k.inconvenientes + k.descartadas ? "aviso" : undefined} valor={entero(k.inconvenientes + k.descartadas)} detalle={`${k.inconvenientes} inconvenientes · ${k.descartadas} descartadas`} />
+      </TableroIndicadores>
 
       <div className="grid grid-cols-1 gap-5 min-[1100px]:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <Tarjeta id="d-meses" titulo="Compras y pagos por mes" extra={<span className="text-xs text-muted-foreground">pulsa un mes para filtrar</span>}>

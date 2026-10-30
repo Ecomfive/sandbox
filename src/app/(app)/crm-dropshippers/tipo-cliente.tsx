@@ -4,6 +4,9 @@ import { useRef, useState } from "react";
 import { claseOpcionPanel, PanelCelda } from "@/app/(app)/compras/panel-celda";
 import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
+import { Tooltip } from "@/components/ui/tooltip";
+import type { CambioTipo } from "@/lib/crm/cambio-tipo";
+import { formatearFecha } from "@/lib/formato";
 import { cambiarTipoCliente } from "./tareas/actions";
 import { NIVELES, etiquetaNivel } from "./def-crm";
 
@@ -24,6 +27,24 @@ export function PastillaTipo({ nivel, soloDestacados = false }: { nivel: string 
   return <span className={`inline-flex flex-none items-center rounded-full px-1.5 py-px text-[10.5px] font-bold tracking-wide uppercase ${CLASE[n] ?? CLASE.regular}`}>{etiquetaNivel(n)}</span>;
 }
 
+/**
+ * La flecha junto al tipo (30 oct 2026, pedido de Alcides): verde hacia arriba si subió (Rookie → VIP → Black), roja hacia abajo si bajó. Solo si
+ * sigue en el nivel al que llegó; el detalle (de qué a qué y cuándo) en el globo.
+ */
+export function FlechaCambioTipo({ cambio, nivel }: { cambio: CambioTipo | null | undefined; nivel?: string }) {
+  if (!cambio || (nivel && nivel !== cambio.hasta)) return null;
+  const texto = `${cambio.sube ? "Subió" : "Bajó"} de ${etiquetaNivel(cambio.desde)} a ${etiquetaNivel(cambio.hasta)} el ${formatearFecha(cambio.fecha.slice(0, 10))}`;
+  return (
+    <Tooltip texto={texto}>
+      <span role="img" tabIndex={0} aria-label={texto} className={`inline-flex h-4 w-4 flex-none items-center justify-center rounded-full ${cambio.sube ? "bg-success-soft text-success" : "bg-destructive-soft text-destructive"} ${anilloFoco}`}>
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          {cambio.sube ? <path d="M12 19V5M5 12l7-7 7 7" /> : <path d="M12 5v14M19 12l-7 7-7-7" />}
+        </svg>
+      </span>
+    </Tooltip>
+  );
+}
+
 const cifra = (n: number) => n.toLocaleString("es-PA", { maximumFractionDigits: 0 });
 
 /**
@@ -37,6 +58,7 @@ export function TipoCliente({
   manual,
   promedio,
   puede,
+  cambio,
   alCambiar,
 }: {
   dropshipperId: string;
@@ -44,6 +66,8 @@ export function TipoCliente({
   manual: boolean;
   promedio: number | null;
   puede: boolean;
+  /** El último cambio de tipo, para la flecha de «subió» o «bajó». */
+  cambio?: CambioTipo | null;
   alCambiar?: (nivel: string) => void;
 }) {
   const { mostrarToast } = useToast();
@@ -72,9 +96,16 @@ export function TipoCliente({
       });
   }
 
-  if (!puede) return <PastillaTipo nivel={actual.nivel} />;
+  const flecha = <FlechaCambioTipo cambio={cambio} nivel={actual.nivel} />;
+  if (!puede)
+    return (
+      <span className="inline-flex items-center gap-1">
+        <PastillaTipo nivel={actual.nivel} />
+        {flecha}
+      </span>
+    );
   return (
-    <>
+    <span className="inline-flex items-center gap-1">
       <button
         ref={boton}
         type="button"
@@ -125,6 +156,7 @@ export function TipoCliente({
           </ul>
         </PanelCelda>
       )}
-    </>
+      {flecha}
+    </span>
   );
 }

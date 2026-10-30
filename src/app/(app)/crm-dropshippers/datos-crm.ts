@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { cambioDeTipo, type EventoTipo } from "@/lib/crm/cambio-tipo";
 import type { AreaCrm } from "@/lib/crm/areas";
 import { conversacionesOcultas } from "@/lib/whatsapp/ocultos";
 import { dondeVende } from "@/lib/whatsapp/origen-chat";
@@ -96,14 +97,23 @@ export async function obtenerDatosCrm(supabase: SupabaseClient, paisId: string, 
     return (soloId ? q.eq("dropshipper_id", soloId) : q).order("dropshipper_id").range(desde, hasta);
   };
 
-  const [conCuentas, { data: sumas }, { data: casosBd }, chats, vendeEnBd] = await Promise.all([
+  // Los cambios de tipo de cliente (Rookie → VIP → Black) de la Actividad, para la flecha de «subió» o «bajó» (30 oct 2026).
+  const consultaCambiosTipo = (desde: number, hasta: number) => {
+    const q = supabase.from("historial_auditoria").select("entidad_id, antes, despues, creado_en").eq("entidad", "dropshippers").eq("accion", "tipo_cliente_dropshipper");
+    return (soloId ? q.eq("entidad_id", soloId) : q).order("creado_en", { ascending: false }).range(desde, hasta);
+  };
+
+  const [conCuentas, { data: sumas }, { data: casosBd }, chats, vendeEnBd, cambiosTipoBd] = await Promise.all([
     consultaDropshippers(true),
     // Una fila por dropshipper y país: las ventas de este país no se mezclan con las de otro (otra moneda).
     soloId ? consultaSumas.eq("id", soloId) : consultaSumas,
     (soloId ? consultaCasos.eq("dropshipper_id", soloId) : consultaCasos).order("abierto_en", { ascending: false }).limit(500),
     cargarChats(supabase, areasWhatsapp, soloId),
     traerTodasConError<Record<string, unknown>>(consultaVendeEn),
+    traerTodasConError<EventoTipo & { entidad_id: string }>(consultaCambiosTipo),
   ]);
+  const cambiosTipo = new Map<string, EventoTipo[]>();
+  for (const e of cambiosTipoBd.data ?? []) cambiosTipo.set(e.entidad_id, [...(cambiosTipo.get(e.entidad_id) ?? []), e]);
   const vendeEnManual = new Map<string, { plataforma: string; pais: string; oculto: boolean }[]>();
   for (const m of vendeEnBd.data ?? []) {
     const plataforma = uno<{ nombre: string }>(m.crm_plataformas_venta as Relacion<{ nombre: string }>)?.nombre;
@@ -137,6 +147,7 @@ export async function obtenerDatosCrm(supabase: SupabaseClient, paisId: string, 
       estado: d.estado,
       nivel: d.nivel,
       nivelManual: !!d.nivel_manual,
+      cambioTipo: cambioDeTipo(cambiosTipo.get(d.id) ?? [], d.nivel),
       promedioPedidosMes: d.promedio_pedidos_mes === null || d.promedio_pedidos_mes === undefined ? null : Number(d.promedio_pedidos_mes),
       responsable: uno<{ nombre: string | null }>(d.perfiles as Relacion<{ nombre: string | null }>)?.nombre ?? null,
       paisOrigen: d.pais_origen,

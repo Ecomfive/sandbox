@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { createContext, useContext, type ButtonHTMLAttributes, type ComponentType, type ReactNode } from "react";
 import { anilloFoco } from "@/components/ui/field";
-import { DescargarIcon } from "@/lib/nav-icons";
+import { AlertaIcon, CalendarioIcon, ComprasIcon, DashboardIcon, DescargarIcon, EnvioIcon, InventarioIcon, ProveedorIcon, WalletIcon } from "@/lib/nav-icons";
+import { COLORES, type Color } from "./colores-tablero";
 import { filasACsv, nombreArchivoCsv } from "@/lib/tabla/csv";
 import type { DefTabla } from "@/lib/tabla/motor";
 
@@ -152,6 +153,45 @@ export function Delta({ valor, sufijo, prefijo = "", inverso = false, decimales 
 }
 
 /** Una celda de la barra de indicadores; con `href` es un enlace a la página que lista lo que cuenta. */
+/** Dentro de un `TableroIndicadores`, cada `Indicador` se dibuja como tarjeta (30 oct 2026, Compras: como el tablero de Gestión de IDs). */
+const EnTablero = createContext(false);
+
+/** Los íconos de las tarjetas, por de qué hablan. */
+const ICONOS_TARJETA = { alerta: AlertaIcon, dinero: WalletIcon, unidades: InventarioIcon, envio: EnvioIcon, tiempo: CalendarioIcon, proveedor: ProveedorIcon, compras: ComprasIcon, panel: DashboardIcon };
+
+/** De qué habla una tarjeta según su título (las que no calzan llevan el ícono del panel). */
+function temaDeTitulo(titulo: string): keyof typeof ICONOS_TARJETA {
+  const t = titulo.toLowerCase();
+  if (/atrasad|falla|inconvenient|debían|vencid/.test(t)) return "alerta";
+  if (/pagad|pago|monto|costo|dinero|saldo|abono/.test(t)) return "dinero";
+  if (/unidad|stock|inventario/.test(t)) return "unidades";
+  if (/tránsito|transito|enviad|llegad|llega|envío|envio|ruta/.test(t)) return "envio";
+  if (/ciclo|tiempo|días|dias|mes|semana|plazo/.test(t)) return "tiempo";
+  if (/proveedor/.test(t)) return "proveedor";
+  if (/compra|abierta|completad|cread|reponer/.test(t)) return "compras";
+  return "panel";
+}
+
+/**
+ * Un grupo de indicadores como tablero de tarjetas (ícono de color, título, número grande y detalle), igual que el de Gestión de IDs. Los
+ * `Indicador` de adentro cambian solos de forma; los que tienen `href` o `alPulsar` siguen llevando a su lista o filtrando.
+ */
+export function TableroIndicadores({ etiqueta, titulo, extra, children }: { etiqueta: string; titulo?: ReactNode; extra?: ReactNode; children: ReactNode }) {
+  return (
+    <section aria-label={etiqueta} className="flex min-w-0 flex-col gap-2">
+      {(titulo || extra) && (
+        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 px-0.5 text-xs">
+          {titulo && <span className="font-semibold tracking-[0.04em] text-muted-foreground uppercase">{titulo}</span>}
+          {extra && <span className="text-muted-foreground">{extra}</span>}
+        </div>
+      )}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(12rem,1fr))]">
+        <EnTablero.Provider value={true}>{children}</EnTablero.Provider>
+      </div>
+    </section>
+  );
+}
+
 export function Indicador({
   titulo,
   punto,
@@ -160,9 +200,14 @@ export function Indicador({
   href,
   alPulsar,
   activo,
+  icono,
+  color,
 }: {
   titulo: string;
   punto?: "aviso" | "peligro" | "exito";
+  /** Solo en un `TableroIndicadores`: el ícono y el color de la tarjeta (sin ellos, por el título y el punto). */
+  icono?: ComponentType<{ className?: string }>;
+  color?: Color;
   valor: string;
   detalle: ReactNode;
   href?: string;
@@ -170,6 +215,38 @@ export function Indicador({
   alPulsar?: () => void;
   activo?: boolean;
 }) {
+  const enTablero = useContext(EnTablero);
+  if (enTablero) {
+    const c = COLORES[color ?? (punto === "peligro" ? "rojo" : punto === "aviso" ? "ambar" : punto === "exito" ? "verde" : "violeta")];
+    const Icono = icono ?? ICONOS_TARJETA[temaDeTitulo(titulo)];
+    const tarjeta = (
+      <>
+        <span className="flex items-center gap-3">
+          <span aria-hidden="true" className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${c.icono}`}>
+            <Icono className="h-[18px] w-[18px]" />
+          </span>
+          <span className="min-w-0 text-xs leading-tight font-medium tracking-wide text-muted-foreground uppercase hyphens-auto">{titulo}</span>
+        </span>
+        <span className={`block text-[26px] leading-none font-semibold tracking-tight tabular-nums ${punto ? c.numero : "text-foreground"}`}>{valor}</span>
+        <span className="block text-xs text-muted-foreground">{detalle}</span>
+      </>
+    );
+    const base = `flex min-w-0 flex-col gap-3 rounded-2xl border bg-card p-4 text-left shadow-sm ${anilloFoco}`;
+    const movil = "transition duration-150 hover:-translate-y-0.5 hover:shadow-md motion-reduce:transition-none motion-reduce:hover:translate-y-0";
+    if (alPulsar)
+      return (
+        <button type="button" aria-pressed={activo} onClick={alPulsar} className={`${base} ${movil} cursor-pointer ${activo ? `ring-2 ${c.activa}` : "border-border"}`}>
+          {tarjeta}
+        </button>
+      );
+    return href ? (
+      <Link href={href} className={`${base} ${movil} border-border`}>
+        {tarjeta}
+      </Link>
+    ) : (
+      <div className={`${base} border-border`}>{tarjeta}</div>
+    );
+  }
   const contenido = (
     <>
       <span className="flex items-center gap-1.5 text-xs text-muted-foreground">

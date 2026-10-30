@@ -3,6 +3,7 @@
 /* eslint-disable @next/next/no-img-element -- fotos que llegan por WhatsApp, servidas por /api/whatsapp/media */
 import Link from "next/link";
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition, type MouseEvent as EventoRaton } from "react";
+import { ContadorPestana } from "@/components/migas/contador-pestana";
 import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { VisorImagen } from "@/components/ui/visor-imagen";
@@ -22,7 +23,7 @@ import { abrirChatInterno } from "./interno-actions";
 import { BotonWhatsappInterno } from "./interno";
 import { colorFoto, iniciales } from "./globo-persona";
 import { EtiquetasChat, PastillasEtiquetas, SelectorEtiquetasChat, type ManejoEtiquetas } from "./etiquetas-chat";
-import { claseBotonFicha, claseBotonFichaPrincipal, FichaDelChat, type AccionExtra } from "./ficha-chat";
+import { claseBotonFicha, claseBotonFichaPrincipal, DatosEnLaCabecera, FichaDelChat, type AccionExtra } from "./ficha-chat";
 import { reaccionarAMensaje } from "./reaccion-actions";
 import { VistaPreviaChat } from "./vista-previa-chat";
 import { VentanaVincular } from "./vincular-chat";
@@ -1189,6 +1190,8 @@ export function Bandeja({
 
   return (
     <div className="bandeja-wa flex min-h-[640px] flex-col gap-3 text-[var(--wa-texto)] lg:h-[calc(100vh-200px)]">
+      {/* El globo de la pestaña sigue lo que la bandeja va leyendo (los chats sin responder de todas las áreas que ve la persona). */}
+      <ContadorPestana href="/crm-dropshippers/bandeja" cantidad={datos.conversaciones.filter((c) => !c.interno && sinResponder(c)).length} />
       {/* ===== Arriba, para todos los paneles: buscar, número, filtros e «Importar chat» ===== */}
       <div className="flex flex-wrap items-center gap-2.5">
         <div role="group" aria-label="Cómo ver la bandeja" className="flex h-10 flex-none overflow-hidden rounded-lg border border-[var(--wa-borde)]">
@@ -1481,7 +1484,7 @@ export function Bandeja({
                   </span>
                 </span>
               </span>
-              {sel.vip && <EtiquetaVip tipo={sel.tipoCliente} />}
+              <DatosEnLaCabecera sel={sel} ficha={fichaDelChat} respondieron={quienesRespondieron(mensajes ?? [])} alGuardarCrm={() => setVersionCrm((v) => v + 1)} />
               <EtiquetaArea area={sel.area} />
               {sel.interno && <span className="rounded-full bg-azul-soft px-2 py-px text-[11.5px] font-semibold text-azul">WhatsApp interno</span>}
               {/* Dónde vende (29 oct 2026, pedido de Alcides): sus plataformas por país, puestas a mano o de sus cuentas; y los países de su ficha que aún no tienen plataforma. */}
@@ -1551,7 +1554,6 @@ export function Bandeja({
                   accionesChat={accionesChat}
                   etiquetas={<EtiquetasChat key={sel.id} conversacionId={sel.id} etiquetas={sel.etiquetas} manejo={manejoEtiquetas} escribe={escribe} />}
                   accionesExtra={accionesExtra}
-                  respondieron={quienesRespondieron(mensajes ?? [])}
                   versionEquipo={`${(mensajes ?? []).filter((m) => m.direccion !== "entrante").length}|${sel.nombrePersonalizado ?? ""}|${sel.dropshipperId ?? ""}|${sel.area}|${sel.estado}|${sel.asignadaA ?? ""}`}
                   alAbrirVincular={() => setVincular(true)}
                   alVinculado={(mensaje) => {
