@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { BotonBarra, CabeceraTarjeta, Delta, Indicador, Pastilla, Punto, Segmentado } from "@/components/panel/piezas-panel";
+import { BotonBarra, CabeceraTarjeta, Delta, Indicador, TableroIndicadores, Pastilla, Punto, Segmentado } from "@/components/panel/piezas-panel";
 import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { etiquetaEtapa, etiquetaVia, numeroOC, type FilaCompra } from "./def-compras";
@@ -148,38 +148,26 @@ export function InformeCompras({
         </BotonBarra>
       </div>
 
-      <section aria-label="Indicadores del periodo" className="overflow-hidden rounded-[10px] border border-border bg-card">
-        <div className="flex flex-wrap justify-between gap-x-3 gap-y-0.5 border-b border-border bg-muted px-3.5 py-2 text-xs">
-          <span className="font-semibold tracking-[0.04em] text-muted-foreground uppercase">{TITULO[g]}</span>
-          <span className="text-muted-foreground">{anterior ? `comparado con ${etiquetaPeriodo(anterior.clave, g)}` : "sin periodo anterior para comparar"}</span>
-        </div>
-        <div className="flex flex-wrap">
-          <Indicador titulo="Compras creadas" valor={entero(s.creadas)} detalle={sa ? <><Delta valor={s.creadas - sa.creadas} sufijo="" decimales={0} /> vs anterior</> : "en el periodo"} />
-          <Indicador titulo="Pagado a proveedores" valor={usd(s.pagado, true)} detalle={`${s.pagadas} pagos iniciales`} />
-          <Indicador titulo="Unidades" valor={entero(s.unidades)} detalle="de las compras creadas" />
-          <Indicador titulo="Enviadas / llegadas" valor={`${s.enviadas} / ${s.llegadas}`} detalle="salieron y llegaron en el periodo" />
-          <Indicador titulo="Completadas" valor={entero(s.cerradas)} detalle={s.ciclo.mediana !== null ? `ciclo de ${s.ciclo.mediana} días (mediana)` : "en el periodo"} />
-        </div>
-      </section>
+      <TableroIndicadores etiqueta="Indicadores del periodo" titulo={TITULO[g]} extra={anterior ? `comparado con ${etiquetaPeriodo(anterior.clave, g)}` : "sin periodo anterior para comparar"}>
+        <Indicador titulo="Compras creadas" valor={entero(s.creadas)} detalle={sa ? <><Delta valor={s.creadas - sa.creadas} sufijo="" decimales={0} /> vs anterior</> : "en el periodo"} />
+        <Indicador titulo="Pagado a proveedores" valor={usd(s.pagado, true)} detalle={`${s.pagadas} pagos iniciales`} />
+        <Indicador titulo="Unidades" valor={entero(s.unidades)} detalle="de las compras creadas" />
+        <Indicador titulo="Enviadas / llegadas" valor={`${s.enviadas} / ${s.llegadas}`} detalle="salieron y llegaron en el periodo" />
+        <Indicador titulo="Completadas" valor={entero(s.cerradas)} detalle={s.ciclo.mediana !== null ? `ciclo de ${s.ciclo.mediana} días (mediana)` : "en el periodo"} />
+      </TableroIndicadores>
 
-      <section aria-label="La operación hoy" className="overflow-hidden rounded-[10px] border border-border bg-card">
-        <div className="flex flex-wrap justify-between gap-x-3 gap-y-0.5 border-b border-border bg-muted px-3.5 py-2 text-xs">
-          <span className="font-semibold tracking-[0.04em] text-muted-foreground uppercase">Hoy</span>
-          <span className="text-muted-foreground">todas las fechas</span>
-        </div>
-        <div className="flex flex-wrap">
-          <Indicador titulo="Abiertas" valor={entero(abiertas.length)} detalle="sin completar ni descartar" href={`/compras/lista?${ver}grupo=abiertas`} />
-          <Indicador titulo="En tránsito" valor={entero(transito.length)} detalle="salieron y no han llegado" href={`/compras/lista?${ver}grupo=transito`} />
-          <Indicador
-            titulo="Atrasadas"
-            punto={revisar.atrasadas.length ? "peligro" : undefined}
-            valor={entero(revisar.atrasadas.length)}
-            detalle="más de lo normal para su vía"
-            href={`/compras/lista?${ver}grupo=atrasadas`}
-          />
-          <Indicador titulo="Con inconveniente" punto={revisar.conInconveniente.length ? "aviso" : undefined} valor={entero(revisar.conInconveniente.length)} detalle="aduana, retrasos…" />
-        </div>
-      </section>
+      <TableroIndicadores etiqueta="La operación hoy" titulo="Hoy" extra="todas las fechas">
+        <Indicador titulo="Abiertas" valor={entero(abiertas.length)} detalle="sin completar ni descartar" href={`/compras/lista?${ver}grupo=abiertas`} />
+        <Indicador titulo="En tránsito" valor={entero(transito.length)} detalle="salieron y no han llegado" href={`/compras/lista?${ver}grupo=transito`} />
+        <Indicador
+          titulo="Atrasadas"
+          punto={revisar.atrasadas.length ? "peligro" : undefined}
+          valor={entero(revisar.atrasadas.length)}
+          detalle="más de lo normal para su vía"
+          href={`/compras/lista?${ver}grupo=atrasadas`}
+        />
+        <Indicador titulo="Con inconveniente" punto={revisar.conInconveniente.length ? "aviso" : undefined} valor={entero(revisar.conInconveniente.length)} detalle="aduana, retrasos…" />
+      </TableroIndicadores>
 
       <div className="grid grid-cols-1 gap-5 min-[960px]:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <section aria-labelledby="c-grafica" className="min-w-0 rounded-[10px] border border-border bg-card">
