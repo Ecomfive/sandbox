@@ -4,9 +4,9 @@ import Link from "next/link";
 import { useState, type ComponentType, type ReactNode, type SVGProps } from "react";
 import { Tooltip } from "@/components/ui/tooltip";
 import { anilloFoco } from "@/components/ui/field";
+import { formatearFecha } from "@/lib/formato";
 import {
   AlertaIcon,
-  CalendarioIcon,
   ChatIcon,
   CorreoIcon,
   EnlaceIcon,
@@ -14,9 +14,7 @@ import {
   EtiquetaIcon,
   FlechaAbajoIcon,
   FlechaArribaIcon,
-  PedidoIcon,
   PersonaIcon,
-  ProductoIcon,
   SugerenciaIcon,
   TiendaIcon,
   UbicacionIcon,
@@ -43,7 +41,6 @@ import {
   etiquetaEstado,
   etiquetaEstadoCaso,
   etiquetaTipoCaso,
-  etiquetaUltimoPedido,
   type FilaCaso,
   type FilaDropshipper,
 } from "./def-crm";
@@ -93,6 +90,8 @@ export function ContenidoFichaDropshipper({ d, casos, codigoPais, hoy, acceso }:
       <div className="flex flex-col gap-2 border-b border-border p-3.5">
         <div className="flex flex-wrap gap-1.5">
           <Pastilla tono={tonoEstado(d.estado)}>{etiquetaEstado(d.estado)}</Pastilla>
+          {/* La fecha de ingreso va aquí arriba, como en la ficha del chat («Captado el…»), y ya no en «Datos» (30 oct 2026, pedido de Alcides). */}
+          {d.ingreso && <span className="self-center text-xs whitespace-nowrap text-muted-foreground">Captado el {formatearFecha(d.ingreso)}</span>}
           <TipoCliente key={`tipo-${d.id}`} dropshipperId={d.id} nivel={d.nivel} manual={d.nivelManual} promedio={d.promedioPedidosMes} cambio={d.cambioTipo} puede={acceso.escribeAtencion || acceso.escribeComercial} />
           {abiertos.length > 0 && (
             <Pastilla>
@@ -210,16 +209,16 @@ export function CasosAbiertos({ abiertos, acceso }: { abiertos: FilaCaso[]; acce
 }
 
 /**
- * Sus datos: nombre, estado, WhatsApp (con «Mostrar número» para administradores), tiendas, ciudad, ingreso, último pedido, productos, etiquetas
- * (editables, como en ClickUp) y correo. Todo se cambia ahí mismo con el lápiz (`DatoEditable`), salvo el último pedido. Etapa, notas y responsable (lo que venía de ClickUp) ya no se muestran
- * (29 oct 2026, pedido de Alcides). En la ficha del chat `conEtiquetas` va en falso: ahí las mismas etiquetas se editan arriba de todo.
+ * Sus datos: nombre, estado, WhatsApp (con «Mostrar número» para administradores), ciudad, tiendas, correos y etiquetas (editables, como en ClickUp).
+ * Todo se cambia ahí mismo (`DatoEditable`). Etapa, notas y responsable (lo que venía de ClickUp) ya no se muestran (29 oct 2026, pedido de Alcides); el
+ * último pedido (está en Desempeño), la fecha de ingreso (arriba, «Captado el…») y los productos tampoco (30 oct 2026, pedido de Alcides). En la ficha del chat `conEtiquetas` va en falso: ahí las mismas etiquetas se editan arriba de todo.
  */
-export function DatosDropshipper({ d, hoy, acceso, conEtiquetas = true }: { d: FilaDropshipper; hoy: string; acceso: AccesoCrm; conEtiquetas?: boolean }) {
+export function DatosDropshipper({ d, acceso, conEtiquetas = true }: { d: FilaDropshipper; hoy: string; acceso: AccesoCrm; conEtiquetas?: boolean }) {
   const dato = (campo: CampoDato, inicial: string | null) => (
     <DatoEditable key={`${campo}-${d.id}`} dropshipperId={d.id} campo={campo} inicial={inicial} puede={acceso.escribeAtencion} />
   );
   // Cada dato en una sola línea, con su ícono y su valor, en dos columnas (30 oct 2026, pedido de Alcides, opción A con maqueta). El nombre del dato va
-  // para lectores de pantalla (`dt`); a la vista lo dice el ícono y, si falta, «Sin ciudad». Productos y etiquetas van a todo el ancho, como pastillas.
+  // para lectores de pantalla (`dt`); a la vista lo dice el ícono y, si falta, «Sin ciudad». Tiendas, correos y etiquetas van a todo el ancho, como pastillas.
   const datos: [string, ComponentType<SVGProps<SVGSVGElement>>, ReactNode, boolean?][] = [
     ["Nombre", PersonaIcon, dato("nombre", d.nombre)],
     ["Estado", EstadoIcon, dato("estado", d.estado)],
@@ -231,12 +230,10 @@ export function DatosDropshipper({ d, hoy, acceso, conEtiquetas = true }: { d: F
         {d.tieneTelefono && acceso.verTelefonos && <MostrarTelefono tipo="dropshipper" id={d.id} puede />}
       </span>,
     ],
-    ["Correo", CorreoIcon, dato("correo", d.email)],
-    ["Ingreso", CalendarioIcon, dato("ingreso", d.ingreso)],
-    ["Último pedido", PedidoIcon, <span key="u" className="block truncate px-1.5 py-0.5">Último pedido: {etiquetaUltimoPedido(d.ultimoPedido, hoy).toLowerCase()}</span>],
     ["Ciudad", UbicacionIcon, dato("ciudad", d.ciudad)],
-    ["Tiendas", TiendaIcon, dato("tiendas", d.tiendas.join(", ") || null)],
-    ["Productos", ProductoIcon, dato("productos", d.productos.join(", ") || null), true],
+    ["Tiendas", TiendaIcon, dato("tiendas", d.tiendas.join(", ") || null), true],
+    // Varios correos (migración 0206): el primero es el principal; sirven para reconocer sus cuentas en cada plataforma.
+    ["Correos", CorreoIcon, dato("correo", d.correos.join(", ") || null), true],
     ...(conEtiquetas
       ? [
           [
