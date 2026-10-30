@@ -315,6 +315,16 @@ convenciones técnicas del código.
   lo puede abrir: en un Client Component con `usePuedeAbrir("modulo")` (`src/components/modulos-contexto.tsx`, lo provee el layout de
   `(app)`), en un Server Component con `usuario.modulos.includes(...)`. Un enlace nuevo a otro módulo debe hacer lo mismo. Las acciones
   del servidor siguen devolviendo `{ error }` o lanzando: eso es defensa, no pantalla.
+- **Verificación en dos pasos al ingresar** (27 oct 2026, pedido de Jhokser; sin migración; detalle y riesgos en [SEGURIDAD.md](SEGURIDAD.md)). Después de la contraseña se pide
+  **en cada ingreso** el código de una **app autenticadora** (TOTP nativo de Supabase: `mfa.enroll`/`challengeAndVerify`, la sesión sube a `aal2`). Quien aún no la tiene la
+  **activa en el mismo ingreso** (`/login/verificar`: QR + clave + primer código); también se cambia en `/cuenta/seguridad` («Seguridad de la cuenta» en `MenuCuenta`, que abre
+  cualquiera con sesión; quitarla pide un código vigente). **No hay código por correo** (se quitó el 27 oct 2026: hacía falta un dominio verificado en Resend). **El gate está en
+  `getUsuarioSesion`** (`src/lib/auth.ts`): sin `aal2` no hay sesión para páginas, acciones ni rutas; `getUsuarioSesionBruta` (sin gate) solo la usan `/login` y `/login/verificar`
+  (y sus acciones). Lógica pura y pruebas en `src/lib/seguridad/segundo-paso.ts`; la sesión en `segundo-paso-servidor.ts`. **Celular perdido:** quien puede modificar Usuarios y roles pulsa
+  «Restablecer verificación» en la ficha de la persona (`restablecerSegundoPaso`, `auth.admin.mfa.deleteFactor`, con auditoría). **Está apagada por defecto**: se enciende con
+  `SEGUNDO_PASO=activo` en Vercel (y volver a desplegar); interruptor de emergencia: `SEGUNDO_PASO=desactivado`. Las cuentas del portal del proveedor (`cuentaDeProveedor`) no la
+  usan. **Una lectura nueva de la sesión** pasa por `getUsuarioSesion`/`getUsuarioActual`, nunca por `createSessionClient().auth.getUser()` directo (se saltaría el gate;
+  `subirAvatar` ya se corrigió).
 - **Países permitidos por persona** (migración 0087, `perfiles.paises_permitidos`; se elige en la ficha de la persona, Usuarios
   y roles › «Países»). `null` = todos; una lista = solo esos códigos, y «importacion» para Compras Importadora. Viaja en
   `UsuarioActual.paisesPermitidos` y la regla vive en `src/lib/paises-permitidos.ts` (`puedeVerPais`, `filtrarPaises`). Lo

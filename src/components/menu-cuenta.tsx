@@ -5,7 +5,7 @@ import { useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { cerrarSesion } from "@/app/login/actions";
 import { EVENTO_ABRIR_ATAJOS } from "@/components/atajos-teclado";
 import { MenuDesplegable, TituloGrupoMenu, claseOpcionMenu } from "@/components/ui/menu-desplegable";
-import { CheckIcon, ConfiguracionIcon, PuestosIcon } from "@/lib/nav-icons";
+import { CheckIcon, ConfiguracionIcon, EscudoIcon, PuestosIcon } from "@/lib/nav-icons";
 import { subirAvatar } from "@/lib/perfil-actions";
 import { CAMBIOS_RECIENTES, VERSION } from "@/lib/version";
 
@@ -130,6 +130,10 @@ export function MenuCuenta({
           <Link href="/mi-puesto" role="menuitem" onClick={() => cerrar()} className={claseOpcionMenu}>
             <PuestosIcon className="h-4 w-4 text-muted-foreground" />
             Mi puesto
+          </Link>
+          <Link href="/cuenta/seguridad" role="menuitem" onClick={() => cerrar()} className={claseOpcionMenu}>
+            <EscudoIcon className="h-4 w-4 text-muted-foreground" />
+            Seguridad de la cuenta
           </Link>
           {puedeConfigurar && (
             <Link href="/configuracion" role="menuitem" onClick={() => cerrar()} className={claseOpcionMenu}>
