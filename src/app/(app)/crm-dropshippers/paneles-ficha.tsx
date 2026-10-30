@@ -5,12 +5,11 @@ import { Campo } from "@/components/ui/campo-ficha";
 import { anilloFoco, fieldClass } from "@/components/ui/field";
 import { FichaCrear } from "@/components/ui/ficha-crear";
 import { Seccion } from "@/components/ui/seccion-ficha";
-import { AlertaIcon, DropshipperIcon, EtiquetaIcon, PersonaIcon, SugerenciaIcon } from "@/lib/nav-icons";
+import { AlertaIcon, SugerenciaIcon } from "@/lib/nav-icons";
 import { recomendarProducto } from "../sugerencias-clientes/actions";
 import { FichaSugerencia } from "../sugerencias-clientes/ficha-sugerencia";
-import { CampoTiendas } from "./campo-tiendas";
-import { crearCaso, editarDropshipper } from "./actions";
-import { CANALES, ESTADOS, NIVELES, PRIORIDADES, TIPOS_CASO, nombrePais, type FilaDropshipper } from "./def-crm";
+import { crearCaso } from "./actions";
+import { CANALES, PRIORIDADES, TIPOS_CASO, nombrePais, type FilaDropshipper } from "./def-crm";
 
 
 /** Los datos mínimos de un dropshipper para elegirlo en una lista. */
@@ -161,81 +160,5 @@ export function PanelRecomendar({ d, alGuardar }: { d: FilaDropshipper; alGuarda
       alGuardar={alGuardar}
       boton={(abrir) => <BotonAccion texto="Recomendar" icono={SugerenciaIcon} alHacerClic={abrir} />}
     />
-  );
-}
-
-/** Editar los datos de un dropshipper. La ficha lleva `key` con su id, así que al cambiar de uno arranca con sus datos. */
-export function PanelEditar({ d, alGuardar }: { d: FilaDropshipper; alGuardar?: () => void }) {
-  return (
-    <FichaCrear
-      alGuardar={alGuardar}
-      titulo={`Editar ${d.nombre}`}
-      etiquetaCrear="Guardar cambios"
-      action={editarDropshipper}
-      mensajeExito="Cambios guardados"
-      ocultos={{ id: d.id }}
-      boton={(abrir) => <BotonAccion texto="Editar" icono={PersonaIcon} alHacerClic={abrir} />}
-    >
-      {({ faltante, invalido }) => (
-        <>
-          <Seccion icono={DropshipperIcon} titulo="Dropshipper">
-            <Campo etiqueta="Nombre" id="campo-nombre-editar" obligatorio faltante={faltante}>
-              <input
-                id="campo-nombre-editar"
-                type="text"
-                name="nombre"
-                required
-                data-enfocar
-                autoComplete="off"
-                aria-invalid={invalido("campo-nombre-editar")}
-                defaultValue={d.nombre}
-                className={`${fieldClass} w-full`}
-              />
-            </Campo>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Campo etiqueta="Estado" id="campo-estado-editar">
-                <select id="campo-estado-editar" name="estado" defaultValue={d.estado} className={`${fieldClass} w-full`}>
-                  <Opciones lista={ESTADOS} />
-                </select>
-              </Campo>
-              <Campo etiqueta="Tipo de cliente" id="campo-nivel-editar">
-                <select id="campo-nivel-editar" name="nivel" defaultValue={d.nivel} className={`${fieldClass} w-full`}>
-                  <Opciones lista={NIVELES} />
-                </select>
-              </Campo>
-              <CampoTiendas id="campo-tienda-editar" inicial={d.tiendas} />
-              <Campo etiqueta="Ciudad" id="campo-ciudad-editar">
-                <input id="campo-ciudad-editar" type="text" name="ciudad" autoComplete="off" defaultValue={d.ciudad ?? ""} className={`${fieldClass} w-full`} />
-              </Campo>
-            </div>
-          </Seccion>
-
-          <Seccion icono={PersonaIcon} titulo="Contacto">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Campo etiqueta="Correo" id="campo-correo-editar">
-                <input id="campo-correo-editar" type="email" name="contacto_email" autoComplete="off" defaultValue={d.email ?? ""} className={`${fieldClass} w-full`} />
-              </Campo>
-              <Campo etiqueta="WhatsApp" id="campo-telefono-editar">
-                <input
-                  id="campo-telefono-editar"
-                  type="text"
-                  name="contacto_telefono"
-                  autoComplete="off"
-                  defaultValue=""
-                  placeholder={d.tieneTelefono ? "Déjalo vacío para no cambiarlo" : "Ej: +57 300 111 2233"}
-                  className={`${fieldClass} w-full`}
-                />
-              </Campo>
-            </div>
-          </Seccion>
-
-          <Seccion icono={EtiquetaIcon} titulo="Detalle">
-            <Campo etiqueta="Productos (separados por coma)" id="campo-productos-editar">
-              <input id="campo-productos-editar" type="text" name="productos" autoComplete="off" defaultValue={d.productos.join(", ")} className={`${fieldClass} w-full`} />
-            </Campo>
-          </Seccion>
-        </>
-      )}
-    </FichaCrear>
   );
 }

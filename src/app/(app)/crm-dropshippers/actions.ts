@@ -9,7 +9,7 @@ import { mencionadosValidos, notificarMenciones } from "@/lib/menciones";
 import { ACCIONES_COMERCIALES, FASES, MODULO_ATENCION, MODULO_COMERCIAL, accesoCrm, areaParaNota, areasVisibles, etiquetaFase } from "@/lib/crm/areas";
 import { normalizarTelefono } from "@/lib/crm/telefono";
 import { enlazarChatsPorTelefono, telefonoDeOtro } from "@/lib/whatsapp/vinculo";
-import { CANALES, ESTADOS, NIVELES, PRIORIDADES, TIPOS_CASO, etiquetaEstado, etiquetaNivel, etiquetaTipo } from "./def-crm";
+import { CANALES, PRIORIDADES, TIPOS_CASO, etiquetaEstado, etiquetaTipo } from "./def-crm";
 
 /** Devuelve el error como valor, no lo lanza: en producción Next.js oculta el mensaje de una excepción de una acción. */
 export async function crearDropshipper(formData: FormData): Promise<{ error?: string }> {
@@ -185,100 +185,6 @@ export async function crearCaso(formData: FormData): Promise<{ error?: string }>
     entidad: "dropshippers",
     entidadId: dropshipper_id,
     detalle: `caso=${data.numero} ${titulo}`,
-  });
-  revalidatePath("/crm-dropshippers", "layout");
-  return {};
-}
-
-const lista = (valor: string, max: number) =>
-  [...new Set(valor.split(",").map((e) => e.trim()).filter(Boolean))].slice(0, max);
-
-/** Edita los datos de un dropshipper. Devuelve el error como valor (ver `crearDropshipper`). */
-export async function editarDropshipper(formData: FormData): Promise<{ error?: string }> {
-  await requireModuloEscritura("crm-dropshippers");
-  const id = texto(formData, "id");
-  const nombre = texto(formData, "nombre");
-  const estado = texto(formData, "estado");
-  const nivel = texto(formData, "nivel");
-  const tiendas = listaTiendas(formData);
-  const ciudad = texto(formData, "ciudad") || null;
-  const contacto_email = texto(formData, "contacto_email").toLowerCase() || null;
-  // Las notas de ClickUp ya no se muestran ni se editan (29 oct 2026): solo se tocan si vienen en el formulario, para no borrarlas.
-  const notas = formData.has("notas") ? texto(formData, "notas") || null : undefined;
-  // Las etiquetas se editan aparte (`guardarEtiquetasDropshipper`): solo se tocan si vienen en el formulario.
-  const etiquetas = formData.has("etiquetas") ? lista(texto(formData, "etiquetas"), 30) : undefined;
-  const productos = lista(texto(formData, "productos"), 60);
-
-  if (!ES_ID(id)) return { error: "Dropshipper no válido." };
-  if (!nombre) return { error: "Escribe el nombre del dropshipper." };
-  if (!esUnoDe(ESTADOS, estado) || !esUnoDe(NIVELES, nivel)) return { error: "Revisa el estado y el tipo de cliente." };
-  if (contacto_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contacto_email)) return { error: "El correo no es válido." };
-
-  const supabase = createServiceClient();
-  const { data: actual } = await supabase
-    .from("dropshippers")
-    .select("estado, nivel, contacto_telefono, dropshipper_paises(paises(codigo))")
-    .eq("id", id)
-    .single();
-  if (!actual) return { error: "No se encontró el dropshipper." };
-
-  // El WhatsApp se guarda en formato internacional; sin prefijo se asume el primer país donde vende.
-  // El número no sale escrito en la ficha: un campo vacío lo deja como estaba (no lo borra).
-  let contacto_telefono: string | null = (actual.contacto_telefono as string | null) ?? null;
-  let pais_origen: string | null | undefined;
-  const telefonoTexto = texto(formData, "contacto_telefono");
-  if (telefonoTexto) {
-    const primero = ((actual.dropshipper_paises ?? []) as unknown as { paises: { codigo: string } | { codigo: string }[] | null }[])
-      .map((p) => (Array.isArray(p.paises) ? p.paises[0]?.codigo : p.paises?.codigo))
-      .find(Boolean);
-    const tel = normalizarTelefono(telefonoTexto, primero);
-    if (!tel) return { error: "El teléfono no es válido. Escríbelo con el prefijo del país, p. ej. +57 300 111 2233." };
-    contacto_telefono = tel.e164;
-    if (tel.e164 !== actual.contacto_telefono) {
-      pais_origen = tel.pais;
-      if (await telefonoDeOtro(supabase, tel.e164, id)) return { error: "Ya hay un dropshipper con ese WhatsApp." };
-    }
-  }
-
-  const { error } = await supabase
-    .from("dropshippers")
-    .update({
-      nombre,
-      estado,
-      nivel,
-      // Cambiar el tipo en «Editar» lo fija a mano: el cálculo automático (migración 0196) ya no lo mueve.
-      ...(actual.nivel !== nivel ? { nivel_manual: true } : {}),
-      tienda: tiendas[0] ?? null,
-      tiendas,
-      ciudad,
-      contacto_email,
-      contacto_telefono,
-      ...(notas !== undefined ? { notas } : {}),
-      ...(etiquetas !== undefined ? { etiquetas } : {}),
-      productos,
-      ...(pais_origen !== undefined ? { pais_origen } : {}),
-    })
-    .eq("id", id);
-  if (error) return { error: error.code === "23505" ? "Ya hay un dropshipper con ese WhatsApp." : "No se pudo guardar." };
-  // Los chats sin enlazar de su número quedan enlazados desde ahora (no hace falta esperar a su próximo mensaje).
-  if (contacto_telefono && (await enlazarChatsPorTelefono(supabase, id, contacto_telefono)) > 0) revalidatePath("/crm-dropshippers/bandeja");
-
-  const antes: Record<string, string> = {};
-  const despues: Record<string, string> = {};
-  if (actual.estado !== estado) {
-    antes.Estado = etiquetaEstado(actual.estado);
-    despues.Estado = etiquetaEstado(estado);
-  }
-  if (actual.nivel !== nivel) {
-    antes["Tipo de cliente"] = etiquetaNivel(actual.nivel);
-    despues["Tipo de cliente"] = etiquetaNivel(nivel);
-  }
-  const cambioDeEstado = Object.keys(despues).length > 0;
-  await registrarAuditoria({
-    accion: cambioDeEstado ? "cambiar_estado_dropshipper" : "editar_dropshipper",
-    entidad: "dropshippers",
-    entidadId: id,
-    ...(cambioDeEstado ? { antes, despues } : { detalle: "datos editados" }),
   });
   revalidatePath("/crm-dropshippers", "layout");
   return {};

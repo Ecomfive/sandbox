@@ -19,10 +19,11 @@ import { ActividadDropshipper } from "./actividad-dropshipper";
 import { BotonEscalar } from "./areas-ficha";
 import { MostrarTelefono } from "./mostrar-telefono";
 import { DatoEditable } from "./dato-editable";
+import { NUMERO_REGISTRADO, type CampoDato } from "@/lib/crm/dato-dropshipper";
 import { CuentasDropshipper } from "./cuentas-dropshipper";
 import { DesempenoDropshipper } from "./desempeno-dropshipper";
 import { VentasDropiDropshipperBloque } from "./ventas-dropi-dropshipper";
-import { PanelCaso, PanelEditar, PanelRecomendar } from "./paneles-ficha";
+import { PanelCaso, PanelRecomendar } from "./paneles-ficha";
 import { RecomendacionesDropshipper } from "./recomendaciones-dropshipper";
 import { ConversacionWhatsapp } from "./conversacion-whatsapp";
 import { EtiquetasDropshipper } from "./etiquetas-dropshipper";
@@ -37,7 +38,7 @@ import {
   type FilaCaso,
   type FilaDropshipper,
 } from "./def-crm";
-import { Etiqueta, Pastilla, Punto } from "@/components/panel/piezas-panel";
+import { Pastilla, Punto } from "@/components/panel/piezas-panel";
 
 export const tonoEstado = (estado: string) => (estado === "activo" ? "exito" : estado === "prospecto" ? "aviso" : "neutro");
 
@@ -153,7 +154,7 @@ export function ContenidoFichaDropshipper({ d, casos, codigoPais, hoy, acceso }:
 }
 
 /**
- * Los botones de la ficha que abren una ventana del CRM: caso, recomendar y editar; seguimiento en Comercial. Sin «Pedido», «Nota» ni «Fase»
+ * Los botones de la ficha que abren una ventana del CRM: caso y recomendar. Ya no hay «Editar» (30 oct 2026, pedido de Jhokser): los datos se cambian ahí mismo en el bloque «Datos». Sin «Pedido», «Nota» ni «Fase»
  * (29 oct 2026, pedido de Alcides): lo que se anotaba en una nota va como comentario en la Actividad.
  */
 export function AccionesCrm({ d, codigoPais, acceso, alGuardar }: { d: FilaDropshipper; codigoPais: string; acceso: AccesoCrm; alGuardar: () => void }) {
@@ -163,7 +164,6 @@ export function AccionesCrm({ d, codigoPais, acceso, alGuardar }: { d: FilaDrops
         <>
           <PanelCaso key={`caso-${d.id}`} d={d} codigoPais={codigoPais} alGuardar={alGuardar} />
           <PanelRecomendar key={`recomendar-${d.id}`} d={d} alGuardar={alGuardar} />
-          <PanelEditar key={`editar-${d.id}`} d={d} alGuardar={alGuardar} />
         </>
       )}
     </>
@@ -195,22 +195,31 @@ export function CasosAbiertos({ abiertos, acceso }: { abiertos: FilaCaso[]; acce
 }
 
 /**
- * Sus datos: teléfono (con «Mostrar número»), ciudad, ingreso, último pedido, etiquetas (editables, como en ClickUp)… Ciudad, ingreso y
- * correo se cambian ahí mismo con el lápiz (`DatoEditable`). Etapa, notas y responsable (lo que venía de ClickUp) ya no se muestran
+ * Sus datos: nombre, estado, WhatsApp (con «Mostrar número» para administradores), tiendas, ciudad, ingreso, último pedido, productos, etiquetas
+ * (editables, como en ClickUp) y correo. Todo se cambia ahí mismo con el lápiz (`DatoEditable`), salvo el último pedido. Etapa, notas y responsable (lo que venía de ClickUp) ya no se muestran
  * (29 oct 2026, pedido de Alcides). En la ficha del chat `conEtiquetas` va en falso: ahí las mismas etiquetas se editan arriba de todo.
  */
 export function DatosDropshipper({ d, hoy, acceso, conEtiquetas = true }: { d: FilaDropshipper; hoy: string; acceso: AccesoCrm; conEtiquetas?: boolean }) {
-  const dato = (campo: "ciudad" | "ingreso" | "correo", inicial: string | null) => (
+  const dato = (campo: CampoDato, inicial: string | null) => (
     <DatoEditable key={`${campo}-${d.id}`} dropshipperId={d.id} campo={campo} inicial={inicial} puede={acceso.escribeAtencion} />
   );
   return (
     <dl className="m-0 grid grid-cols-[7.5rem_minmax(0,1fr)] gap-x-2.5 gap-y-1.5 text-[13px]">
       {[
-        ...(d.tieneTelefono && acceso.verTelefonos ? [["Teléfono", <MostrarTelefono key="t" tipo="dropshipper" id={d.id} puede />]] : []),
+        ["Nombre", dato("nombre", d.nombre)],
+        ["Estado", dato("estado", d.estado)],
+        [
+          "WhatsApp",
+          <span key="w" className="flex flex-wrap items-center gap-x-2">
+            {dato("telefono", d.tieneTelefono ? NUMERO_REGISTRADO : null)}
+            {d.tieneTelefono && acceso.verTelefonos && <MostrarTelefono tipo="dropshipper" id={d.id} puede />}
+          </span>,
+        ],
+        ["Tiendas", dato("tiendas", d.tiendas.join(", ") || null)],
         ["Ciudad", dato("ciudad", d.ciudad)],
         ["Ingreso", dato("ingreso", d.ingreso)],
         ["Último pedido", etiquetaUltimoPedido(d.ultimoPedido, hoy)],
-        ...(d.productos.length ? [["Productos", d.productos.map((p) => <Etiqueta key={p}>{p}</Etiqueta>)]] : []),
+        ["Productos", dato("productos", d.productos.join(", ") || null)],
         ...(conEtiquetas ? [["Etiquetas", <EtiquetasDropshipper key={`etiquetas-${d.id}`} dropshipperId={d.id} iniciales={d.etiquetas} puedeEscribir={acceso.escribeAtencion} />]] : []),
         ["Correo", dato("correo", d.email)],
       ].map(([titulo, valor]) => (
