@@ -93,24 +93,25 @@ test("se clasifica solo lo que espera y tiene algo nuevo; lo que puso una person
   assert.equal(hayQueClasificar({ ...dePersona, esperandoDesde: hace(2) }, AHORA), true);
 });
 
-test("tablero: cada chat va al nivel de su motivo; vencido sube uno; contestado va a Contestados", () => {
+test("tablero: escribe el cliente → Por atender; le contestan → En conversación; resuelto → Cerrados", () => {
   const base = { vip: false, resuelta: false, ultimoMensajeEn: hace(1) };
-  assert.deepEqual(columnaDelChat({ ...base, grupo: "queja", esperandoDesde: hace(5) }, AHORA), { columna: "alta", subio: false });
-  assert.deepEqual(columnaDelChat({ ...base, grupo: "comercial", esperandoDesde: hace(30) }, AHORA), { columna: "media", subio: false });
-  assert.deepEqual(columnaDelChat({ ...base, grupo: "consulta", esperandoDesde: hace(130) }, AHORA), { columna: "alta", subio: true });
-  assert.deepEqual(columnaDelChat({ ...base, grupo: "otro", esperandoDesde: hace(3000) }, AHORA), { columna: "baja", subio: false });
-  // Un VIP con saludo tiene plazo (el de comercial): al vencer sube a Media.
-  assert.deepEqual(columnaDelChat({ ...base, vip: true, grupo: "otro", esperandoDesde: hace(300) }, AHORA), { columna: "media", subio: true });
-  // Sin motivo todavía: Media.
-  assert.deepEqual(columnaDelChat({ ...base, grupo: null, esperandoDesde: hace(10) }, AHORA), { columna: "media", subio: false });
-  assert.deepEqual(columnaDelChat({ ...base, grupo: "pedido", esperandoDesde: null }, AHORA), { columna: "contestados", subio: false });
+  assert.equal(columnaDelChat({ ...base, grupo: "queja", esperandoDesde: hace(5) }, AHORA), "por_atender");
+  assert.equal(columnaDelChat({ ...base, grupo: null, esperandoDesde: hace(3000) }, AHORA), "por_atender");
+  // Resuelto, pero el cliente volvió a escribir: vuelve a empezar.
+  assert.equal(columnaDelChat({ ...base, grupo: "pedido", esperandoDesde: hace(2), resuelta: true }, AHORA), "por_atender");
+  assert.equal(columnaDelChat({ ...base, grupo: "pedido", esperandoDesde: null }, AHORA), "en_conversacion");
   assert.equal(columnaDelChat({ ...base, grupo: "pedido", esperandoDesde: null, ultimoMensajeEn: hace(60 * 50) }, AHORA), null);
-  assert.equal(columnaDelChat({ ...base, grupo: "pedido", esperandoDesde: null, resuelta: true }, AHORA), null);
+  assert.equal(columnaDelChat({ ...base, grupo: "pedido", esperandoDesde: null, resuelta: true }, AHORA), "cerrados");
+  assert.equal(columnaDelChat({ ...base, grupo: "pedido", esperandoDesde: null, resuelta: true, ultimoMensajeEn: hace(60 * 25) }, AHORA), null);
 });
 
-test("tablero: cada columna por urgencia y Contestados con lo más reciente arriba", () => {
-  const chat = (id: string, grupo: ChatParaOrdenar["grupo"], espera: number | null, ultimo = 1) => ({ id, grupo, vip: false, resuelta: false, esperandoDesde: espera == null ? null : hace(espera), ultimoMensajeEn: hace(ultimo) });
-  const t = repartirTablero([chat("pagos", "pagos", 10), chat("queja", "queja", 10), chat("viejo", null, null, 300), chat("nuevo", null, null, 5)], AHORA);
-  assert.deepEqual(t.alta.map((x) => x.chat.id), ["queja", "pagos"]);
-  assert.deepEqual(t.contestados.map((x) => x.chat.id), ["nuevo", "viejo"]);
+test("tablero: Por atender por urgencia; En conversación y Cerrados con lo más reciente arriba", () => {
+  const chat = (id: string, grupo: ChatParaOrdenar["grupo"], espera: number | null, ultimo = 1, resuelta = false) => ({ id, grupo, vip: false, resuelta, esperandoDesde: espera == null ? null : hace(espera), ultimoMensajeEn: hace(ultimo) });
+  const t = repartirTablero(
+    [chat("pagos", "pagos", 10), chat("queja", "queja", 10), chat("saludo", "otro", 200), chat("viejo", null, null, 300), chat("nuevo", null, null, 5), chat("cerrado", null, null, 60, true)],
+    AHORA,
+  );
+  assert.deepEqual(t.por_atender.map((x) => x.id), ["queja", "pagos", "saludo"]);
+  assert.deepEqual(t.en_conversacion.map((x) => x.id), ["nuevo", "viejo"]);
+  assert.deepEqual(t.cerrados.map((x) => x.id), ["cerrado"]);
 });

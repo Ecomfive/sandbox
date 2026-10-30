@@ -2,13 +2,16 @@
 
 import { Tooltip } from "@/components/ui/tooltip";
 
-/** Las iniciales de un nombre («Nicole Muñoz» → «NM»). */
+/**
+ * Las iniciales de un nombre («Nicole Muñoz» → «NM»). Cada inicial es un carácter entero (`Array.from`), no media letra: con `p[0]` un nombre de
+ * emojis («😇😇😇») daba medio emoji, que el servidor y el navegador dibujan distinto, y la bandeja se volvía a armar entera (30 oct 2026).
+ */
 export const iniciales = (nombre: string) =>
   nombre
     .replace(/^\+/, "")
     .split(/\s+/)
     .filter(Boolean)
-    .map((p) => p[0])
+    .map((p) => Array.from(p)[0])
     .slice(0, 2)
     .join("")
     .toUpperCase();
