@@ -8,9 +8,13 @@ import { Ventana } from "@/components/ui/ventana";
 import { supabase } from "@/lib/supabase/client";
 import { motivoDeRechazoEnvio } from "@/lib/whatsapp/archivos";
 import { enviarArchivoPorWhatsapp, prepararEnvioArchivo } from "./actions";
+import { enviarArchivoInterno, prepararArchivoInterno } from "./interno-actions";
 
 /** Lo que se acepta al elegir un archivo para mandar por WhatsApp (el servidor vuelve a revisar el contenido). */
 export const ACEPTAR_ENVIO = "image/jpeg,image/png,audio/*,video/mp4,video/3gpp,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.m4a,.aac,.ogg,.amr";
+
+/** Lo que se acepta en el chat interno: fotos JPG o PNG y audios (el servidor vuelve a revisar el contenido). */
+export const ACEPTAR_INTERNO = "image/jpeg,image/png,audio/*,.m4a,.aac,.ogg,.mp3";
 
 const tamanoLegible = (bytes: number) => (bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`);
 
@@ -18,7 +22,7 @@ const tamanoLegible = (bytes: number) => (bytes >= 1024 * 1024 ? `${(bytes / 102
  * Mandar un archivo por WhatsApp (29 oct 2026): foto, audio, video o documento. Se ve una vista previa, se puede escribir un texto al pie (menos en un audio) y al enviar el
  * archivo se sube directo al almacenamiento (permiso firmado) y el servidor lo revisa por su contenido y lo manda.
  */
-export function EnviarArchivo({ conversacionId, nombre, archivo, alCerrar, alEnviado }: { conversacionId: string; nombre: string; archivo: File; alCerrar: () => void; alEnviado: () => void }) {
+export function EnviarArchivo({ conversacionId, nombre, archivo, alCerrar, alEnviado, interno = false }: { conversacionId: string; nombre: string; archivo: File; alCerrar: () => void; alEnviado: () => void; interno?: boolean }) {
   const [pie, setPie] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [paso, setPaso] = useState<"subiendo" | "enviando" | null>(null);
@@ -37,7 +41,7 @@ export function EnviarArchivo({ conversacionId, nombre, archivo, alCerrar, alEnv
     setError(null);
     empezar(async () => {
       setPaso("subiendo");
-      const permiso = await prepararEnvioArchivo(conversacionId, archivo.name, archivo.size).catch(() => ({ error: "No se pudo preparar la subida." }));
+      const permiso = await (interno ? prepararArchivoInterno : prepararEnvioArchivo)(conversacionId, archivo.name, archivo.size).catch(() => ({ error: "No se pudo preparar la subida." }));
       if ("error" in permiso) {
         setPaso(null);
         return setError(permiso.error);
@@ -48,7 +52,7 @@ export function EnviarArchivo({ conversacionId, nombre, archivo, alCerrar, alEnv
         return setError("No se pudo subir el archivo. Revisa tu conexión e inténtalo de nuevo.");
       }
       setPaso("enviando");
-      const r = await enviarArchivoPorWhatsapp(conversacionId, permiso.ruta, archivo.name, pie).catch(() => ({ error: "No se pudo mandar. Inténtalo de nuevo." }));
+      const r = await (interno ? enviarArchivoInterno : enviarArchivoPorWhatsapp)(conversacionId, permiso.ruta, archivo.name, pie).catch(() => ({ error: "No se pudo mandar. Inténtalo de nuevo." }));
       setPaso(null);
       if ("error" in r) setError(r.error);
       else alEnviado();
@@ -56,7 +60,7 @@ export function EnviarArchivo({ conversacionId, nombre, archivo, alCerrar, alEnv
   }
 
   return (
-    <Ventana abierto alCerrar={paso ? () => undefined : alCerrar} titulo={`Mandar a ${nombre}`} ancho="sm">
+    <Ventana abierto alCerrar={paso ? () => undefined : alCerrar} titulo={interno ? `Mandar a ${nombre} (chat interno)` : `Mandar a ${nombre}`} ancho="sm">
       <form
         className="flex flex-col gap-4 p-5"
         onSubmit={(e) => {

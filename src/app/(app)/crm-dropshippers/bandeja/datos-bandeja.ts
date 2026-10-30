@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getUsuarioActual, type UsuarioActual } from "@/lib/auth";
+import { areaPropiaDeChat, esTelefonoInterno, salaDeTelefono } from "@/lib/crm/chat-interno";
 import { accesoCrm, areasVisibles, escribeEnArea, MODULO_ATENCION, MODULO_COMERCIAL, MODULO_DIRECCION, numerosDeAreas, pierdeLoBorrado, type AreaCrm, type PermisosCrm } from "@/lib/crm/areas";
 import { chatVisibleParaAtencion, mensajeVisibleParaAtencion } from "@/lib/whatsapp/borrados-atencion";
 import { areaDeModulos, cargoDePersona } from "@/lib/crm/respondieron";
@@ -54,8 +55,10 @@ export interface ConversacionVista {
   paises: string[];
   /** Dónde vende: plataforma y país, de sus cuentas vinculadas y lo puesto a mano en el chat (migración 0193). */
   vendeEn: VendeEn[];
-  /** Es un chat entre dos números de la empresa («WhatsApp interno»): no es un cliente y no sale en la lista ni en los conteos. */
+  /** Es un chat interno entre áreas (una sala, o el de dos números de la 0202): no es un cliente y no sale en la lista ni en los conteos. */
   interno: boolean;
+  /** En un chat interno, la sala a la que pertenece (`ac`, `ad`, `cd` o `acd`); null si no es de una sala. */
+  salaInterna: string | null;
   /** Sus etiquetas, como en ClickUp: las del dropshipper si el chat tiene uno; si no, las del chat (migración 0185). */
   etiquetas: string[];
   /** Desde cuándo espera respuesta: su primer mensaje sin contestar (migración 0189). Sin la migración, null y se usa `ultimoEntranteEn`. */
@@ -156,6 +159,7 @@ export const areasDe = (u: PermisosCrm): AreaCrm[] => areasVisibles(accesoCrm(u)
 export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosCrm): Promise<DatosBandeja | null> {
   const areas = areasDe(usuario);
   const sinBorrados = pierdeLoBorrado(accesoCrm(usuario));
+  const miAreaChat = areaPropiaDeChat(accesoCrm(usuario));
   const numerosR = await supabase.from("whatsapp_numeros").select("id, nombre, numero, area").eq("activo", true).order("nombre");
   if (numerosR.error) return null;
   const numeros = (numerosR.data ?? []) as NumeroVista[];
@@ -208,11 +212,14 @@ export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosC
       etiquetas: d ? (d.etiquetas ?? []) : [],
       esperandoDesde: null,
       motivo: null,
-      interno: empresa.has(digitos(c.telefono)),
+      interno: empresa.has(digitos(c.telefono)) || esTelefonoInterno(c.telefono as string),
+      salaInterna: salaDeTelefono(c.telefono as string)?.sala ?? null,
       vendeEn: dondeVende(cuentas, []),
       paises: paisesDondeVende((d?.dropshipper_paises ?? []).map((x) => uno(x.paises)?.codigo ?? null), cuentas.filter((x): x is { plataforma: string | null; pais: string } => !!x.pais)),
     };
   });
+  // Las salas del chat interno: cada quien ve solo la copia de su propia área (Comercial no lee lo que Atención habla con Dirección).
+  const copiasPropias = new Set((data ?? []).filter((c) => salaDeTelefono(c.telefono as string)?.area === miAreaChat).map((c) => c.id as string));
   // Las que alguien marcó como borradas en la app de WhatsApp Business (migración 0171). Sin la columna, ninguna.
   const marcadas = await supabase.from("whatsapp_conversaciones").select("id, borrada_en_app_en, borrada_en_app_por").not("borrada_en_app_en", "is", null);
   if (!marcadas.error) {
@@ -292,7 +299,7 @@ export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosC
     numerosEmpresa: numeros.map((n) => ({ id: n.id, nombre: n.nombre, area: n.area })),
     // Lo borrado en la app de WhatsApp Business: a quien tiene solo Atención el chat marcado desaparece (y no ve la marca); los demás lo ven intacto, con su marca.
     conversaciones: conversaciones
-      .filter((c) => !ocultas.has(c.id) && (!sinBorrados || chatVisibleParaAtencion(c.ultimoMensajeEn, c.borradaEnApp?.en ?? null)))
+      .filter((c) => !ocultas.has(c.id) && (!c.salaInterna || copiasPropias.has(c.id)) && (!sinBorrados || chatVisibleParaAtencion(c.ultimoMensajeEn, c.borradaEnApp?.en ?? null)))
       .map((c) => (sinBorrados && c.borradaEnApp ? { ...c, borradaEnApp: null } : c)),
     colores,
   };
@@ -318,6 +325,9 @@ export async function conversacionPermitida(
   const numero = uno(data?.whatsapp_numeros as Uno<{ phone_number_id: string; numero: string | null }>);
   const area = data?.area as AreaCrm | undefined;
   if (!data || !numero || !area || !areasDe(usuario).includes(area)) return null;
+  // Una sala del chat interno es solo de su área: Comercial no abre la copia de Atención ni al revés, aunque supervise sus chats.
+  const sala = salaDeTelefono(data.telefono as string);
+  if (esTelefonoInterno(data.telefono as string) && (!sala || sala.area !== areaPropiaDeChat(accesoCrm(usuario)))) return null;
   if (escribe && !escribeEnArea(accesoCrm(usuario), area)) return null;
   return {
     id: data.id as string,
