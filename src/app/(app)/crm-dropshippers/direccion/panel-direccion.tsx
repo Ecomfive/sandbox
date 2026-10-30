@@ -79,7 +79,7 @@ export function PanelDireccion({
   usuarioId,
 }: {
   datos: DatosDireccion;
-  /** Lo que vende cada cliente y qué recomendarle (fase 3); null sin la migración 0200. */
+  /** Lo que vende cada cliente y qué recomendarle (fase 3); null sin las migraciones 0198 y 0201. */
   productos: DatosProductos | null;
   codigoPais: string;
   escribe: boolean;

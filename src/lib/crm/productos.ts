@@ -1,6 +1,6 @@
 /**
  * Productos de la cartera para el panel de Dirección (30 oct 2026, fase 3: vender más). Cruza lo que vende cada dropshipper (sus pedidos de
- * Dropi por producto, `crm_productos_por_dropshipper`, migración 0200) con el stock de cada producto en Dropi y lo que viene en camino
+ * Dropi por producto, `crm_productos_por_dropshipper`, migraciones 0198 y 0201) con el stock de cada producto en Dropi y lo que viene en camino
  * (Compras): qué se está acabando y a quién afecta, qué vende cada cliente y qué recomendarle. Lógica pura: se prueba en productos.test.ts.
  */
 

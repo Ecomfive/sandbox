@@ -4,7 +4,7 @@ import { loQueVende, productosDeCartera, recomendados, type CaminoProducto, type
 import { cargarEnCamino } from "@/lib/publicaciones/en-camino-datos";
 import { idsDeDropi } from "@/lib/publicaciones/sincronizar-dropi";
 import { cargarResumenVentas } from "@/lib/publicaciones/ventas-datos";
-import { traerTodasLasFilas } from "@/lib/supabase/paginar";
+import { traerTodasConError, traerTodasLasFilas } from "@/lib/supabase/paginar";
 
 export interface DatosProductos {
   productos: ProductoCartera[];
@@ -17,22 +17,30 @@ export interface DatosProductos {
 }
 
 /**
- * Lo que vende la cartera en el país (pedidos de 30 días por producto y dropshipper, migración 0200) con el stock y el ritmo de venta de
+ * Lo que vende la cartera en el país (pedidos de 30 días por producto y dropshipper, migraciones 0198 y 0201) con el stock y el ritmo de venta de
  * cada producto (Desempeño › Ventas Dropi) y lo que viene en camino (Compras, por el producto del sistema vinculado en Gestión de IDs).
- * `ids`: los dropshippers del panel (para armar lo de cada uno). Sin la migración 0200 devuelve el error para avisarlo.
+ * `ids`: los dropshippers del panel (para armar lo de cada uno). Sin esas migraciones devuelve el error para avisarlo.
  */
 export async function cargarProductos(supabase: SupabaseClient, paisId: string, usuario: UsuarioActual, ids: string[]): Promise<DatosProductos | { error: string }> {
   const [ventasR, resumen, pubs, camino] = await Promise.all([
-    supabase.rpc("crm_productos_por_dropshipper", { p_pais: paisId, p_dias: 30 }),
+    // Por páginas: la base devuelve hasta 1 000 filas por consulta y son una por dropshipper y producto.
+    traerTodasConError<{ dropshipper_id: string; producto_id: number; producto: string | null; pedidos: number }>((d, h) =>
+      supabase.rpc("crm_productos_por_dropshipper", { p_pais: paisId, p_dias: 30 }).order("dropshipper_id").order("producto_id").range(d, h),
+    ),
     cargarResumenVentas(supabase, paisId),
     traerTodasLasFilas<{ dropi_id: string | null; sku_maestro_id: string | null }>((d, h) =>
       supabase.from("dropi_publicaciones").select("dropi_id, sku_maestro_id").eq("pais_id", paisId).not("sku_maestro_id", "is", null).order("id").range(d, h),
     ),
     cargarEnCamino(supabase, paisId, usuario).catch(() => ({ camino: new Map() })),
   ]);
-  if (ventasR.error) return { error: "Falta correr la migración 0200 (productos de cada dropshipper) en la base." };
+  if (ventasR.error) return { error: "Falta correr la migración 0201 (productos de cada dropshipper) en la base." };
+  // Sin la 0198 (el ID de Dropi de cada línea del pedido) la función no encuentra nada: se avisa en vez de mostrar la vista vacía.
+  if (!(ventasR.data ?? []).length) {
+    const { data: conId } = await supabase.from("crm_ordenes_items").select("orden_id").not("producto_id", "is", null).limit(1);
+    if (!conId?.length) return { error: "Falta correr la migración 0198 (el ID de Dropi de cada producto de los pedidos) en la base." };
+  }
 
-  const ventas: VentaProducto[] = ((ventasR.data ?? []) as { dropshipper_id: string; producto_id: number; producto: string | null; pedidos: number }[]).map((v) => ({
+  const ventas: VentaProducto[] = (ventasR.data ?? []).map((v) => ({
     dropshipperId: v.dropshipper_id,
     productoId: Number(v.producto_id),
     producto: v.producto ?? `Producto ${v.producto_id}`,

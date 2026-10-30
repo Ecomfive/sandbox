@@ -1028,8 +1028,8 @@ convenciones técnicas del código.
   respuestas por persona de `whatsapp_kpis` (cruzadas por nombre de autor con `perfiles.nombre`), chats asignados y `esperando_desde` por tramos,
   tareas por `responsable_id` y la cartera por responsable de la fase 1. «Lo lleva» (`asignarResponsable`) escribe `dropshippers.responsable_id`
   (antes no se podía elegir en ninguna pantalla). El reparto automático de chats quedó para después (pedido de Hernán: los chats no cambian).
-  **Fase 3** (migración 0200): `crm_ordenes_items.producto_id` (el `product_id` del pedido de Dropi; `crm_sincronizar_ordenes` lo guarda y la
-  migración la corre una vez para completarlo) y `crm_productos_por_dropshipper(p_pais, p_dias)`. `datos-productos.ts` lo cruza con el stock
+  **Fase 3** (migración 0201, va después de la 0198 de Alcides, que guarda `crm_ordenes_items.producto_id` desde `crm_sincronizar_ordenes`):
+  `crm_productos_por_dropshipper(p_pais, p_dias)`. `datos-productos.ts` lo cruza con el stock
   de `cargarResumenVentas` y lo en camino de `cargarEnCamino` (por el SKU vinculado en Gestión de IDs); lógica pura en `src/lib/crm/productos.ts`
   (estado del stock, lo que vende cada uno, recomendados por clientes parecidos). Vista `?vista=productos`. «Descargar lista» (`lista-csv.ts` +
   `contactosParaLista`): CSV del filtro, con WhatsApp solo si `puedeVerTelefonos`; queda en auditoría. Las difusiones no se envían (pedido de Hernán).
