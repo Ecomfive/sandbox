@@ -733,6 +733,57 @@ export async function apagarPublicacion(id: string, otrasIds: string[]): Promise
 }
 
 /**
+ * «Quitar privatización» (pedido de Hernán, 30 oct 2026): el candado cerrado de un ID privado. Deja pendiente el apagado del privado (sacarle el stock,
+ * quitarle el correo y archivarlo) y, si se elige el público del mismo producto (`publicoId`), que «Aplicar en Dropi» le devuelva esas unidades antes
+ * de archivar el privado. Sin público, las unidades solo se sacan (como «Apagar»). Nada se toca en Dropi hasta «Aplicar en Dropi».
+ */
+export async function quitarPrivatizacion(id: string, publicoId: string | null): Promise<{ error?: string; detalle?: string }> {
+  const usuario = await requireModuloEscritura(MODULO);
+  const antes = await publicacionPermitida(id, usuario.paisesPermitidos);
+  if (!antes) return { error: "La publicación ya no existe o no es de tus países." };
+  if (publicoId !== null && (typeof publicoId !== "string" || !UUID.test(publicoId))) return { error: "El público elegido no es válido." };
+  const supabase = createServiceClient();
+  const { data: delPais } = await supabase.from("dropi_publicaciones").select("id, nombre, tipo_publicacion, dropi_id, estado, estado_publicacion, pais_id, sku_maestro_id").eq("pais_id", antes.pais_id);
+  const todas = (delPais ?? []).map((x) => ({
+    id: x.id as string,
+    nombre: x.nombre as string,
+    tipo: (x.tipo_publicacion as "publico" | "privado" | null) ?? null,
+    dropiId: String(x.dropi_id ?? ""),
+    archivada: x.estado === "archivado" || x.estado_publicacion === "archivado",
+    skuId: (x.sku_maestro_id as string | null) ?? null,
+  }));
+  const yo = todas.find((x) => x.id === id);
+  if (!yo) return { error: "La publicación ya no existe." };
+  if (yo.tipo !== "privado") return { error: "Solo se le quita la privatización a un ID privado." };
+  // El público tiene que ser del mismo producto (su grupo por nombre o el mismo producto vinculado: el navegador no decide a qué ID de Dropi se le
+  // suma stock), estar activo y sin apagado esperando.
+  let devolverA: { publico: number; publicacionId: string } | null = null;
+  let publico: (typeof todas)[number] | undefined;
+  if (publicoId) {
+    const grupo = new Set(grupoDe(yo, todas).map((x) => x.id));
+    publico = todas.find((x) => x.id === publicoId && x.tipo !== "privado" && (grupo.has(x.id) || (!!yo.skuId && x.skuId === yo.skuId)));
+    const idDropi = publico ? Number(idsDeDropi(publico.dropiId)[0]) : 0;
+    if (!publico || !idDropi) return { error: "Ese público no es del mismo producto o no tiene ID de Dropi." };
+    if (publico.archivada) return { error: "Ese público está archivado: elige otro o no devuelvas las unidades." };
+    const { data: apagado } = await supabase.from("dropi_cambios_pendientes").select("id").eq("publicacion_id", publico.id).eq("tipo", "apagar").in("estado", ["pendiente", "error"]).limit(1);
+    if (apagado?.length) return { error: "Ese público tiene un apagado pendiente: no se le pueden devolver unidades." };
+    devolverA = { publico: idDropi, publicacionId: publico.id };
+  }
+  const por = { id: usuario.id, nombre: usuario.nombre || usuario.email };
+  const r = await encolarApagar(supabase, { id, pais_id: antes.pais_id, dropi_id: (antes.dropi_id as string | null) ?? null }, { quitarPrivados: true, devolverA }, por);
+  if ("error" in r) return { error: r.error };
+  const destino = publico && devolverA ? `devolverle las unidades al público ${publico.nombre} (ID ${devolverA.publico})` : "sin devolver las unidades a un público";
+  await registrarAuditoria({
+    accion: "dropi_quitar_privatizacion_pendiente",
+    entidad: "dropi_publicaciones",
+    entidadId: id,
+    detalle: `${antes.nombre} · ID Dropi ${antes.dropi_id}: pendiente para «Aplicar en Dropi» (sacar el stock, quitar la privatización, ${destino} y archivar)`,
+  });
+  revalidatePath(RUTA);
+  return { detalle: `Quitar privatización pendiente${devolverA ? ` (las unidades vuelven al ID ${devolverA.publico})` : ""}: pulsa «Aplicar en Dropi» con Dropi abierto.` };
+}
+
+/**
  * «Deshacer apagado» (pedido de Hernán, 23 oct 2026): quita de la cola de «Aplicar en Dropi» los apagados que todavía **no** se aplicaron en
  * Dropi, por si hubo un error o se cambió de opinión. En el sistema vuelven a verse como antes (el apagado pendiente es lo que las mostraba
  * apagadas; nada más se había movido). Solo los que Dropi no ha tocado (ningún intento): uno que ya sacó el stock en Dropi a medias no se

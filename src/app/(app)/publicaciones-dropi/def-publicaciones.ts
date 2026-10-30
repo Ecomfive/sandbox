@@ -138,6 +138,11 @@ export interface FilaPublicacion {
   stockPendiente: { bodega: number; nombreBodega: string; unidades: number; antes: number | null }[];
   /** Las demás publicaciones del mismo producto (el público y sus privadas «P-MA …»), para apagarlas juntas (`grupoDe`). */
   grupo: { id: string; nombre: string; dropiId: string; archivada: boolean; tipo: "publico" | "privado" | null; stock: number | null; correo: string; apagadoPendiente: boolean; apagadoSinTocar: boolean }[];
+  /**
+   * De una privada, los públicos a los que «Quitar privatización» le puede devolver las unidades (30 oct 2026): activos, con ID de Dropi y sin apagado
+   * esperando, de su grupo o del mismo producto vinculado (muchos privados no llevan el «P-XX» con el nombre del público). Vacío en una pública.
+   */
+  publicosDelProducto: { id: string; nombre: string; dropiId: string; stock: number | null }[];
   /** Público o privado: el elegido en la ficha (el sistema manda, 24 oct 2026); si no hay nada anotado, lo que dice Dropi. */
   tipoDropi: "publico" | "privado" | null;
   /** Público o privado según la última lectura de Dropi (solo de referencia; null sin datos de Dropi). */

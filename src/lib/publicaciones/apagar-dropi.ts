@@ -80,6 +80,39 @@ export function armarApagado(producto: Obj, bodegasProveedor: Obj[], quitarPriva
   return { cuerpo, unidades, privadas };
 }
 
+/**
+ * «Quitar privatización» (pedido de Hernán, 30 oct 2026): el candado de un ID privado. Es un apagado del privado (sacarle el stock, quitarle el
+ * correo y archivarlo) que además le devuelve esas unidades al público del que salió. Va en `datos` del apagado: el ID de Dropi del público, las
+ * unidades que tenía el privado por bodega (las anota el favorito al sacarlas, así un reintento no las cuenta de nuevo; null = todavía no se
+ * sacaron) y si ya se devolvieron (no se devuelven dos veces).
+ */
+export interface DatosDevolver {
+  /** El ID de Dropi del público que recibe las unidades. */
+  publico: number;
+  /** Su publicación en el sistema. */
+  publicacionId: string | null;
+  unidades: Record<string, number> | null;
+  devuelto: boolean;
+}
+
+/** Unidades por bodega (`{ "81": 50 }`): solo bodegas con ID y unidades enteras mayores que cero; null si no hay ninguna. */
+export function normalizarUnidades(crudo: unknown): Record<string, number> | null {
+  if (!crudo || typeof crudo !== "object" || Array.isArray(crudo)) return null;
+  const out: Record<string, number> = {};
+  for (const [k, v] of Object.entries(crudo as Obj).slice(0, 20)) if (/^\d{1,9}$/.test(k) && Number.isInteger(Number(v)) && Number(v) > 0) out[k] = Number(v);
+  return Object.keys(out).length ? out : null;
+}
+
+/** Los datos de devolver de un apagado (de la base o del favorito); null si el apagado no devuelve nada (un apagado de siempre). */
+export function normalizarDatosDevolver(crudo: unknown): DatosDevolver | null {
+  if (!crudo || typeof crudo !== "object") return null;
+  const d = crudo as Obj;
+  const publico = Number(d.publico);
+  if (!Number.isInteger(publico) || publico <= 0 || publico >= 100_000_000) return null;
+  const pub = typeof d.publicacionId === "string" && /^[0-9a-f-]{36}$/i.test(d.publicacionId) ? d.publicacionId : null;
+  return { publico, publicacionId: pub, unidades: normalizarUnidades(d.unidades), devuelto: d.devuelto === true };
+}
+
 /** Lo mismo en JavaScript simple para el favorito (va después de `REPUBLICAR_JS`, que define `mover` y `stockDe`, y de `PRIVATIZAR_JS`, que define `reservasQuitadas`). La prueba compara los dos. */
 export const APAGAR_JS = [
   "function apagado(o,bp,q){",

@@ -3,7 +3,7 @@
 import { headers } from "next/headers";
 import { getUsuarioActual } from "@/lib/auth";
 import { registrarAuditoria } from "@/lib/auditoria";
-import { accesoCrm, supervisaArea, type AccesoCrm, type AreaCrm } from "@/lib/crm/areas";
+import { accesoCrm, supervisaArea, pierdeLoBorrado, type AccesoCrm, type AreaCrm } from "@/lib/crm/areas";
 import { getPaisActual } from "@/lib/pais";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { nombreArchivoSeguro } from "@/lib/seguridad/ruta-almacen";
@@ -12,7 +12,8 @@ import { enviarPlantillaWhatsapp, enviarTextoWhatsapp } from "@/lib/whatsapp/api
 import { avisarBandeja } from "@/lib/whatsapp/aviso-bandeja";
 import { detectarArchivoWhatsapp, MAX_BYTES_ENVIO } from "@/lib/whatsapp/archivos";
 import { resumenMensaje } from "@/lib/whatsapp/extraer";
-import { mensajesOcultos } from "@/lib/whatsapp/ocultos";
+import { mensajeVisibleParaAtencion } from "@/lib/whatsapp/borrados-atencion";
+import { corteDeBorradoEnApp, mensajesEliminadosEnWhatsapp, mensajesOcultos } from "@/lib/whatsapp/ocultos";
 import { rellenar, resolverVariables } from "@/lib/whatsapp/plantillas";
 import { COLUMNAS_PLANTILLA, type PlantillaGuardada } from "@/lib/whatsapp/plantillas-servidor";
 import { claves360, urlWebhook360 } from "@/lib/whatsapp/proveedor";
@@ -78,7 +79,7 @@ export async function ultimosMensajesDropshipper(
     .maybeSingle();
   if (error || !c) return null;
   const numero = c.whatsapp_numeros as unknown as { nombre: string } | { nombre: string }[];
-  const { mensajes } = await cargarConversacion(supabase, c.id as string, null);
+  const { mensajes } = await cargarConversacion(supabase, c.id as string, null, undefined, undefined, pierdeLoBorrado(accesoCrm(u)));
   return {
     conversacionId: c.id as string,
     numero: (Array.isArray(numero) ? numero[0]?.nombre : numero?.nombre) ?? "WhatsApp",
@@ -98,13 +99,17 @@ export async function vistaPreviaChat(id: string, cantidad = 3): Promise<{ mensa
   const supabase = createServiceClient();
   if (!(await conversacionPermitida(supabase, id, u))) return { error: "Esa conversación no existe o no es de tu área." };
   const n = Math.min(8, Math.max(1, Math.floor(Number(cantidad)) || 3));
-  const [r, ocultos] = await Promise.all([
+  // A quien tiene solo Atención no le salen los mensajes eliminados en WhatsApp ni lo de antes de que se borrara el chat (`pierdeLoBorrado`).
+  const sinBorrados = pierdeLoBorrado(accesoCrm(u));
+  const [r, ocultos, eliminados, corte] = await Promise.all([
     supabase.from("whatsapp_mensajes").select("id, direccion, tipo, texto, momento").eq("conversacion_id", id).order("momento", { ascending: false }).limit(n + 6),
     mensajesOcultos(supabase, id),
+    sinBorrados ? mensajesEliminadosEnWhatsapp(supabase, id) : Promise.resolve(new Set<string>()),
+    sinBorrados ? corteDeBorradoEnApp(supabase, id) : Promise.resolve(null),
   ]);
   if (r.error) return { error: "No se pudieron leer los mensajes." };
   const mensajes: VistaPreviaMensaje[] = (r.data ?? [])
-    .filter((m) => !ocultos.has(m.id as string))
+    .filter((m) => !ocultos.has(m.id as string) && (!sinBorrados || mensajeVisibleParaAtencion({ id: m.id as string, momento: m.momento as string }, eliminados, corte)))
     .slice(0, n)
     .reverse()
     .map((m) => {
@@ -125,7 +130,7 @@ export async function abrirConversacion(id: string): Promise<{ mensajes: Mensaje
   const c = await conversacionPermitida(supabase, id, u);
   if (!c) return { error: "Esa conversación no existe o no es de tu área." };
   if (!supervisaArea(accesoCrm(u), c.area)) await supabase.from("whatsapp_conversaciones").update({ no_leidos: 0 }).eq("id", id).gt("no_leidos", 0);
-  return cargarConversacion(supabase, id, c.dropshipperId);
+  return cargarConversacion(supabase, id, c.dropshipperId, undefined, undefined, pierdeLoBorrado(accesoCrm(u)));
 }
 
 /** «Ver mensajes anteriores»: los 300 de antes de `antesDe` (un chat importado del celular puede tener años de mensajes). */
@@ -135,7 +140,7 @@ export async function mensajesAnteriores(id: string, antesDe: string): Promise<{
   if (Number.isNaN(Date.parse(String(antesDe)))) return { error: "Fecha no válida." };
   const supabase = createServiceClient();
   if (!(await conversacionPermitida(supabase, id, u))) return { error: "Esa conversación no existe o no es de tu área." };
-  const { mensajes, hayAnteriores } = await cargarConversacion(supabase, id, null, new Date(antesDe).toISOString());
+  const { mensajes, hayAnteriores } = await cargarConversacion(supabase, id, null, new Date(antesDe).toISOString(), undefined, pierdeLoBorrado(accesoCrm(u)));
   return { mensajes, hayAnteriores };
 }
 

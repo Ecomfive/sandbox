@@ -9,7 +9,7 @@ import { Seccion } from "@/components/ui/seccion-ficha";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
-import { ActualizarIcon, CerrarIcon, CheckIcon, ComprasIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, InteligenciaIcon, InventarioIcon, LapizIcon, MargenIcon, PapeleraIcon, ProductoIcon, ArchivarIcon, FotosIcon, PausaIcon, ReactivarIcon, ApagarIcon, CandadoIcon } from "@/lib/nav-icons";
+import { ActualizarIcon, CerrarIcon, CheckIcon, ComprasIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, InteligenciaIcon, InventarioIcon, LapizIcon, MargenIcon, PapeleraIcon, ProductoIcon, ArchivarIcon, FotosIcon, PausaIcon, ReactivarIcon, ApagarIcon, CandadoAbiertoIcon, CandadoIcon } from "@/lib/nav-icons";
 import {
   ESTADOS_PUBLICACION,
   fulfillmentFijo,
@@ -25,7 +25,7 @@ import { EnCaminoProducto } from "../producto/en-camino-producto";
 import { detalleCompuesto } from "@/lib/compras/en-camino";
 import type { OpcionesCrear } from "@/lib/publicaciones/crear-dropi";
 import { BotonAccionApagado } from "./boton-icono-fila";
-import { motivoApagar, motivoArchivar, motivoPausar, motivoPrivatizar, motivoRepublicar } from "@/lib/publicaciones/botones-fila";
+import { motivoApagar, motivoArchivar, motivoPausar, motivoPrivatizar, motivoQuitarPrivatizacion, motivoRepublicar } from "@/lib/publicaciones/botones-fila";
 import { actualizarPublicacion, archivarPublicacion, eliminarPublicacion, pausarPublicacion, publicarEnDropi, republicarPublicacion } from "./actions";
 import { DatosParaDropi } from "./datos-para-dropi";
 import { ActividadPublicacion } from "./actividad-publicacion";
@@ -460,12 +460,19 @@ function ContenidoFicha({
               {/* «Apagar en Dropi»: sacar el stock y archivar allá, con sus privadas a elección. Queda pendiente para «Aplicar en Dropi». */}
               {!sinGuardar && puedeArchivar && !p.sinPublicar &&
                 (puedeApagar(p) ? <BotonApagarDropi p={p} deshabilitado={pendiente} /> : <BotonAccionApagado icono={ApagarIcon} texto="Apagar en Dropi" motivo={motivoApagar(botones) ?? "No disponible"} />)}
-              {/* «Privatizar en Dropi»: dejarle unidades de este producto a un solo dropshipper, en un producto privado nuevo. */}
+              {/* El candado: abierto en un público («Privatizar en Dropi», a un solo dropshipper en un producto privado nuevo); cerrado en un privado
+                  («Quitar privatización», 30 oct 2026: sus unidades vuelven al público). */}
               {!sinGuardar && puedeArchivar && !p.sinPublicar &&
-                (puedePrivatizar(p) ? (
+                (p.tipoDropi === "privado" ? (
+                  motivoQuitarPrivatizacion(botones) === null ? (
+                    <BotonPrivatizarDropi p={p} deshabilitado={pendiente} />
+                  ) : (
+                    <BotonAccionApagado icono={CandadoIcon} texto="Quitar privatización" motivo={motivoQuitarPrivatizacion(botones) ?? "No disponible"} />
+                  )
+                ) : puedePrivatizar(p) ? (
                   <BotonPrivatizarDropi p={p} deshabilitado={pendiente} />
                 ) : (
-                  <BotonAccionApagado icono={CandadoIcon} texto="Privatizar en Dropi" motivo={motivoPrivatizar(botones) ?? "No disponible"} />
+                  <BotonAccionApagado icono={CandadoAbiertoIcon} texto="Privatizar en Dropi" motivo={motivoPrivatizar(botones) ?? "No disponible"} />
                 ))}
               {!sinGuardar && puedeArchivar && !p.sinPublicar &&
                 (estaPausada ? (

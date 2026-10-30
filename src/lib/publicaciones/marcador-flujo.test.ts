@@ -25,7 +25,7 @@ function productoBase(id: number, extra: Obj = {}): Obj {
 }
 
 /** Un Dropi de mentira con las rutas que usa el favorito. */
-function crearDropi(opciones: { usuarios?: Record<string, Obj>; fallaAsignar?: boolean; stockAlCrear?: boolean; noArchiva?: boolean; categorias?: Obj[]; fallaCrear?: boolean; respuestaCrear?: "sinId" | "anidado"; fotos?: "rechaza" | "soloXAuth" | "fallaLaPrincipal"; cdnSinCache?: boolean; cdnBloqueado?: boolean } = {}) {
+function crearDropi(opciones: { usuarios?: Record<string, Obj>; fallaAsignar?: boolean; stockAlCrear?: boolean; noArchiva?: boolean; categorias?: Obj[]; fallaCrear?: boolean; respuestaCrear?: "sinId" | "anidado"; fotos?: "rechaza" | "soloXAuth" | "fallaLaPrincipal"; cdnSinCache?: boolean; cdnBloqueado?: boolean; fallaPutDe?: number } = {}) {
   const productos = new Map<number, Obj>();
   const llamadas: string[] = [];
   const garantias = new Map<number, Obj[]>();
@@ -71,6 +71,7 @@ function crearDropi(opciones: { usuarios?: Record<string, Obj>; fallaAsignar?: b
       return responder(opciones.respuestaCrear === "anidado" ? { product: { id } } : { id });
     }
     if (metodo === "PUT" && m && !m[2]) {
+      if (opciones.fallaPutDe === Number(m[1])) return responder({ isSuccess: false, message: "Error al guardar" }, 500);
       const p = productos.get(Number(m[1]))!;
       // «Productos privados»: la reserva nueva (`change`) se agrega; una con `deleted_at` y `change` se quita; no se puede reservar más que el stock.
       const reservas = (cuerpo!.private_product_inventories as Obj[] | undefined) ?? [];
@@ -564,6 +565,52 @@ test("apagar un privado: la reserva del correo se quita (va marcada como quitada
   assert.deepEqual(d.stockDe(privado), { 81: 0 });
   assert.ok((privado.private_product_inventories as Obj[]).every((x) => x.deleted_at));
   assert.equal(privado.archived, true);
+});
+
+test("quitar privatización: las unidades del privado vuelven al público, se quita el correo y el privado queda archivado", async () => {
+  const d = crearDropi({ usuarios: { "maria@correo.com": maria } });
+  d.productos.set(8406, publicoVeganic());
+  await aplicar(d, [{ ...base, id: "v1", tipo: "privatizar", producto: 8406, datos: privatizacion }]);
+  assert.deepEqual(d.stockDe(d.productos.get(8406)!), { 81: 250 });
+  const [r] = await aplicar(d, [{ ...base, id: "q1", tipo: "apagar", producto: 9001, quitarPrivados: true, datos: { publico: 8406, publicacionId: null, unidades: null, devuelto: false } }]);
+  assert.equal(r.ok, true, String(r.error));
+  assert.equal(r.archivado, true);
+  assert.equal(r.devuelto, true);
+  assert.deepEqual(r.unidades, { 81: 50 });
+  assert.deepEqual(d.stockDe(d.productos.get(8406)!), { 81: 300 }, "el público recupera las 50");
+  const privado = d.productos.get(9001)!;
+  assert.deepEqual(d.stockDe(privado), { 81: 0 });
+  assert.ok((privado.private_product_inventories as Obj[]).every((x) => x.deleted_at));
+  assert.equal(privado.archived, true);
+});
+
+test("quitar privatización: si no se pudo devolver, el reintento devuelve lo anotado una sola vez", async () => {
+  const d = crearDropi({ usuarios: { "maria@correo.com": maria } });
+  d.productos.set(8406, publicoVeganic());
+  await aplicar(d, [{ ...base, id: "v1", tipo: "privatizar", producto: 8406, datos: privatizacion }]);
+  const falla = crearDropi({ fallaPutDe: 8406 });
+  falla.productos.set(8406, d.productos.get(8406)!);
+  falla.productos.set(9001, d.productos.get(9001)!);
+  const datos = { publico: 8406, publicacionId: null, unidades: null, devuelto: false };
+  const [r1] = await aplicar(falla, [{ ...base, id: "q1", tipo: "apagar", producto: 9001, quitarPrivados: true, datos }]);
+  assert.equal(r1.ok, false);
+  assert.match(String(r1.error), /no se le pudieron devolver las unidades al 8406/);
+  assert.deepEqual(r1.unidades, { 81: 50 }, "las unidades sacadas vuelven anotadas aunque falle");
+  assert.equal(r1.devuelto, false);
+  assert.deepEqual(falla.stockDe(falla.productos.get(9001)!), { 81: 0 });
+  assert.deepEqual(falla.stockDe(falla.productos.get(8406)!), { 81: 250 });
+  // El reintento (con lo que guardó el sistema): el privado ya está en cero, igual devuelve las 50.
+  const bien = crearDropi();
+  bien.productos.set(8406, falla.productos.get(8406)!);
+  bien.productos.set(9001, falla.productos.get(9001)!);
+  const [r2] = await aplicar(bien, [{ ...base, id: "q1", tipo: "apagar", producto: 9001, quitarPrivados: true, datos: { ...datos, unidades: r1.unidades } }]);
+  assert.equal(r2.ok, true, String(r2.error));
+  assert.equal(r2.devuelto, true);
+  assert.deepEqual(bien.stockDe(bien.productos.get(8406)!), { 81: 300 });
+  // Otro reintento con lo ya devuelto (por ejemplo, Dropi no dejó archivar): no suma de nuevo.
+  const [r3] = await aplicar(bien, [{ ...base, id: "q1", tipo: "apagar", producto: 9001, quitarPrivados: true, datos: { ...datos, unidades: r1.unidades, devuelto: true } }]);
+  assert.equal(r3.ok, true, String(r3.error));
+  assert.deepEqual(bien.stockDe(bien.productos.get(8406)!), { 81: 300 });
 });
 
 test("stock: deja la bodega con las unidades pedidas (entrada o salida), lo comprueba y devuelve las bodegas releídas", async () => {

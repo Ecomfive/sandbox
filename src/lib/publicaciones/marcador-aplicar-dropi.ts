@@ -15,6 +15,7 @@
  * Un cambio de tipo «apagar» (23 oct 2026, migración 0148; `apagar`, con `APAGAR_JS`) hace lo que Nicole a mano: saca todo el stock
  * (concepto «stock»), con `quitarPrivados` quita la privatización, comprueba que quedó en cero e intenta archivar. Si Dropi no deja
  * archivar (órdenes pendientes) devuelve `ok: true, archivado: false`: queda pendiente y el próximo «Aplicar en Dropi» solo repite el archivado.
+ * Con `datos` («Quitar privatización», 30 oct 2026) es el apagado de un privado que, antes de archivarlo, le devuelve sus unidades al público.
  *
  * Un cambio de tipo «privatizar» (26 oct 2026, migración 0155; `privatizar`, con `PRIVATIZAR_JS`) deja un producto a un solo dropshipper: comprueba
  * su correo en Dropi, crea el producto privado (copia del público), le pone fotos, garantías y stock, se lo asigna en «Productos privados» y le
@@ -135,18 +136,28 @@ const CODIGO = [
   "var a=await pedir('/products/'+c.producto);if(!a.ok)return{ok:false,error:motivo(a)};",
   "var o=a.j&&a.j.objects;if(!o||Number(o.id)!==Number(c.producto))return{ok:false,error:'Dropi no devolvió el producto.'};",
   "if(Number(o.user_id)!==Number(L.id))return{ok:false,error:'Ese producto no es de este proveedor en Dropi.'};",
-  "var p=apagado(o,bp,c.quitarPrivados===true);if(p.error)return{ok:false,error:p.error};",
-  "if(p.cuerpo){var g=await pedir('/products/'+c.producto,'PUT',p.cuerpo);if(!g.ok)return{ok:false,error:motivo(g)};",
-  "var d=await pedir('/products/'+c.producto),n=d.j&&d.j.objects;if(!d.ok||!n)return{ok:false,error:'Se guardó, pero no se pudo comprobar en Dropi.'};",
-  "var sn=stockDe(n),tv=0,k;for(k in sn)tv+=sn[k];if(tv>0)return{ok:false,error:'Dropi sigue mostrando '+tv+' unidades de stock.'};",
-  "if(c.quitarPrivados===true&&(Array.isArray(n.private_product_inventories)?n.private_product_inventories:[]).some(function(x){return!x.deleted_at}))return{ok:false,error:'Dropi no quitó la privatización: quítala a mano en «Productos privados».'};",
+  // «Quitar privatización» (30 oct 2026): `c.datos` dice a qué público se le devuelven las unidades del privado. Se anotan al sacarlas (`du`, o las
+  // que anotó un intento anterior) y vuelven en cada respuesta con `devuelto`, así el sistema las guarda y un reintento no las devuelve dos veces.
+  "var dv=c.datos&&Number(c.datos.publico)>0?c.datos:null,du=dv&&dv.unidades&&typeof dv.unidades==='object'?dv.unidades:null,hecho=!!(dv&&dv.devuelto===true);",
+  "var R=function(x){if(dv){x.unidades=du;x.devuelto=hecho}return x};",
+  "var p=apagado(o,bp,c.quitarPrivados===true);if(p.error)return R({ok:false,error:p.error});",
+  "if(p.cuerpo){var su=dv&&!du&&!hecho?stockDe(o):null;var g=await pedir('/products/'+c.producto,'PUT',p.cuerpo);if(!g.ok)return R({ok:false,error:motivo(g)});if(su)du=su;",
+  "var d=await pedir('/products/'+c.producto),n=d.j&&d.j.objects;if(!d.ok||!n)return R({ok:false,error:'Se guardó, pero no se pudo comprobar en Dropi.'});",
+  "var sn=stockDe(n),tv=0,k;for(k in sn)tv+=sn[k];if(tv>0)return R({ok:false,error:'Dropi sigue mostrando '+tv+' unidades de stock.'});",
+  "if(c.quitarPrivados===true&&(Array.isArray(n.private_product_inventories)?n.private_product_inventories:[]).some(function(x){return!x.deleted_at}))return R({ok:false,error:'Dropi no quitó la privatización: quítala a mano en «Productos privados».'});",
   "o=n}",
-  "if(o.archived)return{ok:true,archivado:true};",
+  "if(dv&&du&&!hecho){var tu=0,kd;for(kd in du)tu+=Number(du[kd])||0;if(tu>0){",
+  "var pa=await pedir('/products/'+dv.publico),po=pa.j&&pa.j.objects;if(!pa.ok||!po||Number(po.id)!==Number(dv.publico))return R({ok:false,error:'Se quitó la privatización, pero no se pudo leer el público '+dv.publico+': '+motivo(pa)});",
+  "if(Number(po.user_id)!==Number(L.id))return R({ok:false,error:'El público '+dv.publico+' no es de este proveedor en Dropi.'});",
+  "var me=mover(po,bp,du,'Privatización quitada del ID '+c.producto);if(me.error)return R({ok:false,error:'No se le pudieron devolver las unidades al '+dv.publico+': '+me.error});",
+  "var pp=await pedir('/products/'+dv.publico,'PUT',me.cuerpo);if(!pp.ok)return R({ok:false,error:'Se quitó la privatización, pero no se le pudieron devolver las unidades al '+dv.publico+': '+motivo(pp)})}",
+  "hecho=true}",
+  "if(o.archived)return R({ok:true,archivado:true});",
   "var ar=await pedir('/products/'+c.producto+'/archiveProduct','POST',{});",
-  "if(!ar.ok)return{ok:true,archivado:false,error:'Sin stock en Dropi, pero no dejó archivarlo: '+motivo(ar)+' Si tiene órdenes pendientes, se reintenta en el próximo Aplicar en Dropi.'};",
+  "if(!ar.ok)return R({ok:true,archivado:false,error:'Sin stock en Dropi, pero no dejó archivarlo: '+motivo(ar)+' Si tiene órdenes pendientes, se reintenta en el próximo Aplicar en Dropi.'});",
   "var v=await pedir('/products/'+c.producto),w=v.j&&v.j.objects;",
-  "if(v.ok&&w&&!w.archived)return{ok:true,archivado:false,error:'Se pidió archivarlo, pero Dropi todavía no lo muestra archivado.'};",
-  "return{ok:true,archivado:true}}",
+  "if(v.ok&&w&&!w.archived)return R({ok:true,archivado:false,error:'Se pidió archivarlo, pero Dropi todavía no lo muestra archivado.'});",
+  "return R({ok:true,archivado:true})}",
   // ¿La galería del producto ya tiene una foto con ese nombre? (Dropi antepone un número al nombre del archivo: se compara el final.)
   "function tiene(n,nom){var k=ck(nom);return fotosDe(n).some(function(g){return ck(g.nombre)===k})}",
   // Sube a un producto las fotos que le falten; devuelve cuántas no se pudieron subir.

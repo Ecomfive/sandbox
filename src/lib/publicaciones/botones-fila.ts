@@ -45,6 +45,15 @@ export function motivoPrivatizar(e: EstadoBotones): string | null {
   );
 }
 
+/**
+ * El candado cerrado de un ID privado (30 oct 2026): quitarle la privatización (y devolver sus unidades al público). Con un apagado pendiente se
+ * usa para deshacerlo, como «Apagar».
+ */
+export function motivoQuitarPrivatizacion(e: EstadoBotones): string | null {
+  if (e.apagadoPendiente && !e.duplicada) return null;
+  return comun(e) ?? (e.archivada || e.archivadaEnDropi ? "Está archivada" : esBodegaDropi(e.bodegaId) ? B280 : null);
+}
+
 /** Con un apagado pendiente el botón se usa para deshacerlo. */
 export function motivoApagar(e: EstadoBotones): string | null {
   if (e.apagadoPendiente) return null;

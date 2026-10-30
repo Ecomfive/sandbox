@@ -1171,6 +1171,16 @@ export function CandadoIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+/** El candado abierto: un ID público, que se puede privatizar (el cerrado es un privado, que se le quita la privatización). */
+export function CandadoAbiertoIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <rect x="5" y="11" width="14" height="9" rx="2" />
+      <path d="M8 11V8a4 4 0 0 1 7.75-1.4" />
+    </Icon>
+  );
+}
+
 /** Los controles deslizantes: «Afinar» lo que ve un rol o una persona dentro de un módulo. */
 export function AfinarIcon(props: SVGProps<SVGSVGElement>) {
   return (

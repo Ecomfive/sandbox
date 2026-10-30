@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { accesoCrm, supervisaArea } from "@/lib/crm/areas";
+import { accesoCrm, supervisaArea, pierdeLoBorrado } from "@/lib/crm/areas";
 import { createServiceClient } from "@/lib/supabase/server";
 import { cargarBandeja, cargarConversacion, conversacionPermitida, usuarioBandeja } from "@/app/(app)/crm-dropshippers/bandeja/datos-bandeja";
 
@@ -27,7 +27,7 @@ export async function POST(request: Request) {
   let chat = null;
   if (c) {
     const [conversacion] = await Promise.all([
-      cargarConversacion(supabase, c.id, c.dropshipperId, undefined, MENSAJES_DEL_REFRESCO),
+      cargarConversacion(supabase, c.id, c.dropshipperId, undefined, MENSAJES_DEL_REFRESCO, pierdeLoBorrado(accesoCrm(u))),
       supervisaArea(accesoCrm(u), c.area) ? null : supabase.from("whatsapp_conversaciones").update({ no_leidos: 0 }).eq("id", c.id).gt("no_leidos", 0),
     ]);
     chat = { id: c.id, mensajes: conversacion.mensajes, dropshipper: conversacion.dropshipper };
