@@ -11,14 +11,18 @@ import type { AreaCrm } from "@/lib/crm/areas";
 export async function contarSinResponder(supabase: SupabaseClient, areas: AreaCrm[], sinBorrados = false): Promise<number> {
   const { data, error } = await supabase
     .from("whatsapp_conversaciones")
-    .select("id, ultimo_mensaje_en")
+    .select("id, telefono, ultimo_mensaje_en")
     .eq("estado", "abierta")
     .or("no_leidos.gt.0,ultimo_de.eq.entrante")
     .in("area", areas)
     .limit(2000);
   if (error) return 0;
   const ocultas = await conversacionesOcultas(supabase);
-  let chats = (data ?? []).filter((c) => !ocultas.has(c.id as string));
+  // El chat interno entre las áreas (el teléfono es otro número de la empresa) no es un cliente que espera respuesta.
+  const digitos = (t: unknown) => String(t ?? "").replace(/\D/g, "");
+  const { data: numeros } = await supabase.from("whatsapp_numeros").select("numero");
+  const deLaEmpresa = new Set((numeros ?? []).map((n) => digitos(n.numero)).filter((d) => d.length >= 7));
+  let chats = (data ?? []).filter((c) => !ocultas.has(c.id as string) && !deLaEmpresa.has(digitos(c.telefono)));
   if (sinBorrados && chats.length) {
     // Sin la columna (migración 0171) la consulta falla y no se descuenta nada.
     const marcadas = await supabase.from("whatsapp_conversaciones").select("id, borrada_en_app_en").not("borrada_en_app_en", "is", null);

@@ -94,6 +94,8 @@ export interface MensajeVista {
   autorCargo: string | null;
   /** La foto del autor en el sistema (Usuarios), para su globito. */
   autorFoto: string | null;
+  /** Quién lo escribió (su id): en el chat interno decide de qué lado va cada mensaje. */
+  autorId?: string | null;
   momento: string;
   /** Vino de un chat exportado desde el celular («Importar chat», wa_id «import:…»), no por el webhook. */
   importado: boolean;
@@ -107,6 +109,8 @@ export interface MensajeVista {
   reaccionA?: string | null;
   /** Su autor lo editó en WhatsApp (migración 0191): el texto ya es el nuevo y se marca «editado». */
   editado?: boolean;
+  /** En un audio, lo que dice, ya transcrito con la IA (migración 0200); null hasta que alguien lo transcribe. */
+  transcripcion?: string | null;
 }
 
 /** Un mensaje de la vista previa que se despliega al pasar el cursor por la lista de chats. */
@@ -395,14 +399,17 @@ export async function cargarConversacion(
     // Los que su autor borró «para todos» en WhatsApp (migración 0171): se muestran con su marca. Sin la columna, ninguno.
     supabase.from("whatsapp_mensajes").select("id").eq("conversacion_id", id).not("eliminado_en_whatsapp_en", "is", null),
   ]);
-  const [ocultos, pendientes, reaccionesR, editadosR] = await Promise.all([
+  const [ocultos, pendientes, reaccionesR, editadosR, transcritosR] = await Promise.all([
     mensajesOcultos(supabase, id),
     borradosPendientes(supabase),
     // A qué mensaje va cada reacción (migración 0186), aparte: sin la columna la conversación se carga igual.
     supabase.from("whatsapp_mensajes").select("id, reaccion_a").eq("conversacion_id", id).eq("tipo", "reaccion").not("reaccion_a", "is", null),
     // Los que su autor editó en WhatsApp (migración 0191), aparte: sin la columna ninguno sale marcado.
     supabase.from("whatsapp_mensajes").select("id").eq("conversacion_id", id).not("editado_en", "is", null),
+    // Los audios ya transcritos (migración 0200), aparte: sin la columna ninguno sale con texto.
+    supabase.from("whatsapp_mensajes").select("id, transcripcion").eq("conversacion_id", id).eq("tipo", "audio").not("transcripcion", "is", null),
   ]);
+  const transcripciones = new Map((transcritosR.error ? [] : (transcritosR.data ?? [])).map((x) => [x.id as string, x.transcripcion as string]));
   const editados = new Set((editadosR.error ? [] : (editadosR.data ?? [])).map((x) => x.id as string));
   const reaccionA = new Map((reaccionesR.error ? [] : (reaccionesR.data ?? [])).map((x) => [x.id as string, x.reaccion_a as string]));
   const eliminados = new Set((eliminadosR.error ? [] : (eliminadosR.data ?? [])).map((x) => x.id as string));
@@ -427,6 +434,7 @@ export async function cargarConversacion(
       autor: (m.autor_nombre as string | null) ?? null,
       autorCargo: (m.autor_id && cargos.get(m.autor_id as string)) || null,
       autorFoto: (m.autor_id && fotos.get(m.autor_id as string)) || null,
+      autorId: (m.autor_id as string | null) ?? null,
       momento: m.momento as string,
       importado: String(m.wa_id ?? "").startsWith("import:"),
       eliminadoEnWhatsapp: eliminados.has(m.id as string),
@@ -434,6 +442,7 @@ export async function cargarConversacion(
       waId: (m.wa_id as string | null) ?? null,
       reaccionA: reaccionA.get(m.id as string) ?? null,
       editado: editados.has(m.id as string),
+      transcripcion: transcripciones.get(m.id as string) ?? null,
     }))
     .reverse();
   const d = dsR.data as {

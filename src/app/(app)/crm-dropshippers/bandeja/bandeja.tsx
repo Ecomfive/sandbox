@@ -19,10 +19,11 @@ import type { ConversacionVista, DatosBandeja, MensajeVista, ResumenDropshipper,
 import { guardarColorEtiquetaChat, guardarEtiquetasChat } from "./etiquetas-actions";
 import { PastillaTipo } from "../tipo-cliente";
 import { VendeEnChat } from "./vende-en";
-import { abrirChatInterno } from "./interno-actions";
+import { abrirChatInterno, enviarMensajeInterno } from "./interno-actions";
 import { BotonWhatsappInterno } from "./interno";
 import { colorFoto, iniciales } from "./globo-persona";
 import { EtiquetasChat, PastillasEtiquetas, SelectorEtiquetasChat, type ManejoEtiquetas } from "./etiquetas-chat";
+import { transcribirAudio } from "./transcripcion-actions";
 import { BotonBarra, DatosEnLaCabecera, FichaDelChat, type AccionExtra } from "./ficha-chat";
 import { reaccionarAMensaje } from "./reaccion-actions";
 import { VistaPreviaChat } from "./vista-previa-chat";
@@ -259,8 +260,51 @@ function EtiquetaArea({ area }: { area: AreaCrm }) {
   );
 }
 
+/**
+ * La transcripción de un audio (30 oct 2026, pedido de Jhokser): si ya la tiene, el texto bajo el audio; si no y se puede, el botón «Transcribir», que pide la
+ * transcripción a la IA (cuesta un poco de crédito: queda guardada para todos y no se vuelve a pagar).
+ */
+function TranscripcionAudio({ m, puede }: { m: MensajeVista; puede: boolean }) {
+  const [texto, setTexto] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [transcribiendo, empezar] = useTransition();
+  const actual = m.transcripcion ?? texto;
+  if (actual)
+    return (
+      <span className="mt-1 mb-0.5 block max-w-[34ch] border-l-2 border-[var(--wa-acento)] pl-2 text-[13.5px] leading-[18px]">
+        <span className="block text-[11.5px] font-semibold text-[var(--wa-sec)]">Transcripción</span>
+        <span className="whitespace-pre-wrap break-words">{actual}</span>
+      </span>
+    );
+  if (!puede) return null;
+  return (
+    <span className="mt-0.5 mb-0.5 flex flex-col items-start gap-0.5">
+      <button
+        type="button"
+        disabled={transcribiendo}
+        onClick={() =>
+          empezar(async () => {
+            setError(null);
+            const r = await transcribirAudio(m.id).catch(() => ({ error: "No se pudo transcribir." }));
+            if ("error" in r) setError(r.error);
+            else setTexto(r.texto);
+          })
+        }
+        className={`rounded text-[12.5px] font-medium text-[var(--wa-acento)] hover:underline disabled:opacity-60 ${anilloFoco}`}
+      >
+        {transcribiendo ? "Transcribiendo…" : "Transcribir"}
+      </button>
+      {error && (
+        <span role="alert" className="text-[12px] text-destructive">
+          {error}
+        </span>
+      )}
+    </span>
+  );
+}
+
 /** El contenido de un mensaje: su texto y, si trae un archivo, la foto, el audio, el video o el enlace para bajarlo. */
-function Contenido({ m }: { m: MensajeVista }) {
+function Contenido({ m, puedeTranscribir = false }: { m: MensajeVista; puedeTranscribir?: boolean }) {
   const src = `/api/whatsapp/media/${m.id}`;
   // Una foto se abre en un visor sobre la misma página (centrada, con su texto y «Descargar»), no en una pestaña con la imagen suelta.
   const [ampliada, setAmpliada] = useState(false);
@@ -277,6 +321,7 @@ function Contenido({ m }: { m: MensajeVista }) {
       )}
       {m.conArchivo && m.tipo === "sticker" && <img src={src} alt="Sticker" loading="lazy" className="h-28 w-28 object-contain" />}
       {m.conArchivo && m.tipo === "audio" && <audio controls preload="none" src={src} className="max-w-full" />}
+      {m.conArchivo && m.tipo === "audio" && <TranscripcionAudio m={m} puede={puedeTranscribir} />}
       {m.conArchivo && m.tipo === "video" && m.mediaNombre?.startsWith("gif-") && <video autoPlay loop muted playsInline preload="auto" src={src} aria-label="GIF" className="max-h-60 max-w-full rounded-md" />}
       {m.conArchivo && m.tipo === "video" && !m.mediaNombre?.startsWith("gif-") && <video controls preload="none" src={src} className="max-h-72 max-w-full rounded-md" />}
       {m.conArchivo && m.tipo === "documento" && (
@@ -668,9 +713,11 @@ export function Bandeja({
   }, [ultimoEntranteSel]);
   // Supervisión: un chat de otro panel se mira sin dejar rastro; para responderle al dropshipper hay que «Intervenir» (queda a su cargo).
   const supervisando = !!sel && sel.area !== miArea;
-  const mirando = supervisando && sel?.asignadaAId !== miId;
-  const esNota = modo === "nota" || mirando;
-  const bloqueado = !escribe || (!esNota && !ventana);
+  // El chat interno (entre las áreas) va por notas dentro del sistema, no por WhatsApp: no hay ventana de 24 h, ni plantillas, ni supervisión, ni «Nota privada».
+  const esInterno = !!sel?.interno;
+  const mirando = !esInterno && supervisando && sel?.asignadaAId !== miId;
+  const esNota = !esInterno && (modo === "nota" || mirando);
+  const bloqueado = !escribe || (!esNota && !esInterno && !ventana);
   const mensajes = chat && sel && chat.id === sel.id ? chat.mensajes : null;
   // Las reacciones no son mensajes sueltos: van sobre el mensaje al que se reaccionó, como en WhatsApp (29 oct 2026).
   const conReacciones = mensajes ? agruparReacciones(mensajes) : null;
@@ -694,6 +741,7 @@ export function Bandeja({
   function soltarArchivos(lista: FileList) {
     const f = lista[0];
     if (!f || !sel) return;
+    if (sel.interno) return mostrarToast("En el chat interno solo se escriben mensajes de texto.", "destructive");
     if (mirando) return mostrarToast("Estás supervisando este chat: para mandarle un archivo, toca «Intervenir».", "destructive");
     if (!escribe) return mostrarToast("No tienes permiso para escribir en este chat.", "destructive");
     if (!ventana) return mostrarToast("Pasaron más de 24 h desde su último mensaje: por WhatsApp solo se le puede escribir con una plantilla aprobada.", "destructive");
@@ -723,9 +771,12 @@ export function Bandeja({
    * `reemplaza`: el que falló y se reintenta.
    */
   function enviarTexto(chatId: string, texto: string, nota: boolean, reemplaza?: string) {
+    // En un chat interno el mensaje se guarda como nota en las dos áreas (sin pasar por WhatsApp).
+    const interno = !!datos.conversaciones.find((c) => c.id === chatId)?.interno;
     const local: MensajeVista = {
       id: idLocal(),
-      direccion: nota ? "nota" : "saliente",
+      autorId: interno ? miId : null,
+      direccion: nota || interno ? "nota" : "saliente",
       tipo: "texto",
       texto: texto.trim(),
       mediaNombre: null,
@@ -741,7 +792,7 @@ export function Bandeja({
       borradoPendiente: false,
     };
     setChat((c) => (c && c.id === chatId ? { ...c, mensajes: [...c.mensajes.filter((m) => m.id !== reemplaza), local] } : c));
-    void (nota ? notaWhatsapp(chatId, texto) : enviarWhatsapp(chatId, texto))
+    void (interno ? enviarMensajeInterno(chatId, texto) : nota ? notaWhatsapp(chatId, texto) : enviarWhatsapp(chatId, texto))
       .catch(() => ({ error: "No se pudo. Inténtalo de nuevo." }))
       .then((r) => {
         if ("error" in r) mostrarToast(r.error, "destructive");
@@ -1500,7 +1551,7 @@ export function Bandeja({
               </span>
               <DatosEnLaCabecera sel={sel} ficha={fichaDelChat} respondieron={quienesRespondieron(mensajes ?? [])} alGuardarCrm={() => setVersionCrm((v) => v + 1)} />
               <EtiquetaArea area={sel.area} />
-              {sel.interno && <span className="rounded-full bg-azul-soft px-2 py-px text-[11.5px] font-semibold text-azul">WhatsApp interno</span>}
+              {sel.interno && <span className="rounded-full bg-azul-soft px-2 py-px text-[11.5px] font-semibold text-azul">Chat interno</span>}
               {/* Dónde vende (29 oct 2026, pedido de Alcides): sus plataformas por país, puestas a mano o de sus cuentas; y los países de su ficha que aún no tienen plataforma. */}
               <VendeEnChat
                 key={`vende-${sel.id}`}
@@ -1620,7 +1671,12 @@ export function Bandeja({
                   </div>
                 )}
                 <div ref={chatRef} className="bandeja-wa-chat flex flex-1 flex-col overflow-y-auto px-[5%] pt-3 pb-2">
-                  {enNavegador && (
+                  {esInterno && (
+                    <p className="m-0 mb-2 max-w-[560px] self-center rounded-lg bg-[var(--wa-aviso)] px-3 py-1.5 text-center text-[12.5px] text-[var(--wa-sec)] shadow-[0_1px_0.5px_var(--wa-sombra)]">
+                      Chat interno: se escribe aquí, dentro del sistema. No sale por WhatsApp, así que no hay ventana de 24 h ni plantillas.
+                    </p>
+                  )}
+                  {enNavegador && !esInterno && (
                     <>
                       <p
                         className={`m-0 mb-2 max-w-[560px] self-center rounded-lg px-3 py-1.5 text-center text-[12.5px] shadow-[0_1px_0.5px_var(--wa-sombra)] ${
@@ -1678,6 +1734,8 @@ export function Bandeja({
                           <Burbuja
                             m={m}
                             seguido={seguido}
+                            interna={esInterno ? { miId } : undefined}
+                            puedeTranscribir={escribe && !esLocal(m)}
                             reacciones={conReacciones?.reacciones.get(m.id)}
                             alPedirBorrar={escribe && !mirando && !esLocal(m) ? (x) => setBorrar({ tipo: "mensaje", mensajeId: x.id, resumen: vistaPreviaTexto(x.texto) || `(${x.tipo})` }) : undefined}
                             alGuardarRapida={escribe && !mirando ? guardarComoRapida : undefined}
@@ -1705,7 +1763,7 @@ export function Bandeja({
                       </p>
                     )}
                     {/* Fuera de las 24 h el cuadro de texto está apagado: se avisa aquí mismo y se ofrecen las plantillas que Meta ya aprobó (30 oct 2026). */}
-                    {enNavegador && !ventana && escribe && !mirando && !esNota && (
+                    {enNavegador && !ventana && escribe && !mirando && !esNota && !esInterno && (
                       <PlantillasEnLinea
                         key={sel.id}
                         conversacionId={sel.id}
@@ -1720,7 +1778,7 @@ export function Bandeja({
                       />
                     )}
                     {/* Arriba, si va como mensaje o como nota privada y, escribiendo un mensaje, los mensajes rápidos: así el cuadro de texto queda ancho. */}
-                    {(!mirando || (!esNota && !bloqueado)) && (
+                    {!esInterno && (!mirando || (!esNota && !bloqueado)) && (
                       <div className="flex items-center gap-2 px-3 pt-2">
                         {!mirando && (
                           <div role="group" aria-label="Tipo de mensaje" className="flex flex-none rounded-full bg-[var(--wa-fondo)] p-[3px]">
@@ -1768,7 +1826,7 @@ export function Bandeja({
                       </div>
                     )}
                     <div className="flex items-end gap-2 px-3 py-2">
-                      {!esNota && (
+                      {!esNota && !esInterno && (
                         <>
                           <input
                             ref={inputArchivo}
@@ -1809,7 +1867,7 @@ export function Bandeja({
                           onChange={(e) => setBorrador(e.target.value)}
                           onPaste={(e) => {
                             const pegado = e.clipboardData.files[0];
-                            if (pegado && !esNota && !bloqueado && /^image\//.test(pegado.type)) {
+                            if (pegado && !esNota && !esInterno && !bloqueado && /^image\//.test(pegado.type)) {
                               e.preventDefault();
                               setArchivo(pegado);
                             }
@@ -1821,7 +1879,7 @@ export function Bandeja({
                               mandar();
                             }
                           }}
-                          placeholder={esNota ? "Nota para el equipo. El dropshipper no la ve." : ventana ? "Escribe un mensaje" : "Fuera de las 24 h: hace falta una plantilla aprobada"}
+                          placeholder={esNota ? "Nota para el equipo. El dropshipper no la ve." : esInterno ? `Escribe un mensaje para ${sel.nombre}` : ventana ? "Escribe un mensaje" : "Fuera de las 24 h: hace falta una plantilla aprobada"}
                           className={`min-h-[42px] w-full resize-none rounded-lg border-0 px-3.5 py-[10px] text-[15px] leading-[22px] outline-none placeholder:text-[var(--wa-sec)] focus-visible:ring-2 focus-visible:ring-[var(--wa-acento)] disabled:opacity-60 ${
                             esNota ? "bg-[var(--wa-nota)] text-[var(--wa-nota-texto)]" : "bg-[var(--wa-fondo)] text-[var(--wa-texto)]"
                           }`}
@@ -2137,9 +2195,15 @@ function Burbuja({
   alGuardarRapida,
   alReaccionar,
   alReintentar,
+  interna,
+  puedeTranscribir,
 }: {
   m: MensajeVista;
   seguido: boolean;
+  /** Dentro de un chat interno entre áreas: las notas se dibujan como mensajes (los míos a la derecha, los de las demás personas a la izquierda). */
+  interna?: { miId: string };
+  /** Muestra «Transcribir» en un audio (se puede escribir en el CRM y el mensaje ya está guardado). */
+  puedeTranscribir?: boolean;
   /** Reaccionar a este mensaje con un emoji (vacío = quitar la reacción del equipo); solo si se puede. */
   alReaccionar?: (emoji: string) => void;
   /** Las reacciones a este mensaje (una por lado), que se dibujan sobre su borde de abajo, como en WhatsApp. */
@@ -2157,6 +2221,30 @@ function Burbuja({
     );
   }
   const margen = seguido ? "mt-0.5" : "mt-2";
+  if (m.direccion === "nota" && interna) {
+    const mio = !!m.autorId && m.autorId === interna.miId;
+    return (
+      <div
+        className={`${margen} group relative max-w-[min(70%,560px)] rounded-lg px-2.5 pt-1.5 pb-2 text-[14.2px] leading-[19px] shadow-[0_1px_0.5px_var(--wa-sombra)] ${seguido ? "" : mio ? "rounded-tr-none" : "rounded-tl-none"} ${
+          mio ? "self-end bg-[var(--wa-saliente)]" : "self-start bg-[var(--wa-entrante)]"
+        }`}
+      >
+        {alPedirBorrar && !m.borradoPendiente && <BotonBorrarMensaje alPulsar={() => alPedirBorrar(m)} />}
+        {!mio && !seguido && (
+          <span className="mb-0.5 block text-[12.5px] font-semibold text-[var(--wa-autor)]">
+            {m.autor ?? "Alguien del equipo"}
+            {m.autorCargo && <span className="font-normal"> · {m.autorCargo}</span>}
+          </span>
+        )}
+        <Contenido m={m} />
+        <span className="float-right mt-1.5 -mb-1 ml-2.5 text-[11px] text-[var(--wa-sec)]">
+          {horaMensaje(m.momento)}
+          {m.estado === "enviando" && " · Enviando…"}
+        </span>
+        <Fallo m={m} alReintentar={alReintentar} />
+      </div>
+    );
+  }
   if (m.direccion === "nota") {
     return (
       <div className={`${margen} group relative max-w-[min(65%,560px)] self-end rounded-lg border border-dashed border-[var(--wa-nota-borde)] bg-[var(--wa-nota)] px-2.5 pt-1.5 pb-2 text-[14px] leading-[19px] text-[var(--wa-nota-texto)]`}>
@@ -2169,7 +2257,7 @@ function Burbuja({
           Nota privada{m.autor ? ` · ${m.autor}` : ""}
           {m.autor && m.autorCargo ? ` (${m.autorCargo})` : ""}
         </span>
-        <Contenido m={m} />
+        <Contenido m={m} puedeTranscribir={puedeTranscribir} />
         <span className="float-right mt-1.5 -mb-1 ml-2.5 text-[11px] text-[var(--wa-nota-acento)]">
           {horaMensaje(m.momento)}
           {m.estado === "enviando" && " · Guardando…"}
@@ -2210,7 +2298,7 @@ function Burbuja({
           {m.autorCargo && <span className="font-normal"> · {m.autorCargo}</span>}
         </span>
       )}
-      <Contenido m={m} />
+      <Contenido m={m} puedeTranscribir={puedeTranscribir} />
       {m.eliminadoEnWhatsapp && (
         <span className="mt-1 block text-[11.5px] font-medium text-[var(--wa-sec)] italic">
           {nuestro ? "Se eliminó desde la app de WhatsApp Business (Meta no dice quién). Aquí se conserva." : "Lo eliminó en WhatsApp quien lo mandó. Aquí se conserva."}
