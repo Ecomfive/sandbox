@@ -94,6 +94,8 @@ export interface MensajeVista {
   autorCargo: string | null;
   /** La foto del autor en el sistema (Usuarios), para su globito. */
   autorFoto: string | null;
+  /** Quién lo escribió (su id): en el chat interno decide de qué lado va cada mensaje. */
+  autorId?: string | null;
   momento: string;
   /** Vino de un chat exportado desde el celular («Importar chat», wa_id «import:…»), no por el webhook. */
   importado: boolean;
@@ -427,6 +429,7 @@ export async function cargarConversacion(
       autor: (m.autor_nombre as string | null) ?? null,
       autorCargo: (m.autor_id && cargos.get(m.autor_id as string)) || null,
       autorFoto: (m.autor_id && fotos.get(m.autor_id as string)) || null,
+      autorId: (m.autor_id as string | null) ?? null,
       momento: m.momento as string,
       importado: String(m.wa_id ?? "").startsWith("import:"),
       eliminadoEnWhatsapp: eliminados.has(m.id as string),

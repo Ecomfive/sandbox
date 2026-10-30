@@ -4,15 +4,16 @@ import { registrarAuditoria } from "@/lib/auditoria";
 import { accesoCrm, escribeEnArea, type AreaCrm } from "@/lib/crm/areas";
 import { normalizarTelefono } from "@/lib/crm/telefono";
 import { createServiceClient } from "@/lib/supabase/server";
-import { usuarioBandeja } from "./datos-bandeja";
+import { avisarBandeja } from "@/lib/whatsapp/aviso-bandeja";
+import { conversacionPermitida, usuarioBandeja } from "./datos-bandeja";
 
 const ES_ID = (v: unknown) => typeof v === "string" && /^[0-9a-f-]{36}$/i.test(v);
 
 /**
- * «WhatsApp interno» (29 oct 2026, pedido de Alcides): el chat entre dos números de la empresa (Atención ↔ Comercial), por WhatsApp. Es una
- * conversación del número `desde` con el número `hacia` como si fuera un contacto; la bandeja la reconoce como interna y no la cuenta como cliente.
- * Si no existe se crea. Pide poder escribir en el área del número desde el que se escribe. Pasadas 24 horas sin respuesta, se escribe con una
- * plantilla, como con cualquier contacto. Devuelve el id de la conversación.
+ * «Chat interno» (29 oct 2026, pedido de Alcides): el chat entre dos números de la empresa (Atención ↔ Comercial). Es una conversación del número `desde` con el
+ * número `hacia` como si fuera un contacto; la bandeja la reconoce como interna y no la cuenta como cliente. Si no existe se crea. Pide poder escribir en el área del
+ * número desde el que se escribe. Desde el 30 oct 2026 **no usa WhatsApp**: se escribe con `enviarMensajeInterno` (notas dentro del sistema, sin las 24 h ni las plantillas
+ * de Meta). Devuelve el id de la conversación.
  */
 export async function abrirChatInterno(desdeId: string, haciaId: string): Promise<{ id: string } | { error: string }> {
   const u = await usuarioBandeja(true);
@@ -36,4 +37,30 @@ export async function abrirChatInterno(desdeId: string, haciaId: string): Promis
   if (error || !nueva) return { error: "No se pudo abrir el chat interno." };
   await registrarAuditoria({ accion: "abrir_chat_interno", entidad: "whatsapp_conversaciones", entidadId: nueva.id as string, detalle: `${desde.nombre} → ${hacia.nombre}` });
   return { id: nueva.id as string };
+}
+
+/**
+ * Un mensaje del chat interno (30 oct 2026, pedido de Jhokser): **se guarda como nota en el sistema y no sale por WhatsApp**, así no pesan las reglas de Meta (la
+ * ventana de 24 h, las plantillas, el primer contacto, el costo y la calidad del número). `whatsapp_enviar_interno` (migración 0201) lo guarda, en una sola transacción,
+ * en las dos conversaciones del chat —la de quien escribe y su espejo en el otro número— y en la del otro lado lo cuenta como no leído. Hay que poder escribir en el
+ * área de este chat y que sea un chat entre dos números de la empresa. Devuelve el error como valor.
+ */
+export async function enviarMensajeInterno(id: string, texto: string): Promise<{ ok: true; mensajeId: string; momento: string } | { error: string }> {
+  const u = await usuarioBandeja(true);
+  if (!u) return { error: "No tienes permiso para escribir en el CRM." };
+  const cuerpo = String(texto ?? "").trim();
+  if (!cuerpo) return { error: "Escribe el mensaje." };
+  if (cuerpo.length > 4096) return { error: "El mensaje es muy largo (máximo 4096 caracteres)." };
+  const supabase = createServiceClient();
+  if (!(await conversacionPermitida(supabase, id, u, true))) return { error: "Esa conversación no existe o no es de tu área." };
+  const { data, error } = await supabase.rpc("whatsapp_enviar_interno", { p_conversacion: id, p_texto: cuerpo, p_autor_id: u.id, p_autor_nombre: u.nombre || u.email });
+  if (error) {
+    if (/no_es_chat_interno/.test(error.message)) return { error: "Este no es un chat interno." };
+    if (/whatsapp_enviar_interno|schema cache|does not exist/i.test(error.message)) return { error: "Falta correr la migración 0201 (chat interno)." };
+    return { error: "No se pudo mandar el mensaje." };
+  }
+  const fila = (Array.isArray(data) ? data[0] : data) as { o_mensaje?: string; o_momento?: string } | null;
+  if (!fila?.o_mensaje) return { error: "No se pudo mandar el mensaje." };
+  await avisarBandeja();
+  return { ok: true, mensajeId: fila.o_mensaje, momento: fila.o_momento ?? new Date().toISOString() };
 }
