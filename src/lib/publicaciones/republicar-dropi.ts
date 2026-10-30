@@ -54,6 +54,7 @@ export function armarProductoNuevo(
  */
 export const ERRORES_ANTES_DE_DROPI = [
   "Tiene variaciones",
+  "Dropi no devolvió los atributos",
   "Tiene stock en una bodega que no es de ECOMFIVE",
   "Tiene unidades privatizadas",
   "Tiene porcentajes por dropshipper",

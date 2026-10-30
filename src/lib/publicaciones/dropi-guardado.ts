@@ -3,7 +3,9 @@
 // perder. Por eso el cuerpo se arma igual que el de la pantalla a partir de lo que devuelve `GET api/products/<id>` (comprobado el
 // 22 oct 2026 atrapando el guardado de la pantalla, sin enviarlo, con el 8179 y el 7587): mismos 29 campos y en el mismo orden,
 // precios y medidas como números, y en `warehouselected` las bodegas del producto y después las del proveedor. Solo se cambian el
-// nombre y el nombre de la guía de envío. Un producto con variaciones no se toca (su pantalla manda atributos que aquí no se arman).
+// nombre y el nombre de la guía de envío. Un producto con variaciones (type «VARIABLE»: colores, tallas…) no se toca salvo que quien arma el guardado lo
+// pida con `variable` (1 nov 2026: apagar y quitar privatizaciones; antes se rechazaba siempre): entonces se arman `attribute` y `variations` como los arma la
+// pantalla de Dropi (`cargarAtributes` y `cargarVariations`, leídos de su código) y `warehouselected` queda vacío para que quien llama ponga las bodegas por variación.
 // Sin base ni red, con prueba.
 
 /** Lo que Dropi admite en «Nombre del producto» y en «Nombre del producto en la guía de envío». */
@@ -29,6 +31,45 @@ export function leerTokenDropi(token: string): { usuarioId: number; venceEn: Dat
 type Obj = Record<string, unknown>;
 const num = (v: unknown) => (v === null || v === undefined || v === "" ? v : Number(v));
 
+/** Los atributos de un producto con variaciones (color, talla…) como los manda la pantalla de Dropi (`cargarAtributes`); null si Dropi no los devolvió. */
+export function atributosDeDropi(producto: Obj): Obj[] | null {
+  if (!Array.isArray(producto.attributes) || !producto.attributes.length) return null;
+  return (producto.attributes as Obj[]).map((a) => ({
+    id: a.id ?? null,
+    product_id: a.product_id ?? null,
+    description: a.description ?? "",
+    isVariation: a.isVariation ?? false,
+    deleted_at: a.deleted_at != null ? true : null,
+    values: (Array.isArray(a.values) ? (a.values as Obj[]) : []).map((v) => ({
+      id: v.id ?? null,
+      value: v.value ?? "",
+      attribute_id: v.attribute_id ?? null,
+      attribute_name: v.attribute_name ?? "",
+      deleted_at: v.deleted_at != null ? true : null,
+    })),
+  }));
+}
+
+/** Las variaciones de un producto como las manda la pantalla de Dropi (`cargarVariations`). */
+export function variacionesDeDropi(producto: Obj): Obj[] {
+  return (Array.isArray(producto.variations) ? (producto.variations as Obj[]) : []).map((r) => ({
+    id: r.id ?? null,
+    sale_price: Number(r.sale_price),
+    suggested_price: Number(r.suggested_price),
+    product_id: r.product_id ?? null,
+    stock: r.stock,
+    sku: r.sku,
+    attribute_values: (Array.isArray(r.attribute_values) ? (r.attribute_values as Obj[]) : []).map((a) => ({
+      id: a.id ?? null,
+      value: a.value ?? "",
+      attribute_id: a.attribute_id ?? null,
+      attribute_name: a.attribute_name ?? "",
+      deleted_at: a.deleted_at != null ? a.deleted_at : null,
+    })),
+    deleted_at: r.deleted_at != null ? r.deleted_at : null,
+  }));
+}
+
 /**
  * El cuerpo del `PUT api/products/<id>` de Dropi para cambiar el nombre (y el de la guía de envío) de un producto: lo mismo que
  * manda la pantalla de Dropi con el producto tal como está, salvo esos dos campos. `producto` = `objects` del GET del producto;
@@ -39,8 +80,13 @@ export function armarGuardadoProducto(
   bodegasProveedor: Obj[],
   /** Lo que se cambia: el nombre (y el de la guía), el precio, el precio sugerido y la descripción. `null` o sin poner = se deja como está. */
   cambio: { nombre: string | null; nombreGuia: string | null; precio?: number | null; precioSugerido?: number | null; descripcion?: string | null },
+  /** `variable`: acepta un producto con variaciones (quien llama pone después las bodegas por variación); sin esto se rechaza. */
+  opciones: { variable?: boolean } = {},
 ): { cuerpo: Obj } | { error: string } {
-  if (producto.type !== "SIMPLE") return { error: "Tiene variaciones: cámbialo a mano en Dropi." };
+  const variable = producto.type === "VARIABLE" && opciones.variable === true;
+  if (producto.type !== "SIMPLE" && !variable) return { error: "Tiene variaciones: cámbialo a mano en Dropi." };
+  const atributos = variable ? atributosDeDropi(producto) : [];
+  if (!atributos) return { error: "Dropi no devolvió los atributos (color, talla…) del producto con variaciones: no se puede guardar desde aquí, hazlo a mano en Dropi." };
   if (cambio.nombre !== null && (!cambio.nombre.trim() || cambio.nombre.length > MAX_NOMBRE_DROPI)) return { error: `El nombre debe tener de 1 a ${MAX_NOMBRE_DROPI} caracteres.` };
   const precio = cambio.precio ?? null;
   const sugerido = cambio.precioSugerido ?? null;
@@ -85,14 +131,14 @@ export function armarGuardadoProducto(
       length: num(producto.length),
       width: num(producto.width),
       height: num(producto.height),
-      attribute: [],
-      variations: producto.variations,
+      attribute: atributos,
+      variations: variable ? variacionesDeDropi(producto) : producto.variations,
       categories: producto.categories,
       add_stock_in_return: producto.add_stock_in_return,
       private_product_inventories: producto.private_product_inventories,
       user_profit_percentage_product: producto.user_profit_percentage_product,
       is_warehouse_white_brand: producto.is_warehouse_white_brand,
-      warehouselected: bodegas,
+      warehouselected: variable ? [] : bodegas,
       warehouse_previus: null,
       controlChangesPhotos: [],
       name_in_guide: cambio.nombreGuia ?? producto.name_in_guide ?? "",
