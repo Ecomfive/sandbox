@@ -1,18 +1,25 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type ReactNode } from "react";
+import { useState, type ComponentType, type ReactNode, type SVGProps } from "react";
 import { Tooltip } from "@/components/ui/tooltip";
 import { anilloFoco } from "@/components/ui/field";
 import {
   AlertaIcon,
+  CalendarioIcon,
   ChatIcon,
+  CorreoIcon,
   EnlaceIcon,
   EstadoIcon,
+  EtiquetaIcon,
   FlechaAbajoIcon,
   FlechaArribaIcon,
+  PedidoIcon,
   PersonaIcon,
+  ProductoIcon,
   SugerenciaIcon,
+  TiendaIcon,
+  UbicacionIcon,
 } from "@/lib/nav-icons";
 import type { AccesoCrm } from "@/lib/crm/areas";
 import { ActividadDropshipper } from "./actividad-dropshipper";
@@ -211,34 +218,45 @@ export function DatosDropshipper({ d, hoy, acceso, conEtiquetas = true }: { d: F
   const dato = (campo: CampoDato, inicial: string | null) => (
     <DatoEditable key={`${campo}-${d.id}`} dropshipperId={d.id} campo={campo} inicial={inicial} puede={acceso.escribeAtencion} />
   );
-  // Dos columnas, con el nombre del dato arriba de su valor y agrupado por lo que se mira junto (30 oct 2026, pedido de Alcides: un dato por fila ocupaba
-  // mucho alto). Productos y etiquetas van a todo el ancho.
-  const datos: [string, ReactNode, boolean?][] = [
-    ["Nombre", dato("nombre", d.nombre)],
-    ["Estado", dato("estado", d.estado)],
+  // Cada dato en una sola línea, con su ícono y su valor, en dos columnas (30 oct 2026, pedido de Alcides, opción A con maqueta). El nombre del dato va
+  // para lectores de pantalla (`dt`); a la vista lo dice el ícono y, si falta, «Sin ciudad». Productos y etiquetas van a todo el ancho, como pastillas.
+  const datos: [string, ComponentType<SVGProps<SVGSVGElement>>, ReactNode, boolean?][] = [
+    ["Nombre", PersonaIcon, dato("nombre", d.nombre)],
+    ["Estado", EstadoIcon, dato("estado", d.estado)],
     [
       "WhatsApp",
-      <span key="w" className="flex flex-wrap items-center gap-x-2">
+      ChatIcon,
+      <span key="w" className="flex min-w-0 items-center gap-1">
         {dato("telefono", d.tieneTelefono ? NUMERO_REGISTRADO : null)}
         {d.tieneTelefono && acceso.verTelefonos && <MostrarTelefono tipo="dropshipper" id={d.id} puede />}
       </span>,
     ],
-    ["Correo", dato("correo", d.email)],
-    ["Ingreso", dato("ingreso", d.ingreso)],
-    ["Último pedido", etiquetaUltimoPedido(d.ultimoPedido, hoy)],
-    ["Ciudad", dato("ciudad", d.ciudad)],
-    ["Tiendas", dato("tiendas", d.tiendas.join(", ") || null)],
-    ["Productos", dato("productos", d.productos.join(", ") || null), true],
+    ["Correo", CorreoIcon, dato("correo", d.email)],
+    ["Ingreso", CalendarioIcon, dato("ingreso", d.ingreso)],
+    ["Último pedido", PedidoIcon, <span key="u" className="block truncate px-1.5 py-0.5">Último pedido: {etiquetaUltimoPedido(d.ultimoPedido, hoy).toLowerCase()}</span>],
+    ["Ciudad", UbicacionIcon, dato("ciudad", d.ciudad)],
+    ["Tiendas", TiendaIcon, dato("tiendas", d.tiendas.join(", ") || null)],
+    ["Productos", ProductoIcon, dato("productos", d.productos.join(", ") || null), true],
     ...(conEtiquetas
-      ? [["Etiquetas", <EtiquetasDropshipper key={`etiquetas-${d.id}`} dropshipperId={d.id} iniciales={d.etiquetas} puedeEscribir={acceso.escribeAtencion} />, true] as [string, ReactNode, boolean]]
+      ? [
+          [
+            "Etiquetas",
+            EtiquetaIcon,
+            <EtiquetasDropshipper key={`etiquetas-${d.id}`} dropshipperId={d.id} iniciales={d.etiquetas} puedeEscribir={acceso.escribeAtencion} />,
+            true,
+          ] as [string, ComponentType<SVGProps<SVGSVGElement>>, ReactNode, boolean],
+        ]
       : []),
   ];
   return (
-    <dl className="m-0 grid grid-cols-1 gap-x-4 gap-y-2.5 text-[13px] min-[360px]:grid-cols-2">
-      {datos.map(([titulo, valor, ancho]) => (
-        <div key={titulo} className={`flex min-w-0 flex-col gap-0.5 ${ancho ? "col-span-full" : ""}`}>
-          <dt className="text-[11.5px] text-muted-foreground">{titulo}</dt>
-          <dd className="m-0 min-w-0">{valor}</dd>
+    <dl className="m-0 grid grid-cols-1 gap-x-3 gap-y-0.5 text-[13px] min-[360px]:grid-cols-2">
+      {datos.map(([titulo, Icono, valor, ancho]) => (
+        <div key={titulo} className={`flex min-w-0 gap-1 ${ancho ? "col-span-full mt-1 items-start" : "items-center"}`}>
+          <dt className={`flex-none text-muted-foreground ${ancho ? "pt-1" : ""}`}>
+            <Icono className="h-4 w-4" aria-hidden="true" />
+            <span className="sr-only">{titulo}</span>
+          </dt>
+          <dd className="m-0 min-w-0 flex-1">{valor}</dd>
         </div>
       ))}
     </dl>

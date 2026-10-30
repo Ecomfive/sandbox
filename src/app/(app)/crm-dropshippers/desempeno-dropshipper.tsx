@@ -153,7 +153,10 @@ export function DesempenoDropshipper({ dropshipperId, tieneCuentas }: { dropship
               <ul className="m-0 flex list-none flex-col gap-1 p-0 text-[13px]">
                 {datos.productos.map((p) => (
                   <li key={`${p.producto}-${p.sku ?? ""}`} className="flex items-baseline justify-between gap-2">
-                    <span className="min-w-0 truncate">{p.producto}</span>
+                    <span className="flex min-w-0 items-baseline gap-1.5">
+                      <span className="min-w-0 truncate">{p.producto}</span>
+                      {p.ids && <span className="shrink-0 text-xs tabular-nums text-muted-foreground">ID {p.ids}</span>}
+                    </span>
                     <span className="shrink-0 tabular-nums text-muted-foreground">
                       {p.unidades} {p.unidades === 1 ? "unidad" : "unidades"} · {p.entregadas} entr.
                     </span>

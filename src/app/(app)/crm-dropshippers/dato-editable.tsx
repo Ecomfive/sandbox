@@ -35,12 +35,14 @@ function Valor({ campo, valor }: { campo: CampoDato; valor: string | null }) {
         ))}
       </span>
     );
-  return <span className={`min-w-0 break-words ${valor ? "" : "text-muted-foreground"}`}>{mostrar(campo, valor)}</span>;
+  // Una sola línea por dato (30 oct 2026, pedido de Alcides): si no cabe, se corta con «…».
+  return <span className={`min-w-0 truncate ${valor ? "" : "text-muted-foreground"}`}>{mostrar(campo, valor)}</span>;
 }
 
 function mostrar(campo: CampoDato, valor: string | null): string {
-  if (!valor) return "—";
-  if (campo === "ingreso") return formatearFecha(valor);
+  // Sin el nombre del dato a la vista (solo su ícono), lo que falta dice qué es: «Sin ciudad».
+  if (!valor) return `Sin ${CAMPOS_DATO[campo].etiqueta.toLowerCase()}`;
+  if (campo === "ingreso") return `Ingresó el ${formatearFecha(valor)}`;
   if (campo === "estado") return etiquetaEstado(valor);
   if (campo === "telefono") return valor === NUMERO_REGISTRADO ? "Registrado" : "—";
   return valor;
@@ -66,7 +68,12 @@ export function DatoEditable({ dropshipperId, campo, inicial, puede }: { dropshi
   const idError = useId();
   const nombre = CAMPOS_DATO[campo].etiqueta.toLowerCase();
 
-  if (!puede) return <Valor campo={campo} valor={valor} />;
+  if (!puede)
+    return (
+      <span className="flex min-w-0 px-1.5 py-0.5">
+        <Valor campo={campo} valor={valor} />
+      </span>
+    );
 
   function abrir() {
     // El número de WhatsApp no se enseña: se escribe el nuevo desde cero.
@@ -101,10 +108,10 @@ export function DatoEditable({ dropshipperId, campo, inicial, puede }: { dropshi
           ref={boton}
           type="button"
           onClick={abrir}
-          className={`group -mx-1.5 -my-0.5 inline-flex max-w-full items-start gap-1 rounded px-1.5 py-0.5 text-left hover:bg-muted ${anilloFoco}`}
+          className={`group flex w-full min-w-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-left hover:bg-muted ${anilloFoco}`}
         >
           <Valor campo={campo} valor={valor} />
-          <LapizIcon width={12} height={12} aria-hidden="true" className="mt-[3px] flex-none text-muted-foreground opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100" />
+          <LapizIcon width={12} height={12} aria-hidden="true" className="ml-auto flex-none text-muted-foreground opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100" />
         </button>
       </Tooltip>
     );

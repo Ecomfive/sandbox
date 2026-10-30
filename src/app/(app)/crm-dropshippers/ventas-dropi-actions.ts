@@ -89,7 +89,7 @@ export async function obtenerVentasDropi(dropshipperId: string): Promise<VentasD
       ultimaOrden: t.ultima,
       porMes: [...mesMap.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([mes, netas]) => ({ mes, netas })),
       productos: [...prodMap.entries()]
-        .map(([id, p]) => ({ id, nombre: nombre.get(id) ?? `Producto ${id}`, pedidas: p.pedidas, noEfectivas: p.noEfectivas, netas: p.pedidas - p.noEfectivas }))
+        .map(([id, p]) => ({ id, nombre: nombre.get(id) ?? "Sin nombre", pedidas: p.pedidas, noEfectivas: p.noEfectivas, netas: p.pedidas - p.noEfectivas }))
         .sort((a, b) => b.netas - a.netas),
     });
   }
