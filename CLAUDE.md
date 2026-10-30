@@ -2106,6 +2106,10 @@ convenciones técnicas del código.
   Compras) en la ficha del CRM y en la del chat de la bandeja; `actividad-dropshipper-actions.ts` usa el motor de `lib/comentarios` (tablas
   `dropshipper_comentarios`/`_adjuntos`/`_comentario_reacciones`, bucket `crm-dropshippers`) y toma los cambios de `obtenerLineaDeTiempo`,
   que ya filtra por área. Los comentarios los ve todo el que abre el CRM.
+  **Datos editables en la ficha** (29 oct 2026, pedido de Alcides): en el bloque «Datos» (`DatosDropshipper`, `ficha-lateral.tsx`, también en la ficha del chat)
+  Ciudad, Ingreso (`fecha_ingreso`) y Correo se editan con el lápiz (`DatoEditable`, `dato-editable.tsx`; `cambiarDatoDropshipper`, `dato-actions.ts`;
+  reglas en `src/lib/crm/dato-dropshipper.ts`, con prueba; auditoría `editar_dropshipper` con antes/después). Ya no se muestran Etapa, Notas ni
+  Responsable (lo de ClickUp); las notas siguen en la base y «Editar» ya no las pide ni las borra (`editarDropshipper` solo las toca si vienen).
   **Áreas** (un solo CRM, `src/lib/crm/areas.ts`): Atención = módulo `crm-dropshippers`; Comercial = además el módulo
   `crm-comercial`. Atención **no** ve las notas, seguimientos ni cambios comerciales: se filtran en el servidor
   (`obtenerLineaDeTiempo`, `areaParaNota`); Comercial ve las dos. Captación: `dropshippers.fase` (captado → onboarding →
