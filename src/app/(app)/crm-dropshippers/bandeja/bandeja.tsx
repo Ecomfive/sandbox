@@ -1038,9 +1038,15 @@ export function Bandeja({
 
   /**
    * Un chat en su tarjeta del tablero: nombre, motivo y último mensaje, quién lo lleva, el plazo y su estado.
-   * Se abre como en la lista y el clic derecho da el mismo menú.
+   * Se abre como en la lista y el clic derecho da el mismo menú. Debajo, los botones de su columna, como en el prototipo
+   * (https://claude.ai/artifact/WhfJpQZQf6AdvSxsmzfZFa, 30 oct 2026): Por atender → «Responder»; En conversación → «Ver chat» y «Resolver»
+   * (pasa a Cerrados); Cerrados → «Ver chat» y «Reabrir». Resolver y reabrir solo en los chats de tu área o que llevas tú, y nunca en «Ver como».
    */
-  function tarjetaChat(c: ConversacionVista) {
+  function tarjetaChat(c: ConversacionVista, columna: ColumnaTablero) {
+    const puedeCambiar = escribe && !verComo && (c.area === miArea || c.asignadaAId === miId);
+    const claseBoton = `inline-flex h-8 items-center rounded-md px-2.5 text-[12.5px] font-semibold ${anilloFoco}`;
+    const principal = `${claseBoton} bg-[var(--wa-acento)] text-[var(--wa-acento-texto)] hover:opacity-90 disabled:opacity-60`;
+    const secundario = `${claseBoton} border border-[var(--wa-borde)] bg-[var(--wa-fondo)] text-[var(--wa-texto)] hover:bg-[var(--wa-hover)] disabled:opacity-60`;
     const espera = enNavegador ? esperaConPlazo(c) : null;
     const grupo = grupoPorId(c.motivo?.grupo);
     const estado = espera
@@ -1087,8 +1093,41 @@ export function Bandeja({
           </span>
           <IconoEstado clase={espera ? espera.clase : "text-[var(--wa-sec)]"} signo={estado.signo} texto={estado.texto} />
         </button>
+        <span className="mt-1.5 flex flex-wrap gap-1.5 px-0.5">
+          {columna === "por_atender" ? (
+            <button type="button" onClick={() => abrirChat(c)} className={principal}>
+              Responder
+            </button>
+          ) : (
+            <>
+              <button type="button" onClick={() => abrirChat(c)} className={secundario}>
+                Ver chat
+              </button>
+              {puedeCambiar && columna === "en_conversacion" && (
+                <button type="button" disabled={enviando} onClick={() => cambiarDesdeTablero(c, "resuelta")} className={principal}>
+                  Resolver
+                </button>
+              )}
+              {puedeCambiar && columna === "cerrados" && (
+                <button type="button" disabled={enviando} onClick={() => cambiarDesdeTablero(c, "abierta")} className={secundario}>
+                  Reabrir
+                </button>
+              )}
+            </>
+          )}
+        </span>
       </li>
     );
+  }
+
+  /** «Resolver» o «Reabrir» desde la tarjeta del tablero, sin abrir el chat: el tablero se refresca y la tarjeta cambia de columna. */
+  function cambiarDesdeTablero(c: ConversacionVista, estado: "abierta" | "resuelta") {
+    empezar(async () => {
+      const r = await cambiarEstadoConversacion(c.id, estado).catch(() => ({ error: "No se pudo. Inténtalo de nuevo." }));
+      if ("error" in r) return mostrarToast(r.error, "destructive");
+      mostrarToast(estado === "resuelta" ? `${c.nombre}: resuelto, pasa a Cerrados. Si vuelve a escribir, regresa a Por atender.` : `${c.nombre}: reabierto.`);
+      await refrescar(elegidoRef.current);
+    });
   }
 
   /**
@@ -1498,7 +1537,7 @@ export function Bandeja({
                           </span>
                         </div>
                         <ul className="m-0 flex min-h-0 flex-1 list-none flex-col gap-2 overflow-y-auto p-2.5">
-                          {col.chats.map((c) => tarjetaChat(c))}
+                          {col.chats.map((c) => tarjetaChat(c, col.id))}
                           {!col.chats.length && <li className="px-2 py-6 text-center text-[13px] text-[var(--wa-sec)]">Nada aquí.</li>}
                         </ul>
                       </div>
