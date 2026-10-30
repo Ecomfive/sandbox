@@ -12,7 +12,9 @@ import type { DatosDireccion, FilaDireccion } from "./datos-direccion";
 import type { ProductoCartera } from "@/lib/crm/productos";
 import { Barra, Cifra, Cifras, Insignia, Tarjeta, type TonoDireccion } from "./piezas-direccion";
 import { rutaVista } from "./ruta";
+import type { CargaPareto } from "./datos-pareto";
 import { TONO_STOCK } from "./vista-productos";
+import { TarjetaParetoResumen } from "./vista-pareto";
 
 /** El stock que se acaba, ya resumido en el servidor: cuántos productos, a cuántos clientes afecta y los 5 que más se piden. */
 export interface ResumenStock {
@@ -83,12 +85,15 @@ function VerMas({ href, children }: { href: string; children: React.ReactNode })
  */
 export function VistaResumen({
   datos,
+  pareto,
   stock,
   entregas,
   atencion,
   codigoPais,
 }: {
   datos: DatosDireccion;
+  /** Las guías de cada cliente mes a mes (Pareto de 12 meses); null si no se cargaron. */
+  pareto: CargaPareto | null;
   stock: ResumenStock | null;
   entregas: FilaEntregas[] | null;
   atencion: ResumenAtencion | null;
@@ -228,6 +233,8 @@ export function VistaResumen({
           <p className="m-0 text-xs text-muted-foreground">Pulsa un estado para ver esos clientes.</p>
         </Tarjeta>
       </div>
+
+      <TarjetaParetoResumen datos={datos} pareto={pareto} />
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         <Tarjeta id="t-riesgo" titulo="Dónde está el riesgo" extra={`${cuenta("riesgo") + cuenta("dormido")} clientes`}>

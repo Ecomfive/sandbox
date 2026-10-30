@@ -14,7 +14,9 @@ import type { AlertaDireccion, DatosDireccion, FilaDireccion } from "./datos-dir
 import type { DatosProductos } from "./datos-productos";
 import { descargarLista } from "./lista-csv";
 import { rutaVista } from "./ruta";
+import type { DatosPareto } from "./datos-pareto";
 import { Barra, Boton, Chip, Cifra, Cifras, FONDO_TONO, Insignia, TEXTO_TONO, Tarjeta, tonoPuntaje, type TonoDireccion } from "./piezas-direccion";
+import { BloquePareto } from "./vista-pareto";
 import { textoCamino } from "./vista-productos";
 
 const TONO_BANDA: Record<Banda, TonoDireccion> = { sano: "exito", atencion: "aviso", critico: "peligro", sin_pedidos: "neutro" };
@@ -84,6 +86,7 @@ export function PanelDireccion({
   clienteInicial,
   datos,
   productos,
+  pareto,
   codigoPais,
   escribe,
   usuarioId,
@@ -96,6 +99,8 @@ export function PanelDireccion({
   datos: DatosDireccion;
   /** Lo que vende cada cliente y qué recomendarle (fase 3); null sin las migraciones 0198 y 0201. */
   productos: DatosProductos | null;
+  /** Las guías de cada cliente mes a mes (12 meses), para su Pareto en la ficha; null sin la migración 0207. */
+  pareto: DatosPareto | null;
   codigoPais: string;
   escribe: boolean;
   usuarioId: string;
@@ -438,6 +443,7 @@ export function PanelDireccion({
               f={seleccionado}
               alertas={alertas.filter((a) => a.dropshipperId === seleccionado.id)}
               extra={productos?.porCliente[seleccionado.id]}
+              pareto={pareto}
               personas={datos.personas}
               escribe={escribe}
               pendiente={pendiente}
@@ -481,6 +487,7 @@ function FichaCliente({
   f,
   alertas,
   extra,
+  pareto,
   personas,
   escribe,
   pendiente,
@@ -491,6 +498,7 @@ function FichaCliente({
   f: FilaDireccion;
   alertas: AlertaDireccion[];
   extra: DatosProductos["porCliente"][string] | undefined;
+  pareto: DatosPareto | null;
   personas: { id: string; nombre: string }[];
   escribe: boolean;
   pendiente: boolean;
@@ -586,6 +594,8 @@ function FichaCliente({
       </div>
 
       <LoLleva f={f} personas={personas} escribe={escribe} />
+
+      {pareto && <BloquePareto f={f} pareto={pareto} />}
 
       {extra && (
         <div className="grid grid-cols-1 items-start gap-5 2xl:grid-cols-2">

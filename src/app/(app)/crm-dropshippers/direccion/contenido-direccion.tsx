@@ -6,6 +6,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { VistaKpis, type KpisWhatsapp } from "../kpis/vista-kpis";
 import { cargarDireccion } from "./datos-direccion";
 import { cargarEquipo } from "./datos-equipo";
+import { cargarPareto } from "./datos-pareto";
 import { cargarDuplicados, cargarEntregas, cargarSecuenciaAlta } from "./datos-fase4";
 import { cargarProductos } from "./datos-productos";
 import { PanelDireccion } from "./panel-direccion";
@@ -15,6 +16,7 @@ import { VistaAutomatizaciones } from "./vista-automatizaciones";
 import { VistaDuplicados } from "./vista-duplicados";
 import { VistaEntregas } from "./vista-entregas";
 import { VistaEquipo } from "./vista-equipo";
+import { PERIODOS_PARETO, VistaPareto } from "./vista-pareto";
 import { VistaProductos } from "./vista-productos";
 import { VistaResumen, type ResumenAtencion, type ResumenStock } from "./vista-resumen";
 import type { DatosProductos } from "./datos-productos";
@@ -24,6 +26,8 @@ const PERIODOS_ENTREGAS = [30, 60, 90];
 const PERIODOS_KPIS = [7, 30, 90];
 const SEGMENTOS: Segmento[] = ["activo", "riesgo", "dormido", "perdido", "sin_pedidos"];
 const ES_ID = /^[0-9a-f-]{36}$/i;
+/** Los meses del Pareto (3, 6 o 12; sin otro valor, 12). */
+const mesesDe = (v: unknown) => (PERIODOS_PARETO.includes(Number(v)) ? Number(v) : 12);
 
 /** El inicio del periodo (ISO): hace `dias` días. */
 const desdeHace = (dias: number) => new Date(Date.now() - dias * 24 * 60 * 60 * 1000).toISOString();
@@ -74,6 +78,8 @@ function periodoDe(vista: VistaDireccion, dias: unknown): number {
  *    la cartera, dónde está el riesgo, los que más piden, qué atender hoy, el stock que se acaba, las entregas y la atención por WhatsApp.
  *  - Clientes (fase 1): los chips de estado y la lista de clientes con su ficha al lado (lo que vende y qué recomendarle, fase 3). Abre con el
  *    estado (`segmento`) o el cliente (`cliente`) que se eligió en el Resumen.
+ *  - Pareto (31 oct 2026, pedido de Hernán): el 80/20 de las guías de los dropshippers de los últimos 3, 6 o 12 meses (`crm_pedidos_mensuales`, migración 0207);
+ *    también va en el Resumen y en la ficha de cada cliente (con el Pareto de sus productos).
  *  - Productos (fase 3), Entregas (fase 4), Equipo (fase 2), Duplicados (fase 4) y Automatizaciones (fase 4).
  *  - KPIs de atención: tiempo de respuesta, sin responder, por número y por persona (`whatsapp_kpis`, migración 0164).
  * Solo lo ve Dirección: los chats y las pantallas de Comercial y Atención no cambian, y no se envía nada desde aquí.
@@ -84,12 +90,14 @@ export async function ContenidoDireccion({
   dias: diasParam,
   segmento: segmentoParam,
   cliente: clienteParam,
+  meses: mesesParam,
 }: {
   usuario: UsuarioActual;
   vista: Exclude<VistaDireccion, "chats">;
   dias?: unknown;
   segmento?: unknown;
   cliente?: unknown;
+  meses?: unknown;
 }) {
   const dias = periodoDe(vista, diasParam);
   const segmento = SEGMENTOS.includes(segmentoParam as Segmento) ? (segmentoParam as Segmento) : null;
@@ -102,12 +110,14 @@ export async function ContenidoDireccion({
   const datos = vista === "kpis" ? null : await cargarDireccion(supabase, pais.id);
   const ok = !!datos && !("error" in datos);
   const filas = ok ? datos.filas : [];
-  const [equipo, productos, entregas, duplicados, secuencia] = await Promise.all([
+  const [equipo, productos, entregas, duplicados, secuencia, pareto] = await Promise.all([
     vista === "equipo" && ok ? cargarEquipo(supabase, dias, filas) : null,
     (vista === "clientes" || vista === "productos" || vista === "resumen") && ok ? cargarProductos(supabase, pais.id, usuario, filas.map((f) => f.id)) : null,
     vista === "entregas" || vista === "resumen" ? cargarEntregas(supabase, pais.id, vista === "resumen" ? 60 : dias) : null,
     vista === "duplicados" ? cargarDuplicados(supabase) : null,
     vista === "automatizaciones" ? cargarSecuenciaAlta(supabase) : null,
+    // Las guías mes a mes: el Resumen, la ficha de un cliente y el Pareto las usan.
+    (vista === "resumen" || vista === "clientes" || vista === "pareto") && ok ? cargarPareto(supabase, pais.id, datos.hoy) : null,
   ]);
   const errorDe = (x: unknown) => (x && typeof x === "object" && "error" in x ? String((x as { error: string }).error) : null);
   const error =
@@ -116,7 +126,8 @@ export async function ContenidoDireccion({
     errorDe(equipo) ??
     errorDe(entregas) ??
     errorDe(secuencia) ??
-    (vista === "productos" ? errorDe(productos) : null);
+    (vista === "productos" ? errorDe(productos) : null) ??
+    (vista === "pareto" ? errorDe(pareto) : null);
   const escribe = accesoCrm(usuario).escribeDireccion;
 
   function contenido() {
@@ -135,10 +146,12 @@ export async function ContenidoDireccion({
           alertasAbiertas={datos.alertas.reduce<Record<string, number>>((m, x) => ((m[x.tipo] = (m[x.tipo] ?? 0) + 1), m), {})}
         />
       );
+    if (vista === "pareto" && pareto && !("error" in pareto)) return <VistaPareto datos={datos} pareto={pareto} meses={mesesDe(mesesParam)} />;
     if (vista === "resumen")
       return (
         <VistaResumen
           datos={datos}
+          pareto={pareto ?? null}
           stock={productos && !("error" in productos) ? stockDe(productos) : null}
           entregas={Array.isArray(entregas) ? entregas : null}
           atencion={kpis?.error ? null : atencionDe(kpis?.data)}
@@ -155,6 +168,7 @@ export async function ContenidoDireccion({
           clienteInicial={cliente && filas.some((f) => f.id === cliente) ? cliente : null}
           datos={datos}
           productos={productos && !("error" in productos) ? productos : null}
+          pareto={pareto && !("error" in pareto) ? pareto : null}
           codigoPais={pais.codigo}
           escribe={escribe}
           usuarioId={usuario.id}

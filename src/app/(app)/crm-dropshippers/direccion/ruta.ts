@@ -10,6 +10,7 @@ export const RUTA_DIRECCION = "/crm-dropshippers/bandeja";
 export const VISTAS_DIRECCION = [
   { valor: "resumen", etiqueta: "Resumen" },
   { valor: "clientes", etiqueta: "Clientes" },
+  { valor: "pareto", etiqueta: "Pareto" },
   { valor: "productos", etiqueta: "Productos" },
   { valor: "entregas", etiqueta: "Entregas" },
   { valor: "equipo", etiqueta: "Equipo" },

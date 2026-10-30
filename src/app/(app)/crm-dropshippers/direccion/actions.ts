@@ -182,3 +182,24 @@ export async function guardarSecuenciaAlta(encendida: boolean, responsableId: st
   return { ok: true };
 }
 
+
+/**
+ * Los productos que pidió un dropshipper en los últimos 12 meses (`crm_productos_de_dropshipper`, migración 0207), para su Pareto de productos: qué pocos
+ * productos hacen la mayoría de sus guías. Es de lectura: basta ver el panel de Dirección. Devuelve el error como valor.
+ */
+export async function productosParaPareto(dropshipperId: string): Promise<{ productos: { productoId: number; nombre: string; pedidos: number }[] } | { error: string }> {
+  const u = await getUsuarioActual();
+  if (!u || !accesoCrm(u).direccion) return { error: "Solo Dirección puede ver esto." };
+  if (!ES_ID(dropshipperId)) return { error: "Dropshipper no válido." };
+  const supabase = createServiceClient();
+  const pais = await getPaisActual(supabase);
+  const { data, error } = await supabase.rpc("crm_productos_de_dropshipper", { p_pais: pais.id, p_dropshipper: dropshipperId, p_meses: 12 });
+  if (error) return { error: "Falta correr la migración 0207 (Pareto de guías) en la base." };
+  return {
+    productos: ((data ?? []) as { producto_id: number; producto: string | null; pedidos: number }[]).map((p) => ({
+      productoId: Number(p.producto_id),
+      nombre: p.producto ?? `Producto ${p.producto_id}`,
+      pedidos: Number(p.pedidos),
+    })),
+  };
+}

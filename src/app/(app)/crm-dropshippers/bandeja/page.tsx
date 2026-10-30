@@ -25,7 +25,7 @@ export const maxDuration = 300;
  */
 export default async function BandejaWhatsappPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
   const usuario = await requireModulo("crm-dropshippers");
-  const { abrir, vista: vistaParam, dias, segmento, cliente } = await searchParams;
+  const { abrir, vista: vistaParam, dias, segmento, cliente, meses } = await searchParams;
   const a = accesoCrm(usuario);
   const vistaDireccion: VistaDireccion | null = !a.direccion
     ? null
@@ -35,7 +35,7 @@ export default async function BandejaWhatsappPage({ searchParams }: { searchPara
   if (vistaDireccion && vistaDireccion !== "chats")
     return (
       <Pagina ancho="ancha" className="flex flex-col gap-6">
-        <ContenidoDireccion usuario={usuario} vista={vistaDireccion} dias={dias} segmento={segmento} cliente={cliente} />
+        <ContenidoDireccion usuario={usuario} vista={vistaDireccion} dias={dias} segmento={segmento} cliente={cliente} meses={meses} />
       </Pagina>
     );
   const supabase = createServiceClient();
