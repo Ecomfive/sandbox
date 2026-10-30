@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ComponentType } from "react";
+import { useState, type ComponentType, type ReactNode } from "react";
 import { Campo } from "@/components/ui/campo-ficha";
 import { anilloFoco, fieldClass } from "@/components/ui/field";
 import { FichaCrear } from "@/components/ui/ficha-crear";
@@ -9,6 +9,7 @@ import { AlertaIcon, SugerenciaIcon } from "@/lib/nav-icons";
 import { recomendarProducto } from "../sugerencias-clientes/actions";
 import { FichaSugerencia } from "../sugerencias-clientes/ficha-sugerencia";
 import { crearCaso } from "./actions";
+import { ItemFila } from "./botones-ficha";
 import { CANALES, PRIORIDADES, TIPOS_CASO, nombrePais, type FilaDropshipper } from "./def-crm";
 
 
@@ -24,7 +25,6 @@ function BotonAccion({ texto, icono: Icono, alHacerClic }: { texto: string; icon
   return (
     <button
       type="button"
-      aria-haspopup="dialog"
       onClick={alHacerClic}
       className={`flex flex-col items-center gap-0.5 rounded-lg bg-accent px-1 py-2 text-[11.5px] font-medium hover:bg-accent-hover ${anilloFoco}`}
     >
@@ -66,7 +66,20 @@ function Opciones({ lista }: { lista: readonly { valor: string; etiqueta: string
  * Abrir un caso de soporte. Con `d` es el de ese dropshipper (botón de su ficha); sin `d`, el «Agregar caso» de la
  * tabla de casos, donde primero se elige a quién.
  */
-export function PanelCaso({ d, dropshippers, codigoPais, alGuardar }: { d?: FilaDropshipper; dropshippers?: OpcionDropshipper[]; codigoPais: string; alGuardar?: () => void }) {
+export function PanelCaso({
+  d,
+  dropshippers,
+  codigoPais,
+  alGuardar,
+  boton,
+}: {
+  d?: FilaDropshipper;
+  dropshippers?: OpcionDropshipper[];
+  codigoPais: string;
+  alGuardar?: () => void;
+  /** Otro botón para abrirlo (el de la barra de acciones del chat). */
+  boton?: (abrir: () => void) => ReactNode;
+}) {
   const [elegido, setElegido] = useState("");
   const opciones = dropshippers ?? [];
   const paises = d ? d.paises : (opciones.find((o) => o.id === elegido)?.paises ?? []);
@@ -80,7 +93,17 @@ export function PanelCaso({ d, dropshippers, codigoPais, alGuardar }: { d?: Fila
       mensajeExito="Caso abierto"
       ocultos={d ? { dropshipper_id: d.id } : undefined}
       alAbrir={() => setElegido("")}
-      boton={d ? (abrir) => <BotonAccion texto="Nuevo caso" icono={AlertaIcon} alHacerClic={abrir} /> : undefined}
+      enSitio
+      boton={
+        d
+          ? (boton ??
+            ((abrir) => (
+              <ItemFila id="caso">
+                <BotonAccion texto="Nuevo caso" icono={AlertaIcon} alHacerClic={abrir} />
+              </ItemFila>
+            )))
+          : undefined
+      }
     >
       {({ faltante, invalido }) => (
         <>
@@ -152,13 +175,21 @@ export function PanelCaso({ d, dropshippers, codigoPais, alGuardar }: { d?: Fila
  * «Recomendar»: el cliente nos recomienda un producto y Atención lo registra aquí. Llega a Testing Lab › Sugerencias de
  * clientes con su código SUG- sin que quien lo carga necesite ese módulo.
  */
-export function PanelRecomendar({ d, alGuardar }: { d: FilaDropshipper; alGuardar?: () => void }) {
+export function PanelRecomendar({ d, alGuardar, boton }: { d: FilaDropshipper; alGuardar?: () => void; boton?: (abrir: () => void) => ReactNode }) {
   return (
     <FichaSugerencia
       action={recomendarProducto}
       ocultos={{ dropshipper_id: d.id }}
       alGuardar={alGuardar}
-      boton={(abrir) => <BotonAccion texto="Recomendar" icono={SugerenciaIcon} alHacerClic={abrir} />}
+      enSitio
+      boton={
+        boton ??
+        ((abrir) => (
+          <ItemFila id="recomendar">
+            <BotonAccion texto="Recomendar" icono={SugerenciaIcon} alHacerClic={abrir} />
+          </ItemFila>
+        ))
+      }
     />
   );
 }

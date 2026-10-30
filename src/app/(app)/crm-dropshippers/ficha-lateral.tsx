@@ -18,6 +18,8 @@ import type { AccesoCrm } from "@/lib/crm/areas";
 import { ActividadDropshipper } from "./actividad-dropshipper";
 import { BotonEscalar } from "./areas-ficha";
 import { MostrarTelefono } from "./mostrar-telefono";
+import { DestinoEnSitio, EnSitio } from "@/components/ui/en-sitio";
+import { FilaBotones, ItemFila } from "./botones-ficha";
 import { DatoEditable } from "./dato-editable";
 import { NUMERO_REGISTRADO, type CampoDato } from "@/lib/crm/dato-dropshipper";
 import { CuentasDropshipper } from "./cuentas-dropshipper";
@@ -98,23 +100,29 @@ export function ContenidoFichaDropshipper({ d, casos, codigoPais, hoy, acceso }:
             </Pastilla>
           )}
         </div>
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(58px,1fr))] gap-1.5">
-          {d.whatsapp ? (
-            <Link
-              href={`/crm-dropshippers/bandeja?abrir=${d.whatsapp.conversacionId}`}
-              className={`flex flex-col items-center gap-0.5 rounded-lg bg-primario px-1 py-2 text-[11.5px] font-medium text-white hover:opacity-90 ${anilloFoco}`}
-            >
-              <ChatIcon className="h-4 w-4" />
-              WhatsApp
-            </Link>
-          ) : (
-            <span aria-disabled="true" className="flex flex-col items-center gap-0.5 rounded-lg bg-accent px-1 py-2 text-[11.5px] font-medium opacity-40">
-              <ChatIcon className="h-4 w-4" />
-              WhatsApp
-            </span>
-          )}
-          <AccionesCrm d={d} codigoPais={codigoPais} acceso={acceso} alGuardar={alGuardar} />
-        </div>
+        {/* Los botones, de derecha a izquierda según su uso; Nuevo caso y Recomendar abren su formulario justo debajo, en el mismo lugar. */}
+        <EnSitio key={d.id}>
+          <FilaBotones className="grid grid-cols-[repeat(auto-fit,minmax(58px,1fr))] gap-1.5">
+            <ItemFila id="whatsapp">
+              {d.whatsapp ? (
+                <Link
+                  href={`/crm-dropshippers/bandeja?abrir=${d.whatsapp.conversacionId}`}
+                  className={`flex flex-col items-center gap-0.5 rounded-lg bg-primario px-1 py-2 text-[11.5px] font-medium text-white hover:opacity-90 ${anilloFoco}`}
+                >
+                  <ChatIcon className="h-4 w-4" />
+                  WhatsApp
+                </Link>
+              ) : (
+                <span aria-disabled="true" className="flex flex-col items-center gap-0.5 rounded-lg bg-accent px-1 py-2 text-[11.5px] font-medium opacity-40">
+                  <ChatIcon className="h-4 w-4" />
+                  WhatsApp
+                </span>
+              )}
+            </ItemFila>
+            <AccionesCrm d={d} codigoPais={codigoPais} acceso={acceso} alGuardar={alGuardar} />
+          </FilaBotones>
+          <DestinoEnSitio />
+        </EnSitio>
       </div>
 
       <Bloque icono={ChatIcon} titulo="Conversación de WhatsApp">
@@ -203,28 +211,33 @@ export function DatosDropshipper({ d, hoy, acceso, conEtiquetas = true }: { d: F
   const dato = (campo: CampoDato, inicial: string | null) => (
     <DatoEditable key={`${campo}-${d.id}`} dropshipperId={d.id} campo={campo} inicial={inicial} puede={acceso.escribeAtencion} />
   );
+  // Dos columnas, con el nombre del dato arriba de su valor y agrupado por lo que se mira junto (30 oct 2026, pedido de Alcides: un dato por fila ocupaba
+  // mucho alto). Productos y etiquetas van a todo el ancho.
+  const datos: [string, ReactNode, boolean?][] = [
+    ["Nombre", dato("nombre", d.nombre)],
+    ["Estado", dato("estado", d.estado)],
+    [
+      "WhatsApp",
+      <span key="w" className="flex flex-wrap items-center gap-x-2">
+        {dato("telefono", d.tieneTelefono ? NUMERO_REGISTRADO : null)}
+        {d.tieneTelefono && acceso.verTelefonos && <MostrarTelefono tipo="dropshipper" id={d.id} puede />}
+      </span>,
+    ],
+    ["Correo", dato("correo", d.email)],
+    ["Ingreso", dato("ingreso", d.ingreso)],
+    ["Último pedido", etiquetaUltimoPedido(d.ultimoPedido, hoy)],
+    ["Ciudad", dato("ciudad", d.ciudad)],
+    ["Tiendas", dato("tiendas", d.tiendas.join(", ") || null)],
+    ["Productos", dato("productos", d.productos.join(", ") || null), true],
+    ...(conEtiquetas
+      ? [["Etiquetas", <EtiquetasDropshipper key={`etiquetas-${d.id}`} dropshipperId={d.id} iniciales={d.etiquetas} puedeEscribir={acceso.escribeAtencion} />, true] as [string, ReactNode, boolean]]
+      : []),
+  ];
   return (
-    <dl className="m-0 grid grid-cols-[7.5rem_minmax(0,1fr)] gap-x-2.5 gap-y-1.5 text-[13px]">
-      {[
-        ["Nombre", dato("nombre", d.nombre)],
-        ["Estado", dato("estado", d.estado)],
-        [
-          "WhatsApp",
-          <span key="w" className="flex flex-wrap items-center gap-x-2">
-            {dato("telefono", d.tieneTelefono ? NUMERO_REGISTRADO : null)}
-            {d.tieneTelefono && acceso.verTelefonos && <MostrarTelefono tipo="dropshipper" id={d.id} puede />}
-          </span>,
-        ],
-        ["Tiendas", dato("tiendas", d.tiendas.join(", ") || null)],
-        ["Ciudad", dato("ciudad", d.ciudad)],
-        ["Ingreso", dato("ingreso", d.ingreso)],
-        ["Último pedido", etiquetaUltimoPedido(d.ultimoPedido, hoy)],
-        ["Productos", dato("productos", d.productos.join(", ") || null)],
-        ...(conEtiquetas ? [["Etiquetas", <EtiquetasDropshipper key={`etiquetas-${d.id}`} dropshipperId={d.id} iniciales={d.etiquetas} puedeEscribir={acceso.escribeAtencion} />]] : []),
-        ["Correo", dato("correo", d.email)],
-      ].map(([titulo, valor]) => (
-        <div key={String(titulo)} className="contents">
-          <dt className="text-muted-foreground">{titulo}</dt>
+    <dl className="m-0 grid grid-cols-1 gap-x-4 gap-y-2.5 text-[13px] min-[360px]:grid-cols-2">
+      {datos.map(([titulo, valor, ancho]) => (
+        <div key={titulo} className={`flex min-w-0 flex-col gap-0.5 ${ancho ? "col-span-full" : ""}`}>
+          <dt className="text-[11.5px] text-muted-foreground">{titulo}</dt>
           <dd className="m-0 min-w-0">{valor}</dd>
         </div>
       ))}

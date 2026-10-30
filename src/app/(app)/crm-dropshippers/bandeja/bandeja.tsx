@@ -23,7 +23,7 @@ import { abrirChatInterno } from "./interno-actions";
 import { BotonWhatsappInterno } from "./interno";
 import { colorFoto, iniciales } from "./globo-persona";
 import { EtiquetasChat, PastillasEtiquetas, SelectorEtiquetasChat, type ManejoEtiquetas } from "./etiquetas-chat";
-import { claseBotonFicha, claseBotonFichaPrincipal, DatosEnLaCabecera, FichaDelChat, type AccionExtra } from "./ficha-chat";
+import { BotonBarra, DatosEnLaCabecera, FichaDelChat, type AccionExtra } from "./ficha-chat";
 import { reaccionarAMensaje } from "./reaccion-actions";
 import { VistaPreviaChat } from "./vista-previa-chat";
 import { VentanaVincular } from "./vincular-chat";
@@ -391,6 +391,8 @@ export function Bandeja({
   const [vincular, setVincular] = useState(false);
   // Mensajes rápidos del equipo (se ofrecen arriba del cuadro de texto) y el cambio de nombre de un contacto.
   const [rapidas, setRapidas] = useState<RespuestaRapida[]>(RAPIDAS_BASE);
+  // El hueco arriba del cuadro de escribir donde la ficha del chat dibuja sus botones.
+  const [ranuraAcciones, setRanuraAcciones] = useState<HTMLDivElement | null>(null);
   const [verRapidas, setVerRapidas] = useState(false);
   /** Si se está cambiando el nombre del contacto del chat abierto (en la cabecera de su ventana). */
   const [editandoNombre, setEditandoNombre] = useState<"cabecera" | null>(null);
@@ -1119,45 +1121,55 @@ export function Bandeja({
   const accionesChat =
     sel && escribe ? (
       mirando ? (
-        <button
-          type="button"
+        <BotonBarra
+          id="tomar"
+          principal
           disabled={enviando}
-          className={claseBotonFichaPrincipal}
-          onClick={() => accion(() => intervenirConversacion(sel.id), "Intervienes en este chat: ya puedes responderle.")}
-          title="Tomar el chat para responderle al dropshipper. Queda una nota en el chat."
-        >
-          <ChatIcon className="h-4 w-4" />
-          Intervenir
-        </button>
+          texto="Intervenir: tomar el chat para responderle al dropshipper (queda una nota en el chat)"
+          corto="Intervenir"
+          icono={ChatIcon}
+          alPulsar={() => accion(() => intervenirConversacion(sel.id), "Intervienes en este chat: ya puedes responderle.")}
+        />
       ) : (
         <>
           {sel.asignadaAId === miId ? (
-            <button type="button" disabled={enviando} className={claseBotonFicha} onClick={() => accion(() => tomarConversacion(sel.id, true), "Soltaste la conversación.")}>
-              <PersonaIcon className="h-4 w-4" />
-              Soltar
-            </button>
-          ) : (
-            <button
-              type="button"
+            <BotonBarra
+              id="tomar"
               disabled={enviando}
-              className={claseBotonFichaPrincipal}
-              title={sel.asignadaA ? `La lleva ${sel.asignadaA}` : "Que quede a tu cargo"}
-              onClick={() => accion(() => tomarConversacion(sel.id), "La conversación quedó a tu cargo.")}
-            >
-              <PersonaIcon className="h-4 w-4" />
-              Tomar
-            </button>
+              texto="Soltar la conversación"
+              corto="Soltar"
+              icono={PersonaIcon}
+              alPulsar={() => accion(() => tomarConversacion(sel.id, true), "Soltaste la conversación.")}
+            />
+          ) : (
+            <BotonBarra
+              id="tomar"
+              principal
+              disabled={enviando}
+              texto={sel.asignadaA ? `Tomar (la lleva ${sel.asignadaA})` : "Tomar: que quede a tu cargo"}
+              corto="Tomar"
+              icono={PersonaIcon}
+              alPulsar={() => accion(() => tomarConversacion(sel.id), "La conversación quedó a tu cargo.")}
+            />
           )}
           {sel.estado === "abierta" ? (
-            <button type="button" disabled={enviando} className={claseBotonFicha} onClick={() => accion(() => cambiarEstadoConversacion(sel.id, "resuelta"), "Marcada resuelta. Si vuelve a escribir, se reabre sola.")}>
-              <CheckIcon className="h-4 w-4" />
-              Resuelta
-            </button>
+            <BotonBarra
+              id="resuelta"
+              disabled={enviando}
+              texto="Marcar resuelta"
+              corto="Resuelta"
+              icono={CheckIcon}
+              alPulsar={() => accion(() => cambiarEstadoConversacion(sel.id, "resuelta"), "Marcada resuelta. Si vuelve a escribir, se reabre sola.")}
+            />
           ) : (
-            <button type="button" disabled={enviando} className={claseBotonFicha} onClick={() => accion(() => cambiarEstadoConversacion(sel.id, "abierta"), "Conversación reabierta.")}>
-              <ReactivarIcon className="h-4 w-4" />
-              Reabrir
-            </button>
+            <BotonBarra
+              id="resuelta"
+              disabled={enviando}
+              texto="Reabrir la conversación"
+              corto="Reabrir"
+              icono={ReactivarIcon}
+              alPulsar={() => accion(() => cambiarEstadoConversacion(sel.id, "abierta"), "Conversación reabierta.")}
+            />
           )}
         </>
       )
@@ -1167,24 +1179,25 @@ export function Bandeja({
   const accionesExtra: AccionExtra[] = !sel
     ? []
     : [
-        { texto: "Marcar como no leído", corto: "No leído", icono: ChatIcon, alPulsar: () => marcarLeido(sel, false) },
+        { id: "no_leido", texto: "Marcar como no leído", corto: "No leído", icono: ChatIcon, alPulsar: () => marcarLeido(sel, false) },
         ...(escribe && !mirando
           ? [
-              ...AREAS_CHAT.filter((a) => a.valor !== sel.area).map((a) => ({ texto: `Pasar el chat a ${a.etiqueta}`, corto: `A ${a.etiqueta}`, icono: ActualizarIcon, alPulsar: () => pasarA(a.valor) })),
-              { texto: "Importar chat del celular", corto: "Importar", icono: DescargarIcon, alPulsar: () => setImportar({ conversacion: sel }) },
+              ...AREAS_CHAT.filter((a) => a.valor !== sel.area).map((a) => ({ id: `pasar_${a.valor}` as AccionExtra["id"], texto: `Pasar el chat a ${a.etiqueta}`, corto: `A ${a.etiqueta}`, icono: ActualizarIcon, alPulsar: () => pasarA(a.valor) })),
+              { id: "importar" as const, texto: "Importar chat del celular", corto: "Importar", icono: DescargarIcon, alPulsar: () => setImportar({ conversacion: sel }) },
               {
+                id: "borrado_app" as const,
                 texto: sel.borradaEnApp ? "Quitar marca de borrado" : "Marcar borrado en la app",
                 corto: sel.borradaEnApp ? "Quitar marca" : "Borrado en app",
                 icono: ArchivarIcon,
                 alPulsar: () => accion(() => marcarChatBorradoEnApp(sel.id, !sel.borradaEnApp), sel.borradaEnApp ? "Quitaste la marca." : "Marcado: se borró en la app de WhatsApp Business. Aquí se conserva todo."),
               },
-              ...(sel.borradoPendiente ? [] : [{ texto: "Pedir borrar el chat", corto: "Pedir borrar", icono: PapeleraIcon, alPulsar: () => setBorrar({ tipo: "chat" }) }]),
+              ...(sel.borradoPendiente ? [] : [{ id: "pedir_borrar" as const, texto: "Pedir borrar el chat", corto: "Pedir borrar", icono: PapeleraIcon, alPulsar: () => setBorrar({ tipo: "chat" }) }]),
             ]
           : []),
         // Sin «Abrir su ficha en el CRM» ni «No es este» (29 oct 2026, pedido de Alcides): la ficha completa ya se ve aquí y las cuentas de Dropi se
         // quitan en su bloque «Cuentas».
         ...(!verDropshipper && escribe && !sel.dropshipperId
-            ? [{ texto: "Vincular a un dropshipper", corto: "Vincular", icono: ConectadoIcon, alPulsar: () => setVincular(true) }]
+            ? [{ id: "vincular" as const, texto: "Vincular a un dropshipper", corto: "Vincular", icono: ConectadoIcon, alPulsar: () => setVincular(true) }]
             : []),
       ];
 
@@ -1554,6 +1567,7 @@ export function Bandeja({
                   accionesChat={accionesChat}
                   etiquetas={<EtiquetasChat key={sel.id} conversacionId={sel.id} etiquetas={sel.etiquetas} manejo={manejoEtiquetas} escribe={escribe} />}
                   accionesExtra={accionesExtra}
+                  ranuraAcciones={sel.interno ? null : ranuraAcciones}
                   versionEquipo={`${(mensajes ?? []).filter((m) => m.direccion !== "entrante").length}|${sel.nombrePersonalizado ?? ""}|${sel.dropshipperId ?? ""}|${sel.area}|${sel.estado}|${sel.asignadaA ?? ""}`}
                   alAbrirVincular={() => setVincular(true)}
                   alVinculado={(mensaje) => {
@@ -1678,6 +1692,9 @@ export function Bandeja({
                   <div ref={finRef} />
                 </div>
 
+                {/* Aquí la ficha dibuja la barra de acciones (Tomar, Resuelta, Tarea…) y el formulario que se abra, justo arriba del cuadro de escribir: donde
+                    ya está el mouse al responder (30 oct 2026, pedido de Alcides). */}
+                <div ref={setRanuraAcciones} className="contents" />
                 {escribe ? (
                   <div className="relative flex flex-col bg-[var(--wa-panel)]">
                     {mirando && (
