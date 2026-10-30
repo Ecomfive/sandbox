@@ -14,7 +14,7 @@ import { SeguimientosDropshipper } from "../areas-ficha";
 import { CuentasDropshipper } from "../cuentas-dropshipper";
 import { etiquetaEstado, etiquetaNivel } from "../def-crm";
 import { DesempenoDropshipper } from "../desempeno-dropshipper";
-import { AccionesCrm, CasosAbiertos, CifrasDelMes, DatosDropshipper, tonoEstado } from "../ficha-lateral";
+import { AccionesCrm, CasosAbiertos, DatosDropshipper, tonoEstado } from "../ficha-lateral";
 import { RecomendacionesDropshipper } from "../recomendaciones-dropshipper";
 import { VentasDropiDropshipperBloque } from "../ventas-dropi-dropshipper";
 import { ActividadDelClienteFicha } from "./actividad-cliente";
@@ -288,9 +288,6 @@ export function FichaDelChat({
             {cargando}
             {d && datos && acceso && (
               <>
-                <Seccion titulo="Este mes">
-                  <CifrasDelMes d={d} codigoPais={datos.codigoPais} hoy={datos.hoy} />
-                </Seccion>
                 <Seccion titulo="Datos">
                   <DatosDropshipper d={d} hoy={datos.hoy} acceso={acceso} conEtiquetas={false} />
                 </Seccion>
