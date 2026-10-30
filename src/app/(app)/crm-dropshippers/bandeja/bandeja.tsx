@@ -1317,7 +1317,8 @@ export function Bandeja({
       ];
 
   return (
-    <div className="bandeja-wa flex min-h-[640px] flex-col gap-3 text-[var(--wa-texto)] lg:h-[calc(100vh-200px)]">
+    // En el tablero la bandeja crece con sus columnas (30 oct 2026, pedido de Hernán: que no se corten); en la lista, alto fijo con un panel por área.
+    <div className={`bandeja-wa flex min-h-[640px] flex-col gap-3 text-[var(--wa-texto)] ${enTablero ? "" : "lg:h-[calc(100vh-200px)]"}`}>
       {/* El globo de la pestaña sigue lo que la bandeja va leyendo (los chats sin responder de todas las áreas que ve la persona). */}
       <ContadorPestana href="/crm-dropshippers/bandeja" cantidad={datos.conversaciones.filter((c) => !c.interno && sinResponder(c)).length} />
       {/* «Ver como»: qué se está mirando y cómo volver. Neutro, sin el verde de WhatsApp (30 oct 2026, pedido de Hernán: «ese verde no me gusta»). */}
@@ -1516,7 +1517,7 @@ export function Bandeja({
             .map((n) => n.nombre)
             .join(" · ");
           return (
-            <section aria-label={`Tablero de ${areaChat(areaTablero).etiqueta}`} className="flex max-h-[80vh] min-h-[420px] flex-1 flex-col gap-3.5 lg:max-h-none lg:min-h-0">
+            <section aria-label={`Tablero de ${areaChat(areaTablero).etiqueta}`} className="flex flex-col gap-3.5">
               <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
                 <span aria-hidden="true" className={`h-2.5 w-2.5 flex-none rounded-full bg-current ${colorDeArea(areaTablero)}`} />
                 <h2 className="m-0 text-[17px] font-bold">{areaChat(areaTablero).etiqueta}</h2>
@@ -1547,12 +1548,12 @@ export function Bandeja({
                   <span className="rounded-full bg-[var(--wa-acento)] px-2.5 py-1 text-xs font-bold text-[var(--wa-acento-texto)]">{pendientes.length} sin responder</span>
                 </span>
               </div>
-              <div className="min-h-0 flex-1 overflow-x-auto">
-                <div className="grid h-full min-w-[840px] grid-cols-3 gap-4">
+              <div className="overflow-x-auto pb-1">
+                <div className="grid min-w-[840px] grid-cols-3 gap-4">
                   {tablero.map((col) => {
                     const venc = enNavegador && col.id === "por_atender" ? col.chats.filter((c) => esperaConPlazo(c)?.plazo?.startsWith("Venció")).length : 0;
                     return (
-                      <section key={col.id} aria-label={col.etiqueta} className="flex min-h-0 flex-col rounded-[14px] bg-[var(--wa-panel)]" style={{ borderTop: `4px solid ${COLOR_COLUMNA[col.id]}` }}>
+                      <section key={col.id} aria-label={col.etiqueta} className="flex flex-col rounded-[14px] bg-[var(--wa-panel)]" style={{ borderTop: `4px solid ${COLOR_COLUMNA[col.id]}` }}>
                         <div className="flex flex-col gap-0.5 px-3.5 pt-3.5 pb-2.5">
                           <div className="flex items-center gap-2">
                             <h3 className="m-0 text-[15px] font-bold">{col.etiqueta}</h3>
@@ -1567,7 +1568,7 @@ export function Bandeja({
                           </div>
                           <span className="text-[12px] text-[var(--wa-sec)]">{col.detalle}</span>
                         </div>
-                        <ul className="m-0 flex min-h-0 flex-1 list-none flex-col gap-2.5 overflow-y-auto px-2.5 pb-3">
+                        <ul className="m-0 flex flex-1 list-none flex-col gap-2.5 px-2.5 pb-3">
                           {col.chats.map((c) => tarjetaChat(c, col.id))}
                           {!col.chats.length && <li className="px-1 py-2 text-[13px] text-[var(--wa-sec)]">Nada por aquí.</li>}
                         </ul>
