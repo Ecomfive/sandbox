@@ -18,6 +18,8 @@ import type { ConversacionVista, DatosBandeja, MensajeVista, ResumenDropshipper,
 import { guardarColorEtiquetaChat, guardarEtiquetasChat } from "./etiquetas-actions";
 import { PastillaTipo } from "../tipo-cliente";
 import { VendeEnChat } from "./vende-en";
+import { abrirChatInterno } from "./interno-actions";
+import { BotonWhatsappInterno } from "./interno";
 import { colorFoto, iniciales } from "./globo-persona";
 import { EtiquetasChat, PastillasEtiquetas, SelectorEtiquetasChat, type ManejoEtiquetas } from "./etiquetas-chat";
 import { claseBotonFicha, claseBotonFichaPrincipal, FichaDelChat, type AccionExtra } from "./ficha-chat";
@@ -600,7 +602,9 @@ export function Bandeja({
   }, [borrador]);
 
   const numeroDe = useMemo(() => new Map(datos.numeros.map((n) => [n.id, n])), [datos.numeros]);
-  const delNumero = useMemo(() => datos.conversaciones.filter((c) => numero === "todos" || c.numeroId === numero), [datos.conversaciones, numero]);
+  const chatsInternos = useMemo(() => datos.conversaciones.filter((c) => c.interno).map((c) => ({ numeroId: c.numeroId, nombre: c.nombre, noLeidos: c.noLeidos })), [datos.conversaciones]);
+  // Los chats internos (WhatsApp entre áreas) no son clientes: no van en las listas ni en los conteos; se abren con «Interno».
+  const delNumero = useMemo(() => datos.conversaciones.filter((c) => !c.interno && (numero === "todos" || c.numeroId === numero)), [datos.conversaciones, numero]);
   // Los filtros cuentan los chats de todos los paneles que se ven.
   const opciones: { id: Filtro; texto: string; cuenta: number }[] = [
     { id: "sinResponder", texto: "Sin responder", cuenta: delNumero.filter(sinResponder).length },
@@ -872,6 +876,23 @@ export function Bandeja({
   }
 
   /** Abre un chat en su ventana: queda leído (en el panel propio; supervisando, no) y se ve el chat primero. */
+  // «WhatsApp interno»: el chat del cliente al que se vuelve después de escribirle a la otra área.
+  const [volverA, setVolverA] = useState<string | null>(null);
+  const [abriendoInterno, setAbriendoInterno] = useState(false);
+  async function abrirInterno(desdeId: string, haciaId: string) {
+    setAbriendoInterno(true);
+    const r = await abrirChatInterno(desdeId, haciaId).catch(() => ({ error: "No se pudo abrir el chat interno." }));
+    setAbriendoInterno(false);
+    if ("error" in r) return mostrarToast(r.error, "destructive");
+    const actual = datos.conversaciones.find((c) => c.id === elegido);
+    if (actual && !actual.interno) setVolverA(actual.id);
+    ocultarVistaPrevia();
+    setElegido(r.id);
+    setChat(null);
+    setEditandoNombre(null);
+    await refrescar(r.id);
+  }
+
   function abrirChat(c: ConversacionVista) {
     ocultarVistaPrevia();
     setElegido(c.id);
@@ -1257,12 +1278,17 @@ export function Bandeja({
             </button>
           ))}
         </div>
+        {escribe && datos.numerosEmpresa.length > 1 && (
+          <span className="ml-auto">
+            <BotonWhatsappInterno numeros={datos.numerosEmpresa} areas={areas} alElegir={(d, h) => void abrirInterno(d, h)} ocupado={abriendoInterno} internos={chatsInternos} conTexto />
+          </span>
+        )}
         {escribe && (
           <button
             type="button"
             onClick={() => setImportar({ conversacion: null })}
             title="Importar un chat exportado desde el celular"
-            className={`ml-auto inline-flex min-h-9 items-center gap-2 rounded-lg border border-[var(--wa-borde)] bg-[var(--wa-fondo)] px-3.5 text-[13px] font-medium text-[var(--wa-sec)] hover:bg-[var(--wa-hover)] ${anilloFoco}`}
+            className={`${datos.numerosEmpresa.length > 1 ? "" : "ml-auto"} inline-flex min-h-9 items-center gap-2 rounded-lg border border-[var(--wa-borde)] bg-[var(--wa-fondo)] px-3.5 text-[13px] font-medium text-[var(--wa-sec)] hover:bg-[var(--wa-hover)] ${anilloFoco}`}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M12 4v11M7 10l5 5 5-5M5 20h14" />
@@ -1445,6 +1471,7 @@ export function Bandeja({
               </span>
               {sel.vip && <EtiquetaVip tipo={sel.tipoCliente} />}
               <EtiquetaArea area={sel.area} />
+              {sel.interno && <span className="rounded-full bg-azul-soft px-2 py-px text-[11.5px] font-semibold text-azul">WhatsApp interno</span>}
               {/* Dónde vende (29 oct 2026, pedido de Alcides): sus plataformas por país, puestas a mano o de sus cuentas; y los países de su ficha que aún no tienen plataforma. */}
               <VendeEnChat
                 key={`vende-${sel.id}`}
@@ -1479,6 +1506,20 @@ export function Bandeja({
           }
           navegacion={
             <>
+              {escribe && datos.numerosEmpresa.length > 1 && <BotonWhatsappInterno numeros={datos.numerosEmpresa} areas={areas} alElegir={(d, h) => void abrirInterno(d, h)} ocupado={abriendoInterno} internos={chatsInternos} />}
+              {sel.interno && volverA && datos.conversaciones.some((c) => c.id === volverA) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const c = datos.conversaciones.find((x) => x.id === volverA);
+                    setVolverA(null);
+                    if (c) abrirChat(c);
+                  }}
+                  className={`inline-flex h-9 items-center gap-1 rounded-md px-2.5 text-[13px] font-medium text-primario hover:bg-muted ${anilloFoco}`}
+                >
+                  ← Volver a {datos.conversaciones.find((c) => c.id === volverA)?.nombre}
+                </button>
+              )}
               <BotonNavegar texto="Chat anterior" icono={FlechaArribaIcon} activo={!!chatAnterior} alHacerClic={() => chatAnterior && abrirChat(chatAnterior)} />
               <BotonNavegar texto="Chat siguiente" icono={FlechaAbajoIcon} activo={!!chatSiguiente} alHacerClic={() => chatSiguiente && abrirChat(chatSiguiente)} />
             </>
@@ -1487,7 +1528,7 @@ export function Bandeja({
           <div className="bandeja-wa @container flex min-h-0 flex-1 flex-col bg-[var(--wa-fondo)] text-[var(--wa-texto)]">
             {/* La ficha del dropshipper siempre se ve con el chat (29 oct 2026, pedido de Alcides): al lado si caben, y si la ventana es angosta, arriba del chat. */}
             <div className="flex min-h-0 flex-1 flex-col @4xl:flex-row">
-              <div className="flex max-h-[45%] min-h-0 min-w-0 flex-none flex-col @4xl:max-h-none @4xl:flex-1">
+              <div className={`${sel.interno ? "hidden" : "flex"} max-h-[45%] min-h-0 min-w-0 flex-none flex-col @4xl:max-h-none @4xl:flex-1`}>
                 <FichaDelChat
                   sel={sel}
                   dropshipper={verDropshipper ?? null}
@@ -1510,7 +1551,7 @@ export function Bandeja({
               </div>
               <section
                 aria-label={`Conversación con ${sel.nombre}`}
-                className={`relative flex min-h-0 w-full min-w-0 flex-1 flex-col border-t border-[var(--wa-borde)] @4xl:w-[46%] @4xl:border-t-0 @4xl:max-w-[720px] @4xl:flex-none @4xl:border-l @4xl:border-[var(--wa-borde)]`}
+                className={`relative flex min-h-0 w-full min-w-0 flex-1 flex-col border-t border-[var(--wa-borde)] ${sel.interno ? "@4xl:border-t-0" : "@4xl:w-[46%] @4xl:border-t-0 @4xl:max-w-[720px] @4xl:flex-none @4xl:border-l @4xl:border-[var(--wa-borde)]"}`}
                 onDragEnter={(e) => {
                   if (!traeArchivos(e)) return;
                   e.preventDefault();
