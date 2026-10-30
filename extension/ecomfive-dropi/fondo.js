@@ -19,6 +19,9 @@ const LECTORES = {
   // Costa Rica (28 oct 2026): los mismos lectores en la pestaña de app.dropi.cr.
   proveedor_cr: { pais: "cr", archivo: "lectores/dropi-diario.js", funcion: "dropiDiario", estado: "__dropiDiario", archivos: ["pedidos", "cartera", "retiros", "stock"] },
   ventas_cr: { pais: "cr", archivo: "lectores/ventas-dropi.js", funcion: "ventasDropi", estado: "__ventasDropi", archivos: ["resumen", "movimientos"] },
+  // México (0.4.0, 30 oct 2026): los mismos lectores en la pestaña de app.dropi.mx, con la cuenta de proveedor.
+  proveedor_mx: { pais: "mx", archivo: "lectores/dropi-diario.js", funcion: "dropiDiario", estado: "__dropiDiario", archivos: ["pedidos", "cartera", "retiros", "stock"] },
+  ventas_mx: { pais: "mx", archivo: "lectores/ventas-dropi.js", funcion: "ventasDropi", estado: "__ventasDropi", archivos: ["resumen", "movimientos"] },
   catalogo_mx: { pais: "mx", archivo: "lectores/catalogo.js", funcion: "leerCatalogo", estado: "__catalogo", archivos: ["catalogo"] },
 };
 // Las direcciones firmadas de subida del sistema: solo a su carpeta temporal de «Actualizar Dropi» y solo en el proyecto de Supabase
@@ -106,7 +109,8 @@ async function atender(m) {
         subida[a] = u;
       }
       const d = m.dias;
-      const entero = (x) => Number.isInteger(x) && x > 0 && x <= 400;
+      // Hasta 1.000 días (MAX_DIAS_LECTURA del sistema): la primera lectura de México trae desde julio de 2024.
+      const entero = (x) => Number.isInteger(x) && x > 0 && x <= 1000;
       const dias = d && entero(d.pedidos) && entero(d.cartera) ? { pedidos: d.pedidos, cartera: d.cartera } : null;
       const t = await pestana(l.pais, true, false);
       await chrome.scripting.executeScript({ target: { tabId: t.id }, world: "MAIN", files: [l.archivo] });

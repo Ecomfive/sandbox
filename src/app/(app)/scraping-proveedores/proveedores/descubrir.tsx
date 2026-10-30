@@ -7,7 +7,7 @@ import { claseCeldaColumna, claseEncabezadoColumna, claseFilaEncabezado } from "
 import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { pedirExtension, type AvanceLector, type SesionDropi } from "@/lib/dropi-actualizar/extension";
-import { sesionValida } from "@/lib/dropi-actualizar/partes";
+import { sesionCatalogoMx } from "@/lib/dropi-actualizar/partes";
 import { formatearFechaHora } from "@/lib/formato";
 import { CDN_FOTOS_DROPI } from "@/lib/publicaciones/republicar-dropi";
 import { formatoNumero } from "../def-scraping";
@@ -121,7 +121,7 @@ export function DescubrirProveedores({ lectura, proveedores, puedeLeer, puedeSeg
       let mostrada = false;
       for (;;) {
         const s = await pedirExtension<SesionDropi>({ tipo: "sesion", pais: "mx", abrir: true }, 45000).catch(() => null);
-        if (sesionValida("mx", s) === "ok") break;
+        if (sesionCatalogoMx(s) === "ok") break;
         if (!mostrada) {
           await pedirExtension({ tipo: "mostrar", pais: "mx" }).catch(() => null);
           mostrada = true;

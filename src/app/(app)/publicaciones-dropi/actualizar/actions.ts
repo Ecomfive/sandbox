@@ -33,8 +33,8 @@ export async function empezarActualizacion(partes: unknown): Promise<{ error?: s
   const usuario = await usuarioPermitido();
   const pedidas = (Array.isArray(partes) ? partes : []).filter(esParte);
   if (!pedidas.length) return { error: "Elige al menos una parte." };
-  // Panamá y Costa Rica se actualizan por separado (28 oct 2026, Hernán: juntos es mucha carga y tarda mucho más).
-  if (new Set(pedidas.map((p) => parteDe(p).pais)).size > 1) return { error: "Panamá y Costa Rica se actualizan por separado: elige las partes de un solo país." };
+  // Cada país se actualiza por separado (28 oct 2026, Hernán: juntos es mucha carga y tarda mucho más).
+  if (new Set(pedidas.map((p) => parteDe(p).pais)).size > 1) return { error: "Cada país se actualiza por separado: elige las partes de un solo país." };
   const supabase = createServiceClient();
   // Una sola a la vez (26 oct 2026: un doble clic arrancó dos y el CRM no alcanzó). Una que quedó «corriendo» hace más de 40
   // minutos (se cerró la pestaña a medias) ya no bloquea.
