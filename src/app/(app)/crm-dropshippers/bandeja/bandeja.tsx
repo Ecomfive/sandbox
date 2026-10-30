@@ -38,7 +38,7 @@ import { ImportarChat } from "./importar-chat";
 import { NuevoContacto } from "./nuevo-contacto";
 import { PedirBorrado, type QueBorrar } from "./pedir-borrado";
 import { MostrarTelefono } from "../mostrar-telefono";
-import { ActualizarIcon, ArchivarIcon, ChatIcon, CheckIcon, ConectadoIcon, DescargarIcon, DesconectadoIcon, FlechaAbajoIcon, FlechaArribaIcon, PapeleraIcon, PersonaIcon, ReactivarIcon } from "@/lib/nav-icons";
+import { ActualizarIcon, ArchivarIcon, ChatIcon, CheckIcon, ConectadoIcon, DescargarIcon, FlechaAbajoIcon, FlechaArribaIcon, PapeleraIcon, PersonaIcon, ReactivarIcon } from "@/lib/nav-icons";
 import { Ventana } from "@/components/ui/ventana";
 import { BotonNavegar } from "../ficha-lateral";
 import { vistaPreviaTexto } from "@/lib/whatsapp/borrado";
@@ -1180,12 +1180,9 @@ export function Bandeja({
               ...(sel.borradoPendiente ? [] : [{ texto: "Pedir borrar el chat", corto: "Pedir borrar", icono: PapeleraIcon, alPulsar: () => setBorrar({ tipo: "chat" }) }]),
             ]
           : []),
-        ...(verDropshipper
-          ? // Sin «Abrir su ficha en el CRM» (29 oct 2026, pedido de Alcides): la ficha completa ya se ve aquí.
-            escribe
-            ? [{ texto: "No es este dropshipper: vincular otro", corto: "No es este", icono: DesconectadoIcon, alPulsar: () => setVincular(true) }]
-            : []
-          : escribe && !sel.dropshipperId
+        // Sin «Abrir su ficha en el CRM» ni «No es este» (29 oct 2026, pedido de Alcides): la ficha completa ya se ve aquí y las cuentas de Dropi se
+        // quitan en su bloque «Cuentas».
+        ...(!verDropshipper && escribe && !sel.dropshipperId
             ? [{ texto: "Vincular a un dropshipper", corto: "Vincular", icono: ConectadoIcon, alPulsar: () => setVincular(true) }]
             : []),
       ];

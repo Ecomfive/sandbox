@@ -10,7 +10,6 @@ import { DESDE_EL_CELULAR } from "@/lib/whatsapp/actividad-equipo";
 import { formatearFecha } from "@/lib/formato";
 import { Tooltip } from "@/components/ui/tooltip";
 import { ActividadDropshipper } from "../actividad-dropshipper";
-import { SeguimientosDropshipper } from "../areas-ficha";
 import { CuentasDropshipper } from "../cuentas-dropshipper";
 import { etiquetaEstado } from "../def-crm";
 import { DesempenoDropshipper } from "../desempeno-dropshipper";
@@ -326,11 +325,6 @@ export function FichaDelChat({
           <div id="ficha-chat-actividad" className="scroll-mt-12">
             {/* Una sola Actividad (29 oct 2026, pedido de Alcides): con dropshipper, la del CRM ya trae lo que el equipo hizo en sus chats; sin él, la del chat. */}
             {!sel.dropshipperId && <ActividadDelEquipoFicha key={`equipo-${sel.id}`} conversacionId={sel.id} version={versionEquipo} />}
-            {d && acceso && acceso.comercial && (
-              <Seccion titulo="Seguimientos">
-                <SeguimientosDropshipper key={`seguimientos-${d.id}`} dropshipperId={d.id} puedeEscribir={acceso.escribeComercial} version={version} />
-              </Seccion>
-            )}
             {d && acceso && (
               // La misma Actividad de Compras y Gestión de IDs (comentarios, emojis, archivos y quién hizo qué), con su propio encabezado y los
               // colores del sistema, no los del chat.

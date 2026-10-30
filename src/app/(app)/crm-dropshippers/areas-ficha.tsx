@@ -1,42 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { TextoConMenciones } from "@/components/ui/campo-menciones";
-import { Campo } from "@/components/ui/campo-ficha";
-import { anilloFoco, fieldClass } from "@/components/ui/field";
-import { FichaCrear } from "@/components/ui/ficha-crear";
-import { Seccion } from "@/components/ui/seccion-ficha";
+import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
-import { formatearFecha, formatearTiempoRelativo } from "@/lib/formato";
+import { formatearTiempoRelativo } from "@/lib/formato";
 import type { AccesoCrm } from "@/lib/crm/areas";
-import { CalendarioIcon, PersonaIcon } from "@/lib/nav-icons";
-import {
-  completarSeguimiento,
-  crearSeguimiento,
-  escalarCaso,
-  obtenerLineaDeTiempo,
-  obtenerSeguimientos,
-  type ItemLinea,
-  type Seguimiento,
-} from "./actions";
-import type { FilaDropshipper } from "./def-crm";
-
-const hoy = () => new Date().toLocaleDateString("en-CA");
-
-/** Botón de la fila de acciones de la ficha: ícono arriba y texto abajo (igual que los de `paneles-ficha`). */
-function BotonAccion({ texto, icono: Icono, alHacerClic }: { texto: string; icono: typeof PersonaIcon; alHacerClic: () => void }) {
-  return (
-    <button
-      type="button"
-      aria-haspopup="dialog"
-      onClick={alHacerClic}
-      className={`flex flex-col items-center gap-0.5 rounded-lg bg-accent px-1 py-2 text-[11.5px] font-medium hover:bg-accent-hover ${anilloFoco}`}
-    >
-      <Icono className="h-4 w-4" />
-      {texto}
-    </button>
-  );
-}
+import { escalarCaso, obtenerLineaDeTiempo, type ItemLinea } from "./actions";
 
 /** «Pasar a Comercial» en un caso abierto: Atención lo deja como seguimiento del área comercial. */
 export function BotonEscalar({ casoId, escalado }: { casoId: string; escalado: boolean }) {
@@ -57,98 +27,6 @@ export function BotonEscalar({ casoId, escalado }: { casoId: string; escalado: b
     >
       Pasar a Comercial
     </button>
-  );
-}
-
-/** Nuevo seguimiento comercial. */
-export function PanelSeguimiento({ d, alGuardar }: { d: FilaDropshipper; alGuardar?: () => void }) {
-  return (
-    <FichaCrear
-      alGuardar={alGuardar}
-      titulo="Nuevo seguimiento"
-      etiquetaCrear="Crear seguimiento"
-      action={crearSeguimiento}
-      mensajeExito="Seguimiento creado"
-      ocultos={{ dropshipper_id: d.id }}
-      boton={(abrir) => <BotonAccion texto="Seguim." icono={CalendarioIcon} alHacerClic={abrir} />}
-    >
-      {({ faltante, invalido }) => (
-        <Seccion icono={CalendarioIcon} titulo="Seguimiento">
-          <Campo etiqueta="Qué hay que hacer" id="campo-titulo-seguimiento" obligatorio faltante={faltante}>
-            <input
-              id="campo-titulo-seguimiento"
-              type="text"
-              name="titulo"
-              required
-              maxLength={200}
-              autoComplete="off"
-              data-enfocar
-              aria-invalid={invalido("campo-titulo-seguimiento")}
-              placeholder="Ej: Ofrecerle el nuevo producto de belleza"
-              className={`${fieldClass} w-full`}
-            />
-          </Campo>
-          <Campo etiqueta="Para cuándo" id="campo-vence-seguimiento">
-            <input id="campo-vence-seguimiento" type="date" name="vence" min={hoy()} className={`${fieldClass} w-full`} />
-          </Campo>
-          <Campo etiqueta="Detalle" id="campo-detalle-seguimiento">
-            <textarea id="campo-detalle-seguimiento" name="detalle" rows={3} className={`${fieldClass} w-full resize-y`} />
-          </Campo>
-        </Seccion>
-      )}
-    </FichaCrear>
-  );
-}
-
-/** Los seguimientos comerciales del dropshipper, con su casilla para marcarlos como hechos. */
-export function SeguimientosDropshipper({ dropshipperId, puedeEscribir, version }: { dropshipperId: string; puedeEscribir: boolean; version: number }) {
-  const { mostrarToast } = useToast();
-  const [lista, setLista] = useState<Seguimiento[] | "error" | null>(null);
-  const [pendiente, start] = useTransition();
-
-  const cargar = useCallback(() => {
-    obtenerSeguimientos(dropshipperId)
-      .then((r) => setLista("seguimientos" in r ? r.seguimientos : "error"))
-      .catch(() => setLista("error"));
-  }, [dropshipperId]);
-
-  useEffect(() => {
-    cargar();
-  }, [cargar, version]);
-
-  if (lista === null) return <p className="m-0 text-[13px] text-muted-foreground">Cargando…</p>;
-  if (lista === "error") return <p role="alert" className="m-0 text-[13px] text-destructive">No se pudieron cargar los seguimientos.</p>;
-  if (lista.length === 0) return <p className="m-0 text-[13px] text-muted-foreground">Sin seguimientos.</p>;
-
-  return (
-    <ul className="m-0 flex list-none flex-col gap-1.5 p-0 text-[13px]">
-      {lista.map((t) => (
-        <li key={t.id} className="flex items-start gap-2">
-          <input
-            type="checkbox"
-            checked={t.estado === "hecha"}
-            disabled={!puedeEscribir || pendiente}
-            aria-label={`Marcar como hecho: ${t.titulo}`}
-            onChange={(e) =>
-              start(async () => {
-                const r = await completarSeguimiento(t.id, e.target.checked);
-                if (r.error) mostrarToast(r.error, "destructive");
-                cargar();
-              })
-            }
-            className="mt-0.5 h-4 w-4 shrink-0"
-          />
-          <span className={`min-w-0 flex-1 ${t.estado === "hecha" ? "text-muted-foreground line-through" : ""}`}>
-            {t.titulo}
-            {t.escalado ? <span className="text-xs text-muted-foreground"> · desde Atención</span> : null}
-            <span className="block text-xs text-muted-foreground">
-              {t.vence ? `Para ${formatearFecha(t.vence)}` : "Sin fecha"}
-              {t.responsable ? ` · ${t.responsable}` : ""}
-            </span>
-          </span>
-        </li>
-      ))}
-    </ul>
   );
 }
 
