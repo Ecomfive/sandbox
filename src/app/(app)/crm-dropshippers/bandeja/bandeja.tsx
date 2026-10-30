@@ -23,6 +23,7 @@ import { abrirChatInterno } from "./interno-actions";
 import { BotonWhatsappInterno } from "./interno";
 import { colorFoto, iniciales } from "./globo-persona";
 import { EtiquetasChat, PastillasEtiquetas, SelectorEtiquetasChat, type ManejoEtiquetas } from "./etiquetas-chat";
+import { ItemFila } from "../botones-ficha";
 import { claseBotonFicha, claseBotonFichaPrincipal, DatosEnLaCabecera, FichaDelChat, type AccionExtra } from "./ficha-chat";
 import { reaccionarAMensaje } from "./reaccion-actions";
 import { VistaPreviaChat } from "./vista-previa-chat";
@@ -1119,6 +1120,7 @@ export function Bandeja({
   const accionesChat =
     sel && escribe ? (
       mirando ? (
+        <ItemFila id="tomar">
         <button
           type="button"
           disabled={enviando}
@@ -1129,8 +1131,10 @@ export function Bandeja({
           <ChatIcon className="h-4 w-4" />
           Intervenir
         </button>
+        </ItemFila>
       ) : (
         <>
+          <ItemFila id="tomar">
           {sel.asignadaAId === miId ? (
             <button type="button" disabled={enviando} className={claseBotonFicha} onClick={() => accion(() => tomarConversacion(sel.id, true), "Soltaste la conversación.")}>
               <PersonaIcon className="h-4 w-4" />
@@ -1148,6 +1152,8 @@ export function Bandeja({
               Tomar
             </button>
           )}
+          </ItemFila>
+          <ItemFila id="resuelta">
           {sel.estado === "abierta" ? (
             <button type="button" disabled={enviando} className={claseBotonFicha} onClick={() => accion(() => cambiarEstadoConversacion(sel.id, "resuelta"), "Marcada resuelta. Si vuelve a escribir, se reabre sola.")}>
               <CheckIcon className="h-4 w-4" />
@@ -1159,6 +1165,7 @@ export function Bandeja({
               Reabrir
             </button>
           )}
+          </ItemFila>
         </>
       )
     ) : null;
@@ -1167,24 +1174,25 @@ export function Bandeja({
   const accionesExtra: AccionExtra[] = !sel
     ? []
     : [
-        { texto: "Marcar como no leído", corto: "No leído", icono: ChatIcon, alPulsar: () => marcarLeido(sel, false) },
+        { id: "no_leido", texto: "Marcar como no leído", corto: "No leído", icono: ChatIcon, alPulsar: () => marcarLeido(sel, false) },
         ...(escribe && !mirando
           ? [
-              ...AREAS_CHAT.filter((a) => a.valor !== sel.area).map((a) => ({ texto: `Pasar el chat a ${a.etiqueta}`, corto: `A ${a.etiqueta}`, icono: ActualizarIcon, alPulsar: () => pasarA(a.valor) })),
-              { texto: "Importar chat del celular", corto: "Importar", icono: DescargarIcon, alPulsar: () => setImportar({ conversacion: sel }) },
+              ...AREAS_CHAT.filter((a) => a.valor !== sel.area).map((a) => ({ id: `pasar_${a.valor}` as AccionExtra["id"], texto: `Pasar el chat a ${a.etiqueta}`, corto: `A ${a.etiqueta}`, icono: ActualizarIcon, alPulsar: () => pasarA(a.valor) })),
+              { id: "importar" as const, texto: "Importar chat del celular", corto: "Importar", icono: DescargarIcon, alPulsar: () => setImportar({ conversacion: sel }) },
               {
+                id: "borrado_app" as const,
                 texto: sel.borradaEnApp ? "Quitar marca de borrado" : "Marcar borrado en la app",
                 corto: sel.borradaEnApp ? "Quitar marca" : "Borrado en app",
                 icono: ArchivarIcon,
                 alPulsar: () => accion(() => marcarChatBorradoEnApp(sel.id, !sel.borradaEnApp), sel.borradaEnApp ? "Quitaste la marca." : "Marcado: se borró en la app de WhatsApp Business. Aquí se conserva todo."),
               },
-              ...(sel.borradoPendiente ? [] : [{ texto: "Pedir borrar el chat", corto: "Pedir borrar", icono: PapeleraIcon, alPulsar: () => setBorrar({ tipo: "chat" }) }]),
+              ...(sel.borradoPendiente ? [] : [{ id: "pedir_borrar" as const, texto: "Pedir borrar el chat", corto: "Pedir borrar", icono: PapeleraIcon, alPulsar: () => setBorrar({ tipo: "chat" }) }]),
             ]
           : []),
         // Sin «Abrir su ficha en el CRM» ni «No es este» (29 oct 2026, pedido de Alcides): la ficha completa ya se ve aquí y las cuentas de Dropi se
         // quitan en su bloque «Cuentas».
         ...(!verDropshipper && escribe && !sel.dropshipperId
-            ? [{ texto: "Vincular a un dropshipper", corto: "Vincular", icono: ConectadoIcon, alPulsar: () => setVincular(true) }]
+            ? [{ id: "vincular" as const, texto: "Vincular a un dropshipper", corto: "Vincular", icono: ConectadoIcon, alPulsar: () => setVincular(true) }]
             : []),
       ];
 

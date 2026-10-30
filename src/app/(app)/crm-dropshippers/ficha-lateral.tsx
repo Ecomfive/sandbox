@@ -18,6 +18,8 @@ import type { AccesoCrm } from "@/lib/crm/areas";
 import { ActividadDropshipper } from "./actividad-dropshipper";
 import { BotonEscalar } from "./areas-ficha";
 import { MostrarTelefono } from "./mostrar-telefono";
+import { DestinoEnSitio, EnSitio } from "@/components/ui/en-sitio";
+import { FilaBotones, ItemFila } from "./botones-ficha";
 import { DatoEditable } from "./dato-editable";
 import { NUMERO_REGISTRADO, type CampoDato } from "@/lib/crm/dato-dropshipper";
 import { CuentasDropshipper } from "./cuentas-dropshipper";
@@ -98,23 +100,29 @@ export function ContenidoFichaDropshipper({ d, casos, codigoPais, hoy, acceso }:
             </Pastilla>
           )}
         </div>
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(58px,1fr))] gap-1.5">
-          {d.whatsapp ? (
-            <Link
-              href={`/crm-dropshippers/bandeja?abrir=${d.whatsapp.conversacionId}`}
-              className={`flex flex-col items-center gap-0.5 rounded-lg bg-primario px-1 py-2 text-[11.5px] font-medium text-white hover:opacity-90 ${anilloFoco}`}
-            >
-              <ChatIcon className="h-4 w-4" />
-              WhatsApp
-            </Link>
-          ) : (
-            <span aria-disabled="true" className="flex flex-col items-center gap-0.5 rounded-lg bg-accent px-1 py-2 text-[11.5px] font-medium opacity-40">
-              <ChatIcon className="h-4 w-4" />
-              WhatsApp
-            </span>
-          )}
-          <AccionesCrm d={d} codigoPais={codigoPais} acceso={acceso} alGuardar={alGuardar} />
-        </div>
+        {/* Los botones, de derecha a izquierda según su uso; Nuevo caso y Recomendar abren su formulario justo debajo, en el mismo lugar. */}
+        <EnSitio key={d.id}>
+          <FilaBotones className="grid grid-cols-[repeat(auto-fit,minmax(58px,1fr))] gap-1.5">
+            <ItemFila id="whatsapp">
+              {d.whatsapp ? (
+                <Link
+                  href={`/crm-dropshippers/bandeja?abrir=${d.whatsapp.conversacionId}`}
+                  className={`flex flex-col items-center gap-0.5 rounded-lg bg-primario px-1 py-2 text-[11.5px] font-medium text-white hover:opacity-90 ${anilloFoco}`}
+                >
+                  <ChatIcon className="h-4 w-4" />
+                  WhatsApp
+                </Link>
+              ) : (
+                <span aria-disabled="true" className="flex flex-col items-center gap-0.5 rounded-lg bg-accent px-1 py-2 text-[11.5px] font-medium opacity-40">
+                  <ChatIcon className="h-4 w-4" />
+                  WhatsApp
+                </span>
+              )}
+            </ItemFila>
+            <AccionesCrm d={d} codigoPais={codigoPais} acceso={acceso} alGuardar={alGuardar} />
+          </FilaBotones>
+          <DestinoEnSitio />
+        </EnSitio>
       </div>
 
       <Bloque icono={ChatIcon} titulo="Conversación de WhatsApp">
