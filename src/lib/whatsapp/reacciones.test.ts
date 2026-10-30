@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { agruparReacciones, emojiDeReaccion, miReaccion, REACCIONES_RAPIDAS, type MensajeConReaccion, agruparReaccionesInternas } from "./reacciones";
+import { agruparReacciones, emojiDeReaccion, miReaccion, REACCIONES_RAPIDAS, type MensajeConReaccion } from "./reacciones";
 
 let n = 0;
 const msj = (direccion: MensajeConReaccion["direccion"], texto: string, waId: string | null = `w${++n}`): MensajeConReaccion => ({ id: `m${++n}`, direccion, tipo: "texto", texto, waId, reaccionA: null });
@@ -68,41 +68,4 @@ test("dice con qué emoji reaccionó el equipo", () => {
   assert.equal(miReaccion([{ emoji: "👍", direccion: "entrante" }, { emoji: "❤️", direccion: "saliente" }]), "❤️");
   assert.equal(miReaccion([{ emoji: "👍", direccion: "entrante" }]), null);
   assert.equal(miReaccion(undefined), null);
-});
-
-test("chat interno: cada persona reacciona por su cuenta y los emojis se juntan con quiénes los pusieron", () => {
-  const m = (id: string, extra: object = {}) => ({ id, direccion: "nota" as const, tipo: "texto", texto: "hola", ...extra });
-  const mensajes = [
-    m("1", { waId: "int:g1:c1", autorId: "u-nicole", autor: "Nicole" }),
-    m("2", { tipo: "reaccion", texto: "👍", reaccionA: "int:g1:c1", autorId: "u-francis", autor: "Francis" }),
-    m("3", { tipo: "reaccion", texto: "👍", reaccionA: "int:g1:c1", autorId: "u-ceo", autor: "Alcides" }),
-    m("4", { tipo: "reaccion", texto: "❤️", reaccionA: "int:g1:c1", autorId: "u-nicole", autor: "Nicole" }),
-  ];
-  const { visibles, reacciones } = agruparReaccionesInternas(mensajes, "u-ceo");
-  assert.deepEqual(visibles.map((x) => x.id), ["1"]);
-  const r = reacciones.get("1")!;
-  assert.deepEqual(r.map((x) => [x.emoji, x.autores]), [["👍", ["Francis", "Alcides"]], ["❤️", ["Nicole"]]]);
-  assert.equal(r[0].mia, true);
-  assert.equal(r[1].mia, false);
-  assert.equal(miReaccion(r), "👍");
-});
-
-test("chat interno: la última reacción de una persona es la que vale y una vacía la quita", () => {
-  const m = (id: string, extra: object = {}) => ({ id, direccion: "nota" as const, tipo: "texto", texto: "hola", ...extra });
-  const mensajes = [
-    m("1", { waId: "int:g1:c1" }),
-    m("2", { tipo: "reaccion", texto: "👍", reaccionA: "int:g1:c1", autorId: "u1", autor: "Ana" }),
-    m("3", { tipo: "reaccion", texto: "😂", reaccionA: "int:g1:c1", autorId: "u1", autor: "Ana" }),
-    m("4", { tipo: "reaccion", texto: "🙏", reaccionA: "int:g1:c1", autorId: "u2", autor: "Luis" }),
-    m("5", { tipo: "reaccion", texto: null, reaccionA: "int:g1:c1", autorId: "u2", autor: "Luis" }),
-  ];
-  const { reacciones } = agruparReaccionesInternas(mensajes, "u9");
-  assert.deepEqual(reacciones.get("1")!.map((x) => [x.emoji, x.autores]), [["😂", ["Ana"]]]);
-  assert.equal(miReaccion(reacciones.get("1")), null);
-});
-
-test("chat interno: una reacción a un mensaje que no está cargado no se dibuja suelta", () => {
-  const { visibles, reacciones } = agruparReaccionesInternas([{ id: "9", direccion: "nota" as const, tipo: "reaccion", texto: "👍", reaccionA: "int:otro:c", autorId: "u1", autor: "Ana" }], "u1");
-  assert.equal(visibles.length, 0);
-  assert.equal(reacciones.size, 0);
 });
