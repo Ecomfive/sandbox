@@ -1,3 +1,4 @@
+import type { VendeEn } from "@/lib/whatsapp/origen-chat";
 import { FASES } from "@/lib/crm/areas";
 import { SIN_VALOR, type DefTabla } from "@/lib/tabla/motor";
 
@@ -128,6 +129,8 @@ export interface FilaDropshipper {
   cuentas: CuentaVinculada[];
   /** Plataformas donde vende con nosotros, según sus cuentas vinculadas («Dropi»). */
   plataformas: string[];
+  /** Dónde vende: plataforma y país (bandera), de sus cuentas vinculadas y lo puesto a mano en «Dónde vende» del chat (migraciones 0193 y 0194). */
+  vendeEn: VendeEn[];
   /** Captación: captado, en onboarding o activo. */
   fase: string;
   /** Líder comercial que lo lleva (id de perfil), si hay. */

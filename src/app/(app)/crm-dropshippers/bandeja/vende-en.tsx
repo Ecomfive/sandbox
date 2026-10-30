@@ -14,7 +14,7 @@ const igual = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLo
 const botonIcono = `flex h-6 w-6 flex-none items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground ${anilloFoco}`;
 
 /** «🇵🇦 Dropi»: una plataforma en un país, con su ✕ para quitarla si se puede escribir. */
-function PastillaVendeEn({ v, alQuitar }: { v: VendeEn; alQuitar?: () => void }) {
+export function PastillaVendeEn({ v, alQuitar }: { v: VendeEn; alQuitar?: () => void }) {
   return (
     <span className="inline-flex items-center gap-1 rounded-full border border-border-control py-px pr-0.5 pl-2 text-[11px] font-semibold whitespace-nowrap">
       <span aria-hidden="true">{bandera(v.pais)}</span>

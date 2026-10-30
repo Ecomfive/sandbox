@@ -1,5 +1,6 @@
 "use client";
 
+import { bandera, nombrePais } from "@/lib/whatsapp/origen-chat";
 import { PastillaTipo } from "./tipo-cliente";
 import type { ReactNode } from "react";
 import { anilloFoco } from "@/components/ui/field";
@@ -69,7 +70,6 @@ export function EncabezadoFilasCrm() {
  */
 export function FilaDropshipperLista({ d, codigoPais, hoy, alAbrir }: { d: FilaDropshipper; codigoPais: string; hoy: string; alAbrir: () => void }) {
   const sinPedir = d.estado === "activo" && !!d.ultimoPedido && diasEntre(d.ultimoPedido, hoy) >= DIAS_SIN_PEDIR;
-  const cuentas = [...new Set(d.cuentas.map((c) => `${c.plataforma} ${c.codigoPais}`.trim()))];
   const w = d.whatsapp;
   return (
     <button
@@ -102,16 +102,19 @@ export function FilaDropshipperLista({ d, codigoPais, hoy, alAbrir }: { d: FilaD
         <Celda
           nombre="Vende en"
           principal={
-            cuentas.length ? (
+            // La plataforma con la bandera de su país («🇵🇦 Dropi»), como «Dónde vende» del chat (29 oct 2026, pedido de Alcides).
+            d.vendeEn.length ? (
               <span className="flex flex-wrap gap-1">
-                {cuentas.map((c) => (
-                  <span key={c} className="rounded-[5px] bg-muted px-1.5 py-px text-xs font-medium text-foreground-soft">
-                    {c}
+                {d.vendeEn.map((v) => (
+                  <span key={`${v.plataforma}|${v.pais}`} className="inline-flex items-center gap-1 rounded-[5px] bg-muted px-1.5 py-px text-xs font-medium whitespace-nowrap text-foreground-soft">
+                    <span aria-hidden="true">{bandera(v.pais)}</span>
+                    <span className="sr-only">{nombrePais(v.pais)}: </span>
+                    {v.plataforma}
                   </span>
                 ))}
               </span>
             ) : (
-              <span className="text-xs text-muted-foreground">Sin cuenta vinculada</span>
+              <span className="text-xs text-muted-foreground">Sin plataforma</span>
             )
           }
         />
