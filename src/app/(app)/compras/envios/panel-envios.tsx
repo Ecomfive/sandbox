@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
-import { BotonBarra, BotonDescargar, CabeceraTarjeta, Indicador, Pastilla, Segmentado } from "@/components/panel/piezas-panel";
+import { BotonBarra, BotonDescargar, CabeceraTarjeta, Indicador, TableroIndicadores, Pastilla, Segmentado } from "@/components/panel/piezas-panel";
 import { anilloFoco } from "@/components/ui/field";
 import { almacen } from "@/components/tabla/almacen";
 import { estadoRuta, realQueManda } from "@/lib/compras/estado-ruta";
@@ -267,21 +267,19 @@ function Indicadores({ activas, medidas, tardes, cumplen, soloTarde, alAlternarT
     </span>
   );
   return (
-    <section aria-label="Indicadores" className="marco-neon overflow-hidden rounded-[10px] border border-border bg-card">
-      <div className="flex flex-wrap">
-        <Indicador titulo="Rutas activas" valor={String(activas.length)} detalle={`${paises} ${paises === 1 ? "país" : "países"} · ${agentes} ${agentes === 1 ? "agente" : "agentes"}`} />
-        <Indicador titulo="Marítimo · real 12 meses" valor={dias(mar.real.promedio)} detalle={detalleVia(mar)} />
-        <Indicador titulo="Aéreo · real 12 meses" valor={dias(aire.real.promedio)} detalle={detalleVia(aire)} />
-        <Indicador titulo="Cumplen el plazo" valor={`${cumplen} de ${medidas}`} detalle="rutas con plazo y envíos medidos" />
-        <Indicador
-          titulo="Fuera de plazo"
-          punto={tardes ? "peligro" : "exito"}
-          valor={String(tardes)}
-          detalle={soloTarde ? "Mostrando solo estas · pulsa para ver todas" : tardes ? "Pulsa para ver solo estas" : "Todo en plazo"}
-          alPulsar={alAlternarTarde}
-          activo={soloTarde}
-        />
-      </div>
-    </section>
+    <TableroIndicadores etiqueta="Indicadores">
+      <Indicador titulo="Rutas activas" valor={String(activas.length)} detalle={`${paises} ${paises === 1 ? "país" : "países"} · ${agentes} ${agentes === 1 ? "agente" : "agentes"}`} />
+      <Indicador titulo="Marítimo · real 12 meses" valor={dias(mar.real.promedio)} detalle={detalleVia(mar)} />
+      <Indicador titulo="Aéreo · real 12 meses" valor={dias(aire.real.promedio)} detalle={detalleVia(aire)} />
+      <Indicador titulo="Cumplen el plazo" valor={`${cumplen} de ${medidas}`} detalle="rutas con plazo y envíos medidos" />
+      <Indicador
+        titulo="Fuera de plazo"
+        punto={tardes ? "peligro" : "exito"}
+        valor={String(tardes)}
+        detalle={soloTarde ? "Mostrando solo estas · pulsa para ver todas" : tardes ? "Pulsa para ver solo estas" : "Todo en plazo"}
+        alPulsar={alAlternarTarde}
+        activo={soloTarde}
+      />
+    </TableroIndicadores>
   );
 }

@@ -16,15 +16,9 @@ import { DEF_PUBLICACIONES, POCO_STOCK, estadoVinculo, paraReactivar, pocoStock,
 
 const seleccion = (campo: string, ...valores: string[]) => ({ campo, valor: { tipo: "seleccion" as const, valores } });
 
-/** El color de cada tarjeta: el del ícono (sobre su fondo suave), el del número y el del borde cuando está filtrando. */
-export const COLORES = {
-  verde: { icono: "bg-success-soft text-success", numero: "text-success", activa: "border-success ring-success/30" },
-  ambar: { icono: "bg-warning-soft text-warning", numero: "text-warning", activa: "border-warning ring-warning/30" },
-  rojo: { icono: "bg-destructive-soft text-destructive", numero: "text-destructive", activa: "border-destructive ring-destructive/30" },
-  azul: { icono: "bg-azul-soft text-azul", numero: "text-azul", activa: "border-azul ring-azul/30" },
-  violeta: { icono: "bg-primario-suave text-primario", numero: "text-primario", activa: "border-primario ring-primario/30" },
-} as const;
-export type Color = keyof typeof COLORES;
+// El color de cada tarjeta vive en components/panel (lo usan también el CRM y Compras); se reexporta para los que ya lo importan de aquí.
+import { COLORES, type Color } from "@/components/panel/colores-tablero";
+export { COLORES, type Color };
 
 interface Tarjeta {
   id: string;
