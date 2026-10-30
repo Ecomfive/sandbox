@@ -20,7 +20,7 @@ import { PastillaTipo } from "../tipo-cliente";
 import { VendeEnChat } from "./vende-en";
 import { colorFoto, iniciales } from "./globo-persona";
 import { EtiquetasChat, PastillasEtiquetas, SelectorEtiquetasChat, type ManejoEtiquetas } from "./etiquetas-chat";
-import { claseBotonFicha, claseBotonFichaPrincipal, FichaDelChat, type OpcionMas } from "./ficha-chat";
+import { claseBotonFicha, claseBotonFichaPrincipal, FichaDelChat, type AccionExtra } from "./ficha-chat";
 import { reaccionarAMensaje } from "./reaccion-actions";
 import { VistaPreviaChat } from "./vista-previa-chat";
 import { VentanaVincular } from "./vincular-chat";
@@ -35,7 +35,7 @@ import { EnviarPlantilla, PlantillasEnLinea } from "./enviar-plantilla";
 import { ImportarChat } from "./importar-chat";
 import { PedirBorrado, type QueBorrar } from "./pedir-borrado";
 import { MostrarTelefono } from "../mostrar-telefono";
-import { ChatIcon, CheckIcon, FlechaAbajoIcon, FlechaArribaIcon, PapeleraIcon, PersonaIcon, ReactivarIcon } from "@/lib/nav-icons";
+import { ActualizarIcon, ArchivarIcon, ChatIcon, CheckIcon, ConectadoIcon, DescargarIcon, DesconectadoIcon, FlechaAbajoIcon, FlechaArribaIcon, PapeleraIcon, PersonaIcon, ReactivarIcon } from "@/lib/nav-icons";
 import { Ventana } from "@/components/ui/ventana";
 import { BotonNavegar } from "../ficha-lateral";
 import { vistaPreviaTexto } from "@/lib/whatsapp/borrado";
@@ -1138,29 +1138,31 @@ export function Bandeja({
       )
     ) : null;
 
-  // «Más»: lo que antes estaba en la cabecera del chat y en la ficha del costado.
-  const opcionesMas: OpcionMas[] = !sel
+  // Los demás botones del chat, en la misma fila (antes iban en un menú «Más»).
+  const accionesExtra: AccionExtra[] = !sel
     ? []
     : [
-        { texto: "Marcar como no leído", alPulsar: () => marcarLeido(sel, false) },
+        { texto: "Marcar como no leído", corto: "No leído", icono: ChatIcon, alPulsar: () => marcarLeido(sel, false) },
         ...(escribe && !mirando
           ? [
-              ...AREAS_CHAT.filter((a) => a.valor !== sel.area).map((a) => ({ texto: `Pasar a ${a.etiqueta}`, alPulsar: () => pasarA(a.valor) })),
-              { texto: "Importar chat del celular", alPulsar: () => setImportar({ conversacion: sel }) },
+              ...AREAS_CHAT.filter((a) => a.valor !== sel.area).map((a) => ({ texto: `Pasar el chat a ${a.etiqueta}`, corto: `A ${a.etiqueta}`, icono: ActualizarIcon, alPulsar: () => pasarA(a.valor) })),
+              { texto: "Importar chat del celular", corto: "Importar", icono: DescargarIcon, alPulsar: () => setImportar({ conversacion: sel }) },
               {
                 texto: sel.borradaEnApp ? "Quitar marca de borrado" : "Marcar borrado en la app",
+                corto: sel.borradaEnApp ? "Quitar marca" : "Borrado en app",
+                icono: ArchivarIcon,
                 alPulsar: () => accion(() => marcarChatBorradoEnApp(sel.id, !sel.borradaEnApp), sel.borradaEnApp ? "Quitaste la marca." : "Marcado: se borró en la app de WhatsApp Business. Aquí se conserva todo."),
               },
-              ...(sel.borradoPendiente ? [] : [{ texto: "Pedir borrar el chat", alPulsar: () => setBorrar({ tipo: "chat" }) }]),
+              ...(sel.borradoPendiente ? [] : [{ texto: "Pedir borrar el chat", corto: "Pedir borrar", icono: PapeleraIcon, alPulsar: () => setBorrar({ tipo: "chat" }) }]),
             ]
           : []),
         ...(verDropshipper
           ? // Sin «Abrir su ficha en el CRM» (29 oct 2026, pedido de Alcides): la ficha completa ya se ve aquí.
             escribe
-            ? [{ texto: "No es este dropshipper", alPulsar: () => setVincular(true) }]
+            ? [{ texto: "No es este dropshipper: vincular otro", corto: "No es este", icono: DesconectadoIcon, alPulsar: () => setVincular(true) }]
             : []
           : escribe && !sel.dropshipperId
-            ? [{ texto: "Vincular a un dropshipper", alPulsar: () => setVincular(true) }]
+            ? [{ texto: "Vincular a un dropshipper", corto: "Vincular", icono: ConectadoIcon, alPulsar: () => setVincular(true) }]
             : []),
       ];
 
@@ -1495,7 +1497,7 @@ export function Bandeja({
                   mirando={mirando}
                   accionesChat={accionesChat}
                   etiquetas={<EtiquetasChat key={sel.id} conversacionId={sel.id} etiquetas={sel.etiquetas} manejo={manejoEtiquetas} escribe={escribe} />}
-                  opcionesMas={opcionesMas}
+                  accionesExtra={accionesExtra}
                   respondieron={quienesRespondieron(mensajes ?? [])}
                   versionEquipo={`${(mensajes ?? []).filter((m) => m.direccion !== "entrante").length}|${sel.nombrePersonalizado ?? ""}|${sel.dropshipperId ?? ""}|${sel.area}|${sel.estado}|${sel.asignadaA ?? ""}`}
                   alAbrirVincular={() => setVincular(true)}
