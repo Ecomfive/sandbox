@@ -367,7 +367,7 @@ export function Bandeja({
   escribe,
   miId,
   verTelefono = false,
-  areas,
+  areas: misAreas,
   miArea,
   estado360 = null,
 }: {
@@ -396,9 +396,16 @@ export function Bandeja({
   const [filtro, setFiltro] = useState<Filtro>(abrirInicial ? "todas" : "sinResponder");
   const [numero, setNumero] = useState<string>("todos");
   const [buscar, setBuscar] = useState("");
-  // El tablero (29 oct 2026, pedido de Hernán; bosquejo https://claude.ai/artifact/1KpnHWrczXW3DtQ8Yv65na): un área a la vez, en columnas Alta, Media, Baja y Contestados.
+  // «Ver como» (30 oct 2026, pedido de Hernán): quien supervisa otras áreas ve la bandeja tal como la ve esa área (Nicole, en Atención): solo su
+  // panel, a todo lo ancho, con sus filtros, sus conteos y su tablero. Es para auditar desde el propio usuario: sigue siendo supervisión (lo que
+  // abre no se marca leído y para contestar hay que «Intervenir»). Desde aquí, `areas` son los paneles que se muestran.
+  const [verComo, setVerComo] = useState<AreaCrm | null>(null);
+  const areas = useMemo(() => (verComo ? [verComo] : misAreas), [verComo, misAreas]);
+  // El tablero (29 oct 2026, pedido de Hernán; bosquejo https://claude.ai/artifact/1KpnHWrczXW3DtQ8Yv65na): un área a la vez; desde el 30 oct, en
+  // columnas Por atender, En conversación y Cerrados. Viendo como otra área, el tablero es el de esa área.
   const [vistaBandeja, setVistaBandeja] = useState<"lista" | "tablero">("lista");
-  const [areaTablero, setAreaTablero] = useState<AreaCrm>(miArea);
+  const [areaElegida, setAreaTablero] = useState<AreaCrm>(miArea);
+  const areaTablero = verComo ?? areaElegida;
   const [soloMios, setSoloMios] = useState(false);
   // La vista elegida se recuerda en el navegador; si no se puede leer, se abre la lista.
   useEffect(() => {
@@ -655,8 +662,12 @@ export function Bandeja({
 
   const numeroDe = useMemo(() => new Map(datos.numeros.map((n) => [n.id, n])), [datos.numeros]);
   const chatsInternos = useMemo(() => datos.conversaciones.filter((c) => c.interno && c.salaInterna).map((c) => ({ sala: c.salaInterna as string, noLeidos: c.noLeidos })), [datos.conversaciones]);
-  // Los chats internos (WhatsApp entre áreas) no son clientes: no van en las listas ni en los conteos; se abren con «Interno».
-  const delNumero = useMemo(() => datos.conversaciones.filter((c) => !c.interno && (numero === "todos" || c.numeroId === numero)), [datos.conversaciones, numero]);
+  // Los chats internos (WhatsApp entre áreas) no son clientes: no van en las listas ni en los conteos; se abren con «Interno». Solo los de los
+  // paneles a la vista: con «Ver como», los conteos de los filtros son los de esa área, como los ve ella.
+  const delNumero = useMemo(
+    () => datos.conversaciones.filter((c) => !c.interno && areas.includes(c.area) && (numero === "todos" || c.numeroId === numero)),
+    [datos.conversaciones, numero, areas],
+  );
   // Los filtros cuentan los chats de todos los paneles que se ven.
   const opciones: { id: Filtro; texto: string; cuenta: number }[] = [
     { id: "sinResponder", texto: "Sin responder", cuenta: delNumero.filter(sinResponder).length },
@@ -927,7 +938,7 @@ export function Bandeja({
 
   function pasarA(destino: AreaCrm) {
     if (!sel) return;
-    const queda = areas.includes(destino);
+    const queda = misAreas.includes(destino);
     accion(() => pasarConversacionDeArea(sel.id, destino), queda ? `Chat pasado a ${areaChat(destino).etiqueta}.` : `Chat pasado a ${areaChat(destino).etiqueta}. Ya no lo verás en tu bandeja.`);
     // Si sigue a la vista, aparece en la columna de su nuevo panel; si no, se cierra.
     if (!queda) setElegido(null);
@@ -1258,6 +1269,25 @@ export function Bandeja({
     <div className="bandeja-wa flex min-h-[640px] flex-col gap-3 text-[var(--wa-texto)] lg:h-[calc(100vh-200px)]">
       {/* El globo de la pestaña sigue lo que la bandeja va leyendo (los chats sin responder de todas las áreas que ve la persona). */}
       <ContadorPestana href="/crm-dropshippers/bandeja" cantidad={datos.conversaciones.filter((c) => !c.interno && sinResponder(c)).length} />
+      {/* «Ver como»: qué se está mirando y cómo volver. */}
+      {verComo && (
+        <div role="status" className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border border-[var(--wa-acento)] bg-[var(--wa-acento-suave)] px-3.5 py-2 text-[13px] text-[var(--wa-acento-suave-texto)]">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+            <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+          <span className="min-w-0 flex-1">
+            <strong>Estás viendo la bandeja como la ve {areaChat(verComo).etiqueta}</strong>: sus chats, su orden, sus filtros y su tablero. Es para revisar: lo que abras no se marca leído y para contestar hay que «Intervenir».
+          </span>
+          <button
+            type="button"
+            onClick={() => setVerComo(null)}
+            className={`h-8 rounded-md border border-[var(--wa-acento)] bg-[var(--wa-fondo)] px-3 text-[13px] font-semibold text-[var(--wa-texto)] hover:bg-[var(--wa-hover)] ${anilloFoco}`}
+          >
+            Volver a mi vista
+          </button>
+        </div>
+      )}
       {/* ===== Arriba, para todos los paneles: buscar, número, filtros e «Importar chat» ===== */}
       <div className="flex flex-wrap items-center gap-2.5">
         <div role="group" aria-label="Cómo ver la bandeja" className="flex h-10 flex-none overflow-hidden rounded-lg border border-[var(--wa-borde)]">
@@ -1272,7 +1302,7 @@ export function Bandeja({
               type="button"
               aria-pressed={vistaBandeja === o.v}
               onClick={() => cambiarVista(o.v)}
-              title={o.v === "tablero" ? "Tablero: Alta, Media, Baja y Contestados" : "Lista: los paneles de siempre"}
+              title={o.v === "tablero" ? "Tablero: Por atender, En conversación y Cerrados" : "Lista: los paneles de siempre"}
               className={`flex items-center gap-1.5 px-3 text-[13px] font-medium ${vistaBandeja === o.v ? "bg-[var(--wa-acento-suave)] text-[var(--wa-acento-suave-texto)]" : "bg-[var(--wa-fondo)] text-[var(--wa-sec)] hover:bg-[var(--wa-hover)]"} ${anilloFoco}`}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
@@ -1282,6 +1312,26 @@ export function Bandeja({
             </button>
           ))}
         </div>
+        {misAreas.length > 1 && (
+          <label className="flex h-10 items-center gap-2 text-[13px] text-[var(--wa-sec)]">
+            Ver como
+            <select
+              value={verComo ?? ""}
+              onChange={(e) => setVerComo((e.target.value || null) as AreaCrm | null)}
+              title="Ver la bandeja tal como la ve un área, para revisarla sin entrar con su usuario"
+              className={`h-10 rounded-lg border-0 px-2 text-[13px] font-semibold ${verComo ? "bg-[var(--wa-acento-suave)] text-[var(--wa-acento-suave-texto)]" : "bg-[var(--wa-panel)] text-[var(--wa-texto)]"} ${anilloFoco}`}
+            >
+              <option value="">Mi vista (todas mis áreas)</option>
+              {misAreas
+                .filter((a) => a !== miArea)
+                .map((a) => (
+                  <option key={a} value={a}>
+                    {areaChat(a).etiqueta}
+                  </option>
+                ))}
+            </select>
+          </label>
+        )}
         <label className="flex h-10 min-w-0 flex-[1_1_260px] items-center gap-3 rounded-lg bg-[var(--wa-panel)] px-3.5 text-[var(--wa-sec)] focus-within:ring-2 focus-within:ring-[var(--wa-acento)] sm:max-w-md">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
             <circle cx="11" cy="11" r="7" />
@@ -2055,7 +2105,7 @@ export function Bandeja({
       {nuevoContacto && (
         <NuevoContacto
           numeros={datos.numeros}
-          areas={areas}
+          areas={misAreas}
           alCerrar={() => setNuevoContacto(false)}
           alTerminar={(id, escribirDirecto) => {
             setNuevoContacto(false);
@@ -2074,7 +2124,7 @@ export function Bandeja({
           alCerrar={() => setImportar(null)}
           conversacion={importar.conversacion}
           numeros={datos.numeros}
-          areas={areas}
+          areas={misAreas}
           alTerminar={(id) => {
             if (!importar.conversacion) setFiltro("todas");
             setElegido(id);
