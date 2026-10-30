@@ -179,7 +179,6 @@ export function FichaDelChat({
   accionesChat,
   etiquetas,
   opcionesMas,
-  areaDelChat,
   respondieron,
   versionEquipo,
   alAbrirVincular,
@@ -197,8 +196,6 @@ export function FichaDelChat({
   /** Las etiquetas del chat (como en ClickUp), arriba de todo. */
   etiquetas: ReactNode;
   opcionesMas: OpcionMas[];
-  /** El apartado «Área del chat», que arma la Bandeja con los cambios de área. */
-  areaDelChat: ReactNode;
   /** Quién del equipo le escribió al dropshipper en este chat y con qué cargo (su puesto o su área; la más reciente primero). */
   respondieron: QuienRespondio[];
   versionEquipo: string;
@@ -365,7 +362,6 @@ export function FichaDelChat({
           <div id="ficha-chat-actividad" className="scroll-mt-12">
             {/* Una sola Actividad (29 oct 2026, pedido de Alcides): con dropshipper, la del CRM ya trae lo que el equipo hizo en sus chats; sin él, la del chat. */}
             {!sel.dropshipperId && <ActividadDelEquipoFicha key={`equipo-${sel.id}`} conversacionId={sel.id} version={versionEquipo} />}
-            {areaDelChat}
             {d && acceso && acceso.comercial && (
               <Seccion titulo="Seguimientos">
                 <SeguimientosDropshipper key={`seguimientos-${d.id}`} dropshipperId={d.id} puedeEscribir={acceso.escribeComercial} version={version} />
