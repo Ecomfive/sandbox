@@ -246,6 +246,8 @@ export async function editarDropshipper(formData: FormData): Promise<{ error?: s
       nombre,
       estado,
       nivel,
+      // Cambiar el tipo en «Editar» lo fija a mano: el cálculo automático (migración 0196) ya no lo mueve.
+      ...(actual.nivel !== nivel ? { nivel_manual: true } : {}),
       tienda: tiendas[0] ?? null,
       tiendas,
       ciudad,

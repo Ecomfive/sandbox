@@ -99,6 +99,10 @@ export async function ingerirPedidos(supabase: SupabaseClient, codigoPais: strin
   // Pedidos por dropshipper del CRM (migración 0065). Si todavía no se corrió, solo avisa.
   const { data: crm, error: errorCrm } = await supabase.rpc("crm_sincronizar_ordenes");
   if (errorCrm) log(`No se actualizaron los pedidos del CRM (${errorCrm.message}).`);
+  // Con los pedidos al día, el tipo de cliente (ROOKIE, VIP, BLACK) se recalcula con el promedio de 3 meses (migración 0196; sin ella, solo avisa).
+  const { data: tipos, error: errorTipos } = await supabase.rpc("crm_recalcular_tipo_cliente");
+  if (errorTipos) log(`No se recalculó el tipo de cliente (${errorTipos.message}).`);
+  else if (Number(tipos ?? 0) > 0) log(`${tipos} clientes cambiaron de tipo (ROOKIE, VIP o BLACK).`);
   // De cada pedido queda en bruto solo la copia más reciente (migración 0133; sin ella, solo avisa).
   const { data: borradas, error: errorLimpiar } = await supabase.rpc("dropi_staging_ordenes_limpiar");
   if (errorLimpiar) log(`No se limpiaron las copias viejas de los pedidos (${errorLimpiar.message}).`);

@@ -234,7 +234,7 @@ export function FichaDelChat({
         {d && (
           <div className="flex flex-wrap items-center gap-1.5">
             <Pastilla tono={tonoEstado(d.estado)}>{etiquetaEstado(d.estado)}</Pastilla>
-            <TipoCliente key={`tipo-${d.id}`} dropshipperId={d.id} nivel={d.nivel} puede={!!acceso && (acceso.escribeAtencion || acceso.escribeComercial)} alCambiar={guardado} />
+            <TipoCliente key={`tipo-${d.id}`} dropshipperId={d.id} nivel={d.nivel} manual={d.nivelManual} promedio={d.promedioPedidosMes} puede={!!acceso && (acceso.escribeAtencion || acceso.escribeComercial)} alCambiar={guardado} />
             {abiertos.length > 0 && (
               <Pastilla>
                 <Punto />

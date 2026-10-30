@@ -233,26 +233,39 @@ export async function completarTarea(id: string, hecha: boolean): Promise<{ ok: 
   return { ok: true };
 }
 
-/** Cambia el «Tipo de cliente» de un dropshipper: Rookie, VIP o Black (migración 0195). Queda en la Actividad con lo de antes y lo de después. */
-export async function cambiarTipoCliente(dropshipperId: string, nivel: string): Promise<{ ok: true } | { error: string }> {
+/**
+ * Cambia el «Tipo de cliente» de un dropshipper: ROOKIE, VIP o BLACK puesto a mano (queda fijo: el cálculo automático no lo toca), o `"auto"`, que lo
+ * suelta y lo recalcula con el promedio de pedidos de los últimos 3 meses (migración 0196). Queda en la Actividad con lo de antes y lo de después.
+ */
+export async function cambiarTipoCliente(dropshipperId: string, nivel: string): Promise<{ ok: true; nivel: string; manual: boolean } | { error: string }> {
   const u = await usuarioBandeja(false);
   if (!u) return { error: "No tienes acceso." };
   const a = accesoCrm(u);
   if (!a.escribeAtencion && !a.escribeComercial) return { error: "No tienes permiso para cambiar el tipo de cliente." };
   if (!ES_ID(dropshipperId)) return { error: "Dropshipper no válido." };
-  if (!NIVELES.some((n) => n.valor === nivel)) return { error: "Elige Rookie, VIP o Black." };
+  const auto = nivel === "auto";
+  if (!auto && !NIVELES.some((n) => n.valor === nivel)) return { error: "Elige ROOKIE, VIP o BLACK." };
   const supabase = createServiceClient();
-  const { data: antes } = await supabase.from("dropshippers").select("nivel").eq("id", dropshipperId).maybeSingle();
+  const { data: antes, error: errorAntes } = await supabase.from("dropshippers").select("nivel, nivel_manual").eq("id", dropshipperId).maybeSingle();
+  if (errorAntes) return { error: "Falta correr en Supabase la migración 0196 (tipo de cliente automático)." };
   if (!antes) return { error: "No se encontró el dropshipper." };
-  const { error } = await supabase.from("dropshippers").update({ nivel }).eq("id", dropshipperId);
-  if (error) return { error: error.code === "23514" ? "Falta correr en Supabase la migración 0195 (tipo de cliente)." : "No se pudo cambiar el tipo de cliente." };
+  const { error } = await supabase.from("dropshippers").update(auto ? { nivel_manual: false } : { nivel, nivel_manual: true }).eq("id", dropshipperId);
+  if (error) return { error: "No se pudo cambiar el tipo de cliente." };
+  let final = nivel;
+  if (auto) {
+    // El cálculo automático deja su propia línea en la Actividad si cambia el tipo.
+    await supabase.rpc("crm_recalcular_tipo_cliente");
+    const { data } = await supabase.from("dropshippers").select("nivel").eq("id", dropshipperId).maybeSingle();
+    final = (data?.nivel as string) ?? (antes.nivel as string);
+  }
   await registrarAuditoria({
     accion: "tipo_cliente_dropshipper",
     entidad: "dropshippers",
     entidadId: dropshipperId,
-    antes: { "Tipo de cliente": etiquetaNivel(antes.nivel as string) },
-    despues: { "Tipo de cliente": etiquetaNivel(nivel) },
+    detalle: auto ? "Vuelve a calcularse solo con el promedio de pedidos" : "Fijado a mano",
+    antes: { "Tipo de cliente": `${etiquetaNivel(antes.nivel as string)}${antes.nivel_manual ? " (a mano)" : " (automático)"}` },
+    despues: { "Tipo de cliente": `${etiquetaNivel(final)}${auto ? " (automático)" : " (a mano)"}` },
   });
   revalidatePath("/crm-dropshippers", "layout");
-  return { ok: true };
+  return { ok: true, nivel: final, manual: !auto };
 }

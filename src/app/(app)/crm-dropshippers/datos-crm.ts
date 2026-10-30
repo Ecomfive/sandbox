@@ -69,7 +69,7 @@ export async function obtenerDatosCrm(supabase: SupabaseClient, paisId: string, 
   const hoy = new Date().toISOString().slice(0, 10);
 
   const CAMPOS_DROPSHIPPER =
-    "id, codigo, nombre, tienda, tiendas, ciudad, pais_origen, contacto_email, contacto_telefono, estado, nivel, fecha_ingreso, etiquetas, etapa, productos, notas, fase, responsable_id, perfiles:responsable_id(nombre), dropshipper_paises(pais_id, paises(codigo))";
+    "id, codigo, nombre, tienda, tiendas, ciudad, pais_origen, contacto_email, contacto_telefono, estado, nivel, nivel_manual, promedio_pedidos_mes, fecha_ingreso, etiquetas, etapa, productos, notas, fase, responsable_id, perfiles:responsable_id(nombre), dropshipper_paises(pais_id, paises(codigo))";
   const consultaDropshippers = (conCuentas: boolean) => {
     const q = supabase
       .from("dropshippers")
@@ -119,6 +119,8 @@ export async function obtenerDatosCrm(supabase: SupabaseClient, paisId: string, 
       tieneTelefono: !!d.contacto_telefono,
       estado: d.estado,
       nivel: d.nivel,
+      nivelManual: !!d.nivel_manual,
+      promedioPedidosMes: d.promedio_pedidos_mes === null || d.promedio_pedidos_mes === undefined ? null : Number(d.promedio_pedidos_mes),
       responsable: uno<{ nombre: string | null }>(d.perfiles as Relacion<{ nombre: string | null }>)?.nombre ?? null,
       paisOrigen: d.pais_origen,
       paises,
