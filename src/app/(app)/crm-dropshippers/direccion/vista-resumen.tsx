@@ -14,7 +14,7 @@ import { Barra, Cifra, Cifras, Insignia, Tarjeta, type TonoDireccion } from "./p
 import { rutaVista } from "./ruta";
 import type { CargaPareto } from "./datos-pareto";
 import { TONO_STOCK } from "./vista-productos";
-import { TarjetaParetoResumen } from "./vista-pareto";
+import { SeccionParetoResumen } from "./vista-pareto";
 
 /** El stock que se acaba, ya resumido en el servidor: cuántos productos, a cuántos clientes afecta y los 5 que más se piden. */
 export interface ResumenStock {
@@ -234,7 +234,7 @@ export function VistaResumen({
         </Tarjeta>
       </div>
 
-      <TarjetaParetoResumen datos={datos} pareto={pareto} />
+      <SeccionParetoResumen datos={datos} pareto={pareto} />
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         <Tarjeta id="t-riesgo" titulo="Dónde está el riesgo" extra={`${cuenta("riesgo") + cuenta("dormido")} clientes`}>

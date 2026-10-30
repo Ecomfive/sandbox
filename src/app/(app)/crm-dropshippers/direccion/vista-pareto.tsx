@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ComposedChart, Legend, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, Cell, ComposedChart, Legend, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { anilloFoco } from "@/components/ui/field";
 import {
   CLASES_PARETO,
@@ -22,28 +22,19 @@ import { ETIQUETA_SEGMENTO, nPedidos, type Segmento } from "@/lib/crm/salud";
 import { productosParaPareto } from "./actions";
 import type { DatosPareto } from "./datos-pareto";
 import type { DatosDireccion, FilaDireccion } from "./datos-direccion";
-import { Barra, Boton, Chip, ChipEnlace, Cifra, Cifras, Insignia, Tarjeta, type TonoDireccion } from "./piezas-direccion";
+import { Barra, Chip, Insignia, Tarjeta, type TonoDireccion } from "./piezas-direccion";
 import { rutaVista } from "./ruta";
 
-/** Los periodos que se pueden mirar; el análisis siempre sale de las guías mes a mes de los últimos 12 meses. */
-export const PERIODOS_PARETO = [3, 6, 12];
-
 const COLOR_CLASE: Record<ClasePareto, string> = { A: "var(--primario)", B: "var(--warning)", C: "var(--border-control)" };
-const TONO_CLASE: Record<ClasePareto, TonoDireccion> = { A: "info", B: "aviso", C: "neutro" };
+export const TONO_CLASE: Record<ClasePareto, TonoDireccion> = { A: "info", B: "aviso", C: "neutro" };
 const LIMITE_CLASE: Record<ClasePareto, string> = { A: "hasta el 80 % de las guías", B: "del 80 al 95 %", C: "el último 5 %" };
 const TONO_SEGMENTO: Record<Segmento, TonoDireccion> = { activo: "exito", riesgo: "aviso", dormido: "peligro", perdido: "neutro", sin_pedidos: "neutro" };
 const ejes = { tick: { fontSize: 11, fill: "var(--muted-foreground)" }, axisLine: false, tickLine: false } as const;
 const estiloTooltip = { background: "var(--card)", border: "1px solid var(--border)", borderRadius: 10, fontSize: 12 };
-const POR_PAGINA = 40;
 
 const nombreMes = (iso: string) => new Date(`${iso.slice(0, 10)}T12:00:00Z`).toLocaleDateString("es", { month: "short", year: "2-digit", timeZone: "UTC" });
 const enRiesgo = (f: FilaDireccion) => f.segmento === "riesgo" || f.segmento === "dormido" || f.segmento === "perdido";
 const guias = (n: number) => `${n.toLocaleString("es")} ${n === 1 ? "guía" : "guías"}`;
-
-/** Las guías por mes de cada dropshipper como un `Map` (el dato viaja como objeto). */
-function useSeries(pareto: DatosPareto) {
-  return useMemo(() => new Map(Object.entries(pareto.porMes)), [pareto]);
-}
 
 /** Cuatro gráficas comparten esta cabecera de datos: la curva ordenada de más a menos, con su acumulado. */
 function datosCurva(r: ResultadoPareto, nombreDe: (id: string) => string) {
@@ -55,7 +46,7 @@ function RotuloClase({ clase, n }: { clase: ClasePareto; n?: number }) {
   return (
     <span className="inline-flex items-center gap-1.5 text-sm">
       <span aria-hidden="true" className="h-2.5 w-2.5 rounded-[3px]" style={{ backgroundColor: COLOR_CLASE[clase] }} />
-      <span className="font-semibold">Clase {clase}</span>
+      <span className="font-semibold whitespace-nowrap">Clase {clase}</span>
       <span className="text-muted-foreground">
         {LIMITE_CLASE[clase]}
         {n !== undefined ? ` · ${n}` : ""}
@@ -95,236 +86,126 @@ function CurvaPareto({ r, nombreDe, alto = 300 }: { r: ResultadoPareto; nombreDe
   );
 }
 
-/** Dirección › Pareto: el 80/20 de las guías de los dropshippers, con los últimos 3, 6 o 12 meses. */
-export function VistaPareto({ datos, pareto, meses }: { datos: DatosDireccion; pareto: DatosPareto; meses: number }) {
-  const series = useSeries(pareto);
+/** Los periodos que se pueden mirar en el Resumen; el análisis siempre sale de las guías mes a mes de los últimos 12 meses. */
+export const PERIODOS_PARETO = [3, 6, 12];
+
+/**
+ * El Pareto de toda la operación, dentro del Resumen (31 oct 2026, pedido de Hernán: integrado, no en una pestaña aparte): la frase, el periodo (3, 6 o 12 meses), cuántos
+ * clientes hay en cada clase y qué parte de las guías hacen, la curva, las guías de cada mes por clase y los clientes clase A que bajaron o pararon.
+ */
+export function SeccionParetoResumen({ datos, pareto }: { datos: DatosDireccion; pareto: DatosPareto | { error: string } | null }) {
+  const [meses, setMeses] = useState(12);
+  const sinDatos = !pareto || "error" in pareto;
+  const series = useMemo(() => new Map(Object.entries(sinDatos ? {} : pareto.porMes)), [pareto, sinDatos]);
   const r = useMemo(() => paretoDe(series, meses), [series, meses]);
   const porId = useMemo(() => new Map(datos.filas.map((f) => [f.id, f])), [datos.filas]);
   const nombreDe = useMemo(() => (id: string) => porId.get(id)?.nombre ?? "Sin ficha", [porId]);
-  const porMes = useMemo(() => mesesPorClase(series, r, meses, pareto.meses).map((m) => ({ ...m, nombre: nombreMes(m.mes) })), [series, r, meses, pareto.meses]);
-  const [filtro, setFiltro] = useState<ClasePareto | "A_riesgo" | "todas">("todas");
-  const [mostrar, setMostrar] = useState(POR_PAGINA);
-
-  const aEnRiesgo = r.filas.filter((f) => f.clase === "A" && (porId.get(f.id) ? enRiesgo(porId.get(f.id)!) : false));
-  const parteEnRiesgo = aEnRiesgo.reduce((s, f) => s + f.parte, 0);
-  const sinGuias = Math.max(0, datos.filas.length - r.n);
-  const visibles = r.filas.filter((f) => (filtro === "todas" ? true : filtro === "A_riesgo" ? aEnRiesgo.includes(f) : f.clase === filtro));
-
-  return (
-    <>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="m-0 text-base font-semibold">{fraseDelAnalisis(r, "los dropshippers", "las guías")}</p>
-        <nav aria-label="Periodo del Pareto" className="flex gap-1.5">
-          {PERIODOS_PARETO.map((m) => (
-            <ChipEnlace key={m} href={rutaVista("pareto", m === 12 ? {} : { meses: m })} activo={meses === m}>
-              {m} meses
-            </ChipEnlace>
-          ))}
-        </nav>
-      </div>
-
-      <Cifras>
-        <Cifra titulo="Clase A" valor={r.clases.A.n} nota={`${textoParte(r.clases.A.parteDeLosItems)} de los clientes · ${textoParte(r.clases.A.parteDelTotal)} de las guías`} tono="info" activa={filtro === "A"} alPulsar={() => setFiltro((x) => (x === "A" ? "todas" : "A"))} />
-        <Cifra titulo="Clase B" valor={r.clases.B.n} nota={`${textoParte(r.clases.B.parteDeLosItems)} de los clientes · ${textoParte(r.clases.B.parteDelTotal)} de las guías`} tono="aviso" activa={filtro === "B"} alPulsar={() => setFiltro((x) => (x === "B" ? "todas" : "B"))} />
-        <Cifra titulo="Clase C" valor={r.clases.C.n} nota={`${textoParte(r.clases.C.parteDeLosItems)} de los clientes · ${textoParte(r.clases.C.parteDelTotal)} de las guías`} tono="neutro" activa={filtro === "C"} alPulsar={() => setFiltro((x) => (x === "C" ? "todas" : "C"))} />
-        <Cifra
-          titulo={`El ${textoParte(PARTE_TOP)} de los clientes hace`}
-          valor={textoParte(r.top.parteDelTotal)}
-          nota={r.cumple8020 ? `Se cumple el 80/20 (${r.top.n} clientes)` : `No llega al 80 % (${r.top.n} clientes)`}
-          tono={r.cumple8020 ? "exito" : "aviso"}
-        />
-        <Cifra
-          titulo="Clase A en riesgo"
-          valor={aEnRiesgo.length}
-          nota={aEnRiesgo.length ? `${textoParte(parteEnRiesgo)} de las guías bajó o paró` : "Ninguno de los que más pesan"}
-          tono={aEnRiesgo.length ? "peligro" : "exito"}
-          activa={filtro === "A_riesgo"}
-          alPulsar={() => setFiltro((x) => (x === "A_riesgo" ? "todas" : "A_riesgo"))}
-        />
-        <Cifra titulo={`Guías en ${meses} meses`} valor={r.total.toLocaleString("es")} nota={`${r.n} con guías · ${sinGuias} sin guías`} tono="neutro" />
-      </Cifras>
-
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-        <Tarjeta id="t-curva" titulo="Curva de Pareto" extra={`${r.n} dropshippers, de más a menos guías`} className="lg:col-span-2">
-          {r.n === 0 ? <p className="m-0 text-sm text-muted-foreground">Sin guías en {meses} meses.</p> : <CurvaPareto r={r} nombreDe={nombreDe} />}
-          <div className="flex flex-wrap gap-x-5 gap-y-1">
-            {CLASES_PARETO.map((c) => (
-              <RotuloClase key={c} clase={c} n={r.clases[c].n} />
-            ))}
-          </div>
-        </Tarjeta>
-
-        <Tarjeta id="t-meses" titulo="Guías por mes, por clase" extra={`${meses} meses`}>
-          <div role="img" aria-label={`Guías por mes por clase: ${porMes.map((m) => `${m.nombre} A ${m.A}, B ${m.B}, C ${m.C}`).join("; ")}`} className="h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={porMes} margin={{ top: 8, right: 4, left: -12, bottom: 0 }}>
-                <CartesianGrid stroke="var(--border)" strokeDasharray="3 4" vertical={false} />
-                <XAxis dataKey="nombre" {...ejes} interval={meses > 6 ? 1 : 0} />
-                <YAxis {...ejes} width={44} />
-                <Tooltip contentStyle={estiloTooltip} cursor={{ fill: "var(--muted)" }} formatter={(v, n) => [Number(v).toLocaleString("es"), `Clase ${n}`]} />
-                <Legend formatter={(v) => `Clase ${v}`} wrapperStyle={{ fontSize: 12 }} />
-                {CLASES_PARETO.map((c) => (
-                  <Bar key={c} dataKey={c} stackId="guias" fill={COLOR_CLASE[c]} isAnimationActive={false} />
-                ))}
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-          <p className="m-0 text-xs text-muted-foreground">El último mes va en curso.</p>
-        </Tarjeta>
-      </div>
-
-      <Tarjeta id="t-ranking" titulo="Quién hace el 80 %" extra={`${visibles.length} de ${r.n}`}>
-        <div className="flex flex-wrap gap-1.5">
-          <Chip activo={filtro === "todas"} onClick={() => setFiltro("todas")}>
-            Todos ({r.n})
-          </Chip>
-          {CLASES_PARETO.map((c) => (
-            <Chip key={c} activo={filtro === c} onClick={() => setFiltro((x) => (x === c ? "todas" : c))}>
-              Clase {c} ({r.clases[c].n})
-            </Chip>
-          ))}
-          <Chip activo={filtro === "A_riesgo"} onClick={() => setFiltro((x) => (x === "A_riesgo" ? "todas" : "A_riesgo"))}>
-            A en riesgo ({aEnRiesgo.length})
-          </Chip>
-        </div>
-        {visibles.length === 0 ? (
-          <p className="m-0 text-sm text-muted-foreground">Nadie en este grupo.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] border-collapse text-sm">
-              <caption className="sr-only">Dropshippers ordenados por guías en {meses} meses, con su parte y el acumulado</caption>
-              <thead>
-                <tr className="text-left text-xs font-semibold text-muted-foreground">
-                  <th scope="col" className="py-2 pr-3">
-                    #
-                  </th>
-                  <th scope="col" className="py-2 pr-3">
-                    Dropshipper
-                  </th>
-                  <th scope="col" className="py-2 pr-3">
-                    Clase
-                  </th>
-                  <th scope="col" className="py-2 pr-3 text-right">
-                    Guías
-                  </th>
-                  <th scope="col" className="py-2 pr-3 text-right">
-                    Del total
-                  </th>
-                  <th scope="col" className="w-40 py-2 pr-3">
-                    Acumulado
-                  </th>
-                  <th scope="col" className="py-2">
-                    Estado
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibles.slice(0, mostrar).map((fila) => {
-                  const f = porId.get(fila.id);
-                  return (
-                    <tr key={fila.id} className="border-t border-border">
-                      <td className="py-2 pr-3 tabular-nums text-muted-foreground">{fila.posicion}</td>
-                      <td className="py-2 pr-3">
-                        {f ? (
-                          <Link href={rutaVista("clientes", { cliente: f.id })} className={`font-semibold hover:underline ${anilloFoco}`}>
-                            {f.nombre} <span className="text-xs font-normal text-muted-foreground">{f.codigo}</span>
-                          </Link>
-                        ) : (
-                          <span className="text-muted-foreground">Sin ficha</span>
-                        )}
-                      </td>
-                      <td className="py-2 pr-3">
-                        <Insignia tono={TONO_CLASE[fila.clase]}>Clase {fila.clase}</Insignia>
-                      </td>
-                      <td className="py-2 pr-3 text-right font-semibold tabular-nums">{fila.valor.toLocaleString("es")}</td>
-                      <td className="py-2 pr-3 text-right tabular-nums">{textoParte(fila.parte)}</td>
-                      <td className="py-2 pr-3">
-                        <span className="flex items-center gap-2">
-                          <span className="w-12 shrink-0 text-right text-xs whitespace-nowrap tabular-nums">{textoParte(fila.acumulado)}</span>
-                          <Barra valor={fila.acumulado * 100} tono={TONO_CLASE[fila.clase]} />
-                        </span>
-                      </td>
-                      <td className="py-2">{f ? <Insignia tono={TONO_SEGMENTO[f.segmento]}>{ETIQUETA_SEGMENTO[f.segmento]}</Insignia> : null}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-        {visibles.length > mostrar && (
-          <Boton onClick={() => setMostrar((m) => m + POR_PAGINA)} className="self-start">
-            Ver {Math.min(POR_PAGINA, visibles.length - mostrar)} más
-          </Boton>
-        )}
-      </Tarjeta>
-    </>
-  );
-}
-
-/** El Pareto en el Resumen (12 meses): la frase, la curva y las tres clases; lleva a la pestaña Pareto. */
-export function TarjetaParetoResumen({ datos, pareto }: { datos: DatosDireccion; pareto: DatosPareto | { error: string } | null }) {
-  const sinDatos = !pareto || "error" in pareto;
-  const series = useMemo(() => new Map(Object.entries(sinDatos ? {} : pareto.porMes)), [pareto, sinDatos]);
-  const r = useMemo(() => paretoDe(series, 12), [series]);
-  const porId = useMemo(() => new Map(datos.filas.map((f) => [f.id, f])), [datos.filas]);
-  const curva = useMemo(() => datosCurva(r, (id) => porId.get(id)?.nombre ?? "Sin ficha"), [r, porId]);
+  const porMes = useMemo(() => (sinDatos ? [] : mesesPorClase(series, r, meses, pareto.meses).map((m) => ({ ...m, nombre: nombreMes(m.mes) }))), [series, r, meses, pareto, sinDatos]);
   const aEnRiesgo = r.filas.filter((f) => f.clase === "A" && porId.get(f.id) && enRiesgo(porId.get(f.id)!));
+  const parteEnRiesgo = aEnRiesgo.reduce((s, f) => s + f.parte, 0);
 
-  return (
-    <Tarjeta id="t-pareto" titulo="Pareto de guías" extra="Últimos 12 meses">
-      {pareto && "error" in pareto ? (
+  if (pareto && "error" in pareto)
+    return (
+      <Tarjeta id="t-pareto" titulo="Pareto de guías">
         <p role="alert" className="m-0 text-sm text-warning">
           {pareto.error}
         </p>
-      ) : r.n === 0 ? (
-        <p className="m-0 text-sm text-muted-foreground">Sin guías en los últimos 12 meses.</p>
-      ) : (
-        <div className="grid grid-cols-1 items-center gap-5 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-          <div className="flex min-w-0 flex-col gap-3">
+      </Tarjeta>
+    );
+
+  return (
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+      <Tarjeta
+        id="t-pareto"
+        titulo="Pareto de guías"
+        className="lg:col-span-2"
+        extra={
+          <span className="flex gap-1.5">
+            {PERIODOS_PARETO.map((m) => (
+              <Chip key={m} activo={meses === m} onClick={() => setMeses(m)}>
+                {m} meses
+              </Chip>
+            ))}
+          </span>
+        }
+      >
+        {r.n === 0 ? (
+          <p className="m-0 text-sm text-muted-foreground">Sin guías en {meses} meses.</p>
+        ) : (
+          <>
             <p className="m-0 text-base font-semibold">{fraseDelAnalisis(r, "los dropshippers", "las guías")}</p>
-            <div role="img" aria-label={`Curva de Pareto de 12 meses: ${fraseDelAnalisis(r, "los dropshippers", "las guías")}`} className="h-[170px]">
+            <ul className="m-0 grid list-none grid-cols-1 gap-3 p-0 sm:grid-cols-3">
+              {CLASES_PARETO.map((c) => (
+                <li key={c} className="flex flex-col gap-1 rounded-lg border border-border px-3 py-2.5">
+                  <span className="flex items-baseline justify-between gap-2">
+                    <RotuloClase clase={c} />
+                    <span className="text-xl font-bold tabular-nums">{r.clases[c].n}</span>
+                  </span>
+                  <Barra valor={r.clases[c].parteDelTotal * 100} tono={TONO_CLASE[c]} alto="h-2" />
+                  <span className="text-xs text-muted-foreground">
+                    {textoParte(r.clases[c].parteDeLosItems)} de los clientes · {textoParte(r.clases[c].parteDelTotal)} de las guías
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <CurvaPareto r={r} nombreDe={nombreDe} alto={260} />
+            <p className="m-0 text-[13px] text-muted-foreground">
+              El {textoParte(PARTE_TOP)} de los clientes ({r.top.n}) hace el <span className={`font-semibold ${r.cumple8020 ? "text-success" : "text-warning"}`}>{textoParte(r.top.parteDelTotal)}</span> de las guías
+              {r.cumple8020 ? ": el 80/20 se cumple." : ": no llega al 80 %."} {guias(r.total)} de {r.n} dropshippers.
+            </p>
+          </>
+        )}
+      </Tarjeta>
+
+      <Tarjeta id="t-pareto-meses" titulo="Guías por mes, por clase" extra={`${meses} meses`}>
+        {r.n === 0 ? (
+          <p className="m-0 text-sm text-muted-foreground">Sin guías en {meses} meses.</p>
+        ) : (
+          <>
+            <div role="img" aria-label={`Guías por mes por clase: ${porMes.map((m) => `${m.nombre} A ${m.A}, B ${m.B}, C ${m.C}`).join("; ")}`} className="h-[220px]">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={curva} margin={{ top: 6, right: 4, left: 0, bottom: 0 }}>
+                <BarChart data={porMes} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
                   <CartesianGrid stroke="var(--border)" strokeDasharray="3 4" vertical={false} />
-                  <XAxis dataKey="posicion" {...ejes} interval="preserveStartEnd" minTickGap={30} />
-                  <YAxis domain={[0, 100]} ticks={[0, 40, 80, 100]} tickFormatter={(v) => `${v} %`} {...ejes} width={50} />
-                  <Tooltip
-                    contentStyle={estiloTooltip}
-                    labelFormatter={(l, payload) => (payload?.[0]?.payload ? `#${l} · ${(payload[0].payload as { nombre: string }).nombre}` : String(l))}
-                    formatter={(v) => [`${Number(v).toLocaleString("es")} %`, "Acumulado"]}
-                  />
-                  <ReferenceLine y={LIMITE_A * 100} stroke="var(--foreground)" strokeDasharray="5 4" strokeOpacity={0.55} />
-                  <Area dataKey="acumulado" type="monotone" stroke="var(--primario)" strokeWidth={2} fill="var(--primario)" fillOpacity={0.15} isAnimationActive={false} />
-                </AreaChart>
+                  <XAxis dataKey="nombre" {...ejes} interval={meses > 6 ? 1 : 0} />
+                  <YAxis {...ejes} width={44} />
+                  <Tooltip contentStyle={estiloTooltip} cursor={{ fill: "var(--muted)" }} formatter={(v, n) => [Number(v).toLocaleString("es"), `Clase ${n}`]} />
+                  <Legend formatter={(v) => `Clase ${v}`} wrapperStyle={{ fontSize: 12 }} />
+                  {CLASES_PARETO.map((c) => (
+                    <Bar key={c} dataKey={c} stackId="guias" fill={COLOR_CLASE[c]} isAnimationActive={false} />
+                  ))}
+                </BarChart>
               </ResponsiveContainer>
             </div>
-          </div>
-          <ul className="m-0 flex list-none flex-col gap-3 p-0">
-            {CLASES_PARETO.map((c) => (
-              <li key={c} className="flex flex-col gap-1">
-                <span className="flex items-baseline justify-between gap-2 text-sm">
-                  <RotuloClase clase={c} />
-                  <span className="font-bold tabular-nums">{r.clases[c].n}</span>
-                </span>
-                <Barra valor={r.clases[c].parteDelTotal * 100} tono={TONO_CLASE[c]} alto="h-2" />
-                <span className="text-xs text-muted-foreground">
-                  {textoParte(r.clases[c].parteDeLosItems)} de los clientes · {textoParte(r.clases[c].parteDelTotal)} de las guías
-                </span>
-              </li>
-            ))}
-            {aEnRiesgo.length > 0 && (
-              <li className="text-sm font-semibold text-destructive">
-                {aEnRiesgo.length} {aEnRiesgo.length === 1 ? "cliente clase A bajó o paró" : "clientes clase A bajaron o pararon"}
-              </li>
-            )}
-          </ul>
-        </div>
-      )}
-      <Link href={rutaVista("pareto")} className={`mt-auto self-start text-sm font-semibold text-primario hover:underline ${anilloFoco}`}>
-        Ver el Pareto →
-      </Link>
-    </Tarjeta>
+            <div className="flex flex-col gap-1.5 border-t border-border pt-3">
+              <h3 className="m-0 flex items-baseline justify-between gap-2 text-sm font-semibold">
+                <span>Clase A en riesgo</span>
+                <span className={aEnRiesgo.length ? "text-destructive" : "text-success"}>{aEnRiesgo.length ? `${aEnRiesgo.length} · ${textoParte(parteEnRiesgo)} de las guías` : "Ninguno"}</span>
+              </h3>
+              {aEnRiesgo.length === 0 ? (
+                <p className="m-0 text-sm text-muted-foreground">Ninguno de los que más pesan bajó o paró.</p>
+              ) : (
+                <ul className="m-0 flex list-none flex-col p-0">
+                  {aEnRiesgo.slice(0, 5).map((fila) => {
+                    const f = porId.get(fila.id)!;
+                    return (
+                      <li key={fila.id}>
+                        <Link href={rutaVista("clientes", { cliente: f.id })} className={`flex items-center justify-between gap-2 rounded-md px-1.5 py-1.5 text-sm hover:bg-muted ${anilloFoco}`}>
+                          <span className="min-w-0 truncate font-semibold">{f.nombre}</span>
+                          <span className="flex shrink-0 items-center gap-2">
+                            <span className="text-xs text-muted-foreground tabular-nums">{textoParte(fila.parte)}</span>
+                            <Insignia tono={TONO_SEGMENTO[f.segmento]}>{ETIQUETA_SEGMENTO[f.segmento]}</Insignia>
+                          </span>
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          </>
+        )}
+      </Tarjeta>
+    </div>
   );
 }
 
