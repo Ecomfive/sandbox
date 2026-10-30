@@ -16,7 +16,7 @@ import { descargarLista } from "./lista-csv";
 import { rutaVista } from "./ruta";
 import type { DatosPareto } from "./datos-pareto";
 import { Barra, Boton, Chip, Cifra, Cifras, FONDO_TONO, Insignia, TEXTO_TONO, Tarjeta, tonoPuntaje, type TonoDireccion } from "./piezas-direccion";
-import { BloquePareto, TONO_CLASE } from "./vista-pareto";
+import { BloquePareto, ROTULO_GRUPO, TONO_GRUPO } from "./vista-pareto";
 import { paretoDe } from "@/lib/crm/pareto";
 import { textoCamino } from "./vista-productos";
 
@@ -122,8 +122,8 @@ export function PanelDireccion({
 
   const { filas, hoy } = datos;
   const porId = useMemo(() => new Map(filas.map((f) => [f.id, f])), [filas]);
-  // La clase de cada cliente en el Pareto de 12 meses (A hace el 80 % de las guías con los de arriba, B hasta el 95 %, C el resto).
-  const claseDe = useMemo(() => (pareto ? new Map(paretoDe(new Map(Object.entries(pareto.porMes)), 12).filas.map((x) => [x.id, x.clase])) : new Map<string, "A" | "B" | "C">()), [pareto]);
+  // El grupo de cada cliente en el Pareto de 12 meses: el 20 % que más guías hace o el 80 % restante.
+  const grupoDe = useMemo(() => (pareto ? new Map(paretoDe(new Map(Object.entries(pareto.porMes)), 12).filas.map((x) => [x.id, x.grupo])) : new Map<string, "top" | "resto">()), [pareto]);
   const alertas = datos.alertas.filter((a) => !quitadas.has(a.clave));
   const visiblesAlerta = alertas.filter((a) => pasaFiltro(a, filtroAlerta));
 
@@ -398,7 +398,7 @@ export function PanelDireccion({
                             <button type="button" aria-pressed={activo} onClick={() => verCliente(f.id)} className={`flex min-h-11 flex-col items-start justify-center rounded text-left ${anilloFoco}`}>
                               <span className="flex items-center gap-1.5 font-semibold">
                                 {f.nombre} <TipoCliente nivel={f.nivel} />
-                                {claseDe.get(f.id) && <Insignia tono={TONO_CLASE[claseDe.get(f.id)!]}>Clase {claseDe.get(f.id)}</Insignia>}
+                                {grupoDe.get(f.id) && <Insignia tono={TONO_GRUPO[grupoDe.get(f.id)!]}>{ROTULO_GRUPO[grupoDe.get(f.id)!]}</Insignia>}
                               </span>
                               <span className="text-xs text-muted-foreground">{f.codigo}</span>
                             </button>
