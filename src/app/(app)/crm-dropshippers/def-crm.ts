@@ -271,14 +271,6 @@ export const DEF_DROPSHIPPERS: DefTabla<FilaDropshipper> = {
       ordenGrupos: ["black", "vip", "regular"],
     },
     {
-      id: "responsable",
-      etiqueta: "Responsable",
-      tipo: "seleccion",
-      valores: (d) => [d.responsable ?? SIN_VALOR],
-      etiquetaSinValor: "Sin responsable",
-      agrupable: true,
-    },
-    {
       id: "venta",
       etiqueta: "Vende en",
       tipo: "seleccion",
