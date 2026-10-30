@@ -103,7 +103,13 @@ export async function obtenerDatosCrm(supabase: SupabaseClient, paisId: string, 
     return (soloId ? q.eq("entidad_id", soloId) : q).order("creado_en", { ascending: false }).range(desde, hasta);
   };
 
-  const [conCuentas, { data: sumas }, { data: casosBd }, chats, vendeEnBd, cambiosTipoBd] = await Promise.all([
+  // Los demás correos de cada dropshipper (migración 0206). Sin ella, solo el principal.
+  const consultaCorreos = (desde: number, hasta: number) => {
+    const q = supabase.from("dropshipper_correos").select("dropshipper_id, correo");
+    return (soloId ? q.eq("dropshipper_id", soloId) : q).order("dropshipper_id").order("creado_en").range(desde, hasta);
+  };
+
+  const [conCuentas, { data: sumas }, { data: casosBd }, chats, vendeEnBd, cambiosTipoBd, correosBd] = await Promise.all([
     consultaDropshippers(true),
     // Una fila por dropshipper y país: las ventas de este país no se mezclan con las de otro (otra moneda).
     soloId ? consultaSumas.eq("id", soloId) : consultaSumas,
@@ -111,7 +117,10 @@ export async function obtenerDatosCrm(supabase: SupabaseClient, paisId: string, 
     cargarChats(supabase, areasWhatsapp, soloId),
     traerTodasConError<Record<string, unknown>>(consultaVendeEn),
     traerTodasConError<EventoTipo & { entidad_id: string }>(consultaCambiosTipo),
+    traerTodasConError<{ dropshipper_id: string; correo: string }>(consultaCorreos),
   ]);
+  const otrosCorreos = new Map<string, string[]>();
+  for (const c of correosBd.data ?? []) otrosCorreos.set(c.dropshipper_id, [...(otrosCorreos.get(c.dropshipper_id) ?? []), c.correo]);
   const cambiosTipo = new Map<string, EventoTipo[]>();
   for (const e of cambiosTipoBd.data ?? []) cambiosTipo.set(e.entidad_id, [...(cambiosTipo.get(e.entidad_id) ?? []), e]);
   const vendeEnManual = new Map<string, { plataforma: string; pais: string; oculto: boolean }[]>();
@@ -143,6 +152,7 @@ export async function obtenerDatosCrm(supabase: SupabaseClient, paisId: string, 
       tiendas: d.tiendas?.length ? d.tiendas : d.tienda ? [d.tienda] : [],
       ciudad: d.ciudad,
       email: d.contacto_email,
+      correos: d.contacto_email ? [d.contacto_email] : [],
       tieneTelefono: !!d.contacto_telefono,
       estado: d.estado,
       nivel: d.nivel,
@@ -185,6 +195,8 @@ export async function obtenerDatosCrm(supabase: SupabaseClient, paisId: string, 
   });
 
   for (const d of dropshippers) {
+    const otros = otrosCorreos.get(d.id);
+    if (otros) d.correos = [...new Set([...d.correos, ...otros])];
     d.plataformas = [...new Set(d.cuentas.map((c) => c.plataforma))];
     d.vendeEn = dondeVende(
       d.cuentas.map((c) => ({ plataforma: c.plataforma === "—" ? null : c.plataforma, pais: c.codigoPais === "—" ? null : c.codigoPais })),

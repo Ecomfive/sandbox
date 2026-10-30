@@ -79,8 +79,8 @@ export function DatoEditable({ dropshipperId, campo, inicial, puede }: { dropshi
   const idError = useId();
   const nombre = CAMPOS_DATO[campo].etiqueta.toLowerCase();
 
-  // Las tiendas tienen su propio editor: varias, una por una, y las que son enlace se abren con un clic.
-  if (campo === "tiendas") return <DatoTiendas dropshipperId={dropshipperId} inicial={valor} puede={puede} />;
+  // Tiendas y correos tienen su propio editor: varios, uno por uno (las tiendas que son enlace se abren con un clic).
+  if (campo === "tiendas" || campo === "correo") return <DatoLista dropshipperId={dropshipperId} campo={campo} inicial={valor} puede={puede} />;
 
   if (!puede)
     return (
@@ -347,9 +347,9 @@ function CampoCiudad({
 
 const clasePastilla = "inline-flex max-w-full items-center gap-1 rounded-md border border-border bg-card px-1.5 py-px text-[12px] leading-snug";
 
-/** Una tienda en la ficha: si es un enlace, se abre en una pestaña nueva; si no, su nombre. */
-function PastillaTienda({ tienda, alQuitar }: { tienda: string; alQuitar?: () => void }) {
-  const enlace = enlaceDeTienda(tienda);
+/** Una tienda o un correo en la ficha: una tienda que es enlace se abre en una pestaña nueva; lo demás, su texto. */
+function PastillaTienda({ tienda, alQuitar, conEnlace = true }: { tienda: string; alQuitar?: () => void; conEnlace?: boolean }) {
+  const enlace = conEnlace ? enlaceDeTienda(tienda) : null;
   return (
     <span className={clasePastilla}>
       {enlace ? (
@@ -370,11 +370,19 @@ function PastillaTienda({ tienda, alQuitar }: { tienda: string; alQuitar?: () =>
   );
 }
 
+const LISTA = {
+  tiendas: { vacio: "Sin tiendas", editar: "Editar tiendas", agregar: "Agregar una tienda: su nombre o el enlace", ejemplo: "Nombre o enlace, ej: mitienda.com" },
+  correo: { vacio: "Sin correo", editar: "Editar correos", agregar: "Agregar un correo", ejemplo: "Ej: nombre@correo.com" },
+} as const;
+
 /**
- * Las tiendas del dropshipper (30 oct 2026, pedido de Alcides): cada una es un nombre o el enlace de su tienda, que se abre con un clic. Con el lápiz se
- * editan: se agregan una por una (Enter; también varias separadas por coma) y se quitan con su ✕; cada cambio se guarda al momento. Escape o «Listo» cierran.
+ * Las tiendas o los correos del dropshipper (30 oct 2026, pedido de Alcides): varios. Una tienda es un nombre o el enlace de su tienda, que se abre con un
+ * clic; el primer correo es el principal y los demás sirven para reconocer sus cuentas en cada plataforma (migración 0206). Con el lápiz se editan: se agregan
+ * uno por uno (Enter; también varios separados por coma) y se quitan con su ✕; cada cambio se guarda al momento. Escape o «Listo» cierran.
  */
-function DatoTiendas({ dropshipperId, inicial, puede }: { dropshipperId: string; inicial: string | null; puede: boolean }) {
+function DatoLista({ dropshipperId, campo, inicial, puede }: { dropshipperId: string; campo: "tiendas" | "correo"; inicial: string | null; puede: boolean }) {
+  const textos = LISTA[campo];
+  const conEnlace = campo === "tiendas";
   const [tiendas, setTiendas] = useState<string[]>(inicial ? inicial.split(", ") : []);
   const [editando, setEditando] = useState(false);
   const [texto, setTexto] = useState("");
@@ -386,7 +394,7 @@ function DatoTiendas({ dropshipperId, inicial, puede }: { dropshipperId: string;
   function guardar(nuevas: string[]) {
     setError(null);
     empezar(async () => {
-      const r = await cambiarDatoDropshipper(dropshipperId, "tiendas", nuevas.join(", ")).catch(() => ({ error: "No se pudo guardar." }));
+      const r = await cambiarDatoDropshipper(dropshipperId, campo, nuevas.join(", ")).catch(() => ({ error: "No se pudo guardar." }));
       if ("error" in r) return setError(r.error);
       setTiendas(r.valor ? r.valor.split(", ") : []);
     });
@@ -408,14 +416,14 @@ function DatoTiendas({ dropshipperId, inicial, puede }: { dropshipperId: string;
   if (!editando)
     return (
       <span className="flex min-w-0 flex-wrap items-center gap-1 px-1.5 py-0.5">
-        {tiendas.length ? tiendas.map((t) => <PastillaTienda key={t} tienda={t} />) : <span className="text-muted-foreground">Sin tiendas</span>}
+        {tiendas.length ? tiendas.map((t) => <PastillaTienda key={t} tienda={t} conEnlace={conEnlace} />) : <span className="text-muted-foreground">{textos.vacio}</span>}
         {puede && (
-          <Tooltip texto="Editar tiendas">
+          <Tooltip texto={textos.editar}>
             <button
               ref={lapiz}
               type="button"
               onClick={() => setEditando(true)}
-              aria-label="Editar tiendas"
+              aria-label={textos.editar}
               className={`flex h-5 w-5 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground ${anilloFoco}`}
             >
               <LapizIcon width={12} height={12} aria-hidden="true" />
@@ -430,19 +438,19 @@ function DatoTiendas({ dropshipperId, inicial, puede }: { dropshipperId: string;
       {tiendas.length > 0 && (
         <span className="flex flex-wrap gap-1">
           {tiendas.map((t) => (
-            <PastillaTienda key={t} tienda={t} alQuitar={ocupado ? undefined : () => guardar(tiendas.filter((x) => x !== t))} />
+            <PastillaTienda key={t} tienda={t} conEnlace={conEnlace} alQuitar={ocupado ? undefined : () => guardar(tiendas.filter((x) => x !== t))} />
           ))}
         </span>
       )}
       <span className="flex items-center gap-1.5">
         <input
-          type="text"
           value={texto}
           onChange={(e) => setTexto(e.target.value)}
-          aria-label="Agregar una tienda: su nombre o el enlace"
+          aria-label={textos.agregar}
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? idError : undefined}
-          placeholder="Nombre o enlace, ej: mitienda.com"
+          placeholder={textos.ejemplo}
+          type={campo === "correo" ? "email" : "text"}
           autoFocus
           autoComplete="off"
           readOnly={ocupado}

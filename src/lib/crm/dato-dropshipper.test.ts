@@ -59,3 +59,10 @@ test("tiendas y productos: lista separada por comas, sin vacíos ni repetidos", 
 test("tiendas: un enlace se guarda completo y un nombre tal cual", () => {
   assert.deepEqual(normalizarDato("tiendas", "Innovalabs, mitienda.com", HOY), { valor: "Innovalabs, https://mitienda.com/" });
 });
+
+test("correos: varios, en minúsculas, sin repetir; uno malo lo dice", () => {
+  assert.deepEqual(normalizarDato("correo", "Ana@Tienda.com, ventas@tienda.com.co, ana@tienda.com", HOY), { valor: "ana@tienda.com, ventas@tienda.com.co" });
+  const malo = normalizarDato("correo", "ana@tienda.com, ventas@tienda", HOY);
+  assert.ok("error" in malo && malo.error.includes("ventas@tienda"));
+  assert.ok("error" in normalizarDato("correo", 'ana"@tienda.com', HOY));
+});
