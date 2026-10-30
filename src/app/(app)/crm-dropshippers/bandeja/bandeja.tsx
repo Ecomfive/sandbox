@@ -226,7 +226,7 @@ function BurbujaPersona({ nombre, tam = "lista", vacio = false, className = "" }
 }
 
 /** El color de la franja de arriba de cada columna del tablero. */
-const COLOR_COLUMNA: Record<ColumnaTablero, string> = { alta: "#D92D20", media: "#F79009", baja: "#98A2B3", contestados: "var(--wa-acento)" };
+const COLOR_COLUMNA: Record<ColumnaTablero, string> = { por_atender: "#D92D20", en_conversacion: "var(--wa-acento)", cerrados: "#667085" };
 /** Dónde se recuerda si esta persona usa la lista o el tablero (solo en su navegador). */
 const CLAVE_VISTA = "bandeja-whatsapp-vista";
 
@@ -693,13 +693,13 @@ export function Bandeja({
       .filter((c) => !q || [c.nombre, c.nombrePerfil, c.codigo, ...c.tiendas].some((x) => x?.toLowerCase().includes(q)))
       .map((c) => ({ c, esperandoDesde: esperandoDesde(c), grupo: c.motivo?.grupo ?? null, vip: c.vip, ultimoMensajeEn: c.ultimoMensajeEn, resuelta: c.estado === "resuelta" }));
     const r = repartirTablero(chats);
-    return COLUMNAS_TABLERO.map((col) => ({ ...col, chats: r[col.id].map((x) => ({ c: x.chat.c, subio: x.subio })) }));
+    return COLUMNAS_TABLERO.map((col) => ({ ...col, chats: r[col.id].map((x) => x.c) }));
   }, [delNumero, areaTablero, soloMios, miId, buscar]);
   const enTablero = vistaBandeja === "tablero";
 
   const sel = datos.conversaciones.find((c) => c.id === elegido) ?? null;
   // La lista del panel del chat abierto (o el tablero, en su orden): las flechas de su ventana pasan al anterior o al siguiente.
-  const lista = sel ? (enTablero ? tablero.flatMap((col) => col.chats.map((x) => x.c)) : (listas.get(sel.area) ?? [])) : [];
+  const lista = sel ? (enTablero ? tablero.flatMap((col) => col.chats) : (listas.get(sel.area) ?? [])) : [];
   const ventana = sel && enNavegador ? textoVentana(sel.ultimoEntranteEn, new Date(milisegundosAhora())) : null;
   const ultimoEntranteSel = sel?.ultimoEntranteEn ?? null;
   useEffect(() => {
@@ -1010,10 +1010,10 @@ export function Bandeja({
   }
 
   /**
-   * Un chat en su tarjeta del tablero: nombre, motivo y último mensaje, quién lo lleva, el plazo y su estado. `subio`: se le venció el plazo y pasó al nivel de arriba.
+   * Un chat en su tarjeta del tablero: nombre, motivo y último mensaje, quién lo lleva, el plazo y su estado.
    * Se abre como en la lista y el clic derecho da el mismo menú.
    */
-  function tarjetaChat(c: ConversacionVista, subio: boolean) {
+  function tarjetaChat(c: ConversacionVista) {
     const espera = enNavegador ? esperaConPlazo(c) : null;
     const grupo = grupoPorId(c.motivo?.grupo);
     const estado = espera
@@ -1024,7 +1024,9 @@ export function Bandeja({
           : espera.clase.includes("warning")
             ? { signo: "!", texto: "Por vencer" }
             : { signo: "", texto: espera.plazo ? "A tiempo" : "Esperando respuesta" }
-      : { signo: "✓", texto: "Contestado" };
+      : c.estado === "resuelta"
+        ? { signo: "✓", texto: "Resuelto" }
+        : { signo: "✓", texto: "Contestado" };
     return (
       <li key={c.id} onContextMenu={(e) => abrirMenuChat(e, c)}>
         <button
@@ -1037,7 +1039,6 @@ export function Bandeja({
             <span className="flex items-center gap-1.5">
               <span className="min-w-0 truncate text-[14px] font-semibold">{c.nombre}</span>
               {c.vip && <EtiquetaVip tipo={c.tipoCliente} />}
-              {subio && <span className="flex-none rounded-full bg-destructive/10 px-1.5 text-[10.5px] font-bold text-destructive">subió</span>}
               {c.noLeidos > 0 && (
                 <span className="ml-auto flex h-[18px] min-w-[18px] flex-none items-center justify-center rounded-full bg-[var(--wa-acento)] px-1 text-[11px] font-semibold text-[var(--wa-acento-texto)] tabular-nums">
                   {c.noLeidos}
@@ -1377,11 +1378,11 @@ export function Bandeja({
         )}
       </div>
 
-      {/* ===== El tablero (29 oct 2026): un área a la vez, en columnas Alta, Media, Baja y Contestados ===== */}
+      {/* ===== El tablero (29 oct 2026; por estado desde el 30 oct): un área a la vez, en columnas Por atender, En conversación y Cerrados ===== */}
       {enTablero &&
         (() => {
-          const pendientes = tablero.filter((col) => col.id !== "contestados").flatMap((col) => col.chats);
-          const conEspera = enNavegador ? pendientes.map((x) => esperaConPlazo(x.c)) : [];
+          const pendientes = tablero.find((col) => col.id === "por_atender")?.chats ?? [];
+          const conEspera = enNavegador ? pendientes.map((c) => esperaConPlazo(c)) : [];
           const vencidos = conEspera.filter((e) => e?.plazo?.startsWith("Venció")).length;
           const porVencer = conEspera.filter((e) => e && !e.plazo?.startsWith("Venció") && e.clase.includes("warning")).length;
           const sinMotivo = delNumero.filter((c) => c.area === areaTablero && sinResponder(c) && !c.motivo).length;
@@ -1400,7 +1401,7 @@ export function Bandeja({
                     type="button"
                     disabled={clasificando}
                     onClick={clasificarPendientes}
-                    title="La IA lee por qué escribe cada chat que espera respuesta sin motivo: así va a su columna."
+                    title="La IA lee por qué escribe cada chat que espera respuesta sin motivo: así se ordena por urgencia en Por atender."
                     className={`ml-auto rounded-full border border-[var(--wa-borde)] px-2.5 py-0.5 text-xs font-semibold text-[var(--wa-texto)] hover:bg-[var(--wa-hover)] disabled:opacity-60 ${anilloFoco}`}
                   >
                     {clasificando ? "Leyendo motivos…" : `Leer motivos con IA (${sinMotivo})`}
@@ -1408,11 +1409,11 @@ export function Bandeja({
                 )}
               </div>
               <div className="min-h-0 flex-1 overflow-x-auto bg-[var(--wa-panel)]">
-                <div className="grid h-full min-w-[960px] grid-cols-4">
+                <div className="grid h-full min-w-[840px] grid-cols-3">
                   {tablero.map((col) => {
-                    const venc = enNavegador ? col.chats.filter((x) => esperaConPlazo(x.c)?.plazo?.startsWith("Venció")).length : 0;
-                    const resumen =
-                      col.id === "contestados" ? "esperan al cliente" : col.id === "baja" ? "pueden esperar" : venc ? `${venc} ${venc === 1 ? "vencido" : "vencidos"}` : col.chats.length ? "a tiempo" : "";
+                    // «Por atender» va por urgencia: cuántos se vencieron; las demás dicen qué significan.
+                    const venc = enNavegador && col.id === "por_atender" ? col.chats.filter((c) => esperaConPlazo(c)?.plazo?.startsWith("Venció")).length : 0;
+                    const resumen = venc ? `${venc} ${venc === 1 ? "vencido" : "vencidos"}` : col.detalle;
                     return (
                       <div key={col.id} className="flex min-h-0 flex-col border-r border-[var(--wa-borde)] last:border-r-0">
                         <div className="border-b border-[var(--wa-borde)] bg-[var(--wa-fondo)] px-3.5 pt-2.5 pb-2" style={{ borderTop: `3px solid ${COLOR_COLUMNA[col.id]}` }}>
@@ -1423,7 +1424,7 @@ export function Bandeja({
                           </span>
                         </div>
                         <ul className="m-0 flex min-h-0 flex-1 list-none flex-col gap-2 overflow-y-auto p-2.5">
-                          {col.chats.map((x) => tarjetaChat(x.c, x.subio))}
+                          {col.chats.map((c) => tarjetaChat(c))}
                           {!col.chats.length && <li className="px-2 py-6 text-center text-[13px] text-[var(--wa-sec)]">Nada aquí.</li>}
                         </ul>
                       </div>
