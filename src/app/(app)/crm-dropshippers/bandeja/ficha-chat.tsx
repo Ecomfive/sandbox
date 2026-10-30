@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState, type ComponentType, type ReactNode, type SVGProps } from "react";
+import { createPortal } from "react-dom";
 import { DestinoEnSitio, EnSitio } from "@/components/ui/en-sitio";
 import { anilloFoco } from "@/components/ui/field";
 import { Pastilla, Punto } from "@/components/panel/piezas-panel";
@@ -12,11 +13,13 @@ import { DESDE_EL_CELULAR } from "@/lib/whatsapp/actividad-equipo";
 import { formatearFecha } from "@/lib/formato";
 import { Tooltip } from "@/components/ui/tooltip";
 import { ActividadDropshipper } from "../actividad-dropshipper";
-import { FilaBotones, ItemFila } from "../botones-ficha";
+import { CON_NOMBRE, FilaBotones, ItemFila, usePosicionBoton } from "../botones-ficha";
 import { CuentasDropshipper } from "../cuentas-dropshipper";
 import { etiquetaEstado } from "../def-crm";
 import { DesempenoDropshipper } from "../desempeno-dropshipper";
-import { AccionesCrm, CasosAbiertos, DatosDropshipper, tonoEstado } from "../ficha-lateral";
+import { CasosAbiertos, DatosDropshipper, tonoEstado } from "../ficha-lateral";
+import { PanelCaso, PanelRecomendar } from "../paneles-ficha";
+import { AlertaIcon, SugerenciaIcon, TareasIcon } from "@/lib/nav-icons";
 import { RecomendacionesDropshipper } from "../recomendaciones-dropshipper";
 import { PastillaTipo, TipoCliente } from "../tipo-cliente";
 import { VentasDropiDropshipperBloque } from "../ventas-dropi-dropshipper";
@@ -49,10 +52,49 @@ const PESTANAS_SIN_CRM: Pestana[] = ["resumen", "productos", "actividad"];
 /** Un número que cambia cuando cambia el texto: vuelve a pedir la Actividad (sin desmontarla, así no se pierde un comentario a medias) cuando algo del chat cambia. */
 const huella = (t: string) => [...t].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 1_000_003, 0);
 
-/** Un botón de la fila de acciones, del mismo tamaño que los del CRM (Nuevo caso, Pedido, Nota…). */
-export const claseBotonFicha = `flex flex-col items-center gap-0.5 rounded-lg bg-accent px-1 py-2 text-[11.5px] font-medium hover:bg-accent-hover disabled:opacity-50 ${anilloFoco}`;
-/** El principal de la fila (Tomar o Intervenir), en el verde del chat. */
-export const claseBotonFichaPrincipal = `flex flex-col items-center gap-0.5 rounded-lg bg-[var(--wa-acento)] px-1 py-2 text-[11.5px] font-semibold text-[var(--wa-acento-texto)] hover:opacity-90 disabled:opacity-50 ${anilloFoco}`;
+/** Un botón con nombre de la barra de acciones, que va arriba del cuadro de escribir del chat (Resuelta, Tarea, Caso…). */
+export const claseBotonFicha = `flex h-8 flex-none items-center gap-1.5 rounded-lg border border-[var(--wa-borde)] bg-[var(--wa-fondo)] px-2.5 text-[12.5px] font-medium whitespace-nowrap text-[var(--wa-texto)] hover:bg-[var(--wa-hover)] disabled:opacity-50 ${anilloFoco}`;
+/** El principal de la barra (Tomar o Intervenir), en el verde del chat. */
+export const claseBotonFichaPrincipal = `flex h-8 flex-none items-center gap-1.5 rounded-lg bg-[var(--wa-acento)] px-3 text-[12.5px] font-semibold whitespace-nowrap text-[var(--wa-acento-texto)] hover:opacity-90 disabled:opacity-50 ${anilloFoco}`;
+/** Los que se usan menos van solo con su ícono (el globo y el `aria-label` dicen qué hacen). */
+const claseBotonIcono = `flex h-8 w-8 flex-none items-center justify-center rounded-lg text-[var(--wa-sec)] hover:bg-[var(--wa-hover)] hover:text-[var(--wa-texto)] disabled:opacity-50 ${anilloFoco}`;
+const claseBotonIconoPrincipal = `flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-[var(--wa-acento)] text-[var(--wa-acento-texto)] hover:opacity-90 disabled:opacity-50 ${anilloFoco}`;
+
+/**
+ * Un botón de la barra de acciones del chat, en su sitio según el uso (`ItemFila`, de Jhokser: los más usados a la derecha, junto a «Enviar»). Los
+ * `CON_NOMBRE` más usados llevan su nombre; los demás, solo su ícono, con el globo y el `aria-label` (30 oct 2026, pedido de Alcides).
+ */
+export function BotonBarra({
+  id,
+  texto,
+  corto,
+  icono: Icono,
+  alPulsar,
+  principal,
+  disabled,
+}: {
+  id: BotonFicha;
+  texto: string;
+  corto: string;
+  icono: ComponentType<SVGProps<SVGSVGElement>>;
+  alPulsar: () => void;
+  principal?: boolean;
+  disabled?: boolean;
+}) {
+  const posicion = usePosicionBoton(id);
+  const conNombre = posicion === null || posicion < CON_NOMBRE;
+  const clase = conNombre ? (principal ? claseBotonFichaPrincipal : claseBotonFicha) : principal ? claseBotonIconoPrincipal : claseBotonIcono;
+  return (
+    <ItemFila id={id}>
+      <Tooltip texto={texto}>
+        <button type="button" disabled={disabled} onClick={alPulsar} aria-label={conNombre ? undefined : texto} className={clase}>
+          <Icono className={conNombre ? "h-4 w-4" : "h-[18px] w-[18px]"} aria-hidden="true" />
+          {conNombre && corto}
+        </button>
+      </Tooltip>
+    </ItemFila>
+  );
+}
 
 /** Un botón más de la fila (pasar de área, importar, marcar borrado…): `corto` va en el botón y `texto` en el globo. */
 export interface AccionExtra {
@@ -76,21 +118,14 @@ function Seccion({ titulo, children }: { titulo: string; children: ReactNode }) 
 
 
 /**
- * Los demás botones del chat (no leído, pasar de área, importar, marcar borrado, vincular…), en la misma fila que los otros. Antes iban
+ * Los demás botones del chat (no leído, pasar de área, importar, marcar borrado, vincular…), en la misma barra que los otros. Antes iban
  * dentro de un menú «Más»; desde el 29 oct 2026 (pedido de Alcides) se ven todos seguidos.
  */
 function BotonesExtra({ acciones }: { acciones: AccionExtra[] }) {
   return (
     <>
-      {acciones.map(({ id, texto, corto, icono: Icono, alPulsar }) => (
-        <ItemFila key={texto} id={id}>
-          <Tooltip texto={texto}>
-            <button type="button" onClick={alPulsar} className={`${claseBotonFicha} w-full`}>
-              <Icono className="h-4 w-4" aria-hidden="true" />
-              <span className="leading-tight">{corto}</span>
-            </button>
-          </Tooltip>
-        </ItemFila>
+      {acciones.map((a) => (
+        <BotonBarra key={a.texto} id={a.id} texto={a.texto} corto={a.corto} icono={a.icono} alPulsar={a.alPulsar} />
       ))}
     </>
   );
@@ -190,6 +225,7 @@ export function FichaDelChat({
   accionesChat,
   etiquetas,
   accionesExtra,
+  ranuraAcciones,
   versionEquipo,
   alAbrirVincular,
   alVinculado,
@@ -206,6 +242,8 @@ export function FichaDelChat({
   /** Las etiquetas del chat (como en ClickUp), arriba de todo. */
   etiquetas: ReactNode;
   accionesExtra: AccionExtra[];
+  /** El hueco arriba del cuadro de escribir del chat, donde se dibuja la barra de acciones (30 oct 2026, pedido de Alcides). */
+  ranuraAcciones: HTMLElement | null;
   versionEquipo: string;
   alAbrirVincular: () => void;
   alVinculado: (mensaje: string) => void;
@@ -248,16 +286,49 @@ export function FichaDelChat({
             </Pastilla>
           </div>
         )}
-        {/* Los botones, de derecha a izquierda según su uso (los más usados a la derecha). Tarea, Nuevo caso y Recomendar abren su formulario justo debajo, en el mismo lugar, para poder copiar del chat y de la ficha. */}
-        <EnSitio key={sel.id}>
-          <FilaBotones className="grid grid-cols-[repeat(auto-fill,minmax(76px,1fr))] gap-1.5">
-            {accionesChat}
-            {escribe && <BotonNuevaTarea conversacionId={sel.id} nombre={sel.nombre} clase={claseBotonFicha} alCreada={() => setVersionTareas((v) => v + 1)} alAviso={alAviso} />}
-            {d && acceso && <AccionesCrm d={d} codigoPais={datos!.codigoPais} acceso={acceso} alGuardar={guardado} />}
-            <BotonesExtra acciones={accionesExtra} />
-          </FilaBotones>
-          <DestinoEnSitio />
-        </EnSitio>
+        {/* Los botones van abajo, en una barra arriba del cuadro de escribir, donde ya está el mouse al responder (30 oct 2026, pedido de Alcides). Siguen el
+            orden de Jhokser (los más usados a la derecha, junto a «Enviar») y Tarea, Caso y Recomendar abren su formulario en el mismo lugar, justo encima de la
+            barra, para poder copiar del chat y de la ficha. Los dibuja la ficha (portal) para que una tarea o un caso nuevo refresquen sus bloques. */}
+        {ranuraAcciones &&
+          createPortal(
+            <EnSitio key={sel.id}>
+              <div className="max-h-[50vh] overflow-y-auto px-3 pb-1.5 [&:has(>div:empty)]:hidden">
+                <DestinoEnSitio />
+              </div>
+              <FilaBotones className="flex flex-wrap items-center gap-1.5 border-t border-[var(--wa-borde)] bg-[var(--wa-panel)] px-3 py-2">
+                {accionesChat}
+                {escribe && (
+                  <BotonNuevaTarea
+                    conversacionId={sel.id}
+                    nombre={sel.nombre}
+                    clase={claseBotonFicha}
+                    alCreada={() => setVersionTareas((v) => v + 1)}
+                    alAviso={alAviso}
+                    boton={(abrir) => <BotonBarra id="tarea" texto="Nueva tarea" corto="Tarea" icono={TareasIcon} alPulsar={abrir} />}
+                  />
+                )}
+                {d && acceso?.escribeAtencion && (
+                  <>
+                    <PanelCaso
+                      key={`caso-${d.id}`}
+                      d={d}
+                      codigoPais={datos!.codigoPais}
+                      alGuardar={guardado}
+                      boton={(abrir) => <BotonBarra id="caso" texto="Abrir un caso nuevo" corto="Caso" icono={AlertaIcon} alPulsar={abrir} />}
+                    />
+                    <PanelRecomendar
+                      key={`recomendar-${d.id}`}
+                      d={d}
+                      alGuardar={guardado}
+                      boton={(abrir) => <BotonBarra id="recomendar" texto="Recomendar un producto" corto="Recomendar" icono={SugerenciaIcon} alPulsar={abrir} />}
+                    />
+                  </>
+                )}
+                <BotonesExtra acciones={accionesExtra} />
+              </FilaBotones>
+            </EnSitio>,
+            ranuraAcciones,
+          )}
       </div>
 
       <nav aria-label="Ir a una parte de la ficha" className="sticky top-0 z-[2] flex gap-1 overflow-x-auto border-b border-[var(--wa-borde)] bg-[var(--wa-fondo)] px-3 [scrollbar-width:none]">

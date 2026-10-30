@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ComponentType } from "react";
+import { useState, type ComponentType, type ReactNode } from "react";
 import { Campo } from "@/components/ui/campo-ficha";
 import { anilloFoco, fieldClass } from "@/components/ui/field";
 import { FichaCrear } from "@/components/ui/ficha-crear";
@@ -66,7 +66,20 @@ function Opciones({ lista }: { lista: readonly { valor: string; etiqueta: string
  * Abrir un caso de soporte. Con `d` es el de ese dropshipper (botón de su ficha); sin `d`, el «Agregar caso» de la
  * tabla de casos, donde primero se elige a quién.
  */
-export function PanelCaso({ d, dropshippers, codigoPais, alGuardar }: { d?: FilaDropshipper; dropshippers?: OpcionDropshipper[]; codigoPais: string; alGuardar?: () => void }) {
+export function PanelCaso({
+  d,
+  dropshippers,
+  codigoPais,
+  alGuardar,
+  boton,
+}: {
+  d?: FilaDropshipper;
+  dropshippers?: OpcionDropshipper[];
+  codigoPais: string;
+  alGuardar?: () => void;
+  /** Otro botón para abrirlo (el de la barra de acciones del chat). */
+  boton?: (abrir: () => void) => ReactNode;
+}) {
   const [elegido, setElegido] = useState("");
   const opciones = dropshippers ?? [];
   const paises = d ? d.paises : (opciones.find((o) => o.id === elegido)?.paises ?? []);
@@ -83,11 +96,12 @@ export function PanelCaso({ d, dropshippers, codigoPais, alGuardar }: { d?: Fila
       enSitio
       boton={
         d
-          ? (abrir) => (
+          ? (boton ??
+            ((abrir) => (
               <ItemFila id="caso">
                 <BotonAccion texto="Nuevo caso" icono={AlertaIcon} alHacerClic={abrir} />
               </ItemFila>
-            )
+            )))
           : undefined
       }
     >
@@ -161,18 +175,21 @@ export function PanelCaso({ d, dropshippers, codigoPais, alGuardar }: { d?: Fila
  * «Recomendar»: el cliente nos recomienda un producto y Atención lo registra aquí. Llega a Testing Lab › Sugerencias de
  * clientes con su código SUG- sin que quien lo carga necesite ese módulo.
  */
-export function PanelRecomendar({ d, alGuardar }: { d: FilaDropshipper; alGuardar?: () => void }) {
+export function PanelRecomendar({ d, alGuardar, boton }: { d: FilaDropshipper; alGuardar?: () => void; boton?: (abrir: () => void) => ReactNode }) {
   return (
     <FichaSugerencia
       action={recomendarProducto}
       ocultos={{ dropshipper_id: d.id }}
       alGuardar={alGuardar}
       enSitio
-      boton={(abrir) => (
-        <ItemFila id="recomendar">
-          <BotonAccion texto="Recomendar" icono={SugerenciaIcon} alHacerClic={abrir} />
-        </ItemFila>
-      )}
+      boton={
+        boton ??
+        ((abrir) => (
+          <ItemFila id="recomendar">
+            <BotonAccion texto="Recomendar" icono={SugerenciaIcon} alHacerClic={abrir} />
+          </ItemFila>
+        ))
+      }
     />
   );
 }
