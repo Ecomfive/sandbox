@@ -1019,8 +1019,9 @@ convenciones técnicas del código.
   `whatsapp_kpis(p_desde, p_areas)` devuelve por número, por persona y por día las consultas (primer entrante tras un saliente), sin
   responder y la mediana hasta la primera respuesta; se ven en la pestaña «KPIs de atención» de la Bandeja de Dirección (`kpis/vista-kpis.tsx`).
   **Bandeja de Dirección** (30 oct 2026, pedido de Hernán): quien tiene `crm-direccion` abre en `/crm-dropshippers/bandeja` el panel de
-  Dirección con el diseño del prototipo (`direccion/ruta.ts` › `VISTAS_DIRECCION`, `?vista=`: clientes —sin `vista`—, productos, entregas,
-  equipo, duplicados, automatizaciones, kpis y chats = la bandeja de WhatsApp; `?abrir=` va directo a chats). `direccion/contenido-direccion.tsx`
+  Dirección con el diseño del prototipo (`direccion/ruta.ts` › `VISTAS_DIRECCION`, `?vista=`: resumen —sin `vista`—, clientes —con
+  `segmento` o `cliente` desde el Resumen—, productos, entregas, equipo, duplicados, automatizaciones, kpis y chats = la bandeja de
+  WhatsApp; `?abrir=` va directo a chats). `PanelDireccion` tiene `modo` resumen / clientes, como las dos pestañas del prototipo. `direccion/contenido-direccion.tsx`
   carga cada vista. Las pestañas `/crm-dropshippers/direccion` y `/crm-dropshippers/kpis` ya no existen: sus páginas redirigen ahí.
   **Panel de Dirección** (migración 0197, 30 oct 2026, fase 1 del panel del CEO; prototipo en https://claude.ai/artifact/EgMSyATkMEUXzk9LsX8Wkj):
   hoy, la Bandeja de Dirección. `crm_salud_dropshippers(p_pais)` da por dropshipper los

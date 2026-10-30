@@ -6,12 +6,14 @@ import { useMemo, useState, useTransition } from "react";
 import { anilloFoco, fieldClass, labelClassSm } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { Ventana } from "@/components/ui/ventana";
+import { TASA_BUENA, TASA_REGULAR } from "@/lib/crm/automatizar";
 import { ETIQUETA_ESTADO_STOCK, type EstadoStock } from "@/lib/crm/productos";
 import { ETIQUETA_ALERTA, ETIQUETA_BANDA, ETIQUETA_SEGMENTO, nPedidos, SUGERENCIA_ALERTA, type Banda, type Prioridad, type Segmento, type TipoAlerta } from "@/lib/crm/salud";
 import { asignarResponsable, atenderAlerta, crearTareaDeAlerta } from "./actions";
 import type { AlertaDireccion, DatosDireccion, FilaDireccion } from "./datos-direccion";
 import type { DatosProductos } from "./datos-productos";
 import { descargarLista } from "./lista-csv";
+import { rutaVista } from "./ruta";
 import { Barra, Boton, Chip, Cifra, Cifras, FONDO_TONO, Insignia, TEXTO_TONO, Tarjeta, tonoPuntaje, type TonoDireccion } from "./piezas-direccion";
 import { textoCamino } from "./vista-productos";
 
@@ -59,6 +61,8 @@ function diasDesde(iso: string | null, hoy: string): string {
 function cambio(f: { pedidos30: number; pedidos30Antes: number }): number | null {
   return f.pedidos30Antes ? (f.pedidos30 / f.pedidos30Antes - 1) * 100 : null;
 }
+/** El color de la entrega de un cliente, con los mismos cortes que la vista Entregas: verde desde 80 %, ámbar desde 65 %, rojo abajo. */
+const tonoEntregaFila = (pct: number): TonoDireccion => (pct >= TASA_BUENA * 100 ? "exito" : pct >= TASA_REGULAR * 100 ? "aviso" : "peligro");
 const textoCambio = (c: number | null) => (c === null ? "—" : `${c >= 0 ? "+" : "−"}${Math.abs(Math.round(c))} %`);
 
 function TipoCliente({ nivel }: { nivel: string }) {
@@ -68,17 +72,27 @@ function TipoCliente({ nivel }: { nivel: string }) {
 }
 
 /**
- * CRM › Dirección › Clientes, con el diseño del prototipo: las cifras de la cartera (filtran la lista), la cola «Qué atender hoy», la salud de
- * la cartera, los pedidos por semana y la lista de clientes con su ficha al lado (salud, por qué, siguiente paso, quién lo lleva, lo que vende y
- * qué recomendarle).
+ * El panel de Dirección con el diseño del prototipo, en sus dos pestañas (`modo`, separadas como en el prototipo desde el 30 oct 2026):
+ *  - **Resumen**: las cifras de la cartera, la cola «Qué atender hoy», la salud de la cartera y los pedidos por semana. Una cifra lleva a
+ *    Clientes con ese estado y «Ver cliente» abre su ficha allá (antes filtraban una lista que quedaba muy abajo y parecía que no hacían nada).
+ *  - **Clientes**: los chips de estado, el buscador y la lista con la ficha al lado (salud, por qué, siguiente paso, quién lo lleva, lo que
+ *    vende y qué recomendarle).
  */
 export function PanelDireccion({
+  modo,
+  segmentoInicial,
+  clienteInicial,
   datos,
   productos,
   codigoPais,
   escribe,
   usuarioId,
 }: {
+  modo: "resumen" | "clientes";
+  /** El estado con que abre la lista (el de la cifra que se tocó en el Resumen). */
+  segmentoInicial: Segmento | null;
+  /** El cliente cuya ficha abre (el de «Ver cliente» en el Resumen). */
+  clienteInicial: string | null;
   datos: DatosDireccion;
   /** Lo que vende cada cliente y qué recomendarle (fase 3); null sin las migraciones 0198 y 0201. */
   productos: DatosProductos | null;
@@ -87,15 +101,16 @@ export function PanelDireccion({
   usuarioId: string;
 }) {
   const { mostrarToast } = useToast();
+  const router = useRouter();
   const [pendiente, empezar] = useTransition();
   const [quitadas, setQuitadas] = useState<Set<string>>(new Set());
   const [filtroAlerta, setFiltroAlerta] = useState<FiltroAlerta>("todas");
-  const [segmento, setSegmento] = useState<Segmento | "todos">("todos");
+  const [segmento, setSegmento] = useState<Segmento | "todos">(segmentoInicial ?? "todos");
   const [busca, setBusca] = useState("");
   const [tipo, setTipo] = useState<"todos" | "vip" | "regular">("todos");
   const [orden, setOrden] = useState<Orden>("salud");
   // La ficha de al lado empieza con el cliente de la primera alerta (como en el prototipo).
-  const [sel, setSel] = useState<string | null>(datos.alertas[0]?.dropshipperId ?? null);
+  const [sel, setSel] = useState<string | null>(clienteInicial ?? datos.alertas[0]?.dropshipperId ?? null);
   const [mostrar, setMostrar] = useState(POR_PAGINA);
   const [tareaDe, setTareaDe] = useState<AlertaDireccion | null>(null);
 
@@ -131,10 +146,14 @@ export function PanelDireccion({
   const bajaSemanas = ultimas.length >= 2 && ultimas[0].pedidos ? (ultimas[ultimas.length - 2].pedidos / ultimas[0].pedidos - 1) * 100 : null;
 
   const elegirSegmento = (s: Segmento | "todos") => {
+    // En el Resumen no hay lista: la cifra lleva a Clientes con ese estado.
+    if (modo === "resumen") return router.push(s === "todos" ? rutaVista("clientes") : rutaVista("clientes", { segmento: s }));
     setSegmento((x) => (x === s && s !== "todos" ? "todos" : s));
     setMostrar(POR_PAGINA);
   };
   function verCliente(id: string) {
+    // Desde el Resumen, la ficha está en Clientes.
+    if (modo === "resumen") return router.push(rutaVista("clientes", { cliente: id }));
     setSel(id);
     setTimeout(() => document.getElementById("ficha-cliente")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
   }
@@ -159,19 +178,20 @@ export function PanelDireccion({
 
   return (
     <>
+      {modo === "resumen" && (
+      <>
       <Cifras>
         <Cifra
           titulo="Cartera con Dropi"
           valor={filas.length}
           nota={datos.sinCuenta ? `${datos.sinCuenta} sin cuenta vinculada` : `Con cuenta en ${codigoPais}`}
           tono={datos.sinCuenta ? "aviso" : "neutro"}
-          activa={segmento === "todos"}
           alPulsar={() => elegirSegmento("todos")}
         />
-        <Cifra titulo="Activos" valor={cuenta("activo")} nota="Piden con normalidad" tono="exito" activa={segmento === "activo"} alPulsar={() => elegirSegmento("activo")} />
-        <Cifra titulo="En riesgo" valor={cuenta("riesgo")} nota="Bajaron o dejaron de pedir" tono="aviso" activa={segmento === "riesgo"} alPulsar={() => elegirSegmento("riesgo")} />
-        <Cifra titulo="Dormidos" valor={cuenta("dormido")} nota="21 a 59 días sin pedir" tono="peligro" activa={segmento === "dormido"} alPulsar={() => elegirSegmento("dormido")} />
-        <Cifra titulo="Sin pedidos" valor={cuenta("sin_pedidos")} nota="Con cuenta, sin pedidos" tono="neutro" activa={segmento === "sin_pedidos"} alPulsar={() => elegirSegmento("sin_pedidos")} />
+        <Cifra titulo="Activos" valor={cuenta("activo")} nota="Piden con normalidad" tono="exito" alPulsar={() => elegirSegmento("activo")} />
+        <Cifra titulo="En riesgo" valor={cuenta("riesgo")} nota="Bajaron o dejaron de pedir" tono="aviso" alPulsar={() => elegirSegmento("riesgo")} />
+        <Cifra titulo="Dormidos" valor={cuenta("dormido")} nota="21 a 59 días sin pedir" tono="peligro" alPulsar={() => elegirSegmento("dormido")} />
+        <Cifra titulo="Sin pedidos" valor={cuenta("sin_pedidos")} nota="Con cuenta, sin pedidos" tono="neutro" alPulsar={() => elegirSegmento("sin_pedidos")} />
         <Cifra
           titulo="Pedidos en 30 días"
           valor={pedidos30.toLocaleString("es")}
@@ -256,7 +276,7 @@ export function PanelDireccion({
             </ul>
           </Tarjeta>
 
-          <Tarjeta id="t-semanas" titulo="Pedidos por semana">
+          <Tarjeta id="t-semanas" titulo="Pedidos de la cartera por semana">
             {datos.semanas.length === 0 ? (
               <p className="m-0 text-sm text-muted-foreground">Sin pedidos en las últimas 8 semanas.</p>
             ) : (
@@ -277,7 +297,7 @@ export function PanelDireccion({
                   ))}
                 </div>
                 <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>{fechaCorta(datos.semanas[0].semana)}</span>
+                  <span>{datos.semanas.length === 1 ? fechaCorta(datos.semanas[0].semana) : `Hace ${datos.semanas.length - 1} semanas`}</span>
                   <span>Esta semana (en curso)</span>
                 </div>
                 {bajaSemanas !== null && (
@@ -290,7 +310,10 @@ export function PanelDireccion({
           </Tarjeta>
         </div>
       </div>
+      </>
+      )}
 
+      {modo === "clientes" && (
       <section aria-labelledby="t-clientes" className="flex flex-col gap-4">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div className="flex flex-col gap-2.5">
@@ -340,8 +363,8 @@ export function PanelDireccion({
               <table className="w-full min-w-[48rem] border-collapse text-sm">
                 <thead>
                   <tr className="bg-muted text-left text-xs tracking-[0.04em] text-muted-foreground uppercase">
-                    {["Cliente", "Estado", "Salud", "Pedidos 30 d", "Tendencia", "Último pedido", "Lo lleva"].map((t, i) => (
-                      <th key={t} scope="col" className={`px-3 py-3 font-semibold ${i === 0 ? "pl-4" : ""} ${i === 3 || i === 4 ? "text-right" : ""}`}>
+                    {["Cliente", "Estado", "Salud", "Pedidos 30 d", "Tendencia", "Último pedido", "Entrega", "Lo lleva"].map((t, i) => (
+                      <th key={t} scope="col" className={`px-3 py-3 font-semibold ${i === 0 ? "pl-4" : ""} ${i === 3 || i === 4 || i === 6 ? "text-right" : ""}`}>
                         {t}
                       </th>
                     ))}
@@ -350,7 +373,7 @@ export function PanelDireccion({
                 <tbody>
                   {lista.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">
+                      <td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">
                         Ningún cliente coincide.
                       </td>
                     </tr>
@@ -388,6 +411,9 @@ export function PanelDireccion({
                           <td className="px-3 py-1.5 text-right font-semibold tabular-nums">{f.pedidos30.toLocaleString("es")}</td>
                           <td className={`px-3 py-1.5 text-right font-semibold tabular-nums ${c === null ? "text-muted-foreground" : c >= 0 ? "text-success" : "text-destructive"}`}>{textoCambio(c)}</td>
                           <td className="px-3 py-1.5 text-muted-foreground">{diasDesde(f.ultimoPedido, hoy)}</td>
+                          <td className={`px-3 py-1.5 text-right font-semibold tabular-nums ${f.entrega === null ? "text-muted-foreground" : TEXTO_TONO[tonoEntregaFila(f.entrega)]}`} title={f.entrega === null ? "Menos de 5 pedidos cerrados en 60 días" : "Entregados de los pedidos cerrados en 60 días"}>
+                            {f.entrega === null ? "—" : `${f.entrega} %`}
+                          </td>
                           <td className="px-3 py-1.5">{f.responsable ?? <span className="text-muted-foreground">—</span>}</td>
                         </tr>
                       );
@@ -420,6 +446,7 @@ export function PanelDireccion({
           )}
         </div>
       </section>
+      )}
 
       {tareaDe && (
         <FormTarea

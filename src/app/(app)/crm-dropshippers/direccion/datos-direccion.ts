@@ -20,6 +20,8 @@ export interface FilaDireccion {
   ultimoPedido: string | null;
   pedidos30: number;
   pedidos30Antes: number;
+  /** Qué parte de sus pedidos cerrados en 60 días se entregó (0 a 100); null con menos de 5 cerrados. */
+  entrega: number | null;
 }
 
 export interface AlertaDireccion {
@@ -130,6 +132,7 @@ export async function cargarDireccion(supabase: SupabaseClient, paisId: string):
       ultimoPedido: p.ultimoPedido,
       pedidos30: p.pedidos30,
       pedidos30Antes: p.pedidos30Antes,
+      entrega: p.entregados60 + p.devueltos60 >= 5 ? Math.round((p.entregados60 / (p.entregados60 + p.devueltos60)) * 100) : null,
     });
     // La fecha de ingreso real (no `creado_en`: los que vinieron de ClickUp se crearon todos al importarlos, en octubre de 2026).
     const ingreso = (d.fecha_ingreso ?? d.captado_en)?.slice(0, 10) ?? null;

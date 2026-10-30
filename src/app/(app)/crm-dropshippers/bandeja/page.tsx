@@ -20,22 +20,22 @@ export const maxDuration = 300;
 /**
  * CRM Dropshippers › Bandeja de WhatsApp (26 oct 2026): los chats de los números de la empresa, para contestar desde el sistema.
  * **Dirección** (quien tiene «CRM: dirección (CEO)», 30 oct 2026, pedido de Hernán): su bandeja de entrada es el panel de Dirección con el diseño
- * del prototipo (Clientes, Productos, Entregas, Equipo, Duplicados, Automatizaciones y KPIs de atención); «Chats» es esta misma bandeja de
+ * del prototipo (Resumen, Clientes, Productos, Entregas, Equipo, Duplicados, Automatizaciones y KPIs de atención); «Chats» es esta misma bandeja de
  * WhatsApp. Un enlace para abrir un chat (`?abrir=`) va directo a Chats. Los demás ven la bandeja de siempre.
  */
 export default async function BandejaWhatsappPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
   const usuario = await requireModulo("crm-dropshippers");
-  const { abrir, vista: vistaParam, dias } = await searchParams;
+  const { abrir, vista: vistaParam, dias, segmento, cliente } = await searchParams;
   const a = accesoCrm(usuario);
   const vistaDireccion: VistaDireccion | null = !a.direccion
     ? null
     : typeof abrir === "string"
       ? "chats"
-      : (VISTAS_DIRECCION.find((v) => v.valor === vistaParam)?.valor ?? "clientes");
+      : (VISTAS_DIRECCION.find((v) => v.valor === vistaParam)?.valor ?? "resumen");
   if (vistaDireccion && vistaDireccion !== "chats")
     return (
       <Pagina ancho="ancha" className="flex flex-col gap-6">
-        <ContenidoDireccion usuario={usuario} vista={vistaDireccion} dias={dias} />
+        <ContenidoDireccion usuario={usuario} vista={vistaDireccion} dias={dias} segmento={segmento} cliente={cliente} />
       </Pagina>
     );
   const supabase = createServiceClient();

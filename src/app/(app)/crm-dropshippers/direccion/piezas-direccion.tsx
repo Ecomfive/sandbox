@@ -39,13 +39,13 @@ export function EncabezadoDireccion({ subtitulo, vistas, activa }: { subtitulo: 
   return (
     <header className="flex flex-wrap items-center justify-between gap-4">
       <div className="flex items-center gap-3">
-        <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-foreground">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-background">
+        <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[9px] bg-foreground">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-background">
             <path d="M3 12h4l3 8 4-16 3 8h4" />
           </svg>
         </span>
         <div>
-          <h1 className="m-0 text-xl font-bold tracking-tight">Panel de Dirección</h1>
+          <h1 className="m-0 text-[17px] font-bold">Panel de Dirección</h1>
           <p className="m-0 text-[13px] text-muted-foreground">{subtitulo}</p>
         </div>
       </div>
@@ -55,7 +55,7 @@ export function EncabezadoDireccion({ subtitulo, vistas, activa }: { subtitulo: 
             key={v.valor}
             href={v.href}
             aria-current={activa === v.valor ? "page" : undefined}
-            className={`inline-flex min-h-10 items-center rounded-lg px-3.5 text-sm font-semibold ${
+            className={`inline-flex min-h-11 items-center rounded-lg px-3.5 text-sm font-semibold ${
               activa === v.valor ? "bg-foreground text-background" : "text-muted-foreground hover:bg-muted hover:text-foreground"
             } ${anilloFoco}`}
           >
@@ -112,7 +112,7 @@ export function Chip({ activo, className = "", ...props }: ButtonHTMLAttributes<
     <button
       type="button"
       aria-pressed={activo}
-      className={`inline-flex min-h-9 items-center rounded-full border px-3.5 text-[13px] font-semibold ${
+      className={`inline-flex min-h-11 items-center rounded-full border px-3.5 text-sm font-semibold ${
         activo ? "border-primario bg-primario text-white" : "border-border bg-card text-foreground hover:bg-muted"
       } ${anilloFoco} ${className}`}
       {...props}
@@ -126,7 +126,7 @@ export function ChipEnlace({ href, activo, children }: { href: string; activo: b
     <Link
       href={href}
       aria-current={activo ? "page" : undefined}
-      className={`inline-flex min-h-9 items-center rounded-full border px-3.5 text-[13px] font-semibold ${
+      className={`inline-flex min-h-11 items-center rounded-full border px-3.5 text-sm font-semibold ${
         activo ? "border-primario bg-primario text-white" : "border-border bg-card text-foreground hover:bg-muted"
       } ${anilloFoco}`}
     >
@@ -140,7 +140,7 @@ export function Boton({ principal = false, className = "", ...props }: ButtonHTM
   return (
     <button
       type="button"
-      className={`inline-flex min-h-10 items-center justify-center rounded-lg px-3.5 text-sm font-semibold disabled:opacity-50 ${
+      className={`inline-flex min-h-11 items-center justify-center rounded-lg px-3.5 text-sm font-semibold disabled:opacity-50 ${
         principal ? "bg-primario text-white hover:opacity-90" : "border border-border bg-card text-foreground hover:bg-muted"
       } ${anilloFoco} ${className}`}
       {...props}

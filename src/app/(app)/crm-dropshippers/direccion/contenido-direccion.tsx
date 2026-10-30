@@ -1,5 +1,6 @@
 import type { UsuarioActual } from "@/lib/auth";
 import { accesoCrm, areasVisibles } from "@/lib/crm/areas";
+import type { Segmento } from "@/lib/crm/salud";
 import { getPaisActual } from "@/lib/pais";
 import { createServiceClient } from "@/lib/supabase/server";
 import { VistaKpis, type KpisWhatsapp } from "../kpis/vista-kpis";
@@ -19,6 +20,8 @@ import { VistaProductos } from "./vista-productos";
 const PERIODOS_EQUIPO = [7, 30, 90];
 const PERIODOS_ENTREGAS = [30, 60, 90];
 const PERIODOS_KPIS = [7, 30, 90];
+const SEGMENTOS: Segmento[] = ["activo", "riesgo", "dormido", "perdido", "sin_pedidos"];
+const ES_ID = /^[0-9a-f-]{36}$/i;
 
 /** El inicio del periodo (ISO): hace `dias` días. */
 const desdeHace = (dias: number) => new Date(Date.now() - dias * 24 * 60 * 60 * 1000).toISOString();
@@ -39,14 +42,29 @@ function periodoDe(vista: VistaDireccion, dias: unknown): number {
 /**
  * El panel de Dirección (módulo `crm-direccion`), que desde el 30 oct 2026 es la Bandeja de Dirección (pedido de Hernán: antes eran las pestañas
  * «Dirección» y «KPIs de atención» del CRM): el encabezado con sus pestañas y el contenido de la vista. Vistas:
- *  - Clientes (fase 1, con el diseño del prototipo): las cifras de la cartera, «Qué atender hoy», la salud, los pedidos por semana y la lista de
- *    clientes con su ficha al lado (lo que vende y qué recomendarle, fase 3).
+ *  - Resumen (con el diseño del prototipo): las cifras de la cartera, «Qué atender hoy», la salud y los pedidos por semana.
+ *  - Clientes (fase 1): los chips de estado y la lista de clientes con su ficha al lado (lo que vende y qué recomendarle, fase 3). Abre con el
+ *    estado (`segmento`) o el cliente (`cliente`) que se eligió en el Resumen.
  *  - Productos (fase 3), Entregas (fase 4), Equipo (fase 2), Duplicados (fase 4) y Automatizaciones (fase 4).
  *  - KPIs de atención: tiempo de respuesta, sin responder, por número y por persona (`whatsapp_kpis`, migración 0164).
  * Solo lo ve Dirección: los chats y las pantallas de Comercial y Atención no cambian, y no se envía nada desde aquí.
  */
-export async function ContenidoDireccion({ usuario, vista, dias: diasParam }: { usuario: UsuarioActual; vista: Exclude<VistaDireccion, "chats">; dias?: unknown }) {
+export async function ContenidoDireccion({
+  usuario,
+  vista,
+  dias: diasParam,
+  segmento: segmentoParam,
+  cliente: clienteParam,
+}: {
+  usuario: UsuarioActual;
+  vista: Exclude<VistaDireccion, "chats">;
+  dias?: unknown;
+  segmento?: unknown;
+  cliente?: unknown;
+}) {
   const dias = periodoDe(vista, diasParam);
+  const segmento = SEGMENTOS.includes(segmentoParam as Segmento) ? (segmentoParam as Segmento) : null;
+  const cliente = typeof clienteParam === "string" && ES_ID.test(clienteParam) ? clienteParam : null;
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
   const kpis = vista === "kpis" ? await supabase.rpc("whatsapp_kpis", { p_desde: desdeHace(dias), p_areas: areasVisibles(accesoCrm(usuario)) }) : null;
@@ -86,8 +104,23 @@ export async function ContenidoDireccion({ usuario, vista, dias: diasParam }: { 
           alertasAbiertas={datos.alertas.reduce<Record<string, number>>((m, x) => ((m[x.tipo] = (m[x.tipo] ?? 0) + 1), m), {})}
         />
       );
+    if (vista === "resumen")
+      return <PanelDireccion key="resumen" modo="resumen" segmentoInicial={null} clienteInicial={null} datos={datos} productos={null} codigoPais={pais.codigo} escribe={escribe} usuarioId={usuario.id} />;
     if (vista === "clientes")
-      return <PanelDireccion datos={datos} productos={productos && !("error" in productos) ? productos : null} codigoPais={pais.codigo} escribe={escribe} usuarioId={usuario.id} />;
+      return (
+        // La `key` arma el panel de nuevo con el estado o el cliente elegidos en el Resumen (si no, React guarda el estado de antes).
+        <PanelDireccion
+          key={`clientes-${segmento ?? "todos"}-${cliente ?? ""}`}
+          modo="clientes"
+          segmentoInicial={segmento}
+          clienteInicial={cliente && filas.some((f) => f.id === cliente) ? cliente : null}
+          datos={datos}
+          productos={productos && !("error" in productos) ? productos : null}
+          codigoPais={pais.codigo}
+          escribe={escribe}
+          usuarioId={usuario.id}
+        />
+      );
     return null;
   }
 
