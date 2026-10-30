@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { chatVisibleParaAtencion } from "@/lib/whatsapp/borrados-atencion";
 import { conversacionesOcultas } from "@/lib/whatsapp/ocultos";
 import type { AreaCrm } from "@/lib/crm/areas";
+import { esTelefonoInterno } from "@/lib/crm/chat-interno";
 
 /**
  * Las conversaciones de WhatsApp sin responder en los números que ve la persona (también las de quien no está en el CRM): Atención cuenta las de su área,
@@ -22,7 +23,7 @@ export async function contarSinResponder(supabase: SupabaseClient, areas: AreaCr
   const digitos = (t: unknown) => String(t ?? "").replace(/\D/g, "");
   const { data: numeros } = await supabase.from("whatsapp_numeros").select("numero");
   const deLaEmpresa = new Set((numeros ?? []).map((n) => digitos(n.numero)).filter((d) => d.length >= 7));
-  let chats = (data ?? []).filter((c) => !ocultas.has(c.id as string) && !deLaEmpresa.has(digitos(c.telefono)));
+  let chats = (data ?? []).filter((c) => !ocultas.has(c.id as string) && !esTelefonoInterno(c.telefono as string) && !deLaEmpresa.has(digitos(c.telefono)));
   if (sinBorrados && chats.length) {
     // Sin la columna (migración 0171) la consulta falla y no se descuenta nada.
     const marcadas = await supabase.from("whatsapp_conversaciones").select("id, borrada_en_app_en").not("borrada_en_app_en", "is", null);
