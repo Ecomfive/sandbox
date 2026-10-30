@@ -5,9 +5,11 @@
  * Salud (0 a 100), la suma pesada de cuatro factores (los que no se pueden medir no cuentan y los demás se reparten su peso):
  *  - Recencia (35 %): pidió hoy o ayer = 100; baja hasta 0 a los 30 días sin pedir.
  *  - Volumen (25 %): pedidos de 30 días en escala logarítmica; llegar al umbral VIP del país (pedidos al mes) = 100.
- *  - Tendencia (25 %): 30 días frente a los 30 anteriores; igual = 75, +20 % = 100, −40 % = 0. Sin los 30 anteriores, no cuenta.
+ *  - Tendencia (25 %): 30 días frente a los 30 anteriores y 14 días frente a los 14 anteriores (con 5 pedidos o más antes); cuenta la peor.
+ *    Igual = 75, +20 % = 100, −40 % = 0. Sin con qué comparar, no cuenta.
  *  - Entrega (15 %): entregados ÷ (entregados + devueltos) de 60 días; 85 % = 100, 55 % = 0. Con menos de 5 cerrados, no cuenta.
- * 70 o más: Sano; de 40 a 69: Atención; menos de 40: Crítico. Sin pedidos: sin puntaje.
+ * 70 o más: Sano; de 40 a 69: Atención; menos de 40: Crítico. Sin pedidos: sin puntaje. Con una caída de pedidos (la alerta «Caída») el puntaje
+ * no pasa de 69: un cliente en riesgo nunca sale «Sano» (31 oct 2026: Jose Sinisterra salía 100 con −50 % en 14 días).
  */
 
 export interface PedidosDropshipper {
@@ -41,6 +43,8 @@ export interface Salud {
   puntaje: number | null;
   banda: Banda;
   factores: Factor[];
+  /** Por qué el puntaje quedó limitado (p. ej. por una caída de pedidos); null si no. */
+  tope: string | null;
 }
 
 export interface Alerta {
@@ -82,14 +86,19 @@ export function bandaDe(puntaje: number | null): Banda {
 
 /** `refVolumen`: los pedidos al mes desde los que el país considera VIP (Configuración › Tipo de cliente). */
 export function calcularSalud(p: PedidosDropshipper, hoy: string, refVolumen: number): Salud {
-  if (!p.ultimoPedido) return { puntaje: null, banda: "sin_pedidos", factores: [] };
+  if (!p.ultimoPedido) return { puntaje: null, banda: "sin_pedidos", factores: [], tope: null };
   const dias = Math.max(0, diasEntre(p.ultimoPedido, hoy));
   const recencia = dias <= 1 ? 100 : limitar(100 - ((dias - 1) * 100) / 29);
   const ref = Math.max(2, refVolumen);
   const volumen = limitar((Math.log(1 + p.pedidos30) / Math.log(1 + ref)) * 100);
   // Sin 30 días anteriores completos (empezó a pedir hace menos de 60 días) no hay con qué comparar.
   const conHistoria = !!p.primerPedido && diasEntre(p.primerPedido, hoy) >= 45;
-  const tendencia = !conHistoria ? null : p.pedidos30Antes === 0 ? (p.pedidos30 > 0 ? 100 : 0) : limitar(75 + (p.pedidos30 / p.pedidos30Antes - 1) * 125);
+  const tendencia30 = !conHistoria ? null : p.pedidos30Antes === 0 ? (p.pedidos30 > 0 ? 100 : 0) : limitar(75 + (p.pedidos30 / p.pedidos30Antes - 1) * 125);
+  // Los últimos 14 días frente a los 14 anteriores: una caída reciente no se esconde detrás de un buen mes.
+  const tendencia14 = p.pedidos14Antes >= 5 ? limitar(75 + (p.pedidos14 / p.pedidos14Antes - 1) * 125) : null;
+  const usa14 = tendencia14 !== null && (tendencia30 === null || tendencia14 < tendencia30);
+  const tendencia = usa14 ? tendencia14 : tendencia30;
+  const cambio14 = p.pedidos14Antes ? p.pedidos14 / p.pedidos14Antes - 1 : 0;
   const cerrados = p.entregados60 + p.devueltos60;
   const tasa = cerrados ? p.entregados60 / cerrados : 0;
   const entrega = cerrados < 5 ? null : limitar(((tasa - 0.55) / 0.3) * 100);
@@ -102,7 +111,9 @@ export function calcularSalud(p: PedidosDropshipper, hoy: string, refVolumen: nu
       etiqueta: "Tendencia",
       valor: tendencia,
       peso: PESOS.tendencia,
-      detalle: !conHistoria
+      detalle: usa14
+        ? `${cambio14 >= 0 ? "+" : "−"}${pct(Math.abs(cambio14))} en los últimos 14 días frente a los 14 anteriores (${p.pedidos14} y ${p.pedidos14Antes})`
+        : !conHistoria
         ? "Todavía sin 30 días anteriores para comparar"
         : cambio === null
           ? `${nPedidos(p.pedidos30)}; en los 30 días anteriores no pidió`
@@ -118,8 +129,10 @@ export function calcularSalud(p: PedidosDropshipper, hoy: string, refVolumen: nu
   ];
   const medidos = factores.filter((f) => f.valor !== null);
   const peso = medidos.reduce((s, f) => s + f.peso, 0);
-  const puntaje = limitar(medidos.reduce((s, f) => s + (f.valor as number) * f.peso, 0) / peso);
-  return { puntaje, banda: bandaDe(puntaje), factores };
+  const calculado = limitar(medidos.reduce((s, f) => s + (f.valor as number) * f.peso, 0) / peso);
+  const conCaida = !!caida(p, dias) && calculado > 69;
+  const puntaje = conCaida ? 69 : calculado;
+  return { puntaje, banda: bandaDe(puntaje), factores, tope: conCaida ? `Daba ${calculado}, pero tiene una caída de pedidos: no pasa de 69 (Atención).` : null };
 }
 
 /** Bajó fuerte en 14 días (con al menos 5 pedidos antes), o lleva de 10 a 20 días sin pedir cuando antes pedía seguido. */

@@ -1022,7 +1022,9 @@ convenciones técnicas del código.
   `/crm-dropshippers/direccion` (oculta sin `crm-direccion` en el layout, como KPIs). `crm_salud_dropshippers(p_pais)` da por dropshipper los
   pedidos de 14/30 días y los anteriores, primer y último pedido y entregados/devueltos de 60 días (sin cancelados, por `dropshipper_cuentas`);
   `crm_pedidos_semanales`. El puntaje, el segmento y las alertas son de `src/lib/crm/salud.ts` (puro, con pruebas). «Atendida» y «Crear tarea»
-  (`direccion/actions.ts`, solo `escribeDireccion`) guardan en `crm_alertas_atendidas` (7 días); la tarea va con `origen = 'alerta'`. Para «Sin
+  (`direccion/actions.ts`, solo `escribeDireccion`) guardan en `crm_alertas_atendidas` (7 días); la tarea va con `origen = 'alerta'`. **Diseño** (30 oct 2026, pedido de Hernán: «que se vea como el prototipo»): piezas de
+  `direccion/piezas-direccion.tsx` (`EncabezadoDireccion`, `Cifra`, `Tarjeta`, `Chip`, `Insignia`, `Barra`) y la ficha del cliente al lado de la lista
+  (`FichaCliente`). La salud toma la peor tendencia (30 o 14 días) y con «Caída» no pasa de 69 (`Salud.tope`). Para «Sin
   primer pedido» se usa `fecha_ingreso`/`captado_en`, nunca `creado_en` (los de ClickUp se crearon todos al importarlos). No toca la Bandeja.
   **Fase 2** (sin migración): vista `?vista=equipo&dias=7|30|90` (`datos-equipo.ts` + `vista-equipo.tsx`, lógica pura en `src/lib/crm/equipo.ts`):
   respuestas por persona de `whatsapp_kpis` (cruzadas por nombre de autor con `perfiles.nombre`), chats asignados y `esperando_desde` por tramos,

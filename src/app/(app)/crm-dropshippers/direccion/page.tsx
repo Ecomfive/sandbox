@@ -1,6 +1,3 @@
-import Link from "next/link";
-import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
-import { anilloFoco } from "@/components/ui/field";
 import { Pagina } from "@/components/ui/pagina";
 import { requireModulo } from "@/lib/auth";
 import { accesoCrm, MODULO_DIRECCION } from "@/lib/crm/areas";
@@ -11,6 +8,7 @@ import { cargarEquipo } from "./datos-equipo";
 import { cargarDuplicados, cargarEntregas, cargarSecuenciaAlta } from "./datos-fase4";
 import { cargarProductos } from "./datos-productos";
 import { PanelDireccion } from "./panel-direccion";
+import { EncabezadoDireccion } from "./piezas-direccion";
 import { VistaAutomatizaciones } from "./vista-automatizaciones";
 import { VistaDuplicados } from "./vista-duplicados";
 import { VistaEntregas } from "./vista-entregas";
@@ -74,7 +72,14 @@ export default async function DireccionCrmPage({ searchParams }: { searchParams:
     if (vista === "productos" && productos && !("error" in productos)) return <VistaProductos datos={productos} clientes={filas} codigoPais={pais.codigo} />;
     if (vista === "entregas" && Array.isArray(entregas)) return <VistaEntregas filas={entregas} clientes={filas} dias={dias} periodos={PERIODOS_ENTREGAS} codigoPais={pais.codigo} />;
     if (vista === "duplicados" && duplicados) return <VistaDuplicados datos={duplicados} />;
-    if (vista === "automatizaciones" && secuencia && !("error" in secuencia)) return <VistaAutomatizaciones datos={secuencia} personas={ok ? datos.personas : []} escribe={escribe} />;
+    if (vista === "automatizaciones" && secuencia && !("error" in secuencia)) return (
+        <VistaAutomatizaciones
+          datos={secuencia}
+          personas={ok ? datos.personas : []}
+          escribe={escribe}
+          alertasAbiertas={ok ? datos.alertas.reduce<Record<string, number>>((m, x) => ((m[x.tipo] = (m[x.tipo] ?? 0) + 1), m), {}) : {}}
+        />
+      );
     if (vista === "clientes" && ok)
       return <PanelDireccion datos={datos} productos={productos && !("error" in productos) ? productos : null} codigoPais={pais.codigo} escribe={escribe} usuarioId={usuario.id} />;
     return null;
@@ -82,21 +87,11 @@ export default async function DireccionCrmPage({ searchParams }: { searchParams:
 
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
-      <EncabezadoPagina titulo="Dirección" oculto>
-        La salud de la cartera, a quién atender hoy, qué se vende, cómo se entrega y cómo trabaja el equipo.
-      </EncabezadoPagina>
-      <nav aria-label="Vistas de Dirección" className="flex gap-1 overflow-x-auto border-b border-border">
-        {VISTAS.map((v) => (
-          <Link
-            key={v.valor}
-            href={v.valor === "clientes" ? "/crm-dropshippers/direccion" : `/crm-dropshippers/direccion?vista=${v.valor}`}
-            aria-current={vista === v.valor ? "page" : undefined}
-            className={`-mb-px border-b-2 px-3 py-2 text-sm whitespace-nowrap ${vista === v.valor ? "border-primario font-semibold text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"} ${anilloFoco}`}
-          >
-            {v.etiqueta}
-          </Link>
-        ))}
-      </nav>
+      <EncabezadoDireccion
+        subtitulo={`${pais.nombre} · pedidos de Dropi de las cuentas vinculadas`}
+        activa={vista}
+        vistas={VISTAS.map((v) => ({ ...v, href: v.valor === "clientes" ? "/crm-dropshippers/direccion" : `/crm-dropshippers/direccion?vista=${v.valor}` }))}
+      />
       {error ? (
         <p role="alert" className="m-0 rounded-lg border border-warning bg-warning-soft px-4 py-3 text-sm text-warning">
           {error}
