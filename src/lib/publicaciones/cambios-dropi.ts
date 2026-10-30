@@ -6,6 +6,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { DatosCrearDropi, FotoCrear } from "./crear-dropi";
 import { MAX_NOMBRE_DROPI } from "./dropi-guardado";
+import { normalizarDatosDevolver } from "./apagar-dropi";
 import { normalizarDatosPrivatizar, type DatosPrivatizar } from "./privatizar-dropi";
 import { idsDeDropi } from "./sincronizar-dropi";
 import { normalizarDatosStock, type DatosStock } from "./stock-dropi";
@@ -168,25 +169,34 @@ export async function encolarRepublicar(
  * «Apagar en Dropi» (pedido de Hernán, 23 oct 2026; migración 0148): deja en la cola que se saque todo el stock del producto en Dropi
  * (con `quitarPrivados`, también su privatización) y se archive. Si ya había un apagado esperando, no se agrega otro (el pendiente
  * se reintenta solo en cada «Aplicar en Dropi»; si antes no pedía quitar privados y ahora sí, se actualiza).
+ * `devolverA` («Quitar privatización», 30 oct 2026): el público al que se le devuelven las unidades del privado (va en `datos`). A un apagado que
+ * ya estaba esperando se le agrega solo si Dropi todavía no lo tocó.
  */
 export async function encolarApagar(
   supabase: SupabaseClient,
   pub: { id: string; pais_id: string; dropi_id: string | null },
-  opciones: { quitarPrivados: boolean },
+  opciones: { quitarPrivados: boolean; devolverA?: { publico: number; publicacionId: string } | null },
   por: { id: string; nombre: string },
 ): Promise<{ id: string; yaEstaba: boolean } | { error: string }> {
   const productoId = idsDeDropi(pub.dropi_id)[0];
   if (!productoId) return { error: "La publicación no tiene ID de Dropi." };
   const falta = (m: string) => /tipo|column|does not exist|schema cache|quitar_privados/i.test(m);
-  const previo = await supabase.from("dropi_cambios_pendientes").select("id, quitar_privados").eq("publicacion_id", pub.id).eq("tipo", "apagar").in("estado", ["pendiente", "error"]).limit(1).maybeSingle();
+  const devolver = opciones.devolverA ? { publico: opciones.devolverA.publico, publicacionId: opciones.devolverA.publicacionId, unidades: null, devuelto: false } : null;
+  const previo = await supabase.from("dropi_cambios_pendientes").select("id, quitar_privados, datos, intentos").eq("publicacion_id", pub.id).eq("tipo", "apagar").in("estado", ["pendiente", "error"]).limit(1).maybeSingle();
   if (previo.error) return { error: falta(previo.error.message) ? "Falta correr en Supabase la migración 0148." : "No se pudo dejar el apagado para Dropi." };
   if (previo.data) {
-    if (opciones.quitarPrivados && !previo.data.quitar_privados) await supabase.from("dropi_cambios_pendientes").update({ quitar_privados: true }).eq("id", previo.data.id as string);
+    const cambios: Record<string, unknown> = {};
+    if (opciones.quitarPrivados && !previo.data.quitar_privados) cambios.quitar_privados = true;
+    if (devolver && !normalizarDatosDevolver(previo.data.datos)) {
+      if (Number(previo.data.intentos) > 0) return { error: "Este ID ya tiene un apagado que se intentó en Dropi: espera a que termine y devuelve las unidades con «Cambiar stock»." };
+      cambios.datos = devolver;
+    }
+    if (Object.keys(cambios).length) await supabase.from("dropi_cambios_pendientes").update(cambios).eq("id", previo.data.id as string);
     return { id: previo.data.id as string, yaEstaba: true };
   }
   const { data, error } = await supabase
     .from("dropi_cambios_pendientes")
-    .insert({ pais_id: pub.pais_id, publicacion_id: pub.id, dropi_producto_id: productoId, tipo: "apagar", quitar_privados: opciones.quitarPrivados, creado_por: por.id, creado_por_nombre: por.nombre })
+    .insert({ pais_id: pub.pais_id, publicacion_id: pub.id, dropi_producto_id: productoId, tipo: "apagar", quitar_privados: opciones.quitarPrivados, ...(devolver ? { datos: devolver } : {}), creado_por: por.id, creado_por_nombre: por.nombre })
     .select("id")
     .single();
   if (error || !data) return { error: error && falta(error.message) ? "Falta correr en Supabase la migración 0148." : "No se pudo dejar el apagado para Dropi." };

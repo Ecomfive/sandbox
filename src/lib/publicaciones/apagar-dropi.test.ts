@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { APAGAR_JS, armarApagado, CONCEPTO_APAGAR, grupoDe, nombreDelPublico, privadasDe, type PublicacionParaApagar } from "./apagar-dropi";
+import { APAGAR_JS, armarApagado, CONCEPTO_APAGAR, grupoDe, nombreDelPublico, normalizarDatosDevolver, normalizarUnidades, privadasDe, type PublicacionParaApagar } from "./apagar-dropi";
 import { ARMAR_JS, marcadorAplicarDropi } from "./marcador-aplicar-dropi";
 import { PRIVATIZAR_JS } from "./privatizar-dropi";
 import { REPUBLICAR_JS } from "./republicar-dropi";
@@ -114,6 +114,14 @@ test("el favorito apaga lo marcado «apagar», archiva con el endpoint de Dropi 
   assert.ok(codigo.includes("if(c.tipo==='apagar')return apagar(c,bp);"));
   assert.ok(codigo.includes("/archiveProduct"));
   // Sin archivar por órdenes pendientes: ok con archivado false (queda pendiente), no un error.
-  assert.ok(codigo.includes("return{ok:true,archivado:false,error:"));
+  assert.ok(codigo.includes("return R({ok:true,archivado:false,error:"));
   assert.doesNotThrow(() => new Function(codigo));
+});
+
+test("quitar privatización: los datos de devolver se limpian (sin público no hay devolución)", () => {
+  assert.equal(normalizarDatosDevolver(null), null);
+  assert.equal(normalizarDatosDevolver({ publico: "abc" }), null);
+  assert.deepEqual(normalizarDatosDevolver({ publico: 8406, publicacionId: "x", unidades: { "81": 50, "82": 0, malo: 3, "83": 1.5 }, devuelto: "sí" }), { publico: 8406, publicacionId: null, unidades: { "81": 50 }, devuelto: false });
+  assert.equal(normalizarUnidades({ "81": 0 }), null);
+  assert.deepEqual(normalizarUnidades({ "81": "12" }), { "81": 12 });
 });

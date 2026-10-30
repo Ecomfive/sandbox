@@ -423,6 +423,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
       liquidacionDesde: liquidacionEn.get(d.id as string) ?? null,
       tareasPendientes: tareasDe.get(d.id as string) ?? { total: 0, atrasadas: 0 },
       grupo: [],
+      publicosDelProducto: [],
     };
     // Una duplicada (otra publicación con el mismo ID de Dropi) va a Archivados aunque Dropi diga activo, sin acciones.
     if (!original) return fila;
@@ -437,6 +438,13 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
       const o = porIdFila.get(x.id)!;
       return { id: x.id, nombre: x.nombre, dropiId: x.dropiId, archivada: x.archivada, tipo: o.tipoDropi, stock: o.stockProveedor, correo: o.privatizadoEmail, apagadoPendiente: o.apagadoPendiente, apagadoSinTocar: o.apagadoSinTocar };
     });
+  // «Quitar privatización» (30 oct 2026): a qué públicos le puede devolver sus unidades cada privada: los de su grupo y los del mismo producto vinculado.
+  for (const f of filas) {
+    if (f.tipoDropi !== "privado") continue;
+    f.publicosDelProducto = filas
+      .filter((o) => o.id !== f.id && o.tipoDropi !== "privado" && !o.archivada && o.enDropi !== "archivado" && !o.duplicadaDe && !o.apagadoPendiente && o.dropiId.trim() !== "" && (f.grupo.some((g) => g.id === o.id) || (!!f.sku && o.sku?.id === f.sku.id)))
+      .map((o) => ({ id: o.id, nombre: o.nombre, dropiId: o.dropiId, stock: o.stockProveedor }));
+  }
 
   const moneda = await monedaPais;
   // Las recomendaciones van al final: el combo necesita saber qué compuestos ya están publicados (y no archivados) en el país.

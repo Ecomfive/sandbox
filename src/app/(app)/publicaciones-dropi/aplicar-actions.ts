@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { registrarAuditoria, registrarAuditoriaLote } from "@/lib/auditoria";
 import { requireModuloEscritura } from "@/lib/auth";
+import { normalizarDatosDevolver, normalizarUnidades, type DatosDevolver } from "@/lib/publicaciones/apagar-dropi";
 import { normalizarDatosCrear, type DatosCrearDropi, type FotoCrear } from "@/lib/publicaciones/crear-dropi";
 import { unaPorFoto } from "@/lib/publicaciones/fotos-dropi";
 import { normalizarDatosPrivatizar, type DatosPrivatizar } from "@/lib/publicaciones/privatizar-dropi";
@@ -37,6 +38,8 @@ export interface CambioParaDropi {
   privatizar: DatosPrivatizar | null;
   /** «apagar»: además de sacar el stock, quitar la privatización (un producto privado, asignado a un correo). */
   quitarPrivados: boolean;
+  /** «apagar» de «Quitar privatización»: a qué público se le devuelven las unidades del privado (al favorito viaja como `datos`). */
+  devolver: DatosDevolver | null;
   /** El producto nuevo que un intento anterior de republicar ya creó en Dropi (el favorito sigue desde ahí). */
   nuevo: number | null;
   producto: number;
@@ -259,6 +262,7 @@ export async function pendientesParaDropi(codigoPais: string): Promise<{ error?:
       datos: f.tipo === "crear" ? normalizarDatosCrear(f.datos) : null,
       privatizar: f.tipo === "privatizar" ? normalizarDatosPrivatizar(f.datos) : null,
       quitarPrivados: f.quitar_privados === true,
+      devolver: f.tipo === "apagar" ? normalizarDatosDevolver(f.datos) : null,
       nuevo: num(f.nuevo_dropi_id),
       producto: f.dropi_producto_id == null ? 0 : Number(f.dropi_producto_id),
       nombre: (f.nombre as string | null) ?? null,
@@ -282,7 +286,7 @@ export async function guardarResultadosDropi(codigoPais: string, resultados: unk
   if (!pais) return { error: "País no válido." };
   if (!Array.isArray(resultados) || resultados.length > MAX) return { error: "Resultados no válidos." };
   const limpios = resultados
-    .map((r) => r as { id?: unknown; ok?: unknown; error?: unknown; nuevo?: unknown; archivado?: unknown; aviso?: unknown; salida?: unknown; antes?: unknown; stock?: unknown; bodegas?: unknown })
+    .map((r) => r as { id?: unknown; ok?: unknown; error?: unknown; nuevo?: unknown; archivado?: unknown; aviso?: unknown; salida?: unknown; antes?: unknown; stock?: unknown; bodegas?: unknown; unidades?: unknown; devuelto?: unknown })
     .filter((r) => typeof r.id === "string" && UUID.test(r.id))
     .map((r) => ({
       id: r.id as string,
@@ -291,6 +295,9 @@ export async function guardarResultadosDropi(codigoPais: string, resultados: unk
       archivado: r.archivado === true,
       // «privatizar»: ya se le sacó el stock al público (un reintento no lo saca otra vez).
       salida: r.salida === true,
+      // «apagar» de «Quitar privatización»: las unidades que se le sacaron al privado y si ya se le devolvieron al público.
+      unidades: normalizarUnidades(r.unidades),
+      devuelto: r.devuelto === true,
       error: typeof r.error === "string" ? r.error.slice(0, 500) : "Sin detalle",
       // «crear»: un aviso que no impidió publicar (por ejemplo, las garantías que Dropi no dejó poner).
       aviso: typeof r.aviso === "string" ? r.aviso.slice(0, 300) : null,
@@ -329,10 +336,19 @@ export async function guardarResultadosDropi(codigoPais: string, resultados: unk
       // Sin stock en Dropi pero sin archivar: sigue pendiente (con el motivo) y el próximo «Aplicar en Dropi» solo repite el archivado.
       const hecho = r.ok && r.archivado;
       const parcial = r.ok && !r.archivado;
+      // «Quitar privatización»: se guarda lo que se le sacó al privado y si ya volvió al público, así un reintento no lo devuelve dos veces.
+      const dv = normalizarDatosDevolver(f.datos);
+      const devolver = dv ? { ...dv, unidades: dv.unidades ?? r.unidades, devuelto: dv.devuelto || r.devuelto } : null;
       await supabase
         .from("dropi_cambios_pendientes")
-        .update(hecho ? { estado: "aplicado", aplicado_en: ahora, error: null, intentos: Number(f.intentos) + 1 } : parcial ? { estado: "pendiente", error: r.error, intentos: Number(f.intentos) + 1 } : { estado: "error", error: r.error, intentos: Number(f.intentos) + 1 })
+        .update({
+          ...(hecho ? { estado: "aplicado", aplicado_en: ahora, error: null } : parcial ? { estado: "pendiente", error: r.error } : { estado: "error", error: r.error }),
+          intentos: Number(f.intentos) + 1,
+          ...(devolver ? { datos: devolver } : {}),
+        })
         .eq("id", r.id);
+      const totalDevuelto = devolver?.unidades ? Object.values(devolver.unidades).reduce((t, n) => t + n, 0) : 0;
+      const devuelta = dv && !dv.devuelto && r.devuelto ? (totalDevuelto ? ` · ${totalDevuelto} u. devueltas al público (ID ${dv.publico})` : " · no tenía unidades que devolver") : "";
       // Sin stock y sin privatización en Dropi (aunque no haya dejado archivar): en el sistema la publicación deja de ser de ese correo.
       let privatizacion = "";
       if (r.ok && f.quitar_privados === true) {
@@ -349,7 +365,7 @@ export async function guardarResultadosDropi(codigoPais: string, resultados: unk
         accion: hecho ? "dropi_apagado" : parcial ? "dropi_apagado_parcial" : "dropi_apagado_error",
         entidad: "dropi_publicaciones",
         entidadId: f.publicacion_id as string,
-        detalle: hecho ? `ID ${f.dropi_producto_id}: sin stock y archivado en Dropi${privatizacion} (desde Dropi)` : `ID ${f.dropi_producto_id} · ${r.error}${privatizacion}`,
+        detalle: hecho ? `ID ${f.dropi_producto_id}: sin stock y archivado en Dropi${privatizacion}${devuelta} (desde Dropi)` : `ID ${f.dropi_producto_id} · ${r.error}${privatizacion}${devuelta}`,
       });
       if (hecho) aplicados++;
       else errores++;

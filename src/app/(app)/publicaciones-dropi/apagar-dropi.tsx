@@ -132,7 +132,7 @@ function VentanaApagarDropi({ p, abierta, alCerrar }: { p: FilaPublicacion; abie
  * publicación y de las demás de su producto que también lo tengan pendiente (vienen marcadas), por si hubo un error o se cambió de opinión.
  * En el sistema vuelven a verse como antes. Un apagado que ya se intentó en Dropi (puede tener el stock en cero) no se puede deshacer desde aquí.
  */
-function VentanaDeshacerApagado({ p, abierta, alCerrar }: { p: FilaPublicacion; abierta: boolean; alCerrar: () => void }) {
+export function VentanaDeshacerApagado({ p, abierta, alCerrar }: { p: FilaPublicacion; abierta: boolean; alCerrar: () => void }) {
   const { mostrarToast } = useToast();
   const filas = [
     { id: p.id, nombre: p.nombre, dropiId: p.dropiId, tipo: p.tipoDropi, sinTocar: p.apagadoSinTocar, esta: true },
