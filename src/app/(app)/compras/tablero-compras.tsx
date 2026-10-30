@@ -29,7 +29,8 @@ export const TARJETAS_COMPRAS: TarjetaCompras[] = [
 
 /** Una tarjeta: botón que pone o quita su filtro en la lista de abajo, con el número grande y, si hay, las unidades y el monto. */
 function Tarjeta({ t, valor, unidades, monto, activa, alPulsar }: { t: TarjetaCompras; valor: number; unidades: number | null; monto: string | null; activa: boolean; alPulsar: () => void }) {
-  const c = COLORES[valor === 0 && t.color === "rojo" ? "verde" : t.color];
+  // Lo que avisa (atrasadas, sin productos) en 0 se ve en verde: está todo bien.
+  const c = COLORES[valor === 0 && (t.id === "atrasadas" || t.id === "sin_productos") ? "verde" : t.color];
   const Icono = t.icono;
   return (
     <button

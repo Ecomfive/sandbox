@@ -553,7 +553,8 @@ export function TablaCompras({
               t,
               valor: t.id === "sin_productos" ? sinProductos.length : conteo[t.id],
               unidades: unidades > 0 ? unidades : null,
-              monto: montoVisible && t.id !== "sin_productos" ? sumar(grupo, (c) => c.montoTotal, usd) : null,
+              // Sin compras (o sin montos cargados) no se escribe «—» suelto: la línea no sale.
+              monto: montoVisible && t.id !== "sin_productos" && grupo.some((c) => c.montoTotal !== null) ? sumar(grupo, (c) => c.montoTotal, usd) : null,
             };
           })}
           activa={(id) => (id === "sin_productos" ? soloSinProductos : rapido === id)}
