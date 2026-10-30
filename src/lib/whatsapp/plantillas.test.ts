@@ -214,12 +214,13 @@ describe("lo que dice Meta", () => {
 });
 
 describe("plantillas sugeridas", () => {
-  it("son 9 (5 para retomar, 3 de aviso de llegada y 1 interna), con nombres distintos que acepta Meta", () => {
-    assert.equal(PLANTILLAS_SUGERIDAS.length, 9);
+  it("son 10 (5 para retomar, 3 de aviso de llegada, 1 interna y 1 de primer contacto), con nombres distintos que acepta Meta", () => {
+    assert.equal(PLANTILLAS_SUGERIDAS.length, 10);
     assert.equal(PLANTILLAS_SUGERIDAS.filter((p) => p.grupo === "retomar").length, 5);
     assert.equal(PLANTILLAS_SUGERIDAS.filter((p) => p.grupo === "interno").length, 1);
-    assert.equal(new Set(PLANTILLAS_SUGERIDAS.map((p) => p.nombre)).size, 9);
-    assert.equal(new Set(PLANTILLAS_SUGERIDAS.map((p) => p.clave)).size, 9);
+    assert.equal(PLANTILLAS_SUGERIDAS.filter((p) => p.grupo === "primer_contacto").length, 1);
+    assert.equal(new Set(PLANTILLAS_SUGERIDAS.map((p) => p.nombre)).size, 10);
+    assert.equal(new Set(PLANTILLAS_SUGERIDAS.map((p) => p.clave)).size, 10);
   });
   for (const p of PLANTILLAS_SUGERIDAS) {
     it(`${p.nombre}: pasa la revisión sin errores ni avisos`, () => {
@@ -234,6 +235,16 @@ describe("plantillas sugeridas", () => {
   });
   it("todas dejan decir que no", () => {
     for (const p of PLANTILLAS_SUGERIDAS.filter((x) => x.categoria === "marketing")) assert.ok(p.botones.some((b) => /\bno\b/i.test(b)), p.nombre);
+  });
+});
+
+describe("plantilla de primer contacto", () => {
+  it("lleva botón para aceptar y para rechazar, el nombre del asesor y el motivo", () => {
+    const p = PLANTILLAS_SUGERIDAS.find((x) => x.clave === "primer_contacto")!;
+    assert.deepEqual(p.botones, ["Sí, escríbeme", "No, gracias"]);
+    assert.ok(p.botones.some((b) => /\bno\b/i.test(b)));
+    assert.deepEqual(p.variables.map((v) => v.campo), ["primer_nombre", "manual", "manual"]);
+    assert.equal(p.categoria, "utility");
   });
 });
 

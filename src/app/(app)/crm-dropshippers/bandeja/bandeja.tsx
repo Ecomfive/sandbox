@@ -35,6 +35,7 @@ import { VentanaRapidas } from "./respuestas-rapidas";
 import { sugerirRapidas, validarRapida, yaEsRapida, type RespuestaRapida } from "@/lib/whatsapp/rapidas";
 import { EnviarPlantilla, PlantillasEnLinea } from "./enviar-plantilla";
 import { ImportarChat } from "./importar-chat";
+import { NuevoContacto } from "./nuevo-contacto";
 import { PedirBorrado, type QueBorrar } from "./pedir-borrado";
 import { MostrarTelefono } from "../mostrar-telefono";
 import { ActualizarIcon, ArchivarIcon, ChatIcon, CheckIcon, ConectadoIcon, DescargarIcon, DesconectadoIcon, FlechaAbajoIcon, FlechaArribaIcon, PapeleraIcon, PersonaIcon, ReactivarIcon } from "@/lib/nav-icons";
@@ -372,6 +373,8 @@ export function Bandeja({
   const [chat, setChat] = useState<ChatAbierto | null>(null);
   /** La ventana «Importar chat»: con el chat abierto o, con `null`, para uno que todavía no existe en la bandeja. */
   const [importar, setImportar] = useState<{ conversacion: ConversacionVista | null } | null>(null);
+  /** La ventana «Nuevo contacto»: escribirle por primera vez a alguien con una plantilla de primer contacto. */
+  const [nuevoContacto, setNuevoContacto] = useState(false);
   const [cargandoAnteriores, setCargandoAnteriores] = useState(false);
   const chatRef = useRef<HTMLDivElement>(null);
   /** La altura del chat antes de sumar mensajes viejos arriba, para dejar la vista donde estaba. */
@@ -1286,9 +1289,21 @@ export function Bandeja({
         {escribe && (
           <button
             type="button"
+            onClick={() => setNuevoContacto(true)}
+            className={`${datos.numerosEmpresa.length > 1 ? "" : "ml-auto"} inline-flex min-h-9 items-center gap-2 rounded-lg bg-[var(--wa-acento)] px-3.5 text-[13px] font-semibold text-[var(--wa-acento-texto)] hover:opacity-90 ${anilloFoco}`}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            Nuevo contacto
+          </button>
+        )}
+        {escribe && (
+          <button
+            type="button"
             onClick={() => setImportar({ conversacion: null })}
             title="Importar un chat exportado desde el celular"
-            className={`${datos.numerosEmpresa.length > 1 ? "" : "ml-auto"} inline-flex min-h-9 items-center gap-2 rounded-lg border border-[var(--wa-borde)] bg-[var(--wa-fondo)] px-3.5 text-[13px] font-medium text-[var(--wa-sec)] hover:bg-[var(--wa-hover)] ${anilloFoco}`}
+            className={`inline-flex min-h-9 items-center gap-2 rounded-lg border border-[var(--wa-borde)] bg-[var(--wa-fondo)] px-3.5 text-[13px] font-medium text-[var(--wa-sec)] hover:bg-[var(--wa-hover)] ${anilloFoco}`}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M12 4v11M7 10l5 5 5-5M5 20h14" />
@@ -1953,6 +1968,22 @@ export function Bandeja({
             setVerPlantillas(false);
             mostrarToast("Plantilla enviada.");
             void refrescar(sel.id);
+          }}
+        />
+      )}
+
+      {nuevoContacto && (
+        <NuevoContacto
+          numeros={datos.numeros}
+          areas={areas}
+          alCerrar={() => setNuevoContacto(false)}
+          alTerminar={(id, escribirDirecto) => {
+            setNuevoContacto(false);
+            setFiltro("todas");
+            setElegido(id);
+            setChat((x) => (x?.id === id ? null : x));
+            void refrescar(id);
+            mostrarToast(escribirDirecto ? "Ya hay un chat abierto con esa persona: escríbele directo." : "Primer contacto enviado. Cuando responda, el chat queda abierto.");
           }}
         />
       )}

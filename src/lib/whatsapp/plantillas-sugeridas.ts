@@ -9,8 +9,9 @@ import type { Categoria, VariablePlantilla } from "./plantillas";
 /**
  * «retomar»: para volver a hablar con alguien. «llegada»: avisar a quien preguntó por un producto que ya llegó o que su fecha cambió (la tarea
  * «Avisar cuando llegue»). «interno»: el «WhatsApp interno» entre los números de la empresa, cuando pasaron 24 horas sin escribirse.
+ * «primer_contacto»: escribirle por primera vez a alguien que aceptó recibir mensajes («Nuevo contacto» de la bandeja).
  */
-export type GrupoSugerida = "retomar" | "llegada" | "interno";
+export type GrupoSugerida = "retomar" | "llegada" | "interno" | "primer_contacto";
 
 export interface PlantillaSugerida {
   clave: string;
@@ -26,6 +27,23 @@ export interface PlantillaSugerida {
 }
 
 export const PLANTILLAS_SUGERIDAS: PlantillaSugerida[] = [
+  // «Nuevo contacto» de la bandeja (30 oct 2026): escribirle primero a alguien que ya aceptó recibir mensajes. Lleva los dos botones de respuesta —aceptar y rechazar— porque un primer
+  // mensaje sin salida es lo que más bloqueos causa: «No, gracias» le deja a la persona negarse sin bloquear ni reportar el número. El motivo del contacto se escribe al enviar.
+  {
+    clave: "primer_contacto",
+    grupo: "primer_contacto",
+    nombre: "primer_contacto",
+    titulo: "Primer contacto con permiso",
+    categoria: "utility",
+    paraQue: "Para escribirle por primera vez a alguien que aceptó recibir mensajes (desde «Nuevo contacto» de la bandeja).",
+    cuerpo: "Hola {{1}}, te escribe {{2}} del equipo de Ecomfive. Te contactamos por lo siguiente: {{3}}. ¿Te parece bien que sigamos la conversación por este medio?",
+    botones: ["Sí, escríbeme", "No, gracias"],
+    variables: [
+      { campo: "primer_nombre", ejemplo: "María" },
+      { campo: "manual", ejemplo: "Carlos", etiqueta: "Nombre del asesor" },
+      { campo: "manual", ejemplo: "la consulta que dejaste sobre los productos de belleza", etiqueta: "Motivo del contacto" },
+    ],
+  },
   {
     clave: "retomar_conversacion",
     grupo: "retomar",
