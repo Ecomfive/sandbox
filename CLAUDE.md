@@ -1216,7 +1216,8 @@ convenciones técnicas del código.
   `TipoCliente` / `PastillaTipo` (`crm-dropshippers/tipo-cliente.tsx`) en la ficha del CRM y del chat, con `cambiarTipoCliente` (`tareas/actions.ts`, auditoría
   `tipo_cliente_dropshipper`). Black cuenta como VIP para el plazo de respuesta. Ya no hay «Marcar como VIP» en «Más».
   **Automático** (migración 0196): `crm_recalcular_tipo_cliente()` (la llama `ingerirPedidos` después de `crm_sincronizar_ordenes`) pone `promedio_pedidos_mes` = pedidos de 90 días
-  sin cancelados × 30 ÷ días con pedidos (30 a 90) y el tipo: < 500 ROOKIE, ≥ 500 VIP, ≥ 1 000 BLACK; deja auditoría «Sistema». `nivel_manual` (pastilla o «Editar») lo fija; «Automático» lo suelta.
+  sin cancelados × 30 ÷ días con pedidos (30 a 90), **por país** con los umbrales de `crm_tipo_cliente_umbrales` (Configuración › «Tipo de cliente del CRM»,
+  `guardarUmbralesTipoCliente`; 500 y 1 000 de entrada), y el tipo más alto entre sus países; deja auditoría «Sistema». `nivel_manual` (pastilla o «Editar») lo fija; «Automático» lo suelta.
   **Quién atiende, en globitos** (29 oct 2026, pedido de Alcides): arriba de la ficha del chat, `EquipoDelChat` (`ficha-chat.tsx`) dibuja «Lo atiende»
   (`quienesAtienden`, `src/lib/crm/respondieron.ts`, con prueba: quien lo lleva o intervino + la persona cuyo cargo es del área del chat) y «Respondieron» con
   `GloboPersona` / `GloboCelular` (`bandeja/globo-persona.tsx`: foto de `perfiles.avatar_url` o iniciales, tooltip «Nombre · Cargo»). `MensajeVista.autorFoto`,
