@@ -7,7 +7,7 @@
 // Efectividad de entrega
 // ---------------------------------------------------------------------------------------------------------------------------------------
 
-/** Lo que devuelve `crm_entregas` (migración 0204): una fila por dropshipper y transportadora. */
+/** Lo que devuelve `crm_entregas` (migración 0205): una fila por dropshipper y transportadora. */
 export interface FilaEntregas {
   dropshipperId: string | null;
   transportadora: string;

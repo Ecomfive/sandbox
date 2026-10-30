@@ -163,7 +163,7 @@ export async function guardarSecuenciaAlta(encendida: boolean, responsableId: st
     if (!p?.activo) return { error: "Esa persona no está activa." };
   }
   const { data: antes } = await supabase.from("crm_automatizaciones").select("encendida, encendida_en").eq("clave", "secuencia_alta").maybeSingle();
-  if (!antes) return { error: "Falta correr la migración 0204 en la base." };
+  if (!antes) return { error: "Falta correr la migración 0205 en la base." };
   const { error } = await supabase
     .from("crm_automatizaciones")
     .update({

@@ -1033,7 +1033,7 @@ convenciones técnicas del código.
   de `cargarResumenVentas` y lo en camino de `cargarEnCamino` (por el SKU vinculado en Gestión de IDs); lógica pura en `src/lib/crm/productos.ts`
   (estado del stock, lo que vende cada uno, recomendados por clientes parecidos). Vista `?vista=productos`. «Descargar lista» (`lista-csv.ts` +
   `contactosParaLista`): CSV del filtro, con WhatsApp solo si `puedeVerTelefonos`; queda en auditoría. Las difusiones no se envían (pedido de Hernán).
-  **Fase 4** (migración 0204; lógica pura en `src/lib/crm/automatizar.ts`): vistas `entregas` (`crm_entregas(p_pais, p_dias)` por dropshipper y
+  **Fase 4** (migración 0205; lógica pura en `src/lib/crm/automatizar.ts`): vistas `entregas` (`crm_entregas(p_pais, p_dias)` por dropshipper y
   transportadora; tasa = entregados ÷ cerrados), `duplicados` (`buscarDuplicados`: WhatsApp, correo, tienda o nombre; no muestra números ni une) y
   `automatizaciones`: `crm_automatizaciones` (clave `secuencia_alta`, **apagada** por defecto) + `crm_alta_pasos`; `correrSecuenciaAlta`
   (`src/lib/crm/secuencia-alta-servidor.ts`) corre en el cron de notificaciones antes de `avisarTareasDeHoy` y crea tareas `origen = 'alta'` a los

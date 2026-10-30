@@ -5,7 +5,7 @@
 --    dropshipper que se cree desde ese momento se le crean tareas de seguimiento el día 1, 3, 7 y 14 hasta su primer pedido (para quien lo
 --    lleva o, si nadie, para la persona elegida). `crm_alta_pasos` guarda qué paso ya se creó a cada uno (no se repite).
 --  * `tareas_dropshipper.origen` admite «alta».
--- RLS sin políticas (migración 0063): solo el servidor las toca. Reversa: supabase/rollbacks/0204_rollback.sql
+-- RLS sin políticas (migración 0063): solo el servidor las toca. Reversa: supabase/rollbacks/0205_rollback.sql
 
 create or replace function crm_entregas(p_pais uuid, p_dias integer default 60)
 returns table (dropshipper_id uuid, transportadora text, pedidos integer, entregados integer, devueltos integer, cancelados integer, novedades integer, en_camino integer)

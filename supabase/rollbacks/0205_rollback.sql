@@ -1,4 +1,4 @@
--- Reversa de 0204_crm_direccion_automatizar.sql: se pierden el interruptor de la secuencia de alta y qué pasos se crearon; las tareas creadas
+-- Reversa de 0205_crm_direccion_automatizar.sql: se pierden el interruptor de la secuencia de alta y qué pasos se crearon; las tareas creadas
 -- por la secuencia quedan como «manual».
 update tareas_dropshipper set origen = 'manual' where origen = 'alta';
 alter table tareas_dropshipper drop constraint if exists tareas_dropshipper_origen_check;

@@ -2,12 +2,12 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { buscarDuplicados, type FilaEntregas, type GrupoDuplicado } from "@/lib/crm/automatizar";
 import { traerTodasConError, traerTodasLasFilas } from "@/lib/supabase/paginar";
 
-/** Los pedidos del país por dropshipper y transportadora (`crm_entregas`, migración 0204). */
+/** Los pedidos del país por dropshipper y transportadora (`crm_entregas`, migración 0205). */
 export async function cargarEntregas(supabase: SupabaseClient, paisId: string, dias: number): Promise<FilaEntregas[] | { error: string }> {
   const r = await traerTodasConError<{ dropshipper_id: string | null; transportadora: string; pedidos: number; entregados: number; devueltos: number; cancelados: number; novedades: number; en_camino: number }>(
     (d, h) => supabase.rpc("crm_entregas", { p_pais: paisId, p_dias: dias }).order("transportadora").order("dropshipper_id").range(d, h),
   );
-  if (r.error) return { error: "Falta correr la migración 0204 (fase 4 del panel de Dirección) en la base." };
+  if (r.error) return { error: "Falta correr la migración 0205 (fase 4 del panel de Dirección) en la base." };
   return (r.data ?? []).map((f) => ({
     dropshipperId: f.dropshipper_id,
     transportadora: f.transportadora,
@@ -87,7 +87,7 @@ export async function cargarSecuenciaAlta(supabase: SupabaseClient): Promise<Sec
     supabase.from("crm_automatizaciones").select("encendida, config, encendida_en, actualizado_por_nombre, actualizado_en").eq("clave", "secuencia_alta").maybeSingle(),
     traerTodasConError<{ dropshipper_id: string; tarea_id: string | null }>((d, h) => supabase.from("crm_alta_pasos").select("dropshipper_id, tarea_id").order("dropshipper_id").order("paso").range(d, h)),
   ]);
-  if (error || !data) return { error: "Falta correr la migración 0204 (fase 4 del panel de Dirección) en la base." };
+  if (error || !data) return { error: "Falta correr la migración 0205 (fase 4 del panel de Dirección) en la base." };
   const filas = pasos.data ?? [];
   return {
     encendida: !!data.encendida,

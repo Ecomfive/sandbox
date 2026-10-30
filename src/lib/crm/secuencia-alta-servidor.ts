@@ -6,7 +6,7 @@ const diaPanama = (iso: string) => new Date(iso).toLocaleDateString("en-CA", { t
 const diasEntre = (desde: string, hasta: string) => Math.round((Date.parse(`${hasta}T00:00:00Z`) - Date.parse(`${desde}T00:00:00Z`)) / 86_400_000);
 
 /**
- * La secuencia de alta (Dirección › Automatizaciones, fase 4, migración 0204). Corre una vez al día (cron de notificaciones, antes de avisar
+ * La secuencia de alta (Dirección › Automatizaciones, fase 4, migración 0205). Corre una vez al día (cron de notificaciones, antes de avisar
  * las tareas de hoy, así el aviso llega por la campana). **Solo si está encendida**: a cada dropshipper creado desde que se encendió le crea la
  * tarea del paso que toca (día 1, 3, 7 o 14) hasta su primer pedido, para quien lo lleva o, si nadie, para la persona elegida. Cada paso se
  * crea una sola vez (`crm_alta_pasos`). Devuelve cuántas tareas creó; si algo falla, 0 (no frena el resto del cron).
