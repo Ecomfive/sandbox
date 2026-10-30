@@ -8,7 +8,7 @@ import { anilloFoco } from "@/components/ui/field";
 import { Pastilla, Punto } from "@/components/panel/piezas-panel";
 import type { AccesoCrm } from "@/lib/crm/areas";
 import type { BotonFicha } from "@/lib/crm/botones-ficha";
-import { quienesAtienden, type QuienRespondio } from "@/lib/crm/respondieron";
+import { quienesAtienden, respondieronRecientes, type QuienRespondio } from "@/lib/crm/respondieron";
 import { DESDE_EL_CELULAR } from "@/lib/whatsapp/actividad-equipo";
 import { formatearFecha } from "@/lib/formato";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -143,6 +143,8 @@ function BotonesExtra({ acciones }: { acciones: AccionExtra[] }) {
 function EquipoDelChat({ sel, respondieron }: { sel: ConversacionVista; respondieron: QuienRespondio[] }) {
   const asignada = sel.asignadaA ? { nombre: sel.asignadaA, cargo: sel.asignadaCargo, foto: sel.asignadaFoto } : null;
   const atienden = quienesAtienden(asignada, respondieron, sel.area, DESDE_EL_CELULAR);
+  // «Respondieron» solo cuenta los últimos 7 días (un chat nunca se cierra); «Lo atiende» sigue mirando todo el chat.
+  const recientes = respondieronRecientes(respondieron);
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-normal text-[var(--wa-sec)]">
       <span className="flex items-center gap-1.5">
@@ -157,11 +159,11 @@ function EquipoDelChat({ sel, respondieron }: { sel: ConversacionVista; respondi
           <span className="text-[var(--wa-texto)]">nadie todavía</span>
         )}
       </span>
-      {respondieron.length > 0 && (
+      {recientes.length > 0 && (
         <span className="flex items-center gap-1.5">
           <span>Respondieron</span>
           <span className="flex -space-x-1.5">
-            {respondieron.map((r) => (r.nombre === DESDE_EL_CELULAR ? <GloboCelular key={r.nombre} /> : <GloboPersona key={r.nombre} nombre={r.nombre} cargo={r.cargo} foto={r.foto ?? null} />))}
+            {recientes.map((r) => (r.nombre === DESDE_EL_CELULAR ? <GloboCelular key={r.nombre} /> : <GloboPersona key={r.nombre} nombre={r.nombre} cargo={r.cargo} foto={r.foto ?? null} />))}
           </span>
         </span>
       )}
