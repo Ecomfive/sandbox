@@ -1,19 +1,33 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useId, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
+import { PanelEnSitio, useEnSitio } from "@/components/ui/en-sitio";
 import { anilloFoco, fieldClass } from "@/components/ui/field";
 import { Ventana } from "@/components/ui/ventana";
 import { TareasIcon } from "@/lib/nav-icons";
 import { completarTarea, crearTareaChat, tareasDelChat, type TareaVista } from "../tareas/actions";
 import { FilaTarea } from "../tareas/panel-tareas";
+import { ItemFila } from "../botones-ficha";
 
 /**
  * «Tarea» en la fila de botones de la ficha del chat (29 oct 2026): qué hay que hacer con este cliente y para cuándo («Llamarlo para
  * ofrecerle la semilla de calabaza», 23 dic). Queda a cargo de quien lleva el chat (si nadie, de quien la crea) y sale en el panel de tareas.
  */
 export function BotonNuevaTarea({ conversacionId, nombre, clase, alCreada, alAviso }: { conversacionId: string; nombre: string; clase: string; alCreada: () => void; alAviso: (texto: string, error?: boolean) => void }) {
-  const [abierta, setAbierta] = useState(false);
+  const [abiertaLocal, setAbiertaLocal] = useState(false);
+  // Dentro de la ficha se abre en el mismo lugar, debajo de los botones (así se puede copiar del chat); fuera, en su ventana.
+  const sitio = useEnSitio();
+  const idPanel = useId();
+  const enLugar = !!sitio;
+  const abierta = enLugar ? sitio.activo === idPanel : abiertaLocal;
+  const setAbierta = (valor: boolean) => {
+    if (enLugar) {
+      if (valor) sitio.abrir(idPanel);
+      else sitio.cerrar(idPanel);
+    } else setAbiertaLocal(valor);
+  };
   const [titulo, setTitulo] = useState("");
   const [vence, setVence] = useState("");
   const [detalle, setDetalle] = useState("");
@@ -37,13 +51,8 @@ export function BotonNuevaTarea({ conversacionId, nombre, clase, alCreada, alAvi
       alCreada();
     });
 
-  return (
-    <>
-      <button type="button" aria-haspopup="dialog" onClick={() => setAbierta(true)} className={clase}>
-        <TareasIcon className="h-4 w-4" />
-        Tarea
-      </button>
-      <Ventana abierto={abierta} alCerrar={cerrar} titulo={`Nueva tarea con ${nombre}`}>
+  const encabezado = `Nueva tarea con ${nombre}`;
+  const formulario = (
         <form
           className="flex flex-col gap-3 p-4"
           onSubmit={(e) => {
@@ -89,7 +98,23 @@ export function BotonNuevaTarea({ conversacionId, nombre, clase, alCreada, alAvi
             </button>
           </div>
         </form>
-      </Ventana>
+  );
+
+  return (
+    <>
+      <ItemFila id="tarea">
+        <button type="button" onClick={() => setAbierta(true)} className={clase}>
+          <TareasIcon className="h-4 w-4" />
+          Tarea
+        </button>
+      </ItemFila>
+      {enLugar ? (
+        abierta && sitio.destino && createPortal(<PanelEnSitio titulo={encabezado} alCerrar={cerrar}>{formulario}</PanelEnSitio>, sitio.destino)
+      ) : (
+        <Ventana abierto={abierta} alCerrar={cerrar} titulo={encabezado}>
+          {formulario}
+        </Ventana>
+      )}
     </>
   );
 }

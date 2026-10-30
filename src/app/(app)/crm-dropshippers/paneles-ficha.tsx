@@ -9,6 +9,7 @@ import { AlertaIcon, SugerenciaIcon } from "@/lib/nav-icons";
 import { recomendarProducto } from "../sugerencias-clientes/actions";
 import { FichaSugerencia } from "../sugerencias-clientes/ficha-sugerencia";
 import { crearCaso } from "./actions";
+import { ItemFila } from "./botones-ficha";
 import { CANALES, PRIORIDADES, TIPOS_CASO, nombrePais, type FilaDropshipper } from "./def-crm";
 
 
@@ -24,7 +25,6 @@ function BotonAccion({ texto, icono: Icono, alHacerClic }: { texto: string; icon
   return (
     <button
       type="button"
-      aria-haspopup="dialog"
       onClick={alHacerClic}
       className={`flex flex-col items-center gap-0.5 rounded-lg bg-accent px-1 py-2 text-[11.5px] font-medium hover:bg-accent-hover ${anilloFoco}`}
     >
@@ -80,7 +80,16 @@ export function PanelCaso({ d, dropshippers, codigoPais, alGuardar }: { d?: Fila
       mensajeExito="Caso abierto"
       ocultos={d ? { dropshipper_id: d.id } : undefined}
       alAbrir={() => setElegido("")}
-      boton={d ? (abrir) => <BotonAccion texto="Nuevo caso" icono={AlertaIcon} alHacerClic={abrir} /> : undefined}
+      enSitio
+      boton={
+        d
+          ? (abrir) => (
+              <ItemFila id="caso">
+                <BotonAccion texto="Nuevo caso" icono={AlertaIcon} alHacerClic={abrir} />
+              </ItemFila>
+            )
+          : undefined
+      }
     >
       {({ faltante, invalido }) => (
         <>
@@ -158,7 +167,12 @@ export function PanelRecomendar({ d, alGuardar }: { d: FilaDropshipper; alGuarda
       action={recomendarProducto}
       ocultos={{ dropshipper_id: d.id }}
       alGuardar={alGuardar}
-      boton={(abrir) => <BotonAccion texto="Recomendar" icono={SugerenciaIcon} alHacerClic={abrir} />}
+      enSitio
+      boton={(abrir) => (
+        <ItemFila id="recomendar">
+          <BotonAccion texto="Recomendar" icono={SugerenciaIcon} alHacerClic={abrir} />
+        </ItemFila>
+      )}
     />
   );
 }
