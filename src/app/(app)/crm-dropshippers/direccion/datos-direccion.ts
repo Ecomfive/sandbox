@@ -73,7 +73,8 @@ interface FilaSalud {
  */
 export async function cargarDireccion(supabase: SupabaseClient, paisId: string): Promise<DatosDireccion | { error: string }> {
   const hoy = hoyPanama();
-  const [salud, semanas, cuentas, enPais, umbral, atendidas, perfiles, personas] = await Promise.all([
+  // Todo a la vez (31 oct 2026: los dropshippers y los chats asignados iban después, uno tras otro, y sumaban dos vueltas a la base).
+  const [salud, semanas, cuentas, enPais, umbral, atendidas, perfiles, personas, ds, chats] = await Promise.all([
     traerTodasConError<FilaSalud>((d, h) => supabase.rpc("crm_salud_dropshippers", { p_pais: paisId }).order("dropshipper_id").range(d, h)),
     supabase.rpc("crm_pedidos_semanales", { p_pais: paisId, p_semanas: 8 }),
     traerTodasLasFilas<{ dropshipper_id: string }>((d, h) => supabase.from("dropshipper_cuentas").select("dropshipper_id").eq("pais_id", paisId).order("id").range(d, h)),
@@ -82,20 +83,20 @@ export async function cargarDireccion(supabase: SupabaseClient, paisId: string):
     supabase.from("crm_alertas_atendidas").select("dropshipper_id, tipo").eq("pais_id", paisId).gte("hasta", hoy),
     supabase.from("perfiles").select("id, nombre, email"),
     personasConModulos(supabase, [MODULO_ATENCION]).catch(() => []),
+    traerTodasLasFilas<{ id: string; codigo: string; nombre: string; nivel: string; responsable_id: string | null; fecha_ingreso: string | null; captado_en: string | null }>((d, h) =>
+      supabase.from("dropshippers").select("id, codigo, nombre, nivel, responsable_id, fecha_ingreso, captado_en").order("id").range(d, h),
+    ),
+    // Quién lo lleva: su líder comercial y, si no tiene, quien tiene asignado su chat.
+    traerTodasLasFilas<{ dropshipper_id: string; asignada_a: string | null }>((d, h) =>
+      supabase.from("whatsapp_conversaciones").select("dropshipper_id, asignada_a").not("dropshipper_id", "is", null).not("asignada_a", "is", null).order("id").range(d, h),
+    ),
   ]);
   if (salud.error || semanas.error || atendidas.error) return { error: "Falta correr la migración 0197 (panel de Dirección) en la base." };
 
   const conCuenta = new Set(cuentas.map((c) => c.dropshipper_id));
   const porId = new Map((salud.data ?? []).map((f) => [f.dropshipper_id, f]));
   const ids = [...new Set([...conCuenta, ...porId.keys()])];
-  const ds = await traerTodasLasFilas<{ id: string; codigo: string; nombre: string; nivel: string; responsable_id: string | null; fecha_ingreso: string | null; captado_en: string | null }>(
-    (d, h) => supabase.from("dropshippers").select("id, codigo, nombre, nivel, responsable_id, fecha_ingreso, captado_en").order("id").range(d, h),
-  );
   const dsPorId = new Map(ds.map((d) => [d.id, d]));
-  // Quién lo lleva: su líder comercial y, si no tiene, quien tiene asignado su chat.
-  const chats = await traerTodasLasFilas<{ dropshipper_id: string; asignada_a: string | null }>((d, h) =>
-    supabase.from("whatsapp_conversaciones").select("dropshipper_id, asignada_a").not("dropshipper_id", "is", null).not("asignada_a", "is", null).order("id").range(d, h),
-  );
   const nombrePerfil = new Map(((perfiles.data ?? []) as { id: string; nombre: string | null; email: string }[]).map((p) => [p.id, p.nombre || p.email]));
   const chatDe = new Map(chats.map((c) => [c.dropshipper_id, c.asignada_a]));
   const refVip = Number(umbral.data?.vip_desde ?? 500);

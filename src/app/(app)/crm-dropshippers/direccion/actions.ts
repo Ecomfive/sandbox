@@ -9,6 +9,7 @@ import { DIAS_ATENDIDA, ETIQUETA_ALERTA, SUGERENCIA_ALERTA, type TipoAlerta } fr
 import { avisarTarea } from "@/lib/crm/tareas-servidor";
 import { getPaisActual } from "@/lib/pais";
 import { createServiceClient } from "@/lib/supabase/server";
+import { olvidarDireccion } from "./guardado";
 import { RUTA_DIRECCION as RUTA } from "./ruta";
 
 const ES_ID = (v: unknown): v is string => typeof v === "string" && /^[0-9a-fA-F-]{8,64}$/.test(v);
@@ -46,6 +47,7 @@ export async function atenderAlerta(dropshipperId: string, tipo: TipoAlerta): Pr
   });
   if (error) return { error: "No se pudo guardar. ¿Falta correr la migración 0197?" };
   await registrarAuditoria({ accion: "crm_alerta_atendida", entidad: "dropshippers", entidadId: dropshipperId, detalle: `${ETIQUETA_ALERTA[tipo]} · ${d.nombre} (${pais.codigo})` });
+  olvidarDireccion();
   revalidatePath(RUTA);
   return { ok: true };
 }
@@ -89,6 +91,7 @@ export async function crearTareaDeAlerta(datos: { dropshipperId: string; tipo: T
   if (datos.responsableId !== u.id)
     await avisarTarea(supabase, { usuarioId: datos.responsableId, titulo, cliente: d.nombre, conversacionId: chat?.id ?? null, motivo: "asignada", autor: { id: u.id, nombre: u.nombre ?? null } });
   await registrarAuditoria({ accion: "crear_tarea_crm", entidad: "dropshippers", entidadId: datos.dropshipperId, detalle: `${titulo} (desde Dirección, ${pais.codigo})` });
+  olvidarDireccion();
   revalidatePath(RUTA);
   revalidatePath("/crm-dropshippers/tareas");
   return { ok: true };
@@ -113,6 +116,7 @@ export async function asignarResponsable(dropshipperId: string, perfilId: string
   const { error } = await supabase.from("dropshippers").update({ responsable_id: perfilId }).eq("id", dropshipperId);
   if (error) return { error: "No se pudo guardar." };
   await registrarAuditoria({ accion: "crm_responsable_dropshipper", entidad: "dropshippers", entidadId: dropshipperId, detalle: `${d.nombre}: lo lleva ${p ? p.nombre || p.email : "nadie"}` });
+  olvidarDireccion();
   revalidatePath(RUTA);
   return { ok: true };
 }
@@ -178,6 +182,7 @@ export async function guardarSecuenciaAlta(encendida: boolean, responsableId: st
     .eq("clave", "secuencia_alta");
   if (error) return { error: "No se pudo guardar." };
   await registrarAuditoria({ accion: "crm_secuencia_alta", entidad: "crm_automatizaciones", entidadId: "secuencia_alta", detalle: encendida ? "Secuencia de alta encendida" : "Secuencia de alta apagada" });
+  olvidarDireccion();
   revalidatePath(RUTA);
   return { ok: true };
 }

@@ -6,7 +6,8 @@ import { esAdministrador } from "@/lib/permisos/acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 import { config360 } from "@/lib/whatsapp/proveedor";
 import { getPaisActual } from "@/lib/pais";
-import { ContenidoDireccion, EncabezadoBandejaDireccion } from "../direccion/contenido-direccion";
+import { Suspense } from "react";
+import { ContenidoDireccion, EncabezadoBandejaDireccion, EsqueletoDireccion } from "../direccion/contenido-direccion";
 import { VISTAS_DIRECCION, type VistaDireccion } from "../direccion/ruta";
 import { Bandeja } from "./bandeja";
 import { cargarBandeja } from "./datos-bandeja";
@@ -32,12 +33,19 @@ export default async function BandejaWhatsappPage({ searchParams }: { searchPara
     : typeof abrir === "string"
       ? "chats"
       : (VISTAS_DIRECCION.find((v) => v.valor === vistaParam)?.valor ?? "resumen");
-  if (vistaDireccion && vistaDireccion !== "chats")
+  // El encabezado con las pestañas sale enseguida y el contenido llega después (`Suspense` con su `key`): al cambiar de pestaña se ve el esqueleto al
+  // instante, en vez de quedar la pantalla quieta mientras carga (31 oct 2026, pedido de Hernán).
+  if (vistaDireccion && vistaDireccion !== "chats") {
+    const pais = await getPaisActual(createServiceClient());
     return (
       <Pagina ancho="ancha" className="flex flex-col gap-6">
-        <ContenidoDireccion usuario={usuario} vista={vistaDireccion} dias={dias} segmento={segmento} cliente={cliente} />
+        <EncabezadoBandejaDireccion vista={vistaDireccion} pais={pais.nombre} />
+        <Suspense key={[vistaDireccion, dias, segmento, cliente].map(String).join("|")} fallback={<EsqueletoDireccion />}>
+          <ContenidoDireccion usuario={usuario} vista={vistaDireccion} dias={dias} segmento={segmento} cliente={cliente} />
+        </Suspense>
       </Pagina>
     );
+  }
   const supabase = createServiceClient();
   const [datos, pais] = await Promise.all([cargarBandeja(supabase, usuario), vistaDireccion ? getPaisActual(supabase) : null]);
   return (
