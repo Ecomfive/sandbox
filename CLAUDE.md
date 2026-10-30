@@ -1030,7 +1030,7 @@ convenciones técnicas del código.
   (`direccion/actions.ts`, solo `escribeDireccion`) guardan en `crm_alertas_atendidas` (7 días); la tarea va con `origen = 'alerta'`. **Diseño** (30 oct 2026, pedido de Hernán: «que se vea como el prototipo»): piezas de
   `direccion/piezas-direccion.tsx` (`EncabezadoDireccion`, `Cifra`, `Tarjeta`, `Chip`, `Insignia`, `Barra`) y la ficha del cliente al lado de la lista
   (`FichaCliente`). La salud toma la peor tendencia (30 o 14 días) y con «Caída» no pasa de 69 (`Salud.tope`). Para «Sin
-  primer pedido» se usa `fecha_ingreso`/`captado_en`, nunca `creado_en` (los de ClickUp se crearon todos al importarlos). No toca la Bandeja.
+  primer pedido» se usa `fecha_ingreso`/`captado_en`, nunca `creado_en` (los de ClickUp se crearon todos al importarlos). No toca la Bandeja. **En Clientes, toda la fila abre la ficha** (1 nov 2026, pedido de Hernán: antes solo el nombre; `onClick` en el `<tr>` de `panel-direccion.tsx`, el botón del nombre queda para el teclado y su clic sube a la fila).
   **Fase 2** (sin migración): vista `?vista=equipo&dias=7|30|90` (`datos-equipo.ts` + `vista-equipo.tsx`, lógica pura en `src/lib/crm/equipo.ts`):
   respuestas por persona de `whatsapp_kpis` (cruzadas por nombre de autor con `perfiles.nombre`), chats asignados y `esperando_desde` por tramos,
   tareas por `responsable_id` y la cartera por responsable de la fase 1. «Lo lleva» (`asignarResponsable`) escribe `dropshippers.responsable_id`
