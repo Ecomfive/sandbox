@@ -3,6 +3,7 @@
 /* eslint-disable @next/next/no-img-element -- fotos que llegan por WhatsApp, servidas por /api/whatsapp/media */
 import Link from "next/link";
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition, type MouseEvent as EventoRaton } from "react";
+import { ContadorPestana } from "@/components/migas/contador-pestana";
 import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { VisorImagen } from "@/components/ui/visor-imagen";
@@ -1189,6 +1190,8 @@ export function Bandeja({
 
   return (
     <div className="bandeja-wa flex min-h-[640px] flex-col gap-3 text-[var(--wa-texto)] lg:h-[calc(100vh-200px)]">
+      {/* El globo de la pestaña sigue lo que la bandeja va leyendo (los chats sin responder de todas las áreas que ve la persona). */}
+      <ContadorPestana href="/crm-dropshippers/bandeja" cantidad={datos.conversaciones.filter((c) => !c.interno && sinResponder(c)).length} />
       {/* ===== Arriba, para todos los paneles: buscar, número, filtros e «Importar chat» ===== */}
       <div className="flex flex-wrap items-center gap-2.5">
         <div role="group" aria-label="Cómo ver la bandeja" className="flex h-10 flex-none overflow-hidden rounded-lg border border-[var(--wa-borde)]">
