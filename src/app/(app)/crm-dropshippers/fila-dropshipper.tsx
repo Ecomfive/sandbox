@@ -8,7 +8,7 @@ import { etiquetaFase } from "@/lib/crm/areas";
 import { DIAS_SIN_PEDIR, diasEntre, etiquetaUltimoPedido, montoCorto, type FilaDropshipper } from "./def-crm";
 
 /** Las columnas de la fila en pantalla ancha; las usa también el encabezado de la lista, así que van juntas. */
-const COLUMNAS = "lg:grid-cols-[minmax(0,2.4fr)_minmax(0,1.1fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_minmax(0,1.8fr)_minmax(0,0.8fr)_minmax(0,0.9fr)_1rem]";
+const COLUMNAS = "lg:grid-cols-[minmax(0,2.4fr)_minmax(0,1.1fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_minmax(0,1.8fr)_minmax(0,0.8fr)_1rem]";
 
 const iniciales = (nombre: string) =>
   nombre
@@ -49,7 +49,6 @@ export function EncabezadoFilasCrm() {
     { nombre: "Último pedido" },
     { nombre: "WhatsApp" },
     { nombre: "Casos" },
-    { nombre: "Responsable" },
   ];
   return (
     <div className={`hidden items-center gap-x-4 px-4 py-2.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase lg:grid ${COLUMNAS}`}>
@@ -164,7 +163,6 @@ export function FilaDropshipperLista({ d, codigoPais, hoy, alAbrir }: { d: FilaD
             )
           }
         />
-        <Celda nombre="Responsable" principal={d.responsable ? <span className="truncate text-foreground-soft">{d.responsable}</span> : <span className="text-xs text-muted-foreground">Sin asignar</span>} />
       </span>
 
       <ChevronRightIcon aria-hidden="true" className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 lg:order-last" />

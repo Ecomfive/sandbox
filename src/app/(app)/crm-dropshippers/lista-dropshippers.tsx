@@ -21,7 +21,6 @@ const ICONOS: Record<string, IconoComp> = {
   plataforma: EnlaceIcon,
   etapa: EstadoIcon,
   nivel: EstadoIcon,
-  responsable: PersonaIcon,
   venta: DropshipperIcon,
   origen: DropshipperIcon,
   ciudad: DropshipperIcon,
