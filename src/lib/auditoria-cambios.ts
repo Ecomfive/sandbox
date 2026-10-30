@@ -187,6 +187,7 @@ export const ETIQUETA_ACCION: Record<string, string> = {
   unir_productos: "Unió productos",
   marcar_chat_borrado_app: "Marcó el chat como borrado en la app de WhatsApp Business",
   pedir_borrado_whatsapp: "Pidió borrar un chat o un mensaje de WhatsApp",
+  borrar_mensaje_interno: "Borró un mensaje del chat interno",
   autorizar_borrado_whatsapp: "Autorizó borrar un chat o un mensaje de WhatsApp",
   rechazar_borrado_whatsapp: "Rechazó borrar un chat o un mensaje de WhatsApp",
   cancelar_borrado_whatsapp: "Canceló una petición de borrado de WhatsApp",
