@@ -8,6 +8,8 @@ import { MODULO_ATENCION } from "@/lib/crm/areas";
 import { CAMPOS_DATO, esCampoDato, normalizarDato, NUMERO_REGISTRADO } from "@/lib/crm/dato-dropshipper";
 import { normalizarTelefono } from "@/lib/crm/telefono";
 import { hoyPanama } from "@/lib/proveedor/fechas";
+import { leerCiudades, textoParaBuscar, type CiudadSugerida } from "@/lib/crm/ciudades";
+import { descargarPublico } from "@/lib/seguridad/url-externa";
 import { enlazarChatsPorTelefono, telefonoDeOtro } from "@/lib/whatsapp/vinculo";
 import { etiquetaEstado } from "./def-crm";
 
@@ -78,4 +80,34 @@ export async function cambiarDatoDropshipper(id: string, campo: string, valor: s
   });
   revalidatePath("/crm-dropshippers", "layout");
   return { valor: campo === "telefono" ? NUMERO_REGISTRADO : limpio.valor };
+}
+
+// Lo ya buscado, en memoria del servidor (son ciudades, no datos de nadie): «Cali» no se vuelve a pedir en cada letra ni por cada persona.
+const ciudadesBuscadas = new Map<string, CiudadSugerida[]>();
+
+/**
+ * Las ciudades del mundo que se llaman como lo escrito, con su país, para el dato «Ciudad» de la ficha (30 oct 2026, pedido de Alcides: «Cali» →
+ * «Santiago de Cali, Colombia»). Las da el buscador público de Open-Meteo (sin clave; solo viaja lo escrito) y `leerCiudades` pone primero las de los
+ * países donde trabajamos. Devuelve el error como valor; sin respuesta, la persona puede escribir la ciudad igual.
+ */
+export async function buscarCiudades(escrito: string): Promise<{ ciudades: CiudadSugerida[] } | { error: string }> {
+  await requireModuloEscritura(MODULO_ATENCION);
+  const texto = textoParaBuscar(String(escrito ?? ""));
+  if (!texto) return { ciudades: [] };
+  const clave = texto.toLowerCase();
+  const guardadas = ciudadesBuscadas.get(clave);
+  if (guardadas) return { ciudades: guardadas };
+  const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(texto)}&count=10&language=es&format=json`;
+  const r = await descargarPublico(url, 200_000);
+  if ("error" in r) return { error: "No se pudo buscar la ciudad. Escríbela con su país, por ejemplo: Cali, Colombia." };
+  let json: unknown = null;
+  try {
+    json = JSON.parse(new TextDecoder().decode(r.bytes));
+  } catch {
+    return { error: "No se pudo buscar la ciudad. Escríbela con su país, por ejemplo: Cali, Colombia." };
+  }
+  const ciudades = leerCiudades(json);
+  if (ciudadesBuscadas.size > 500) ciudadesBuscadas.clear();
+  ciudadesBuscadas.set(clave, ciudades);
+  return { ciudades };
 }
