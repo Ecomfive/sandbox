@@ -1,14 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useState, type ComponentType, type ReactNode, type SVGProps } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { Pastilla, Punto } from "@/components/panel/piezas-panel";
 import type { AccesoCrm } from "@/lib/crm/areas";
 import { quienesAtienden, type QuienRespondio } from "@/lib/crm/respondieron";
 import { DESDE_EL_CELULAR } from "@/lib/whatsapp/actividad-equipo";
 import { formatearFecha } from "@/lib/formato";
-import { MasIcon } from "@/lib/nav-icons";
+import { Tooltip } from "@/components/ui/tooltip";
 import { ActividadDropshipper } from "../actividad-dropshipper";
 import { SeguimientosDropshipper } from "../areas-ficha";
 import { CuentasDropshipper } from "../cuentas-dropshipper";
@@ -52,10 +52,12 @@ export const claseBotonFicha = `flex flex-col items-center gap-0.5 rounded-lg bg
 /** El principal de la fila (Tomar o Intervenir), en el verde del chat. */
 export const claseBotonFichaPrincipal = `flex flex-col items-center gap-0.5 rounded-lg bg-[var(--wa-acento)] px-1 py-2 text-[11.5px] font-semibold text-[var(--wa-acento-texto)] hover:opacity-90 disabled:opacity-50 ${anilloFoco}`;
 
-export interface OpcionMas {
+/** Un botón más de la fila (pasar de área, importar, marcar borrado…): `corto` va en el botón y `texto` en el globo. */
+export interface AccionExtra {
   texto: string;
-  alPulsar?: () => void;
-  href?: string;
+  corto: string;
+  icono: ComponentType<SVGProps<SVGSVGElement>>;
+  alPulsar: () => void;
 }
 
 /** Un apartado de la ficha, separado del siguiente con la franja gris del chat. */
@@ -69,61 +71,22 @@ function Seccion({ titulo, children }: { titulo: string; children: ReactNode }) 
 }
 
 
-/** «Más»: lo que no cabe en la fila de botones (pasar de área, importar, marcar borrado, abrir en el CRM…). */
-function MenuMas({ opciones }: { opciones: OpcionMas[] }) {
-  const [abierto, setAbierto] = useState(false);
-  const caja = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!abierto) return;
-    const fuera = (e: MouseEvent) => {
-      if (!caja.current?.contains(e.target as Node)) setAbierto(false);
-    };
-    const tecla = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      // Escape cierra solo el menú, no la ventana del chat.
-      e.stopPropagation();
-      setAbierto(false);
-    };
-    document.addEventListener("mousedown", fuera);
-    document.addEventListener("keydown", tecla, true);
-    return () => {
-      document.removeEventListener("mousedown", fuera);
-      document.removeEventListener("keydown", tecla, true);
-    };
-  }, [abierto]);
-  if (!opciones.length) return null;
-  const claseItem = `rounded-md px-3 py-2 text-left text-[13.5px] hover:bg-[var(--wa-hover)] ${anilloFoco}`;
+/**
+ * Los demás botones del chat (no leído, pasar de área, importar, marcar borrado, vincular…), en la misma fila que los otros. Antes iban
+ * dentro de un menú «Más»; desde el 29 oct 2026 (pedido de Alcides) se ven todos seguidos.
+ */
+function BotonesExtra({ acciones }: { acciones: AccionExtra[] }) {
   return (
-    <div ref={caja} className="relative flex">
-      <button type="button" aria-haspopup="menu" aria-expanded={abierto} onClick={() => setAbierto((v) => !v)} className={`${claseBotonFicha} w-full`}>
-        <MasIcon className="h-4 w-4" />
-        Más
-      </button>
-      {abierto && (
-        <div role="menu" aria-label="Más acciones" className="absolute top-[calc(100%+6px)] right-0 z-20 flex w-64 flex-col rounded-[10px] border border-[var(--wa-borde)] bg-[var(--wa-fondo)] p-1.5 shadow-lg">
-          {opciones.map((o) =>
-            o.href ? (
-              <Link key={o.texto} role="menuitem" href={o.href} className={claseItem} onClick={() => setAbierto(false)}>
-                {o.texto}
-              </Link>
-            ) : (
-              <button
-                key={o.texto}
-                type="button"
-                role="menuitem"
-                className={claseItem}
-                onClick={() => {
-                  setAbierto(false);
-                  o.alPulsar?.();
-                }}
-              >
-                {o.texto}
-              </button>
-            ),
-          )}
-        </div>
-      )}
-    </div>
+    <>
+      {acciones.map(({ texto, corto, icono: Icono, alPulsar }) => (
+        <Tooltip key={texto} texto={texto}>
+          <button type="button" onClick={alPulsar} className={`${claseBotonFicha} w-full`}>
+            <Icono className="h-4 w-4" aria-hidden="true" />
+            <span className="leading-tight">{corto}</span>
+          </button>
+        </Tooltip>
+      ))}
+    </>
   );
 }
 
@@ -167,7 +130,7 @@ function EquipoDelChat({ sel, respondieron }: { sel: ConversacionVista; respondi
 
 /**
  * La ficha del dropshipper en la ventana del chat de la Bandeja (29 oct 2026, pedido de Hernán sobre su referencia): arriba sus pastillas,
- * la fase y una fila de botones (los del chat: Tomar, Marcar resuelta…; los del CRM: Nuevo caso, Pedido, Nota…; y «Más»), y debajo
+ * la fase y una fila de botones (los del chat: Tomar, Marcar resuelta…; los del CRM: Nuevo caso, Pedido, Nota…; y los demás del chat), y debajo
  * pestañas con todo lo del CRM. Sin dropshipper vinculado, solo lo que sale del chat y cómo vincularlo.
  */
 export function FichaDelChat({
@@ -179,7 +142,7 @@ export function FichaDelChat({
   mirando,
   accionesChat,
   etiquetas,
-  opcionesMas,
+  accionesExtra,
   respondieron,
   versionEquipo,
   alAbrirVincular,
@@ -196,7 +159,7 @@ export function FichaDelChat({
   accionesChat: ReactNode;
   /** Las etiquetas del chat (como en ClickUp), arriba de todo. */
   etiquetas: ReactNode;
-  opcionesMas: OpcionMas[];
+  accionesExtra: AccionExtra[];
   /** Quién del equipo le escribió al dropshipper en este chat y con qué cargo (su puesto o su área; la más reciente primero). */
   respondieron: QuienRespondio[];
   versionEquipo: string;
@@ -235,7 +198,7 @@ export function FichaDelChat({
         {d && (
           <div className="flex flex-wrap items-center gap-1.5">
             <Pastilla tono={tonoEstado(d.estado)}>{etiquetaEstado(d.estado)}</Pastilla>
-            <TipoCliente key={`tipo-${d.id}`} dropshipperId={d.id} nivel={d.nivel} puede={!!acceso && (acceso.escribeAtencion || acceso.escribeComercial)} alCambiar={guardado} />
+            <TipoCliente key={`tipo-${d.id}`} dropshipperId={d.id} nivel={d.nivel} manual={d.nivelManual} promedio={d.promedioPedidosMes} puede={!!acceso && (acceso.escribeAtencion || acceso.escribeComercial)} alCambiar={guardado} />
             {abiertos.length > 0 && (
               <Pastilla>
                 <Punto />
@@ -252,7 +215,7 @@ export function FichaDelChat({
           {accionesChat}
           {escribe && <BotonNuevaTarea conversacionId={sel.id} nombre={sel.nombre} clase={claseBotonFicha} alCreada={() => setVersionTareas((v) => v + 1)} alAviso={alAviso} />}
           {d && acceso && <AccionesCrm d={d} codigoPais={datos!.codigoPais} acceso={acceso} alGuardar={guardado} />}
-          <MenuMas opciones={opcionesMas} />
+          <BotonesExtra acciones={accionesExtra} />
         </div>
       </div>
 

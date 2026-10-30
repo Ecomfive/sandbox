@@ -108,6 +108,10 @@ export interface FilaDropshipper {
   tieneTelefono: boolean;
   estado: string;
   nivel: string;
+  /** El tipo lo fijó una persona: el cálculo automático no lo toca (migración 0196). */
+  nivelManual: boolean;
+  /** Promedio de pedidos al mes de los últimos 3 meses, sin cancelados (de él sale el tipo automático). */
+  promedioPedidosMes: number | null;
   responsable: string | null;
   /** País de donde es (código ISO de 2 letras, «CO»), según su teléfono; null si no se sabe. */
   paisOrigen: string | null;

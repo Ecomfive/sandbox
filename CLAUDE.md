@@ -1031,8 +1031,9 @@ convenciones técnicas del código.
   uno a la vez, «Chat» / «Ficha del dropshipper»). La ficha usa las piezas exportadas de `ficha-lateral.tsx` (`AccionesCrm`, `CifrasDelMes`,
   `CasosAbiertos`, `DatosDropshipper`) con los datos de `fichaCrmDelChat` (acción en `bandeja/actions.ts`: `obtenerDatosCrm(…, soloId)`
   del país elegido), en pestañas Resumen, Casos, Productos, Cuentas, Ventas Dropi y Actividad (sin dropshipper: Resumen, Productos y
-  Actividad). La fila de botones lleva Tomar/Soltar o Intervenir, Resuelta/Reabrir, los del CRM y «Más» (`opcionesMas`: no leído, pasar
-  de área, importar, marca de borrado, pedir borrar, abrir en el CRM, desvincular). Ya no hay ficha al costado ni botones en la cabecera
+  Actividad). La fila de botones lleva Tomar/Soltar o Intervenir, Resuelta/Reabrir, los del CRM y, seguidos en la misma fila (sin menú «Más»
+  desde el 29 oct 2026, pedido de Alcides), los demás (`accionesExtra` / `AccionExtra` con texto corto, ícono y globo con el texto completo:
+  no leído, pasar de área, importar, marca de borrado, pedir borrar, no es este / vincular). Ya no hay ficha al costado ni botones en la cabecera
   del chat; «Mensaje / Nota privada» va arriba del cuadro, junto a los rápidos.
   **Eliminar etiquetas y empezar de cero** (29 oct 2026, pedido de Hernán, migración 0192): `PanelEtiquetas` acepta `alEliminar` (papelera con
   confirmación en cada etiqueta; solo la pasa `EtiquetasDropshipper`); `eliminarEtiquetaCrm` (`crm-dropshippers/etiquetas-actions.ts`) la
@@ -1216,6 +1217,9 @@ convenciones técnicas del código.
   **Tipo de cliente** (migración 0195, 29 oct 2026, pedido de Alcides): `dropshippers.nivel` = `regular` (se muestra «Rookie»), `vip` o `black`; «Nuevo» pasó a Rookie.
   `TipoCliente` / `PastillaTipo` (`crm-dropshippers/tipo-cliente.tsx`) en la ficha del CRM y del chat, con `cambiarTipoCliente` (`tareas/actions.ts`, auditoría
   `tipo_cliente_dropshipper`). Black cuenta como VIP para el plazo de respuesta. Ya no hay «Marcar como VIP» en «Más».
+  **Automático** (migración 0196): `crm_recalcular_tipo_cliente()` (la llama `ingerirPedidos` después de `crm_sincronizar_ordenes`) pone `promedio_pedidos_mes` = pedidos de 90 días
+  sin cancelados × 30 ÷ días con pedidos (30 a 90), **por país** con los umbrales de `crm_tipo_cliente_umbrales` (Configuración › «Tipo de cliente del CRM»,
+  `guardarUmbralesTipoCliente`; 500 y 1 000 de entrada), y el tipo más alto entre sus países; deja auditoría «Sistema». `nivel_manual` (pastilla o «Editar») lo fija; «Automático» lo suelta.
   **Quién atiende, en globitos** (29 oct 2026, pedido de Alcides): arriba de la ficha del chat, `EquipoDelChat` (`ficha-chat.tsx`) dibuja «Lo atiende»
   (`quienesAtienden`, `src/lib/crm/respondieron.ts`, con prueba: quien lo lleva o intervino + la persona cuyo cargo es del área del chat) y «Respondieron» con
   `GloboPersona` / `GloboCelular` (`bandeja/globo-persona.tsx`: foto de `perfiles.avatar_url` o iniciales, tooltip «Nombre · Cargo»). `MensajeVista.autorFoto`,
@@ -2111,7 +2115,7 @@ convenciones técnicas del código.
   acción del servidor: las acciones de la página van en fila y, en la ficha, el cambio de período esperaba detrás de las demás lecturas (29 oct 2026). Muestra
   «Del … al …» y «Cargando…» con las cifras de antes atenuadas.
   **Datos editables en la ficha** (29 oct 2026, pedido de Alcides): en el bloque «Datos» (`DatosDropshipper`, `ficha-lateral.tsx`, también en la ficha del chat)
-  Ciudad, Ingreso (`fecha_ingreso`) y Correo se editan con el lápiz (`DatoEditable`, `dato-editable.tsx`; `cambiarDatoDropshipper`, `dato-actions.ts`;
+  Ciudad, Ingreso (`fecha_ingreso`) y Correo se ven como texto y se editan con un clic sobre el dato, como una celda de Compras (al pasar el cursor se marca y sale el lápiz; Enter o clic fuera guardan, Escape cancela; `DatoEditable`, `dato-editable.tsx`; `cambiarDatoDropshipper`, `dato-actions.ts`;
   reglas en `src/lib/crm/dato-dropshipper.ts`, con prueba; auditoría `editar_dropshipper` con antes/después). Ya no se muestran Etapa, Notas ni
   Responsable (lo de ClickUp), y la lista del CRM ya no tiene la columna ni el filtro «Responsable»; las notas siguen en la base y «Editar» ya no las pide ni las borra (`editarDropshipper` solo las toca si vienen).
   **Áreas** (un solo CRM, `src/lib/crm/areas.ts`): Atención = módulo `crm-dropshippers`; Comercial = además el módulo
