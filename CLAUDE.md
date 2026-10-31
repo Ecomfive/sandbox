@@ -501,10 +501,20 @@ convenciones técnicas del código.
   país del proveedor, precios en dólares, `scraping_producto_id` único). El receptor calcula `scraping_productos.foto_huella` de
   las fotos nuevas (`npx tsx scripts/scraping-proveedores.ts huellas` para las que falten).
 - **Operación › Fulfillment › Gestión de IDs Dropi** (antes «Gestión de publicaciones Dropi») (`/publicaciones-dropi`, módulo `publicaciones-dropi`, migración 0116, 21 oct
-  2026; debajo de Compras). **Fulfillment por país** (Hernán, 27 oct 2026, migraciones 0160 y 0161; por país desde el 31 oct 2026, migración 0208): `paises.fulfillment`
-  (Panamá 1.50, Costa Rica 2.00), que se cambia en Bodegas › «Fulfillment por pedido» (`wms-bodegas/fulfillment-actions.ts` › `guardarFulfillmentPais`:
-  lo pone en todas las publicaciones del país, con el valor de antes en su Actividad). `fulfillmentDePais` (`src/lib/publicaciones/fulfillment-pais.ts`)
-  lo lee; con él la ficha y «Agregar» lo muestran apagado y `leerDatos` lo pone (no viene del formulario). Sin valor en el país (null) se escribe
+  2026; debajo de Compras). **Fulfillment por país y plataforma** (Hernán, 27 oct 2026, migraciones 0160 y 0161; por país el 31 oct 2026, migración 0208; por plataforma, con
+  su moneda y en Configuración el mismo día, pedido de Alcides, migración 0213): cada fila de `pais_plataformas` tiene `fulfillment` y
+  `fulfillment_moneda` (**la moneda en que factura el proveedor**: dólares o la del país, `monedasFulfillment`; Costa Rica cobra y paga en colones), que
+  se cambian en Configuración › «Plataformas de <país>» (`CeldaFulfillment`, `configuracion/fulfillment-actions.ts` › `guardarFulfillmentPlataforma`; ya
+  no está en Bodegas). El de **Dropi** se pone en todas las publicaciones del país: tal cual si está en su moneda; si no, con el tipo de cambio del día
+  (`fulfillmentEnMoneda`, unidades enteras en colones o pesos), con el valor de antes en su Actividad; sin tipo de cambio no se guarda. Las demás
+  plataformas solo lo guardan (todavía nada lo usa). La 0213 arregló Costa Rica (sus publicaciones restaban 2 colones; quedó en colones al tipo de
+  cambio de los $2), puso la moneda del país a las plataformas de Costa Rica y México sin fulfillment y le agregó Dropi a México (sin datos ni
+  retiros). `paises.fulfillment` (0208) queda solo para cuando falta la 0213. **Regla de monedas** (análisis del 31 oct 2026): cada monto en la
+  moneda en que de verdad se cobró o pagó, nunca se reemplaza lo histórico por su conversión, y se suma entre países solo en dólares con el tipo de
+  cambio del día de la operación. Pendiente de revisar con esa regla: el costo de mercancía de las publicaciones de Costa Rica (Compras paga en
+  dólares), la comisión de Retiros (dice «en dólares» aunque el retiro esté en colones; Costa Rica retira al cambio según la moneda que se elija) y
+  las dos listas de monedas por país (`formato.ts` solo conoce CR, PA y MX; `tipo-cambio.ts` todas). `fulfillmentDePais` (`src/lib/publicaciones/fulfillment-pais.ts`) lo lee ya
+  en la moneda del país; con él la ficha y «Agregar» lo muestran apagado y `leerDatos` lo pone (no viene del formulario). Sin valor en el país (null) se escribe
   en la ficha como antes; sin la migración, `fulfillmentFijo` (1.50 solo en Panamá). La columna no tiene valor por defecto: cada alta lo pone (también «Sin publicación», `sin-publicacion-actions.ts`). Los productos que ECOMFIVE tiene publicados en Dropi como proveedor; reemplaza la lista «GCC 🇵🇦 Ecomfive
   Panamá» de ClickUp. Una fila de `dropi_publicaciones` por publicación (por país): `dropi_id` (texto: a veces son dos, «7231-7679»),
   `estado` (el flujo de ClickUp: producto_nuevo → revisar_precio → verificar_dropshipper → validar_bajar_precio → bajar_precio → al_dia
