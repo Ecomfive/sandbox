@@ -40,9 +40,8 @@ import { ImportarChat } from "./importar-chat";
 import { NuevoContacto } from "./nuevo-contacto";
 import { PedirBorrado, type QueBorrar } from "./pedir-borrado";
 import { MostrarTelefono } from "../mostrar-telefono";
-import { ActualizarIcon, ArchivarIcon, ChatIcon, CheckIcon, ConectadoIcon, DescargarIcon, FlechaAbajoIcon, FlechaArribaIcon, PapeleraIcon, PersonaIcon, ReactivarIcon } from "@/lib/nav-icons";
+import { ActualizarIcon, ArchivarIcon, ChatIcon, CheckIcon, ConectadoIcon, DescargarIcon, PapeleraIcon, PersonaIcon, ReactivarIcon } from "@/lib/nav-icons";
 import { Ventana } from "@/components/ui/ventana";
-import { BotonNavegar } from "../ficha-lateral";
 import { vistaPreviaTexto } from "@/lib/whatsapp/borrado";
 import { agruparReacciones, miReaccion, REACCIONES_RAPIDAS, type ReaccionVista } from "@/lib/whatsapp/reacciones";
 import { COLUMNAS_TABLERO, GRUPOS, grupoPorId, ordenarPorUrgencia, plazoDelChat, repartirTablero, textoPlazo, type ColumnaTablero, type GrupoMotivo } from "@/lib/whatsapp/prioridad";
@@ -712,8 +711,6 @@ export function Bandeja({
   const enTablero = vistaBandeja === "tablero";
 
   const sel = datos.conversaciones.find((c) => c.id === elegido) ?? null;
-  // La lista del panel del chat abierto (o el tablero, en su orden): las flechas de su ventana pasan al anterior o al siguiente.
-  const lista = sel ? (enTablero ? tablero.flatMap((col) => col.chats) : (listas.get(sel.area) ?? [])) : [];
   const ventana = sel && enNavegador ? textoVentana(sel.ultimoEntranteEn, new Date(milisegundosAhora())) : null;
   const ultimoEntranteSel = sel?.ultimoEntranteEn ?? null;
   useEffect(() => {
@@ -1215,10 +1212,6 @@ export function Bandeja({
   }
 
   const verDropshipper = chat?.id === sel?.id ? chat?.dropshipper : null;
-  // Las flechas de la ventana pasan al chat anterior o siguiente de su columna tal como se ve (filtro y búsqueda).
-  const posicion = sel ? lista.findIndex((c) => c.id === sel.id) : -1;
-  const chatAnterior = posicion > 0 ? lista[posicion - 1] : null;
-  const chatSiguiente = posicion >= 0 && posicion < lista.length - 1 ? lista[posicion + 1] : null;
 
   // Los botones del chat que abren la fila de la ficha: Intervenir (supervisando) o Tomar / Soltar y Marcar resuelta / Reabrir.
   const accionesChat =
@@ -1728,8 +1721,6 @@ export function Bandeja({
                   ← Volver a {datos.conversaciones.find((c) => c.id === volverA)?.nombre}
                 </button>
               )}
-              <BotonNavegar texto="Chat anterior" icono={FlechaArribaIcon} activo={!!chatAnterior} alHacerClic={() => chatAnterior && abrirChat(chatAnterior)} />
-              <BotonNavegar texto="Chat siguiente" icono={FlechaAbajoIcon} activo={!!chatSiguiente} alHacerClic={() => chatSiguiente && abrirChat(chatSiguiente)} />
             </>
           }
         >
