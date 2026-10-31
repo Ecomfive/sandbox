@@ -23,6 +23,7 @@ import { abrirChatInterno } from "./interno-actions";
 import { BotonWhatsappInterno } from "./interno";
 import { BotonNumerosPais } from "./numeros-pais";
 import { DocumentoRevisado, TextoConEnlaces } from "./texto-enlaces";
+import { avisoTelefonosAjenos } from "@/lib/whatsapp/telefonos-ajenos";
 import { colorFoto, iniciales } from "./globo-persona";
 import { EtiquetasChat, PastillasEtiquetas, SelectorEtiquetasChat, type ManejoEtiquetas } from "./etiquetas-chat";
 import { transcribirAudio } from "./transcripcion-actions";
@@ -677,6 +678,8 @@ export function Bandeja({
   }, [borrador]);
 
   const numeroDe = useMemo(() => new Map(datos.numeros.map((n) => [n.id, n])), [datos.numeros]);
+  // Un teléfono que no es de la empresa en lo que se está escribiendo: se avisa antes de enviar (el servidor no lo deja salir).
+  const avisoNumeros = useMemo(() => avisoTelefonosAjenos(borrador, datos.numeros.map((n) => n.numero)), [borrador, datos.numeros]);
   // Los países de los números, para filtrar por país cuando hay números de más de uno.
   const paisesNumeros = useMemo(() => [...new Set(datos.numeros.map((n) => n.pais).filter((p): p is string => !!p))].sort(), [datos.numeros]);
   const chatsInternos = useMemo(() => datos.conversaciones.filter((c) => c.interno).map((c) => ({ numeroId: c.numeroId, nombre: c.nombre, noLeidos: c.noLeidos })), [datos.conversaciones]);
@@ -1978,6 +1981,11 @@ export function Bandeja({
                           </>
                         )}
                       </div>
+                    )}
+                    {!esNota && avisoNumeros && (
+                      <p role="status" className="m-0 border-t border-[var(--wa-borde)] bg-warning-soft px-4 py-1.5 text-[12.5px] leading-snug text-warning">
+                        ⚠️ {avisoNumeros}
+                      </p>
                     )}
                     <div className="flex items-end gap-2 px-3 py-2">
                       {!esNota && (

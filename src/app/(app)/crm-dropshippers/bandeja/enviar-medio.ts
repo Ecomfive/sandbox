@@ -6,6 +6,7 @@ import { accesoCrm, supervisaArea, type AreaCrm } from "@/lib/crm/areas";
 import { createServiceClient } from "@/lib/supabase/server";
 import { avisarBandeja } from "@/lib/whatsapp/aviso-bandeja";
 import { enviarArchivoWhatsapp, subirMedioWhatsapp } from "@/lib/whatsapp/api";
+import { avisoNumerosAjenos } from "@/lib/whatsapp/numeros-propios";
 import { TIPO_DE_MENSAJE, type TipoEnvio } from "@/lib/whatsapp/archivos";
 import { resumenMensaje } from "@/lib/whatsapp/extraer";
 import { minutosVentana } from "@/lib/whatsapp/ventana";
@@ -73,6 +74,12 @@ export async function mandarMedioGuardado(
 ): Promise<{ ok: true } | { error: string }> {
   const { u, c, supabase } = e;
   const quitar = () => supabase.storage.from(BUCKET_ARCHIVOS).remove([a.ruta]);
+  // El pie del archivo tampoco lleva teléfonos que no son de la empresa; lo que el navegador ya subió se borra.
+  const ajenos = await avisoNumerosAjenos(supabase, a.pie);
+  if (ajenos) {
+    if (!a.subir) await quitar();
+    return { error: `No se manda: ${ajenos}` };
+  }
   if (a.subir) {
     const { error } = await supabase.storage.from(BUCKET_ARCHIVOS).upload(a.ruta, a.bytes, { contentType: a.mime, upsert: false });
     if (error) return { error: "No se pudo guardar el archivo. Inténtalo de nuevo." };

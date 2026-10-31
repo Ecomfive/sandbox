@@ -1292,6 +1292,13 @@ convenciones técnicas del código.
   `whatsapp_etiquetas` para todo el CRM. «Editar» del dropshipper ya no trae el campo de etiquetas separadas por coma (`editarDropshipper` solo las toca si vienen).
   **Mensajes que el equipo borra en la app**: un eco `revoke` de `smb_message_echoes` se trata como `revoke` de un cliente (`extraerAviso` → `revocados` → `eliminado_en_whatsapp_en`); la burbuja dice «Se eliminó desde la app de WhatsApp Business (Meta no dice quién)»
   si el mensaje era nuestro. **No está confirmado que Meta/360dialog mande ese eco** (la prueba usa la forma del `revoke` de clientes); borrar un chat entero en la app sigue sin aviso (marca manual).
+- **Solo se comparten los números de la empresa** (31 oct 2026, pedido de Hernán; sin migración): `@/lib/whatsapp/telefonos-ajenos` ›
+  `telefonosEnTexto` (con «+» o código de país, celular de 8 cifras 5-8, fijo 3-4 partido, MX 10 partido, después de «tel/cel/WhatsApp/llama al»,
+  wa.me; no después de «pedido/guía/ID/#/factura/$», ni un número largo sin partir) y `telefonosAjenos` / `avisoTelefonosAjenos` (comparan las
+  últimas 8 cifras con los de la empresa). `@/lib/whatsapp/numeros-propios` › `avisoNumerosAjenos(supabase, texto)` (todos los
+  `whatsapp_numeros`) frena `enviarWhatsapp`, `enviarPlantillaConversacion`, `nuevo-contacto-actions` (lo escrito en la plantilla) y
+  `mandarMedioGuardado` (el pie; borra lo ya subido). En `bandeja.tsx`, `avisoNumeros` muestra el aviso naranja arriba del cuadro (no en
+  notas). Pruebas en `telefonos-ajenos.test.ts`.
 - **Enlaces y archivos peligrosos en la bandeja** (31 oct 2026, pedido de Hernán; sin migración; solo reglas propias, Google Safe Browsing
   quedó para después): `@/lib/whatsapp/enlaces` › `partesConEnlaces` (encuentra los enlaces con https, www o dominio suelto con terminación
   conocida; no correos) y `revisarEnlace` → peligroso (imita una marca de `MARCAS` sin ser su dominio oficial, IP, `@` en la URL, punycode,

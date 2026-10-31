@@ -11,6 +11,7 @@ import { nombreArchivoSeguro } from "@/lib/seguridad/ruta-almacen";
 import { createServiceClient } from "@/lib/supabase/server";
 import { enviarPlantillaWhatsapp, enviarTextoWhatsapp } from "@/lib/whatsapp/api";
 import { enlacesPeligrosos } from "@/lib/whatsapp/enlaces";
+import { avisoNumerosAjenos } from "@/lib/whatsapp/numeros-propios";
 import { avisarBandeja } from "@/lib/whatsapp/aviso-bandeja";
 import { detectarArchivoWhatsapp, MAX_BYTES_ENVIO } from "@/lib/whatsapp/archivos";
 import { resumenMensaje } from "@/lib/whatsapp/extraer";
@@ -161,6 +162,9 @@ export async function enviarWhatsapp(id: string, texto: string): Promise<{ ok: t
   const bloqueado = enlacesPeligrosos(cuerpo)[0];
   if (bloqueado) return { error: `No se manda: «${bloqueado.texto}» es un enlace peligroso. ${bloqueado.motivos[0] ?? ""}`.trim() };
   const supabase = createServiceClient();
+  // Solo se comparten los números de WhatsApp de la empresa (31 oct 2026, pedido de Hernán).
+  const ajenos = await avisoNumerosAjenos(supabase, cuerpo);
+  if (ajenos) return { error: `No se manda: ${ajenos}` };
   const c = await conversacionPermitida(supabase, id, u, true);
   if (!c) return { error: "Esa conversación no existe o no es de tu área." };
   const supervisando = avisoSupervision(u, c);
@@ -544,6 +548,9 @@ export async function enviarPlantillaConversacion(id: string, plantillaId: strin
   if (count) return { error: "Ya le mandaste esta plantilla hoy. Repetirla es lo que más reportes causa: espera su respuesta." };
   const valores = resolverVariables(p.variables ?? [], await personaDeLaConversacion(supabase, id), Array.isArray(manuales) ? manuales.map(String) : []);
   if ("error" in valores) return valores;
+  // Solo se comparten los números de WhatsApp de la empresa (31 oct 2026, pedido de Hernán).
+  const ajenos = await avisoNumerosAjenos(supabase, valores.valores.join("\n"));
+  if (ajenos) return { error: `No se manda: ${ajenos}` };
   const r = await enviarPlantillaWhatsapp({ phoneNumberId: c.phoneNumberId, numero: c.numeroEmpresa }, c.telefono, p.nombre, p.idioma, valores.valores);
   if ("error" in r) return r;
   const texto = [p.encabezado, rellenar(p.cuerpo, valores.valores)].filter(Boolean).join("\n");
