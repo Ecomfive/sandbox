@@ -5,6 +5,7 @@ import { idsDropiEnTexto, productosDeLaConversacion, type MencionEnChat } from "
 import { cargarEnCamino } from "@/lib/publicaciones/en-camino-datos";
 import { createServiceClient } from "@/lib/supabase/server";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
+import { descontinuadosEnPais } from "@/lib/producto/descontinuado-pais";
 import { conversacionPermitida, usuarioBandeja } from "./datos-bandeja";
 import { paisDelChat } from "./pais-chat";
 
@@ -33,6 +34,8 @@ export interface ProductoDelChat {
    * solo el precio de venta, sin costos. Vacío si no está publicado allá (o no se sabe el país).
    */
   precios: PrecioDropi[];
+  /** Descontinuado en el país del chat (ficha del producto, migración 0211): ya no se vuelve a traer allá. */
+  descontinuado: boolean;
 }
 
 export interface PrecioDropi {
@@ -171,6 +174,7 @@ export async function productosDelChat(conversacionId: string): Promise<Producto
     pais ? cargarEnCamino(supabase, pais.id, u) : { camino: new Map(), cotizando: new Map(), etapasCotizando: new Map() },
     pais ? preciosDropi(supabase, pais.id, lista.map(({ p }) => p.id), ids) : new Map<string, PrecioDropi[]>(),
   ]);
+  const descontinuados = pais ? await descontinuadosEnPais(supabase, pais.id) : new Set<string>();
   return {
     pais,
     sePuedeFijar,
@@ -191,6 +195,7 @@ export async function productosDelChat(conversacionId: string): Promise<Producto
         etapa: etapasCotizando.get(p.id) ?? null,
         aviso: avisos.get(p.id) ?? null,
         precios: precios.get(p.id) ?? [],
+        descontinuado: descontinuados.has(p.id),
       };
     }),
   };

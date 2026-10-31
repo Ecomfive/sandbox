@@ -134,6 +134,8 @@ export interface FilaPublicacion {
   tareasPendientes: { total: number; atrasadas: number };
   /** Desde cuándo está en liquidación (migración 0174): sale del aviso de margen bajo y va a la tarjeta «En liquidación». */
   liquidacionDesde: string | null;
+  /** Su producto está descontinuado en este país (ficha del producto, migración 0211): ya no se compra para aquí. */
+  descontinuadoPais: boolean;
   /** Cambios de stock esperando «Aplicar en Dropi» (migración 0173): en qué bodega y cuántas unidades deben quedar. */
   stockPendiente: { producto: number | null; bodega: number; nombreBodega: string; unidades: number; antes: number | null }[];
   /** Las demás publicaciones del mismo producto (el público y sus privadas «P-MA …»), para apagarlas juntas (`grupoDe`). */

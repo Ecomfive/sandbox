@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { descontinuadosEnPais } from "@/lib/producto/descontinuado-pais";
 import { after } from "next/server";
 import { accionesPublicacion, enDropi, esBodegaDropi, estaArchivada, necesitaRepublicar } from "@/lib/publicaciones/automatico";
 import { normalizarDatosCrear, type OpcionesCrear } from "@/lib/publicaciones/crear-dropi";
@@ -279,6 +280,8 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
     tareasDe.set(t.publicacion_id, x);
   }
   const liquidacionEn = new Map(liquidacionR.error ? [] : (liquidacionR.data ?? []).map((n) => [n.id, n.liquidacion_en as string]));
+  // Los productos descontinuados en este país (migración 0211): sin la migración, ninguno.
+  const descontinuados = await descontinuadosEnPais(supabase, paisId);
 
   const datos = filasR.data ?? [];
   const nombrePorId = new Map(datos.map((d) => [d.id, d.nombre as string]));
@@ -427,6 +430,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
       duplicadaDe: null,
       pausadaDesde: pausadaEn.get(d.id as string) ?? null,
       liquidacionDesde: liquidacionEn.get(d.id as string) ?? null,
+      descontinuadoPais: !!d.sku_maestro_id && descontinuados.has(d.sku_maestro_id as string),
       tareasPendientes: tareasDe.get(d.id as string) ?? { total: 0, atrasadas: 0 },
       grupo: [],
       publicosDelProducto: [],

@@ -5,6 +5,7 @@ import { after } from "next/server";
 import { activarTareasDeLlegada } from "@/lib/crm/tareas-servidor";
 import { rutaPropia } from "@/lib/seguridad/ruta-almacen";
 import { createServiceClient } from "@/lib/supabase/server";
+import { descontinuadoEn } from "@/lib/producto/descontinuado-pais";
 import { registrarAuditoria, registrarAuditoriaLote } from "@/lib/auditoria";
 import { MENSAJE_ACCION_BLOQUEADA, requireModulo, requireModuloEscritura, getUsuarioActual } from "@/lib/auth";
 import { EMOJIS_REACCION } from "@/lib/compras/reacciones";
@@ -291,7 +292,7 @@ export async function crearCompra(formData: FormData): Promise<{ error?: string;
     if (!ES_ID(l.sku)) return { error: "Hay un producto que no es válido." };
     if (!ES_CANTIDAD(l.cantidad)) return { error: "Las cantidades deben ser números enteros mayores que cero." };
     if (!ES_COSTO(l.costo)) return { error: "Hay un costo unitario que no es válido." };
-    const sku = await productoComprable(l.sku);
+    const sku = await productoComprable(l.sku, tipoYPais.pais_id);
     if ("error" in sku) return sku;
   }
 
@@ -1354,7 +1355,8 @@ export async function agregarProductoCompra(compraId: string, skuId: string, can
   if (sinAcceso) return { error: sinAcceso };
   if (!ES_CANTIDAD(cantidad)) return { error: "La cantidad debe ser un número entero mayor que cero." };
   if (!ES_COSTO(costo)) return { error: "El costo unitario no es válido." };
-  const sku = await productoComprable(skuId);
+  const { data: compra } = await createServiceClient().from("wms_compras").select("pais_id").eq("id", compraId).maybeSingle();
+  const sku = await productoComprable(skuId, (compra?.pais_id as string | null) ?? null);
   if ("error" in sku) return sku;
   const supabase = createServiceClient();
   const { error } = await supabase.rpc("wms_agregar_item_compra", {
@@ -1376,8 +1378,11 @@ export async function agregarProductoCompra(compraId: string, skuId: string, can
   return {};
 }
 
-/** Un producto que se puede comprar (existe, no es compuesto, no está en Test, Inactivo ni Descontinuado y no tiene variantes), o por qué no. */
-async function productoComprable(skuId: string): Promise<{ codigo: string; nombre: string } | { error: string }> {
+/**
+ * Un producto que se puede comprar (existe, no es compuesto, no está en Test, Inactivo ni Descontinuado —ni descontinuado en el país de la
+ * compra, migración 0211— y no tiene variantes), o por qué no.
+ */
+async function productoComprable(skuId: string, paisId: string | null): Promise<{ codigo: string; nombre: string } | { error: string }> {
   const supabase = createServiceClient();
   const { data: sku } = await supabase.from("skus_maestros").select("codigo, nombre, tipo, clase").eq("id", skuId).maybeSingle();
   if (!sku) return { error: "El producto no existe." };
@@ -1385,6 +1390,8 @@ async function productoComprable(skuId: string): Promise<{ codigo: string; nombr
   if (sku.clase === "test") return { error: `${sku.codigo} está en Test: pásalo a Activo para comprarlo.` };
   if (sku.clase === "inactivo") return { error: `${sku.codigo} está Inactivo: pásalo a Activo para volver a comprarlo.` };
   if (sku.clase === "descontinuado") return { error: `${sku.codigo} está Descontinuado: pásalo a Activo para volver a comprarlo.` };
+  const enPais = await descontinuadoEn(supabase, skuId, paisId);
+  if (enPais) return { error: `${sku.codigo} está Descontinuado en ${enPais}: quítale la marca en su ficha (Producto) para volver a comprarlo para ese país.` };
   const { count: variantes } = await supabase.from("skus_maestros").select("id", { count: "exact", head: true }).eq("padre_id", skuId);
   if ((variantes ?? 0) > 0) return { error: `${sku.codigo} tiene variantes: se compra por variante.` };
   return { codigo: sku.codigo as string, nombre: sku.nombre as string };
