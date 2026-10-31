@@ -60,3 +60,16 @@ test("republicar: 30 días sin ninguna venta, activa y de nuestra bodega (nunca 
   assert.equal(r({ ...base, hayVentas: false }, hoy), false, "sin datos de Dropi no se sabe");
   assert.equal(r(base, hoy, { dias_republicar: 60 }), false, "el plazo sale de las reglas");
 });
+
+test("la bodega de Dropi de cada país: B280 Panamá, B15 Costa Rica, B49 México", async () => {
+  const { esBodegaDropi, codigoBodegaDropi, detalleAccion } = await import("./automatico");
+  const { REGLAS_DEFECTO } = await import("./reglas");
+  for (const id of [280, 15, 49]) assert.equal(esBodegaDropi(id), true, `B${id} es de Dropi`);
+  assert.equal(esBodegaDropi(81), false, "B81 es de ECOMFIVE");
+  assert.equal(esBodegaDropi(3903), false);
+  assert.equal(codigoBodegaDropi("MX"), "B49");
+  assert.equal(codigoBodegaDropi("cr"), "B15");
+  assert.equal(codigoBodegaDropi(undefined), "B280");
+  assert.match(detalleAccion("republicar", REGLAS_DEFECTO, "MX"), /no la B49\)/);
+  assert.match(detalleAccion("republicar", REGLAS_DEFECTO, "PA"), /no la B280\)/);
+});
