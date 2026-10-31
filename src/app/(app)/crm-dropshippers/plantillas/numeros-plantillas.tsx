@@ -5,7 +5,8 @@ import { Badge, type Tone } from "@/components/ui/badge";
 import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { Ventana } from "@/components/ui/ventana";
-import { enviarPlantillaANumero, igualarNumerosPlantillas, revisarNumerosDePlantillas, type NumeroConPlantillas } from "./actions";
+import { enviarPlantillaANumero, revisarNumerosDePlantillas, type NumeroConPlantillas } from "./actions";
+import { IgualarNumeros } from "./igualar-numeros";
 
 const boton = `inline-flex min-h-9 items-center rounded-md border border-border-control bg-card px-3 text-xs font-medium hover:bg-muted disabled:opacity-50 ${anilloFoco}`;
 
@@ -19,14 +20,16 @@ const ESTADO: Record<string, { etiqueta: string; tono: Tone }> = {
 
 /**
  * «Revisar números» e «Igualar números» (30 oct 2026): con dos números de 360dialog, cada uno habla con Meta con su propia clave y las plantillas viven en la cuenta de WhatsApp Business de cada
- * número. «Revisar» pregunta a Meta qué ve cada número y en qué estado (no cambia nada); «Igualar» deja en los demás números las plantillas que ya se mandaron por el principal.
+ * número. «Revisar» pregunta a Meta qué ve cada número y en qué estado (no cambia nada); «Igualar» muestra lo que le falta a cada número para elegir qué mandar, una
+ * cada dos minutos (`IgualarNumeros`, 31 oct 2026).
  * Donde un número no tiene una plantilla («Falta»), «Enviar a Meta» la manda solo a ese número (31 oct 2026, pedido de Hernán: el número de Dirección
  * llegó sin ninguna); solo con permiso para escribir y si la plantilla está guardada en el sistema.
  */
 export function NumerosPlantillas({ escribe }: { escribe: boolean }) {
   const { mostrarToast } = useToast();
   const [ocupado, empezar] = useTransition();
-  const [enCurso, setEnCurso] = useState<"revisar" | "igualar" | null>(null);
+  const [enCurso, setEnCurso] = useState<"revisar" | null>(null);
+  const [igualando, setIgualando] = useState(false);
   const [revision, setRevision] = useState<{ numeros: NumeroConPlantillas[]; mismaCuenta: boolean; enSistema: string[] } | null>(null);
   /** La celda que se está mandando («nombre|idioma|canal»). */
   const [enviando, setEnviando] = useState<string | null>(null);
@@ -61,17 +64,6 @@ export function NumerosPlantillas({ escribe }: { escribe: boolean }) {
     });
   }
 
-  function igualar() {
-    setEnCurso("igualar");
-    empezar(async () => {
-      const r = await igualarNumerosPlantillas().catch(() => ({ error: "No se pudo. Inténtalo de nuevo." }));
-      setEnCurso(null);
-      if ("error" in r) return mostrarToast(r.error, "destructive");
-      if (r.fallas.length) mostrarToast(`${r.creadas} creadas. Fallaron ${r.fallas.length}: ${r.fallas[0]}`, "destructive");
-      else mostrarToast(r.creadas ? `Listo: ${r.creadas} plantillas mandadas a los otros números.` : "Todos los números ya tienen las mismas plantillas.");
-    });
-  }
-
   // Todas las plantillas que aparecen en algún número, para ver cuál falta en cuál.
   const nombres = revision ? [...new Set(revision.numeros.flatMap((n) => n.plantillas.map((p) => `${p.nombre}|${p.idioma}`)))].sort() : [];
 
@@ -81,10 +73,11 @@ export function NumerosPlantillas({ escribe }: { escribe: boolean }) {
         {enCurso === "revisar" ? "Revisando…" : "Revisar números"}
       </button>
       {escribe && (
-        <button type="button" disabled={ocupado} onClick={igualar} className={boton}>
-          {enCurso === "igualar" ? "Igualando…" : "Igualar números"}
+        <button type="button" disabled={ocupado || igualando} onClick={() => setIgualando(true)} className={boton}>
+          Igualar números
         </button>
       )}
+      {igualando && <IgualarNumeros alCerrar={() => setIgualando(false)} />}
       {revision && (
         <Ventana abierto alCerrar={() => setRevision(null)} titulo="Plantillas por número" ancho="lg">
           <div className="flex flex-col gap-4 p-5">
