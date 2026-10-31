@@ -12,7 +12,7 @@ import { DisponibleToggle } from "./disponible-toggle";
 const NOMBRE: NombreFilas = { singular: "plataforma", plural: "plataformas" };
 const ICONOS: Record<string, IconoComp> = { estado: EstadoIcon, nombre: TiendaIcon, fulfillment: InventarioIcon };
 
-const columnas = (nombrePais: string, puedeEscribir: boolean): ColumnaTabla<FilaPlataforma>[] => [
+const columnas = (nombrePais: string, monedas: string[], puedeEscribir: boolean): ColumnaTabla<FilaPlataforma>[] => [
   { id: "nombre", label: "Plataforma", ocultable: false, clase: "font-medium", render: (p) => p.nombre },
   { id: "estado", label: "En retiros", ocultable: true, render: (p) => <DisponibleToggle id={p.id} disponible={p.disponible} /> },
   {
@@ -21,11 +21,13 @@ const columnas = (nombrePais: string, puedeEscribir: boolean): ColumnaTabla<Fila
     ocultable: true,
     render: (p) => (
       <CeldaFulfillment
-        key={`${p.id}-${p.fulfillment}`}
+        key={`${p.id}-${p.fulfillment}-${p.fulfillmentMoneda}`}
         id={p.id}
         plataforma={p.nombre}
         nombrePais={nombrePais}
         valor={p.fulfillment}
+        moneda={p.fulfillmentMoneda}
+        monedas={monedas}
         equivalente={p.fulfillmentEquivalente}
         esDropi={p.nombre.trim().toLowerCase() === "dropi"}
         puedeEscribir={puedeEscribir}
@@ -36,24 +38,27 @@ const columnas = (nombrePais: string, puedeEscribir: boolean): ColumnaTabla<Fila
 
 /**
  * Plataformas del país con la barra de herramientas común (agrupar por estado, ocultas, filtros y «Agregar»): si salen al crear un retiro y su
- * fulfillment por pedido en dólares (el de Dropi es el de las publicaciones de Gestión de IDs Dropi del país).
+ * fulfillment por pedido en la moneda que factura cada una (el de Dropi es el de las publicaciones de Gestión de IDs Dropi del país).
  */
 export function TablaPlataformas({
   plataformas,
   paisId,
   nombrePais,
+  monedas,
   puedeEscribir,
 }: {
   plataformas: FilaPlataforma[];
   paisId: string;
   nombrePais: string;
+  /** En qué monedas se puede escribir el fulfillment: dólares y la del país. */
+  monedas: string[];
   puedeEscribir: boolean;
 }) {
   return (
     <TablaDatos
       def={DEF_PLATAFORMAS}
       filas={plataformas}
-      columnas={columnas(nombrePais, puedeEscribir)}
+      columnas={columnas(nombrePais, monedas, puedeEscribir)}
       iconos={ICONOS}
       nombre={NOMBRE}
       claveFila={(p) => p.id}

@@ -5,18 +5,23 @@ import { anilloFoco, fieldClassSm } from "@/components/ui/field";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/toast";
 import { CerrarIcon, CheckIcon, LapizIcon } from "@/lib/nav-icons";
+import { montoConMoneda } from "@/lib/publicaciones/fulfillment-pais";
 import { guardarFulfillmentPlataforma } from "./fulfillment-actions";
 
+const NOMBRE_MONEDA: Record<string, string> = { USD: "Dólares (US$)", CRC: "Colones (₡)", MXN: "Pesos (MX$)" };
+
 /**
- * El fulfillment por pedido de una plataforma del país, en dólares, editable en la misma celda (Configuración, 31 oct 2026). Debajo, cuánto es en
- * la moneda del país (`equivalente`, si no es el dólar). En Dropi, guardarlo lo pone en todas las publicaciones del país de Gestión de IDs Dropi: se
- * confirma antes.
+ * El fulfillment por pedido de una plataforma del país, editable en la misma celda (Configuración, 31 oct 2026), en la moneda en que lo factura
+ * (dólares o la del país: Costa Rica cobra y paga en colones). Debajo, cuánto es en la otra moneda (`equivalente`). En Dropi, guardarlo lo pone en
+ * todas las publicaciones del país de Gestión de IDs Dropi: se confirma antes.
  */
 export function CeldaFulfillment({
   id,
   plataforma,
   nombrePais,
   valor,
+  moneda,
+  monedas,
   equivalente,
   esDropi,
   puedeEscribir,
@@ -25,7 +30,11 @@ export function CeldaFulfillment({
   plataforma: string;
   nombrePais: string;
   valor: number | null;
-  /** «≈ ₡1 011»: el mismo monto en la moneda del país, o null. */
+  /** La moneda del monto guardado. */
+  moneda: string;
+  /** Las que se pueden elegir: dólares y la del país. */
+  monedas: string[];
+  /** «≈ ₡1 011»: el mismo monto en la otra moneda del país, o null. */
   equivalente: string | null;
   esDropi: boolean;
   puedeEscribir: boolean;
@@ -33,35 +42,38 @@ export function CeldaFulfillment({
   const { mostrarToast } = useToast();
   const [editando, setEditando] = useState(false);
   const [texto, setTexto] = useState("");
-  const [mostrado, setMostrado] = useState<{ valor: number | null; equivalente: string | null }>({ valor, equivalente });
+  // Sin monto todavía, se propone la moneda del país (la última de la lista).
+  const [monedaElegida, setMonedaElegida] = useState(valor === null ? monedas[monedas.length - 1] : moneda);
+  const [mostrado, setMostrado] = useState<{ valor: number | null; moneda: string; equivalente: string | null }>({ valor, moneda, equivalente });
   const [error, setError] = useState<string | null>(null);
   const [pendiente, empezar] = useTransition();
 
   function abrir() {
-    setTexto(mostrado.valor === null ? "" : mostrado.valor.toFixed(2));
+    setTexto(mostrado.valor === null ? "" : String(mostrado.valor));
+    if (mostrado.valor !== null) setMonedaElegida(mostrado.moneda);
     setError(null);
     setEditando(true);
   }
 
   function guardar() {
     const nuevo = texto.trim();
-    if (nuevo === (mostrado.valor === null ? "" : mostrado.valor.toFixed(2))) return setEditando(false);
+    if (nuevo === (mostrado.valor === null ? "" : String(mostrado.valor)) && monedaElegida === mostrado.moneda) return setEditando(false);
     if (esDropi) {
       const aviso = nuevo
-        ? `El fulfillment de Dropi en ${nombrePais} pasa a US$${Number(nuevo.replace(",", ".")).toFixed(2)} y se pone en todas las publicaciones de ${nombrePais} en Gestión de IDs Dropi (cambia su margen). ¿Seguir?`
+        ? `El fulfillment de Dropi en ${nombrePais} pasa a ${montoConMoneda(Number(nuevo.replace(",", ".").replace(/^[^\d]+/, "")), monedaElegida)} y se pone en todas las publicaciones de ${nombrePais} en Gestión de IDs Dropi (cambia su margen). ¿Seguir?`
         : `Dropi en ${nombrePais} se queda sin fulfillment fijo: se vuelve a escribir en cada publicación. ¿Seguir?`;
       if (!confirm(aviso)) return;
     }
     setError(null);
     empezar(async () => {
-      const r = await guardarFulfillmentPlataforma(id, nuevo).catch(() => ({ error: "No se pudo guardar. Inténtalo de nuevo." }));
+      const r = await guardarFulfillmentPlataforma(id, nuevo, monedaElegida).catch(() => ({ error: "No se pudo guardar. Inténtalo de nuevo." }));
       if ("error" in r) return void setError(r.error);
-      setMostrado({ valor: r.valor, equivalente: r.enMoneda ? `≈ ${r.enMoneda}` : null });
+      setMostrado({ valor: r.valor, moneda: r.moneda, equivalente: r.equivalente });
       setEditando(false);
       mostrarToast(
         r.valor === null
           ? `${plataforma} en ${nombrePais}: sin fulfillment fijo.`
-          : `Fulfillment de ${plataforma} en ${nombrePais}: US$${r.valor.toFixed(2)}${esDropi ? (r.cambiadas ? ` · se cambió en ${r.cambiadas} ${r.cambiadas === 1 ? "publicación" : "publicaciones"}` : " · todas las publicaciones ya lo tenían") : ""}.`,
+          : `Fulfillment de ${plataforma} en ${nombrePais}: ${montoConMoneda(r.valor, r.moneda)}${esDropi ? (r.cambiadas ? ` · se cambió en ${r.cambiadas} ${r.cambiadas === 1 ? "publicación" : "publicaciones"}` : " · todas las publicaciones ya lo tenían") : ""}.`,
       );
     });
   }
@@ -70,9 +82,25 @@ export function CeldaFulfillment({
     return (
       <div className="flex flex-col gap-1">
         <div className="flex items-center gap-1.5">
-          <span aria-hidden="true" className="text-xs text-muted-foreground">
-            US$
-          </span>
+          {monedas.length > 1 ? (
+            <select
+              value={monedaElegida}
+              onChange={(e) => setMonedaElegida(e.target.value)}
+              disabled={pendiente}
+              aria-label={`Moneda del fulfillment de ${plataforma}`}
+              className={`${fieldClassSm} w-auto`}
+            >
+              {monedas.map((m) => (
+                <option key={m} value={m}>
+                  {NOMBRE_MONEDA[m] ?? m}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <span aria-hidden="true" className="text-xs text-muted-foreground">
+              US$
+            </span>
+          )}
           <input
             autoFocus
             value={texto}
@@ -87,9 +115,9 @@ export function CeldaFulfillment({
               }
             }}
             inputMode="decimal"
-            placeholder="Ej: 2.00"
+            placeholder={monedaElegida === "USD" ? "Ej: 2.00" : "Ej: 1000"}
             disabled={pendiente}
-            aria-label={`Fulfillment por pedido de ${plataforma}, en dólares`}
+            aria-label={`Fulfillment por pedido de ${plataforma}, en ${(NOMBRE_MONEDA[monedaElegida] ?? monedaElegida).toLowerCase()}`}
             aria-invalid={!!error || undefined}
             aria-describedby={error ? `error-fulfillment-${id}` : undefined}
             className={`${fieldClassSm} w-24 tabular-nums`}
@@ -115,7 +143,7 @@ export function CeldaFulfillment({
 
   const contenido = (
     <span className="flex flex-col items-start leading-tight">
-      <span className="tabular-nums">{mostrado.valor === null ? <span className="text-muted-foreground">—</span> : `US$${mostrado.valor.toFixed(2)}`}</span>
+      <span className="tabular-nums">{mostrado.valor === null ? <span className="text-muted-foreground">—</span> : montoConMoneda(mostrado.valor, mostrado.moneda)}</span>
       {mostrado.valor !== null && mostrado.equivalente && <span className="text-xs text-muted-foreground tabular-nums">{mostrado.equivalente}</span>}
     </span>
   );
@@ -125,7 +153,7 @@ export function CeldaFulfillment({
       <button
         type="button"
         onClick={abrir}
-        aria-label={`Fulfillment de ${plataforma}: ${mostrado.valor === null ? "sin dato" : `US$${mostrado.valor.toFixed(2)}`}. Cambiar`}
+        aria-label={`Fulfillment de ${plataforma}: ${montoConMoneda(mostrado.valor, mostrado.moneda)}. Cambiar`}
         className={`group -mx-1.5 inline-flex min-h-8 items-center gap-2 rounded-md px-1.5 py-1 text-left hover:bg-muted ${anilloFoco}`}
       >
         {contenido}
