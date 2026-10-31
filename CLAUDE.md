@@ -306,6 +306,13 @@ convenciones técnicas del código.
   Dashboard, Planificación o Tiempos visibles (sus cifras saldrían en cero). **Un módulo nuevo que se quiera afinar**: agrega su
   `CatalogoModulo` a `src/lib/permisos/catalogo.ts` y aplica sus claves en el servidor como Compras (`permisos-compras.ts` es el modelo).
   `acceso-seccion.ts`, «Líderes comerciales» del CRM y el progreso de la Universidad ya cuentan lo propio de cada persona.
+- **Contraseña propia** (31 oct 2026, pedido de Alcides). Cualquiera con sesión cambia la suya en el menú de su cuenta › «Cambiar
+  contraseña» (`VentanaContrasena` + `FormularioContrasena`, `src/components/cuenta/`; `cambiarMiContrasena`, `src/lib/cuenta/contrasena-actions.ts`:
+  siempre el usuario de la sesión, comprueba la actual con `createAnonClient`, guarda con la clave de servicio, quita la marca y renueva la sesión;
+  reglas puras con prueba en `contrasena.ts`, `errorContrasenaNueva`). Una contraseña que da un administrador (`crearUsuario`, salvo el primer
+  usuario, y `generarContrasenaTemporal`) marca `app_metadata.clave_temporal = true`; con la marca, el layout de `(app)` manda a
+  `/elegir-contrasena` (fuera de `(app)`) hasta que la persona elija la suya. Las cuentas que ya existían no tienen la marca. Es la misma marca del
+  portal de Shen Zhen, que cambia su clave en su portal (`cambiarMiContrasena` lo rechaza).
 - **Acceso en silencio** (21 oct 2026). Una sección a la que la persona no tiene acceso **no se le muestra ni se le rechaza con un aviso**.
   `requireModulo`, `requirePestana` y las páginas de Usuarios llaman a `irAlInicio(usuario, moduloRechazado?)` (`src/lib/auth.ts`), que
   la lleva a `paginaInicialDe` (`src/lib/nav-data.ts`: la primera página del menú que su rol le deja abrir, sin volver al módulo que la
