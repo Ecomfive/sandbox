@@ -12,7 +12,6 @@ import { Ventana } from "@/components/ui/ventana";
 import { ActualizarIcon, CerrarIcon, CheckIcon, ComprasIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, InteligenciaIcon, InventarioIcon, LapizIcon, MargenIcon, PapeleraIcon, ProductoIcon, ArchivarIcon, FotosIcon, PausaIcon, ReactivarIcon, ApagarIcon, CandadoAbiertoIcon, CandadoIcon } from "@/lib/nav-icons";
 import {
   ESTADOS_PUBLICACION,
-  fulfillmentFijo,
   TIPOS,
   UBICACIONES,
   numeroPublicacion,
@@ -139,6 +138,7 @@ const PENDIENTE_EN_COLOR = "disabled:!border-azul/30 disabled:!bg-azul-soft disa
 export function FichaPublicacion({
   publicacion,
   codigoPais,
+  fulfillmentPais = null,
   nombrePais,
   puedeEscribir,
   puedeArchivar,
@@ -156,6 +156,8 @@ export function FichaPublicacion({
 }: {
   publicacion: FilaPublicacion | undefined;
   codigoPais: string;
+  /** El fulfillment por pedido del país (Bodegas): con él no se escribe en la ficha. */
+  fulfillmentPais?: number | null;
   nombrePais: string;
   puedeEscribir: boolean;
   /** Solo un administrador: elimina la publicación de verdad. */
@@ -185,6 +187,7 @@ export function FichaPublicacion({
       key={publicacion.id}
       p={publicacion}
       codigoPais={codigoPais}
+      fulfillmentPais={fulfillmentPais}
       nombrePais={nombrePais}
       puedeEscribir={puedeEscribir}
       puedeArchivar={puedeArchivar}
@@ -206,6 +209,7 @@ export function FichaPublicacion({
 function ContenidoFicha({
   p,
   codigoPais,
+  fulfillmentPais,
   nombrePais,
   puedeEscribir,
   puedeArchivar,
@@ -223,6 +227,7 @@ function ContenidoFicha({
 }: {
   p: FilaPublicacion;
   codigoPais: string;
+  fulfillmentPais: number | null;
   nombrePais: string;
   puedeEscribir: boolean;
   puedeArchivar: boolean;
@@ -282,8 +287,8 @@ function ContenidoFicha({
   const sinGuardar = JSON.stringify(d) !== base;
   const cambiar = (c: Partial<Formulario>) => setD((a) => ({ ...a, ...c }));
 
-  // En Panamá el fulfillment es fijo (27 oct 2026): se ve, pero no se escribe.
-  const fijo = fulfillmentFijo(codigoPais);
+  // El fulfillment del país (Bodegas; antes, solo Panamá): se ve, pero no se escribe.
+  const fijo = fulfillmentPais;
   const precio = n(d.precio_venta);
   const utilidad = precio === null ? null : precio - (n(d.costo_mercancia) ?? 0) - (fijo ?? n(d.fulfillment) ?? 0);
   const margen = precio && utilidad !== null ? utilidad / precio : null;

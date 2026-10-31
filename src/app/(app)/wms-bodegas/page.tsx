@@ -4,6 +4,7 @@ import { requireModulo } from "@/lib/auth";
 import { getPaisActual } from "@/lib/pais";
 import { createServiceClient } from "@/lib/supabase/server";
 import type { FilaBodega } from "./def-bodegas";
+import { FulfillmentPais } from "./fulfillment-pais";
 import { TablaBodegas } from "./tabla-bodegas";
 
 export const metadata = { title: "Bodegas" };
@@ -22,6 +23,13 @@ export default async function WmsBodegasPage() {
     .order("orden")
     .order("nombre");
 
+  // El fulfillment por pedido del país (migración 0208): sin la columna, la caja avisa que falta la migración.
+  const fulfillmentR = await supabase.from("paises").select("fulfillment").eq("id", pais.id).maybeSingle();
+  const fulfillment = fulfillmentR.error || fulfillmentR.data?.fulfillment == null ? null : Number(fulfillmentR.data.fulfillment);
+  const puedeEscribir = !usuario.modulosSoloLectura.includes("wms-bodegas");
+  // Cambiarlo cambia el margen de las publicaciones: también hay que poder escribir en Gestión de IDs Dropi.
+  const puedeFulfillment = puedeEscribir && usuario.modulos.includes("publicaciones-dropi") && !usuario.modulosSoloLectura.includes("publicaciones-dropi");
+
   const filas: FilaBodega[] = (data ?? []).map((b) => ({
     id: b.id as string,
     nombre: b.nombre as string,
@@ -38,7 +46,8 @@ export default async function WmsBodegasPage() {
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
       <EncabezadoPagina titulo="Bodegas" oculto />
-      <TablaBodegas bodegas={filas} paisId={pais.id} codigoPais={pais.codigo} puedeEscribir={!usuario.modulosSoloLectura.includes("wms-bodegas")} />
+      <FulfillmentPais key={pais.id} paisId={pais.id} nombrePais={pais.nombre} valor={fulfillment} puedeEscribir={puedeFulfillment} falta={!!fulfillmentR.error} />
+      <TablaBodegas bodegas={filas} paisId={pais.id} codigoPais={pais.codigo} puedeEscribir={puedeEscribir} />
     </Pagina>
   );
 }

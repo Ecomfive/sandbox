@@ -9,7 +9,7 @@ import { FichaCrear } from "@/components/ui/ficha-crear";
 import { Seccion } from "@/components/ui/seccion-ficha";
 import { InventarioIcon, MargenIcon, ProductoIcon } from "@/lib/nav-icons";
 import { MAX_NOMBRE_CREAR, PRECIO_MINIMO, type OpcionesCrear } from "@/lib/publicaciones/crear-dropi";
-import { fulfillmentFijo, UBICACIONES } from "@/lib/publicaciones/publicacion";
+import { UBICACIONES } from "@/lib/publicaciones/publicacion";
 import { crearPublicacion, type PublicacionCreada } from "./actions";
 import { BotonCrearProducto, CamposDatosDropi } from "./campos-datos-dropi";
 import { CrearProductoAlAgregar } from "./crear-producto-al-agregar";
@@ -29,8 +29,9 @@ type Modo = "publicar" | "existente";
  * En los dos modos se busca el producto de Producto que se vincula y, si no existe, «No existe: crear el producto» lo crea ahí mismo y lo
  * deja elegido (pedido de Alcides, 27 oct 2026; reemplaza el botón «Nuevo producto» de la barra).
  */
-export function CrearPublicacionPanel({ paisId, codigoPais, opciones }: { paisId: string; codigoPais: string; opciones: OpcionesCrear }) {
-  const fijo = fulfillmentFijo(codigoPais);
+export function CrearPublicacionPanel({ paisId, fulfillmentPais = null, opciones }: { paisId: string; codigoPais: string; fulfillmentPais?: number | null; opciones: OpcionesCrear }) {
+  // El fulfillment del país (Bodegas): se ve, pero no se escribe.
+  const fijo = fulfillmentPais;
   const [modo, setModo] = useState<Modo>("publicar");
   const publicar = modo === "publicar";
   // La publicación recién creada sin producto: se ofrece crearlo (el pack o combo).

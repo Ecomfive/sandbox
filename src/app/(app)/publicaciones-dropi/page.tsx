@@ -6,6 +6,7 @@ import { requireModulo } from "@/lib/auth";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { puedeActualizarDropi } from "@/lib/dropi-actualizar/partes";
 import { getPaisActual } from "@/lib/pais";
+import { fulfillmentDePais } from "@/lib/publicaciones/fulfillment-pais";
 import { monedaDePais, tasasUsd } from "@/lib/moneda/tipo-cambio";
 import { monedaPublicaciones } from "@/lib/publicaciones/moneda";
 import { fechaHoraLectura } from "@/lib/publicaciones/sincronizar-dropi";
@@ -59,6 +60,7 @@ export default async function PublicacionesDropiPage({ searchParams }: { searchP
         paisId={pais.id}
         codigoPais={pais.codigo}
         nombrePais={pais.nombre}
+        fulfillmentPais={await fulfillmentDePais(supabase, pais.id)}
         moneda={moneda}
         puedeEscribir={puedeEscribir}
         puedeArchivar={puedeEscribir}

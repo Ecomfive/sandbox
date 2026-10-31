@@ -5,7 +5,8 @@ import { registrarAuditoria } from "@/lib/auditoria";
 import { formatearEventoAuditoria } from "@/lib/auditoria-cambios";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { esAdministrador } from "@/lib/permisos/acceso";
-import { ESTADOS_PUBLICACION, fulfillmentFijo, TIPOS, UBICACIONES, etiqueta, numeroPublicacion, type OpcionPublicacion } from "@/lib/publicaciones/publicacion";
+import { fulfillmentDePais } from "@/lib/publicaciones/fulfillment-pais";
+import { ESTADOS_PUBLICACION, TIPOS, UBICACIONES, etiqueta, numeroPublicacion, type OpcionPublicacion } from "@/lib/publicaciones/publicacion";
 import { codigoBodega, idsDeDropi } from "@/lib/publicaciones/sincronizar-dropi";
 import { grupoDe, nombreDelPublico } from "@/lib/publicaciones/apagar-dropi";
 import { encolarApagar, encolarArchivar, encolarCrear, encolarPrivatizar, encolarRepublicar, encolarStock, enviarNombreADropi, enviarPrecioADropi } from "@/lib/publicaciones/cambios-dropi";
@@ -62,11 +63,8 @@ async function sinStockEnDropi(paisId: string, dropiId: string | null): Promise<
   return ventas?.length ? sinStockParaArchivar(suma(ventas, "stock")) : false;
 }
 
-/** El fulfillment fijo del país de la publicación (Panamá), o null si se escribe en la ficha. */
-async function fulfillmentDelPais(supabase: ReturnType<typeof createServiceClient>, paisId: string): Promise<number | null> {
-  const { data } = await supabase.from("paises").select("codigo").eq("id", paisId).maybeSingle();
-  return fulfillmentFijo(data?.codigo as string | undefined);
-}
+/** El fulfillment del país de la publicación (el de Bodegas, migración 0208), o null si se escribe en la ficha. */
+const fulfillmentDelPais = (supabase: ReturnType<typeof createServiceClient>, paisId: string): Promise<number | null> => fulfillmentDePais(supabase, paisId);
 
 /** Lee y valida los datos de la ficha (crear o guardar). `fijo`: el fulfillment del país, si no se escribe. Devuelve el error como valor. */
 function leerDatos(f: FormData, fijo: number | null): Datos | { error: string } {
@@ -74,7 +72,7 @@ function leerDatos(f: FormData, fijo: number | null): Datos | { error: string } 
   if (!nombre) return { error: "Escribe el nombre del producto." };
   const precio = numero(f, "precio_venta");
   const costo = numero(f, "costo_mercancia");
-  // En Panamá el fulfillment es fijo (27 oct 2026) y no viene del formulario.
+  // Con el fulfillment del país (Bodegas; antes, solo Panamá) no viene del formulario.
   const fulfillment = fijo ?? numero(f, "fulfillment");
   if ([precio, costo, fulfillment].includes(undefined)) return { error: "Un precio o costo no es válido." };
   const email = texto(f, "privatizado_email", 200).toLowerCase();
