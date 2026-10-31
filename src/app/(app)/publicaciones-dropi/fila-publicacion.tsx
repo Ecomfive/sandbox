@@ -289,6 +289,12 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, puedeArchi
                 En liquidación
               </span>
             )}
+            {/* Su producto está descontinuado en este país (ficha del producto, migración 0211): ya no se compra para aquí. */}
+            {f.descontinuadoPais && (
+              <span title="Descontinuado en este país: ya no se compra para aquí (se cambia en la ficha del producto)" className="inline-flex shrink-0 items-center rounded-full border border-destructive px-2 py-0.5 text-xs font-semibold text-destructive">
+                Descontinuado
+              </span>
+            )}
           </span>
           <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
             <span className="font-medium tabular-nums">{numeroPublicacion(f.numero)}</span>

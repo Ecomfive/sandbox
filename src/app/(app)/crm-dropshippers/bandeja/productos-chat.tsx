@@ -136,6 +136,9 @@ export function ProductosDelChatFicha({
                 ) : (
                   !p.fijado && <span className="text-[11.5px] text-[var(--wa-sec)]">Lo nombra en el chat</span>
                 )}
+                {p.descontinuado && datos.pais && (
+                  <span className="text-[12.5px] font-medium text-destructive">{`Descontinuado en ${datos.pais.nombre}: no se vuelve a traer. No le prometas que llega.`}</span>
+                )}
                 {datos.pais && <PreciosDropi precios={p.precios} pais={datos.pais} />}
                 <EnCamino p={p} hoy={hoy} />
                 {p.aviso ? (
