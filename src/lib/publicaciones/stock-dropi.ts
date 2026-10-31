@@ -79,7 +79,7 @@ export function faltantesStock(d: DatosStock, bodegas: { id: number }[]): string
  * tiene esas unidades. Error si tiene variaciones, si la bodega no es del proveedor o si quedarían menos unidades que las reservadas a privados.
  */
 export function armarAjusteStock(producto: Obj, bodegasProveedor: Obj[], d: DatosStock): { cuerpo: Obj | null; antes: number } | { error: string } {
-  if (d.bodega === BODEGA_DROPI || !bodegasProveedor.some((b) => Number(b.id) === d.bodega))
+  if (esBodegaDropi(d.bodega) || !bodegasProveedor.some((b) => Number(b.id) === d.bodega))
     return { error: "Esa bodega no es de ECOMFIVE en Dropi: el stock no se mueve desde aquí." };
   if (!(d.unidades >= 0)) return { error: "El cambio no trae las unidades." };
   const stock = stockPorBodega(producto);

@@ -687,7 +687,7 @@ convenciones técnicas del código.
   tareas de ese producto. Una tarea de recomendación solo pasa a Hecha (`marcarTareaHecha`). Sin la 0178 todo carga igual (solo Por hacer y Hecha, sin prioridad
   ni archivar; `conEstados`). Reversa: `supabase/rollbacks/0178_rollback.sql`.
   **Costa Rica** (28 oct 2026, pedido de Alcides: lo nuevo de Gestión de IDs vale también ahí). La bodega de Dropi depende del país: `esBodegaDropi`
-  (`automatico.ts`, `BODEGAS_DROPI` = 280 Panamá y 15 «Bodega Dropi San Jose» de Costa Rica; decisión de Alcides: la B15 es de Dropi como la B280) reemplaza
+  (`automatico.ts`, `BODEGAS_DROPI` = 280 Panamá, 15 «Bodega Dropi San Jose» de Costa Rica y, desde el 31 oct 2026, 49 «BODEGA DROPI» de México; decisión de Alcides: son de Dropi como la B280; salen de `BODEGA_DROPI_POR_PAIS` y `codigoBodegaDropi(codigoPais)` da el código para los textos, como la tarjeta «Republicar» del tablero, que recibe `codigoPais`) reemplaza
   las comparaciones con `BODEGA_DROPI` en republicar, apagar, privatizar, el stock de la ficha y las bodegas que se ofrecen. Una bodega de Dropi de otro país se
   agrega a `BODEGAS_DROPI`. Las recomendaciones de precio van en la moneda del país (`recomendar(p, reglas, moneda)`: texto con `formatoMonto` y, fuera del dólar,
   precios enteros que terminan en 9) y la página Recomendaciones va dentro de `ProveedorMoneda`. El favorito no cambió (sigue rechazando lo que no es una bodega
