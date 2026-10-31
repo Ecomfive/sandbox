@@ -1707,7 +1707,6 @@ export function Bandeja({
           }
           navegacion={
             <>
-              {escribe && datos.numerosEmpresa.length > 1 && <BotonWhatsappInterno numeros={datos.numerosEmpresa} areas={areas} alElegir={(d, h) => void abrirInterno(d, h)} ocupado={abriendoInterno} internos={chatsInternos} />}
               {sel.interno && volverA && datos.conversaciones.some((c) => c.id === volverA) && (
                 <button
                   type="button"
@@ -1738,7 +1737,8 @@ export function Bandeja({
                   accionesChat={accionesChat}
                   etiquetas={<EtiquetasChat key={sel.id} conversacionId={sel.id} etiquetas={sel.etiquetas} manejo={manejoEtiquetas} escribe={escribe} />}
                   accionesExtra={accionesExtra}
-                  ranuraAcciones={sel.interno ? null : ranuraAcciones}
+                  ranuraAcciones={ranuraAcciones}
+                  botonInterno={escribe && datos.numerosEmpresa.length > 1 ? <BotonWhatsappInterno numeros={datos.numerosEmpresa} areas={areas} alElegir={(d, h) => void abrirInterno(d, h)} ocupado={abriendoInterno} internos={chatsInternos} enBarra /> : null}
                   versionEquipo={`${(mensajes ?? []).filter((m) => m.direccion !== "entrante").length}|${sel.nombrePersonalizado ?? ""}|${sel.dropshipperId ?? ""}|${sel.area}|${sel.estado}|${sel.asignadaA ?? ""}`}
                   alAbrirVincular={() => setVincular(true)}
                   alVinculado={(mensaje) => {

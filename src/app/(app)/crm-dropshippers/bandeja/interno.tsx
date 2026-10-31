@@ -5,6 +5,7 @@ import { claseOpcionPanel, PanelCelda } from "@/app/(app)/compras/panel-celda";
 import { anilloFoco } from "@/components/ui/field";
 import { Tooltip } from "@/components/ui/tooltip";
 import type { AreaCrm } from "@/lib/crm/areas";
+import { CON_NOMBRE, ItemFila, usePosicionBoton } from "../botones-ficha";
 
 type NumeroEmpresa = { id: string; nombre: string; area: AreaCrm };
 
@@ -19,6 +20,7 @@ export function BotonWhatsappInterno({
   ocupado,
   internos = [],
   conTexto = false,
+  enBarra = false,
 }: {
   numeros: NumeroEmpresa[];
   /** Las áreas que ve la persona: puede escribir desde los números de esas áreas (el servidor lo vuelve a revisar). */
@@ -29,7 +31,11 @@ export function BotonWhatsappInterno({
   internos?: { numeroId: string; nombre: string; noLeidos: number }[];
   /** Con el texto «WhatsApp interno» al lado (en la barra de la bandeja). */
   conTexto?: boolean;
+  /** En la barra de botones de abajo del chat (junto a Tarea, Caso…): verde como WhatsApp y en su sitio según el uso; los más usados llevan su nombre. */
+  enBarra?: boolean;
 }) {
+  const posicion = usePosicionBoton("interno");
+  const conNombre = posicion === null || posicion < CON_NOMBRE;
   const [abierto, setAbierto] = useState(false);
   const boton = useRef<HTMLButtonElement>(null);
   const pares = numeros.filter((d) => areas.includes(d.area)).flatMap((d) => numeros.filter((h) => h.id !== d.id).map((h) => ({ desde: d, hacia: h })));
@@ -38,6 +44,33 @@ export function BotonWhatsappInterno({
   const total = pares.reduce((t, p) => t + sinLeer(p.desde.id, p.hacia.nombre), 0);
   return (
     <>
+      {enBarra ? (
+        <ItemFila id="interno">
+          <Tooltip texto="WhatsApp interno">
+            <button
+              ref={boton}
+              type="button"
+              aria-label={total ? `WhatsApp interno entre áreas, ${total} sin leer` : "WhatsApp interno entre áreas"}
+              aria-haspopup="dialog"
+              aria-expanded={abierto}
+              disabled={ocupado}
+              onClick={() => setAbierto((x) => !x)}
+              className={`relative flex h-8 flex-none items-center justify-center gap-1.5 rounded-lg bg-[var(--wa-acento-suave)] text-[12.5px] font-medium whitespace-nowrap text-[var(--wa-acento-suave-texto)] hover:opacity-90 disabled:opacity-50 ${conNombre ? "px-2.5" : "w-8"} ${anilloFoco}`}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
+                <path d="M9 11h.01M12 11h.01M15 11h.01" />
+              </svg>
+              {conNombre && "Interno"}
+              {total > 0 && (
+                <span aria-hidden="true" className="flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--wa-acento)] px-1 text-[10px] leading-none font-semibold text-[var(--wa-acento-texto)] tabular-nums">
+                  {total}
+                </span>
+              )}
+            </button>
+          </Tooltip>
+        </ItemFila>
+      ) : (
       <Tooltip texto="WhatsApp interno">
         <button
           ref={boton}
@@ -61,6 +94,7 @@ export function BotonWhatsappInterno({
           )}
         </button>
       </Tooltip>
+      )}
       {abierto && (
         <PanelCelda ancla={boton} etiqueta="WhatsApp interno" ancho={260} alCerrar={(m) => (setAbierto(false), m === "escape" && boton.current?.focus())}>
           <p className="m-0 px-3 pt-2.5 pb-1 text-xs text-muted-foreground">Escribir por WhatsApp a otra área</p>

@@ -1262,7 +1262,7 @@ convenciones técnicas del código.
   (`dropshippers`), armada con `formatearEventoAuditoria` (antes → después); no repite los mensajes del chat y oculta `ACCIONES_COMERCIALES` a quien no ve lo comercial.
   **WhatsApp interno** (29 oct 2026, pedido de Alcides, sin migración): un chat entre dos números de la empresa es una conversación normal cuyo `telefono` es otro
   número de `whatsapp_numeros`; `cargarBandeja` la marca `interno` (y le pone el nombre de ese número) y `delNumero` la saca de listas y conteos. `BotonWhatsappInterno`
-  (`bandeja/interno.tsx`, en la barra y en la ventana del chat, con los no leídos) llama a `abrirChatInterno` (`interno-actions.ts`: escribir en el área del número de
+  (`bandeja/interno.tsx`, en la barra de la lista y, **desde el 31 oct 2026 (pedido de Jhokser), abajo en la ventana del chat con los demás botones** —`enBarra`, `ItemFila id="interno"`, verde como WhatsApp, ordenado por uso como los otros y con su contador de no leídos—, ya no arriba junto a la X; también aparece en el chat interno—) llama a `abrirChatInterno` (`interno-actions.ts`: escribir en el área del número de
   origen; crea la conversación si falta). Sin ficha, a todo lo ancho, con «← Volver a …» al cliente. Pasadas 24 h, plantilla. Los KPIs de SQL todavía la cuentan.
   **Tipo de cliente** (migración 0195, 29 oct 2026, pedido de Alcides): `dropshippers.nivel` = `regular` (se muestra «Rookie»), `vip` o `black`; «Nuevo» pasó a Rookie.
   `TipoCliente` / `PastillaTipo` (`crm-dropshippers/tipo-cliente.tsx`) en la ficha del CRM y del chat, con `cambiarTipoCliente` (`tareas/actions.ts`, auditoría
