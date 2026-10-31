@@ -15,6 +15,8 @@ export const MAX_UNIDADES_STOCK = 100_000;
 
 /** Lo que lleva un cambio de stock (`datos` de la cola). */
 export interface DatosStock {
+  /** El ID de Dropi al que se le cambia el stock (31 oct 2026): una publicación puede tener dos («6667-8295»). null = el primero, como antes. */
+  producto: number | null;
   /** El ID de la bodega en Dropi (B81 = 81). */
   bodega: number;
   nombreBodega: string;
@@ -37,7 +39,9 @@ export function normalizarDatosStock(crudo: unknown): DatosStock {
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, MAX_CONCEPTO_STOCK);
+  const producto = entero(o.producto);
   return {
+    producto: producto !== null && producto > 0 ? producto : null,
     bodega: entero(o.bodega) ?? 0,
     nombreBodega: String(o.nombreBodega ?? "")
       .replace(/\s+/g, " ")
@@ -47,6 +51,16 @@ export function normalizarDatosStock(crudo: unknown): DatosStock {
     antes: o.antes === null || o.antes === undefined ? null : entero(o.antes),
     concepto: concepto || CONCEPTO_STOCK,
   };
+}
+
+/**
+ * A qué ID de Dropi va el cambio: el elegido si es de la publicación; sin elegir, el primero (lo de antes). Con dos IDs el primero no siempre es el
+ * que muestra la ficha (31 oct 2026, Nicol: pidió dejar 50 en el 8295 y la entrada cayó en el 6667, que tenía 0).
+ */
+export function productoDelCambio(ids: number[], elegido: number | null): number | { error: string } {
+  if (!ids.length) return { error: "La publicación no tiene ID de Dropi." };
+  if (elegido === null) return ids[0];
+  return ids.includes(elegido) ? elegido : { error: `El ID ${elegido} no es de esta publicación.` };
 }
 
 /** Lo que impide pedir el cambio (vacío = se puede). `bodegas` son las de ECOMFIVE del país. */

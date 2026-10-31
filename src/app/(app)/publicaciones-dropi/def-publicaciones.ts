@@ -135,7 +135,7 @@ export interface FilaPublicacion {
   /** Desde cuándo está en liquidación (migración 0174): sale del aviso de margen bajo y va a la tarjeta «En liquidación». */
   liquidacionDesde: string | null;
   /** Cambios de stock esperando «Aplicar en Dropi» (migración 0173): en qué bodega y cuántas unidades deben quedar. */
-  stockPendiente: { bodega: number; nombreBodega: string; unidades: number; antes: number | null }[];
+  stockPendiente: { producto: number | null; bodega: number; nombreBodega: string; unidades: number; antes: number | null }[];
   /** Las demás publicaciones del mismo producto (el público y sus privadas «P-MA …»), para apagarlas juntas (`grupoDe`). */
   grupo: { id: string; nombre: string; dropiId: string; archivada: boolean; tipo: "publico" | "privado" | null; stock: number | null; correo: string; apagadoPendiente: boolean; apagadoSinTocar: boolean }[];
   /**
@@ -165,6 +165,9 @@ export interface FilaPublicacion {
   /** Lo que dice «Mis productos» de Dropi (migración 0131): cada bodega con su stock, el total y lo reservado a privados. null si
    * la publicación no tiene un ID que esté entre nuestros productos de Dropi o nunca se leyó. */
   bodegasDropi: { id: number; nombre: string; stock: number }[] | null;
+  /** Cada ID de la publicación que aparece en «Mis productos», con sus bodegas (31 oct 2026): con dos IDs («6667-8295») el stock se cambia en el
+   * que se elija. El primero es el de `bodegasDropi`. */
+  stockPorId: { id: number; archivado: boolean; stock: number; bodegas: { id: number; nombre: string; stock: number }[] }[];
   stockProveedor: number | null;
   stockPrivadoProveedor: number | null;
   /** Cuándo se leyó «Mis productos» por última vez (lo mismo en todas las filas del país). */

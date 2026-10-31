@@ -248,7 +248,9 @@ function DetalleCambio({ c }: { c: CambioParaDropi }) {
     const d = c.stock;
     return (
       <>
-        <span className="font-medium">Stock: {c.publicacion}</span>
+        <span className="font-medium">
+          Stock: {c.publicacion} · ID {c.producto}
+        </span>
         <span className="text-xs tabular-nums">
           {d ? `${codigoBodega(d.bodega)}${d.nombreBodega ? ` · ${d.nombreBodega}` : ""}: ${d.antes !== null ? `${d.antes.toLocaleString("es-PA")} → ` : ""}${d.unidades.toLocaleString("es-PA")} u. · «${d.concepto}»` : ""}
         </span>

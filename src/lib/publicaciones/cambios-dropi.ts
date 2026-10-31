@@ -11,7 +11,7 @@ import { MAX_NOMBRE_DROPI } from "./dropi-guardado";
 import { normalizarDatosDevolver } from "./apagar-dropi";
 import { normalizarDatosPrivatizar, type DatosPrivatizar } from "./privatizar-dropi";
 import { idsDeDropi } from "./sincronizar-dropi";
-import { normalizarDatosStock, type DatosStock } from "./stock-dropi";
+import { normalizarDatosStock, productoDelCambio, type DatosStock } from "./stock-dropi";
 
 export type EstadoCambioDropi = "pendiente" | "aplicado" | "error" | "reemplazado";
 
@@ -322,24 +322,30 @@ export async function encolarStock(
   datos: DatosStock,
   por: { id: string; nombre: string },
 ): Promise<{ id: string; yaEstaba: boolean } | { error: string }> {
-  const productoId = idsDeDropi(pub.dropi_id)[0];
-  if (!productoId) return { error: "La publicación no tiene ID de Dropi." };
+  const productoId = productoDelCambio(idsDeDropi(pub.dropi_id), datos.producto);
+  if (typeof productoId !== "number") return productoId;
   const falta = (m: string) => /tipo|column|does not exist|schema cache|datos|check constraint/i.test(m);
-  const previo = await supabase.from("dropi_cambios_pendientes").select("id, datos").eq("publicacion_id", pub.id).eq("tipo", "stock").in("estado", ["pendiente", "error"]);
+  const previo = await supabase
+    .from("dropi_cambios_pendientes")
+    .select("id, datos")
+    .eq("publicacion_id", pub.id)
+    .eq("dropi_producto_id", productoId)
+    .eq("tipo", "stock")
+    .in("estado", ["pendiente", "error"]);
   if (previo.error) return { error: falta(previo.error.message) ? "Falta correr en Supabase la migración 0173." : "No se pudo dejar el stock para Dropi." };
   const igual = (previo.data ?? []).find((f) => normalizarDatosStock(f.datos).bodega === datos.bodega);
   if (igual) {
     const antes = normalizarDatosStock(igual.datos).antes;
     const { error } = await supabase
       .from("dropi_cambios_pendientes")
-      .update({ datos: { ...datos, antes: antes ?? datos.antes }, estado: "pendiente", error: null, creado_por: por.id, creado_por_nombre: por.nombre })
+      .update({ datos: { ...datos, producto: productoId, antes: antes ?? datos.antes }, estado: "pendiente", error: null, creado_por: por.id, creado_por_nombre: por.nombre })
       .eq("id", igual.id as string);
     if (error) return { error: "No se pudo dejar el stock para Dropi." };
     return { id: igual.id as string, yaEstaba: true };
   }
   const { data, error } = await supabase
     .from("dropi_cambios_pendientes")
-    .insert({ pais_id: pub.pais_id, publicacion_id: pub.id, dropi_producto_id: productoId, tipo: "stock", datos, creado_por: por.id, creado_por_nombre: por.nombre })
+    .insert({ pais_id: pub.pais_id, publicacion_id: pub.id, dropi_producto_id: productoId, tipo: "stock", datos: { ...datos, producto: productoId }, creado_por: por.id, creado_por_nombre: por.nombre })
     .select("id")
     .single();
   if (error || !data) return { error: error && falta(error.message) ? "Falta correr en Supabase la migración 0173." : "No se pudo dejar el stock para Dropi." };
@@ -439,7 +445,7 @@ export async function cargarCambiosDropi(
   creando: Map<string, number>;
   /** Privatizaciones esperando por publicación pública (pendientes o con error), con a quién y cuántas unidades. */
   privatizando: Map<string, Pick<DatosPrivatizar, "correo" | "dropshipper" | "unidades" | "nombre">[]>;
-  /** Cambios de stock esperando por publicación (pendientes o con error): bodega y unidades que deben quedar. */
+  /** Cambios de stock esperando por publicación (pendientes o con error): ID de Dropi, bodega y unidades que deben quedar. */
   ajustandoStock: Map<string, DatosStock[]>;
 }> {
   const porPublicacion = new Map<string, CambioDropiVista>();
@@ -453,7 +459,7 @@ export async function cargarCambiosDropi(
   const ajustandoStock = new Map<string, DatosStock[]>();
   const leer = (columnas: string) =>
     supabase.from("dropi_cambios_pendientes").select(columnas).eq("pais_id", paisId).neq("estado", "reemplazado").order("creado_en", { ascending: false }).limit(2000);
-  let r = await leer("id, publicacion_id, tipo, restaurar, descripcion, fotos, datos, nuevo_dropi_id, intentos, estado, nombre, nombre_guia, precio, precio_sugerido, error, creado_en, aplicado_en");
+  let r = await leer("id, publicacion_id, dropi_producto_id, tipo, restaurar, descripcion, fotos, datos, nuevo_dropi_id, intentos, estado, nombre, nombre_guia, precio, precio_sugerido, error, creado_en, aplicado_en");
   // Sin la migración 0151, sin archivar, descripción ni fotos; sin la 0145, sin republicaciones; sin la 0139, sin precios.
   if (r.error) r = await leer("id, publicacion_id, tipo, nuevo_dropi_id, intentos, estado, nombre, nombre_guia, precio, precio_sugerido, error, creado_en, aplicado_en");
   if (r.error) r = await leer("id, publicacion_id, estado, nombre, nombre_guia, precio, precio_sugerido, error, creado_en, aplicado_en");
@@ -468,7 +474,11 @@ export async function cargarCambiosDropi(
       privatizando.set(f.publicacion_id as string, [...(privatizando.get(f.publicacion_id as string) ?? []), { correo: d.correo, dropshipper: d.dropshipper, unidades: d.unidades, nombre: d.nombre }]);
     }
     if (f.tipo === "stock" && (f.estado === "pendiente" || f.estado === "error"))
-      ajustandoStock.set(f.publicacion_id as string, [...(ajustandoStock.get(f.publicacion_id as string) ?? []), normalizarDatosStock(f.datos)]);
+      // El ID va en la fila (los pedidos de antes del 31 oct no lo traen en `datos`).
+      ajustandoStock.set(f.publicacion_id as string, [
+        ...(ajustandoStock.get(f.publicacion_id as string) ?? []),
+        { ...normalizarDatosStock(f.datos), producto: Number(f.dropi_producto_id) || normalizarDatosStock(f.datos).producto },
+      ]);
     if (f.tipo === "apagar" && (f.estado === "pendiente" || f.estado === "error")) apagando.set(f.publicacion_id as string, Number(f.intentos ?? 0));
     if (f.tipo === "archivar" && (f.estado === "pendiente" || f.estado === "error") && !archivando.has(f.publicacion_id as string)) archivando.set(f.publicacion_id as string, f.restaurar === true);
     if (f.tipo === "crear" && (f.estado === "pendiente" || f.estado === "error")) creando.set(f.publicacion_id as string, Number(f.intentos ?? 0));
