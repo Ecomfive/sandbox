@@ -7,7 +7,7 @@ import { areaDeModulos, cargoDePersona } from "@/lib/crm/respondieron";
 import { personasConModulos } from "@/lib/whatsapp/personas-crm";
 import { borradosPendientes, conversacionesOcultas, corteDeBorradoEnApp, mensajesOcultos } from "@/lib/whatsapp/ocultos";
 import { esGrupo, type GrupoMotivo } from "@/lib/whatsapp/prioridad";
-import { dondeVende, paisesDondeVende, type VendeEn } from "@/lib/whatsapp/origen-chat";
+import { dondeVende, paisDeNumeroEmpresa, paisesDondeVende, type VendeEn } from "@/lib/whatsapp/origen-chat";
 import { nombreSinNumero } from "@/lib/whatsapp/telefono-oculto";
 
 /** Un número de WhatsApp de la empresa (Atención, Comercial…). */
@@ -159,11 +159,12 @@ export async function numerosActivos(supabase: SupabaseClient): Promise<NumeroVi
       nombre: n.nombre as string,
       numero: n.numero as string,
       area: n.area as AreaCrm,
-      pais: uno(n.paises as Uno<{ codigo: string }>)?.codigo ?? null,
+      // El elegido en «Números»; si no hay, el de su prefijo (+506 Costa Rica…), así un número recién llegado ya trae su bandera.
+      pais: uno(n.paises as Uno<{ codigo: string }>)?.codigo ?? paisDeNumeroEmpresa(n.numero as string),
     }));
   const sinPais = await supabase.from("whatsapp_numeros").select("id, nombre, numero, area").eq("activo", true).order("nombre");
   if (sinPais.error) return null;
-  return ((sinPais.data ?? []) as Omit<NumeroVista, "pais">[]).map((n) => ({ ...n, pais: null }));
+  return ((sinPais.data ?? []) as Omit<NumeroVista, "pais">[]).map((n) => ({ ...n, pais: paisDeNumeroEmpresa(n.numero) }));
 }
 
 /**

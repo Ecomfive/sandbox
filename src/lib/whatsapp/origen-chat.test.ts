@@ -1,6 +1,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { bandera, dondeVende, nombrePais, paisesDondeVende } from "./origen-chat";
+import { bandera, dondeVende, nombrePais, paisDeNumeroEmpresa, paisesDondeVende } from "./origen-chat";
+
+test("el país de un número de la empresa sale de su prefijo, solo para los países de la operación", () => {
+  assert.equal(paisDeNumeroEmpresa("+50766367426"), "PA");
+  assert.equal(paisDeNumeroEmpresa("+506 8888 7777"), "CR");
+  assert.equal(paisDeNumeroEmpresa("5215512345678"), "MX");
+  assert.equal(paisDeNumeroEmpresa("+584220350576"), null);
+  assert.equal(paisDeNumeroEmpresa(null), null);
+});
 
 test("dónde vende junta cuentas y lo puesto a mano, sin repetir", () => {
   assert.deepEqual(

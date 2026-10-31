@@ -4,8 +4,8 @@ import { useEffect, useState, useTransition } from "react";
 import { anilloFoco, fieldClass } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { Ventana } from "@/components/ui/ventana";
-import { bandera } from "@/lib/whatsapp/origen-chat";
 import { cambiarAreaNumero, cambiarPaisNumero, numerosConPais, type NumeroConPais } from "./numeros-actions";
+import { Bandera } from "@/components/paises/bandera";
 
 const AREAS = [
   ["atencion", "Atención"],
@@ -75,7 +75,7 @@ function VentanaNumeros({ alCerrar, alCambiar }: { alCerrar: () => void; alCambi
       const r = await cambiarPaisNumero(n.id, codigo).catch(() => ({ error: "No se pudo. Inténtalo de nuevo." }));
       if ("error" in r) return mostrarToast(r.error, "destructive");
       setDatos((d) => (d && !("error" in d) ? { ...d, numeros: d.numeros.map((x) => (x.id === n.id ? { ...x, pais: codigo } : x)) } : d));
-      mostrarToast(codigo ? `${n.nombre}: ${bandera(codigo)} ahora es de ese país.` : `${n.nombre} quedó sin país.`);
+      mostrarToast(codigo ? `${n.nombre} ahora es de ${(datos && !("error" in datos) ? datos.paises.find((p) => p.codigo === codigo)?.nombre : null) ?? codigo}.` : `${n.nombre} quedó sin país.`);
       alCambiar();
     });
   }
@@ -101,7 +101,7 @@ function VentanaNumeros({ alCerrar, alCambiar }: { alCerrar: () => void; alCambi
               <li key={n.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border px-3 py-2.5">
                 <span className="flex min-w-0 flex-col">
                   <span className="font-medium">
-                    {n.pais && <span aria-hidden="true">{bandera(n.pais)} </span>}
+                    {n.pais && <Bandera codigo={n.pais} className="mr-1.5 align-[-1px]" />}
                     {n.nombre}
                   </span>
                   <span className="text-xs text-muted-foreground tabular-nums">
@@ -127,7 +127,7 @@ function VentanaNumeros({ alCerrar, alCambiar }: { alCerrar: () => void; alCambi
                         <option value="">Sin país</option>
                         {datos.paises.map((p) => (
                           <option key={p.codigo} value={p.codigo}>
-                            {bandera(p.codigo)} {p.nombre}
+                            {p.nombre}
                           </option>
                         ))}
                       </select>

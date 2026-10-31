@@ -8,7 +8,7 @@ import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { VisorImagen } from "@/components/ui/visor-imagen";
 import { supabase } from "@/lib/supabase/client";
-import { bandera, nombrePais } from "@/lib/whatsapp/origen-chat";
+import { nombrePais } from "@/lib/whatsapp/origen-chat";
 import { CANAL_BANDEJA, EVENTO_NOVEDAD } from "@/lib/whatsapp/canal-bandeja";
 import { HORAS_VENTANA, textoVentana } from "@/lib/whatsapp/ventana";
 import type { AreaCrm } from "@/lib/crm/areas";
@@ -49,6 +49,7 @@ import { vistaPreviaTexto } from "@/lib/whatsapp/borrado";
 import { agruparReacciones, miReaccion, REACCIONES_RAPIDAS, type ReaccionVista } from "@/lib/whatsapp/reacciones";
 import { COLUMNAS_TABLERO, GRUPOS, grupoPorId, ordenarPorUrgencia, plazoDelChat, repartirTablero, textoPlazo, type ColumnaTablero, type GrupoMotivo } from "@/lib/whatsapp/prioridad";
 import { cambiarMotivoChat, clasificarChatsPendientes } from "./motivo-actions";
+import { Bandera } from "@/components/paises/bandera";
 
 /** Qué conversaciones del panel se ven. */
 type Filtro = "sinResponder" | "mias" | "resueltas" | "todas";
@@ -244,8 +245,8 @@ function BanderaNumero({ pais }: { pais: string | null | undefined }) {
   if (!pais) return null;
   const texto = `Entró por el número de ${nombrePais(pais)}`;
   return (
-    <span role="img" aria-label={texto} title={texto} className="flex-none text-[15px] leading-none">
-      {bandera(pais)}
+    <span role="img" aria-label={texto} title={texto} className="inline-flex flex-none">
+      <Bandera codigo={pais} />
     </span>
   );
 }
@@ -1184,7 +1185,11 @@ export function Bandeja({
             {c.paises.length > 0 && (
               <span title={`Vende en ${c.paises.map(nombrePais).join(", ")}`} className="rounded-full border border-[var(--wa-borde)] px-1.5 py-px font-semibold text-[var(--wa-texto)]">
                 <span className="sr-only">Vende en {c.paises.map(nombrePais).join(", ")}</span>
-                <span aria-hidden="true">{c.paises.map(bandera).join(" ")}</span>
+                <span aria-hidden="true" className="inline-flex items-center gap-1 align-middle">
+                  {c.paises.map((p) => (
+                    <Bandera key={p} codigo={p} />
+                  ))}
+                </span>
               </span>
             )}
             {!c.dropshipperId && <span className="rounded-full bg-warning-soft px-2 py-px font-medium text-warning">No está en el CRM</span>}
@@ -1414,8 +1419,8 @@ export function Bandeja({
               <option value="todos">Todos los números</option>
               {datos.numeros.map((n) => (
                 <option key={n.id} value={n.id}>
-                  {n.pais ? `${bandera(n.pais)} ` : ""}
                   {n.nombre}
+                  {n.pais ? ` · ${nombrePais(n.pais)}` : ""}
                 </option>
               ))}
             </select>
@@ -1428,7 +1433,7 @@ export function Bandeja({
               <option value="todos">Todos los países</option>
               {paisesNumeros.map((p) => (
                 <option key={p} value={p}>
-                  {bandera(p)} {nombrePais(p)}
+                  {nombrePais(p)}
                 </option>
               ))}
             </select>
@@ -1699,7 +1704,7 @@ export function Bandeja({
                     {[
                       sel.codigo,
                       // El país del número por el que entró (migración 0209).
-                      numeroDe.get(sel.numeroId)?.pais ? `${bandera(numeroDe.get(sel.numeroId)?.pais as string)} ${nombrePais(numeroDe.get(sel.numeroId)?.pais as string)}` : null,
+                      numeroDe.get(sel.numeroId)?.pais ? nombrePais(numeroDe.get(sel.numeroId)?.pais as string) : null,
                       sel.nombrePerfil && sel.nombrePerfil !== sel.nombre ? `«${sel.nombrePerfil}» en WhatsApp` : null,
                       // El área ya va en su etiqueta de color al lado: no se repite en el nombre del número («Ecomfive · Atención» → «Ecomfive»).
                       (numeroDe.get(sel.numeroId)?.nombre ?? "")
@@ -1736,7 +1741,7 @@ export function Bandeja({
                 .filter((p) => !sel.vendeEn.some((v) => v.pais === p))
                 .map((p) => (
                   <span key={p} className="inline-flex items-center gap-1 rounded-full border border-border-control px-2 py-px text-[11px] font-semibold">
-                    <span aria-hidden="true">{bandera(p)}</span> {nombrePais(p)}
+                    <Bandera codigo={p} /> {nombrePais(p)}
                   </span>
                 ))}
               {sel.estado === "resuelta" && <span className="rounded-full bg-success-soft px-2 py-px text-[11.5px] font-medium text-success">Resuelta</span>}

@@ -3,8 +3,8 @@
 import { useState, useTransition } from "react";
 import { anilloFoco, fieldClassSm } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
-import { bandera } from "@/lib/whatsapp/origen-chat";
 import { guardarUmbralesTipoCliente } from "./actions";
+import { Bandera } from "@/components/paises/bandera";
 
 export interface UmbralPais {
   paisId: string;
@@ -35,7 +35,7 @@ function FilaUmbral({ u, puedeEscribir }: { u: UmbralPais; puedeEscribir: boolea
   return (
     <tr className="border-t border-border">
       <td className="px-3 py-2 text-sm">
-        <span aria-hidden="true">{bandera(u.codigo)}</span> {u.nombre}
+        <Bandera codigo={u.codigo} /> {u.nombre}
       </td>
       <td className="px-3 py-2 text-sm text-muted-foreground">menos de {Number(vip) || "—"}</td>
       <td className="px-3 py-2">

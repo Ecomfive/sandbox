@@ -7,6 +7,7 @@ import type { AreaCrm } from "@/lib/crm/areas";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 import { avisarBandeja } from "@/lib/whatsapp/aviso-bandeja";
+import { paisDeNumeroEmpresa } from "@/lib/whatsapp/origen-chat";
 import { claves360 } from "@/lib/whatsapp/proveedor";
 import { NOMBRE_AREA } from "./enviar-medio";
 
@@ -54,7 +55,7 @@ export async function numerosConPais(): Promise<{ numeros: NumeroConPais[]; pais
   const porLlegar: NumeroConPais[] = previstos
     ? [...new Set(claves360().map((c) => /^D360_API_KEY_(\d{7,15})$/.exec(c.variable)?.[1]).filter((d): d is string => !!d))]
         .filter((d) => !yaEntraron.has(d))
-        .map((d) => ({ id: `previsto:${d}`, nombre: previstos.get(d)?.nombre || "Número nuevo", numero: `+${d}`, pais: null, area: previstos.get(d)?.area ?? "atencion", previsto: true }))
+        .map((d) => ({ id: `previsto:${d}`, nombre: previstos.get(d)?.nombre || "Número nuevo", numero: `+${d}`, pais: paisDeNumeroEmpresa(d), area: previstos.get(d)?.area ?? "atencion", previsto: true }))
     : [];
   return {
     numeros: [
@@ -62,7 +63,7 @@ export async function numerosConPais(): Promise<{ numeros: NumeroConPais[]; pais
         id: n.id as string,
         nombre: n.nombre as string,
         numero: n.numero as string,
-        pais: uno(n.paises as { codigo: string } | { codigo: string }[] | null)?.codigo ?? null,
+        pais: uno(n.paises as { codigo: string } | { codigo: string }[] | null)?.codigo ?? paisDeNumeroEmpresa(n.numero as string),
         area: n.area as AreaCrm,
         previsto: false,
       })),
