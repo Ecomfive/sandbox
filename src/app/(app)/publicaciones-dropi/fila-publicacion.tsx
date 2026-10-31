@@ -355,7 +355,7 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, puedeArchi
               <span className="inline-flex items-center gap-1.5 font-medium text-destructive">
                 <Punto clase="bg-destructive" texto="Stock pendiente en Dropi" />
                 {f.stockPendiente.length === 1
-                  ? `Stock pendiente · ${codigoBodega(f.stockPendiente[0].bodega)} a ${f.stockPendiente[0].unidades.toLocaleString("es-PA")} u.`
+                  ? `Stock pendiente · ${f.stockPorId.length > 1 && f.stockPendiente[0].producto ? `ID ${f.stockPendiente[0].producto} · ` : ""}${codigoBodega(f.stockPendiente[0].bodega)} a ${f.stockPendiente[0].unidades.toLocaleString("es-PA")} u.`
                   : `Stock pendiente en ${f.stockPendiente.length} bodegas`}
               </span>
             )}
