@@ -227,6 +227,7 @@ export function FichaDelChat({
   accionesChat,
   etiquetas,
   accionesExtra,
+  botonInterno,
   ranuraAcciones,
   versionEquipo,
   alAbrirVincular,
@@ -244,6 +245,8 @@ export function FichaDelChat({
   /** Las etiquetas del chat (como en ClickUp), arriba de todo. */
   etiquetas: ReactNode;
   accionesExtra: AccionExtra[];
+  /** El botón «WhatsApp interno» de la barra (31 oct 2026, pedido de Jhokser: abajo con los demás, no arriba); null si la persona no puede escribirle a otra área. */
+  botonInterno: ReactNode;
   /** El hueco arriba del cuadro de escribir del chat, donde se dibuja la barra de acciones (30 oct 2026, pedido de Alcides). */
   ranuraAcciones: HTMLElement | null;
   versionEquipo: string;
@@ -298,8 +301,8 @@ export function FichaDelChat({
                 <DestinoEnSitio />
               </div>
               <FilaBotones className="flex flex-wrap items-center gap-1.5 border-t border-[var(--wa-borde)] bg-[var(--wa-panel)] px-3 py-2">
-                {accionesChat}
-                {escribe && (
+                {!sel.interno && accionesChat}
+                {!sel.interno && escribe && (
                   <BotonNuevaTarea
                     conversacionId={sel.id}
                     nombre={sel.nombre}
@@ -309,7 +312,7 @@ export function FichaDelChat({
                     boton={(abrir) => <BotonBarra id="tarea" texto="Nueva tarea" corto="Tarea" icono={TareasIcon} alPulsar={abrir} />}
                   />
                 )}
-                {d && acceso?.escribeAtencion && (
+                {!sel.interno && d && acceso?.escribeAtencion && (
                   <>
                     <PanelCaso
                       key={`caso-${d.id}`}
@@ -326,7 +329,8 @@ export function FichaDelChat({
                     />
                   </>
                 )}
-                <BotonesExtra acciones={accionesExtra} />
+                {!sel.interno && <BotonesExtra acciones={accionesExtra} />}
+                {botonInterno}
               </FilaBotones>
             </EnSitio>,
             ranuraAcciones,
