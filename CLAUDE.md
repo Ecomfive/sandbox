@@ -1097,6 +1097,10 @@ convenciones técnicas del código.
   van en fila y frenaban el envío), con los últimos 40 mensajes unidos a los que hay, y al volver a la pestaña. Aviso en vivo: `avisarBandeja()`
   (`src/lib/whatsapp/aviso-bandeja.ts`, broadcast de Supabase Realtime por REST con la clave de servicio, sin datos) desde `guardar.ts` y las
   acciones que guardan mensajes; la bandeja escucha `CANAL_BANDEJA` con el cliente anon y refresca (8 s sin aviso, 30 s con aviso).
+  **Precio actual por ID** (31 oct 2026, pedido de Hernán; sin migración): `ProductoDelChat.precios` (`preciosDropi` en
+  `productos-chat-actions.ts`: `dropi_publicaciones.precio_venta` del país del chat, sin archivadas/eliminadas/descartadas, primero el ID
+  nombrado, luego por precio) y `PreciosDropi` en `productos-chat.tsx` (`formatoMonto` en la moneda del país; `paisDelChat` devuelve también
+  `codigo`). Solo el precio de venta, nunca costos.
   **Productos que pregunta** (29 oct 2026): la ficha del chat (`productos-chat.tsx`,
   `productos-chat-actions.ts`) cruza los últimos 40 mensajes entrantes con los productos simples de `skus_maestros` (`productosMencionados`
   en `src/lib/crm/productos-chat.ts`: dos palabras seguidas del nombre o el código) y suma los fijados (tabla `whatsapp_conversacion_productos`,

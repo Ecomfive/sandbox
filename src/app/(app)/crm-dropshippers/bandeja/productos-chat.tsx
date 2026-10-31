@@ -3,9 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { cuantoFalta, type MencionEnChat } from "@/lib/crm/productos-chat";
+import { formatoMonto, monedaPublicaciones } from "@/lib/publicaciones/moneda";
 import { EtapaCotizando, LlegadaCamino } from "../../publicaciones-dropi/llegada-camino";
 import { avisarCuandoLlegue } from "../tareas/actions";
-import { buscarProductosChat, fijarProductoChat, productosDelChat, type ProductoDelChat, type ProductosDelChat } from "./productos-chat-actions";
+import { buscarProductosChat, fijarProductoChat, productosDelChat, type PrecioDropi, type ProductoDelChat, type ProductosDelChat } from "./productos-chat-actions";
 
 const entero = (n: number) => n.toLocaleString("es-PA");
 const fechaCorta = (iso: string) => new Date(iso).toLocaleDateString("es-PA", { day: "numeric", month: "short", timeZone: "America/Panama" });
@@ -135,6 +136,7 @@ export function ProductosDelChatFicha({
                 ) : (
                   !p.fijado && <span className="text-[11.5px] text-[var(--wa-sec)]">Lo nombra en el chat</span>
                 )}
+                {datos.pais && <PreciosDropi precios={p.precios} pais={datos.pais} />}
                 <EnCamino p={p} hoy={hoy} />
                 {p.aviso ? (
                   <span className="mt-0.5 text-[12px] font-medium text-[var(--wa-acento)]">Te avisamos cuando llegue para que le escribas.</span>
@@ -198,6 +200,29 @@ export function ProductosDelChatFicha({
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * El precio actual en Dropi de cada ID del producto en el país del chat (31 oct 2026, pedido de Hernán): «ID 51188 · $12.50», primero el ID que
+ * se nombró en el chat (resaltado). Así se le contesta el precio sin salir del chat. Sin publicación allá, lo dice.
+ */
+function PreciosDropi({ precios, pais }: { precios: PrecioDropi[]; pais: { nombre: string; codigo: string } }) {
+  if (!precios.length) return <span className="text-[12.5px] text-[var(--wa-sec)]">{`No está publicado en Dropi ${pais.nombre}.`}</span>;
+  const moneda = monedaPublicaciones(pais.codigo, {});
+  return (
+    <ul className="m-0 flex list-none flex-col gap-0.5 p-0 text-[12.5px]" aria-label={`Precio actual en Dropi ${pais.nombre}`}>
+      {precios.map((x, i) => (
+        <li key={`${x.dropiId ?? "sin-id"}-${i}`} className={`flex flex-wrap items-baseline gap-x-1.5 ${x.nombrado ? "font-semibold text-[var(--wa-texto)]" : "text-[var(--wa-sec)]"}`}>
+          <span>{x.dropiId ? `ID ${x.dropiId}` : "Sin ID"}</span>
+          <span aria-hidden="true">·</span>
+          <span className="tabular-nums font-semibold text-[var(--wa-texto)]">{x.precio === null ? "sin precio" : formatoMonto(x.precio, moneda)}</span>
+          {x.nombrado && <span className="rounded-full bg-[var(--wa-acento-suave)] px-1.5 text-[11px] font-medium text-[var(--wa-acento-suave-texto)]">el que nombró</span>}
+          {x.enEspera && <span className="text-[11.5px] font-normal text-warning">en espera</span>}
+          {x.cambio && <span className="text-[11.5px] font-normal text-[var(--wa-sec)]">{`· precio desde el ${fechaCorta(`${x.cambio}T12:00:00Z`)}`}</span>}
+        </li>
+      ))}
+    </ul>
   );
 }
 

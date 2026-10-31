@@ -28,10 +28,26 @@ export interface ProductoDelChat {
   etapa: EtapaCotizacion | null;
   /** Hay una tarea esperando que llegue este producto para avisarle al cliente (29 oct 2026), con la llegada que se le prometió. */
   aviso: { llegadaEstimada: string | null } | null;
+  /**
+   * El precio actual en Dropi de cada ID de este producto en el país del chat (31 oct 2026, pedido de Hernán), en la moneda de ese país;
+   * solo el precio de venta, sin costos. Vacío si no está publicado allá (o no se sabe el país).
+   */
+  precios: PrecioDropi[];
+}
+
+export interface PrecioDropi {
+  dropiId: string | null;
+  precio: number | null;
+  /** Cuándo cambió el precio por última vez (AAAA-MM-DD). */
+  cambio: string | null;
+  /** Está en espera en Dropi (no se puede pedir todavía). */
+  enEspera: boolean;
+  /** Es el ID que se nombró en el chat. */
+  nombrado: boolean;
 }
 
 export interface ProductosDelChat {
-  pais: { id: string; nombre: string } | null;
+  pais: { id: string; nombre: string; codigo: string } | null;
   productos: ProductoDelChat[];
   /** Sin la migración 0180 no se pueden fijar productos (las sugerencias salen igual). */
   sePuedeFijar: boolean;
@@ -151,7 +167,10 @@ export async function productosDelChat(conversacionId: string): Promise<Producto
   const lista = [...fijadosEnOrden.map((p) => ({ p, fijado: true })), ...sugeridos.map((p) => ({ p, fijado: false }))];
   if (!lista.length) return { pais, productos: [], sePuedeFijar };
 
-  const { camino, cotizando, etapasCotizando } = pais ? await cargarEnCamino(supabase, pais.id, u) : { camino: new Map(), cotizando: new Map(), etapasCotizando: new Map() };
+  const [{ camino, cotizando, etapasCotizando }, precios] = await Promise.all([
+    pais ? cargarEnCamino(supabase, pais.id, u) : { camino: new Map(), cotizando: new Map(), etapasCotizando: new Map() },
+    pais ? preciosDropi(supabase, pais.id, lista.map(({ p }) => p.id), ids) : new Map<string, PrecioDropi[]>(),
+  ]);
   return {
     pais,
     sePuedeFijar,
@@ -171,9 +190,43 @@ export async function productosDelChat(conversacionId: string): Promise<Producto
         cotizando: cotizando.get(p.id) ?? 0,
         etapa: etapasCotizando.get(p.id) ?? null,
         aviso: avisos.get(p.id) ?? null,
+        precios: precios.get(p.id) ?? [],
       };
     }),
   };
+}
+
+/**
+ * El precio actual de las publicaciones de Dropi de estos productos en un país, por producto: las que no están archivadas, eliminadas ni
+ * descartadas, primero la del ID que se nombró en el chat (`nombrados`) y luego de la más barata a la más cara. Un ID doble («6667-8295»)
+ * cuenta como nombrado si se nombró cualquiera de los dos.
+ */
+async function preciosDropi(supabase: ReturnType<typeof createServiceClient>, paisId: string, skuIds: string[], nombrados: string[]): Promise<Map<string, PrecioDropi[]>> {
+  const porSku = new Map<string, PrecioDropi[]>();
+  if (!skuIds.length) return porSku;
+  const { data, error } = await supabase
+    .from("dropi_publicaciones")
+    .select("sku_maestro_id, dropi_id, precio_venta, ultimo_cambio_precio, estado_publicacion")
+    .eq("pais_id", paisId)
+    .in("sku_maestro_id", skuIds);
+  if (error) return porSku;
+  const nombrado = new Set(nombrados);
+  for (const f of data ?? []) {
+    const estado = (f.estado_publicacion as string | null) ?? null;
+    if (estado && estado !== "activo" && estado !== "en_espera") continue;
+    const dropiId = (f.dropi_id as string | null)?.trim() || null;
+    const lista = porSku.get(f.sku_maestro_id as string) ?? [];
+    lista.push({
+      dropiId,
+      precio: f.precio_venta === null || f.precio_venta === undefined ? null : Number(f.precio_venta),
+      cambio: (f.ultimo_cambio_precio as string | null) ?? null,
+      enEspera: estado === "en_espera",
+      nombrado: !!dropiId && dropiId.split(/\D+/).some((parte) => nombrado.has(parte)),
+    });
+    porSku.set(f.sku_maestro_id as string, lista);
+  }
+  for (const lista of porSku.values()) lista.sort((a, b) => Number(b.nombrado) - Number(a.nombrado) || (a.precio ?? Infinity) - (b.precio ?? Infinity));
+  return porSku;
 }
 
 /** «Agregar producto» en la ficha: busca en el catálogo por nombre o código. */
