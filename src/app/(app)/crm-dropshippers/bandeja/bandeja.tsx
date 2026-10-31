@@ -21,6 +21,7 @@ import { PastillaTipo } from "../tipo-cliente";
 import { VendeEnChat } from "./vende-en";
 import { abrirChatInterno } from "./interno-actions";
 import { BotonWhatsappInterno } from "./interno";
+import { BotonNumerosPais } from "./numeros-pais";
 import { colorFoto, iniciales } from "./globo-persona";
 import { EtiquetasChat, PastillasEtiquetas, SelectorEtiquetasChat, type ManejoEtiquetas } from "./etiquetas-chat";
 import { transcribirAudio } from "./transcripcion-actions";
@@ -234,6 +235,20 @@ const CLAVE_VISTA = "bandeja-whatsapp-vista";
 /** El color del punto de cada motivo en la tarjeta del tablero, como en el prototipo. */
 const COLOR_MOTIVO: Record<string, string> = { queja: "#D92D20", pedido: "#F79009", pagos: "#EAAA08", consulta: "#2E90FA", comercial: "#12B76A", otro: "#98A2B3" };
 
+/**
+ * La bandera del país del número por el que entró el chat (31 oct 2026, pedido de Hernán; migración 0209): Atención contesta desde varios números
+ * (Panamá, Costa Rica, México) y todos sus chats salen juntos; así sabe de qué país es cada cliente. Sin país en el número, nada.
+ */
+function BanderaNumero({ pais }: { pais: string | null | undefined }) {
+  if (!pais) return null;
+  const texto = `Entró por el número de ${nombrePais(pais)}`;
+  return (
+    <span role="img" aria-label={texto} title={texto} className="flex-none text-[15px] leading-none">
+      {bandera(pais)}
+    </span>
+  );
+}
+
 /** «VIP»: un dropshipper de los que más pedidos mueven (29 oct 2026), para saber con quién se trata. */
 function EtiquetaVip({ tipo }: { tipo: string | null }) {
   return <PastillaTipo nivel={tipo} soloDestacados />;
@@ -384,6 +399,8 @@ export function Bandeja({
   const [datos, setDatos] = useState(inicial);
   const [filtro, setFiltro] = useState<Filtro>(abrirInicial ? "todas" : "sinResponder");
   const [numero, setNumero] = useState<string>("todos");
+  // El país del número por el que entró cada chat (migración 0209): «todos» o un código ISO.
+  const [paisSel, setPaisSel] = useState<string>("todos");
   const [buscar, setBuscar] = useState("");
   // «Ver como» (30 oct 2026, pedido de Hernán): quien supervisa otras áreas ve la bandeja tal como la ve esa área (Nicole, en Atención): solo su
   // panel, a todo lo ancho, con sus filtros, sus conteos y su tablero. Es para auditar desde el propio usuario: sigue siendo supervisión (lo que
@@ -663,12 +680,17 @@ export function Bandeja({
   }, [borrador]);
 
   const numeroDe = useMemo(() => new Map(datos.numeros.map((n) => [n.id, n])), [datos.numeros]);
+  // Los países de los números, para filtrar por país cuando hay números de más de uno.
+  const paisesNumeros = useMemo(() => [...new Set(datos.numeros.map((n) => n.pais).filter((p): p is string => !!p))].sort(), [datos.numeros]);
   const chatsInternos = useMemo(() => datos.conversaciones.filter((c) => c.interno).map((c) => ({ numeroId: c.numeroId, nombre: c.nombre, noLeidos: c.noLeidos })), [datos.conversaciones]);
   // Los chats internos (WhatsApp entre los números de la empresa) no son clientes: no van en las listas ni en los conteos; se abren con «WhatsApp interno». Solo los de los
   // paneles a la vista: con «Ver como», los conteos de los filtros son los de esa área, como los ve ella.
   const delNumero = useMemo(
-    () => datos.conversaciones.filter((c) => !c.interno && areas.includes(c.area) && (numero === "todos" || c.numeroId === numero)),
-    [datos.conversaciones, numero, areas],
+    () =>
+      datos.conversaciones.filter(
+        (c) => !c.interno && areas.includes(c.area) && (numero === "todos" || c.numeroId === numero) && (paisSel === "todos" || numeroDe.get(c.numeroId)?.pais === paisSel),
+      ),
+    [datos.conversaciones, numero, areas, paisSel, numeroDe],
   );
   // Los filtros cuentan los chats de todos los paneles que se ven.
   const opciones: { id: Filtro; texto: string; cuenta: number }[] = [
@@ -1050,6 +1072,7 @@ export function Bandeja({
               <Foto nombre={c.nombre} tam="tarjeta" />
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className="flex items-center gap-2">
+                  <BanderaNumero pais={numeroDe.get(c.numeroId)?.pais} />
                   <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">{c.nombre}</span>
                   {c.vip && <EtiquetaVip tipo={c.tipoCliente} />}
                   {c.noLeidos > 0 && (
@@ -1128,6 +1151,7 @@ export function Bandeja({
     const datosFila = (
       <>
         <span className="flex items-baseline gap-2">
+          <BanderaNumero pais={numeroDe.get(c.numeroId)?.pais} />
           <span className="min-w-0 flex-1 truncate text-[16px]">{c.nombre}</span>
           {c.vip && <EtiquetaVip tipo={c.tipoCliente} />}
           <span className={`flex-none text-xs tabular-nums ${c.noLeidos ? "font-semibold text-[var(--wa-acento)]" : "text-[var(--wa-sec)]"}`}>{enNavegador ? horaCorta(c.ultimoMensajeEn) : ""}</span>
@@ -1396,7 +1420,21 @@ export function Bandeja({
               <option value="todos">Todos los números</option>
               {datos.numeros.map((n) => (
                 <option key={n.id} value={n.id}>
+                  {n.pais ? `${bandera(n.pais)} ` : ""}
                   {n.nombre}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        {paisesNumeros.length > 1 && (
+          <label className="flex">
+            <span className="sr-only">País del número</span>
+            <select value={paisSel} onChange={(e) => setPaisSel(e.target.value)} className={`h-10 max-w-[200px] rounded-lg border-0 bg-[var(--wa-panel)] px-2 text-[13px] ${anilloFoco}`}>
+              <option value="todos">Todos los países</option>
+              {paisesNumeros.map((p) => (
+                <option key={p} value={p}>
+                  {bandera(p)} {nombrePais(p)}
                 </option>
               ))}
             </select>
@@ -1484,6 +1522,8 @@ export function Bandeja({
             Importar chat
           </button>
         )}
+        {/* De qué país es cada número (solo quien administra). */}
+        {estado360 && <BotonNumerosPais alCambiar={() => void refrescar(elegido)} />}
       </div>
 
       {/* ===== El tablero (29 oct 2026; por estado desde el 30 oct): un área a la vez, en columnas Por atender, En conversación y Cerrados ===== */}
@@ -1664,6 +1704,8 @@ export function Bandeja({
                   <span className="flex min-w-0 items-center gap-1 truncate text-xs font-normal text-muted-foreground tabular-nums">
                     {[
                       sel.codigo,
+                      // El país del número por el que entró (migración 0209).
+                      numeroDe.get(sel.numeroId)?.pais ? `${bandera(numeroDe.get(sel.numeroId)?.pais as string)} ${nombrePais(numeroDe.get(sel.numeroId)?.pais as string)}` : null,
                       sel.nombrePerfil && sel.nombrePerfil !== sel.nombre ? `«${sel.nombrePerfil}» en WhatsApp` : null,
                       // El área ya va en su etiqueta de color al lado: no se repite en el nombre del número («Ecomfive · Atención» → «Ecomfive»).
                       (numeroDe.get(sel.numeroId)?.nombre ?? "")

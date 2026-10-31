@@ -16,6 +16,8 @@ export interface NumeroVista {
   nombre: string;
   numero: string;
   area: AreaCrm;
+  /** El país del número (código ISO, «PA»), migración 0209: cada chat lleva su bandera y la bandeja filtra por él. null = sin elegir. */
+  pais: string | null;
 }
 
 /** Una conversación de la bandeja: con quién es, en qué número, quién la lleva y su último mensaje. */
@@ -148,6 +150,22 @@ export async function usuarioBandeja(escribe: boolean): Promise<UsuarioActual | 
 /** Las áreas cuyos números ve esta persona: Atención ve el suyo; Comercial ve los dos. */
 export const areasDe = (u: PermisosCrm): AreaCrm[] => areasVisibles(accesoCrm(u));
 
+/** Los números activos de la empresa con su país (migración 0209; sin ella, sin país). null si falta la migración 0158. */
+export async function numerosActivos(supabase: SupabaseClient): Promise<NumeroVista[] | null> {
+  const conPais = await supabase.from("whatsapp_numeros").select("id, nombre, numero, area, paises(codigo)").eq("activo", true).order("nombre");
+  if (!conPais.error)
+    return (conPais.data ?? []).map((n) => ({
+      id: n.id as string,
+      nombre: n.nombre as string,
+      numero: n.numero as string,
+      area: n.area as AreaCrm,
+      pais: uno(n.paises as Uno<{ codigo: string }>)?.codigo ?? null,
+    }));
+  const sinPais = await supabase.from("whatsapp_numeros").select("id, nombre, numero, area").eq("activo", true).order("nombre");
+  if (sinPais.error) return null;
+  return ((sinPais.data ?? []) as Omit<NumeroVista, "pais">[]).map((n) => ({ ...n, pais: null }));
+}
+
 /**
  * Los números de la empresa y las conversaciones (las 300 más recientes) que esta persona puede ver: las de las áreas que ve. El área es
  * de cada conversación desde la migración 0168, así un solo número sirve a todo el equipo. `null` si falta la migración 0158.
@@ -155,9 +173,8 @@ export const areasDe = (u: PermisosCrm): AreaCrm[] => areasVisibles(accesoCrm(u)
 export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosCrm): Promise<DatosBandeja | null> {
   const areas = areasDe(usuario);
   const sinBorrados = pierdeLoBorrado(accesoCrm(usuario));
-  const numerosR = await supabase.from("whatsapp_numeros").select("id, nombre, numero, area").eq("activo", true).order("nombre");
-  if (numerosR.error) return null;
-  const numeros = (numerosR.data ?? []) as NumeroVista[];
+  const numeros = await numerosActivos(supabase);
+  if (numeros === null) return null;
   if (!numeros.length) return { numeros, numerosEmpresa: [], conversaciones: [], colores: {} };
   const { data } = await supabase
     .from("whatsapp_conversaciones")
