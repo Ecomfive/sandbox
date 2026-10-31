@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { leerFulfillment, MAX_FULFILLMENT } from "./fulfillment-pais";
+import { fulfillmentEnMoneda, leerFulfillment, MAX_FULFILLMENT } from "./fulfillment-pais";
 
 test("leerFulfillment: dólares con hasta dos decimales, con punto, coma o el signo $", () => {
   assert.deepEqual(leerFulfillment("2"), { valor: 2 });
@@ -17,4 +17,12 @@ test("leerFulfillment: vacío = el país no tiene uno (se escribe en cada public
 
 test("leerFulfillment: lo que no es un monto válido da error", () => {
   for (const malo of ["dos", "-1", "1.234", "1e3", "2,5,0", String(MAX_FULFILLMENT + 1)]) assert.ok("error" in leerFulfillment(malo), malo);
+});
+
+test("fulfillmentEnMoneda: en dólares igual; en colones o pesos por el tipo de cambio, en unidades enteras", () => {
+  const porUsd = { CRC: 505.3, MXN: 18.42 };
+  assert.equal(fulfillmentEnMoneda(1.5, "PA", porUsd), 1.5);
+  assert.equal(fulfillmentEnMoneda(2, "CR", porUsd), 1011);
+  assert.equal(fulfillmentEnMoneda(2, "mx", porUsd), 37);
+  assert.equal(fulfillmentEnMoneda(2, "CR", {}), null, "sin tipo de cambio no se adivina");
 });

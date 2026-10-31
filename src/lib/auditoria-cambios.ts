@@ -139,6 +139,7 @@ export const ETIQUETA_ACCION: Record<string, string> = {
   conciliar_retiro: "Concilió un retiro",
   marcar_consolidacion: "Cambió la consolidación de un retiro",
   configurar_plataforma_retiro: "Configuró una plataforma para crear retiros",
+  fulfillment_plataforma: "Cambió el fulfillment de una plataforma",
   crear_plataforma: "Creó una plataforma",
   activar_cuenta_retiro: "Cambió el estado de una cuenta de retiro",
   eliminar_cuenta_retiro: "Eliminó una cuenta de retiro",

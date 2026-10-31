@@ -5,6 +5,10 @@ export interface FilaPlataforma {
   nombre: string;
   /** Aparece en el botón «+ Crear» de Retiros. */
   disponible: boolean;
+  /** Fulfillment por pedido en dólares (migración 0213), o null. */
+  fulfillment: number | null;
+  /** El mismo monto en la moneda del país («≈ ₡1 011»), o null si es el dólar o no hay tipo de cambio. */
+  fulfillmentEquivalente: string | null;
 }
 
 /** Filtros y agrupación de las plataformas del país; «Ocultas» son las que no salen en «+ Crear». */
