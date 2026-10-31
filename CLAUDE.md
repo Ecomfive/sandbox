@@ -1064,7 +1064,7 @@ convenciones técnicas del código.
   `no_leidos = 0` (Atención no se entera), el composer queda solo para notas y `enviarWhatsapp`/`enviarPlantillaConversacion` piden
   «Intervenir» (`intervenirConversacion`: `asignada_a` = quien interviene + nota «X intervino en este chat.» + auditoría `intervenir_whatsapp`).
   **Chat en ventana con la ficha del CRM** (29 oct 2026, pedido de Hernán con un bosquejo aprobado): al pulsar un chat de la lista,
-  `bandeja.tsx` lo abre en `Ventana` (`lado="centro"`, `ancho="xl"`, `masAncha`: 96rem al centro; flechas = chat anterior/siguiente de `lista`, `abrirChat`); a la
+  `bandeja.tsx` lo abre en `Ventana` (`lado="centro"`, `ancho="xl"`, `masAncha`: 96rem al centro; sin flechas de chat anterior/siguiente: se quitaron el 31 oct 2026, pedido de Jhokser, para no ir abriendo chats sin contestarlos); a la
   izquierda `FichaDelChat` (`bandeja/ficha-chat.tsx`) y a la derecha la sección del chat de siempre (con `@container`: bajo `@4xl` se ve
   uno a la vez, «Chat» / «Ficha del dropshipper»). La ficha usa las piezas exportadas de `ficha-lateral.tsx` (`AccionesCrm`, `CifrasDelMes`,
   `CasosAbiertos`, `DatosDropshipper`) con los datos de `fichaCrmDelChat` (acción en `bandeja/actions.ts`: `obtenerDatosCrm(…, soloId)`
