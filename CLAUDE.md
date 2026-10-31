@@ -1292,6 +1292,14 @@ convenciones técnicas del código.
   `whatsapp_etiquetas` para todo el CRM. «Editar» del dropshipper ya no trae el campo de etiquetas separadas por coma (`editarDropshipper` solo las toca si vienen).
   **Mensajes que el equipo borra en la app**: un eco `revoke` de `smb_message_echoes` se trata como `revoke` de un cliente (`extraerAviso` → `revocados` → `eliminado_en_whatsapp_en`); la burbuja dice «Se eliminó desde la app de WhatsApp Business (Meta no dice quién)»
   si el mensaje era nuestro. **No está confirmado que Meta/360dialog mande ese eco** (la prueba usa la forma del `revoke` de clientes); borrar un chat entero en la app sigue sin aviso (marca manual).
+- **Enlaces y archivos peligrosos en la bandeja** (31 oct 2026, pedido de Hernán; sin migración; solo reglas propias, Google Safe Browsing
+  quedó para después): `@/lib/whatsapp/enlaces` › `partesConEnlaces` (encuentra los enlaces con https, www o dominio suelto con terminación
+  conocida; no correos) y `revisarEnlace` → peligroso (imita una marca de `MARCAS` sin ser su dominio oficial, IP, `@` en la URL, punycode,
+  descarga .apk/.exe…, esquemas javascript/data/file), sospechoso (acortador, TLD barato, http, puerto, palabras de estafa en el sitio,
+  demasiados subdominios), conocido o normal; `revisarArchivo` (extensión y mime). `bandeja/texto-enlaces.tsx` › `TextoConEnlaces` (en
+  `Contenido`: normales como `<a>` con noopener, sospechosos con ventana «Este enlace puede ser una estafa», peligrosos tachados y con
+  aviso) y `DocumentoRevisado`. La ruta `/api/whatsapp/media/[id]` responde 403 a un archivo peligroso y `enviarWhatsapp` no manda un
+  texto con un enlace peligroso. Pruebas en `enlaces.test.ts`.
 - **País de cada número de WhatsApp** (31 oct 2026, pedido de Hernán; migración 0209): `whatsapp_numeros.pais_id` (FK a `paises`; la migración lo llena por el prefijo
   507/506/52). `numerosActivos` (`datos-bandeja.ts`) lo trae como `NumeroVista.pais` (código ISO; sin la migración, null). En `bandeja.tsx`, `BanderaNumero`
   pone la bandera antes del nombre en `filaChat` y `tarjetaChat` y en el subtítulo del chat abierto; `paisSel` filtra `delNumero` («Todos los países», solo con

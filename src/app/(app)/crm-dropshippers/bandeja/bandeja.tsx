@@ -22,6 +22,7 @@ import { VendeEnChat } from "./vende-en";
 import { abrirChatInterno } from "./interno-actions";
 import { BotonWhatsappInterno } from "./interno";
 import { BotonNumerosPais } from "./numeros-pais";
+import { DocumentoRevisado, TextoConEnlaces } from "./texto-enlaces";
 import { colorFoto, iniciales } from "./globo-persona";
 import { EtiquetasChat, PastillasEtiquetas, SelectorEtiquetasChat, type ManejoEtiquetas } from "./etiquetas-chat";
 import { transcribirAudio } from "./transcripcion-actions";
@@ -329,12 +330,8 @@ function Contenido({ m, puedeTranscribir = false }: { m: MensajeVista; puedeTran
       {m.conArchivo && m.tipo === "video" && m.mediaNombre?.startsWith("gif-") && <video autoPlay loop muted playsInline preload="auto" src={src} aria-label="GIF" className="max-h-60 max-w-full rounded-md" />}
       {m.conArchivo && m.tipo === "video" && !m.mediaNombre?.startsWith("gif-") && <video controls preload="none" src={src} className="max-h-72 max-w-full rounded-md" />}
       {m.conArchivo && m.tipo === "documento" && (
-        <a href={src} target="_blank" rel="noreferrer" className={`mb-1 flex items-center gap-2 rounded-md bg-[var(--wa-panel)] px-2 py-2 text-[13px] font-medium ${anilloFoco}`}>
-          <span aria-hidden="true" className="flex h-8 w-7 flex-none items-center justify-center rounded bg-[var(--wa-acento)] text-[9px] font-bold text-[var(--wa-acento-texto)]">
-            DOC
-          </span>
-          <span className="truncate">{m.mediaNombre ?? "Abrir documento"}</span>
-        </a>
+        // Un .apk, .exe… no se abre; un .zip o con macros avisa (`@/lib/whatsapp/enlaces`).
+        <DocumentoRevisado href={src} nombre={m.mediaNombre} />
       )}
       {m.importado && !m.conArchivo && m.mediaNombre && (
         <span className="mb-1 block text-[13px] text-[var(--wa-sec)]">📎 {m.mediaNombre} (el archivo no se subió: vuelve a importar el chat con sus archivos)</span>
@@ -342,7 +339,8 @@ function Contenido({ m, puedeTranscribir = false }: { m: MensajeVista; puedeTran
       {m.tipo === "reaccion" && <span className="text-[var(--wa-sec)]">Reaccionó </span>}
       {m.tipo === "ubicacion" && <span className="block text-xs font-medium text-[var(--wa-sec)]">Ubicación</span>}
       {m.texto ? (
-        <span className="whitespace-pre-wrap break-words">{m.texto}</span>
+        // Los enlaces se abren como en WhatsApp, salvo los sospechosos (piden confirmar) y los peligrosos (bloqueados).
+        <TextoConEnlaces texto={m.texto} />
       ) : (
         !m.conArchivo && !m.mediaNombre && m.tipo !== "reaccion" && <span className="text-[var(--wa-sec)]">{m.tipo === "otro" ? "Mensaje que WhatsApp no entregó a la plataforma. Pídele que lo mande de nuevo como mensaje normal." : `Mensaje que el sistema todavía no muestra (${m.tipo}).`}</span>
       )}
