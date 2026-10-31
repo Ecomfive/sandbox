@@ -147,6 +147,7 @@ export const ETIQUETA_ACCION: Record<string, string> = {
   suspender_usuario: "Cambió el estado de un usuario",
   eliminar_usuario: "Eliminó un usuario",
   generar_contrasena_temporal: "Generó una contraseña temporal",
+  cambiar_contrasena: "Cambió su contraseña",
   crear_dropshipper: "Agregó el dropshipper",
   cambiar_estado_dropshipper: "Cambió el estado",
   editar_dropshipper: "Editó los datos",

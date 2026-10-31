@@ -9,7 +9,8 @@ import { NavBar } from "@/components/nav";
 import { Sidebar } from "@/components/sidebar";
 import { ToastProvider } from "@/components/ui/toast";
 import { TransicionPagina } from "@/components/transicion-pagina";
-import { getUsuarioActual, getUsuarioIdSesion } from "@/lib/auth";
+import { getUsuarioActual, getUsuarioIdSesion, getUsuarioSesion } from "@/lib/auth";
+import { tieneContrasenaTemporal } from "@/lib/cuenta/contrasena";
 import { getPaisActual } from "@/lib/pais";
 import { obtenerPlataformasPais } from "@/lib/pais-plataformas";
 import { construirAreas } from "@/lib/nav-data";
@@ -53,6 +54,8 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     getUsuarioIdSesion().then((id) => (id ? obtenerFavoritos(supabase, id) : [])),
     usuarioP,
   ]);
+  // Quien entra con la contraseña temporal que le dio un administrador elige la suya antes de usar el sistema (31 oct 2026).
+  if (usuario && tieneContrasenaTemporal(await getUsuarioSesion())) redirect("/elegir-contrasena");
   // Una cuenta del portal del proveedor no tiene perfil: no ve ni el menú del sistema, vuelve a su portal.
   if (!usuario) {
     const usuarioId = await getUsuarioIdSesion();

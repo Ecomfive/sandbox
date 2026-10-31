@@ -61,7 +61,7 @@ export function CrearUsuarioPanel({ roles }: { roles: Rol[] }) {
       <Ventana abierto={abierto} alCerrar={cerrar} lado="derecha" titulo={<span className="text-lg font-semibold">Crear usuario</span>}>
         {contrasena ? (
           <div className="flex flex-col gap-4 p-5">
-            <p className="text-sm">La cuenta ya se creó. Pásale esta contraseña — no se vuelve a mostrar:</p>
+            <p className="text-sm">La cuenta ya se creó. Pásale esta contraseña — no se vuelve a mostrar. Al entrar, elegirá la suya:</p>
             <p className="rounded-md border border-border bg-muted p-3 text-center font-mono text-lg font-semibold select-all">
               {contrasena}
             </p>
