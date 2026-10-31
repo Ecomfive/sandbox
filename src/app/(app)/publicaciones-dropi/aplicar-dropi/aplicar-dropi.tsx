@@ -97,7 +97,21 @@ export function AplicarDropi({ puedeEscribir }: { puedeEscribir: boolean }) {
     dropi.postMessage(
       {
         tipo: "pendientes",
-        cambios: cambios.map(({ id, tipo, quitarPrivados, restaurar, nuevo, producto, nombre, guia, precio, sugerido, descripcion, fotos, datos, privatizar, stock }) => ({ id, tipo, quitarPrivados, restaurar, nuevo, producto, nombre, guia, precio, sugerido, descripcion, fotos, datos: tipo === "privatizar" ? privatizar : tipo === "stock" ? stock : datos })),
+        cambios: cambios.map(({ id, tipo, quitarPrivados, restaurar, nuevo, producto, nombre, guia, precio, sugerido, descripcion, fotos, datos, privatizar, stock, devolver }) => ({
+          id,
+          tipo,
+          quitarPrivados,
+          restaurar,
+          nuevo,
+          producto,
+          nombre,
+          guia,
+          precio,
+          sugerido,
+          descripcion,
+          fotos,
+          datos: tipo === "privatizar" ? privatizar : tipo === "stock" ? stock : tipo === "apagar" ? devolver : datos,
+        })),
       },
       origen,
     );
@@ -161,7 +175,9 @@ export function AplicarDropi({ puedeEscribir }: { puedeEscribir: boolean }) {
                         ? `Republicada: ID nuevo ${r.nuevo ?? "—"}; la vieja quedó archivada y sin stock`
                         : c.tipo === "apagar"
                           ? r.archivado
-                            ? "Apagado y archivado en Dropi"
+                            ? c.devolver
+                              ? `Privatización quitada: las unidades volvieron al ID ${c.devolver.publico} y el privado quedó archivado`
+                              : "Apagado y archivado en Dropi"
                             : `Sin stock en Dropi, falta archivar: ${r.error ?? "Dropi no lo dejó"}`
                           : c.tipo === "archivar"
                             ? c.restaurar
@@ -232,7 +248,9 @@ function DetalleCambio({ c }: { c: CambioParaDropi }) {
     const d = c.stock;
     return (
       <>
-        <span className="font-medium">Stock: {c.publicacion}</span>
+        <span className="font-medium">
+          Stock: {c.publicacion} · ID {c.producto}
+        </span>
         <span className="text-xs tabular-nums">
           {d ? `${codigoBodega(d.bodega)}${d.nombreBodega ? ` · ${d.nombreBodega}` : ""}: ${d.antes !== null ? `${d.antes.toLocaleString("es-PA")} → ` : ""}${d.unidades.toLocaleString("es-PA")} u. · «${d.concepto}»` : ""}
         </span>
@@ -240,6 +258,17 @@ function DetalleCambio({ c }: { c: CambioParaDropi }) {
       </>
     );
   }
+  if (c.tipo === "apagar" && c.devolver)
+    return (
+      <>
+        <span className="font-medium">Quitar privatización: {c.publicacion}</span>
+        <span className="text-xs">
+          Sacarle el stock, quitar la privatización, devolver esas unidades al público (ID {c.devolver.publico}) y archivarlo. Si Dropi no deja archivar (órdenes pendientes), se reintenta en el próximo «Aplicar en
+          Dropi».
+        </span>
+        <span className="text-xs text-muted-foreground">ID {c.producto}</span>
+      </>
+    );
   if (c.tipo === "apagar")
     return (
       <>

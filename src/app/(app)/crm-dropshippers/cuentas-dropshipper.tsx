@@ -14,34 +14,44 @@ import { nombrePais, type FilaDropshipper } from "./def-crm";
 /** Plataformas con pedidos que ya llegan al sistema. Boxful y EFI se suman aquí cuando tengan datos. */
 const PLATAFORMAS = ["Dropi"] as const;
 
-/** «Vincular cuenta»: elige a qué usuario de la plataforma (de los que ya tienen pedidos) corresponde este dropshipper. */
+/**
+ * «Vincular cuenta»: elige a qué usuarios de la plataforma (de los que ya tienen pedidos) corresponde este dropshipper. Un mismo dropshipper (un
+ * mismo WhatsApp) puede tener varios usuarios de Dropi, así que se marcan varios de una vez. Desde el 29 oct 2026 es un buscador (tienda, número de
+ * usuario o dueño) con la lista debajo, en vez de un desplegable de cientos de renglones.
+ */
 function PanelVincular({ d, codigoPais, alGuardar }: { d: FilaDropshipper; codigoPais: string; alGuardar?: () => void }) {
   const paises = d.paises.length ? d.paises : [codigoPais];
   const [pais, setPais] = useState(paises.includes(codigoPais) ? codigoPais : paises[0]);
   const [plataforma, setPlataforma] = useState<string>(PLATAFORMAS[0]);
   const [usuarios, setUsuarios] = useState<UsuarioPlataforma[] | "error" | null>(null);
-  const [elegido, setElegido] = useState("");
+  const [elegidos, setElegidos] = useState<string[]>([]);
+  const [buscar, setBuscar] = useState("");
 
   function cargar(p: string, plat: string) {
     setUsuarios(null);
-    setElegido("");
+    setElegidos([]);
     listarUsuariosPlataforma(p, plat)
       .then((r) => setUsuarios("usuarios" in r ? r.usuarios : "error"))
       .catch(() => setUsuarios("error"));
   }
 
-  const usuario = Array.isArray(usuarios) ? usuarios.find((u) => u.idExterno === elegido) : undefined;
-  // Los usuarios cuya tienda se parece a este dropshipper van primero, marcados con ★ (sin vincular a otro).
+  // Primero los que se parecen a este dropshipper («Se parece», sin vincular a otro); luego los libres, los de más pedidos primero; al final los que
+  // ya son suyos y, atenuados, los de otros dropshippers.
+  const grupo = (x: { u: UsuarioPlataforma; sugerido: boolean }) => (x.sugerido ? 0 : !x.u.dropshipperId ? 1 : x.u.dropshipperId === d.id ? 2 : 3);
   const ordenados = (Array.isArray(usuarios) ? usuarios : [])
     .map((u) => ({ u, puntaje: Math.max(...d.tiendas.map((t) => parecido(u.tienda, t)), parecido(u.tienda, d.nombre) * 0.9) }))
-    .map((x) => ({ ...x, sugerido: x.puntaje >= PUNTAJE_MINIMO && (!x.u.dropshipperId || x.u.dropshipperId === d.id) }))
-    .sort((a, b) => Number(b.sugerido) - Number(a.sugerido) || b.puntaje - a.puntaje);
+    .map((x) => ({ ...x, sugerido: x.puntaje >= PUNTAJE_MINIMO && !x.u.dropshipperId }))
+    .sort((a, b) => grupo(a) - grupo(b) || (grupo(a) === 0 ? b.puntaje - a.puntaje : b.u.pedidos - a.u.pedidos));
+  const q = buscar.trim().toLowerCase();
+  const visibles = ordenados.filter(({ u }) => !q || [u.tienda, u.idExterno, u.dropshipperNombre].some((x) => x?.toLowerCase().includes(q)));
+  const elegidosDatos = elegidos.map((id) => ordenados.find((x) => x.u.idExterno === id)?.u).filter((u): u is UsuarioPlataforma => !!u);
+  const alternar = (id: string) => setElegidos((x) => (x.includes(id) ? x.filter((y) => y !== id) : [...x, id]));
 
   return (
     <FichaCrear
       alGuardar={alGuardar}
       titulo="Vincular cuenta"
-      etiquetaCrear="Vincular cuenta"
+      etiquetaCrear={elegidos.length > 1 ? `Vincular ${elegidos.length} cuentas` : "Vincular cuenta"}
       action={vincularCuenta}
       mensajeExito="Cuenta vinculada"
       ocultos={{ dropshipper_id: d.id }}
@@ -98,35 +108,105 @@ function PanelVincular({ d, codigoPais, alGuardar }: { d: FilaDropshipper; codig
               </select>
             </Campo>
           </div>
-          <Campo etiqueta="Usuario de la plataforma" id="campo-usuario-cuenta" obligatorio faltante={faltante}>
+          <Campo
+            etiqueta="Usuarios de la plataforma"
+            id="campo-usuario-cuenta"
+            obligatorio
+            // El dato que falta es la marca de abajo (sin usuarios elegidos); el aviso sale junto al buscador.
+            faltante={faltante === "campo-usuario-cuenta-elegidos" ? "campo-usuario-cuenta" : faltante}
+          >
             {usuarios === "error" ? (
               <p id="campo-usuario-cuenta" role="alert" className="py-1 text-xs text-destructive">
                 No se pudo cargar la lista de usuarios.
               </p>
             ) : (
-              <select
-                id="campo-usuario-cuenta"
-                name="id_externo"
-                required
-                data-enfocar
-                disabled={usuarios === null}
-                aria-invalid={invalido("campo-usuario-cuenta")}
-                value={elegido}
-                onChange={(e) => setElegido(e.target.value)}
-                className={`${fieldClass} w-full`}
-              >
-                <option value="">{usuarios === null ? "Cargando…" : "Selecciona un usuario"}</option>
-                {ordenados.map(({ u, sugerido }) => (
-                  <option key={u.idExterno} value={u.idExterno} disabled={!!u.dropshipperId && u.dropshipperId !== d.id}>
-                    {sugerido ? "★ " : ""}
-                    {u.tienda ?? "Sin tienda"} · usuario {u.idExterno} · {u.pedidos} {u.pedidos === 1 ? "pedido" : "pedidos"}
-                    {u.dropshipperNombre ? ` · de ${u.dropshipperNombre}` : ""}
-                  </option>
-                ))}
-              </select>
+              <div className="flex flex-col gap-2">
+                <input
+                  id="campo-usuario-cuenta"
+                  type="search"
+                  data-enfocar
+                  value={buscar}
+                  onChange={(e) => setBuscar(e.target.value)}
+                  disabled={usuarios === null}
+                  placeholder={usuarios === null ? "Cargando usuarios…" : "Buscar por tienda, número de usuario o dueño"}
+                  aria-controls="lista-usuarios-cuenta"
+                  aria-invalid={invalido("campo-usuario-cuenta-elegidos")}
+                  className={`${fieldClass} w-full`}
+                />
+                {/* Lo que se va a vincular: se quita con la ×. */}
+                {elegidosDatos.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5" aria-label="Usuarios elegidos">
+                    {elegidosDatos.map((u) => (
+                      <span key={u.idExterno} className="inline-flex items-center gap-1 rounded-full bg-primario-suave py-0.5 pr-1 pl-2.5 text-xs font-medium text-primario">
+                        {u.tienda ?? "Sin tienda"} · {u.idExterno}
+                        <button
+                          type="button"
+                          onClick={() => alternar(u.idExterno)}
+                          aria-label={`Quitar ${u.tienda ?? "el usuario"} ${u.idExterno}`}
+                          className={`flex h-5 w-5 items-center justify-center rounded-full hover:bg-primario/15 ${anilloFoco}`}
+                        >
+                          <span aria-hidden="true">×</span>
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <div id="lista-usuarios-cuenta" role="group" aria-label="Usuarios de la plataforma" className="max-h-72 overflow-y-auto rounded-lg border border-border">
+                  {usuarios === null ? (
+                    <p className="m-0 px-3 py-6 text-center text-sm text-muted-foreground">Cargando…</p>
+                  ) : !visibles.length ? (
+                    <p className="m-0 px-3 py-6 text-center text-sm text-muted-foreground">{q ? "Ningún usuario coincide con la búsqueda." : "No hay usuarios con pedidos en este país."}</p>
+                  ) : (
+                    visibles.map(({ u, sugerido }) => {
+                      const deOtro = !!u.dropshipperId && u.dropshipperId !== d.id;
+                      const yaSuyo = u.dropshipperId === d.id;
+                      const marcado = elegidos.includes(u.idExterno);
+                      return (
+                        <label
+                          key={u.idExterno}
+                          className={`flex items-center gap-3 border-b border-border px-3 py-2 last:border-b-0 ${deOtro || yaSuyo ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:bg-muted"} ${marcado ? "bg-primario-suave/60" : ""}`}
+                        >
+                          <input type="checkbox" checked={marcado || yaSuyo} disabled={deOtro || yaSuyo} onChange={() => alternar(u.idExterno)} className="h-4 w-4 flex-none accent-[var(--primario)]" />
+                          <span className="flex min-w-0 flex-1 flex-col">
+                            <span className="flex items-center gap-1.5 text-sm font-medium">
+                              <span className="truncate">{u.tienda ?? "Sin tienda"}</span>
+                              {sugerido && !yaSuyo && <span className="flex-none rounded-full bg-success-soft px-1.5 py-px text-[11px] font-semibold text-success">Se parece</span>}
+                            </span>
+                            <span className="text-xs text-muted-foreground tabular-nums">
+                              Usuario {u.idExterno} · {u.pedidos} {u.pedidos === 1 ? "pedido" : "pedidos"}
+                              {yaSuyo ? " · ya es de este dropshipper" : deOtro ? ` · ya es de ${u.dropshipperNombre ?? "otro dropshipper"}` : ""}
+                            </span>
+                          </span>
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
+                {Array.isArray(usuarios) && (
+                  <span className="text-xs text-muted-foreground">
+                    {q ? `${visibles.length} de ${ordenados.length} usuarios` : `${ordenados.length} usuarios con pedidos`} · primero los que se parecen a este dropshipper y los libres
+                  </span>
+                )}
+              </div>
             )}
           </Campo>
-          <input type="hidden" name="tienda_nombre" value={usuario?.tienda ?? ""} />
+          {/* Lo que se manda: un id_externo (y su tienda) por usuario elegido. El campo de abajo solo exige elegir al menos uno. */}
+          {elegidosDatos.map((u) => (
+            <span key={u.idExterno} hidden>
+              <input type="hidden" name="id_externo" value={u.idExterno} />
+              <input type="hidden" name="tienda_nombre" value={u.tienda ?? ""} />
+            </span>
+          ))}
+          <input
+            id="campo-usuario-cuenta-elegidos"
+            required
+            tabIndex={-1}
+            aria-hidden="true"
+            data-destino="campo-usuario-cuenta"
+            value={elegidosDatos.length ? String(elegidosDatos.length) : ""}
+            onChange={() => {}}
+            className="sr-only"
+          />
         </Seccion>
       )}
     </FichaCrear>

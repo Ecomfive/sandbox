@@ -44,6 +44,17 @@ export function costoTexto(modelo: string, uso: UsoTexto): number {
 }
 
 /**
+ * El costo estimado de transcribir un audio (30 oct 2026): ni OpenAI ni Gemini dicen los minutos, así que se calculan con el tamaño (una nota de voz de
+ * WhatsApp pesa unos 150 KB por minuto) y la tarifa por minuto del modelo: `gpt-4o-mini-transcribe` 0,003, `whisper` y `gpt-4o-transcribe` 0,006 y Gemini
+ * (tokens de audio) alrededor de 0,001. Es una estimación para el saldo de «Consumo de IA».
+ */
+export function costoTranscripcion(modelo: string, bytes: number): number {
+  const minutos = Math.max(0, bytes) / 150_000;
+  const tarifa = /gemini/i.test(modelo) ? 0.001 : /mini/i.test(modelo) ? 0.003 : 0.006;
+  return r4(minutos * tarifa);
+}
+
+/**
  * Lo que cuesta una imagen de Gemini de 1K: unos 0,034 dólares en el modelo por defecto y 0,134 en los «Pro». Se corrige con
  * `GEMINI_IMAGE_PRICE_USD` si el modelo o la tarifa cambian.
  */

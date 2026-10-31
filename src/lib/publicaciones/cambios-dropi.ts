@@ -4,11 +4,14 @@
 // resultado (aplicar-actions.ts).
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { traerTodasLasFilas } from "@/lib/supabase/paginar";
+import type { CambioPrecio } from "./competencia-publicaciones";
 import type { DatosCrearDropi, FotoCrear } from "./crear-dropi";
 import { MAX_NOMBRE_DROPI } from "./dropi-guardado";
+import { normalizarDatosDevolver } from "./apagar-dropi";
 import { normalizarDatosPrivatizar, type DatosPrivatizar } from "./privatizar-dropi";
 import { idsDeDropi } from "./sincronizar-dropi";
-import { normalizarDatosStock, type DatosStock } from "./stock-dropi";
+import { normalizarDatosStock, productoDelCambio, type DatosStock } from "./stock-dropi";
 
 export type EstadoCambioDropi = "pendiente" | "aplicado" | "error" | "reemplazado";
 
@@ -168,25 +171,34 @@ export async function encolarRepublicar(
  * «Apagar en Dropi» (pedido de Hernán, 23 oct 2026; migración 0148): deja en la cola que se saque todo el stock del producto en Dropi
  * (con `quitarPrivados`, también su privatización) y se archive. Si ya había un apagado esperando, no se agrega otro (el pendiente
  * se reintenta solo en cada «Aplicar en Dropi»; si antes no pedía quitar privados y ahora sí, se actualiza).
+ * `devolverA` («Quitar privatización», 30 oct 2026): el público al que se le devuelven las unidades del privado (va en `datos`). A un apagado que
+ * ya estaba esperando se le agrega solo si Dropi todavía no lo tocó.
  */
 export async function encolarApagar(
   supabase: SupabaseClient,
   pub: { id: string; pais_id: string; dropi_id: string | null },
-  opciones: { quitarPrivados: boolean },
+  opciones: { quitarPrivados: boolean; devolverA?: { publico: number; publicacionId: string } | null },
   por: { id: string; nombre: string },
 ): Promise<{ id: string; yaEstaba: boolean } | { error: string }> {
   const productoId = idsDeDropi(pub.dropi_id)[0];
   if (!productoId) return { error: "La publicación no tiene ID de Dropi." };
   const falta = (m: string) => /tipo|column|does not exist|schema cache|quitar_privados/i.test(m);
-  const previo = await supabase.from("dropi_cambios_pendientes").select("id, quitar_privados").eq("publicacion_id", pub.id).eq("tipo", "apagar").in("estado", ["pendiente", "error"]).limit(1).maybeSingle();
+  const devolver = opciones.devolverA ? { publico: opciones.devolverA.publico, publicacionId: opciones.devolverA.publicacionId, unidades: null, devuelto: false } : null;
+  const previo = await supabase.from("dropi_cambios_pendientes").select("id, quitar_privados, datos, intentos").eq("publicacion_id", pub.id).eq("tipo", "apagar").in("estado", ["pendiente", "error"]).limit(1).maybeSingle();
   if (previo.error) return { error: falta(previo.error.message) ? "Falta correr en Supabase la migración 0148." : "No se pudo dejar el apagado para Dropi." };
   if (previo.data) {
-    if (opciones.quitarPrivados && !previo.data.quitar_privados) await supabase.from("dropi_cambios_pendientes").update({ quitar_privados: true }).eq("id", previo.data.id as string);
+    const cambios: Record<string, unknown> = {};
+    if (opciones.quitarPrivados && !previo.data.quitar_privados) cambios.quitar_privados = true;
+    if (devolver && !normalizarDatosDevolver(previo.data.datos)) {
+      if (Number(previo.data.intentos) > 0) return { error: "Este ID ya tiene un apagado que se intentó en Dropi: espera a que termine y devuelve las unidades con «Cambiar stock»." };
+      cambios.datos = devolver;
+    }
+    if (Object.keys(cambios).length) await supabase.from("dropi_cambios_pendientes").update(cambios).eq("id", previo.data.id as string);
     return { id: previo.data.id as string, yaEstaba: true };
   }
   const { data, error } = await supabase
     .from("dropi_cambios_pendientes")
-    .insert({ pais_id: pub.pais_id, publicacion_id: pub.id, dropi_producto_id: productoId, tipo: "apagar", quitar_privados: opciones.quitarPrivados, creado_por: por.id, creado_por_nombre: por.nombre })
+    .insert({ pais_id: pub.pais_id, publicacion_id: pub.id, dropi_producto_id: productoId, tipo: "apagar", quitar_privados: opciones.quitarPrivados, ...(devolver ? { datos: devolver } : {}), creado_por: por.id, creado_por_nombre: por.nombre })
     .select("id")
     .single();
   if (error || !data) return { error: error && falta(error.message) ? "Falta correr en Supabase la migración 0148." : "No se pudo dejar el apagado para Dropi." };
@@ -310,24 +322,30 @@ export async function encolarStock(
   datos: DatosStock,
   por: { id: string; nombre: string },
 ): Promise<{ id: string; yaEstaba: boolean } | { error: string }> {
-  const productoId = idsDeDropi(pub.dropi_id)[0];
-  if (!productoId) return { error: "La publicación no tiene ID de Dropi." };
+  const productoId = productoDelCambio(idsDeDropi(pub.dropi_id), datos.producto);
+  if (typeof productoId !== "number") return productoId;
   const falta = (m: string) => /tipo|column|does not exist|schema cache|datos|check constraint/i.test(m);
-  const previo = await supabase.from("dropi_cambios_pendientes").select("id, datos").eq("publicacion_id", pub.id).eq("tipo", "stock").in("estado", ["pendiente", "error"]);
+  const previo = await supabase
+    .from("dropi_cambios_pendientes")
+    .select("id, datos")
+    .eq("publicacion_id", pub.id)
+    .eq("dropi_producto_id", productoId)
+    .eq("tipo", "stock")
+    .in("estado", ["pendiente", "error"]);
   if (previo.error) return { error: falta(previo.error.message) ? "Falta correr en Supabase la migración 0173." : "No se pudo dejar el stock para Dropi." };
   const igual = (previo.data ?? []).find((f) => normalizarDatosStock(f.datos).bodega === datos.bodega);
   if (igual) {
     const antes = normalizarDatosStock(igual.datos).antes;
     const { error } = await supabase
       .from("dropi_cambios_pendientes")
-      .update({ datos: { ...datos, antes: antes ?? datos.antes }, estado: "pendiente", error: null, creado_por: por.id, creado_por_nombre: por.nombre })
+      .update({ datos: { ...datos, producto: productoId, antes: antes ?? datos.antes }, estado: "pendiente", error: null, creado_por: por.id, creado_por_nombre: por.nombre })
       .eq("id", igual.id as string);
     if (error) return { error: "No se pudo dejar el stock para Dropi." };
     return { id: igual.id as string, yaEstaba: true };
   }
   const { data, error } = await supabase
     .from("dropi_cambios_pendientes")
-    .insert({ pais_id: pub.pais_id, publicacion_id: pub.id, dropi_producto_id: productoId, tipo: "stock", datos, creado_por: por.id, creado_por_nombre: por.nombre })
+    .insert({ pais_id: pub.pais_id, publicacion_id: pub.id, dropi_producto_id: productoId, tipo: "stock", datos: { ...datos, producto: productoId }, creado_por: por.id, creado_por_nombre: por.nombre })
     .select("id")
     .single();
   if (error || !data) return { error: error && falta(error.message) ? "Falta correr en Supabase la migración 0173." : "No se pudo dejar el stock para Dropi." };
@@ -383,6 +401,39 @@ export async function enviarNombreADropi(
 }
 
 /** El último cambio en Dropi de cada publicación del país y cuántos siguen pendientes. Sin la migración 0137, vacío. */
+/**
+ * El último precio aplicado en Dropi desde el sistema, por publicación (30 oct 2026, pedido de Hernán): «Aplicar en Dropi» lo cambia al
+ * momento y la lectura del catálogo lo ve recién en su próxima vuelta (o nunca, si no se corre). Las republicaciones no cuentan: su precio
+ * queda en la publicación nueva. Si falla, sin ninguno (la ficha sigue con lo de la lectura).
+ */
+export async function cargarPreciosAplicados(supabase: SupabaseClient, paisId: string): Promise<Map<string, CambioPrecio>> {
+  const r = new Map<string, CambioPrecio>();
+  try {
+    const filas = await traerTodasLasFilas<{ publicacion_id: string; tipo: string | null; precio: number; precio_antes: number | null; aplicado_en: string; creado_por_nombre: string | null }>((d, h) =>
+      supabase
+        .from("dropi_cambios_pendientes")
+        .select("publicacion_id, tipo, precio, precio_antes, aplicado_en, creado_por_nombre")
+        .eq("pais_id", paisId)
+        .eq("estado", "aplicado")
+        .not("precio", "is", null)
+        .not("aplicado_en", "is", null)
+        .order("aplicado_en", { ascending: false })
+        .range(d, h),
+    );
+    for (const f of filas) {
+      if ((f.tipo && f.tipo !== "cambio") || r.has(f.publicacion_id)) continue;
+      const despues = Number(f.precio);
+      const antes = f.precio_antes === null ? null : Number(f.precio_antes);
+      // Un nombre que se mandó con el mismo precio no es un cambio de precio.
+      if (antes !== null && Math.abs(antes - despues) <= 0.004) continue;
+      r.set(f.publicacion_id, { fecha: f.aplicado_en, antes, despues, origen: "sistema", por: f.creado_por_nombre });
+    }
+  } catch {
+    // Sin los aplicados: queda lo que vio la lectura del catálogo.
+  }
+  return r;
+}
+
 export async function cargarCambiosDropi(
   supabase: SupabaseClient,
   paisId: string,
@@ -394,7 +445,7 @@ export async function cargarCambiosDropi(
   creando: Map<string, number>;
   /** Privatizaciones esperando por publicación pública (pendientes o con error), con a quién y cuántas unidades. */
   privatizando: Map<string, Pick<DatosPrivatizar, "correo" | "dropshipper" | "unidades" | "nombre">[]>;
-  /** Cambios de stock esperando por publicación (pendientes o con error): bodega y unidades que deben quedar. */
+  /** Cambios de stock esperando por publicación (pendientes o con error): ID de Dropi, bodega y unidades que deben quedar. */
   ajustandoStock: Map<string, DatosStock[]>;
 }> {
   const porPublicacion = new Map<string, CambioDropiVista>();
@@ -408,7 +459,7 @@ export async function cargarCambiosDropi(
   const ajustandoStock = new Map<string, DatosStock[]>();
   const leer = (columnas: string) =>
     supabase.from("dropi_cambios_pendientes").select(columnas).eq("pais_id", paisId).neq("estado", "reemplazado").order("creado_en", { ascending: false }).limit(2000);
-  let r = await leer("id, publicacion_id, tipo, restaurar, descripcion, fotos, datos, nuevo_dropi_id, intentos, estado, nombre, nombre_guia, precio, precio_sugerido, error, creado_en, aplicado_en");
+  let r = await leer("id, publicacion_id, dropi_producto_id, tipo, restaurar, descripcion, fotos, datos, nuevo_dropi_id, intentos, estado, nombre, nombre_guia, precio, precio_sugerido, error, creado_en, aplicado_en");
   // Sin la migración 0151, sin archivar, descripción ni fotos; sin la 0145, sin republicaciones; sin la 0139, sin precios.
   if (r.error) r = await leer("id, publicacion_id, tipo, nuevo_dropi_id, intentos, estado, nombre, nombre_guia, precio, precio_sugerido, error, creado_en, aplicado_en");
   if (r.error) r = await leer("id, publicacion_id, estado, nombre, nombre_guia, precio, precio_sugerido, error, creado_en, aplicado_en");
@@ -423,7 +474,11 @@ export async function cargarCambiosDropi(
       privatizando.set(f.publicacion_id as string, [...(privatizando.get(f.publicacion_id as string) ?? []), { correo: d.correo, dropshipper: d.dropshipper, unidades: d.unidades, nombre: d.nombre }]);
     }
     if (f.tipo === "stock" && (f.estado === "pendiente" || f.estado === "error"))
-      ajustandoStock.set(f.publicacion_id as string, [...(ajustandoStock.get(f.publicacion_id as string) ?? []), normalizarDatosStock(f.datos)]);
+      // El ID va en la fila (los pedidos de antes del 31 oct no lo traen en `datos`).
+      ajustandoStock.set(f.publicacion_id as string, [
+        ...(ajustandoStock.get(f.publicacion_id as string) ?? []),
+        { ...normalizarDatosStock(f.datos), producto: Number(f.dropi_producto_id) || normalizarDatosStock(f.datos).producto },
+      ]);
     if (f.tipo === "apagar" && (f.estado === "pendiente" || f.estado === "error")) apagando.set(f.publicacion_id as string, Number(f.intentos ?? 0));
     if (f.tipo === "archivar" && (f.estado === "pendiente" || f.estado === "error") && !archivando.has(f.publicacion_id as string)) archivando.set(f.publicacion_id as string, f.restaurar === true);
     if (f.tipo === "crear" && (f.estado === "pendiente" || f.estado === "error")) creando.set(f.publicacion_id as string, Number(f.intentos ?? 0));

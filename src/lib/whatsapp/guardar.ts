@@ -1,6 +1,9 @@
 import { normalizarTelefono } from "@/lib/crm/telefono";
 import { createServiceClient } from "@/lib/supabase/server";
-import { ORDEN_ESTADO, resumenMensaje, type EstadoEntrante, type MensajeEntrante, type RevocadoEntrante } from "./extraer";
+import { avisarBandeja } from "./aviso-bandeja";
+import { clasificarPorTelefonos } from "./clasificar";
+import { dropshipperPorTelefonos } from "./vinculo";
+import { ORDEN_ESTADO, resumenMensaje, type EditadoEntrante, type EstadoEntrante, type MensajeEntrante, type RevocadoEntrante } from "./extraer";
 
 /**
  * Guarda los mensajes que llegan por el webhook (migración 0158): cada uno en su conversación (número de la empresa + teléfono del
@@ -12,8 +15,8 @@ export async function guardarEntrantes(mensajes: MensajeEntrante[], desdeCelular
   const supabase = createServiceClient();
   // El dropshipper de cada teléfono: el CRM guarda el WhatsApp en formato internacional (src/lib/crm/telefono.ts).
   const telefonos = [...new Set(mensajes.map((m) => normalizarTelefono(m.telefono)?.e164 ?? m.telefono))];
-  const { data } = await supabase.from("dropshippers").select("id, contacto_telefono").in("contacto_telefono", telefonos);
-  const dropshipperDe = new Map((data ?? []).map((d) => [d.contacto_telefono as string, d.id as string]));
+  // Su número principal o uno de sus otros números (migración 0177).
+  const dropshipperDe = await dropshipperPorTelefonos(supabase, telefonos);
   for (const m of [...mensajes].sort((a, b) => a.momento.localeCompare(b.momento))) {
     const telefono = normalizarTelefono(m.telefono)?.e164 ?? m.telefono;
     const { error } = await supabase.rpc(desdeCelular ? "whatsapp_registrar_saliente_celular" : "whatsapp_registrar_entrante", {
@@ -32,8 +35,13 @@ export async function guardarEntrantes(mensajes: MensajeEntrante[], desdeCelular
       p_resumen: resumenMensaje(m.tipo, m.texto),
     });
     if (error) console.error(`WhatsApp: no se pudo guardar un mensaje${desdeCelular ? " mandado desde el celular" : ""}`, m.waId, error.message);
+    // Una reacción: a qué mensaje va (migración 0186), para dibujarla sobre ese mensaje. Sin la columna no pasa nada.
+    else if (m.reaccionA) await supabase.from("whatsapp_mensajes").update({ reaccion_a: m.reaccionA }).eq("wa_id", m.waId);
   }
   if (!desdeCelular) await volverAMostrarSiOcultos(supabase, telefonos);
+  await avisarBandeja();
+  // El motivo de los chats que esperan respuesta, leído por la IA (migración 0189): la bandeja los ordena por su plazo.
+  if (!desdeCelular && (await clasificarPorTelefonos(supabase, telefonos)) > 0) await avisarBandeja();
 }
 
 /**
@@ -60,6 +68,31 @@ export async function guardarEstados(estados: EstadoEntrante[]): Promise<void> {
     const anteriores = ORDEN_ESTADO.slice(0, ORDEN_ESTADO.indexOf(e.estado));
     await supabase.from("whatsapp_mensajes").update({ estado: e.estado }).eq("wa_id", e.waId).in("estado", anteriores);
   }
+  await avisarBandeja();
+}
+
+/**
+ * Aplica las ediciones: el mensaje original se queda con el texto nuevo y se guarda el primero que tuvo (`texto_antes`) y cuándo se editó (`editado_en`, migración 0191). Nada se pierde: una
+ * segunda edición no pisa el `texto_antes`. Sin la migración no se cambia nada (el texto de antes se perdería); un original que el sistema no tiene se ignora.
+ */
+export async function guardarEditados(editados: EditadoEntrante[]): Promise<void> {
+  if (!editados.length) return;
+  const supabase = createServiceClient();
+  // En el orden en que se hicieron: dos ediciones seguidas dejan la última.
+  for (const e of [...editados].sort((a, b) => (a.momento < b.momento ? -1 : 1))) {
+    const { data, error } = await supabase.from("whatsapp_mensajes").select("id, texto, texto_antes").eq("wa_id", e.waIdOriginal).maybeSingle();
+    if (error) {
+      console.error("WhatsApp: no se pudo leer un mensaje editado (¿falta la migración 0191?)", e.waIdOriginal, error.message);
+      continue;
+    }
+    if (!data || data.texto === e.texto) continue;
+    const { error: falla } = await supabase
+      .from("whatsapp_mensajes")
+      .update({ texto: e.texto, texto_antes: (data.texto_antes as string | null) ?? (data.texto as string | null), editado_en: e.momento })
+      .eq("id", data.id as string);
+    if (falla) console.error("WhatsApp: no se pudo guardar la edición de un mensaje", e.waIdOriginal, falla.message);
+  }
+  await avisarBandeja();
 }
 
 /**
@@ -73,4 +106,5 @@ export async function guardarRevocados(revocados: RevocadoEntrante[]): Promise<v
     const { error } = await supabase.from("whatsapp_mensajes").update({ eliminado_en_whatsapp_en: r.momento }).eq("wa_id", r.waIdOriginal).is("eliminado_en_whatsapp_en", null);
     if (error) console.error("WhatsApp: no se pudo marcar un mensaje eliminado en WhatsApp", r.waIdOriginal, error.message);
   }
+  await avisarBandeja();
 }

@@ -59,6 +59,11 @@ export function areasVisibles(acceso: AccesoCrm): AreaCrm[] {
   return acceso.comercial ? ["comercial", "atencion"] : ["atencion"];
 }
 
+/** Los números de WhatsApp de la empresa que esta persona puede ver o elegir: los de sus áreas (Atención no ve el número de Comercial; Comercial ve los dos). */
+export function numerosDeAreas<T extends { area: AreaCrm }>(numeros: readonly T[], areas: readonly AreaCrm[]): T[] {
+  return numeros.filter((n) => areas.includes(n.area));
+}
+
 /**
  * En qué área se guarda una nota nueva. Quien pide «comercial» sin poder escribir en Comercial no la puede crear
  * (devuelve null); sin pedir nada, cada quien escribe en su área (Comercial si la tiene, si no Atención).
@@ -78,6 +83,28 @@ export function escribeEnArea(acceso: AccesoCrm, area: AreaCrm): boolean {
   if (area === "direccion") return acceso.escribeDireccion;
   return area === "comercial" ? acceso.escribeComercial : acceso.escribeAtencion || acceso.escribeComercial;
 }
+
+/**
+ * El área propia de cada quien en la bandeja (pedido de Hernán, 29 oct 2026): la de más arriba que tiene. Es su panel; los de las áreas de
+ * abajo los supervisa (Comercial mira Atención; Dirección mira Comercial y Atención).
+ */
+export function areaPropia(acceso: AccesoCrm): AreaCrm {
+  if (acceso.direccion) return "direccion";
+  return acceso.comercial ? "comercial" : "atencion";
+}
+
+/**
+ * Si mira esa área como supervisor (no es la suya): al abrir sus chats **no los marca leídos** —quien la atiende no se entera— y para
+ * responderle al dropshipper primero tiene que «Intervenir» (el chat queda a su cargo). Las notas privadas sí las puede dejar.
+ */
+export const supervisaArea = (acceso: AccesoCrm, area: AreaCrm) => area !== areaPropia(acceso);
+
+/**
+ * A quién se le borra de verdad lo que se borra en WhatsApp Business (pedido de Jhokser, 30 oct 2026): a quien tiene **únicamente Atención** (Nicole y su equipo) un mensaje
+ * borrado «para todos» o un chat borrado en la app **desaparece**, como en WhatsApp. Comercial, Dirección y los administradores (que tienen las tres áreas) lo siguen viendo
+ * intacto, con su marca de borrado. Lo decide el servidor: a Atención ni siquiera viaja.
+ */
+export const pierdeLoBorrado = (acceso: AccesoCrm) => acceso.atencion && !acceso.comercial && !acceso.direccion;
 
 /** Acciones de la auditoría que son del trabajo comercial y no se muestran a Atención. */
 export const ACCIONES_COMERCIALES = [

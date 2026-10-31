@@ -23,7 +23,20 @@ function previa(p: PlantillaParaEnviar, manuales: string[]): string {
  * «Enviar plantilla» (28 oct 2026): pasadas 24 h del último mensaje de un dropshipper, la única forma de escribirle. Lista las plantillas
  * que Meta aprobó con sus datos ya llenos para esta persona; lo que no se sabe (el producto, por ejemplo) se escribe antes de enviar.
  */
-export function EnviarPlantilla({ conversacionId, nombre, alCerrar, alEnviado }: { conversacionId: string; nombre: string; alCerrar: () => void; alEnviado: () => void }) {
+export function EnviarPlantilla({
+  conversacionId,
+  nombre,
+  plantillaInicial = null,
+  alCerrar,
+  alEnviado,
+}: {
+  conversacionId: string;
+  nombre: string;
+  /** El id de una plantilla que ya viene elegida (la que se pulsó en el aviso de «fuera de las 24 h»). */
+  plantillaInicial?: string | null;
+  alCerrar: () => void;
+  alEnviado: () => void;
+}) {
   const [plantillas, setPlantillas] = useState<PlantillaParaEnviar[] | null>(null);
   const [errorCarga, setErrorCarga] = useState<string | null>(null);
   const [elegida, setElegida] = useState<PlantillaParaEnviar | null>(null);
@@ -38,11 +51,20 @@ export function EnviarPlantilla({ conversacionId, nombre, alCerrar, alEnviado }:
       .then((r) => {
         if (!vigente) return;
         if ("error" in r) setErrorCarga(r.error);
-        else setPlantillas(r.plantillas);
+        else {
+          setPlantillas(r.plantillas);
+          const inicial = plantillaInicial ? r.plantillas.find((p) => p.id === plantillaInicial) : null;
+          if (inicial) {
+            setElegida(inicial);
+            setManuales(inicial.valores.map((_, i) => inicial.sugeridos[i] ?? ""));
+          }
+        }
       });
     return () => {
       vigente = false;
     };
+    // La plantilla inicial solo cuenta al abrir.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversacionId]);
 
   const faltaEscribir = !!elegida && elegida.manual.some((m, i) => m && !manuales[i]?.trim());
@@ -87,7 +109,7 @@ export function EnviarPlantilla({ conversacionId, nombre, alCerrar, alEnviado }:
                   type="button"
                   onClick={() => {
                     setElegida(p);
-                    setManuales(p.valores.map(() => ""));
+                    setManuales(p.valores.map((_, i) => p.sugeridos[i] ?? ""));
                     setError(null);
                   }}
                   className={`flex min-h-12 w-full flex-col gap-1 rounded-lg border border-border bg-card p-3 text-left hover:bg-muted ${anilloFoco}`}
@@ -95,6 +117,7 @@ export function EnviarPlantilla({ conversacionId, nombre, alCerrar, alEnviado }:
                   <span className="flex flex-wrap items-center gap-2">
                     <span className="font-mono text-sm font-semibold">{p.nombre}</span>
                     <Badge tone="neutral">{CATEGORIA[p.categoria] ?? p.categoria}</Badge>
+                    {p.predeterminada && <Badge tone="info">Predeterminada</Badge>}
                     {p.yaEnviada && <Badge tone="warning">Ya enviada hoy</Badge>}
                   </span>
                   <span className="text-sm text-muted-foreground whitespace-pre-wrap [overflow-wrap:anywhere]">{previa(p, [])}</span>
@@ -154,5 +177,89 @@ export function EnviarPlantilla({ conversacionId, nombre, alCerrar, alEnviado }:
         </div>
       </div>
     </Ventana>
+  );
+}
+
+/**
+ * El aviso de «fuera de las 24 h» arriba del cuadro de texto (30 oct 2026): pasado ese plazo WhatsApp solo deja escribirle con una plantilla aprobada por Meta, así que aquí mismo se ven las que ya
+ * están aprobadas, una por botón, y al pulsar una se abre su ventana ya elegida. Enviar un mensaje libre fuera de la ventana es lo que más reportes (y riesgo de bloqueo) causa: el cuadro de
+ * texto queda apagado y el servidor lo rechaza también (`chatParaEnviar`).
+ */
+export function PlantillasEnLinea({ conversacionId, interno = false, alElegir, alVerTodas }: { conversacionId: string; /** Es el «WhatsApp interno» entre dos números de la empresa. */ interno?: boolean; alElegir: (plantillaId: string) => void; alVerTodas: () => void }) {
+  const [plantillas, setPlantillas] = useState<PlantillaParaEnviar[] | null>(null);
+  const [errorCarga, setErrorCarga] = useState<string | null>(null);
+
+  useEffect(() => {
+    let vigente = true;
+    plantillasParaConversacion(conversacionId)
+      .catch(() => ({ error: "No se pudieron cargar las plantillas." }))
+      .then((r) => {
+        if (!vigente) return;
+        if ("error" in r) setErrorCarga(r.error);
+        else setPlantillas(r.plantillas);
+      });
+    return () => {
+      vigente = false;
+    };
+  }, [conversacionId]);
+
+  return (
+    <div role="region" aria-label="Fuera de las 24 horas: hace falta una plantilla" className="mx-3 mt-2 flex flex-col gap-2 rounded-lg border border-[var(--wa-borde)] bg-[var(--wa-fondo)] px-3 py-2.5">
+      <p className="m-0 text-[13px] text-[var(--wa-texto)]">
+        <span className="inline-flex items-center gap-1.5 font-semibold text-warning">
+          <span aria-hidden="true" className="h-2 w-2 rounded-full bg-warning" />
+          No se puede escribir.
+        </span>{" "}
+        {interno
+          ? "Es un chat de WhatsApp entre los números de la empresa: el primer mensaje, y cualquiera pasadas 24 h sin respuesta, es una plantilla aprobada por Meta. Cuando la otra área responda, se escribe libre."
+          : "Pasaron más de 24 h desde su último mensaje: para retomar la conversación hay que enviarle una plantilla aprobada por Meta."}
+      </p>
+      {errorCarga && (
+        <p role="alert" className="m-0 text-[12.5px] text-destructive">
+          {errorCarga}
+        </p>
+      )}
+      {!errorCarga && !plantillas && (
+        <p role="status" className="m-0 text-[12.5px] text-[var(--wa-sec)]">
+          Cargando plantillas…
+        </p>
+      )}
+      {plantillas && plantillas.length === 0 && (
+        <p className="m-0 text-[12.5px] text-[var(--wa-sec)]">
+          Todavía no hay plantillas aprobadas por Meta.{" "}
+          <Link href="/crm-dropshippers/plantillas" className={`font-medium underline underline-offset-2 ${anilloFoco}`}>
+            Ir a Plantillas
+          </Link>
+        </p>
+      )}
+      {plantillas && plantillas.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          {plantillas.map((p) => {
+            const apagada = p.yaEnviada || !!p.faltante;
+            const motivo = p.yaEnviada ? "Ya se le mandó hoy: espera su respuesta antes de repetirla." : (p.faltante ?? previa(p, []));
+            return (
+              <button
+                key={p.id}
+                type="button"
+                aria-disabled={apagada || undefined}
+                title={motivo}
+                onClick={() => !apagada && alElegir(p.id)}
+                className={`inline-flex min-h-9 max-w-full items-center gap-1.5 rounded-full border border-[var(--wa-borde)] px-3 text-[13px] ${
+                  apagada ? "cursor-not-allowed text-[var(--wa-sec)] opacity-60" : "bg-[var(--wa-acento-suave)] font-medium text-[var(--wa-acento-suave-texto)] hover:opacity-90"
+                } ${p.predeterminada && !apagada ? "ring-2 ring-[var(--wa-acento)]" : ""} ${anilloFoco}`}
+              >
+                <span className="truncate">{p.nombre.replace(/_/g, " ")}</span>
+                {p.predeterminada && <span className="flex-none text-[11.5px] font-semibold">· predeterminada</span>}
+                <span className="flex-none text-[11.5px] font-normal opacity-80">{CATEGORIA[p.categoria] ?? p.categoria}</span>
+                {p.yaEnviada && <span className="flex-none text-[11.5px] font-normal">· ya enviada hoy</span>}
+              </button>
+            );
+          })}
+          <button type="button" onClick={alVerTodas} className={`inline-flex min-h-9 items-center rounded-full px-3 text-[13px] font-medium text-[var(--wa-sec)] underline underline-offset-2 hover:text-[var(--wa-texto)] ${anilloFoco}`}>
+            Ver con su texto
+          </button>
+        </div>
+      )}
+    </div>
   );
 }

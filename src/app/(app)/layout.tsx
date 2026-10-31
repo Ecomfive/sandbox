@@ -15,7 +15,6 @@ import { obtenerPlataformasPais } from "@/lib/pais-plataformas";
 import { construirAreas } from "@/lib/nav-data";
 import { paginasBuscables } from "@/lib/paleta";
 import { esAdministrador } from "@/lib/permisos/acceso";
-import { MODULO_DIRECCION } from "@/lib/crm/areas";
 import { PESTANAS_SOLO_ADMIN, pestanasOcultasDe } from "@/lib/permisos/ocultas";
 import { createServiceClient } from "@/lib/supabase/server";
 import { obtenerFavoritos } from "@/lib/favoritos";
@@ -65,8 +64,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     ? [
         ...pestanasOcultasDe(usuario.afinado),
         ...(esAdministrador(usuario) ? [] : PESTANAS_SOLO_ADMIN),
-        // Los KPIs de atención son del CEO (módulo crm-direccion).
-        ...(usuario.modulos.includes(MODULO_DIRECCION) ? [] : ["/crm-dropshippers/kpis"]),
+        // Los KPIs de atención y el panel de Dirección ya no son pestañas: desde el 30 oct 2026 son la Bandeja de Dirección.
       ]
     : [];
   const paginas = paginasBuscables(areas, usuario?.modulos ?? null, pestanasOcultas);
@@ -80,7 +78,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         <Sidebar modulosPermitidos={usuario?.modulos ?? null} areas={areas} favoritos={favoritos} pendientes={pendientes} />
         <div className="flex min-h-full min-w-0 flex-1 flex-col">
           <NavBar paginas={paginas} pendientes={pendientes} plataforma={plataformasPais.find((p) => p.tieneDatos)?.nombre ?? null} />
-          <BarraMigas areas={areas} favoritos={favoritos} pestanasOcultas={pestanasOcultas} />
+          <BarraMigas areas={areas} favoritos={favoritos} pestanasOcultas={pestanasOcultas} verAccesos={!!usuario && esAdministrador(usuario)} />
           <TransicionPagina>{children}</TransicionPagina>
         </div>
       </div>

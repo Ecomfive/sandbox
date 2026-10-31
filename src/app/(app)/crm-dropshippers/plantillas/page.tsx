@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { requireModulo } from "@/lib/auth";
@@ -5,6 +6,7 @@ import { accesoCrm } from "@/lib/crm/areas";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 import { conexionPlantillas } from "@/lib/whatsapp/api-plantillas";
+import { revisarPlantillasEnRevision } from "@/lib/whatsapp/revision-plantillas";
 import { cargarPlantillas } from "./datos-plantillas";
 import { Plantillas } from "./plantillas";
 
@@ -16,6 +18,8 @@ export const dynamic = "force-dynamic";
 export default async function PlantillasWhatsappPage() {
   const usuario = await requireModulo("crm-dropshippers");
   const datos = await cargarPlantillas(createServiceClient());
+  // Si hay plantillas en revisión, se le pregunta a Meta cómo van (de paso, sin hacer esperar la pantalla): lo que cambie se ve al volver a abrirla.
+  if (datos?.plantillas.some((p) => p.estado === "pendiente")) after(async () => void (await revisarPlantillasEnRevision(createServiceClient(), true)));
   const a = accesoCrm(usuario);
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-4">

@@ -1,7 +1,7 @@
 "use client";
 
 import { BotonIconoFila } from "./boton-icono-fila";
-import { motivoPrivatizar } from "@/lib/publicaciones/botones-fila";
+import { motivoPrivatizar, motivoQuitarPrivatizacion } from "@/lib/publicaciones/botones-fila";
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { BotonAccion } from "@/components/ui/boton-accion";
@@ -10,11 +10,12 @@ import { anilloFoco, fieldClass } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { Ventana } from "@/components/ui/ventana";
 import { usePuedeAbrir } from "@/components/modulos-contexto";
-import { CandadoIcon } from "@/lib/nav-icons";
+import { CandadoAbiertoIcon, CandadoIcon, DeshacerIcon } from "@/lib/nav-icons";
 import { esBodegaDropi } from "@/lib/publicaciones/automatico";
 import { faltantesPrivatizar, inicialesDe, limpiarIniciales, nombrePrivado, normalizarDatosPrivatizar } from "@/lib/publicaciones/privatizar-dropi";
 import { codigoBodega } from "@/lib/publicaciones/sincronizar-dropi";
-import { buscarDropshippersParaPrivatizar, privatizarPublicacion } from "./actions";
+import { buscarDropshippersParaPrivatizar, privatizarPublicacion, quitarPrivatizacion } from "./actions";
+import { VentanaDeshacerApagado } from "./apagar-dropi";
 import { estadoBotones, type FilaPublicacion } from "./def-publicaciones";
 
 /** Las bodegas de ECOMFIVE con stock de este producto en Dropi (la B280 es de Dropi y no se mueve desde aquí), de más a menos stock. */
@@ -204,34 +205,133 @@ function VentanaPrivatizar({ p, alCerrar }: { p: FilaPublicacion; alCerrar: () =
   );
 }
 
-/** El botón «Privatizar en Dropi» de la ficha. La ventana solo existe mientras está abierta, así cada vez sale vacía. */
+/**
+ * «Quitar privatización» (pedido de Hernán, 30 oct 2026): el candado cerrado de un ID privado. Deja pendiente que «Aplicar en Dropi» le saque el stock
+ * al privado, le quite el correo en «Productos privados», le devuelva esas unidades al público que se elija (el del mismo producto) y lo archive.
+ * Se puede elegir no devolverlas (quedan fuera, como con «Apagar»). Nada se toca en Dropi hasta «Aplicar en Dropi».
+ */
+function VentanaQuitarPrivatizacion({ p, alCerrar }: { p: FilaPublicacion; alCerrar: () => void }) {
+  const { mostrarToast } = useToast();
+  const publicos = p.publicosDelProducto;
+  const [destino, setDestino] = useState(publicos[0]?.id ?? "");
+  const [error, setError] = useState<string | null>(null);
+  const [pendiente, empezar] = useTransition();
+  const elegido = publicos.find((x) => x.id === destino) ?? null;
+  const unidades = p.stockProveedor ?? 0;
+  const quien = p.privatizadoA || p.privatizadoEmail;
+  const pasos = [
+    unidades > 0 ? `Sacarle al privado sus ${unidades.toLocaleString("es-PA")} unidades` : "Sacarle al privado el stock que tenga",
+    `Quitar la privatización${quien ? ` (${quien})` : ""} en «Productos privados»`,
+    elegido ? `Devolver esas unidades al público «${elegido.nombre}» (ID ${elegido.dropiId})` : "No devolver las unidades a un público",
+    "Archivar el privado",
+  ];
+
+  function confirmar() {
+    setError(null);
+    empezar(async () => {
+      const r = await quitarPrivatizacion(p.id, elegido?.id ?? null).catch(() => ({ error: "No se pudo. Inténtalo de nuevo.", detalle: undefined }));
+      if (r.error) return void setError(r.error);
+      alCerrar();
+      mostrarToast(r.detalle ?? "Quitar privatización pendiente");
+    });
+  }
+
+  return (
+    <Ventana abierto alCerrar={alCerrar} titulo="Quitar privatización" ancho="md">
+      <div className="flex flex-col gap-4 p-5 text-sm">
+        <p className="m-0 truncate font-medium">
+          {p.nombre} <span className="font-normal text-muted-foreground">· ID {p.dropiId}</span>
+        </p>
+        <Campo etiqueta="Devolver las unidades a" id="quitar-priv-destino">
+          <select id="quitar-priv-destino" value={destino} onChange={(e) => setDestino(e.target.value)} className={`${fieldClass} w-full`}>
+            {publicos.map((x) => (
+              <option key={x.id} value={x.id}>
+                {x.nombre} · ID {x.dropiId}
+                {x.stock != null ? ` (${x.stock.toLocaleString("es-PA")} u.)` : ""}
+              </option>
+            ))}
+            <option value="">No devolverlas (solo sacarlas)</option>
+          </select>
+        </Campo>
+        {!publicos.length && <p className="m-0 text-xs text-muted-foreground">No hay un público activo de este producto: las unidades solo se sacan del privado.</p>}
+        <ol className="m-0 flex list-none flex-col gap-0.5 p-0 text-xs text-muted-foreground">
+          {pasos.map((t, i) => (
+            <li key={t}>
+              {i + 1}. {t}
+            </li>
+          ))}
+        </ol>
+        <p className="m-0 text-xs text-muted-foreground">Queda pendiente hasta que alguien pulse «Aplicar en Dropi». Si Dropi no deja archivar (órdenes pendientes), se reintenta en el siguiente.</p>
+        {error && (
+          <p role="alert" className="m-0 text-destructive">
+            {error}
+          </p>
+        )}
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={confirmar} disabled={pendiente} className={`inline-flex min-h-10 items-center rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-40 ${anilloFoco}`}>
+            {pendiente ? "Un momento..." : "Quitar privatización y dejar pendiente para Dropi"}
+          </button>
+          <button type="button" onClick={alCerrar} className={`inline-flex min-h-10 items-center rounded-md border border-border bg-card px-4 py-2 text-sm font-medium hover:bg-muted ${anilloFoco}`}>
+            Cancelar
+          </button>
+        </div>
+      </div>
+    </Ventana>
+  );
+}
+
+/** La ventana del candado: privatizar un público, quitarle la privatización a un privado o, si ya hay un apagado esperando en el privado, deshacerlo. */
+function VentanaCandado({ p, alCerrar }: { p: FilaPublicacion; alCerrar: () => void }) {
+  if (p.tipoDropi !== "privado") return <VentanaPrivatizar p={p} alCerrar={alCerrar} />;
+  if (p.apagadoPendiente) return <VentanaDeshacerApagado p={p} abierta alCerrar={alCerrar} />;
+  return <VentanaQuitarPrivatizacion p={p} alCerrar={alCerrar} />;
+}
+
+/**
+ * El botón del candado en la ficha. Un público lo tiene abierto («Privatizar en Dropi»); un privado, cerrado («Quitar privatización», 30 oct 2026). La
+ * ventana solo existe mientras está abierta, así cada vez sale vacía.
+ */
 export function BotonPrivatizarDropi({ p, deshabilitado }: { p: FilaPublicacion; deshabilitado: boolean }) {
   const [abierta, setAbierta] = useState(false);
+  const privado = p.tipoDropi === "privado";
   return (
     <>
-      <BotonAccion icono={CandadoIcon} tono="neutro" disabled={deshabilitado} onClick={() => setAbierta(true)}>
-        Privatizar en Dropi
+      <BotonAccion icono={privado ? (p.apagadoPendiente ? DeshacerIcon : CandadoIcon) : CandadoAbiertoIcon} tono={privado ? (p.apagadoPendiente ? "alerta" : "privado") : "neutro"} disabled={deshabilitado} onClick={() => setAbierta(true)}>
+        {privado ? (p.apagadoPendiente ? "Deshacer apagado" : "Quitar privatización") : "Privatizar en Dropi"}
       </BotonAccion>
-      {abierta && <VentanaPrivatizar p={p} alCerrar={() => setAbierta(false)} />}
+      {abierta && <VentanaCandado p={p} alCerrar={() => setAbierta(false)} />}
     </>
   );
 }
 
-/** El ícono «Privatizar en Dropi» de cada fila, junto al de apagar: abre la misma ventana. Si no se puede privatizar, va apagado y dice por qué. */
+/**
+ * El candado de cada fila, junto al de apagar (30 oct 2026): **abierto** en un público (privatizarlo) y **cerrado** en un privado (quitarle la
+ * privatización). Si no se puede usar, va apagado y dice por qué.
+ */
 export function BotonPrivatizarFila({ f }: { f: FilaPublicacion }) {
   const [abierta, setAbierta] = useState(false);
-  // Siempre se ve (27 oct 2026): si no se puede privatizar, va apagado y dice por qué.
+  const privado = f.tipoDropi === "privado";
+  // Siempre se ve (27 oct 2026): si no se puede usar, va apagado y dice por qué.
   return (
     <>
       <BotonIconoFila
-        texto={f.privatizaciones.length ? "Privatizar en Dropi (hay una pendiente)" : "Privatizar en Dropi"}
-        motivo={motivoPrivatizar(estadoBotones(f))}
-        icono={CandadoIcon}
+        texto={
+          privado
+            ? f.apagadoPendiente
+              ? "Quitar privatización (pendiente: pulsa para deshacer)"
+              : "Quitar privatización"
+            : f.privatizaciones.length
+              ? "Privatizar en Dropi (hay una pendiente)"
+              : "Privatizar en Dropi"
+        }
+        motivo={privado ? motivoQuitarPrivatizacion(estadoBotones(f)) : motivoPrivatizar(estadoBotones(f))}
+        icono={privado ? CandadoIcon : CandadoAbiertoIcon}
         nombre={f.nombre}
         onClick={() => setAbierta(true)}
-        activo={f.privatizaciones.length ? "violeta" : undefined}
+        // Privado: el candado cerrado en el morado de lo privado (30 oct 2026, pedido de Hernán); con «Quitar privatización» pendiente, en rojo.
+        activo={privado ? (f.apagadoPendiente ? "rojo" : "violeta") : f.privatizaciones.length ? "violeta" : undefined}
       />
-      {abierta && <VentanaPrivatizar p={f} alCerrar={() => setAbierta(false)} />}
+      {abierta && <VentanaCandado p={f} alCerrar={() => setAbierta(false)} />}
     </>
   );
 }

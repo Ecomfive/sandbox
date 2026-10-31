@@ -5,7 +5,7 @@ import { useState, useTransition, type ReactNode } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
-import { ActualizarIcon, ArchivarIcon, CandadoIcon, ChevronRightIcon, DropiIcon, PausaIcon, ReactivarIcon } from "@/lib/nav-icons";
+import { ActualizarIcon, ArchivarIcon, CandadoIcon, ChevronRightIcon, DropiIcon, EtiquetaIcon, PausaIcon, ReactivarIcon } from "@/lib/nav-icons";
 import { UBICACIONES, numeroPublicacion, opcion } from "@/lib/publicaciones/publicacion";
 import { EN_DROPI } from "@/lib/publicaciones/automatico";
 import { ConfirmarRepublicar } from "./confirmar-republicar";
@@ -18,6 +18,7 @@ import { motivoArchivar, motivoPausar, motivoRepublicar } from "@/lib/publicacio
 import { BotonApagarFila } from "./apagar-dropi";
 import { BotonPrivatizarFila } from "./privatizar-dropi";
 import { BotonLiquidacionFila } from "./liquidacion";
+import { BotonTareasFila } from "./tareas-publicacion";
 import { InsigniaConectado } from "./insignia-conectado";
 import { Monto, useMoneda } from "./moneda-contexto";
 import { EtapaCotizando, LlegadaCamino } from "./llegada-camino";
@@ -235,7 +236,7 @@ export function EncabezadoFilasPublicacion({ verVentas = false, puedeArchivar = 
     { nombre: "En Dropi" },
   ];
   return (
-    <div className={`hidden items-center gap-x-4 py-2.5 pl-4 text-xs font-semibold tracking-wide text-muted-foreground uppercase lg:grid ${puedeArchivar ? "pr-[16.5rem]" : "pr-4"} ${verVentas ? COLUMNAS_CON_VENTAS : COLUMNAS_SIN_VENTAS}`}>
+    <div className={`hidden items-center gap-x-4 py-2.5 pl-4 text-xs font-semibold tracking-wide text-muted-foreground uppercase lg:grid ${puedeArchivar ? "pr-[19rem]" : "pr-4"} ${verVentas ? COLUMNAS_CON_VENTAS : COLUMNAS_SIN_VENTAS}`}>
       {columnas.map((c) => (
         <span key={c.nombre} className={`min-w-0 truncate ${c.clase ?? ""}`}>
           {c.nombre}
@@ -279,6 +280,13 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, puedeArchi
               <span className="inline-flex max-w-48 shrink-0 items-center gap-1 rounded-full bg-privado px-2 py-0.5 text-xs font-semibold text-white">
                 <CandadoIcon aria-hidden="true" className="h-3 w-3 shrink-0" />
                 <span className="truncate">Privado{f.privatizadoA ? ` · ${f.privatizadoA}` : ""}</span>
+              </span>
+            )}
+            {/* En liquidación: insignia roja sólida junto al nombre, como «Privado» (29 oct 2026, pedido de Alcides; antes era un punto). */}
+            {f.liquidacionDesde && (
+              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-destructive px-2 py-0.5 text-xs font-semibold text-background">
+                <EtiquetaIcon aria-hidden="true" className="h-3 w-3 shrink-0" />
+                En liquidación
               </span>
             )}
           </span>
@@ -325,12 +333,6 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, puedeArchi
                 {f.tareasPendientes.atrasadas ? " · atrasada" : ""}
               </span>
             )}
-            {f.liquidacionDesde && (
-              <span className="inline-flex items-center gap-1.5 font-medium">
-                <Punto clase="bg-warning" texto="En liquidación" />
-                En liquidación
-              </span>
-            )}
             {f.archivadoPendiente && !f.apagadoPendiente && (
               <span className="inline-flex items-center gap-1.5 font-medium text-destructive">
                 <Punto clase="bg-destructive" texto="Pendiente en Dropi" />
@@ -353,7 +355,7 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, puedeArchi
               <span className="inline-flex items-center gap-1.5 font-medium text-destructive">
                 <Punto clase="bg-destructive" texto="Stock pendiente en Dropi" />
                 {f.stockPendiente.length === 1
-                  ? `Stock pendiente · ${codigoBodega(f.stockPendiente[0].bodega)} a ${f.stockPendiente[0].unidades.toLocaleString("es-PA")} u.`
+                  ? `Stock pendiente · ${f.stockPorId.length > 1 && f.stockPendiente[0].producto ? `ID ${f.stockPendiente[0].producto} · ` : ""}${codigoBodega(f.stockPendiente[0].bodega)} a ${f.stockPendiente[0].unidades.toLocaleString("es-PA")} u.`
                   : `Stock pendiente en ${f.stockPendiente.length} bodegas`}
               </span>
             )}
@@ -410,7 +412,7 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, puedeArchi
   return (
     <div className="flex items-center">
       <div className="min-w-0 flex-1">{fila}</div>
-      {/* Siempre los mismos seis botones, en el mismo orden; los que no aplican van apagados y dicen por qué (27 oct 2026; liquidación, 28 oct). */}
+      {/* Siempre los mismos siete botones, en el mismo orden; los que no aplican van apagados y dicen por qué (27 oct 2026; liquidación, 28 oct). */}
       <div className="mr-3 flex shrink-0 items-center gap-1">
         <BotonRepublicarFila f={f} />
         <BotonPrivatizarFila f={f} />
@@ -418,6 +420,7 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, puedeArchi
         <BotonPausarFila f={f} />
         <BotonLiquidacionFila f={f} />
         <BotonArchivarFila f={f} />
+        <BotonTareasFila f={f} />
       </div>
     </div>
   );

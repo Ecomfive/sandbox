@@ -330,6 +330,16 @@ export function CheckIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+/** Casilla con visto: las tareas de un producto (Gestión de IDs Dropi). */
+export function TareasIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <rect x="4" y="4" width="16" height="16" rx="3.5" />
+      <path d="M8.5 12.2l2.4 2.4 4.6-4.8" />
+    </Icon>
+  );
+}
+
 /** Círculo con visto: "retiros cerrados". */
 export function CerradoIcon(props: SVGProps<SVGSVGElement>) {
   return (
@@ -1010,6 +1020,15 @@ export function BodegaIcon(props: SVGProps<SVGSVGElement>) {
 }
 
 /** Pin de mapa: Ubicaciones (bins de una bodega). */
+export function CorreoIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <IconoLucide {...props}>
+      <rect x="2" y="4" width="20" height="16" rx="2" />
+      <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+    </IconoLucide>
+  );
+}
+
 export function UbicacionIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <IconoLucide {...props}>
@@ -1157,6 +1176,16 @@ export function CandadoIcon(props: SVGProps<SVGSVGElement>) {
     <Icon {...props}>
       <rect x="5" y="11" width="14" height="9" rx="2" />
       <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+    </Icon>
+  );
+}
+
+/** El candado abierto: un ID público, que se puede privatizar (el cerrado es un privado, que se le quita la privatización). */
+export function CandadoAbiertoIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <rect x="5" y="11" width="14" height="9" rx="2" />
+      <path d="M8 11V8a4 4 0 0 1 7.75-1.4" />
     </Icon>
   );
 }

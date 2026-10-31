@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { getUsuarioActual } from "@/lib/auth";
-import { MODULO_ATENCION, MODULO_COMERCIAL } from "@/lib/crm/areas";
-import { detectarImagen } from "@/lib/seguridad/imagen";
+import { accesoCrm, MODULO_ATENCION, MODULO_COMERCIAL, pierdeLoBorrado } from "@/lib/crm/areas";
+import { mensajeVisibleParaAtencion } from "@/lib/whatsapp/borrados-atencion";
 import { createServiceClient } from "@/lib/supabase/server";
-import { estaOculto } from "@/lib/whatsapp/ocultos";
-import { config360, urlDescarga360, urlMedia360 } from "@/lib/whatsapp/proveedor";
+import { corteDeBorradoEnApp, estaOculto, mensajesEliminadosEnWhatsapp } from "@/lib/whatsapp/ocultos";
+import { archivoDeMensaje } from "@/lib/whatsapp/archivo-mensaje";
+import { revisarArchivo } from "@/lib/whatsapp/enlaces";
 import { conversacionPermitida } from "@/app/(app)/crm-dropshippers/bandeja/datos-bandeja";
 
 export const dynamic = "force-dynamic";
@@ -29,44 +30,24 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if (!m?.media_id || !c) return new NextResponse("Not Found", { status: 404 });
   // Lo que se autorizó borrar (migración 0172) ya no se entrega.
   if (await estaOculto(supabase, id, m.conversacion_id as string)) return new NextResponse("Not Found", { status: 404 });
+  // Lo eliminado en WhatsApp (o lo de antes de borrar el chat) tampoco se le entrega a quien tiene solo Atención.
+  if (pierdeLoBorrado(accesoCrm(u))) {
+    const [eliminados, corte, { data: fila }] = await Promise.all([
+      mensajesEliminadosEnWhatsapp(supabase, m.conversacion_id as string),
+      corteDeBorradoEnApp(supabase, m.conversacion_id as string),
+      supabase.from("whatsapp_mensajes").select("momento").eq("id", id).maybeSingle(),
+    ]);
+    if (!mensajeVisibleParaAtencion({ id, momento: String(fila?.momento ?? "") }, eliminados, corte)) return new NextResponse("Not Found", { status: 404 });
+  }
+  // Un archivo que instala o ejecuta programas (.apk, .exe…) no se entrega a nadie (31 oct 2026, enlaces y archivos peligrosos).
+  if (revisarArchivo(m.media_nombre as string | null, m.media_mime as string | null).riesgo === "peligroso") {
+    return new NextResponse("Archivo bloqueado: instala o ejecuta un programa y puede traer un virus.", { status: 403 });
+  }
   const nombre = String(m.media_nombre || "archivo").replace(/[^\w.\- ]+/g, "_").slice(0, 120);
-  // Un archivo de un chat importado del celular (bandeja › «Importar chat», migración 0169): vive en el bucket, en la carpeta del chat.
-  if (String(m.media_id).startsWith("storage:")) {
-    const ruta = String(m.media_id).slice(8);
-    if (!ruta.startsWith(`${m.conversacion_id}/`) || ruta.includes("..")) return new NextResponse("Not Found", { status: 404 });
-    const { data: archivo } = await supabase.storage.from("whatsapp-importados").download(ruta);
-    if (!archivo || archivo.size > MAX_BYTES) return new NextResponse("Archivo no disponible.", { status: 410 });
-    const bytes = new Uint8Array(await archivo.arrayBuffer());
-    // El tipo sale de la extensión que dio el celular: una foto solo se muestra si de verdad lo es.
-    const declarado = String(m.media_mime || "").toLowerCase();
-    const tipo = declarado.startsWith("image/") ? (detectarImagen(bytes.slice(0, 64))?.tipo ?? "") : declarado;
-    return respuesta(bytes, tipo, nombre);
-  }
-  if (!/^\d+$/.test(String(m.media_id))) return new NextResponse("Not Found", { status: 404 });
-  // Con 360dialog (proveedor.ts) los archivos se piden por su dominio y con su clave; si no, a Meta con el token.
-  // Con varios números, el archivo se pide con la clave del número por donde llegó.
-  const d360 = config360(c.numeroEmpresa);
-  if (d360?.sandbox) return new NextResponse("El sandbox de 360dialog no entrega archivos: se verán con el número real.", { status: 410 });
-  const token = process.env.WHATSAPP_TOKEN;
-  const version = process.env.WHATSAPP_API_VERSION || "v23.0";
-  if (!d360 && (!token || !/^v\d+\.\d+$/.test(version))) return new NextResponse("Not Found", { status: 404 });
-  const autorizacion: Record<string, string> = d360 ? { "D360-API-KEY": d360.clave } : { Authorization: `Bearer ${token}` };
-  try {
-    const info = await fetch(d360 ? urlMedia360(String(m.media_id)) : `https://graph.facebook.com/${version}/${m.media_id}`, { headers: autorizacion, signal: AbortSignal.timeout(10_000) });
-    const j = (await info.json().catch(() => null)) as { url?: string; mime_type?: string; file_size?: number } | null;
-    // Meta da una dirección temporal de su propio dominio: solo se sigue esa (con 360dialog, cambiada a su dominio).
-    const descarga = j?.url ? (d360 ? urlDescarga360(j.url) : /^https:\/\/[a-z0-9.-]+\.(fbsbx|facebook|whatsapp)\.(com|net)\//i.test(j.url) ? j.url : null) : null;
-    if (!info.ok || !descarga || Number(j?.file_size ?? 0) > MAX_BYTES) {
-      return new NextResponse("Archivo no disponible (Meta lo guarda unos 30 días).", { status: 410 });
-    }
-    const archivo = await fetch(descarga, { headers: autorizacion, signal: AbortSignal.timeout(20_000) });
-    if (!archivo.ok) return new NextResponse("Archivo no disponible.", { status: 410 });
-    const bytes = await archivo.arrayBuffer();
-    if (bytes.byteLength > MAX_BYTES) return new NextResponse("Archivo muy grande.", { status: 413 });
-    return respuesta(bytes, String(j?.mime_type || m.media_mime || ""), nombre);
-  } catch {
-    return new NextResponse("No se pudo traer el archivo de WhatsApp.", { status: 502 });
-  }
+  // De la copia del sistema (chat importado o archivo mandado desde aquí) o de WhatsApp: lo decide `archivoDeMensaje`.
+  const archivo = await archivoDeMensaje(supabase, { conversacion_id: m.conversacion_id as string, media_id: m.media_id as string, media_mime: (m.media_mime as string | null) ?? null }, c.numeroEmpresa, MAX_BYTES);
+  if ("estado" in archivo) return new NextResponse(archivo.mensaje, { status: archivo.estado });
+  return respuesta(archivo.bytes, archivo.mime, nombre);
 }
 
 /** El archivo para la página: los tipos que se muestran van en línea; cualquier otro, como descarga. Nunca se ejecuta nada. */

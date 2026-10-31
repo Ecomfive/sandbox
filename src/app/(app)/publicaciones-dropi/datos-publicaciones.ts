@@ -14,7 +14,8 @@ import { enCaminoDeCompuesto, juntarEtapaCotizacion } from "@/lib/compras/en-cam
 import { cargarProductosProveedor } from "@/lib/publicaciones/proveedor-datos";
 import { enDropiSinPublicacion, type ProductoSinPublicacion } from "@/lib/publicaciones/sin-publicacion";
 import { grupoDe } from "@/lib/publicaciones/apagar-dropi";
-import { cargarCambiosDropi } from "@/lib/publicaciones/cambios-dropi";
+import { masReciente } from "@/lib/publicaciones/cambio-precio";
+import { cargarCambiosDropi, cargarPreciosAplicados } from "@/lib/publicaciones/cambios-dropi";
 import { bodegaDePublicacion, bodegasDelPais, bodegasEnOrden, productoPrincipal, type ProductoProveedor } from "@/lib/publicaciones/sincronizar-dropi";
 import { cargarSugerencias } from "@/lib/publicaciones/sugerencias";
 import type { UsuarioActual } from "@/lib/auth";
@@ -261,10 +262,15 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
   const liquidacionR = await traerTodasConError<{ id: string; liquidacion_en: string | null }>((desde, hasta) =>
     supabase.from("dropi_publicaciones").select("id, liquidacion_en").eq("pais_id", paisId).not("liquidacion_en", "is", null).order("id").range(desde, hasta),
   );
-  // Las tareas escritas a mano sin resolver (migración 0175), para la marca de la fila: sin la migración, ninguna.
-  const tareasR = await traerTodasConError<{ publicacion_id: string; plazo: string | null }>((desde, hasta) =>
-    supabase.from("dropi_publicaciones_tareas").select("publicacion_id, plazo, id, dropi_publicaciones!inner(pais_id)").eq("dropi_publicaciones.pais_id", paisId).is("hecha_en", null).order("id").range(desde, hasta),
-  );
+  // Las tareas escritas a mano sin resolver ni archivar (migraciones 0175 y 0178), para la marca de la fila: sin la 0178 cuentan también las archivadas
+  // (no hay) y sin la 0175, ninguna.
+  const leerTareas = (sinArchivadas: boolean) =>
+    traerTodasConError<{ publicacion_id: string; plazo: string | null }>((desde, hasta) => {
+      const q = supabase.from("dropi_publicaciones_tareas").select("publicacion_id, plazo, id, dropi_publicaciones!inner(pais_id)").eq("dropi_publicaciones.pais_id", paisId).is("hecha_en", null);
+      return (sinArchivadas ? q.is("archivada_en", null) : q).order("id").range(desde, hasta);
+    });
+  let tareasR = await leerTareas(true);
+  if (tareasR.error) tareasR = await leerTareas(false);
   const tareasDe = new Map<string, { total: number; atrasadas: number }>();
   for (const t of tareasR.error ? [] : (tareasR.data ?? [])) {
     const x = tareasDe.get(t.publicacion_id) ?? { total: 0, atrasadas: 0 };
@@ -283,7 +289,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
     const b = await supabase.from("dropi_publicaciones").select("id, datos_dropi").in("id", idsBorrador);
     if (!b.error) for (const x of b.data ?? []) datosBorradores.set(x.id as string, x.datos_dropi);
   }
-  const [{ skus, sugerencias, combosX2 }, opcionesSku, ventas, competidores, precios, enCaminoYCotizando, enDropiCatalogo, proveedor, cambiosDropi] = await Promise.all([
+  const [{ skus, sugerencias, combosX2 }, opcionesSku, ventas, competidores, precios, enCaminoYCotizando, enDropiCatalogo, proveedor, cambiosDropi, preciosAplicados] = await Promise.all([
     cargarSugerencias(
       supabase,
       paisId,
@@ -297,6 +303,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
     cargarNuestrosEnDropi(supabase, paisId),
     cargarProductosProveedor(supabase, paisId),
     cargarCambiosDropi(supabase, paisId),
+    cargarPreciosAplicados(supabase, paisId),
   ]);
   const { camino: enCaminoPorSku, cotizando: cotizandoPorSku, etapasCotizando } = enCaminoYCotizando;
   const r = reglas.reglas;
@@ -369,7 +376,8 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
       ultimaRevision: (d.ultima_revision as string | null) ?? null,
       proximaRevision: proxima,
       ultimoCambioPrecio: (d.ultimo_cambio_precio as string | null) ?? null,
-      cambioPrecioDropi: ultimoCambioDe(idsDropi(d), precios.cambios),
+      // El más reciente entre lo que vio la lectura del catálogo y lo aplicado desde el sistema (30 oct 2026).
+      cambioPrecioDropi: masReciente([ultimoCambioDe(idsDropi(d), precios.cambios), preciosAplicados.get(d.id as string)]),
       lecturaDropiDesde: precios.desde,
       revisionVencida: revisionVencida({ estado, proximaRevision: proxima }, hoy),
       // Sin foto propia, la del producto vinculado (pedido de Hernán, 23 oct 2026): así no queda el cuadro vacío.
@@ -394,6 +402,9 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
       recomendaciones: [],
       decisiones: decisionesDe.get(d.id) ?? [],
       bodegasDropi: prov ? bodegasEnOrden(prov.bodegas).map((b) => ({ id: b.id, nombre: b.nombre, stock: b.stock })) : null,
+      stockPorId: (prov ? [prov, ...idsDropi(d).map((i) => proveedor?.productos.get(i)).filter((x) => !!x && x.id !== prov.id)] : [])
+        .filter((x): x is NonNullable<typeof x> => !!x)
+        .map((x) => ({ id: x.id, archivado: x.archivado, stock: x.stock, bodegas: bodegasEnOrden(x.bodegas).map((b) => ({ id: b.id, nombre: b.nombre, stock: b.stock })) })),
       stockProveedor: prov?.stock ?? null,
       stockPrivadoProveedor: prov?.stockPrivado ?? null,
       leidoProveedor: proveedor?.leidoEn ?? null,
@@ -412,12 +423,13 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
       datosDropi: d.estado_publicacion === "borrador" ? normalizarDatosCrear(datosBorradores.get(d.id as string) ?? null) : null,
       archivadoPendiente: cambiosDropi.archivando.has(d.id as string) ? (cambiosDropi.archivando.get(d.id as string) ? "restaurar" : "archivar") : null,
       privatizaciones: cambiosDropi.privatizando.get(d.id as string) ?? [],
-      stockPendiente: (cambiosDropi.ajustandoStock.get(d.id as string) ?? []).map(({ bodega, nombreBodega, unidades, antes }) => ({ bodega, nombreBodega, unidades, antes })),
+      stockPendiente: (cambiosDropi.ajustandoStock.get(d.id as string) ?? []).map(({ producto, bodega, nombreBodega, unidades, antes }) => ({ producto, bodega, nombreBodega, unidades, antes })),
       duplicadaDe: null,
       pausadaDesde: pausadaEn.get(d.id as string) ?? null,
       liquidacionDesde: liquidacionEn.get(d.id as string) ?? null,
       tareasPendientes: tareasDe.get(d.id as string) ?? { total: 0, atrasadas: 0 },
       grupo: [],
+      publicosDelProducto: [],
     };
     // Una duplicada (otra publicación con el mismo ID de Dropi) va a Archivados aunque Dropi diga activo, sin acciones.
     if (!original) return fila;
@@ -432,6 +444,13 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
       const o = porIdFila.get(x.id)!;
       return { id: x.id, nombre: x.nombre, dropiId: x.dropiId, archivada: x.archivada, tipo: o.tipoDropi, stock: o.stockProveedor, correo: o.privatizadoEmail, apagadoPendiente: o.apagadoPendiente, apagadoSinTocar: o.apagadoSinTocar };
     });
+  // «Quitar privatización» (30 oct 2026): a qué públicos le puede devolver sus unidades cada privada: los de su grupo y los del mismo producto vinculado.
+  for (const f of filas) {
+    if (f.tipoDropi !== "privado") continue;
+    f.publicosDelProducto = filas
+      .filter((o) => o.id !== f.id && o.tipoDropi !== "privado" && !o.archivada && o.enDropi !== "archivado" && !o.duplicadaDe && !o.apagadoPendiente && o.dropiId.trim() !== "" && (f.grupo.some((g) => g.id === o.id) || (!!f.sku && o.sku?.id === f.sku.id)))
+      .map((o) => ({ id: o.id, nombre: o.nombre, dropiId: o.dropiId, stock: o.stockProveedor }));
+  }
 
   const moneda = await monedaPais;
   // Las recomendaciones van al final: el combo necesita saber qué compuestos ya están publicados (y no archivados) en el país.

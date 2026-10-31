@@ -13,7 +13,9 @@ export const MODULO_DE_ENTIDAD: Record<string, string> = {
   skus_maestros: "producto",
   dropshippers: "crm-dropshippers",
   whatsapp_conversaciones: "crm-dropshippers",
+  crm_plataformas_venta: "crm-dropshippers",
   whatsapp_plantillas: "crm-dropshippers",
+  whatsapp_respuestas_rapidas: "crm-dropshippers",
   wms_compras: "compras",
   wms_rutas_envio: "compras",
   retiros: "retiros",
@@ -38,6 +40,7 @@ export const MODULO_DE_ENTIDAD: Record<string, string> = {
   paises: "configuracion",
   plataformas: "configuracion",
   pais_plataformas: "configuracion",
+  crm_tipo_cliente_umbrales: "configuracion",
 };
 
 const COMERCIALES = new Set<string>(ACCIONES_COMERCIALES);

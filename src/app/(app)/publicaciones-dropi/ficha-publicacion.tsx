@@ -9,22 +9,22 @@ import { Seccion } from "@/components/ui/seccion-ficha";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
-import { ActualizarIcon, CerrarIcon, CheckIcon, ComprasIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, InteligenciaIcon, InventarioIcon, LapizIcon, MargenIcon, PapeleraIcon, ProductoIcon, ArchivarIcon, FotosIcon, PausaIcon, ReactivarIcon, ApagarIcon, CandadoIcon } from "@/lib/nav-icons";
+import { ActualizarIcon, CerrarIcon, CheckIcon, ComprasIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, InteligenciaIcon, InventarioIcon, LapizIcon, MargenIcon, PapeleraIcon, ProductoIcon, ArchivarIcon, FotosIcon, PausaIcon, ReactivarIcon, ApagarIcon, CandadoAbiertoIcon, CandadoIcon } from "@/lib/nav-icons";
 import {
   ESTADOS_PUBLICACION,
-  fulfillmentFijo,
   TIPOS,
   UBICACIONES,
   numeroPublicacion,
   type OpcionPublicacion,
 } from "@/lib/publicaciones/publicacion";
+import { masReciente } from "@/lib/publicaciones/cambio-precio";
 import { MAX_NOMBRE_DROPI } from "@/lib/publicaciones/dropi-guardado";
 import { ComprasProducto } from "../producto/compras-producto";
 import { EnCaminoProducto } from "../producto/en-camino-producto";
 import { detalleCompuesto } from "@/lib/compras/en-camino";
 import type { OpcionesCrear } from "@/lib/publicaciones/crear-dropi";
 import { BotonAccionApagado } from "./boton-icono-fila";
-import { motivoApagar, motivoArchivar, motivoPausar, motivoPrivatizar, motivoRepublicar } from "@/lib/publicaciones/botones-fila";
+import { motivoApagar, motivoArchivar, motivoPausar, motivoPrivatizar, motivoQuitarPrivatizacion, motivoRepublicar } from "@/lib/publicaciones/botones-fila";
 import { actualizarPublicacion, archivarPublicacion, eliminarPublicacion, pausarPublicacion, publicarEnDropi, republicarPublicacion } from "./actions";
 import { DatosParaDropi } from "./datos-para-dropi";
 import { ActividadPublicacion } from "./actividad-publicacion";
@@ -138,6 +138,7 @@ const PENDIENTE_EN_COLOR = "disabled:!border-azul/30 disabled:!bg-azul-soft disa
 export function FichaPublicacion({
   publicacion,
   codigoPais,
+  fulfillmentPais = null,
   nombrePais,
   puedeEscribir,
   puedeArchivar,
@@ -155,6 +156,8 @@ export function FichaPublicacion({
 }: {
   publicacion: FilaPublicacion | undefined;
   codigoPais: string;
+  /** El fulfillment por pedido del país (Bodegas): con él no se escribe en la ficha. */
+  fulfillmentPais?: number | null;
   nombrePais: string;
   puedeEscribir: boolean;
   /** Solo un administrador: elimina la publicación de verdad. */
@@ -184,6 +187,7 @@ export function FichaPublicacion({
       key={publicacion.id}
       p={publicacion}
       codigoPais={codigoPais}
+      fulfillmentPais={fulfillmentPais}
       nombrePais={nombrePais}
       puedeEscribir={puedeEscribir}
       puedeArchivar={puedeArchivar}
@@ -205,6 +209,7 @@ export function FichaPublicacion({
 function ContenidoFicha({
   p,
   codigoPais,
+  fulfillmentPais,
   nombrePais,
   puedeEscribir,
   puedeArchivar,
@@ -222,6 +227,7 @@ function ContenidoFicha({
 }: {
   p: FilaPublicacion;
   codigoPais: string;
+  fulfillmentPais: number | null;
   nombrePais: string;
   puedeEscribir: boolean;
   puedeArchivar: boolean;
@@ -281,11 +287,13 @@ function ContenidoFicha({
   const sinGuardar = JSON.stringify(d) !== base;
   const cambiar = (c: Partial<Formulario>) => setD((a) => ({ ...a, ...c }));
 
-  // En Panamá el fulfillment es fijo (27 oct 2026): se ve, pero no se escribe.
-  const fijo = fulfillmentFijo(codigoPais);
+  // El fulfillment del país (Bodegas; antes, solo Panamá): se ve, pero no se escribe.
+  const fijo = fulfillmentPais;
   const precio = n(d.precio_venta);
   const utilidad = precio === null ? null : precio - (n(d.costo_mercancia) ?? 0) - (fijo ?? n(d.fulfillment) ?? 0);
   const margen = precio && utilidad !== null ? utilidad / precio : null;
+  // La fecha anotada (sin montos) solo si es más nueva que el cambio con montos.
+  const cambioPrecio = masReciente([p.cambioPrecioDropi, p.ultimoCambioPrecio ? { fecha: p.ultimoCambioPrecio, antes: null, despues: null } : null]);
 
   const salir = (accion: () => void) => {
     if (pendiente) return;
@@ -457,12 +465,19 @@ function ContenidoFicha({
               {/* «Apagar en Dropi»: sacar el stock y archivar allá, con sus privadas a elección. Queda pendiente para «Aplicar en Dropi». */}
               {!sinGuardar && puedeArchivar && !p.sinPublicar &&
                 (puedeApagar(p) ? <BotonApagarDropi p={p} deshabilitado={pendiente} /> : <BotonAccionApagado icono={ApagarIcon} texto="Apagar en Dropi" motivo={motivoApagar(botones) ?? "No disponible"} />)}
-              {/* «Privatizar en Dropi»: dejarle unidades de este producto a un solo dropshipper, en un producto privado nuevo. */}
+              {/* El candado: abierto en un público («Privatizar en Dropi», a un solo dropshipper en un producto privado nuevo); cerrado en un privado
+                  («Quitar privatización», 30 oct 2026: sus unidades vuelven al público). */}
               {!sinGuardar && puedeArchivar && !p.sinPublicar &&
-                (puedePrivatizar(p) ? (
+                (p.tipoDropi === "privado" ? (
+                  motivoQuitarPrivatizacion(botones) === null ? (
+                    <BotonPrivatizarDropi p={p} deshabilitado={pendiente} />
+                  ) : (
+                    <BotonAccionApagado icono={CandadoIcon} texto="Quitar privatización" motivo={motivoQuitarPrivatizacion(botones) ?? "No disponible"} />
+                  )
+                ) : puedePrivatizar(p) ? (
                   <BotonPrivatizarDropi p={p} deshabilitado={pendiente} />
                 ) : (
-                  <BotonAccionApagado icono={CandadoIcon} texto="Privatizar en Dropi" motivo={motivoPrivatizar(botones) ?? "No disponible"} />
+                  <BotonAccionApagado icono={CandadoAbiertoIcon} texto="Privatizar en Dropi" motivo={motivoPrivatizar(botones) ?? "No disponible"} />
                 ))}
               {!sinGuardar && puedeArchivar && !p.sinPublicar &&
                 (estaPausada ? (
@@ -702,20 +717,31 @@ function ContenidoFicha({
               </div>
               <div>
                 <dt className="text-xs text-muted-foreground">Último cambio de precio</dt>
-                {/* Lo detecta la lectura del catálogo de Dropi (Análisis de competencia): ya no se anota a mano. */}
+                {/* El más reciente (30 oct 2026): el que vio la lectura del catálogo de Dropi, el aplicado desde el sistema o la fecha anotada. */}
                 <dd className="text-xs">
-                  {p.cambioPrecioDropi ? (
+                  {cambioPrecio ? (
                     <>
-                      <span className="block font-semibold">{fechaLarga(p.cambioPrecioDropi.fecha)}</span>
+                      <span className="block font-semibold">{fechaLarga(cambioPrecio.fecha)}</span>
                       <span className="block text-muted-foreground">
-                        de <Monto valor={p.cambioPrecioDropi.antes} /> a <Monto valor={p.cambioPrecioDropi.despues} /> en Dropi
+                        {cambioPrecio.despues === null ? (
+                          <>
+                            ahora a <Monto valor={p.precioVenta} />
+                          </>
+                        ) : (
+                          <>
+                            {cambioPrecio.antes !== null && (
+                              <>
+                                de <Monto valor={cambioPrecio.antes} />{" "}
+                              </>
+                            )}
+                            a <Monto valor={cambioPrecio.despues} />{" "}
+                            {cambioPrecio.origen === "sistema" ? `· aplicado desde el sistema${cambioPrecio.por ? ` (lo pidió ${cambioPrecio.por})` : ""}` : "en Dropi"}
+                          </>
+                        )}
                       </span>
                     </>
                   ) : (
-                    <>
-                      <span className="block">{p.lecturaDropiDesde ? `Sin cambios en Dropi desde el ${fechaLarga(p.lecturaDropiDesde)}` : "Sin datos de Dropi"}</span>
-                      {p.ultimoCambioPrecio && <span className="block text-muted-foreground">Antes: {fechaLarga(p.ultimoCambioPrecio)}</span>}
-                    </>
+                    <span className="block">{p.lecturaDropiDesde ? `Sin cambios en Dropi desde el ${fechaLarga(p.lecturaDropiDesde)}` : "Sin datos de Dropi"}</span>
                   )}
                 </dd>
               </div>

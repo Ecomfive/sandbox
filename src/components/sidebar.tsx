@@ -101,7 +101,7 @@ function ItemPagina({
             <span className="truncate">{item.label}</span>
           )}
         </span>
-        <ContadorMenu cantidad={cantidadDe(item, pendientes)} />
+        <ContadorMenu cantidad={cantidadDe(item, pendientes)} href={item.href} />
       </Link>
       <FavoritoToggle href={item.href} activo={favoritos.includes(item.href)} />
     </div>

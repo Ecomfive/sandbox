@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { accesoCrm, areaParaNota, areasVisibles, escribeEnArea } from "./areas";
+import { accesoCrm, areaParaNota, areaPropia, areasVisibles, escribeEnArea, numerosDeAreas, supervisaArea, pierdeLoBorrado } from "./areas";
 
 // Se corre con: npm run test:seguridad (incluye estas pruebas del CRM)
 const atencion = accesoCrm({ modulos: ["crm-dropshippers"], modulosSoloLectura: [] });
@@ -53,4 +53,37 @@ test("Dirección (CEO) ve las tres áreas y solo ella escribe en la suya", () =>
   assert.equal(areasVisibles(atencion).includes("direccion"), false);
   assert.equal(escribeEnArea(comercial, "direccion"), false);
   assert.equal(escribeEnArea(atencion, "direccion"), false);
+});
+
+test("paneles de la bandeja: cada quien tiene el suyo y supervisa los de abajo sin marcarlos leídos", () => {
+  const direccion = accesoCrm({ modulos: ["crm-dropshippers", "crm-comercial", "crm-direccion"], modulosSoloLectura: [] });
+  assert.equal(areaPropia(atencion), "atencion");
+  assert.equal(areaPropia(comercial), "comercial");
+  assert.equal(areaPropia(direccion), "direccion");
+  assert.equal(supervisaArea(atencion, "atencion"), false);
+  assert.equal(supervisaArea(comercial, "comercial"), false);
+  assert.equal(supervisaArea(comercial, "atencion"), true);
+  assert.equal(supervisaArea(direccion, "comercial"), true);
+  assert.equal(supervisaArea(direccion, "atencion"), true);
+  assert.equal(supervisaArea(direccion, "direccion"), false);
+});
+
+test("cada quien ve solo los números de WhatsApp de sus áreas", () => {
+  const numeros = [
+    { id: "a", area: "atencion" as const },
+    { id: "c", area: "comercial" as const },
+    { id: "d", area: "direccion" as const },
+  ];
+  assert.deepEqual(numerosDeAreas(numeros, areasVisibles(atencion)).map((n) => n.id), ["a"]);
+  assert.deepEqual(numerosDeAreas(numeros, areasVisibles(comercial)).map((n) => n.id), ["a", "c"]);
+  assert.deepEqual(numerosDeAreas(numeros, ["direccion", "comercial", "atencion"]).map((n) => n.id), ["a", "c", "d"]);
+});
+
+test("lo borrado en WhatsApp Business se le borra solo a quien tiene únicamente Atención", () => {
+  const todo = accesoCrm({ modulos: ["crm-dropshippers", "crm-comercial", "crm-direccion"], modulosSoloLectura: [] });
+  assert.equal(pierdeLoBorrado(atencion), true);
+  assert.equal(pierdeLoBorrado(comercial), false);
+  assert.equal(pierdeLoBorrado(comercialLectura), false);
+  assert.equal(pierdeLoBorrado(todo), false);
+  assert.equal(pierdeLoBorrado(sinAcceso), false);
 });

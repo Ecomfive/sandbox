@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { extraerAviso, resumenMensaje } from "./extraer";
 import { claves360, config360, urlDescarga360, variableClave360 } from "./proveedor";
 import { errorEnEspanol, leerErrorEnvio, minutosVentana, textoVentana } from "./ventana";
+import { canalesPlantillas, etiquetaDeCanal } from "./api-plantillas";
 
 const aviso = (value: unknown) => ({ object: "whatsapp_business_account", entry: [{ id: "WABA", changes: [{ field: "messages", value }] }] });
 const META = { display_phone_number: "50760000000", phone_number_id: "1234567890" };
@@ -29,6 +30,7 @@ test("un texto que llega: número de la empresa, quién escribe con su nombre de
       mediaId: null,
       mediaMime: null,
       mediaNombre: null,
+      reaccionA: null,
       momento: new Date(1793040000 * 1000).toISOString(),
     },
   ]);
@@ -44,6 +46,9 @@ test("fotos, documentos, botones y ubicaciones: el pie o el texto, y el archivo 
         { from: "50761112233", id: "wamid.B", timestamp: "3", type: "interactive", interactive: { type: "button_reply", button_reply: { id: "si", title: "Sí, confirmo" } } },
         { from: "50761112233", id: "wamid.U", timestamp: "4", type: "location", location: { latitude: 8.98, longitude: -79.52, name: "Bodega" } },
         { from: "50761112233", id: "wamid.X", timestamp: "5", type: "unsupported" },
+        { from: "50761112233", id: "wamid.Y", timestamp: "6", type: "unsupported", unsupported: { type: "media_placeholder" }, errors: [{ code: 131051, title: "Message type unknown" }] },
+        { from: "50761112233", id: "wamid.Z", timestamp: "7", type: "unsupported", unsupported: { type: "algo_nuevo" }, errors: [{ code: 131051, title: "Message type unknown" }] },
+        { from: "50761112233", id: "wamid.W", timestamp: "8", type: "unsupported", errors: [{ code: 131051, title: "Message type unknown" }] },
       ],
     }),
   );
@@ -54,7 +59,10 @@ test("fotos, documentos, botones y ubicaciones: el pie o el texto, y el archivo 
       ["documento", null, "MEDIA2", "guia.pdf"],
       ["texto", "Sí, confirmo", null, null],
       ["ubicacion", "Bodega · 8.98, -79.52", null, null],
-      ["otro", null, null, null],
+      ["otro", "Mensaje que WhatsApp no deja leer a la plataforma. Pídele que lo mande de nuevo como mensaje normal.", null, null],
+      ["otro", "Mandó una foto o un video que WhatsApp no entrega (por ejemplo, de «ver una vez»). WhatsApp no lo entrega a la plataforma: pídele que lo mande de nuevo como mensaje normal.", null, null],
+      ["otro", "Mensaje que WhatsApp no deja leer a la plataforma (algo_nuevo). Pídele que lo mande de nuevo como mensaje normal.", null, null],
+      ["otro", "Mensaje que WhatsApp no deja leer a la plataforma (Message type unknown). Pídele que lo mande de nuevo como mensaje normal.", null, null],
     ],
   );
   assert.equal(resumenMensaje("imagen", "Llegó así"), "Foto: Llegó así");
@@ -84,8 +92,8 @@ test("estados de lo que mandó el equipo: en español, y el motivo si falló", (
 });
 
 test("lo que no es de WhatsApp o viene incompleto se ignora sin romper", () => {
-  assert.deepEqual(extraerAviso({ object: "instagram", entry: [] }), { mensajes: [], estados: [], ecos: [], revocados: [] });
-  assert.deepEqual(extraerAviso(null), { mensajes: [], estados: [], ecos: [], revocados: [] });
+  assert.deepEqual(extraerAviso({ object: "instagram", entry: [] }), { mensajes: [], estados: [], ecos: [], revocados: [], editados: [] });
+  assert.deepEqual(extraerAviso(null), { mensajes: [], estados: [], ecos: [], revocados: [], editados: [] });
   assert.deepEqual(extraerAviso(aviso({ metadata: {}, messages: [{ from: "1", id: "x", type: "text", text: { body: "hola" } }] })).mensajes, []);
   assert.deepEqual(extraerAviso(aviso({ metadata: META, messages: [{ id: "sin-remitente", type: "text" }] })).mensajes, []);
 });
@@ -226,6 +234,62 @@ test("un mensaje que el equipo borra «para todos» desde la app (eco revoke) no
 });
 
 
+test("un mensaje editado (de un cliente o desde la app) no es un mensaje nuevo: trae el original y el texto nuevo", () => {
+  const edit = (id: string, original: string, mensaje: unknown, extra: object = {}) => ({ ...extra, id, timestamp: "1793040300", type: "edit", edit: { original_message_id: original, message: mensaje } });
+  const cliente = extraerAviso(
+    aviso({
+      metadata: META,
+      messages: [
+        edit("wamid.E1", "wamid.ORIG", { type: "text", text: { body: "Hola Michael, un gusto" } }, { from: "50761112233" }),
+        edit("wamid.E2", "wamid.FOTO", { type: "image", image: { caption: "Pie nuevo", id: "9", mime_type: "image/jpeg" } }, { from: "50761112233" }),
+        edit("wamid.E3", "wamid.SIN", { type: "image", image: { id: "9", mime_type: "image/jpeg" } }, { from: "50761112233" }),
+        edit("wamid.E4", "", { type: "text", text: { body: "sin original" } }, { from: "50761112233" }),
+      ],
+    }),
+  );
+  assert.equal(cliente.mensajes.length, 0);
+  assert.deepEqual(cliente.editados, [
+    { waIdOriginal: "wamid.ORIG", texto: "Hola Michael, un gusto", momento: new Date(1793040300 * 1000).toISOString() },
+    { waIdOriginal: "wamid.FOTO", texto: "Pie nuevo", momento: new Date(1793040300 * 1000).toISOString() },
+  ]);
+  const eco = extraerAviso({
+    object: "whatsapp_business_account",
+    entry: [
+      {
+        id: "WABA",
+        changes: [
+          {
+            field: "smb_message_echoes",
+            value: { metadata: META, message_echoes: [edit("wamid.E5", "wamid.MIO", { type: "text", text: { body: "Hola Michael, te saludo Francis" } }, { from: "50760000000", to: "50761112233" })] },
+          },
+        ],
+      },
+    ],
+  });
+  assert.equal(eco.ecos.length, 0);
+  assert.deepEqual(eco.editados.map((e) => [e.waIdOriginal, e.texto]), [["wamid.MIO", "Hola Michael, te saludo Francis"]]);
+});
+
+
+test("plantillas con varios números: un canal por clave distinta, el principal primero, y su etiqueta", () => {
+  const antes = { ...process.env };
+  try {
+    for (const v of Object.keys(process.env)) if (v.startsWith("D360_")) delete process.env[v];
+    assert.deepEqual(canalesPlantillas(), []);
+    process.env.D360_API_KEY = "clave-a";
+    process.env.D360_API_KEY_584220350576 = "clave-b";
+    process.env.D360_API_KEY_50761234567 = "clave-a"; // la misma clave que la principal: es el mismo número
+    assert.deepEqual(canalesPlantillas().map((c) => c.variable), ["D360_API_KEY", "D360_API_KEY_584220350576"]);
+    process.env.D360_SANDBOX = "1";
+    assert.deepEqual(canalesPlantillas(), []); // el sandbox no maneja plantillas
+  } finally {
+    for (const v of Object.keys(process.env)) if (v.startsWith("D360_")) delete process.env[v];
+    Object.assign(process.env, antes);
+  }
+  assert.equal(etiquetaDeCanal("D360_API_KEY"), "el número principal");
+  assert.equal(etiquetaDeCanal("D360_API_KEY_584220350576"), "+584220350576");
+});
+
 test("360dialog con varios números: cada uno usa su propia clave y, si no tiene, la principal", () => {
   const antes = { ...process.env };
   try {
@@ -248,4 +312,25 @@ test("360dialog con varios números: cada uno usa su propia clave y, si no tiene
     for (const v of Object.keys(process.env)) if (v.startsWith("D360_")) delete process.env[v];
     Object.assign(process.env, antes);
   }
+});
+
+test("un mensaje sin texto que el sistema no sabe leer dice qué llegó, no un «Mensaje» vacío", () => {
+  const caso = (m: Record<string, unknown>) =>
+    extraerAviso(aviso({ metadata: META, contacts: [{ wa_id: "50761112233", profile: { name: "Ana" } }], messages: [{ from: "50761112233", id: "wamid.X", timestamp: "1700000000", ...m }] })).mensajes[0];
+  const sinSoporte = caso({ type: "unsupported", errors: [{ code: 131051, title: "Message type is not currently supported" }] });
+  assert.match(sinSoporte.texto ?? "", /no deja leer.*not currently supported/);
+  assert.equal(sinSoporte.tipo, "otro");
+  assert.match(caso({ type: "request_welcome" }).texto ?? "", /anuncio o un enlace/);
+  assert.match(caso({ type: "algo_nuevo" }).texto ?? "", /«algo_nuevo»/);
+  // Un botón de plantilla sin texto usa su contenido; un formulario (flow) usa su cuerpo.
+  assert.equal(caso({ type: "button", button: { payload: "Sí quiero" } }).texto, "Sí quiero");
+  assert.equal(caso({ type: "interactive", interactive: { type: "nfm_reply", nfm_reply: { body: "Enviado" } } }).texto, "Enviado");
+  // Lo que ya se mostraba bien no cambia.
+  assert.equal(caso({ type: "text", text: { body: "hola" } }).texto, "hola");
+  assert.equal(caso({ type: "reaction", reaction: { emoji: "👍" } }).texto, "👍");
+  // A qué mensaje va la reacción (migración 0186); sin emoji, la quitó.
+  assert.equal(caso({ type: "reaction", reaction: { message_id: "wamid.ORIGEN", emoji: "❤️" } }).reaccionA, "wamid.ORIGEN");
+  assert.equal(caso({ type: "reaction", reaction: { message_id: "wamid.ORIGEN", emoji: "" } }).texto, null);
+  assert.equal(caso({ type: "text", text: { body: "hola" } }).reaccionA, null);
+  assert.equal(caso({ type: "image", image: { id: "m1", mime_type: "image/jpeg" } }).texto, null);
 });

@@ -1,5 +1,7 @@
 "use client";
 
+import { bandera, nombrePais } from "@/lib/whatsapp/origen-chat";
+import { PastillaTipo } from "./tipo-cliente";
 import type { ReactNode } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { ChevronRightIcon } from "@/lib/nav-icons";
@@ -7,7 +9,7 @@ import { etiquetaFase } from "@/lib/crm/areas";
 import { DIAS_SIN_PEDIR, diasEntre, etiquetaUltimoPedido, montoCorto, type FilaDropshipper } from "./def-crm";
 
 /** Las columnas de la fila en pantalla ancha; las usa también el encabezado de la lista, así que van juntas. */
-const COLUMNAS = "lg:grid-cols-[minmax(0,2.4fr)_minmax(0,1.1fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_minmax(0,1.8fr)_minmax(0,0.8fr)_minmax(0,0.9fr)_1rem]";
+const COLUMNAS = "lg:grid-cols-[minmax(0,2.4fr)_minmax(0,1.1fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_minmax(0,1.8fr)_minmax(0,0.8fr)_1rem]";
 
 const iniciales = (nombre: string) =>
   nombre
@@ -48,7 +50,6 @@ export function EncabezadoFilasCrm() {
     { nombre: "Último pedido" },
     { nombre: "WhatsApp" },
     { nombre: "Casos" },
-    { nombre: "Responsable" },
   ];
   return (
     <div className={`hidden items-center gap-x-4 px-4 py-2.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase lg:grid ${COLUMNAS}`}>
@@ -69,7 +70,6 @@ export function EncabezadoFilasCrm() {
  */
 export function FilaDropshipperLista({ d, codigoPais, hoy, alAbrir }: { d: FilaDropshipper; codigoPais: string; hoy: string; alAbrir: () => void }) {
   const sinPedir = d.estado === "activo" && !!d.ultimoPedido && diasEntre(d.ultimoPedido, hoy) >= DIAS_SIN_PEDIR;
-  const cuentas = [...new Set(d.cuentas.map((c) => `${c.plataforma} ${c.codigoPais}`.trim()))];
   const w = d.whatsapp;
   return (
     <button
@@ -86,7 +86,7 @@ export function FilaDropshipperLista({ d, codigoPais, hoy, alAbrir }: { d: FilaD
         <span className="flex min-w-0 flex-col gap-0.5">
           <span className="flex min-w-0 items-center gap-1.5">
             <span className="truncate text-sm font-medium">{d.nombre}</span>
-            {d.nivel === "vip" && <span className="shrink-0 rounded-[5px] bg-primario-suave px-1.5 text-[11px] font-semibold text-primario">VIP</span>}
+            <PastillaTipo nivel={d.nivel} soloDestacados />
             {d.fase !== "activo" && <span className="shrink-0 rounded-[5px] bg-azul-soft px-1.5 text-[11px] font-medium text-azul">{etiquetaFase(d.fase)}</span>}
             {d.estado !== "activo" && d.fase === "activo" && <span className="shrink-0 rounded-[5px] bg-muted px-1.5 text-[11px] font-medium text-muted-foreground capitalize">{d.estado}</span>}
           </span>
@@ -102,16 +102,19 @@ export function FilaDropshipperLista({ d, codigoPais, hoy, alAbrir }: { d: FilaD
         <Celda
           nombre="Vende en"
           principal={
-            cuentas.length ? (
+            // La plataforma con la bandera de su país («🇵🇦 Dropi»), como «Dónde vende» del chat (29 oct 2026, pedido de Alcides).
+            d.vendeEn.length ? (
               <span className="flex flex-wrap gap-1">
-                {cuentas.map((c) => (
-                  <span key={c} className="rounded-[5px] bg-muted px-1.5 py-px text-xs font-medium text-foreground-soft">
-                    {c}
+                {d.vendeEn.map((v) => (
+                  <span key={`${v.plataforma}|${v.pais}`} className="inline-flex items-center gap-1 rounded-[5px] bg-muted px-1.5 py-px text-xs font-medium whitespace-nowrap text-foreground-soft">
+                    <span aria-hidden="true">{bandera(v.pais)}</span>
+                    <span className="sr-only">{nombrePais(v.pais)}: </span>
+                    {v.plataforma}
                   </span>
                 ))}
               </span>
             ) : (
-              <span className="text-xs text-muted-foreground">Sin cuenta vinculada</span>
+              <span className="text-xs text-muted-foreground">Sin plataforma</span>
             )
           }
         />
@@ -163,7 +166,6 @@ export function FilaDropshipperLista({ d, codigoPais, hoy, alAbrir }: { d: FilaD
             )
           }
         />
-        <Celda nombre="Responsable" principal={d.responsable ? <span className="truncate text-foreground-soft">{d.responsable}</span> : <span className="text-xs text-muted-foreground">Sin asignar</span>} />
       </span>
 
       <ChevronRightIcon aria-hidden="true" className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 lg:order-last" />

@@ -69,6 +69,7 @@ export function TablaPublicaciones({
   paisId,
   codigoPais,
   nombrePais,
+  fulfillmentPais = null,
   moneda = MONEDA_DOLAR,
   puedeEscribir,
   puedeArchivar,
@@ -90,6 +91,8 @@ export function TablaPublicaciones({
   paisId: string;
   codigoPais: string;
   nombrePais: string;
+  /** El fulfillment por pedido del país (Bodegas, migración 0208): con él no se escribe en la ficha. */
+  fulfillmentPais?: number | null;
   /** La moneda del país (Costa Rica en colones, con su valor en dólares en pequeño). */
   moneda?: MonedaPublicaciones;
   puedeEscribir: boolean;
@@ -197,12 +200,13 @@ export function TablaPublicaciones({
           const o = COLOR_GRUPO[campo] && grupo.clave !== SIN_VALOR ? opcion(COLOR_GRUPO[campo], grupo.clave) : null;
           return o ? <Badge color={o.color}>{o.etiqueta}</Badge> : <span className="font-semibold">{grupo.etiqueta}</span>;
         }}
-        accionPrincipal={puedeEscribir ? <CrearPublicacionPanel paisId={paisId} codigoPais={codigoPais} opciones={opcionesCrear} /> : undefined}
+        accionPrincipal={puedeEscribir ? <CrearPublicacionPanel paisId={paisId} codigoPais={codigoPais} fulfillmentPais={fulfillmentPais} opciones={opcionesCrear} /> : undefined}
         vacio="Todavía no hay publicaciones en este país."
       />
       <FichaPublicacion
         publicacion={enNavegador ? publicaciones.find((p) => p.id === abierta) : undefined}
         codigoPais={codigoPais}
+        fulfillmentPais={fulfillmentPais}
         nombrePais={nombrePais}
         puedeEscribir={puedeEscribir}
         puedeArchivar={puedeArchivar}

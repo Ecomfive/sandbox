@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { motivoApagar, motivoArchivar, motivoLiquidacion, motivoPausar, motivoPrivatizar, motivoRepublicar, type EstadoBotones } from "./botones-fila";
+import { motivoApagar, motivoArchivar, motivoLiquidacion, motivoPausar, motivoPrivatizar, motivoQuitarPrivatizacion, motivoRepublicar, type EstadoBotones } from "./botones-fila";
 
 const base: EstadoBotones = {
   dropiId: "8406",
@@ -68,4 +68,13 @@ test("la bodega de Dropi de Costa Rica (B15) cuenta como la B280 de Panamá: no 
   assert.equal(motivoApagar({ ...base, bodegaId: 15 }), "Su stock es de la bodega de Dropi");
   assert.equal(motivoRepublicar({ ...base, bodegaId: 280 }), "Su stock es de la bodega de Dropi");
   assert.equal(motivoRepublicar({ ...base, bodegaId: 81 }), null);
+});
+
+test("candado cerrado de una privada: se le quita la privatización; archivada o de la B280, no; con apagado pendiente, se deshace", () => {
+  const privada: EstadoBotones = { ...base, tipo: "privado" };
+  assert.equal(motivoQuitarPrivatizacion(privada), null);
+  assert.equal(motivoQuitarPrivatizacion({ ...privada, archivadaEnDropi: true }), "Está archivada");
+  assert.equal(motivoQuitarPrivatizacion({ ...privada, bodegaId: 280 }), "Su stock es de la bodega de Dropi");
+  assert.equal(motivoQuitarPrivatizacion({ ...privada, dropiId: "" }), "Sin ID de Dropi");
+  assert.equal(motivoQuitarPrivatizacion({ ...privada, archivada: true, apagadoPendiente: true }), null);
 });

@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { BotonBarra, Punto } from "@/components/panel/piezas-panel";
 import { Badge } from "@/components/ui/badge";
 import { TarjetaEmergente } from "@/components/ui/tarjeta-emergente";
+import { TableroCompras, TARJETAS_COMPRAS } from "./tablero-compras";
 import { useToast } from "@/components/ui/toast";
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { TablaDatos, type ColumnaTabla } from "@/components/tabla/tabla-datos";
@@ -534,6 +535,8 @@ export function TablaCompras({
   // El avance de vincular productos a las compras de país (las de ClickUp llegaron sin productos).
   const dePais = compras.filter((c) => c.tipo === "pais" && !c.anulada);
   const sinProductos = dePais.filter((c) => c.productos === 0);
+  // El monto de cada tarjeta, solo si su rol ve el monto (lo mismo que la columna).
+  const montoVisible = !columnasOcultas(restricciones).includes("montoTotal");
   const completa = abierta ? compras.find((c) => c.id === abierta.id) : undefined;
 
   return (
@@ -541,25 +544,29 @@ export function TablaCompras({
     <ProveedorTiendas value={gestionTiendas}>
     <div className="flex flex-col">
       <div className="flex min-w-0 flex-col gap-3">
-        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filtros rápidos">
-          {RAPIDOS.map((r) => (
-            <BotonBarra key={r.valor} activo={rapido === r.valor} onClick={() => setRapido((v) => (v === r.valor ? null : r.valor))}>
-              {r.valor === "atrasadas" && conteo.atrasadas > 0 && <Punto tono="peligro" />}
-              {r.etiqueta} <span className="text-muted-foreground tabular-nums">{conteo[r.valor]}</span>
-            </BotonBarra>
-          ))}
-          {etapa && (
+        {/* El tablero de arriba, como el de Gestión de IDs (30 oct 2026): cada tarjeta cuenta y filtra la lista. */}
+        <TableroCompras
+          tarjetas={TARJETAS_COMPRAS.filter((t) => t.id !== "sin_productos" || dePais.length > 0).map((t) => {
+            const grupo = t.id === "sin_productos" ? sinProductos : base.filter((c) => enGrupo(c, t.id as Grupo, umbral));
+            const unidades = grupo.reduce((n, c) => n + (c.qtyTotal ?? 0), 0);
+            return {
+              t,
+              valor: t.id === "sin_productos" ? sinProductos.length : conteo[t.id],
+              unidades: unidades > 0 ? unidades : null,
+              // Sin compras (o sin montos cargados) no se escribe «—» suelto: la línea no sale.
+              monto: montoVisible && t.id !== "sin_productos" && grupo.some((c) => c.montoTotal !== null) ? sumar(grupo, (c) => c.montoTotal, usd) : null,
+            };
+          })}
+          activa={(id) => (id === "sin_productos" ? soloSinProductos : rapido === id)}
+          alPulsar={(id) => (id === "sin_productos" ? setSoloSinProductos((v) => !v) : setRapido((v) => (v === id ? null : (id as Grupo))))}
+        />
+        {etapa && (
+          <div className="flex flex-wrap gap-1.5">
             <BotonBarra activo onClick={() => setEtapa("")} aria-label={`Quitar el filtro de etapa ${etiquetaEtapa(etapa)}`}>
               Etapa: {etiquetaEtapa(etapa)} ✕
             </BotonBarra>
-          )}
-          {dePais.length > 0 && (
-            <BotonBarra activo={soloSinProductos} onClick={() => setSoloSinProductos((v) => !v)}>
-              {sinProductos.length > 0 && <Punto tono="aviso" />}
-              Sin productos <span className="text-muted-foreground tabular-nums">{sinProductos.length}</span>
-            </BotonBarra>
-          )}
-        </div>
+          </div>
+        )}
         {dePais.length > 0 && (
           <p className="m-0 text-xs text-muted-foreground" role="status">
             {sinProductos.length === 0

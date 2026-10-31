@@ -5,14 +5,25 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { pedirExtension, type AvanceLector, type SesionDropi } from "@/lib/dropi-actualizar/extension";
-import { CUENTAS, GRUPOS, LECTORES, LECTORES_PAIS, PARTES, archivoSubido, diasPrimeraLectura, lectoresDe, sesionValida, type ClaveLector, type ClaveParte } from "@/lib/dropi-actualizar/partes";
+import { CUENTAS, GRUPOS, LECTORES, LECTORES_PAIS, PARTES, PRIMERA_LECTURA_DESDE, archivoSubido, diasPrimeraLectura, lectoresDe, sesionValida, type ClaveLector, type ClaveParte } from "@/lib/dropi-actualizar/partes";
 import { archivosSubidos, empezarActualizacion, marcarPartesConError, procesarParte, subidasDeLector, terminarActualizacion } from "./actions";
 import type { Corrida, UltimaParte } from "./datos";
 
 type EstadoExtension = "buscando" | "lista" | "no_instalada" | "recargar";
 /** Los países que se actualizan desde aquí con la cuenta de proveedor. */
-type PaisProveedor = "pa" | "cr";
-const PAISES: PaisProveedor[] = ["pa", "cr"];
+type PaisProveedor = "pa" | "cr" | "mx";
+const PAISES: PaisProveedor[] = ["pa", "cr", "mx"];
+
+/** Costa Rica llegó a la extensión en la 0.3.0 (28 oct 2026) y México en la 0.4.0 (30 oct 2026): una anterior no sabe de ese país. */
+const VERSION_PARA: Record<PaisProveedor, string> = { pa: "0.0.0", cr: "0.3.0", mx: "0.4.0" };
+/** «0.2.3» es anterior a «0.3.0». */
+const versionAnterior = (tiene: string | null, pide: string) => {
+  if (!tiene) return false;
+  const a = tiene.split(".").map(Number);
+  const b = pide.split(".").map(Number);
+  for (let i = 0; i < 3; i++) if ((a[i] ?? 0) !== (b[i] ?? 0)) return (a[i] ?? 0) < (b[i] ?? 0);
+  return false;
+};
 type EstadoPaso = "espera" | "leyendo" | "procesando" | "listo" | "error";
 interface Paso {
   estado: EstadoPaso;
@@ -60,28 +71,39 @@ function textoAvance(lector: ClaveLector, a: AvanceLector | null): string {
  * la última vez, y el botón que lo corre con la extensión «Ecomfive · Dropi». Mientras corre: el avance de cada parte y, si falta
  * iniciar sesión, la pestaña de Dropi al frente y un aviso; al entrar, sigue sola. La que manda es esta página: si se recarga (o se
  * recarga la extensión) a medias, al volver la retoma sola con la barra y lo que está haciendo (27 oct 2026, pedido de Hernán).
- * Costa Rica (28 oct 2026): su propia tarjeta y sus propias partes; cada lector usa la pestaña y la sesión de su país. Cada país se
+ * Costa Rica (28 oct 2026) y México (30 oct 2026, con su cuenta de proveedor): su propia tarjeta y sus propias partes; cada lector usa la
+ * pestaña y la sesión de su país. Cada país se
  * actualiza por separado (Hernán: los dos juntos es mucha carga y tarda mucho más), con su botón; no hay «Actualizar todo».
  */
 export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponible: boolean; corridas: Corrida[]; ultima: Partial<Record<ClaveParte, UltimaParte>> }) {
   const router = useRouter();
   const [extension, setExtension] = useState<EstadoExtension>("buscando");
   const [version, setVersion] = useState<string | null>(null);
-  const [sesiones, setSesiones] = useState<Record<PaisProveedor, SesionDropi | null>>({ pa: null, cr: null });
+  const [sesiones, setSesiones] = useState<Record<PaisProveedor, SesionDropi | null>>({ pa: null, cr: null, mx: null });
+  /** Por qué no se pudo revisar la sesión de un país (la extensión no respondió); antes se callaba y la tarjeta quedaba en «Revisando…». */
+  const [fallos, setFallos] = useState<Record<PaisProveedor, string | null>>({ pa: null, cr: null, mx: null });
   const [corriendo, setCorriendo] = useState<Corriendo | null>(null);
   const [eligiendo, setEligiendo] = useState(false);
-  const [elegidos, setElegidos] = useState<ClaveLector[]>([...LECTORES_PAIS.pa, ...LECTORES_PAIS.cr]);
+  const [elegidos, setElegidos] = useState<ClaveLector[]>([...LECTORES_PAIS.pa, ...LECTORES_PAIS.cr, ...LECTORES_PAIS.mx]);
   const [error, setError] = useState<string | null>(null);
   const detener = useRef(false);
   // Mientras arranca (antes de que el servidor responda) los botones ya no sirven: un doble clic arrancaba dos.
   const arrancando = useRef(false);
+  /** El país al que se le trae todo el historial en esta actualización («Traer historial»), o null para los días de siempre. */
+  const historial = useRef<PaisProveedor | null>(null);
   const [empezando, setEmpezando] = useState(false);
   const retomada = useRef(false);
 
   const revisarSesion = useCallback(async (pais: PaisProveedor, abrir: boolean) => {
-    const s = await pedirExtension<SesionDropi>({ tipo: "sesion", pais, abrir }, abrir ? 45000 : 10000);
-    setSesiones((x) => ({ ...x, [pais]: s }));
-    return s;
+    try {
+      const s = await pedirExtension<SesionDropi>({ tipo: "sesion", pais, abrir }, abrir ? 45000 : 10000);
+      setSesiones((x) => ({ ...x, [pais]: s }));
+      setFallos((x) => ({ ...x, [pais]: null }));
+      return s;
+    } catch (e) {
+      setFallos((x) => ({ ...x, [pais]: e instanceof Error ? e.message : "La extensión no respondió." }));
+      throw e;
+    }
   }, []);
 
   // ¿Está la extensión? (el puente puede tardar un instante en cargar: se pregunta unas veces).
@@ -134,8 +156,9 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
     return false;
   }
 
-  async function actualizar(lectores: ClaveLector[]) {
+  async function actualizar(lectores: ClaveLector[], conHistorial: PaisProveedor | null = null) {
     if (arrancando.current || (corriendo && !corriendo.terminado)) return;
+    historial.current = conHistorial;
     arrancando.current = true;
     setEmpezando(true);
     setError(null);
@@ -179,8 +202,10 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
               subida = s.subida;
             }
             for (const p of suyas) ponerPaso(p, { estado: "leyendo", detalle: "Leyendo en Dropi…" });
-            // La primera vez que se leen los pedidos de un país, desde su fecha de arranque (Costa Rica: 1 de septiembre).
-            const primera = lector.startsWith("proveedor") && !ultima[pais === "pa" ? "pedidos" : "pedidos_cr"] ? diasPrimeraLectura(pais) : null;
+            // La primera vez que se leen los pedidos de un país, o con «Traer historial», desde su fecha de arranque (Costa Rica: 1 abr 2026;
+            // México: 1 jul 2024).
+            const primera =
+              lector.startsWith("proveedor") && (historial.current === pais || !ultima[pais === "pa" ? "pedidos" : (`pedidos_${pais}` as ClaveParte)]) ? diasPrimeraLectura(pais) : null;
             await pedirExtension({ tipo: "lanzar", lector, subida, dias: primera }, 45000);
           } else {
             for (const p of suyas) ponerPaso(p, { estado: "leyendo", detalle: "Leyendo en Dropi…" });
@@ -406,21 +431,30 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
             cuenta={CUENTAS[p].cuenta}
             estado={estadoDe(p)}
             vence={sesiones[p]?.vence ?? null}
-            alAbrir={extension === "lista" ? () => void pedirExtension({ tipo: "mostrar", pais: p }).then(() => revisarSesion(p, false)).catch(() => null) : undefined}
+            fallo={fallos[p]}
+            historial={
+              PRIMERA_LECTURA_DESDE[p] && extension === "lista" && !ocupado
+                ? { desde: PRIMERA_LECTURA_DESDE[p]!, alPulsar: () => void actualizar([p === "pa" ? "proveedor" : (`proveedor_${p}` as ClaveLector)], p) }
+                : null
+            }
+            extensionVieja={extension === "lista" && versionAnterior(version, VERSION_PARA[p]) ? { tiene: version ?? "", pide: VERSION_PARA[p] } : null}
+            origen={CUENTAS[p].origen}
+            alAbrir={
+              extension === "lista"
+                ? () =>
+                    void pedirExtension({ tipo: "mostrar", pais: p }, 10000)
+                      .then(() => revisarSesion(p, false))
+                      .catch((e) => setFallos((x) => ({ ...x, [p]: e instanceof Error ? e.message : "La extensión no respondió." })))
+                : undefined
+            }
             alRevisar={extension === "lista" ? () => void revisarSesion(p, false).catch(() => null) : undefined}
-            que={p === "cr" && !ultima.stock_cr ? "Pedidos (desde el 1 de septiembre), cartera, retiros, stock y ventas · la primera vez crea sus publicaciones" : "Pedidos, cartera, retiros, stock y ventas"}
+            que={
+              p !== "pa" && PRIMERA_LECTURA_DESDE[p] && !ultima[`pedidos_${p}` as ClaveParte]
+                ? `La primera vez trae todo el historial: pedidos y cartera desde el ${new Date(`${PRIMERA_LECTURA_DESDE[p]}T12:00:00`).toLocaleDateString("es-PA", { day: "numeric", month: "long", year: "numeric" })}, retiros, stock y ventas · tarda más`
+                : "Pedidos, cartera, retiros, stock y ventas"
+            }
           />
         ))}
-        <div className="flex flex-col gap-3 rounded-2xl border border-dashed border-border bg-card px-5 py-4">
-          <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted text-sm font-bold">MX</span>
-            <div className="flex flex-col">
-              <span className="font-semibold">México y competencia de Panamá</span>
-              <span className="text-sm text-muted-foreground">Siguiente etapa</span>
-            </div>
-          </div>
-          <span className="text-sm text-muted-foreground">Los proveedores de Scraping (México) y la competencia del catálogo de Panamá siguen por ahora con la tarea programada de las 5:00.</span>
-        </div>
       </div>
 
       <section aria-labelledby="que-se-actualiza" className="overflow-hidden rounded-2xl border border-border bg-card">
@@ -541,6 +575,10 @@ function TarjetaCuenta({
   que,
   alAbrir,
   alRevisar,
+  fallo = null,
+  extensionVieja = null,
+  origen,
+  historial = null,
 }: {
   sigla: string;
   titulo: string;
@@ -551,6 +589,14 @@ function TarjetaCuenta({
   que: string;
   alAbrir?: () => void;
   alRevisar?: () => void;
+  /** Por qué no se pudo revisar (la extensión no respondió). */
+  fallo?: string | null;
+  /** La extensión es anterior a la que pide este país. */
+  extensionVieja?: { tiene: string; pide: string } | null;
+  /** La página de Dropi del país, para abrirla aunque la extensión no responda. */
+  origen: string;
+  /** «Traer historial»: pedidos y cartera desde la fecha de arranque del país (una vez, o cuando falte algo). */
+  historial?: { desde: string; alPulsar: () => void } | null;
 }) {
   const chip: Record<string, [string, string]> = {
     ok: ["Sesión activa", "bg-success/10 text-success"],
@@ -559,7 +605,8 @@ function TarjetaCuenta({
     otra_cuenta: ["Otra cuenta", "bg-warning/10 text-warning"],
     sin_pestana: ["Dropi no está abierto", "bg-muted text-muted-foreground"],
   };
-  const [texto, clase] = estado ? chip[estado] : ["Revisando…", "bg-muted text-muted-foreground"];
+  const sinRespuesta = !!(extensionVieja || fallo) && estado !== "ok";
+  const [texto, clase] = sinRespuesta ? ["Sin respuesta", "bg-destructive/10 text-destructive"] : estado ? chip[estado] : ["Revisando…", "bg-muted text-muted-foreground"];
   return (
     <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card px-5 py-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -577,7 +624,11 @@ function TarjetaCuenta({
       </div>
       <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
         <span>
-          {estado === "ok" && vence
+          {extensionVieja && estado !== "ok"
+            ? `Tu extensión «Ecomfive · Dropi» es la ${extensionVieja.tiene} y ${titulo} necesita la ${extensionVieja.pide}: en chrome://extensions pulsa «Recargar» en ella y después recarga esta página.`
+            : fallo && estado !== "ok"
+              ? `${fallo} Recarga la extensión en chrome://extensions y esta página. Mientras tanto puedes abrir Dropi ${titulo} con el enlace.`
+              : estado === "ok" && vence
             ? `Vence ${fechaHora(vence)}.`
             : estado === "otra_cuenta"
               ? `La pestaña tiene otra cuenta: entra con la ${cuenta}.`
@@ -593,15 +644,33 @@ function TarjetaCuenta({
               Revisar
             </button>
           )}
-          {alAbrir && estado !== "ok" && (
-            <button type="button" className={botonSecundario} onClick={alAbrir}>
+          {sinRespuesta ? (
+            // Sin respuesta de la extensión, el botón igual abre Dropi del país (en una pestaña nueva) para iniciar sesión.
+            <a href={`${origen}/dashboard/home`} target="_blank" rel="noreferrer" className={botonSecundario}>
               Abrir Dropi {titulo}
-            </button>
+            </a>
+          ) : (
+            alAbrir &&
+            estado !== "ok" && (
+              <button type="button" className={botonSecundario} onClick={alAbrir}>
+                Abrir Dropi {titulo}
+              </button>
+            )
           )}
 
         </span>
       </div>
       <span className="text-xs text-muted-foreground">{que}</span>
+      {historial && (
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3 text-sm">
+          <span className="text-muted-foreground">
+            Trae todos los pedidos y la cartera desde el {new Date(`${historial.desde}T12:00:00`).toLocaleDateString("es-PA", { day: "numeric", month: "long", year: "numeric" })}, sin repetir lo que ya está. Tarda más que la de todos los días.
+          </span>
+          <button type="button" className={botonSecundario} onClick={historial.alPulsar}>
+            Traer historial completo
+          </button>
+        </div>
+      )}
     </div>
   );
 }

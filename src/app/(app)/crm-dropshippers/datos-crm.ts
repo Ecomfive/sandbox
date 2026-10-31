@@ -1,6 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { cambioDeTipo, type EventoTipo } from "@/lib/crm/cambio-tipo";
 import type { AreaCrm } from "@/lib/crm/areas";
 import { conversacionesOcultas } from "@/lib/whatsapp/ocultos";
+import { dondeVende } from "@/lib/whatsapp/origen-chat";
+import { traerTodasConError } from "@/lib/supabase/paginar";
 import { diasEntre, type ChatDropshipper, type FilaCaso, type FilaDropshipper, type ResumenCrm } from "./def-crm";
 
 export interface DatosCrm {
@@ -25,16 +28,16 @@ const uno = <T>(r: Relacion<T>): T | null => (Array.isArray(r) ? (r[0] ?? null) 
  * El chat de WhatsApp de cada dropshipper (migración 0158) en los números de las áreas que ve la persona: la conversación más
  * reciente y la suma de no leídos de todas. Sin la migración (o sin áreas), ninguno.
  */
-async function cargarChats(supabase: SupabaseClient, areas: AreaCrm[]): Promise<Map<string, ChatDropshipper>> {
+async function cargarChats(supabase: SupabaseClient, areas: AreaCrm[], soloId?: string): Promise<Map<string, ChatDropshipper>> {
   const chats = new Map<string, ChatDropshipper>();
   if (!areas.length) return chats;
-  const { data, error } = await supabase
+  let consulta = supabase
     .from("whatsapp_conversaciones")
     .select("id, dropshipper_id, estado, no_leidos, ultimo_texto, ultimo_mensaje_en, ultimo_de")
     .not("dropshipper_id", "is", null)
-    .in("area", areas)
-    .order("ultimo_mensaje_en", { ascending: false, nullsFirst: false })
-    .limit(2000);
+    .in("area", areas);
+  if (soloId) consulta = consulta.eq("dropshipper_id", soloId);
+  const { data, error } = await consulta.order("ultimo_mensaje_en", { ascending: false, nullsFirst: false }).limit(2000);
   if (error) return chats;
   // Un chat que se autorizó borrar (migración 0172) ya no cuenta.
   const ocultas = await conversacionesOcultas(supabase);
@@ -62,38 +65,72 @@ async function cargarChats(supabase: SupabaseClient, areas: AreaCrm[]): Promise<
 /**
  * Lo que necesita el CRM para dibujarse: la base. Las sumas por
  * dropshipper (pedidos y ventas del mes, último pedido, casos abiertos) las hace Postgres en la vista
- * `crm_dropshippers_resumen` (migración 0062), no JavaScript.
+ * `crm_dropshippers_resumen` (migración 0062), no JavaScript. Con `soloId` trae solo ese dropshipper y sus casos (la ficha del chat
+ * de la Bandeja de WhatsApp, 29 oct 2026).
  */
-export async function obtenerDatosCrm(supabase: SupabaseClient, paisId: string, areasWhatsapp: AreaCrm[] = []): Promise<DatosCrm> {
+export async function obtenerDatosCrm(supabase: SupabaseClient, paisId: string, areasWhatsapp: AreaCrm[] = [], soloId?: string): Promise<DatosCrm> {
   const hoy = new Date().toISOString().slice(0, 10);
 
   const CAMPOS_DROPSHIPPER =
-    "id, codigo, nombre, tienda, tiendas, ciudad, pais_origen, contacto_email, contacto_telefono, estado, nivel, fecha_ingreso, etiquetas, etapa, productos, notas, fase, responsable_id, perfiles:responsable_id(nombre), dropshipper_paises(pais_id, paises(codigo))";
-  const consultaDropshippers = (conCuentas: boolean) =>
-    supabase
+    "id, codigo, nombre, tienda, tiendas, ciudad, pais_origen, contacto_email, contacto_telefono, estado, nivel, nivel_manual, promedio_pedidos_mes, fecha_ingreso, etiquetas, etapa, productos, notas, fase, responsable_id, perfiles:responsable_id(nombre), dropshipper_paises(pais_id, paises(codigo))";
+  const consultaDropshippers = (conCuentas: boolean) => {
+    const q = supabase
       .from("dropshippers")
       .select(
         conCuentas
           ? `${CAMPOS_DROPSHIPPER}, dropshipper_cuentas(id, id_externo, tienda_nombre, plataformas(nombre), paises(codigo))`
           : CAMPOS_DROPSHIPPER,
-      )
-      .order("nombre")
-      .limit(2000);
+      );
+    return (soloId ? q.eq("id", soloId) : q).order("nombre").limit(2000);
+  };
+  const consultaSumas = supabase.from("crm_dropshippers_resumen").select("id, pedidos_mes, ventas_mes, ultimo_pedido, casos_abiertos").eq("pais_id", paisId);
+  const consultaCasos = supabase
+    .from("casos_dropshipper")
+    .select(
+      "id, numero, titulo, tipo, prioridad, estado, numero_pedido, canal, abierto_en, primera_respuesta_en, escalado_en, dropshipper_id, dropshippers(nombre), perfiles:responsable_id(nombre)",
+    )
+    .eq("pais_id", paisId);
 
-  const [conCuentas, { data: sumas }, { data: casosBd }, chats] = await Promise.all([
+  // «Dónde vende» puesto a mano o quitado en el chat (migraciones 0193 y 0194). Sin ellas, solo lo de sus cuentas.
+  const consultaVendeEn = (desde: number, hasta: number) => {
+    const q = supabase.from("dropshipper_vende_en").select("dropshipper_id, oculto, crm_plataformas_venta(nombre), paises(codigo)");
+    return (soloId ? q.eq("dropshipper_id", soloId) : q).order("dropshipper_id").range(desde, hasta);
+  };
+
+  // Los cambios de tipo de cliente (Rookie → VIP → Black) de la Actividad, para la flecha de «subió» o «bajó» (30 oct 2026).
+  const consultaCambiosTipo = (desde: number, hasta: number) => {
+    const q = supabase.from("historial_auditoria").select("entidad_id, antes, despues, creado_en").eq("entidad", "dropshippers").eq("accion", "tipo_cliente_dropshipper");
+    return (soloId ? q.eq("entidad_id", soloId) : q).order("creado_en", { ascending: false }).range(desde, hasta);
+  };
+
+  // Los demás correos de cada dropshipper (migración 0206). Sin ella, solo el principal.
+  const consultaCorreos = (desde: number, hasta: number) => {
+    const q = supabase.from("dropshipper_correos").select("dropshipper_id, correo");
+    return (soloId ? q.eq("dropshipper_id", soloId) : q).order("dropshipper_id").order("creado_en").range(desde, hasta);
+  };
+
+  const [conCuentas, { data: sumas }, { data: casosBd }, chats, vendeEnBd, cambiosTipoBd, correosBd] = await Promise.all([
     consultaDropshippers(true),
     // Una fila por dropshipper y país: las ventas de este país no se mezclan con las de otro (otra moneda).
-    supabase.from("crm_dropshippers_resumen").select("id, pedidos_mes, ventas_mes, ultimo_pedido, casos_abiertos").eq("pais_id", paisId),
-    supabase
-      .from("casos_dropshipper")
-      .select(
-        "id, numero, titulo, tipo, prioridad, estado, numero_pedido, canal, abierto_en, primera_respuesta_en, escalado_en, dropshipper_id, dropshippers(nombre), perfiles:responsable_id(nombre)",
-      )
-      .eq("pais_id", paisId)
-      .order("abierto_en", { ascending: false })
-      .limit(500),
-    cargarChats(supabase, areasWhatsapp),
+    soloId ? consultaSumas.eq("id", soloId) : consultaSumas,
+    (soloId ? consultaCasos.eq("dropshipper_id", soloId) : consultaCasos).order("abierto_en", { ascending: false }).limit(500),
+    cargarChats(supabase, areasWhatsapp, soloId),
+    traerTodasConError<Record<string, unknown>>(consultaVendeEn),
+    traerTodasConError<EventoTipo & { entidad_id: string }>(consultaCambiosTipo),
+    traerTodasConError<{ dropshipper_id: string; correo: string }>(consultaCorreos),
   ]);
+  const otrosCorreos = new Map<string, string[]>();
+  for (const c of correosBd.data ?? []) otrosCorreos.set(c.dropshipper_id, [...(otrosCorreos.get(c.dropshipper_id) ?? []), c.correo]);
+  const cambiosTipo = new Map<string, EventoTipo[]>();
+  for (const e of cambiosTipoBd.data ?? []) cambiosTipo.set(e.entidad_id, [...(cambiosTipo.get(e.entidad_id) ?? []), e]);
+  const vendeEnManual = new Map<string, { plataforma: string; pais: string; oculto: boolean }[]>();
+  for (const m of vendeEnBd.data ?? []) {
+    const plataforma = uno<{ nombre: string }>(m.crm_plataformas_venta as Relacion<{ nombre: string }>)?.nombre;
+    const pais = uno<{ codigo: string }>(m.paises as Relacion<{ codigo: string }>)?.codigo;
+    if (!plataforma || !pais) continue;
+    const id = m.dropshipper_id as string;
+    vendeEnManual.set(id, [...(vendeEnManual.get(id) ?? []), { plataforma, pais, oculto: !!m.oculto }]);
+  }
 
   // Plan B: si la migración 0065 (cuentas vinculadas) todavía no se corrió, el directorio se lee sin ellas.
   const filas = (conCuentas.error ? (await consultaDropshippers(false)).data : conCuentas.data) as unknown as
@@ -115,9 +152,13 @@ export async function obtenerDatosCrm(supabase: SupabaseClient, paisId: string, 
       tiendas: d.tiendas?.length ? d.tiendas : d.tienda ? [d.tienda] : [],
       ciudad: d.ciudad,
       email: d.contacto_email,
+      correos: d.contacto_email ? [d.contacto_email] : [],
       tieneTelefono: !!d.contacto_telefono,
       estado: d.estado,
       nivel: d.nivel,
+      nivelManual: !!d.nivel_manual,
+      cambioTipo: cambioDeTipo(cambiosTipo.get(d.id) ?? [], d.nivel),
+      promedioPedidosMes: d.promedio_pedidos_mes === null || d.promedio_pedidos_mes === undefined ? null : Number(d.promedio_pedidos_mes),
       responsable: uno<{ nombre: string | null }>(d.perfiles as Relacion<{ nombre: string | null }>)?.nombre ?? null,
       paisOrigen: d.pais_origen,
       paises,
@@ -145,6 +186,7 @@ export async function obtenerDatosCrm(supabase: SupabaseClient, paisId: string, 
       etapa: d.etapa ?? null,
       productos: d.productos ?? [],
       plataformas: [],
+      vendeEn: [],
       notas: d.notas,
       // La serie de seis meses de la ficha se pide al abrirla cuando haya pedidos reales (fase siguiente).
       pedidosPorMes: [],
@@ -152,7 +194,15 @@ export async function obtenerDatosCrm(supabase: SupabaseClient, paisId: string, 
     };
   });
 
-  for (const d of dropshippers) d.plataformas = [...new Set(d.cuentas.map((c) => c.plataforma))];
+  for (const d of dropshippers) {
+    const otros = otrosCorreos.get(d.id);
+    if (otros) d.correos = [...new Set([...d.correos, ...otros])];
+    d.plataformas = [...new Set(d.cuentas.map((c) => c.plataforma))];
+    d.vendeEn = dondeVende(
+      d.cuentas.map((c) => ({ plataforma: c.plataforma === "—" ? null : c.plataforma, pais: c.codigoPais === "—" ? null : c.codigoPais })),
+      vendeEnManual.get(d.id) ?? [],
+    );
+  }
 
   const ahora = Date.now();
   const casos: FilaCaso[] = (casosBd ?? []).map((c) => ({

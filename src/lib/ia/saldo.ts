@@ -154,5 +154,7 @@ export const ETIQUETA_OPERACION: Record<string, string> = {
   foto_texto: "Revisión del texto de una foto",
   landing_imagen: "Imagen de landing",
   busqueda_imagen: "Búsqueda por imagen",
+  actividad_cliente_completo: "Análisis completo del cliente (WhatsApp)",
+  actividad_cliente: "Actividad del cliente (WhatsApp)",
 };
 export const etiquetaOperacion = (o: string) => ETIQUETA_OPERACION[o] ?? o;

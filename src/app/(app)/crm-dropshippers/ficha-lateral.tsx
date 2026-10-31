@@ -1,73 +1,54 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type ReactNode } from "react";
+import { useState, type ComponentType, type ReactNode, type SVGProps } from "react";
 import { Tooltip } from "@/components/ui/tooltip";
 import { anilloFoco } from "@/components/ui/field";
-import { formatearFecha, formatearMoneda } from "@/lib/formato";
+import { formatearFecha } from "@/lib/formato";
 import {
   AlertaIcon,
   ChatIcon,
+  CorreoIcon,
   EnlaceIcon,
   EstadoIcon,
+  EtiquetaIcon,
   FlechaAbajoIcon,
   FlechaArribaIcon,
-  HistorialIcon,
   PersonaIcon,
   SugerenciaIcon,
+  TiendaIcon,
+  UbicacionIcon,
 } from "@/lib/nav-icons";
-import { etiquetaFase, type AccesoCrm } from "@/lib/crm/areas";
-import { BotonEscalar, LineaDeTiempo, PanelFase, PanelSeguimiento, SeguimientosDropshipper } from "./areas-ficha";
+import type { AccesoCrm } from "@/lib/crm/areas";
+import { ActividadDropshipper } from "./actividad-dropshipper";
+import { BotonEscalar } from "./areas-ficha";
 import { MostrarTelefono } from "./mostrar-telefono";
+import { DestinoEnSitio, EnSitio } from "@/components/ui/en-sitio";
+import { FilaBotones, ItemFila } from "./botones-ficha";
+import { DatoEditable } from "./dato-editable";
+import { NUMERO_REGISTRADO, type CampoDato } from "@/lib/crm/dato-dropshipper";
 import { CuentasDropshipper } from "./cuentas-dropshipper";
 import { DesempenoDropshipper } from "./desempeno-dropshipper";
 import { VentasDropiDropshipperBloque } from "./ventas-dropi-dropshipper";
-import { PanelCaso, PanelEditar, PanelNota, PanelPedido, PanelRecomendar } from "./paneles-ficha";
+import { PanelCaso, PanelRecomendar } from "./paneles-ficha";
 import { RecomendacionesDropshipper } from "./recomendaciones-dropshipper";
 import { ConversacionWhatsapp } from "./conversacion-whatsapp";
+import { EtiquetasDropshipper } from "./etiquetas-dropshipper";
+import { TipoCliente } from "./tipo-cliente";
 import {
   etiquetaAntiguedad,
   etiquetaCanal,
   etiquetaEstado,
   etiquetaEstadoCaso,
-  etiquetaNivel,
   etiquetaTipoCaso,
-  etiquetaUltimoPedido,
-  montoCorto,
   type FilaCaso,
   type FilaDropshipper,
 } from "./def-crm";
-import { Etiqueta, Pastilla, Punto } from "@/components/panel/piezas-panel";
+import { Pastilla, Punto } from "@/components/panel/piezas-panel";
 
 export const tonoEstado = (estado: string) => (estado === "activo" ? "exito" : estado === "prospecto" ? "aviso" : "neutro");
 
-const MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
-
-/** Pedidos de los últimos seis meses; el mes en curso va en oscuro. */
-function GraficaPedidos({ serie, hoy }: { serie: number[]; hoy: string }) {
-  const mesActual = Number(hoy.slice(5, 7)) - 1;
-  const maximo = Math.max(...serie, 1);
-  return (
-    <figure className="m-0">
-      <div role="img" aria-label={`Pedidos de los últimos seis meses: ${serie.join(", ")}`} className="flex h-16 items-end gap-3">
-        {serie.map((v, i) => (
-          <div key={i} className="flex h-full flex-1 flex-col justify-end">
-            <div className={`w-full rounded-[3px] ${i === serie.length - 1 ? "bg-foreground-soft" : "bg-accent"}`} style={{ height: `${Math.max(4, (v / maximo) * 100)}%` }} />
-          </div>
-        ))}
-      </div>
-      <div aria-hidden="true" className="mt-1 flex gap-3 text-[10px] text-muted-foreground">
-        {serie.map((_, i) => (
-          <span key={i} className="flex-1 text-center">
-            {MESES_CORTOS[(mesActual - (serie.length - 1 - i) + 12) % 12]}
-          </span>
-        ))}
-      </div>
-    </figure>
-  );
-}
-
-function Bloque({ icono: Icono, titulo, children }: { icono: typeof PersonaIcon; titulo: string; children: ReactNode }) {
+export function Bloque({ icono: Icono, titulo, children }: { icono: typeof PersonaIcon; titulo: string; children: ReactNode }) {
   return (
     <section className="border-b border-border p-3.5 last:border-b-0">
       <h4 className="mb-2.5 flex items-center gap-1.5 text-xs font-semibold tracking-[0.05em] text-muted-foreground uppercase">
@@ -109,8 +90,9 @@ export function ContenidoFichaDropshipper({ d, casos, codigoPais, hoy, acceso }:
       <div className="flex flex-col gap-2 border-b border-border p-3.5">
         <div className="flex flex-wrap gap-1.5">
           <Pastilla tono={tonoEstado(d.estado)}>{etiquetaEstado(d.estado)}</Pastilla>
-          <Pastilla tono={d.nivel === "vip" ? "oscuro" : "neutro"}>{etiquetaNivel(d.nivel)}</Pastilla>
-          {d.fase !== "activo" && <Pastilla tono="aviso">{etiquetaFase(d.fase)}</Pastilla>}
+          {/* La fecha de ingreso va aquí arriba, como en la ficha del chat («Captado el…»), y ya no en «Datos» (30 oct 2026, pedido de Alcides). */}
+          {d.ingreso && <span className="self-center text-xs whitespace-nowrap text-muted-foreground">Captado el {formatearFecha(d.ingreso)}</span>}
+          <TipoCliente key={`tipo-${d.id}`} dropshipperId={d.id} nivel={d.nivel} manual={d.nivelManual} promedio={d.promedioPedidosMes} cambio={d.cambioTipo} puede={acceso.escribeAtencion || acceso.escribeComercial} />
           {abiertos.length > 0 && (
             <Pastilla>
               <Punto />
@@ -124,107 +106,43 @@ export function ContenidoFichaDropshipper({ d, casos, codigoPais, hoy, acceso }:
             </Pastilla>
           )}
         </div>
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(58px,1fr))] gap-1.5">
-          {d.whatsapp ? (
-            <Link
-              href={`/crm-dropshippers/bandeja?abrir=${d.whatsapp.conversacionId}`}
-              className={`flex flex-col items-center gap-0.5 rounded-lg bg-primario px-1 py-2 text-[11.5px] font-medium text-white hover:opacity-90 ${anilloFoco}`}
-            >
-              <ChatIcon className="h-4 w-4" />
-              WhatsApp
-            </Link>
-          ) : (
-            <span aria-disabled="true" className="flex flex-col items-center gap-0.5 rounded-lg bg-accent px-1 py-2 text-[11.5px] font-medium opacity-40">
-              <ChatIcon className="h-4 w-4" />
-              WhatsApp
-            </span>
-          )}
-          {acceso.escribeAtencion && (
-            <>
-              <PanelCaso key={`caso-${d.id}`} d={d} codigoPais={codigoPais} alGuardar={alGuardar} />
-              <PanelPedido key={`pedido-${d.id}`} d={d} codigoPais={codigoPais} alGuardar={alGuardar} />
-              <PanelNota key={`nota-${d.id}`} d={d} acceso={acceso} alGuardar={alGuardar} />
-              <PanelRecomendar key={`recomendar-${d.id}`} d={d} alGuardar={alGuardar} />
-              <PanelEditar key={`editar-${d.id}`} d={d} alGuardar={alGuardar} />
-            </>
-          )}
-          {acceso.escribeComercial && (
-            <>
-              <PanelSeguimiento key={`seg-${d.id}`} d={d} alGuardar={alGuardar} />
-              <PanelFase key={`fase-${d.id}`} d={d} alGuardar={alGuardar} />
-            </>
-          )}
-        </div>
+        {/* Los botones, de derecha a izquierda según su uso; Nuevo caso y Recomendar abren su formulario justo debajo, en el mismo lugar. */}
+        <EnSitio key={d.id}>
+          <FilaBotones className="grid grid-cols-[repeat(auto-fit,minmax(58px,1fr))] gap-1.5">
+            <ItemFila id="whatsapp">
+              {d.whatsapp ? (
+                <Link
+                  href={`/crm-dropshippers/bandeja?abrir=${d.whatsapp.conversacionId}`}
+                  className={`flex flex-col items-center gap-0.5 rounded-lg bg-primario px-1 py-2 text-[11.5px] font-medium text-white hover:opacity-90 ${anilloFoco}`}
+                >
+                  <ChatIcon className="h-4 w-4" />
+                  WhatsApp
+                </Link>
+              ) : (
+                <span aria-disabled="true" className="flex flex-col items-center gap-0.5 rounded-lg bg-accent px-1 py-2 text-[11.5px] font-medium opacity-40">
+                  <ChatIcon className="h-4 w-4" />
+                  WhatsApp
+                </span>
+              )}
+            </ItemFila>
+            <AccionesCrm d={d} codigoPais={codigoPais} acceso={acceso} alGuardar={alGuardar} />
+          </FilaBotones>
+          <DestinoEnSitio />
+        </EnSitio>
       </div>
 
       <Bloque icono={ChatIcon} titulo="Conversación de WhatsApp">
         <ConversacionWhatsapp key={`chat-${d.id}`} dropshipperId={d.id} />
       </Bloque>
 
-      <Bloque icono={EstadoIcon} titulo="Desempeño">
-        <div className="mb-3 grid grid-cols-3 gap-2">
-          {[
-            ["Pedidos mes", d.pedidosMes ? String(d.pedidosMes) : "—"],
-            ["Ventas mes", d.ventasMes ? montoCorto(d.ventasMes, codigoPais) : "—"],
-            ["Último pedido", etiquetaUltimoPedido(d.ultimoPedido, hoy)],
-          ].map(([titulo, valor]) => (
-            <div key={titulo} className="min-w-0 rounded-lg border border-border px-2.5 py-2">
-              <p className="m-0 text-[11.5px] text-muted-foreground">{titulo}</p>
-              <p className="m-0 truncate text-base font-semibold tabular-nums">{valor}</p>
-            </div>
-          ))}
-        </div>
-        {d.pedidosPorMes.length > 0 && d.pedidosMes > 0 ? (
-          <GraficaPedidos serie={d.pedidosPorMes} hoy={hoy} />
-        ) : (
-          <p className="m-0 text-xs text-muted-foreground">Todavía no tiene pedidos registrados este mes.</p>
-        )}
-        {d.ventasMes > 0 && <p className="mt-2 mb-0 text-xs text-muted-foreground tabular-nums">Ventas exactas: {formatearMoneda(d.ventasMes, codigoPais)}</p>}
-      </Bloque>
-
       {abiertos.length > 0 && (
         <Bloque icono={AlertaIcon} titulo="Casos abiertos">
-          <ul className="-my-2.5 -mx-3.5 m-0 flex list-none flex-col p-0">
-            {abiertos.map((c) => (
-              <li key={c.id} className="flex items-start gap-2.5 border-b border-border px-3.5 py-2.5 last:border-b-0">
-                <Punto tono={c.prioridad === "alta" ? "peligro" : "aviso"} className="mt-1.5" />
-                <div className="min-w-0 flex-1">
-                  <p className="m-0 text-[13px] font-medium">{c.titulo}</p>
-                  <p className="m-0 text-xs text-muted-foreground">
-                    {etiquetaTipoCaso(c.tipo)} · {etiquetaEstadoCaso(c.estado)}
-                    {c.numeroPedido ? ` · ${c.numeroPedido}` : ""} · {etiquetaCanal(c.canal)}
-                  </p>
-                </div>
-                <div className="ml-auto flex flex-col items-end gap-1">
-                  <span className="text-xs whitespace-nowrap text-muted-foreground tabular-nums">{etiquetaAntiguedad(c.horasAbierto)}</span>
-                  {acceso.escribeAtencion && <BotonEscalar casoId={c.id} escalado={c.escalado} />}
-                </div>
-              </li>
-            ))}
-          </ul>
+          <CasosAbiertos abiertos={abiertos} acceso={acceso} />
         </Bloque>
       )}
 
       <Bloque icono={PersonaIcon} titulo="Datos">
-        <dl className="m-0 grid grid-cols-[7.5rem_minmax(0,1fr)] gap-x-2.5 gap-y-1.5 text-[13px]">
-          {[
-            ["Teléfono", d.tieneTelefono ? <MostrarTelefono key="t" tipo="dropshipper" id={d.id} puede={acceso.verTelefonos} /> : "—"],
-            ["Ciudad", d.ciudad ?? "—"],
-            ["Ingreso", d.ingreso ? formatearFecha(d.ingreso) : "—"],
-            ["Responsable", d.responsable ?? "Sin asignar"],
-            ["Último pedido", etiquetaUltimoPedido(d.ultimoPedido, hoy)],
-            ...(d.etapa ? [["Etapa", d.etapa]] : []),
-            ...(d.productos.length ? [["Productos", d.productos.map((p) => <Etiqueta key={p}>{p}</Etiqueta>)]] : []),
-            ["Etiquetas", d.etiquetas.length ? d.etiquetas.map((e) => <Etiqueta key={e}>{e}</Etiqueta>) : "—"],
-            ...(d.email ? [["Correo", d.email]] : []),
-            ...(d.notas ? [["Notas", d.notas]] : []),
-          ].map(([titulo, valor]) => (
-            <div key={String(titulo)} className="contents">
-              <dt className="text-muted-foreground">{titulo}</dt>
-              <dd className="m-0 min-w-0">{valor}</dd>
-            </div>
-          ))}
-        </dl>
+        <DatosDropshipper d={d} hoy={hoy} acceso={acceso} />
       </Bloque>
 
       <Bloque icono={SugerenciaIcon} titulo="Productos recomendados">
@@ -235,12 +153,6 @@ export function ContenidoFichaDropshipper({ d, casos, codigoPais, hoy, acceso }:
         <CuentasDropshipper key={`cuentas-${d.id}`} d={d} codigoPais={codigoPais} puedeEscribir={acceso.escribeAtencion} />
       </Bloque>
 
-      {acceso.comercial && (
-        <Bloque icono={AlertaIcon} titulo="Seguimientos">
-          <SeguimientosDropshipper key={`seguimientos-${d.id}`} dropshipperId={d.id} puedeEscribir={acceso.escribeComercial} version={version} />
-        </Bloque>
-      )}
-
       <Bloque icono={EstadoIcon} titulo="Ventas en Dropi">
         <VentasDropiDropshipperBloque key={`ventas-dropi-${d.id}`} dropshipperId={d.id} tieneCuentas={d.cuentas.length > 0} />
       </Bloque>
@@ -249,10 +161,102 @@ export function ContenidoFichaDropshipper({ d, casos, codigoPais, hoy, acceso }:
         <DesempenoDropshipper key={`desempeno-${d.id}`} dropshipperId={d.id} tieneCuentas={d.cuentas.length > 0} />
       </Bloque>
 
-      <Bloque icono={HistorialIcon} titulo="Actividad">
-        <LineaDeTiempo key={`linea-${d.id}`} dropshipperId={d.id} acceso={acceso} version={version} />
-      </Bloque>
+      {/* Como la de Compras (29 oct 2026): comentarios con archivos, @menciones y reacciones, y los cambios filtrados por área. Trae su propio encabezado. */}
+      <ActividadDropshipper key={`actividad-${d.id}`} id={d.id} puedeComentar={acceso.escribeAtencion} version={version} />
     </>
+  );
+}
+
+/**
+ * Los botones de la ficha que abren una ventana del CRM: caso y recomendar. Ya no hay «Editar» (30 oct 2026, pedido de Jhokser): los datos se cambian ahí mismo en el bloque «Datos». Sin «Pedido», «Nota» ni «Fase»
+ * (29 oct 2026, pedido de Alcides): lo que se anotaba en una nota va como comentario en la Actividad.
+ */
+export function AccionesCrm({ d, codigoPais, acceso, alGuardar }: { d: FilaDropshipper; codigoPais: string; acceso: AccesoCrm; alGuardar: () => void }) {
+  return (
+    <>
+      {acceso.escribeAtencion && (
+        <>
+          <PanelCaso key={`caso-${d.id}`} d={d} codigoPais={codigoPais} alGuardar={alGuardar} />
+          <PanelRecomendar key={`recomendar-${d.id}`} d={d} alGuardar={alGuardar} />
+        </>
+      )}
+    </>
+  );
+}
+
+/** Los casos abiertos del dropshipper, con «Escalar» para quien escribe en Atención. */
+export function CasosAbiertos({ abiertos, acceso }: { abiertos: FilaCaso[]; acceso: AccesoCrm }) {
+  return (
+    <ul className="-my-2.5 -mx-3.5 m-0 flex list-none flex-col p-0">
+      {abiertos.map((c) => (
+        <li key={c.id} className="flex items-start gap-2.5 border-b border-border px-3.5 py-2.5 last:border-b-0">
+          <Punto tono={c.prioridad === "alta" ? "peligro" : "aviso"} className="mt-1.5" />
+          <div className="min-w-0 flex-1">
+            <p className="m-0 text-[13px] font-medium">{c.titulo}</p>
+            <p className="m-0 text-xs text-muted-foreground">
+              {etiquetaTipoCaso(c.tipo)} · {etiquetaEstadoCaso(c.estado)}
+              {c.numeroPedido ? ` · ${c.numeroPedido}` : ""} · {etiquetaCanal(c.canal)}
+            </p>
+          </div>
+          <div className="ml-auto flex flex-col items-end gap-1">
+            <span className="text-xs whitespace-nowrap text-muted-foreground tabular-nums">{etiquetaAntiguedad(c.horasAbierto)}</span>
+            {acceso.escribeAtencion && <BotonEscalar casoId={c.id} escalado={c.escalado} />}
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/**
+ * Sus datos: nombre, estado, WhatsApp (con «Mostrar número» para administradores), ciudad, tiendas, correos y etiquetas (editables, como en ClickUp).
+ * Todo se cambia ahí mismo (`DatoEditable`). Etapa, notas y responsable (lo que venía de ClickUp) ya no se muestran (29 oct 2026, pedido de Alcides); el
+ * último pedido (está en Desempeño), la fecha de ingreso (arriba, «Captado el…») y los productos tampoco (30 oct 2026, pedido de Alcides). En la ficha del chat `conEtiquetas` va en falso: ahí las mismas etiquetas se editan arriba de todo.
+ */
+export function DatosDropshipper({ d, acceso, conEtiquetas = true }: { d: FilaDropshipper; hoy: string; acceso: AccesoCrm; conEtiquetas?: boolean }) {
+  const dato = (campo: CampoDato, inicial: string | null) => (
+    <DatoEditable key={`${campo}-${d.id}`} dropshipperId={d.id} campo={campo} inicial={inicial} puede={acceso.escribeAtencion} />
+  );
+  // Cada dato en una sola línea, con su ícono y su valor, en dos columnas (30 oct 2026, pedido de Alcides, opción A con maqueta). El nombre del dato va
+  // para lectores de pantalla (`dt`); a la vista lo dice el ícono y, si falta, «Sin ciudad». Tiendas, correos y etiquetas van a todo el ancho, como pastillas.
+  const datos: [string, ComponentType<SVGProps<SVGSVGElement>>, ReactNode, boolean?][] = [
+    ["Nombre", PersonaIcon, dato("nombre", d.nombre)],
+    ["Estado", EstadoIcon, dato("estado", d.estado)],
+    [
+      "WhatsApp",
+      ChatIcon,
+      <span key="w" className="flex min-w-0 items-center gap-1">
+        {dato("telefono", d.tieneTelefono ? NUMERO_REGISTRADO : null)}
+        {d.tieneTelefono && acceso.verTelefonos && <MostrarTelefono tipo="dropshipper" id={d.id} puede />}
+      </span>,
+    ],
+    ["Ciudad", UbicacionIcon, dato("ciudad", d.ciudad)],
+    ["Tiendas", TiendaIcon, dato("tiendas", d.tiendas.join(", ") || null), true],
+    // Varios correos (migración 0206): el primero es el principal; sirven para reconocer sus cuentas en cada plataforma.
+    ["Correos", CorreoIcon, dato("correo", d.correos.join(", ") || null), true],
+    ...(conEtiquetas
+      ? [
+          [
+            "Etiquetas",
+            EtiquetaIcon,
+            <EtiquetasDropshipper key={`etiquetas-${d.id}`} dropshipperId={d.id} iniciales={d.etiquetas} puedeEscribir={acceso.escribeAtencion} />,
+            true,
+          ] as [string, ComponentType<SVGProps<SVGSVGElement>>, ReactNode, boolean],
+        ]
+      : []),
+  ];
+  return (
+    <dl className="m-0 grid grid-cols-1 gap-x-3 gap-y-0.5 text-[13px] min-[360px]:grid-cols-2">
+      {datos.map(([titulo, Icono, valor, ancho]) => (
+        <div key={titulo} className={`flex min-w-0 gap-1 ${ancho ? "col-span-full mt-1 items-start" : "items-center"}`}>
+          <dt className={`flex-none text-muted-foreground ${ancho ? "pt-1" : ""}`}>
+            <Icono className="h-4 w-4" aria-hidden="true" />
+            <span className="sr-only">{titulo}</span>
+          </dt>
+          <dd className="m-0 min-w-0 flex-1">{valor}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 

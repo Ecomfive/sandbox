@@ -166,10 +166,14 @@ export async function cargarNuestrosEnDropi(supabase: SupabaseClient, paisId: st
 }
 
 export interface CambioPrecio {
-  /** Cuándo se vio el cambio en Dropi (la lectura del catálogo que lo encontró, no el minuto exacto). */
+  /** Cuándo se vio el cambio en Dropi (la lectura del catálogo que lo encontró, no el minuto exacto) o cuándo se aplicó desde el sistema. */
   fecha: string;
   antes: number | null;
   despues: number | null;
+  /** «dropi»: lo vio la lectura del catálogo; «sistema»: se aplicó con «Aplicar en Dropi» (30 oct 2026). */
+  origen?: "dropi" | "sistema";
+  /** Quién lo pidió (solo los aplicados desde el sistema). */
+  por?: string | null;
 }
 
 /**
@@ -199,7 +203,7 @@ export async function cargarCambiosPrecio(supabase: SupabaseClient, paisId: stri
       if (dropiId === undefined) continue;
       const actual = cambios.get(dropiId);
       if (!actual || e.fecha > actual.fecha)
-        cambios.set(dropiId, { fecha: e.fecha, antes: e.precio_antes === null ? null : Number(e.precio_antes), despues: e.precio === null ? null : Number(e.precio) });
+        cambios.set(dropiId, { fecha: e.fecha, antes: e.precio_antes === null ? null : Number(e.precio_antes), despues: e.precio === null ? null : Number(e.precio), origen: "dropi" });
     }
     return { cambios, desde: (primera.data?.inicio as string | undefined) ?? null };
   } catch {

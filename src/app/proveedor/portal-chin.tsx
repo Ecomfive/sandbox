@@ -345,7 +345,7 @@ function PorCotizar({ pedidos, alCotizar }: { pedidos: PedidoPortal[]; alCotizar
 
 function Cotizados({ pedidos, fotos, alCorregir }: { pedidos: PedidoPortal[]; fotos: Record<string, string>; alCorregir: ((p: PedidoPortal) => void) | null }) {
   const { t, idioma, numero, tr } = useIdioma();
-  const hoja = hojaCotizados(pedidos, useContextoExcel());
+  const hoja = hojaCotizados(pedidos, useContextoExcel(), fotos);
   return (
     <Tarjeta titulo={t.cotizadoTitulo} accion={<BotonExcel clave="cotizado" titulo={t.tabCotizado} columnas={hoja.columnas} filas={hoja.filas} />}>
       {pedidos.length === 0 ? (

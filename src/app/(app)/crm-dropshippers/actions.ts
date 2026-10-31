@@ -2,13 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
-import { registrarAuditoria } from "@/lib/auditoria";
+import { registrarAuditoria, registrarAuditoriaLote } from "@/lib/auditoria";
 import { formatearEventoAuditoria } from "@/lib/auditoria-cambios";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { mencionadosValidos, notificarMenciones } from "@/lib/menciones";
 import { ACCIONES_COMERCIALES, FASES, MODULO_ATENCION, MODULO_COMERCIAL, accesoCrm, areaParaNota, areasVisibles, etiquetaFase } from "@/lib/crm/areas";
 import { normalizarTelefono } from "@/lib/crm/telefono";
-import { CANALES, ESTADOS, ESTADOS_PEDIDO, NIVELES, PRIORIDADES, TIPOS_CASO, etiquetaEstado, etiquetaNivel, etiquetaTipo } from "./def-crm";
+import { enlazarChatsPorTelefono, telefonoDeOtro } from "@/lib/whatsapp/vinculo";
+import { CANALES, PRIORIDADES, TIPOS_CASO, etiquetaEstado, etiquetaTipo } from "./def-crm";
 
 /** Devuelve el error como valor, no lo lanza: en producción Next.js oculta el mensaje de una excepción de una acción. */
 export async function crearDropshipper(formData: FormData): Promise<{ error?: string }> {
@@ -37,6 +38,7 @@ export async function crearDropshipper(formData: FormData): Promise<{ error?: st
     if (!tel) return { error: "El teléfono no es válido. Escríbelo con el prefijo del país, p. ej. +57 300 111 2233." };
     contacto_telefono = tel.e164;
     pais_origen = tel.pais;
+    if (await telefonoDeOtro(supabase, tel.e164, null)) return { error: "Ya hay un dropshipper con ese WhatsApp." };
   }
 
   const { data, error } = await supabase
@@ -54,6 +56,8 @@ export async function crearDropshipper(formData: FormData): Promise<{ error?: st
     return { error: errorPais.message };
   }
   await registrarAuditoria({ accion: "crear_dropshipper", entidad: "dropshippers", entidadId: data.id, detalle: `nombre=${nombre}` });
+  // Si ya había chats de ese número, quedan enlazados desde ahora.
+  if (contacto_telefono && (await enlazarChatsPorTelefono(supabase, data.id, contacto_telefono)) > 0) revalidatePath("/crm-dropshippers/bandeja");
   revalidatePath("/crm-dropshippers", "layout");
   return {};
 }
@@ -186,123 +190,6 @@ export async function crearCaso(formData: FormData): Promise<{ error?: string }>
   return {};
 }
 
-/** Registra a mano un pedido de un dropshipper (hasta que Dropi los traiga solo). */
-export async function crearPedidoManual(formData: FormData): Promise<{ error?: string }> {
-  await requireModuloEscritura("crm-dropshippers");
-  const dropshipper_id = texto(formData, "dropshipper_id");
-  const numero = texto(formData, "numero") || null;
-  const fecha = texto(formData, "fecha");
-  const estado = texto(formData, "estado");
-  const monto = Number(texto(formData, "monto").replace(",", "."));
-
-  if (!ES_ID(dropshipper_id)) return { error: "Elige el dropshipper." };
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha) || Number.isNaN(Date.parse(fecha))) return { error: "Escribe la fecha del pedido." };
-  if (!Number.isFinite(monto) || monto < 0 || monto > 1e9) return { error: "El monto debe ser un número mayor o igual a cero." };
-  if (!esUnoDe(ESTADOS_PEDIDO, estado)) return { error: "Elige el estado del pedido." };
-
-  const supabase = createServiceClient();
-  const pais = await resolverPais(supabase, dropshipper_id, texto(formData, "pais"));
-  if ("error" in pais) return { error: pais.error };
-
-  const { error } = await supabase
-    .from("pedidos_dropshipper")
-    .insert({ dropshipper_id, pais_id: pais.id, numero, fecha, monto, estado, origen: "manual" });
-  if (error) return { error: "No se pudo guardar el pedido." };
-  await registrarAuditoria({
-    accion: "crear_pedido_dropshipper",
-    entidad: "dropshippers",
-    entidadId: dropshipper_id,
-    detalle: `pedido=${numero ?? "—"} monto=${monto}`,
-  });
-  revalidatePath("/crm-dropshippers", "layout");
-  return {};
-}
-
-const lista = (valor: string, max: number) =>
-  [...new Set(valor.split(",").map((e) => e.trim()).filter(Boolean))].slice(0, max);
-
-/** Edita los datos de un dropshipper. Devuelve el error como valor (ver `crearDropshipper`). */
-export async function editarDropshipper(formData: FormData): Promise<{ error?: string }> {
-  await requireModuloEscritura("crm-dropshippers");
-  const id = texto(formData, "id");
-  const nombre = texto(formData, "nombre");
-  const estado = texto(formData, "estado");
-  const nivel = texto(formData, "nivel");
-  const tiendas = listaTiendas(formData);
-  const ciudad = texto(formData, "ciudad") || null;
-  const contacto_email = texto(formData, "contacto_email").toLowerCase() || null;
-  const notas = texto(formData, "notas") || null;
-  const etiquetas = lista(texto(formData, "etiquetas"), 30);
-  const productos = lista(texto(formData, "productos"), 60);
-
-  if (!ES_ID(id)) return { error: "Dropshipper no válido." };
-  if (!nombre) return { error: "Escribe el nombre del dropshipper." };
-  if (!esUnoDe(ESTADOS, estado) || !esUnoDe(NIVELES, nivel)) return { error: "Revisa el estado y el nivel." };
-  if (contacto_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contacto_email)) return { error: "El correo no es válido." };
-
-  const supabase = createServiceClient();
-  const { data: actual } = await supabase
-    .from("dropshippers")
-    .select("estado, nivel, contacto_telefono, dropshipper_paises(paises(codigo))")
-    .eq("id", id)
-    .single();
-  if (!actual) return { error: "No se encontró el dropshipper." };
-
-  // El WhatsApp se guarda en formato internacional; sin prefijo se asume el primer país donde vende.
-  // El número no sale escrito en la ficha: un campo vacío lo deja como estaba (no lo borra).
-  let contacto_telefono: string | null = (actual.contacto_telefono as string | null) ?? null;
-  let pais_origen: string | null | undefined;
-  const telefonoTexto = texto(formData, "contacto_telefono");
-  if (telefonoTexto) {
-    const primero = ((actual.dropshipper_paises ?? []) as unknown as { paises: { codigo: string } | { codigo: string }[] | null }[])
-      .map((p) => (Array.isArray(p.paises) ? p.paises[0]?.codigo : p.paises?.codigo))
-      .find(Boolean);
-    const tel = normalizarTelefono(telefonoTexto, primero);
-    if (!tel) return { error: "El teléfono no es válido. Escríbelo con el prefijo del país, p. ej. +57 300 111 2233." };
-    contacto_telefono = tel.e164;
-    if (tel.e164 !== actual.contacto_telefono) pais_origen = tel.pais;
-  }
-
-  const { error } = await supabase
-    .from("dropshippers")
-    .update({
-      nombre,
-      estado,
-      nivel,
-      tienda: tiendas[0] ?? null,
-      tiendas,
-      ciudad,
-      contacto_email,
-      contacto_telefono,
-      notas,
-      etiquetas,
-      productos,
-      ...(pais_origen !== undefined ? { pais_origen } : {}),
-    })
-    .eq("id", id);
-  if (error) return { error: error.code === "23505" ? "Ya hay un dropshipper con ese WhatsApp." : "No se pudo guardar." };
-
-  const antes: Record<string, string> = {};
-  const despues: Record<string, string> = {};
-  if (actual.estado !== estado) {
-    antes.Estado = etiquetaEstado(actual.estado);
-    despues.Estado = etiquetaEstado(estado);
-  }
-  if (actual.nivel !== nivel) {
-    antes.Nivel = etiquetaNivel(actual.nivel);
-    despues.Nivel = etiquetaNivel(nivel);
-  }
-  const cambioDeEstado = Object.keys(despues).length > 0;
-  await registrarAuditoria({
-    accion: cambioDeEstado ? "cambiar_estado_dropshipper" : "editar_dropshipper",
-    entidad: "dropshippers",
-    entidadId: id,
-    ...(cambioDeEstado ? { antes, despues } : { detalle: "datos editados" }),
-  });
-  revalidatePath("/crm-dropshippers", "layout");
-  return {};
-}
-
 // ---- Cuentas de plataforma vinculadas (Dropi hoy; Boxful y EFI cuando lleguen) y su desempeño ----
 
 export interface UsuarioPlataforma {
@@ -344,10 +231,13 @@ export async function listarUsuariosPlataforma(
 export async function vincularCuenta(formData: FormData): Promise<{ error?: string }> {
   await requireModuloEscritura("crm-dropshippers");
   const dropshipper_id = texto(formData, "dropshipper_id");
-  const id_externo = texto(formData, "id_externo");
-  const tienda_nombre = texto(formData, "tienda_nombre") || null;
+  // Uno o varios usuarios (29 oct 2026): un mismo dropshipper puede tener varios usuarios de Dropi. Cada `id_externo` va con su `tienda_nombre`.
+  const ids = formData.getAll("id_externo").map((v) => String(v).trim());
+  const tiendas = formData.getAll("tienda_nombre").map((v) => String(v).trim());
   if (!ES_ID(dropshipper_id)) return { error: "Dropshipper no válido." };
-  if (!/^[\w.-]{1,64}$/.test(id_externo)) return { error: "Elige el usuario de la plataforma." };
+  if (!ids.length || ids.some((id) => !/^[\w.-]{1,64}$/.test(id))) return { error: "Elige el usuario de la plataforma." };
+  if (ids.length > 30) return { error: "Son demasiados usuarios de una vez (máximo 30)." };
+  if (new Set(ids).size !== ids.length) return { error: "Elegiste el mismo usuario dos veces." };
 
   const supabase = createServiceClient();
   const [{ data: pais }, { data: plat }] = await Promise.all([
@@ -356,20 +246,30 @@ export async function vincularCuenta(formData: FormData): Promise<{ error?: stri
   ]);
   if (!pais || !plat) return { error: "Elige el país y la plataforma." };
 
-  const { error } = await supabase
-    .from("dropshipper_cuentas")
-    .insert({ dropshipper_id, plataforma_id: plat.id, pais_id: pais.id, id_externo, tienda_nombre });
+  const filas = ids.map((id_externo, n) => ({ dropshipper_id, plataforma_id: plat.id, pais_id: pais.id, id_externo, tienda_nombre: tiendas[n] || null }));
+  const { error } = await supabase.from("dropshipper_cuentas").insert(filas);
   if (error) {
-    return { error: error.code === "23505" ? "Ese usuario ya está vinculado a un dropshipper." : "No se pudo vincular la cuenta." };
+    return {
+      error:
+        error.code === "23505"
+          ? ids.length > 1
+            ? "Alguno de esos usuarios ya está vinculado a un dropshipper: no se vinculó ninguno."
+            : "Ese usuario ya está vinculado a un dropshipper."
+          : ids.length > 1
+            ? "No se pudieron vincular las cuentas."
+            : "No se pudo vincular la cuenta.",
+    };
   }
   // Para que sus cifras de ese país aparezcan en el directorio, el dropshipper debe vender en él.
   await supabase.from("dropshipper_paises").upsert({ dropshipper_id, pais_id: pais.id }, { onConflict: "dropshipper_id,pais_id", ignoreDuplicates: true });
-  await registrarAuditoria({
-    accion: "vincular_cuenta_dropshipper",
-    entidad: "dropshippers",
-    entidadId: dropshipper_id,
-    detalle: `${plat.nombre} usuario ${id_externo}${tienda_nombre ? ` (${tienda_nombre})` : ""}`,
-  });
+  await registrarAuditoriaLote(
+    filas.map((f) => ({
+      accion: "vincular_cuenta_dropshipper",
+      entidad: "dropshippers",
+      entidadId: dropshipper_id,
+      detalle: `${plat.nombre} usuario ${f.id_externo}${f.tienda_nombre ? ` (${f.tienda_nombre})` : ""}`,
+    })),
+  );
   revalidatePath("/crm-dropshippers", "layout");
   return {};
 }
@@ -396,71 +296,6 @@ export async function desvincularCuenta(cuentaId: string): Promise<{ error?: str
   });
   revalidatePath("/crm-dropshippers", "layout");
   return {};
-}
-
-export interface DesempenoPais {
-  codigoPais: string;
-  pedidos: number;
-  despachados: number;
-  entregados: number;
-  devueltos: number;
-  cancelados: number;
-  conNovedad: number;
-  ventas: number;
-}
-export interface ProductoVendido {
-  producto: string;
-  sku: string | null;
-  unidades: number;
-  entregadas: number;
-}
-
-const FECHA_ISO = /^\d{4}-\d{2}-\d{2}$/;
-
-/**
- * Lo que hizo un dropshipper en Dropi (u otra plataforma vinculada) entre dos fechas: guías, despachadas, entregadas,
- * tasa de entrega y productos. Las sumas las hace Postgres (`crm_desempeno`, `crm_productos_vendidos`). Es una lectura:
- * basta poder abrir el CRM. Devuelve el error como valor.
- */
-export async function obtenerDesempeno(
-  dropshipperId: string,
-  desde: string,
-  hasta: string,
-): Promise<{ paises: DesempenoPais[]; productos: ProductoVendido[] } | { error: string }> {
-  await requireModulo("crm-dropshippers");
-  if (!ES_ID(dropshipperId)) return { error: "Dropshipper no válido." };
-  if (!FECHA_ISO.test(desde) || !FECHA_ISO.test(hasta) || Number.isNaN(Date.parse(desde)) || Number.isNaN(Date.parse(hasta))) {
-    return { error: "Las fechas no son válidas." };
-  }
-  if (desde > hasta) return { error: "La fecha de inicio es posterior a la final." };
-  if (Date.parse(hasta) - Date.parse(desde) > 3 * 366 * 86_400_000) return { error: "Elige un período de hasta 3 años." };
-
-  const supabase = createServiceClient();
-  const [resumen, productos, paises] = await Promise.all([
-    supabase.rpc("crm_desempeno", { p_dropshipper: dropshipperId, p_desde: desde, p_hasta: hasta }),
-    supabase.rpc("crm_productos_vendidos", { p_dropshipper: dropshipperId, p_desde: desde, p_hasta: hasta }),
-    supabase.from("paises").select("id, codigo"),
-  ]);
-  if (resumen.error || productos.error) return { error: "No se pudo cargar el desempeño." };
-  const codigo = new Map((paises.data ?? []).map((p) => [p.id as string, p.codigo as string]));
-  return {
-    paises: (resumen.data ?? []).map((r: Record<string, unknown>) => ({
-      codigoPais: codigo.get(r.pais_id as string) ?? "—",
-      pedidos: Number(r.pedidos),
-      despachados: Number(r.despachados),
-      entregados: Number(r.entregados),
-      devueltos: Number(r.devueltos),
-      cancelados: Number(r.cancelados),
-      conNovedad: Number(r.con_novedad),
-      ventas: Number(r.ventas),
-    })),
-    productos: (productos.data ?? []).map((p: Record<string, unknown>) => ({
-      producto: String(p.producto),
-      sku: (p.sku as string | null) ?? null,
-      unidades: Number(p.unidades),
-      entregadas: Number(p.entregadas),
-    })),
-  };
 }
 
 // ---- Áreas: seguimientos comerciales, escalar un caso, captación y línea de tiempo por área ----
@@ -646,6 +481,9 @@ export interface ItemLinea {
   area: "comercial" | "atencion" | "general";
   texto: string;
   creadoEn: string;
+  /** Quién lo hizo, y lo que hizo sin su nombre: la Actividad común los muestra por separado, como en Compras. */
+  autor?: string | null;
+  detalle?: string;
 }
 
 /**
@@ -667,7 +505,22 @@ export async function obtenerLineaDeTiempo(id: string): Promise<{ items: ItemLin
     .limit(40);
   if (!acceso.comercial) auditoria = auditoria.not("accion", "in", `(${ACCIONES_COMERCIALES.join(",")})`);
 
-  const [notas, casos, tareas, eventos] = await Promise.all([
+  // Lo que el equipo hizo en sus chats de WhatsApp (cambiar el nombre, pasarlo de área, tomarlo, etiquetas…), de las áreas que ve la persona
+  // (29 oct 2026, pedido de Alcides: una sola Actividad con todo). Los mensajes no van: están en el chat.
+  const chats = await supabase.from("whatsapp_conversaciones").select("id").eq("dropshipper_id", id).in("area", areasVisibles(acceso));
+  const idsChats = (chats.data ?? []).map((c) => c.id as string);
+  const deChats = idsChats.length
+    ? supabase
+        .from("historial_auditoria")
+        .select("id, accion, usuario_nombre, detalle, antes, despues, creado_en")
+        .eq("entidad", "whatsapp_conversaciones")
+        .in("entidad_id", idsChats)
+        .not("accion", "in", "(enviar_archivo_whatsapp,enviar_plantilla_whatsapp,marcar_leido_whatsapp)")
+        .order("creado_en", { ascending: false })
+        .limit(40)
+    : Promise.resolve({ data: [] as { id: number; accion: string; usuario_nombre: string | null; detalle: string | null; antes: Record<string, string> | null; despues: Record<string, string> | null; creado_en: string }[], error: null });
+
+  const [notas, casos, tareas, eventos, eventosChat] = await Promise.all([
     supabase
       .from("interacciones_dropshipper")
       .select("id, tipo, nota, area, creado_en, fecha, perfiles:creado_por(nombre)")
@@ -685,6 +538,7 @@ export async function obtenerLineaDeTiempo(id: string): Promise<{ items: ItemLin
       ? supabase.from("tareas_dropshipper").select("id, titulo, origen, creado_en, hecha_en").eq("dropshipper_id", id).order("creado_en", { ascending: false }).limit(30)
       : Promise.resolve({ data: [] as { id: string; titulo: string; origen: string; creado_en: string; hecha_en: string | null }[], error: null }),
     auditoria,
+    deChats,
   ]);
   if (notas.error || casos.error || tareas.error || eventos.error) return { error: "No se pudo cargar la actividad." };
 
@@ -695,6 +549,8 @@ export async function obtenerLineaDeTiempo(id: string): Promise<{ items: ItemLin
       id: `n-${n.id}`,
       area: n.area === "comercial" ? "comercial" : "atencion",
       texto: `${autor ? `${autor}: ` : ""}${etiquetaTipo(n.tipo)} — ${n.nota}`,
+      autor,
+      detalle: `${etiquetaTipo(n.tipo)} — ${n.nota}`,
       creadoEn: n.creado_en ?? `${n.fecha}T12:00:00Z`,
     });
   }
@@ -713,6 +569,18 @@ export async function obtenerLineaDeTiempo(id: string): Promise<{ items: ItemLin
       id: `a-${e.id}`,
       area: ACCIONES_COMERCIALES.includes(e.accion) ? "comercial" : "general",
       texto: formatearEventoAuditoria(e),
+      autor: e.usuario_nombre,
+      detalle: formatearEventoAuditoria({ ...e, usuario_nombre: null }),
+      creadoEn: e.creado_en,
+    });
+  }
+  for (const e of eventosChat.error ? [] : (eventosChat.data ?? [])) {
+    items.push({
+      id: `w-${e.id}`,
+      area: "general",
+      texto: `${formatearEventoAuditoria(e)} (chat de WhatsApp)`,
+      autor: e.usuario_nombre,
+      detalle: `${formatearEventoAuditoria({ ...e, usuario_nombre: null })} (chat de WhatsApp)`,
       creadoEn: e.creado_en,
     });
   }
