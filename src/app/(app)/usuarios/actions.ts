@@ -95,6 +95,26 @@ export async function generarContrasenaTemporal(formData: FormData): Promise<{ e
   return { contrasena };
 }
 
+/**
+ * Restablece la verificación en dos pasos de una persona que perdió su celular (27 oct 2026): quita su app autenticadora y, en su próximo
+ * ingreso, activa una nueva. Pide poder modificar Usuarios y roles. Las sesiones que ya tenga abiertas siguen hasta que venzan.
+ */
+export async function restablecerSegundoPaso(id: string): Promise<{ error?: string; quitadas?: number }> {
+  await requireModuloEscritura("usuarios");
+  if (!/^[0-9a-f-]{36}$/i.test(String(id))) return { error: "Persona no válida." };
+  const supabase = createServiceClient();
+  const { data, error } = await supabase.auth.admin.mfa.listFactors({ userId: id });
+  if (error) return { error: "No se pudo leer la verificación de esa persona." };
+  const factores = data?.factors ?? [];
+  if (!factores.length) return { error: "Esa persona no tiene una app autenticadora activada." };
+  for (const f of factores) {
+    const r = await supabase.auth.admin.mfa.deleteFactor({ id: f.id, userId: id });
+    if (r.error) return { error: "No se pudo quitar la app autenticadora. Inténtalo de nuevo." };
+  }
+  await registrarAuditoria({ accion: "restablecer_segundo_paso", entidad: "perfiles", entidadId: id, detalle: "Se restableció su verificación en dos pasos (pierde la app autenticadora)" });
+  return { quitadas: factores.length };
+}
+
 /** Nombre y correo con el que entra — todo lo demás de "Datos" en la ficha. */
 export async function actualizarDatosUsuario(formData: FormData): Promise<{ error?: string }> {
   await requireModuloEscritura("usuarios");

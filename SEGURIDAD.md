@@ -13,6 +13,17 @@ momento: `npm run test:seguridad` (pruebas del sanitizador y de las imágenes) y
 - **Las tablas tienen RLS activado y sin políticas** (migración `0063`): solo el servidor puede tocarlas. Nadie puede
   llamar directo a la API de Supabase con la clave pública, ni con sesión ni sin ella.
 
+## Verificación en dos pasos (27 oct 2026)
+
+Después de la contraseña se pide, en cada ingreso, el código de una **app autenticadora** (TOTP, el MFA nativo de Supabase Auth: al verificarlo, la sesión sube
+a `aal2`, que Supabase firma dentro del token). Quien aún no la tiene la activa en el mismo ingreso (`/login/verificar`). El gate vive en `getUsuarioSesion`
+(`src/lib/auth.ts`): sin `aal2` no hay sesión para páginas, acciones ni rutas de API; solo `/login/verificar` usa la sesión sin él (`getUsuarioSesionBruta`). Las cuentas del
+portal del proveedor (Shen Zhen) están fuera. No hay tablas ni migración. **Encendido:** `SEGUNDO_PASO=activo` en Vercel y volver a desplegar. **Interruptor de
+emergencia:** `SEGUNDO_PASO=desactivado` y volver a desplegar. **Celular perdido:** un administrador usa «Restablecer verificación» en la ficha de la persona (Usuarios y
+roles; `restablecerSegundoPaso`, con auditoría): le quita la app y en su próximo ingreso activa una nueva. Sus sesiones abiertas siguen hasta que venzan. **Límite conocido:** no
+hay códigos de recuperación ni código por correo (se quitó hasta tener un dominio de correo verificado); mientras tanto, la recuperación depende de que haya al menos un
+administrador que pueda entrar. Quien quite su app desde «Seguridad de la cuenta» la vuelve a activar en su siguiente ingreso.
+
 ## Hallazgos y estado
 
 | Gravedad | Hallazgo | Estado |
