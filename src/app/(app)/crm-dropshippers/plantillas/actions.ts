@@ -32,8 +32,10 @@ import {
   crearPlantillaEnNumero,
   eliminarPlantillaCompleta,
   enviarPlantillaAMeta,
-  igualarNumerosDePlantillas,
+  esperaParaPlantilla,
+  faltantesEnOtrosNumeros,
   sincronizarPlantillas,
+  type FaltantesDeNumero,
   type PlantillaGuardada,
 } from "@/lib/whatsapp/plantillas-servidor";
 
@@ -236,8 +238,8 @@ export async function revisarNumerosDePlantillas(): Promise<{ numeros: NumeroCon
   return { numeros, mismaCuenta, enSistema };
 }
 
-/** «Enviar a Meta» en «Revisar números»: manda una plantilla del sistema solo al número que no la tiene. */
-export async function enviarPlantillaANumero(nombre: string, idioma: string, canal: string): Promise<{ hecho: "creada" | "ya estaba"; estado: string | null } | { error: string }> {
+/** «Enviar a Meta» en «Revisar números» y en «Igualar números»: manda una plantilla del sistema solo al número que no la tiene (una cada dos minutos). */
+export async function enviarPlantillaANumero(nombre: string, idioma: string, canal: string): Promise<{ hecho: "creada" | "ya estaba"; estado: string | null } | { error: string; esperaS?: number }> {
   const u = await usuarioPlantillas(true);
   if (!u) return { error: SIN_PERMISO };
   if (!NOMBRE_VALIDO.test(String(nombre ?? "")) || !/^[a-z]{2}([_-][A-Za-z]{2})?$/.test(String(idioma ?? "")) || !/^D360_API_KEY(_\d+)?$/.test(String(canal ?? "")))
@@ -249,15 +251,18 @@ export async function enviarPlantillaANumero(nombre: string, idioma: string, can
   return { hecho: r.hecho, estado: r.estado };
 }
 
-/** Deja en los demás números las plantillas que ya se mandaron a Meta por el principal, para que todos tengan las mismas. */
-export async function igualarNumerosPlantillas(): Promise<{ creadas: number; yaEstaban: number; fallas: string[] } | { error: string }> {
+/**
+ * «Igualar números»: qué plantillas le faltan a cada uno de los otros números (no manda nada) y cuántos segundos faltan para poder mandar la
+ * siguiente. Se mandan de a una con `enviarPlantillaANumero`, una cada dos minutos.
+ */
+export async function faltantesParaIgualar(): Promise<{ numeros: FaltantesDeNumero[]; esperaS: number } | { error: string }> {
   const u = await usuarioPlantillas(true);
   if (!u) return { error: SIN_PERMISO };
-  const r = await igualarNumerosDePlantillas(createServiceClient());
-  if ("error" in r) return r;
-  await registrarAuditoria({ accion: "igualar_plantillas_numeros", entidad: "whatsapp_plantillas", detalle: `${r.creadas} creadas, ${r.yaEstaban} ya estaban, ${r.fallas.length} con fallo` });
-  revalidatePath(RUTA_PLANTILLAS);
-  return r;
+  const supabase = createServiceClient();
+  const [numeros, esperaS] = await Promise.all([faltantesEnOtrosNumeros(supabase), esperaParaPlantilla(supabase)]);
+  if ("error" in numeros) return numeros;
+  if (!numeros.length) return { error: "No hay otros números con clave propia de 360dialog." };
+  return { numeros, esperaS };
 }
 
 /** Agrega una plantilla sugerida como borrador (todavía no va a Meta). */
