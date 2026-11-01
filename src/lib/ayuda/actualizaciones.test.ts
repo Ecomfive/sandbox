@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { agruparPorDia, cambiosNuevos, filtrarCambios, ultimaFecha } from "./actualizaciones";
+import { agruparPorDia, claveNovedad, filtrarCambios, recientes, sinVer, ultimaFecha } from "./actualizaciones";
 import { NOVEDADES } from "./contenido";
 
 const N = [
@@ -16,12 +16,27 @@ test("agrupa por día, del más nuevo al más viejo, y salta fechas inválidas",
   assert.equal(d[0].cambios[0].titulo, "Fulfillment por plataforma");
 });
 
-test("la última fecha y cuántos cambios son nuevos", () => {
+test("la última fecha, la clave de cada una y cuántas no vio", () => {
   assert.equal(ultimaFecha(N), "2026-10-31");
   assert.equal(ultimaFecha([]), null);
-  assert.equal(cambiosNuevos(N.slice(0, 3), "2026-10-30"), 2);
-  assert.equal(cambiosNuevos(N.slice(0, 3), "2026-10-31"), 0);
-  assert.equal(cambiosNuevos(N.slice(0, 3), null), 3);
+  const k = claveNovedad(N[1]);
+  assert.match(k, /^2026-10-31-[0-9a-f]{8}$/);
+  assert.equal(claveNovedad({ ...N[1] }), k, "la misma novedad da la misma clave");
+  assert.notEqual(claveNovedad(N[2]), k);
+  assert.equal(sinVer(N.slice(0, 3), new Set([k])), 2);
+  assert.equal(sinVer(N.slice(0, 3), new Set()), 3);
+});
+
+test("recientes: los últimos días hasta hoy, de la más nueva a la más vieja", () => {
+  const r = recientes(N.slice(0, 3), "2026-10-31", 1);
+  assert.deepEqual(r.map((n) => n.titulo), ["Fulfillment por plataforma", "Cambiar tu contraseña"]);
+  assert.equal(recientes(N.slice(0, 3), "2026-10-31", 2).length, 3);
+  assert.equal(recientes([{ fecha: "2026-11-05", titulo: "futura", texto: "" }], "2026-10-31").length, 0, "una fecha futura no sale");
+});
+
+test("todas las claves de las novedades reales son distintas", () => {
+  const claves = NOVEDADES.map(claveNovedad);
+  assert.equal(new Set(claves).size, claves.length);
 });
 
 test("busca sin acentos en título y texto, y por módulo", () => {

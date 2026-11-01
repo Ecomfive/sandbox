@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { ICONO_MODULO } from "@/components/ayuda/iconos-modulo";
-import { almacen } from "@/components/tabla/almacen";
 import { anilloFoco, fieldClass } from "@/components/ui/field";
-import { agruparPorDia, CLAVE_VISTO, filtrarCambios, ultimaFecha } from "@/lib/ayuda/actualizaciones";
+import { useToast } from "@/components/ui/toast";
+import { agruparPorDia, claveNovedad, filtrarCambios } from "@/lib/ayuda/actualizaciones";
+import { marcarNovedades } from "@/lib/ayuda/novedades-actions";
 import type { Novedad } from "@/lib/ayuda/contenido";
 import { formatearFecha } from "@/lib/formato";
 import { HistorialIcon } from "@/lib/nav-icons";
@@ -22,31 +23,40 @@ function nombreDia(fecha: string): string {
   return `${DIAS[new Date(`${fecha}T12:00:00Z`).getUTCDay()]} ${formatearFecha(fecha)}`;
 }
 
+/** Quiénes vieron una actualización, para el administrador. */
+export interface LecturaNovedad {
+  vieron: string[];
+  faltan: string[];
+}
+
 /**
- * La lista de Actualizaciones: buscar, filtrar por módulo y, por día, cada cambio con su módulo y un enlace a dónde verlo. Lo que llegó después de la
- * última visita lleva «Nuevo»; al abrir la página queda como visto (en este navegador).
+ * La lista de Actualizaciones (administradores): buscar, filtrar por módulo y, por día, cada cambio con su módulo y un enlace a dónde verlo. Lo que
+ * el administrador no ha visto lleva «Nuevo» (lo visto se guarda por persona, migración 0218, igual que en el Centro de notificaciones), y cada
+ * cambio dice cuántas personas de su módulo ya lo vieron y quiénes faltan.
  */
-export function ListaActualizaciones({ novedades, modulos }: { novedades: Novedad[]; modulos: { clave: string; etiqueta: string }[] }) {
+export function ListaActualizaciones({
+  novedades,
+  modulos,
+  vistas,
+  lecturas,
+}: {
+  novedades: Novedad[];
+  modulos: { clave: string; etiqueta: string }[];
+  /** Las claves que ya vio quien mira. */
+  vistas: string[];
+  /** Por clave, quiénes la vieron y quiénes de su módulo faltan. */
+  lecturas: Record<string, LecturaNovedad>;
+}) {
+  const { mostrarToast } = useToast();
   const [busqueda, setBusqueda] = useState("");
   const [modulo, setModulo] = useState("");
-  const visto = almacen(CLAVE_VISTO, "local");
-  const vistoHasta = useSyncExternalStore(visto.suscribir, visto.leer, () => "");
-  const ultima = ultimaFecha(novedades);
-  // Lo de esta visita queda visto al salir de la página (así «Nuevo» se ve mientras se lee), o antes con el botón.
-  useEffect(
-    () => () => {
-      if (ultima && ultima > (visto.leer() || "")) visto.guardar(ultima);
-    },
-    // `visto` apunta siempre a la misma clave guardada.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [ultima],
-  );
+  const [marcando, empezar] = useTransition();
+  const vistasSet = useMemo(() => new Set(vistas), [vistas]);
 
   const etiqueta = useMemo(() => new Map(modulos.map((m) => [m.clave, m.etiqueta])), [modulos]);
   const filtradas = useMemo(() => filtrarCambios(novedades, busqueda, modulo), [novedades, busqueda, modulo]);
   const dias = useMemo(() => agruparPorDia(filtradas), [filtradas]);
-  const referencia = vistoHasta || null;
-  const hayNuevos = !!ultima && (referencia === null || ultima > referencia);
+  const noVistas = filtradas.filter((c) => !vistasSet.has(claveNovedad(c)));
 
   return (
     <div className="flex flex-col gap-5">
@@ -66,9 +76,19 @@ export function ListaActualizaciones({ novedades, modulos }: { novedades: Noveda
             ))}
           </select>
         </label>
-        {hayNuevos && (
-          <button type="button" onClick={() => ultima && visto.guardar(ultima)} className={`inline-flex min-h-10 items-center rounded-md border border-border-control bg-card px-3 text-sm font-medium hover:bg-muted ${anilloFoco}`}>
-            Marcar todo como visto
+        {noVistas.length > 0 && (
+          <button
+            type="button"
+            disabled={marcando}
+            onClick={() =>
+              empezar(async () => {
+                const r = await marcarNovedades(noVistas.map(claveNovedad));
+                if (r.error) mostrarToast(r.error, "destructive");
+              })
+            }
+            className={`inline-flex min-h-10 items-center rounded-md border border-border-control bg-card px-3 text-sm font-medium hover:bg-muted disabled:opacity-60 ${anilloFoco}`}
+          >
+            Marcar {noVistas.length === filtradas.length ? "todo" : `${noVistas.length}`} como visto
           </button>
         )}
         <p className="m-0 pb-2 text-xs text-muted-foreground tabular-nums" aria-live="polite">
@@ -80,7 +100,7 @@ export function ListaActualizaciones({ novedades, modulos }: { novedades: Noveda
         <p className="m-0 rounded-xl border border-border bg-card px-5 py-8 text-center text-sm text-muted-foreground">Ningún cambio coincide con la búsqueda.</p>
       ) : (
         dias.map((d) => {
-          const nuevos = referencia === null ? 0 : d.cambios.filter((c) => c.fecha > referencia).length;
+          const nuevos = d.cambios.filter((c) => !vistasSet.has(claveNovedad(c))).length;
           return (
             <section key={d.fecha} aria-labelledby={`dia-${d.fecha}`} className="overflow-hidden rounded-xl border border-border bg-card">
               <h2 id={`dia-${d.fecha}`} className="m-0 flex items-baseline justify-between gap-3 border-b border-border bg-muted px-5 py-2.5 text-sm font-semibold">
@@ -93,7 +113,8 @@ export function ListaActualizaciones({ novedades, modulos }: { novedades: Noveda
               <ul className="m-0 list-none divide-y divide-border p-0">
                 {d.cambios.map((c) => {
                   const Icono = (c.modulo && ICONO_MODULO[c.modulo]) || HistorialIcon;
-                  const nuevo = referencia !== null && c.fecha > referencia;
+                  const nuevo = !vistasSet.has(claveNovedad(c));
+                  const l = lecturas[claveNovedad(c)];
                   return (
                     <li key={`${c.fecha}-${c.titulo}`} className="flex gap-3 px-5 py-3.5">
                       <Icono aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
@@ -115,6 +136,15 @@ export function ListaActualizaciones({ novedades, modulos }: { novedades: Noveda
                         </div>
                         <p className="m-0 text-[13px] leading-relaxed text-muted-foreground">{c.texto}</p>
                         <span className="text-[11px] text-muted-foreground">{c.modulo ? (etiqueta.get(c.modulo) ?? c.modulo) : "Todo el sistema"}</span>
+                        {l && (
+                          <details className="text-[11px] text-muted-foreground">
+                            <summary className={`w-fit cursor-pointer rounded ${anilloFoco}`}>
+                              Lo vieron {l.vieron.length} de {l.vieron.length + l.faltan.length}
+                            </summary>
+                            <p className="m-0 mt-1">{l.vieron.length ? `Vieron: ${l.vieron.join(", ")}` : "Nadie lo ha visto."}</p>
+                            {l.faltan.length > 0 && <p className="m-0">Faltan: {l.faltan.join(", ")}</p>}
+                          </details>
+                        )}
                       </div>
                     </li>
                   );

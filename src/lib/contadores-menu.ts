@@ -10,13 +10,15 @@ export interface PendientesMenu {
   total: number;
   /** Avisos personales sin leer (menciones con «@»): los ve todo el que los tenga, aunque no tenga el módulo. */
   paraTi: number;
+  /** Actualizaciones del sistema recientes que la persona no ha visto (Centro de notificaciones, migración 0218). */
+  novedades: number;
 }
 
-export const SIN_PENDIENTES: PendientesMenu = { contadores: {}, total: 0, paraTi: 0 };
+export const SIN_PENDIENTES: PendientesMenu = { contadores: {}, total: 0, paraTi: 0, novedades: 0 };
 
-/** Suma los avisos «Para ti» sin leer al total de Avisos. */
-export function conParaTi(p: PendientesMenu, paraTi: number): PendientesMenu {
-  return { ...p, total: p.total + paraTi, paraTi };
+/** Suma al total de Avisos los avisos «Para ti» sin leer y las actualizaciones del sistema sin ver. */
+export function conParaTi(p: PendientesMenu, paraTi: number, novedades = 0): PendientesMenu {
+  return { ...p, total: p.total + paraTi + novedades, paraTi, novedades };
 }
 
 /** Páginas del menú que muestran un contador; el resto no cuenta nada. */
@@ -61,7 +63,7 @@ export function calcularPendientesMenu(pendientes: PendientesHoy, modulos: strin
       pendientes.creditosIA +
       pendientes.sinStockPorRevisar
     : 0;
-  return { contadores, total, paraTi: 0 };
+  return { contadores, total, paraTi: 0, novedades: 0 };
 }
 
 /**
