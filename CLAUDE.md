@@ -1778,9 +1778,9 @@ convenciones técnicas del código.
   historial de Dropi, y stock esperado según pedidos entregados, en tránsito, en devolución y devueltos contra el stock que dice Dropi; los pedidos
   traen `warehouse_id` en `staging_ordenes_dropi.payload`; empieza en la fecha del levantamiento). Probado con PGlite. Reversa:
   `supabase/rollbacks/0214_rollback.sql`.
-  **Costa Rica y remisiones** (migración 0215, 31 oct 2026, pedido de Alcides): bodega «Oficina» (`oficina`, propia) en Costa Rica, cargada
-  con el inventario de la oficina que había en ClickUp («Inventario 🇨🇷 Ecomfive Costa Rica»: columnas DunamixFY, DROP = Boxfull, Dropi, Effi,
-  Oficina, Tiendas); «Despacho» y «Fulfillment» de Costa Rica desactivadas. Las bolsas de empaque por medida son productos simples
+  **Costa Rica y remisiones** (migración 0215, 31 oct 2026, pedido de Alcides): bodega «Oficina» (`oficina`, propia) en Costa Rica, que se
+  levanta desde cero con un conteo en el sistema (decisión de Alcides: no se trae lo de ClickUp, «Inventario 🇨🇷 Ecomfive Costa Rica», cuyas
+  columnas eran DunamixFY, DROP = Boxfull, Dropi, Effi, Oficina y Tiendas); «Despacho» y «Fulfillment» de Costa Rica desactivadas. Las bolsas de empaque por medida son productos simples
   (`BOLSAS/BURBUJAS/15X24`… `BOLSAS/ROLLO/38X52`). **Remisión** a cualquier bodega externa del país: `wms_enviar_a_externa` (`remitirAExterna`,
   `PanelRemision`; `wms_enviar_a_dropi` es su atajo) y la pestaña `/inventario/remisiones` (`/inventario/envios-dropi` redirige); la tabla sigue
   siendo `wms_envios_dropi` (`bodega_dropi_id` = la externa de destino). **Corte de una bodega externa** (`wms_cortes_externa`): lo que tenía el
