@@ -51,10 +51,9 @@ export function chequearTitulo(titulo: string, categoria: string | null, r: Pick
     },
     { clave: "espanol", ok: ingles.length === 0, texto: ingles.length ? `Palabras en inglés: ${ingles.join(", ")}` : "En español", obligatorio: true },
   ];
-  const letras = t.replace(/[^a-zA-ZÁÉÍÓÚÑáéíóúñ]/g, "");
-  const mayusculas = letras.length >= 8 && letras === letras.toUpperCase();
   const palabras = t.split(/\s+/).filter(Boolean).length;
-  chequeos.push({ clave: "formato", ok: !mayusculas && palabras >= 3, texto: mayusculas ? "Todo en mayúsculas" : palabras < 3 ? "Muy corto" : "Claro", obligatorio: true });
+  // Las mayúsculas no se exigen (31 oct 2026, pedido de Alcides): se escriben como el equipo las corrige a mano.
+  chequeos.push({ clave: "formato", ok: palabras >= 3, texto: palabras < 3 ? "Muy corto" : "Claro", obligatorio: true });
   if (suple) chequeos.push({ clave: "cantidad", ok: tieneCantidad(t), texto: tieneCantidad(t) ? "Dice la cantidad" : "Falta la cantidad (30c, 30go, 30t, 30sg)", obligatorio: true });
   chequeos.push({ clave: "angulo", ok: tieneAngulo(t), texto: tieneAngulo(t) ? "Dice para qué sirve" : "No dice para qué sirve", obligatorio: false });
   return { chequeos, cumple: chequeos.every((c) => !c.obligatorio || c.ok) };
@@ -63,7 +62,7 @@ export function chequearTitulo(titulo: string, categoria: string | null, r: Pick
 /** Las reglas en palabras, para ponerlas en el pedido a la IA. */
 export function textoCriterios(r: ReglasIA): string {
   return [
-    `Título: de ${r.minTitulo} a ${r.maxTitulo} caracteres contando espacios (Dropi no admite más de ${r.maxTitulo}; menos de ${r.minTitulo} desaprovecha espacio). Orden: el nombre del producto, la cantidad y el uso principal. El nombre del producto va tal cual aunque esté en inglés («15 Days Cleanse»); lo que se le agrega va en español. Si es un suplemento, la cantidad; si no cabe completa, abreviada: ${ABREVIATURAS_CANTIDAD.map((a) => `30${a.abrev} = 30 ${a.nombre}`).join(", ")} (mejor abreviar que dejar fuera el uso). El uso puede ir directo, sin «para» («Limpieza Intestinal»). Claro: no todo en mayúsculas. Ejemplo: «15 Days Cleanse 30c Limpieza Intestinal».`,
+    `Título: de ${r.minTitulo} a ${r.maxTitulo} caracteres contando espacios (Dropi no admite más de ${r.maxTitulo}; menos de ${r.minTitulo} desaprovecha espacio). Orden: el nombre del producto, la cantidad y el uso principal. El nombre del producto va tal cual aunque esté en inglés («15 Days Cleanse»); lo que se le agrega va en español. Si es un suplemento, la cantidad; si no cabe completa, abreviada: ${ABREVIATURAS_CANTIDAD.map((a) => `30${a.abrev} = 30 ${a.nombre}`).join(", ")} (mejor abreviar que dejar fuera el uso). El uso puede ir directo, sin «para» («Limpieza Intestinal»). Las mayúsculas, como las escribe el equipo en sus correcciones. Ejemplo: «15 Days Cleanse 30c Limpieza Intestinal».`,
     `Fotos: mínimo ${r.minFotos} por publicación.`,
     `Descripción: mínimo ${r.minDescripcion} caracteres.`,
   ].join("\n- ");
@@ -145,7 +144,7 @@ export function textoEjemplos(e: Ejemplos): string {
   const correcciones = e.correcciones ?? [];
   if (correcciones.length)
     partes.push(
-      `Nombres que el equipo corrigió a mano en Dropi (antes → después). Es lo que más pesa: entiende por qué se cambió cada uno y escribe con ese mismo criterio, sin copiarlos:\n- ${correcciones
+      `Nombres que el equipo corrigió a mano en Dropi (antes → después), del más reciente al más viejo. Es lo que más pesa, y los primeros más que los últimos: entiende por qué se cambió cada uno (qué quitó, qué agregó, cómo abrevió, cómo usa las mayúsculas, qué largo dejó) y escribe con ese mismo criterio, sin copiarlos:\n- ${correcciones
         .slice(0, MAX_CORRECCIONES)
         .map((c) => `«${c.antes}» → «${c.despues}»`)
         .join("\n- ")}`,
