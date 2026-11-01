@@ -306,6 +306,11 @@ convenciones técnicas del código.
   Dashboard, Planificación o Tiempos visibles (sus cifras saldrían en cero). **Un módulo nuevo que se quiera afinar**: agrega su
   `CatalogoModulo` a `src/lib/permisos/catalogo.ts` y aplica sus claves en el servidor como Compras (`permisos-compras.ts` es el modelo).
   `acceso-seccion.ts`, «Líderes comerciales» del CRM y el progreso de la Universidad ya cuentan lo propio de cada persona.
+- **Actualizaciones del sistema** (`/actualizaciones`, 31 oct 2026, pedido de Alcides): **solo administradores** (`esAdministrador`; los demás vuelven a su
+  inicio). Botón «Cambios» abajo en el riel (y «Cambios» en el menú del celular), con un punto si hay cambios que la persona no vio. Lista **todas** las
+  `NOVEDADES` del Centro de ayuda por día (`agruparPorDia`, `filtrarCambios`, `ultimaFecha`, `src/lib/ayuda/actualizaciones.ts`, con prueba), con búsqueda
+  y filtro por módulo. Lo visto se guarda en el navegador (`CLAVE_VISTO`) al salir de la página o con «Marcar todo como visto». **Por eso toda novedad
+  lleva su fecha real (nunca una futura) y, si se ve en un módulo, su `modulo` y su `href`.**
 - **Símbolo de moneda en todo monto** (31 oct 2026, pedido de Alcides: «los precios y valores siempre con el símbolo de la moneda del país en que se
   están viendo»). Un solo lugar: `src/lib/moneda/simbolo.ts` (con prueba): `simboloDeMoneda` («$» USD, «₡» CRC, **«MX$» MXN**, para no confundir el
   peso con el dólar), `simboloDePais`, `simboloDolarEn` («US$» donde no se usa el dólar), `montoConSimbolo` y `montoDePais`. `formatearMoneda`
