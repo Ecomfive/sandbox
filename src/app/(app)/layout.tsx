@@ -17,6 +17,8 @@ import { obtenerPlataformasPais } from "@/lib/pais-plataformas";
 import { construirAreas } from "@/lib/nav-data";
 import { paginasBuscables } from "@/lib/paleta";
 import { esAdministrador } from "@/lib/permisos/acceso";
+import { ultimaFecha } from "@/lib/ayuda/actualizaciones";
+import { NOVEDADES } from "@/lib/ayuda/contenido";
 import { PESTANAS_SOLO_ADMIN, pestanasOcultasDe } from "@/lib/permisos/ocultas";
 import { createServiceClient } from "@/lib/supabase/server";
 import { obtenerFavoritos } from "@/lib/favoritos";
@@ -81,7 +83,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       {usuario && <LatidoPresencia />}
       {usuario?.vistaPrevia && <BannerVistaPrevia rolNombre={usuario.vistaPrevia.rolNombre} />}
       <div className="flex min-h-full">
-        <Sidebar modulosPermitidos={usuario?.modulos ?? null} areas={areas} favoritos={favoritos} pendientes={pendientes} />
+        <Sidebar modulosPermitidos={usuario?.modulos ?? null} areas={areas} favoritos={favoritos} pendientes={pendientes} ultimaActualizacion={usuario && esAdministrador(usuario) ? ultimaFecha(NOVEDADES) : null} />
         <div className="flex min-h-full min-w-0 flex-1 flex-col">
           <NavBar paginas={paginas} pendientes={pendientes} plataforma={plataformasPais.find((p) => p.tieneDatos)?.nombre ?? null} />
           <BarraMigas areas={areas} favoritos={favoritos} pestanasOcultas={pestanasOcultas} verAccesos={!!usuario && esAdministrador(usuario)} />
