@@ -1851,7 +1851,7 @@ convenciones técnicas del código.
   con aspecto de lista (**lo que se archiva —«Cerrados», oculto por defecto— lo decide el Estado: solo `estado = completado`;
   la etapa «Completado» no archiva**, porque el producto puede haber llegado y la compra seguir «En Gestión»; los tiempos y lo
   atrasado siguen por etapa) (agrupar —arranca por Etapa; el título de cada grupo lleva el color de su etapa, estado o etiqueta, como
-  en ClickUp: `etiquetaGrupo` de `TablaDatos`—, filtros, columnas, Cerrados, descarga), 8 columnas a la vista y el resto
+  en ClickUp: `etiquetaGrupo` de `TablaDatos`—, filtros, columnas, Cerrados, descarga), 8 columnas a la vista (la de «País» con la bandera `Bandera` de cada código, 1 nov 2026, pedido de Alcides) y el resto
   de los campos de ClickUp ocultos (`oculta` en la columna) hasta mostrarlos en «Columnas»; filtros de un toque (Cotizando,
   Producción, En tránsito, Atrasadas; `?grupo=` y `?etapa=` los preseleccionan). **Pulsar la descripción de
   la compra (la columna «Orden de compra», y solo esa; las etiquetas van dentro de ella, ya no hay columna «Etiquetas») abre directo la ficha completa con la actividad; el resto de las celdas se editan en su sitio** (ver abajo). Ya no hay ficha de resumen a la derecha (13 oct 2026: se quitó `ficha-lateral-compra.tsx`; en Windows obligaba a pulsar además «Abrir ficha completa»).
