@@ -28,6 +28,11 @@ select p.id, n.nombre, n.codigo, 'propia', n.orden
  where p.codigo = 'PA'
    and not exists (select 1 from wms_bodegas b where b.pais_id = p.id and b.codigo = n.codigo);
 
+-- Los nombres con tilde, por si se copiaron mal (31 oct 2026: el portapapeles cambió «Ancón» por «Anc√≥n»).
+update wms_bodegas b set nombre = n.nombre, actualizado_en = now()
+  from paises p, (values ('oficina_ancon', 'Oficina Ancón'), ('istorage', 'iStorage')) as n(codigo, nombre)
+ where p.id = b.pais_id and p.codigo = 'PA' and b.codigo = n.codigo and b.nombre <> n.nombre;
+
 update wms_bodegas b set activa = false, actualizado_en = now()
   from paises p
  where p.id = b.pais_id and p.codigo = 'PA' and b.activa
