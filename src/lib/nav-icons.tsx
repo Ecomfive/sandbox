@@ -322,6 +322,15 @@ export function FlechaAbajoIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+/** Dos flechas opuestas: pasar algo de un lugar a otro (transferencia entre bodegas). */
+export function TransferirIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M4 8h14M14 4l4 4-4 4M20 16H6M10 12l-4 4 4 4" />
+    </Icon>
+  );
+}
+
 export function CheckIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <Icon {...props}>

@@ -28,11 +28,13 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
 
   const { data: bodegasPais } = await supabase
     .from("wms_bodegas")
-    .select("id, nombre, tipo, activa")
+    .select("id, nombre, tipo, activa, codigo")
     .eq("pais_id", pais.id)
     .order("tipo")
     .order("nombre");
-  const bodegas = bodegasPais ?? [];
+  // Las desactivadas (Effi, Boxfull… en Panamá) no se ofrecen.
+  const todas = bodegasPais ?? [];
+  const bodegas = todas.filter((b) => b.activa);
   // Solo vale una bodega del país actual.
   const bodegaElegida = bodegaPedida && bodegas.some((b) => b.id === bodegaPedida) ? bodegaPedida : "";
 
@@ -82,6 +84,7 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
           ubicaciones={(ubicaciones.data ?? []).map((u) => ({ id: u.id, bodegaId: u.bodega_id, codigo: u.codigo, propiedad: u.propiedad }))}
           puedeEscribir={!usuario.modulosSoloLectura.includes("inventario")}
           codigoPais={pais.codigo}
+          hayDropi={bodegas.some((b) => b.codigo === "dropi")}
         />
       )}
     </Pagina>

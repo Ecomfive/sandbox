@@ -6,12 +6,13 @@ import { Seccion } from "@/components/ui/seccion-ficha";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
 import { formatearTiempoRelativo } from "@/lib/formato";
-import { CalendarioIcon, ComprasIcon, HistorialIcon, InventarioIcon } from "@/lib/nav-icons";
+import { CalendarioIcon, ComprasIcon, DropiIcon, HistorialIcon, InventarioIcon } from "@/lib/nav-icons";
 import { ComprasProducto } from "../producto/compras-producto";
 import { ETIQUETA_TIPO_SKU, type FilaStock } from "./def-stock";
 import { DESCRIPCION_CUBETA } from "./descripciones-stock";
 import { PanelMovimiento, type BodegaOpcion, type UbicacionOpcion } from "./panel-movimiento";
-import { obtenerStockDeSku, type LoteStock, type MovimientoStock, type StockBodega } from "./stock-actions";
+import { PanelEnvioDropi, PanelTransferencia } from "./panel-transferencia";
+import { obtenerStockDeSku, type EnvioDropi, type LoteStock, type MovimientoStock, type StockBodega } from "./stock-actions";
 
 const ETIQUETA_TIPO_MOV: Record<string, string> = { entrada: "Entrada", salida: "Salida", ajuste: "Ajuste", reserva: "Reserva", liberacion: "Liberación", traslado: "Traslado" };
 const ETIQUETA_CUBETA: Record<string, string> = {
@@ -23,7 +24,15 @@ const ETIQUETA_CUBETA: Record<string, string> = {
   en_camino: "en camino",
   vencido: "vencido",
 };
-const ETIQUETA_ORIGEN: Record<string, string> = { manual: "A mano", sync_dropi: "Sincronización de Dropi", sync_shopify: "Sincronización de Shopify", pedido: "Pedido", conteo: "Conteo" };
+const ETIQUETA_ORIGEN: Record<string, string> = {
+  manual: "A mano",
+  sync_dropi: "Sincronización de Dropi",
+  sync_shopify: "Sincronización de Shopify",
+  pedido: "Pedido",
+  conteo: "Levantamiento",
+  transferencia: "Transferencia",
+  envio_dropi: "Envío a Dropi",
+};
 
 const ETIQUETA_ESTADO_LOTE = { vencido: "Vencido", por_vencer: "Por vencer", vigente: "Vigente" } as const;
 
@@ -55,11 +64,14 @@ export function FichaStock({
   ubicaciones,
   puedeEscribir,
   codigoPais,
+  hayDropi,
   alCerrar,
   alCambiar,
 }: {
   sku: FilaStock | undefined;
   bodegasPropias: BodegaOpcion[];
+  /** El país tiene bodega de Dropi: se ofrece «Enviar a Dropi». */
+  hayDropi: boolean;
   ubicaciones: UbicacionOpcion[];
   puedeEscribir: boolean;
   /** Las compras que se ven son las de este país, como el stock. */
@@ -68,7 +80,7 @@ export function FichaStock({
   /** Se llama tras guardar un movimiento, para que la tabla vuelva a pedir sus totales. */
   alCambiar: () => void;
 }) {
-  const [datos, setDatos] = useState<{ bodegas: StockBodega[]; movimientos: MovimientoStock[]; lotes: LoteStock[] } | "error" | null>(null);
+  const [datos, setDatos] = useState<{ bodegas: StockBodega[]; movimientos: MovimientoStock[]; lotes: LoteStock[]; envios: EnvioDropi[] } | "error" | null>(null);
   // Sube cuando se guarda un movimiento, para volver a pedir el stock y el libro.
   const [version, setVersion] = useState(0);
   const id = sku?.id;
@@ -125,6 +137,30 @@ export function FichaStock({
                   }}
                 />
               ))}
+              <PanelTransferencia
+                key={`${sku.id}-transferir`}
+                skuId={sku.id}
+                bodegas={bodegasPropias}
+                manejaVencimiento={sku.manejaVencimiento}
+                lotes={datos && datos !== "error" ? datos.lotes : []}
+                alGuardar={() => {
+                  setVersion((v) => v + 1);
+                  alCambiar();
+                }}
+              />
+              {hayDropi && (
+                <PanelEnvioDropi
+                  key={`${sku.id}-dropi`}
+                  skuId={sku.id}
+                  bodegas={bodegasPropias}
+                  manejaVencimiento={sku.manejaVencimiento}
+                  lotes={datos && datos !== "error" ? datos.lotes : []}
+                  alGuardar={() => {
+                    setVersion((v) => v + 1);
+                    alCambiar();
+                  }}
+                />
+              )}
             </div>
           )}
 
@@ -213,6 +249,32 @@ export function FichaStock({
                     ))}
                   </ul>
                 )}
+              </Seccion>
+            )}
+
+            {!esCombo && !esTest && datos !== null && datos !== "error" && datos.envios.length > 0 && (
+              <Seccion icono={DropiIcon} titulo="Envíos a Dropi">
+                <ul className="m-0 flex list-none flex-col gap-2.5 p-0 text-[13px]">
+                  {datos.envios.map((e) => (
+                    <li key={e.id} className="flex flex-col">
+                      <span className="flex flex-wrap items-center gap-2">
+                        <strong className="font-medium tabular-nums">{e.enviada} u.</strong>
+                        {e.estado === "en_camino" ? (
+                          <Badge tone="warning">En camino</Badge>
+                        ) : e.recibida === e.enviada ? (
+                          <Badge tone="success">Llegó completo</Badge>
+                        ) : (
+                          <Badge tone="destructive">Llegaron {e.recibida}</Badge>
+                        )}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        Desde {e.desde} · {formatearTiempoRelativo(e.enviadoEn)}
+                        {e.referencia ? ` · ${e.referencia}` : ""}
+                        {e.motivo ? ` · ${e.motivo}` : ""}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
               </Seccion>
             )}
 

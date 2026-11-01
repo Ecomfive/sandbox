@@ -1762,6 +1762,22 @@ convenciones técnicas del código.
   ficha de un SKU (`FichaStock`) muestra su stock por bodega, los últimos movimientos y los botones Entrada, Salida y Ajuste
   (`registrarMovimientoStock`, que devuelve `{ error }` como valor). El pistoleo anterior (carga por CSV) quedó en
   `/inventario/pistoleo`.
+  **Inventario a mano en Panamá** (migración 0214, 31 oct 2026, pedido de Alcides: dejar ClickUp, donde había una tarea por producto con una
+  columna de stock por lugar y cada movimiento era cambiar el número + un comentario). Bodegas de Panamá: Despacho Plaza 100, Oficina Ancón
+  (`oficina_ancon`), Fulfillment Ricardo (la `fulfillment`, antes «Deposito Plaza 100») e iStorage (`istorage`), todas propias, más Dropi (B280,
+  externa); Effi, Boxfull, Dunamixfy y «Deposito Principal» quedaron desactivadas en Panamá (la página de Inventario y la ficha ya no listan las
+  desactivadas: `wms_stock_por_bodega` las salta si no tienen stock). **Levantamiento** (`/inventario/levantamiento`, `levantamiento/`):
+  `wms_registrar_conteo(bodega, items jsonb, referencia, usuario)` deja cada producto contado en lo contado con un ajuste por la diferencia (origen
+  `conteo`, cabecera en `wms_conteos`); con vencimiento se cuenta por lote (un lote nuevo entra con su fecha; uno con unidades que no se nombró
+  queda en cero); lo no contado no se toca. Reglas puras en `src/lib/wms/levantamiento.ts` (`revisarConteo`, con prueba). **Transferir**
+  (`PanelTransferencia`, `panel-transferencia.tsx`; `transferirStock`): `wms_transferir` = salida + entrada (origen `transferencia`) entre dos
+  propias activas del mismo país, el mismo lote o FEFO. **Enviar a Dropi** (`PanelEnvioDropi`, `enviarADropi`): `wms_enviar_a_dropi` = salida
+  (origen `envio_dropi`) + fila en `wms_envios_dropi` «en_camino»; `wms_recibir_envio_dropi` (pestaña `/inventario/envios-dropi`,
+  `recibirEnvioDropi`) guarda cuántas dice Dropi que llegaron y exige motivo si no son las enviadas. **La bodega de Dropi no se mueve aquí**: su
+  stock sigue siendo la lectura de Dropi; los envíos son la base de la fase 2 (cuadre de la B280: enviado vs recibido según los ingresos del
+  historial de Dropi, y stock esperado según pedidos entregados, en tránsito, en devolución y devueltos contra el stock que dice Dropi; los pedidos
+  traen `warehouse_id` en `staging_ordenes_dropi.payload`; empieza en la fecha del levantamiento). Probado con PGlite. Reversa:
+  `supabase/rollbacks/0214_rollback.sql`.
   **Lotes y vencimiento** (migración 0073): el producto marca «maneja vencimiento» (+ días de aviso, 90 por defecto desde el 13 oct 2026: `DIAS_AVISO_PREDETERMINADO`, `src/lib/wms/vencimiento.ts`, se guarda en el producto al activarlo; las funciones SQL aún caen a 60 si el dato está vacío) en su ficha; no
   aplica a compuestos y solo se activa sin stock físico (se desactiva sin lotes con unidades). Su stock se reparte por lote
   (`wms_lotes`, `wms_stock_lote`, por bodega): la entrada exige lote y fecha (un lote existente exige la misma fecha), el ajuste exige
