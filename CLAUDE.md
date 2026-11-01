@@ -608,6 +608,8 @@ convenciones técnicas del código.
   puede elegir en la barra (`PAISES_NAV` sin `pronto`), así se ve en Gestión de IDs y en todo el sistema.
   **Honduras** se puede elegir en la barra desde el 31 oct 2026 (Alcides: empiezan las compras para Honduras); sin datos de Dropi todavía,
   así que `construirAreas` no muestra sus páginas de Dropi. Moneda HNL («L») y hora de Tegucigalpa en `formato.ts`.
+  **Venezuela** también desde el 31 oct 2026 (Alcides), igual sin datos de Dropi; sus montos van en dólares (`MONEDA_POR_PAIS` no la tiene,
+  así que `monedaDePais` da USD) y la hora es la de Caracas en `formato.ts`.
   **Moneda de cada país** (28 oct 2026, Hernán: «en colones y pequeño el valor en dólares»): los montos de una publicación están en la
   moneda de su país de Dropi (Costa Rica en colones: Dropi da 5.499). `src/lib/publicaciones/moneda.ts` (`monedaPublicaciones`,
   `formatoMonto`, `formatoEnDolares`, `simboloMoneda`, con prueba) y `moneda-contexto.tsx` (`ProveedorMoneda` en `TablaPublicaciones`,

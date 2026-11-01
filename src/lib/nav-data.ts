@@ -179,7 +179,8 @@ export const PAISES_NAV: PaisNav[] = [
   { codigo: "MX", nombre: "México" },
   // Honduras abierto el 31 oct 2026 (Alcides): empiezan las compras para Honduras.
   { codigo: "HN", nombre: "Honduras" },
-  { codigo: "VE", nombre: "Venezuela", pronto: true },
+  // Venezuela abierto el 31 oct 2026 (Alcides).
+  { codigo: "VE", nombre: "Venezuela" },
 ];
 
 export const PAIS_COOKIE = "pais_actual";
