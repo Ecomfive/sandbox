@@ -6,6 +6,8 @@ const MONEDA_POR_PAIS: Record<string, { locale: string; currency: string; timeZo
   PA: { locale: "es-PA", currency: "USD", timeZone: "America/Panama" },
   MX: { locale: "es-MX", currency: "MXN", timeZone: "America/Mexico_City" },
   HN: { locale: "es-HN", currency: "HNL", timeZone: "America/Tegucigalpa" },
+  // Venezuela en dólares: así se vende allá (sin cambiar `MONEDA_POR_PAIS`, que también da USD).
+  VE: { locale: "es-VE", currency: "USD", timeZone: "America/Caracas" },
 };
 
 /**
