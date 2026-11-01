@@ -1,3 +1,4 @@
+import { useMoneda } from "./moneda-contexto";
 import type { CambioDropiVista } from "@/lib/publicaciones/cambios-dropi";
 import { republicacionSinTocarDropi } from "@/lib/publicaciones/republicar-dropi";
 import { codigoBodega } from "@/lib/publicaciones/sincronizar-dropi";
@@ -9,6 +10,7 @@ const fecha = (iso: string) => new Date(iso).toLocaleString("es-PA", { day: "num
  * que alguien lo pulse) o con error (el próximo «Aplicar en Dropi» lo vuelve a intentar).
  */
 export function EstadoCambioDropi({ c }: { c: CambioDropiVista }) {
+  const { monto } = useMoneda();
   if (c.tipo === "republicar") return <EstadoRepublicar c={c} />;
   if (c.tipo === "apagar") return <EstadoApagar c={c} />;
   if (c.tipo === "archivar") return <EstadoArchivar c={c} />;
@@ -19,8 +21,8 @@ export function EstadoCambioDropi({ c }: { c: CambioDropiVista }) {
   // Qué lleva el cambio: el nombre, el precio y/o el precio sugerido.
   const que = [
     c.nombre ? `«${c.nombre}»${guia}` : "",
-    c.precio !== null ? `precio $${c.precio.toFixed(2)}` : "",
-    c.precioSugerido !== null ? `sugerido $${c.precioSugerido.toFixed(2)}` : "",
+    c.precio !== null ? `precio ${monto(c.precio)}` : "",
+    c.precioSugerido !== null ? `sugerido ${monto(c.precioSugerido)}` : "",
     c.descripcion ? "descripción" : "",
     c.fotos > 0 ? `${c.fotos} ${c.fotos === 1 ? "foto" : "fotos"}` : "",
   ]

@@ -4,6 +4,7 @@
 // de cambio del día. La ficha y «Crear publicación» lo muestran sin dejar escribirlo. null = en ese país se escribe en cada publicación.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { montoConSimbolo } from "@/lib/moneda/simbolo";
 import { monedaDePais, tasasUsd } from "@/lib/moneda/tipo-cambio";
 import { fulfillmentFijo } from "./publicacion";
 
@@ -23,13 +24,9 @@ export function leerFulfillment(texto: string): { valor: number | null } | { err
   return { valor: Math.round(valor * 100) / 100 };
 }
 
-/** «US$2.00», «₡1 011», «MX$37»: un monto con su moneda. */
+/** «US$2.00», «₡1 011», «MX$37»: un monto con su moneda (el dólar siempre como «US$»: aquí se compara con la moneda del país). */
 export const montoConMoneda = (n: number | null, moneda: string): string =>
-  n === null
-    ? "sin dato"
-    : moneda === "USD"
-      ? `US$${n.toFixed(2)}`
-      : `${moneda === "MXN" ? "MX$" : moneda === "CRC" ? "₡" : `${moneda} `}${n.toLocaleString("es-CR", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+  n === null ? "sin dato" : moneda === "USD" ? `US$${n.toFixed(2)}` : montoConSimbolo(n, moneda);
 
 /** Las monedas en que se puede escribir el fulfillment de un país: dólares y, si es otra, la del país. */
 export function monedasFulfillment(codigoPais: string): string[] {

@@ -3,6 +3,7 @@
 // 5.499, no 10.75). Se muestran en esa moneda y, si no es el dólar, con su valor en dólares en pequeño («US$10.75», como en Scraping de
 // proveedores), con el tipo de cambio del día (`tasasUsd`). Sin base ni React.
 
+import { montoConSimbolo, simboloDeMoneda } from "@/lib/moneda/simbolo";
 import { monedaDePais } from "@/lib/moneda/tipo-cambio";
 
 export interface MonedaPublicaciones {
@@ -22,20 +23,17 @@ export function monedaPublicaciones(codigoPais: string, porUsd: Record<string, n
   return { moneda, porUsd: Number.isFinite(tasa) && tasa > 0 ? tasa : null };
 }
 
-/** El símbolo para un campo de monto («$», «₡»). */
+/** El símbolo para un campo de monto («$», «₡», «MX$»). */
 export function simboloMoneda(m: MonedaPublicaciones): string {
-  if (m.moneda === "USD") return "$";
-  return new Intl.NumberFormat("es-CR", { style: "currency", currency: m.moneda, currencyDisplay: "narrowSymbol" }).formatToParts(0).find((p) => p.type === "currency")?.value ?? m.moneda;
+  return simboloDeMoneda(m.moneda);
 }
 
 /**
  * Un monto en la moneda del país: en dólares igual que siempre («$8.99», «-$1.20»); en otra, con su símbolo y sin decimales si no los
- * tiene («₡5 499», «₡5 499,50»), como la escribe ese país. `null` → «—».
+ * tiene («₡5 499», «₡5 499,50», «MX$37»). `null` → «—».
  */
 export function formatoMonto(v: number | null, m: MonedaPublicaciones): string {
-  if (v === null || !Number.isFinite(v)) return "—";
-  if (m.moneda === "USD") return `${v < 0 ? "-" : ""}$${Math.abs(v).toFixed(2)}`;
-  return new Intl.NumberFormat("es-CR", { style: "currency", currency: m.moneda, currencyDisplay: "narrowSymbol", minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(v);
+  return montoConSimbolo(v, m.moneda);
 }
 
 /** El mismo monto en dólares («US$10.75»), o `null` si ya está en dólares, no hay tasa o no hay monto. */

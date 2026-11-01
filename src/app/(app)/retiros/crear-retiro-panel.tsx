@@ -1,5 +1,6 @@
 "use client";
 
+import { useSimboloPais } from "@/components/pais-contexto";
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { pideCrear } from "@/lib/crear-global";
@@ -70,6 +71,7 @@ export function CrearRetiroPanel({
   cuentas: Cuenta[];
 }) {
   const [abierto, setAbierto] = useState(false);
+  const simbolo = useSimboloPais();
   const [monto, setMonto] = useState("");
   // La comisión arranca vacía: es un dato obligatorio que hay que escribir (o que sugiere la cuenta al elegirla).
   const [comisionValor, setComisionValor] = useState("");
@@ -316,7 +318,7 @@ export function CrearRetiroPanel({
                     <Obligatorio />
                   </label>
                   <div className="flex items-center gap-1">
-                    <span className="text-sm text-muted-foreground">$</span>
+                    <span className="text-sm text-muted-foreground">{simbolo}</span>
                     <input
                       id="campo-monto"
                       type="number"
@@ -344,7 +346,7 @@ export function CrearRetiroPanel({
                     A recibir
                   </label>
                   <div className="flex items-center gap-1">
-                    <span className="text-sm text-muted-foreground">$</span>
+                    <span className="text-sm text-muted-foreground">{simbolo}</span>
                     <input
                       id="campo-a-recibir"
                       type="number"
@@ -363,7 +365,7 @@ export function CrearRetiroPanel({
                   </p>
                   <div className="mt-1 grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div className="flex min-w-0 items-center gap-1">
-                      <span className="text-sm text-muted-foreground">$</span>
+                      <span className="text-sm text-muted-foreground">{simbolo}</span>
                       <input
                         id="campo-comision"
                         type="number"
@@ -372,7 +374,7 @@ export function CrearRetiroPanel({
                         name="comision"
                         required
                         aria-invalid={invalido("campo-comision")}
-                        aria-label="Comisión en dólares"
+                        aria-label="Comisión"
                         aria-describedby="etiqueta-comision"
                         placeholder="Ej: 3.00"
                         value={comisionValor}

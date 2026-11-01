@@ -1,5 +1,6 @@
 "use client";
 
+import { montoDePais } from "@/lib/moneda/simbolo";
 import Link from "next/link";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { anilloFoco } from "@/components/ui/field";
@@ -7,6 +8,9 @@ import { origenDropi, VERSION_FAVORITO } from "@/lib/publicaciones/marcador-apli
 import { CDN_FOTOS_DROPI } from "@/lib/publicaciones/republicar-dropi";
 import { codigoBodega } from "@/lib/publicaciones/sincronizar-dropi";
 import { guardarResultadosDropi, pendientesParaDropi, type CambioParaDropi } from "../aplicar-actions";
+
+/** Un monto con el símbolo de la moneda del país de esta ventana (`?p=` de la pestaña de Dropi que la abrió: «₡» en Costa Rica, «MX$» en México). */
+const montoUrl = (v: number) => montoDePais(v, typeof window === "undefined" ? "PA" : new URLSearchParams(window.location.search).get("p") ?? "PA");
 
 type Resultado = { id: string; ok: boolean; error?: string; nuevo?: number; archivado?: boolean; aviso?: string; salida?: boolean; antes?: number; stock?: number };
 type Estado =
@@ -223,7 +227,7 @@ function DetalleCambio({ c }: { c: CambioParaDropi }) {
       <>
         <span className="font-medium">Publicar en Dropi: {d?.nombre || c.publicacion}</span>
         <span className="text-xs tabular-nums">
-          {d?.precio != null ? `$${d.precio.toFixed(2)} · ` : ""}
+          {d?.precio != null ? `${montoUrl(d.precio)} · ` : ""}
           {d ? `${d.fotos.length} fotos · ${d.bodegas.reduce((t, b) => t + b.unidades, 0)} unidades` : ""}
         </span>
         <span className="text-xs text-muted-foreground">{c.nuevo ? `Ya creado como ID ${c.nuevo}: sigue desde ahí` : "Producto nuevo: se crea en Dropi con sus fotos, garantías y stock"}</span>
@@ -236,7 +240,7 @@ function DetalleCambio({ c }: { c: CambioParaDropi }) {
       <>
         <span className="font-medium">Privatizar: {c.publicacion}</span>
         <span className="text-xs tabular-nums">
-          {d ? `A ${d.dropshipper || d.correo} (${d.correo}) · ${d.unidades.toLocaleString("es-PA")} u. · $${d.precio.toFixed(2)} · «${d.nombre}»` : ""}
+          {d ? `A ${d.dropshipper || d.correo} (${d.correo}) · ${d.unidades.toLocaleString("es-PA")} u. · ${montoUrl(d.precio)} · «${d.nombre}»` : ""}
         </span>
         <span className="text-xs text-muted-foreground">
           ID {c.producto} (público){c.nuevo ? ` · ya creado el privado ID ${c.nuevo}: sigue desde ahí` : ": se crea el privado en Dropi, se le asigna el correo y se le sacan las unidades al público"}
@@ -293,9 +297,9 @@ function DetalleCambio({ c }: { c: CambioParaDropi }) {
       <span className="font-medium">{c.nombre ?? c.publicacion}</span>
       {(c.precio !== null || c.sugerido !== null) && (
         <span className="text-xs tabular-nums">
-          {c.precio !== null && `Precio ${c.precioAntes !== null ? `$${c.precioAntes.toFixed(2)} → ` : ""}$${c.precio.toFixed(2)}`}
+          {c.precio !== null && `Precio ${c.precioAntes !== null ? `${montoUrl(c.precioAntes)} → ` : ""}${montoUrl(c.precio)}`}
           {c.precio !== null && c.sugerido !== null && " · "}
-          {c.sugerido !== null && `Sugerido ${c.sugeridoAntes !== null ? `$${c.sugeridoAntes.toFixed(2)} → ` : ""}$${c.sugerido.toFixed(2)}`}
+          {c.sugerido !== null && `Sugerido ${c.sugeridoAntes !== null ? `${montoUrl(c.sugeridoAntes)} → ` : ""}${montoUrl(c.sugerido)}`}
         </span>
       )}
       {(c.descripcion || c.fotos.length > 0) && (

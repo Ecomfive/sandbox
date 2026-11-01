@@ -5,6 +5,7 @@ import { BannerVistaPrevia } from "@/components/banner-vista-previa";
 import { BarraMigas } from "@/components/barra-migas";
 import { LatidoPresencia } from "@/components/latido-presencia";
 import { ProveedorModulos } from "@/components/modulos-contexto";
+import { ProveedorPais } from "@/components/pais-contexto";
 import { NavBar } from "@/components/nav";
 import { Sidebar } from "@/components/sidebar";
 import { ToastProvider } from "@/components/ui/toast";
@@ -49,10 +50,11 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       ]).then(([menu, paraTi]) => conParaTi(menu, paraTi))
     )
     .catch(() => SIN_PENDIENTES);
-  const [plataformasPais, favoritosDeSesion, usuario] = await Promise.all([
+  const [plataformasPais, favoritosDeSesion, usuario, paisActual] = await Promise.all([
     paisP.then((p) => obtenerPlataformasPais(supabase, p.id)),
     getUsuarioIdSesion().then((id) => (id ? obtenerFavoritos(supabase, id) : [])),
     usuarioP,
+    paisP,
   ]);
   // Quien entra con la contraseña temporal que le dio un administrador elige la suya antes de usar el sistema (31 oct 2026).
   if (usuario && tieneContrasenaTemporal(await getUsuarioSesion())) redirect("/elegir-contrasena");
@@ -74,6 +76,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <ProveedorModulos modulos={usuario?.modulos ?? null}>
+    <ProveedorPais codigo={paisActual.codigo}>
     <ToastProvider>
       {usuario && <LatidoPresencia />}
       {usuario?.vistaPrevia && <BannerVistaPrevia rolNombre={usuario.vistaPrevia.rolNombre} />}
@@ -86,6 +89,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         </div>
       </div>
     </ToastProvider>
+    </ProveedorPais>
     </ProveedorModulos>
   );
 }

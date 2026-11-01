@@ -1,5 +1,6 @@
 "use client";
 
+import { useSimboloPais } from "@/components/pais-contexto";
 import { CampoSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import { useState, type MutableRefObject } from "react";
 import { anilloFoco, fieldClass, labelClassSm } from "@/components/ui/field";
@@ -43,6 +44,7 @@ const MB = 1024 * 1024;
 // ─── General ───────────────────────────────────────────────────────────────────────────────────────────────────
 
 export function SeccionGeneral({ d, set, intento }: PropsSeccion) {
+  const simbolo = useSimboloPais();
   const falta = (ok: boolean) => intento && !ok;
 
   function cambiarTipo(tipo: TipoDropi) {
@@ -91,8 +93,8 @@ export function SeccionGeneral({ d, set, intento }: PropsSeccion) {
 
         {d.tipo === "simple" && (
           <div className="grid grid-cols-2 gap-3">
-            <CampoNumero etiqueta="Precio" prefijo="$" valor={d.precio} alCambiar={(precio) => set({ precio })} placeholder="0.00" />
-            <CampoNumero etiqueta="Precio sugerido" prefijo="$" valor={d.precio_sugerido} alCambiar={(precio_sugerido) => set({ precio_sugerido })} placeholder="0.00" />
+            <CampoNumero etiqueta="Precio" prefijo={simbolo} valor={d.precio} alCambiar={(precio) => set({ precio })} placeholder="0.00" />
+            <CampoNumero etiqueta="Precio sugerido" prefijo={simbolo} valor={d.precio_sugerido} alCambiar={(precio_sugerido) => set({ precio_sugerido })} placeholder="0.00" />
           </div>
         )}
         {d.tipo === "simple" && falta(Number(d.precio) > 0 && Number(d.precio_sugerido) > 0) && (
@@ -155,6 +157,7 @@ export function SeccionStock({
   alAgregarBodega,
   puedeEscribir,
 }: PropsSeccion & { bodegas: Bodega[]; paisId: string; alAgregarBodega: (b: Bodega) => void; puedeEscribir: boolean }) {
+  const simbolo = useSimboloPais();
   const [nueva, setNueva] = useState("");
   const [errorBodega, setErrorBodega] = useState<string | null>(null);
   const variable = d.tipo === "variable";
@@ -221,8 +224,8 @@ export function SeccionStock({
                         <tr key={nombre}>
                           <th scope="row" className="whitespace-nowrap px-3 py-2 text-left font-medium">{nombre}</th>
                           <td className="px-2 py-1.5"><input type="text" value={v.sku} onChange={(e) => cambiar({ sku: e.target.value })} aria-label={`SKU de ${nombre}`} maxLength={120} className={`${fieldClass} w-full min-w-24`} /></td>
-                          <td className="px-2 py-1.5"><CampoNumero prefijo="$" valor={v.precio} alCambiar={(precio) => cambiar({ precio })} ariaLabel={`Precio de ${nombre}`} /></td>
-                          <td className="px-2 py-1.5"><CampoNumero prefijo="$" valor={v.precio_sugerido} alCambiar={(precio_sugerido) => cambiar({ precio_sugerido })} ariaLabel={`Precio sugerido de ${nombre}`} /></td>
+                          <td className="px-2 py-1.5"><CampoNumero prefijo={simbolo} valor={v.precio} alCambiar={(precio) => cambiar({ precio })} ariaLabel={`Precio de ${nombre}`} /></td>
+                          <td className="px-2 py-1.5"><CampoNumero prefijo={simbolo} valor={v.precio_sugerido} alCambiar={(precio_sugerido) => cambiar({ precio_sugerido })} ariaLabel={`Precio sugerido de ${nombre}`} /></td>
                           {bodegas.map((b) => (
                             <td key={b.id} className="px-2 py-1.5">
                               <CampoNumero entero valor={v.stock[b.id] ?? 0} alCambiar={(n) => cambiar({ stock: { ...v.stock, [b.id]: n ?? 0 } })} ariaLabel={`Stock de ${nombre} en ${b.nombre}`} />
