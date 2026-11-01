@@ -44,6 +44,8 @@ export interface EnvioDropi {
   id: string;
   enviadoEn: string;
   desde: string;
+  /** La bodega externa a la que fue (Dropi, Effi, Boxfull…). */
+  hacia: string;
   enviada: number;
   recibida: number | null;
   estado: "en_camino" | "recibido";
@@ -84,7 +86,7 @@ export async function obtenerStockDeSku(skuId: string): Promise<{ bodegas: Stock
     // Sin la migración 0214 no hay envíos: la ficha carga igual.
     supabase
       .from("wms_envios_dropi")
-      .select("id, enviado_en, enviada, recibida, estado, referencia, motivo_diferencia, wms_bodegas!wms_envios_dropi_bodega_origen_id_fkey!inner(nombre, pais_id)")
+      .select("id, enviado_en, enviada, recibida, estado, referencia, motivo_diferencia, wms_bodegas!wms_envios_dropi_bodega_origen_id_fkey!inner(nombre, pais_id), destino:wms_bodegas!wms_envios_dropi_bodega_dropi_id_fkey(nombre)")
       .eq("sku_maestro_id", skuId)
       .eq("wms_bodegas.pais_id", pais.id)
       .order("enviado_en", { ascending: false })
@@ -131,6 +133,7 @@ export async function obtenerStockDeSku(skuId: string): Promise<{ bodegas: Stock
           id: e.id as string,
           enviadoEn: e.enviado_en as string,
           desde: uno<{ nombre: string }>(e.wms_bodegas as never)?.nombre ?? "—",
+          hacia: uno<{ nombre: string }>(e.destino as never)?.nombre ?? "—",
           enviada: Number(e.enviada),
           recibida: e.recibida === null ? null : Number(e.recibida),
           estado: e.estado as EnvioDropi["estado"],
@@ -289,47 +292,59 @@ export async function transferirStock(formData: FormData): Promise<{ error?: str
 }
 
 /**
- * Envío a la bodega de Dropi: las unidades salen de una bodega propia y el envío queda «en camino» hasta que Dropi diga
- * cuántas llegaron (`recibirEnvioDropi`). Lo que hay en la bodega de Dropi lo sigue diciendo la lectura de Dropi.
+ * Remisión a una bodega externa del país (Dropi, Effi, Boxfull, Dunamixfy): las unidades salen de una bodega propia y la
+ * remisión queda «en camino» hasta que el tercero diga cuántas llegaron (`recibirEnvioDropi`). Lo que hay en la bodega externa
+ * no se mueve aquí: lo dice el tercero (la lectura de Dropi) y las remisiones son la base para cuadrarlo.
  */
-export async function enviarADropi(formData: FormData): Promise<{ error?: string }> {
+export async function remitirAExterna(formData: FormData): Promise<{ error?: string }> {
   const usuario = await requireModuloEscritura(MODULO);
   const sku = texto(formData, "sku_id");
   const desde = texto(formData, "desde_id");
+  const hacia = texto(formData, "hacia_id");
   const cantidad = Number(texto(formData, "cantidad"));
   const loteId = texto(formData, "lote_id") || null;
   const referencia = texto(formData, "referencia").slice(0, 200) || null;
   if (!ES_ID(sku)) return { error: "SKU no válido." };
   if (!ES_ID(desde)) return { error: "Elige de qué bodega sale." };
+  if (!ES_ID(hacia)) return { error: "Elige a qué bodega va." };
   if (!Number.isInteger(cantidad) || cantidad <= 0 || cantidad > 1_000_000) return { error: "La cantidad debe ser un número entero mayor que cero." };
   if (loteId && !ES_ID(loteId)) return { error: "Lote no válido." };
 
   const supabase = createServiceClient();
-  if (!(await puedeVerBodega(supabase, usuario.paisesPermitidos, desde))) return { error: "No tienes acceso al país de esa bodega." };
-  const { data: maestro } = await supabase.from("skus_maestros").select("codigo").eq("id", sku).maybeSingle();
+  if (!(await puedeVerBodega(supabase, usuario.paisesPermitidos, desde)) || !(await puedeVerBodega(supabase, usuario.paisesPermitidos, hacia))) {
+    return { error: "No tienes acceso al país de esas bodegas." };
+  }
+  const [{ data: maestro }, { data: destino }] = await Promise.all([
+    supabase.from("skus_maestros").select("codigo").eq("id", sku).maybeSingle(),
+    supabase.from("wms_bodegas").select("nombre").eq("id", hacia).maybeSingle(),
+  ]);
   if (!maestro) return { error: "El SKU no existe." };
-  const { error } = await supabase.rpc("wms_enviar_a_dropi", {
+  const { error } = await supabase.rpc("wms_enviar_a_externa", {
     p_sku: sku,
     p_desde: desde,
+    p_hacia: hacia,
     p_cantidad: cantidad,
     p_lote: loteId,
     p_referencia: referencia,
     p_usuario: usuario.id,
   });
-  if (error) return { error: errorDeBase(error.message, "No se pudo registrar el envío.") };
+  if (error) {
+    if (/wms_enviar_a_externa/.test(error.message)) return { error: "Falta correr la migración 0215 en la base." };
+    return { error: errorDeBase(error.message, "No se pudo registrar la remisión.") };
+  }
   const pais = await paisDeBodega(supabase, desde);
   await registrarAuditoria({
     accion: "envio_dropi_inventario",
     entidad: "skus_maestros",
     entidadId: sku,
-    detalle: `Envío a Dropi: ${cantidad} de ${maestro.codigo}${referencia ? ` (${referencia})` : ""}${pais ? ` · ${pais}` : ""}`,
+    detalle: `Remisión a ${destino?.nombre ?? "bodega externa"}: ${cantidad} de ${maestro.codigo}${referencia ? ` (${referencia})` : ""}${pais ? ` · ${pais}` : ""}`,
   });
   revalidatePath("/inventario");
-  revalidatePath("/inventario/envios-dropi");
+  revalidatePath("/inventario/remisiones");
   return {};
 }
 
-/** Dropi confirmó un envío: cuántas unidades dice que llegaron. Si no son las enviadas, el motivo es obligatorio. */
+/** El tercero (Dropi, Effi…) confirmó una remisión: cuántas unidades dice que llegaron. Si no son las enviadas, el motivo es obligatorio. */
 export async function recibirEnvioDropi(envioId: string, recibida: number, motivo: string): Promise<{ error?: string }> {
   const usuario = await requireModuloEscritura(MODULO);
   if (!ES_ID(envioId)) return { error: "Envío no válido." };
@@ -348,9 +363,9 @@ export async function recibirEnvioDropi(envioId: string, recibida: number, motiv
     accion: "envio_dropi_recibido",
     entidad: "skus_maestros",
     entidadId: envio.sku_maestro_id as string,
-    detalle: `Dropi recibió ${recibida} de ${envio.enviada} de ${codigo}${recibida !== envio.enviada && nota ? `: ${nota}` : ""}${pais ? ` · ${pais}` : ""}`,
+    detalle: `Recibieron ${recibida} de ${envio.enviada} de ${codigo}${recibida !== envio.enviada && nota ? `: ${nota}` : ""}${pais ? ` · ${pais}` : ""}`,
   });
   revalidatePath("/inventario");
-  revalidatePath("/inventario/envios-dropi");
+  revalidatePath("/inventario/remisiones");
   return {};
 }

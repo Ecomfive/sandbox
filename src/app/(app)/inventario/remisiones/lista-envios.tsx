@@ -17,6 +17,8 @@ export interface FilaEnvio {
   nombre: string;
   foto: string | null;
   desde: string;
+  /** La bodega externa a la que fue. */
+  hacia: string;
   enviadoEn: string;
   enviada: number;
   recibida: number | null;
@@ -25,7 +27,7 @@ export interface FilaEnvio {
   motivo: string | null;
 }
 
-/** Anotar lo que Dropi dice que llegó de un envío: arranca con lo enviado; si cambia, pide el motivo. */
+/** Anotar lo que el tercero dice que llegó de una remisión: arranca con lo enviado; si cambia, pide el motivo. */
 function Recibir({ fila }: { fila: FilaEnvio }) {
   const router = useRouter();
   const { mostrarToast } = useToast();
@@ -72,7 +74,7 @@ function Recibir({ fila }: { fila: FilaEnvio }) {
                 setError(r.error);
                 return;
               }
-              mostrarToast(n === fila.enviada ? "Envío recibido completo" : `Envío recibido: llegaron ${n} de ${fila.enviada}`);
+              mostrarToast(n === fila.enviada ? "Remisión recibida completa" : `Remisión recibida: llegaron ${n} de ${fila.enviada}`);
               router.refresh();
             });
           }}
@@ -90,7 +92,7 @@ function Recibir({ fila }: { fila: FilaEnvio }) {
   );
 }
 
-/** Los envíos a la bodega de Dropi: los que siguen en camino arriba, con su campo para anotar lo que llegó. */
+/** Las remisiones a bodegas externas: las que siguen en camino arriba, con su campo para anotar lo que llegó. */
 export function ListaEnvios({ filas, puedeEscribir }: { filas: FilaEnvio[]; puedeEscribir: boolean }) {
   const enCamino = filas.filter((f) => f.estado === "en_camino").length;
   const conDiferencia = filas.filter((f) => f.estado === "recibido" && f.recibida !== f.enviada).length;
@@ -99,8 +101,8 @@ export function ListaEnvios({ filas, puedeEscribir }: { filas: FilaEnvio[]; pued
       <p className="text-sm">
         <strong className="tabular-nums">{enCamino}</strong> en camino · <strong className="tabular-nums">{conDiferencia}</strong> llegaron con diferencia
       </p>
-      <ContenedorTabla ariaLabel="Envíos a Dropi">
-        <table className="tabla-datos w-full min-w-[56rem] border-collapse text-sm">
+      <ContenedorTabla ariaLabel="Remisiones">
+        <table className="tabla-datos w-full min-w-[62rem] border-collapse text-sm">
           <thead>
             <tr className={claseFilaEncabezado}>
               <th scope="col" className={claseEncabezadoColumna}>
@@ -112,19 +114,22 @@ export function ListaEnvios({ filas, puedeEscribir }: { filas: FilaEnvio[]; pued
               <th scope="col" className={claseEncabezadoColumna}>
                 Salió de
               </th>
+              <th scope="col" className={claseEncabezadoColumna}>
+                Va a
+              </th>
               <th scope="col" className={`${claseEncabezadoColumna} text-right`}>
                 Enviadas
               </th>
               <th scope="col" className={claseEncabezadoColumna}>
-                Llegaron según Dropi
+                Llegaron según la bodega
               </th>
             </tr>
           </thead>
           <tbody>
             {filas.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
-                  Todavía no hay envíos a Dropi. Se registran desde la ficha de cada producto en Stock.
+                <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                  Todavía no hay remisiones. Se registran desde la ficha de cada producto en Stock.
                 </td>
               </tr>
             )}
@@ -144,6 +149,7 @@ export function ListaEnvios({ filas, puedeEscribir }: { filas: FilaEnvio[]; pued
                     {f.referencia ? ` · ${f.referencia}` : ""}
                   </span>
                 </td>
+                <td className={claseCeldaColumna}>{f.hacia}</td>
                 <td className={`${claseCeldaColumna} text-right tabular-nums`}>{f.enviada}</td>
                 <td className={claseCeldaColumna}>
                   {f.estado === "en_camino" ? (

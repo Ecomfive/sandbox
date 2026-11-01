@@ -25,3 +25,20 @@ test("rechaza lo que no sirve", () => {
   assert.ok("error" in revisarConteo([{ sku: B, lotes: [{ codigo: "L1", cantidad: 1 }, { codigo: "l1", cantidad: 2 }] }]));
   assert.ok("error" in revisarConteo([{ sku: B, lotes: [{ codigo: "L1", vencimiento: "31/12/2030", cantidad: 1 }] }]));
 });
+
+import { leerLista } from "./levantamiento";
+
+test("lee una lista con punto y coma, tabulador o coma, y salta el encabezado", () => {
+  const r = leerLista("﻿Producto;Oficina\nAceite de Batana;850\nBolsas de rollo 17*30;29,900\nLemme Burn\t3.208\nKing Maker,201\nSin cantidad;\n\n");
+  assert.deepEqual(r.lineas, [
+    { nombre: "Aceite de Batana", cantidad: 850 },
+    { nombre: "Bolsas de rollo 17*30", cantidad: 29900 },
+    { nombre: "Lemme Burn", cantidad: 3208 },
+    { nombre: "King Maker", cantidad: 201 },
+  ]);
+  assert.equal(r.saltadas, 2);
+});
+
+test("una cantidad que no es un número entero se salta", () => {
+  assert.deepEqual(leerLista("A;-3\nB;1.5\nC;abc").lineas, []);
+});

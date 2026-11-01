@@ -6,12 +6,12 @@ import { Seccion } from "@/components/ui/seccion-ficha";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
 import { formatearTiempoRelativo } from "@/lib/formato";
-import { CalendarioIcon, ComprasIcon, DropiIcon, HistorialIcon, InventarioIcon } from "@/lib/nav-icons";
+import { CalendarioIcon, ComprasIcon, EnvioIcon, HistorialIcon, InventarioIcon } from "@/lib/nav-icons";
 import { ComprasProducto } from "../producto/compras-producto";
 import { ETIQUETA_TIPO_SKU, type FilaStock } from "./def-stock";
 import { DESCRIPCION_CUBETA } from "./descripciones-stock";
 import { PanelMovimiento, type BodegaOpcion, type UbicacionOpcion } from "./panel-movimiento";
-import { PanelEnvioDropi, PanelTransferencia } from "./panel-transferencia";
+import { PanelRemision, PanelTransferencia } from "./panel-transferencia";
 import { obtenerStockDeSku, type EnvioDropi, type LoteStock, type MovimientoStock, type StockBodega } from "./stock-actions";
 
 const ETIQUETA_TIPO_MOV: Record<string, string> = { entrada: "Entrada", salida: "Salida", ajuste: "Ajuste", reserva: "Reserva", liberacion: "Liberación", traslado: "Traslado" };
@@ -31,7 +31,7 @@ const ETIQUETA_ORIGEN: Record<string, string> = {
   pedido: "Pedido",
   conteo: "Levantamiento",
   transferencia: "Transferencia",
-  envio_dropi: "Envío a Dropi",
+  envio_dropi: "Remisión",
 };
 
 const ETIQUETA_ESTADO_LOTE = { vencido: "Vencido", por_vencer: "Por vencer", vigente: "Vigente" } as const;
@@ -64,14 +64,14 @@ export function FichaStock({
   ubicaciones,
   puedeEscribir,
   codigoPais,
-  hayDropi,
+  bodegasExternas,
   alCerrar,
   alCambiar,
 }: {
   sku: FilaStock | undefined;
   bodegasPropias: BodegaOpcion[];
-  /** El país tiene bodega de Dropi: se ofrece «Enviar a Dropi». */
-  hayDropi: boolean;
+  /** Las bodegas externas activas del país (Dropi, Effi…): a dónde va una remisión. */
+  bodegasExternas: BodegaOpcion[];
   ubicaciones: UbicacionOpcion[];
   puedeEscribir: boolean;
   /** Las compras que se ven son las de este país, como el stock. */
@@ -148,11 +148,12 @@ export function FichaStock({
                   alCambiar();
                 }}
               />
-              {hayDropi && (
-                <PanelEnvioDropi
-                  key={`${sku.id}-dropi`}
+              {bodegasExternas.length > 0 && (
+                <PanelRemision
+                  key={`${sku.id}-remision`}
                   skuId={sku.id}
                   bodegas={bodegasPropias}
+                  externas={bodegasExternas}
                   manejaVencimiento={sku.manejaVencimiento}
                   lotes={datos && datos !== "error" ? datos.lotes : []}
                   alGuardar={() => {
@@ -253,12 +254,13 @@ export function FichaStock({
             )}
 
             {!esCombo && !esTest && datos !== null && datos !== "error" && datos.envios.length > 0 && (
-              <Seccion icono={DropiIcon} titulo="Envíos a Dropi">
+              <Seccion icono={EnvioIcon} titulo="Remisiones">
                 <ul className="m-0 flex list-none flex-col gap-2.5 p-0 text-[13px]">
                   {datos.envios.map((e) => (
                     <li key={e.id} className="flex flex-col">
                       <span className="flex flex-wrap items-center gap-2">
                         <strong className="font-medium tabular-nums">{e.enviada} u.</strong>
+                        <span>a {e.hacia}</span>
                         {e.estado === "en_camino" ? (
                           <Badge tone="warning">En camino</Badge>
                         ) : e.recibida === e.enviada ? (

@@ -11,6 +11,7 @@ import { useToast } from "@/components/ui/toast";
 import { formatearTiempoRelativo } from "@/lib/formato";
 import { BuscarIcon, MasIcon, PapeleraIcon } from "@/lib/nav-icons";
 import { guardarLevantamiento } from "./actions";
+import { ImportarLista } from "./importar-lista";
 
 export interface ProductoConteo {
   id: string;
@@ -159,6 +160,13 @@ export function Levantamiento({
             <input type="search" value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Código o nombre" className={`${fieldClassSm} w-56 pl-8`} />
           </span>
         </label>
+        {puedeEscribir && (
+          <ImportarLista
+            productos={productos}
+            deshabilitado={pendiente}
+            alAplicar={(cantidades) => setContados((x) => ({ ...x, ...Object.fromEntries(Object.entries(cantidades).map(([id, n]) => [id, String(n)])) }))}
+          />
+        )}
         <button
           type="button"
           aria-pressed={verTodos}

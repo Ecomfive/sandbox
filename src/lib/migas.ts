@@ -69,7 +69,7 @@ const SUBPAGINAS: Record<string, string> = {
   "/inventario/pistoleo": "Pistoleo",
   "/inventario/vencimientos": "Vencimientos",
   "/inventario/levantamiento": "Levantamiento",
-  "/inventario/envios-dropi": "Envíos a Dropi",
+  "/inventario/remisiones": "Remisiones",
   "/crm-dropshippers/vinculos": "Vínculos",
   "/productos-test/productos": "Productos",
   "/analisis-competencia/resumen": "Resumen",

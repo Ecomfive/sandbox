@@ -6,9 +6,9 @@ import { Campo } from "@/components/ui/campo-ficha";
 import { fieldClass } from "@/components/ui/field";
 import { FichaCrear } from "@/components/ui/ficha-crear";
 import { Seccion } from "@/components/ui/seccion-ficha";
-import { DropiIcon, InventarioIcon, TransferirIcon } from "@/lib/nav-icons";
+import { EnvioIcon, InventarioIcon, TransferirIcon } from "@/lib/nav-icons";
 import type { BodegaOpcion } from "./panel-movimiento";
-import { enviarADropi, transferirStock, type LoteStock } from "./stock-actions";
+import { remitirAExterna, transferirStock, type LoteStock } from "./stock-actions";
 
 /** El lote que sale: en un producto con vencimiento se puede elegir; sin elegir, sale primero el que vence antes. */
 function CampoLote({ lotes, bodega }: { lotes: LoteStock[]; bodega: string }) {
@@ -107,18 +107,21 @@ export function PanelTransferencia({
 }
 
 /**
- * Envío a la bodega de Dropi (B280): las unidades salen de una bodega propia y el envío queda «en camino» hasta que Dropi
- * diga cuántas llegaron (pestaña «Envíos a Dropi»).
+ * Remisión a una bodega externa del país (Dropi, Effi, Boxfull, Dunamixfy): las unidades salen de una bodega propia y la
+ * remisión queda «en camino» hasta que, en la pestaña «Remisiones», se anote cuántas dice el tercero que llegaron.
  */
-export function PanelEnvioDropi({
+export function PanelRemision({
   skuId,
   bodegas,
+  externas,
   manejaVencimiento,
   lotes,
   alGuardar,
 }: {
   skuId: string;
   bodegas: BodegaOpcion[];
+  /** Las bodegas externas activas del país (a dónde puede ir). */
+  externas: BodegaOpcion[];
   manejaVencimiento: boolean;
   lotes: LoteStock[];
   alGuardar: () => void;
@@ -126,24 +129,36 @@ export function PanelEnvioDropi({
   const [desde, setDesde] = useState(bodegas[0]?.id ?? "");
   return (
     <FichaCrear
-      titulo="Enviar a Dropi"
-      etiquetaCrear="Registrar envío"
-      action={enviarADropi}
-      mensajeExito="Envío registrado: queda en camino"
+      titulo="Remisión a una bodega externa"
+      etiquetaCrear="Registrar remisión"
+      action={remitirAExterna}
+      mensajeExito="Remisión registrada: queda en camino"
       ocultos={{ sku_id: skuId }}
-      puedeExtra={bodegas.length > 0}
+      puedeExtra={bodegas.length > 0 && externas.length > 0}
       alGuardar={alGuardar}
       boton={(abrir) => (
-        <BotonAccion icono={DropiIcon} onClick={abrir} aria-haspopup="dialog">
-          Enviar a Dropi
+        <BotonAccion icono={EnvioIcon} onClick={abrir} aria-haspopup="dialog">
+          Remisión
         </BotonAccion>
       )}
     >
       {({ faltante, invalido }) => (
-        <Seccion icono={InventarioIcon} titulo="Envío">
+        <Seccion icono={InventarioIcon} titulo="Remisión">
           <Campo etiqueta="Sale de" id="campo-desde-env" obligatorio faltante={faltante}>
             <select id="campo-desde-env" name="desde_id" required data-enfocar value={desde} onChange={(e) => setDesde(e.target.value)} className={`${fieldClass} w-full`}>
               {bodegas.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.nombre}
+                </option>
+              ))}
+            </select>
+          </Campo>
+          <Campo etiqueta="Va a" id="campo-hacia-env" obligatorio faltante={faltante}>
+            <select id="campo-hacia-env" name="hacia_id" required defaultValue={externas.length === 1 ? externas[0].id : ""} aria-invalid={invalido("campo-hacia-env")} className={`${fieldClass} w-full`}>
+              <option value="" disabled>
+                Elige la bodega
+              </option>
+              {externas.map((b) => (
                 <option key={b.id} value={b.id}>
                   {b.nombre}
                 </option>

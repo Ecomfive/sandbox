@@ -84,7 +84,7 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
           ubicaciones={(ubicaciones.data ?? []).map((u) => ({ id: u.id, bodegaId: u.bodega_id, codigo: u.codigo, propiedad: u.propiedad }))}
           puedeEscribir={!usuario.modulosSoloLectura.includes("inventario")}
           codigoPais={pais.codigo}
-          hayDropi={bodegas.some((b) => b.codigo === "dropi")}
+          bodegasExternas={bodegas.filter((b) => b.tipo === "externa").map((b) => ({ id: b.id as string, nombre: b.nombre as string }))}
         />
       )}
     </Pagina>
