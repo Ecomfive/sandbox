@@ -46,7 +46,7 @@ import { codigoBodega } from "@/lib/publicaciones/sincronizar-dropi";
 import { VinculoSku } from "./vinculo-sku";
 import { FotosPublicacion } from "./fotos-publicacion";
 import { PublicacionesDelProducto } from "./mismo-producto";
-import { Monto } from "./moneda-contexto";
+import { Monto, useMoneda } from "./moneda-contexto";
 import { VentasDropiProducto } from "../producto/ventas-dropi-producto";
 
 interface Formulario {
@@ -135,6 +135,53 @@ const PENDIENTE_EN_COLOR = "disabled:!border-azul/30 disabled:!bg-azul-soft disa
  * un dato y arriba aparecen «Guardar cambios» y «Cancelar»; al guardar, la ficha sigue abierta. Utilidad y
  * margen se calculan solos. Con cambios sin guardar, cerrar o pasar a otra pide confirmación.
  */
+/**
+ * Un monto de la ficha en la moneda del país, con su símbolo delante («₡», «MX$», «$») y, si el país no usa dólares, debajo cuánto es en dólares
+ * con el tipo de cambio de hoy («≈ US$9.90»). Sin valor, nada debajo.
+ */
+function CampoMonto({
+  etiqueta,
+  value,
+  onChange,
+  placeholder,
+  disabled = false,
+  nota,
+}: {
+  etiqueta: string;
+  value: string;
+  onChange?: (v: string) => void;
+  placeholder?: string;
+  disabled?: boolean;
+  /** Una línea debajo (el fulfillment del país). */
+  nota?: string;
+}) {
+  const { simbolo, enDolares } = useMoneda();
+  const numero = value.trim() === "" ? null : Number(value);
+  const usd = numero === null || !Number.isFinite(numero) ? null : enDolares(numero);
+  return (
+    <label className="flex min-w-0 flex-col gap-1">
+      <span className={labelClassSm}>{etiqueta}</span>
+      <span className={`flex items-center gap-1.5 ${fieldClass} w-full ${disabled ? "cursor-not-allowed bg-muted" : "focus-within:border-foreground focus-within:ring-2 focus-within:ring-foreground"}`}>
+        <span aria-hidden="true" className="shrink-0 text-sm text-muted-foreground">
+          {simbolo}
+        </span>
+        <input
+          type="number"
+          min={0}
+          step="0.01"
+          value={value}
+          onChange={(e) => onChange?.(e.target.value)}
+          placeholder={placeholder}
+          disabled={disabled}
+          className="w-full min-w-0 border-0 bg-transparent p-0 tabular-nums outline-none disabled:cursor-not-allowed"
+        />
+      </span>
+      {usd && <span className="text-xs text-muted-foreground tabular-nums">≈ {usd}</span>}
+      {nota && <span className="text-xs text-muted-foreground">{nota}</span>}
+    </label>
+  );
+}
+
 export function FichaPublicacion({
   publicacion,
   codigoPais,
@@ -681,25 +728,13 @@ function ContenidoFicha({
 
           <Seccion icono={MargenIcon} titulo="Precio y margen">
             <div className="grid gap-3 sm:grid-cols-2">
-              <label className="flex min-w-0 flex-col gap-1">
-                <span className={labelClassSm}>Precio de venta</span>
-                <input type="number" min={0} step="0.01" value={d.precio_venta} onChange={(e) => cambiar({ precio_venta: e.target.value })} placeholder="Ej: 9.99" className={`${fieldClass} w-full tabular-nums`} />
-              </label>
-              <label className="flex min-w-0 flex-col gap-1">
-                <span className={labelClassSm}>Costo de producto</span>
-                <input type="number" min={0} step="0.01" value={d.costo_mercancia} onChange={(e) => cambiar({ costo_mercancia: e.target.value })} placeholder="Ej: 1.16" className={`${fieldClass} w-full tabular-nums`} />
-              </label>
-              <label className="flex min-w-0 flex-col gap-1">
-                <span className={labelClassSm}>Fulfillment</span>
-                {fijo !== null ? (
-                  <>
-                    <input value={fijo.toFixed(2)} disabled className={`${fieldClass} w-full tabular-nums disabled:cursor-not-allowed disabled:bg-muted`} />
-                    <span className="text-xs text-muted-foreground">Igual en todas las de Panamá</span>
-                  </>
-                ) : (
-                  <input type="number" min={0} step="0.01" value={d.fulfillment} onChange={(e) => cambiar({ fulfillment: e.target.value })} placeholder="Ej: 1.50" className={`${fieldClass} w-full tabular-nums`} />
-                )}
-              </label>
+              <CampoMonto etiqueta="Precio de venta" value={d.precio_venta} onChange={(v) => cambiar({ precio_venta: v })} placeholder="Ej: 9.99" />
+              <CampoMonto etiqueta="Costo de producto" value={d.costo_mercancia} onChange={(v) => cambiar({ costo_mercancia: v })} placeholder="Ej: 1.16" />
+              {fijo !== null ? (
+                <CampoMonto etiqueta="Fulfillment" value={String(fijo)} disabled nota="Igual en todas las del país (se cambia en Configuración)" />
+              ) : (
+                <CampoMonto etiqueta="Fulfillment" value={d.fulfillment} onChange={(v) => cambiar({ fulfillment: v })} placeholder="Ej: 1.50" />
+              )}
             </div>
             <dl className="grid grid-cols-3 gap-3 rounded-lg bg-muted px-4 py-3 text-sm tabular-nums">
               <div>
