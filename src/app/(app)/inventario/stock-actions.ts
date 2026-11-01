@@ -39,6 +39,18 @@ export interface LoteStock {
   cantidad: number;
 }
 
+/** Un envío a la bodega de Dropi: cuánto salió, de dónde y, cuando Dropi confirma, cuánto llegó. */
+export interface EnvioDropi {
+  id: string;
+  enviadoEn: string;
+  desde: string;
+  enviada: number;
+  recibida: number | null;
+  estado: "en_camino" | "recibido";
+  referencia: string | null;
+  motivo: string | null;
+}
+
 export interface MovimientoStock {
   id: string;
   creadoEn: string;
@@ -53,13 +65,13 @@ export interface MovimientoStock {
 }
 
 /** El stock de un SKU en cada bodega del país y sus últimos movimientos, para su ficha. Basta poder abrir Inventario. */
-export async function obtenerStockDeSku(skuId: string): Promise<{ bodegas: StockBodega[]; movimientos: MovimientoStock[]; lotes: LoteStock[] } | { error: string }> {
+export async function obtenerStockDeSku(skuId: string): Promise<{ bodegas: StockBodega[]; movimientos: MovimientoStock[]; lotes: LoteStock[]; envios: EnvioDropi[] } | { error: string }> {
   await requireModulo(MODULO);
   if (!ES_ID(skuId)) return { error: "SKU no válido." };
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
 
-  const [porBodega, libro, lotesRpc] = await Promise.all([
+  const [porBodega, libro, lotesRpc, enviosRes] = await Promise.all([
     supabase.rpc("wms_stock_por_bodega", { p_sku: skuId, p_pais: pais.id }),
     supabase
       .from("wms_movimientos")
@@ -69,6 +81,14 @@ export async function obtenerStockDeSku(skuId: string): Promise<{ bodegas: Stock
       .order("creado_en", { ascending: false })
       .limit(30),
     supabase.rpc("wms_lotes_de_sku", { p_sku: skuId, p_pais: pais.id }),
+    // Sin la migración 0214 no hay envíos: la ficha carga igual.
+    supabase
+      .from("wms_envios_dropi")
+      .select("id, enviado_en, enviada, recibida, estado, referencia, motivo_diferencia, wms_bodegas!wms_envios_dropi_bodega_origen_id_fkey!inner(nombre, pais_id)")
+      .eq("sku_maestro_id", skuId)
+      .eq("wms_bodegas.pais_id", pais.id)
+      .order("enviado_en", { ascending: false })
+      .limit(20),
   ]);
   if (porBodega.error) return { error: "No se pudo cargar el stock." };
 
@@ -104,6 +124,18 @@ export async function obtenerStockDeSku(skuId: string): Promise<{ bodegas: Stock
           bodegaId: String(l.bodega_id),
           bodega: String(l.bodega),
           cantidad: Number(l.cantidad),
+        })),
+    envios: enviosRes.error
+      ? []
+      : (enviosRes.data ?? []).map((e) => ({
+          id: e.id as string,
+          enviadoEn: e.enviado_en as string,
+          desde: uno<{ nombre: string }>(e.wms_bodegas as never)?.nombre ?? "—",
+          enviada: Number(e.enviada),
+          recibida: e.recibida === null ? null : Number(e.recibida),
+          estado: e.estado as EnvioDropi["estado"],
+          referencia: (e.referencia as string | null) ?? null,
+          motivo: (e.motivo_diferencia as string | null) ?? null,
         })),
     // El libro puede fallar sin romper la ficha (si no se pudo leer, se muestra el stock igual).
     movimientos: libro.error
@@ -193,5 +225,132 @@ export async function registrarMovimientoStock(formData: FormData): Promise<{ er
     detalle: `${tipo} ${cantidad} de ${maestro.codigo}${loteCodigo ? ` lote ${loteCodigo}` : ""}${referencia ? ` (${referencia})` : ""}${nombrePais ? ` · ${nombrePais}` : ""}`,
   });
   revalidatePath("/inventario");
+  return {};
+}
+
+/** El nombre del país de una bodega, para el final del detalle de la auditoría («· Panamá»). */
+async function paisDeBodega(supabase: ReturnType<typeof createServiceClient>, bodega: string): Promise<string | null> {
+  const { data } = await supabase.from("wms_bodegas").select("paises(nombre)").eq("id", bodega).maybeSingle();
+  const p = data?.paises as { nombre: string } | { nombre: string }[] | null | undefined;
+  return (Array.isArray(p) ? p[0] : p)?.nombre ?? null;
+}
+
+const errorDeBase = (mensaje: string, porDefecto: string) => (mensaje.length < 200 ? mensaje : porDefecto);
+
+/**
+ * Transferencia entre dos bodegas propias del mismo país: sale de una y entra en la otra en la misma transacción
+ * (`wms_transferir`). En un producto con vencimiento pasa el lote elegido o, sin elegir, los que vencen antes.
+ */
+export async function transferirStock(formData: FormData): Promise<{ error?: string }> {
+  const usuario = await requireModuloEscritura(MODULO);
+  const sku = texto(formData, "sku_id");
+  const desde = texto(formData, "desde_id");
+  const hacia = texto(formData, "hacia_id");
+  const cantidad = Number(texto(formData, "cantidad"));
+  const loteId = texto(formData, "lote_id") || null;
+  const referencia = texto(formData, "referencia").slice(0, 200) || null;
+  const motivo = texto(formData, "motivo").slice(0, 500) || null;
+  if (!ES_ID(sku)) return { error: "SKU no válido." };
+  if (!ES_ID(desde) || !ES_ID(hacia)) return { error: "Elige las dos bodegas." };
+  if (desde === hacia) return { error: "La bodega de origen y la de destino son la misma." };
+  if (!Number.isInteger(cantidad) || cantidad <= 0 || cantidad > 1_000_000) return { error: "La cantidad debe ser un número entero mayor que cero." };
+  if (loteId && !ES_ID(loteId)) return { error: "Lote no válido." };
+
+  const supabase = createServiceClient();
+  if (!(await puedeVerBodega(supabase, usuario.paisesPermitidos, desde)) || !(await puedeVerBodega(supabase, usuario.paisesPermitidos, hacia))) {
+    return { error: "No tienes acceso al país de esas bodegas." };
+  }
+  const [{ data: maestro }, { data: bodegas }] = await Promise.all([
+    supabase.from("skus_maestros").select("codigo").eq("id", sku).maybeSingle(),
+    supabase.from("wms_bodegas").select("id, nombre").in("id", [desde, hacia]),
+  ]);
+  if (!maestro) return { error: "El SKU no existe." };
+  const { error } = await supabase.rpc("wms_transferir", {
+    p_sku: sku,
+    p_desde: desde,
+    p_hacia: hacia,
+    p_cantidad: cantidad,
+    p_lote: loteId,
+    p_referencia: referencia,
+    p_motivo: motivo,
+    p_usuario: usuario.id,
+  });
+  if (error) return { error: errorDeBase(error.message, "No se pudo hacer la transferencia.") };
+  const nombre = (id: string) => (bodegas ?? []).find((b) => b.id === id)?.nombre ?? "otra bodega";
+  const pais = await paisDeBodega(supabase, desde);
+  await registrarAuditoria({
+    accion: "movimiento_inventario",
+    entidad: "skus_maestros",
+    entidadId: sku,
+    detalle: `transferencia ${cantidad} de ${maestro.codigo} de ${nombre(desde)} a ${nombre(hacia)}${referencia ? ` (${referencia})` : ""}${pais ? ` · ${pais}` : ""}`,
+  });
+  revalidatePath("/inventario");
+  return {};
+}
+
+/**
+ * Envío a la bodega de Dropi: las unidades salen de una bodega propia y el envío queda «en camino» hasta que Dropi diga
+ * cuántas llegaron (`recibirEnvioDropi`). Lo que hay en la bodega de Dropi lo sigue diciendo la lectura de Dropi.
+ */
+export async function enviarADropi(formData: FormData): Promise<{ error?: string }> {
+  const usuario = await requireModuloEscritura(MODULO);
+  const sku = texto(formData, "sku_id");
+  const desde = texto(formData, "desde_id");
+  const cantidad = Number(texto(formData, "cantidad"));
+  const loteId = texto(formData, "lote_id") || null;
+  const referencia = texto(formData, "referencia").slice(0, 200) || null;
+  if (!ES_ID(sku)) return { error: "SKU no válido." };
+  if (!ES_ID(desde)) return { error: "Elige de qué bodega sale." };
+  if (!Number.isInteger(cantidad) || cantidad <= 0 || cantidad > 1_000_000) return { error: "La cantidad debe ser un número entero mayor que cero." };
+  if (loteId && !ES_ID(loteId)) return { error: "Lote no válido." };
+
+  const supabase = createServiceClient();
+  if (!(await puedeVerBodega(supabase, usuario.paisesPermitidos, desde))) return { error: "No tienes acceso al país de esa bodega." };
+  const { data: maestro } = await supabase.from("skus_maestros").select("codigo").eq("id", sku).maybeSingle();
+  if (!maestro) return { error: "El SKU no existe." };
+  const { error } = await supabase.rpc("wms_enviar_a_dropi", {
+    p_sku: sku,
+    p_desde: desde,
+    p_cantidad: cantidad,
+    p_lote: loteId,
+    p_referencia: referencia,
+    p_usuario: usuario.id,
+  });
+  if (error) return { error: errorDeBase(error.message, "No se pudo registrar el envío.") };
+  const pais = await paisDeBodega(supabase, desde);
+  await registrarAuditoria({
+    accion: "envio_dropi_inventario",
+    entidad: "skus_maestros",
+    entidadId: sku,
+    detalle: `Envío a Dropi: ${cantidad} de ${maestro.codigo}${referencia ? ` (${referencia})` : ""}${pais ? ` · ${pais}` : ""}`,
+  });
+  revalidatePath("/inventario");
+  revalidatePath("/inventario/envios-dropi");
+  return {};
+}
+
+/** Dropi confirmó un envío: cuántas unidades dice que llegaron. Si no son las enviadas, el motivo es obligatorio. */
+export async function recibirEnvioDropi(envioId: string, recibida: number, motivo: string): Promise<{ error?: string }> {
+  const usuario = await requireModuloEscritura(MODULO);
+  if (!ES_ID(envioId)) return { error: "Envío no válido." };
+  if (!Number.isInteger(recibida) || recibida < 0 || recibida > 1_000_000) return { error: "Escribe cuántas unidades llegaron." };
+  const nota = motivo.trim().slice(0, 500);
+  const supabase = createServiceClient();
+  const { data: envio } = await supabase.from("wms_envios_dropi").select("sku_maestro_id, bodega_origen_id, enviada, skus_maestros(codigo)").eq("id", envioId).maybeSingle();
+  if (!envio) return { error: "El envío no existe." };
+  if (!(await puedeVerBodega(supabase, usuario.paisesPermitidos, envio.bodega_origen_id as string))) return { error: "No tienes acceso al país de ese envío." };
+  const { error } = await supabase.rpc("wms_recibir_envio_dropi", { p_envio: envioId, p_recibida: recibida, p_motivo: nota || null, p_usuario: usuario.id });
+  if (error) return { error: errorDeBase(error.message, "No se pudo guardar la recepción.") };
+  const m = envio.skus_maestros as { codigo: string } | { codigo: string }[] | null;
+  const codigo = (Array.isArray(m) ? m[0] : m)?.codigo ?? "";
+  const pais = await paisDeBodega(supabase, envio.bodega_origen_id as string);
+  await registrarAuditoria({
+    accion: "envio_dropi_recibido",
+    entidad: "skus_maestros",
+    entidadId: envio.sku_maestro_id as string,
+    detalle: `Dropi recibió ${recibida} de ${envio.enviada} de ${codigo}${recibida !== envio.enviada && nota ? `: ${nota}` : ""}${pais ? ` · ${pais}` : ""}`,
+  });
+  revalidatePath("/inventario");
+  revalidatePath("/inventario/envios-dropi");
   return {};
 }
