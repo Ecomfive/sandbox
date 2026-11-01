@@ -145,15 +145,12 @@ function CampoMonto({
   onChange,
   placeholder,
   disabled = false,
-  nota,
 }: {
   etiqueta: string;
   value: string;
   onChange?: (v: string) => void;
   placeholder?: string;
   disabled?: boolean;
-  /** Una línea debajo (el fulfillment del país). */
-  nota?: string;
 }) {
   const { simbolo, enDolares } = useMoneda();
   const numero = value.trim() === "" ? null : Number(value);
@@ -177,7 +174,6 @@ function CampoMonto({
         />
       </span>
       {usd && <span className="text-xs text-muted-foreground tabular-nums">≈ {usd}</span>}
-      {nota && <span className="text-xs text-muted-foreground">{nota}</span>}
     </label>
   );
 }
@@ -731,7 +727,7 @@ function ContenidoFicha({
               <CampoMonto etiqueta="Precio de venta" value={d.precio_venta} onChange={(v) => cambiar({ precio_venta: v })} placeholder="Ej: 9.99" />
               <CampoMonto etiqueta="Costo de producto" value={d.costo_mercancia} onChange={(v) => cambiar({ costo_mercancia: v })} placeholder="Ej: 1.16" />
               {fijo !== null ? (
-                <CampoMonto etiqueta="Fulfillment" value={String(fijo)} disabled nota="Igual en todas las del país (se cambia en Configuración)" />
+                <CampoMonto etiqueta="Fulfillment" value={String(fijo)} disabled />
               ) : (
                 <CampoMonto etiqueta="Fulfillment" value={d.fulfillment} onChange={(v) => cambiar({ fulfillment: v })} placeholder="Ej: 1.50" />
               )}
