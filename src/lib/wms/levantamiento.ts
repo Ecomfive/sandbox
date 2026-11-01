@@ -65,3 +65,44 @@ export function revisarConteo(items: unknown): { items: ItemConteo[] } | { error
 
 /** La diferencia entre lo contado y lo que dice el sistema (positiva: sobra en el sistema; negativa: falta). */
 export const diferencia = (contado: number, enSistema: number) => contado - enSistema;
+
+export interface LineaImportada {
+  nombre: string;
+  cantidad: number;
+}
+
+export const MAX_LINEAS_IMPORTADAS = 2000;
+
+/**
+ * Lee una lista pegada o subida (una línea por producto: «nombre o SKU;cantidad», también con tabulador o coma) para cargar
+ * lo contado en el levantamiento. La cantidad es lo último de la línea (admite «1,491» o «1.491» como miles). Las líneas sin
+ * cantidad (el encabezado) se saltan. Devuelve las líneas leídas y cuántas se saltaron.
+ */
+export function leerLista(texto: string): { lineas: LineaImportada[]; saltadas: number } {
+  const lineas: LineaImportada[] = [];
+  let saltadas = 0;
+  for (const cruda of texto.replace(/^﻿/, "").split(/\r?\n/)) {
+    const linea = cruda.trim();
+    if (!linea) continue;
+    const sep = linea.includes("\t") ? "\t" : linea.includes(";") ? ";" : ",";
+    const corte = linea.lastIndexOf(sep);
+    if (corte <= 0) {
+      saltadas++;
+      continue;
+    }
+    const nombre = linea.slice(0, corte).replace(/^"|"$/g, "").replace(/\s+/g, " ").trim().slice(0, 200);
+    const cantTexto = linea.slice(corte + 1).replace(/^"|"$/g, "").trim();
+    if (!/^\d{1,3}([.,]\d{3})*$|^\d+$/.test(cantTexto) || !nombre) {
+      saltadas++;
+      continue;
+    }
+    const cantidad = Number(cantTexto.replace(/[.,]/g, ""));
+    if (!Number.isInteger(cantidad) || cantidad > MAX_CANTIDAD) {
+      saltadas++;
+      continue;
+    }
+    lineas.push({ nombre, cantidad });
+    if (lineas.length >= MAX_LINEAS_IMPORTADAS) break;
+  }
+  return { lineas, saltadas };
+}

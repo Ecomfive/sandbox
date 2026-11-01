@@ -2,10 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
-import { requireModuloEscritura } from "@/lib/auth";
+import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { puedeVerBodega } from "@/lib/seguridad/pais-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
-import { revisarConteo } from "@/lib/wms/levantamiento";
+import { indexar, parecidos, todasLasCoincidencias } from "@/lib/scraping/cruces";
+import { traerTodasConError } from "@/lib/supabase/paginar";
+import { MAX_LINEAS_IMPORTADAS, revisarConteo } from "@/lib/wms/levantamiento";
 
 const ES_ID = /^[0-9a-fA-F-]{8,64}$/;
 
@@ -46,4 +48,52 @@ export async function guardarLevantamiento(
   revalidatePath("/inventario");
   revalidatePath("/inventario/levantamiento");
   return { productos: r.productos ?? 0, ajustes: r.ajustes ?? 0 };
+}
+
+export interface SugerenciaLinea {
+  /** El producto elegido de entrada (null si no se encontró ninguno). */
+  skuId: string | null;
+  /** «seguro»: el SKU o el nombre calzan; «revisar»: se parece pero conviene mirarlo; «sin»: no se encontró. */
+  estado: "seguro" | "revisar" | "sin";
+  /** Otros productos parecidos para elegir (el primero es el sugerido). */
+  opciones: { id: string; codigo: string; nombre: string }[];
+}
+
+const normal = (t: string) => t.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().replace(/\s+/g, " ").trim();
+
+/**
+ * Para «Importar lista» del levantamiento: busca el producto de cada línea (por SKU, por nombre igual o por parecido del nombre,
+ * el mismo cruce de Testing Lab) entre los productos simples que no están en Test. No guarda nada.
+ */
+export async function sugerirProductosParaLista(nombres: string[]): Promise<{ sugerencias: SugerenciaLinea[] } | { error: string }> {
+  await requireModulo("inventario");
+  if (!Array.isArray(nombres) || nombres.length === 0) return { error: "La lista está vacía." };
+  if (nombres.length > MAX_LINEAS_IMPORTADAS) return { error: `Son demasiadas líneas (máximo ${MAX_LINEAS_IMPORTADAS}).` };
+  const supabase = createServiceClient();
+  const { data, error } = await traerTodasConError<{ id: string; codigo: string; nombre: string }>((d, h) =>
+    supabase.from("skus_maestros").select("id, codigo, nombre").neq("tipo", "combo").neq("clase", "test").order("codigo").range(d, h),
+  );
+  if (error || !data) return { error: "No se pudieron cargar los productos." };
+  const porId = new Map(data.map((p) => [p.id, p]));
+  const porCodigo = new Map(data.map((p) => [normal(p.codigo), p]));
+  const porNombre = new Map(data.map((p) => [normal(p.nombre), p]));
+  const indice = indexar(data.map((p) => ({ tipo: "producto" as const, id: p.id, nombre: p.nombre, huella: null, detalle: p.codigo })));
+  const opcion = (id: string) => {
+    const p = porId.get(id)!;
+    return { id: p.id, codigo: p.codigo, nombre: p.nombre };
+  };
+  const sugerencias = nombres.map((bruto): SugerenciaLinea => {
+    const nombre = String(bruto ?? "").slice(0, 200);
+    const exacto = porCodigo.get(normal(nombre)) ?? porNombre.get(normal(nombre));
+    if (exacto) return { skuId: exacto.id, estado: "seguro", opciones: [opcion(exacto.id)] };
+    const iguales = todasLasCoincidencias(nombre, null, indice);
+    if (iguales.length > 0) {
+      const ids = [...new Set(iguales.map((c) => c.id))].slice(0, 5);
+      return { skuId: ids[0], estado: ids.length === 1 ? "seguro" : "revisar", opciones: ids.map(opcion) };
+    }
+    const cerca = [...new Set(parecidos(nombre, null, indice, 4).map((c) => c.id))];
+    if (cerca.length > 0) return { skuId: cerca[0], estado: "revisar", opciones: cerca.map(opcion) };
+    return { skuId: null, estado: "sin", opciones: [] };
+  });
+  return { sugerencias };
 }
