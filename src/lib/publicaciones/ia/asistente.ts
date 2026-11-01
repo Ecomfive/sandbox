@@ -111,7 +111,7 @@ export function pedidoTitulos(d: DatosPublicacionIA, c: ContextoIA): { instrucci
       "- Si el producto tiene un nombre comercial en inglés (su marca o lo que dice su empaque: «15 Days Cleanse»), consérvalo tal cual, sin traducirlo. Lo que agregas (el uso, el beneficio) va en español; traduce las palabras descriptivas en inglés que vengan del proveedor (hair, growth, cream, pain relief…).",
       "- Si es un suplemento, di cuántas cápsulas, gomitas, tabletas o softgels trae, solo si la cantidad aparece en los datos: no inventes cantidades. Si no cabe completa, abrévala: 30c (cápsulas), 30go (gomitas), 30t (tabletas), 30sg (softgels); es mejor abreviar que dejar fuera el uso.",
       "- El uso puede ir directo, sin «para» («Limpieza Intestinal», «Salud Digestiva»), o con «para…», «contra…», «alivio de…».",
-      "- Mínimo 3 palabras. Sin MAYÚSCULAS sostenidas, emojis, signos de exclamación ni punto final.",
+      "- Mínimo 3 palabras. Sin emojis, signos de exclamación ni punto final. Las mayúsculas, como las usa el equipo en sus correcciones.",
       "- Que las opciones sean distintas entre sí (otro enfoque o beneficio), no la misma frase reordenada.",
     ].join("\n"),
     `Reglas:\n- ${REGLAS_COMUNES}`,
@@ -138,7 +138,7 @@ export function pedidoCorregirTitulos(titulos: Pick<TituloSugerido, "titulo" | "
   const instrucciones = bloques(
     "Eres especialista en catálogos de dropshipping en Latinoamérica (Dropi). Ajustas el largo de títulos de producto sin cambiar su idea.",
     `Cada título debe medir entre ${minTitulo} y ${maxTitulo} caracteres contando los espacios. Te paso cada uno con su largo actual: reescríbelo para que quede dentro del rango (si se pasa, quita palabras de relleno; si se queda corto, agrega el beneficio o la cantidad que ya aparece en el título). Cuenta los caracteres antes de responder.`,
-    "Conserva el nombre del producto tal cual (aunque esté en inglés) y lo demás en español; que diga qué es y para qué sirve (si no cabe, abrevia la cantidad: 30c, 30go, 30t, 30sg), sin mayúsculas sostenidas, emojis, exclamaciones ni punto final, y no inventes cantidades.",
+    "Conserva el nombre del producto tal cual (aunque esté en inglés) y lo demás en español; que diga qué es y para qué sirve (si no cabe, abrevia la cantidad: 30c, 30go, 30t, 30sg), sin emojis, exclamaciones ni punto final, y no inventes cantidades.",
     'Responde SOLO con un JSON, sin texto antes ni después: {"titulos":[{"titulo":"…","porque":"una frase corta de por qué ese título vende mejor"}]}.',
   );
   const texto = titulos.map((t, i) => `${i + 1}. «${t.titulo}» (${t.titulo.length} caracteres; objetivo ${minTitulo}-${maxTitulo})${t.porque ? ` · idea: ${t.porque}` : ""}`).join("\n");

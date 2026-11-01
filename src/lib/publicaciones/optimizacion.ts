@@ -119,8 +119,6 @@ export function revisarPublicacion(p: EntradaRevision, reglas: Pick<Reglas, "min
   const t = p.titulo.trim();
   const ingles = palabrasEnIngles(t, p.nombreProducto);
   const palabras = t.split(/\s+/).filter(Boolean);
-  const letras = t.replace(/[^a-zA-ZÁÉÍÓÚÑáéíóúñ]/g, "");
-  const mayusculas = letras.length >= 8 && letras === letras.toUpperCase();
   const suple = esSuplemento(t, p.categoria);
   const sinDatos = "Se sabrá con la próxima lectura de Dropi";
 
@@ -144,8 +142,9 @@ export function revisarPublicacion(p: EntradaRevision, reglas: Pick<Reglas, "min
     r("titulo_angulo", tieneAngulo(t) ? "ok" : "revisar", tieneAngulo(t) ? "Dice para qué sirve" : "No dice para qué sirve («para…», «contra…», «alivio de…»)"),
     r(
       "titulo_formato",
-      palabras.length < 3 ? "falta" : mayusculas ? "falta" : "ok",
-      palabras.length < 3 ? `Muy corto (${palabras.length} ${palabras.length === 1 ? "palabra" : "palabras"})` : mayusculas ? "Todo en mayúsculas" : "Claro",
+      // Las mayúsculas no se revisan (31 oct 2026, pedido de Alcides): el equipo escribe algunos nombres en mayúsculas a propósito.
+      palabras.length < 3 ? "falta" : "ok",
+      palabras.length < 3 ? `Muy corto (${palabras.length} ${palabras.length === 1 ? "palabra" : "palabras"})` : "Claro",
     ),
     p.fotos === null
       ? r("fotos", "sin_datos", sinDatos)
