@@ -1,5 +1,5 @@
--- Inventario de Costa Rica (31 oct 2026, pedido de Alcides): la oficina se carga con lo que dice ClickUp y de ahí sale la
--- mercancía a las bodegas de terceros (Dropi, Effi, Boxfull, Dunamixfy) con remisiones.
+-- Inventario de Costa Rica (31 oct 2026, pedido de Alcides): la oficina se levanta desde cero con un conteo en el sistema y de
+-- ahí sale la mercancía a las bodegas de terceros (Dropi, Effi, Boxfull, Dunamixfy) con remisiones.
 --
 -- * Bodega «Oficina» (propia) en Costa Rica; «Despacho» y «Fulfillment» de Costa Rica se desactivan si no tienen stock.
 -- * Las bolsas de empaque de la oficina (de burbujas y de rollo, por medida) como productos simples (categoría de la que ya
