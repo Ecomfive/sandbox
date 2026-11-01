@@ -274,6 +274,16 @@ convenciones técnicas del código.
   solo muestra lo suyo (jefe, equipo, cada puesto con su onboarding). Lectura de todo en `cargarPuestos` (`src/lib/puestos/datos.ts`);
   sin la migración las páginas avisan. La migración da `puestos` a los roles que tienen `usuarios`. Fuera de la fase 1: KPI,
   scorecard, OKR, evaluaciones, PDI e incentivos.
+- **Equipo › Tareas** (`/tareas`, módulo `tareas`, migración 0215, 31 oct 2026, pedido de Alcides; **módulo temporal** hasta reorganizarlo). Tablero de
+  tareas del equipo como «Lideres Empresas» de ClickUp: `tareas_equipo` (TAR-0001, título, descripción, `estado` backlog/pendiente/en_progreso/
+  en_revision/aprobado/rechazado/hecho/archivado, `prioridad` urgente/alta/normal/baja, `responsable_id`, `fecha_inicio`, `fecha_limite`, `modulo`,
+  `creado_por`, `hecha_en`; RLS sin políticas). Reglas puras con prueba en `src/lib/tareas/tareas.ts` (`normalizarCambio`, `puedeVerTarea`,
+  `motivoNoPuede`: cada persona ve y cambia las suyas —asignadas o creadas—, solo un administrador asigna a otras personas). `crearTarea`,
+  `crearTareaFormulario` («Agregar tarea» con `FichaCrear`), `actualizarTarea` y `obtenerHistorialTarea` (`tareas/actions.ts`; auditoría
+  `crear_tarea_equipo`/`editar_tarea_equipo` con antes → después; aviso «Para ti» tipo `tarea` con `?abrir=` al asignar). Pantalla `tablero-tareas.tsx`:
+  «Lista» por estado o persona (se recuerda en el navegador), «Tablero» con columnas por estado y arrastrar para cambiar de estado, «Mías / De todos»
+  para administradores, menús de celda en `piezas.tsx` (los paneles de Compras) y ficha `ficha-tarea.tsx` con `HistorialGenerico`. La 0215 da el
+  módulo a todos los roles y carga 19 pendientes del sistema sin asignar (creados por Alcides).
 - **Perfiles de acceso por área** (migración 0115, 20 oct 2026; cuadro en `Perfiles-de-acceso-Ecomfive.pdf`, junto a la carpeta del proyecto). Roles
   listos con los módulos de cada área y qué es solo lectura: **nuevos** Investigación de producto, Contenido y ofertas, Compras, Producto / Catálogo,
   Talento humano y Consulta; **completados** Administrativo (Finanzas), Atención al cliente, Líder comercial y Operaciones (Bodega); Admin

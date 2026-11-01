@@ -1156,6 +1156,7 @@ export const ICONOS_PAGINA: Record<string, (props: SVGProps<SVGSVGElement>) => R
   "/productos": MargenIcon,
   "/usuarios": UsuariosIcon,
   "/puestos": PuestosIcon,
+  "/tareas": TareasIcon,
   "/rendimiento": RendimientoIcon,
   "/wms-productos": TiendaIcon,
   "/wms-productos-dropi": CatalogoIcon,

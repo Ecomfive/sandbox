@@ -40,6 +40,7 @@ export const MODULO_DE_ENTIDAD: Record<string, string> = {
   paises: "configuracion",
   plataformas: "configuracion",
   pais_plataformas: "configuracion",
+  tareas_equipo: "tareas",
   crm_tipo_cliente_umbrales: "configuracion",
 };
 

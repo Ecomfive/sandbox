@@ -134,6 +134,7 @@ const AREAS: NavSection[] = [
     items: [
       { label: "Usuarios y roles", href: "/usuarios" },
       { label: "Puestos", href: "/puestos" },
+      { label: "Tareas", href: "/tareas" },
       { label: "Rendimiento", href: "/rendimiento" },
     ],
   },
