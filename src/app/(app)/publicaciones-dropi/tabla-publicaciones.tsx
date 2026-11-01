@@ -216,7 +216,6 @@ export function TablaPublicaciones({
         margenMinimo={reglas.margen_minimo}
         decisionesDisponibles={decisionesDisponibles}
         opcionesCrear={opcionesCrear}
-        anterior={i > 0 ? () => setAbierta(orden[i - 1]) : undefined}
         siguiente={i >= 0 && i < orden.length - 1 ? () => setAbierta(orden[i + 1]) : undefined}
         alCerrar={() => setAbierta(null)}
         mismoProducto={mismoProducto}
