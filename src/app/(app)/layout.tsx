@@ -17,8 +17,7 @@ import { obtenerPlataformasPais } from "@/lib/pais-plataformas";
 import { construirAreas } from "@/lib/nav-data";
 import { paginasBuscables } from "@/lib/paleta";
 import { esAdministrador } from "@/lib/permisos/acceso";
-import { ultimaFecha } from "@/lib/ayuda/actualizaciones";
-import { NOVEDADES } from "@/lib/ayuda/contenido";
+import { contarNovedadesSinVer } from "@/lib/ayuda/novedades-vistas";
 import { PESTANAS_SOLO_ADMIN, pestanasOcultasDe } from "@/lib/permisos/ocultas";
 import { createServiceClient } from "@/lib/supabase/server";
 import { obtenerFavoritos } from "@/lib/favoritos";
@@ -49,7 +48,9 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           : SIN_PENDIENTES,
         // Los avisos «Para ti» (menciones con «@») de esta persona, sin leer.
         u ? contarParaTi(u.id).catch(() => 0) : 0,
-      ]).then(([menu, paraTi]) => conParaTi(menu, paraTi))
+        // Las actualizaciones del sistema recientes de sus módulos que no ha visto (migración 0218).
+        u ? contarNovedadesSinVer(supabase, u).catch(() => 0) : 0,
+      ]).then(([menu, paraTi, novedades]) => conParaTi(menu, paraTi, novedades))
     )
     .catch(() => SIN_PENDIENTES);
   const [plataformasPais, favoritosDeSesion, usuario, paisActual] = await Promise.all([
@@ -83,7 +84,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       {usuario && <LatidoPresencia />}
       {usuario?.vistaPrevia && <BannerVistaPrevia rolNombre={usuario.vistaPrevia.rolNombre} />}
       <div className="flex min-h-full">
-        <Sidebar modulosPermitidos={usuario?.modulos ?? null} areas={areas} favoritos={favoritos} pendientes={pendientes} ultimaActualizacion={usuario && esAdministrador(usuario) ? ultimaFecha(NOVEDADES) : null} />
+        <Sidebar modulosPermitidos={usuario?.modulos ?? null} areas={areas} favoritos={favoritos} pendientes={pendientes} verActualizaciones={!!usuario && esAdministrador(usuario)} />
         <div className="flex min-h-full min-w-0 flex-1 flex-col">
           <NavBar paginas={paginas} pendientes={pendientes} plataforma={plataformasPais.find((p) => p.tieneDatos)?.nombre ?? null} />
           <BarraMigas areas={areas} favoritos={favoritos} pestanasOcultas={pestanasOcultas} verAccesos={!!usuario && esAdministrador(usuario)} />

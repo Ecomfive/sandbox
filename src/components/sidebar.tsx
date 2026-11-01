@@ -12,7 +12,6 @@ import { anilloFoco } from "@/components/ui/field";
 import { SIN_PENDIENTES, type PendientesMenu } from "@/lib/contadores-menu";
 import { FRENTES, PRONTO_NAV, encontrarSeccionActiva, moduloDeHref, type NavItem, type NavSection } from "@/lib/nav-data";
 import { AjustesIcon, AvisosIcon, AyudaIcon, BabyYodaIcon, ConfiguracionIcon, DashboardIcon, HistorialIcon, ICONOS_PAGINA, SECTION_ICONS } from "@/lib/nav-icons";
-import { CLAVE_VISTO } from "@/lib/ayuda/actualizaciones";
 
 /** Si el panel de páginas está oculto («cerrado»); se guarda en el navegador de cada persona. */
 const CLAVE_PANEL = "sidebar-panel-v1";
@@ -249,14 +248,6 @@ const claseRielBoton = `flex w-full flex-col items-center gap-1.5 rounded-lg px-
 /** Elegida: texto blanco y el halo de color detrás del ícono; las demás, gris claro que se aclara al pasar. */
 const claseRiel = (seleccionada: boolean) => `${claseRielBoton} ${seleccionada ? "font-semibold text-white" : "text-riel-texto hover:bg-riel-hover hover:text-white"}`;
 
-/** Si hay cambios del sistema que la persona no ha visto (lo visto se guarda en su navegador al salir de /actualizaciones; nunca entró = todo es nuevo). */
-function useCambiosNuevos(ultima: string | null): boolean {
-  const visto = almacen(CLAVE_VISTO, "local");
-  // En el servidor no se sabe qué vio («servidor»): sin punto, y React lo vuelve a leer en el navegador al hidratar.
-  const hasta = useSyncExternalStore(visto.suscribir, visto.leer, () => "servidor");
-  return !!ultima && hasta !== "servidor" && (hasta === "" || ultima > hasta);
-}
-
 /** El ícono de un botón del riel, con el halo de color si es el elegido y la pastilla de pendientes en su esquina. */
 function IconoRiel({ Icono, seleccionada, cantidad = 0, punto = false }: { Icono: (typeof SECTION_ICONS)[string]; seleccionada: boolean; cantidad?: number; punto?: boolean }) {
   return (
@@ -279,14 +270,15 @@ function RielYPanel({
   modulosPermitidos,
   favoritos,
   pendientes,
-  ultimaActualizacion,
+  verActualizaciones,
 }: {
   areas: NavSection[];
   modulosPermitidos?: string[] | null;
   favoritos: string[];
   pendientes: PendientesMenu;
   /** Solo para administradores: la fecha del último cambio del sistema (botón «Cambios»); null = no se dibuja. */
-  ultimaActualizacion: string | null;
+  /** Solo para administradores: el botón «Cambios» (Actualizaciones del sistema). */
+  verActualizaciones: boolean;
 }) {
   const pathname = usePathname();
   const visibles = areasVisibles(areas, modulosPermitidos);
@@ -322,8 +314,9 @@ function RielYPanel({
   const verAyuda = titulo === "Ayuda";
   const mostrada = delRiel.find((v) => v.area.title === titulo) ?? delRiel[0];
   const puedeConfigurar = puedeVer(modulosPermitidos, "/configuracion");
-  const puedeVerAvisos = puedeVer(modulosPermitidos, "/notificaciones") || pendientes.paraTi > 0;
-  const cambiosNuevos = useCambiosNuevos(ultimaActualizacion);
+  // Avisos lo ve todo el mundo: ahí están las actualizaciones del sistema y los avisos «Para ti» (31 oct 2026).
+  const puedeVerAvisos = true;
+  const cambiosNuevos = pendientes.novedades > 0;
 
   function elegir(nombre: string) {
     setElegida({ ruta: pathname, titulo: nombre });
@@ -378,7 +371,7 @@ function RielYPanel({
               <span>Avisos</span>
             </Link>
           )}
-          {ultimaActualizacion && (
+          {verActualizaciones && (
             <Link
               href="/actualizaciones"
               aria-current={pathname === "/actualizaciones" ? "page" : undefined}
@@ -444,19 +437,20 @@ function ListaMovil({
   favoritos,
   pendientes,
   alNavegar,
-  ultimaActualizacion,
+  verActualizaciones,
 }: {
   areas: NavSection[];
   modulosPermitidos?: string[] | null;
   favoritos: string[];
   pendientes: PendientesMenu;
   alNavegar: () => void;
-  ultimaActualizacion: string | null;
+  /** Solo para administradores: el botón «Cambios» (Actualizaciones del sistema). */
+  verActualizaciones: boolean;
 }) {
   const pathname = usePathname();
   const visibles = areasVisibles(areas, modulosPermitidos);
   const limitado = tieneAccesoLimitado(areas, modulosPermitidos);
-  const cambiosNuevos = useCambiosNuevos(ultimaActualizacion);
+  const cambiosNuevos = pendientes.novedades > 0;
   return (
     <nav aria-label="Menú principal" className="flex flex-1 flex-col gap-4 overflow-y-auto p-2.5">
       <Favoritos areas={visibles} favoritos={favoritos} pathname={pathname} pendientes={pendientes} alNavegar={alNavegar} />
@@ -468,7 +462,7 @@ function ListaMovil({
             <PaginasDeArea area={v.area} items={v.items} limitado={limitado} pathname={pathname} favoritos={favoritos} pendientes={pendientes} alNavegar={alNavegar} />
           </section>
         ))}
-      {(puedeVer(modulosPermitidos, "/notificaciones") || pendientes.paraTi > 0) && (
+      {(
         <section aria-label="Avisos">
           <Titulo>Avisos</Titulo>
           <Link
@@ -482,7 +476,7 @@ function ListaMovil({
           </Link>
         </section>
       )}
-      {ultimaActualizacion && (
+      {verActualizaciones && (
         <section aria-label="Cambios del sistema">
           <Titulo>Cambios</Titulo>
           <Link
@@ -555,14 +549,14 @@ export function Sidebar({
   areas,
   favoritos,
   pendientes,
-  ultimaActualizacion = null,
+  verActualizaciones = false,
 }: {
   modulosPermitidos?: string[] | null;
   areas: NavSection[];
   favoritos: string[];
   pendientes: Promise<PendientesMenu>;
   /** Solo para administradores: la fecha del último cambio del sistema (botón «Cambios»). */
-  ultimaActualizacion?: string | null;
+  verActualizaciones?: boolean;
 }) {
   const [movilAbierto, setMovilAbierto] = useState(false);
 
@@ -571,7 +565,7 @@ export function Sidebar({
       {/* Riel y panel — escritorio */}
       <aside className="sticky top-0 hidden h-screen shrink-0 md:flex">
         <ConPendientes pendientes={pendientes}>
-          {(p) => <RielYPanel areas={areas} modulosPermitidos={modulosPermitidos} favoritos={favoritos} pendientes={p} ultimaActualizacion={ultimaActualizacion} />}
+          {(p) => <RielYPanel areas={areas} modulosPermitidos={modulosPermitidos} favoritos={favoritos} pendientes={p} verActualizaciones={verActualizaciones} />}
         </ConPendientes>
       </aside>
 
@@ -606,7 +600,7 @@ export function Sidebar({
             </div>
             <ConPendientes pendientes={pendientes}>
               {(p) => (
-                <ListaMovil areas={areas} modulosPermitidos={modulosPermitidos} favoritos={favoritos} pendientes={p} alNavegar={() => setMovilAbierto(false)} ultimaActualizacion={ultimaActualizacion} />
+                <ListaMovil areas={areas} modulosPermitidos={modulosPermitidos} favoritos={favoritos} pendientes={p} alNavegar={() => setMovilAbierto(false)} verActualizaciones={verActualizaciones} />
               )}
             </ConPendientes>
           </div>
