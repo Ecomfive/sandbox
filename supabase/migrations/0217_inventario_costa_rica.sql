@@ -8,7 +8,7 @@
 --   siguen en `wms_envios_dropi` (su `bodega_dropi_id` es la bodega externa de destino).
 -- * Corte de una bodega externa (`wms_cortes_externa`): lo que había en ella el día que se conectó, la base para cuadrarla
 --   después con las remisiones. Se toma hoy el de Dropi Costa Rica (bodega B15) con la última lectura de «Mis productos».
--- Se puede correr dos veces. Reversa: supabase/rollbacks/0215_rollback.sql.
+-- Se puede correr dos veces. Reversa: supabase/rollbacks/0217_rollback.sql.
 
 -- Bodega «Oficina» de Costa Rica.
 insert into wms_bodegas (pais_id, nombre, codigo, tipo, orden)

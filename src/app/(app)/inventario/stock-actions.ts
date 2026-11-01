@@ -329,7 +329,7 @@ export async function remitirAExterna(formData: FormData): Promise<{ error?: str
     p_usuario: usuario.id,
   });
   if (error) {
-    if (/wms_enviar_a_externa/.test(error.message)) return { error: "Falta correr la migración 0215 en la base." };
+    if (/wms_enviar_a_externa/.test(error.message)) return { error: "Falta correr la migración 0217 en la base." };
     return { error: errorDeBase(error.message, "No se pudo registrar la remisión.") };
   }
   const pais = await paisDeBodega(supabase, desde);

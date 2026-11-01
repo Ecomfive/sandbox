@@ -17,6 +17,7 @@ import {
   TestIcon,
   WalletIcon,
   WmsIcon,
+  TareasIcon,
 } from "@/lib/nav-icons";
 
 type Icono = ComponentType<SVGProps<SVGSVGElement>>;
@@ -41,6 +42,7 @@ export const ICONO_MODULO: Record<string, Icono> = {
   "inteligencia-competitiva": InteligenciaIcon,
   usuarios: EquipoIcon,
   notificaciones: AvisosIcon,
+  tareas: TareasIcon,
 };
 
 /** Colores de la paleta neón para las tarjetas de los módulos (uno por módulo, siempre el mismo). */

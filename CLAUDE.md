@@ -274,6 +274,16 @@ convenciones técnicas del código.
   solo muestra lo suyo (jefe, equipo, cada puesto con su onboarding). Lectura de todo en `cargarPuestos` (`src/lib/puestos/datos.ts`);
   sin la migración las páginas avisan. La migración da `puestos` a los roles que tienen `usuarios`. Fuera de la fase 1: KPI,
   scorecard, OKR, evaluaciones, PDI e incentivos.
+- **Equipo › Tareas** (`/tareas`, módulo `tareas`, migración 0215, 31 oct 2026, pedido de Alcides; **módulo temporal** hasta reorganizarlo). Tablero de
+  tareas del equipo como «Lideres Empresas» de ClickUp: `tareas_equipo` (TAR-0001, título, descripción, `estado` backlog/pendiente/en_progreso/
+  en_revision/aprobado/rechazado/hecho/archivado, `prioridad` urgente/alta/normal/baja, `responsable_id`, `fecha_inicio`, `fecha_limite`, `modulo`,
+  `creado_por`, `hecha_en`; RLS sin políticas). Reglas puras con prueba en `src/lib/tareas/tareas.ts` (`normalizarCambio`, `puedeVerTarea`,
+  `motivoNoPuede`: cada persona ve y cambia las suyas —asignadas o creadas—, solo un administrador asigna a otras personas). `crearTarea`,
+  `crearTareaFormulario` («Agregar tarea» con `FichaCrear`), `actualizarTarea` y `obtenerHistorialTarea` (`tareas/actions.ts`; auditoría
+  `crear_tarea_equipo`/`editar_tarea_equipo` con antes → después; aviso «Para ti» tipo `tarea` con `?abrir=` al asignar). Pantalla `tablero-tareas.tsx`:
+  «Lista» por estado o persona (se recuerda en el navegador), «Tablero» con columnas por estado y arrastrar para cambiar de estado, «Mías / De todos»
+  para administradores, menús de celda en `piezas.tsx` (los paneles de Compras) y ficha `ficha-tarea.tsx` con `HistorialGenerico`. La 0215 da el
+  módulo a todos los roles y carga 19 pendientes del sistema sin asignar (creados por Alcides).
 - **Perfiles de acceso por área** (migración 0115, 20 oct 2026; cuadro en `Perfiles-de-acceso-Ecomfive.pdf`, junto a la carpeta del proyecto). Roles
   listos con los módulos de cada área y qué es solo lectura: **nuevos** Investigación de producto, Contenido y ofertas, Compras, Producto / Catálogo,
   Talento humano y Consulta; **completados** Administrativo (Finanzas), Atención al cliente, Líder comercial y Operaciones (Bodega); Admin
@@ -1778,16 +1788,16 @@ convenciones técnicas del código.
   historial de Dropi, y stock esperado según pedidos entregados, en tránsito, en devolución y devueltos contra el stock que dice Dropi; los pedidos
   traen `warehouse_id` en `staging_ordenes_dropi.payload`; empieza en la fecha del levantamiento). Probado con PGlite. Reversa:
   `supabase/rollbacks/0214_rollback.sql`.
-  **Costa Rica y remisiones** (migración 0215, 31 oct 2026, pedido de Alcides): bodega «Oficina» (`oficina`, propia) en Costa Rica, que se
+  **Costa Rica y remisiones** (migración 0217, 31 oct 2026, pedido de Alcides): bodega «Oficina» (`oficina`, propia) en Costa Rica, que se
   levanta desde cero con un conteo en el sistema (decisión de Alcides: no se trae lo de ClickUp, «Inventario 🇨🇷 Ecomfive Costa Rica», cuyas
   columnas eran DunamixFY, DROP = Boxfull, Dropi, Effi, Oficina y Tiendas); «Despacho» y «Fulfillment» de Costa Rica desactivadas. Las bolsas de empaque por medida son productos simples
   (`BOLSAS/BURBUJAS/15X24`… `BOLSAS/ROLLO/38X52`). **Remisión** a cualquier bodega externa del país: `wms_enviar_a_externa` (`remitirAExterna`,
   `PanelRemision`; `wms_enviar_a_dropi` es su atajo) y la pestaña `/inventario/remisiones` (`/inventario/envios-dropi` redirige); la tabla sigue
   siendo `wms_envios_dropi` (`bodega_dropi_id` = la externa de destino). **Corte de una bodega externa** (`wms_cortes_externa`): lo que tenía el
-  día que se conectó, la base del cuadre (fase 2); la 0215 tomó el de Dropi Costa Rica (B15) con la lectura de «Mis productos» del 31 oct 2026.
+  día que se conectó, la base del cuadre (fase 2); la 0217 tomó el de Dropi Costa Rica (B15) con la lectura de «Mis productos» del 31 oct 2026.
   **«Importar lista»** del levantamiento (`levantamiento/importar-lista.tsx`; `leerLista` en `src/lib/wms/levantamiento.ts`, con prueba;
   `sugerirProductosParaLista` con el cruce de Testing Lab): llena «Contado» con «nombre o SKU;cantidad», cada línea con su producto «Seguro»,
-  «Revisar» o «Sin producto», sin guardar. Probado con PGlite. Reversa: `supabase/rollbacks/0215_rollback.sql`.
+  «Revisar» o «Sin producto», sin guardar. Probado con PGlite. Reversa: `supabase/rollbacks/0217_rollback.sql`.
   **Lotes y vencimiento** (migración 0073): el producto marca «maneja vencimiento» (+ días de aviso, 90 por defecto desde el 13 oct 2026: `DIAS_AVISO_PREDETERMINADO`, `src/lib/wms/vencimiento.ts`, se guarda en el producto al activarlo; las funciones SQL aún caen a 60 si el dato está vacío) en su ficha; no
   aplica a compuestos y solo se activa sin stock físico (se desactiva sin lotes con unidades). Su stock se reparte por lote
   (`wms_lotes`, `wms_stock_lote`, por bodega): la entrada exige lote y fecha (un lote existente exige la misma fecha), el ajuste exige
