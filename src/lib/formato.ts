@@ -5,6 +5,7 @@ const MONEDA_POR_PAIS: Record<string, { locale: string; currency: string; timeZo
   CR: { locale: "es-CR", currency: "CRC", timeZone: "America/Costa_Rica" },
   PA: { locale: "es-PA", currency: "USD", timeZone: "America/Panama" },
   MX: { locale: "es-MX", currency: "MXN", timeZone: "America/Mexico_City" },
+  HN: { locale: "es-HN", currency: "HNL", timeZone: "America/Tegucigalpa" },
 };
 
 /**
