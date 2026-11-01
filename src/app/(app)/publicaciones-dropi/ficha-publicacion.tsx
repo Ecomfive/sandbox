@@ -9,7 +9,7 @@ import { Seccion } from "@/components/ui/seccion-ficha";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
-import { ActualizarIcon, CerrarIcon, CheckIcon, ComprasIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, InteligenciaIcon, InventarioIcon, LapizIcon, MargenIcon, PapeleraIcon, ProductoIcon, ArchivarIcon, FotosIcon, PausaIcon, ReactivarIcon, ApagarIcon, CandadoAbiertoIcon, CandadoIcon } from "@/lib/nav-icons";
+import { ActualizarIcon, CerrarIcon, CheckIcon, ComprasIcon, EstadoIcon, InteligenciaIcon, InventarioIcon, LapizIcon, MargenIcon, PapeleraIcon, ProductoIcon, ArchivarIcon, FotosIcon, PausaIcon, ReactivarIcon, ApagarIcon, CandadoAbiertoIcon, CandadoIcon } from "@/lib/nav-icons";
 import {
   ESTADOS_PUBLICACION,
   TIPOS,
@@ -97,21 +97,6 @@ const desde = (p: FilaPublicacion): Formulario => ({
 const n = (s: string) => (s.trim() === "" ? null : Number(s));
 const fechaLarga = (iso: string) => new Date(iso.length === 10 ? `${iso}T12:00:00` : iso).toLocaleDateString("es-PA", { day: "numeric", month: "short", year: "numeric", timeZone: "America/Panama" });
 
-function BotonNavegar({ texto, icono: Icono, activo, alHacerClic }: { texto: string; icono: typeof FlechaArribaIcon; activo: boolean; alHacerClic: () => void }) {
-  return (
-    <Tooltip texto={texto}>
-      <button
-        type="button"
-        aria-label={texto}
-        aria-disabled={!activo}
-        onClick={() => activo && alHacerClic()}
-        className={`flex h-9 w-9 items-center justify-center border border-border bg-card text-foreground ${anilloFoco} !rounded-md ${activo ? "hover:bg-muted" : "cursor-default opacity-40"}`}
-      >
-        <Icono className="h-4 w-4" />
-      </button>
-    </Tooltip>
-  );
-}
 
 
 function Selector({ valor, lista, cambiar, nombre, vacio = "—" }: { valor: string; lista: OpcionPublicacion[]; cambiar: (v: string) => void; nombre: string; vacio?: string }) {
@@ -191,7 +176,6 @@ export function FichaPublicacion({
   margenMinimo,
   decisionesDisponibles,
   opcionesCrear,
-  anterior,
   siguiente,
   alCerrar,
   mismoProducto = [],
@@ -220,7 +204,7 @@ export function FichaPublicacion({
   /** Las demás publicaciones del mismo producto (mismo SKU vinculado), públicas y privadas, y cómo abrir una. */
   mismoProducto?: FilaPublicacion[];
   alAbrirOtra?: (id: string) => void;
-  anterior?: () => void;
+  /** Para «Vincular y siguiente» del producto vinculado. */
   siguiente?: () => void;
   alCerrar: () => void;
 }) {
@@ -240,7 +224,6 @@ export function FichaPublicacion({
       margenMinimo={margenMinimo}
       decisionesDisponibles={decisionesDisponibles}
       opcionesCrear={opcionesCrear}
-      anterior={anterior}
       siguiente={siguiente}
       alCerrar={alCerrar}
       mismoProducto={mismoProducto}
@@ -262,7 +245,6 @@ function ContenidoFicha({
   margenMinimo,
   decisionesDisponibles,
   opcionesCrear,
-  anterior,
   siguiente,
   alCerrar,
   mismoProducto,
@@ -280,7 +262,7 @@ function ContenidoFicha({
   margenMinimo: number;
   decisionesDisponibles: boolean;
   opcionesCrear: OpcionesCrear;
-  anterior?: () => void;
+  /** Para «Vincular y siguiente» del producto vinculado. */
   siguiente?: () => void;
   alCerrar: () => void;
   mismoProducto: FilaPublicacion[];
@@ -458,12 +440,6 @@ function ContenidoFicha({
               ) : null;
             })
           )}
-        </>
-      }
-      navegacion={
-        <>
-          <BotonNavegar texto="Publicación anterior" icono={FlechaArribaIcon} activo={!!anterior && !pendiente} alHacerClic={() => anterior && salir(anterior)} />
-          <BotonNavegar texto="Publicación siguiente" icono={FlechaAbajoIcon} activo={!!siguiente && !pendiente} alHacerClic={() => siguiente && salir(siguiente)} />
         </>
       }
     >
