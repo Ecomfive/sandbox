@@ -1,19 +1,26 @@
+import { simboloDeMoneda } from "@/lib/moneda/simbolo";
+import { monedaDePais } from "@/lib/moneda/tipo-cambio";
+
 const MONEDA_POR_PAIS: Record<string, { locale: string; currency: string; timeZone: string }> = {
   CR: { locale: "es-CR", currency: "CRC", timeZone: "America/Costa_Rica" },
   PA: { locale: "es-PA", currency: "USD", timeZone: "America/Panama" },
   MX: { locale: "es-MX", currency: "MXN", timeZone: "America/Mexico_City" },
 };
 
-/** 9520682 -> "₡9.520.682,00" (CR) o "$9,520,682.00" (PA), según el país. */
+/**
+ * 9520682 -> "₡9 520 682,00" (CR), "$9,520,682.00" (PA) o "MX$9,520,682.00" (MX), según el país, con el símbolo de `simboloDeMoneda` (el peso
+ * mexicano es «MX$» para no confundirlo con el dólar). Un país que no está en la lista usa su moneda (`monedaDePais`), no la de Panamá.
+ */
 export function formatearMoneda(valor: number, codigoPais: string): string {
-  const config = MONEDA_POR_PAIS[codigoPais] ?? MONEDA_POR_PAIS.PA;
-  return new Intl.NumberFormat(config.locale, {
+  const config = MONEDA_POR_PAIS[codigoPais?.toUpperCase()] ?? { locale: "es", currency: monedaDePais(codigoPais ?? "PA"), timeZone: "America/Panama" };
+  const partes = new Intl.NumberFormat(config.locale, {
     style: "currency",
     currency: config.currency,
     currencyDisplay: "narrowSymbol",
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }).format(valor);
+  }).formatToParts(valor);
+  return partes.map((p) => (p.type === "currency" ? simboloDeMoneda(config.currency) : p.value)).join("");
 }
 
 const MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];

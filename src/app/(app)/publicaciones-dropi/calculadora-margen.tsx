@@ -12,7 +12,8 @@ import { useMoneda } from "./moneda-contexto";
 const COLOR_NIVEL: Record<string, string> = { critico: "text-destructive", bajo: "text-destructive", aceptable: "text-warning", sano: "text-success" };
 const ETIQUETA_NIVEL: Record<string, string> = { critico: "crítico", bajo: "bajo", aceptable: "aceptable", sano: "saludable" };
 const monto = (n: number | null) => (n === null ? "" : n.toFixed(2));
-const dolares = (n: number | null) => (n === null ? "—" : `${n < 0 ? "-" : ""}$${Math.abs(n).toFixed(2)}`);
+/** En un país que no usa dólares la calculadora cuenta en dólares: «US$», para no confundirlo con la moneda del país. */
+const dolares = (n: number | null) => (n === null ? "—" : `${n < 0 ? "-" : ""}US$${Math.abs(n).toFixed(2)}`);
 const pct = (n: number) => `${Math.round(n * 100)} %`;
 const etiquetaOpcion = (sku: { codigo: string; nombre: string }) => `${sku.codigo} · ${sku.nombre}`;
 
@@ -148,7 +149,7 @@ function VentanaCalculadora({ publicaciones, reglas, alCerrar }: { publicaciones
               </label>
               <span className="flex items-center gap-1 rounded-md border border-border-control bg-card px-3 focus-within:border-foreground focus-within:ring-2 focus-within:ring-foreground">
                 <span aria-hidden="true" className="text-sm text-muted-foreground">
-                  {tasa ? "$" : simbolo}
+                  {tasa ? "US$" : simbolo}
                 </span>
                 <input
                   id={`${id}-${clave}`}

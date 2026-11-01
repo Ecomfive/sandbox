@@ -1,5 +1,6 @@
 "use client";
 
+import { useSimboloPais } from "@/components/pais-contexto";
 import { useRef, useState, type ReactNode } from "react";
 import { etiquetaComision, etiquetaTipoCuenta, type FilaCuenta } from "./def-cuentas";
 import { EliminarCuentaBoton } from "./eliminar-cuenta-boton";
@@ -51,11 +52,12 @@ function BotonNavegar({ texto, icono: Icono, activo, alHacerClic }: {
 
 /** Lo primero de la ficha, sobre los botones: el país con la comisión. */
 function EncabezadoFicha({ cuenta, paisNombre }: { cuenta: FilaCuenta; paisNombre: string }) {
+  const simbolo = useSimboloPais();
   return (
     <p className="px-5 pt-5 pb-4 text-sm text-muted-foreground">
       {paisNombre} ·{" "}
       {cuenta.comision_tipo
-        ? `Comisión sugerida ${etiquetaComision(cuenta.comision_tipo, cuenta.comision_porcentaje, cuenta.comision_monto_fijo)}`
+        ? `Comisión sugerida ${etiquetaComision(cuenta.comision_tipo, cuenta.comision_porcentaje, cuenta.comision_monto_fijo, simbolo)}`
         : "Sin comisión sugerida"}
     </p>
   );
@@ -63,6 +65,7 @@ function EncabezadoFicha({ cuenta, paisNombre }: { cuenta: FilaCuenta; paisNombr
 
 /** Los datos de la cuenta solo para leer: lo que ve quien no tiene permiso de escritura en Retiros. */
 function DatosDeLaCuenta({ cuenta }: { cuenta: FilaCuenta }) {
+  const simbolo = useSimboloPais();
   const datosBinance = datosBinanceDeLaBase(cuenta.datos_binance);
   return (
     <div className="flex flex-col divide-y divide-border border-t border-border p-5">
@@ -100,7 +103,7 @@ function DatosDeLaCuenta({ cuenta }: { cuenta: FilaCuenta }) {
         <dl className="flex flex-col gap-3">
           <Dato etiqueta="Comisión">
             {cuenta.comision_tipo
-              ? etiquetaComision(cuenta.comision_tipo, cuenta.comision_porcentaje, cuenta.comision_monto_fijo)
+              ? etiquetaComision(cuenta.comision_tipo, cuenta.comision_porcentaje, cuenta.comision_monto_fijo, simbolo)
               : "Sin comisión"}
           </Dato>
         </dl>

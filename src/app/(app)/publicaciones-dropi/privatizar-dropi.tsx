@@ -1,5 +1,6 @@
 "use client";
 
+import { useMoneda } from "./moneda-contexto";
 import { BotonIconoFila } from "./boton-icono-fila";
 import { motivoPrivatizar, motivoQuitarPrivatizacion } from "@/lib/publicaciones/botones-fila";
 
@@ -37,6 +38,7 @@ const numero = (t: string) => Number(t.replace(",", "."));
  * crea la publicación privada. Nada se privatiza solo.
  */
 function VentanaPrivatizar({ p, alCerrar }: { p: FilaPublicacion; alCerrar: () => void }) {
+  const { monto } = useMoneda();
   const { mostrarToast } = useToast();
   const bodegas = bodegasConStock(p);
   const puedeCrm = usePuedeAbrir("crm-dropshippers");
@@ -91,7 +93,7 @@ function VentanaPrivatizar({ p, alCerrar }: { p: FilaPublicacion; alCerrar: () =
   const faltan = faltantesPrivatizar(datos, bodegaElegida?.stock ?? null);
   const pasos = [
     `Comprobar que ${datos.correo || "el correo"} tiene cuenta de dropshipper en Dropi`,
-    `Crear el producto privado «${nombre || "P-XX …"}»${datos.precio ? ` a $${datos.precio.toFixed(2)}` : ""}, con las fotos y garantías del público`,
+    `Crear el producto privado «${nombre || "P-XX …"}»${datos.precio ? ` a ${monto(datos.precio)}` : ""}, con las fotos y garantías del público`,
     `Ponerle ${datos.unidades ? datos.unidades.toLocaleString("es-PA") : "las"} unidades y asignárselo a ${datos.dropshipper || "el dropshipper"} en «Productos privados»`,
     `Sacarle esas unidades al público (ID ${p.dropiId})`,
   ];

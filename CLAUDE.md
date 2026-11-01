@@ -306,6 +306,14 @@ convenciones técnicas del código.
   Dashboard, Planificación o Tiempos visibles (sus cifras saldrían en cero). **Un módulo nuevo que se quiera afinar**: agrega su
   `CatalogoModulo` a `src/lib/permisos/catalogo.ts` y aplica sus claves en el servidor como Compras (`permisos-compras.ts` es el modelo).
   `acceso-seccion.ts`, «Líderes comerciales» del CRM y el progreso de la Universidad ya cuentan lo propio de cada persona.
+- **Símbolo de moneda en todo monto** (31 oct 2026, pedido de Alcides: «los precios y valores siempre con el símbolo de la moneda del país en que se
+  están viendo»). Un solo lugar: `src/lib/moneda/simbolo.ts` (con prueba): `simboloDeMoneda` («$» USD, «₡» CRC, **«MX$» MXN**, para no confundir el
+  peso con el dólar), `simboloDePais`, `simboloDolarEn` («US$» donde no se usa el dólar), `montoConSimbolo` y `montoDePais`. `formatearMoneda`
+  (`formato.ts`) y `formatoMonto`/`simboloMoneda` (`publicaciones/moneda.ts`) ya lo usan, y un país fuera de su lista toma su moneda, no la de Panamá.
+  En un Client Component: `useSimboloPais()`, `useMontoPais()`, `useCodigoPais()` (`src/components/pais-contexto.tsx`; el layout de `(app)` pone
+  `ProveedorPais` con el país de la barra). En el servidor, el código del país del registro (no el de la barra). **No escribas «$» fijo junto a un
+  monto que depende del país**; solo lo que siempre es en dólares (Compras, consumo de IA, Shen Zhen, Meta Ads, Shopify) lleva «$». Pendiente: la
+  tolerancia de conciliación de Retiros (`TOLERANCIA_DISCREPANCIA`) es la misma cifra en dólares y en colones.
 - **Contraseña propia** (31 oct 2026, pedido de Alcides). Cualquiera con sesión cambia la suya en el menú de su cuenta › «Cambiar
   contraseña» (`VentanaContrasena` + `FormularioContrasena`, `src/components/cuenta/`; `cambiarMiContrasena`, `src/lib/cuenta/contrasena-actions.ts`:
   siempre el usuario de la sesión, comprueba la actual con `createAnonClient`, guarda con la clave de servicio, quita la marca y renueva la sesión;

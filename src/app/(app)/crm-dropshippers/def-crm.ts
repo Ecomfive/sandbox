@@ -1,3 +1,4 @@
+import { simboloDePais } from "@/lib/moneda/simbolo";
 import type { VendeEn } from "@/lib/whatsapp/origen-chat";
 import { FASES } from "@/lib/crm/areas";
 import { SIN_VALOR, type DefTabla } from "@/lib/tabla/motor";
@@ -205,9 +206,9 @@ export function etiquetaAntiguedad(horas: number): string {
   return horas >= 72 ? `${Math.floor(horas / 24)} d` : `${horas} h`;
 }
 
-/** Montos cortos para listas y rankings: «₡4,82 M», «₡870 mil», «$12,5 mil»; el exacto va en la ficha. */
+/** Montos cortos para listas y rankings: «₡4,82 M», «₡870 mil», «$12,5 mil», «MX$3,2 mil»; el exacto va en la ficha. */
 export function montoCorto(valor: number, codigoPais: string): string {
-  const simbolo = codigoPais === "CR" ? "₡" : "$";
+  const simbolo = simboloDePais(codigoPais);
   const nf = (n: number, dec: number) => n.toLocaleString("es-CR", { maximumFractionDigits: dec, minimumFractionDigits: dec });
   if (valor >= 1_000_000) return `${simbolo}${nf(valor / 1_000_000, 2)} M`;
   if (valor >= 1_000) return `${simbolo}${nf(valor / 1_000, valor >= 100_000 ? 0 : 1)} mil`;
