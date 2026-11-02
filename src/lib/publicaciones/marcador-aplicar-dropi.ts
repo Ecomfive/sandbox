@@ -15,21 +15,31 @@
  * Un cambio de tipo «apagar» (23 oct 2026, migración 0148; `apagar`, con `APAGAR_JS`) hace lo que Nicole a mano: saca todo el stock
  * (concepto «stock»), con `quitarPrivados` quita la privatización, comprueba que quedó en cero e intenta archivar. Si Dropi no deja
  * archivar (órdenes pendientes) devuelve `ok: true, archivado: false`: queda pendiente y el próximo «Aplicar en Dropi» solo repite el archivado.
+ * Con `datos` («Quitar privatización», 30 oct 2026) es el apagado de un privado que, antes de archivarlo, le devuelve sus unidades al público.
  *
  * Un cambio de tipo «privatizar» (26 oct 2026, migración 0155; `privatizar`, con `PRIVATIZAR_JS`) deja un producto a un solo dropshipper: comprueba
  * su correo en Dropi, crea el producto privado (copia del público), le pone fotos, garantías y stock, se lo asigna en «Productos privados» y le
  * saca esas unidades al público. Devuelve el ID nuevo aunque falle un paso después, y si ya le sacó el stock al público (`salida`).
+ *
+ * Un cambio de tipo «stock» (28 oct 2026, migración 0173; `stock`, con `STOCK_JS`) deja una bodega de ECOMFIVE con las unidades pedidas: lee el stock de
+ * Dropi en ese momento, hace la entrada o la salida que falte y lo vuelve a leer para comprobar. Si ya tiene esas unidades, no guarda nada.
  */
 
 import { APAGAR_JS } from "./apagar-dropi";
 import { CREAR_JS } from "./crear-dropi";
 import { PRIVATIZAR_JS } from "./privatizar-dropi";
 import { CLAVE_FOTO_JS, REPUBLICAR_JS } from "./republicar-dropi";
+import { STOCK_JS } from "./stock-dropi";
 
 /** El armado del guardado de Dropi, en JavaScript simple para el favorito (el mismo de `armarGuardadoProducto`). */
 export const ARMAR_JS = [
+  // Los atributos y las variaciones de un producto con variaciones, como los manda la pantalla de Dropi (`atributosDeDropi` y `variacionesDeDropi`).
+  "function atr(o){if(!Array.isArray(o.attributes)||!o.attributes.length)return null;return o.attributes.map(function(a){return{id:a.id!=null?a.id:null,product_id:a.product_id!=null?a.product_id:null,description:a.description!=null?a.description:'',isVariation:a.isVariation!=null?a.isVariation:false,deleted_at:a.deleted_at!=null?true:null,values:(Array.isArray(a.values)?a.values:[]).map(function(v){return{id:v.id!=null?v.id:null,value:v.value!=null?v.value:'',attribute_id:v.attribute_id!=null?v.attribute_id:null,attribute_name:v.attribute_name!=null?v.attribute_name:'',deleted_at:v.deleted_at!=null?true:null}})}})}",
+  "function vars(o){return(Array.isArray(o.variations)?o.variations:[]).map(function(r){return{id:r.id!=null?r.id:null,sale_price:Number(r.sale_price),suggested_price:Number(r.suggested_price),product_id:r.product_id!=null?r.product_id:null,stock:r.stock,sku:r.sku,attribute_values:(Array.isArray(r.attribute_values)?r.attribute_values:[]).map(function(a){return{id:a.id!=null?a.id:null,value:a.value!=null?a.value:'',attribute_id:a.attribute_id!=null?a.attribute_id:null,attribute_name:a.attribute_name!=null?a.attribute_name:'',deleted_at:a.deleted_at!=null?a.deleted_at:null}}),deleted_at:r.deleted_at!=null?r.deleted_at:null}})}",
   "function armar(o,bp,c){",
-  "if(o.type!=='SIMPLE')return{error:'Tiene variaciones: cámbialo a mano en Dropi.'};",
+  "var vr=o.type==='VARIABLE'&&c.variable===true;",
+  "if(o.type!=='SIMPLE'&&!vr)return{error:'Tiene variaciones: cámbialo a mano en Dropi.'};",
+  "var at=vr?atr(o):[];if(!at)return{error:'Dropi no devolvió los atributos (color, talla…) del producto con variaciones: no se puede guardar desde aquí, hazlo a mano en Dropi.'};",
   "if(c.nombre!==null&&(!c.nombre.trim()||c.nombre.length>40))return{error:'El nombre debe tener de 1 a 40 caracteres.'};",
   "var pr=c.precio==null?null:c.precio,su=c.precioSugerido==null?null:c.precioSugerido;",
   "if((pr!==null&&!(pr>0))||(su!==null&&!(su>0)))return{error:'El precio debe ser mayor que cero.'};",
@@ -41,8 +51,8 @@ export const ARMAR_JS = [
   "if(ds!==null&&ds.replace(/<[^>]*>/g,' ').replace(/&nbsp;/g,' ').replace(/\\s+/g,' ').trim().length<200)return{error:'La descripción necesita al menos 200 caracteres.'};",
   "function num(v){return v===null||v===undefined||v===''?v:Number(v)}",
   "var b=(Array.isArray(o.warehouse_product)?o.warehouse_product:[]).map(function(w){var x=w.warehouse||{};return{warehouse_id:w.warehouse_id,fullName:(x.name!=null?x.name:'')+'('+(x.address!=null?x.address:'')+')',stock:w.stock,city:x.city,warehouse_white_brand:!!x.warehouse_white_brand}});",
-  "bp.forEach(function(p){if(!b.some(function(x){return x.warehouse_id===p.id}))b.push({fullName:p.name+'('+p.address+')',warehouse_id:p.id,warehouse_white_brand:!!p.warehouse_white_brand})});",
-  "return{cuerpo:{id:o.id,name:c.nombre!==null?c.nombre:o.name,description:ds!==null?ds:o.description,dropi_app_description:o.dropi_app_description,type:o.type,sale_price:pr!==null?pr:num(o.sale_price),suggested_price:su!==null?su:(sa!==null?sa:num(o.suggested_price)),user_id:o.user_id,privated_product:o.privated_product,active:o.active,sku:o.sku,weight:num(o.weight),length:num(o.length),width:num(o.width),height:num(o.height),attribute:[],variations:o.variations,categories:o.categories,add_stock_in_return:o.add_stock_in_return,private_product_inventories:o.private_product_inventories,user_profit_percentage_product:o.user_profit_percentage_product,is_warehouse_white_brand:o.is_warehouse_white_brand,warehouselected:b,warehouse_previus:null,controlChangesPhotos:[],name_in_guide:c.nombreGuia!==null?c.nombreGuia:(o.name_in_guide!=null?o.name_in_guide:''),shipping_method:o.shipping_method,bar_code:o.bar_code,dropi_product_supplier_increment_fixed:o.dropi_product_supplier_increment_fixed}}",
+  "bp.forEach(function(p){if(!b.some(function(x){return Number(x.warehouse_id)===Number(p.id)}))b.push({fullName:p.name+'('+p.address+')',warehouse_id:p.id,warehouse_white_brand:!!p.warehouse_white_brand})});",
+  "return{cuerpo:{id:o.id,name:c.nombre!==null?c.nombre:o.name,description:ds!==null?ds:o.description,dropi_app_description:o.dropi_app_description,type:o.type,sale_price:pr!==null?pr:num(o.sale_price),suggested_price:su!==null?su:(sa!==null?sa:num(o.suggested_price)),user_id:o.user_id,privated_product:o.privated_product,active:o.active,sku:o.sku,weight:num(o.weight),length:num(o.length),width:num(o.width),height:num(o.height),attribute:at,variations:vr?vars(o):o.variations,categories:o.categories,add_stock_in_return:o.add_stock_in_return,private_product_inventories:o.private_product_inventories,user_profit_percentage_product:o.user_profit_percentage_product,is_warehouse_white_brand:o.is_warehouse_white_brand,warehouselected:vr?[]:b,warehouse_previus:null,controlChangesPhotos:[],name_in_guide:c.nombreGuia!==null?c.nombreGuia:(o.name_in_guide!=null?o.name_in_guide:''),shipping_method:o.shipping_method,bar_code:o.bar_code,dropi_product_supplier_increment_fixed:o.dropi_product_supplier_increment_fixed}}",
   "}",
 ].join("");
 
@@ -64,6 +74,7 @@ const CODIGO = [
   "function idCreado(j){var o=j&&j.objects,c=[o&&o.id,o&&o.product&&o.product.id,o&&o.product_id,Array.isArray(o)&&o[0]&&o[0].id,typeof o==='number'?o:null,j&&j.id,j&&j.product&&j.product.id,j&&j.data&&j.data.id];for(var i=0;i<c.length;i++){var n=Number(c[i]);if(n>0&&n<1e8&&Math.floor(n)===n)return n}return 0}",
   "function sinId(g){var j=g.j,m=j&&(j.message||j.msg||j.error);return'Dropi no devolvió el ID del producto nuevo (respondió '+g.s+(m?': '+String(m).slice(0,150):'')+(j&&typeof j==='object'?'; llaves: '+Object.keys(j).slice(0,8).join(', ')+(j.objects&&typeof j.objects==='object'?' / objects: '+Object.keys(j.objects).slice(0,8).join(', '):''):'; sin cuerpo')+'). No se creó nada en el sistema.'}",
   REPUBLICAR_JS,
+  STOCK_JS,
   PRIVATIZAR_JS,
   APAGAR_JS,
   CREAR_JS,
@@ -96,9 +107,10 @@ const CODIGO = [
   "var a=await pedir('/products/'+c.producto);if(!a.ok)return{ok:false,error:motivo(a)};",
   "var o=a.j&&a.j.objects;if(!o||Number(o.id)!==Number(c.producto))return{ok:false,error:'Dropi no devolvió el producto.'};",
   "if(Number(o.user_id)!==Number(L.id))return{ok:false,error:'Ese producto no es de este proveedor en Dropi.'};",
-  "var id=Number(c.nuevo)||0,st=stockDe(o),k;",
+  // Con variaciones (1 nov 2026) las unidades se cuentan por bodega y variación y el producto nuevo se arma con sus atributos y variaciones (el precio de cada una se copia igual).
+  "var vr=esV(o),id=Number(c.nuevo)||0,st=vr?unidadesV(o):stockDe(o),k;",
   // El precio elegido al republicar (27 oct 2026) va al producto nuevo; sin él, queda el del viejo.
-  "if(!id){var r=nuevo(o,bp,{precio:c.precio,precioSugerido:c.sugerido});if(r.error)return{ok:false,error:r.error};",
+  "if(!id){var r=vr?nuevoV(o,bp):nuevo(o,bp,{precio:c.precio,precioSugerido:c.sugerido});if(r.error)return{ok:false,error:r.error};",
   "var g=await pedir('/products','POST',r.cuerpo);if(!g.ok)return{ok:false,error:motivo(g)};",
   "id=idCreado(g.j);if(!id)return{ok:false,error:sinId(g)}}",
   "var f=function(e){return{ok:false,nuevo:id,error:e}};",
@@ -115,33 +127,71 @@ const CODIGO = [
   "var lv=gv.ok&&Array.isArray(gv.j&&gv.j.objects)?gv.j.objects:[],ln=gn.ok&&Array.isArray(gn.j&&gn.j.objects)?gn.j.objects:[];",
   "if(lv.length&&!ln.length){var gw=lv.filter(function(w){return w&&w.name}).map(function(w){return{name:w.name,time:w.time||w.type_time||'DIAS',quantity:Number(w.quantity_time!=null?w.quantity_time:w.quantity)||10,description:w.description&&w.description!=='NULL'&&String(w.description).trim()?w.description:(w.name==='Different order'?'':'Ninguna')}});",
   "var gc=await pedir('/productwarranty/create','POST',{id:id,warranties:gw});if(!gc.ok)return f('Se creó el '+id+', pero no se le pudieron poner las garantías: '+motivo(gc))}",
-  "var sn=stockDe(n),en={},hay=false;for(k in st)if((sn[k]||0)<st[k]){en[k]=st[k]-(sn[k]||0);hay=true}",
-  "if(hay){var me=mover(n,bp,en,'Republicado desde el ID '+c.producto);if(me.error)return f(me.error);",
+  "var sn=vr?unidadesV(n):stockDe(n),en={},hay=false;for(k in st)if((sn[k]||0)<st[k]){en[k]=st[k]-(sn[k]||0);hay=true}",
+  "if(hay){var me;if(vr){var em=emparejarV(n,en);if(em.error)return f('Se creó el '+id+', pero no se le pudo poner el stock: '+em.error);var e1=await entradasV(n);if(e1.error)return f('Se creó el '+id+', pero no se le pudo poner el stock: '+e1.error);me=entradaV(n,bp,em.porVariacion,e1.ent,'Republicado desde el ID '+c.producto)}else me=mover(n,bp,en,'Republicado desde el ID '+c.producto);if(me.error)return f(me.error);",
   "var pe=await pedir('/products/'+id,'PUT',me.cuerpo);if(!pe.ok)return f('Se creó el '+id+', pero no se le pudo poner el stock: '+motivo(pe))}",
+  // Con variaciones, antes de sacarle algo al viejo se comprueba que el nuevo quedó con el stock de cada variación: si no, no se toca el viejo.
+  "if(vr){var vz=await pedir('/products/'+id),nz=vz.j&&vz.j.objects;if(!vz.ok||!nz)return f('Se creó el '+id+', pero no se pudo comprobar su stock: '+motivo(vz));var s2=unidadesV(nz),m2=[];for(k in st)if((s2[k]||0)<st[k])m2.push(k.slice(k.indexOf('|')+1)||k);if(m2.length)return f('Se creó el '+id+', pero su stock no coincide con el del '+c.producto+' (falta en: '+m2.join(', ')+'): no se le sacó nada al '+c.producto+'.')}",
+  "if(vr){if(Object.keys(st).length){var e2=await entradasV(o);if(e2.error)return f(e2.error);var ms2=apagadoV(o,bp,false,e2.ent,'Republicado como ID '+id);if(ms2.error)return f(ms2.error);",
+  "if(ms2.cuerpo){var ps2=await pedir('/products/'+c.producto,'PUT',ms2.cuerpo);if(!ps2.ok)return f('Se creó el '+id+', pero no se le pudo sacar el stock al '+c.producto+': '+motivo(ps2))}}}else{",
   "var sa={},hs=false;for(k in st){sa[k]=-st[k];hs=true}",
   "if(hs){var ms=mover(o,bp,sa,'Republicado como ID '+id);if(ms.error)return f(ms.error);",
-  "var ps=await pedir('/products/'+c.producto,'PUT',ms.cuerpo);if(!ps.ok)return f('Se creó el '+id+', pero no se le pudo sacar el stock al '+c.producto+': '+motivo(ps))}",
+  "var ps=await pedir('/products/'+c.producto,'PUT',ms.cuerpo);if(!ps.ok)return f('Se creó el '+id+', pero no se le pudo sacar el stock al '+c.producto+': '+motivo(ps))}}",
   "if(!o.archived){var ar=await pedir('/products/'+c.producto+'/archiveProduct','POST',{});if(!ar.ok)return f('Se creó el '+id+' y el '+c.producto+' quedó sin stock, pero no se pudo archivar: '+motivo(ar))}",
-  "var v=await pedir('/products/'+id),w=v.j&&v.j.objects,x=await pedir('/products/'+c.producto),q=x.j&&x.j.objects,tn=0,tv=0,sw=w?stockDe(w):{},sq=q?stockDe(q):{};",
-  "for(k in sw)tn+=sw[k];for(k in sq)tv+=sq[k];",
+  "var v=await pedir('/products/'+id),w=v.j&&v.j.objects,x=await pedir('/products/'+c.producto),q=x.j&&x.j.objects,tn=w?totalU(w):0,tv=q?totalU(q):0;",
   "if(tv>0)return f('El '+c.producto+' sigue con '+tv+' unidades en Dropi.');",
   "return{ok:true,nuevo:id,stock:tn,fotos:w&&Array.isArray(w.gallery)?w.gallery.length:null}}",
+  // El stock de cada variación viva de un producto con variaciones, como lo pide la pantalla de Dropi (`get_warehouses_stock`, un pedido por variación).
+  "async function entradasV(o){var vs=vivasV(o),r=[];for(var i=0;i<vs.length;i++){var g=await pedir('/products/get_warehouses_stock','POST',{product_id:null,type:'VARIABLE',variation_id:vs[i].id});if(!g.ok||!Array.isArray(g.j&&g.j.objects))return{error:'No se pudo leer el stock de la variación '+(firmaV(vs[i])||vs[i].id)+': '+motivo(g)};r.push(g.j.objects)}return{ent:r}}",
   "async function apagar(c,bp){",
   "var a=await pedir('/products/'+c.producto);if(!a.ok)return{ok:false,error:motivo(a)};",
   "var o=a.j&&a.j.objects;if(!o||Number(o.id)!==Number(c.producto))return{ok:false,error:'Dropi no devolvió el producto.'};",
   "if(Number(o.user_id)!==Number(L.id))return{ok:false,error:'Ese producto no es de este proveedor en Dropi.'};",
-  "var p=apagado(o,bp,c.quitarPrivados===true);if(p.error)return{ok:false,error:p.error};",
-  "if(p.cuerpo){var g=await pedir('/products/'+c.producto,'PUT',p.cuerpo);if(!g.ok)return{ok:false,error:motivo(g)};",
-  "var d=await pedir('/products/'+c.producto),n=d.j&&d.j.objects;if(!d.ok||!n)return{ok:false,error:'Se guardó, pero no se pudo comprobar en Dropi.'};",
-  "var sn=stockDe(n),tv=0,k;for(k in sn)tv+=sn[k];if(tv>0)return{ok:false,error:'Dropi sigue mostrando '+tv+' unidades de stock.'};",
-  "if(c.quitarPrivados===true&&(Array.isArray(n.private_product_inventories)?n.private_product_inventories:[]).some(function(x){return!x.deleted_at}))return{ok:false,error:'Dropi no quitó la privatización: quítala a mano en «Productos privados».'};",
+  // «Quitar privatización» (30 oct 2026): `c.datos` dice a qué público se le devuelven las unidades del privado. Se anotan al sacarlas (`du`, o las
+  // que anotó un intento anterior) y vuelven en cada respuesta con `devuelto`, así el sistema las guarda y un reintento no las devuelve dos veces.
+  "var dv=c.datos&&Number(c.datos.publico)>0?c.datos:null,du=dv&&dv.unidades&&typeof dv.unidades==='object'?dv.unidades:null,hecho=!!(dv&&dv.devuelto===true);",
+  "var R=function(x){if(dv){x.unidades=du;x.devuelto=hecho}return x};",
+  // Con variaciones (1 nov 2026): el stock sale de cada variación, y si hay que devolverle unidades a un público, primero se comprueba —antes de tocar nada— que el público
+  // tenga las mismas variaciones.
+  // Un producto con stock negativo no se apaga ni se archiva: primero se deja en 0 (2 nov 2026, el 8822 en -96).
+  "var ng=negU(o);if(ng<0)return R({ok:false,error:'Dropi muestra '+ng+' unidades (stock negativo): déjalo en 0 con «Cambiar stock» o a mano en Dropi, y se reintenta.'});",
+  "var vr=esV(o),ent=null;if(vr){var er=await entradasV(o);if(er.error)return R({ok:false,error:er.error});ent=er.ent}",
+  "if(vr&&dv&&!du&&!hecho){var pq=await pedir('/products/'+dv.publico),pz=pq.j&&pq.j.objects;if(!pq.ok||!pz||Number(pz.id)!==Number(dv.publico))return R({ok:false,error:'No se pudo leer el público '+dv.publico+' antes de quitar la privatización: '+motivo(pq)});",
+  "if(!esV(pz))return R({ok:false,error:'El público '+dv.publico+' no tiene variaciones y este privado sí: devuelve esas unidades a mano.'});",
+  "var ez=emparejarV(pz,unidadesV(o));if(ez.error)return R({ok:false,error:ez.error})}",
+  // Quitar la reserva a privados va SOLO, en su propio guardado, y después se vuelve a leer el producto: Dropi, al quitar la reserva, puede sacar él mismo
+  // esas unidades. Antes iba junto con la salida del stock y Dropi descontaba dos veces (2 nov 2026: el 8822 tenía 96 reservadas y quedó en -96, el 8445 en -46).
+  // Las unidades a devolver se anotan con la lectura de antes de tocar nada.
+  "var su0=dv&&!du&&!hecho?(vr?unidadesV(o):stockDe(o)):null;",
+  "if(c.quitarPrivados===true&&(Array.isArray(o.private_product_inventories)?o.private_product_inventories:[]).some(function(x){return!x.deleted_at})){",
+  "var rq=armar(o,bp,{nombre:null,nombreGuia:null,variable:vr});if(rq.error)return R({ok:false,error:rq.error});",
+  "var g0=await pedir('/products/'+c.producto,'PUT',Object.assign({},rq.cuerpo,{private_product_inventories:reservasQuitadas(o.private_product_inventories)}));if(!g0.ok)return R({ok:false,error:motivo(g0)});if(su0)du=su0;",
+  "var a0=await pedir('/products/'+c.producto),o0=a0.j&&a0.j.objects;if(!a0.ok||!o0)return R({ok:false,error:'Se quitó la reserva, pero no se pudo volver a leer el producto en Dropi.'});o=o0;",
+  "var n0=negU(o);if(n0<0)return R({ok:false,error:'Al quitar la reserva, Dropi dejó el stock en '+n0+': revísalo en Dropi antes de seguir (no se movió nada más).'});",
+  "if((Array.isArray(o.private_product_inventories)?o.private_product_inventories:[]).some(function(x){return!x.deleted_at}))return R({ok:false,error:'Dropi no quitó la privatización: quítala a mano en «Productos privados».'});",
+  "if(vr){var e0=await entradasV(o);if(e0.error)return R({ok:false,error:e0.error});ent=e0.ent}}",
+  "var p=vr?apagadoV(o,bp,c.quitarPrivados===true,ent):apagado(o,bp,c.quitarPrivados===true);if(p.error)return R({ok:false,error:p.error});",
+  "if(p.cuerpo){var su=dv&&!du&&!hecho?(vr?unidadesV(o):stockDe(o)):null;var g=await pedir('/products/'+c.producto,'PUT',p.cuerpo);if(!g.ok)return R({ok:false,error:motivo(g)});if(su)du=su;",
+  "var d=await pedir('/products/'+c.producto),n=d.j&&d.j.objects;if(!d.ok||!n)return R({ok:false,error:'Se guardó, pero no se pudo comprobar en Dropi.'});",
+  "var tv=totalU(n);if(tv>0)return R({ok:false,error:'Dropi sigue mostrando '+tv+' unidades de stock.'});",
+  "var nn=negU(n);if(nn<0)return R({ok:false,error:'Dropi dejó el stock en '+nn+' (negativo): revísalo en Dropi; no se archivó.'});",
+  "if(c.quitarPrivados===true&&(Array.isArray(n.private_product_inventories)?n.private_product_inventories:[]).some(function(x){return!x.deleted_at}))return R({ok:false,error:'Dropi no quitó la privatización: quítala a mano en «Productos privados».'});",
   "o=n}",
-  "if(o.archived)return{ok:true,archivado:true};",
+  "if(dv&&du&&!hecho){var tu=0,kd;for(kd in du)tu+=Number(du[kd])||0;if(tu>0){",
+  "var pa=await pedir('/products/'+dv.publico),po=pa.j&&pa.j.objects;if(!pa.ok||!po||Number(po.id)!==Number(dv.publico))return R({ok:false,error:'Se quitó la privatización, pero no se pudo leer el público '+dv.publico+': '+motivo(pa)});",
+  "if(Number(po.user_id)!==Number(L.id))return R({ok:false,error:'El público '+dv.publico+' no es de este proveedor en Dropi.'});",
+  "var me;if(esV(po)){var em=emparejarV(po,du);if(em.error)return R({ok:false,error:'No se le pudieron devolver las unidades al '+dv.publico+': '+em.error});",
+  "var e2=await entradasV(po);if(e2.error)return R({ok:false,error:'No se le pudieron devolver las unidades al '+dv.publico+': '+e2.error});",
+  "me=entradaV(po,bp,em.porVariacion,e2.ent,'Privatización quitada del ID '+c.producto)}else me=mover(po,bp,du,'Privatización quitada del ID '+c.producto);",
+  "if(me.error)return R({ok:false,error:'No se le pudieron devolver las unidades al '+dv.publico+': '+me.error});",
+  "var pp=await pedir('/products/'+dv.publico,'PUT',me.cuerpo);if(!pp.ok)return R({ok:false,error:'Se quitó la privatización, pero no se le pudieron devolver las unidades al '+dv.publico+': '+motivo(pp)})}",
+  "hecho=true}",
+  "if(o.archived)return R({ok:true,archivado:true});",
   "var ar=await pedir('/products/'+c.producto+'/archiveProduct','POST',{});",
-  "if(!ar.ok)return{ok:true,archivado:false,error:'Sin stock en Dropi, pero no dejó archivarlo: '+motivo(ar)+' Si tiene órdenes pendientes, se reintenta en el próximo Aplicar en Dropi.'};",
+  "if(!ar.ok)return R({ok:true,archivado:false,error:'Sin stock en Dropi, pero no dejó archivarlo: '+motivo(ar)+' Si tiene órdenes pendientes, se reintenta en el próximo Aplicar en Dropi.'});",
   "var v=await pedir('/products/'+c.producto),w=v.j&&v.j.objects;",
-  "if(v.ok&&w&&!w.archived)return{ok:true,archivado:false,error:'Se pidió archivarlo, pero Dropi todavía no lo muestra archivado.'};",
-  "return{ok:true,archivado:true}}",
+  "if(v.ok&&w&&!w.archived)return R({ok:true,archivado:false,error:'Se pidió archivarlo, pero Dropi todavía no lo muestra archivado.'});",
+  "return R({ok:true,archivado:true})}",
   // ¿La galería del producto ya tiene una foto con ese nombre? (Dropi antepone un número al nombre del archivo: se compara el final.)
   "function tiene(n,nom){var k=ck(nom);return fotosDe(n).some(function(g){return ck(g.nombre)===k})}",
   // Sube a un producto las fotos que le falten; devuelve cuántas no se pudieron subir.
@@ -222,7 +272,20 @@ const CODIGO = [
   "if(!yaAsignado(w,Number(u.id)))return fin('Dropi no muestra la reserva para '+d.correo+' en el '+id+'.');",
   "if(tn<d.unidades)return fin('El '+id+' tiene '+tn+' unidades en Dropi y se esperaban '+d.unidades+'.');",
   "return{ok:true,nuevo:id,stock:tn,salida:true,aviso:avisos.length?avisos.join(' '):null}}",
+  // Stock (28 oct 2026): dejar la bodega con las unidades pedidas (entrada o salida por la diferencia con lo que Dropi tiene ahora) y comprobar.
+  "async function stock(c,bp){",
+  "var d=c.datos;if(!d||!d.bodega||!(Number(d.unidades)>=0))return{ok:false,error:'El cambio no trae la bodega ni las unidades.'};",
+  "var a=await pedir('/products/'+c.producto);if(!a.ok)return{ok:false,error:motivo(a)};",
+  "var o=a.j&&a.j.objects;if(!o||Number(o.id)!==Number(c.producto))return{ok:false,error:'Dropi no devolvió el producto.'};",
+  "if(Number(o.user_id)!==Number(L.id))return{ok:false,error:'Ese producto no es de este proveedor en Dropi.'};",
+  "var r=ajuste(o,bp,d);if(r.error)return{ok:false,error:r.error};",
+  "if(r.cuerpo){var g=await pedir('/products/'+c.producto,'PUT',r.cuerpo);if(!g.ok)return{ok:false,error:motivo(g)}}",
+  "var v=await pedir('/products/'+c.producto),n=v.j&&v.j.objects;if(!v.ok||!n)return{ok:false,error:'Se guardó, pero no se pudo comprobar en Dropi.'};",
+  "var qf=(Array.isArray(n.warehouse_product)?n.warehouse_product:[]).filter(function(w){return String(w.warehouse_id)===String(d.bodega)})[0],q=qf?Number(qf.stock)||0:0;if(q!==Number(d.unidades))return{ok:false,error:'Dropi muestra '+q+' unidades en esa bodega y se pidieron '+d.unidades+'.'};",
+  "var bs=(Array.isArray(n.warehouse_product)?n.warehouse_product:[]).map(function(w){var x=w.warehouse||{};return{id:Number(w.warehouse_id),nombre:x.name!=null?String(x.name):'',stock:Number(w.stock)||0}});",
+  "return{ok:true,antes:r.antes,stock:q,bodegas:bs,aviso:d.antes!=null&&Number(d.antes)!==r.antes?'En Dropi había '+r.antes+' (el sistema mostraba '+d.antes+').':null}}",
   "async function aplicar(c,bp){",
+  "if(c.tipo==='stock')return stock(c,bp);",
   "if(c.tipo==='privatizar')return privatizar(c,bp);",
   "if(c.tipo==='apagar')return apagar(c,bp);",
   "if(c.tipo==='republicar')return republicar(c,bp);",

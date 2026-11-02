@@ -75,3 +75,33 @@ export async function alternarDisponiblePlataforma(formData: FormData) {
   revalidatePath("/configuracion");
   revalidatePath("/retiros");
 }
+
+/**
+ * Los umbrales del «Tipo de cliente» del CRM en un país (migración 0196): VIP desde `vipDesde` y BLACK desde `blackDesde` pedidos al mes (promedio de
+ * los últimos 3 meses). Al guardar se recalcula el tipo de todos los clientes. Devuelve cuántos cambiaron de tipo.
+ */
+export async function guardarUmbralesTipoCliente(paisId: string, vipDesde: number, blackDesde: number): Promise<{ cambiados: number } | { error: string }> {
+  await requireModuloEscritura("configuracion");
+  if (!/^[0-9a-f-]{36}$/i.test(String(paisId))) return { error: "País no válido." };
+  const vip = Math.round(Number(vipDesde));
+  const black = Math.round(Number(blackDesde));
+  if (!Number.isFinite(vip) || vip < 1 || !Number.isFinite(black) || black < 1) return { error: "Escribe cantidades de pedidos mayores que cero." };
+  if (black <= vip) return { error: "BLACK tiene que empezar en más pedidos que VIP." };
+  const supabase = createServiceClient();
+  const { data: antes } = await supabase.from("crm_tipo_cliente_umbrales").select("vip_desde, black_desde").eq("pais_id", paisId).maybeSingle();
+  const { error } = await supabase
+    .from("crm_tipo_cliente_umbrales")
+    .upsert({ pais_id: paisId, vip_desde: vip, black_desde: black, actualizado_en: new Date().toISOString() }, { onConflict: "pais_id" });
+  if (error) return { error: error.code === "42P01" ? "Falta correr en Supabase la migración 0196." : "No se pudieron guardar los umbrales." };
+  await registrarAuditoria({
+    accion: "umbrales_tipo_cliente",
+    entidad: "crm_tipo_cliente_umbrales",
+    entidadId: paisId,
+    antes: { "VIP desde": String(antes?.vip_desde ?? 500), "BLACK desde": String(antes?.black_desde ?? 1000) },
+    despues: { "VIP desde": String(vip), "BLACK desde": String(black) },
+  });
+  const { data: cambiados } = await supabase.rpc("crm_recalcular_tipo_cliente");
+  revalidatePath("/configuracion");
+  revalidatePath("/crm-dropshippers", "layout");
+  return { cambiados: Number(cambiados ?? 0) };
+}

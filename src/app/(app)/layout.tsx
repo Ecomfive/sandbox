@@ -5,17 +5,19 @@ import { BannerVistaPrevia } from "@/components/banner-vista-previa";
 import { BarraMigas } from "@/components/barra-migas";
 import { LatidoPresencia } from "@/components/latido-presencia";
 import { ProveedorModulos } from "@/components/modulos-contexto";
+import { ProveedorPais } from "@/components/pais-contexto";
 import { NavBar } from "@/components/nav";
 import { Sidebar } from "@/components/sidebar";
 import { ToastProvider } from "@/components/ui/toast";
 import { TransicionPagina } from "@/components/transicion-pagina";
-import { getUsuarioActual, getUsuarioIdSesion } from "@/lib/auth";
+import { getUsuarioActual, getUsuarioIdSesion, getUsuarioSesion } from "@/lib/auth";
+import { tieneContrasenaTemporal } from "@/lib/cuenta/contrasena";
 import { getPaisActual } from "@/lib/pais";
 import { obtenerPlataformasPais } from "@/lib/pais-plataformas";
 import { construirAreas } from "@/lib/nav-data";
 import { paginasBuscables } from "@/lib/paleta";
 import { esAdministrador } from "@/lib/permisos/acceso";
-import { MODULO_DIRECCION } from "@/lib/crm/areas";
+import { contarNovedadesSinVer } from "@/lib/ayuda/novedades-vistas";
 import { PESTANAS_SOLO_ADMIN, pestanasOcultasDe } from "@/lib/permisos/ocultas";
 import { createServiceClient } from "@/lib/supabase/server";
 import { obtenerFavoritos } from "@/lib/favoritos";
@@ -46,14 +48,19 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           : SIN_PENDIENTES,
         // Los avisos «Para ti» (menciones con «@») de esta persona, sin leer.
         u ? contarParaTi(u.id).catch(() => 0) : 0,
-      ]).then(([menu, paraTi]) => conParaTi(menu, paraTi))
+        // Las actualizaciones del sistema recientes de sus módulos que no ha visto (migración 0218).
+        u ? contarNovedadesSinVer(supabase, u).catch(() => 0) : 0,
+      ]).then(([menu, paraTi, novedades]) => conParaTi(menu, paraTi, novedades))
     )
     .catch(() => SIN_PENDIENTES);
-  const [plataformasPais, favoritosDeSesion, usuario] = await Promise.all([
+  const [plataformasPais, favoritosDeSesion, usuario, paisActual] = await Promise.all([
     paisP.then((p) => obtenerPlataformasPais(supabase, p.id)),
     getUsuarioIdSesion().then((id) => (id ? obtenerFavoritos(supabase, id) : [])),
     usuarioP,
+    paisP,
   ]);
+  // Quien entra con la contraseña temporal que le dio un administrador elige la suya antes de usar el sistema (31 oct 2026).
+  if (usuario && tieneContrasenaTemporal(await getUsuarioSesion())) redirect("/elegir-contrasena");
   // Una cuenta del portal del proveedor no tiene perfil: no ve ni el menú del sistema, vuelve a su portal.
   if (!usuario) {
     const usuarioId = await getUsuarioIdSesion();
@@ -65,26 +72,27 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     ? [
         ...pestanasOcultasDe(usuario.afinado),
         ...(esAdministrador(usuario) ? [] : PESTANAS_SOLO_ADMIN),
-        // Los KPIs de atención son del CEO (módulo crm-direccion).
-        ...(usuario.modulos.includes(MODULO_DIRECCION) ? [] : ["/crm-dropshippers/kpis"]),
+        // Los KPIs de atención y el panel de Dirección ya no son pestañas: desde el 30 oct 2026 son la Bandeja de Dirección.
       ]
     : [];
   const paginas = paginasBuscables(areas, usuario?.modulos ?? null, pestanasOcultas);
 
   return (
     <ProveedorModulos modulos={usuario?.modulos ?? null}>
+    <ProveedorPais codigo={paisActual.codigo}>
     <ToastProvider>
       {usuario && <LatidoPresencia />}
       {usuario?.vistaPrevia && <BannerVistaPrevia rolNombre={usuario.vistaPrevia.rolNombre} />}
       <div className="flex min-h-full">
-        <Sidebar modulosPermitidos={usuario?.modulos ?? null} areas={areas} favoritos={favoritos} pendientes={pendientes} />
+        <Sidebar modulosPermitidos={usuario?.modulos ?? null} areas={areas} favoritos={favoritos} pendientes={pendientes} verActualizaciones={!!usuario && esAdministrador(usuario)} />
         <div className="flex min-h-full min-w-0 flex-1 flex-col">
-          <NavBar paginas={paginas} pendientes={pendientes} plataforma={plataformasPais.find((p) => p.tieneDatos)?.nombre ?? null} />
-          <BarraMigas areas={areas} favoritos={favoritos} pestanasOcultas={pestanasOcultas} />
+          <NavBar paginas={paginas} pendientes={pendientes} />
+          <BarraMigas areas={areas} favoritos={favoritos} pestanasOcultas={pestanasOcultas} verAccesos={!!usuario && esAdministrador(usuario)} />
           <TransicionPagina>{children}</TransicionPagina>
         </div>
       </div>
     </ToastProvider>
+    </ProveedorPais>
     </ProveedorModulos>
   );
 }

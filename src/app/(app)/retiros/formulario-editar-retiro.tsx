@@ -1,5 +1,6 @@
 "use client";
 
+import { simboloDePais } from "@/lib/moneda/simbolo";
 import { useEffect, useState, useTransition, type FormEvent, type ReactNode } from "react";
 import { actualizarRetiro } from "./actions";
 import { calcularComisionSugerida, type Cuenta, type Plataforma } from "./crear-retiro-panel";
@@ -75,6 +76,7 @@ export function FormularioEditarRetiro({
   alModificar?: () => void;
 }) {
   const [modificado, setModificado] = useState(false);
+  const simbolo = simboloDePais(codigoPais);
   const [pending, startTransition] = useTransition();
   useEffect(() => {
     alCambiarGuardando?.(pending);
@@ -333,13 +335,13 @@ export function FormularioEditarRetiro({
           </p>
           <div className="mt-1 flex items-center gap-2">
             <div className="flex min-w-0 flex-1 items-center gap-1">
-              <span className="text-sm text-muted-foreground">$</span>
+              <span className="text-sm text-muted-foreground">{simbolo}</span>
               <input
                 type="number"
                 step="0.01"
                 min="0"
                 name="comision"
-                aria-label="Comisión en dólares"
+                aria-label="Comisión"
                 aria-describedby={`etiqueta-comision-${fila.id}`}
                 value={comisionValor}
                 onChange={(e) => alCambiarComisionValor(e.target.value)}
@@ -368,7 +370,7 @@ export function FormularioEditarRetiro({
               A recibir
             </label>
             <div className="mt-1 flex items-center gap-1">
-              <span className="text-sm text-muted-foreground">$</span>
+              <span className="text-sm text-muted-foreground">{simbolo}</span>
               <input
                 id={`campo-a-recibir-${fila.id}`}
                 type="number"

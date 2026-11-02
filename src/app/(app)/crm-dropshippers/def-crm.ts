@@ -1,5 +1,8 @@
+import { simboloDePais } from "@/lib/moneda/simbolo";
+import type { VendeEn } from "@/lib/whatsapp/origen-chat";
 import { FASES } from "@/lib/crm/areas";
 import { SIN_VALOR, type DefTabla } from "@/lib/tabla/motor";
+import type { CambioTipo } from "@/lib/crm/cambio-tipo";
 
 /** Un usuario de una plataforma (Dropi, Boxful, EFI) vinculado a un dropshipper. */
 export interface CuentaVinculada {
@@ -16,10 +19,11 @@ export const ESTADOS = [
   { valor: "inactivo", etiqueta: "Inactivo" },
 ] as const;
 
+/** El «Tipo de cliente» (migración 0195, 29 oct 2026): Rookie (el normal; se guarda `regular`), VIP y Black, el más alto. */
 export const NIVELES = [
-  { valor: "nuevo", etiqueta: "Nuevo" },
-  { valor: "regular", etiqueta: "Regular" },
+  { valor: "regular", etiqueta: "Rookie" },
   { valor: "vip", etiqueta: "VIP" },
+  { valor: "black", etiqueta: "Black" },
 ] as const;
 
 export const TIPOS_CASO = [
@@ -102,9 +106,18 @@ export interface FilaDropshipper {
   tiendas: string[];
   ciudad: string | null;
   email: string | null;
-  telefono: string | null;
+  /** Todos sus correos, el principal (`email`) primero; los demás de `dropshipper_correos` (migración 0206). */
+  correos: string[];
+  /** Tiene WhatsApp guardado. El número no viaja a la pantalla: se pide con «Mostrar número». */
+  tieneTelefono: boolean;
   estado: string;
   nivel: string;
+  /** El tipo lo fijó una persona: el cálculo automático no lo toca (migración 0196). */
+  nivelManual: boolean;
+  /** El último cambio de tipo, si sigue en el nivel al que llegó: la flecha de «subió» o «bajó» junto a la pastilla. */
+  cambioTipo: CambioTipo | null;
+  /** Promedio de pedidos al mes de los últimos 3 meses, sin cancelados (de él sale el tipo automático). */
+  promedioPedidosMes: number | null;
   responsable: string | null;
   /** País de donde es (código ISO de 2 letras, «CO»), según su teléfono; null si no se sabe. */
   paisOrigen: string | null;
@@ -126,6 +139,8 @@ export interface FilaDropshipper {
   cuentas: CuentaVinculada[];
   /** Plataformas donde vende con nosotros, según sus cuentas vinculadas («Dropi»). */
   plataformas: string[];
+  /** Dónde vende: plataforma y país (bandera), de sus cuentas vinculadas y lo puesto a mano en «Dónde vende» del chat (migraciones 0193 y 0194). */
+  vendeEn: VendeEn[];
   /** Captación: captado, en onboarding o activo. */
   fase: string;
   /** Líder comercial que lo lleva (id de perfil), si hay. */
@@ -191,9 +206,9 @@ export function etiquetaAntiguedad(horas: number): string {
   return horas >= 72 ? `${Math.floor(horas / 24)} d` : `${horas} h`;
 }
 
-/** Montos cortos para listas y rankings: «₡4,82 M», «₡870 mil», «$12,5 mil»; el exacto va en la ficha. */
+/** Montos cortos para listas y rankings: «₡4,82 M», «₡870 mil», «$12,5 mil», «MX$3,2 mil»; el exacto va en la ficha. */
 export function montoCorto(valor: number, codigoPais: string): string {
-  const simbolo = codigoPais === "CR" ? "₡" : "$";
+  const simbolo = simboloDePais(codigoPais);
   const nf = (n: number, dec: number) => n.toLocaleString("es-CR", { maximumFractionDigits: dec, minimumFractionDigits: dec });
   if (valor >= 1_000_000) return `${simbolo}${nf(valor / 1_000_000, 2)} M`;
   if (valor >= 1_000) return `${simbolo}${nf(valor / 1_000, valor >= 100_000 ? 0 : 1)} mil`;
@@ -266,15 +281,7 @@ export const DEF_DROPSHIPPERS: DefTabla<FilaDropshipper> = {
       valores: (d) => [d.nivel],
       opciones: () => NIVELES.map((n) => ({ valor: n.valor, etiqueta: n.etiqueta })),
       agrupable: true,
-      ordenGrupos: ["vip", "regular", "nuevo"],
-    },
-    {
-      id: "responsable",
-      etiqueta: "Responsable",
-      tipo: "seleccion",
-      valores: (d) => [d.responsable ?? SIN_VALOR],
-      etiquetaSinValor: "Sin responsable",
-      agrupable: true,
+      ordenGrupos: ["black", "vip", "regular"],
     },
     {
       id: "venta",
@@ -340,7 +347,7 @@ export const DEF_DROPSHIPPERS: DefTabla<FilaDropshipper> = {
       ],
     },
     { id: "nombre", etiqueta: "Nombre", tipo: "texto", valor: (d) => `${d.nombre} ${d.codigo} ${d.tiendas.join(" ")}` },
-    { id: "contacto", etiqueta: "Correo o teléfono", tipo: "texto", valor: (d) => `${d.email ?? ""} ${d.telefono ?? ""}` },
+    { id: "contacto", etiqueta: "Correo", tipo: "texto", valor: (d) => d.email ?? "" },
     { id: "pedidos", etiqueta: "Pedidos del mes", tipo: "numero", valor: (d) => d.pedidosMes },
     { id: "ventas", etiqueta: "Ventas del mes", tipo: "numero", valor: (d) => d.ventasMes },
     { id: "ultimoPedido", etiqueta: "Último pedido", tipo: "fecha", valor: (d) => d.ultimoPedido },

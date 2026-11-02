@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, useTransition, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { BotonAgregar } from "@/components/ui/boton-agregar";
 import { BotonCrear } from "@/components/ui/boton-crear";
+import { PanelEnSitio, useEnSitio } from "@/components/ui/en-sitio";
 import { useToast } from "@/components/ui/toast";
 import { useFaltantes } from "@/components/ui/usar-faltantes";
 import { Ventana } from "@/components/ui/ventana";
@@ -42,6 +44,7 @@ export function FichaCrear({
   boton,
   alGuardar,
   incrustada = false,
+  enSitio = false,
   alCambiarEnviando,
   secundario,
   children,
@@ -69,6 +72,11 @@ export function FichaCrear({
   alGuardar?: () => void;
   /** Solo el formulario, sin botón ni panel propio: va dentro de otra ventana (p. ej. una pestaña de «Agregar»). */
   incrustada?: boolean;
+  /**
+   * Se abre **en el mismo lugar** (debajo de los botones de la ficha, `EnSitio`) en vez de en una ventana encima, para poder copiar y pegar datos de lo que
+   * queda a la vista. Solo vale dentro de una zona `EnSitio`; fuera de ella se abre en su ventana de siempre.
+   */
+  enSitio?: boolean;
   /** Avisa cuando empieza y termina de guardar (para que la ventana que la contiene no se cierre a medias). */
   alCambiarEnviando?: (enviando: boolean) => void;
   /**
@@ -78,7 +86,18 @@ export function FichaCrear({
   secundario?: { etiqueta: string; etiquetaEnviando?: string; mensajeExito: string; action: (formData: FormData) => Promise<{ error?: string } | void> };
   children: (ayuda: AyudaFaltantes) => ReactNode;
 }) {
-  const [abierto, setAbierto] = useState(false);
+  const [abiertoLocal, setAbiertoLocal] = useState(false);
+  const sitio = useEnSitio();
+  const idPanel = useId();
+  const enLugar = enSitio && !!sitio;
+  // En el sitio, el que está abierto lo decide la zona (solo hay uno a la vez: abrir otro cierra este).
+  const abierto = enLugar ? sitio.activo === idPanel : abiertoLocal;
+  const setAbierto = (valor: boolean) => {
+    if (enLugar) {
+      if (valor) sitio.abrir(idPanel);
+      else sitio.cerrar(idPanel);
+    } else setAbiertoLocal(valor);
+  };
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const botonAbrirRef = useRef<HTMLButtonElement>(null);
@@ -109,7 +128,7 @@ export function FichaCrear({
     yaAbrio.current = true;
     router.replace(pathname, { scroll: false });
     alAbrirRef.current?.();
-    setAbierto(true);
+    setAbiertoLocal(true);
   }, [abrirConNuevo, parametros, pathname, router]);
 
   // Incrustada: se «abre» al montarse (deja en blanco su estado) y avisa si está guardando.
@@ -183,7 +202,7 @@ export function FichaCrear({
             {children({ faltante, invalido: (id) => (faltante === id ? true : undefined) })}
           </div>
 
-          <div className="sticky bottom-0 mt-auto flex flex-col gap-2 border-t border-border bg-card p-4">
+          <div className={`${enLugar ? "" : "sticky bottom-0 "}mt-auto flex flex-col gap-2 border-t border-border bg-card p-4`}>
             {error && (
               <p role="alert" className="text-sm text-destructive">
                 {error}
@@ -217,6 +236,15 @@ export function FichaCrear({
   );
 
   if (incrustada) return formulario;
+
+  if (enLugar) {
+    return (
+      <>
+        {boton ? boton(abrir) : <BotonAgregar ref={botonAbrirRef} etiqueta={etiquetaBoton} onClick={abrir} />}
+        {abierto && sitio.destino && createPortal(<PanelEnSitio titulo={titulo} alCerrar={cerrar}>{formulario}</PanelEnSitio>, sitio.destino)}
+      </>
+    );
+  }
 
   return (
     <>

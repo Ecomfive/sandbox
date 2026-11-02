@@ -5,11 +5,25 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { pedirExtension, type AvanceLector, type SesionDropi } from "@/lib/dropi-actualizar/extension";
-import { CUENTAS, GRUPOS, LECTORES, PARTES, lectoresDe, sesionValida, type ClaveLector, type ClaveParte } from "@/lib/dropi-actualizar/partes";
+import { CUENTAS, GRUPOS, LECTORES, LECTORES_PAIS, PARTES, PRIMERA_LECTURA_DESDE, archivoSubido, diasPrimeraLectura, lectoresDe, sesionValida, type ClaveLector, type ClaveParte } from "@/lib/dropi-actualizar/partes";
 import { archivosSubidos, empezarActualizacion, marcarPartesConError, procesarParte, subidasDeLector, terminarActualizacion } from "./actions";
 import type { Corrida, UltimaParte } from "./datos";
 
 type EstadoExtension = "buscando" | "lista" | "no_instalada" | "recargar";
+/** Los países que se actualizan desde aquí con la cuenta de proveedor. */
+type PaisProveedor = "pa" | "cr" | "mx";
+const PAISES: PaisProveedor[] = ["pa", "cr", "mx"];
+
+/** Costa Rica llegó a la extensión en la 0.3.0 (28 oct 2026) y México en la 0.4.0 (30 oct 2026): una anterior no sabe de ese país. */
+const VERSION_PARA: Record<PaisProveedor, string> = { pa: "0.0.0", cr: "0.3.0", mx: "0.4.0" };
+/** «0.2.3» es anterior a «0.3.0». */
+const versionAnterior = (tiene: string | null, pide: string) => {
+  if (!tiene) return false;
+  const a = tiene.split(".").map(Number);
+  const b = pide.split(".").map(Number);
+  for (let i = 0; i < 3; i++) if ((a[i] ?? 0) !== (b[i] ?? 0)) return (a[i] ?? 0) < (b[i] ?? 0);
+  return false;
+};
 type EstadoPaso = "espera" | "leyendo" | "procesando" | "listo" | "error";
 interface Paso {
   estado: EstadoPaso;
@@ -21,7 +35,8 @@ interface Corriendo {
   pasos: Partial<Record<ClaveParte, Paso>>;
   /** Lo que muestra la barra: «Leyendo pedidos: 4.200…». */
   avance: string;
-  esperandoSesion: boolean;
+  /** El país cuya sesión falta (la pestaña queda al frente y se avisa), o null. */
+  esperandoSesion: PaisProveedor | null;
   terminado: string | null;
 }
 
@@ -38,7 +53,7 @@ const VIGENCIA_MS = 40 * 60000;
 /** Lo que dice la barra mientras un lector trabaja en la pestaña de Dropi. */
 function textoAvance(lector: ClaveLector, a: AvanceLector | null): string {
   if (!a) return "Arrancando en la pestaña de Dropi…";
-  if (lector === "proveedor") {
+  if (lector.startsWith("proveedor")) {
     if (a.fase === "pedidos") return `Leyendo pedidos en Dropi: ${n(a.pedidos)}…`;
     if (a.fase === "cartera") return `Leyendo la cartera: ${n(a.cartera)} movimientos…`;
     if (a.fase === "retiros") return "Leyendo los retiros…";
@@ -56,26 +71,39 @@ function textoAvance(lector: ClaveLector, a: AvanceLector | null): string {
  * la última vez, y el botón que lo corre con la extensión «Ecomfive · Dropi». Mientras corre: el avance de cada parte y, si falta
  * iniciar sesión, la pestaña de Dropi al frente y un aviso; al entrar, sigue sola. La que manda es esta página: si se recarga (o se
  * recarga la extensión) a medias, al volver la retoma sola con la barra y lo que está haciendo (27 oct 2026, pedido de Hernán).
+ * Costa Rica (28 oct 2026) y México (30 oct 2026, con su cuenta de proveedor): su propia tarjeta y sus propias partes; cada lector usa la
+ * pestaña y la sesión de su país. Cada país se
+ * actualiza por separado (Hernán: los dos juntos es mucha carga y tarda mucho más), con su botón; no hay «Actualizar todo».
  */
 export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponible: boolean; corridas: Corrida[]; ultima: Partial<Record<ClaveParte, UltimaParte>> }) {
   const router = useRouter();
   const [extension, setExtension] = useState<EstadoExtension>("buscando");
   const [version, setVersion] = useState<string | null>(null);
-  const [sesionPa, setSesionPa] = useState<SesionDropi | null>(null);
+  const [sesiones, setSesiones] = useState<Record<PaisProveedor, SesionDropi | null>>({ pa: null, cr: null, mx: null });
+  /** Por qué no se pudo revisar la sesión de un país (la extensión no respondió); antes se callaba y la tarjeta quedaba en «Revisando…». */
+  const [fallos, setFallos] = useState<Record<PaisProveedor, string | null>>({ pa: null, cr: null, mx: null });
   const [corriendo, setCorriendo] = useState<Corriendo | null>(null);
   const [eligiendo, setEligiendo] = useState(false);
-  const [elegidos, setElegidos] = useState<ClaveLector[]>(["proveedor", "ventas"]);
+  const [elegidos, setElegidos] = useState<ClaveLector[]>([...LECTORES_PAIS.pa, ...LECTORES_PAIS.cr, ...LECTORES_PAIS.mx]);
   const [error, setError] = useState<string | null>(null);
   const detener = useRef(false);
   // Mientras arranca (antes de que el servidor responda) los botones ya no sirven: un doble clic arrancaba dos.
   const arrancando = useRef(false);
+  /** El país al que se le trae todo el historial en esta actualización («Traer historial»), o null para los días de siempre. */
+  const historial = useRef<PaisProveedor | null>(null);
   const [empezando, setEmpezando] = useState(false);
   const retomada = useRef(false);
 
-  const revisarSesion = useCallback(async (abrir: boolean) => {
-    const s = await pedirExtension<SesionDropi>({ tipo: "sesion", pais: "pa", abrir }, abrir ? 45000 : 10000);
-    setSesionPa(s);
-    return s;
+  const revisarSesion = useCallback(async (pais: PaisProveedor, abrir: boolean) => {
+    try {
+      const s = await pedirExtension<SesionDropi>({ tipo: "sesion", pais, abrir }, abrir ? 45000 : 10000);
+      setSesiones((x) => ({ ...x, [pais]: s }));
+      setFallos((x) => ({ ...x, [pais]: null }));
+      return s;
+    } catch (e) {
+      setFallos((x) => ({ ...x, [pais]: e instanceof Error ? e.message : "La extensión no respondió." }));
+      throw e;
+    }
   }, []);
 
   // ¿Está la extensión? (el puente puede tardar un instante en cargar: se pregunta unas veces).
@@ -88,7 +116,7 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
           if (!vivo) return;
           setVersion(r.version);
           setExtension("lista");
-          await revisarSesion(false).catch(() => null);
+          for (const p of PAISES) await revisarSesion(p, false).catch(() => null);
           return;
         } catch (e) {
           // La extensión se recargó con esta página abierta: el puente viejo ya no llega a ella.
@@ -107,29 +135,30 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
   }, [revisarSesion]);
 
   const ponerPaso = (clave: ClaveParte, paso: Paso) => setCorriendo((c) => (c ? { ...c, pasos: { ...c.pasos, [clave]: paso } } : c));
-  const ponerAvance = (avance: string, esperandoSesion = false) => setCorriendo((c) => (c ? { ...c, avance, esperandoSesion } : c));
+  const ponerAvance = (avance: string, esperandoSesion: PaisProveedor | null = null) => setCorriendo((c) => (c ? { ...c, avance, esperandoSesion } : c));
 
-  /** Espera a que la pestaña de Panamá tenga la sesión de ECOMFIVE: si falta, la pone al frente y avisa. */
-  async function asegurarSesion(): Promise<boolean> {
+  /** Espera a que la pestaña del país tenga la sesión de proveedor: si falta, la pone al frente y avisa. */
+  async function asegurarSesion(pais: PaisProveedor): Promise<boolean> {
     let mostrada = false;
     while (!detener.current) {
-      const s = await revisarSesion(true).catch(() => null);
-      if (sesionValida("pa", s) === "ok") {
-        ponerAvance("Sesión de Dropi Panamá lista.");
+      const s = await revisarSesion(pais, true).catch(() => null);
+      if (sesionValida(pais, s) === "ok") {
+        ponerAvance(`Sesión de Dropi ${CUENTAS[pais].nombre} lista.`);
         return true;
       }
       if (!mostrada) {
-        await pedirExtension({ tipo: "mostrar", pais: "pa" }).catch(() => null);
+        await pedirExtension({ tipo: "mostrar", pais }).catch(() => null);
         mostrada = true;
       }
-      ponerAvance("Esperando que inicies sesión en Dropi Panamá…", true);
+      ponerAvance(`Esperando que inicies sesión en Dropi ${CUENTAS[pais].nombre}…`, pais);
       await esperar(3000);
     }
     return false;
   }
 
-  async function actualizar(lectores: ClaveLector[]) {
+  async function actualizar(lectores: ClaveLector[], conHistorial: PaisProveedor | null = null) {
     if (arrancando.current || (corriendo && !corriendo.terminado)) return;
+    historial.current = conHistorial;
     arrancando.current = true;
     setEmpezando(true);
     setError(null);
@@ -141,7 +170,7 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
       arrancando.current = false;
       return setError(r.error ?? "No se pudo empezar la actualización.");
     }
-    setCorriendo({ id: r.id, pedidas: partes, pasos: Object.fromEntries(partes.map((p) => [p, { estado: "espera", detalle: "En espera" }])), avance: "Revisando la sesión de Dropi…", esperandoSesion: false, terminado: null });
+    setCorriendo({ id: r.id, pedidas: partes, pasos: Object.fromEntries(partes.map((p) => [p, { estado: "espera", detalle: "En espera" }])), avance: "Revisando la sesión de Dropi…", esperandoSesion: null, terminado: null });
     await correr(r.id, partes, r.subidas, [], false);
   }
 
@@ -158,13 +187,14 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
       let fallo: string | null = null;
       // Al retomar: ¿la extensión ya subió todo lo de este lector? Entonces solo falta guardarlo.
       const subidos = retomando ? ((await archivosSubidos(id).catch(() => null))?.archivos ?? []) : [];
-      const yaLeido = retomando && LECTORES[lector].archivos.every((a) => subidos.includes(a));
+      const yaLeido = retomando && LECTORES[lector].archivos.every((a) => subidos.includes(archivoSubido(lector, a)));
+      const pais = LECTORES[lector].pais as PaisProveedor;
       try {
         if (!yaLeido) {
           // Al retomar: ¿la pestaña de Dropi sigue leyendo? Entonces se espera sin lanzar otra lectura.
           const previo = retomando ? await pedirExtension<AvanceLector | null>({ tipo: "avance", lector }).catch(() => null) : null;
           if (!previo || previo.fin) {
-            if (!(await asegurarSesion())) break;
+            if (!(await asegurarSesion(pais))) break;
             let subida = subidas[lector];
             if (!subida) {
               const s = await subidasDeLector(id, lector).catch(() => ({ error: "No se pudo preparar la subida.", subida: undefined }));
@@ -172,7 +202,11 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
               subida = s.subida;
             }
             for (const p of suyas) ponerPaso(p, { estado: "leyendo", detalle: "Leyendo en Dropi…" });
-            await pedirExtension({ tipo: "lanzar", lector, subida }, 45000);
+            // La primera vez que se leen los pedidos de un país, o con «Traer historial», desde su fecha de arranque (Costa Rica: 1 abr 2026;
+            // México: 1 jul 2024).
+            const primera =
+              lector.startsWith("proveedor") && (historial.current === pais || !ultima[pais === "pa" ? "pedidos" : (`pedidos_${pais}` as ClaveParte)]) ? diasPrimeraLectura(pais) : null;
+            await pedirExtension({ tipo: "lanzar", lector, subida, dias: primera }, 45000);
           } else {
             for (const p of suyas) ponerPaso(p, { estado: "leyendo", detalle: "Leyendo en Dropi…" });
             ponerAvance(textoAvance(lector, previo));
@@ -196,7 +230,7 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
       }
     }
     const fin = await terminarActualizacion(id, detener.current).catch(() => ({ estado: undefined }));
-    setCorriendo((c) => (c ? { ...c, avance: "", esperandoSesion: false, terminado: fin.estado ?? "con_fallos" } : c));
+    setCorriendo((c) => (c ? { ...c, avance: "", esperandoSesion: null, terminado: fin.estado ?? "con_fallos" } : c));
     arrancando.current = false;
     router.refresh();
   }
@@ -234,7 +268,7 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
       }),
     );
     void Promise.resolve().then(() => {
-      setCorriendo({ id: c.id, pedidas: c.pedidas, pasos, avance: `Retomando la actualización de las ${hora(c.inicio)}…`, esperandoSesion: false, terminado: null });
+      setCorriendo({ id: c.id, pedidas: c.pedidas, pasos, avance: `Retomando la actualización de las ${hora(c.inicio)}…`, esperandoSesion: null, terminado: null });
       void correr(c.id, c.pedidas, {}, hechas, true);
     });
     // `correr` usa el estado más reciente por sus propios setters; solo importa que la extensión ya respondió.
@@ -257,7 +291,10 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
       </p>
     );
 
-  const estadoPa = sesionPa ? (sesionPa.pestana ? sesionValida("pa", sesionPa) : "sin_pestana") : null;
+  const estadoDe = (p: PaisProveedor) => {
+    const s = sesiones[p];
+    return s ? (s.pestana ? sesionValida(p, s) : "sin_pestana") : null;
+  };
   const ocupado = empezando || (!!corriendo && !corriendo.terminado);
   const hechos = corriendo ? corriendo.pedidas.filter((p) => ["listo", "error"].includes(corriendo.pasos[p]?.estado ?? "")).length : 0;
 
@@ -270,7 +307,8 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
           </Link>
           <h1 className="m-0 text-2xl font-bold">{ocupado ? "Actualizando datos…" : "Actualizar datos"}</h1>
           <p className="m-0 text-sm text-muted-foreground">
-            Trae de Dropi los pedidos, la cartera, los retiros, el stock y las ventas. Solo lee: no crea ni cambia nada en Dropi ni en tus publicaciones.
+            Trae de Dropi los pedidos, la cartera, los retiros, el stock y las ventas, de un país a la vez. Solo lee: no crea ni cambia nada en Dropi ni en tus
+            publicaciones (la primera vez de un país crea sus publicaciones).
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -283,13 +321,15 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
               <button type="button" className={botonSecundario} aria-expanded={eligiendo} onClick={() => setEligiendo((v) => !v)} disabled={extension !== "lista"}>
                 Elegir qué actualizar
               </button>
-              <button type="button" className={botonPrincipal} onClick={() => void actualizar(["proveedor", "ventas"])} disabled={extension !== "lista"}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M21 12a9 9 0 1 1-3-6.7" />
-                  <path d="M21 3v6h-6" />
-                </svg>
-                Actualizar todo
-              </button>
+              {PAISES.map((p, i) => (
+                <button key={p} type="button" className={i === 0 ? botonPrincipal : botonSecundario} onClick={() => void actualizar(LECTORES_PAIS[p])} disabled={extension !== "lista"}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M21 12a9 9 0 1 1-3-6.7" />
+                    <path d="M21 3v6h-6" />
+                  </svg>
+                  Actualizar {CUENTAS[p].nombre}
+                </button>
+              ))}
             </>
           )}
         </div>
@@ -323,26 +363,34 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
       )}
 
       {eligiendo && !ocupado && (
-        <fieldset className="m-0 flex flex-wrap items-end gap-4 rounded-2xl border border-border bg-card px-5 py-4">
-          <legend className="sr-only">Qué actualizar</legend>
-          {GRUPOS.map((g) => (
-            <label key={g.lector} className="flex min-h-11 items-center gap-3 text-sm">
-              <input
-                type="checkbox"
-                className="h-5 w-5 accent-foreground"
-                checked={elegidos.includes(g.lector)}
-                onChange={(e) => setElegidos((x) => (e.target.checked ? [...x, g.lector] : x.filter((y) => y !== g.lector)))}
-              />
-              <span className="flex flex-col">
-                <span className="font-semibold">{g.etiqueta}</span>
-                <span className="text-xs text-muted-foreground">{g.detalle}</span>
-              </span>
-            </label>
-          ))}
-          <button type="button" className={botonPrincipal} disabled={!elegidos.length} onClick={() => void actualizar(elegidos)}>
-            Actualizar lo elegido
-          </button>
-        </fieldset>
+        <div className="flex flex-col gap-3">
+          {PAISES.map((p) => {
+            const suyos = elegidos.filter((l) => LECTORES[l].pais === p);
+            return (
+              <fieldset key={p} className="m-0 flex flex-wrap items-end gap-4 rounded-2xl border border-border bg-card px-5 py-4">
+                <legend className="sr-only">Qué actualizar de {CUENTAS[p].nombre}</legend>
+                <span className="flex min-h-11 w-28 items-center text-sm font-semibold">{CUENTAS[p].nombre}</span>
+                {GRUPOS.filter((g) => LECTORES[g.lector].pais === p).map((g) => (
+                  <label key={g.lector} className="flex min-h-11 items-center gap-3 text-sm">
+                    <input
+                      type="checkbox"
+                      className="h-5 w-5 accent-foreground"
+                      checked={elegidos.includes(g.lector)}
+                      onChange={(e) => setElegidos((x) => (e.target.checked ? [...x, g.lector] : x.filter((y) => y !== g.lector)))}
+                    />
+                    <span className="flex flex-col">
+                      <span className="font-semibold">{g.etiqueta}</span>
+                      <span className="text-xs text-muted-foreground">{g.detalle}</span>
+                    </span>
+                  </label>
+                ))}
+                <button type="button" className={botonPrincipal} disabled={!suyos.length} onClick={() => void actualizar(suyos)}>
+                  Actualizar lo elegido de {CUENTAS[p].nombre}
+                </button>
+              </fieldset>
+            );
+          })}
+        </div>
       )}
 
       {corriendo && (
@@ -362,36 +410,51 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
       {corriendo?.esperandoSesion && (
         <div role="alert" className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-warning/50 bg-warning/10 px-5 py-4">
           <div className="flex flex-col gap-1 text-sm">
-            <span className="font-semibold">Falta iniciar sesión en Dropi Panamá</span>
-            <span>Te dejamos la pestaña de Dropi al frente. Entra con la {CUENTAS.pa.cuenta} (con el código de dos pasos) y la actualización sigue sola.</span>
+            <span className="font-semibold">Falta iniciar sesión en Dropi {CUENTAS[corriendo.esperandoSesion].nombre}</span>
+            <span>
+              Te dejamos la pestaña de Dropi al frente. Entra con la {CUENTAS[corriendo.esperandoSesion].cuenta} (con el código de dos pasos) y la actualización sigue sola.
+            </span>
           </div>
-          <button type="button" className={botonPrincipal} onClick={() => void pedirExtension({ tipo: "mostrar", pais: "pa" }).catch(() => null)}>
-            Ir a la pestaña de Panamá
+          <button type="button" className={botonPrincipal} onClick={() => void pedirExtension({ tipo: "mostrar", pais: corriendo.esperandoSesion! }).catch(() => null)}>
+            Ir a la pestaña de {CUENTAS[corriendo.esperandoSesion].nombre}
           </button>
         </div>
       )}
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <TarjetaCuenta
-          sigla="PA"
-          titulo={CUENTAS.pa.nombre}
-          detalle={`app.dropi.pa · ${CUENTAS.pa.cuenta}`}
-          estado={estadoPa}
-          vence={sesionPa?.vence ?? null}
-          alAbrir={extension === "lista" ? () => void pedirExtension({ tipo: "mostrar", pais: "pa" }).then(() => revisarSesion(false)).catch(() => null) : undefined}
-          alRevisar={extension === "lista" ? () => void revisarSesion(false).catch(() => null) : undefined}
-          que="Pedidos, cartera, retiros, stock y ventas"
-        />
-        <div className="flex flex-col gap-3 rounded-2xl border border-dashed border-border bg-card px-5 py-4">
-          <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted text-sm font-bold">MX</span>
-            <div className="flex flex-col">
-              <span className="font-semibold">México y competencia de Panamá</span>
-              <span className="text-sm text-muted-foreground">Siguiente etapa</span>
-            </div>
-          </div>
-          <span className="text-sm text-muted-foreground">Los proveedores de Scraping (México) y la competencia del catálogo de Panamá siguen por ahora con la tarea programada de las 5:00.</span>
-        </div>
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {PAISES.map((p) => (
+          <TarjetaCuenta
+            key={p}
+            sigla={p.toUpperCase()}
+            titulo={CUENTAS[p].nombre}
+            detalle={`${CUENTAS[p].origen.replace("https://", "")} · ${CUENTAS[p].cuenta}`}
+            cuenta={CUENTAS[p].cuenta}
+            estado={estadoDe(p)}
+            vence={sesiones[p]?.vence ?? null}
+            fallo={fallos[p]}
+            historial={
+              PRIMERA_LECTURA_DESDE[p] && extension === "lista" && !ocupado
+                ? { desde: PRIMERA_LECTURA_DESDE[p]!, alPulsar: () => void actualizar([p === "pa" ? "proveedor" : (`proveedor_${p}` as ClaveLector)], p) }
+                : null
+            }
+            extensionVieja={extension === "lista" && versionAnterior(version, VERSION_PARA[p]) ? { tiene: version ?? "", pide: VERSION_PARA[p] } : null}
+            origen={CUENTAS[p].origen}
+            alAbrir={
+              extension === "lista"
+                ? () =>
+                    void pedirExtension({ tipo: "mostrar", pais: p }, 10000)
+                      .then(() => revisarSesion(p, false))
+                      .catch((e) => setFallos((x) => ({ ...x, [p]: e instanceof Error ? e.message : "La extensión no respondió." })))
+                : undefined
+            }
+            alRevisar={extension === "lista" ? () => void revisarSesion(p, false).catch(() => null) : undefined}
+            que={
+              p !== "pa" && PRIMERA_LECTURA_DESDE[p] && !ultima[`pedidos_${p}` as ClaveParte]
+                ? `La primera vez trae todo el historial: pedidos y cartera desde el ${new Date(`${PRIMERA_LECTURA_DESDE[p]}T12:00:00`).toLocaleDateString("es-PA", { day: "numeric", month: "long", year: "numeric" })}, retiros, stock y ventas · tarda más`
+                : "Pedidos, cartera, retiros, stock y ventas"
+            }
+          />
+        ))}
       </div>
 
       <section aria-labelledby="que-se-actualiza" className="overflow-hidden rounded-2xl border border-border bg-card">
@@ -468,7 +531,14 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
                 <li key={c.id} className="flex flex-wrap justify-between gap-2 py-2 text-sm">
                   <span>
                     {fechaHora(c.inicio)} · {c.origen === "automatica" ? "automática" : c.quien}
-                    {c.pedidas.length < PARTES.length ? ` · ${c.pedidas.map((p) => PARTES.find((x) => x.clave === p)?.etiqueta.split(" (")[0]).join(", ")}` : ""}
+                    {c.pedidas.length < PARTES.length
+                      ? ` · ${c.pedidas
+                          .map((p) => {
+                            const x = PARTES.find((y) => y.clave === p);
+                            return x ? `${x.etiqueta.split(" (")[0]} ${x.pais.toUpperCase()}` : p;
+                          })
+                          .join(", ")}`
+                      : ""}
                   </span>
                   <span className={c.estado === "listo" ? "text-success" : c.estado === "corriendo" ? "text-muted-foreground" : "text-warning"}>
                     {c.estado === "corriendo" ? `En curso desde las ${hora(c.inicio)}` : c.estado === "detenido" ? "Detenida" : `${listas} de ${c.pedidas.length} partes`}
@@ -499,20 +569,34 @@ function TarjetaCuenta({
   sigla,
   titulo,
   detalle,
+  cuenta,
   estado,
   vence,
   que,
   alAbrir,
   alRevisar,
+  fallo = null,
+  extensionVieja = null,
+  origen,
+  historial = null,
 }: {
   sigla: string;
   titulo: string;
   detalle: string;
+  cuenta: string;
   estado: ReturnType<typeof sesionValida> | "sin_pestana" | null;
   vence: string | null;
   que: string;
   alAbrir?: () => void;
   alRevisar?: () => void;
+  /** Por qué no se pudo revisar (la extensión no respondió). */
+  fallo?: string | null;
+  /** La extensión es anterior a la que pide este país. */
+  extensionVieja?: { tiene: string; pide: string } | null;
+  /** La página de Dropi del país, para abrirla aunque la extensión no responda. */
+  origen: string;
+  /** «Traer historial»: pedidos y cartera desde la fecha de arranque del país (una vez, o cuando falte algo). */
+  historial?: { desde: string; alPulsar: () => void } | null;
 }) {
   const chip: Record<string, [string, string]> = {
     ok: ["Sesión activa", "bg-success/10 text-success"],
@@ -521,7 +605,8 @@ function TarjetaCuenta({
     otra_cuenta: ["Otra cuenta", "bg-warning/10 text-warning"],
     sin_pestana: ["Dropi no está abierto", "bg-muted text-muted-foreground"],
   };
-  const [texto, clase] = estado ? chip[estado] : ["Revisando…", "bg-muted text-muted-foreground"];
+  const sinRespuesta = !!(extensionVieja || fallo) && estado !== "ok";
+  const [texto, clase] = sinRespuesta ? ["Sin respuesta", "bg-destructive/10 text-destructive"] : estado ? chip[estado] : ["Revisando…", "bg-muted text-muted-foreground"];
   return (
     <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card px-5 py-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -539,14 +624,18 @@ function TarjetaCuenta({
       </div>
       <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
         <span>
-          {estado === "ok" && vence
+          {extensionVieja && estado !== "ok"
+            ? `Tu extensión «Ecomfive · Dropi» es la ${extensionVieja.tiene} y ${titulo} necesita la ${extensionVieja.pide}: en chrome://extensions pulsa «Recargar» en ella y después recarga esta página.`
+            : fallo && estado !== "ok"
+              ? `${fallo} Recarga la extensión en chrome://extensions y esta página. Mientras tanto puedes abrir Dropi ${titulo} con el enlace.`
+              : estado === "ok" && vence
             ? `Vence ${fechaHora(vence)}.`
             : estado === "otra_cuenta"
-              ? "La pestaña tiene otra cuenta: entra con la de ECOMFIVE."
+              ? `La pestaña tiene otra cuenta: entra con la ${cuenta}.`
               : estado === "sin_pestana"
                 ? "Se abre solo al actualizar."
                 : estado
-                  ? "Inicia sesión con la cuenta de ECOMFIVE."
+                  ? `Inicia sesión con la ${cuenta}.`
                   : ""}
         </span>
         <span className="flex gap-2">
@@ -555,14 +644,33 @@ function TarjetaCuenta({
               Revisar
             </button>
           )}
-          {alAbrir && estado !== "ok" && (
-            <button type="button" className={botonSecundario} onClick={alAbrir}>
-              Abrir Dropi {sigla === "PA" ? "Panamá" : sigla}
-            </button>
+          {sinRespuesta ? (
+            // Sin respuesta de la extensión, el botón igual abre Dropi del país (en una pestaña nueva) para iniciar sesión.
+            <a href={`${origen}/dashboard/home`} target="_blank" rel="noreferrer" className={botonSecundario}>
+              Abrir Dropi {titulo}
+            </a>
+          ) : (
+            alAbrir &&
+            estado !== "ok" && (
+              <button type="button" className={botonSecundario} onClick={alAbrir}>
+                Abrir Dropi {titulo}
+              </button>
+            )
           )}
+
         </span>
       </div>
       <span className="text-xs text-muted-foreground">{que}</span>
+      {historial && (
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3 text-sm">
+          <span className="text-muted-foreground">
+            Trae todos los pedidos y la cartera desde el {new Date(`${historial.desde}T12:00:00`).toLocaleDateString("es-PA", { day: "numeric", month: "long", year: "numeric" })}, sin repetir lo que ya está. Tarda más que la de todos los días.
+          </span>
+          <button type="button" className={botonSecundario} onClick={historial.alPulsar}>
+            Traer historial completo
+          </button>
+        </div>
+      )}
     </div>
   );
 }

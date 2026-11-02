@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { armarAlertas, decisionesDeHoy, medidaEnNombre, normalizarCompetencia, posicionPrecio, precioEquivalente, precioPorUnidad, unidadesBajadas, unirCoincidencias, unidadesEnNombre, type ProductoAlerta } from "./analisis";
+import { armarAlertas, decisionesDeHoy, medidaEnNombre, normalizarCompetencia, posicionPrecio, precioEn, precioEquivalente, precioPorUnidad, unidadesBajadas, unirCoincidencias, unidadesEnNombre, type ProductoAlerta } from "./analisis";
 
 test("normaliza un producto con su proveedor y reconoce los nuestros", () => {
   const p = normalizarCompetencia({ id: 7, name: "King Maker 120", sale_price: 6.99, user: { id: 2094, name: "ECOMFIVE" }, warehouse_product: [{ stock: 5 }] });
@@ -143,4 +143,19 @@ test("unirCoincidencias: un competidor encontrado por dos nombres cuenta una vez
   assert.equal(r[0].parecido, 0.95);
   assert.equal(r[0].porFoto, true);
   assert.deepEqual(unirCoincidencias([]), []);
+});
+
+test("los precios van en la moneda del catálogo: dólares en Panamá, colones en Costa Rica", () => {
+  assert.equal(precioEn(8.99), "$8.99");
+  assert.equal(precioEn(null, "CRC"), "—");
+  assert.match(precioEn(5499, "CRC"), /^₡\s?5.?499$/);
+  assert.match(precioEquivalente("Colágeno 60 cápsulas", { precio: 6000, nombre: "Colágeno 30 cápsulas" }, "CRC").nota ?? "", /^₡\s?6.?000 por 30 cápsulas$/);
+});
+
+test("en Costa Rica nuestro proveedor se reconoce por su id de Dropi, aunque no se llame ECOMFIVE", () => {
+  const alcides = { id: 1, name: "Colágeno", sale_price: 6000, user: { id: 27, name: "Alcides" } };
+  assert.equal(normalizarCompetencia(alcides, "CR")?.esNuestro, true);
+  assert.equal(normalizarCompetencia(alcides, "PA")?.esNuestro, false);
+  assert.equal(normalizarCompetencia(alcides)?.esNuestro, false);
+  assert.equal(normalizarCompetencia({ ...alcides, user: { id: 42, name: "Jessica" } }, "CR")?.esNuestro, false);
 });

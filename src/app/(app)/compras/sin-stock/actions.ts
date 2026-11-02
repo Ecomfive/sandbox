@@ -2,13 +2,27 @@
 
 import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
-import { requireModuloEscritura } from "@/lib/auth";
+import { getUsuarioActual, requireModuloEscritura } from "@/lib/auth";
 import { DECISIONES, esDecision } from "@/lib/compras/sin-stock";
 import { RUTA_SIN_STOCK } from "@/lib/compras/sin-stock-datos";
+import { getPaisActual } from "@/lib/pais";
 import { puedeVerPaisId } from "@/lib/seguridad/pais-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Cuántos productos sin stock faltan por revisar en el país de la barra (las alertas abiertas): el mismo número que lleva «Compras» en el
+ * menú, para que la pestaña «Sin stock» diga de dónde sale (30 oct 2026, pedido de Hernán). null si no tiene Compras o la consulta falla.
+ */
+export async function contarSinStockPorRevisar(): Promise<number | null> {
+  const usuario = await getUsuarioActual();
+  if (!usuario?.modulos.includes("compras")) return null;
+  const supabase = createServiceClient();
+  const pais = await getPaisActual(supabase);
+  const { count, error } = await supabase.from("compras_alertas_sin_stock").select("*", { count: "exact", head: true }).eq("pais_id", pais.id).eq("estado", "abierta");
+  return error ? null : (count ?? 0);
+}
 
 /**
  * Compras revisa una alerta de sin stock (migración 0167): anota qué decidió (comprar, hay inventario manual, no reponer) y una nota. Se

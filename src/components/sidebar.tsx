@@ -11,7 +11,7 @@ import { FavoritoToggle } from "@/components/favorito-toggle";
 import { anilloFoco } from "@/components/ui/field";
 import { SIN_PENDIENTES, type PendientesMenu } from "@/lib/contadores-menu";
 import { FRENTES, PRONTO_NAV, encontrarSeccionActiva, moduloDeHref, type NavItem, type NavSection } from "@/lib/nav-data";
-import { AjustesIcon, AvisosIcon, AyudaIcon, BabyYodaIcon, ConfiguracionIcon, DashboardIcon, ICONOS_PAGINA, SECTION_ICONS } from "@/lib/nav-icons";
+import { AjustesIcon, AvisosIcon, AyudaIcon, BabyYodaIcon, ConfiguracionIcon, DashboardIcon, HistorialIcon, ICONOS_PAGINA, SECTION_ICONS } from "@/lib/nav-icons";
 
 /** Si el panel de páginas está oculto («cerrado»); se guarda en el navegador de cada persona. */
 const CLAVE_PANEL = "sidebar-panel-v1";
@@ -101,7 +101,7 @@ function ItemPagina({
             <span className="truncate">{item.label}</span>
           )}
         </span>
-        <ContadorMenu cantidad={cantidadDe(item, pendientes)} />
+        <ContadorMenu cantidad={cantidadDe(item, pendientes)} href={item.href} />
       </Link>
       <FavoritoToggle href={item.href} activo={favoritos.includes(item.href)} />
     </div>
@@ -249,12 +249,13 @@ const claseRielBoton = `flex w-full flex-col items-center gap-1.5 rounded-lg px-
 const claseRiel = (seleccionada: boolean) => `${claseRielBoton} ${seleccionada ? "font-semibold text-white" : "text-riel-texto hover:bg-riel-hover hover:text-white"}`;
 
 /** El ícono de un botón del riel, con el halo de color si es el elegido y la pastilla de pendientes en su esquina. */
-function IconoRiel({ Icono, seleccionada, cantidad = 0 }: { Icono: (typeof SECTION_ICONS)[string]; seleccionada: boolean; cantidad?: number }) {
+function IconoRiel({ Icono, seleccionada, cantidad = 0, punto = false }: { Icono: (typeof SECTION_ICONS)[string]; seleccionada: boolean; cantidad?: number; punto?: boolean }) {
   return (
     <span className="relative inline-flex">
       {seleccionada && <span aria-hidden="true" className="brillo-riel" />}
       <Icono className="relative h-5 w-5" />
       <ContadorSobreIcono cantidad={cantidad} />
+      {punto && !cantidad && <span aria-hidden="true" className="absolute -top-0.5 -right-1 h-2 w-2 rounded-full bg-primario ring-2 ring-riel" />}
     </span>
   );
 }
@@ -269,11 +270,15 @@ function RielYPanel({
   modulosPermitidos,
   favoritos,
   pendientes,
+  verActualizaciones,
 }: {
   areas: NavSection[];
   modulosPermitidos?: string[] | null;
   favoritos: string[];
   pendientes: PendientesMenu;
+  /** Solo para administradores: la fecha del último cambio del sistema (botón «Cambios»); null = no se dibuja. */
+  /** Solo para administradores: el botón «Cambios» (Actualizaciones del sistema). */
+  verActualizaciones: boolean;
 }) {
   const pathname = usePathname();
   const visibles = areasVisibles(areas, modulosPermitidos);
@@ -309,7 +314,9 @@ function RielYPanel({
   const verAyuda = titulo === "Ayuda";
   const mostrada = delRiel.find((v) => v.area.title === titulo) ?? delRiel[0];
   const puedeConfigurar = puedeVer(modulosPermitidos, "/configuracion");
-  const puedeVerAvisos = puedeVer(modulosPermitidos, "/notificaciones") || pendientes.paraTi > 0;
+  // Avisos lo ve todo el mundo: ahí están las actualizaciones del sistema y los avisos «Para ti» (31 oct 2026).
+  const puedeVerAvisos = true;
+  const cambiosNuevos = pendientes.novedades > 0;
 
   function elegir(nombre: string) {
     setElegida({ ruta: pathname, titulo: nombre });
@@ -362,6 +369,17 @@ function RielYPanel({
             >
               <IconoRiel Icono={AvisosIcon} seleccionada={pathname === "/notificaciones"} cantidad={pendientes.total} />
               <span>Avisos</span>
+            </Link>
+          )}
+          {verActualizaciones && (
+            <Link
+              href="/actualizaciones"
+              aria-current={pathname === "/actualizaciones" ? "page" : undefined}
+              aria-label={cambiosNuevos ? "Cambios del sistema: hay cambios nuevos" : "Cambios del sistema"}
+              className={claseRiel(pathname === "/actualizaciones")}
+            >
+              <IconoRiel Icono={HistorialIcon} seleccionada={pathname === "/actualizaciones"} punto={cambiosNuevos} />
+              <span>Cambios</span>
             </Link>
           )}
           {puedeConfigurar && (
@@ -419,16 +437,20 @@ function ListaMovil({
   favoritos,
   pendientes,
   alNavegar,
+  verActualizaciones,
 }: {
   areas: NavSection[];
   modulosPermitidos?: string[] | null;
   favoritos: string[];
   pendientes: PendientesMenu;
   alNavegar: () => void;
+  /** Solo para administradores: el botón «Cambios» (Actualizaciones del sistema). */
+  verActualizaciones: boolean;
 }) {
   const pathname = usePathname();
   const visibles = areasVisibles(areas, modulosPermitidos);
   const limitado = tieneAccesoLimitado(areas, modulosPermitidos);
+  const cambiosNuevos = pendientes.novedades > 0;
   return (
     <nav aria-label="Menú principal" className="flex flex-1 flex-col gap-4 overflow-y-auto p-2.5">
       <Favoritos areas={visibles} favoritos={favoritos} pathname={pathname} pendientes={pendientes} alNavegar={alNavegar} />
@@ -440,7 +462,7 @@ function ListaMovil({
             <PaginasDeArea area={v.area} items={v.items} limitado={limitado} pathname={pathname} favoritos={favoritos} pendientes={pendientes} alNavegar={alNavegar} />
           </section>
         ))}
-      {(puedeVer(modulosPermitidos, "/notificaciones") || pendientes.paraTi > 0) && (
+      {(
         <section aria-label="Avisos">
           <Titulo>Avisos</Titulo>
           <Link
@@ -451,6 +473,26 @@ function ListaMovil({
           >
             Centro de notificaciones
             <ContadorMenu cantidad={pendientes.total} />
+          </Link>
+        </section>
+      )}
+      {verActualizaciones && (
+        <section aria-label="Cambios del sistema">
+          <Titulo>Cambios</Titulo>
+          <Link
+            href="/actualizaciones"
+            onClick={alNavegar}
+            aria-current={pathname === "/actualizaciones" ? "page" : undefined}
+            className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-[13px] ${anilloFoco} ${pathname === "/actualizaciones" ? "bg-accent font-medium text-accent-foreground" : "hover:bg-muted"}`}
+          >
+            <HistorialIcon className="h-4 w-4 text-muted-foreground" />
+            Actualizaciones del sistema
+            {cambiosNuevos && (
+              <span className="ml-auto inline-flex items-center gap-1 text-[11px] font-medium text-primario">
+                <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-primario" />
+                Nuevo
+              </span>
+            )}
           </Link>
         </section>
       )}
@@ -507,11 +549,14 @@ export function Sidebar({
   areas,
   favoritos,
   pendientes,
+  verActualizaciones = false,
 }: {
   modulosPermitidos?: string[] | null;
   areas: NavSection[];
   favoritos: string[];
   pendientes: Promise<PendientesMenu>;
+  /** Solo para administradores: la fecha del último cambio del sistema (botón «Cambios»). */
+  verActualizaciones?: boolean;
 }) {
   const [movilAbierto, setMovilAbierto] = useState(false);
 
@@ -520,7 +565,7 @@ export function Sidebar({
       {/* Riel y panel — escritorio */}
       <aside className="sticky top-0 hidden h-screen shrink-0 md:flex">
         <ConPendientes pendientes={pendientes}>
-          {(p) => <RielYPanel areas={areas} modulosPermitidos={modulosPermitidos} favoritos={favoritos} pendientes={p} />}
+          {(p) => <RielYPanel areas={areas} modulosPermitidos={modulosPermitidos} favoritos={favoritos} pendientes={p} verActualizaciones={verActualizaciones} />}
         </ConPendientes>
       </aside>
 
@@ -555,7 +600,7 @@ export function Sidebar({
             </div>
             <ConPendientes pendientes={pendientes}>
               {(p) => (
-                <ListaMovil areas={areas} modulosPermitidos={modulosPermitidos} favoritos={favoritos} pendientes={p} alNavegar={() => setMovilAbierto(false)} />
+                <ListaMovil areas={areas} modulosPermitidos={modulosPermitidos} favoritos={favoritos} pendientes={p} alNavegar={() => setMovilAbierto(false)} verActualizaciones={verActualizaciones} />
               )}
             </ConPendientes>
           </div>

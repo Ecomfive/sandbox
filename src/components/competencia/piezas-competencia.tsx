@@ -6,9 +6,9 @@ import { Badge } from "@/components/ui/badge";
 import { anilloFoco } from "@/components/ui/field";
 import { VisorImagen } from "@/components/ui/visor-imagen";
 import { formatearFechaHora } from "@/lib/formato";
+import { useMonedaCompetencia } from "./moneda-competencia";
 import { obtenerCompetenciaProducto, obtenerHistorialCompetencia, type CompetenciaDeProducto, type EventoCompetencia } from "@/lib/competencia/actions";
 
-const usd = (n: number | null) => (n === null ? "—" : `$${n.toFixed(2)}`);
 const num = (n: number | null) => (n === null ? "—" : n.toLocaleString("es-PA"));
 
 /**
@@ -67,6 +67,7 @@ function queFue(e: EventoCompetencia): { texto: string; tono: "success" | "destr
  * lo de antes, lo de después y la diferencia en color.
  */
 export function HistorialCompetencia({ productoId, limite = 30 }: { productoId: string; limite?: number }) {
+  const { precio: usd } = useMonedaCompetencia();
   const [eventos, setEventos] = useState<EventoCompetencia[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
@@ -137,6 +138,7 @@ export function HistorialCompetencia({ productoId, limite = 30 }: { productoId: 
  * precio frente al nuestro, su stock, cuánto vendió en 7 y 30 días y el historial de cada uno (al desplegarlo).
  */
 export function BloqueCompetencia({ skuId }: { skuId: string }) {
+  const { precio: usd } = useMonedaCompetencia();
   const [datos, setDatos] = useState<CompetenciaDeProducto[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [abierto, setAbierto] = useState<string | null>(null);

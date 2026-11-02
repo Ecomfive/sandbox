@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { anilloFoco } from "@/components/ui/field";
 import { linkClass } from "@/components/ui/link";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -34,9 +33,9 @@ function Avatar({ persona }: { persona: PersonaConAcceso }) {
 
 /**
  * "Accesos" de la franja de migas: muestra quién tiene acceso a la sección actual (lo da el rol de cada
- * persona), con atajo a Usuarios y roles para dar más acceso y botón para copiar el vínculo. Es solo
- * lectura: no comparte ni da permisos, por eso no se llama "Compartir". Solo consulta al abrirse, así que
- * no suma trabajo a cada página. `cargar` solo se cambia en pruebas visuales.
+ * persona), con atajo a Usuarios y roles para dar más acceso. Solo lo ve un administrador (29 oct 2026, pedido
+ * de Hernán; ya no trae «Copiar vínculo»). Es solo lectura: no comparte ni da permisos. Solo consulta al abrirse,
+ * así que no suma trabajo a cada página. `cargar` solo se cambia en pruebas visuales.
  */
 export function BotonAccesos({
   moduloHref,
@@ -48,7 +47,6 @@ export function BotonAccesos({
   cargar?: (moduloHref: string) => Promise<AccesoSeccion>;
 }) {
   const [estado, setEstado] = useState<Estado>({ tipo: "cerrado" });
-  const [copiado, setCopiado] = useState<"si" | "no" | null>(null);
   const contenedorRef = useRef<HTMLDivElement>(null);
   const botonRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -58,7 +56,6 @@ export function BotonAccesos({
   function cerrar() {
     consulta.current++;
     setEstado({ tipo: "cerrado" });
-    setCopiado(null);
   }
 
   function consultar() {
@@ -97,16 +94,6 @@ export function BotonAccesos({
       document.removeEventListener("keydown", alTeclear);
     };
   }, [abierto]);
-
-  async function copiarVinculo() {
-    try {
-      await navigator.clipboard.writeText(window.location.href);
-      setCopiado("si");
-    } catch {
-      setCopiado("no");
-    }
-    setTimeout(() => setCopiado(null), 3000);
-  }
 
   const acceso = estado.tipo === "listo" ? estado.acceso : null;
 
@@ -203,26 +190,12 @@ export function BotonAccesos({
             )}
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-border px-4 py-3">
-            <Button type="button" variant="secondary" onClick={copiarVinculo} className="min-h-8 px-3 py-1 text-xs">
-              Copiar vínculo
-            </Button>
-            {acceso &&
-              (acceso.puedeAdministrar ? (
-                <Link href="/usuarios" className={`text-xs ${linkClass}`}>
-                  Administrar permisos
-                </Link>
-              ) : (
-                <span className="text-xs text-muted-foreground">Para dar acceso, pide a un administrador.</span>
-              ))}
-          </div>
-          <p role="status" className="sr-only">
-            {copiado === "si" ? "Vínculo copiado" : copiado === "no" ? "No se pudo copiar el vínculo" : ""}
-          </p>
-          {copiado && (
-            <p className="border-t border-border px-4 py-2 text-xs text-muted-foreground" aria-hidden="true">
-              {copiado === "si" ? "Vínculo copiado. Solo entra quien ya tiene acceso." : "No se pudo copiar el vínculo."}
-            </p>
+          {acceso?.puedeAdministrar && (
+            <div className="border-t border-border px-4 py-3">
+              <Link href="/usuarios" className={`text-xs ${linkClass}`}>
+                Administrar permisos
+              </Link>
+            </div>
           )}
         </div>
       )}

@@ -1,4 +1,7 @@
+import { useMoneda } from "./moneda-contexto";
 import type { CambioDropiVista } from "@/lib/publicaciones/cambios-dropi";
+import { republicacionSinTocarDropi } from "@/lib/publicaciones/republicar-dropi";
+import { codigoBodega } from "@/lib/publicaciones/sincronizar-dropi";
 
 const fecha = (iso: string) => new Date(iso).toLocaleString("es-PA", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone: "America/Panama" });
 
@@ -7,17 +10,19 @@ const fecha = (iso: string) => new Date(iso).toLocaleString("es-PA", { day: "num
  * que alguien lo pulse) o con error (el próximo «Aplicar en Dropi» lo vuelve a intentar).
  */
 export function EstadoCambioDropi({ c }: { c: CambioDropiVista }) {
+  const { monto } = useMoneda();
   if (c.tipo === "republicar") return <EstadoRepublicar c={c} />;
   if (c.tipo === "apagar") return <EstadoApagar c={c} />;
   if (c.tipo === "archivar") return <EstadoArchivar c={c} />;
   if (c.tipo === "crear") return <EstadoCrear c={c} />;
   if (c.tipo === "privatizar") return <EstadoPrivatizar c={c} />;
+  if (c.tipo === "stock") return <EstadoStock c={c} />;
   const guia = c.nombreGuia ? ` · guía «${c.nombreGuia}»` : "";
   // Qué lleva el cambio: el nombre, el precio y/o el precio sugerido.
   const que = [
     c.nombre ? `«${c.nombre}»${guia}` : "",
-    c.precio !== null ? `precio $${c.precio.toFixed(2)}` : "",
-    c.precioSugerido !== null ? `sugerido $${c.precioSugerido.toFixed(2)}` : "",
+    c.precio !== null ? `precio ${monto(c.precio)}` : "",
+    c.precioSugerido !== null ? `sugerido ${monto(c.precioSugerido)}` : "",
     c.descripcion ? "descripción" : "",
     c.fotos > 0 ? `${c.fotos} ${c.fotos === 1 ? "foto" : "fotos"}` : "",
   ]
@@ -58,6 +63,27 @@ function EstadoApagar({ c }: { c: CambioDropiVista }) {
       {c.error
         ? `${c.estado === "error" ? "No se pudo apagar en Dropi" : "Apagado a medias en Dropi"}: ${c.error} Se reintenta al pulsar «Aplicar en Dropi».`
         : "Apagado pendiente: pulsa «Aplicar en Dropi» con Dropi abierto (saca el stock y archiva)."}
+    </span>
+  );
+}
+
+/** Cómo va un cambio de stock (migración 0173): hecho, pendiente o con error (se reintenta). */
+function EstadoStock({ c }: { c: CambioDropiVista }) {
+  const d = c.stock;
+  const que = d ? `${codigoBodega(d.bodega)} a ${d.unidades.toLocaleString("es-PA")} u.` : "stock";
+  if (c.estado === "aplicado")
+    return (
+      <span className="flex items-center gap-1.5 text-xs text-success">
+        <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-success" />
+        Stock cambiado en Dropi el {fecha(c.aplicadoEn ?? c.creadoEn)} ({que}).
+      </span>
+    );
+  return (
+    <span className="flex items-center gap-1.5 text-xs text-destructive">
+      <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-destructive" />
+      {c.estado === "error"
+        ? `No se pudo cambiar el stock en Dropi (${que}): ${c.error ?? "sin detalle"} Se vuelve a intentar al pulsar «Aplicar en Dropi».`
+        : `Stock pendiente en Dropi (${que}): pulsa «Aplicar en Dropi» con Dropi abierto.`}
     </span>
   );
 }
@@ -135,9 +161,11 @@ function EstadoRepublicar({ c }: { c: CambioDropiVista }) {
   return (
     <span className="flex items-center gap-1.5 text-xs text-destructive">
       <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-destructive" />
-      {c.estado === "error"
-        ? `No se pudo republicar en Dropi: ${c.error ?? "sin detalle"} Se sigue desde ahí al pulsar «Aplicar en Dropi».`
-        : "Republicación pendiente: pulsa «Aplicar en Dropi» con Dropi abierto."}
+      {c.estado === "error" && republicacionSinTocarDropi(c.error, c.nuevoDropiId)
+        ? `Esta no se republica desde el sistema: ${c.error} Dropi no se tocó. Republícala a mano en Dropi y quítala de la cola con «Deshacer» en «Cambios pendientes para Dropi»; la nueva aparece en «Sin publicación», donde se crea copiando los datos de esta.`
+        : c.estado === "error"
+          ? `No se pudo republicar en Dropi: ${c.error ?? "sin detalle"} Se sigue desde ahí al pulsar «Aplicar en Dropi».`
+          : "Republicación pendiente: pulsa «Aplicar en Dropi» con Dropi abierto."}
     </span>
   );
 }

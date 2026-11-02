@@ -1,0 +1,97 @@
+/* Testing Lab › Tu Winner (2 nov 2026): el mismo diseño del boceto aprobado (https://claude.ai/artifact/TwPE4fx17EiS39TJkLLkX2), con los colores del
+   sistema (claros y oscuros). Todo va dentro de `.tw` para no tocar el resto de la app. */
+.tw {
+  --tw-bg: var(--muted);
+  --tw-card: var(--card);
+  --tw-fg: var(--foreground);
+  --tw-muted: var(--muted-foreground);
+  --tw-line: var(--border);
+  --tw-soft: var(--muted);
+  --tw-linea: var(--primario);
+  background: var(--tw-bg);
+  color: var(--tw-fg);
+  min-height: 100%;
+  font-size: 14px;
+  line-height: 1.45;
+}
+.tw * { box-sizing: border-box; }
+.tw-pagina { max-width: 1180px; margin: 0 auto; padding: 20px 24px 48px; display: grid; gap: 18px; }
+.tw h1 { font-size: 22px; margin: 0; letter-spacing: -0.01em; text-wrap: balance; font-weight: 700; }
+.tw .sub { margin: 4px 0 0; color: var(--tw-muted); max-width: 72ch; }
+.tw .encabezado { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; align-items: flex-end; }
+.tw .lectura { font-size: 12.5px; color: var(--tw-muted); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.tw .punto { width: 8px; height: 8px; border-radius: 50%; background: var(--success); display: inline-block; }
+.tw .punto.mal { background: var(--destructive); }
+.tw .punto.leyendo { background: var(--warning); }
+.tw .btn { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--tw-line); background: var(--tw-card); color: var(--tw-fg); font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; }
+.tw .btn:hover { background: var(--tw-soft); }
+.tw .btn:disabled { opacity: 0.55; cursor: default; }
+.tw .btn:focus-visible, .tw button:focus-visible, .tw select:focus-visible, .tw a:focus-visible { outline: 2px solid var(--primario); outline-offset: 2px; }
+.tw .paises { display: flex; gap: 8px; flex-wrap: wrap; }
+.tw .pais { display: inline-flex; align-items: center; gap: 8px; padding: 7px 12px; border-radius: 999px; border: 1px solid var(--tw-line); background: var(--tw-card); cursor: pointer; font: inherit; font-size: 13px; color: var(--tw-fg); }
+.tw .pais[aria-pressed="true"] { border-color: var(--primario); background: var(--primario-suave); font-weight: 600; }
+.tw .pais .n { font-variant-numeric: tabular-nums; color: var(--tw-muted); font-weight: 500; }
+.tw .pais:disabled { opacity: 0.55; cursor: default; }
+.tw .cifras { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.tw .cifra { background: var(--tw-card); border: 1px solid var(--tw-line); border-radius: 12px; padding: 14px 16px; display: grid; gap: 2px; }
+.tw .cifra .t { font-size: 12px; color: var(--tw-muted); }
+.tw .cifra .v { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+.tw .cifra .d { font-size: 12px; color: var(--tw-muted); }
+.tw .filtros { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.tw .chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; border: 1px solid var(--tw-line); background: var(--tw-card); font: inherit; font-size: 12.5px; cursor: pointer; color: var(--tw-fg); }
+.tw .chip[aria-pressed="true"] { background: var(--tw-fg); color: var(--tw-card); border-color: var(--tw-fg); }
+.tw .lista { background: var(--tw-card); border: 1px solid var(--tw-line); border-radius: 12px; overflow: hidden; }
+.tw .fila { display: grid; grid-template-columns: 30px 44px minmax(0, 1.6fr) minmax(150px, 1fr) 92px 84px minmax(0, 1.3fr); gap: 14px; align-items: center; padding: 12px 16px; border-top: 1px solid var(--tw-line); }
+.tw .fila:first-child { border-top: 0; }
+.tw .fila.cab { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--tw-muted); background: var(--tw-soft); padding-block: 8px; }
+.tw .rank { font-variant-numeric: tabular-nums; color: var(--tw-muted); font-weight: 600; text-align: right; }
+.tw .foto { width: 44px; height: 44px; border-radius: 8px; display: grid; place-items: center; font-weight: 700; font-size: 13px; color: var(--primario); background: var(--primario-suave); overflow: hidden; }
+.tw .foto img { width: 100%; height: 100%; object-fit: cover; background: #fff; }
+.tw .nombre { font-weight: 600; overflow-wrap: anywhere; }
+.tw .meta { font-size: 12.5px; color: var(--tw-muted); }
+.tw .num { font-variant-numeric: tabular-nums; text-align: right; }
+.tw .num b { font-size: 15px; }
+.tw .etiquetas { display: flex; gap: 5px; flex-wrap: wrap; }
+.tw .et { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 600; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.tw .et.nuestro { background: var(--primario-suave); color: var(--primario); }
+.tw .et.tenemos { background: var(--success-soft); color: var(--success); }
+.tw .et.no { background: var(--warning-soft); color: var(--warning); }
+.tw .et.canal { background: var(--azul-soft); color: var(--azul); }
+.tw .et.alerta { background: var(--destructive-soft); color: var(--destructive); }
+.tw .comparar { font-size: 12px; color: var(--tw-muted); margin-top: 2px; }
+.tw .comparar b { color: var(--destructive); }
+.tw svg.spark { width: 100%; height: 34px; display: block; }
+.tw .nota { background: var(--tw-card); border: 1px dashed var(--tw-line); border-radius: 12px; padding: 12px 16px; color: var(--tw-muted); font-size: 13px; margin: 0; }
+.tw .nota b { color: var(--tw-fg); }
+.tw .aviso { background: var(--warning-soft); color: var(--warning); border-radius: 12px; padding: 12px 16px; font-size: 13px; margin: 0; }
+.tw .aviso.mal { background: var(--destructive-soft); color: var(--destructive); }
+.tw .scroll { overflow-x: auto; background: var(--tw-card); border: 1px solid var(--tw-line); border-radius: 12px; }
+.tw .tabla { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 880px; }
+.tw .tabla th, .tw .tabla td { padding: 10px 12px; border-top: 1px solid var(--tw-line); text-align: left; vertical-align: middle; }
+.tw .tabla thead th { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--tw-muted); background: var(--tw-soft); border-top: 0; font-weight: 600; }
+.tw .tabla td.c, .tw .tabla th.c { text-align: center; font-variant-numeric: tabular-nums; }
+.tw .si { display: inline-grid; place-items: center; min-width: 26px; height: 22px; padding: 0 6px; border-radius: 6px; background: var(--azul-soft); color: var(--azul); font-weight: 600; font-size: 12px; }
+.tw .vacio { color: var(--tw-line); }
+.tw .puntos { display: inline-flex; gap: 3px; vertical-align: middle; }
+.tw .puntos i { width: 9px; height: 9px; border-radius: 50%; background: var(--tw-line); display: block; }
+.tw .puntos i.on { background: var(--primario); }
+.tw .dos { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 16px; }
+.tw .panel { background: var(--tw-card); border: 1px solid var(--tw-line); border-radius: 12px; padding: 16px; display: grid; gap: 12px; align-content: start; }
+.tw .panel h2 { margin: 0; font-size: 15px; font-weight: 600; }
+.tw .eventos { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+.tw .eventos li { display: grid; grid-template-columns: 62px minmax(0, 1fr); gap: 10px; font-size: 13px; }
+.tw .eventos .f { color: var(--tw-muted); font-variant-numeric: tabular-nums; }
+.tw .pasos { margin: 0; padding-left: 18px; display: grid; gap: 8px; max-width: 76ch; }
+.tw .pasos li::marker { color: var(--primario); font-weight: 700; }
+.tw select { font: inherit; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--tw-line); background: var(--tw-card); color: var(--tw-fg); max-width: 100%; }
+.tw .leyenda { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--tw-muted); }
+.tw .leyenda span { display: inline-flex; align-items: center; gap: 6px; }
+.tw .leyenda i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+@media (max-width: 900px) {
+  .tw-pagina { padding: 16px 16px 40px; }
+  .tw .cifras { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tw .fila { grid-template-columns: 26px 40px minmax(0, 1fr) 80px; }
+  .tw .fila .col-graf, .tw .fila .col-stock { display: none; }
+  .tw .fila .col-et { grid-column: 3 / -1; }
+  .tw .dos { grid-template-columns: 1fr; }
+}

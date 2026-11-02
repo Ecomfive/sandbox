@@ -1,21 +1,22 @@
-import { textoContador, textoPendientes } from "@/lib/contadores-menu";
+import { textoContador, textoDeDonde, textoPendientes } from "@/lib/contadores-menu";
 
 /**
  * Pastilla con lo que hay por atender en una página del menú. Se ve el número; un lector de pantalla oye
  * «3 pendientes» (con contexto, no un «3» suelto) como parte del nombre del enlace o botón. No es una
  * región en vivo: el número cambia al cargar la página, no mientras se lee.
  */
-export function ContadorMenu({ cantidad }: { cantidad: number }) {
+export function ContadorMenu({ cantidad, href }: { cantidad: number; href?: string }) {
   if (cantidad <= 0) return null;
   return (
     <>
       <span
         aria-hidden="true"
+        title={textoDeDonde(href, cantidad)}
         className="shrink-0 rounded-full bg-aviso px-1.5 py-0.5 text-xs leading-none font-semibold text-white tabular-nums"
       >
         {textoContador(cantidad)}
       </span>
-      <span className="sr-only">, {textoPendientes(cantidad)}</span>
+      <span className="sr-only">, {textoDeDonde(href, cantidad)}</span>
     </>
   );
 }

@@ -26,6 +26,11 @@ interface FilaProducto {
   ultima_vez: string;
 }
 
+/** Los datos de Drop (3 nov 2026): todavía no hay búsquedas, así que todo va vacío. Las pestañas se dibujan igual que las de Dropi, sin datos, hasta que se conecten. */
+export function datosCompetenciaVacios(plataforma: DatosCompetencia["plataforma"], paisNombre: string): DatosCompetencia {
+  return { plataforma, pais: paisNombre, productos: [], competidores: [], alertas: [], bitacora: [], ultima: null, busquedas: 0, corte: null, ventas: [] };
+}
+
 /**
  * Todo lo que muestran las pestañas de Análisis de competencia para un país: los productos (nuestros y de la competencia) con
  * sus iguales, el stock vendido en 1/7/30 días, los competidores, las alertas, la bitácora y las
@@ -131,6 +136,7 @@ export async function cargarDatosCompetencia(supabase: SupabaseClient, pais: { i
 
   const ultima = (busq.data ?? [])[0] ?? null;
   const datos: DatosCompetencia = {
+    plataforma: "dropi",
     pais: pais.nombre,
     productos,
     competidores: [...porProveedor.values()].sort((a, b) => b.bajo7 - a.bajo7 || b.productos - a.productos),

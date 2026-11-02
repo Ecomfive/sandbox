@@ -10,10 +10,10 @@ const CANAL = "ecomfive-dropi";
 
 export type MensajeExtension =
   | { tipo: "hola" }
-  | { tipo: "sesion"; pais: CodigoPaisDropi; abrir: boolean }
-  | { tipo: "mostrar"; pais: CodigoPaisDropi }
-  | { tipo: "lanzar"; lector: ClaveLector; subida: Record<string, string> }
-  | { tipo: "avance"; lector: ClaveLector };
+  | { tipo: "sesion"; pais: CodigoPaisDropi | "tw"; abrir: boolean }
+  | { tipo: "mostrar"; pais: CodigoPaisDropi | "tw" }
+  | { tipo: "lanzar"; lector: ClaveLector | "tuwinner"; subida: Record<string, string>; dias?: { pedidos: number; cartera: number } | null }
+  | { tipo: "avance"; lector: ClaveLector | "tuwinner" };
 
 export interface SesionDropi {
   /** false = no hay ninguna pestaña de Dropi de ese país abierta (y no se pidió abrirla). */

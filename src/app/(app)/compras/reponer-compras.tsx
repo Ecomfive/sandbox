@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { CabeceraTarjeta, Indicador, Segmentado, claseTdLista, claseThLista } from "@/components/panel/piezas-panel";
+import { CabeceraTarjeta, Indicador, TableroIndicadores, Segmentado, claseTdLista, claseThLista } from "@/components/panel/piezas-panel";
 import { anilloFoco } from "@/components/ui/field";
 import { COBERTURAS, DIAS_COBERTURA, filasReponer, type EnCamino } from "@/lib/compras/reponer";
 import { DIAS_REPONER, type ResumenProducto } from "@/lib/publicaciones/ventas";
@@ -54,14 +54,12 @@ export function ReponerCompras({
         </p>
       </header>
 
-      <section aria-label="Indicadores" className="marco-neon overflow-hidden rounded-[10px] border border-border bg-card">
-        <div className="flex flex-wrap">
-          <Indicador titulo="Productos para reponer" valor={entero(filas.length)} detalle={`${sinStock} ya sin stock`} punto={sinStock ? "peligro" : undefined} />
-          <Indicador titulo="Unidades sugeridas" valor={entero(sugeridas)} detalle={`para ${dias} días de venta`} />
-          <Indicador titulo="Con compra en camino" valor={entero(conCompra)} detalle="ya tienen una compra abierta" />
-          <Indicador titulo="Sin vincular a Producto" punto={sinVincular ? "aviso" : undefined} valor={entero(sinVincular)} detalle="no se pueden comprar desde aquí" />
-        </div>
-      </section>
+      <TableroIndicadores etiqueta="Indicadores">
+        <Indicador titulo="Productos para reponer" valor={entero(filas.length)} detalle={`${sinStock} ya sin stock`} punto={sinStock ? "peligro" : undefined} />
+        <Indicador titulo="Unidades sugeridas" valor={entero(sugeridas)} detalle={`para ${dias} días de venta`} />
+        <Indicador titulo="Con compra en camino" valor={entero(conCompra)} detalle="ya tienen una compra abierta" />
+        <Indicador titulo="Sin vincular a Producto" punto={sinVincular ? "aviso" : undefined} valor={entero(sinVincular)} detalle="no se pueden comprar desde aquí" />
+      </TableroIndicadores>
 
       {comprasSinCargar && (
         <p role="alert" className="rounded-lg border border-border bg-card px-4 py-3 text-sm text-destructive">

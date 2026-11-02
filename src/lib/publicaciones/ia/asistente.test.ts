@@ -112,6 +112,9 @@ test("Claude: el pedido lleva la búsqueda y las fotos; la respuesta junta los b
   assert.deepEqual((c.messages as { content: unknown[] }[])[0].content[1], { type: "image", source: { type: "url", url: "https://x/a.jpg" } });
   assert.equal((c.tools as { name: string }[])[0].name, "web_search");
   assert.equal("tools" in (cuerpoMensaje("m", { instrucciones: "i", texto: "t", imagenes: [] }, false) as Record<string, unknown>), false);
+  // El CRM pide esfuerzo bajo; lo demás, el del modelo (sin output_config).
+  assert.deepEqual((cuerpoMensaje("m", { instrucciones: "i", texto: "t", imagenes: [] }, false, "low") as Record<string, unknown>).output_config, { effort: "low" });
+  assert.equal("output_config" in c, false);
   const r = extraerMensaje({
     content: [
       { type: "server_tool_use", name: "web_search" },
@@ -168,11 +171,11 @@ test("los títulos se limpian y se piden con su porqué, sin repetir ni el actua
     reglas,
     "Biotina fuerte para tu pelo 90 cápsulas",
   );
-  assert.deepEqual(p?.titulos.map((x) => x.titulo), ["Biotina para el cabello 60 cápsulas"]);
+  // Las mayúsculas ya no descartan un título (31 oct 2026): el equipo escribe algunos así.
+  assert.deepEqual(p?.titulos.map((x) => x.titulo), ["Biotina para el cabello 60 cápsulas", "BIOTINA PARA EL CABELLO 60 CAPSULAS"]);
   assert.equal(p?.titulos[0].porque, "Dice la cantidad y para qué sirve");
-  assert.equal(p?.descartados, 1); // el que venía todo en mayúsculas
   assert.match(pedidoTitulos(datos, contexto).instrucciones, /no inventes cantidades/);
-  assert.match(pedidoTitulos(datos, contexto).instrucciones, /Sin MAYÚSCULAS sostenidas/);
+  assert.match(pedidoTitulos(datos, contexto).instrucciones, /como las usa el equipo/);
 });
 
 test("si ningún título cumple, salen los más cercanos marcados para ajustarlos a mano", () => {

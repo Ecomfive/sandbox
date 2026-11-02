@@ -1,10 +1,11 @@
 "use server";
 
+import { montoDePais } from "@/lib/moneda/simbolo";
 import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { getPaisActual } from "@/lib/pais";
-import { DECISIONES, TIPOS_RECOMENDACION, etiquetaRecomendacion, sumarDias, vigenteHasta, type Decision } from "@/lib/publicaciones/recomendaciones";
+import { DECISIONES, MAX_COMPETIDORES_RECOMENDACION, TIPOS_RECOMENDACION, etiquetaRecomendacion, sumarDias, vigenteHasta, type Decision } from "@/lib/publicaciones/recomendaciones";
 import { REGLAS, leerValorRegla, mostrarRegla, revisarReglas, type ClaveRegla, type Reglas } from "@/lib/publicaciones/reglas";
 import { encolarCambio, enviarPrecioADropi } from "@/lib/publicaciones/cambios-dropi";
 import { cargarReglas } from "@/lib/publicaciones/reglas-datos";
@@ -29,7 +30,13 @@ function limpiarRecomendacion(r: unknown) {
     else if (typeof v === "string") datos[k] = v.slice(0, 120);
     else if (v === null) datos[k] = null;
   }
-  return { titulo: corto(o.titulo, 300), motivo: corto(o.motivo, 600), resultado: corto(o.resultado, 600), datos };
+  // Los competidores que se vieron al decidir (subir o bajar el precio), limpios: quedan guardados con la decisión.
+  const competidores = (Array.isArray(o.competidores) ? o.competidores : [])
+    .slice(0, MAX_COMPETIDORES_RECOMENDACION)
+    .map((c) => (c && typeof c === "object" ? (c as Record<string, unknown>) : {}))
+    .map((c) => ({ proveedor: corto(c.proveedor, 120), nombre: corto(c.nombre, 200), precio: Number(c.precio), stock: Number(c.stock), vendido30: Number(c.vendido30) }))
+    .filter((c) => c.proveedor && [c.precio, c.stock, c.vendido30].every((n) => Number.isFinite(n) && n >= 0 && n < 1e7));
+  return { titulo: corto(o.titulo, 300), motivo: corto(o.motivo, 600), resultado: corto(o.resultado, 600), datos, ...(competidores.length ? { competidores } : {}) };
 }
 
 /**
@@ -57,6 +64,8 @@ export async function decidirRecomendacion(entrada: { publicacionId: string; rec
   const supabase = createServiceClient();
   const { data: pub } = await supabase.from("dropi_publicaciones").select("id, nombre, pais_id, dropi_id, precio_venta, margen").eq("id", publicacionId).maybeSingle();
   if (!pub || !(await puedeVerPaisId(supabase, usuario.paisesPermitidos, pub.pais_id as string))) return { error: "No se encontró la publicación." };
+  const { data: paisPub } = await supabase.from("paises").select("codigo").eq("id", pub.pais_id).maybeSingle();
+  const codigoPub = String(paisPub?.codigo ?? "PA");
 
   const dia = hoy();
   const hasta = vigenteHasta(decision, dia, entrada.dias);
@@ -101,7 +110,7 @@ export async function decidirRecomendacion(entrada: { publicacionId: string; rec
       tipo: "tarea",
       titulo: `Tarea en Gestión de IDs Dropi: ${rec.titulo || etiquetaRecomendacion(tipo)}`.slice(0, 300),
       texto: `${pub.nombre} · para el ${tarea.plazo}${nota ? ` · «${nota}»` : ""}`.slice(0, 600),
-      href: "/publicaciones-dropi/recomendaciones?ver=por_hacer",
+      href: "/publicaciones-dropi/tareas",
       autor_id: usuario.id,
       autor_nombre: usuario.nombre ?? usuario.email ?? null,
     });
@@ -117,8 +126,8 @@ export async function decidirRecomendacion(entrada: { publicacionId: string; rec
         accion: "editar_publicacion_dropi",
         entidad: "dropi_publicaciones",
         entidadId: publicacionId,
-        antes: { "Precio de venta": antes === null ? "—" : `$${antes.toFixed(2)}` },
-        despues: { "Precio de venta": `$${nuevo.toFixed(2)}` },
+        antes: { "Precio de venta": antes === null ? "—" : montoDePais(antes, codigoPub) },
+        despues: { "Precio de venta": montoDePais(nuevo, codigoPub) },
       });
       const r = await enviarPrecioADropi(supabase, { id: pub.id as string, pais_id: pub.pais_id as string, dropi_id: (pub.dropi_id as string | null) ?? null }, nuevo, antes, { id: usuario.id, nombre: usuario.nombre || usuario.email });
       dropi = r.estado === "pendiente" ? r.detalle : `El precio se guardó, pero no quedó para Dropi: ${r.detalle}`;
@@ -128,7 +137,7 @@ export async function decidirRecomendacion(entrada: { publicacionId: string; rec
   const precioActual = pub.precio_venta === null ? null : Number(pub.precio_venta);
   if (decision === "aceptada" && tipo === "precio_sugerido" && precioActual !== null && precioActual > 0) {
     const r = await encolarCambio(supabase, { id: pub.id as string, pais_id: pub.pais_id as string, dropi_id: (pub.dropi_id as string | null) ?? null }, { precioSugerido: precioActual }, { id: usuario.id, nombre: usuario.nombre || usuario.email });
-    dropi = "error" in r ? `No quedó para Dropi: ${r.error}` : `Precio sugerido $${precioActual.toFixed(2)} para Dropi: pulsa «Aplicar en Dropi» con Dropi abierto.`;
+    dropi = "error" in r ? `No quedó para Dropi: ${r.error}` : `Precio sugerido ${montoDePais(precioActual, codigoPub)} para Dropi: pulsa «Aplicar en Dropi» con Dropi abierto.`;
   }
   revalidatePath("/publicaciones-dropi");
   revalidatePath("/publicaciones-dropi/recomendaciones");

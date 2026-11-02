@@ -43,10 +43,11 @@ export interface VentasDropiPais {
 /**
  * Las ventas en Dropi de un producto (bloque «Ventas en Dropi» de su ficha): suma todos los IDs de Dropi de sus publicaciones de
  * Gestión de IDs Dropi —activas y archivadas, públicas y privadas, de cualquier bodega— y las de sus variantes, por país. Sale de
- * las ventas diarias de Dropi (migración 0120). Lo ven quienes abren Producto o Inventario, solo en sus países. Devuelve el error
+ * las ventas diarias de Dropi (migración 0120). Lo ven quienes abren Producto o Inventario, solo en sus países; con `soloPais` (el código, «PA»),
+ * solo ese país. Devuelve el error
  * como valor; sin la migración o sin publicaciones, una lista vacía.
  */
-export async function obtenerVentasDropiProducto(id: string): Promise<{ paises: VentasDropiPais[] } | { error: string }> {
+export async function obtenerVentasDropiProducto(id: string, soloPais?: string): Promise<{ paises: VentasDropiPais[] } | { error: string }> {
   const usuario = await getUsuarioActual();
   // También Gestión de IDs Dropi: la ficha de una publicación muestra las ventas de todo su producto (25 oct 2026).
   if (!usuario || !(usuario.modulos.includes("producto") || usuario.modulos.includes("inventario") || usuario.modulos.includes("publicaciones-dropi"))) return { error: "No tienes acceso." };
@@ -62,6 +63,8 @@ export async function obtenerVentasDropiProducto(id: string): Promise<{ paises: 
   for (const p of pubs ?? []) {
     const pais = (Array.isArray(p.paises) ? p.paises[0] : p.paises) as { codigo: string; nombre: string } | null;
     if (!pais || !puedeVerPais(usuario.paisesPermitidos, pais.codigo)) continue;
+    // Gestión de IDs Dropi pide solo el país de la barra (28 oct 2026, pedido de Alcides): en Panamá, solo lo de Panamá.
+    if (soloPais && pais.codigo.toUpperCase() !== soloPais.toUpperCase()) continue;
     const ids = String(p.dropi_id ?? "").match(/\d{3,6}/g) ?? [];
     if (!ids.length) continue;
     const x = porPais.get(p.pais_id as string) ?? { nombre: pais.nombre, ids: new Set<number>() };

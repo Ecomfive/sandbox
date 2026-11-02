@@ -7,7 +7,7 @@ import { Ventana } from "@/components/ui/ventana";
 import { DeshacerIcon } from "@/lib/nav-icons";
 import { deshacerCambioPendiente, listarCambiosPendientes, type CambioPendienteVista } from "./pendientes-actions";
 
-const ETIQUETA_TIPO = { cambio: "Cambio", apagar: "Apagar", republicar: "Republicar", archivar: "Archivar", crear: "Publicar", privatizar: "Privatizar" } as const;
+const ETIQUETA_TIPO = { cambio: "Cambio", apagar: "Apagar", republicar: "Republicar", archivar: "Archivar", crear: "Publicar", privatizar: "Privatizar", stock: "Stock" } as const;
 const hora = (iso: string) => new Date(iso).toLocaleString("es-PA", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone: "America/Panama" });
 
 /**

@@ -4,6 +4,7 @@
 // Dropi salen de la lectura del catálogo (Análisis de competencia); fotos, video y descripción, desde la migración 0129 y la lectura
 // siguiente: sin ellos, el punto queda «Sin datos». Sin base ni React, con prueba.
 
+import { montoConSimbolo } from "@/lib/moneda/simbolo";
 import { medidaEnNombre } from "@/lib/competencia/analisis";
 import type { Reglas } from "./reglas";
 
@@ -26,6 +27,8 @@ export interface EntradaRevision {
   categoria: string | null;
   precio: number | null;
   precioSugerido: number | null;
+  /** La moneda de los precios («USD», «CRC», «MXN»), para escribirlos con su símbolo. Sin ella, dólares. */
+  moneda?: string;
   /** null = todavía no se sabe (sin la lectura con fotos, video y descripción). */
   fotos: number | null;
   videos: number | null;
@@ -116,8 +119,6 @@ export function revisarPublicacion(p: EntradaRevision, reglas: Pick<Reglas, "min
   const t = p.titulo.trim();
   const ingles = palabrasEnIngles(t, p.nombreProducto);
   const palabras = t.split(/\s+/).filter(Boolean);
-  const letras = t.replace(/[^a-zA-ZÁÉÍÓÚÑáéíóúñ]/g, "");
-  const mayusculas = letras.length >= 8 && letras === letras.toUpperCase();
   const suple = esSuplemento(t, p.categoria);
   const sinDatos = "Se sabrá con la próxima lectura de Dropi";
 
@@ -141,8 +142,9 @@ export function revisarPublicacion(p: EntradaRevision, reglas: Pick<Reglas, "min
     r("titulo_angulo", tieneAngulo(t) ? "ok" : "revisar", tieneAngulo(t) ? "Dice para qué sirve" : "No dice para qué sirve («para…», «contra…», «alivio de…»)"),
     r(
       "titulo_formato",
-      palabras.length < 3 ? "falta" : mayusculas ? "falta" : "ok",
-      palabras.length < 3 ? `Muy corto (${palabras.length} ${palabras.length === 1 ? "palabra" : "palabras"})` : mayusculas ? "Todo en mayúsculas" : "Claro",
+      // Las mayúsculas no se revisan (31 oct 2026, pedido de Alcides): el equipo escribe algunos nombres en mayúsculas a propósito.
+      palabras.length < 3 ? "falta" : "ok",
+      palabras.length < 3 ? `Muy corto (${palabras.length} ${palabras.length === 1 ? "palabra" : "palabras"})` : "Claro",
     ),
     p.fotos === null
       ? r("fotos", "sin_datos", sinDatos)
@@ -158,8 +160,8 @@ export function revisarPublicacion(p: EntradaRevision, reglas: Pick<Reglas, "min
         : // El sugerido va IGUAL al precio (decisión de Alcides, 23 oct 2026): el dropshipper no lo usa de referencia y, si es más alto,
           // Dropi no le deja montar una orden por debajo de él.
           p.precio !== null && Math.abs(p.precioSugerido - p.precio) > 0.005
-          ? r("precio_sugerido", "falta", `Sugerido $${p.precioSugerido.toFixed(2)}, nuestro precio $${p.precio.toFixed(2)}: debe ser igual al precio`)
-          : r("precio_sugerido", "ok", `$${p.precioSugerido.toFixed(2)}, igual al precio`),
+          ? r("precio_sugerido", "falta", `Sugerido ${montoConSimbolo(p.precioSugerido, p.moneda ?? "USD")}, nuestro precio ${montoConSimbolo(p.precio, p.moneda ?? "USD")}: debe ser igual al precio`)
+          : r("precio_sugerido", "ok", `${montoConSimbolo(p.precioSugerido, p.moneda ?? "USD")}, igual al precio`),
   ];
 }
 

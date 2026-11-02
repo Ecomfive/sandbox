@@ -7,7 +7,8 @@ import { anilloFoco, fieldClass, labelClassSm } from "@/components/ui/field";
 import { Seccion } from "@/components/ui/seccion-ficha";
 import { useToast } from "@/components/ui/toast";
 import { SugerenciaIcon } from "@/lib/nav-icons";
-import { DECISIONES, DIAS_POSPONER, ESTADOS_TAREA, TIPOS_RECOMENDACION, etiquetaRecomendacion, type Decision, type Recomendacion } from "@/lib/publicaciones/recomendaciones";
+import { Monto } from "./moneda-contexto";
+import { DECISIONES, DIAS_POSPONER, ESTADOS_TAREA, TIPOS_RECOMENDACION, etiquetaRecomendacion, type CompetidorRecomendacion, type Decision, type Recomendacion } from "@/lib/publicaciones/recomendaciones";
 import type { DecisionVista, FilaPublicacion } from "./def-publicaciones";
 import { tipoIADeRecomendacion } from "@/lib/publicaciones/ia/asistente";
 import { BotonAsistenteIA } from "./asistente-ia";
@@ -24,6 +25,9 @@ const ContextoTareas = createContext<Tareas>({ personas: [], yo: "", conTareas: 
 export function ProveedorTareas({ children, ...valor }: Tareas & { children: ReactNode }) {
   return <ContextoTareas.Provider value={valor}>{children}</ContextoTareas.Provider>;
 }
+
+/** A quién se le puede asignar una tarea y quién es la persona (también para las tareas escritas a mano). */
+export const usePersonasTareas = () => useContext(ContextoTareas);
 
 const fechaCorta = (iso: string) => new Date(iso).toLocaleDateString("es-PA", { day: "numeric", month: "short", year: "numeric", timeZone: "America/Panama" });
 const botonClaro = `inline-flex h-9 items-center rounded-md border border-border-control bg-card px-3 text-sm font-medium hover:bg-muted disabled:opacity-50 ${anilloFoco}`;
@@ -83,6 +87,7 @@ export function TarjetaRecomendacion({ publicacionId, rec, puedeDecidir, respons
         {rec.titulo}
       </h4>
       <p className="m-0 text-sm">{rec.motivo}</p>
+      {rec.competidores && rec.competidores.length > 0 && <CompetidoresRecomendacion competidores={rec.competidores} nuestro={typeof rec.datos.precio === "number" ? rec.datos.precio : null} />}
       <p className="m-0 flex gap-1.5 text-sm text-muted-foreground">
         <SugerenciaIcon aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
         <span>{rec.resultado}</span>
@@ -321,6 +326,57 @@ export function RecomendacionesFicha({ p, puedeEscribir, disponible }: { p: Fila
           </details>
         )}
       </Seccion>
+    </div>
+  );
+}
+
+/**
+ * Quién más vende lo mismo (28 oct 2026, pedido de Alcides): de cada competidor, su precio llevado al tamaño del nuestro, su stock y lo que vendió en
+ * 30 días (lo que bajó su stock: Dropi no muestra las ventas de otros), para decidir si igualarse o bajar. Un punto rojo marca al que vende más barato.
+ */
+function CompetidoresRecomendacion({ competidores, nuestro }: { competidores: CompetidorRecomendacion[]; nuestro: number | null }) {
+  return (
+    <div className="overflow-x-auto rounded-md border border-border">
+      <table className="w-full text-sm">
+        <caption className="sr-only">Competidores que venden lo mismo</caption>
+        <thead className="bg-muted text-xs text-muted-foreground">
+          <tr>
+            <th scope="col" className="px-3 py-1.5 text-left font-medium">
+              Competidor
+            </th>
+            <th scope="col" className="px-3 py-1.5 text-right font-medium">
+              Precio
+            </th>
+            <th scope="col" className="px-3 py-1.5 text-right font-medium">
+              Stock
+            </th>
+            <th scope="col" className="px-3 py-1.5 text-right font-medium whitespace-nowrap">
+              Vendió 30 días
+            </th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-border">
+          {competidores.map((c, i) => {
+            const masBarato = nuestro !== null && c.precio < nuestro;
+            return (
+              <tr key={`${c.proveedor}-${i}`}>
+                <td className="max-w-[14rem] px-3 py-1.5">
+                  <span className="block truncate font-medium">{c.proveedor}</span>
+                  <span className="block truncate text-xs text-muted-foreground">{c.nombre}</span>
+                </td>
+                <td className="px-3 py-1.5 text-right whitespace-nowrap tabular-nums">
+                  <span className="inline-flex items-center gap-1.5">
+                    {masBarato && <span role="img" aria-label="Más barato que nosotros" className="h-1.5 w-1.5 rounded-full bg-destructive" />}
+                    <Monto valor={c.precio} />
+                  </span>
+                </td>
+                <td className="px-3 py-1.5 text-right tabular-nums">{c.stock.toLocaleString("es-PA")}</td>
+                <td className="px-3 py-1.5 text-right tabular-nums">{c.vendido30.toLocaleString("es-PA")}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }

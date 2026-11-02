@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import {
   BotonBarra,
   CabeceraTarjeta,
-  Indicador,
+  Indicador, TableroIndicadores,
   Punto,
   Segmentado,
   claseTd,
@@ -322,35 +322,30 @@ export function PlanificacionCompras({
         )}
       </div>
 
-      <section
-        aria-label="Indicadores"
-        className="marco-neon overflow-hidden rounded-[10px] border border-border bg-card"
-      >
-        <div className="flex flex-wrap">
-          <Indicador
-            titulo={`Llega de ${etiquetaMes(meses[0])} a ${etiquetaMes(meses[meses.length - 1])}`}
-            valor={`${entero(k.meses.compras)} compras`}
-            detalle={`${entero(k.meses.unidades)} unidades · ${usd(k.meses.monto, true)}`}
-          />
-          <Indicador
-            titulo="Debían llegar"
-            punto={k.antes.compras ? "peligro" : undefined}
-            valor={entero(k.antes.compras)}
-            detalle={`${entero(k.antes.unidades)} unidades · planificadas antes y sin llegar`}
-          />
-          <Indicador
-            titulo="Sin fecha de envío"
-            punto={k.sin ? "aviso" : undefined}
-            valor={entero(k.sin)}
-            detalle="abiertas sin planificación (ver abajo)"
-          />
-          <Indicador
-            titulo="Más adelante"
-            valor={entero(k.despues)}
-            detalle={`después de ${etiquetaMes(meses[meses.length - 1])}`}
-          />
-        </div>
-      </section>
+      <TableroIndicadores etiqueta="Indicadores">
+        <Indicador
+          titulo={`Llega de ${etiquetaMes(meses[0])} a ${etiquetaMes(meses[meses.length - 1])}`}
+          valor={`${entero(k.meses.compras)} compras`}
+          detalle={`${entero(k.meses.unidades)} unidades · ${usd(k.meses.monto, true)}`}
+        />
+        <Indicador
+          titulo="Debían llegar"
+          punto={k.antes.compras ? "peligro" : undefined}
+          valor={entero(k.antes.compras)}
+          detalle={`${entero(k.antes.unidades)} unidades · planificadas antes y sin llegar`}
+        />
+        <Indicador
+          titulo="Sin fecha de envío"
+          punto={k.sin ? "aviso" : undefined}
+          valor={entero(k.sin)}
+          detalle="abiertas sin planificación (ver abajo)"
+        />
+        <Indicador
+          titulo="Más adelante"
+          valor={entero(k.despues)}
+          detalle={`después de ${etiquetaMes(meses[meses.length - 1])}`}
+        />
+      </TableroIndicadores>
 
       <section
         aria-labelledby="p-tabla"

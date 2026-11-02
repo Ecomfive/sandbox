@@ -3,7 +3,9 @@
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { BotonBarra, Punto } from "@/components/panel/piezas-panel";
 import { Badge } from "@/components/ui/badge";
+import { Bandera } from "@/components/paises/bandera";
 import { TarjetaEmergente } from "@/components/ui/tarjeta-emergente";
+import { TableroCompras, TARJETAS_COMPRAS } from "./tablero-compras";
 import { useToast } from "@/components/ui/toast";
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { TablaDatos, type ColumnaTabla } from "@/components/tabla/tabla-datos";
@@ -44,7 +46,6 @@ import {
 } from "./def-compras";
 import { FichaCompra } from "./ficha-compra";
 import { diasEntre, enGrupo, estaAtrasada, hoy, umbralesTransito, type Grupo } from "./calculos-compras";
-import { ConMasProductos } from "./mas-productos";
 
 const NOMBRE: NombreFilas = { singular: "compra", plural: "compras" };
 const ICONOS: Record<string, IconoComp> = {
@@ -126,6 +127,41 @@ function podarCambios(cambios: Record<string, Partial<FilaCompra>>, servidor: Fi
   return cambio ? resultado : cambios;
 }
 
+/**
+ * Una foto en su celda, del alto de la fila (pedido de Alcides, 2 nov 2026): la celda es `relative` y la foto la llena sin
+ * agrandarla (va en `absolute`, cuadrada), así la fila sigue midiendo lo que mide la orden de compra. Se amplía al pasar el cursor;
+ * sin foto, un cuadro punteado.
+ */
+function FotoCelda({ foto, alt, mas = 0 }: { foto: string | null; alt: string; mas?: number }) {
+  return (
+    <div className="absolute inset-y-1.5 left-2 aspect-square max-w-[calc(100%-1rem)]">
+      {foto ? (
+        <TarjetaEmergente
+          clase="rounded-lg border border-border bg-card p-1.5 shadow-lg"
+          claseEnvoltura="h-full w-full"
+          contenido={
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={foto} alt={alt} className="max-h-72 max-w-72 rounded-md object-contain" />
+          }
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={foto} alt={alt} className="h-full w-full rounded-md border border-border object-cover" />
+        </TarjetaEmergente>
+      ) : (
+        <div className="flex h-full w-full items-center justify-center rounded-md border border-dashed border-border text-muted-foreground" role="img" aria-label={`Sin ${alt.toLowerCase()}`}>
+          <AdjuntoIcon className="h-4 w-4" />
+        </div>
+      )}
+      {mas > 0 && (
+        <span className="pointer-events-none absolute -right-1 -bottom-1 rounded-full border-2 border-card bg-foreground px-1.5 text-[10px] leading-4 font-semibold text-background tabular-nums">
+          <span aria-hidden="true">+{mas}</span>
+          <span className="sr-only">y {mas === 1 ? "1 producto más" : `${mas} productos más`}</span>
+        </span>
+      )}
+    </div>
+  );
+}
+
 /** Una columna con el emoji de su campo delante del nombre, como en ClickUp. */
 function col(id: string, nombre: string, resto: Omit<ColumnaTabla<FilaCompra>, "id" | "label">): ColumnaTabla<FilaCompra> {
   return { id, label: conEmoji(id, nombre), ...resto };
@@ -158,6 +194,25 @@ function columnas(
   );
   return [
     { id: "numero", label: "N.º OC", ocultable: true, clase: "whitespace-nowrap tabular-nums text-muted-foreground", render: (c) => numeroOC(c.numero) },
+    // Código y las dos fotos van juntos antes de la orden (pedido de Alcides, 2 nov 2026). Ids nuevos («codigoOC», «fotoComercial»,
+    // «fotoReal») para que también en quien ya tenía un orden guardado aparezcan aquí, justo después del N.º OC.
+    { id: "codigoOC", label: conEmoji("codigo", "Código"), ...resto, clase: "text-muted-foreground tabular-nums whitespace-nowrap", render: (c) => c.codigo ?? "—" },
+    {
+      id: "fotoComercial",
+      label: conEmoji("foto", "Foto del producto"),
+      ...resto,
+      clase: "relative w-20 min-w-20",
+      // La foto comercial (la de Producto), la de referencia.
+      render: (c) => <FotoCelda foto={c.fotoComercial} alt="Foto del producto" mas={otrosProductos(c.lineas)} />,
+    },
+    {
+      id: "fotoReal",
+      label: conEmoji("foto", "Foto real"),
+      ...resto,
+      clase: "relative w-20 min-w-20",
+      // La foto real que manda el proveedor.
+      render: (c) => <FotoCelda foto={c.fotoUrl} alt="Foto real" />,
+    },
     {
       id: "nombre",
       label: "Orden de compra",
@@ -219,35 +274,29 @@ function columnas(
     col("qtyTotal", "Cantidad total", { ocultable: true, clase: "tabular-nums", total: (f) => sumar(f, (c) => c.qtyTotal, (n) => n.toLocaleString("es-PA")), render: (c) => ed(c, "qtyTotal", c.qtyTotal ?? "—") }),
     col("pagadoAProveedor", "Pagado a Proveedor", { ocultable: true, clase: "tabular-nums", total: (f) => sumar(f, (c) => c.pagadoAProveedor, usd), render: (c) => ed(c, "pagadoAProveedor", usd(c.pagadoAProveedor)) }),
     col("dias", "Días", { ocultable: true, clase: "tabular-nums", render: (c) => diasDeCompra(c) }),
-    col("foto", "Foto", {
+    col("pais", "País", {
       ...resto,
-      // La foto comercial (la de Producto); sin ella, la foto real que subió el proveedor.
-      render: (c) => {
-        const foto = c.fotoComercial ?? c.fotoUrl;
-        return foto ? (
-          <TarjetaEmergente
-            clase="rounded-lg border border-border bg-card p-1.5 shadow-lg"
-            contenido={
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={foto} alt="" className="max-h-72 max-w-72 rounded-md object-contain" />
-            }
-          >
-            <ConMasProductos n={otrosProductos(c.lineas)}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={foto} alt="" className="h-8 w-8 rounded-md border border-border object-cover" />
-            </ConMasProductos>
-          </TarjetaEmergente>
+      clase: "text-muted-foreground",
+      render: (c) =>
+        c.paisCodigo ? (
+          <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+            <Bandera codigo={c.paisCodigo} />
+            {c.paisCodigo}
+          </span>
+        ) : c.paisesDestino.length ? (
+          <span className="inline-flex flex-wrap items-center gap-1.5">
+            →
+            {c.paisesDestino.map((p) => (
+              <span key={p} className="inline-flex items-center gap-1 whitespace-nowrap">
+                <Bandera codigo={p} />
+                {p}
+              </span>
+            ))}
+          </span>
         ) : (
-          <ConMasProductos n={otrosProductos(c.lineas)}>
-            <div className="flex h-8 w-8 items-center justify-center rounded-md border border-dashed border-border text-muted-foreground">
-              <AdjuntoIcon className="h-3.5 w-3.5" />
-            </div>
-          </ConMasProductos>
-        );
-      },
+          "—"
+        ),
     }),
-    col("codigo", "Código", { ...resto, clase: "text-muted-foreground tabular-nums whitespace-nowrap", render: (c) => c.codigo ?? "—" }),
-    col("pais", "País", { ...resto, clase: "text-muted-foreground", render: (c) => c.paisCodigo ?? (c.paisesDestino.length ? `→ ${c.paisesDestino.join(", ")}` : "—") }),
     col("estado", "Estado", { ...resto, render: (c) => ed(c, "estado", <Badge color={colorEstado(c.estado)}>{etiquetaEstado(c.estado)}</Badge>) }),
     col("proveedor", "Proveedor", { ...resto, clase: "text-muted-foreground", render: (c) => ed(c, "proveedor", conColor(c.proveedor, colorProveedor)) }),
     col("ventaImportacion", "Tipo de venta", {
@@ -534,6 +583,8 @@ export function TablaCompras({
   // El avance de vincular productos a las compras de país (las de ClickUp llegaron sin productos).
   const dePais = compras.filter((c) => c.tipo === "pais" && !c.anulada);
   const sinProductos = dePais.filter((c) => c.productos === 0);
+  // El monto de cada tarjeta, solo si su rol ve el monto (lo mismo que la columna).
+  const montoVisible = !columnasOcultas(restricciones).includes("montoTotal");
   const completa = abierta ? compras.find((c) => c.id === abierta.id) : undefined;
 
   return (
@@ -541,25 +592,29 @@ export function TablaCompras({
     <ProveedorTiendas value={gestionTiendas}>
     <div className="flex flex-col">
       <div className="flex min-w-0 flex-col gap-3">
-        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filtros rápidos">
-          {RAPIDOS.map((r) => (
-            <BotonBarra key={r.valor} activo={rapido === r.valor} onClick={() => setRapido((v) => (v === r.valor ? null : r.valor))}>
-              {r.valor === "atrasadas" && conteo.atrasadas > 0 && <Punto tono="peligro" />}
-              {r.etiqueta} <span className="text-muted-foreground tabular-nums">{conteo[r.valor]}</span>
-            </BotonBarra>
-          ))}
-          {etapa && (
+        {/* El tablero de arriba, como el de Gestión de IDs (30 oct 2026): cada tarjeta cuenta y filtra la lista. */}
+        <TableroCompras
+          tarjetas={TARJETAS_COMPRAS.filter((t) => t.id !== "sin_productos" || dePais.length > 0).map((t) => {
+            const grupo = t.id === "sin_productos" ? sinProductos : base.filter((c) => enGrupo(c, t.id as Grupo, umbral));
+            const unidades = grupo.reduce((n, c) => n + (c.qtyTotal ?? 0), 0);
+            return {
+              t,
+              valor: t.id === "sin_productos" ? sinProductos.length : conteo[t.id],
+              unidades: unidades > 0 ? unidades : null,
+              // Sin compras (o sin montos cargados) no se escribe «—» suelto: la línea no sale.
+              monto: montoVisible && t.id !== "sin_productos" && grupo.some((c) => c.montoTotal !== null) ? sumar(grupo, (c) => c.montoTotal, usd) : null,
+            };
+          })}
+          activa={(id) => (id === "sin_productos" ? soloSinProductos : rapido === id)}
+          alPulsar={(id) => (id === "sin_productos" ? setSoloSinProductos((v) => !v) : setRapido((v) => (v === id ? null : (id as Grupo))))}
+        />
+        {etapa && (
+          <div className="flex flex-wrap gap-1.5">
             <BotonBarra activo onClick={() => setEtapa("")} aria-label={`Quitar el filtro de etapa ${etiquetaEtapa(etapa)}`}>
               Etapa: {etiquetaEtapa(etapa)} ✕
             </BotonBarra>
-          )}
-          {dePais.length > 0 && (
-            <BotonBarra activo={soloSinProductos} onClick={() => setSoloSinProductos((v) => !v)}>
-              {sinProductos.length > 0 && <Punto tono="aviso" />}
-              Sin productos <span className="text-muted-foreground tabular-nums">{sinProductos.length}</span>
-            </BotonBarra>
-          )}
-        </div>
+          </div>
+        )}
         {dePais.length > 0 && (
           <p className="m-0 text-xs text-muted-foreground" role="status">
             {sinProductos.length === 0

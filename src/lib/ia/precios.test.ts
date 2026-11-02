@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { costoImagen, costoTexto } from "./precios";
+import { costoImagen, costoTexto, costoTranscripcion } from "./precios";
 
 test("el costo de texto: tokens de entrada y salida según el modelo, más las búsquedas", () => {
   // gpt-4.1-mini: 0,40 y 1,60 dólares por millón.
@@ -21,4 +21,12 @@ test("el costo de una imagen de Gemini: por modelo, o el precio que se fije", ()
   assert.equal(costoImagen("gemini-3-pro-image-preview"), 0.134);
   assert.equal(costoImagen("gemini-nano-banana-2.1", "0.05"), 0.05);
   assert.equal(costoImagen("gemini-nano-banana-2.1", "mal"), 0.034);
+});
+
+test("el costo de transcribir: por minutos estimados con el tamaño y la tarifa del modelo", () => {
+  // 150 KB ≈ 1 minuto.
+  assert.equal(costoTranscripcion("gpt-4o-mini-transcribe", 150_000), 0.003);
+  assert.equal(costoTranscripcion("whisper-1", 300_000), 0.012);
+  assert.equal(costoTranscripcion("gemini-3.5-flash-lite", 150_000), 0.001);
+  assert.equal(costoTranscripcion("whisper-1", 0), 0);
 });

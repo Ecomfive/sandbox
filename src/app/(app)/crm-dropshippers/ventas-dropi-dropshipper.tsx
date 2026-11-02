@@ -88,7 +88,10 @@ export function VentasDropiDropshipperBloque({ dropshipperId, tieneCuentas }: { 
               <ul className="m-0 flex list-none flex-col gap-1 p-0">
                 {productos.map((x) => (
                   <li key={x.id} className="flex items-baseline justify-between gap-3 text-[13px]">
-                    <span className="min-w-0 truncate">{x.nombre}</span>
+                    <span className="flex min-w-0 items-baseline gap-1.5">
+                      <span className="min-w-0 truncate">{x.nombre}</span>
+                      <span className="shrink-0 text-xs tabular-nums text-muted-foreground">ID {x.id}</span>
+                    </span>
                     <span className="shrink-0 tabular-nums text-muted-foreground">
                       <b className="font-semibold text-foreground">{entero(x.netas)}</b> netas · {pct(x.noEfectivas, x.pedidas)} no efectivas
                     </span>

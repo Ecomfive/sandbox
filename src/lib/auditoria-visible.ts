@@ -12,6 +12,10 @@ export const MODULO_DE_ENTIDAD: Record<string, string> = {
   compras_alertas_sin_stock: "compras",
   skus_maestros: "producto",
   dropshippers: "crm-dropshippers",
+  whatsapp_conversaciones: "crm-dropshippers",
+  crm_plataformas_venta: "crm-dropshippers",
+  whatsapp_plantillas: "crm-dropshippers",
+  whatsapp_respuestas_rapidas: "crm-dropshippers",
   wms_compras: "compras",
   wms_rutas_envio: "compras",
   retiros: "retiros",
@@ -36,6 +40,8 @@ export const MODULO_DE_ENTIDAD: Record<string, string> = {
   paises: "configuracion",
   plataformas: "configuracion",
   pais_plataformas: "configuracion",
+  tareas_equipo: "tareas",
+  crm_tipo_cliente_umbrales: "configuracion",
 };
 
 const COMERCIALES = new Set<string>(ACCIONES_COMERCIALES);
@@ -44,7 +50,7 @@ const COMERCIALES = new Set<string>(ACCIONES_COMERCIALES);
  * Acciones de un producto (`skus_maestros`, que no tiene país) que sí son de un país: la orden de compra creada al pasarlo a
  * Activo y un movimiento de inventario. Su país va al final del detalle («… · Panamá») y se lee con `paisEnDetalle`.
  */
-export const ACCIONES_PRODUCTO_CON_PAIS = new Set(["crear_compra", "movimiento_inventario"]);
+export const ACCIONES_PRODUCTO_CON_PAIS = new Set(["crear_compra", "movimiento_inventario", "envio_dropi_inventario", "envio_dropi_recibido"]);
 
 /** El código del país nombrado en el detalle como « · <Nombre>», o undefined si no nombra ninguno. */
 export function paisEnDetalle(detalle: string | null | undefined, paises: { codigo: string; nombre: string }[]): string | undefined {

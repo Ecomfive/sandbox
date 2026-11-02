@@ -1,15 +1,18 @@
 "use server";
 
+import { montoDePais } from "@/lib/moneda/simbolo";
 import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { formatearEventoAuditoria } from "@/lib/auditoria-cambios";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { esAdministrador } from "@/lib/permisos/acceso";
-import { ESTADOS_PUBLICACION, fulfillmentFijo, TIPOS, UBICACIONES, etiqueta, numeroPublicacion, type OpcionPublicacion } from "@/lib/publicaciones/publicacion";
-import { idsDeDropi } from "@/lib/publicaciones/sincronizar-dropi";
+import { fulfillmentDePais } from "@/lib/publicaciones/fulfillment-pais";
+import { ESTADOS_PUBLICACION, TIPOS, UBICACIONES, etiqueta, numeroPublicacion, type OpcionPublicacion } from "@/lib/publicaciones/publicacion";
+import { codigoBodega, idsDeDropi } from "@/lib/publicaciones/sincronizar-dropi";
 import { grupoDe, nombreDelPublico } from "@/lib/publicaciones/apagar-dropi";
-import { encolarApagar, encolarArchivar, encolarCrear, encolarPrivatizar, encolarRepublicar, enviarNombreADropi, enviarPrecioADropi } from "@/lib/publicaciones/cambios-dropi";
-import { BODEGA_DROPI } from "@/lib/publicaciones/automatico";
+import { encolarApagar, encolarArchivar, encolarCrear, encolarPrivatizar, encolarRepublicar, encolarStock, enviarNombreADropi, enviarPrecioADropi } from "@/lib/publicaciones/cambios-dropi";
+import { esBodegaDropi } from "@/lib/publicaciones/automatico";
+import { faltantesStock, normalizarDatosStock, productoDelCambio } from "@/lib/publicaciones/stock-dropi";
 import { faltantesPrivatizar, nombrePrivado, normalizarDatosPrivatizar } from "@/lib/publicaciones/privatizar-dropi";
 import { faltantesCrearDropi, normalizarDatosCrear, MAX_FOTOS_CREAR, type DatosCrearDropi, type FotoCrear } from "@/lib/publicaciones/crear-dropi";
 import { descripcionAHtml } from "@/lib/publicaciones/descripcion-dropi";
@@ -61,11 +64,8 @@ async function sinStockEnDropi(paisId: string, dropiId: string | null): Promise<
   return ventas?.length ? sinStockParaArchivar(suma(ventas, "stock")) : false;
 }
 
-/** El fulfillment fijo del país de la publicación (Panamá), o null si se escribe en la ficha. */
-async function fulfillmentDelPais(supabase: ReturnType<typeof createServiceClient>, paisId: string): Promise<number | null> {
-  const { data } = await supabase.from("paises").select("codigo").eq("id", paisId).maybeSingle();
-  return fulfillmentFijo(data?.codigo as string | undefined);
-}
+/** El fulfillment del país de la publicación (el de Bodegas, migración 0208), o null si se escribe en la ficha. */
+const fulfillmentDelPais = (supabase: ReturnType<typeof createServiceClient>, paisId: string): Promise<number | null> => fulfillmentDePais(supabase, paisId);
 
 /** Lee y valida los datos de la ficha (crear o guardar). `fijo`: el fulfillment del país, si no se escribe. Devuelve el error como valor. */
 function leerDatos(f: FormData, fijo: number | null): Datos | { error: string } {
@@ -73,7 +73,7 @@ function leerDatos(f: FormData, fijo: number | null): Datos | { error: string } 
   if (!nombre) return { error: "Escribe el nombre del producto." };
   const precio = numero(f, "precio_venta");
   const costo = numero(f, "costo_mercancia");
-  // En Panamá el fulfillment es fijo (27 oct 2026) y no viene del formulario.
+  // Con el fulfillment del país (Bodegas; antes, solo Panamá) no viene del formulario.
   const fulfillment = fijo ?? numero(f, "fulfillment");
   if ([precio, costo, fulfillment].includes(undefined)) return { error: "Un precio o costo no es válido." };
   const email = texto(f, "privatizado_email", 200).toLowerCase();
@@ -124,6 +124,12 @@ async function idDropiRepetido(paisId: string, dropiId: string | null, menos: st
 }
 
 /** La publicación, si existe y es de un país que la persona ve. */
+/** El código del país de una publicación («CR»), para escribir sus montos con el símbolo de su moneda. */
+async function codigoDePais(paisId: string): Promise<string> {
+  const { data } = await createServiceClient().from("paises").select("codigo").eq("id", paisId).maybeSingle();
+  return String(data?.codigo ?? "PA");
+}
+
 async function publicacionPermitida(id: string, permitidos: string[] | null) {
   if (!UUID.test(id)) return null;
   const supabase = createServiceClient();
@@ -337,13 +343,13 @@ export async function crearPublicacion(f: FormData): Promise<PublicacionCreada> 
 }
 
 /** Lo que se muestra de cada dato en la actividad (antes → después). */
-const VISTA: [string, string, (v: unknown) => string][] = [
+const VISTA: [string, string, (v: unknown, codigo: string) => string][] = [
   ["nombre", "Producto", (v) => String(v ?? "—")],
   ["dropi_id", "ID Dropi", (v) => String(v ?? "—")],
   ["privatizado_a", "Privatizado a", (v) => String(v ?? "—")],
-  ["precio_venta", "Precio de venta", (v) => (v === null ? "—" : `$${Number(v).toFixed(2)}`)],
-  ["costo_mercancia", "Costo de producto", (v) => (v === null ? "—" : `$${Number(v).toFixed(2)}`)],
-  ["fulfillment", "Fulfillment", (v) => (v === null ? "—" : `$${Number(v).toFixed(2)}`)],
+  ["precio_venta", "Precio de venta", (v, codigo) => (v === null ? "—" : montoDePais(Number(v), codigo))],
+  ["costo_mercancia", "Costo de producto", (v, codigo) => (v === null ? "—" : montoDePais(Number(v), codigo))],
+  ["fulfillment", "Fulfillment", (v, codigo) => (v === null ? "—" : montoDePais(Number(v), codigo))],
   ["ubicacion", "Dónde está", (v) => etiqueta(UBICACIONES, v as string)],
   ["estado_publicacion", "Estado", (v) => (v ? etiqueta(ESTADOS_PUBLICACION, v as string) : "—")],
   ["tipo_publicacion", "Tipo", (v) => (v ? etiqueta(TIPOS, v as string) : "—")],
@@ -401,13 +407,14 @@ export async function actualizarPublicacion(f: FormData): Promise<{ error?: stri
     const a = antes[k] === null || antes[k] === undefined ? null : typeof datos[k] === "number" ? Number(antes[k]) : antes[k];
     return a !== datos[k];
   });
+  const codigo = await codigoDePais(antes.pais_id);
   if (cambios.length)
     await registrarAuditoria({
       accion: "editar_publicacion_dropi",
       entidad: "dropi_publicaciones",
       entidadId: id,
-      antes: Object.fromEntries(cambios.map(([k, n, ver]) => [n, ver(antes[k] ?? null)])),
-      despues: Object.fromEntries(cambios.map(([k, n, ver]) => [n, ver(datos[k])])),
+      antes: Object.fromEntries(cambios.map(([k, n, ver]) => [n, ver(antes[k] ?? null, codigo)])),
+      despues: Object.fromEntries(cambios.map(([k, n, ver]) => [n, ver(datos[k], codigo)])),
     });
   let dropi: string | undefined;
   // Archivar o sacar de Archivados eligiendo el Estado en la ficha también queda pendiente para Dropi, igual que el botón «Archivar» (24 oct 2026).
@@ -732,6 +739,57 @@ export async function apagarPublicacion(id: string, otrasIds: string[]): Promise
 }
 
 /**
+ * «Quitar privatización» (pedido de Hernán, 30 oct 2026): el candado cerrado de un ID privado. Deja pendiente el apagado del privado (sacarle el stock,
+ * quitarle el correo y archivarlo) y, si se elige el público del mismo producto (`publicoId`), que «Aplicar en Dropi» le devuelva esas unidades antes
+ * de archivar el privado. Sin público, las unidades solo se sacan (como «Apagar»). Nada se toca en Dropi hasta «Aplicar en Dropi».
+ */
+export async function quitarPrivatizacion(id: string, publicoId: string | null): Promise<{ error?: string; detalle?: string }> {
+  const usuario = await requireModuloEscritura(MODULO);
+  const antes = await publicacionPermitida(id, usuario.paisesPermitidos);
+  if (!antes) return { error: "La publicación ya no existe o no es de tus países." };
+  if (publicoId !== null && (typeof publicoId !== "string" || !UUID.test(publicoId))) return { error: "El público elegido no es válido." };
+  const supabase = createServiceClient();
+  const { data: delPais } = await supabase.from("dropi_publicaciones").select("id, nombre, tipo_publicacion, dropi_id, estado, estado_publicacion, pais_id, sku_maestro_id").eq("pais_id", antes.pais_id);
+  const todas = (delPais ?? []).map((x) => ({
+    id: x.id as string,
+    nombre: x.nombre as string,
+    tipo: (x.tipo_publicacion as "publico" | "privado" | null) ?? null,
+    dropiId: String(x.dropi_id ?? ""),
+    archivada: x.estado === "archivado" || x.estado_publicacion === "archivado",
+    skuId: (x.sku_maestro_id as string | null) ?? null,
+  }));
+  const yo = todas.find((x) => x.id === id);
+  if (!yo) return { error: "La publicación ya no existe." };
+  if (yo.tipo !== "privado") return { error: "Solo se le quita la privatización a un ID privado." };
+  // El público tiene que ser del mismo producto (su grupo por nombre o el mismo producto vinculado: el navegador no decide a qué ID de Dropi se le
+  // suma stock), estar activo y sin apagado esperando.
+  let devolverA: { publico: number; publicacionId: string } | null = null;
+  let publico: (typeof todas)[number] | undefined;
+  if (publicoId) {
+    const grupo = new Set(grupoDe(yo, todas).map((x) => x.id));
+    publico = todas.find((x) => x.id === publicoId && x.tipo !== "privado" && (grupo.has(x.id) || (!!yo.skuId && x.skuId === yo.skuId)));
+    const idDropi = publico ? Number(idsDeDropi(publico.dropiId)[0]) : 0;
+    if (!publico || !idDropi) return { error: "Ese público no es del mismo producto o no tiene ID de Dropi." };
+    if (publico.archivada) return { error: "Ese público está archivado: elige otro o no devuelvas las unidades." };
+    const { data: apagado } = await supabase.from("dropi_cambios_pendientes").select("id").eq("publicacion_id", publico.id).eq("tipo", "apagar").in("estado", ["pendiente", "error"]).limit(1);
+    if (apagado?.length) return { error: "Ese público tiene un apagado pendiente: no se le pueden devolver unidades." };
+    devolverA = { publico: idDropi, publicacionId: publico.id };
+  }
+  const por = { id: usuario.id, nombre: usuario.nombre || usuario.email };
+  const r = await encolarApagar(supabase, { id, pais_id: antes.pais_id, dropi_id: (antes.dropi_id as string | null) ?? null }, { quitarPrivados: true, devolverA }, por);
+  if ("error" in r) return { error: r.error };
+  const destino = publico && devolverA ? `devolverle las unidades al público ${publico.nombre} (ID ${devolverA.publico})` : "sin devolver las unidades a un público";
+  await registrarAuditoria({
+    accion: "dropi_quitar_privatizacion_pendiente",
+    entidad: "dropi_publicaciones",
+    entidadId: id,
+    detalle: `${antes.nombre} · ID Dropi ${antes.dropi_id}: pendiente para «Aplicar en Dropi» (sacar el stock, quitar la privatización, ${destino} y archivar)`,
+  });
+  revalidatePath(RUTA);
+  return { detalle: `Quitar privatización pendiente${devolverA ? ` (las unidades vuelven al ID ${devolverA.publico})` : ""}: pulsa «Aplicar en Dropi» con Dropi abierto.` };
+}
+
+/**
  * «Deshacer apagado» (pedido de Hernán, 23 oct 2026): quita de la cola de «Aplicar en Dropi» los apagados que todavía **no** se aplicaron en
  * Dropi, por si hubo un error o se cambió de opinión. En el sistema vuelven a verse como antes (el apagado pendiente es lo que las mostraba
  * apagadas; nada más se había movido). Solo los que Dropi no ha tocado (ningún intento): uno que ya sacó el stock en Dropi a medias no se
@@ -809,7 +867,9 @@ export async function republicarPublicacion(id: string, precio: number): Promise
     { precio: precioNuevo, precioAntes },
   );
   if ("error" in r) return { error: r.error };
-  const cambioPrecio = precioAntes === null || Math.abs(precioAntes - precioNuevo) > 0.004 ? `, con precio $${precioNuevo.toFixed(2)}${precioAntes !== null ? ` (antes $${precioAntes.toFixed(2)})` : ""}` : `, con el mismo precio $${precioNuevo.toFixed(2)}`;
+  const codigoRep = await codigoDePais(antes.pais_id);
+  const m = (n: number) => montoDePais(n, codigoRep);
+  const cambioPrecio = precioAntes === null || Math.abs(precioAntes - precioNuevo) > 0.004 ? `, con precio ${m(precioNuevo)}${precioAntes !== null ? ` (antes ${m(precioAntes)})` : ""}` : `, con el mismo precio ${m(precioNuevo)}`;
   await registrarAuditoria({ accion: "dropi_republicar_pendiente", entidad: "dropi_publicaciones", entidadId: id, detalle: `${antes.nombre} · ID Dropi ${antes.dropi_id}: pendiente para «Aplicar en Dropi»${cambioPrecio}` });
   revalidatePath(RUTA);
   return { detalle: r.yaEstaba ? "Ya estaba pendiente: pulsa «Aplicar en Dropi» con Dropi abierto." : "Republicación pendiente: pulsa «Aplicar en Dropi» con Dropi abierto." };
@@ -838,7 +898,7 @@ export async function privatizarPublicacion(id: string, crudo: unknown): Promise
   const { data: lectura } = await supabase.from("dropi_productos_proveedor").select("bodegas").eq("pais_id", antes.pais_id).eq("dropi_producto_id", ids[0]).maybeSingle();
   const bodegas = Array.isArray(lectura?.bodegas) ? (lectura!.bodegas as { id: number; stock: number }[]) : null;
   if (bodegas && !bodegas.some((b) => Number(b.id) === d.bodega)) return { error: "Esa bodega no tiene stock de este producto en Dropi." };
-  if (d.bodega === BODEGA_DROPI) return { error: "El stock de la bodega de Dropi (B280) no se mueve desde aquí." };
+  if (esBodegaDropi(d.bodega)) return { error: "El stock de la bodega de Dropi no se mueve desde aquí." };
   const disponible = bodegas ? Number(bodegas.find((b) => Number(b.id) === d.bodega)?.stock ?? 0) : null;
   const faltan = faltantesPrivatizar(d, disponible);
   if (faltan.length) return { error: faltan[0] };
@@ -860,6 +920,81 @@ export async function privatizarPublicacion(id: string, crudo: unknown): Promise
     });
   revalidatePath(RUTA);
   return { detalle: r.yaEstaba ? "Ya estaba pendiente para ese correo: pulsa «Aplicar en Dropi» con Dropi abierto." : "Privatización pendiente: pulsa «Aplicar en Dropi» con Dropi abierto." };
+}
+
+/**
+ * «En liquidación» (pedido de Alcides, 28 oct 2026; migración 0174): marca o desmarca una publicación que se está liquidando a propósito. Sale del
+ * aviso de margen bajo y de las recomendaciones de subir el precio o armar el combo, y va a la tarjeta «En liquidación». Solo cambia el sistema.
+ */
+export async function marcarLiquidacion(id: string, enLiquidacion: boolean): Promise<{ error?: string; detalle?: string }> {
+  const usuario = await requireModuloEscritura(MODULO);
+  const antes = await publicacionPermitida(id, usuario.paisesPermitidos);
+  if (!antes) return { error: "La publicación ya no existe o no es de tus países." };
+  const supabase = createServiceClient();
+  const { data: actual, error: errorLeer } = await supabase.from("dropi_publicaciones").select("liquidacion_en").eq("id", id).maybeSingle();
+  if (errorLeer) return { error: /liquidacion_en/.test(errorLeer.message) ? "Falta correr en Supabase la migración 0174." : "No se pudo leer la publicación." };
+  const ya = !!actual?.liquidacion_en;
+  if (ya === enLiquidacion) return { detalle: enLiquidacion ? "Ya estaba en liquidación." : "No estaba en liquidación." };
+  const { error } = await supabase
+    .from("dropi_publicaciones")
+    .update({ liquidacion_en: enLiquidacion ? new Date().toISOString() : null, actualizado_en: new Date().toISOString() })
+    .eq("id", id);
+  if (error) return { error: "No se pudo guardar." };
+  await registrarAuditoria({
+    accion: enLiquidacion ? "publicacion_liquidacion" : "publicacion_fin_liquidacion",
+    entidad: "dropi_publicaciones",
+    entidadId: id,
+    detalle: `${antes.nombre}${antes.dropi_id ? ` · ID Dropi ${antes.dropi_id}` : ""}: ${enLiquidacion ? "en liquidación (sale del aviso de margen bajo)" : "fuera de liquidación"}`,
+    antes: { Liquidación: ya ? "Sí" : "No" },
+    despues: { Liquidación: enLiquidacion ? "Sí" : "No" },
+  });
+  revalidatePath(RUTA);
+  return { detalle: enLiquidacion ? "En liquidación: ya no sale como margen bajo." : "Fuera de liquidación." };
+}
+
+/**
+ * «Cambiar stock en Dropi» (pedido de Alcides, 28 oct 2026): deja pendiente para «Aplicar en Dropi» que una bodega de ECOMFIVE quede con esas unidades.
+ * El sistema no cambia su stock al pedirlo (el stock es el que lee Dropi): cambia cuando el favorito lo confirma. La bodega tiene que ser una de
+ * ECOMFIVE del país (las de la lectura de «Mis productos»; nunca la B280) y la publicación tiene que existir en Dropi.
+ */
+export async function cambiarStockDropi(id: string, crudo: unknown): Promise<{ error?: string; detalle?: string }> {
+  const usuario = await requireModuloEscritura(MODULO);
+  const antes = await publicacionPermitida(id, usuario.paisesPermitidos);
+  if (!antes) return { error: "La publicación ya no existe o no es de tus países." };
+  if (antes.estado_publicacion === "borrador") return { error: "Todavía no está publicada en Dropi: el stock se pone al publicarla." };
+  if (antes.duplicada_de) return { error: "Es una duplicada: el stock se cambia en la publicación que vale." };
+  const ids = idsDeDropi((antes.dropi_id as string | null) ?? null);
+  if (!ids.length) return { error: "La publicación no tiene ID de Dropi." };
+  const supabase = createServiceClient();
+  const pedido = normalizarDatosStock(crudo);
+  // Con dos IDs («6667-8295») va al que se eligió en la ficha; sin elegir, al primero.
+  const producto = productoDelCambio(ids, pedido.producto);
+  if (typeof producto !== "number") return producto;
+  // Las bodegas de ECOMFIVE del país y lo que la última lectura mostraba de ese ID (el «antes»; la cuenta de verdad la hace el favorito).
+  const { data: lecturas } = await supabase.from("dropi_productos_proveedor").select("dropi_producto_id, bodegas").eq("pais_id", antes.pais_id).limit(1000);
+  const bodegas = new Map<number, string>();
+  let actual: { id: number; stock: number }[] = [];
+  for (const l of lecturas ?? []) {
+    const bs = Array.isArray(l.bodegas) ? (l.bodegas as { id: number; nombre?: string; stock?: number }[]) : [];
+    for (const b of bs) if (!esBodegaDropi(Number(b.id))) bodegas.set(Number(b.id), String(b.nombre ?? ""));
+    if (Number(l.dropi_producto_id) === producto) actual = bs.map((b) => ({ id: Number(b.id), stock: Number(b.stock) || 0 }));
+  }
+  const d = { ...pedido, producto, nombreBodega: bodegas.get(pedido.bodega) ?? pedido.nombreBodega, antes: lecturas ? (actual.find((b) => b.id === pedido.bodega)?.stock ?? 0) : null };
+  const faltan = faltantesStock(d, [...bodegas.keys()].map((b) => ({ id: b })));
+  if (faltan.length) return { error: faltan[0] };
+  const r = await encolarStock(supabase, { id, pais_id: antes.pais_id, dropi_id: (antes.dropi_id as string | null) ?? null }, d, { id: usuario.id, nombre: usuario.nombre || usuario.email });
+  if ("error" in r) return { error: r.error };
+  const bodega = `${codigoBodega(d.bodega)}${d.nombreBodega ? ` · ${d.nombreBodega}` : ""}`;
+  await registrarAuditoria({
+    accion: "dropi_stock_pendiente",
+    entidad: "dropi_publicaciones",
+    entidadId: id,
+    detalle: `${antes.nombre} · ID Dropi ${producto}: stock en ${bodega} ${d.antes !== null ? `de ${d.antes} ` : ""}a ${d.unidades} u. («${d.concepto}») · pendiente para «Aplicar en Dropi»`,
+  });
+  revalidatePath(RUTA);
+  return {
+    detalle: `Stock ${ids.length > 1 ? `del ID ${producto} ` : ""}en ${codigoBodega(d.bodega)} a ${d.unidades.toLocaleString("es-PA")} u. pendiente: pulsa «Aplicar en Dropi» con Dropi abierto.`,
+  };
 }
 
 /**

@@ -7,11 +7,13 @@ import { Ventana } from "@/components/ui/ventana";
 import { calcularMargen, leerMonto, precioParaMargen, productosPorSku, textoWhatsapp } from "@/lib/publicaciones/calculadora";
 import { nivelMargen, type Reglas } from "@/lib/publicaciones/reglas";
 import type { FilaPublicacion } from "./def-publicaciones";
+import { useMoneda } from "./moneda-contexto";
 
 const COLOR_NIVEL: Record<string, string> = { critico: "text-destructive", bajo: "text-destructive", aceptable: "text-warning", sano: "text-success" };
 const ETIQUETA_NIVEL: Record<string, string> = { critico: "crítico", bajo: "bajo", aceptable: "aceptable", sano: "saludable" };
 const monto = (n: number | null) => (n === null ? "" : n.toFixed(2));
-const usd = (n: number) => `${n < 0 ? "-" : ""}$${Math.abs(n).toFixed(2)}`;
+/** En un país que no usa dólares la calculadora cuenta en dólares: «US$», para no confundirlo con la moneda del país. */
+const dolares = (n: number | null) => (n === null ? "—" : `${n < 0 ? "-" : ""}US$${Math.abs(n).toFixed(2)}`);
 const pct = (n: number) => `${Math.round(n * 100)} %`;
 const etiquetaOpcion = (sku: { codigo: string; nombre: string }) => `${sku.codigo} · ${sku.nombre}`;
 
@@ -19,6 +21,8 @@ const etiquetaOpcion = (sku: { codigo: string; nombre: string }) => `${sku.codig
  * Gestión de IDs Dropi › Calculadora de margen (27 oct 2026, pedido de Hernán): se elige un producto por su SKU (o se escribe uno
  * nuevo; la lista es por SKU, no por publicación ni por ID de Dropi, pedido de Jhokser), se ponen el costo de mercancía, el fulfillment y el precio de venta, y sale la utilidad y el margen con el color de las
  * reglas. «Copiar para WhatsApp» deja el resultado en el portapapeles, listo para pegarlo en un chat. No guarda nada.
+ * En Costa Rica (31 oct 2026, pedido de Hernán) se calcula en dólares —lo de la publicación, que está en colones, se pasa con la tasa del
+ * día— y cada monto dice además cuánto es en colones. Sin tasa del día, en colones como el resto de Gestión de IDs.
  */
 export function CalculadoraMargen({ publicaciones, reglas }: { publicaciones: FilaPublicacion[]; reglas: Reglas }) {
   const [abierta, setAbierta] = useState(false);
@@ -43,6 +47,13 @@ export function CalculadoraMargen({ publicaciones, reglas }: { publicaciones: Fi
 function VentanaCalculadora({ publicaciones, reglas, alCerrar }: { publicaciones: FilaPublicacion[]; reglas: Reglas; alCerrar: () => void }) {
   const { mostrarToast } = useToast();
   const id = useId();
+  // En la moneda del país (Costa Rica en colones, con su valor en dólares en pequeño)…
+  const { moneda: m, monto: enMoneda, enDolares, simbolo } = useMoneda();
+  // …salvo Costa Rica con tasa del día: en dólares y, al lado, en colones.
+  const tasa = m.moneda !== "USD" && m.porUsd ? m.porUsd : null;
+  const usd = tasa ? dolares : enMoneda;
+  const enLocal = (n: number | null) => (tasa && n !== null ? enMoneda(n * tasa) : null);
+  const deLaPublicacion = (n: number | null) => (n === null ? null : tasa ? n / tasa : n);
   // Un producto por SKU; sus datos salen de su publicación pública al día (`productosPorSku`).
   const opciones = useMemo(() => productosPorSku(publicaciones).map((x) => ({ etiqueta: etiquetaOpcion(x.sku), codigo: x.sku.codigo, nombre: x.sku.nombre, p: x.representante })), [publicaciones]);
   const [buscar, setBuscar] = useState("");
@@ -65,9 +76,9 @@ function VentanaCalculadora({ publicaciones, reglas, alCerrar }: { publicaciones
     setNombreElegido(o.nombre);
     setNombre(o.nombre);
     setIdDropi(o.p.dropiId);
-    setCosto(monto(o.p.costoMercancia));
-    setFulfillment(monto(o.p.fulfillment));
-    setPrecio(monto(o.p.precioVenta));
+    setCosto(monto(deLaPublicacion(o.p.costoMercancia)));
+    setFulfillment(monto(deLaPublicacion(o.p.fulfillment)));
+    setPrecio(monto(deLaPublicacion(o.p.precioVenta)));
   }
 
   const datos = { costo: leerMonto(costo) ?? 0, fulfillment: leerMonto(fulfillment) ?? 0, precio: leerMonto(precio) ?? 0 };
@@ -76,7 +87,7 @@ function VentanaCalculadora({ publicaciones, reglas, alCerrar }: { publicaciones
   const paraMinimo = precioParaMargen(datos.costo, datos.fulfillment, reglas.margen_minimo);
   // El coste real (lo que costó la última compra) solo se incluye si la publicación elegida lo tiene y no se cambió el producto.
   const costeReal = elegida && nombreElegido === nombre ? elegida.costeReal : null;
-  const mensaje = resultado ? textoWhatsapp({ nombre, idDropi, costeReal }, datos, resultado) : null;
+  const mensaje = resultado ? textoWhatsapp({ nombre, idDropi, costeReal }, datos, resultado, (n) => (tasa ? `${dolares(n)} (${enLocal(n)})` : usd(n))) : null;
 
   async function copiar() {
     if (!mensaje) return;
@@ -138,7 +149,7 @@ function VentanaCalculadora({ publicaciones, reglas, alCerrar }: { publicaciones
               </label>
               <span className="flex items-center gap-1 rounded-md border border-border-control bg-card px-3 focus-within:border-foreground focus-within:ring-2 focus-within:ring-foreground">
                 <span aria-hidden="true" className="text-sm text-muted-foreground">
-                  $
+                  {tasa ? "US$" : simbolo}
                 </span>
                 <input
                   id={`${id}-${clave}`}
@@ -150,9 +161,15 @@ function VentanaCalculadora({ publicaciones, reglas, alCerrar }: { publicaciones
                   className="min-w-0 flex-1 bg-transparent py-2 text-sm tabular-nums outline-none"
                 />
               </span>
+              {tasa && leerMonto(valor) !== null && <span className="text-xs text-muted-foreground tabular-nums">≈ {enLocal(leerMonto(valor))}</span>}
             </div>
           ))}
         </div>
+        {tasa && (
+          <p className="m-0 text-xs text-muted-foreground">
+            En dólares. Tipo de cambio del día: {enMoneda(tasa)} por US$1; los datos del producto se pasan de colones a dólares con él.
+          </p>
+        )}
 
         <section aria-live="polite" aria-label="Resultado" className="rounded-lg bg-muted px-4 py-3">
           {resultado ? (
@@ -160,7 +177,14 @@ function VentanaCalculadora({ publicaciones, reglas, alCerrar }: { publicaciones
               <dl className="m-0 grid grid-cols-2 gap-3">
                 <div>
                   <dt className="text-xs text-muted-foreground">Utilidad</dt>
-                  <dd className={`m-0 text-2xl font-semibold tabular-nums ${resultado.utilidad < 0 ? "text-destructive" : ""}`}>{usd(resultado.utilidad)}</dd>
+                  <dd className={`m-0 text-2xl font-semibold tabular-nums ${resultado.utilidad < 0 ? "text-destructive" : ""}`}>
+                    {usd(resultado.utilidad)}
+                    {tasa ? (
+                      <span className="ml-1.5 text-xs font-normal text-muted-foreground">{enLocal(resultado.utilidad)}</span>
+                    ) : (
+                      enDolares(resultado.utilidad) && <span className="ml-1.5 text-xs font-normal text-muted-foreground">{enDolares(resultado.utilidad)}</span>
+                    )}
+                  </dd>
                 </div>
                 <div>
                   <dt className="text-xs text-muted-foreground">Margen</dt>
@@ -172,7 +196,8 @@ function VentanaCalculadora({ publicaciones, reglas, alCerrar }: { publicaciones
               </dl>
               {paraMinimo !== null && resultado.margen < reglas.margen_minimo && (
                 <p className="m-0 text-xs text-muted-foreground">
-                  Para llegar al margen mínimo ({pct(reglas.margen_minimo)}) el precio tendría que ser al menos <span className="font-semibold text-foreground tabular-nums">{usd(paraMinimo)}</span>.
+                  Para llegar al margen mínimo ({pct(reglas.margen_minimo)}) el precio tendría que ser al menos <span className="font-semibold text-foreground tabular-nums">{usd(paraMinimo)}</span>
+                  {tasa && <span className="tabular-nums"> ({enLocal(paraMinimo)})</span>}.
                 </p>
               )}
             </div>

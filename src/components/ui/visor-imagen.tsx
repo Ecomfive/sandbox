@@ -11,7 +11,22 @@ import { CerrarIcon } from "@/lib/nav-icons";
  * cierran, igual que `Ventana`, pero este es más simple (sin foco atrapado) porque solo muestra una imagen,
  * no un formulario.
  */
-export function VisorImagen({ src, alt, onClose }: { src: string | null; alt?: string; onClose: () => void }) {
+export function VisorImagen({
+  src,
+  alt,
+  onClose,
+  pie,
+  descargar,
+}: {
+  src: string | null;
+  alt?: string;
+  onClose: () => void;
+  /** Un texto bajo la imagen (el pie de una foto de WhatsApp). */
+  pie?: string | null;
+  /** Con esto se ofrece «Descargar» bajo la imagen (el nombre con que se guarda). */
+  descargar?: { href: string; nombre: string };
+}) {
+  const conInfo = !!pie || !!descargar;
   const cerrarRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -52,13 +67,20 @@ export function VisorImagen({ src, alt, onClose }: { src: string | null; alt?: s
       >
         <CerrarIcon className="h-5 w-5" />
       </button>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={src}
-        alt={alt || ""}
-        onClick={(e) => e.stopPropagation()}
-        className="max-h-[90vh] max-w-[90vw] rounded-md object-contain shadow-2xl"
-      />
+      <div className="flex max-h-full max-w-full flex-col items-center gap-3" onClick={(e) => e.stopPropagation()}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={src} alt={alt || ""} className={`${conInfo ? "max-h-[80vh]" : "max-h-[90vh]"} max-w-[90vw] rounded-md object-contain shadow-2xl`} />
+        {conInfo && (
+          <div className="flex max-w-[90vw] items-center gap-3 rounded-full bg-black/55 px-4 py-2 text-sm text-white">
+            {pie && <span className="min-w-0 max-w-[60vw] truncate">{pie}</span>}
+            {descargar && (
+              <a href={descargar.href} download={descargar.nombre} className={`flex-none rounded-full bg-white/15 px-3 py-1 font-medium hover:bg-white/25 ${anilloFoco}`}>
+                Descargar
+              </a>
+            )}
+          </div>
+        )}
+      </div>
     </div>,
     document.body
   );

@@ -5,8 +5,7 @@ import { anilloFoco, labelClass } from "@/components/ui/field";
 import { Ventana } from "@/components/ui/ventana";
 import { calcularMargen, leerMonto } from "@/lib/publicaciones/calculadora";
 import type { FilaPublicacion } from "./def-publicaciones";
-
-const usd = (n: number) => `$${n.toFixed(2)}`;
+import { useMoneda } from "./moneda-contexto";
 
 /**
  * La confirmación de «Republicar» (27 oct 2026, pedido de Hernán: el 11446 salió con el precio viejo porque nadie lo cambió). Antes de
@@ -15,6 +14,8 @@ const usd = (n: number) => `$${n.toFixed(2)}`;
  */
 export function ConfirmarRepublicar({ p, alCerrar, alConfirmar, enviando }: { p: FilaPublicacion; alCerrar: () => void; alConfirmar: (precio: number) => void; enviando: boolean }) {
   const id = useId();
+  // En la moneda del país (Costa Rica en colones).
+  const { monto: usd, simbolo } = useMoneda();
   const [texto, setTexto] = useState(p.precioVenta === null ? "" : p.precioVenta.toFixed(2));
   const precio = leerMonto(texto);
   const valido = precio !== null && precio > 0;
@@ -39,7 +40,7 @@ export function ConfirmarRepublicar({ p, alCerrar, alConfirmar, enviando }: { p:
           </label>
           <span className="flex items-center gap-1 rounded-md border border-border-control bg-card px-3 focus-within:border-foreground focus-within:ring-2 focus-within:ring-foreground">
             <span aria-hidden="true" className="text-sm text-muted-foreground">
-              $
+              {simbolo}
             </span>
             <input
               id={`${id}-precio`}

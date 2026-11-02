@@ -9,7 +9,7 @@ import type { SkuResumen, SugerenciaVista } from "@/lib/publicaciones/sugerencia
 import type { ComponenteEnCamino, EtapaCotizacion } from "@/lib/compras/en-camino";
 import type { VentasPublicacion } from "@/lib/publicaciones/ventas";
 import type { DatosCrearDropi } from "@/lib/publicaciones/crear-dropi";
-import { ACCIONES, BODEGA_DROPI, EN_DROPI, type Accion, type EnDropi } from "@/lib/publicaciones/automatico";
+import { ACCIONES, EN_DROPI, esBodegaDropi, type Accion, type EnDropi } from "@/lib/publicaciones/automatico";
 import { listaParaReactivar, sePuedePausar } from "@/lib/publicaciones/archivar";
 import type { EstadoBotones } from "@/lib/publicaciones/botones-fila";
 import { TIPOS_RECOMENDACION, type Decision, type EstadoTarea, type Recomendacion } from "@/lib/publicaciones/recomendaciones";
@@ -74,9 +74,9 @@ export interface FilaPublicacion {
   fechaPublicacion: string | null;
   ultimaRevision: string | null;
   proximaRevision: string | null;
-  /** La fecha anotada antes (ClickUp o a mano). Se usa solo si Dropi todavía no registró ningún cambio. */
+  /** La fecha anotada (ClickUp, al actualizar desde Dropi, al republicar o al aplicar un precio). La ficha la usa si es más nueva. */
   ultimoCambioPrecio: string | null;
-  /** El último cambio de precio que se vio en Dropi (fecha, de cuánto a cuánto), o null si no se vio ninguno. */
+  /** El último cambio de precio con montos: el que vio la lectura del catálogo o el aplicado desde el sistema, o null si no hay. */
   cambioPrecioDropi: CambioPrecio | null;
   /** Desde cuándo se lee el catálogo de Dropi del país (antes de esa fecha no se pueden ver cambios). */
   lecturaDropiDesde: string | null;
@@ -130,8 +130,21 @@ export interface FilaPublicacion {
   archivadoPendiente: "archivar" | "restaurar" | null;
   /** Privatizaciones esperando «Aplicar en Dropi» (migración 0155): a quién se le deja, cuántas unidades y bajo qué nombre. */
   privatizaciones: { correo: string; dropshipper: string; unidades: number; nombre: string }[];
+  /** Tareas escritas a mano sin resolver (migración 0175): cuántas y cuántas ya pasaron su fecha. */
+  tareasPendientes: { total: number; atrasadas: number };
+  /** Desde cuándo está en liquidación (migración 0174): sale del aviso de margen bajo y va a la tarjeta «En liquidación». */
+  liquidacionDesde: string | null;
+  /** Su producto está descontinuado en este país (ficha del producto, migración 0211): ya no se compra para aquí. */
+  descontinuadoPais: boolean;
+  /** Cambios de stock esperando «Aplicar en Dropi» (migración 0173): en qué bodega y cuántas unidades deben quedar. */
+  stockPendiente: { producto: number | null; bodega: number; nombreBodega: string; unidades: number; antes: number | null }[];
   /** Las demás publicaciones del mismo producto (el público y sus privadas «P-MA …»), para apagarlas juntas (`grupoDe`). */
   grupo: { id: string; nombre: string; dropiId: string; archivada: boolean; tipo: "publico" | "privado" | null; stock: number | null; correo: string; apagadoPendiente: boolean; apagadoSinTocar: boolean }[];
+  /**
+   * De una privada, los públicos a los que «Quitar privatización» le puede devolver las unidades (30 oct 2026): activos, con ID de Dropi y sin apagado
+   * esperando, de su grupo o del mismo producto vinculado (muchos privados no llevan el «P-XX» con el nombre del público). Vacío en una pública.
+   */
+  publicosDelProducto: { id: string; nombre: string; dropiId: string; stock: number | null }[];
   /** Público o privado: el elegido en la ficha (el sistema manda, 24 oct 2026); si no hay nada anotado, lo que dice Dropi. */
   tipoDropi: "publico" | "privado" | null;
   /** Público o privado según la última lectura de Dropi (solo de referencia; null sin datos de Dropi). */
@@ -154,6 +167,9 @@ export interface FilaPublicacion {
   /** Lo que dice «Mis productos» de Dropi (migración 0131): cada bodega con su stock, el total y lo reservado a privados. null si
    * la publicación no tiene un ID que esté entre nuestros productos de Dropi o nunca se leyó. */
   bodegasDropi: { id: number; nombre: string; stock: number }[] | null;
+  /** Cada ID de la publicación que aparece en «Mis productos», con sus bodegas (31 oct 2026): con dos IDs («6667-8295») el stock se cambia en el
+   * que se elija. El primero es el de `bodegasDropi`. */
+  stockPorId: { id: number; archivado: boolean; stock: number; bodegas: { id: number; nombre: string; stock: number }[] }[];
   stockProveedor: number | null;
   stockPrivadoProveedor: number | null;
   /** Cuándo se leyó «Mis productos» por última vez (lo mismo en todas las filas del país). */
@@ -184,7 +200,7 @@ export function sinStock(f: Pick<FilaPublicacion, "archivada" | "enDropi" | "sto
  * nuestra bodega (lo de la B280 es de Dropi). El servidor lo vuelve a comprobar en `republicarPublicacion`.
  */
 export function puedeRepublicar(f: Pick<FilaPublicacion, "dropiId" | "archivada" | "bodega" | "tipoDropi" | "sinPublicar" | "apagadoPendiente" | "duplicadaDe">): boolean {
-  return f.dropiId.trim() !== "" && !f.archivada && !f.sinPublicar && !f.apagadoPendiente && !f.duplicadaDe && f.bodega?.id !== BODEGA_DROPI && f.tipoDropi !== "privado";
+  return f.dropiId.trim() !== "" && !f.archivada && !f.sinPublicar && !f.apagadoPendiente && !f.duplicadaDe && !esBodegaDropi(f.bodega?.id) && f.tipoDropi !== "privado";
 }
 /** Si tiene una republicación esperando «Aplicar en Dropi» (o que dio error y se reintenta). */
 export const republicacionPendiente = (f: Pick<FilaPublicacion, "cambioDropi">) => f.cambioDropi?.tipo === "republicar" && f.cambioDropi.estado !== "aplicado";
@@ -332,6 +348,15 @@ export const DEF_PUBLICACIONES: DefTabla<FilaPublicacion> = {
     { id: "enCamino", etiqueta: "Mercancía en camino (unidades)", tipo: "numero", valor: (f) => f.enCamino },
     { id: "enCotizacion", etiqueta: "En cotización (unidades)", tipo: "numero", valor: (f) => f.enCotizacion },
     // «Sin stock» del tablero (25 oct 2026, pedido de Alcides): toda publicación activa en Dropi con 0 unidades, venda o no.
+    // «En liquidación» (28 oct 2026, migración 0174): su margen bajo es a propósito y no cuenta como aviso.
+    {
+      id: "liquidacion",
+      etiqueta: "Liquidación",
+      tipo: "seleccion",
+      valores: (f) => [f.liquidacionDesde ? "si" : "no"],
+      opciones: () => [{ valor: "si", etiqueta: "En liquidación" }, { valor: "no", etiqueta: "Sin liquidar" }],
+      agrupable: true,
+    },
     { id: "sinStock", etiqueta: "Sin stock", tipo: "seleccion", valores: (f) => [sinStock(f) ? "si" : "no"], opciones: () => [{ valor: "si", etiqueta: "Sin stock" }, { valor: "no", etiqueta: "Con stock" }] },
     // «Poco stock» del tablero (27 oct 2026, pedido de Hernán): vende y le quedan menos de 100 unidades.
     { id: "pocoStock", etiqueta: "Poco stock", tipo: "seleccion", valores: (f) => [pocoStock(f) ? "si" : "no"], opciones: () => [{ valor: "si", etiqueta: "Poco stock" }, { valor: "no", etiqueta: "Stock suficiente o sin ventas" }] },
@@ -405,6 +430,7 @@ export function estadoBotones(f: FilaPublicacion): EstadoBotones {
     bodegaId: f.bodega?.id ?? null,
     stock: stockDe(f),
     privado: privadoDe(f),
-    stockPropio: (f.bodegasDropi ?? []).some((b) => b.id !== BODEGA_DROPI && b.stock > 0),
+    stockPropio: (f.bodegasDropi ?? []).some((b) => !esBodegaDropi(b.id) && b.stock > 0),
+    liquidacion: !!f.liquidacionDesde,
   };
 }

@@ -8,9 +8,16 @@ export interface Pestana {
  * una es el título de su página. La primera es la página del módulo; las demás cuelgan de ella.
  */
 export const PESTANAS_POR_MODULO: Record<string, Pestana[]> = {
+  "/publicaciones-drop": [
+    { etiqueta: "Publicaciones", href: "/publicaciones-drop" },
+    { etiqueta: "Recomendaciones", href: "/publicaciones-drop/recomendaciones" },
+    { etiqueta: "Tareas", href: "/publicaciones-drop/tareas" },
+    { etiqueta: "Reglas", href: "/publicaciones-drop/reglas" },
+  ],
   "/publicaciones-dropi": [
     { etiqueta: "Publicaciones", href: "/publicaciones-dropi" },
     { etiqueta: "Recomendaciones", href: "/publicaciones-dropi/recomendaciones" },
+    { etiqueta: "Tareas", href: "/publicaciones-dropi/tareas" },
     { etiqueta: "Reglas", href: "/publicaciones-dropi/reglas" },
     { etiqueta: "Consumo de IA", href: "/publicaciones-dropi/consumo" },
   ],
@@ -34,13 +41,18 @@ export const PESTANAS_POR_MODULO: Record<string, Pestana[]> = {
   "/crm-dropshippers": [
     { etiqueta: "Dropshippers", href: "/crm-dropshippers" },
     { etiqueta: "Bandeja de WhatsApp", href: "/crm-dropshippers/bandeja" },
+    { etiqueta: "Tareas", href: "/crm-dropshippers/tareas" },
+    { etiqueta: "Plantillas", href: "/crm-dropshippers/plantillas" },
+    { etiqueta: "Borrados", href: "/crm-dropshippers/borrados" },
     { etiqueta: "Casos", href: "/crm-dropshippers/casos" },
+    { etiqueta: "Motivos", href: "/crm-dropshippers/motivos" },
     { etiqueta: "Ranking", href: "/crm-dropshippers/ranking" },
-    { etiqueta: "KPIs de atención", href: "/crm-dropshippers/kpis" },
     { etiqueta: "Vínculos", href: "/crm-dropshippers/vinculos" },
   ],
   "/inventario": [
     { etiqueta: "Stock", href: "/inventario" },
+    { etiqueta: "Levantamiento", href: "/inventario/levantamiento" },
+    { etiqueta: "Remisiones", href: "/inventario/remisiones" },
     { etiqueta: "Vencimientos", href: "/inventario/vencimientos" },
     { etiqueta: "Pistoleo", href: "/inventario/pistoleo" },
   ],
@@ -59,6 +71,13 @@ export const PESTANAS_POR_MODULO: Record<string, Pestana[]> = {
   "/analisis-competencia": [
     { etiqueta: "Competidores", href: "/analisis-competencia" },
     { etiqueta: "Resumen", href: "/analisis-competencia/resumen" },
+  ],
+  // Tu Winner (2 nov 2026, boceto aprobado): los ganadores, lo que se repite en varios canales, el seguimiento y cómo se lee.
+  "/tu-winner": [
+    { etiqueta: "Ganadores", href: "/tu-winner" },
+    { etiqueta: "Se repite en varios canales", href: "/tu-winner/canales" },
+    { etiqueta: "Seguimiento", href: "/tu-winner/seguimiento" },
+    { etiqueta: "Cómo se actualiza", href: "/tu-winner/como" },
   ],
   // Compras primero y luego el Tablero de Shen Zhen (pedido de Hernán, 22 oct 2026).
   "/compras": [

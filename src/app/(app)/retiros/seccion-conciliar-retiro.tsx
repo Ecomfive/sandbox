@@ -1,5 +1,6 @@
 "use client";
 
+import { simboloDePais } from "@/lib/moneda/simbolo";
 import { useState, useTransition } from "react";
 import { conciliarRetiro } from "./actions";
 import { BotonAdjuntar } from "@/components/ui/boton-adjuntar";
@@ -52,6 +53,7 @@ export function SeccionConciliarRetiro({
   alConciliado: () => void;
 }) {
   const [pending, startTransition] = useTransition();
+  const simbolo = simboloDePais(codigoPais);
   const [error, setError] = useState<string | null>(null);
   const { formRef, completo, faltante, revisar, señalarFaltante } = useFaltantes();
   const idRecibido = `campo-recibido-${id}`;
@@ -96,7 +98,7 @@ export function SeccionConciliarRetiro({
               <span aria-hidden="true" className="text-destructive"> *</span>
             </label>
             <div className="flex items-center gap-1">
-              <span className="text-sm text-muted-foreground">$</span>
+              <span className="text-sm text-muted-foreground">{simbolo}</span>
               <input
                 id={idRecibido}
                 type="number"

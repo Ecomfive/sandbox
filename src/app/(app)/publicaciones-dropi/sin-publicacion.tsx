@@ -1,5 +1,6 @@
 "use client";
 
+import { useMoneda } from "./moneda-contexto";
 import { useState, useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
 import { anilloFoco, fieldClassSm, labelClassSm } from "@/components/ui/field";
@@ -62,8 +63,9 @@ function ProductoSinPublicacionFila({ p, sinId, puedeEscribir }: { p: ProductoSi
   const [trabajando, empezar] = useTransition();
   const [copiarDe, setCopiarDe] = useState("");
   const [vincularA, setVincularA] = useState("");
+  const { monto } = useMoneda();
   const creado = fecha(p.creado);
-  const datos = [`ID ${p.dropiId}`, p.bodega !== null ? codigoBodega(p.bodega) : "Sin bodega", `${p.stock.toLocaleString("es-PA")} u.`, p.precio !== null ? `$${p.precio.toFixed(2)}` : null, creado ? `creado ${creado}` : null].filter(Boolean);
+  const datos = [`ID ${p.dropiId}`, p.bodega !== null ? codigoBodega(p.bodega) : "Sin bodega", `${p.stock.toLocaleString("es-PA")} u.`, p.precio !== null ? monto(p.precio) : null, creado ? `creado ${creado}` : null].filter(Boolean);
 
   function correr(accion: () => Promise<{ error?: string; detalle?: string }>) {
     empezar(async () => {

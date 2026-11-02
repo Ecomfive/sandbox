@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { anilloFoco, fieldClassSm } from "@/components/ui/field";
-import { formatearMoneda } from "@/lib/formato";
-import { obtenerDesempeno, type DesempenoPais, type ProductoVendido } from "./actions";
+import { formatearFecha, formatearMoneda } from "@/lib/formato";
+import type { Desempeno } from "./desempeno-datos";
 import { nombrePais } from "./def-crm";
 
 const PERIODOS = [
+  // «Este mes» (29 oct 2026, pedido de Alcides): reemplaza al bloque «Este mes» de la ficha; va primero y es el de entrada.
+  { id: "mes", etiqueta: "Este mes", dias: -1 },
   { id: "7", etiqueta: "7 días", dias: 7 },
   { id: "14", etiqueta: "14 días", dias: 14 },
   { id: "30", etiqueta: "30 días", dias: 30 },
@@ -17,6 +19,11 @@ const PERIODOS = [
 /** AAAA-MM-DD en la hora de quien mira (no en UTC: de noche «hoy» en UTC ya es mañana). */
 const aIso = (d: Date) => d.toLocaleDateString("en-CA");
 const haceDias = (n: number) => aIso(new Date(Date.now() - (n - 1) * 86_400_000));
+/** El primer día del mes en curso, en la hora de quien mira. */
+const inicioDelMes = () => {
+  const h = new Date();
+  return aIso(new Date(h.getFullYear(), h.getMonth(), 1));
+};
 
 const porcentaje = (parte: number, total: number) => (total > 0 ? `${Math.round((parte / total) * 1000) / 10} %` : "—");
 
@@ -35,29 +42,43 @@ function Cifra({ titulo, valor, destacada }: { titulo: string; valor: string | n
  * (otra moneda). Despachada = ya salió de la bodega; tasa de entrega = entregadas ÷ despachadas.
  */
 export function DesempenoDropshipper({ dropshipperId, tieneCuentas }: { dropshipperId: string; tieneCuentas: boolean }) {
-  const [periodo, setPeriodo] = useState<(typeof PERIODOS)[number]["id"]>("30");
-  const [desde, setDesde] = useState(() => haceDias(30));
+  const [periodo, setPeriodo] = useState<(typeof PERIODOS)[number]["id"]>("mes");
+  const [desde, setDesde] = useState(inicioDelMes);
   const [hasta, setHasta] = useState(() => aIso(new Date()));
-  const [datos, setDatos] = useState<{ paises: DesempenoPais[]; productos: ProductoVendido[] } | "error" | null>(null);
+  const [datos, setDatos] = useState<Desempeno | "error" | null>(null);
+  // El período que muestran las cifras: mientras llega el nuevo, las de antes se ven atenuadas con «Cargando…».
+  const [mostrado, setMostrado] = useState<string | null>(null);
+  const pedido = `${desde}|${hasta}`;
+  const cargando = datos === null || mostrado !== pedido;
 
   function elegir(id: (typeof PERIODOS)[number]["id"]) {
     setPeriodo(id);
     const p = PERIODOS.find((x) => x.id === id);
-    if (p && p.dias > 0) {
-      setDesde(haceDias(p.dias));
+    if (p && p.dias !== 0) {
+      setDesde(p.dias < 0 ? inicioDelMes() : haceDias(p.dias));
       setHasta(aIso(new Date()));
     }
   }
 
   useEffect(() => {
     if (!tieneCuentas || !desde || !hasta || desde > hasta) return;
-    let vigente = true;
-    obtenerDesempeno(dropshipperId, desde, hasta)
-      .then((r) => vigente && setDatos("error" in r ? "error" : r))
-      .catch(() => vigente && setDatos("error"));
-    return () => {
-      vigente = false;
-    };
+    // Una ruta y no una acción del servidor: las acciones de la página van en fila y esta esperaba detrás de las otras lecturas de la
+    // ficha, así que los botones parecían no hacer nada (29 oct 2026).
+    const control = new AbortController();
+    const q = new URLSearchParams({ d: dropshipperId, desde, hasta });
+    fetch(`/api/crm/desempeno?${q}`, { signal: control.signal, cache: "no-store" })
+      .then(async (r) => {
+        const json = (await r.json().catch(() => null)) as Desempeno | { error: string } | null;
+        setDatos(!r.ok || !json || "error" in json ? "error" : json);
+        setMostrado(`${desde}|${hasta}`);
+      })
+      .catch((e) => {
+        if (control.signal.aborted) return;
+        console.error(e);
+        setDatos("error");
+        setMostrado(`${desde}|${hasta}`);
+      });
+    return () => control.abort();
   }, [dropshipperId, desde, hasta, tieneCuentas]);
 
   if (!tieneCuentas) {
@@ -94,14 +115,17 @@ export function DesempenoDropshipper({ dropshipperId, tieneCuentas }: { dropship
         </div>
       )}
 
-      {datos === null && <p className="m-0 text-[13px] text-muted-foreground">Cargando…</p>}
+      <p className="m-0 text-xs text-muted-foreground tabular-nums" aria-live="polite">
+        {desde > hasta ? "La fecha «Desde» va después de «Hasta»." : `Del ${formatearFecha(desde)} al ${formatearFecha(hasta)}`}
+        {cargando && desde <= hasta ? " · Cargando…" : ""}
+      </p>
       {datos === "error" && (
         <p role="alert" className="m-0 text-[13px] text-destructive">
           No se pudo cargar el desempeño.
         </p>
       )}
       {datos && datos !== "error" && (
-        <>
+        <div className={`flex flex-col gap-3 transition-opacity ${cargando ? "opacity-50" : ""}`} aria-busy={cargando}>
           {datos.paises.length === 0 ? (
             <p className="m-0 text-[13px] text-muted-foreground">Sin pedidos en este período.</p>
           ) : (
@@ -129,7 +153,10 @@ export function DesempenoDropshipper({ dropshipperId, tieneCuentas }: { dropship
               <ul className="m-0 flex list-none flex-col gap-1 p-0 text-[13px]">
                 {datos.productos.map((p) => (
                   <li key={`${p.producto}-${p.sku ?? ""}`} className="flex items-baseline justify-between gap-2">
-                    <span className="min-w-0 truncate">{p.producto}</span>
+                    <span className="flex min-w-0 items-baseline gap-1.5">
+                      <span className="min-w-0 truncate">{p.producto}</span>
+                      {p.ids && <span className="shrink-0 text-xs tabular-nums text-muted-foreground">ID {p.ids}</span>}
+                    </span>
                     <span className="shrink-0 tabular-nums text-muted-foreground">
                       {p.unidades} {p.unidades === 1 ? "unidad" : "unidades"} · {p.entregadas} entr.
                     </span>
@@ -138,7 +165,7 @@ export function DesempenoDropshipper({ dropshipperId, tieneCuentas }: { dropship
               </ul>
             </div>
           )}
-        </>
+        </div>
       )}
     </div>
   );

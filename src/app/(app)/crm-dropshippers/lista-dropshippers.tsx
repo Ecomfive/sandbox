@@ -1,13 +1,13 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { ListaDatos } from "@/components/tabla/lista-datos";
-import { anilloFoco } from "@/components/ui/field";
+import { ContadorPestana } from "@/components/migas/contador-pestana";
 import type { AccesoCrm } from "@/lib/crm/areas";
 import { AlertaIcon, CalendarioIcon, ChatIcon, DropshipperIcon, EnlaceIcon, EstadoIcon, PersonaIcon, VentasIcon } from "@/lib/nav-icons";
 import type { NombreFilas } from "@/lib/tabla/pie";
+import { BurbujaWhatsapp } from "./burbuja-whatsapp";
 import { CrearDropshipperPanel } from "./crear-dropshipper-panel";
 import { DEF_DROPSHIPPERS, type FilaCaso, type FilaDropshipper } from "./def-crm";
 import { EncabezadoFilasCrm, FilaDropshipperLista } from "./fila-dropshipper";
@@ -21,7 +21,6 @@ const ICONOS: Record<string, IconoComp> = {
   plataforma: EnlaceIcon,
   etapa: EstadoIcon,
   nivel: EstadoIcon,
-  responsable: PersonaIcon,
   venta: DropshipperIcon,
   origen: DropshipperIcon,
   ciudad: DropshipperIcon,
@@ -57,7 +56,7 @@ export function ListaDropshippers({
   hoy: string;
   acceso: AccesoCrm;
   abrirInicial?: string | null;
-  /** Conversaciones de WhatsApp sin responder (también las de quien no está en el CRM), para el botón de la bandeja. */
+  /** Conversaciones de WhatsApp sin responder (también las de quien no está en el CRM), para la burbuja de la bandeja. */
   sinResponder: number;
 }) {
   const [abierto, setAbierto] = useState<string | null>(() => (abrirInicial && dropshippers.some((d) => d.id === abrirInicial) ? abrirInicial : null));
@@ -78,16 +77,8 @@ export function ListaDropshippers({
   );
   return (
     <>
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        <Link
-          href="/crm-dropshippers/bandeja"
-          className={`inline-flex min-h-10 items-center gap-2 rounded-lg bg-primario px-3.5 text-sm font-semibold text-white hover:opacity-90 ${anilloFoco}`}
-        >
-          <ChatIcon className="h-4 w-4" />
-          Bandeja de WhatsApp
-          {sinResponder > 0 && <span className="rounded-full bg-white px-1.5 text-xs font-semibold text-primario tabular-nums">{sinResponder}</span>}
-        </Link>
-      </div>
+      <ContadorPestana href="/crm-dropshippers/bandeja" cantidad={sinResponder} />
+      <BurbujaWhatsapp sinResponder={sinResponder} />
       <TableroCrm dropshippers={dropshippers} casos={casos} />
       <ListaDatos
         def={DEF_DROPSHIPPERS}

@@ -1,11 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { descontinuadosEnPais } from "@/lib/producto/descontinuado-pais";
 import { after } from "next/server";
-import { accionesPublicacion, BODEGA_DROPI, enDropi, estaArchivada, necesitaRepublicar } from "@/lib/publicaciones/automatico";
+import { accionesPublicacion, enDropi, esBodegaDropi, estaArchivada, necesitaRepublicar } from "@/lib/publicaciones/automatico";
 import { normalizarDatosCrear, type OpcionesCrear } from "@/lib/publicaciones/crear-dropi";
-import { cargarCambiosPrecio, cargarCompetidores, cargarNuestrosEnDropi, competidorMasBarato, competidorMinimo, ultimoCambioDe } from "@/lib/publicaciones/competencia-publicaciones";
+import { monedaPublicaciones } from "@/lib/publicaciones/moneda";
+import { cargarCambiosPrecio, cargarCompetidores, cargarNuestrosEnDropi, competidorMasBarato, competidorMinimo, competidoresEquivalentes, ultimoCambioDe } from "@/lib/publicaciones/competencia-publicaciones";
 import { notaOptimizacion, revisarPublicacion } from "@/lib/publicaciones/optimizacion";
 import { numeroPublicacion, revisionVencida } from "@/lib/publicaciones/publicacion";
-import { estadoTarea, etiquetaRecomendacion, NO_EN_PRIVADAS, pendientes, recomendar, recomendarOptimizacion, tareaCumplida, type Decision } from "@/lib/publicaciones/recomendaciones";
+import { estadoTarea, etiquetaRecomendacion, NO_EN_LIQUIDACION, NO_EN_PRIVADAS, pendientes, recomendar, recomendarOptimizacion, tareaCumplida, type Decision } from "@/lib/publicaciones/recomendaciones";
 import { nivelMargen, type Reglas } from "@/lib/publicaciones/reglas";
 import { cargarReglas, type ReglasGuardadas } from "@/lib/publicaciones/reglas-datos";
 import { cargarEnCamino } from "@/lib/publicaciones/en-camino-datos";
@@ -13,7 +15,8 @@ import { enCaminoDeCompuesto, juntarEtapaCotizacion } from "@/lib/compras/en-cam
 import { cargarProductosProveedor } from "@/lib/publicaciones/proveedor-datos";
 import { enDropiSinPublicacion, type ProductoSinPublicacion } from "@/lib/publicaciones/sin-publicacion";
 import { grupoDe } from "@/lib/publicaciones/apagar-dropi";
-import { cargarCambiosDropi } from "@/lib/publicaciones/cambios-dropi";
+import { masReciente } from "@/lib/publicaciones/cambio-precio";
+import { cargarCambiosDropi, cargarPreciosAplicados } from "@/lib/publicaciones/cambios-dropi";
 import { bodegaDePublicacion, bodegasDelPais, bodegasEnOrden, productoPrincipal, type ProductoProveedor } from "@/lib/publicaciones/sincronizar-dropi";
 import { cargarSugerencias } from "@/lib/publicaciones/sugerencias";
 import type { UsuarioActual } from "@/lib/auth";
@@ -36,7 +39,7 @@ function opcionesParaCrear(productos: Iterable<ProductoProveedor>): OpcionesCrea
   const bodegas = new Map<number, string>();
   for (const p of productos) {
     for (const c of p.categorias) if (c.trim()) categorias.add(c.trim());
-    for (const b of p.bodegas) if (b.id !== BODEGA_DROPI) bodegas.set(b.id, b.nombre);
+    for (const b of p.bodegas) if (!esBodegaDropi(b.id)) bodegas.set(b.id, b.nombre);
   }
   return {
     categorias: [...categorias].sort((a, b) => a.localeCompare(b, "es")),
@@ -193,7 +196,7 @@ async function guardarCumplidas(supabase: SupabaseClient, cumplidas: { d: Decisi
 }
 
 /** Las personas activas del sistema, para elegir quién hace una tarea. */
-async function cargarPersonas(supabase: SupabaseClient): Promise<{ id: string; nombre: string }[]> {
+export async function cargarPersonas(supabase: SupabaseClient): Promise<{ id: string; nombre: string }[]> {
   const { data } = await supabase.from("perfiles").select("id, nombre, email").eq("activo", true).order("nombre");
   return (data ?? []).map((p) => ({ id: p.id as string, nombre: ((p.nombre as string | null) || (p.email as string | null) || "Sin nombre").trim() }));
 }
@@ -225,6 +228,8 @@ export interface DatosPublicaciones {
  */
 export async function cargarPublicaciones(supabase: SupabaseClient, paisId: string, usuario: UsuarioActual): Promise<DatosPublicaciones | null> {
   const hoy = new Date().toLocaleDateString("en-CA", { timeZone: "America/Panama" });
+  // La moneda del país, para los textos y el redondeo de las recomendaciones de precio (Costa Rica en colones).
+  const monedaPais = Promise.resolve(supabase.from("paises").select("codigo").eq("id", paisId).maybeSingle()).then(({ data }) => monedaPublicaciones(String(data?.codigo ?? "PA"), {}));
   const [filasR, numerosR, reglas, { decisiones, conTareas }, personas] = await Promise.all([
     traerTodasConError<Fila>((desde, hasta) =>
       supabase
@@ -254,6 +259,29 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
     supabase.from("dropi_publicaciones").select("id, pausada_en").eq("pais_id", paisId).not("pausada_en", "is", null).order("id").range(desde, hasta),
   );
   const pausadaEn = new Map(pausadasR.error ? [] : (pausadasR.data ?? []).map((n) => [n.id, n.pausada_en as string]));
+  // Las que están en liquidación (migración 0174), igual: sin la migración, ninguna.
+  const liquidacionR = await traerTodasConError<{ id: string; liquidacion_en: string | null }>((desde, hasta) =>
+    supabase.from("dropi_publicaciones").select("id, liquidacion_en").eq("pais_id", paisId).not("liquidacion_en", "is", null).order("id").range(desde, hasta),
+  );
+  // Las tareas escritas a mano sin resolver ni archivar (migraciones 0175 y 0178), para la marca de la fila: sin la 0178 cuentan también las archivadas
+  // (no hay) y sin la 0175, ninguna.
+  const leerTareas = (sinArchivadas: boolean) =>
+    traerTodasConError<{ publicacion_id: string; plazo: string | null }>((desde, hasta) => {
+      const q = supabase.from("dropi_publicaciones_tareas").select("publicacion_id, plazo, id, dropi_publicaciones!inner(pais_id)").eq("dropi_publicaciones.pais_id", paisId).is("hecha_en", null);
+      return (sinArchivadas ? q.is("archivada_en", null) : q).order("id").range(desde, hasta);
+    });
+  let tareasR = await leerTareas(true);
+  if (tareasR.error) tareasR = await leerTareas(false);
+  const tareasDe = new Map<string, { total: number; atrasadas: number }>();
+  for (const t of tareasR.error ? [] : (tareasR.data ?? [])) {
+    const x = tareasDe.get(t.publicacion_id) ?? { total: 0, atrasadas: 0 };
+    x.total++;
+    if (t.plazo && t.plazo < hoy) x.atrasadas++;
+    tareasDe.set(t.publicacion_id, x);
+  }
+  const liquidacionEn = new Map(liquidacionR.error ? [] : (liquidacionR.data ?? []).map((n) => [n.id, n.liquidacion_en as string]));
+  // Los productos descontinuados en este país (migración 0211): sin la migración, ninguno.
+  const descontinuados = await descontinuadosEnPais(supabase, paisId);
 
   const datos = filasR.data ?? [];
   const nombrePorId = new Map(datos.map((d) => [d.id, d.nombre as string]));
@@ -264,7 +292,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
     const b = await supabase.from("dropi_publicaciones").select("id, datos_dropi").in("id", idsBorrador);
     if (!b.error) for (const x of b.data ?? []) datosBorradores.set(x.id as string, x.datos_dropi);
   }
-  const [{ skus, sugerencias, combosX2 }, opcionesSku, ventas, competidores, precios, enCaminoYCotizando, enDropiCatalogo, proveedor, cambiosDropi] = await Promise.all([
+  const [{ skus, sugerencias, combosX2 }, opcionesSku, ventas, competidores, precios, enCaminoYCotizando, enDropiCatalogo, proveedor, cambiosDropi, preciosAplicados] = await Promise.all([
     cargarSugerencias(
       supabase,
       paisId,
@@ -278,6 +306,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
     cargarNuestrosEnDropi(supabase, paisId),
     cargarProductosProveedor(supabase, paisId),
     cargarCambiosDropi(supabase, paisId),
+    cargarPreciosAplicados(supabase, paisId),
   ]);
   const { camino: enCaminoPorSku, cotizando: cotizandoPorSku, etapasCotizando } = enCaminoYCotizando;
   const r = reglas.reglas;
@@ -294,6 +323,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
   }
   const compuestoDe = new Map(combos.map((id) => [id, enCaminoDeCompuesto(componentesDe.get(id) ?? [], enCaminoPorSku)]));
   // La revisión de optimización: con lo que muestra Dropi (el primer ID que esté en el catálogo); si no se leyó, el título guardado.
+  const monedaRevision = (await monedaPais).moneda;
   const revisionDe = (d: Fila): Pick<FilaPublicacion, "revisiones" | "nota" | "tituloDropi"> => {
     const cat = idsDropi(d).map((id) => enDropiCatalogo.get(id)).find((x) => !!x) ?? null;
     const revisiones = revisarPublicacion(
@@ -302,6 +332,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
         categoria: cat?.categoria ?? null,
         precio: cat?.precio ?? num(d.precio_venta),
         precioSugerido: cat?.precioSugerido ?? null,
+        moneda: monedaRevision,
         fotos: cat?.fotos ?? null,
         videos: cat?.videos ?? null,
         descripcionLargo: cat?.descripcionLargo ?? null,
@@ -350,7 +381,8 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
       ultimaRevision: (d.ultima_revision as string | null) ?? null,
       proximaRevision: proxima,
       ultimoCambioPrecio: (d.ultimo_cambio_precio as string | null) ?? null,
-      cambioPrecioDropi: ultimoCambioDe(idsDropi(d), precios.cambios),
+      // El más reciente entre lo que vio la lectura del catálogo y lo aplicado desde el sistema (30 oct 2026).
+      cambioPrecioDropi: masReciente([ultimoCambioDe(idsDropi(d), precios.cambios), preciosAplicados.get(d.id as string)]),
       lecturaDropiDesde: precios.desde,
       revisionVencida: revisionVencida({ estado, proximaRevision: proxima }, hoy),
       // Sin foto propia, la del producto vinculado (pedido de Hernán, 23 oct 2026): así no queda el cuadro vacío.
@@ -375,6 +407,9 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
       recomendaciones: [],
       decisiones: decisionesDe.get(d.id) ?? [],
       bodegasDropi: prov ? bodegasEnOrden(prov.bodegas).map((b) => ({ id: b.id, nombre: b.nombre, stock: b.stock })) : null,
+      stockPorId: (prov ? [prov, ...idsDropi(d).map((i) => proveedor?.productos.get(i)).filter((x) => !!x && x.id !== prov.id)] : [])
+        .filter((x): x is NonNullable<typeof x> => !!x)
+        .map((x) => ({ id: x.id, archivado: x.archivado, stock: x.stock, bodegas: bodegasEnOrden(x.bodegas).map((b) => ({ id: b.id, nombre: b.nombre, stock: b.stock })) })),
       stockProveedor: prov?.stock ?? null,
       stockPrivadoProveedor: prov?.stockPrivado ?? null,
       leidoProveedor: proveedor?.leidoEn ?? null,
@@ -393,9 +428,14 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
       datosDropi: d.estado_publicacion === "borrador" ? normalizarDatosCrear(datosBorradores.get(d.id as string) ?? null) : null,
       archivadoPendiente: cambiosDropi.archivando.has(d.id as string) ? (cambiosDropi.archivando.get(d.id as string) ? "restaurar" : "archivar") : null,
       privatizaciones: cambiosDropi.privatizando.get(d.id as string) ?? [],
+      stockPendiente: (cambiosDropi.ajustandoStock.get(d.id as string) ?? []).map(({ producto, bodega, nombreBodega, unidades, antes }) => ({ producto, bodega, nombreBodega, unidades, antes })),
       duplicadaDe: null,
       pausadaDesde: pausadaEn.get(d.id as string) ?? null,
+      liquidacionDesde: liquidacionEn.get(d.id as string) ?? null,
+      descontinuadoPais: !!d.sku_maestro_id && descontinuados.has(d.sku_maestro_id as string),
+      tareasPendientes: tareasDe.get(d.id as string) ?? { total: 0, atrasadas: 0 },
       grupo: [],
+      publicosDelProducto: [],
     };
     // Una duplicada (otra publicación con el mismo ID de Dropi) va a Archivados aunque Dropi diga activo, sin acciones.
     if (!original) return fila;
@@ -410,7 +450,15 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
       const o = porIdFila.get(x.id)!;
       return { id: x.id, nombre: x.nombre, dropiId: x.dropiId, archivada: x.archivada, tipo: o.tipoDropi, stock: o.stockProveedor, correo: o.privatizadoEmail, apagadoPendiente: o.apagadoPendiente, apagadoSinTocar: o.apagadoSinTocar };
     });
+  // «Quitar privatización» (30 oct 2026): a qué públicos le puede devolver sus unidades cada privada: los de su grupo y los del mismo producto vinculado.
+  for (const f of filas) {
+    if (f.tipoDropi !== "privado") continue;
+    f.publicosDelProducto = filas
+      .filter((o) => o.id !== f.id && o.tipoDropi !== "privado" && !o.archivada && o.enDropi !== "archivado" && !o.duplicadaDe && !o.apagadoPendiente && o.dropiId.trim() !== "" && (f.grupo.some((g) => g.id === o.id) || (!!f.sku && o.sku?.id === f.sku.id)))
+      .map((o) => ({ id: o.id, nombre: o.nombre, dropiId: o.dropiId, stock: o.stockProveedor }));
+  }
 
+  const moneda = await monedaPais;
   // Las recomendaciones van al final: el combo necesita saber qué compuestos ya están publicados (y no archivados) en el país.
   const publicados = new Set(filas.filter((f) => !f.archivada && f.sku).map((f) => f.sku!.id));
   const cumplidas: { d: DecisionVista; nombre: string }[] = [];
@@ -434,7 +482,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
         cumplidas.push({ d, nombre: f.nombre });
         continue;
       }
-      const c = tareaCumplida({ tipo: d.tipo, fecha: d.fecha, precioAntes: d.precioAntes }, { cambioPrecio: f.cambioPrecioDropi, comboPublicado, revisiones: f.revisiones });
+      const c = tareaCumplida({ tipo: d.tipo, fecha: d.fecha, precioAntes: d.precioAntes }, { cambioPrecio: f.cambioPrecioDropi, comboPublicado, revisiones: f.revisiones }, monedaRevision);
       if (!c) continue;
       d.hechaEn = c.fecha ? `${c.fecha.slice(0, 10)}T12:00:00Z` : new Date().toISOString();
       d.hechaComo = c.como;
@@ -457,10 +505,14 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
         combo: combo ? { codigo: combo.codigo, publicado: comboPublicado } : null,
         competidorMasBarato: f.competidorMasBarato,
         competidorMinimo: f.competidorMinimo,
+        competidores: competidoresEquivalentes({ nombre: f.nombre, idsDropi: idsDropi({ id: f.id, dropi_id: f.dropiId }) }, competidores),
       },
       r,
+      moneda,
     );
-    f.recomendaciones = pendientes([...recs, ...recomendarOptimizacion(f.revisiones, f.archivada, privada)], f.decisiones, hoy);
+    // En liquidación (28 oct 2026): sigue en margen bajo (la tarjeta la cuenta aparte, «/ N en liquidación»), pero no se recomienda subir el precio ni armar el combo.
+    const recsVigentes = f.liquidacionDesde ? recs.filter((x) => !NO_EN_LIQUIDACION.includes(x.tipo)) : recs;
+    f.recomendaciones = pendientes([...recsVigentes, ...recomendarOptimizacion(f.revisiones, f.archivada, privada)], f.decisiones, hoy);
   }
   if (cumplidas.length && conTareas) after(() => guardarCumplidas(supabase, cumplidas));
 

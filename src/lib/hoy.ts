@@ -91,8 +91,8 @@ const PENDIENTES: {
     modulo: "publicaciones-dropi",
     campo: "tareasAtrasadas",
     titulo: "Tareas de Gestión de IDs Dropi atrasadas",
-    descripcion: "Recomendaciones aceptadas que pasaron su plazo sin hacerse",
-    href: "/publicaciones-dropi/recomendaciones?ver=por_hacer",
+    descripcion: "Tareas y recomendaciones aceptadas que pasaron su fecha sin hacerse",
+    href: "/publicaciones-dropi/tareas?ver=todas",
     accion: "Revisar",
   },
   {

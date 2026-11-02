@@ -20,11 +20,11 @@ export function tiposParaElegir(tipoActual?: string): readonly { valor: string; 
   return [...TIPOS_CUENTA, { valor: tipoActual, etiqueta: etiquetaTipoCuenta(tipoActual) }];
 }
 
-/** Solo lectura: la comisión sugerida se edita desde "Modificar" (o desde Configuración al crearla). */
-export function etiquetaComision(tipo: string | null, porcentaje: number | null, montoFijo: number | null) {
+/** Solo lectura: la comisión sugerida se edita desde "Modificar" (o desde Configuración al crearla). «2%», «₡500.00», «2% + $1.00»: con el símbolo de la moneda del país (`simbolo`). */
+export function etiquetaComision(tipo: string | null, porcentaje: number | null, montoFijo: number | null, simbolo = "$") {
   if (tipo === "porcentaje" && porcentaje != null) return `${porcentaje}%`;
-  if (tipo === "monto_fijo" && montoFijo != null) return `$${montoFijo.toFixed(2)}`;
-  if (tipo === "ambos" && porcentaje != null && montoFijo != null) return `${porcentaje}% + $${montoFijo.toFixed(2)}`;
+  if (tipo === "monto_fijo" && montoFijo != null) return `${simbolo}${montoFijo.toFixed(2)}`;
+  if (tipo === "ambos" && porcentaje != null && montoFijo != null) return `${porcentaje}% + ${simbolo}${montoFijo.toFixed(2)}`;
   return "—";
 }
 

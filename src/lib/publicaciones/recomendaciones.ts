@@ -4,6 +4,8 @@
 // decisiones quedan guardadas (`dropi_publicaciones_decisiones`) y son lo que en la fase 2 leerá la IA para aprender. Sin base
 // ni React, con prueba.
 
+import { montoConSimbolo } from "@/lib/moneda/simbolo";
+import { formatoMonto, MONEDA_DOLAR, type MonedaPublicaciones } from "./moneda";
 import type { Revision } from "./optimizacion";
 import type { Reglas } from "./reglas";
 
@@ -35,7 +37,25 @@ export interface Recomendacion {
   resultado: string;
   /** Los números con que se calculó (quedan guardados con la decisión). */
   datos: Record<string, number | string | null>;
+  /**
+   * De subir o bajar el precio (28 oct 2026, pedido de Alcides): quién más vende lo mismo, del más barato al más caro, con su precio equivalente,
+   * su stock y lo que vendió en 30 días, para decidir si igualarse o bajar.
+   */
+  competidores?: CompetidorRecomendacion[];
 }
+
+export interface CompetidorRecomendacion {
+  proveedor: string;
+  nombre: string;
+  /** Su precio llevado al tamaño del nuestro. */
+  precio: number;
+  stock: number;
+  /** Unidades que bajó su stock en 30 días. */
+  vendido30: number;
+}
+
+/** Cuántos competidores lleva una recomendación de precio. */
+export const MAX_COMPETIDORES_RECOMENDACION = 5;
 
 export interface EntradaRecomendacion {
   archivada: boolean;
@@ -54,27 +74,43 @@ export interface EntradaRecomendacion {
   competidorMasBarato: { proveedor: string; precio: number } | null;
   /** El precio equivalente más bajo de la competencia con stock, aunque sea más caro que el nuestro. */
   competidorMinimo: { proveedor: string; precio: number } | null;
+  /** Todos los que venden lo mismo con stock, del más barato al más caro (para mostrarlos en la recomendación de precio). */
+  competidores?: CompetidorRecomendacion[];
 }
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 /** El margen bruto a un precio: lo que queda después del costo y el fulfillment, sobre el precio. */
 export const margenA = (precio: number, costo: number, fulfillment: number) => (precio > 0 ? (precio - costo - fulfillment) / precio : 0);
 /** Redondea hacia arriba a un precio que termina en 9 (5,37 → 5,39; 8,98 → 8,99). */
-export const precioArriba = (p: number) => r2(Math.ceil(r2((p + 0.01) * 10) - 1e-9) / 10 - 0.01);
+const precioArribaUsd = (p: number) => r2(Math.ceil(r2((p + 0.01) * 10) - 1e-9) / 10 - 0.01);
 /** Redondea hacia abajo a un precio que termina en 9, sin pasar del dado (4,50 → 4,49; 4,49 → 4,49). */
-export const precioAbajo = (p: number) => r2(Math.floor(r2((p + 0.01) * 10) + 1e-9) / 10 - 0.01);
+const precioAbajoUsd = (p: number) => r2(Math.floor(r2((p + 0.01) * 10) + 1e-9) / 10 - 0.01);
+
+export const precioArriba = precioArribaUsd;
+export const precioAbajo = precioAbajoUsd;
 
 const pct = (v: number) => `${(Math.round(v * 1000) / 10).toLocaleString("es-PA")} %`;
-const usd = (v: number) => `$${v.toFixed(2)}`;
 
-/** Las recomendaciones de una publicación según las reglas (puede no tener ninguna). */
-export function recomendar(p: EntradaRecomendacion, reglas: Reglas): Recomendacion[] {
+/** En colones (y cualquier moneda que no sea el dólar) los precios son enteros que terminan en 9: 5 450 → 5 449 hacia abajo, 5 451 → 5 459 hacia arriba. */
+const enteroAbajo = (p: number) => Math.floor((p + 1) / 10) * 10 - 1;
+const enteroArriba = (p: number) => Math.ceil((p + 1) / 10) * 10 - 1;
+
+/**
+ * Las recomendaciones de una publicación según las reglas (puede no tener ninguna). Los montos van en la moneda del país (28 oct 2026, Costa Rica en
+ * colones): los textos con su símbolo y los precios redondeados como se ponen en esa moneda.
+ */
+export function recomendar(p: EntradaRecomendacion, reglas: Reglas, moneda: MonedaPublicaciones = MONEDA_DOLAR): Recomendacion[] {
   if (p.archivada || p.precio === null || p.precio <= 0 || p.costo === null || p.margen === null) return [];
+  const usd = (v: number) => formatoMonto(v, moneda);
+  const enDolares = moneda.moneda === "USD";
+  const precioAbajo = enDolares ? precioAbajoUsd : enteroAbajo;
+  const precioArriba = enDolares ? precioArribaUsd : enteroArriba;
   const out: Recomendacion[] = [];
   const ful = p.fulfillment ?? 0;
   const bajo = p.margen < reglas.margen_minimo;
   const ventas = p.netas30 ?? 0;
   const baseMotivo = `Margen ${pct(p.margen)}, menor a tu mínimo de ${pct(reglas.margen_minimo)}`;
+  const competidores = (p.competidores ?? []).slice(0, MAX_COMPETIDORES_RECOMENDACION);
 
   // Combo x2: el fulfillment se paga una vez por pedido, así que dos unidades en un pedido reparten ese costo y suben el margen.
   if (bajo && !p.esPack && p.sku?.tipo === "simple" && ventas >= reglas.combo_min_ventas && !p.combo?.publicado) {
@@ -107,6 +143,7 @@ export function recomendar(p: EntradaRecomendacion, reglas: Reglas): Recomendaci
         motivo: `${baseMotivo}. Nadie lo vende más barato${tope ? `; ${tope}` : ""}.`,
         resultado: `A ${usd(precio)} el margen sería ${pct(margenNuevo)}${margenNuevo < reglas.margen_minimo ? " (todavía bajo el mínimo, para no pasar a la competencia)" : ""}.`,
         datos: { margen: p.margen, precio: p.precio, costo: p.costo, fulfillment: ful, precioSugerido: precio, margenNuevo: Math.round(margenNuevo * 10000) / 10000, competidor: p.competidorMinimo?.proveedor ?? null, precioCompetidor: p.competidorMinimo?.precio ?? null },
+        ...(competidores.length ? { competidores } : {}),
       });
   }
 
@@ -121,6 +158,7 @@ export function recomendar(p: EntradaRecomendacion, reglas: Reglas): Recomendaci
         motivo: `${p.competidorMasBarato.proveedor} vende lo mismo a ${usd(p.competidorMasBarato.precio)} (precio equivalente) y tiene stock; nosotros, a ${usd(p.precio)}.`,
         resultado: `A ${usd(precio)} el margen quedaría en ${pct(margenNuevo)} (tu crítico es ${pct(reglas.margen_critico)}).`,
         datos: { margen: p.margen, precio: p.precio, costo: p.costo, fulfillment: ful, precioSugerido: precio, margenNuevo: Math.round(margenNuevo * 10000) / 10000, competidor: p.competidorMasBarato.proveedor, precioCompetidor: p.competidorMasBarato.precio },
+        ...(competidores.length ? { competidores } : {}),
       });
   }
   return out;
@@ -156,6 +194,9 @@ const TITULO_OPTIMIZACION: Partial<Record<TipoRecomendacion, string>> = {
  * dropshipper a quien se privatizó, que ya conoce el producto. Una tarea abierta de estos tipos en una privada se da de baja.
  */
 export const NO_EN_PRIVADAS: TipoRecomendacion[] = ["optimizar_titulo", "mas_fotos"];
+
+/** Lo que no se recomienda a una publicación en liquidación (migración 0174): su margen bajo es a propósito. */
+export const NO_EN_LIQUIDACION: TipoRecomendacion[] = ["combo_x2", "subir_precio"];
 
 /**
  * Las recomendaciones de optimización a partir de la revisión: una por cosa que arreglar en Dropi (el título junta sus cuatro
@@ -239,6 +280,8 @@ export interface Cumplimiento {
 export function tareaCumplida(
   t: { tipo: string; fecha: string; precioAntes: number | null },
   actual: { cambioPrecio: { fecha: string; antes: number | null; despues: number | null } | null; comboPublicado: boolean; revisiones?: Revision[] },
+  /** La moneda de los precios, para escribirlos con su símbolo. */
+  moneda = "USD",
 ): Cumplimiento | null {
   // Optimización: hecha cuando la lectura de Dropi ya no ve lo que faltaba (lo «sin datos» no cuenta como hecho).
   const puntos = PUNTOS[t.tipo as TipoRecomendacion];
@@ -253,6 +296,6 @@ export function tareaCumplida(
   const subio = c.despues > t.precioAntes + 0.004;
   const bajo = c.despues < t.precioAntes - 0.004;
   if ((t.tipo === "subir_precio" && subio) || (t.tipo === "igualar_precio" && bajo))
-    return { como: "dropi", fecha: c.fecha, detalle: `Dropi muestra $${c.despues.toFixed(2)} (antes $${t.precioAntes.toFixed(2)})` };
+    return { como: "dropi", fecha: c.fecha, detalle: `Dropi muestra ${montoConSimbolo(c.despues, moneda)} (antes ${montoConSimbolo(t.precioAntes, moneda)})` };
   return null;
 }

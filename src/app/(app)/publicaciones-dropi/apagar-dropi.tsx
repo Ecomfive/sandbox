@@ -9,7 +9,7 @@ import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { Ventana } from "@/components/ui/ventana";
 import { ApagarIcon, DeshacerIcon } from "@/lib/nav-icons";
-import { BODEGA_DROPI } from "@/lib/publicaciones/automatico";
+import { esBodegaDropi } from "@/lib/publicaciones/automatico";
 import { apagarPublicacion, deshacerApagado } from "./actions";
 import { estadoBotones, type FilaPublicacion } from "./def-publicaciones";
 
@@ -37,7 +37,7 @@ function Pasos({ x }: { x: Paso }) {
  * Si una publicación se puede apagar en Dropi: tiene ID de Dropi, no es una duplicada, Dropi no la tiene ya archivada y su stock no es de la
  * bodega de Dropi (B280, que no se mueve desde aquí). Lo usan el botón de la ficha y el de la fila.
  */
-export const puedeApagar = (p: FilaPublicacion): boolean => p.dropiId.trim() !== "" && !p.duplicadaDe && p.enDropi !== "archivado" && p.bodega?.id !== BODEGA_DROPI;
+export const puedeApagar = (p: FilaPublicacion): boolean => p.dropiId.trim() !== "" && !p.duplicadaDe && p.enDropi !== "archivado" && !esBodegaDropi(p.bodega?.id);
 
 /**
  * «Apagar en Dropi» (pedido de Hernán, 23 oct 2026): el mismo proceso que se hace a mano en Dropi cuando un producto se queda
@@ -132,7 +132,7 @@ function VentanaApagarDropi({ p, abierta, alCerrar }: { p: FilaPublicacion; abie
  * publicación y de las demás de su producto que también lo tengan pendiente (vienen marcadas), por si hubo un error o se cambió de opinión.
  * En el sistema vuelven a verse como antes. Un apagado que ya se intentó en Dropi (puede tener el stock en cero) no se puede deshacer desde aquí.
  */
-function VentanaDeshacerApagado({ p, abierta, alCerrar }: { p: FilaPublicacion; abierta: boolean; alCerrar: () => void }) {
+export function VentanaDeshacerApagado({ p, abierta, alCerrar }: { p: FilaPublicacion; abierta: boolean; alCerrar: () => void }) {
   const { mostrarToast } = useToast();
   const filas = [
     { id: p.id, nombre: p.nombre, dropiId: p.dropiId, tipo: p.tipoDropi, sinTocar: p.apagadoSinTocar, esta: true },
@@ -228,7 +228,7 @@ export function BotonApagarFila({ f }: { f: FilaPublicacion }) {
   const texto = f.apagadoPendiente ? "Deshacer apagado" : "Apagar en Dropi";
   return (
     <>
-      <BotonIconoFila texto={texto} motivo={motivoApagar(estadoBotones(f))} icono={f.apagadoPendiente ? DeshacerIcon : ApagarIcon} nombre={f.nombre} onClick={() => setAbierta(true)} />
+      <BotonIconoFila texto={texto} motivo={motivoApagar(estadoBotones(f))} icono={f.apagadoPendiente ? DeshacerIcon : ApagarIcon} nombre={f.nombre} onClick={() => setAbierta(true)} activo={f.apagadoPendiente ? "rojo" : undefined} />
       {abierta && (f.apagadoPendiente ? <VentanaDeshacerApagado p={f} abierta alCerrar={() => setAbierta(false)} /> : <VentanaApagarDropi p={f} abierta alCerrar={() => setAbierta(false)} />)}
     </>
   );

@@ -5,7 +5,7 @@ import { useState, useTransition, type ReactNode } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
-import { ActualizarIcon, ArchivarIcon, CandadoIcon, ChevronRightIcon, DropiIcon, PausaIcon, ReactivarIcon } from "@/lib/nav-icons";
+import { ActualizarIcon, ArchivarIcon, CandadoIcon, ChevronRightIcon, DropiIcon, EtiquetaIcon, PausaIcon, ReactivarIcon } from "@/lib/nav-icons";
 import { UBICACIONES, numeroPublicacion, opcion } from "@/lib/publicaciones/publicacion";
 import { EN_DROPI } from "@/lib/publicaciones/automatico";
 import { ConfirmarRepublicar } from "./confirmar-republicar";
@@ -17,7 +17,10 @@ import { BotonIconoFila } from "./boton-icono-fila";
 import { motivoArchivar, motivoPausar, motivoRepublicar } from "@/lib/publicaciones/botones-fila";
 import { BotonApagarFila } from "./apagar-dropi";
 import { BotonPrivatizarFila } from "./privatizar-dropi";
+import { BotonLiquidacionFila } from "./liquidacion";
+import { BotonTareasFila } from "./tareas-publicacion";
 import { InsigniaConectado } from "./insignia-conectado";
+import { Monto, useMoneda } from "./moneda-contexto";
 import { EtapaCotizando, LlegadaCamino } from "./llegada-camino";
 import { conexionDropi, estadoBotones, paraReactivar, pausada, puedeRepublicar, republicacionPendiente, type FilaPublicacion } from "./def-publicaciones";
 
@@ -25,7 +28,6 @@ import { conexionDropi, estadoBotones, paraReactivar, pausada, puedeRepublicar, 
 const COLUMNAS_CON_VENTAS = "lg:grid-cols-[minmax(0,2.6fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1.1fr)_minmax(0,1.2fr)_4rem_1rem]";
 const COLUMNAS_SIN_VENTAS = "lg:grid-cols-[minmax(0,3fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.3fr)_4rem_1rem]";
 
-const usd = (n: number | null) => (n === null ? "—" : `$${n.toFixed(2)}`);
 const entero = (n: number) => n.toLocaleString("es-PA", { maximumFractionDigits: 0 });
 
 const Punto = ({ clase, texto }: { clase: string; texto: string }) => (
@@ -89,7 +91,7 @@ function BotonPausarFila({ f }: { f: FilaPublicacion }) {
       nombre={f.nombre}
       onClick={cambiar}
       ocupado={pendiente}
-      clase={reactivarYa ? "text-success hover:bg-success-soft" : undefined}
+      activo={estaPausada ? (reactivarYa ? "verde" : "azul") : undefined}
     />
   );
 }
@@ -116,6 +118,7 @@ function BotonArchivarFila({ f }: { f: FilaPublicacion }) {
       nombre={f.nombre}
       onClick={cambiar}
       ocupado={pendiente}
+      activo={archivar ? undefined : "rojo"}
     />
   );
 }
@@ -148,7 +151,7 @@ function BotonRepublicarFila({ f }: { f: FilaPublicacion }) {
         nombre={f.nombre}
         onClick={() => !yaPendiente && setConfirmando(true)}
         ocupado={enviando}
-        clase={yaPendiente ? "cursor-default text-destructive" : undefined}
+        activo={yaPendiente ? "rojo" : undefined}
       />
     </>
   );
@@ -233,7 +236,7 @@ export function EncabezadoFilasPublicacion({ verVentas = false, puedeArchivar = 
     { nombre: "En Dropi" },
   ];
   return (
-    <div className={`hidden items-center gap-x-4 py-2.5 pl-4 text-xs font-semibold tracking-wide text-muted-foreground uppercase lg:grid ${puedeArchivar ? "pr-[14rem]" : "pr-4"} ${verVentas ? COLUMNAS_CON_VENTAS : COLUMNAS_SIN_VENTAS}`}>
+    <div className={`hidden items-center gap-x-4 py-2.5 pl-4 text-xs font-semibold tracking-wide text-muted-foreground uppercase lg:grid ${puedeArchivar ? "pr-[19rem]" : "pr-4"} ${verVentas ? COLUMNAS_CON_VENTAS : COLUMNAS_SIN_VENTAS}`}>
       {columnas.map((c) => (
         <span key={c.nombre} className={`min-w-0 truncate ${c.clase ?? ""}`}>
           {c.nombre}
@@ -250,6 +253,8 @@ export function EncabezadoFilasPublicacion({ verVentas = false, puedeArchivar = 
  * reposición y próxima revisión. Toda la fila abre su ficha. Las alertas son un punto de color junto al dato, no una caja.
  */
 export function FilaPublicacionLista({ f, verVentas = false, alAbrir, puedeArchivar = false }: { f: FilaPublicacion; verVentas?: boolean; alAbrir: () => void; puedeArchivar?: boolean }) {
+  // Los montos en la moneda del país (Costa Rica en colones, con su valor en dólares en pequeño).
+  const { monto } = useMoneda();
   const enDropi = EN_DROPI.find((e) => e.valor === (f.archivada && f.enDropi !== "archivado" ? "archivado" : f.enDropi));
   const ubicacion = opcion(UBICACIONES, f.ubicacion);
   const sugerida = !f.sku && f.sugerencia && f.sugerencia.tipo !== "ninguno" ? f.sugerencia : null;
@@ -275,6 +280,19 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, puedeArchi
               <span className="inline-flex max-w-48 shrink-0 items-center gap-1 rounded-full bg-privado px-2 py-0.5 text-xs font-semibold text-white">
                 <CandadoIcon aria-hidden="true" className="h-3 w-3 shrink-0" />
                 <span className="truncate">Privado{f.privatizadoA ? ` · ${f.privatizadoA}` : ""}</span>
+              </span>
+            )}
+            {/* En liquidación: insignia roja sólida junto al nombre, como «Privado» (29 oct 2026, pedido de Alcides; antes era un punto). */}
+            {f.liquidacionDesde && (
+              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-destructive px-2 py-0.5 text-xs font-semibold text-background">
+                <EtiquetaIcon aria-hidden="true" className="h-3 w-3 shrink-0" />
+                En liquidación
+              </span>
+            )}
+            {/* Su producto está descontinuado en este país (ficha del producto, migración 0211): ya no se compra para aquí. */}
+            {f.descontinuadoPais && (
+              <span title="Descontinuado en este país: ya no se compra para aquí (se cambia en la ficha del producto)" className="inline-flex shrink-0 items-center rounded-full border border-destructive px-2 py-0.5 text-xs font-semibold text-destructive">
+                Descontinuado
               </span>
             )}
           </span>
@@ -314,6 +332,13 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, puedeArchi
                 {paraReactivar(f) ? "Volvió el stock: reactivar" : "Pausada sin stock"}
               </span>
             )}
+            {f.tareasPendientes.total > 0 && (
+              <span className={`inline-flex items-center gap-1.5 font-medium ${f.tareasPendientes.atrasadas ? "text-destructive" : ""}`}>
+                <Punto clase={f.tareasPendientes.atrasadas ? "bg-destructive" : "bg-warning"} texto={f.tareasPendientes.atrasadas ? "Tarea atrasada" : "Tarea pendiente"} />
+                {f.tareasPendientes.total === 1 ? "1 tarea" : `${f.tareasPendientes.total} tareas`}
+                {f.tareasPendientes.atrasadas ? " · atrasada" : ""}
+              </span>
+            )}
             {f.archivadoPendiente && !f.apagadoPendiente && (
               <span className="inline-flex items-center gap-1.5 font-medium text-destructive">
                 <Punto clase="bg-destructive" texto="Pendiente en Dropi" />
@@ -332,28 +357,37 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, puedeArchi
                 {f.privatizaciones.length === 1 ? `Privatización pendiente · ${f.privatizaciones[0].dropshipper || f.privatizaciones[0].correo}` : `${f.privatizaciones.length} privatizaciones pendientes`}
               </span>
             )}
+            {f.stockPendiente.length > 0 && (
+              <span className="inline-flex items-center gap-1.5 font-medium text-destructive">
+                <Punto clase="bg-destructive" texto="Stock pendiente en Dropi" />
+                {f.stockPendiente.length === 1
+                  ? `Stock pendiente · ${f.stockPorId.length > 1 && f.stockPendiente[0].producto ? `ID ${f.stockPendiente[0].producto} · ` : ""}${codigoBodega(f.stockPendiente[0].bodega)} a ${f.stockPendiente[0].unidades.toLocaleString("es-PA")} u.`
+                  : `Stock pendiente en ${f.stockPendiente.length} bodegas`}
+              </span>
+            )}
           </span>
         </span>
       </span>
 
       {/* Los datos: en pantalla ancha una columna cada uno; en angosta, debajo del producto en una fila que envuelve. */}
       <span className="order-last col-span-2 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3 lg:order-none lg:contents">
-        <Celda nombre="Precio" alinear="derecha" principal={<span className="font-semibold tabular-nums">{usd(f.precioVenta)}</span>} apoyo={
+        <Celda nombre="Precio" alinear="derecha" principal={<Monto valor={f.precioVenta} className="font-semibold tabular-nums" />} apoyo={
             <span className="flex flex-col lg:items-end">
-              <span className="max-w-full truncate">Costo de producto {usd(f.costoMercancia)}</span>
-              <span className="max-w-full truncate">Fulfillment {usd(f.fulfillment)}</span>
+              <span className="max-w-full truncate">Costo de producto {monto(f.costoMercancia)}</span>
+              <span className="max-w-full truncate">Fulfillment {monto(f.fulfillment)}</span>
             </span>
           } />
         <Celda
           nombre="Utilidad bruta y margen bruto"
           alinear="derecha"
-          principal={<span className="tabular-nums">{usd(f.utilidad)}</span>}
+          principal={<Monto valor={f.utilidad} className="tabular-nums" />}
           apoyo={
             f.margen === null ? (
               "Sin margen"
             ) : (
               <span className="inline-flex items-center gap-1.5 tabular-nums">
-                {(f.nivelMargen === "critico" || f.nivelMargen === "bajo") && <Punto clase="bg-destructive" texto="Margen bajo" />}
+                {(f.nivelMargen === "critico" || f.nivelMargen === "bajo") &&
+                  (f.liquidacionDesde ? <Punto clase="bg-warning" texto="Margen bajo, en liquidación" /> : <Punto clase="bg-destructive" texto="Margen bajo" />)}
                 {Math.round(f.margen * 100)} % de margen bruto
               </span>
             )
@@ -384,13 +418,15 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, puedeArchi
   return (
     <div className="flex items-center">
       <div className="min-w-0 flex-1">{fila}</div>
-      {/* Siempre los mismos cinco botones, en el mismo orden; los que no aplican van apagados y dicen por qué (27 oct 2026). */}
+      {/* Siempre los mismos siete botones, en el mismo orden; los que no aplican van apagados y dicen por qué (27 oct 2026; liquidación, 28 oct). */}
       <div className="mr-3 flex shrink-0 items-center gap-1">
         <BotonRepublicarFila f={f} />
         <BotonPrivatizarFila f={f} />
         <BotonApagarFila f={f} />
         <BotonPausarFila f={f} />
+        <BotonLiquidacionFila f={f} />
         <BotonArchivarFila f={f} />
+        <BotonTareasFila f={f} />
       </div>
     </div>
   );

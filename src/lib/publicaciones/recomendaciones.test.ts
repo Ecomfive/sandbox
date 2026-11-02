@@ -115,3 +115,31 @@ test("el sistema detecta que se hizo: precio en Dropi hacia donde se pidió, o e
   assert.equal(tareaCumplida({ ...subir, tipo: "igualar_precio" }, { cambioPrecio: { fecha: "2026-10-24", antes: 4.99, despues: 4.49 }, comboPublicado: false })?.como, "dropi");
   assert.equal(tareaCumplida({ ...subir, tipo: "combo_x2" }, { cambioPrecio: null, comboPublicado: true })?.como, "producto");
 });
+
+test("subir o bajar el precio lleva a los competidores (precio, stock y lo vendido en 30 días), hasta 5, del más barato al más caro", () => {
+  const competidores = Array.from({ length: 7 }, (_, i) => ({ proveedor: `P${i}`, nombre: "Aceite", precio: 4 + i, stock: 100 - i, vendido30: 10 * i }));
+  const recs = recomendar(
+    { archivada: false, esPack: false, precio: 9.9, costo: 1, fulfillment: 0.5, margen: 0.85, netas30: 10, sku: null, combo: null, competidorMasBarato: { proveedor: "P0", precio: 4 }, competidorMinimo: { proveedor: "P0", precio: 4 }, competidores },
+    REGLAS_DEFECTO,
+  );
+  const bajar = recs.find((r) => r.tipo === "igualar_precio");
+  assert.ok(bajar);
+  assert.equal(bajar!.competidores?.length, 5);
+  assert.deepEqual(bajar!.competidores?.[0], competidores[0]);
+  const sin = recomendar({ archivada: false, esPack: false, precio: 9.9, costo: 1, fulfillment: 0.5, margen: 0.85, netas30: 10, sku: null, combo: null, competidorMasBarato: { proveedor: "P0", precio: 4 }, competidorMinimo: null }, REGLAS_DEFECTO);
+  assert.equal(sin.find((r) => r.tipo === "igualar_precio")?.competidores, undefined);
+});
+
+test("en colones (Costa Rica) los textos van con ₡ y los precios son enteros que terminan en 9", () => {
+  const colones = { moneda: "CRC" as const, porUsd: 510 };
+  const recs = recomendar(
+    { archivada: false, esPack: false, precio: 5499, costo: 1000, fulfillment: 500, margen: 0.72, netas30: 10, sku: null, combo: null, competidorMasBarato: { proveedor: "P0", precio: 4975 }, competidorMinimo: { proveedor: "P0", precio: 4975 } },
+    REGLAS_DEFECTO,
+    colones,
+  );
+  const bajar = recs.find((r) => r.tipo === "igualar_precio");
+  assert.ok(bajar);
+  assert.equal(bajar!.datos.precioSugerido, 4969);
+  assert.match(bajar!.titulo, /₡/);
+  assert.doesNotMatch(bajar!.titulo, /\$/);
+});

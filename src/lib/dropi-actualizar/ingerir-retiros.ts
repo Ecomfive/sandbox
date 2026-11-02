@@ -25,7 +25,7 @@ export interface FilaRetiro {
 }
 
 // Panamá y Costa Rica no usan horario de verano, así que el desfase es fijo.
-const OFFSET_HORAS: Record<string, number> = { CR: -6, PA: -5 };
+const OFFSET_HORAS: Record<string, number> = { CR: -6, PA: -5, MX: -6 };
 const TAMANO_LOTE = 100;
 
 function lotes<T>(items: T[]): T[][] {

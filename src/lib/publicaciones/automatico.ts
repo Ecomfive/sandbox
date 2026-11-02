@@ -49,10 +49,10 @@ export const ACCIONES: { valor: Accion | "al_dia"; etiqueta: string; color: stri
 ];
 
 /** El detalle de cada tarjeta con los umbrales de las reglas («Margen bruto menor a 25 %»). */
-export function detalleAccion(valor: Accion | "al_dia", r: Reglas): string {
+export function detalleAccion(valor: Accion | "al_dia", r: Reglas, codigoPais?: string): string {
   const pct = (v: number) => `${(Math.round(v * 1000) / 10).toLocaleString("es-PA")} %`;
   if (valor === "margen_bajo") return `Margen bruto menor a ${pct(r.margen_minimo)}`;
-  if (valor === "republicar") return `${r.dias_republicar} días sin ninguna venta y es de nuestra bodega (no la B280)`;
+  if (valor === "republicar") return `${r.dias_republicar} días sin ninguna venta y es de nuestra bodega (no la ${codigoBodegaDropi(codigoPais)})`;
   if (valor === "ventas_caida") return `En 30 días vende menos del ${pct(r.caida_ventas)} de los 30 anteriores`;
   return ACCIONES.find((a) => a.valor === valor)?.detalle ?? "";
 }
@@ -104,6 +104,17 @@ export function accionesPublicacion(
 export const BODEGA_DROPI = 280;
 
 /**
+ * La bodega de Dropi de cada país: Panamá B280 «Bodega Dropi Panama», Costa Rica B15 «Bodega Dropi San Jose» (28 oct 2026) y México B49
+ * «BODEGA DROPI» (31 oct 2026, pedido de Alcides). Lo que está ahí lo maneja Dropi: no se le cambia el stock, no se apaga, no se privatiza ni se
+ * republica desde el sistema. Una bodega de Dropi de otro país se agrega aquí.
+ */
+export const BODEGA_DROPI_POR_PAIS: Readonly<Record<string, number>> = { PA: 280, CR: 15, MX: 49 };
+export const BODEGAS_DROPI: ReadonlySet<number> = new Set(Object.values(BODEGA_DROPI_POR_PAIS));
+/** El código de la bodega de Dropi del país para los textos: «B280» en Panamá, «B49» en México. Sin país conocido, «B280». */
+export const codigoBodegaDropi = (codigoPais?: string | null): string => `B${BODEGA_DROPI_POR_PAIS[(codigoPais ?? "").toUpperCase()] ?? BODEGA_DROPI}`;
+export const esBodegaDropi = (id: number | null | undefined): boolean => id !== null && id !== undefined && BODEGAS_DROPI.has(Number(id));
+
+/**
  * Republicar (pedido de Alcides, 22 oct 2026): una publicación activa en Dropi que lleva `dias_republicar` (30) sin ninguna venta
  * se manda a republicar, solo si es de nuestra bodega (no de la B280 de Dropi) y ya lleva publicada al menos esos días. Sin
  * bodega conocida o sin datos de ventas de Dropi, no se sabe: no sale.
@@ -116,7 +127,7 @@ export function necesitaRepublicar(
   // Una privada no se republica (pedido de Alcides, 25 oct 2026): es de un solo dropshipper y republicarla le cambia el ID.
   // Sin stock no se republica (25 oct 2026, pedido de Alcides): no vende porque no hay qué vender, no porque esté vieja.
   if (p.stock != null && p.stock <= 0) return false;
-  if (p.privada || p.archivada || p.enDropi !== "activo" || !p.hayVentas || p.bodegaId === null || p.bodegaId === BODEGA_DROPI) return false;
+  if (p.privada || p.archivada || p.enDropi !== "activo" || !p.hayVentas || p.bodegaId === null || esBodegaDropi(p.bodegaId)) return false;
   const n = reglas.dias_republicar;
   // Con la regla en 30 días, cuentan las ventas netas (un pedido cancelado, rechazado o devuelto no es venta; 25 oct 2026, PUB-0132:
   // su único pedido en 30 días se canceló). Sin netas en 30 días, sale si lleva al menos esos días publicada.

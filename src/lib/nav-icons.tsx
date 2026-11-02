@@ -322,10 +322,29 @@ export function FlechaAbajoIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+/** Dos flechas opuestas: pasar algo de un lugar a otro (transferencia entre bodegas). */
+export function TransferirIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M4 8h14M14 4l4 4-4 4M20 16H6M10 12l-4 4 4 4" />
+    </Icon>
+  );
+}
+
 export function CheckIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <Icon {...props}>
       <path d="M5 12.5l4.5 4.5L19 7.5" />
+    </Icon>
+  );
+}
+
+/** Casilla con visto: las tareas de un producto (Gestión de IDs Dropi). */
+export function TareasIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <rect x="4" y="4" width="16" height="16" rx="3.5" />
+      <path d="M8.5 12.2l2.4 2.4 4.6-4.8" />
     </Icon>
   );
 }
@@ -426,6 +445,17 @@ export function ChatIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <Icon {...props}>
       <path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-5.1A8 8 0 1 1 21 12Z" />
+    </Icon>
+  );
+}
+
+/** Un sobre cerrado con un punto: «marcar como no leído» (distinto del globo de chat, que es el de WhatsApp interno). */
+export function NoLeidoIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <rect x="2" y="7" width="15" height="12" rx="2" />
+      <path d="m3 9 6.5 4.2L16 9" />
+      <circle cx="19" cy="5" r="2.6" fill="currentColor" stroke="none" />
     </Icon>
   );
 }
@@ -997,6 +1027,33 @@ export function DropiIcon({ marca = false, ...props }: SVGProps<SVGSVGElement> &
   );
 }
 
+/**
+ * El logo de Drop (una chispa de cuatro puntas dentro de un cuadrado redondeado). Por defecto (el menú) va relleno con el color del texto y la chispa es
+ * transparente (una máscara), así se ve bien en los dos temas y al estar seleccionado. Con `marca` va con sus colores: cuadrado negro y chispa blanca, con un
+ * borde fino claro para que se distinga sobre el tema oscuro.
+ */
+const CHISPA_DROP = "M12 3.6c.7 5.1 3.3 7.7 8.4 8.4-5.1.7-7.7 3.3-8.4 8.4-.7-5.1-3.3-7.7-8.4-8.4 5.1-.7 7.7-3.3 8.4-8.4Z";
+export function DropIcon({ marca = false, ...props }: SVGProps<SVGSVGElement> & { marca?: boolean }) {
+  if (marca)
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" {...props}>
+        <rect x="1" y="1" width="22" height="22" rx="6" fill="#111111" stroke="#ffffff" strokeOpacity=".35" strokeWidth="1" />
+        <path d={CHISPA_DROP} fill="white" />
+      </svg>
+    );
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" {...props}>
+      <defs>
+        <mask id="icono-drop-mascara" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24">
+          <rect width="24" height="24" fill="white" />
+          <path d={CHISPA_DROP} fill="black" />
+        </mask>
+      </defs>
+      <rect x="1.5" y="1.5" width="21" height="21" rx="6" fill="currentColor" mask="url(#icono-drop-mascara)" />
+    </svg>
+  );
+}
+
 /** Almacén con estantes: Bodegas. */
 export function BodegaIcon(props: SVGProps<SVGSVGElement>) {
   return (
@@ -1010,6 +1067,15 @@ export function BodegaIcon(props: SVGProps<SVGSVGElement>) {
 }
 
 /** Pin de mapa: Ubicaciones (bins de una bodega). */
+export function CorreoIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <IconoLucide {...props}>
+      <rect x="2" y="4" width="20" height="16" rx="2" />
+      <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+    </IconoLucide>
+  );
+}
+
 export function UbicacionIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <IconoLucide {...props}>
@@ -1109,6 +1175,7 @@ export const ICONOS_PAGINA: Record<string, (props: SVGProps<SVGSVGElement>) => R
   "/creacion-ofertas": OfertaIcon,
   "/generador-landings": LandingIcon,
   "/publicaciones-dropi": DropiIcon,
+  "/publicaciones-drop": DropIcon,
   "/productos-test": TestIcon,
   "/filtro-productos": FiltroIcon,
   "/crm-dropshippers": DropshipperIcon,
@@ -1128,6 +1195,7 @@ export const ICONOS_PAGINA: Record<string, (props: SVGProps<SVGSVGElement>) => R
   "/productos": MargenIcon,
   "/usuarios": UsuariosIcon,
   "/puestos": PuestosIcon,
+  "/tareas": TareasIcon,
   "/rendimiento": RendimientoIcon,
   "/wms-productos": TiendaIcon,
   "/wms-productos-dropi": CatalogoIcon,
@@ -1157,6 +1225,16 @@ export function CandadoIcon(props: SVGProps<SVGSVGElement>) {
     <Icon {...props}>
       <rect x="5" y="11" width="14" height="9" rx="2" />
       <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+    </Icon>
+  );
+}
+
+/** El candado abierto: un ID público, que se puede privatizar (el cerrado es un privado, que se le quita la privatización). */
+export function CandadoAbiertoIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <rect x="5" y="11" width="14" height="9" rx="2" />
+      <path d="M8 11V8a4 4 0 0 1 7.75-1.4" />
     </Icon>
   );
 }

@@ -1,7 +1,7 @@
 import { forwardRef, type ButtonHTMLAttributes, type ComponentType } from "react";
 import { anilloFoco } from "@/components/ui/field";
 
-type Tono = "neutro" | "oscuro" | "peligro" | "exito" | "alerta" | "info";
+type Tono = "neutro" | "oscuro" | "peligro" | "exito" | "alerta" | "info" | "privado";
 
 // Los colores salen de los tokens, que cambian con el tema: en oscuro el «oscuro» pasa a claro y el texto se invierte
 // (un #202020 fijo se confundía con la tarjeta oscura). El texto de los rellenos es `text-background`, que en los dos
@@ -13,6 +13,8 @@ const TONOS: Record<Tono, string> = {
   exito: "border-success bg-success text-background hover:bg-success/85",
   alerta: "border-warning bg-warning text-background hover:bg-warning/85",
   info: "border-azul bg-azul text-background hover:bg-azul/85",
+  // El morado de lo privado (el de la insignia «Privado»), con texto blanco en los dos temas.
+  privado: "border-privado bg-privado text-white hover:bg-privado/85",
 };
 
 /**

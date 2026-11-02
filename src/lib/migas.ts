@@ -26,6 +26,7 @@ const TITULOS_APARTE: Record<string, string> = {
   "/sin-acceso": "Sin acceso",
   "/mi-puesto": "Mi puesto",
   "/cuenta/seguridad": "Seguridad de la cuenta",
+  "/actualizaciones": "Actualizaciones del sistema",
 };
 
 /** Las secciones del Centro de ayuda (`/ayuda`), en el orden en que se buscan. */
@@ -42,7 +43,11 @@ const SUBPAGINAS: Record<string, string> = {
   "/usuarios/auditoria": "Historial de auditoría",
   "/usuarios/roles": "Roles",
   "/puestos/organigrama": "Organigrama",
+  "/publicaciones-drop/recomendaciones": "Recomendaciones",
+  "/publicaciones-drop/tareas": "Tareas",
+  "/publicaciones-drop/reglas": "Reglas",
   "/publicaciones-dropi/recomendaciones": "Recomendaciones",
+  "/publicaciones-dropi/tareas": "Tareas",
   "/publicaciones-dropi/reglas": "Reglas",
   "/publicaciones-dropi/consumo": "Consumo de IA",
   "/extractos/patrones": "Diccionario de patrones bancarios",
@@ -54,14 +59,24 @@ const SUBPAGINAS: Record<string, string> = {
   "/compras/envios": "Envíos",
   "/compras/planificacion": "Planificación",
   "/compras/reponer": "Reponer",
+  "/tu-winner/canales": "Se repite en varios canales",
+  "/tu-winner/seguimiento": "Seguimiento",
+  "/tu-winner/como": "Cómo se actualiza",
   "/compras/sin-stock": "Sin stock",
   "/crm-dropshippers/directorio": "Dropshippers",
   "/crm-dropshippers/casos": "Casos",
   "/crm-dropshippers/bandeja": "Bandeja de WhatsApp",
+  "/crm-dropshippers/tareas": "Tareas",
+  "/crm-dropshippers/plantillas": "Plantillas",
+  "/crm-dropshippers/borrados": "Borrados",
+  "/crm-dropshippers/motivos": "Motivos",
   "/crm-dropshippers/ranking": "Ranking",
   "/crm-dropshippers/kpis": "KPIs de atención",
+  "/crm-dropshippers/direccion": "Dirección",
   "/inventario/pistoleo": "Pistoleo",
   "/inventario/vencimientos": "Vencimientos",
+  "/inventario/levantamiento": "Levantamiento",
+  "/inventario/remisiones": "Remisiones",
   "/crm-dropshippers/vinculos": "Vínculos",
   "/productos-test/productos": "Productos",
   "/analisis-competencia/resumen": "Resumen",
@@ -113,7 +128,7 @@ export function construirMigas(
   if (titulo) {
     // "Sin acceso" no es un módulo: no hay permisos que mostrar.
     // "Mi puesto" lo abre cualquiera con sesión: tampoco es un módulo.
-    const esModulo = ruta !== "/sin-acceso" && ruta !== "/mi-puesto" && ruta !== "/cuenta/seguridad";
+    const esModulo = ruta !== "/sin-acceso" && ruta !== "/mi-puesto" && ruta !== "/cuenta/seguridad" && ruta !== "/actualizaciones";
     return {
       migas: [{ etiqueta: titulo }],
       favoritoHref: null,

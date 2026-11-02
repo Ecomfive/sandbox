@@ -22,7 +22,7 @@ const hora = (iso: string) => {
  * para seguirla en la Bandeja de WhatsApp. Si nunca escribió, se le puede escribir desde el celular (iniciar una conversación desde el
  * sistema necesita una plantilla aprobada por Meta).
  */
-export function ConversacionWhatsapp({ dropshipperId, telefono }: { dropshipperId: string; telefono: string | null }) {
+export function ConversacionWhatsapp({ dropshipperId }: { dropshipperId: string }) {
   const [chat, setChat] = useState<Chat | null | "cargando" | "error">("cargando");
   useEffect(() => {
     let vigente = true;
@@ -40,11 +40,6 @@ export function ConversacionWhatsapp({ dropshipperId, telefono }: { dropshipperI
     return (
       <div className="flex flex-col gap-1.5 text-[13px]">
         <p className="m-0 text-muted-foreground">Todavía no ha escrito al WhatsApp de la empresa. Cuando escriba, la conversación aparece aquí y en la Bandeja de WhatsApp.</p>
-        {telefono && (
-          <a href={`https://wa.me/${telefono.replace(/\D/g, "")}`} target="_blank" rel="noopener noreferrer" className={`font-medium text-primario hover:underline ${anilloFoco}`}>
-            Escribirle desde el celular<span className="sr-only"> (se abre en una pestaña nueva)</span> ↗
-          </a>
-        )}
       </div>
     );
   const ventana = textoVentana(chat.ultimoEntranteEn);

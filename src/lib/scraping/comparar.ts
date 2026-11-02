@@ -6,9 +6,8 @@
 // encabezado cuenta también los sin stock y los privados de otros dropshippers). Por eso un producto que se agota deja de
 // aparecer: desaparecer con poco stock se toma como «agotado».
 
+import { cdnDeRuta } from "@/lib/publicaciones/republicar-dropi";
 import { palabrasClave, parecidoNombre } from "@/lib/wms/duplicados";
-
-export const URL_FOTOS_DROPI = "https://d39ru7awumhhs2.cloudfront.net/";
 
 /** Con este stock o menos en la búsqueda anterior, un producto que desaparece se cuenta como agotado. */
 export const STOCK_AGOTADO = 10;
@@ -81,8 +80,10 @@ export function normalizarDropi(o: unknown): ProductoVisto | null {
   const principal = galeria.find((g) => g?.main) ?? galeria[0];
   const ruta = typeof principal?.urlS3 === "string" ? principal.urlS3 : typeof principal?.url === "string" ? principal.url : "";
   const privado = esPrivado(nombre, p.privated_product === true || p.private_product === true);
-  // Un privado suele llevar el logo del proveedor en vez de la foto del producto: no sirve como foto.
-  const foto = ruta && !/logo/i.test(ruta.split("/").pop() ?? "") ? (/^https?:\/\//.test(ruta) ? ruta : URL_FOTOS_DROPI + ruta) : null;
+  // Un privado suele llevar el logo del proveedor en vez de la foto del producto: no sirve como foto. Cada país tiene su CDN
+  // (2 nov 2026, pedido de Hernán: en Análisis de competencia de Costa Rica no se veía ninguna foto; iban al de Panamá y daban 403).
+  // Un «+» en el nombre del archivo va como %2B: tal cual, el CDN lo lee como espacio y da 403.
+  const foto = ruta && !/logo/i.test(ruta.split("/").pop() ?? "") ? (/^https?:\/\//.test(ruta) ? ruta : `${cdnDeRuta(ruta)}/${ruta.replace(/\+/g, "%2B")}`) : null;
   const variaciones = Array.isArray(p.variations) ? (p.variations as Record<string, unknown>[]) : [];
   const stock =
     p.type === "VARIABLE" && variaciones.length

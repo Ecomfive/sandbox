@@ -1,10 +1,14 @@
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { ContadorPestana } from "@/components/migas/contador-pestana";
+import { contarMisTareasPendientes } from "./tareas-actions";
 import { requireModulo } from "@/lib/auth";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { puedeActualizarDropi } from "@/lib/dropi-actualizar/partes";
 import { getPaisActual } from "@/lib/pais";
+import { fulfillmentDePais } from "@/lib/publicaciones/fulfillment-pais";
+import { monedaDePais, tasasUsd } from "@/lib/moneda/tipo-cambio";
+import { monedaPublicaciones } from "@/lib/publicaciones/moneda";
 import { fechaHoraLectura } from "@/lib/publicaciones/sincronizar-dropi";
 import { BarraAplicarDropi } from "./barra-aplicar-dropi";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -30,6 +34,8 @@ export default async function PublicacionesDropiPage({ searchParams }: { searchP
   const puedeEscribir = !usuario.modulosSoloLectura.includes("publicaciones-dropi");
   // Ninguna publicación se elimina: quien puede editar, archiva. Las ventas de Dropi (últimos 30 días) las ve todo el que abre el módulo.
   const datos = await cargarPublicaciones(supabase, pais.id, usuario);
+  // Costa Rica en colones con su valor en dólares (28 oct 2026): la tasa del día solo hace falta si el país no usa dólares.
+  const moneda = monedaPublicaciones(pais.codigo, monedaDePais(pais.codigo) === "USD" ? {} : (await tasasUsd(supabase)).porUsd);
 
   if (!datos) {
     return (
@@ -46,6 +52,7 @@ export default async function PublicacionesDropiPage({ searchParams }: { searchP
     <Pagina ancho="ancha" className="flex flex-col gap-6">
       <EncabezadoPagina titulo="Gestión de IDs Dropi" oculto />
       <ContadorPestana href="/publicaciones-dropi/recomendaciones" cantidad={datos.filas.reduce((n, f) => n + f.recomendaciones.length, 0)} />
+      <ContadorPestana href="/publicaciones-dropi/tareas" cargar={contarMisTareasPendientes} />
       <TablaPublicaciones
         publicaciones={datos.filas}
         opcionesSku={datos.opcionesSku}
@@ -53,6 +60,8 @@ export default async function PublicacionesDropiPage({ searchParams }: { searchP
         paisId={pais.id}
         codigoPais={pais.codigo}
         nombrePais={pais.nombre}
+        fulfillmentPais={await fulfillmentDePais(supabase, pais.id)}
+        moneda={moneda}
         puedeEscribir={puedeEscribir}
         puedeArchivar={puedeEscribir}
         esAdmin={esAdministrador(usuario)}

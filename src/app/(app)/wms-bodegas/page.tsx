@@ -22,6 +22,8 @@ export default async function WmsBodegasPage() {
     .order("orden")
     .order("nombre");
 
+  const puedeEscribir = !usuario.modulosSoloLectura.includes("wms-bodegas");
+
   const filas: FilaBodega[] = (data ?? []).map((b) => ({
     id: b.id as string,
     nombre: b.nombre as string,
@@ -38,7 +40,7 @@ export default async function WmsBodegasPage() {
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
       <EncabezadoPagina titulo="Bodegas" oculto />
-      <TablaBodegas bodegas={filas} paisId={pais.id} codigoPais={pais.codigo} puedeEscribir={!usuario.modulosSoloLectura.includes("wms-bodegas")} />
+      <TablaBodegas bodegas={filas} paisId={pais.id} codigoPais={pais.codigo} puedeEscribir={puedeEscribir} />
     </Pagina>
   );
 }

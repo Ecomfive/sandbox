@@ -28,6 +28,7 @@ export function FichaSugerencia({
   ocultos,
   clientes,
   alGuardar,
+  enSitio,
 }: {
   action: (formData: FormData) => Promise<{ error?: string } | void>;
   boton?: (abrir: () => void) => ReactNode;
@@ -36,6 +37,8 @@ export function FichaSugerencia({
   /** Con la lista, la ficha pide el cliente (desde el módulo); sin ella, el cliente ya viene en `ocultos` (desde el CRM). */
   clientes?: ClienteCrm[];
   alGuardar?: () => void;
+  /** Se abre en el mismo lugar (debajo de los botones de la ficha) y no en una ventana encima. */
+  enSitio?: boolean;
 }) {
   const [subiendo, setSubiendo] = useState(false);
   const paises = useMemo(() => paisesDelMundo(), []);
@@ -50,6 +53,7 @@ export function FichaSugerencia({
       boton={boton}
       puedeExtra={!subiendo}
       alGuardar={alGuardar}
+      enSitio={enSitio}
     >
       {({ faltante, invalido }) => (
         <>

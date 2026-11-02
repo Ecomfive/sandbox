@@ -6,6 +6,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { armarAlertas, normalizarCompetencia, type ProductoAlerta, type VistoCompetencia } from "../src/lib/competencia/analisis";
+import { monedaDePais } from "../src/lib/moneda/tipo-cambio";
 import { comparar, type Evento, type ProductoGuardado } from "../src/lib/scraping/comparar";
 import { indexar, yaVisto } from "../src/lib/scraping/cruces";
 
@@ -79,7 +80,8 @@ export async function guardarCompetencia(
   try {
     // 1. Lo guardado, lo leído y la comparación (precio, stock, nuevos, desaparecidos).
     const antes = await todas(supabase, pais.id);
-    const vistos = l.productos.map(normalizarCompetencia).filter((v): v is VistoCompetencia => v !== null);
+    // Con el país, para reconocer a nuestro proveedor aunque no se llame ECOMFIVE (en Costa Rica es «Alcides»).
+    const vistos = l.productos.map((o) => normalizarCompetencia(o, codigo)).filter((v): v is VistoCompetencia => v !== null);
     const unicos = new Map(vistos.map((v) => [v.dropiId, v]));
     const guardados: ProductoGuardado[] = antes.map((g) => ({
       id: g.id,
@@ -201,6 +203,8 @@ export async function guardarCompetencia(
         cambios,
         desaparecidos,
         proveedoresNuevos: [...provNuevos.values()],
+        // Los textos de las alertas en la moneda del catálogo (Costa Rica en colones).
+        moneda: monedaDePais(codigo),
       });
       await enTrozos(lista, 500, async (trozo) => {
         revisar(

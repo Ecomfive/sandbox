@@ -28,3 +28,12 @@ export function paisesDelMundo(): { codigo: string; nombre: string }[] {
 
 /** Para buscar sin importar mayúsculas ni acentos. */
 export const normalPais = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
+
+/** El nombre de un país en español («CR» → «Costa Rica»); si no se reconoce, el código. */
+export function nombrePais(codigo: string): string {
+  try {
+    return new Intl.DisplayNames(["es"], { type: "region" }).of(codigo) ?? codigo;
+  } catch {
+    return codigo;
+  }
+}

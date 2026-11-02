@@ -16,15 +16,9 @@ import { DEF_PUBLICACIONES, POCO_STOCK, estadoVinculo, paraReactivar, pocoStock,
 
 const seleccion = (campo: string, ...valores: string[]) => ({ campo, valor: { tipo: "seleccion" as const, valores } });
 
-/** El color de cada tarjeta: el del ícono (sobre su fondo suave), el del número y el del borde cuando está filtrando. */
-export const COLORES = {
-  verde: { icono: "bg-success-soft text-success", numero: "text-success", activa: "border-success ring-success/30" },
-  ambar: { icono: "bg-warning-soft text-warning", numero: "text-warning", activa: "border-warning ring-warning/30" },
-  rojo: { icono: "bg-destructive-soft text-destructive", numero: "text-destructive", activa: "border-destructive ring-destructive/30" },
-  azul: { icono: "bg-azul-soft text-azul", numero: "text-azul", activa: "border-azul ring-azul/30" },
-  violeta: { icono: "bg-primario-suave text-primario", numero: "text-primario", activa: "border-primario ring-primario/30" },
-} as const;
-export type Color = keyof typeof COLORES;
+// El color de cada tarjeta vive en components/panel (lo usan también el CRM y Compras); se reexporta para los que ya lo importan de aquí.
+import { COLORES, type Color } from "@/components/panel/colores-tablero";
+export { COLORES, type Color };
 
 interface Tarjeta {
   id: string;
@@ -36,13 +30,13 @@ interface Tarjeta {
   atajo: AtajoFiltro;
   /** Lo que cuenta la tarjeta, en pocas palabras. */
   /** Lo que cuenta la tarjeta, con los umbrales de las reglas. */
-  detalle: string | ((r: Reglas) => string);
+  detalle: string | ((r: Reglas, codigoPais?: string) => string);
   /** Una línea más, calculada (p. ej. cuántas están en margen crítico). */
   extra?: (abiertas: FilaPublicacion[], r: Reglas) => string | null;
   /** El color de esa línea: rojo (lo que alarma) o verde (lo que va bien, como lo que viene en camino). */
   extraColor?: "rojo" | "verde";
   /** Un segundo número junto al grande, tras una barra: «/ 300» (el total) o «/ 6 en camino». */
-  junto?: (abiertas: FilaPublicacion[]) => { n: number; texto?: string; color?: "verde" };
+  junto?: (abiertas: FilaPublicacion[]) => { n: number; texto?: string; color?: "verde" | "ambar" };
   /** Cuenta también las archivadas (las pausadas por falta de stock están en Archivados). */
   todas?: boolean;
 }
@@ -55,7 +49,7 @@ const porAccion = (valor: AccionCalculada, icono: Tarjeta["icono"], color: Color
     titulo: a.etiqueta,
     icono,
     color,
-    detalle: (r) => detalleAccion(valor, r),
+    detalle: (r, codigoPais) => detalleAccion(valor, r, codigoPais),
     cuenta: (f) => f.acciones.includes(valor),
     atajo: { id: valor, etiqueta: a.etiqueta, ayuda: `Filtrar la lista: ${a.etiqueta.toLowerCase()}`, filtro: seleccion("accion", valor), suma: true },
   };
@@ -75,10 +69,15 @@ const TARJETAS: Tarjeta[] = [
     junto: (abiertas) => ({ n: abiertas.length }),
     atajo: { id: "activas", etiqueta: "Activas en Dropi", ayuda: "Filtrar la lista: activas en Dropi", filtro: seleccion("publicacion", "activo") },
   },
-  { ...porAccion("margen_bajo", MargenIcon, "rojo"), extra: (abiertas, r) => {
+  {
+    ...porAccion("margen_bajo", MargenIcon, "rojo"),
+    extra: (abiertas, r) => {
       const n = abiertas.filter((f) => f.nivelMargen === "critico").length;
       return n ? `${n} en crítico (menos de ${Math.round(r.margen_critico * 100)} %)` : null;
-    } },
+    },
+    // Las que se están liquidando a propósito siguen en margen bajo y se cuentan junto al número: «22 / 13 en liquidación» (28 oct 2026).
+    junto: (abiertas) => ({ n: abiertas.filter((f) => f.acciones.includes("margen_bajo") && !!f.liquidacionDesde).length, texto: "en liquidación", color: "ambar" }),
+  },
   porAccion("ventas_caida", VentasIcon, "ambar"),
   porAccion("bajar_precio", AnalisisCompetenciaIcon, "rojo"),
   porAccion("verificar_dropshipper", DropshipperIcon, "azul"),
@@ -152,7 +151,7 @@ const TARJETAS: Tarjeta[] = [
 ];
 
 /** Una tarjeta del tablero: ícono de color, título y el número grande. Es un botón que pone o quita su filtro en la lista. */
-function TarjetaAccion({ t, valor, junto, extra, detalle, def }: { t: Tarjeta; valor: number; junto: { n: number; texto?: string; color?: "verde" } | null; extra: string | null; detalle: string; def: DefTabla<FilaPublicacion> }) {
+function TarjetaAccion({ t, valor, junto, extra, detalle, def }: { t: Tarjeta; valor: number; junto: { n: number; texto?: string; color?: "verde" | "ambar" } | null; extra: string | null; detalle: string; def: DefTabla<FilaPublicacion> }) {
   const [filtros, cambiarFiltros] = useFiltros(def);
   const activa = atajoActivo(filtros, t.atajo);
   const c = COLORES[t.color];
@@ -175,7 +174,7 @@ function TarjetaAccion({ t, valor, junto, extra, detalle, def }: { t: Tarjeta; v
       <span className="flex items-baseline gap-1">
         <span className={`text-3xl leading-none font-semibold tabular-nums ${c.numero}`}>{valor.toLocaleString("es-PA")}</span>
         {junto && (
-          <span className={`text-sm tabular-nums ${junto.color === "verde" ? "font-medium text-success" : "text-muted-foreground"}`}>
+          <span className={`text-sm tabular-nums ${junto.color === "verde" ? "font-medium text-success" : junto.color === "ambar" ? "font-medium text-warning" : "text-muted-foreground"}`}>
             / {junto.n.toLocaleString("es-PA")}
             {junto.texto && ` ${junto.texto}`}
           </span>
@@ -195,14 +194,14 @@ function TarjetaAccion({ t, valor, junto, extra, detalle, def }: { t: Tarjeta; v
  * (las acciones calculadas, lo que falta vincular y lo que no tiene stock). Cada tarjeta cuenta las publicaciones abiertas y, al
  * pulsarla, filtra la lista de abajo; pulsarla otra vez quita el filtro.
  */
-export function TableroAcciones({ publicaciones, reglas, def = DEF_PUBLICACIONES }: { publicaciones: FilaPublicacion[]; reglas: Reglas; def?: DefTabla<FilaPublicacion> }) {
+export function TableroAcciones({ publicaciones, reglas, codigoPais, def = DEF_PUBLICACIONES }: { publicaciones: FilaPublicacion[]; reglas: Reglas; codigoPais?: string; def?: DefTabla<FilaPublicacion> }) {
   const abiertas = publicaciones.filter((f) => !f.archivada);
   return (
     <section aria-label="Tablero de acciones" className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(12rem,1fr))]">
       {TARJETAS.map((t) => {
         const base = t.todas ? publicaciones : abiertas;
         return (
-          <TarjetaAccion key={t.id} t={t} valor={base.filter(t.cuenta).length} junto={t.junto ? t.junto(base) : null} extra={t.extra ? t.extra(base, reglas) : null} detalle={typeof t.detalle === "function" ? t.detalle(reglas) : t.detalle} def={def} />
+          <TarjetaAccion key={t.id} t={t} valor={base.filter(t.cuenta).length} junto={t.junto ? t.junto(base) : null} extra={t.extra ? t.extra(base, reglas) : null} detalle={typeof t.detalle === "function" ? t.detalle(reglas, codigoPais) : t.detalle} def={def} />
         );
       })}
     </section>

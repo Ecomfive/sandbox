@@ -28,6 +28,7 @@ const ES = {
   colPorUnidad: "Por unidad",
   colTotal: "Total",
   colFotoReal: "Foto real",
+  colFotoReferencia: "Foto de referencia",
   colEstado: "Estado",
   colFechaEnvio: "Fecha de envío",
   colEnviado: "Enviado",
@@ -160,6 +161,18 @@ const ES = {
   guardarClave: "Guardar clave",
   guardandoClave: "Guardando…",
   claveCambiada: "Listo: tu clave nueva quedó guardada.",
+  // Descargar en Excel (28 oct 2026).
+  descargarExcel: "Descargar Excel",
+  descargarSeleccion: (n: number) => `Descargar selección (${n})`,
+  quitarSeleccion: "Quitar selección",
+  excelListo: (n: number) => `Excel descargado: ${n.toLocaleString("es-PA")} ${n === 1 ? "fila" : "filas"}`,
+  seleccionarTodas: "Seleccionar todas las filas",
+  seleccionarFila: (nombre: string) => `Seleccionar ${nombre}`,
+  colCodigo: "Código",
+  colComentario: "Comentario",
+  colPedidas: "Unidades pedidas",
+  excelError: "No se pudo crear el Excel.",
+  excelPreparando: "Preparando Excel…",
 };
 
 export type Textos = typeof ES;
@@ -183,6 +196,7 @@ const ZH: Textos = {
   colPorUnidad: "单价",
   colTotal: "总价",
   colFotoReal: "实物照片",
+  colFotoReferencia: "参考照片",
   colEstado: "状态",
   colFechaEnvio: "发货日期",
   colEnviado: "发货日期",
@@ -315,6 +329,17 @@ const ZH: Textos = {
   guardarClave: "保存密码",
   guardandoClave: "正在保存…",
   claveCambiada: "完成：新密码已保存。",
+  descargarExcel: "下载 Excel",
+  descargarSeleccion: (n: number) => `下载所选（${n}）`,
+  quitarSeleccion: "取消选择",
+  excelListo: (n: number) => `已下载 Excel：${n.toLocaleString("zh-CN")} 行`,
+  seleccionarTodas: "选择全部行",
+  seleccionarFila: (nombre: string) => `选择 ${nombre}`,
+  colCodigo: "编号",
+  colComentario: "备注",
+  colPedidas: "下单数量",
+  excelError: "无法生成 Excel。",
+  excelPreparando: "正在生成 Excel…",
 };
 
 export const TEXTOS: Record<Idioma, Textos> = { es: ES, zh: ZH };

@@ -113,6 +113,7 @@ const AREAS: NavSection[] = [
       { label: "Ubicaciones", href: "/wms-ubicaciones", frente: "fulfillment" },
       { label: "Compras", href: "/compras", frente: "fulfillment" },
       { label: "Gestión de IDs Dropi", href: "/publicaciones-dropi", frente: "fulfillment" },
+      { label: "Gestión de IDs Drop", href: "/publicaciones-drop", frente: "fulfillment" },
       { label: "Producto", href: "/producto", frente: "fulfillment" },
     ],
   },
@@ -134,6 +135,7 @@ const AREAS: NavSection[] = [
     items: [
       { label: "Usuarios y roles", href: "/usuarios" },
       { label: "Puestos", href: "/puestos" },
+      { label: "Tareas", href: "/tareas" },
       { label: "Rendimiento", href: "/rendimiento" },
     ],
   },
@@ -175,9 +177,12 @@ export interface PaisNav {
 export const PAISES_NAV: PaisNav[] = [
   { codigo: "CR", nombre: "Costa Rica" },
   { codigo: "PA", nombre: "Panamá" },
-  { codigo: "MX", nombre: "México", pronto: true },
-  { codigo: "HN", nombre: "Honduras", pronto: true },
-  { codigo: "VE", nombre: "Venezuela", pronto: true },
+  // México abierto el 29 oct 2026 (Hernán): sus datos de Dropi ya están cargados.
+  { codigo: "MX", nombre: "México" },
+  // Honduras abierto el 31 oct 2026 (Alcides): empiezan las compras para Honduras.
+  { codigo: "HN", nombre: "Honduras" },
+  // Venezuela abierto el 31 oct 2026 (Alcides).
+  { codigo: "VE", nombre: "Venezuela" },
 ];
 
 export const PAIS_COOKIE = "pais_actual";

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { ARMAR_JS, marcadorAplicarDropi } from "./marcador-aplicar-dropi";
-import { armarMovimientoStock, armarProductoNuevo, CDN_FOTOS_DROPI, fotosParaCopiar, REPUBLICAR_JS, stockPorBodega } from "./republicar-dropi";
+import { armarMovimientoStock, armarProductoNuevo, CDN_FOTOS_DROPI, fotosParaCopiar, REPUBLICAR_JS, republicacionSinTocarDropi, stockPorBodega } from "./republicar-dropi";
 
 type Obj = Record<string, unknown>;
 const delFavorito = new Function(`${ARMAR_JS};${REPUBLICAR_JS}; return { nuevo, mover, stockDe, fotosDe };`)() as {
@@ -49,6 +49,24 @@ test("no se republica: con variaciones, con stock en la B280, con privados o con
   assert.ok("error" in armarProductoNuevo({ ...veganic, user_profit_percentage_product: [{ user_id: 9 }] }, bp));
 });
 
+test("una republicación detenida antes de crear nada en Dropi se reconoce (se puede quitar de la cola y hacer a mano)", () => {
+  const errores = [
+    armarProductoNuevo({ ...veganic, type: "VARIABLE" }, bp),
+    armarProductoNuevo({ ...veganic, warehouse_product: [{ warehouse_id: 280, stock: 10, warehouse: { id: 280, name: "Bodega Dropi Panama" } }] }, bp),
+    armarProductoNuevo({ ...veganic, private_product_inventories: [{ stock: 5, deleted_at: null }] }, bp),
+    armarProductoNuevo({ ...veganic, user_profit_percentage_product: [{ user_id: 9 }] }, bp),
+  ].map((r) => (r as { error: string }).error);
+  for (const e of errores) assert.equal(republicacionSinTocarDropi(e, null), true, e);
+  assert.equal(republicacionSinTocarDropi("Ese producto no es de este proveedor en Dropi.", null), true);
+  // Con producto nuevo creado, o con un error de después de crearlo, no.
+  assert.equal(republicacionSinTocarDropi("Tiene variaciones: cámbialo a mano en Dropi.", 12345), false);
+  assert.equal(republicacionSinTocarDropi("Dropi no devolvió el ID del producto nuevo (respondió 200).", null), false);
+  assert.equal(republicacionSinTocarDropi("Dropi respondió 500.", null), false);
+  assert.equal(republicacionSinTocarDropi(null, null), false);
+  // El favorito usa los mismos textos.
+  for (const e of errores) assert.ok(ARMAR_JS.includes(e.slice(0, 20)) || REPUBLICAR_JS.includes(e.slice(0, 20)), e);
+});
+
 test("mover stock: salida del viejo con su concepto, entrada en el nuevo aunque la bodega no tenga stock todavía", () => {
   const salida = armarMovimientoStock(veganic, bp, { "81": -224 }, "Republicado como ID 9001");
   assert.ok("cuerpo" in salida);
@@ -79,6 +97,22 @@ test("el favorito arma exactamente lo mismo que el sistema", () => {
     igual(delFavorito.stockDe(o), stockPorBodega(o));
     igual(delFavorito.fotosDe(o), fotosParaCopiar(o));
   }
+});
+
+test("fotos de Costa Rica: se bajan de su propio CDN, en el sistema y en el favorito", () => {
+  const cr: Obj = {
+    id: 309,
+    gallery: [
+      { urlS3: "costarica/products/309/177594143873dadcb7.png", main: true, variation_id: null },
+      { url: "https://otro.example.com/costarica/products/309/sin-s3.jpg", main: false, variation_id: null },
+    ],
+  };
+  const f = fotosParaCopiar(cr);
+  assert.equal(f[0].url, "https://d3sk39qh2f4j46.cloudfront.net/costarica/products/309/177594143873dadcb7.png");
+  assert.ok(f[1].alternas.every((a) => a.startsWith("https://d3sk39qh2f4j46.cloudfront.net/costarica/")));
+  igual(delFavorito.fotosDe(cr), f);
+  // Panamá sigue en el suyo.
+  assert.ok(fotosParaCopiar(veganic)[0].url.startsWith(`${CDN_FOTOS_DROPI}/panama/`));
 });
 
 test("el favorito republica solo lo que viene marcado «republicar» y sube fotos al mismo endpoint de Dropi", () => {

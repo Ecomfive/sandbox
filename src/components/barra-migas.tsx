@@ -33,12 +33,15 @@ export function BarraMigas({
   areas,
   favoritos,
   pestanasOcultas = [],
+  verAccesos = false,
   rutaActual,
 }: {
   areas: NavSection[];
   favoritos: string[];
   /** Las pestañas que esta persona no debe ver (las que su rol o su ficha esconden con «Afinar»). */
   pestanasOcultas?: string[];
+  /** El botón «Accesos» (quién tiene acceso a la sección): solo para un administrador (29 oct 2026, pedido de Hernán). */
+  verAccesos?: boolean;
   /** Solo para pruebas visuales: fuerza la ruta en vez de leerla del navegador. */
   rutaActual?: string;
 }) {
@@ -137,7 +140,7 @@ export function BarraMigas({
               </Link>
             </Tooltip>
           )}
-          {moduloHref && moduloEtiqueta && moduloHref !== "/ayuda" && (
+          {verAccesos && moduloHref && moduloEtiqueta && moduloHref !== "/ayuda" && (
             <BotonAccesos key={ruta} moduloHref={moduloHref} moduloEtiqueta={moduloEtiqueta} />
           )}
         </div>

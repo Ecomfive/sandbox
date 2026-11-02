@@ -17,6 +17,26 @@ export function textoVentana(ultimoEntrante: string | null, ahora: Date = new Da
   return m >= 60 ? `quedan ${Math.floor(m / 60)} h` : `quedan ${m} min`;
 }
 
+/**
+ * El código y el motivo de un envío rechazado, de cualquiera de las formas en que responden (28 oct 2026: con 360dialog la bandeja solo
+ * decía «WhatsApp no lo envió», sin motivo): la de Meta (`error.code`, `error.error_data.details`, `error.message`), la de 360dialog
+ * (`meta.developer_message`, `errors[].code/title/details`) o un texto suelto. Sin nada legible, el código HTTP.
+ */
+export function leerErrorEnvio(status: number, cuerpo: unknown): { codigo: number | null; mensaje: string } {
+  const objeto = (v: unknown) => (typeof v === "object" && v !== null ? v : {}) as Record<string, unknown>;
+  const texto = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
+  const numero = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : typeof v === "string" && /^\d+$/.test(v) ? Number(v) : null);
+  const o = objeto(cuerpo);
+  const e = objeto(o.error);
+  const datos = objeto(e.error_data);
+  const meta = objeto(o.meta);
+  const primero = objeto(Array.isArray(o.errors) ? o.errors[0] : null);
+  const codigo = numero(e.code) ?? numero(primero.code);
+  const mensaje =
+    texto(datos.details) ?? texto(e.message) ?? texto(meta.developer_message) ?? texto(primero.details) ?? texto(primero.title) ?? texto(o.message) ?? texto(typeof cuerpo === "string" ? cuerpo.slice(0, 300) : null);
+  return { codigo, mensaje: mensaje ?? `código ${status}` };
+}
+
 /** Un error de la API de WhatsApp en palabras para el equipo (los códigos son los de Meta). */
 export function errorEnEspanol(codigo: number | null, mensaje: string | null): string {
   switch (codigo) {
