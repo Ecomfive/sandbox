@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { BotonBarra, Punto } from "@/components/panel/piezas-panel";
 import { Badge } from "@/components/ui/badge";
+import { Bandera } from "@/components/paises/bandera";
 import { TarjetaEmergente } from "@/components/ui/tarjeta-emergente";
 import { TableroCompras, TARJETAS_COMPRAS } from "./tablero-compras";
 import { useToast } from "@/components/ui/toast";
@@ -248,7 +249,29 @@ function columnas(
       },
     }),
     col("codigo", "Código", { ...resto, clase: "text-muted-foreground tabular-nums whitespace-nowrap", render: (c) => c.codigo ?? "—" }),
-    col("pais", "País", { ...resto, clase: "text-muted-foreground", render: (c) => c.paisCodigo ?? (c.paisesDestino.length ? `→ ${c.paisesDestino.join(", ")}` : "—") }),
+    col("pais", "País", {
+      ...resto,
+      clase: "text-muted-foreground",
+      render: (c) =>
+        c.paisCodigo ? (
+          <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+            <Bandera codigo={c.paisCodigo} />
+            {c.paisCodigo}
+          </span>
+        ) : c.paisesDestino.length ? (
+          <span className="inline-flex flex-wrap items-center gap-1.5">
+            →
+            {c.paisesDestino.map((p) => (
+              <span key={p} className="inline-flex items-center gap-1 whitespace-nowrap">
+                <Bandera codigo={p} />
+                {p}
+              </span>
+            ))}
+          </span>
+        ) : (
+          "—"
+        ),
+    }),
     col("estado", "Estado", { ...resto, render: (c) => ed(c, "estado", <Badge color={colorEstado(c.estado)}>{etiquetaEstado(c.estado)}</Badge>) }),
     col("proveedor", "Proveedor", { ...resto, clase: "text-muted-foreground", render: (c) => ed(c, "proveedor", conColor(c.proveedor, colorProveedor)) }),
     col("ventaImportacion", "Tipo de venta", {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useTransition } from "react";
+import { Bandera } from "@/components/paises/bandera";
 import { MenuDesplegable, TituloGrupoMenu, claseOpcionMenu } from "@/components/ui/menu-desplegable";
 import { CheckIcon, ChevronRightIcon } from "@/lib/nav-icons";
 import { PAISES_NAV } from "@/lib/nav-data";
@@ -25,6 +26,8 @@ export function SelectorContexto({ pais, plataforma, permitidos = null }: { pais
   const paises = permitidos === null ? PAISES_NAV : PAISES_NAV.filter((p) => permitidos.includes(p.codigo));
   const [pending, startTransition] = useTransition();
   const nombrePais = PAISES_NAV.find((p) => p.codigo === pais)?.nombre ?? pais;
+  // Sin un país conocido (p. ej. «Sin país») queda el globo.
+  const conBandera = PAISES_NAV.some((p) => p.codigo === pais);
 
   return (
     <MenuDesplegable
@@ -32,7 +35,7 @@ export function SelectorContexto({ pais, plataforma, permitidos = null }: { pais
       claseBoton={`inline-flex min-h-8 items-center gap-1.5 rounded-full border border-border-control bg-card px-3 py-1 text-sm hover:bg-muted ${pending ? "opacity-60" : ""}`}
       contenidoBoton={
         <>
-          <GloboIcon className="h-4 w-4 text-muted-foreground" />
+          {conBandera ? <Bandera codigo={pais} /> : <GloboIcon className="h-4 w-4 text-muted-foreground" />}
           <span className="hidden sm:inline">
             {nombrePais}
             {plataforma ? <span className="text-muted-foreground"> · {plataforma}</span> : null}
@@ -58,6 +61,7 @@ export function SelectorContexto({ pais, plataforma, permitidos = null }: { pais
               }}
               className={claseOpcionMenu}
             >
+              <Bandera codigo={p.codigo} />
               <span className={p.codigo === pais ? "font-semibold" : ""}>{p.nombre}</span>
               {p.codigo === pais && <CheckIcon className="ml-auto h-4 w-4 text-success" />}
               {p.pronto && <span className="ml-auto rounded-full border border-border px-2 text-[0.65rem] text-muted-foreground">Pronto</span>}

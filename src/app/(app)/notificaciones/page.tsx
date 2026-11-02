@@ -4,6 +4,11 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { getUsuarioActual } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { ParaTi, type AvisoParaTi } from "./para-ti";
+import { ActualizacionesAvisos, type ActualizacionAviso } from "./actualizaciones-avisos";
+import { claveNovedad, DIAS_AVISO, recientes } from "@/lib/ayuda/actualizaciones";
+import { novedadesPara } from "@/lib/ayuda/contenido";
+import { hoyPanama, vistasDe } from "@/lib/ayuda/novedades-vistas";
+import { etiquetaDeModulo } from "@/lib/permisos/catalogo";
 import { getPaisActual } from "@/lib/pais";
 import { obtenerPendientesHoy } from "@/lib/pendientes-hoy";
 import { pendientesVisibles } from "@/lib/hoy";
@@ -16,8 +21,8 @@ export const metadata = { title: "Centro de notificaciones" };
 export const dynamic = "force-dynamic";
 
 /**
- * Centro de notificaciones. Arriba, «Para ti»: los avisos personales (menciones con «@»), que ve todo el que los tenga. El
- * resto (pendientes del día, actividad, sesiones de Dropi) solo con el módulo.
+ * Centro de notificaciones. Arriba, «Para ti»: los avisos personales (menciones con «@»), que ve todo el que los tenga, y las actualizaciones
+ * del sistema de sus módulos, que cada persona marca como leídas. El resto (pendientes del día, actividad, sesiones de Dropi) solo con el módulo.
  */
 export default async function NotificacionesPage() {
   const usuario = await getUsuarioActual();
@@ -30,12 +35,24 @@ export default async function NotificacionesPage() {
     .order("creado_en", { ascending: false })
     .limit(50);
   const avisos: AvisoParaTi[] = (propios ?? []).map((a) => ({ id: a.id, titulo: a.titulo, texto: a.texto, href: a.href, leida: !!a.leida_en, creadoEn: a.creado_en }));
+  // Las actualizaciones del sistema de sus módulos de los últimos días, con las que ya vio (migración 0218).
+  const vistas = await vistasDe(supabase, usuario.id);
+  const actualizaciones: ActualizacionAviso[] = recientes(novedadesPara(usuario.modulos), hoyPanama()).map((n) => ({
+    clave: claveNovedad(n),
+    fecha: n.fecha,
+    titulo: n.titulo,
+    texto: n.texto,
+    href: n.href ?? null,
+    modulo: n.modulo ? etiquetaDeModulo(n.modulo) : null,
+    vista: vistas.has(claveNovedad(n)),
+  }));
 
   if (!usuario.modulos.includes("notificaciones")) {
     return (
       <Pagina ancho="media" className="flex flex-col gap-6">
         <EncabezadoPagina titulo="Centro de notificaciones" oculto />
         <ParaTi avisos={avisos} />
+        <ActualizacionesAvisos actualizaciones={actualizaciones} dias={DIAS_AVISO} />
       </Pagina>
     );
   }
@@ -104,6 +121,7 @@ export default async function NotificacionesPage() {
       </EncabezadoPagina>
 
       <ParaTi avisos={avisos} />
+      <ActualizacionesAvisos actualizaciones={actualizaciones} dias={DIAS_AVISO} />
 
       <CentroNotificaciones
         pendientes={pendientesVisibles(pendientes, usuario.modulos)}

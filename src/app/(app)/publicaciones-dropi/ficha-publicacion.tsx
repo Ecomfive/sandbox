@@ -9,7 +9,7 @@ import { Seccion } from "@/components/ui/seccion-ficha";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
-import { ActualizarIcon, CerrarIcon, CheckIcon, ComprasIcon, EstadoIcon, FlechaAbajoIcon, FlechaArribaIcon, InteligenciaIcon, InventarioIcon, LapizIcon, MargenIcon, PapeleraIcon, ProductoIcon, ArchivarIcon, FotosIcon, PausaIcon, ReactivarIcon, ApagarIcon, CandadoAbiertoIcon, CandadoIcon } from "@/lib/nav-icons";
+import { ActualizarIcon, CerrarIcon, CheckIcon, ComprasIcon, EstadoIcon, InteligenciaIcon, InventarioIcon, LapizIcon, MargenIcon, PapeleraIcon, ProductoIcon, ArchivarIcon, FotosIcon, PausaIcon, ReactivarIcon, ApagarIcon, CandadoAbiertoIcon, CandadoIcon } from "@/lib/nav-icons";
 import {
   ESTADOS_PUBLICACION,
   TIPOS,
@@ -46,7 +46,7 @@ import { codigoBodega } from "@/lib/publicaciones/sincronizar-dropi";
 import { VinculoSku } from "./vinculo-sku";
 import { FotosPublicacion } from "./fotos-publicacion";
 import { PublicacionesDelProducto } from "./mismo-producto";
-import { Monto } from "./moneda-contexto";
+import { Monto, useMoneda } from "./moneda-contexto";
 import { VentasDropiProducto } from "../producto/ventas-dropi-producto";
 
 interface Formulario {
@@ -97,21 +97,6 @@ const desde = (p: FilaPublicacion): Formulario => ({
 const n = (s: string) => (s.trim() === "" ? null : Number(s));
 const fechaLarga = (iso: string) => new Date(iso.length === 10 ? `${iso}T12:00:00` : iso).toLocaleDateString("es-PA", { day: "numeric", month: "short", year: "numeric", timeZone: "America/Panama" });
 
-function BotonNavegar({ texto, icono: Icono, activo, alHacerClic }: { texto: string; icono: typeof FlechaArribaIcon; activo: boolean; alHacerClic: () => void }) {
-  return (
-    <Tooltip texto={texto}>
-      <button
-        type="button"
-        aria-label={texto}
-        aria-disabled={!activo}
-        onClick={() => activo && alHacerClic()}
-        className={`flex h-9 w-9 items-center justify-center border border-border bg-card text-foreground ${anilloFoco} !rounded-md ${activo ? "hover:bg-muted" : "cursor-default opacity-40"}`}
-      >
-        <Icono className="h-4 w-4" />
-      </button>
-    </Tooltip>
-  );
-}
 
 
 function Selector({ valor, lista, cambiar, nombre, vacio = "—" }: { valor: string; lista: OpcionPublicacion[]; cambiar: (v: string) => void; nombre: string; vacio?: string }) {
@@ -135,6 +120,49 @@ const PENDIENTE_EN_COLOR = "disabled:!border-azul/30 disabled:!bg-azul-soft disa
  * un dato y arriba aparecen «Guardar cambios» y «Cancelar»; al guardar, la ficha sigue abierta. Utilidad y
  * margen se calculan solos. Con cambios sin guardar, cerrar o pasar a otra pide confirmación.
  */
+/**
+ * Un monto de la ficha en la moneda del país, con su símbolo delante («₡», «MX$», «$») y, si el país no usa dólares, debajo cuánto es en dólares
+ * con el tipo de cambio de hoy («≈ US$9.90»). Sin valor, nada debajo.
+ */
+function CampoMonto({
+  etiqueta,
+  value,
+  onChange,
+  placeholder,
+  disabled = false,
+}: {
+  etiqueta: string;
+  value: string;
+  onChange?: (v: string) => void;
+  placeholder?: string;
+  disabled?: boolean;
+}) {
+  const { simbolo, enDolares } = useMoneda();
+  const numero = value.trim() === "" ? null : Number(value);
+  const usd = numero === null || !Number.isFinite(numero) ? null : enDolares(numero);
+  return (
+    <label className="flex min-w-0 flex-col gap-1">
+      <span className={labelClassSm}>{etiqueta}</span>
+      <span className={`flex items-center gap-1.5 ${fieldClass} w-full ${disabled ? "cursor-not-allowed bg-muted" : "focus-within:border-foreground focus-within:ring-2 focus-within:ring-foreground"}`}>
+        <span aria-hidden="true" className="shrink-0 text-sm text-muted-foreground">
+          {simbolo}
+        </span>
+        <input
+          type="number"
+          min={0}
+          step="0.01"
+          value={value}
+          onChange={(e) => onChange?.(e.target.value)}
+          placeholder={placeholder}
+          disabled={disabled}
+          className="w-full min-w-0 border-0 bg-transparent p-0 tabular-nums outline-none disabled:cursor-not-allowed"
+        />
+      </span>
+      {usd && <span className="text-xs text-muted-foreground tabular-nums">≈ {usd}</span>}
+    </label>
+  );
+}
+
 export function FichaPublicacion({
   publicacion,
   codigoPais,
@@ -148,7 +176,6 @@ export function FichaPublicacion({
   margenMinimo,
   decisionesDisponibles,
   opcionesCrear,
-  anterior,
   siguiente,
   alCerrar,
   mismoProducto = [],
@@ -177,7 +204,7 @@ export function FichaPublicacion({
   /** Las demás publicaciones del mismo producto (mismo SKU vinculado), públicas y privadas, y cómo abrir una. */
   mismoProducto?: FilaPublicacion[];
   alAbrirOtra?: (id: string) => void;
-  anterior?: () => void;
+  /** Para «Vincular y siguiente» del producto vinculado. */
   siguiente?: () => void;
   alCerrar: () => void;
 }) {
@@ -197,7 +224,6 @@ export function FichaPublicacion({
       margenMinimo={margenMinimo}
       decisionesDisponibles={decisionesDisponibles}
       opcionesCrear={opcionesCrear}
-      anterior={anterior}
       siguiente={siguiente}
       alCerrar={alCerrar}
       mismoProducto={mismoProducto}
@@ -219,7 +245,6 @@ function ContenidoFicha({
   margenMinimo,
   decisionesDisponibles,
   opcionesCrear,
-  anterior,
   siguiente,
   alCerrar,
   mismoProducto,
@@ -237,7 +262,7 @@ function ContenidoFicha({
   margenMinimo: number;
   decisionesDisponibles: boolean;
   opcionesCrear: OpcionesCrear;
-  anterior?: () => void;
+  /** Para «Vincular y siguiente» del producto vinculado. */
   siguiente?: () => void;
   alCerrar: () => void;
   mismoProducto: FilaPublicacion[];
@@ -415,12 +440,6 @@ function ContenidoFicha({
               ) : null;
             })
           )}
-        </>
-      }
-      navegacion={
-        <>
-          <BotonNavegar texto="Publicación anterior" icono={FlechaArribaIcon} activo={!!anterior && !pendiente} alHacerClic={() => anterior && salir(anterior)} />
-          <BotonNavegar texto="Publicación siguiente" icono={FlechaAbajoIcon} activo={!!siguiente && !pendiente} alHacerClic={() => siguiente && salir(siguiente)} />
         </>
       }
     >
@@ -681,25 +700,13 @@ function ContenidoFicha({
 
           <Seccion icono={MargenIcon} titulo="Precio y margen">
             <div className="grid gap-3 sm:grid-cols-2">
-              <label className="flex min-w-0 flex-col gap-1">
-                <span className={labelClassSm}>Precio de venta</span>
-                <input type="number" min={0} step="0.01" value={d.precio_venta} onChange={(e) => cambiar({ precio_venta: e.target.value })} placeholder="Ej: 9.99" className={`${fieldClass} w-full tabular-nums`} />
-              </label>
-              <label className="flex min-w-0 flex-col gap-1">
-                <span className={labelClassSm}>Costo de producto</span>
-                <input type="number" min={0} step="0.01" value={d.costo_mercancia} onChange={(e) => cambiar({ costo_mercancia: e.target.value })} placeholder="Ej: 1.16" className={`${fieldClass} w-full tabular-nums`} />
-              </label>
-              <label className="flex min-w-0 flex-col gap-1">
-                <span className={labelClassSm}>Fulfillment</span>
-                {fijo !== null ? (
-                  <>
-                    <input value={fijo.toFixed(2)} disabled className={`${fieldClass} w-full tabular-nums disabled:cursor-not-allowed disabled:bg-muted`} />
-                    <span className="text-xs text-muted-foreground">Igual en todas las de Panamá</span>
-                  </>
-                ) : (
-                  <input type="number" min={0} step="0.01" value={d.fulfillment} onChange={(e) => cambiar({ fulfillment: e.target.value })} placeholder="Ej: 1.50" className={`${fieldClass} w-full tabular-nums`} />
-                )}
-              </label>
+              <CampoMonto etiqueta="Precio de venta" value={d.precio_venta} onChange={(v) => cambiar({ precio_venta: v })} placeholder="Ej: 9.99" />
+              <CampoMonto etiqueta="Costo de producto" value={d.costo_mercancia} onChange={(v) => cambiar({ costo_mercancia: v })} placeholder="Ej: 1.16" />
+              {fijo !== null ? (
+                <CampoMonto etiqueta="Fulfillment" value={String(fijo)} disabled />
+              ) : (
+                <CampoMonto etiqueta="Fulfillment" value={d.fulfillment} onChange={(v) => cambiar({ fulfillment: v })} placeholder="Ej: 1.50" />
+              )}
             </div>
             <dl className="grid grid-cols-3 gap-3 rounded-lg bg-muted px-4 py-3 text-sm tabular-nums">
               <div>

@@ -3,7 +3,18 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { armarPersonasConAcceso, type PerfilConRol, type PermisoDeRol, type PermisoPropioDeModulo } from "../acceso-seccion";
-import { borrarPlantillaEnOtrosNumeros, borrarPlantillaMeta, crearPlantillaMeta, editarPlantillaMeta, listarPlantillasMeta, replicarPlantillaEnOtrosNumeros, type ResultadoEnCanal } from "./api-plantillas";
+import {
+  ERROR_YA_EXISTE,
+  borrarPlantillaEnOtrosNumeros,
+  borrarPlantillaMeta,
+  canalesPlantillas,
+  crearPlantillaMeta,
+  editarPlantillaMeta,
+  etiquetaDeCanal,
+  listarPlantillasMeta,
+  replicarPlantillaEnOtrosNumeros,
+} from "./api-plantillas";
+import { config360 } from "./proveedor";
 import { alertaDeEvento, extraerEventosCuenta, type AlertaNueva, type EventoCuenta } from "./eventos";
 import {
   alinearVariables,
@@ -102,6 +113,26 @@ export async function registrarAlerta(supabase: SupabaseClient, a: AlertaNueva, 
 }
 
 /**
+ * Cuándo salió hacia Meta la última plantilla, a **cualquier** número (31 oct 2026, Hernán: «una cada dos minutos» también al igualar números): la
+ * última `enviada_en` (las del número principal) o la última auditoría `enviar_plantilla_meta` (las que se mandan a un solo número). `exceptoId`
+ * deja fuera la misma plantilla, para poder corregirla y volver a mandarla.
+ */
+export async function ultimoEnvioDePlantilla(supabase: SupabaseClient, exceptoId?: string): Promise<string | null> {
+  let principal = supabase.from("whatsapp_plantillas").select("enviada_en").not("enviada_en", "is", null).order("enviada_en", { ascending: false }).limit(1);
+  if (exceptoId) principal = principal.neq("id", exceptoId);
+  let otros = supabase.from("historial_auditoria").select("creado_en").eq("accion", "enviar_plantilla_meta").order("creado_en", { ascending: false }).limit(1);
+  if (exceptoId) otros = otros.neq("entidad_id", exceptoId);
+  const [a, b] = await Promise.all([principal, otros]);
+  const fechas = [(a.data?.[0]?.enviada_en as string | undefined) ?? null, (b.data?.[0]?.creado_en as string | undefined) ?? null].filter((x): x is string => !!x);
+  return fechas.sort((x, y) => Date.parse(y) - Date.parse(x))[0] ?? null;
+}
+
+/** Los segundos que faltan para poder mandar otra plantilla a Meta (0 si ya se puede). */
+export async function esperaParaPlantilla(supabase: SupabaseClient, exceptoId?: string): Promise<number> {
+  return segundosDeEspera(await ultimoEnvioDePlantilla(supabase, exceptoId));
+}
+
+/**
  * Manda la plantilla a Meta: nueva, la crea y queda «en revisión»; ya enviada y aprobada o rechazada (o pausada), cambia su texto y Meta la
  * vuelve a revisar. Si Meta no la acepta, el motivo queda anotado en la plantilla (no se pierde nada de lo escrito).
  */
@@ -116,8 +147,7 @@ export async function enviarPlantillaAMeta(supabase: SupabaseClient, id: string)
   if (yaEnMeta && p.estado === "pendiente") return { error: "Meta la está revisando: espera su respuesta para cambiarla." };
   if (yaEnMeta && p.estado === "deshabilitada") return { error: "Meta la deshabilitó y no se puede cambiar. Crea otra con otro nombre." };
   // Dos minutos entre una plantilla y otra, venga de la pantalla o del script: así no parece un envío en masa.
-  const { data: ultima } = await supabase.from("whatsapp_plantillas").select("enviada_en").neq("id", id).not("enviada_en", "is", null).order("enviada_en", { ascending: false }).limit(1).maybeSingle();
-  const espera = segundosDeEspera((ultima?.enviada_en as string | null) ?? null);
+  const espera = await esperaParaPlantilla(supabase, id);
   if (espera > 0) return { error: `Acabas de mandar otra plantilla a Meta. Espera ${textoEspera(espera)} antes de mandar la siguiente: así no parece un envío en masa.` };
 
   let metaId = p.meta_id;
@@ -305,22 +335,73 @@ export async function sincronizarPlantillas(supabase: SupabaseClient): Promise<{
 }
 
 /**
- * «Igualar números» (30 oct 2026): deja en los demás números con clave propia las plantillas que ya se mandaron a Meta por el principal (en revisión o aprobadas). Las que comparten cuenta
- * ya están; las de otra cuenta se crean allá. Devuelve cuántas se crearon, cuántas ya estaban y los fallos por número.
+ * «Enviar a Meta» en «Revisar números» (31 oct 2026, pedido de Hernán: al agregar el número de Dirección salió sin ninguna plantilla): manda una
+ * plantilla del sistema a UN número que no la tiene (`variable` = el nombre de la variable de su clave, de `canalesPlantillas`). Si ya la
+ * tiene, no hace nada. Si es el número principal y la plantilla nunca se había mandado, queda anotada como enviada. No toca los demás números.
  */
-export async function igualarNumerosDePlantillas(supabase: SupabaseClient): Promise<{ creadas: number; yaEstaban: number; fallas: string[] } | { error: string }> {
-  const { data, error } = await supabase.from("whatsapp_plantillas").select(COLUMNAS_PLANTILLA).not("meta_id", "is", null).in("estado", ["pendiente", "aprobada"]);
+export async function crearPlantillaEnNumero(
+  supabase: SupabaseClient,
+  nombre: string,
+  idioma: string,
+  variable: string,
+): Promise<{ id: string; canal: string; hecho: "creada" | "ya estaba"; estado: EstadoPlantilla | null } | { error: string; esperaS?: number }> {
+  const c = canalesPlantillas().find((x) => x.variable === variable);
+  if (!c) return { error: "Ese número ya no tiene su clave de 360dialog en el servidor." };
+  const { data, error } = await supabase.from("whatsapp_plantillas").select(COLUMNAS_PLANTILLA).eq("nombre", nombre.trim());
   if (error) return { error: "Falta correr la migración 0170 (plantillas de WhatsApp)." };
-  let creadas = 0;
-  let yaEstaban = 0;
-  const fallas: string[] = [];
-  for (const p of (data ?? []) as PlantillaGuardada[]) {
-    const r: ResultadoEnCanal[] = await replicarPlantillaEnOtrosNumeros(datosDe(p), p.meta_id, false);
-    for (const x of r) {
-      if ("error" in x) fallas.push(`${p.nombre} en ${x.canal}: ${x.error}`);
-      else if (x.hecho === "creada") creadas++;
-      else yaEstaban++;
-    }
+  const p = ((data ?? []) as PlantillaGuardada[]).find((x) => normalizarIdioma(x.idioma) === normalizarIdioma(idioma));
+  if (!p) return { error: "Esa plantilla no está guardada en el sistema: pulsa «Actualizar estado» para traerla de Meta y vuelve a intentarlo." };
+  const d = datosDe(p);
+  const revision = validarPlantilla(d);
+  if (revision.errores.length) return { error: revision.errores[0] };
+  const canal = etiquetaDeCanal(c.variable);
+  const lista = await listarPlantillasMeta(c.config);
+  if ("error" in lista) return lista;
+  if (lista.plantillas.some((x) => x.nombre === d.nombre && normalizarIdioma(x.idioma) === normalizarIdioma(d.idioma))) return { id: p.id, canal, hecho: "ya estaba", estado: null };
+  // Una plantilla cada dos minutos, a cualquier número (la que ya estaba no cuenta: no se manda nada).
+  const espera = await esperaParaPlantilla(supabase);
+  if (espera > 0) return { error: `Acabas de mandar otra plantilla a Meta. Espera ${textoEspera(espera)} antes de mandar la siguiente: así no parece un envío en masa.`, esperaS: espera };
+  const r = await crearPlantillaMeta(d, c.config);
+  if ("error" in r) return r.error === ERROR_YA_EXISTE ? { id: p.id, canal, hecho: "ya estaba", estado: null } : r;
+  const estado = estadoDeMeta(r.estado) ?? "pendiente";
+  // El número principal es el que manda en la lista: si la plantilla nunca se había mandado, queda con su id y su estado.
+  if (c.config.clave === config360()?.clave && !p.meta_id) {
+    const ahora = new Date().toISOString();
+    await supabase.from("whatsapp_plantillas").update({ meta_id: r.metaId, estado, categoria_actual: categoriaDeMeta(r.categoria) ?? p.categoria, enviada_en: ahora, error_envio: null, actualizado_en: ahora }).eq("id", p.id);
   }
-  return { creadas, yaEstaban, fallas };
+  return { id: p.id, canal, hecho: "creada", estado };
+}
+
+/** Lo que le falta a un número para tener las mismas plantillas que el principal. */
+export interface FaltantesDeNumero {
+  /** El nombre de la variable de su clave (`D360_API_KEY_<n>`), para mandarle una; nunca la clave. */
+  canal: string;
+  numero: string;
+  error: string | null;
+  plantillas: { nombre: string; idioma: string; estado: EstadoPlantilla }[];
+}
+
+/**
+ * «Igualar números» (30 oct 2026; desde el 31 oct elige qué mandar): las plantillas que ya se mandaron a Meta por el principal (en revisión o
+ * aprobadas) y que a cada uno de los otros números le faltan. Las que comparten cuenta con el principal (misma id) ya están. No manda nada: se
+ * mandan de a una con `crearPlantillaEnNumero`, una cada dos minutos.
+ */
+export async function faltantesEnOtrosNumeros(supabase: SupabaseClient): Promise<FaltantesDeNumero[] | { error: string }> {
+  const { data, error } = await supabase.from("whatsapp_plantillas").select(COLUMNAS_PLANTILLA).not("meta_id", "is", null).in("estado", ["pendiente", "aprobada"]).order("nombre");
+  if (error) return { error: "Falta correr la migración 0170 (plantillas de WhatsApp)." };
+  const enviadas = (data ?? []) as PlantillaGuardada[];
+  const principal = config360()?.clave;
+  const salida: FaltantesDeNumero[] = [];
+  for (const c of canalesPlantillas()) {
+    if (c.config.clave === principal) continue;
+    const numero = etiquetaDeCanal(c.variable);
+    const lista = await listarPlantillasMeta(c.config);
+    if ("error" in lista) {
+      salida.push({ canal: c.variable, numero, error: lista.error, plantillas: [] });
+      continue;
+    }
+    const tiene = (p: PlantillaGuardada) => lista.plantillas.some((x) => x.metaId === p.meta_id || (x.nombre === p.nombre && normalizarIdioma(x.idioma) === normalizarIdioma(p.idioma)));
+    salida.push({ canal: c.variable, numero, error: null, plantillas: enviadas.filter((p) => !tiene(p)).map((p) => ({ nombre: p.nombre, idioma: p.idioma, estado: p.estado })) });
+  }
+  return salida;
 }

@@ -5,8 +5,9 @@ import { claseCampoPanel, PanelCelda } from "@/app/(app)/compras/panel-celda";
 import { anilloFoco } from "@/components/ui/field";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/toast";
-import { bandera, nombrePais, type VendeEn } from "@/lib/whatsapp/origen-chat";
+import { nombrePais, type VendeEn } from "@/lib/whatsapp/origen-chat";
 import { cambiarVendeEn, crearPlataformaVenta, eliminarPlataformaVenta, opcionesVendeEn, renombrarPlataformaVenta } from "./vende-en-actions";
+import { Bandera } from "@/components/paises/bandera";
 
 type Opciones = { plataformas: string[]; paises: { codigo: string; nombre: string }[] };
 
@@ -17,7 +18,7 @@ const botonIcono = `flex h-6 w-6 flex-none items-center justify-center rounded-m
 export function PastillaVendeEn({ v, alQuitar }: { v: VendeEn; alQuitar?: () => void }) {
   return (
     <span className="inline-flex items-center gap-1 rounded-full border border-border-control py-px pr-0.5 pl-2 text-[11px] font-semibold whitespace-nowrap">
-      <span aria-hidden="true">{bandera(v.pais)}</span>
+      <Bandera codigo={v.pais} />
       <span className="sr-only">{nombrePais(v.pais)}: </span>
       {v.plataforma}
       {alQuitar ? (
@@ -185,7 +186,7 @@ export function VendeEnChat({
                     onClick={() => setPais(p.codigo)}
                     className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-xs ${pais === p.codigo ? "border-foreground bg-foreground text-background" : "border-border hover:bg-muted"} ${anilloFoco}`}
                   >
-                    <span aria-hidden="true">{bandera(p.codigo)}</span>
+                    <Bandera codigo={p.codigo} />
                     {p.codigo}
                     <span className="sr-only"> {p.nombre}</span>
                   </button>
@@ -205,7 +206,7 @@ export function VendeEnChat({
                 className={`${claseCampoPanel} border-t`}
               />
               <p className="m-0 px-3 pt-2 pb-1 text-xs text-muted-foreground">
-                Plataformas en {bandera(pais)} {nombrePais(pais)}
+                Plataformas en <Bandera codigo={pais} className="mx-0.5 align-[-1px]" /> {nombrePais(pais)}
               </p>
               <ul className="m-0 flex max-h-64 list-none flex-col gap-0.5 overflow-y-auto p-1.5 pt-0">
                 {puedeCrear && (

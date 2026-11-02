@@ -143,7 +143,7 @@ export function CabeceraPersona({ persona, propios, esYo, puedeEscribir }: { per
       </div>
       {contrasena && (
         <div role="status" className="flex flex-col gap-1 rounded-xl border border-border bg-muted p-4">
-          <p className="text-sm text-muted-foreground">Pásasela a mano — no se vuelve a mostrar:</p>
+          <p className="text-sm text-muted-foreground">Pásasela a mano — no se vuelve a mostrar. Al entrar, elegirá la suya:</p>
           <p className="font-mono text-base font-semibold select-all">{contrasena}</p>
         </div>
       )}

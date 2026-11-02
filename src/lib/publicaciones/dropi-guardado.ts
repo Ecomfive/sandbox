@@ -112,7 +112,7 @@ export function armarGuardadoProducto(
     return { warehouse_id: w.warehouse_id, fullName: `${b.name ?? ""}(${b.address ?? ""})`, stock: w.stock, city: b.city, warehouse_white_brand: !!b.warehouse_white_brand };
   });
   for (const b of bodegasProveedor) {
-    if (!bodegas.some((x) => x.warehouse_id === b.id)) bodegas.push({ fullName: `${b.name}(${b.address})`, warehouse_id: b.id, warehouse_white_brand: !!b.warehouse_white_brand });
+    if (!bodegas.some((x) => Number(x.warehouse_id) === Number(b.id))) bodegas.push({ fullName: `${b.name}(${b.address})`, warehouse_id: b.id, warehouse_white_brand: !!b.warehouse_white_brand });
   }
   return {
     cuerpo: {

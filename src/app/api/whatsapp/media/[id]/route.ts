@@ -5,6 +5,7 @@ import { mensajeVisibleParaAtencion } from "@/lib/whatsapp/borrados-atencion";
 import { createServiceClient } from "@/lib/supabase/server";
 import { corteDeBorradoEnApp, estaOculto, mensajesEliminadosEnWhatsapp } from "@/lib/whatsapp/ocultos";
 import { archivoDeMensaje } from "@/lib/whatsapp/archivo-mensaje";
+import { revisarArchivo } from "@/lib/whatsapp/enlaces";
 import { conversacionPermitida } from "@/app/(app)/crm-dropshippers/bandeja/datos-bandeja";
 
 export const dynamic = "force-dynamic";
@@ -37,6 +38,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       supabase.from("whatsapp_mensajes").select("momento").eq("id", id).maybeSingle(),
     ]);
     if (!mensajeVisibleParaAtencion({ id, momento: String(fila?.momento ?? "") }, eliminados, corte)) return new NextResponse("Not Found", { status: 404 });
+  }
+  // Un archivo que instala o ejecuta programas (.apk, .exe…) no se entrega a nadie (31 oct 2026, enlaces y archivos peligrosos).
+  if (revisarArchivo(m.media_nombre as string | null, m.media_mime as string | null).riesgo === "peligroso") {
+    return new NextResponse("Archivo bloqueado: instala o ejecuta un programa y puede traer un virus.", { status: 403 });
   }
   const nombre = String(m.media_nombre || "archivo").replace(/[^\w.\- ]+/g, "_").slice(0, 120);
   // De la copia del sistema (chat importado o archivo mandado desde aquí) o de WhatsApp: lo decide `archivoDeMensaje`.

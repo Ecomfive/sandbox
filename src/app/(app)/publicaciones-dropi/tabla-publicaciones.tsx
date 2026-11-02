@@ -149,7 +149,7 @@ export function TablaPublicaciones({
     <ProveedorMoneda moneda={moneda}>
     <ProveedorTareas {...tareas}>
     <ProveedorSkusMaestros opciones={opcionesSku}>
-      <TableroAcciones publicaciones={publicaciones} def={def} reglas={reglas} />
+      <TableroAcciones publicaciones={publicaciones} def={def} reglas={reglas} codigoPais={codigoPais} />
       <p className="-mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
         <span>
           {actualizadoDropi
@@ -216,7 +216,6 @@ export function TablaPublicaciones({
         margenMinimo={reglas.margen_minimo}
         decisionesDisponibles={decisionesDisponibles}
         opcionesCrear={opcionesCrear}
-        anterior={i > 0 ? () => setAbierta(orden[i - 1]) : undefined}
         siguiente={i >= 0 && i < orden.length - 1 ? () => setAbierta(orden[i + 1]) : undefined}
         alCerrar={() => setAbierta(null)}
         mismoProducto={mismoProducto}

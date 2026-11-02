@@ -9,9 +9,9 @@ import { CAMPOS_DATO, NUMERO_REGISTRADO, type CampoDato } from "@/lib/crm/dato-d
 import { codigoPaisDeCiudad, textoParaBuscar, type CiudadSugerida } from "@/lib/crm/ciudades";
 import { enlaceDeTienda, nombreDeEnlace } from "@/lib/crm/tiendas";
 import { paisesDelMundo } from "@/lib/paises-mundo";
-import { bandera } from "@/lib/whatsapp/origen-chat";
 import { buscarCiudades, cambiarDatoDropshipper } from "./dato-actions";
 import { ESTADOS, etiquetaEstado } from "./def-crm";
+import { Bandera } from "@/components/paises/bandera";
 
 const TIPO: Record<CampoDato, string> = { nombre: "text", estado: "select", telefono: "tel", tiendas: "text", ciudad: "text", ingreso: "date", productos: "text", correo: "email" };
 const EJEMPLO: Record<CampoDato, string> = {
@@ -44,7 +44,7 @@ function Valor({ campo, valor }: { campo: CampoDato; valor: string | null }) {
   // Una sola línea por dato (30 oct 2026, pedido de Alcides): si no cabe, se corta con «…».
   return (
     <span className={`min-w-0 truncate ${valor ? "" : "text-muted-foreground"}`}>
-      {codigo && <span aria-hidden="true">{bandera(codigo)} </span>}
+      {codigo && <Bandera codigo={codigo} className="mr-1.5 align-[-1px]" />}
       {mostrar(campo, valor)}
     </span>
   );
@@ -328,7 +328,7 @@ function CampoCiudad({
             onMouseEnter={() => setActiva(i)}
             className={`flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-[13px] ${i === activa ? "bg-muted" : ""}`}
           >
-            <span aria-hidden="true">{bandera(c.codigo)}</span>
+            <Bandera codigo={c.codigo} />
             <span className="min-w-0 truncate">
               {c.nombre}
               <span className="text-muted-foreground">

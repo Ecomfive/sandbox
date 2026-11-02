@@ -6,9 +6,8 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { conexionPlantillas } from "./api-plantillas";
-import { segundosDeEspera } from "./plantillas";
 import { PLANTILLAS_DE_LLEGADA, type PlantillaSugerida } from "./plantillas-sugeridas";
-import { enviarPlantillaAMeta } from "./plantillas-servidor";
+import { enviarPlantillaAMeta, esperaParaPlantilla } from "./plantillas-servidor";
 
 /** Las plantillas de aviso de llegada que todavía no están en el sistema (por nombre; ya estén en borrador o en Meta). */
 export function faltantesDeLlegada(existentes: readonly string[]): PlantillaSugerida[] {
@@ -44,7 +43,7 @@ export async function asegurarBorradoresDeLlegada(supabase: SupabaseClient, auto
 const dormir = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
- * Manda a Meta los borradores de aviso de llegada, uno tras otro con al menos dos minutos de diferencia (`segundosDeEspera`, contando también las plantillas mandadas desde la
+ * Manda a Meta los borradores de aviso de llegada, uno tras otro con al menos dos minutos de diferencia (`esperaParaPlantilla`, contando también las plantillas mandadas desde la
  * pantalla). Se detiene al primer error, si no alcanza el tiempo (`presupuestoMs`; lo que falte sale en la próxima llamada) o si no queda ninguno. Una plantilla que Meta ya rechazó
  * (con `error_envio`) no se vuelve a mandar sola. Con el envío automático apagado o WhatsApp sin conectar no hace nada.
  */
@@ -67,8 +66,8 @@ export async function enviarBorradoresDeLlegada(supabase: SupabaseClient, presup
       .limit(1)
       .maybeSingle();
     if (!siguiente) return { enviadas, motivo: null };
-    const { data: ultima } = await supabase.from("whatsapp_plantillas").select("enviada_en").not("enviada_en", "is", null).order("enviada_en", { ascending: false }).limit(1).maybeSingle();
-    const espera = segundosDeEspera((ultima?.enviada_en as string | null) ?? null);
+    // La última que salió a cualquier número (también las de «Igualar números»), no solo las del principal.
+    const espera = await esperaParaPlantilla(supabase);
     if (espera > 0) {
       // Unos segundos de margen sobre los dos minutos; si no cabe en el tiempo que queda, se deja para la próxima vez.
       if (Date.now() - inicio + (espera + 3) * 1000 > presupuestoMs) return { enviadas, motivo: null };

@@ -1,5 +1,6 @@
 "use server";
 
+import { randomInt } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
 import { registrarAuditoria } from "@/lib/auditoria";
@@ -12,7 +13,7 @@ const ALFABETO_CLAVE = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789
 /** Clave temporal fácil de leer en voz alta o copiar a un mensaje: sin 0/O ni 1/l/I, que se confunden. */
 function generarClaveTemporal(largo = 12): string {
   let clave = "";
-  for (let i = 0; i < largo; i++) clave += ALFABETO_CLAVE[Math.floor(Math.random() * ALFABETO_CLAVE.length)];
+  for (let i = 0; i < largo; i++) clave += ALFABETO_CLAVE[randomInt(ALFABETO_CLAVE.length)];
   return clave;
 }
 
@@ -52,6 +53,8 @@ export async function crearUsuario(formData: FormData): Promise<{ error?: string
     email,
     password: contrasena,
     email_confirm: true,
+    // La conoce quien la creó: al entrar, la persona elige la suya (/elegir-contrasena). El primer usuario del sistema la eligió él mismo.
+    app_metadata: { clave_temporal: !primerUsuario },
   });
   if (errorCrear || !creado.user) {
     return { error: errorCrear?.message ?? "No se pudo crear la cuenta." };
@@ -79,10 +82,11 @@ export async function crearUsuario(formData: FormData): Promise<{ error?: string
 export async function generarContrasenaTemporal(formData: FormData): Promise<{ error?: string; contrasena?: string }> {
   await requireModuloEscritura("usuarios");
   const id = formData.get("id") as string;
+  if (!esUuid(id)) return { error: "Persona no válida." };
 
   const contrasena = generarClaveTemporal();
   const supabase = createServiceClient();
-  const { error } = await supabase.auth.admin.updateUserById(id, { password: contrasena });
+  const { error } = await supabase.auth.admin.updateUserById(id, { password: contrasena, app_metadata: { clave_temporal: true } });
   if (error) return { error: error.message };
 
   await registrarAuditoria({

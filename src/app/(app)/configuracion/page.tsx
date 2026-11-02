@@ -3,6 +3,8 @@ import { Pagina } from "@/components/ui/pagina";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
 import { requireModulo } from "@/lib/auth";
+import { tasasUsd } from "@/lib/moneda/tipo-cambio";
+import { fulfillmentEnMoneda, monedasFulfillment, montoConMoneda } from "@/lib/publicaciones/fulfillment-pais";
 import type { FilaCuenta } from "../retiros/cuentas/def-cuentas";
 import { TablaCuentasConfiguracion } from "../retiros/cuentas/tabla-cuentas";
 import { TablaPlataformas } from "./tabla-plataformas";
@@ -25,10 +27,12 @@ export default async function ConfiguracionPage() {
     supabase.from("cuentas_retiro").select(columnas).eq("pais_id", pais.id).order("creado_en", { ascending: false });
 
   const [{ data: paisPlataformas }, cuentasConBinance, { data: todosLosPaises }, { data: correlativos }, umbralesR] = await Promise.all([
+    // `fulfillment` lo agrega la migración 0213: sin ella, se repite sin esa columna.
     supabase
       .from("pais_plataformas")
-      .select("id, disponible_para_retiro, plataformas(nombre)")
-      .eq("pais_id", pais.id),
+      .select("id, disponible_para_retiro, fulfillment, fulfillment_moneda, plataformas(nombre)")
+      .eq("pais_id", pais.id)
+      .then((r) => (r.error ? supabase.from("pais_plataformas").select("id, disponible_para_retiro, plataformas(nombre)").eq("pais_id", pais.id) : r)),
     consultarCuentas(`${COLUMNAS_CUENTA}, datos_binance`),
     supabase.from("paises").select("id, codigo, nombre").order("nombre"),
     supabase.from("wms_compras_correlativo").select("clave, prefijo, ultimo"),
@@ -39,12 +43,25 @@ export default async function ConfiguracionPage() {
     | FilaCuenta[]
     | null;
 
-  const plataformas = (paisPlataformas ?? [])
-    .map((pp) => ({
-      id: pp.id,
-      disponible: pp.disponible_para_retiro,
-      nombre: (pp.plataformas as unknown as { nombre: string } | null)?.nombre ?? "?",
-    }))
+  // El fulfillment va en la moneda en que lo factura cada plataforma (dólares o la del país); debajo se ve cuánto es en la otra (tipo de cambio del día).
+  const monedas = monedasFulfillment(pais.codigo);
+  const porUsd = monedas.length > 1 ? (await tasasUsd(supabase)).porUsd : {};
+  const plataformas = ((paisPlataformas ?? []) as { id: string; disponible_para_retiro: boolean; fulfillment?: number | null; fulfillment_moneda?: string | null; plataformas: unknown }[])
+    .map((pp) => {
+      const fulfillment = pp.fulfillment === null || pp.fulfillment === undefined ? null : Number(pp.fulfillment);
+      const moneda = pp.fulfillment_moneda ?? "USD";
+      const otra = monedas.find((m) => m !== moneda) ?? null;
+      // «PA»: a dólares; el código del país: a su moneda.
+      const enOtra = fulfillment === null || otra === null ? null : fulfillmentEnMoneda(fulfillment, moneda, otra === "USD" ? "PA" : pais.codigo, porUsd);
+      return {
+        id: pp.id,
+        disponible: pp.disponible_para_retiro,
+        nombre: (pp.plataformas as { nombre: string } | null)?.nombre ?? "?",
+        fulfillment,
+        fulfillmentMoneda: moneda,
+        fulfillmentEquivalente: enOtra === null || otra === null ? null : `≈ ${montoConMoneda(enOtra, otra)}`,
+      };
+    })
     .sort((a, b) => a.nombre.localeCompare(b.nombre));
 
   return (
@@ -76,8 +93,8 @@ export default async function ConfiguracionPage() {
       )}
 
       <div className="flex flex-col gap-3">
-        <h2 className="text-sm font-semibold tracking-tight">Plataformas para crear retiros</h2>
-        <TablaPlataformas plataformas={plataformas} paisId={pais.id} puedeEscribir={puedeEscribir} />
+        <h2 className="text-sm font-semibold tracking-tight">Plataformas de {pais.nombre}</h2>
+        <TablaPlataformas plataformas={plataformas} paisId={pais.id} nombrePais={pais.nombre} monedas={monedas} puedeEscribir={puedeEscribir} />
       </div>
 
       <div className="flex flex-col gap-3">

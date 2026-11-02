@@ -1,5 +1,7 @@
 "use client";
 
+import { useCodigoPais } from "@/components/pais-contexto";
+import { montoDePais } from "@/lib/moneda/simbolo";
 import { useMemo, useState, type ReactNode } from "react";
 import { Bar, BarChart, CartesianGrid, Cell, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { CabeceraTarjeta, Indicador, Segmentado, claseTdLista, claseThLista } from "@/components/panel/piezas-panel";
@@ -53,8 +55,12 @@ const fecha = (d: string | null) => (d ? `${Number(d.slice(8, 10))} ${MESES[Numb
 /** «+12.4 %» en verde si sube y en rojo si baja; sin dato anterior, nada. */
 const Cambio = ({ valor }: { valor: number | null }) =>
   valor === null ? null : <b className={`font-medium ${valor > 0 ? "text-success" : valor < 0 ? "text-destructive" : ""}`}>{`${valor > 0 ? "+" : valor < 0 ? "−" : ""}${Math.abs(valor).toLocaleString("es-PA", { maximumFractionDigits: 1 })} %`}</b>;
-const usd = (n: number) => `$${n.toLocaleString("es-PA", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
-const usdExacto = (n: number) => `$${n.toLocaleString("es-PA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+/** Montos con el símbolo de la moneda del país de la barra («$1,250», «₡640 000»): sin decimales y exactos. */
+const usd = (n: number, codigo: string) => montoDePais(n, codigo, { decimales: 0 });
+const usdExacto = (n: number, codigo: string) => montoDePais(n, codigo, { decimales: 2 });
+function UtilidadProducto({ v }: { v: number }) {
+  return <span className={v < 0 ? "font-semibold text-destructive" : ""}>{usd(v, useCodigoPais())}</span>;
+}
 const fechaCorta = (d: string) => `${Number(d.slice(8, 10))} ${MESES[Number(d.slice(5, 7)) - 1]}`;
 
 const ejes = { tick: { fontSize: 11, fill: "var(--muted-foreground)" }, axisLine: false, tickLine: false } as const;
@@ -208,13 +214,14 @@ const colUtilidad: Columna<ProductoVentas> = {
   id: "utilidad",
   titulo: "Utilidad",
   valor: (p) => p.dinero?.utilidad ?? null,
-  ver: (p) => (p.dinero ? <span className={p.dinero.utilidad < 0 ? "font-semibold text-destructive" : ""}>{usd(p.dinero.utilidad)}</span> : "—"),
+  ver: (p) => (p.dinero ? <UtilidadProducto v={p.dinero.utilidad} /> : "—"),
   numero: true,
 };
 const colMargen: Columna<ProductoVentas> = { id: "margen", titulo: "Margen", valor: (p) => p.dinero?.margen ?? null, ver: (p) => pct(p.dinero?.margen ?? null), numero: true };
 
 /** Las barras por mes de un producto (al elegirlo en la tabla). */
 function DetalleProducto({ p, meses }: { p: ProductoVentas; meses: string[] }) {
+  const codigo = useCodigoPais();
   const datos = meses.map((m) => ({ mes: nombreMes(m), netas: p.porMes[m] ?? 0 }));
   const dinero = p.dinero;
   const datosDinero = dinero ? Object.keys(dinero.porMes).sort().map((m) => ({ mes: nombreMes(m), utilidad: Math.round(dinero.porMes[m] * 100) / 100 })) : [];
@@ -224,7 +231,7 @@ function DetalleProducto({ p, meses }: { p: ProductoVentas; meses: string[] }) {
         Unidades netas por mes. {CATEGORIAS.find((c) => c.valor === p.categoria)?.etiqueta}. Stock {entero(p.stock)}
         {p.diasInventario !== null ? `, para ${entero(p.diasInventario)} días` : ""}. Pedidas en total {entero(p.pedidas)}: {pct(p.pctCancelacion)} canceladas y {pct(p.pctDevolucion)} devueltas o rechazadas. Última venta: {fecha(p.ultimaVenta)}.
         {p.alertas.length > 0 && <span className="font-medium text-foreground"> {p.alertas.join(" · ")}.</span>}
-        {dinero && ` Utilidad desde marzo: ${usdExacto(dinero.utilidad)} de ${usdExacto(dinero.ganancia)} de ganancia (margen ${pct(dinero.margen)}).`}
+        {dinero && ` Utilidad desde marzo: ${usdExacto(dinero.utilidad, codigo)} de ${usdExacto(dinero.ganancia, codigo)} de ganancia (margen ${pct(dinero.margen)}).`}
       </Nota>
       <div className="h-[220px] p-2">
         <ResponsiveContainer width="100%" height="100%">
@@ -251,8 +258,8 @@ function DetalleProducto({ p, meses }: { p: ProductoVentas; meses: string[] }) {
                 <DegradadosNeon />
                 <CartesianGrid stroke="var(--border)" strokeDasharray="3 4" vertical={false} />
                 <XAxis dataKey="mes" {...ejes} interval="preserveStartEnd" />
-                <YAxis {...ejes} width={52} tickFormatter={(v) => usd(Number(v))} />
-                <Tooltip contentStyle={estiloTooltip} cursor={{ fill: "var(--muted)" }} formatter={(v) => [usdExacto(Number(v)), "Utilidad"]} />
+                <YAxis {...ejes} width={52} tickFormatter={(v) => usd(Number(v), codigo)} />
+                <Tooltip contentStyle={estiloTooltip} cursor={{ fill: "var(--muted)" }} formatter={(v) => [usdExacto(Number(v), codigo), "Utilidad"]} />
                 <Bar dataKey="utilidad" name="Utilidad" radius={[4, 4, 0, 0]}>
                   {datosDinero.map((d) => (
                     <Cell key={d.mes} fill={d.utilidad < 0 ? NEON.rosa : "url(#vd-violeta)"} />
@@ -272,6 +279,7 @@ function DetalleProducto({ p, meses }: { p: ProductoVentas; meses: string[] }) {
  * el stock quieto, todos los productos (con búsqueda, categoría y su detalle por mes), los SKU del sistema y los dropshippers.
  */
 export function TableroVentas({ corte, stockLeido = null, movimientos, productos, porProducto, meses, dias, dropshippers, dinero }: { corte: string; /** La última lectura de «Mis productos» de Dropi, ya escrita en hora de Panamá: de ahí sale el stock. */ stockLeido?: string | null; movimientos: number; productos: ProductoVentas[]; /** Los mismos productos con los IDs de Dropi de un mismo SKU juntos. */ porProducto: ProductoVentas[]; meses: Mes[]; dias: { dia: string; pedidas: number; netas: number }[]; dropshippers: DropshipperVentas[]; dinero: DineroVentas | null }) {
+  const codigo = useCodigoPais();
   const [categoria, setCategoria] = useState<Categoria | "todas">("todas");
   const [busqueda, setBusqueda] = useState("");
   const [buscaDs, setBuscaDs] = useState("");
@@ -362,15 +370,15 @@ export function TableroVentas({ corte, stockLeido = null, movimientos, productos
           {plata?.ultimo && (
             <Indicador
               titulo={`Utilidad · ${nombreMes(plata.ultimo.mes)}`}
-              valor={usd(plata.ultimo.utilidad)}
+              valor={usd(plata.ultimo.utilidad, codigo)}
               detalle={
                 <>
-                  <Cambio valor={plata.cambio} /> vs. {plata.anterior ? `${nombreMes(plata.anterior.mes)} (${usd(plata.anterior.utilidad)})` : "el mes anterior"}
+                  <Cambio valor={plata.cambio} /> vs. {plata.anterior ? `${nombreMes(plata.anterior.mes)} (${usd(plata.anterior.utilidad, codigo)})` : "el mes anterior"}
                 </>
               }
             />
           )}
-          {plata?.ultimo && <Indicador titulo={`Margen · ${nombreMes(plata.ultimo.mes)}`} valor={pct(plata.margen)} detalle={`de ${usd(plata.ultimo.ganancia)} de ganancia`} />}
+          {plata?.ultimo && <Indicador titulo={`Margen · ${nombreMes(plata.ultimo.mes)}`} valor={pct(plata.margen)} detalle={`de ${usd(plata.ultimo.ganancia, codigo)} de ganancia`} />}
         </div>
       </section>
 
@@ -421,8 +429,8 @@ export function TableroVentas({ corte, stockLeido = null, movimientos, productos
                 <DegradadosNeon />
                 <CartesianGrid stroke="var(--border)" strokeDasharray="3 4" vertical={false} />
                 <XAxis dataKey="mes" {...ejes} interval="preserveStartEnd" />
-                <YAxis {...ejes} width={60} tickFormatter={(v) => usd(Number(v))} />
-                <Tooltip contentStyle={estiloTooltip} cursor={{ fill: "var(--muted)" }} formatter={(v, n) => [usdExacto(Number(v)), n]} />
+                <YAxis {...ejes} width={60} tickFormatter={(v) => usd(Number(v), codigo)} />
+                <Tooltip contentStyle={estiloTooltip} cursor={{ fill: "var(--muted)" }} formatter={(v, n) => [usdExacto(Number(v), codigo), n]} />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
                 <Bar dataKey="utilidad" name="Utilidad" stackId="g" fill="url(#vd-violeta)" />
                 <Bar dataKey="coste" name="Coste real" stackId="g" fill="url(#vd-suave)" />

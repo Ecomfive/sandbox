@@ -99,6 +99,7 @@ export const AREAS_ACCESO: AreaAcceso[] = [
     color: "#1d4ed8",
     modulos: [
       { clave: "puestos", etiqueta: "Puestos y organigrama" },
+      { clave: "tareas", etiqueta: "Tareas del equipo" },
       { clave: "rendimiento", etiqueta: "Rendimiento del equipo" },
       { clave: "usuarios", etiqueta: "Usuarios y roles" },
       { clave: "configuracion", etiqueta: "Configuración del sistema" },

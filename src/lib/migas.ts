@@ -25,6 +25,7 @@ const TITULOS_APARTE: Record<string, string> = {
   "/conciliaciones": "Conciliación banco vs. plataforma",
   "/sin-acceso": "Sin acceso",
   "/mi-puesto": "Mi puesto",
+  "/actualizaciones": "Actualizaciones del sistema",
 };
 
 /** Las secciones del Centro de ayuda (`/ayuda`), en el orden en que se buscan. */
@@ -67,6 +68,8 @@ const SUBPAGINAS: Record<string, string> = {
   "/crm-dropshippers/direccion": "Dirección",
   "/inventario/pistoleo": "Pistoleo",
   "/inventario/vencimientos": "Vencimientos",
+  "/inventario/levantamiento": "Levantamiento",
+  "/inventario/remisiones": "Remisiones",
   "/crm-dropshippers/vinculos": "Vínculos",
   "/productos-test/productos": "Productos",
   "/analisis-competencia/resumen": "Resumen",
@@ -118,7 +121,7 @@ export function construirMigas(
   if (titulo) {
     // "Sin acceso" no es un módulo: no hay permisos que mostrar.
     // "Mi puesto" lo abre cualquiera con sesión: tampoco es un módulo.
-    const esModulo = ruta !== "/sin-acceso" && ruta !== "/mi-puesto";
+    const esModulo = ruta !== "/sin-acceso" && ruta !== "/mi-puesto" && ruta !== "/actualizaciones";
     return {
       migas: [{ etiqueta: titulo }],
       favoritoHref: null,

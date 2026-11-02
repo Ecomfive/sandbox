@@ -8,7 +8,7 @@ import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { VisorImagen } from "@/components/ui/visor-imagen";
 import { supabase } from "@/lib/supabase/client";
-import { bandera, nombrePais } from "@/lib/whatsapp/origen-chat";
+import { nombrePais } from "@/lib/whatsapp/origen-chat";
 import { CANAL_BANDEJA, EVENTO_NOVEDAD } from "@/lib/whatsapp/canal-bandeja";
 import { HORAS_VENTANA, textoVentana } from "@/lib/whatsapp/ventana";
 import type { AreaCrm } from "@/lib/crm/areas";
@@ -21,6 +21,9 @@ import { PastillaTipo } from "../tipo-cliente";
 import { VendeEnChat } from "./vende-en";
 import { abrirChatInterno } from "./interno-actions";
 import { BotonWhatsappInterno } from "./interno";
+import { BotonNumerosPais } from "./numeros-pais";
+import { DocumentoRevisado, TextoConEnlaces } from "./texto-enlaces";
+import { avisoTelefonosAjenos } from "@/lib/whatsapp/telefonos-ajenos";
 import { colorFoto, iniciales } from "./globo-persona";
 import { EtiquetasChat, PastillasEtiquetas, SelectorEtiquetasChat, type ManejoEtiquetas } from "./etiquetas-chat";
 import { transcribirAudio } from "./transcripcion-actions";
@@ -46,6 +49,7 @@ import { vistaPreviaTexto } from "@/lib/whatsapp/borrado";
 import { agruparReacciones, miReaccion, REACCIONES_RAPIDAS, type ReaccionVista } from "@/lib/whatsapp/reacciones";
 import { COLUMNAS_TABLERO, GRUPOS, grupoPorId, ordenarPorUrgencia, plazoDelChat, repartirTablero, textoPlazo, type ColumnaTablero, type GrupoMotivo } from "@/lib/whatsapp/prioridad";
 import { cambiarMotivoChat, clasificarChatsPendientes } from "./motivo-actions";
+import { Bandera } from "@/components/paises/bandera";
 
 /** Qué conversaciones del panel se ven. */
 type Filtro = "sinResponder" | "mias" | "resueltas" | "todas";
@@ -233,6 +237,20 @@ const CLAVE_VISTA = "bandeja-whatsapp-vista";
 /** El color del punto de cada motivo en la tarjeta del tablero, como en el prototipo. */
 const COLOR_MOTIVO: Record<string, string> = { queja: "#D92D20", pedido: "#F79009", pagos: "#EAAA08", consulta: "#2E90FA", comercial: "#12B76A", otro: "#98A2B3" };
 
+/**
+ * La bandera del país del número por el que entró el chat (31 oct 2026, pedido de Hernán; migración 0209): Atención contesta desde varios números
+ * (Panamá, Costa Rica, México) y todos sus chats salen juntos; así sabe de qué país es cada cliente. Sin país en el número, nada.
+ */
+function BanderaNumero({ pais }: { pais: string | null | undefined }) {
+  if (!pais) return null;
+  const texto = `Entró por el número de ${nombrePais(pais)}`;
+  return (
+    <span role="img" aria-label={texto} title={texto} className="inline-flex flex-none">
+      <Bandera codigo={pais} />
+    </span>
+  );
+}
+
 /** «VIP»: un dropshipper de los que más pedidos mueven (29 oct 2026), para saber con quién se trata. */
 function EtiquetaVip({ tipo }: { tipo: string | null }) {
   return <PastillaTipo nivel={tipo} soloDestacados />;
@@ -314,12 +332,8 @@ function Contenido({ m, puedeTranscribir = false }: { m: MensajeVista; puedeTran
       {m.conArchivo && m.tipo === "video" && m.mediaNombre?.startsWith("gif-") && <video autoPlay loop muted playsInline preload="auto" src={src} aria-label="GIF" className="max-h-60 max-w-full rounded-md" />}
       {m.conArchivo && m.tipo === "video" && !m.mediaNombre?.startsWith("gif-") && <video controls preload="none" src={src} className="max-h-72 max-w-full rounded-md" />}
       {m.conArchivo && m.tipo === "documento" && (
-        <a href={src} target="_blank" rel="noreferrer" className={`mb-1 flex items-center gap-2 rounded-md bg-[var(--wa-panel)] px-2 py-2 text-[13px] font-medium ${anilloFoco}`}>
-          <span aria-hidden="true" className="flex h-8 w-7 flex-none items-center justify-center rounded bg-[var(--wa-acento)] text-[9px] font-bold text-[var(--wa-acento-texto)]">
-            DOC
-          </span>
-          <span className="truncate">{m.mediaNombre ?? "Abrir documento"}</span>
-        </a>
+        // Un .apk, .exe… no se abre; un .zip o con macros avisa (`@/lib/whatsapp/enlaces`).
+        <DocumentoRevisado href={src} nombre={m.mediaNombre} />
       )}
       {m.importado && !m.conArchivo && m.mediaNombre && (
         <span className="mb-1 block text-[13px] text-[var(--wa-sec)]">📎 {m.mediaNombre} (el archivo no se subió: vuelve a importar el chat con sus archivos)</span>
@@ -327,7 +341,8 @@ function Contenido({ m, puedeTranscribir = false }: { m: MensajeVista; puedeTran
       {m.tipo === "reaccion" && <span className="text-[var(--wa-sec)]">Reaccionó </span>}
       {m.tipo === "ubicacion" && <span className="block text-xs font-medium text-[var(--wa-sec)]">Ubicación</span>}
       {m.texto ? (
-        <span className="whitespace-pre-wrap break-words">{m.texto}</span>
+        // Los enlaces se abren como en WhatsApp, salvo los sospechosos (piden confirmar) y los peligrosos (bloqueados).
+        <TextoConEnlaces texto={m.texto} />
       ) : (
         !m.conArchivo && !m.mediaNombre && m.tipo !== "reaccion" && <span className="text-[var(--wa-sec)]">{m.tipo === "otro" ? "Mensaje que WhatsApp no entregó a la plataforma. Pídele que lo mande de nuevo como mensaje normal." : `Mensaje que el sistema todavía no muestra (${m.tipo}).`}</span>
       )}
@@ -383,6 +398,8 @@ export function Bandeja({
   const [datos, setDatos] = useState(inicial);
   const [filtro, setFiltro] = useState<Filtro>(abrirInicial ? "todas" : "sinResponder");
   const [numero, setNumero] = useState<string>("todos");
+  // El país del número por el que entró cada chat (migración 0209): «todos» o un código ISO.
+  const [paisSel, setPaisSel] = useState<string>("todos");
   const [buscar, setBuscar] = useState("");
   // «Ver como» (30 oct 2026, pedido de Hernán): quien supervisa otras áreas ve la bandeja tal como la ve esa área (Nicole, en Atención): solo su
   // panel, a todo lo ancho, con sus filtros, sus conteos y su tablero. Es para auditar desde el propio usuario: sigue siendo supervisión (lo que
@@ -662,12 +679,19 @@ export function Bandeja({
   }, [borrador]);
 
   const numeroDe = useMemo(() => new Map(datos.numeros.map((n) => [n.id, n])), [datos.numeros]);
+  // Un teléfono que no es de la empresa en lo que se está escribiendo: se avisa antes de enviar (el servidor no lo deja salir).
+  const avisoNumeros = useMemo(() => avisoTelefonosAjenos(borrador, datos.numeros.map((n) => n.numero)), [borrador, datos.numeros]);
+  // Los países de los números, para filtrar por país cuando hay números de más de uno.
+  const paisesNumeros = useMemo(() => [...new Set(datos.numeros.map((n) => n.pais).filter((p): p is string => !!p))].sort(), [datos.numeros]);
   const chatsInternos = useMemo(() => datos.conversaciones.filter((c) => c.interno).map((c) => ({ numeroId: c.numeroId, nombre: c.nombre, noLeidos: c.noLeidos })), [datos.conversaciones]);
   // Los chats internos (WhatsApp entre los números de la empresa) no son clientes: no van en las listas ni en los conteos; se abren con «WhatsApp interno». Solo los de los
   // paneles a la vista: con «Ver como», los conteos de los filtros son los de esa área, como los ve ella.
   const delNumero = useMemo(
-    () => datos.conversaciones.filter((c) => !c.interno && areas.includes(c.area) && (numero === "todos" || c.numeroId === numero)),
-    [datos.conversaciones, numero, areas],
+    () =>
+      datos.conversaciones.filter(
+        (c) => !c.interno && areas.includes(c.area) && (numero === "todos" || c.numeroId === numero) && (paisSel === "todos" || numeroDe.get(c.numeroId)?.pais === paisSel),
+      ),
+    [datos.conversaciones, numero, areas, paisSel, numeroDe],
   );
   // Los filtros cuentan los chats de todos los paneles que se ven.
   const opciones: { id: Filtro; texto: string; cuenta: number }[] = [
@@ -1047,6 +1071,7 @@ export function Bandeja({
               <Foto nombre={c.nombre} tam="tarjeta" />
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className="flex items-center gap-2">
+                  <BanderaNumero pais={numeroDe.get(c.numeroId)?.pais} />
                   <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">{c.nombre}</span>
                   {c.vip && <EtiquetaVip tipo={c.tipoCliente} />}
                   {c.noLeidos > 0 && (
@@ -1125,6 +1150,7 @@ export function Bandeja({
     const datosFila = (
       <>
         <span className="flex items-baseline gap-2">
+          <BanderaNumero pais={numeroDe.get(c.numeroId)?.pais} />
           <span className="min-w-0 flex-1 truncate text-[16px]">{c.nombre}</span>
           {c.vip && <EtiquetaVip tipo={c.tipoCliente} />}
           <span className={`flex-none text-xs tabular-nums ${c.noLeidos ? "font-semibold text-[var(--wa-acento)]" : "text-[var(--wa-sec)]"}`}>{enNavegador ? horaCorta(c.ultimoMensajeEn) : ""}</span>
@@ -1159,7 +1185,11 @@ export function Bandeja({
             {c.paises.length > 0 && (
               <span title={`Vende en ${c.paises.map(nombrePais).join(", ")}`} className="rounded-full border border-[var(--wa-borde)] px-1.5 py-px font-semibold text-[var(--wa-texto)]">
                 <span className="sr-only">Vende en {c.paises.map(nombrePais).join(", ")}</span>
-                <span aria-hidden="true">{c.paises.map(bandera).join(" ")}</span>
+                <span aria-hidden="true" className="inline-flex items-center gap-1 align-middle">
+                  {c.paises.map((p) => (
+                    <Bandera key={p} codigo={p} />
+                  ))}
+                </span>
               </span>
             )}
             {!c.dropshipperId && <span className="rounded-full bg-warning-soft px-2 py-px font-medium text-warning">No está en el CRM</span>}
@@ -1390,6 +1420,20 @@ export function Bandeja({
               {datos.numeros.map((n) => (
                 <option key={n.id} value={n.id}>
                   {n.nombre}
+                  {n.pais ? ` · ${nombrePais(n.pais)}` : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        {paisesNumeros.length > 1 && (
+          <label className="flex">
+            <span className="sr-only">País del número</span>
+            <select value={paisSel} onChange={(e) => setPaisSel(e.target.value)} className={`h-10 max-w-[200px] rounded-lg border-0 bg-[var(--wa-panel)] px-2 text-[13px] ${anilloFoco}`}>
+              <option value="todos">Todos los países</option>
+              {paisesNumeros.map((p) => (
+                <option key={p} value={p}>
+                  {nombrePais(p)}
                 </option>
               ))}
             </select>
@@ -1477,6 +1521,8 @@ export function Bandeja({
             Importar chat
           </button>
         )}
+        {/* De qué país es cada número (solo quien administra). */}
+        {estado360 && <BotonNumerosPais alCambiar={() => void refrescar(elegido)} />}
       </div>
 
       {/* ===== El tablero (29 oct 2026; por estado desde el 30 oct): un área a la vez, en columnas Por atender, En conversación y Cerrados ===== */}
@@ -1657,6 +1703,8 @@ export function Bandeja({
                   <span className="flex min-w-0 items-center gap-1 truncate text-xs font-normal text-muted-foreground tabular-nums">
                     {[
                       sel.codigo,
+                      // El país del número por el que entró (migración 0209).
+                      numeroDe.get(sel.numeroId)?.pais ? nombrePais(numeroDe.get(sel.numeroId)?.pais as string) : null,
                       sel.nombrePerfil && sel.nombrePerfil !== sel.nombre ? `«${sel.nombrePerfil}» en WhatsApp` : null,
                       // El área ya va en su etiqueta de color al lado: no se repite en el nombre del número («Ecomfive · Atención» → «Ecomfive»).
                       (numeroDe.get(sel.numeroId)?.nombre ?? "")
@@ -1693,7 +1741,7 @@ export function Bandeja({
                 .filter((p) => !sel.vendeEn.some((v) => v.pais === p))
                 .map((p) => (
                   <span key={p} className="inline-flex items-center gap-1 rounded-full border border-border-control px-2 py-px text-[11px] font-semibold">
-                    <span aria-hidden="true">{bandera(p)}</span> {nombrePais(p)}
+                    <Bandera codigo={p} /> {nombrePais(p)}
                   </span>
                 ))}
               {sel.estado === "resuelta" && <span className="rounded-full bg-success-soft px-2 py-px text-[11.5px] font-medium text-success">Resuelta</span>}
@@ -1938,6 +1986,11 @@ export function Bandeja({
                           </>
                         )}
                       </div>
+                    )}
+                    {!esNota && avisoNumeros && (
+                      <p role="status" className="m-0 border-t border-[var(--wa-borde)] bg-warning-soft px-4 py-1.5 text-[12.5px] leading-snug text-warning">
+                        ⚠️ {avisoNumeros}
+                      </p>
                     )}
                     <div className="flex items-end gap-2 px-3 py-2">
                       {!esNota && (

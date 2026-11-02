@@ -134,6 +134,7 @@ const AREAS: NavSection[] = [
     items: [
       { label: "Usuarios y roles", href: "/usuarios" },
       { label: "Puestos", href: "/puestos" },
+      { label: "Tareas", href: "/tareas" },
       { label: "Rendimiento", href: "/rendimiento" },
     ],
   },
@@ -177,8 +178,10 @@ export const PAISES_NAV: PaisNav[] = [
   { codigo: "PA", nombre: "Panamá" },
   // México abierto el 29 oct 2026 (Hernán): sus datos de Dropi ya están cargados.
   { codigo: "MX", nombre: "México" },
-  { codigo: "HN", nombre: "Honduras", pronto: true },
-  { codigo: "VE", nombre: "Venezuela", pronto: true },
+  // Honduras abierto el 31 oct 2026 (Alcides): empiezan las compras para Honduras.
+  { codigo: "HN", nombre: "Honduras" },
+  // Venezuela abierto el 31 oct 2026 (Alcides).
+  { codigo: "VE", nombre: "Venezuela" },
 ];
 
 export const PAIS_COOKIE = "pais_actual";

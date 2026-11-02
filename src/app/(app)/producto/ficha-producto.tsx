@@ -30,6 +30,7 @@ import { VentasDropiProducto } from "./ventas-dropi-producto";
 import { ExclusividadProducto } from "./exclusividad-producto";
 import { CategoriaProducto } from "./categoria-producto";
 import { SelectorClaseProducto } from "./selector-clase";
+import { DescontinuadoPorPais } from "./descontinuado-pais";
 import { UnirProducto } from "./unir-producto";
 import type { ResumenUnion } from "@/lib/wms/unir-productos";
 
@@ -233,6 +234,8 @@ export function FichaProducto({
                   ) : (
                     (ETIQUETA_CLASE[producto.clase] ?? producto.clase)
                   )}
+                  {/* Descontinuado solo en algunos países (migración 0211); «Descontinuado» ya vale para todos. */}
+                  {producto.clase !== "descontinuado" && producto.tipo !== "combo" && <DescontinuadoPorPais key={`desc-${producto.id}`} skuId={producto.id} puedeEscribir={puedeEscribir} />}
                   {error && (
                     <span role="alert" className="mt-1 block text-xs text-destructive">
                       {error}

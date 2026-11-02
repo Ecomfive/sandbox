@@ -151,3 +151,11 @@ test("los precios van en la moneda del catálogo: dólares en Panamá, colones e
   assert.match(precioEn(5499, "CRC"), /^₡\s?5.?499$/);
   assert.match(precioEquivalente("Colágeno 60 cápsulas", { precio: 6000, nombre: "Colágeno 30 cápsulas" }, "CRC").nota ?? "", /^₡\s?6.?000 por 30 cápsulas$/);
 });
+
+test("en Costa Rica nuestro proveedor se reconoce por su id de Dropi, aunque no se llame ECOMFIVE", () => {
+  const alcides = { id: 1, name: "Colágeno", sale_price: 6000, user: { id: 27, name: "Alcides" } };
+  assert.equal(normalizarCompetencia(alcides, "CR")?.esNuestro, true);
+  assert.equal(normalizarCompetencia(alcides, "PA")?.esNuestro, false);
+  assert.equal(normalizarCompetencia(alcides)?.esNuestro, false);
+  assert.equal(normalizarCompetencia({ ...alcides, user: { id: 42, name: "Jessica" } }, "CR")?.esNuestro, false);
+});

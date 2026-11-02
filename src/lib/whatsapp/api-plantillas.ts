@@ -212,12 +212,13 @@ export async function borrarPlantillaEnOtrosNumeros(d: { nombre: string; idioma:
   return avisos;
 }
 
-/** Las plantillas que ve cada número (cada uno por su clave), para comparar. */
-export async function plantillasPorNumero(): Promise<{ canal: string; plantillas: PlantillaDeMeta[] | null; error: string | null }[]> {
-  const salida: { canal: string; plantillas: PlantillaDeMeta[] | null; error: string | null }[] = [];
+/** Las plantillas que ve cada número (cada uno por su clave), para comparar. `variable` dice qué número es (el nombre de su variable, nunca la clave). */
+export async function plantillasPorNumero(): Promise<{ canal: string; variable: string; plantillas: PlantillaDeMeta[] | null; error: string | null }[]> {
+  const salida: { canal: string; variable: string; plantillas: PlantillaDeMeta[] | null; error: string | null }[] = [];
   for (const c of canalesPlantillas()) {
     const r = await listarPlantillasMeta(c.config);
-    salida.push("error" in r ? { canal: etiquetaDeCanal(c.variable), plantillas: null, error: r.error } : { canal: etiquetaDeCanal(c.variable), plantillas: r.plantillas, error: null });
+    const canal = etiquetaDeCanal(c.variable);
+    salida.push("error" in r ? { canal, variable: c.variable, plantillas: null, error: r.error } : { canal, variable: c.variable, plantillas: r.plantillas, error: null });
   }
   return salida;
 }

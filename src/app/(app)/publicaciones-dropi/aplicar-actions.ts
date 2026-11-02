@@ -1,5 +1,6 @@
 "use server";
 
+import { montoDePais } from "@/lib/moneda/simbolo";
 import { revalidatePath } from "next/cache";
 import { registrarAuditoria, registrarAuditoriaLote } from "@/lib/auditoria";
 import { requireModuloEscritura } from "@/lib/auth";
@@ -497,7 +498,7 @@ export async function guardarResultadosDropi(codigoPais: string, resultados: unk
       entidad: "dropi_publicaciones",
       entidadId: f.publicacion_id as string,
       detalle: r.ok
-        ? `ID ${f.dropi_producto_id} · ${[f.nombre ? `«${f.nombre}»` : "", f.nombre_guia ? `guía «${f.nombre_guia}»` : "", f.precio != null ? `precio $${Number(f.precio).toFixed(2)}` : "", f.precio_sugerido != null ? `sugerido $${Number(f.precio_sugerido).toFixed(2)}` : "", f.descripcion ? "descripción" : ""].filter(Boolean).join(" · ")} (desde Dropi)`
+        ? `ID ${f.dropi_producto_id} · ${[f.nombre ? `«${f.nombre}»` : "", f.nombre_guia ? `guía «${f.nombre_guia}»` : "", f.precio != null ? `precio ${montoDePais(Number(f.precio), codigoPais)}` : "", f.precio_sugerido != null ? `sugerido ${montoDePais(Number(f.precio_sugerido), codigoPais)}` : "", f.descripcion ? "descripción" : ""].filter(Boolean).join(" · ")} (desde Dropi)`
         : `ID ${f.dropi_producto_id} · ${r.error}`,
     });
     // Un precio aplicado es un cambio de precio de hoy (30 oct 2026): la ficha no espera a que lo vea la lectura del catálogo.
@@ -512,7 +513,7 @@ export async function guardarResultadosDropi(codigoPais: string, resultados: unk
     if (r.ok) {
       const fotos = Array.isArray(f.fotos) ? f.fotos.length : 0;
       const hechas: { tipos: string[]; nota: string }[] = [
-        ...(f.precio != null ? [{ tipos: ["subir_precio", "igualar_precio"], nota: `Aplicado en Dropi: $${Number(f.precio).toFixed(2)}` }] : []),
+        ...(f.precio != null ? [{ tipos: ["subir_precio", "igualar_precio"], nota: `Aplicado en Dropi: ${montoDePais(Number(f.precio), codigoPais)}` }] : []),
         ...(f.nombre ? [{ tipos: ["optimizar_titulo"], nota: `Aplicado en Dropi: «${f.nombre}»` }] : []),
         ...(f.descripcion ? [{ tipos: ["mejorar_descripcion"], nota: "Aplicado en Dropi: descripción nueva" }] : []),
         ...(fotos ? [{ tipos: ["mas_fotos"], nota: `Aplicado en Dropi: ${fotos} ${fotos === 1 ? "foto" : "fotos"}` }] : []),

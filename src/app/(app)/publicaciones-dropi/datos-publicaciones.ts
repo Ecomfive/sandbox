@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { descontinuadosEnPais } from "@/lib/producto/descontinuado-pais";
 import { after } from "next/server";
 import { accionesPublicacion, enDropi, esBodegaDropi, estaArchivada, necesitaRepublicar } from "@/lib/publicaciones/automatico";
 import { normalizarDatosCrear, type OpcionesCrear } from "@/lib/publicaciones/crear-dropi";
@@ -279,6 +280,8 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
     tareasDe.set(t.publicacion_id, x);
   }
   const liquidacionEn = new Map(liquidacionR.error ? [] : (liquidacionR.data ?? []).map((n) => [n.id, n.liquidacion_en as string]));
+  // Los productos descontinuados en este país (migración 0211): sin la migración, ninguno.
+  const descontinuados = await descontinuadosEnPais(supabase, paisId);
 
   const datos = filasR.data ?? [];
   const nombrePorId = new Map(datos.map((d) => [d.id, d.nombre as string]));
@@ -320,6 +323,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
   }
   const compuestoDe = new Map(combos.map((id) => [id, enCaminoDeCompuesto(componentesDe.get(id) ?? [], enCaminoPorSku)]));
   // La revisión de optimización: con lo que muestra Dropi (el primer ID que esté en el catálogo); si no se leyó, el título guardado.
+  const monedaRevision = (await monedaPais).moneda;
   const revisionDe = (d: Fila): Pick<FilaPublicacion, "revisiones" | "nota" | "tituloDropi"> => {
     const cat = idsDropi(d).map((id) => enDropiCatalogo.get(id)).find((x) => !!x) ?? null;
     const revisiones = revisarPublicacion(
@@ -328,6 +332,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
         categoria: cat?.categoria ?? null,
         precio: cat?.precio ?? num(d.precio_venta),
         precioSugerido: cat?.precioSugerido ?? null,
+        moneda: monedaRevision,
         fotos: cat?.fotos ?? null,
         videos: cat?.videos ?? null,
         descripcionLargo: cat?.descripcionLargo ?? null,
@@ -427,6 +432,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
       duplicadaDe: null,
       pausadaDesde: pausadaEn.get(d.id as string) ?? null,
       liquidacionDesde: liquidacionEn.get(d.id as string) ?? null,
+      descontinuadoPais: !!d.sku_maestro_id && descontinuados.has(d.sku_maestro_id as string),
       tareasPendientes: tareasDe.get(d.id as string) ?? { total: 0, atrasadas: 0 },
       grupo: [],
       publicosDelProducto: [],
@@ -476,7 +482,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
         cumplidas.push({ d, nombre: f.nombre });
         continue;
       }
-      const c = tareaCumplida({ tipo: d.tipo, fecha: d.fecha, precioAntes: d.precioAntes }, { cambioPrecio: f.cambioPrecioDropi, comboPublicado, revisiones: f.revisiones });
+      const c = tareaCumplida({ tipo: d.tipo, fecha: d.fecha, precioAntes: d.precioAntes }, { cambioPrecio: f.cambioPrecioDropi, comboPublicado, revisiones: f.revisiones }, monedaRevision);
       if (!c) continue;
       d.hechaEn = c.fecha ? `${c.fecha.slice(0, 10)}T12:00:00Z` : new Date().toISOString();
       d.hechaComo = c.como;

@@ -1,5 +1,6 @@
 "use server";
 
+import { monedaDePais } from "@/lib/moneda/tipo-cambio";
 import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModulo, requireModuloEscritura, type UsuarioActual } from "@/lib/auth";
@@ -238,7 +239,7 @@ async function cargarBase(pub: Pub) {
   const supabase = createServiceClient();
   const ids = idsDropi(pub.dropi_id);
   const [{ data: pais }, enDropi, { reglas }, sku, competidores, ventas, { indicaciones }, ejemplos, { data: numero }, { estilos }] = await Promise.all([
-    supabase.from("paises").select("nombre").eq("id", pub.pais_id).maybeSingle(),
+    supabase.from("paises").select("nombre, codigo").eq("id", pub.pais_id).maybeSingle(),
     cargarNuestrosEnDropi(supabase, pub.pais_id),
     cargarReglas(supabase),
     pub.sku_maestro_id ? supabase.from("skus_maestros").select("codigo, nombre").eq("id", pub.sku_maestro_id).maybeSingle() : Promise.resolve({ data: null }),
@@ -258,6 +259,7 @@ async function cargarBase(pub: Pub) {
       categoria: cat?.categoria ?? null,
       precio: cat?.precio ?? precio,
       precioSugerido: cat?.precioSugerido ?? null,
+      moneda: monedaDePais(String((pais as { codigo?: string } | null)?.codigo ?? "PA")),
       fotos: cat?.fotos ?? null,
       videos: cat?.videos ?? null,
       descripcionLargo: cat?.descripcionLargo ?? null,

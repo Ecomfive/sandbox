@@ -18,6 +18,19 @@ export function bandera(codigo: string): string {
   return String.fromCodePoint(...[...codigo].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65));
 }
 
+/**
+ * El país de un número de WhatsApp **de la empresa** por su prefijo, cuando es de un país de la operación (31 oct 2026, pedido de Hernán: el número
+ * de Costa Rica entra a Atención con su bandera sin elegirla a mano): +507 Panamá, +506 Costa Rica, +52 México; si no, null. Lo mismo hace la
+ * migración 0212 al guardar el número. No sirve para el país del cliente (ver arriba).
+ */
+export function paisDeNumeroEmpresa(numero: string | null | undefined): string | null {
+  const d = String(numero ?? "").replace(/\D/g, "");
+  if (d.startsWith("507")) return "PA";
+  if (d.startsWith("506")) return "CR";
+  if (d.startsWith("52")) return "MX";
+  return null;
+}
+
 const clave = (plataforma: string, pais: string) => `${plataforma.trim().toLowerCase()}|${pais}`;
 
 /**

@@ -4,6 +4,7 @@
 // archivos, y el panel pide procesar cada parte aquí, una por una (cada llamada tiene los 5 minutos de la página). Por ahora solo
 // para quien está en CORREOS_ACTUALIZAR_DROPI. Panamá y, desde el 28 oct 2026, Costa Rica: cada parte sabe de qué país es.
 
+import { montoDePais } from "@/lib/moneda/simbolo";
 import { revalidatePath } from "next/cache";
 import { requireModuloEscritura } from "@/lib/auth";
 import { ingerirCartera, type FilaCartera } from "@/lib/dropi-actualizar/ingerir-cartera";
@@ -145,7 +146,7 @@ export async function procesarParte(id: string, parte: string): Promise<{ error?
       datos = r;
     } else if (p.tipo === "retiros") {
       const r = await ingerirRetiros(supabase, codigo, await bajar<FilaRetiro[]>(supabase, id, archivo("retiros")), log);
-      resumen = [`${n(r.vinculadosAhora)} vinculados ahora`, r.sinVincular ? `${n(r.sinVincular)} sin vincular` : "", r.saldo !== null ? `saldo $${r.saldo.toFixed(2)}` : ""].filter(Boolean).join(" · ");
+      resumen = [`${n(r.vinculadosAhora)} vinculados ahora`, r.sinVincular ? `${n(r.sinVincular)} sin vincular` : "", r.saldo !== null ? `saldo ${montoDePais(r.saldo, codigo)}` : ""].filter(Boolean).join(" · ");
       datos = r;
     } else if (p.tipo === "stock") {
       const r = (await guardarNuestrosProductos(supabase, await bajar<LecturaNuestros>(supabase, id, archivo("stock")), true, FOTOS_POR_VEZ)) as unknown as Record<string, unknown>;

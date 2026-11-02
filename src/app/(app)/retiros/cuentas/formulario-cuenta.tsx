@@ -1,5 +1,6 @@
 "use client";
 
+import { useSimboloPais } from "@/components/pais-contexto";
 import { useEffect, useState, useTransition, type ReactNode } from "react";
 import { crearCuentaRetiro, actualizarCuentaRetiro } from "./actions";
 import { tiposParaElegir, type FilaCuenta } from "./def-cuentas";
@@ -102,6 +103,7 @@ export function FormularioCuenta({
   acciones?: ReactNode;
 }) {
   const [modificado, setModificado] = useState(false);
+  const simbolo = useSimboloPais();
   const { formRef, completo, faltante, revisar, señalarFaltante } = useFaltantes();
   const invalido = (id: string) => faltante === id;
   const [pending, startTransition] = useTransition();
@@ -333,7 +335,7 @@ export function FormularioCuenta({
               {(comisionTipo === "monto_fijo" || comisionTipo === "ambos") && (
                 <Campo etiqueta="Monto fijo" id="campo-comision-monto">
                   <div className="flex items-center gap-1">
-                    <span className="text-sm text-muted-foreground">$</span>
+                    <span className="text-sm text-muted-foreground">{simbolo}</span>
                     <input
                       id="campo-comision-monto"
                       type="number"

@@ -26,7 +26,7 @@ test("cantidad: un suplemento debe decir cuántas cápsulas; lo demás no aplica
 test("para qué sirve, formato, fotos, video, descripción y precio sugerido", () => {
   assert.equal(estado({ titulo: "Cinturón lumbar ciática" }, "titulo_angulo"), "revisar");
   assert.equal(estado({ titulo: "Cinturón lumbar para la ciática" }, "titulo_angulo"), "ok");
-  assert.equal(estado({ titulo: "CINTURON LUMBAR CIATICA" }, "titulo_formato"), "falta");
+  assert.equal(estado({ titulo: "CINTURON LUMBAR CIATICA" }, "titulo_formato"), "ok", "las mayúsculas no se exigen");
   assert.equal(estado({ titulo: "Faja" }, "titulo_formato"), "falta");
   assert.equal(estado({ fotos: null }, "fotos"), "sin_datos");
   assert.equal(estado({ fotos: 4 }, "fotos"), "falta");

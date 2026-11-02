@@ -5,6 +5,7 @@ import { accesoCrm, escribeEnArea } from "@/lib/crm/areas";
 import { normalizarTelefono } from "@/lib/crm/telefono";
 import { createServiceClient } from "@/lib/supabase/server";
 import { enviarPlantillaWhatsapp } from "@/lib/whatsapp/api";
+import { avisoNumerosAjenos } from "@/lib/whatsapp/numeros-propios";
 import { avisarBandeja } from "@/lib/whatsapp/aviso-bandeja";
 import { resumenMensaje } from "@/lib/whatsapp/extraer";
 import { contactosRestantes, inicioDelDiaPanama, motivoSinPlantilla, notaDePermiso, validarNuevoContacto } from "@/lib/whatsapp/nuevo-contacto";
@@ -119,6 +120,9 @@ export async function iniciarChatConPlantilla(p: PedidoNuevoContacto): Promise<{
   }
   const valores = resolverVariables(pl.variables ?? [], persona, Array.isArray(p.manuales) ? p.manuales.map(String) : []);
   if ("error" in valores) return valores;
+  // Solo se comparten los números de WhatsApp de la empresa (31 oct 2026, pedido de Hernán).
+  const ajenos = await avisoNumerosAjenos(supabase, valores.valores.join("\n"));
+  if (ajenos) return { error: `No se manda: ${ajenos}` };
 
   const r = await enviarPlantillaWhatsapp({ phoneNumberId: numero.phone_number_id as string, numero: numero.numero as string }, tel.e164, pl.nombre, pl.idioma, valores.valores);
   if ("error" in r) return r;

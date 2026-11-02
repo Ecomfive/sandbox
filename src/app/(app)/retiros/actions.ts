@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createServiceClient } from "@/lib/supabase/server";
 import { registrarAuditoria } from "@/lib/auditoria";
+import { formatearMoneda } from "@/lib/formato";
 import { getUsuarioActual, requireModuloEscritura } from "@/lib/auth";
 import { insertarConCorrelativo, leerCorrelativo } from "@/lib/retiros/correlativo";
 import { ESTADO_ETIQUETA as ETIQUETA_ESTADO } from "@/lib/retiros/estados";
@@ -17,6 +18,13 @@ const TOLERANCIA_DISCREPANCIA = 3;
  * su propia acción (botón Cancelar; botón Resolver dentro de la novedad). */
 const ESTADOS_EDITABLES = ["abierto", "novedad", "cerrado"] as const;
 type EstadoEditable = (typeof ESTADOS_EDITABLES)[number];
+
+/** Da formato a un monto con el símbolo de la moneda del país del retiro («₡1 500 000,00», «$250.00»). */
+async function formatoDelPais(supabase: ReturnType<typeof createServiceClient>, paisId: string | null | undefined): Promise<(n: number) => string> {
+  const { data } = paisId ? await supabase.from("paises").select("codigo").eq("id", paisId).maybeSingle() : { data: null };
+  const codigo = String(data?.codigo ?? "PA");
+  return (n: number) => formatearMoneda(n, codigo);
+}
 
 async function registrarEvento(supabase: ReturnType<typeof createServiceClient>, retiroId: string, evento: string) {
   await supabase.from("retiro_eventos").insert({ retiro_id: retiroId, evento });
@@ -157,7 +165,7 @@ export async function crearRetiro(formData: FormData) {
   if (error || !data) throw new Error(error?.message ?? "No se pudo crear el retiro");
 
   const correlativoFinal = Number(data.numero_correlativo);
-  await registrarEvento(supabase, data.id, `Retiro creado por ${monto.toFixed(2)}`);
+  await registrarEvento(supabase, data.id, `Retiro creado por ${(await formatoDelPais(supabase, pais_id))(monto)}`);
   await registrarAuditoria({
     accion: "crear_retiro",
     entidad: "retiros",
@@ -188,6 +196,7 @@ export async function cerrarRetiro(formData: FormData) {
     .eq("id", id)
     .single();
   if (errorRetiro) throw new Error(errorRetiro.message);
+  const m = await formatoDelPais(supabase, retiro.pais_id as string);
 
   let comprobante_path = retiro.comprobante_path as string | null;
   if (comprobante && comprobante.size > 0) {
@@ -221,8 +230,8 @@ export async function cerrarRetiro(formData: FormData) {
     supabase,
     id,
     conDiscrepancia
-      ? `Novedad: se esperaban ${esperado.toFixed(2)} y llegaron ${montoRecibido.toFixed(2)} (diferencia de ${diferencia.toFixed(2)})`
-      : `Retiro cerrado: monto recibido ${montoRecibido.toFixed(2)}`
+      ? `Novedad: se esperaban ${m(esperado)} y llegaron ${m(montoRecibido)} (diferencia de ${m(diferencia)})`
+      : `Retiro cerrado: monto recibido ${m(montoRecibido)}`
   );
   await registrarAuditoria({
     accion: conDiscrepancia ? "cerrar_retiro_con_novedad" : "cerrar_retiro",
@@ -286,9 +295,10 @@ export async function conciliarRetiro(formData: FormData): Promise<{ error?: str
 
   const esperado = Number(retiro.a_recibir ?? retiro.monto_neto);
   const diferencia = montoRecibido - esperado;
+  const m = await formatoDelPais(supabase, retiro.pais_id as string);
   if (Math.abs(diferencia) > TOLERANCIA_DISCREPANCIA) {
     return {
-      error: `No se puede conciliar: se esperaban $${esperado.toFixed(2)} y se recibieron $${montoRecibido.toFixed(2)} (diferencia de $${diferencia.toFixed(2)}, máximo permitido $${TOLERANCIA_DISCREPANCIA}). Corrige el monto o investiga antes de conciliar.`,
+      error: `No se puede conciliar: se esperaban ${m(esperado)} y se recibieron ${m(montoRecibido)} (diferencia de ${m(diferencia)}, máximo permitido ${m(TOLERANCIA_DISCREPANCIA)}). Corrige el monto o investiga antes de conciliar.`,
     };
   }
 
@@ -317,7 +327,7 @@ export async function conciliarRetiro(formData: FormData): Promise<{ error?: str
     .eq("id", id);
   if (error) return { error: error.message };
 
-  await registrarEvento(supabase, id, `Retiro conciliado: monto recibido ${montoRecibido.toFixed(2)}`);
+  await registrarEvento(supabase, id, `Retiro conciliado: monto recibido ${m(montoRecibido)}`);
   // Línea aparte en la línea de tiempo: además de conciliarse, queda consolidado — se registra como su
   // propio hecho, con su propia fecha, no solo como un dato dentro del texto de arriba.
   await registrarEvento(supabase, id, "Consolidado");
@@ -534,10 +544,11 @@ export async function actualizarRetiro(formData: FormData) {
   const supabase = createServiceClient();
   const { data: antes, error: errorAntes } = await supabase
     .from("retiros")
-    .select("monto, comision, estado")
+    .select("monto, comision, estado, pais_id")
     .eq("id", id)
     .single();
   if (errorAntes) throw new Error(errorAntes.message);
+  const m = await formatoDelPais(supabase, antes.pais_id as string);
 
   // El estado solo se toca si viene en el formulario y es uno editable a mano (abierto, novedad o
   // cerrado). El selector de la ficha se ve siempre, hasta en un retiro cancelado: es la forma de
@@ -573,7 +584,7 @@ export async function actualizarRetiro(formData: FormData) {
   await registrarEvento(
     supabase,
     id,
-    `Retiro modificado: monto ${Number(antes.monto).toFixed(2)} → ${monto.toFixed(2)}` +
+    `Retiro modificado: monto ${m(Number(antes.monto))} → ${m(monto)}` +
       (cambioEstado
         ? `, estado ${ETIQUETA_ESTADO[antes.estado] ?? antes.estado} → ${ETIQUETA_ESTADO[estadoTexto!] ?? estadoTexto}`
         : "")

@@ -1,5 +1,6 @@
 "use server";
 
+import { montoDePais } from "@/lib/moneda/simbolo";
 import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { formatearEventoAuditoria } from "@/lib/auditoria-cambios";
@@ -123,6 +124,12 @@ async function idDropiRepetido(paisId: string, dropiId: string | null, menos: st
 }
 
 /** La publicación, si existe y es de un país que la persona ve. */
+/** El código del país de una publicación («CR»), para escribir sus montos con el símbolo de su moneda. */
+async function codigoDePais(paisId: string): Promise<string> {
+  const { data } = await createServiceClient().from("paises").select("codigo").eq("id", paisId).maybeSingle();
+  return String(data?.codigo ?? "PA");
+}
+
 async function publicacionPermitida(id: string, permitidos: string[] | null) {
   if (!UUID.test(id)) return null;
   const supabase = createServiceClient();
@@ -336,13 +343,13 @@ export async function crearPublicacion(f: FormData): Promise<PublicacionCreada> 
 }
 
 /** Lo que se muestra de cada dato en la actividad (antes → después). */
-const VISTA: [string, string, (v: unknown) => string][] = [
+const VISTA: [string, string, (v: unknown, codigo: string) => string][] = [
   ["nombre", "Producto", (v) => String(v ?? "—")],
   ["dropi_id", "ID Dropi", (v) => String(v ?? "—")],
   ["privatizado_a", "Privatizado a", (v) => String(v ?? "—")],
-  ["precio_venta", "Precio de venta", (v) => (v === null ? "—" : `$${Number(v).toFixed(2)}`)],
-  ["costo_mercancia", "Costo de producto", (v) => (v === null ? "—" : `$${Number(v).toFixed(2)}`)],
-  ["fulfillment", "Fulfillment", (v) => (v === null ? "—" : `$${Number(v).toFixed(2)}`)],
+  ["precio_venta", "Precio de venta", (v, codigo) => (v === null ? "—" : montoDePais(Number(v), codigo))],
+  ["costo_mercancia", "Costo de producto", (v, codigo) => (v === null ? "—" : montoDePais(Number(v), codigo))],
+  ["fulfillment", "Fulfillment", (v, codigo) => (v === null ? "—" : montoDePais(Number(v), codigo))],
   ["ubicacion", "Dónde está", (v) => etiqueta(UBICACIONES, v as string)],
   ["estado_publicacion", "Estado", (v) => (v ? etiqueta(ESTADOS_PUBLICACION, v as string) : "—")],
   ["tipo_publicacion", "Tipo", (v) => (v ? etiqueta(TIPOS, v as string) : "—")],
@@ -400,13 +407,14 @@ export async function actualizarPublicacion(f: FormData): Promise<{ error?: stri
     const a = antes[k] === null || antes[k] === undefined ? null : typeof datos[k] === "number" ? Number(antes[k]) : antes[k];
     return a !== datos[k];
   });
+  const codigo = await codigoDePais(antes.pais_id);
   if (cambios.length)
     await registrarAuditoria({
       accion: "editar_publicacion_dropi",
       entidad: "dropi_publicaciones",
       entidadId: id,
-      antes: Object.fromEntries(cambios.map(([k, n, ver]) => [n, ver(antes[k] ?? null)])),
-      despues: Object.fromEntries(cambios.map(([k, n, ver]) => [n, ver(datos[k])])),
+      antes: Object.fromEntries(cambios.map(([k, n, ver]) => [n, ver(antes[k] ?? null, codigo)])),
+      despues: Object.fromEntries(cambios.map(([k, n, ver]) => [n, ver(datos[k], codigo)])),
     });
   let dropi: string | undefined;
   // Archivar o sacar de Archivados eligiendo el Estado en la ficha también queda pendiente para Dropi, igual que el botón «Archivar» (24 oct 2026).
@@ -859,7 +867,9 @@ export async function republicarPublicacion(id: string, precio: number): Promise
     { precio: precioNuevo, precioAntes },
   );
   if ("error" in r) return { error: r.error };
-  const cambioPrecio = precioAntes === null || Math.abs(precioAntes - precioNuevo) > 0.004 ? `, con precio $${precioNuevo.toFixed(2)}${precioAntes !== null ? ` (antes $${precioAntes.toFixed(2)})` : ""}` : `, con el mismo precio $${precioNuevo.toFixed(2)}`;
+  const codigoRep = await codigoDePais(antes.pais_id);
+  const m = (n: number) => montoDePais(n, codigoRep);
+  const cambioPrecio = precioAntes === null || Math.abs(precioAntes - precioNuevo) > 0.004 ? `, con precio ${m(precioNuevo)}${precioAntes !== null ? ` (antes ${m(precioAntes)})` : ""}` : `, con el mismo precio ${m(precioNuevo)}`;
   await registrarAuditoria({ accion: "dropi_republicar_pendiente", entidad: "dropi_publicaciones", entidadId: id, detalle: `${antes.nombre} · ID Dropi ${antes.dropi_id}: pendiente para «Aplicar en Dropi»${cambioPrecio}` });
   revalidatePath(RUTA);
   return { detalle: r.yaEstaba ? "Ya estaba pendiente: pulsa «Aplicar en Dropi» con Dropi abierto." : "Republicación pendiente: pulsa «Aplicar en Dropi» con Dropi abierto." };

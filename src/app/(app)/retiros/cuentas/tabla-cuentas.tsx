@@ -1,5 +1,6 @@
 "use client";
 
+import { useSimboloPais } from "@/components/pais-contexto";
 import { useState } from "react";
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { TablaDatos, type ColumnaTabla } from "@/components/tabla/tabla-datos";
@@ -40,6 +41,11 @@ const COLUMNA_DETALLE: ColumnaTabla<FilaCuenta, unknown> = {
   clase: "text-muted-foreground",
   render: (c) => c.detalle || "—",
 };
+/** La comisión sugerida con el símbolo de la moneda del país de la barra. */
+function ComisionCuenta({ c }: { c: FilaCuenta }) {
+  return <>{etiquetaComision(c.comision_tipo, c.comision_porcentaje, c.comision_monto_fijo, useSimboloPais())}</>;
+}
+
 const COLUMNA_ESTADO: ColumnaTabla<FilaCuenta, unknown> = {
   id: "estado",
   label: "Estado",
@@ -57,7 +63,7 @@ const COLUMNAS_DESTINO: ColumnaTabla<FilaCuenta, unknown>[] = [
     label: "Comisión sugerida",
     ocultable: true,
     clase: "text-muted-foreground",
-    render: (c) => etiquetaComision(c.comision_tipo, c.comision_porcentaje, c.comision_monto_fijo),
+    render: (c) => <ComisionCuenta c={c} />,
   },
   COLUMNA_ESTADO,
 ];

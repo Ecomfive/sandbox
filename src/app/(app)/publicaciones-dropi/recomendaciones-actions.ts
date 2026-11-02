@@ -1,5 +1,6 @@
 "use server";
 
+import { montoDePais } from "@/lib/moneda/simbolo";
 import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
@@ -63,6 +64,8 @@ export async function decidirRecomendacion(entrada: { publicacionId: string; rec
   const supabase = createServiceClient();
   const { data: pub } = await supabase.from("dropi_publicaciones").select("id, nombre, pais_id, dropi_id, precio_venta, margen").eq("id", publicacionId).maybeSingle();
   if (!pub || !(await puedeVerPaisId(supabase, usuario.paisesPermitidos, pub.pais_id as string))) return { error: "No se encontró la publicación." };
+  const { data: paisPub } = await supabase.from("paises").select("codigo").eq("id", pub.pais_id).maybeSingle();
+  const codigoPub = String(paisPub?.codigo ?? "PA");
 
   const dia = hoy();
   const hasta = vigenteHasta(decision, dia, entrada.dias);
@@ -123,8 +126,8 @@ export async function decidirRecomendacion(entrada: { publicacionId: string; rec
         accion: "editar_publicacion_dropi",
         entidad: "dropi_publicaciones",
         entidadId: publicacionId,
-        antes: { "Precio de venta": antes === null ? "—" : `$${antes.toFixed(2)}` },
-        despues: { "Precio de venta": `$${nuevo.toFixed(2)}` },
+        antes: { "Precio de venta": antes === null ? "—" : montoDePais(antes, codigoPub) },
+        despues: { "Precio de venta": montoDePais(nuevo, codigoPub) },
       });
       const r = await enviarPrecioADropi(supabase, { id: pub.id as string, pais_id: pub.pais_id as string, dropi_id: (pub.dropi_id as string | null) ?? null }, nuevo, antes, { id: usuario.id, nombre: usuario.nombre || usuario.email });
       dropi = r.estado === "pendiente" ? r.detalle : `El precio se guardó, pero no quedó para Dropi: ${r.detalle}`;
@@ -134,7 +137,7 @@ export async function decidirRecomendacion(entrada: { publicacionId: string; rec
   const precioActual = pub.precio_venta === null ? null : Number(pub.precio_venta);
   if (decision === "aceptada" && tipo === "precio_sugerido" && precioActual !== null && precioActual > 0) {
     const r = await encolarCambio(supabase, { id: pub.id as string, pais_id: pub.pais_id as string, dropi_id: (pub.dropi_id as string | null) ?? null }, { precioSugerido: precioActual }, { id: usuario.id, nombre: usuario.nombre || usuario.email });
-    dropi = "error" in r ? `No quedó para Dropi: ${r.error}` : `Precio sugerido $${precioActual.toFixed(2)} para Dropi: pulsa «Aplicar en Dropi» con Dropi abierto.`;
+    dropi = "error" in r ? `No quedó para Dropi: ${r.error}` : `Precio sugerido ${montoDePais(precioActual, codigoPub)} para Dropi: pulsa «Aplicar en Dropi» con Dropi abierto.`;
   }
   revalidatePath("/publicaciones-dropi");
   revalidatePath("/publicaciones-dropi/recomendaciones");

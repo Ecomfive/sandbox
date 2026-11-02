@@ -3,6 +3,7 @@
 // aplica el favorito «Aplicar en Dropi» desde la pestaña de Dropi (marcador-aplicar-dropi.ts) y la ventana que abre guarda el
 // resultado (aplicar-actions.ts).
 
+import { montoDePais } from "@/lib/moneda/simbolo";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import type { CambioPrecio } from "./competencia-publicaciones";
@@ -376,7 +377,8 @@ export async function enviarPrecioADropi(
   // El sugerido va siempre igual al precio (decisión de Alcides, 23 oct 2026): así Dropi no le impide al dropshipper vender por debajo.
   const r = await encolarCambio(supabase, pub, { precio, precioAntes, precioSugerido: precio }, por);
   if ("error" in r) return { estado: "error", detalle: r.error };
-  return { estado: "pendiente", detalle: `Precio $${precio.toFixed(2)} para Dropi: pulsa «Aplicar en Dropi» con Dropi abierto.` };
+  const { data: pais } = await supabase.from("paises").select("codigo").eq("id", pub.pais_id).maybeSingle();
+  return { estado: "pendiente", detalle: `Precio ${montoDePais(precio, String(pais?.codigo ?? "PA"))} para Dropi: pulsa «Aplicar en Dropi» con Dropi abierto.` };
 }
 
 /**

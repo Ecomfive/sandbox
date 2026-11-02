@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { cerrarSesion } from "@/app/login/actions";
 import { EVENTO_ABRIR_ATAJOS } from "@/components/atajos-teclado";
+import { VentanaContrasena } from "@/components/cuenta/ventana-contrasena";
 import { MenuDesplegable, TituloGrupoMenu, claseOpcionMenu } from "@/components/ui/menu-desplegable";
 import { CheckIcon, ConfiguracionIcon, PuestosIcon } from "@/lib/nav-icons";
 import { subirAvatar } from "@/lib/perfil-actions";
@@ -19,7 +20,7 @@ function suscribirTema(avisar: () => void) {
 }
 const leerTemaOscuro = () => document.documentElement.dataset.theme === "dark";
 
-/** Menú de la persona (la foto de la esquina): quién es, el tema, los atajos, la configuración, la versión y salir. */
+/** Menú de la persona (la foto de la esquina): quién es, su foto y su contraseña, el tema, los atajos, la configuración, la versión y salir. */
 export function MenuCuenta({
   nombre,
   email,
@@ -35,6 +36,7 @@ export function MenuCuenta({
 }) {
   const oscuro = useSyncExternalStore(suscribirTema, leerTemaOscuro, () => false);
   const [verNovedades, setVerNovedades] = useState(false);
+  const [cambiarClave, setCambiarClave] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [subiendo, iniciarSubida] = useTransition();
   const entradaFoto = useRef<HTMLInputElement>(null);
@@ -64,6 +66,7 @@ export function MenuCuenta({
   }
 
   return (
+    <>
     <MenuDesplegable
       etiqueta={`Menú de ${mostrado}`}
       claseBoton="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-border-control bg-muted text-sm font-medium text-muted-foreground hover:opacity-90"
@@ -94,6 +97,17 @@ export function MenuCuenta({
           </button>
           {error && <p className="px-3 pb-1 text-xs text-destructive">{error}</p>}
           <input ref={entradaFoto} type="file" accept="image/*" className="hidden" onChange={alElegirFoto} tabIndex={-1} aria-hidden="true" />
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              cerrar();
+              setCambiarClave(true);
+            }}
+            className={claseOpcionMenu}
+          >
+            Cambiar contraseña
+          </button>
           <div role="separator" className="my-1 border-t border-border" />
           <TituloGrupoMenu>Tema</TituloGrupoMenu>
           {(
@@ -165,5 +179,7 @@ export function MenuCuenta({
         </>
       )}
     </MenuDesplegable>
+    <VentanaContrasena abierto={cambiarClave} alCerrar={() => setCambiarClave(false)} />
+    </>
   );
 }

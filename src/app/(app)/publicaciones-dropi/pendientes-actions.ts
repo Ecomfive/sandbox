@@ -1,5 +1,6 @@
 "use server";
 
+import { montoDePais } from "@/lib/moneda/simbolo";
 import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModuloEscritura } from "@/lib/auth";
@@ -15,7 +16,8 @@ import { createServiceClient } from "@/lib/supabase/server";
 const MODULO = "publicaciones-dropi";
 const RUTA = "/publicaciones-dropi";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const usd = (n: number) => `$${n.toFixed(2)}`;
+/** Da formato a los montos de un país con el símbolo de su moneda («$8.99», «₡5 499», «MX$37»). */
+const formatoDe = (codigo: string) => (n: number) => montoDePais(n, codigo);
 const num = (v: unknown) => (v === null || v === undefined ? null : Number(v));
 
 /** Un cambio que espera «Aplicar en Dropi», para la lista de la barra de la página: qué es, qué pasaría al deshacerlo y si todavía se puede. */
@@ -78,6 +80,7 @@ export async function listarCambiosPendientes(): Promise<{ error?: string; cambi
   if (!(await puedeVerPaisId(supabase, usuario.paisesPermitidos, pais.id))) return { cambios: [] };
   const { filas, error } = await leerPendientes(pais.id);
   if (error) return { error };
+  const usd = formatoDe(pais.codigo);
   return {
     cambios: filas.map((f): CambioPendienteVista => {
       const tipo = tipoDe(f);
@@ -97,7 +100,7 @@ export async function listarCambiosPendientes(): Promise<{ error?: string; cambi
         }
       } else if (tipo === "crear") {
         const d = normalizarDatosCrear(f.datos);
-        lineas.push(`Publicar en Dropi: «${d.nombre || pub?.nombre || "Publicación"}»${d.precio != null ? ` · $${d.precio.toFixed(2)}` : ""} · ${d.fotos.length} ${d.fotos.length === 1 ? "foto" : "fotos"}`);
+        lineas.push(`Publicar en Dropi: «${d.nombre || pub?.nombre || "Publicación"}»${d.precio != null ? ` · ${usd(d.precio)}` : ""} · ${d.fotos.length} ${d.fotos.length === 1 ? "foto" : "fotos"}`);
         alDeshacer = "Vuelve a «Sin publicar»: se queda guardada con todos sus datos, sin borrar nada.";
         if (intentos > 0 || f.nuevo_dropi_id) {
           deshacible = false;
@@ -186,6 +189,8 @@ export async function deshacerCambioPendiente(cambioId: string): Promise<{ error
   const { data: base } = await supabase.from("dropi_cambios_pendientes").select("pais_id").eq("id", cambioId).maybeSingle();
   if (!base || !(await puedeVerPaisId(supabase, usuario.paisesPermitidos, base.pais_id as string))) return { error: "Cambio no válido." };
   const { filas, error } = await leerPendientes(base.pais_id as string, [cambioId]);
+  const { data: paisCambio } = await supabase.from("paises").select("codigo").eq("id", base.pais_id as string).maybeSingle();
+  const usd = formatoDe(String(paisCambio?.codigo ?? "PA"));
   const f = filas[0];
   if (error || !f) return { error: "Ese cambio ya no está pendiente." };
   const tipo = tipoDe(f);

@@ -25,7 +25,7 @@ function productoBase(id: number, extra: Obj = {}): Obj {
 }
 
 /** Un Dropi de mentira con las rutas que usa el favorito. */
-function crearDropi(opciones: { noTomaEntradas?: boolean; usuarios?: Record<string, Obj>; fallaAsignar?: boolean; stockAlCrear?: boolean; noArchiva?: boolean; categorias?: Obj[]; fallaCrear?: boolean; respuestaCrear?: "sinId" | "anidado"; fotos?: "rechaza" | "soloXAuth" | "fallaLaPrincipal"; cdnSinCache?: boolean; cdnBloqueado?: boolean; fallaPutDe?: number } = {}) {
+function crearDropi(opciones: { noTomaEntradas?: boolean; usuarios?: Record<string, Obj>; fallaAsignar?: boolean; stockAlCrear?: boolean; noArchiva?: boolean; categorias?: Obj[]; fallaCrear?: boolean; respuestaCrear?: "sinId" | "anidado"; fotos?: "rechaza" | "soloXAuth" | "fallaLaPrincipal"; cdnSinCache?: boolean; cdnBloqueado?: boolean; fallaPutDe?: number; quitarReservaSaca?: boolean } = {}) {
   const productos = new Map<number, Obj>();
   const llamadas: string[] = [];
   const garantias = new Map<number, Obj[]>();
@@ -104,6 +104,11 @@ function crearDropi(opciones: { noTomaEntradas?: boolean; usuarios?: Record<stri
           const viva = (p.private_product_inventories as Obj[]).find((y) => y.user_id === x.user_id && !y.deleted_at);
           if (x.deleted_at) {
             if (viva) viva.deleted_at = "2026-10-26";
+            // Como el Dropi de verdad (2 nov 2026, el 8822): al quitar la reserva, él mismo saca esas unidades de la bodega.
+            if (viva && opciones.quitarReservaSaca) {
+              const fila = (p.warehouse_product as Obj[]).find((w) => w.warehouse_id === 81)!;
+              fila.stock = Number(fila.stock) - Number(viva.stock);
+            }
           } else if (!viva) {
             const stock = (p.warehouse_product as Obj[]).reduce((t, w) => t + Number(w.stock), 0);
             const ya = (p.private_product_inventories as Obj[]).filter((y) => !y.deleted_at).reduce((t, y) => t + Number(y.stock), 0);
@@ -648,6 +653,47 @@ test("quitar privatización: si no se pudo devolver, el reintento devuelve lo an
   const [r3] = await aplicar(bien, [{ ...base, id: "q1", tipo: "apagar", producto: 9001, quitarPrivados: true, datos: { ...datos, unidades: r1.unidades, devuelto: true } }]);
   assert.equal(r3.ok, true, String(r3.error));
   assert.deepEqual(bien.stockDe(bien.productos.get(8406)!), { 81: 300 });
+});
+
+test("quitar privatización con todo el stock reservado (el 8822): si Dropi saca las unidades al quitar la reserva, no se sacan otra vez", async () => {
+  const d = crearDropi({ usuarios: { "maria@correo.com": maria }, quitarReservaSaca: true });
+  d.productos.set(8406, publicoVeganic());
+  await aplicar(d, [{ ...base, id: "v1", tipo: "privatizar", producto: 8406, datos: privatizacion }]);
+  const [r] = await aplicar(d, [{ ...base, id: "q1", tipo: "apagar", producto: 9001, quitarPrivados: true, datos: { publico: 8406, publicacionId: null, unidades: null, devuelto: false } }]);
+  assert.equal(r.ok, true, String(r.error));
+  assert.deepEqual(d.stockDe(d.productos.get(9001)!), { 81: 0 }, "en cero, no en -50");
+  assert.deepEqual(r.unidades, { 81: 50 });
+  assert.deepEqual(d.stockDe(d.productos.get(8406)!), { 81: 300 }, "el público recupera las 50");
+  assert.equal(d.productos.get(9001)!.archived, true);
+});
+
+test("quitar privatización: la reserva se quita en un guardado propio, antes de sacar el stock", async () => {
+  const d = crearDropi({ usuarios: { "maria@correo.com": maria } });
+  d.productos.set(8406, publicoVeganic());
+  await aplicar(d, [{ ...base, id: "v1", tipo: "privatizar", producto: 8406, datos: privatizacion }]);
+  const antes = d.llamadas.length;
+  const [r] = await aplicar(d, [{ ...base, id: "a1", tipo: "apagar", producto: 9001, quitarPrivados: true }]);
+  assert.equal(r.ok, true, String(r.error));
+  assert.equal(d.llamadas.slice(antes).filter((l) => l.startsWith("PUT") && l.includes("/products/9001")).length, 2);
+  assert.deepEqual(d.stockDe(d.productos.get(9001)!), { 81: 0 });
+});
+
+test("un producto con stock negativo no se apaga ni se archiva: pide dejarlo en 0", async () => {
+  const d = crearDropi();
+  d.productos.set(8822, productoBase(8822, { warehouse_product: [{ warehouse_id: 81, stock: -96, warehouse: BODEGA }] }));
+  const [r] = await aplicar(d, [{ ...base, id: "a1", tipo: "apagar", producto: 8822 }]);
+  assert.equal(r.ok, false);
+  assert.match(String(r.error), /-96 unidades \(stock negativo\)/);
+  assert.equal(d.productos.get(8822)!.archived, null);
+});
+
+test("cambiar stock deja en 0 un producto que quedó en negativo (una entrada por la diferencia)", async () => {
+  const d = crearDropi();
+  d.productos.set(8822, productoBase(8822, { warehouse_product: [{ warehouse_id: 81, stock: -96, warehouse: BODEGA }] }));
+  const [r] = await aplicar(d, [{ ...base, id: "s1", tipo: "stock", producto: 8822, datos: { producto: null, bodega: 81, nombreBodega: "Proveedor Ecomfive", unidades: 0, antes: -96, concepto: "Corrige stock negativo" } }]);
+  assert.equal(r.ok, true, String(r.error));
+  assert.equal(r.antes, -96);
+  assert.deepEqual(d.stockDe(d.productos.get(8822)!), { 81: 0 });
 });
 
 // ---------- Productos con variaciones (1 nov 2026): el caso del Body Viral (ID 7263) ----------

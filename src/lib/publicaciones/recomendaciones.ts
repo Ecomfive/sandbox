@@ -4,6 +4,7 @@
 // decisiones quedan guardadas (`dropi_publicaciones_decisiones`) y son lo que en la fase 2 leerá la IA para aprender. Sin base
 // ni React, con prueba.
 
+import { montoConSimbolo } from "@/lib/moneda/simbolo";
 import { formatoMonto, MONEDA_DOLAR, type MonedaPublicaciones } from "./moneda";
 import type { Revision } from "./optimizacion";
 import type { Reglas } from "./reglas";
@@ -279,6 +280,8 @@ export interface Cumplimiento {
 export function tareaCumplida(
   t: { tipo: string; fecha: string; precioAntes: number | null },
   actual: { cambioPrecio: { fecha: string; antes: number | null; despues: number | null } | null; comboPublicado: boolean; revisiones?: Revision[] },
+  /** La moneda de los precios, para escribirlos con su símbolo. */
+  moneda = "USD",
 ): Cumplimiento | null {
   // Optimización: hecha cuando la lectura de Dropi ya no ve lo que faltaba (lo «sin datos» no cuenta como hecho).
   const puntos = PUNTOS[t.tipo as TipoRecomendacion];
@@ -293,6 +296,6 @@ export function tareaCumplida(
   const subio = c.despues > t.precioAntes + 0.004;
   const bajo = c.despues < t.precioAntes - 0.004;
   if ((t.tipo === "subir_precio" && subio) || (t.tipo === "igualar_precio" && bajo))
-    return { como: "dropi", fecha: c.fecha, detalle: `Dropi muestra $${c.despues.toFixed(2)} (antes $${t.precioAntes.toFixed(2)})` };
+    return { como: "dropi", fecha: c.fecha, detalle: `Dropi muestra ${montoConSimbolo(c.despues, moneda)} (antes ${montoConSimbolo(t.precioAntes, moneda)})` };
   return null;
 }
