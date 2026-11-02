@@ -128,6 +128,32 @@ function podarCambios(cambios: Record<string, Partial<FilaCompra>>, servidor: Fi
   return cambio ? resultado : cambios;
 }
 
+/** Una foto en su celda: miniatura que se amplía al pasar el cursor; sin foto, un cuadro punteado. */
+function FotoCelda({ foto, alt, mas = 0 }: { foto: string | null; alt: string; mas?: number }) {
+  if (!foto)
+    return (
+      <ConMasProductos n={mas}>
+        <div className="flex h-8 w-8 items-center justify-center rounded-md border border-dashed border-border text-muted-foreground" role="img" aria-label={`Sin ${alt.toLowerCase()}`}>
+          <AdjuntoIcon className="h-3.5 w-3.5" />
+        </div>
+      </ConMasProductos>
+    );
+  return (
+    <TarjetaEmergente
+      clase="rounded-lg border border-border bg-card p-1.5 shadow-lg"
+      contenido={
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={foto} alt={alt} className="max-h-72 max-w-72 rounded-md object-contain" />
+      }
+    >
+      <ConMasProductos n={mas}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={foto} alt={alt} className="h-8 w-8 rounded-md border border-border object-cover" />
+      </ConMasProductos>
+    </TarjetaEmergente>
+  );
+}
+
 /** Una columna con el emoji de su campo delante del nombre, como en ClickUp. */
 function col(id: string, nombre: string, resto: Omit<ColumnaTabla<FilaCompra>, "id" | "label">): ColumnaTabla<FilaCompra> {
   return { id, label: conEmoji(id, nombre), ...resto };
@@ -160,6 +186,23 @@ function columnas(
   );
   return [
     { id: "numero", label: "N.º OC", ocultable: true, clase: "whitespace-nowrap tabular-nums text-muted-foreground", render: (c) => numeroOC(c.numero) },
+    // Código y las dos fotos van juntos antes de la orden (pedido de Alcides, 2 nov 2026). Ids nuevos («codigoOC», «fotoComercial»,
+    // «fotoReal») para que también en quien ya tenía un orden guardado aparezcan aquí, justo después del N.º OC.
+    { id: "codigoOC", label: conEmoji("codigo", "Código"), ...resto, clase: "text-muted-foreground tabular-nums whitespace-nowrap", render: (c) => c.codigo ?? "—" },
+    {
+      id: "fotoComercial",
+      label: conEmoji("foto", "Foto del producto"),
+      ...resto,
+      // La foto comercial (la de Producto), la de referencia.
+      render: (c) => <FotoCelda foto={c.fotoComercial} alt="Foto del producto" mas={otrosProductos(c.lineas)} />,
+    },
+    {
+      id: "fotoReal",
+      label: conEmoji("foto", "Foto real"),
+      ...resto,
+      // La foto real que manda el proveedor.
+      render: (c) => <FotoCelda foto={c.fotoUrl} alt="Foto real" />,
+    },
     {
       id: "nombre",
       label: "Orden de compra",
@@ -221,34 +264,6 @@ function columnas(
     col("qtyTotal", "Cantidad total", { ocultable: true, clase: "tabular-nums", total: (f) => sumar(f, (c) => c.qtyTotal, (n) => n.toLocaleString("es-PA")), render: (c) => ed(c, "qtyTotal", c.qtyTotal ?? "—") }),
     col("pagadoAProveedor", "Pagado a Proveedor", { ocultable: true, clase: "tabular-nums", total: (f) => sumar(f, (c) => c.pagadoAProveedor, usd), render: (c) => ed(c, "pagadoAProveedor", usd(c.pagadoAProveedor)) }),
     col("dias", "Días", { ocultable: true, clase: "tabular-nums", render: (c) => diasDeCompra(c) }),
-    col("foto", "Foto", {
-      ...resto,
-      // La foto comercial (la de Producto); sin ella, la foto real que subió el proveedor.
-      render: (c) => {
-        const foto = c.fotoComercial ?? c.fotoUrl;
-        return foto ? (
-          <TarjetaEmergente
-            clase="rounded-lg border border-border bg-card p-1.5 shadow-lg"
-            contenido={
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={foto} alt="" className="max-h-72 max-w-72 rounded-md object-contain" />
-            }
-          >
-            <ConMasProductos n={otrosProductos(c.lineas)}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={foto} alt="" className="h-8 w-8 rounded-md border border-border object-cover" />
-            </ConMasProductos>
-          </TarjetaEmergente>
-        ) : (
-          <ConMasProductos n={otrosProductos(c.lineas)}>
-            <div className="flex h-8 w-8 items-center justify-center rounded-md border border-dashed border-border text-muted-foreground">
-              <AdjuntoIcon className="h-3.5 w-3.5" />
-            </div>
-          </ConMasProductos>
-        );
-      },
-    }),
-    col("codigo", "Código", { ...resto, clase: "text-muted-foreground tabular-nums whitespace-nowrap", render: (c) => c.codigo ?? "—" }),
     col("pais", "País", {
       ...resto,
       clase: "text-muted-foreground",
