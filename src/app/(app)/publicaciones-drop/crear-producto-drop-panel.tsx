@@ -7,7 +7,7 @@ import { FichaCrear } from "@/components/ui/ficha-crear";
 import { Seccion } from "@/components/ui/seccion-ficha";
 import { CampoSkuMaestro, ProveedorSkusMaestros, type OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import { EnlaceIcon, MargenIcon, NotificacionesIcon, ProductoIcon } from "@/lib/nav-icons";
-import { descripcionPorDefecto, MAX_IMAGENES, MIN_IMAGENES, sugerirProductos, textoParaDrop, type BaseDeDrop } from "@/lib/publicaciones-drop/crear";
+import { CATEGORIAS_DROP, descripcionPorDefecto, MAX_IMAGENES, MIN_DESCRIPCION, MIN_IMAGENES, sugerirProductos, textoParaDrop, type BaseDeDrop } from "@/lib/publicaciones-drop/crear";
 import { crearProductoDrop } from "./actions";
 
 /**
@@ -130,6 +130,7 @@ export function CrearProductoDropPanel({ opcionesSku }: { opcionesSku: OpcionSku
                   id="campo-descripcion"
                   name="descripcion"
                   required
+                  minLength={MIN_DESCRIPCION}
                   aria-invalid={invalido("campo-descripcion")}
                   value={descripcion}
                   onChange={(e) => {
@@ -141,7 +142,16 @@ export function CrearProductoDropPanel({ opcionesSku }: { opcionesSku: OpcionSku
                 />
               </Campo>
               <Campo etiqueta="Categoría" id="campo-categoria" obligatorio faltante={faltante}>
-                <input id="campo-categoria" name="categoria" required aria-invalid={invalido("campo-categoria")} placeholder="Ej: Belleza" className={`${fieldClass} w-full`} />
+                <select id="campo-categoria" name="categoria" required defaultValue="" aria-invalid={invalido("campo-categoria")} className={`${fieldClass} w-full`}>
+                  <option value="" disabled>
+                    Elige una categoría
+                  </option>
+                  {CATEGORIAS_DROP.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
               </Campo>
             </Seccion>
 
