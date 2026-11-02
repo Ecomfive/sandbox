@@ -5,6 +5,25 @@
 
 export const MIN_IMAGENES = 1;
 export const MAX_IMAGENES = 5;
+/** La descripción corta de Drop pide **al menos 10 caracteres** (confirmado por Nicole, 3 nov 2026). */
+export const MIN_DESCRIPCION = 10;
+
+/** Las categorías de Drop (las que ofrece su formulario, según Nicole, 3 nov 2026): se elige una de la lista. */
+export const CATEGORIAS_DROP = [
+  "Tecnología",
+  "Decoración para el hogar",
+  "Productos ecológicos",
+  "Cuidado personal",
+  "Ropa y accesorios",
+  "Artículos de oficina",
+  "Accesorios de viaje",
+  "Hogar y cocina",
+  "Deportes y Gimnasio",
+  "Suministros para mascotas",
+  "Juguetes y juegos",
+  "Salud y bienestar",
+] as const;
+export const categoriaValida = (c: string): boolean => (CATEGORIAS_DROP as readonly string[]).includes(c);
 
 export interface DatosCrearDrop {
   nombre: string;
@@ -69,7 +88,9 @@ export function faltantesCrearDrop(d: DatosCrearDrop): string[] {
   const f: string[] = [];
   if (!d.nombre.trim()) f.push("Nombre");
   if (!d.descripcion.trim()) f.push("Descripción");
+  else if (d.descripcion.trim().length < MIN_DESCRIPCION) f.push(`Descripción (mínimo ${MIN_DESCRIPCION} caracteres)`);
   if (!d.categoria.trim()) f.push("Categoría");
+  else if (!categoriaValida(d.categoria)) f.push("Categoría (elige una de la lista)");
   if (d.precio === null || !Number.isFinite(d.precio) || d.precio <= 0) f.push("Precio de venta");
   if (d.imagenes < MIN_IMAGENES) f.push(`Imágenes (de ${MIN_IMAGENES} a ${MAX_IMAGENES})`);
   else if (d.imagenes > MAX_IMAGENES) f.push(`Imágenes (máximo ${MAX_IMAGENES})`);

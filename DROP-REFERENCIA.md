@@ -19,7 +19,7 @@ y plataforma, en `src/lib/plataformas.ts`. La guía para quien sincroniza o cone
 | Botón | «Agregar» (azul) | «Crear producto» (negro) |
 | Al pulsarlo | Una ventana emergente pregunta si se quiere crear un producto | Entra directo al panel para crearlo |
 | Nombre | Título; opción de poner **otro nombre para la guía de envío** | Solo el título; **no** hay otro nombre para la guía |
-| Descripción | Larga (mínimo 200 caracteres) | Corta: se pone **el mismo nombre del producto**. Nicole la describe con «10 caracteres»; **por confirmar si es el mínimo o el máximo** |
+| Descripción | Larga (mínimo 200 caracteres) | Corta: se pone **el mismo nombre del producto**. **Mínimo 10 caracteres** (confirmado por Nicole, 3 nov 2026) |
 | Público o privado | Se elige al crear | **No se elige**: se privatiza después, desde el mismo ID |
 | Peso y medidas | Piden peso, largo, ancho y alto | **No** piden peso ni medidas |
 | Precio de venta | Obligatorio | Obligatorio |
@@ -29,7 +29,7 @@ y plataforma, en `src/lib/plataformas.ts`. La guía para quien sincroniza o cone
 | Aviso de poco stock | No | Opción de recibir un **aviso por correo** si un producto o variante está casi sin stock |
 | SKU | El mismo nombre del producto (salvo en los combos) | **Siempre el mismo nombre del producto** |
 | Simple o variable | Hay que elegir | **No** se elige |
-| Categoría | Se elige | Se elige la que corresponda |
+| Categoría | Se elige | Se elige una de las **12 de Drop**: Tecnología, Decoración para el hogar, Productos ecológicos, Cuidado personal, Ropa y accesorios, Artículos de oficina, Accesorios de viaje, Hogar y cocina, Deportes y Gimnasio, Suministros para mascotas, Juguetes y juegos, Salud y bienestar (`CATEGORIAS_DROP`) |
 | Recursos adicionales (videos…) | Existe el módulo; **no se usa** | No existe |
 | Garantías | Módulo obligatorio: hay que aceptarlas y escribir en observaciones que se está de acuerdo con las de por defecto | **No existe** |
 | Guardar | «Guardar» | «Guardar producto» |
@@ -76,4 +76,4 @@ Ese código de venta público es el **ID de la publicación en Drop**.
   sus validaciones (`faltantesCrearDrop`); Análisis de competencia con la plataforma Drop (vacío). **Todavía no escriben en Drop**: los botones y el formulario validan y avisan «hazlo en Drop».
 - Falta: **escribir** en Drop (crear productos, pedir ingresos de inventario, dar accesos privados, inactivar/activar, eliminar), leer las **solicitudes de inventario** y su estado (aprobada o declinada), conectar la competencia de Drop y crear las tablas de lo que falte (`drop_*`, con RLS sin políticas). Drop **no pide
   código de autenticación**, lo que debería hacer más simple conectarlo.
-- Preguntas abiertas: si la descripción es de mínimo o de máximo 10 caracteres; cuáles son las categorías de Drop; si Drop también tiene privatizar con unidades reservadas, pausar por falta de stock o tareas como Dropi (no se copiaron esos botones).
+- Preguntas abiertas: si Drop también tiene privatizar con unidades reservadas, pausar por falta de stock o tareas como Dropi (no se copiaron esos botones).
