@@ -82,7 +82,8 @@ export function normalizarDropi(o: unknown): ProductoVisto | null {
   const privado = esPrivado(nombre, p.privated_product === true || p.private_product === true);
   // Un privado suele llevar el logo del proveedor en vez de la foto del producto: no sirve como foto. Cada país tiene su CDN
   // (2 nov 2026, pedido de Hernán: en Análisis de competencia de Costa Rica no se veía ninguna foto; iban al de Panamá y daban 403).
-  const foto = ruta && !/logo/i.test(ruta.split("/").pop() ?? "") ? (/^https?:\/\//.test(ruta) ? ruta : `${cdnDeRuta(ruta)}/${ruta}`) : null;
+  // Un «+» en el nombre del archivo va como %2B: tal cual, el CDN lo lee como espacio y da 403.
+  const foto = ruta && !/logo/i.test(ruta.split("/").pop() ?? "") ? (/^https?:\/\//.test(ruta) ? ruta : `${cdnDeRuta(ruta)}/${ruta.replace(/\+/g, "%2B")}`) : null;
   const variaciones = Array.isArray(p.variations) ? (p.variations as Record<string, unknown>[]) : [];
   const stock =
     p.type === "VARIABLE" && variaciones.length
