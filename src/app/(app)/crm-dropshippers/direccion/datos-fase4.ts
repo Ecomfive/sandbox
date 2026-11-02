@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { buscarDuplicados, type FilaEntregas, type GrupoDuplicado } from "@/lib/crm/automatizar";
+import { buscarDuplicados, type FilaEntregas, type GrupoDuplicado, type MotivoDuplicado } from "@/lib/crm/automatizar";
 import { traerTodasConError, traerTodasLasFilas } from "@/lib/supabase/paginar";
 
 /** Los pedidos del país por dropshipper y transportadora (`crm_entregas`, migración 0205). */
@@ -31,6 +31,25 @@ export interface MiembroDuplicado {
 }
 export interface DuplicadosVista {
   grupos: (GrupoDuplicado & { miembros: MiembroDuplicado[] })[];
+}
+
+/** Lo que se ve de un cliente que parece duplicado (3 nov 2026: en su fila y su ficha de Clientes, ya no en una pestaña): por qué y con quiénes. */
+export interface DuplicadoDeCliente {
+  motivos: MotivoDuplicado[];
+  /** Por WhatsApp, correo o tienda (muy probablemente la misma persona); si es solo por el nombre, puede ser casualidad. */
+  fuerte: boolean;
+  /** Las otras fichas del grupo (no esta). */
+  otros: MiembroDuplicado[];
+}
+
+/** Cada dropshipper que está en un grupo de duplicados, con las otras fichas de su grupo. */
+export function duplicadosPorCliente(d: DuplicadosVista): Record<string, DuplicadoDeCliente> {
+  const r: Record<string, DuplicadoDeCliente> = {};
+  for (const g of d.grupos) {
+    const fuerte = g.motivos.some((m) => m !== "nombre");
+    for (const m of g.miembros) r[m.id] = { motivos: g.motivos, fuerte, otros: g.miembros.filter((x) => x.id !== m.id) };
+  }
+  return r;
 }
 
 /** Los dropshippers que parecen la misma persona (de todos los países). Los números no salen de aquí: solo se dice «Mismo WhatsApp». */

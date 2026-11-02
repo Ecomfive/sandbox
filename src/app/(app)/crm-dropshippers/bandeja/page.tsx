@@ -32,7 +32,8 @@ export default async function BandejaWhatsappPage({ searchParams }: { searchPara
     ? null
     : typeof abrir === "string"
       ? "chats"
-      : (VISTAS_DIRECCION.find((v) => v.valor === vistaParam)?.valor ?? "resumen");
+      : // Las pestañas que se quitaron el 3 nov 2026 llevan a donde está ahora lo suyo: la atención va en Equipo y los duplicados en Clientes.
+        (VISTAS_DIRECCION.find((v) => v.valor === vistaParam)?.valor ?? (vistaParam === "kpis" ? "equipo" : vistaParam === "duplicados" ? "clientes" : "resumen"));
   // El encabezado con las pestañas sale enseguida y el contenido llega después (`Suspense` con su `key`): al cambiar de pestaña se ve el esqueleto al
   // instante, en vez de quedar la pantalla quieta mientras carga (31 oct 2026, pedido de Hernán).
   if (vistaDireccion && vistaDireccion !== "chats") {
