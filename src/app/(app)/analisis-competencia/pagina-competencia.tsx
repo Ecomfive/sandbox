@@ -8,11 +8,10 @@ import { getPaisActual } from "@/lib/pais";
 import { createServiceClient } from "@/lib/supabase/server";
 import { cargarDatosCompetencia } from "./datos-competencia";
 import type { DatosCompetencia } from "./def-competencia";
-import { ResumenCompetencia } from "./vista-competencia";
 
 /**
- * El marco de cada pestaña de Análisis de competencia: comprueba el acceso, carga los datos del país de la barra y pone la
- * barra de indicadores arriba (la misma en todas las pestañas, como en Test productos y Compras).
+ * El marco de cada pestaña de Análisis de competencia: comprueba el acceso y carga los datos del país de la barra. Cada pestaña pone arriba el
+ * tablero de tarjetas (`TableroCompetencia`): en Competidores filtran la lista; en Resumen llevan a Competidores con su filtro.
  */
 export async function PaginaCompetencia({ titulo, children }: { titulo: string; children: (datos: DatosCompetencia, puedeEscribir: boolean) => ReactNode }) {
   const usuario = await requireModulo("analisis-competencia");
@@ -33,7 +32,6 @@ export async function PaginaCompetencia({ titulo, children }: { titulo: string; 
       ) : (
         // Los precios en la moneda del catálogo del país: Panamá en dólares, Costa Rica en colones.
         <MonedaCompetencia moneda={monedaDePais(pais.codigo)}>
-          <ResumenCompetencia datos={datos} />
           {children(datos, !usuario.modulosSoloLectura.includes("analisis-competencia"))}
         </MonedaCompetencia>
       )}
