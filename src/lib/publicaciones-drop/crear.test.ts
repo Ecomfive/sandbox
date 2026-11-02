@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { descripcionPorDefecto, enlaceValido, faltantesCrearDrop, skuDeDrop, sugerirProductos, textoParaDrop, type DatosCrearDrop } from "./crear";
+import { CATEGORIAS_DROP, descripcionPorDefecto, enlaceValido, faltantesCrearDrop, skuDeDrop, sugerirProductos, textoParaDrop, type DatosCrearDrop } from "./crear";
 
-const base: DatosCrearDrop = { nombre: "Crema Nida", descripcion: "Crema Nida", categoria: "Belleza", precio: 12000, imagenes: 3, enlaceCreativos: "" };
+const base: DatosCrearDrop = { nombre: "Crema Nida", descripcion: "Crema Nida", categoria: "Cuidado personal", precio: 12000, imagenes: 3, enlaceCreativos: "" };
 
 describe("crear un producto en Drop", () => {
   it("con lo mínimo se puede crear: no pide precio sugerido, peso, medidas ni público o privado", () => {
@@ -32,6 +32,15 @@ describe("crear un producto en Drop", () => {
     const p = { codigo: "CREMA/NIDA/50ML", nombre: "Crema Nida 50 ml" };
     assert.equal(textoParaDrop(p, "sku"), "CREMA/NIDA/50ML");
     assert.equal(textoParaDrop(p, "nombre"), "Crema Nida 50 ml");
+  });
+  it("la descripción pide 10 caracteres como mínimo", () => {
+    assert.deepEqual(faltantesCrearDrop({ ...base, descripcion: "Bolso" }), ["Descripción (mínimo 10 caracteres)"]);
+    assert.deepEqual(faltantesCrearDrop({ ...base, descripcion: "Crema Nida" }), []);
+  });
+  it("la categoría es una de las 12 de Drop", () => {
+    assert.equal(CATEGORIAS_DROP.length, 12);
+    assert.deepEqual(faltantesCrearDrop({ ...base, categoria: "Belleza" }), ["Categoría (elige una de la lista)"]);
+    for (const c of CATEGORIAS_DROP) assert.deepEqual(faltantesCrearDrop({ ...base, categoria: c }), []);
   });
 });
 
