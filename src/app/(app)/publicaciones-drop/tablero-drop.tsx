@@ -1,6 +1,6 @@
 import type { ComponentType } from "react";
 import { COLORES, type Color } from "@/components/panel/colores-tablero";
-import { ActualizarIcon, AnalisisCompetenciaIcon, DesconectadoIcon, DropshipperIcon, EnlaceIcon, EstadoIcon, InventarioIcon, MargenIcon, SugerenciaIcon, TiendaIcon, VentasIcon } from "@/lib/nav-icons";
+import { AnalisisCompetenciaIcon, DesconectadoIcon, DropshipperIcon, EnlaceIcon, EstadoIcon, InventarioIcon, MargenIcon, SugerenciaIcon, TiendaIcon, VentasIcon } from "@/lib/nav-icons";
 
 interface Tarjeta {
   id: string;
@@ -10,18 +10,17 @@ interface Tarjeta {
   color: Color;
 }
 
-/** Las mismas tarjetas que el tablero de Gestión de IDs Dropi, para cuando se conecten los datos de Drop. */
+/** Las tarjetas de Gestión de IDs Dropi que valen para Drop, para cuando se conecten sus datos (sin «Republicar»: Drop no republica). */
 const TARJETAS: Tarjeta[] = [
   { id: "activas", titulo: "Activas en Drop", detalle: "Publicadas y activas según Drop", icono: TiendaIcon, color: "verde" },
   { id: "margen-bajo", titulo: "Margen bajo", detalle: "Utilidad por debajo del margen mínimo", icono: MargenIcon, color: "rojo" },
   { id: "ventas-caida", titulo: "Ventas en caída", detalle: "Venden menos que en el periodo anterior", icono: VentasIcon, color: "ambar" },
   { id: "bajar-precio", titulo: "Bajar precio", detalle: "Hay un competidor más barato", icono: AnalisisCompetenciaIcon, color: "rojo" },
   { id: "verificar-dropshipper", titulo: "Verificar dropshipper", detalle: "Privados por verificar", icono: DropshipperIcon, color: "azul" },
-  { id: "republicar", titulo: "Republicar", detalle: "Sin ventas por mucho tiempo", icono: ActualizarIcon, color: "azul" },
   { id: "recomendaciones", titulo: "Recomendaciones", detalle: "De precio o combo, sin decidir", icono: SugerenciaIcon, color: "violeta" },
   { id: "por-optimizar", titulo: "Por optimizar", detalle: "Título, fotos, video o precio sugerido por mejorar", icono: EstadoIcon, color: "azul" },
   { id: "sin-id", titulo: "Sin ID de Drop", detalle: "Publicaciones sin su ID de Drop anotado", icono: DesconectadoIcon, color: "rojo" },
-  { id: "sin-vincular", titulo: "Sin vincular producto", detalle: "Sin su producto de Producto", icono: EnlaceIcon, color: "violeta" },
+  { id: "sin-vincular", titulo: "Sin vincular producto", detalle: "Su SKU de Drop sin vincular a un producto", icono: EnlaceIcon, color: "violeta" },
   { id: "sin-stock", titulo: "Sin stock", detalle: "Activas en Drop con 0 unidades", icono: InventarioIcon, color: "rojo" },
   { id: "poco-stock", titulo: "Poco stock", detalle: "Venden y les quedan pocas unidades", icono: InventarioIcon, color: "ambar" },
 ];
