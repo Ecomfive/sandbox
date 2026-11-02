@@ -42,7 +42,7 @@ import { ImportarChat } from "./importar-chat";
 import { NuevoContacto } from "./nuevo-contacto";
 import { ConfirmarBorrado, type QueBorrar } from "./confirmar-borrado";
 import { MostrarTelefono } from "../mostrar-telefono";
-import { ActualizarIcon, ArchivarIcon, ChatIcon, CheckIcon, ConectadoIcon, DescargarIcon, PapeleraIcon, PersonaIcon, ReactivarIcon } from "@/lib/nav-icons";
+import { ActualizarIcon, ArchivarIcon, ChatIcon, CheckIcon, ConectadoIcon, DescargarIcon, NoLeidoIcon, PapeleraIcon, PersonaIcon, ReactivarIcon } from "@/lib/nav-icons";
 import { Ventana } from "@/components/ui/ventana";
 import { etiquetaDeChatBorrado, textoDeMensajeBorrado, vistaPreviaTexto } from "@/lib/whatsapp/borrado";
 import { agruparReacciones, miReaccion, REACCIONES_RAPIDAS, type ReaccionVista } from "@/lib/whatsapp/reacciones";
@@ -1304,7 +1304,7 @@ export function Bandeja({
   const accionesExtra: AccionExtra[] = !sel
     ? []
     : [
-        { id: "no_leido", texto: "Marcar como no leído", corto: "No leído", icono: ChatIcon, alPulsar: () => marcarLeido(sel, false) },
+        { id: "no_leido", texto: "Marcar como no leído", corto: "No leído", icono: NoLeidoIcon, alPulsar: () => marcarLeido(sel, false) },
         ...(escribe && !mirando
           ? [
               ...AREAS_CHAT.filter((a) => a.valor !== sel.area).map((a) => ({ id: `pasar_${a.valor}` as AccionExtra["id"], texto: `Pasar el chat a ${a.etiqueta}`, corto: `A ${a.etiqueta}`, icono: ActualizarIcon, alPulsar: () => pasarA(a.valor) })),

@@ -449,6 +449,17 @@ export function ChatIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+/** Un sobre cerrado con un punto: «marcar como no leído» (distinto del globo de chat, que es el de WhatsApp interno). */
+export function NoLeidoIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <rect x="2" y="7" width="15" height="12" rx="2" />
+      <path d="m3 9 6.5 4.2L16 9" />
+      <circle cx="19" cy="5" r="2.6" fill="currentColor" stroke="none" />
+    </Icon>
+  );
+}
+
 export function NotificacionesIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <Icon {...props}>
