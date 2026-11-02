@@ -1,7 +1,6 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element -- fotos que llegan por WhatsApp, servidas por /api/whatsapp/media */
-import Link from "next/link";
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition, type MouseEvent as EventoRaton } from "react";
 import { ContadorPestana } from "@/components/migas/contador-pestana";
 import { anilloFoco } from "@/components/ui/field";
@@ -41,11 +40,11 @@ import { sugerirRapidas, validarRapida, yaEsRapida, type RespuestaRapida } from 
 import { EnviarPlantilla, PlantillasEnLinea } from "./enviar-plantilla";
 import { ImportarChat } from "./importar-chat";
 import { NuevoContacto } from "./nuevo-contacto";
-import { PedirBorrado, type QueBorrar } from "./pedir-borrado";
+import { ConfirmarBorrado, type QueBorrar } from "./confirmar-borrado";
 import { MostrarTelefono } from "../mostrar-telefono";
 import { ActualizarIcon, ArchivarIcon, ChatIcon, CheckIcon, ConectadoIcon, DescargarIcon, PapeleraIcon, PersonaIcon, ReactivarIcon } from "@/lib/nav-icons";
 import { Ventana } from "@/components/ui/ventana";
-import { vistaPreviaTexto } from "@/lib/whatsapp/borrado";
+import { etiquetaDeChatBorrado, textoDeMensajeBorrado, vistaPreviaTexto } from "@/lib/whatsapp/borrado";
 import { agruparReacciones, miReaccion, REACCIONES_RAPIDAS, type ReaccionVista } from "@/lib/whatsapp/reacciones";
 import { COLUMNAS_TABLERO, GRUPOS, grupoPorId, ordenarPorUrgencia, plazoDelChat, repartirTablero, textoPlazo, type ColumnaTablero, type GrupoMotivo } from "@/lib/whatsapp/prioridad";
 import { cambiarMotivoChat, clasificarChatsPendientes } from "./motivo-actions";
@@ -818,7 +817,7 @@ export function Bandeja({
       momento: ahoraIso(),
       importado: false,
       eliminadoEnWhatsapp: false,
-      borradoPendiente: false,
+      eliminadoPor: null,
     };
     setChat((c) => (c && c.id === chatId ? { ...c, mensajes: [...c.mensajes.filter((m) => m.id !== reemplaza), local] } : c));
     void (nota ? notaWhatsapp(chatId, texto) : enviarWhatsapp(chatId, texto))
@@ -1193,7 +1192,7 @@ export function Bandeja({
               </span>
             )}
             {!c.dropshipperId && <span className="rounded-full bg-warning-soft px-2 py-px font-medium text-warning">No está en el CRM</span>}
-            {c.borradaEnApp && <span className="rounded-full bg-warning-soft px-2 py-px font-medium text-warning">Borrado en la app</span>}
+            {c.borradaEnApp && <span className="rounded-full bg-warning-soft px-2 py-px font-medium text-warning">{etiquetaDeChatBorrado(c.borradaEnApp.sistema, c.borradaEnApp.por)}</span>}
             {c.estado === "resuelta" && <span className="rounded-full bg-success-soft px-2 py-px font-medium text-success">Resuelta</span>}
             <PastillasEtiquetas etiquetas={c.etiquetas} colores={manejoEtiquetas.colores} />
             {otroNumero && <span>Por {otroNumero}</span>}
@@ -1310,14 +1309,18 @@ export function Bandeja({
           ? [
               ...AREAS_CHAT.filter((a) => a.valor !== sel.area).map((a) => ({ id: `pasar_${a.valor}` as AccionExtra["id"], texto: `Pasar el chat a ${a.etiqueta}`, corto: `A ${a.etiqueta}`, icono: ActualizarIcon, alPulsar: () => pasarA(a.valor) })),
               { id: "importar" as const, texto: "Importar chat del celular", corto: "Importar", icono: DescargarIcon, alPulsar: () => setImportar({ conversacion: sel }) },
-              {
-                id: "borrado_app" as const,
-                texto: sel.borradaEnApp ? "Quitar marca de borrado" : "Marcar borrado en la app",
-                corto: sel.borradaEnApp ? "Quitar marca" : "Borrado en app",
-                icono: ArchivarIcon,
-                alPulsar: () => accion(() => marcarChatBorradoEnApp(sel.id, !sel.borradaEnApp), sel.borradaEnApp ? "Quitaste la marca." : "Marcado: se borró en la app de WhatsApp Business. Aquí se conserva todo."),
-              },
-              ...(sel.borradoPendiente ? [] : [{ id: "pedir_borrar" as const, texto: "Pedir borrar el chat", corto: "Pedir borrar", icono: PapeleraIcon, alPulsar: () => setBorrar({ tipo: "chat" }) }]),
+              ...(sel.borradaEnApp?.sistema
+                ? []
+                : [
+                    {
+                      id: "borrado_app" as const,
+                      texto: sel.borradaEnApp ? "Quitar marca de borrado" : "Marcar borrado en la app",
+                      corto: sel.borradaEnApp ? "Quitar marca" : "Borrado en app",
+                      icono: ArchivarIcon,
+                      alPulsar: () => accion(() => marcarChatBorradoEnApp(sel.id, !sel.borradaEnApp), sel.borradaEnApp ? "Quitaste la marca." : "Marcado: se borró en la app de WhatsApp Business. Aquí se conserva todo."),
+                    },
+                  ]),
+              ...(sel.borradaEnApp?.sistema ? [] : [{ id: "pedir_borrar" as const, texto: "Borrar el chat", corto: "Borrar", icono: PapeleraIcon, alPulsar: () => setBorrar({ tipo: "chat" }) }]),
             ]
           : []),
         // Sin «Abrir su ficha en el CRM» ni «No es este» (29 oct 2026, pedido de Alcides): la ficha completa ya se ve aquí y las cuentas de Dropi se
@@ -1745,12 +1748,7 @@ export function Bandeja({
                   </span>
                 ))}
               {sel.estado === "resuelta" && <span className="rounded-full bg-success-soft px-2 py-px text-[11.5px] font-medium text-success">Resuelta</span>}
-              {sel.borradaEnApp && <span className="rounded-full bg-warning-soft px-2 py-px text-[11.5px] font-medium text-warning">Borrado en la app</span>}
-              {sel.borradoPendiente && (
-                <Link href="/crm-dropshippers/borrados" className={`rounded-full bg-azul-soft px-2 py-px text-[11.5px] font-medium text-azul hover:underline ${anilloFoco}`}>
-                  Borrado esperando autorización
-                </Link>
-              )}
+              {sel.borradaEnApp && <span className="rounded-full bg-warning-soft px-2 py-px text-[11.5px] font-medium text-warning">{etiquetaDeChatBorrado(sel.borradaEnApp.sistema, sel.borradaEnApp.por)}</span>}
             </span>
           }
           navegacion={
@@ -1853,7 +1851,7 @@ export function Bandeja({
                   )}
                   {enNavegador && sel.borradaEnApp && (
                     <p className="m-0 mb-2 max-w-[560px] self-center rounded-lg bg-warning-soft px-3 py-1.5 text-center text-[12.5px] text-warning">
-                      Este chat se borró en la app de WhatsApp Business ({sel.borradaEnApp.por ? `lo marcó ${sel.borradaEnApp.por}` : "marcado"}, {etiquetaDia(sel.borradaEnApp.en)}). Aquí se conserva todo el historial.
+                      {sel.borradaEnApp.sistema ? `Este chat lo borró ${sel.borradaEnApp.por ?? "alguien del equipo"} desde el sistema (${etiquetaDia(sel.borradaEnApp.en)}).` : `Este chat se borró en la app de WhatsApp Business (${sel.borradaEnApp.por ? `lo marcó ${sel.borradaEnApp.por}` : "marcado"}, ${etiquetaDia(sel.borradaEnApp.en)}).`} Aquí se conserva todo el historial.
                     </p>
                   )}
                   {mensajes && chat?.hayAnteriores && (
@@ -2188,14 +2186,16 @@ export function Bandeja({
         />
       )}
       {borrar && sel && (
-        <PedirBorrado
+        <ConfirmarBorrado
           conversacionId={sel.id}
           nombre={sel.nombre}
           que={borrar}
           alCerrar={() => setBorrar(null)}
-          alPedido={(autorizan) => {
+          alBorrar={() => {
+            const eraChat = borrar.tipo === "chat";
             setBorrar(null);
-            mostrarToast(`Petición enviada: ${autorizan.join(", ")} la tiene que autorizar. Hasta entonces no se borra nada.`);
+            mostrarToast(eraChat ? "Chat borrado." : "Mensaje borrado.");
+            if (eraChat) setElegido(null);
             void refrescar(sel.id);
           }}
         />
@@ -2254,13 +2254,13 @@ export function Bandeja({
  * nota privada a la derecha en amarillo con candado (el dropshipper no la ve) y los cambios de área como aviso al centro. `seguido`: va
  * pegado al anterior del mismo lado, sin colita.
  */
-/** El botón de la esquina de cada mensaje (se ve al pasar el cursor o al enfocarlo con el teclado): pide borrarlo, no lo borra. */
+/** El botón de la esquina de cada mensaje (se ve al pasar el cursor o al enfocarlo con el teclado): abre la confirmación para borrarlo. */
 function BotonBorrarMensaje({ alPulsar }: { alPulsar: () => void }) {
   return (
     <button
       type="button"
       onClick={alPulsar}
-      aria-label="Pedir borrar este mensaje"
+      aria-label="Borrar este mensaje"
       className={`absolute top-1 right-1 flex h-6 w-6 items-center justify-center rounded-full bg-[var(--wa-fondo)] text-[var(--wa-sec)] opacity-0 shadow-[0_1px_2px_var(--wa-sombra)] group-hover:opacity-100 hover:text-destructive focus-visible:opacity-100 ${anilloFoco}`}
     >
       <PapeleraIcon aria-hidden="true" className="h-3 w-3" />
@@ -2388,7 +2388,7 @@ function Burbuja({
   if (m.direccion === "nota") {
     return (
       <div className={`${margen} group relative max-w-[min(65%,560px)] self-end rounded-lg border border-dashed border-[var(--wa-nota-borde)] bg-[var(--wa-nota)] px-2.5 pt-1.5 pb-2 text-[14px] leading-[19px] text-[var(--wa-nota-texto)]`}>
-        {alPedirBorrar && !m.borradoPendiente && <BotonBorrarMensaje alPulsar={() => alPedirBorrar(m)} />}
+        {alPedirBorrar && !m.eliminadoEnWhatsapp && <BotonBorrarMensaje alPulsar={() => alPedirBorrar(m)} />}
         <span className="mb-0.5 flex items-center gap-1 text-[11.5px] font-bold tracking-[0.04em] text-[var(--wa-nota-acento)] uppercase">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
             <rect x="5" y="11" width="14" height="10" rx="2" />
@@ -2430,7 +2430,7 @@ function Burbuja({
         </span>
       )}
       {alReaccionar && <ReaccionarMensaje nuestro={nuestro} actual={miReaccion(reacciones)} alElegir={alReaccionar} />}
-      {alPedirBorrar && !m.borradoPendiente && <BotonBorrarMensaje alPulsar={() => alPedirBorrar(m)} />}
+      {alPedirBorrar && !m.eliminadoEnWhatsapp && <BotonBorrarMensaje alPulsar={() => alPedirBorrar(m)} />}
       {nuestro && alGuardarRapida && m.tipo === "texto" && (m.texto?.trim().length ?? 0) >= 3 && <BotonRapidaMensaje alPulsar={() => alGuardarRapida(m.texto ?? "")} />}
       {nuestro && m.autor && !seguido && (
         <span className="mb-0.5 block text-[12.5px] font-semibold text-[var(--wa-autor)]">
@@ -2441,10 +2441,9 @@ function Burbuja({
       <Contenido m={m} puedeTranscribir={puedeTranscribir} />
       {m.eliminadoEnWhatsapp && (
         <span className="mt-1 block text-[11.5px] font-medium text-[var(--wa-sec)] italic">
-          {nuestro ? "Se eliminó desde la app de WhatsApp Business (Meta no dice quién). Aquí se conserva." : "Lo eliminó en WhatsApp quien lo mandó. Aquí se conserva."}
+          {textoDeMensajeBorrado(m.eliminadoPor, nuestro)}
         </span>
       )}
-      {m.borradoPendiente && <span className="mt-1 block text-[11.5px] font-medium text-azul">Borrado esperando autorización</span>}
       <span
         className={`float-right mt-1.5 -mb-1 ml-2.5 inline-flex items-center gap-1 text-[11px] tabular-nums ${nuestro ? "text-[var(--wa-meta-saliente)]" : "text-[var(--wa-sec)]"} ${m.estado === "fallido" ? "font-medium text-destructive" : ""}`}
       >

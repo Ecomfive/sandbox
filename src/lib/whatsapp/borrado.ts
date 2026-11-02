@@ -1,43 +1,21 @@
-// Borrar un chat o un mensaje de WhatsApp solo con autorización (28 oct 2026). Lo que hay que decidir sin tocar la base ni la red, para poder probarlo
-// (src/lib/whatsapp/borrado.test.ts): quién puede autorizar, quién puede resolver una petición y cómo se escribe el motivo. Importa con rutas relativas.
+// Borrar un chat o un mensaje de WhatsApp (2 nov 2026, pedido de Jhokser: sin autorización, como en WhatsApp Business). Antes se pedía con un motivo y lo autorizaba
+// la persona por encima (28 oct 2026); ahora cualquiera que pueda escribir en el chat lo borra y queda anotado quién. Lo que hay que decidir sin tocar la base
+// (src/lib/whatsapp/borrado.test.ts): cómo se dicen en pantalla un mensaje o un chat borrado. A quién se le quita lo borrado está en `borrados-atencion.ts`.
 
-import { jefesDe, type Ocupante, type PuestoBase } from "../puestos/organigrama";
-
-export type EstadoSolicitud = "pendiente" | "autorizada" | "rechazada" | "cancelada";
-
-export const MIN_MOTIVO = 5;
-export const MAX_MOTIVO = 300;
-
-/** El motivo escrito por una persona: sin saltos de línea ni espacios repetidos, con tope de largo. */
-export const motivoLimpio = (texto: unknown): string => String(texto ?? "").replace(/\s+/g, " ").trim().slice(0, MAX_MOTIVO);
-export const motivoValido = (motivo: string): boolean => motivo.length >= MIN_MOTIVO;
-
-export interface QuienAutoriza {
-  ids: string[];
-  /** De dónde salió: el jefe en Puestos, o los administradores cuando la persona no tiene jefe con acceso al CRM. */
-  origen: "jefe" | "administrador";
-}
-
-/**
- * Quiénes pueden autorizar el borrado que pide alguien: la persona por encima de ella en Puestos y organigrama (el jefe más cercano que exista,
- * saltando puestos vacantes); si no tiene jefe, o su jefe no puede abrir el CRM, los administradores. Nunca quien lo pide. `conAcceso` son las
- * personas que pueden abrir el CRM (sin eso no verían la petición). `null` si no hay a quién pedírselo.
- */
-export function quienAutoriza(solicitanteId: string, puestos: PuestoBase[], ocupantes: Ocupante[], conAcceso: ReadonlySet<string>, administradores: readonly string[]): QuienAutoriza | null {
-  const delJefe = (jefesDe(solicitanteId, puestos, ocupantes)?.usuarioIds ?? []).filter((id) => id !== solicitanteId && conAcceso.has(id));
-  if (delJefe.length) return { ids: [...new Set(delJefe)], origen: "jefe" };
-  const admins = administradores.filter((id) => id !== solicitanteId && conAcceso.has(id));
-  return admins.length ? { ids: [...new Set(admins)], origen: "administrador" } : null;
-}
-
-/** Puede autorizar o rechazar quien está en la lista de quienes autorizan y no es quien lo pidió. */
-export const puedeResolver = (usuarioId: string, autorizaA: readonly string[], solicitanteId: string | null): boolean => !!usuarioId && usuarioId !== solicitanteId && autorizaA.includes(usuarioId);
-
-/** Puede cancelar una petición quien la hizo (o un administrador). */
-export const puedeCancelar = (usuarioId: string, solicitanteId: string | null, esAdmin: boolean): boolean => esAdmin || (!!usuarioId && usuarioId === solicitanteId);
-
-/** Un mensaje en una línea y corto, para mostrarlo en la lista de peticiones. */
+/** Un mensaje en una línea y corto, para mostrarlo en la lista de borrados o en la confirmación. */
 export function vistaPreviaTexto(texto: string | null | undefined, max = 120): string {
   const t = (texto ?? "").replace(/\s+/g, " ").trim();
   return t.length > max ? `${t.slice(0, max - 1)}…` : t;
 }
+
+/**
+ * Lo que dice un mensaje borrado a quien sí puede verlo. `por` es quien lo borró desde el sistema (null: lo eliminó su autor en WhatsApp, o el equipo desde la app
+ * del celular, y Meta no dice quién). `nuestro` es un mensaje que mandamos nosotros.
+ */
+export function textoDeMensajeBorrado(por: string | null, nuestro: boolean): string {
+  if (por) return `Lo borró ${por} desde el sistema. Aquí se conserva.`;
+  return nuestro ? "Se eliminó desde la app de WhatsApp Business (Meta no dice quién). Aquí se conserva." : "Lo eliminó en WhatsApp quien lo mandó. Aquí se conserva.";
+}
+
+/** La etiqueta corta de un chat borrado (en la lista y arriba del chat). */
+export const etiquetaDeChatBorrado = (desdeSistema: boolean, por: string | null): string => (desdeSistema ? (por ? `Borrado por ${por}` : "Borrado") : "Borrado en la app");

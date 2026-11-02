@@ -5,7 +5,7 @@ import { accesoCrm, areasVisibles, escribeEnArea, MODULO_ATENCION, MODULO_COMERC
 import { chatVisibleParaAtencion, mensajeVisibleParaAtencion } from "@/lib/whatsapp/borrados-atencion";
 import { areaDeModulos, cargoDePersona } from "@/lib/crm/respondieron";
 import { personasConModulos } from "@/lib/whatsapp/personas-crm";
-import { borradosPendientes, conversacionesOcultas, corteDeBorradoEnApp, mensajesOcultos } from "@/lib/whatsapp/ocultos";
+import { conversacionesOcultas, corteDeBorradoEnApp, mensajesBorrados, mensajesOcultos } from "@/lib/whatsapp/ocultos";
 import { esGrupo, type GrupoMotivo } from "@/lib/whatsapp/prioridad";
 import { dondeVende, paisDeNumeroEmpresa, paisesDondeVende, type VendeEn } from "@/lib/whatsapp/origen-chat";
 import { nombreSinNumero } from "@/lib/whatsapp/telefono-oculto";
@@ -50,9 +50,9 @@ export interface ConversacionVista {
   /** El área del chat (migración 0168): decide quién lo ve. Se cambia con «Pasar a otra área». */
   area: AreaCrm;
   /** Alguien marcó que este chat se borró en la app de WhatsApp Business (migración 0171). El historial se conserva aquí igual. */
-  borradaEnApp: { por: string | null; en: string } | null;
+  /** Borrado: `sistema` = se borró desde el sistema (por `por`); si no, lo marcó una persona porque se borró en la app de WhatsApp Business. */
+  borradaEnApp: { por: string | null; en: string; sistema: boolean } | null;
   /** Hay una petición de borrar este chat esperando autorización (migración 0172). */
-  borradoPendiente: boolean;
   /** Dónde vende (códigos ISO): los países de su dropshipper en el CRM y de sus cuentas. No sale del prefijo del número (alguien de Colombia vende en Costa Rica). */
   paises: string[];
   /** Dónde vende: plataforma y país, de sus cuentas vinculadas y lo puesto a mano en el chat (migración 0193). */
@@ -102,8 +102,9 @@ export interface MensajeVista {
   importado: boolean;
   /** Su autor lo borró «para todos» en WhatsApp: aquí se conserva y se marca (migración 0171). */
   eliminadoEnWhatsapp: boolean;
+  /** Quién lo borró desde el sistema (null: lo eliminó su autor en WhatsApp o el equipo desde la app del celular). */
+  eliminadoPor: string | null;
   /** Hay una petición de borrar este mensaje esperando autorización (migración 0172). */
-  borradoPendiente: boolean;
   /** Su id en WhatsApp («wamid…»): las reacciones apuntan a él. */
   waId?: string | null;
   /** En una reacción, el `waId` del mensaje reaccionado (migración 0186): la bandeja la dibuja sobre ese mensaje. */
@@ -219,7 +220,6 @@ export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosC
       ultimoDe: (c.ultimo_de as ConversacionVista["ultimoDe"]) ?? null,
       area: c.area as AreaCrm,
       borradaEnApp: null,
-      borradoPendiente: false,
       nombrePersonalizado: null,
       // Con dropshipper, las etiquetas son las suyas (las mismas de su ficha del CRM); sin él, las del chat.
       etiquetas: d ? (d.etiquetas ?? []) : [],
@@ -233,9 +233,16 @@ export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosC
   // Las salas de notas del chat interno (30 oct 2026, ya no se usan; el chat interno volvió a ser por WhatsApp) quedan guardadas pero no se muestran.
   const salasViejas = new Set((data ?? []).filter((c) => esTelefonoInterno(c.telefono as string)).map((c) => c.id as string));
   // Las que alguien marcó como borradas en la app de WhatsApp Business (migración 0171). Sin la columna, ninguna.
-  const marcadas = await supabase.from("whatsapp_conversaciones").select("id, borrada_en_app_en, borrada_en_app_por").not("borrada_en_app_en", "is", null);
+  // Desde la 0219 también las que se borraron desde el sistema (`borrada_desde_sistema`); sin esa columna se leen como antes.
+  let marcadas: { data: unknown[] | null; error: unknown } = await supabase.from("whatsapp_conversaciones").select("id, borrada_en_app_en, borrada_en_app_por, borrada_desde_sistema").not("borrada_en_app_en", "is", null);
+  if (marcadas.error) marcadas = await supabase.from("whatsapp_conversaciones").select("id, borrada_en_app_en, borrada_en_app_por").not("borrada_en_app_en", "is", null);
   if (!marcadas.error) {
-    const porId = new Map((marcadas.data ?? []).map((x) => [x.id as string, { por: (x.borrada_en_app_por as string | null) ?? null, en: x.borrada_en_app_en as string }]));
+    const porId = new Map(
+      (marcadas.data ?? []).map((x) => {
+        const f = x as { id: string; borrada_en_app_en: string; borrada_en_app_por: string | null; borrada_desde_sistema?: boolean };
+        return [f.id, { por: f.borrada_en_app_por ?? null, en: f.borrada_en_app_en, sistema: !!f.borrada_desde_sistema }];
+      }),
+    );
     for (const c of conversaciones) c.borradaEnApp = porId.get(c.id) ?? null;
   }
   // Los nombres que el equipo les puso a los chats (migración 0179). Sin la columna, ninguno.
@@ -302,9 +309,8 @@ export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosC
         c.motivo = { grupo: x.motivo_grupo, resumen: (x.motivo_resumen as string | null) ?? null, por: x.motivo_por === "persona" ? "persona" : "ia", porNombre: (x.motivo_por_nombre as string | null) ?? null };
     }
   }
-  // Lo que se autorizó borrar se oculta y se marca lo que espera autorización (migración 0172). Sin ella, nada.
-  const [ocultas, pendientes] = await Promise.all([conversacionesOcultas(supabase), borradosPendientes(supabase)]);
-  for (const c of conversaciones) c.borradoPendiente = pendientes.chats.has(c.id);
+  // Lo que se ocultó con la autorización de la 0172 (desde la 0219 nada nuevo se oculta: se borra y Atención deja de verlo). Sin la migración, nada.
+  const ocultas = await conversacionesOcultas(supabase);
   // Solo se ofrecen los números de las áreas de la persona (Atención no ve el de Comercial ni su selector). Los chats ya salen por su área, venga del número que venga.
   return {
     numeros: numerosDeAreas(numeros, areas),
@@ -417,12 +423,11 @@ export async function cargarConversacion(
     dropshipperId
       ? supabase.from("casos_dropshipper").select("numero, titulo, prioridad").eq("dropshipper_id", dropshipperId).neq("estado", "resuelto").order("abierto_en", { ascending: false }).limit(5)
       : Promise.resolve({ data: null }),
-    // Los que su autor borró «para todos» en WhatsApp (migración 0171): se muestran con su marca. Sin la columna, ninguno.
-    supabase.from("whatsapp_mensajes").select("id").eq("conversacion_id", id).not("eliminado_en_whatsapp_en", "is", null),
+    // Los borrados (migraciones 0171 y 0219): se muestran con su marca y, desde el sistema, quién los borró. Sin la columna, ninguno.
+    mensajesBorrados(supabase, id),
   ]);
-  const [ocultos, pendientes, reaccionesR, editadosR, transcritosR] = await Promise.all([
+  const [ocultos, reaccionesR, editadosR, transcritosR] = await Promise.all([
     mensajesOcultos(supabase, id),
-    borradosPendientes(supabase),
     // A qué mensaje va cada reacción (migración 0186), aparte: sin la columna la conversación se carga igual.
     supabase.from("whatsapp_mensajes").select("id, reaccion_a").eq("conversacion_id", id).eq("tipo", "reaccion").not("reaccion_a", "is", null),
     // Los que su autor editó en WhatsApp (migración 0191), aparte: sin la columna ninguno sale marcado.
@@ -433,7 +438,7 @@ export async function cargarConversacion(
   const transcripciones = new Map((transcritosR.error ? [] : (transcritosR.data ?? [])).map((x) => [x.id as string, x.transcripcion as string]));
   const editados = new Set((editadosR.error ? [] : (editadosR.data ?? [])).map((x) => x.id as string));
   const reaccionA = new Map((reaccionesR.error ? [] : (reaccionesR.data ?? [])).map((x) => [x.id as string, x.reaccion_a as string]));
-  const eliminados = new Set((eliminadosR.error ? [] : (eliminadosR.data ?? [])).map((x) => x.id as string));
+  const eliminados = new Set(eliminadosR.keys());
   const traidos = mensajesR.data ?? [];
   const corteBorrado = sinBorrados ? await corteDeBorradoEnApp(supabase, id) : null;
   const autores = [...new Set(traidos.map((m) => m.autor_id as string | null).filter((x): x is string => !!x))];
@@ -458,7 +463,7 @@ export async function cargarConversacion(
       momento: m.momento as string,
       importado: String(m.wa_id ?? "").startsWith("import:"),
       eliminadoEnWhatsapp: eliminados.has(m.id as string),
-      borradoPendiente: pendientes.mensajes.has(m.id as string),
+      eliminadoPor: eliminadosR.get(m.id as string) ?? null,
       waId: (m.wa_id as string | null) ?? null,
       reaccionA: reaccionA.get(m.id as string) ?? null,
       editado: editados.has(m.id as string),

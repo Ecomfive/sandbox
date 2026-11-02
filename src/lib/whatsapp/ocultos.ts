@@ -1,4 +1,4 @@
-// Lo que se autorizó ocultar (migración 0172) y lo que está pendiente de autorización, leído con consultas aparte que ignoran el error: sin la migración la
+// Lo que está oculto (migración 0172; desde la 0219 nada nuevo se oculta: se borra con `borrados-atencion.ts`) y lo borrado, leído con consultas aparte que ignoran el error: sin la migración la
 // bandeja sigue cargando, solo sin ocultar nada ni marcar nada. Recibe el cliente de Supabase.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -13,20 +13,6 @@ export async function conversacionesOcultas(supabase: SupabaseClient): Promise<S
 export async function mensajesOcultos(supabase: SupabaseClient, conversacionId: string): Promise<Set<string>> {
   const { data, error } = await supabase.from("whatsapp_mensajes").select("id").eq("conversacion_id", conversacionId).not("oculto_en", "is", null);
   return new Set(error ? [] : (data ?? []).map((m) => m.id as string));
-}
-
-/** Los chats y los mensajes con una petición de borrado esperando autorización. */
-export async function borradosPendientes(supabase: SupabaseClient): Promise<{ chats: Set<string>; mensajes: Set<string> }> {
-  const { data, error } = await supabase.from("whatsapp_solicitudes_borrado").select("tipo, conversacion_id, mensaje_id").eq("estado", "pendiente");
-  const chats = new Set<string>();
-  const mensajes = new Set<string>();
-  if (!error) {
-    for (const s of data ?? []) {
-      if (s.tipo === "chat") chats.add(s.conversacion_id as string);
-      else if (s.mensaje_id) mensajes.add(s.mensaje_id as string);
-    }
-  }
-  return { chats, mensajes };
 }
 
 /** Si este mensaje (o su chat) está oculto: lo usa quien sirve archivos para no entregar lo que ya no debe verse. Sin la migración, no. */
@@ -44,7 +30,16 @@ export async function corteDeBorradoEnApp(supabase: SupabaseClient, conversacion
   return error ? null : ((data?.borrada_en_app_en as string | null) ?? null);
 }
 
-/** Los mensajes de un chat que su autor eliminó «para todos» en WhatsApp (migración 0171); vacío sin la columna. */
+/** Los mensajes de un chat que están borrados (los eliminó su autor «para todos» en WhatsApp o alguien del equipo desde el sistema, migraciones 0171 y 0219), con quién los borró desde el sistema (null: en WhatsApp). Vacío sin la columna. */
+export async function mensajesBorrados(supabase: SupabaseClient, conversacionId: string): Promise<Map<string, string | null>> {
+  const { data, error } = await supabase.from("whatsapp_mensajes").select("id, eliminado_por").eq("conversacion_id", conversacionId).not("eliminado_en_whatsapp_en", "is", null);
+  if (!error) return new Map((data ?? []).map((m) => [m.id as string, (m.eliminado_por as string | null) ?? null]));
+  // Sin la migración 0219 no existe `eliminado_por`: se leen solo los ids.
+  const sola = await supabase.from("whatsapp_mensajes").select("id").eq("conversacion_id", conversacionId).not("eliminado_en_whatsapp_en", "is", null);
+  return new Map(sola.error ? [] : (sola.data ?? []).map((m) => [m.id as string, null]));
+}
+
+/** Los mensajes de un chat borrados (por su autor en WhatsApp o desde el sistema): solo los ids, para esconderlos de Atención. Vacío sin la columna. */
 export async function mensajesEliminadosEnWhatsapp(supabase: SupabaseClient, conversacionId: string): Promise<Set<string>> {
   const { data, error } = await supabase.from("whatsapp_mensajes").select("id").eq("conversacion_id", conversacionId).not("eliminado_en_whatsapp_en", "is", null);
   return new Set(error ? [] : (data ?? []).map((m) => m.id as string));
