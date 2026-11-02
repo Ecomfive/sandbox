@@ -14,6 +14,7 @@
 //
 // Tu Winner (0.5.0, 2 nov 2026): «tw» es la pestaña de app.tuwinner.com, con el lector `tuwinner` (Testing Lab › Tu Winner). Su sesión se ve por el
 // token de Tu Winner en la página (nunca sale de ahí); no tiene tipo de cuenta ni vencimiento.
+// 0.5.1 (2 nov 2026): una pestaña dormida o con error ya no traba la lectura («Cannot access contents of the page»): se recarga antes de usarla.
 
 const ORIGEN = { pa: "https://app.dropi.pa", cr: "https://app.dropi.cr", mx: "https://app.dropi.mx", tw: "https://app.tuwinner.com" };
 /** Dónde abrir una pestaña nueva de cada sitio. */
@@ -55,9 +56,27 @@ function cargada(id) {
   });
 }
 
-/** La pestaña de Dropi del país: la que ya está abierta o, con `crear`, una nueva. `frente`: la pone al frente. */
+/** Si no se puede entrar a la pestaña (dormida por Chrome o con una página de error), se recarga una vez y se espera (0.5.1, 2 nov 2026). */
+async function despierta(t) {
+  const entra = () =>
+    chrome.scripting
+      .executeScript({ target: { tabId: t.id }, world: "MAIN", func: () => true })
+      .then(() => true)
+      .catch(() => false);
+  if (!t.discarded && (await entra())) return t;
+  await chrome.tabs.reload(t.id);
+  await cargada(t.id);
+  return chrome.tabs.get(t.id);
+}
+
+/**
+ * La pestaña de Dropi del país: la que ya está abierta o, con `crear`, una nueva. `frente`: la pone al frente. Entre varias abiertas prefiere una despierta
+ * y cargada; si la elegida no deja entrar (dormida o con error, como la de Tu Winner el 2 nov 2026), la recarga antes de usarla.
+ */
 async function pestana(pais, crear, frente) {
-  const [t] = await chrome.tabs.query({ url: `${ORIGEN[pais]}/*` });
+  const abiertas = await chrome.tabs.query({ url: `${ORIGEN[pais]}/*` });
+  const elegida = abiertas.find((x) => !x.discarded && x.status === "complete") || abiertas.find((x) => !x.discarded) || abiertas[0];
+  const t = elegida ? await despierta(elegida) : null;
   if (t) {
     if (frente) {
       await chrome.tabs.update(t.id, { active: true });

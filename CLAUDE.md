@@ -467,7 +467,7 @@ convenciones técnicas del código.
   **Lectura** (solo lee): lector `scripts/tuwinner-navegador.js` (copia exacta en `extension/ecomfive-dropi/lectores/tuwinner.js`, la prueba lo exige)
   que corre en la pestaña de Tu Winner con su token (`localStorage.old_user_t`, header `token`; nunca sale de la página) y lee
   `api.tuwinner.com/<pa|mex>/api/collections/sales_7_day/records?expand=product.supplier.platform&filter=(daily_sells = true)` (México es la ruta
-  **`mex`**, no `mx`); sube un JSON a `wms-compras/tmp-dropi-panel/<lectura>/tuwinner.json`. Extensión **0.5.0** (`ORIGEN.tw`, lector `tuwinner`,
+  **`mex`**, no `mx`); sube un JSON a `wms-compras/tmp-dropi-panel/<lectura>/tuwinner.json`. Extensión **0.5.0** (0.5.1: si la pestaña de Tu Winner o Dropi está dormida o con error, `despierta` la recarga antes de leer; `ORIGEN.tw`, lector `tuwinner`,
   `leerSesionTuWinner`, permiso `app.tuwinner.com`; `LECTOR_TUWINNER` en `src/lib/tuwinner/lector.ts`). «Leer ahora» (`leer-tuwinner.tsx`) y **la
   lectura del día**: si la última no es de hoy, se lee sola al abrir el panel (una vez por día y navegador, `localStorage`); `empezarLecturaTuWinner` →
   lector → `procesarLecturaTuWinner` (`ingerirLectura`, `src/lib/tuwinner/ingerir.ts`). Desde la consola: `scripts/tuwinner.ts subida | cargar <id>`.
