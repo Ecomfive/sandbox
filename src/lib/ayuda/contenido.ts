@@ -668,6 +668,25 @@ export const GUIAS: GuiaModulo[] = [
     ],
   },
   {
+    modulo: "publicaciones-drop",
+    titulo: "Gestión de IDs Drop",
+    ruta: "/publicaciones-drop",
+    resumen: "Los productos de ECOMFIVE en Drop (app.soydrop.com, Costa Rica, en colones): precio, inventario, margen y el producto de cada uno.",
+    secciones: [
+      {
+        titulo: "Uso",
+        pasos: [
+          "Drop es otra plataforma aparte de Dropi, de Costa Rica: elige Costa Rica arriba. Nuestra cuenta allá es «Proveedor Ecomfive Costa Rica».",
+          "Los datos se leen de Drop con la sesión del proveedor abierta: cada producto con su ID de Drop (ID-ONWAG), su SKU de Drop, si está activo o inactivo, su precio en colones (con su valor en dólares en pequeño) y su inventario. Lo que deja de aparecer en Drop sale de la lista, pero no se borra. Debajo del tablero dice cuándo fue la última lectura.",
+          "Arriba, el tablero de tarjetas, como en Gestión de IDs Dropi: Activas en Drop, Margen bajo, Sin ID de Drop, Sin vincular producto, Sin stock (activas con 0 unidades) y Poco stock (activas con menos de 100). Tocar una filtra la lista; tocarla otra vez quita el filtro. Las que dependen de datos que Drop todavía no da (ventas, competencia, privatizados) se ven con «—».",
+          "Vincular: el SKU de Drop no se puede cambiar, así que cada publicación se une con su producto de Producto. La lectura sugiere uno (la publicación de Dropi de Costa Rica con el mismo nombre, o el parecido del nombre y la foto) y aparece como «Sugerido»; pulsa «Vincular» para confirmarlo. Nada se vincula solo.",
+          "Margen: precio − costo del producto − fulfillment de Drop. El costo es el de ese producto en Gestión de IDs Dropi de Costa Rica; el fulfillment se pone en Configuración › Plataformas del país, en la fila «Drop». Sin producto vinculado o sin costo, el margen sale «—».",
+          "Los botones de la fila (inactivar o activar, liquidación y eliminar) todavía no escriben en Drop: por ahora se hace en Drop.",
+        ],
+      },
+    ],
+  },
+  {
     modulo: "analisis-competencia",
     titulo: "Análisis de competencia",
     ruta: "/analisis-competencia",
@@ -785,6 +804,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-11-03", titulo: "Gestión de IDs Drop ya tiene datos", texto: "Gestión de IDs Drop muestra ahora los productos de ECOMFIVE en Drop (Costa Rica): su ID de Drop, el precio en colones, el inventario, si están activos y el margen. Las tarjetas de arriba (Activas en Drop, Margen bajo, Sin vincular producto, Sin stock, Poco stock…) cuentan y filtran la lista. Cada publicación trae una sugerencia de su producto de Producto: pulsa «Vincular» para confirmarla. El margen usa el costo del producto en Gestión de IDs Dropi y el fulfillment de Drop de Configuración.", modulo: "publicaciones-drop", href: "/publicaciones-drop" },
   { fecha: "2026-11-03", titulo: "Plataforma Dropi o Drop, junto al país", texto: "Arriba a la derecha, donde se elige el país, ahora también se elige la plataforma: Dropi o Drop. Es la misma que el selector que sale arriba de Análisis de competencia: cambiar una cambia la otra. Drop es solo de Costa Rica: con otro país no sale la opción. Análisis de competencia de Drop se ve igual que el de Dropi, pero sin datos todavía; se conectarán poco a poco.", modulo: "analisis-competencia", href: "/analisis-competencia" },
   { fecha: "2026-11-03", titulo: "Dirección: duplicados en Clientes y atención dentro de Equipo", texto: "En la Bandeja de Dirección se quitaron las pestañas «Duplicados» y «KPIs de atención». Los posibles duplicados ahora salen en Clientes: la insignia «Posible duplicado» en la fila, el chip «Posibles duplicados» para ver solo esos y, en la ficha del cliente, un bloque con por qué se parece y las otras fichas. La atención por WhatsApp pasó a la vista Equipo, con un diseño nuevo: un anillo con lo respondido en 15 minutos, la primera respuesta frente a la meta, las consultas sin responder, un gráfico de consultas por día y el desglose por área y por número.", modulo: "crm-dropshippers", href: "/crm-dropshippers/bandeja?vista=equipo" },
   { fecha: "2026-11-03", titulo: "Nuevo: Gestión de IDs Drop", texto: "Debajo de Gestión de IDs Dropi está ahora Gestión de IDs Drop, para otra aplicación aparte de Dropi, con su propio logo. Tiene las mismas pestañas (Publicaciones, Recomendaciones, Tareas y Reglas), un tablero de tarjetas parecido (sin «Republicar») y la misma lista, pero sin datos todavía: se van a ir conectando poco a poco. Drop no es igual que Dropi: no se republica, «apagar» se llama inactivar (y una publicación inactiva se vuelve a activar), no se archiva sino que se elimina, y el botón de liquidación queda pendiente. El SKU de Drop no se puede cambiar: se vincula después con el SKU de nuestro producto.", modulo: "publicaciones-drop", href: "/publicaciones-drop" },
