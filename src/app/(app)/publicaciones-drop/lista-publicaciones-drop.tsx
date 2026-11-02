@@ -8,7 +8,7 @@ import type { MonedaPublicaciones } from "@/lib/publicaciones/moneda";
 import type { NombreFilas } from "@/lib/tabla/pie";
 import { CrearProductoDropPanel } from "./crear-producto-drop-panel";
 import { DEF_PUBLICACIONES_DROP, type FilaPublicacionDrop } from "./def-publicaciones-drop";
-import { FilaPublicacionDropLista } from "./fila-publicacion-drop";
+import { EncabezadoFilasDrop, FilaPublicacionDropLista } from "./fila-publicacion-drop";
 
 const NOMBRE: NombreFilas = { singular: "publicación", plural: "publicaciones" };
 const ICONOS: Record<string, IconoComp> = {
@@ -36,6 +36,7 @@ export function ListaPublicacionesDrop({ publicaciones, moneda, puedeEscribir, o
       nombre={NOMBRE}
       claveFila={(f) => f.id}
       variante="filas"
+      encabezado={<EncabezadoFilasDrop />}
       renderFila={(f) => <FilaPublicacionDropLista f={f} moneda={moneda} puedeEscribir={puedeEscribir} />}
       accionPrincipal={puedeEscribir ? <CrearProductoDropPanel opcionesSku={opcionesSku} /> : undefined}
       vacio={vacio}

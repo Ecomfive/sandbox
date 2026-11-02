@@ -1,3 +1,4 @@
+import type { EtapaCotizacion } from "@/lib/compras/en-camino";
 import { ETIQUETA_ESTADO_DROP, type EstadoDrop } from "@/lib/publicaciones-drop/acciones";
 import { MARGEN_BAJO } from "@/lib/publicaciones/publicacion";
 import type { DefTabla } from "@/lib/tabla/motor";
@@ -40,10 +41,20 @@ export interface FilaPublicacionDrop {
   sugerido: ProductoDrop | null;
   /** El costo del producto vinculado (de su publicación de Dropi del mismo país); null si no hay. */
   costo: number | null;
+  /** El fulfillment de Drop del país (Configuración), en la moneda de Drop; null si no está puesto. */
+  fulfillment: number | null;
   utilidad: number | null;
   margen: number | null;
   /** En liquidación: pendiente, Drop todavía no lo usa. */
   liquidacion: boolean;
+  /** Lo que viene en camino del producto vinculado, en compras del país (como en Gestión de IDs Dropi). */
+  enCamino: number;
+  llegadaCamino: string | null;
+  sinFechaCamino: number;
+  sinEnvioCamino: number;
+  /** Lo que todavía se cotiza (01 - Cotizar y 02 - Cotizado) y su etapa. */
+  enCotizacion: number;
+  etapaCotizacion: EtapaCotizacion | null;
 }
 
 export const estadoVinculoDrop = (f: FilaPublicacionDrop): "vinculado" | "sugerido" | "sin_vincular" => (f.producto ? "vinculado" : f.sugerido ? "sugerido" : "sin_vincular");

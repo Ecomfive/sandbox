@@ -7,6 +7,8 @@
 //   * **No hay producto privado aparte**: se le da **acceso** al producto desde el mismo ID, con el correo del cliente y su precio (el mismo u otro).
 // Todo está explicado en DROP-REFERENCIA.md.
 // Como en Dropi, un botón no se esconde: si no se puede usar va apagado y dice por qué. Sin base ni React, con prueba (acciones.test.ts).
+// La fila lleva todos los íconos de la de Gestión de IDs Dropi, en el mismo orden (3 nov 2026, pedido de Hernán: «con todos los iconos»): los que Drop no
+// tiene (republicar, pausar, archivar) o que todavía no se hacen desde aquí (privatizar, tareas) van apagados y dicen por qué (`MOTIVO_SOLO_DROPI`).
 
 export type EstadoDrop = "activo" | "inactivo";
 
@@ -66,5 +68,13 @@ export function validarAccesoPrivado(correo: string, precio: unknown): { error: 
 export const MOTIVO_LIQUIDACION_DROP = "Pendiente: todavía no se usa en Drop";
 export const motivoLiquidacion = (): string => MOTIVO_LIQUIDACION_DROP;
 
-/** Las acciones de la fila de Drop, en el orden en que se dibujan: lo que no existe en Drop (republicar, archivar) no está. */
-export const ACCIONES_FILA_DROP = ["estado", "inventario", "privatizar", "liquidacion", "eliminar"] as const;
+/** Por qué los botones de Dropi que Drop no tiene (o que todavía no se hacen desde aquí) van apagados en la fila de Drop. */
+export const MOTIVO_SOLO_DROPI = {
+  republicar: "Drop no republica",
+  pausar: "Drop no pausa: la publicación se inactiva",
+  archivar: "Drop no archiva: lo que sobra se elimina",
+  tareas: "Todavía sin tareas en Drop",
+} as const;
+
+/** Las acciones de la fila de Drop, en el orden en que se dibujan: el mismo de la fila de Dropi, más «Gestionar inventario» después de «Privatizar» (acceso privado) y «Eliminar» después de «Archivar». */
+export const ACCIONES_FILA_DROP = ["republicar", "privatizar", "inventario", "estado", "pausar", "liquidacion", "archivar", "eliminar", "tareas"] as const;

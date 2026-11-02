@@ -1,25 +1,127 @@
 "use client";
 
+/* eslint-disable @next/next/no-img-element -- fotos de Drop (Google Cloud Storage) */
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 import { BotonIconoFila } from "@/app/(app)/publicaciones-dropi/boton-icono-fila";
-import { useToast } from "@/components/ui/toast";
+import { EtapaCotizando, LlegadaCamino } from "@/app/(app)/publicaciones-dropi/llegada-camino";
 import { anilloFoco } from "@/components/ui/field";
-import { ApagarIcon, CandadoIcon, EtiquetaIcon, InventarioIcon, PapeleraIcon, ReactivarIcon } from "@/lib/nav-icons";
-import { accionDeEstado, ETIQUETA_ESTADO_DROP, motivoAccesoPrivado, motivoCambioEstado, motivoEliminar, motivoGestionarInventario, motivoLiquidacion } from "@/lib/publicaciones-drop/acciones";
+import { useToast } from "@/components/ui/toast";
+import { Tooltip } from "@/components/ui/tooltip";
+import { ActualizarIcon, ApagarIcon, ArchivarIcon, CandadoAbiertoIcon, DropIcon, EnlaceIcon, EtiquetaIcon, InventarioIcon, PapeleraIcon, PausaIcon, ReactivarIcon, TareasIcon } from "@/lib/nav-icons";
+import { MOTIVO_SOLO_DROPI, accionDeEstado, ETIQUETA_ESTADO_DROP, motivoAccesoPrivado, motivoCambioEstado, motivoEliminar, motivoGestionarInventario, motivoLiquidacion } from "@/lib/publicaciones-drop/acciones";
 import { formatoEnDolares, formatoMonto, type MonedaPublicaciones } from "@/lib/publicaciones/moneda";
 import { vincularPublicacionDrop } from "./actions";
-import { margenBajoDrop, sinStockDrop, type FilaPublicacionDrop } from "./def-publicaciones-drop";
 import { DialogoAccesoPrivado, DialogoSolicitudInventario } from "./dialogos-fila-drop";
+import { margenBajoDrop, sinStockDrop, type FilaPublicacionDrop } from "./def-publicaciones-drop";
+
+/** Las columnas de la fila en pantalla ancha (las mismas de Gestión de IDs Dropi con ventas); las usa también el encabezado, así que van juntas. */
+const COLUMNAS = "lg:grid-cols-[minmax(0,2.6fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1.1fr)_minmax(0,1.2fr)_4rem_1rem]";
 
 const AVISO_SIN_CONEXION = "Todavía no se escribe en Drop desde el sistema: por ahora solo se leen sus publicaciones. Hazlo en Drop.";
 
+const entero = (n: number) => n.toLocaleString("es-PA", { maximumFractionDigits: 0 });
+const urlDrop = (f: FilaPublicacionDrop) => `https://app.soydrop.com/vendor/products/details/${f.dropInterno}/inventory`;
+
+const Punto = ({ clase, texto }: { clase: string; texto: string }) => (
+  <span role="img" aria-label={texto} className={`inline-block h-2 w-2 shrink-0 rounded-full ${clase}`} />
+);
+
+/** Una celda de la fila: lo principal arriba y lo de apoyo abajo; el nombre del dato solo se lee con lector de pantalla (como en Dropi). */
+function Celda({ nombre, principal, apoyo, alinear = "izquierda" }: { nombre: string; principal: ReactNode; apoyo?: ReactNode; alinear?: "izquierda" | "derecha" }) {
+  return (
+    <span className={`flex min-w-0 flex-col gap-0.5 ${alinear === "derecha" ? "lg:items-end lg:text-right" : ""}`}>
+      <span className="sr-only">{nombre}: </span>
+      <span className="min-w-0 max-w-full overflow-hidden text-sm">{principal}</span>
+      {apoyo && <span className="min-w-0 max-w-full truncate text-xs text-muted-foreground">{apoyo}</span>}
+    </span>
+  );
+}
+
+/** Un monto en la moneda de Drop con su valor en dólares en pequeño («₡3 629 US$7.97»), como `Monto` de Dropi. */
+function Monto({ valor, moneda, className = "" }: { valor: number | null; moneda: MonedaPublicaciones; className?: string }) {
+  const usd = formatoEnDolares(valor, moneda);
+  return (
+    <span className={className}>
+      {formatoMonto(valor, moneda)}
+      {usd && <span className="ml-1 text-xs font-normal text-muted-foreground">{usd}</span>}
+    </span>
+  );
+}
+
+/** Cómo está en Drop, en poco espacio: el logo de Drop con un punto del color del estado (verde = activa, gris = inactiva), como el de Dropi. */
+function IconoEnDrop({ f }: { f: FilaPublicacionDrop }) {
+  const activa = f.estado === "activo";
+  const texto = `${ETIQUETA_ESTADO_DROP[f.estado]} en Drop`;
+  return (
+    <Tooltip texto={texto}>
+      <span role="img" aria-label={texto} className="relative inline-flex h-7 w-7 items-center justify-center">
+        <DropIcon marca className={`h-6 w-6 ${activa ? "" : "opacity-40 grayscale"}`} />
+        <span aria-hidden="true" className={`absolute -right-0.5 -bottom-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-card ${activa ? "bg-success" : "bg-muted-foreground"}`} />
+      </span>
+    </Tooltip>
+  );
+}
+
+/** Lo que viene en camino del producto vinculado (de las compras del país), como en Gestión de IDs Dropi. */
+function CeldaEnCamino({ f }: { f: FilaPublicacionDrop }) {
+  const viene = f.enCamino > 0;
+  const cotiza = f.enCotizacion > 0;
+  return (
+    <Celda
+      nombre="En camino"
+      alinear="derecha"
+      principal={
+        viene ? (
+          <span className="font-medium tabular-nums text-success">{entero(f.enCamino)} en camino</span>
+        ) : cotiza ? (
+          <span className="font-medium tabular-nums text-warning">{entero(f.enCotizacion)} en cotización</span>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        )
+      }
+      apoyo={
+        viene ? (
+          <span className="flex flex-wrap items-center gap-1.5 whitespace-normal font-medium text-success lg:justify-end">
+            <LlegadaCamino llegada={f.llegadaCamino} sinFecha={f.sinFechaCamino} sinEnvio={f.sinEnvioCamino} />
+          </span>
+        ) : cotiza ? (
+          <span className="flex flex-wrap items-center gap-1.5 whitespace-normal lg:justify-end">{f.etapaCotizacion ? <EtapaCotizando c={f.etapaCotizacion} /> : "aún no viene"}</span>
+        ) : undefined
+      }
+    />
+  );
+}
+
+/** El nombre de cada columna, en la franja fija de arriba de la lista (solo en pantalla ancha), con la misma rejilla que la fila. */
+export function EncabezadoFilasDrop() {
+  const columnas: { nombre: string; derecha?: boolean }[] = [
+    { nombre: "Producto" },
+    { nombre: "Precio", derecha: true },
+    { nombre: "Utilidad y margen", derecha: true },
+    { nombre: "Ventas · 30 días", derecha: true },
+    { nombre: "En camino", derecha: true },
+    { nombre: "Dónde está" },
+    { nombre: "En Drop" },
+  ];
+  return (
+    // A la derecha quedan los ocho botones de la fila (36 px cada uno, 4 px entre ellos y 12 px de margen, más los 16 px de relleno de la fila).
+    <div className={`hidden items-center gap-x-4 py-2.5 pr-[21.5rem] pl-4 text-xs font-semibold tracking-wide text-muted-foreground uppercase lg:grid ${COLUMNAS}`}>
+      {columnas.map((c) => (
+        <span key={c.nombre} className={`min-w-0 truncate ${c.derecha ? "text-right" : ""}`}>
+          {c.nombre}
+        </span>
+      ))}
+      <span aria-hidden="true" />
+    </div>
+  );
+}
+
 /**
- * Una publicación de Drop como fila de la lista (datos de Drop desde la migración 0221, 3 nov 2026): foto, nombre, ID de Drop, precio (en colones, con su valor
- * en dólares), inventario, margen y el producto vinculado; si no está vinculada, la sugerencia de la lectura con «Vincular» para confirmarla. Los botones
- * de Drop: inactivar o activar, gestionar inventario (pedir un ingreso: el stock no se edita), dar acceso privado (desde el mismo ID, con el correo del cliente), liquidación (pendiente) y
- * eliminar; no hay «Republicar» ni «Archivar» como en Dropi (DROP-REFERENCIA.md). Los botones no se esconden: si no se
- * pueden usar van apagados y dicen por qué. Todavía no escriben en Drop, así que pulsarlos solo avisa.
+ * Una publicación de Drop como fila de la lista, igual a la de Gestión de IDs Dropi (3 nov 2026, pedido de Hernán): foto, nombre con su ID y su SKU, precio
+ * (con el costo del producto y el fulfillment), utilidad y margen, ventas, en camino, dónde está y cómo está en Drop (el logo de Drop con su punto). Toda la
+ * fila abre la página del producto en Drop. Si no está vinculada, la sugerencia de la lectura con «Vincular» para confirmarla. A la derecha, los mismos
+ * botones que en Dropi y en el mismo orden, más «Eliminar»; los que Drop no tiene van apagados y dicen por qué. Todavía no escriben en Drop: pulsarlos avisa.
  */
 export function FilaPublicacionDropLista({ f, moneda, puedeEscribir }: { f: FilaPublicacionDrop; moneda: MonedaPublicaciones; puedeEscribir: boolean }) {
   const { mostrarToast } = useToast();
@@ -28,8 +130,8 @@ export function FilaPublicacionDropLista({ f, moneda, puedeEscribir }: { f: Fila
   const estado = { estado: f.estado, idDrop: f.idDrop };
   const cambio = accionDeEstado(estado);
   const aviso = () => mostrarToast(AVISO_SIN_CONEXION);
+  const nada = () => {};
   const [dialogo, setDialogo] = useState<"inventario" | "privado" | null>(null);
-  const enDolares = formatoEnDolares(f.precio, moneda);
   const vincular = (skuId: string) =>
     empezar(async () => {
       const r = await vincularPublicacionDrop(f.id, skuId).catch(() => ({ error: "No se pudo vincular. Inténtalo de nuevo." }));
@@ -37,66 +139,129 @@ export function FilaPublicacionDropLista({ f, moneda, puedeEscribir }: { f: Fila
       mostrarToast(`${f.nombre}: vinculada a ${r.producto.codigo}.`);
       router.refresh();
     });
+
   return (
-    <div className="flex flex-wrap items-center gap-3 px-4 py-3 sm:flex-nowrap">
-      <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted">
-        {f.fotoUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element -- fotos de Drop (Google Cloud Storage)
-          <img src={f.fotoUrl} alt="" loading="lazy" className="h-full w-full object-cover" />
-        ) : null}
-      </div>
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="flex min-w-0 items-center gap-2">
-          <span className="truncate text-sm font-semibold">{f.nombre}</span>
-          {f.estado === "inactivo" && <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">{ETIQUETA_ESTADO_DROP[f.estado]}</span>}
-        </span>
-        <span className="truncate text-xs text-muted-foreground">
-          {f.idDrop || "Sin ID de Drop"} · SKU de Drop: {f.skuDrop || "—"}
-        </span>
-        {/* Los códigos de Producto no tienen espacios («ACEITE/OREGANO/CAPSULAS/300/BLANCO»): se cortan donde haga falta en pantallas angostas. */}
-        <span className="min-w-0 text-xs [overflow-wrap:anywhere]">
-          {f.producto ? (
-            <span className="text-muted-foreground">
-              SKU nuestro: <span className="font-medium text-foreground">{f.producto.codigo}</span> {f.producto.nombre}
-            </span>
-          ) : f.sugerido ? (
-            <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-              <span className="text-muted-foreground">
-                Sugerido: <span className="font-medium text-foreground">{f.sugerido.codigo}</span> {f.sugerido.nombre}
+    // En pantalla angosta los botones pasan debajo de la fila (no caben al lado); en ancha van a la derecha, como en Dropi.
+    <div className="flex flex-wrap items-center lg:flex-nowrap">
+      <div className="min-w-0 flex-1 basis-full lg:basis-auto">
+        <div className={`group grid w-full grid-cols-[minmax(0,1fr)_1rem] items-center gap-x-4 gap-y-3 px-4 py-3 text-left transition-colors hover:bg-muted/50 ${COLUMNAS}`}>
+          {/* Producto */}
+          <span className="flex min-w-0 items-center gap-3">
+            {f.fotoUrl ? (
+              <img src={f.fotoUrl} alt="" loading="lazy" className="h-12 w-12 shrink-0 rounded-lg border border-border object-cover" />
+            ) : (
+              <span aria-hidden="true" className="h-12 w-12 shrink-0 rounded-lg border border-dashed border-border-control" />
+            )}
+            <span className="flex min-w-0 flex-col gap-0.5">
+              <a href={urlDrop(f)} target="_blank" rel="noopener noreferrer" className={`truncate rounded text-sm font-medium hover:underline ${anilloFoco}`}>
+                {f.nombre}
+                <span className="sr-only"> (abre su página en Drop)</span>
+              </a>
+              <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground [overflow-wrap:anywhere]">
+                <span className="tabular-nums">{f.idDrop || "Sin ID de Drop"}</span>
+                {f.producto ? (
+                  <span className="font-mono font-semibold text-foreground">{f.producto.codigo}</span>
+                ) : f.sugerido ? (
+                  <span className="inline-flex flex-wrap items-center gap-1.5">
+                    <Punto clase="bg-warning" texto="Sin vincular producto" />
+                    Sugerido · <span className="font-mono font-semibold text-foreground">{f.sugerido.codigo}</span>
+                    {puedeEscribir && (
+                      <button
+                        type="button"
+                        disabled={pendiente}
+                        onClick={() => vincular(f.sugerido!.id)}
+                        className={`inline-flex items-center gap-1 rounded px-1 font-medium text-primario hover:underline disabled:opacity-50 ${anilloFoco}`}
+                      >
+                        <EnlaceIcon aria-hidden="true" className="h-3 w-3" />
+                        {pendiente ? "Vinculando…" : "Vincular"}
+                      </button>
+                    )}
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5">
+                    <Punto clase="bg-warning" texto="Sin vincular producto" />
+                    Sin SKU
+                  </span>
+                )}
+                {f.estado === "inactivo" && <span className="font-medium">Inactiva</span>}
               </span>
-              {puedeEscribir && (
-                <button
-                  type="button"
-                  disabled={pendiente}
-                  onClick={() => vincular(f.sugerido!.id)}
-                  className={`rounded px-1.5 py-0.5 font-medium text-primario hover:underline disabled:opacity-50 ${anilloFoco}`}
-                >
-                  {pendiente ? "Vinculando…" : "Vincular"}
-                </button>
-              )}
             </span>
-          ) : (
-            <span className="text-muted-foreground">Sin vincular a un producto (sin candidato)</span>
-          )}
-        </span>
+          </span>
+
+          {/* Los datos: en pantalla ancha una columna cada uno; en angosta, debajo del producto en una fila que envuelve. */}
+          <span className="order-last col-span-2 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3 lg:order-none lg:contents">
+            <Celda
+              nombre="Precio"
+              alinear="derecha"
+              principal={<Monto valor={f.precio} moneda={moneda} className="font-semibold tabular-nums" />}
+              apoyo={
+                <span className="flex flex-col lg:items-end">
+                  <span className="max-w-full truncate">Costo de producto {f.costo === null ? "—" : formatoMonto(f.costo, moneda)}</span>
+                  <span className="max-w-full truncate">Fulfillment {f.fulfillment === null ? "—" : formatoMonto(f.fulfillment, moneda)}</span>
+                </span>
+              }
+            />
+            <Celda
+              nombre="Utilidad bruta y margen bruto"
+              alinear="derecha"
+              principal={f.utilidad === null ? <span className="text-muted-foreground">—</span> : <Monto valor={f.utilidad} moneda={moneda} className="tabular-nums" />}
+              apoyo={
+                f.margen === null ? (
+                  f.producto ? "Sin costo" : "Sin vincular"
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 tabular-nums">
+                    {margenBajoDrop(f) && <Punto clase="bg-destructive" texto="Margen bajo" />}
+                    {Math.round(f.margen * 100)} % de margen bruto
+                  </span>
+                )
+              }
+            />
+            <Celda
+              nombre="Ventas en Drop, últimos 30 días"
+              alinear="derecha"
+              principal={<span className="text-muted-foreground">—</span>}
+              apoyo={
+                f.inventario === null ? (
+                  "Sin datos de Drop"
+                ) : sinStockDrop(f) ? (
+                  <span className="font-medium text-destructive">Sin stock</span>
+                ) : (
+                  <span className="tabular-nums">Stock {entero(f.inventario)}</span>
+                )
+              }
+            />
+            <CeldaEnCamino f={f} />
+            <Celda
+              nombre="Dónde está"
+              principal={
+                <span className="inline-flex max-w-full min-w-0 items-center gap-1.5">
+                  <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-foreground" />
+                  <span className="truncate">Bodega Drop</span>
+                </span>
+              }
+              apoyo={f.inventario !== null ? <span className="tabular-nums">{entero(f.inventario)} u. en Drop</span> : undefined}
+            />
+            <Celda nombre="En Drop" principal={<IconoEnDrop f={f} />} />
+          </span>
+
+          <a
+            href={urlDrop(f)}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={`Abrir ${f.nombre} en Drop`}
+            className={`rounded text-muted-foreground transition-transform group-hover:translate-x-0.5 hover:text-foreground lg:order-last ${anilloFoco}`}
+          >
+            <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="m9 6 6 6-6 6" />
+            </svg>
+          </a>
+        </div>
       </div>
-      <div className="grid shrink-0 grid-cols-3 gap-4 text-right text-xs sm:w-[19rem]">
-        <span className="flex flex-col">
-          <span className="text-muted-foreground">Precio</span>
-          <span className="font-semibold tabular-nums">{formatoMonto(f.precio, moneda)}</span>
-          {enDolares && <span className="text-[11px] text-muted-foreground tabular-nums">{enDolares}</span>}
-        </span>
-        <span className="flex flex-col">
-          <span className="text-muted-foreground">Inventario</span>
-          <span className={`font-semibold tabular-nums ${sinStockDrop(f) ? "text-destructive" : ""}`}>{f.inventario === null ? "—" : f.inventario.toLocaleString("es-PA")}</span>
-        </span>
-        <span className="flex flex-col">
-          <span className="text-muted-foreground">Margen</span>
-          <span className={`font-semibold tabular-nums ${margenBajoDrop(f) ? "text-destructive" : ""}`}>{f.margen === null ? "—" : `${Math.round(f.margen * 100)} %`}</span>
-          <span className="text-[11px] text-muted-foreground tabular-nums">{f.utilidad !== null ? formatoMonto(f.utilidad, moneda) : f.producto ? "sin costo" : "sin vincular"}</span>
-        </span>
-      </div>
-      <div className="flex shrink-0 items-center gap-1">
+      {/* Los mismos botones que la fila de Dropi y en su orden, más «Eliminar»: los que no aplican en Drop van apagados y dicen por qué. */}
+      <div className="mb-2 ml-3 flex min-w-0 flex-wrap items-center gap-1 lg:mb-0 lg:ml-0 lg:mr-3 lg:shrink-0 lg:flex-nowrap">
+        <BotonIconoFila texto="Republicar" motivo={MOTIVO_SOLO_DROPI.republicar} icono={ActualizarIcon} nombre={f.nombre} onClick={nada} />
+        <BotonIconoFila texto="Dar acceso privado" motivo={motivoAccesoPrivado(estado)} icono={CandadoAbiertoIcon} nombre={f.nombre} onClick={() => setDialogo("privado")} />
+        <BotonIconoFila texto="Gestionar inventario" motivo={motivoGestionarInventario(estado)} icono={InventarioIcon} nombre={f.nombre} onClick={() => setDialogo("inventario")} />
         <BotonIconoFila
           texto={cambio.texto}
           motivo={motivoCambioEstado(estado)}
@@ -105,9 +270,9 @@ export function FilaPublicacionDropLista({ f, moneda, puedeEscribir }: { f: Fila
           onClick={aviso}
           activo={cambio.accion === "activar" ? "azul" : undefined}
         />
-        <BotonIconoFila texto="Gestionar inventario" motivo={motivoGestionarInventario(estado)} icono={InventarioIcon} nombre={f.nombre} onClick={() => setDialogo("inventario")} />
-        <BotonIconoFila texto="Dar acceso privado" motivo={motivoAccesoPrivado(estado)} icono={CandadoIcon} nombre={f.nombre} onClick={() => setDialogo("privado")} />
+        <BotonIconoFila texto="Pausar por falta de stock" motivo={MOTIVO_SOLO_DROPI.pausar} icono={PausaIcon} nombre={f.nombre} onClick={nada} />
         <BotonIconoFila texto="Poner en liquidación" motivo={motivoLiquidacion()} icono={EtiquetaIcon} nombre={f.nombre} onClick={aviso} />
+        <BotonIconoFila texto="Archivar publicación" motivo={MOTIVO_SOLO_DROPI.archivar} icono={ArchivarIcon} nombre={f.nombre} onClick={nada} />
         <BotonIconoFila
           texto="Eliminar publicación"
           motivo={motivoEliminar(estado)}
@@ -116,6 +281,7 @@ export function FilaPublicacionDropLista({ f, moneda, puedeEscribir }: { f: Fila
           onClick={aviso}
           clase="text-muted-foreground hover:bg-destructive-soft hover:text-destructive"
         />
+        <BotonIconoFila texto="Tareas" motivo={MOTIVO_SOLO_DROPI.tareas} icono={TareasIcon} nombre={f.nombre} onClick={nada} />
       </div>
       {dialogo === "inventario" && <DialogoSolicitudInventario nombre={f.nombre} alCerrar={() => setDialogo(null)} />}
       {dialogo === "privado" && <DialogoAccesoPrivado nombre={f.nombre} alCerrar={() => setDialogo(null)} />}

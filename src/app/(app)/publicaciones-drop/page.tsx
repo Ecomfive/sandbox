@@ -27,7 +27,7 @@ export default async function PublicacionesDropPage() {
   if (aviso) return aviso;
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
-  const datos = await cargarDatosDrop(supabase, pais);
+  const datos = await cargarDatosDrop(supabase, pais, usuario);
   const puedeEscribir = !usuario.modulosSoloLectura.includes("publicaciones-drop");
   // Los productos nuestros, para vincular al crear un producto en Drop (solo quien puede crear).
   const opcionesSku = puedeEscribir ? await obtenerOpcionesSkuMaestro(supabase) : [];

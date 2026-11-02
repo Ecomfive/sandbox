@@ -1,4 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { UsuarioActual } from "@/lib/auth";
+import { cargarEnCamino } from "@/lib/publicaciones/en-camino-datos";
 import { tasasUsd } from "@/lib/moneda/tipo-cambio";
 import { margenDrop } from "@/lib/publicaciones-drop/lectura";
 import { monedaPublicaciones, type MonedaPublicaciones } from "@/lib/publicaciones/moneda";
@@ -38,7 +40,7 @@ const uno = <T,>(v: T | T[] | null): T | null => (Array.isArray(v) ? (v[0] ?? nu
  * Las publicaciones de Drop del país (las que siguen en Drop), con su producto, la sugerencia y el margen: precio − costo del producto (el de su
  * publicación de Gestión de IDs Dropi del mismo país, la más reciente con costo) − fulfillment de Drop (Configuración › Plataformas del país, fila «Drop»).
  */
-export async function cargarDatosDrop(supabase: SupabaseClient, pais: { id: string; codigo: string }): Promise<DatosDrop> {
+export async function cargarDatosDrop(supabase: SupabaseClient, pais: { id: string; codigo: string }, usuario: UsuarioActual): Promise<DatosDrop> {
   const porUsd = (await tasasUsd(supabase)).porUsd;
   const moneda = monedaPublicaciones(pais.codigo, porUsd);
   let filas: Fila[];
@@ -82,11 +84,15 @@ export async function cargarDatosDrop(supabase: SupabaseClient, pais: { id: stri
       ? null
       : fulfillmentEnMoneda(Number(filaDrop.fulfillment), String(filaDrop.fulfillment_moneda ?? "USD"), pais.codigo, porUsd);
 
+  // Lo que viene en camino y lo que se cotiza de cada producto, en compras del país (lo mismo que muestra Gestión de IDs Dropi).
+  const { camino, cotizando, etapasCotizando } = skuIds.length ? await cargarEnCamino(supabase, pais.id, usuario) : { camino: new Map(), cotizando: new Map(), etapasCotizando: new Map() };
+
   const publicaciones = filas.map((f): FilaPublicacionDrop => {
     const producto = uno(f.producto);
     const costo = producto ? (costos.get(producto.id) ?? null) : null;
     const precio = f.precio === null ? null : Number(f.precio);
     const m = margenDrop(precio, costo, fulfillment);
+    const viene = producto ? camino.get(producto.id) : undefined;
     return {
       id: f.id,
       nombre: f.nombre,
@@ -102,7 +108,14 @@ export async function cargarDatosDrop(supabase: SupabaseClient, pais: { id: stri
       costo,
       utilidad: m?.utilidad ?? null,
       margen: m?.margen ?? null,
+      fulfillment,
       liquidacion: false,
+      enCamino: viene?.unidades ?? 0,
+      llegadaCamino: viene?.llegada ?? null,
+      sinFechaCamino: viene?.sinFecha ?? 0,
+      sinEnvioCamino: viene?.sinEnvio ?? 0,
+      enCotizacion: producto ? (cotizando.get(producto.id) ?? 0) : 0,
+      etapaCotizacion: producto ? (etapasCotizando.get(producto.id) ?? null) : null,
     };
   });
   const ultimaLectura = filas.reduce<string | null>((max, f) => (!max || f.ultima_vez > max ? f.ultima_vez : max), null);

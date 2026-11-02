@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { ACCIONES_FILA_DROP, accionDeEstado, motivoAccesoPrivado, motivoCambioEstado, motivoEliminar, motivoGestionarInventario, motivoLiquidacion, validarAccesoPrivado, validarSolicitudIngreso } from "./acciones";
+import { ACCIONES_FILA_DROP, MOTIVO_SOLO_DROPI, accionDeEstado, motivoAccesoPrivado, motivoCambioEstado, motivoEliminar, motivoGestionarInventario, motivoLiquidacion, validarAccesoPrivado, validarSolicitudIngreso } from "./acciones";
 
 describe("acciones de Drop", () => {
   it("el mismo botón inactiva una activa y activa una inactiva", () => {
@@ -16,10 +16,14 @@ describe("acciones de Drop", () => {
   it("la liquidación siempre queda pendiente", () => {
     assert.match(motivoLiquidacion(), /Pendiente/);
   });
-  it("la fila no tiene republicar ni archivar", () => {
-    assert.deepEqual([...ACCIONES_FILA_DROP], ["estado", "inventario", "privatizar", "liquidacion", "eliminar"]);
+  it("la fila lleva los íconos de Dropi en su orden, más eliminar", () => {
+    assert.deepEqual([...ACCIONES_FILA_DROP], ["republicar", "privatizar", "inventario", "estado", "pausar", "liquidacion", "archivar", "eliminar", "tareas"]);
   });
-
+  it("lo que Drop no tiene va apagado y dice por qué", () => {
+    assert.match(MOTIVO_SOLO_DROPI.republicar, /no republica/);
+    assert.match(MOTIVO_SOLO_DROPI.archivar, /elimina/);
+    for (const m of Object.values(MOTIVO_SOLO_DROPI)) assert.ok(m.length > 5);
+  });
   it("sin ID de Drop no se pide inventario ni se da acceso privado", () => {
     assert.equal(motivoGestionarInventario({ estado: "activo", idDrop: "" }), "Sin ID de Drop");
     assert.equal(motivoAccesoPrivado({ estado: "activo", idDrop: "" }), "Sin ID de Drop");
@@ -37,5 +41,5 @@ describe("acciones de Drop", () => {
     assert.deepEqual(validarAccesoPrivado("a@b.co", "9500"), { correo: "a@b.co", precio: 9500 });
     assert.ok("error" in validarAccesoPrivado("sin-arroba", ""));
     assert.ok("error" in validarAccesoPrivado("a@b.co", "-5"));
-  });
+    });
 });
