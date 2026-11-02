@@ -5,11 +5,14 @@ import { usePathname, useRouter } from "next/navigation";
 import { ContenedorTabla } from "@/components/tabla/contenedor-tabla";
 import { claseCeldaColumna, claseEncabezadoColumna, claseFilaEncabezado } from "@/components/tabla/estilos-tabla";
 import { Badge } from "@/components/ui/badge";
-import { fieldClassSm } from "@/components/ui/field";
+import { VentanaBuscarImagen } from "@/components/buscar-imagen/ventana-buscar-imagen";
+import { anilloFoco, fieldClassSm } from "@/components/ui/field";
 import { MiniaturaFoto } from "@/components/ui/miniatura-foto";
 import { useToast } from "@/components/ui/toast";
+import { Tooltip } from "@/components/ui/tooltip";
 import { formatearTiempoRelativo } from "@/lib/formato";
-import { BuscarIcon, MasIcon, PapeleraIcon } from "@/lib/nav-icons";
+import type { Ambito } from "@/lib/imagen/buscar";
+import { BuscarIcon, CamaraIcon, MasIcon, PapeleraIcon } from "@/lib/nav-icons";
 import { guardarLevantamiento } from "./actions";
 import { ImportarLista } from "./importar-lista";
 
@@ -34,6 +37,7 @@ interface LineaLote {
   existente: boolean;
 }
 
+const AMBITOS_PRODUCTO: Ambito[] = ["producto"];
 const ETIQUETA_CLASE: Record<string, string> = { inactivo: "Inactivo", descontinuado: "Descontinuado" };
 const sinAcentos = (t: string) => t.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
 const numero = (t: string) => (t.trim() === "" ? null : Number(t));
@@ -48,7 +52,8 @@ function Diferencia({ n }: { n: number | null }) {
 /**
  * Levantamiento (conteo físico) de una bodega: una fila por producto con lo que hay en el sistema, lo contado y la
  * diferencia. Solo se guarda lo que se escribió (un producto en blanco no se toca). Un producto con vencimiento se cuenta
- * por lote: sus lotes con unidades aparecen solos y se agrega una línea por lote nuevo.
+ * por lote: sus lotes con unidades aparecen solos y se agrega una línea por lote nuevo. **Buscar por imagen** (3 nov 2026, pedido de Jhokser): la cámara junto a «Buscar»
+ * encuentra el producto con una foto (pegada, arrastrada o subida) y deja en la lista solo lo encontrado, de más a menos parecido, incluso inactivos y descontinuados.
  */
 export function Levantamiento({
   bodegas,
@@ -71,6 +76,9 @@ export function Levantamiento({
   const [lotes, setLotes] = useState<Record<string, LineaLote[]>>({});
   const [buscar, setBuscar] = useState("");
   const [verTodos, setVerTodos] = useState(false);
+  // Los productos que encontró la foto, de más a menos parecido (null = sin filtro por imagen).
+  const [porImagen, setPorImagen] = useState<string[] | null>(null);
+  const [imagenAbierta, setImagenAbierta] = useState(false);
   const [referencia, setReferencia] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -92,12 +100,15 @@ export function Levantamiento({
 
   const visibles = useMemo(() => {
     const q = sinAcentos(buscar.trim());
-    return productos.filter((p) => {
+    const orden = porImagen ? new Map(porImagen.map((id, i) => [id, i])) : null;
+    const lista = productos.filter((p) => {
+      if (orden && !orden.has(p.id)) return false;
       if (q && !sinAcentos(`${p.codigo} ${p.nombre}`).includes(q)) return false;
-      if (verTodos || q) return true;
+      if (verTodos || q || orden) return true;
       return p.clase === "fisico" || p.enSistema !== 0 || contados[p.id] !== undefined || lotes[p.id] !== undefined;
     });
-  }, [productos, buscar, verTodos, contados, lotes]);
+    return orden ? lista.sort((a, b) => (orden.get(a.id) ?? 0) - (orden.get(b.id) ?? 0)) : lista;
+  }, [productos, buscar, verTodos, porImagen, contados, lotes]);
 
   const contadosTotal = productos.filter((p) => contadoDe(p) !== null);
   const conDiferencia = contadosTotal.filter((p) => contadoDe(p) !== p.enSistema).length;
@@ -160,6 +171,26 @@ export function Levantamiento({
             <input type="search" value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Código o nombre" className={`${fieldClassSm} w-56 pl-8`} />
           </span>
         </label>
+        <Tooltip texto="Buscar por imagen">
+          <button
+            type="button"
+            aria-label="Buscar por imagen"
+            onClick={() => setImagenAbierta(true)}
+            className={`inline-flex min-h-9 min-w-9 items-center justify-center rounded-md border border-border-control bg-card hover:bg-muted ${anilloFoco}`}
+          >
+            <CamaraIcon aria-hidden="true" className="h-4 w-4" />
+          </button>
+        </Tooltip>
+        {porImagen && (
+          <button
+            type="button"
+            onClick={() => setPorImagen(null)}
+            aria-label={`Quitar el filtro por imagen (${porImagen.length} productos)`}
+            className={`inline-flex min-h-9 items-center gap-1.5 rounded-md border border-foreground bg-foreground px-3 text-sm font-medium text-background ${anilloFoco}`}
+          >
+            Por imagen ({porImagen.length}) <span aria-hidden="true">×</span>
+          </button>
+        )}
         {puedeEscribir && (
           <ImportarLista
             productos={productos}
@@ -182,6 +213,8 @@ export function Levantamiento({
           </p>
         )}
       </div>
+
+      <VentanaBuscarImagen abierta={imagenAbierta} alCerrar={() => setImagenAbierta(false)} ambitoPropio="producto" ambitos={AMBITOS_PRODUCTO} alFiltrar={(ids) => setPorImagen(ids)} />
 
       <ContenedorTabla ariaLabel={`Levantamiento de ${nombreBodega}`}>
         <table className="tabla-datos w-full min-w-[52rem] border-collapse text-sm">
@@ -208,7 +241,7 @@ export function Levantamiento({
             {visibles.length === 0 && (
               <tr>
                 <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
-                  No hay productos con ese nombre.
+                  {porImagen ? "Ningún producto de esta bodega coincide con la imagen." : "No hay productos con ese nombre."}
                 </td>
               </tr>
             )}
