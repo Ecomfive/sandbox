@@ -80,7 +80,7 @@ export const motivoLiquidacion = (): string => MOTIVO_LIQUIDACION_DROP;
 /** Por qué los botones de Dropi que Drop no tiene (o que todavía no se hacen desde aquí) van apagados en la fila de Drop. */
 export const MOTIVO_SOLO_DROPI = {
   republicar: "Drop no republica",
-  pausar: "Drop no pausa: la publicación se inactiva",
+  pausar: "Drop no pausa: al quedarse sin stock se inactiva sola",
   archivar: "Drop no archiva: lo que sobra se elimina",
   tareas: "Todavía sin tareas en Drop",
 } as const;

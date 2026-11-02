@@ -71,11 +71,11 @@ const TARJETAS: Tarjeta[] = [
   {
     id: "sin-stock",
     titulo: "Sin stock",
-    detalle: "Activas en Drop con 0 unidades",
+    detalle: "Con 0 unidades (Drop las inactiva sola)",
     icono: InventarioIcon,
     color: "rojo",
     cuenta: sinStockDrop,
-    atajo: { id: "sin-stock", etiqueta: "Sin stock", ayuda: "Filtrar la lista: activas en Drop sin stock", filtro: seleccion("stock", "sin_stock") },
+    atajo: { id: "sin-stock", etiqueta: "Sin stock", ayuda: "Filtrar la lista: publicaciones de Drop sin stock", filtro: seleccion("stock", "sin_stock") },
   },
   {
     id: "poco-stock",

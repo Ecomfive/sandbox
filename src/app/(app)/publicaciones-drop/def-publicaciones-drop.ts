@@ -59,8 +59,8 @@ export interface FilaPublicacionDrop {
 
 export const estadoVinculoDrop = (f: FilaPublicacionDrop): "vinculado" | "sugerido" | "sin_vincular" => (f.producto ? "vinculado" : f.sugerido ? "sugerido" : "sin_vincular");
 
-/** Activa en Drop sin unidades. */
-export const sinStockDrop = (f: FilaPublicacionDrop) => f.estado === "activo" && f.inventario === 0;
+/** Sin unidades en Drop. Activa o no: al quedarse sin stock, Drop **inactiva el producto sola** (Nicole, 3 nov 2026), así que mirar solo las activas nunca contaría ninguna. */
+export const sinStockDrop = (f: FilaPublicacionDrop) => f.inventario === 0;
 /** Activa en Drop con menos de `POCO_STOCK_DROP` unidades. */
 export const pocoStockDrop = (f: FilaPublicacionDrop) => f.estado === "activo" && f.inventario !== null && f.inventario > 0 && f.inventario < POCO_STOCK_DROP;
 export const margenBajoDrop = (f: FilaPublicacionDrop) => f.margen !== null && f.margen < MARGEN_BAJO;
