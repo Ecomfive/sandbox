@@ -205,3 +205,71 @@ async function leerNuestrosProductos(puente) {
   setTimeout(() => location.assign(`${puente}#${datos}`), 50);
   return { enviados: productos.length, activos: productos.filter((p) => !p.archivado).length, duracionMs: cuerpo.duracionMs, kb: Math.round(datos.length / 1024) };
 }
+
+// Gestión de IDs Drop (3 nov 2026, pedido de Hernán; migración 0221): «Mis productos» de ECOMFIVE en Drop (app.soydrop.com, Costa Rica, en colones).
+// Se corre en app.soydrop.com con la sesión del PROVEEDOR. Drop no da una dirección con todos los productos: la pestaña abre cada página de la lista
+// (`/vendor/products?page=N`, 10 por página) en un marco invisible, espera a que se dibuje la tabla y lee el texto de cada fila (los revisa
+// src/lib/publicaciones-drop/lectura.ts; los guarda scripts/drop-guardar.ts). La sesión no sale de la página. Como arriba, la pestaña navega al puente.
+//   await leerDrop("http://127.0.0.1:4322/puente/<código>")
+// Costa Rica, 3 nov 2026: 89 productos en 9 páginas.
+async function leerDrop(puente) {
+  if (location.hostname !== "app.soydrop.com") throw new Error("Esto se corre en app.soydrop.com, con la sesión del proveedor.");
+  const inicio = new Date();
+  const t0 = performance.now();
+  const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
+  async function filasDePagina(n) {
+    const marco = document.createElement("iframe");
+    marco.style.cssText = "position:fixed;left:-5000px;top:0;width:1400px;height:900px;border:0";
+    marco.src = `/vendor/products?page=${n}`;
+    document.body.appendChild(marco);
+    try {
+      let vacia = 0;
+      for (let i = 0; i < 120; i++) {
+        await pausa(250);
+        const doc = marco.contentDocument;
+        const filas = doc ? [...doc.querySelectorAll("table tbody tr")].filter((tr) => tr.querySelector("a[href*='/details/']")) : [];
+        if (filas.length) {
+          await pausa(300); // que termine de dibujar la página
+          const cabeza = [...doc.querySelectorAll("table thead th")].map((th) => th.innerText.trim().toLowerCase());
+          const col = (nombre) => cabeza.findIndex((c) => c.startsWith(nombre));
+          const celda = (tr, nombre) => (col(nombre) >= 0 ? tr.querySelectorAll("td")[col(nombre)]?.innerText ?? "" : "");
+          return [...doc.querySelectorAll("table tbody tr")]
+            .filter((tr) => tr.querySelector("a[href*='/details/']"))
+            .map((tr) => ({
+              dropId: /\/details\/([0-9a-f]{24})/.exec(tr.querySelector("a[href*='/details/']").getAttribute("href"))?.[1] ?? "",
+              producto: celda(tr, "producto"),
+              sku: celda(tr, "sku"),
+              estado: celda(tr, "estado"),
+              precio: celda(tr, "precio"),
+              inventario: celda(tr, "inventario"),
+              creado: celda(tr, "creado"),
+              foto: tr.querySelector("img")?.getAttribute("src") ?? null,
+            }));
+        }
+        // Página sin productos (después de la última): la tabla se dibujó pero sin filas.
+        if (doc?.readyState === "complete" && doc.querySelector("table thead") && ++vacia > 16) return [];
+      }
+      throw new Error(`La página ${n} de Drop no cargó: revisa que la sesión siga abierta.`);
+    } finally {
+      marco.remove();
+    }
+  }
+  const productos = new Map();
+  const paginas = [];
+  for (let n = 1; n <= 300; n++) {
+    const filas = await filasDePagina(n);
+    paginas.push(filas.length);
+    let nuevas = 0;
+    for (const f of filas) if (f.dropId && !productos.has(f.dropId)) (productos.set(f.dropId, f), nuevas++);
+    if (filas.length < 10 || !nuevas) break;
+  }
+  if (!productos.size) throw new Error("No se leyó ningún producto de Drop: revisa que la sesión sea la del proveedor.");
+  const cuerpo = { tipo: "drop", pais: "cr", inicio: inicio.toISOString(), duracionMs: Math.round(performance.now() - t0), paginas, productos: [...productos.values()] };
+  const gz = new Blob([JSON.stringify(cuerpo)]).stream().pipeThrough(new CompressionStream("gzip"));
+  const bytes = new Uint8Array(await new Response(gz).arrayBuffer());
+  let binario = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) binario += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  const datos = btoa(binario).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  setTimeout(() => location.assign(`${puente}#${datos}`), 50);
+  return { enviados: cuerpo.productos.length, paginas: paginas.length, duracionMs: cuerpo.duracionMs, kb: Math.round(datos.length / 1024) };
+}
