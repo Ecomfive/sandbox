@@ -50,7 +50,8 @@ export function FilaPublicacionDropLista({ f, moneda, puedeEscribir }: { f: Fila
         <span className="truncate text-xs text-muted-foreground">
           {f.idDrop || "Sin ID de Drop"} · SKU de Drop: {f.skuDrop || "—"}
         </span>
-        <span className="text-xs">
+        {/* Los códigos de Producto no tienen espacios («ACEITE/OREGANO/CAPSULAS/300/BLANCO»): se cortan donde haga falta en pantallas angostas. */}
+        <span className="min-w-0 text-xs [overflow-wrap:anywhere]">
           {f.producto ? (
             <span className="text-muted-foreground">
               Vinculada a <span className="font-medium text-foreground">{f.producto.codigo}</span> {f.producto.nombre}
