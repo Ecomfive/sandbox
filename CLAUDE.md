@@ -1974,7 +1974,7 @@ convenciones técnicas del código.
   productos, la del producto con su mismo nombre (`productoDeCompra`); cada línea trae la suya (`lineas[].foto`, `ItemCompra.foto`:
   la del producto o la de otro con el mismo nombre, `fotoDeProducto`). Lógica pura en `src/lib/compras/foto-producto.ts` (con
   prueba) y carga en `cargarFotosDeProductos` (`fotos-productos-datos.ts`). La lista tiene dos columnas, «Foto del producto» (la comercial) y «Foto real»,
-  entre el código y la orden (2 nov 2026, pedido de Alcides; ids nuevos `codigoOC`, `fotoComercial`, `fotoReal` para que caigan tras el N.º OC también en quien tenía un orden guardado); con varios productos lleva «+N» en la esquina (`ConMasProductos`, `mas-productos.tsx`; `otrosProductos` = códigos distintos − 1;
+  entre el código y la orden (2 nov 2026, pedido de Alcides; ids nuevos `codigoOC`, `fotoComercial`, `fotoReal` para que caigan tras el N.º OC también en quien tenía un orden guardado; cada foto es cuadrada y del alto de la fila: va en `absolute` dentro de una celda `relative`, así no agranda la fila); con varios productos lleva «+N» en la esquina (`ConMasProductos`, `mas-productos.tsx`; `otrosProductos` = códigos distintos − 1;
   25 oct 2026), también en la «Foto comercial» de la ficha; la ficha pone «Foto comercial» (solo se ve) al lado de «Foto real del producto», arriba de los productos.
   **Productos en la ficha:** el bloque «Productos» (`productos-compra.tsx`, solo compras de país) va **dentro del formulario**,
   en el bloque «Compra» justo debajo de Etiquetas (`FormularioCompra` recibe `productos` y `FichaCompra` se lo

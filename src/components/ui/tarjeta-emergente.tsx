@@ -17,11 +17,14 @@ export function TarjetaEmergente({
   contenido,
   ancho,
   clase = "rounded-lg border border-border bg-card p-3 shadow-lg",
+  claseEnvoltura = "",
   children,
 }: {
   contenido: ReactNode;
   ancho?: string;
   clase?: string;
+  /** Clases del elemento que envuelve a lo que se pasa el cursor (p. ej. «h-full w-full» para que llene su celda). */
+  claseEnvoltura?: string;
   children: ReactNode;
 }) {
   const envolturaRef = useRef<HTMLSpanElement>(null);
@@ -87,7 +90,7 @@ export function TarjetaEmergente({
   }, [visible]);
 
   return (
-    <span ref={envolturaRef} className="inline-flex" onMouseEnter={() => mostrar(RETARDO_MOSTRAR)} onMouseLeave={() => ocultar()}>
+    <span ref={envolturaRef} className={`inline-flex ${claseEnvoltura}`} onMouseEnter={() => mostrar(RETARDO_MOSTRAR)} onMouseLeave={() => ocultar()}>
       {children}
       {visible &&
         createPortal(
