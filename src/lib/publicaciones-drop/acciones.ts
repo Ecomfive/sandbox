@@ -3,6 +3,9 @@
 //   * «Apagar» se llama **inactivar**: una publicación inactiva se vuelve a **activar** con el mismo botón.
 //   * No se archiva: solo se **elimina**.
 //   * «En liquidación» queda como botón **pendiente**: Drop todavía no lo usa y se ve si se necesita.
+//   * El stock **no se edita**: un producto nace en cero y el stock entra con una **solicitud de ingreso de inventario** que la bodega aprueba o declina («Gestionar inventario»).
+//   * **No hay producto privado aparte**: se le da **acceso** al producto desde el mismo ID, con el correo del cliente y su precio (el mismo u otro).
+// Todo está explicado en DROP-REFERENCIA.md.
 // Como en Dropi, un botón no se esconde: si no se puede usar va apagado y dice por qué. Sin base ni React, con prueba (acciones.test.ts).
 
 export type EstadoDrop = "activo" | "inactivo";
@@ -30,9 +33,38 @@ export function motivoEliminar(e: EstadoBotonesDrop): string | null {
   return e.idDrop.trim() ? null : "Sin ID de Drop";
 }
 
+/** Por qué no se puede pedir un ingreso de inventario; `null` = se puede. */
+export function motivoGestionarInventario(e: EstadoBotonesDrop): string | null {
+  return e.idDrop.trim() ? null : "Sin ID de Drop";
+}
+
+/** Por qué no se puede dar acceso privado; `null` = se puede. */
+export function motivoAccesoPrivado(e: EstadoBotonesDrop): string | null {
+  return e.idDrop.trim() ? null : "Sin ID de Drop";
+}
+
+/** Lo que se escribe al pedir un ingreso de inventario: cuántas unidades se mandan a la bodega. */
+export function validarSolicitudIngreso(unidades: unknown): { error: string } | { unidades: number } {
+  const n = Number(unidades);
+  if (!Number.isInteger(n) || n < 1) return { error: "Escribe cuántas unidades se mandan (un número entero de 1 en adelante)." };
+  return { unidades: n };
+}
+
+/**
+ * Lo que se escribe al dar acceso privado: el correo del cliente y su precio de venta. Sin precio, se le da el mismo de la publicación (`precio: null`); si se escribe, debe ser mayor a cero.
+ */
+export function validarAccesoPrivado(correo: string, precio: unknown): { error: string } | { correo: string; precio: number | null } {
+  const c = correo.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c)) return { error: "Escribe el correo del cliente." };
+  if (precio === null || precio === undefined || String(precio).trim() === "") return { correo: c, precio: null };
+  const n = Number(precio);
+  if (!Number.isFinite(n) || n <= 0) return { error: "El precio debe ser mayor a cero (o déjalo vacío para usar el mismo)." };
+  return { correo: c, precio: n };
+}
+
 /** El botón de liquidación queda como pendiente: se deja a la vista para ver si Drop lo usa. */
 export const MOTIVO_LIQUIDACION_DROP = "Pendiente: todavía no se usa en Drop";
 export const motivoLiquidacion = (): string => MOTIVO_LIQUIDACION_DROP;
 
 /** Las acciones de la fila de Drop, en el orden en que se dibujan: lo que no existe en Drop (republicar, archivar) no está. */
-export const ACCIONES_FILA_DROP = ["estado", "liquidacion", "eliminar"] as const;
+export const ACCIONES_FILA_DROP = ["estado", "inventario", "privatizar", "liquidacion", "eliminar"] as const;

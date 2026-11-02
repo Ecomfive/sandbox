@@ -1,0 +1,73 @@
+# Drop: cómo funciona (referencia)
+
+Drop es **otra aplicación de dropshipping, aparte de Dropi, y solo de Costa Rica** (regla de Hernán, 3 nov 2026: todo lo que se agregue de Drop es de Costa Rica; los montos van en colones).
+Este documento recoge cómo funciona Drop según **Nicole**, la persona que gestiona los IDs de Drop (explicado a Hernán y Jhokser el 3 nov 2026), para que el sistema se adapte a Drop y
+quien agregue después otros módulos de Drop lo tenga a mano. El código de lo que ya existe está en `src/lib/publicaciones-drop/` y `src/app/(app)/publicaciones-drop/`; las reglas de país
+y plataforma, en `src/lib/plataformas.ts`. La guía para quien sincroniza o conecta datos de Drop está al final.
+
+## Entrar
+
+| | Dropi | Drop |
+|---|---|---|
+| Inicio de sesión | Pide un **código de autenticación** (verificación en dos pasos) | **No** pide código |
+| Pantalla de inicio | Hay que ir al módulo de productos | Se abre solo en **«Mis productos»** |
+
+## Crear un producto
+
+| | Dropi | Drop |
+|---|---|---|
+| Botón | «Agregar» (azul) | «Crear producto» (negro) |
+| Al pulsarlo | Una ventana emergente pregunta si se quiere crear un producto | Entra directo al panel para crearlo |
+| Nombre | Título; opción de poner **otro nombre para la guía de envío** | Solo el título; **no** hay otro nombre para la guía |
+| Descripción | Larga (mínimo 200 caracteres) | Corta: se pone **el mismo nombre del producto**. Nicole la describe con «10 caracteres»; **por confirmar si es el mínimo o el máximo** |
+| Público o privado | Se elige al crear | **No se elige**: se privatiza después, desde el mismo ID |
+| Peso y medidas | Piden peso, largo, ancho y alto | **No** piden peso ni medidas |
+| Precio de venta | Obligatorio | Obligatorio |
+| Precio sugerido | Obligatorio si es público (opcional si es privado) | **Opcional y no se pone**: Drop calcula uno aproximado solo y **solo lo ve el dropshipper**, no nosotros |
+| Imágenes | De **3 o más** | De **1 a 5** |
+| Enlace de creativos | No | Se puede poner un enlace (Drive) a los creativos |
+| Aviso de poco stock | No | Opción de recibir un **aviso por correo** si un producto o variante está casi sin stock |
+| SKU | El mismo nombre del producto (salvo en los combos) | **Siempre el mismo nombre del producto** |
+| Simple o variable | Hay que elegir | **No** se elige |
+| Categoría | Se elige | Se elige la que corresponda |
+| Recursos adicionales (videos…) | Existe el módulo; **no se usa** | No existe |
+| Garantías | Módulo obligatorio: hay que aceptarlas y escribir en observaciones que se está de acuerdo con las de por defecto | **No existe** |
+| Guardar | «Guardar» | «Guardar producto» |
+
+Al guardar, Drop abre una vista del producto con: **estado, proveedor, inventario, precio de venta, precio sugerido** (calculado solo, lo ve el dropshipper), **bodega, fecha de creación, SKU y el código de venta público** (algo como su ID).
+Ese código de venta público es el **ID de la publicación en Drop**.
+
+## Stock
+
+- **Dropi (Costa Rica):** hay que hacer un ingreso de 100 unidades para poder crear el producto y luego editar el stock y quitarlas, para que quede en cero, porque el stock de Dropi lo agrega la bodega de Dropi, no nosotros.
+- **Drop:** el producto **se crea con stock cero** solo. El stock entra con una **solicitud de ingreso de inventario**: desde el producto, «Gestionar inventario» (o desde el módulo de gestión de inventario) se pide el ingreso de 100, 200… unidades. La bodega recibe la mercancía, la cuenta
+  y la compara, y **aprueba o declina** la solicitud (ingresando lo que de verdad llegó). Hasta ahora siempre se ha mandado la cantidad correcta, así que solo la aceptan y las unidades aparecen solas.
+  **No se sube ni se quita stock a mano**: solo se hacen solicitudes. Por eso en Drop no hay botón de editar stock.
+
+## Privatizar
+
+- **Dropi:** se crea otro producto privado aparte (con su propio ID), con el correo del dropshipper y las unidades reservadas.
+- **Drop:** se hace **desde el mismo ID**: se le da **acceso** al producto a un cliente: se activa, se pone su **correo** y el **precio de venta** (el mismo o uno distinto para ese cliente). No hay un producto privado aparte.
+
+## Inactivar, activar, eliminar
+
+- «Apagar» de Dropi se llama **inactivar** en Drop; una publicación inactiva se vuelve a **activar**.
+- Drop **no archiva**: solo se **elimina**.
+- Drop **no republica**.
+- «Poner en liquidación» no se hace actualmente en Drop: el botón queda **pendiente** para ver si se usa.
+
+## El SKU de Drop
+
+- El SKU de Drop **es el nombre del producto** y **no se puede cambiar**.
+- Al sincronizar las publicaciones se guarda tal cual como **«SKU de Drop»** y luego se **vincula con el SKU de nuestro producto** (el de Producto): se sugiere por el parecido entre las palabras del SKU de Drop y las del SKU y el nombre de nuestro producto, y por las **imágenes**
+  (la misma huella de foto y las reglas de `src/lib/publicaciones/vincular.ts`), y una persona lo confirma.
+
+## Qué hace el sistema hoy y qué falta
+
+- **Lee** las publicaciones de Drop (`app.soydrop.com`, cuenta «Proveedor Ecomfive Costa Rica»; menú del proveedor: Dashboard, Mis productos, Solicitudes de inventario) con `scripts/drop-guardar.ts` y las guarda en `drop_publicaciones` (migración 0221); deja una sugerencia de producto a vincular
+  (por nombre y por foto) y una persona la confirma con «Vincular». Detalle en el CLAUDE.md, «Datos de Drop».
+- Módulo «Gestión de IDs Drop» (`/publicaciones-drop`): pestañas Publicaciones, Recomendaciones, Tareas y Reglas; tablero de tarjetas; la fila con **Inactivar/Activar, Gestionar inventario, Dar acceso privado, Liquidación (pendiente) y Eliminar**; el formulario **«Crear producto»** con los datos de Drop y
+  sus validaciones (`faltantesCrearDrop`); Análisis de competencia con la plataforma Drop (vacío). **Todavía no escriben en Drop**: los botones y el formulario validan y avisan «hazlo en Drop».
+- Falta: **escribir** en Drop (crear productos, pedir ingresos de inventario, dar accesos privados, inactivar/activar, eliminar), leer las **solicitudes de inventario** y su estado (aprobada o declinada), conectar la competencia de Drop y crear las tablas de lo que falte (`drop_*`, con RLS sin políticas). Drop **no pide
+  código de autenticación**, lo que debería hacer más simple conectarlo.
+- Preguntas abiertas: si la descripción es de mínimo o de máximo 10 caracteres; cuáles son las categorías de Drop; si Drop también tiene privatizar con unidades reservadas, pausar por falta de stock o tareas como Dropi (no se copiaron esos botones).

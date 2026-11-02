@@ -1,22 +1,24 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { BotonIconoFila } from "@/app/(app)/publicaciones-dropi/boton-icono-fila";
 import { useToast } from "@/components/ui/toast";
 import { anilloFoco } from "@/components/ui/field";
-import { ApagarIcon, EtiquetaIcon, PapeleraIcon, ReactivarIcon } from "@/lib/nav-icons";
-import { accionDeEstado, ETIQUETA_ESTADO_DROP, motivoCambioEstado, motivoEliminar, motivoLiquidacion } from "@/lib/publicaciones-drop/acciones";
+import { ApagarIcon, CandadoIcon, EtiquetaIcon, InventarioIcon, PapeleraIcon, ReactivarIcon } from "@/lib/nav-icons";
+import { accionDeEstado, ETIQUETA_ESTADO_DROP, motivoAccesoPrivado, motivoCambioEstado, motivoEliminar, motivoGestionarInventario, motivoLiquidacion } from "@/lib/publicaciones-drop/acciones";
 import { formatoEnDolares, formatoMonto, type MonedaPublicaciones } from "@/lib/publicaciones/moneda";
 import { vincularPublicacionDrop } from "./actions";
 import { margenBajoDrop, sinStockDrop, type FilaPublicacionDrop } from "./def-publicaciones-drop";
+import { DialogoAccesoPrivado, DialogoSolicitudInventario } from "./dialogos-fila-drop";
 
 const AVISO_SIN_CONEXION = "Todavía no se escribe en Drop desde el sistema: por ahora solo se leen sus publicaciones. Hazlo en Drop.";
 
 /**
  * Una publicación de Drop como fila de la lista (datos de Drop desde la migración 0221, 3 nov 2026): foto, nombre, ID de Drop, precio (en colones, con su valor
  * en dólares), inventario, margen y el producto vinculado; si no está vinculada, la sugerencia de la lectura con «Vincular» para confirmarla. Los botones
- * de Drop: inactivar o activar, liquidación (pendiente) y eliminar; no hay «Republicar» ni «Archivar» como en Dropi. Los botones no se esconden: si no se
+ * de Drop: inactivar o activar, gestionar inventario (pedir un ingreso: el stock no se edita), dar acceso privado (desde el mismo ID, con el correo del cliente), liquidación (pendiente) y
+ * eliminar; no hay «Republicar» ni «Archivar» como en Dropi (DROP-REFERENCIA.md). Los botones no se esconden: si no se
  * pueden usar van apagados y dicen por qué. Todavía no escriben en Drop, así que pulsarlos solo avisa.
  */
 export function FilaPublicacionDropLista({ f, moneda, puedeEscribir }: { f: FilaPublicacionDrop; moneda: MonedaPublicaciones; puedeEscribir: boolean }) {
@@ -26,6 +28,7 @@ export function FilaPublicacionDropLista({ f, moneda, puedeEscribir }: { f: Fila
   const estado = { estado: f.estado, idDrop: f.idDrop };
   const cambio = accionDeEstado(estado);
   const aviso = () => mostrarToast(AVISO_SIN_CONEXION);
+  const [dialogo, setDialogo] = useState<"inventario" | "privado" | null>(null);
   const enDolares = formatoEnDolares(f.precio, moneda);
   const vincular = (skuId: string) =>
     empezar(async () => {
@@ -102,6 +105,8 @@ export function FilaPublicacionDropLista({ f, moneda, puedeEscribir }: { f: Fila
           onClick={aviso}
           activo={cambio.accion === "activar" ? "azul" : undefined}
         />
+        <BotonIconoFila texto="Gestionar inventario" motivo={motivoGestionarInventario(estado)} icono={InventarioIcon} nombre={f.nombre} onClick={() => setDialogo("inventario")} />
+        <BotonIconoFila texto="Dar acceso privado" motivo={motivoAccesoPrivado(estado)} icono={CandadoIcon} nombre={f.nombre} onClick={() => setDialogo("privado")} />
         <BotonIconoFila texto="Poner en liquidación" motivo={motivoLiquidacion()} icono={EtiquetaIcon} nombre={f.nombre} onClick={aviso} />
         <BotonIconoFila
           texto="Eliminar publicación"
@@ -112,6 +117,8 @@ export function FilaPublicacionDropLista({ f, moneda, puedeEscribir }: { f: Fila
           clase="text-muted-foreground hover:bg-destructive-soft hover:text-destructive"
         />
       </div>
+      {dialogo === "inventario" && <DialogoSolicitudInventario nombre={f.nombre} alCerrar={() => setDialogo(null)} />}
+      {dialogo === "privado" && <DialogoAccesoPrivado nombre={f.nombre} alCerrar={() => setDialogo(null)} />}
     </div>
   );
 }
