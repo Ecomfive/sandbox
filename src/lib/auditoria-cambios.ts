@@ -61,6 +61,8 @@ export const ETIQUETA_ACCION: Record<string, string> = {
   reactivar_publicacion_dropi: "Reactivó la publicación pausada (fuera de Archivados)",
   vincular_sku_publicacion: "Vinculó el producto",
   desvincular_sku_publicacion: "Quitó el producto vinculado",
+  vincular_publicacion_drop: "Vinculó el producto de una publicación de Drop",
+  desvincular_publicacion_drop: "Quitó el producto vinculado de una publicación de Drop",
   generar_imagen_landing: "Generó una imagen con Gemini",
   ia_analisis_publicacion: "Analizó la publicación con IA",
   ia_titulos_publicacion: "Generó títulos con IA",

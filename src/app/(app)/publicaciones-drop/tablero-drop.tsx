@@ -7,7 +7,7 @@ import { anilloFoco } from "@/components/ui/field";
 import { alternarAtajo, atajoActivo, type AtajoFiltro } from "@/lib/tabla/atajos";
 import { AnalisisCompetenciaIcon, DesconectadoIcon, DropshipperIcon, EnlaceIcon, EstadoIcon, InventarioIcon, MargenIcon, SugerenciaIcon, TiendaIcon, VentasIcon } from "@/lib/nav-icons";
 import { MARGEN_BAJO } from "@/lib/publicaciones/publicacion";
-import { DEF_PUBLICACIONES_DROP, POCO_STOCK_DROP, estadoVinculoDrop, margenBajoDrop, pocoStockDrop, sinStockDrop, type FilaPublicacionDrop } from "./def-publicaciones-drop";
+import { DEF_PUBLICACIONES_DROP, POCO_STOCK_DROP, activaDrop, estadoVinculoDrop, margenBajoDrop, pocoStockDrop, sinStockDrop, type FilaPublicacionDrop } from "./def-publicaciones-drop";
 
 const seleccion = (campo: string, ...valores: string[]) => ({ campo, valor: { tipo: "seleccion" as const, valores } });
 
@@ -32,9 +32,9 @@ const TARJETAS: Tarjeta[] = [
     detalle: "Publicadas y activas según Drop",
     icono: TiendaIcon,
     color: "verde",
-    cuenta: (f) => f.estado === "activo",
-    junto: (todas) => todas.length.toLocaleString("es-PA"),
-    atajo: { id: "activas", etiqueta: "Activas en Drop", ayuda: "Filtrar la lista: activas en Drop", filtro: seleccion("estado", "activo") },
+    cuenta: activaDrop,
+    junto: (todas) => todas.filter((f) => f.conectado).length.toLocaleString("es-PA"),
+    atajo: { id: "activas", etiqueta: "Activas en Drop", ayuda: "Filtrar la lista: activas en Drop", filtro: seleccion("estado", "activo"), ademas: [seleccion("conexion", "conectado")] },
   },
   {
     id: "margen-bajo",
