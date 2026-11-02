@@ -1,19 +1,19 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element -- fotos de Drop (Google Cloud Storage) */
-import { useRouter } from "next/navigation";
-import { useState, useTransition, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { BotonIconoFila } from "@/app/(app)/publicaciones-dropi/boton-icono-fila";
 import { EtapaCotizando, LlegadaCamino } from "@/app/(app)/publicaciones-dropi/llegada-camino";
 import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
-import { ActualizarIcon, ApagarIcon, ArchivarIcon, CandadoAbiertoIcon, DropIcon, EnlaceIcon, EtiquetaIcon, InventarioIcon, PapeleraIcon, PausaIcon, ReactivarIcon, TareasIcon } from "@/lib/nav-icons";
+import { ActualizarIcon, ApagarIcon, ArchivarIcon, CandadoAbiertoIcon, ChevronRightIcon, DropIcon, EtiquetaIcon, InventarioIcon, PapeleraIcon, PausaIcon, ReactivarIcon, TareasIcon } from "@/lib/nav-icons";
 import { MOTIVO_SOLO_DROPI, accionDeEstado, ETIQUETA_ESTADO_DROP, motivoAccesoPrivado, motivoCambioEstado, motivoEliminar, motivoGestionarInventario, motivoLiquidacion } from "@/lib/publicaciones-drop/acciones";
 import { formatoEnDolares, formatoMonto, type MonedaPublicaciones } from "@/lib/publicaciones/moneda";
-import { vincularPublicacionDrop } from "./actions";
+import { ETIQUETA_SUGERENCIA, type TipoSugerencia } from "@/lib/publicaciones/vincular";
 import { DialogoAccesoPrivado, DialogoSolicitudInventario } from "./dialogos-fila-drop";
 import { margenBajoDrop, sinStockDrop, type FilaPublicacionDrop } from "./def-publicaciones-drop";
+import { InsigniaConectadoDrop } from "./insignia-conectado-drop";
 
 /** Las columnas de la fila en pantalla ancha (las mismas de Gestión de IDs Dropi con ventas); las usa también el encabezado, así que van juntas. */
 const COLUMNAS = "lg:grid-cols-[minmax(0,2.6fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1.1fr)_minmax(0,1.2fr)_4rem_1rem]";
@@ -21,7 +21,6 @@ const COLUMNAS = "lg:grid-cols-[minmax(0,2.6fr)_minmax(0,1fr)_minmax(0,1fr)_minm
 const AVISO_SIN_CONEXION = "Todavía no se escribe en Drop desde el sistema: por ahora solo se leen sus publicaciones. Hazlo en Drop.";
 
 const entero = (n: number) => n.toLocaleString("es-PA", { maximumFractionDigits: 0 });
-const urlDrop = (f: FilaPublicacionDrop) => `https://app.soydrop.com/vendor/products/details/${f.dropInterno}/inventory`;
 
 const Punto = ({ clase, texto }: { clase: string; texto: string }) => (
   <span role="img" aria-label={texto} className={`inline-block h-2 w-2 shrink-0 rounded-full ${clase}`} />
@@ -51,13 +50,13 @@ function Monto({ valor, moneda, className = "" }: { valor: number | null; moneda
 
 /** Cómo está en Drop, en poco espacio: el logo de Drop con un punto del color del estado (verde = activa, gris = inactiva), como el de Dropi. */
 function IconoEnDrop({ f }: { f: FilaPublicacionDrop }) {
-  const activa = f.estado === "activo";
-  const texto = `${ETIQUETA_ESTADO_DROP[f.estado]} en Drop`;
+  const activa = f.conectado && f.estado === "activo";
+  const texto = f.conectado ? `${ETIQUETA_ESTADO_DROP[f.estado]} en Drop` : "Ya no aparece en Drop";
   return (
     <Tooltip texto={texto}>
       <span role="img" aria-label={texto} className="relative inline-flex h-7 w-7 items-center justify-center">
         <DropIcon marca className={`h-6 w-6 ${activa ? "" : "opacity-40 grayscale"}`} />
-        <span aria-hidden="true" className={`absolute -right-0.5 -bottom-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-card ${activa ? "bg-success" : "bg-muted-foreground"}`} />
+        <span aria-hidden="true" className={`absolute -right-0.5 -bottom-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-card ${activa ? "bg-success" : f.conectado ? "bg-muted-foreground" : "bg-destructive"}`} />
       </span>
     </Tooltip>
   );
@@ -105,8 +104,8 @@ export function EncabezadoFilasDrop() {
     { nombre: "En Drop" },
   ];
   return (
-    // A la derecha quedan los ocho botones de la fila (36 px cada uno, 4 px entre ellos y 12 px de margen, más los 16 px de relleno de la fila).
-    <div className={`hidden items-center gap-x-4 py-2.5 pr-[21.5rem] pl-4 text-xs font-semibold tracking-wide text-muted-foreground uppercase lg:grid ${COLUMNAS}`}>
+    // A la derecha quedan los nueve botones de la fila (36 px cada uno, 4 px entre ellos y 12 px de margen, más los 16 px de relleno de la fila).
+    <div className={`hidden items-center gap-x-4 py-2.5 pr-[24rem] pl-4 text-xs font-semibold tracking-wide text-muted-foreground uppercase lg:grid ${COLUMNAS}`}>
       {columnas.map((c) => (
         <span key={c.nombre} className={`min-w-0 truncate ${c.derecha ? "text-right" : ""}`}>
           {c.nombre}
@@ -118,33 +117,30 @@ export function EncabezadoFilasDrop() {
 }
 
 /**
- * Una publicación de Drop como fila de la lista, igual a la de Gestión de IDs Dropi (3 nov 2026, pedido de Hernán): foto, nombre con su ID y su SKU, precio
- * (con el costo del producto y el fulfillment), utilidad y margen, ventas, en camino, dónde está y cómo está en Drop (el logo de Drop con su punto). Toda la
- * fila abre la página del producto en Drop. Si no está vinculada, la sugerencia de la lectura con «Vincular» para confirmarla. A la derecha, los mismos
- * botones que en Dropi y en el mismo orden, más «Eliminar»; los que Drop no tiene van apagados y dicen por qué. Todavía no escriben en Drop: pulsarlos avisa.
+ * Una publicación de Drop como fila de la lista, igual a la de Gestión de IDs Dropi (3 nov 2026, pedido de Hernán): foto, nombre con su ID, la insignia de
+ * conexión con Drop y su SKU (o la sugerencia), precio (con el costo del producto y el fulfillment), utilidad y margen, ventas, en camino, dónde está y cómo
+ * está en Drop (el logo de Drop con su punto). Toda la fila abre su ficha (`FichaPublicacionDrop`), donde se vincula el producto. A la derecha, los botones
+ * de Dropi en su orden, más «Gestionar inventario» y «Eliminar»; los que Drop no tiene van apagados y dicen por qué.
  */
-export function FilaPublicacionDropLista({ f, moneda, puedeEscribir }: { f: FilaPublicacionDrop; moneda: MonedaPublicaciones; puedeEscribir: boolean }) {
+export function FilaPublicacionDropLista({ f, moneda, alAbrir }: { f: FilaPublicacionDrop; moneda: MonedaPublicaciones; alAbrir: () => void }) {
   const { mostrarToast } = useToast();
-  const router = useRouter();
-  const [pendiente, empezar] = useTransition();
   const estado = { estado: f.estado, idDrop: f.idDrop };
   const cambio = accionDeEstado(estado);
   const aviso = () => mostrarToast(AVISO_SIN_CONEXION);
   const nada = () => {};
   const [dialogo, setDialogo] = useState<"inventario" | "privado" | null>(null);
-  const vincular = (skuId: string) =>
-    empezar(async () => {
-      const r = await vincularPublicacionDrop(f.id, skuId).catch(() => ({ error: "No se pudo vincular. Inténtalo de nuevo." }));
-      if ("error" in r) return mostrarToast(r.error, "destructive");
-      mostrarToast(`${f.nombre}: vinculada a ${r.producto.codigo}.`);
-      router.refresh();
-    });
+  const tipo = f.sugerencia as TipoSugerencia | null;
 
   return (
     // En pantalla angosta los botones pasan debajo de la fila (no caben al lado); en ancha van a la derecha, como en Dropi.
     <div className="flex flex-wrap items-center lg:flex-nowrap">
       <div className="min-w-0 flex-1 basis-full lg:basis-auto">
-        <div className={`group grid w-full grid-cols-[minmax(0,1fr)_1rem] items-center gap-x-4 gap-y-3 px-4 py-3 text-left transition-colors hover:bg-muted/50 ${COLUMNAS}`}>
+        <button
+          type="button"
+          onClick={alAbrir}
+          aria-label={`Abrir la ficha de ${f.nombre}`}
+          className={`group grid w-full cursor-pointer grid-cols-[minmax(0,1fr)_1rem] items-center gap-x-4 gap-y-3 px-4 py-3 text-left transition-colors hover:bg-muted/50 ${COLUMNAS} ${anilloFoco}`}
+        >
           {/* Producto */}
           <span className="flex min-w-0 items-center gap-3">
             {f.fotoUrl ? (
@@ -153,37 +149,19 @@ export function FilaPublicacionDropLista({ f, moneda, puedeEscribir }: { f: Fila
               <span aria-hidden="true" className="h-12 w-12 shrink-0 rounded-lg border border-dashed border-border-control" />
             )}
             <span className="flex min-w-0 flex-col gap-0.5">
-              <a href={urlDrop(f)} target="_blank" rel="noopener noreferrer" className={`truncate rounded text-sm font-medium hover:underline ${anilloFoco}`}>
-                {f.nombre}
-                <span className="sr-only"> (abre su página en Drop)</span>
-              </a>
+              <span className="truncate text-sm font-medium">{f.nombre}</span>
               <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground [overflow-wrap:anywhere]">
                 <span className="tabular-nums">{f.idDrop || "Sin ID de Drop"}</span>
+                <InsigniaConectadoDrop conectado={f.conectado} />
                 {f.producto ? (
                   <span className="font-mono font-semibold text-foreground">{f.producto.codigo}</span>
-                ) : f.sugerido ? (
-                  <span className="inline-flex flex-wrap items-center gap-1.5">
-                    <Punto clase="bg-warning" texto="Sin vincular producto" />
-                    Sugerido · <span className="font-mono font-semibold text-foreground">{f.sugerido.codigo}</span>
-                    {puedeEscribir && (
-                      <button
-                        type="button"
-                        disabled={pendiente}
-                        onClick={() => vincular(f.sugerido!.id)}
-                        className={`inline-flex items-center gap-1 rounded px-1 font-medium text-primario hover:underline disabled:opacity-50 ${anilloFoco}`}
-                      >
-                        <EnlaceIcon aria-hidden="true" className="h-3 w-3" />
-                        {pendiente ? "Vinculando…" : "Vincular"}
-                      </button>
-                    )}
-                  </span>
                 ) : (
                   <span className="inline-flex items-center gap-1.5">
                     <Punto clase="bg-warning" texto="Sin vincular producto" />
-                    Sin SKU
+                    {f.sugerido && tipo ? `${ETIQUETA_SUGERENCIA[tipo] ?? "Sugerido"} · ${f.sugerido.codigo}` : "Sin SKU"}
                   </span>
                 )}
-                {f.estado === "inactivo" && <span className="font-medium">Inactiva</span>}
+                {f.conectado && f.estado === "inactivo" && <span className="font-medium">Inactiva</span>}
               </span>
             </span>
           </span>
@@ -244,18 +222,8 @@ export function FilaPublicacionDropLista({ f, moneda, puedeEscribir }: { f: Fila
             <Celda nombre="En Drop" principal={<IconoEnDrop f={f} />} />
           </span>
 
-          <a
-            href={urlDrop(f)}
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label={`Abrir ${f.nombre} en Drop`}
-            className={`rounded text-muted-foreground transition-transform group-hover:translate-x-0.5 hover:text-foreground lg:order-last ${anilloFoco}`}
-          >
-            <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="m9 6 6 6-6 6" />
-            </svg>
-          </a>
-        </div>
+          <ChevronRightIcon aria-hidden="true" className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 lg:order-last" />
+        </button>
       </div>
       {/* Los mismos botones que la fila de Dropi y en su orden, más «Eliminar»: los que no aplican en Drop van apagados y dicen por qué. */}
       <div className="mb-2 ml-3 flex min-w-0 flex-wrap items-center gap-1 lg:mb-0 lg:ml-0 lg:mr-3 lg:shrink-0 lg:flex-nowrap">
