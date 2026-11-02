@@ -2315,6 +2315,12 @@ convenciones técnicas del código.
   La pestaña **Vínculos** (`/crm-dropshippers/vinculos`) lista los usuarios de Dropi con pedidos que no son de ningún
   dropshipper, de más a menos pedidos, con una sugerencia por parecido del nombre de la tienda (`src/lib/crm/sugerencias.ts`;
   Dropi no manda más datos del dropshipper): se confirma uno a uno, nunca se vincula solo.
+  **Vincular un país de una vez** (Panamá el 21 oct 2026; **Costa Rica el 3 nov 2026**, pedido de Hernán: 22 vinculados, 52 fichas nuevas,
+  93,5 % de los pedidos con dropshipper): el pedido de Dropi solo trae `user_id`; nombre, correo y teléfono vienen en el Historial de
+  Existencia (`inventories/history`, `m.user`). `scripts/dropi-usuarios-navegador.js` (en app.dropi.<país> con sesión de proveedor; recibe los
+  productos y usuarios a buscar) los sube con la dirección de `scripts/dropi-usuarios.ts subida <país>`; `… cargar <país>` los baja a
+  `datos-privados/dropi-usuarios-<país>.json`; `scripts/vincular-dropshippers-dropi.ts <país>` da el informe y `--aplicar` vincula (correo,
+  teléfono con el código del país o nombre idéntico) y crea las fichas. México: falta (sesión de proveedor de Dropi MX).
   **Actividad con comentarios** (migración 0184, 29 oct 2026): `ActividadDropshipper` (`actividad-dropshipper.tsx`, el `Actividad` común de
   Compras) en la ficha del CRM y en la del chat de la bandeja; `actividad-dropshipper-actions.ts` usa el motor de `lib/comentarios` (tablas
   `dropshipper_comentarios`/`_adjuntos`/`_comentario_reacciones`, bucket `crm-dropshippers`) y toma los cambios de `obtenerLineaDeTiempo`,
