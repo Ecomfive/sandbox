@@ -47,7 +47,8 @@ Ese código de venta público es el **ID de la publicación en Drop**.
 ## Privatizar
 
 - **Dropi:** se crea otro producto privado aparte (con su propio ID), con el correo del dropshipper y las unidades reservadas.
-- **Drop:** se hace **desde el mismo ID**: se le da **acceso** al producto a un cliente: se activa, se pone su **correo** y el **precio de venta** (el mismo o uno distinto para ese cliente). No hay un producto privado aparte.
+- **Drop:** se hace **desde el mismo ID y con el mismo SKU** (confirmado por Nicole, 3 nov 2026): el producto queda privado para un dropshipper específico y se **aparta una cantidad de unidades solo para él**; se pone su **correo**, las **unidades** y el **precio de venta** (el mismo o uno distinto para ese cliente). No hay un producto privado aparte.
+- **Alerta de poco stock (Drop):** cuando falta stock Drop crea una **alerta que llega al correo** (la opción «avisar por correo» de «Crear producto»). Además, **al quedarse sin stock un producto, Drop solo lo desactiva** (confirmado por Nicole, 3 nov 2026): no hay que pausarlo ni inactivarlo a mano. Por eso Drop **no pausa** por falta de stock, y en el sistema «Sin stock» cuenta las publicaciones con 0 unidades **estén activas o no** (`sinStockDrop`); volver a activar es tras un ingreso de inventario.
 
 ## Inactivar, activar, eliminar
 
@@ -76,4 +77,4 @@ Ese código de venta público es el **ID de la publicación en Drop**.
   sus validaciones (`faltantesCrearDrop`); Análisis de competencia con la plataforma Drop (vacío). **Todavía no escriben en Drop**: los botones y el formulario validan y avisan «hazlo en Drop».
 - Falta: **escribir** en Drop (crear productos, pedir ingresos de inventario, dar accesos privados, inactivar/activar, eliminar), leer las **solicitudes de inventario** y su estado (aprobada o declinada), conectar la competencia de Drop y crear las tablas de lo que falte (`drop_*`, con RLS sin políticas). Drop **no pide
   código de autenticación**, lo que debería hacer más simple conectarlo.
-- Preguntas abiertas: si Drop también tiene privatizar con unidades reservadas, pausar por falta de stock o tareas como Dropi (no se copiaron esos botones).
+- Preguntas abiertas: si Drop tiene tareas como Dropi (el botón «Tareas» sigue apagado).

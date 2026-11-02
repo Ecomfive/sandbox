@@ -410,7 +410,7 @@ export function FichaPublicacionDrop({
       </div>
       <FichaProductoEmbebida productoId={productoAbierto} alCerrar={() => setProductoAbierto(null)} />
       {dialogo === "inventario" && <DialogoSolicitudInventario nombre={p.nombre} alCerrar={() => setDialogo(null)} />}
-      {dialogo === "privado" && <DialogoAccesoPrivado nombre={p.nombre} alCerrar={() => setDialogo(null)} />}
+      {dialogo === "privado" && <DialogoAccesoPrivado nombre={p.nombre} disponibles={p.inventario} alCerrar={() => setDialogo(null)} />}
     </Ventana>
   );
 }

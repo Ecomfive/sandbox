@@ -252,7 +252,7 @@ export function FilaPublicacionDropLista({ f, moneda, alAbrir }: { f: FilaPublic
         <BotonIconoFila texto="Tareas" motivo={MOTIVO_SOLO_DROPI.tareas} icono={TareasIcon} nombre={f.nombre} onClick={nada} />
       </div>
       {dialogo === "inventario" && <DialogoSolicitudInventario nombre={f.nombre} alCerrar={() => setDialogo(null)} />}
-      {dialogo === "privado" && <DialogoAccesoPrivado nombre={f.nombre} alCerrar={() => setDialogo(null)} />}
+      {dialogo === "privado" && <DialogoAccesoPrivado nombre={f.nombre} disponibles={f.inventario} alCerrar={() => setDialogo(null)} />}
     </div>
   );
 }
