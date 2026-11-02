@@ -58,16 +58,18 @@ export function DialogoSolicitudInventario({ nombre, alCerrar }: { nombre: strin
 }
 
 /**
- * «Dar acceso privado» de Drop: no hay un producto privado aparte; se le da acceso al producto desde el mismo ID, con el correo del cliente y su precio de venta (el mismo u otro).
+ * «Dar acceso privado» de Drop: no hay un producto privado aparte; el producto queda privado para un dropshipper desde el mismo ID y el mismo SKU, con el correo del cliente, las unidades que se le apartan
+ * solo a él y su precio de venta (el mismo u otro).
  * Todavía el sistema no escribe en Drop: valida y avisa.
  */
-export function DialogoAccesoPrivado({ nombre, alCerrar }: { nombre: string; alCerrar: () => void }) {
+export function DialogoAccesoPrivado({ nombre, disponibles, alCerrar }: { nombre: string; disponibles: number | null; alCerrar: () => void }) {
   const { mostrarToast } = useToast();
   const [correo, setCorreo] = useState("");
   const [precio, setPrecio] = useState("");
+  const [unidades, setUnidades] = useState("");
   const [error, setError] = useState<string | null>(null);
   function dar() {
-    const r = validarAccesoPrivado(correo, precio);
+    const r = validarAccesoPrivado(correo, precio, unidades, disponibles);
     if ("error" in r) return setError(r.error);
     mostrarToast(AVISO_SIN_CONEXION_FILA);
     alCerrar();
@@ -84,6 +86,9 @@ export function DialogoAccesoPrivado({ nombre, alCerrar }: { nombre: string; alC
         <p className="m-0 text-sm font-medium [overflow-wrap:anywhere]">{nombre}</p>
         <Campo etiqueta="Correo del cliente" id="campo-correo" obligatorio>
           <input id="campo-correo" type="email" required data-enfocar value={correo} onChange={(e) => (setCorreo(e.target.value), setError(null))} placeholder="Ej: cliente@correo.com" className={`${fieldClass} w-full`} />
+        </Campo>
+        <Campo etiqueta={disponibles !== null ? `Unidades que se le apartan (hay ${disponibles})` : "Unidades que se le apartan"} id="campo-unidades-privado" obligatorio>
+          <input id="campo-unidades-privado" type="number" required min="1" step="1" value={unidades} onChange={(e) => (setUnidades(e.target.value), setError(null))} placeholder="Ej: 50" className={`${fieldClass} w-full tabular-nums`} />
         </Campo>
         <Campo etiqueta="Precio de venta para este cliente (₡)" id="campo-precio-privado">
           <input id="campo-precio-privado" type="number" min="1" step="1" value={precio} onChange={(e) => (setPrecio(e.target.value), setError(null))} placeholder="Vacío: el mismo precio" className={`${fieldClass} w-full tabular-nums`} />

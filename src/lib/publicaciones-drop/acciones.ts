@@ -53,15 +53,24 @@ export function validarSolicitudIngreso(unidades: unknown): { error: string } | 
 }
 
 /**
- * Lo que se escribe al dar acceso privado: el correo del cliente y su precio de venta. Sin precio, se le da el mismo de la publicación (`precio: null`); si se escribe, debe ser mayor a cero.
+ * Lo que se escribe al dar acceso privado (confirmado por Nicole, 3 nov 2026): el producto se hace privado para un dropshipper —mismo ID y mismo SKU— y se **aparta una cantidad de unidades solo para él**.
+ * Se pide el correo del cliente, las unidades a apartar (entero de 1 en adelante, sin pasar de las que hay si se conocen) y, opcional, su precio de venta (sin precio, el mismo de la publicación: `precio: null`).
  */
-export function validarAccesoPrivado(correo: string, precio: unknown): { error: string } | { correo: string; precio: number | null } {
+export function validarAccesoPrivado(
+  correo: string,
+  precio: unknown,
+  unidades: unknown,
+  disponibles: number | null = null,
+): { error: string } | { correo: string; precio: number | null; unidades: number } {
   const c = correo.trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c)) return { error: "Escribe el correo del cliente." };
-  if (precio === null || precio === undefined || String(precio).trim() === "") return { correo: c, precio: null };
+  const u = Number(unidades);
+  if (String(unidades ?? "").trim() === "" || !Number.isInteger(u) || u < 1) return { error: "Escribe cuántas unidades se apartan para este cliente (un número entero de 1 en adelante)." };
+  if (disponibles !== null && u > disponibles) return { error: `Solo hay ${disponibles} unidades en Drop: no se pueden apartar ${u}.` };
+  if (precio === null || precio === undefined || String(precio).trim() === "") return { correo: c, precio: null, unidades: u };
   const n = Number(precio);
   if (!Number.isFinite(n) || n <= 0) return { error: "El precio debe ser mayor a cero (o déjalo vacío para usar el mismo)." };
-  return { correo: c, precio: n };
+  return { correo: c, precio: n, unidades: u };
 }
 
 /** El botón de liquidación queda como pendiente: se deja a la vista para ver si Drop lo usa. */

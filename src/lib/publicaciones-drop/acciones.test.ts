@@ -36,10 +36,16 @@ describe("acciones de Drop", () => {
     assert.ok("error" in validarSolicitudIngreso("1.5"));
     assert.ok("error" in validarSolicitudIngreso(""));
   });
-  it("el acceso privado pide el correo; el precio es opcional (sin él, el mismo)", () => {
-    assert.deepEqual(validarAccesoPrivado(" Cliente@Correo.com ", ""), { correo: "cliente@correo.com", precio: null });
-    assert.deepEqual(validarAccesoPrivado("a@b.co", "9500"), { correo: "a@b.co", precio: 9500 });
-    assert.ok("error" in validarAccesoPrivado("sin-arroba", ""));
-    assert.ok("error" in validarAccesoPrivado("a@b.co", "-5"));
-    });
+  it("el acceso privado pide el correo y las unidades a apartar; el precio es opcional (sin él, el mismo)", () => {
+    assert.deepEqual(validarAccesoPrivado(" Cliente@Correo.com ", "", "20"), { correo: "cliente@correo.com", precio: null, unidades: 20 });
+    assert.deepEqual(validarAccesoPrivado("a@b.co", "9500", "5"), { correo: "a@b.co", precio: 9500, unidades: 5 });
+    assert.ok("error" in validarAccesoPrivado("sin-arroba", "", "5"));
+    assert.ok("error" in validarAccesoPrivado("a@b.co", "-5", "5"));
+  });
+  it("las unidades apartadas son enteras, de 1 en adelante y no pasan de las que hay", () => {
+    for (const malo of ["", "0", "1.5", "-2", "abc"]) assert.ok("error" in validarAccesoPrivado("a@b.co", "", malo), malo);
+    assert.deepEqual(validarAccesoPrivado("a@b.co", "", "10", 10), { correo: "a@b.co", precio: null, unidades: 10 });
+    assert.ok("error" in validarAccesoPrivado("a@b.co", "", "11", 10));
+    assert.deepEqual(validarAccesoPrivado("a@b.co", "", "11", null), { correo: "a@b.co", precio: null, unidades: 11 });
+  });
 });
