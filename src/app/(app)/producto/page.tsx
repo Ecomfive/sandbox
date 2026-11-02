@@ -27,10 +27,10 @@ export default async function ProductoPage({ searchParams }: { searchParams: Pro
     typeof componente === "string" && esUuid(componente) && Number.isInteger(unidades) && unidades >= 1 && unidades <= 1000 ? { componenteId: componente, cantidad: unidades } : null;
   const usuario = await requireModulo("producto");
   const supabase = createServiceClient();
-  // El producto es igual para todos los países; el país solo da formato a las fechas de su actividad.
+  // El producto es igual para todos los países; el país da formato a las fechas de su actividad y elige de qué país es el stock en Dropi.
   const pais = await getPaisActual(supabase);
 
-  const { filas, opcionesSimples, referenciasTest } = await cargarProductos(usuario, supabase);
+  const { filas, opcionesSimples, referenciasTest } = await cargarProductos(usuario, supabase, pais.codigo);
 
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">

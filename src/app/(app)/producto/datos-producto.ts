@@ -39,7 +39,7 @@ const unoDe = <T,>(r: T | T[] | null): T | null => (Array.isArray(r) ? (r[0] ?? 
  * variantes), la lista de productos simples para armar un compuesto y la referencia del «Resultado del
  * test». La usan la página de Producto y la ficha que se abre desde otros módulos (`obtenerProductoParaFicha`).
  */
-export async function cargarProductos(usuario: UsuarioActual, supabase: SupabaseClient) {
+export async function cargarProductos(usuario: UsuarioActual, supabase: SupabaseClient, codigoPais: string) {
   // Todos los productos, paginando: cada consulta devuelve 1 000 filas como máximo y el catálogo ya pasa de ahí (sin paginar se
   // perdían los más antiguos).
   const { data: productos } = await traerTodasConError<ProductoBd>((desde, hasta) =>
@@ -111,7 +111,9 @@ export async function cargarProductos(usuario: UsuarioActual, supabase: Supabase
     if (!nombre || actuales.some((n) => n.nombre === nombre && n.pais === pais)) continue;
     nombresDropiPorSku.set(id, [...actuales, { id: String(pub.id), nombre, pais, dropiId: String(pub.dropi_id ?? ""), archivada: pub.estado === "archivado" }]);
   }
-  // Unidades en Dropi de cada producto: la suma de los productos de Dropi de sus publicaciones abiertas (cada ID una vez).
+  // Unidades en Dropi de cada producto: la suma de los productos de Dropi de sus publicaciones abiertas (cada ID una vez) **del país
+  // de la barra** (2 nov 2026, pedido de Hernán: «el inventario de todos los países están unidos»; antes sumaba Panamá, Costa Rica y
+  // México y el mismo total salía en todos).
   const stockPorDropi = new Map(
     (stockDropi.error ? [] : (stockDropi.data ?? [])).map((s) => [`${unoDe(s.paises as { codigo: string } | { codigo: string }[] | null)?.codigo ?? ""}:${s.dropi_producto_id}`, Number(s.stock ?? 0)]),
   );
@@ -120,7 +122,7 @@ export async function cargarProductos(usuario: UsuarioActual, supabase: Supabase
   for (const pub of publicacionesOrdenadas) {
     if (pub.estado === "archivado") continue;
     const pais = unoDe(pub.paises as { codigo: string } | { codigo: string }[] | null)?.codigo ?? "";
-    if (!puedeVerPais(usuario.paisesPermitidos, pais || null)) continue;
+    if (pais !== codigoPais || !puedeVerPais(usuario.paisesPermitidos, pais || null)) continue;
     for (const id of idsDeDropi(pub.dropi_id as string | null)) {
       const clave = `${pais}:${id}`;
       const stock = stockPorDropi.get(clave);

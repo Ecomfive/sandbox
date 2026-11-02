@@ -401,7 +401,9 @@ convenciones técnicas del código.
   `decidir` de `DEF_PRODUCTO`, varios valores por producto de `puntosParaDecidir` (`src/lib/producto/para-decidir.ts`, con prueba):
   sin foto, sin conectar (sin asociaciones ni publicaciones), sin stock / stock bajo (< `STOCK_BAJO` 50) en Dropi, nunca comprado y
   categoría a revisar, solo activos; winner sin comprar (activo o test con test «winner» o «enviado_a_compras» y 0 órdenes).
-  `FilaProducto.stockDropi`: suma de `dropi_productos_proveedor.stock` de los IDs de sus publicaciones abiertas (`idsDeDropi`).
+  `FilaProducto.stockDropi`: suma de `dropi_productos_proveedor.stock` de los IDs de sus publicaciones abiertas (`idsDeDropi`) **del país de la
+  barra** (`cargarProductos(usuario, supabase, codigoPais)`; 2 nov 2026, pedido de Hernán: sumaba Panamá, Costa Rica y México y el mismo total
+  salía en todos los países; el inventario de cada país va por separado).
   **Lista por filas** (23 oct 2026): `ListaDatos variante="filas"` con `FilaProductoLista` (`fila-producto.tsx`, como
   `FilaPublicacionLista`): foto, nombre (vista rápida al pasar el cursor), número, SKU y categoría; estado y tipo; último test con
   oferta; compras; stock en Dropi o «Sin conectar». Ya no hay columnas para ocultar (se quitó `CeldaTestProducto`).
@@ -1823,7 +1825,9 @@ convenciones técnicas del código.
   `wms_stock_resumen` lo calcula de sus componentes. La página lista todos los SKU (también en cero) con filtro por bodega; la
   ficha de un SKU (`FichaStock`) muestra su stock por bodega, los últimos movimientos y los botones Entrada, Salida y Ajuste
   (`registrarMovimientoStock`, que devuelve `{ error }` como valor). El pistoleo anterior (carga por CSV) quedó en
-  `/inventario/pistoleo`.
+  `/inventario/pistoleo`. **Cada país tiene su inventario**: el stock es por bodega y cada bodega es de un país (`wms_bodegas.pais_id`); la
+  página y la ficha solo leen las bodegas del país de la barra. `wms_stock_resumen` se pide **paginado** (`traerTodasConError` + `.range`): sin
+  eso la lista se cortaba en 1 000 productos (2 nov 2026).
   **Inventario a mano en Panamá** (migración 0214, 31 oct 2026, pedido de Alcides: dejar ClickUp, donde había una tarea por producto con una
   columna de stock por lugar y cada movimiento era cambiar el número + un comentario). Bodegas de Panamá: Despacho Plaza 100, Oficina Ancón
   (`oficina_ancon`), Fulfillment Ricardo (la `fulfillment`, antes «Deposito Plaza 100») e iStorage (`istorage`), todas propias, más Dropi (B280,

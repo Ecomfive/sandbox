@@ -40,7 +40,8 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
 
   const idsPropias = bodegas.filter((b) => b.tipo === "propia" && b.activa).map((b) => b.id as string);
   const [resumen, ubicaciones, fotos] = await Promise.all([
-    supabase.rpc("wms_stock_resumen", { p_pais: pais.id, p_bodega: bodegaElegida || null }),
+    // Paginado: cada consulta trae 1 000 filas como máximo y hay más productos (2 nov 2026: la lista se cortaba en 1 000).
+    traerTodasConError<Record<string, unknown>>((desde, hasta) => supabase.rpc("wms_stock_resumen", { p_pais: pais.id, p_bodega: bodegaElegida || null }).range(desde, hasta)),
     idsPropias.length > 0
       ? supabase.from("wms_ubicaciones").select("id, bodega_id, codigo, propiedad").in("bodega_id", idsPropias).eq("activa", true).order("codigo")
       : Promise.resolve({ data: [] as { id: string; bodega_id: string; codigo: string; propiedad: string }[] }),

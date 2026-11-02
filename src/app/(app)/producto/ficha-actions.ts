@@ -26,7 +26,8 @@ export async function obtenerProductoParaFicha(id: string): Promise<ProductoPara
   if (!usuario || !usuario.modulos.includes("producto")) return { error: "No tienes acceso a Producto." };
   if (!ES_ID(id)) return { error: "Producto no válido." };
   const supabase = createServiceClient();
-  const [{ filas, referenciasTest }, pais] = await Promise.all([cargarProductos(usuario, supabase), getPaisActual(supabase)]);
+  const pais = await getPaisActual(supabase);
+  const { filas, referenciasTest } = await cargarProductos(usuario, supabase, pais.codigo);
   const producto = filas.find((f) => f.id === id);
   if (!producto) return { error: "No se encontró el producto." };
   const puedeEscribir = !usuario.modulosSoloLectura.includes("producto");
