@@ -1,14 +1,13 @@
 // Gestión de IDs Drop: lo que se puede hacer con una publicación de Drop (3 nov 2026, pedido de Hernán). Drop no es igual que Dropi, así que las acciones de la fila son otras:
-//   * No se republica (Drop no lo tiene): no hay botón.
+//   * No se republica, no se pausa y no se archiva (Drop no lo tiene): **no hay botón** (3 nov 2026, pedido de Hernán: lo que Drop no usa no se dibuja, ni apagado).
 //   * «Apagar» se llama **inactivar**: una publicación inactiva se vuelve a **activar** con el mismo botón.
-//   * No se archiva: solo se **elimina**.
+//   * Lo que sobra solo se **elimina**.
 //   * «En liquidación» queda como botón **pendiente**: Drop todavía no lo usa y se ve si se necesita.
 //   * El stock **no se edita**: un producto nace en cero y el stock entra con una **solicitud de ingreso de inventario** que la bodega aprueba o declina («Gestionar inventario»).
 //   * **No hay producto privado aparte**: se le da **acceso** al producto desde el mismo ID, con el correo del cliente y su precio (el mismo u otro).
 // Todo está explicado en DROP-REFERENCIA.md.
-// Como en Dropi, un botón no se esconde: si no se puede usar va apagado y dice por qué. Sin base ni React, con prueba (acciones.test.ts).
-// La fila lleva todos los íconos de la de Gestión de IDs Dropi, en el mismo orden (3 nov 2026, pedido de Hernán: «con todos los iconos»): los que Drop no
-// tiene (republicar, pausar, archivar) o que todavía no se hacen desde aquí (privatizar, tareas) van apagados y dicen por qué (`MOTIVO_SOLO_DROPI`).
+// Un botón de Drop que hoy no se puede usar (sin ID, por ejemplo) va apagado y dice por qué; uno que Drop no tiene no está. Los que están **pendientes** de ver si Drop los usa
+// (liquidación, tareas) se dejan a la vista, apagados (`MOTIVOS_PENDIENTES_DROP`). Sin base ni React, con prueba (acciones.test.ts).
 
 export type EstadoDrop = "activo" | "inactivo";
 
@@ -77,13 +76,10 @@ export function validarAccesoPrivado(
 export const MOTIVO_LIQUIDACION_DROP = "Pendiente: todavía no se usa en Drop";
 export const motivoLiquidacion = (): string => MOTIVO_LIQUIDACION_DROP;
 
-/** Por qué los botones de Dropi que Drop no tiene (o que todavía no se hacen desde aquí) van apagados en la fila de Drop. */
-export const MOTIVO_SOLO_DROPI = {
-  republicar: "Drop no republica",
-  pausar: "Drop no pausa: al quedarse sin stock se inactiva sola",
-  archivar: "Drop no archiva: lo que sobra se elimina",
-  tareas: "Todavía sin tareas en Drop",
+/** Los botones que quedan pendientes (todavía no se sabe si Drop los usa): se dejan a la vista, apagados, con su porqué. */
+export const MOTIVOS_PENDIENTES_DROP = {
+  tareas: "Pendiente: todavía sin tareas en Drop",
 } as const;
 
-/** Las acciones de la fila de Drop, en el orden en que se dibujan: el mismo de la fila de Dropi, más «Gestionar inventario» después de «Privatizar» (acceso privado) y «Eliminar» después de «Archivar». */
-export const ACCIONES_FILA_DROP = ["republicar", "privatizar", "inventario", "estado", "pausar", "liquidacion", "archivar", "eliminar", "tareas"] as const;
+/** Las acciones de la fila de Drop, en el orden en que se dibujan: las de Dropi que Drop sí tiene (acceso privado, inactivar o activar, liquidación), «Gestionar inventario» después del acceso privado, «Eliminar» y «Tareas» (pendiente). No están republicar, pausar ni archivar. */
+export const ACCIONES_FILA_DROP = ["privatizar", "inventario", "estado", "liquidacion", "eliminar", "tareas"] as const;

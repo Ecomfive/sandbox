@@ -13,9 +13,9 @@ import { CampoSkuMaestro, type OpcionSkuMaestro } from "@/components/ui/selector
 import { SkuCopiable } from "@/components/ui/sku-copiable";
 import { useToast } from "@/components/ui/toast";
 import { Ventana } from "@/components/ui/ventana";
-import { ActualizarIcon, ApagarIcon, ArchivarIcon, CandadoAbiertoIcon, ComprasIcon, DropIcon, EstadoIcon, EtiquetaIcon, InteligenciaIcon, InventarioIcon, MargenIcon, PapeleraIcon, PausaIcon, ProductoIcon, ReactivarIcon } from "@/lib/nav-icons";
+import { ApagarIcon, CandadoAbiertoIcon, ComprasIcon, DropIcon, EstadoIcon, EtiquetaIcon, InteligenciaIcon, InventarioIcon, MargenIcon, PapeleraIcon, ProductoIcon, ReactivarIcon } from "@/lib/nav-icons";
 import { formatearFechaHora } from "@/lib/formato";
-import { MOTIVO_SOLO_DROPI, accionDeEstado, ETIQUETA_ESTADO_DROP, motivoAccesoPrivado, motivoCambioEstado, motivoEliminar, motivoGestionarInventario, motivoLiquidacion } from "@/lib/publicaciones-drop/acciones";
+import { accionDeEstado, ETIQUETA_ESTADO_DROP, motivoAccesoPrivado, motivoCambioEstado, motivoEliminar, motivoGestionarInventario, motivoLiquidacion } from "@/lib/publicaciones-drop/acciones";
 import { formatoEnDolares, formatoMonto, type MonedaPublicaciones } from "@/lib/publicaciones/moneda";
 import { MARGEN_BAJO } from "@/lib/publicaciones/publicacion";
 import { ETIQUETA_SUGERENCIA, type TipoSugerencia } from "@/lib/publicaciones/vincular";
@@ -217,10 +217,9 @@ export function FichaPublicacionDrop({
         </>
       }
     >
-      {/* Los mismos botones que la fila, en su orden: los de Dropi, más «Gestionar inventario» y «Eliminar». */}
+      {/* Los mismos botones que la fila, en su orden: solo los que Drop usa. */}
       {puedeEscribir && (
         <div className="sticky top-[var(--alto-cabecera,3.8rem)] z-[5] flex flex-wrap gap-2 border-y border-border bg-card px-5 py-3">
-          <BotonAccionApagado icono={ActualizarIcon} texto="Republicar" motivo={MOTIVO_SOLO_DROPI.republicar} />
           {motivoPrivado === null ? (
             <BotonAccion icono={CandadoAbiertoIcon} tono="privado" onClick={() => setDialogo("privado")}>
               Dar acceso privado
@@ -242,9 +241,7 @@ export function FichaPublicacionDrop({
           ) : (
             <BotonAccionApagado icono={ApagarIcon} texto={cambio.accion === "inactivar" ? "Inactivar en Drop" : "Activar en Drop"} motivo={motivoEstado} />
           )}
-          <BotonAccionApagado icono={PausaIcon} texto="Pausar por falta de stock" motivo={MOTIVO_SOLO_DROPI.pausar} />
           <BotonAccionApagado icono={EtiquetaIcon} texto="Poner en liquidación" motivo={motivoLiquidacion()} />
-          <BotonAccionApagado icono={ArchivarIcon} texto="Archivar" motivo={MOTIVO_SOLO_DROPI.archivar} />
           {motivoBorrar === null ? (
             <BotonAccion icono={PapeleraIcon} tono="alerta" onClick={aviso}>
               Eliminar en Drop

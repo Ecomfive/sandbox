@@ -77,4 +77,5 @@ Ese código de venta público es el **ID de la publicación en Drop**.
   sus validaciones (`faltantesCrearDrop`); Análisis de competencia con la plataforma Drop (vacío). **Todavía no escriben en Drop**: los botones y el formulario validan y avisan «hazlo en Drop».
 - Falta: **escribir** en Drop (crear productos, pedir ingresos de inventario, dar accesos privados, inactivar/activar, eliminar), leer las **solicitudes de inventario** y su estado (aprobada o declinada), conectar la competencia de Drop y crear las tablas de lo que falte (`drop_*`, con RLS sin políticas). Drop **no pide
   código de autenticación**, lo que debería hacer más simple conectarlo.
+- **Botones que no existen en Drop no se dibujan** (Hernán, 3 nov 2026): republicar, pausar y archivar no salen, ni apagados. Solo los **pendientes** (liquidación y tareas) quedan apagados a la vista.
 - Preguntas abiertas: si Drop tiene tareas como Dropi (el botón «Tareas» sigue apagado).

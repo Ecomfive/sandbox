@@ -7,8 +7,8 @@ import { EtapaCotizando, LlegadaCamino } from "@/app/(app)/publicaciones-dropi/l
 import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
-import { ActualizarIcon, ApagarIcon, ArchivarIcon, CandadoAbiertoIcon, ChevronRightIcon, DropIcon, EtiquetaIcon, InventarioIcon, PapeleraIcon, PausaIcon, ReactivarIcon, TareasIcon } from "@/lib/nav-icons";
-import { MOTIVO_SOLO_DROPI, accionDeEstado, ETIQUETA_ESTADO_DROP, motivoAccesoPrivado, motivoCambioEstado, motivoEliminar, motivoGestionarInventario, motivoLiquidacion } from "@/lib/publicaciones-drop/acciones";
+import { ApagarIcon, CandadoAbiertoIcon, ChevronRightIcon, DropIcon, EtiquetaIcon, InventarioIcon, PapeleraIcon, ReactivarIcon, TareasIcon } from "@/lib/nav-icons";
+import { MOTIVOS_PENDIENTES_DROP, accionDeEstado, ETIQUETA_ESTADO_DROP, motivoAccesoPrivado, motivoCambioEstado, motivoEliminar, motivoGestionarInventario, motivoLiquidacion } from "@/lib/publicaciones-drop/acciones";
 import { formatoEnDolares, formatoMonto, type MonedaPublicaciones } from "@/lib/publicaciones/moneda";
 import { ETIQUETA_SUGERENCIA, type TipoSugerencia } from "@/lib/publicaciones/vincular";
 import { DialogoAccesoPrivado, DialogoSolicitudInventario } from "./dialogos-fila-drop";
@@ -227,7 +227,6 @@ export function FilaPublicacionDropLista({ f, moneda, alAbrir }: { f: FilaPublic
       </div>
       {/* Los mismos botones que la fila de Dropi y en su orden, más «Eliminar»: los que no aplican en Drop van apagados y dicen por qué. */}
       <div className="mb-2 ml-3 flex min-w-0 flex-wrap items-center gap-1 lg:mb-0 lg:ml-0 lg:mr-3 lg:shrink-0 lg:flex-nowrap">
-        <BotonIconoFila texto="Republicar" motivo={MOTIVO_SOLO_DROPI.republicar} icono={ActualizarIcon} nombre={f.nombre} onClick={nada} />
         <BotonIconoFila texto="Dar acceso privado" motivo={motivoAccesoPrivado(estado)} icono={CandadoAbiertoIcon} nombre={f.nombre} onClick={() => setDialogo("privado")} />
         <BotonIconoFila texto="Gestionar inventario" motivo={motivoGestionarInventario(estado)} icono={InventarioIcon} nombre={f.nombre} onClick={() => setDialogo("inventario")} />
         <BotonIconoFila
@@ -238,9 +237,7 @@ export function FilaPublicacionDropLista({ f, moneda, alAbrir }: { f: FilaPublic
           onClick={aviso}
           activo={cambio.accion === "activar" ? "azul" : undefined}
         />
-        <BotonIconoFila texto="Pausar por falta de stock" motivo={MOTIVO_SOLO_DROPI.pausar} icono={PausaIcon} nombre={f.nombre} onClick={nada} />
         <BotonIconoFila texto="Poner en liquidación" motivo={motivoLiquidacion()} icono={EtiquetaIcon} nombre={f.nombre} onClick={aviso} />
-        <BotonIconoFila texto="Archivar publicación" motivo={MOTIVO_SOLO_DROPI.archivar} icono={ArchivarIcon} nombre={f.nombre} onClick={nada} />
         <BotonIconoFila
           texto="Eliminar publicación"
           motivo={motivoEliminar(estado)}
@@ -249,7 +246,7 @@ export function FilaPublicacionDropLista({ f, moneda, alAbrir }: { f: FilaPublic
           onClick={aviso}
           clase="text-muted-foreground hover:bg-destructive-soft hover:text-destructive"
         />
-        <BotonIconoFila texto="Tareas" motivo={MOTIVO_SOLO_DROPI.tareas} icono={TareasIcon} nombre={f.nombre} onClick={nada} />
+        <BotonIconoFila texto="Tareas" motivo={MOTIVOS_PENDIENTES_DROP.tareas} icono={TareasIcon} nombre={f.nombre} onClick={nada} />
       </div>
       {dialogo === "inventario" && <DialogoSolicitudInventario nombre={f.nombre} alCerrar={() => setDialogo(null)} />}
       {dialogo === "privado" && <DialogoAccesoPrivado nombre={f.nombre} disponibles={f.inventario} alCerrar={() => setDialogo(null)} />}
