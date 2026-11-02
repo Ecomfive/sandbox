@@ -10,6 +10,11 @@
 //
 //   npx tsx scripts/vincular-dropshippers-dropi.ts            → informe (no escribe)
 //   npx tsx scripts/vincular-dropshippers-dropi.ts --aplicar  → vincula y crea
+//
+// Otro país (3 nov 2026, pedido de Hernán: Costa Rica y México no traían los datos de los dropshippers): `… cr` o `… mx` (y `--aplicar`).
+// Lee datos-privados/dropi-usuarios-<país>.json (lo baja `scripts/dropi-usuarios.ts`), arma el teléfono con el código de ese país
+// (8 cifras: +507 Panamá, +506 Costa Rica; 10 cifras: +52 México) y suma a los que tienen pedidos en el CRM aunque no estén en las
+// ventas de Dropi. Una ficha que ya existe (por ejemplo, de Panamá) se vincula también en el otro país: no se duplica.
 
 process.loadEnvFile(".env.local");
 import { createClient } from "@supabase/supabase-js";
@@ -17,8 +22,14 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { restarDias } from "../src/lib/publicaciones/ventas";
 
 const aplicar = process.argv.includes("--aplicar");
+const PAIS = (process.argv.slice(2).find((a) => !a.startsWith("--")) ?? "pa").toLowerCase();
+if (!["pa", "cr", "mx"].includes(PAIS)) throw new Error("País: pa, cr o mx.");
+/** El código del país y cuántas cifras tiene un número local. */
+const TELEFONO: Record<string, { codigo: string; cifras: number }> = { pa: { codigo: "507", cifras: 8 }, cr: { codigo: "506", cifras: 8 }, mx: { codigo: "52", cifras: 10 } };
+const NOMBRE_PAIS: Record<string, string> = { pa: "Panamá", cr: "Costa Rica", mx: "México" };
+const SUFIJO = PAIS === "pa" ? "" : `-${PAIS}`;
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-const HOY = "2026-10-21";
+const HOY = new Date().toLocaleDateString("en-CA", { timeZone: "America/Panama" });
 const ETIQUETA = "Creado desde Dropi";
 /** Nombres de cuentas que parecen de ECOMFIVE (no de un dropshipper): se crean igual, marcadas para revisar. */
 const INTERNAS = /ecomfive|asesora|ofertas tiendas|genesys|yappea/i;
@@ -41,10 +52,11 @@ const norm = (s: string) =>
     .trim();
 const digitos = (t: string | null | undefined) => (t ?? "").replace(/\D+/g, "");
 const correo = (e: string | null | undefined) => (e ?? "").trim().toLowerCase();
-/** El teléfono en formato internacional: 8 dígitos de Panamá llevan +507. */
+/** El teléfono en formato internacional: un número local del país lleva su código (+507, +506, +52). */
 function e164(t: string): string | null {
   const d = digitos(t);
-  if (d.length === 8) return `+507${d}`;
+  const { codigo, cifras } = TELEFONO[PAIS];
+  if (d.length === cifras) return `+${codigo}${d}`;
   if (d.length >= 10 && d.length <= 15) return `+${d}`;
   return null;
 }
@@ -58,10 +70,10 @@ function parecido(a: string, b: string): boolean {
 }
 
 async function main() {
-  const usuarios = new Map((JSON.parse(readFileSync("datos-privados/dropi-usuarios.json", "utf8")) as UsuarioDropi[]).map((u) => [u.id, u]));
-  const { data: pais } = await supabase.from("paises").select("id").eq("codigo", "PA").single();
+  const usuarios = new Map((JSON.parse(readFileSync(`datos-privados/dropi-usuarios${SUFIJO}.json`, "utf8")) as UsuarioDropi[]).map((u) => [u.id, u]));
+  const { data: pais } = await supabase.from("paises").select("id").eq("codigo", PAIS.toUpperCase()).single();
   const { data: dropi } = await supabase.from("plataformas").select("id").eq("nombre", "Dropi").single();
-  if (!pais || !dropi) throw new Error("Falta el país PA o la plataforma Dropi.");
+  if (!pais || !dropi) throw new Error(`Falta el país ${PAIS.toUpperCase()} o la plataforma Dropi.`);
   const [{ data: ventas, error: e1 }, { data: fichas, error: e2 }, { data: cuentas, error: e3 }, { data: porMes, error: e4 }] = await Promise.all([
     supabase.from("dropi_ventas_dropshippers").select("dropi_usuario_id, nombre, pedidas, no_efectivas, netas_30d, ultima_orden").eq("pais_id", pais.id),
     supabase.from("dropshippers").select("id, nombre, contacto_email, contacto_telefono, telefono_alterno"),
@@ -69,6 +81,28 @@ async function main() {
     supabase.from("dropi_ventas_dropshipper_mes").select("dropi_usuario_id, mes").eq("pais_id", pais.id).limit(20000),
   ]);
   if (e1 || e2 || e3) throw new Error((e1 ?? e2 ?? e3)!.message);
+  // Los que tienen pedidos en el CRM de este país pero no salen en las ventas de Dropi (Historial de Existencia): también se vinculan.
+  const enVentas = new Set((ventas ?? []).map((v) => Number(v.dropi_usuario_id)));
+  const pedidosCrm = new Map<number, { pedidas: number; ultima: string | null }>();
+  for (let desde = 0; ; desde += 1000) {
+    const { data, error } = await supabase.from("crm_ordenes").select("usuario_externo, fecha").eq("plataforma_id", dropi.id).eq("pais_id", pais.id).order("id").range(desde, desde + 999);
+    if (error) throw new Error(error.message);
+    for (const o of data ?? []) {
+      const u = Number(o.usuario_externo);
+      const x = pedidosCrm.get(u) ?? { pedidas: 0, ultima: null };
+      x.pedidas++;
+      const dia = (o.fecha as string | null)?.slice(0, 10) ?? null;
+      if (dia && (!x.ultima || dia > x.ultima)) x.ultima = dia;
+      pedidosCrm.set(u, x);
+    }
+    if ((data ?? []).length < 1000) break;
+  }
+  const conPedidos = [
+    ...(ventas ?? []),
+    ...[...pedidosCrm.entries()]
+      .filter(([u]) => !enVentas.has(u))
+      .map(([u, x]) => ({ dropi_usuario_id: u, nombre: `${usuarios.get(u)?.nombre ?? ""} ${usuarios.get(u)?.apellido ?? ""}`.trim() || `Usuario ${u}`, pedidas: x.pedidas, no_efectivas: null, netas_30d: null, ultima_orden: x.ultima })),
+  ];
   // Sin la migración 0122 no se sabe el primer mes de cada uno (la fecha de ingreso): el informe sale igual, la carga no.
   if (e4 && aplicar) throw new Error(`Falta correr la migración 0122: ${e4.message}`);
   const yaVinculados = new Set((cuentas ?? []).map((c) => Number(c.id_externo)));
@@ -101,7 +135,7 @@ async function main() {
   const sinDatos: string[] = [];
   const desde90 = restarDias(HOY, 89);
 
-  for (const v of ventas ?? []) {
+  for (const v of conPedidos) {
     const id = Number(v.dropi_usuario_id);
     if (yaVinculados.has(id)) continue;
     const u = usuarios.get(id);
@@ -135,7 +169,7 @@ async function main() {
       continue;
     }
     let tel = e164(u.telefono);
-    const notas = [`Creado desde las ventas de Dropi Panamá el ${HOY} (usuario de Dropi ${id}).`];
+    const notas = [`Creado desde las ventas de Dropi ${NOMBRE_PAIS[PAIS]} el ${HOY} (usuario de Dropi ${id}).`];
     if (tel && telefonosUsados.has(tel)) {
       notas.push(`Su teléfono de Dropi (${tel}) ya lo tiene otra ficha.`);
       tel = null;
@@ -158,7 +192,7 @@ async function main() {
   }
 
   const informe = [
-    `Usuarios de Dropi con órdenes: ${ventas?.length ?? 0} · ya vinculados: ${yaVinculados.size}`,
+    `Dropi ${NOMBRE_PAIS[PAIS]} · usuarios con órdenes: ${conPedidos.length} · ya vinculados: ${yaVinculados.size}`,
     `Se vinculan a una ficha existente: ${vincular.length}`,
     ...vincular.map((x) => `   ${usuarios.get(x.usuario)?.nombre} ${usuarios.get(x.usuario)?.apellido} → «${nombreFicha.get(x.fichaId)}» (por ${x.por})`),
     `Fichas nuevas: ${crear.length} (${crear.filter((c) => c.datos.estado === "activo").length} activas, ${crear.filter((c) => (c.datos.etiquetas as string[]).length > 1).length} marcadas como posible cuenta interna)`,
@@ -167,12 +201,12 @@ async function main() {
     `Sin datos de Dropi: ${sinDatos.length}`,
     ...sinDatos.map((r) => `   ${r}`),
   ];
-  writeFileSync("datos-privados/vincular-dropshippers-dropi.txt", informe.join("\n"), "utf8");
+  writeFileSync(`datos-privados/vincular-dropshippers-dropi${SUFIJO}.txt`, informe.join("\n"), "utf8");
   console.log(informe.slice(0, 2).join("\n"));
   console.log(informe.find((l) => l.startsWith("Fichas nuevas")));
   console.log(informe.find((l) => l.startsWith("Para revisar")));
   console.log(informe.find((l) => l.startsWith("Sin datos")));
-  if (!aplicar) return console.log("Informe en datos-privados/vincular-dropshippers-dropi.txt. Con --aplicar se vincula y se crean las fichas.");
+  if (!aplicar) return console.log(`Informe en datos-privados/vincular-dropshippers-dropi${SUFIJO}.txt. Con --aplicar se vincula y se crean las fichas.`);
 
   const cuentasNuevas: Record<string, unknown>[] = [];
   const paisesNuevos: Record<string, unknown>[] = [];
