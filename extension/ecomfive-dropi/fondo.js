@@ -11,8 +11,13 @@
 //   { tipo: "lanzar", lector, subida, dias }      → arranca el lector en la pestaña (sin esperarlo); `dias` solo en la primera lectura
 //                                                   de un país ({ pedidos, cartera }: Costa Rica trae desde el 1 de septiembre)
 //   { tipo: "avance", lector }                    → lo que lleva el lector (window.__dropiDiario / __ventasDropi, sin el detalle)
+//
+// Tu Winner (0.5.0, 2 nov 2026): «tw» es la pestaña de app.tuwinner.com, con el lector `tuwinner` (Testing Lab › Tu Winner). Su sesión se ve por el
+// token de Tu Winner en la página (nunca sale de ahí); no tiene tipo de cuenta ni vencimiento.
 
-const ORIGEN = { pa: "https://app.dropi.pa", cr: "https://app.dropi.cr", mx: "https://app.dropi.mx" };
+const ORIGEN = { pa: "https://app.dropi.pa", cr: "https://app.dropi.cr", mx: "https://app.dropi.mx", tw: "https://app.tuwinner.com" };
+/** Dónde abrir una pestaña nueva de cada sitio. */
+const INICIO = { tw: "/dashboard/winners" };
 const LECTORES = {
   proveedor: { pais: "pa", archivo: "lectores/dropi-diario.js", funcion: "dropiDiario", estado: "__dropiDiario", archivos: ["pedidos", "cartera", "retiros", "stock"] },
   ventas: { pais: "pa", archivo: "lectores/ventas-dropi.js", funcion: "ventasDropi", estado: "__ventasDropi", archivos: ["resumen", "movimientos"] },
@@ -23,6 +28,8 @@ const LECTORES = {
   proveedor_mx: { pais: "mx", archivo: "lectores/dropi-diario.js", funcion: "dropiDiario", estado: "__dropiDiario", archivos: ["pedidos", "cartera", "retiros", "stock"] },
   ventas_mx: { pais: "mx", archivo: "lectores/ventas-dropi.js", funcion: "ventasDropi", estado: "__ventasDropi", archivos: ["resumen", "movimientos"] },
   catalogo_mx: { pais: "mx", archivo: "lectores/catalogo.js", funcion: "leerCatalogo", estado: "__catalogo", archivos: ["catalogo"] },
+  // Tu Winner (0.5.0): los ganadores de Panamá y México en la pestaña de app.tuwinner.com.
+  tuwinner: { pais: "tw", archivo: "lectores/tuwinner.js", funcion: "leerTuWinner", estado: "__tuwinner", archivos: ["tuwinner"] },
 };
 // Las direcciones firmadas de subida del sistema: solo a su carpeta temporal de «Actualizar Dropi» y solo en el proyecto de Supabase
 // del sistema (auditoría 27 oct 2026: antes cualquier proyecto *.supabase.co pasaba y lo leído podía terminar en otro lado).
@@ -59,7 +66,7 @@ async function pestana(pais, crear, frente) {
     return t;
   }
   if (!crear) return null;
-  const nueva = await chrome.tabs.create({ url: `${ORIGEN[pais]}/dashboard/home`, active: !!frente });
+  const nueva = await chrome.tabs.create({ url: `${ORIGEN[pais]}${INICIO[pais] || "/dashboard/home"}`, active: !!frente });
   await cargada(nueva.id);
   if (frente) await chrome.windows.update(nueva.windowId, { focused: true });
   return chrome.tabs.get(nueva.id);
@@ -87,6 +94,11 @@ function leerSesion() {
   return { hay: !!t && !location.pathname.startsWith("/auth"), tipoUsuario: o.type_user || null, tienda: o.store_name || null, vence };
 }
 
+// Corre dentro de la pestaña de Tu Winner: si hay sesión (su token está en la página). Nunca devuelve el token.
+function leerSesionTuWinner() {
+  return { hay: !!localStorage.getItem("old_user_t") && !location.pathname.startsWith("/auth"), tipoUsuario: null, tienda: null, vence: null };
+}
+
 async function atender(m) {
   switch (m && m.tipo) {
     case "hola":
@@ -94,7 +106,7 @@ async function atender(m) {
     case "sesion": {
       const t = await pestana(validarPais(m.pais), !!m.abrir, false);
       if (!t) return { pestana: false, hay: false, tipoUsuario: null, tienda: null, vence: null };
-      return { pestana: true, ...(await enPagina(t.id, leerSesion)) };
+      return { pestana: true, ...(await enPagina(t.id, m.pais === "tw" ? leerSesionTuWinner : leerSesion)) };
     }
     case "mostrar":
       await pestana(validarPais(m.pais), true, true);

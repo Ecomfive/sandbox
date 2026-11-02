@@ -33,7 +33,7 @@ test("la extensión solo sube a la carpeta temporal del sistema en SU proyecto d
 
 test("el puente solo va en las páginas del sistema y la extensión solo entra a Dropi", () => {
   const m = JSON.parse(ext("manifest.json")) as { host_permissions: string[]; content_scripts: { matches: string[] }[]; permissions: string[] };
-  assert.deepEqual(m.host_permissions, ["https://app.dropi.pa/*", "https://app.dropi.cr/*", "https://app.dropi.mx/*"]);
+  assert.deepEqual(m.host_permissions, ["https://app.dropi.pa/*", "https://app.dropi.cr/*", "https://app.dropi.mx/*", "https://app.tuwinner.com/*"]);
   // Solo la página del sistema: ninguna página de localhost puede usar la sesión de Dropi (auditoría 27 oct 2026).
   assert.deepEqual(m.content_scripts[0].matches, ["https://mom-beta-proveduria.vercel.app/*"]);
   assert.ok(ext("fondo.js").includes(`remitente.origin !== SISTEMA`));

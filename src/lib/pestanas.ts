@@ -72,6 +72,13 @@ export const PESTANAS_POR_MODULO: Record<string, Pestana[]> = {
     { etiqueta: "Competidores", href: "/analisis-competencia" },
     { etiqueta: "Resumen", href: "/analisis-competencia/resumen" },
   ],
+  // Tu Winner (2 nov 2026, boceto aprobado): los ganadores, lo que se repite en varios canales, el seguimiento y cómo se lee.
+  "/tu-winner": [
+    { etiqueta: "Ganadores", href: "/tu-winner" },
+    { etiqueta: "Se repite en varios canales", href: "/tu-winner/canales" },
+    { etiqueta: "Seguimiento", href: "/tu-winner/seguimiento" },
+    { etiqueta: "Cómo se actualiza", href: "/tu-winner/como" },
+  ],
   // Compras primero y luego el Tablero de Shen Zhen (pedido de Hernán, 22 oct 2026).
   "/compras": [
     { etiqueta: "Compras", href: "/compras/lista" },

@@ -461,6 +461,25 @@ convenciones técnicas del código.
   «Ganador» agrupa `winner` y
   `enviado_a_compras`. Las piezas visuales comunes (insignias redondas, indicadores, botones de barra, marco de
   tabla) viven en `src/components/panel/piezas-panel.tsx` y las usa también el CRM.
+- **Testing Lab › Tu Winner** (`/tu-winner`, módulo `tu-winner`, migración **0223**, 2 nov 2026, pedido de Hernán; boceto aprobado
+  https://claude.ai/artifact/TwPE4fx17EiS39TJkLLkX2: **la pantalla tiene que verse igual**). Los ganadores de Dropi según Tu Winner (app.tuwinner.com,
+  cuenta de Ecomfive) de **Panamá y México** (Tu Winner no tiene Costa Rica), seguidos en el tiempo y cruzados con lo nuestro y las demás fuentes.
+  **Lectura** (solo lee): lector `scripts/tuwinner-navegador.js` (copia exacta en `extension/ecomfive-dropi/lectores/tuwinner.js`, la prueba lo exige)
+  que corre en la pestaña de Tu Winner con su token (`localStorage.old_user_t`, header `token`; nunca sale de la página) y lee
+  `api.tuwinner.com/<pa|mex>/api/collections/sales_7_day/records?expand=product.supplier.platform&filter=(daily_sells = true)` (México es la ruta
+  **`mex`**, no `mx`); sube un JSON a `wms-compras/tmp-dropi-panel/<lectura>/tuwinner.json`. Extensión **0.5.0** (`ORIGEN.tw`, lector `tuwinner`,
+  `leerSesionTuWinner`, permiso `app.tuwinner.com`; `LECTOR_TUWINNER` en `src/lib/tuwinner/lector.ts`). «Leer ahora» (`leer-tuwinner.tsx`) y **la
+  lectura del día**: si la última no es de hoy, se lee sola al abrir el panel (una vez por día y navegador, `localStorage`); `empezarLecturaTuWinner` →
+  lector → `procesarLecturaTuWinner` (`ingerirLectura`, `src/lib/tuwinner/ingerir.ts`). Desde la consola: `scripts/tuwinner.ts subida | cargar <id>`.
+  **Tablas**: `tuwinner_lecturas`, `tuwinner_productos` (por país + ID de Dropi: último precio, proveedor, stock, ventas 7 d, `ganador`, `posicion`,
+  `ganador_desde`), `tuwinner_dias` (stock de cada día → ventas por día = lo que bajó; si subió, reabasteció) y `tuwinner_eventos` (entró, salió, precio,
+  proveedor); `wms_seleccion_productos.tuwinner_clave` («PA|11253», una vez). Lógica pura con prueba en `src/lib/tuwinner/tuwinner.ts` (`leerLectura`,
+  `ventasPorDia`, `cambiosDeLectura`, `diasGanando`, `fotoTuWinner`, `esPrivado`) y `canales.ts` (`agruparGanadores`, `contarMenciones`).
+  **Cruce** (`datos.ts` › `cargarGanadores`): nuestro = misma publicación de Dropi; si no, la competencia enlazada (`competencia_productos.igual_a`); si no,
+  el nombre con `yaVisto` de Testing Lab (Producto, publicado, comprado, testeado). «Nosotros» = nuestras ventas (`dropi_ventas_diarias.pedidas`, 7 días)
+  de ese SKU en ese país. **Pestañas**: Ganadores (`vista-ganadores.tsx`), Se repite en varios canales (`cargarCanales`: competencia de Dropi, Scraping,
+  capturas de Instagram, Sugerencias; Drop Killer pendiente; «A Selección» → `enviarTuWinnerASeleccion`, código TW-, descartado si ya visto), Seguimiento
+  (`?p=PA-11253`: barras por día, reabastecimientos e historial) y Cómo se actualiza. Estilos del boceto en `tu-winner/tu-winner.css` (todo dentro de `.tw`).
 - **Testing Lab › Scraping de proveedores** (`/scraping-proveedores`, módulo `scraping-proveedores`, migración 0105, 14 oct 2026).
   **Rediseño del 26 oct 2026** (pedido de Hernán; boceto aprobado https://claude.ai/artifact/3LFJ3vrW1e72unXf453jZJ), como Gestión
   de IDs Dropi: `/scraping-proveedores` es UNA lista (`lista-scraping.tsx`, `ListaDatos` variante «filas») con los productos de
