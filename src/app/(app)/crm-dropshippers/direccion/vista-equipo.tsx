@@ -4,6 +4,7 @@ import { duracionCorta, META_RESPUESTA_MIN, tonoRespuesta, type FilaEquipo, type
 import { nPedidos } from "@/lib/crm/salud";
 import type { DatosEquipo } from "./datos-equipo";
 import { rutaVista } from "./ruta";
+import { AtencionWhatsappVista } from "./atencion-whatsapp";
 import { Barra, ChipEnlace, Cifra, Cifras, SUAVE_TONO, TEXTO_TONO, Tarjeta, type TonoDireccion } from "./piezas-direccion";
 
 const AREA: Record<string, string> = { atencion: "Atención", comercial: "Comercial", direccion: "Dirección" };
@@ -86,7 +87,6 @@ export function VistaEquipo({ datos, periodos, codigoPais }: { datos: DatosEquip
   const atrasadas = datos.filas.reduce((s, f) => s + f.tareasAtrasadas, 0);
   const activos = datos.filas.filter((f) => f.conActividad);
   const sinActividad = datos.filas.filter((f) => !f.conActividad);
-  const tono = TONO[tonoRespuesta(datos.medianaMin)];
 
   return (
     <>
@@ -99,12 +99,12 @@ export function VistaEquipo({ datos, periodos, codigoPais }: { datos: DatosEquip
       </div>
 
       <Cifras>
-        <Cifra titulo="1.ª respuesta (mediana)" valor={duracionCorta(datos.medianaMin)} nota={`Meta: ${META_RESPUESTA_MIN} min · ${datos.consultas} consultas`} tono={tono} />
-        <Cifra titulo={`Respondidas en ${META_RESPUESTA_MIN} min`} valor={porcentaje(datos.en15, datos.consultas)} nota={`${datos.en15} de ${datos.consultas}`} tono="info" />
         <Cifra titulo="Esperando respuesta" valor={esperandoAhora} nota={masDeUnaHora ? `${masDeUnaHora} llevan más de 1 h` : "Ninguno más de 1 h"} tono={masDeUnaHora ? "peligro" : esperandoAhora ? "aviso" : "exito"} />
         <Cifra titulo="Chats sin asignar" valor={datos.sinAsignar.abiertos} nota={`${datos.sinAsignar.esperando} de ellos esperando`} tono={datos.sinAsignar.esperando ? "aviso" : "neutro"} />
         <Cifra titulo="Tareas atrasadas" valor={atrasadas} nota="De todo el equipo" tono={atrasadas ? "peligro" : "exito"} />
       </Cifras>
+
+      <AtencionWhatsappVista a={datos.atencion} dias={datos.dias} />
 
       <div className="grid grid-cols-[repeat(auto-fill,minmax(19rem,1fr))] gap-4">
         {activos.length === 0 ? <p className="m-0 text-sm text-muted-foreground">Nadie del equipo tuvo actividad en este periodo.</p> : activos.map((p) => <TarjetaPersona key={p.id} p={p} />)}

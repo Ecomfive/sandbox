@@ -3,18 +3,16 @@ import { accesoCrm, areasVisibles } from "@/lib/crm/areas";
 import type { Segmento } from "@/lib/crm/salud";
 import { getPaisActual } from "@/lib/pais";
 import { createServiceClient } from "@/lib/supabase/server";
-import { VistaKpis, type KpisWhatsapp } from "../kpis/vista-kpis";
 import { cargarDireccion } from "./datos-direccion";
 import { cargarEquipo } from "./datos-equipo";
 import { cargarPareto } from "./datos-pareto";
-import { cargarDuplicados, cargarEntregas, cargarSecuenciaAlta } from "./datos-fase4";
+import { cargarDuplicados, cargarEntregas, cargarSecuenciaAlta, duplicadosPorCliente } from "./datos-fase4";
 import { cargarProductos } from "./datos-productos";
 import { PanelDireccion } from "./panel-direccion";
 import { guardado } from "./guardado";
 import { EncabezadoDireccion } from "./piezas-direccion";
 import { rutaVista, VISTAS_DIRECCION, type VistaDireccion } from "./ruta";
 import { VistaAutomatizaciones } from "./vista-automatizaciones";
-import { VistaDuplicados } from "./vista-duplicados";
 import { VistaEntregas } from "./vista-entregas";
 import { VistaEquipo } from "./vista-equipo";
 import { VistaProductos } from "./vista-productos";
@@ -23,7 +21,6 @@ import type { DatosProductos } from "./datos-productos";
 
 const PERIODOS_EQUIPO = [7, 30, 90];
 const PERIODOS_ENTREGAS = [30, 60, 90];
-const PERIODOS_KPIS = [7, 30, 90];
 const SEGMENTOS: Segmento[] = ["activo", "riesgo", "dormido", "perdido", "sin_pedidos"];
 const ES_ID = /^[0-9a-f-]{36}$/i;
 
@@ -81,10 +78,10 @@ function atencionDe(data: unknown): ResumenAtencion | null {
 
 /** El periodo de una vista: el de la dirección si es uno de los que ofrece, si no el de siempre. */
 function periodoDe(vista: VistaDireccion, dias: unknown): number {
-  const periodos = vista === "entregas" ? PERIODOS_ENTREGAS : vista === "kpis" ? PERIODOS_KPIS : PERIODOS_EQUIPO;
+  const periodos = vista === "entregas" ? PERIODOS_ENTREGAS : PERIODOS_EQUIPO;
   const d = Number(dias);
   if (periodos.includes(d)) return d;
-  return vista === "entregas" ? 60 : vista === "kpis" ? 7 : 30;
+  return vista === "entregas" ? 60 : 30;
 }
 
 /**
@@ -96,8 +93,9 @@ function periodoDe(vista: VistaDireccion, dias: unknown): number {
  *    estado (`segmento`) o el cliente (`cliente`) que se eligió en el Resumen.
  *  - Pareto 80/20 (31 oct 2026, pedido de Hernán, `crm_pedidos_mensuales`, migración 0207): **integrado, sin pestaña propia**: el de toda la operación va en el
  *    Resumen (3, 6 o 12 meses) y el de cada cliente, en su clase en la lista de Clientes y en su ficha (con el 80/20 de sus productos).
- *  - Productos (fase 3), Entregas (fase 4), Equipo (fase 2), Duplicados (fase 4) y Automatizaciones (fase 4).
- *  - KPIs de atención: tiempo de respuesta, sin responder, por número y por persona (`whatsapp_kpis`, migración 0164).
+ *  - Productos (fase 3), Entregas (fase 4), Equipo (fase 2) y Automatizaciones (fase 4). Equipo trae también la atención por WhatsApp (3 nov 2026: antes la pestaña «KPIs de
+ *    atención»: tiempo de respuesta, sin responder, por día, por área y por número, `whatsapp_kpis`, migración 0164); los duplicados (antes una pestaña) salen en la lista y la
+ *    ficha de Clientes.
  * Solo lo ve Dirección: los chats y las pantallas de Comercial y Atención no cambian, y no se envía nada desde aquí.
  */
 export async function ContenidoDireccion({
@@ -121,8 +119,8 @@ export async function ContenidoDireccion({
   // Lo pesado (la salud de la cartera, los productos, las entregas, el Pareto) se guarda un minuto (`guardado.ts`): pasar de pestaña no lo recalcula.
   // El Resumen también lleva la atención de los últimos 7 días; va en paralelo con la cartera.
   const [kpis, datos] = await Promise.all([
-    vista === "kpis" || vista === "resumen" ? supabase.rpc("whatsapp_kpis", { p_desde: desdeHace(vista === "resumen" ? 7 : dias), p_areas: areasVisibles(accesoCrm(usuario)) }) : null,
-    vista === "kpis" ? null : guardado(`direccion:${pais.id}`, () => cargarDireccion(supabase, pais.id)),
+    vista === "resumen" ? supabase.rpc("whatsapp_kpis", { p_desde: desdeHace(7), p_areas: areasVisibles(accesoCrm(usuario)) }) : null,
+    guardado(`direccion:${pais.id}`, () => cargarDireccion(supabase, pais.id)),
   ]);
   const ok = !!datos && !("error" in datos);
   const filas = ok ? datos.filas : [];
@@ -132,14 +130,14 @@ export async function ContenidoDireccion({
       ? guardado(`productos:${pais.id}:${usuario.id}`, () => cargarProductos(supabase, pais.id, usuario, filas.map((f) => f.id)))
       : null,
     vista === "entregas" || vista === "resumen" ? guardado(`entregas:${pais.id}:${vista === "resumen" ? 60 : dias}`, () => cargarEntregas(supabase, pais.id, vista === "resumen" ? 60 : dias)) : null,
-    vista === "duplicados" ? cargarDuplicados(supabase) : null,
+    // Los posibles duplicados de cada cliente, para su fila y su ficha en Clientes (de todos los países: dos fichas pueden ser la misma persona).
+    vista === "clientes" ? guardado("duplicados", () => cargarDuplicados(supabase)) : null,
     vista === "automatizaciones" ? cargarSecuenciaAlta(supabase) : null,
     // Las guías mes a mes: el Pareto del Resumen y el de cada cliente (lista y ficha) las usan.
     (vista === "resumen" || vista === "clientes") && ok ? guardado(`pareto:${pais.id}:${datos.hoy}`, () => cargarPareto(supabase, pais.id, datos.hoy)) : null,
   ]);
   const errorDe = (x: unknown) => (x && typeof x === "object" && "error" in x ? String((x as { error: string }).error) : null);
   const error =
-    (vista === "kpis" && kpis?.error ? "Falta correr la migración 0164 (KPIs de WhatsApp) en la base." : null) ??
     errorDe(datos) ??
     errorDe(equipo) ??
     errorDe(entregas) ??
@@ -148,12 +146,10 @@ export async function ContenidoDireccion({
   const escribe = accesoCrm(usuario).escribeDireccion;
 
   function contenido() {
-    if (vista === "kpis") return <VistaKpis datos={kpis?.data as KpisWhatsapp} dias={dias} periodos={PERIODOS_KPIS} />;
     if (!ok || !datos) return null;
     if (vista === "equipo" && equipo && !("error" in equipo)) return <VistaEquipo datos={equipo} periodos={PERIODOS_EQUIPO} codigoPais={pais.codigo} />;
     if (vista === "productos" && productos && !("error" in productos)) return <VistaProductos datos={productos} clientes={filas} codigoPais={pais.codigo} />;
     if (vista === "entregas" && Array.isArray(entregas)) return <VistaEntregas filas={entregas} clientes={filas} dias={dias} periodos={PERIODOS_ENTREGAS} codigoPais={pais.codigo} />;
-    if (vista === "duplicados" && duplicados) return <VistaDuplicados datos={duplicados} />;
     if (vista === "automatizaciones" && secuencia && !("error" in secuencia))
       return (
         <VistaAutomatizaciones
@@ -186,6 +182,7 @@ export async function ContenidoDireccion({
           datos={datos}
           productos={productos && !("error" in productos) ? productos : null}
           pareto={pareto && !("error" in pareto) ? pareto : null}
+          duplicados={duplicados ? duplicadosPorCliente(duplicados) : null}
           codigoPais={pais.codigo}
           escribe={escribe}
           usuarioId={usuario.id}

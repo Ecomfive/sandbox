@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { MODULO_ATENCION, MODULO_COMERCIAL, MODULO_DIRECCION, type AreaCrm } from "@/lib/crm/areas";
+import { armarAtencion, type AtencionWhatsapp, type KpisCrudos } from "@/lib/crm/atencion";
 import { armarEquipo, type ChatEquipo, type Equipo, type RespuestaPersona, type TareaEquipo } from "@/lib/crm/equipo";
 import { personasConModulos } from "@/lib/whatsapp/personas-crm";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
@@ -12,6 +13,8 @@ export interface DatosEquipo extends Equipo {
   consultas: number;
   en15: number;
   sinResponder: number;
+  /** La atención por WhatsApp del periodo (lo que antes eran los KPIs de atención): por área, por número y por día. */
+  atencion: AtencionWhatsapp;
 }
 
 const enPanama = (ms: number) => new Date(ms).toLocaleDateString("en-CA", { timeZone: "America/Panama" });
@@ -43,14 +46,8 @@ export async function cargarEquipo(supabase: SupabaseClient, dias: number, clien
   const esComercial = new Set(comerciales.map((p) => p.id));
   const esDireccion = new Set(direccion.map((p) => p.id));
   const area = (id: string): AreaCrm => (esDireccion.has(id) ? "direccion" : esComercial.has(id) ? "comercial" : "atencion");
-  const datos = (kpis.data ?? {}) as { personas?: RespuestaPersona[]; areas?: { consultas: number; sin_responder: number; en_15_min: number; mediana_min: number | null }[] };
-  const areas = datos.areas ?? [];
-  const consultas = areas.reduce((s, a) => s + Number(a.consultas), 0);
-  const respondidas = areas.reduce((s, a) => s + Number(a.consultas) - Number(a.sin_responder), 0);
-  // La mediana general, aproximada con la de cada área pesada por sus respondidas (como en KPIs de atención).
-  const conMediana = areas.filter((a) => a.mediana_min !== null && Number(a.consultas) - Number(a.sin_responder) > 0);
-  const peso = conMediana.reduce((s, a) => s + Number(a.consultas) - Number(a.sin_responder), 0);
-  const medianaMin = peso ? conMediana.reduce((s, a) => s + Number(a.mediana_min) * (Number(a.consultas) - Number(a.sin_responder)), 0) / peso : null;
+  const datos = (kpis.data ?? {}) as KpisCrudos & { personas?: RespuestaPersona[] };
+  const atencion = armarAtencion(datos);
 
   const equipo = armarEquipo({
     personas: todos.map((p) => ({ id: p.id, nombre: p.nombre, area: area(p.id) })),
@@ -65,9 +62,10 @@ export async function cargarEquipo(supabase: SupabaseClient, dias: number, clien
   return {
     ...equipo,
     dias,
-    medianaMin,
-    consultas,
-    en15: areas.reduce((s, a) => s + Number(a.en_15_min), 0),
-    sinResponder: consultas - respondidas,
+    medianaMin: atencion.medianaMin,
+    consultas: atencion.consultas,
+    en15: atencion.en15,
+    sinResponder: atencion.sinResponder,
+    atencion,
   };
 }
