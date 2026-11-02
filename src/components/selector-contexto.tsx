@@ -2,10 +2,13 @@
 
 import { useTransition } from "react";
 import { Bandera } from "@/components/paises/bandera";
+import { LOGO_PLATAFORMA } from "@/components/plataformas/selector-plataforma";
 import { MenuDesplegable, TituloGrupoMenu, claseOpcionMenu } from "@/components/ui/menu-desplegable";
 import { CheckIcon, ChevronRightIcon } from "@/lib/nav-icons";
 import { PAISES_NAV } from "@/lib/nav-data";
 import { setPaisActual } from "@/lib/pais-actions";
+import { setPlataformaActual } from "@/lib/plataforma-actions";
+import { plataformaDe, type Plataforma, type PlataformaId } from "@/lib/plataformas";
 
 function GloboIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
@@ -17,28 +20,29 @@ function GloboIcon(props: React.SVGProps<SVGSVGElement>) {
 }
 
 /**
- * Contexto de trabajo en la barra de arriba: el país (se cambia aquí) y la plataforma con datos («Panamá · Dropi»).
- * Antes el país era un selector suelto y la plataforma un nivel del menú lateral. Hoy la plataforma solo se muestra:
- * Dropi es la única con datos y las demás se activan cuando los tengan.
+ * Contexto de trabajo en la barra de arriba: el país y la plataforma («Costa Rica · Drop»), los dos se cambian aquí (3 nov 2026, pedido de Hernán: antes la plataforma solo se
+ * mostraba). La plataforma es la misma que elige el selector de Análisis de competencia (comparten la cookie). `plataformas` son las que existen en el país: Drop es solo de Costa
+ * Rica, así que con otro país no hay nada que elegir y la sección «Plataforma» ni se dibuja.
  */
-export function SelectorContexto({ pais, plataforma, permitidos = null }: { pais: string; plataforma: string | null; permitidos?: string[] | null }) {
+export function SelectorContexto({ pais, plataforma, plataformas, permitidos = null }: { pais: string; plataforma: PlataformaId; plataformas: readonly Plataforma[]; permitidos?: string[] | null }) {
   // Solo los países que la persona puede ver (`null` = todos).
   const paises = permitidos === null ? PAISES_NAV : PAISES_NAV.filter((p) => permitidos.includes(p.codigo));
   const [pending, startTransition] = useTransition();
   const nombrePais = PAISES_NAV.find((p) => p.codigo === pais)?.nombre ?? pais;
+  const nombrePlataforma = plataformaDe(plataforma).nombre;
   // Sin un país conocido (p. ej. «Sin país») queda el globo.
   const conBandera = PAISES_NAV.some((p) => p.codigo === pais);
 
   return (
     <MenuDesplegable
-      etiqueta={`País y plataforma: ${nombrePais}${plataforma ? `, ${plataforma}` : ""}`}
+      etiqueta={`País y plataforma: ${nombrePais}, ${nombrePlataforma}`}
       claseBoton={`inline-flex min-h-8 items-center gap-1.5 rounded-full border border-border-control bg-card px-3 py-1 text-sm hover:bg-muted ${pending ? "opacity-60" : ""}`}
       contenidoBoton={
         <>
           {conBandera ? <Bandera codigo={pais} /> : <GloboIcon className="h-4 w-4 text-muted-foreground" />}
           <span className="hidden sm:inline">
             {nombrePais}
-            {plataforma ? <span className="text-muted-foreground"> · {plataforma}</span> : null}
+            <span className="text-muted-foreground"> · {nombrePlataforma}</span>
           </span>
           <ChevronRightIcon className="h-3.5 w-3.5 rotate-90 text-muted-foreground" />
         </>
@@ -67,15 +71,32 @@ export function SelectorContexto({ pais, plataforma, permitidos = null }: { pais
               {p.pronto && <span className="ml-auto rounded-full border border-border px-2 text-[0.65rem] text-muted-foreground">Pronto</span>}
             </button>
           ))}
-          <div role="separator" className="my-1 border-t border-border" />
-          <TituloGrupoMenu>Plataforma</TituloGrupoMenu>
-          {plataforma && (
-            <p className="flex items-center gap-2.5 px-3 py-2 text-sm font-semibold">
-              {plataforma}
-              <CheckIcon className="ml-auto h-4 w-4 text-success" />
-            </p>
+          {plataformas.length > 1 && (
+            <>
+            <div role="separator" className="my-1 border-t border-border" />
+            <TituloGrupoMenu>Plataforma</TituloGrupoMenu>
+            {plataformas.map((p) => {
+              const Logo = LOGO_PLATAFORMA[p.id];
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={p.id === plataforma}
+                  onClick={() => {
+                    cerrar(true);
+                    if (p.id !== plataforma) startTransition(() => setPlataformaActual(p.id));
+                  }}
+                  className={claseOpcionMenu}
+                >
+                  <Logo marca className="h-4 w-4" />
+                  <span className={p.id === plataforma ? "font-semibold" : ""}>{p.nombre}</span>
+                  {p.id === plataforma && <CheckIcon className="ml-auto h-4 w-4 text-success" />}
+                </button>
+              );
+            })}
+            </>
           )}
-          <p className="px-3 pt-0.5 pb-2 text-xs text-muted-foreground">Las demás plataformas aparecen cuando tengan datos.</p>
         </>
       )}
     </MenuDesplegable>

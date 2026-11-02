@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { plataformaDe } from "@/lib/plataformas";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Fragment, useMemo, useState, useTransition, type ComponentType } from "react";
 import { FotoAmpliable, HistorialCompetencia } from "@/components/competencia/piezas-competencia";
@@ -152,7 +153,7 @@ function QueHacerHoy({ decisiones, alAbrir }: { decisiones: Decision[]; alAbrir:
 }
 
 /** «Nuestros productos frente a la competencia»: la posición en precio de cada uno, con filtros de un toque. */
-function NuestrosFrente({ filas, alAbrir }: { filas: ReturnType<typeof posicionesNuestras>; alAbrir: (proveedorId: number) => void }) {
+function NuestrosFrente({ filas, alAbrir, plataforma }: { filas: ReturnType<typeof posicionesNuestras>; alAbrir: (proveedorId: number) => void; plataforma: string }) {
   const { moneda, precio: usd } = useMonedaCompetencia();
   const [estado, setEstado] = useState<EstadoPosicion | "">("");
   const [todos, setTodos] = useState(false);
@@ -177,7 +178,7 @@ function NuestrosFrente({ filas, alAbrir }: { filas: ReturnType<typeof posicione
         </span>
       </CabeceraTarjeta>
       {!filas.length ? (
-        <p className="px-3.5 py-3 text-sm text-muted-foreground">Ningún producto nuestro tiene competencia en Dropi.</p>
+        <p className="px-3.5 py-3 text-sm text-muted-foreground">Ningún producto nuestro tiene competencia en {plataforma}.</p>
       ) : (
         <ul className="flex flex-col">
           {visibles.map((f) => {
@@ -332,7 +333,7 @@ export function TableroCompetencia({
   const ultima = datos.ultima ? `${formatearFechaHora(datos.ultima.inicio)}${datos.ultima.duracionMs !== null ? ` · ${segundos(datos.ultima.duracionMs)}` : ""}` : null;
 
   const contenido: Record<TarjetaC["id"], { valor: number; junto?: string; detalle: string; extra?: string | null; extraRojo?: boolean }> = {
-    todos: { valor: competidores.length, junto: `${num(productosCompetencia)} productos`, detalle: ultima ? `En Dropi ${datos.pais} · última búsqueda ${ultima}` : `En Dropi ${datos.pais}` },
+    todos: { valor: competidores.length, junto: `${num(productosCompetencia)} productos`, detalle: ultima ? `En ${plataformaDe(datos.plataforma).nombre} ${datos.pais} · última búsqueda ${ultima}` : `En ${plataformaDe(datos.plataforma).nombre} ${datos.pais}` },
     iguales: { valor: cuantos("iguales"), detalle: "Tienen productos iguales a los nuestros", extra: `${conCompetencia} de ${nuestras.length} productos nuestros con competencia` },
     baratos: {
       valor: cuantos("baratos"),
@@ -700,7 +701,7 @@ export function VistaCompetidores({ datos, puedeEscribir }: { datos: DatosCompet
     <div className="flex flex-col gap-4">
       <TableroCompetencia datos={datos} filas={conDatos} activa={tarjeta} alPulsar={setTarjeta} />
       {!tarjeta && <QueHacerHoy decisiones={decisiones} alAbrir={abrirCompetidor} />}
-      {!tarjeta && <NuestrosFrente filas={posiciones} alAbrir={abrirCompetidor} />}
+      {!tarjeta && <NuestrosFrente filas={posiciones} alAbrir={abrirCompetidor} plataforma={plataformaDe(datos.plataforma).nombre} />}
       {(!tarjeta || tarjeta === "novedades") && <Novedades alertas={datos.alertas} alAbrir={abrirNovedad} puedeEscribir={puedeEscribir} busquedas={datos.busquedas} />}
 
       <div className="flex flex-wrap items-center gap-2">
