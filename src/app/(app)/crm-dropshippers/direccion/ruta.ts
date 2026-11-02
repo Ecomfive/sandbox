@@ -5,7 +5,7 @@ export const RUTA_DIRECCION = "/crm-dropshippers/bandeja";
 
 /**
  * Las vistas del panel de Dirección en la Bandeja, en el orden de sus pestañas. Resumen y Clientes van separados, como en el prototipo
- * (https://claude.ai/artifact/EgMSyATkMEUXzk9LsX8Wkj). «KPIs de atención» era una pestaña aparte del CRM; «Chats» es la bandeja de WhatsApp.
+ * (https://claude.ai/artifact/EgMSyATkMEUXzk9LsX8Wkj). «KPIs de atención» y «Duplicados» ya no son pestañas (3 nov 2026): la atención va dentro de Equipo y los duplicados, en la lista y la ficha de Clientes. «Chats» es la bandeja de WhatsApp.
  */
 export const VISTAS_DIRECCION = [
   { valor: "resumen", etiqueta: "Resumen" },
@@ -13,9 +13,7 @@ export const VISTAS_DIRECCION = [
   { valor: "productos", etiqueta: "Productos" },
   { valor: "entregas", etiqueta: "Entregas" },
   { valor: "equipo", etiqueta: "Equipo" },
-  { valor: "duplicados", etiqueta: "Duplicados" },
   { valor: "automatizaciones", etiqueta: "Automatizaciones" },
-  { valor: "kpis", etiqueta: "KPIs de atención" },
   { valor: "chats", etiqueta: "Chats" },
 ] as const;
 export type VistaDireccion = (typeof VISTAS_DIRECCION)[number]["valor"];

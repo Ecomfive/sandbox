@@ -16,6 +16,8 @@ import { descargarLista } from "./lista-csv";
 import { rutaVista } from "./ruta";
 import type { DatosPareto } from "./datos-pareto";
 import { Barra, Boton, Chip, Cifra, Cifras, FONDO_TONO, Insignia, TEXTO_TONO, Tarjeta, tonoPuntaje, type TonoDireccion } from "./piezas-direccion";
+import { BloqueDuplicado } from "./bloque-duplicado";
+import type { DuplicadoDeCliente } from "./datos-fase4";
 import { BloquePareto, ROTULO_GRUPO, TONO_GRUPO } from "./vista-pareto";
 import { paretoDe } from "@/lib/crm/pareto";
 import { textoCamino } from "./vista-productos";
@@ -88,6 +90,7 @@ export function PanelDireccion({
   datos,
   productos,
   pareto,
+  duplicados,
   codigoPais,
   escribe,
   usuarioId,
@@ -102,6 +105,8 @@ export function PanelDireccion({
   productos: DatosProductos | null;
   /** Las guías de cada cliente mes a mes (12 meses), para su Pareto en la ficha; null sin la migración 0207. */
   pareto: DatosPareto | null;
+  /** Los clientes que parecen duplicados (mismo WhatsApp, correo, tienda o nombre) y con quiénes; null en el Resumen. */
+  duplicados?: Record<string, DuplicadoDeCliente> | null;
   codigoPais: string;
   escribe: boolean;
   usuarioId: string;
@@ -114,6 +119,7 @@ export function PanelDireccion({
   const [segmento, setSegmento] = useState<Segmento | "todos">(segmentoInicial ?? "todos");
   const [busca, setBusca] = useState("");
   const [tipo, setTipo] = useState<"todos" | "vip" | "regular">("todos");
+  const [soloDuplicados, setSoloDuplicados] = useState(false);
   const [orden, setOrden] = useState<Orden>("salud");
   // La ficha de al lado empieza con el cliente de la primera alerta (como en el prototipo).
   const [sel, setSel] = useState<string | null>(clienteInicial ?? datos.alertas[0]?.dropshipperId ?? null);
@@ -128,6 +134,7 @@ export function PanelDireccion({
   const visiblesAlerta = alertas.filter((a) => pasaFiltro(a, filtroAlerta));
 
   const cuenta = (s: Segmento) => filas.filter((f) => f.segmento === s).length;
+  const conDuplicados = duplicados ? filas.filter((f) => duplicados[f.id]).length : 0;
   const pedidos30 = filas.reduce((s, f) => s + f.pedidos30, 0);
   const pedidos30Antes = filas.reduce((s, f) => s + f.pedidos30Antes, 0);
   const cambioTotal = pedidos30Antes ? (pedidos30 / pedidos30Antes - 1) * 100 : null;
@@ -141,13 +148,14 @@ export function PanelDireccion({
       (f) =>
         (segmento === "todos" || f.segmento === segmento) &&
         (tipo === "todos" || (tipo === "vip") === esVip(f)) &&
+        (!soloDuplicados || !!duplicados?.[f.id]) &&
         (!q || `${f.nombre} ${f.codigo} ${f.responsable ?? ""}`.toLowerCase().includes(q)),
     );
     const salud = (f: FilaDireccion) => f.salud.puntaje ?? 1000;
     return l.sort((a, b) =>
       orden === "pedidos" ? b.pedidos30 - a.pedidos30 : orden === "caida" ? (cambio(a) ?? 1e9) - (cambio(b) ?? 1e9) : salud(a) - salud(b) || b.pedidos30 - a.pedidos30,
     );
-  }, [filas, segmento, tipo, busca, orden]);
+  }, [filas, segmento, tipo, busca, orden, soloDuplicados, duplicados]);
 
   const maxSemana = Math.max(1, ...datos.semanas.map((s) => s.pedidos));
   const ultimas = datos.semanas.slice(-4);
@@ -334,6 +342,11 @@ export function PanelDireccion({
                   {s.etiqueta} · {s.valor === "todos" ? filas.length : cuenta(s.valor)}
                 </Chip>
               ))}
+              {conDuplicados > 0 && (
+                <Chip activo={soloDuplicados} onClick={() => (setSoloDuplicados((x) => !x), setMostrar(POR_PAGINA))}>
+                  Posibles duplicados · {conDuplicados}
+                </Chip>
+              )}
             </div>
           </div>
           <div className="flex flex-wrap items-end gap-3">
@@ -400,6 +413,7 @@ export function PanelDireccion({
                               <span className="flex items-center gap-1.5 font-semibold">
                                 {f.nombre} <TipoCliente nivel={f.nivel} />
                                 {grupoDe.get(f.id) && <Insignia tono={TONO_GRUPO[grupoDe.get(f.id)!]}>{ROTULO_GRUPO[grupoDe.get(f.id)!]}</Insignia>}
+                                {duplicados?.[f.id] && <Insignia tono={duplicados[f.id].fuerte ? "aviso" : "neutro"}>Posible duplicado</Insignia>}
                               </span>
                               <span className="text-xs text-muted-foreground">{f.codigo}</span>
                             </button>
@@ -449,6 +463,9 @@ export function PanelDireccion({
               alertas={alertas.filter((a) => a.dropshipperId === seleccionado.id)}
               extra={productos?.porCliente[seleccionado.id]}
               pareto={pareto}
+              duplicado={duplicados?.[seleccionado.id]}
+              abrirAqui={(id) => porId.has(id)}
+              alAbrirOtro={verCliente}
               personas={datos.personas}
               escribe={escribe}
               pendiente={pendiente}
@@ -493,6 +510,9 @@ function FichaCliente({
   alertas,
   extra,
   pareto,
+  duplicado,
+  abrirAqui,
+  alAbrirOtro,
   personas,
   escribe,
   pendiente,
@@ -504,6 +524,9 @@ function FichaCliente({
   alertas: AlertaDireccion[];
   extra: DatosProductos["porCliente"][string] | undefined;
   pareto: DatosPareto | null;
+  duplicado: DuplicadoDeCliente | undefined;
+  abrirAqui: (id: string) => boolean;
+  alAbrirOtro: (id: string) => void;
   personas: { id: string; nombre: string }[];
   escribe: boolean;
   pendiente: boolean;
@@ -561,6 +584,8 @@ function FichaCliente({
           ))}
         </div>
       )}
+
+      {duplicado && <BloqueDuplicado d={duplicado} abrirAqui={abrirAqui} alAbrir={alAbrirOtro} />}
 
       <div className="flex flex-col gap-2">
         <h3 className="m-0 text-sm font-semibold">Por qué</h3>

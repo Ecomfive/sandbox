@@ -165,7 +165,7 @@ export function VistaResumen({
           valor={duracionCorta(atencion?.medianaMin ?? null)}
           nota={atencion ? `${atencion.sinResponder} sin responder · meta ${META_RESPUESTA_MIN} min` : "Sin datos"}
           tono={tonoAt}
-          alPulsar={() => router.push(rutaVista("kpis"))}
+          alPulsar={() => router.push(rutaVista("equipo", { dias: 7 }))}
         />
       </Cifras>
 
@@ -361,7 +361,7 @@ export function VistaResumen({
             </div>
           )}
           <p className="m-0 text-xs text-muted-foreground">{atencion ? `${atencion.consultas} consultas. Meta: responder en ${META_RESPUESTA_MIN} minutos.` : ""}</p>
-          <VerMas href={rutaVista("kpis")}>Ver KPIs de atención</VerMas>
+          <VerMas href={rutaVista("equipo", { dias: 7 })}>Ver la atención del equipo</VerMas>
         </Tarjeta>
       </div>
     </>
