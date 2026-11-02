@@ -62,6 +62,8 @@ test("normaliza un producto simple y uno variable de Dropi", () => {
   assert.equal(variable?.stock, 7);
   assert.equal(variable?.privado, true);
   assert.equal(variable?.foto, null, "el logo del proveedor no es la foto del producto");
+  const tica = normalizarDropi({ id: 7264, name: "Faja", gallery: [{ urlS3: "costarica/products/7264/e.jpeg", main: true }] });
+  assert.equal(tica?.foto, "https://d3sk39qh2f4j46.cloudfront.net/costarica/products/7264/e.jpeg", "las fotos de Costa Rica van a su propio CDN");
   assert.equal(normalizarDropi({ name: "Sin id" }), null);
 });
 
