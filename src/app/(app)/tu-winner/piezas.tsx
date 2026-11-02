@@ -54,7 +54,7 @@ export function EtiquetasGanador({ g }: { g: Ganador }) {
     principal = (
       <span className="et tenemos" title={g.etiqueta ?? undefined}>
         {PREFIJO_REF[g.tipoRef ?? "producto"]}
-        {g.etiqueta ? ` · ${g.etiqueta.replace(/^SKU /, "")}` : ""}
+        {g.etiqueta ? ` · ${g.etiqueta.split(" · ")[0].replace(/^SKU /, "")}` : ""}
       </span>
     );
   else if (g.estado === "privado") principal = <span className="et canal">Privado del proveedor</span>;
