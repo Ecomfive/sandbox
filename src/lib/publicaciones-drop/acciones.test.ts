@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { ACCIONES_FILA_DROP, accionDeEstado, motivoCambioEstado, motivoEliminar, motivoLiquidacion } from "./acciones";
+import { ACCIONES_FILA_DROP, MOTIVO_SOLO_DROPI, accionDeEstado, motivoCambioEstado, motivoEliminar, motivoLiquidacion } from "./acciones";
 
 describe("acciones de Drop", () => {
   it("el mismo botón inactiva una activa y activa una inactiva", () => {
@@ -16,7 +16,12 @@ describe("acciones de Drop", () => {
   it("la liquidación siempre queda pendiente", () => {
     assert.match(motivoLiquidacion(), /Pendiente/);
   });
-  it("la fila no tiene republicar ni archivar", () => {
-    assert.deepEqual([...ACCIONES_FILA_DROP], ["estado", "liquidacion", "eliminar"]);
+  it("la fila lleva los íconos de Dropi en su orden, más eliminar", () => {
+    assert.deepEqual([...ACCIONES_FILA_DROP], ["republicar", "privatizar", "estado", "pausar", "liquidacion", "archivar", "eliminar", "tareas"]);
+  });
+  it("lo que Drop no tiene va apagado y dice por qué", () => {
+    assert.match(MOTIVO_SOLO_DROPI.republicar, /no republica/);
+    assert.match(MOTIVO_SOLO_DROPI.archivar, /elimina/);
+    for (const m of Object.values(MOTIVO_SOLO_DROPI)) assert.ok(m.length > 5);
   });
 });

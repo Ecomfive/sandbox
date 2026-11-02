@@ -26,7 +26,7 @@ export default async function PublicacionesDropPage() {
   if (aviso) return aviso;
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
-  const datos = await cargarDatosDrop(supabase, pais);
+  const datos = await cargarDatosDrop(supabase, pais, usuario);
   const puedeEscribir = !usuario.modulosSoloLectura.includes("publicaciones-drop");
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
