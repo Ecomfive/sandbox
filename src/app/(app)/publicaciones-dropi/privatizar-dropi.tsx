@@ -11,9 +11,9 @@ import { anilloFoco, fieldClass } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { Ventana } from "@/components/ui/ventana";
 import { usePuedeAbrir } from "@/components/modulos-contexto";
-import { CandadoAbiertoIcon, CandadoIcon, DeshacerIcon } from "@/lib/nav-icons";
+import { CandadoAbiertoIcon, CandadoIcon, DeshacerIcon, PapeleraIcon } from "@/lib/nav-icons";
 import { esBodegaDropi } from "@/lib/publicaciones/automatico";
-import { faltantesPrivatizar, inicialesDe, limpiarIniciales, nombrePrivado, normalizarDatosPrivatizar } from "@/lib/publicaciones/privatizar-dropi";
+import { faltantesPrivatizar, inicialesDe, limpiarIniciales, MAX_EXTRAS, nombrePrivado, normalizarDatosPrivatizar, quienesDe, unidadesTotales } from "@/lib/publicaciones/privatizar-dropi";
 import { codigoBodega } from "@/lib/publicaciones/sincronizar-dropi";
 import { buscarDropshippersParaPrivatizar, privatizarPublicacion, quitarPrivatizacion } from "./actions";
 import { VentanaDeshacerApagado } from "./apagar-dropi";
@@ -36,6 +36,8 @@ const numero = (t: string) => Number(t.replace(",", "."));
  * el dropshipper entra a Dropi, cuántas unidades se le reservan, de qué bodega y a qué precio) y el nombre para el «P-XX»; el sistema lo deja
  * pendiente y «Aplicar en Dropi» crea el producto privado, se lo asigna y le saca esas unidades al público. Cuando Dropi lo confirma, el sistema
  * crea la publicación privada. Nada se privatiza solo.
+ * **Más de un correo en el mismo ID** (3 nov 2026, pedido de Jhokser: dos correos de un mismo dropshipper): «Agregar otro correo» suma filas con su correo y sus
+ * unidades; todos comparten el mismo producto privado (un solo ID) y al público se le sacan las unidades de todos.
  */
 function VentanaPrivatizar({ p, alCerrar }: { p: FilaPublicacion; alCerrar: () => void }) {
   const { monto } = useMoneda();
@@ -50,6 +52,7 @@ function VentanaPrivatizar({ p, alCerrar }: { p: FilaPublicacion; alCerrar: () =
   const [unidades, setUnidades] = useState("");
   const [bodega, setBodega] = useState(String(bodegas[0]?.id ?? ""));
   const [precio, setPrecio] = useState(p.precioVenta != null ? String(p.precioVenta) : "");
+  const [extras, setExtras] = useState<{ correo: string; dropshipper: string; unidades: string }[]>([]);
   const [busqueda, setBusqueda] = useState("");
   const [encontrados, setEncontrados] = useState<{ id: string; nombre: string; correo: string; tienda: string }[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -89,19 +92,20 @@ function VentanaPrivatizar({ p, alCerrar }: { p: FilaPublicacion; alCerrar: () =
 
   const nombre = iniciales ? nombrePrivado(iniciales, p.nombre) : "";
   const bodegaElegida = bodegas.find((b) => String(b.id) === bodega) ?? null;
-  const datos = normalizarDatosPrivatizar({ correo, dropshipper, dropshipperId, iniciales, unidades: numero(unidades), bodega: Number(bodega), precio: numero(precio), nombre, origen: p.id });
+  const extrasEnviar = extras.map((x) => ({ correo: x.correo, dropshipper: x.dropshipper, unidades: numero(x.unidades) }));
+  const datos = normalizarDatosPrivatizar({ correo, dropshipper, dropshipperId, iniciales, unidades: numero(unidades), bodega: Number(bodega), precio: numero(precio), nombre, origen: p.id, extras: extrasEnviar });
   const faltan = faltantesPrivatizar(datos, bodegaElegida?.stock ?? null);
   const pasos = [
     `Comprobar que ${datos.correo || "el correo"} tiene cuenta de dropshipper en Dropi`,
     `Crear el producto privado «${nombre || "P-XX …"}»${datos.precio ? ` a ${monto(datos.precio)}` : ""}, con las fotos y garantías del público`,
-    `Ponerle ${datos.unidades ? datos.unidades.toLocaleString("es-PA") : "las"} unidades y asignárselo a ${datos.dropshipper || "el dropshipper"} en «Productos privados»`,
+    `Ponerle ${unidadesTotales(datos) ? unidadesTotales(datos).toLocaleString("es-PA") : "las"} unidades y asignárselo a ${quienesDe(datos) || "el dropshipper"} en «Productos privados»`,
     `Sacarle esas unidades al público (ID ${p.dropiId})`,
   ];
 
   function confirmar() {
     setError(null);
     empezar(async () => {
-      const r = await privatizarPublicacion(p.id, { correo, dropshipper, dropshipperId, iniciales, unidades: numero(unidades), bodega: Number(bodega), precio: numero(precio) }).catch(() => ({ error: "No se pudo. Inténtalo de nuevo.", detalle: undefined }));
+      const r = await privatizarPublicacion(p.id, { correo, dropshipper, dropshipperId, iniciales, unidades: numero(unidades), bodega: Number(bodega), precio: numero(precio), extras: extrasEnviar }).catch(() => ({ error: "No se pudo. Inténtalo de nuevo.", detalle: undefined }));
       if (r.error) return void setError(r.error);
       alCerrar();
       mostrarToast(r.detalle ?? "Privatización pendiente");
@@ -163,7 +167,7 @@ function VentanaPrivatizar({ p, alCerrar }: { p: FilaPublicacion; alCerrar: () =
           <Campo etiqueta="Precio de venta ($)" id="priv-precio" obligatorio>
             <input id="priv-precio" type="number" inputMode="decimal" min={0.1} step="0.01" value={precio} onChange={(e) => setPrecio(e.target.value)} placeholder="Ej: 9.99" className={`${fieldClass} w-full tabular-nums`} />
           </Campo>
-          <Campo etiqueta="Unidades que se le reservan" id="priv-unidades" obligatorio>
+          <Campo etiqueta={extras.length ? "Unidades para este correo" : "Unidades que se le reservan"} id="priv-unidades" obligatorio>
             <input id="priv-unidades" type="number" inputMode="numeric" min={1} step={1} max={bodegaElegida?.stock} value={unidades} onChange={(e) => setUnidades(e.target.value)} placeholder="Ej: 50" className={`${fieldClass} w-full tabular-nums`} />
           </Campo>
           <Campo etiqueta="Bodega de donde salen" id="priv-bodega" obligatorio>
@@ -176,6 +180,27 @@ function VentanaPrivatizar({ p, alCerrar }: { p: FilaPublicacion; alCerrar: () =
             </select>
           </Campo>
         </div>
+        {extras.map((x, i) => (
+          <div key={i} className="grid gap-3 rounded-lg border border-border p-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_7rem_auto] sm:items-end">
+            <Campo etiqueta={`Correo ${i + 2} en Dropi`} id={`priv-correo-${i}`} obligatorio>
+              <input id={`priv-correo-${i}`} type="email" value={x.correo} onChange={(e) => setExtras((l) => l.map((y, j) => (j === i ? { ...y, correo: e.target.value } : y)))} maxLength={200} autoComplete="off" placeholder="Ej: otro@correo.com" className={`${fieldClass} w-full`} />
+            </Campo>
+            <Campo etiqueta={`Nombre del correo ${i + 2}`} id={`priv-nombre-${i}`}>
+              <input id={`priv-nombre-${i}`} value={x.dropshipper} onChange={(e) => setExtras((l) => l.map((y, j) => (j === i ? { ...y, dropshipper: e.target.value } : y)))} maxLength={120} autoComplete="off" placeholder="Opcional" className={`${fieldClass} w-full`} />
+            </Campo>
+            <Campo etiqueta="Unidades" id={`priv-unidades-${i}`} obligatorio>
+              <input id={`priv-unidades-${i}`} type="number" inputMode="numeric" min={1} step={1} value={x.unidades} onChange={(e) => setExtras((l) => l.map((y, j) => (j === i ? { ...y, unidades: e.target.value } : y)))} placeholder="Ej: 30" className={`${fieldClass} w-full tabular-nums`} />
+            </Campo>
+            <button type="button" aria-label={`Quitar el correo ${i + 2}`} onClick={() => setExtras((l) => l.filter((_, j) => j !== i))} className={`inline-flex min-h-10 min-w-10 items-center justify-center rounded-md border border-border-control bg-card hover:bg-muted ${anilloFoco}`}>
+              <PapeleraIcon aria-hidden="true" className="h-4 w-4" />
+            </button>
+          </div>
+        ))}
+        {extras.length < MAX_EXTRAS && (
+          <button type="button" onClick={() => setExtras((l) => [...l, { correo: "", dropshipper: "", unidades: "" }])} className={`inline-flex min-h-10 w-fit items-center rounded-md border border-border-control bg-card px-3 py-2 text-sm font-medium hover:bg-muted ${anilloFoco}`}>
+            + Agregar otro correo al mismo ID
+          </button>
+        )}
         {nombre && (
           <p className="m-0 text-muted-foreground">
             Nombre en Dropi: <span className="font-medium text-foreground">{nombre}</span>

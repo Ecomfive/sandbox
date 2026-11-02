@@ -7,7 +7,7 @@ import { requireModuloEscritura } from "@/lib/auth";
 import { getPaisActual } from "@/lib/pais";
 import { puedeVerPaisId } from "@/lib/seguridad/pais-acceso";
 import { normalizarDatosCrear } from "@/lib/publicaciones/crear-dropi";
-import { normalizarDatosPrivatizar } from "@/lib/publicaciones/privatizar-dropi";
+import { normalizarDatosPrivatizar, quienesDe, unidadesTotales } from "@/lib/publicaciones/privatizar-dropi";
 import { normalizarDatosStock } from "@/lib/publicaciones/stock-dropi";
 import { republicacionSinTocarDropi } from "@/lib/publicaciones/republicar-dropi";
 import { codigoBodega } from "@/lib/publicaciones/sincronizar-dropi";
@@ -108,7 +108,7 @@ export async function listarCambiosPendientes(): Promise<{ error?: string; cambi
         }
       } else if (tipo === "privatizar") {
         const d = normalizarDatosPrivatizar(f.datos);
-        lineas.push(`Privatizar a ${d.dropshipper || d.correo} (${d.correo}): producto privado «${d.nombre}» · ${d.unidades.toLocaleString("es-PA")} u. pasan del público al privado · ${usd(d.precio)}`);
+        lineas.push(`Privatizar a ${quienesDe(d)}: producto privado «${d.nombre}» · ${unidadesTotales(d).toLocaleString("es-PA")} u. pasan del público al privado · ${usd(d.precio)}`);
         alDeshacer = "Se quita de la cola; no cambia nada en el sistema. Dropi no se había tocado.";
         if (f.nuevo_dropi_id) {
           deshacible = false;

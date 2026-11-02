@@ -596,6 +596,45 @@ test("privatizar: dos dropshippers distintos del mismo público, cada uno con su
   assert.deepEqual((d.productos.get(9002)!.private_product_inventories as Obj[]).map((x) => x.user_id), [6001]);
 });
 
+test("privatizar con dos correos en un mismo ID: un solo producto privado con el stock de los dos, cada correo con sus unidades, y al público se le saca el total", async () => {
+  const sinis2 = { id: 7002, email: "sinis2@correo.com", name: "Sinisterra 2", role_user: { name: "DROPSHIPPER" } };
+  const d = crearDropi({ usuarios: { "maria@correo.com": maria, "sinis2@correo.com": sinis2 } });
+  d.productos.set(8406, publicoVeganic());
+  const datos = { ...privatizacion, extras: [{ correo: "sinis2@correo.com", dropshipper: "Sinisterra 2", unidades: 30 }] };
+  const [r] = await aplicar(d, [{ ...base, id: "v1", tipo: "privatizar", producto: 8406, datos }]);
+  assert.equal(r.ok, true, String(r.error));
+  assert.equal(r.nuevo, 9001);
+  assert.equal(d.llamadas.filter((l) => l === "POST /products").length, 1, "un solo producto privado");
+  const privado = d.productos.get(9001)!;
+  assert.deepEqual(d.stockDe(privado), { 81: 80 });
+  const reservas = (privado.private_product_inventories as Obj[]).filter((x) => !x.deleted_at);
+  assert.deepEqual(reservas.map((x) => [x.user_id, x.email, x.stock]), [[5521, "maria@correo.com", 50], [7002, "sinis2@correo.com", 30]]);
+  assert.deepEqual(d.stockDe(d.productos.get(8406)!), { 81: 220 });
+  assert.ok(d.llamadas.includes("GET /users/existemail/sinis2%40correo.com/false"));
+});
+
+test("privatizar con dos correos: un correo extra que no existe, o que es de un proveedor, se dice antes de crear nada", async () => {
+  const d = crearDropi({ usuarios: { "maria@correo.com": maria, "prov@correo.com": { id: 3, email: "prov@correo.com", role_user: { name: "SUPPLIER" } } } });
+  d.productos.set(8406, publicoVeganic());
+  let [r] = await aplicar(d, [{ ...base, id: "v1", tipo: "privatizar", producto: 8406, datos: { ...privatizacion, extras: [{ correo: "noexiste@correo.com", dropshipper: "", unidades: 5 }] } }]);
+  assert.equal(r.ok, false);
+  assert.match(String(r.error), /noexiste@correo\.com/);
+  [r] = await aplicar(d, [{ ...base, id: "v2", tipo: "privatizar", producto: 8406, datos: { ...privatizacion, extras: [{ correo: "prov@correo.com", dropshipper: "", unidades: 5 }] } }]);
+  assert.match(String(r.error), /es de un proveedor/);
+  assert.equal(d.llamadas.filter((l) => l === "POST /products").length, 0);
+  assert.deepEqual(d.stockDe(d.productos.get(8406)!), { 81: 300 });
+});
+
+test("privatizar con dos correos: si el público no alcanza para el total, no crea nada", async () => {
+  const sinis2 = { id: 7002, email: "sinis2@correo.com", name: "Sinisterra 2", role_user: { name: "DROPSHIPPER" } };
+  const d = crearDropi({ usuarios: { "maria@correo.com": maria, "sinis2@correo.com": sinis2 } });
+  d.productos.set(8406, publicoVeganic());
+  const [r] = await aplicar(d, [{ ...base, id: "v1", tipo: "privatizar", producto: 8406, datos: { ...privatizacion, unidades: 200, extras: [{ correo: "sinis2@correo.com", dropshipper: "", unidades: 150 }] } }]);
+  assert.equal(r.ok, false);
+  assert.match(String(r.error), /350/);
+  assert.equal(d.llamadas.filter((l) => l === "POST /products").length, 0);
+});
+
 test("apagar un privado: la reserva del correo se quita (va marcada como quitada) y queda sin stock y archivado", async () => {
   const d = crearDropi({ usuarios: { "maria@correo.com": maria } });
   d.productos.set(8406, publicoVeganic());

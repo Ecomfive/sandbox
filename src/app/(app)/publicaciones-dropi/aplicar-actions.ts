@@ -7,7 +7,7 @@ import { requireModuloEscritura } from "@/lib/auth";
 import { normalizarDatosDevolver, normalizarUnidades, type DatosDevolver } from "@/lib/publicaciones/apagar-dropi";
 import { normalizarDatosCrear, type DatosCrearDropi, type FotoCrear } from "@/lib/publicaciones/crear-dropi";
 import { unaPorFoto } from "@/lib/publicaciones/fotos-dropi";
-import { normalizarDatosPrivatizar, type DatosPrivatizar } from "@/lib/publicaciones/privatizar-dropi";
+import { destinosDe, normalizarDatosPrivatizar, quienesDe, type DatosPrivatizar } from "@/lib/publicaciones/privatizar-dropi";
 import { normalizarDatosStock, type DatosStock } from "@/lib/publicaciones/stock-dropi";
 import { codigoBodega } from "@/lib/publicaciones/sincronizar-dropi";
 import { puedeVerPaisId } from "@/lib/seguridad/pais-acceso";
@@ -119,7 +119,7 @@ async function crearPrivada(
         estado: "al_dia",
         estado_publicacion: "activo",
         tipo_publicacion: "privado",
-        privatizado_a: d.dropshipper || null,
+        privatizado_a: destinosDe(d).map((x) => x.dropshipper || x.correo).filter(Boolean).join(" y ") || null,
         privatizado_email: d.correo || null,
         dropshipper_id: d.dropshipperId,
         precio_venta: d.precio,
@@ -131,7 +131,7 @@ async function crearPrivada(
       .single();
     if (error || !data) return { error: "Se privatizó en Dropi, pero no se pudo crear la publicación privada en el sistema." };
     id = data.id as string;
-    await registrarAuditoria({ accion: "crear_publicacion_dropi", entidad: "dropi_publicaciones", entidadId: id, detalle: `${d.nombre} (ID ${nuevo}) · privatizada a ${d.dropshipper || d.correo} desde el ID ${publica.dropi_id ?? "—"}` });
+    await registrarAuditoria({ accion: "crear_publicacion_dropi", entidad: "dropi_publicaciones", entidadId: id, detalle: `${d.nombre} (ID ${nuevo}) · privatizada a ${quienesDe(d)} desde el ID ${publica.dropi_id ?? "—"}` });
   }
   await supabase.from("dropi_publicaciones").update({ relacionados: [...new Set([...((publica.relacionados as string[] | null) ?? []), id])], actualizado_en: new Date().toISOString() }).eq("id", publica.id as string);
   return { id };

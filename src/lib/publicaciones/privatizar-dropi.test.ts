@@ -5,6 +5,7 @@ import {
   armarAsignacion,
   armarPrivado,
   armarSalidaDelPublico,
+  destinosDe,
   errorDeOrigen,
   faltantesPrivatizar,
   inicialesDe,
@@ -15,6 +16,7 @@ import {
   reservasQuitadas,
   sinPrefijoPrivado,
   yaAsignado,
+  unidadesTotales,
   type DatosPrivatizar,
 } from "./privatizar-dropi";
 import { REPUBLICAR_JS } from "./republicar-dropi";
@@ -22,7 +24,7 @@ import { REPUBLICAR_JS } from "./republicar-dropi";
 type Obj = Record<string, unknown>;
 const delFavorito = new Function(`${ARMAR_JS};${REPUBLICAR_JS};${PRIVATIZAR_JS}; return { privado, asignacion, errorOrigen, reservasQuitadas, yaAsignado, salidaPublico };`)() as {
   privado: (o: Obj, bp: Obj[], d: DatosPrivatizar) => Obj;
-  asignacion: (o: Obj, bp: Obj[], u: Obj, d: DatosPrivatizar) => Obj;
+  asignacion: (o: Obj, bp: Obj[], u: Obj, d: DatosPrivatizar, dt?: { correo: string; unidades: number }) => Obj;
   errorOrigen: (o: Obj, bp: Obj[], d: DatosPrivatizar) => string | null;
   reservasQuitadas: (l: unknown) => Obj[];
   yaAsignado: (o: Obj, id: number) => boolean;
@@ -162,4 +164,41 @@ test("el favorito arma exactamente lo mismo que el sistema", () => {
   igual(delFavorito.salidaPublico(publico(), bp, datos(), 11500), armarSalidaDelPublico(publico(), bp, datos(), 11500));
   igual(delFavorito.reservasQuitadas(llena.private_product_inventories), reservasQuitadas(llena.private_product_inventories));
   assert.equal(delFavorito.yaAsignado(llena, 7), yaAsignado(llena, 7));
+});
+
+test("varios correos en un mismo ID: se normalizan, se suman las unidades y se piden completos", () => {
+  const d = normalizarDatosPrivatizar({ correo: "A@x.com", dropshipper: "A", iniciales: "A", unidades: 10, bodega: 81, precio: 5, nombre: "P-A X", extras: [{ correo: " B@x.com ", dropshipper: "B", unidades: "5" }, { correo: "malo", unidades: 0 }] });
+  assert.deepEqual(d.extras, [{ correo: "b@x.com", dropshipper: "B", unidades: 5 }, { correo: "", dropshipper: "", unidades: 0 }]);
+  assert.equal(unidadesTotales(d), 15);
+  assert.deepEqual(destinosDe(d).map((x) => x.correo), ["a@x.com", "b@x.com", ""]);
+  assert.equal(unidadesTotales(normalizarDatosPrivatizar({ unidades: 7 })), 7);
+  const f = faltantesPrivatizar(d, null);
+  assert.ok(f.some((m) => /correo 3/.test(m)) && f.some((m) => /unidades se le reservan del correo 3/.test(m)));
+  const bien = { ...d, extras: [{ correo: "b@x.com", dropshipper: "", unidades: 5 }] };
+  assert.deepEqual(faltantesPrivatizar(bien, 15), []);
+  assert.ok(faltantesPrivatizar(bien, 14).some((m) => /se piden 15/.test(m)));
+  assert.ok(faltantesPrivatizar({ ...bien, extras: [{ correo: "a@x.com", dropshipper: "", unidades: 5 }] }, null).some((m) => /repetido/.test(m)));
+});
+
+test("varios correos en un mismo ID: el privado nace con el stock total, el público pierde el total y cada reserva suma a la anterior (y el favorito hace lo mismo)", () => {
+  const d: DatosPrivatizar = { correo: "a@x.com", dropshipper: "A", dropshipperId: null, iniciales: "A", unidades: 10, bodega: 81, precio: 5, nombre: "P-A X", origen: "", salida: false, extras: [{ correo: "b@x.com", dropshipper: "B", unidades: 5 }] };
+  const r = armarPrivado(publico(), bp, d);
+  assert.ok("cuerpo" in r);
+  igual(r, delFavorito.privado(publico(), bp, d));
+  assert.deepEqual((r as { cuerpo: Obj }).cuerpo.warehouselected, [{ ...(((r as { cuerpo: Obj }).cuerpo.warehouselected as Obj[])[0]), stock: 15 }]);
+  const salida = armarSalidaDelPublico(publico(), bp, d, 9001) as { cuerpo: Obj };
+  igual(salida, delFavorito.salidaPublico(publico(), bp, d, 9001));
+  const sb = (salida.cuerpo.warehouselected as Obj[])[0];
+  assert.deepEqual([sb.quantity, sb.type_movement], [15, "SALIDA"]);
+  const nuevo = publico({ id: 9001, privated_product: true, warehouse_product: [{ warehouse_id: 81, stock: 15, warehouse: bodega81 }] });
+  const ua = { id: 1, email: "a@x.com" };
+  const ub = { id: 2, email: "b@x.com" };
+  const primera = armarAsignacion(nuevo, bp, ua, d) as { cuerpo: Obj };
+  igual(primera, delFavorito.asignacion(nuevo, bp, ua, d));
+  const conA = { ...nuevo, private_product_inventories: primera.cuerpo.private_product_inventories };
+  const segunda = armarAsignacion(conA, bp, ub, d, d.extras![0]) as { cuerpo: Obj };
+  igual(segunda, delFavorito.asignacion(conA, bp, ub, d, d.extras![0]));
+  assert.deepEqual((segunda.cuerpo.private_product_inventories as Obj[]).map((x) => [x.user_id, x.stock]), [[1, 10], [2, 5]]);
+  // Más de lo que hay: no se reserva.
+  assert.ok("error" in armarAsignacion(conA, bp, ub, d, { correo: "b@x.com", unidades: 6 }));
 });

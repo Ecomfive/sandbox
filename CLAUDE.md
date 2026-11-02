@@ -755,6 +755,13 @@ convenciones técnicas del código.
   publicación privada no existe en el sistema). **Quitar una privatización** (apagar un privado) ya no manda `private_product_inventories: []`: la pantalla de Dropi
   manda cada reserva con `deleted_at` y `change` (`reservasQuitadas`). **Pendiente de probar con Dropi real**: privatizar de verdad (probado contra un Dropi simulado con las
   rutas que usa su pantalla); la forma exacta de la reserva y que el producto privado nuevo acepte el stock inicial al crear.
+  **Varios correos en un mismo ID** (3 nov 2026, pedido de Jhokser: dos correos de Sinisterra en un solo producto privado): la ventana de privatizar tiene «+ Agregar otro correo al mismo ID»
+  (hasta `MAX_EXTRAS` = 4 más; cada uno con su correo, nombre opcional y unidades). `DatosPrivatizar.extras` los guarda en el cambio de la cola; `unidades` sigue siendo solo las del correo
+  principal y `unidadesTotales(d)` / `destinosDe(d)` / `quienesDe(d)` dan el total, la lista de correos y el texto «A (a@x) y B (b@x)». El favorito crea **un solo** producto privado con el stock
+  total, comprueba que cada correo sea de un dropshipper (`existemail`), asigna cada uno con `asignacion(o,bp,u,d,destino)` **releyendo el producto entre una reserva y la siguiente** (si no, la
+  segunda pisaría la primera) y le saca al público el total; un reintento salta los correos ya asignados. La publicación privada que nace en el sistema guarda todos los nombres en `privatizado_a`
+  («A y B») y solo el correo principal en `privatizado_email`. Una privatización pendiente que comparta cualquier correo con otra no se duplica. Cambia `VERSION_FAVORITO`: hay que volver a
+  arrastrar «Aplicar en Dropi». Probado contra el Dropi simulado (`marcador-flujo.test.ts`), no contra Dropi real.
   **Tareas a mano** (28 oct 2026, pedido de Alcides; migración 0175 `dropi_publicaciones_tareas`: título, nota, responsable, plazo, quién la creó y hecha_*;
   RLS sin políticas): bloque «Tareas» de la ficha (`TareasPublicacion`, `tareas-publicacion.tsx`; `FormularioTarea` y `LineaTarea` en `tareas-piezas.tsx`, dentro
   del formulario de la ficha: Enter no lo envía) con `crearTareaPublicacion` / `resolverTareaPublicacion` / `obtenerTareasPublicacion` (`tareas-actions.ts`; aviso
