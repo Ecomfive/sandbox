@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { descripcionPorDefecto, enlaceValido, faltantesCrearDrop, skuDeDrop, type DatosCrearDrop } from "./crear";
+import { descripcionPorDefecto, enlaceValido, faltantesCrearDrop, skuDeDrop, sugerirProductos, textoParaDrop, type DatosCrearDrop } from "./crear";
 
 const base: DatosCrearDrop = { nombre: "Crema Nida", descripcion: "Crema Nida", categoria: "Belleza", precio: 12000, imagenes: 3, enlaceCreativos: "" };
 
@@ -26,5 +26,33 @@ describe("crear un producto en Drop", () => {
     assert.deepEqual(faltantesCrearDrop({ ...base, enlaceCreativos: "mis creativos" }), ["Enlace de creativos (debe empezar con https://)"]);
     assert.equal(enlaceValido("https://u:p@sitio.com"), false);
     assert.equal(enlaceValido("javascript:alert(1)"), false);
+  });
+
+  it("con nuestro producto, en Drop se escribe su SKU (o, si se prefiere, su nombre)", () => {
+    const p = { codigo: "CREMA/NIDA/50ML", nombre: "Crema Nida 50 ml" };
+    assert.equal(textoParaDrop(p, "sku"), "CREMA/NIDA/50ML");
+    assert.equal(textoParaDrop(p, "nombre"), "Crema Nida 50 ml");
+  });
+});
+
+describe("sugerirProductos", () => {
+  const productos = [
+    { id: "1", codigo: "CREMA/NIDA/50ML", nombre: "Crema Nida 50 ml" },
+    { id: "2", codigo: "CREMA/NIDA/100ML", nombre: "Crema Nida 100 ml grande" },
+    { id: "3", codigo: "ACEITE/OREGANO", nombre: "Aceite de orégano" },
+  ];
+  it("vincula solo cuando el nombre o el SKU es igual (sin tildes ni signos)", () => {
+    assert.equal(sugerirProductos("crema nida 50 ml", productos).exacto?.id, "1");
+    assert.equal(sugerirProductos("CREMA/NIDA/50ML", productos).exacto?.id, "1");
+    assert.equal(sugerirProductos("aceite de oregano", productos).exacto?.id, "3");
+  });
+  it("ofrece los parecidos cuando no es igual", () => {
+    const r = sugerirProductos("crema nida", productos);
+    assert.equal(r.exacto, null);
+    assert.deepEqual(r.parecidos.map((x) => x.id), ["1", "2"]);
+  });
+  it("con muy poco escrito no sugiere nada", () => {
+    assert.deepEqual(sugerirProductos("cr", productos), { exacto: null, parecidos: [] });
+    assert.deepEqual(sugerirProductos("zapatos", productos), { exacto: null, parecidos: [] });
   });
 });

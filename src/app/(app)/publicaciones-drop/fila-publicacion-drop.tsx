@@ -57,7 +57,7 @@ export function FilaPublicacionDropLista({ f, moneda, puedeEscribir }: { f: Fila
         <span className="min-w-0 text-xs [overflow-wrap:anywhere]">
           {f.producto ? (
             <span className="text-muted-foreground">
-              Vinculada a <span className="font-medium text-foreground">{f.producto.codigo}</span> {f.producto.nombre}
+              SKU nuestro: <span className="font-medium text-foreground">{f.producto.codigo}</span> {f.producto.nombre}
             </span>
           ) : f.sugerido ? (
             <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">

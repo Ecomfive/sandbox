@@ -55,5 +55,12 @@ export async function crearProductoDrop(formData: FormData): Promise<{ error?: s
   const faltan = faltantesCrearDrop({ nombre: texto("nombre"), descripcion: texto("descripcion"), categoria: texto("categoria"), precio, imagenes, enlaceCreativos: texto("enlace_creativos") });
   if (faltan.length) return { error: `Falta o está mal: ${faltan.join(", ")}.` };
   if (imagenes > MAX_IMAGENES) return { error: `Máximo ${MAX_IMAGENES} imágenes.` };
+  // El producto nuestro con que se vincula (opcional): debe existir.
+  const skuId = texto("sku_maestro_id");
+  if (skuId) {
+    if (!UUID.test(skuId)) return { error: "Datos no válidos." };
+    const { data: sku } = await createServiceClient().from("skus_maestros").select("id").eq("id", skuId).maybeSingle();
+    if (!sku) return { error: "Ese producto nuestro ya no existe." };
+  }
   return { error: SIN_ESCRITURA };
 }

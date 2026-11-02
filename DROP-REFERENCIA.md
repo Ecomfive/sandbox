@@ -62,6 +62,12 @@ Ese código de venta público es el **ID de la publicación en Drop**.
 - Al sincronizar las publicaciones se guarda tal cual como **«SKU de Drop»** y luego se **vincula con el SKU de nuestro producto** (el de Producto): se sugiere por el parecido entre las palabras del SKU de Drop y las del SKU y el nombre de nuestro producto, y por las **imágenes**
   (la misma huella de foto y las reglas de `src/lib/publicaciones/vincular.ts`), y una persona lo confirma.
 
+### Vincular con nuestro producto al crear (regla de Hernán, 3 nov 2026)
+
+- El SKU de Drop es el nombre y no se cambia, así que **al crear un producto en Drop se vincula con uno nuestro** y se procura que el SKU de Drop sea **el mismo que el SKU de nuestro producto** (o, si se prefiere, su nombre).
+- En «Crear producto» (`CrearProductoDropPanel`): se elige el producto nuestro, o el sistema lo vincula solo cuando lo escrito es igual al nombre o al SKU de uno (`sugerirProductos`); si solo se parece, ofrece «Vincular». Sin vincular se puede después.
+- Un producto que **ya está creado en Drop** conserva su SKU: quedan los dos SKU («SKU de Drop» y «SKU nuestro») y el vínculo los conecta.
+
 ## Qué hace el sistema hoy y qué falta
 
 - **Lee** las publicaciones de Drop (`app.soydrop.com`, cuenta «Proveedor Ecomfive Costa Rica»; menú del proveedor: Dashboard, Mis productos, Solicitudes de inventario) con `scripts/drop-guardar.ts` y las guarda en `drop_publicaciones` (migración 0221); deja una sugerencia de producto a vincular
