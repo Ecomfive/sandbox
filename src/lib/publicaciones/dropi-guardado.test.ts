@@ -65,6 +65,10 @@ test("bodegas: las del producto (con su stock) y después las del proveedor, sin
   assert.deepEqual((sinStock.cuerpo.warehouselected as unknown[]).length, 1);
   // Sin nombre de guía nuevo se queda el que tenía (la pantalla manda "" si no había).
   assert.equal(sinStock.cuerpo.name_in_guide, "");
+  // La bodega del producto con el ID en texto («81») es la misma que la del proveedor (81): no va dos veces.
+  const enTexto = armarGuardadoProducto({ ...producto7587, warehouse_product: [{ warehouse_id: "81", stock: 5, warehouse: { name: "Proveedor Ecomfive", address: "x" } }] }, bodegasProveedor, { nombre: "X nombre", nombreGuia: null });
+  assert.ok("cuerpo" in enTexto);
+  assert.equal((enTexto.cuerpo.warehouselected as unknown[]).length, 1);
 });
 
 test("no se toca un producto con variaciones ni un nombre de más de 40", () => {

@@ -83,7 +83,9 @@ export function armarAjusteStock(producto: Obj, bodegasProveedor: Obj[], d: Dato
     return { error: "Esa bodega no es de ECOMFIVE en Dropi: el stock no se mueve desde aquí." };
   if (!(d.unidades >= 0)) return { error: "El cambio no trae las unidades." };
   const stock = stockPorBodega(producto);
-  const antes = stock[String(d.bodega)] ?? 0;
+  // Lo que tiene ahora esa bodega, aunque sea negativo (2 nov 2026: el 8822 quedó en -96; con `stockPorBodega`, que solo cuenta lo positivo, se leía 0 y no se movía nada).
+  const fila = (Array.isArray(producto.warehouse_product) ? (producto.warehouse_product as Obj[]) : []).find((w) => String(w.warehouse_id) === String(d.bodega));
+  const antes = fila && Number.isFinite(Number(fila.stock)) ? Number(fila.stock) : 0;
   if (antes === d.unidades) return { cuerpo: null, antes };
   let total = d.unidades;
   for (const [b, n] of Object.entries(stock)) if (b !== String(d.bodega)) total += n;
@@ -102,7 +104,7 @@ export const STOCK_JS = [
   "var b=Number(d.bodega),u=Number(d.unidades);",
   `if(b===${BODEGA_DROPI}||!bp.some(function(p){return Number(p.id)===b}))return{error:'Esa bodega no es de ECOMFIVE en Dropi: el stock no se mueve desde aquí.'};`,
   "if(!(u>=0))return{error:'El cambio no trae las unidades.'};",
-  "var st=stockDe(o),an=st[String(b)]||0,k;if(an===u)return{cuerpo:null,antes:an};",
+  "var st=stockDe(o),wf=(Array.isArray(o.warehouse_product)?o.warehouse_product:[]).filter(function(w){return String(w.warehouse_id)===String(b)})[0],an=wf&&isFinite(Number(wf.stock))?Number(wf.stock):0,k;if(an===u)return{cuerpo:null,antes:an};",
   "var tt=u;for(k in st)if(k!==String(b))tt+=st[k];",
   "var rs=(Array.isArray(o.private_product_inventories)?o.private_product_inventories:[]).filter(function(p){return!p.deleted_at}).reduce(function(t,p){return t+(Number(p.stock)||0)},0);",
   "if(rs>tt)return{error:'Tiene '+rs+' unidades reservadas a privados: el stock total no puede quedar en '+tt+'.'};",

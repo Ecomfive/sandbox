@@ -89,6 +89,19 @@ export function unidadesDeVariable(o: Obj): Record<string, number> {
   return u;
 }
 
+/**
+ * Cuánto stock tiene bajo cero un producto (la suma de las bodegas —o, con variaciones, de cada variación en cada bodega— que están en negativo); 0 si
+ * ninguna. Las otras cuentas solo miran lo positivo, así que un negativo pasaba como «sin stock» (2 nov 2026: el 8822 quedó en -96 y se dio por apagado).
+ */
+export function stockNegativo(o: Obj): number {
+  const filas = esVariable(o)
+    ? variacionesVivas(o).flatMap((v) => (Array.isArray(v.warehouse_product_variation) ? (v.warehouse_product_variation as Obj[]) : []))
+    : Array.isArray(o.warehouse_product)
+      ? (o.warehouse_product as Obj[])
+      : [];
+  return filas.reduce((t, w) => (Number(w.stock) < 0 ? t + Number(w.stock) : t), 0);
+}
+
 /** Las unidades que tiene un producto en total, simple o con variaciones. */
 export function unidadesTotales(o: Obj): number {
   const m = esVariable(o) ? unidadesDeVariable(o) : stockPorBodega(o);
@@ -288,6 +301,7 @@ export const APAGAR_JS = [
   "function firmaV(v){var a=(Array.isArray(v.attribute_values)?v.attribute_values:[]).filter(function(x){return!x.deleted_at}).map(function(x){return limpV(x.attribute_name)+'='+limpV(x.value)}).sort().join(',');return a||limpV(v.sku)}",
   "function unidadesV(o){var u={};vivasV(o).forEach(function(v){var f=firmaV(v);(Array.isArray(v.warehouse_product_variation)?v.warehouse_product_variation:[]).forEach(function(w){var n=Number(w.stock),b=Number(w.warehouse_id!=null?w.warehouse_id:(w.warehouse&&w.warehouse.id));if(n>0&&b>0){var k=b+'|'+f;u[k]=(u[k]||0)+n}})});return u}",
   "function totalU(o){var m=esV(o)?unidadesV(o):stockDe(o),s=0,k;for(k in m)s+=m[k];return s}",
+  "function negU(o){var f=esV(o)?[].concat.apply([],vivasV(o).map(function(v){return Array.isArray(v.warehouse_product_variation)?v.warehouse_product_variation:[]})):(Array.isArray(o.warehouse_product)?o.warehouse_product:[]);return f.reduce(function(t,w){return Number(w.stock)<0?t+Number(w.stock):t},0)}",
   "function apagadoV(o,bp,q,en,cp){var pr={};bp.forEach(function(p){pr[Number(p.id)]=1});",
   "var r=armar(o,bp,{nombre:null,nombreGuia:null,variable:true});if(r.error)return r;",
   "var un=0,fu=false;var wh=en.map(function(a){return a.map(function(e){var n=Number(e.stock);if(!(n>0))return e;if(!pr[Number(e.warehouse_id)])fu=true;un+=n;return Object.assign({},e,{quantity:n,type_movement:'SALIDA',concept:cp||" + JSON.stringify(CONCEPTO_APAGAR) + "})})});",
