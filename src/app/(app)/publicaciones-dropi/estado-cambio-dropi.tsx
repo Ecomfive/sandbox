@@ -2,6 +2,7 @@ import { useMoneda } from "./moneda-contexto";
 import type { CambioDropiVista } from "@/lib/publicaciones/cambios-dropi";
 import { republicacionSinTocarDropi } from "@/lib/publicaciones/republicar-dropi";
 import { codigoBodega } from "@/lib/publicaciones/sincronizar-dropi";
+import { quienesDe, unidadesTotales } from "@/lib/publicaciones/privatizar-dropi";
 
 const fecha = (iso: string) => new Date(iso).toLocaleString("es-PA", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone: "America/Panama" });
 
@@ -130,8 +131,8 @@ function EstadoCrear({ c }: { c: CambioDropiVista }) {
 /** Cómo va una privatización (migración 0155): hecha (con el ID del producto privado), pendiente o con error (se sigue desde donde quedó). */
 function EstadoPrivatizar({ c }: { c: CambioDropiVista }) {
   const p = c.privatizacion;
-  const quien = p ? `${p.dropshipper || p.correo} (${p.correo})` : "el dropshipper";
-  const que = p ? `${p.unidades.toLocaleString("es-PA")} u. como «${p.nombre}»` : "";
+  const quien = p ? quienesDe(p) : "el dropshipper";
+  const que = p ? `${unidadesTotales(p).toLocaleString("es-PA")} u. como «${p.nombre}»` : "";
   if (c.estado === "aplicado")
     return (
       <span className="flex items-center gap-1.5 text-xs text-success">

@@ -129,7 +129,7 @@ export interface FilaPublicacion {
   /** Tiene archivar (o sacar de Archivados) esperando «Aplicar en Dropi»: «archivar» o «restaurar». */
   archivadoPendiente: "archivar" | "restaurar" | null;
   /** Privatizaciones esperando «Aplicar en Dropi» (migración 0155): a quién se le deja, cuántas unidades y bajo qué nombre. */
-  privatizaciones: { correo: string; dropshipper: string; unidades: number; nombre: string }[];
+  privatizaciones: { correo: string; dropshipper: string; unidades: number; nombre: string; extras?: { correo: string; dropshipper: string; unidades: number }[] }[];
   /** Tareas escritas a mano sin resolver (migración 0175): cuántas y cuántas ya pasaron su fecha. */
   tareasPendientes: { total: number; atrasadas: number };
   /** Desde cuándo está en liquidación (migración 0174): sale del aviso de margen bajo y va a la tarjeta «En liquidación». */

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { origenDropi, VERSION_FAVORITO } from "@/lib/publicaciones/marcador-aplicar-dropi";
+import { quienesDe, unidadesTotales } from "@/lib/publicaciones/privatizar-dropi";
 import { CDN_FOTOS_DROPI } from "@/lib/publicaciones/republicar-dropi";
 import { codigoBodega } from "@/lib/publicaciones/sincronizar-dropi";
 import { guardarResultadosDropi, pendientesParaDropi, type CambioParaDropi } from "../aplicar-actions";
@@ -190,7 +191,7 @@ export function AplicarDropi({ puedeEscribir }: { puedeEscribir: boolean }) {
                             : c.tipo === "crear"
                               ? `Publicada en Dropi con el ID ${r.nuevo ?? "—"}${r.aviso ? `. Aviso: ${r.aviso}` : ""}`
                               : c.tipo === "privatizar"
-                                ? `Privatizada: producto privado ID ${r.nuevo ?? "—"} para ${c.privatizar?.dropshipper || c.privatizar?.correo}${r.aviso ? `. Aviso: ${r.aviso}` : ""}`
+                                ? `Privatizada: producto privado ID ${r.nuevo ?? "—"} para ${c.privatizar ? quienesDe(c.privatizar) : "el dropshipper"}${r.aviso ? `. Aviso: ${r.aviso}` : ""}`
                                 : c.tipo === "stock"
                                   ? `Stock en Dropi: ${r.antes ?? "—"} → ${r.stock ?? c.stock?.unidades ?? "—"} u.${r.aviso ? ` ${r.aviso}` : ""}`
                                   : "Cambiado en Dropi"
@@ -240,7 +241,7 @@ function DetalleCambio({ c }: { c: CambioParaDropi }) {
       <>
         <span className="font-medium">Privatizar: {c.publicacion}</span>
         <span className="text-xs tabular-nums">
-          {d ? `A ${d.dropshipper || d.correo} (${d.correo}) · ${d.unidades.toLocaleString("es-PA")} u. · ${montoUrl(d.precio)} · «${d.nombre}»` : ""}
+          {d ? `A ${quienesDe(d)} · ${unidadesTotales(d).toLocaleString("es-PA")} u. · ${montoUrl(d.precio)} · «${d.nombre}»` : ""}
         </span>
         <span className="text-xs text-muted-foreground">
           ID {c.producto} (público){c.nuevo ? ` · ya creado el privado ID ${c.nuevo}: sigue desde ahí` : ": se crea el privado en Dropi, se le asigna el correo y se le sacan las unidades al público"}

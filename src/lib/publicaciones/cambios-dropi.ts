@@ -10,7 +10,7 @@ import type { CambioPrecio } from "./competencia-publicaciones";
 import type { DatosCrearDropi, FotoCrear } from "./crear-dropi";
 import { MAX_NOMBRE_DROPI } from "./dropi-guardado";
 import { normalizarDatosDevolver } from "./apagar-dropi";
-import { normalizarDatosPrivatizar, type DatosPrivatizar } from "./privatizar-dropi";
+import { destinosDe, normalizarDatosPrivatizar, type DatosPrivatizar } from "./privatizar-dropi";
 import { idsDeDropi } from "./sincronizar-dropi";
 import { normalizarDatosStock, productoDelCambio, type DatosStock } from "./stock-dropi";
 
@@ -28,7 +28,7 @@ export interface CambioDropiVista {
   /** «stock»: la bodega, las unidades que deben quedar y las que había. */
   stock: DatosStock | null;
   /** «privatizar»: a quién, cuántas unidades y bajo qué nombre. */
-  privatizacion: Pick<DatosPrivatizar, "correo" | "dropshipper" | "unidades" | "nombre"> | null;
+  privatizacion: Pick<DatosPrivatizar, "correo" | "dropshipper" | "unidades" | "nombre" | "extras"> | null;
   /** «archivar»: true = sacarlo de Archivados. */
   restaurar: boolean;
   /** «cambio»: la descripción nueva y cuántas fotos se suben. */
@@ -288,7 +288,7 @@ export async function encolarCrear(
 /**
  * «Privatizar en Dropi» (pedido de Jhokser, 26 oct 2026; migración 0155): deja en la cola que se cree en Dropi un producto privado del público de
  * `pub` y se le asigne a un dropshipper con unas unidades que salen del público. Va en la publicación pública. Si ya había una privatización
- * esperando para el mismo correo, no se agrega otra (`yaEstaba`); a otro correo sí (se puede privatizar a varios).
+ * esperando para alguno de los mismos correos, no se agrega otra (`yaEstaba`); a otro correo sí (se puede privatizar a varios). Varios correos pueden ir en un mismo ID (`extras`).
  */
 export async function encolarPrivatizar(
   supabase: SupabaseClient,
@@ -301,7 +301,8 @@ export async function encolarPrivatizar(
   const falta = (m: string) => /tipo|column|does not exist|schema cache|datos/i.test(m);
   const previo = await supabase.from("dropi_cambios_pendientes").select("id, datos").eq("publicacion_id", pub.id).eq("tipo", "privatizar").in("estado", ["pendiente", "error"]);
   if (previo.error) return { error: falta(previo.error.message) ? "Falta correr en Supabase la migración 0155." : "No se pudo dejar la privatización para Dropi." };
-  const igual = (previo.data ?? []).find((f) => normalizarDatosPrivatizar(f.datos).correo === datos.correo);
+  const nuevos = new Set(destinosDe(datos).map((x) => x.correo));
+  const igual = (previo.data ?? []).find((f) => destinosDe(normalizarDatosPrivatizar(f.datos)).some((x) => nuevos.has(x.correo)));
   if (igual) return { id: igual.id as string, yaEstaba: true };
   const { data, error } = await supabase
     .from("dropi_cambios_pendientes")
@@ -446,7 +447,7 @@ export async function cargarCambiosDropi(
   archivando: Map<string, boolean>;
   creando: Map<string, number>;
   /** Privatizaciones esperando por publicación pública (pendientes o con error), con a quién y cuántas unidades. */
-  privatizando: Map<string, Pick<DatosPrivatizar, "correo" | "dropshipper" | "unidades" | "nombre">[]>;
+  privatizando: Map<string, Pick<DatosPrivatizar, "correo" | "dropshipper" | "unidades" | "nombre" | "extras">[]>;
   /** Cambios de stock esperando por publicación (pendientes o con error): ID de Dropi, bodega y unidades que deben quedar. */
   ajustandoStock: Map<string, DatosStock[]>;
 }> {
@@ -457,7 +458,7 @@ export async function cargarCambiosDropi(
   // Archivar (true = sacar de Archivados) y publicar (veces que se intentó) pendientes: la fila los muestra.
   const archivando = new Map<string, boolean>();
   const creando = new Map<string, number>();
-  const privatizando = new Map<string, Pick<DatosPrivatizar, "correo" | "dropshipper" | "unidades" | "nombre">[]>();
+  const privatizando = new Map<string, Pick<DatosPrivatizar, "correo" | "dropshipper" | "unidades" | "nombre" | "extras">[]>();
   const ajustandoStock = new Map<string, DatosStock[]>();
   const leer = (columnas: string) =>
     supabase.from("dropi_cambios_pendientes").select(columnas).eq("pais_id", paisId).neq("estado", "reemplazado").order("creado_en", { ascending: false }).limit(2000);
@@ -473,7 +474,7 @@ export async function cargarCambiosDropi(
     if (f.estado === "pendiente") pendientes++;
     if (f.tipo === "privatizar" && (f.estado === "pendiente" || f.estado === "error")) {
       const d = normalizarDatosPrivatizar(f.datos);
-      privatizando.set(f.publicacion_id as string, [...(privatizando.get(f.publicacion_id as string) ?? []), { correo: d.correo, dropshipper: d.dropshipper, unidades: d.unidades, nombre: d.nombre }]);
+      privatizando.set(f.publicacion_id as string, [...(privatizando.get(f.publicacion_id as string) ?? []), { correo: d.correo, dropshipper: d.dropshipper, unidades: d.unidades, nombre: d.nombre, extras: d.extras }]);
     }
     if (f.tipo === "stock" && (f.estado === "pendiente" || f.estado === "error"))
       // El ID va en la fila (los pedidos de antes del 31 oct no lo traen en `datos`).
@@ -489,7 +490,7 @@ export async function cargarCambiosDropi(
       id: f.id as string,
       tipo: f.tipo === "republicar" ? "republicar" : f.tipo === "apagar" ? "apagar" : f.tipo === "archivar" ? "archivar" : f.tipo === "crear" ? "crear" : f.tipo === "privatizar" ? "privatizar" : f.tipo === "stock" ? "stock" : "cambio",
       stock: f.tipo === "stock" ? normalizarDatosStock(f.datos) : null,
-      privatizacion: f.tipo === "privatizar" ? (({ correo, dropshipper, unidades, nombre }) => ({ correo, dropshipper, unidades, nombre }))(normalizarDatosPrivatizar(f.datos)) : null,
+      privatizacion: f.tipo === "privatizar" ? (({ correo, dropshipper, unidades, nombre, extras }) => ({ correo, dropshipper, unidades, nombre, extras }))(normalizarDatosPrivatizar(f.datos)) : null,
       restaurar: f.restaurar === true,
       descripcion: (f.descripcion as string | null | undefined) ?? null,
       fotos: Array.isArray(f.fotos) ? f.fotos.length : 0,

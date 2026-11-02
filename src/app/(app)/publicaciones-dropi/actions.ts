@@ -13,7 +13,7 @@ import { grupoDe, nombreDelPublico } from "@/lib/publicaciones/apagar-dropi";
 import { encolarApagar, encolarArchivar, encolarCrear, encolarPrivatizar, encolarRepublicar, encolarStock, enviarNombreADropi, enviarPrecioADropi } from "@/lib/publicaciones/cambios-dropi";
 import { esBodegaDropi } from "@/lib/publicaciones/automatico";
 import { faltantesStock, normalizarDatosStock, productoDelCambio } from "@/lib/publicaciones/stock-dropi";
-import { faltantesPrivatizar, nombrePrivado, normalizarDatosPrivatizar } from "@/lib/publicaciones/privatizar-dropi";
+import { destinosDe, faltantesPrivatizar, nombrePrivado, normalizarDatosPrivatizar, quienesDe, unidadesTotales } from "@/lib/publicaciones/privatizar-dropi";
 import { faltantesCrearDropi, normalizarDatosCrear, MAX_FOTOS_CREAR, type DatosCrearDropi, type FotoCrear } from "@/lib/publicaciones/crear-dropi";
 import { descripcionAHtml } from "@/lib/publicaciones/descripcion-dropi";
 import { detectarImagen } from "@/lib/seguridad/imagen";
@@ -905,10 +905,11 @@ export async function privatizarPublicacion(id: string, crudo: unknown): Promise
   // Un dropshipper no recibe dos veces el mismo producto: si ya tiene su privada (sin archivar), se avisa.
   const { data: privadas } = await supabase.from("dropi_publicaciones").select("id, numero, nombre, privatizado_email, estado, estado_publicacion").eq("pais_id", antes.pais_id).not("privatizado_email", "is", null).limit(5000);
   const base = nombreDelPublico(antes.nombre);
+  const correos = destinosDe(d).map((x) => x.correo);
   const ya = (privadas ?? []).find(
-    (x) => String(x.privatizado_email ?? "").toLowerCase() === d.correo && nombreDelPublico(String(x.nombre ?? "")) === base && x.estado !== "archivado" && x.estado_publicacion !== "archivado",
+    (x) => correos.includes(String(x.privatizado_email ?? "").toLowerCase()) && nombreDelPublico(String(x.nombre ?? "")) === base && x.estado !== "archivado" && x.estado_publicacion !== "archivado",
   );
-  if (ya) return { error: `${d.correo} ya tiene este producto privado: ${numeroPublicacion(ya.numero as number | null)} (${ya.nombre}).` };
+  if (ya) return { error: `${String(ya.privatizado_email).toLowerCase()} ya tiene este producto privado: ${numeroPublicacion(ya.numero as number | null)} (${ya.nombre}).` };
   const r = await encolarPrivatizar(supabase, { id, pais_id: antes.pais_id, dropi_id: (antes.dropi_id as string | null) ?? null }, d, { id: usuario.id, nombre: usuario.nombre || usuario.email });
   if ("error" in r) return { error: r.error };
   if (!r.yaEstaba)
@@ -916,10 +917,10 @@ export async function privatizarPublicacion(id: string, crudo: unknown): Promise
       accion: "dropi_privatizar_pendiente",
       entidad: "dropi_publicaciones",
       entidadId: id,
-      detalle: `${antes.nombre} · ID Dropi ${antes.dropi_id}: privatizar ${d.unidades} u. a ${d.dropshipper} (${d.correo}) como «${d.nombre}» · pendiente para «Aplicar en Dropi»`,
+      detalle: `${antes.nombre} · ID Dropi ${antes.dropi_id}: privatizar ${unidadesTotales(d)} u. a ${quienesDe(d)} como «${d.nombre}» · pendiente para «Aplicar en Dropi»`,
     });
   revalidatePath(RUTA);
-  return { detalle: r.yaEstaba ? "Ya estaba pendiente para ese correo: pulsa «Aplicar en Dropi» con Dropi abierto." : "Privatización pendiente: pulsa «Aplicar en Dropi» con Dropi abierto." };
+  return { detalle: r.yaEstaba ? "Ya estaba pendiente para alguno de esos correos: pulsa «Aplicar en Dropi» con Dropi abierto." : "Privatización pendiente: pulsa «Aplicar en Dropi» con Dropi abierto." };
 }
 
 /**
