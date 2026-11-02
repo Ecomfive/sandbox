@@ -1027,6 +1027,33 @@ export function DropiIcon({ marca = false, ...props }: SVGProps<SVGSVGElement> &
   );
 }
 
+/**
+ * El logo de Drop (una chispa de cuatro puntas dentro de un cuadrado redondeado). Por defecto (el menú) va relleno con el color del texto y la chispa es
+ * transparente (una máscara), así se ve bien en los dos temas y al estar seleccionado. Con `marca` va con sus colores: cuadrado negro y chispa blanca, con un
+ * borde fino claro para que se distinga sobre el tema oscuro.
+ */
+const CHISPA_DROP = "M12 3.6c.7 5.1 3.3 7.7 8.4 8.4-5.1.7-7.7 3.3-8.4 8.4-.7-5.1-3.3-7.7-8.4-8.4 5.1-.7 7.7-3.3 8.4-8.4Z";
+export function DropIcon({ marca = false, ...props }: SVGProps<SVGSVGElement> & { marca?: boolean }) {
+  if (marca)
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" {...props}>
+        <rect x="1" y="1" width="22" height="22" rx="6" fill="#111111" stroke="#ffffff" strokeOpacity=".35" strokeWidth="1" />
+        <path d={CHISPA_DROP} fill="white" />
+      </svg>
+    );
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" {...props}>
+      <defs>
+        <mask id="icono-drop-mascara" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24">
+          <rect width="24" height="24" fill="white" />
+          <path d={CHISPA_DROP} fill="black" />
+        </mask>
+      </defs>
+      <rect x="1.5" y="1.5" width="21" height="21" rx="6" fill="currentColor" mask="url(#icono-drop-mascara)" />
+    </svg>
+  );
+}
+
 /** Almacén con estantes: Bodegas. */
 export function BodegaIcon(props: SVGProps<SVGSVGElement>) {
   return (
@@ -1148,6 +1175,7 @@ export const ICONOS_PAGINA: Record<string, (props: SVGProps<SVGSVGElement>) => R
   "/creacion-ofertas": OfertaIcon,
   "/generador-landings": LandingIcon,
   "/publicaciones-dropi": DropiIcon,
+  "/publicaciones-drop": DropIcon,
   "/productos-test": TestIcon,
   "/filtro-productos": FiltroIcon,
   "/crm-dropshippers": DropshipperIcon,

@@ -526,6 +526,11 @@ convenciones técnicas del código.
   vinculados en la ficha del publicado, tiene el historial en tabla y envía a Selección (`enviarASeleccion`, fuente SP, en el
   país del proveedor, precios en dólares, `scraping_producto_id` único). El receptor calcula `scraping_productos.foto_huella` de
   las fotos nuevas (`npx tsx scripts/scraping-proveedores.ts huellas` para las que falten).
+- **Operación › Fulfillment › Gestión de IDs Drop** (`/publicaciones-drop`, módulo `publicaciones-drop`, migración 0220, 3 nov 2026, pedido de Jhokser): **otra aplicación aparte de Dropi**, debajo de Gestión de IDs Dropi en el menú, con su propio logo
+  (`DropIcon`, `nav-icons.tsx`: una chispa de cuatro puntas en un cuadrado redondeado; `marca` lo dibuja negro con la chispa blanca, igual que el logo, y sin `marca` va del color del texto como `DropiIcon`). Por ahora **solo el esqueleto, sin datos ni tablas** (se van a conectar poco a poco):
+  las mismas pestañas que Dropi (Publicaciones, Recomendaciones, Tareas, Reglas; sin «Consumo de IA», que es de todo el sistema), el tablero de acciones con las mismas tarjetas en cero (`tablero-drop.tsx`, sin filtrar nada todavía: cuando haya publicaciones pasan a ser `KpiFiltro` como las de Dropi)
+  y la lista de filas con la barra de herramientas común (`ListaPublicacionesDrop`, `DEF_PUBLICACIONES_DROP`, sin filas); cada pestaña dice «Todavía no hay … de Drop» (`VacioDrop`). La migración solo da el permiso a los roles que ya tienen `publicaciones-dropi`, con su mismo nivel
+  (reversa: `supabase/rollbacks/0220_rollback.sql`). Al conectar los datos: crear sus tablas (`drop_*`, con RLS sin políticas), completar `FilaPublicacionDrop` y reutilizar las piezas de Dropi que sirvan (`ficha-publicacion.tsx`, `fila-publicacion.tsx`…); los textos del módulo dicen «Drop», no «Dropi».
 - **Operación › Fulfillment › Gestión de IDs Dropi** (antes «Gestión de publicaciones Dropi») (`/publicaciones-dropi`, módulo `publicaciones-dropi`, migración 0116, 21 oct
   2026; debajo de Compras). **Fulfillment por país y plataforma** (Hernán, 27 oct 2026, migraciones 0160 y 0161; por país el 31 oct 2026, migración 0208; por plataforma, con
   su moneda y en Configuración el mismo día, pedido de Alcides, migración 0213): cada fila de `pais_plataformas` tiene `fulfillment` y
