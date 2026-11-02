@@ -9,7 +9,7 @@ import { anilloFoco } from "@/components/ui/field";
 import { TarjetaEmergente } from "@/components/ui/tarjeta-emergente";
 import { precioEquivalente } from "@/lib/competencia/analisis";
 import type { DatosCompetencia, ProductoC } from "./def-competencia";
-import { filasNuestras } from "./vista-competencia";
+import { TableroCompetencia, filasNuestras } from "./vista-competencia";
 import { useMonedaCompetencia } from "@/components/competencia/moneda-competencia";
 
 const ejes = { tick: { fontSize: 11, fill: "var(--muted-foreground)" }, axisLine: false, tickLine: false } as const;
@@ -192,6 +192,7 @@ export function DashboardCompetencia({ datos }: { datos: DatosCompetencia }) {
 
   return (
     <div className="graficas-neon flex flex-col gap-5">
+      <TableroCompetencia datos={datos} />
       <div className="flex flex-wrap items-center gap-2">
         <select aria-label="Competidor" value={competidor} onChange={(e) => setCompetidor(e.target.value)} className={claseSelect}>
           <option value="">Todos los competidores</option>
