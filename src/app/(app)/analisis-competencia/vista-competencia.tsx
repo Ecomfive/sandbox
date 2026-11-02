@@ -1,15 +1,18 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { Fragment, useMemo, useState, useTransition } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Fragment, useMemo, useState, useTransition, type ComponentType } from "react";
 import { FotoAmpliable, HistorialCompetencia } from "@/components/competencia/piezas-competencia";
-import { BotonBarra, CabeceraTarjeta, Indicador } from "@/components/panel/piezas-panel";
+import { COLORES, type Color } from "@/components/panel/colores-tablero";
+import { BotonBarra, CabeceraTarjeta } from "@/components/panel/piezas-panel";
 import { claseCeldaColumna, claseEncabezadoColumna, claseFilaEncabezado } from "@/components/tabla/estilos-tabla";
 import { Badge } from "@/components/ui/badge";
 import { anilloFoco, fieldClass } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { useMonedaCompetencia } from "@/components/competencia/moneda-competencia";
 import { formatearFechaHora } from "@/lib/formato";
+import { ActualizarIcon, AlertaIcon, AnalisisCompetenciaIcon, EnlaceIcon, ProveedorIcon, TiendaIcon, VentasIcon } from "@/lib/nav-icons";
 import { marcarAlertasVistas } from "./actions";
 import { decisionesDeHoy, posicionPrecio, precioEquivalente, type Decision, type EstadoPosicion, type Posicion, type TipoDecision } from "@/lib/competencia/analisis";
 import type { AlertaC, CompetidorC, DatosCompetencia, FilaNuestro, ProductoC } from "./def-competencia";
@@ -226,43 +229,169 @@ function NuestrosFrente({ filas, alAbrir }: { filas: ReturnType<typeof posicione
   );
 }
 
-// ---------- Barra de indicadores ----------
+// ---------- Tablero de arriba ----------
 
-/** Los indicadores de arriba, con el borde neón de los dashboards del sistema (en las dos pestañas). */
-export function ResumenCompetencia({ datos }: { datos: DatosCompetencia }) {
-  const filas = useMemo(() => filasNuestras(datos.productos), [datos.productos]);
-  const conCompetencia = filas.filter((f) => f.iguales.length).length;
-  const masBaratos = filas.filter((f) => f.diferencia !== null && f.diferencia < 0).length;
-  const posiciones = useMemo(() => {
-    const c = { ganando: 0, empatado: 0, perdiendo: 0 };
-    for (const f of filas) {
-      const p = posicionPrecio(f.nuestro.precio, f.iguales.map((i) => precioEquivalente(f.nuestro.nombre, i).precio));
-      if (p) c[p.estado]++;
-    }
-    return c;
-  }, [filas]);
+/** Un competidor con lo que cuentan las tarjetas: productos iguales a los nuestros, cuántos más baratos, cambios, si es nuevo y novedades sin ver. */
+export type CompetidorFila = CompetidorC & { igualesN: number; baratos: number; cambiosHoy: number; nuevo: boolean; sinVer: number };
+
+const sinPrefijoNuevo = (titulo: string) => titulo.replace(/^Competidor nuevo:\s*/, "");
+
+/** El competidor de una novedad: el del producto o, si es un competidor nuevo, el que se llama como dice su título. */
+function proveedorDeAlerta(a: AlertaC, datos: DatosCompetencia, porId: Map<string, ProductoC>): number | undefined {
+  if (a.tipo === "competidor_nuevo") return datos.competidores.find((c) => c.nombre === sinPrefijoNuevo(a.titulo))?.id;
+  return a.productoId ? porId.get(a.productoId)?.proveedorId : undefined;
+}
+
+/** Los productos activos de la competencia, por competidor. */
+function productosPorCompetidor(productos: ProductoC[]): Map<number, ProductoC[]> {
+  const m = new Map<number, ProductoC[]>();
+  for (const p of productos) if (!p.esNuestro && p.estado === "activo") (m.get(p.proveedorId) ?? m.set(p.proveedorId, []).get(p.proveedorId)!).push(p);
+  return m;
+}
+
+/** Cada competidor con lo que cuentan las tarjetas de arriba (y filtran la lista). */
+export function competidoresConDatos(datos: DatosCompetencia): CompetidorFila[] {
+  const porId = new Map(datos.productos.map((p) => [p.id, p]));
+  const porCompetidor = productosPorCompetidor(datos.productos);
+  const ultima = datos.ultima?.inicio ?? null;
+  const cambios = new Map<string, number>();
+  if (ultima) for (const b of datos.bitacora) if (b.fecha >= ultima && !b.esNuestro) cambios.set(b.proveedor, (cambios.get(b.proveedor) ?? 0) + 1);
+  const nuevos = new Set(datos.alertas.filter((a) => a.tipo === "competidor_nuevo").map((a) => sinPrefijoNuevo(a.titulo)));
+  const sinVer = new Map<number, number>();
+  for (const a of datos.alertas) {
+    const id = a.vista ? undefined : proveedorDeAlerta(a, datos, porId);
+    if (id !== undefined) sinVer.set(id, (sinVer.get(id) ?? 0) + 1);
+  }
+  return datos.competidores.map((c) => {
+    const iguales = (porCompetidor.get(c.id) ?? []).filter((p) => p.igualA);
+    const baratos = iguales.filter((p) => {
+      const n = porId.get(p.igualA!);
+      const pu = n ? precioEquivalente(n.nombre, p).precio : null;
+      return n?.precio != null && pu !== null && pu < n.precio - 0.004;
+    }).length;
+    return { ...c, igualesN: iguales.length, baratos, cambiosHoy: cambios.get(c.nombre) ?? 0, nuevo: nuevos.has(c.nombre), sinVer: sinVer.get(c.id) ?? 0 };
+  });
+}
+
+/** Lo que filtra cada tarjeta del tablero (los competidores de la lista de abajo). */
+const FILTRO_TARJETA = {
+  iguales: (c: CompetidorFila) => c.igualesN > 0,
+  baratos: (c: CompetidorFila) => c.baratos > 0,
+  vendieron: (c: CompetidorFila) => c.bajo7 > 0,
+  cambios: (c: CompetidorFila) => c.cambiosHoy > 0,
+  nuevos: (c: CompetidorFila) => c.nuevo,
+  novedades: (c: CompetidorFila) => c.sinVer > 0,
+} as const;
+export type IdTarjeta = keyof typeof FILTRO_TARJETA;
+export const esIdTarjeta = (v: string | null): v is IdTarjeta => !!v && Object.hasOwn(FILTRO_TARJETA, v);
+
+interface TarjetaC {
+  id: IdTarjeta | "todos";
+  titulo: string;
+  icono: ComponentType<{ className?: string }>;
+  color: Color;
+  /** Lo que avisa: en 0 se ve en verde (está todo bien). */
+  avisa?: boolean;
+}
+
+const TARJETAS_COMPETENCIA: TarjetaC[] = [
+  { id: "todos", titulo: "Competidores", icono: TiendaIcon, color: "verde" },
+  { id: "iguales", titulo: "Venden lo nuestro", icono: EnlaceIcon, color: "azul" },
+  { id: "baratos", titulo: "Más baratos que nosotros", icono: AnalisisCompetenciaIcon, color: "rojo", avisa: true },
+  { id: "vendieron", titulo: "Vendieron en 7 días", icono: VentasIcon, color: "ambar" },
+  { id: "cambios", titulo: "Con cambios", icono: ActualizarIcon, color: "azul" },
+  { id: "nuevos", titulo: "Competidores nuevos", icono: ProveedorIcon, color: "violeta" },
+  { id: "novedades", titulo: "Novedades sin ver", icono: AlertaIcon, color: "rojo", avisa: true },
+];
+export const tituloTarjeta = (id: IdTarjeta) => TARJETAS_COMPETENCIA.find((t) => t.id === id)!.titulo;
+
+/**
+ * El tablero de arriba de Análisis de competencia (2 nov 2026, pedido de Hernán: «como el de Gestión de IDs Dropi»), igual en todos los países.
+ * Cada tarjeta cuenta los competidores de lo suyo y, al tocarla, filtra la lista de abajo; tocarla otra vez quita el filtro. «Competidores» los
+ * muestra todos. Sin `alPulsar` (en la pestaña Resumen), cada tarjeta lleva a Competidores con su filtro puesto.
+ */
+export function TableroCompetencia({
+  datos,
+  filas,
+  activa = null,
+  alPulsar,
+}: {
+  datos: DatosCompetencia;
+  filas?: CompetidorFila[];
+  activa?: IdTarjeta | null;
+  alPulsar?: (id: IdTarjeta | null) => void;
+}) {
+  const competidores = useMemo(() => filas ?? competidoresConDatos(datos), [filas, datos]);
+  const nuestras = useMemo(() => filasNuestras(datos.productos), [datos.productos]);
+  const perdiendo = useMemo(() => posicionesNuestras(datos.productos).filter((f) => f.posicion.estado === "perdiendo").length, [datos.productos]);
+  const conCompetencia = nuestras.filter((f) => f.iguales.length).length;
+  const productosCompetencia = datos.productos.filter((p) => !p.esNuestro && p.estado === "activo").length;
+  const vendido7 = competidores.reduce((t, c) => t + c.bajo7, 0);
   const sinVer = datos.alertas.filter((a) => !a.vista).length;
-  const vendido7 = datos.competidores.reduce((t, c) => t + c.bajo7, 0);
-  const competencia = datos.productos.filter((p) => !p.esNuestro && p.estado === "activo").length;
+  const cuantos = (id: IdTarjeta) => competidores.filter(FILTRO_TARJETA[id]).length;
+  const ultima = datos.ultima ? `${formatearFechaHora(datos.ultima.inicio)}${datos.ultima.duracionMs !== null ? ` · ${segundos(datos.ultima.duracionMs)}` : ""}` : null;
+
+  const contenido: Record<TarjetaC["id"], { valor: number; junto?: string; detalle: string; extra?: string | null; extraRojo?: boolean }> = {
+    todos: { valor: competidores.length, junto: `${num(productosCompetencia)} productos`, detalle: ultima ? `En Dropi ${datos.pais} · última búsqueda ${ultima}` : `En Dropi ${datos.pais}` },
+    iguales: { valor: cuantos("iguales"), detalle: "Tienen productos iguales a los nuestros", extra: `${conCompetencia} de ${nuestras.length} productos nuestros con competencia` },
+    baratos: {
+      valor: cuantos("baratos"),
+      detalle: "Venden un producto igual al nuestro más barato",
+      extra: perdiendo ? `${perdiendo} ${perdiendo === 1 ? "producto nuestro pierde" : "productos nuestros pierden"} en precio` : null,
+      extraRojo: true,
+    },
+    vendieron: { valor: cuantos("vendieron"), junto: `${num(vendido7)} unidades`, detalle: "Bajó su stock entre búsquedas" },
+    cambios: { valor: cuantos("cambios"), detalle: "Precio o stock distinto en la última búsqueda" },
+    nuevos: { valor: cuantos("nuevos"), detalle: "Aparecieron después de la primera búsqueda" },
+    novedades: {
+      valor: sinVer,
+      detalle: datos.busquedas > 1 ? "Cambios en lo igual a lo nuestro y competidores nuevos" : "Empiezan en la segunda búsqueda",
+      extra: sinVer ? `De ${cuantos("novedades")} ${cuantos("novedades") === 1 ? "competidor" : "competidores"}` : null,
+    },
+  };
+
   return (
-    <section aria-label="Indicadores de la competencia" className="marco-neon overflow-hidden rounded-[10px] border border-border bg-card">
-      <div className="flex flex-wrap">
-        <Indicador titulo={`Competidores en Dropi ${datos.pais}`} valor={num(datos.competidores.length)} detalle={`${num(competencia)} productos suyos`} />
-        <Indicador titulo="Nuestros productos con competencia" valor={`${conCompetencia} de ${filas.length}`} detalle="ECOMFIVE" />
-        <Indicador
-          titulo="Nuestra posición en precio"
-          punto={masBaratos ? "peligro" : undefined}
-          valor={`${posiciones.ganando} · ${posiciones.empatado} · ${posiciones.perdiendo}`}
-          detalle="ganando · empatado · perdiendo"
-        />
-        <Indicador titulo="Stock vendido por la competencia" valor={num(vendido7)} detalle="unidades en 7 días" />
-        <Indicador
-          titulo="Novedades sin ver"
-          punto={sinVer ? "peligro" : undefined}
-          valor={num(sinVer)}
-          detalle={datos.ultima ? `última búsqueda ${formatearFechaHora(datos.ultima.inicio)} · ${segundos(datos.ultima.duracionMs)}` : "sin búsquedas"}
-        />
-      </div>
+    <section aria-label="Tablero de la competencia" className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(12rem,1fr))]">
+      {TARJETAS_COMPETENCIA.map((t) => {
+        const d = contenido[t.id];
+        const c = COLORES[t.avisa && d.valor === 0 ? "verde" : t.color];
+        const Icono = t.icono;
+        const encendida = t.id !== "todos" && activa === t.id;
+        const clase = `group flex min-w-0 flex-col gap-3 rounded-2xl border bg-card p-4 text-left shadow-sm transition duration-150 hover:-translate-y-0.5 hover:shadow-md motion-reduce:transition-none motion-reduce:hover:translate-y-0 ${anilloFoco} ${
+          encendida ? `ring-2 ${c.activa}` : "border-border"
+        }`;
+        const ayuda = t.id === "todos" ? "Ver todos los competidores, sin filtro." : encendida ? "Filtrando la lista: tócala para quitar el filtro." : `Ver solo: ${t.titulo.toLowerCase()}.`;
+        const interior = (
+          <>
+            <span className="flex items-center gap-3">
+              <span aria-hidden="true" className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${c.icono}`}>
+                <Icono className="h-[18px] w-[18px]" />
+              </span>
+              <span className="min-w-0 text-xs leading-tight font-medium tracking-wide text-muted-foreground uppercase hyphens-auto">{t.titulo}</span>
+            </span>
+            <span className="flex flex-wrap items-baseline gap-x-1">
+              <span className={`text-3xl leading-none font-semibold tabular-nums ${c.numero}`}>{num(d.valor)}</span>
+              {d.junto && <span className="text-sm text-muted-foreground tabular-nums">/ {d.junto}</span>}
+            </span>
+            <span className="text-xs text-muted-foreground">
+              {d.detalle}
+              {d.extra && <span className={`mt-0.5 block font-medium ${d.extraRojo ? "text-destructive" : "text-foreground-soft"}`}>{d.extra}</span>}
+              <span className="sr-only">. {ayuda}</span>
+            </span>
+          </>
+        );
+        if (!alPulsar)
+          return (
+            <Link key={t.id} href={t.id === "todos" ? "/analisis-competencia" : `/analisis-competencia?tarjeta=${t.id}`} className={clase}>
+              {interior}
+            </Link>
+          );
+        return (
+          <button key={t.id} type="button" aria-pressed={t.id === "todos" ? undefined : encendida} onClick={() => alPulsar(t.id === "todos" || encendida ? null : t.id)} className={clase}>
+            {interior}
+          </button>
+        );
+      })}
     </section>
   );
 }
@@ -440,7 +569,7 @@ function TarjetaCompetidor({
   alAlternar,
   busqueda,
 }: {
-  c: CompetidorC & { igualesN: number; baratos: number; cambiosHoy: number; nuevo: boolean };
+  c: CompetidorFila;
   productos: ProductoC[];
   nuestros: Map<string, ProductoC>;
   abierto: boolean;
@@ -502,61 +631,42 @@ function Dato({ titulo, valor, extra }: { titulo: string; valor: string; extra?:
 type Orden = "vendido" | "iguales" | "productos";
 
 /**
- * Análisis de competencia en una sola pantalla: las novedades arriba, un buscador y filtros de un toque, y la lista de
- * competidores; cada uno se abre en su sitio con sus productos (los iguales a los nuestros primero, con el precio frente al
- * nuestro) y cada producto despliega su historial.
+ * Análisis de competencia en una sola pantalla: el tablero de tarjetas arriba (cuentan y filtran los competidores), lo que hay que decidir
+ * hoy, nuestra posición en precio, las novedades y la lista de competidores con su buscador; cada uno se abre en su sitio con sus productos
+ * (los iguales a los nuestros primero, con el precio frente al nuestro) y cada producto despliega su historial. Con una tarjeta encendida
+ * la lista queda justo debajo del tablero, como en Gestión de IDs Dropi.
  */
 export function VistaCompetidores({ datos, puedeEscribir }: { datos: DatosCompetencia; puedeEscribir: boolean }) {
   const { moneda } = useMonedaCompetencia();
+  const parametros = useSearchParams();
   const [abierto, setAbierto] = useState<number | null>(null);
   const [texto, setTexto] = useState("");
-  const [soloIguales, setSoloIguales] = useState(false);
-  const [soloBaratos, setSoloBaratos] = useState(false);
-  const [soloCambios, setSoloCambios] = useState(false);
+  // La tarjeta encendida del tablero; desde la pestaña Resumen llega en la dirección («?tarjeta=baratos»).
+  const [tarjeta, setTarjeta] = useState<IdTarjeta | null>(() => {
+    const t = parametros.get("tarjeta");
+    return esIdTarjeta(t) ? t : null;
+  });
   const [orden, setOrden] = useState<Orden>("vendido");
   const busqueda = texto.trim().toLowerCase();
 
   const nuestros = useMemo(() => new Map(datos.productos.filter((p) => p.esNuestro).map((p) => [p.id, p])), [datos.productos]);
-  const porCompetidor = useMemo(() => {
-    const m = new Map<number, ProductoC[]>();
-    for (const p of datos.productos) if (!p.esNuestro && p.estado === "activo") m.set(p.proveedorId, [...(m.get(p.proveedorId) ?? []), p]);
-    return m;
-  }, [datos.productos]);
-  const ultimaFecha = datos.ultima?.inicio ?? null;
-  const cambiosHoy = useMemo(() => {
-    const m = new Map<string, number>();
-    if (!ultimaFecha) return m;
-    for (const b of datos.bitacora) if (b.fecha >= ultimaFecha && !b.esNuestro) m.set(b.proveedor, (m.get(b.proveedor) ?? 0) + 1);
-    return m;
-  }, [datos.bitacora, ultimaFecha]);
-  const nuevos = useMemo(
-    () => new Set(datos.alertas.filter((a) => a.tipo === "competidor_nuevo").map((a) => a.titulo.replace(/^Competidor nuevo:\s*/, ""))),
-    [datos.alertas],
-  );
+  const porId = useMemo(() => new Map(datos.productos.map((p) => [p.id, p])), [datos.productos]);
+  const porCompetidor = useMemo(() => productosPorCompetidor(datos.productos), [datos.productos]);
+  const conDatos = useMemo(() => competidoresConDatos(datos), [datos]);
 
-  const competidores = useMemo(() => {
-    const filas = datos.competidores.map((c) => {
-      const prods = porCompetidor.get(c.id) ?? [];
-      const iguales = prods.filter((p) => p.igualA);
-      const baratos = iguales.filter((p) => {
-        const n = nuestros.get(p.igualA!);
-        const pu = n ? precioEquivalente(n.nombre, p).precio : null;
-        return n?.precio != null && pu !== null && pu < n.precio - 0.004;
-      }).length;
-      return { ...c, igualesN: iguales.length, baratos, cambiosHoy: cambiosHoy.get(c.nombre) ?? 0, nuevo: nuevos.has(c.nombre) };
-    });
-    return filas
-      .filter(
-        (c) =>
-          (!soloIguales || c.igualesN > 0) &&
-          (!soloBaratos || c.baratos > 0) &&
-          (!soloCambios || c.cambiosHoy > 0) &&
-          (!busqueda || c.nombre.toLowerCase().includes(busqueda) || (porCompetidor.get(c.id) ?? []).some((p) => p.nombre.toLowerCase().includes(busqueda))),
-      )
-      .sort((a, b) =>
-        orden === "vendido" ? b.bajo7 - a.bajo7 || b.bajo30 - a.bajo30 || b.productos - a.productos : orden === "iguales" ? b.igualesN - a.igualesN || b.bajo7 - a.bajo7 : b.productos - a.productos,
-      );
-  }, [datos.competidores, porCompetidor, nuestros, cambiosHoy, nuevos, soloIguales, soloBaratos, soloCambios, busqueda, orden]);
+  const competidores = useMemo(
+    () =>
+      conDatos
+        .filter(
+          (c) =>
+            (!tarjeta || FILTRO_TARJETA[tarjeta](c)) &&
+            (!busqueda || c.nombre.toLowerCase().includes(busqueda) || (porCompetidor.get(c.id) ?? []).some((p) => p.nombre.toLowerCase().includes(busqueda))),
+        )
+        .sort((a, b) =>
+          orden === "vendido" ? b.bajo7 - a.bajo7 || b.bajo30 - a.bajo30 || b.productos - a.productos : orden === "iguales" ? b.igualesN - a.igualesN || b.bajo7 - a.bajo7 : b.productos - a.productos,
+        ),
+    [conDatos, porCompetidor, tarjeta, busqueda, orden],
+  );
 
   const posiciones = useMemo(() => posicionesNuestras(datos.productos), [datos.productos]);
   const decisiones = useMemo(() => {
@@ -575,27 +685,23 @@ export function VistaCompetidores({ datos, puedeEscribir }: { datos: DatosCompet
   }, [datos.productos, datos.competidores, datos.corte, moneda]);
   const abrirCompetidor = (prov: number) => {
     setTexto("");
-    setSoloIguales(false);
-    setSoloBaratos(false);
-    setSoloCambios(false);
+    setTarjeta(null);
     setAbierto(prov);
     requestAnimationFrame(() => document.getElementById(`competidor-${prov}`)?.scrollIntoView({ block: "start", behavior: "smooth" }));
   };
 
   // Una novedad abre su competidor (y lo lleva a la vista).
   const abrirNovedad = (a: AlertaC) => {
-    const prov =
-      a.tipo === "competidor_nuevo"
-        ? datos.competidores.find((c) => c.nombre === a.titulo.replace(/^Competidor nuevo:\s*/, ""))?.id
-        : datos.productos.find((p) => p.id === a.productoId)?.proveedorId;
+    const prov = proveedorDeAlerta(a, datos, porId);
     if (prov !== undefined) abrirCompetidor(prov);
   };
 
   return (
     <div className="flex flex-col gap-4">
-      <QueHacerHoy decisiones={decisiones} alAbrir={abrirCompetidor} />
-      <NuestrosFrente filas={posiciones} alAbrir={abrirCompetidor} />
-      <Novedades alertas={datos.alertas} alAbrir={abrirNovedad} puedeEscribir={puedeEscribir} busquedas={datos.busquedas} />
+      <TableroCompetencia datos={datos} filas={conDatos} activa={tarjeta} alPulsar={setTarjeta} />
+      {!tarjeta && <QueHacerHoy decisiones={decisiones} alAbrir={abrirCompetidor} />}
+      {!tarjeta && <NuestrosFrente filas={posiciones} alAbrir={abrirCompetidor} />}
+      {(!tarjeta || tarjeta === "novedades") && <Novedades alertas={datos.alertas} alAbrir={abrirNovedad} puedeEscribir={puedeEscribir} busquedas={datos.busquedas} />}
 
       <div className="flex flex-wrap items-center gap-2">
         <input
@@ -606,16 +712,6 @@ export function VistaCompetidores({ datos, puedeEscribir }: { datos: DatosCompet
           aria-label="Buscar un competidor o un producto"
           className={`${fieldClass} min-w-0 flex-[1_1_16rem]`}
         />
-        <BotonBarra activo={soloIguales} onClick={() => setSoloIguales(!soloIguales)}>
-          Venden productos nuestros
-        </BotonBarra>
-        <BotonBarra activo={soloBaratos} onClick={() => setSoloBaratos(!soloBaratos)}>
-          <span aria-hidden="true" className="h-2 w-2 rounded-full bg-destructive" />
-          Más baratos que nosotros
-        </BotonBarra>
-        <BotonBarra activo={soloCambios} onClick={() => setSoloCambios(!soloCambios)}>
-          Con cambios en la última búsqueda
-        </BotonBarra>
         <select aria-label="Ordenar competidores" value={orden} onChange={(e) => setOrden(e.target.value as Orden)} className={`h-[34px] rounded-lg border border-border-control bg-card px-2 text-[13px] ${anilloFoco}`}>
           <option value="vendido">Más vendido (7 días)</option>
           <option value="iguales">Más productos iguales a los nuestros</option>
@@ -623,8 +719,16 @@ export function VistaCompetidores({ datos, puedeEscribir }: { datos: DatosCompet
         </select>
       </div>
 
-      <p className="text-xs text-muted-foreground" aria-live="polite">
+      <p className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground" aria-live="polite">
         {competidores.length} de {datos.competidores.length} competidores
+        {tarjeta && (
+          <>
+            <span>· {tituloTarjeta(tarjeta)}</span>
+            <button type="button" onClick={() => setTarjeta(null)} className={`rounded px-1.5 py-0.5 text-primario hover:underline ${anilloFoco}`}>
+              Quitar filtro
+            </button>
+          </>
+        )}
       </p>
       <div className="flex flex-col gap-2">
         {competidores.map((c) => (

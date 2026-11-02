@@ -46,7 +46,6 @@ import {
 } from "./def-compras";
 import { FichaCompra } from "./ficha-compra";
 import { diasEntre, enGrupo, estaAtrasada, hoy, umbralesTransito, type Grupo } from "./calculos-compras";
-import { ConMasProductos } from "./mas-productos";
 
 const NOMBRE: NombreFilas = { singular: "compra", plural: "compras" };
 const ICONOS: Record<string, IconoComp> = {
@@ -128,29 +127,38 @@ function podarCambios(cambios: Record<string, Partial<FilaCompra>>, servidor: Fi
   return cambio ? resultado : cambios;
 }
 
-/** Una foto en su celda: miniatura que se amplía al pasar el cursor; sin foto, un cuadro punteado. */
+/**
+ * Una foto en su celda, del alto de la fila (pedido de Alcides, 2 nov 2026): la celda es `relative` y la foto la llena sin
+ * agrandarla (va en `absolute`, cuadrada), así la fila sigue midiendo lo que mide la orden de compra. Se amplía al pasar el cursor;
+ * sin foto, un cuadro punteado.
+ */
 function FotoCelda({ foto, alt, mas = 0 }: { foto: string | null; alt: string; mas?: number }) {
-  if (!foto)
-    return (
-      <ConMasProductos n={mas}>
-        <div className="flex h-8 w-8 items-center justify-center rounded-md border border-dashed border-border text-muted-foreground" role="img" aria-label={`Sin ${alt.toLowerCase()}`}>
-          <AdjuntoIcon className="h-3.5 w-3.5" />
-        </div>
-      </ConMasProductos>
-    );
   return (
-    <TarjetaEmergente
-      clase="rounded-lg border border-border bg-card p-1.5 shadow-lg"
-      contenido={
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={foto} alt={alt} className="max-h-72 max-w-72 rounded-md object-contain" />
-      }
-    >
-      <ConMasProductos n={mas}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={foto} alt={alt} className="h-8 w-8 rounded-md border border-border object-cover" />
-      </ConMasProductos>
-    </TarjetaEmergente>
+    <div className="absolute inset-y-1.5 left-2 aspect-square max-w-[calc(100%-1rem)]">
+      {foto ? (
+        <TarjetaEmergente
+          clase="rounded-lg border border-border bg-card p-1.5 shadow-lg"
+          claseEnvoltura="h-full w-full"
+          contenido={
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={foto} alt={alt} className="max-h-72 max-w-72 rounded-md object-contain" />
+          }
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={foto} alt={alt} className="h-full w-full rounded-md border border-border object-cover" />
+        </TarjetaEmergente>
+      ) : (
+        <div className="flex h-full w-full items-center justify-center rounded-md border border-dashed border-border text-muted-foreground" role="img" aria-label={`Sin ${alt.toLowerCase()}`}>
+          <AdjuntoIcon className="h-4 w-4" />
+        </div>
+      )}
+      {mas > 0 && (
+        <span className="pointer-events-none absolute -right-1 -bottom-1 rounded-full border-2 border-card bg-foreground px-1.5 text-[10px] leading-4 font-semibold text-background tabular-nums">
+          <span aria-hidden="true">+{mas}</span>
+          <span className="sr-only">y {mas === 1 ? "1 producto más" : `${mas} productos más`}</span>
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -193,6 +201,7 @@ function columnas(
       id: "fotoComercial",
       label: conEmoji("foto", "Foto del producto"),
       ...resto,
+      clase: "relative w-20 min-w-20",
       // La foto comercial (la de Producto), la de referencia.
       render: (c) => <FotoCelda foto={c.fotoComercial} alt="Foto del producto" mas={otrosProductos(c.lineas)} />,
     },
@@ -200,6 +209,7 @@ function columnas(
       id: "fotoReal",
       label: conEmoji("foto", "Foto real"),
       ...resto,
+      clase: "relative w-20 min-w-20",
       // La foto real que manda el proveedor.
       render: (c) => <FotoCelda foto={c.fotoUrl} alt="Foto real" />,
     },
