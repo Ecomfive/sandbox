@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { APAGAR_JS, armarApagado, armarApagadoVariable, armarEntradaVariable, armarProductoNuevoVariable, CONCEPTO_APAGAR, emparejarDevolucion, firmaVariacion, grupoDe, nombreDelPublico, normalizarDatosDevolver, normalizarUnidades, privadasDe, unidadesDeVariable, unidadesTotales, variacionesVivas, type PublicacionParaApagar } from "./apagar-dropi";
+import { APAGAR_JS, armarApagado, armarApagadoVariable, armarEntradaVariable, armarProductoNuevoVariable, CONCEPTO_APAGAR, emparejarDevolucion, firmaVariacion, grupoDe, nombreDelPublico, normalizarDatosDevolver, normalizarUnidades, privadasDe, stockNegativo, unidadesDeVariable, unidadesTotales, variacionesVivas, type PublicacionParaApagar } from "./apagar-dropi";
 import { ARMAR_JS, marcadorAplicarDropi } from "./marcador-aplicar-dropi";
 import { PRIVATIZAR_JS } from "./privatizar-dropi";
 import { REPUBLICAR_JS } from "./republicar-dropi";
@@ -129,6 +129,18 @@ const conTallas = (id: number, stocks: Record<string, number>, extra: Obj = {}):
     })),
     ...extra,
   });
+test("stock negativo: se suma lo que está bajo cero, simple o con variaciones, igual en el favorito", () => {
+  const { negU } = new Function(`${ARMAR_JS};${REPUBLICAR_JS};${PRIVATIZAR_JS};${APAGAR_JS}; return { negU };`)() as { negU: (o: Obj) => number };
+  const casos = [
+    producto({ warehouse_product: [{ warehouse_id: 81, stock: -96 }, { warehouse_id: 280, stock: 4 }] }),
+    producto({ warehouse_product: [{ warehouse_id: 81, stock: 10 }] }),
+    conTallas(8445, { S: -40, M: -6, L: 3 }),
+    conTallas(8446, { S: 2 }),
+  ];
+  assert.deepEqual(casos.map(stockNegativo), [-96, 0, -46, 0]);
+  assert.deepEqual(casos.map(negU), [-96, 0, -46, 0]);
+});
+
 /** Lo que Dropi devuelve de `get_warehouses_stock` por variación. */
 const entradasDe = (o: Obj): Obj[][] => variacionesVivas(o).map((v) => (v.warehouse_product_variation as Obj[]).map((w) => ({ variation_id: v.id, warehouse_id: w.warehouse_id, stock: w.stock, fullName: "Proveedor Ecomfive(Ave)" })));
 

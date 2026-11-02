@@ -51,7 +51,7 @@ export const ARMAR_JS = [
   "if(ds!==null&&ds.replace(/<[^>]*>/g,' ').replace(/&nbsp;/g,' ').replace(/\\s+/g,' ').trim().length<200)return{error:'La descripción necesita al menos 200 caracteres.'};",
   "function num(v){return v===null||v===undefined||v===''?v:Number(v)}",
   "var b=(Array.isArray(o.warehouse_product)?o.warehouse_product:[]).map(function(w){var x=w.warehouse||{};return{warehouse_id:w.warehouse_id,fullName:(x.name!=null?x.name:'')+'('+(x.address!=null?x.address:'')+')',stock:w.stock,city:x.city,warehouse_white_brand:!!x.warehouse_white_brand}});",
-  "bp.forEach(function(p){if(!b.some(function(x){return x.warehouse_id===p.id}))b.push({fullName:p.name+'('+p.address+')',warehouse_id:p.id,warehouse_white_brand:!!p.warehouse_white_brand})});",
+  "bp.forEach(function(p){if(!b.some(function(x){return Number(x.warehouse_id)===Number(p.id)}))b.push({fullName:p.name+'('+p.address+')',warehouse_id:p.id,warehouse_white_brand:!!p.warehouse_white_brand})});",
   "return{cuerpo:{id:o.id,name:c.nombre!==null?c.nombre:o.name,description:ds!==null?ds:o.description,dropi_app_description:o.dropi_app_description,type:o.type,sale_price:pr!==null?pr:num(o.sale_price),suggested_price:su!==null?su:(sa!==null?sa:num(o.suggested_price)),user_id:o.user_id,privated_product:o.privated_product,active:o.active,sku:o.sku,weight:num(o.weight),length:num(o.length),width:num(o.width),height:num(o.height),attribute:at,variations:vr?vars(o):o.variations,categories:o.categories,add_stock_in_return:o.add_stock_in_return,private_product_inventories:o.private_product_inventories,user_profit_percentage_product:o.user_profit_percentage_product,is_warehouse_white_brand:o.is_warehouse_white_brand,warehouselected:vr?[]:b,warehouse_previus:null,controlChangesPhotos:[],name_in_guide:c.nombreGuia!==null?c.nombreGuia:(o.name_in_guide!=null?o.name_in_guide:''),shipping_method:o.shipping_method,bar_code:o.bar_code,dropi_product_supplier_increment_fixed:o.dropi_product_supplier_increment_fixed}}",
   "}",
 ].join("");
@@ -153,14 +153,28 @@ const CODIGO = [
   "var R=function(x){if(dv){x.unidades=du;x.devuelto=hecho}return x};",
   // Con variaciones (1 nov 2026): el stock sale de cada variación, y si hay que devolverle unidades a un público, primero se comprueba —antes de tocar nada— que el público
   // tenga las mismas variaciones.
+  // Un producto con stock negativo no se apaga ni se archiva: primero se deja en 0 (2 nov 2026, el 8822 en -96).
+  "var ng=negU(o);if(ng<0)return R({ok:false,error:'Dropi muestra '+ng+' unidades (stock negativo): déjalo en 0 con «Cambiar stock» o a mano en Dropi, y se reintenta.'});",
   "var vr=esV(o),ent=null;if(vr){var er=await entradasV(o);if(er.error)return R({ok:false,error:er.error});ent=er.ent}",
   "if(vr&&dv&&!du&&!hecho){var pq=await pedir('/products/'+dv.publico),pz=pq.j&&pq.j.objects;if(!pq.ok||!pz||Number(pz.id)!==Number(dv.publico))return R({ok:false,error:'No se pudo leer el público '+dv.publico+' antes de quitar la privatización: '+motivo(pq)});",
   "if(!esV(pz))return R({ok:false,error:'El público '+dv.publico+' no tiene variaciones y este privado sí: devuelve esas unidades a mano.'});",
   "var ez=emparejarV(pz,unidadesV(o));if(ez.error)return R({ok:false,error:ez.error})}",
+  // Quitar la reserva a privados va SOLO, en su propio guardado, y después se vuelve a leer el producto: Dropi, al quitar la reserva, puede sacar él mismo
+  // esas unidades. Antes iba junto con la salida del stock y Dropi descontaba dos veces (2 nov 2026: el 8822 tenía 96 reservadas y quedó en -96, el 8445 en -46).
+  // Las unidades a devolver se anotan con la lectura de antes de tocar nada.
+  "var su0=dv&&!du&&!hecho?(vr?unidadesV(o):stockDe(o)):null;",
+  "if(c.quitarPrivados===true&&(Array.isArray(o.private_product_inventories)?o.private_product_inventories:[]).some(function(x){return!x.deleted_at})){",
+  "var rq=armar(o,bp,{nombre:null,nombreGuia:null,variable:vr});if(rq.error)return R({ok:false,error:rq.error});",
+  "var g0=await pedir('/products/'+c.producto,'PUT',Object.assign({},rq.cuerpo,{private_product_inventories:reservasQuitadas(o.private_product_inventories)}));if(!g0.ok)return R({ok:false,error:motivo(g0)});if(su0)du=su0;",
+  "var a0=await pedir('/products/'+c.producto),o0=a0.j&&a0.j.objects;if(!a0.ok||!o0)return R({ok:false,error:'Se quitó la reserva, pero no se pudo volver a leer el producto en Dropi.'});o=o0;",
+  "var n0=negU(o);if(n0<0)return R({ok:false,error:'Al quitar la reserva, Dropi dejó el stock en '+n0+': revísalo en Dropi antes de seguir (no se movió nada más).'});",
+  "if((Array.isArray(o.private_product_inventories)?o.private_product_inventories:[]).some(function(x){return!x.deleted_at}))return R({ok:false,error:'Dropi no quitó la privatización: quítala a mano en «Productos privados».'});",
+  "if(vr){var e0=await entradasV(o);if(e0.error)return R({ok:false,error:e0.error});ent=e0.ent}}",
   "var p=vr?apagadoV(o,bp,c.quitarPrivados===true,ent):apagado(o,bp,c.quitarPrivados===true);if(p.error)return R({ok:false,error:p.error});",
   "if(p.cuerpo){var su=dv&&!du&&!hecho?(vr?unidadesV(o):stockDe(o)):null;var g=await pedir('/products/'+c.producto,'PUT',p.cuerpo);if(!g.ok)return R({ok:false,error:motivo(g)});if(su)du=su;",
   "var d=await pedir('/products/'+c.producto),n=d.j&&d.j.objects;if(!d.ok||!n)return R({ok:false,error:'Se guardó, pero no se pudo comprobar en Dropi.'});",
   "var tv=totalU(n);if(tv>0)return R({ok:false,error:'Dropi sigue mostrando '+tv+' unidades de stock.'});",
+  "var nn=negU(n);if(nn<0)return R({ok:false,error:'Dropi dejó el stock en '+nn+' (negativo): revísalo en Dropi; no se archivó.'});",
   "if(c.quitarPrivados===true&&(Array.isArray(n.private_product_inventories)?n.private_product_inventories:[]).some(function(x){return!x.deleted_at}))return R({ok:false,error:'Dropi no quitó la privatización: quítala a mano en «Productos privados».'});",
   "o=n}",
   "if(dv&&du&&!hecho){var tu=0,kd;for(kd in du)tu+=Number(du[kd])||0;if(tu>0){",
@@ -267,7 +281,7 @@ const CODIGO = [
   "var r=ajuste(o,bp,d);if(r.error)return{ok:false,error:r.error};",
   "if(r.cuerpo){var g=await pedir('/products/'+c.producto,'PUT',r.cuerpo);if(!g.ok)return{ok:false,error:motivo(g)}}",
   "var v=await pedir('/products/'+c.producto),n=v.j&&v.j.objects;if(!v.ok||!n)return{ok:false,error:'Se guardó, pero no se pudo comprobar en Dropi.'};",
-  "var q=stockDe(n)[String(d.bodega)]||0;if(q!==Number(d.unidades))return{ok:false,error:'Dropi muestra '+q+' unidades en esa bodega y se pidieron '+d.unidades+'.'};",
+  "var qf=(Array.isArray(n.warehouse_product)?n.warehouse_product:[]).filter(function(w){return String(w.warehouse_id)===String(d.bodega)})[0],q=qf?Number(qf.stock)||0:0;if(q!==Number(d.unidades))return{ok:false,error:'Dropi muestra '+q+' unidades en esa bodega y se pidieron '+d.unidades+'.'};",
   "var bs=(Array.isArray(n.warehouse_product)?n.warehouse_product:[]).map(function(w){var x=w.warehouse||{};return{id:Number(w.warehouse_id),nombre:x.name!=null?String(x.name):'',stock:Number(w.stock)||0}});",
   "return{ok:true,antes:r.antes,stock:q,bodegas:bs,aviso:d.antes!=null&&Number(d.antes)!==r.antes?'En Dropi había '+r.antes+' (el sistema mostraba '+d.antes+').':null}}",
   "async function aplicar(c,bp){",

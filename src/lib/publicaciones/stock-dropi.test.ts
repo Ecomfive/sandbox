@@ -104,6 +104,17 @@ test("no se toca la B280 ni una bodega que no es del proveedor; no se deja menos
   assert.ok("error" in delFavorito.ajuste(variable, bp, datos()));
 });
 
+test("un stock negativo se lee como está: dejarlo en 0 es una entrada por la diferencia (el 8822 en -96)", () => {
+  const negativo = producto({ warehouse_product: [{ warehouse_id: 81, stock: -96, warehouse: { id: 81, name: "Proveedor Ecomfive", address: "x" } }] });
+  const r = armarAjusteStock(negativo, bp, datos({ unidades: 0 }));
+  assert.ok("cuerpo" in r && r.cuerpo);
+  assert.equal(r.antes, -96);
+  const m = movimiento(r.cuerpo!, 81)!;
+  assert.equal(m.type_movement, "ENTRADA");
+  assert.equal(m.quantity, 96);
+  igual(delFavorito.ajuste(negativo, bp, datos({ unidades: 0 })), r);
+});
+
 test("lo que llega se limpia y se revisa antes de encolar", () => {
   const d = normalizarDatosStock({ bodega: "81", unidades: "35", antes: 12, concepto: "   ", nombreBodega: "  B  " });
   igual(d, { producto: null, bodega: 81, nombreBodega: "B", unidades: 35, antes: 12, concepto: CONCEPTO_STOCK });
