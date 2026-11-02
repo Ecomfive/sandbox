@@ -11,6 +11,9 @@ export interface ProductoDrop {
   id: string;
   codigo: string;
   nombre: string;
+  foto: string | null;
+  /** simple o combo (compuesto). */
+  tipo: string;
 }
 
 /**
@@ -39,6 +42,13 @@ export interface FilaPublicacionDrop {
   producto: ProductoDrop | null;
   /** El producto que sugirió la lectura, mientras no esté vinculada. */
   sugerido: ProductoDrop | null;
+  /** Cómo se sugirió: «seguro» (coincidencia exacta), «sugerido», «varios», «falta_compuesto» o «ninguno». */
+  sugerencia: string | null;
+  /** Si la última lectura de Drop la encontró (como «Conectado con Dropi»); false = ya no aparece en Drop (se eliminó allá). */
+  conectado: boolean;
+  /** Cuándo se creó en Drop y cuándo la vio la última lectura. */
+  creadoEnDrop: string | null;
+  ultimaVez: string;
   /** El costo del producto vinculado (de su publicación de Dropi del mismo país); null si no hay. */
   costo: number | null;
   /** El fulfillment de Drop del país (Configuración), en la moneda de Drop; null si no está puesto. */
@@ -59,10 +69,12 @@ export interface FilaPublicacionDrop {
 
 export const estadoVinculoDrop = (f: FilaPublicacionDrop): "vinculado" | "sugerido" | "sin_vincular" => (f.producto ? "vinculado" : f.sugerido ? "sugerido" : "sin_vincular");
 
+/** Activa en Drop (y todavía en Drop). */
+export const activaDrop = (f: FilaPublicacionDrop) => f.conectado && f.estado === "activo";
 /** Activa en Drop sin unidades. */
-export const sinStockDrop = (f: FilaPublicacionDrop) => f.estado === "activo" && f.inventario === 0;
+export const sinStockDrop = (f: FilaPublicacionDrop) => activaDrop(f) && f.inventario === 0;
 /** Activa en Drop con menos de `POCO_STOCK_DROP` unidades. */
-export const pocoStockDrop = (f: FilaPublicacionDrop) => f.estado === "activo" && f.inventario !== null && f.inventario > 0 && f.inventario < POCO_STOCK_DROP;
+export const pocoStockDrop = (f: FilaPublicacionDrop) => activaDrop(f) && f.inventario !== null && f.inventario > 0 && f.inventario < POCO_STOCK_DROP;
 export const margenBajoDrop = (f: FilaPublicacionDrop) => f.margen !== null && f.margen < MARGEN_BAJO;
 
 export const DEF_PUBLICACIONES_DROP: DefTabla<FilaPublicacionDrop> = {
@@ -87,6 +99,16 @@ export const DEF_PUBLICACIONES_DROP: DefTabla<FilaPublicacionDrop> = {
       valores: (f) => [f.estado],
       opciones: () => (Object.keys(ETIQUETA_ESTADO_DROP) as EstadoDrop[]).map((valor) => ({ valor, etiqueta: ETIQUETA_ESTADO_DROP[valor] })),
       agrupable: true,
+    },
+    {
+      id: "conexion",
+      etiqueta: "Conexión con Drop",
+      tipo: "seleccion",
+      valores: (f) => [f.conectado ? "conectado" : "no_aparece"],
+      opciones: () => [
+        { valor: "conectado", etiqueta: "Conectado con Drop" },
+        { valor: "no_aparece", etiqueta: "Ya no aparece en Drop" },
+      ],
     },
     {
       id: "vinculo",

@@ -4,6 +4,7 @@ import { requireModulo } from "@/lib/auth";
 import { formatearFechaHora } from "@/lib/formato";
 import { formatoMonto } from "@/lib/publicaciones/moneda";
 import { getPaisActual } from "@/lib/pais";
+import { esAdministrador } from "@/lib/permisos/acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 import { obtenerOpcionesSkuMaestro } from "@/lib/wms/skus-maestros";
 import { avisoPaisDrop } from "./aviso-pais-drop";
@@ -20,8 +21,9 @@ export const dynamic = "force-dynamic";
  * (tablero de acciones arriba y lista de filas debajo), con los datos que se leen de Drop (migración 0221; Drop es de Costa Rica): las publicaciones del
  * país elegido arriba.
  */
-export default async function PublicacionesDropPage() {
+export default async function PublicacionesDropPage({ searchParams }: { searchParams: Promise<{ [k: string]: string | string[] | undefined }> }) {
   const usuario = await requireModulo("publicaciones-drop");
+  const { abrir } = await searchParams;
   // Drop es solo de Costa Rica: con otro país elegido, la página dice dónde existe (avisoPaisDrop).
   const aviso = await avisoPaisDrop(usuario, "Gestión de IDs Drop");
   if (aviso) return aviso;
@@ -51,7 +53,11 @@ export default async function PublicacionesDropPage() {
       <ListaPublicacionesDrop
         publicaciones={datos.publicaciones}
         moneda={datos.moneda}
+        codigoPais={pais.codigo}
+        nombrePais={pais.nombre}
         puedeEscribir={puedeEscribir}
+        puedeVerCompras={esAdministrador(usuario)}
+        abrirInicial={typeof abrir === "string" ? abrir : null}
         opcionesSku={opcionesSku}
         vacio="Todavía no hay publicaciones de Drop: falta la primera lectura."
       />
