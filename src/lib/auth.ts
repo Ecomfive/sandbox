@@ -7,6 +7,7 @@ import { accionPermitida, contarAjustes, pestanaVisible, resolverAfinado, type A
 import { MODULOS_AFINABLES, catalogoDe } from "@/lib/permisos/catalogo";
 import { paginaInicialDe } from "@/lib/nav-data";
 import { RUTA_PORTAL_PROVEEDOR, cuentaDeProveedor } from "@/lib/proveedor/cuenta";
+import { segundoPasoCumplido } from "@/lib/seguridad/segundo-paso-servidor";
 
 /** Cookie de "Ver así": el id del rol que Usuarios y roles está probando, o nada. Vive solo en el
  * navegador de quien la prende (ver `src/lib/vista-previa-actions.ts`), nunca en la base. */
@@ -92,13 +93,24 @@ function juntarAfinado(rolId: string | null, finos: Pick<PermisosFinos, "afinado
  */
 export const getUsuarioIdSesion = cache(async (): Promise<string | null> => (await getUsuarioSesion())?.id ?? null);
 
-/** El usuario de autenticación con sesión (con su `app_metadata`), de la misma consulta que `getUsuarioIdSesion`. */
-export const getUsuarioSesion = cache(async () => {
+/** La persona con contraseña puesta, **sin mirar el segundo paso**: solo para la pantalla donde se pone el código (`/login/verificar`). */
+export const getUsuarioSesionBruta = cache(async () => {
   const session = await createSessionClient();
   const {
     data: { user },
   } = await session.auth.getUser();
   return user ?? null;
+});
+
+/**
+ * El usuario de autenticación con sesión (con su `app_metadata`), de la misma consulta que `getUsuarioIdSesion`. **Aquí está el gate de la
+ * verificación en dos pasos** (27 oct 2026): con ella encendida, quien puso la contraseña pero no el código no tiene sesión para nada del
+ * sistema (páginas, acciones ni rutas de API). Todo lo demás pasa por esta función.
+ */
+export const getUsuarioSesion = cache(async () => {
+  const user = await getUsuarioSesionBruta();
+  if (!user) return null;
+  return (await segundoPasoCumplido(user.id)) ? user : null;
 });
 
 /** Usuario con sesión activa, su rol y los módulos a los que ese rol tiene acceso (una vez por petición). */

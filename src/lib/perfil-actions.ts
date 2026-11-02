@@ -1,14 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createSessionClient, createServiceClient } from "@/lib/supabase/server";
+import { getUsuarioSesion } from "@/lib/auth";
+import { createServiceClient } from "@/lib/supabase/server";
 import { detectarImagen } from "@/lib/seguridad/imagen";
 
 export async function subirAvatar(formData: FormData) {
-  const session = await createSessionClient();
-  const {
-    data: { user },
-  } = await session.auth.getUser();
+  // Con la verificación en dos pasos encendida, también aquí hace falta haberla cumplido.
+  const user = await getUsuarioSesion();
   if (!user) throw new Error("No autenticado.");
 
   const archivo = formData.get("avatar") as File | null;

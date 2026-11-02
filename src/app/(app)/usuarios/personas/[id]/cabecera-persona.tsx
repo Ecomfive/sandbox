@@ -9,7 +9,7 @@ import { Chip } from "@/components/permisos/piezas-permisos";
 import { AfinarIcon, OjoIcon } from "@/lib/nav-icons";
 import { colorDeRol } from "@/lib/permisos/color-rol";
 import { iniciarVistaPreviaPersona } from "@/lib/vista-previa-actions";
-import { cambiarActivoUsuario, eliminarUsuario, generarContrasenaTemporal } from "../../actions";
+import { cambiarActivoUsuario, eliminarUsuario, generarContrasenaTemporal, restablecerSegundoPaso } from "../../actions";
 import { faltantesDePersona } from "../../def-usuarios";
 import { EstadoPresencia } from "../../estado-presencia";
 
@@ -27,6 +27,8 @@ export interface PersonaCabecera {
   ultimoIngresoEn: string | null;
   ultimaActividadEn: string | null;
   fotoRecordadaEn: string | null;
+  /** Si ya activó su app autenticadora (verificación en dos pasos). */
+  conSegundoPaso: boolean;
 }
 
 /** La cabecera de la ficha de una persona: quién es, su rol y qué le falta, y lo que se hace con su cuenta (ver así, contraseña, suspender, eliminar). */
@@ -58,6 +60,18 @@ export function CabeceraPersona({ persona, propios, esYo, puedeEscribir }: { per
       const r = await generarContrasenaTemporal(formData).catch(() => ({ error: "Inténtalo de nuevo." }) as { error: string; contrasena?: undefined });
       if (r.error) mostrarToast(r.error, "destructive");
       else setContrasena(r.contrasena ?? null);
+    });
+  }
+
+  function restablecer() {
+    if (!confirm(`¿Restablecer la verificación en dos pasos de ${nombre}? Pierde su app autenticadora y tendrá que activar una nueva al entrar.`)) return;
+    empezar(async () => {
+      const r = await restablecerSegundoPaso(persona.id).catch(() => ({ error: "Inténtalo de nuevo." }) as { error: string });
+      if (r.error) mostrarToast(r.error, "destructive");
+      else {
+        mostrarToast("Verificación restablecida: activará una app nueva en su próximo ingreso");
+        router.refresh();
+      }
     });
   }
 
@@ -127,6 +141,11 @@ export function CabeceraPersona({ persona, propios, esYo, puedeEscribir }: { per
               <button type="button" onClick={generar} disabled={pendiente} className={boton}>
                 Generar contraseña temporal
               </button>
+              {persona.conSegundoPaso && (
+                <button type="button" onClick={restablecer} disabled={pendiente} className={boton}>
+                  Restablecer verificación
+                </button>
+              )}
               {!esYo && (
                 <>
                   <button type="button" onClick={suspender} disabled={pendiente} className={boton}>

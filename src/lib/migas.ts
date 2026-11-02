@@ -25,6 +25,7 @@ const TITULOS_APARTE: Record<string, string> = {
   "/conciliaciones": "Conciliación banco vs. plataforma",
   "/sin-acceso": "Sin acceso",
   "/mi-puesto": "Mi puesto",
+  "/cuenta/seguridad": "Seguridad de la cuenta",
   "/actualizaciones": "Actualizaciones del sistema",
 };
 
@@ -127,7 +128,7 @@ export function construirMigas(
   if (titulo) {
     // "Sin acceso" no es un módulo: no hay permisos que mostrar.
     // "Mi puesto" lo abre cualquiera con sesión: tampoco es un módulo.
-    const esModulo = ruta !== "/sin-acceso" && ruta !== "/mi-puesto" && ruta !== "/actualizaciones";
+    const esModulo = ruta !== "/sin-acceso" && ruta !== "/mi-puesto" && ruta !== "/cuenta/seguridad" && ruta !== "/actualizaciones";
     return {
       migas: [{ etiqueta: titulo }],
       favoritoHref: null,

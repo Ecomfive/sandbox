@@ -99,6 +99,7 @@ export default async function PersonaPage({ params }: { params: Promise<{ id: st
           ultimoIngresoEn: authUsuario.data?.user?.last_sign_in_at ?? null,
           ultimaActividadEn: perfil.ultima_actividad_en,
           fotoRecordadaEn: perfil.foto_recordada_en,
+          conSegundoPaso: (authUsuario.data?.user?.factors ?? []).some((f) => f.status === "verified"),
         }}
         propios={lista.length}
         esYo={esYo}

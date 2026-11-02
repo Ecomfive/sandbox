@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { RUTA_PORTAL_PROVEEDOR, cuentaDeProveedor } from "@/lib/proveedor/cuenta";
+import { segundoPasoActivo } from "@/lib/seguridad/segundo-paso";
 import { createServiceClient, createSessionClient } from "@/lib/supabase/server";
 
 export interface LoginState {
@@ -23,6 +24,9 @@ export async function iniciarSesion(_prevState: LoginState, formData: FormData):
     await createServiceClient().from("proveedor_usuarios").update({ ultimo_ingreso_en: new Date().toISOString() }).eq("id", cuenta.cuentaId);
     redirect(RUTA_PORTAL_PROVEEDOR);
   }
+  // Verificación en dos pasos (27 oct 2026): con la contraseña puesta todavía no hay sesión para el sistema; se pide el código de la app
+  // autenticadora (quien aún no la tiene la activa en esa misma pantalla).
+  if (segundoPasoActivo()) redirect("/login/verificar");
   redirect("/");
 }
 
