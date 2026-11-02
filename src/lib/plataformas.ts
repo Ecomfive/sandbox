@@ -18,8 +18,8 @@ export const PLATAFORMAS: readonly Plataforma[] = [
 
 export const PLATAFORMA_POR_DEFECTO: PlataformaId = "dropi";
 
-/** La cookie con la plataforma que se mira en Análisis de competencia (se mantiene al pasar de una pestaña a otra). */
-export const COOKIE_PLATAFORMA_COMPETENCIA = "competencia-plataforma";
+/** La cookie con la plataforma elegida (la de arriba a la derecha, junto al país): la comparten el selector de la barra y el de Análisis de competencia. */
+export const PLATAFORMA_COOKIE = "plataforma_actual";
 
 /** El código del único país de Drop. */
 export const PAIS_DE_DROP = "CR";
