@@ -2,16 +2,17 @@
 
 /* eslint-disable @next/next/no-img-element -- fotos de Drop (Google Cloud Storage) */
 import { useRouter } from "next/navigation";
-import { useTransition, type ReactNode } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 import { BotonIconoFila } from "@/app/(app)/publicaciones-dropi/boton-icono-fila";
 import { EtapaCotizando, LlegadaCamino } from "@/app/(app)/publicaciones-dropi/llegada-camino";
 import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
-import { ActualizarIcon, ApagarIcon, ArchivarIcon, CandadoAbiertoIcon, DropIcon, EnlaceIcon, EtiquetaIcon, PapeleraIcon, PausaIcon, ReactivarIcon, TareasIcon } from "@/lib/nav-icons";
-import { MOTIVO_SOLO_DROPI, accionDeEstado, ETIQUETA_ESTADO_DROP, motivoCambioEstado, motivoEliminar, motivoLiquidacion } from "@/lib/publicaciones-drop/acciones";
+import { ActualizarIcon, ApagarIcon, ArchivarIcon, CandadoAbiertoIcon, DropIcon, EnlaceIcon, EtiquetaIcon, InventarioIcon, PapeleraIcon, PausaIcon, ReactivarIcon, TareasIcon } from "@/lib/nav-icons";
+import { MOTIVO_SOLO_DROPI, accionDeEstado, ETIQUETA_ESTADO_DROP, motivoAccesoPrivado, motivoCambioEstado, motivoEliminar, motivoGestionarInventario, motivoLiquidacion } from "@/lib/publicaciones-drop/acciones";
 import { formatoEnDolares, formatoMonto, type MonedaPublicaciones } from "@/lib/publicaciones/moneda";
 import { vincularPublicacionDrop } from "./actions";
+import { DialogoAccesoPrivado, DialogoSolicitudInventario } from "./dialogos-fila-drop";
 import { margenBajoDrop, sinStockDrop, type FilaPublicacionDrop } from "./def-publicaciones-drop";
 
 /** Las columnas de la fila en pantalla ancha (las mismas de Gestión de IDs Dropi con ventas); las usa también el encabezado, así que van juntas. */
@@ -130,6 +131,7 @@ export function FilaPublicacionDropLista({ f, moneda, puedeEscribir }: { f: Fila
   const cambio = accionDeEstado(estado);
   const aviso = () => mostrarToast(AVISO_SIN_CONEXION);
   const nada = () => {};
+  const [dialogo, setDialogo] = useState<"inventario" | "privado" | null>(null);
   const vincular = (skuId: string) =>
     empezar(async () => {
       const r = await vincularPublicacionDrop(f.id, skuId).catch(() => ({ error: "No se pudo vincular. Inténtalo de nuevo." }));
@@ -258,7 +260,8 @@ export function FilaPublicacionDropLista({ f, moneda, puedeEscribir }: { f: Fila
       {/* Los mismos botones que la fila de Dropi y en su orden, más «Eliminar»: los que no aplican en Drop van apagados y dicen por qué. */}
       <div className="mb-2 ml-3 flex min-w-0 flex-wrap items-center gap-1 lg:mb-0 lg:ml-0 lg:mr-3 lg:shrink-0 lg:flex-nowrap">
         <BotonIconoFila texto="Republicar" motivo={MOTIVO_SOLO_DROPI.republicar} icono={ActualizarIcon} nombre={f.nombre} onClick={nada} />
-        <BotonIconoFila texto="Privatizar" motivo={MOTIVO_SOLO_DROPI.privatizar} icono={CandadoAbiertoIcon} nombre={f.nombre} onClick={nada} />
+        <BotonIconoFila texto="Dar acceso privado" motivo={motivoAccesoPrivado(estado)} icono={CandadoAbiertoIcon} nombre={f.nombre} onClick={() => setDialogo("privado")} />
+        <BotonIconoFila texto="Gestionar inventario" motivo={motivoGestionarInventario(estado)} icono={InventarioIcon} nombre={f.nombre} onClick={() => setDialogo("inventario")} />
         <BotonIconoFila
           texto={cambio.texto}
           motivo={motivoCambioEstado(estado)}
@@ -280,6 +283,8 @@ export function FilaPublicacionDropLista({ f, moneda, puedeEscribir }: { f: Fila
         />
         <BotonIconoFila texto="Tareas" motivo={MOTIVO_SOLO_DROPI.tareas} icono={TareasIcon} nombre={f.nombre} onClick={nada} />
       </div>
+      {dialogo === "inventario" && <DialogoSolicitudInventario nombre={f.nombre} alCerrar={() => setDialogo(null)} />}
+      {dialogo === "privado" && <DialogoAccesoPrivado nombre={f.nombre} alCerrar={() => setDialogo(null)} />}
     </div>
   );
 }
