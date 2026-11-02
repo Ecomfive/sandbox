@@ -23,6 +23,7 @@ export function VentanaBuscarImagen({
   alCerrar,
   ambitoPropio,
   alFiltrar,
+  ambitos,
 }: {
   abierta: boolean;
   alCerrar: () => void;
@@ -30,6 +31,8 @@ export function VentanaBuscarImagen({
   ambitoPropio?: Ambito;
   /** Recibe los ids encontrados en `ambitoPropio` (de más a menos parecido). */
   alFiltrar?: (ids: string[]) => void;
+  /** Dónde buscar; sin esto, en todas las partes que la persona puede abrir. */
+  ambitos?: Ambito[];
 }) {
   const [imagen, setImagen] = useState<string | null>(null);
   const [conIA, setConIA] = useState(true);
@@ -46,12 +49,12 @@ export function VentanaBuscarImagen({
     setBuscando(true);
     setError(null);
     setRespuesta(null);
-    const r = await buscarPorImagen(dataUrl, { conIA: ia }).catch(() => ({ error: "No se pudo buscar. Inténtalo de nuevo." }));
+    const r = await buscarPorImagen(dataUrl, { conIA: ia, ambitos }).catch(() => ({ error: "No se pudo buscar. Inténtalo de nuevo." }));
     if (mio !== turno.current) return;
     setBuscando(false);
     if ("error" in r) setError(r.error);
     else setRespuesta(r);
-  }, []);
+  }, [ambitos]);
 
   const recibir = useCallback(
     async (archivo: File | null | undefined) => {
