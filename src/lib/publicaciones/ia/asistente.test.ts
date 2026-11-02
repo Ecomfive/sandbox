@@ -112,6 +112,9 @@ test("Claude: el pedido lleva la búsqueda y las fotos; la respuesta junta los b
   assert.deepEqual((c.messages as { content: unknown[] }[])[0].content[1], { type: "image", source: { type: "url", url: "https://x/a.jpg" } });
   assert.equal((c.tools as { name: string }[])[0].name, "web_search");
   assert.equal("tools" in (cuerpoMensaje("m", { instrucciones: "i", texto: "t", imagenes: [] }, false) as Record<string, unknown>), false);
+  // El CRM pide esfuerzo bajo; lo demás, el del modelo (sin output_config).
+  assert.deepEqual((cuerpoMensaje("m", { instrucciones: "i", texto: "t", imagenes: [] }, false, "low") as Record<string, unknown>).output_config, { effort: "low" });
+  assert.equal("output_config" in c, false);
   const r = extraerMensaje({
     content: [
       { type: "server_tool_use", name: "web_search" },

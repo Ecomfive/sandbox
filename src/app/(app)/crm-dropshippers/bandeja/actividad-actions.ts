@@ -202,7 +202,7 @@ export async function actividadDelCliente(conversacionId: string): Promise<Activ
     situacion: situacionDelCliente((conv.data?.ultimo_de as string | null) ?? null, (conv.data?.ultimo_mensaje_en as string | null) ?? null, ultimo ? { dia: ultimo.dia, estado: ultimo.estado, resumen: ultimo.resumen } : null),
     porAnalizar: g.falta ? 0 : dias.length,
     falta: g.falta,
-    iaConectada: proveedorTexto() !== null,
+    iaConectada: proveedorTexto("crm") !== null,
   };
 }
 
@@ -219,7 +219,7 @@ async function analizarChat(supabase: Supabase, u: UsuarioActual, id: string, li
   const tramos = tramosDeDias(pendientes);
   let analizados = 0;
   let primerError: string | null = null;
-  const modelo = modeloDeTexto();
+  const modelo = modeloDeTexto("crm");
   // Los motivos nuevos que la IA propone en esta pasada (con tope) y los que ya existen, compartidos por los tramos que corren a la vez.
   let motivosNuevos = 0;
 
@@ -243,7 +243,7 @@ async function analizarChat(supabase: Supabase, u: UsuarioActual, id: string, li
       modulo: "crm-dropshippers",
       usuario: { id: u.id, nombre: u.nombre ?? null, email: u.email },
       referencia: id,
-    });
+    }, "crm");
     if ("error" in r) {
       primerError ??= r.error;
       return 0;
@@ -307,12 +307,12 @@ async function analizarPerfil(supabase: Supabase, u: UsuarioActual, id: string):
     modulo: "crm-dropshippers",
     usuario: { id: u.id, nombre: u.nombre ?? null, email: u.email },
     referencia: id,
-  });
+  }, "crm");
   if ("error" in r) return { error: r.error };
   const perfil = normalizarPerfil(r.texto);
   if (!perfil) return { error: "La IA no devolvió un análisis completo que se pueda guardar. Vuelve a intentarlo." };
   const { error } = await supabase.from("whatsapp_actividad_cliente").upsert(
-    { conversacion_id: id, datos: perfil, dias_analizados: g.filas.length, modelo: modeloDeTexto(), analizado_por: u.nombre || u.email, analizado_en: new Date().toISOString() },
+    { conversacion_id: id, datos: perfil, dias_analizados: g.filas.length, modelo: modeloDeTexto("crm"), analizado_por: u.nombre || u.email, analizado_en: new Date().toISOString() },
     { onConflict: "conversacion_id" },
   );
   if (error) return { error: error.code === "42P01" ? "Falta correr la migración 0187 (análisis completo del cliente)." : "No se pudo guardar el análisis completo." };
@@ -396,7 +396,7 @@ export async function motivosRecurrentes(dias: number): Promise<MotivosRecurrent
       .gte("dia", desde)
       .order("dia", { ascending: false })
       .range(d, d + 999);
-    if (error) return { desde, chats: 0, dias: 0, sinResolver: 0, motivos: [], productos: [], falta: true, iaConectada: proveedorTexto() !== null };
+    if (error) return { desde, chats: 0, dias: 0, sinResolver: 0, motivos: [], productos: [], falta: true, iaConectada: proveedorTexto("crm") !== null };
     filas.push(...((data ?? []) as typeof filas));
     if ((data ?? []).length < 1000 || filas.length >= 20_000) break;
   }
@@ -417,7 +417,7 @@ export async function motivosRecurrentes(dias: number): Promise<MotivosRecurrent
     motivos,
     productos: interesPorProducto(mias.map((f) => ({ cliente: f.conversacion_id, productos: f.productos ?? [] }))).slice(0, 25),
     falta: false,
-    iaConectada: proveedorTexto() !== null,
+    iaConectada: proveedorTexto("crm") !== null,
   };
 }
 

@@ -13,14 +13,18 @@ export function imagenParaClaude(url: string) {
   return { type: "image", source: m ? { type: "base64", media_type: m[1], data: m[2] } : { type: "url", url } };
 }
 
-/** El cuerpo del pedido. Con `buscar` Claude puede consultar internet. */
-export function cuerpoMensaje(modelo: string, e: EntradaTexto, buscar: boolean) {
+/**
+ * El cuerpo del pedido. Con `buscar` Claude puede consultar internet. `esfuerzo` (`output_config.effort`) cuánto piensa: «low» para
+ * clasificar y resumir chats (el CRM), más barato y suficiente; sin él, el de siempre del modelo.
+ */
+export function cuerpoMensaje(modelo: string, e: EntradaTexto, buscar: boolean, esfuerzo?: "low" | "medium" | "high") {
   return {
     model: modelo,
     max_tokens: 8000,
     system: e.instrucciones,
     messages: [{ role: "user", content: [{ type: "text", text: e.texto }, ...e.imagenes.map(imagenParaClaude)] }],
     ...(buscar ? { tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 5 }] } : {}),
+    ...(esfuerzo ? { output_config: { effort: esfuerzo } } : {}),
   };
 }
 

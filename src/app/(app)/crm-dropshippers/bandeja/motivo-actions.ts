@@ -54,7 +54,7 @@ const MAX_POR_TOQUE = 15;
 export async function clasificarChatsPendientes(): Promise<{ clasificados: number; quedan: number } | { error: string }> {
   const u = await usuarioBandeja(true);
   if (!u) return { error: "No tienes permiso para escribir en el CRM." };
-  if (proveedorTexto() === null) return { error: "Falta conectar la IA (OPENAI_API_KEY o ANTHROPIC_API_KEY)." };
+  if (proveedorTexto("crm") === null) return { error: "Falta conectar la IA (OPENAI_API_KEY o ANTHROPIC_API_KEY)." };
   const supabase = createServiceClient();
   const { data, error } = await supabase
     .from("whatsapp_conversaciones")

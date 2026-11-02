@@ -69,7 +69,7 @@ async function clasificarUno(supabase: Supabase, id: string, ejemplos: Correccio
     return false;
   }
   const pedido = pedidoMotivo(mensajes, ejemplos);
-  const r = await conTiempo(pedirIA({ instrucciones: pedido.instrucciones, texto: pedido.texto, imagenes: [] }, false, { ...consumo, referencia: id }), ESPERA_IA_MS);
+  const r = await conTiempo(pedirIA({ instrucciones: pedido.instrucciones, texto: pedido.texto, imagenes: [] }, false, { ...consumo, referencia: id }, "crm"), ESPERA_IA_MS);
   const motivo = r && !("error" in r) ? normalizarMotivo(r.texto) : null;
   if (!motivo) {
     if (r && "error" in r) console.error("WhatsApp: la IA no pudo leer el motivo de un chat", id, r.error);
@@ -93,7 +93,7 @@ async function clasificarUno(supabase: Supabase, id: string, ejemplos: Correccio
  * se vuelve a leer una vez. Devuelve cuántos quedaron con motivo.
  */
 export async function clasificarChats(supabase: Supabase, ids: string[], consumo: Omit<ContextoConsumo, "referencia">): Promise<number> {
-  if (!ids.length || proveedorTexto() === null) return 0;
+  if (!ids.length || proveedorTexto("crm") === null) return 0;
   const { data, error } = await supabase.from("whatsapp_conversaciones").select(COLUMNAS).in("id", ids);
   if (error) return 0;
   const ahora = Date.now();
@@ -131,7 +131,7 @@ export async function clasificarChats(supabase: Supabase, ids: string[], consumo
 
 /** Los chats de esos teléfonos que esperan respuesta, para leer su motivo al llegar un mensaje. */
 export async function clasificarPorTelefonos(supabase: Supabase, telefonos: string[]): Promise<number> {
-  if (!telefonos.length || proveedorTexto() === null) return 0;
+  if (!telefonos.length || proveedorTexto("crm") === null) return 0;
   const { data, error } = await supabase.from("whatsapp_conversaciones").select("id").in("telefono", telefonos).not("esperando_desde", "is", null).is("oculta_en", null).limit(20);
   if (error || !data?.length) return 0;
   return clasificarChats(
