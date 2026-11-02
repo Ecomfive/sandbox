@@ -5,6 +5,7 @@ import { formatearFechaHora } from "@/lib/formato";
 import { formatoMonto } from "@/lib/publicaciones/moneda";
 import { getPaisActual } from "@/lib/pais";
 import { createServiceClient } from "@/lib/supabase/server";
+import { obtenerOpcionesSkuMaestro } from "@/lib/wms/skus-maestros";
 import { avisoPaisDrop } from "./aviso-pais-drop";
 import { cargarDatosDrop } from "./datos-drop";
 import { ListaPublicacionesDrop } from "./lista-publicaciones-drop";
@@ -28,6 +29,8 @@ export default async function PublicacionesDropPage() {
   const pais = await getPaisActual(supabase);
   const datos = await cargarDatosDrop(supabase, pais, usuario);
   const puedeEscribir = !usuario.modulosSoloLectura.includes("publicaciones-drop");
+  // Los productos nuestros, para vincular al crear un producto en Drop (solo quien puede crear).
+  const opcionesSku = puedeEscribir ? await obtenerOpcionesSkuMaestro(supabase) : [];
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
       <EncabezadoPagina titulo="Gestión de IDs Drop" oculto />
@@ -49,6 +52,7 @@ export default async function PublicacionesDropPage() {
         publicaciones={datos.publicaciones}
         moneda={datos.moneda}
         puedeEscribir={puedeEscribir}
+        opcionesSku={opcionesSku}
         vacio="Todavía no hay publicaciones de Drop: falta la primera lectura."
       />
     </Pagina>
