@@ -1,3 +1,5 @@
+import type { PlataformaId } from "@/lib/plataformas";
+
 /** Un producto del catálogo de Dropi del país (nuestro o de la competencia). */
 export interface ProductoC {
   id: string;
@@ -81,6 +83,8 @@ export interface VentaC {
 }
 
 export interface DatosCompetencia {
+  /** De qué plataforma son los datos (Dropi o Drop; Drop es solo de Costa Rica). */
+  plataforma: PlataformaId;
   pais: string;
   productos: ProductoC[];
   competidores: CompetidorC[];
