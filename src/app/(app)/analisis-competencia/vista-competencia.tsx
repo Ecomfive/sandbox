@@ -643,7 +643,8 @@ export function VistaCompetidores({ datos, puedeEscribir }: { datos: DatosCompet
   const { moneda } = useMonedaCompetencia();
   const parametros = useSearchParams();
   const [abierto, setAbierto] = useState<number | null>(null);
-  const [texto, setTexto] = useState("");
+  // El buscador de arriba (Ctrl K) llega con el competidor escrito («?buscar=Oferfly»).
+  const [texto, setTexto] = useState(() => parametros.get("buscar") ?? "");
   // La tarjeta encendida del tablero; desde la pestaña Resumen llega en la dirección («?tarjeta=baratos»).
   const [tarjeta, setTarjeta] = useState<IdTarjeta | null>(() => {
     const t = parametros.get("tarjeta");

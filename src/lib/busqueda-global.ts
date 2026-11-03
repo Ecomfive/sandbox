@@ -6,9 +6,11 @@ import { getUsuarioActual } from "@/lib/auth";
 import { etiquetaCorrelativo, leerBusquedaRetiro } from "@/lib/paleta";
 import { formatearMoneda } from "@/lib/formato";
 import { etiquetaEstado as etiquetaEstadoTest } from "@/app/(app)/productos-test/def-productos-test";
+import { VIGILADOS } from "@/lib/competencia/analisis";
+import { nombrePais } from "@/app/(app)/scraping-proveedores/def-scraping";
 
 export interface ResultadoBusqueda {
-  tipo: "retiro" | "pedido" | "producto" | "producto-test" | "dropshipper" | "puesto";
+  tipo: "retiro" | "pedido" | "producto" | "producto-test" | "dropshipper" | "puesto" | "proveedor" | "competidor";
   etiquetaTipo: string;
   titulo: string;
   detalle: string;
@@ -168,6 +170,51 @@ export async function buscarGlobal(consulta: string): Promise<ResultadoBusqueda[
             resultados.push({ tipo: "puesto", etiquetaTipo: "Puesto", titulo: p.nombre, detalle: p.area, href: `/puestos?abrir=${encodeURIComponent(p.id)}` });
           }
         })
+    );
+  }
+
+  // Proveedores (3 nov 2026, pedido de Hernán: «Oferfly» no salía en el buscador): los referentes de Scraping de proveedores, de
+  // cualquier país, y los competidores del Análisis de competencia del país de la barra, también por el nombre con que vigilamos a uno
+  // (`VIGILADOS`: Oferfly sale en Dropi como «IMPORTADORA»).
+  if (buscaTexto && textoFiltro.length >= 2 && usuario.modulos.includes("scraping-proveedores")) {
+    tareas.push(
+      supabase
+        .from("scraping_proveedores")
+        .select("nombre, pais")
+        .eq("activo", true)
+        .ilike("nombre", `%${textoFiltro}%`)
+        .limit(LIMITE_POR_TIPO)
+        .then(({ data }) => {
+          for (const p of data ?? []) {
+            resultados.push({ tipo: "proveedor", etiquetaTipo: "Proveedor referente", titulo: p.nombre, detalle: `Scraping de proveedores · ${nombrePais(p.pais)}`, href: "/scraping-proveedores/proveedores" });
+          }
+        })
+    );
+  }
+
+  if (buscaTexto && textoFiltro.length >= 2 && usuario.modulos.includes("analisis-competencia")) {
+    const minusculas = textoFiltro.toLowerCase();
+    const vigilados = Object.entries(VIGILADOS[pais.codigo.toLowerCase()] ?? {}).filter(([, nombre]) => nombre.toLowerCase().includes(minusculas));
+    tareas.push(
+      Promise.all([
+        supabase.from("competencia_productos").select("proveedor_dropi_id, proveedor_nombre").eq("pais_id", pais.id).eq("es_nuestro", false).ilike("proveedor_nombre", `%${textoFiltro}%`).limit(200),
+        vigilados.length
+          ? supabase.from("competencia_productos").select("proveedor_dropi_id, proveedor_nombre").eq("pais_id", pais.id).in("proveedor_dropi_id", vigilados.map(([id]) => Number(id))).limit(50)
+          : Promise.resolve({ data: [] as { proveedor_dropi_id: number; proveedor_nombre: string }[] }),
+      ]).then(([porNombre, porVigilado]) => {
+        const vistos = new Map<number, string>();
+        for (const c of [...(porVigilado.data ?? []), ...(porNombre.data ?? [])]) if (!vistos.has(Number(c.proveedor_dropi_id))) vistos.set(Number(c.proveedor_dropi_id), c.proveedor_nombre);
+        for (const [id, nombre] of [...vistos].slice(0, LIMITE_POR_TIPO)) {
+          const vigilado = VIGILADOS[pais.codigo.toLowerCase()]?.[id];
+          resultados.push({
+            tipo: "competidor",
+            etiquetaTipo: "Competidor",
+            titulo: vigilado ? `${vigilado} (${nombre})` : nombre,
+            detalle: `Análisis de competencia · ${pais.nombre}${vigilado ? " · vigilado" : ""}`,
+            href: `/analisis-competencia?buscar=${encodeURIComponent(vigilado ?? nombre)}`,
+          });
+        }
+      })
     );
   }
 

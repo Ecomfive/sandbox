@@ -15,9 +15,10 @@ export const NUESTRO_PROVEEDOR = /^ecomfive$/i;
 
 /**
  * Nuestro proveedor en el Dropi de cada país, por su id de usuario, cuando no se llama ECOMFIVE (29 oct 2026): en Costa Rica la cuenta
- * de proveedor sale como «Alcides» (id 27; sus 66 productos públicos son las publicaciones de Gestión de IDs de Costa Rica).
+ * de proveedor sale como «Alcides» (id 27; sus 66 productos públicos son las publicaciones de Gestión de IDs de Costa Rica). En México tenemos dos
+ * tiendas «ECOMFIVE»: la 20538 (se llama así) y la 31442, a nombre de «MARIA» (3 nov 2026, confirmado por Hernán).
  */
-export const NUESTRO_PROVEEDOR_ID: Record<string, number[]> = { cr: [27] };
+export const NUESTRO_PROVEEDOR_ID: Record<string, number[]> = { cr: [27], mx: [31442] };
 
 /**
  * Competidores vigilados, por país e id de proveedor de Dropi, con el nombre con que los conocemos (3 nov 2026, pedido de Hernán: «Oferfly»
