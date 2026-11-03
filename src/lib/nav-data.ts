@@ -56,6 +56,7 @@ const AREAS: NavSection[] = [
     items: [
       { label: "Hoy", href: "/", frente: "proveeduria" },
       { label: "Ventas Dropi", href: "/ventas-dropi", dropi: true, frente: "proveeduria" },
+      { label: "Dashboard de tienda", href: "/tienda-dashboard", frente: "tienda" },
     ],
   },
   // El recorrido de un producto antes de comprarse, en orden: de dónde sale (Fuentes), qué se elige (Selección), cómo se
@@ -107,6 +108,10 @@ const AREAS: NavSection[] = [
     frentes: true,
     items: [
       { label: "Pedidos Dropi", href: "/pedidos-dropi", dropi: true, frente: "proveeduria" },
+      // Gestión de tienda (3 nov 2026): las tiendas de Shopify (Kenku primero), conectadas solo de lectura.
+      { label: "Pedidos de tienda", href: "/tienda-pedidos", frente: "tienda" },
+      { label: "Productos de Shopify", href: "/tienda-productos", frente: "tienda" },
+      { label: "Tiendas Shopify", href: "/tienda-tiendas", frente: "tienda" },
       { label: "Alertas de inventario", href: "/alertas", dropi: true, frente: "fulfillment" },
       { label: "Inventario", href: "/inventario", dropi: true, frente: "fulfillment" },
       { label: "Bodegas", href: "/wms-bodegas", frente: "fulfillment" },

@@ -668,6 +668,78 @@ export const GUIAS: GuiaModulo[] = [
     ],
   },
   {
+    modulo: "tienda-dashboard",
+    titulo: "Dashboard de tienda",
+    ruta: "/tienda-dashboard",
+    resumen: "Cómo van las tiendas de Shopify del país (Kenku, Nuvo, Wao Ofertas, Ofertfy…): pedidos, confirmación, entrega, dinero contra entrega y lo vendido por producto.",
+    secciones: [
+      {
+        titulo: "Uso",
+        pasos: [
+          "Está en Desempeño, en el frente Gestión de tienda. Arriba eliges una tienda (o todas las del país) y el periodo: 7, 30 o 90 días.",
+          "Operación: pedidos, % de confirmación, % de entrega (de lo que salió), cancelación, devolución y unidades por pedido, cada una frente al periodo anterior.",
+          "Dinero, contra entrega: facturado (todo menos lo cancelado), recaudado (lo entregado), por recaudar (lo que va en camino), devuelto y ticket promedio.",
+          "Avisos: variantes de Shopify sin producto nuestro, pedidos de más de 24 horas sin confirmar y cuántas tiendas están conectadas. Tocar una lleva a su lista.",
+          "Abajo, los pedidos por día y los productos vendidos, ya traducidos a nuestro producto (lo que no está vinculado sale como «Sin vincular»).",
+          "Por ahora ninguna tienda está conectada: las pantallas están listas y vacías. Se conectan de una en una, empezando por Kenku (Panamá), y siempre solo de lectura: el sistema nunca crea, edita ni cancela nada en Shopify ni toca el despacho.",
+        ],
+      },
+    ],
+  },
+  {
+    modulo: "tienda-pedidos",
+    titulo: "Pedidos de tienda",
+    ruta: "/tienda-pedidos",
+    resumen: "Los pedidos de Shopify de las tiendas del país, al instante, con su estado, su cliente y sus productos.",
+    secciones: [
+      {
+        titulo: "Uso",
+        pasos: [
+          "Está en Operación, en el frente Gestión de tienda. Arriba eliges una tienda (o todas) y el periodo.",
+          "El tablero de tarjetas cuenta los pedidos por estado: por confirmar, confirmados, en camino, entregados, cancelados y devoluciones, más los SKU sin vincular. Tocar una tarjeta filtra la lista; tocarla otra vez quita el filtro.",
+          "La lista se busca por número de pedido, cliente, zona o guía. Al tocar el número se abre el detalle: los productos con su SKU de Shopify y el producto nuestro al que corresponde, los totales, el cliente y la dirección, la entrega, el historial y las notas del equipo.",
+          "Las notas son internas: no se mandan a Shopify. «Abrir en Shopify» abre el pedido allá, sin cambiar nada.",
+          "Por ahora ninguna tienda está conectada: las pantallas están listas y vacías. Se conectan de una en una, empezando por Kenku (Panamá), y siempre solo de lectura: el sistema nunca crea, edita ni cancela nada en Shopify ni toca el despacho.",
+        ],
+      },
+    ],
+  },
+  {
+    modulo: "tienda-productos",
+    titulo: "Productos de Shopify",
+    ruta: "/tienda-productos",
+    resumen: "Cada variante de Shopify unida a uno de nuestros productos, aunque su SKU sea distinto.",
+    secciones: [
+      {
+        titulo: "Uso",
+        pasos: [
+          "El SKU de Shopify puede ser distinto al nuestro. En vez de cambiarlo en Shopify, cada variante se une aquí con su producto de Producto, y con eso cada pedido sabe qué sale de bodega y lo vendido se cuenta por producto.",
+          "El sistema sugiere el producto con las mismas reglas de Gestión de IDs Dropi: SKU o nombre igual, nombre parecido o la misma foto. Un pack o combo va a su producto compuesto.",
+          "Tarjetas: Vinculadas, Por confirmar (con sugerencia), Sin vincular (sin sugerencia: se busca a mano) y No sale de bodega. Tocar una filtra la lista.",
+          "En cada fila: «Confirmar» acepta la sugerencia, «Elegir otro» o «Buscar producto» abre el buscador de productos, «Quitar» deshace el vínculo y «No sale de bodega» marca lo que no es un producto físico (garantía extendida, envío prioritario), que no cuenta como vendido. Si hay sugerencias con SKU o nombre igual, un botón las confirma todas de una vez.",
+          "Por ahora ninguna tienda está conectada: las pantallas están listas y vacías. Se conectan de una en una, empezando por Kenku (Panamá), y siempre solo de lectura: el sistema nunca crea, edita ni cancela nada en Shopify ni toca el despacho.",
+        ],
+      },
+    ],
+  },
+  {
+    modulo: "tienda-tiendas",
+    titulo: "Tiendas Shopify",
+    ruta: "/tienda-tiendas",
+    resumen: "Las tiendas de Shopify del país y si sus pedidos están llegando bien.",
+    secciones: [
+      {
+        titulo: "Uso",
+        pasos: [
+          "Cada tienda con su país, su moneda y su estado: Por conectar, Conectada o Pausada. Kenku (Panamá, en dólares) es la primera.",
+          "Con la tienda conectada se ve cuándo llegó el último aviso de Shopify (cada pedido nuevo o cambio llega al instante), cuándo fue la última revisión (cada 10 minutos, por si se perdió alguno) y la conciliación: si el número de pedidos del sistema coincide con el de Shopify.",
+          "El permiso es siempre Solo lectura. Abajo están los pasos para conectar una tienda, lo que el sistema lee y lo que nunca hace.",
+          "Las tiendas también pueden estar en otros países: con otro país elegido arriba se ven las de ese país. Por ahora se trabaja con las de Panamá.",
+        ],
+      },
+    ],
+  },
+  {
     modulo: "publicaciones-drop",
     titulo: "Gestión de IDs Drop",
     ruta: "/publicaciones-drop",
@@ -807,6 +879,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-11-03", titulo: "Nuevo: Gestión de tienda", texto: "El frente Gestión de tienda ya tiene sus pantallas para las tiendas de Shopify: Dashboard de tienda (en Desempeño), y Pedidos de tienda, Productos de Shopify y Tiendas Shopify (en Operación). En Productos de Shopify cada variante se une a uno de nuestros productos aunque su SKU sea distinto. Todavía están vacías: las tiendas se conectan de una en una, empezando por Kenku (Panamá), y siempre solo de lectura, sin tocar nada en Shopify ni en el despacho.", modulo: "tienda-pedidos", href: "/tienda-pedidos" },
   { fecha: "2026-11-03", titulo: "Competencia: Oferfly, vigilado en México", texto: "En Análisis de competencia de México, Oferfly (en Dropi sale como «IMPORTADORA») lleva la insignia «Vigilado · Oferfly» y lo encuentras buscando su nombre. Cada análisis avisa en Novedades cada producto nuevo que publique, con su precio, su stock y a qué producto nuestro se parece. En el Resumen se cuentan como «Productos nuevos de vigilados».", modulo: "analisis-competencia", href: "/analisis-competencia" },
   { fecha: "2026-11-03", titulo: "Levantamiento: buscar el producto con una foto", texto: "En el Levantamiento de inventario, junto a «Buscar» hay una cámara: pega una foto (Ctrl+V), arrástrala o súbela y el sistema encuentra el producto, aunque la foto sea distinta (con «Confirmar con IA»). «Filtrar esta lista» deja solo los productos encontrados, del más parecido al menos, incluso los inactivos y descontinuados, y el botón «Por imagen» los vuelve a mostrar todos. Hace falta poder abrir Producto.", modulo: "inventario", href: "/inventario/levantamiento" },
   { fecha: "2026-11-03", titulo: "Gestión de IDs Dropi: varios correos en un mismo ID privado", texto: "Al privatizar en Dropi ahora se pueden poner varios correos en el mismo producto privado: en la ventana de privatizar, pulsa «Agregar otro correo al mismo ID» (hasta 4 más) y escribe el correo, el nombre (opcional) y las unidades de cada uno. Se crea un solo producto privado con el stock de todos, cada correo queda con sus unidades en «Productos privados» y al público se le sacan las unidades de todos. Después de este cambio hay que volver a arrastrar el favorito «Aplicar en Dropi» a la barra de favoritos (cambió su versión).", modulo: "publicaciones-dropi", href: "/publicaciones-dropi" },

@@ -25,6 +25,7 @@ export const AREAS_ACCESO: AreaAcceso[] = [
     modulos: [
       { clave: "dashboard", etiqueta: "Hoy" },
       { clave: "ventas-dropi", etiqueta: "Ventas Dropi" },
+      { clave: "tienda-dashboard", etiqueta: "Dashboard de tienda" },
       { clave: "notificaciones", etiqueta: "Centro de notificaciones" },
     ],
   },
@@ -80,6 +81,9 @@ export const AREAS_ACCESO: AreaAcceso[] = [
       { clave: "wms-productos-dropi", etiqueta: "Ficha producto Dropi" },
       { clave: "publicaciones-dropi", etiqueta: "Gestión de IDs Dropi" },
       { clave: "publicaciones-drop", etiqueta: "Gestión de IDs Drop" },
+      { clave: "tienda-pedidos", etiqueta: "Pedidos de tienda" },
+      { clave: "tienda-productos", etiqueta: "Productos de Shopify" },
+      { clave: "tienda-tiendas", etiqueta: "Tiendas Shopify" },
     ],
   },
   {
