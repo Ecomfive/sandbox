@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { descubrir, enlaceProveedor, fotoDe, type LecturaCatalogo } from "./descubrir";
+import { descubrir, enlaceProveedor, fotoDe, urlLogoDropi, type LecturaCatalogo } from "./descubrir";
 
 const primera: LecturaCatalogo = {
   pais: "mx",
@@ -61,4 +61,15 @@ test("sin fechas (Dropi México): recién publicados = el 10 % más nuevo por ID
 
 test("el enlace del proveedor es el que acepta «Agregar proveedor»", () => {
   assert.equal(enlaceProveedor("mx", 3243, "Hyper Moda Importaciones"), "https://app.dropi.mx/dashboard/provider/3243/HYPER%20MODA%20IMPORTACIONES");
+});
+
+test("la dirección del logo de un proveedor: cada parte codificada, solo CDN de CloudFront", () => {
+  const cdn = () => "https://d39ru7awumhhs2.cloudfront.net";
+  assert.equal(urlLogoDropi("mexico/user/3243/logo/1747875089IMPORTADORES (6).png", cdn), "https://d39ru7awumhhs2.cloudfront.net/mexico/user/3243/logo/1747875089IMPORTADORES%20(6).png");
+  assert.equal(urlLogoDropi("mexico/user/134630/logo/ChatGPT Image 17 may 2026, 11_10_28 p.m..png", cdn), "https://d39ru7awumhhs2.cloudfront.net/mexico/user/134630/logo/ChatGPT%20Image%2017%20may%202026%2C%2011_10_28%20p.m..png");
+  assert.equal(urlLogoDropi("", cdn), null);
+  assert.equal(urlLogoDropi(null, cdn), null);
+  assert.equal(urlLogoDropi("mexico/../secreto.png", cdn), null);
+  assert.equal(urlLogoDropi("https://otro.ejemplo.com/logo.png", cdn), null);
+  assert.equal(urlLogoDropi("https://d3sk39qh2f4j46.cloudfront.net/costarica/user/1/logo/a.png", cdn), "https://d3sk39qh2f4j46.cloudfront.net/costarica/user/1/logo/a.png");
 });

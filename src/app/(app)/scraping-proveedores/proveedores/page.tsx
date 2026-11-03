@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireModulo } from "@/lib/auth";
 import { puedeActualizarDropi } from "@/lib/dropi-actualizar/partes";
 import { createServiceClient } from "@/lib/supabase/server";
+import { vigiladoDe } from "@/lib/competencia/analisis";
 import { cargarScraping } from "../datos-scraping";
 import { DescubrirProveedores, type LecturaDescubrir, type ProveedorDescubiertoVista } from "./descubrir";
 import { VistaProveedores, type ResumenProveedor } from "./vista-proveedores";
@@ -60,6 +61,9 @@ export default async function Page() {
       </Pagina>
     );
   }
+  // El logo y la categoría de cada uno (migración 0225; sin ella, sin logos: la página dibuja las iniciales).
+  const { data: extra } = await supabase.from("scraping_proveedores").select("id, logo_url, categoria").eq("activo", true);
+  const extraPorId = new Map((extra ?? []).map((x) => [x.id as string, x as { logo_url: string | null; categoria: string | null }]));
   const resumen: ResumenProveedor[] = datos.proveedores.map((p) => {
     const suyos = datos.filas.filter((f) => f.proveedorId === p.id);
     const regs = datos.registros.filter((r) => r.proveedorId === p.id);
@@ -71,6 +75,9 @@ export default async function Page() {
       paraTestear: suyos.filter((f) => f.recomendacion === "testear").length,
       registros: regs.slice(-30).reverse(),
       busqueda: datos.busquedas.find((b) => b.proveedorId === p.id) ?? null,
+      logo: extraPorId.get(p.id)?.logo_url ?? null,
+      verificado: extraPorId.get(p.id)?.categoria === "VERIFICADO",
+      vigilado: p.dropiId ? vigiladoDe(p.pais, p.dropiId) : null,
     };
   });
   // Los más top primero: por las órdenes que muestra Dropi (las últimas cifras anotadas; 3 nov 2026, pedido de Hernán).
