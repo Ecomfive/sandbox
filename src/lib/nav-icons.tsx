@@ -1200,6 +1200,10 @@ export const ICONOS_PAGINA: Record<string, (props: SVGProps<SVGSVGElement>) => R
   "/wms-productos": TiendaIcon,
   "/wms-productos-dropi": CatalogoIcon,
   "/notificaciones": NotificacionesIcon,
+  "/tienda-dashboard": GestionTiendasIcon,
+  "/tienda-pedidos": PedidoIcon,
+  "/tienda-productos": EnlaceIcon,
+  "/tienda-tiendas": TiendaIcon,
 };
 
 export function OjoIcon(props: SVGProps<SVGSVGElement>) {
