@@ -524,6 +524,12 @@ convenciones técnicas del código.
   Lluvia Cero, Aviro, ADMA, VibroSculpt y Novetec) y Oferfly (vigilado); la tabla de referentes va de más a menos órdenes (las últimas cifras
   anotadas). **Buscador de arriba (Ctrl K)**: «Proveedores» trae los referentes de Scraping (cualquier país) y los competidores del Análisis
   de competencia del país de la barra, también por su nombre de vigilado (`/analisis-competencia?buscar=…` abre la lista filtrada).
+  **Lista a lo largo y ficha completa** (3 nov 2026, pedido de Hernán: las tarjetas «cubren mucho espacio»; la ficha debe tener «toda la
+  información de ese proveedor»): `vista-proveedores.tsx` es una fila por proveedor (puesto, logo de la migración 0225 o iniciales,
+  Verificado/Vigilado, categoría fuerte, órdenes, dropshippers, productos, ventas 30 d, para testear, nuevos, última búsqueda) y la ficha
+  (`FichaProveedor`, `Ventana` ancho xl) trae sus cifras en Dropi con la diferencia, lo que vemos de sus productos, rango de precios,
+  categorías fuertes, «Lo que tiene y nosotros no», lo que más vende, lo nuevo, lo que ya tenemos de él y las cifras por fecha:
+  `perfilProveedor` (`src/lib/scraping/perfil-proveedor.ts`, con prueba) sobre sus filas de `cargarScraping`.
   Sigue proveedores de Dropi: `scraping_proveedores`, `scraping_proveedor_registros` (órdenes/productos/dropshippers, `origen`
   manual o dropi), `scraping_busquedas` (con `duracion_ms`), `scraping_productos` (último precio y stock, `estado` activo o
   desaparecido con `motivo_desaparicion`, privado con `vinculado_a`/`vinculo_parecido`/`vinculo_seguro`) y

@@ -5,6 +5,7 @@ import { requireModulo } from "@/lib/auth";
 import { puedeActualizarDropi } from "@/lib/dropi-actualizar/partes";
 import { createServiceClient } from "@/lib/supabase/server";
 import { vigiladoDe } from "@/lib/competencia/analisis";
+import { perfilProveedor } from "@/lib/scraping/perfil-proveedor";
 import { cargarScraping } from "../datos-scraping";
 import { DescubrirProveedores, type LecturaDescubrir, type ProveedorDescubiertoVista } from "./descubrir";
 import { VistaProveedores, type ResumenProveedor } from "./vista-proveedores";
@@ -78,6 +79,8 @@ export default async function Page() {
       logo: extraPorId.get(p.id)?.logo_url ?? null,
       verificado: extraPorId.get(p.id)?.categoria === "VERIFICADO",
       vigilado: p.dropiId ? vigiladoDe(p.pais, p.dropiId) : null,
+      // La ficha completa: categorías fuertes, lo que tiene y nosotros no, lo que más vende, lo nuevo (3 nov 2026).
+      perfil: perfilProveedor(suyos),
     };
   });
   // Los más top primero: por las órdenes que muestra Dropi (las últimas cifras anotadas; 3 nov 2026, pedido de Hernán).
