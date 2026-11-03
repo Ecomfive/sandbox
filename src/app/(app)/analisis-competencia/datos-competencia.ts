@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { unidadesBajadas, type CambioStock } from "@/lib/competencia/analisis";
+import { unidadesBajadas, vigiladoDe, type CambioStock } from "@/lib/competencia/analisis";
 import { traerTodasConError } from "@/lib/supabase/paginar";
 import type { AlertaC, BitacoraC, CompetidorC, DatosCompetencia, ProductoC, VentaC } from "./def-competencia";
 
@@ -117,7 +117,7 @@ export async function cargarDatosCompetencia(supabase: SupabaseClient, pais: { i
   const hace7 = new Date(Date.now() - 7 * 86_400_000).toISOString();
   for (const p of productos) {
     if (p.esNuestro || p.estado !== "activo") continue;
-    const c = porProveedor.get(p.proveedorId) ?? { id: p.proveedorId, nombre: p.proveedor, url: p.urlProveedor, productos: 0, iguales: 0, nuevos7: 0, bajo1: 0, bajo7: 0, bajo30: 0, primeraVez: p.primeraVez };
+    const c = porProveedor.get(p.proveedorId) ?? { id: p.proveedorId, nombre: p.proveedor, url: p.urlProveedor, productos: 0, iguales: 0, nuevos7: 0, bajo1: 0, bajo7: 0, bajo30: 0, primeraVez: p.primeraVez, vigilado: vigiladoDe(pais.codigo, p.proveedorId) };
     c.productos++;
     if (p.igualA) c.iguales++;
     if (corte && p.primeraVez > corte && p.primeraVez > hace7) c.nuevos7++;

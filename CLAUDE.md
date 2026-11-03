@@ -1525,7 +1525,13 @@ convenciones técnicas del código.
   días (`unidadesBajadas`), porque Dropi no muestra ventas ajenas. Panamá, 14 oct 2026: 1.452 productos de 93 proveedores
   leídos en 10 s; ECOMFIVE tiene 178. **Costa Rica** (29 oct 2026): `app.dropi.cr` (no .co.cr), sesión de dropshipper en el navegador
   integrado; 649 productos de 36 proveedores. Allí nuestro proveedor se llama «Alcides» (id 27): `NUESTRO_PROVEEDOR_ID` +
-  `esNuestroProveedor` (`normalizarCompetencia(o, pais)`). Los precios van en la moneda del país (`MonedaCompetencia`, colones). **Pestañas** (`PESTANAS_POR_MODULO`, simplificado a pedido el 14 oct 2026): **Competidores**
+  `esNuestroProveedor` (`normalizarCompetencia(o, pais)`). **Competidores vigilados** (3 nov 2026, pedido de Hernán: Oferfly en México,
+  «nos está sacando bastante información en productos»): `VIGILADOS` / `vigiladoDe` (`analisis.ts`), por país e id de proveedor —Dropi
+  muestra el nombre de la persona, no el de la tienda: Oferfly sale como «IMPORTADORA» (id 146020; su tienda es «IMPORTADORA OFERFLY»)—.
+  Cada búsqueda guarda una alerta `nuevo` por cada producto nuevo suyo («Oferfly publicó «X»», precio, stock y a qué se parece de lo
+  nuestro: `yaVisto`, `parecidos` o `palabraDistintiva` de `cruces.ts` —comparten una palabra de 6 letras o más no genérica, una pista—
+  contra `cargarReferencias`, todo lo nuestro de todos los países); el competidor lleva la insignia «Vigilado · Oferfly» y el buscador lo
+  encuentra por ese nombre; el Resumen cuenta «Productos nuevos de vigilados». Para vigilar otro, se suma a `VIGILADOS`. Los precios van en la moneda del país (`MonedaCompetencia`, colones). **Pestañas** (`PESTANAS_POR_MODULO`, simplificado a pedido el 14 oct 2026): **Competidores**
   (`/analisis-competencia`, `VistaCompetidores`: novedades = alertas arriba, buscador, filtros de un toque y la lista de
   competidores en acordeón; cada uno muestra sus productos, los iguales a los nuestros primero, y cada producto despliega
   `HistorialCompetencia`) y **Resumen** (`/analisis-competencia/resumen`, `dashboard-competencia.tsx`). Las dos usan

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { armarAlertas, decisionesDeHoy, medidaEnNombre, normalizarCompetencia, posicionPrecio, precioEn, precioEquivalente, precioPorUnidad, unidadesBajadas, unirCoincidencias, unidadesEnNombre, type ProductoAlerta } from "./analisis";
+import { armarAlertas, decisionesDeHoy, vigiladoDe, medidaEnNombre, normalizarCompetencia, posicionPrecio, precioEn, precioEquivalente, precioPorUnidad, unidadesBajadas, unirCoincidencias, unidadesEnNombre, type ProductoAlerta } from "./analisis";
 
 test("normaliza un producto con su proveedor y reconoce los nuestros", () => {
   const p = normalizarCompetencia({ id: 7, name: "King Maker 120", sale_price: 6.99, user: { id: 2094, name: "ECOMFIVE" }, warehouse_product: [{ stock: 5 }] });
@@ -158,4 +158,26 @@ test("en Costa Rica nuestro proveedor se reconoce por su id de Dropi, aunque no 
   assert.equal(normalizarCompetencia(alcides, "PA")?.esNuestro, false);
   assert.equal(normalizarCompetencia(alcides)?.esNuestro, false);
   assert.equal(normalizarCompetencia({ ...alcides, user: { id: 42, name: "Jessica" } }, "CR")?.esNuestro, false);
+});
+
+test("competidores vigilados: cada producto nuevo suyo es una alerta con lo nuestro a lo que se parece", () => {
+  assert.equal(vigiladoDe("MX", 146020), "Oferfly");
+  assert.equal(vigiladoDe("pa", 146020), null, "se vigila por país");
+  const a = armarAlertas({
+    productos: new Map(),
+    cambios: [],
+    desaparecidos: [],
+    proveedoresNuevos: [],
+    moneda: "MXN",
+    nuevosVigilados: [
+      { productoId: "x1", vigilado: "Oferfly", nombre: "Spray Veneno Abeja Verrugas 20ml", precio: 60, stock: 813, parecidoA: { nombre: "Spray Bee Venom para Eliminar Verrugas", donde: "Lo vendemos en Dropi", como: "palabra", palabras: ["verrugas"] } },
+      { productoId: "x2", vigilado: "Oferfly", nombre: "Super Relax Polvo", precio: 180, stock: 1000, parecidoA: null },
+    ],
+  });
+  assert.deepEqual(a.map((x) => [x.tipo, x.productoId, x.titulo]), [
+    ["nuevo", "x1", "Oferfly publicó «Spray Veneno Abeja Verrugas 20ml»"],
+    ["nuevo", "x2", "Oferfly publicó «Super Relax Polvo»"],
+  ]);
+  assert.match(a[0].detalle!, /813 en stock · puede ser nuestro «Spray Bee Venom para Eliminar Verrugas» \(Lo vendemos en Dropi; comparten «verrugas»\)$/);
+  assert.match(a[1].detalle!, /no se parece a nada nuestro$/);
 });

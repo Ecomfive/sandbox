@@ -281,6 +281,7 @@ export function DashboardCompetencia({ datos }: { datos: DatosCompetencia }) {
               ["bajo_stock", "Bajaron stock", "neon"],
               ["desaparecio", "Desaparecieron", "neon"],
               ["competidor_nuevo", "Competidores nuevos", "neon"],
+              ["nuevo", "Productos nuevos de vigilados", "rojo"],
             ].map(([tipo, nombre, tono]) => (
               <BarraH
                 key={tipo}

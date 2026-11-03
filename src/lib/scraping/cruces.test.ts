@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { indexar, motivoYaVisto, parecidos, repetidos, todasLasCoincidencias, yaVisto } from "./cruces";
+import { indexar, motivoYaVisto, palabraDistintiva, parecidos, repetidos, todasLasCoincidencias, yaVisto } from "./cruces";
 
 const indice = indexar([
   { tipo: "test", id: "t1", nombre: "Crema ChillFlex Alivia Músculos", huella: null, detalle: "Test #3 · 12 mar 2026 · winner" },
@@ -67,4 +67,18 @@ test("parecidos: lo que se parece sin ser igual (lo igual no sale aquí)", () =>
   assert.equal(p[0].nombre, "Magnesio Complex 12 en 1 Totaria 120 capsulas");
   assert.deepEqual(parecidos("Magnesio Complex 12 en 1 Totaria 120 capsulas", null, idx), []); // es igual: lo da yaVisto
   assert.deepEqual(parecidos("Lámpara de luna 3D", null, idx), []);
+});
+
+test("palabra distintiva: una pista para un competidor vigilado aunque el resto del nombre no se parezca", () => {
+  const nuestro = indexar([
+    { tipo: "producto", id: "p1", nombre: "Spray Bee Venom para Eliminar Verrugas", huella: null, detalle: "" },
+    { tipo: "publicacion", id: "d1", nombre: "SPRAY BEE VENOM PARA ELIMINAR VERRUGAS", huella: null, detalle: "" },
+    { tipo: "producto", id: "p2", nombre: "Crema Hidratante Tallow Honey Balm", huella: null, detalle: "" },
+  ]);
+  const v = palabraDistintiva("Spray Veneno Abeja Verrugas 20ml", nuestro);
+  assert.equal(v?.id, "d1", "lo publicado se nombra antes que la ficha de Producto");
+  assert.deepEqual(v?.palabras, ["verrugas"]);
+  assert.equal(palabraDistintiva("Facial Tallow Crema Sebo Miel", nuestro)?.id, "p2");
+  // «crema» es genérica y «spray» es corta: no bastan.
+  assert.equal(palabraDistintiva("Crema Spray Facial", nuestro), null);
 });

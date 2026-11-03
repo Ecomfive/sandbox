@@ -5,10 +5,11 @@
 // alertas: todo es nuevo.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { armarAlertas, normalizarCompetencia, type ProductoAlerta, type VistoCompetencia } from "../src/lib/competencia/analisis";
+import { armarAlertas, normalizarCompetencia, vigiladoDe, type NuevoVigilado, type ProductoAlerta, type VistoCompetencia } from "../src/lib/competencia/analisis";
+import { cargarReferencias } from "../src/lib/scraping/referencias";
 import { monedaDePais } from "../src/lib/moneda/tipo-cambio";
 import { comparar, type Evento, type ProductoGuardado } from "../src/lib/scraping/comparar";
-import { indexar, yaVisto } from "../src/lib/scraping/cruces";
+import { ETIQUETA_REFERENCIA, indexar, palabraDistintiva, parecidos, yaVisto } from "../src/lib/scraping/cruces";
 
 interface LecturaCompetencia {
   pais: string;
@@ -198,11 +199,38 @@ export async function guardarCompetencia(
         x.productos++;
         provNuevos.set(v.proveedorId, x);
       }
+      // Lo nuevo de los competidores vigilados (3 nov 2026, Oferfly en México), con lo nuestro a lo que se parece: contra todo lo
+      // nuestro (Producto, Compras, publicaciones y tests), no solo lo que vendemos en este país.
+      const nuevosV = r.nuevos.filter((n) => vigiladoDe(codigo, unicos.get(n.dropiId)?.proveedorId ?? 0));
+      const nuevosVigilados: NuevoVigilado[] = [];
+      if (nuevosV.length) {
+        const referencias = await cargarReferencias(supabase);
+        const huellaPorId = new Map(actuales.map((p) => [p.id, p.foto_huella]));
+        for (const n of nuevosV) {
+          const v = unicos.get(n.dropiId)!;
+          const id = idPorDropi.get(n.dropiId);
+          if (!id) continue;
+          const huella = huellaPorId.get(id) ?? null;
+          const igual = yaVisto(v.nombre, huella, referencias);
+          const parecido = igual ? null : parecidos(v.nombre, huella, referencias, 1)[0] ?? null;
+          const palabra = igual || parecido ? null : palabraDistintiva(v.nombre, referencias);
+          const c = igual ?? parecido ?? palabra;
+          nuevosVigilados.push({
+            productoId: id,
+            vigilado: vigiladoDe(codigo, v.proveedorId)!,
+            nombre: v.nombre,
+            precio: v.precio,
+            stock: v.stock,
+            parecidoA: c ? { nombre: c.nombre, donde: ETIQUETA_REFERENCIA[c.tipo], como: igual ? "igual" : parecido ? "parecido" : "palabra", palabras: palabra?.palabras } : null,
+          });
+        }
+      }
       const lista = armarAlertas({
         productos,
         cambios,
         desaparecidos,
         proveedoresNuevos: [...provNuevos.values()],
+        nuevosVigilados,
         // Los textos de las alertas en la moneda del catálogo (Costa Rica en colones).
         moneda: monedaDePais(codigo),
       });

@@ -30,6 +30,7 @@ const TIPO: Record<string, { etiqueta: string; tono: "destructive" | "warning" |
   bajo_stock: { etiqueta: "Bajó stock", tono: "warning", punto: "bg-warning" },
   desaparecio: { etiqueta: "Desapareció", tono: "neutral", punto: "bg-border-control" },
   competidor_nuevo: { etiqueta: "Competidor nuevo", tono: "neutral", punto: "bg-border-control" },
+  nuevo: { etiqueta: "Producto nuevo de un vigilado", tono: "warning", punto: "bg-warning" },
 };
 
 // ---------- Datos derivados ----------
@@ -591,6 +592,7 @@ function TarjetaCompetidor({
         <span className="flex min-w-0 flex-col">
           <span className="flex flex-wrap items-center gap-2">
             <span className="font-semibold">{c.nombre}</span>
+            {c.vigilado && <Badge tone="warning">Vigilado · {c.vigilado}</Badge>}
             {c.nuevo && <Badge>Nuevo</Badge>}
           </span>
           <span className="text-xs text-muted-foreground">{c.cambiosHoy ? `${c.cambiosHoy} ${c.cambiosHoy === 1 ? "cambio" : "cambios"} en la última búsqueda` : "sin cambios en la última búsqueda"}</span>
@@ -661,7 +663,7 @@ export function VistaCompetidores({ datos, puedeEscribir }: { datos: DatosCompet
         .filter(
           (c) =>
             (!tarjeta || FILTRO_TARJETA[tarjeta](c)) &&
-            (!busqueda || c.nombre.toLowerCase().includes(busqueda) || (porCompetidor.get(c.id) ?? []).some((p) => p.nombre.toLowerCase().includes(busqueda))),
+            (!busqueda || c.nombre.toLowerCase().includes(busqueda) || !!c.vigilado?.toLowerCase().includes(busqueda) || (porCompetidor.get(c.id) ?? []).some((p) => p.nombre.toLowerCase().includes(busqueda))),
         )
         .sort((a, b) =>
           orden === "vendido" ? b.bajo7 - a.bajo7 || b.bajo30 - a.bajo30 || b.productos - a.productos : orden === "iguales" ? b.igualesN - a.igualesN || b.bajo7 - a.bajo7 : b.productos - a.productos,

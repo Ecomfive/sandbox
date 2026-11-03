@@ -50,6 +50,8 @@ export interface CompetidorC {
   bajo7: number;
   bajo30: number;
   primeraVez: string;
+  /** El nombre con que lo vigilamos («Oferfly», `VIGILADOS`), o `null`. */
+  vigilado: string | null;
 }
 
 export interface BitacoraC {

@@ -72,6 +72,26 @@ export function indexar(refs: Referencia[]): IndiceReferencias {
 
 const comunes = (a: string[], b: string[], parecido: number) => Math.round(parecido * Math.min(a.length, b.length));
 
+/**
+ * Lo nuestro que comparte con el nombre alguna **palabra distintiva** (6 letras o más, no genérica) aunque el resto no se parezca
+ * (3 nov 2026, competidores vigilados: «Spray Veneno Abeja Verrugas» de Oferfly y nuestro «Spray Bee Venom para Eliminar Verrugas»).
+ * Más suelto que `parecidos`: es una pista («puede ser»), no un vínculo. Gana la que comparte más palabras; a igual número, lo comprado
+ * y lo publicado antes que la ficha de Producto.
+ */
+export function palabraDistintiva(nombre: string, indice: IndiceReferencias): (Coincidencia & { palabras: string[] }) | null {
+  const distintivas = palabrasClave(nombre).filter((p) => p.length >= 6 && !GENERICAS.has(p));
+  const enComun = new Map<number, string[]>();
+  for (const p of distintivas) for (const i of indice.porPalabra.get(p) ?? []) enComun.set(i, [...(enComun.get(i) ?? []), p]);
+  let mejor: { i: number; palabras: string[]; puntos: number } | null = null;
+  for (const [i, palabras] of enComun) {
+    const puntos = palabras.length + PREFERENCIA[indice.refs[i].tipo];
+    if (!mejor || puntos > mejor.puntos) mejor = { i, palabras, puntos };
+  }
+  if (!mejor) return null;
+  const r = indice.refs[mejor.i];
+  return { tipo: r.tipo, id: r.id, nombre: r.nombre, detalle: r.detalle, porFoto: false, parecido: parecidoNombre(palabrasClave(nombre), r.palabras), palabras: mejor.palabras };
+}
+
 /** La referencia más parecida (un test se prefiere a un producto si se parecen igual), o `null`. */
 export function yaVisto(nombre: string, huella: string | null, indice: IndiceReferencias): Coincidencia | null {
   const palabras = palabrasClave(nombre);

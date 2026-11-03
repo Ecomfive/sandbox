@@ -19,6 +19,17 @@ export const NUESTRO_PROVEEDOR = /^ecomfive$/i;
  */
 export const NUESTRO_PROVEEDOR_ID: Record<string, number[]> = { cr: [27] };
 
+/**
+ * Competidores vigilados, por país e id de proveedor de Dropi, con el nombre con que los conocemos (3 nov 2026, pedido de Hernán: «Oferfly»
+ * —en Dropi «IMPORTADORA OFERFLY», id 146020, desde el 30 jun 2026— «nos está sacando bastante información en productos»). Cada búsqueda
+ * avisa cada producto nuevo suyo (alerta `nuevo`) y a qué producto nuestro se parece. Dropi muestra el nombre de la persona
+ * («IMPORTADORA»), no el de la tienda: por eso van por id.
+ */
+export const VIGILADOS: Record<string, Record<number, string>> = { mx: { 146020: "Oferfly" } };
+
+/** El nombre con que vigilamos a ese proveedor en ese país («mx»), o `null` si no se vigila. */
+export const vigiladoDe = (pais: string, proveedorId: number): string | null => VIGILADOS[pais.toLowerCase()]?.[proveedorId] ?? null;
+
 /** Si un proveedor del catálogo de ese país (código «pa», «cr») somos nosotros. */
 export const esNuestroProveedor = (proveedorId: number, nombre: string, pais?: string): boolean =>
   NUESTRO_PROVEEDOR.test(nombre) || (!!pais && (NUESTRO_PROVEEDOR_ID[pais.toLowerCase()] ?? []).includes(proveedorId));
@@ -39,7 +50,19 @@ export function normalizarCompetencia(o: unknown, pais?: string): VistoCompetenc
   return { ...v, proveedorId, proveedorNombre, esNuestro: esNuestroProveedor(proveedorId, proveedorNombre, pais) };
 }
 
-export type TipoAlerta = "bajo_precio" | "mas_barato" | "bajo_stock" | "competidor_nuevo" | "desaparecio";
+export type TipoAlerta = "bajo_precio" | "mas_barato" | "bajo_stock" | "competidor_nuevo" | "desaparecio" | "nuevo";
+
+/** Un producto que un competidor vigilado publicó desde la búsqueda anterior, con lo nuestro a lo que se parece. */
+export interface NuevoVigilado {
+  productoId: string;
+  /** El nombre con que lo vigilamos («Oferfly»). */
+  vigilado: string;
+  nombre: string;
+  precio: number | null;
+  stock: number | null;
+  /** Lo nuestro a lo que se parece: `igual` (mismo nombre o foto), `parecido` o `palabra` (comparte una palabra distintiva). */
+  parecidoA: { nombre: string; donde: string; como: "igual" | "parecido" | "palabra"; palabras?: string[] } | null;
+}
 
 export interface Alerta {
   tipo: TipoAlerta;
@@ -73,6 +96,8 @@ export function armarAlertas(datos: {
   cambios: { id: string; eventos: Evento[] }[];
   desaparecidos: string[];
   proveedoresNuevos: { nombre: string; productos: number }[];
+  /** Los productos nuevos de los competidores vigilados (`VIGILADOS`). */
+  nuevosVigilados?: NuevoVigilado[];
   /** La moneda del país del catálogo (sin ella, dólares). */
   moneda?: string;
 }): Alerta[] {
@@ -125,6 +150,24 @@ export function armarAlertas(datos: {
 
   for (const prov of datos.proveedoresNuevos) {
     alertas.push({ tipo: "competidor_nuevo", productoId: null, nuestroId: null, titulo: `Competidor nuevo: ${prov.nombre}`, detalle: `${prov.productos} productos publicados` });
+  }
+
+  for (const n of datos.nuevosVigilados ?? []) {
+    const a = n.parecidoA;
+    const pista = !a
+      ? "no se parece a nada nuestro"
+      : a.como === "igual"
+        ? `igual a nuestro «${a.nombre}» (${a.donde})`
+        : a.como === "parecido"
+          ? `se parece a nuestro «${a.nombre}» (${a.donde})`
+          : `puede ser nuestro «${a.nombre}» (${a.donde}; comparten «${(a.palabras ?? []).join("», «")}»)`;
+    alertas.push({
+      tipo: "nuevo",
+      productoId: n.productoId,
+      nuestroId: null,
+      titulo: `${n.vigilado} publicó «${n.nombre}»`,
+      detalle: `${usd(n.precio)} · ${unidades(n.stock)} en stock · ${pista}`,
+    });
   }
   return alertas;
 }
