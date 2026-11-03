@@ -10,6 +10,8 @@ import { TablaCuentasConfiguracion } from "../retiros/cuentas/tabla-cuentas";
 import { TablaPlataformas } from "./tabla-plataformas";
 import { TablaPaises } from "./tabla-paises";
 import { UmbralesTipoCliente } from "./umbrales-tipo-cliente";
+import { ConexionEffi } from "./conexion-effi";
+import { llaveEffi } from "@/lib/effi/api";
 
 export const metadata = { title: "Configuración" };
 
@@ -95,6 +97,11 @@ export default async function ConfiguracionPage() {
       <div className="flex flex-col gap-3">
         <h2 className="text-sm font-semibold tracking-tight">Plataformas de {pais.nombre}</h2>
         <TablaPlataformas plataformas={plataformas} paisId={pais.id} nombrePais={pais.nombre} monedas={monedas} puedeEscribir={puedeEscribir} />
+      </div>
+
+      <div id="effi" className="flex flex-col gap-3">
+        <h2 className="text-sm font-semibold tracking-tight">Conexión con Effi</h2>
+        <ConexionEffi hayLlave={llaveEffi() !== null} />
       </div>
 
       <div className="flex flex-col gap-3">
