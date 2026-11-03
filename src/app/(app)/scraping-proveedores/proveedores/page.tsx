@@ -73,6 +73,8 @@ export default async function Page() {
       busqueda: datos.busquedas.find((b) => b.proveedorId === p.id) ?? null,
     };
   });
+  // Los más top primero: por las órdenes que muestra Dropi (las últimas cifras anotadas; 3 nov 2026, pedido de Hernán).
+  resumen.sort((a, b) => (b.registros[0]?.ordenes ?? -1) - (a.registros[0]?.ordenes ?? -1));
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
       <EncabezadoPagina titulo="Proveedores referentes" oculto />

@@ -519,6 +519,11 @@ convenciones técnicas del código.
   (`seguirProveedor`) lo agrega a `scraping_proveedores` con `enlaceProveedor` y su primera búsqueda pedida. **Buscador** (3 nov 2026): filtra en el
   navegador por nombre, ID de Dropi o nombre de un destacado (la página carga hasta 1.000 proveedores de la última lectura). Pendiente (segunda etapa de «Actualizar datos»): leer los proveedores de cada país con la extensión (sesión de
   dropshipper por país), «Descubrir proveedores» desde el catálogo de cada país y TuWinner.
+  **Top 10 de México** (3 nov 2026, pedido de Hernán): se siguen los 10 proveedores de Dropi México con más órdenes (las cifras de su página,
+  `api-v2.dropi.mx/indicators/supplier/<id>/metrics` con la cabecera `X-Host: mx`; Hyper Moda, Radanta, CIT Colombia, Imporshop, Impowinner,
+  Lluvia Cero, Aviro, ADMA, VibroSculpt y Novetec) y Oferfly (vigilado); la tabla de referentes va de más a menos órdenes (las últimas cifras
+  anotadas). **Buscador de arriba (Ctrl K)**: «Proveedores» trae los referentes de Scraping (cualquier país) y los competidores del Análisis
+  de competencia del país de la barra, también por su nombre de vigilado (`/analisis-competencia?buscar=…` abre la lista filtrada).
   Sigue proveedores de Dropi: `scraping_proveedores`, `scraping_proveedor_registros` (órdenes/productos/dropshippers, `origen`
   manual o dropi), `scraping_busquedas` (con `duracion_ms`), `scraping_productos` (último precio y stock, `estado` activo o
   desaparecido con `motivo_desaparicion`, privado con `vinculado_a`/`vinculo_parecido`/`vinculo_seguro`) y
@@ -1532,7 +1537,8 @@ convenciones técnicas del código.
   Cada búsqueda guarda una alerta `nuevo` por cada producto nuevo suyo («Oferfly publicó «X»», precio, stock y a qué se parece de lo
   nuestro: `yaVisto`, `parecidos` o `palabraDistintiva` de `cruces.ts` —comparten una palabra de 6 letras o más no genérica, una pista—
   contra `cargarReferencias`, todo lo nuestro de todos los países); el competidor lleva la insignia «Vigilado · Oferfly» y el buscador lo
-  encuentra por ese nombre; el Resumen cuenta «Productos nuevos de vigilados». Para vigilar otro, se suma a `VIGILADOS`. Los precios van en la moneda del país (`MonedaCompetencia`, colones). **Pestañas** (`PESTANAS_POR_MODULO`, simplificado a pedido el 14 oct 2026): **Competidores**
+  encuentra por ese nombre; el Resumen cuenta «Productos nuevos de vigilados». Para vigilar otro, se suma a `VIGILADOS`. En México tenemos **dos tiendas ECOMFIVE**: 20538 y 31442 («MARIA»,
+  `NUESTRO_PROVEEDOR_ID.mx`, confirmado por Hernán el 3 nov 2026). Los precios van en la moneda del país (`MonedaCompetencia`, colones). **Pestañas** (`PESTANAS_POR_MODULO`, simplificado a pedido el 14 oct 2026): **Competidores**
   (`/analisis-competencia`, `VistaCompetidores`: novedades = alertas arriba, buscador, filtros de un toque y la lista de
   competidores en acordeón; cada uno muestra sus productos, los iguales a los nuestros primero, y cada producto despliega
   `HistorialCompetencia`) y **Resumen** (`/analisis-competencia/resumen`, `dashboard-competencia.tsx`). Las dos usan

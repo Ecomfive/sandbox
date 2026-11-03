@@ -157,6 +157,7 @@ export function BusquedaGlobal({ paginas, acciones }: { paginas: PaginaBuscable[
     deRemoto("Productos en test", ["producto-test"]);
     deRemoto("Dropshippers", ["dropshipper"]);
     deRemoto("Puestos", ["puesto"]);
+    deRemoto("Proveedores", ["proveedor", "competidor"]);
     return lista;
   }, [texto, remotos, paginas, acciones, porHref, recientesJson, pathname, idBase]);
 
