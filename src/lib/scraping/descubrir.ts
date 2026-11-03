@@ -71,6 +71,26 @@ export function descubrir(l: LecturaCatalogo, anterior: FotoCatalogo | null): Pr
     .sort((a, b) => (b.ventas ?? 0) - (a.ventas ?? 0) || b.nuevos30 - a.nuevos30 || b.productos - a.productos);
 }
 
+/**
+ * La dirección del logo de un proveedor de Dropi (3 nov 2026, Proveedores referentes con logo): Dropi da la ruta en su CDN («mexico/user/3243/
+ * logo/1747875089IMPORTADORES (6).png»); cada parte va codificada (espacios, comas y «+» rompen la dirección). Una dirección completa solo
+ * se acepta si es de un CDN de CloudFront (la lectura viene de la página de Dropi); «..» o vacío, `null`.
+ */
+export function urlLogoDropi(ruta: unknown, cdn: (ruta: string) => string): string | null {
+  if (typeof ruta !== "string" || !ruta.trim() || ruta.length > 500) return null;
+  const r = ruta.trim();
+  if (/^https:\/\//i.test(r)) {
+    try {
+      return new URL(r).hostname.endsWith(".cloudfront.net") ? r : null;
+    } catch {
+      return null;
+    }
+  }
+  const partes = r.replace(/^\/+/, "").split("/");
+  if (partes.some((p) => !p || p === "." || p === "..")) return null;
+  return `${cdn(r)}/${partes.map(encodeURIComponent).join("/")}`;
+}
+
 /** El enlace del proveedor en Dropi (el que pide «Agregar proveedor»): `https://app.dropi.<país>/dashboard/provider/<id>/<NOMBRE>`. */
 export function enlaceProveedor(pais: string, dropiId: number, nombre: string): string {
   return `https://app.dropi.${pais}/dashboard/provider/${dropiId}/${encodeURIComponent(nombre.trim().toUpperCase())}`;

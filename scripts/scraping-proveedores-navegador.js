@@ -68,12 +68,22 @@ async function scrapingProveedor(dropiId, puente) {
     const d = m?.data;
     if (d) metricas = { productos: d.total_monthly_products, ordenes: d.total_monthly_orders, dropshippers: d.total_monthly_dropshippers };
   } catch {}
+  // El logo y la categoría («VERIFICADO») de la página del proveedor (migración 0225; 3 nov 2026): la ruta en el CDN de Dropi.
+  let logo = null;
+  let categoria = null;
+  try {
+    const i = await fetch(`https://${apiV2}/indicators/supplier/${dropiId}/information`, {
+      headers: { "X-Authorization": "Bearer " + token, "X-Host": host },
+    }).then((x) => x.json());
+    logo = i?.data?.logo || null;
+    categoria = i?.data?.category || null;
+  } catch {}
   // El título de la pestaña es «Proveedor: NOMBRE | Dropi».
   const nombre = /^Proveedor:\s*(.+?)\s*\|/.exec(document.title)?.[1] || null;
 
   const cuerpo = {
     dropiId, pais: location.hostname.split(".").pop(), url: location.href, nombre, inicio: inicio.toISOString(),
-    duracionMs: Math.round(performance.now() - t0), paginas, metricas, productos: [...productos.values()],
+    duracionMs: Math.round(performance.now() - t0), paginas, metricas, logo, categoria, productos: [...productos.values()],
   };
   // La lectura viaja comprimida en el fragmento (#) de la dirección del puente: el fragmento no sale del navegador y el
   // puente (127.0.0.1) la manda al receptor. La pestaña queda en el puente, que muestra el resultado.

@@ -24,6 +24,8 @@ import { guardarCompetencia } from "./competencia-guardar";
 import { guardarDrop, type LecturaDrop } from "./drop-guardar";
 import { guardarNuestrosProductos, type LecturaNuestros } from "./publicaciones-sincronizar-dropi";
 import { comparar, mejorPareja, normalizarDropi, type Evento, type ProductoGuardado, type ProductoVisto } from "../src/lib/scraping/comparar";
+import { urlLogoDropi } from "../src/lib/scraping/descubrir";
+import { cdnDeRuta } from "../src/lib/publicaciones/republicar-dropi";
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 const PUERTO = 4322;
@@ -44,6 +46,9 @@ interface Lectura {
   duracionMs: number;
   paginas: number[];
   metricas: { productos: number; ordenes: number; dropshippers: number } | null;
+  /** La ruta del logo en el CDN de Dropi y la categoría («VERIFICADO») del proveedor (migración 0225). */
+  logo?: string | null;
+  categoria?: string | null;
   productos: unknown[];
 }
 
@@ -184,6 +189,11 @@ async function guardarLectura(l: Lectura) {
     // 8. Las cifras del encabezado de Dropi y el cierre de la búsqueda.
     if (l.metricas && [l.metricas.ordenes, l.metricas.productos, l.metricas.dropshippers].every((n) => Number.isInteger(n) && n >= 0)) {
       revisar(await supabase.from("scraping_proveedor_registros").insert({ proveedor_id: proveedor.id, ordenes: l.metricas.ordenes, productos: l.metricas.productos, dropshippers: l.metricas.dropshippers, origen: "dropi" }), "Cifras del proveedor");
+    }
+    // El logo y la categoría que muestra Dropi (migración 0225; sin ella, el error se ignora y la página dibuja las iniciales).
+    if (l.logo !== undefined) {
+      const categoria = typeof l.categoria === "string" ? l.categoria.trim().slice(0, 40) || null : null;
+      await supabase.from("scraping_proveedores").update({ logo_url: urlLogoDropi(l.logo, cdnDeRuta), categoria }).eq("id", proveedor.id);
     }
     const totalMs = l.duracionMs + (Date.now() - t0);
     const detalle = `${l.paginas.length} páginas de Dropi (${l.paginas.join(", ")}) en ${Math.round(l.duracionMs / 1000)} s; guardado en ${Math.round((Date.now() - t0) / 1000)} s. ${vinculados} privados vinculados. ${huellas} huellas de foto nuevas.`;
