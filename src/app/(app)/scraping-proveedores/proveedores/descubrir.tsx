@@ -1,14 +1,15 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { ContenedorTabla } from "@/components/tabla/contenedor-tabla";
 import { claseCeldaColumna, claseEncabezadoColumna, claseFilaEncabezado } from "@/components/tabla/estilos-tabla";
-import { anilloFoco } from "@/components/ui/field";
+import { anilloFoco, fieldClassSm } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { pedirExtension, type AvanceLector, type SesionDropi } from "@/lib/dropi-actualizar/extension";
 import { sesionCatalogoMx } from "@/lib/dropi-actualizar/partes";
 import { formatearFechaHora } from "@/lib/formato";
+import { BuscarIcon } from "@/lib/nav-icons";
 import { CDN_FOTOS_DROPI } from "@/lib/publicaciones/republicar-dropi";
 import { formatoNumero } from "../def-scraping";
 import { empezarDescubrir, fallarDescubrir, procesarDescubrir, seguirProveedor } from "./descubrir-actions";
@@ -36,6 +37,7 @@ export interface LecturaDescubrir {
 }
 
 const esperar = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
+const sinAcentos = (t: string) => t.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
 const foto = (f: string | null) => (!f ? null : /^https?:\/\//i.test(f) ? f : `${CDN_FOTOS_DROPI}/${encodeURI(f)}`);
 const VERSION_MINIMA = [0, 2, 0];
 const versionVieja = (v: string) => {
@@ -73,6 +75,13 @@ function Seguir({ p }: { p: ProveedorDescubiertoVista }) {
 export function DescubrirProveedores({ lectura, proveedores, puedeLeer, puedeSeguir }: { lectura: LecturaDescubrir | null; proveedores: ProveedorDescubiertoVista[]; puedeLeer: boolean; puedeSeguir: boolean }) {
   const router = useRouter();
   const [cuantos, setCuantos] = useState(30);
+  const [buscar, setBuscar] = useState("");
+  // El buscador (3 nov 2026, pedido de Hernán): por nombre del proveedor, su ID de Dropi o el nombre de sus productos destacados.
+  const visibles = useMemo(() => {
+    const q = sinAcentos(buscar.trim());
+    if (!q) return proveedores;
+    return proveedores.filter((p) => sinAcentos(`${p.nombre} ${p.dropiId} ${p.destacados.map((d) => d.nombre).join(" ")}`).includes(q));
+  }, [proveedores, buscar]);
   const [extension, setExtension] = useState<"buscando" | "lista" | "vieja" | "no_instalada">("buscando");
   const [avance, setAvance] = useState<string | null>(null);
   const [esperandoSesion, setEsperandoSesion] = useState(false);
@@ -205,6 +214,30 @@ export function DescubrirProveedores({ lectura, proveedores, puedeLeer, puedeSeg
         </p>
       )}
 
+      {proveedores.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="relative">
+            <span className="sr-only">Buscar proveedor</span>
+            <BuscarIcon className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+            <input
+              type="search"
+              value={buscar}
+              onChange={(e) => {
+                setBuscar(e.target.value);
+                setCuantos(30);
+              }}
+              placeholder="Buscar proveedor, ID de Dropi o producto"
+              className={`${fieldClassSm} w-80 max-w-full pl-8`}
+            />
+          </label>
+          {buscar.trim() && (
+            <span className="text-xs text-muted-foreground" aria-live="polite">
+              {visibles.length === 1 ? "1 proveedor" : `${formatoNumero(visibles.length)} proveedores`} de {formatoNumero(proveedores.length)}
+            </span>
+          )}
+        </div>
+      )}
+
       {proveedores.length === 0 ? (
         <p className="m-0 rounded-lg bg-muted/50 px-4 py-6 text-center text-sm text-muted-foreground">{puedeLeer ? "Todavía no se leyó el catálogo: pulsa «Leer el catálogo de México»." : "Todavía no se leyó el catálogo."}</p>
       ) : (
@@ -223,7 +256,14 @@ export function DescubrirProveedores({ lectura, proveedores, puedeLeer, puedeSeg
               </tr>
             </thead>
             <tbody>
-              {proveedores.slice(0, cuantos).map((p) => (
+              {visibles.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                    Ningún proveedor con «{buscar.trim()}».
+                  </td>
+                </tr>
+              )}
+              {visibles.slice(0, cuantos).map((p) => (
                 <tr key={p.dropiId} className="border-b border-border last:border-0">
                   <td className={claseCeldaColumna}>
                     <span className="flex flex-col gap-1.5">
@@ -255,9 +295,9 @@ export function DescubrirProveedores({ lectura, proveedores, puedeLeer, puedeSeg
               ))}
             </tbody>
           </table>
-          {proveedores.length > cuantos && (
+          {visibles.length > cuantos && (
             <button type="button" onClick={() => setCuantos((n) => n + 30)} className={`w-full border-t border-border px-4 py-2.5 text-left text-xs font-medium text-azul hover:bg-muted/50 ${anilloFoco}`}>
-              Ver 30 más (quedan {proveedores.length - cuantos})
+              Ver 30 más (quedan {visibles.length - cuantos})
             </button>
           )}
         </ContenedorTabla>

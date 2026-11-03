@@ -29,7 +29,7 @@ async function cargarDescubrir(supabase: SupabaseClient, seguidos: Set<number>):
     .order("ventas_estimadas", { ascending: false, nullsFirst: false })
     .order("nuevos_30", { ascending: false })
     .order("productos", { ascending: false })
-    .limit(300);
+    .limit(1000);
   return {
     lectura,
     proveedores: (data ?? []).map((p) => ({

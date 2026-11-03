@@ -516,7 +516,8 @@ convenciones técnicas del código.
   foto]`; `procesarDescubrir` resume por proveedor con `descubrir` (`src/lib/scraping/descubrir.ts`, con prueba: ventas estimadas =
   lo que bajó el stock contra la foto anterior guardada en Storage `wms-compras/scraping-catalogo/<país>.json`; «recién publicados» = los que no estaban en la lectura anterior y, en la primera, el 10 % más nuevo del catálogo por ID (Dropi México no manda `created_at` en `v4/index`; el lector sigue hasta una página vacía porque las páginas vienen con menos de 100),
   productos, stock y 3 destacados) en `scraping_descubrir_lecturas` / `scraping_descubrir_proveedores`; «Seguir»
-  (`seguirProveedor`) lo agrega a `scraping_proveedores` con `enlaceProveedor` y su primera búsqueda pedida. Pendiente (segunda etapa de «Actualizar datos»): leer los proveedores de cada país con la extensión (sesión de
+  (`seguirProveedor`) lo agrega a `scraping_proveedores` con `enlaceProveedor` y su primera búsqueda pedida. **Buscador** (3 nov 2026): filtra en el
+  navegador por nombre, ID de Dropi o nombre de un destacado (la página carga hasta 1.000 proveedores de la última lectura). Pendiente (segunda etapa de «Actualizar datos»): leer los proveedores de cada país con la extensión (sesión de
   dropshipper por país), «Descubrir proveedores» desde el catálogo de cada país y TuWinner.
   Sigue proveedores de Dropi: `scraping_proveedores`, `scraping_proveedor_registros` (órdenes/productos/dropshippers, `origen`
   manual o dropi), `scraping_busquedas` (con `duracion_ms`), `scraping_productos` (último precio y stock, `estado` activo o
