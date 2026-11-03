@@ -5,7 +5,7 @@ import { Bandera } from "@/components/paises/bandera";
 import type { PaisTuWinner } from "@/lib/tuwinner/tuwinner";
 import type { EstadoGanador, Ganador } from "./datos";
 import { n } from "./formato";
-import { EtiquetasGanador, FotoProducto, Spark } from "./piezas";
+import { ConFotoGrande, EtiquetasGanador, FotoProducto, Spark } from "./piezas";
 
 type Filtro = "todos" | EstadoGanador;
 const FILTROS: [Filtro, string][] = [
@@ -100,7 +100,10 @@ export function VistaGanadores({ ganadores }: { ganadores: Record<PaisTuWinner, 
               <span className="rank">{x.posicion}</span>
               <FotoProducto src={x.foto} nombre={x.nombre} />
               <span style={{ minWidth: 0 }}>
-                <span className="nombre">{x.nombre}</span>
+                {/* Pasar el cursor por el nombre también muestra la foto grande. */}
+                <ConFotoGrande src={x.foto} claseEnvoltura="max-w-full min-w-0">
+                  <span className="nombre">{x.nombre}</span>
+                </ConFotoGrande>
                 <div className="meta">{[x.proveedor, x.plataforma ?? `Dropi ${pais}`, `ID ${x.dropiId}`, precio(x)].filter(Boolean).join(" · ")}</div>
               </span>
               <span className="col-graf">

@@ -1,16 +1,40 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
+import { TarjetaEmergente } from "@/components/ui/tarjeta-emergente";
 import type { DiaDeVentas } from "@/lib/tuwinner/tuwinner";
 import type { Ganador } from "./datos";
 import { iniciales, n, NOMBRE_PAIS } from "./formato";
 
 // Piezas del panel Tu Winner, iguales a las del boceto aprobado: números, la foto, la línea de ventas por día y las etiquetas de cada ganador.
 
-/** La foto de Tu Winner; si no carga (su servidor a veces falla), las iniciales. */
+/** Tu Winner da la foto en miniatura («…_thumb.webp», 300 px); sin «_thumb» está la original (unos 1000 px). */
+export const fotoOriginal = (src: string) => src.replace(/_thumb(\.\w+)$/, "$1");
+
+/** La foto original; si no carga, la miniatura. */
+function FotoGrande({ src }: { src: string }) {
+  const [url, setUrl] = useState(fotoOriginal(src));
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={url} alt="" onError={() => url !== src && setUrl(src)} className="max-h-80 max-w-80 rounded-md bg-white object-contain" />;
+}
+
+/**
+ * La foto en grande al pasar el cursor por encima (3 nov 2026, pedido de Hernán: «como ya se ha hecho en otros apartados», la misma tarjeta flotante de
+ * `MiniaturaFoto`), en su tamaño original. Sin foto, lo de adentro tal cual.
+ */
+export function ConFotoGrande({ src, claseEnvoltura = "", children }: { src: string | null; claseEnvoltura?: string; children: ReactNode }) {
+  if (!src) return <>{children}</>;
+  return (
+    <TarjetaEmergente clase="rounded-lg border border-border bg-card p-1.5 shadow-lg" claseEnvoltura={claseEnvoltura} contenido={<FotoGrande src={src} />}>
+      {children}
+    </TarjetaEmergente>
+  );
+}
+
+/** La foto de Tu Winner; si no carga (su servidor a veces falla), las iniciales. Al pasar el cursor se ve en grande. */
 export function FotoProducto({ src, nombre }: { src: string | null; nombre: string }) {
   const [rota, setRota] = useState(false);
-  return (
+  const foto = (
     <span className="foto" aria-hidden="true">
       {src && !rota ? (
         // eslint-disable-next-line @next/next/no-img-element
@@ -20,6 +44,7 @@ export function FotoProducto({ src, nombre }: { src: string | null; nombre: stri
       )}
     </span>
   );
+  return <ConFotoGrande src={src && !rota ? src : null}>{foto}</ConFotoGrande>;
 }
 
 /** La línea de ventas de cada día (área suave, punto en el último día) con los reabastecimientos en verde detrás. */
