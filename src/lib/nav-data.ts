@@ -108,6 +108,9 @@ const AREAS: NavSection[] = [
     frentes: true,
     items: [
       { label: "Pedidos Dropi", href: "/pedidos-dropi", dropi: true, frente: "proveeduria" },
+      // Proveeduría (5 nov 2026, pedido de Alcides): son lo que publicamos como proveedor, junto a los pedidos que generan.
+      { label: "Gestión de IDs Dropi", href: "/publicaciones-dropi", frente: "proveeduria" },
+      { label: "Gestión de IDs Drop", href: "/publicaciones-drop", frente: "proveeduria" },
       // Gestión de tienda (3 nov 2026): las tiendas de Shopify (Kenku primero), conectadas solo de lectura.
       { label: "Pedidos de tienda", href: "/tienda-pedidos", frente: "tienda" },
       { label: "Productos de Shopify", href: "/tienda-productos", frente: "tienda" },
@@ -117,8 +120,6 @@ const AREAS: NavSection[] = [
       { label: "Bodegas", href: "/wms-bodegas", frente: "fulfillment" },
       { label: "Ubicaciones", href: "/wms-ubicaciones", frente: "fulfillment" },
       { label: "Compras", href: "/compras", frente: "fulfillment" },
-      { label: "Gestión de IDs Dropi", href: "/publicaciones-dropi", frente: "fulfillment" },
-      { label: "Gestión de IDs Drop", href: "/publicaciones-drop", frente: "fulfillment" },
       { label: "Producto", href: "/producto", frente: "fulfillment" },
     ],
   },
