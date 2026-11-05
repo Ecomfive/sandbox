@@ -1027,6 +1027,23 @@ export function DropiIcon({ marca = false, ...props }: SVGProps<SVGSVGElement> &
   );
 }
 
+/** Effi: una «E» en un cuadrado redondeado. Por defecto va con el color del texto (la letra es transparente); con `marca`, con el azul de Effi. */
+const LETRA_EFFI = "M8 6.5h8.5v2.6h-5.6v1.7h5v2.5h-5v1.6h5.7v2.6H8V6.5Z";
+export function EffiIcon({ marca = false, ...props }: SVGProps<SVGSVGElement> & { marca?: boolean }) {
+  if (marca)
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" {...props}>
+        <rect x="1" y="1" width="22" height="22" rx="6" fill="#1b6fd1" />
+        <path d={LETRA_EFFI} fill="white" />
+      </svg>
+    );
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" {...props}>
+      <path fillRule="evenodd" fill="currentColor" d={`M7 1h10a6 6 0 0 1 6 6v10a6 6 0 0 1-6 6H7a6 6 0 0 1-6-6V7a6 6 0 0 1 6-6Z${LETRA_EFFI}`} />
+    </svg>
+  );
+}
+
 /**
  * El logo de Drop (una chispa de cuatro puntas dentro de un cuadrado redondeado). Por defecto (el menú) va relleno con el color del texto y la chispa es
  * transparente (una máscara), así se ve bien en los dos temas y al estar seleccionado. Con `marca` va con sus colores: cuadrado negro y chispa blanca, con un
@@ -1176,6 +1193,7 @@ export const ICONOS_PAGINA: Record<string, (props: SVGProps<SVGSVGElement>) => R
   "/generador-landings": LandingIcon,
   "/publicaciones-dropi": DropiIcon,
   "/publicaciones-drop": DropIcon,
+  "/publicaciones-effi": EffiIcon,
   "/productos-test": TestIcon,
   "/filtro-productos": FiltroIcon,
   "/crm-dropshippers": DropshipperIcon,

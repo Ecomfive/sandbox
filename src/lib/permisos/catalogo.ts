@@ -81,6 +81,7 @@ export const AREAS_ACCESO: AreaAcceso[] = [
       { clave: "wms-productos-dropi", etiqueta: "Ficha producto Dropi" },
       { clave: "publicaciones-dropi", etiqueta: "Gestión de IDs Dropi" },
       { clave: "publicaciones-drop", etiqueta: "Gestión de IDs Drop" },
+      { clave: "publicaciones-effi", etiqueta: "Gestión de IDs Effi" },
       { clave: "uso-sistema", etiqueta: "Uso del sistema (IDs Dropi)" },
       { clave: "tienda-pedidos", etiqueta: "Pedidos de tienda" },
       { clave: "tienda-productos", etiqueta: "Productos de Shopify" },

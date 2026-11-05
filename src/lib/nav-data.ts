@@ -111,6 +111,7 @@ const AREAS: NavSection[] = [
       // Proveeduría (5 nov 2026, pedido de Alcides): son lo que publicamos como proveedor, junto a los pedidos que generan.
       { label: "Gestión de IDs Dropi", href: "/publicaciones-dropi", frente: "proveeduria" },
       { label: "Gestión de IDs Drop", href: "/publicaciones-drop", frente: "proveeduria" },
+      { label: "Gestión de IDs Effi", href: "/publicaciones-effi", frente: "proveeduria" },
       // Gestión de tienda (3 nov 2026): las tiendas de Shopify (Kenku primero), conectadas solo de lectura.
       { label: "Pedidos de tienda", href: "/tienda-pedidos", frente: "tienda" },
       { label: "Productos de Shopify", href: "/tienda-productos", frente: "tienda" },
