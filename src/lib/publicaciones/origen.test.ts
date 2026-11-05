@@ -1,23 +1,66 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { etiquetaOrigen, faltaParaResolver } from "./origen";
+import { esMotivoFuera, inicioSemana, porcentajeSistema, resumirUso, tipoDeAlta, type AltaPublicacion } from "./origen";
 
-const base = { origen: "dropi" as const, sku: { id: "1" }, costoMercancia: 4.5, archivada: false };
-
-test("una publicación creada en Dropi dice qué le falta", () => {
-  assert.deepEqual(faltaParaResolver({ ...base, sku: null, costoMercancia: null }), ["vincular su producto", "poner el costo de mercancía"]);
-  assert.deepEqual(faltaParaResolver({ ...base, costoMercancia: 0 }), ["poner el costo de mercancía"]);
-  assert.deepEqual(faltaParaResolver({ ...base, sku: null }), ["vincular su producto"]);
+const alta = (x: Partial<AltaPublicacion>): AltaPublicacion => ({
+  id: "1",
+  numero: 1,
+  nombre: "Producto",
+  pais: "PA",
+  origen: "dropi",
+  tipo: "nuevo",
+  fecha: "2026-10-28",
+  persona: null,
+  motivo: null,
+  nota: "",
+  ...x,
 });
 
-test("completa, archivada o de otro origen no queda por resolver", () => {
-  assert.deepEqual(faltaParaResolver(base), []);
-  assert.deepEqual(faltaParaResolver({ ...base, sku: null, archivada: true }), []);
-  for (const origen of ["sistema", "carga_inicial", null] as const) assert.deepEqual(faltaParaResolver({ ...base, sku: null, origen }), []);
+test("el tipo sale de la actividad y, si no, de la publicación", () => {
+  assert.equal(tipoDeAlta({ detalle: "Crema (ID 1) · republicada desde el ID 2", privado: false, relacionados: 0 }), "republicacion");
+  assert.equal(tipoDeAlta({ detalle: "Crema (ID 1) · privatizada a Ana desde el ID 2", privado: true, relacionados: 1 }), "privatizacion");
+  assert.equal(tipoDeAlta({ detalle: "Crema (ID 1) · estaba en Dropi sin publicación", privado: true, relacionados: 0 }), "privatizacion");
+  assert.equal(tipoDeAlta({ detalle: "Crema (ID 1) · estaba en Dropi sin publicación", privado: false, relacionados: 1 }), "republicacion");
+  assert.equal(tipoDeAlta({ detalle: null, privado: false, relacionados: 0 }), "nuevo");
 });
 
-test("la etiqueta de cada origen", () => {
-  assert.equal(etiquetaOrigen("dropi"), "Creada en Dropi");
-  assert.equal(etiquetaOrigen("sistema"), "Creada en el sistema");
-  assert.equal(etiquetaOrigen("carga_inicial"), "Carga inicial");
+test("la semana empieza el lunes", () => {
+  assert.equal(inicioSemana("2026-11-05"), "2026-11-02"); // jueves
+  assert.equal(inicioSemana("2026-11-02"), "2026-11-02"); // lunes
+  assert.equal(inicioSemana("2026-11-01"), "2026-10-26"); // domingo
+});
+
+test("el porcentaje hecho en el sistema", () => {
+  assert.equal(porcentajeSistema({ sistema: 1, dropi: 3 }), 25);
+  assert.equal(porcentajeSistema({ sistema: 0, dropi: 36 }), 0);
+  assert.equal(porcentajeSistema({ sistema: 0, dropi: 0 }), null);
+});
+
+test("el resumen cuenta por tipo, país, semana y motivo", () => {
+  const r = resumirUso([
+    alta({ id: "1", motivo: "mas_rapido" }),
+    alta({ id: "2", motivo: "mas_rapido", pais: "CR", fecha: "2026-11-03" }),
+    alta({ id: "3", motivo: "no_sabia", pais: "CR" }),
+    alta({ id: "4" }),
+    alta({ id: "5", origen: "sistema", tipo: "republicacion", fecha: "2026-11-04" }),
+  ]);
+  assert.deepEqual(r.total, { sistema: 1, dropi: 4 });
+  assert.deepEqual(r.porTipo.find((t) => t.tipo === "nuevo"), { tipo: "nuevo", sistema: 0, dropi: 4 });
+  assert.deepEqual(r.porTipo.find((t) => t.tipo === "republicacion"), { tipo: "republicacion", sistema: 1, dropi: 0 });
+  assert.deepEqual(r.porPais.map((p) => p.pais), ["CR", "PA"]);
+  assert.deepEqual(r.porSemana, [
+    { semana: "2026-11-02", sistema: 1, dropi: 1 },
+    { semana: "2026-10-26", sistema: 0, dropi: 3 },
+  ]);
+  assert.deepEqual(r.motivos, [
+    { motivo: "mas_rapido", n: 2 },
+    { motivo: "no_sabia", n: 1 },
+  ]);
+  assert.equal(r.sinMotivo, 1);
+});
+
+test("el motivo se valida contra la lista", () => {
+  assert.ok(esMotivoFuera("no_permite"));
+  assert.ok(!esMotivoFuera("cualquiera"));
+  assert.ok(!esMotivoFuera(null));
 });

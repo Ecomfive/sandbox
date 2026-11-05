@@ -10,7 +10,6 @@ import type { ComponenteEnCamino, EtapaCotizacion } from "@/lib/compras/en-camin
 import type { VentasPublicacion } from "@/lib/publicaciones/ventas";
 import type { DatosCrearDropi } from "@/lib/publicaciones/crear-dropi";
 import { ACCIONES, EN_DROPI, esBodegaDropi, type Accion, type EnDropi } from "@/lib/publicaciones/automatico";
-import { ORIGENES, type OrigenPublicacion } from "@/lib/publicaciones/origen";
 import { listaParaReactivar, sePuedePausar } from "@/lib/publicaciones/archivar";
 import type { EstadoBotones } from "@/lib/publicaciones/botones-fila";
 import { TIPOS_RECOMENDACION, type Decision, type EstadoTarea, type Recomendacion } from "@/lib/publicaciones/recomendaciones";
@@ -115,10 +114,6 @@ export interface FilaPublicacion {
   archivada: boolean;
   /** Si es un duplicado de otra publicación con el mismo ID de Dropi (migración 0147): «PUB-0309 · nombre» de la que vale. */
   duplicadaDe: string | null;
-  /** De dónde nació (migración 0226): en el sistema, en Dropi o en la carga inicial. Sin la migración, null. */
-  origen: OrigenPublicacion | null;
-  /** Si nació en Dropi: lo que le falta para quedar resuelta (producto vinculado, costo). Vacío si no falta nada. */
-  porResolver: string[];
   /** Desde cuándo está pausada por falta de stock (migración 0165): archivada en Dropi, pero a la vista en «Pausadas sin stock». */
   pausadaDesde: string | null;
   /** Tiene un apagado esperando «Aplicar en Dropi» (migración 0148): en el sistema ya cuenta como apagada (va a Archivados, sin acciones). */
@@ -346,8 +341,6 @@ export const DEF_PUBLICACIONES: DefTabla<FilaPublicacion> = {
       agrupable: true,
       ordenGrupos: ["sin_id", "no_aparece", "conectado", "sin_datos"],
     },
-    { id: "origen", etiqueta: "Origen", tipo: "seleccion", valores: (f) => uno(f.origen), opciones: () => ORIGENES, etiquetaSinValor: "Sin dato", agrupable: true, ordenGrupos: ORIGENES.map((o) => o.valor) },
-    { id: "creadaDropiPorResolver", etiqueta: "Creada en Dropi por resolver", tipo: "seleccion", valores: (f) => [f.porResolver.length ? "si" : "no"], opciones: () => [{ valor: "si", etiqueta: "Por resolver" }, { valor: "no", etiqueta: "Nada por resolver" }] },
     { id: "vinculo", etiqueta: "Vínculo con Producto", tipo: "seleccion", valores: (f) => [estadoVinculo(f)], opciones: () => VINCULOS, agrupable: true, ordenGrupos: VINCULOS.map((v) => v.valor) },
     // Las ventas de Dropi (21 oct 2026): reemplazan el «Estado de venta» que se marcaba a mano. Las ve todo el que abre el módulo.
     { id: "netas30", etiqueta: "Ventas 30 días", tipo: "numero", valor: (f) => f.ventas?.netas30 ?? null },

@@ -7,6 +7,9 @@ import { catalogoDe } from "./catalogo";
 /** Pestañas que por ahora solo ve un administrador (no se afinan por rol): Compras › Reponer. */
 export const PESTANAS_SOLO_ADMIN = ["/compras/reponer"];
 
+/** Supervisión de lo que se hace fuera del sistema: solo quien tiene el módulo `uso-sistema`, que se da por persona (Hernán y Alcides). */
+export const PESTANAS_USO_SISTEMA = ["/publicaciones-dropi/uso-sistema"];
+
 export function pestanasOcultasDe(afinado: Record<string, Afinado>): string[] {
   const ocultas: string[] = [];
   for (const [modulo, a] of Object.entries(afinado)) {

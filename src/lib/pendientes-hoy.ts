@@ -20,8 +20,6 @@ export interface PendientesHoy {
   creditosIA: number;
   /** Productos que se quedaron sin stock en Dropi y Compras todavía no revisa (migración 0167). */
   sinStockPorRevisar: number;
-  /** Lo creado directo en Dropi por resolver: productos sin publicación y publicaciones sin producto o sin costo (migración 0226). */
-  creadasEnDropi: number;
 }
 
 async function contarNovedades(supabase: SupabaseClient, paisId: string): Promise<{ count: number | null }> {
@@ -63,7 +61,6 @@ async function calcularPendientesHoy(supabase: SupabaseClient, paisId: string): 
     creditosIA,
     { count: sinStockPorRevisar },
     { count: tareasManualesAtrasadas },
-    creadasEnDropi,
   ] = await Promise.all([
     supabase
       .from("alertas_inventario_no_retornado")
@@ -104,8 +101,6 @@ async function calcularPendientesHoy(supabase: SupabaseClient, paisId: string): 
       const r = await contar(true);
       return r.error ? contar(false) : r;
     })(),
-    // Sin la migración 0226 la función no existe y cuenta cero.
-    supabase.rpc("dropi_creadas_por_resolver", { p_pais: paisId }),
   ]);
 
   const plataformasConSaldo = new Set((saldos ?? []).map((s) => s.plataforma_id));
@@ -124,7 +119,6 @@ async function calcularPendientesHoy(supabase: SupabaseClient, paisId: string): 
     tareasAtrasadas: (tareasAtrasadas ?? 0) + (tareasManualesAtrasadas ?? 0),
     creditosIA: creditosIA.length,
     sinStockPorRevisar: sinStockPorRevisar ?? 0,
-    creadasEnDropi: creadasEnDropi.error ? 0 : Number(creadasEnDropi.data ?? 0),
   };
 }
 

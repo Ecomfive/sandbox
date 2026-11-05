@@ -187,13 +187,6 @@ function PorCorregir({ pendientes }: { pendientes: PendientesHoy }) {
       Icono: ComprasIcon,
     },
     {
-      clave: "creadas-dropi",
-      cantidad: pendientes.creadasEnDropi,
-      titulo: "Creadas directo en Dropi por resolver",
-      href: "/publicaciones-dropi",
-      Icono: InteligenciaIcon,
-    },
-    {
       clave: "creditos-ia",
       cantidad: pendientes.creditosIA,
       titulo: "Crédito de IA por acabarse",
