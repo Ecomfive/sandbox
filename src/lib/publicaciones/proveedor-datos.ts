@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
+import type { VariacionLeida } from "./privatizar-variable";
 import type { BodegaDropi, ProductoProveedor } from "./sincronizar-dropi";
 
 /**
@@ -33,7 +34,7 @@ export async function cargarProductosProveedor(supabase: SupabaseClient, paisId:
     const filas = await traerTodasLasFilas<Record<string, unknown>>((d, h) =>
       supabase
         .from("dropi_productos_proveedor")
-        .select("dropi_producto_id, nombre, tipo, archivado, privado, precio, precio_sugerido, stock, stock_privado, bodegas, categorias, fotos, creado_dropi, leido_en")
+        .select("dropi_producto_id, nombre, tipo, archivado, privado, precio, precio_sugerido, stock, stock_privado, bodegas, variaciones, categorias, fotos, creado_dropi, leido_en")
         .eq("pais_id", paisId)
         .order("dropi_producto_id")
         .range(d, h),
@@ -59,6 +60,7 @@ export async function cargarProductosProveedor(supabase: SupabaseClient, paisId:
         categorias: (f.categorias as string[] | null) ?? [],
         fotos: Number(f.fotos ?? 0),
         creado: (f.creado_dropi as string | null) ?? null,
+        variaciones: Array.isArray(f.variaciones) ? (f.variaciones as VariacionLeida[]) : null,
       });
     }
     return { leidoEn, productos };

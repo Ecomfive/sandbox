@@ -2,6 +2,7 @@ import { useMoneda } from "./moneda-contexto";
 import type { CambioDropiVista } from "@/lib/publicaciones/cambios-dropi";
 import { republicacionSinTocarDropi } from "@/lib/publicaciones/republicar-dropi";
 import { codigoBodega } from "@/lib/publicaciones/sincronizar-dropi";
+import { textoVariacion } from "@/lib/publicaciones/stock-dropi";
 import { quienesDe, unidadesTotales } from "@/lib/publicaciones/privatizar-dropi";
 
 const fecha = (iso: string) => new Date(iso).toLocaleString("es-PA", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone: "America/Panama" });
@@ -71,7 +72,7 @@ function EstadoApagar({ c }: { c: CambioDropiVista }) {
 /** Cómo va un cambio de stock (migración 0173): hecho, pendiente o con error (se reintenta). */
 function EstadoStock({ c }: { c: CambioDropiVista }) {
   const d = c.stock;
-  const que = d ? `${codigoBodega(d.bodega)} a ${d.unidades.toLocaleString("es-PA")} u.` : "stock";
+  const que = d ? `${codigoBodega(d.bodega)}${textoVariacion(d)} a ${d.unidades.toLocaleString("es-PA")} u.` : "stock";
   if (c.estado === "aplicado")
     return (
       <span className="flex items-center gap-1.5 text-xs text-success">

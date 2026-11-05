@@ -8,7 +8,8 @@ import { normalizarDatosDevolver, normalizarUnidades, type DatosDevolver } from 
 import { normalizarDatosCrear, type DatosCrearDropi, type FotoCrear } from "@/lib/publicaciones/crear-dropi";
 import { unaPorFoto } from "@/lib/publicaciones/fotos-dropi";
 import { destinosDe, normalizarDatosPrivatizar, quienesDe, type DatosPrivatizar } from "@/lib/publicaciones/privatizar-dropi";
-import { normalizarDatosStock, type DatosStock } from "@/lib/publicaciones/stock-dropi";
+import type { VariacionLeida } from "@/lib/publicaciones/privatizar-variable";
+import { normalizarDatosStock, textoVariacion, type DatosStock } from "@/lib/publicaciones/stock-dropi";
 import { codigoBodega } from "@/lib/publicaciones/sincronizar-dropi";
 import { puedeVerPaisId } from "@/lib/seguridad/pais-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -17,6 +18,17 @@ const MODULO = "publicaciones-dropi";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX = 100;
 const num = (v: unknown) => (v === null || v === undefined ? null : Number(v));
+
+/** Lo que el favorito dice de una variación releída, ya limpio; null si no sirve. */
+function normalizarVariacionReleida(crudo: unknown): { firma: string; bodegas: { id: number; stock: number }[] } | null {
+  const v = (typeof crudo === "object" && crudo !== null ? crudo : {}) as { firma?: unknown; bodegas?: unknown };
+  if (typeof v.firma !== "string" || !v.firma || !Array.isArray(v.bodegas)) return null;
+  const bodegas = (v.bodegas as { id?: unknown; stock?: unknown }[])
+    .slice(0, 20)
+    .filter((b) => Number.isInteger(b?.id) && (b.id as number) > 0 && Number.isInteger(b?.stock) && (b.stock as number) >= 0)
+    .map((b) => ({ id: b.id as number, stock: b.stock as number }));
+  return { firma: v.firma, bodegas };
+}
 
 export interface CambioParaDropi {
   id: string;
@@ -214,6 +226,14 @@ async function stockAlSistema(supabase: ReturnType<typeof createServiceClient>, 
   await supabase.from("dropi_productos_proveedor").update({ bodegas: nuevas, stock: nuevas.reduce((t, b) => t + b.stock, 0) }).eq("pais_id", paisId).eq("dropi_producto_id", productoId);
 }
 
+/** Pone en la lectura de «Mis productos» lo que el favorito releyó de una variación, para que la ficha la muestre sin esperar la lectura (5 nov 2026). */
+async function variacionAlSistema(supabase: ReturnType<typeof createServiceClient>, paisId: string, productoId: number, v: { firma: string; bodegas: { id: number; stock: number }[] }) {
+  const { data: fila } = await supabase.from("dropi_productos_proveedor").select("variaciones").eq("pais_id", paisId).eq("dropi_producto_id", productoId).maybeSingle();
+  if (!Array.isArray(fila?.variaciones)) return;
+  const variaciones = (fila.variaciones as VariacionLeida[]).map((x) => (x.firma === v.firma ? { ...x, bodegas: v.bodegas } : x));
+  await supabase.from("dropi_productos_proveedor").update({ variaciones }).eq("pais_id", paisId).eq("dropi_producto_id", productoId);
+}
+
 /**
  * Los cambios que esperan para Dropi en un país (pendientes y los que dieron error, para reintentarlos), para el favorito «Aplicar en
  * Dropi». No lleva nada de la sesión de Dropi: el favorito los aplica desde su pestaña.
@@ -287,7 +307,7 @@ export async function guardarResultadosDropi(codigoPais: string, resultados: unk
   if (!pais) return { error: "País no válido." };
   if (!Array.isArray(resultados) || resultados.length > MAX) return { error: "Resultados no válidos." };
   const limpios = resultados
-    .map((r) => r as { id?: unknown; ok?: unknown; error?: unknown; nuevo?: unknown; archivado?: unknown; aviso?: unknown; salida?: unknown; antes?: unknown; stock?: unknown; bodegas?: unknown; unidades?: unknown; devuelto?: unknown })
+    .map((r) => r as { id?: unknown; ok?: unknown; error?: unknown; nuevo?: unknown; archivado?: unknown; aviso?: unknown; salida?: unknown; antes?: unknown; stock?: unknown; bodegas?: unknown; variacion?: unknown; unidades?: unknown; devuelto?: unknown })
     .filter((r) => typeof r.id === "string" && UUID.test(r.id))
     .map((r) => ({
       id: r.id as string,
@@ -312,6 +332,8 @@ export async function guardarResultadosDropi(codigoPais: string, resultados: unk
             .filter((b) => Number.isInteger(b.id) && (b.id as number) > 0 && Number.isInteger(b.stock) && (b.stock as number) >= 0)
             .map((b) => ({ id: b.id as number, nombre: String(b.nombre ?? "").slice(0, 80), stock: b.stock as number }))
         : null,
+      // «stock» de una variación: cómo quedó esa variación en cada bodega.
+      variacion: normalizarVariacionReleida(r.variacion),
       // El ID del producto que creó una republicación (aunque haya fallado un paso después).
       nuevo: Number.isInteger(r.nuevo) && (r.nuevo as number) > 0 && (r.nuevo as number) < 100_000_000 ? (r.nuevo as number) : null,
     }));
@@ -380,7 +402,8 @@ export async function guardarResultadosDropi(codigoPais: string, resultados: unk
         .eq("id", r.id);
       // Confirmado en Dropi: el sistema muestra ya ese stock (lo que releyó el favorito), sin esperar la próxima lectura de «Mis productos».
       if (r.ok && r.bodegas) await stockAlSistema(supabase, pais.id, Number(f.dropi_producto_id), r.bodegas);
-      const bodega = `${codigoBodega(d.bodega)}${d.nombreBodega ? ` · ${d.nombreBodega}` : ""}`;
+      if (r.ok && r.variacion && r.variacion.firma === d.firma) await variacionAlSistema(supabase, pais.id, Number(f.dropi_producto_id), r.variacion);
+      const bodega = `${codigoBodega(d.bodega)}${d.nombreBodega ? ` · ${d.nombreBodega}` : ""}${textoVariacion(d)}`;
       auditoria.push({
         accion: r.ok ? "dropi_stock_aplicado" : "dropi_stock_error",
         entidad: "dropi_publicaciones",

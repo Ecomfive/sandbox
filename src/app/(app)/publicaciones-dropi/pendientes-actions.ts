@@ -8,7 +8,7 @@ import { getPaisActual } from "@/lib/pais";
 import { puedeVerPaisId } from "@/lib/seguridad/pais-acceso";
 import { normalizarDatosCrear } from "@/lib/publicaciones/crear-dropi";
 import { normalizarDatosPrivatizar, quienesDe, unidadesTotales } from "@/lib/publicaciones/privatizar-dropi";
-import { normalizarDatosStock } from "@/lib/publicaciones/stock-dropi";
+import { normalizarDatosStock, textoVariacion } from "@/lib/publicaciones/stock-dropi";
 import { republicacionSinTocarDropi } from "@/lib/publicaciones/republicar-dropi";
 import { codigoBodega } from "@/lib/publicaciones/sincronizar-dropi";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -116,7 +116,7 @@ export async function listarCambiosPendientes(): Promise<{ error?: string; cambi
         }
       } else if (tipo === "stock") {
         const d = normalizarDatosStock(f.datos);
-        lineas.push(`Stock en ${codigoBodega(d.bodega)}${d.nombreBodega ? ` · ${d.nombreBodega}` : ""}: ${d.antes !== null ? `${d.antes.toLocaleString("es-PA")} → ` : ""}${d.unidades.toLocaleString("es-PA")} u. · «${d.concepto}»`);
+        lineas.push(`Stock en ${codigoBodega(d.bodega)}${d.nombreBodega ? ` · ${d.nombreBodega}` : ""}${textoVariacion(d)}: ${d.antes !== null ? `${d.antes.toLocaleString("es-PA")} → ` : ""}${d.unidades.toLocaleString("es-PA")} u. · «${d.concepto}»`);
         alDeshacer = "Se quita de la cola; el stock del sistema no cambia (es el que lee Dropi). Dropi no se había tocado.";
         if (intentos > 0) {
           deshacible = false;

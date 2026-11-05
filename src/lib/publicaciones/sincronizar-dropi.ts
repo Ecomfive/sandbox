@@ -3,6 +3,8 @@
 // estado que dice Dropi. Sin base ni React, con prueba. La lectura la hace scripts/scraping-proveedores-navegador.js ›
 // leerNuestrosProductos y la guarda scripts/publicaciones-sincronizar-dropi.ts (migración 0131).
 
+import type { VariacionLeida } from "./privatizar-variable";
+
 export interface BodegaDropi {
   id: number;
   nombre: string;
@@ -24,6 +26,8 @@ export interface ProductoProveedor {
   categorias: string[];
   fotos: number;
   creado: string | null;
+  /** Las variaciones con su stock por bodega (migración 0226); null o sin poner = esa lectura no las trajo. */
+  variaciones?: VariacionLeida[] | null;
 }
 
 const numero = (v: unknown): number | null => (v === null || v === undefined || v === "" || !Number.isFinite(Number(v)) ? null : Number(v));

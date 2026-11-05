@@ -409,7 +409,14 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
       bodegasDropi: prov ? bodegasEnOrden(prov.bodegas).map((b) => ({ id: b.id, nombre: b.nombre, stock: b.stock })) : null,
       stockPorId: (prov ? [prov, ...idsDropi(d).map((i) => proveedor?.productos.get(i)).filter((x) => !!x && x.id !== prov.id)] : [])
         .filter((x): x is NonNullable<typeof x> => !!x)
-        .map((x) => ({ id: x.id, archivado: x.archivado, stock: x.stock, bodegas: bodegasEnOrden(x.bodegas).map((b) => ({ id: b.id, nombre: b.nombre, stock: b.stock })) })),
+        .map((x) => ({
+          id: x.id,
+          archivado: x.archivado,
+          stock: x.stock,
+          bodegas: bodegasEnOrden(x.bodegas).map((b) => ({ id: b.id, nombre: b.nombre, stock: b.stock })),
+          variable: x.tipo === "VARIABLE",
+          variaciones: x.tipo === "VARIABLE" ? (x.variaciones ?? null) : null,
+        })),
       stockProveedor: prov?.stock ?? null,
       stockPrivadoProveedor: prov?.stockPrivado ?? null,
       leidoProveedor: proveedor?.leidoEn ?? null,
@@ -428,7 +435,15 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
       datosDropi: d.estado_publicacion === "borrador" ? normalizarDatosCrear(datosBorradores.get(d.id as string) ?? null) : null,
       archivadoPendiente: cambiosDropi.archivando.has(d.id as string) ? (cambiosDropi.archivando.get(d.id as string) ? "restaurar" : "archivar") : null,
       privatizaciones: cambiosDropi.privatizando.get(d.id as string) ?? [],
-      stockPendiente: (cambiosDropi.ajustandoStock.get(d.id as string) ?? []).map(({ producto, bodega, nombreBodega, unidades, antes }) => ({ producto, bodega, nombreBodega, unidades, antes })),
+      stockPendiente: (cambiosDropi.ajustandoStock.get(d.id as string) ?? []).map(({ producto, bodega, nombreBodega, unidades, antes, firma, etiqueta }) => ({
+        producto,
+        bodega,
+        nombreBodega,
+        unidades,
+        antes,
+        firma: firma ?? null,
+        etiqueta: etiqueta ?? null,
+      })),
       duplicadaDe: null,
       pausadaDesde: pausadaEn.get(d.id as string) ?? null,
       liquidacionDesde: liquidacionEn.get(d.id as string) ?? null,

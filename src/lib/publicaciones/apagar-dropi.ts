@@ -200,21 +200,45 @@ export function emparejarDevolucion(publico: Obj, unidades: Record<string, numbe
   return { porVariacion };
 }
 
-/** El guardado que le devuelve unidades a un público con variaciones: una entrada por variación y bodega (`porVariacion`, de `emparejarDevolucion`) sobre lo que Dropi devuelve de cada variación. */
+/**
+ * Las filas de una variación en `warehouselected`, como las arma la pantalla de Dropi: lo que devuelve `get_warehouses_stock`, más las bodegas del proveedor que aún no tiene (van sin
+ * `stock`), y en cada una su movimiento si lo lleva (`movimientos`, por bodega). Un producto recién creado no tiene ninguna fila: sin agregarlas no se le podía dar stock.
+ */
+export function filasDeVariacion(entradas: Obj[], bodegasProveedor: Obj[], variacionId: unknown, movimientos: Record<string, Obj>): Obj[] {
+  const lista = entradas.map((e) => ({ ...e, ...movimientos[String(e.warehouse_id)] }));
+  for (const b of bodegasProveedor) {
+    if (lista.some((e) => Number(e.warehouse_id) === Number(b.id))) continue;
+    lista.push({ warehouse_id: b.id, fullName: `${b.name}(${b.address})`, variation_id: variacionId, warehouse_white_brand: b.warehouse_white_brand, ...movimientos[String(b.id)] });
+  }
+  return lista;
+}
+
+/**
+ * El guardado que le da unidades a un producto con variaciones: una entrada por variación y bodega (`porVariacion`, de `emparejarDevolucion`, por posición entre las vivas) sobre lo que
+ * Dropi devuelve de cada variación. Igual que la pantalla (comprobado el 5 nov 2026, ver `stock-dropi.ts`): cada lista va en su posición de `variations`, con `null` en las que no se tocan.
+ */
 export function armarEntradaVariable(publico: Obj, bodegasProveedor: Obj[], porVariacion: Record<string, Record<string, number>>, entradas: Obj[][], concepto: string): { cuerpo: Obj } | { error: string } {
   const r = armarGuardadoProducto(publico, bodegasProveedor, { nombre: null, nombreGuia: null }, { variable: true });
   if ("error" in r) return r;
+  const todas = Array.isArray(publico.variations) ? (publico.variations as Obj[]) : [];
+  const vivas = variacionesVivas(publico);
+  const bodegas: (Obj[] | null)[] = [];
   let movidas = 0;
   let esperadas = 0;
-  for (const i of Object.keys(porVariacion)) esperadas += Object.keys(porVariacion[i]).length;
-  const bodegas = entradas.map((a, i) =>
-    a.map((e) => {
-      const q = Number(porVariacion[String(i)]?.[String(e.warehouse_id)] ?? 0);
-      if (!q) return e;
-      movidas++;
-      return { ...e, quantity: q, type_movement: "ENTRADA", concept: concepto };
-    }),
-  );
+  for (const i of Object.keys(porVariacion)) {
+    const v = vivas[Number(i)];
+    const pos = todas.indexOf(v);
+    if (pos < 0) return { error: "Esa variación no está en el público." };
+    const movimientos: Record<string, Obj> = {};
+    for (const [b, q] of Object.entries(porVariacion[i])) {
+      movimientos[b] = { quantity: String(q), type_movement: "ENTRADA", concept: concepto };
+      esperadas++;
+    }
+    const lista = filasDeVariacion(entradas[Number(i)] ?? [], bodegasProveedor, v.id, movimientos);
+    movidas += lista.filter((e) => e.type_movement).length;
+    while (bodegas.length <= pos) bodegas.push(null);
+    bodegas[pos] = lista;
+  }
   if (movidas !== esperadas) return { error: "Una bodega de esas unidades no está en la variación del público." };
   return { cuerpo: { ...r.cuerpo, warehouselected: bodegas } };
 }
@@ -327,9 +351,13 @@ export const APAGAR_JS = [
   "if(!por[i])por[i]={};por[i][b]=(por[i][b]||0)+u[k]}",
   "if(sp.length)return{error:'El público no tiene la variación '+sp.map(function(x){return x||'(sin atributos)'}).join(', ')+': devuelve esas unidades a mano.'};",
   "return{porVariacion:por}}",
+  "function filasV(en,bp,id,mv){var li=en.map(function(e){return Object.assign({},e,mv[String(e.warehouse_id)])});",
+  "bp.forEach(function(p){if(li.some(function(e){return Number(e.warehouse_id)===Number(p.id)}))return;li.push(Object.assign({warehouse_id:p.id,fullName:p.name+'('+p.address+')',variation_id:id,warehouse_white_brand:p.warehouse_white_brand},mv[String(p.id)]))});return li}",
   "function entradaV(po,bp,pv,en,k){var r=armar(po,bp,{nombre:null,nombreGuia:null,variable:true});if(r.error)return r;",
-  "var mv=0,es=0,i,b;for(i in pv)for(b in pv[i])es++;",
-  "var wh=en.map(function(a,i2){return a.map(function(e){var q=Number(pv[String(i2)]&&pv[String(i2)][String(e.warehouse_id)]||0);if(!q)return e;mv++;return Object.assign({},e,{quantity:q,type_movement:'ENTRADA',concept:k})})});",
+  "var td=Array.isArray(po.variations)?po.variations:[],vv=vivasV(po),wh=[],mv=0,es=0,i,b;",
+  "for(i in pv){var v=vv[Number(i)],ps=td.indexOf(v);if(ps<0)return{error:'Esa variación no está en el público.'};var m={};",
+  "for(b in pv[i]){m[b]={quantity:String(pv[i][b]),type_movement:'ENTRADA',concept:k};es++}",
+  "var li=filasV(en[Number(i)]||[],bp,v.id,m);mv+=li.filter(function(e){return e.type_movement}).length;while(wh.length<=ps)wh.push(null);wh[ps]=li}",
   "if(mv!==es)return{error:'Una bodega de esas unidades no está en la variación del público.'};",
   "return{cuerpo:Object.assign({},r.cuerpo,{warehouselected:wh})}}",
 ].join("");
