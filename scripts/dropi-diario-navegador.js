@@ -131,6 +131,12 @@ async function dropiDiario(subida, dias = { pedidos: 30, cartera: 7 }) {
         await espera(1300);
       }
     }
+    // Las variaciones de cada producto activo con variaciones, para «Privatizar en Dropi»: la lista no las trae (5 nov 2026). Si una no se puede leer, la lectura sigue sin ella.
+    for (const p of productos.filter((x) => x.type === "VARIABLE" && !x.archivado)) {
+      const j = await pedir(`https://${api}/api/products/${p.id}`).catch(() => null);
+      if (Array.isArray(j?.objects?.variations)) p.variations = j.objects.variations.map((v) => ({ id: v.id, sku: v.sku, deleted_at: v.deleted_at, attribute_values: v.attribute_values, warehouse_product_variation: (v.warehouse_product_variation || []).map((w) => ({ warehouse_id: w.warehouse_id, stock: w.stock })) }));
+      await espera(300);
+    }
     const stock = { tipo: "nuestros", pais, inicio: new Date().toISOString(), duracionMs: Math.round(performance.now() - t0), productos };
 
     // 5. Subida (cada dirección vale para un archivo y 2 horas).

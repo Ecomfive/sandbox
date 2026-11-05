@@ -14,6 +14,7 @@
 //  trae otros dropshippers con sus unidades. Dropi ya lo permite (`private_product_inventories` es una lista): se crea UN producto privado con el stock total
 //  (principal + extras), se asigna cada correo con sus unidades (releyendo el producto entre una reserva y la otra, para no pisar la anterior) y al público
 //  se le saca el total.
+//  Con variaciones (pedido de Hernán, 5 nov 2026): `variaciones` trae las unidades de cada una y se arma aparte, en `privatizar-variable.ts`.
 // Aquí van las piezas puras (sin base ni red), con prueba que también compara la versión en JavaScript del favorito.
 
 import { armarGuardadoProducto, MAX_NOMBRE_DROPI } from "./dropi-guardado";
@@ -87,7 +88,21 @@ export interface DatosPrivatizar {
   salida: boolean;
   /** Otros correos en el mismo ID (con sus unidades); `unidades` es solo la del correo principal. Vacío o ausente = un solo correo. */
   extras?: DestinoExtra[];
+  /** Un público con variaciones: las unidades de cada una (`unidades` es su suma y va un solo correo). Vacío o ausente = un producto simple. */
+  variaciones?: VariacionPrivatizar[];
 }
+
+/** Las unidades de una variación del público que pasan al privado. */
+export interface VariacionPrivatizar {
+  /** Qué variación es (`firmaVariacion`). */
+  firma: string;
+  /** Cómo se muestra: «+1.50», «Negro / M». */
+  etiqueta: string;
+  unidades: number;
+}
+
+/** Cuántas variaciones caben en una privatización. */
+const MAX_VARIACIONES = 200;
 
 /** Todas las unidades que pasan al producto privado: las del correo principal y las de los demás correos del mismo ID. */
 export const unidadesTotales = (d: Pick<DatosPrivatizar, "unidades" | "extras">): number => d.unidades + (d.extras ?? []).reduce((t, x) => t + x.unidades, 0);
@@ -126,18 +141,28 @@ export function normalizarDatosPrivatizar(crudo: unknown): DatosPrivatizar {
     const u = Math.trunc(n(e.unidades));
     return { correo: CORREO_VALIDO.test(c) ? c : "", dropshipper: texto(e.dropshipper, 120), unidades: u > 0 && u < 10_000_000 ? u : 0 };
   });
+  const variaciones: VariacionPrivatizar[] = (Array.isArray(r.variaciones) ? (r.variaciones as unknown[]) : [])
+    .slice(0, MAX_VARIACIONES)
+    .map((x) => {
+      const e = (typeof x === "object" && x !== null ? x : {}) as Obj;
+      const u = Math.trunc(n(e.unidades));
+      return { firma: texto(e.firma, 300), etiqueta: texto(e.etiqueta, 120), unidades: u > 0 && u < 10_000_000 ? u : 0 };
+    })
+    .filter((x) => x.firma && x.unidades > 0);
+  const total = variaciones.length ? variaciones.reduce((t, x) => t + x.unidades, 0) : unidades;
   return {
     correo: CORREO_VALIDO.test(correo) ? correo : "",
     dropshipper: texto(r.dropshipper, 120),
     dropshipperId: typeof r.dropshipperId === "string" && UUID.test(r.dropshipperId) ? r.dropshipperId : null,
     iniciales,
-    unidades: unidades > 0 && unidades < 10_000_000 ? unidades : 0,
+    unidades: total > 0 && total < 10_000_000 ? total : 0,
     bodega: bodega > 0 && bodega < 100_000_000 ? bodega : 0,
     precio: precio >= PRECIO_MINIMO_PRIVADO && precio < 1e7 ? precio : 0,
     nombre: texto(r.nombre, MAX_NOMBRE_DROPI),
     origen,
     salida: r.salida === true,
-    ...(extras.length ? { extras } : {}),
+    ...(extras.length && !variaciones.length ? { extras } : {}),
+    ...(variaciones.length ? { variaciones } : {}),
   };
 }
 
@@ -205,7 +230,7 @@ export function armarPrivado(producto: Obj, bodegasProveedor: Obj[], d: DatosPri
 
 /** Por qué el producto público no se puede privatizar con estos datos (o null si sí). */
 export function errorDeOrigen(producto: Obj, bodegasProveedor: Obj[], d: DatosPrivatizar): string | null {
-  if (producto.type !== "SIMPLE") return "Tiene variaciones: privatízalo a mano en Dropi.";
+  if (producto.type !== "SIMPLE") return "Tiene variaciones: hay que indicar las unidades de cada una.";
   if (producto.privated_product === true) return "Ese producto ya es privado: se privatiza el público.";
   if (!bodegasProveedor.some((b) => Number(b.id) === d.bodega)) return "Esa bodega no es de ECOMFIVE: solo se privatiza stock de las bodegas propias.";
   if (!d.salida) {
@@ -253,7 +278,7 @@ export const PRIVATIZAR_JS = [
   "if(e)for(var k in e)r[k]=e[k];return r}",
   "function reservasQuitadas(l){return(Array.isArray(l)?l:[]).map(function(x){return x.deleted_at?reserva(x):reserva(x,{deleted_at:true,change:true})})}",
   "function errorOrigen(o,bp,d){",
-  "if(o.type!=='SIMPLE')return'Tiene variaciones: privatízalo a mano en Dropi.';",
+  "if(o.type!=='SIMPLE')return'Tiene variaciones: hay que indicar las unidades de cada una.';",
   "if(o.privated_product===true)return'Ese producto ya es privado: se privatiza el público.';",
   "if(!bp.some(function(b){return Number(b.id)===d.bodega}))return'Esa bodega no es de ECOMFIVE: solo se privatiza stock de las bodegas propias.';",
   "if(!d.salida){var w=(Array.isArray(o.warehouse_product)?o.warehouse_product:[]).filter(function(x){return Number(x.warehouse_id)===d.bodega})[0]||{},hay=Number(w.stock!=null?w.stock:0);",
