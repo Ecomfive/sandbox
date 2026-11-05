@@ -64,6 +64,7 @@ export function TablaDatos<F, C = undefined>({
   descargaCompleta,
   sinDescarga,
   accionPrincipal,
+  resumen,
   seleccion,
   fijarEncabezado,
   vacio,
@@ -115,6 +116,8 @@ export function TablaDatos<F, C = undefined>({
   sinDescarga?: boolean;
   /** El botón «Agregar» del módulo (`FichaCrear`), al final de la fila de botones de la barra, junto a Descargar. */
   accionPrincipal?: ReactNode;
+  /** Un resumen arriba de la tabla, con **todas** las filas que dejan ver los filtros (no solo la página). */
+  resumen?: (filas: F[]) => ReactNode;
   /**
    * Casillas para marcar filas (una por fila y una en el encabezado que marca todas las que se ven) y, con alguna marcada,
    * la barra que dibuja el módulo (`barra`) fija abajo, como en Retiros y en ClickUp. Solo cuenta lo que se ve ahora (las
@@ -317,6 +320,7 @@ export function TablaDatos<F, C = undefined>({
 
   return (
     <div ref={raiz} className="min-w-0 rounded-xl border border-border bg-card">
+      {resumen && <div className="border-b border-border p-3">{resumen(resultado.filas)}</div>}
       <BarraHerramientas
         def={def}
         filas={filas}

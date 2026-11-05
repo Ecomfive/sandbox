@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
+import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
 import { fieldClassSm } from "@/components/ui/field";
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { MiniaturaFoto } from "@/components/ui/miniatura-foto";
@@ -61,6 +62,19 @@ const COLUMNAS: ColumnaTabla<FilaStock>[] = [
   { id: "vencido", label: "Vencido", descripcion: DESCRIPCION_CUBETA.vencido, ocultable: true, render: (f) => celda(f.vencido), total: total((f) => f.vencido) },
   { id: "enCamino", label: "En camino", descripcion: DESCRIPCION_CUBETA.enCamino, ocultable: true, render: (f) => celda(f.enCamino), total: total((f) => f.enCamino) },
 ];
+
+/** Los totales arriba de la tabla, a la vista sin bajar ni descargar: cambian con la bodega, la búsqueda y los filtros. */
+function ResumenStock({ filas }: { filas: FilaStock[] }) {
+  const num = (n: number) => n.toLocaleString("es-PA");
+  const conStock = filas.filter((f) => f.tipo !== "combo" && f.fisico !== 0).length;
+  return (
+    <KpiGrid compacta>
+      <KpiCard compacta titulo="Unidades físicas" valor={num(sumaSinCompuestos(filas, (f) => f.fisico))} subtexto="Sin contar compuestos" />
+      <KpiCard compacta titulo="Disponibles" valor={num(sumaSinCompuestos(filas, (f) => f.disponible))} subtexto="Las que se pueden vender" />
+      <KpiCard compacta titulo="Productos con stock" valor={num(conStock)} subtexto="Sin contar compuestos" />
+    </KpiGrid>
+  );
+}
 
 /** Elige de qué bodega se ve el stock (todas las del país, o una): se guarda en la dirección, `?bodega=`. */
 function SelectorBodega({ bodegas, elegida }: { bodegas: { id: string; nombre: string; externa: boolean }[]; elegida: string }) {
@@ -125,6 +139,7 @@ export function TablaStock({
         claveFila={(f) => f.id}
         anchoMinimo="60rem"
         accionPrincipal={<SelectorBodega bodegas={bodegas} elegida={bodegaElegida} />}
+        resumen={(visibles) => <ResumenStock filas={visibles} />}
         abrirFila={{ etiqueta: (f) => `Abrir el inventario del SKU ${f.codigo}`, alAbrir: (f) => setAbierto(f.id) }}
         ariaLabel="Inventario por SKU"
         vacio="Todavía no hay SKUs maestros."
