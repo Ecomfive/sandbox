@@ -63,7 +63,7 @@ const normal = (t: string) => t.normalize("NFD").replace(/\p{M}/gu, "").toLowerC
 
 /**
  * Para «Importar lista» del levantamiento: busca el producto de cada línea (por SKU, por nombre igual o por parecido del nombre,
- * el mismo cruce de Testing Lab) entre los productos simples que no están en Test. No guarda nada.
+ * el mismo cruce de Testing Lab) entre los productos simples que no están en Test ni tienen variantes (se cuenta cada variante). No guarda nada.
  */
 export async function sugerirProductosParaLista(nombres: string[]): Promise<{ sugerencias: SugerenciaLinea[] } | { error: string }> {
   await requireModulo("inventario");
@@ -71,7 +71,7 @@ export async function sugerirProductosParaLista(nombres: string[]): Promise<{ su
   if (nombres.length > MAX_LINEAS_IMPORTADAS) return { error: `Son demasiadas líneas (máximo ${MAX_LINEAS_IMPORTADAS}).` };
   const supabase = createServiceClient();
   const { data, error } = await traerTodasConError<{ id: string; codigo: string; nombre: string }>((d, h) =>
-    supabase.from("skus_maestros").select("id, codigo, nombre").neq("tipo", "combo").neq("clase", "test").order("codigo").range(d, h),
+    supabase.from("skus_maestros").select("id, codigo, nombre").neq("tipo", "combo").neq("clase", "test").is("opciones_variantes", null).order("codigo").range(d, h),
   );
   if (error || !data) return { error: "No se pudieron cargar los productos." };
   const porId = new Map(data.map((p) => [p.id, p]));

@@ -14,7 +14,8 @@ const ES_ID = (v: string) => /^[0-9a-fA-F-]{8,64}$/.test(v);
 
 /**
  * Levantamiento de inventario (conteo físico) por bodega: se elige una bodega propia del país, se escribe lo que se contó de
- * cada producto y, al guardar, cada uno queda en lo contado (la diferencia se anota como ajuste en el libro).
+ * cada producto y, al guardar, cada uno queda en lo contado (la diferencia se anota como ajuste en el libro). Un producto con
+ * variantes no sale: no lleva stock propio y la base rechazaría todo el conteo; se cuenta cada variante.
  */
 export default async function LevantamientoPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
   const usuario = await requireModulo("inventario");
@@ -36,7 +37,7 @@ export default async function LevantamientoPage({ searchParams }: { searchParams
 
   const [productos, stock, lotes, ultimo] = await Promise.all([
     traerTodasConError<{ id: string; codigo: string; nombre: string; clase: string | null; maneja_vencimiento: boolean | null; foto_url: string | null }>((d, h) =>
-      supabase.from("skus_maestros").select("id, codigo, nombre, clase, maneja_vencimiento, foto_url").neq("tipo", "combo").neq("clase", "test").order("codigo").range(d, h),
+      supabase.from("skus_maestros").select("id, codigo, nombre, clase, maneja_vencimiento, foto_url").neq("tipo", "combo").neq("clase", "test").is("opciones_variantes", null).order("codigo").range(d, h),
     ),
     elegida
       ? traerTodasConError<{ sku_maestro_id: string; fisico: number }>((d, h) => supabase.from("wms_stock").select("sku_maestro_id, fisico").eq("bodega_id", elegida).order("sku_maestro_id").range(d, h))
