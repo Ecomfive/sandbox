@@ -318,7 +318,7 @@ convenciones técnicas del código.
   `acceso-seccion.ts`, «Líderes comerciales» del CRM y el progreso de la Universidad ya cuentan lo propio de cada persona.
 - **Actualizaciones del sistema** (31 oct 2026, pedido de Alcides). **Para todos**, en Avisos (`/notificaciones`, `actualizaciones-avisos.tsx`, debajo
   de «Para ti»): las `NOVEDADES` de sus módulos de los últimos `DIAS_AVISO` (30) días; al abrir una queda leída, con «Por leer / Leídas / Todas»,
-  «Marcar todas como leídas» y «Marcar como no leída». Lo leído se guarda **por persona** en `novedades_vistas` (migración 0218; `claveNovedad` =
+  «Marcar todas como leídas» y, en cada una, un botón a su derecha para marcarla leída o por leer sin abrirla (5 nov 2026; también en `/actualizaciones`, visto o nuevo). Lo leído se guarda **por persona** en `novedades_vistas` (migración 0218; `claveNovedad` =
   fecha + huella FNV-1a del título, con prueba de que no se repite; `marcarNovedades`, `src/lib/ayuda/novedades-actions.ts`), y lo no leído suma al
   número de Avisos (`PendientesMenu.novedades`, `contarNovedadesSinVer`). Avisos se ve para todo el mundo. **Para administradores**, `/actualizaciones`
   (botón «Cambios» del riel, con punto si hay sin leer): todas las novedades por día, con «Nuevo» y, de cada una, quiénes de su módulo ya la vieron y
