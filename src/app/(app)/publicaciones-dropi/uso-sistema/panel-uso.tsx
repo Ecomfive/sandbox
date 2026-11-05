@@ -1,9 +1,10 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
+import { Delta, Pastilla, claseThLista, claseTdLista } from "@/components/panel/piezas-panel";
 import { fieldClassSm, labelClassSm } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
+import { AlertaIcon, TiendaIcon, VentasIcon } from "@/lib/nav-icons";
 import { numeroPublicacion } from "@/lib/publicaciones/publicacion";
 import {
   MOTIVOS_FUERA,
@@ -15,6 +16,7 @@ import {
   type MotivoFuera,
 } from "@/lib/publicaciones/origen";
 import { guardarMotivoUso } from "./actions";
+import { AnilloUso, AvanceMotivos, CifraUso, FilaMotivo, FilaProporcion, GraficaSemanas, LeyendaUso, TarjetaUso } from "./graficas-uso";
 
 const etiquetaTipo = (t: AltaPublicacion["tipo"]) => TIPOS_ALTA.find((x) => x.valor === t)?.etiqueta ?? t;
 const etiquetaMotivo = (m: MotivoFuera) => MOTIVOS_FUERA.find((x) => x.valor === m)?.etiqueta ?? m;
@@ -24,47 +26,7 @@ const textoPorcentaje = (c: Conteo) => {
 };
 const dia = (f: string) => new Date(`${f}T12:00:00Z`).toLocaleDateString("es-PA", { day: "numeric", month: "short", timeZone: "UTC" });
 
-const claseCelda = "px-3 py-2 align-top";
-const claseTitulo = "px-3 py-2 text-left text-xs font-medium text-muted-foreground";
-const claseNumero = `${claseCelda} text-right tabular-nums`;
-
-function TablaConteos({ titulo, encabezado, filas }: { titulo: string; encabezado: string; filas: (Conteo & { clave: string; etiqueta: string })[] }) {
-  return (
-    <section className="flex min-w-0 flex-col gap-2">
-      <h2 className="text-sm font-semibold tracking-tight">{titulo}</h2>
-      <div className="overflow-x-auto rounded-lg border border-border bg-card">
-        <table className="w-full text-sm">
-          <thead>
-            <tr>
-              <th scope="col" className={claseTitulo}>
-                {encabezado}
-              </th>
-              <th scope="col" className={`${claseTitulo} text-right`}>
-                Sistema
-              </th>
-              <th scope="col" className={`${claseTitulo} text-right`}>
-                Dropi
-              </th>
-              <th scope="col" className={`${claseTitulo} text-right`}>
-                En el sistema
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {filas.map((f) => (
-              <tr key={f.clave} className="border-t border-border">
-                <td className={claseCelda}>{f.etiqueta}</td>
-                <td className={claseNumero}>{f.sistema}</td>
-                <td className={claseNumero}>{f.dropi}</td>
-                <td className={`${claseNumero} font-medium`}>{textoPorcentaje(f)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </section>
-  );
-}
+const claseCelda = `${claseTdLista} align-middle whitespace-normal`;
 
 function FilaDropi({ a, puedeEscribir, nombrePais }: { a: AltaPublicacion; puedeEscribir: boolean; nombrePais: string }) {
   const { mostrarToast } = useToast();
@@ -79,14 +41,16 @@ function FilaDropi({ a, puedeEscribir, nombrePais }: { a: AltaPublicacion; puede
     });
 
   return (
-    <tr className="border-t border-border">
+    <tr className="hover:bg-muted/50">
       <td className={claseCelda}>
         <span className="block font-medium">{a.nombre}</span>
         <span className="text-xs text-muted-foreground tabular-nums">{numeroPublicacion(a.numero)}</span>
       </td>
       <td className={claseCelda}>{nombrePais}</td>
       <td className={`${claseCelda} whitespace-nowrap`}>{dia(a.fecha)}</td>
-      <td className={claseCelda}>{etiquetaTipo(a.tipo)}</td>
+      <td className={claseCelda}>
+        <Pastilla>{etiquetaTipo(a.tipo)}</Pastilla>
+      </td>
       <td className={claseCelda}>{a.persona ?? "—"}</td>
       <td className={claseCelda}>
         <select
@@ -97,7 +61,7 @@ function FilaDropi({ a, puedeEscribir, nombrePais }: { a: AltaPublicacion; puede
             setMotivo(e.target.value);
             guardar(e.target.value, nota);
           }}
-          className={`${fieldClassSm} w-56`}
+          className={`${fieldClassSm} w-48`}
         >
           <option value="">Sin motivo</option>
           {MOTIVOS_FUERA.map((m) => (
@@ -118,7 +82,7 @@ function FilaDropi({ a, puedeEscribir, nombrePais }: { a: AltaPublicacion; puede
           onBlur={() => {
             if (motivo && nota.trim() !== a.nota) guardar(motivo, nota);
           }}
-          className={`${fieldClassSm} w-64`}
+          className={`${fieldClassSm} w-52`}
         />
       </td>
     </tr>
@@ -132,6 +96,12 @@ export function PanelUso({ altas, paises, puedeEscribir }: { altas: AltaPublicac
   const enDropi = visibles.filter((a) => a.origen === "dropi");
   const nombrePais = (codigo: string) => paises.find((p) => p.codigo === codigo)?.nombre ?? codigo;
   const nuevos = r.porTipo.find((t) => t.tipo === "nuevo") ?? { sistema: 0, dropi: 0 };
+  // La gráfica va de la semana más vieja a la más nueva; `porSemana` viene al revés.
+  const semanas = [...r.porSemana].reverse().map((s) => ({ ...s, etiqueta: dia(s.semana) }));
+  const ultima = r.porSemana[0] ?? null;
+  const pctUltima = ultima ? porcentajeSistema(ultima) : null;
+  const pctAnterior = r.porSemana[1] ? porcentajeSistema(r.porSemana[1]) : null;
+  const cambio = pctUltima !== null && pctAnterior !== null ? pctUltima - pctAnterior : null;
 
   return (
     <div className="flex flex-col gap-6">
@@ -152,43 +122,77 @@ export function PanelUso({ altas, paises, puedeEscribir }: { altas: AltaPublicac
         </label>
       </div>
 
-      <KpiGrid>
-        <KpiCard titulo="Productos nuevos en el sistema" valor={textoPorcentaje(nuevos)} subtexto={`${nuevos.sistema} en el sistema · ${nuevos.dropi} en Dropi`} tono={nuevos.dropi > 0 ? "warning" : "success"} />
-        <KpiCard titulo="Todo lo creado en el sistema" valor={textoPorcentaje(r.total)} subtexto={`${r.total.sistema} en el sistema · ${r.total.dropi} en Dropi`} tono="info" />
-        <KpiCard titulo="Hecho en Dropi sin motivo" valor={r.sinMotivo} subtexto={`de ${r.total.dropi} hechos en Dropi`} tono={r.sinMotivo > 0 ? "warning" : "success"} />
-      </KpiGrid>
-
-      <div className="grid gap-6 lg:grid-cols-3">
-        <TablaConteos titulo="Por tipo" encabezado="Qué fue" filas={r.porTipo.map((t) => ({ ...t, clave: t.tipo, etiqueta: etiquetaTipo(t.tipo) }))} />
-        <TablaConteos titulo="Por semana" encabezado="Semana del" filas={r.porSemana.map((s) => ({ ...s, clave: s.semana, etiqueta: dia(s.semana) }))} />
-        <TablaConteos titulo="Por país" encabezado="País" filas={r.porPais.map((p) => ({ ...p, clave: p.pais, etiqueta: nombrePais(p.pais) }))} />
+      <div className="grid items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+        <TarjetaUso titulo="Todo lo creado" detalle="Desde el 24 de octubre" neon>
+          <AnilloUso total={r.total} />
+        </TarjetaUso>
+        <div className="flex min-w-0 flex-col gap-4">
+          <div className="grid gap-4 sm:grid-cols-3">
+            <CifraUso titulo="Productos nuevos en el sistema" valor={textoPorcentaje(nuevos)} detalle={`${nuevos.sistema} en el sistema · ${nuevos.dropi} en Dropi`} icono={TiendaIcon} color={nuevos.dropi > 0 ? "ambar" : "verde"} />
+            <CifraUso
+              titulo="Última semana"
+              valor={ultima ? textoPorcentaje(ultima) : "—"}
+              detalle={
+                ultima ? (
+                  <>
+                    Semana del {dia(ultima.semana)}
+                    {cambio !== null && (
+                      <>
+                        {" · "}
+                        <Delta valor={cambio} sufijo=" puntos" decimales={0} />
+                      </>
+                    )}
+                  </>
+                ) : (
+                  "Sin datos"
+                )
+              }
+              icono={VentasIcon}
+              color="azul"
+            />
+            <CifraUso titulo="Hecho en Dropi sin motivo" valor={r.sinMotivo} detalle={`de ${r.total.dropi} hechos en Dropi`} icono={AlertaIcon} color={r.sinMotivo > 0 ? "ambar" : "verde"} />
+          </div>
+          <TarjetaUso titulo="Por qué se hace en Dropi" detalle="Lo que hay que arreglar para que nadie tenga que ir allá">
+            {r.motivos.length > 0 && (
+              <div className="grid gap-3 sm:grid-cols-2">
+                {r.motivos.map((m) => (
+                  <FilaMotivo key={m.motivo} etiqueta={etiquetaMotivo(m.motivo)} n={m.n} maximo={r.motivos[0].n} />
+                ))}
+              </div>
+            )}
+            <AvanceMotivos hechos={r.total.dropi - r.sinMotivo} total={r.total.dropi} />
+          </TarjetaUso>
+        </div>
       </div>
 
-      <section className="flex flex-col gap-2">
-        <h2 className="text-sm font-semibold tracking-tight">Por qué se hace en Dropi</h2>
-        {r.motivos.length ? (
-          <ul className="m-0 flex list-none flex-col divide-y divide-border rounded-lg border border-border bg-card p-0 text-sm">
-            {r.motivos.map((m) => (
-              <li key={m.motivo} className="flex items-center justify-between gap-4 px-3 py-2">
-                <span>{etiquetaMotivo(m.motivo)}</span>
-                <span className="font-medium tabular-nums">{m.n}</span>
-              </li>
+      <div className="grid gap-4 lg:grid-cols-3">
+        <TarjetaUso titulo="Por semana" detalle="El porcentaje es lo creado en el sistema">
+          <GraficaSemanas semanas={semanas} />
+          <LeyendaUso />
+        </TarjetaUso>
+        <TarjetaUso titulo="Por tipo" detalle="Qué se creó">
+          <div className="flex flex-col gap-4">
+            {r.porTipo.map((f) => (
+              <FilaProporcion key={f.tipo} etiqueta={etiquetaTipo(f.tipo)} conteo={f} />
             ))}
-          </ul>
-        ) : (
-          <p className="text-sm text-muted-foreground">Todavía no hay motivos anotados: anótalos en la lista de abajo.</p>
-        )}
-      </section>
+          </div>
+        </TarjetaUso>
+        <TarjetaUso titulo="Por país" detalle="Dónde se creó">
+          <div className="flex flex-col gap-4">
+            {r.porPais.map((f) => (
+              <FilaProporcion key={f.pais} etiqueta={nombrePais(f.pais)} conteo={f} />
+            ))}
+          </div>
+        </TarjetaUso>
+      </div>
 
-      <section className="flex flex-col gap-2">
-        <h2 className="text-sm font-semibold tracking-tight">Hecho en Dropi ({enDropi.length})</h2>
-        <p className="text-xs text-muted-foreground">Dropi no dice quién creó un producto. «Lo pasó al sistema» es quien lo registró aquí después: es a quien hay que preguntarle.</p>
-        <div className="overflow-x-auto rounded-lg border border-border bg-card">
+      <TarjetaUso titulo={`Hecho en Dropi (${enDropi.length})`} detalle="Dropi no dice quién creó un producto. «Lo pasó al sistema» es quien lo registró aquí después: es a quien hay que preguntarle.">
+        <div className="-mx-5 -mb-5 overflow-x-auto border-t border-border">
           <table className="w-full text-sm">
             <thead>
               <tr>
                 {["Publicación", "País", "Fecha", "Qué fue", "Lo pasó al sistema", "Motivo", "Nota"].map((t) => (
-                  <th key={t} scope="col" className={claseTitulo}>
+                  <th key={t} scope="col" className={claseThLista}>
                     {t}
                   </th>
                 ))}
@@ -201,7 +205,7 @@ export function PanelUso({ altas, paises, puedeEscribir }: { altas: AltaPublicac
             </tbody>
           </table>
         </div>
-      </section>
+      </TarjetaUso>
     </div>
   );
 }

@@ -34,7 +34,7 @@ export async function cargarProductosProveedor(supabase: SupabaseClient, paisId:
     const filas = await traerTodasLasFilas<Record<string, unknown>>((d, h) =>
       supabase
         .from("dropi_productos_proveedor")
-        .select("dropi_producto_id, nombre, tipo, archivado, privado, precio, precio_sugerido, stock, stock_privado, bodegas, variaciones, categorias, fotos, creado_dropi, leido_en")
+        .select("dropi_producto_id, nombre, tipo, archivado, privado, precio, precio_sugerido, stock, stock_privado, bodegas, categorias, fotos, creado_dropi, leido_en, variaciones")
         .eq("pais_id", paisId)
         .order("dropi_producto_id")
         .range(d, h),

@@ -17,7 +17,7 @@ import { enDropiSinPublicacion, type ProductoSinPublicacion } from "@/lib/public
 import { grupoDe } from "@/lib/publicaciones/apagar-dropi";
 import { masReciente } from "@/lib/publicaciones/cambio-precio";
 import { cargarCambiosDropi, cargarPreciosAplicados } from "@/lib/publicaciones/cambios-dropi";
-import { bodegaDePublicacion, bodegasDelPais, bodegasEnOrden, productoPrincipal, type ProductoProveedor } from "@/lib/publicaciones/sincronizar-dropi";
+import { bodegaDePublicacion, bodegasDelPais, bodegasEnOrden, productoPrincipal, variacionesBajas, type ProductoProveedor } from "@/lib/publicaciones/sincronizar-dropi";
 import { cargarSugerencias } from "@/lib/publicaciones/sugerencias";
 import type { UsuarioActual } from "@/lib/auth";
 import { ventasDePublicacion } from "@/lib/publicaciones/ventas";
@@ -26,7 +26,7 @@ import { detectarPack } from "@/lib/publicaciones/vincular";
 import { traerTodasConError } from "@/lib/supabase/paginar";
 import { obtenerOpcionesSkuMaestro } from "@/lib/wms/skus-maestros";
 import type { OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
-import type { DecisionVista, FilaPublicacion } from "./def-publicaciones";
+import { POCO_STOCK_VARIACION, type DecisionVista, type FilaPublicacion } from "./def-publicaciones";
 
 const num = (v: unknown) => (v === null || v === undefined ? null : Number(v));
 const idsDropi = (d: Fila) => (String(d.dropi_id ?? "").match(/\d{3,6}/g) ?? []).map(Number);
@@ -419,6 +419,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
         })),
       stockProveedor: prov?.stock ?? null,
       stockPrivadoProveedor: prov?.stockPrivado ?? null,
+      variacionesBajas: variacionesBajas(prov?.variaciones, POCO_STOCK_VARIACION),
       leidoProveedor: proveedor?.leidoEn ?? null,
       cambioDropi: cambiosDropi.porPublicacion.get(d.id) ?? null,
       bodega: bodegaDePublicacion({ ubicacion: (d.ubicacion as string | null) ?? null, nombre: d.nombre as string }, prov, bodegasPais),

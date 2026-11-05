@@ -40,6 +40,9 @@
   --neon: linear-gradient(120deg, #c22f6a 0%, #9b2fa8 50%, #5f43d1 100%);
   --neon-brillo: 0 6px 20px -6px rgb(155 47 168 / 0.6);
   --primario: #8a35c9;
+  /* Las series «sistema» y «Dropi» de una gráfica: índigo y rosa del neón, validados (daltonismo y contraste) en claro y en oscuro. */
+  --serie-sistema: #5f43d1;
+  --serie-dropi: #d74c81;
   --primario-suave: #f3ecfc;
   /* Los niveles de acceso de Usuarios y roles cuando están elegidos (relleno sólido con texto blanco, ≥ 4,5:1 en los dos temas). */
   --nivel-lectura: #1d4ed8;
@@ -102,6 +105,8 @@
   --accent-hover: #46375c;
   --accent-foreground: #f1e9ff;
   --primario: #9d55e0;
+  --serie-sistema: #8b74f0;
+  --serie-dropi: #d74c81;
   --primario-suave: #2c2140;
   --success: #4ade80;
   --success-soft: #14532d;

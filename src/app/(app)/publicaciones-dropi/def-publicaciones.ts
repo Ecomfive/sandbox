@@ -182,6 +182,8 @@ export interface FilaPublicacion {
   }[];
   stockProveedor: number | null;
   stockPrivadoProveedor: number | null;
+  /** Las variaciones (tallas, colores, graduaciones) con menos de `POCO_STOCK_VARIACION` unidades; vacío en un producto simple. */
+  variacionesBajas: { etiqueta: string; stock: number }[];
   /** Cuándo se leyó «Mis productos» por última vez (lo mismo en todas las filas del país). */
   leidoProveedor: string | null;
   /** A qué bodega de Dropi pertenece (B280, B81): la que muestra Dropi o, sin stock, la de «Dónde está» o la del nombre. */
@@ -220,11 +222,15 @@ export const avisoRepublicar = (dropiId: string) =>
 
 /** Por debajo de cuántas unidades una publicación que vende tiene «Poco stock» (pedido de Hernán, 27 oct 2026). */
 export const POCO_STOCK = 100;
-/** Activa en Dropi, con ventas en los últimos 30 días y de 1 a 99 unidades (las de 0 van en «Sin stock»). */
-export function pocoStock(f: Pick<FilaPublicacion, "archivada" | "enDropi" | "stockProveedor" | "ventas">): boolean {
+/** Por debajo de cuántas unidades una variación deja al producto en «Poco stock», aunque el total alcance (pedido del equipo, 5 nov 2026). */
+export const POCO_STOCK_VARIACION = 50;
+/** Activa en Dropi, con ventas en los últimos 30 días y de 1 a 99 unidades, o con alguna variación por debajo de 50 (las de 0 en total van en «Sin stock»). */
+export function pocoStock(f: Pick<FilaPublicacion, "archivada" | "enDropi" | "stockProveedor" | "ventas" | "variacionesBajas">): boolean {
   const stock = f.stockProveedor ?? f.ventas?.stock ?? null;
-  return !f.archivada && f.enDropi === "activo" && stock !== null && stock > 0 && stock < POCO_STOCK && (f.ventas?.netas30 ?? 0) > 0;
+  return !f.archivada && f.enDropi === "activo" && stock !== null && stock > 0 && (stock < POCO_STOCK || f.variacionesBajas.length > 0) && (f.ventas?.netas30 ?? 0) > 0;
 }
+/** Las variaciones bajas como se muestran: «+1:50 (40) · +2:50 (0)». */
+export const textoVariacionesBajas = (l: { etiqueta: string; stock: number }[]) => l.map((v) => `${v.etiqueta} (${v.stock.toLocaleString("es-PA")})`).join(" · ");
 
 const stockDe = (f: Pick<FilaPublicacion, "stockProveedor" | "ventas">) => f.stockProveedor ?? f.ventas?.stock ?? null;
 const privadoDe = (f: Pick<FilaPublicacion, "stockProveedor" | "stockPrivadoProveedor">) => (f.stockProveedor === null ? null : f.stockPrivadoProveedor);
