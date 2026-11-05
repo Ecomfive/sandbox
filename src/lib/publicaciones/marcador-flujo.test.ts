@@ -82,7 +82,7 @@ function crearDropi(opciones: { noTomaEntradas?: boolean; usuarios?: Record<stri
             ? [{ variation_id: nuevo * 10 + i, warehouse_id: 81, stock: 0, warehouse: BODEGA }]
             : ((cuerpo!.warehouselected as Obj[][])[i] ?? []).map((w) => ({ variation_id: nuevo * 10 + i, warehouse_id: w.warehouse_id, stock: w.stock, warehouse: BODEGA })),
         }));
-        productos.set(nuevo, productoBase(nuevo, { type: "VARIABLE", name: cuerpo!.name, description: cuerpo!.description, categories: cuerpo!.categories, attributes: atributos, variations: variaciones, warehouse_product: [], gallery: [] }));
+        productos.set(nuevo, productoBase(nuevo, { type: "VARIABLE", privated_product: cuerpo!.privated_product === true, name: cuerpo!.name, description: cuerpo!.description, categories: cuerpo!.categories, attributes: atributos, variations: variaciones, warehouse_product: [], gallery: [] }));
         return responder({ id: nuevo });
       }
       const id = siguiente++;
@@ -101,7 +101,7 @@ function crearDropi(opciones: { noTomaEntradas?: boolean; usuarios?: Record<stri
       if (reservas.some((x) => x.change === true)) {
         if (opciones.fallaAsignar) return responder({ isSuccess: false, message: "Error al asignar" }, 500);
         for (const x of reservas.filter((y) => y.change === true)) {
-          const viva = (p.private_product_inventories as Obj[]).find((y) => y.user_id === x.user_id && !y.deleted_at);
+          const viva = (p.private_product_inventories as Obj[]).find((y) => y.user_id === x.user_id && !y.deleted_at && (y.variation_id ?? null) === (x.variation_id ?? null));
           if (x.deleted_at) {
             if (viva) viva.deleted_at = "2026-10-26";
             // Como el Dropi de verdad (2 nov 2026, el 8822): al quitar la reserva, él mismo saca esas unidades de la bodega.
@@ -110,10 +110,12 @@ function crearDropi(opciones: { noTomaEntradas?: boolean; usuarios?: Record<stri
               fila.stock = Number(fila.stock) - Number(viva.stock);
             }
           } else if (!viva) {
-            const stock = (p.warehouse_product as Obj[]).reduce((t, w) => t + Number(w.stock), 0);
-            const ya = (p.private_product_inventories as Obj[]).filter((y) => !y.deleted_at).reduce((t, y) => t + Number(y.stock), 0);
+            // Con variaciones, la reserva se compara con el stock de su variación (`privateVariationStockFix`).
+            const variacion = (p.variations as Obj[] | undefined)?.find((v) => v.id === x.variation_id);
+            const stock = ((variacion?.warehouse_product_variation ?? p.warehouse_product) as Obj[]).reduce((t, w) => t + Number(w.stock), 0);
+            const ya = (p.private_product_inventories as Obj[]).filter((y) => !y.deleted_at && (y.variation_id ?? null) === (x.variation_id ?? null)).reduce((t, y) => t + Number(y.stock), 0);
             if (ya + Number(x.stock) > stock) return responder({ isSuccess: false, message: "La cantidad en stock es menor" }, 422);
-            p.private_product_inventories.push({ id: 500 + p.private_product_inventories.length, product_id: p.id, user_id: x.user_id, email: x.email, stock: x.stock, deleted_at: null });
+            p.private_product_inventories.push({ id: 500 + p.private_product_inventories.length, product_id: p.id, variation_id: x.variation_id ?? null, user_id: x.user_id, email: x.email, stock: x.stock, deleted_at: null });
           }
         }
       }
@@ -754,6 +756,83 @@ function conVariaciones(id: number, nombre: string, privado: boolean, stocks: Re
 const stockVariable = (p: Obj): Record<string, number> =>
   Object.fromEntries((p.variations as Obj[]).map((v) => [(v.attribute_values as Obj[])[0].value as string, (v.warehouse_product_variation as Obj[]).reduce((t, w) => t + Number(w.stock), 0)]));
 const reservaDe = (id: number, producto: number, variacion: number, usuario: number, stock: number): Obj => ({ id, product_id: producto, variation_id: variacion, user_id: usuario, email: `u${usuario}@correo.com`, stock, deleted_at: null });
+
+const privatizacionV = (extra: Obj = {}): Obj => ({
+  correo: "maria@correo.com", dropshipper: "María Álvarez", dropshipperId: null, iniciales: "MA", unidades: 25, bodega: 81, precio: 5.5, nombre: "P-MA Lentes TR90", origen: "01a15c00-2a2d-7f7e-9a68-b1e3d0a7c111", salida: false,
+  variaciones: [{ firma: "talla=m", etiqueta: "M", unidades: 15 }, { firma: "talla=s", etiqueta: "S", unidades: 10 }],
+  ...extra,
+});
+const reservasDe = (p: Obj) => (p.private_product_inventories as Obj[]).filter((x) => !x.deleted_at).map((x) => [x.variation_id, x.user_id, x.stock]);
+
+test("privatizar con variaciones: crea el privado con las tallas pedidas, reserva cada una y se las saca al público", async () => {
+  const d = crearDropi({ usuarios: { "maria@correo.com": maria } });
+  d.productos.set(7000, conVariaciones(7000, "Lentes TR90", false, { S: 100, M: 80, L: 60 }));
+  const [r] = await aplicar(d, [{ ...base, id: "v1", tipo: "privatizar", producto: 7000, datos: privatizacionV() }]);
+  assert.equal(r.ok, true, String(r.error));
+  assert.equal(r.nuevo, 9001);
+  assert.equal(r.stock, 25);
+  assert.equal(r.salida, true);
+  const privado = d.productos.get(9001)!;
+  assert.equal(privado.privated_product, true);
+  assert.equal(privado.name, "P-MA Lentes TR90");
+  assert.deepEqual(stockVariable(privado), { M: 15, S: 10 }, "solo las tallas pedidas");
+  assert.deepEqual(reservasDe(privado).map((x) => [x[1], x[2]]), [[5521, 15], [5521, 10]], "una reserva por talla");
+  assert.deepEqual(reservasDe(privado).map((x) => x[0]), (privado.variations as Obj[]).map((v) => v.id), "cada reserva con el ID de la variación del privado");
+  assert.deepEqual(stockVariable(d.productos.get(7000)!), { S: 90, M: 65, L: 60 }, "al público se le sacó talla por talla");
+});
+
+test("privatizar con variaciones: si Dropi no toma el stock al crear, se lo pone por variación antes de reservar", async () => {
+  const d = crearDropi({ stockAlCrear: false, usuarios: { "maria@correo.com": maria } });
+  d.productos.set(7000, conVariaciones(7000, "Lentes TR90", false, { S: 100, M: 80 }));
+  const [r] = await aplicar(d, [{ ...base, id: "v1", tipo: "privatizar", producto: 7000, datos: privatizacionV() }]);
+  assert.equal(r.ok, true, String(r.error));
+  assert.deepEqual(stockVariable(d.productos.get(9001)!), { M: 15, S: 10 });
+  assert.deepEqual(stockVariable(d.productos.get(7000)!), { S: 90, M: 65 });
+});
+
+test("privatizar con variaciones: sin tantas unidades, con una talla que ya no está o con un correo malo no crea nada", async () => {
+  const d = crearDropi();
+  d.productos.set(7000, conVariaciones(7000, "Lentes TR90", false, { S: 5, M: 80 }));
+  let [r] = await aplicar(d, [{ ...base, id: "v1", tipo: "privatizar", producto: 7000, datos: privatizacionV() }]);
+  assert.equal(r.ok, false);
+  assert.match(String(r.error), /De S el público solo tiene 5/);
+  [r] = await aplicar(d, [{ ...base, id: "v2", tipo: "privatizar", producto: 7000, datos: privatizacionV({ variaciones: [{ firma: "talla=xl", etiqueta: "XL", unidades: 1 }] }) }]);
+  assert.match(String(r.error), /ya no tiene la variación XL/);
+  [r] = await aplicar(d, [{ ...base, id: "v3", tipo: "privatizar", producto: 7000, datos: privatizacionV({ correo: "nadie@correo.com", variaciones: [{ firma: "talla=m", etiqueta: "M", unidades: 1 }] }) }]);
+  assert.match(String(r.error), /no tiene una cuenta/);
+  assert.equal(d.productos.has(9001), false);
+  assert.deepEqual(stockVariable(d.productos.get(7000)!), { S: 5, M: 80 });
+});
+
+test("privatizar con variaciones: si falla la reserva no se toca el público y el reintento sigue con el mismo privado", async () => {
+  const d = crearDropi({ fallaAsignar: true, usuarios: { "maria@correo.com": maria } });
+  d.productos.set(7000, conVariaciones(7000, "Lentes TR90", false, { S: 100, M: 80 }));
+  const [r1] = await aplicar(d, [{ ...base, id: "v1", tipo: "privatizar", producto: 7000, datos: privatizacionV() }]);
+  assert.equal(r1.ok, false);
+  assert.equal(r1.nuevo, 9001);
+  assert.equal(r1.salida, false);
+  assert.deepEqual(stockVariable(d.productos.get(7000)!), { S: 100, M: 80 }, "el público sigue igual");
+  const siguiente = crearDropi({ usuarios: { "maria@correo.com": maria } });
+  for (const [id, p] of d.productos) siguiente.productos.set(id, p);
+  const [r2] = await aplicar(siguiente, [{ ...base, id: "v1", tipo: "privatizar", producto: 7000, nuevo: 9001, datos: privatizacionV() }]);
+  assert.equal(r2.ok, true, String(r2.error));
+  assert.equal(siguiente.productos.has(9002), false, "no crea otro privado");
+  assert.deepEqual(stockVariable(siguiente.productos.get(9001)!), { M: 15, S: 10 }, "no duplica el stock");
+  assert.equal(reservasDe(siguiente.productos.get(9001)!).length, 2);
+  assert.deepEqual(stockVariable(siguiente.productos.get(7000)!), { S: 90, M: 65 });
+  // Un tercer intento (ya se le sacó al público) no se lo saca otra vez.
+  const [r3] = await aplicar(siguiente, [{ ...base, id: "v1", tipo: "privatizar", producto: 7000, nuevo: 9001, datos: privatizacionV({ salida: true }) }]);
+  assert.equal(r3.ok, true, String(r3.error));
+  assert.deepEqual(stockVariable(siguiente.productos.get(7000)!), { S: 90, M: 65 });
+});
+
+test("privatizar: un producto con variaciones sin las unidades de cada una no crea nada", async () => {
+  const d = crearDropi();
+  d.productos.set(7000, conVariaciones(7000, "Lentes TR90", false, { S: 100 }));
+  const [r] = await aplicar(d, [{ ...base, id: "v1", tipo: "privatizar", producto: 7000, datos: { ...privatizacion, unidades: 5 } }]);
+  assert.match(String(r.error), /hay que indicar las unidades de cada una/);
+  assert.equal(d.productos.has(9001), false);
+});
 
 test("variaciones: quitar la privatización del Body Viral saca el stock de cada talla, quita los correos, devuelve las unidades al público talla por talla y archiva", async () => {
   const d = crearDropi();

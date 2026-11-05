@@ -206,6 +206,13 @@ async function leerNuestrosProductos(puente) {
       await new Promise((ok) => setTimeout(ok, 1300));
     }
   }
+  // Las variaciones de cada producto activo con variaciones, para «Privatizar en Dropi»: la lista no las trae (5 nov 2026). Si una no se puede leer, la lectura sigue sin ella.
+  const api = location.hostname.replace(/^app\./, "api.");
+  for (const p of productos.filter((x) => x.type === "VARIABLE" && !x.archivado)) {
+    const j = await fetch(`https://${api}/api/products/${p.id}`, { headers: { "X-Authorization": "Bearer " + token, Accept: "application/json" } }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    if (Array.isArray(j?.objects?.variations)) p.variations = j.objects.variations.map((v) => ({ id: v.id, sku: v.sku, deleted_at: v.deleted_at, attribute_values: v.attribute_values, warehouse_product_variation: (v.warehouse_product_variation || []).map((w) => ({ warehouse_id: w.warehouse_id, stock: w.stock })) }));
+    await new Promise((ok) => setTimeout(ok, 300));
+  }
   const cuerpo = { tipo: "nuestros", pais, inicio: inicio.toISOString(), duracionMs: Math.round(performance.now() - t0), productos };
   const gz = new Blob([JSON.stringify(cuerpo)]).stream().pipeThrough(new CompressionStream("gzip"));
   const bytes = new Uint8Array(await new Response(gz).arrayBuffer());

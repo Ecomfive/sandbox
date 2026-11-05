@@ -26,6 +26,7 @@ import {
   ubicacionDeProducto,
   type ProductoProveedor,
 } from "../src/lib/publicaciones/sincronizar-dropi";
+import { variacionesDeLectura } from "../src/lib/publicaciones/privatizar-variable";
 
 export interface LecturaNuestros {
   tipo: "nuestros";
@@ -60,6 +61,9 @@ export async function guardarNuestrosProductos(supabase: SupabaseClient, l: Lect
     if (p && !(productos.get(p.id) && p.archivado)) productos.set(p.id, p);
   }
   if (!productos.size) throw new Error("La lectura no trae productos.");
+  // Las variaciones de los productos activos con variaciones, para «Privatizar en Dropi» (migración 0226).
+  const conVariaciones = !(await supabase.from("dropi_productos_proveedor").select("variaciones").limit(1)).error;
+  const variaciones = new Map(l.productos.map((o) => [Number(o.id), variacionesDeLectura(o)]));
 
   const pubs = revisar(
     await supabase.from("dropi_publicaciones").select("id, nombre, dropi_id, ubicacion, precio_venta, tipo_publicacion, estado_publicacion").eq("pais_id", pais.id),
@@ -142,6 +146,8 @@ export async function guardarNuestrosProductos(supabase: SupabaseClient, l: Lect
     fotos: p.fotos,
     creado_dropi: p.creado ? `${p.creado.slice(0, 19)}${codigo === "CR" || codigo === "MX" ? "-06:00" : "-05:00"}` : null,
     leido_en: leidoEn,
+    // Sin la migración 0226 todavía no está la columna: la lectura se guarda igual.
+    ...(conVariaciones ? { variaciones: variaciones.get(p.id) ?? null } : {}),
   }));
   await enTrozos(filas, 500, async (t) => void revisar(await supabase.from("dropi_productos_proveedor").upsert(t, { onConflict: "pais_id,dropi_producto_id" }), "Guardar productos"));
   // Lo que Dropi ya no lista (eliminado) sale de la tabla: se reemplaza en cada lectura.
