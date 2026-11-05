@@ -4,9 +4,11 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import { BotonBarra } from "@/components/panel/piezas-panel";
 import { anilloFoco } from "@/components/ui/field";
+import { Tooltip } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/toast";
 import { marcarNovedades } from "@/lib/ayuda/novedades-actions";
 import { formatearFecha } from "@/lib/formato";
+import { CheckIcon, NoLeidoIcon } from "@/lib/nav-icons";
 
 export interface ActualizacionAviso {
   clave: string;
@@ -24,7 +26,7 @@ type Filtro = "por_leer" | "leidas" | "todas";
 /**
  * «Actualizaciones del sistema» en el Centro de notificaciones (31 oct 2026, pedido de Alcides), como la bandeja de ClickUp: lo que cambió en el
  * sistema en los últimos días, de los módulos de cada persona. Al abrir una se marca como leída (por persona, migración 0218); se puede volver a
- * dejar por leer o marcarlas todas. «Por leer» y «Leídas» separan lo visto de lo que falta.
+ * dejar por leer o marcarlas todas; cada una se marca leída o por leer sin abrirla con el botón de su derecha (5 nov 2026, pedido de Alcides). «Por leer» y «Leídas» separan lo visto de lo que falta.
  */
 export function ActualizacionesAvisos({ actualizaciones, dias }: { actualizaciones: ActualizacionAviso[]; dias: number }) {
   const { mostrarToast } = useToast();
@@ -99,7 +101,8 @@ export function ActualizacionesAvisos({ actualizaciones, dias }: { actualizacion
             const abiertaEsta = abierta === a.clave;
             return (
               <li key={a.clave} className={`rounded-lg ${vista ? "" : "bg-primario-suave"}`}>
-                <button type="button" aria-expanded={abiertaEsta} onClick={() => abrir(a)} className={`flex w-full items-start gap-2.5 rounded-lg px-3 py-2 text-left hover:bg-muted ${anilloFoco}`}>
+                <div className="flex items-start gap-1">
+                <button type="button" aria-expanded={abiertaEsta} onClick={() => abrir(a)} className={`flex min-w-0 flex-1 items-start gap-2.5 rounded-lg px-3 py-2 text-left hover:bg-muted ${anilloFoco}`}>
                   <span aria-hidden="true" className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${vista ? "bg-transparent" : "bg-primario"}`} />
                   <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                     <span className={`text-sm ${vista ? "" : "font-semibold"}`}>{a.titulo}</span>
@@ -110,6 +113,18 @@ export function ActualizacionesAvisos({ actualizaciones, dias }: { actualizacion
                     </span>
                   </span>
                 </button>
+                <Tooltip texto={vista ? "Marcar como no leída" : "Marcar como leída"}>
+                  <button
+                    type="button"
+                    disabled={pendiente}
+                    onClick={() => marcar([a.clave], !vista)}
+                    aria-label={`${vista ? "Marcar como no leída" : "Marcar como leída"}: ${a.titulo}`}
+                    className={`mt-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-60 ${anilloFoco}`}
+                  >
+                    {vista ? <NoLeidoIcon aria-hidden="true" className="h-4 w-4" /> : <CheckIcon aria-hidden="true" className="h-4 w-4" />}
+                  </button>
+                </Tooltip>
+                </div>
                 {abiertaEsta && (
                   <div className="flex flex-col gap-2 px-3 pb-3 pl-[2.1rem]">
                     <p className="m-0 text-[13px] leading-relaxed text-muted-foreground">{a.texto}</p>
@@ -118,11 +133,6 @@ export function ActualizacionesAvisos({ actualizaciones, dias }: { actualizacion
                         <Link href={a.href} className={`rounded font-medium text-primario hover:underline ${anilloFoco}`}>
                           Ir a verlo
                         </Link>
-                      )}
-                      {vista && (
-                        <button type="button" disabled={pendiente} onClick={() => marcar([a.clave], false)} className={`rounded text-muted-foreground hover:text-foreground hover:underline ${anilloFoco}`}>
-                          Marcar como no leída
-                        </button>
                       )}
                     </div>
                   </div>
