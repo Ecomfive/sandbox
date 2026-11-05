@@ -1,5 +1,5 @@
 -- Gestión de IDs Dropi › Uso del sistema (5 nov 2026, pedido de Alcides y Hernán). Saber qué se sigue haciendo en Dropi y por qué, para pasarlo al
--- sistema. Es de supervisión: solo Hernán y Alcides. Quien gestiona los IDs no ve nada, así que se quita el pendiente de «Hoy» que traía la 0226.
+-- sistema. Es de supervisión: solo Hernán y Alcides. Quien gestiona los IDs no ve nada, así que se quita el pendiente de «Hoy» que traía la 0227.
 drop function if exists dropi_creadas_por_resolver(uuid);
 
 -- Por qué se hizo en Dropi. Lo anota quien supervisa; el resumen de motivos es la lista de lo que hay que arreglar en el sistema.

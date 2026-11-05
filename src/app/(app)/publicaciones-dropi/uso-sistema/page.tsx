@@ -22,7 +22,7 @@ export default async function UsoSistemaPage() {
       {datos ? (
         <PanelUso altas={datos.altas} paises={datos.paises} puedeEscribir={!usuario.modulosSoloLectura.includes("uso-sistema")} />
       ) : (
-        <p className="text-sm text-muted-foreground">Falta correr en Supabase la migración 0227.</p>
+        <p className="text-sm text-muted-foreground">Falta correr en Supabase la migración 0228.</p>
       )}
     </Pagina>
   );

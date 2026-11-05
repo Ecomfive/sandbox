@@ -14,6 +14,7 @@ import { encolarApagar, encolarArchivar, encolarCrear, encolarPrivatizar, encola
 import { esBodegaDropi } from "@/lib/publicaciones/automatico";
 import { faltantesStock, normalizarDatosStock, productoDelCambio } from "@/lib/publicaciones/stock-dropi";
 import { destinosDe, faltantesPrivatizar, nombrePrivado, normalizarDatosPrivatizar, quienesDe, unidadesTotales } from "@/lib/publicaciones/privatizar-dropi";
+import { faltantesVariaciones, textoVariaciones, type VariacionLeida } from "@/lib/publicaciones/privatizar-variable";
 import { faltantesCrearDropi, normalizarDatosCrear, MAX_FOTOS_CREAR, type DatosCrearDropi, type FotoCrear } from "@/lib/publicaciones/crear-dropi";
 import { descripcionAHtml } from "@/lib/publicaciones/descripcion-dropi";
 import { detectarImagen } from "@/lib/seguridad/imagen";
@@ -882,6 +883,24 @@ export async function republicarPublicacion(id: string, precio: number): Promise
  * las unidades que se le reservan y se las saca al público. Cuando Dropi lo confirma, el sistema crea la publicación privada (`guardarResultadosDropi`).
  * El nombre del privado, el público de origen y la bodega se vuelven a calcular y comprobar aquí: el navegador no decide a qué producto se toca.
  */
+/** Si un producto de Dropi tiene variaciones y las que dio la última lectura (null si esa lectura no las trajo). */
+async function variacionesDePublicacion(supabase: ReturnType<typeof createServiceClient>, paisId: string, dropiId: number): Promise<{ variable: boolean; variaciones: VariacionLeida[] | null }> {
+  const { data: tipo } = await supabase.from("dropi_productos_proveedor").select("tipo").eq("pais_id", paisId).eq("dropi_producto_id", dropiId).maybeSingle();
+  if (tipo?.tipo !== "VARIABLE") return { variable: false, variaciones: null };
+  // Sin la migración 0226 la columna no está: se trata como una lectura que no las trajo.
+  const { data } = await supabase.from("dropi_productos_proveedor").select("variaciones").eq("pais_id", paisId).eq("dropi_producto_id", dropiId).maybeSingle();
+  return { variable: true, variaciones: Array.isArray(data?.variaciones) ? (data.variaciones as VariacionLeida[]) : null };
+}
+
+/** Para «Privatizar en Dropi»: si la publicación tiene variaciones, las que hay para pedir las unidades de cada una. */
+export async function variacionesParaPrivatizar(id: string): Promise<{ variable: boolean; variaciones: VariacionLeida[] | null }> {
+  const usuario = await requireModuloEscritura(MODULO);
+  const antes = await publicacionPermitida(id, usuario.paisesPermitidos);
+  const ids = idsDeDropi((antes?.dropi_id as string | null) ?? null);
+  if (!antes || !ids.length) return { variable: false, variaciones: null };
+  return variacionesDePublicacion(createServiceClient(), antes.pais_id, ids[0]);
+}
+
 export async function privatizarPublicacion(id: string, crudo: unknown): Promise<{ error?: string; detalle?: string }> {
   const usuario = await requireModuloEscritura(MODULO);
   const antes = await publicacionPermitida(id, usuario.paisesPermitidos);
@@ -901,7 +920,11 @@ export async function privatizarPublicacion(id: string, crudo: unknown): Promise
   if (bodegas && !bodegas.some((b) => Number(b.id) === d.bodega)) return { error: "Esa bodega no tiene stock de este producto en Dropi." };
   if (esBodegaDropi(d.bodega)) return { error: "El stock de la bodega de Dropi no se mueve desde aquí." };
   const disponible = bodegas ? Number(bodegas.find((b) => Number(b.id) === d.bodega)?.stock ?? 0) : null;
-  const faltan = faltantesPrivatizar(d, disponible);
+  const lecturaVar = await variacionesDePublicacion(supabase, antes.pais_id, ids[0]);
+  if (lecturaVar.variable && !lecturaVar.variaciones) return { error: "Todavía no están las variaciones de este producto: actualiza Dropi y vuelve a intentarlo." };
+  if (lecturaVar.variable && !d.variaciones?.length) return { error: "Escribe cuántas unidades se le reservan de cada variación." };
+  if (!lecturaVar.variable && d.variaciones?.length) return { error: "Este producto no tiene variaciones en Dropi." };
+  const faltan = [...faltantesPrivatizar(d, disponible), ...faltantesVariaciones(d, lecturaVar.variaciones ?? [])];
   if (faltan.length) return { error: faltan[0] };
   // Un dropshipper no recibe dos veces el mismo producto: si ya tiene su privada (sin archivar), se avisa.
   const { data: privadas } = await supabase.from("dropi_publicaciones").select("id, numero, nombre, privatizado_email, estado, estado_publicacion").eq("pais_id", antes.pais_id).not("privatizado_email", "is", null).limit(5000);
@@ -918,7 +941,7 @@ export async function privatizarPublicacion(id: string, crudo: unknown): Promise
       accion: "dropi_privatizar_pendiente",
       entidad: "dropi_publicaciones",
       entidadId: id,
-      detalle: `${antes.nombre} · ID Dropi ${antes.dropi_id}: privatizar ${unidadesTotales(d)} u. a ${quienesDe(d)} como «${d.nombre}» · pendiente para «Aplicar en Dropi»`,
+      detalle: `${antes.nombre} · ID Dropi ${antes.dropi_id}: privatizar ${unidadesTotales(d)} u.${d.variaciones?.length ? ` (${textoVariaciones(d)})` : ""} a ${quienesDe(d)} como «${d.nombre}» · pendiente para «Aplicar en Dropi»`,
     });
   revalidatePath(RUTA);
   return { detalle: r.yaEstaba ? "Ya estaba pendiente para alguno de esos correos: pulsa «Aplicar en Dropi» con Dropi abierto." : "Privatización pendiente: pulsa «Aplicar en Dropi» con Dropi abierto." };

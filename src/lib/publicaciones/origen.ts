@@ -1,4 +1,4 @@
-// Gestión de IDs Dropi › Uso del sistema (5 nov 2026, pedido de Alcides y Hernán; migraciones 0226 y 0227). El objetivo es operar todo desde el
+// Gestión de IDs Dropi › Uso del sistema (5 nov 2026, pedido de Alcides y Hernán; migraciones 0227 y 0228). El objetivo es operar todo desde el
 // sistema e ir a las plataformas solo para conectar algo: esto mide qué se sigue haciendo en Dropi y por qué, para arreglar lo que le falta al
 // sistema. Es una vista de supervisión (módulo `uso-sistema`): quien gestiona los IDs no ve nada de esto. Sin base ni React, con prueba.
 

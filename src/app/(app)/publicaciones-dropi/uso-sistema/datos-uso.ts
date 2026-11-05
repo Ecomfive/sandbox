@@ -17,7 +17,7 @@ interface FilaPublicacion {
 
 const diaPanama = (iso: string) => new Date(iso).toLocaleDateString("en-CA", { timeZone: "America/Panama" });
 
-/** Lo creado desde el 24 oct 2026 en el sistema o en Dropi, con su motivo. `null` si faltan las migraciones 0226 y 0227. */
+/** Lo creado desde el 24 oct 2026 en el sistema o en Dropi, con su motivo. `null` si faltan las migraciones 0227 y 0228. */
 export async function cargarAltas(supabase: SupabaseClient, paisesPermitidos: string[] | null): Promise<{ altas: AltaPublicacion[]; paises: { codigo: string; nombre: string }[] } | null> {
   const { data: todos } = await supabase.from("paises").select("id, codigo, nombre").order("nombre");
   const paises = filtrarPaises(paisesPermitidos, (todos ?? []) as { id: string; codigo: string; nombre: string }[]);
