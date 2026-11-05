@@ -48,7 +48,11 @@ export default async function BandejaWhatsappPage({ searchParams }: { searchPara
     );
   }
   const supabase = createServiceClient();
-  const [datos, pais] = await Promise.all([cargarBandeja(supabase, usuario), vistaDireccion ? getPaisActual(supabase) : null]);
+  const [datos, pais, { data: personas }] = await Promise.all([
+    cargarBandeja(supabase, usuario),
+    vistaDireccion ? getPaisActual(supabase) : null,
+    supabase.from("perfiles").select("id, nombre, email, avatar_url").eq("activo", true),
+  ]);
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-4">
       {vistaDireccion ? (
@@ -66,6 +70,7 @@ export default async function BandejaWhatsappPage({ searchParams }: { searchPara
           abrirInicial={typeof abrir === "string" ? abrir : null}
           escribe={a.escribeAtencion || a.escribeComercial || a.escribeDireccion}
           miId={usuario.id}
+          equipo={(personas ?? []).map((p) => ({ id: p.id as string, nombre: (p.nombre as string | null) || (p.email as string), foto: (p.avatar_url as string | null) ?? null }))}
           verTelefono={a.verTelefonos}
           areas={areasVisibles(a)}
           miArea={areaPropia(a)}
