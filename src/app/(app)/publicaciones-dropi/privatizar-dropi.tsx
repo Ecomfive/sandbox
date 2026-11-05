@@ -14,8 +14,9 @@ import { usePuedeAbrir } from "@/components/modulos-contexto";
 import { CandadoAbiertoIcon, CandadoIcon, DeshacerIcon, PapeleraIcon } from "@/lib/nav-icons";
 import { esBodegaDropi } from "@/lib/publicaciones/automatico";
 import { faltantesPrivatizar, inicialesDe, limpiarIniciales, MAX_EXTRAS, nombrePrivado, normalizarDatosPrivatizar, quienesDe, unidadesTotales } from "@/lib/publicaciones/privatizar-dropi";
+import { faltantesVariaciones, stockEnBodega, textoVariaciones, type VariacionLeida } from "@/lib/publicaciones/privatizar-variable";
 import { codigoBodega } from "@/lib/publicaciones/sincronizar-dropi";
-import { buscarDropshippersParaPrivatizar, privatizarPublicacion, quitarPrivatizacion } from "./actions";
+import { buscarDropshippersParaPrivatizar, privatizarPublicacion, quitarPrivatizacion, variacionesParaPrivatizar } from "./actions";
 import { VentanaDeshacerApagado } from "./apagar-dropi";
 import { estadoBotones, type FilaPublicacion } from "./def-publicaciones";
 
@@ -38,6 +39,7 @@ const numero = (t: string) => Number(t.replace(",", "."));
  * crea la publicación privada. Nada se privatiza solo.
  * **Más de un correo en el mismo ID** (3 nov 2026, pedido de Jhokser: dos correos de un mismo dropshipper): «Agregar otro correo» suma filas con su correo y sus
  * unidades; todos comparten el mismo producto privado (un solo ID) y al público se le sacan las unidades de todos.
+ * **Productos con variaciones** (5 nov 2026, pedido de Hernán): en vez de una cantidad sale cada variación con su stock en la bodega; lo que quede vacío no pasa al privado. Un solo correo.
  */
 function VentanaPrivatizar({ p, alCerrar }: { p: FilaPublicacion; alCerrar: () => void }) {
   const { monto } = useMoneda();
@@ -53,6 +55,9 @@ function VentanaPrivatizar({ p, alCerrar }: { p: FilaPublicacion; alCerrar: () =
   const [bodega, setBodega] = useState(String(bodegas[0]?.id ?? ""));
   const [precio, setPrecio] = useState(p.precioVenta != null ? String(p.precioVenta) : "");
   const [extras, setExtras] = useState<{ correo: string; dropshipper: string; unidades: string }[]>([]);
+  // null mientras se pregunta si el producto tiene variaciones.
+  const [lectura, setLectura] = useState<{ variable: boolean; variaciones: VariacionLeida[] | null } | null>(null);
+  const [porVariacion, setPorVariacion] = useState<Record<string, string>>({});
   const [busqueda, setBusqueda] = useState("");
   const [encontrados, setEncontrados] = useState<{ id: string; nombre: string; correo: string; tienda: string }[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -73,6 +78,16 @@ function VentanaPrivatizar({ p, alCerrar }: { p: FilaPublicacion; alCerrar: () =
     return () => clearTimeout(t);
   }, [busqueda, p.id, puedeCrm]);
 
+  useEffect(() => {
+    let vigente = true;
+    variacionesParaPrivatizar(p.id)
+      .then((r) => vigente && setLectura(r))
+      .catch(() => vigente && setLectura({ variable: false, variaciones: null }));
+    return () => {
+      vigente = false;
+    };
+  }, [p.id]);
+
   // Lo que se muestra: nada hasta escribir al menos dos letras (sin tocar el estado desde el efecto).
   const resultados = puedeCrm && busqueda.trim().length >= 2 ? encontrados : [];
 
@@ -92,20 +107,24 @@ function VentanaPrivatizar({ p, alCerrar }: { p: FilaPublicacion; alCerrar: () =
 
   const nombre = iniciales ? nombrePrivado(iniciales, p.nombre) : "";
   const bodegaElegida = bodegas.find((b) => String(b.id) === bodega) ?? null;
-  const extrasEnviar = extras.map((x) => ({ correo: x.correo, dropshipper: x.dropshipper, unidades: numero(x.unidades) }));
-  const datos = normalizarDatosPrivatizar({ correo, dropshipper, dropshipperId, iniciales, unidades: numero(unidades), bodega: Number(bodega), precio: numero(precio), nombre, origen: p.id, extras: extrasEnviar });
-  const faltan = faltantesPrivatizar(datos, bodegaElegida?.stock ?? null);
+  const variable = lectura?.variable === true;
+  const variaciones = lectura?.variaciones ?? [];
+  const extrasEnviar = variable ? [] : extras.map((x) => ({ correo: x.correo, dropshipper: x.dropshipper, unidades: numero(x.unidades) }));
+  const variacionesEnviar = variable ? variaciones.map((v) => ({ firma: v.firma, etiqueta: v.etiqueta, unidades: numero(porVariacion[v.firma] ?? "") })) : [];
+  const unidadesEnviar = variable ? 0 : numero(unidades);
+  const datos = normalizarDatosPrivatizar({ correo, dropshipper, dropshipperId, iniciales, unidades: unidadesEnviar, bodega: Number(bodega), precio: numero(precio), nombre, origen: p.id, extras: extrasEnviar, variaciones: variacionesEnviar });
+  const faltan = [...faltantesPrivatizar(datos, bodegaElegida?.stock ?? null), ...faltantesVariaciones(datos, variaciones)];
   const pasos = [
     `Comprobar que ${datos.correo || "el correo"} tiene cuenta de dropshipper en Dropi`,
     `Crear el producto privado «${nombre || "P-XX …"}»${datos.precio ? ` a ${monto(datos.precio)}` : ""}, con las fotos y garantías del público`,
-    `Ponerle ${unidadesTotales(datos) ? unidadesTotales(datos).toLocaleString("es-PA") : "las"} unidades y asignárselo a ${quienesDe(datos) || "el dropshipper"} en «Productos privados»`,
+    `Ponerle ${unidadesTotales(datos) ? unidadesTotales(datos).toLocaleString("es-PA") : "las"} unidades${datos.variaciones?.length ? ` (${textoVariaciones(datos)})` : ""} y asignárselo a ${quienesDe(datos) || "el dropshipper"} en «Productos privados»`,
     `Sacarle esas unidades al público (ID ${p.dropiId})`,
   ];
 
   function confirmar() {
     setError(null);
     empezar(async () => {
-      const r = await privatizarPublicacion(p.id, { correo, dropshipper, dropshipperId, iniciales, unidades: numero(unidades), bodega: Number(bodega), precio: numero(precio), extras: extrasEnviar }).catch(() => ({ error: "No se pudo. Inténtalo de nuevo.", detalle: undefined }));
+      const r = await privatizarPublicacion(p.id, { correo, dropshipper, dropshipperId, iniciales, unidades: unidadesEnviar, bodega: Number(bodega), precio: numero(precio), extras: extrasEnviar, variaciones: variacionesEnviar }).catch(() => ({ error: "No se pudo. Inténtalo de nuevo.", detalle: undefined }));
       if (r.error) return void setError(r.error);
       alCerrar();
       mostrarToast(r.detalle ?? "Privatización pendiente");
@@ -118,7 +137,7 @@ function VentanaPrivatizar({ p, alCerrar }: { p: FilaPublicacion; alCerrar: () =
         className="flex flex-col gap-4 p-5 text-sm"
         onSubmit={(e) => {
           e.preventDefault();
-          if (!faltan.length && !pendiente) confirmar();
+          if (!faltan.length && !pendiente && lectura) confirmar();
         }}
       >
         <p className="m-0 truncate font-medium">
@@ -167,9 +186,11 @@ function VentanaPrivatizar({ p, alCerrar }: { p: FilaPublicacion; alCerrar: () =
           <Campo etiqueta="Precio de venta ($)" id="priv-precio" obligatorio>
             <input id="priv-precio" type="number" inputMode="decimal" min={0.1} step="0.01" value={precio} onChange={(e) => setPrecio(e.target.value)} placeholder="Ej: 9.99" className={`${fieldClass} w-full tabular-nums`} />
           </Campo>
-          <Campo etiqueta={extras.length ? "Unidades para este correo" : "Unidades que se le reservan"} id="priv-unidades" obligatorio>
-            <input id="priv-unidades" type="number" inputMode="numeric" min={1} step={1} max={bodegaElegida?.stock} value={unidades} onChange={(e) => setUnidades(e.target.value)} placeholder="Ej: 50" className={`${fieldClass} w-full tabular-nums`} />
-          </Campo>
+          {!variable && (
+            <Campo etiqueta={extras.length ? "Unidades para este correo" : "Unidades que se le reservan"} id="priv-unidades" obligatorio>
+              <input id="priv-unidades" type="number" inputMode="numeric" min={1} step={1} max={bodegaElegida?.stock} value={unidades} onChange={(e) => setUnidades(e.target.value)} placeholder="Ej: 50" className={`${fieldClass} w-full tabular-nums`} />
+            </Campo>
+          )}
           <Campo etiqueta="Bodega de donde salen" id="priv-bodega" obligatorio>
             <select id="priv-bodega" value={bodega} onChange={(e) => setBodega(e.target.value)} className={`${fieldClass} w-full`}>
               {bodegas.map((b) => (
@@ -180,7 +201,44 @@ function VentanaPrivatizar({ p, alCerrar }: { p: FilaPublicacion; alCerrar: () =
             </select>
           </Campo>
         </div>
-        {extras.map((x, i) => (
+        {variable && !lectura?.variaciones && (
+          <p className="m-0 rounded-lg border border-border bg-muted px-3 py-2 text-xs text-muted-foreground">
+            Este producto tiene variaciones y todavía no están en el sistema: pulsa «Actualizar Dropi» y vuelve a abrir esta ventana.
+          </p>
+        )}
+        {variable && variaciones.length > 0 && (
+          <fieldset className="m-0 flex flex-col gap-2 border-0 p-0">
+            <legend className="mb-1.5 p-0 text-sm font-medium">Unidades que se le reservan de cada variación</legend>
+            <ul className="m-0 flex list-none flex-col divide-y divide-border overflow-hidden rounded-lg border border-border bg-card p-0">
+              {variaciones.map((v, i) => {
+                const hay = stockEnBodega(v, Number(bodega));
+                return (
+                  <li key={v.firma} className="flex items-center justify-between gap-3 px-3 py-1.5">
+                    <label htmlFor={`priv-variacion-${i}`} className="min-w-0 flex-1">
+                      <span className="block truncate font-medium">{v.etiqueta}</span>
+                      <span className="block text-xs text-muted-foreground tabular-nums">{hay.toLocaleString("es-PA")} disponibles</span>
+                    </label>
+                    <input
+                      id={`priv-variacion-${i}`}
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      max={hay}
+                      step={1}
+                      disabled={hay === 0}
+                      value={porVariacion[v.firma] ?? ""}
+                      onChange={(e) => setPorVariacion((m) => ({ ...m, [v.firma]: e.target.value }))}
+                      placeholder="0"
+                      className={`${fieldClass} w-24 tabular-nums`}
+                    />
+                  </li>
+                );
+              })}
+            </ul>
+            <p className="m-0 text-xs text-muted-foreground tabular-nums">Total: {unidadesTotales(datos).toLocaleString("es-PA")} unidades. Solo las variaciones con unidades pasan al producto privado.</p>
+          </fieldset>
+        )}
+        {!variable && extras.map((x, i) => (
           <div key={i} className="grid gap-3 rounded-lg border border-border p-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_7rem_auto] sm:items-end">
             <Campo etiqueta={`Correo ${i + 2} en Dropi`} id={`priv-correo-${i}`} obligatorio>
               <input id={`priv-correo-${i}`} type="email" value={x.correo} onChange={(e) => setExtras((l) => l.map((y, j) => (j === i ? { ...y, correo: e.target.value } : y)))} maxLength={200} autoComplete="off" placeholder="Ej: otro@correo.com" className={`${fieldClass} w-full`} />
@@ -196,7 +254,7 @@ function VentanaPrivatizar({ p, alCerrar }: { p: FilaPublicacion; alCerrar: () =
             </button>
           </div>
         ))}
-        {extras.length < MAX_EXTRAS && (
+        {!variable && extras.length < MAX_EXTRAS && (
           <button type="button" onClick={() => setExtras((l) => [...l, { correo: "", dropshipper: "", unidades: "" }])} className={`inline-flex min-h-10 w-fit items-center rounded-md border border-border-control bg-card px-3 py-2 text-sm font-medium hover:bg-muted ${anilloFoco}`}>
             + Agregar otro correo al mismo ID
           </button>
@@ -220,7 +278,7 @@ function VentanaPrivatizar({ p, alCerrar }: { p: FilaPublicacion; alCerrar: () =
         )}
         {faltan.length > 0 && <p className="m-0 text-xs text-muted-foreground">Falta: {faltan.join(" ")}</p>}
         <div className="flex flex-wrap gap-2">
-          <button type="submit" disabled={pendiente || faltan.length > 0} className={`inline-flex min-h-10 items-center rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-40 ${anilloFoco}`}>
+          <button type="submit" disabled={pendiente || faltan.length > 0 || !lectura} className={`inline-flex min-h-10 items-center rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-40 ${anilloFoco}`}>
             {pendiente ? "Un momento..." : "Privatizar y dejar pendiente para Dropi"}
           </button>
           <button type="button" onClick={alCerrar} className={`inline-flex min-h-10 items-center rounded-md border border-border bg-card px-4 py-2 text-sm font-medium hover:bg-muted ${anilloFoco}`}>
