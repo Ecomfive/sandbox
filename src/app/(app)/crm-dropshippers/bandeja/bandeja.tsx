@@ -9,6 +9,7 @@ import { VisorImagen } from "@/components/ui/visor-imagen";
 import { supabase } from "@/lib/supabase/client";
 import { nombrePais } from "@/lib/whatsapp/origen-chat";
 import { CANAL_BANDEJA, EVENTO_NOVEDAD } from "@/lib/whatsapp/canal-bandeja";
+import { BarraPresencia, PersonasEnChat, usePresenciaChats, type PersonaEquipo } from "./personas-en-chat";
 import { HORAS_VENTANA, textoVentana } from "@/lib/whatsapp/ventana";
 import type { AreaCrm } from "@/lib/crm/areas";
 import { quienesRespondieron } from "@/lib/crm/respondieron";
@@ -368,6 +369,7 @@ export function Bandeja({
   abrirInicial,
   escribe,
   miId,
+  equipo,
   verTelefono = false,
   areas: misAreas,
   miArea,
@@ -377,6 +379,8 @@ export function Bandeja({
   abrirInicial: string | null;
   escribe: boolean;
   miId: string;
+  /** Las personas del equipo, para ponerle foto a quien está en cada chat. */
+  equipo: PersonaEquipo[];
   /** Puede usar «Mostrar número» (por ahora, administradores). */
   verTelefono?: boolean;
   /** Los paneles que ve la persona (las áreas, de la suya hacia abajo). */
@@ -441,6 +445,9 @@ export function Bandeja({
     if (!area) setVistaBandeja(vistaInicial());
   }
   const [elegido, setElegido] = useState<string | null>(abrirInicial);
+  // Quién está trabajando en cada chat ahora mismo: su foto parpadea en verde en ese chat y se mueve con la persona (5 nov 2026, pedido de Hernán).
+  const { enChats, conectadas } = usePresenciaChats(elegido, miId);
+  const equipoPorId = useMemo(() => new Map(equipo.map((p) => [p.id, p])), [equipo]);
   const [chat, setChat] = useState<ChatAbierto | null>(null);
   /** La ventana «Importar chat»: con el chat abierto o, con `null`, para uno que todavía no existe en la bandeja. */
   const [importar, setImportar] = useState<{ conversacion: ConversacionVista | null } | null>(null);
@@ -1072,6 +1079,7 @@ export function Bandeja({
                 <span className="flex items-center gap-2">
                   <BanderaNumero pais={numeroDe.get(c.numeroId)?.pais} />
                   <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">{c.nombre}</span>
+                  <PersonasEnChat ids={enChats[c.id]} equipo={equipoPorId} />
                   {c.vip && <EtiquetaVip tipo={c.tipoCliente} />}
                   {c.noLeidos > 0 && (
                     <span className="flex h-[18px] min-w-[18px] flex-none items-center justify-center rounded-full bg-[var(--wa-acento)] px-1 text-[11px] font-semibold text-[var(--wa-acento-texto)] tabular-nums">
@@ -1151,6 +1159,7 @@ export function Bandeja({
         <span className="flex items-baseline gap-2">
           <BanderaNumero pais={numeroDe.get(c.numeroId)?.pais} />
           <span className="min-w-0 flex-1 truncate text-[16px]">{c.nombre}</span>
+          <PersonasEnChat ids={enChats[c.id]} equipo={equipoPorId} />
           {c.vip && <EtiquetaVip tipo={c.tipoCliente} />}
           <span className={`flex-none text-xs tabular-nums ${c.noLeidos ? "font-semibold text-[var(--wa-acento)]" : "text-[var(--wa-sec)]"}`}>{enNavegador ? horaCorta(c.ultimoMensajeEn) : ""}</span>
         </span>
@@ -1528,6 +1537,18 @@ export function Bandeja({
         {estado360 && <BotonNumerosPais alCambiar={() => void refrescar(elegido)} />}
       </div>
 
+      <BarraPresencia
+        miId={miId}
+        miChat={elegido}
+        conectadas={conectadas}
+        equipo={equipoPorId}
+        nombreDeChat={(id) => datos.conversaciones.find((c) => c.id === id)?.nombre ?? null}
+        alAbrir={(id) => {
+          const c = datos.conversaciones.find((x) => x.id === id);
+          if (c) abrirChat(c);
+        }}
+      />
+
       {/* ===== El tablero (29 oct 2026; por estado desde el 30 oct): un área a la vez, en columnas Por atender, En conversación y Cerrados ===== */}
       {enTablero &&
         (() => {
@@ -1694,6 +1715,7 @@ export function Bandeja({
                   ) : (
                     <span className="flex min-w-0 items-center gap-1">
                       <span className="min-w-0 text-lg leading-tight font-semibold [overflow-wrap:anywhere]">{sel.nombre}</span>
+                      <PersonasEnChat ids={enChats[sel.id]} equipo={equipoPorId} tamano="sm" />
                       {escribe && (
                         <button type="button" onClick={() => setEditandoNombre("cabecera")} aria-label="Cambiar el nombre del contacto" title="Cambiar el nombre" className={`${botonIcono} !h-8 !w-8`}>
                           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

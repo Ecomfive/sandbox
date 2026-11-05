@@ -7,7 +7,7 @@ import { registrarActividad } from "@/lib/presencia-actions";
 const INTERVALO_MS = 60_000;
 /** Sin tocar el mouse ni el teclado más de esto, el minuto no cuenta como trabajado (Equipo › Rendimiento). */
 const SIN_USO_MS = 5 * 60_000;
-const EVENTOS_USO = ["pointerdown", "pointermove", "keydown", "wheel", "scroll", "touchstart"] as const;
+export const EVENTOS_USO = ["pointerdown", "pointermove", "keydown", "wheel", "scroll", "touchstart"] as const;
 
 /**
  * Manda un "estoy aquí" cada 60s mientras la pestaña está visible y usable (montado una sola vez, en el

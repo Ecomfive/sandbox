@@ -43,6 +43,8 @@
   /* Las series «sistema» y «Dropi» de una gráfica: índigo y rosa del neón, validados (daltonismo y contraste) en claro y en oscuro. */
   --serie-sistema: #5f43d1;
   --serie-dropi: #d74c81;
+  /* El aro que parpadea en la foto de quien está trabajando en un chat. */
+  --presencia: #22c55e;
   --primario-suave: #f3ecfc;
   /* Los niveles de acceso de Usuarios y roles cuando están elegidos (relleno sólido con texto blanco, ≥ 4,5:1 en los dos temas). */
   --nivel-lectura: #1d4ed8;
@@ -107,6 +109,7 @@
   --primario: #9d55e0;
   --serie-sistema: #8b74f0;
   --serie-dropi: #d74c81;
+  --presencia: #4ade80;
   --primario-suave: #2c2140;
   --success: #4ade80;
   --success-soft: #14532d;
