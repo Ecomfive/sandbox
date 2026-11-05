@@ -39,6 +39,17 @@ export function variacionesDeLectura(o: Obj): VariacionLeida[] | null {
   });
 }
 
+/** El número de una graduación («+1:50», «-0.75»); null si la etiqueta no es un número (una talla, un color). */
+function numeroDeEtiqueta(etiqueta: string): number | null {
+  const m = etiqueta.trim().match(/^([+-]?\d+)(?:[.,:](\d+))?$/);
+  return m ? Number(`${m[1]}.${m[2] ?? 0}`) : null;
+}
+
+/** Las variaciones en el orden en que se muestran: de menor a mayor si todas son números (graduaciones); las demás, en el orden de Dropi (S, M, L…). */
+export function ordenarVariaciones<T extends { etiqueta: string }>(lista: T[]): T[] {
+  return lista.every((v) => numeroDeEtiqueta(v.etiqueta) !== null) ? [...lista].sort((a, b) => numeroDeEtiqueta(a.etiqueta)! - numeroDeEtiqueta(b.etiqueta)!) : lista;
+}
+
 /** Lo que la lectura dice que hay de una variación en una bodega. */
 export const stockEnBodega = (v: VariacionLeida, bodega: number) => v.bodegas.find((b) => b.id === bodega)?.stock ?? 0;
 
