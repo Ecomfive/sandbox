@@ -322,7 +322,7 @@ convenciones técnicas del código.
   fecha + huella FNV-1a del título, con prueba de que no se repite; `marcarNovedades`, `src/lib/ayuda/novedades-actions.ts`), y lo no leído suma al
   número de Avisos (`PendientesMenu.novedades`, `contarNovedadesSinVer`). Avisos se ve para todo el mundo. **Para administradores**, `/actualizaciones`
   (botón «Cambios» del riel, con punto si hay sin leer): todas las novedades por día, con «Nuevo» y, de cada una, quiénes de su módulo ya la vieron y
-  quiénes faltan (`armarPersonasConAcceso`). **Toda novedad lleva su fecha real (nunca futura), un título que no se repite ese día y, si es de un
+  quiénes faltan (`armarPersonasConAcceso`), **solo entre Alcides, Jhokser y Hernán** (`REVISAN_CAMBIOS`, `src/lib/ayuda/actualizaciones.ts`; 6 nov 2026, pedido de Hernán: los que construyen el sistema). **Toda novedad lleva su fecha real (nunca futura), un título que no se repite ese día y, si es de un
   módulo, su `modulo` y su `href`**: cambiar el título de una ya publicada la vuelve «por leer» para todos.
 - **Símbolo de moneda en todo monto** (31 oct 2026, pedido de Alcides: «los precios y valores siempre con el símbolo de la moneda del país en que se
   están viendo»). Un solo lugar: `src/lib/moneda/simbolo.ts` (con prueba): `simboloDeMoneda` («$» USD, «₡» CRC, **«MX$» MXN**, para no confundir el

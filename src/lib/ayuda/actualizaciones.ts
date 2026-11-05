@@ -4,6 +4,12 @@
 
 import type { Novedad } from "./contenido";
 
+/**
+ * Quienes revisan «Lo vieron» y «Faltan» en `/actualizaciones` (6 nov 2026, pedido de Hernán: son los que construyen el sistema; el resto del equipo
+ * no debe salir como si le faltara marcar): Alcides, Jhokser y Hernán, por su id de `perfiles`.
+ */
+export const REVISAN_CAMBIOS: ReadonlySet<string> = new Set(["a3e6cde5-006a-42a6-91df-db2ac88dffbb", "2abacbe8-669a-4927-9beb-fb941a97540b", "ffe79fe4-bb46-4522-b35a-7b3005719d58"]);
+
 /** Las actualizaciones de los últimos días que el Centro de notificaciones muestra para marcar como vistas (las anteriores, en el Centro de ayuda). */
 export const DIAS_AVISO = 30;
 

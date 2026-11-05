@@ -2,7 +2,7 @@ import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { armarPersonasConAcceso, type PerfilConRol, type PermisoDeRol, type PermisoPropioDeModulo } from "@/lib/acceso-seccion";
 import { getUsuarioActual, irAlInicio } from "@/lib/auth";
-import { claveNovedad } from "@/lib/ayuda/actualizaciones";
+import { claveNovedad, REVISAN_CAMBIOS } from "@/lib/ayuda/actualizaciones";
 import { NOVEDADES } from "@/lib/ayuda/contenido";
 import { createServiceClient } from "@/lib/supabase/server";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
@@ -17,7 +17,7 @@ export const metadata = { title: "Actualizaciones del sistema" };
 /**
  * Actualizaciones del sistema (31 oct 2026, pedido de Alcides): todo lo que cambió, día por día, para los administradores (botón «Cambios» del
  * riel). Sale de las novedades del Centro de ayuda, todas, sin filtrar por módulo. Quien no es administrador vuelve a su inicio. De cada una dice
- * quiénes de su módulo ya la vieron en el Centro de notificaciones (`novedades_vistas`, migración 0218) y quiénes faltan.
+ * cuáles de `REVISAN_CAMBIOS` con su módulo ya la vieron en el Centro de notificaciones (`novedades_vistas`, migración 0218) y cuáles faltan.
  */
 export default async function ActualizacionesPage() {
   const usuario = await getUsuarioActual();
@@ -57,7 +57,8 @@ export default async function ActualizacionesPage() {
   for (const n of NOVEDADES) {
     const clave = claveNovedad(n);
     const vieron = vieronPor.get(clave) ?? new Set<string>();
-    const deEsta = personasDe(n.modulo);
+    // Solo cuentan quienes construyen el sistema (`REVISAN_CAMBIOS`); los demás leen sus novedades en Avisos.
+    const deEsta = personasDe(n.modulo).filter((id) => REVISAN_CAMBIOS.has(id));
     lecturas[clave] = {
       vieron: deEsta.filter((id) => vieron.has(id)).map((id) => nombre.get(id) ?? "?"),
       faltan: deEsta.filter((id) => !vieron.has(id)).map((id) => nombre.get(id) ?? "?"),
