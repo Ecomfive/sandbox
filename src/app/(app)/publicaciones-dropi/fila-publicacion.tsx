@@ -22,7 +22,7 @@ import { BotonTareasFila } from "./tareas-publicacion";
 import { InsigniaConectado } from "./insignia-conectado";
 import { Monto, useMoneda } from "./moneda-contexto";
 import { EtapaCotizando, LlegadaCamino } from "./llegada-camino";
-import { conexionDropi, estadoBotones, paraReactivar, pausada, puedeRepublicar, republicacionPendiente, type FilaPublicacion } from "./def-publicaciones";
+import { POCO_STOCK_VARIACION, conexionDropi, estadoBotones, paraReactivar, pausada, puedeRepublicar, republicacionPendiente, textoVariacionesBajas, type FilaPublicacion } from "./def-publicaciones";
 
 /** Las columnas de la fila en pantalla ancha; las usa también el encabezado de la lista, así que van juntas. */
 const COLUMNAS_CON_VENTAS = "lg:grid-cols-[minmax(0,2.6fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1.1fr)_minmax(0,1.2fr)_4rem_1rem]";
@@ -403,6 +403,11 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, puedeArchi
               <span className="tabular-nums">
                 {f.stockProveedor.toLocaleString("es-PA")} u. en Dropi
                 {f.stockPrivadoProveedor ? ` · ${f.stockPrivadoProveedor.toLocaleString("es-PA")} privadas` : ""}
+                {f.variacionesBajas.length > 0 && (
+                  <span className="block truncate text-warning" title={`Con menos de ${POCO_STOCK_VARIACION} unidades: ${textoVariacionesBajas(f.variacionesBajas)}`}>
+                    Bajas: {textoVariacionesBajas(f.variacionesBajas)}
+                  </span>
+                )}
               </span>
             ) : undefined
           }

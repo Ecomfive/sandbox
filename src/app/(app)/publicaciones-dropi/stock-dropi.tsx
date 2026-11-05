@@ -9,7 +9,7 @@ import { esBodegaDropi } from "@/lib/publicaciones/automatico";
 import { codigoBodega, fechaHoraLectura, idsDeDropi } from "@/lib/publicaciones/sincronizar-dropi";
 import { CONCEPTO_STOCK, MAX_CONCEPTO_STOCK, MAX_UNIDADES_STOCK } from "@/lib/publicaciones/stock-dropi";
 import { cambiarStockDropi } from "./actions";
-import type { FilaPublicacion } from "./def-publicaciones";
+import { POCO_STOCK_VARIACION, textoVariacionesBajas, type FilaPublicacion } from "./def-publicaciones";
 
 interface BodegaVista {
   id: number;
@@ -88,6 +88,11 @@ export function BodegasStockDropi({
           />
         </div>
       ))}
+      {p.variacionesBajas.length > 0 && (
+        <span className="text-xs text-warning tabular-nums">
+          Con menos de {POCO_STOCK_VARIACION} unidades: {textoVariacionesBajas(p.variacionesBajas)}
+        </span>
+      )}
       <span className="text-xs text-muted-foreground tabular-nums">
         {varios
           ? `Total entre los ${grupos.length} IDs ${grupos.reduce((t, g) => t + g.stock, 0).toLocaleString("es-PA")} u. · `
