@@ -164,6 +164,7 @@ export async function guardarNuestrosProductos(supabase: SupabaseClient, l: Lect
                 pais_id: pais.id,
                 nombre: p.nombre,
                 dropi_id: String(p.id),
+                origen: "carga_inicial",
                 estado: p.archivado ? "archivado" : "producto_nuevo",
                 estado_publicacion: p.archivado ? "archivado" : "activo",
                 tipo_publicacion: p.privado ? "privado" : "publico",

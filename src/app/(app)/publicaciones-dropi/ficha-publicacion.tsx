@@ -36,6 +36,7 @@ import { OptimizacionFicha } from "./optimizacion-publicacion";
 import { RecomendacionesFicha } from "./recomendacion-publicacion";
 import { FichaProductoEmbebida } from "../producto/ficha-producto-embebida";
 import { InsigniaConectado } from "./insignia-conectado";
+import { etiquetaOrigen } from "@/lib/publicaciones/origen";
 import { BotonApagarDropi, puedeApagar } from "./apagar-dropi";
 import { BotonPrivatizarDropi, puedePrivatizar } from "./privatizar-dropi";
 import { EstadoCambioDropi } from "./estado-cambio-dropi";
@@ -562,6 +563,12 @@ function ContenidoFicha({
             Archivados.
           </p>
         )}
+        {p.origen === "dropi" && (
+          <p role="note" className="m-0 border-b border-border bg-warning-soft px-5 py-3 text-sm">
+            <span className="font-semibold">Se creó directo en Dropi.</span>{" "}
+            {p.porResolver.length ? `Para resolverla falta ${p.porResolver.join(" y ")}.` : "Ya tiene su producto y su costo: no falta nada."}
+          </p>
+        )}
         <div className="border-b border-border px-5 py-5">
           <Seccion icono={InventarioIcon} titulo="Producto vinculado (SKU)">
             <VinculoSku p={p} puedeEscribir={puedeEscribir} siguiente={siguiente} alAbrirProducto={setProductoAbierto} />
@@ -607,6 +614,7 @@ function ContenidoFicha({
                       <InsigniaConectado estado={conexionDropi(p)!} />
                     </div>
                   )}
+                  {p.origen && <span className="text-xs text-muted-foreground">Origen: {etiquetaOrigen(p.origen)}</span>}
                   <label className="flex min-w-0 flex-col gap-1">
                     <span className={labelClassSm}>ID en Dropi</span>
                     <span className="flex items-center gap-1.5">

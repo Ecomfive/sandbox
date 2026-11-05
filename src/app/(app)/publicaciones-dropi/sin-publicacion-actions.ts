@@ -98,6 +98,7 @@ export async function crearDesdeDropi(dropiId: number, copiarDe: string | null):
       pais_id: paisId,
       nombre: p.nombre,
       dropi_id: String(p.id),
+      origen: "dropi",
       estado: estadoBase && estadoBase !== "archivado" ? estadoBase : base ? "al_dia" : "producto_nuevo",
       estado_publicacion: "activo",
       tipo_publicacion: p.privado ? "privado" : "publico",
@@ -144,6 +145,8 @@ export async function vincularADropi(dropiId: number, publicacionId: string): Pr
     .from("dropi_publicaciones")
     .update({
       dropi_id: String(p.id),
+      // El producto se hizo en Dropi: esta publicación solo estaba anotada.
+      origen: "dropi",
       estado_publicacion: "activo",
       tipo_publicacion: p.privado ? "privado" : "publico",
       ...(pub.estado === "archivado" ? { estado: "al_dia" } : {}),

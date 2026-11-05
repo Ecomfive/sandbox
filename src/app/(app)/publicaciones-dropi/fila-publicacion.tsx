@@ -289,6 +289,15 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, puedeArchi
                 En liquidación
               </span>
             )}
+            {/* Nació directo en Dropi (5 nov 2026, pedido de Hernán, migración 0226): se ve de lejos y dice si falta resolverla. */}
+            {f.origen === "dropi" && (
+              <span
+                title={f.porResolver.length ? `Se creó directo en Dropi. Falta ${f.porResolver.join(" y ")}.` : "Se creó directo en Dropi. Ya tiene su producto y su costo."}
+                className="inline-flex shrink-0 items-center rounded-full border border-warning px-2 py-0.5 text-xs font-semibold text-warning"
+              >
+                Creada en Dropi{f.porResolver.length ? " · por resolver" : ""}
+              </span>
+            )}
             {/* Su producto está descontinuado en este país (ficha del producto, migración 0211): ya no se compra para aquí. */}
             {f.descontinuadoPais && (
               <span title="Descontinuado en este país: ya no se compra para aquí (se cambia en la ficha del producto)" className="inline-flex shrink-0 items-center rounded-full border border-destructive px-2 py-0.5 text-xs font-semibold text-destructive">
@@ -300,6 +309,7 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, puedeArchi
             <span className="font-medium tabular-nums">{numeroPublicacion(f.numero)}</span>
             <span className="tabular-nums">{f.dropiId ? `ID ${f.dropiId}` : "Sin ID de Dropi"}</span>
             {conexionDropi(f) && <InsigniaConectado estado={conexionDropi(f)!} />}
+            {f.origen === "sistema" && <span>Creada en el sistema</span>}
             {/* A qué bodega de Dropi pertenece («B280»): la que muestra Dropi o, si hoy no tiene stock, la última que se conoció. */}
             {f.bodega ? (
               <span className="rounded border border-border-control px-1 font-mono font-semibold text-foreground">

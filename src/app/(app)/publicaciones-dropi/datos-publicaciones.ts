@@ -13,6 +13,7 @@ import { cargarReglas, type ReglasGuardadas } from "@/lib/publicaciones/reglas-d
 import { cargarEnCamino } from "@/lib/publicaciones/en-camino-datos";
 import { enCaminoDeCompuesto, juntarEtapaCotizacion } from "@/lib/compras/en-camino";
 import { cargarProductosProveedor } from "@/lib/publicaciones/proveedor-datos";
+import { faltaParaResolver, type OrigenPublicacion } from "@/lib/publicaciones/origen";
 import { enDropiSinPublicacion, type ProductoSinPublicacion } from "@/lib/publicaciones/sin-publicacion";
 import { grupoDe } from "@/lib/publicaciones/apagar-dropi";
 import { masReciente } from "@/lib/publicaciones/cambio-precio";
@@ -254,6 +255,11 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
     supabase.from("dropi_publicaciones").select("id, duplicada_de").eq("pais_id", paisId).not("duplicada_de", "is", null).order("id").range(desde, hasta),
   );
   const duplicadaDe = new Map(duplicadasR.error ? [] : (duplicadasR.data ?? []).map((n) => [n.id, n.duplicada_de as string]));
+  // De dónde nació (migración 0226), aparte: lo normal es «sistema», así que solo se traen las demás; sin la migración, no se sabe (null).
+  const origenesR = await traerTodasConError<{ id: string; origen: OrigenPublicacion }>((desde, hasta) =>
+    supabase.from("dropi_publicaciones").select("id, origen").eq("pais_id", paisId).neq("origen", "sistema").order("id").range(desde, hasta),
+  );
+  const origenDe = new Map((origenesR.data ?? []).map((n) => [n.id, n.origen]));
   // Las pausadas por falta de stock (migración 0165) van aparte, igual: sin la migración, ninguna.
   const pausadasR = await traerTodasConError<{ id: string; pausada_en: string | null }>((desde, hasta) =>
     supabase.from("dropi_publicaciones").select("id, pausada_en").eq("pais_id", paisId).not("pausada_en", "is", null).order("id").range(desde, hasta),
@@ -430,6 +436,8 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
       privatizaciones: cambiosDropi.privatizando.get(d.id as string) ?? [],
       stockPendiente: (cambiosDropi.ajustandoStock.get(d.id as string) ?? []).map(({ producto, bodega, nombreBodega, unidades, antes }) => ({ producto, bodega, nombreBodega, unidades, antes })),
       duplicadaDe: null,
+      origen: origenesR.error ? null : (origenDe.get(d.id as string) ?? "sistema"),
+      porResolver: [],
       pausadaDesde: pausadaEn.get(d.id as string) ?? null,
       liquidacionDesde: liquidacionEn.get(d.id as string) ?? null,
       descontinuadoPais: !!d.sku_maestro_id && descontinuados.has(d.sku_maestro_id as string),
@@ -515,6 +523,8 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
     f.recomendaciones = pendientes([...recsVigentes, ...recomendarOptimizacion(f.revisiones, f.archivada, privada)], f.decisiones, hoy);
   }
   if (cumplidas.length && conTareas) after(() => guardarCumplidas(supabase, cumplidas));
+
+  for (const f of filas) f.porResolver = faltaParaResolver(f);
 
   const opcionesCrear = opcionesParaCrear(proveedor?.productos.values() ?? []);
   const sinPublicacion = proveedor

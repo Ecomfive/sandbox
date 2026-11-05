@@ -333,7 +333,8 @@ export async function crearPublicacion(f: FormData): Promise<PublicacionCreada> 
   const producto = await productoElegido(f, supabase);
   const { data, error } = await supabase
     .from("dropi_publicaciones")
-    .insert({ ...datos, sku_maestro_id: producto?.id ?? null, pais_id: paisId, fecha_publicacion: datos.fecha_publicacion ?? hoy(), responsable_id: datos.responsable_id ?? usuario.id, creado_por: usuario.id })
+    // «Ya está en Dropi»: se anota algo que nació allá.
+    .insert({ ...datos, origen: "dropi", sku_maestro_id: producto?.id ?? null, pais_id: paisId, fecha_publicacion: datos.fecha_publicacion ?? hoy(), responsable_id: datos.responsable_id ?? usuario.id, creado_por: usuario.id })
     .select("id")
     .single();
   if (error || !data) return { error: error?.code === "42P01" ? "Falta correr en Supabase la migración 0116." : "No se pudo crear la publicación." };

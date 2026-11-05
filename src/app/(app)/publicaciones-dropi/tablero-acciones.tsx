@@ -7,7 +7,7 @@ import { ACCIONES as ACCIONES_CALCULADAS, detalleAccion, type Accion as AccionCa
 import type { Reglas } from "@/lib/publicaciones/reglas";
 import { alternarAtajo, atajoActivo, type AtajoFiltro } from "@/lib/tabla/atajos";
 import type { DefTabla } from "@/lib/tabla/motor";
-import { ActualizarIcon, AnalisisCompetenciaIcon, DesconectadoIcon, DropshipperIcon, EnlaceIcon, EstadoIcon, InventarioIcon, MargenIcon, SugerenciaIcon, TiendaIcon, VentasIcon } from "@/lib/nav-icons";
+import { ActualizarIcon, AnalisisCompetenciaIcon, DesconectadoIcon, DropiIcon, DropshipperIcon, EnlaceIcon, EstadoIcon, InventarioIcon, MargenIcon, SugerenciaIcon, TiendaIcon, VentasIcon } from "@/lib/nav-icons";
 import { TIPOS_RECOMENDACION, type GrupoRecomendacion } from "@/lib/publicaciones/recomendaciones";
 
 const grupoDe = (t: string) => TIPOS_RECOMENDACION.find((x) => x.valor === t)?.grupo;
@@ -32,7 +32,9 @@ interface Tarjeta {
   /** Lo que cuenta la tarjeta, con los umbrales de las reglas. */
   detalle: string | ((r: Reglas, codigoPais?: string) => string);
   /** Una línea más, calculada (p. ej. cuántas están en margen crítico). */
-  extra?: (abiertas: FilaPublicacion[], r: Reglas) => string | null;
+  extra?: (abiertas: FilaPublicacion[], r: Reglas, sinPublicacion: number) => string | null;
+  /** Suma al número los productos que están en Dropi sin publicación (no son filas de la lista). */
+  sumaSinPublicacion?: boolean;
   /** El color de esa línea: rojo (lo que alarma) o verde (lo que va bien, como lo que viene en camino). */
   extraColor?: "rojo" | "verde";
   /** Un segundo número junto al grande, tras una barra: «/ 300» (el total) o «/ 6 en camino». */
@@ -108,6 +110,19 @@ const TARJETAS: Tarjeta[] = [
     detalle: "Publicaciones sin su ID de Dropi anotado",
     cuenta: (f) => !f.dropiId.trim(),
     atajo: { id: "sin-id", etiqueta: "Sin ID de Dropi", ayuda: "Filtrar la lista: sin ID de Dropi", filtro: seleccion("idDropi", "sin_id") },
+  },
+  {
+    // Lo que se hizo directo en Dropi y falta resolver (5 nov 2026, pedido de Hernán): al completarlo deja de contar solo.
+    id: "creadas-dropi",
+    titulo: "Creadas en Dropi",
+    icono: DropiIcon,
+    color: "ambar",
+    detalle: "Hechas directo en Dropi: les falta el producto o el costo",
+    cuenta: (f) => f.porResolver.length > 0,
+    sumaSinPublicacion: true,
+    junto: (abiertas) => ({ n: abiertas.filter((f) => f.origen === "dropi").length, texto: "en total" }),
+    extra: (_abiertas, _r, sinPublicacion) => (sinPublicacion ? `${sinPublicacion.toLocaleString("es-PA")} sin publicación: se crean en el aviso de abajo` : null),
+    atajo: { id: "creadas-dropi", etiqueta: "Creadas en Dropi", ayuda: "Filtrar la lista: creadas en Dropi por resolver", filtro: seleccion("creadaDropiPorResolver", "si") },
   },
   {
     id: "sin-vincular",
@@ -194,14 +209,14 @@ function TarjetaAccion({ t, valor, junto, extra, detalle, def }: { t: Tarjeta; v
  * (las acciones calculadas, lo que falta vincular y lo que no tiene stock). Cada tarjeta cuenta las publicaciones abiertas y, al
  * pulsarla, filtra la lista de abajo; pulsarla otra vez quita el filtro.
  */
-export function TableroAcciones({ publicaciones, reglas, codigoPais, def = DEF_PUBLICACIONES }: { publicaciones: FilaPublicacion[]; reglas: Reglas; codigoPais?: string; def?: DefTabla<FilaPublicacion> }) {
+export function TableroAcciones({ publicaciones, reglas, codigoPais, sinPublicacion = 0, def = DEF_PUBLICACIONES }: { publicaciones: FilaPublicacion[]; reglas: Reglas; codigoPais?: string; sinPublicacion?: number; def?: DefTabla<FilaPublicacion> }) {
   const abiertas = publicaciones.filter((f) => !f.archivada);
   return (
     <section aria-label="Tablero de acciones" className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(12rem,1fr))]">
       {TARJETAS.map((t) => {
         const base = t.todas ? publicaciones : abiertas;
         return (
-          <TarjetaAccion key={t.id} t={t} valor={base.filter(t.cuenta).length} junto={t.junto ? t.junto(base) : null} extra={t.extra ? t.extra(base, reglas) : null} detalle={typeof t.detalle === "function" ? t.detalle(reglas, codigoPais) : t.detalle} def={def} />
+          <TarjetaAccion key={t.id} t={t} valor={base.filter(t.cuenta).length + (t.sumaSinPublicacion ? sinPublicacion : 0)} junto={t.junto ? t.junto(base) : null} extra={t.extra ? t.extra(base, reglas, sinPublicacion) : null} detalle={typeof t.detalle === "function" ? t.detalle(reglas, codigoPais) : t.detalle} def={def} />
         );
       })}
     </section>

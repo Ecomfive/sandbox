@@ -105,6 +105,15 @@ const PENDIENTES: {
     accion: "Revisar",
   },
   {
+    clave: "creadas-dropi",
+    modulo: "publicaciones-dropi",
+    campo: "creadasEnDropi",
+    titulo: "Creadas directo en Dropi por resolver",
+    descripcion: "Se hicieron en Dropi y no en el sistema: falta su publicación, su producto o su costo",
+    href: "/publicaciones-dropi",
+    accion: "Resolver",
+  },
+  {
     clave: "creditos-ia",
     modulo: "publicaciones-dropi",
     campo: "creditosIA",

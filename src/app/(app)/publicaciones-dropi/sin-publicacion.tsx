@@ -38,9 +38,9 @@ export function AvisoSinPublicacion({ productos, sinId, puedeEscribir }: { produ
         className={`inline-flex items-center gap-1.5 rounded text-left font-medium text-foreground underline-offset-4 hover:underline hover:decoration-dotted ${anilloFoco}`}
       >
         <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-warning" />
-        {`${n} ${n === 1 ? "producto" : "productos"} en Dropi sin publicación`}
+        {`${n} ${n === 1 ? "producto creado" : "productos creados"} en Dropi sin publicación`}
       </button>
-      <Ventana abierto={abierta} alCerrar={() => setAbierta(false)} titulo="En Dropi sin publicación" ancho="lg">
+      <Ventana abierto={abierta} alCerrar={() => setAbierta(false)} titulo="Creados en Dropi sin publicación" ancho="lg">
         <div className="flex flex-col gap-4 p-5 text-sm">
           <ul className="m-0 flex list-none flex-col divide-y divide-border rounded-lg border border-border bg-card p-0">
             {productos.map((p) => (

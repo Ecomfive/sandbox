@@ -44,7 +44,7 @@ export function calcularPendientesMenu(pendientes: PendientesHoy, modulos: strin
     "/retiros": pendientes.saldosSinRegistrar + pendientes.retirosDropiSinVincular,
     "/inventario": pendientes.lotesVencidos + pendientes.lotesPorVencer,
     "/analisis-competencia": pendientes.competidoresNuevos,
-    "/publicaciones-dropi": pendientes.tareasAtrasadas + pendientes.creditosIA,
+    "/publicaciones-dropi": pendientes.tareasAtrasadas + pendientes.creditosIA + pendientes.creadasEnDropi,
     "/compras": pendientes.sinStockPorRevisar,
   };
   const contadores: ContadoresMenu = {};
@@ -61,7 +61,8 @@ export function calcularPendientesMenu(pendientes: PendientesHoy, modulos: strin
       pendientes.competidoresNuevos +
       pendientes.tareasAtrasadas +
       pendientes.creditosIA +
-      pendientes.sinStockPorRevisar
+      pendientes.sinStockPorRevisar +
+      pendientes.creadasEnDropi
     : 0;
   return { contadores, total, paraTi: 0, novedades: 0 };
 }
@@ -76,7 +77,7 @@ const DE_DONDE: Record<string, string> = {
   "/retiros": "saldos sin registrar y retiros de Dropi sin vincular",
   "/inventario": "lotes vencidos o por vencer",
   "/analisis-competencia": "competidores nuevos",
-  "/publicaciones-dropi": "tareas atrasadas o crédito de IA por acabarse",
+  "/publicaciones-dropi": "tareas atrasadas, crédito de IA por acabarse o publicaciones creadas directo en Dropi por resolver",
   "/compras": "productos sin stock por revisar, en la pestaña «Sin stock»",
 };
 
