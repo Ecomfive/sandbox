@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { revisarConteo } from "./levantamiento";
+import { revisarConteo, varianteDeLinea } from "./levantamiento";
 
 const A = "0194f0a2-0000-7000-8000-000000000001";
 const B = "0194f0a2-0000-7000-8000-000000000002";
@@ -41,4 +41,19 @@ test("lee una lista con punto y coma, tabulador o coma, y salta el encabezado", 
 
 test("una cantidad que no es un número entero se salta", () => {
   assert.deepEqual(leerLista("A;-3\nB;1.5\nC;abc").lineas, []);
+});
+
+test("la línea elige su variante: color y talla, graduación escrita de cualquier forma, y nada si no se sabe cuál", () => {
+  const faja = ["Beige", "Negro"].flatMap((Color) => ["S", "M", "L", "XL", "XXL"].map((Talla) => ({ id: `${Color}/${Talla}`, opciones: { Color, Talla } })));
+  assert.equal(varianteDeLinea("Faja Body Entero FullBody Negro S", faja), "Negro/S");
+  assert.equal(varianteDeLinea("Faja Body Entero FullBody Beige XXL", faja), "Beige/XXL");
+  assert.equal(varianteDeLinea("Faja Body Beige 2XL", faja), "Beige/XXL");
+  assert.equal(varianteDeLinea("Faja Body Entero FullBody Negro", faja), null, "sin talla no se adivina");
+  const lentes = ["+1.00", "+1.50", "+4.00"].map((g) => ({ id: g, opciones: { Graduación: g } }));
+  assert.equal(varianteDeLinea("Lente de Calidad +150", lentes), "+1.50");
+  assert.equal(varianteDeLinea("Lente de Calidad +4.00", lentes), "+4.00");
+  assert.equal(varianteDeLinea("Lente de Calidad 1:00", lentes), "+1.00");
+  assert.equal(varianteDeLinea("Lente de Calidad +250", lentes), null);
+  assert.equal(varianteDeLinea("Corrector de Postura Ortopédico XL", [{ id: "L", opciones: { Talla: "L" } }, { id: "XL", opciones: { Talla: "XL" } }]), "XL");
+  assert.equal(varianteDeLinea("Algo", [{ id: "x", opciones: null }]), null);
 });

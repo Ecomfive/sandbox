@@ -66,6 +66,27 @@ export function revisarConteo(items: unknown): { items: ItemConteo[] } | { error
 /** La diferencia entre lo contado y lo que dice el sistema (positiva: sobra en el sistema; negativa: falta). */
 export const diferencia = (contado: number, enSistema: number) => contado - enSistema;
 
+/** Un valor de variante o una palabra de una línea, comparables: sin acentos, «+100», «+1.00» y «1:00» son lo mismo, y XXL es 2XL. */
+function valorComparable(t: string): string {
+  const v = t.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().trim();
+  if (/^\+?\d+([.,:]\d+)?$/.test(v)) return v.replace(/\D/g, "");
+  return v === "xxl" ? "2xl" : v;
+}
+const palabrasDe = (t: string) => t.split(/[\s/·()]+/).filter(Boolean).map(valorComparable);
+
+/**
+ * La variante de la que habla una línea de «Importar lista» (pedido de Hernán, 5 nov 2026: «Faja … Negro S» caía en la talla L): la única de sus hermanas que tiene **todos** sus valores
+ * (color, talla, graduación) en la línea. null si ninguna o más de una.
+ */
+export function varianteDeLinea(nombre: string, hermanas: { id: string; opciones: Record<string, string> | null }[]): string | null {
+  const enLinea = new Set(palabrasDe(nombre));
+  const calzan = hermanas.filter((h) => {
+    const valores = Object.values(h.opciones ?? {}).flatMap(palabrasDe);
+    return valores.length > 0 && valores.every((v) => enLinea.has(v));
+  });
+  return calzan.length === 1 ? calzan[0].id : null;
+}
+
 export interface LineaImportada {
   nombre: string;
   cantidad: number;
