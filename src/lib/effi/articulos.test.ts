@@ -41,6 +41,12 @@ test("las tarifas salen del texto de Effi", () => {
   assert.equal(tarifasEffi(null).size, 0);
 });
 
+test("reconoce la tarifa aunque se llame distinto o venga con otro separador", () => {
+  const a = normalizarArticulo({ ...articulo, precios_venta: "Tarifa Dropshipping: $5,449<br>Tarifa Sugerida: $19,000<br>Tarifa Garantías: $0" })!;
+  assert.equal(a.precioDropshipping, 5449);
+  assert.equal(a.precioSugerido, 19000);
+});
+
 test("solo cuenta nuestras bodegas: las de los dropshippers no entran", () => {
   const a = normalizarArticulo(articulo)!;
   assert.equal(a.stockPrincipal, 150);

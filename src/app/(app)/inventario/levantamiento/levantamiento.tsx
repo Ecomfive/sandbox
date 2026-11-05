@@ -112,6 +112,9 @@ export function Levantamiento({
 
   const contadosTotal = productos.filter((p) => contadoDe(p) !== null);
   const conDiferencia = contadosTotal.filter((p) => contadoDe(p) !== p.enSistema).length;
+  // Para cuadrar: lo que se lleva contado y lo que el sistema tiene hoy en esta bodega (aquí no hay compuestos).
+  const unidadesContadas = contadosTotal.reduce((s, p) => s + (contadoDe(p) ?? 0), 0);
+  const unidadesEnSistema = productos.reduce((s, p) => s + p.enSistema, 0);
   const nombreBodega = bodegas.find((b) => b.id === bodegaElegida)?.nombre ?? "";
 
   const guardar = () => {
@@ -357,7 +360,8 @@ export function Levantamiento({
       {puedeEscribir && (
         <div className="sticky bottom-4 z-20 flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card px-4 py-3 shadow-lg">
           <p className="text-sm">
-            <strong className="tabular-nums">{contadosTotal.length}</strong> productos contados · <strong className="tabular-nums">{conDiferencia}</strong> con diferencia
+            <strong className="tabular-nums">{contadosTotal.length}</strong> productos contados · <strong className="tabular-nums">{unidadesContadas.toLocaleString("es-PA")}</strong> unidades contadas ·{" "}
+            <strong className="tabular-nums">{conDiferencia}</strong> con diferencia · <strong className="tabular-nums">{unidadesEnSistema.toLocaleString("es-PA")}</strong> unidades en el sistema
           </p>
           {error && (
             <p role="alert" className="text-sm text-destructive">

@@ -85,6 +85,8 @@ export type ResumenConexionEffi = {
   conCostos: boolean;
   conStock: boolean;
   ejemplo: { id: string; nombre: string } | null;
+  /** El texto de las tarifas tal como lo manda Effi, para revisar la lectura de precios. */
+  tarifas: string | null;
 };
 
 /** Prueba la llave con dos consultas livianas: un artículo (y el total) y las bodegas. Solo lee. */
@@ -103,6 +105,7 @@ export async function probarConexionEffi(): Promise<{ ok: true; resumen: Resumen
       conCostos: !!a && "p_costo" in a,
       conStock: !!a && "stock_empresa" in a,
       ejemplo: a ? { id: String(a.id ?? ""), nombre: String(a.descripcion ?? "") } : null,
+      tarifas: typeof a?.precios_venta === "string" ? a.precios_venta.slice(0, 300) : null,
     },
   };
 }

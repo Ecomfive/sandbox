@@ -41,11 +41,11 @@ export function montoEffi(v: unknown): number | null {
   return Number.isFinite(n) && n >= 0 ? n : null;
 }
 
-/** «Dropshipping: 5449; Sugerida: 19000; Garantías: 0» → cada tarifa, con su nombre sin tildes y en minúsculas. */
+/** «Dropshipping: 5449; Sugerida: 19000; Garantías: 0» (también separadas por salto de línea o `<br>`) → cada tarifa, con su nombre sin tildes y en minúsculas. */
 export function tarifasEffi(v: unknown): Map<string, number> {
   const m = new Map<string, number>();
   if (typeof v !== "string") return m;
-  for (const parte of v.split(";")) {
+  for (const parte of v.split(/;|<br\s*\/?>|<hr[^>]*>|\n/i)) {
     const i = parte.lastIndexOf(":");
     if (i <= 0) continue;
     const monto = montoEffi(parte.slice(i + 1));
@@ -53,6 +53,9 @@ export function tarifasEffi(v: unknown): Map<string, number> {
   }
   return m;
 }
+
+/** El monto de la tarifa cuyo nombre lleva esa palabra: la cuenta puede llamarla «Dropshipping» o «Tarifa Dropshipping». */
+const tarifaCon = (tarifas: Map<string, number>, palabra: string): number | null => [...tarifas].find(([nombre]) => nombre.includes(palabra))?.[1] ?? null;
 
 /** El stock de una de nuestras bodegas en `stock_bodegas`; `null` si Effi no la lista (combos, servicios o sin registro). */
 function stockDeBodega(bodegas: unknown, nombre: string): number | null {
@@ -87,8 +90,8 @@ export function normalizarArticulo(o: unknown): ArticuloEffi | null {
     gtin: texto(a.gtin, 64),
     categoria: texto(a.nombre_categoria_dropshipping) ?? texto(a.nombre_categoria),
     fotoUrl: url && /^https:\/\//.test(url) ? url : null,
-    precioDropshipping: tarifas.get("dropshipping") ?? null,
-    precioSugerido: tarifas.get("sugerida") ?? tarifas.get("sugerido") ?? null,
+    precioDropshipping: tarifaCon(tarifas, "dropshipping"),
+    precioSugerido: tarifaCon(tarifas, "sugerid"),
     precioMinimo: montoEffi(a.p_min_venta),
     costo: costoReal(a),
     stockPrincipal: stockDeBodega(a.stock_bodegas, "principal"),

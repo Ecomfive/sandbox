@@ -46,6 +46,7 @@ export function ConexionEffi({ hayLlave }: { hayLlave: boolean }) {
             </span>
           </div>
           {resultado.resumen.bodegas.length > 0 && <p className="text-muted-foreground">Bodegas: {resultado.resumen.bodegas.join(", ")}</p>}
+          <p className="text-muted-foreground">Tarifas que manda Effi: {resultado.resumen.tarifas ?? "Effi no mandó tarifas"}</p>
           <div className="flex flex-wrap gap-2">
             <Badge tone={resultado.resumen.conStock ? "success" : "warning"}>{resultado.resumen.conStock ? "Ve el stock" : "No ve el stock"}</Badge>
             <Badge tone={resultado.resumen.conCostos ? "success" : "warning"}>{resultado.resumen.conCostos ? "Ve los costos" : "No ve los costos"}</Badge>

@@ -9,6 +9,7 @@ import { MiniaturaFoto } from "@/components/ui/miniatura-foto";
 import { TablaDatos, type ColumnaTabla } from "@/components/tabla/tabla-datos";
 import { InventarioIcon, ProductoIcon } from "@/lib/nav-icons";
 import type { NombreFilas } from "@/lib/tabla/pie";
+import { sumaSinCompuestos } from "@/lib/wms/total-stock";
 import { DEF_STOCK, ETIQUETA_CLASE_SKU, ETIQUETA_TIPO_SKU, type FilaStock } from "./def-stock";
 import { DESCRIPCION_CUBETA } from "./descripciones-stock";
 import { FichaStock } from "./ficha-stock";
@@ -22,8 +23,11 @@ function celda(n: number) {
   return <span className={`block text-right tabular-nums ${n < 0 ? "font-medium text-destructive" : n === 0 ? "text-muted-foreground" : ""}`}>{n}</span>;
 }
 
+/** El total de una cifra sobre las filas que deja ver la tabla (bodega, búsqueda y filtros), sin los compuestos. */
+const total = (valor: (f: FilaStock) => number) => (filas: FilaStock[]) => <span className="block text-right font-semibold tabular-nums">{sumaSinCompuestos(filas, valor).toLocaleString("es-PA")}</span>;
+
 const COLUMNAS: ColumnaTabla<FilaStock>[] = [
-  { id: "codigo", label: "Código", ocultable: false, clase: "font-medium", render: (f) => f.codigo },
+  { id: "codigo", label: "Código", ocultable: false, clase: "font-medium", render: (f) => f.codigo, total: () => "Total sin compuestos" },
   { id: "foto", label: "Foto", ocultable: true, render: (f) => <MiniaturaFoto url={f.foto} nombre={f.nombre} /> },
   { id: "nombre", label: "Producto", ocultable: true, render: (f) => f.nombre },
   {
@@ -48,14 +52,14 @@ const COLUMNAS: ColumnaTabla<FilaStock>[] = [
         <span className="text-muted-foreground">{ETIQUETA_CLASE_SKU.fisico}</span>
       ),
   },
-  { id: "fisico", label: "Físico", descripcion: DESCRIPCION_CUBETA.fisico, ocultable: false, render: (f) => celda(f.fisico) },
-  { id: "reservado", label: "Reservado", descripcion: DESCRIPCION_CUBETA.reservado, ocultable: true, render: (f) => celda(f.reservado) },
-  { id: "disponible", label: "Disponible", descripcion: DESCRIPCION_CUBETA.disponible, ocultable: false, render: (f) => celda(f.disponible) },
-  { id: "danado", label: "Dañado", descripcion: DESCRIPCION_CUBETA.danado, ocultable: true, render: (f) => celda(f.danado) },
-  { id: "inspeccion", label: "En inspección", descripcion: DESCRIPCION_CUBETA.inspeccion, ocultable: true, render: (f) => celda(f.inspeccion) },
-  { id: "retenido", label: "Retenido", descripcion: DESCRIPCION_CUBETA.retenido, ocultable: true, render: (f) => celda(f.retenido) },
-  { id: "vencido", label: "Vencido", descripcion: DESCRIPCION_CUBETA.vencido, ocultable: true, render: (f) => celda(f.vencido) },
-  { id: "enCamino", label: "En camino", descripcion: DESCRIPCION_CUBETA.enCamino, ocultable: true, render: (f) => celda(f.enCamino) },
+  { id: "fisico", label: "Físico", descripcion: DESCRIPCION_CUBETA.fisico, ocultable: false, render: (f) => celda(f.fisico), total: total((f) => f.fisico) },
+  { id: "reservado", label: "Reservado", descripcion: DESCRIPCION_CUBETA.reservado, ocultable: true, render: (f) => celda(f.reservado), total: total((f) => f.reservado) },
+  { id: "disponible", label: "Disponible", descripcion: DESCRIPCION_CUBETA.disponible, ocultable: false, render: (f) => celda(f.disponible), total: total((f) => f.disponible) },
+  { id: "danado", label: "Dañado", descripcion: DESCRIPCION_CUBETA.danado, ocultable: true, render: (f) => celda(f.danado), total: total((f) => f.danado) },
+  { id: "inspeccion", label: "En inspección", descripcion: DESCRIPCION_CUBETA.inspeccion, ocultable: true, render: (f) => celda(f.inspeccion), total: total((f) => f.inspeccion) },
+  { id: "retenido", label: "Retenido", descripcion: DESCRIPCION_CUBETA.retenido, ocultable: true, render: (f) => celda(f.retenido), total: total((f) => f.retenido) },
+  { id: "vencido", label: "Vencido", descripcion: DESCRIPCION_CUBETA.vencido, ocultable: true, render: (f) => celda(f.vencido), total: total((f) => f.vencido) },
+  { id: "enCamino", label: "En camino", descripcion: DESCRIPCION_CUBETA.enCamino, ocultable: true, render: (f) => celda(f.enCamino), total: total((f) => f.enCamino) },
 ];
 
 /** Elige de qué bodega se ve el stock (todas las del país, o una): se guarda en la dirección, `?bodega=`. */
