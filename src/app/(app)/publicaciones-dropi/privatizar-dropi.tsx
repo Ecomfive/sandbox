@@ -14,7 +14,7 @@ import { usePuedeAbrir } from "@/components/modulos-contexto";
 import { CandadoAbiertoIcon, CandadoIcon, DeshacerIcon, PapeleraIcon } from "@/lib/nav-icons";
 import { esBodegaDropi } from "@/lib/publicaciones/automatico";
 import { faltantesPrivatizar, inicialesDe, limpiarIniciales, MAX_EXTRAS, nombrePrivado, normalizarDatosPrivatizar, quienesDe, unidadesTotales } from "@/lib/publicaciones/privatizar-dropi";
-import { faltantesVariaciones, stockEnBodega, textoVariaciones, type VariacionLeida } from "@/lib/publicaciones/privatizar-variable";
+import { faltantesVariaciones, ordenarVariaciones, stockEnBodega, textoVariaciones, type VariacionLeida } from "@/lib/publicaciones/privatizar-variable";
 import { codigoBodega } from "@/lib/publicaciones/sincronizar-dropi";
 import { buscarDropshippersParaPrivatizar, privatizarPublicacion, quitarPrivatizacion, variacionesParaPrivatizar } from "./actions";
 import { VentanaDeshacerApagado } from "./apagar-dropi";
@@ -108,7 +108,7 @@ function VentanaPrivatizar({ p, alCerrar }: { p: FilaPublicacion; alCerrar: () =
   const nombre = iniciales ? nombrePrivado(iniciales, p.nombre) : "";
   const bodegaElegida = bodegas.find((b) => String(b.id) === bodega) ?? null;
   const variable = lectura?.variable === true;
-  const variaciones = lectura?.variaciones ?? [];
+  const variaciones = ordenarVariaciones(lectura?.variaciones ?? []);
   const extrasEnviar = variable ? [] : extras.map((x) => ({ correo: x.correo, dropshipper: x.dropshipper, unidades: numero(x.unidades) }));
   const variacionesEnviar = variable ? variaciones.map((v) => ({ firma: v.firma, etiqueta: v.etiqueta, unidades: numero(porVariacion[v.firma] ?? "") })) : [];
   const unidadesEnviar = variable ? 0 : numero(unidades);
@@ -216,7 +216,7 @@ function VentanaPrivatizar({ p, alCerrar }: { p: FilaPublicacion; alCerrar: () =
                   <li key={v.firma} className="flex items-center justify-between gap-3 px-3 py-1.5">
                     <label htmlFor={`priv-variacion-${i}`} className="min-w-0 flex-1">
                       <span className="block truncate font-medium">{v.etiqueta}</span>
-                      <span className="block text-xs text-muted-foreground tabular-nums">{hay.toLocaleString("es-PA")} disponibles</span>
+                      <span className="block text-xs text-muted-foreground tabular-nums">{hay.toLocaleString("es-PA")} {hay === 1 ? "disponible" : "disponibles"}</span>
                     </label>
                     <input
                       id={`priv-variacion-${i}`}
