@@ -276,8 +276,8 @@ function RielYPanel({
   modulosPermitidos?: string[] | null;
   favoritos: string[];
   pendientes: PendientesMenu;
-  /** Solo para administradores: la fecha del último cambio del sistema (botón «Cambios»); null = no se dibuja. */
-  /** Solo para administradores: el botón «Cambios» (Actualizaciones del sistema). */
+  /** Solo para `REVISAN_CAMBIOS`: la fecha del último cambio del sistema (botón «Cambios»); null = no se dibuja. */
+  /** Solo para `REVISAN_CAMBIOS`: el botón «Cambios» (Actualizaciones del sistema). */
   verActualizaciones: boolean;
 }) {
   const pathname = usePathname();
@@ -444,7 +444,7 @@ function ListaMovil({
   favoritos: string[];
   pendientes: PendientesMenu;
   alNavegar: () => void;
-  /** Solo para administradores: el botón «Cambios» (Actualizaciones del sistema). */
+  /** Solo para `REVISAN_CAMBIOS`: el botón «Cambios» (Actualizaciones del sistema). */
   verActualizaciones: boolean;
 }) {
   const pathname = usePathname();
@@ -555,7 +555,7 @@ export function Sidebar({
   areas: NavSection[];
   favoritos: string[];
   pendientes: Promise<PendientesMenu>;
-  /** Solo para administradores: la fecha del último cambio del sistema (botón «Cambios»). */
+  /** Solo para `REVISAN_CAMBIOS`: la fecha del último cambio del sistema (botón «Cambios»). */
   verActualizaciones?: boolean;
 }) {
   const [movilAbierto, setMovilAbierto] = useState(false);

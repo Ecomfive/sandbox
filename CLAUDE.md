@@ -320,7 +320,7 @@ convenciones técnicas del código.
   de «Para ti»): las `NOVEDADES` de sus módulos de los últimos `DIAS_AVISO` (30) días; al abrir una queda leída, con «Por leer / Leídas / Todas»,
   «Marcar todas como leídas» y, en cada una, un botón a su derecha para marcarla leída o por leer sin abrirla (5 nov 2026; también en `/actualizaciones`, visto o nuevo). Lo leído se guarda **por persona** en `novedades_vistas` (migración 0218; `claveNovedad` =
   fecha + huella FNV-1a del título, con prueba de que no se repite; `marcarNovedades`, `src/lib/ayuda/novedades-actions.ts`), y lo no leído suma al
-  número de Avisos (`PendientesMenu.novedades`, `contarNovedadesSinVer`). Avisos se ve para todo el mundo. **Para administradores**, `/actualizaciones`
+  número de Avisos (`PendientesMenu.novedades`, `contarNovedadesSinVer`). Avisos se ve para todo el mundo. **Solo para Alcides, Jhokser y Hernán** (`REVISAN_CAMBIOS`; 6 nov 2026, pedido de Hernán, ni los demás administradores), `/actualizaciones`
   (botón «Cambios» del riel, con punto si hay sin leer): todas las novedades por día, con «Nuevo» y, de cada una, quiénes de su módulo ya la vieron y
   quiénes faltan (`armarPersonasConAcceso`), **solo entre Alcides, Jhokser y Hernán** (`REVISAN_CAMBIOS`, `src/lib/ayuda/actualizaciones.ts`; 6 nov 2026, pedido de Hernán: los que construyen el sistema). **Toda novedad lleva su fecha real (nunca futura), un título que no se repite ese día y, si es de un
   módulo, su `modulo` y su `href`**: cambiar el título de una ya publicada la vuelve «por leer» para todos.

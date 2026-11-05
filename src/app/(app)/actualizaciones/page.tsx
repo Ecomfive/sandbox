@@ -7,7 +7,6 @@ import { NOVEDADES } from "@/lib/ayuda/contenido";
 import { createServiceClient } from "@/lib/supabase/server";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { etiquetaDeModulo } from "@/lib/permisos/catalogo";
-import { esAdministrador } from "@/lib/permisos/acceso";
 import { redirect } from "next/navigation";
 import { ListaActualizaciones, type LecturaNovedad } from "./lista-actualizaciones";
 
@@ -15,14 +14,14 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Actualizaciones del sistema" };
 
 /**
- * Actualizaciones del sistema (31 oct 2026, pedido de Alcides): todo lo que cambió, día por día, para los administradores (botón «Cambios» del
- * riel). Sale de las novedades del Centro de ayuda, todas, sin filtrar por módulo. Quien no es administrador vuelve a su inicio. De cada una dice
+ * Actualizaciones del sistema (31 oct 2026, pedido de Alcides): todo lo que cambió, día por día, solo para `REVISAN_CAMBIOS` (botón «Cambios» del
+ * riel; 6 nov 2026, pedido de Hernán: Alcides, Jhokser y Hernán). Sale de las novedades del Centro de ayuda, todas, sin filtrar por módulo. Quien más entre vuelve a su inicio. De cada una dice
  * cuáles de `REVISAN_CAMBIOS` con su módulo ya la vieron en el Centro de notificaciones (`novedades_vistas`, migración 0218) y cuáles faltan.
  */
 export default async function ActualizacionesPage() {
   const usuario = await getUsuarioActual();
   if (!usuario) redirect("/login");
-  if (!esAdministrador(usuario)) irAlInicio(usuario);
+  if (!REVISAN_CAMBIOS.has(usuario.id)) irAlInicio(usuario);
 
   const modulos = [...new Set(NOVEDADES.map((n) => n.modulo).filter((m): m is string => !!m))]
     .map((clave) => ({ clave, etiqueta: etiquetaDeModulo(clave) }))
