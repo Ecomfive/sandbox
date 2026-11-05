@@ -7,7 +7,7 @@ import { puedeVerBodega } from "@/lib/seguridad/pais-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 import { indexar, parecidos, todasLasCoincidencias } from "@/lib/scraping/cruces";
 import { traerTodasConError } from "@/lib/supabase/paginar";
-import { MAX_LINEAS_IMPORTADAS, revisarConteo } from "@/lib/wms/levantamiento";
+import { MAX_LINEAS_IMPORTADAS, revisarConteo, varianteDeLinea } from "@/lib/wms/levantamiento";
 
 const ES_ID = /^[0-9a-fA-F-]{8,64}$/;
 
@@ -70,8 +70,8 @@ export async function sugerirProductosParaLista(nombres: string[]): Promise<{ su
   if (!Array.isArray(nombres) || nombres.length === 0) return { error: "La lista está vacía." };
   if (nombres.length > MAX_LINEAS_IMPORTADAS) return { error: `Son demasiadas líneas (máximo ${MAX_LINEAS_IMPORTADAS}).` };
   const supabase = createServiceClient();
-  const { data, error } = await traerTodasConError<{ id: string; codigo: string; nombre: string }>((d, h) =>
-    supabase.from("skus_maestros").select("id, codigo, nombre").neq("tipo", "combo").neq("clase", "test").is("opciones_variantes", null).order("codigo").range(d, h),
+  const { data, error } = await traerTodasConError<{ id: string; codigo: string; nombre: string; padre_id: string | null; opciones: Record<string, string> | null }>((d, h) =>
+    supabase.from("skus_maestros").select("id, codigo, nombre, padre_id, opciones").neq("tipo", "combo").neq("clase", "test").is("opciones_variantes", null).order("codigo").range(d, h),
   );
   if (error || !data) return { error: "No se pudieron cargar los productos." };
   const porId = new Map(data.map((p) => [p.id, p]));
@@ -82,6 +82,16 @@ export async function sugerirProductosParaLista(nombres: string[]): Promise<{ su
     const p = porId.get(id)!;
     return { id: p.id, codigo: p.codigo, nombre: p.nombre };
   };
+  // Si lo encontrado es una variante, se elige la que dice la línea y se ofrecen todas sus hermanas (el parecido del nombre no distingue una talla de otra).
+  const hermanasDe = new Map<string, typeof data>();
+  for (const p of data) if (p.padre_id) hermanasDe.set(p.padre_id, [...(hermanasDe.get(p.padre_id) ?? []), p]);
+  const conVariante = (nombre: string, ids: string[]): SugerenciaLinea | null => {
+    const padre = porId.get(ids[0])?.padre_id;
+    const hermanas = padre ? (hermanasDe.get(padre) ?? []) : [];
+    if (!hermanas.length) return null;
+    const id = varianteDeLinea(nombre, hermanas);
+    return { skuId: id ?? hermanas[0].id, estado: id ? "seguro" : "revisar", opciones: hermanas.map((h) => opcion(h.id)) };
+  };
   const sugerencias = nombres.map((bruto): SugerenciaLinea => {
     const nombre = String(bruto ?? "").slice(0, 200);
     const exacto = porCodigo.get(normal(nombre)) ?? porNombre.get(normal(nombre));
@@ -89,10 +99,12 @@ export async function sugerirProductosParaLista(nombres: string[]): Promise<{ su
     const iguales = todasLasCoincidencias(nombre, null, indice);
     if (iguales.length > 0) {
       const ids = [...new Set(iguales.map((c) => c.id))].slice(0, 5);
+      const variante = conVariante(nombre, ids);
+      if (variante) return variante;
       return { skuId: ids[0], estado: ids.length === 1 ? "seguro" : "revisar", opciones: ids.map(opcion) };
     }
     const cerca = [...new Set(parecidos(nombre, null, indice, 4).map((c) => c.id))];
-    if (cerca.length > 0) return { skuId: cerca[0], estado: "revisar", opciones: cerca.map(opcion) };
+    if (cerca.length > 0) return conVariante(nombre, cerca) ?? { skuId: cerca[0], estado: "revisar", opciones: cerca.map(opcion) };
     return { skuId: null, estado: "sin", opciones: [] };
   });
   return { sugerencias };
