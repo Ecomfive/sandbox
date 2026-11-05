@@ -143,7 +143,7 @@ export function PanelUso({ altas, paises, puedeEscribir }: { altas: AltaPublicac
           <span className={labelClassSm}>País</span>
           <select value={pais} onChange={(e) => setPais(e.target.value)} className={`${fieldClassSm} w-44`}>
             <option value="">Todos</option>
-            {paises.map((p) => (
+            {paises.filter((p) => altas.some((a) => a.pais === p.codigo)).map((p) => (
               <option key={p.codigo} value={p.codigo}>
                 {p.nombre}
               </option>
