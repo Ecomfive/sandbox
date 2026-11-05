@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useState, useTransition } from "react";
-import { BotonBarra } from "@/components/panel/piezas-panel";
 import { anilloFoco } from "@/components/ui/field";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/toast";
@@ -26,16 +25,18 @@ type Filtro = "por_leer" | "leidas" | "todas";
 /**
  * «Actualizaciones del sistema» en el Centro de notificaciones (31 oct 2026, pedido de Alcides), como la bandeja de ClickUp: lo que cambió en el
  * sistema en los últimos días, de los módulos de cada persona. Al abrir una se marca como leída (por persona, migración 0218); se puede volver a
- * dejar por leer o marcarlas todas; cada una se marca leída o por leer sin abrirla con el botón de su derecha (5 nov 2026, pedido de Alcides). «Por leer» y «Leídas» separan lo visto de lo que falta.
+ * dejar por leer; cada una se marca leída o por leer sin abrirla con el botón de su derecha (5 nov 2026, pedido de Alcides). «Por leer» y «Leídas» separan lo visto de lo que falta.
+ * Arranca siempre en «Por leer»: lo marcado leído sale de la lista (la que está abierta se queda hasta cerrarla) y no hay «Marcar todas» (5 nov 2026).
  */
 export function ActualizacionesAvisos({ actualizaciones, dias }: { actualizaciones: ActualizacionAviso[]; dias: number }) {
   const { mostrarToast } = useToast();
   const [vistas, setVistas] = useState(() => new Set(actualizaciones.filter((a) => a.vista).map((a) => a.clave)));
-  const [filtro, setFiltro] = useState<Filtro>(() => (actualizaciones.some((a) => !a.vista) ? "por_leer" : "todas"));
+  const [filtro, setFiltro] = useState<Filtro>("por_leer");
   const [abierta, setAbierta] = useState<string | null>(null);
   const [pendiente, empezar] = useTransition();
   const porLeer = actualizaciones.filter((a) => !vistas.has(a.clave));
-  const lista = filtro === "por_leer" ? porLeer : filtro === "leidas" ? actualizaciones.filter((a) => vistas.has(a.clave)) : actualizaciones;
+  // La que se está leyendo no desaparece al abrirla: sale de «Por leer» al cerrarla.
+  const lista = filtro === "por_leer" ? actualizaciones.filter((a) => !vistas.has(a.clave) || a.clave === abierta) : filtro === "leidas" ? actualizaciones.filter((a) => vistas.has(a.clave)) : actualizaciones;
 
   function marcar(claves: string[], vista: boolean) {
     const antes = vistas;
@@ -70,23 +71,16 @@ export function ActualizacionesAvisos({ actualizaciones, dias }: { actualizacion
           Actualizaciones del sistema{" "}
           {porLeer.length > 0 && <span className="ml-1 rounded-full bg-aviso px-1.5 py-0.5 text-xs font-semibold text-white tabular-nums">{porLeer.length}</span>}
         </h2>
-        <div className="flex flex-wrap items-center gap-2">
-          <div role="group" aria-label="Qué actualizaciones ver" className="inline-flex rounded-lg border border-border p-0.5">
-            <button type="button" aria-pressed={filtro === "por_leer"} onClick={() => setFiltro("por_leer")} className={claseFiltro(filtro === "por_leer")}>
-              Por leer <span className="tabular-nums">{porLeer.length}</span>
-            </button>
-            <button type="button" aria-pressed={filtro === "leidas"} onClick={() => setFiltro("leidas")} className={claseFiltro(filtro === "leidas")}>
-              Leídas
-            </button>
-            <button type="button" aria-pressed={filtro === "todas"} onClick={() => setFiltro("todas")} className={claseFiltro(filtro === "todas")}>
-              Todas
-            </button>
-          </div>
-          {porLeer.length > 0 && (
-            <BotonBarra disabled={pendiente} onClick={() => marcar(porLeer.map((a) => a.clave), true)}>
-              Marcar todas como leídas
-            </BotonBarra>
-          )}
+        <div role="group" aria-label="Qué actualizaciones ver" className="inline-flex rounded-lg border border-border p-0.5">
+          <button type="button" aria-pressed={filtro === "por_leer"} onClick={() => setFiltro("por_leer")} className={claseFiltro(filtro === "por_leer")}>
+            Por leer <span className="tabular-nums">{porLeer.length}</span>
+          </button>
+          <button type="button" aria-pressed={filtro === "leidas"} onClick={() => setFiltro("leidas")} className={claseFiltro(filtro === "leidas")}>
+            Leídas
+          </button>
+          <button type="button" aria-pressed={filtro === "todas"} onClick={() => setFiltro("todas")} className={claseFiltro(filtro === "todas")}>
+            Todas
+          </button>
         </div>
       </div>
 
@@ -117,7 +111,10 @@ export function ActualizacionesAvisos({ actualizaciones, dias }: { actualizacion
                   <button
                     type="button"
                     disabled={pendiente}
-                    onClick={() => marcar([a.clave], !vista)}
+                    onClick={() => {
+                      if (!vista && abierta === a.clave) setAbierta(null);
+                      marcar([a.clave], !vista);
+                    }}
                     aria-label={`${vista ? "Marcar como no leída" : "Marcar como leída"}: ${a.titulo}`}
                     className={`mt-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-60 ${anilloFoco}`}
                   >
