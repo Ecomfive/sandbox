@@ -4,12 +4,13 @@ import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { ICONO_MODULO } from "@/components/ayuda/iconos-modulo";
 import { anilloFoco, fieldClass } from "@/components/ui/field";
+import { Tooltip } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/toast";
 import { agruparPorDia, claveNovedad, filtrarCambios } from "@/lib/ayuda/actualizaciones";
 import { marcarNovedades } from "@/lib/ayuda/novedades-actions";
 import type { Novedad } from "@/lib/ayuda/contenido";
 import { formatearFecha } from "@/lib/formato";
-import { HistorialIcon } from "@/lib/nav-icons";
+import { CheckIcon, HistorialIcon, NoLeidoIcon } from "@/lib/nav-icons";
 
 
 const DIAS = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
@@ -32,7 +33,7 @@ export interface LecturaNovedad {
 /**
  * La lista de Actualizaciones (administradores): buscar, filtrar por módulo y, por día, cada cambio con su módulo y un enlace a dónde verlo. Lo que
  * el administrador no ha visto lleva «Nuevo» (lo visto se guarda por persona, migración 0218, igual que en el Centro de notificaciones), y cada
- * cambio dice cuántas personas de su módulo ya lo vieron y quiénes faltan.
+ * cambio dice cuántas personas de su módulo ya lo vieron y quiénes faltan. Cada uno se marca visto o nuevo con el botón de su derecha (5 nov 2026).
  */
 export function ListaActualizaciones({
   novedades,
@@ -51,7 +52,28 @@ export function ListaActualizaciones({
   const [busqueda, setBusqueda] = useState("");
   const [modulo, setModulo] = useState("");
   const [marcando, empezar] = useTransition();
-  const vistasSet = useMemo(() => new Set(vistas), [vistas]);
+  // Lo marcado aquí se ve al instante, antes de que el servidor vuelva a mandar las vistas (y vuelve atrás si falla).
+  const [cambiadas, setCambiadas] = useState<Record<string, boolean>>({});
+  const vistasSet = useMemo(() => {
+    const s = new Set(vistas);
+    for (const [clave, vista] of Object.entries(cambiadas)) {
+      if (vista) s.add(clave);
+      else s.delete(clave);
+    }
+    return s;
+  }, [vistas, cambiadas]);
+
+  function marcar(claves: string[], vista: boolean) {
+    const antes = cambiadas;
+    setCambiadas((c) => ({ ...c, ...Object.fromEntries(claves.map((k) => [k, vista])) }));
+    empezar(async () => {
+      const r = await marcarNovedades(claves, vista).catch(() => ({ error: "No se pudo guardar." }));
+      if (r.error) {
+        setCambiadas(antes);
+        mostrarToast(r.error, "destructive");
+      }
+    });
+  }
 
   const etiqueta = useMemo(() => new Map(modulos.map((m) => [m.clave, m.etiqueta])), [modulos]);
   const filtradas = useMemo(() => filtrarCambios(novedades, busqueda, modulo), [novedades, busqueda, modulo]);
@@ -80,12 +102,7 @@ export function ListaActualizaciones({
           <button
             type="button"
             disabled={marcando}
-            onClick={() =>
-              empezar(async () => {
-                const r = await marcarNovedades(noVistas.map(claveNovedad));
-                if (r.error) mostrarToast(r.error, "destructive");
-              })
-            }
+            onClick={() => marcar(noVistas.map(claveNovedad), true)}
             className={`inline-flex min-h-10 items-center rounded-md border border-border-control bg-card px-3 text-sm font-medium hover:bg-muted disabled:opacity-60 ${anilloFoco}`}
           >
             Marcar {noVistas.length === filtradas.length ? "todo" : `${noVistas.length}`} como visto
@@ -118,7 +135,7 @@ export function ListaActualizaciones({
                   return (
                     <li key={`${c.fecha}-${c.titulo}`} className="flex gap-3 px-5 py-3.5">
                       <Icono aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                      <div className="flex min-w-0 flex-col gap-1">
+                      <div className="flex min-w-0 flex-1 flex-col gap-1">
                         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                           {c.href ? (
                             <Link href={c.href} className={`rounded text-sm font-medium hover:underline ${anilloFoco}`}>
@@ -146,6 +163,17 @@ export function ListaActualizaciones({
                           </details>
                         )}
                       </div>
+                      <Tooltip texto={nuevo ? "Marcar como visto" : "Marcar como nuevo"}>
+                        <button
+                          type="button"
+                          disabled={marcando}
+                          onClick={() => marcar([claveNovedad(c)], nuevo)}
+                          aria-label={`${nuevo ? "Marcar como visto" : "Marcar como nuevo"}: ${c.titulo}`}
+                          className={`-mt-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-60 ${anilloFoco}`}
+                        >
+                          {nuevo ? <CheckIcon aria-hidden="true" className="h-4 w-4" /> : <NoLeidoIcon aria-hidden="true" className="h-4 w-4" />}
+                        </button>
+                      </Tooltip>
                     </li>
                   );
                 })}
