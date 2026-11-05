@@ -79,7 +79,7 @@ function crearDropi(opciones: { noTomaEntradas?: boolean; usuarios?: Record<stri
         const variaciones = (cuerpo!.variations as Obj[]).map((v, i) => ({
           ...v, id: nuevo * 10 + i, product_id: nuevo,
           warehouse_product_variation: opciones.stockAlCrear === false
-            ? [{ variation_id: nuevo * 10 + i, warehouse_id: 81, stock: 0, warehouse: BODEGA }]
+            ? [] // Dropi real: un producto recién creado no trae ninguna bodega en sus variaciones (visto el 5 nov 2026 en el 11711 y el 11841).
             : ((cuerpo!.warehouselected as Obj[][])[i] ?? []).map((w) => ({ variation_id: nuevo * 10 + i, warehouse_id: w.warehouse_id, stock: w.stock, warehouse: BODEGA })),
         }));
         productos.set(nuevo, productoBase(nuevo, { type: "VARIABLE", privated_product: cuerpo!.privated_product === true, name: cuerpo!.name, description: cuerpo!.description, categories: cuerpo!.categories, attributes: atributos, variations: variaciones, warehouse_product: [], gallery: [] }));
@@ -123,19 +123,22 @@ function crearDropi(opciones: { noTomaEntradas?: boolean; usuarios?: Record<stri
       // Un producto con variaciones: Dropi pide los atributos y las bodegas van en una lista por variación; cada movimiento lleva su `variation_id`.
       if (p.type === "VARIABLE") {
         if (!Array.isArray(cuerpo!.attribute) || !cuerpo!.attribute.length) return responder({ isSuccess: false, message: "Faltan los atributos" }, 422);
-        for (const grupo of cuerpo!.warehouselected as Obj[][]) {
-          for (const e of grupo) {
+        // Las variaciones que no se tocan van en null, como en la pantalla.
+        for (const grupo of cuerpo!.warehouselected as (Obj[] | null)[]) {
+          for (const e of grupo ?? []) {
             if (!e.type_movement) continue;
             const v = (p.variations as Obj[]).find((x) => x.id === e.variation_id);
-            const fila = (v?.warehouse_product_variation as Obj[] | undefined)?.find((x) => x.warehouse_id === e.warehouse_id);
+            let fila = (v?.warehouse_product_variation as Obj[] | undefined)?.find((x) => x.warehouse_id === e.warehouse_id);
+            // Una fila sin `stock` es la bodega que la variación aún no tenía: Dropi la crea.
+            if (!fila && v && e.stock === undefined) (v.warehouse_product_variation as Obj[]).push((fila = { variation_id: v.id, warehouse_id: e.warehouse_id, stock: 0, warehouse: BODEGA }));
             if (!fila) return responder({ isSuccess: false, message: "Esa variación no tiene esa bodega" }, 422);
             if (e.type_movement === "ENTRADA" && opciones.noTomaEntradas) continue;
             fila.stock = Number(fila.stock) + (e.type_movement === "ENTRADA" ? 1 : -1) * Number(e.quantity);
           }
         }
       }
-      for (const w of cuerpo!.warehouselected as Obj[]) {
-        if (!w.type_movement) continue;
+      for (const w of cuerpo!.warehouselected as (Obj | null)[]) {
+        if (!w?.type_movement) continue;
         let fila = (p.warehouse_product as Obj[]).find((x) => x.warehouse_id === w.warehouse_id);
         if (!fila) p.warehouse_product.push((fila = { warehouse_id: w.warehouse_id, stock: 0, warehouse: BODEGA }));
         fila.stock = Number(fila.stock) + (w.type_movement === "ENTRADA" ? 1 : -1) * Number(w.quantity);
@@ -1018,5 +1021,59 @@ test("stock: no toca un producto de otro proveedor ni la bodega de Dropi", async
   assert.match(String(ajeno.error), /no es de este proveedor/);
   assert.equal(b280.ok, false);
   assert.match(String(b280.error), /no es de ECOMFIVE/);
+  assert.equal(d.llamadas.filter((l) => l.startsWith("PUT")).length, 0);
+});
+
+test("stock por variación: lo deja en el objetivo, lo comprueba y devuelve lo que quedó; un reintento no mueve nada", async () => {
+  const d = crearDropi();
+  d.productos.set(7000, conVariaciones(7000, "Body Viral", false, { S: 10, M: 3 }));
+  const datos = { producto: 7000, bodega: 81, nombreBodega: "Proveedor Ecomfive", unidades: 8, antes: 3, concepto: "Llegó la OC-1", firma: "talla=m", etiqueta: "M" };
+  const [r] = await aplicar(d, [{ ...base, id: "v1", tipo: "stock", producto: 7000, datos }]);
+  assert.equal(r.ok, true, String(r.error));
+  assert.deepEqual(stockVariable(d.productos.get(7000)!), { S: 10, M: 8 }, "solo cambió la M");
+  assert.equal(r.antes, 3);
+  assert.equal(r.stock, 8);
+  assert.deepEqual(r.bodegas, [{ id: 81, nombre: "Proveedor Ecomfive", stock: 18 }], "el total de la bodega, para el sistema");
+  assert.deepEqual(r.variacion, { firma: "talla=m", bodegas: [{ id: 81, stock: 8 }] });
+
+  const antes = d.llamadas.length;
+  const [otra] = await aplicar(d, [{ ...base, id: "v2", tipo: "stock", producto: 7000, datos }]);
+  assert.equal(otra.ok, true);
+  assert.equal(d.llamadas.slice(antes).filter((l) => l.startsWith("PUT")).length, 0, "ya estaba en el objetivo");
+
+  const [baja] = await aplicar(d, [{ ...base, id: "v3", tipo: "stock", producto: 7000, datos: { ...datos, unidades: 2, firma: "talla=s", etiqueta: "S", antes: 10 } }]);
+  assert.equal(baja.ok, true, String(baja.error));
+  assert.deepEqual(stockVariable(d.productos.get(7000)!), { S: 2, M: 8 });
+});
+
+test("stock por variación: le da stock a una variación sin bodega, avisa si Dropi tenía otra cosa y si Dropi no lo toma lo dice", async () => {
+  const d = crearDropi();
+  const o = conVariaciones(7000, "Body Viral", false, { S: 0, M: 3 });
+  (o.variations as Obj[])[0].warehouse_product_variation = [];
+  d.productos.set(7000, o);
+  const [r] = await aplicar(d, [{ ...base, id: "v1", tipo: "stock", producto: 7000, datos: { bodega: 81, nombreBodega: "", unidades: 5, antes: 2, concepto: "x", firma: "talla=s", etiqueta: "S" } }]);
+  assert.equal(r.ok, true, String(r.error));
+  assert.deepEqual(stockVariable(d.productos.get(7000)!), { S: 5, M: 3 });
+  assert.match(String(r.aviso), /había 0 \(el sistema mostraba 2\)/);
+
+  const n = crearDropi({ noTomaEntradas: true });
+  n.productos.set(7000, conVariaciones(7000, "Body Viral", false, { S: 1 }));
+  const [mal] = await aplicar(n, [{ ...base, id: "v2", tipo: "stock", producto: 7000, datos: { bodega: 81, nombreBodega: "", unidades: 5, antes: 1, concepto: "x", firma: "talla=s", etiqueta: "S" } }]);
+  assert.equal(mal.ok, false);
+  assert.match(String(mal.error), /muestra 1 unidades de S/);
+});
+
+test("stock: un cambio sin variación en un producto con variaciones (o al revés) se detiene sin guardar", async () => {
+  const d = crearDropi();
+  d.productos.set(7000, conVariaciones(7000, "Body Viral", false, { S: 1 }));
+  d.productos.set(8406, productoBase(8406));
+  const [a, b, c] = await aplicar(d, [
+    { ...base, id: "a", tipo: "stock", producto: 7000, datos: { bodega: 81, nombreBodega: "", unidades: 5, antes: 1, concepto: "x" } },
+    { ...base, id: "b", tipo: "stock", producto: 8406, datos: { bodega: 81, nombreBodega: "", unidades: 5, antes: 1, concepto: "x", firma: "talla=s", etiqueta: "S" } },
+    { ...base, id: "c", tipo: "stock", producto: 7000, datos: { bodega: 81, nombreBodega: "", unidades: 5, antes: 1, concepto: "x", firma: "talla=xl", etiqueta: "XL" } },
+  ]);
+  assert.match(String(a.error), /cada variación en la ficha/);
+  assert.match(String(b.error), /ya no tiene variaciones/);
+  assert.match(String(c.error), /ya no tiene la variación XL/);
   assert.equal(d.llamadas.filter((l) => l.startsWith("PUT")).length, 0);
 });

@@ -225,10 +225,35 @@ test("variaciones: devolver unidades al público es una entrada por variación y
   const r = armarEntradaVariable(publico, bp, { "0": { "81": 5 }, "1": { "81": 3 } }, entradasDe(publico), "Privatización quitada del ID 7263");
   assert.ok("cuerpo" in r);
   const bodegas = r.cuerpo!.warehouselected as Obj[][];
-  assert.deepEqual([bodegas[0][0].quantity, bodegas[0][0].type_movement, bodegas[0][0].concept], [5, "ENTRADA", "Privatización quitada del ID 7263"]);
-  assert.deepEqual([bodegas[1][0].quantity, bodegas[1][0].type_movement], [3, "ENTRADA"]);
+  assert.deepEqual([bodegas[0][0].quantity, bodegas[0][0].type_movement, bodegas[0][0].concept], ["5", "ENTRADA", "Privatización quitada del ID 7263"]);
+  assert.deepEqual([bodegas[1][0].quantity, bodegas[1][0].type_movement], ["3", "ENTRADA"]);
   const mal = armarEntradaVariable(publico, bp, { "0": { "82": 5 } }, entradasDe(publico), "x");
   assert.ok("error" in mal);
+});
+
+test("variaciones: a un producto recién creado, sin bodegas en sus variaciones, se le agrega la fila sin stock (como la pantalla de Dropi); las que no reciben nada van en null", () => {
+  const nuevo = conTallas(7000, { S: 0, M: 0, L: 0 });
+  for (const v of nuevo.variations as Obj[]) v.warehouse_product_variation = [];
+  const r = armarEntradaVariable(nuevo, bp, { "1": { "81": 3 } }, [[], [], []], "Republicado");
+  assert.ok("cuerpo" in r);
+  const [primera, segunda] = r.cuerpo!.warehouselected as (Obj[] | null)[];
+  assert.equal(primera, null);
+  assert.equal((r.cuerpo!.warehouselected as unknown[]).length, 2, "se corta en la última que recibe unidades");
+  assert.equal(segunda![0].quantity, "3");
+  assert.equal(segunda![0].warehouse_id, 81);
+  assert.equal(segunda![0].variation_id, (nuevo.variations as Obj[])[1].id);
+  assert.ok(!("stock" in segunda![0]), "la pantalla la manda sin stock");
+});
+
+test("variaciones: la posición de la entrada cuenta las variaciones borradas, que van en variations", () => {
+  const o = conTallas(7000, { S: 1, M: 2 });
+  const vivas = [...(o.variations as Obj[])];
+  o.variations = [{ ...vivas[0], id: 1, deleted_at: "2026-01-01" }, ...vivas];
+  const r = armarEntradaVariable(o, bp, { "1": { "81": 3 } }, entradasDe(o), "x");
+  assert.ok("cuerpo" in r);
+  const l = r.cuerpo!.warehouselected as (Obj[] | null)[];
+  assert.equal(l.length, 3);
+  assert.equal(l[2]![0].variation_id, vivas[1].id);
 });
 
 test("variaciones: el producto nuevo al republicar va sin IDs, con solo lo vivo, el stock de cada variación y sus bodegas en el mismo orden", () => {
@@ -284,6 +309,10 @@ test("variaciones: el favorito arma exactamente lo mismo que el sistema", () => 
   const pv = { "0": { "81": 5 }, "1": { "81": 3 } };
   igual(delFavorito.entradaV(publico, bp, pv, entradasDe(publico), "k"), armarEntradaVariable(publico, bp, pv, entradasDe(publico), "k"));
   igual(delFavorito.entradaV(publico, bp, { "0": { "82": 5 } }, entradasDe(publico), "k"), armarEntradaVariable(publico, bp, { "0": { "82": 5 } }, entradasDe(publico), "k"));
+  // Un producto recién creado no tiene ninguna bodega en sus variaciones.
+  const nuevo = conTallas(7000, { S: 0, M: 0 });
+  for (const v of nuevo.variations as Obj[]) v.warehouse_product_variation = [];
+  igual(delFavorito.entradaV(nuevo, bp, { "1": { "81": 3 } }, [[], []], "k"), armarEntradaVariable(nuevo, bp, { "1": { "81": 3 } }, [[], []], "k"));
 });
 
 test("el favorito apaga lo marcado «apagar», archiva con el endpoint de Dropi y reintenta solo el archivado", () => {

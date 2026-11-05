@@ -1,11 +1,17 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { APAGAR_JS } from "./apagar-dropi";
+import { pesoCambio } from "./cambios-dropi";
 import { ARMAR_JS } from "./marcador-aplicar-dropi";
+import { PRIVATIZAR_JS } from "./privatizar-dropi";
 import { REPUBLICAR_JS } from "./republicar-dropi";
-import { armarAjusteStock, CONCEPTO_STOCK, faltantesStock, normalizarDatosStock, productoDelCambio, STOCK_JS, type DatosStock } from "./stock-dropi";
+import { armarAjusteStock, armarAjusteStockVariable, CONCEPTO_STOCK, faltantesStock, normalizarDatosStock, productoDelCambio, STOCK_JS, textoVariacion, type DatosStock } from "./stock-dropi";
 
 type Obj = Record<string, unknown>;
-const delFavorito = new Function(`${ARMAR_JS};${REPUBLICAR_JS};${STOCK_JS}; return { ajuste };`)() as { ajuste: (o: Obj, bp: Obj[], d: DatosStock) => Obj };
+const delFavorito = new Function(`${ARMAR_JS};${REPUBLICAR_JS};${STOCK_JS};${PRIVATIZAR_JS};${APAGAR_JS}; return { ajuste, ajusteV };`)() as {
+  ajuste: (o: Obj, bp: Obj[], d: DatosStock) => Obj;
+  ajusteV: (o: Obj, bp: Obj[], d: DatosStock, en: Obj[]) => Obj;
+};
 const igual = (a: unknown, b: unknown) => assert.deepEqual(JSON.parse(JSON.stringify(a)), JSON.parse(JSON.stringify(b)));
 
 const b81 = { id: 81, name: "Proveedor Ecomfive", address: "Ave Centenario", warehouse_white_brand: false };
@@ -134,4 +140,124 @@ test("con dos IDs el stock va al que se eligió, no al primero (6667-8295)", () 
   assert.equal(productoDelCambio([6667, 8295], null), 6667, "sin elegir, el primero (lo de antes)");
   assert.ok(typeof productoDelCambio([6667, 8295], 8595) === "object", "un ID que no es de la publicación no se acepta");
   assert.ok(typeof productoDelCambio([], null) === "object");
+});
+
+// ---------- Con variaciones (5 nov 2026): el cuerpo es el de la pantalla de Dropi, atrapado sin enviarlo con la Rodillera 8559 ----------
+const valor = (id: number, value: string) => ({ id, value, attribute_id: 1795, attribute_name: "talla", deleted_at: null });
+const variacion = (id: number, value: string, stock: number | null, extra: Obj = {}): Obj => ({
+  id,
+  sale_price: "4.99",
+  suggested_price: "4.99",
+  product_id: 8559,
+  stock: stock ?? 0,
+  sku: `Rodillera-${value}`,
+  deleted_at: null,
+  attribute_values: [valor(id - 1568, value)],
+  warehouse_product_variation: stock === null ? [] : [{ id: 1, warehouse_id: 81, variation_id: id, stock, warehouse: b81 }],
+  ...extra,
+});
+const rodillera = (extra: Obj = {}): Obj =>
+  producto({
+    id: 8559,
+    name: "Rodillera Deportiva",
+    type: "VARIABLE",
+    sku: null,
+    warehouse_product: [],
+    attributes: [{ id: 1795, product_id: 8559, description: "talla", isVariation: true, deleted_at: null, values: [valor(4766, "S"), valor(4767, "M")] }],
+    variations: [variacion(6334, "S", null), variacion(6335, "M", 9), variacion(6336, "L", 20)],
+    ...extra,
+  });
+/** Lo que devuelve `get_warehouses_stock`. */
+const entrada = (variationId: number, stock: number, w: Obj = b81): Obj => ({
+  variation_id: variationId,
+  warehouse_id: w.id,
+  fullName: `${w.name}(${w.address})`,
+  stock,
+  warehouse_white_brand: false,
+});
+const deVariacion = (firma: string, extra: Partial<DatosStock> = {}): DatosStock => datos({ firma, etiqueta: firma.split("=")[1].toUpperCase(), unidades: 10, antes: 9, ...extra });
+const cuerpo = (r: unknown) => (r as { cuerpo: Obj }).cuerpo;
+
+test("variación: una entrada va en su posición de variations, con null en las anteriores (como la pantalla de Dropi)", () => {
+  const r = armarAjusteStockVariable(rodillera(), [b81], deVariacion("talla=m"), [entrada(6335, 9)]);
+  assert.ok(!("error" in r));
+  igual(r.antes, 9);
+  igual(cuerpo(r).warehouselected, [null, [{ ...entrada(6335, 9), quantity: "1", type_movement: "ENTRADA", concept: CONCEPTO_STOCK }]]);
+  assert.equal((cuerpo(r).variations as Obj[])[1].stock, 9, "variations no cambia: Dropi aplica el movimiento");
+  assert.equal(cuerpo(r).type, "VARIABLE");
+  assert.equal((cuerpo(r).attribute as Obj[]).length, 1);
+});
+
+test("variación sin esa bodega (en cero): la fila va sin stock, como la pantalla", () => {
+  const r = armarAjusteStockVariable(rodillera(), [b81], deVariacion("talla=s", { unidades: 5, antes: 0 }), []);
+  igual(cuerpo(r).warehouselected, [
+    [{ warehouse_id: 81, fullName: "Proveedor Ecomfive(Ave Centenario)", variation_id: 6334, warehouse_white_brand: false, quantity: "5", type_movement: "ENTRADA", concept: CONCEPTO_STOCK }],
+  ]);
+});
+
+test("variación: una salida por la diferencia; las otras bodegas van sin movimiento", () => {
+  const r = armarAjusteStockVariable(rodillera(), bp, deVariacion("talla=l", { unidades: 12, antes: 20 }), [entrada(6336, 20)]);
+  igual(cuerpo(r).warehouselected, [
+    null,
+    null,
+    [
+      { ...entrada(6336, 20), quantity: "8", type_movement: "SALIDA", concept: CONCEPTO_STOCK },
+      { warehouse_id: 90, fullName: "Ecomfive Colón(Colón)", variation_id: 6336, warehouse_white_brand: false },
+    ],
+  ]);
+});
+
+test("variación: la posición cuenta las borradas, que van en variations", () => {
+  const o = rodillera({ variations: [variacion(6333, "XS", null, { deleted_at: "2026-01-01" }), variacion(6335, "M", 9)] });
+  const r = armarAjusteStockVariable(o, [b81], deVariacion("talla=m"), [entrada(6335, 9)]);
+  assert.equal((cuerpo(r).warehouselected as unknown[]).length, 2);
+  assert.equal((cuerpo(r).warehouselected as unknown[])[0], null);
+});
+
+test("variación: ya en el objetivo no guarda nada (un reintento no mueve dos veces)", () => {
+  const r = armarAjusteStockVariable(rodillera(), [b81], deVariacion("talla=m", { unidades: 9 }), [entrada(6335, 9)]);
+  assert.deepEqual(r, { cuerpo: null, antes: 9 });
+});
+
+test("variación: se detiene en la B280, una bodega ajena, una variación que ya no está o por debajo de lo reservado", () => {
+  const o = rodillera();
+  assert.match(String((armarAjusteStockVariable(o, [b81], deVariacion("talla=m", { bodega: 280 }), []) as Obj).error), /no es de ECOMFIVE/);
+  assert.match(String((armarAjusteStockVariable(o, [b81], deVariacion("talla=m", { bodega: 7 }), []) as Obj).error), /no es de ECOMFIVE/);
+  assert.match(String((armarAjusteStockVariable(o, [b81], deVariacion("talla=xl"), []) as Obj).error), /ya no tiene la variación XL/);
+  const reservado = rodillera({ private_product_inventories: [{ variation_id: 6335, stock: 5, deleted_at: null }, { variation_id: 6336, stock: 90, deleted_at: null }, { variation_id: 6335, stock: 50, deleted_at: "2026-01-01" }] });
+  assert.match(String((armarAjusteStockVariable(reservado, [b81], deVariacion("talla=m", { unidades: 4 }), [entrada(6335, 9)]) as Obj).error), /M tiene 5 unidades reservadas/);
+  assert.ok(!("error" in armarAjusteStockVariable(reservado, [b81], deVariacion("talla=m", { unidades: 5 }), [entrada(6335, 9)])), "lo reservado de otra variación no cuenta");
+});
+
+test("el favorito arma lo mismo que armarAjusteStockVariable", () => {
+  const casos: [Obj, Obj[], DatosStock, Obj[]][] = [
+    [rodillera(), [b81], deVariacion("talla=m"), [entrada(6335, 9)]],
+    [rodillera(), [b81], deVariacion("talla=s", { unidades: 5, antes: 0 }), []],
+    [rodillera(), bp, deVariacion("talla=l", { unidades: 12, concepto: "Conteo" }), [entrada(6336, 20)]],
+    [rodillera(), bp, deVariacion("talla=l", { bodega: 90, unidades: 7 }), [entrada(6336, 20)]],
+    [rodillera(), [b81], deVariacion("talla=m", { unidades: 9 }), [entrada(6335, 9)]],
+    [rodillera(), [b81], deVariacion("talla=m", { bodega: 280 }), []],
+    [rodillera(), [b81], deVariacion("talla=xl"), []],
+    [rodillera({ private_product_inventories: [{ variation_id: 6335, stock: 5, deleted_at: null }] }), [b81], deVariacion("talla=m", { unidades: 4 }), [entrada(6335, 9)]],
+    [rodillera({ attributes: [] }), [b81], deVariacion("talla=m"), [entrada(6335, 9)]],
+  ];
+  for (const [o, b, d, en] of casos) igual(delFavorito.ajusteV(o, b, d, en), armarAjusteStockVariable(o, b, d, en));
+});
+
+test("la variación se conserva al normalizar y un producto simple queda como antes", () => {
+  const d = normalizarDatosStock({ bodega: 81, unidades: 5, firma: " talla=m ", etiqueta: " M ", concepto: "" });
+  assert.equal(d.firma, "talla=m");
+  assert.equal(d.etiqueta, "M");
+  assert.equal(textoVariacion(d), " · M");
+  assert.equal(textoVariacion({ firma: "talla=m", etiqueta: null }), " · talla=m");
+  const simple = normalizarDatosStock({ bodega: 81, unidades: 5 });
+  assert.ok(!("firma" in simple));
+  assert.equal(textoVariacion(simple), "");
+});
+
+test("la ficha no tapa lo que sigue sin resolver: una republicación con error pesa más que un stock aplicado o pendiente", () => {
+  assert.ok(pesoCambio("republicar", "error") > pesoCambio("stock", "aplicado"));
+  assert.ok(pesoCambio("republicar", "error") > pesoCambio("stock", "pendiente"));
+  assert.ok(pesoCambio("stock", "pendiente") > pesoCambio("cambio", "aplicado"));
+  assert.equal(pesoCambio("cambio", "pendiente"), pesoCambio("republicar", "error"), "entre dos sin resolver gana el más reciente");
 });

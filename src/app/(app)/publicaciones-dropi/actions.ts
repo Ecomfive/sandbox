@@ -12,9 +12,9 @@ import { codigoBodega, idsDeDropi } from "@/lib/publicaciones/sincronizar-dropi"
 import { grupoDe, nombreDelPublico } from "@/lib/publicaciones/apagar-dropi";
 import { encolarApagar, encolarArchivar, encolarCrear, encolarPrivatizar, encolarRepublicar, encolarStock, enviarNombreADropi, enviarPrecioADropi } from "@/lib/publicaciones/cambios-dropi";
 import { esBodegaDropi } from "@/lib/publicaciones/automatico";
-import { faltantesStock, normalizarDatosStock, productoDelCambio } from "@/lib/publicaciones/stock-dropi";
+import { faltantesStock, normalizarDatosStock, productoDelCambio, textoVariacion } from "@/lib/publicaciones/stock-dropi";
 import { destinosDe, faltantesPrivatizar, nombrePrivado, normalizarDatosPrivatizar, quienesDe, unidadesTotales } from "@/lib/publicaciones/privatizar-dropi";
-import { faltantesVariaciones, textoVariaciones, type VariacionLeida } from "@/lib/publicaciones/privatizar-variable";
+import { faltantesVariaciones, stockEnBodega, textoVariaciones, type VariacionLeida } from "@/lib/publicaciones/privatizar-variable";
 import { faltantesCrearDropi, normalizarDatosCrear, MAX_FOTOS_CREAR, type DatosCrearDropi, type FotoCrear } from "@/lib/publicaciones/crear-dropi";
 import { descripcionAHtml } from "@/lib/publicaciones/descripcion-dropi";
 import { detectarImagen } from "@/lib/seguridad/imagen";
@@ -1004,12 +1004,25 @@ export async function cambiarStockDropi(id: string, crudo: unknown): Promise<{ e
     for (const b of bs) if (!esBodegaDropi(Number(b.id))) bodegas.set(Number(b.id), String(b.nombre ?? ""));
     if (Number(l.dropi_producto_id) === producto) actual = bs.map((b) => ({ id: Number(b.id), stock: Number(b.stock) || 0 }));
   }
-  const d = { ...pedido, producto, nombreBodega: bodegas.get(pedido.bodega) ?? pedido.nombreBodega, antes: lecturas ? (actual.find((b) => b.id === pedido.bodega)?.stock ?? 0) : null };
+  // Con variaciones el stock es de una variación (5 nov 2026): tiene que ser una de la última lectura.
+  const { variable, variaciones } = await variacionesDePublicacion(supabase, antes.pais_id, producto);
+  const variacion = variaciones?.find((v) => v.firma === pedido.firma) ?? null;
+  if (variable && !variaciones) return { error: "La última lectura no trajo las variaciones de este producto: pulsa «Actualizar datos» y vuelve a intentarlo." };
+  if (variable && !variacion) return { error: pedido.firma ? "Dropi ya no muestra esa variación: pulsa «Actualizar datos»." : "Este producto tiene variaciones: cambia el stock de cada una." };
+  const antesDeLectura = lecturas ? (actual.find((b) => b.id === pedido.bodega)?.stock ?? 0) : null;
+  const d = {
+    ...pedido,
+    producto,
+    nombreBodega: bodegas.get(pedido.bodega) ?? pedido.nombreBodega,
+    antes: variacion ? stockEnBodega(variacion, pedido.bodega) : antesDeLectura,
+    firma: variacion?.firma ?? null,
+    etiqueta: variacion?.etiqueta ?? null,
+  };
   const faltan = faltantesStock(d, [...bodegas.keys()].map((b) => ({ id: b })));
   if (faltan.length) return { error: faltan[0] };
   const r = await encolarStock(supabase, { id, pais_id: antes.pais_id, dropi_id: (antes.dropi_id as string | null) ?? null }, d, { id: usuario.id, nombre: usuario.nombre || usuario.email });
   if ("error" in r) return { error: r.error };
-  const bodega = `${codigoBodega(d.bodega)}${d.nombreBodega ? ` · ${d.nombreBodega}` : ""}`;
+  const bodega = `${codigoBodega(d.bodega)}${d.nombreBodega ? ` · ${d.nombreBodega}` : ""}${textoVariacion(d)}`;
   await registrarAuditoria({
     accion: "dropi_stock_pendiente",
     entidad: "dropi_publicaciones",
@@ -1018,7 +1031,7 @@ export async function cambiarStockDropi(id: string, crudo: unknown): Promise<{ e
   });
   revalidatePath(RUTA);
   return {
-    detalle: `Stock ${ids.length > 1 ? `del ID ${producto} ` : ""}en ${codigoBodega(d.bodega)} a ${d.unidades.toLocaleString("es-PA")} u. pendiente: pulsa «Aplicar en Dropi» con Dropi abierto.`,
+    detalle: `Stock ${ids.length > 1 ? `del ID ${producto} ` : ""}en ${codigoBodega(d.bodega)}${textoVariacion(d)} a ${d.unidades.toLocaleString("es-PA")} u. pendiente: pulsa «Aplicar en Dropi» con Dropi abierto.`,
   };
 }
 

@@ -21,7 +21,7 @@
  * su correo en Dropi, crea el producto privado (copia del público), le pone fotos, garantías y stock, se lo asigna en «Productos privados» y le
  * saca esas unidades al público. Devuelve el ID nuevo aunque falle un paso después, y si ya le sacó el stock al público (`salida`).
  *
- * Un cambio de tipo «stock» (28 oct 2026, migración 0173; `stock`, con `STOCK_JS`) deja una bodega de ECOMFIVE con las unidades pedidas: lee el stock de
+ * Un cambio de tipo «stock» (28 oct 2026, migración 0173; `stock`, con `STOCK_JS`; con variaciones `stockV`, 5 nov 2026) deja una bodega de ECOMFIVE con las unidades pedidas: lee el stock de
  * Dropi en ese momento, hace la entrada o la salida que falte y lo vuelve a leer para comprobar. Si ya tiene esas unidades, no guarda nada.
  */
 
@@ -322,12 +322,27 @@ const CODIGO = [
   "var a=await pedir('/products/'+c.producto);if(!a.ok)return{ok:false,error:motivo(a)};",
   "var o=a.j&&a.j.objects;if(!o||Number(o.id)!==Number(c.producto))return{ok:false,error:'Dropi no devolvió el producto.'};",
   "if(Number(o.user_id)!==Number(L.id))return{ok:false,error:'Ese producto no es de este proveedor en Dropi.'};",
+  "if(d.firma)return stockV(c,bp,d,o);",
+  "if(esV(o))return{ok:false,error:'Tiene variaciones: cambia el stock de cada variación en la ficha.'};",
   "var r=ajuste(o,bp,d);if(r.error)return{ok:false,error:r.error};",
   "if(r.cuerpo){var g=await pedir('/products/'+c.producto,'PUT',r.cuerpo);if(!g.ok)return{ok:false,error:motivo(g)}}",
   "var v=await pedir('/products/'+c.producto),n=v.j&&v.j.objects;if(!v.ok||!n)return{ok:false,error:'Se guardó, pero no se pudo comprobar en Dropi.'};",
   "var qf=(Array.isArray(n.warehouse_product)?n.warehouse_product:[]).filter(function(w){return String(w.warehouse_id)===String(d.bodega)})[0],q=qf?Number(qf.stock)||0:0;if(q!==Number(d.unidades))return{ok:false,error:'Dropi muestra '+q+' unidades en esa bodega y se pidieron '+d.unidades+'.'};",
   "var bs=(Array.isArray(n.warehouse_product)?n.warehouse_product:[]).map(function(w){var x=w.warehouse||{};return{id:Number(w.warehouse_id),nombre:x.name!=null?String(x.name):'',stock:Number(w.stock)||0}});",
   "return{ok:true,antes:r.antes,stock:q,bodegas:bs,aviso:d.antes!=null&&Number(d.antes)!==r.antes?'En Dropi había '+r.antes+' (el sistema mostraba '+d.antes+').':null}}",
+  // Stock de una variación (5 nov 2026): lo mismo con el stock de esa variación, como la pantalla de Dropi; devuelve lo que quedó para ponerlo en el sistema.
+  "async function stockV(c,bp,d,o){",
+  "if(!esV(o))return{ok:false,error:'Ese producto ya no tiene variaciones en Dropi.'};",
+  "var vv=vivasV(o).filter(function(v){return firmaV(v)===d.firma})[0];if(!vv)return{ok:false,error:'Dropi ya no tiene la variación '+(d.etiqueta||d.firma)+'.'};",
+  "var e=await pedir('/products/get_warehouses_stock','POST',{product_id:null,type:'VARIABLE',variation_id:vv.id});if(!e.ok||!Array.isArray(e.j&&e.j.objects))return{ok:false,error:'Dropi no devolvió el stock de la variación: '+motivo(e)};",
+  "var r=ajusteV(o,bp,d,e.j.objects);if(r.error)return{ok:false,error:r.error};",
+  "if(r.cuerpo){var g=await pedir('/products/'+c.producto,'PUT',r.cuerpo);if(!g.ok)return{ok:false,error:motivo(g)}}",
+  "var v=await pedir('/products/'+c.producto),n=v.j&&v.j.objects;if(!v.ok||!n)return{ok:false,error:'Se guardó, pero no se pudo comprobar en Dropi.'};",
+  "var fw=function(x){return Array.isArray(x.warehouse_product_variation)?x.warehouse_product_variation:[]},lv=vivasV(n).filter(function(x){return firmaV(x)===d.firma})[0],q=0,vb=[];",
+  "if(lv)fw(lv).forEach(function(w){var s=Number(w.stock)||0;if(Number(w.warehouse_id)===Number(d.bodega))q+=s;if(s>0)vb.push({id:Number(w.warehouse_id),stock:s})});",
+  "if(q!==Number(d.unidades))return{ok:false,error:'Dropi muestra '+q+' unidades de '+(d.etiqueta||d.firma)+' en esa bodega y se pidieron '+d.unidades+'.'};",
+  "var bm={};vivasV(n).forEach(function(x){fw(x).forEach(function(w){var s=Number(w.stock)||0,y=w.warehouse||{},k=Number(w.warehouse_id);if(!bm[k])bm[k]={id:k,nombre:y.name!=null?String(y.name):'',stock:0};bm[k].stock+=s>0?s:0})});",
+  "return{ok:true,antes:r.antes,stock:q,bodegas:Object.keys(bm).map(function(k){return bm[k]}),variacion:{firma:d.firma,bodegas:vb},aviso:d.antes!=null&&Number(d.antes)!==r.antes?'En Dropi había '+r.antes+' (el sistema mostraba '+d.antes+').':null}}",
   "async function aplicar(c,bp){",
   "if(c.tipo==='stock')return stock(c,bp);",
   "if(c.tipo==='privatizar')return privatizar(c,bp);",

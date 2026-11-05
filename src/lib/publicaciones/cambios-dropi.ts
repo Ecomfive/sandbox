@@ -314,8 +314,17 @@ export async function encolarPrivatizar(
 }
 
 /**
+ * Qué cambio de una publicación muestra la ficha (5 nov 2026): el más reciente, salvo que otro siga sin resolver. Si no, un cambio de stock ya aplicado tapaba una republicación
+ * atascada: desaparecía su aviso y el botón volvía a decir «Republicar». El stock pendiente pesa menos que lo demás porque ya se ve en su bodega o variación. A igual peso, el primero (el más reciente).
+ */
+export function pesoCambio(tipo: unknown, estado: unknown): number {
+  if (estado === "aplicado") return 0;
+  return tipo === "stock" ? 1 : 2;
+}
+
+/**
  * «Cambiar stock en Dropi» (pedido de Alcides, 28 oct 2026; migración 0173): deja en la cola que una bodega de ECOMFIVE quede con `datos.unidades`.
- * Un solo cambio de stock por publicación y bodega: si ya había uno esperando, se le ponen las unidades nuevas (se conserva el «antes» de la primera
+ * Un solo cambio de stock por publicación, ID, bodega y variación (migración 0229): si ya había uno esperando, se le ponen las unidades nuevas (se conserva el «antes» de la primera
  * vez, que es lo que de verdad tenía Dropi) y vuelve a quedar pendiente.
  */
 export async function encolarStock(
@@ -327,6 +336,7 @@ export async function encolarStock(
   const productoId = productoDelCambio(idsDeDropi(pub.dropi_id), datos.producto);
   if (typeof productoId !== "number") return productoId;
   const falta = (m: string) => /tipo|column|does not exist|schema cache|datos|check constraint/i.test(m);
+  const firma = datos.firma ?? null;
   const previo = await supabase
     .from("dropi_cambios_pendientes")
     .select("id, datos")
@@ -335,7 +345,10 @@ export async function encolarStock(
     .eq("tipo", "stock")
     .in("estado", ["pendiente", "error"]);
   if (previo.error) return { error: falta(previo.error.message) ? "Falta correr en Supabase la migración 0173." : "No se pudo dejar el stock para Dropi." };
-  const igual = (previo.data ?? []).find((f) => normalizarDatosStock(f.datos).bodega === datos.bodega);
+  const igual = (previo.data ?? []).find((f) => {
+    const d = normalizarDatosStock(f.datos);
+    return d.bodega === datos.bodega && (d.firma ?? null) === firma;
+  });
   if (igual) {
     const antes = normalizarDatosStock(igual.datos).antes;
     const { error } = await supabase
@@ -350,6 +363,8 @@ export async function encolarStock(
     .insert({ pais_id: pub.pais_id, publicacion_id: pub.id, dropi_producto_id: productoId, tipo: "stock", datos: { ...datos, producto: productoId }, creado_por: por.id, creado_por_nombre: por.nombre })
     .select("id")
     .single();
+  // El índice de antes solo admite un cambio por bodega: la segunda variación de la misma bodega choca hasta correr la 0229.
+  if (error?.code === "23505") return { error: "Falta correr en Supabase la migración 0229 para dejar pendiente otra variación de la misma bodega." };
   if (error || !data) return { error: error && falta(error.message) ? "Falta correr en Supabase la migración 0173." : "No se pudo dejar el stock para Dropi." };
   return { id: data.id as string, yaEstaba: false };
 }
@@ -485,7 +500,8 @@ export async function cargarCambiosDropi(
     if (f.tipo === "apagar" && (f.estado === "pendiente" || f.estado === "error")) apagando.set(f.publicacion_id as string, Number(f.intentos ?? 0));
     if (f.tipo === "archivar" && (f.estado === "pendiente" || f.estado === "error") && !archivando.has(f.publicacion_id as string)) archivando.set(f.publicacion_id as string, f.restaurar === true);
     if (f.tipo === "crear" && (f.estado === "pendiente" || f.estado === "error")) creando.set(f.publicacion_id as string, Number(f.intentos ?? 0));
-    if (porPublicacion.has(f.publicacion_id as string)) continue;
+    const yaVisto = porPublicacion.get(f.publicacion_id as string);
+    if (yaVisto && pesoCambio(f.tipo, f.estado) <= pesoCambio(yaVisto.tipo, yaVisto.estado)) continue;
     porPublicacion.set(f.publicacion_id as string, {
       id: f.id as string,
       tipo: f.tipo === "republicar" ? "republicar" : f.tipo === "apagar" ? "apagar" : f.tipo === "archivar" ? "archivar" : f.tipo === "crear" ? "crear" : f.tipo === "privatizar" ? "privatizar" : f.tipo === "stock" ? "stock" : "cambio",

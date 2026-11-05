@@ -2,8 +2,14 @@
 // precio, y queda en la cola de «Aplicar en Dropi» (`tipo = 'stock'`). Lo que se pide es **cuántas unidades deben quedar** en esa bodega: el
 // favorito lee el stock de Dropi en ese momento y hace la entrada o la salida que falte (así un reintento no mueve dos veces). La B280 es de
 // Dropi y no se toca. Aquí van las piezas puras (sin base ni red), con prueba que también compara la versión en JavaScript del favorito.
+//
+// Un producto con variaciones guarda el stock por variación y bodega (5 nov 2026, pedido de Hernán): cada cambio va a una variación (`firma`). El cuerpo es el que manda
+// la pantalla de Dropi (atrapado sin enviarlo con la Rodillera 8559): en `warehouselected` lo de esa variación EN SU POSICIÓN de `variations`, con `null` en las anteriores, y
+// si la variación aún no tiene esa bodega, la fila va sin `stock`. `variations` no cambia: Dropi suma o resta lo que dice el movimiento.
 
+import { filasDeVariacion, firmaVariacion } from "./apagar-dropi";
 import { BODEGA_DROPI, esBodegaDropi } from "./automatico";
+import { armarGuardadoProducto } from "./dropi-guardado";
 import { armarMovimientoStock, stockPorBodega } from "./republicar-dropi";
 
 type Obj = Record<string, unknown>;
@@ -25,6 +31,10 @@ export interface DatosStock {
   /** Lo que mostraba la última lectura de Dropi al pedirlo (null si no se sabía): para decir «de … a …». */
   antes: number | null;
   concepto: string;
+  /** Con variaciones (5 nov 2026): cuál (`firmaVariacion`, no cambia aunque Dropi cambie su ID). Sin esto es un producto simple. */
+  firma?: string | null;
+  /** Cómo se muestra esa variación («+1:50», «Negro / M»). */
+  etiqueta?: string | null;
 }
 
 const entero = (v: unknown): number | null => {
@@ -40,6 +50,7 @@ export function normalizarDatosStock(crudo: unknown): DatosStock {
     .trim()
     .slice(0, MAX_CONCEPTO_STOCK);
   const producto = entero(o.producto);
+  const firma = String(o.firma ?? "").trim();
   return {
     producto: producto !== null && producto > 0 ? producto : null,
     bodega: entero(o.bodega) ?? 0,
@@ -50,8 +61,12 @@ export function normalizarDatosStock(crudo: unknown): DatosStock {
     unidades: entero(o.unidades) ?? -1,
     antes: o.antes === null || o.antes === undefined ? null : entero(o.antes),
     concepto: concepto || CONCEPTO_STOCK,
+    ...(firma ? { firma, etiqueta: String(o.etiqueta ?? "").trim().slice(0, 80) || null } : {}),
   };
 }
+
+/** Lo que va después de la bodega al mostrar un cambio de una variación (« · +1:50»); vacío en un producto simple. */
+export const textoVariacion = (d: Pick<DatosStock, "firma" | "etiqueta">) => (d.firma ? ` · ${d.etiqueta || d.firma}` : "");
 
 /**
  * A qué ID de Dropi va el cambio: el elegido si es de la publicación; sin elegir, el primero (lo de antes). Con dos IDs el primero no siempre es el
@@ -98,7 +113,37 @@ export function armarAjusteStock(producto: Obj, bodegasProveedor: Obj[], d: Dato
   return { cuerpo: r.cuerpo, antes };
 }
 
-/** Lo mismo en JavaScript simple para el favorito (va después de `REPUBLICAR_JS`, que define `mover` y `stockDe`). La prueba compara los dos. */
+/**
+ * El guardado que deja una variación con `d.unidades` en esa bodega, por la diferencia con lo que Dropi tiene ahora. `entradas` = lo que devuelve `get_warehouses_stock` de esa
+ * variación. `cuerpo` es null si ya tiene esas unidades. Error si la bodega no es del proveedor, si Dropi ya no tiene la variación o si quedarían menos que lo reservado a privados.
+ */
+export function armarAjusteStockVariable(producto: Obj, bodegasProveedor: Obj[], d: DatosStock, entradas: Obj[]): { cuerpo: Obj | null; antes: number } | { error: string } {
+  if (esBodegaDropi(d.bodega) || !bodegasProveedor.some((b) => Number(b.id) === d.bodega))
+    return { error: "Esa bodega no es de ECOMFIVE en Dropi: el stock no se mueve desde aquí." };
+  if (!(d.unidades >= 0)) return { error: "El cambio no trae las unidades." };
+  // Se busca en todas (no solo en las vivas): la posición es la de `variations` en el cuerpo.
+  const todas = Array.isArray(producto.variations) ? (producto.variations as Obj[]) : [];
+  const i = todas.findIndex((v) => !v.deleted_at && firmaVariacion(v) === d.firma);
+  if (i < 0) return { error: `Dropi ya no tiene la variación ${d.etiqueta || d.firma}.` };
+  const fila = entradas.find((e) => Number(e.warehouse_id) === d.bodega);
+  const antes = fila && Number.isFinite(Number(fila.stock)) ? Number(fila.stock) : 0;
+  if (antes === d.unidades) return { cuerpo: null, antes };
+  // Lo reservado a privados es por variación (`variation_id`) y Dropi no deja bajar de eso.
+  const reservado = (Array.isArray(producto.private_product_inventories) ? (producto.private_product_inventories as Obj[]) : [])
+    .filter((p) => !p.deleted_at && Number(p.variation_id) === Number(todas[i].id))
+    .reduce((t, p) => t + (Number(p.stock) || 0), 0);
+  const total = entradas.reduce((t, e) => (Number(e.warehouse_id) !== d.bodega && Number(e.stock) > 0 ? t + Number(e.stock) : t), d.unidades);
+  if (reservado > total) return { error: `${d.etiqueta || d.firma} tiene ${reservado} unidades reservadas a privados: el stock no puede quedar en ${total}.` };
+  const r = armarGuardadoProducto(producto, bodegasProveedor, { nombre: null, nombreGuia: null }, { variable: true });
+  if ("error" in r) return r;
+  const q = d.unidades - antes;
+  const movimiento = { quantity: String(Math.abs(q)), type_movement: q > 0 ? "ENTRADA" : "SALIDA", concept: d.concepto || CONCEPTO_STOCK };
+  const lista = filasDeVariacion(entradas, bodegasProveedor, todas[i].id, { [d.bodega]: movimiento });
+  const bodegas: (Obj[] | null)[] = Array.from({ length: i + 1 }, (_, j) => (j === i ? lista : null));
+  return { cuerpo: { ...r.cuerpo, warehouselected: bodegas }, antes };
+}
+
+/** Lo mismo en JavaScript simple para el favorito (va después de `REPUBLICAR_JS`, que define `mover` y `stockDe`; `firmaV` y `filasV` vienen de `APAGAR_JS`). La prueba compara los dos. */
 export const STOCK_JS = [
   "function ajuste(o,bp,d){",
   "var b=Number(d.bodega),u=Number(d.unidades);",
@@ -111,4 +156,19 @@ export const STOCK_JS = [
   "var mv={};mv[String(b)]=u-an;",
   `var r=mover(o,bp,mv,d.concepto||${JSON.stringify(CONCEPTO_STOCK)});if(r.error)return r;`,
   "return{cuerpo:r.cuerpo,antes:an}}",
+  "function ajusteV(o,bp,d,en){",
+  "var b=Number(d.bodega),u=Number(d.unidades);",
+  `if(b===${BODEGA_DROPI}||!bp.some(function(p){return Number(p.id)===b}))return{error:'Esa bodega no es de ECOMFIVE en Dropi: el stock no se mueve desde aquí.'};`,
+  "if(!(u>=0))return{error:'El cambio no trae las unidades.'};",
+  "var td=Array.isArray(o.variations)?o.variations:[],i=-1;td.forEach(function(v,j){if(i<0&&!v.deleted_at&&firmaV(v)===d.firma)i=j});",
+  "var nv=d.etiqueta||d.firma;if(i<0)return{error:'Dropi ya no tiene la variación '+nv+'.'};",
+  "var fi=en.filter(function(e){return Number(e.warehouse_id)===b})[0],an=fi&&isFinite(Number(fi.stock))?Number(fi.stock):0;if(an===u)return{cuerpo:null,antes:an};",
+  "var rs=(Array.isArray(o.private_product_inventories)?o.private_product_inventories:[]).filter(function(p){return!p.deleted_at&&Number(p.variation_id)===Number(td[i].id)}).reduce(function(t,p){return t+(Number(p.stock)||0)},0);",
+  "var tt=en.reduce(function(t,e){return Number(e.warehouse_id)!==b&&Number(e.stock)>0?t+Number(e.stock):t},u);",
+  "if(rs>tt)return{error:nv+' tiene '+rs+' unidades reservadas a privados: el stock no puede quedar en '+tt+'.'};",
+  "var r=armar(o,bp,{nombre:null,nombreGuia:null,variable:true});if(r.error)return r;",
+  `var q=u-an,mv={quantity:String(Math.abs(q)),type_movement:q>0?'ENTRADA':'SALIDA',concept:d.concepto||${JSON.stringify(CONCEPTO_STOCK)}};`,
+  "var mm={};mm[String(b)]=mv;var li=filasV(en,bp,td[i].id,mm);",
+  "var wh=[];for(var j=0;j<=i;j++)wh.push(j===i?li:null);",
+  "return{cuerpo:Object.assign({},r.cuerpo,{warehouselected:wh}),antes:an}}",
 ].join("");

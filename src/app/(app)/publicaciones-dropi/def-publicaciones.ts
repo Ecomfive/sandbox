@@ -17,6 +17,7 @@ import type { NivelMargen } from "@/lib/publicaciones/reglas";
 import type { Revision } from "@/lib/publicaciones/optimizacion";
 import type { CambioPrecio, CompetidorBarato } from "@/lib/publicaciones/competencia-publicaciones";
 import { ETIQUETA_SUGERENCIA } from "@/lib/publicaciones/vincular";
+import type { VariacionLeida } from "@/lib/publicaciones/privatizar-variable";
 import { codigoBodega, type BodegaAsignada } from "@/lib/publicaciones/sincronizar-dropi";
 import type { CambioDropiVista } from "@/lib/publicaciones/cambios-dropi";
 import { SIN_VALOR, type DefTabla } from "@/lib/tabla/motor";
@@ -137,7 +138,7 @@ export interface FilaPublicacion {
   /** Su producto está descontinuado en este país (ficha del producto, migración 0211): ya no se compra para aquí. */
   descontinuadoPais: boolean;
   /** Cambios de stock esperando «Aplicar en Dropi» (migración 0173): en qué bodega y cuántas unidades deben quedar. */
-  stockPendiente: { producto: number | null; bodega: number; nombreBodega: string; unidades: number; antes: number | null }[];
+  stockPendiente: { producto: number | null; bodega: number; nombreBodega: string; unidades: number; antes: number | null; firma: string | null; etiqueta: string | null }[];
   /** Las demás publicaciones del mismo producto (el público y sus privadas «P-MA …»), para apagarlas juntas (`grupoDe`). */
   grupo: { id: string; nombre: string; dropiId: string; archivada: boolean; tipo: "publico" | "privado" | null; stock: number | null; correo: string; apagadoPendiente: boolean; apagadoSinTocar: boolean }[];
   /**
@@ -169,7 +170,16 @@ export interface FilaPublicacion {
   bodegasDropi: { id: number; nombre: string; stock: number }[] | null;
   /** Cada ID de la publicación que aparece en «Mis productos», con sus bodegas (31 oct 2026): con dos IDs («6667-8295») el stock se cambia en el
    * que se elija. El primero es el de `bodegasDropi`. */
-  stockPorId: { id: number; archivado: boolean; stock: number; bodegas: { id: number; nombre: string; stock: number }[] }[];
+  stockPorId: {
+    id: number;
+    archivado: boolean;
+    stock: number;
+    bodegas: { id: number; nombre: string; stock: number }[];
+    /** Si tiene variaciones (colores, tallas…): su stock se cambia por variación, no por bodega (5 nov 2026). */
+    variable: boolean;
+    /** Las variaciones de la última lectura; null si no las trajo. */
+    variaciones: VariacionLeida[] | null;
+  }[];
   stockProveedor: number | null;
   stockPrivadoProveedor: number | null;
   /** Las variaciones (tallas, colores, graduaciones) con menos de `POCO_STOCK_VARIACION` unidades; vacío en un producto simple. */

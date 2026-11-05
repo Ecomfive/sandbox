@@ -8,6 +8,7 @@ import { origenDropi, VERSION_FAVORITO } from "@/lib/publicaciones/marcador-apli
 import { quienesDe, unidadesTotales } from "@/lib/publicaciones/privatizar-dropi";
 import { CDN_FOTOS_DROPI } from "@/lib/publicaciones/republicar-dropi";
 import { codigoBodega } from "@/lib/publicaciones/sincronizar-dropi";
+import { textoVariacion } from "@/lib/publicaciones/stock-dropi";
 import { guardarResultadosDropi, pendientesParaDropi, type CambioParaDropi } from "../aplicar-actions";
 
 /** Un monto con el símbolo de la moneda del país de esta ventana (`?p=` de la pestaña de Dropi que la abrió: «₡» en Costa Rica, «MX$» en México). */
@@ -257,7 +258,7 @@ function DetalleCambio({ c }: { c: CambioParaDropi }) {
           Stock: {c.publicacion} · ID {c.producto}
         </span>
         <span className="text-xs tabular-nums">
-          {d ? `${codigoBodega(d.bodega)}${d.nombreBodega ? ` · ${d.nombreBodega}` : ""}: ${d.antes !== null ? `${d.antes.toLocaleString("es-PA")} → ` : ""}${d.unidades.toLocaleString("es-PA")} u. · «${d.concepto}»` : ""}
+          {d ? `${codigoBodega(d.bodega)}${d.nombreBodega ? ` · ${d.nombreBodega}` : ""}${textoVariacion(d)}: ${d.antes !== null ? `${d.antes.toLocaleString("es-PA")} → ` : ""}${d.unidades.toLocaleString("es-PA")} u. · «${d.concepto}»` : ""}
         </span>
         <span className="text-xs text-muted-foreground">ID {c.producto}: entrada o salida por la diferencia con lo que Dropi tenga en ese momento</span>
       </>
