@@ -12,7 +12,7 @@ import { TIPOS_RECOMENDACION, type GrupoRecomendacion } from "@/lib/publicacione
 
 const grupoDe = (t: string) => TIPOS_RECOMENDACION.find((x) => x.valor === t)?.grupo;
 const tiposDe = (g: GrupoRecomendacion) => TIPOS_RECOMENDACION.filter((t) => t.grupo === g).map((t) => t.valor);
-import { DEF_PUBLICACIONES, POCO_STOCK, estadoVinculo, paraReactivar, pocoStock, sinStock, type FilaPublicacion } from "./def-publicaciones";
+import { DEF_PUBLICACIONES, POCO_STOCK, POCO_STOCK_VARIACION, estadoVinculo, paraReactivar, pocoStock, sinStock, type FilaPublicacion } from "./def-publicaciones";
 
 const seleccion = (campo: string, ...valores: string[]) => ({ campo, valor: { tipo: "seleccion" as const, valores } });
 
@@ -143,10 +143,10 @@ const TARJETAS: Tarjeta[] = [
     titulo: "Poco stock",
     icono: InventarioIcon,
     color: "ambar",
-    detalle: `Venden y les quedan menos de ${POCO_STOCK} unidades`,
+    detalle: `Venden y les quedan menos de ${POCO_STOCK} unidades, o menos de ${POCO_STOCK_VARIACION} de una variación`,
     cuenta: (f) => pocoStock(f),
     junto: (abiertas) => ({ n: abiertas.filter((f) => pocoStock(f) && f.enCamino > 0).length, texto: "en camino", color: "verde" }),
-    atajo: { id: "poco-stock", etiqueta: "Poco stock", ayuda: `Filtrar la lista: venden y tienen menos de ${POCO_STOCK} unidades`, filtro: seleccion("pocoStock", "si") },
+    atajo: { id: "poco-stock", etiqueta: "Poco stock", ayuda: `Filtrar la lista: venden y tienen menos de ${POCO_STOCK} unidades, o menos de ${POCO_STOCK_VARIACION} de una variación`, filtro: seleccion("pocoStock", "si") },
   },
 ];
 

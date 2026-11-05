@@ -3,6 +3,8 @@
 // estado que dice Dropi. Sin base ni React, con prueba. La lectura la hace scripts/scraping-proveedores-navegador.js ›
 // leerNuestrosProductos y la guarda scripts/publicaciones-sincronizar-dropi.ts (migración 0131).
 
+import { ordenarVariaciones, type VariacionLeida } from "./privatizar-variable";
+
 export interface BodegaDropi {
   id: number;
   nombre: string;
@@ -24,6 +26,17 @@ export interface ProductoProveedor {
   categorias: string[];
   fotos: number;
   creado: string | null;
+  /** Sus variaciones vivas, con el stock de cada una por bodega (migración 0226); null o sin poner = es simple o la lectura no las trajo. */
+  variaciones?: VariacionLeida[] | null;
+}
+
+/**
+ * Las variaciones con menos de `limite` unidades, contando todas las bodegas (pedido del equipo, 5 nov 2026: el total de un producto esconde la talla que se está
+ * agotando). Las que están en 0 cuentan: es la que ya se agotó. Un producto sin stock en ninguna va en «Sin stock», no aquí.
+ */
+export function variacionesBajas(variaciones: VariacionLeida[] | null | undefined, limite: number): { etiqueta: string; stock: number }[] {
+  const lista = (variaciones ?? []).map((v) => ({ etiqueta: v.etiqueta, stock: v.bodegas.reduce((t, b) => t + b.stock, 0) }));
+  return lista.some((v) => v.stock > 0) ? ordenarVariaciones(lista).filter((v) => v.stock < limite) : [];
 }
 
 const numero = (v: unknown): number | null => (v === null || v === undefined || v === "" || !Number.isFinite(Number(v)) ? null : Number(v));

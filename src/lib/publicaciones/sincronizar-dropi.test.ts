@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { bodegaDePublicacion, bodegasDelPais, bodegasEnOrden, cambiosDesdeDropi, productosNuevos, codigoBodega, idsDeDropi, normalizarProductoProveedor, productoPrincipal, ubicacionDeBodega, ubicacionDeProducto, type ProductoProveedor } from "./sincronizar-dropi";
+import { bodegaDePublicacion, bodegasDelPais, bodegasEnOrden, cambiosDesdeDropi, productosNuevos, codigoBodega, idsDeDropi, normalizarProductoProveedor, productoPrincipal, ubicacionDeBodega, ubicacionDeProducto, variacionesBajas, type ProductoProveedor } from "./sincronizar-dropi";
 
 const HOY = "2026-10-22";
 const prod = (id: number, extra: Partial<ProductoProveedor> = {}): ProductoProveedor => ({
@@ -114,4 +114,14 @@ test("cambios: un precio nuestro esperando «Aplicar en Dropi» no se pisa", () 
   const base = { ubicacion: "bodega_ecomfive", precioVenta: 5.29, tipo: "publico", estadoPublicacion: "activo" };
   assert.deepEqual(cambiosDesdeDropi({ ...base, precioPendiente: true }, prod(1, { precio: 4.99 }), HOY).cambios, {});
   assert.equal(cambiosDesdeDropi(base, prod(1, { precio: 4.99 }), HOY).cambios.precio_venta, 4.99);
+});
+
+test("variaciones bajas: las de menos del límite, sumando sus bodegas y en orden; sin stock en ninguna no cuenta", () => {
+  const v = (etiqueta: string, ...stocks: number[]) => ({ firma: etiqueta, etiqueta, sku: null, bodegas: stocks.map((stock, i) => ({ id: i + 1, stock })) });
+  assert.deepEqual(variacionesBajas([v("+4:00", 1), v("+1:50", 40), v("+1:00", 196), v("+2:50")], 50), [{ etiqueta: "+1:50", stock: 40 }, { etiqueta: "+2:50", stock: 0 }, { etiqueta: "+4:00", stock: 1 }]);
+  assert.deepEqual(variacionesBajas([v("S", 30, 30), v("M", 49)], 50), [{ etiqueta: "M", stock: 49 }], "la que suma 60 entre dos bodegas no es baja");
+  assert.deepEqual(variacionesBajas([v("S", 50)], 50), [], "con 50 ya no es baja");
+  assert.deepEqual(variacionesBajas([v("S"), v("M", 0)], 50), [], "un producto en 0 va en «Sin stock»");
+  assert.deepEqual(variacionesBajas(null, 50), []);
+  assert.deepEqual(variacionesBajas(undefined, 50), []);
 });
