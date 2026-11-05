@@ -25,6 +25,8 @@ function nombreDia(fecha: string): string {
 }
 
 /** Quiénes vieron una actualización, para el administrador. */
+type Ver = "por_ver" | "vistos" | "todos";
+
 export interface LecturaNovedad {
   vieron: string[];
   faltan: string[];
@@ -34,6 +36,7 @@ export interface LecturaNovedad {
  * La lista de Actualizaciones (administradores): buscar, filtrar por módulo y, por día, cada cambio con su módulo y un enlace a dónde verlo. Lo que
  * el administrador no ha visto lleva «Nuevo» (lo visto se guarda por persona, migración 0218, igual que en el Centro de notificaciones), y cada
  * cambio dice cuántas personas de su módulo ya lo vieron y quiénes faltan. Cada uno se marca visto o nuevo con el botón de su derecha (5 nov 2026).
+ * Arranca en «Por ver»: lo que se marca visto sale de la lista y queda en «Vistos». No hay «Marcar todo como visto» (5 nov 2026, pedido de Alcides).
  */
 export function ListaActualizaciones({
   novedades,
@@ -51,6 +54,7 @@ export function ListaActualizaciones({
   const { mostrarToast } = useToast();
   const [busqueda, setBusqueda] = useState("");
   const [modulo, setModulo] = useState("");
+  const [ver, setVer] = useState<Ver>("por_ver");
   const [marcando, empezar] = useTransition();
   // Lo marcado aquí se ve al instante, antes de que el servidor vuelva a mandar las vistas (y vuelve atrás si falla).
   const [cambiadas, setCambiadas] = useState<Record<string, boolean>>({});
@@ -76,9 +80,11 @@ export function ListaActualizaciones({
   }
 
   const etiqueta = useMemo(() => new Map(modulos.map((m) => [m.clave, m.etiqueta])), [modulos]);
-  const filtradas = useMemo(() => filtrarCambios(novedades, busqueda, modulo), [novedades, busqueda, modulo]);
-  const dias = useMemo(() => agruparPorDia(filtradas), [filtradas]);
-  const noVistas = filtradas.filter((c) => !vistasSet.has(claveNovedad(c)));
+  const buscadas = useMemo(() => filtrarCambios(novedades, busqueda, modulo), [novedades, busqueda, modulo]);
+  const porVer = buscadas.filter((c) => !vistasSet.has(claveNovedad(c)));
+  const filtradas = ver === "por_ver" ? porVer : ver === "vistos" ? buscadas.filter((c) => vistasSet.has(claveNovedad(c))) : buscadas;
+  const dias = agruparPorDia(filtradas);
+  const claseVer = (activo: boolean) => `min-h-9 rounded-md px-3 text-sm font-medium ${anilloFoco} ${activo ? "bg-foreground text-background" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`;
 
   return (
     <div className="flex flex-col gap-5">
@@ -98,23 +104,26 @@ export function ListaActualizaciones({
             ))}
           </select>
         </label>
-        {noVistas.length > 0 && (
-          <button
-            type="button"
-            disabled={marcando}
-            onClick={() => marcar(noVistas.map(claveNovedad), true)}
-            className={`inline-flex min-h-10 items-center rounded-md border border-border-control bg-card px-3 text-sm font-medium hover:bg-muted disabled:opacity-60 ${anilloFoco}`}
-          >
-            Marcar {noVistas.length === filtradas.length ? "todo" : `${noVistas.length}`} como visto
+        <div role="group" aria-label="Qué cambios ver" className="inline-flex rounded-lg border border-border p-0.5">
+          <button type="button" aria-pressed={ver === "por_ver"} onClick={() => setVer("por_ver")} className={claseVer(ver === "por_ver")}>
+            Por ver <span className="tabular-nums">{porVer.length}</span>
           </button>
-        )}
+          <button type="button" aria-pressed={ver === "vistos"} onClick={() => setVer("vistos")} className={claseVer(ver === "vistos")}>
+            Vistos
+          </button>
+          <button type="button" aria-pressed={ver === "todos"} onClick={() => setVer("todos")} className={claseVer(ver === "todos")}>
+            Todos
+          </button>
+        </div>
         <p className="m-0 pb-2 text-xs text-muted-foreground tabular-nums" aria-live="polite">
           {filtradas.length} {filtradas.length === 1 ? "cambio" : "cambios"} en {dias.length} {dias.length === 1 ? "día" : "días"}
         </p>
       </div>
 
       {dias.length === 0 ? (
-        <p className="m-0 rounded-xl border border-border bg-card px-5 py-8 text-center text-sm text-muted-foreground">Ningún cambio coincide con la búsqueda.</p>
+        <p className="m-0 rounded-xl border border-border bg-card px-5 py-8 text-center text-sm text-muted-foreground">
+          {ver === "por_ver" && !busqueda && !modulo ? "Estás al día: ya viste todos los cambios." : ver === "vistos" && !busqueda && !modulo ? "Todavía no has marcado ningún cambio como visto." : "Ningún cambio coincide con la búsqueda."}
+        </p>
       ) : (
         dias.map((d) => {
           const nuevos = d.cambios.filter((c) => !vistasSet.has(claveNovedad(c))).length;
