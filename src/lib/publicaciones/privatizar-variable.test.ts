@@ -9,6 +9,7 @@ import {
   armarSalidaVariable,
   errorDeVariable,
   faltantesVariaciones,
+  ordenarVariaciones,
   PRIVATIZAR_VARIABLE_JS,
   textoVariaciones,
   unidadesPedidas,
@@ -71,6 +72,14 @@ test("la lectura guarda cada variación viva con su etiqueta y su stock por bode
     { firma: firma(2), etiqueta: "+2.00", sku: "LENTES/2", bodegas: [{ id: 81, stock: 102 }] },
   ]);
   assert.equal(variacionesDeLectura({ id: 1 }), null, "sin variaciones en la lectura no se inventa ninguna");
+});
+
+test("las graduaciones se ordenan de menor a mayor; las tallas y colores quedan en el orden de Dropi", () => {
+  const etiquetas = (l: string[]) => ordenarVariaciones(l.map((etiqueta) => ({ etiqueta }))).map((x) => x.etiqueta);
+  assert.deepEqual(etiquetas(["+4:00", "+1:50", "+2:00", "+1:00", "+2:50", "+3:00", "+3:50"]), ["+1:00", "+1:50", "+2:00", "+2:50", "+3:00", "+3:50", "+4:00"]);
+  assert.deepEqual(etiquetas(["+2.00", "-0.75", "+1,50"]), ["-0.75", "+1,50", "+2.00"]);
+  assert.deepEqual(etiquetas(["S", "M", "L", "XL"]), ["S", "M", "L", "XL"]);
+  assert.deepEqual(etiquetas(["BEIGE / S", "BEIGE / 2XL", "NEGRO / S"]), ["BEIGE / S", "BEIGE / 2XL", "NEGRO / S"]);
 });
 
 test("lo pedido se compara con la lectura: una variación que no está o sin tantas unidades", () => {
