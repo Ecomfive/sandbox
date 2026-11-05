@@ -67,7 +67,7 @@ export default async function ActualizacionesPage() {
   const mias = vistas.filter((v) => v.usuario_id === usuario.id).map((v) => v.clave);
 
   return (
-    <Pagina ancho="media" className="flex flex-col gap-6">
+    <Pagina ancho="ancha" className="flex flex-col gap-6">
       <EncabezadoPagina titulo="Actualizaciones del sistema" oculto />
       <ListaActualizaciones novedades={NOVEDADES} modulos={modulos} vistas={mias} lecturas={lecturas} />
     </Pagina>
