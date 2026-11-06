@@ -4,6 +4,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
 import { requireModulo } from "@/lib/auth";
 import { traerTodasConError } from "@/lib/supabase/paginar";
+import { leerStockPlataformas, PAISES_CON_PLATAFORMAS } from "./datos-plataformas";
 import type { FilaStock } from "./def-stock";
 import { ListaStock } from "./lista-stock";
 
@@ -50,11 +51,25 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
     traerTodasConError<{ id: string }>((desde, hasta) => supabase.from("skus_maestros").select("id").not("opciones_variantes", "is", null).order("id").range(desde, hasta)),
   ]);
   const fotoPorId = new Map(((fotos.data ?? []) as { id: string; foto_url: string }[]).map((f) => [f.id, f.foto_url]));
+  // Las cajas de cada producto, de las bodegas que se están viendo (migración 0236; sin ella, en cero).
+  const bodegasVistas = bodegaElegida ? [bodegaElegida] : bodegas.map((b) => b.id as string);
+  const { data: filasCajas } = bodegasVistas.length
+    ? await traerTodasConError<{ sku_maestro_id: string; cajas: number; unidades_por_caja: number }>((d, h) => supabase.from("wms_cajas").select("sku_maestro_id, cajas, unidades_por_caja").in("bodega_id", bodegasVistas).order("id").range(d, h))
+    : { data: [] };
+  const cajasPorSku = new Map<string, { cajas: number; unidades: number }>();
+  for (const c of filasCajas ?? []) {
+    const x = cajasPorSku.get(c.sku_maestro_id) ?? { cajas: 0, unidades: 0 };
+    x.cajas += c.cajas;
+    x.unidades += c.cajas * c.unidades_por_caja;
+    cajasPorSku.set(c.sku_maestro_id, x);
+  }
 
   const conVariantes = new Set(((padres.data ?? []) as { id: string }[]).map((p) => p.id));
+  // Lo que hay en las plataformas (6 nov 2026, flujograma de Costa Rica): se lee de sus publicaciones, no de `wms_stock`.
+  const plataformas = PAISES_CON_PLATAFORMAS.includes(pais.codigo) ? await leerStockPlataformas(supabase, pais.id) : null;
 
-  // Un producto con variantes no lleva stock: se ven sus variantes. Sale solo si le viene algo en camino (una compra hecha al producto general).
-  const filas: FilaStock[] = ((resumen.data ?? []) as Record<string, unknown>[]).filter((r) => !conVariantes.has(String(r.sku_maestro_id)) || Number(r.en_camino) > 0).map((r) => ({
+  // Un producto con variantes no lleva stock: se ven sus variantes. Sale solo si le viene algo en camino (una compra hecha al producto general) o si una plataforma lo tiene publicado así.
+  const filas: FilaStock[] = ((resumen.data ?? []) as Record<string, unknown>[]).filter((r) => !conVariantes.has(String(r.sku_maestro_id)) || Number(r.en_camino) > 0 || !!plataformas?.porProducto.has(String(r.sku_maestro_id))).map((r) => ({
     id: String(r.sku_maestro_id),
     codigo: String(r.codigo),
     nombre: String(r.nombre),
@@ -70,6 +85,9 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
     vencido: Number(r.vencido ?? 0),
     manejaVencimiento: r.maneja_vencimiento === true,
     foto: fotoPorId.get(String(r.sku_maestro_id)) ?? null,
+    cajas: cajasPorSku.get(String(r.sku_maestro_id))?.cajas ?? 0,
+    unidadesEnCajas: cajasPorSku.get(String(r.sku_maestro_id))?.unidades ?? 0,
+    plataformas: plataformas?.porProducto.get(String(r.sku_maestro_id)) ?? null,
   }));
 
   return (
@@ -90,6 +108,8 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
           puedeEscribir={!usuario.modulosSoloLectura.includes("inventario")}
           codigoPais={pais.codigo}
           bodegasExternas={bodegas.filter((b) => b.tipo === "externa").map((b) => ({ id: b.id as string, nombre: b.nombre as string }))}
+          lecturas={plataformas?.lecturas ?? null}
+          lecturasFallaron={plataformas?.fallaron ?? false}
         />
       )}
     </Pagina>

@@ -3,16 +3,18 @@
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Seccion } from "@/components/ui/seccion-ficha";
+import { cuantasCajas, textoCaja, unidadesDeCajas } from "@/lib/wms/cajas";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
 import { formatearTiempoRelativo } from "@/lib/formato";
 import { CalendarioIcon, ComprasIcon, EnvioIcon, HistorialIcon, InventarioIcon } from "@/lib/nav-icons";
+import { ETIQUETA_PLATAFORMA } from "@/lib/wms/stock-plataformas";
 import { ComprasProducto } from "../producto/compras-producto";
 import { ETIQUETA_TIPO_SKU, type FilaStock } from "./def-stock";
 import { DESCRIPCION_CUBETA } from "./descripciones-stock";
 import { PanelMovimiento, type BodegaOpcion, type UbicacionOpcion } from "./panel-movimiento";
 import { PanelRemision, PanelTransferencia } from "./panel-transferencia";
-import { obtenerStockDeSku, type EnvioDropi, type LoteStock, type MovimientoStock, type StockBodega } from "./stock-actions";
+import { obtenerStockDeSku, type EnvioDropi, type CajaDeBodega, type LoteStock, type MovimientoStock, type StockBodega } from "./stock-actions";
 
 const ETIQUETA_TIPO_MOV: Record<string, string> = { entrada: "Entrada", salida: "Salida", ajuste: "Ajuste", reserva: "Reserva", liberacion: "Liberación", traslado: "Traslado" };
 const ETIQUETA_CUBETA: Record<string, string> = {
@@ -65,6 +67,7 @@ export function FichaStock({
   puedeEscribir,
   codigoPais,
   bodegasExternas,
+  conPlataformas = false,
   alCerrar,
   alCambiar,
 }: {
@@ -76,11 +79,13 @@ export function FichaStock({
   puedeEscribir: boolean;
   /** Las compras que se ven son las de este país, como el stock. */
   codigoPais: string;
+  /** Este país muestra las plataformas: las bodegas externas sin nada propio no salen, porque su stock se ve en «En plataformas». */
+  conPlataformas?: boolean;
   alCerrar: () => void;
   /** Se llama tras guardar un movimiento, para que la tabla vuelva a pedir sus totales. */
   alCambiar: () => void;
 }) {
-  const [datos, setDatos] = useState<{ bodegas: StockBodega[]; movimientos: MovimientoStock[]; lotes: LoteStock[]; envios: EnvioDropi[] } | "error" | null>(null);
+  const [datos, setDatos] = useState<{ bodegas: StockBodega[]; movimientos: MovimientoStock[]; lotes: LoteStock[]; envios: EnvioDropi[]; cajas: CajaDeBodega[] } | "error" | null>(null);
   // Sube cuando se guarda un movimiento, para volver a pedir el stock y el libro.
   const [version, setVersion] = useState(0);
   const id = sku?.id;
@@ -208,7 +213,7 @@ export function FichaStock({
                       </tr>
                     </thead>
                     <tbody>
-                      {datos.bodegas.map((b) => (
+                      {datos.bodegas.filter((b) => !conPlataformas || b.tipo !== "externa" || b.fisico !== 0 || b.enCamino !== 0).map((b) => (
                         <tr key={b.bodegaId} className="border-t border-border">
                           <th scope="row" className="py-1.5 pr-2 text-left font-medium">
                             {b.nombre}
@@ -226,6 +231,69 @@ export function FichaStock({
                 </div>
               )}
             </Seccion>
+
+            {conPlataformas && (
+              <Seccion icono={EnvioIcon} titulo="En plataformas">
+                {!sku.plataformas ? (
+                  <p className="text-sm text-muted-foreground">No tiene unidades en Dropi, Effi ni Drop, o no está vinculado a una publicación de allá.</p>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    <ul className="m-0 flex list-none flex-col gap-1 p-0 text-[13px]">
+                      {sku.plataformas.lineas.map((l) => (
+                        <li key={`${l.plataforma}-${l.id}`} className="flex flex-wrap justify-between gap-x-3">
+                          <span className="min-w-0">
+                            <span className="font-medium">{ETIQUETA_PLATAFORMA[l.plataforma]}</span>
+                            <span className="text-muted-foreground">
+                              {" "}
+                              · {l.id} · {l.nombre}
+                            </span>
+                            {l.aparte !== 0 && <span className="text-muted-foreground"> · {l.aparte.toLocaleString("es-PA")} u. {l.plataforma === "effi" ? "en garantías" : "en otra bodega (referencial)"}</span>}
+                          </span>
+                          <span className="tabular-nums">{l.unidades.toLocaleString("es-PA")} u.</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="m-0 text-xs text-muted-foreground">Es lo de la última lectura de cada plataforma. Aquí no se cambia: se mueve con remisión o en la plataforma.</p>
+                  </div>
+                )}
+              </Seccion>
+            )}
+
+            {!esCombo && !esTest && datos !== null && datos !== "error" && datos.cajas.length > 0 && (
+              <Seccion icono={InventarioIcon} titulo="Cajas">
+                <div className="flex flex-col gap-3">
+                  {[...new Set(datos.cajas.map((c) => c.bodegaId))].map((bodegaId) => {
+                    const deBodega = datos.cajas.filter((c) => c.bodegaId === bodegaId);
+                    const fisico = datos.bodegas.find((b) => b.bodegaId === bodegaId)?.fisico ?? 0;
+                    const unidades = unidadesDeCajas(deBodega);
+                    return (
+                      <div key={bodegaId} className="flex flex-col gap-1">
+                        <p className="m-0 text-[13px] font-medium">
+                          {deBodega[0].bodega}: {cuantasCajas(deBodega).toLocaleString("es-PA")} {cuantasCajas(deBodega) === 1 ? "caja" : "cajas"} · {unidades.toLocaleString("es-PA")} u.
+                        </p>
+                        <ul className="m-0 flex list-none flex-col gap-0.5 p-0 text-[13px]">
+                          {deBodega.map((c) => (
+                            <li key={c.id} className="flex flex-wrap justify-between gap-x-3">
+                              <span>
+                                {textoCaja(c)}
+                                {c.lugar ? ` · ${c.lugar}` : ""}
+                                {c.observacion ? <span className="text-muted-foreground"> · {c.observacion}</span> : null}
+                              </span>
+                              <span className="text-muted-foreground tabular-nums">{(c.cajas * c.porCaja).toLocaleString("es-PA")} u.</span>
+                            </li>
+                          ))}
+                        </ul>
+                        {unidades !== fisico && (
+                          <p role="status" className="m-0 text-xs text-warning">
+                            No cuadra: las cajas suman {unidades.toLocaleString("es-PA")} u. y el stock físico es {fisico.toLocaleString("es-PA")} u. Corrígelo en el Levantamiento.
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </Seccion>
+            )}
 
             {!esCombo && (
               <Seccion icono={ComprasIcon} titulo="Compras">

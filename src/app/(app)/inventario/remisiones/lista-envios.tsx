@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ContenedorTabla } from "@/components/tabla/contenedor-tabla";
 import { claseCeldaColumna, claseEncabezadoColumna, claseFilaEncabezado } from "@/components/tabla/estilos-tabla";
@@ -8,25 +8,21 @@ import { Badge } from "@/components/ui/badge";
 import { fieldClassSm } from "@/components/ui/field";
 import { MiniaturaFoto } from "@/components/ui/miniatura-foto";
 import { useToast } from "@/components/ui/toast";
-import { formatearTiempoRelativo } from "@/lib/formato";
+import { Ventana } from "@/components/ui/ventana";
+import { anilloFoco } from "@/components/ui/field";
+import { formatearFechaHoraCompleta } from "@/lib/formato";
+import { agruparRemisiones, type EstadoRemision, type LineaEnviada, type RemisionAgrupada } from "@/lib/wms/remision";
 import { recibirEnvioDropi } from "../stock-actions";
+import { PedirCorreccion } from "./correcciones";
 
-export interface FilaEnvio {
-  id: string;
+/** Un producto enviado: una línea de una remisión, con su foto y el motivo si llegó distinto. */
+export interface FilaEnvio extends LineaEnviada {
   codigo: string;
   nombre: string;
   foto: string | null;
-  desde: string;
-  /** La remisión a la que pertenece (migración 0233), para abrir su papel. */
-  remisionId: string | null;
-  /** La bodega externa a la que fue. */
-  hacia: string;
-  enviadoEn: string;
-  enviada: number;
-  recibida: number | null;
-  estado: "en_camino" | "recibido";
-  referencia: string | null;
   motivo: string | null;
+  /** Las cajas que salieron, en palabras (migración 0236). */
+  cajas: string | null;
 }
 
 /** Anotar lo que el tercero dice que llegó de una remisión: arranca con lo enviado; si cambia, pide el motivo. */
@@ -94,30 +90,79 @@ function Recibir({ fila }: { fila: FilaEnvio }) {
   );
 }
 
-/** Las remisiones a bodegas externas: las que siguen en camino arriba, con su campo para anotar lo que llegó. */
-export function ListaEnvios({ filas, puedeEscribir }: { filas: FilaEnvio[]; puedeEscribir: boolean }) {
-  const enCamino = filas.filter((f) => f.estado === "en_camino").length;
-  const conDiferencia = filas.filter((f) => f.estado === "recibido" && f.recibida !== f.enviada).length;
+const ESTADO: Record<EstadoRemision, { tono: "warning" | "success" | "destructive" | "neutral"; texto: (r: RemisionAgrupada) => string }> = {
+  anulada: { tono: "neutral", texto: () => "Anulada" },
+  en_camino: { tono: "warning", texto: () => "En camino" },
+  parcial: { tono: "warning", texto: (r) => `Faltan ${r.porConfirmar} por confirmar` },
+  completa: { tono: "success", texto: () => "Llegó completo" },
+  diferencia: { tono: "destructive", texto: (r) => `Con diferencia (${r.diferencia > 0 ? "+" : ""}${r.diferencia})` },
+};
+
+const EstadoBadge = ({ r }: { r: RemisionAgrupada }) => <Badge tone={ESTADO[r.estado].tono}>{ESTADO[r.estado].texto(r)}</Badge>;
+
+/** Lo que se imprimió: el papel de la remisión, en otra pestaña. Una línea anterior a las remisiones no tiene papel. */
+function VerPapel({ r, grande = false }: { r: RemisionAgrupada; grande?: boolean }) {
+  if (!r.remisionId) return <span className="text-xs text-muted-foreground">Sin papel</span>;
   return (
-    <div className="flex flex-col gap-4">
-      <p className="text-sm">
-        <strong className="tabular-nums">{enCamino}</strong> en camino · <strong className="tabular-nums">{conDiferencia}</strong> llegaron con diferencia
-      </p>
-      <ContenedorTabla ariaLabel="Remisiones">
-        <table className="tabla-datos w-full min-w-[62rem] border-collapse text-sm">
+    <a
+      href={`/imprimir/remision/${r.remisionId}`}
+      target="_blank"
+      rel="noreferrer"
+      onClick={(e) => e.stopPropagation()}
+      className={`inline-flex items-center whitespace-nowrap rounded-md border border-border bg-card font-medium hover:bg-muted ${grande ? "min-h-10 px-4 text-sm" : "min-h-8 px-3 text-xs"} ${anilloFoco}`}
+    >
+      Ver remisión
+    </a>
+  );
+}
+
+/** La ficha de una remisión: sus datos, el papel y cada producto enviado, con lo que llegó (ahí se confirma). */
+function FichaRemision({
+  r,
+  puedeEscribir,
+  codigoPais,
+  conPendiente,
+  resueltas,
+}: {
+  r: RemisionAgrupada<FilaEnvio>;
+  puedeEscribir: boolean;
+  codigoPais: string;
+  conPendiente: Set<string>;
+  resueltas: Record<string, string>;
+}) {
+  return (
+    <div className="flex flex-col gap-5 p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <EstadoBadge r={r} />
+        <VerPapel r={r} grande />
+      </div>
+      <dl className="m-0 grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
+        {[
+          ["Salió de", r.desde],
+          ["Va a", r.hacia],
+          ["Enviada", formatearFechaHoraCompleta(r.enviadoEn, codigoPais)],
+          ["Productos", r.productos.toLocaleString("es-PA")],
+          ["Unidades enviadas", r.enviadas.toLocaleString("es-PA")],
+          ["Unidades que llegaron", r.porConfirmar === r.productos ? "—" : r.recibidas.toLocaleString("es-PA")],
+        ].map(([titulo, valor]) => (
+          <div key={titulo} className="flex flex-col gap-0.5">
+            <dt className="text-xs text-muted-foreground">{titulo}</dt>
+            <dd className="m-0 font-medium tabular-nums">{valor}</dd>
+          </div>
+        ))}
+        {r.notas && (
+          <div className="col-span-full flex flex-col gap-0.5">
+            <dt className="text-xs text-muted-foreground">Notas</dt>
+            <dd className="m-0">{r.notas}</dd>
+          </div>
+        )}
+      </dl>
+      <ContenedorTabla ariaLabel={`Productos de ${r.numero}`}>
+        <table className="tabla-datos w-full min-w-[34rem] border-collapse text-sm">
           <thead>
             <tr className={claseFilaEncabezado}>
               <th scope="col" className={claseEncabezadoColumna}>
-                Foto
-              </th>
-              <th scope="col" className={claseEncabezadoColumna}>
                 Producto
-              </th>
-              <th scope="col" className={claseEncabezadoColumna}>
-                Salió de
-              </th>
-              <th scope="col" className={claseEncabezadoColumna}>
-                Va a
               </th>
               <th scope="col" className={`${claseEncabezadoColumna} text-right`}>
                 Enviadas
@@ -128,36 +173,19 @@ export function ListaEnvios({ filas, puedeEscribir }: { filas: FilaEnvio[]; pued
             </tr>
           </thead>
           <tbody>
-            {filas.length === 0 && (
-              <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
-                  Todavía no hay remisiones. Crea una con «Nueva remisión» o desde la ficha de un producto en Stock.
-                </td>
-              </tr>
-            )}
-            {filas.map((f) => (
-              <tr key={f.id} className="border-b border-border align-top">
+            {r.lineas.map((f) => (
+              <tr key={f.id} className="border-b border-border align-top last:border-0">
                 <td className={claseCeldaColumna}>
-                  <MiniaturaFoto url={f.foto} nombre={f.nombre} />
-                </td>
-                <td className={claseCeldaColumna}>
-                  <span className="block font-medium">{f.codigo}</span>
-                  <span className="block text-xs text-muted-foreground">{f.nombre}</span>
-                </td>
-                <td className={claseCeldaColumna}>
-                  <span className="block">{f.desde}</span>
-                  <span className="block text-xs text-muted-foreground">
-                    {formatearTiempoRelativo(f.enviadoEn)}
-                    {f.referencia && !f.remisionId ? ` · ${f.referencia}` : ""}
+                  <span className="flex items-center gap-3">
+                    <MiniaturaFoto url={f.foto} nombre={f.nombre} />
+                    <span className="min-w-0">
+                      <span className="block font-medium">{f.codigo}</span>
+                      <span className="block text-xs text-muted-foreground">{f.nombre}</span>
+                      {f.cajas && <span className="block text-xs text-muted-foreground">{f.cajas}</span>}
+                    </span>
                   </span>
-                  {f.remisionId && (
-                    <a href={`/imprimir/remision/${f.remisionId}`} target="_blank" rel="noreferrer" className="block text-xs font-medium underline underline-offset-2">
-                      {f.referencia ?? "Ver remisión"}
-                    </a>
-                  )}
                 </td>
-                <td className={claseCeldaColumna}>{f.hacia}</td>
-                <td className={`${claseCeldaColumna} text-right tabular-nums`}>{f.enviada}</td>
+                <td className={`${claseCeldaColumna} text-right tabular-nums`}>{f.enviada.toLocaleString("es-PA")}</td>
                 <td className={claseCeldaColumna}>
                   {f.estado === "en_camino" ? (
                     puedeEscribir ? (
@@ -165,6 +193,8 @@ export function ListaEnvios({ filas, puedeEscribir }: { filas: FilaEnvio[]; pued
                     ) : (
                       <Badge tone="warning">En camino</Badge>
                     )
+                  ) : f.estado === "anulado" ? (
+                    <Badge tone="neutral">Anulada</Badge>
                   ) : f.recibida === f.enviada ? (
                     <Badge tone="success">Llegó completo</Badge>
                   ) : (
@@ -175,12 +205,118 @@ export function ListaEnvios({ filas, puedeEscribir }: { filas: FilaEnvio[]; pued
                       {f.motivo && <span className="text-xs text-muted-foreground">{f.motivo}</span>}
                     </span>
                   )}
+                  {resueltas[f.id] && <span className="mt-1 block text-xs text-muted-foreground">{resueltas[f.id]}</span>}
+                  {conPendiente.has(f.id) ? (
+                    <span className="mt-1 block">
+                      <Badge tone="warning">Corrección por autorizar</Badge>
+                    </span>
+                  ) : (
+                    puedeEscribir &&
+                    f.remisionId &&
+                    f.estado !== "anulado" && (
+                      <span className="mt-1 block">
+                        <PedirCorreccion envioId={f.id} tipo={f.estado === "en_camino" ? "anular" : "recibida"} codigo={f.codigo} enviada={f.enviada} recibida={f.recibida} />
+                      </span>
+                    )
+                  )}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </ContenedorTabla>
+    </div>
+  );
+}
+
+/**
+ * Las remisiones a bodegas externas, una fila por remisión (7 nov 2026, pedido de Hernán): número, fecha, de dónde a dónde, cuántos productos y
+ * unidades, cómo van y el papel. Lo que falta por confirmar va arriba. Al tocar una se abre su ficha con los productos, y ahí se confirma lo que llegó.
+ */
+export function ListaEnvios({
+  filas,
+  puedeEscribir,
+  codigoPais,
+  conPendiente,
+  resueltas,
+}: {
+  filas: FilaEnvio[];
+  puedeEscribir: boolean;
+  codigoPais: string;
+  /** Las líneas con una corrección esperando autorización. */
+  conPendiente: string[];
+  /** La última corrección resuelta de cada línea, como texto. */
+  resueltas: Record<string, string>;
+}) {
+  const remisiones = useMemo(() => agruparRemisiones(filas), [filas]);
+  const pendientes = useMemo(() => new Set(conPendiente), [conPendiente]);
+  const [abierta, setAbierta] = useState<string | null>(null);
+  const elegida = remisiones.find((r) => r.clave === abierta) ?? null;
+  const enCamino = remisiones.filter((r) => r.porConfirmar > 0).length;
+  const conDiferencia = remisiones.filter((r) => r.estado === "diferencia").length;
+  const columnas = ["Remisión", "Fecha", "Salió de", "Va a"];
+  return (
+    <div className="flex flex-col gap-4">
+      <p className="text-sm">
+        <strong className="tabular-nums">{enCamino}</strong> en camino · <strong className="tabular-nums">{conDiferencia}</strong> llegaron con diferencia
+      </p>
+      <ContenedorTabla ariaLabel="Remisiones">
+        <table className="tabla-datos w-full min-w-[60rem] border-collapse text-sm">
+          <thead>
+            <tr className={claseFilaEncabezado}>
+              {columnas.map((c) => (
+                <th key={c} scope="col" className={claseEncabezadoColumna}>
+                  {c}
+                </th>
+              ))}
+              <th scope="col" className={`${claseEncabezadoColumna} text-right`}>
+                Productos
+              </th>
+              <th scope="col" className={`${claseEncabezadoColumna} text-right`}>
+                Unidades
+              </th>
+              <th scope="col" className={claseEncabezadoColumna}>
+                Estado
+              </th>
+              <th scope="col" className={claseEncabezadoColumna}>
+                Papel
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {remisiones.length === 0 && (
+              <tr>
+                <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
+                  Todavía no hay remisiones. Crea una con «Nueva remisión» o desde la ficha de un producto en Stock.
+                </td>
+              </tr>
+            )}
+            {remisiones.map((r) => (
+              <tr key={r.clave} onClick={() => setAbierta(r.clave)} className="cursor-pointer border-b border-border hover:bg-muted/50">
+                <td className={claseCeldaColumna}>
+                  <button type="button" onClick={() => setAbierta(r.clave)} className={`rounded font-semibold underline-offset-2 hover:underline ${anilloFoco}`}>
+                    {r.numero}
+                  </button>
+                </td>
+                <td className={`${claseCeldaColumna} whitespace-nowrap`}>{formatearFechaHoraCompleta(r.enviadoEn, codigoPais)}</td>
+                <td className={claseCeldaColumna}>{r.desde}</td>
+                <td className={claseCeldaColumna}>{r.hacia}</td>
+                <td className={`${claseCeldaColumna} text-right tabular-nums`}>{r.productos.toLocaleString("es-PA")}</td>
+                <td className={`${claseCeldaColumna} text-right tabular-nums`}>{r.enviadas.toLocaleString("es-PA")}</td>
+                <td className={claseCeldaColumna}>
+                  <EstadoBadge r={r} />
+                </td>
+                <td className={claseCeldaColumna}>
+                  <VerPapel r={r} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </ContenedorTabla>
+      <Ventana abierto={!!elegida} alCerrar={() => setAbierta(null)} titulo={elegida?.numero ?? ""} lado="derecha" ancho="lg">
+        {elegida && <FichaRemision r={elegida} puedeEscribir={puedeEscribir} codigoPais={codigoPais} conPendiente={pendientes} resueltas={resueltas} />}
+      </Ventana>
     </div>
   );
 }

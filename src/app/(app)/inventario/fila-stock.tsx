@@ -6,11 +6,13 @@ import { anilloFoco } from "@/components/ui/field";
 import { MiniaturaFoto } from "@/components/ui/miniatura-foto";
 import { Tooltip } from "@/components/ui/tooltip";
 import { ChevronRightIcon } from "@/lib/nav-icons";
+import { textoPlataformas } from "@/lib/wms/stock-plataformas";
 import { ETIQUETA_CLASE_SKU, ETIQUETA_TIPO_SKU, type FilaStock } from "./def-stock";
 import { DESCRIPCION_CUBETA } from "./descripciones-stock";
 
 /** Las columnas de la fila en pantalla ancha; las usa también el encabezado, así que van juntas. */
-const COLUMNAS = "lg:grid-cols-[minmax(0,3fr)_repeat(4,minmax(0,1fr))_minmax(0,1.4fr)_1rem]";
+const COLUMNAS = "lg:grid-cols-[minmax(0,3fr)_repeat(5,minmax(0,1fr))_minmax(0,1.4fr)_1rem]";
+const COLUMNAS_PLATAFORMAS = "lg:grid-cols-[minmax(0,2.6fr)_repeat(3,minmax(0,0.9fr))_minmax(0,1.7fr)_repeat(2,minmax(0,0.9fr))_minmax(0,1.2fr)_1rem]";
 
 const entero = (n: number) => n.toLocaleString("es-PA");
 
@@ -34,16 +36,18 @@ function Cifra({ nombre, n, apoyo, fuerte = false }: { nombre: string; n: number
   );
 }
 
-export function EncabezadoFilasStock() {
+export function EncabezadoFilasStock({ conPlataformas = false }: { conPlataformas?: boolean }) {
   const columnas = [
     { nombre: "Disponible", ayuda: DESCRIPCION_CUBETA.disponible },
     { nombre: "Físico", ayuda: DESCRIPCION_CUBETA.fisico },
+    { nombre: "Cajas", ayuda: "Cuántas cajas hay guardadas. En la ficha se ve de qué tamaño son y en qué lugar. Si no suman el stock físico, sale aviso." },
+    ...(conPlataformas ? [{ nombre: "En plataformas", ayuda: "Lo que hay en Dropi, Effi y Drop según su última lectura. No se mezcla con el físico de tus bodegas." }] : []),
     { nombre: "Reservado", ayuda: DESCRIPCION_CUBETA.reservado },
     { nombre: "En camino", ayuda: DESCRIPCION_CUBETA.enCamino },
     { nombre: "Fuera de venta", ayuda: "En la bodega pero sin poder venderse: dañado, en inspección, retenido o vencido." },
   ];
   return (
-    <div className={`hidden items-center gap-x-4 px-4 py-2.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase lg:grid ${COLUMNAS}`}>
+    <div className={`hidden items-center gap-x-4 px-4 py-2.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase lg:grid ${conPlataformas ? COLUMNAS_PLATAFORMAS : COLUMNAS}`}>
       <span>Producto</span>
       {columnas.map((c) => (
         <span key={c.nombre} className="min-w-0 truncate text-right">
@@ -60,7 +64,7 @@ export function EncabezadoFilasStock() {
 }
 
 /** Un SKU como fila: foto, nombre, SKU y lo que lo distingue, y sus cifras. Toda la fila abre su ficha, donde están el stock por bodega y los movimientos. */
-export function FilaStockLista({ f, alAbrir }: { f: FilaStock; alAbrir: () => void }) {
+export function FilaStockLista({ f, alAbrir, conPlataformas = false }: { f: FilaStock; alAbrir: () => void; conPlataformas?: boolean }) {
   const compuesto = f.tipo === "combo";
   const armables = compuesto && f.fisico !== 0 ? "armables" : undefined;
   const fuera = fueraDeVenta(f);
@@ -69,7 +73,7 @@ export function FilaStockLista({ f, alAbrir }: { f: FilaStock; alAbrir: () => vo
       type="button"
       onClick={alAbrir}
       aria-label={`Abrir el inventario del SKU ${f.codigo}`}
-      className={`group grid w-full cursor-pointer grid-cols-[minmax(0,1fr)_1rem] items-center gap-x-4 gap-y-3 px-4 py-3 text-left transition-colors hover:bg-muted/50 ${COLUMNAS} ${anilloFoco}`}
+      className={`group grid w-full cursor-pointer grid-cols-[minmax(0,1fr)_1rem] items-center gap-x-4 gap-y-3 px-4 py-3 text-left transition-colors hover:bg-muted/50 ${conPlataformas ? COLUMNAS_PLATAFORMAS : COLUMNAS} ${anilloFoco}`}
     >
       <span className="flex min-w-0 items-center gap-3">
         <span className="shrink-0">
@@ -87,9 +91,11 @@ export function FilaStockLista({ f, alAbrir }: { f: FilaStock; alAbrir: () => vo
         </span>
       </span>
 
-      <span className="order-last col-span-2 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-5 lg:order-none lg:contents">
+      <span className="order-last col-span-2 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-6 lg:order-none lg:contents">
         <Cifra nombre="Disponible" n={f.disponible} fuerte apoyo={armables} />
         <Cifra nombre="Físico" n={f.fisico} apoyo={armables} />
+        <Cifra nombre="Cajas" n={f.cajas} apoyo={f.cajas > 0 && f.unidadesEnCajas !== f.fisico ? <span className="text-warning">No cuadra</span> : undefined} />
+        {conPlataformas && <Cifra nombre="En plataformas" n={f.plataformas?.total ?? 0} apoyo={textoPlataformas(f.plataformas) || undefined} />}
         <Cifra nombre="Reservado" n={f.reservado} />
         <Cifra nombre="En camino" n={f.enCamino} />
         <Cifra

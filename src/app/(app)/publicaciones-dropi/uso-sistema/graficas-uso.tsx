@@ -160,7 +160,7 @@ export function GraficaSemanas({ semanas }: { semanas: (Conteo & { etiqueta: str
 }
 
 /** Una fila con su barra partida en sistema y Dropi, el porcentaje y las cantidades a la vista (no hace falta pasar el cursor). */
-export function FilaProporcion({ etiqueta, conteo }: { etiqueta: string; conteo: Conteo }) {
+export function FilaProporcion({ etiqueta, conteo, textoSistema = "en el sistema", textoFuera = "en Dropi" }: { etiqueta: string; conteo: Conteo; textoSistema?: string; textoFuera?: string }) {
   const total = conteo.sistema + conteo.dropi;
   return (
     <div className="flex flex-col gap-1.5">
@@ -168,13 +168,13 @@ export function FilaProporcion({ etiqueta, conteo }: { etiqueta: string; conteo:
         <span className="min-w-0 truncate text-sm">{etiqueta}</span>
         <span className="text-sm font-semibold tabular-nums">{textoPct(conteo)}</span>
       </div>
-      <div className="flex h-2.5 gap-0.5" role="img" aria-label={`${etiqueta}: ${conteo.sistema} en el sistema y ${conteo.dropi} en Dropi`}>
+      <div className="flex h-2.5 gap-0.5" role="img" aria-label={`${etiqueta}: ${conteo.sistema} ${textoSistema} y ${conteo.dropi} ${textoFuera}`}>
         {total === 0 && <span className="flex-1 rounded-full bg-muted" />}
         {conteo.sistema > 0 && <span className="min-w-1 rounded-l-full last:rounded-r-full" style={{ flexGrow: conteo.sistema, background: SISTEMA }} />}
         {conteo.dropi > 0 && <span className="min-w-1 rounded-r-full first:rounded-l-full" style={{ flexGrow: conteo.dropi, background: DROPI }} />}
       </div>
       <span className="text-xs text-muted-foreground tabular-nums">
-        {conteo.sistema} en el sistema · {conteo.dropi} en Dropi
+        {conteo.sistema} {textoSistema} · {conteo.dropi} {textoFuera}
       </span>
     </div>
   );

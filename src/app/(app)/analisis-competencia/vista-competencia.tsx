@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { anilloFoco, fieldClass } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { useMonedaCompetencia } from "@/components/competencia/moneda-competencia";
-import { formatearFechaHora } from "@/lib/formato";
+import { formatearFechaHoraCompleta } from "@/lib/formato";
 import { ActualizarIcon, AlertaIcon, AnalisisCompetenciaIcon, EnlaceIcon, ProveedorIcon, TiendaIcon, VentasIcon } from "@/lib/nav-icons";
 import { marcarAlertasVistas } from "./actions";
 import { decisionesDeHoy, posicionPrecio, precioEquivalente, type Decision, type EstadoPosicion, type Posicion, type TipoDecision } from "@/lib/competencia/analisis";
@@ -323,6 +323,7 @@ export function TableroCompetencia({
   activa?: IdTarjeta | null;
   alPulsar?: (id: IdTarjeta | null) => void;
 }) {
+  const { pais } = useMonedaCompetencia();
   const competidores = useMemo(() => filas ?? competidoresConDatos(datos), [filas, datos]);
   const nuestras = useMemo(() => filasNuestras(datos.productos), [datos.productos]);
   const perdiendo = useMemo(() => posicionesNuestras(datos.productos).filter((f) => f.posicion.estado === "perdiendo").length, [datos.productos]);
@@ -331,7 +332,7 @@ export function TableroCompetencia({
   const vendido7 = competidores.reduce((t, c) => t + c.bajo7, 0);
   const sinVer = datos.alertas.filter((a) => !a.vista).length;
   const cuantos = (id: IdTarjeta) => competidores.filter(FILTRO_TARJETA[id]).length;
-  const ultima = datos.ultima ? `${formatearFechaHora(datos.ultima.inicio)}${datos.ultima.duracionMs !== null ? ` · ${segundos(datos.ultima.duracionMs)}` : ""}` : null;
+  const ultima = datos.ultima ? `${formatearFechaHoraCompleta(datos.ultima.inicio, pais)}${datos.ultima.duracionMs !== null ? ` · ${segundos(datos.ultima.duracionMs)}` : ""}` : null;
 
   const contenido: Record<TarjetaC["id"], { valor: number; junto?: string; detalle: string; extra?: string | null; extraRojo?: boolean }> = {
     todos: { valor: competidores.length, junto: `${num(productosCompetencia)} productos`, detalle: ultima ? `En ${plataformaDe(datos.plataforma).nombre} ${datos.pais} · última búsqueda ${ultima}` : `En ${plataformaDe(datos.plataforma).nombre} ${datos.pais}` },
@@ -342,7 +343,7 @@ export function TableroCompetencia({
       extra: perdiendo ? `${perdiendo} ${perdiendo === 1 ? "producto nuestro pierde" : "productos nuestros pierden"} en precio` : null,
       extraRojo: true,
     },
-    vendieron: { valor: cuantos("vendieron"), junto: `${num(vendido7)} unidades`, detalle: "Bajó su stock entre búsquedas" },
+    vendieron: { valor: cuantos("vendieron"), junto: `${num(vendido7)} unidades`, detalle: datos.plataforma === "effi" ? "Subieron sus ventas entre búsquedas" : "Bajó su stock entre búsquedas" },
     cambios: { valor: cuantos("cambios"), detalle: "Precio o stock distinto en la última búsqueda" },
     nuevos: { valor: cuantos("nuevos"), detalle: "Aparecieron después de la primera búsqueda" },
     novedades: {
@@ -401,6 +402,7 @@ export function TableroCompetencia({
 // ---------- Novedades ----------
 
 function Novedades({ alertas, alAbrir, puedeEscribir, busquedas }: { alertas: AlertaC[]; alAbrir: (a: AlertaC) => void; puedeEscribir: boolean; busquedas: number }) {
+  const { pais } = useMonedaCompetencia();
   const [verVistas, setVerVistas] = useState(false);
   const [todas, setTodas] = useState(false);
   const [pendiente, iniciar] = useTransition();
@@ -446,7 +448,7 @@ function Novedades({ alertas, alAbrir, puedeEscribir, busquedas }: { alertas: Al
                   {a.detalle && <span className="text-xs text-muted-foreground">{a.detalle}</span>}
                 </button>
                 <Badge tone={t.tono}>{t.etiqueta}</Badge>
-                <span className="text-xs whitespace-nowrap text-muted-foreground">{formatearFechaHora(a.fecha)}</span>
+                <span className="text-xs whitespace-nowrap text-muted-foreground">{formatearFechaHoraCompleta(a.fecha, pais)}</span>
                 {puedeEscribir && !a.vista && (
                   <button type="button" disabled={pendiente} onClick={() => marcar([a.id])} className={`rounded px-1.5 py-0.5 text-xs text-muted-foreground hover:text-foreground ${anilloFoco}`}>
                     Vista
@@ -476,10 +478,11 @@ function ProductosDelCompetidor({ productos, nuestros, busqueda }: { productos: 
     () =>
       productos
         .filter((p) => !busqueda || p.nombre.toLowerCase().includes(busqueda))
-        .sort((a, b) => Number(!!b.igualA) - Number(!!a.igualA) || b.bajo7 - a.bajo7 || b.bajo30 - a.bajo30 || (b.stock ?? 0) - (a.stock ?? 0)),
+        .sort((a, b) => Number(!!b.igualA) - Number(!!a.igualA) || b.bajo7 - a.bajo7 || b.bajo30 - a.bajo30 || (b.ventasTotal ?? 0) - (a.ventasTotal ?? 0) || (b.stock ?? 0) - (a.stock ?? 0)),
     [productos, busqueda],
   );
   const visibles = todos ? orden : orden.slice(0, PRIMEROS);
+  const conVentas = productos.some((p) => p.ventasTotal !== null);
   return (
     <div className="flex flex-col gap-2">
       <div className="overflow-x-auto rounded-lg border border-border bg-card">
@@ -490,6 +493,7 @@ function ProductosDelCompetidor({ productos, nuestros, busqueda }: { productos: 
               <th className={`${claseEncabezadoColumna} text-right`}>Su precio</th>
               <th className={claseEncabezadoColumna}>Igual a nuestro</th>
               <th className={`${claseEncabezadoColumna} text-right`}>Stock</th>
+              {conVentas && <th className={`${claseEncabezadoColumna} text-right`}>Ventas</th>}
               <th className={`${claseEncabezadoColumna} text-right`}>Vendido 7 d</th>
               <th className={`${claseEncabezadoColumna} text-right`}>30 d</th>
             </tr>
@@ -538,6 +542,7 @@ function ProductosDelCompetidor({ productos, nuestros, busqueda }: { productos: 
                       )}
                     </td>
                     <td className={`${claseCeldaColumna} text-right tabular-nums`}>{num(p.stock)}</td>
+                    {conVentas && <td className={`${claseCeldaColumna} text-right font-medium tabular-nums`}>{num(p.ventasTotal)}</td>}
                     <td className={`${claseCeldaColumna} text-right tabular-nums ${p.bajo7 ? "text-destructive" : "text-muted-foreground"}`}>{p.bajo7 ? `−${num(p.bajo7)}` : "0"}</td>
                     <td className={`${claseCeldaColumna} text-right tabular-nums ${p.bajo30 ? "text-destructive" : "text-muted-foreground"}`}>{p.bajo30 ? `−${num(p.bajo30)}` : "0"}</td>
                   </tr>
@@ -598,6 +603,7 @@ function TarjetaCompetidor({
           <span className="text-xs text-muted-foreground">{c.cambiosHoy ? `${c.cambiosHoy} ${c.cambiosHoy === 1 ? "cambio" : "cambios"} en la última búsqueda` : "sin cambios en la última búsqueda"}</span>
         </span>
         <Dato titulo="Productos" valor={num(c.productos)} />
+        {c.ventasTotal !== null && <Dato titulo="Ventas totales" valor={num(c.ventasTotal)} />}
         <Dato titulo="Iguales a los nuestros" valor={num(c.igualesN)} extra={c.baratos ? <Badge tone="destructive">{c.baratos} más baratos</Badge> : null} />
         <Dato titulo="Vendido 7 d" valor={num(c.bajo7)} />
         <Dato titulo="Vendido 30 d" valor={num(c.bajo30)} />
@@ -607,7 +613,7 @@ function TarjetaCompetidor({
           <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
             <span>Los iguales a los nuestros primero; luego lo que más vendió.</span>
             <a href={c.url} target="_blank" rel="noopener noreferrer" className="text-primario underline-offset-2 hover:underline">
-              Abrir su página en Dropi ↗
+              {c.enlace}
             </a>
           </div>
           <ProductosDelCompetidor productos={productos} nuestros={nuestros} busqueda={busqueda} />
@@ -667,7 +673,7 @@ export function VistaCompetidores({ datos, puedeEscribir }: { datos: DatosCompet
             (!busqueda || c.nombre.toLowerCase().includes(busqueda) || !!c.vigilado?.toLowerCase().includes(busqueda) || (porCompetidor.get(c.id) ?? []).some((p) => p.nombre.toLowerCase().includes(busqueda))),
         )
         .sort((a, b) =>
-          orden === "vendido" ? b.bajo7 - a.bajo7 || b.bajo30 - a.bajo30 || b.productos - a.productos : orden === "iguales" ? b.igualesN - a.igualesN || b.bajo7 - a.bajo7 : b.productos - a.productos,
+          orden === "vendido" ? b.bajo7 - a.bajo7 || b.bajo30 - a.bajo30 || (b.ventasTotal ?? 0) - (a.ventasTotal ?? 0) || b.productos - a.productos : orden === "iguales" ? b.igualesN - a.igualesN || b.bajo7 - a.bajo7 : b.productos - a.productos,
         ),
     [conDatos, porCompetidor, tarjeta, busqueda, orden],
   );

@@ -45,7 +45,7 @@ export interface ProductoGuardado {
   estado: "activo" | "desaparecido";
 }
 
-export type TipoEvento = "primera_vez" | "precio" | "stock" | "desaparecio" | "reaparecio" | "privatizado" | "publicado" | "vinculado";
+export type TipoEvento = "primera_vez" | "precio" | "stock" | "desaparecio" | "reaparecio" | "privatizado" | "publicado" | "vinculado" | "ventas";
 
 export interface Evento {
   evento: TipoEvento;

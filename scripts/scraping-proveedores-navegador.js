@@ -223,6 +223,141 @@ async function leerNuestrosProductos(puente) {
   return { enviados: productos.length, activos: productos.filter((p) => !p.archivado).length, duracionMs: cuerpo.duracionMs, kb: Math.round(datos.length / 1024) };
 }
 
+// Análisis de competencia con Drop (6 nov 2026; migración 0234): TODO el catálogo de Drop, con el proveedor de cada producto. Se corre en
+// app.soydrop.com/dropshipping con la sesión de un DROPSHIPPER y sin «Ver en USD». Pulsa «Ver más productos» hasta el final (40 cada vez) y lee cada tarjeta;
+// la categoría y la fecha de creación salen de la ficha de cada producto, de a 4 a la vez (si una falla, queda sin ellas). Los revisa
+// src/lib/competencia/drop.ts y los guarda scripts/competencia-catalogo-guardar.ts. Como arriba, la pestaña navega al puente.
+//   await scrapingCompetenciaDrop("http://127.0.0.1:4322/puente/<código>")
+// Costa Rica, 6 nov 2026: 205 productos de 11 proveedores.
+async function scrapingCompetenciaDrop(puente) {
+  if (location.hostname !== "app.soydrop.com" || location.pathname !== "/dropshipping") throw new Error("Esto se corre en app.soydrop.com/dropshipping, con la sesión de dropshipper.");
+  const inicio = new Date();
+  const t0 = performance.now();
+  const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
+  const enlaces = () => [...document.querySelectorAll('a[href^="/dropshipping/product/"]')];
+  document.querySelector('button[aria-label="Vista grilla"]')?.click();
+  await pausa(300);
+  const paginas = [enlaces().length];
+  for (let i = 0; i < 200; i++) {
+    const mas = [...document.querySelectorAll("button")].find((b) => /Ver más productos/.test(b.innerText));
+    if (!mas) break;
+    const antes = enlaces().length;
+    mas.click();
+    let crecio = false;
+    for (let j = 0; j < 80 && !crecio; j++) {
+      await pausa(150);
+      crecio = enlaces().length > antes;
+    }
+    if (!crecio) throw new Error("«Ver más productos» dejó de responder: el catálogo quedó a medias.");
+    paginas.push(enlaces().length - antes);
+  }
+  const productos = new Map();
+  for (const a of enlaces()) {
+    const dropId = /\/product\/([0-9a-f]{24})/.exec(a.getAttribute("href"))?.[1];
+    if (!dropId || productos.has(dropId)) continue;
+    let tarjeta = a;
+    while (tarjeta && !/Precio proveedor/.test(tarjeta.innerText ?? "")) tarjeta = tarjeta.parentElement;
+    if (!tarjeta) continue;
+    const lineas = tarjeta.innerText.split("\n").map((l) => l.trim()).filter(Boolean);
+    const i = lineas.findIndex((l) => /^ID-[A-Z0-9]+$/.test(l));
+    const tras = (t) => lineas[lineas.findIndex((l) => l.startsWith(t)) + 1] ?? "";
+    if (/\$/.test(tras("Precio proveedor"))) throw new Error("Los precios están en dólares: quita «Ver en USD» y vuelve a correr la lectura.");
+    productos.set(dropId, {
+      dropId,
+      codigo: lineas[i] ?? null,
+      nombre: lineas[i - 2] ?? "",
+      proveedor: lineas[i - 1] ?? "",
+      stock: lineas[i + 1] ?? "",
+      precio: tras("Precio proveedor"),
+      sugerido: tras("Precio sugerido"),
+      foto: tarjeta.querySelector("img")?.getAttribute("src") ?? null,
+    });
+  }
+  const cola = [...productos.values()];
+  await Promise.all(
+    Array.from({ length: 4 }, async () => {
+      for (let p = cola.shift(); p; p = cola.shift()) {
+        try {
+          const html = await (await fetch(`/dropshipping/product/${p.dropId}`, { headers: { accept: "text/html" } })).text();
+          const plano = [...html.matchAll(/self\.__next_f\.push\(\[1,"((?:[^"\\]|\\.)*)"\]\)/g)].map((m) => JSON.parse(`"${m[1]}"`)).join("");
+          p.creado = /"createdAt":"([^"]+)","vendor":/.exec(plano)?.[1] ?? null;
+          p.categoria = /"category":"([^"]*)"/.exec(plano)?.[1] ?? null;
+        } catch {
+          // Sin la ficha el producto se guarda igual, sin categoría ni fecha.
+        }
+      }
+    }),
+  );
+  if (!productos.size) throw new Error("No se leyó ningún producto de Drop: revisa que la sesión sea la de dropshipper.");
+  const cuerpo = { tipo: "competencia-drop", pais: "cr", inicio: inicio.toISOString(), duracionMs: Math.round(performance.now() - t0), paginas, productos: [...productos.values()] };
+  const gz = new Blob([JSON.stringify(cuerpo)]).stream().pipeThrough(new CompressionStream("gzip"));
+  const bytes = new Uint8Array(await new Response(gz).arrayBuffer());
+  let binario = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) binario += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  const datos = btoa(binario).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  setTimeout(() => location.assign(`${puente}#${datos}`), 50);
+  return { enviados: cuerpo.productos.length, paginas: paginas.length, duracionMs: cuerpo.duracionMs, kb: Math.round(datos.length / 1024) };
+}
+
+// Análisis de competencia con Effi (6 nov 2026; migración 0239): TODO el catálogo de dropshipping de Effi, con proveedor, stock y ventas. Se corre en
+// effi.com.co con nuestra propia sesión (no hay API para esto): recorre `/app/articulo_dropshipping?page=N`, de a 3 páginas a la vez, y lee cada tarjeta. La sesión
+// no sale de la página. Los revisa src/lib/competencia/effi.ts y los guarda scripts/competencia-catalogo-guardar.ts. Como arriba, la pestaña navega al puente.
+//   await scrapingCompetenciaEffi("http://127.0.0.1:4322/puente/<código>")
+// Costa Rica, 6 nov 2026: 2.109 artículos de 32 proveedores en 15 s.
+async function scrapingCompetenciaEffi(puente) {
+  if (location.hostname !== "effi.com.co") throw new Error("Esto se corre en effi.com.co, con la sesión abierta.");
+  const inicio = new Date();
+  const t0 = performance.now();
+  const pagina = async (n) => {
+    const r = await fetch(`/app/articulo_dropshipping?page=${n}`);
+    if (!r.ok) throw new Error(`Effi respondió ${r.status} en la página ${n}.`);
+    return new DOMParser().parseFromString(await r.text(), "text/html");
+  };
+  const primera = await pagina(1);
+  const total = Math.max(1, ...[...primera.querySelectorAll(".pagination a[data-page]")].map((a) => Number(a.getAttribute("data-page")) || 1));
+  if (!primera.querySelector(".product-card")) throw new Error("No se ve el catálogo de Effi: revisa que la sesión siga abierta.");
+  const cifra = (t, nombre) => new RegExp(`${nombre}:\\s*(-?[\\d,]+)`).exec(t)?.[1] ?? "";
+  const productos = [];
+  const paginas = Array(total).fill(0);
+  const leer = (doc, n) => {
+    const tarjetas = [...doc.querySelectorAll(".product-card")];
+    paginas[n - 1] = tarjetas.length;
+    for (const c of tarjetas) {
+      const enlaces = c.querySelectorAll(".product-meta a");
+      const detalle = c.querySelector(".ver-detalles");
+      const stats = c.querySelector(".product-stats")?.textContent ?? "";
+      const precio = c.querySelector(".price-block")?.textContent.replace(/\s+/g, " ") ?? "";
+      productos.push({
+        codigo: detalle?.getAttribute("data-codigo") ?? null,
+        nombre: c.querySelector(".product-title")?.textContent ?? "",
+        foto: detalle?.getAttribute("data-url_foto") ?? null,
+        proveedor: enlaces[0]?.textContent ?? "",
+        proveedorId: /proveedor=(\d+)/.exec(enlaces[0]?.getAttribute("href") ?? "")?.[1] ?? "",
+        categoria: enlaces[1]?.textContent ?? "",
+        stock: cifra(stats, "Stock"),
+        ventas: cifra(stats, "Ventas"),
+        precio: /Costo:\s*([^\s]+)/.exec(precio)?.[1] ?? "",
+        sugerido: /Sugerido:\s*([^\s]+)/.exec(precio)?.[1] ?? "",
+      });
+    }
+  };
+  leer(primera, 1);
+  const cola = Array.from({ length: total - 1 }, (_, i) => i + 2);
+  await Promise.all(
+    Array.from({ length: 3 }, async () => {
+      for (let n = cola.shift(); n; n = cola.shift()) leer(await pagina(n), n);
+    }),
+  );
+  const cuerpo = { tipo: "competencia-effi", pais: "cr", inicio: inicio.toISOString(), duracionMs: Math.round(performance.now() - t0), paginas, productos };
+  const gz = new Blob([JSON.stringify(cuerpo)]).stream().pipeThrough(new CompressionStream("gzip"));
+  const bytes = new Uint8Array(await new Response(gz).arrayBuffer());
+  let binario = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) binario += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  const datos = btoa(binario).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  setTimeout(() => location.assign(`${puente}#${datos}`), 50);
+  return { enviados: productos.length, paginas: paginas.length, duracionMs: cuerpo.duracionMs, kb: Math.round(datos.length / 1024) };
+}
+
 // Gestión de IDs Drop (3 nov 2026, pedido de Hernán; migración 0221): «Mis productos» de ECOMFIVE en Drop (app.soydrop.com, Costa Rica, en colones).
 // Se corre en app.soydrop.com con la sesión del PROVEEDOR. Drop no da una dirección con todos los productos: la pestaña abre cada página de la lista
 // (`/vendor/products?page=N`, 10 por página) en un marco invisible, espera a que se dibuje la tabla y lee el texto de cada fila (los revisa

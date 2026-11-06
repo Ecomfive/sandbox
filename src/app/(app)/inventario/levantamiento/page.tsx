@@ -53,6 +53,17 @@ export default async function LevantamientoPage({ searchParams }: { searchParams
   ]);
 
   const enBodega = new Map((stock.data ?? []).map((s) => [s.sku_maestro_id, Number(s.fisico)]));
+  // Los lugares de la bodega y las cajas guardadas (migración 0236; sin ella, sin cajas).
+  const [lugares, guardadas] = elegida
+    ? await Promise.all([
+        supabase.from("wms_ubicaciones").select("id, codigo, notas").eq("bodega_id", elegida).eq("activa", true).order("codigo"),
+        traerTodasConError<{ id: string; sku_maestro_id: string; ubicacion_id: string; cajas: number; unidades_por_caja: number; observacion: string | null }>((d, h) =>
+          supabase.from("wms_cajas").select("id, sku_maestro_id, ubicacion_id, cajas, unidades_por_caja, observacion").eq("bodega_id", elegida).order("id").range(d, h),
+        ),
+      ])
+    : [{ data: [] }, { data: [] }];
+  const cajasPorSku = new Map<string, ProductoConteo["cajas"]>();
+  for (const c of guardadas.data ?? []) cajasPorSku.set(c.sku_maestro_id, [...(cajasPorSku.get(c.sku_maestro_id) ?? []), { ubicacion: c.ubicacion_id, cajas: String(c.cajas), porCaja: String(c.unidades_por_caja), observacion: c.observacion ?? "" }]);
   const lotesPorSku = new Map<string, { codigo: string; vencimiento: string; cantidad: number }[]>();
   for (const l of lotes.data ?? []) {
     const lote = Array.isArray(l.wms_lotes) ? l.wms_lotes[0] : l.wms_lotes;
@@ -70,6 +81,7 @@ export default async function LevantamientoPage({ searchParams }: { searchParams
     foto: p.foto_url,
     enSistema: enBodega.get(p.id) ?? 0,
     lotes: lotesPorSku.get(p.id) ?? [],
+    cajas: cajasPorSku.get(p.id) ?? [],
   }));
   const ultimoConteo = ultimo.data as { creado_en: string; referencia: string | null; productos: number } | null;
 
@@ -84,6 +96,7 @@ export default async function LevantamientoPage({ searchParams }: { searchParams
         <p className="rounded-lg border border-border bg-card px-4 py-3 text-sm text-muted-foreground">Este país no tiene bodegas propias activas.</p>
       ) : (
         <Levantamiento
+          ubicaciones={(lugares.data ?? []).map((u) => ({ id: u.id as string, codigo: u.codigo as string, nombre: (u.notas as string | null) ?? null }))}
           key={elegida}
           bodegas={bodegas}
           bodegaElegida={elegida}

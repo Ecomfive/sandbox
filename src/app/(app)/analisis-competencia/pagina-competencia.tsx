@@ -7,38 +7,38 @@ import { requireModulo } from "@/lib/auth";
 import { monedaDePais } from "@/lib/moneda/tipo-cambio";
 import { getPaisActual } from "@/lib/pais";
 import { getPlataformaActual } from "@/lib/plataforma-actual";
-import { plataformaDe, plataformasDePais, tieneCompetencia } from "@/lib/plataformas";
+import { plataformaDe, plataformasDePais } from "@/lib/plataformas";
 import { createServiceClient } from "@/lib/supabase/server";
 import { cargarDatosCompetencia, datosCompetenciaVacios } from "./datos-competencia";
 import type { DatosCompetencia } from "./def-competencia";
 
 /**
- * El marco de cada pestaña de Análisis de competencia: comprueba el acceso y carga los datos del país de la barra. Arriba se elige la plataforma (Dropi o Drop, 3 nov 2026): Drop es solo
- * de Costa Rica: el selector solo sale con Costa Rica elegido (con otro país no hay nada que elegir y se mira Dropi); sin búsquedas de Drop todavía, las pestañas se dibujan igual
- * que las de Dropi pero sin datos. Cada pestaña pone arriba el
+ * El marco de cada pestaña de Análisis de competencia: comprueba el acceso y carga los datos del país de la barra. Arriba se elige la plataforma (Dropi, Drop o Effi): Drop y Effi son solo
+ * de Costa Rica: el selector solo sale con Costa Rica elegido (con otro país no hay nada que elegir y se mira Dropi). Sin búsquedas de Drop o Effi, las pestañas se dibujan igual
+ * que las de Dropi, en cero. Cada pestaña pone arriba el
  * tablero de tarjetas (`TableroCompetencia`): en Competidores filtran la lista; en Resumen llevan a Competidores con su filtro.
  */
 export async function PaginaCompetencia({ titulo, children }: { titulo: string; children: (datos: DatosCompetencia, puedeEscribir: boolean) => ReactNode }) {
   const usuario = await requireModulo("analisis-competencia");
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
-  const elegida = await getPlataformaActual(pais.codigo);
-  // Effi no tiene análisis de competencia: si la plataforma de la barra es Effi, aquí se mira Dropi.
-  const plataforma = tieneCompetencia(elegida) ? elegida : "dropi";
-  const plataformas = plataformasDePais(pais.codigo).filter((p) => tieneCompetencia(p.id));
-  const esDrop = plataforma === "drop";
-  // Los datos de Dropi solo se cargan si se mira Dropi: de Drop todavía no hay búsquedas.
-  const datos = esDrop ? datosCompetenciaVacios("drop", pais.nombre) : await cargarDatosCompetencia(supabase, pais);
+  const plataforma = await getPlataformaActual(pais.codigo);
+  const plataformas = plataformasDePais(pais.codigo);
+  const soloCostaRica = plataforma !== "dropi";
+  // Solo se carga la plataforma que se mira, cada una de sus propias tablas.
+  const datos = soloCostaRica ? ((await cargarDatosCompetencia(supabase, pais, plataforma)) ?? datosCompetenciaVacios(plataforma, pais.nombre)) : await cargarDatosCompetencia(supabase, pais);
   // Solo con más de una plataforma en el país (Costa Rica): en los demás países ni se ofrece.
   const selector = plataformas.length > 1 ? <SelectorPlataforma plataforma={plataforma} plataformas={plataformas} /> : null;
   const puedeEscribir = !usuario.modulosSoloLectura.includes("analisis-competencia");
-  if (esDrop) {
+  if (soloCostaRica) {
     return (
       <Pagina ancho="ancha" className="flex flex-col gap-5">
         <EncabezadoPagina titulo={titulo} oculto />
         {selector}
-        {/* Igual que la de Dropi, sin datos: Drop es de Costa Rica y se paga en colones. */}
-        <MonedaCompetencia moneda={monedaDePais(pais.codigo)}>{children(datos!, puedeEscribir)}</MonedaCompetencia>
+        {/* Drop y Effi son de Costa Rica: en colones. */}
+        <MonedaCompetencia moneda={monedaDePais(pais.codigo)} pais={pais.codigo}>
+          {children(datos!, puedeEscribir)}
+        </MonedaCompetencia>
       </Pagina>
     );
   }
@@ -56,7 +56,7 @@ export async function PaginaCompetencia({ titulo, children }: { titulo: string; 
         </p>
       ) : (
         // Los precios en la moneda del catálogo del país: Panamá en dólares, Costa Rica en colones.
-        <MonedaCompetencia moneda={monedaDePais(pais.codigo)}>
+        <MonedaCompetencia moneda={monedaDePais(pais.codigo)} pais={pais.codigo}>
           {children(datos, puedeEscribir)}
         </MonedaCompetencia>
       )}

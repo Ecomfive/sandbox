@@ -6,6 +6,7 @@ import { MiniaturaFoto } from "@/components/ui/miniatura-foto";
 import { anilloFoco, fieldClass, fieldClassSm, labelClassSm } from "@/components/ui/field";
 import { CampoSkuMaestro, ProveedorSkusMaestros, type OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import { Ventana } from "@/components/ui/ventana";
+import { textoCaja, type CajaGuardada } from "@/lib/wms/cajas";
 import { crearRemision } from "./actions";
 
 export interface BodegaRemision {
@@ -16,13 +17,18 @@ export interface BodegaRemision {
 /** Lo que hay disponible de cada producto en cada bodega propia: `{ [bodega]: { [producto]: unidades } }`. */
 export type StockPorBodega = Record<string, Record<string, number>>;
 
+/** Las cajas de cada producto en cada bodega propia: `{ [bodega]: { [producto]: cajas } }` (migración 0236). */
+export type CajasPorBodega = Record<string, Record<string, CajaGuardada[]>>;
+
 interface Linea {
   sku: OpcionSkuMaestro;
   cantidad: string;
+  /** Cuántas cajas se eligieron de cada grupo guardado: `{ [id de la caja]: cuántas }`. */
+  elegidas: Record<string, string>;
 }
 
 /** «Nueva remisión»: de qué bodega sale, a cuál va y los productos con sus cantidades. Al crearla ofrece el papel que va con la carga. */
-export function NuevaRemision({ propias, externas, productos, stock }: { propias: BodegaRemision[]; externas: BodegaRemision[]; productos: OpcionSkuMaestro[]; stock: StockPorBodega }) {
+export function NuevaRemision({ propias, externas, productos, stock, cajas }: { propias: BodegaRemision[]; externas: BodegaRemision[]; productos: OpcionSkuMaestro[]; stock: StockPorBodega; cajas: CajasPorBodega }) {
   const router = useRouter();
   const [abierta, setAbierta] = useState(false);
   const [desde, setDesde] = useState(propias[0]?.id ?? "");
@@ -35,10 +41,16 @@ export function NuevaRemision({ propias, externas, productos, stock }: { propias
 
   const hay = (sku: string) => stock[desde]?.[sku] ?? 0;
   const numero = (t: string) => Number(t);
-  const pasada = lineas.find((l) => numero(l.cantidad) > hay(l.sku.id));
-  const incompleta = lineas.some((l) => !Number.isInteger(numero(l.cantidad)) || numero(l.cantidad) <= 0);
-  const unidades = lineas.reduce((t, l) => t + (Number.isInteger(numero(l.cantidad)) ? numero(l.cantidad) : 0), 0);
-  const falta = !desde ? "Elige de qué bodega sale." : !hacia ? "Elige a qué bodega va." : lineas.length === 0 ? "Agrega al menos un producto." : incompleta ? "Escribe la cantidad de cada producto." : pasada ? `De ${pasada.sku.codigo} solo hay ${hay(pasada.sku.id).toLocaleString("es-PA")} en esa bodega.` : null;
+  const cajasDe = (sku: string) => cajas[desde]?.[sku] ?? [];
+  const elegidasDe = (l: Linea) => cajasDe(l.sku.id).map((c) => ({ c, n: numero(l.elegidas[c.id] ?? "") })).filter(({ n }) => Number.isInteger(n) && n > 0);
+  // Un producto guardado por cajas se manda por cajas: las unidades salen de las que se elijan (7 nov 2026, pedido de Hernán).
+  const cantidadDe = (l: Linea) => (cajasDe(l.sku.id).length ? elegidasDe(l).reduce((t, { c, n }) => t + n * c.porCaja, 0) : numero(l.cantidad));
+  const cajaPasada = (l: Linea) => cajasDe(l.sku.id).some((c) => numero(l.elegidas[c.id] ?? "") > c.cajas);
+  const pasada = lineas.find((l) => cantidadDe(l) > hay(l.sku.id) || cajaPasada(l));
+  const incompleta = lineas.some((l) => !Number.isInteger(cantidadDe(l)) || cantidadDe(l) <= 0);
+  const unidades = lineas.reduce((t, l) => t + (Number.isInteger(cantidadDe(l)) ? cantidadDe(l) : 0), 0);
+  const totalCajas = lineas.reduce((t, l) => t + elegidasDe(l).reduce((s, { n }) => s + n, 0), 0);
+  const falta = !desde ? "Elige de qué bodega sale." : !hacia ? "Elige a qué bodega va." : lineas.length === 0 ? "Agrega al menos un producto." : incompleta ? "Escribe la cantidad o elige las cajas de cada producto." : pasada ? `De ${pasada.sku.codigo} solo hay ${hay(pasada.sku.id).toLocaleString("es-PA")} en esa bodega.` : null;
 
   function cerrar() {
     setAbierta(false);
@@ -48,12 +60,12 @@ export function NuevaRemision({ propias, externas, productos, stock }: { propias
     setError(null);
   }
   function agregar(sku: OpcionSkuMaestro | null) {
-    if (sku && !lineas.some((l) => l.sku.id === sku.id)) setLineas((l) => [...l, { sku, cantidad: "" }]);
+    if (sku && !lineas.some((l) => l.sku.id === sku.id)) setLineas((l) => [...l, { sku, cantidad: "", elegidas: {} }]);
   }
   function crear() {
     setError(null);
     empezar(async () => {
-      const r = await crearRemision({ desde, hacia, notas, lineas: lineas.map((l) => ({ sku: l.sku.id, cantidad: numero(l.cantidad) })) }).catch(() => ({ error: "No se pudo. Inténtalo de nuevo." }));
+      const r = await crearRemision({ desde, hacia, notas, lineas: lineas.map((l) => ({ sku: l.sku.id, cantidad: cantidadDe(l), cajas: elegidasDe(l).map(({ c, n }) => ({ id: c.id, cajas: n })) })) }).catch(() => ({ error: "No se pudo. Inténtalo de nuevo." }));
       if ("error" in r) return void setError(r.error);
       setCreada(r);
       router.refresh();
@@ -124,28 +136,62 @@ export function NuevaRemision({ propias, externas, productos, stock }: { propias
               {lineas.length > 0 && (
                 <ul className="m-0 flex list-none flex-col divide-y divide-border rounded-lg border border-border p-0">
                   {lineas.map((l) => {
-                    const pasa = numero(l.cantidad) > hay(l.sku.id);
+                    const pasa = cantidadDe(l) > hay(l.sku.id);
+                    const guardadas = cajasDe(l.sku.id);
                     return (
-                      <li key={l.sku.id} className="flex items-center gap-3 px-3 py-2">
+                      <li key={l.sku.id} className="flex flex-col gap-2 px-3 py-2">
+                        <div className="flex items-center gap-3">
                         <MiniaturaFoto url={l.sku.foto ?? null} nombre={l.sku.nombre} />
                         <span className="min-w-0 flex-1">
                           <span className="block truncate font-medium">{l.sku.codigo}</span>
                           <span className={`block text-xs tabular-nums ${pasa ? "text-destructive" : "text-muted-foreground"}`}>{hay(l.sku.id).toLocaleString("es-PA")} disponibles en la bodega</span>
                         </span>
-                        <input
-                          type="number"
-                          inputMode="numeric"
-                          min={1}
-                          step={1}
-                          aria-label={`Unidades de ${l.sku.codigo}`}
-                          value={l.cantidad}
-                          onChange={(e) => setLineas((ls) => ls.map((x) => (x.sku.id === l.sku.id ? { ...x, cantidad: e.target.value } : x)))}
-                          placeholder="0"
-                          className={`${fieldClassSm} w-24 tabular-nums`}
-                        />
+                        {guardadas.length > 0 ? (
+                          <span className="w-24 text-right text-sm font-medium tabular-nums">{cantidadDe(l).toLocaleString("es-PA")} u.</span>
+                        ) : (
+                          <input
+                            type="number"
+                            inputMode="numeric"
+                            min={1}
+                            step={1}
+                            aria-label={`Unidades de ${l.sku.codigo}`}
+                            value={l.cantidad}
+                            onChange={(e) => setLineas((ls) => ls.map((x) => (x.sku.id === l.sku.id ? { ...x, cantidad: e.target.value } : x)))}
+                            placeholder="0"
+                            className={`${fieldClassSm} w-24 tabular-nums`}
+                          />
+                        )}
                         <button type="button" aria-label={`Quitar ${l.sku.codigo}`} onClick={() => setLineas((ls) => ls.filter((x) => x.sku.id !== l.sku.id))} className={`min-h-9 rounded-md px-2 text-xs text-muted-foreground hover:bg-muted ${anilloFoco}`}>
                           Quitar
                         </button>
+                        </div>
+                        {guardadas.length > 0 && (
+                          <ul className="m-0 flex list-none flex-col gap-1 rounded-md bg-muted/50 p-2 text-xs">
+                            {guardadas.map((caja) => {
+                              const pide = numero(l.elegidas[caja.id] ?? "");
+                              return (
+                                <li key={caja.id} className="flex items-center gap-2">
+                                  <span className={`min-w-0 flex-1 ${pide > caja.cajas ? "text-destructive" : ""}`}>
+                                    {textoCaja(caja)}
+                                    {caja.lugar ? ` · ${caja.lugar}` : ""}
+                                  </span>
+                                  <input
+                                    type="number"
+                                    inputMode="numeric"
+                                    min={0}
+                                    max={caja.cajas}
+                                    step={1}
+                                    aria-label={`Cajas de ${caja.porCaja} en ${caja.ubicacion} de ${l.sku.codigo}`}
+                                    value={l.elegidas[caja.id] ?? ""}
+                                    onChange={(e) => setLineas((ls) => ls.map((x) => (x.sku.id === l.sku.id ? { ...x, elegidas: { ...x.elegidas, [caja.id]: e.target.value } } : x)))}
+                                    placeholder="0"
+                                    className={`${fieldClassSm} w-20 tabular-nums`}
+                                  />
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        )}
                       </li>
                     );
                   })}
@@ -157,7 +203,7 @@ export function NuevaRemision({ propias, externas, productos, stock }: { propias
               </label>
               {lineas.length > 0 && (
                 <p className="m-0 text-xs text-muted-foreground tabular-nums">
-                  {lineas.length} {lineas.length === 1 ? "producto" : "productos"} · {unidades.toLocaleString("es-PA")} unidades
+                  {lineas.length} {lineas.length === 1 ? "producto" : "productos"} · {unidades.toLocaleString("es-PA")} unidades{totalCajas > 0 ? ` · ${totalCajas.toLocaleString("es-PA")} ${totalCajas === 1 ? "caja" : "cajas"}` : ""}
                 </p>
               )}
               {error && (

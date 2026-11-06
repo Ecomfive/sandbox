@@ -6,7 +6,7 @@ import { claseCeldaColumna, claseEncabezadoColumna, claseFilaEncabezado } from "
 import { Badge } from "@/components/ui/badge";
 import { anilloFoco } from "@/components/ui/field";
 import { VisorImagen } from "@/components/ui/visor-imagen";
-import { formatearFechaHora } from "@/lib/formato";
+import { formatearFechaHoraCompleta } from "@/lib/formato";
 import { useMonedaCompetencia } from "./moneda-competencia";
 import { obtenerCompetenciaProducto, obtenerHistorialCompetencia, type CompetenciaDeProducto, type EventoCompetencia } from "@/lib/competencia/actions";
 
@@ -57,6 +57,7 @@ function queFue(e: EventoCompetencia): { texto: string; tono: "success" | "destr
     return e.stock < e.stockAntes ? { texto: `Bajó el stock (vendió ${num(e.stockAntes - e.stock)})`, tono: "destructive" } : { texto: `Subió el stock (+${num(e.stock - e.stockAntes)})`, tono: "success" };
   if (e.evento === "precio" && e.precio !== null && e.precioAntes !== null)
     return e.precio < e.precioAntes ? { texto: "Bajó el precio", tono: "destructive" } : { texto: "Subió el precio", tono: "success" };
+  if (e.evento === "ventas" && e.stock !== null && e.stockAntes !== null) return { texto: `Vendió ${(e.stock - e.stockAntes).toLocaleString("es-PA")}: ${e.stockAntes.toLocaleString("es-PA")} → ${e.stock.toLocaleString("es-PA")} ventas`, tono: "success" };
   if (e.evento === "primera_vez") return { texto: "Lo vimos por primera vez", tono: "info" };
   if (e.evento === "desaparecio") return { texto: "Dejó de mostrarlo", tono: "neutral" };
   if (e.evento === "reaparecio") return { texto: "Lo volvió a mostrar", tono: "info" };
@@ -67,8 +68,9 @@ function queFue(e: EventoCompetencia): { texto: string; tono: "success" | "destr
  * El historial de un producto de la competencia en una tabla: cada vez que bajó o subió el stock y cada cambio de precio, con
  * lo de antes, lo de después y la diferencia en color.
  */
-export function HistorialCompetencia({ productoId, limite = 30 }: { productoId: string; limite?: number }) {
-  const { precio: usd } = useMonedaCompetencia();
+export function HistorialCompetencia({ productoId, limite = 30, pais: paisProducto }: { productoId: string; limite?: number; pais?: string }) {
+  const { precio: usd, pais: paisPagina } = useMonedaCompetencia();
+  const pais = paisProducto ?? paisPagina;
   const [eventos, setEventos] = useState<EventoCompetencia[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
@@ -119,7 +121,7 @@ export function HistorialCompetencia({ productoId, limite = 30 }: { productoId: 
             const q = queFue(e);
             return (
               <tr key={i} className="border-b border-border align-top last:border-0">
-                <td className={`${claseCeldaColumna} whitespace-nowrap text-xs`}>{formatearFechaHora(e.fecha)}</td>
+                <td className={`${claseCeldaColumna} whitespace-nowrap text-xs`}>{formatearFechaHoraCompleta(e.fecha, pais)}</td>
                 <td className={claseCeldaColumna}>
                   <Badge tone={q.tono}>{q.texto}</Badge>
                 </td>
@@ -212,7 +214,7 @@ export function BloqueCompetencia({ skuId }: { skuId: string }) {
                           </button>
                         </span>
                       </div>
-                      {abierto === c.id && <HistorialCompetencia productoId={c.id} />}
+                      {abierto === c.id && <HistorialCompetencia productoId={c.id} pais={d.codigo} />}
                     </li>
                   );
                 })}

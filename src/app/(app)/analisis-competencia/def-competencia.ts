@@ -1,8 +1,9 @@
 import type { PlataformaId } from "@/lib/plataformas";
 
-/** Un producto del catálogo de Dropi del país (nuestro o de la competencia). */
+/** Un producto del catálogo de Dropi, Drop o Effi del país (nuestro o de la competencia). */
 export interface ProductoC {
   id: string;
+  /** Su ID en Dropi; 0 en Drop y Effi, donde no es un número. */
   dropiId: number;
   proveedorId: number;
   proveedor: string;
@@ -23,6 +24,8 @@ export interface ProductoC {
   bajo1: number;
   bajo7: number;
   bajo30: number;
+  /** Las ventas que muestra la plataforma, de toda la vida: solo Effi las da; en Dropi y Drop, `null`. */
+  ventasTotal: number | null;
   urlProveedor: string;
 }
 
@@ -43,6 +46,10 @@ export interface CompetidorC {
   id: number;
   nombre: string;
   url: string;
+  /** El texto del enlace a `url`. */
+  enlace: string;
+  /** Lo que suman las ventas de sus productos (solo Effi las da; en Dropi y Drop, `null`). */
+  ventasTotal: number | null;
   productos: number;
   iguales: number;
   nuevos7: number;
@@ -85,7 +92,7 @@ export interface VentaC {
 }
 
 export interface DatosCompetencia {
-  /** De qué plataforma son los datos (Dropi o Drop; Drop es solo de Costa Rica). */
+  /** De qué plataforma son los datos (Dropi, Drop o Effi; las dos últimas son solo de Costa Rica). */
   plataforma: PlataformaId;
   pais: string;
   productos: ProductoC[];

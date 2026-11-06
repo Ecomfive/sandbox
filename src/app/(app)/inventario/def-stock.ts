@@ -1,4 +1,5 @@
 import type { DefTabla } from "@/lib/tabla/motor";
+import type { StockPlataformas } from "@/lib/wms/stock-plataformas";
 
 /** Una fila del inventario: un SKU maestro con lo que hay en las bodegas elegidas (todas las del país o una). */
 export interface FilaStock {
@@ -21,6 +22,11 @@ export interface FilaStock {
   manejaVencimiento: boolean;
   /** La foto del producto (la de su ficha en Producto), o null. */
   foto: string | null;
+  /** Cuántas cajas tiene y qué unidades suman (migración 0236): lo que Nicol mira para saber cuánto pedir. */
+  cajas: number;
+  unidadesEnCajas: number;
+  /** Lo que tiene en las plataformas, en los países que las muestran (`PAISES_CON_PLATAFORMAS`); `null` si no tiene o no aplica. */
+  plataformas: StockPlataformas | null;
 }
 
 export const ETIQUETA_TIPO_SKU: Record<string, string> = { simple: "Simple", combo: "Compuesto" };
@@ -71,6 +77,7 @@ export const DEF_STOCK: DefTabla<FilaStock> = {
     { id: "disponible", etiqueta: "Disponible", tipo: "numero", sinCsv: true, valor: (f) => f.disponible },
     { id: "vencido", etiqueta: "Vencido", tipo: "numero", sinCsv: true, valor: (f) => f.vencido },
     { id: "enCamino", etiqueta: "En camino", tipo: "numero", sinCsv: true, valor: (f) => f.enCamino },
+    { id: "cajas", etiqueta: "Cajas", tipo: "numero", sinCsv: true, valor: (f) => f.cajas },
   ],
   // Al agrupar, cada grupo dice sus unidades físicas; un compuesto no suma, sus unidades ya están en sus componentes.
   total: (f) => (f.tipo === "combo" ? 0 : f.fisico),
@@ -85,5 +92,18 @@ export const DEF_STOCK: DefTabla<FilaStock> = {
     { etiqueta: "Retenido", valor: (f) => f.retenido },
     { etiqueta: "En camino", valor: (f) => f.enCamino },
     { etiqueta: "Vencido", valor: (f) => f.vencido },
+    { etiqueta: "Cajas", valor: (f) => f.cajas },
+  ],
+};
+
+/** En los países que muestran las plataformas, además se filtra y se descarga por ellas. */
+export const DEF_STOCK_PLATAFORMAS: DefTabla<FilaStock> = {
+  ...DEF_STOCK,
+  campos: [...DEF_STOCK.campos, { id: "plataformas", etiqueta: "En plataformas", tipo: "numero", sinCsv: true, valor: (f) => f.plataformas?.total ?? 0 }],
+  csvAntes: [
+    ...(DEF_STOCK.csvAntes ?? []),
+    { etiqueta: "Dropi", valor: (f) => f.plataformas?.dropi ?? 0 },
+    { etiqueta: "Effi", valor: (f) => f.plataformas?.effi ?? 0 },
+    { etiqueta: "Drop", valor: (f) => f.plataformas?.drop ?? 0 },
   ],
 };

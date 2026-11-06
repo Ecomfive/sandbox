@@ -1,4 +1,4 @@
-// Las plataformas de dropshipping con que trabaja el sistema y en qué países está cada una (3 nov 2026, pedido de Hernán): **Dropi** está en varios países y **Drop es solo de Costa Rica**.
+// Las plataformas de dropshipping con que trabaja el sistema y en qué países está cada una (3 nov 2026, pedido de Hernán): **Dropi** está en varios países; **Drop** y **Effi** son solo de Costa Rica.
 // Todo lo que se agregue de Drop (módulos, datos, búsquedas) es de Costa Rica; con otro país elegido en la barra se avisa y se ofrece pasar a Costa Rica. Sin base ni React, con prueba
 // (plataformas.test.ts).
 
@@ -14,7 +14,6 @@ export interface Plataforma {
 export const PLATAFORMAS: readonly Plataforma[] = [
   { id: "dropi", nombre: "Dropi", paises: null },
   { id: "drop", nombre: "Drop", paises: ["CR"] },
-  // Effi (6 nov 2026, pedido de Hernán): el ERP de la cuenta de Costa Rica; como Drop, solo existe en Costa Rica.
   { id: "effi", nombre: "Effi", paises: ["CR"] },
 ];
 
@@ -57,6 +56,3 @@ export const GESTION_IDS: Record<PlataformaId, { ruta: string; modulo: string }>
 export function gestionesDePais(codigoPais: string, modulos: readonly string[] | null): Plataforma[] {
   return plataformasDePais(codigoPais).filter((p) => modulos === null || modulos.includes(GESTION_IDS[p.id].modulo));
 }
-
-/** Las plataformas con análisis de competencia: Effi no tiene (es un ERP, no un catálogo de dropshipping). */
-export const tieneCompetencia = (id: PlataformaId): boolean => id !== "effi";

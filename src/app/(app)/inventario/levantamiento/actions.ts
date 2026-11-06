@@ -7,47 +7,83 @@ import { puedeVerBodega } from "@/lib/seguridad/pais-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 import { indexar, parecidos, todasLasCoincidencias } from "@/lib/scraping/cruces";
 import { traerTodasConError } from "@/lib/supabase/paginar";
-import { MAX_LINEAS_IMPORTADAS, revisarConteo, varianteDeLinea } from "@/lib/wms/levantamiento";
+import { revisarCajas } from "@/lib/wms/cajas";
+import { itemsParaSumar, MAX_LINEAS_IMPORTADAS, revisarConteo, varianteDeLinea, type ItemConteo } from "@/lib/wms/levantamiento";
 
 const ES_ID = /^[0-9a-fA-F-]{8,64}$/;
 
+const revisarLista = (lista: unknown): { items: ItemConteo[] } | { error: string } => (Array.isArray(lista) && lista.length === 0 ? { items: [] } : revisarConteo(lista));
+
+const refrescar = () => {
+  revalidatePath("/inventario");
+  revalidatePath("/inventario/levantamiento");
+  revalidatePath("/inventario/remisiones");
+};
+
 /**
- * Guarda un levantamiento (conteo físico) de una bodega propia: cada producto contado queda en lo contado y la diferencia
- * se anota como ajuste (`wms_registrar_conteo`, migración 0214). Devuelve el error como valor.
+ * Guarda un levantamiento (conteo físico) de una bodega propia: cada producto contado queda en lo contado y la diferencia se anota como ajuste (`wms_registrar_conteo`,
+ * migración 0214), y lo de `sumas` entra además de lo que ya había (`wms_sumar_levantamiento`, migración 0235). Cada fila dice lo suyo (`repartirFilas`). Son dos pasos:
+ * primero lo contado, que se puede repetir sin problema; si la suma falla, `contadoGuardado` avisa que lo contado ya quedó. Devuelve el error como valor.
  */
 export async function guardarLevantamiento(
   bodegaId: string,
   referencia: string,
   items: unknown,
-): Promise<{ error?: string; productos?: number; ajustes?: number }> {
+  sumas: unknown,
+  /** Las cajas de los productos que se tocaron (migración 0236): deben sumar lo que queda en la bodega. */
+  cajas?: unknown,
+): Promise<{ error?: string; contadoGuardado?: boolean; productos?: number; ajustes?: number; cajas?: number; sumados?: number }> {
   const usuario = await requireModuloEscritura("inventario");
   if (!ES_ID.test(bodegaId)) return { error: "Elige la bodega." };
-  const revisado = revisarConteo(items);
+  const revisadasCajas = revisarCajas(cajas);
+  if ("error" in revisadasCajas) return { error: revisadasCajas.error };
+  const revisado = revisarLista(items);
   if ("error" in revisado) return { error: revisado.error };
+  const revisadoSumas = revisarLista(sumas);
+  if ("error" in revisadoSumas) return { error: revisadoSumas.error };
+  const porSumar = itemsParaSumar(revisadoSumas.items);
+  const contados = new Set(revisado.items.map((i) => i.sku));
+  if (porSumar.some((i) => contados.has(i.sku))) return { error: "Un producto viene dos veces." };
   const ref = referencia.replace(/\s+/g, " ").trim().slice(0, 120);
 
   const supabase = createServiceClient();
   if (!(await puedeVerBodega(supabase, usuario.paisesPermitidos, bodegaId))) return { error: "No tienes acceso al país de esa bodega." };
-  const { data, error } = await supabase.rpc("wms_registrar_conteo", {
-    p_bodega: bodegaId,
-    p_items: revisado.items,
-    p_referencia: ref || null,
-    p_usuario: usuario.id,
-  });
-  if (error) {
-    if (/wms_registrar_conteo/.test(error.message)) return { error: "Falta correr la migración 0214 en la base." };
-    return { error: error.message.length < 200 ? error.message : "No se pudo guardar el levantamiento." };
+  const conCajas = revisadasCajas.cajas.length > 0;
+  const conConteo = conCajas || revisado.items.length > 0;
+  if (!conConteo && !porSumar.length) return { error: "No hay nada que guardar." };
+
+  let r: { productos?: number; ajustes?: number; cajas?: number } = {};
+  if (conConteo) {
+    const { data, error } = conCajas
+      ? await supabase.rpc("wms_registrar_conteo_cajas", { p_bodega: bodegaId, p_items: revisado.items, p_cajas: revisadasCajas.cajas, p_referencia: ref || null, p_usuario: usuario.id })
+      : await supabase.rpc("wms_registrar_conteo", { p_bodega: bodegaId, p_items: revisado.items, p_referencia: ref || null, p_usuario: usuario.id });
+    if (error) {
+      if (/wms_registrar_conteo_cajas/.test(error.message)) return { error: "Falta correr la migración 0236 en la base." };
+      if (/wms_registrar_conteo/.test(error.message)) return { error: "Falta correr la migración 0214 en la base." };
+      return { error: error.message.length < 200 ? error.message : "No se pudo guardar el levantamiento." };
+    }
+    r = (data ?? {}) as typeof r;
+    await registrarAuditoria({
+      accion: "levantamiento_inventario",
+      entidad: "wms_bodegas",
+      entidadId: bodegaId,
+      detalle: `Levantamiento${ref ? ` «${ref}»` : ""}: ${r.productos ?? 0} productos contados, ${r.ajustes ?? 0} con diferencia${r.cajas ? `, cajas de ${r.cajas} productos` : ""}`,
+    });
   }
-  const r = (data ?? {}) as { productos?: number; ajustes?: number };
-  await registrarAuditoria({
-    accion: "levantamiento_inventario",
-    entidad: "wms_bodegas",
-    entidadId: bodegaId,
-    detalle: `Levantamiento${ref ? ` «${ref}»` : ""}: ${r.productos ?? 0} productos contados, ${r.ajustes ?? 0} con diferencia`,
-  });
-  revalidatePath("/inventario");
-  revalidatePath("/inventario/levantamiento");
-  return { productos: r.productos ?? 0, ajustes: r.ajustes ?? 0 };
+
+  let sumados = 0;
+  if (porSumar.length) {
+    const { data, error } = await supabase.rpc("wms_sumar_levantamiento", { p_bodega: bodegaId, p_items: porSumar, p_referencia: ref || null, p_usuario: usuario.id });
+    if (error) {
+      if (conConteo) refrescar();
+      const motivo = /wms_sumar_levantamiento/.test(error.message) ? "Falta correr la migración 0235 en la base." : error.message.length < 200 ? error.message : "No se pudo sumar.";
+      return { error: conConteo ? `Lo contado ya se guardó, pero no se pudo sumar: ${motivo}` : motivo, contadoGuardado: conConteo };
+    }
+    sumados = ((data ?? {}) as { productos?: number }).productos ?? 0;
+    await registrarAuditoria({ accion: "levantamiento_inventario", entidad: "wms_bodegas", entidadId: bodegaId, detalle: `Suma al inventario${ref ? ` «${ref}»` : ""}: ${sumados} productos` });
+  }
+  refrescar();
+  return { productos: r.productos ?? 0, ajustes: r.ajustes ?? 0, cajas: r.cajas ?? 0, sumados };
 }
 
 export interface SugerenciaLinea {
