@@ -7,18 +7,20 @@ import { puedeVerBodega } from "@/lib/seguridad/pais-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 import { indexar, parecidos, todasLasCoincidencias } from "@/lib/scraping/cruces";
 import { traerTodasConError } from "@/lib/supabase/paginar";
-import { MAX_LINEAS_IMPORTADAS, revisarConteo, varianteDeLinea } from "@/lib/wms/levantamiento";
+import { itemsParaSumar, MAX_LINEAS_IMPORTADAS, revisarConteo, varianteDeLinea, type ModoLevantamiento } from "@/lib/wms/levantamiento";
 
 const ES_ID = /^[0-9a-fA-F-]{8,64}$/;
 
 /**
  * Guarda un levantamiento (conteo físico) de una bodega propia: cada producto contado queda en lo contado y la diferencia
- * se anota como ajuste (`wms_registrar_conteo`, migración 0214). Devuelve el error como valor.
+ * se anota como ajuste (`wms_registrar_conteo`, migración 0214). En modo «sumar» lo escrito entra además de lo que ya había
+ * (`wms_sumar_levantamiento`, migración 0235). Devuelve el error como valor.
  */
 export async function guardarLevantamiento(
   bodegaId: string,
   referencia: string,
   items: unknown,
+  modo: ModoLevantamiento = "contado",
 ): Promise<{ error?: string; productos?: number; ajustes?: number }> {
   const usuario = await requireModuloEscritura("inventario");
   if (!ES_ID.test(bodegaId)) return { error: "Elige la bodega." };
@@ -28,13 +30,17 @@ export async function guardarLevantamiento(
 
   const supabase = createServiceClient();
   if (!(await puedeVerBodega(supabase, usuario.paisesPermitidos, bodegaId))) return { error: "No tienes acceso al país de esa bodega." };
-  const { data, error } = await supabase.rpc("wms_registrar_conteo", {
+  const sumar = modo === "sumar";
+  const porSumar = sumar ? itemsParaSumar(revisado.items) : revisado.items;
+  if (!porSumar.length) return { error: "Escribe cuánto vas a sumar." };
+  const { data, error } = await supabase.rpc(sumar ? "wms_sumar_levantamiento" : "wms_registrar_conteo", {
     p_bodega: bodegaId,
-    p_items: revisado.items,
+    p_items: porSumar,
     p_referencia: ref || null,
     p_usuario: usuario.id,
   });
   if (error) {
+    if (/wms_sumar_levantamiento/.test(error.message)) return { error: "Falta correr la migración 0235 en la base." };
     if (/wms_registrar_conteo/.test(error.message)) return { error: "Falta correr la migración 0214 en la base." };
     return { error: error.message.length < 200 ? error.message : "No se pudo guardar el levantamiento." };
   }
@@ -43,7 +49,7 @@ export async function guardarLevantamiento(
     accion: "levantamiento_inventario",
     entidad: "wms_bodegas",
     entidadId: bodegaId,
-    detalle: `Levantamiento${ref ? ` «${ref}»` : ""}: ${r.productos ?? 0} productos contados, ${r.ajustes ?? 0} con diferencia`,
+    detalle: `${sumar ? "Suma al inventario" : "Levantamiento"}${ref ? ` «${ref}»` : ""}: ${r.productos ?? 0} productos${sumar ? "" : ` contados, ${r.ajustes ?? 0} con diferencia`}`,
   });
   revalidatePath("/inventario");
   revalidatePath("/inventario/levantamiento");
