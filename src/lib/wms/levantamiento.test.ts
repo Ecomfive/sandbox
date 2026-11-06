@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { revisarConteo, varianteDeLinea } from "./levantamiento";
+import { itemsParaSumar, revisarConteo, varianteDeLinea } from "./levantamiento";
 
 const A = "0194f0a2-0000-7000-8000-000000000001";
 const B = "0194f0a2-0000-7000-8000-000000000002";
@@ -56,4 +56,14 @@ test("la línea elige su variante: color y talla, graduación escrita de cualqui
   assert.equal(varianteDeLinea("Lente de Calidad +250", lentes), null);
   assert.equal(varianteDeLinea("Corrector de Postura Ortopédico XL", [{ id: "L", opciones: { Talla: "L" } }, { id: "XL", opciones: { Talla: "XL" } }]), "XL");
   assert.equal(varianteDeLinea("Algo", [{ id: "x", opciones: null }]), null);
+});
+
+test("para sumar solo cuenta lo que entra", () => {
+  const items = [
+    { sku: A, cantidad: 25 },
+    { sku: B, cantidad: 0 },
+    { sku: "c", lotes: [{ codigo: "L1", vencimiento: null, cantidad: 5 }, { codigo: "L2", vencimiento: null, cantidad: 0 }] },
+    { sku: "d", lotes: [{ codigo: "L3", vencimiento: null, cantidad: 0 }] },
+  ];
+  assert.deepEqual(itemsParaSumar(items), [{ sku: A, cantidad: 25 }, { sku: "c", lotes: [{ codigo: "L1", vencimiento: null, cantidad: 5 }] }]);
 });
