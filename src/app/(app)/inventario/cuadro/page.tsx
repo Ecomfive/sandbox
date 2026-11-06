@@ -6,7 +6,7 @@ import { esAdministrador } from "@/lib/permisos/acceso";
 import { idsDeDropi } from "@/lib/publicaciones/sincronizar-dropi";
 import { traerTodasConError } from "@/lib/supabase/paginar";
 import { createServiceClient } from "@/lib/supabase/server";
-import { armarCuadro, BODEGA_DE_PLATAFORMA, CON_VENTAS, diaSiguiente, type RemisionCuadro, type VentaDia } from "@/lib/wms/cuadro-plataformas";
+import { armarCuadro, BODEGA_DE_PLATAFORMA, CON_VENTAS, diaSiguiente, type NovedadCuadro, type RemisionCuadro, type VentaDia } from "@/lib/wms/cuadro-plataformas";
 import { PAISES_CON_RECEPCION } from "@/lib/wms/recepcion";
 import type { Plataforma } from "@/lib/wms/stock-plataformas";
 import { leerStockPlataformas } from "../datos-plataformas";
@@ -63,6 +63,7 @@ export default async function CuadroPage({ searchParams }: { searchParams: Promi
 
   let remisiones: RemisionCuadro[] = [];
   let salidas: RemisionCuadro[] = [];
+  let novedades: NovedadCuadro[] = [];
   let ventas: VentaDia[] = [];
   let ventasHasta: string | null = null;
   if (bodega && desde) {
@@ -74,6 +75,9 @@ export default async function CuadroPage({ searchParams }: { searchParams: Promi
     const [entradas, salieron] = await Promise.all([leer("bodega_dropi_id"), leer("bodega_origen_id")]);
     remisiones = (entradas.data ?? []).map(aRemision);
     salidas = (salieron.data ?? []).map(aRemision);
+    // Sin la migración 0243 no hay novedades: el cuadro sale igual.
+    const { data: filasNovedad } = await supabase.from("wms_novedades_plataforma").select("sku_maestro_id, estado, cantidad").eq("bodega_id", bodega.id).neq("estado", "por_revisar").gte("resuelto_en", desde).limit(2000);
+    novedades = (filasNovedad ?? []).map((n) => ({ sku: n.sku_maestro_id as string, estado: n.estado as string, cantidad: Number(n.cantidad) }));
     if (CON_VENTAS[plataforma]) {
       const { data: dias } = await traerTodasConError<{ dropi_producto_id: number; dia: string; pedidas: number; canceladas: number; rechazadas: number; devueltas: number }>((d, h) =>
         supabase.from("dropi_ventas_diarias").select("dropi_producto_id, dia, pedidas, canceladas, rechazadas, devueltas").eq("pais_id", pais.id).gte("dia", desde).order("dia").order("dropi_producto_id").range(d, h),
@@ -87,7 +91,7 @@ export default async function CuadroPage({ searchParams }: { searchParams: Promi
   }
 
   const dice = new Map([...porProducto].flatMap(([sku, s]): [string, number][] => (s[plataforma] ? [[sku, s[plataforma]]] : [])));
-  const filas = fechaCorte ? armarCuadro({ cortes: cortePorSku, remisiones, salidas, ventas, dice }) : [];
+  const filas = fechaCorte ? armarCuadro({ cortes: cortePorSku, remisiones, salidas, ventas, novedades, dice }) : [];
   const ids = filas.map((f) => f.sku);
   const { data: productos } = ids.length ? await supabase.from("skus_maestros").select("id, codigo, nombre, foto_url").in("id", ids) : { data: [] };
   const producto = new Map((productos ?? []).map((p) => [p.id as string, p]));
