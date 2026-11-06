@@ -44,6 +44,8 @@ export interface HoraJornada {
   /** Las páginas de esa hora, de la que más tiempo tuvo a la que menos. */
   paginas: { pagina: string; minutos: number }[];
   acciones: AccionHecha[];
+  /** Los WhatsApp de esa hora, juntos por chat. */
+  mensajes: { chat: string; n: number; primero: string }[];
 }
 
 /**
@@ -187,10 +189,10 @@ export function armarJornada(minutosEnBruto: MinutoTrabajado[], acciones: Accion
     inicio = i;
   }
 
-  const porHora = new Map<number, { minutos: number; paginas: Map<string, number>; acciones: AccionHecha[] }>();
+  const porHora = new Map<number, { minutos: number; paginas: Map<string, number>; acciones: AccionHecha[]; mensajes: HoraJornada["mensajes"] }>();
   const de = (h: number) => {
     let x = porHora.get(h);
-    if (!x) porHora.set(h, (x = { minutos: 0, paginas: new Map(), acciones: [] }));
+    if (!x) porHora.set(h, (x = { minutos: 0, paginas: new Map(), acciones: [], mensajes: [] }));
     return x;
   };
   const totalPorPagina = new Map<string, number>();
@@ -205,10 +207,11 @@ export function armarJornada(minutosEnBruto: MinutoTrabajado[], acciones: Accion
   const bloques = armarBloques(minutos);
   for (const a of ordenadas) bloqueDe(bloques, a.creadoEn).acciones.push(a);
   for (const m of [...mensajes].sort((a, b) => a.momento.localeCompare(b.momento))) {
-    const b = bloqueDe(bloques, m.momento);
-    const grupo = b.mensajes.find((x) => x.chat === m.chat);
-    if (grupo) grupo.n++;
-    else b.mensajes.push({ chat: m.chat, n: 1, primero: m.momento });
+    for (const lista of [bloqueDe(bloques, m.momento).mensajes, de(horaPanama(m.momento)).mensajes]) {
+      const grupo = lista.find((x) => x.chat === m.chat);
+      if (grupo) grupo.n++;
+      else lista.push({ chat: m.chat, n: 1, primero: m.momento });
+    }
   }
   const porArea = new Map<string, Map<string, number>>();
   const porDispositivo = new Map<Dispositivo | null, number>();
@@ -231,7 +234,7 @@ export function armarJornada(minutosEnBruto: MinutoTrabajado[], acciones: Accion
     pausas,
     horas: [...porHora]
       .sort((a, b) => a[0] - b[0])
-      .map(([hora, x]) => ({ hora, minutos: x.minutos, paginas: ordenar(x.paginas), acciones: x.acciones })),
+      .map(([hora, x]) => ({ hora, minutos: x.minutos, paginas: ordenar(x.paginas), acciones: x.acciones, mensajes: x.mensajes })),
     acciones: ordenadas.length,
     principal: ordenar(totalPorPagina)[0]?.pagina ?? null,
     bloques,
@@ -241,6 +244,41 @@ export function armarJornada(minutosEnBruto: MinutoTrabajado[], acciones: Accion
     dispositivos: [...porDispositivo].map(([dispositivo, minutos]) => ({ dispositivo, minutos })).sort((a, b) => b.minutos - a.minutos),
     mensajes: mensajes.length,
   };
+}
+
+/** Algo que se hizo, con su hora: lo guardado o un WhatsApp. */
+export interface CosaHecha {
+  momento: string;
+  texto: string;
+}
+
+/** Desde cuántas seguidas del mismo tipo se juntan en un renglón. */
+export const MIN_REPETIDAS = 3;
+
+/**
+ * Junta lo que se repite seguido: 96 «Vinculó la publicación: …» son un renglón que se abre, no 96. `titulo` es null en lo que va suelto. El tipo es lo que va antes de «: »,
+ * así que dos cosas distintas nunca se juntan por parecerse.
+ */
+export function agruparHechas(cosas: CosaHecha[]): { titulo: string | null; cosas: CosaHecha[] }[] {
+  const tipo = (c: CosaHecha) => c.texto.split(": ")[0];
+  const tandas: CosaHecha[][] = [];
+  for (const c of cosas) {
+    const tanda = tandas.at(-1);
+    if (tanda && tipo(tanda[0]) === tipo(c)) tanda.push(c);
+    else tandas.push([c]);
+  }
+  return tandas.flatMap((t): { titulo: string | null; cosas: CosaHecha[] }[] => (t.length >= MIN_REPETIDAS ? [{ titulo: tipo(t[0]), cosas: t }] : t.map((c) => ({ titulo: null, cosas: [c] }))));
+}
+
+/** Las páginas que no están en el menú, para no mostrar una ruta. */
+const RUTAS_SIN_MENU: Record<string, string> = { "/ayuda": "Centro de ayuda", "/notificaciones": "Notificaciones", "/actualizaciones": "Actualizaciones" };
+
+/** El nombre de una ruta que no está en el menú: «/ventas-tiendas/pipeline» es «Ventas tiendas › Pipeline». Sin códigos: un número o un ID no dicen nada. */
+export function nombreDeRuta(ruta: string): string {
+  const conocida = Object.keys(RUTAS_SIN_MENU).find((r) => ruta === r || ruta.startsWith(`${r}/`));
+  if (conocida) return RUTAS_SIN_MENU[conocida];
+  const partes = ruta.split("/").filter((p) => p && !/^(\d+|[0-9a-f]{8}-[0-9a-f-]+)$/i.test(p));
+  return partes.length ? partes.map((p) => p.charAt(0).toUpperCase() + p.slice(1).replaceAll("-", " ")).join(" › ") : ruta;
 }
 
 /** Junta los bloques del día en ratos de trabajo: una pausa de más de `MINUTOS_PAUSA` empieza otro. Los bloques vienen en orden. */
