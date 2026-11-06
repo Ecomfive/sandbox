@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 import { Bandera } from "@/components/paises/bandera";
 import { claseCeldaColumna, claseEncabezadoColumna, claseFilaEncabezado } from "@/components/tabla/estilos-tabla";
 import { Badge } from "@/components/ui/badge";
@@ -161,7 +161,7 @@ export function BloqueCompetencia({ skuId }: { skuId: string }) {
   if (!datos.length) return <p className="text-sm text-muted-foreground">Ningún competidor vende este producto en Dropi (ni por nombre ni por foto).</p>;
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       {datos.map((d) => {
         const precios = d.competidores.map((c) => c.precio).filter((x): x is number => x !== null);
         const minimo = precios.length ? Math.min(...precios) : null;
@@ -169,15 +169,12 @@ export function BloqueCompetencia({ skuId }: { skuId: string }) {
         const vendido7 = d.competidores.reduce((t, c) => t + c.vendido7, 0);
         return (
           <div key={d.pais} className="flex flex-col gap-3">
+            <h4 className="m-0 inline-flex items-center gap-2 text-sm font-semibold">
+              <Bandera codigo={d.codigo} />
+              {d.pais}
+            </h4>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <Dato
-                titulo={
-                  <>
-                    Competidores en <Bandera codigo={d.codigo} /> {d.pais}
-                  </>
-                }
-                valor={num(d.competidores.length)}
-              />
+              <Dato titulo="Competidores" valor={num(d.competidores.length)} />
               <Dato titulo="Precio más bajo" valor={usd(minimo)} sub={d.nuestro ? `nosotros ${usd(d.nuestro.precio)}` : "no lo vendemos en Dropi"} tono={masBaratos ? "destructive" : undefined} />
               <Dato titulo="Más baratos que nosotros" valor={num(masBaratos)} tono={masBaratos ? "destructive" : undefined} />
               <Dato titulo="Vendieron (7 días)" valor={num(vendido7)} sub="bajadas de stock" />
@@ -228,7 +225,7 @@ export function BloqueCompetencia({ skuId }: { skuId: string }) {
   );
 }
 
-function Dato({ titulo, valor, sub, tono }: { titulo: ReactNode; valor: string; sub?: string; tono?: "destructive" }) {
+function Dato({ titulo, valor, sub, tono }: { titulo: string; valor: string; sub?: string; tono?: "destructive" }) {
   return (
     <div className="rounded-lg border border-border px-3 py-2">
       <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
