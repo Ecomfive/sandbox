@@ -48,6 +48,13 @@ const datos: DatosUsoPersonas = {
     { numero: "Atención", dia: "2026-11-05", crm: 50, celular: 2 },
     { numero: "Atención", dia: "2026-10-01", crm: 900, celular: 0 },
   ],
+  externos: [
+    { persona: "a", dia: "2026-11-06", plataforma: "dropi", seccion: "orders", minutos: 40 },
+    { persona: "a", dia: "2026-11-06", plataforma: "effi", seccion: "", minutos: 10 },
+    { persona: "b", dia: "2026-11-06", plataforma: "dropi", seccion: "orders", minutos: 5 },
+    { persona: "a", dia: "2026-10-01", plataforma: "dropi", seccion: "products", minutos: 900 },
+  ],
+  conExtension: ["a"],
 };
 
 test("junta a cada persona solo con lo del periodo", () => {
@@ -75,6 +82,27 @@ test("quien no entró queda sin porcentaje y no cuenta como usuario", () => {
 test("el % del día no pasa de 100", () => {
   const r = resumirPersonas({ ...datos, jornadas: [{ persona: "b", dia: "2026-11-06", minutos: 1 }] }, "2026-11-01");
   assert.equal(r.filas.find((f) => f.id === "b")?.pctDia, 100);
+});
+
+test("con extensión se ve cuánto de su tiempo fue en el sistema", () => {
+  const ana = resumirPersonas(datos, "2026-11-01").filas[0];
+  assert.equal(ana.midiendo, true);
+  assert.equal(ana.minutosExterno, 50);
+  assert.deepEqual(ana.porPlataforma, { dropi: 40, effi: 10 });
+  assert.equal(ana.pctSistema, 75);
+});
+
+test("sin extensión queda sin medir, no en cero", () => {
+  const r = resumirPersonas(datos, "2026-11-01");
+  assert.equal(r.filas.find((f) => f.id === "c")?.midiendo, false);
+  assert.equal(r.filas.find((f) => f.id === "c")?.pctSistema, null);
+  assert.equal(r.filas.find((f) => f.id === "b")?.pctSistema, null);
+});
+
+test("las secciones de afuera van de la más usada a la menos, con quién las usa", () => {
+  const r = resumirPersonas(datos, "2026-11-01");
+  assert.deepEqual(r.secciones[0], { plataforma: "dropi", seccion: "orders", minutos: 45, personas: ["Ana", "Beto"] });
+  assert.equal(r.minutosExterno, 55);
 });
 
 test("WhatsApp por número, del que más mandó al que menos", () => {

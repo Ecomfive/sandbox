@@ -5,6 +5,7 @@ import { Segmentado, claseThLista, claseTdLista } from "@/components/panel/pieza
 import { AvatarPersona } from "@/components/ui/avatar-persona";
 import { ChatIcon, EquipoIcon, TiendaIcon, VentasIcon } from "@/lib/nav-icons";
 import { porcentajeSistema, type AltaPublicacion } from "@/lib/publicaciones/origen";
+import { PLATAFORMAS_EXTERNAS, type PlataformaExterna } from "@/lib/rendimiento/uso-externo";
 import { duracion } from "@/lib/rendimiento/jornada";
 import { FRENTES_USO, pct, restarDias, resumirPersonas, type DatosUsoPersonas, type FilaPersonaUso, type FrenteUso } from "@/lib/rendimiento/uso-personas";
 import { CifraUso, FilaProporcion, TarjetaUso } from "./graficas-uso";
@@ -22,12 +23,30 @@ const etiquetaFrente = (f: FrenteUso) => FRENTES_USO.find((x) => x.id === f)?.et
 const ultimaVez = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString("es-PA", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone: "America/Panama" }) : "Nunca";
 
-/** Una sola tinta: más oscura cuanto más tiempo. El número va siempre escrito. */
-function fondoCelda(p: number): { background?: string; color?: string } {
-  if (p >= 60) return { background: "color-mix(in srgb, var(--serie-sistema) 85%, var(--card))", color: "#fff" };
-  if (p >= 30) return { background: "color-mix(in srgb, var(--serie-sistema) 40%, var(--card))" };
-  if (p >= 10) return { background: "color-mix(in srgb, var(--serie-sistema) 20%, var(--card))" };
-  return { background: "color-mix(in srgb, var(--serie-sistema) 8%, var(--card))" };
+const etiquetaPlataforma = (p: PlataformaExterna) => PLATAFORMAS_EXTERNAS.find((x) => x.id === p)?.etiqueta ?? p;
+
+/** Una sola tinta por lado, sistema o afuera: más oscura cuanto más tiempo. El número va siempre escrito. */
+function fondoCelda(p: number, serie: "sistema" | "dropi"): { background?: string; color?: string } {
+  const tinta = `var(--serie-${serie})`;
+  if (p >= 60) return { background: `color-mix(in srgb, ${tinta} 85%, var(--card))`, color: "#fff" };
+  if (p >= 30) return { background: `color-mix(in srgb, ${tinta} 40%, var(--card))` };
+  if (p >= 10) return { background: `color-mix(in srgb, ${tinta} 20%, var(--card))` };
+  return { background: `color-mix(in srgb, ${tinta} 8%, var(--card))` };
+}
+
+function Celda({ minutos, total, serie, titulo }: { minutos: number; total: number; serie: "sistema" | "dropi"; titulo: string }) {
+  const p = pct(minutos, total);
+  return (
+    <td className="border-b border-border/45 p-0.5 text-center text-[13px] tabular-nums" title={titulo}>
+      {minutos > 0 ? (
+        <span className="block rounded-md px-1 py-2" style={fondoCelda(p, serie)}>
+          {p === 0 ? "<1" : p} %
+        </span>
+      ) : (
+        <span className="block py-2 text-muted-foreground/50">·</span>
+      )}
+    </td>
+  );
 }
 
 function DetallePersona({ f }: { f: FilaPersonaUso }) {
@@ -42,6 +61,10 @@ function DetallePersona({ f }: { f: FilaPersonaUso }) {
         <dd className="m-0 tabular-nums">{f.cambios.toLocaleString("es-PA")}</dd>
         <dt className="text-muted-foreground">WhatsApp desde el CRM</dt>
         <dd className="m-0 tabular-nums">{f.mensajes.toLocaleString("es-PA")}</dd>
+        <dt className="text-muted-foreground" title="Minutos activos en el sistema entre su primera y su última actividad de cada día.">
+          Activo del día en el sistema
+        </dt>
+        <dd className="m-0 tabular-nums">{f.pctDia === null ? "—" : `${f.pctDia} %`}</dd>
       </dl>
       {f.paginas.length > 0 && (
         <ul className="m-0 grid list-none gap-x-6 gap-y-1 p-0 text-[13px] sm:grid-cols-2">
@@ -60,6 +83,7 @@ function DetallePersona({ f }: { f: FilaPersonaUso }) {
 }
 
 function FilaPersona({ f, abierta, alPulsar }: { f: FilaPersonaUso; abierta: boolean; alPulsar: () => void }) {
+  const total = f.minutos + f.minutosExterno;
   return (
     <Fragment>
       <tr className="hover:bg-muted/50">
@@ -72,27 +96,26 @@ function FilaPersona({ f, abierta, alPulsar }: { f: FilaPersonaUso; abierta: boo
             </span>
           </button>
         </th>
-        <td className={`${claseTdLista} tabular-nums`}>{f.minutos ? duracion(f.minutos) : <span className="text-muted-foreground">No entró</span>}</td>
-        <td className={`${claseTdLista} text-right tabular-nums`}>{f.pctDia === null ? "—" : `${f.pctDia} %`}</td>
+        <td className={`${claseTdLista} tabular-nums`}>{total ? duracion(total) : <span className="text-muted-foreground">No entró</span>}</td>
+        <td className={`${claseTdLista} text-right tabular-nums`}>{f.pctSistema !== null ? `${f.pctSistema} %` : <span className="text-muted-foreground">Sin medir</span>}</td>
         {FRENTES_USO.map((x) => {
           const m = f.porFrente[x.id] ?? 0;
-          const p = pct(m, f.minutos);
-          return (
-            <td key={x.id} className="border-b border-border/45 p-0.5 text-center text-[13px] tabular-nums" title={m ? `${f.nombre} · ${x.etiqueta}: ${duracion(m)}` : `${f.nombre} no entró a ${x.etiqueta}`}>
-              {m > 0 ? (
-                <span className="block rounded-md px-1 py-2" style={fondoCelda(p)}>
-                  {p === 0 ? "<1" : p} %
-                </span>
-              ) : (
-                <span className="block py-2 text-muted-foreground/50">·</span>
-              )}
-            </td>
-          );
+          return <Celda key={x.id} minutos={m} total={total} serie="sistema" titulo={m ? `${f.nombre} · ${x.etiqueta}: ${duracion(m)}` : `${f.nombre} no entró a ${x.etiqueta}`} />;
+        })}
+        {PLATAFORMAS_EXTERNAS.map((x) => {
+          const m = f.porPlataforma[x.id] ?? 0;
+          if (!f.midiendo)
+            return (
+              <td key={x.id} className="border-b border-border/45 p-0.5 text-center text-[13px] text-muted-foreground" title={`${f.nombre} no tiene la extensión: ${x.etiqueta} sin medir`}>
+                —
+              </td>
+            );
+          return <Celda key={x.id} minutos={m} total={total} serie="dropi" titulo={m ? `${f.nombre} · ${x.etiqueta}: ${duracion(m)}` : `${f.nombre} no entró a ${x.etiqueta}`} />;
         })}
       </tr>
       {abierta && (
         <tr>
-          <td colSpan={3 + FRENTES_USO.length} className="border-b border-border/45 bg-muted/30 px-4 py-3">
+          <td colSpan={3 + FRENTES_USO.length + PLATAFORMAS_EXTERNAS.length} className="border-b border-border/45 bg-muted/30 px-4 py-3">
             <DetallePersona f={f} />
           </td>
         </tr>
@@ -109,6 +132,7 @@ export function PanelPersonas({ datos, hoy, altas }: { datos: DatosUsoPersonas; 
   const r = useMemo(() => resumirPersonas(datos, desde), [datos, desde]);
 
   const noEntraron = r.filas.filter((f) => f.minutos === 0);
+  const sinExtension = r.filas.filter((f) => !f.midiendo);
   const masUsado = [...r.porFrente].filter((f) => f.frente !== "general").sort((a, b) => b.minutos - a.minutos)[0];
   const wa = r.whatsapp.reduce((t, w) => ({ crm: t.crm + w.crm, celular: t.celular + w.celular }), { crm: 0, celular: 0 });
   const conteoWa = { sistema: wa.crm, dropi: wa.celular };
@@ -143,7 +167,7 @@ export function PanelPersonas({ datos, hoy, altas }: { datos: DatosUsoPersonas; 
         <CifraUso titulo="Publicaciones creadas aquí" valor={pctPub === null ? "—" : `${pctPub} %`} detalle={`${conteoPub.sistema} en el sistema · ${conteoPub.dropi} en Dropi`} icono={TiendaIcon} color="azul" />
       </div>
 
-      <TarjetaUso titulo="Quién trabaja dónde" detalle="Cada porcentaje es la parte de su tiempo en el sistema que esa persona pasó en esa área; cada fila suma 100 %. Un punto: no entró. Clic en el nombre para ver sus páginas.">
+      <TarjetaUso titulo="Quién trabaja dónde" detalle="Cada porcentaje es la parte de su tiempo que esa persona pasó ahí. Morado: dentro del sistema. Rosado: en otra plataforma. Un punto: no entró. Una raya: sin medir, porque no tiene la extensión. Clic en el nombre para ver sus páginas.">
         <div className="-mx-5 -mb-5 overflow-x-auto border-t border-border">
           <table className="w-full text-sm">
             <thead>
@@ -154,10 +178,10 @@ export function PanelPersonas({ datos, hoy, altas }: { datos: DatosUsoPersonas; 
                 <th scope="col" className={claseThLista}>
                   Tiempo activo
                 </th>
-                <th scope="col" className={`${claseThLista} text-right`} title="Minutos activos en el sistema entre su primera y su última actividad de cada día. El resto pudo ser otra plataforma, el celular o una pausa.">
-                  Activo del día
+                <th scope="col" className={`${claseThLista} text-right`} title="Su tiempo en el sistema, de todo el tiempo medido: sistema más Dropi, Effi, Drop y Shopify.">
+                  En el sistema
                 </th>
-                {FRENTES_USO.map((x) => (
+                {[...FRENTES_USO, ...PLATAFORMAS_EXTERNAS].map((x) => (
                   <th key={x.id} scope="col" className="w-20 border-b border-border px-1 py-2 text-center align-bottom text-xs font-medium text-muted-foreground">
                     {x.etiqueta}
                   </th>
@@ -173,16 +197,40 @@ export function PanelPersonas({ datos, hoy, altas }: { datos: DatosUsoPersonas; 
         </div>
       </TarjetaUso>
 
-      <TarjetaUso titulo="Afuera del sistema" detalle="Lo que hoy se puede contar de lo que se sigue haciendo en otras plataformas">
+      <TarjetaUso titulo="Afuera del sistema" detalle="Lo que se sigue haciendo en otras plataformas">
         <div className="grid gap-x-8 gap-y-4 md:grid-cols-2 xl:grid-cols-3">
           {r.whatsapp.map((w) => (
             <FilaProporcion key={w.numero} etiqueta={`WhatsApp · ${w.numero}`} conteo={{ sistema: w.crm, dropi: w.celular }} textoSistema="en el CRM" textoFuera="en el celular" />
           ))}
           <FilaProporcion etiqueta="Publicaciones nuevas" conteo={conteoPub} />
         </div>
+        <div className="border-t border-border pt-3">
+          <h3 className="m-0 text-sm font-semibold tracking-tight">Lo que falta traer al sistema</h3>
+          <p className="mt-0.5 text-xs text-muted-foreground">El tiempo en cada sección de las otras plataformas, de lo que más se usa a lo que menos.</p>
+          {r.secciones.length > 0 ? (
+            <ul className="m-0 mt-3 grid list-none gap-x-8 gap-y-1.5 p-0 text-[13px] md:grid-cols-2">
+              {r.secciones.slice(0, 16).map((s) => (
+                <li key={`${s.plataforma}|${s.seccion}`} className="flex justify-between gap-3">
+                  <span className="min-w-0 truncate" title={s.personas.join(", ")}>
+                    {etiquetaPlataforma(s.plataforma)}
+                    {s.seccion ? ` › ${s.seccion}` : ""}
+                  </span>
+                  <span className="shrink-0 text-muted-foreground tabular-nums">
+                    {duracion(s.minutos)} · {s.personas.length} {s.personas.length === 1 ? "persona" : "personas"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-2 text-[13px] text-muted-foreground">Todavía no hay tiempo medido en estos días.</p>
+          )}
+        </div>
         <p className="m-0 border-t border-border pt-3 text-xs text-muted-foreground">
-          Falta por medir: cuánto tiempo pasa cada persona dentro de Dropi, Effi, Drop y Shopify. Esas plataformas no dicen quién hizo qué, y por eso aquí no sale todavía. «Activo del día» solo dice qué parte de su jornada estuvo dentro del
-          sistema, no dónde estuvo el resto.
+          {sinExtension.length ? `Sin la extensión «Ecomfive · Uso»: ${sinExtension.map((f) => f.nombre.split(" ")[0]).join(", ")}. ` : "Todo el equipo tiene la extensión «Ecomfive · Uso». "}
+          <a href="/extensiones/ecomfive-uso.zip" className="underline underline-offset-2">
+            Descargar la extensión
+          </a>
+          . Solo cuenta minutos y sección; no lee las páginas.
         </p>
       </TarjetaUso>
     </div>

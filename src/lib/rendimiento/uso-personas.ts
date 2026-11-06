@@ -1,6 +1,8 @@
 // Gestión de IDs Dropi › Uso del sistema, por persona (6 nov 2026, pedido de Hernán): quién usa el sistema, en qué parte y en qué no, para saber qué falta
 // para mudarnos. Sale de los minutos activos (`actividad_minutos`, migración 0166), lo guardado (auditoría) y los WhatsApp enviados. Lo que pasa dentro de
-// otra plataforma no se ve desde aquí: el «% del día» es solo el tiempo activo dentro de la jornada. Sin base ni React, con prueba.
+// otra plataforma lo manda la extensión «Ecomfive · Uso» (migración 0240): quien no la tiene queda «sin medir», nunca en cero. Sin base ni React, con prueba.
+
+import type { PlataformaExterna } from "./uso-externo";
 
 export const FRENTES_USO = [
   { id: "crm", etiqueta: "CRM", rutas: ["/crm-dropshippers"] },
@@ -58,6 +60,14 @@ export interface ConteoPersona {
   n: number;
 }
 
+export interface MinutosExterno {
+  persona: string;
+  dia: string;
+  plataforma: PlataformaExterna;
+  seccion: string;
+  minutos: number;
+}
+
 export interface WhatsappDia {
   numero: string;
   dia: string;
@@ -72,6 +82,9 @@ export interface DatosUsoPersonas {
   cambios: ConteoPersona[];
   mensajes: ConteoPersona[];
   whatsapp: WhatsappDia[];
+  externos: MinutosExterno[];
+  /** Quién tiene la extensión puesta. */
+  conExtension: string[];
 }
 
 export interface FilaPersonaUso extends PersonaUso {
@@ -83,6 +96,19 @@ export interface FilaPersonaUso extends PersonaUso {
   mensajes: number;
   porFrente: Partial<Record<FrenteUso, number>>;
   paginas: { frente: FrenteUso; pagina: string; minutos: number }[];
+  /** Tiene la extensión: sus ceros en otras plataformas son ceros de verdad. */
+  midiendo: boolean;
+  minutosExterno: number;
+  porPlataforma: Partial<Record<PlataformaExterna, number>>;
+  /** Qué parte de su tiempo total fue en el sistema; null si no se mide o no hubo tiempo. */
+  pctSistema: number | null;
+}
+
+export interface SeccionExterna {
+  plataforma: PlataformaExterna;
+  seccion: string;
+  minutos: number;
+  personas: string[];
 }
 
 export interface ResumenPersonas {
@@ -91,6 +117,9 @@ export interface ResumenPersonas {
   minutos: number;
   porFrente: { frente: FrenteUso; minutos: number }[];
   whatsapp: { numero: string; crm: number; celular: number }[];
+  minutosExterno: number;
+  /** Dónde se va el tiempo afuera, de lo que más a lo que menos. */
+  secciones: SeccionExterna[];
 }
 
 /** Una fecha (AAAA-MM-DD) menos unos días. */
@@ -111,6 +140,8 @@ export function resumirPersonas(d: DatosUsoPersonas, desde: string): ResumenPers
   const jornadas = delPeriodo(d.jornadas);
   const cambios = delPeriodo(d.cambios);
   const mensajes = delPeriodo(d.mensajes);
+  const externos = delPeriodo(d.externos);
+  const conExtension = new Set(d.conExtension);
 
   const filas = d.personas
     .map((p): FilaPersonaUso => {
@@ -125,8 +156,16 @@ export function resumirPersonas(d: DatosUsoPersonas, desde: string): ResumenPers
         x.minutos += m.minutos;
         paginas.set(m.pagina, x);
       }
+      const porPlataforma: Partial<Record<PlataformaExterna, number>> = {};
+      for (const e of externos) if (e.persona === p.id) porPlataforma[e.plataforma] = (porPlataforma[e.plataforma] ?? 0) + e.minutos;
+      const minutosExterno = Object.values(porPlataforma).reduce((t, m) => t + m, 0);
+      const midiendo = conExtension.has(p.id);
       return {
         ...p,
+        midiendo,
+        minutosExterno,
+        porPlataforma,
+        pctSistema: midiendo && total + minutosExterno > 0 ? pct(total, total + minutosExterno) : null,
         minutos: total,
         dias: new Set(suyos.map((m) => m.dia)).size,
         pctDia: jornada > 0 ? Math.min(100, pct(total, jornada)) : null,
@@ -136,7 +175,7 @@ export function resumirPersonas(d: DatosUsoPersonas, desde: string): ResumenPers
         paginas: [...paginas.values()].sort((a, b) => b.minutos - a.minutos || a.pagina.localeCompare(b.pagina)),
       };
     })
-    .sort((a, b) => b.minutos - a.minutos || b.cambios - a.cambios || a.nombre.localeCompare(b.nombre));
+    .sort((a, b) => b.minutos + b.minutosExterno - (a.minutos + a.minutosExterno) || b.cambios - a.cambios || a.nombre.localeCompare(b.nombre));
 
   const whatsapp = new Map<string, { numero: string; crm: number; celular: number }>();
   for (const w of delPeriodo(d.whatsapp)) {
@@ -146,8 +185,21 @@ export function resumirPersonas(d: DatosUsoPersonas, desde: string): ResumenPers
     whatsapp.set(w.numero, x);
   }
 
+  const secciones = new Map<string, SeccionExterna>();
+  const nombreDe = new Map(d.personas.map((p) => [p.id, p.nombre]));
+  for (const e of externos) {
+    const k = `${e.plataforma}|${e.seccion}`;
+    const x = secciones.get(k) ?? { plataforma: e.plataforma, seccion: e.seccion, minutos: 0, personas: [] };
+    x.minutos += e.minutos;
+    const nombre = nombreDe.get(e.persona);
+    if (nombre && !x.personas.includes(nombre)) x.personas.push(nombre);
+    secciones.set(k, x);
+  }
+
   return {
     filas,
+    minutosExterno: externos.reduce((t, e) => t + e.minutos, 0),
+    secciones: [...secciones.values()].sort((a, b) => b.minutos - a.minutos || a.seccion.localeCompare(b.seccion)),
     usaron: filas.filter((f) => f.minutos > 0).length,
     minutos: filas.reduce((t, f) => t + f.minutos, 0),
     porFrente: FRENTES_USO.map((f) => ({ frente: f.id as FrenteUso, minutos: minutos.filter((m) => m.frente === f.id).reduce((t, m) => t + m.minutos, 0) })),

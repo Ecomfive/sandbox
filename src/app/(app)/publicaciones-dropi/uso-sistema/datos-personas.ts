@@ -1,7 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { paginaDeRuta } from "@/lib/rendimiento/datos";
 import { diaPanama, rangoDelDia } from "@/lib/rendimiento/jornada";
-import { frenteDeRuta, restarDias, type ConteoPersona, type DatosUsoPersonas, type JornadaDia, type MinutosPagina, type WhatsappDia } from "@/lib/rendimiento/uso-personas";
+import type { PlataformaExterna } from "@/lib/rendimiento/uso-externo";
+import { frenteDeRuta, restarDias, type ConteoPersona, type DatosUsoPersonas, type JornadaDia, type MinutosExterno, type MinutosPagina, type WhatsappDia } from "@/lib/rendimiento/uso-personas";
 import { traerTodasConError } from "@/lib/supabase/paginar";
 
 /** Los días que se pueden mirar: el panel recorta desde aquí. */
@@ -28,7 +29,7 @@ export async function cargarUsoPersonas(supabase: SupabaseClient): Promise<(Dato
   const hoy = diaPanama();
   const inicio = rangoDelDia(restarDias(hoy, DIAS_USO - 1)).desde;
 
-  const [perfiles, minutos, auditoria, mensajes] = await Promise.all([
+  const [perfiles, minutos, auditoria, mensajes, externos, extensiones] = await Promise.all([
     supabase.from("perfiles").select("id, nombre, email, avatar_url, ultima_actividad_en, roles(nombre)").eq("activo", true),
     traerTodasConError<{ usuario_id: string; minuto: string; ruta: string }>((a, b) =>
       supabase.from("actividad_minutos").select("usuario_id, minuto, ruta").gte("minuto", inicio).order("minuto").range(a, b),
@@ -46,6 +47,11 @@ export async function cargarUsoPersonas(supabase: SupabaseClient): Promise<(Dato
         .order("id")
         .range(a, b),
     ),
+    // Sin la migración 0240 no hay nada de afuera: el panel sale igual, todos sin medir.
+    traerTodasConError<{ usuario_id: string; minuto: string; plataforma: PlataformaExterna; seccion: string }>((a, b) =>
+      supabase.from("uso_externo_minutos").select("usuario_id, minuto, plataforma, seccion").gte("minuto", inicio).order("minuto").range(a, b),
+    ),
+    supabase.from("uso_externo_extensiones").select("usuario_id"),
   ]);
   if (minutos.error) return null;
 
@@ -90,8 +96,19 @@ export async function cargarUsoPersonas(supabase: SupabaseClient): Promise<(Dato
     if (m.autor_id) delCrm.push({ persona: m.autor_id, dia });
   }
 
+  const externo = new Map<string, MinutosExterno>();
+  for (const e of externos.data ?? []) {
+    const dia = diaPanama(e.minuto);
+    const k = `${e.usuario_id}|${dia}|${e.plataforma}|${e.seccion}`;
+    const x = externo.get(k) ?? { persona: e.usuario_id, dia, plataforma: e.plataforma, seccion: e.seccion, minutos: 0 };
+    x.minutos++;
+    externo.set(k, x);
+  }
+
   return {
     hoy,
+    externos: [...externo.values()],
+    conExtension: (extensiones.data ?? []).map((e) => e.usuario_id as string),
     personas: ((perfiles.data ?? []) as { id: string; nombre: string | null; email: string; avatar_url: string | null; ultima_actividad_en: string | null; roles: unknown }[]).map((p) => ({
       id: p.id,
       nombre: p.nombre || p.email,
