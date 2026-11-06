@@ -13,7 +13,7 @@ const vacio = { publicaciones: [], compras: [], stock: [], decisiones: [], desco
 test("publicado manda sobre comprado y stock; una variante suma a su producto", () => {
   const r = armarPorPais(productos, ["PA", "CR"], {
     ...vacio,
-    publicaciones: [{ skuId: "a", pais: "PA", plataforma: "dropi", idPlataforma: "8406", ref: "p1", activa: true, stock: 598 }],
+    publicaciones: [{ skuId: "a", pais: "PA", plataforma: "dropi", idPlataforma: "8406", ref: "p1", activa: true, stock: 598, stockReferencial: 40 }],
     compras: [
       { skuId: "a-m", compraId: "c12", pais: "CR", numero: 12, unidades: 100, etapa: "tracking", anulada: false, creada: "2026-10-01" },
       { skuId: "a", compraId: "c12", pais: "CR", numero: 12, unidades: 50, etapa: "tracking", anulada: false, creada: "2026-10-01" },
@@ -25,6 +25,7 @@ test("publicado manda sobre comprado y stock; una variante suma a su producto", 
   assert.equal(r.get("a")!.PA.unidadesStock, 5);
   assert.equal(r.get("a")!.PA.unidadesPlataformas, 598);
   assert.equal(r.get("a")!.PA.unidadesDisponibles, 603);
+  assert.equal(r.get("a")!.PA.unidadesReferencial, 40);
   assert.equal(r.get("a")!.CR.estado, "comprado");
   assert.deepEqual(r.get("a")!.CR.compras, [{ compraId: "c12", numero: 12, unidades: 150, creada: "2026-10-01" }]);
   assert.equal(r.get("b")!.PA.estado, "no");
