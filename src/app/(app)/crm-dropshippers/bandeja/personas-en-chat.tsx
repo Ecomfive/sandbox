@@ -1,11 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AvatarPersona } from "@/components/ui/avatar-persona";
 import { anilloFoco } from "@/components/ui/field";
 import { EVENTOS_USO } from "@/components/latido-presencia";
-import { CANAL_PRESENCIA_CHATS, personasConectadas, personasPorChat, sigueActiva, type PersonaConectada, type PresenciaChat } from "@/lib/crm/presencia-chats";
+import { CANAL_PRESENCIA_CHATS, personasConectadas, personasFuera, personasPorChat, sigueActiva, type PersonaConectada, type PersonaEnSistema, type PresenciaChat } from "@/lib/crm/presencia-chats";
 import { supabase } from "@/lib/supabase/client";
+import { RUTA_DIRECCION } from "../direccion/ruta";
+import { equipoEnSistema, nombresDeChats } from "./presencia-actions";
 
 /** Una persona del equipo, para ponerle cara a quien está en un chat. */
 export interface PersonaEquipo {
@@ -16,6 +19,8 @@ export interface PersonaEquipo {
 
 /** Cada cuánto se revisa si la persona dejó de usar el sistema. */
 const REVISAR_MS = 15_000;
+/** Cada cuánto Dirección pregunta quién está usando el sistema: cada persona avisa una vez por minuto. */
+const EQUIPO_MS = 60_000;
 /** Hasta cuántas fotos se muestran en un chat; las demás van en «+N». */
 const MAX_FOTOS = 3;
 
@@ -80,6 +85,30 @@ export function usePresenciaChats(chatAbierto: string | null, miId: string): { e
   return presencia;
 }
 
+/** Para Dirección: quién del CRM está usando el sistema y en qué página (`equipoEnSistema`). Va por el aviso de cada minuto, así que no depende de la conexión en vivo. */
+export function useEquipoEnSistema(activo: boolean): PersonaEnSistema[] {
+  const [personas, setPersonas] = useState<PersonaEnSistema[]>([]);
+  useEffect(() => {
+    if (!activo) return;
+    let vigente = true;
+    const traer = () => {
+      if (document.visibilityState !== "visible") return;
+      equipoEnSistema()
+        .then((r) => vigente && setPersonas(r))
+        .catch(() => {});
+    };
+    traer();
+    const cada = setInterval(traer, EQUIPO_MS);
+    document.addEventListener("visibilitychange", traer);
+    return () => {
+      vigente = false;
+      clearInterval(cada);
+      document.removeEventListener("visibilitychange", traer);
+    };
+  }, [activo]);
+  return personas;
+}
+
 /** La foto de una persona que está trabajando: el círculo con el aro verde que parpadea. */
 function FotoPresente({ persona, tamano }: { persona: PersonaEquipo; tamano: "xs" | "sm" }) {
   return (
@@ -92,7 +121,8 @@ function FotoPresente({ persona, tamano }: { persona: PersonaEquipo; tamano: "xs
 
 /**
  * Arriba de la bandeja: «Tú» y cada persona conectada, con su foto y el chat donde está. Pulsar a alguien abre ese chat.
- * `nombreDeChat` da null si el chat no está entre los que esta persona puede ver: se dice que está en otro chat, sin abrirlo.
+ * `nombreDeChat` da null si el chat no está en la lista cargada: el nombre se le pide al servidor, que solo lo da si es de un área que esta persona puede ver; si no, dice «otro chat».
+ * `abreTodos`: abrir no depende de la lista cargada (el panel de Dirección no tiene lista: lleva al chat). `fuera`: solo para Dirección, quienes usan el sistema sin salir en vivo.
  */
 export function BarraPresencia({
   miId,
@@ -101,6 +131,8 @@ export function BarraPresencia({
   equipo,
   nombreDeChat,
   alAbrir,
+  abreTodos = false,
+  enSistema = [],
 }: {
   miId: string;
   miChat: string | null;
@@ -108,9 +140,25 @@ export function BarraPresencia({
   equipo: Map<string, PersonaEquipo>;
   nombreDeChat: (id: string) => string | null;
   alAbrir: (id: string) => void;
+  abreTodos?: boolean;
+  enSistema?: PersonaEnSistema[];
 }) {
   const yo = equipo.get(miId);
   const quienes = [{ id: miId, chats: miChat ? [miChat] : [] }, ...conectadas];
+  const [nombres, setNombres] = useState<Record<string, string>>({});
+  // Vacío si el servidor no dio el nombre: se recuerda para no volver a pedirlo.
+  const faltan = [...new Set(quienes.flatMap((q) => q.chats))].filter((id) => !nombreDeChat(id) && !(id in nombres)).sort().join(",");
+  useEffect(() => {
+    if (!faltan) return;
+    let vigente = true;
+    const ids = faltan.split(",");
+    nombresDeChats(ids)
+      .then((r) => vigente && setNombres((a) => ({ ...a, ...Object.fromEntries(ids.map((id) => [id, r[id] ?? ""])) })))
+      .catch(() => {});
+    return () => {
+      vigente = false;
+    };
+  }, [faltan]);
   return (
     <section aria-label="Quién está trabajando en la bandeja" className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] text-[var(--wa-sec)]">
       {quienes.flatMap((q) => {
@@ -119,7 +167,8 @@ export function BarraPresencia({
         const quien = q.id === miId ? "Tú" : persona.nombre.split(/\s+/)[0];
         const lugares = q.chats.length ? q.chats : [null];
         return lugares.map((chat) => {
-          const nombre = chat ? nombreDeChat(chat) : null;
+          const enLista = chat ? nombreDeChat(chat) : null;
+          const nombre = enLista ?? (chat ? nombres[chat] || null : null);
           const contenido = (
             <>
               <FotoPresente persona={persona} tamano="xs" />
@@ -128,7 +177,7 @@ export function BarraPresencia({
             </>
           );
           const llave = `${q.id}-${chat ?? "bandeja"}`;
-          return chat && nombre && q.id !== miId ? (
+          return chat && nombre && q.id !== miId && (enLista || abreTodos) ? (
             <button key={llave} type="button" onClick={() => alAbrir(chat)} title={`Abrir el chat de ${nombre}`} className={`inline-flex items-center gap-2 rounded-full hover:text-[var(--wa-texto)] ${anilloFoco}`}>
               {contenido}
             </button>
@@ -139,8 +188,30 @@ export function BarraPresencia({
           );
         });
       })}
+      {personasFuera(enSistema, conectadas, miId).flatMap((p) => {
+        const persona = equipo.get(p.id);
+        if (!persona) return [];
+        return [
+          <span key={p.id} title={`${persona.nombre} está en ${p.pagina}`} className="inline-flex items-center gap-2">
+            <span aria-hidden="true" className="inline-flex flex-none rounded-full ring-2 ring-border">
+              <AvatarPersona nombre={persona.nombre} email="" avatarUrl={persona.foto} tamano="xs" />
+            </span>
+            <span className="font-medium text-[var(--wa-texto)]">{persona.nombre.split(/\s+/)[0]}</span>
+            <span className="max-w-48 truncate">· {p.pagina}</span>
+          </span>,
+        ];
+      })}
     </section>
   );
+}
+
+/** La misma barra en las pestañas del panel de Dirección (Resumen, Clientes, Equipo…): ahí no hay bandeja, pero Dirección también ve a Atención y a Comercial. */
+export function PresenciaDireccion({ miId, equipo }: { miId: string; equipo: PersonaEquipo[] }) {
+  const router = useRouter();
+  const { conectadas } = usePresenciaChats(null, miId);
+  const enSistema = useEquipoEnSistema(true);
+  const porId = useMemo(() => new Map(equipo.map((p) => [p.id, p])), [equipo]);
+  return <BarraPresencia miId={miId} miChat={null} conectadas={conectadas} equipo={porId} nombreDeChat={() => null} abreTodos enSistema={enSistema} alAbrir={(id) => router.push(`${RUTA_DIRECCION}?abrir=${id}`)} />;
 }
 
 /** La foto de cada persona que está trabajando en un chat, en un círculo pequeño que parpadea en verde. */

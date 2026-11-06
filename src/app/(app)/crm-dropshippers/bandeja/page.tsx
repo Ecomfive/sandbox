@@ -11,12 +11,19 @@ import { ContenidoDireccion, EncabezadoBandejaDireccion, EsqueletoDireccion } fr
 import { VISTAS_DIRECCION, type VistaDireccion } from "../direccion/ruta";
 import { Bandeja } from "./bandeja";
 import { cargarBandeja } from "./datos-bandeja";
+import { PresenciaDireccion, type PersonaEquipo } from "./personas-en-chat";
 
 export const metadata = { title: "Bandeja de WhatsApp" };
 
 export const dynamic = "force-dynamic";
 // «Analizar con IA» en la ficha del chat puede tardar en una conversación larga.
 export const maxDuration = 300;
+
+/** El equipo con su foto, para la barra de quién está trabajando. */
+async function cargarEquipo(supabase: ReturnType<typeof createServiceClient>): Promise<PersonaEquipo[]> {
+  const { data } = await supabase.from("perfiles").select("id, nombre, email, avatar_url").eq("activo", true);
+  return (data ?? []).map((p) => ({ id: p.id as string, nombre: (p.nombre as string | null) || (p.email as string), foto: (p.avatar_url as string | null) ?? null }));
+}
 
 /**
  * CRM Dropshippers › Bandeja de WhatsApp (26 oct 2026): los chats de los números de la empresa, para contestar desde el sistema.
@@ -37,10 +44,12 @@ export default async function BandejaWhatsappPage({ searchParams }: { searchPara
   // El encabezado con las pestañas sale enseguida y el contenido llega después (`Suspense` con su `key`): al cambiar de pestaña se ve el esqueleto al
   // instante, en vez de quedar la pantalla quieta mientras carga (31 oct 2026, pedido de Hernán).
   if (vistaDireccion && vistaDireccion !== "chats") {
-    const pais = await getPaisActual(createServiceClient());
+    const supabase = createServiceClient();
+    const [pais, equipo] = await Promise.all([getPaisActual(supabase), cargarEquipo(supabase)]);
     return (
       <Pagina ancho="ancha" className="flex flex-col gap-6">
         <EncabezadoBandejaDireccion vista={vistaDireccion} pais={pais.nombre} />
+        <PresenciaDireccion miId={usuario.id} equipo={equipo} />
         <Suspense key={[vistaDireccion, dias, segmento, cliente].map(String).join("|")} fallback={<EsqueletoDireccion />}>
           <ContenidoDireccion usuario={usuario} vista={vistaDireccion} dias={dias} segmento={segmento} cliente={cliente} />
         </Suspense>
@@ -48,11 +57,7 @@ export default async function BandejaWhatsappPage({ searchParams }: { searchPara
     );
   }
   const supabase = createServiceClient();
-  const [datos, pais, { data: personas }] = await Promise.all([
-    cargarBandeja(supabase, usuario),
-    vistaDireccion ? getPaisActual(supabase) : null,
-    supabase.from("perfiles").select("id, nombre, email, avatar_url").eq("activo", true),
-  ]);
+  const [datos, pais, equipo] = await Promise.all([cargarBandeja(supabase, usuario), vistaDireccion ? getPaisActual(supabase) : null, cargarEquipo(supabase)]);
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-4">
       {vistaDireccion ? (
@@ -70,7 +75,8 @@ export default async function BandejaWhatsappPage({ searchParams }: { searchPara
           abrirInicial={typeof abrir === "string" ? abrir : null}
           escribe={a.escribeAtencion || a.escribeComercial || a.escribeDireccion}
           miId={usuario.id}
-          equipo={(personas ?? []).map((p) => ({ id: p.id as string, nombre: (p.nombre as string | null) || (p.email as string), foto: (p.avatar_url as string | null) ?? null }))}
+          equipo={equipo}
+          direccion={a.direccion}
           verTelefono={a.verTelefonos}
           areas={areasVisibles(a)}
           miArea={areaPropia(a)}

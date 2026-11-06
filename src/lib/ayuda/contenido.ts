@@ -814,14 +814,15 @@ export const GUIAS: GuiaModulo[] = [
     modulo: "rendimiento",
     titulo: "Rendimiento del equipo",
     ruta: "/rendimiento",
-    resumen: "La jornada de cada persona en el sistema: a qué hora empezó y terminó, cuánto tiempo estuvo activa, sus pausas y qué hizo en cada hora. Solo la ven los administradores.",
+    resumen: "La jornada de cada persona en el sistema: a qué hora empezó y terminó, cuánto tiempo estuvo activa, sus pausas y, al pulsarla, su ficha con el área, el dispositivo y lo que hizo a cada hora. Solo la ven los administradores.",
     secciones: [
       {
         titulo: "Cómo se mide",
         pasos: [
           "Mientras una persona tiene el sistema abierto y lo está usando (mouse o teclado en los últimos 5 minutos, con la pestaña a la vista), cada minuto queda anotado con la página en que estaba. Varias pestañas en el mismo minuto cuentan una vez.",
           "Entrada es el primer minuto (o la primera acción) del día y salida el último; tiempo activo son los minutos anotados. Un hueco de más de 5 minutos es una pausa.",
-          "Lo que hizo sale de lo que guardó en el sistema (la misma actividad de las fichas): cambios, archivos, vínculos, comentarios que dejan registro…",
+          "Lo que hizo sale de lo que guardó en el sistema (la misma actividad de las fichas): cambios, archivos, vínculos, comentarios que dejan registro… y de los WhatsApp que mandó desde el CRM.",
+          "El dispositivo (computadora, teléfono o tablet) sale del navegador y se guarda desde el 6 nov 2026: lo anterior aparece como «Sin dato».",
           "El tiempo trabajando fuera del sistema (dentro de Dropi, WhatsApp u otra pestaña) todavía no se cuenta. Se mide desde el 27 oct 2026: antes no hay datos.",
         ],
       },
@@ -886,6 +887,8 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-11-06", titulo: "Rendimiento: la ficha de cada persona se despliega en la fila", texto: "En Equipo › Rendimiento, al pulsar a una persona se abre su ficha ahí mismo: en qué área estuvo y cuánto tiempo, si se conectó desde una computadora o un teléfono, y la cronología del día con la hora de cada cosa que hizo, incluidos los WhatsApp. Cada renglón se despliega para ver el detalle, y «Por hora» conserva la gráfica de siempre. El dispositivo se guarda desde hoy.", modulo: "rendimiento", href: "/rendimiento" },
+  { fecha: "2026-11-06", titulo: "CRM: Dirección ve dónde está cada persona", texto: "La barra de quién está trabajando ahora sale también en las pestañas del panel de Dirección (Resumen, Clientes, Equipo…), no solo en Chats. Dirección ve a Atención y a Comercial: con el aro verde a quien está en la bandeja, con su chat, y con aro gris a quien está en otra parte del sistema, con la página en que está.", modulo: "crm-dropshippers", href: "/crm-dropshippers/bandeja" },
   { fecha: "2026-11-06", titulo: "Gestión de IDs: una sola entrada con Dropi, Drop y Effi", texto: "En el menú de Operación (Proveeduría) ya no hay tres entradas: hay una sola, «Gestión de IDs». Con Costa Rica elegida, arriba de cada gestión salen los logos de Dropi, Drop y Effi: pulsa uno y pasas a la gestión de esa plataforma. El logo de la entrada del menú cambia con la plataforma donde estás. Es el mismo botón de Análisis de competencia, y la que elijas es la misma plataforma de la barra de arriba (junto al país). Drop y Effi solo existen en Costa Rica, así que con otro país el menú lleva directo a Gestión de IDs Dropi y no sale el selector. Solo aparecen las plataformas cuyo módulo puedes abrir.", modulo: "publicaciones-dropi", href: "/publicaciones-dropi" },
   { fecha: "2026-11-06", titulo: "Medición de uso en otras plataformas", texto: "La extensión «Ecomfive · Uso» cuenta los minutos activos en Dropi, Effi, Drop y Shopify y en qué sección, para saber qué falta traer al sistema. No lee las páginas, no guarda pedidos ni clientes y no ve ningún otro sitio. Solo Hernán y Alcides ven el resultado, en Uso del sistema de Gestión de IDs Dropi: cada persona con su tiempo dentro del sistema y en cada plataforma.", modulo: "publicaciones-dropi" },
   { fecha: "2026-11-06", titulo: "Uso del sistema por persona", texto: "La pestaña Uso del sistema ahora abre en «Personas»: cada persona del equipo con su tiempo activo y qué porcentaje de ese tiempo pasó en CRM, IDs, Producto, Compras, Inventario y las demás áreas, y dónde no entró. Debajo, lo que hoy se puede contar afuera: los WhatsApp enviados desde el CRM contra los del celular, por número, y las publicaciones creadas en Dropi. Lo de antes sigue en «Publicaciones». El tiempo dentro de Dropi, Effi, Drop o Shopify todavía no se mide.", modulo: "publicaciones-dropi" },
