@@ -246,13 +246,6 @@ export function FichaProducto({
               </dl>
               </div>
             </Seccion>
-            {/* Descontinuado solo en algunos países (migración 0211), en su propia sección (5 nov 2026, pedido de Alcides: junto al estado se
-                veía cortado). Con el estado «Descontinuado» ya vale para todos, y un compuesto no se compra: no sale. */}
-            {producto.clase !== "descontinuado" && producto.tipo !== "combo" && (
-              <Seccion icono={MundoIcon} titulo="Descontinuado por país">
-                <DescontinuadoPorPais key={`desc-${producto.id}`} skuId={producto.id} puedeEscribir={puedeEscribir} />
-              </Seccion>
-            )}
             <Seccion icono={CatalogoIcon} titulo="Código de barras">
               <CodigoBarrasProducto
                 key={producto.id}
@@ -356,6 +349,13 @@ export function FichaProducto({
                   diasAviso={producto.diasAvisoVencimiento}
                   puedeEscribir={puedeEscribir}
                 />
+              </Seccion>
+            )}
+            {/* Descontinuado solo en algunos países (migración 0211), en su propia sección (5 nov 2026, pedido de Alcides: junto al estado se
+                veía cortado), al final de la columna, debajo de Vencimiento: se usa poco. Con el estado «Descontinuado» ya vale para todos, y un compuesto no se compra: no sale. */}
+            {producto.clase !== "descontinuado" && producto.tipo !== "combo" && (
+              <Seccion icono={MundoIcon} titulo="Descontinuado por país">
+                <DescontinuadoPorPais key={`desc-${producto.id}`} skuId={producto.id} puedeEscribir={puedeEscribir} />
               </Seccion>
             )}
             </div>
