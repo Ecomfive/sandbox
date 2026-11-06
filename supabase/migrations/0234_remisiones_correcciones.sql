@@ -54,7 +54,7 @@ alter table wms_correcciones_remision enable row level security;
 alter table notificaciones_usuario drop constraint if exists notificaciones_usuario_tipo_check;
 alter table notificaciones_usuario add constraint notificaciones_usuario_tipo_check check (tipo in ('mencion', 'proveedor', 'tarea', 'sin_stock', 'whatsapp', 'remision'));
 
--- Resuelve una petición. Todo en una transacción: el cambio de la línea y, al anular, las unidades de vuelta a la bodega, del mismo lote del que salieron.
+-- Resuelve una petición. Todo en una transacción: el cambio de la línea y, al anular, las unidades de vuelta a la bodega, del mismo lote del que salieron, y sus cajas (migración 0236) a su ubicación.
 create or replace function wms_resolver_correccion_remision(
   p_correccion uuid,
   p_autorizar boolean,
@@ -67,6 +67,8 @@ declare
   c record;
   e record;
   m record;
+  v_caja jsonb;
+  v_ubicacion uuid;
   v_devueltas integer := 0;
 begin
   select * into c from wms_correcciones_remision where id = p_correccion for update;
@@ -97,6 +99,15 @@ begin
       if v_devueltas <> e.enviada then
         raise exception 'No se encontraron las % unidades de esa salida: revísalo antes de anular.', e.enviada;
       end if;
+      -- `to_jsonb`: si la base todavía no tiene las cajas, una línea simplemente no trae ninguna.
+      for v_caja in select * from jsonb_array_elements(case when jsonb_typeof(to_jsonb(e) -> 'cajas') = 'array' then to_jsonb(e) -> 'cajas' else '[]'::jsonb end) loop
+        select id into v_ubicacion from wms_ubicaciones where bodega_id = e.bodega_origen_id and codigo = v_caja ->> 'ubicacion';
+        if v_ubicacion is null then raise exception 'La ubicación % ya no existe: no se pueden devolver sus cajas.', v_caja ->> 'ubicacion'; end if;
+        insert into wms_cajas (bodega_id, sku_maestro_id, ubicacion_id, unidades_por_caja, cajas, actualizado_por)
+        values (e.bodega_origen_id, e.sku_maestro_id, v_ubicacion, (v_caja ->> 'por_caja')::integer, (v_caja ->> 'cajas')::integer, p_usuario)
+        on conflict (bodega_id, sku_maestro_id, ubicacion_id, unidades_por_caja)
+        do update set cajas = wms_cajas.cajas + excluded.cajas, actualizado_por = p_usuario, actualizado_en = now();
+      end loop;
       update wms_envios_dropi set estado = 'anulado' where id = e.id;
     end if;
   end if;

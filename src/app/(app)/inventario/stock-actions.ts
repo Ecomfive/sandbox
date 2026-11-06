@@ -6,10 +6,17 @@ import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { getPaisActual } from "@/lib/pais";
 import { puedeVerBodega } from "@/lib/seguridad/pais-acceso";
+import type { CajaGuardada } from "@/lib/wms/cajas";
 
 const MODULO = "inventario";
 const ES_ID = (v: string) => /^[0-9a-fA-F-]{8,64}$/.test(v);
 const texto = (formData: FormData, campo: string) => String(formData.get(campo) ?? "").trim();
+
+/** Unas cajas de un producto: en qué bodega y lugar, cuántas y de cuántas unidades (migración 0236). */
+export interface CajaDeBodega extends CajaGuardada {
+  bodegaId: string;
+  bodega: string;
+}
 
 export interface StockBodega {
   bodegaId: string;
@@ -67,13 +74,13 @@ export interface MovimientoStock {
 }
 
 /** El stock de un SKU en cada bodega del país y sus últimos movimientos, para su ficha. Basta poder abrir Inventario. */
-export async function obtenerStockDeSku(skuId: string): Promise<{ bodegas: StockBodega[]; movimientos: MovimientoStock[]; lotes: LoteStock[]; envios: EnvioDropi[] } | { error: string }> {
+export async function obtenerStockDeSku(skuId: string): Promise<{ bodegas: StockBodega[]; movimientos: MovimientoStock[]; lotes: LoteStock[]; envios: EnvioDropi[]; cajas: CajaDeBodega[] } | { error: string }> {
   await requireModulo(MODULO);
   if (!ES_ID(skuId)) return { error: "SKU no válido." };
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
 
-  const [porBodega, libro, lotesRpc, enviosRes] = await Promise.all([
+  const [porBodega, libro, lotesRpc, enviosRes, cajasRes] = await Promise.all([
     supabase.rpc("wms_stock_por_bodega", { p_sku: skuId, p_pais: pais.id }),
     supabase
       .from("wms_movimientos")
@@ -92,6 +99,12 @@ export async function obtenerStockDeSku(skuId: string): Promise<{ bodegas: Stock
       .eq("wms_bodegas.pais_id", pais.id)
       .order("enviado_en", { ascending: false })
       .limit(20),
+    // Sin la migración 0236 no hay cajas: la ficha carga igual.
+    supabase
+      .from("wms_cajas")
+      .select("id, bodega_id, cajas, unidades_por_caja, observacion, wms_ubicaciones(codigo, notas), wms_bodegas!inner(nombre, pais_id)")
+      .eq("sku_maestro_id", skuId)
+      .eq("wms_bodegas.pais_id", pais.id),
   ]);
   if (porBodega.error) return { error: "No se pudo cargar el stock." };
 
@@ -141,6 +154,23 @@ export async function obtenerStockDeSku(skuId: string): Promise<{ bodegas: Stock
           referencia: (e.referencia as string | null) ?? null,
           motivo: (e.motivo_diferencia as string | null) ?? null,
         })),
+    cajas: cajasRes.error
+      ? []
+      : (cajasRes.data ?? [])
+          .map((c) => {
+            const u = uno<{ codigo: string; notas: string | null }>(c.wms_ubicaciones as never);
+            return {
+              id: c.id as string,
+              bodegaId: c.bodega_id as string,
+              bodega: uno<{ nombre: string }>(c.wms_bodegas as never)?.nombre ?? "—",
+              ubicacion: u?.codigo ?? "—",
+              lugar: u?.notas ?? null,
+              cajas: Number(c.cajas),
+              porCaja: Number(c.unidades_por_caja),
+              observacion: (c.observacion as string | null) ?? null,
+            };
+          })
+          .sort((a, b) => a.bodega.localeCompare(b.bodega) || a.ubicacion.localeCompare(b.ubicacion) || b.porCaja - a.porCaja),
     // El libro puede fallar sin romper la ficha (si no se pudo leer, se muestra el stock igual).
     movimientos: libro.error
       ? []
@@ -269,7 +299,7 @@ export async function transferirStock(formData: FormData): Promise<{ error?: str
     supabase.from("wms_bodegas").select("id, nombre").in("id", [desde, hacia]),
   ]);
   if (!maestro) return { error: "El SKU no existe." };
-  // Desde la ficha es un traslado de un solo producto: queda en la pestaña Traslados, con su número, como cualquier otro (migración 0235).
+  // Desde la ficha es un traslado de un solo producto: queda en la pestaña Traslados, con su número, como cualquier otro (migración 0236).
   const { error } = await supabase.rpc("wms_crear_traslado", {
     p_desde: desde,
     p_hacia: hacia,
@@ -279,7 +309,7 @@ export async function transferirStock(formData: FormData): Promise<{ error?: str
     p_nombre: usuario.nombre || usuario.email,
   });
   if (error) {
-    if (/wms_crear_traslado/.test(error.message)) return { error: "Falta correr la migración 0235 en la base." };
+    if (/wms_crear_traslado/.test(error.message)) return { error: "Falta correr la migración 0236 en la base." };
     return { error: errorDeBase(error.message, "No se pudo hacer la transferencia.") };
   }
   const nombre = (id: string) => (bodegas ?? []).find((b) => b.id === id)?.nombre ?? "otra bodega";

@@ -4,10 +4,11 @@ import { requireModulo } from "@/lib/auth";
 import { getPaisActual } from "@/lib/pais";
 import { createServiceClient } from "@/lib/supabase/server";
 import { traerTodasConError } from "@/lib/supabase/paginar";
+import { textoCajasEnviadas, type CajaGuardada } from "@/lib/wms/cajas";
 import { textoCorreccion, type TipoCorreccion } from "@/lib/wms/correccion-remision";
 import { CorreccionesPendientes, type CorreccionVista } from "./correcciones";
 import { ListaEnvios, type FilaEnvio } from "./lista-envios";
-import { NuevaRemision, type StockPorBodega } from "./nueva-remision";
+import { NuevaRemision, type CajasPorBodega, type StockPorBodega } from "./nueva-remision";
 
 export const metadata = { title: "Remisiones" };
 
@@ -33,6 +34,10 @@ export default async function RemisionesPage() {
     .order("enviado_en", { ascending: false })
     .limit(500);
 
+  // Qué cajas salieron en cada línea (migración 0236; sin ella, nada).
+  const { data: conCajas } = await supabase.from("wms_envios_dropi").select("id, cajas").in("id", (data ?? []).map((e) => e.id as string));
+  const cajasDeLinea = new Map((conCajas ?? []).map((c) => [c.id as string, textoCajasEnviadas(c.cajas)]));
+
   const filas: FilaEnvio[] = (data ?? []).map((e) => {
     const sku = uno(e.skus_maestros as { codigo: string; nombre: string; foto_url: string | null } | { codigo: string; nombre: string; foto_url: string | null }[] | null);
     return {
@@ -50,6 +55,7 @@ export default async function RemisionesPage() {
       remisionId: (e.remision_id as string | null) ?? null,
       notas: uno(e.wms_remisiones as { notas: string | null } | { notas: string | null }[] | null)?.notas ?? null,
       motivo: (e.motivo_diferencia as string | null) ?? null,
+      cajas: cajasDeLinea.get(e.id as string) ?? null,
     };
   });
 
@@ -106,6 +112,19 @@ export default async function RemisionesPage() {
   const stock: StockPorBodega = {};
   for (const s of conStock.data ?? []) (stock[s.bodega_id] ??= {})[s.sku_maestro_id] = Number(s.disponible);
   const hay = new Set((conStock.data ?? []).map((s) => s.sku_maestro_id));
+  // Las cajas de cada producto en cada bodega propia (migración 0236; sin ella, se sigue por unidades).
+  const { data: guardadas } = puedeEscribir && propias.length
+    ? await traerTodasConError<{ id: string; bodega_id: string; sku_maestro_id: string; cajas: number; unidades_por_caja: number; observacion: string | null; wms_ubicaciones: unknown }>((d, h) =>
+        supabase.from("wms_cajas").select("id, bodega_id, sku_maestro_id, cajas, unidades_por_caja, observacion, wms_ubicaciones(codigo, notas)").in("bodega_id", propias.map((b) => b.id)).order("id").range(d, h),
+      )
+    : { data: [] };
+  const cajas: CajasPorBodega = {};
+  for (const c of guardadas ?? []) {
+    const u = uno(c.wms_ubicaciones as { codigo: string; notas: string | null } | { codigo: string; notas: string | null }[] | null);
+    const caja: CajaGuardada = { id: c.id, ubicacion: u?.codigo ?? "—", lugar: u?.notas ?? null, cajas: Number(c.cajas), porCaja: Number(c.unidades_por_caja), observacion: c.observacion };
+    ((cajas[c.bodega_id] ??= {})[c.sku_maestro_id] ??= []).push(caja);
+  }
+  for (const porSku of Object.values(cajas)) for (const lista of Object.values(porSku)) lista.sort((a, b) => a.ubicacion.localeCompare(b.ubicacion) || b.porCaja - a.porCaja);
   const opciones = (productos.data ?? []).filter((p) => hay.has(p.id)).map((p) => ({ id: p.id, codigo: p.codigo, nombre: p.nombre, estado: p.estado, numero: p.numero, foto: p.foto_url }));
 
   return (
@@ -113,7 +132,7 @@ export default async function RemisionesPage() {
       <EncabezadoPagina titulo="Remisiones" oculto />
       {puedeEscribir && (
         <div className="flex justify-end">
-          <NuevaRemision propias={propias} externas={externas} productos={opciones} stock={stock} />
+          <NuevaRemision propias={propias} externas={externas} productos={opciones} stock={stock} cajas={cajas} />
         </div>
       )}
       <CorreccionesPendientes pendientes={pendientes} />
