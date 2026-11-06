@@ -98,6 +98,7 @@ function FilaItem({
             Lote #{item.loteNumero}
             {item.origen === "clickup" ? " · de ClickUp" : ""}
             {recibido ? ` · recibido ${item.cantidadRecibida} u.${item.fechaRecepcion ? ` el ${formatearFecha(item.fechaRecepcion)}` : ""}` : ""}
+            {recibido && Number(item.cantidadRecibida) < item.cantidadPedida ? ` · faltaron ${item.cantidadPedida - Number(item.cantidadRecibida)} u.` : ""}
           </p>
           </div>
         </div>

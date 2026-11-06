@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
+import { esAdministrador } from "@/lib/permisos/acceso";
+import { pideMotivo, puedeMoverAMano, SOLO_ADMIN_MOVIMIENTO } from "@/lib/wms/recepcion";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { getPaisActual } from "@/lib/pais";
@@ -224,9 +226,13 @@ export async function registrarMovimientoStock(formData: FormData): Promise<{ er
   const supabase = createServiceClient();
   if (!(await puedeVerBodega(supabase, usuario.paisesPermitidos, bodega))) return { error: "No tienes acceso al país de esa bodega." };
   // El país de la bodega va al final del detalle de la auditoría («· Panamá»): así su actividad se filtra por país.
-  const { data: bodegaFila } = await supabase.from("wms_bodegas").select("paises(nombre)").eq("id", bodega).maybeSingle();
-  const paisBodega = bodegaFila?.paises as { nombre: string } | { nombre: string }[] | null | undefined;
-  const nombrePais = (Array.isArray(paisBodega) ? paisBodega[0] : paisBodega)?.nombre;
+  const { data: bodegaFila } = await supabase.from("wms_bodegas").select("paises(nombre, codigo)").eq("id", bodega).maybeSingle();
+  const paisBodega = bodegaFila?.paises as { nombre: string; codigo: string } | { nombre: string; codigo: string }[] | null | undefined;
+  const paisDeLaBodega = Array.isArray(paisBodega) ? paisBodega[0] : paisBodega;
+  const nombrePais = paisDeLaBodega?.nombre;
+  // Donde toda salida va con remisión, la salida y el ajuste a mano son de un administrador y llevan motivo (6 nov 2026, flujograma de Costa Rica).
+  if (!puedeMoverAMano(tipo, paisDeLaBodega?.codigo, esAdministrador(usuario))) return { error: SOLO_ADMIN_MOVIMIENTO };
+  if (pideMotivo(tipo, paisDeLaBodega?.codigo) && !motivo) return { error: "Una salida a mano necesita un motivo." };
   const { data: maestro } = await supabase.from("skus_maestros").select("codigo, tipo, clase, maneja_vencimiento").eq("id", sku).maybeSingle();
   if (!maestro) return { error: "El SKU no existe." };
   if (maestro.tipo === "combo") return { error: "Un producto compuesto no guarda stock: se calcula de sus componentes." };

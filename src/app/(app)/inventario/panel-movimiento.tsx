@@ -39,6 +39,7 @@ export function PanelMovimiento({
   ubicaciones,
   manejaVencimiento = false,
   lotes = [],
+  motivoObligatorio = false,
   alGuardar,
 }: {
   skuId: string;
@@ -47,6 +48,8 @@ export function PanelMovimiento({
   manejaVencimiento?: boolean;
   /** Los lotes con unidades del producto (para elegir uno en una salida o un ajuste). */
   lotes?: LoteStock[];
+  /** El motivo es obligatorio: siempre en un ajuste, y en una salida donde toda salida va con remisión. */
+  motivoObligatorio?: boolean;
   bodegas: BodegaOpcion[];
   ubicaciones: UbicacionOpcion[];
   alGuardar: () => void;
@@ -150,14 +153,14 @@ export function PanelMovimiento({
           <Campo etiqueta="Referencia" id="campo-referencia-mov">
             <input id="campo-referencia-mov" type="text" name="referencia" autoComplete="off" maxLength={200} placeholder="Ej: Compra #0012" className={`${fieldClass} w-full`} />
           </Campo>
-          <Campo etiqueta={tipo === "ajuste" ? "Motivo" : "Motivo (opcional)"} id="campo-motivo-mov" obligatorio={tipo === "ajuste"} faltante={faltante}>
+          <Campo etiqueta={motivoObligatorio ? "Motivo" : "Motivo (opcional)"} id="campo-motivo-mov" obligatorio={motivoObligatorio} faltante={faltante}>
             <textarea
               id="campo-motivo-mov"
               name="motivo"
               rows={2}
               maxLength={500}
-              required={tipo === "ajuste"}
-              aria-invalid={tipo === "ajuste" ? invalido("campo-motivo-mov") : undefined}
+              required={motivoObligatorio}
+              aria-invalid={motivoObligatorio ? invalido("campo-motivo-mov") : undefined}
               placeholder="Ej: Conteo del inventario inicial"
               className={`${fieldClass} w-full resize-y`}
             />
