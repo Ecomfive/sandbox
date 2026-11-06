@@ -1,5 +1,7 @@
 "use client";
 
+import { Segmentado } from "@/components/panel/piezas-panel";
+import type { ModoLevantamiento } from "@/lib/wms/levantamiento";
 import { useMemo, useState, useTransition } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { ContenedorTabla } from "@/components/tabla/contenedor-tabla";
@@ -81,6 +83,9 @@ export function Levantamiento({
   const [imagenAbierta, setImagenAbierta] = useState(false);
   const [referencia, setReferencia] = useState("");
   const [error, setError] = useState<string | null>(null);
+  // «Contado» deja el producto en lo escrito; «Sumar» se lo agrega a lo que ya hay (7 nov 2026, pedido de Hernán).
+  const [modo, setModo] = useState<ModoLevantamiento>("contado");
+  const sumando = modo === "sumar";
 
   const lineasDe = (p: ProductoConteo): LineaLote[] =>
     lotes[p.id] ?? p.lotes.map((l) => ({ codigo: l.codigo, vencimiento: l.vencimiento, cantidad: "", existente: true }));
@@ -130,12 +135,12 @@ export function Levantamiento({
         : { sku: p.id, cantidad: contadoDe(p) },
     );
     startTransition(async () => {
-      const r = await guardarLevantamiento(bodegaElegida, referencia, items);
+      const r = await guardarLevantamiento(bodegaElegida, referencia, items, modo);
       if (r.error) {
         setError(r.error);
         return;
       }
-      mostrarToast(`Levantamiento de ${nombreBodega} guardado: ${r.productos} productos, ${r.ajustes} con diferencia`);
+      mostrarToast(sumando ? `Sumado a ${nombreBodega}: ${r.productos} productos` : `Levantamiento de ${nombreBodega} guardado: ${r.productos} productos, ${r.ajustes} con diferencia`);
       setContados({});
       setLotes({});
       setReferencia("");
@@ -161,6 +166,20 @@ export function Levantamiento({
             ))}
           </select>
         </label>
+        {puedeEscribir && (
+          <div className="flex flex-col gap-1">
+            <span className="text-xs font-semibold text-muted-foreground">Al guardar</span>
+            <Segmentado
+              etiqueta="Cómo se guarda"
+              valor={modo}
+              alCambiar={setModo}
+              opciones={[
+                { valor: "contado", etiqueta: "Dejar lo contado" },
+                { valor: "sumar", etiqueta: "Sumar a lo que hay" },
+              ]}
+            />
+          </div>
+        )}
         {puedeEscribir && (
           <label className="flex flex-col gap-1">
             <span className="text-xs font-semibold text-muted-foreground">Referencia (opcional)</span>
@@ -233,10 +252,10 @@ export function Levantamiento({
                 En sistema
               </th>
               <th scope="col" className={claseEncabezadoColumna}>
-                Contado
+                {sumando ? "A sumar" : "Contado"}
               </th>
               <th scope="col" className={`${claseEncabezadoColumna} text-right`}>
-                Diferencia
+                {sumando ? "Quedará" : "Diferencia"}
               </th>
             </tr>
           </thead>
@@ -273,7 +292,7 @@ export function Levantamiento({
                         min="0"
                         step="1"
                         inputMode="numeric"
-                        aria-label={`Contado de ${p.codigo}`}
+                        aria-label={`${sumando ? "A sumar" : "Contado"} de ${p.codigo}`}
                         disabled={!puedeEscribir || pendiente}
                         value={contados[p.id] ?? ""}
                         onChange={(e) =>
@@ -348,7 +367,7 @@ export function Levantamiento({
                     )}
                   </td>
                   <td className={`${claseCeldaColumna} text-right`}>
-                    <Diferencia n={dif} />
+                    {sumando ? <span className="tabular-nums">{contado === null ? "—" : (p.enSistema + contado).toLocaleString("es-PA")}</span> : <Diferencia n={dif} />}
                   </td>
                 </tr>
               );
@@ -374,7 +393,7 @@ export function Levantamiento({
             disabled={pendiente || contadosTotal.length === 0}
             className="ml-auto min-h-10 rounded-md bg-foreground px-4 text-sm font-semibold text-background hover:opacity-90 disabled:bg-muted disabled:text-muted-foreground"
           >
-            {pendiente ? "Guardando…" : `Guardar levantamiento de ${nombreBodega}`}
+            {pendiente ? "Guardando…" : sumando ? `Sumar a ${nombreBodega}` : `Guardar levantamiento de ${nombreBodega}`}
           </button>
         </div>
       )}
