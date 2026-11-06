@@ -9,7 +9,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 const MODULO = "producto";
 const ES_ID = (v: string) => /^[0-9a-fA-F-]{36}$/.test(v);
 const FALTA = "Falta correr la migración 0211 (descontinuado por país) en la base.";
-/** Países donde todavía no se piensa entrar mercancía (5 nov 2026, pedido de Alcides): no se ofrecen, salvo que ya estén marcados. */
+/** Países donde todavía no se piensa entrar mercancía (5 nov 2026, pedido de Alcides): no se ofrecen ni se muestran. */
 const PAISES_FUERA = ["CO"];
 
 export interface PaisDescontinuado {
@@ -31,7 +31,7 @@ export async function paisesDescontinuado(skuId: string): Promise<{ paises: Pais
   const marcados = new Set((marcadosR.data ?? []).map((f) => f.pais_id as string));
   return {
     paises: ((paisesR.data ?? []) as { id: string; codigo: string; nombre: string }[])
-      .filter((p) => !PAISES_FUERA.includes(p.codigo) || marcados.has(p.id))
+      .filter((p) => !PAISES_FUERA.includes(p.codigo))
       .map((p) => ({ codigo: p.codigo, nombre: p.nombre, descontinuado: marcados.has(p.id) })),
   };
 }

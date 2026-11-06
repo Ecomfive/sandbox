@@ -396,9 +396,9 @@ convenciones técnicas del código.
   descripción de 200 caracteres como mínimo y, si el producto es público, una bodega con
   100 unidades y 3 imágenes. Peso en gramos, medidas en centímetros. No incluye Carga masiva,
   Actualización masiva ni las descargas en Excel de Dropi.
-- **Compras › Por país** (`/compras/por-pais`, migraciones 0231 y 0232, 5 nov 2026, pedido de Alcides; reemplaza su hoja «Gestión de Productos por País»). Son decisiones de compra de Alcides: módulo propio
+- **Compras › Gestión por país** (`/compras/por-pais`, migraciones 0231 y 0232, 5 nov 2026, pedido de Alcides; reemplaza su hoja «Gestión de Productos por País»). Son decisiones de compra de Alcides: módulo propio
   `compras-por-pais` dado **por persona** (`permisos_persona`, hoy solo Alcides; la pestaña se oculta con `PESTANAS_POR_PAIS` a quien no lo tiene; estuvo unas horas en Producto y `/producto/paises` redirige). Cada producto
-  (sin las variantes, que suman a su producto) con una casilla por país de `PAISES_NAV` que la persona ve: **existe** si tiene una publicación activa de Dropi o Drop (un borrador no
+  (sin las variantes, que suman a su producto) con una casilla por país de `PAISES_GESTION` (`def-por-pais.ts`: PA, CR, MX, GT, VE, SV, HN, NI; sin Colombia) que la persona ve: **existe** si tiene una publicación activa de Dropi o Drop (un borrador no
   cuenta), una compra que cuenta (`compraCuenta`) o stock físico en una bodega del país (`wms_stock`). Estados y orden en `src/lib/producto/por-pais.ts` (`armarPorPais`,
   `estadoDeCelda`, con prueba): publicado > comprado > con stock > descontinuado en el país > la decisión > solo archivado > no existe. Donde no existe, «Enviar» o «Descartado» (con
   motivo) en `producto_pais_decisiones` (RLS sin políticas; `decidirProductoPais`, `por-pais/actions.ts`, pide escribir en `compras-por-pais`, auditoría `decidir_producto_pais`). Carga en
@@ -422,7 +422,7 @@ convenciones técnicas del código.
   es una combinación de productos simples con su cantidad: al venderlo se descuenta cada componente) y **Activo o Test** (se ve como «Estado» y se elige en la ficha; en la base es la columna `clase`, y Activo se guarda como `'fisico'`:
   un test se está probando, todavía no se compra, **aparece en Inventario pero no tiene stock** —`wms_aplicar_cambios` rechaza cualquier
   movimiento— y se pasa a Activo desde el selector «Estado» de su ficha; volver a Test solo si nunca tuvo movimientos). **Descontinuado por país**
-  (31 oct 2026, pedido de Hernán; migración 0211, tabla `skus_descontinuado_pais`): sección «Descontinuado por país» de la ficha, debajo de Vencimiento (5 nov 2026: antes iba junto al estado; sin Colombia por ahora, `PAISES_FUERA`, salvo ya marcada; `producto/descontinuado-pais.tsx`,
+  (31 oct 2026, pedido de Hernán; migración 0211, tabla `skus_descontinuado_pais`): sección «Descontinuado por país» de la ficha, debajo de Vencimiento (5 nov 2026: antes iba junto al estado; sin Colombia por ahora, `PAISES_FUERA`, ni aunque esté marcada; `producto/descontinuado-pais.tsx`,
   `descontinuado-pais-actions.ts`, una casilla por país; no se muestra con el estado Descontinuado ni en compuestos). `@/lib/producto/descontinuado-pais`
   (`descontinuadoEn`, `descontinuadosEnPais`, `descontinuadosPorPais`) lo usan `productoComprable(skuId, paisId)` de Compras (no se agrega a una
   compra de ese país), `FilaPublicacion.descontinuadoPais` (insignia «Descontinuado» en la fila) y `ProductoDelChat.descontinuado` (aviso en el chat).
