@@ -4,6 +4,7 @@ import { compraCuenta } from "@/lib/compras/cuenta";
 import { PAISES_NAV } from "@/lib/nav-data";
 import { puedeVerPais } from "@/lib/paises-permitidos";
 import { accionesPorPais, armarPorPais, ESTADOS_EXISTE, paisesPorDecidir, type CompraPais, type DecisionPais, type PublicacionPais, type StockPais } from "@/lib/producto/por-pais";
+import { esBodegaDropi } from "@/lib/publicaciones/automatico";
 import { idsDeDropi } from "@/lib/publicaciones/sincronizar-dropi";
 import { traerTodasConError } from "@/lib/supabase/paginar";
 import type { FilaPorPais, PaisColumna } from "./def-por-pais";
@@ -42,15 +43,24 @@ export async function cargarPorPais(usuario: UsuarioActual, supabase: SupabaseCl
     ),
     supabase.from("skus_descontinuado_pais").select("sku_id, pais_id"),
     supabase.from("producto_pais_decisiones").select("sku_id, pais_id, decision, motivo, decidido_por, decidido_en"),
-    // El stock en Dropi de nuestros productos: la última lectura de «Mis productos» de cada país (público + privado).
-    traerTodasConError<{ pais_id: string; dropi_producto_id: number; stock: number | null }>((d, h) =>
-      supabase.from("dropi_productos_proveedor").select("pais_id, dropi_producto_id, stock").order("pais_id").order("dropi_producto_id").range(d, h),
+    // El stock en Dropi de nuestros productos: la última lectura de «Mis productos» de cada país, por bodega.
+    traerTodasConError<{ pais_id: string; dropi_producto_id: number; stock: number | null; bodegas: { id: number; stock: number }[] | null }>((d, h) =>
+      supabase.from("dropi_productos_proveedor").select("pais_id, dropi_producto_id, stock, bodegas").order("pais_id").order("dropi_producto_id").range(d, h),
     ),
   ]);
-  const stockPorDropi = new Map((stockDropi.data ?? []).map((s) => [`${s.pais_id}:${s.dropi_producto_id}`, Number(s.stock ?? 0)]));
-  const stockDeDropi = (paisId: string, dropiId: string | null): number | null => {
-    const valores = idsDeDropi(dropiId).map((id) => stockPorDropi.get(`${paisId}:${id}`)).filter((v): v is number => v !== undefined);
-    return valores.length ? valores.reduce((a, b) => a + b, 0) : null;
+  // Real = lo de la bodega de Dropi (B280, B15, B49…); lo de la bodega del proveedor (la B81 de Panamá) es referencial: se pone a mano para
+  // la publicación y no es el stock que hay (5 nov 2026, Alcides). Sin el detalle por bodega, el total cuenta como referencial.
+  const stockPorDropi = new Map(
+    (stockDropi.data ?? []).map((s) => {
+      const bodegas = Array.isArray(s.bodegas) ? s.bodegas : null;
+      const real = bodegas ? bodegas.filter((b) => esBodegaDropi(b.id)).reduce((t, b) => t + Number(b.stock ?? 0), 0) : 0;
+      const referencial = bodegas ? bodegas.filter((b) => !esBodegaDropi(b.id)).reduce((t, b) => t + Number(b.stock ?? 0), 0) : Number(s.stock ?? 0);
+      return [`${s.pais_id}:${s.dropi_producto_id}`, { real, referencial }];
+    }),
+  );
+  const stockDeDropi = (paisId: string, dropiId: string | null): { real: number; referencial: number } | null => {
+    const valores = idsDeDropi(dropiId).map((id) => stockPorDropi.get(`${paisId}:${id}`)).filter((v): v is { real: number; referencial: number } => v !== undefined);
+    return valores.length ? valores.reduce((a, b) => ({ real: a.real + b.real, referencial: a.referencial + b.referencial }), { real: 0, referencial: 0 }) : null;
   };
   if (productos.error) throw new Error("No se pudieron leer los productos.");
 
@@ -65,7 +75,8 @@ export async function cargarPorPais(usuario: UsuarioActual, supabase: SupabaseCl
         idPlataforma: p.dropi_id ?? "sin ID",
         ref: p.id,
         activa: p.estado !== "archivado" && p.estado_publicacion !== "archivado" && !!p.dropi_id,
-        stock: stockDeDropi(p.pais_id, p.dropi_id),
+        stock: stockDeDropi(p.pais_id, p.dropi_id)?.real ?? null,
+        stockReferencial: stockDeDropi(p.pais_id, p.dropi_id)?.referencial ?? null,
       })),
     ...(drop.data ?? []).map((p) => ({
       skuId: p.sku_maestro_id,

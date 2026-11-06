@@ -37,7 +37,8 @@ const PUNTO: Record<EstadoPais, string> = {
 
 /** Lo que dice la casilla debajo del estado: las unidades disponibles en el país (bodegas + plataformas), las compradas o el motivo. */
 function subtitulo(c: CeldaPais): string {
-  const disponibles = c.unidadesDisponibles > 0 ? `${c.unidadesDisponibles.toLocaleString("es")} u. disponibles` : "Sin stock";
+  const referencial = c.unidadesReferencial > 0 ? ` · ${c.unidadesReferencial.toLocaleString("es")} ref.` : "";
+  const disponibles = (c.unidadesDisponibles > 0 ? `${c.unidadesDisponibles.toLocaleString("es")} u. disponibles` : "Sin stock real") + referencial;
   if (c.estado === "publicado" || c.estado === "stock") return disponibles;
   if (c.estado === "comprado") return c.unidadesDisponibles > 0 ? disponibles : `${c.unidadesCompradas.toLocaleString("es")} u. compradas`;
   if (c.estado === "descartado") return c.decision?.motivo ?? "";
@@ -261,6 +262,7 @@ function DetalleCelda({
                       <span className="text-muted-foreground">
                     {p.activa ? "activa" : "archivada"}
                     {p.activa && p.stock !== null ? ` · ${p.stock.toLocaleString("es")} u.` : ""}
+                    {p.activa && p.stockReferencial ? ` · ${p.stockReferencial.toLocaleString("es")} u. referenciales` : ""}
                   </span>
                     </li>
                   );
@@ -271,7 +273,13 @@ function DetalleCelda({
 
           <section className="flex flex-col gap-1.5">
             {titulo(`Stock disponible en ${pais.nombre}: ${c.unidadesDisponibles.toLocaleString("es")} u.`)}
-            {c.unidadesPlataformas > 0 && <p className="m-0 text-sm text-muted-foreground">En las plataformas: {c.unidadesPlataformas.toLocaleString("es")} u. (la última lectura de Dropi o Drop)</p>}
+            {c.unidadesPlataformas > 0 && <p className="m-0 text-sm text-muted-foreground">En la bodega de Dropi o en Drop: {c.unidadesPlataformas.toLocaleString("es")} u. (la última lectura)</p>}
+            {c.unidadesReferencial > 0 && (
+              <p className="m-0 text-sm text-muted-foreground">
+                Referencial: {c.unidadesReferencial.toLocaleString("es")} u. en la bodega del proveedor en Dropi. No es stock real y no se suma; lo real de nuestras bodegas
+                sale del inventario del sistema.
+              </p>
+            )}
             {c.stock.length === 0 ? (
               <p className="m-0 text-sm text-muted-foreground">Sin unidades en las bodegas del sistema de {pais.nombre}.</p>
             ) : (

@@ -33,8 +33,16 @@ export interface PublicacionPais {
   /** El id de la publicación en el sistema (para abrir su ficha). */
   ref: string;
   activa: boolean;
-  /** Las unidades que dice la plataforma (la última lectura de «Mis productos» de Dropi, o el inventario de Drop); null si no se sabe. */
+  /**
+   * Las unidades reales en la plataforma: en Dropi, solo las de la bodega de Dropi (B280, B15, B49…), según la última lectura de «Mis
+   * productos»; en Drop, su inventario. null si no se sabe.
+   */
   stock: number | null;
+  /**
+   * Las unidades que Dropi muestra en la bodega del proveedor (la B81 «Proveedor Ecomfive» de Panamá): son referenciales, se ponen a mano
+   * para la publicación y no son el stock real (5 nov 2026, Alcides). Lo real de nuestras bodegas sale del inventario del sistema.
+   */
+  stockReferencial?: number | null;
 }
 
 export interface CompraPais {
@@ -67,7 +75,7 @@ export interface DecisionPais {
 /** Lo que hay de un producto en un país, para la casilla y su ventana. */
 export interface CeldaPais {
   estado: EstadoPais;
-  publicaciones: { plataforma: "dropi" | "drop"; id: string; ref: string; activa: boolean; stock: number | null }[];
+  publicaciones: { plataforma: "dropi" | "drop"; id: string; ref: string; activa: boolean; stock: number | null; stockReferencial: number | null }[];
   compras: { compraId: string; numero: number | null; unidades: number; creada: string }[];
   unidadesCompradas: number;
   stock: { bodega: string; unidades: number }[];
@@ -75,8 +83,10 @@ export interface CeldaPais {
   unidadesStock: number;
   /** Unidades en las plataformas (Dropi, Drop) según sus publicaciones activas; cada ID una vez. */
   unidadesPlataformas: number;
-  /** Lo disponible en el país: bodegas + plataformas. */
+  /** Lo disponible en el país: bodegas + plataformas (sin lo referencial). */
   unidadesDisponibles: number;
+  /** Lo que Dropi muestra en la bodega del proveedor: referencial, no suma a lo disponible. */
+  unidadesReferencial: number;
   decision: { decision: Decision; motivo: string | null; por: string | null; en: string } | null;
   descontinuado: boolean;
 }
@@ -90,6 +100,7 @@ export const celdaVacia = (): CeldaPais => ({
   unidadesStock: 0,
   unidadesPlataformas: 0,
   unidadesDisponibles: 0,
+  unidadesReferencial: 0,
   decision: null,
   descontinuado: false,
 });
@@ -133,8 +144,9 @@ export function armarPorPais(
   for (const pub of datos.publicaciones) {
     const c = celda(pub.skuId, pub.pais);
     if (!c || c.publicaciones.some((x) => x.plataforma === pub.plataforma && x.id === pub.idPlataforma)) continue;
-    c.publicaciones.push({ plataforma: pub.plataforma, id: pub.idPlataforma, ref: pub.ref, activa: pub.activa, stock: pub.stock });
+    c.publicaciones.push({ plataforma: pub.plataforma, id: pub.idPlataforma, ref: pub.ref, activa: pub.activa, stock: pub.stock, stockReferencial: pub.stockReferencial ?? null });
     if (pub.activa && pub.stock) c.unidadesPlataformas += pub.stock;
+    if (pub.activa && pub.stockReferencial) c.unidadesReferencial += pub.stockReferencial;
   }
   for (const compra of datos.compras) {
     if (!cuenta(compra)) continue;
