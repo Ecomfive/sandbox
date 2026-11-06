@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { anilloFoco } from "@/components/ui/field";
+import { Bandera } from "@/components/paises/bandera";
 import { useToast } from "@/components/ui/toast";
-import { bandera } from "@/lib/whatsapp/origen-chat";
 import { cambiarDescontinuadoPais, paisesDescontinuado, type PaisDescontinuado } from "./descontinuado-pais-actions";
 
 /**
@@ -45,13 +44,18 @@ export function DescontinuadoPorPais({ skuId, puedeEscribir }: { skuId: string; 
   }
   return (
     <fieldset className="mt-2 flex flex-col gap-1 border-0 p-0">
-      <legend className="mb-0.5 p-0 text-xs text-muted-foreground">Descontinuado en</legend>
-      <div className="flex flex-wrap gap-x-3 gap-y-1">
+      <legend className="mb-1 p-0 text-xs text-muted-foreground">Descontinuado en</legend>
+      <div className="grid grid-cols-2 gap-1.5">
         {paises.map((p) => (
-          <label key={p.codigo} className={`inline-flex cursor-pointer items-center gap-1.5 rounded-sm text-[13px] ${p.descontinuado ? "font-medium text-destructive" : ""}`}>
-            <input type="checkbox" checked={p.descontinuado} disabled={pendiente} onChange={(e) => cambiar(p, e.target.checked)} className={`h-4 w-4 accent-[var(--destructive)] ${anilloFoco}`} />
-            <span aria-hidden="true">{bandera(p.codigo)}</span>
-            {p.nombre}
+          <label
+            key={p.codigo}
+            className={`flex min-w-0 cursor-pointer items-center gap-2 rounded-md border px-2 py-1.5 text-[13px] transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring ${
+              p.descontinuado ? "border-destructive bg-destructive-soft font-medium text-destructive" : "border-border bg-card hover:bg-muted"
+            } ${pendiente ? "cursor-wait opacity-70" : ""}`}
+          >
+            <input type="checkbox" checked={p.descontinuado} disabled={pendiente} onChange={(e) => cambiar(p, e.target.checked)} className="h-3.5 w-3.5 shrink-0 accent-[var(--destructive)]" />
+            <Bandera codigo={p.codigo} />
+            <span className="truncate">{p.nombre}</span>
           </label>
         ))}
       </div>
