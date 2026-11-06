@@ -40,7 +40,7 @@ export function existenciaDe(f: Pick<FilaStock, "fisico">): "negativo" | "sin_st
 export const DEF_STOCK: DefTabla<FilaStock> = {
   clave: "wms-stock",
   campos: [
-    { id: "sku", etiqueta: "SKU", tipo: "texto", valor: (f) => `${f.codigo} ${f.nombre}` },
+    { id: "sku", etiqueta: "SKU", tipo: "texto", sinCsv: true, valor: (f) => `${f.codigo} ${f.nombre}` },
     {
       id: "existencia",
       etiqueta: "Existencia",
@@ -67,10 +67,13 @@ export const DEF_STOCK: DefTabla<FilaStock> = {
       opciones: () => Object.entries(ETIQUETA_TIPO_SKU).map(([valor, etiqueta]) => ({ valor, etiqueta })),
       agrupable: true,
     },
-    { id: "fisico", etiqueta: "Físico", tipo: "numero", valor: (f) => f.fisico },
-    { id: "disponible", etiqueta: "Disponible", tipo: "numero", valor: (f) => f.disponible },
-    { id: "vencido", etiqueta: "Vencido", tipo: "numero", valor: (f) => f.vencido },
+    { id: "fisico", etiqueta: "Físico", tipo: "numero", sinCsv: true, valor: (f) => f.fisico },
+    { id: "disponible", etiqueta: "Disponible", tipo: "numero", sinCsv: true, valor: (f) => f.disponible },
+    { id: "vencido", etiqueta: "Vencido", tipo: "numero", sinCsv: true, valor: (f) => f.vencido },
+    { id: "enCamino", etiqueta: "En camino", tipo: "numero", sinCsv: true, valor: (f) => f.enCamino },
   ],
+  // Al agrupar, cada grupo dice sus unidades físicas; un compuesto no suma, sus unidades ya están en sus componentes.
+  total: (f) => (f.tipo === "combo" ? 0 : f.fisico),
   csvAntes: [
     { etiqueta: "Código", valor: (f) => f.codigo },
     { etiqueta: "Producto", valor: (f) => f.nombre },
