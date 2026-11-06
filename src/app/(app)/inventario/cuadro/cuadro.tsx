@@ -149,7 +149,7 @@ export function Cuadro({
           </div>
 
           <ContenedorTabla ariaLabel={`Cuadro de ${nombre}`}>
-            <table className="tabla-datos w-full min-w-[62rem] border-collapse text-sm">
+            <table className="tabla-datos w-full min-w-[66rem] border-collapse text-sm">
               <thead>
                 <tr className={claseFilaEncabezado}>
                   <th scope="col" className={claseEncabezadoColumna}>Foto</th>
@@ -158,6 +158,7 @@ export function Cuadro({
                   <th scope="col" className={`${claseEncabezadoColumna} text-right`}>Entró</th>
                   <th scope="col" className={`${claseEncabezadoColumna} text-right`}>Salió a otra</th>
                   {conVentas && <th scope="col" className={`${claseEncabezadoColumna} text-right`}>Vendido</th>}
+                  <th scope="col" className={`${claseEncabezadoColumna} text-right`}>Bajas</th>
                   <th scope="col" className={`${claseEncabezadoColumna} text-right`}>Debería haber</th>
                   <th scope="col" className={`${claseEncabezadoColumna} text-right`}>{nombre} dice</th>
                   <th scope="col" className={`${claseEncabezadoColumna} text-right`}>Diferencia</th>
@@ -166,7 +167,7 @@ export function Cuadro({
               <tbody>
                 {visibles.length === 0 && (
                   <tr>
-                    <td colSpan={conVentas ? 9 : 8} className="px-4 py-8 text-center text-muted-foreground">
+                    <td colSpan={conVentas ? 10 : 9} className="px-4 py-8 text-center text-muted-foreground">
                       {filas.length ? "Ningún producto con diferencia." : "Todavía no hay datos para cuadrar."}
                     </td>
                   </tr>
@@ -187,10 +188,12 @@ export function Cuadro({
                     </td>
                     <td className={`${claseCeldaColumna} text-right tabular-nums`}>{entero(f.salio)}</td>
                     {conVentas && <td className={`${claseCeldaColumna} text-right tabular-nums`}>{entero(f.vendido)}</td>}
+                    <td className={`${claseCeldaColumna} text-right tabular-nums`}>{entero(f.bajas)}</td>
                     <td className={`${claseCeldaColumna} text-right tabular-nums`}>{entero(f.deberia)}</td>
                     <td className={`${claseCeldaColumna} text-right tabular-nums`}>{entero(f.dice)}</td>
                     <td className={`${claseCeldaColumna} text-right`}>
                       {f.diferencia === 0 ? <span className="text-success">Cuadra</span> : <span className={`font-semibold tabular-nums ${f.diferencia > 0 ? "text-warning" : "text-destructive"}`}>{f.diferencia > 0 ? `+${entero(f.diferencia)}` : entero(f.diferencia)}</span>}
+                      {f.reclamo > 0 && <span className="block text-xs text-muted-foreground">{entero(f.reclamo)} en reclamo</span>}
                     </td>
                   </tr>
                 ))}
