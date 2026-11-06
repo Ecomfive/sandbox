@@ -24,6 +24,8 @@ export interface IdDropiVentas {
 /** Las ventas en Dropi de un producto en un país: todos sus IDs de Dropi juntos. */
 export interface VentasDropiPais {
   pais: string;
+  /** El código del país (para su bandera). */
+  codigo: string;
   /** Hasta qué día llegan los datos (la última carga de ventas). */
   corte: string;
   netas30: number;
@@ -59,7 +61,7 @@ export async function obtenerVentasDropiProducto(id: string, soloPais?: string):
   if (error) return { error: "No se pudieron cargar las ventas." };
 
   // Los IDs de Dropi por país («7231-7679» son dos).
-  const porPais = new Map<string, { nombre: string; ids: Set<number> }>();
+  const porPais = new Map<string, { nombre: string; codigo: string; ids: Set<number> }>();
   for (const p of pubs ?? []) {
     const pais = (Array.isArray(p.paises) ? p.paises[0] : p.paises) as { codigo: string; nombre: string } | null;
     if (!pais || !puedeVerPais(usuario.paisesPermitidos, pais.codigo)) continue;
@@ -67,13 +69,13 @@ export async function obtenerVentasDropiProducto(id: string, soloPais?: string):
     if (soloPais && pais.codigo.toUpperCase() !== soloPais.toUpperCase()) continue;
     const ids = String(p.dropi_id ?? "").match(/\d{3,6}/g) ?? [];
     if (!ids.length) continue;
-    const x = porPais.get(p.pais_id as string) ?? { nombre: pais.nombre, ids: new Set<number>() };
+    const x = porPais.get(p.pais_id as string) ?? { nombre: pais.nombre, codigo: pais.codigo, ids: new Set<number>() };
     porPais.set(p.pais_id as string, x);
     for (const n of ids) x.ids.add(Number(n));
   }
 
   const paises: VentasDropiPais[] = [];
-  for (const [paisId, { nombre, ids: set }] of porPais) {
+  for (const [paisId, { nombre, codigo, ids: set }] of porPais) {
     const ids = [...set];
     const [cargaR, productosR, diasR, stockR] = await Promise.all([
       supabase.from("dropi_ventas_cargas").select("corte").eq("pais_id", paisId).order("corte", { ascending: false }).limit(1).maybeSingle(),
@@ -104,6 +106,7 @@ export async function obtenerVentasDropiProducto(id: string, soloPais?: string):
     const primerMes = Object.keys(v.porMes).filter((m) => v.porMes[m] !== 0).sort()[0];
     paises.push({
       pais: nombre,
+      codigo,
       corte,
       netas30: v.netas30,
       netas30Antes: v.netas30Antes,

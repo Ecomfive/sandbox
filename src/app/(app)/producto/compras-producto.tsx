@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { Bandera } from "@/components/paises/bandera";
 import { Badge } from "@/components/ui/badge";
 import { anilloFoco } from "@/components/ui/field";
 import { compraCuenta } from "@/lib/compras/cuenta";
 import { diasPedidoLlegada, promedioDias } from "@/lib/compras/tiempo-compra";
 import { formatearFecha, formatearMoneda } from "@/lib/formato";
+import { nombrePais } from "@/lib/paises-mundo";
 import { colorEtapa, etiquetaEtapa, numeroOC } from "../compras/def-compras";
 import { obtenerComprasProducto, type CompraDeProducto } from "./compras-actions";
 
@@ -55,7 +57,7 @@ export function ComprasProducto({ id, limite, pais }: { id: string; limite?: num
   if (datos.length === 0)
     return (
       <div className="flex flex-col gap-1">
-        <p className="m-0 text-sm text-muted-foreground">{pais ? `Todavía no hay compras de este producto en ${pais}.` : "Todavía no hay compras vinculadas a este producto."}</p>
+        <p className="m-0 text-sm text-muted-foreground">{pais ? `Todavía no hay compras de este producto en ${nombrePais(pais)}.` : "Todavía no hay compras vinculadas a este producto."}</p>
         {otrosPaises}
       </div>
     );
@@ -95,9 +97,12 @@ export function ComprasProducto({ id, limite, pais }: { id: string; limite?: num
       </p>
       {grupos ? (
         grupos.map((g) => (
-          <section key={g.pais} aria-label={`Compras en ${g.pais}`} className="flex flex-col gap-1">
+          <section key={g.pais} aria-label={`Compras en ${g.pais === "—" ? "sin país" : nombrePais(g.pais)}`} className="flex flex-col gap-1">
             <h4 className="m-0 flex flex-wrap items-baseline justify-between gap-x-3 border-b border-border pb-1 text-xs font-semibold">
-              <span>{g.pais === "—" ? "Sin país" : g.pais}</span>
+              <span className="inline-flex items-center gap-1.5">
+                {g.pais !== "—" && <Bandera codigo={g.pais} />}
+                {g.pais === "—" ? "Sin país" : nombrePais(g.pais)}
+              </span>
               <span className="font-normal text-muted-foreground tabular-nums">
                 {entero(g.compras.filter(compraCuenta).length)} {g.compras.filter(compraCuenta).length === 1 ? "compra" : "compras"} · {entero(g.unidades)} u.
               </span>
@@ -141,7 +146,12 @@ function ListaCompras({ compras, conPais }: { compras: CompraDeProducto[]; conPa
                 <FechasCompra c={c} />
                 <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                   <Badge color={colorEtapa(c.etapa)}>{etiquetaEtapa(c.etapa)}</Badge>
-                  {conPais && c.pais && <span className="text-xs text-muted-foreground">{c.pais}</span>}
+                  {conPais && c.pais && (
+                    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                      <Bandera codigo={c.pais} />
+                      {nombrePais(c.pais)}
+                    </span>
+                  )}
                   {c.variante && <span className="text-xs text-muted-foreground">{c.variante}</span>}
                 </span>
               </div>

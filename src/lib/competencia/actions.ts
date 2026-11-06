@@ -26,6 +26,8 @@ export interface CompetidorDeProducto {
 
 export interface CompetenciaDeProducto {
   pais: string;
+  /** El código del país (para su bandera). */
+  codigo: string;
   /** Nuestro producto en ese Dropi (ECOMFIVE), si está. */
   nuestro: { nombre: string; precio: number | null; stock: number | null; foto: string | null } | null;
   competidores: CompetidorDeProducto[];
@@ -111,6 +113,7 @@ export async function obtenerCompetenciaProducto(skuId: string): Promise<{ datos
     const dominio = DOMINIO[pais?.codigo ?? ""] ?? (pais?.codigo ?? "pa").toLowerCase();
     salida.push({
       pais: pais?.nombre ?? "—",
+      codigo: pais?.codigo ?? "",
       nuestro: nuestra ? { nombre: nuestra.nombre, precio: n(nuestra.precio), stock: nuestra.stock, foto: nuestra.foto_url } : null,
       competidores: ids
         .map((id) => {

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { Bandera } from "@/components/paises/bandera";
 import { claseCeldaColumna, claseEncabezadoColumna, claseFilaEncabezado } from "@/components/tabla/estilos-tabla";
 import { Badge } from "@/components/ui/badge";
 import { anilloFoco } from "@/components/ui/field";
@@ -169,7 +170,14 @@ export function BloqueCompetencia({ skuId }: { skuId: string }) {
         return (
           <div key={d.pais} className="flex flex-col gap-3">
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <Dato titulo={`Competidores en ${d.pais}`} valor={num(d.competidores.length)} />
+              <Dato
+                titulo={
+                  <>
+                    Competidores en <Bandera codigo={d.codigo} /> {d.pais}
+                  </>
+                }
+                valor={num(d.competidores.length)}
+              />
               <Dato titulo="Precio más bajo" valor={usd(minimo)} sub={d.nuestro ? `nosotros ${usd(d.nuestro.precio)}` : "no lo vendemos en Dropi"} tono={masBaratos ? "destructive" : undefined} />
               <Dato titulo="Más baratos que nosotros" valor={num(masBaratos)} tono={masBaratos ? "destructive" : undefined} />
               <Dato titulo="Vendieron (7 días)" valor={num(vendido7)} sub="bajadas de stock" />
@@ -220,7 +228,7 @@ export function BloqueCompetencia({ skuId }: { skuId: string }) {
   );
 }
 
-function Dato({ titulo, valor, sub, tono }: { titulo: string; valor: string; sub?: string; tono?: "destructive" }) {
+function Dato({ titulo, valor, sub, tono }: { titulo: ReactNode; valor: string; sub?: string; tono?: "destructive" }) {
   return (
     <div className="rounded-lg border border-border px-3 py-2">
       <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
