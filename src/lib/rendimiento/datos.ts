@@ -4,7 +4,7 @@ import { paginasBuscables } from "@/lib/paleta";
 import { createServiceClient } from "@/lib/supabase/server";
 import { traerTodasConError } from "@/lib/supabase/paginar";
 import { nombreSinNumero } from "@/lib/whatsapp/telefono-oculto";
-import { armarJornada, rangoDelDia, type Dispositivo, type Jornada, type MensajeEnviado } from "./jornada";
+import { armarJornada, nombreDeRuta, rangoDelDia, type Dispositivo, type Jornada, type MensajeEnviado } from "./jornada";
 
 export interface PersonaDelDia {
   id: string;
@@ -18,7 +18,7 @@ const PAGINAS = paginasBuscables(construirAreas([{ nombre: "Dropi", tieneDatos: 
 /** El nombre de la página de una ruta: la del menú o la pestaña que más se le parece («/retiros/12» es «Conciliación de Retiros»). */
 export function paginaDeRuta(ruta: string): string {
   const p = PAGINAS.find((x) => (x.href === "/" ? ruta === "/" : ruta === x.href || ruta.startsWith(`${x.href}/`)));
-  return p ? p.etiqueta : ruta;
+  return p ? p.etiqueta : nombreDeRuta(ruta);
 }
 
 type FilaMinuto = { usuario_id: string; minuto: string; ruta: string; dispositivo?: Dispositivo | null };

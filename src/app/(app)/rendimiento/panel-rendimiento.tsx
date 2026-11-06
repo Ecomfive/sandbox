@@ -9,7 +9,8 @@ import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
 import { Tooltip } from "@/components/ui/tooltip";
 import { MINUTOS_PAUSA, NOMBRE_DISPOSITIVO, duracion, etiquetaHora, rangoDeHoras, type Jornada } from "@/lib/rendimiento/jornada";
 import { cargarFicha } from "./actions";
-import { QueHizo, colorDeArea, hora } from "./que-hizo";
+import { Flecha, hora } from "./piezas-ficha";
+import { QueHizo } from "./que-hizo";
 
 /** Lo que la lista necesita de cada persona: el detalle se pide al desplegar su ficha. */
 export interface FilaEquipo {
@@ -30,15 +31,6 @@ const fechaLarga = (dia: string) => new Date(`${dia}T12:00:00Z`).toLocaleDateStr
 const enlace = (dia: string, persona?: string | null, h?: number | null) => `/rendimiento?dia=${dia}${persona ? `&persona=${persona}` : ""}${persona && h != null ? `&hora=${h}` : ""}`;
 const pct = (parte: number, total: number) => (total ? Math.round((parte / total) * 100) : 0);
 
-/** La flecha de lo que se despliega: apunta abajo cuando está abierto. */
-function Flecha({ abierta, clase = "" }: { abierta?: boolean; clase?: string }) {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={`shrink-0 text-muted-foreground transition-transform motion-reduce:transition-none ${abierta ? "rotate-90" : ""} ${clase}`}>
-      <path d="m9 6 6 6-6 6" />
-    </svg>
-  );
-}
-
 function Tarjeta({ titulo, children }: { titulo: string; children: ReactNode }) {
   return (
     <section className="flex min-w-0 flex-col gap-3 rounded-xl border border-border bg-card p-4">
@@ -56,23 +48,22 @@ function Barra({ valor, total, color = "var(--primario)" }: { valor: number; tot
   );
 }
 
-/** En qué área estuvo y cuánto tiempo, con el color que tiene en la línea del día: esta lista es su leyenda. Cada área se despliega en sus páginas. */
+/** En qué área estuvo y cuánto tiempo. Cada área se despliega en sus páginas. */
 function PorArea({ j }: { j: Jornada }) {
   return (
-    <ul className="m-0 flex list-none flex-col gap-3 p-0">
+    <ul className="m-0 grid list-none items-start gap-x-6 gap-y-2.5 p-0 sm:grid-cols-2">
       {j.areas.map((a) => (
         <li key={a.area}>
           <details className="group">
             <summary className={`flex cursor-pointer list-none flex-col gap-1 rounded [&::-webkit-details-marker]:hidden ${anilloFoco}`}>
               <span className="flex items-center gap-2 text-sm">
                 <Flecha clase="group-open:rotate-90" />
-                <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: colorDeArea(a.area) }} />
                 <span className="min-w-0 flex-1 truncate font-medium">{a.area}</span>
                 <span className="shrink-0 text-muted-foreground tabular-nums">
                   {duracion(a.minutos)} · {pct(a.minutos, j.minutosActivos)} %
                 </span>
               </span>
-              <Barra valor={a.minutos} total={j.minutosActivos} color={colorDeArea(a.area)} />
+              <Barra valor={a.minutos} total={j.minutosActivos} />
             </summary>
             <ul className="m-0 mt-2 flex list-none flex-col gap-1 p-0 pl-6 text-[13px]">
               {a.paginas.map((p) => (
@@ -100,7 +91,7 @@ function PorDispositivo({ j }: { j: Jornada }) {
               <span className={d.dispositivo ? "font-medium" : "text-muted-foreground"}>{d.dispositivo ? NOMBRE_DISPOSITIVO[d.dispositivo] : "Sin dato"}</span>
               <span className="shrink-0 text-muted-foreground tabular-nums">{duracion(d.minutos)}</span>
             </span>
-            <Barra valor={d.minutos} total={j.minutosActivos} color={d.dispositivo ? undefined : "var(--area-otras)"} />
+            <Barra valor={d.minutos} total={j.minutosActivos} color={d.dispositivo ? undefined : "color-mix(in srgb, var(--muted-foreground) 45%, transparent)"} />
           </li>
         ))}
       </ul>

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { armarJornada, diaPanama, dispositivoDeAgente, duracion, etiquetaHora, horaPanama, rangoDeHoras, rangoDelDia, rutaDeLatido, tramosDelDia } from "./jornada";
+import { agruparHechas, armarJornada, diaPanama, dispositivoDeAgente, duracion, etiquetaHora, horaPanama, nombreDeRuta, rangoDeHoras, rangoDelDia, rutaDeLatido, tramosDelDia } from "./jornada";
 
 // 8:00 de Panamá = 13:00 UTC.
 const min = (hhmm: string, ruta = "/publicaciones-dropi") => ({ minuto: `2026-10-27T${hhmm}:00.000Z`, ruta });
@@ -140,4 +140,30 @@ test("los bloques se juntan en ratos de trabajo, cortados por las pausas", () =>
   const j = armarJornada([compu("13:00"), compu("13:05"), compu("13:11")], [], pagina);
   assert.equal(j.pausas.length, 1);
   assert.equal(tramosDelDia(j.bloques).length, j.pausas.length + 1);
+});
+
+test("lo repetido seguido se junta en un renglón; lo suelto queda como está", () => {
+  const c = (texto: string, s: string) => ({ momento: `2026-10-27T13:00:${s}.000Z`, texto });
+  const g = agruparHechas([c("Marcó no leído", "01"), c("Vinculó: A", "02"), c("Vinculó: B", "03"), c("Vinculó: C", "04"), c("Cambió: X", "05"), c("Cambió: Y", "06"), c("Vinculó: D", "07")]);
+  assert.deepEqual(g.map((x) => [x.titulo, x.cosas.length]), [[null, 1], ["Vinculó", 3], [null, 1], [null, 1], [null, 1]]);
+  assert.deepEqual(agruparHechas([]), []);
+  assert.deepEqual(agruparHechas([c("Resolvió", "01"), c("Resolvió", "02"), c("Resolvió", "03")]).map((x) => [x.titulo, x.cosas.length]), [["Resolvió", 3]]);
+});
+
+test("una ruta fuera del menú sale con nombre", () => {
+  assert.equal(nombreDeRuta("/ayuda"), "Centro de ayuda");
+  assert.equal(nombreDeRuta("/ayuda/guias"), "Centro de ayuda");
+  assert.equal(nombreDeRuta("/ventas-tiendas/pipeline"), "Ventas tiendas › Pipeline");
+  assert.equal(nombreDeRuta("/retiros/1234"), "Retiros");
+  assert.equal(nombreDeRuta("/compras/0194f0a2-0000-7000-8000-000000000001"), "Compras");
+  assert.equal(nombreDeRuta("/"), "/");
+});
+
+test("cada hora guarda sus WhatsApp, juntos por chat", () => {
+  const j = armarJornada([min("13:00")], [], pagina, [
+    { momento: "2026-10-27T13:10:00.000Z", chat: "Sol" },
+    { momento: "2026-10-27T13:20:00.000Z", chat: "Sol" },
+    { momento: "2026-10-27T14:05:00.000Z", chat: "Luna" },
+  ]);
+  assert.deepEqual(j.horas.map((h) => [h.hora, h.mensajes.map((m) => [m.chat, m.n])]), [[8, [["Sol", 2]]], [9, [["Luna", 1]]]]);
 });
