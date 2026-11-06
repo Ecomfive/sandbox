@@ -188,6 +188,18 @@ export const DEF_PRODUCTO: DefTabla<FilaProducto> = {
       opciones: () => (Object.entries(ETIQUETA_PUNTO) as [PuntoDecidir, string][]).map(([valor, etiqueta]) => ({ valor, etiqueta })),
       etiquetaSinValor: "Nada pendiente",
     },
+    {
+      // Todos los productos, de cualquier estado: la tarjeta «Sin foto» de arriba solo cuenta los Activos (6 nov 2026, pedido de Jhokser: revisar los que faltan).
+      id: "foto",
+      etiqueta: "Foto",
+      tipo: "seleccion",
+      valores: (p) => [p.foto ? "con" : "sin"],
+      opciones: () => [
+        { valor: "sin", etiqueta: "Sin foto" },
+        { valor: "con", etiqueta: "Con foto" },
+      ],
+      agrupable: true,
+    },
     { id: "comprado", etiqueta: "Unidades compradas", tipo: "numero", valor: (p) => p.unidadesCompradas },
     { id: "oferta", etiqueta: "Oferta", tipo: "numero", valor: (p) => p.tests[0]?.oferta ?? null },
     {
