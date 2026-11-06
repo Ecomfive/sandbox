@@ -12,9 +12,10 @@ import { useToast } from "@/components/ui/toast";
 import { Ventana } from "@/components/ui/ventana";
 import { formatearFecha } from "@/lib/formato";
 import { EstadoIcon, InventarioIcon, MundoIcon } from "@/lib/nav-icons";
-import { ESTADOS_EXISTE, ETIQUETA_ESTADO_PAIS, estadoDeCelda, type CeldaPais, type Decision, type EstadoPais } from "@/lib/producto/por-pais";
+import { accionesPorPais, ESTADOS_EXISTE, ETIQUETA_ESTADO_PAIS, estadoDeCelda, paisesPorDecidir, type CeldaPais, type Decision, type EstadoPais } from "@/lib/producto/por-pais";
 import type { NombreFilas } from "@/lib/tabla/pie";
 import { decidirProductoPais } from "./actions";
+import { TableroPorPais } from "./tablero-por-pais";
 import { DEF_POR_PAIS, detalleCelda, type FilaPorPais, type PaisColumna } from "./def-por-pais";
 
 const NOMBRE: NombreFilas = { singular: "producto", plural: "productos" };
@@ -115,7 +116,7 @@ export function TablaPorPais({ filas: iniciales, paises, puedeEscribir, codigoPa
   );
 
   const iconos = useMemo<Record<string, IconoComp>>(
-    () => ({ falta: MundoIcon, existe: MundoIcon, cuantos: MundoIcon, tipo: InventarioIcon, clase: EstadoIcon, nombre: InventarioIcon, codigo: InventarioIcon, ...Object.fromEntries(paises.map((p) => [`pais_${p.codigo}`, MundoIcon])) }),
+    () => ({ accion: EstadoIcon, decidir: MundoIcon, falta: MundoIcon, existe: MundoIcon, cuantos: MundoIcon, tipo: InventarioIcon, clase: EstadoIcon, nombre: InventarioIcon, codigo: InventarioIcon, ...Object.fromEntries(paises.map((p) => [`pais_${p.codigo}`, MundoIcon])) }),
     [paises],
   );
 
@@ -127,13 +128,15 @@ export function TablaPorPais({ filas: iniciales, paises, puedeEscribir, codigoPa
       todas.map((f) => {
         if (f.id !== id) return f;
         const celda = { ...f.celdas[codigo], decision };
-        return { ...f, celdas: { ...f.celdas, [codigo]: { ...celda, estado: estadoDeCelda(celda) } } };
+        const celdas = { ...f.celdas, [codigo]: { ...celda, estado: estadoDeCelda(celda) } };
+        return { ...f, celdas, acciones: accionesPorPais(celdas, f.clase), porDecidir: paisesPorDecidir(celdas, f.clase) };
       }),
     );
   }
 
   return (
     <>
+      <TableroPorPais filas={filas} paises={paises} />
       <TablaDatos
         def={DEF_POR_PAIS}
         filas={filas}

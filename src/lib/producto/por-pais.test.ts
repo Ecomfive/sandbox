@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { compraCuenta } from "@/lib/compras/cuenta";
-import { armarPorPais, errorDecision } from "./por-pais";
+import { accionesPorPais, armarPorPais, errorDecision, paisesPorDecidir } from "./por-pais";
 
 const productos = [
   { id: "a", padreId: null },
@@ -66,4 +66,24 @@ test("descartar pide motivo", () => {
   assert.equal(errorDecision("enviar", ""), null);
   assert.equal(errorDecision(null, ""), null);
   assert.equal(errorDecision("otra", ""), "Decisión desconocida.");
+});
+
+test("tarjetas: por decidir solo en activos que ya existen en otro país", () => {
+  const r = armarPorPais(productos, ["PA", "CR", "MX"], {
+    ...vacio,
+    publicaciones: [{ skuId: "a", pais: "PA", plataforma: "dropi", idPlataforma: "1", ref: "p", activa: true }],
+    compras: [{ skuId: "a", compraId: "c", pais: "MX", numero: 1, unidades: 5, etapa: "tracking", anulada: false, creada: "2026-10-01" }],
+    decisiones: [{ skuId: "a", pais: "CR", decision: "enviar", motivo: null, por: null, en: "2026-11-05" }],
+  }, compraCuenta);
+  const a = r.get("a")!;
+  assert.deepEqual(paisesPorDecidir(a, "fisico"), []);
+  assert.deepEqual(accionesPorPais(a, "fisico"), ["por_enviar", "comprado_sin_publicar"]);
+  const b = r.get("b")!;
+  assert.deepEqual(paisesPorDecidir(b, "fisico"), []);
+  assert.deepEqual(accionesPorPais(b, "fisico"), ["ningun_pais"]);
+  assert.deepEqual(accionesPorPais(b, "test"), []);
+  const r2 = armarPorPais(productos, ["PA", "CR"], { ...vacio, publicaciones: [{ skuId: "b", pais: "PA", plataforma: "dropi", idPlataforma: "1", ref: "p", activa: true }] }, compraCuenta);
+  assert.deepEqual(paisesPorDecidir(r2.get("b")!, "fisico"), ["CR"]);
+  assert.deepEqual(accionesPorPais(r2.get("b")!, "fisico"), ["por_decidir", "un_pais"]);
+  assert.deepEqual(paisesPorDecidir(r2.get("b")!, "inactivo"), []);
 });

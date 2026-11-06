@@ -3,7 +3,7 @@ import type { UsuarioActual } from "@/lib/auth";
 import { compraCuenta } from "@/lib/compras/cuenta";
 import { PAISES_NAV } from "@/lib/nav-data";
 import { puedeVerPais } from "@/lib/paises-permitidos";
-import { armarPorPais, ESTADOS_EXISTE, type CompraPais, type DecisionPais, type PublicacionPais, type StockPais } from "@/lib/producto/por-pais";
+import { accionesPorPais, armarPorPais, ESTADOS_EXISTE, paisesPorDecidir, type CompraPais, type DecisionPais, type PublicacionPais, type StockPais } from "@/lib/producto/por-pais";
 import { traerTodasConError } from "@/lib/supabase/paginar";
 import type { FilaPorPais, PaisColumna } from "./def-por-pais";
 
@@ -111,6 +111,8 @@ export async function cargarPorPais(usuario: UsuarioActual, supabase: SupabaseCl
         clase: p.clase,
         celdas: porPais,
         existeEn,
+        acciones: accionesPorPais(porPais, p.clase),
+        porDecidir: paisesPorDecidir(porPais, p.clase),
       };
     })
     .sort((a, b) => b.existeEn.length - a.existeEn.length || (b.numero ?? 0) - (a.numero ?? 0));

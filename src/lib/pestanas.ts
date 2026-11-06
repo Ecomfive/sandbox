@@ -22,10 +22,6 @@ export const PESTANAS_POR_MODULO: Record<string, Pestana[]> = {
     { etiqueta: "Consumo de IA", href: "/publicaciones-dropi/consumo" },
     { etiqueta: "Uso del sistema", href: "/publicaciones-dropi/uso-sistema" },
   ],
-  "/producto": [
-    { etiqueta: "Producto", href: "/producto" },
-    { etiqueta: "Por país", href: "/producto/paises" },
-  ],
   "/retiros": [
     { etiqueta: "Retiros", href: "/retiros" },
     { etiqueta: "Cuentas destino", href: "/retiros/cuentas" },
@@ -93,6 +89,7 @@ export const PESTANAS_POR_MODULO: Record<string, Pestana[]> = {
     { etiqueta: "Planificación", href: "/compras/planificacion" },
     { etiqueta: "Reponer", href: "/compras/reponer" },
     { etiqueta: "Sin stock", href: "/compras/sin-stock" },
+    { etiqueta: "Por país", href: "/compras/por-pais" },
     { etiqueta: "Tiempos y fallas", href: "/compras/tiempos" },
     { etiqueta: "Envíos", href: "/compras/envios" },
   ],

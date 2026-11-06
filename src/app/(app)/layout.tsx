@@ -19,7 +19,7 @@ import { paginasBuscables } from "@/lib/paleta";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { REVISAN_CAMBIOS } from "@/lib/ayuda/actualizaciones";
 import { contarNovedadesSinVer } from "@/lib/ayuda/novedades-vistas";
-import { PESTANAS_SOLO_ADMIN, PESTANAS_USO_SISTEMA, pestanasOcultasDe } from "@/lib/permisos/ocultas";
+import { PESTANAS_POR_PAIS, PESTANAS_SOLO_ADMIN, PESTANAS_USO_SISTEMA, pestanasOcultasDe } from "@/lib/permisos/ocultas";
 import { createServiceClient } from "@/lib/supabase/server";
 import { obtenerFavoritos } from "@/lib/favoritos";
 import { obtenerPendientesHoy } from "@/lib/pendientes-hoy";
@@ -74,6 +74,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         ...pestanasOcultasDe(usuario.afinado),
         ...(esAdministrador(usuario) ? [] : PESTANAS_SOLO_ADMIN),
         ...(usuario.modulos.includes("uso-sistema") ? [] : PESTANAS_USO_SISTEMA),
+        ...(usuario.modulos.includes("compras-por-pais") ? [] : PESTANAS_POR_PAIS),
         // Los KPIs de atención y el panel de Dirección ya no son pestañas: desde el 30 oct 2026 son la Bandeja de Dirección.
       ]
     : [];

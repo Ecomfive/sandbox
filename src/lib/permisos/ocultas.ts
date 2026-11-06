@@ -10,6 +10,9 @@ export const PESTANAS_SOLO_ADMIN = ["/compras/reponer"];
 /** Supervisión de lo que se hace fuera del sistema: solo quien tiene el módulo `uso-sistema`, que se da por persona (Hernán y Alcides). */
 export const PESTANAS_USO_SISTEMA = ["/publicaciones-dropi/uso-sistema"];
 
+/** Compras › Por país: decisiones de compra por país de Alcides; solo quien tiene el módulo `compras-por-pais`, que se da por persona (migración 0232). */
+export const PESTANAS_POR_PAIS = ["/compras/por-pais"];
+
 export function pestanasOcultasDe(afinado: Record<string, Afinado>): string[] {
   const ocultas: string[] = [];
   for (const [modulo, a] of Object.entries(afinado)) {

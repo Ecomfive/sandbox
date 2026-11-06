@@ -396,12 +396,15 @@ convenciones técnicas del código.
   descripción de 200 caracteres como mínimo y, si el producto es público, una bodega con
   100 unidades y 3 imágenes. Peso en gramos, medidas en centímetros. No incluye Carga masiva,
   Actualización masiva ni las descargas en Excel de Dropi.
-- **Producto › Por país** (`/producto/paises`, pestaña de Producto, migración 0231, 5 nov 2026, pedido de Alcides; reemplaza su hoja «Gestión de Productos por País»). Cada producto
+- **Compras › Por país** (`/compras/por-pais`, migraciones 0231 y 0232, 5 nov 2026, pedido de Alcides; reemplaza su hoja «Gestión de Productos por País»). Son decisiones de compra de Alcides: módulo propio
+  `compras-por-pais` dado **por persona** (`permisos_persona`, hoy solo Alcides; la pestaña se oculta con `PESTANAS_POR_PAIS` a quien no lo tiene; estuvo unas horas en Producto y `/producto/paises` redirige). Cada producto
   (sin las variantes, que suman a su producto) con una casilla por país de `PAISES_NAV` que la persona ve: **existe** si tiene una publicación activa de Dropi o Drop (un borrador no
   cuenta), una compra que cuenta (`compraCuenta`) o stock físico en una bodega del país (`wms_stock`). Estados y orden en `src/lib/producto/por-pais.ts` (`armarPorPais`,
   `estadoDeCelda`, con prueba): publicado > comprado > con stock > descontinuado en el país > la decisión > solo archivado > no existe. Donde no existe, «Enviar» o «Descartado» (con
-  motivo) en `producto_pais_decisiones` (RLS sin políticas; `decidirProductoPais`, `paises/actions.ts`, pide escribir en Producto, auditoría `decidir_producto_pais`). Carga en
-  `paises/datos-por-pais.ts`; tabla `tabla-por-pais.tsx` (`DEF_POR_PAIS`: filtros «Todavía no está en», «Existe en» y uno por país). Pendiente: señales de competencia y
+  motivo) en `producto_pais_decisiones` (RLS sin políticas; `decidirProductoPais`, `por-pais/actions.ts`, pide escribir en `compras-por-pais`, auditoría `decidir_producto_pais`). Carga en
+  `compras/por-pais/datos-por-pais.ts`; tabla `tabla-por-pais.tsx` (`DEF_POR_PAIS`: filtros «Todavía no está en», «Existe en» y uno por país). Arriba, `tablero-por-pais.tsx` (como Compras): «Para hacer»
+  (`accionesPorPais`: por decidir, por enviar, comprado sin publicar, en un solo país, activos en ningún país, solo archivado, descartados) y «Por decidir en cada país»
+  (`paisesPorDecidir`: activos que existen en otro país y ahí no, sin decisión), cada tarjeta filtra la lista. Pendiente: señales de competencia y
   oportunidad (Análisis de competencia, Tu Winner) en las casillas vacías.
 - **Tablero de Producto** (23 oct 2026, pedido de Hernán, al estilo de Gestión de IDs Dropi): `tablero-producto.tsx` (reemplaza
   `tarjetas-clase.tsx`) con «Estado» (Activos, En test, Inactivos + descontinuados; filtran «clase») y «Para decidir»: el campo

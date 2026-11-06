@@ -169,3 +169,34 @@ export function errorDecision(decision: string | null, motivo: string): string |
   if (motivo.length > 300) return "El motivo no puede pasar de 300 caracteres.";
   return null;
 }
+
+/** Las tarjetas de acción de «Por país» (5 nov 2026, pedido de Alcides: «los cuadritos arriba, como en Compras»). */
+export type AccionPorPais = "por_decidir" | "por_enviar" | "comprado_sin_publicar" | "solo_archivado" | "un_pais" | "ningun_pais" | "descartado";
+
+/**
+ * Los países donde un producto activo es una oportunidad por decidir: ya existe en otro país y aquí no existe (o solo quedó archivado),
+ * sin «Enviar», «Descartado» ni descontinuado.
+ */
+export function paisesPorDecidir(celdas: Record<string, CeldaPais>, clase: string): string[] {
+  if (clase !== "fisico") return [];
+  const existe = Object.values(celdas).some((c) => ESTADOS_EXISTE.includes(c.estado));
+  if (!existe) return [];
+  return Object.entries(celdas)
+    .filter(([, c]) => c.estado === "no" || c.estado === "archivado")
+    .map(([codigo]) => codigo);
+}
+
+/** En qué tarjetas cuenta un producto (puede estar en varias). Las de oportunidad y alcance son solo de productos activos. */
+export function accionesPorPais(celdas: Record<string, CeldaPais>, clase: string): AccionPorPais[] {
+  const estados = Object.values(celdas).map((c) => c.estado);
+  const existeEn = estados.filter((e) => ESTADOS_EXISTE.includes(e)).length;
+  const salida: AccionPorPais[] = [];
+  if (paisesPorDecidir(celdas, clase).length) salida.push("por_decidir");
+  if (estados.includes("enviar")) salida.push("por_enviar");
+  if (estados.includes("comprado")) salida.push("comprado_sin_publicar");
+  if (estados.includes("archivado")) salida.push("solo_archivado");
+  if (clase === "fisico" && existeEn === 1) salida.push("un_pais");
+  if (clase === "fisico" && existeEn === 0) salida.push("ningun_pais");
+  if (estados.includes("descartado")) salida.push("descartado");
+  return salida;
+}
