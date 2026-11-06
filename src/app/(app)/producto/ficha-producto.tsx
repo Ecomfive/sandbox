@@ -11,7 +11,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/toast";
 import { Ventana } from "@/components/ui/ventana";
 import { Badge } from "@/components/ui/badge";
-import { CalendarioIcon, CatalogoIcon, ComprasIcon, EnlaceIcon, EnvioIcon, FlechaAbajoIcon, FlechaArribaIcon, InteligenciaIcon, InventarioIcon, PapeleraIcon, ProductoIcon, TestIcon, VentasIcon } from "@/lib/nav-icons";
+import { CalendarioIcon, CatalogoIcon, ComprasIcon, EnlaceIcon, EnvioIcon, FlechaAbajoIcon, FlechaArribaIcon, InteligenciaIcon, InventarioIcon, MundoIcon, PapeleraIcon, ProductoIcon, TestIcon, VentasIcon } from "@/lib/nav-icons";
 import { BloqueCompetencia } from "@/components/competencia/piezas-competencia";
 import { ResultadoTestProducto } from "./test-producto";
 import { formatearFecha } from "@/lib/formato";
@@ -234,8 +234,6 @@ export function FichaProducto({
                   ) : (
                     (ETIQUETA_CLASE[producto.clase] ?? producto.clase)
                   )}
-                  {/* Descontinuado solo en algunos países (migración 0211); «Descontinuado» ya vale para todos. */}
-                  {producto.clase !== "descontinuado" && producto.tipo !== "combo" && <DescontinuadoPorPais key={`desc-${producto.id}`} skuId={producto.id} puedeEscribir={puedeEscribir} />}
                   {error && (
                     <span role="alert" className="mt-1 block text-xs text-destructive">
                       {error}
@@ -248,6 +246,13 @@ export function FichaProducto({
               </dl>
               </div>
             </Seccion>
+            {/* Descontinuado solo en algunos países (migración 0211), en su propia sección (5 nov 2026, pedido de Alcides: junto al estado se
+                veía cortado). Con el estado «Descontinuado» ya vale para todos, y un compuesto no se compra: no sale. */}
+            {producto.clase !== "descontinuado" && producto.tipo !== "combo" && (
+              <Seccion icono={MundoIcon} titulo="Descontinuado por país">
+                <DescontinuadoPorPais key={`desc-${producto.id}`} skuId={producto.id} puedeEscribir={puedeEscribir} />
+              </Seccion>
+            )}
             <Seccion icono={CatalogoIcon} titulo="Código de barras">
               <CodigoBarrasProducto
                 key={producto.id}

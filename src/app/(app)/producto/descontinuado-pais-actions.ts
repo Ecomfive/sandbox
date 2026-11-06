@@ -9,6 +9,8 @@ import { createServiceClient } from "@/lib/supabase/server";
 const MODULO = "producto";
 const ES_ID = (v: string) => /^[0-9a-fA-F-]{36}$/.test(v);
 const FALTA = "Falta correr la migración 0211 (descontinuado por país) en la base.";
+/** Países donde todavía no se piensa entrar mercancía (5 nov 2026, pedido de Alcides): no se ofrecen, salvo que ya estén marcados. */
+const PAISES_FUERA = ["CO"];
 
 export interface PaisDescontinuado {
   codigo: string;
@@ -28,7 +30,9 @@ export async function paisesDescontinuado(skuId: string): Promise<{ paises: Pais
   if (marcadosR.error) return { error: FALTA };
   const marcados = new Set((marcadosR.data ?? []).map((f) => f.pais_id as string));
   return {
-    paises: ((paisesR.data ?? []) as { id: string; codigo: string; nombre: string }[]).map((p) => ({ codigo: p.codigo, nombre: p.nombre, descontinuado: marcados.has(p.id) })),
+    paises: ((paisesR.data ?? []) as { id: string; codigo: string; nombre: string }[])
+      .filter((p) => !PAISES_FUERA.includes(p.codigo) || marcados.has(p.id))
+      .map((p) => ({ codigo: p.codigo, nombre: p.nombre, descontinuado: marcados.has(p.id) })),
   };
 }
 
@@ -41,6 +45,7 @@ export async function cambiarDescontinuadoPais(skuId: string, codigo: string, si
   if (!ES_ID(skuId)) return { error: "Producto no válido." };
   if (typeof codigo !== "string" || !/^[A-Z]{2}$/.test(codigo)) return { error: "País no válido." };
   if (!puedeVerPais(usuario.paisesPermitidos ?? null, codigo)) return { error: "No tienes acceso a ese país." };
+  if (si && PAISES_FUERA.includes(codigo)) return { error: "Ese país no se ofrece por ahora." };
   const supabase = createServiceClient();
   const [{ data: pais }, { data: sku }] = await Promise.all([
     supabase.from("paises").select("id, nombre").eq("codigo", codigo).maybeSingle(),
