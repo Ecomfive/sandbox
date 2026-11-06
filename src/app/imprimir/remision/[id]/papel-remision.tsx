@@ -29,88 +29,107 @@ export function PapelRemision({ d }: { d: DatosPapelRemision }) {
   const unidades = d.lineas.reduce((t, f) => t + f.enviada, 0);
   return (
     <div className="min-h-screen bg-neutral-200 py-6 text-black print:bg-white print:py-0" style={{ colorScheme: "light" }}>
-      <style>{"@page { size: letter; margin: 14mm; }"}</style>
+      <style>{"@page { size: letter; margin: 0 14mm; }"}</style>
       <div className="mx-auto mb-4 flex w-full max-w-[816px] justify-end px-4 print:hidden">
         <BotonImprimir />
       </div>
-      <main className="mx-auto flex w-full max-w-[816px] flex-col gap-6 bg-white p-10 shadow print:max-w-none print:p-0 print:shadow-none">
-        <header className="flex items-start justify-between gap-6 border-b-2 border-black pb-4">
-          <img src="/brand/ecomfive-negro.png" alt="Ecomfive" className="h-9 w-auto" />
-          <div className="text-right">
-            <h1 className="m-0 text-2xl font-bold tracking-tight">Remisión {d.numero}</h1>
-            <p className="m-0 text-sm">{d.fecha}</p>
-          </div>
-        </header>
+      {/* Sin margen arriba y abajo en la hoja, el navegador no tiene dónde imprimir su enlace, el título y la fecha. Estas dos franjas lo reponen en cada hoja: una tabla repite su `thead` y su `tfoot` al pasar de página. */}
+      <table role="presentation" className="mx-auto w-full max-w-[816px] border-collapse print:max-w-none">
+        <thead className="hidden print:table-header-group">
+          <tr>
+            <td className="h-[14mm] p-0" />
+          </tr>
+        </thead>
+        <tfoot className="hidden print:table-footer-group">
+          <tr>
+            <td className="h-[14mm] p-0" />
+          </tr>
+        </tfoot>
+        <tbody>
+          <tr>
+            <td className="p-0">
+            <main className="flex w-full flex-col gap-6 bg-white p-10 shadow print:p-0 print:shadow-none">
+              <header className="flex items-start justify-between gap-6 border-b-2 border-black pb-4">
+                <img src="/brand/ecomfive-negro.png" alt="Ecomfive" className="h-9 w-auto" />
+                <div className="text-right">
+                  <h1 className="m-0 text-2xl font-bold tracking-tight">Remisión {d.numero}</h1>
+                  <p className="m-0 text-sm">{d.fecha}</p>
+                </div>
+              </header>
 
-        <section className="grid grid-cols-3 gap-4 text-sm">
-          <div>
-            <p className="m-0 text-xs text-neutral-600">Sale de</p>
-            <p className="m-0 font-semibold">{d.desde}</p>
-          </div>
-          <div>
-            <p className="m-0 text-xs text-neutral-600">Va a</p>
-            <p className="m-0 font-semibold">{d.hacia}</p>
-          </div>
-          <div>
-            <p className="m-0 text-xs text-neutral-600">País</p>
-            <p className="m-0 font-semibold">{d.pais}</p>
-          </div>
-          {d.notas && (
-            <div className="col-span-3">
-              <p className="m-0 text-xs text-neutral-600">Notas</p>
-              <p className="m-0">{d.notas}</p>
-            </div>
-          )}
-        </section>
+              <section className="grid grid-cols-3 gap-4 text-sm">
+                <div>
+                  <p className="m-0 text-xs text-neutral-600">Sale de</p>
+                  <p className="m-0 font-semibold">{d.desde}</p>
+                </div>
+                <div>
+                  <p className="m-0 text-xs text-neutral-600">Va a</p>
+                  <p className="m-0 font-semibold">{d.hacia}</p>
+                </div>
+                <div>
+                  <p className="m-0 text-xs text-neutral-600">País</p>
+                  <p className="m-0 font-semibold">{d.pais}</p>
+                </div>
+                {d.notas && (
+                  <div className="col-span-3">
+                    <p className="m-0 text-xs text-neutral-600">Notas</p>
+                    <p className="m-0">{d.notas}</p>
+                  </div>
+                )}
+              </section>
 
-        <table className="w-full border-collapse text-sm">
-          <thead>
-            <tr className="text-left">
-              {["N.º", "SKU", "Producto", "Enviadas", "Recibidas", "Observaciones"].map((t) => (
-                <th key={t} scope="col" className={`border border-black px-2 py-1.5 text-xs font-semibold ${t === "Enviadas" || t === "Recibidas" ? "text-right" : ""}`}>
-                  {t}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {d.lineas.map((f, i) => (
-              <tr key={f.id} className="break-inside-avoid">
-                <td className="border border-black px-2 py-2 align-top tabular-nums">{i + 1}</td>
-                <td className="border border-black px-2 py-2 align-top text-xs [overflow-wrap:anywhere]">
-                  {f.codigo.split("/").map((parte, j) => (
-                    <span key={j}>
-                      {j > 0 && "/"}
-                      <wbr />
-                      {parte}
-                    </span>
+              <table className="w-full border-collapse text-sm">
+                <thead>
+                  <tr className="text-left">
+                    {["N.º", "SKU", "Producto", "Enviadas", "Recibidas", "Observaciones"].map((t) => (
+                      <th key={t} scope="col" className={`border border-black px-2 py-1.5 text-xs font-semibold ${t === "Enviadas" || t === "Recibidas" ? "text-right" : ""}`}>
+                        {t}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {d.lineas.map((f, i) => (
+                    <tr key={f.id} className="break-inside-avoid">
+                      <td className="border border-black px-2 py-2 align-top tabular-nums">{i + 1}</td>
+                      <td className="border border-black px-2 py-2 align-top text-xs [overflow-wrap:anywhere]">
+                        {f.codigo.split("/").map((parte, j) => (
+                          <span key={j}>
+                            {j > 0 && "/"}
+                            <wbr />
+                            {parte}
+                          </span>
+                        ))}
+                        {f.barras && <span className="block text-neutral-600">{f.barras}</span>}
+                      </td>
+                      <td className="border border-black px-2 py-2 align-top">{f.nombre}</td>
+                      <td className="border border-black px-2 py-2 text-right align-top font-semibold tabular-nums">{f.enviada.toLocaleString("es-PA")}</td>
+                      <td className="w-20 border border-black" />
+                      <td className="w-36 border border-black" />
+                    </tr>
                   ))}
-                  {f.barras && <span className="block text-neutral-600">{f.barras}</span>}
-                </td>
-                <td className="border border-black px-2 py-2 align-top">{f.nombre}</td>
-                <td className="border border-black px-2 py-2 text-right align-top font-semibold tabular-nums">{f.enviada.toLocaleString("es-PA")}</td>
-                <td className="w-20 border border-black" />
-                <td className="w-36 border border-black" />
-              </tr>
-            ))}
-            <tr className="font-semibold">
-              <td colSpan={3} className="border border-black px-2 py-2 text-right">
-                Total ({d.lineas.length} {d.lineas.length === 1 ? "producto" : "productos"})
-              </td>
-              <td className="border border-black px-2 py-2 text-right tabular-nums">{unidades.toLocaleString("es-PA")}</td>
-              <td className="border border-black" />
-              <td className="border border-black" />
-            </tr>
-          </tbody>
-        </table>
+                  <tr className="font-semibold">
+                    <td colSpan={3} className="border border-black px-2 py-2 text-right">
+                      Total ({d.lineas.length} {d.lineas.length === 1 ? "producto" : "productos"})
+                    </td>
+                    <td className="border border-black px-2 py-2 text-right tabular-nums">{unidades.toLocaleString("es-PA")}</td>
+                    <td className="border border-black" />
+                    <td className="border border-black" />
+                  </tr>
+                </tbody>
+              </table>
 
-        <p className="m-0 text-xs text-neutral-700">Al recibir, cuenta la mercancía, anota en «Recibidas» lo que llegó y explica cualquier diferencia en «Observaciones».</p>
+              <p className="m-0 text-xs text-neutral-700">Al recibir, cuenta la mercancía, anota en «Recibidas» lo que llegó y explica cualquier diferencia en «Observaciones».</p>
 
-        <section className="mt-6 grid grid-cols-2 gap-10 break-inside-avoid">
-          <Firma titulo="Entrega" />
-          <Firma titulo="Recibe" />
-        </section>
-      </main>
+              <section className="mt-6 grid grid-cols-2 gap-10 break-inside-avoid">
+                <Firma titulo="Entrega" />
+                <Firma titulo="Recibe" />
+              </section>
+            </main>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   );
 }
