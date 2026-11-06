@@ -404,7 +404,7 @@ convenciones técnicas del código.
   motivo) en `producto_pais_decisiones` (RLS sin políticas; `decidirProductoPais`, `por-pais/actions.ts`, pide escribir en `compras-por-pais`, auditoría `decidir_producto_pais`). Carga en
   `compras/por-pais/datos-por-pais.ts`; tabla `tabla-por-pais.tsx` (`DEF_POR_PAIS`: filtros «Todavía no está en», «Existe en» y uno por país). Arriba, `tablero-por-pais.tsx` (como Compras): «Para hacer»
   (`accionesPorPais`: por decidir, por enviar, comprado sin publicar, en un solo país, activos en ningún país, solo archivado, descartados) y «Por decidir en cada país»
-  (`paisesPorDecidir`: activos que existen en otro país y ahí no, sin decisión), cada tarjeta filtra la lista. Pendiente: señales de competencia y
+  (`paisesPorDecidir`: activos que existen en otro país y ahí no, sin decisión), cada tarjeta filtra la lista. Columna y filtro «Creado» (fecha de creación del producto). Pendiente: señales de competencia y
   oportunidad (Análisis de competencia, Tu Winner) en las casillas vacías.
 - **Tablero de Producto** (23 oct 2026, pedido de Hernán, al estilo de Gestión de IDs Dropi): `tablero-producto.tsx` (reemplaza
   `tarjetas-clase.tsx`) con «Estado» (Activos, En test, Inactivos + descontinuados; filtran «clase») y «Para decidir»: el campo

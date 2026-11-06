@@ -18,6 +18,8 @@ export interface FilaPorPais {
   foto: string | null;
   tipo: string;
   clase: string;
+  /** Día en que se creó el producto (AAAA-MM-DD). */
+  creado: string;
   celdas: Record<string, CeldaPais>;
   /** Los países donde ya existe (publicado, comprado o con stock). */
   existeEn: string[];
@@ -106,6 +108,7 @@ export const DEF_POR_PAIS: DefTabla<FilaPorPais> = {
       opciones: () => Object.entries(ETIQUETA_CLASE).map(([valor, etiqueta]) => ({ valor, etiqueta })),
       agrupable: true,
     },
+    { id: "creado", etiqueta: "Creado el", tipo: "fecha", valor: (f) => f.creado || null },
     { id: "nombre", etiqueta: "Nombre", tipo: "texto", valor: (f) => f.nombre },
     { id: "codigo", etiqueta: "SKU", tipo: "texto", valor: (f) => f.codigo },
   ],

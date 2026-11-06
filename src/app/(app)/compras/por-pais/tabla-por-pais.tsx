@@ -11,7 +11,7 @@ import { anilloFoco, fieldClass, labelClass } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { Ventana } from "@/components/ui/ventana";
 import { formatearFecha } from "@/lib/formato";
-import { EstadoIcon, InventarioIcon, MundoIcon } from "@/lib/nav-icons";
+import { CalendarioIcon, EstadoIcon, InventarioIcon, MundoIcon } from "@/lib/nav-icons";
 import { accionesPorPais, ESTADOS_EXISTE, ETIQUETA_ESTADO_PAIS, estadoDeCelda, paisesPorDecidir, type CeldaPais, type Decision, type EstadoPais } from "@/lib/producto/por-pais";
 import type { NombreFilas } from "@/lib/tabla/pie";
 import { decidirProductoPais } from "./actions";
@@ -79,6 +79,14 @@ export function TablaPorPais({ filas: iniciales, paises, puedeEscribir, codigoPa
           </span>
         ),
       },
+      {
+        id: "creado",
+        label: "Creado",
+        ocultable: true,
+        descripcion: "El día en que se creó el producto en Producto.",
+        clase: "whitespace-nowrap tabular-nums text-muted-foreground",
+        render: (f) => (f.creado ? formatearFecha(f.creado) : "—"),
+      },
       ...paises.map<ColumnaTabla<FilaPorPais>>((p) => ({
         id: `pais_${p.codigo}`,
         label: p.nombre,
@@ -116,7 +124,7 @@ export function TablaPorPais({ filas: iniciales, paises, puedeEscribir, codigoPa
   );
 
   const iconos = useMemo<Record<string, IconoComp>>(
-    () => ({ accion: EstadoIcon, decidir: MundoIcon, falta: MundoIcon, existe: MundoIcon, cuantos: MundoIcon, tipo: InventarioIcon, clase: EstadoIcon, nombre: InventarioIcon, codigo: InventarioIcon, ...Object.fromEntries(paises.map((p) => [`pais_${p.codigo}`, MundoIcon])) }),
+    () => ({ creado: CalendarioIcon, accion: EstadoIcon, decidir: MundoIcon, falta: MundoIcon, existe: MundoIcon, cuantos: MundoIcon, tipo: InventarioIcon, clase: EstadoIcon, nombre: InventarioIcon, codigo: InventarioIcon, ...Object.fromEntries(paises.map((p) => [`pais_${p.codigo}`, MundoIcon])) }),
     [paises],
   );
 
@@ -198,7 +206,10 @@ function DetalleCelda({
         <Bandera codigo={pais.codigo} className="h-3.5 w-5" />
         <span aria-hidden="true" className={`h-2 w-2 rounded-full ${PUNTO[c.estado]}`} />
         <span className="font-medium">{ETIQUETA_ESTADO_PAIS[c.estado]}</span>
-        <span className="text-muted-foreground">· {fila.codigo}</span>
+        <span className="text-muted-foreground">
+          · {fila.codigo}
+          {fila.creado ? ` · creado el ${formatearFecha(fila.creado)}` : ""}
+        </span>
       </p>
 
       <section className="flex flex-col gap-1.5">
