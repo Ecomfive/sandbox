@@ -3,6 +3,7 @@ import { requireModulo } from "@/lib/auth";
 import { puedeVerBodega } from "@/lib/seguridad/pais-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 import { numeroRemision } from "@/lib/wms/remision";
+import { textoCajasEnviadas } from "@/lib/wms/cajas";
 import { PapelRemision } from "./papel-remision";
 
 export const metadata = { title: "Remisión" };
@@ -26,6 +27,9 @@ export default async function RemisionImprimirPage({ params }: { params: Promise
     .maybeSingle();
   if (!r || !(await puedeVerBodega(supabase, usuario.paisesPermitidos, r.bodega_origen_id as string))) notFound();
   const { data: lineas } = await supabase.from("wms_envios_dropi").select("id, enviada, skus_maestros(codigo, nombre, codigo_barras)").eq("remision_id", id).order("id");
+  // Las cajas de cada línea (migración 0236; sin ella, el papel sale sin ellas).
+  const { data: conCajas } = await supabase.from("wms_envios_dropi").select("id, cajas").eq("remision_id", id);
+  const cajasDe = new Map((conCajas ?? []).map((c) => [c.id as string, textoCajasEnviadas(c.cajas)]));
 
   const origen = uno(r.origen as { nombre: string; paises: { nombre: string } | { nombre: string }[] | null } | { nombre: string; paises: { nombre: string } | { nombre: string }[] | null }[] | null);
   const destino = uno(r.destino as { nombre: string } | { nombre: string }[] | null);
@@ -43,7 +47,7 @@ export default async function RemisionImprimirPage({ params }: { params: Promise
         notas: (r.notas as string | null) ?? null,
         lineas: (lineas ?? []).map((l) => {
           const sku = uno(l.skus_maestros as { codigo: string; nombre: string; codigo_barras: string | null } | { codigo: string; nombre: string; codigo_barras: string | null }[] | null);
-          return { id: l.id as string, codigo: sku?.codigo ?? "—", nombre: sku?.nombre ?? "", barras: sku?.codigo_barras ?? null, enviada: Number(l.enviada) };
+          return { id: l.id as string, codigo: sku?.codigo ?? "—", nombre: sku?.nombre ?? "", barras: sku?.codigo_barras ?? null, enviada: Number(l.enviada), cajas: cajasDe.get(l.id as string) ?? null };
         }),
       }}
     />

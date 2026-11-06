@@ -10,7 +10,7 @@ import { ETIQUETA_CLASE_SKU, ETIQUETA_TIPO_SKU, type FilaStock } from "./def-sto
 import { DESCRIPCION_CUBETA } from "./descripciones-stock";
 
 /** Las columnas de la fila en pantalla ancha; las usa también el encabezado, así que van juntas. */
-const COLUMNAS = "lg:grid-cols-[minmax(0,3fr)_repeat(4,minmax(0,1fr))_minmax(0,1.4fr)_1rem]";
+const COLUMNAS = "lg:grid-cols-[minmax(0,3fr)_repeat(5,minmax(0,1fr))_minmax(0,1.4fr)_1rem]";
 
 const entero = (n: number) => n.toLocaleString("es-PA");
 
@@ -38,6 +38,7 @@ export function EncabezadoFilasStock() {
   const columnas = [
     { nombre: "Disponible", ayuda: DESCRIPCION_CUBETA.disponible },
     { nombre: "Físico", ayuda: DESCRIPCION_CUBETA.fisico },
+    { nombre: "Cajas", ayuda: "Cuántas cajas hay guardadas. En la ficha se ve de qué tamaño son y en qué lugar. Si no suman el stock físico, sale aviso." },
     { nombre: "Reservado", ayuda: DESCRIPCION_CUBETA.reservado },
     { nombre: "En camino", ayuda: DESCRIPCION_CUBETA.enCamino },
     { nombre: "Fuera de venta", ayuda: "En la bodega pero sin poder venderse: dañado, en inspección, retenido o vencido." },
@@ -87,9 +88,10 @@ export function FilaStockLista({ f, alAbrir }: { f: FilaStock; alAbrir: () => vo
         </span>
       </span>
 
-      <span className="order-last col-span-2 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-5 lg:order-none lg:contents">
+      <span className="order-last col-span-2 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-6 lg:order-none lg:contents">
         <Cifra nombre="Disponible" n={f.disponible} fuerte apoyo={armables} />
         <Cifra nombre="Físico" n={f.fisico} apoyo={armables} />
+        <Cifra nombre="Cajas" n={f.cajas} apoyo={f.cajas > 0 && f.unidadesEnCajas !== f.fisico ? <span className="text-warning">No cuadra</span> : undefined} />
         <Cifra nombre="Reservado" n={f.reservado} />
         <Cifra nombre="En camino" n={f.enCamino} />
         <Cifra

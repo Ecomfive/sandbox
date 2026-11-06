@@ -20,6 +20,8 @@ export interface FilaEnvio extends LineaEnviada {
   nombre: string;
   foto: string | null;
   motivo: string | null;
+  /** Las cajas que salieron, en palabras (migración 0236). */
+  cajas: string | null;
 }
 
 /** Anotar lo que el tercero dice que llegó de una remisión: arranca con lo enviado; si cambia, pide el motivo. */
@@ -165,6 +167,7 @@ function FichaRemision({ r, puedeEscribir, codigoPais }: { r: RemisionAgrupada<F
                     <span className="min-w-0">
                       <span className="block font-medium">{f.codigo}</span>
                       <span className="block text-xs text-muted-foreground">{f.nombre}</span>
+                      {f.cajas && <span className="block text-xs text-muted-foreground">{f.cajas}</span>}
                     </span>
                   </span>
                 </td>

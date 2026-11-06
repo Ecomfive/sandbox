@@ -7,6 +7,7 @@ import { puedeVerBodega } from "@/lib/seguridad/pais-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 import { indexar, parecidos, todasLasCoincidencias } from "@/lib/scraping/cruces";
 import { traerTodasConError } from "@/lib/supabase/paginar";
+import { revisarCajas } from "@/lib/wms/cajas";
 import { itemsParaSumar, MAX_LINEAS_IMPORTADAS, revisarConteo, varianteDeLinea, type ModoLevantamiento } from "@/lib/wms/levantamiento";
 
 const ES_ID = /^[0-9a-fA-F-]{8,64}$/;
@@ -21,10 +22,15 @@ export async function guardarLevantamiento(
   referencia: string,
   items: unknown,
   modo: ModoLevantamiento = "contado",
-): Promise<{ error?: string; productos?: number; ajustes?: number }> {
+  /** Las cajas de los productos que se tocaron (migración 0236): deben sumar lo que queda en la bodega. Al sumar no se usan. */
+  cajas?: unknown,
+): Promise<{ error?: string; productos?: number; ajustes?: number; cajas?: number }> {
   const usuario = await requireModuloEscritura("inventario");
   if (!ES_ID.test(bodegaId)) return { error: "Elige la bodega." };
-  const revisado = revisarConteo(items);
+  const revisadasCajas = revisarCajas(modo === "sumar" ? undefined : cajas);
+  if ("error" in revisadasCajas) return { error: revisadasCajas.error };
+  const soloCajas = revisadasCajas.cajas.length > 0 && Array.isArray(items) && items.length === 0;
+  const revisado = soloCajas ? { items: [] } : revisarConteo(items);
   if ("error" in revisado) return { error: revisado.error };
   const ref = referencia.replace(/\s+/g, " ").trim().slice(0, 120);
 
@@ -32,28 +38,28 @@ export async function guardarLevantamiento(
   if (!(await puedeVerBodega(supabase, usuario.paisesPermitidos, bodegaId))) return { error: "No tienes acceso al país de esa bodega." };
   const sumar = modo === "sumar";
   const porSumar = sumar ? itemsParaSumar(revisado.items) : revisado.items;
-  if (!porSumar.length) return { error: "Escribe cuánto vas a sumar." };
-  const { data, error } = await supabase.rpc(sumar ? "wms_sumar_levantamiento" : "wms_registrar_conteo", {
-    p_bodega: bodegaId,
-    p_items: porSumar,
-    p_referencia: ref || null,
-    p_usuario: usuario.id,
-  });
+  const conCajas = revisadasCajas.cajas.length > 0;
+  if (!conCajas && !porSumar.length) return { error: "Escribe cuánto vas a sumar." };
+  const { data, error } = conCajas
+    ? await supabase.rpc("wms_registrar_conteo_cajas", { p_bodega: bodegaId, p_items: porSumar, p_cajas: revisadasCajas.cajas, p_referencia: ref || null, p_usuario: usuario.id })
+    : await supabase.rpc(sumar ? "wms_sumar_levantamiento" : "wms_registrar_conteo", { p_bodega: bodegaId, p_items: porSumar, p_referencia: ref || null, p_usuario: usuario.id });
   if (error) {
+    if (/wms_registrar_conteo_cajas/.test(error.message)) return { error: "Falta correr la migración 0236 en la base." };
     if (/wms_sumar_levantamiento/.test(error.message)) return { error: "Falta correr la migración 0235 en la base." };
     if (/wms_registrar_conteo/.test(error.message)) return { error: "Falta correr la migración 0214 en la base." };
     return { error: error.message.length < 200 ? error.message : "No se pudo guardar el levantamiento." };
   }
-  const r = (data ?? {}) as { productos?: number; ajustes?: number };
+  const r = (data ?? {}) as { productos?: number; ajustes?: number; cajas?: number };
   await registrarAuditoria({
     accion: "levantamiento_inventario",
     entidad: "wms_bodegas",
     entidadId: bodegaId,
-    detalle: `${sumar ? "Suma al inventario" : "Levantamiento"}${ref ? ` «${ref}»` : ""}: ${r.productos ?? 0} productos${sumar ? "" : ` contados, ${r.ajustes ?? 0} con diferencia`}`,
+    detalle: `${sumar ? "Suma al inventario" : "Levantamiento"}${ref ? ` «${ref}»` : ""}: ${r.productos ?? 0} productos${sumar ? "" : ` contados, ${r.ajustes ?? 0} con diferencia${r.cajas ? `, cajas de ${r.cajas} productos` : ""}`}`,
   });
   revalidatePath("/inventario");
   revalidatePath("/inventario/levantamiento");
-  return { productos: r.productos ?? 0, ajustes: r.ajustes ?? 0 };
+  revalidatePath("/inventario/remisiones");
+  return { productos: r.productos ?? 0, ajustes: r.ajustes ?? 0, cajas: r.cajas ?? 0 };
 }
 
 export interface SugerenciaLinea {
