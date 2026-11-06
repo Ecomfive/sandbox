@@ -422,7 +422,7 @@ convenciones técnicas del código.
   es una combinación de productos simples con su cantidad: al venderlo se descuenta cada componente) y **Activo o Test** (se ve como «Estado» y se elige en la ficha; en la base es la columna `clase`, y Activo se guarda como `'fisico'`:
   un test se está probando, todavía no se compra, **aparece en Inventario pero no tiene stock** —`wms_aplicar_cambios` rechaza cualquier
   movimiento— y se pasa a Activo desde el selector «Estado» de su ficha; volver a Test solo si nunca tuvo movimientos). **Descontinuado por país**
-  (31 oct 2026, pedido de Hernán; migración 0211, tabla `skus_descontinuado_pais`): «Descontinuado en» de la ficha (`producto/descontinuado-pais.tsx`,
+  (31 oct 2026, pedido de Hernán; migración 0211, tabla `skus_descontinuado_pais`): sección «Descontinuado por país» de la ficha (5 nov 2026: antes iba junto al estado; sin Colombia por ahora, `PAISES_FUERA`, salvo ya marcada; `producto/descontinuado-pais.tsx`,
   `descontinuado-pais-actions.ts`, una casilla por país; no se muestra con el estado Descontinuado ni en compuestos). `@/lib/producto/descontinuado-pais`
   (`descontinuadoEn`, `descontinuadosEnPais`, `descontinuadosPorPais`) lo usan `productoComprable(skuId, paisId)` de Compras (no se agrega a una
   compra de ese país), `FilaPublicacion.descontinuadoPais` (insignia «Descontinuado» en la fila) y `ProductoDelChat.descontinuado` (aviso en el chat).

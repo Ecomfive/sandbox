@@ -27,7 +27,7 @@ export function DescontinuadoPorPais({ skuId, puedeEscribir }: { skuId: string; 
   }, [skuId]);
 
   if (!paises) return null;
-  if ("error" in paises) return <span className="mt-1.5 block text-xs text-muted-foreground">{paises.error}</span>;
+  if ("error" in paises) return <p className="m-0 text-sm text-muted-foreground">{paises.error}</p>;
   const marcados = paises.filter((p) => p.descontinuado);
 
   function cambiar(p: PaisDescontinuado, si: boolean) {
@@ -40,26 +40,26 @@ export function DescontinuadoPorPais({ skuId, puedeEscribir }: { skuId: string; 
   }
 
   if (!puedeEscribir) {
-    return marcados.length ? <span className="mt-1.5 block text-xs text-destructive">{`Descontinuado en ${marcados.map((p) => p.nombre).join(", ")}`}</span> : null;
+    return <p className={`m-0 text-sm ${marcados.length ? "text-destructive" : "text-muted-foreground"}`}>{marcados.length ? `Descontinuado en ${marcados.map((p) => p.nombre).join(", ")}.` : "Se compra para todos los países."}</p>;
   }
   return (
-    <fieldset className="mt-2 flex flex-col gap-1 border-0 p-0">
-      <legend className="mb-1 p-0 text-xs text-muted-foreground">Descontinuado en</legend>
-      <div className="grid grid-cols-2 gap-1.5">
+    <fieldset className="flex flex-col gap-2 border-0 p-0">
+      <legend className="sr-only">Países donde está descontinuado</legend>
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(9.5rem,1fr))] gap-2">
         {paises.map((p) => (
           <label
             key={p.codigo}
-            className={`flex min-w-0 cursor-pointer items-center gap-2 rounded-md border px-2 py-1.5 text-[13px] transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring ${
+            className={`flex min-w-0 cursor-pointer items-center gap-2 rounded-md border px-2.5 py-2 text-sm transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring ${
               p.descontinuado ? "border-destructive bg-destructive-soft font-medium text-destructive" : "border-border bg-card hover:bg-muted"
             } ${pendiente ? "cursor-wait opacity-70" : ""}`}
           >
             <input type="checkbox" checked={p.descontinuado} disabled={pendiente} onChange={(e) => cambiar(p, e.target.checked)} className="h-3.5 w-3.5 shrink-0 accent-[var(--destructive)]" />
             <Bandera codigo={p.codigo} />
-            <span className="truncate">{p.nombre}</span>
+            <span className="min-w-0">{p.nombre}</span>
           </label>
         ))}
       </div>
-      {marcados.length > 0 && <span className="text-xs text-muted-foreground">{`No se compra para ${marcados.map((p) => p.nombre).join(" ni ")}; los demás países siguen igual.`}</span>}
+      {marcados.length > 0 && <span className="text-sm text-muted-foreground">{`No se compra para ${marcados.map((p) => p.nombre).join(", ")}. Los demás países siguen igual.`}</span>}
     </fieldset>
   );
 }
