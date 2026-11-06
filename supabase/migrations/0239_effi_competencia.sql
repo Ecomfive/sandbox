@@ -4,7 +4,7 @@
 -- cuánto subió entre lecturas (evento `ventas`, con la cifra en `stock` y la anterior en `stock_antes`).
 -- `effi_clave` identifica cada artículo entre lecturas: el nombre del archivo de su foto, que no cambia; el código que muestra Effi está cifrado y no se sabe si dura.
 -- Las llena scripts/competencia-catalogo-guardar.ts (el mismo receptor de Scraping de proveedores). RLS sin políticas. Se puede repetir.
--- Reversa: supabase/rollbacks/0238_rollback.sql
+-- Reversa: supabase/rollbacks/0239_rollback.sql
 
 create table if not exists effi_competencia_busquedas (
   id uuid primary key default uuid_v7(),

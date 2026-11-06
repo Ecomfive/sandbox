@@ -8,7 +8,7 @@ import type { AlertaC, BitacoraC, CompetidorC, DatosCompetencia, ProductoC, Vent
 const n = (v: unknown) => (v === null || v === undefined ? null : Number(v));
 const DOMINIO: Record<string, string> = { PA: "pa", CR: "cr", MX: "mx", CO: "co" };
 
-/** Las tablas de cada plataforma: Dropi (0108), Drop (0234) y Effi (0238), iguales salvo por cómo se identifica un producto y su proveedor. */
+/** Las tablas de cada plataforma: Dropi (0108), Drop (0234) y Effi (0239), iguales salvo por cómo se identifica un producto y su proveedor. */
 const TABLAS: Record<PlataformaId, Record<"productos" | "busquedas" | "historial" | "alertas" | "ids", string>> = {
   dropi: { productos: "competencia_productos", busquedas: "competencia_busquedas", historial: "competencia_historial", alertas: "competencia_alertas", ids: "dropi_producto_id, proveedor_dropi_id" },
   drop: { productos: "drop_competencia_productos", busquedas: "drop_competencia_busquedas", historial: "drop_competencia_historial", alertas: "drop_competencia_alertas", ids: "drop_producto_id" },
@@ -42,7 +42,7 @@ interface FilaProducto {
 
 type FilaBitacora = { fecha: string; evento: string; precio: string | null; stock: number | null; precio_antes: string | null; stock_antes: number | null } & Record<string, unknown>;
 
-/** Drop o Effi sin datos (falta su migración, 0234 o 0238): las pestañas se dibujan igual que las de Dropi, en cero. */
+/** Drop o Effi sin datos (falta su migración, 0234 o 0239): las pestañas se dibujan igual que las de Dropi, en cero. */
 export function datosCompetenciaVacios(plataforma: DatosCompetencia["plataforma"], paisNombre: string): DatosCompetencia {
   return { plataforma, pais: paisNombre, productos: [], competidores: [], alertas: [], bitacora: [], ultima: null, busquedas: 0, corte: null, ventas: [] };
 }
@@ -50,7 +50,7 @@ export function datosCompetenciaVacios(plataforma: DatosCompetencia["plataforma"
 /**
  * Todo lo que muestran las pestañas de Análisis de competencia para un país: los productos (nuestros y de la competencia) con
  * sus iguales, el stock vendido en 1/7/30 días, los competidores, las alertas, la bitácora y las
- * ventas por día (bajadas de stock) para el dashboard. `null` si falta la migración de esa plataforma (0108 Dropi, 0234 Drop, 0238 Effi). Effi dice las ventas de cada
+ * ventas por día (bajadas de stock) para el dashboard. `null` si falta la migración de esa plataforma (0108 Dropi, 0234 Drop, 0239 Effi). Effi dice las ventas de cada
  * artículo: lo vendido sale de lo que subieron entre lecturas (evento `ventas`), no de las bajadas de stock, que también serían reposiciones al revés.
  */
 export async function cargarDatosCompetencia(supabase: SupabaseClient, pais: { id: string; codigo: string; nombre: string }, plataforma: PlataformaId = "dropi"): Promise<DatosCompetencia | null> {

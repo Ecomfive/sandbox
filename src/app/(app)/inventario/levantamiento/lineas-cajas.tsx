@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { fieldClassSm } from "@/components/ui/field";
 import { MasIcon, PapeleraIcon } from "@/lib/nav-icons";
 
@@ -40,12 +40,15 @@ export function LineasCajas({
   ubicaciones,
   deshabilitado,
   alCambiar,
+  junto,
 }: {
   codigo: string;
   lineas: LineaCajasForm[];
   ubicaciones: UbicacionConteo[];
   deshabilitado: boolean;
   alCambiar: (lineas: LineaCajasForm[]) => void;
+  /** Lo que va a la par del botón de cajas (el «Sumar» de la fila). */
+  junto?: ReactNode;
 }) {
   const [abierto, setAbierto] = useState(false);
   const cajas = cajasFormulario(lineas);
@@ -53,17 +56,20 @@ export function LineasCajas({
   const cambiar = (i: number, cambio: Partial<LineaCajasForm>) => alCambiar(lineas.map((l, j) => (j === i ? { ...l, ...cambio } : l)));
   return (
     <div className="mt-1.5 flex flex-col gap-1.5">
-      <button
-        type="button"
-        aria-expanded={abierto}
-        onClick={() => {
-          if (!abierto && lineas.length === 0 && !deshabilitado) alCambiar([VACIA]);
-          setAbierto(!abierto);
-        }}
-        className="inline-flex w-fit items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
-      >
-        {cajas > 0 ? `${cajas.toLocaleString("es-PA")} ${cajas === 1 ? "caja" : "cajas"} · ${unidades.toLocaleString("es-PA")} u.` : "Agregar cajas"}
-      </button>
+      <div className="flex flex-wrap items-center gap-1">
+        {junto}
+        <button
+          type="button"
+          aria-expanded={abierto}
+          onClick={() => {
+            if (!abierto && lineas.length === 0 && !deshabilitado) alCambiar([VACIA]);
+            setAbierto(!abierto);
+          }}
+          className="inline-flex w-fit items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+        >
+          {cajas > 0 ? `${cajas.toLocaleString("es-PA")} ${cajas === 1 ? "caja" : "cajas"} · ${unidades.toLocaleString("es-PA")} u.` : "Agregar cajas"}
+        </button>
+      </div>
       {abierto && ubicaciones.length === 0 && (
         <p className="m-0 text-xs text-muted-foreground">
           Esta bodega no tiene ubicaciones. Créalas en{" "}

@@ -14,7 +14,7 @@ export interface FilaTraslado {
   hacia: string;
   quien: string | null;
   notas: string;
-  lineas: { codigo: string; nombre: string; foto: string | null; cantidad: number }[];
+  lineas: { codigo: string; nombre: string; foto: string | null; cantidad: number; cajas: string | null }[];
 }
 
 const fechaHora = (f: string) => new Date(f).toLocaleString("es-PA", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" });
@@ -76,6 +76,7 @@ function Traslado({ t, puedeEscribir }: { t: FilaTraslado; puedeEscribir: boolea
             <span className="min-w-0 flex-1">
               <span className="block truncate font-medium">{l.codigo}</span>
               <span className="block truncate text-xs text-muted-foreground">{l.nombre}</span>
+              {l.cajas && <span className="block text-xs text-muted-foreground">{l.cajas}</span>}
             </span>
             <span className="font-medium tabular-nums">{l.cantidad.toLocaleString("es-PA")}</span>
           </li>

@@ -299,7 +299,7 @@ async function scrapingCompetenciaDrop(puente) {
   return { enviados: cuerpo.productos.length, paginas: paginas.length, duracionMs: cuerpo.duracionMs, kb: Math.round(datos.length / 1024) };
 }
 
-// Análisis de competencia con Effi (6 nov 2026; migración 0238): TODO el catálogo de dropshipping de Effi, con proveedor, stock y ventas. Se corre en
+// Análisis de competencia con Effi (6 nov 2026; migración 0239): TODO el catálogo de dropshipping de Effi, con proveedor, stock y ventas. Se corre en
 // effi.com.co con nuestra propia sesión (no hay API para esto): recorre `/app/articulo_dropshipping?page=N`, de a 3 páginas a la vez, y lee cada tarjeta. La sesión
 // no sale de la página. Los revisa src/lib/competencia/effi.ts y los guarda scripts/competencia-catalogo-guardar.ts. Como arriba, la pestaña navega al puente.
 //   await scrapingCompetenciaEffi("http://127.0.0.1:4322/puente/<código>")

@@ -22,7 +22,7 @@ const ETIQUETA = (p: { codigo: string; nombre: string }) => `${p.codigo} — ${p
  * producto) y se puede cambiar escribiendo su SKU o su nombre. No guarda nada: solo llena el levantamiento, que se revisa y
  * se guarda como siempre. Un producto con vencimiento no se puede cargar así (pide lotes).
  */
-export function ImportarLista({ productos, alAplicar, deshabilitado }: { productos: ProductoLista[]; alAplicar: (cantidades: Record<string, number>) => void; deshabilitado: boolean }) {
+export function ImportarLista({ productos, alAplicar, deshabilitado }: { productos: ProductoLista[]; alAplicar: (cantidades: Record<string, number>, comoSuma: boolean) => void; deshabilitado: boolean }) {
   const idLista = useId();
   const [abierto, setAbierto] = useState(false);
   const [texto, setTexto] = useState("");
@@ -80,10 +80,10 @@ export function ImportarLista({ productos, alAplicar, deshabilitado }: { product
   const sinProducto = (lineas ?? []).filter((l) => !l.skuId).length;
   const aRevisar = (lineas ?? []).filter((l) => l.estado === "revisar").length;
 
-  const aplicar = () => {
+  const aplicar = (comoSuma: boolean) => {
     const suma: Record<string, number> = {};
     for (const l of conProducto) suma[l.skuId!] = (suma[l.skuId!] ?? 0) + l.cantidad;
-    alAplicar(suma);
+    alAplicar(suma, comoSuma);
     cerrar();
   };
 
@@ -181,7 +181,15 @@ export function ImportarLista({ productos, alAplicar, deshabilitado }: { product
                 </button>
                 <button
                   type="button"
-                  onClick={aplicar}
+                  onClick={() => aplicar(true)}
+                  disabled={conProducto.length === 0}
+                  className="min-h-10 rounded-md border border-border-control px-4 text-sm hover:bg-muted disabled:text-muted-foreground"
+                >
+                  Pasar {conProducto.length} como suma
+                </button>
+                <button
+                  type="button"
+                  onClick={() => aplicar(false)}
                   disabled={conProducto.length === 0}
                   className="min-h-10 rounded-md bg-foreground px-4 text-sm font-semibold text-background hover:opacity-90 disabled:bg-muted disabled:text-muted-foreground"
                 >

@@ -1,4 +1,4 @@
-// Análisis de competencia con Drop y Effi (6 nov 2026, migraciones 0234 y 0238): guarda una lectura del catálogo de una de las dos (la mandan
+// Análisis de competencia con Drop y Effi (6 nov 2026, migraciones 0234 y 0239): guarda una lectura del catálogo de una de las dos (la mandan
 // `scrapingCompetenciaDrop` y `scrapingCompetenciaEffi` de scripts/scraping-proveedores-navegador.js al receptor de scripts/scraping-proveedores.ts). Lo mismo que
 // competencia-guardar.ts con Dropi, en sus propias tablas: anota cada cambio, empareja cada producto de la competencia con el nuestro igual (por nombre y por
 // foto) y deja las alertas. La primera búsqueda no deja alertas: todo es nuevo. Una lectura que trae mucho menos que lo guardado no toca nada: sería un catálogo
