@@ -381,6 +381,10 @@ export const GUIAS: GuiaModulo[] = [
     resumen: "Los productos que tenemos publicados en Dropi como proveedor: precio, margen, ventas, stock y lo que necesita cada uno.",
     secciones: [
       {
+        titulo: "Cambiar entre Dropi, Drop y Effi",
+        pasos: ["En el menú hay una sola entrada, «Gestión de IDs». Con Costa Rica elegida, arriba de la lista salen los logos de Dropi, Drop y Effi: pulsa el de la plataforma que quieres gestionar y se abre su gestión (solo salen las que tu rol puede abrir). Con otro país solo existe Dropi y no sale el selector."],
+      },
+      {
         titulo: "Calculadora de margen",
         pasos: [
           "Arriba de la lista, «Calculadora» abre la calculadora. Elige un producto por su SKU (la lista es por SKU, no por publicación ni por ID de Dropi; busca por el código o el nombre) para llenar sus datos con los de su publicación pública, o escribe un producto nuevo.",
@@ -880,6 +884,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-11-06", titulo: "Gestión de IDs: una sola entrada con Dropi, Drop y Effi", texto: "En el menú de Operación (Proveeduría) ya no hay tres entradas: hay una sola, «Gestión de IDs». Con Costa Rica elegida, arriba de cada gestión salen los logos de Dropi, Drop y Effi: pulsa uno y pasas a la gestión de esa plataforma. El logo de la entrada del menú cambia con la plataforma donde estás. Es el mismo botón de Análisis de competencia, y la que elijas es la misma plataforma de la barra de arriba (junto al país). Drop y Effi solo existen en Costa Rica, así que con otro país el menú lleva directo a Gestión de IDs Dropi y no sale el selector. Solo aparecen las plataformas cuyo módulo puedes abrir.", modulo: "publicaciones-dropi", href: "/publicaciones-dropi" },
   { fecha: "2026-11-06", titulo: "Remisiones: el papel que va con la carga", texto: "En Inventario › Remisiones, «Nueva remisión» lleva varios productos con un solo número (REM-0012). Al crearla imprimes el papel que va con la mercancía, con lo enviado, las columnas para anotar lo recibido y las firmas.", modulo: "inventario" },
   { fecha: "2026-11-05", titulo: "Gestión por país: ocho países", texto: "La pestaña de Compras se llama ahora «Gestión por país» y tiene una columna por cada país que se evalúa: Panamá, Costa Rica, México, Guatemala, Venezuela, El Salvador, Honduras y Nicaragua. Colombia no sale, ni aquí ni en «Descontinuado por país» de la ficha del producto.", modulo: "compras-por-pais", href: "/compras/por-pais" },
   { fecha: "2026-11-05", titulo: "Banderas en la ficha del producto", texto: "En la ficha de un producto, los países de «Ventas en Dropi», «Competencia en Dropi» (cada país con su bandera como título) y «Compras» llevan su bandera y el nombre completo del país, en vez de PA, CR o MX.", modulo: "producto", href: "/producto" },

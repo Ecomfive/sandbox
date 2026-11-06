@@ -1,3 +1,5 @@
+import { GESTION_IDS, gestionesDePais, type PlataformaId } from "./plataformas";
+
 /** Los tres frentes del negocio: cada área del menú se reparte entre ellos. */
 export type FrenteId = "proveeduria" | "tienda" | "fulfillment";
 
@@ -10,6 +12,8 @@ export const FRENTES: { id: FrenteId; titulo: string }[] = [
 export interface NavItem {
   label: string;
   href?: string;
+  /** Otras rutas que también son esta página (la entrada única de «Gestión de IDs» cubre las tres plataformas): el menú la marca activa en cualquiera de ellas. */
+  rutas?: string[];
   /** Solo se ofrece cuando la plataforma Dropi tiene datos en el país elegido. */
   dropi?: boolean;
   /** El frente al que pertenece. Sin frente la página va «afuera» de los tres (es de toda la empresa). */
@@ -227,9 +231,33 @@ export function encontrarSeccionActiva(pathname: string, areas: NavSection[]): s
   for (const area of areas) {
     for (const item of area.items) {
       if (!item.href) continue;
-      const coincide = item.href === ruta || (item.href !== "/" && ruta.startsWith(`${item.href}/`));
-      if (coincide && (!mejor || item.href.length > mejor.largo)) mejor = { titulo: area.title, largo: item.href.length };
+      for (const h of [item.href, ...(item.rutas ?? [])]) {
+        const coincide = h === ruta || (h !== "/" && ruta.startsWith(`${h}/`));
+        if (coincide && (!mejor || h.length > mejor.largo)) mejor = { titulo: area.title, largo: h.length };
+      }
     }
   }
   return mejor?.titulo ?? null;
+}
+
+
+/**
+ * El menú con **una sola entrada «Gestión de IDs»** (6 nov 2026, pedido de Hernán): las de Dropi, Drop y Effi se juntan en una que lleva a la gestión de la plataforma elegida (la de la
+ * barra de arriba) si la persona puede abrirla, o a la primera que pueda; el cambio entre ellas se hace con el selector de logos que sale arriba de cada gestión. Las migas, el buscador
+ * y los favoritos siguen viendo las tres páginas: esto solo es para el menú lateral.
+ */
+export function colapsarGestionDeIds(areas: NavSection[], opciones: { plataforma: PlataformaId; codigoPais: string; modulos: readonly string[] | null }): NavSection[] {
+  const rutas = Object.values(GESTION_IDS).map((g) => g.ruta);
+  const disponibles = gestionesDePais(opciones.codigoPais, opciones.modulos);
+  const elegida = disponibles.find((p) => p.id === opciones.plataforma) ?? disponibles[0];
+  const href = GESTION_IDS[elegida?.id ?? "dropi"].ruta;
+  return areas.map((area) => {
+    const primero = area.items.findIndex((i) => i.href && rutas.includes(i.href));
+    if (primero === -1) return area;
+    const base = area.items[primero];
+    const juntos: NavItem = { label: "Gestión de IDs", href, rutas, frente: base.frente };
+    const items = area.items.filter((i) => !(i.href && rutas.includes(i.href)));
+    items.splice(primero, 0, juntos);
+    return { ...area, items };
+  });
 }

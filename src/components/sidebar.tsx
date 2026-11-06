@@ -78,12 +78,14 @@ function ItemPagina({
   alNavegar?: () => void;
 }) {
   if (!item.href) return null;
-  const activo = esActiva(pathname, item.href);
-  const Icono = ICONOS_PAGINA[item.href];
+  // La entrada única de Gestión de IDs sigue a la plataforma: si se está en la gestión de Drop o de Effi, su ícono y su enlace son los de esa (6 nov 2026).
+  const href = (item.rutas ?? []).find((r) => esActiva(pathname, r)) ?? item.href;
+  const activo = esActiva(pathname, href);
+  const Icono = ICONOS_PAGINA[href];
   return (
     <div className="flex items-center gap-0.5">
       <Link
-        href={item.href}
+        href={href}
         onClick={alNavegar}
         aria-current={activo ? "page" : undefined}
         className={`flex flex-1 items-center justify-between gap-2 rounded-md px-3 py-1.5 text-[13px] ${anilloFoco} ${
@@ -101,9 +103,9 @@ function ItemPagina({
             <span className="truncate">{item.label}</span>
           )}
         </span>
-        <ContadorMenu cantidad={cantidadDe(item, pendientes)} href={item.href} />
+        <ContadorMenu cantidad={cantidadDe({ ...item, href }, pendientes)} href={href} />
       </Link>
-      <FavoritoToggle href={item.href} activo={favoritos.includes(item.href)} />
+      <FavoritoToggle href={href} activo={favoritos.includes(href)} />
     </div>
   );
 }
@@ -189,7 +191,10 @@ function PaginasDeArea({
 /** Las páginas favoritas de la persona (los accesos rápidos), siempre a la vista. */
 function Favoritos({ areas, favoritos, ...resto }: { areas: AreaVisible[]; favoritos: string[]; pathname: string; pendientes: PendientesMenu; alNavegar?: () => void }) {
   const todos = areas.flatMap((a) => a.items);
-  const fijados = favoritos.map((href) => todos.find((i) => i.href === href)).filter((i): i is NavItem => i !== undefined);
+  // Un favorito de una de las tres Gestión de IDs se muestra en la entrada única del menú (sin repetirla si fijaron más de una).
+  const fijados = favoritos
+    .map((href) => todos.find((i) => i.href === href || i.rutas?.includes(href)))
+    .filter((i, n, lista): i is NavItem => i !== undefined && lista.indexOf(i) === n);
   return (
     <section aria-label="Favoritos">
       <Titulo>Favoritos</Titulo>

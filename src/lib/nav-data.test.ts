@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { FRENTES, construirAreas, encontrarSeccionActiva, paginaInicialDe } from "./nav-data";
+import { FRENTES, colapsarGestionDeIds, construirAreas, encontrarSeccionActiva, paginaInicialDe } from "./nav-data";
 import { ICONOS_PAGINA } from "./nav-icons";
 
 // Se corre con: npm run test:seguridad (incluye estas pruebas del menú)
@@ -121,4 +121,23 @@ test("sin acceso a una página, la persona cae en la primera suya y nunca en el 
   // Un rol con un solo módulo cuyas pestañas están todas ocultas no tiene a dónde ir: se queda sin página.
   assert.equal(paginaInicialDe(["compras"], "compras"), null);
   assert.equal(paginaInicialDe([]), null);
+});
+
+test("Gestión de IDs es una sola entrada del menú que sigue a la plataforma elegida y se marca activa en las tres rutas", () => {
+  const todos = { plataforma: "drop" as const, codigoPais: "CR", modulos: null };
+  const menu = colapsarGestionDeIds(areas, todos);
+  const items = menu.flatMap((a) => a.items).filter((i) => i.href?.startsWith("/publicaciones-"));
+  assert.equal(items.length, 1);
+  assert.equal(items[0].label, "Gestión de IDs");
+  assert.equal(items[0].href, "/publicaciones-drop");
+  // La entrada se queda en su sitio del menú, junto a Pedidos Dropi.
+  const operacion = menu.find((a) => a.title === "Operación")!.items.map((i) => i.label);
+  assert.equal(operacion.indexOf("Gestión de IDs"), operacion.indexOf("Pedidos Dropi") + 1);
+  assert.equal(encontrarSeccionActiva("/publicaciones-effi/tareas", menu), "Operación");
+  assert.equal(encontrarSeccionActiva("/publicaciones-dropi", menu), "Operación");
+  // Con otro país solo existe Dropi; sin el módulo de la elegida, la primera que pueda abrir.
+  assert.equal(colapsarGestionDeIds(areas, { ...todos, codigoPais: "PA" }).flatMap((a) => a.items).find((i) => i.label === "Gestión de IDs")!.href, "/publicaciones-dropi");
+  assert.equal(colapsarGestionDeIds(areas, { ...todos, modulos: ["publicaciones-effi"] }).flatMap((a) => a.items).find((i) => i.label === "Gestión de IDs")!.href, "/publicaciones-effi");
+  // El menú original no cambia: las migas y el buscador siguen viendo las tres páginas.
+  assert.equal(areas.flatMap((a) => a.items).filter((i) => i.href?.startsWith("/publicaciones-")).length, 3);
 });

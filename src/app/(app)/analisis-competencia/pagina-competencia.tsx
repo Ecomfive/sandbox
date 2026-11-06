@@ -7,7 +7,7 @@ import { requireModulo } from "@/lib/auth";
 import { monedaDePais } from "@/lib/moneda/tipo-cambio";
 import { getPaisActual } from "@/lib/pais";
 import { getPlataformaActual } from "@/lib/plataforma-actual";
-import { plataformaDe, plataformasDePais } from "@/lib/plataformas";
+import { plataformaDe, plataformasDePais, tieneCompetencia } from "@/lib/plataformas";
 import { createServiceClient } from "@/lib/supabase/server";
 import { cargarDatosCompetencia, datosCompetenciaVacios } from "./datos-competencia";
 import type { DatosCompetencia } from "./def-competencia";
@@ -22,8 +22,10 @@ export async function PaginaCompetencia({ titulo, children }: { titulo: string; 
   const usuario = await requireModulo("analisis-competencia");
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
-  const plataforma = await getPlataformaActual(pais.codigo);
-  const plataformas = plataformasDePais(pais.codigo);
+  const elegida = await getPlataformaActual(pais.codigo);
+  // Effi no tiene análisis de competencia: si la plataforma de la barra es Effi, aquí se mira Dropi.
+  const plataforma = tieneCompetencia(elegida) ? elegida : "dropi";
+  const plataformas = plataformasDePais(pais.codigo).filter((p) => tieneCompetencia(p.id));
   const esDrop = plataforma === "drop";
   // Los datos de Dropi solo se cargan si se mira Dropi: de Drop todavía no hay búsquedas.
   const datos = esDrop ? datosCompetenciaVacios("drop", pais.nombre) : await cargarDatosCompetencia(supabase, pais);
