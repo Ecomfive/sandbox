@@ -411,7 +411,7 @@ convenciones técnicas del código.
   `decidir` de `DEF_PRODUCTO`, varios valores por producto de `puntosParaDecidir` (`src/lib/producto/para-decidir.ts`, con prueba):
   sin foto, sin conectar (sin asociaciones ni publicaciones), sin stock / stock bajo (< `STOCK_BAJO` 50) en Dropi, nunca comprado y
   categoría a revisar, solo activos; winner sin comprar (activo o test con test «winner» o «enviado_a_compras» y 0 órdenes).
-  `FilaProducto.stockDropi`: suma de `dropi_productos_proveedor.stock` de los IDs de sus publicaciones abiertas (`idsDeDropi`) **del país de la
+  **Filtro «Foto»** (6 nov 2026, pedido de Jhokser): el campo `foto` de `DEF_PRODUCTO` (Sin foto / Con foto, también para agrupar) cubre **todos los estados**; la tarjeta «Sin foto» de «Para decidir» solo cuenta los Activos. `FilaProducto.stockDropi`: suma de `dropi_productos_proveedor.stock` de los IDs de sus publicaciones abiertas (`idsDeDropi`) **del país de la
   barra** (`cargarProductos(usuario, supabase, codigoPais)`; 2 nov 2026, pedido de Hernán: sumaba Panamá, Costa Rica y México y el mismo total
   salía en todos los países; el inventario de cada país va por separado).
   **Lista por filas** (23 oct 2026): `ListaDatos variante="filas"` con `FilaProductoLista` (`fila-producto.tsx`, como
