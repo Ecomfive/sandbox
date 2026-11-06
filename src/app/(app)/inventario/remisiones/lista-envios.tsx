@@ -17,6 +17,8 @@ export interface FilaEnvio {
   nombre: string;
   foto: string | null;
   desde: string;
+  /** La remisión a la que pertenece (migración 0233), para abrir su papel. */
+  remisionId: string | null;
   /** La bodega externa a la que fue. */
   hacia: string;
   enviadoEn: string;
@@ -129,7 +131,7 @@ export function ListaEnvios({ filas, puedeEscribir }: { filas: FilaEnvio[]; pued
             {filas.length === 0 && (
               <tr>
                 <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
-                  Todavía no hay remisiones. Se registran desde la ficha de cada producto en Stock.
+                  Todavía no hay remisiones. Crea una con «Nueva remisión» o desde la ficha de un producto en Stock.
                 </td>
               </tr>
             )}
@@ -146,8 +148,13 @@ export function ListaEnvios({ filas, puedeEscribir }: { filas: FilaEnvio[]; pued
                   <span className="block">{f.desde}</span>
                   <span className="block text-xs text-muted-foreground">
                     {formatearTiempoRelativo(f.enviadoEn)}
-                    {f.referencia ? ` · ${f.referencia}` : ""}
+                    {f.referencia && !f.remisionId ? ` · ${f.referencia}` : ""}
                   </span>
+                  {f.remisionId && (
+                    <a href={`/imprimir/remision/${f.remisionId}`} target="_blank" rel="noreferrer" className="block text-xs font-medium underline underline-offset-2">
+                      {f.referencia ?? "Ver remisión"}
+                    </a>
+                  )}
                 </td>
                 <td className={claseCeldaColumna}>{f.hacia}</td>
                 <td className={`${claseCeldaColumna} text-right tabular-nums`}>{f.enviada}</td>
