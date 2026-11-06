@@ -1,6 +1,6 @@
 const TEXTOS = {
   ok: "Funcionando",
-  "sin-sesion": "Inicia sesión en el sistema Ecomfive en este navegador",
+  "sin-llave": "Abre el sistema Ecomfive en este navegador, con tu sesión",
   error: "No se pudo conectar con el sistema",
 };
 

@@ -1,6 +1,6 @@
 // «Ecomfive · Uso»: cada minuto mira si la persona está activa en la pestaña de delante y si esa pestaña es de Dropi, Effi, Drop o Shopify. Si lo es, le dice al
 // sistema la plataforma y la sección (sin números, ids ni el nombre de la tienda). No lee las páginas: Chrome solo le deja ver la dirección de esas plataformas,
-// no la de ningún otro sitio. La sesión es la del sistema en este navegador: sin ella no se anota nada y el ícono muestra «!».
+// no la de ningún otro sitio. Quién es la persona lo dice la llave que trae puente.js al abrir el sistema: sin ella no se anota nada y el ícono muestra «!».
 const RUTA = "https://mom-beta-proveduria.vercel.app/api/uso-externo";
 /** Igual que el sistema: activa es con mouse o teclado en los últimos 5 minutos. */
 const SEGUNDOS_ACTIVA = 300;
@@ -31,8 +31,15 @@ async function anotarEstado(estado) {
 
 async function avisar(cuerpo) {
   try {
-    const r = await fetch(RUTA, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...cuerpo, version: VERSION }) });
-    await anotarEstado(r.ok ? "ok" : r.status === 401 ? "sin-sesion" : "error");
+    const { llave } = await chrome.storage.local.get("llave");
+    if (!llave) return anotarEstado("sin-llave");
+    const r = await fetch(RUTA, {
+      method: "POST",
+      credentials: "omit",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${llave}` },
+      body: JSON.stringify({ ...cuerpo, version: VERSION }),
+    });
+    await anotarEstado(r.ok ? "ok" : r.status === 401 ? "sin-llave" : "error");
   } catch {
     await anotarEstado("error");
   }
@@ -54,6 +61,12 @@ function arrancar() {
   chrome.alarms.create("senal", { periodInMinutes: 60 });
   avisar({});
 }
+
+// Solo el puente de esta misma extensión, desde una página del sistema, puede entregar la llave.
+chrome.runtime.onMessage.addListener((m, quien) => {
+  if (quien.id !== chrome.runtime.id || !quien.url?.startsWith("https://mom-beta-proveduria.vercel.app/") || m?.tipo !== "llave" || typeof m.llave !== "string") return;
+  chrome.storage.local.set({ llave: m.llave }).then(() => avisar({}));
+});
 
 chrome.runtime.onInstalled.addListener(arrancar);
 chrome.runtime.onStartup.addListener(arrancar);

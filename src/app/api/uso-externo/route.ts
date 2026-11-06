@@ -1,18 +1,18 @@
 import { NextResponse } from "next/server";
-import { getUsuarioIdSesion } from "@/lib/auth";
+import { leerLlaveUso, llaveDeCabecera } from "@/lib/rendimiento/llave-uso";
 import { revisarLatidoExterno } from "@/lib/rendimiento/uso-externo";
 import { createServiceClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Lo que manda la extensión «Ecomfive · Uso» (migración 0240), con la sesión de la persona: un minuto activo en una plataforma, o la señal de que la extensión
- * está puesta. Solo se aceptan pedidos de una extensión, y el minuto lo pone el servidor: nadie puede anotar tiempo pasado ni a nombre de otro.
+ * Lo que manda la extensión «Ecomfive · Uso» (migración 0240), con la llave de la persona (`llave-uso.ts`): un minuto activo en una plataforma, o la señal de que la
+ * extensión está puesta. Solo se aceptan pedidos de una extensión, y el minuto lo pone el servidor: nadie puede anotar tiempo pasado ni a nombre de otro.
  */
 export async function POST(request: Request) {
   if (!request.headers.get("origin")?.startsWith("chrome-extension://")) return NextResponse.json({ error: "No permitido." }, { status: 403 });
-  const usuarioId = await getUsuarioIdSesion();
-  if (!usuarioId) return NextResponse.json({ error: "Sin sesión." }, { status: 401 });
+  const usuarioId = leerLlaveUso(llaveDeCabecera(request.headers.get("authorization")), process.env.SUPABASE_SERVICE_ROLE_KEY ?? "");
+  if (!usuarioId) return NextResponse.json({ error: "Sin llave." }, { status: 401 });
   const latido = revisarLatidoExterno(await request.json().catch(() => null));
   if (!latido) return NextResponse.json({ error: "Datos no válidos." }, { status: 400 });
 

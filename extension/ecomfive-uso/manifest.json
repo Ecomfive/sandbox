@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Ecomfive · Uso",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Cuenta los minutos activos en Dropi, Effi, Drop y Shopify para saber qué traer al sistema Ecomfive. No guarda contenido de las páginas.",
   "permissions": ["alarms", "idle", "storage"],
   "host_permissions": [
@@ -15,5 +15,6 @@
     "https://admin.shopify.com/*"
   ],
   "background": { "service_worker": "fondo.js" },
+  "content_scripts": [{ "matches": ["https://mom-beta-proveduria.vercel.app/*"], "js": ["puente.js"], "run_at": "document_idle" }],
   "action": { "default_title": "Ecomfive · Uso", "default_popup": "popup.html" }
 }
