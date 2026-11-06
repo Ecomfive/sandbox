@@ -9,6 +9,7 @@ import { usePuedeAbrir } from "@/components/modulos-contexto";
 import { Bandera } from "@/components/paises/bandera";
 import { anilloFoco, fieldClass, labelClass } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
+import { TarjetaEmergente } from "@/components/ui/tarjeta-emergente";
 import { Ventana } from "@/components/ui/ventana";
 import { formatearFecha } from "@/lib/formato";
 import { CalendarioIcon, EstadoIcon, InventarioIcon, MundoIcon } from "@/lib/nav-icons";
@@ -43,6 +44,25 @@ function subtitulo(c: CeldaPais): string {
   return "";
 }
 
+/** La foto llena la casilla, como en Compras, y al pasar el cursor se ve en grande (la misma tarjeta flotante de Compras). */
+function FotoCelda({ foto, nombre }: { foto: string | null; nombre: string }) {
+  return (
+    <div className="absolute inset-y-1.5 left-2 aspect-square max-w-[calc(100%-1rem)]">
+      {foto ? (
+        <TarjetaEmergente
+          clase="rounded-lg border border-border bg-card p-1.5 shadow-lg"
+          claseEnvoltura="h-full w-full"
+          contenido={<img src={foto} alt={`Foto de ${nombre}`} className="max-h-72 max-w-72 rounded-md object-contain" />}
+        >
+          <img src={foto} alt={`Foto de ${nombre}`} loading="lazy" className="h-full w-full rounded-md border border-border object-cover" />
+        </TarjetaEmergente>
+      ) : (
+        <div role="img" aria-label="Sin foto" className="h-full w-full rounded-md border border-dashed border-border-control" />
+      )}
+    </div>
+  );
+}
+
 interface Abierta {
   id: string;
   pais: string;
@@ -59,22 +79,22 @@ export function TablaPorPais({ filas: iniciales, paises, puedeEscribir, codigoPa
   const columnas = useMemo<ColumnaTabla<FilaPorPais>[]>(
     () => [
       {
+        id: "foto",
+        label: "Foto",
+        ocultable: true,
+        clase: "relative w-20 min-w-20",
+        render: (f) => <FotoCelda foto={f.foto} nombre={f.nombre} />,
+      },
+      {
         id: "producto",
         label: "Producto",
         ocultable: false,
         render: (f) => (
-          <span className="flex min-w-0 items-center gap-2.5">
-            {f.foto ? (
-              <img src={f.foto} alt="" loading="lazy" className="h-9 w-9 shrink-0 rounded-md border border-border object-cover" />
-            ) : (
-              <span role="img" aria-label="Sin foto" className="h-9 w-9 shrink-0 rounded-md border border-dashed border-border-control" />
-            )}
-            <span className="flex min-w-0 flex-col">
-              <span className="truncate font-medium">{f.nombre}</span>
-              <span className="truncate text-xs text-muted-foreground">
-                {f.numero ? `N.º ${f.numero} · ` : ""}
-                {f.codigo}
-              </span>
+          <span className="flex min-w-0 flex-col">
+            <span className="truncate font-medium">{f.nombre}</span>
+            <span className="truncate text-xs text-muted-foreground">
+              {f.numero ? `N.º ${f.numero} · ` : ""}
+              {f.codigo}
             </span>
           </span>
         ),
