@@ -43,6 +43,16 @@
   /* Las series «sistema» y «Dropi» de una gráfica: índigo y rosa del neón, validados (daltonismo y contraste) en claro y en oscuro. */
   --serie-sistema: #5f43d1;
   --serie-dropi: #d74c81;
+  /* Las áreas del sistema en Rendimiento: cada área siempre con su color, validados (daltonismo y contraste) en claro y en oscuro. Lo que no tiene color propio va en gris. */
+  --area-1: #2a78d6;
+  --area-2: #eb6834;
+  --area-3: #1baf7a;
+  --area-4: #eda100;
+  --area-5: #e87ba4;
+  --area-6: #008300;
+  --area-7: #6250d6;
+  --area-8: #e34948;
+  --area-otras: #9a9aa2;
   /* El aro que parpadea en la foto de quien está trabajando en un chat. */
   --presencia: #22c55e;
   --primario-suave: #f3ecfc;
@@ -109,6 +119,15 @@
   --primario: #9d55e0;
   --serie-sistema: #8b74f0;
   --serie-dropi: #d74c81;
+  --area-1: #3987e5;
+  --area-2: #d95926;
+  --area-3: #199e70;
+  --area-4: #c98500;
+  --area-5: #d55181;
+  --area-6: #008300;
+  --area-7: #9085e9;
+  --area-8: #e66767;
+  --area-otras: #76767e;
   --presencia: #4ade80;
   --primario-suave: #2c2140;
   --success: #4ade80;

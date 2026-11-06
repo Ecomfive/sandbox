@@ -32,6 +32,7 @@ export function ContenedorTabla({
   aspecto,
   encabezadoFijo,
   totales,
+  encabezadoQuieto = false,
 }: {
   ariaLabel: string;
   children: ReactNode;
@@ -41,6 +42,8 @@ export function ContenedorTabla({
   encabezadoFijo?: CeldaFija[];
   /** Una celda por cada columna de la tabla, en el mismo orden (la primera suele decir «Total»). */
   totales?: CeldaFija[];
+  /** El encabezado no se pega al bajar: en una tabla corta cuyas filas se despliegan en una ficha, taparía lo que se está leyendo. */
+  encabezadoQuieto?: boolean;
 }) {
   const [densidad] = useDensidad();
   const ref = useRef<HTMLDivElement>(null);
@@ -149,7 +152,7 @@ export function ContenedorTabla({
         ref={ref}
         onScroll={desborda ? alMoverTabla : undefined}
         data-densidad={densidad}
-        data-encabezado-fijo={desborda ? undefined : ""}
+        data-encabezado-fijo={desborda || encabezadoQuieto ? undefined : ""}
         {...(desborda
           ? {
               role: "region",

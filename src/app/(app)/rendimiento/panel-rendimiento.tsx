@@ -2,15 +2,14 @@
 
 import Link from "next/link";
 import { Fragment, useEffect, useState, type ReactNode } from "react";
-import { Segmentado } from "@/components/panel/piezas-panel";
 import { ContenedorTabla } from "@/components/tabla/contenedor-tabla";
 import { claseCeldaColumna, claseEncabezadoColumna, claseFilaEncabezado } from "@/components/tabla/estilos-tabla";
 import { anilloFoco, fieldClass } from "@/components/ui/field";
 import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
 import { Tooltip } from "@/components/ui/tooltip";
-import { MINUTOS_PAUSA, NOMBRE_DISPOSITIVO, ZONA, duracion, etiquetaHora, rangoDeHoras, type Bloque, type Jornada } from "@/lib/rendimiento/jornada";
+import { MINUTOS_PAUSA, NOMBRE_DISPOSITIVO, duracion, etiquetaHora, rangoDeHoras, type Jornada } from "@/lib/rendimiento/jornada";
 import { cargarFicha } from "./actions";
-import { GraficaHoras } from "./grafica-horas";
+import { QueHizo, colorDeArea, hora } from "./que-hizo";
 
 /** Lo que la lista necesita de cada persona: el detalle se pide al desplegar su ficha. */
 export interface FilaEquipo {
@@ -26,12 +25,10 @@ export interface FilaEquipo {
   horas: { hora: number; minutos: number; acciones: number }[];
 }
 
-const hora = (iso: string | null) => (iso ? new Date(iso).toLocaleTimeString("es-PA", { timeZone: ZONA, hour: "numeric", minute: "2-digit" }) : "—");
 const otroDia = (dia: string, n: number) => new Date(Date.parse(`${dia}T12:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 const fechaLarga = (dia: string) => new Date(`${dia}T12:00:00Z`).toLocaleDateString("es-PA", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
 const enlace = (dia: string, persona?: string | null, h?: number | null) => `/rendimiento?dia=${dia}${persona ? `&persona=${persona}` : ""}${persona && h != null ? `&hora=${h}` : ""}`;
 const pct = (parte: number, total: number) => (total ? Math.round((parte / total) * 100) : 0);
-const minutosEntre = (desde: string, hasta: string) => Math.round((new Date(hasta).getTime() - new Date(desde).getTime()) / 60_000);
 
 /** La flecha de lo que se despliega: apunta abajo cuando está abierto. */
 function Flecha({ abierta, clase = "" }: { abierta?: boolean; clase?: string }) {
@@ -51,15 +48,15 @@ function Tarjeta({ titulo, children }: { titulo: string; children: ReactNode }) 
   );
 }
 
-function Barra({ valor, total }: { valor: number; total: number }) {
+function Barra({ valor, total, color = "var(--primario)" }: { valor: number; total: number; color?: string }) {
   return (
     <span aria-hidden="true" className="block h-1.5 overflow-hidden rounded-full bg-muted">
-      <span className="block h-full rounded-full bg-primario" style={{ width: `${pct(valor, total)}%` }} />
+      <span className="block h-full rounded-full" style={{ width: `${pct(valor, total)}%`, background: color }} />
     </span>
   );
 }
 
-/** En qué área estuvo y cuánto tiempo. Cada área se despliega en sus páginas. */
+/** En qué área estuvo y cuánto tiempo, con el color que tiene en la línea del día: esta lista es su leyenda. Cada área se despliega en sus páginas. */
 function PorArea({ j }: { j: Jornada }) {
   return (
     <ul className="m-0 flex list-none flex-col gap-3 p-0">
@@ -69,12 +66,13 @@ function PorArea({ j }: { j: Jornada }) {
             <summary className={`flex cursor-pointer list-none flex-col gap-1 rounded [&::-webkit-details-marker]:hidden ${anilloFoco}`}>
               <span className="flex items-center gap-2 text-sm">
                 <Flecha clase="group-open:rotate-90" />
+                <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: colorDeArea(a.area) }} />
                 <span className="min-w-0 flex-1 truncate font-medium">{a.area}</span>
                 <span className="shrink-0 text-muted-foreground tabular-nums">
                   {duracion(a.minutos)} · {pct(a.minutos, j.minutosActivos)} %
                 </span>
               </span>
-              <Barra valor={a.minutos} total={j.minutosActivos} />
+              <Barra valor={a.minutos} total={j.minutosActivos} color={colorDeArea(a.area)} />
             </summary>
             <ul className="m-0 mt-2 flex list-none flex-col gap-1 p-0 pl-6 text-[13px]">
               {a.paginas.map((p) => (
@@ -102,7 +100,7 @@ function PorDispositivo({ j }: { j: Jornada }) {
               <span className={d.dispositivo ? "font-medium" : "text-muted-foreground"}>{d.dispositivo ? NOMBRE_DISPOSITIVO[d.dispositivo] : "Sin dato"}</span>
               <span className="shrink-0 text-muted-foreground tabular-nums">{duracion(d.minutos)}</span>
             </span>
-            <Barra valor={d.minutos} total={j.minutosActivos} />
+            <Barra valor={d.minutos} total={j.minutosActivos} color={d.dispositivo ? undefined : "var(--area-otras)"} />
           </li>
         ))}
       </ul>
@@ -111,81 +109,8 @@ function PorDispositivo({ j }: { j: Jornada }) {
   );
 }
 
-/** Lo hecho en un bloque, por hora: lo guardado y los WhatsApp. */
-function LoHecho({ b }: { b: Bloque }) {
-  const cosas = [
-    ...b.acciones.map((a) => ({ momento: a.creadoEn, texto: a.texto })),
-    ...b.mensajes.map((m) => ({ momento: m.primero, texto: `WhatsApp a ${m.chat}: ${m.n} ${m.n === 1 ? "mensaje" : "mensajes"}` })),
-  ].sort((x, y) => x.momento.localeCompare(y.momento));
-  return (
-    <ol className="m-0 flex list-none flex-col divide-y divide-border p-0 pl-6">
-      {cosas.map((c, i) => (
-        <li key={i} className="flex gap-3 py-1.5 text-sm">
-          <span className="w-20 shrink-0 whitespace-nowrap text-muted-foreground tabular-nums">{hora(c.momento)}</span>
-          <span className="min-w-0 break-words">{c.texto}</span>
-        </li>
-      ))}
-    </ol>
-  );
-}
-
-function FilaBloque({ b }: { b: Bloque }) {
-  const cuantas = b.acciones.length + b.mensajes.length;
-  const cabeza = (
-    <>
-      <span className="w-40 shrink-0 text-muted-foreground tabular-nums">{b.minutos ? `${hora(b.desde)} – ${hora(b.hasta)}` : hora(b.desde)}</span>
-      <span className="min-w-40 flex-1 truncate">
-        <span className="font-medium">{b.pagina ?? "Sin página anotada"}</span>
-        {b.area && <span className="text-muted-foreground"> · {b.area}</span>}
-      </span>
-      <span className="ml-auto shrink-0 text-muted-foreground tabular-nums">
-        {[b.minutos ? duracion(b.minutos) : null, b.minutos ? (b.dispositivo ? NOMBRE_DISPOSITIVO[b.dispositivo] : "Sin dato") : null, cuantas ? `${cuantas} ${cuantas === 1 ? "cosa hecha" : "cosas hechas"}` : null].filter(Boolean).join(" · ")}
-      </span>
-    </>
-  );
-  if (!cuantas)
-    return (
-      <li className="flex flex-wrap items-center gap-x-3 gap-y-0.5 py-2 text-sm">
-        <Flecha clase="invisible -mr-1" />
-        {cabeza}
-      </li>
-    );
-  return (
-    <li>
-      <details className="group">
-        <summary className={`flex cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-0.5 rounded py-2 text-sm hover:bg-muted/60 [&::-webkit-details-marker]:hidden ${anilloFoco}`}>
-          <Flecha clase="-mr-1 group-open:rotate-90" />
-          {cabeza}
-        </summary>
-        <div className="pb-2">
-          <LoHecho b={b} />
-        </div>
-      </details>
-    </li>
-  );
-}
-
-/** El día de corrido, con las pausas entre los bloques. */
-function Cronologia({ j }: { j: Jornada }) {
-  return (
-    <ol className="m-0 flex list-none flex-col divide-y divide-border rounded-xl border border-border bg-card p-0 px-3">
-      {j.bloques.map((b, i) => {
-        const anterior = j.bloques[i - 1];
-        const hueco = anterior ? minutosEntre(anterior.hasta, b.desde) : 0;
-        return (
-          <Fragment key={`${b.desde}-${i}`}>
-            {hueco > MINUTOS_PAUSA && <li className="py-1.5 pl-6 text-xs text-muted-foreground">Pausa de {duracion(hueco)}</li>}
-            <FilaBloque b={b} />
-          </Fragment>
-        );
-      })}
-    </ol>
-  );
-}
-
 /** La ficha ya cargada. */
 export function ContenidoFicha({ nombre, dia, jornada: j, horaInicial }: { nombre: string; dia: string; jornada: Jornada; horaInicial: number | null }) {
-  const [vista, setVista] = useState<"cronologia" | "horas">(horaInicial === null ? "cronologia" : "horas");
   if (!j.entrada) return <p className="m-0 text-sm text-muted-foreground">{nombre} no tuvo actividad en el sistema este día.</p>;
   return (
     <div className="flex flex-col gap-4">
@@ -200,7 +125,7 @@ export function ContenidoFicha({ nombre, dia, jornada: j, horaInicial }: { nombr
           compacta
           titulo={`Pausas de más de ${MINUTOS_PAUSA} min`}
           valor={j.pausas.length ? duracion(j.pausas.reduce((t, x) => t + x.minutos, 0)) : "Ninguna"}
-          subtexto={j.pausas.length ? `${j.pausas.length} ${j.pausas.length === 1 ? "pausa" : "pausas"}: cada una sale en la cronología` : undefined}
+          subtexto={j.pausas.length ? `${j.pausas.length} ${j.pausas.length === 1 ? "pausa" : "pausas"}` : undefined}
         />
         <KpiCard compacta titulo="Acciones guardadas" valor={j.acciones.toLocaleString("es-PA")} />
         <KpiCard compacta titulo="WhatsApp desde el CRM" valor={j.mensajes.toLocaleString("es-PA")} />
@@ -213,19 +138,7 @@ export function ContenidoFicha({ nombre, dia, jornada: j, horaInicial }: { nombr
           <PorDispositivo j={j} />
         </Tarjeta>
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h4 className="m-0 text-xs font-semibold tracking-wide text-muted-foreground uppercase">Qué hizo</h4>
-        <Segmentado
-          etiqueta="Cómo ver lo que hizo"
-          opciones={[
-            { valor: "cronologia", etiqueta: "Cronología" },
-            { valor: "horas", etiqueta: "Por hora" },
-          ]}
-          valor={vista}
-          alCambiar={setVista}
-        />
-      </div>
-      {vista === "cronologia" ? <Cronologia j={j} /> : <GraficaHoras horas={j.horas} inicial={horaInicial} />}
+      <QueHizo j={j} horaInicial={horaInicial} />
     </div>
   );
 }
@@ -345,7 +258,7 @@ export function PanelRendimiento({ equipo, dia, hoy, personaInicial, horaInicial
           <KpiCard compacta titulo="Acciones guardadas" valor={con.reduce((t, p) => t + p.acciones, 0).toLocaleString("es-PA")} />
         </KpiGrid>
         <p className="m-0 text-sm text-muted-foreground">Pulsa una persona para ver su ficha: en qué área estuvo, cuánto tiempo, desde qué dispositivo y qué hizo.</p>
-        <ContenedorTabla ariaLabel="Jornada de cada persona">
+        <ContenedorTabla ariaLabel="Jornada de cada persona" encabezadoQuieto>
           <table className="tabla-datos w-full text-sm">
             <thead>
               <tr className={claseFilaEncabezado}>
