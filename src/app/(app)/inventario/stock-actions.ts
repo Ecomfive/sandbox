@@ -268,17 +268,19 @@ export async function transferirStock(formData: FormData): Promise<{ error?: str
     supabase.from("wms_bodegas").select("id, nombre").in("id", [desde, hacia]),
   ]);
   if (!maestro) return { error: "El SKU no existe." };
-  const { error } = await supabase.rpc("wms_transferir", {
-    p_sku: sku,
+  // Desde la ficha es un traslado de un solo producto: queda en la pestaña Traslados, con su número, como cualquier otro (migración 0235).
+  const { error } = await supabase.rpc("wms_crear_traslado", {
     p_desde: desde,
     p_hacia: hacia,
-    p_cantidad: cantidad,
-    p_lote: loteId,
-    p_referencia: referencia,
-    p_motivo: motivo,
+    p_items: [{ sku, cantidad, lote: loteId }],
+    p_notas: [referencia, motivo].filter(Boolean).join(" · ") || null,
     p_usuario: usuario.id,
+    p_nombre: usuario.nombre || usuario.email,
   });
-  if (error) return { error: errorDeBase(error.message, "No se pudo hacer la transferencia.") };
+  if (error) {
+    if (/wms_crear_traslado/.test(error.message)) return { error: "Falta correr la migración 0235 en la base." };
+    return { error: errorDeBase(error.message, "No se pudo hacer la transferencia.") };
+  }
   const nombre = (id: string) => (bodegas ?? []).find((b) => b.id === id)?.nombre ?? "otra bodega";
   const pais = await paisDeBodega(supabase, desde);
   await registrarAuditoria({

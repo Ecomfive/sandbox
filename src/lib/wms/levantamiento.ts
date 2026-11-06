@@ -63,6 +63,18 @@ export function revisarConteo(items: unknown): { items: ItemConteo[] } | { error
   return { items: limpios };
 }
 
+/** Cómo se guarda el levantamiento: «contado» deja cada producto en lo escrito; «sumar» se lo agrega a lo que ya hay en la bodega. */
+export type ModoLevantamiento = "contado" | "sumar";
+
+/** Para sumar solo cuenta lo que entra: un 0 o un lote vacío no hacen nada. */
+export function itemsParaSumar(items: ItemConteo[]): ItemConteo[] {
+  return items.flatMap((i): ItemConteo[] => {
+    if ("cantidad" in i) return i.cantidad > 0 ? [i] : [];
+    const lotes = i.lotes.filter((l) => l.cantidad > 0);
+    return lotes.length ? [{ sku: i.sku, lotes }] : [];
+  });
+}
+
 /** La diferencia entre lo contado y lo que dice el sistema (positiva: sobra en el sistema; negativa: falta). */
 export const diferencia = (contado: number, enSistema: number) => contado - enSistema;
 
