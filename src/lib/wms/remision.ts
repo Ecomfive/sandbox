@@ -9,6 +9,8 @@ export const MAX_LINEAS_REMISION = 200;
 export interface LineaRemision {
   sku: string;
   cantidad: number;
+  /** Las cajas elegidas (migración 0235): `id` de `wms_cajas` y cuántas. */
+  cajas?: { id: string; cajas: number }[];
 }
 
 /** «REM-0012»: el número que sale en el papel y en la lista. */
@@ -28,7 +30,15 @@ export function revisarLineasRemision(lineas: unknown): { lineas: LineaRemision[
     vistos.add(sku);
     const cantidad = Number(o.cantidad);
     if (!Number.isInteger(cantidad) || cantidad <= 0 || cantidad > MAX_CANTIDAD) return { error: "Cada producto necesita una cantidad entera mayor que cero." };
-    limpias.push({ sku, cantidad });
+    const elegidas = Array.isArray(o.cajas) ? o.cajas : [];
+    const cajas: { id: string; cajas: number }[] = [];
+    for (const c of elegidas) {
+      const x = (c ?? {}) as Record<string, unknown>;
+      const n = Number(x.cajas);
+      if (typeof x.id !== "string" || !ES_ID.test(x.id) || !Number.isInteger(n) || n <= 0 || n > MAX_CANTIDAD) return { error: "Las cajas elegidas no son válidas." };
+      cajas.push({ id: x.id, cajas: n });
+    }
+    limpias.push(cajas.length ? { sku, cantidad, cajas } : { sku, cantidad });
   }
   return { lineas: limpias };
 }

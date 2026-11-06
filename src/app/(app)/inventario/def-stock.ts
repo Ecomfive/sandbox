@@ -21,6 +21,9 @@ export interface FilaStock {
   manejaVencimiento: boolean;
   /** La foto del producto (la de su ficha en Producto), o null. */
   foto: string | null;
+  /** Cuántas cajas tiene y qué unidades suman (migración 0235): lo que Nicol mira para saber cuánto pedir. */
+  cajas: number;
+  unidadesEnCajas: number;
 }
 
 export const ETIQUETA_TIPO_SKU: Record<string, string> = { simple: "Simple", combo: "Compuesto" };
@@ -71,6 +74,7 @@ export const DEF_STOCK: DefTabla<FilaStock> = {
     { id: "disponible", etiqueta: "Disponible", tipo: "numero", sinCsv: true, valor: (f) => f.disponible },
     { id: "vencido", etiqueta: "Vencido", tipo: "numero", sinCsv: true, valor: (f) => f.vencido },
     { id: "enCamino", etiqueta: "En camino", tipo: "numero", sinCsv: true, valor: (f) => f.enCamino },
+    { id: "cajas", etiqueta: "Cajas", tipo: "numero", sinCsv: true, valor: (f) => f.cajas },
   ],
   // Al agrupar, cada grupo dice sus unidades físicas; un compuesto no suma, sus unidades ya están en sus componentes.
   total: (f) => (f.tipo === "combo" ? 0 : f.fisico),
@@ -85,5 +89,6 @@ export const DEF_STOCK: DefTabla<FilaStock> = {
     { etiqueta: "Retenido", valor: (f) => f.retenido },
     { etiqueta: "En camino", valor: (f) => f.enCamino },
     { etiqueta: "Vencido", valor: (f) => f.vencido },
+    { etiqueta: "Cajas", valor: (f) => f.cajas },
   ],
 };

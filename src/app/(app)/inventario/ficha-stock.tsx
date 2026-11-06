@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Seccion } from "@/components/ui/seccion-ficha";
+import { cuantasCajas, textoCaja, unidadesDeCajas } from "@/lib/wms/cajas";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
 import { formatearTiempoRelativo } from "@/lib/formato";
@@ -12,7 +13,7 @@ import { ETIQUETA_TIPO_SKU, type FilaStock } from "./def-stock";
 import { DESCRIPCION_CUBETA } from "./descripciones-stock";
 import { PanelMovimiento, type BodegaOpcion, type UbicacionOpcion } from "./panel-movimiento";
 import { PanelRemision, PanelTransferencia } from "./panel-transferencia";
-import { obtenerStockDeSku, type EnvioDropi, type LoteStock, type MovimientoStock, type StockBodega } from "./stock-actions";
+import { obtenerStockDeSku, type EnvioDropi, type CajaDeBodega, type LoteStock, type MovimientoStock, type StockBodega } from "./stock-actions";
 
 const ETIQUETA_TIPO_MOV: Record<string, string> = { entrada: "Entrada", salida: "Salida", ajuste: "Ajuste", reserva: "Reserva", liberacion: "Liberación", traslado: "Traslado" };
 const ETIQUETA_CUBETA: Record<string, string> = {
@@ -80,7 +81,7 @@ export function FichaStock({
   /** Se llama tras guardar un movimiento, para que la tabla vuelva a pedir sus totales. */
   alCambiar: () => void;
 }) {
-  const [datos, setDatos] = useState<{ bodegas: StockBodega[]; movimientos: MovimientoStock[]; lotes: LoteStock[]; envios: EnvioDropi[] } | "error" | null>(null);
+  const [datos, setDatos] = useState<{ bodegas: StockBodega[]; movimientos: MovimientoStock[]; lotes: LoteStock[]; envios: EnvioDropi[]; cajas: CajaDeBodega[] } | "error" | null>(null);
   // Sube cuando se guarda un movimiento, para volver a pedir el stock y el libro.
   const [version, setVersion] = useState(0);
   const id = sku?.id;
@@ -226,6 +227,42 @@ export function FichaStock({
                 </div>
               )}
             </Seccion>
+
+            {!esCombo && !esTest && datos !== null && datos !== "error" && datos.cajas.length > 0 && (
+              <Seccion icono={InventarioIcon} titulo="Cajas">
+                <div className="flex flex-col gap-3">
+                  {[...new Set(datos.cajas.map((c) => c.bodegaId))].map((bodegaId) => {
+                    const deBodega = datos.cajas.filter((c) => c.bodegaId === bodegaId);
+                    const fisico = datos.bodegas.find((b) => b.bodegaId === bodegaId)?.fisico ?? 0;
+                    const unidades = unidadesDeCajas(deBodega);
+                    return (
+                      <div key={bodegaId} className="flex flex-col gap-1">
+                        <p className="m-0 text-[13px] font-medium">
+                          {deBodega[0].bodega}: {cuantasCajas(deBodega).toLocaleString("es-PA")} {cuantasCajas(deBodega) === 1 ? "caja" : "cajas"} · {unidades.toLocaleString("es-PA")} u.
+                        </p>
+                        <ul className="m-0 flex list-none flex-col gap-0.5 p-0 text-[13px]">
+                          {deBodega.map((c) => (
+                            <li key={c.id} className="flex flex-wrap justify-between gap-x-3">
+                              <span>
+                                {textoCaja(c)}
+                                {c.lugar ? ` · ${c.lugar}` : ""}
+                                {c.observacion ? <span className="text-muted-foreground"> · {c.observacion}</span> : null}
+                              </span>
+                              <span className="text-muted-foreground tabular-nums">{(c.cajas * c.porCaja).toLocaleString("es-PA")} u.</span>
+                            </li>
+                          ))}
+                        </ul>
+                        {unidades !== fisico && (
+                          <p role="status" className="m-0 text-xs text-warning">
+                            No cuadra: las cajas suman {unidades.toLocaleString("es-PA")} u. y el stock físico es {fisico.toLocaleString("es-PA")} u. Corrígelo en el Levantamiento.
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </Seccion>
+            )}
 
             {!esCombo && (
               <Seccion icono={ComprasIcon} titulo="Compras">

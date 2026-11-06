@@ -50,6 +50,18 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
     traerTodasConError<{ id: string }>((desde, hasta) => supabase.from("skus_maestros").select("id").not("opciones_variantes", "is", null).order("id").range(desde, hasta)),
   ]);
   const fotoPorId = new Map(((fotos.data ?? []) as { id: string; foto_url: string }[]).map((f) => [f.id, f.foto_url]));
+  // Las cajas de cada producto, de las bodegas que se están viendo (migración 0235; sin ella, en cero).
+  const bodegasVistas = bodegaElegida ? [bodegaElegida] : bodegas.map((b) => b.id as string);
+  const { data: filasCajas } = bodegasVistas.length
+    ? await traerTodasConError<{ sku_maestro_id: string; cajas: number; unidades_por_caja: number }>((d, h) => supabase.from("wms_cajas").select("sku_maestro_id, cajas, unidades_por_caja").in("bodega_id", bodegasVistas).order("id").range(d, h))
+    : { data: [] };
+  const cajasPorSku = new Map<string, { cajas: number; unidades: number }>();
+  for (const c of filasCajas ?? []) {
+    const x = cajasPorSku.get(c.sku_maestro_id) ?? { cajas: 0, unidades: 0 };
+    x.cajas += c.cajas;
+    x.unidades += c.cajas * c.unidades_por_caja;
+    cajasPorSku.set(c.sku_maestro_id, x);
+  }
 
   const conVariantes = new Set(((padres.data ?? []) as { id: string }[]).map((p) => p.id));
 
@@ -70,6 +82,8 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
     vencido: Number(r.vencido ?? 0),
     manejaVencimiento: r.maneja_vencimiento === true,
     foto: fotoPorId.get(String(r.sku_maestro_id)) ?? null,
+    cajas: cajasPorSku.get(String(r.sku_maestro_id))?.cajas ?? 0,
+    unidadesEnCajas: cajasPorSku.get(String(r.sku_maestro_id))?.unidades ?? 0,
   }));
 
   return (

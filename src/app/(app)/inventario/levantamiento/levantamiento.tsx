@@ -15,6 +15,7 @@ import type { Ambito } from "@/lib/imagen/buscar";
 import { BuscarIcon, CamaraIcon, MasIcon, PapeleraIcon } from "@/lib/nav-icons";
 import { guardarLevantamiento } from "./actions";
 import { ImportarLista } from "./importar-lista";
+import { LineasCajas, unidadesFormulario, type LineaCajasForm, type UbicacionConteo } from "./lineas-cajas";
 
 export interface ProductoConteo {
   id: string;
@@ -27,6 +28,8 @@ export interface ProductoConteo {
   enSistema: number;
   /** Sus lotes con unidades en esta bodega (solo si maneja vencimiento). */
   lotes: { codigo: string; vencimiento: string; cantidad: number }[];
+  /** Sus cajas guardadas en esta bodega (migración 0235). */
+  cajas: LineaCajasForm[];
 }
 
 interface LineaLote {
@@ -58,12 +61,14 @@ function Diferencia({ n }: { n: number | null }) {
 export function Levantamiento({
   bodegas,
   bodegaElegida,
+  ubicaciones,
   productos,
   ultimo,
   puedeEscribir,
 }: {
   bodegas: { id: string; nombre: string }[];
   bodegaElegida: string;
+  ubicaciones: UbicacionConteo[];
   productos: ProductoConteo[];
   ultimo: { fecha: string; referencia: string | null; productos: number } | null;
   puedeEscribir: boolean;
@@ -74,6 +79,8 @@ export function Levantamiento({
   const [pendiente, startTransition] = useTransition();
   const [contados, setContados] = useState<Record<string, string>>({});
   const [lotes, setLotes] = useState<Record<string, LineaLote[]>>({});
+  // Las cajas que se tocaron; un producto sin tocar conserva las suyas.
+  const [cajas, setCajas] = useState<Record<string, LineaCajasForm[]>>({});
   const [buscar, setBuscar] = useState("");
   const [verTodos, setVerTodos] = useState(false);
   // Los productos que encontró la foto, de más a menos parecido (null = sin filtro por imagen).
@@ -90,6 +97,9 @@ export function Levantamiento({
   // Lo contado de cada producto (null si no se tocó).
   const contadoDe = (p: ProductoConteo): number | null => {
     if (!p.manejaVencimiento) {
+      // Con cajas, lo contado es lo que suman (7 nov 2026, pedido de Yanixia).
+      const enCajas = cajas[p.id] ? unidadesFormulario(cajas[p.id]) : 0;
+      if (enCajas > 0) return enCajas;
       const n = numero(contados[p.id] ?? "");
       return n !== null && Number.isInteger(n) && n >= 0 ? n : null;
     }
@@ -105,10 +115,10 @@ export function Levantamiento({
       if (orden && !orden.has(p.id)) return false;
       if (q && !sinAcentos(`${p.codigo} ${p.nombre}`).includes(q)) return false;
       if (verTodos || q || orden) return true;
-      return p.clase === "fisico" || p.enSistema !== 0 || contados[p.id] !== undefined || lotes[p.id] !== undefined;
+      return p.clase === "fisico" || p.enSistema !== 0 || contados[p.id] !== undefined || lotes[p.id] !== undefined || cajas[p.id] !== undefined;
     });
     return orden ? lista.sort((a, b) => (orden.get(a.id) ?? 0) - (orden.get(b.id) ?? 0)) : lista;
-  }, [productos, buscar, verTodos, porImagen, contados, lotes]);
+  }, [productos, buscar, verTodos, porImagen, contados, lotes, cajas]);
 
   const contadosTotal = productos.filter((p) => contadoDe(p) !== null);
   const conDiferencia = contadosTotal.filter((p) => contadoDe(p) !== p.enSistema).length;
@@ -129,15 +139,20 @@ export function Levantamiento({
           }
         : { sku: p.id, cantidad: contadoDe(p) },
     );
+    const cajasTocadas = Object.entries(cajas).map(([sku, lineas]) => ({
+      sku,
+      lineas: lineas.map((l) => ({ ubicacion: l.ubicacion, cajas: l.cajas, por_caja: l.porCaja, observacion: l.observacion })),
+    }));
     startTransition(async () => {
-      const r = await guardarLevantamiento(bodegaElegida, referencia, items);
+      const r = await guardarLevantamiento(bodegaElegida, referencia, items, cajasTocadas);
       if (r.error) {
         setError(r.error);
         return;
       }
-      mostrarToast(`Levantamiento de ${nombreBodega} guardado: ${r.productos} productos, ${r.ajustes} con diferencia`);
+      mostrarToast(`Levantamiento de ${nombreBodega} guardado: ${r.productos} productos, ${r.ajustes} con diferencia${r.cajas ? `, cajas de ${r.cajas}` : ""}`);
       setContados({});
       setLotes({});
+      setCajas({});
       setReferencia("");
       router.refresh();
     });
@@ -274,8 +289,8 @@ export function Levantamiento({
                         step="1"
                         inputMode="numeric"
                         aria-label={`Contado de ${p.codigo}`}
-                        disabled={!puedeEscribir || pendiente}
-                        value={contados[p.id] ?? ""}
+                        disabled={!puedeEscribir || pendiente || unidadesFormulario(cajas[p.id] ?? []) > 0}
+                        value={unidadesFormulario(cajas[p.id] ?? []) > 0 ? String(unidadesFormulario(cajas[p.id] ?? [])) : (contados[p.id] ?? "")}
                         onChange={(e) =>
                           setContados((x) => {
                             const y = { ...x };
@@ -346,6 +361,13 @@ export function Levantamiento({
                         )}
                       </div>
                     )}
+                    <LineasCajas
+                      codigo={p.codigo}
+                      lineas={cajas[p.id] ?? p.cajas}
+                      ubicaciones={ubicaciones}
+                      deshabilitado={!puedeEscribir || pendiente}
+                      alCambiar={(lineas) => setCajas((x) => ({ ...x, [p.id]: lineas }))}
+                    />
                   </td>
                   <td className={`${claseCeldaColumna} text-right`}>
                     <Diferencia n={dif} />
@@ -371,7 +393,7 @@ export function Levantamiento({
           <button
             type="button"
             onClick={guardar}
-            disabled={pendiente || contadosTotal.length === 0}
+            disabled={pendiente || (contadosTotal.length === 0 && Object.keys(cajas).length === 0)}
             className="ml-auto min-h-10 rounded-md bg-foreground px-4 text-sm font-semibold text-background hover:opacity-90 disabled:bg-muted disabled:text-muted-foreground"
           >
             {pendiente ? "Guardando…" : `Guardar levantamiento de ${nombreBodega}`}

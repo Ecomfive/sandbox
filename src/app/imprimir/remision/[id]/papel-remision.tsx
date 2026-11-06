@@ -8,7 +8,7 @@ export interface DatosPapelRemision {
   hacia: string;
   pais: string;
   notas: string | null;
-  lineas: { id: string; codigo: string; nombre: string; barras: string | null; enviada: number }[];
+  lineas: { id: string; codigo: string; nombre: string; barras: string | null; enviada: number; cajas: string | null }[];
 }
 
 function Firma({ titulo }: { titulo: string }) {
@@ -102,7 +102,10 @@ export function PapelRemision({ d }: { d: DatosPapelRemision }) {
                         ))}
                         {f.barras && <span className="block text-neutral-600">{f.barras}</span>}
                       </td>
-                      <td className="border border-black px-2 py-2 align-top">{f.nombre}</td>
+                      <td className="border border-black px-2 py-2 align-top">
+                        {f.nombre}
+                        {f.cajas && <span className="block text-xs text-neutral-600">{f.cajas}</span>}
+                      </td>
                       <td className="border border-black px-2 py-2 text-right align-top font-semibold tabular-nums">{f.enviada.toLocaleString("es-PA")}</td>
                       <td className="w-20 border border-black" />
                       <td className="w-36 border border-black" />
