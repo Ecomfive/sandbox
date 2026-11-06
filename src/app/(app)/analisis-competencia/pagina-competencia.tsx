@@ -36,7 +36,9 @@ export async function PaginaCompetencia({ titulo, children }: { titulo: string; 
         <EncabezadoPagina titulo={titulo} oculto />
         {selector}
         {/* Drop y Effi son de Costa Rica: en colones. */}
-        <MonedaCompetencia moneda={monedaDePais(pais.codigo)}>{children(datos!, puedeEscribir)}</MonedaCompetencia>
+        <MonedaCompetencia moneda={monedaDePais(pais.codigo)} pais={pais.codigo}>
+          {children(datos!, puedeEscribir)}
+        </MonedaCompetencia>
       </Pagina>
     );
   }
@@ -54,7 +56,7 @@ export async function PaginaCompetencia({ titulo, children }: { titulo: string; 
         </p>
       ) : (
         // Los precios en la moneda del catálogo del país: Panamá en dólares, Costa Rica en colones.
-        <MonedaCompetencia moneda={monedaDePais(pais.codigo)}>
+        <MonedaCompetencia moneda={monedaDePais(pais.codigo)} pais={pais.codigo}>
           {children(datos, puedeEscribir)}
         </MonedaCompetencia>
       )}

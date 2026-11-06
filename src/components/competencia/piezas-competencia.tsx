@@ -6,7 +6,7 @@ import { claseCeldaColumna, claseEncabezadoColumna, claseFilaEncabezado } from "
 import { Badge } from "@/components/ui/badge";
 import { anilloFoco } from "@/components/ui/field";
 import { VisorImagen } from "@/components/ui/visor-imagen";
-import { formatearFechaHora } from "@/lib/formato";
+import { formatearFechaHoraCompleta } from "@/lib/formato";
 import { useMonedaCompetencia } from "./moneda-competencia";
 import { obtenerCompetenciaProducto, obtenerHistorialCompetencia, type CompetenciaDeProducto, type EventoCompetencia } from "@/lib/competencia/actions";
 
@@ -68,8 +68,9 @@ function queFue(e: EventoCompetencia): { texto: string; tono: "success" | "destr
  * El historial de un producto de la competencia en una tabla: cada vez que bajó o subió el stock y cada cambio de precio, con
  * lo de antes, lo de después y la diferencia en color.
  */
-export function HistorialCompetencia({ productoId, limite = 30 }: { productoId: string; limite?: number }) {
-  const { precio: usd } = useMonedaCompetencia();
+export function HistorialCompetencia({ productoId, limite = 30, pais: paisProducto }: { productoId: string; limite?: number; pais?: string }) {
+  const { precio: usd, pais: paisPagina } = useMonedaCompetencia();
+  const pais = paisProducto ?? paisPagina;
   const [eventos, setEventos] = useState<EventoCompetencia[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
@@ -120,7 +121,7 @@ export function HistorialCompetencia({ productoId, limite = 30 }: { productoId: 
             const q = queFue(e);
             return (
               <tr key={i} className="border-b border-border align-top last:border-0">
-                <td className={`${claseCeldaColumna} whitespace-nowrap text-xs`}>{formatearFechaHora(e.fecha)}</td>
+                <td className={`${claseCeldaColumna} whitespace-nowrap text-xs`}>{formatearFechaHoraCompleta(e.fecha, pais)}</td>
                 <td className={claseCeldaColumna}>
                   <Badge tone={q.tono}>{q.texto}</Badge>
                 </td>
@@ -213,7 +214,7 @@ export function BloqueCompetencia({ skuId }: { skuId: string }) {
                           </button>
                         </span>
                       </div>
-                      {abierto === c.id && <HistorialCompetencia productoId={c.id} />}
+                      {abierto === c.id && <HistorialCompetencia productoId={c.id} pais={d.codigo} />}
                     </li>
                   );
                 })}
