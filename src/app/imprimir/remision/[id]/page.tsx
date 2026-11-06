@@ -27,7 +27,7 @@ export default async function RemisionImprimirPage({ params }: { params: Promise
     .maybeSingle();
   if (!r || !(await puedeVerBodega(supabase, usuario.paisesPermitidos, r.bodega_origen_id as string))) notFound();
   const { data: lineas } = await supabase.from("wms_envios_dropi").select("id, enviada, skus_maestros(codigo, nombre, codigo_barras)").eq("remision_id", id).order("id");
-  // Las cajas de cada línea (migración 0235; sin ella, el papel sale sin ellas).
+  // Las cajas de cada línea (migración 0236; sin ella, el papel sale sin ellas).
   const { data: conCajas } = await supabase.from("wms_envios_dropi").select("id, cajas").eq("remision_id", id);
   const cajasDe = new Map((conCajas ?? []).map((c) => [c.id as string, textoCajasEnviadas(c.cajas)]));
 

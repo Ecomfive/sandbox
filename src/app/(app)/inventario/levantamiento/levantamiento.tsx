@@ -1,5 +1,7 @@
 "use client";
 
+import { Segmentado } from "@/components/panel/piezas-panel";
+import type { ModoLevantamiento } from "@/lib/wms/levantamiento";
 import { useMemo, useState, useTransition } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { ContenedorTabla } from "@/components/tabla/contenedor-tabla";
@@ -28,7 +30,7 @@ export interface ProductoConteo {
   enSistema: number;
   /** Sus lotes con unidades en esta bodega (solo si maneja vencimiento). */
   lotes: { codigo: string; vencimiento: string; cantidad: number }[];
-  /** Sus cajas guardadas en esta bodega (migración 0235). */
+  /** Sus cajas guardadas en esta bodega (migración 0236). */
   cajas: LineaCajasForm[];
 }
 
@@ -88,6 +90,9 @@ export function Levantamiento({
   const [imagenAbierta, setImagenAbierta] = useState(false);
   const [referencia, setReferencia] = useState("");
   const [error, setError] = useState<string | null>(null);
+  // «Contado» deja el producto en lo escrito; «Sumar» se lo agrega a lo que ya hay (7 nov 2026, pedido de Hernán).
+  const [modo, setModo] = useState<ModoLevantamiento>("contado");
+  const sumando = modo === "sumar";
 
   const lineasDe = (p: ProductoConteo): LineaLote[] =>
     lotes[p.id] ?? p.lotes.map((l) => ({ codigo: l.codigo, vencimiento: l.vencimiento, cantidad: "", existente: true }));
@@ -98,7 +103,7 @@ export function Levantamiento({
   const contadoDe = (p: ProductoConteo): number | null => {
     if (!p.manejaVencimiento) {
       // Con cajas, lo contado es lo que suman (7 nov 2026, pedido de Yanixia).
-      const enCajas = cajas[p.id] ? unidadesFormulario(cajas[p.id]) : 0;
+      const enCajas = !sumando && cajas[p.id] ? unidadesFormulario(cajas[p.id]) : 0;
       if (enCajas > 0) return enCajas;
       const n = numero(contados[p.id] ?? "");
       return n !== null && Number.isInteger(n) && n >= 0 ? n : null;
@@ -144,12 +149,12 @@ export function Levantamiento({
       lineas: lineas.map((l) => ({ ubicacion: l.ubicacion, cajas: l.cajas, por_caja: l.porCaja, observacion: l.observacion })),
     }));
     startTransition(async () => {
-      const r = await guardarLevantamiento(bodegaElegida, referencia, items, cajasTocadas);
+      const r = await guardarLevantamiento(bodegaElegida, referencia, items, modo, sumando ? [] : cajasTocadas);
       if (r.error) {
         setError(r.error);
         return;
       }
-      mostrarToast(`Levantamiento de ${nombreBodega} guardado: ${r.productos} productos, ${r.ajustes} con diferencia${r.cajas ? `, cajas de ${r.cajas}` : ""}`);
+      mostrarToast(sumando ? `Sumado a ${nombreBodega}: ${r.productos} productos` : `Levantamiento de ${nombreBodega} guardado: ${r.productos} productos, ${r.ajustes} con diferencia${r.cajas ? `, cajas de ${r.cajas}` : ""}`);
       setContados({});
       setLotes({});
       setCajas({});
@@ -176,6 +181,20 @@ export function Levantamiento({
             ))}
           </select>
         </label>
+        {puedeEscribir && (
+          <div className="flex flex-col gap-1">
+            <span className="text-xs font-semibold text-muted-foreground">Al guardar</span>
+            <Segmentado
+              etiqueta="Cómo se guarda"
+              valor={modo}
+              alCambiar={setModo}
+              opciones={[
+                { valor: "contado", etiqueta: "Dejar lo contado" },
+                { valor: "sumar", etiqueta: "Sumar a lo que hay" },
+              ]}
+            />
+          </div>
+        )}
         {puedeEscribir && (
           <label className="flex flex-col gap-1">
             <span className="text-xs font-semibold text-muted-foreground">Referencia (opcional)</span>
@@ -248,10 +267,10 @@ export function Levantamiento({
                 En sistema
               </th>
               <th scope="col" className={claseEncabezadoColumna}>
-                Contado
+                {sumando ? "A sumar" : "Contado"}
               </th>
               <th scope="col" className={`${claseEncabezadoColumna} text-right`}>
-                Diferencia
+                {sumando ? "Quedará" : "Diferencia"}
               </th>
             </tr>
           </thead>
@@ -288,9 +307,9 @@ export function Levantamiento({
                         min="0"
                         step="1"
                         inputMode="numeric"
-                        aria-label={`Contado de ${p.codigo}`}
-                        disabled={!puedeEscribir || pendiente || unidadesFormulario(cajas[p.id] ?? []) > 0}
-                        value={unidadesFormulario(cajas[p.id] ?? []) > 0 ? String(unidadesFormulario(cajas[p.id] ?? [])) : (contados[p.id] ?? "")}
+                        aria-label={`${sumando ? "A sumar" : "Contado"} de ${p.codigo}`}
+                        disabled={!puedeEscribir || pendiente || (!sumando && unidadesFormulario(cajas[p.id] ?? []) > 0)}
+                        value={!sumando && unidadesFormulario(cajas[p.id] ?? []) > 0 ? String(unidadesFormulario(cajas[p.id] ?? [])) : (contados[p.id] ?? "")}
                         onChange={(e) =>
                           setContados((x) => {
                             const y = { ...x };
@@ -361,16 +380,18 @@ export function Levantamiento({
                         )}
                       </div>
                     )}
-                    <LineasCajas
-                      codigo={p.codigo}
-                      lineas={cajas[p.id] ?? p.cajas}
-                      ubicaciones={ubicaciones}
-                      deshabilitado={!puedeEscribir || pendiente}
-                      alCambiar={(lineas) => setCajas((x) => ({ ...x, [p.id]: lineas }))}
-                    />
+                    {!sumando && (
+                      <LineasCajas
+                        codigo={p.codigo}
+                        lineas={cajas[p.id] ?? p.cajas}
+                        ubicaciones={ubicaciones}
+                        deshabilitado={!puedeEscribir || pendiente}
+                        alCambiar={(lineas) => setCajas((x) => ({ ...x, [p.id]: lineas }))}
+                      />
+                    )}
                   </td>
                   <td className={`${claseCeldaColumna} text-right`}>
-                    <Diferencia n={dif} />
+                    {sumando ? <span className="tabular-nums">{contado === null ? "—" : (p.enSistema + contado).toLocaleString("es-PA")}</span> : <Diferencia n={dif} />}
                   </td>
                 </tr>
               );
@@ -393,10 +414,10 @@ export function Levantamiento({
           <button
             type="button"
             onClick={guardar}
-            disabled={pendiente || (contadosTotal.length === 0 && Object.keys(cajas).length === 0)}
+            disabled={pendiente || (contadosTotal.length === 0 && (sumando || Object.keys(cajas).length === 0))}
             className="ml-auto min-h-10 rounded-md bg-foreground px-4 text-sm font-semibold text-background hover:opacity-90 disabled:bg-muted disabled:text-muted-foreground"
           >
-            {pendiente ? "Guardando…" : `Guardar levantamiento de ${nombreBodega}`}
+            {pendiente ? "Guardando…" : sumando ? `Sumar a ${nombreBodega}` : `Guardar levantamiento de ${nombreBodega}`}
           </button>
         </div>
       )}

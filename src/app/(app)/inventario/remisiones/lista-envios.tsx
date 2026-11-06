@@ -20,7 +20,7 @@ export interface FilaEnvio extends LineaEnviada {
   nombre: string;
   foto: string | null;
   motivo: string | null;
-  /** Las cajas que salieron, en palabras (migración 0235). */
+  /** Las cajas que salieron, en palabras (migración 0236). */
   cajas: string | null;
 }
 

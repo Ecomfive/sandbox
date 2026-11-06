@@ -53,7 +53,7 @@ export default async function LevantamientoPage({ searchParams }: { searchParams
   ]);
 
   const enBodega = new Map((stock.data ?? []).map((s) => [s.sku_maestro_id, Number(s.fisico)]));
-  // Los lugares de la bodega y las cajas guardadas (migración 0235; sin ella, sin cajas).
+  // Los lugares de la bodega y las cajas guardadas (migración 0236; sin ella, sin cajas).
   const [lugares, guardadas] = elegida
     ? await Promise.all([
         supabase.from("wms_ubicaciones").select("id, codigo, notas").eq("bodega_id", elegida).eq("activa", true).order("codigo"),

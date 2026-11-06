@@ -21,7 +21,7 @@ export interface FilaStock {
   manejaVencimiento: boolean;
   /** La foto del producto (la de su ficha en Producto), o null. */
   foto: string | null;
-  /** Cuántas cajas tiene y qué unidades suman (migración 0235): lo que Nicol mira para saber cuánto pedir. */
+  /** Cuántas cajas tiene y qué unidades suman (migración 0236): lo que Nicol mira para saber cuánto pedir. */
   cajas: number;
   unidadesEnCajas: number;
 }

@@ -50,7 +50,7 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
     traerTodasConError<{ id: string }>((desde, hasta) => supabase.from("skus_maestros").select("id").not("opciones_variantes", "is", null).order("id").range(desde, hasta)),
   ]);
   const fotoPorId = new Map(((fotos.data ?? []) as { id: string; foto_url: string }[]).map((f) => [f.id, f.foto_url]));
-  // Las cajas de cada producto, de las bodegas que se están viendo (migración 0235; sin ella, en cero).
+  // Las cajas de cada producto, de las bodegas que se están viendo (migración 0236; sin ella, en cero).
   const bodegasVistas = bodegaElegida ? [bodegaElegida] : bodegas.map((b) => b.id as string);
   const { data: filasCajas } = bodegasVistas.length
     ? await traerTodasConError<{ sku_maestro_id: string; cajas: number; unidades_por_caja: number }>((d, h) => supabase.from("wms_cajas").select("sku_maestro_id, cajas, unidades_por_caja").in("bodega_id", bodegasVistas).order("id").range(d, h))

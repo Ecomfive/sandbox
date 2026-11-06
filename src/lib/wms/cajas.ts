@@ -1,4 +1,4 @@
-// Cajas por producto y ubicación (7 nov 2026, pedido de Hernán, a través de Yanixia y Nicol; migración 0235): cuántas cajas hay, de qué tamaño y dónde. Un mismo
+// Cajas por producto y ubicación (7 nov 2026, pedido de Hernán, a través de Yanixia y Nicol; migración 0236): cuántas cajas hay, de qué tamaño y dónde. Un mismo
 // producto suele tener cajas de varios tamaños («16 de 175 y 1 de 58»), por eso va una línea por tamaño y lugar. Lógica pura, con prueba.
 
 const ES_ID = /^[0-9a-fA-F-]{8,64}$/;

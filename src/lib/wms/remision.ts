@@ -9,7 +9,7 @@ export const MAX_LINEAS_REMISION = 200;
 export interface LineaRemision {
   sku: string;
   cantidad: number;
-  /** Las cajas elegidas (migración 0235): `id` de `wms_cajas` y cuántas. */
+  /** Las cajas elegidas (migración 0236): `id` de `wms_cajas` y cuántas. */
   cajas?: { id: string; cajas: number }[];
 }
 

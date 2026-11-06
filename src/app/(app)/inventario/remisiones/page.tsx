@@ -32,7 +32,7 @@ export default async function RemisionesPage() {
     .order("enviado_en", { ascending: false })
     .limit(500);
 
-  // Qué cajas salieron en cada línea (migración 0235; sin ella, nada).
+  // Qué cajas salieron en cada línea (migración 0236; sin ella, nada).
   const { data: conCajas } = await supabase.from("wms_envios_dropi").select("id, cajas").in("id", (data ?? []).map((e) => e.id as string));
   const cajasDeLinea = new Map((conCajas ?? []).map((c) => [c.id as string, textoCajasEnviadas(c.cajas)]));
 
@@ -75,7 +75,7 @@ export default async function RemisionesPage() {
   const stock: StockPorBodega = {};
   for (const s of conStock.data ?? []) (stock[s.bodega_id] ??= {})[s.sku_maestro_id] = Number(s.disponible);
   const hay = new Set((conStock.data ?? []).map((s) => s.sku_maestro_id));
-  // Las cajas de cada producto en cada bodega propia (migración 0235; sin ella, se sigue por unidades).
+  // Las cajas de cada producto en cada bodega propia (migración 0236; sin ella, se sigue por unidades).
   const { data: guardadas } = puedeEscribir && propias.length
     ? await traerTodasConError<{ id: string; bodega_id: string; sku_maestro_id: string; cajas: number; unidades_por_caja: number; observacion: string | null; wms_ubicaciones: unknown }>((d, h) =>
         supabase.from("wms_cajas").select("id, bodega_id, sku_maestro_id, cajas, unidades_por_caja, observacion, wms_ubicaciones(codigo, notas)").in("bodega_id", propias.map((b) => b.id)).order("id").range(d, h),

@@ -12,7 +12,7 @@ const MODULO = "inventario";
 const ES_ID = (v: string) => /^[0-9a-fA-F-]{8,64}$/.test(v);
 const texto = (formData: FormData, campo: string) => String(formData.get(campo) ?? "").trim();
 
-/** Unas cajas de un producto: en qué bodega y lugar, cuántas y de cuántas unidades (migración 0235). */
+/** Unas cajas de un producto: en qué bodega y lugar, cuántas y de cuántas unidades (migración 0236). */
 export interface CajaDeBodega extends CajaGuardada {
   bodegaId: string;
   bodega: string;
@@ -98,7 +98,7 @@ export async function obtenerStockDeSku(skuId: string): Promise<{ bodegas: Stock
       .eq("wms_bodegas.pais_id", pais.id)
       .order("enviado_en", { ascending: false })
       .limit(20),
-    // Sin la migración 0235 no hay cajas: la ficha carga igual.
+    // Sin la migración 0236 no hay cajas: la ficha carga igual.
     supabase
       .from("wms_cajas")
       .select("id, bodega_id, cajas, unidades_por_caja, observacion, wms_ubicaciones(codigo, notas), wms_bodegas!inner(nombre, pais_id)")
@@ -298,17 +298,19 @@ export async function transferirStock(formData: FormData): Promise<{ error?: str
     supabase.from("wms_bodegas").select("id, nombre").in("id", [desde, hacia]),
   ]);
   if (!maestro) return { error: "El SKU no existe." };
-  const { error } = await supabase.rpc("wms_transferir", {
-    p_sku: sku,
+  // Desde la ficha es un traslado de un solo producto: queda en la pestaña Traslados, con su número, como cualquier otro (migración 0236).
+  const { error } = await supabase.rpc("wms_crear_traslado", {
     p_desde: desde,
     p_hacia: hacia,
-    p_cantidad: cantidad,
-    p_lote: loteId,
-    p_referencia: referencia,
-    p_motivo: motivo,
+    p_items: [{ sku, cantidad, lote: loteId }],
+    p_notas: [referencia, motivo].filter(Boolean).join(" · ") || null,
     p_usuario: usuario.id,
+    p_nombre: usuario.nombre || usuario.email,
   });
-  if (error) return { error: errorDeBase(error.message, "No se pudo hacer la transferencia.") };
+  if (error) {
+    if (/wms_crear_traslado/.test(error.message)) return { error: "Falta correr la migración 0236 en la base." };
+    return { error: errorDeBase(error.message, "No se pudo hacer la transferencia.") };
+  }
   const nombre = (id: string) => (bodegas ?? []).find((b) => b.id === id)?.nombre ?? "otra bodega";
   const pais = await paisDeBodega(supabase, desde);
   await registrarAuditoria({

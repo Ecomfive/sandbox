@@ -17,7 +17,7 @@ export interface BodegaRemision {
 /** Lo que hay disponible de cada producto en cada bodega propia: `{ [bodega]: { [producto]: unidades } }`. */
 export type StockPorBodega = Record<string, Record<string, number>>;
 
-/** Las cajas de cada producto en cada bodega propia: `{ [bodega]: { [producto]: cajas } }` (migración 0235). */
+/** Las cajas de cada producto en cada bodega propia: `{ [bodega]: { [producto]: cajas } }` (migración 0236). */
 export type CajasPorBodega = Record<string, Record<string, CajaGuardada[]>>;
 
 interface Linea {
