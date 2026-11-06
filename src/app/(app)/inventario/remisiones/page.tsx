@@ -14,8 +14,8 @@ export const dynamic = "force-dynamic";
 const uno = <T,>(r: T | T[] | null): T | null => (Array.isArray(r) ? (r[0] ?? null) : r);
 
 /**
- * Las remisiones a las bodegas externas del país (Dropi, Effi, Boxfull, Dunamixfy): las que siguen en camino primero (para
- * anotar cuántas unidades dice el tercero que llegaron) y después las ya recibidas, con su diferencia.
+ * Las remisiones a las bodegas externas del país (Dropi, Effi, Boxfull, Dunamixfy): una fila por remisión, las que siguen en camino primero; en su
+ * ficha están los productos, para anotar cuántas unidades dice el tercero que llegaron, y las ya recibidas con su diferencia.
  */
 export default async function RemisionesPage() {
   const usuario = await requireModulo("inventario");
@@ -24,7 +24,7 @@ export default async function RemisionesPage() {
   const { data, error } = await supabase
     .from("wms_envios_dropi")
     .select(
-      "id, enviado_en, enviada, recibida, estado, referencia, motivo_diferencia, recibido_en, remision_id, skus_maestros(codigo, nombre, foto_url), wms_bodegas!wms_envios_dropi_bodega_origen_id_fkey!inner(nombre, pais_id), destino:wms_bodegas!wms_envios_dropi_bodega_dropi_id_fkey(nombre)",
+      "id, enviado_en, enviada, recibida, estado, referencia, motivo_diferencia, recibido_en, remision_id, wms_remisiones(notas), skus_maestros(codigo, nombre, foto_url), wms_bodegas!wms_envios_dropi_bodega_origen_id_fkey!inner(nombre, pais_id), destino:wms_bodegas!wms_envios_dropi_bodega_dropi_id_fkey(nombre)",
     )
     .eq("wms_bodegas.pais_id", pais.id)
     .order("estado")
@@ -46,6 +46,7 @@ export default async function RemisionesPage() {
       estado: e.estado as FilaEnvio["estado"],
       referencia: (e.referencia as string | null) ?? null,
       remisionId: (e.remision_id as string | null) ?? null,
+      notas: uno(e.wms_remisiones as { notas: string | null } | { notas: string | null }[] | null)?.notas ?? null,
       motivo: (e.motivo_diferencia as string | null) ?? null,
     };
   });
@@ -83,7 +84,7 @@ export default async function RemisionesPage() {
           {/remision_id/.test(error.message) ? "Falta correr la migración 0233 en la base." : "No se pudieron cargar las remisiones."}
         </p>
       ) : (
-        <ListaEnvios filas={filas} puedeEscribir={puedeEscribir} />
+        <ListaEnvios filas={filas} puedeEscribir={puedeEscribir} codigoPais={pais.codigo} />
       )}
     </Pagina>
   );
