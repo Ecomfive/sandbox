@@ -1,7 +1,21 @@
-import { PAISES_NAV } from "@/lib/nav-data";
 import { ETIQUETA_ESTADO_PAIS, type AccionPorPais, type CeldaPais, type EstadoPais } from "@/lib/producto/por-pais";
 import type { DefTabla } from "@/lib/tabla/motor";
 import { ETIQUETA_CLASE } from "@/app/(app)/producto/def-producto";
+
+/**
+ * Los países de «Gestión por país» (5 nov 2026, Alcides): los de la operación y los que se evalúan para entrar, en este orden. Colombia no va
+ * (no se piensa entrar mercancía por ahora). Para sumar uno, agrégalo aquí (y a la tabla `paises` si no está).
+ */
+export const PAISES_GESTION: { codigo: string; nombre: string }[] = [
+  { codigo: "PA", nombre: "Panamá" },
+  { codigo: "CR", nombre: "Costa Rica" },
+  { codigo: "MX", nombre: "México" },
+  { codigo: "GT", nombre: "Guatemala" },
+  { codigo: "VE", nombre: "Venezuela" },
+  { codigo: "SV", nombre: "El Salvador" },
+  { codigo: "HN", nombre: "Honduras" },
+  { codigo: "NI", nombre: "Nicaragua" },
+];
 
 export interface PaisColumna {
   id: string;
@@ -41,11 +55,11 @@ export const ETIQUETA_ACCION_PAIS: Record<AccionPorPais, string> = {
 
 const ORDEN_ESTADOS: EstadoPais[] = ["publicado", "comprado", "stock", "enviar", "no", "archivado", "descartado", "descontinuado"];
 const OPCIONES_ESTADO = () => ORDEN_ESTADOS.map((valor) => ({ valor, etiqueta: ETIQUETA_ESTADO_PAIS[valor] }));
-const NOMBRE_PAIS = (codigo: string) => PAISES_NAV.find((p) => p.codigo === codigo)?.nombre ?? codigo;
+const NOMBRE_PAIS = (codigo: string) => PAISES_GESTION.find((p) => p.codigo === codigo)?.nombre ?? codigo;
 
 /**
  * La tabla de «Por país»: un filtro por cada país de la barra (cómo está ahí el producto), «Existe en» y «Todavía no está en» (los
- * países donde no existe), más el tipo y el estado del producto. Los países son fijos (los de `PAISES_NAV`) para que la definición sea
+ * países donde no existe), más el tipo y el estado del producto. Los países son fijos (`PAISES_GESTION`) para que la definición sea
  * una constante del módulo; uno que la persona no puede ver simplemente no tiene casillas.
  */
 export const DEF_POR_PAIS: DefTabla<FilaPorPais> = {
@@ -63,23 +77,23 @@ export const DEF_POR_PAIS: DefTabla<FilaPorPais> = {
       etiqueta: "Por decidir en",
       tipo: "seleccion",
       valores: (f) => f.porDecidir,
-      opciones: () => PAISES_NAV.map((p) => ({ valor: p.codigo, etiqueta: p.nombre })),
+      opciones: () => PAISES_GESTION.map((p) => ({ valor: p.codigo, etiqueta: p.nombre })),
     },
     {
       id: "falta",
       etiqueta: "Todavía no está en",
       tipo: "seleccion",
       valores: (f) => Object.keys(f.celdas).filter((c) => !f.existeEn.includes(c)),
-      opciones: () => PAISES_NAV.map((p) => ({ valor: p.codigo, etiqueta: p.nombre })),
+      opciones: () => PAISES_GESTION.map((p) => ({ valor: p.codigo, etiqueta: p.nombre })),
     },
     {
       id: "existe",
       etiqueta: "Existe en",
       tipo: "seleccion",
       valores: (f) => (f.existeEn.length ? f.existeEn : ["__sin_valor__"]),
-      opciones: () => [...PAISES_NAV.map((p) => ({ valor: p.codigo, etiqueta: p.nombre })), { valor: "__sin_valor__", etiqueta: "En ningún país" }],
+      opciones: () => [...PAISES_GESTION.map((p) => ({ valor: p.codigo, etiqueta: p.nombre })), { valor: "__sin_valor__", etiqueta: "En ningún país" }],
     },
-    ...PAISES_NAV.map((p) => ({
+    ...PAISES_GESTION.map((p) => ({
       id: `pais_${p.codigo}`,
       etiqueta: p.nombre,
       tipo: "seleccion" as const,
@@ -114,7 +128,7 @@ export const DEF_POR_PAIS: DefTabla<FilaPorPais> = {
   ],
   csvAntes: [
     { etiqueta: "N.º", valor: (f) => f.numero },
-    ...PAISES_NAV.map((p) => ({ etiqueta: `Detalle ${p.nombre}`, valor: (f: FilaPorPais) => detalleCelda(f.celdas[p.codigo]) })),
+    ...PAISES_GESTION.map((p) => ({ etiqueta: `Detalle ${p.nombre}`, valor: (f: FilaPorPais) => detalleCelda(f.celdas[p.codigo]) })),
   ],
 };
 

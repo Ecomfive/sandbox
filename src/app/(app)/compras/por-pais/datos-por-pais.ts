@@ -1,13 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { UsuarioActual } from "@/lib/auth";
 import { compraCuenta } from "@/lib/compras/cuenta";
-import { PAISES_NAV } from "@/lib/nav-data";
 import { puedeVerPais } from "@/lib/paises-permitidos";
 import { accionesPorPais, armarPorPais, ESTADOS_EXISTE, paisesPorDecidir, type CompraPais, type DecisionPais, type PublicacionPais, type StockPais } from "@/lib/producto/por-pais";
 import { esBodegaDropi } from "@/lib/publicaciones/automatico";
 import { idsDeDropi } from "@/lib/publicaciones/sincronizar-dropi";
 import { traerTodasConError } from "@/lib/supabase/paginar";
-import type { FilaPorPais, PaisColumna } from "./def-por-pais";
+import { PAISES_GESTION, type FilaPorPais, type PaisColumna } from "./def-por-pais";
 
 const unoDe = <T,>(r: T | T[] | null): T | null => (Array.isArray(r) ? (r[0] ?? null) : r);
 
@@ -16,11 +15,11 @@ const unoDe = <T,>(r: T | T[] | null): T | null => (Array.isArray(r) ? (r[0] ?? 
  * Dropi y Drop, las compras, el stock de las bodegas, lo descontinuado y las decisiones (migración 0231; sin ella, ninguna).
  */
 export async function cargarPorPais(usuario: UsuarioActual, supabase: SupabaseClient): Promise<{ filas: FilaPorPais[]; paises: PaisColumna[]; sinMigracion: boolean }> {
-  const codigos = PAISES_NAV.map((p) => p.codigo).filter((c) => puedeVerPais(usuario.paisesPermitidos, c));
+  const codigos = PAISES_GESTION.map((p) => p.codigo).filter((c) => puedeVerPais(usuario.paisesPermitidos, c));
   const { data: filasPaises } = await supabase.from("paises").select("id, codigo, nombre").in("codigo", codigos);
   const codigoPorId = new Map(((filasPaises ?? []) as { id: string; codigo: string }[]).map((p) => [p.id, p.codigo]));
   const paises: PaisColumna[] = codigos
-    .map((codigo) => ({ codigo, nombre: PAISES_NAV.find((p) => p.codigo === codigo)?.nombre ?? codigo, id: [...codigoPorId].find(([, c]) => c === codigo)?.[0] ?? "" }))
+    .map((codigo) => ({ codigo, nombre: PAISES_GESTION.find((p) => p.codigo === codigo)?.nombre ?? codigo, id: [...codigoPorId].find(([, c]) => c === codigo)?.[0] ?? "" }))
     .filter((p) => p.id);
   const paisDe = (id: string | null | undefined) => (id ? (codigoPorId.get(id) ?? null) : null);
 
