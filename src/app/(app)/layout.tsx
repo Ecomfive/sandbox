@@ -77,7 +77,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         ...(esAdministrador(usuario) ? [] : PESTANAS_SOLO_ADMIN),
         ...(usuario.modulos.includes("uso-sistema") ? [] : PESTANAS_USO_SISTEMA),
         ...(usuario.modulos.includes("compras-por-pais") ? [] : PESTANAS_POR_PAIS),
-        ...(PAISES_CON_RECEPCION.includes(paisActual.codigo) ? [] : ["/inventario/recepcion"]),
+        ...(PAISES_CON_RECEPCION.includes(paisActual.codigo) ? [] : ["/inventario/recepcion", "/inventario/cuadro"]),
         // Los KPIs de atención y el panel de Dirección ya no son pestañas: desde el 30 oct 2026 son la Bandeja de Dirección.
       ]
     : [];

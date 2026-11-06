@@ -54,6 +54,7 @@ export const PESTANAS_POR_MODULO: Record<string, Pestana[]> = {
     { etiqueta: "Stock", href: "/inventario" },
     { etiqueta: "Levantamiento", href: "/inventario/levantamiento" },
     { etiqueta: "Recepción", href: "/inventario/recepcion" },
+    { etiqueta: "Cuadro", href: "/inventario/cuadro" },
     { etiqueta: "Traslados", href: "/inventario/traslados" },
     { etiqueta: "Remisiones", href: "/inventario/remisiones" },
     { etiqueta: "Vencimientos", href: "/inventario/vencimientos" },
