@@ -1,4 +1,5 @@
 import type { DefTabla } from "@/lib/tabla/motor";
+import type { StockPlataformas } from "@/lib/wms/stock-plataformas";
 
 /** Una fila del inventario: un SKU maestro con lo que hay en las bodegas elegidas (todas las del país o una). */
 export interface FilaStock {
@@ -24,6 +25,8 @@ export interface FilaStock {
   /** Cuántas cajas tiene y qué unidades suman (migración 0236): lo que Nicol mira para saber cuánto pedir. */
   cajas: number;
   unidadesEnCajas: number;
+  /** Lo que tiene en las plataformas, en los países que las muestran (`PAISES_CON_PLATAFORMAS`); `null` si no tiene o no aplica. */
+  plataformas: StockPlataformas | null;
 }
 
 export const ETIQUETA_TIPO_SKU: Record<string, string> = { simple: "Simple", combo: "Compuesto" };
@@ -90,5 +93,17 @@ export const DEF_STOCK: DefTabla<FilaStock> = {
     { etiqueta: "En camino", valor: (f) => f.enCamino },
     { etiqueta: "Vencido", valor: (f) => f.vencido },
     { etiqueta: "Cajas", valor: (f) => f.cajas },
+  ],
+};
+
+/** En los países que muestran las plataformas, además se filtra y se descarga por ellas. */
+export const DEF_STOCK_PLATAFORMAS: DefTabla<FilaStock> = {
+  ...DEF_STOCK,
+  campos: [...DEF_STOCK.campos, { id: "plataformas", etiqueta: "En plataformas", tipo: "numero", sinCsv: true, valor: (f) => f.plataformas?.total ?? 0 }],
+  csvAntes: [
+    ...(DEF_STOCK.csvAntes ?? []),
+    { etiqueta: "Dropi", valor: (f) => f.plataformas?.dropi ?? 0 },
+    { etiqueta: "Effi", valor: (f) => f.plataformas?.effi ?? 0 },
+    { etiqueta: "Drop", valor: (f) => f.plataformas?.drop ?? 0 },
   ],
 };

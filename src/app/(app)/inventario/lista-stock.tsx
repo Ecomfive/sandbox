@@ -8,14 +8,16 @@ import { ListaDatos } from "@/components/tabla/lista-datos";
 import { InventarioIcon, ProductoIcon } from "@/lib/nav-icons";
 import type { NombreFilas } from "@/lib/tabla/pie";
 import { conStockPrimero } from "@/lib/wms/total-stock";
-import { DEF_STOCK, type FilaStock } from "./def-stock";
+import { formatearTiempoRelativo } from "@/lib/formato";
+import { ETIQUETA_PLATAFORMA, lecturaVieja, type LecturasPlataformas, type Plataforma } from "@/lib/wms/stock-plataformas";
+import { DEF_STOCK, DEF_STOCK_PLATAFORMAS, type FilaStock } from "./def-stock";
 import { FichaStock } from "./ficha-stock";
 import { EncabezadoFilasStock, FilaStockLista } from "./fila-stock";
 import type { BodegaOpcion, UbicacionOpcion } from "./panel-movimiento";
 import { TableroStock } from "./tablero-stock";
 
 const NOMBRE: NombreFilas = { singular: "SKU", plural: "SKUs" };
-const ICONOS: Record<string, IconoComp> = { sku: ProductoIcon, existencia: InventarioIcon, tipo: ProductoIcon, clase: ProductoIcon, fisico: InventarioIcon, disponible: InventarioIcon, vencido: InventarioIcon, enCamino: InventarioIcon };
+const ICONOS: Record<string, IconoComp> = { sku: ProductoIcon, existencia: InventarioIcon, tipo: ProductoIcon, clase: ProductoIcon, fisico: InventarioIcon, plataformas: InventarioIcon, disponible: InventarioIcon, vencido: InventarioIcon, enCamino: InventarioIcon };
 
 /** Elige de qué bodega se ve el stock (todas las del país, o una): se guarda en la dirección, `?bodega=`. */
 function SelectorBodega({ bodegas, elegida }: { bodegas: { id: string; nombre: string; externa: boolean }[]; elegida: string }) {
@@ -39,6 +41,25 @@ function SelectorBodega({ bodegas, elegida }: { bodegas: { id: string; nombre: s
   );
 }
 
+/** Cuándo se leyó cada plataforma: una lectura vieja se avisa, porque lo que se ve es lo de ese momento. Dunamixfy todavía no se lee. */
+function AvisoLecturas({ lecturas, fallaron }: { lecturas: LecturasPlataformas; fallaron: boolean }) {
+  return (
+    <p className="m-0 mt-3 text-xs text-muted-foreground">
+      Plataformas, según su última lectura:{" "}
+      {(["dropi", "effi", "drop"] as Plataforma[]).map((p, i) => (
+        <span key={p}>
+          {i > 0 && " · "}
+          <span className={lecturaVieja(lecturas[p]) ? "font-medium text-warning" : ""}>
+            {ETIQUETA_PLATAFORMA[p]} {lecturas[p] ? formatearTiempoRelativo(lecturas[p]) : "sin lectura"}
+          </span>
+        </span>
+      ))}
+      {" · "}Dunamixfy sin conectar
+      {fallaron && <span className="font-medium text-destructive"> · Una lectura no cargó: faltan unidades. Recarga la página.</span>}
+    </p>
+  );
+}
+
 /**
  * Inventario por SKU maestro: lo que hay en las bodegas del país (o en una), en cubetas. Empieza en cero y un saldo puede
  * quedar negativo (se ve en rojo) hasta que se registren las entradas o se conecten las fuentes. Arriba, el tablero con los
@@ -54,6 +75,8 @@ export function ListaStock({
   puedeEscribir,
   codigoPais,
   bodegasExternas,
+  lecturas,
+  lecturasFallaron,
 }: {
   filas: FilaStock[];
   bodegas: { id: string; nombre: string; externa: boolean }[];
@@ -64,26 +87,36 @@ export function ListaStock({
   /** El país de la barra de arriba: la ficha muestra las compras de ese país (el stock también es de ese país). */
   codigoPais: string;
   bodegasExternas: BodegaOpcion[];
+  /** Cuándo se leyó cada plataforma; `null` en los países que no las muestran. */
+  lecturas: LecturasPlataformas | null;
+  lecturasFallaron: boolean;
 }) {
   const router = useRouter();
   const [abierto, setAbierto] = useState<string | null>(null);
   const sku = abierto ? filas.find((f) => f.id === abierto) : undefined;
-  const enOrden = useMemo(() => conStockPrimero(filas), [filas]);
+  const conPlataformas = lecturas !== null;
+  const def = conPlataformas ? DEF_STOCK_PLATAFORMAS : DEF_STOCK;
+  const enOrden = useMemo(() => conStockPrimero(filas, (f) => f.plataformas?.total ?? 0), [filas]);
 
   return (
     <>
       <ListaDatos
-        def={DEF_STOCK}
+        def={def}
         filas={enOrden}
         iconos={ICONOS}
         nombre={NOMBRE}
         claveFila={(f) => f.id}
         variante="filas"
-        encabezado={<EncabezadoFilasStock />}
-        renderFila={(f) => <FilaStockLista f={f} alAbrir={() => setAbierto(f.id)} />}
+        encabezado={<EncabezadoFilasStock conPlataformas={conPlataformas} />}
+        renderFila={(f) => <FilaStockLista f={f} conPlataformas={conPlataformas} alAbrir={() => setAbierto(f.id)} />}
         formatearTotal={(n) => `${n.toLocaleString("es-PA")} u.`}
         accionPrincipal={<SelectorBodega bodegas={bodegas} elegida={bodegaElegida} />}
-        resumen={(visibles) => <TableroStock filas={visibles} />}
+        resumen={(visibles) => (
+          <>
+            <TableroStock filas={visibles} def={def} conPlataformas={conPlataformas} />
+            {lecturas && <AvisoLecturas lecturas={lecturas} fallaron={lecturasFallaron} />}
+          </>
+        )}
         vacio="Todavía no hay SKUs maestros."
       />
       <FichaStock
@@ -93,6 +126,7 @@ export function ListaStock({
         puedeEscribir={puedeEscribir}
         codigoPais={codigoPais}
         bodegasExternas={bodegasExternas}
+        conPlataformas={conPlataformas}
         alCerrar={() => setAbierto(null)}
         alCambiar={() => router.refresh()}
       />

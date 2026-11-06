@@ -4,6 +4,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
 import { requireModulo } from "@/lib/auth";
 import { traerTodasConError } from "@/lib/supabase/paginar";
+import { leerStockPlataformas, PAISES_CON_PLATAFORMAS } from "./datos-plataformas";
 import type { FilaStock } from "./def-stock";
 import { ListaStock } from "./lista-stock";
 
@@ -64,9 +65,11 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
   }
 
   const conVariantes = new Set(((padres.data ?? []) as { id: string }[]).map((p) => p.id));
+  // Lo que hay en las plataformas (6 nov 2026, flujograma de Costa Rica): se lee de sus publicaciones, no de `wms_stock`.
+  const plataformas = PAISES_CON_PLATAFORMAS.includes(pais.codigo) ? await leerStockPlataformas(supabase, pais.id) : null;
 
-  // Un producto con variantes no lleva stock: se ven sus variantes. Sale solo si le viene algo en camino (una compra hecha al producto general).
-  const filas: FilaStock[] = ((resumen.data ?? []) as Record<string, unknown>[]).filter((r) => !conVariantes.has(String(r.sku_maestro_id)) || Number(r.en_camino) > 0).map((r) => ({
+  // Un producto con variantes no lleva stock: se ven sus variantes. Sale solo si le viene algo en camino (una compra hecha al producto general) o si una plataforma lo tiene publicado así.
+  const filas: FilaStock[] = ((resumen.data ?? []) as Record<string, unknown>[]).filter((r) => !conVariantes.has(String(r.sku_maestro_id)) || Number(r.en_camino) > 0 || !!plataformas?.porProducto.has(String(r.sku_maestro_id))).map((r) => ({
     id: String(r.sku_maestro_id),
     codigo: String(r.codigo),
     nombre: String(r.nombre),
@@ -84,6 +87,7 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
     foto: fotoPorId.get(String(r.sku_maestro_id)) ?? null,
     cajas: cajasPorSku.get(String(r.sku_maestro_id))?.cajas ?? 0,
     unidadesEnCajas: cajasPorSku.get(String(r.sku_maestro_id))?.unidades ?? 0,
+    plataformas: plataformas?.porProducto.get(String(r.sku_maestro_id)) ?? null,
   }));
 
   return (
@@ -104,6 +108,8 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
           puedeEscribir={!usuario.modulosSoloLectura.includes("inventario")}
           codigoPais={pais.codigo}
           bodegasExternas={bodegas.filter((b) => b.tipo === "externa").map((b) => ({ id: b.id as string, nombre: b.nombre as string }))}
+          lecturas={plataformas?.lecturas ?? null}
+          lecturasFallaron={plataformas?.fallaron ?? false}
         />
       )}
     </Pagina>

@@ -6,8 +6,11 @@ export function sumaSinCompuestos<F extends { tipo: string }>(filas: F[], valor:
   return filas.reduce((suma, f) => (f.tipo === "combo" ? suma : suma + valor(f)), 0);
 }
 
-/** Lo que pide atención va primero: los saldos negativos, luego lo que tiene stock y al final lo que está en cero, sin cambiar el orden dentro de cada parte. */
-export function conStockPrimero<F extends { fisico: number }>(filas: F[]): F[] {
-  const lugar = (f: F) => (f.fisico < 0 ? 0 : f.fisico > 0 ? 1 : 2);
+/**
+ * Lo que pide atención va primero: los saldos negativos, luego lo que tiene stock y al final lo que está en cero, sin cambiar el orden dentro de cada parte.
+ * `fuera` son las unidades que tiene en otra parte (en las plataformas): con ellas un producto no cuenta como en cero.
+ */
+export function conStockPrimero<F extends { fisico: number }>(filas: F[], fuera: (f: F) => number = () => 0): F[] {
+  const lugar = (f: F) => (f.fisico < 0 ? 0 : f.fisico > 0 || fuera(f) > 0 ? 1 : 2);
   return [...filas].sort((a, b) => lugar(a) - lugar(b));
 }

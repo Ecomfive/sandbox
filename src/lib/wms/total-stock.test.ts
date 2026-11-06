@@ -21,5 +21,6 @@ test("primero los negativos, luego lo que tiene stock y al final lo que está en
     { codigo: "E", fisico: 1 },
   ];
   assert.deepEqual(conStockPrimero(filas).map((f) => f.codigo), ["C", "B", "E", "A", "D"]);
+  assert.deepEqual(conStockPrimero(filas, (f) => (f.codigo === "D" ? 9 : 0)).map((f) => f.codigo), ["C", "B", "D", "E", "A"]);
   assert.equal(filas[0].codigo, "A");
 });

@@ -6,6 +6,8 @@ import { useFiltros } from "@/components/tabla/ganchos";
 import { anilloFoco } from "@/components/ui/field";
 import { AlertaIcon, CalendarioIcon, CheckIcon, EnvioIcon, InventarioIcon } from "@/lib/nav-icons";
 import { alternarAtajo, atajoActivo, type AtajoFiltro } from "@/lib/tabla/atajos";
+import type { DefTabla } from "@/lib/tabla/motor";
+import { textoPlataformas, type StockPlataformas } from "@/lib/wms/stock-plataformas";
 import { sumaSinCompuestos } from "@/lib/wms/total-stock";
 import { DEF_STOCK, existenciaDe, type FilaStock } from "./def-stock";
 
@@ -25,11 +27,23 @@ interface Tarjeta {
 }
 
 /** Las tarjetas de lo que se está viendo: cambian con la bodega, la búsqueda y los filtros. Un compuesto no suma unidades, porque ya están en sus componentes. */
-function tarjetas(filas: FilaStock[]): Tarjeta[] {
+function tarjetas(filas: FilaStock[], conPlataformas: boolean): Tarjeta[] {
   const conStock = filas.filter((f) => existenciaDe(f) === "con_stock");
   const compuestos = conStock.filter((f) => f.tipo === "combo").length;
+  // Aquí los compuestos sí suman: en una plataforma un compuesto es una publicación con su propio stock.
+  const enPlataforma = (valor: (p: StockPlataformas) => number) => filas.reduce((t, f) => t + (f.plataformas ? valor(f.plataformas) : 0), 0);
+  const enPlataformas: Tarjeta = {
+    id: "plataformas",
+    titulo: "En plataformas",
+    numero: enPlataforma((p) => p.total),
+    detalle: textoPlataformas({ dropi: enPlataforma((p) => p.dropi), effi: enPlataforma((p) => p.effi), drop: enPlataforma((p) => p.drop) }) || "Sin unidades",
+    icono: EnvioIcon,
+    color: "azul",
+    atajo: { id: "plataformas", etiqueta: "En plataformas", ayuda: "Filtrar la lista: con unidades en plataformas", filtro: desdeUna("plataformas") },
+  };
   return [
     { id: "fisicas", titulo: "Unidades físicas", numero: sumaSinCompuestos(filas, (f) => f.fisico), detalle: "Sin contar compuestos", icono: InventarioIcon, color: "violeta" },
+    ...(conPlataformas ? [enPlataformas] : []),
     { id: "disponibles", titulo: "Disponibles", numero: sumaSinCompuestos(filas, (f) => f.disponible), detalle: "Las que se pueden vender", icono: CheckIcon, color: "verde" },
     {
       id: "con-stock",
@@ -80,11 +94,11 @@ function tarjetas(filas: FilaStock[]): Tarjeta[] {
 }
 
 /** El tablero de Inventario, a la vista sin bajar ni descargar. Una tarjeta con atajo filtra la lista al pulsarla; pulsarla otra vez quita el filtro. */
-export function TableroStock({ filas }: { filas: FilaStock[] }) {
-  const [filtros, cambiarFiltros] = useFiltros(DEF_STOCK);
+export function TableroStock({ filas, def = DEF_STOCK, conPlataformas = false }: { filas: FilaStock[]; def?: DefTabla<FilaStock>; conPlataformas?: boolean }) {
+  const [filtros, cambiarFiltros] = useFiltros(def);
   return (
     <section aria-label="Tablero de inventario" className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fit,minmax(9.5rem,1fr))]">
-      {tarjetas(filas).map((t) => {
+      {tarjetas(filas, conPlataformas).map((t) => {
         const c = COLORES[t.color];
         const Icono = t.icono;
         const atajo = t.atajo;

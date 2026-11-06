@@ -8,6 +8,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
 import { formatearTiempoRelativo } from "@/lib/formato";
 import { CalendarioIcon, ComprasIcon, EnvioIcon, HistorialIcon, InventarioIcon } from "@/lib/nav-icons";
+import { ETIQUETA_PLATAFORMA } from "@/lib/wms/stock-plataformas";
 import { ComprasProducto } from "../producto/compras-producto";
 import { ETIQUETA_TIPO_SKU, type FilaStock } from "./def-stock";
 import { DESCRIPCION_CUBETA } from "./descripciones-stock";
@@ -66,6 +67,7 @@ export function FichaStock({
   puedeEscribir,
   codigoPais,
   bodegasExternas,
+  conPlataformas = false,
   alCerrar,
   alCambiar,
 }: {
@@ -77,6 +79,8 @@ export function FichaStock({
   puedeEscribir: boolean;
   /** Las compras que se ven son las de este país, como el stock. */
   codigoPais: string;
+  /** Este país muestra las plataformas: las bodegas externas sin nada propio no salen, porque su stock se ve en «En plataformas». */
+  conPlataformas?: boolean;
   alCerrar: () => void;
   /** Se llama tras guardar un movimiento, para que la tabla vuelva a pedir sus totales. */
   alCambiar: () => void;
@@ -209,7 +213,7 @@ export function FichaStock({
                       </tr>
                     </thead>
                     <tbody>
-                      {datos.bodegas.map((b) => (
+                      {datos.bodegas.filter((b) => !conPlataformas || b.tipo !== "externa" || b.fisico !== 0 || b.enCamino !== 0).map((b) => (
                         <tr key={b.bodegaId} className="border-t border-border">
                           <th scope="row" className="py-1.5 pr-2 text-left font-medium">
                             {b.nombre}
@@ -227,6 +231,33 @@ export function FichaStock({
                 </div>
               )}
             </Seccion>
+
+            {conPlataformas && (
+              <Seccion icono={EnvioIcon} titulo="En plataformas">
+                {!sku.plataformas ? (
+                  <p className="text-sm text-muted-foreground">No tiene unidades en Dropi, Effi ni Drop, o no está vinculado a una publicación de allá.</p>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    <ul className="m-0 flex list-none flex-col gap-1 p-0 text-[13px]">
+                      {sku.plataformas.lineas.map((l) => (
+                        <li key={`${l.plataforma}-${l.id}`} className="flex flex-wrap justify-between gap-x-3">
+                          <span className="min-w-0">
+                            <span className="font-medium">{ETIQUETA_PLATAFORMA[l.plataforma]}</span>
+                            <span className="text-muted-foreground">
+                              {" "}
+                              · {l.id} · {l.nombre}
+                            </span>
+                            {l.aparte !== 0 && <span className="text-muted-foreground"> · {l.aparte.toLocaleString("es-PA")} u. {l.plataforma === "effi" ? "en garantías" : "en otra bodega (referencial)"}</span>}
+                          </span>
+                          <span className="tabular-nums">{l.unidades.toLocaleString("es-PA")} u.</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="m-0 text-xs text-muted-foreground">Es lo de la última lectura de cada plataforma. Aquí no se cambia: se mueve con remisión o en la plataforma.</p>
+                  </div>
+                )}
+              </Seccion>
+            )}
 
             {!esCombo && !esTest && datos !== null && datos !== "error" && datos.cajas.length > 0 && (
               <Seccion icono={InventarioIcon} titulo="Cajas">
