@@ -4,6 +4,7 @@ import { compraCuenta } from "@/lib/compras/cuenta";
 import { PAISES_NAV } from "@/lib/nav-data";
 import { puedeVerPais } from "@/lib/paises-permitidos";
 import { accionesPorPais, armarPorPais, ESTADOS_EXISTE, paisesPorDecidir, type CompraPais, type DecisionPais, type PublicacionPais, type StockPais } from "@/lib/producto/por-pais";
+import { idsDeDropi } from "@/lib/publicaciones/sincronizar-dropi";
 import { traerTodasConError } from "@/lib/supabase/paginar";
 import type { FilaPorPais, PaisColumna } from "./def-por-pais";
 
@@ -22,7 +23,7 @@ export async function cargarPorPais(usuario: UsuarioActual, supabase: SupabaseCl
     .filter((p) => p.id);
   const paisDe = (id: string | null | undefined) => (id ? (codigoPorId.get(id) ?? null) : null);
 
-  const [productos, fotos, dropi, drop, lineas, stock, descontinuados, decisiones] = await Promise.all([
+  const [productos, fotos, dropi, drop, lineas, stock, descontinuados, decisiones, stockDropi] = await Promise.all([
     traerTodasConError<{ id: string; codigo: string; nombre: string; tipo: string; clase: string; padre_id: string | null; numero: number | null; creado_en: string }>((d, h) =>
       supabase.from("skus_maestros").select("id, codigo, nombre, tipo, clase, padre_id, numero, creado_en").order("id").range(d, h),
     ),
@@ -30,8 +31,8 @@ export async function cargarPorPais(usuario: UsuarioActual, supabase: SupabaseCl
     traerTodasConError<{ id: string; sku_maestro_id: string; dropi_id: string | null; estado: string | null; estado_publicacion: string | null; pais_id: string }>((d, h) =>
       supabase.from("dropi_publicaciones").select("id, sku_maestro_id, dropi_id, estado, estado_publicacion, pais_id").not("sku_maestro_id", "is", null).order("id").range(d, h),
     ),
-    traerTodasConError<{ id: string; sku_maestro_id: string; codigo: string | null; estado: string; en_drop: boolean; pais_id: string }>((d, h) =>
-      supabase.from("drop_publicaciones").select("id, sku_maestro_id, codigo, estado, en_drop, pais_id").not("sku_maestro_id", "is", null).order("id").range(d, h),
+    traerTodasConError<{ id: string; sku_maestro_id: string; codigo: string | null; estado: string; en_drop: boolean; inventario: number | null; pais_id: string }>((d, h) =>
+      supabase.from("drop_publicaciones").select("id, sku_maestro_id, codigo, estado, en_drop, inventario, pais_id").not("sku_maestro_id", "is", null).order("id").range(d, h),
     ),
     traerTodasConError<{ sku_maestro_id: string; compra_id: string; cantidad_pedida: number; wms_compras: unknown }>((d, h) =>
       supabase.from("wms_compra_items").select("sku_maestro_id, compra_id, cantidad_pedida, wms_compras(numero, creado_en, etapa, anulada_en, pais_id)").order("id").range(d, h),
@@ -41,7 +42,16 @@ export async function cargarPorPais(usuario: UsuarioActual, supabase: SupabaseCl
     ),
     supabase.from("skus_descontinuado_pais").select("sku_id, pais_id"),
     supabase.from("producto_pais_decisiones").select("sku_id, pais_id, decision, motivo, decidido_por, decidido_en"),
+    // El stock en Dropi de nuestros productos: la última lectura de «Mis productos» de cada país (público + privado).
+    traerTodasConError<{ pais_id: string; dropi_producto_id: number; stock: number | null }>((d, h) =>
+      supabase.from("dropi_productos_proveedor").select("pais_id, dropi_producto_id, stock").order("pais_id").order("dropi_producto_id").range(d, h),
+    ),
   ]);
+  const stockPorDropi = new Map((stockDropi.data ?? []).map((s) => [`${s.pais_id}:${s.dropi_producto_id}`, Number(s.stock ?? 0)]));
+  const stockDeDropi = (paisId: string, dropiId: string | null): number | null => {
+    const valores = idsDeDropi(dropiId).map((id) => stockPorDropi.get(`${paisId}:${id}`)).filter((v): v is number => v !== undefined);
+    return valores.length ? valores.reduce((a, b) => a + b, 0) : null;
+  };
   if (productos.error) throw new Error("No se pudieron leer los productos.");
 
   // Una publicación de Dropi en borrador todavía no está en Dropi: no cuenta.
@@ -55,6 +65,7 @@ export async function cargarPorPais(usuario: UsuarioActual, supabase: SupabaseCl
         idPlataforma: p.dropi_id ?? "sin ID",
         ref: p.id,
         activa: p.estado !== "archivado" && p.estado_publicacion !== "archivado" && !!p.dropi_id,
+        stock: stockDeDropi(p.pais_id, p.dropi_id),
       })),
     ...(drop.data ?? []).map((p) => ({
       skuId: p.sku_maestro_id,
@@ -63,6 +74,7 @@ export async function cargarPorPais(usuario: UsuarioActual, supabase: SupabaseCl
       idPlataforma: p.codigo ?? "Drop",
       ref: p.id,
       activa: p.en_drop && p.estado === "activo",
+      stock: p.inventario ?? null,
     })),
   ];
   const compras: CompraPais[] = [];

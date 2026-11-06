@@ -33,6 +33,8 @@ export interface PublicacionPais {
   /** El id de la publicación en el sistema (para abrir su ficha). */
   ref: string;
   activa: boolean;
+  /** Las unidades que dice la plataforma (la última lectura de «Mis productos» de Dropi, o el inventario de Drop); null si no se sabe. */
+  stock: number | null;
 }
 
 export interface CompraPais {
@@ -65,11 +67,16 @@ export interface DecisionPais {
 /** Lo que hay de un producto en un país, para la casilla y su ventana. */
 export interface CeldaPais {
   estado: EstadoPais;
-  publicaciones: { plataforma: "dropi" | "drop"; id: string; ref: string; activa: boolean }[];
+  publicaciones: { plataforma: "dropi" | "drop"; id: string; ref: string; activa: boolean; stock: number | null }[];
   compras: { compraId: string; numero: number | null; unidades: number; creada: string }[];
   unidadesCompradas: number;
   stock: { bodega: string; unidades: number }[];
+  /** Unidades en las bodegas del sistema (WMS) de ese país. */
   unidadesStock: number;
+  /** Unidades en las plataformas (Dropi, Drop) según sus publicaciones activas; cada ID una vez. */
+  unidadesPlataformas: number;
+  /** Lo disponible en el país: bodegas + plataformas. */
+  unidadesDisponibles: number;
   decision: { decision: Decision; motivo: string | null; por: string | null; en: string } | null;
   descontinuado: boolean;
 }
@@ -81,6 +88,8 @@ export const celdaVacia = (): CeldaPais => ({
   unidadesCompradas: 0,
   stock: [],
   unidadesStock: 0,
+  unidadesPlataformas: 0,
+  unidadesDisponibles: 0,
   decision: null,
   descontinuado: false,
 });
@@ -124,7 +133,8 @@ export function armarPorPais(
   for (const pub of datos.publicaciones) {
     const c = celda(pub.skuId, pub.pais);
     if (!c || c.publicaciones.some((x) => x.plataforma === pub.plataforma && x.id === pub.idPlataforma)) continue;
-    c.publicaciones.push({ plataforma: pub.plataforma, id: pub.idPlataforma, ref: pub.ref, activa: pub.activa });
+    c.publicaciones.push({ plataforma: pub.plataforma, id: pub.idPlataforma, ref: pub.ref, activa: pub.activa, stock: pub.stock });
+    if (pub.activa && pub.stock) c.unidadesPlataformas += pub.stock;
   }
   for (const compra of datos.compras) {
     if (!cuenta(compra)) continue;
@@ -156,6 +166,7 @@ export function armarPorPais(
     for (const c of Object.values(celdas)) {
       c.compras.sort((a, b) => b.creada.localeCompare(a.creada));
       c.stock.sort((a, b) => b.unidades - a.unidades);
+      c.unidadesDisponibles = c.unidadesStock + c.unidadesPlataformas;
       c.estado = estadoDeCelda(c);
     }
   }

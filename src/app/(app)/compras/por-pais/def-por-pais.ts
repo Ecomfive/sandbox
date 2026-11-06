@@ -125,7 +125,7 @@ export function detalleCelda(c: CeldaPais | undefined): string {
   const activas = c.publicaciones.filter((p) => p.activa);
   if (activas.length) partes.push(activas.map((p) => `${p.plataforma === "drop" ? "Drop" : "Dropi"} ${p.id}`).join(", "));
   if (c.compras.length) partes.push(`${c.compras.length} ${c.compras.length === 1 ? "compra" : "compras"} · ${c.unidadesCompradas.toLocaleString("es")} u.`);
-  if (c.unidadesStock > 0) partes.push(`${c.unidadesStock.toLocaleString("es")} u. en bodega`);
+  if (c.unidadesDisponibles > 0) partes.push(`${c.unidadesDisponibles.toLocaleString("es")} u. disponibles`);
   if (c.decision?.motivo) partes.push(c.decision.motivo);
   return partes.join(" · ");
 }
