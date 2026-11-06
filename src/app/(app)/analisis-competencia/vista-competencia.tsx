@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { anilloFoco, fieldClass } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { useMonedaCompetencia } from "@/components/competencia/moneda-competencia";
-import { formatearFechaHora } from "@/lib/formato";
+import { formatearFechaHoraCompleta } from "@/lib/formato";
 import { ActualizarIcon, AlertaIcon, AnalisisCompetenciaIcon, EnlaceIcon, ProveedorIcon, TiendaIcon, VentasIcon } from "@/lib/nav-icons";
 import { marcarAlertasVistas } from "./actions";
 import { decisionesDeHoy, posicionPrecio, precioEquivalente, type Decision, type EstadoPosicion, type Posicion, type TipoDecision } from "@/lib/competencia/analisis";
@@ -323,6 +323,7 @@ export function TableroCompetencia({
   activa?: IdTarjeta | null;
   alPulsar?: (id: IdTarjeta | null) => void;
 }) {
+  const { pais } = useMonedaCompetencia();
   const competidores = useMemo(() => filas ?? competidoresConDatos(datos), [filas, datos]);
   const nuestras = useMemo(() => filasNuestras(datos.productos), [datos.productos]);
   const perdiendo = useMemo(() => posicionesNuestras(datos.productos).filter((f) => f.posicion.estado === "perdiendo").length, [datos.productos]);
@@ -331,7 +332,7 @@ export function TableroCompetencia({
   const vendido7 = competidores.reduce((t, c) => t + c.bajo7, 0);
   const sinVer = datos.alertas.filter((a) => !a.vista).length;
   const cuantos = (id: IdTarjeta) => competidores.filter(FILTRO_TARJETA[id]).length;
-  const ultima = datos.ultima ? `${formatearFechaHora(datos.ultima.inicio)}${datos.ultima.duracionMs !== null ? ` · ${segundos(datos.ultima.duracionMs)}` : ""}` : null;
+  const ultima = datos.ultima ? `${formatearFechaHoraCompleta(datos.ultima.inicio, pais)}${datos.ultima.duracionMs !== null ? ` · ${segundos(datos.ultima.duracionMs)}` : ""}` : null;
 
   const contenido: Record<TarjetaC["id"], { valor: number; junto?: string; detalle: string; extra?: string | null; extraRojo?: boolean }> = {
     todos: { valor: competidores.length, junto: `${num(productosCompetencia)} productos`, detalle: ultima ? `En ${plataformaDe(datos.plataforma).nombre} ${datos.pais} · última búsqueda ${ultima}` : `En ${plataformaDe(datos.plataforma).nombre} ${datos.pais}` },
@@ -401,6 +402,7 @@ export function TableroCompetencia({
 // ---------- Novedades ----------
 
 function Novedades({ alertas, alAbrir, puedeEscribir, busquedas }: { alertas: AlertaC[]; alAbrir: (a: AlertaC) => void; puedeEscribir: boolean; busquedas: number }) {
+  const { pais } = useMonedaCompetencia();
   const [verVistas, setVerVistas] = useState(false);
   const [todas, setTodas] = useState(false);
   const [pendiente, iniciar] = useTransition();
@@ -446,7 +448,7 @@ function Novedades({ alertas, alAbrir, puedeEscribir, busquedas }: { alertas: Al
                   {a.detalle && <span className="text-xs text-muted-foreground">{a.detalle}</span>}
                 </button>
                 <Badge tone={t.tono}>{t.etiqueta}</Badge>
-                <span className="text-xs whitespace-nowrap text-muted-foreground">{formatearFechaHora(a.fecha)}</span>
+                <span className="text-xs whitespace-nowrap text-muted-foreground">{formatearFechaHoraCompleta(a.fecha, pais)}</span>
                 {puedeEscribir && !a.vista && (
                   <button type="button" disabled={pendiente} onClick={() => marcar([a.id])} className={`rounded px-1.5 py-0.5 text-xs text-muted-foreground hover:text-foreground ${anilloFoco}`}>
                     Vista
