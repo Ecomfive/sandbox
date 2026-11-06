@@ -27,8 +27,11 @@ interface Linea {
   elegidas: Record<string, string>;
 }
 
-/** «Nueva remisión»: de qué bodega sale, a cuál va y los productos con sus cantidades. Al crearla ofrece el papel que va con la carga. */
-export function NuevaRemision({ propias, externas, productos, stock, cajas }: { propias: BodegaRemision[]; externas: BodegaRemision[]; productos: OpcionSkuMaestro[]; stock: StockPorBodega; cajas: CajasPorBodega }) {
+/**
+ * «Nueva remisión»: de qué bodega sale, a cuál va y los productos con sus cantidades. Al crearla ofrece el papel que va con la carga. Con `plataformas`, también puede salir de una
+ * plataforma hacia otra (migración 0242): es un documento, así que el movimiento se hace allá.
+ */
+export function NuevaRemision({ propias, externas, plataformas = [], productos, stock, cajas }: { propias: BodegaRemision[]; externas: BodegaRemision[]; plataformas?: BodegaRemision[]; productos: OpcionSkuMaestro[]; stock: StockPorBodega; cajas: CajasPorBodega }) {
   const router = useRouter();
   const [abierta, setAbierta] = useState(false);
   const [desde, setDesde] = useState(propias[0]?.id ?? "");
@@ -39,6 +42,8 @@ export function NuevaRemision({ propias, externas, productos, stock, cajas }: { 
   const [creada, setCreada] = useState<{ id: string; numero: string } | null>(null);
   const [pendiente, empezar] = useTransition();
 
+  const dePlataforma = plataformas.some((b) => b.id === desde);
+  const destinos = externas.filter((b) => b.id !== desde);
   const hay = (sku: string) => stock[desde]?.[sku] ?? 0;
   const numero = (t: string) => Number(t);
   const cajasDe = (sku: string) => cajas[desde]?.[sku] ?? [];
@@ -83,7 +88,15 @@ export function NuevaRemision({ propias, externas, productos, stock, cajas }: { 
           {creada ? (
             <div className="flex flex-col gap-4 p-5 text-sm">
               <p className="m-0">
-                Las unidades salieron de la bodega y quedan <b className="font-medium">en camino</b>. Imprime el papel: va con la carga y ahí anotan lo que recibieron.
+                {dePlataforma ? (
+                  <>
+                    Quedó <b className="font-medium">en camino</b>. El sistema no mueve nada en las plataformas: hay que sacarlo de una y entrarlo en la otra allá. Imprime el papel: va con la carga y ahí anotan lo que recibieron.
+                  </>
+                ) : (
+                  <>
+                    Las unidades salieron de la bodega y quedan <b className="font-medium">en camino</b>. Imprime el papel: va con la carga y ahí anotan lo que recibieron.
+                  </>
+                )}
               </p>
               <div className="flex flex-wrap gap-2">
                 <a href={`/imprimir/remision/${creada.id}`} target="_blank" rel="noreferrer" className={`inline-flex min-h-10 items-center rounded-md bg-foreground px-4 py-2 font-medium text-background ${anilloFoco}`}>
@@ -105,12 +118,28 @@ export function NuevaRemision({ propias, externas, productos, stock, cajas }: { 
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="flex flex-col gap-1">
                   <span className={labelClassSm}>Sale de</span>
-                  <select value={desde} onChange={(e) => setDesde(e.target.value)} className={`${fieldClass} w-full`}>
+                  <select
+                    value={desde}
+                    onChange={(e) => {
+                      setDesde(e.target.value);
+                      if (hacia === e.target.value) setHacia("");
+                    }}
+                    className={`${fieldClass} w-full`}
+                  >
                     {propias.map((b) => (
                       <option key={b.id} value={b.id}>
                         {b.nombre}
                       </option>
                     ))}
+                    {plataformas.length > 0 && (
+                      <optgroup label="Plataformas">
+                        {plataformas.map((b) => (
+                          <option key={b.id} value={b.id}>
+                            {b.nombre}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
                   </select>
                 </label>
                 <label className="flex flex-col gap-1">
@@ -119,7 +148,7 @@ export function NuevaRemision({ propias, externas, productos, stock, cajas }: { 
                     <option value="" disabled>
                       Elige la bodega
                     </option>
-                    {externas.map((b) => (
+                    {destinos.map((b) => (
                       <option key={b.id} value={b.id}>
                         {b.nombre}
                       </option>
@@ -127,6 +156,7 @@ export function NuevaRemision({ propias, externas, productos, stock, cajas }: { 
                   </select>
                 </label>
               </div>
+              {dePlataforma && <p className="m-0 text-xs text-muted-foreground">Las unidades disponibles son las de la última lectura de la plataforma. El sistema deja el documento: el movimiento se hace en cada plataforma.</p>}
               <div className="flex flex-col gap-1">
                 <span className={labelClassSm}>Agregar producto</span>
                 <ProveedorSkusMaestros opciones={productos}>

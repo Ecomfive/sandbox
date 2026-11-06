@@ -6,9 +6,13 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { traerTodasConError } from "@/lib/supabase/paginar";
 import { textoCajasEnviadas, type CajaGuardada } from "@/lib/wms/cajas";
 import { textoCorreccion, type TipoCorreccion } from "@/lib/wms/correccion-remision";
+import { BODEGA_DE_PLATAFORMA } from "@/lib/wms/cuadro-plataformas";
+import { PAISES_SALIDA_CON_REMISION } from "@/lib/wms/recepcion";
+import type { Plataforma } from "@/lib/wms/stock-plataformas";
+import { leerStockPlataformas } from "../datos-plataformas";
 import { CorreccionesPendientes, type CorreccionVista } from "./correcciones";
 import { ListaEnvios, type FilaEnvio } from "./lista-envios";
-import { NuevaRemision, type CajasPorBodega, type StockPorBodega } from "./nueva-remision";
+import { NuevaRemision, type BodegaRemision, type CajasPorBodega, type StockPorBodega } from "./nueva-remision";
 
 export const metadata = { title: "Remisiones" };
 
@@ -95,7 +99,7 @@ export default async function RemisionesPage() {
     if (c.estado === "pendiente" || ultimas.has(c.envioId)) continue;
     ultimas.set(c.envioId, `${c.estado === "autorizada" ? "Autorizó" : "Rechazó"} ${c.resueltaPor ?? "—"}: ${textoCorreccion(c)}${c.nota ? ` · ${c.nota}` : ""}`);
   }
-  const { data: bodegas } = await supabase.from("wms_bodegas").select("id, nombre, tipo").eq("pais_id", pais.id).eq("activa", true).order("nombre");
+  const { data: bodegas } = await supabase.from("wms_bodegas").select("id, nombre, tipo, codigo").eq("pais_id", pais.id).eq("activa", true).order("nombre");
   const propias = (bodegas ?? []).filter((b) => b.tipo === "propia").map((b) => ({ id: b.id as string, nombre: b.nombre as string }));
   const externas = (bodegas ?? []).filter((b) => b.tipo === "externa").map((b) => ({ id: b.id as string, nombre: b.nombre as string }));
   // Solo se puede remitir lo que hay: un compuesto o un producto con variantes no llevan stock propio.
@@ -112,6 +116,21 @@ export default async function RemisionesPage() {
   const stock: StockPorBodega = {};
   for (const s of conStock.data ?? []) (stock[s.bodega_id] ??= {})[s.sku_maestro_id] = Number(s.disponible);
   const hay = new Set((conStock.data ?? []).map((s) => s.sku_maestro_id));
+  // Donde toda salida va con remisión, también se remite de una plataforma a otra: lo que hay allá es lo de su última lectura (Dunamixfy todavía no se lee).
+  const plataformas: BodegaRemision[] = [];
+  if (puedeEscribir && PAISES_SALIDA_CON_REMISION.includes(pais.codigo)) {
+    const { porProducto } = await leerStockPlataformas(supabase, pais.id);
+    for (const p of Object.keys(BODEGA_DE_PLATAFORMA) as Plataforma[]) {
+      const bodega = (bodegas ?? []).find((b) => b.tipo === "externa" && b.codigo === BODEGA_DE_PLATAFORMA[p]);
+      if (!bodega) continue;
+      plataformas.push({ id: bodega.id as string, nombre: bodega.nombre as string });
+      for (const [sku, s] of porProducto) {
+        if (s[p] <= 0) continue;
+        (stock[bodega.id as string] ??= {})[sku] = s[p];
+        hay.add(sku);
+      }
+    }
+  }
   // Las cajas de cada producto en cada bodega propia (migración 0236; sin ella, se sigue por unidades).
   const { data: guardadas } = puedeEscribir && propias.length
     ? await traerTodasConError<{ id: string; bodega_id: string; sku_maestro_id: string; cajas: number; unidades_por_caja: number; observacion: string | null; wms_ubicaciones: unknown }>((d, h) =>
@@ -132,7 +151,7 @@ export default async function RemisionesPage() {
       <EncabezadoPagina titulo="Remisiones" oculto />
       {puedeEscribir && (
         <div className="flex justify-end">
-          <NuevaRemision propias={propias} externas={externas} productos={opciones} stock={stock} cajas={cajas} />
+          <NuevaRemision propias={propias} externas={externas} plataformas={plataformas} productos={opciones} stock={stock} cajas={cajas} />
         </div>
       )}
       <CorreccionesPendientes pendientes={pendientes} />

@@ -11,11 +11,19 @@ test("corte + entró − vendido = debería haber, contra lo que dice la platafo
     ventas: [{ sku: "a", pedidas: 30, canceladas: 5, rechazadas: 1, devueltas: 4 }],
     dice: new Map([["a", 120]]),
   });
-  assert.deepEqual(f, { sku: "a", corte: 100, entro: 48, enCamino: 0, vendido: 20, deberia: 128, dice: 120, diferencia: -8 });
+  assert.deepEqual(f, { sku: "a", corte: 100, entro: 48, salio: 0, enCamino: 0, vendido: 20, deberia: 128, dice: 120, diferencia: -8 });
+});
+
+test("una remisión entre plataformas: sale de una al enviarse y entra a la otra al recibirse; anulada no cuenta", () => {
+  const remision = { sku: "a", estado: "en_camino", enviada: 30, recibida: null };
+  const [origen] = armarCuadro({ ...vacio, cortes: new Map([["a", 100]]), salidas: [remision, { ...remision, estado: "anulado", enviada: 5 }], dice: new Map([["a", 70]]) });
+  assert.deepEqual([origen.salio, origen.deberia, origen.diferencia], [30, 70, 0]);
+  const [destino] = armarCuadro({ ...vacio, cortes: new Map([["a", 10]]), remisiones: [{ ...remision, estado: "recibido", recibida: 30 }, { ...remision, estado: "anulado", enviada: 5 }], dice: new Map([["a", 40]]) });
+  assert.deepEqual([destino.entro, destino.enCamino, destino.deberia, destino.diferencia], [30, 0, 40, 0]);
 });
 
 test("lo que sigue en camino no cuenta, pero se ve", () => {
-  const [f] = armarCuadro({ ...vacio, cortes: new Map([["a", 10]]), remisiones: [{ sku: "a", estado: "enviado", enviada: 50, recibida: null }], dice: new Map([["a", 10]]) });
+  const [f] = armarCuadro({ ...vacio, cortes: new Map([["a", 10]]), remisiones: [{ sku: "a", estado: "en_camino", enviada: 50, recibida: null }], dice: new Map([["a", 10]]) });
   assert.equal(f.enCamino, 50);
   assert.equal(f.deberia, 10);
   assert.equal(f.diferencia, 0);

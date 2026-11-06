@@ -149,13 +149,14 @@ export function Cuadro({
           </div>
 
           <ContenedorTabla ariaLabel={`Cuadro de ${nombre}`}>
-            <table className="tabla-datos w-full min-w-[56rem] border-collapse text-sm">
+            <table className="tabla-datos w-full min-w-[62rem] border-collapse text-sm">
               <thead>
                 <tr className={claseFilaEncabezado}>
                   <th scope="col" className={claseEncabezadoColumna}>Foto</th>
                   <th scope="col" className={claseEncabezadoColumna}>Producto</th>
                   <th scope="col" className={`${claseEncabezadoColumna} text-right`}>Corte</th>
                   <th scope="col" className={`${claseEncabezadoColumna} text-right`}>Entró</th>
+                  <th scope="col" className={`${claseEncabezadoColumna} text-right`}>Salió a otra</th>
                   {conVentas && <th scope="col" className={`${claseEncabezadoColumna} text-right`}>Vendido</th>}
                   <th scope="col" className={`${claseEncabezadoColumna} text-right`}>Debería haber</th>
                   <th scope="col" className={`${claseEncabezadoColumna} text-right`}>{nombre} dice</th>
@@ -165,7 +166,7 @@ export function Cuadro({
               <tbody>
                 {visibles.length === 0 && (
                   <tr>
-                    <td colSpan={conVentas ? 8 : 7} className="px-4 py-8 text-center text-muted-foreground">
+                    <td colSpan={conVentas ? 9 : 8} className="px-4 py-8 text-center text-muted-foreground">
                       {filas.length ? "Ningún producto con diferencia." : "Todavía no hay datos para cuadrar."}
                     </td>
                   </tr>
@@ -184,6 +185,7 @@ export function Cuadro({
                       {entero(f.entro)}
                       {f.enCamino > 0 && <span className="block text-xs text-muted-foreground">{entero(f.enCamino)} en camino</span>}
                     </td>
+                    <td className={`${claseCeldaColumna} text-right tabular-nums`}>{entero(f.salio)}</td>
                     {conVentas && <td className={`${claseCeldaColumna} text-right tabular-nums`}>{entero(f.vendido)}</td>}
                     <td className={`${claseCeldaColumna} text-right tabular-nums`}>{entero(f.deberia)}</td>
                     <td className={`${claseCeldaColumna} text-right tabular-nums`}>{entero(f.dice)}</td>

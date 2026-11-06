@@ -7,6 +7,7 @@ import { puedeVerBodega } from "@/lib/seguridad/pais-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 import { quienesAutorizan, revisarCorreccion, textoCorreccion } from "@/lib/wms/correccion-remision";
 import { numeroRemision, revisarLineasRemision } from "@/lib/wms/remision";
+import { PAISES_SALIDA_CON_REMISION } from "@/lib/wms/recepcion";
 
 const ES_ID = (v: unknown): v is string => typeof v === "string" && /^[0-9a-fA-F-]{8,64}$/.test(v);
 
@@ -25,8 +26,14 @@ export async function crearRemision(datos: { desde: unknown; hacia: unknown; not
   if (!(await puedeVerBodega(supabase, usuario.paisesPermitidos, datos.desde)) || !(await puedeVerBodega(supabase, usuario.paisesPermitidos, datos.hacia))) {
     return { error: "No tienes acceso al país de esas bodegas." };
   }
-  const { data, error } = await supabase.rpc("wms_crear_remision", { p_desde: datos.desde, p_hacia: datos.hacia, p_items: revisadas.lineas, p_notas: notas || null, p_usuario: usuario.id });
+  // De una plataforma a otra (migración 0242): es un documento, no mueve el stock del sistema. Solo donde toda salida va con remisión.
+  const { data: origen } = await supabase.from("wms_bodegas").select("tipo, paises(codigo)").eq("id", datos.desde).maybeSingle();
+  const paisOrigen = origen?.paises as { codigo: string } | { codigo: string }[] | null | undefined;
+  const entrePlataformas = origen?.tipo === "externa";
+  if (entrePlataformas && !PAISES_SALIDA_CON_REMISION.includes((Array.isArray(paisOrigen) ? paisOrigen[0] : paisOrigen)?.codigo ?? "")) return { error: "En este país la remisión sale de una bodega propia." };
+  const { data, error } = await supabase.rpc(entrePlataformas ? "wms_crear_remision_plataformas" : "wms_crear_remision", { p_desde: datos.desde, p_hacia: datos.hacia, p_items: revisadas.lineas, p_notas: notas || null, p_usuario: usuario.id });
   if (error) {
+    if (/wms_crear_remision_plataformas/.test(error.message)) return { error: "Falta correr la migración 0242 en la base." };
     if (/wms_crear_remision/.test(error.message)) return { error: "Falta correr la migración 0233 en la base." };
     return { error: error.message.length < 200 ? error.message : "No se pudo crear la remisión." };
   }
