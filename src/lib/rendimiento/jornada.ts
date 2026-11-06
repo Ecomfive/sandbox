@@ -62,6 +62,21 @@ export interface Bloque {
   mensajes: { chat: string; n: number; primero: string }[];
 }
 
+/** Un rato de trabajo entre dos pausas, con sus bloques: un renglón de «Qué hizo», para que un día no sean 60 renglones. */
+export interface TramoDia {
+  desde: string;
+  hasta: string;
+  minutos: number;
+  bloques: Bloque[];
+  /** Cuánto tiempo en cada área en este rato, de la que más a la que menos. */
+  areas: { area: string; minutos: number }[];
+  dispositivos: (Dispositivo | null)[];
+  acciones: number;
+  mensajes: number;
+  /** Los minutos hasta el rato siguiente; 0 en el último del día. */
+  pausaDespues: number;
+}
+
 export interface Jornada {
   entrada: string | null;
   salida: string | null;
@@ -226,6 +241,35 @@ export function armarJornada(minutosEnBruto: MinutoTrabajado[], acciones: Accion
     dispositivos: [...porDispositivo].map(([dispositivo, minutos]) => ({ dispositivo, minutos })).sort((a, b) => b.minutos - a.minutos),
     mensajes: mensajes.length,
   };
+}
+
+/** Junta los bloques del día en ratos de trabajo: una pausa de más de `MINUTOS_PAUSA` empieza otro. Los bloques vienen en orden. */
+export function tramosDelDia(bloques: Bloque[]): TramoDia[] {
+  const grupos: Bloque[][] = [];
+  for (const b of bloques) {
+    const grupo = grupos.at(-1);
+    // De un minuto trabajado al siguiente, igual que `armarJornada` cuenta las pausas: `hasta` ya es el final de ese minuto.
+    const hueco = grupo ? new Date(b.desde).getTime() - new Date(grupo.at(-1)!.hasta).getTime() + MINUTO : Infinity;
+    if (grupo && hueco <= MINUTOS_PAUSA * MINUTO) grupo.push(b);
+    else grupos.push([b]);
+  }
+  return grupos.map((grupo, i) => {
+    const porArea = new Map<string, number>();
+    for (const b of grupo) if (b.area) porArea.set(b.area, (porArea.get(b.area) ?? 0) + b.minutos);
+    const hasta = grupo.at(-1)!.hasta;
+    const siguiente = grupos[i + 1]?.[0].desde;
+    return {
+      desde: grupo[0].desde,
+      hasta,
+      minutos: grupo.reduce((t, b) => t + b.minutos, 0),
+      bloques: grupo,
+      areas: [...porArea].map(([area, minutos]) => ({ area, minutos })).sort((x, y) => y.minutos - x.minutos || x.area.localeCompare(y.area)),
+      dispositivos: [...new Set(grupo.filter((b) => b.minutos).map((b) => b.dispositivo))],
+      acciones: grupo.reduce((t, b) => t + b.acciones.length, 0),
+      mensajes: grupo.reduce((t, b) => t + b.mensajes.reduce((n, m) => n + m.n, 0), 0),
+      pausaDespues: siguiente ? Math.round((new Date(siguiente).getTime() - new Date(hasta).getTime()) / MINUTO) : 0,
+    };
+  });
 }
 
 /** «7 h 25 min», «45 min», «0 min». */

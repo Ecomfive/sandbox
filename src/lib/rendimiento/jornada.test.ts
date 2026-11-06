@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { armarJornada, diaPanama, dispositivoDeAgente, duracion, etiquetaHora, horaPanama, rangoDeHoras, rangoDelDia, rutaDeLatido } from "./jornada";
+import { armarJornada, diaPanama, dispositivoDeAgente, duracion, etiquetaHora, horaPanama, rangoDeHoras, rangoDelDia, rutaDeLatido, tramosDelDia } from "./jornada";
 
 // 8:00 de Panamá = 13:00 UTC.
 const min = (hhmm: string, ruta = "/publicaciones-dropi") => ({ minuto: `2026-10-27T${hhmm}:00.000Z`, ruta });
@@ -117,4 +117,27 @@ test("la cronología separa por página, dispositivo y pausa, y reparte lo que h
   assert.equal(j.mensajes, 2);
   assert.deepEqual(j.areas.map((x) => [x.area, x.minutos]), [["Compras", 4], ["CRM", 3]]);
   assert.deepEqual(j.dispositivos, [{ dispositivo: "computadora", minutos: 4 }, { dispositivo: "telefono", minutos: 2 }, { dispositivo: null, minutos: 1 }]);
+});
+
+test("los bloques se juntan en ratos de trabajo, cortados por las pausas", () => {
+  const compu = (hhmm: string, ruta = "/compras") => ({ ...min(hhmm, ruta), dispositivo: "computadora" as const });
+  const { bloques } = armarJornada(
+    [compu("13:00"), compu("13:01"), compu("13:02", "/crm-dropshippers/bandeja"), { ...min("13:04", "/crm-dropshippers/bandeja"), dispositivo: "telefono" as const }, compu("13:30")],
+    [{ creadoEn: "2026-10-27T13:01:10.000Z", texto: "Guardó" }, { creadoEn: "2026-10-27T18:00:00.000Z", texto: "Suelta" }],
+    pagina,
+    [{ momento: "2026-10-27T13:02:10.000Z", chat: "Tienda Sol" }, { momento: "2026-10-27T13:02:20.000Z", chat: "Tienda Sol" }, { momento: "2026-10-27T13:02:30.000Z", chat: "Otra" }],
+  );
+  const tramos = tramosDelDia(bloques);
+  assert.equal(bloques.length, 5);
+  assert.equal(tramos.length, 3);
+  assert.deepEqual([tramos[0].desde, tramos[0].hasta, tramos[0].minutos], ["2026-10-27T13:00:00.000Z", "2026-10-27T13:05:00.000Z", 4]);
+  assert.deepEqual(tramos[0].areas, [{ area: "Compras", minutos: 2 }, { area: "CRM", minutos: 2 }]);
+  assert.deepEqual(tramos[0].dispositivos, ["computadora", "telefono"]);
+  assert.deepEqual([tramos[0].acciones, tramos[0].mensajes, tramos[0].pausaDespues], [1, 3, 25]);
+  assert.deepEqual([tramos[2].minutos, tramos[2].acciones, tramos[2].areas, tramos[2].dispositivos, tramos[2].pausaDespues], [0, 1, [], [], 0]);
+  assert.deepEqual(tramosDelDia([]), []);
+  // Con la misma medida que las pausas de la jornada: habría un rato más que pausas.
+  const j = armarJornada([compu("13:00"), compu("13:05"), compu("13:11")], [], pagina);
+  assert.equal(j.pausas.length, 1);
+  assert.equal(tramosDelDia(j.bloques).length, j.pausas.length + 1);
 });
