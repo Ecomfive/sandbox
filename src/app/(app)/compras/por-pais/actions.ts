@@ -12,7 +12,7 @@ const ETIQUETA: Record<Decision, string> = { enviar: "Enviar", descartado: "Desc
 
 /**
  * Guarda (o quita, con `decision = null`) la decisión de un producto en un país de «Producto › Por país»: «Enviar» (traerlo a ese
- * país) o «Descartado» (con su motivo). Pide poder modificar Producto y ver ese país. Devuelve el error como valor.
+ * país) o «Descartado» (con su motivo). Pide poder modificar «Por país» (módulo `compras-por-pais`, solo de Alcides) y ver ese país. Devuelve el error como valor.
  */
 export async function decidirProductoPais(
   skuId: string,
@@ -21,7 +21,7 @@ export async function decidirProductoPais(
   motivo: string,
 ): Promise<{ error: string } | { ok: true; por: string | null; en: string }> {
   try {
-    const usuario = await requireModuloEscritura("producto");
+    const usuario = await requireModuloEscritura("compras-por-pais");
     if (!esUuid(skuId)) return { error: "Producto no válido." };
     if (!PAISES_NAV.some((p) => p.codigo === codigoPais) || !puedeVerPais(usuario.paisesPermitidos, codigoPais)) return { error: "No puedes ver ese país." };
     const texto = String(motivo ?? "").trim();

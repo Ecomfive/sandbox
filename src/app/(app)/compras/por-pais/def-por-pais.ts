@@ -1,7 +1,7 @@
 import { PAISES_NAV } from "@/lib/nav-data";
-import { ETIQUETA_ESTADO_PAIS, type CeldaPais, type EstadoPais } from "@/lib/producto/por-pais";
+import { ETIQUETA_ESTADO_PAIS, type AccionPorPais, type CeldaPais, type EstadoPais } from "@/lib/producto/por-pais";
 import type { DefTabla } from "@/lib/tabla/motor";
-import { ETIQUETA_CLASE } from "../def-producto";
+import { ETIQUETA_CLASE } from "@/app/(app)/producto/def-producto";
 
 export interface PaisColumna {
   id: string;
@@ -18,10 +18,26 @@ export interface FilaPorPais {
   foto: string | null;
   tipo: string;
   clase: string;
+  /** Día en que se creó el producto (AAAA-MM-DD). */
+  creado: string;
   celdas: Record<string, CeldaPais>;
   /** Los países donde ya existe (publicado, comprado o con stock). */
   existeEn: string[];
+  /** Las tarjetas de acción en que cuenta (`accionesPorPais`). */
+  acciones: AccionPorPais[];
+  /** Los países donde es una oportunidad por decidir (`paisesPorDecidir`). */
+  porDecidir: string[];
 }
+
+export const ETIQUETA_ACCION_PAIS: Record<AccionPorPais, string> = {
+  por_decidir: "Por decidir",
+  por_enviar: "Por enviar",
+  comprado_sin_publicar: "Comprado sin publicar",
+  solo_archivado: "Solo archivado",
+  un_pais: "En un solo país",
+  ningun_pais: "Activos en ningún país",
+  descartado: "Descartados",
+};
 
 const ORDEN_ESTADOS: EstadoPais[] = ["publicado", "comprado", "stock", "enviar", "no", "archivado", "descartado", "descontinuado"];
 const OPCIONES_ESTADO = () => ORDEN_ESTADOS.map((valor) => ({ valor, etiqueta: ETIQUETA_ESTADO_PAIS[valor] }));
@@ -35,6 +51,20 @@ const NOMBRE_PAIS = (codigo: string) => PAISES_NAV.find((p) => p.codigo === codi
 export const DEF_POR_PAIS: DefTabla<FilaPorPais> = {
   clave: "producto-por-pais",
   campos: [
+    {
+      id: "accion",
+      etiqueta: "Para hacer",
+      tipo: "seleccion",
+      valores: (f) => f.acciones,
+      opciones: () => (Object.keys(ETIQUETA_ACCION_PAIS) as AccionPorPais[]).map((valor) => ({ valor, etiqueta: ETIQUETA_ACCION_PAIS[valor] })),
+    },
+    {
+      id: "decidir",
+      etiqueta: "Por decidir en",
+      tipo: "seleccion",
+      valores: (f) => f.porDecidir,
+      opciones: () => PAISES_NAV.map((p) => ({ valor: p.codigo, etiqueta: p.nombre })),
+    },
     {
       id: "falta",
       etiqueta: "Todavía no está en",
@@ -78,6 +108,7 @@ export const DEF_POR_PAIS: DefTabla<FilaPorPais> = {
       opciones: () => Object.entries(ETIQUETA_CLASE).map(([valor, etiqueta]) => ({ valor, etiqueta })),
       agrupable: true,
     },
+    { id: "creado", etiqueta: "Creado el", tipo: "fecha", valor: (f) => f.creado || null },
     { id: "nombre", etiqueta: "Nombre", tipo: "texto", valor: (f) => f.nombre },
     { id: "codigo", etiqueta: "SKU", tipo: "texto", valor: (f) => f.codigo },
   ],

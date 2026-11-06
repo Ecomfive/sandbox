@@ -3,7 +3,7 @@ import type { UsuarioActual } from "@/lib/auth";
 import { compraCuenta } from "@/lib/compras/cuenta";
 import { PAISES_NAV } from "@/lib/nav-data";
 import { puedeVerPais } from "@/lib/paises-permitidos";
-import { armarPorPais, ESTADOS_EXISTE, type CompraPais, type DecisionPais, type PublicacionPais, type StockPais } from "@/lib/producto/por-pais";
+import { accionesPorPais, armarPorPais, ESTADOS_EXISTE, paisesPorDecidir, type CompraPais, type DecisionPais, type PublicacionPais, type StockPais } from "@/lib/producto/por-pais";
 import { traerTodasConError } from "@/lib/supabase/paginar";
 import type { FilaPorPais, PaisColumna } from "./def-por-pais";
 
@@ -23,8 +23,8 @@ export async function cargarPorPais(usuario: UsuarioActual, supabase: SupabaseCl
   const paisDe = (id: string | null | undefined) => (id ? (codigoPorId.get(id) ?? null) : null);
 
   const [productos, fotos, dropi, drop, lineas, stock, descontinuados, decisiones] = await Promise.all([
-    traerTodasConError<{ id: string; codigo: string; nombre: string; tipo: string; clase: string; padre_id: string | null; numero: number | null }>((d, h) =>
-      supabase.from("skus_maestros").select("id, codigo, nombre, tipo, clase, padre_id, numero").order("id").range(d, h),
+    traerTodasConError<{ id: string; codigo: string; nombre: string; tipo: string; clase: string; padre_id: string | null; numero: number | null; creado_en: string }>((d, h) =>
+      supabase.from("skus_maestros").select("id, codigo, nombre, tipo, clase, padre_id, numero, creado_en").order("id").range(d, h),
     ),
     traerTodasConError<{ id: string; foto_url: string }>((d, h) => supabase.from("skus_maestros").select("id, foto_url").not("foto_url", "is", null).order("id").range(d, h)),
     traerTodasConError<{ id: string; sku_maestro_id: string; dropi_id: string | null; estado: string | null; estado_publicacion: string | null; pais_id: string }>((d, h) =>
@@ -109,8 +109,11 @@ export async function cargarPorPais(usuario: UsuarioActual, supabase: SupabaseCl
         foto: fotoPorId.get(p.id) ?? null,
         tipo: p.tipo,
         clase: p.clase,
+        creado: String(p.creado_en ?? "").slice(0, 10),
         celdas: porPais,
         existeEn,
+        acciones: accionesPorPais(porPais, p.clase),
+        porDecidir: paisesPorDecidir(porPais, p.clase),
       };
     })
     .sort((a, b) => b.existeEn.length - a.existeEn.length || (b.numero ?? 0) - (a.numero ?? 0));

@@ -9,12 +9,14 @@ import { usePuedeAbrir } from "@/components/modulos-contexto";
 import { Bandera } from "@/components/paises/bandera";
 import { anilloFoco, fieldClass, labelClass } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
+import { TarjetaEmergente } from "@/components/ui/tarjeta-emergente";
 import { Ventana } from "@/components/ui/ventana";
 import { formatearFecha } from "@/lib/formato";
-import { EstadoIcon, InventarioIcon, MundoIcon } from "@/lib/nav-icons";
-import { ESTADOS_EXISTE, ETIQUETA_ESTADO_PAIS, estadoDeCelda, type CeldaPais, type Decision, type EstadoPais } from "@/lib/producto/por-pais";
+import { CalendarioIcon, EstadoIcon, InventarioIcon, MundoIcon } from "@/lib/nav-icons";
+import { accionesPorPais, ESTADOS_EXISTE, ETIQUETA_ESTADO_PAIS, estadoDeCelda, paisesPorDecidir, type CeldaPais, type Decision, type EstadoPais } from "@/lib/producto/por-pais";
 import type { NombreFilas } from "@/lib/tabla/pie";
 import { decidirProductoPais } from "./actions";
+import { TableroPorPais } from "./tablero-por-pais";
 import { DEF_POR_PAIS, detalleCelda, type FilaPorPais, type PaisColumna } from "./def-por-pais";
 
 const NOMBRE: NombreFilas = { singular: "producto", plural: "productos" };
@@ -42,6 +44,25 @@ function subtitulo(c: CeldaPais): string {
   return "";
 }
 
+/** La foto llena la casilla, como en Compras, y al pasar el cursor se ve en grande (la misma tarjeta flotante de Compras). */
+function FotoCelda({ foto, nombre }: { foto: string | null; nombre: string }) {
+  return (
+    <div className="absolute inset-y-1.5 left-2 aspect-square max-w-[calc(100%-1rem)]">
+      {foto ? (
+        <TarjetaEmergente
+          clase="rounded-lg border border-border bg-card p-1.5 shadow-lg"
+          claseEnvoltura="h-full w-full"
+          contenido={<img src={foto} alt={`Foto de ${nombre}`} className="max-h-72 max-w-72 rounded-md object-contain" />}
+        >
+          <img src={foto} alt={`Foto de ${nombre}`} loading="lazy" className="h-full w-full rounded-md border border-border object-cover" />
+        </TarjetaEmergente>
+      ) : (
+        <div role="img" aria-label="Sin foto" className="h-full w-full rounded-md border border-dashed border-border-control" />
+      )}
+    </div>
+  );
+}
+
 interface Abierta {
   id: string;
   pais: string;
@@ -58,25 +79,33 @@ export function TablaPorPais({ filas: iniciales, paises, puedeEscribir, codigoPa
   const columnas = useMemo<ColumnaTabla<FilaPorPais>[]>(
     () => [
       {
+        id: "foto",
+        label: "Foto",
+        ocultable: true,
+        clase: "relative w-20 min-w-20",
+        render: (f) => <FotoCelda foto={f.foto} nombre={f.nombre} />,
+      },
+      {
         id: "producto",
         label: "Producto",
         ocultable: false,
         render: (f) => (
-          <span className="flex min-w-0 items-center gap-2.5">
-            {f.foto ? (
-              <img src={f.foto} alt="" loading="lazy" className="h-9 w-9 shrink-0 rounded-md border border-border object-cover" />
-            ) : (
-              <span role="img" aria-label="Sin foto" className="h-9 w-9 shrink-0 rounded-md border border-dashed border-border-control" />
-            )}
-            <span className="flex min-w-0 flex-col">
-              <span className="truncate font-medium">{f.nombre}</span>
-              <span className="truncate text-xs text-muted-foreground">
-                {f.numero ? `N.º ${f.numero} · ` : ""}
-                {f.codigo}
-              </span>
+          <span className="flex min-w-0 flex-col">
+            <span className="truncate font-medium">{f.nombre}</span>
+            <span className="truncate text-xs text-muted-foreground">
+              {f.numero ? `N.º ${f.numero} · ` : ""}
+              {f.codigo}
             </span>
           </span>
         ),
+      },
+      {
+        id: "creado",
+        label: "Creado",
+        ocultable: true,
+        descripcion: "El día en que se creó el producto en Producto.",
+        clase: "whitespace-nowrap tabular-nums text-muted-foreground",
+        render: (f) => (f.creado ? formatearFecha(f.creado) : "—"),
       },
       ...paises.map<ColumnaTabla<FilaPorPais>>((p) => ({
         id: `pais_${p.codigo}`,
@@ -115,7 +144,7 @@ export function TablaPorPais({ filas: iniciales, paises, puedeEscribir, codigoPa
   );
 
   const iconos = useMemo<Record<string, IconoComp>>(
-    () => ({ falta: MundoIcon, existe: MundoIcon, cuantos: MundoIcon, tipo: InventarioIcon, clase: EstadoIcon, nombre: InventarioIcon, codigo: InventarioIcon, ...Object.fromEntries(paises.map((p) => [`pais_${p.codigo}`, MundoIcon])) }),
+    () => ({ creado: CalendarioIcon, accion: EstadoIcon, decidir: MundoIcon, falta: MundoIcon, existe: MundoIcon, cuantos: MundoIcon, tipo: InventarioIcon, clase: EstadoIcon, nombre: InventarioIcon, codigo: InventarioIcon, ...Object.fromEntries(paises.map((p) => [`pais_${p.codigo}`, MundoIcon])) }),
     [paises],
   );
 
@@ -127,13 +156,15 @@ export function TablaPorPais({ filas: iniciales, paises, puedeEscribir, codigoPa
       todas.map((f) => {
         if (f.id !== id) return f;
         const celda = { ...f.celdas[codigo], decision };
-        return { ...f, celdas: { ...f.celdas, [codigo]: { ...celda, estado: estadoDeCelda(celda) } } };
+        const celdas = { ...f.celdas, [codigo]: { ...celda, estado: estadoDeCelda(celda) } };
+        return { ...f, celdas, acciones: accionesPorPais(celdas, f.clase), porDecidir: paisesPorDecidir(celdas, f.clase) };
       }),
     );
   }
 
   return (
     <>
+      <TableroPorPais filas={filas} paises={paises} />
       <TablaDatos
         def={DEF_POR_PAIS}
         filas={filas}
@@ -195,7 +226,10 @@ function DetalleCelda({
         <Bandera codigo={pais.codigo} className="h-3.5 w-5" />
         <span aria-hidden="true" className={`h-2 w-2 rounded-full ${PUNTO[c.estado]}`} />
         <span className="font-medium">{ETIQUETA_ESTADO_PAIS[c.estado]}</span>
-        <span className="text-muted-foreground">· {fila.codigo}</span>
+        <span className="text-muted-foreground">
+          · {fila.codigo}
+          {fila.creado ? ` · creado el ${formatearFecha(fila.creado)}` : ""}
+        </span>
       </p>
 
       <section className="flex flex-col gap-1.5">
