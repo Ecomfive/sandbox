@@ -9,7 +9,7 @@ import { VisorImagen } from "@/components/ui/visor-imagen";
 import { supabase } from "@/lib/supabase/client";
 import { nombrePais } from "@/lib/whatsapp/origen-chat";
 import { CANAL_BANDEJA, EVENTO_NOVEDAD } from "@/lib/whatsapp/canal-bandeja";
-import { BarraPresencia, PersonasEnChat, usePresenciaChats, type PersonaEquipo } from "./personas-en-chat";
+import { BarraPresencia, PersonasEnChat, useEquipoEnSistema, usePresenciaChats, type PersonaEquipo } from "./personas-en-chat";
 import { HORAS_VENTANA, textoVentana } from "@/lib/whatsapp/ventana";
 import type { AreaCrm } from "@/lib/crm/areas";
 import { quienesRespondieron } from "@/lib/crm/respondieron";
@@ -370,6 +370,7 @@ export function Bandeja({
   escribe,
   miId,
   equipo,
+  direccion,
   verTelefono = false,
   areas: misAreas,
   miArea,
@@ -381,6 +382,8 @@ export function Bandeja({
   miId: string;
   /** Las personas del equipo, para ponerle foto a quien está en cada chat. */
   equipo: PersonaEquipo[];
+  /** Quien tiene Dirección ve además a los de Atención y Comercial que están en otra parte del sistema. */
+  direccion: boolean;
   /** Puede usar «Mostrar número» (por ahora, administradores). */
   verTelefono?: boolean;
   /** Los paneles que ve la persona (las áreas, de la suya hacia abajo). */
@@ -447,6 +450,7 @@ export function Bandeja({
   const [elegido, setElegido] = useState<string | null>(abrirInicial);
   // Quién está trabajando en cada chat ahora mismo: su foto parpadea en verde en ese chat y se mueve con la persona (5 nov 2026, pedido de Hernán).
   const { enChats, conectadas } = usePresenciaChats(elegido, miId);
+  const enSistema = useEquipoEnSistema(direccion);
   const equipoPorId = useMemo(() => new Map(equipo.map((p) => [p.id, p])), [equipo]);
   const [chat, setChat] = useState<ChatAbierto | null>(null);
   /** La ventana «Importar chat»: con el chat abierto o, con `null`, para uno que todavía no existe en la bandeja. */
@@ -1542,6 +1546,7 @@ export function Bandeja({
         miChat={elegido}
         conectadas={conectadas}
         equipo={equipoPorId}
+        enSistema={enSistema}
         nombreDeChat={(id) => datos.conversaciones.find((c) => c.id === id)?.nombre ?? null}
         alAbrir={(id) => {
           const c = datos.conversaciones.find((x) => x.id === id);

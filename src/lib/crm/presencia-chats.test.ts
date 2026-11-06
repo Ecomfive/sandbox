@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { personasConectadas, personasPorChat, sigueActiva } from "./presencia-chats";
+import { personasConectadas, personasPorChat, sigueActiva, personasFuera } from "./presencia-chats";
 
 test("cada persona sale en el chat que tiene abierto, y yo no salgo", () => {
   const estado = { yo: [{ chat: "a", activa: true }], maria: [{ chat: "a", activa: true }], luis: [{ chat: "b", activa: true }], ana: [{ chat: null, activa: true }] };
@@ -36,4 +36,9 @@ test("la barra muestra a los demás que están trabajando, con su chat; quien no
     { id: "maria", chats: ["a", "b"] },
     { id: "zoe", chats: ["c"] },
   ]);
+});
+
+test("Dirección ve a quien usa el sistema aunque no salga en vivo, sin repetir a nadie", () => {
+  const enSistema = [{ id: "nicol", pagina: "Bandeja de WhatsApp" }, { id: "ana", pagina: "Compras" }, { id: "yo", pagina: "Compras" }];
+  assert.deepEqual(personasFuera(enSistema, [{ id: "ana", chats: [] }], "yo"), [{ id: "nicol", pagina: "Bandeja de WhatsApp" }]);
 });

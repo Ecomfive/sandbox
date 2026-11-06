@@ -15,6 +15,15 @@ export interface PresenciaChat {
   activa: boolean;
 }
 
+/** Hasta hace cuánto cuenta el último minuto trabajado para decir que alguien sigue en el sistema. */
+export const VENTANA_EN_SISTEMA_MS = 3 * 60_000;
+
+/** Alguien del equipo usando el sistema ahora mismo, según el aviso de cada minuto (`LatidoPresencia`), y la página en que está. */
+export interface PersonaEnSistema {
+  id: string;
+  pagina: string;
+}
+
 /** Una persona que está trabajando en la bandeja y en qué chats (ninguno: está en la bandeja, sin chat abierto). */
 export interface PersonaConectada {
   id: string;
@@ -41,4 +50,13 @@ export function personasConectadas(estado: Record<string, PresenciaChat[]>, miId
     .filter(([persona, pestanas]) => persona !== miId && pestanas.some((p) => p.activa))
     .map(([id, pestanas]) => ({ id, chats: [...new Set(pestanas.filter((p) => p.activa && p.chat).map((p) => p.chat as string))] }))
     .sort((a, b) => a.id.localeCompare(b.id));
+}
+
+/**
+ * Para Dirección: quienes están usando el sistema pero no salen en la presencia en vivo, sea porque están en otra página o porque su pestaña no publica (abierta desde antes de
+ * la función, o con la conexión en vivo bloqueada). Así nadie del equipo queda invisible.
+ */
+export function personasFuera(enSistema: PersonaEnSistema[], conectadas: PersonaConectada[], miId: string): PersonaEnSistema[] {
+  const enVivo = new Set(conectadas.map((c) => c.id));
+  return enSistema.filter((p) => p.id !== miId && !enVivo.has(p.id));
 }
