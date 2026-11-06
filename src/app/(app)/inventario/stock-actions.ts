@@ -319,17 +319,16 @@ export async function remitirAExterna(formData: FormData): Promise<{ error?: str
     supabase.from("wms_bodegas").select("nombre").eq("id", hacia).maybeSingle(),
   ]);
   if (!maestro) return { error: "El SKU no existe." };
-  const { error } = await supabase.rpc("wms_enviar_a_externa", {
-    p_sku: sku,
+  // Desde la ficha es una remisión de un solo producto, con su número y su papel como cualquier otra (migración 0233).
+  const { error } = await supabase.rpc("wms_crear_remision", {
     p_desde: desde,
     p_hacia: hacia,
-    p_cantidad: cantidad,
-    p_lote: loteId,
-    p_referencia: referencia,
+    p_items: [{ sku, cantidad, lote: loteId }],
+    p_notas: referencia,
     p_usuario: usuario.id,
   });
   if (error) {
-    if (/wms_enviar_a_externa/.test(error.message)) return { error: "Falta correr la migración 0217 en la base." };
+    if (/wms_crear_remision/.test(error.message)) return { error: "Falta correr la migración 0233 en la base." };
     return { error: errorDeBase(error.message, "No se pudo registrar la remisión.") };
   }
   const pais = await paisDeBodega(supabase, desde);
