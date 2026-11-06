@@ -15,6 +15,7 @@ import { formatearFecha } from "@/lib/formato";
 import { CalendarioIcon, EstadoIcon, InventarioIcon, MundoIcon } from "@/lib/nav-icons";
 import { accionesPorPais, ESTADOS_EXISTE, ETIQUETA_ESTADO_PAIS, estadoDeCelda, paisesPorDecidir, type CeldaPais, type Decision, type EstadoPais } from "@/lib/producto/por-pais";
 import type { NombreFilas } from "@/lib/tabla/pie";
+import { ComprasProducto } from "@/app/(app)/producto/compras-producto";
 import { decidirProductoPais } from "./actions";
 import { TableroPorPais } from "./tablero-por-pais";
 import { DEF_POR_PAIS, detalleCelda, type FilaPorPais, type PaisColumna } from "./def-por-pais";
@@ -177,7 +178,7 @@ export function TablaPorPais({ filas: iniciales, paises, puedeEscribir, codigoPa
         ariaLabel="Productos por país"
         vacio="No hay productos."
       />
-      <Ventana abierto={!!fila && !!pais} alCerrar={() => setAbierta(null)} titulo={fila && pais ? `${fila.nombre} en ${pais.nombre}` : ""} ancho="md">
+      <Ventana abierto={!!fila && !!pais} alCerrar={() => setAbierta(null)} titulo={fila && pais ? `${fila.nombre} en ${pais.nombre}` : ""} ancho="xl">
         {fila && pais && <DetalleCelda key={`${fila.id}-${pais.codigo}`} fila={fila} pais={pais} puedeEscribir={puedeEscribir} esPaisBarra={pais.codigo === codigoPaisBarra} alDecidir={alDecidir} />}
       </Ventana>
     </>
@@ -201,7 +202,6 @@ function DetalleCelda({
   const { mostrarToast } = useToast();
   const [motivo, setMotivo] = useState(c.decision?.motivo ?? "");
   const [pendiente, empezar] = useTransition();
-  const abreCompras = usePuedeAbrir("compras");
   const abreDropi = usePuedeAbrir("publicaciones-dropi");
   const abreDrop = usePuedeAbrir("publicaciones-drop");
   const existe = ESTADOS_EXISTE.includes(c.estado);
@@ -221,7 +221,7 @@ function DetalleCelda({
   const titulo = (texto: string) => <h3 className="m-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{texto}</h3>;
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="@container flex flex-col gap-5">
       <p className="m-0 inline-flex items-center gap-2 text-sm">
         <Bandera codigo={pais.codigo} className="h-3.5 w-5" />
         <span aria-hidden="true" className={`h-2 w-2 rounded-full ${PUNTO[c.estado]}`} />
@@ -232,120 +232,105 @@ function DetalleCelda({
         </span>
       </p>
 
-      <section className="flex flex-col gap-1.5">
-        {titulo("Publicaciones")}
-        {c.publicaciones.length === 0 ? (
-          <p className="m-0 text-sm text-muted-foreground">Sin publicaciones en {pais.nombre}.</p>
-        ) : (
-          <ul className="m-0 flex list-none flex-col gap-1 p-0 text-sm">
-            {c.publicaciones.map((p) => {
-              const texto = `${p.plataforma === "drop" ? "Drop" : "Dropi"} ${p.id}`;
-              const puede = esPaisBarra && (p.plataforma === "drop" ? abreDrop : abreDropi);
-              return (
-                <li key={`${p.plataforma}-${p.ref}`} className="flex items-center gap-2">
-                  <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${p.activa ? "bg-success" : "border border-muted-foreground"}`} />
-                  {puede ? (
-                    <Link href={`/publicaciones-${p.plataforma}?abrir=${p.ref}`} className={`rounded font-medium hover:underline ${anilloFoco}`}>
-                      {texto}
-                    </Link>
-                  ) : (
-                    <span className="font-medium">{texto}</span>
-                  )}
-                  <span className="text-muted-foreground">{p.activa ? "activa" : "archivada"}</span>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
+      <div className="grid gap-6 @3xl:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+        <div className="flex flex-col gap-5">
+          <section className="flex flex-col gap-1.5">
+            {titulo("Publicaciones")}
+            {c.publicaciones.length === 0 ? (
+              <p className="m-0 text-sm text-muted-foreground">Sin publicaciones en {pais.nombre}.</p>
+            ) : (
+              <ul className="m-0 flex list-none flex-col gap-1 p-0 text-sm">
+                {c.publicaciones.map((p) => {
+                  const texto = `${p.plataforma === "drop" ? "Drop" : "Dropi"} ${p.id}`;
+                  const puede = esPaisBarra && (p.plataforma === "drop" ? abreDrop : abreDropi);
+                  return (
+                    <li key={`${p.plataforma}-${p.ref}`} className="flex items-center gap-2">
+                      <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${p.activa ? "bg-success" : "border border-muted-foreground"}`} />
+                      {puede ? (
+                        <Link href={`/publicaciones-${p.plataforma}?abrir=${p.ref}`} className={`rounded font-medium hover:underline ${anilloFoco}`}>
+                          {texto}
+                        </Link>
+                      ) : (
+                        <span className="font-medium">{texto}</span>
+                      )}
+                      <span className="text-muted-foreground">{p.activa ? "activa" : "archivada"}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
 
-      <section className="flex flex-col gap-1.5">
-        {titulo("Compras")}
-        {c.compras.length === 0 ? (
-          <p className="m-0 text-sm text-muted-foreground">Nunca se compró para {pais.nombre}.</p>
-        ) : (
-          <ul className="m-0 flex list-none flex-col gap-1 p-0 text-sm">
-            {c.compras.map((k) => (
-              <li key={k.compraId} className="flex items-center gap-2 tabular-nums">
-                {abreCompras ? (
-                  <Link href={`/compras/lista?ver=todos&abrir=${k.compraId}`} className={`rounded font-medium hover:underline ${anilloFoco}`}>
-                    {k.numero ? `OC-${k.numero}` : "Compra"}
-                  </Link>
-                ) : (
-                  <span className="font-medium">{k.numero ? `OC-${k.numero}` : "Compra"}</span>
-                )}
-                <span className="text-muted-foreground">
-                  {k.unidades.toLocaleString("es")} u. · {formatearFecha(k.creada)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+          <section className="flex flex-col gap-1.5">
+            {titulo("Stock en bodegas")}
+            {c.stock.length === 0 ? (
+              <p className="m-0 text-sm text-muted-foreground">Sin unidades en las bodegas de {pais.nombre}.</p>
+            ) : (
+              <ul className="m-0 flex list-none flex-col gap-1 p-0 text-sm tabular-nums">
+                {c.stock.map((s) => (
+                  <li key={s.bodega}>
+                    <span className="font-medium">{s.bodega}</span> <span className="text-muted-foreground">· {s.unidades.toLocaleString("es")} u.</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
 
-      <section className="flex flex-col gap-1.5">
-        {titulo("Stock en bodegas")}
-        {c.stock.length === 0 ? (
-          <p className="m-0 text-sm text-muted-foreground">Sin unidades en las bodegas de {pais.nombre}.</p>
-        ) : (
-          <ul className="m-0 flex list-none flex-col gap-1 p-0 text-sm tabular-nums">
-            {c.stock.map((s) => (
-              <li key={s.bodega}>
-                <span className="font-medium">{s.bodega}</span> <span className="text-muted-foreground">· {s.unidades.toLocaleString("es")} u.</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+          {c.descontinuado && <p className="m-0 text-sm text-muted-foreground">Está descontinuado en {pais.nombre} (se cambia en la ficha del producto).</p>}
 
-      {c.descontinuado && <p className="m-0 text-sm text-muted-foreground">Está descontinuado en {pais.nombre} (se cambia en la ficha del producto).</p>}
-
-      {!existe && !c.descontinuado && (
-        <section className="flex flex-col gap-2 border-t border-border pt-4">
-          {titulo("Decisión")}
-          {c.decision && (
-            <p className="m-0 text-sm">
-              <span className="font-medium">{c.decision.decision === "enviar" ? "Enviar" : "Descartado"}</span>
-              <span className="text-muted-foreground">
-                {c.decision.por ? ` · ${c.decision.por}` : ""} · {formatearFecha(c.decision.en)}
-              </span>
-            </p>
+          {!existe && !c.descontinuado && (
+            <section className="flex flex-col gap-2 border-t border-border pt-4">
+              {titulo("Decisión")}
+              {c.decision && (
+                <p className="m-0 text-sm">
+                  <span className="font-medium">{c.decision.decision === "enviar" ? "Enviar" : "Descartado"}</span>
+                  <span className="text-muted-foreground">
+                    {c.decision.por ? ` · ${c.decision.por}` : ""} · {formatearFecha(c.decision.en)}
+                  </span>
+                </p>
+              )}
+              {puedeEscribir ? (
+                <>
+                  <label className="flex flex-col gap-1">
+                    <span className={labelClass}>Motivo (obligatorio para descartar)</span>
+                    <textarea value={motivo} onChange={(e) => setMotivo(e.target.value)} maxLength={300} rows={2} placeholder="Ej: ya está saturado en Dropi de este país" className={fieldClass} />
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      disabled={pendiente || c.decision?.decision === "enviar"}
+                      onClick={() => decidir("enviar")}
+                      className={`inline-flex min-h-10 items-center rounded-md bg-foreground px-4 text-sm font-medium text-background hover:opacity-90 disabled:opacity-50 ${anilloFoco}`}
+                    >
+                      Enviar a {pais.nombre}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={pendiente || motivo.trim().length < 3}
+                      onClick={() => decidir("descartado")}
+                      className={`inline-flex min-h-10 items-center rounded-md border border-border-control bg-card px-4 text-sm font-medium hover:bg-muted disabled:opacity-50 ${anilloFoco}`}
+                    >
+                      {c.decision?.decision === "descartado" ? "Guardar motivo" : "Descartar"}
+                    </button>
+                    {c.decision && (
+                      <button type="button" disabled={pendiente} onClick={() => decidir(null)} className={`inline-flex min-h-10 items-center rounded-md px-3 text-sm text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50 ${anilloFoco}`}>
+                        Quitar decisión
+                      </button>
+                    )}
+                  </div>
+                </>
+              ) : (
+                !c.decision && <p className="m-0 text-sm text-muted-foreground">Sin decidir.</p>
+              )}
+            </section>
           )}
-          {puedeEscribir ? (
-            <>
-              <label className="flex flex-col gap-1">
-                <span className={labelClass}>Motivo (obligatorio para descartar)</span>
-                <textarea value={motivo} onChange={(e) => setMotivo(e.target.value)} maxLength={300} rows={2} placeholder="Ej: ya está saturado en Dropi de este país" className={fieldClass} />
-              </label>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  disabled={pendiente || c.decision?.decision === "enviar"}
-                  onClick={() => decidir("enviar")}
-                  className={`inline-flex min-h-10 items-center rounded-md bg-foreground px-4 text-sm font-medium text-background hover:opacity-90 disabled:opacity-50 ${anilloFoco}`}
-                >
-                  Enviar a {pais.nombre}
-                </button>
-                <button
-                  type="button"
-                  disabled={pendiente || motivo.trim().length < 3}
-                  onClick={() => decidir("descartado")}
-                  className={`inline-flex min-h-10 items-center rounded-md border border-border-control bg-card px-4 text-sm font-medium hover:bg-muted disabled:opacity-50 ${anilloFoco}`}
-                >
-                  {c.decision?.decision === "descartado" ? "Guardar motivo" : "Descartar"}
-                </button>
-                {c.decision && (
-                  <button type="button" disabled={pendiente} onClick={() => decidir(null)} className={`inline-flex min-h-10 items-center rounded-md px-3 text-sm text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50 ${anilloFoco}`}>
-                    Quitar decisión
-                  </button>
-                )}
-              </div>
-            </>
-          ) : (
-            !c.decision && <p className="m-0 text-sm text-muted-foreground">Sin decidir.</p>
-          )}
+        </div>
+
+        <section className="flex flex-col gap-2 @3xl:border-l @3xl:border-border @3xl:pl-6">
+          {titulo(`Compras para ${pais.nombre}`)}
+          <ComprasProducto id={fila.id} pais={pais.codigo} />
         </section>
-      )}
+      </div>
     </div>
   );
 }
