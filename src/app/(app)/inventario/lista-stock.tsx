@@ -77,6 +77,7 @@ export function ListaStock({
   bodegasExternas,
   lecturas,
   lecturasFallaron,
+  esAdmin,
 }: {
   filas: FilaStock[];
   bodegas: { id: string; nombre: string; externa: boolean }[];
@@ -90,6 +91,7 @@ export function ListaStock({
   /** Cuándo se leyó cada plataforma; `null` en los países que no las muestran. */
   lecturas: LecturasPlataformas | null;
   lecturasFallaron: boolean;
+  esAdmin: boolean;
 }) {
   const router = useRouter();
   const [abierto, setAbierto] = useState<string | null>(null);
@@ -127,6 +129,7 @@ export function ListaStock({
         codigoPais={codigoPais}
         bodegasExternas={bodegasExternas}
         conPlataformas={conPlataformas}
+        esAdmin={esAdmin}
         alCerrar={() => setAbierto(null)}
         alCambiar={() => router.refresh()}
       />

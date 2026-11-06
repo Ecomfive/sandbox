@@ -3,6 +3,7 @@ import { Pagina } from "@/components/ui/pagina";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
 import { requireModulo } from "@/lib/auth";
+import { esAdministrador } from "@/lib/permisos/acceso";
 import { traerTodasConError } from "@/lib/supabase/paginar";
 import { leerStockPlataformas, PAISES_CON_PLATAFORMAS } from "./datos-plataformas";
 import type { FilaStock } from "./def-stock";
@@ -110,6 +111,7 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
           bodegasExternas={bodegas.filter((b) => b.tipo === "externa").map((b) => ({ id: b.id as string, nombre: b.nombre as string }))}
           lecturas={plataformas?.lecturas ?? null}
           lecturasFallaron={plataformas?.fallaron ?? false}
+          esAdmin={esAdministrador(usuario)}
         />
       )}
     </Pagina>

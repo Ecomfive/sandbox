@@ -8,6 +8,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
 import { formatearTiempoRelativo } from "@/lib/formato";
 import { CalendarioIcon, ComprasIcon, EnvioIcon, HistorialIcon, InventarioIcon } from "@/lib/nav-icons";
+import { pideMotivo, puedeMoverAMano } from "@/lib/wms/recepcion";
 import { ETIQUETA_PLATAFORMA } from "@/lib/wms/stock-plataformas";
 import { ComprasProducto } from "../producto/compras-producto";
 import { ETIQUETA_TIPO_SKU, type FilaStock } from "./def-stock";
@@ -34,6 +35,7 @@ const ETIQUETA_ORIGEN: Record<string, string> = {
   conteo: "Levantamiento",
   transferencia: "Transferencia",
   envio_dropi: "Remisión",
+  compra: "Recepción de compra",
 };
 
 const ETIQUETA_ESTADO_LOTE = { vencido: "Vencido", por_vencer: "Por vencer", vigente: "Vigente" } as const;
@@ -68,6 +70,7 @@ export function FichaStock({
   codigoPais,
   bodegasExternas,
   conPlataformas = false,
+  esAdmin = false,
   alCerrar,
   alCambiar,
 }: {
@@ -81,6 +84,8 @@ export function FichaStock({
   codigoPais: string;
   /** Este país muestra las plataformas: las bodegas externas sin nada propio no salen, porque su stock se ve en «En plataformas». */
   conPlataformas?: boolean;
+  /** Es administrador: en los países donde toda salida va con remisión, solo él hace salidas y ajustes a mano. */
+  esAdmin?: boolean;
   alCerrar: () => void;
   /** Se llama tras guardar un movimiento, para que la tabla vuelva a pedir sus totales. */
   alCambiar: () => void;
@@ -127,11 +132,12 @@ export function FichaStock({
 
           {puedeEscribir && !esCombo && !esTest && (
             <div className="flex flex-wrap gap-2 border-y border-border px-5 py-3">
-              {(["entrada", "salida", "ajuste"] as const).map((tipo) => (
+              {(["entrada", "salida", "ajuste"] as const).filter((tipo) => puedeMoverAMano(tipo, codigoPais, esAdmin)).map((tipo) => (
                 <PanelMovimiento
                   key={`${sku.id}-${tipo}`}
                   skuId={sku.id}
                   tipo={tipo}
+                  motivoObligatorio={pideMotivo(tipo, codigoPais)}
                   bodegas={bodegasPropias}
                   ubicaciones={ubicaciones}
                   manejaVencimiento={sku.manejaVencimiento}

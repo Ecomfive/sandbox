@@ -8,7 +8,7 @@ export const ZONA = "America/Panama";
 /** Un hueco de más de esto entre dos minutos trabajados es una pausa. */
 export const MINUTOS_PAUSA = 5;
 
-/** Desde dónde se conectó (migración 0241). Lo que se anotó antes no lo dice: `null`, «sin dato». */
+/** Desde dónde se conectó (migración 0242). Lo que se anotó antes no lo dice: `null`, «sin dato». */
 export type Dispositivo = "computadora" | "telefono" | "tablet";
 
 export const NOMBRE_DISPOSITIVO: Record<Dispositivo, string> = { computadora: "Computadora", telefono: "Teléfono", tablet: "Tablet" };

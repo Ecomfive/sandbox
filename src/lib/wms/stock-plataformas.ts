@@ -9,6 +9,7 @@ import { idsDeDropi } from "@/lib/publicaciones/sincronizar-dropi";
 
 export type Plataforma = "dropi" | "effi" | "drop";
 
+/** Drop es la bodega y Boxfull quien entrega: son lo mismo (Hernán, 6 nov 2026). */
 export const ETIQUETA_PLATAFORMA: Record<Plataforma, string> = { dropi: "Dropi", effi: "Effi", drop: "Drop" };
 
 /** Una publicación con su stock, para la ficha del producto. */

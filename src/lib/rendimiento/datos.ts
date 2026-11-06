@@ -62,7 +62,7 @@ export async function cargarDia(dia: string, soloPersona?: string): Promise<Pers
   const consultaPerfiles = supabase.from("perfiles").select("id, nombre, email").eq("activo", true);
   const [perfiles, minutos, auditoria, mensajes] = await Promise.all([
     soloPersona ? consultaPerfiles.eq("id", soloPersona) : consultaPerfiles,
-    // Sin la migración 0241 no hay dispositivo: los minutos salen igual.
+    // Sin la migración 0242 no hay dispositivo: los minutos salen igual.
     traerMinutos("usuario_id, minuto, ruta, dispositivo").then((r) => (r.error ? traerMinutos("usuario_id, minuto, ruta") : r)),
     traerTodasConError<{ usuario_id: string | null; accion: string; detalle: string | null; antes: Record<string, string> | null; despues: Record<string, string> | null; creado_en: string }>(
       (a, b) => {
