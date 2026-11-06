@@ -16,6 +16,7 @@ import { CalendarioIcon, EstadoIcon, InventarioIcon, MundoIcon } from "@/lib/nav
 import { accionesPorPais, ESTADOS_EXISTE, ETIQUETA_ESTADO_PAIS, estadoDeCelda, paisesPorDecidir, type CeldaPais, type Decision, type EstadoPais } from "@/lib/producto/por-pais";
 import type { NombreFilas } from "@/lib/tabla/pie";
 import { ComprasProducto } from "@/app/(app)/producto/compras-producto";
+import { FichaProductoEmbebida } from "@/app/(app)/producto/ficha-producto-embebida";
 import { decidirProductoPais } from "./actions";
 import { TableroPorPais } from "./tablero-por-pais";
 import { DEF_POR_PAIS, detalleCelda, type FilaPorPais, type PaisColumna } from "./def-por-pais";
@@ -34,12 +35,11 @@ const PUNTO: Record<EstadoPais, string> = {
   no: "border border-dashed border-muted-foreground bg-transparent",
 };
 
-/** Lo que dice la casilla debajo del estado: el ID publicado, las unidades compradas o en bodega, o el motivo. */
+/** Lo que dice la casilla debajo del estado: las unidades disponibles en el país (bodegas + plataformas), las compradas o el motivo. */
 function subtitulo(c: CeldaPais): string {
-  const activa = c.publicaciones.find((p) => p.activa);
-  if (c.estado === "publicado" && activa) return `${activa.plataforma === "drop" ? "Drop" : "Dropi"} ${activa.id}${c.publicaciones.filter((p) => p.activa).length > 1 ? " +" : ""}`;
-  if (c.estado === "comprado") return `${c.unidadesCompradas.toLocaleString("es")} u. compradas`;
-  if (c.estado === "stock") return `${c.unidadesStock.toLocaleString("es")} u. en bodega`;
+  const disponibles = c.unidadesDisponibles > 0 ? `${c.unidadesDisponibles.toLocaleString("es")} u. disponibles` : "Sin stock";
+  if (c.estado === "publicado" || c.estado === "stock") return disponibles;
+  if (c.estado === "comprado") return c.unidadesDisponibles > 0 ? disponibles : `${c.unidadesCompradas.toLocaleString("es")} u. compradas`;
   if (c.estado === "descartado") return c.decision?.motivo ?? "";
   if (c.estado === "enviar" && c.decision?.en) return `desde ${formatearFecha(c.decision.en)}`;
   return "";
@@ -76,6 +76,9 @@ interface Abierta {
 export function TablaPorPais({ filas: iniciales, paises, puedeEscribir, codigoPaisBarra }: { filas: FilaPorPais[]; paises: PaisColumna[]; puedeEscribir: boolean; codigoPaisBarra: string }) {
   const [filas, setFilas] = useState(iniciales);
   const [abierta, setAbierta] = useState<Abierta | null>(null);
+  // El nombre del producto abre su ficha de Producto aquí mismo, encima de la tabla (como desde Gestión de IDs Dropi).
+  const [productoAbierto, setProductoAbierto] = useState<string | null>(null);
+  const abreProducto = usePuedeAbrir("producto");
 
   const columnas = useMemo<ColumnaTabla<FilaPorPais>[]>(
     () => [
@@ -175,12 +178,14 @@ export function TablaPorPais({ filas: iniciales, paises, puedeEscribir, codigoPa
         claveFila={(f) => f.id}
         anchoMinimo="60rem"
         fijarEncabezado
+        abrirFila={abreProducto ? { etiqueta: (f) => `Abrir la ficha de ${f.nombre}`, alAbrir: (f) => setProductoAbierto(f.id), columna: "producto", soloColumna: true } : undefined}
         ariaLabel="Productos por país"
         vacio="No hay productos."
       />
       <Ventana abierto={!!fila && !!pais} alCerrar={() => setAbierta(null)} titulo={fila && pais ? `${fila.nombre} en ${pais.nombre}` : ""} ancho="xl">
         {fila && pais && <DetalleCelda key={`${fila.id}-${pais.codigo}`} fila={fila} pais={pais} puedeEscribir={puedeEscribir} esPaisBarra={pais.codigo === codigoPaisBarra} alDecidir={alDecidir} />}
       </Ventana>
+      <FichaProductoEmbebida productoId={productoAbierto} alCerrar={() => setProductoAbierto(null)} />
     </>
   );
 }
@@ -253,7 +258,10 @@ function DetalleCelda({
                       ) : (
                         <span className="font-medium">{texto}</span>
                       )}
-                      <span className="text-muted-foreground">{p.activa ? "activa" : "archivada"}</span>
+                      <span className="text-muted-foreground">
+                    {p.activa ? "activa" : "archivada"}
+                    {p.activa && p.stock !== null ? ` · ${p.stock.toLocaleString("es")} u.` : ""}
+                  </span>
                     </li>
                   );
                 })}
@@ -262,9 +270,10 @@ function DetalleCelda({
           </section>
 
           <section className="flex flex-col gap-1.5">
-            {titulo("Stock en bodegas")}
+            {titulo(`Stock disponible en ${pais.nombre}: ${c.unidadesDisponibles.toLocaleString("es")} u.`)}
+            {c.unidadesPlataformas > 0 && <p className="m-0 text-sm text-muted-foreground">En las plataformas: {c.unidadesPlataformas.toLocaleString("es")} u. (la última lectura de Dropi o Drop)</p>}
             {c.stock.length === 0 ? (
-              <p className="m-0 text-sm text-muted-foreground">Sin unidades en las bodegas de {pais.nombre}.</p>
+              <p className="m-0 text-sm text-muted-foreground">Sin unidades en las bodegas del sistema de {pais.nombre}.</p>
             ) : (
               <ul className="m-0 flex list-none flex-col gap-1 p-0 text-sm tabular-nums">
                 {c.stock.map((s) => (

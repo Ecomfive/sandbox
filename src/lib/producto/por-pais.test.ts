@@ -13,7 +13,7 @@ const vacio = { publicaciones: [], compras: [], stock: [], decisiones: [], desco
 test("publicado manda sobre comprado y stock; una variante suma a su producto", () => {
   const r = armarPorPais(productos, ["PA", "CR"], {
     ...vacio,
-    publicaciones: [{ skuId: "a", pais: "PA", plataforma: "dropi", idPlataforma: "8406", ref: "p1", activa: true }],
+    publicaciones: [{ skuId: "a", pais: "PA", plataforma: "dropi", idPlataforma: "8406", ref: "p1", activa: true, stock: 598 }],
     compras: [
       { skuId: "a-m", compraId: "c12", pais: "CR", numero: 12, unidades: 100, etapa: "tracking", anulada: false, creada: "2026-10-01" },
       { skuId: "a", compraId: "c12", pais: "CR", numero: 12, unidades: 50, etapa: "tracking", anulada: false, creada: "2026-10-01" },
@@ -23,6 +23,8 @@ test("publicado manda sobre comprado y stock; una variante suma a su producto", 
   assert.equal(r.size, 2);
   assert.equal(r.get("a")!.PA.estado, "publicado");
   assert.equal(r.get("a")!.PA.unidadesStock, 5);
+  assert.equal(r.get("a")!.PA.unidadesPlataformas, 598);
+  assert.equal(r.get("a")!.PA.unidadesDisponibles, 603);
   assert.equal(r.get("a")!.CR.estado, "comprado");
   assert.deepEqual(r.get("a")!.CR.compras, [{ compraId: "c12", numero: 12, unidades: 150, creada: "2026-10-01" }]);
   assert.equal(r.get("b")!.PA.estado, "no");
@@ -43,13 +45,14 @@ test("donde no existe: descontinuado, la decisión y luego solo archivado", () =
   const r = armarPorPais(productos, ["PA", "CR", "MX"], {
     ...vacio,
     publicaciones: [
-      { skuId: "b", pais: "PA", plataforma: "dropi", idPlataforma: "1", ref: "p2", activa: false },
-      { skuId: "b", pais: "CR", plataforma: "drop", idPlataforma: "ID-AB", ref: "p3", activa: false },
+      { skuId: "b", pais: "PA", plataforma: "dropi", idPlataforma: "1", ref: "p2", activa: false, stock: 7 },
+      { skuId: "b", pais: "CR", plataforma: "drop", idPlataforma: "ID-AB", ref: "p3", activa: false, stock: null },
     ],
     decisiones: [{ skuId: "b", pais: "CR", decision: "descartado", motivo: "Saturado", por: "Alcides", en: "2026-11-05" }],
     descontinuados: [{ skuId: "b", pais: "MX" }],
   }, compraCuenta);
   assert.equal(r.get("b")!.PA.estado, "archivado");
+  assert.equal(r.get("b")!.PA.unidadesDisponibles, 0);
   assert.equal(r.get("b")!.CR.estado, "descartado");
   assert.equal(r.get("b")!.MX.estado, "descontinuado");
 });
@@ -71,7 +74,7 @@ test("descartar pide motivo", () => {
 test("tarjetas: por decidir solo en activos que ya existen en otro país", () => {
   const r = armarPorPais(productos, ["PA", "CR", "MX"], {
     ...vacio,
-    publicaciones: [{ skuId: "a", pais: "PA", plataforma: "dropi", idPlataforma: "1", ref: "p", activa: true }],
+    publicaciones: [{ skuId: "a", pais: "PA", plataforma: "dropi", idPlataforma: "1", ref: "p", activa: true, stock: null }],
     compras: [{ skuId: "a", compraId: "c", pais: "MX", numero: 1, unidades: 5, etapa: "tracking", anulada: false, creada: "2026-10-01" }],
     decisiones: [{ skuId: "a", pais: "CR", decision: "enviar", motivo: null, por: null, en: "2026-11-05" }],
   }, compraCuenta);
@@ -82,7 +85,7 @@ test("tarjetas: por decidir solo en activos que ya existen en otro país", () =>
   assert.deepEqual(paisesPorDecidir(b, "fisico"), []);
   assert.deepEqual(accionesPorPais(b, "fisico"), ["ningun_pais"]);
   assert.deepEqual(accionesPorPais(b, "test"), []);
-  const r2 = armarPorPais(productos, ["PA", "CR"], { ...vacio, publicaciones: [{ skuId: "b", pais: "PA", plataforma: "dropi", idPlataforma: "1", ref: "p", activa: true }] }, compraCuenta);
+  const r2 = armarPorPais(productos, ["PA", "CR"], { ...vacio, publicaciones: [{ skuId: "b", pais: "PA", plataforma: "dropi", idPlataforma: "1", ref: "p", activa: true, stock: null }] }, compraCuenta);
   assert.deepEqual(paisesPorDecidir(r2.get("b")!, "fisico"), ["CR"]);
   assert.deepEqual(accionesPorPais(r2.get("b")!, "fisico"), ["por_decidir", "un_pais"]);
   assert.deepEqual(paisesPorDecidir(r2.get("b")!, "inactivo"), []);
