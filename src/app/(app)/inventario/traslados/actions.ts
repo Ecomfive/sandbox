@@ -10,7 +10,7 @@ import { MAX_NOTA_TRASLADO, numeroTraslado, revisarLineasTraslado } from "@/lib/
 const ES_ID = (v: unknown): v is string => typeof v === "string" && /^[0-9a-fA-F-]{8,64}$/.test(v);
 const RUTA = "/inventario/traslados";
 
-/** Crea un traslado entre dos bodegas propias del país (`wms_crear_traslado`, migración 0235): todos sus productos se mueven o ninguno. Devuelve el error como valor. */
+/** Crea un traslado entre dos bodegas propias del país (`wms_crear_traslado`, migraciones 0235 y 0238): todos sus productos y cajas se mueven o ninguno. Devuelve el error como valor. */
 export async function crearTraslado(datos: { desde: unknown; hacia: unknown; notas: unknown; lineas: unknown }): Promise<{ error: string } | { numero: string }> {
   const usuario = await requireModuloEscritura("inventario");
   if (!ES_ID(datos.desde)) return { error: "Elige de qué bodega sale." };
