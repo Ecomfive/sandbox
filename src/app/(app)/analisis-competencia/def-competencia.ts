@@ -1,8 +1,9 @@
 import type { PlataformaId } from "@/lib/plataformas";
 
-/** Un producto del catálogo de Dropi del país (nuestro o de la competencia). */
+/** Un producto del catálogo de Dropi o Drop del país (nuestro o de la competencia). */
 export interface ProductoC {
   id: string;
+  /** Su ID en Dropi; 0 en Drop, cuyo ID no es un número. */
   dropiId: number;
   proveedorId: number;
   proveedor: string;
@@ -43,6 +44,8 @@ export interface CompetidorC {
   id: number;
   nombre: string;
   url: string;
+  /** El texto del enlace a `url`. */
+  enlace: string;
   productos: number;
   iguales: number;
   nuevos7: number;

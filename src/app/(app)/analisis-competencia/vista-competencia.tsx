@@ -607,7 +607,7 @@ function TarjetaCompetidor({
           <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
             <span>Los iguales a los nuestros primero; luego lo que más vendió.</span>
             <a href={c.url} target="_blank" rel="noopener noreferrer" className="text-primario underline-offset-2 hover:underline">
-              Abrir su página en Dropi ↗
+              {c.enlace}
             </a>
           </div>
           <ProductosDelCompetidor productos={productos} nuestros={nuestros} busqueda={busqueda} />

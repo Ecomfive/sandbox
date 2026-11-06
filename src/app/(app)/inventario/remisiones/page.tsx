@@ -60,7 +60,7 @@ export default async function RemisionesPage() {
   });
 
   const puedeEscribir = !usuario.modulosSoloLectura.includes("inventario");
-  // Las peticiones de corrección de estas líneas (migración 0234): sin ella, la lista se ve igual.
+  // Las peticiones de corrección de estas líneas (migración 0237): sin ella, la lista se ve igual.
   const ids = filas.map((f) => f.id);
   const { data: filasCorreccion } = ids.length
     ? await supabase

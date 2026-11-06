@@ -1,5 +1,5 @@
 /**
- * Corregir una remisión con autorización (migración 0234): quién puede resolver una petición y qué se revisa al pedirla. Quien pide nunca autoriza. Lógica pura, con prueba.
+ * Corregir una remisión con autorización (migración 0237): quién puede resolver una petición y qué se revisa al pedirla. Quien pide nunca autoriza. Lógica pura, con prueba.
  */
 
 export type TipoCorreccion = "recibida" | "anular";

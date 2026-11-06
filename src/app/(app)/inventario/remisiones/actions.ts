@@ -52,7 +52,7 @@ async function avisar(supabase: ReturnType<typeof createServiceClient>, personas
   await supabase.from("notificaciones_usuario").insert(personas.map((usuario_id) => ({ usuario_id, tipo: "remision", titulo, texto: texto.slice(0, 500), href: RUTA, autor_id: autor.id, autor_nombre: autor.nombre })));
 }
 
-/** Pide corregir lo recibido o anular lo que sigue en camino (migración 0234). No cambia nada: queda esperando a quien puede autorizar y les llega el aviso. */
+/** Pide corregir lo recibido o anular lo que sigue en camino (migración 0237). No cambia nada: queda esperando a quien puede autorizar y les llega el aviso. */
 export async function pedirCorreccion(envioId: string, tipo: unknown, recibida: unknown, motivo: unknown): Promise<{ error?: string }> {
   const usuario = await requireModuloEscritura("inventario");
   if (!ES_ID(envioId)) return { error: "Línea no válida." };
@@ -68,7 +68,7 @@ export async function pedirCorreccion(envioId: string, tipo: unknown, recibida: 
   if ("error" in r) return r;
   const bodega = (Array.isArray(linea.wms_bodegas) ? linea.wms_bodegas[0] : linea.wms_bodegas) as { pais_id: string } | null;
   const { data: autorizadores, error: errorAut } = await supabase.from("wms_autorizadores_remision").select("perfil_id, pais_id");
-  if (errorAut) return { error: "Falta correr la migración 0234 en la base." };
+  if (errorAut) return { error: "Falta correr la migración 0237 en la base." };
   const autoriza = quienesAutorizan(autorizadores ?? [], bodega?.pais_id ?? "", usuario.id);
   if (!autoriza.length) return { error: "No hay quién autorice esta corrección." };
   const nombre = usuario.nombre || usuario.email;

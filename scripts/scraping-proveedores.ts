@@ -7,6 +7,7 @@
 //   npx tsx scripts/scraping-proveedores.ts archivo <json>     guarda una lectura ya bajada (la misma forma que manda el navegador)
 //   (Una lectura con `tipo: "competencia"` es todo el catálogo de un país para Análisis de competencia: competencia-guardar.ts.)
 //   (Una lectura con `tipo: "drop"` es «Mis productos» de Drop, app.soydrop.com, para Gestión de IDs Drop: drop-guardar.ts.)
+//   (Una lectura con `tipo: "competencia-drop"` es todo el catálogo de Drop para Análisis de competencia: competencia-drop-guardar.ts.)
 //   npx tsx scripts/scraping-proveedores.ts pendientes         lista los proveedores con una búsqueda pedida desde el sistema
 //   npx tsx scripts/scraping-proveedores.ts lista              los proveedores activos (la búsqueda diaria de las 5:00 los recorre)
 //   npx tsx scripts/scraping-proveedores.ts huellas            calcula las huellas de foto que falten (también lo hace cada búsqueda)
@@ -21,6 +22,7 @@ import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import { huellaFoto } from "../src/lib/wms/huella-foto";
 import { guardarCompetencia } from "./competencia-guardar";
+import { guardarCompetenciaDrop, type LecturaCompetenciaDrop } from "./competencia-drop-guardar";
 import { guardarDrop, type LecturaDrop } from "./drop-guardar";
 import { guardarNuestrosProductos, type LecturaNuestros } from "./publicaciones-sincronizar-dropi";
 import { comparar, mejorPareja, normalizarDropi, type Evento, type ProductoGuardado, type ProductoVisto } from "../src/lib/scraping/comparar";
@@ -35,9 +37,9 @@ const ORIGENES = /^https:\/\/app\.dropi\.(mx|co|cr|pa|cl|ec|pe|gt|py|ar)$/;
 
 interface Lectura {
   /** «competencia»: todo el catálogo de un país para Análisis de competencia; «nuestros»: nuestros productos con sus bodegas
-   * (Gestión de IDs Dropi, publicaciones-sincronizar-dropi.ts); «drop»: nuestros productos en Drop (Gestión de IDs Drop, drop-guardar.ts); sin él,
-   * un proveedor de Scraping. */
-  tipo?: "competencia" | "nuestros" | "drop";
+   * (Gestión de IDs Dropi, publicaciones-sincronizar-dropi.ts); «drop»: nuestros productos en Drop (Gestión de IDs Drop, drop-guardar.ts); «competencia-drop»: todo el
+   * catálogo de Drop (competencia-drop-guardar.ts); sin él, un proveedor de Scraping. */
+  tipo?: "competencia" | "nuestros" | "drop" | "competencia-drop";
   dropiId: number;
   pais: string;
   url: string;
@@ -244,7 +246,7 @@ export async function calcularHuellas(filtro: string, tabla = "scraping_producto
  */
 function guardarCopia(l: Lectura) {
   const pais = typeof l.pais === "string" && /^[a-z]{2}$/.test(l.pais) ? l.pais : "xx";
-  const que = l.tipo === "competencia" || l.tipo === "nuestros" || l.tipo === "drop" ? l.tipo : Number.isInteger(l.dropiId) ? String(l.dropiId) : "lectura";
+  const que = l.tipo === "competencia" || l.tipo === "nuestros" || l.tipo === "drop" || l.tipo === "competencia-drop" ? l.tipo : Number.isInteger(l.dropiId) ? String(l.dropiId) : "lectura";
   const carpeta = path.resolve("datos-privados", "scraping");
   const ruta = path.join(carpeta, `${pais}-${que}-${new Date().toISOString().slice(0, 19).replace(/:/g, "")}.json`);
   if (!ruta.startsWith(carpeta + path.sep)) throw new Error("Ruta de la copia no válida.");
@@ -263,6 +265,7 @@ function guardarSegunTipo(l: Lectura) {
   if (l.tipo === "competencia") return guardarCompetencia(supabase, l, calcularHuellas);
   if (l.tipo === "nuestros") return guardarNuestrosProductos(supabase, l as unknown as LecturaNuestros);
   if (l.tipo === "drop") return guardarDrop(supabase, l as unknown as LecturaDrop);
+  if (l.tipo === "competencia-drop") return guardarCompetenciaDrop(supabase, l as unknown as LecturaCompetenciaDrop, calcularHuellas);
   return guardarLectura(l);
 }
 

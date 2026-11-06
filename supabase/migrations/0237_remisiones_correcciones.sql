@@ -1,6 +1,6 @@
 -- Corregir una remisión con autorización (pedido de Hernán, 6 nov 2026). Nadie corrige por su cuenta: quien necesita cambiar lo recibido o anular lo que sigue en camino lo **pide** con
 -- su motivo y otra persona lo **autoriza**; recién entonces cambia. Autorizan Hernán y Alcides en todos los países, Dinora en Panamá y Yanixia en Costa Rica (`wms_autorizadores_remision`).
--- Nunca autoriza quien lo pidió. Reversa: supabase/rollbacks/0234_rollback.sql
+-- Nunca autoriza quien lo pidió. Reversa: supabase/rollbacks/0237_rollback.sql
 
 create table if not exists wms_autorizadores_remision (
   id uuid primary key default uuid_v7(),

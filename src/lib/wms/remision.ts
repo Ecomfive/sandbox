@@ -94,7 +94,7 @@ export function agruparRemisiones<L extends LineaEnviada>(lineas: readonly L[]):
   }
   const salida = [...grupos.entries()].map(([clave, ls]): RemisionAgrupada<L> => {
     const p = ls[0];
-    // Una línea anulada (migración 0234) volvió a la bodega: no cuenta en los totales, pero sigue a la vista en la ficha.
+    // Una línea anulada (migración 0237) volvió a la bodega: no cuenta en los totales, pero sigue a la vista en la ficha.
     const vivas = ls.filter((l) => l.estado !== "anulado");
     const confirmadas = vivas.filter((l) => l.estado === "recibido");
     const porConfirmar = vivas.length - confirmadas.length;
