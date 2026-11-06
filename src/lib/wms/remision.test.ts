@@ -65,3 +65,11 @@ test("agrupa las líneas en una fila por remisión, con lo que falta por confirm
   assert.equal(r.find((x) => x.clave === "e1")!.numero, "Sin número", "una línea anterior a las remisiones sale sola");
   assert.deepEqual(agruparRemisiones([]), []);
 });
+
+test("una línea anulada no cuenta en la remisión; si se anulan todas, la remisión queda anulada", () => {
+  const l = (id: string, estado: LineaEnviada["estado"]): LineaEnviada => ({ id, remisionId: "r", referencia: "REM-0009", desde: "Plaza", hacia: "Dropi", enviadoEn: "2026-11-06T14:00:00Z", enviada: 100, recibida: estado === "recibido" ? 100 : null, estado, notas: null });
+  const [una] = agruparRemisiones([l("a", "recibido"), l("b", "anulado")]);
+  assert.deepEqual([una.estado, una.productos, una.enviadas, una.porConfirmar, una.lineas.length], ["completa", 1, 100, 0, 2]);
+  const [todas] = agruparRemisiones([l("a", "anulado")]);
+  assert.deepEqual([todas.estado, todas.productos, todas.enviadas, todas.porConfirmar], ["anulada", 0, 0, 0]);
+});

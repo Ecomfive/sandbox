@@ -13,6 +13,7 @@ import { anilloFoco } from "@/components/ui/field";
 import { formatearFechaHoraCompleta } from "@/lib/formato";
 import { agruparRemisiones, type EstadoRemision, type LineaEnviada, type RemisionAgrupada } from "@/lib/wms/remision";
 import { recibirEnvioDropi } from "../stock-actions";
+import { PedirCorreccion } from "./correcciones";
 
 /** Un producto enviado: una línea de una remisión, con su foto y el motivo si llegó distinto. */
 export interface FilaEnvio extends LineaEnviada {
@@ -89,7 +90,8 @@ function Recibir({ fila }: { fila: FilaEnvio }) {
   );
 }
 
-const ESTADO: Record<EstadoRemision, { tono: "warning" | "success" | "destructive"; texto: (r: RemisionAgrupada) => string }> = {
+const ESTADO: Record<EstadoRemision, { tono: "warning" | "success" | "destructive" | "neutral"; texto: (r: RemisionAgrupada) => string }> = {
+  anulada: { tono: "neutral", texto: () => "Anulada" },
   en_camino: { tono: "warning", texto: () => "En camino" },
   parcial: { tono: "warning", texto: (r) => `Faltan ${r.porConfirmar} por confirmar` },
   completa: { tono: "success", texto: () => "Llegó completo" },
@@ -115,7 +117,19 @@ function VerPapel({ r, grande = false }: { r: RemisionAgrupada; grande?: boolean
 }
 
 /** La ficha de una remisión: sus datos, el papel y cada producto enviado, con lo que llegó (ahí se confirma). */
-function FichaRemision({ r, puedeEscribir, codigoPais }: { r: RemisionAgrupada<FilaEnvio>; puedeEscribir: boolean; codigoPais: string }) {
+function FichaRemision({
+  r,
+  puedeEscribir,
+  codigoPais,
+  conPendiente,
+  resueltas,
+}: {
+  r: RemisionAgrupada<FilaEnvio>;
+  puedeEscribir: boolean;
+  codigoPais: string;
+  conPendiente: Set<string>;
+  resueltas: Record<string, string>;
+}) {
   return (
     <div className="flex flex-col gap-5 p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -179,6 +193,8 @@ function FichaRemision({ r, puedeEscribir, codigoPais }: { r: RemisionAgrupada<F
                     ) : (
                       <Badge tone="warning">En camino</Badge>
                     )
+                  ) : f.estado === "anulado" ? (
+                    <Badge tone="neutral">Anulada</Badge>
                   ) : f.recibida === f.enviada ? (
                     <Badge tone="success">Llegó completo</Badge>
                   ) : (
@@ -188,6 +204,20 @@ function FichaRemision({ r, puedeEscribir, codigoPais }: { r: RemisionAgrupada<F
                       </Badge>
                       {f.motivo && <span className="text-xs text-muted-foreground">{f.motivo}</span>}
                     </span>
+                  )}
+                  {resueltas[f.id] && <span className="mt-1 block text-xs text-muted-foreground">{resueltas[f.id]}</span>}
+                  {conPendiente.has(f.id) ? (
+                    <span className="mt-1 block">
+                      <Badge tone="warning">Corrección por autorizar</Badge>
+                    </span>
+                  ) : (
+                    puedeEscribir &&
+                    f.remisionId &&
+                    f.estado !== "anulado" && (
+                      <span className="mt-1 block">
+                        <PedirCorreccion envioId={f.id} tipo={f.estado === "en_camino" ? "anular" : "recibida"} codigo={f.codigo} enviada={f.enviada} recibida={f.recibida} />
+                      </span>
+                    )
                   )}
                 </td>
               </tr>
@@ -203,8 +233,23 @@ function FichaRemision({ r, puedeEscribir, codigoPais }: { r: RemisionAgrupada<F
  * Las remisiones a bodegas externas, una fila por remisión (7 nov 2026, pedido de Hernán): número, fecha, de dónde a dónde, cuántos productos y
  * unidades, cómo van y el papel. Lo que falta por confirmar va arriba. Al tocar una se abre su ficha con los productos, y ahí se confirma lo que llegó.
  */
-export function ListaEnvios({ filas, puedeEscribir, codigoPais }: { filas: FilaEnvio[]; puedeEscribir: boolean; codigoPais: string }) {
+export function ListaEnvios({
+  filas,
+  puedeEscribir,
+  codigoPais,
+  conPendiente,
+  resueltas,
+}: {
+  filas: FilaEnvio[];
+  puedeEscribir: boolean;
+  codigoPais: string;
+  /** Las líneas con una corrección esperando autorización. */
+  conPendiente: string[];
+  /** La última corrección resuelta de cada línea, como texto. */
+  resueltas: Record<string, string>;
+}) {
   const remisiones = useMemo(() => agruparRemisiones(filas), [filas]);
+  const pendientes = useMemo(() => new Set(conPendiente), [conPendiente]);
   const [abierta, setAbierta] = useState<string | null>(null);
   const elegida = remisiones.find((r) => r.clave === abierta) ?? null;
   const enCamino = remisiones.filter((r) => r.porConfirmar > 0).length;
@@ -270,7 +315,7 @@ export function ListaEnvios({ filas, puedeEscribir, codigoPais }: { filas: FilaE
         </table>
       </ContenedorTabla>
       <Ventana abierto={!!elegida} alCerrar={() => setAbierta(null)} titulo={elegida?.numero ?? ""} lado="derecha" ancho="lg">
-        {elegida && <FichaRemision r={elegida} puedeEscribir={puedeEscribir} codigoPais={codigoPais} />}
+        {elegida && <FichaRemision r={elegida} puedeEscribir={puedeEscribir} codigoPais={codigoPais} conPendiente={pendientes} resueltas={resueltas} />}
       </Ventana>
     </div>
   );

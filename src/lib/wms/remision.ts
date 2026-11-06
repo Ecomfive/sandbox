@@ -54,11 +54,11 @@ export interface LineaEnviada {
   enviadoEn: string;
   enviada: number;
   recibida: number | null;
-  estado: "en_camino" | "recibido";
+  estado: "en_camino" | "recibido" | "anulado";
   notas: string | null;
 }
 
-export type EstadoRemision = "en_camino" | "parcial" | "completa" | "diferencia";
+export type EstadoRemision = "en_camino" | "parcial" | "completa" | "diferencia" | "anulada";
 
 /** Una remisión con sus totales: lo que se ve en una fila de la lista. Las líneas van en la ficha. */
 export interface RemisionAgrupada<L extends LineaEnviada = LineaEnviada> {
@@ -94,8 +94,10 @@ export function agruparRemisiones<L extends LineaEnviada>(lineas: readonly L[]):
   }
   const salida = [...grupos.entries()].map(([clave, ls]): RemisionAgrupada<L> => {
     const p = ls[0];
-    const confirmadas = ls.filter((l) => l.estado === "recibido");
-    const porConfirmar = ls.length - confirmadas.length;
+    // Una línea anulada (migración 0237) volvió a la bodega: no cuenta en los totales, pero sigue a la vista en la ficha.
+    const vivas = ls.filter((l) => l.estado !== "anulado");
+    const confirmadas = vivas.filter((l) => l.estado === "recibido");
+    const porConfirmar = vivas.length - confirmadas.length;
     const recibidas = confirmadas.reduce((t, l) => t + (l.recibida ?? 0), 0);
     const conDiferencia = confirmadas.some((l) => l.recibida !== l.enviada);
     return {
@@ -106,12 +108,12 @@ export function agruparRemisiones<L extends LineaEnviada>(lineas: readonly L[]):
       hacia: p.hacia,
       enviadoEn: p.enviadoEn,
       notas: p.notas,
-      productos: ls.length,
-      enviadas: ls.reduce((t, l) => t + l.enviada, 0),
+      productos: vivas.length,
+      enviadas: vivas.reduce((t, l) => t + l.enviada, 0),
       recibidas,
       porConfirmar,
       diferencia: confirmadas.reduce((t, l) => t + ((l.recibida ?? 0) - l.enviada), 0),
-      estado: conDiferencia ? "diferencia" : porConfirmar === 0 ? "completa" : confirmadas.length ? "parcial" : "en_camino",
+      estado: !vivas.length ? "anulada" : conDiferencia ? "diferencia" : porConfirmar === 0 ? "completa" : confirmadas.length ? "parcial" : "en_camino",
       lineas: ls,
     };
   });
