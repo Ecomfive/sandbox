@@ -17,6 +17,7 @@ export function calcularCambios(
 }
 
 export const ETIQUETA_ACCION: Record<string, string> = {
+  decidir_producto_pais: "Decidió en Por país",
   cambiar_categoria_producto: "Cambió la categoría",
   confirmar_categoria_producto: "Confirmó la categoría",
   clasificar_categorias: "Clasificó por categoría",

@@ -22,6 +22,10 @@ export const PESTANAS_POR_MODULO: Record<string, Pestana[]> = {
     { etiqueta: "Consumo de IA", href: "/publicaciones-dropi/consumo" },
     { etiqueta: "Uso del sistema", href: "/publicaciones-dropi/uso-sistema" },
   ],
+  "/producto": [
+    { etiqueta: "Producto", href: "/producto" },
+    { etiqueta: "Por país", href: "/producto/paises" },
+  ],
   "/retiros": [
     { etiqueta: "Retiros", href: "/retiros" },
     { etiqueta: "Cuentas destino", href: "/retiros/cuentas" },
