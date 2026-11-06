@@ -13,8 +13,8 @@ import { cargarDatosCompetencia, datosCompetenciaVacios } from "./datos-competen
 import type { DatosCompetencia } from "./def-competencia";
 
 /**
- * El marco de cada pestaña de Análisis de competencia: comprueba el acceso y carga los datos del país de la barra. Arriba se elige la plataforma (Dropi o Drop, 3 nov 2026): Drop es solo
- * de Costa Rica: el selector solo sale con Costa Rica elegido (con otro país no hay nada que elegir y se mira Dropi). Sin búsquedas de Drop, las pestañas se dibujan igual
+ * El marco de cada pestaña de Análisis de competencia: comprueba el acceso y carga los datos del país de la barra. Arriba se elige la plataforma (Dropi, Drop o Effi): Drop y Effi son solo
+ * de Costa Rica: el selector solo sale con Costa Rica elegido (con otro país no hay nada que elegir y se mira Dropi). Sin búsquedas de Drop o Effi, las pestañas se dibujan igual
  * que las de Dropi, en cero. Cada pestaña pone arriba el
  * tablero de tarjetas (`TableroCompetencia`): en Competidores filtran la lista; en Resumen llevan a Competidores con su filtro.
  */
@@ -24,18 +24,18 @@ export async function PaginaCompetencia({ titulo, children }: { titulo: string; 
   const pais = await getPaisActual(supabase);
   const plataforma = await getPlataformaActual(pais.codigo);
   const plataformas = plataformasDePais(pais.codigo);
-  const esDrop = plataforma === "drop";
+  const soloCostaRica = plataforma !== "dropi";
   // Solo se carga la plataforma que se mira, cada una de sus propias tablas.
-  const datos = esDrop ? ((await cargarDatosCompetencia(supabase, pais, "drop")) ?? datosCompetenciaVacios("drop", pais.nombre)) : await cargarDatosCompetencia(supabase, pais);
+  const datos = soloCostaRica ? ((await cargarDatosCompetencia(supabase, pais, plataforma)) ?? datosCompetenciaVacios(plataforma, pais.nombre)) : await cargarDatosCompetencia(supabase, pais);
   // Solo con más de una plataforma en el país (Costa Rica): en los demás países ni se ofrece.
   const selector = plataformas.length > 1 ? <SelectorPlataforma plataforma={plataforma} plataformas={plataformas} /> : null;
   const puedeEscribir = !usuario.modulosSoloLectura.includes("analisis-competencia");
-  if (esDrop) {
+  if (soloCostaRica) {
     return (
       <Pagina ancho="ancha" className="flex flex-col gap-5">
         <EncabezadoPagina titulo={titulo} oculto />
         {selector}
-        {/* Drop es de Costa Rica y se paga en colones. */}
+        {/* Drop y Effi son de Costa Rica: en colones. */}
         <MonedaCompetencia moneda={monedaDePais(pais.codigo)}>{children(datos!, puedeEscribir)}</MonedaCompetencia>
       </Pagina>
     );

@@ -13,7 +13,8 @@ export async function marcarAlertasVistas(ids?: string[]): Promise<{ error?: str
   await requireModuloEscritura("analisis-competencia");
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
-  const tabla = (await getPlataformaActual(pais.codigo)) === "drop" ? "drop_competencia_alertas" : "competencia_alertas";
+  const plataforma = await getPlataformaActual(pais.codigo);
+  const tabla = plataforma === "dropi" ? "competencia_alertas" : `${plataforma}_competencia_alertas`;
   let q = supabase.from(tabla).update({ vista: true }).eq("pais_id", pais.id).eq("vista", false);
   if (ids) {
     if (!ids.length || ids.length > 500 || !ids.every((i) => UUID.test(i))) return { error: "Selección no válida." };

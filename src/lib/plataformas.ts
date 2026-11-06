@@ -1,8 +1,8 @@
-// Las plataformas de dropshipping con que trabaja el sistema y en qué países está cada una (3 nov 2026, pedido de Hernán): **Dropi** está en varios países y **Drop es solo de Costa Rica**.
+// Las plataformas de dropshipping con que trabaja el sistema y en qué países está cada una (3 nov 2026, pedido de Hernán): **Dropi** está en varios países; **Drop** y **Effi** son solo de Costa Rica.
 // Todo lo que se agregue de Drop (módulos, datos, búsquedas) es de Costa Rica; con otro país elegido en la barra se avisa y se ofrece pasar a Costa Rica. Sin base ni React, con prueba
 // (plataformas.test.ts).
 
-export type PlataformaId = "dropi" | "drop";
+export type PlataformaId = "dropi" | "drop" | "effi";
 
 export interface Plataforma {
   id: PlataformaId;
@@ -14,6 +14,7 @@ export interface Plataforma {
 export const PLATAFORMAS: readonly Plataforma[] = [
   { id: "dropi", nombre: "Dropi", paises: null },
   { id: "drop", nombre: "Drop", paises: ["CR"] },
+  { id: "effi", nombre: "Effi", paises: ["CR"] },
 ];
 
 export const PLATAFORMA_POR_DEFECTO: PlataformaId = "dropi";

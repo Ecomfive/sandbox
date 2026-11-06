@@ -8,10 +8,11 @@ import type { AlertaC, BitacoraC, CompetidorC, DatosCompetencia, ProductoC, Vent
 const n = (v: unknown) => (v === null || v === undefined ? null : Number(v));
 const DOMINIO: Record<string, string> = { PA: "pa", CR: "cr", MX: "mx", CO: "co" };
 
-/** Las tablas de cada plataforma: las de Dropi (0108) y las de Drop (0234), iguales salvo por cómo se identifica un producto y su proveedor. */
+/** Las tablas de cada plataforma: Dropi (0108), Drop (0234) y Effi (0238), iguales salvo por cómo se identifica un producto y su proveedor. */
 const TABLAS: Record<PlataformaId, Record<"productos" | "busquedas" | "historial" | "alertas" | "ids", string>> = {
   dropi: { productos: "competencia_productos", busquedas: "competencia_busquedas", historial: "competencia_historial", alertas: "competencia_alertas", ids: "dropi_producto_id, proveedor_dropi_id" },
   drop: { productos: "drop_competencia_productos", busquedas: "drop_competencia_busquedas", historial: "drop_competencia_historial", alertas: "drop_competencia_alertas", ids: "drop_producto_id" },
+  effi: { productos: "effi_competencia_productos", busquedas: "effi_competencia_busquedas", historial: "effi_competencia_historial", alertas: "effi_competencia_alertas", ids: "proveedor_effi_id, ventas" },
 };
 
 /** El catálogo de Drop no tiene una página por proveedor. */
@@ -21,6 +22,8 @@ interface FilaProducto {
   id: string;
   dropi_producto_id?: number;
   proveedor_dropi_id?: number;
+  proveedor_effi_id?: number;
+  ventas?: number | null;
   proveedor_nombre: string;
   nombre: string;
   foto_url: string | null;
@@ -39,7 +42,7 @@ interface FilaProducto {
 
 type FilaBitacora = { fecha: string; evento: string; precio: string | null; stock: number | null; precio_antes: string | null; stock_antes: number | null } & Record<string, unknown>;
 
-/** Drop sin datos (falta la migración 0234): las pestañas se dibujan igual que las de Dropi, en cero. */
+/** Drop o Effi sin datos (falta su migración, 0234 o 0238): las pestañas se dibujan igual que las de Dropi, en cero. */
 export function datosCompetenciaVacios(plataforma: DatosCompetencia["plataforma"], paisNombre: string): DatosCompetencia {
   return { plataforma, pais: paisNombre, productos: [], competidores: [], alertas: [], bitacora: [], ultima: null, busquedas: 0, corte: null, ventas: [] };
 }
@@ -47,12 +50,14 @@ export function datosCompetenciaVacios(plataforma: DatosCompetencia["plataforma"
 /**
  * Todo lo que muestran las pestañas de Análisis de competencia para un país: los productos (nuestros y de la competencia) con
  * sus iguales, el stock vendido en 1/7/30 días, los competidores, las alertas, la bitácora y las
- * ventas por día (bajadas de stock) para el dashboard. `null` si falta la migración de esa plataforma (0108 Dropi, 0234 Drop).
+ * ventas por día (bajadas de stock) para el dashboard. `null` si falta la migración de esa plataforma (0108 Dropi, 0234 Drop, 0238 Effi). Effi dice las ventas de cada
+ * artículo: lo vendido sale de lo que subieron entre lecturas (evento `ventas`), no de las bajadas de stock, que también serían reposiciones al revés.
  */
 export async function cargarDatosCompetencia(supabase: SupabaseClient, pais: { id: string; codigo: string; nombre: string }, plataforma: PlataformaId = "dropi"): Promise<DatosCompetencia | null> {
   const desde31 = new Date(Date.now() - 31 * 86_400_000).toISOString();
   const t = TABLAS[plataforma];
   const esDrop = plataforma === "drop";
+  const esEffi = plataforma === "effi";
   // Como `string`: armadas con el nombre de la tabla, el tipo de Supabase no sabe leerlas.
   const columnasProducto: string = `id, ${t.ids}, proveedor_nombre, nombre, foto_url, foto_huella, precio, stock, categoria, es_nuestro, estado, igual_a, igual_parecido, igual_metodo, primera_vez, ultima_vez`;
   const columnasStock: string = `producto_id, fecha, stock, stock_antes, ${t.productos}!inner(pais_id)`;
@@ -74,7 +79,7 @@ export async function cargarDatosCompetencia(supabase: SupabaseClient, pais: { i
         .from(t.historial)
         .select<string, { producto_id: string; fecha: string; stock: number; stock_antes: number }>(columnasStock)
         .eq(`${t.productos}.pais_id`, pais.id)
-        .eq("evento", "stock")
+        .eq("evento", esEffi ? "ventas" : "stock")
         .gte("fecha", desde31)
         .order("id")
         .range(a, b),
@@ -95,8 +100,10 @@ export async function cargarDatosCompetencia(supabase: SupabaseClient, pais: { i
   const ventas: VentaC[] = [];
   for (const c of stockR.data ?? []) {
     if (c.stock === null || c.stock_antes === null) continue;
-    cambiosDe.set(c.producto_id, [...(cambiosDe.get(c.producto_id) ?? []), { fecha: c.fecha, stock: c.stock, stockAntes: c.stock_antes }]);
-    if (c.stock < c.stock_antes) ventas.push({ fecha: c.fecha, productoId: c.producto_id, unidades: c.stock_antes - c.stock });
+    // Las ventas de Effi suben: con el signo contrario, `unidadesBajadas` las cuenta como cualquier otra salida.
+    const [despues, antes] = esEffi ? [-c.stock, -c.stock_antes] : [c.stock, c.stock_antes];
+    cambiosDe.set(c.producto_id, [...(cambiosDe.get(c.producto_id) ?? []), { fecha: c.fecha, stock: despues, stockAntes: antes }]);
+    if (despues < antes) ventas.push({ fecha: c.fecha, productoId: c.producto_id, unidades: antes - despues });
   }
   const dominio = DOMINIO[pais.codigo] ?? pais.codigo.toLowerCase();
   const filas = prods.data ?? [];
@@ -105,7 +112,7 @@ export async function cargarDatosCompetencia(supabase: SupabaseClient, pais: { i
     return {
       id: p.id,
       dropiId: esDrop ? 0 : Number(p.dropi_producto_id),
-      proveedorId: esDrop ? idDeProveedorDrop(p.proveedor_nombre) : Number(p.proveedor_dropi_id),
+      proveedorId: esDrop ? idDeProveedorDrop(p.proveedor_nombre) : esEffi ? Number(p.proveedor_effi_id) : Number(p.proveedor_dropi_id),
       proveedor: p.proveedor_nombre,
       nombre: p.nombre,
       foto: p.foto_url,
@@ -122,7 +129,8 @@ export async function cargarDatosCompetencia(supabase: SupabaseClient, pais: { i
       bajo1: unidadesBajadas(cambios, 1, ahora),
       bajo7: unidadesBajadas(cambios, 7, ahora),
       bajo30: unidadesBajadas(cambios, 30, ahora),
-      urlProveedor: esDrop ? CATALOGO_DROP : `https://app.dropi.${dominio}/dashboard/provider/${p.proveedor_dropi_id}/${encodeURIComponent(p.proveedor_nombre)}`,
+      ventasTotal: esEffi ? (p.ventas ?? null) : null,
+      urlProveedor: esDrop ? CATALOGO_DROP : esEffi ? `https://effi.com.co/app/articulo_dropshipping?proveedor=${p.proveedor_effi_id}` : `https://app.dropi.${dominio}/dashboard/provider/${p.proveedor_dropi_id}/${encodeURIComponent(p.proveedor_nombre)}`,
     };
   };
   const productos = filas.map(aProducto);
@@ -136,13 +144,14 @@ export async function cargarDatosCompetencia(supabase: SupabaseClient, pais: { i
   const hace7 = new Date(Date.now() - 7 * 86_400_000).toISOString();
   for (const p of productos) {
     if (p.esNuestro || p.estado !== "activo") continue;
-    const c = porProveedor.get(p.proveedorId) ?? { id: p.proveedorId, nombre: p.proveedor, url: p.urlProveedor, enlace: esDrop ? "Abrir el catálogo de Drop ↗" : "Abrir su página en Dropi ↗", productos: 0, iguales: 0, nuevos7: 0, bajo1: 0, bajo7: 0, bajo30: 0, primeraVez: p.primeraVez, vigilado: vigiladoDe(pais.codigo, p.proveedorId) };
+    const c = porProveedor.get(p.proveedorId) ?? { id: p.proveedorId, nombre: p.proveedor, url: p.urlProveedor, enlace: esDrop ? "Abrir el catálogo de Drop ↗" : esEffi ? "Abrir su catálogo en Effi ↗" : "Abrir su página en Dropi ↗", ventasTotal: esEffi ? 0 : null, productos: 0, iguales: 0, nuevos7: 0, bajo1: 0, bajo7: 0, bajo30: 0, primeraVez: p.primeraVez, vigilado: vigiladoDe(pais.codigo, p.proveedorId) };
     c.productos++;
     if (p.igualA) c.iguales++;
     if (corte && p.primeraVez > corte && p.primeraVez > hace7) c.nuevos7++;
     c.bajo1 += p.bajo1;
     c.bajo7 += p.bajo7;
     c.bajo30 += p.bajo30;
+    if (c.ventasTotal !== null) c.ventasTotal += p.ventasTotal ?? 0;
     if (p.primeraVez < c.primeraVez) c.primeraVez = p.primeraVez;
     porProveedor.set(p.proveedorId, c);
   }
@@ -159,7 +168,7 @@ export async function cargarDatosCompetencia(supabase: SupabaseClient, pais: { i
     plataforma,
     pais: pais.nombre,
     productos,
-    competidores: [...porProveedor.values()].sort((a, b) => b.bajo7 - a.bajo7 || b.productos - a.productos),
+    competidores: [...porProveedor.values()].sort((a, b) => b.bajo7 - a.bajo7 || (b.ventasTotal ?? 0) - (a.ventasTotal ?? 0) || b.productos - a.productos),
     alertas,
     bitacora,
     ultima: ultima ? { inicio: ultima.inicio, estado: ultima.estado, duracionMs: ultima.duracion_ms, productos: ultima.productos, proveedores: ultima.proveedores } : null,

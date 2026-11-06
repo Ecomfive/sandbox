@@ -57,6 +57,7 @@ function queFue(e: EventoCompetencia): { texto: string; tono: "success" | "destr
     return e.stock < e.stockAntes ? { texto: `Bajó el stock (vendió ${num(e.stockAntes - e.stock)})`, tono: "destructive" } : { texto: `Subió el stock (+${num(e.stock - e.stockAntes)})`, tono: "success" };
   if (e.evento === "precio" && e.precio !== null && e.precioAntes !== null)
     return e.precio < e.precioAntes ? { texto: "Bajó el precio", tono: "destructive" } : { texto: "Subió el precio", tono: "success" };
+  if (e.evento === "ventas" && e.stock !== null && e.stockAntes !== null) return { texto: `Vendió ${(e.stock - e.stockAntes).toLocaleString("es-PA")}: ${e.stockAntes.toLocaleString("es-PA")} → ${e.stock.toLocaleString("es-PA")} ventas`, tono: "success" };
   if (e.evento === "primera_vez") return { texto: "Lo vimos por primera vez", tono: "info" };
   if (e.evento === "desaparecio") return { texto: "Dejó de mostrarlo", tono: "neutral" };
   if (e.evento === "reaparecio") return { texto: "Lo volvió a mostrar", tono: "info" };

@@ -147,7 +147,7 @@ export interface EventoCompetencia {
   stockAntes: number | null;
 }
 
-/** El historial de un producto (para la comparación lado a lado), del más nuevo al más viejo. Un producto de Drop está en sus propias tablas: todo producto tiene su fila «primera vez», así que sin filas en Dropi es de Drop. */
+/** El historial de un producto (para la comparación lado a lado), del más nuevo al más viejo. Drop y Effi tienen sus propias tablas: todo producto tiene su fila «primera vez», así que se busca en cada una hasta encontrarlo. */
 export async function obtenerHistorialCompetencia(productoId: string): Promise<{ eventos?: EventoCompetencia[]; error?: string }> {
   const usuario = await getUsuarioActual();
   if (!usuario || !["producto", "compras", "analisis-competencia"].some((m) => usuario.modulos.includes(m))) return { error: "No tienes acceso." };
@@ -155,7 +155,8 @@ export async function obtenerHistorialCompetencia(productoId: string): Promise<{
   const supabase = createServiceClient();
   const leer = (tabla: string) => supabase.from(tabla).select("fecha, evento, precio, stock, precio_antes, stock_antes").eq("producto_id", productoId).order("fecha", { ascending: false }).limit(200);
   const dropi = await leer("competencia_historial");
-  const { data, error } = dropi.data?.length ? dropi : await leer("drop_competencia_historial");
+  const drop = dropi.data?.length ? dropi : await leer("drop_competencia_historial");
+  const { data, error } = drop.data?.length ? drop : await leer("effi_competencia_historial");
   if (error) return { error: error.message };
   const n = (v: unknown) => (v === null || v === undefined ? null : Number(v));
   return { eventos: (data ?? []).map((e) => ({ fecha: e.fecha, evento: e.evento, precio: n(e.precio), stock: e.stock, precioAntes: n(e.precio_antes), stockAntes: e.stock_antes })) };

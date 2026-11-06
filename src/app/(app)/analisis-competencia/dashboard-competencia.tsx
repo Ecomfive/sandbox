@@ -248,11 +248,11 @@ export function DashboardCompetencia({ datos }: { datos: DatosCompetencia }) {
       )}
 
       <div className="grid grid-cols-1 gap-5 min-[1100px]:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-        <Tarjeta id="c-ventas" titulo="Stock vendido por la competencia" extra={<span className="text-xs text-muted-foreground">unidades por día · {num(totalVendido)} en {NOMBRE_PERIODO[periodo]}</span>}>
+        <Tarjeta id="c-ventas" titulo={datos.plataforma === "effi" ? "Ventas de la competencia" : "Stock vendido por la competencia"} extra={<span className="text-xs text-muted-foreground">unidades por día · {num(totalVendido)} en {NOMBRE_PERIODO[periodo]}</span>}>
           <div className="h-[280px] p-2">
             {!hayVentas || !serie.length ? (
               <p className="p-2 text-sm text-muted-foreground">
-                {datos.busquedas > 1 ? "Sin bajadas de stock con estos filtros." : "Lo vendido se ve desde la segunda búsqueda: se cuenta lo que baja el stock entre una y otra."}
+                {datos.plataforma === "effi" ? "Sin ventas nuevas con estos filtros: se cuenta lo que suben las ventas de Effi entre búsquedas." : datos.busquedas > 1 ? "Sin bajadas de stock con estos filtros." : "Lo vendido se ve desde la segunda búsqueda: se cuenta lo que baja el stock entre una y otra."}
               </p>
             ) : (
               <ResponsiveContainer width="100%" height="100%">

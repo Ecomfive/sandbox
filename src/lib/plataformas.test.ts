@@ -12,7 +12,7 @@ describe("plataformas", () => {
     assert.equal(plataformaDisponible("dropi", "CR"), true);
   });
   it("qué plataformas hay en cada país", () => {
-    assert.deepEqual(plataformasDePais("CR").map((p) => p.id), ["dropi", "drop"]);
+    assert.deepEqual(plataformasDePais("CR").map((p) => p.id), ["dropi", "drop", "effi"]);
     assert.deepEqual(plataformasDePais("PA").map((p) => p.id), ["dropi"]);
   });
   it("un valor desconocido cae en Dropi", () => {

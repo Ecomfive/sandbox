@@ -342,7 +342,7 @@ export function TableroCompetencia({
       extra: perdiendo ? `${perdiendo} ${perdiendo === 1 ? "producto nuestro pierde" : "productos nuestros pierden"} en precio` : null,
       extraRojo: true,
     },
-    vendieron: { valor: cuantos("vendieron"), junto: `${num(vendido7)} unidades`, detalle: "Bajó su stock entre búsquedas" },
+    vendieron: { valor: cuantos("vendieron"), junto: `${num(vendido7)} unidades`, detalle: datos.plataforma === "effi" ? "Subieron sus ventas entre búsquedas" : "Bajó su stock entre búsquedas" },
     cambios: { valor: cuantos("cambios"), detalle: "Precio o stock distinto en la última búsqueda" },
     nuevos: { valor: cuantos("nuevos"), detalle: "Aparecieron después de la primera búsqueda" },
     novedades: {
@@ -476,10 +476,11 @@ function ProductosDelCompetidor({ productos, nuestros, busqueda }: { productos: 
     () =>
       productos
         .filter((p) => !busqueda || p.nombre.toLowerCase().includes(busqueda))
-        .sort((a, b) => Number(!!b.igualA) - Number(!!a.igualA) || b.bajo7 - a.bajo7 || b.bajo30 - a.bajo30 || (b.stock ?? 0) - (a.stock ?? 0)),
+        .sort((a, b) => Number(!!b.igualA) - Number(!!a.igualA) || b.bajo7 - a.bajo7 || b.bajo30 - a.bajo30 || (b.ventasTotal ?? 0) - (a.ventasTotal ?? 0) || (b.stock ?? 0) - (a.stock ?? 0)),
     [productos, busqueda],
   );
   const visibles = todos ? orden : orden.slice(0, PRIMEROS);
+  const conVentas = productos.some((p) => p.ventasTotal !== null);
   return (
     <div className="flex flex-col gap-2">
       <div className="overflow-x-auto rounded-lg border border-border bg-card">
@@ -490,6 +491,7 @@ function ProductosDelCompetidor({ productos, nuestros, busqueda }: { productos: 
               <th className={`${claseEncabezadoColumna} text-right`}>Su precio</th>
               <th className={claseEncabezadoColumna}>Igual a nuestro</th>
               <th className={`${claseEncabezadoColumna} text-right`}>Stock</th>
+              {conVentas && <th className={`${claseEncabezadoColumna} text-right`}>Ventas</th>}
               <th className={`${claseEncabezadoColumna} text-right`}>Vendido 7 d</th>
               <th className={`${claseEncabezadoColumna} text-right`}>30 d</th>
             </tr>
@@ -538,6 +540,7 @@ function ProductosDelCompetidor({ productos, nuestros, busqueda }: { productos: 
                       )}
                     </td>
                     <td className={`${claseCeldaColumna} text-right tabular-nums`}>{num(p.stock)}</td>
+                    {conVentas && <td className={`${claseCeldaColumna} text-right font-medium tabular-nums`}>{num(p.ventasTotal)}</td>}
                     <td className={`${claseCeldaColumna} text-right tabular-nums ${p.bajo7 ? "text-destructive" : "text-muted-foreground"}`}>{p.bajo7 ? `−${num(p.bajo7)}` : "0"}</td>
                     <td className={`${claseCeldaColumna} text-right tabular-nums ${p.bajo30 ? "text-destructive" : "text-muted-foreground"}`}>{p.bajo30 ? `−${num(p.bajo30)}` : "0"}</td>
                   </tr>
@@ -598,6 +601,7 @@ function TarjetaCompetidor({
           <span className="text-xs text-muted-foreground">{c.cambiosHoy ? `${c.cambiosHoy} ${c.cambiosHoy === 1 ? "cambio" : "cambios"} en la última búsqueda` : "sin cambios en la última búsqueda"}</span>
         </span>
         <Dato titulo="Productos" valor={num(c.productos)} />
+        {c.ventasTotal !== null && <Dato titulo="Ventas totales" valor={num(c.ventasTotal)} />}
         <Dato titulo="Iguales a los nuestros" valor={num(c.igualesN)} extra={c.baratos ? <Badge tone="destructive">{c.baratos} más baratos</Badge> : null} />
         <Dato titulo="Vendido 7 d" valor={num(c.bajo7)} />
         <Dato titulo="Vendido 30 d" valor={num(c.bajo30)} />
@@ -667,7 +671,7 @@ export function VistaCompetidores({ datos, puedeEscribir }: { datos: DatosCompet
             (!busqueda || c.nombre.toLowerCase().includes(busqueda) || !!c.vigilado?.toLowerCase().includes(busqueda) || (porCompetidor.get(c.id) ?? []).some((p) => p.nombre.toLowerCase().includes(busqueda))),
         )
         .sort((a, b) =>
-          orden === "vendido" ? b.bajo7 - a.bajo7 || b.bajo30 - a.bajo30 || b.productos - a.productos : orden === "iguales" ? b.igualesN - a.igualesN || b.bajo7 - a.bajo7 : b.productos - a.productos,
+          orden === "vendido" ? b.bajo7 - a.bajo7 || b.bajo30 - a.bajo30 || (b.ventasTotal ?? 0) - (a.ventasTotal ?? 0) || b.productos - a.productos : orden === "iguales" ? b.igualesN - a.igualesN || b.bajo7 - a.bajo7 : b.productos - a.productos,
         ),
     [conDatos, porCompetidor, tarjeta, busqueda, orden],
   );
