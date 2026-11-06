@@ -5,7 +5,7 @@ import { getPaisActual } from "@/lib/pais";
 import { requireModulo } from "@/lib/auth";
 import { traerTodasConError } from "@/lib/supabase/paginar";
 import type { FilaStock } from "./def-stock";
-import { TablaStock } from "./tabla-stock";
+import { ListaStock } from "./lista-stock";
 
 export const metadata = { title: "Inventario" };
 
@@ -80,7 +80,7 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
           No se pudo cargar el inventario.
         </p>
       ) : (
-        <TablaStock
+        <ListaStock
           key={bodegaElegida}
           filas={filas}
           bodegas={bodegas.map((b) => ({ id: b.id as string, nombre: b.nombre as string, externa: b.tipo === "externa" }))}

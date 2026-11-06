@@ -27,6 +27,7 @@ export function ListaDatos<F>({
   etiquetaGrupo,
   formatearTotal,
   encima,
+  resumen,
   porPagina = POR_PAGINA,
   accionPrincipal,
   variante = "tarjetas",
@@ -44,6 +45,8 @@ export function ListaDatos<F>({
   formatearTotal?: (total: number) => string;
   /** Bloque entre la barra y la lista que necesita saber qué filas se ven (p. ej. seleccionar todas). */
   encima?: (visibles: F[]) => ReactNode;
+  /** Un tablero encima de la barra, con **todas** las filas que dejan ver los filtros y la búsqueda (no solo la página). */
+  resumen?: (filas: F[]) => ReactNode;
   /** Tarjetas por página cuando no hay filtros ni grupos (50 por defecto); con menos que eso no se ve la paginación. */
   porPagina?: number;
   /** El botón «Agregar» del módulo (`FichaCrear`), al final de la fila de botones de la barra, junto a Descargar. */
@@ -97,6 +100,7 @@ export function ListaDatos<F>({
 
   return (
     <div ref={raiz} className="flex flex-col gap-3">
+      {resumen?.(resultado.filas)}
       <div className="min-w-0 rounded-xl border border-border bg-card [&>div]:border-b-0">
         <BarraHerramientas
           def={def}

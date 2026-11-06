@@ -40,15 +40,16 @@ function valorDeCampo<F>(campo: CampoDef<F>, fila: F, etiquetas: Map<string, str
 /** Encabezado y una línea por fila: primero las columnas de `csvAntes` de la tabla y luego cada campo. */
 export function filasACsv<F>(def: DefTabla<F>, filas: F[]): string {
   const antes = def.csvAntes ?? [];
+  const campos = def.campos.filter((c) => !c.sinCsv);
   const etiquetas = new Map<string, Map<string, string>>();
-  for (const campo of def.campos) {
+  for (const campo of campos) {
     if (campo.tipo === "seleccion") {
       etiquetas.set(campo.id, new Map(opcionesDeSeleccion(def, filas, campo.id).map((o) => [o.valor, o.etiqueta])));
     }
   }
-  const lineas = [[...antes.map((a) => a.etiqueta), ...def.campos.map((c) => c.etiqueta)].map(celdaCsv).join(",")];
+  const lineas = [[...antes.map((a) => a.etiqueta), ...campos.map((c) => c.etiqueta)].map(celdaCsv).join(",")];
   for (const fila of filas) {
-    const celdas = [...antes.map((a) => a.valor(fila)), ...def.campos.map((c) => valorDeCampo(c, fila, etiquetas.get(c.id)))];
+    const celdas = [...antes.map((a) => a.valor(fila)), ...campos.map((c) => valorDeCampo(c, fila, etiquetas.get(c.id)))];
     lineas.push(celdas.map(celdaCsv).join(","));
   }
   return lineas.join("\r\n");

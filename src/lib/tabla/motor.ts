@@ -14,6 +14,8 @@ export interface Opcion {
 interface CampoComun {
   id: string;
   etiqueta: string;
+  /** No sale en «Descargar»: solo filtra o busca, y su dato ya va en `csvAntes` o lo dice otra columna. */
+  sinCsv?: boolean;
 }
 
 export interface CampoSeleccion<F> extends CampoComun {
