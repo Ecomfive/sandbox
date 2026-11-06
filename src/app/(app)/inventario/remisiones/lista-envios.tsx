@@ -10,6 +10,7 @@ import { MiniaturaFoto } from "@/components/ui/miniatura-foto";
 import { useToast } from "@/components/ui/toast";
 import { formatearTiempoRelativo } from "@/lib/formato";
 import { recibirEnvioDropi } from "../stock-actions";
+import { PedirCorreccion } from "./correcciones";
 
 export interface FilaEnvio {
   id: string;
@@ -24,7 +25,7 @@ export interface FilaEnvio {
   enviadoEn: string;
   enviada: number;
   recibida: number | null;
-  estado: "en_camino" | "recibido";
+  estado: "en_camino" | "recibido" | "anulado";
   referencia: string | null;
   motivo: string | null;
 }
@@ -95,7 +96,20 @@ function Recibir({ fila }: { fila: FilaEnvio }) {
 }
 
 /** Las remisiones a bodegas externas: las que siguen en camino arriba, con su campo para anotar lo que llegó. */
-export function ListaEnvios({ filas, puedeEscribir }: { filas: FilaEnvio[]; puedeEscribir: boolean }) {
+export function ListaEnvios({
+  filas,
+  puedeEscribir,
+  conPendiente,
+  resueltas,
+}: {
+  filas: FilaEnvio[];
+  puedeEscribir: boolean;
+  /** Las líneas con una corrección esperando autorización. */
+  conPendiente: string[];
+  /** La última corrección resuelta de cada línea, como texto. */
+  resueltas: Record<string, string>;
+}) {
+  const pendientes = new Set(conPendiente);
   const enCamino = filas.filter((f) => f.estado === "en_camino").length;
   const conDiferencia = filas.filter((f) => f.estado === "recibido" && f.recibida !== f.enviada).length;
   return (
@@ -165,6 +179,8 @@ export function ListaEnvios({ filas, puedeEscribir }: { filas: FilaEnvio[]; pued
                     ) : (
                       <Badge tone="warning">En camino</Badge>
                     )
+                  ) : f.estado === "anulado" ? (
+                    <Badge tone="neutral">Anulada</Badge>
                   ) : f.recibida === f.enviada ? (
                     <Badge tone="success">Llegó completo</Badge>
                   ) : (
@@ -174,6 +190,20 @@ export function ListaEnvios({ filas, puedeEscribir }: { filas: FilaEnvio[]; pued
                       </Badge>
                       {f.motivo && <span className="text-xs text-muted-foreground">{f.motivo}</span>}
                     </span>
+                  )}
+                  {resueltas[f.id] && <span className="mt-1 block text-xs text-muted-foreground">{resueltas[f.id]}</span>}
+                  {pendientes.has(f.id) ? (
+                    <span className="mt-1 block">
+                      <Badge tone="warning">Corrección por autorizar</Badge>
+                    </span>
+                  ) : (
+                    puedeEscribir &&
+                    f.remisionId &&
+                    f.estado !== "anulado" && (
+                      <span className="mt-1 block">
+                        <PedirCorreccion envioId={f.id} tipo={f.estado === "en_camino" ? "anular" : "recibida"} codigo={f.codigo} enviada={f.enviada} recibida={f.recibida} />
+                      </span>
+                    )
                   )}
                 </td>
               </tr>

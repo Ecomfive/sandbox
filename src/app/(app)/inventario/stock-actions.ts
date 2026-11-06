@@ -87,6 +87,7 @@ export async function obtenerStockDeSku(skuId: string): Promise<{ bodegas: Stock
     supabase
       .from("wms_envios_dropi")
       .select("id, enviado_en, enviada, recibida, estado, referencia, motivo_diferencia, wms_bodegas!wms_envios_dropi_bodega_origen_id_fkey!inner(nombre, pais_id), destino:wms_bodegas!wms_envios_dropi_bodega_dropi_id_fkey(nombre)")
+      .neq("estado", "anulado")
       .eq("sku_maestro_id", skuId)
       .eq("wms_bodegas.pais_id", pais.id)
       .order("enviado_en", { ascending: false })

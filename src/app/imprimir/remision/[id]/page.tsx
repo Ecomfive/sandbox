@@ -25,7 +25,7 @@ export default async function RemisionImprimirPage({ params }: { params: Promise
     .eq("id", id)
     .maybeSingle();
   if (!r || !(await puedeVerBodega(supabase, usuario.paisesPermitidos, r.bodega_origen_id as string))) notFound();
-  const { data: lineas } = await supabase.from("wms_envios_dropi").select("id, enviada, skus_maestros(codigo, nombre, codigo_barras)").eq("remision_id", id).order("id");
+  const { data: lineas } = await supabase.from("wms_envios_dropi").select("id, enviada, skus_maestros(codigo, nombre, codigo_barras)").eq("remision_id", id).neq("estado", "anulado").order("id");
 
   const origen = uno(r.origen as { nombre: string; paises: { nombre: string } | { nombre: string }[] | null } | { nombre: string; paises: { nombre: string } | { nombre: string }[] | null }[] | null);
   const destino = uno(r.destino as { nombre: string } | { nombre: string }[] | null);

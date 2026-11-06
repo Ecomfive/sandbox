@@ -4,6 +4,8 @@ import { requireModulo } from "@/lib/auth";
 import { getPaisActual } from "@/lib/pais";
 import { createServiceClient } from "@/lib/supabase/server";
 import { traerTodasConError } from "@/lib/supabase/paginar";
+import { textoCorreccion, type TipoCorreccion } from "@/lib/wms/correccion-remision";
+import { CorreccionesPendientes, type CorreccionVista } from "./correcciones";
 import { ListaEnvios, type FilaEnvio } from "./lista-envios";
 import { NuevaRemision, type StockPorBodega } from "./nueva-remision";
 
@@ -51,6 +53,41 @@ export default async function RemisionesPage() {
   });
 
   const puedeEscribir = !usuario.modulosSoloLectura.includes("inventario");
+  // Las peticiones de corrección de estas líneas (migración 0234): sin ella, la lista se ve igual.
+  const ids = filas.map((f) => f.id);
+  const { data: filasCorreccion } = ids.length
+    ? await supabase
+        .from("wms_correcciones_remision")
+        .select("id, envio_id, tipo, recibida_antes, recibida_nueva, motivo, estado, solicitante_nombre, autoriza_a, resuelta_por_nombre, nota_resolucion")
+        .in("envio_id", ids)
+        .order("creado_en", { ascending: false })
+    : { data: [] };
+  const correcciones: CorreccionVista[] = (filasCorreccion ?? []).map((c) => {
+    const f = filas.find((x) => x.id === c.envio_id);
+    return {
+      id: c.id as string,
+      envioId: c.envio_id as string,
+      tipo: c.tipo as TipoCorreccion,
+      recibidaAntes: c.recibida_antes as number | null,
+      recibidaNueva: c.recibida_nueva as number | null,
+      enviada: f?.enviada ?? 0,
+      motivo: c.motivo as string,
+      estado: c.estado as CorreccionVista["estado"],
+      solicitante: c.solicitante_nombre as string,
+      resueltaPor: (c.resuelta_por_nombre as string | null) ?? null,
+      nota: (c.nota_resolucion as string | null) ?? null,
+      codigo: f?.codigo ?? "—",
+      remision: f?.referencia ?? null,
+      meToca: puedeEscribir && ((c.autoriza_a as string[] | null) ?? []).includes(usuario.id),
+    };
+  });
+  const pendientes = correcciones.filter((c) => c.estado === "pendiente");
+  const conPendiente = new Set(pendientes.map((c) => c.envioId));
+  const ultimas = new Map<string, string>();
+  for (const c of correcciones) {
+    if (c.estado === "pendiente" || ultimas.has(c.envioId)) continue;
+    ultimas.set(c.envioId, `${c.estado === "autorizada" ? "Autorizó" : "Rechazó"} ${c.resueltaPor ?? "—"}: ${textoCorreccion(c)}${c.nota ? ` · ${c.nota}` : ""}`);
+  }
   const { data: bodegas } = await supabase.from("wms_bodegas").select("id, nombre, tipo").eq("pais_id", pais.id).eq("activa", true).order("nombre");
   const propias = (bodegas ?? []).filter((b) => b.tipo === "propia").map((b) => ({ id: b.id as string, nombre: b.nombre as string }));
   const externas = (bodegas ?? []).filter((b) => b.tipo === "externa").map((b) => ({ id: b.id as string, nombre: b.nombre as string }));
@@ -78,12 +115,13 @@ export default async function RemisionesPage() {
           <NuevaRemision propias={propias} externas={externas} productos={opciones} stock={stock} />
         </div>
       )}
+      <CorreccionesPendientes pendientes={pendientes} />
       {error ? (
         <p role="alert" className="rounded-lg border border-border bg-card px-4 py-3 text-sm text-destructive">
           {/remision_id/.test(error.message) ? "Falta correr la migración 0233 en la base." : "No se pudieron cargar las remisiones."}
         </p>
       ) : (
-        <ListaEnvios filas={filas} puedeEscribir={puedeEscribir} />
+        <ListaEnvios filas={filas} puedeEscribir={puedeEscribir} conPendiente={[...conPendiente]} resueltas={Object.fromEntries(ultimas)} />
       )}
     </Pagina>
   );
