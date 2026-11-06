@@ -1,5 +1,6 @@
 "use client";
 
+import { Bandera } from "@/components/paises/bandera";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
@@ -30,7 +31,12 @@ function VentasDePais({ v, conPais }: { v: VentasDropiPais; conPais: boolean }) 
   const cambio = v.netas30Antes ? Math.round(((v.netas30 - v.netas30Antes) / v.netas30Antes) * 100) : null;
   return (
     <div className="flex flex-col gap-3">
-      {conPais && <h4 className="m-0 text-xs font-medium text-muted-foreground">{v.pais}</h4>}
+      {conPais && (
+        <h4 className="m-0 inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+          <Bandera codigo={v.codigo} />
+          {v.pais}
+        </h4>
+      )}
       <dl className="m-0 grid grid-cols-3 gap-3">
         <Cifra titulo="Netas · 30 días" valor={entero(v.netas30)} detalle={cambio === null ? undefined : `${cambio > 0 ? "+" : ""}${cambio} % vs. 30 anteriores`} />
         <Cifra titulo="Netas en total" valor={entero(v.netasTotal)} detalle={v.primeraVenta ? `desde ${fecha(v.primeraVenta)}` : undefined} />
