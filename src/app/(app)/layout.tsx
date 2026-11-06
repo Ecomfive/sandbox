@@ -14,7 +14,8 @@ import { getUsuarioActual, getUsuarioIdSesion, getUsuarioSesion } from "@/lib/au
 import { tieneContrasenaTemporal } from "@/lib/cuenta/contrasena";
 import { getPaisActual } from "@/lib/pais";
 import { obtenerPlataformasPais } from "@/lib/pais-plataformas";
-import { construirAreas } from "@/lib/nav-data";
+import { colapsarGestionDeIds, construirAreas } from "@/lib/nav-data";
+import { getPlataformaActual } from "@/lib/plataforma-actual";
 import { paginasBuscables } from "@/lib/paleta";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { REVISAN_CAMBIOS } from "@/lib/ayuda/actualizaciones";
@@ -79,6 +80,8 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       ]
     : [];
   const paginas = paginasBuscables(areas, usuario?.modulos ?? null, pestanasOcultas);
+  // Gestión de IDs es una sola entrada del menú (Dropi, Drop o Effi según la plataforma de la barra); las migas y el buscador siguen viendo las tres.
+  const areasMenu = colapsarGestionDeIds(areas, { plataforma: await getPlataformaActual(paisActual.codigo), codigoPais: paisActual.codigo, modulos: usuario?.modulos ?? null });
 
   return (
     <ProveedorModulos modulos={usuario?.modulos ?? null}>
@@ -87,7 +90,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       {usuario && <LatidoPresencia />}
       {usuario?.vistaPrevia && <BannerVistaPrevia rolNombre={usuario.vistaPrevia.rolNombre} />}
       <div className="flex min-h-full">
-        <Sidebar modulosPermitidos={usuario?.modulos ?? null} areas={areas} favoritos={favoritos} pendientes={pendientes} verActualizaciones={!!usuario && REVISAN_CAMBIOS.has(usuario.id)} />
+        <Sidebar modulosPermitidos={usuario?.modulos ?? null} areas={areasMenu} favoritos={favoritos} pendientes={pendientes} verActualizaciones={!!usuario && REVISAN_CAMBIOS.has(usuario.id)} />
         <div className="flex min-h-full min-w-0 flex-1 flex-col">
           <NavBar paginas={paginas} pendientes={pendientes} />
           <BarraMigas areas={areas} favoritos={favoritos} pestanasOcultas={pestanasOcultas} verAccesos={!!usuario && esAdministrador(usuario)} />

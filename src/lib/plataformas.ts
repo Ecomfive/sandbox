@@ -40,3 +40,19 @@ export function plataformaDisponible(id: PlataformaId, codigoPais: string): bool
 
 /** Las plataformas que existen en un país. */
 export const plataformasDePais = (codigoPais: string): Plataforma[] => PLATAFORMAS.filter((p) => plataformaDisponible(p.id, codigoPais));
+
+
+/**
+ * Gestión de IDs (6 nov 2026, pedido de Hernán): una sola entrada del menú y un selector arriba de cada gestión para pasar de una plataforma a otra. Cada plataforma sigue
+ * siendo su propia ruta y su propio módulo de permisos; esto solo dice cuál es.
+ */
+export const GESTION_IDS: Record<PlataformaId, { ruta: string; modulo: string }> = {
+  dropi: { ruta: "/publicaciones-dropi", modulo: "publicaciones-dropi" },
+  drop: { ruta: "/publicaciones-drop", modulo: "publicaciones-drop" },
+  effi: { ruta: "/publicaciones-effi", modulo: "publicaciones-effi" },
+};
+
+/** Las gestiones de IDs que una persona puede abrir en un país, en el orden de las plataformas (`modulos` null = todos los módulos). */
+export function gestionesDePais(codigoPais: string, modulos: readonly string[] | null): Plataforma[] {
+  return plataformasDePais(codigoPais).filter((p) => modulos === null || modulos.includes(GESTION_IDS[p.id].modulo));
+}

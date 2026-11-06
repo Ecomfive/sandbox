@@ -382,6 +382,10 @@ export const GUIAS: GuiaModulo[] = [
     resumen: "Los productos que tenemos publicados en Dropi como proveedor: precio, margen, ventas, stock y lo que necesita cada uno.",
     secciones: [
       {
+        titulo: "Cambiar entre Dropi, Drop y Effi",
+        pasos: ["En el menú hay una sola entrada, «Gestión de IDs». Con Costa Rica elegida, arriba de la lista salen los logos de Dropi, Drop y Effi: pulsa el de la plataforma que quieres gestionar y se abre su gestión (solo salen las que tu rol puede abrir). Con otro país solo existe Dropi y no sale el selector."],
+      },
+      {
         titulo: "Calculadora de margen",
         pasos: [
           "Arriba de la lista, «Calculadora» abre la calculadora. Elige un producto por su SKU (la lista es por SKU, no por publicación ni por ID de Dropi; busca por el código o el nombre) para llenar sus datos con los de su publicación pública, o escribe un producto nuevo.",
@@ -882,6 +886,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-11-06", titulo: "Gestión de IDs: una sola entrada con Dropi, Drop y Effi", texto: "En el menú de Operación (Proveeduría) ya no hay tres entradas: hay una sola, «Gestión de IDs». Con Costa Rica elegida, arriba de cada gestión salen los logos de Dropi, Drop y Effi: pulsa uno y pasas a la gestión de esa plataforma. El logo de la entrada del menú cambia con la plataforma donde estás. Es el mismo botón de Análisis de competencia, y la que elijas es la misma plataforma de la barra de arriba (junto al país). Drop y Effi solo existen en Costa Rica, así que con otro país el menú lleva directo a Gestión de IDs Dropi y no sale el selector. Solo aparecen las plataformas cuyo módulo puedes abrir.", modulo: "publicaciones-dropi", href: "/publicaciones-dropi" },
   { fecha: "2026-11-06", titulo: "Medición de uso en otras plataformas", texto: "La extensión «Ecomfive · Uso» cuenta los minutos activos en Dropi, Effi, Drop y Shopify y en qué sección, para saber qué falta traer al sistema. No lee las páginas, no guarda pedidos ni clientes y no ve ningún otro sitio. Solo Hernán y Alcides ven el resultado, en Uso del sistema de Gestión de IDs Dropi: cada persona con su tiempo dentro del sistema y en cada plataforma.", modulo: "publicaciones-dropi" },
   { fecha: "2026-11-06", titulo: "Uso del sistema por persona", texto: "La pestaña Uso del sistema ahora abre en «Personas»: cada persona del equipo con su tiempo activo y qué porcentaje de ese tiempo pasó en CRM, IDs, Producto, Compras, Inventario y las demás áreas, y dónde no entró. Debajo, lo que hoy se puede contar afuera: los WhatsApp enviados desde el CRM contra los del celular, por número, y las publicaciones creadas en Dropi. Lo de antes sigue en «Publicaciones». El tiempo dentro de Dropi, Effi, Drop o Shopify todavía no se mide.", modulo: "publicaciones-dropi" },
   { fecha: "2026-11-06", titulo: "Inventario de Costa Rica: el stock de las plataformas", texto: "En Costa Rica, Inventario ahora muestra lo que hay de cada producto en Dropi, Effi y Drop: una columna «En plataformas», una tarjeta arriba con el total y el detalle en la ficha del producto, junto a lo de la Oficina. Son las últimas lecturas de cada plataforma, y debajo de las tarjetas se ve cuándo se hizo cada una; si una tiene más de 2 días sale en ámbar. Solo se ve: no se cambia desde aquí. Dunamixfy todavía no está conectado.", modulo: "inventario", href: "/inventario" },
