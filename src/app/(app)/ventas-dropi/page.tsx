@@ -2,6 +2,7 @@ import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { requireModulo } from "@/lib/auth";
 import { getPaisActual } from "@/lib/pais";
+import { plataformaDe, plataformasDePais, vistaVentasValida } from "@/lib/plataformas";
 import { dineroPorMes, margen, utilidad, type DineroDia } from "@/lib/publicaciones/dinero";
 import { cargarStockProveedor, stockVigente } from "@/lib/publicaciones/proveedor-datos";
 import { fechaHoraLectura } from "@/lib/publicaciones/sincronizar-dropi";
@@ -9,9 +10,10 @@ import { agruparProductos, resumirProductos, restarDias, totalesPorDia, totalesP
 import { traerTodasConError } from "@/lib/supabase/paginar";
 import { traerDineroPorMes, traerVentasDiarias } from "@/lib/publicaciones/ventas-compactas";
 import { createServiceClient } from "@/lib/supabase/server";
+import { SelectorVistaVentas } from "./selector-vista-ventas";
 import { TableroVentas, type DineroVentas, type DropshipperVentas, type ProductoVentas } from "./tablero-ventas";
 
-export const metadata = { title: "Ventas Dropi" };
+export const metadata = { title: "Ventas Proveeduría" };
 
 export const dynamic = "force-dynamic";
 
@@ -19,20 +21,39 @@ export const dynamic = "force-dynamic";
 const MESES_ATRAS = 13;
 
 /**
- * Desempeño › Ventas Dropi: cuánto vende cada producto de ECOMFIVE en Dropi (del país de la barra), qué se está acabando, qué
- * crece y qué cae, y quién vende. Sale del Historial de Existencia de Dropi que carga scripts/importar-ventas-dropi.ts
- * (migración 0120); muestra la última carga.
+ * Desempeño › Ventas Proveeduría (antes «Ventas Dropi»; 7 nov 2026, pedido de Hernán): cuánto vende cada producto de ECOMFIVE (del país de la barra), qué se está acabando, qué
+ * crece y qué cae, y quién vende. Con más de una plataforma en el país (Costa Rica: Dropi, Drop y Effi) arriba hay un selector: «Todas» (el análisis general) o una sola plataforma
+ * (`?ver=`). Hoy solo hay datos de Dropi: sale del Historial de Existencia que carga scripts/importar-ventas-dropi.ts (migración 0120), muestra la última carga, y «Todas» es lo mismo
+ * que Dropi; las ventas de Drop y Effi todavía no se leen, así que su vista lo dice. Cuando se lean, las consultas de abajo se vuelven por plataforma y «Todas» las suma.
+ * La ruta y el módulo de permisos siguen siendo `ventas-dropi`.
  */
-export default async function VentasDropiPage() {
+export default async function VentasDropiPage({ searchParams }: { searchParams: Promise<{ ver?: string | string[] }> }) {
   await requireModulo("ventas-dropi");
+  const { ver } = await searchParams;
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
+  const vista = vistaVentasValida(Array.isArray(ver) ? ver[0] : ver, pais.codigo);
+  const selector = <SelectorVistaVentas vista={vista} codigoPais={pais.codigo} />;
+
+  // Drop y Effi: la plataforma existe en el país, pero sus ventas todavía no se leen.
+  if (vista === "drop" || vista === "effi") {
+    return (
+      <Pagina ancho="ancha" className="flex flex-col gap-6">
+        <EncabezadoPagina titulo="Ventas Proveeduría" oculto />
+        {selector}
+        <p role="status" className="rounded-xl border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">
+          Todavía no se leen las ventas de {plataformaDe(vista).nombre}. Cuando se conecten, saldrán aquí y también sumarán en «Todas».
+        </p>
+      </Pagina>
+    );
+  }
 
   const { data: carga, error: errorCarga } = await supabase.from("dropi_ventas_cargas").select("corte, productos, movimientos").eq("pais_id", pais.id).order("corte", { ascending: false }).limit(1).maybeSingle();
   if (errorCarga || !carga) {
     return (
       <Pagina ancho="ancha" className="flex flex-col gap-6">
-        <EncabezadoPagina titulo="Ventas Dropi" oculto />
+        <EncabezadoPagina titulo="Ventas Proveeduría" oculto />
+        {selector}
         <p role={errorCarga ? "alert" : "status"} className="rounded-lg border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
           {errorCarga ? "No se pudieron cargar las ventas. Falta correr en Supabase la migración 0120." : `Todavía no hay ventas de Dropi cargadas para ${pais.nombre}.`}
         </p>
@@ -57,7 +78,8 @@ export default async function VentasDropiPage() {
   if (productosR.error || diasR.error || dsR.error) {
     return (
       <Pagina ancho="ancha" className="flex flex-col gap-6">
-        <EncabezadoPagina titulo="Ventas Dropi" oculto />
+        <EncabezadoPagina titulo="Ventas Proveeduría" oculto />
+        {selector}
         <p role="alert" className="rounded-lg border border-border bg-card px-4 py-3 text-sm text-destructive">
           No se pudieron cargar las ventas. Vuelve a intentarlo.
         </p>
@@ -160,7 +182,13 @@ export default async function VentasDropiPage() {
 
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
-      <EncabezadoPagina titulo="Ventas Dropi" oculto />
+      <EncabezadoPagina titulo="Ventas Proveeduría" oculto />
+      {selector}
+      {vista === "todas" && plataformasDePais(pais.codigo).length > 1 && (
+        <p role="status" className="m-0 -mt-3 text-xs text-muted-foreground">
+          Por ahora «Todas» solo suma Dropi: las ventas de Drop y Effi todavía no se leen.
+        </p>
+      )}
       <TableroVentas
         corte={corte}
         stockLeido={stockActual ? fechaHoraLectura(stockActual.leidoEn) : null}

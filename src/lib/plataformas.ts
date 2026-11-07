@@ -56,3 +56,15 @@ export const GESTION_IDS: Record<PlataformaId, { ruta: string; modulo: string }>
 export function gestionesDePais(codigoPais: string, modulos: readonly string[] | null): Plataforma[] {
   return plataformasDePais(codigoPais).filter((p) => modulos === null || modulos.includes(GESTION_IDS[p.id].modulo));
 }
+
+/**
+ * Ventas Proveeduría (7 nov 2026, pedido de Hernán): las ventas de todas las plataformas juntas («todas») o de una sola. Es un parámetro de la página (`?ver=`), no la plataforma de la barra
+ * de arriba: la barra no tiene «todas». Solo hay datos de Dropi; Drop y Effi existen pero sus ventas todavía no se leen.
+ */
+export type VistaVentas = "todas" | PlataformaId;
+
+/** La vista pedida en la dirección; si no existe o la plataforma no está en ese país, «todas». */
+export function vistaVentasValida(valor: unknown, codigoPais: string): VistaVentas {
+  const id = PLATAFORMAS.find((p) => p.id === valor)?.id;
+  return id && plataformaDisponible(id, codigoPais) ? id : "todas";
+}

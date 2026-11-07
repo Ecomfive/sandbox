@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { GESTION_IDS, PAIS_DE_DROP, gestionesDePais, plataformaDisponible, plataformaValida, plataformasDePais } from "./plataformas";
+import { GESTION_IDS, PAIS_DE_DROP, gestionesDePais, plataformaDisponible, plataformaValida, plataformasDePais, vistaVentasValida } from "./plataformas";
 
 describe("plataformas", () => {
   it("Drop es solo de Costa Rica; Dropi está en todos los países", () => {
@@ -31,5 +31,13 @@ describe("plataformas", () => {
     assert.deepEqual(gestionesDePais("CR", ["publicaciones-dropi", "publicaciones-effi"]).map((p) => p.id), ["dropi", "effi"]);
     assert.deepEqual(gestionesDePais("PA", null).map((p) => p.id), ["dropi"]);
     assert.deepEqual(gestionesDePais("CR", ["producto"]).map((p) => p.id), []);
+  });
+  it("Ventas Proveeduría: «todas» o una plataforma que exista en el país", () => {
+    assert.equal(vistaVentasValida("drop", "CR"), "drop");
+    assert.equal(vistaVentasValida("effi", "CR"), "effi");
+    assert.equal(vistaVentasValida("dropi", "PA"), "dropi");
+    assert.equal(vistaVentasValida("drop", "PA"), "todas");
+    assert.equal(vistaVentasValida("otra", "CR"), "todas");
+    assert.equal(vistaVentasValida(undefined, "CR"), "todas");
   });
 });

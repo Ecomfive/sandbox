@@ -107,7 +107,7 @@ export interface FilaPublicacion {
   sinEnvioCamino: number;
   /** Si no está vinculada: el producto sugerido y cómo se encontró. */
   sugerencia: SugerenciaVista | null;
-  /** Sus ventas en Dropi (Desempeño › Ventas Dropi); `null` si no tiene datos. */
+  /** Sus ventas en Dropi (Desempeño › Ventas Proveeduría); `null` si no tiene datos. */
   ventas: VentasPublicacion | null;
   /** Cómo está en Dropi según lo que reporta Dropi (ya no se marca a mano). */
   enDropi: EnDropi;

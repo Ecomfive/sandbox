@@ -1,4 +1,4 @@
-// Compras › Reponer: qué comprar según lo que se vende en Dropi (Desempeño › Ventas Dropi). Lógica pura, sin base ni React.
+// Compras › Reponer: qué comprar según lo que se vende en Dropi (Desempeño › Ventas Proveeduría). Lógica pura, sin base ni React.
 //
 // Un producto del sistema puede estar publicado varias veces en Dropi (pública y privadas): se suman sus ventas y su stock, porque
 // la compra es una sola. Lo que ya viene en compras abiertas se descuenta de lo sugerido.
