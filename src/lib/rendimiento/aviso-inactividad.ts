@@ -1,12 +1,9 @@
-// Aviso de inactividad (7 nov 2026, pedido de Alcides): a las personas de esta lista el sistema les muestra, a la vista, que lleva 5 minutos
-// sin actividad, y al volver, cuánto tiempo estuvo así. Es la misma regla con que Equipo › Rendimiento deja de contar un minuto como
+// Aviso de inactividad (7 nov 2026, pedido de Alcides): a las personas marcadas en Configuración › «Aviso de inactividad»
+// (`perfiles.aviso_inactividad`, migración 0249) el sistema les muestra que llevan 5 minutos sin actividad, y bloquea hasta «Entendido». Es la misma regla con que Equipo › Rendimiento deja de contar un minuto como
 // activo (mouse, teclado, desplazarse o tocar la pantalla en los últimos 5 minutos). Solo avisa a la persona: no guarda nada nuevo.
 // Sin base ni React, con prueba.
 
 import { duracion, ZONA } from "./jornada";
-
-/** A quién se le muestra (por id de perfil). Hoy solo Nicol Muñoz, de Atención al cliente. Para sumar a alguien, se agrega su id. */
-export const AVISO_INACTIVIDAD: ReadonlySet<string> = new Set(["3abaec4c-3689-4cc9-94c5-613003a8680d"]);
 
 /** Los minutos sin usar el sistema a partir de los cuales sale el aviso (los mismos que Rendimiento, `SIN_USO_MS` del latido). */
 export const MINUTOS_AVISO = 5;

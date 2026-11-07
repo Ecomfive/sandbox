@@ -5,7 +5,6 @@ import { BannerVistaPrevia } from "@/components/banner-vista-previa";
 import { BarraMigas } from "@/components/barra-migas";
 import { LatidoPresencia } from "@/components/latido-presencia";
 import { AvisoInactividad } from "@/components/aviso-inactividad";
-import { AVISO_INACTIVIDAD } from "@/lib/rendimiento/aviso-inactividad";
 import { ProveedorModulos } from "@/components/modulos-contexto";
 import { ProveedorPais } from "@/components/pais-contexto";
 import { NavBar } from "@/components/nav";
@@ -58,11 +57,15 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       ]).then(([menu, paraTi, novedades]) => conParaTi(menu, paraTi, novedades))
     )
     .catch(() => SIN_PENDIENTES);
-  const [plataformasPais, favoritosDeSesion, usuario, paisActual] = await Promise.all([
+  const [plataformasPais, favoritosDeSesion, usuario, paisActual, avisoInactividad] = await Promise.all([
     paisP.then((p) => obtenerPlataformasPais(supabase, p.id)),
     getUsuarioIdSesion().then((id) => (id ? obtenerFavoritos(supabase, id) : [])),
     usuarioP,
     paisP,
+    // Si se le muestra el aviso de 5 minutos sin actividad (Configuración, migración 0249). Sin la migración, a nadie.
+    getUsuarioIdSesion().then((id) =>
+      id ? supabase.from("perfiles").select("aviso_inactividad").eq("id", id).maybeSingle().then((r) => !r.error && r.data?.aviso_inactividad === true) : false,
+    ),
   ]);
   // Quien entra con la contraseña temporal que le dio un administrador elige la suya antes de usar el sistema (31 oct 2026).
   if (usuario && tieneContrasenaTemporal(await getUsuarioSesion())) redirect("/elegir-contrasena");
@@ -92,7 +95,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     <ProveedorPais codigo={paisActual.codigo}>
     <ToastProvider>
       {usuario && <LatidoPresencia />}
-      {usuario && AVISO_INACTIVIDAD.has(usuario.id) && <AvisoInactividad />}
+      {usuario && avisoInactividad && <AvisoInactividad />}
       {usuario?.vistaPrevia && <BannerVistaPrevia rolNombre={usuario.vistaPrevia.rolNombre} />}
       <div className="flex min-h-full">
         <Sidebar modulosPermitidos={usuario?.modulos ?? null} areas={areasMenu} favoritos={favoritos} pendientes={pendientes} verActualizaciones={!!usuario && REVISAN_CAMBIOS.has(usuario.id)} />
