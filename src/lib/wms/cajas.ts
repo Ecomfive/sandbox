@@ -29,11 +29,12 @@ export interface CajaGuardada {
   observacion: string | null;
 }
 
-/** Las cajas que salieron en una línea de remisión (`wms_envios_dropi.cajas`). */
+/** Las cajas que salieron en una línea de remisión (`wms_envios_dropi.cajas`): enteras y, si se abrió una, las unidades sueltas que salieron de ella (migración 0248). */
 export interface CajasEnviadas {
   ubicacion: string;
   cajas: number;
   por_caja: number;
+  sueltas?: number;
 }
 
 const entero = (v: unknown): number | null => {
@@ -53,7 +54,12 @@ export const textoCaja = (c: { cajas: number; porCaja: number; ubicacion?: strin
 /** Lo que salió en una línea de remisión, en palabras. Sin cajas, `null`. */
 export function textoCajasEnviadas(cajas: unknown): string | null {
   if (!Array.isArray(cajas) || cajas.length === 0) return null;
-  return (cajas as CajasEnviadas[]).map((c) => textoCaja({ cajas: c.cajas, porCaja: c.por_caja, ubicacion: c.ubicacion })).join(" · ");
+  return (cajas as CajasEnviadas[])
+    .flatMap((c) => [
+      ...(c.cajas > 0 ? [textoCaja({ cajas: c.cajas, porCaja: c.por_caja, ubicacion: c.ubicacion })] : []),
+      ...(c.sueltas ? [`${c.sueltas.toLocaleString("es-PA")} u. de una caja de ${c.por_caja.toLocaleString("es-PA")} (${c.ubicacion})`] : []),
+    ])
+    .join(" · ");
 }
 
 /**

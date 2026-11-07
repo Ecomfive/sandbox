@@ -12,6 +12,8 @@ test("las cuentas y los textos de las cajas", () => {
   assert.equal(cuantasCajas(lineas), 17);
   assert.equal(textoCaja({ cajas: 1, porCaja: 58, ubicacion: "C1" }), "1 caja de 58 (C1)");
   assert.equal(textoCajasEnviadas([{ ubicacion: "C1", cajas: 3, por_caja: 175 }, { ubicacion: "C3", cajas: 1, por_caja: 58 }]), "3 cajas de 175 (C1) · 1 caja de 58 (C3)");
+  assert.equal(textoCajasEnviadas([{ ubicacion: "C1", cajas: 4, por_caja: 48 }, { ubicacion: "C1", cajas: 0, por_caja: 29, sueltas: 8 }]), "4 cajas de 48 (C1) · 8 u. de una caja de 29 (C1)");
+  assert.equal(textoCajasEnviadas([{ ubicacion: "C1", cajas: 2, por_caja: 29, sueltas: 8 }]), "2 cajas de 29 (C1) · 8 u. de una caja de 29 (C1)");
   assert.equal(textoCajasEnviadas(null), null);
   assert.equal(textoCajasEnviadas([]), null);
 });
