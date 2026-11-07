@@ -7,7 +7,7 @@ const ID2 = "01a1364c-f839-7da8-b333-121b076154e6";
 
 test("en Costa Rica la salida y el ajuste a mano son de un administrador; en los demás países no cambia", () => {
   assert.equal(puedeMoverAMano("salida", "CR", false), false);
-  assert.equal(puedeMoverAMano("ajuste", "CR", false), false);
+  assert.equal(puedeMoverAMano("ajuste", "CR", false), true);
   assert.equal(puedeMoverAMano("entrada", "CR", false), true);
   assert.equal(puedeMoverAMano("salida", "CR", true), true);
   assert.equal(puedeMoverAMano("salida", "PA", false), true);

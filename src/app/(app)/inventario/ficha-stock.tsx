@@ -11,6 +11,7 @@ import { CalendarioIcon, ComprasIcon, EnvioIcon, HistorialIcon, InventarioIcon }
 import { pideMotivo, puedeMoverAMano } from "@/lib/wms/recepcion";
 import { ETIQUETA_PLATAFORMA } from "@/lib/wms/stock-plataformas";
 import { ComprasProducto } from "../producto/compras-producto";
+import { CorregirStock } from "./corregir-stock";
 import { ETIQUETA_TIPO_SKU, type FilaStock } from "./def-stock";
 import { DESCRIPCION_CUBETA } from "./descripciones-stock";
 import { PanelMovimiento, type BodegaOpcion, type UbicacionOpcion } from "./panel-movimiento";
@@ -108,6 +109,8 @@ export function FichaStock({
 
   const esCombo = sku?.tipo === "combo";
   const esTest = sku?.clase === "test";
+  // Corregir un valor: cualquiera que edite el inventario, en todos los países, siempre con nota (7 nov 2026).
+  const puedeCorregir = puedeEscribir && !esCombo && !esTest;
   return (
     <Ventana
       abierto={!!sku}
@@ -132,7 +135,8 @@ export function FichaStock({
 
           {puedeEscribir && !esCombo && !esTest && (
             <div className="flex flex-wrap gap-2 border-y border-border px-5 py-3">
-              {(["entrada", "salida", "ajuste"] as const).filter((tipo) => puedeMoverAMano(tipo, codigoPais, esAdmin)).map((tipo) => (
+              {/* Corregir un valor va en cada bodega de «Stock por bodega» (`CorregirStock`): se escribe el número correcto, no la diferencia. */}
+              {(["entrada", "salida"] as const).filter((tipo) => puedeMoverAMano(tipo, codigoPais, esAdmin)).map((tipo) => (
                 <PanelMovimiento
                   key={`${sku.id}-${tipo}`}
                   skuId={sku.id}
@@ -216,6 +220,11 @@ export function FichaStock({
                             </Tooltip>
                           </th>
                         ))}
+                        {puedeCorregir && (
+                          <th scope="col" className="py-1.5 pl-1.5">
+                            <span className="sr-only">Corregir</span>
+                          </th>
+                        )}
                       </tr>
                     </thead>
                     <tbody>
@@ -230,6 +239,25 @@ export function FichaStock({
                               <Cifra n={n} />
                             </td>
                           ))}
+                          {puedeCorregir && (
+                            <td className="py-1 pl-1.5 text-right">
+                              {b.tipo !== "externa" && (
+                                <CorregirStock
+                                  key={`${sku.id}-${b.bodegaId}-${b.fisico}`}
+                                  skuId={sku.id}
+                                  bodegaId={b.bodegaId}
+                                  bodega={b.nombre}
+                                  fisico={b.fisico}
+                                  manejaVencimiento={sku.manejaVencimiento}
+                                  lotes={datos.lotes.filter((l) => l.bodegaId === b.bodegaId)}
+                                  alGuardar={() => {
+                                    setVersion((v) => v + 1);
+                                    alCambiar();
+                                  }}
+                                />
+                              )}
+                            </td>
+                          )}
                         </tr>
                       ))}
                     </tbody>

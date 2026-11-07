@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { revisarCorreccionStock } from "@/lib/wms/correccion-stock";
 import { createServiceClient } from "@/lib/supabase/server";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { pideMotivo, puedeMoverAMano, SOLO_ADMIN_MOVIMIENTO } from "@/lib/wms/recepcion";
@@ -405,5 +406,68 @@ export async function recibirEnvioDropi(envioId: string, recibida: number, motiv
   });
   revalidatePath("/inventario");
   revalidatePath("/inventario/remisiones");
+  return {};
+}
+
+/**
+ * Corrige el físico de un producto en una bodega propia escribiendo el valor correcto (7 nov 2026, pedido de Hernán): se guarda como ajuste por la diferencia, con la nota en el
+ * motivo, en todos los países. `visto` es lo que la persona tenía en pantalla: si cambió mientras corregía, no se guarda y se le avisa, así nunca corrige sobre un número viejo.
+ */
+export async function corregirStock(datos: { skuId: unknown; bodegaId: unknown; loteId: unknown; visto: unknown; correcto: unknown; nota: unknown }): Promise<{ error?: string }> {
+  const usuario = await requireModuloEscritura(MODULO);
+  if (!ES_ID(datos.skuId as string)) return { error: "SKU no válido." };
+  if (!ES_ID(datos.bodegaId as string)) return { error: "Bodega no válida." };
+  const sku = datos.skuId as string;
+  const bodega = datos.bodegaId as string;
+  const lote = datos.loteId === null || datos.loteId === undefined || datos.loteId === "" ? null : (datos.loteId as string);
+  if (lote && !ES_ID(lote)) return { error: "Lote no válido." };
+  const visto = Number(datos.visto);
+  if (!Number.isInteger(visto)) return { error: "Vuelve a abrir la corrección." };
+
+  const supabase = createServiceClient();
+  if (!(await puedeVerBodega(supabase, usuario.paisesPermitidos, bodega))) return { error: "No tienes acceso al país de esa bodega." };
+  const [{ data: bodegaFila }, { data: maestro }] = await Promise.all([
+    supabase.from("wms_bodegas").select("tipo, nombre, paises(nombre)").eq("id", bodega).maybeSingle(),
+    supabase.from("skus_maestros").select("codigo, tipo, clase, maneja_vencimiento").eq("id", sku).maybeSingle(),
+  ]);
+  if (!bodegaFila) return { error: "La bodega no existe." };
+  if (bodegaFila.tipo === "externa") return { error: "Esa bodega es de una plataforma: su stock no se corrige aquí." };
+  if (!maestro) return { error: "El SKU no existe." };
+  if (maestro.tipo === "combo") return { error: "Un producto compuesto no guarda stock: se calcula de sus componentes." };
+  if (maestro.clase === "test") return { error: "Es un producto de prueba: no tiene stock hasta que se pase a Activo." };
+  if (maestro.maneja_vencimiento && !lote) return { error: "Elige el lote que vas a corregir." };
+  if (!maestro.maneja_vencimiento && lote) return { error: "Este producto no maneja vencimiento." };
+
+  const actual = lote
+    ? Number((await supabase.from("wms_stock_lote").select("cantidad").eq("lote_id", lote).eq("bodega_id", bodega).maybeSingle()).data?.cantidad ?? 0)
+    : Number((await supabase.from("wms_stock").select("fisico").eq("sku_maestro_id", sku).eq("bodega_id", bodega).maybeSingle()).data?.fisico ?? 0);
+  if (actual !== visto) return { error: `Mientras corregías, el valor cambió a ${actual.toLocaleString("es-PA")}. Cierra y vuelve a abrir para corregir sobre el número de ahora.` };
+  const r = revisarCorreccionStock({ actual, correcto: datos.correcto, nota: datos.nota });
+  if ("error" in r) return r;
+
+  const { error } = await supabase.rpc("wms_registrar_movimiento", {
+    p_sku: sku,
+    p_bodega: bodega,
+    p_tipo: "ajuste",
+    p_cantidad: r.diferencia,
+    p_origen: "manual",
+    p_referencia: "Corrección",
+    p_motivo: r.motivo,
+    p_usuario: usuario.id,
+    p_lote: lote,
+  });
+  if (error) return { error: errorDeBase(error.message, "No se pudo guardar la corrección.") };
+
+  const p = bodegaFila.paises as { nombre: string } | { nombre: string }[] | null;
+  const pais = (Array.isArray(p) ? p[0] : p)?.nombre;
+  await registrarAuditoria({
+    accion: "correccion_inventario",
+    entidad: "skus_maestros",
+    entidadId: sku,
+    detalle: `${maestro.codigo} en ${bodegaFila.nombre}: ${r.motivo}${pais ? ` · ${pais}` : ""}`,
+    antes: { Físico: String(actual) },
+    despues: { Físico: String(actual + r.diferencia) },
+  });
+  revalidatePath("/inventario");
   return {};
 }
