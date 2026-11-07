@@ -3,6 +3,7 @@
 import { useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
+import { textoLecturaEffi } from "@/lib/effi/resumen";
 import { actualizarDesdeEffi } from "./actions";
 
 /** Lee Effi en el momento, sin esperar la lectura diaria. Solo consulta Effi y guarda aquí. */
@@ -20,10 +21,9 @@ export function BotonActualizarEffi({ hayLlave }: { hayLlave: boolean }) {
           const r = await actualizarDesdeEffi();
           if (r.error) return mostrarToast(r.error, "destructive");
           if (r.resumen) {
-            const v = r.resumen.ventas;
-            // Las ventas (migración 0244) se leen en la misma pasada: si fallan, los artículos igual quedaron y aquí se dice por qué.
-            const ventas = !v ? "" : "error" in v ? ` Las ventas no se pudieron leer: ${v.error}` : ` Ventas: ${v.filas} filas de ${v.dias} días.`;
-            mostrarToast(`Effi leído: ${r.resumen.articulos} artículos, ${r.resumen.nuevos} nuevos, ${r.resumen.yaNoEstan} ya no aparecen.${ventas}`, v && "error" in v ? "destructive" : "success");
+            // Las ventas (migración 0244) y los precios del análisis van en la misma pasada: si fallan, los artículos igual quedaron y aquí se dice por qué.
+            const { texto, error } = textoLecturaEffi(r.resumen);
+            mostrarToast(texto, error ? "destructive" : "success");
           }
         })
       }
