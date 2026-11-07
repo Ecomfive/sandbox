@@ -3,7 +3,6 @@ import { traerTodasConError } from "@/lib/supabase/paginar";
 import { armarStockPlataformas, type LecturasPlataformas, type ProductoDropi, type PublicacionDrop, type PublicacionDropi, type PublicacionEffi, type StockPlataformas } from "@/lib/wms/stock-plataformas";
 
 /** Los países donde Inventario muestra el stock de las plataformas. Por ahora solo Costa Rica, que trabaja con plataformas y no tiene tiendas. */
-export const PAISES_CON_PLATAFORMAS = ["CR"];
 
 /** Lee lo último que se sabe de Dropi, Effi y Drop en el país y lo junta por producto. Si una lectura falla, esa plataforma no se muestra y el inventario carga igual. */
 export async function leerStockPlataformas(

@@ -13,6 +13,7 @@ import { DEF_STOCK, existenciaDe, type FilaStock } from "./def-stock";
 
 const num = (n: number) => n.toLocaleString("es-PA");
 const conExistencia = (e: ReturnType<typeof existenciaDe>) => ({ campo: "existencia", valor: { tipo: "seleccion" as const, valores: [e] } });
+const soloActivos = { campo: "clase", valor: { tipo: "seleccion" as const, valores: ["fisico"] } };
 const desdeUna = (campo: string) => ({ campo, valor: { tipo: "numero" as const, min: "1", max: "" } });
 
 interface Tarjeta {
@@ -57,11 +58,12 @@ function tarjetas(filas: FilaStock[], conPlataformas: boolean): Tarjeta[] {
     {
       id: "sin-stock",
       titulo: "Sin stock",
-      numero: filas.filter((f) => existenciaDe(f) === "sin_stock").length,
-      detalle: "SKUs en cero",
+      // Solo lo Activo (7 nov 2026, pedido de Hernán): el catálogo es único para todos los países y los inactivos y de prueba inflaban la cifra. Siguen en la lista.
+      numero: filas.filter((f) => f.clase === "fisico" && existenciaDe(f) === "sin_stock").length,
+      detalle: conPlataformas ? "Activos, ni en bodegas ni en plataformas" : "Activos en cero",
       icono: InventarioIcon,
       color: "ambar",
-      atajo: { id: "sin-stock", etiqueta: "Sin stock", ayuda: "Filtrar la lista: sin stock", filtro: conExistencia("sin_stock") },
+      atajo: { id: "sin-stock", etiqueta: "Sin stock", ayuda: "Filtrar la lista: activos sin stock", filtro: conExistencia("sin_stock"), ademas: [soloActivos] },
     },
     {
       id: "negativo",
