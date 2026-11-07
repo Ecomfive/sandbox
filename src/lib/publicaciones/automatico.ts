@@ -3,6 +3,7 @@
 // bajar precio, Al día) el sistema calcula qué atención necesita cada publicación. Los umbrales salen de la pantalla de Reglas
 // (reglas.ts, migración 0127); las constantes de abajo son sus valores de siempre. Sin base ni React, con prueba.
 
+import { claveFecha } from "./cambio-precio";
 import { REGLAS_DEFECTO, type Reglas } from "./reglas";
 
 /** Cómo está en Dropi: activo o archivado según Dropi; no aparece (tiene ID pero Dropi no lo reporta: en espera de
@@ -102,19 +103,32 @@ export function accionesPublicacion(
   return out;
 }
 
+/** Los días de ventas que mira «Vende poco» y los que espera después de un cambio de precio. */
+export const DIAS_VENDE_POCO = 30;
+
 /**
  * Vende poco (7 nov 2026, pedido de Alcides: «si vendo menos de 100 unidades al mes, que me avise para ajustar el precio»): activa en
  * Dropi, con stock, publicada hace más de `dias_nuevo` días (ya tuvo un mes entero) y con menos de `venta_minima_mes` ventas netas en
- * 30 días. Sin stock no sale (no vende porque no hay qué vender, eso es «Sin stock»), ni sin datos de ventas de Dropi.
+ * los últimos 30 días. Sin stock no sale (no vende porque no hay qué vender, eso es «Sin stock»), ni sin datos de ventas de Dropi.
+ *
+ * **Después de un cambio de precio espera 30 días** (7 nov 2026, Alcides: «si le bajo el precio, que salga de ahí y no vuelva hasta que
+ * pasen 30 días»): los 30 días que se miran tienen que ser todos con el precio nuevo. Entonces devuelve `espera` con el día en que se
+ * vuelve a revisar (el cambio + 30 días), y la tarjeta las cuenta aparte.
  */
 export function vendePoco(
-  p: { archivada: boolean; enDropi: EnDropi; netas30: number | null; stock: number | null; publicadaDesde: string | null },
+  p: { archivada: boolean; enDropi: EnDropi; netas30: number | null; stock: number | null; publicadaDesde: string | null; ultimoCambioPrecio?: string | null },
   hoy: string,
   reglas: Pick<Reglas, "venta_minima_mes" | "dias_nuevo"> = REGLAS_DEFECTO,
-): boolean {
-  if (p.archivada || p.enDropi !== "activo" || p.netas30 === null || p.stock === null || p.stock <= 0) return false;
-  if (!p.publicadaDesde || dias(p.publicadaDesde, hoy) <= reglas.dias_nuevo) return false;
-  return p.netas30 < reglas.venta_minima_mes;
+): { vende: false; espera: string | null } | { vende: true } {
+  const no = { vende: false as const, espera: null };
+  if (p.archivada || p.enDropi !== "activo" || p.netas30 === null || p.stock === null || p.stock <= 0) return no;
+  if (!p.publicadaDesde || dias(p.publicadaDesde, hoy) <= reglas.dias_nuevo) return no;
+  if (p.netas30 >= reglas.venta_minima_mes) return no;
+  if (p.ultimoCambioPrecio) {
+    const dia = claveFecha(p.ultimoCambioPrecio).slice(0, 10);
+    if (dias(dia, hoy) < DIAS_VENDE_POCO) return { vende: false, espera: new Date(Date.parse(dia) + DIAS_VENDE_POCO * 86_400_000).toISOString().slice(0, 10) };
+  }
+  return { vende: true };
 }
 
 /** La bodega de Dropi (B280, «Bodega Dropi Panama»): lo que está ahí no se puede republicar, porque la publicación es de Dropi. */

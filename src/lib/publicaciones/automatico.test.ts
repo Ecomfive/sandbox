@@ -78,15 +78,27 @@ test("vende poco: activa, con stock, con más de un mes publicada y menos de 100
   const { vendePoco, REGLAS_DEFECTO } = { ...(await import("./automatico")), ...(await import("./reglas")) };
   const hoy = "2026-11-07";
   const base = { archivada: false, enDropi: "activo" as const, netas30: 40, stock: 200, publicadaDesde: "2026-08-01" };
-  assert.equal(vendePoco(base, hoy), true);
-  assert.equal(vendePoco({ ...base, netas30: 0 }, hoy), true, "sin ventas también: el precio puede ser el problema");
-  assert.equal(vendePoco({ ...base, netas30: 100 }, hoy), false, "100 ya alcanza");
-  assert.equal(vendePoco({ ...base, stock: 0 }, hoy), false, "sin stock es otra tarjeta");
-  assert.equal(vendePoco({ ...base, stock: null }, hoy), false);
-  assert.equal(vendePoco({ ...base, netas30: null }, hoy), false, "sin datos de ventas no se sabe");
-  assert.equal(vendePoco({ ...base, publicadaDesde: "2026-10-20" }, hoy), false, "todavía no tiene un mes entero");
-  assert.equal(vendePoco({ ...base, publicadaDesde: null }, hoy), false);
-  assert.equal(vendePoco({ ...base, archivada: true }, hoy), false);
-  assert.equal(vendePoco({ ...base, enDropi: "archivado" }, hoy), false);
-  assert.equal(vendePoco({ ...base, netas30: 140 }, hoy, { ...REGLAS_DEFECTO, venta_minima_mes: 150 }), true, "el umbral sale de Reglas");
+  const si = (p: Parameters<typeof vendePoco>[0], r?: Parameters<typeof vendePoco>[2]) => vendePoco(p, hoy, r).vende;
+  assert.equal(si(base), true);
+  assert.equal(si({ ...base, netas30: 0 }), true, "sin ventas también: el precio puede ser el problema");
+  assert.equal(si({ ...base, netas30: 100 }), false, "100 ya alcanza");
+  assert.equal(si({ ...base, stock: 0 }), false, "sin stock es otra tarjeta");
+  assert.equal(si({ ...base, stock: null }), false);
+  assert.equal(si({ ...base, netas30: null }), false, "sin datos de ventas no se sabe");
+  assert.equal(si({ ...base, publicadaDesde: "2026-10-20" }), false, "todavía no tiene un mes entero");
+  assert.equal(si({ ...base, publicadaDesde: null }), false);
+  assert.equal(si({ ...base, archivada: true }), false);
+  assert.equal(si({ ...base, enDropi: "archivado" }), false);
+  assert.equal(si({ ...base, netas30: 140 }, { ...REGLAS_DEFECTO, venta_minima_mes: 150 }), true, "el umbral sale de Reglas");
+});
+
+test("vende poco: después de un cambio de precio espera 30 días con el precio nuevo", async () => {
+  const { vendePoco } = await import("./automatico");
+  const hoy = "2026-11-07";
+  const base = { archivada: false, enDropi: "activo" as const, netas30: 40, stock: 200, publicadaDesde: "2026-08-01" };
+  assert.deepEqual(vendePoco({ ...base, ultimoCambioPrecio: "2026-11-01" }, hoy), { vende: false, espera: "2026-12-01" }, "cambió hace 6 días: vuelve el 1 dic");
+  assert.deepEqual(vendePoco({ ...base, ultimoCambioPrecio: "2026-11-07T15:30:00Z" }, hoy), { vende: false, espera: "2026-12-07" }, "con hora: el día de Panamá");
+  assert.deepEqual(vendePoco({ ...base, ultimoCambioPrecio: "2026-10-08" }, hoy), { vende: true }, "ya pasaron 30 días con el precio nuevo y sigue vendiendo poco");
+  assert.deepEqual(vendePoco({ ...base, ultimoCambioPrecio: "2026-08-15" }, hoy), { vende: true });
+  assert.deepEqual(vendePoco({ ...base, netas30: 150, ultimoCambioPrecio: "2026-11-01" }, hoy), { vende: false, espera: null }, "si ya vende bien no espera nada");
 });

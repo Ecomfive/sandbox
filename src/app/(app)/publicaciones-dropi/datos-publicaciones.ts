@@ -448,6 +448,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
       duplicadaDe: null,
       pausadaDesde: pausadaEn.get(d.id as string) ?? null,
       liquidacionDesde: liquidacionEn.get(d.id as string) ?? null,
+      vendePocoVuelve: null,
       descontinuadoPais: !!d.sku_maestro_id && descontinuados.has(d.sku_maestro_id as string),
       tareasPendientes: tareasDe.get(d.id as string) ?? { total: 0, atrasadas: 0 },
       grupo: [],
@@ -482,9 +483,13 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
     // Republicar: necesita la bodega de la fila (se conoce después de armarla).
     if (necesitaRepublicar({ archivada: f.archivada, enDropi: f.enDropi, bodegaId: f.bodega?.id ?? null, hayVentas: !!f.ventas, ultimaVenta: f.ventas?.ultimaVenta ?? null, publicadaDesde: f.fechaPublicacion ?? f.ventas?.primeraVenta ?? null, privada: f.tipoDropi === "privado", stock: f.stockProveedor ?? f.ventas?.stock ?? null, netas30: f.ventas?.netas30 ?? null }, hoy, r))
       f.acciones = [...f.acciones, "republicar"];
-    // Vende poco: también necesita el stock de la lectura de «Mis productos».
-    if (!f.apagadoPendiente && !f.duplicadaDe && !f.sinPublicar && vendePoco({ archivada: f.archivada, enDropi: f.enDropi, netas30: f.ventas?.netas30 ?? null, stock: f.stockProveedor ?? f.ventas?.stock ?? null, publicadaDesde: f.fechaPublicacion ?? f.ventas?.primeraVenta ?? null }, hoy, r))
-      f.acciones = [...f.acciones, "vende_poco"];
+    // Vende poco: también necesita el stock de la lectura de «Mis productos». Con un cambio de precio de menos de 30 días, espera.
+    if (!f.apagadoPendiente && !f.duplicadaDe && !f.sinPublicar) {
+      const cambio = masReciente([f.cambioPrecioDropi, f.ultimoCambioPrecio ? { fecha: f.ultimoCambioPrecio } : null]);
+      const vp = vendePoco({ archivada: f.archivada, enDropi: f.enDropi, netas30: f.ventas?.netas30 ?? null, stock: f.stockProveedor ?? f.ventas?.stock ?? null, publicadaDesde: f.fechaPublicacion ?? f.ventas?.primeraVenta ?? null, ultimoCambioPrecio: cambio?.fecha ?? null }, hoy, r);
+      if (vp.vende) f.acciones = [...f.acciones, "vende_poco"];
+      else f.vendePocoVuelve = vp.espera;
+    }
     const combo = f.sku ? combosX2.get(f.sku.id) : undefined;
     const comboPublicado = !!combo && publicados.has(combo.id);
     // Las tareas abiertas que los datos ya muestran hechas.
