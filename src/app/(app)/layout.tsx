@@ -4,6 +4,8 @@ import { RUTA_PORTAL_PROVEEDOR, cuentaDeProveedor } from "@/lib/proveedor/cuenta
 import { BannerVistaPrevia } from "@/components/banner-vista-previa";
 import { BarraMigas } from "@/components/barra-migas";
 import { LatidoPresencia } from "@/components/latido-presencia";
+import { AvisoInactividad } from "@/components/aviso-inactividad";
+import { AVISO_INACTIVIDAD } from "@/lib/rendimiento/aviso-inactividad";
 import { ProveedorModulos } from "@/components/modulos-contexto";
 import { ProveedorPais } from "@/components/pais-contexto";
 import { NavBar } from "@/components/nav";
@@ -90,6 +92,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     <ProveedorPais codigo={paisActual.codigo}>
     <ToastProvider>
       {usuario && <LatidoPresencia />}
+      {usuario && AVISO_INACTIVIDAD.has(usuario.id) && <AvisoInactividad />}
       {usuario?.vistaPrevia && <BannerVistaPrevia rolNombre={usuario.vistaPrevia.rolNombre} />}
       <div className="flex min-h-full">
         <Sidebar modulosPermitidos={usuario?.modulos ?? null} areas={areasMenu} favoritos={favoritos} pendientes={pendientes} verActualizaciones={!!usuario && REVISAN_CAMBIOS.has(usuario.id)} />
