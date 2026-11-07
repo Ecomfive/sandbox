@@ -47,8 +47,10 @@ export function ConexionEffi({ hayLlave }: { hayLlave: boolean }) {
           </div>
           {resultado.resumen.bodegas.length > 0 && <p className="text-muted-foreground">Bodegas: {resultado.resumen.bodegas.join(", ")}</p>}
           <p className="text-muted-foreground">Tarifas que manda Effi: {resultado.resumen.tarifas ?? "Effi no mandó tarifas"}</p>
-          <p className="break-words text-muted-foreground">
-            Órdenes de venta{resultado.resumen.ordenes.total !== null ? ` (${resultado.resumen.ordenes.total.toLocaleString("es-PA")})` : ""}: {resultado.resumen.ordenes.campos || "Effi no mandó ninguna"}
+          <p className={`break-words ${resultado.resumen.ventas.error ? "text-warning" : "text-muted-foreground"}`}>
+            {resultado.resumen.ventas.error
+              ? `Ventas: no se pueden leer. ${resultado.resumen.ventas.error} Al perfil «Sistema MOM solo consulta» le falta el permiso de reportes en «Notas de remisión de venta» y «Devoluciones de venta».`
+              : `Ventas: ve ${(resultado.resumen.ventas.total ?? 0).toLocaleString("es-PA")} filas de remisiones de venta de los últimos 2 días.`}
           </p>
           <div className="flex flex-wrap gap-2">
             <Badge tone={resultado.resumen.conStock ? "success" : "warning"}>{resultado.resumen.conStock ? "Ve el stock" : "No ve el stock"}</Badge>

@@ -4,6 +4,7 @@ import { prepararContexto, sugerirSku, type Sugerencia } from "@/lib/publicacion
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { consultarTodoEffi } from "./api";
 import { articulosDeLectura, type ArticuloEffi } from "./articulos";
+import { ventanaVentas, ventasPorDia, type FilaDetalleEffi } from "./ventas";
 
 /** Effi es de la cuenta de Costa Rica. */
 export const PAIS_DE_EFFI = "CR";
@@ -13,6 +14,8 @@ export interface ResumenLecturaEffi {
   nuevos: number;
   yaNoEstan: number;
   vinculados: number;
+  /** Las ventas de la ventana leída (filas artículo + día), o por qué no se pudieron leer. Si fallan, los artículos igual se guardan. */
+  ventas?: { dias: number; filas: number } | { error: string };
 }
 
 const revisar = <T,>(r: { data: T; error: { message: string } | null }, que: string): T => {
@@ -106,5 +109,26 @@ export async function sincronizarEffi(supabase: SupabaseClient): Promise<Resumen
   if (yaNoEstan.length)
     revisar(await supabase.from("effi_publicaciones").update({ en_effi: false, actualizado_en: ahora }).in("id", yaNoEstan.map((a) => a.id)), "Marcar los que ya no están en Effi");
 
-  return { articulos: vistos.length, nuevos: vistos.filter((v) => !porId.has(v.effiId)).length, yaNoEstan: yaNoEstan.length, vinculados: vistos.length - sinVincular.length };
+  const ventas = await sincronizarVentasEffi(supabase, pais.id).catch((e: unknown) => ({ error: e instanceof Error ? e.message : "No se pudieron leer las ventas de Effi." }));
+  return { articulos: vistos.length, nuevos: vistos.filter((v) => !porId.has(v.effiId)).length, yaNoEstan: yaNoEstan.length, vinculados: vistos.length - sinVincular.length, ventas };
+}
+
+/**
+ * Las ventas de Effi de la ventana (`DIAS_VENTAS_EFFI`) en `plataforma_ventas_diarias` (migración 0244): remisiones y devoluciones de venta de la bodega Principal, por artículo y día.
+ * Se vuelve a escribir la ventana entera, así una remisión anulada después deja de contar. Pide el permiso de reportes en «Notas de remisión de venta» y «Devoluciones de venta».
+ */
+export async function sincronizarVentasEffi(supabase: SupabaseClient, paisId: string, ahora = new Date()): Promise<{ dias: number; filas: number }> {
+  const { desde, hasta } = ventanaVentas(ahora);
+  const filtros = { desde, hasta: `${hasta} 23:59:59`, vigente: 1 };
+  const [remisiones, devoluciones] = await Promise.all([
+    consultarTodoEffi<FilaDetalleEffi>("detalle_remision_v", filtros, 1000),
+    consultarTodoEffi<FilaDetalleEffi>("detalle_devolucion_v", filtros, 1000),
+  ]);
+  if (!remisiones.ok) throw new Error(`Remisiones de venta: ${remisiones.error}`);
+  if (!devoluciones.ok) throw new Error(`Devoluciones de venta: ${devoluciones.error}`);
+  const ventas = ventasPorDia(remisiones.data, devoluciones.data);
+  revisar(await supabase.from("plataforma_ventas_diarias").delete().eq("pais_id", paisId).eq("plataforma", "effi").gte("dia", desde), "Borrar la ventana de ventas de Effi");
+  const filas = ventas.map((v) => ({ pais_id: paisId, plataforma: "effi", producto_id: v.productoId, dia: v.dia, salidas: v.salidas, devueltas: v.devueltas }));
+  for (let i = 0; i < filas.length; i += 500) revisar(await supabase.from("plataforma_ventas_diarias").insert(filas.slice(i, i + 500)), "Guardar las ventas de Effi");
+  return { dias: new Set(ventas.map((v) => v.dia)).size, filas: filas.length };
 }
