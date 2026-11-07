@@ -1,5 +1,6 @@
 import type { DefTabla } from "@/lib/tabla/motor";
 import type { StockPlataformas } from "@/lib/wms/stock-plataformas";
+import { existencia } from "@/lib/wms/total-stock";
 
 /** Una fila del inventario: un SKU maestro con lo que hay en las bodegas elegidas (todas las del país o una). */
 export interface FilaStock {
@@ -25,7 +26,7 @@ export interface FilaStock {
   /** Cuántas cajas tiene y qué unidades suman (migración 0236): lo que Nicol mira para saber cuánto pedir. */
   cajas: number;
   unidadesEnCajas: number;
-  /** Lo que tiene en las plataformas, en los países que las muestran (`PAISES_CON_PLATAFORMAS`); `null` si no tiene o no aplica. */
+  /** Lo que tiene en las plataformas (Dropi, Effi, Drop) del país; `null` si no tiene. */
   plataformas: StockPlataformas | null;
 }
 
@@ -38,9 +39,9 @@ export const ETIQUETA_EXISTENCIA: Record<string, string> = {
   con_stock: "Con stock",
 };
 
-/** Negativo: salió más de lo que se registró que entró (se corrige con una entrada o un ajuste). */
-export function existenciaDe(f: Pick<FilaStock, "fisico">): "negativo" | "sin_stock" | "con_stock" {
-  return f.fisico < 0 ? "negativo" : f.fisico === 0 ? "sin_stock" : "con_stock";
+/** Negativo: salió más de lo que se registró que entró (se corrige con «Corregir»). Con unidades en una plataforma, el producto tiene stock aunque las bodegas estén en cero. */
+export function existenciaDe(f: Pick<FilaStock, "fisico" | "plataformas">): "negativo" | "sin_stock" | "con_stock" {
+  return existencia(f.fisico, f.plataformas?.total ?? 0);
 }
 
 export const DEF_STOCK: DefTabla<FilaStock> = {

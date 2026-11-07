@@ -1,5 +1,5 @@
 /**
- * Lo que hay de cada producto en las plataformas de Costa Rica (6 nov 2026, pedido de Hernán, flujograma de Proveeduría Costa Rica): Dropi, Effi y Drop. Las lecturas
+ * Lo que hay de cada producto en las plataformas (6 nov 2026 en Costa Rica, pedido de Hernán; en todos los países desde el 7 nov): Dropi, Effi y Drop. Las lecturas
  * ya estaban (`dropi_productos_proveedor`, `effi_publicaciones`, `drop_publicaciones`), pero cada una en su módulo, y las bodegas externas de Inventario salían en cero
  * porque `wms_stock` no las recibe. Aquí se juntan por producto, sin escribir nada: es una vista de lo último que se leyó. Lógica pura, con prueba.
  */
@@ -67,7 +67,7 @@ export interface PublicacionDrop {
 const masReciente = (fechas: (string | null)[]) => fechas.reduce<string | null>((a, f) => (f && (!a || f > a) ? f : a), null);
 
 /**
- * Junta las tres lecturas por producto. En Dropi solo cuenta lo de su bodega (la B15): lo de otra es referencial, se pone a mano para la publicación y no es stock de
+ * Junta las tres lecturas por producto. En Dropi solo cuenta lo de la bodega de Dropi del país (B280 en Panamá, B15 en Costa Rica, B49 en México): lo de otra es referencial, se pone a mano para la publicación y no es stock de
  * verdad (5 nov 2026, Alcides). Un ID de Dropi cuenta una sola vez, aunque dos publicaciones lo tengan. Effi cuenta su bodega Principal; las de las tiendas son de cada
  * dropshipper y aquí no llegan. Lo que ya no está en Effi o en Drop no cuenta. Un producto sin nada en ninguna plataforma no sale.
  */
