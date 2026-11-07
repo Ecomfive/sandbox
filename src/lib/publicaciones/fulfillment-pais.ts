@@ -72,3 +72,40 @@ export async function fulfillmentDePais(supabase: SupabaseClient, paisId: string
   if (moneda === monedaDePais(codigo)) return monto;
   return fulfillmentEnMoneda(monto, moneda, codigo, (await tasasUsd(supabase)).porUsd);
 }
+
+/**
+ * Quién paga el fulfillment de una plataforma (7 nov 2026, pedido de Hernán; migración 0247): «nosotros» (cuenta en el margen) o «dropshipper» (lo paga el mismo dropshipper: no se toma en
+ * cuenta). Se elige en Configuración › Plataformas del país. Un valor desconocido, o la columna que todavía no existe, es «nosotros».
+ */
+export type QuienPagaFulfillment = "nosotros" | "dropshipper";
+
+export const quienPagaFulfillment = (valor: unknown): QuienPagaFulfillment => (valor === "dropshipper" ? "dropshipper" : "nosotros");
+
+/** El fulfillment que cuenta en el margen: el monto si lo pagamos nosotros; null (no cuenta) si lo paga el dropshipper. */
+export const fulfillmentQueCuenta = (monto: number | null, paga: QuienPagaFulfillment): number | null => (paga === "dropshipper" ? null : monto);
+
+/** En Dropi el fulfillment va escrito en cada publicación, así que su «quién paga» no se cambia: siempre lo pagamos nosotros. */
+export const puedeElegirQuienPaga = (nombrePlataforma: string): boolean => nombrePlataforma.trim().toLowerCase() !== "dropi";
+
+/**
+ * El fulfillment de una plataforma del país por su nombre (Drop, Effi…): su monto y moneda de Configuración y quién lo paga (migración 0247). Sin la 0247 se lee sin esa columna (todas
+ * «nosotros»); null si el país no tiene esa plataforma.
+ */
+export async function leerFulfillmentPlataforma(supabase: SupabaseClient, paisId: string, nombre: string): Promise<{ monto: number | null; moneda: string; paga: QuienPagaFulfillment } | null> {
+  const buscar = (filas: { fulfillment?: unknown; fulfillment_moneda?: unknown; fulfillment_paga?: unknown; plataformas: unknown }[] | null) => {
+    const fila = (filas ?? []).find((f) => {
+      const p = Array.isArray(f.plataformas) ? f.plataformas[0] : f.plataformas;
+      return (p as { nombre?: string } | null)?.nombre?.trim().toLowerCase() === nombre.toLowerCase();
+    });
+    if (!fila) return null;
+    return {
+      monto: fila.fulfillment === null || fila.fulfillment === undefined ? null : Number(fila.fulfillment),
+      moneda: String(fila.fulfillment_moneda ?? "USD"),
+      paga: quienPagaFulfillment(fila.fulfillment_paga),
+    };
+  };
+  const conPaga = await supabase.from("pais_plataformas").select("fulfillment, fulfillment_moneda, fulfillment_paga, plataformas(nombre)").eq("pais_id", paisId);
+  if (!conPaga.error) return buscar(conPaga.data);
+  const sinPaga = await supabase.from("pais_plataformas").select("fulfillment, fulfillment_moneda, plataformas(nombre)").eq("pais_id", paisId);
+  return buscar(sinPaga.data);
+}

@@ -50,7 +50,9 @@ export default async function PublicacionesEffiPage({ searchParams }: { searchPa
       <div className="-mt-3 flex flex-wrap items-center justify-between gap-3">
         <p className="m-0 text-xs text-muted-foreground">
           {datos.ultimaLectura ? `Última lectura de Effi: ${formatearFechaHora(datos.ultimaLectura)}. ` : ""}
-          {datos.fulfillment === null
+          {datos.fulfillmentPaga === "dropshipper"
+            ? "El fulfillment lo paga el dropshipper: el margen se calcula con el costo en Effi, sin fulfillment."
+            : datos.fulfillment === null
             ? "El margen se calcula sin fulfillment: ponlo en Configuración › Plataformas del país, en la fila «EFFI»."
             : `Margen con el costo en Effi y el fulfillment de Effi (${formatoMonto(datos.fulfillment, datos.moneda)}).`}{" "}
           El stock es el de la bodega Principal; las bodegas de los dropshippers no cuentan.

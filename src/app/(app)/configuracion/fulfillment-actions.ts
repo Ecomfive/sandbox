@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModuloEscritura } from "@/lib/auth";
 import { monedaDePais, tasasUsd } from "@/lib/moneda/tipo-cambio";
-import { fulfillmentEnMoneda, leerFulfillment, monedasFulfillment, montoConMoneda } from "@/lib/publicaciones/fulfillment-pais";
+import { fulfillmentEnMoneda, leerFulfillment, monedasFulfillment, montoConMoneda, puedeElegirQuienPaga, type QuienPagaFulfillment } from "@/lib/publicaciones/fulfillment-pais";
 import { formatoMonto, monedaPublicaciones } from "@/lib/publicaciones/moneda";
 import { puedeVerPaisId } from "@/lib/seguridad/pais-acceso";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
@@ -104,4 +104,38 @@ export async function guardarFulfillmentPlataforma(paisPlataformaId: string, tex
   revalidatePath("/configuracion");
   if (esDropi) revalidatePath("/publicaciones-dropi");
   return { ok: true, valor, moneda, cambiadas, equivalente: enOtra === null || otra === null ? null : `≈ ${montoConMoneda(enOtra, otra)}` };
+}
+
+/**
+ * Quién paga el fulfillment de una plataforma del país (Configuración, 7 nov 2026, pedido de Hernán; migración 0247): «nosotros» o «dropshipper». Si lo paga el dropshipper no se toma en
+ * cuenta en el margen (Gestión de IDs Drop y Effi). Dropi no se elige: su fulfillment va escrito en cada publicación. Pide poder escribir en Configuración. Devuelve el error como valor.
+ */
+export async function guardarQuienPagaFulfillment(paisPlataformaId: string, paga: string): Promise<{ ok: true; paga: QuienPagaFulfillment } | { error: string }> {
+  const usuario = await requireModuloEscritura("configuracion");
+  if (typeof paisPlataformaId !== "string" || !UUID.test(paisPlataformaId)) return { error: "Plataforma no válida." };
+  if (paga !== "nosotros" && paga !== "dropshipper") return { error: "Elige quién paga el fulfillment." };
+  const supabase = createServiceClient();
+  const { data: fila, error: errorFila } = await supabase.from("pais_plataformas").select("id, pais_id, fulfillment_paga, plataformas(nombre), paises(nombre)").eq("id", paisPlataformaId).maybeSingle();
+  if (errorFila) return { error: /fulfillment_paga|column|schema cache/i.test(errorFila.message) ? "Falta correr la migración 0247 (quién paga el fulfillment) en la base." : "No se pudo leer la plataforma." };
+  if (!fila) return { error: "Esa plataforma no existe en este país." };
+  if (!(await puedeVerPaisId(supabase, usuario.paisesPermitidos, fila.pais_id as string))) return { error: "No tienes acceso a este país." };
+  const plataforma = (fila.plataformas as unknown as { nombre: string } | null)?.nombre ?? "?";
+  const nombrePais = (fila.paises as unknown as { nombre: string } | null)?.nombre ?? "";
+  if (!puedeElegirQuienPaga(plataforma)) return { error: "El fulfillment de Dropi lo pagamos nosotros: va escrito en cada publicación." };
+  const antes = String(fila.fulfillment_paga ?? "nosotros");
+  if (antes === paga) return { ok: true, paga };
+  const { error } = await supabase.from("pais_plataformas").update({ fulfillment_paga: paga }).eq("id", paisPlataformaId);
+  if (error) return { error: "No se pudo guardar." };
+  const texto = (v: string) => (v === "dropshipper" ? "El dropshipper" : "Nosotros");
+  await registrarAuditoria({
+    accion: "fulfillment_paga_plataforma",
+    entidad: "pais_plataformas",
+    entidadId: paisPlataformaId,
+    antes: { [`Quién paga el fulfillment de ${plataforma} en ${nombrePais}`]: texto(antes) },
+    despues: { [`Quién paga el fulfillment de ${plataforma} en ${nombrePais}`]: texto(paga) },
+  });
+  revalidatePath("/configuracion");
+  revalidatePath("/publicaciones-drop");
+  revalidatePath("/publicaciones-effi");
+  return { ok: true, paga };
 }
