@@ -3,7 +3,7 @@ import type { UsuarioActual } from "@/lib/auth";
 import { margenEffi } from "@/lib/effi/articulos";
 import { tasasUsd } from "@/lib/moneda/tipo-cambio";
 import { cargarEnCamino } from "@/lib/publicaciones/en-camino-datos";
-import { fulfillmentEnMoneda } from "@/lib/publicaciones/fulfillment-pais";
+import { fulfillmentEnMoneda, fulfillmentQueCuenta, leerFulfillmentPlataforma, type QuienPagaFulfillment } from "@/lib/publicaciones/fulfillment-pais";
 import { monedaPublicaciones, type MonedaPublicaciones } from "@/lib/publicaciones/moneda";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import type { FilaPublicacionEffi, ProductoEffi } from "./def-publicaciones-effi";
@@ -12,7 +12,10 @@ export interface DatosEffi {
   publicaciones: FilaPublicacionEffi[];
   moneda: MonedaPublicaciones;
   ultimaLectura: string | null;
+  /** El fulfillment de Effi que cuenta en el margen; null si no está en Configuración o si lo paga el dropshipper. */
   fulfillment: number | null;
+  /** Quién paga el fulfillment de Effi (Configuración, migración 0247). */
+  fulfillmentPaga: QuienPagaFulfillment;
   faltaMigracion: boolean;
 }
 
@@ -61,14 +64,14 @@ export async function cargarDatosEffi(supabase: SupabaseClient, pais: { id: stri
         .range(d, h),
     );
   } catch (e) {
-    if (/effi_publicaciones|schema cache|does not exist/i.test(String((e as { message?: string })?.message ?? e))) return { publicaciones: [], moneda, ultimaLectura: null, fulfillment: null, faltaMigracion: true };
+    if (/effi_publicaciones|schema cache|does not exist/i.test(String((e as { message?: string })?.message ?? e))) return { publicaciones: [], moneda, ultimaLectura: null, fulfillment: null, fulfillmentPaga: "nosotros", faltaMigracion: true };
     throw e;
   }
 
-  const { data: plataformas } = await supabase.from("pais_plataformas").select("fulfillment, fulfillment_moneda, plataformas(nombre)").eq("pais_id", pais.id);
-  const filaEffi = (plataformas ?? []).find((p) => uno(p.plataformas as unknown as { nombre: string } | null)?.nombre?.trim().toLowerCase() === "effi");
-  const fulfillment =
-    filaEffi?.fulfillment === null || filaEffi?.fulfillment === undefined ? null : fulfillmentEnMoneda(Number(filaEffi.fulfillment), String(filaEffi.fulfillment_moneda ?? "USD"), pais.codigo, porUsd);
+  const plataforma = await leerFulfillmentPlataforma(supabase, pais.id, "effi");
+  const fulfillmentPaga = plataforma?.paga ?? "nosotros";
+  // Si lo paga el dropshipper, no se toma en cuenta en el margen.
+  const fulfillment = fulfillmentQueCuenta(plataforma?.monto == null ? null : fulfillmentEnMoneda(plataforma.monto, plataforma.moneda, pais.codigo, porUsd), fulfillmentPaga);
 
   const hayProductos = filas.some((f) => uno(f.producto));
   const { camino, cotizando, etapasCotizando } = hayProductos ? await cargarEnCamino(supabase, pais.id, usuario) : { camino: new Map(), cotizando: new Map(), etapasCotizando: new Map() };
@@ -92,6 +95,7 @@ export async function cargarDatosEffi(supabase: SupabaseClient, pais: { id: stri
       precioMinimo: num(f.precio_minimo),
       costo,
       fulfillment,
+      fulfillmentPaga,
       utilidad: m?.utilidad ?? null,
       margen: m?.margen ?? null,
       stock: f.stock_principal,
@@ -111,5 +115,5 @@ export async function cargarDatosEffi(supabase: SupabaseClient, pais: { id: stri
     };
   });
   const ultimaLectura = filas.filter((f) => f.en_effi).reduce<string | null>((max, f) => (!max || f.ultima_vez > max ? f.ultima_vez : max), null);
-  return { publicaciones, moneda, ultimaLectura, fulfillment, faltaMigracion: false };
+  return { publicaciones, moneda, ultimaLectura, fulfillment, fulfillmentPaga, faltaMigracion: false };
 }

@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { unidadesBajadas, vigiladoDe, type CambioStock } from "@/lib/competencia/analisis";
 import { certezaIgual } from "@/lib/competencia/certeza";
+import { claveVerificacion } from "@/lib/competencia/verificar-ia";
 import { idDeProveedorDrop } from "@/lib/competencia/drop";
 import type { PlataformaId } from "@/lib/plataformas";
 import { traerTodasConError } from "@/lib/supabase/paginar";
@@ -45,7 +46,7 @@ type FilaBitacora = { fecha: string; evento: string; precio: string | null; stoc
 
 /** Drop o Effi sin datos (falta su migración, 0234 o 0239): las pestañas se dibujan igual que las de Dropi, en cero. */
 export function datosCompetenciaVacios(plataforma: DatosCompetencia["plataforma"], paisNombre: string): DatosCompetencia {
-  return { plataforma, pais: paisNombre, productos: [], competidores: [], alertas: [], bitacora: [], ultima: null, busquedas: 0, corte: null, ventas: [] };
+  return { plataforma, pais: paisNombre, productos: [], competidores: [], alertas: [], bitacora: [], ultima: null, busquedas: 0, corte: null, ventas: [], dudososSinRevisar: 0 };
 }
 
 /**
@@ -124,6 +125,7 @@ export async function cargarDatosCompetencia(supabase: SupabaseClient, pais: { i
       esNuestro: p.es_nuestro,
       igualA: p.igual_a,
       dudosoDe: null,
+      revision: null,
       parecido: n(p.igual_parecido),
       metodo: p.igual_metodo,
       primeraVez: p.primera_vez,
@@ -137,14 +139,26 @@ export async function cargarDatosCompetencia(supabase: SupabaseClient, pais: { i
   };
   const productos = filas.map(aProducto);
   // Solo el mismo producto cuenta como igual (7 nov 2026, pedido de Hernán): el que solo se parece queda como dudoso y no se compara.
+  // Con las fotos también, no solo los nombres. Lo que ya revisó la IA (migración 0246; sin ella, nada) manda sobre la regla.
   const porIdProducto = new Map(productos.map((p) => [p.id, p]));
+  const huellaDe = new Map(filas.map((f) => [f.id, f.foto_huella]));
+  const { data: verificaciones } = await supabase.from("competencia_verificaciones").select("producto_id, nuestro_id, veredicto, motivo").eq("plataforma", plataforma).limit(10000);
+  const revisado = new Map((verificaciones ?? []).map((v) => [claveVerificacion(v.producto_id, v.nuestro_id), { veredicto: v.veredicto as "mismo" | "parecido" | "distinto", motivo: v.motivo as string | null }]));
   for (const p of productos) {
     if (!p.igualA) continue;
+    const r = revisado.get(claveVerificacion(p.id, p.igualA)) ?? null;
+    p.revision = r;
+    if (r?.veredicto === "mismo") continue;
+    if (r?.veredicto === "distinto") {
+      p.igualA = null;
+      continue;
+    }
     const nuestro = porIdProducto.get(p.igualA);
-    if (nuestro && certezaIgual(nuestro.nombre, p.nombre, p.metodo) === "exacto") continue;
+    if (!r && nuestro && certezaIgual({ nombre: nuestro.nombre, huella: huellaDe.get(nuestro.id) }, { nombre: p.nombre, huella: huellaDe.get(p.id) }, p.metodo) === "exacto") continue;
     p.dudosoDe = p.igualA;
     p.igualA = null;
   }
+  const dudososSinRevisar = productos.filter((p) => p.dudosoDe && !p.revision && p.estado === "activo" && p.foto && porIdProducto.get(p.dudosoDe)?.foto).length;
 
   // La primera búsqueda marca desde cuándo un producto de un competidor cuenta como «nuevo» suyo.
   const listas = (busq.data ?? []).filter((b) => b.estado === "lista");
@@ -186,6 +200,7 @@ export async function cargarDatosCompetencia(supabase: SupabaseClient, pais: { i
     busquedas: listas.length,
     corte,
     ventas,
+    dudososSinRevisar,
   };
 
   return datos;

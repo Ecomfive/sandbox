@@ -4,7 +4,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
 import { requireModulo } from "@/lib/auth";
 import { tasasUsd } from "@/lib/moneda/tipo-cambio";
-import { fulfillmentEnMoneda, monedasFulfillment, montoConMoneda } from "@/lib/publicaciones/fulfillment-pais";
+import { fulfillmentEnMoneda, monedasFulfillment, montoConMoneda, quienPagaFulfillment } from "@/lib/publicaciones/fulfillment-pais";
 import type { FilaCuenta } from "../retiros/cuentas/def-cuentas";
 import { TablaCuentasConfiguracion } from "../retiros/cuentas/tabla-cuentas";
 import { TablaPlataformas } from "./tabla-plataformas";
@@ -29,12 +29,20 @@ export default async function ConfiguracionPage() {
     supabase.from("cuentas_retiro").select(columnas).eq("pais_id", pais.id).order("creado_en", { ascending: false });
 
   const [{ data: paisPlataformas }, cuentasConBinance, { data: todosLosPaises }, { data: correlativos }, umbralesR] = await Promise.all([
-    // `fulfillment` lo agrega la migración 0213: sin ella, se repite sin esa columna.
+    // `fulfillment` lo agrega la migración 0213 y `fulfillment_paga` la 0247: sin ellas, se repite sin esas columnas.
     supabase
       .from("pais_plataformas")
-      .select("id, disponible_para_retiro, fulfillment, fulfillment_moneda, plataformas(nombre)")
+      .select("id, disponible_para_retiro, fulfillment, fulfillment_moneda, fulfillment_paga, plataformas(nombre)")
       .eq("pais_id", pais.id)
-      .then((r) => (r.error ? supabase.from("pais_plataformas").select("id, disponible_para_retiro, plataformas(nombre)").eq("pais_id", pais.id) : r)),
+      .then((r) =>
+        r.error
+          ? supabase
+              .from("pais_plataformas")
+              .select("id, disponible_para_retiro, fulfillment, fulfillment_moneda, plataformas(nombre)")
+              .eq("pais_id", pais.id)
+              .then((r2) => (r2.error ? supabase.from("pais_plataformas").select("id, disponible_para_retiro, plataformas(nombre)").eq("pais_id", pais.id) : r2))
+          : r,
+      ),
     consultarCuentas(`${COLUMNAS_CUENTA}, datos_binance`),
     supabase.from("paises").select("id, codigo, nombre").order("nombre"),
     supabase.from("wms_compras_correlativo").select("clave, prefijo, ultimo"),
@@ -48,7 +56,7 @@ export default async function ConfiguracionPage() {
   // El fulfillment va en la moneda en que lo factura cada plataforma (dólares o la del país); debajo se ve cuánto es en la otra (tipo de cambio del día).
   const monedas = monedasFulfillment(pais.codigo);
   const porUsd = monedas.length > 1 ? (await tasasUsd(supabase)).porUsd : {};
-  const plataformas = ((paisPlataformas ?? []) as { id: string; disponible_para_retiro: boolean; fulfillment?: number | null; fulfillment_moneda?: string | null; plataformas: unknown }[])
+  const plataformas = ((paisPlataformas ?? []) as { id: string; disponible_para_retiro: boolean; fulfillment?: number | null; fulfillment_moneda?: string | null; fulfillment_paga?: string | null; plataformas: unknown }[])
     .map((pp) => {
       const fulfillment = pp.fulfillment === null || pp.fulfillment === undefined ? null : Number(pp.fulfillment);
       const moneda = pp.fulfillment_moneda ?? "USD";
@@ -62,6 +70,7 @@ export default async function ConfiguracionPage() {
         fulfillment,
         fulfillmentMoneda: moneda,
         fulfillmentEquivalente: enOtra === null || otra === null ? null : `≈ ${montoConMoneda(enOtra, otra)}`,
+        fulfillmentPaga: quienPagaFulfillment(pp.fulfillment_paga),
       };
     })
     .sort((a, b) => a.nombre.localeCompare(b.nombre));

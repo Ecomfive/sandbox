@@ -4,8 +4,10 @@
 // alertas— o solo **dudoso**, que se muestra como tal y no se compara. Sin base ni React, con prueba.
 //
 // Exacto por nombre: las mismas palabras (sin las de relleno: «de», «cápsulas», «natural», «CR»…), los mismos números y el mismo tamaño si los dos lo dicen.
-// Exacto por foto: misma foto y las palabras de uno contenidas en las del otro, sin números ni tamaños que choquen. Todo lo demás, dudoso.
+// Exacto por foto: misma foto y las palabras de uno contenidas en las del otro, sin números ni tamaños que choquen. Todo lo demás, dudoso. La foto se mira
+// siempre que los dos la tengan, se hayan emparejado por nombre o por foto (7 nov 2026, Hernán: «también debes tomar en cuenta las fotos»).
 
+import { distanciaHuella, UMBRAL_FOTO } from "@/lib/wms/duplicados";
 import { medidaEnNombre, unidadesEnNombre } from "./analisis";
 
 export type Certeza = "exacto" | "dudoso";
@@ -56,10 +58,24 @@ const iguales = (a: Set<string>, b: Set<string>) => a.size === b.size && [...a].
 const contenido = (a: Set<string>, b: Set<string>) => [...a].every((x) => b.has(x));
 const unoEnOtro = (a: Set<string>, b: Set<string>) => contenido(a, b) || contenido(b, a);
 
-/** Si el producto de la competencia es el mismo que el nuestro. `metodo` es cómo lo emparejó la búsqueda: «foto» o «nombre». */
-export function certezaIgual(nuestro: string, otro: string, metodo: string | null): Certeza {
-  const a = huella(nuestro);
-  const b = huella(otro);
+/** Un producto para comparar: su nombre y, si se calculó, la huella de su foto. */
+export interface ParaComparar {
+  nombre: string;
+  huella?: string | null;
+}
+
+/** Las dos fotos son la misma (o casi): la misma huella, a pocos bits. */
+export function mismaFoto(a: string | null | undefined, b: string | null | undefined): boolean {
+  return !!a && !!b && distanciaHuella(a, b) <= UMBRAL_FOTO;
+}
+
+/** Si el producto de la competencia es el mismo que el nuestro. `metodo` es cómo lo emparejó la búsqueda: «foto» o «nombre»; si las dos fotos son la misma, cuenta como «foto» aunque se emparejara por nombre. */
+export function certezaIgual(nuestroP: ParaComparar | string, otroP: ParaComparar | string, metodo: string | null): Certeza {
+  const nuestro = typeof nuestroP === "string" ? { nombre: nuestroP } : nuestroP;
+  const otro = typeof otroP === "string" ? { nombre: otroP } : otroP;
+  if (mismaFoto(nuestro.huella, otro.huella)) metodo = "foto";
+  const a = huella(nuestro.nombre);
+  const b = huella(otro.nombre);
   if (!a.palabras.size || !b.palabras.size) return "dudoso";
   if (a.unidades !== b.unidades) return "dudoso";
   // Dos tamaños distintos (60 frente a 120 cápsulas) son otro producto; si solo uno lo dice, no choca.

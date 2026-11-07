@@ -4,22 +4,33 @@ import type { IconoComp } from "@/components/tabla/botones-vista";
 import { TablaDatos, type ColumnaTabla } from "@/components/tabla/tabla-datos";
 import { EstadoIcon, InventarioIcon, TiendaIcon } from "@/lib/nav-icons";
 import type { NombreFilas } from "@/lib/tabla/pie";
+import { puedeElegirQuienPaga } from "@/lib/publicaciones/fulfillment-pais";
 import { CeldaFulfillment } from "./celda-fulfillment";
+import { CeldaQuienPaga } from "./celda-quien-paga";
 import { CrearPlataformaPanel } from "./crear-plataforma-panel";
 import { DEF_PLATAFORMAS, type FilaPlataforma } from "./def-plataformas";
 import { DisponibleToggle } from "./disponible-toggle";
 
 const NOMBRE: NombreFilas = { singular: "plataforma", plural: "plataformas" };
-const ICONOS: Record<string, IconoComp> = { estado: EstadoIcon, nombre: TiendaIcon, fulfillment: InventarioIcon };
+const ICONOS: Record<string, IconoComp> = { estado: EstadoIcon, nombre: TiendaIcon, fulfillment: InventarioIcon, paga: InventarioIcon };
 
 const columnas = (nombrePais: string, monedas: string[], puedeEscribir: boolean): ColumnaTabla<FilaPlataforma>[] => [
   { id: "nombre", label: "Plataforma", ocultable: false, clase: "font-medium", render: (p) => p.nombre },
   { id: "estado", label: "En retiros", ocultable: true, render: (p) => <DisponibleToggle id={p.id} disponible={p.disponible} /> },
   {
+    id: "paga",
+    label: "Lo paga",
+    ocultable: true,
+    render: (p) => <CeldaQuienPaga key={`${p.id}-${p.fulfillmentPaga}`} id={p.id} plataforma={p.nombre} paga={p.fulfillmentPaga} puedeElegir={puedeEscribir && puedeElegirQuienPaga(p.nombre)} />,
+  },
+  {
     id: "fulfillment",
     label: "Fulfillment por pedido",
     ocultable: true,
-    render: (p) => (
+    render: (p) =>
+      p.fulfillmentPaga === "dropshipper" ? (
+        <span className="text-sm text-muted-foreground">Lo paga el dropshipper</span>
+      ) : (
       <CeldaFulfillment
         key={`${p.id}-${p.fulfillment}-${p.fulfillmentMoneda}`}
         id={p.id}

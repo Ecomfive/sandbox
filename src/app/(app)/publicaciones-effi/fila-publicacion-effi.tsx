@@ -128,7 +128,7 @@ export function FilaPublicacionEffiLista({ f, moneda, alAbrir }: { f: FilaPublic
           apoyo={
             <span className="flex flex-col lg:items-end">
               <span className="max-w-full truncate">Costo {f.costo === null ? "—" : formatoMonto(f.costo, moneda)}</span>
-              <span className="max-w-full truncate">Fulfillment {f.fulfillment === null ? "—" : formatoMonto(f.fulfillment, moneda)}</span>
+              <span className="max-w-full truncate">Fulfillment {f.fulfillmentPaga === "dropshipper" ? "lo paga el dropshipper" : f.fulfillment === null ? "—" : formatoMonto(f.fulfillment, moneda)}</span>
             </span>
           }
         />

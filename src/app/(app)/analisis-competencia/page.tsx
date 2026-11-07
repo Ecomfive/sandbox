@@ -5,6 +5,9 @@ export const metadata = { title: "Análisis de competencia" };
 
 export const dynamic = "force-dynamic";
 
+// «Revisar con IA» pide a la IA una tanda de comparaciones con fotos: tarda más que una página.
+export const maxDuration = 120;
+
 /**
  * Investigación › Análisis de competencia: una sola pantalla. Las novedades (alertas) arriba y la lista de competidores de
  * Dropi del país; cada competidor se abre en su sitio con sus productos y cada producto con su historial.

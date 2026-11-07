@@ -5,6 +5,7 @@ import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { consultarTodoEffi } from "./api";
 import { articulosDeLectura, type ArticuloEffi } from "./articulos";
 import { ventanaVentas, ventasPorDia, type FilaDetalleEffi } from "./ventas";
+import { cambiosPrecioNuestros } from "@/lib/competencia/effi-precios";
 
 /** Effi es de la cuenta de Costa Rica. */
 export const PAIS_DE_EFFI = "CR";
@@ -16,6 +17,8 @@ export interface ResumenLecturaEffi {
   vinculados: number;
   /** Las ventas de la ventana leída (filas artículo + día), o por qué no se pudieron leer. Si fallan, los artículos igual se guardan. */
   ventas?: { dias: number; filas: number } | { error: string };
+  /** Cuántos precios nuestros del análisis de competencia se pusieron al día con los de la API, o por qué no. */
+  preciosCompetencia?: { cambiaron: number } | { error: string };
 }
 
 const revisar = <T,>(r: { data: T; error: { message: string } | null }, que: string): T => {
@@ -110,7 +113,8 @@ export async function sincronizarEffi(supabase: SupabaseClient): Promise<Resumen
     revisar(await supabase.from("effi_publicaciones").update({ en_effi: false, actualizado_en: ahora }).in("id", yaNoEstan.map((a) => a.id)), "Marcar los que ya no están en Effi");
 
   const ventas = await sincronizarVentasEffi(supabase, pais.id).catch((e: unknown) => ({ error: e instanceof Error ? e.message : "No se pudieron leer las ventas de Effi." }));
-  return { articulos: vistos.length, nuevos: vistos.filter((v) => !porId.has(v.effiId)).length, yaNoEstan: yaNoEstan.length, vinculados: vistos.length - sinVincular.length, ventas };
+  const preciosCompetencia = await alinearPreciosCompetenciaEffi(supabase, pais.id, vistos).catch((e: unknown) => ({ error: e instanceof Error ? e.message : "No se pudieron poner al día los precios del análisis." }));
+  return { articulos: vistos.length, nuevos: vistos.filter((v) => !porId.has(v.effiId)).length, yaNoEstan: yaNoEstan.length, vinculados: vistos.length - sinVincular.length, ventas, preciosCompetencia };
 }
 
 /**
@@ -131,4 +135,29 @@ export async function sincronizarVentasEffi(supabase: SupabaseClient, paisId: st
   const filas = ventas.map((v) => ({ pais_id: paisId, plataforma: "effi", producto_id: v.productoId, dia: v.dia, salidas: v.salidas, devueltas: v.devueltas }));
   for (let i = 0; i < filas.length; i += 500) revisar(await supabase.from("plataforma_ventas_diarias").insert(filas.slice(i, i + 500)), "Guardar las ventas de Effi");
   return { dias: new Set(ventas.map((v) => v.dia)).size, filas: filas.length };
+}
+
+/**
+ * Pone al día nuestros precios en el análisis de competencia de Effi con los que acaba de traer la API (`cambiosPrecioNuestros`): el catálogo, que tiene los de la competencia, se lee
+ * con sesión y se queda atrás cuando alguien cambia un precio nuestro en Effi. Cada cambio queda en el historial como cualquier cambio de precio. Sin la migración 0239 no hace nada.
+ */
+export async function alinearPreciosCompetenciaEffi(supabase: SupabaseClient, paisId: string, articulos: ArticuloEffi[]): Promise<{ cambiaron: number }> {
+  const { data, error } = await supabase.from("effi_competencia_productos").select("id, effi_clave, precio, precio_sugerido").eq("pais_id", paisId).eq("es_nuestro", true);
+  if (error) {
+    if (/effi_competencia_productos|schema cache|does not exist/i.test(error.message)) return { cambiaron: 0 };
+    throw new Error(`Precios del análisis: ${error.message}`);
+  }
+  const nuestros = (data ?? []).map((f) => ({
+    id: f.id as string,
+    effiClave: f.effi_clave as string,
+    precio: f.precio === null ? null : Number(f.precio),
+    precioSugerido: f.precio_sugerido === null ? null : Number(f.precio_sugerido),
+  }));
+  const cambios = cambiosPrecioNuestros(nuestros, articulos);
+  for (const c of cambios) revisar(await supabase.from("effi_competencia_productos").update({ precio: c.precio, precio_sugerido: c.precioSugerido }).eq("id", c.id), "Poner al día un precio del análisis");
+  const historial = cambios
+    .filter((c) => c.precioAntes !== null)
+    .map((c) => ({ producto_id: c.id, evento: "precio", precio: c.precio, precio_antes: c.precioAntes, detalle: "Desde la API de Effi" }));
+  if (historial.length) revisar(await supabase.from("effi_competencia_historial").insert(historial), "Anotar los cambios de precio en el historial");
+  return { cambiaron: cambios.length };
 }

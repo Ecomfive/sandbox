@@ -4,7 +4,7 @@ import { cargarEnCamino } from "@/lib/publicaciones/en-camino-datos";
 import { tasasUsd } from "@/lib/moneda/tipo-cambio";
 import { margenDrop } from "@/lib/publicaciones-drop/lectura";
 import { monedaPublicaciones, type MonedaPublicaciones } from "@/lib/publicaciones/moneda";
-import { fulfillmentEnMoneda } from "@/lib/publicaciones/fulfillment-pais";
+import { fulfillmentEnMoneda, fulfillmentQueCuenta, leerFulfillmentPlataforma, type QuienPagaFulfillment } from "@/lib/publicaciones/fulfillment-pais";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import type { FilaPublicacionDrop, ProductoDrop } from "./def-publicaciones-drop";
 
@@ -13,8 +13,10 @@ export interface DatosDrop {
   moneda: MonedaPublicaciones;
   /** La última lectura de Drop (la más reciente `ultima_vez`); null si nunca se leyó. */
   ultimaLectura: string | null;
-  /** El fulfillment de Drop del país en la moneda de las publicaciones; null si no está en Configuración. */
+  /** El fulfillment de Drop del país en la moneda de las publicaciones que cuenta en el margen; null si no está en Configuración o si lo paga el dropshipper. */
   fulfillment: number | null;
+  /** Quién paga el fulfillment de Drop (Configuración, migración 0247). */
+  fulfillmentPaga: QuienPagaFulfillment;
   /** Falta correr la migración 0221. */
   faltaMigracion: boolean;
 }
@@ -64,7 +66,7 @@ export async function cargarDatosDrop(supabase: SupabaseClient, pais: { id: stri
         .range(d, h),
     );
   } catch (e) {
-    if (/drop_publicaciones|schema cache|does not exist/i.test(String((e as { message?: string })?.message ?? e))) return { publicaciones: [], moneda, ultimaLectura: null, fulfillment: null, faltaMigracion: true };
+    if (/drop_publicaciones|schema cache|does not exist/i.test(String((e as { message?: string })?.message ?? e))) return { publicaciones: [], moneda, ultimaLectura: null, fulfillment: null, fulfillmentPaga: "nosotros", faltaMigracion: true };
     throw e;
   }
 
@@ -83,12 +85,10 @@ export async function cargarDatosDrop(supabase: SupabaseClient, pais: { id: stri
   }
 
   // El fulfillment de Drop del país, pasado a la moneda de las publicaciones si se escribió en otra.
-  const { data: plataformas } = await supabase.from("pais_plataformas").select("fulfillment, fulfillment_moneda, plataformas(nombre)").eq("pais_id", pais.id);
-  const filaDrop = (plataformas ?? []).find((p) => uno(p.plataformas as unknown as { nombre: string } | null)?.nombre?.trim().toLowerCase() === "drop");
-  const fulfillment =
-    filaDrop?.fulfillment === null || filaDrop?.fulfillment === undefined
-      ? null
-      : fulfillmentEnMoneda(Number(filaDrop.fulfillment), String(filaDrop.fulfillment_moneda ?? "USD"), pais.codigo, porUsd);
+  const plataforma = await leerFulfillmentPlataforma(supabase, pais.id, "drop");
+  const fulfillmentPaga = plataforma?.paga ?? "nosotros";
+  // Si lo paga el dropshipper, no se toma en cuenta en el margen.
+  const fulfillment = fulfillmentQueCuenta(plataforma?.monto == null ? null : fulfillmentEnMoneda(plataforma.monto, plataforma.moneda, pais.codigo, porUsd), fulfillmentPaga);
 
   // Lo que viene en camino y lo que se cotiza de cada producto, en compras del país (lo mismo que muestra Gestión de IDs Dropi).
   const { camino, cotizando, etapasCotizando } = skuIds.length ? await cargarEnCamino(supabase, pais.id, usuario) : { camino: new Map(), cotizando: new Map(), etapasCotizando: new Map() };
@@ -119,6 +119,7 @@ export async function cargarDatosDrop(supabase: SupabaseClient, pais: { id: stri
       utilidad: m?.utilidad ?? null,
       margen: m?.margen ?? null,
       fulfillment,
+      fulfillmentPaga,
       liquidacion: false,
       enCamino: viene?.unidades ?? 0,
       llegadaCamino: viene?.llegada ?? null,
@@ -129,5 +130,5 @@ export async function cargarDatosDrop(supabase: SupabaseClient, pais: { id: stri
     };
   });
   const ultimaLectura = filas.filter((f) => f.en_drop).reduce<string | null>((max, f) => (!max || f.ultima_vez > max ? f.ultima_vez : max), null);
-  return { publicaciones, moneda, ultimaLectura, fulfillment, faltaMigracion: false };
+  return { publicaciones, moneda, ultimaLectura, fulfillment, fulfillmentPaga, faltaMigracion: false };
 }

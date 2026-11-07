@@ -9,6 +9,8 @@ import { getPaisActual } from "@/lib/pais";
 import { getPlataformaActual } from "@/lib/plataforma-actual";
 import { plataformaDe, plataformasDePais } from "@/lib/plataformas";
 import { createServiceClient } from "@/lib/supabase/server";
+import { llaveEffi } from "@/lib/effi/api";
+import { BotonPreciosEffi } from "./boton-precios-effi";
 import { cargarDatosCompetencia, datosCompetenciaVacios } from "./datos-competencia";
 import type { DatosCompetencia } from "./def-competencia";
 
@@ -35,6 +37,7 @@ export async function PaginaCompetencia({ titulo, children }: { titulo: string; 
       <Pagina ancho="ancha" className="flex flex-col gap-5">
         <EncabezadoPagina titulo={titulo} oculto />
         {selector}
+        {plataforma === "effi" && puedeEscribir && <BotonPreciosEffi hayLlave={llaveEffi() !== null} />}
         {/* Drop y Effi son de Costa Rica: en colones. */}
         <MonedaCompetencia moneda={monedaDePais(pais.codigo)} pais={pais.codigo}>
           {children(datos!, puedeEscribir)}

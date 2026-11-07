@@ -353,8 +353,8 @@ export function FichaPublicacionDrop({
             </div>
             <div className="flex min-w-0 flex-col gap-1">
               <span className={labelClassSm}>Fulfillment</span>
-              <span className="text-sm tabular-nums">{p.fulfillment === null ? "—" : <Monto valor={p.fulfillment} moneda={moneda} />}</span>
-              <span className="text-xs text-muted-foreground">{p.fulfillment === null ? "Ponlo en Configuración, fila «Drop»" : "El de Drop en Configuración"}</span>
+              <span className="text-sm tabular-nums">{p.fulfillmentPaga === "dropshipper" ? "Lo paga el dropshipper" : p.fulfillment === null ? "—" : <Monto valor={p.fulfillment} moneda={moneda} />}</span>
+              <span className="text-xs text-muted-foreground">{p.fulfillmentPaga === "dropshipper" ? "No cuenta en el margen" : p.fulfillment === null ? "Ponlo en Configuración, fila «Drop»" : "El de Drop en Configuración"}</span>
             </div>
           </div>
           <dl className="grid grid-cols-2 gap-3 rounded-lg bg-muted px-4 py-3 text-sm tabular-nums">

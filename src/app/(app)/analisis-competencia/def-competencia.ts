@@ -19,6 +19,8 @@ export interface ProductoC {
   igualA: string | null;
   /** El nuestro al que se parece sin ser seguro que sea el mismo (`certezaIgual` = dudoso): se muestra como dudoso y no se compara. */
   dudosoDe: string | null;
+  /** Lo que dijo la IA al revisar el par (migración 0246): «mismo» lo vuelve igual, «distinto» lo quita, «parecido» lo deja dudoso. `null` si no lo revisó. */
+  revision: { veredicto: "mismo" | "parecido" | "distinto"; motivo: string | null } | null;
   parecido: number | null;
   metodo: string | null;
   primeraVez: string;
@@ -104,6 +106,8 @@ export interface DatosCompetencia {
   bitacora: BitacoraC[];
   ultima: { inicio: string; estado: string; duracionMs: number | null; productos: number | null; proveedores: number | null } | null;
   busquedas: number;
+  /** Los pares dudosos con foto que la IA todavía no revisó (botón «Revisar con IA»). */
+  dudososSinRevisar: number;
   /** Fin de la primera búsqueda del país: lo que aparece después es nuevo de verdad. */
   corte: string | null;
   ventas: VentaC[];
