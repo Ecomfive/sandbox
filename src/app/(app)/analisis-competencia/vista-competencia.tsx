@@ -537,6 +537,11 @@ function ProductosDelCompetidor({ productos, nuestros, busqueda }: { productos: 
                           {dif !== null && dif > 0 && <InsigniaPosicion estado="ganando" detalle={`nosotros ${usd(dif)} más baratos${eq?.nota ? " (equivalente)" : ""}`} />}
                           {dif === 0 && <InsigniaPosicion estado="empatado" detalle="mismo precio" />}
                         </span>
+                      ) : p.dudosoDe && nuestros.get(p.dudosoDe) ? (
+                        <span className="flex flex-col items-start gap-0.5">
+                          <Badge tone="neutral">Dudoso</Badge>
+                          <span className="text-xs text-muted-foreground">Se parece a «{nuestros.get(p.dudosoDe)!.nombre}», pero no es seguro que sea el mismo: no se compara su precio.</span>
+                        </span>
                       ) : (
                         <span className="text-muted-foreground">—</span>
                       )}

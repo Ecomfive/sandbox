@@ -5,6 +5,7 @@
 // alertas: todo es nuevo.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { certezaIgual } from "../src/lib/competencia/certeza";
 import { armarAlertas, normalizarCompetencia, vigiladoDe, type NuevoVigilado, type ProductoAlerta, type VistoCompetencia } from "../src/lib/competencia/analisis";
 import { cargarReferencias } from "../src/lib/scraping/referencias";
 import { monedaDePais } from "../src/lib/moneda/tipo-cambio";
@@ -188,8 +189,12 @@ export async function guardarCompetencia(
     // 5. Alertas (no en la primera búsqueda del país).
     let alertas = 0;
     if (!primera) {
+      // Las alertas que comparan con lo nuestro (bajó el precio, vende más barato, bajó el stock) solo si es el mismo producto (`certezaIgual`, 7 nov 2026).
+      const nombrePorId = new Map(actuales.map((p) => [p.id, p.nombre]));
+      const exacto = (p: { nombre: string; igual_a: string | null; igual_metodo: string | null }) =>
+        p.igual_a && certezaIgual(nombrePorId.get(p.igual_a) ?? "", p.nombre, p.igual_metodo) === "exacto" ? p.igual_a : null;
       const productos = new Map<string, ProductoAlerta>(
-        actuales.map((p) => [p.id, { id: p.id, nombre: p.nombre, proveedorNombre: p.proveedor_nombre, esNuestro: p.es_nuestro, precio: p.precio === null ? null : Number(p.precio), stock: p.stock, igualA: p.igual_a }]),
+        actuales.map((p) => [p.id, { id: p.id, nombre: p.nombre, proveedorNombre: p.proveedor_nombre, esNuestro: p.es_nuestro, precio: p.precio === null ? null : Number(p.precio), stock: p.stock, igualA: exacto(p) }]),
       );
       const provAntes = new Set(antes.map((g) => Number(g.proveedor_dropi_id)));
       const provNuevos = new Map<number, { nombre: string; productos: number }>();
