@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { descontinuadosEnPais } from "@/lib/producto/descontinuado-pais";
 import { after } from "next/server";
-import { accionesPublicacion, enDropi, esBodegaDropi, estaArchivada, necesitaRepublicar } from "@/lib/publicaciones/automatico";
+import { accionesPublicacion, enDropi, esBodegaDropi, estaArchivada, necesitaRepublicar, vendePoco } from "@/lib/publicaciones/automatico";
 import { normalizarDatosCrear, type OpcionesCrear } from "@/lib/publicaciones/crear-dropi";
 import { monedaPublicaciones } from "@/lib/publicaciones/moneda";
 import { cargarCambiosPrecio, cargarCompetidores, cargarNuestrosEnDropi, competidorMasBarato, competidorMinimo, competidoresEquivalentes, ultimoCambioDe } from "@/lib/publicaciones/competencia-publicaciones";
@@ -482,6 +482,9 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
     // Republicar: necesita la bodega de la fila (se conoce después de armarla).
     if (necesitaRepublicar({ archivada: f.archivada, enDropi: f.enDropi, bodegaId: f.bodega?.id ?? null, hayVentas: !!f.ventas, ultimaVenta: f.ventas?.ultimaVenta ?? null, publicadaDesde: f.fechaPublicacion ?? f.ventas?.primeraVenta ?? null, privada: f.tipoDropi === "privado", stock: f.stockProveedor ?? f.ventas?.stock ?? null, netas30: f.ventas?.netas30 ?? null }, hoy, r))
       f.acciones = [...f.acciones, "republicar"];
+    // Vende poco: también necesita el stock de la lectura de «Mis productos».
+    if (!f.apagadoPendiente && !f.duplicadaDe && !f.sinPublicar && vendePoco({ archivada: f.archivada, enDropi: f.enDropi, netas30: f.ventas?.netas30 ?? null, stock: f.stockProveedor ?? f.ventas?.stock ?? null, publicadaDesde: f.fechaPublicacion ?? f.ventas?.primeraVenta ?? null }, hoy, r))
+      f.acciones = [...f.acciones, "vende_poco"];
     const combo = f.sku ? combosX2.get(f.sku.id) : undefined;
     const comboPublicado = !!combo && publicados.has(combo.id);
     // Las tareas abiertas que los datos ya muestran hechas.
