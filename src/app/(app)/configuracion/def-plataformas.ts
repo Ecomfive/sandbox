@@ -1,3 +1,4 @@
+import type { QuienPagaFulfillment } from "@/lib/publicaciones/fulfillment-pais";
 import type { DefTabla } from "@/lib/tabla/motor";
 
 export interface FilaPlataforma {
@@ -11,6 +12,8 @@ export interface FilaPlataforma {
   fulfillmentMoneda: string;
   /** El mismo monto en la otra moneda del país («≈ US$2.00», «≈ ₡1 011»), o null. */
   fulfillmentEquivalente: string | null;
+  /** Quién paga el fulfillment (migración 0246): si es el dropshipper, no se toma en cuenta en el margen. */
+  fulfillmentPaga: QuienPagaFulfillment;
 }
 
 /** Filtros y agrupación de las plataformas del país; «Ocultas» son las que no salen en «+ Crear». */

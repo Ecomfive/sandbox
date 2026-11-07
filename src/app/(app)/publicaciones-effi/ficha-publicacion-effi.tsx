@@ -252,8 +252,8 @@ export function FichaPublicacionEffi({
             <Dato etiqueta="Costo" ayuda="El último costo de compra en Effi">
               {p.costo === null ? "—" : <Monto valor={p.costo} moneda={moneda} />}
             </Dato>
-            <Dato etiqueta="Fulfillment" ayuda={p.fulfillment === null ? "Ponlo en Configuración, fila «EFFI»" : "El de Effi en Configuración"}>
-              {p.fulfillment === null ? "—" : <Monto valor={p.fulfillment} moneda={moneda} />}
+            <Dato etiqueta="Fulfillment" ayuda={p.fulfillmentPaga === "dropshipper" ? "No cuenta en el margen" : p.fulfillment === null ? "Ponlo en Configuración, fila «EFFI»" : "El de Effi en Configuración"}>
+              {p.fulfillmentPaga === "dropshipper" ? "Lo paga el dropshipper" : p.fulfillment === null ? "—" : <Monto valor={p.fulfillment} moneda={moneda} />}
             </Dato>
           </div>
           <dl className="grid grid-cols-2 gap-3 rounded-lg bg-muted px-4 py-3 text-sm tabular-nums">

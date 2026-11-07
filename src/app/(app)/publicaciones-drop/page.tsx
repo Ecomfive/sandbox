@@ -45,7 +45,9 @@ export default async function PublicacionesDropPage({ searchParams }: { searchPa
       {datos.publicaciones.length > 0 && (
         <p className="m-0 -mt-3 text-xs text-muted-foreground">
           {datos.ultimaLectura ? `Última lectura de Drop: ${formatearFechaHora(datos.ultimaLectura)}. ` : ""}
-          {datos.fulfillment === null
+          {datos.fulfillmentPaga === "dropshipper"
+            ? "El fulfillment lo paga el dropshipper: el margen se calcula con el costo de cada producto en Gestión de IDs Dropi, sin fulfillment."
+            : datos.fulfillment === null
             ? "El margen se calcula sin fulfillment: ponlo en Configuración › Plataformas del país, en la fila «Drop»."
             : `Margen con el costo de cada producto en Gestión de IDs Dropi y el fulfillment de Drop (${formatoMonto(datos.fulfillment, datos.moneda)}).`}
         </p>
