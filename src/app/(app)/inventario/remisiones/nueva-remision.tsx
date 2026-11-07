@@ -25,6 +25,8 @@ interface Linea {
   cantidad: string;
   /** Cuántas cajas se eligieron de cada grupo guardado: `{ [id de la caja]: cuántas }`. */
   elegidas: Record<string, string>;
+  /** Unidades sueltas de una caja más de cada grupo, que se abre: `{ [id de la caja]: cuántas }` (migración 0248). */
+  sueltas: Record<string, string>;
 }
 
 /**
@@ -47,10 +49,19 @@ export function NuevaRemision({ propias, externas, plataformas = [], productos, 
   const hay = (sku: string) => stock[desde]?.[sku] ?? 0;
   const numero = (t: string) => Number(t);
   const cajasDe = (sku: string) => cajas[desde]?.[sku] ?? [];
-  const elegidasDe = (l: Linea) => cajasDe(l.sku.id).map((c) => ({ c, n: numero(l.elegidas[c.id] ?? "") })).filter(({ n }) => Number.isInteger(n) && n > 0);
-  // Un producto guardado por cajas se manda por cajas: las unidades salen de las que se elijan (7 nov 2026, pedido de Hernán).
-  const cantidadDe = (l: Linea) => (cajasDe(l.sku.id).length ? elegidasDe(l).reduce((t, { c, n }) => t + n * c.porCaja, 0) : numero(l.cantidad));
-  const cajaPasada = (l: Linea) => cajasDe(l.sku.id).some((c) => numero(l.elegidas[c.id] ?? "") > c.cajas);
+  const entero = (t: string | undefined) => (t ? numero(t) : 0);
+  const elegidasDe = (l: Linea) =>
+    cajasDe(l.sku.id)
+      .map((c) => ({ c, n: entero(l.elegidas[c.id]), s: entero(l.sueltas[c.id]) }))
+      .filter(({ n, s }) => Number.isInteger(n) && Number.isInteger(s) && n >= 0 && s >= 0 && n + s > 0);
+  // Un producto guardado por cajas se manda por cajas: las unidades salen de las que se elijan (7 nov 2026, pedido de Hernán). Las sueltas salen de una caja más, que se abre.
+  const cantidadDe = (l: Linea) => (cajasDe(l.sku.id).length ? elegidasDe(l).reduce((t, { c, n, s }) => t + n * c.porCaja + s, 0) : numero(l.cantidad));
+  const cajaMal = (l: Linea, c: CajaGuardada) => {
+    const n = entero(l.elegidas[c.id]);
+    const s = entero(l.sueltas[c.id]);
+    return s >= c.porCaja || n + (s > 0 ? 1 : 0) > c.cajas;
+  };
+  const cajaPasada = (l: Linea) => cajasDe(l.sku.id).some((c) => cajaMal(l, c));
   const pasada = lineas.find((l) => cantidadDe(l) > hay(l.sku.id) || cajaPasada(l));
   const incompleta = lineas.some((l) => !Number.isInteger(cantidadDe(l)) || cantidadDe(l) <= 0);
   const unidades = lineas.reduce((t, l) => t + (Number.isInteger(cantidadDe(l)) ? cantidadDe(l) : 0), 0);
@@ -65,12 +76,12 @@ export function NuevaRemision({ propias, externas, plataformas = [], productos, 
     setError(null);
   }
   function agregar(sku: OpcionSkuMaestro | null) {
-    if (sku && !lineas.some((l) => l.sku.id === sku.id)) setLineas((l) => [...l, { sku, cantidad: "", elegidas: {} }]);
+    if (sku && !lineas.some((l) => l.sku.id === sku.id)) setLineas((l) => [...l, { sku, cantidad: "", elegidas: {}, sueltas: {} }]);
   }
   function crear() {
     setError(null);
     empezar(async () => {
-      const r = await crearRemision({ desde, hacia, notas, lineas: lineas.map((l) => ({ sku: l.sku.id, cantidad: cantidadDe(l), cajas: elegidasDe(l).map(({ c, n }) => ({ id: c.id, cajas: n })) })) }).catch(() => ({ error: "No se pudo. Inténtalo de nuevo." }));
+      const r = await crearRemision({ desde, hacia, notas, lineas: lineas.map((l) => ({ sku: l.sku.id, cantidad: cantidadDe(l), cajas: elegidasDe(l).map(({ c, n, s }) => (s > 0 ? { id: c.id, cajas: n, sueltas: s } : { id: c.id, cajas: n })) })) }).catch(() => ({ error: "No se pudo. Inténtalo de nuevo." }));
       if ("error" in r) return void setError(r.error);
       setCreada(r);
       router.refresh();
@@ -197,11 +208,16 @@ export function NuevaRemision({ propias, externas, plataformas = [], productos, 
                         </div>
                         {guardadas.length > 0 && (
                           <ul className="m-0 flex list-none flex-col gap-1 rounded-md bg-muted/50 p-2 text-xs">
+                            <li aria-hidden="true" className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                              <span className="min-w-0 flex-1" />
+                              <span className="w-20">Cajas</span>
+                              <span className="w-20">Sueltas</span>
+                            </li>
                             {guardadas.map((caja) => {
-                              const pide = numero(l.elegidas[caja.id] ?? "");
+                              const mal = cajaMal(l, caja);
                               return (
                                 <li key={caja.id} className="flex items-center gap-2">
-                                  <span className={`min-w-0 flex-1 ${pide > caja.cajas ? "text-destructive" : ""}`}>
+                                  <span className={`min-w-0 flex-1 ${mal ? "text-destructive" : ""}`}>
                                     {textoCaja(caja)}
                                     {caja.lugar ? ` · ${caja.lugar}` : ""}
                                   </span>
@@ -214,6 +230,19 @@ export function NuevaRemision({ propias, externas, plataformas = [], productos, 
                                     aria-label={`Cajas de ${caja.porCaja} en ${caja.ubicacion} de ${l.sku.codigo}`}
                                     value={l.elegidas[caja.id] ?? ""}
                                     onChange={(e) => setLineas((ls) => ls.map((x) => (x.sku.id === l.sku.id ? { ...x, elegidas: { ...x.elegidas, [caja.id]: e.target.value } } : x)))}
+                                    placeholder="0"
+                                    className={`${fieldClassSm} w-20 tabular-nums`}
+                                  />
+                                  <input
+                                    type="number"
+                                    inputMode="numeric"
+                                    min={0}
+                                    max={caja.porCaja - 1}
+                                    step={1}
+                                    aria-label={`Unidades sueltas de una caja de ${caja.porCaja} en ${caja.ubicacion} de ${l.sku.codigo}`}
+                                    title={`Se abre una caja de ${caja.porCaja}: salen estas unidades y lo que sobra queda como una caja más chica en ${caja.ubicacion}`}
+                                    value={l.sueltas[caja.id] ?? ""}
+                                    onChange={(e) => setLineas((ls) => ls.map((x) => (x.sku.id === l.sku.id ? { ...x, sueltas: { ...x.sueltas, [caja.id]: e.target.value } } : x)))}
                                     placeholder="0"
                                     className={`${fieldClassSm} w-20 tabular-nums`}
                                   />
