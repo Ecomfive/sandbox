@@ -11,6 +11,7 @@ import { TablaPlataformas } from "./tabla-plataformas";
 import { TablaPaises } from "./tabla-paises";
 import { UmbralesTipoCliente } from "./umbrales-tipo-cliente";
 import { ConexionEffi } from "./conexion-effi";
+import { AvisoInactividadConfig, type PersonaAviso } from "./aviso-inactividad";
 import { llaveEffi } from "@/lib/effi/api";
 
 export const metadata = { title: "Configuración" };
@@ -28,7 +29,7 @@ export default async function ConfiguracionPage() {
   const consultarCuentas = (columnas: string) =>
     supabase.from("cuentas_retiro").select(columnas).eq("pais_id", pais.id).order("creado_en", { ascending: false });
 
-  const [{ data: paisPlataformas }, cuentasConBinance, { data: todosLosPaises }, { data: correlativos }, umbralesR] = await Promise.all([
+  const [{ data: paisPlataformas }, cuentasConBinance, { data: todosLosPaises }, { data: correlativos }, umbralesR, avisoR] = await Promise.all([
     // `fulfillment` lo agrega la migración 0213 y `fulfillment_paga` la 0247: sin ellas, se repite sin esas columnas.
     supabase
       .from("pais_plataformas")
@@ -48,7 +49,17 @@ export default async function ConfiguracionPage() {
     supabase.from("wms_compras_correlativo").select("clave, prefijo, ultimo"),
     // Umbrales del tipo de cliente del CRM (migración 0196). Sin ella, la sección no sale.
     supabase.from("crm_tipo_cliente_umbrales").select("pais_id, vip_desde, black_desde"),
+    // A quién se le muestra el aviso de 5 minutos sin actividad (migración 0249). Sin ella, la sección no sale.
+    supabase.from("perfiles").select("id, nombre, email, aviso_inactividad, roles(nombre)").eq("activo", true).order("nombre"),
   ]);
+  const personasAviso: PersonaAviso[] | null = avisoR.error
+    ? null
+    : ((avisoR.data ?? []) as unknown as { id: string; nombre: string | null; email: string; aviso_inactividad: boolean; roles: { nombre: string } | null }[]).map((p) => ({
+        id: p.id,
+        nombre: p.nombre || p.email,
+        rol: p.roles?.nombre ?? null,
+        activo: p.aviso_inactividad,
+      }));
   const cuentas = (cuentasConBinance.error ? (await consultarCuentas(COLUMNAS_CUENTA)).data : cuentasConBinance.data) as unknown as
     | FilaCuenta[]
     | null;
@@ -107,6 +118,13 @@ export default async function ConfiguracionPage() {
         <h2 className="text-sm font-semibold tracking-tight">Plataformas de {pais.nombre}</h2>
         <TablaPlataformas plataformas={plataformas} paisId={pais.id} nombrePais={pais.nombre} monedas={monedas} puedeEscribir={puedeEscribir} />
       </div>
+
+      {personasAviso && (
+        <div id="aviso-inactividad" className="flex flex-col gap-3">
+          <h2 className="text-sm font-semibold tracking-tight">Aviso de inactividad</h2>
+          <AvisoInactividadConfig personas={personasAviso} puedeEscribir={puedeEscribir} />
+        </div>
+      )}
 
       <div id="effi" className="flex flex-col gap-3">
         <h2 className="text-sm font-semibold tracking-tight">Conexión con Effi</h2>

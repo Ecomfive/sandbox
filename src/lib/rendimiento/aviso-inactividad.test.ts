@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { AVISO_INACTIVIDAD, minutosEntre, sinActividad, textoSinActividad, textoVolvio } from "./aviso-inactividad";
+import { minutosEntre, sinActividad, textoSinActividad, textoVolvio } from "./aviso-inactividad";
 
 // 10:12 de Panamá = 15:12 UTC.
 const t = (hhmm: string) => Date.parse(`2026-11-07T${hhmm}:00Z`);
@@ -19,6 +19,3 @@ test("los textos dicen desde qué hora y cuánto tiempo, en hora de Panamá", ()
   assert.match(volvio, /^Estuviste 1 h 8 min sin actividad en el sistema, de 10:12.* a 11:20/);
 });
 
-test("hoy solo le sale a Nicol", () => {
-  assert.equal(AVISO_INACTIVIDAD.size, 1);
-});
