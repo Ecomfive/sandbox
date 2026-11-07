@@ -7,7 +7,7 @@ import { ACCIONES as ACCIONES_CALCULADAS, detalleAccion, type Accion as AccionCa
 import type { Reglas } from "@/lib/publicaciones/reglas";
 import { alternarAtajo, atajoActivo, type AtajoFiltro } from "@/lib/tabla/atajos";
 import type { DefTabla } from "@/lib/tabla/motor";
-import { ActualizarIcon, AnalisisCompetenciaIcon, DesconectadoIcon, DropshipperIcon, EnlaceIcon, EstadoIcon, InventarioIcon, MargenIcon, SugerenciaIcon, TiendaIcon, VentasIcon } from "@/lib/nav-icons";
+import { ActualizarIcon, AnalisisCompetenciaIcon, DesconectadoIcon, DropshipperIcon, EnlaceIcon, EstadoIcon, EtiquetaIcon, InventarioIcon, MargenIcon, SugerenciaIcon, TiendaIcon, VentasIcon } from "@/lib/nav-icons";
 import { TIPOS_RECOMENDACION, type GrupoRecomendacion } from "@/lib/publicaciones/recomendaciones";
 
 const grupoDe = (t: string) => TIPOS_RECOMENDACION.find((x) => x.valor === t)?.grupo;
@@ -70,14 +70,25 @@ const TARJETAS: Tarjeta[] = [
     atajo: { id: "activas", etiqueta: "Activas en Dropi", ayuda: "Filtrar la lista: activas en Dropi", filtro: seleccion("publicacion", "activo") },
   },
   {
+    // Sin las de liquidación, que tienen su propia tarjeta (7 nov 2026, pedido de Alcides: «sepárame los de margen bajo de los de liquidación»).
     ...porAccion("margen_bajo", MargenIcon, "rojo"),
+    cuenta: (f) => f.acciones.includes("margen_bajo") && !f.liquidacionDesde,
     extra: (abiertas, r) => {
-      const n = abiertas.filter((f) => f.nivelMargen === "critico").length;
+      const n = abiertas.filter((f) => f.nivelMargen === "critico" && f.acciones.includes("margen_bajo") && !f.liquidacionDesde).length;
       return n ? `${n} en crítico (menos de ${Math.round(r.margen_critico * 100)} %)` : null;
     },
-    // Las que se están liquidando a propósito siguen en margen bajo y se cuentan junto al número: «22 / 13 en liquidación» (28 oct 2026).
-    junto: (abiertas) => ({ n: abiertas.filter((f) => f.acciones.includes("margen_bajo") && !!f.liquidacionDesde).length, texto: "en liquidación", color: "ambar" }),
+    atajo: { id: "margen_bajo", etiqueta: "Margen bajo", ayuda: "Filtrar la lista: margen bajo, sin las que están en liquidación", filtro: seleccion("accion", "margen_bajo"), ademas: [seleccion("liquidacion", "no")] },
   },
+  {
+    id: "liquidacion",
+    titulo: "En liquidación",
+    icono: EtiquetaIcon,
+    color: "ambar",
+    detalle: "Con el precio bajo a propósito para vender lo que queda",
+    cuenta: (f) => !!f.liquidacionDesde,
+    atajo: { id: "liquidacion", etiqueta: "En liquidación", ayuda: "Filtrar la lista: en liquidación", filtro: seleccion("liquidacion", "si") },
+  },
+  porAccion("vende_poco", VentasIcon, "violeta"),
   porAccion("ventas_caida", VentasIcon, "ambar"),
   porAccion("bajar_precio", AnalisisCompetenciaIcon, "rojo"),
   porAccion("verificar_dropshipper", DropshipperIcon, "azul"),

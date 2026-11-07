@@ -73,3 +73,20 @@ test("la bodega de Dropi de cada país: B280 Panamá, B15 Costa Rica, B49 Méxic
   assert.match(detalleAccion("republicar", REGLAS_DEFECTO, "MX"), /no la B49\)/);
   assert.match(detalleAccion("republicar", REGLAS_DEFECTO, "PA"), /no la B280\)/);
 });
+
+test("vende poco: activa, con stock, con más de un mes publicada y menos de 100 ventas en 30 días", async () => {
+  const { vendePoco, REGLAS_DEFECTO } = { ...(await import("./automatico")), ...(await import("./reglas")) };
+  const hoy = "2026-11-07";
+  const base = { archivada: false, enDropi: "activo" as const, netas30: 40, stock: 200, publicadaDesde: "2026-08-01" };
+  assert.equal(vendePoco(base, hoy), true);
+  assert.equal(vendePoco({ ...base, netas30: 0 }, hoy), true, "sin ventas también: el precio puede ser el problema");
+  assert.equal(vendePoco({ ...base, netas30: 100 }, hoy), false, "100 ya alcanza");
+  assert.equal(vendePoco({ ...base, stock: 0 }, hoy), false, "sin stock es otra tarjeta");
+  assert.equal(vendePoco({ ...base, stock: null }, hoy), false);
+  assert.equal(vendePoco({ ...base, netas30: null }, hoy), false, "sin datos de ventas no se sabe");
+  assert.equal(vendePoco({ ...base, publicadaDesde: "2026-10-20" }, hoy), false, "todavía no tiene un mes entero");
+  assert.equal(vendePoco({ ...base, publicadaDesde: null }, hoy), false);
+  assert.equal(vendePoco({ ...base, archivada: true }, hoy), false);
+  assert.equal(vendePoco({ ...base, enDropi: "archivado" }, hoy), false);
+  assert.equal(vendePoco({ ...base, netas30: 140 }, hoy, { ...REGLAS_DEFECTO, venta_minima_mes: 150 }), true, "el umbral sale de Reglas");
+});
