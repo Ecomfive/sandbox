@@ -19,7 +19,12 @@ export function BotonActualizarEffi({ hayLlave }: { hayLlave: boolean }) {
         empezar(async () => {
           const r = await actualizarDesdeEffi();
           if (r.error) return mostrarToast(r.error, "destructive");
-          if (r.resumen) mostrarToast(`Effi leído: ${r.resumen.articulos} artículos, ${r.resumen.nuevos} nuevos, ${r.resumen.yaNoEstan} ya no aparecen.`, "success");
+          if (r.resumen) {
+            const v = r.resumen.ventas;
+            // Las ventas (migración 0244) se leen en la misma pasada: si fallan, los artículos igual quedaron y aquí se dice por qué.
+            const ventas = !v ? "" : "error" in v ? ` Las ventas no se pudieron leer: ${v.error}` : ` Ventas: ${v.filas} filas de ${v.dias} días.`;
+            mostrarToast(`Effi leído: ${r.resumen.articulos} artículos, ${r.resumen.nuevos} nuevos, ${r.resumen.yaNoEstan} ya no aparecen.${ventas}`, v && "error" in v ? "destructive" : "success");
+          }
         })
       }
     >
