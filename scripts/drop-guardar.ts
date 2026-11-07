@@ -49,8 +49,8 @@ export async function guardarDrop(supabase: SupabaseClient, l: LecturaDrop) {
   // Una lectura vacía (sesión vencida, página cambiada) no marca todo como «ya no está en Drop».
   if (!vistos.length) throw new Error("La lectura de Drop no trajo ningún producto: no se tocó nada.");
 
-  const antes = await traerTodasLasFilas<{ id: string; drop_id: string; sku_maestro_id: string | null; foto_url: string | null; foto_huella: string | null; en_drop: boolean }>((d, h) =>
-    supabase.from("drop_publicaciones").select("id, drop_id, sku_maestro_id, foto_url, foto_huella, en_drop").eq("pais_id", pais.id).order("id").range(d, h),
+  const antes = await traerTodasLasFilas<{ id: string; drop_id: string; codigo: string | null; sku_maestro_id: string | null; foto_url: string | null; foto_huella: string | null; en_drop: boolean }>((d, h) =>
+    supabase.from("drop_publicaciones").select("id, drop_id, codigo, sku_maestro_id, foto_url, foto_huella, en_drop").eq("pais_id", pais.id).order("id").range(d, h),
   );
   const porDropId = new Map(antes.map((a) => [a.drop_id, a]));
 
@@ -101,7 +101,8 @@ export async function guardarDrop(supabase: SupabaseClient, l: LecturaDrop) {
     return {
       pais_id: pais.id,
       drop_id: v.dropId,
-      codigo: v.codigo,
+      // «Mis productos» a veces no muestra el ID público (7 nov 2026: dos productos que el catálogo sí mostraba con su ID): si no viene, se conserva el que había.
+      codigo: v.codigo ?? porDropId.get(v.dropId)?.codigo ?? null,
       nombre: v.nombre,
       sku_drop: v.skuDrop,
       estado: v.estado,

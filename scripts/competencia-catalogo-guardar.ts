@@ -187,6 +187,14 @@ export async function guardarCatalogo(supabase: SupabaseClient, l: LecturaCatalo
       ) as FilaGuardada[];
       for (const f of data) idPorClave.set(claveDe(f), f.id);
     });
+    // Drop: el catálogo muestra el ID público de nuestros productos aunque «Mis productos» a veces no lo dé (7 nov 2026). Gestión de IDs Drop lo toma de aquí si le falta.
+    if (l.tipo === "competencia-drop") {
+      for (const v of vistos) {
+        const codigo = v.extras.codigo;
+        if (!v.esNuestro || typeof codigo !== "string") continue;
+        revisar(await supabase.from("drop_publicaciones").update({ codigo }).eq("pais_id", pais.id).eq("drop_id", v.clave).is("codigo", null), "ID de Drop de nuestros productos");
+      }
+    }
     const desaparecidos = r.desaparecidos.map((d) => d.id);
     await enTrozos(desaparecidos, 300, async (trozo) => {
       revisar(await supabase.from(tablas.productos).update({ estado: "desaparecido" }).in("id", trozo), "Desaparecidos");
