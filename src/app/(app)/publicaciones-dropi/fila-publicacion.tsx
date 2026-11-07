@@ -13,6 +13,7 @@ import { ETIQUETA_SUGERENCIA } from "@/lib/publicaciones/vincular";
 import { codigoBodega } from "@/lib/publicaciones/sincronizar-dropi";
 import { textoVariacion } from "@/lib/publicaciones/stock-dropi";
 import { detalleCompuesto } from "@/lib/compras/en-camino";
+import { CodigosProducto } from "@/components/ui/codigos-producto";
 import { archivarPublicacion, pausarPublicacion, republicarPublicacion } from "./actions";
 import { BotonIconoFila } from "./boton-icono-fila";
 import { motivoArchivar, motivoPausar, motivoRepublicar } from "@/lib/publicaciones/botones-fila";
@@ -314,7 +315,10 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, puedeArchi
               </span>
             )}
             {f.sku ? (
-              <span className="font-mono font-semibold text-foreground">{f.sku.codigo}</span>
+              <>
+                <span className="font-mono font-semibold text-foreground">{f.sku.codigo}</span>
+                <CodigosProducto numero={f.sku.numero} barras={f.sku.barras} />
+              </>
             ) : (
               <span className="inline-flex items-center gap-1.5">
                 <Punto clase="bg-warning" texto="Sin vincular producto" />

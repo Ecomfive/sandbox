@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { BloqueCompetencia, FotoAmpliable } from "@/components/competencia/piezas-competencia";
+import { CodigosProducto } from "@/components/ui/codigos-producto";
 import { usePuedeAbrir } from "@/components/modulos-contexto";
 import { Badge } from "@/components/ui/badge";
 import { BotonAccion } from "@/components/ui/boton-accion";
@@ -40,6 +41,7 @@ function Producto({ sku, pequeño = false }: { sku: ProductoDrop; pequeño?: boo
       <FotoAmpliable url={sku.foto} nombre={sku.codigo} tam={pequeño ? "h-8 w-8" : "h-10 w-10"} />
       <span className="flex min-w-0 flex-col">
         <SkuCopiable codigo={sku.codigo} className="font-mono text-xs font-semibold" />
+        <CodigosProducto numero={sku.numero} barras={sku.barras} />
         <span className="truncate text-xs text-muted-foreground">
           {sku.nombre}
           {sku.tipo === "combo" && " · compuesto"}

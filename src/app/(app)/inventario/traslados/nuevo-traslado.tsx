@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { anilloFoco, fieldClass, fieldClassSm, labelClassSm } from "@/components/ui/field";
+import { CodigosProducto } from "@/components/ui/codigos-producto";
 import { MiniaturaFoto } from "@/components/ui/miniatura-foto";
 import { CampoSkuMaestro, ProveedorSkusMaestros, type OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import { useToast } from "@/components/ui/toast";
@@ -159,6 +160,7 @@ export function NuevoTraslado({
                         <MiniaturaFoto url={l.sku.foto ?? null} nombre={l.sku.nombre} />
                         <span className="min-w-0 flex-1">
                           <span className="block truncate font-medium">{l.sku.codigo}</span>
+                          <CodigosProducto numero={l.sku.numero} barras={l.sku.barras} className="block" />
                           <span className={`block text-xs tabular-nums ${pasa ? "text-destructive" : "text-muted-foreground"}`}>{hay(l.sku.id).toLocaleString("es-PA")} disponibles en la bodega</span>
                         </span>
                         {guardadas.length > 0 ? (

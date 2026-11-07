@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { anilloFoco } from "@/components/ui/field";
+import { CodigosProducto } from "@/components/ui/codigos-producto";
 import { MiniaturaFoto } from "@/components/ui/miniatura-foto";
 import { Tooltip } from "@/components/ui/tooltip";
 import { ChevronRightIcon } from "@/lib/nav-icons";
@@ -83,6 +84,7 @@ export function FilaStockLista({ f, alAbrir, conPlataformas = false }: { f: Fila
           <span className="truncate text-sm font-medium">{f.nombre}</span>
           <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground [overflow-wrap:anywhere]">
             <span className="font-mono font-semibold text-foreground">{f.codigo}</span>
+            <CodigosProducto numero={f.numero} barras={f.barras} />
             {compuesto && <Badge tone="neutral">{ETIQUETA_TIPO_SKU.combo}</Badge>}
             {f.clase === "test" && <Badge tone="azul">{ETIQUETA_CLASE_SKU.test}</Badge>}
             {f.clase === "inactivo" && <Badge tone="destructive">{ETIQUETA_CLASE_SKU.inactivo}</Badge>}

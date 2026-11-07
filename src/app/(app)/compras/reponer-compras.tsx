@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { CodigosProducto } from "@/components/ui/codigos-producto";
 import { useMemo, useState } from "react";
 import { CabeceraTarjeta, Indicador, TableroIndicadores, Segmentado, claseTdLista, claseThLista } from "@/components/panel/piezas-panel";
 import { anilloFoco } from "@/components/ui/field";
@@ -30,7 +31,7 @@ export function ReponerCompras({
   /** La última lectura de «Mis productos» de Dropi, ya escrita en hora de Panamá: de ahí sale el stock. */
   stockLeido?: string | null;
   resumen: ResumenProducto[];
-  skuDe: [number, { id: string; codigo: string; nombre: string }][];
+  skuDe: [number, { id: string; codigo: string; nombre: string; numero?: number | null; barras?: string | null }][];
   enCamino: [string, EnCamino][];
   comprasSinCargar: boolean;
 }) {
@@ -96,6 +97,7 @@ export function ReponerCompras({
                     <td className={`${claseTdLista} whitespace-normal`}>
                       <span className="flex min-w-[14rem] max-w-[24rem] flex-col">
                         <span className="font-medium">{f.nombre}</span>
+                        {f.sku && <CodigosProducto numero={f.sku.numero} barras={f.sku.barras} />}
                         <span className="text-xs text-muted-foreground tabular-nums">
                           {f.sku ? <span className="font-mono">{f.sku.codigo}</span> : <span className="text-warning">Sin vincular a Producto</span>}
                           {" · "}

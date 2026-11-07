@@ -1,5 +1,6 @@
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
+import { cargarCodigosProductos } from "@/lib/wms/codigos-producto";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
 import { requireModulo } from "@/lib/auth";
@@ -41,7 +42,7 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
   const bodegaElegida = bodegaPedida && bodegas.some((b) => b.id === bodegaPedida) ? bodegaPedida : "";
 
   const idsPropias = bodegas.filter((b) => b.tipo === "propia" && b.activa).map((b) => b.id as string);
-  const [resumen, ubicaciones, fotos, padres] = await Promise.all([
+  const [resumen, ubicaciones, fotos, padres, codigos] = await Promise.all([
     // Paginado: cada consulta trae 1 000 filas como máximo y hay más productos (2 nov 2026: la lista se cortaba en 1 000).
     traerTodasConError<Record<string, unknown>>((desde, hasta) => supabase.rpc("wms_stock_resumen", { p_pais: pais.id, p_bodega: bodegaElegida || null }).range(desde, hasta)),
     idsPropias.length > 0
@@ -50,6 +51,8 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
     // Sin la migración 0086 no hay columna de foto: el inventario se carga igual, sin fotos.
     traerTodasConError<{ id: string; foto_url: string }>((desde, hasta) => supabase.from("skus_maestros").select("id, foto_url").not("foto_url", "is", null).order("id").range(desde, hasta)),
     traerTodasConError<{ id: string }>((desde, hasta) => supabase.from("skus_maestros").select("id").not("opciones_variantes", "is", null).order("id").range(desde, hasta)),
+    // El N.º y el código de barras de cada producto (7 nov 2026, pedido de Hernán).
+    cargarCodigosProductos(supabase),
   ]);
   const fotoPorId = new Map(((fotos.data ?? []) as { id: string; foto_url: string }[]).map((f) => [f.id, f.foto_url]));
   // Las cajas de cada producto, de las bodegas que se están viendo (migración 0236; sin ella, en cero).
@@ -75,6 +78,8 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
     id: String(r.sku_maestro_id),
     codigo: String(r.codigo),
     nombre: String(r.nombre),
+    numero: codigos.get(String(r.sku_maestro_id))?.numero ?? null,
+    barras: codigos.get(String(r.sku_maestro_id))?.barras ?? null,
     tipo: String(r.tipo),
     clase: String(r.clase ?? "fisico"),
     fisico: Number(r.fisico),

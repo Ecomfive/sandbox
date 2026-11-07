@@ -31,20 +31,20 @@ export default async function NovedadesPage() {
   const [{ data, error }, { data: bodegas }, productos] = await Promise.all([
     supabase
       .from("wms_novedades_plataforma")
-      .select("id, numero, tipo, cantidad, referencia, nota, foto_url, retorno_oficina, estado, autoriza_a, creado_por, creado_por_nombre, creado_en, resuelto_por_nombre, resuelto_en, nota_resolucion, bodega_id, wms_bodegas(nombre), skus_maestros(codigo, nombre, foto_url)")
+      .select("id, numero, tipo, cantidad, referencia, nota, foto_url, retorno_oficina, estado, autoriza_a, creado_por, creado_por_nombre, creado_en, resuelto_por_nombre, resuelto_en, nota_resolucion, bodega_id, wms_bodegas(nombre), skus_maestros(codigo, nombre, foto_url, numero, codigo_barras)")
       .eq("pais_id", pais.id)
       .order("creado_en", { ascending: false })
       .limit(500),
     supabase.from("wms_bodegas").select("id, nombre").eq("pais_id", pais.id).eq("tipo", "externa").eq("activa", true).order("nombre"),
     puedeEscribir
-      ? traerTodasConError<{ id: string; codigo: string; nombre: string; estado: string; numero: number | null; foto_url: string | null }>((d, h) =>
-          supabase.from("skus_maestros").select("id, codigo, nombre, estado, numero, foto_url").neq("tipo", "combo").is("opciones_variantes", null).order("codigo").range(d, h),
+      ? traerTodasConError<{ id: string; codigo: string; nombre: string; estado: string; numero: number | null; foto_url: string | null; codigo_barras: string | null }>((d, h) =>
+          supabase.from("skus_maestros").select("id, codigo, nombre, estado, numero, foto_url, codigo_barras").neq("tipo", "combo").is("opciones_variantes", null).order("codigo").range(d, h),
         )
       : Promise.resolve({ data: [] }),
   ]);
 
   const filas: NovedadVista[] = (data ?? []).map((n) => {
-    const sku = uno(n.skus_maestros as { codigo: string; nombre: string; foto_url: string | null } | { codigo: string; nombre: string; foto_url: string | null }[] | null);
+    const sku = uno(n.skus_maestros as { codigo: string; nombre: string; foto_url: string | null; numero: number | null; codigo_barras: string | null } | { codigo: string; nombre: string; foto_url: string | null; numero: number | null; codigo_barras: string | null }[] | null);
     const tipo = n.tipo as TipoNovedad;
     const estado = n.estado as EstadoNovedad;
     return {
@@ -57,6 +57,8 @@ export default async function NovedadesPage() {
       codigo: sku?.codigo ?? "—",
       nombre: sku?.nombre ?? "",
       foto: sku?.foto_url ?? null,
+      numeroProducto: sku?.numero ?? null,
+      barras: sku?.codigo_barras ?? null,
       referencia: (n.referencia as string | null) ?? null,
       nota: (n.nota as string | null) ?? null,
       evidencia: (n.foto_url as string | null) ?? null,
@@ -81,7 +83,7 @@ export default async function NovedadesPage() {
         <Novedades
           filas={filas}
           plataformas={(bodegas ?? []).map((b) => ({ id: b.id as string, nombre: b.nombre as string }))}
-          productos={(productos.data ?? []).map((p) => ({ id: p.id, codigo: p.codigo, nombre: p.nombre, estado: p.estado, numero: p.numero, foto: p.foto_url }))}
+          productos={(productos.data ?? []).map((p) => ({ id: p.id, codigo: p.codigo, nombre: p.nombre, estado: p.estado, numero: p.numero, barras: p.codigo_barras, foto: p.foto_url }))}
           puedeEscribir={puedeEscribir}
         />
       )}

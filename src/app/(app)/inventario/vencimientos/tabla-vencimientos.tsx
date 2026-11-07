@@ -1,5 +1,6 @@
 "use client";
 
+import { CodigosProducto } from "@/components/ui/codigos-producto";
 import { Badge } from "@/components/ui/badge";
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { TablaDatos, type ColumnaTabla } from "@/components/tabla/tabla-datos";
@@ -9,7 +10,8 @@ import type { NombreFilas } from "@/lib/tabla/pie";
 import { DEF_VENCIMIENTOS, ETIQUETA_ESTADO_VENCIMIENTO, type FilaVencimiento } from "./def-vencimientos";
 
 const NOMBRE: NombreFilas = { singular: "lote", plural: "lotes" };
-const ICONOS: Record<string, IconoComp> = { estado: EstadoIcon, sku: ProductoIcon, lote: InventarioIcon, vence: CalendarioIcon, cantidad: InventarioIcon };
+const ICONOS: Record<string, IconoComp> = { estado: EstadoIcon, sku: ProductoIcon,
+  codigos: ProductoIcon, lote: InventarioIcon, vence: CalendarioIcon, cantidad: InventarioIcon };
 const TONO = { vencido: "destructive", por_vencer: "warning", vigente: "neutral" } as const;
 
 function textoDias(d: number): string {
@@ -22,6 +24,7 @@ const COLUMNAS: ColumnaTabla<FilaVencimiento>[] = [
   { id: "estado", label: "Estado", ocultable: false, render: (f) => <Badge tone={TONO[f.estado]}>{ETIQUETA_ESTADO_VENCIMIENTO[f.estado]}</Badge> },
   { id: "sku", label: "SKU", ocultable: false, clase: "font-medium", render: (f) => f.sku },
   { id: "producto", label: "Producto", ocultable: true, clase: "text-muted-foreground", render: (f) => f.producto },
+  { id: "codigos", label: "N.º y barras", ocultable: true, render: (f) => <CodigosProducto numero={f.numero} barras={f.barras} /> },
   { id: "lote", label: "Lote", ocultable: true, render: (f) => f.lote },
   { id: "vence", label: "Vence", ocultable: true, render: (f) => `${formatearFecha(f.vence)} (${textoDias(f.dias)})` },
   { id: "cantidad", label: "Unidades", ocultable: true, clase: "tabular-nums", render: (f) => f.cantidad },

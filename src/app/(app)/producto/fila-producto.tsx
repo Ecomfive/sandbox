@@ -158,6 +158,12 @@ export function FilaProductoLista({ p, alAbrir }: { p: FilaProducto; alAbrir: ()
           <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
             <span className="font-medium tabular-nums">{numeroProducto(p.numero)}</span>
             <span className="font-mono font-semibold text-foreground">{p.codigo}</span>
+            {p.codigoBarras && (
+              <span className="font-mono">
+                <span className="sr-only">Código de barras </span>
+                {p.codigoBarras}
+              </span>
+            )}
             {categoria ? (
               <span className="inline-flex max-w-[14rem] min-w-0 items-center gap-1.5">
                 {p.categoria?.revisar && p.clase === "fisico" && <Punto clase="bg-warning" texto="Categoría por revisar" />}

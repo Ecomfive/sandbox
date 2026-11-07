@@ -100,6 +100,7 @@ export function TablaPorPais({ filas: iniciales, paises, puedeEscribir, codigoPa
             <span className="truncate text-xs text-muted-foreground">
               {f.numero ? `N.º ${f.numero} · ` : ""}
               {f.codigo}
+              {f.barras ? ` · ${f.barras}` : ""}
             </span>
           </span>
         ),

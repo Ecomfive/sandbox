@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { fieldClassSm, labelClassSm } from "@/components/ui/field";
+import { CodigosProducto } from "@/components/ui/codigos-producto";
 import { MiniaturaFoto } from "@/components/ui/miniatura-foto";
 import { useToast } from "@/components/ui/toast";
 import { guardarNotaTraslado } from "./actions";
@@ -14,7 +15,7 @@ export interface FilaTraslado {
   hacia: string;
   quien: string | null;
   notas: string;
-  lineas: { codigo: string; nombre: string; foto: string | null; cantidad: number; cajas: string | null }[];
+  lineas: { codigo: string; nombre: string; foto: string | null; numero: number | null; barras: string | null; cantidad: number; cajas: string | null }[];
 }
 
 const fechaHora = (f: string) => new Date(f).toLocaleString("es-PA", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" });
@@ -76,6 +77,7 @@ function Traslado({ t, puedeEscribir }: { t: FilaTraslado; puedeEscribir: boolea
             <span className="min-w-0 flex-1">
               <span className="block truncate font-medium">{l.codigo}</span>
               <span className="block truncate text-xs text-muted-foreground">{l.nombre}</span>
+              <CodigosProducto numero={l.numero} barras={l.barras} className="block" />
               {l.cajas && <span className="block text-xs text-muted-foreground">{l.cajas}</span>}
             </span>
             <span className="font-medium tabular-nums">{l.cantidad.toLocaleString("es-PA")}</span>

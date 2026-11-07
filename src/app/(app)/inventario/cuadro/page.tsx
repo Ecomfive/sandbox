@@ -109,9 +109,9 @@ export default async function CuadroPage({ searchParams }: { searchParams: Promi
   const dice = new Map([...porProducto].flatMap(([sku, s]): [string, number][] => (s[plataforma] ? [[sku, s[plataforma]]] : [])));
   const filas = fechaCorte ? armarCuadro({ cortes: cortePorSku, remisiones, salidas, ventas, novedades, dice }) : [];
   const ids = filas.map((f) => f.sku);
-  const { data: productos } = ids.length ? await supabase.from("skus_maestros").select("id, codigo, nombre, foto_url").in("id", ids) : { data: [] };
+  const { data: productos } = ids.length ? await supabase.from("skus_maestros").select("id, codigo, nombre, foto_url, numero, codigo_barras").in("id", ids) : { data: [] };
   const producto = new Map((productos ?? []).map((p) => [p.id as string, p]));
-  const vista: FilaVista[] = filas.map((f) => ({ ...f, codigo: (producto.get(f.sku)?.codigo as string) ?? "", nombre: (producto.get(f.sku)?.nombre as string) ?? "Producto", foto: (producto.get(f.sku)?.foto_url as string | null) ?? null }));
+  const vista: FilaVista[] = filas.map((f) => ({ ...f, codigo: (producto.get(f.sku)?.codigo as string) ?? "", nombre: (producto.get(f.sku)?.nombre as string) ?? "Producto", foto: (producto.get(f.sku)?.foto_url as string | null) ?? null, numero: (producto.get(f.sku)?.numero as number | null) ?? null, barras: (producto.get(f.sku)?.codigo_barras as string | null) || null }));
 
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">

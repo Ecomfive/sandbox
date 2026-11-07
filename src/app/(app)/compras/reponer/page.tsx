@@ -29,7 +29,7 @@ export default async function ReponerComprasPage() {
   const pais = await getPaisActual(supabase);
   const [ventas, pubsR, datosCompras] = await Promise.all([
     cargarResumenVentas(supabase, pais.id),
-    traerTodasConError<Record<string, unknown>>((d, h) => supabase.from("dropi_publicaciones").select("dropi_id, skus_maestros(id, codigo, nombre)").eq("pais_id", pais.id).not("sku_maestro_id", "is", null).order("id").range(d, h)),
+    traerTodasConError<Record<string, unknown>>((d, h) => supabase.from("dropi_publicaciones").select("dropi_id, skus_maestros(id, codigo, nombre, numero, codigo_barras)").eq("pais_id", pais.id).not("sku_maestro_id", "is", null).order("id").range(d, h)),
     cargarCompras("todos"),
   ]);
 
@@ -45,10 +45,11 @@ export default async function ReponerComprasPage() {
   }
 
   // El SKU del sistema de cada producto de Dropi, por el vínculo de Gestión de IDs Dropi.
-  const skuDe: [number, { id: string; codigo: string; nombre: string }][] = [];
+  const skuDe: [number, { id: string; codigo: string; nombre: string; numero?: number | null; barras?: string | null }][] = [];
   for (const p of pubsR.data ?? []) {
-    const sku = p.skus_maestros as { id: string; codigo: string; nombre: string } | null;
-    if (!sku) continue;
+    const fila = p.skus_maestros as { id: string; codigo: string; nombre: string; numero: number | null; codigo_barras: string | null } | null;
+    if (!fila) continue;
+    const sku = { id: fila.id, codigo: fila.codigo, nombre: fila.nombre, numero: fila.numero ?? null, barras: fila.codigo_barras || null };
     for (const id of String(p.dropi_id ?? "").match(/\d{3,6}/g) ?? []) skuDe.push([Number(id), sku]);
   }
   // Lo que ya viene en compras abiertas hacia este país.
