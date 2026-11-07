@@ -66,6 +66,8 @@ type Resultado = Promise<{ error?: string }>;
 /** Lo que cada módulo le da a la Actividad: sus acciones del servidor (cada una revisa permisos y acceso) y su bucket. */
 export interface AccionesActividad {
   bucket: string;
+  /** Si también acepta videos (las notas de un producto; el servidor lo vuelve a revisar). */
+  videos?: boolean;
   comentar: (entidadId: string, texto: string, menciones: string[], adjuntos: AdjuntoSubido[], respuestaA?: string | null) => Resultado;
   editar: (comentarioId: string, texto: string, menciones: string[], archivos: { quitar?: string[]; agregar?: AdjuntoSubido[] }) => Resultado;
   eliminar: (comentarioId: string) => Resultado;

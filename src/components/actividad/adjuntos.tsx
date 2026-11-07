@@ -5,7 +5,7 @@ import { anilloFoco } from "@/components/ui/field";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/toast";
 import { VisorImagen } from "@/components/ui/visor-imagen";
-import { ACEPTAR_ADJUNTOS, iconoArchivo, MAX_ADJUNTOS_COMENTARIO, motivoDeRechazo } from "@/lib/compras/adjuntos";
+import { ACEPTAR_ADJUNTOS, ACEPTAR_ADJUNTOS_CON_VIDEO, iconoArchivo, MAX_ADJUNTOS_COMENTARIO, motivoDeRechazo } from "@/lib/compras/adjuntos";
 import { AdjuntoIcon, CerrarIcon } from "@/lib/nav-icons";
 import { supabase } from "@/lib/supabase/client";
 import type { AdjuntoActividad, AdjuntoSubido } from "@/lib/comentarios/tipos";
@@ -30,7 +30,7 @@ export interface Pendiente {
  */
 export function useAdjuntosPendientes(entidadId: string) {
   const { mostrarToast } = useToast();
-  const { bucket, prepararSubida, descartarSubida } = useAccionesActividad();
+  const { bucket, videos, prepararSubida, descartarSubida } = useAccionesActividad();
   const [pendientes, setPendientes] = useState<Pendiente[]>([]);
   const actuales = useRef<Pendiente[]>([]);
   useEffect(() => {
@@ -54,7 +54,7 @@ export function useAdjuntosPendientes(entidadId: string) {
     (archivos: File[]) => {
       let sitio = MAX_ADJUNTOS_COMENTARIO - actuales.current.length;
       for (const archivo of archivos) {
-        const motivo = motivoDeRechazo({ tipo: archivo.type, tamano: archivo.size, nombre: archivo.name });
+        const motivo = motivoDeRechazo({ tipo: archivo.type, tamano: archivo.size, nombre: archivo.name }, { videos });
         if (motivo) {
           mostrarToast(`${archivo.name}: ${motivo}`, "destructive");
           continue;
@@ -82,7 +82,7 @@ export function useAdjuntosPendientes(entidadId: string) {
         })();
       }
     },
-    [entidadId, mostrarToast, actualizar, prepararSubida, bucket],
+    [entidadId, mostrarToast, actualizar, prepararSubida, bucket, videos],
   );
 
   const quitar = useCallback(
@@ -134,16 +134,17 @@ export function archivosDe(origen: ClipboardEvent | DragEvent): File[] {
   return [...(datos?.files ?? [])];
 }
 
-/** El botón «Adjuntar»: abre el selector de archivos (imágenes, PDF, Excel, Word, PowerPoint, CSV y texto). */
+/** El botón «Adjuntar»: abre el selector de archivos (imágenes, PDF, Excel, Word, PowerPoint, CSV y texto; y videos donde el módulo los acepta). */
 export function BotonAdjuntar({ alElegir, deshabilitado }: { alElegir: (archivos: File[]) => void; deshabilitado?: boolean }) {
   const entrada = useRef<HTMLInputElement>(null);
+  const { videos } = useAccionesActividad();
   return (
     <>
       <input
         ref={entrada}
         type="file"
         multiple
-        accept={ACEPTAR_ADJUNTOS}
+        accept={videos ? ACEPTAR_ADJUNTOS_CON_VIDEO : ACEPTAR_ADJUNTOS}
         aria-label="Elegir archivos para adjuntar"
         className="sr-only"
         tabIndex={-1}
@@ -236,7 +237,8 @@ export function GaleriaAdjuntos({ adjuntos }: { adjuntos: AdjuntoActividad[] }) 
   const [ampliada, setAmpliada] = useState<AdjuntoActividad | null>(null);
   if (adjuntos.length === 0) return null;
   const imagenes = adjuntos.filter((a) => a.clase === "foto" && a.url);
-  const otros = adjuntos.filter((a) => !(a.clase === "foto" && a.url));
+  const videos = adjuntos.filter((a) => a.clase === "video" && a.url);
+  const otros = adjuntos.filter((a) => !((a.clase === "foto" || a.clase === "video") && a.url));
   return (
     <div className="mt-1.5 flex flex-col gap-2">
       {imagenes.length > 0 && (
@@ -252,6 +254,15 @@ export function GaleriaAdjuntos({ adjuntos }: { adjuntos: AdjuntoActividad[] }) 
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={a.url!} alt={a.nombre} loading="lazy" className="h-10 w-10 object-cover" />
               </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {videos.length > 0 && (
+        <ul className="m-0 flex list-none flex-wrap gap-2 p-0">
+          {videos.map((a) => (
+            <li key={a.id} className="min-w-0">
+              <video src={a.url!} controls preload="metadata" playsInline aria-label={a.nombre} className="h-40 max-w-72 rounded-md border border-border bg-black" />
             </li>
           ))}
         </ul>

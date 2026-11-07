@@ -3,7 +3,7 @@
 // y acceso ANTES de llamar a estas funciones: aquí no se revisa quién es la persona, solo se hace el trabajo con las tablas. Los
 // archivos se revisan por su contenido (`detectarAdjunto`) y solo se borran los de la carpeta de esa entidad.
 
-import { detectarAdjunto, MAX_ADJUNTOS_COMENTARIO, MAX_BYTES_ADJUNTO, nombreSeguro } from "@/lib/compras/adjuntos";
+import { detectarAdjunto, MAX_ADJUNTOS_COMENTARIO, MAX_BYTES_ADJUNTO, MAX_BYTES_VIDEO, nombreSeguro } from "@/lib/compras/adjuntos";
 import { EMOJIS_REACCION } from "@/lib/compras/reacciones";
 import { mencionadosValidos, notificarMenciones } from "@/lib/menciones";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -19,6 +19,8 @@ export interface ConfigComentarios {
   /** La columna que une un comentario con su registro («publicacion_id»). */
   fk: string;
   bucket: string;
+  /** Si también acepta videos (MP4, MOV, WebM, hasta `MAX_BYTES_VIDEO`): las notas de un producto. */
+  videos?: boolean;
 }
 
 export interface Persona {
@@ -125,11 +127,13 @@ async function revisarSubidos(cfg: ConfigComentarios, entidadId: string, archivo
     const ruta = rutas[i];
     const { data, error } = await storage.download(ruta);
     if (error || !data) return falla("No se encontró uno de los archivos. Vuelve a adjuntarlo.");
-    if (data.size > MAX_BYTES_ADJUNTO) return falla("Un archivo pesa más de lo permitido.");
+    if (data.size > (cfg.videos ? MAX_BYTES_VIDEO : MAX_BYTES_ADJUNTO)) return falla("Un archivo pesa más de lo permitido.");
     const contenido = new Uint8Array(await data.arrayBuffer());
     const nombre0 = String(archivo.nombre ?? "").trim().slice(0, 120);
-    const tipo = detectarAdjunto(contenido, nombre0 || ruta);
-    if (!tipo) return falla("Se pueden adjuntar imágenes, PDF, Excel, Word, PowerPoint, CSV y texto (se revisa el contenido, no el nombre).");
+    const tipo = detectarAdjunto(contenido, nombre0 || ruta, { videos: cfg.videos });
+    if (!tipo) return falla(`Se pueden adjuntar imágenes${cfg.videos ? ", videos (MP4, MOV o WebM)" : ""}, PDF, Excel, Word, PowerPoint, CSV y texto (se revisa el contenido, no el nombre).`);
+    // Solo un video puede pasar del máximo de un documento.
+    if (tipo.clase !== "video" && data.size > MAX_BYTES_ADJUNTO) return falla("Un archivo pesa más de lo permitido.");
     // Se vuelve a guardar con el tipo de su contenido: un texto se abre siempre como texto, nunca como página.
     if ((data.type || "").split(";")[0] !== tipo.tipo.split(";")[0]) {
       const { error: e } = await storage.update(ruta, contenido, { contentType: tipo.tipo, upsert: true });

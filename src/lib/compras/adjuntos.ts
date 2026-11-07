@@ -6,6 +6,8 @@ import { detectarImagen } from "../seguridad/imagen";
 
 /** Peso máximo de cada archivo. */
 export const MAX_BYTES_ADJUNTO = 25 * 1024 * 1024;
+/** Peso máximo de un video, donde se aceptan (las notas de un producto: sus videos reales, 7 nov 2026). */
+export const MAX_BYTES_VIDEO = 50 * 1024 * 1024;
 /** Cuántos archivos puede llevar un comentario. */
 export const MAX_ADJUNTOS_COMENTARIO = 10;
 
@@ -26,10 +28,17 @@ const DOCUMENTOS: Record<string, string> = {
 };
 const IMAGENES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 export const ACEPTAR_ADJUNTOS = [...IMAGENES, ...Object.keys(DOCUMENTOS).map((e) => `.${e}`)].join(",");
+/** Los videos, solo donde el módulo los acepta (`{ videos: true }`): MP4, MOV (iPhone) y WebM. */
+const VIDEOS: Record<string, string> = { mp4: "video/mp4", mov: "video/quicktime", webm: "video/webm" };
+export const ACEPTAR_ADJUNTOS_CON_VIDEO = [ACEPTAR_ADJUNTOS, ...Object.values(VIDEOS), ...Object.keys(VIDEOS).map((e) => `.${e}`)].join(",");
+
+export interface OpcionesAdjuntos {
+  videos?: boolean;
+}
 
 export interface AdjuntoValido {
-  /** `foto` para imágenes; `documento` para lo demás (las clases de `wms_compra_adjuntos`). */
-  clase: "foto" | "documento";
+  /** `foto` para imágenes; `video` para videos (donde se aceptan); `documento` para lo demás (las clases de `wms_compra_adjuntos`). */
+  clase: "foto" | "documento" | "video";
   /** El tipo con que se guarda y se sirve (lo pone el servidor, no el navegador). */
   tipo: string;
   extension: string;
@@ -38,11 +47,25 @@ export interface AdjuntoValido {
 const extensionDe = (nombre: string) => (/\.([a-z0-9]+)$/i.exec(nombre)?.[1] ?? "").toLowerCase();
 
 /** Por qué un archivo elegido no se puede adjuntar, o null si está bien. Es un aviso rápido: el servidor revisa el contenido. */
-export function motivoDeRechazo(archivo: { tipo: string; tamano: number; nombre?: string }): string | null {
+export function motivoDeRechazo(archivo: { tipo: string; tamano: number; nombre?: string }, opciones: OpcionesAdjuntos = {}): string | null {
   const ext = extensionDe(archivo.nombre ?? "");
-  if (!IMAGENES.includes(archivo.tipo) && !(ext in DOCUMENTOS)) return "Se pueden adjuntar imágenes, PDF, Excel, Word, PowerPoint, CSV y texto.";
+  const esVideo = !!opciones.videos && (Object.values(VIDEOS).includes(archivo.tipo) || ext in VIDEOS);
+  if (!IMAGENES.includes(archivo.tipo) && !(ext in DOCUMENTOS) && !esVideo) return `Se pueden adjuntar imágenes${opciones.videos ? ", videos (MP4, MOV o WebM)" : ""}, PDF, Excel, Word, PowerPoint, CSV y texto.`;
   if (archivo.tamano <= 0) return "El archivo está vacío.";
-  if (archivo.tamano > MAX_BYTES_ADJUNTO) return `El archivo pesa más de ${MAX_BYTES_ADJUNTO / 1024 / 1024} MB.`;
+  const maximo = esVideo ? MAX_BYTES_VIDEO : MAX_BYTES_ADJUNTO;
+  if (archivo.tamano > maximo) return `${esVideo ? "El video" : "El archivo"} pesa más de ${maximo / 1024 / 1024} MB.`;
+  return null;
+}
+
+/** MP4 y MOV (la caja «ftyp» con una marca de video; HEIC y AVIF también la usan y no son videos) o WebM. */
+const MARCAS_MP4 = new Set(["isom", "iso2", "iso4", "iso5", "iso6", "mp41", "mp42", "avc1", "M4V ", "M4VP", "3gp4", "3gp5", "3g2a", "MSNV", "dash"]);
+export function detectarVideo(bytes: Uint8Array): { tipo: string; extension: string } | null {
+  if (bytes.length >= 12 && String.fromCharCode(...bytes.slice(4, 8)) === "ftyp") {
+    const marca = String.fromCharCode(...bytes.slice(8, 12));
+    if (marca === "qt  ") return { tipo: VIDEOS.mov, extension: "mov" };
+    return MARCAS_MP4.has(marca) ? { tipo: VIDEOS.mp4, extension: "mp4" } : null;
+  }
+  if (empiezaCon(bytes, [0x1a, 0x45, 0xdf, 0xa3]) && contiene(bytes.slice(0, 64), "webm")) return { tipo: VIDEOS.webm, extension: "webm" };
   return null;
 }
 
@@ -62,9 +85,11 @@ function contiene(bytes: Uint8Array, texto: string): boolean {
  * permitido. `bytes` es el archivo entero (los Office modernos se reconocen por sus carpetas internas) y `nombre` solo sirve
  * para distinguir un Excel de un Word viejo (los dos usan el mismo contenedor) y un CSV de un texto.
  */
-export function detectarAdjunto(bytes: Uint8Array, nombre = ""): AdjuntoValido | null {
+export function detectarAdjunto(bytes: Uint8Array, nombre = "", opciones: OpcionesAdjuntos = {}): AdjuntoValido | null {
   const imagen = detectarImagen(bytes.slice(0, 64));
   if (imagen) return { clase: "foto", tipo: imagen.tipo, extension: imagen.extension };
+  const video = opciones.videos ? detectarVideo(bytes.slice(0, 64)) : null;
+  if (video) return { clase: "video", ...video };
   const doc = (extension: string): AdjuntoValido => ({ clase: "documento", tipo: DOCUMENTOS[extension], extension });
   if (String.fromCharCode(...bytes.slice(0, 5)) === "%PDF-") return doc("pdf");
   const ext = extensionDe(nombre);
@@ -109,5 +134,6 @@ export function iconoArchivo(nombre: string): string {
   if (ext === "docx" || ext === "doc" || ext === "txt") return "📝";
   if (ext === "pptx" || ext === "ppt") return "📽️";
   if (ext === "pdf") return "📄";
+  if (ext in VIDEOS) return "🎬";
   return "📎";
 }

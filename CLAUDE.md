@@ -461,6 +461,7 @@ convenciones técnicas del código.
   `TablaDatos` y «Agregar» con `FichaCrear`; ficha lateral que ya es el formulario (la bodega se
   ve pero no se cambia; Desactivar/Activar; **no se borra**). El stock por ubicación llega con
   el inventario multi-estado.
+- **Notas, fotos y videos del producto** (7 nov 2026, pedido de Hernán; migraciones 0250 y 0251): la ficha de Producto usa al final `NotasProducto` (`inventario/notas-producto.tsx`, las mismas notas de la ficha del inventario, tablas `sku_comentarios`, `sku_adjuntos`, `sku_comentario_reacciones`, bucket `producto-notas`) en vez del historial suelto. Ese módulo acepta videos: `videos: true` en `ConfigComentarios` y `AccionesActividad` activa `detectarVideo` (MP4, MOV, WebM por contenido, `src/lib/compras/adjuntos.ts`, con prueba) hasta `MAX_BYTES_VIDEO` (50 MB; fotos y documentos siguen en 25 MB) y la galería los muestra con `<video>`. Los demás módulos no aceptan videos.
 - **Productos Test: Informe + Productos** (`/productos-test` y `/productos-test/productos`, pestañas en
   `PESTANAS_POR_MODULO`). **Informe** (`informe-test.tsx`, lógica pura en `informe.ts`): agrupa los tests por
   día, semana o mes según `fecha_test`, con indicadores, gráfica (pulsar una barra elige el periodo), winners vs
