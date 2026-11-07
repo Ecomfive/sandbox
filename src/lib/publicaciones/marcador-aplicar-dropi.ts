@@ -112,7 +112,7 @@ const CODIGO = [
   // Con variaciones (1 nov 2026) las unidades se cuentan por bodega y variación y el producto nuevo se arma con sus atributos y variaciones (el precio de cada una se copia igual).
   "var vr=esV(o),id=Number(c.nuevo)||0,st=vr?unidadesV(o):stockDe(o),k;",
   // El precio elegido al republicar (27 oct 2026) va al producto nuevo; sin él, queda el del viejo.
-  "if(!id){var r=vr?nuevoV(o,bp):nuevo(o,bp,{precio:c.precio,precioSugerido:c.sugerido});if(r.error)return{ok:false,error:r.error};",
+  "if(!id){var r=vr?nuevoV(o,bp,{precio:c.precio,precioSugerido:c.sugerido}):nuevo(o,bp,{precio:c.precio,precioSugerido:c.sugerido});if(r.error)return{ok:false,error:r.error};",
   "var g=await pedir('/products','POST',r.cuerpo);if(!g.ok)return{ok:false,error:motivo(g)};",
   "id=idCreado(g.j);if(!id)return{ok:false,error:sinId(g)}}",
   "var f=function(e){return{ok:false,nuevo:id,error:e}};",

@@ -134,6 +134,17 @@ export async function encolarCambio(
   if (p?.id) await supabase.from("dropi_cambios_pendientes").update({ estado: "reemplazado" }).eq("id", p.id as string);
   const { data, error } = await supabase.from("dropi_cambios_pendientes").insert(fila).select("id").single();
   if (error || !data) return { error: /does not exist|schema cache/i.test(error?.message ?? "") ? "Falta correr en Supabase la migración 0137." : "No se pudo dejar el cambio para Dropi." };
+  // Un precio nuevo mientras la republicación espera (todavía no se creó el producto nuevo en Dropi) también es el del producto nuevo: la república sale con el precio más bajo
+  // sin importar si se bajó antes o después de pedirla (7 nov 2026, pedido de Hernán). Si ya se creó, este cambio va al viejo, que se archiva.
+  if (hayPrecios && cambio.precio !== undefined && cambio.precio !== null) {
+    await supabase
+      .from("dropi_cambios_pendientes")
+      .update({ precio: cambio.precio, precio_sugerido: cambio.precio })
+      .eq("publicacion_id", pub.id)
+      .eq("tipo", "republicar")
+      .in("estado", ["pendiente", "error"])
+      .is("nuevo_dropi_id", null);
+  }
   return { id: data.id as string };
 }
 

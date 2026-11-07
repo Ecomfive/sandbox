@@ -7,7 +7,7 @@ import { REPUBLICAR_JS } from "./republicar-dropi";
 
 type Obj = Record<string, unknown>;
 const delFavorito = new Function(`${ARMAR_JS};${REPUBLICAR_JS};${PRIVATIZAR_JS};${APAGAR_JS}; return { apagado, apagadoV, emparejarV, entradaV, unidadesV, firmaV, nuevoV };`)() as {
-  nuevoV: (o: Obj, bp: Obj[]) => Obj;
+  nuevoV: (o: Obj, bp: Obj[], p?: { precio?: number | null; precioSugerido?: number | null }) => Obj;
   apagado: (o: Obj, bp: Obj[], q: boolean) => Obj;
   apagadoV: (o: Obj, bp: Obj[], q: boolean, en: Obj[][], cp?: string) => Obj;
   emparejarV: (o: Obj, u: Record<string, number>) => Obj;
@@ -332,4 +332,29 @@ test("quitar privatización: los datos de devolver se limpian (sin público no h
   // De un producto con variaciones: por bodega y variación.
   assert.deepEqual(normalizarUnidades({ "81|talla=s": 5, "81|color=rojo,talla=m": "3", "81|raro;drop": 2, "81|": 1 }), { "81|talla=s": 5, "81|color=rojo,talla=m": 3, "81|": 1 });
   assert.deepEqual(normalizarUnidades({ "81": "12" }), { "81": 12 });
+});
+
+test("variaciones: al republicar con precio nuevo, el producto y cada variación van con el precio bajo (igual en el favorito)", () => {
+  const o = conTallas(7000, { S: 100, M: 80 }, { sale_price: "9.90", suggested_price: "9.90" });
+  const r = armarProductoNuevoVariable(o, bp, { precio: 7.9, precioSugerido: 7.9 });
+  assert.ok("cuerpo" in r);
+  assert.equal(r.cuerpo.sale_price, 7.9);
+  assert.equal(r.cuerpo.suggested_price, 7.9);
+  assert.deepEqual((r.cuerpo.variations as Obj[]).map((v) => [v.sale_price, v.suggested_price]), [[7.9, 7.9], [7.9, 7.9]]);
+  igual(delFavorito.nuevoV(o, bp, { precio: 7.9, precioSugerido: 7.9 }), r);
+  // Sin precio nuevo, cada variación conserva el suyo.
+  const igualAntes = armarProductoNuevoVariable(o, bp);
+  assert.ok("cuerpo" in igualAntes);
+  assert.deepEqual((igualAntes.cuerpo.variations as Obj[]).map((v) => v.sale_price), [9.9, 9.9]);
+  igual(delFavorito.nuevoV(o, bp), igualAntes);
+  // Variaciones con precios distintos: cada una cambia en la misma proporción.
+  const distintas = conTallas(7000, { S: 100, M: 80 }, { sale_price: "10", suggested_price: "10" });
+  (distintas.variations as Obj[])[0].sale_price = "10";
+  (distintas.variations as Obj[])[0].suggested_price = "10";
+  (distintas.variations as Obj[])[1].sale_price = "12";
+  (distintas.variations as Obj[])[1].suggested_price = "12";
+  const d = armarProductoNuevoVariable(distintas, bp, { precio: 8, precioSugerido: 8 });
+  assert.ok("cuerpo" in d);
+  assert.deepEqual((d.cuerpo.variations as Obj[]).map((v) => v.sale_price), [8, 9.6]);
+  igual(delFavorito.nuevoV(distintas, bp, { precio: 8, precioSugerido: 8 }), d);
 });
