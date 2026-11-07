@@ -137,11 +137,13 @@ export async function cargarDatosCompetencia(supabase: SupabaseClient, pais: { i
   };
   const productos = filas.map(aProducto);
   // Solo el mismo producto cuenta como igual (7 nov 2026, pedido de Hernán): el que solo se parece queda como dudoso y no se compara.
+  // Con las fotos también, no solo los nombres.
   const porIdProducto = new Map(productos.map((p) => [p.id, p]));
+  const huellaDe = new Map(filas.map((f) => [f.id, f.foto_huella]));
   for (const p of productos) {
     if (!p.igualA) continue;
     const nuestro = porIdProducto.get(p.igualA);
-    if (nuestro && certezaIgual(nuestro.nombre, p.nombre, p.metodo) === "exacto") continue;
+    if (nuestro && certezaIgual({ nombre: nuestro.nombre, huella: huellaDe.get(nuestro.id) }, { nombre: p.nombre, huella: huellaDe.get(p.id) }, p.metodo) === "exacto") continue;
     p.dudosoDe = p.igualA;
     p.igualA = null;
   }

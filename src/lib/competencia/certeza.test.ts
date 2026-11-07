@@ -30,6 +30,16 @@ test("con la misma foto basta que un nombre esté contenido en el otro", () => {
   assert.equal(certezaIgual("Blood Sugar Complex", "Blood Sugar Complex, Toplux, 60 Caps.", "foto"), "exacto");
 });
 
+test("la foto cuenta aunque se hayan emparejado por nombre", () => {
+  const h = "0f0f0f0f0f0f0f0f";
+  assert.equal(certezaIgual({ nombre: "Lemme burn", huella: h }, { nombre: "Quemador Lemme Burn", huella: h }, "nombre"), "exacto");
+  assert.equal(certezaIgual({ nombre: "Lemme burn", huella: h }, { nombre: "Quemador Lemme Burn", huella: "f0f0f0f0f0f0f0f0" }, "nombre"), "dudoso");
+  assert.equal(certezaIgual({ nombre: "Lemme burn" }, { nombre: "Quemador Lemme Burn" }, "nombre"), "dudoso");
+  // La misma foto no salva un tamaño o un número distinto.
+  assert.equal(certezaIgual({ nombre: "Hair Growth 60 cápsulas", huella: h }, { nombre: "Hair Growth 120 cápsulas", huella: h }, "nombre"), "dudoso");
+  assert.equal(certezaIgual({ nombre: "Shilajit en Capsulas 8 en 1", huella: h }, { nombre: "Shilajit 92 minerales", huella: h }, "nombre"), "dudoso");
+});
+
 test("sin palabras que comparar no se da por igual", () => {
   assert.equal(certezaIgual("Pack 2", "Pack 2", "nombre"), "dudoso");
 });
