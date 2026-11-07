@@ -5,7 +5,7 @@ import { getPaisActual } from "@/lib/pais";
 import { requireModulo } from "@/lib/auth";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { traerTodasConError } from "@/lib/supabase/paginar";
-import { leerStockPlataformas, PAISES_CON_PLATAFORMAS } from "./datos-plataformas";
+import { leerStockPlataformas } from "./datos-plataformas";
 import type { FilaStock } from "./def-stock";
 import { ListaStock } from "./lista-stock";
 
@@ -66,8 +66,9 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
   }
 
   const conVariantes = new Set(((padres.data ?? []) as { id: string }[]).map((p) => p.id));
-  // Lo que hay en las plataformas (6 nov 2026, flujograma de Costa Rica): se lee de sus publicaciones, no de `wms_stock`.
-  const plataformas = PAISES_CON_PLATAFORMAS.includes(pais.codigo) ? await leerStockPlataformas(supabase, pais.id) : null;
+  // Lo que hay en las plataformas (6 nov 2026 en Costa Rica; en todos los países desde el 7 nov, pedido de Hernán): se lee de sus publicaciones, no de `wms_stock`.
+  // Cuenta como stock: un producto con unidades en Dropi, Effi o Drop no está «sin stock».
+  const plataformas = await leerStockPlataformas(supabase, pais.id);
 
   // Un producto con variantes no lleva stock: se ven sus variantes. Sale solo si le viene algo en camino (una compra hecha al producto general) o si una plataforma lo tiene publicado así.
   const filas: FilaStock[] = ((resumen.data ?? []) as Record<string, unknown>[]).filter((r) => !conVariantes.has(String(r.sku_maestro_id)) || Number(r.en_camino) > 0 || !!plataformas?.porProducto.has(String(r.sku_maestro_id))).map((r) => ({
