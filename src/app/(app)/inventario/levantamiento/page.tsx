@@ -1,6 +1,8 @@
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { requireModulo } from "@/lib/auth";
+import { esAdministrador } from "@/lib/permisos/acceso";
+import { pideMotivo, puedeMoverAMano } from "@/lib/wms/recepcion";
 import { getPaisActual } from "@/lib/pais";
 import { createServiceClient } from "@/lib/supabase/server";
 import { traerTodasConError } from "@/lib/supabase/paginar";
@@ -103,6 +105,8 @@ export default async function LevantamientoPage({ searchParams }: { searchParams
           productos={filas}
           ultimo={ultimoConteo ? { fecha: ultimoConteo.creado_en, referencia: ultimoConteo.referencia, productos: ultimoConteo.productos } : null}
           puedeEscribir={!usuario.modulosSoloLectura.includes("inventario")}
+          puedeRestar={puedeMoverAMano("salida", pais.codigo, esAdministrador(usuario))}
+          restarPideMotivo={pideMotivo("salida", pais.codigo)}
         />
       )}
     </Pagina>

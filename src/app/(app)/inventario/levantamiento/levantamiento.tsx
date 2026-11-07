@@ -13,7 +13,7 @@ import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
 import { formatearTiempoRelativo } from "@/lib/formato";
 import type { Ambito } from "@/lib/imagen/buscar";
-import { BuscarIcon, CamaraIcon, CerrarIcon, MasIcon, PapeleraIcon } from "@/lib/nav-icons";
+import { BuscarIcon, CamaraIcon, MasIcon, PapeleraIcon } from "@/lib/nav-icons";
 import { guardarLevantamiento } from "./actions";
 import { ImportarLista } from "./importar-lista";
 import { LineasCajas, unidadesFormulario, type LineaCajasForm, type UbicacionConteo } from "./lineas-cajas";
@@ -63,8 +63,9 @@ function Diferencia({ n }: { n: number | null }) {
 
 /**
  * Levantamiento (conteo físico) de una bodega: una fila por producto con lo que hay en el sistema, lo contado y la
- * diferencia. Solo se guarda lo que se escribió (un producto en blanco no se toca). **Sumar** (6 nov 2026, pedido de Hernán: el botón de arriba quedaba lejos y despacho se
- * equivocaba): cada fila tiene su «Sumar», que abre otra casilla; con contado se suma a lo contado y sola se suma a lo que hay. Un producto con vencimiento se cuenta
+ * diferencia. Solo se guarda lo que se escribió (un producto en blanco no se toca). **Añadir, Restar y Transferir** (7 nov 2026, pedido de Hernán; el «Sumar» de la fila, del 6 nov, pasó a
+ * ser la columna Añadir): cada fila tiene sus casillas a la vista y un solo botón guarda todo. Con contado, lo añadido se suma a lo contado; sola, se suma a lo que hay. Restar saca de lo que
+ * hay (en Costa Rica, solo un administrador y con motivo). Transferir lleva una cantidad a otro depósito de la lista (un traslado con número por cada destino). Un producto con vencimiento se cuenta
  * por lote: sus lotes con unidades aparecen solos y se agrega una línea por lote nuevo. **Buscar por imagen** (3 nov 2026, pedido de Jhokser): la cámara junto a «Buscar»
  * encuentra el producto con una foto (pegada, arrastrada o subida) y deja en la lista solo lo encontrado, de más a menos parecido, incluso inactivos y descontinuados.
  */
@@ -75,6 +76,8 @@ export function Levantamiento({
   productos,
   ultimo,
   puedeEscribir,
+  puedeRestar,
+  restarPideMotivo,
 }: {
   bodegas: { id: string; nombre: string }[];
   bodegaElegida: string;
@@ -82,6 +85,10 @@ export function Levantamiento({
   productos: ProductoConteo[];
   ultimo: { fecha: string; referencia: string | null; productos: number } | null;
   puedeEscribir: boolean;
+  /** Si esta persona puede restar a mano: donde toda salida va con remisión (Costa Rica) es de un administrador. */
+  puedeRestar: boolean;
+  /** Si restar pide motivo (en la Referencia). */
+  restarPideMotivo: boolean;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -98,9 +105,10 @@ export function Levantamiento({
   const [imagenAbierta, setImagenAbierta] = useState(false);
   const [referencia, setReferencia] = useState("");
   const [error, setError] = useState<string | null>(null);
-  // Lo que se suma en cada fila y las filas con la casilla abierta.
+  // Lo que se añade, lo que se resta y lo que se transfiere (cantidad y depósito de destino) en cada fila.
   const [sumas, setSumas] = useState<Record<string, string>>({});
-  const [sumarAbierto, setSumarAbierto] = useState<Record<string, boolean>>({});
+  const [restas, setRestas] = useState<Record<string, string>>({});
+  const [traslados, setTraslados] = useState<Record<string, { cantidad: string; destino: string }>>({});
 
   const lineasDe = (p: ProductoConteo): LineaLote[] =>
     lotes[p.id] ?? p.lotes.map((l) => ({ codigo: l.codigo, vencimiento: l.vencimiento, cantidad: "", sumar: "", existente: true }));
@@ -128,15 +136,26 @@ export function Levantamiento({
     const n = p.manejaVencimiento ? (lotes[p.id] ?? []).reduce((s, l) => s + (cantidadDe(l.sumar) ?? 0), 0) : cantidadDe(sumas[p.id]);
     return n ? n : null;
   };
-  const cerrarSumar = (p: ProductoConteo) => {
-    setSumarAbierto((x) => ({ ...x, [p.id]: false }));
-    setSumas((x) => {
+  // Lo que se resta y lo que se transfiere de cada producto (null si nada). Con cajas en edición no: las cajas deben dar lo que queda.
+  const restarDe = (p: ProductoConteo): number | null => (cajasMandan(p) ? null : (cantidadDe(restas[p.id]) || null));
+  const transferirDe = (p: ProductoConteo): number | null => (cajasMandan(p) ? null : (cantidadDe(traslados[p.id]?.cantidad) || null));
+  // Lo que sale de la bodega en esta fila.
+  const saleDe = (p: ProductoConteo) => (restarDe(p) ?? 0) + (transferirDe(p) ?? 0);
+  const cambiarTraslado = (p: ProductoConteo, cambio: Partial<{ cantidad: string; destino: string }>) =>
+    setTraslados((x) => {
+      const nuevo = { cantidad: x[p.id]?.cantidad ?? "", destino: x[p.id]?.destino ?? "", ...cambio };
       const y = { ...x };
-      delete y[p.id];
+      if (nuevo.cantidad === "" && nuevo.destino === "") delete y[p.id];
+      else y[p.id] = nuevo;
       return y;
     });
-    if (lotes[p.id]) setLotes((x) => ({ ...x, [p.id]: lineasDe(p).map((l) => ({ ...l, sumar: "" })) }));
-  };
+  const escribirRestar = (p: ProductoConteo, valor: string) =>
+    setRestas((x) => {
+      const y = { ...x };
+      if (valor === "") delete y[p.id];
+      else y[p.id] = valor;
+      return y;
+    });
 
   const visibles = useMemo(() => {
     const q = sinAcentos(buscar.trim());
@@ -145,15 +164,20 @@ export function Levantamiento({
       if (orden && !orden.has(p.id)) return false;
       if (q && !sinAcentos(`${p.codigo} ${p.nombre}`).includes(q)) return false;
       if (verTodos || q || orden) return true;
-      return p.clase === "fisico" || p.enSistema !== 0 || contados[p.id] !== undefined || lotes[p.id] !== undefined || cajas[p.id] !== undefined || sumas[p.id] !== undefined || sumarAbierto[p.id] === true;
+      return p.clase === "fisico" || p.enSistema !== 0 || contados[p.id] !== undefined || lotes[p.id] !== undefined || cajas[p.id] !== undefined || sumas[p.id] !== undefined || restas[p.id] !== undefined || traslados[p.id] !== undefined;
     });
     return orden ? lista.sort((a, b) => (orden.get(a.id) ?? 0) - (orden.get(b.id) ?? 0)) : lista;
-  }, [productos, buscar, verTodos, porImagen, contados, lotes, cajas, sumas, sumarAbierto]);
+  }, [productos, buscar, verTodos, porImagen, contados, lotes, cajas, sumas, restas, traslados]);
 
   const contadosTotal = productos.filter((p) => contadoDe(p) !== null);
-  const conDiferencia = contadosTotal.filter((p) => quedaDespues(contadoDe(p), sumarDe(p), p.enSistema) !== p.enSistema).length;
+  const conDiferencia = contadosTotal.filter((p) => quedaDespues(contadoDe(p), sumarDe(p), p.enSistema, saleDe(p)) !== p.enSistema).length;
   const conSuma = productos.filter((p) => sumarDe(p) !== null);
   const unidadesPorSumar = conSuma.reduce((s, p) => s + (sumarDe(p) ?? 0), 0);
+  const conResta = productos.filter((p) => restarDe(p) !== null);
+  const unidadesPorRestar = conResta.reduce((s, p) => s + (restarDe(p) ?? 0), 0);
+  const conTraslado = productos.filter((p) => transferirDe(p) !== null);
+  const unidadesPorTransferir = conTraslado.reduce((s, p) => s + (transferirDe(p) ?? 0), 0);
+  const hayQueGuardar = contadosTotal.length > 0 || conSuma.length > 0 || conResta.length > 0 || conTraslado.length > 0 || Object.keys(cajas).length > 0;
   // Para cuadrar: lo que se lleva contado y lo que el sistema tiene hoy en esta bodega (aquí no hay compuestos).
   const unidadesContadas = contadosTotal.reduce((s, p) => s + (contadoDe(p) ?? 0), 0);
   const unidadesEnSistema = productos.reduce((s, p) => s + p.enSistema, 0);
@@ -161,6 +185,10 @@ export function Levantamiento({
 
   const guardar = () => {
     setError(null);
+    // Transferir: la cantidad y el depósito van juntos.
+    const sinDestino = conTraslado.find((p) => !traslados[p.id]?.destino);
+    if (sinDestino) return setError(`Elige el depósito al que se transfiere ${sinDestino.codigo}.`);
+    if (conResta.length > 0 && restarPideMotivo && !referencia.trim()) return setError("Para restar, escribe el motivo en «Referencia».");
     const filas = productos.map(
       (p): FilaConteo =>
         p.manejaVencimiento
@@ -180,30 +208,49 @@ export function Levantamiento({
       sku,
       lineas: lineas.map((l) => ({ ubicacion: l.ubicacion, cajas: l.cajas, por_caja: l.porCaja, observacion: l.observacion })),
     }));
+    const aRestar = conResta.map((p) => ({ sku: p.id, cantidad: restarDe(p) }));
+    const aTransferir = conTraslado.map((p) => ({ sku: p.id, cantidad: transferirDe(p), destino: traslados[p.id].destino }));
     startTransition(async () => {
-      const r = await guardarLevantamiento(bodegaElegida, referencia, items, porSumar, cajasTocadas);
+      const r = await guardarLevantamiento(bodegaElegida, referencia, items, porSumar, cajasTocadas, aRestar, aTransferir);
       if (r.error) {
         setError(r.error);
-        // Lo contado ya quedó guardado, con lo que se le sumaba: solo sigue escrito lo que falta sumar.
-        if (r.contadoGuardado) {
-          const guardados = new Set(items.map((i) => i.sku));
-          const sinGuardados = <T,>(x: Record<string, T>) => Object.fromEntries(Object.entries(x).filter(([id]) => !guardados.has(id)));
-          setContados({});
-          setCajas({});
-          setSumas(sinGuardados);
-          setLotes(sinGuardados);
+        // Lo que ya quedó guardado se suelta; solo sigue escrito lo que falta.
+        const h = r.hecho;
+        if (h && (h.contados || h.sumas || h.restas || h.trasladados.length)) {
+          if (h.contados) {
+            // Lo contado ya quedó guardado, con lo que se le añadía.
+            const guardados = new Set(items.map((i) => i.sku));
+            const sinGuardados = <T,>(x: Record<string, T>) => Object.fromEntries(Object.entries(x).filter(([id]) => !guardados.has(id)));
+            setContados({});
+            setCajas({});
+            setSumas(sinGuardados);
+            setLotes(sinGuardados);
+          }
+          if (h.sumas) {
+            setSumas({});
+            setLotes((x) => Object.fromEntries(Object.entries(x).map(([id, ls]) => [id, ls.map((l) => ({ ...l, sumar: "" }))] as const).filter(([, ls]) => ls.some((l) => l.cantidad.trim() !== ""))));
+          }
+          if (h.restas) setRestas({});
+          if (h.trasladados.length) setTraslados((x) => Object.fromEntries(Object.entries(x).filter(([id]) => !h.trasladados.includes(id))));
           router.refresh();
         }
         return;
       }
       const guardado = items.length > 0 || cajasTocadas.length > 0 ? `Levantamiento de ${nombreBodega} guardado: ${r.productos} productos, ${r.ajustes} con diferencia${r.cajas ? `, cajas de ${r.cajas}` : ""}` : "";
-      const sumado = r.sumados ? `${guardado ? "sumado a" : `Sumado en ${nombreBodega} a`} ${r.sumados} ${r.sumados === 1 ? "producto" : "productos"}` : "";
-      mostrarToast([guardado, sumado].filter(Boolean).join(" · "));
+      const cuantos = (n: number) => `${n} ${n === 1 ? "producto" : "productos"}`;
+      const otras = [
+        r.sumados ? `añadido a ${cuantos(r.sumados)}` : "",
+        r.restados ? `restado a ${cuantos(r.restados)}` : "",
+        r.traslados?.length ? `transferido en ${r.traslados.join(", ")}` : "",
+      ].filter(Boolean);
+      const resto = otras.join(" · ");
+      mostrarToast(guardado ? [guardado, resto].filter(Boolean).join(" · ") : `${resto.charAt(0).toUpperCase()}${resto.slice(1)} en ${nombreBodega}`);
       setContados({});
       setLotes({});
       setCajas({});
       setSumas({});
-      setSumarAbierto({});
+      setRestas({});
+      setTraslados({});
       setReferencia("");
       router.refresh();
     });
@@ -268,7 +315,6 @@ export function Levantamiento({
               const escritas = Object.fromEntries(Object.entries(cantidades).map(([id, n]) => [id, String(n)]));
               if (!comoSuma) return setContados((x) => ({ ...x, ...escritas }));
               setSumas((x) => ({ ...x, ...escritas }));
-              setSumarAbierto((x) => ({ ...x, ...Object.fromEntries(Object.keys(cantidades).map((id) => [id, true])) }));
             }}
           />
         )}
@@ -291,7 +337,7 @@ export function Levantamiento({
       <VentanaBuscarImagen abierta={imagenAbierta} alCerrar={() => setImagenAbierta(false)} ambitoPropio="producto" ambitos={AMBITOS_PRODUCTO} alFiltrar={(ids) => setPorImagen(ids)} />
 
       <ContenedorTabla ariaLabel={`Levantamiento de ${nombreBodega}`}>
-        <table className="tabla-datos w-full min-w-[52rem] border-collapse text-sm">
+        <table className="tabla-datos w-full min-w-[78rem] border-collapse text-sm">
           <thead>
             <tr className={claseFilaEncabezado}>
               <th scope="col" className={claseEncabezadoColumna}>
@@ -306,6 +352,15 @@ export function Levantamiento({
               <th scope="col" className={claseEncabezadoColumna}>
                 Contado
               </th>
+              <th scope="col" className={claseEncabezadoColumna}>
+                Añadir
+              </th>
+              <th scope="col" className={claseEncabezadoColumna}>
+                Restar
+              </th>
+              <th scope="col" className={claseEncabezadoColumna}>
+                Transferir
+              </th>
               <th scope="col" className={`${claseEncabezadoColumna} text-right`}>
                 Diferencia
               </th>
@@ -314,7 +369,7 @@ export function Levantamiento({
           <tbody>
             {visibles.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
+                <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
                   {porImagen ? "Ningún producto de esta bodega coincide con la imagen." : "No hay productos con ese nombre."}
                 </td>
               </tr>
@@ -322,11 +377,15 @@ export function Levantamiento({
             {visibles.map((p) => {
               const contado = contadoDe(p);
               const sumar = sumarDe(p);
-              const queda = quedaDespues(contado, sumar, p.enSistema);
-              const dif = contado === null && sumar === null ? null : queda - p.enSistema;
+              const restar = restarDe(p);
+              const transferir = transferirDe(p);
+              const sale = saleDe(p);
+              const queda = quedaDespues(contado, sumar, p.enSistema, sale);
+              const dif = contado === null && sumar === null && restar === null && transferir === null ? null : queda - p.enSistema;
               const conCajas = cajasMandan(p);
-              const sumaEscrita = p.manejaVencimiento ? (lotes[p.id] ?? []).some((l) => l.sumar.trim() !== "") : sumas[p.id] !== undefined;
-              const lineaSumar = !conCajas && (sumarAbierto[p.id] === true || sumaEscrita);
+              const tieneCajas = p.cajas.length > 0;
+              const traslado = traslados[p.id];
+              const destinos = bodegas.filter((b) => b.id !== bodegaElegida);
               return (
                 <tr key={p.id} className="border-b border-border align-top">
                   <td className={claseCeldaColumna}>
@@ -398,20 +457,18 @@ export function Levantamiento({
                               placeholder={l.existente ? "0" : "—"}
                               className={`${fieldClassSm} w-20 text-right tabular-nums`}
                             />
-                            {lineaSumar && (
-                              <input
-                                type="number"
-                                min="0"
-                                step="1"
-                                inputMode="numeric"
-                                aria-label={`Sumar al lote ${l.codigo || "nuevo"} de ${p.codigo}`}
-                                disabled={!puedeEscribir || pendiente}
-                                value={l.sumar}
-                                onChange={(e) => cambiarLinea(p, i, { sumar: e.target.value })}
-                                placeholder="+ Sumar"
-                                className={`${fieldClassSm} w-24 text-right tabular-nums`}
-                              />
-                            )}
+                            <input
+                              type="number"
+                              min="0"
+                              step="1"
+                              inputMode="numeric"
+                              aria-label={`Añadir al lote ${l.codigo || "nuevo"} de ${p.codigo}`}
+                              disabled={!puedeEscribir || pendiente || conCajas}
+                              value={l.sumar}
+                              onChange={(e) => cambiarLinea(p, i, { sumar: e.target.value })}
+                              placeholder="+ Añadir"
+                              className={`${fieldClassSm} w-24 text-right tabular-nums`}
+                            />
                             {!l.existente && (
                               <button
                                 type="button"
@@ -436,62 +493,114 @@ export function Levantamiento({
                         )}
                       </div>
                     )}
-                    {!p.manejaVencimiento && lineaSumar && (
-                      <div className="mt-1.5 flex items-center gap-1">
-                        <span className="relative">
-                          <span aria-hidden="true" className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-sm font-semibold text-success">
-                            +
-                          </span>
-                          <input
-                            type="number"
-                            min="0"
-                            step="1"
-                            inputMode="numeric"
-                            autoFocus={sumas[p.id] === undefined}
-                            aria-label={`Sumar a ${p.codigo}`}
-                            disabled={!puedeEscribir || pendiente}
-                            value={sumas[p.id] ?? ""}
-                            onChange={(e) =>
-                              setSumas((x) => {
-                                const y = { ...x };
-                                if (e.target.value === "") delete y[p.id];
-                                else y[p.id] = e.target.value;
-                                return y;
-                              })
-                            }
-                            placeholder="Sumar"
-                            className={`${fieldClassSm} w-28 pl-6 text-right tabular-nums`}
-                          />
-                        </span>
-                        <button type="button" aria-label={`Quitar la suma de ${p.codigo}`} disabled={pendiente} onClick={() => cerrarSumar(p)} className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
-                          <CerrarIcon className="h-3.5 w-3.5" aria-hidden="true" />
-                        </button>
-                      </div>
+                    {conCajas && (sumas[p.id] !== undefined || restas[p.id] !== undefined || traslados[p.id] !== undefined) && (
+                      <p className="m-0 mt-1 text-xs text-warning">Con cajas, lo que entra se agrega como otra línea de cajas y lo que sale se resta de ellas.</p>
                     )}
-                    {conCajas && (sumas[p.id] !== undefined || sumarAbierto[p.id] === true) && <p className="m-0 mt-1 text-xs text-warning">Con cajas, lo que entra se agrega como otra línea de cajas.</p>}
-                    {!conCajas && lineaSumar && !cajas[p.id] && p.cajas.length > 0 && <p className="m-0 mt-1 text-xs text-warning">Tiene cajas: lo sumado queda suelto, fuera de ellas.</p>}
+                    {!conCajas && tieneCajas && !cajas[p.id] && (sumas[p.id] !== undefined || restas[p.id] !== undefined) && (
+                      <p className="m-0 mt-1 text-xs text-warning">Tiene cajas: lo que se añade o se resta queda suelto, fuera de ellas.</p>
+                    )}
                     <LineasCajas
                       codigo={p.codigo}
                       lineas={cajas[p.id] ?? p.cajas}
                       ubicaciones={ubicaciones}
                       deshabilitado={!puedeEscribir || pendiente}
                       alCambiar={(lineas) => setCajas((x) => ({ ...x, [p.id]: lineas }))}
-                      junto={
-                        puedeEscribir && !conCajas && !lineaSumar ? (
-                          <button type="button" disabled={pendiente} onClick={() => setSumarAbierto((x) => ({ ...x, [p.id]: true }))} className={CLASE_ACCION_FILA}>
-                            <MasIcon className="h-3.5 w-3.5" aria-hidden="true" /> Sumar
-                          </button>
-                        ) : p.manejaVencimiento && lineaSumar ? (
-                          <button type="button" disabled={pendiente} onClick={() => cerrarSumar(p)} className={CLASE_ACCION_FILA}>
-                            Quitar suma
-                          </button>
-                        ) : null
-                      }
                     />
+                  </td>
+                  <td className={claseCeldaColumna}>
+                    {p.manejaVencimiento ? (
+                      <span className="text-xs text-muted-foreground">En cada lote</span>
+                    ) : (
+                      <span className="relative inline-block">
+                        <span aria-hidden="true" className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-sm font-semibold text-success">
+                          +
+                        </span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          inputMode="numeric"
+                          aria-label={`Añadir a ${p.codigo}`}
+                          disabled={!puedeEscribir || pendiente || conCajas}
+                          value={sumas[p.id] ?? ""}
+                          onChange={(e) =>
+                            setSumas((x) => {
+                              const y = { ...x };
+                              if (e.target.value === "") delete y[p.id];
+                              else y[p.id] = e.target.value;
+                              return y;
+                            })
+                          }
+                          placeholder="—"
+                          className={`${fieldClassSm} w-24 pl-6 text-right tabular-nums`}
+                        />
+                      </span>
+                    )}
+                  </td>
+                  <td className={claseCeldaColumna}>
+                    {puedeRestar || !puedeEscribir ? (
+                      <span className="relative inline-block">
+                        <span aria-hidden="true" className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-sm font-semibold text-destructive">
+                          −
+                        </span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          inputMode="numeric"
+                          aria-label={`Restar a ${p.codigo}`}
+                          disabled={!puedeEscribir || pendiente || conCajas}
+                          value={restas[p.id] ?? ""}
+                          onChange={(e) => escribirRestar(p, e.target.value)}
+                          placeholder="—"
+                          className={`${fieldClassSm} w-24 pl-6 text-right tabular-nums`}
+                        />
+                      </span>
+                    ) : (
+                      <Tooltip texto="Solo un administrador resta a mano; usa Transferir">
+                        <span className="relative inline-block">
+                          <input type="number" aria-label={`Restar a ${p.codigo} (solo administradores)`} disabled placeholder="—" className={`${fieldClassSm} w-24 text-right`} />
+                        </span>
+                      </Tooltip>
+                    )}
+                  </td>
+                  <td className={claseCeldaColumna}>
+                    {tieneCajas || conCajas ? (
+                      <span className="text-xs text-muted-foreground">Con cajas: usa «Nuevo traslado»</span>
+                    ) : (
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          inputMode="numeric"
+                          aria-label={`Cantidad a transferir de ${p.codigo}`}
+                          disabled={!puedeEscribir || pendiente || destinos.length === 0}
+                          value={traslado?.cantidad ?? ""}
+                          onChange={(e) => cambiarTraslado(p, { cantidad: e.target.value })}
+                          placeholder="Cant."
+                          className={`${fieldClassSm} w-20 text-right tabular-nums`}
+                        />
+                        <select
+                          aria-label={`Depósito de destino de ${p.codigo}`}
+                          disabled={!puedeEscribir || pendiente || destinos.length === 0}
+                          value={traslado?.destino ?? ""}
+                          onChange={(e) => cambiarTraslado(p, { destino: e.target.value })}
+                          className={`${fieldClassSm} w-36`}
+                        >
+                          <option value="">Depósito…</option>
+                          {destinos.map((b) => (
+                            <option key={b.id} value={b.id}>
+                              {b.nombre}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                   </td>
                   <td className={`${claseCeldaColumna} text-right`}>
                     <Diferencia n={dif} />
-                    {sumar !== null && <span className="mt-0.5 block text-xs text-muted-foreground tabular-nums">Quedará {queda.toLocaleString("es-PA")}</span>}
+                    {(sumar !== null || sale > 0) && <span className="mt-0.5 block text-xs text-muted-foreground tabular-nums">Quedará {queda.toLocaleString("es-PA")}</span>}
                   </td>
                 </tr>
               );
@@ -508,7 +617,19 @@ export function Levantamiento({
             {conSuma.length > 0 && (
               <>
                 {" "}
-                · <strong className="tabular-nums">{unidadesPorSumar.toLocaleString("es-PA")}</strong> por sumar en <strong className="tabular-nums">{conSuma.length}</strong> {conSuma.length === 1 ? "producto" : "productos"}
+                · <strong className="tabular-nums">{unidadesPorSumar.toLocaleString("es-PA")}</strong> por añadir en <strong className="tabular-nums">{conSuma.length}</strong> {conSuma.length === 1 ? "producto" : "productos"}
+              </>
+            )}
+            {conResta.length > 0 && (
+              <>
+                {" "}
+                · <strong className="tabular-nums">{unidadesPorRestar.toLocaleString("es-PA")}</strong> por restar en <strong className="tabular-nums">{conResta.length}</strong> {conResta.length === 1 ? "producto" : "productos"}
+              </>
+            )}
+            {conTraslado.length > 0 && (
+              <>
+                {" "}
+                · <strong className="tabular-nums">{unidadesPorTransferir.toLocaleString("es-PA")}</strong> por transferir en <strong className="tabular-nums">{conTraslado.length}</strong> {conTraslado.length === 1 ? "producto" : "productos"}
               </>
             )}
           </p>
@@ -520,7 +641,7 @@ export function Levantamiento({
           <button
             type="button"
             onClick={guardar}
-            disabled={pendiente || (contadosTotal.length === 0 && conSuma.length === 0 && Object.keys(cajas).length === 0)}
+            disabled={pendiente || !hayQueGuardar}
             className="ml-auto min-h-10 rounded-md bg-foreground px-4 text-sm font-semibold text-background hover:opacity-90 disabled:bg-muted disabled:text-muted-foreground"
           >
             {pendiente ? "Guardando…" : `Guardar levantamiento de ${nombreBodega}`}
