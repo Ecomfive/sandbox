@@ -292,6 +292,7 @@ function ContenidoFicha({
   // Archivar va aparte: así, mientras termina de guardar, el botón no dice «Un momento...».
   const [archivando, setArchivando] = useState(false);
   const [republicando, setRepublicando] = useState(false);
+  const idFormulario = `ficha-publicacion-${p.id}`;
   const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
   // La ficha del producto vinculado, abierta encima de esta (no lleva al módulo Producto).
@@ -446,94 +447,9 @@ function ContenidoFicha({
       {confirmandoRepublicar && <ConfirmarRepublicar p={p} enviando={republicando} alCerrar={() => setConfirmandoRepublicar(false)} alConfirmar={confirmarRepublicar} />}
       {/* Una publicación «Sin publicar»: lo que Dropi pide para crearla. Es un formulario aparte (uno no va dentro de otro). */}
       {p.sinPublicar && puedeEscribir && <DatosParaDropi p={p} opciones={opcionesCrear} />}
-      <form onSubmit={guardar} aria-busy={pendiente} className="flex flex-1 flex-col">
-        {puedeEscribir && (
-          <div className="sticky top-[var(--alto-cabecera,3.8rem)] z-[5] flex flex-col gap-2 border-y border-border bg-card px-5 py-3">
-            <div className="flex flex-wrap gap-2">
-              {sinGuardar && (
-                <>
-                  <button type="submit" disabled={pendiente} className="inline-flex items-center gap-1.5 rounded-md bg-success px-3 py-2 text-sm font-medium text-background hover:bg-success/85 disabled:opacity-50">
-                    <CheckIcon className="h-4 w-4" />
-                    {pendiente ? "Guardando..." : "Guardar cambios"}
-                  </button>
-                  <button type="button" onClick={() => setD(JSON.parse(base) as Formulario)} disabled={pendiente} className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50">
-                    <CerrarIcon className="h-4 w-4" />
-                    Cancelar
-                  </button>
-                </>
-              )}
-              {!sinGuardar && puedeArchivar && p.sinPublicar && (
-                <BotonAccion icono={CheckIcon} tono="exito" className={PENDIENTE_EN_COLOR} disabled={pendiente || p.publicarPendiente} onClick={publicar}>
-                  {publicando ? "Un momento..." : p.publicarPendiente ? "Publicación pendiente" : "Publicar en Dropi"}
-                </BotonAccion>
-              )}
-              {!sinGuardar && puedeArchivar && eliminable && (
-                <BotonAccion icono={PapeleraIcon} tono="peligro" disabled={pendiente} onClick={eliminar}>
-                  {eliminando ? "Un momento..." : p.sinPublicar ? "Eliminar borrador" : "Eliminar"}
-                </BotonAccion>
-              )}
-              {/* Republicar, Apagar, Privatizar, Pausar y Archivar siempre se ven: si no se pueden usar, van apagados y dicen por qué (27 oct 2026). */}
-              {!sinGuardar && puedeArchivar && !p.sinPublicar &&
-                (sePuedeRepublicar ? (
-                  <BotonAccion icono={ActualizarIcon} tono="info" className={PENDIENTE_EN_COLOR} disabled={pendiente || yaRepublicando} onClick={republicar}>
-                    {republicando ? "Un momento..." : yaRepublicando ? "Republicación pendiente" : "Republicar"}
-                  </BotonAccion>
-                ) : (
-                  <BotonAccionApagado icono={ActualizarIcon} texto="Republicar" motivo={motivoRepublicar(botones) ?? "No disponible"} />
-                ))}
-              {/* «Apagar en Dropi»: sacar el stock y archivar allá, con sus privadas a elección. Queda pendiente para «Aplicar en Dropi». */}
-              {!sinGuardar && puedeArchivar && !p.sinPublicar &&
-                (puedeApagar(p) ? <BotonApagarDropi p={p} deshabilitado={pendiente} /> : <BotonAccionApagado icono={ApagarIcon} texto="Apagar en Dropi" motivo={motivoApagar(botones) ?? "No disponible"} />)}
-              {/* El candado: abierto en un público («Privatizar en Dropi», a un solo dropshipper en un producto privado nuevo); cerrado en un privado
-                  («Quitar privatización», 30 oct 2026: sus unidades vuelven al público). */}
-              {!sinGuardar && puedeArchivar && !p.sinPublicar &&
-                (p.tipoDropi === "privado" ? (
-                  motivoQuitarPrivatizacion(botones) === null ? (
-                    <BotonPrivatizarDropi p={p} deshabilitado={pendiente} />
-                  ) : (
-                    <BotonAccionApagado icono={CandadoIcon} texto="Quitar privatización" motivo={motivoQuitarPrivatizacion(botones) ?? "No disponible"} />
-                  )
-                ) : puedePrivatizar(p) ? (
-                  <BotonPrivatizarDropi p={p} deshabilitado={pendiente} />
-                ) : (
-                  <BotonAccionApagado icono={CandadoAbiertoIcon} texto="Privatizar en Dropi" motivo={motivoPrivatizar(botones) ?? "No disponible"} />
-                ))}
-              {!sinGuardar && puedeArchivar && !p.sinPublicar &&
-                (estaPausada ? (
-                  <BotonAccion icono={ReactivarIcon} tono="exito" disabled={pendiente} onClick={() => archivar()}>
-                    {archivando ? "Un momento..." : "Reactivar"}
-                  </BotonAccion>
-                ) : sePausa ? (
-                  <BotonAccion icono={PausaIcon} tono="info" disabled={pendiente} onClick={() => archivar(true)}>
-                    {archivando ? "Un momento..." : "Pausar por falta de stock"}
-                  </BotonAccion>
-                ) : (
-                  <BotonAccionApagado icono={PausaIcon} texto="Pausar por falta de stock" motivo={motivoPausar(botones) ?? "No disponible"} />
-                ))}
-              {!sinGuardar && puedeArchivar && <BotonLiquidacionFicha f={p} />}
-              {!sinGuardar && puedeArchivar &&
-                (motivoArchivar(botones) === null ? (
-                  <BotonAccion icono={ArchivarIcon} tono={p.archivada ? "exito" : "alerta"} disabled={pendiente} onClick={() => archivar()}>
-                    {archivando ? "Un momento..." : p.archivada ? "Sacar de Archivados" : "Archivar"}
-                  </BotonAccion>
-                ) : (
-                  <BotonAccionApagado icono={ArchivarIcon} texto={p.archivada ? "Sacar de Archivados" : "Archivar"} motivo={motivoArchivar(botones)!} />
-                ))}
-            </div>
-            {error && (
-              <p role="alert" className="text-sm text-destructive">
-                {error}
-              </p>
-            )}
-            {cambioEsperando && (
-              <div role="status" className="rounded-md border border-destructive/30 bg-destructive-soft px-3 py-2 text-sm [&>span]:text-sm [&>span]:font-medium">
-                <EstadoCambioDropi c={cambioEsperando} />
-              </div>
-            )}
-          </div>
-        )}
-        {/* Sin permiso de escritura no hay barra de botones: el aviso va igual arriba. */}
-        {!puedeEscribir && cambioEsperando && (
+      <form id={idFormulario} onSubmit={guardar} aria-busy={pendiente} className="flex flex-1 flex-col">
+        {/* El cambio que espera «Aplicar en Dropi» se ve arriba; los botones van en la barra fija de abajo. */}
+        {cambioEsperando && (
           <div role="status" className="border-b border-border bg-destructive-soft px-5 py-3 [&>span]:text-sm [&>span]:font-medium">
             <EstadoCambioDropi c={cambioEsperando} />
           </div>
@@ -841,6 +757,88 @@ function ContenidoFicha({
       {/* Fuera del formulario: escribir un comentario no debe enviar ni ensuciar la publicación. Se vuelve a pedir al guardar y
           al decidir una recomendación (cambia la cantidad de decisiones o de tareas hechas). */}
       <ActividadPublicacion id={p.id} puedeComentar={puedeEscribir} version={version + p.decisiones.length + p.decisiones.filter((x) => x.hechaEn).length} />
+      {/* Los botones de acción van en una barra fija abajo (7 nov 2026, pedido de Alcides: para no tener que subir con el mouse cada vez).
+          Está fuera del formulario: «Guardar cambios» lo envía con el atributo form. */}
+      {puedeEscribir && (
+        <div role="region" aria-label="Acciones de la publicación" className="sticky bottom-0 z-[5] mt-auto flex flex-col gap-2 border-t border-border bg-card px-5 py-3 shadow-[0_-4px_12px_-6px_rgb(0_0_0/0.15)]">
+          <div className="flex flex-wrap gap-2">
+            {sinGuardar && (
+              <>
+                <button type="submit" form={idFormulario} disabled={pendiente} className="inline-flex items-center gap-1.5 rounded-md bg-success px-3 py-2 text-sm font-medium text-background hover:bg-success/85 disabled:opacity-50">
+                  <CheckIcon className="h-4 w-4" />
+                  {pendiente ? "Guardando..." : "Guardar cambios"}
+                </button>
+                <button type="button" onClick={() => setD(JSON.parse(base) as Formulario)} disabled={pendiente} className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50">
+                  <CerrarIcon className="h-4 w-4" />
+                  Cancelar
+                </button>
+              </>
+            )}
+            {!sinGuardar && puedeArchivar && p.sinPublicar && (
+              <BotonAccion icono={CheckIcon} tono="exito" className={PENDIENTE_EN_COLOR} disabled={pendiente || p.publicarPendiente} onClick={publicar}>
+                {publicando ? "Un momento..." : p.publicarPendiente ? "Publicación pendiente" : "Publicar en Dropi"}
+              </BotonAccion>
+            )}
+            {!sinGuardar && puedeArchivar && eliminable && (
+              <BotonAccion icono={PapeleraIcon} tono="peligro" disabled={pendiente} onClick={eliminar}>
+                {eliminando ? "Un momento..." : p.sinPublicar ? "Eliminar borrador" : "Eliminar"}
+              </BotonAccion>
+            )}
+            {/* Republicar, Apagar, Privatizar, Pausar y Archivar siempre se ven: si no se pueden usar, van apagados y dicen por qué (27 oct 2026). */}
+            {!sinGuardar && puedeArchivar && !p.sinPublicar &&
+              (sePuedeRepublicar ? (
+                <BotonAccion icono={ActualizarIcon} tono="info" className={PENDIENTE_EN_COLOR} disabled={pendiente || yaRepublicando} onClick={republicar}>
+                  {republicando ? "Un momento..." : yaRepublicando ? "Republicación pendiente" : "Republicar"}
+                </BotonAccion>
+              ) : (
+                <BotonAccionApagado icono={ActualizarIcon} texto="Republicar" motivo={motivoRepublicar(botones) ?? "No disponible"} />
+              ))}
+            {/* «Apagar en Dropi»: sacar el stock y archivar allá, con sus privadas a elección. Queda pendiente para «Aplicar en Dropi». */}
+            {!sinGuardar && puedeArchivar && !p.sinPublicar &&
+              (puedeApagar(p) ? <BotonApagarDropi p={p} deshabilitado={pendiente} /> : <BotonAccionApagado icono={ApagarIcon} texto="Apagar en Dropi" motivo={motivoApagar(botones) ?? "No disponible"} />)}
+            {/* El candado: abierto en un público («Privatizar en Dropi», a un solo dropshipper en un producto privado nuevo); cerrado en un privado
+                («Quitar privatización», 30 oct 2026: sus unidades vuelven al público). */}
+            {!sinGuardar && puedeArchivar && !p.sinPublicar &&
+              (p.tipoDropi === "privado" ? (
+                motivoQuitarPrivatizacion(botones) === null ? (
+                  <BotonPrivatizarDropi p={p} deshabilitado={pendiente} />
+                ) : (
+                  <BotonAccionApagado icono={CandadoIcon} texto="Quitar privatización" motivo={motivoQuitarPrivatizacion(botones) ?? "No disponible"} />
+                )
+              ) : puedePrivatizar(p) ? (
+                <BotonPrivatizarDropi p={p} deshabilitado={pendiente} />
+              ) : (
+                <BotonAccionApagado icono={CandadoAbiertoIcon} texto="Privatizar en Dropi" motivo={motivoPrivatizar(botones) ?? "No disponible"} />
+              ))}
+            {!sinGuardar && puedeArchivar && !p.sinPublicar &&
+              (estaPausada ? (
+                <BotonAccion icono={ReactivarIcon} tono="exito" disabled={pendiente} onClick={() => archivar()}>
+                  {archivando ? "Un momento..." : "Reactivar"}
+                </BotonAccion>
+              ) : sePausa ? (
+                <BotonAccion icono={PausaIcon} tono="info" disabled={pendiente} onClick={() => archivar(true)}>
+                  {archivando ? "Un momento..." : "Pausar por falta de stock"}
+                </BotonAccion>
+              ) : (
+                <BotonAccionApagado icono={PausaIcon} texto="Pausar por falta de stock" motivo={motivoPausar(botones) ?? "No disponible"} />
+              ))}
+            {!sinGuardar && puedeArchivar && <BotonLiquidacionFicha f={p} />}
+            {!sinGuardar && puedeArchivar &&
+              (motivoArchivar(botones) === null ? (
+                <BotonAccion icono={ArchivarIcon} tono={p.archivada ? "exito" : "alerta"} disabled={pendiente} onClick={() => archivar()}>
+                  {archivando ? "Un momento..." : p.archivada ? "Sacar de Archivados" : "Archivar"}
+                </BotonAccion>
+              ) : (
+                <BotonAccionApagado icono={ArchivarIcon} texto={p.archivada ? "Sacar de Archivados" : "Archivar"} motivo={motivoArchivar(botones)!} />
+              ))}
+          </div>
+          {error && (
+            <p role="alert" className="text-sm text-destructive">
+              {error}
+            </p>
+          )}
+        </div>
+      )}
       {/* Fuera del formulario: los eventos de un portal suben por el árbol de React y enviarían o ensuciarían este formulario. */}
       <FichaProductoEmbebida productoId={productoAbierto} alCerrar={() => setProductoAbierto(null)} />
     </Ventana>
