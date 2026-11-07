@@ -1,5 +1,6 @@
 "use client";
 
+import { SelectorTipoProducto } from "@/components/tabla/selector-tipo-producto";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { ListaDatos } from "@/components/tabla/lista-datos";
 import type { IconoComp } from "@/components/tabla/botones-vista";
@@ -75,6 +76,7 @@ export function ListaPublicacionesDrop({
   );
   return (
     <>
+      <SelectorTipoProducto def={DEF_PUBLICACIONES_DROP} campo="tipoProducto" cuentas={{ todos: publicaciones.length, simple: publicaciones.filter((f) => f.producto && f.producto.tipo !== "combo").length, pack: publicaciones.filter((f) => f.producto?.tipo === "combo").length }} />
       <ListaDatos
         def={DEF_PUBLICACIONES_DROP}
         filas={publicaciones}

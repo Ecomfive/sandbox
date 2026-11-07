@@ -116,6 +116,16 @@ export const DEF_PUBLICACIONES_DROP: DefTabla<FilaPublicacionDrop> = {
       ],
     },
     {
+      id: "tipoProducto",
+      etiqueta: "Tipo de producto",
+      tipo: "seleccion",
+      valores: (f) => (f.producto ? [f.producto.tipo === "combo" ? "combo" : "simple"] : []),
+      opciones: () => [
+        { valor: "simple", etiqueta: "Producto simple" },
+        { valor: "combo", etiqueta: "Pack o combo" },
+      ],
+    },
+    {
       id: "vinculo",
       etiqueta: "Producto vinculado",
       tipo: "seleccion",

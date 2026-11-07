@@ -34,7 +34,7 @@ export interface FilaStock {
   plataformas: StockPlataformas | null;
 }
 
-export const ETIQUETA_TIPO_SKU: Record<string, string> = { simple: "Simple", combo: "Compuesto" };
+export const ETIQUETA_TIPO_SKU: Record<string, string> = { simple: "Simple", combo: "Pack o combo" };
 export const ETIQUETA_CLASE_SKU: Record<string, string> = { fisico: "Activo", test: "Test", inactivo: "Inactivo", descontinuado: "Descontinuado" };
 
 export const ETIQUETA_EXISTENCIA: Record<string, string> = {

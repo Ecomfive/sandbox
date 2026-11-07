@@ -359,6 +359,8 @@ export const DEF_PUBLICACIONES: DefTabla<FilaPublicacion> = {
       agrupable: true,
       ordenGrupos: ["sin_id", "no_aparece", "conectado", "sin_datos"],
     },
+    // Producto simple o pack/combo, según el producto con que está vinculada (7 nov 2026): la lista lo ofrece como selector arriba. Sin producto vinculado no cuenta en ninguno de los dos.
+    { id: "tipoProducto", etiqueta: "Tipo de producto", tipo: "seleccion", valores: (f) => (f.sku ? [f.sku.tipo === "combo" ? "combo" : "simple"] : []), opciones: () => [{ valor: "simple", etiqueta: "Producto simple" }, { valor: "combo", etiqueta: "Pack o combo" }] },
     { id: "vinculo", etiqueta: "Vínculo con Producto", tipo: "seleccion", valores: (f) => [estadoVinculo(f)], opciones: () => VINCULOS, agrupable: true, ordenGrupos: VINCULOS.map((v) => v.valor) },
     // Las ventas de Dropi (21 oct 2026): reemplazan el «Estado de venta» que se marcaba a mano. Las ve todo el que abre el módulo.
     { id: "netas30", etiqueta: "Ventas 30 días", tipo: "numero", valor: (f) => f.ventas?.netas30 ?? null },

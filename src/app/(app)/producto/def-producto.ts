@@ -3,8 +3,8 @@ import { grupoReporte, primerNivel, rutaLegible } from "@/lib/categorias/taxonom
 import type { DefTabla } from "@/lib/tabla/motor";
 import { ETIQUETA_PUNTO, puntosParaDecidir, type PuntoDecidir } from "@/lib/producto/para-decidir";
 
-/** Simple: un solo producto. Compuesto: una combinación de productos simples (al venderlo se descuenta cada uno). */
-export const ETIQUETA_TIPO: Record<string, string> = { simple: "Simple", combo: "Compuesto" };
+/** Simple: un solo producto. Pack o combo (en el sistema, «compuesto»): varias unidades de un producto o una combinación de productos simples (al venderlo se descuenta cada uno). */
+export const ETIQUETA_TIPO: Record<string, string> = { simple: "Simple", combo: "Pack o combo" };
 
 /**
  * El estado de un producto. Activo: se compra y tiene stock. Test: se está probando; todavía no se compra y no tiene stock.

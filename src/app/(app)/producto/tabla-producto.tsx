@@ -4,6 +4,7 @@ import type { OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type { IconoComp } from "@/components/tabla/botones-vista";
+import { SelectorTipoProducto } from "@/components/tabla/selector-tipo-producto";
 import { ListaDatos } from "@/components/tabla/lista-datos";
 import { CalendarioIcon, CatalogoIcon, ComprasIcon, EstadoIcon, ProductoIcon } from "@/lib/nav-icons";
 import type { NombreFilas } from "@/lib/tabla/pie";
@@ -80,6 +81,10 @@ export function TablaProducto({
 
   return (
     <>
+      <SelectorTipoProducto
+        def={DEF_PRODUCTO}
+        cuentas={{ todos: productos.length, simple: productos.filter((p) => p.tipo !== "combo").length, pack: productos.filter((p) => p.tipo === "combo").length }}
+      />
       <TableroProducto productos={productos} />
       <ListaDatos
         def={DEF_PRODUCTO}

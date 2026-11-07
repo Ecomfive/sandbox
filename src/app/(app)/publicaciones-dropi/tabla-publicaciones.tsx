@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { SelectorTipoProducto } from "@/components/tabla/selector-tipo-producto";
 import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { anilloFoco } from "@/components/ui/field";
@@ -177,6 +178,7 @@ export function TablaPublicaciones({
           )}
         </div>
       </div>
+      <SelectorTipoProducto def={def} campo="tipoProducto" cuentas={{ todos: publicaciones.length, simple: publicaciones.filter((f) => f.sku && f.sku.tipo !== "combo").length, pack: publicaciones.filter((f) => f.sku?.tipo === "combo").length }} />
       <ListaDatos
         def={def}
         filas={publicaciones}

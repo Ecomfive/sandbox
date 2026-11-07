@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { fieldClassSm } from "@/components/ui/field";
 import type { IconoComp } from "@/components/tabla/botones-vista";
+import { SelectorTipoProducto } from "@/components/tabla/selector-tipo-producto";
 import { ListaDatos } from "@/components/tabla/lista-datos";
 import { InventarioIcon, ProductoIcon } from "@/lib/nav-icons";
 import type { NombreFilas } from "@/lib/tabla/pie";
@@ -115,6 +116,7 @@ export function ListaStock({
         accionPrincipal={<SelectorBodega bodegas={bodegas} elegida={bodegaElegida} />}
         resumen={(visibles) => (
           <>
+            <SelectorTipoProducto def={def} cuentas={{ todos: filas.length, simple: filas.filter((f) => f.tipo !== "combo").length, pack: filas.filter((f) => f.tipo === "combo").length }} />
             <TableroStock filas={visibles} def={def} conPlataformas={conPlataformas} />
             {lecturas && <AvisoLecturas lecturas={lecturas} fallaron={lecturasFallaron} conDunamixfy={codigoPais === "CR"} />}
           </>

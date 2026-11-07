@@ -113,7 +113,7 @@ export const DEF_POR_PAIS: DefTabla<FilaPorPais> = {
       valores: (f) => [f.tipo],
       opciones: () => [
         { valor: "simple", etiqueta: "Simple" },
-        { valor: "compuesto", etiqueta: "Compuesto" },
+        { valor: "combo", etiqueta: "Pack o combo" },
       ],
       agrupable: true,
     },
