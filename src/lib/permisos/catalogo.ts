@@ -24,7 +24,7 @@ export const AREAS_ACCESO: AreaAcceso[] = [
     color: "#5f43d1",
     modulos: [
       { clave: "dashboard", etiqueta: "Hoy" },
-      { clave: "ventas-dropi", etiqueta: "Ventas Dropi" },
+      { clave: "ventas-dropi", etiqueta: "Ventas Proveeduría" },
       { clave: "tienda-dashboard", etiqueta: "Dashboard de tienda" },
       { clave: "notificaciones", etiqueta: "Centro de notificaciones" },
     ],

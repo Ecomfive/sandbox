@@ -135,7 +135,7 @@ export function VistaGanadores({ ganadores }: { ganadores: Record<PaisTuWinner, 
       </div>
       <p className="nota">
         <b>«Ventas»</b> es lo que bajó el stock en Dropi en 7 días, como lo calcula Tu Winner; en verde, los días en que el proveedor reabasteció. <b>«Nosotros»</b> son nuestras
-        ventas del mismo producto en Ventas Dropi esa semana.
+        ventas del mismo producto en Ventas Proveeduría esa semana.
       </p>
     </section>
   );

@@ -59,7 +59,7 @@ const AREAS: NavSection[] = [
     frentes: true,
     items: [
       { label: "Hoy", href: "/", frente: "proveeduria" },
-      { label: "Ventas Dropi", href: "/ventas-dropi", dropi: true, frente: "proveeduria" },
+      { label: "Ventas Proveeduría", href: "/ventas-dropi", dropi: true, frente: "proveeduria" },
       { label: "Dashboard de tienda", href: "/tienda-dashboard", frente: "tienda" },
     ],
   },

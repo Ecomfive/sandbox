@@ -20,7 +20,7 @@ function Cifra({ titulo, valor, detalle, tono }: { titulo: string; valor: string
 }
 
 /**
- * Las ventas en Dropi del dropshipper (Desempeño › Ventas Dropi), por sus cuentas de Dropi vinculadas: netas de los últimos 30
+ * Las ventas en Dropi del dropshipper (Desempeño › Ventas Proveeduría), por sus cuentas de Dropi vinculadas: netas de los últimos 30
  * días y de siempre, lo no efectivo (cancelado, rechazado o devuelto), sus netas por mes y qué productos vende.
  */
 export function VentasDropiDropshipperBloque({ dropshipperId, tieneCuentas }: { dropshipperId: string; tieneCuentas: boolean }) {
@@ -107,7 +107,7 @@ export function VentasDropiDropshipperBloque({ dropshipperId, tieneCuentas }: { 
           </div>
         );
       })}
-      <p className="m-0 text-[11px] text-muted-foreground">Del Historial de Existencia de Dropi hasta el {fecha(datos.corte)} (Desempeño › Ventas Dropi).</p>
+      <p className="m-0 text-[11px] text-muted-foreground">Del Historial de Existencia de Dropi hasta el {fecha(datos.corte)} (Desempeño › Ventas Proveeduría).</p>
     </div>
   );
 }

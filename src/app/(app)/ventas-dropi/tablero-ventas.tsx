@@ -275,7 +275,7 @@ function DetalleProducto({ p, meses }: { p: ProductoVentas; meses: string[] }) {
 }
 
 /**
- * El tablero de Ventas Dropi: las cifras de arriba, la tendencia por mes y por día, lo que hay que reponer, lo que crece y cae,
+ * El tablero de Ventas Proveeduría (antes Ventas Dropi): las cifras de arriba, la tendencia por mes y por día, lo que hay que reponer, lo que crece y cae,
  * el stock quieto, todos los productos (con búsqueda, categoría y su detalle por mes), los SKU del sistema y los dropshippers.
  */
 export function TableroVentas({ corte, stockLeido = null, movimientos, productos, porProducto, meses, dias, dropshippers, dinero }: { corte: string; /** La última lectura de «Mis productos» de Dropi, ya escrita en hora de Panamá: de ahí sale el stock. */ stockLeido?: string | null; movimientos: number; productos: ProductoVentas[]; /** Los mismos productos con los IDs de Dropi de un mismo SKU juntos. */ porProducto: ProductoVentas[]; meses: Mes[]; dias: { dia: string; pedidas: number; netas: number }[]; dropshippers: DropshipperVentas[]; dinero: DineroVentas | null }) {
@@ -347,7 +347,7 @@ export function TableroVentas({ corte, stockLeido = null, movimientos, productos
   return (
     <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-1.5">
-        <h2 className="text-2xl font-bold tracking-tight">Ventas Dropi</h2>
+        <h2 className="text-2xl font-bold tracking-tight">Ventas Proveeduría</h2>
         <p className="max-w-[75ch] text-sm text-muted-foreground">
           En los últimos 30 días salieron <b className="font-semibold text-foreground">{entero(k.n30)} unidades netas</b>
           {k.cambio !== null && `, ${Math.abs(k.cambio).toLocaleString("es-PA", { maximumFractionDigits: 1 })} % ${k.cambio < 0 ? "menos" : "más"} que los 30 días anteriores`}. {k.sinStock} productos que se venden ya no tienen stock y a {k.agotandose} más se les acaba en menos de dos semanas.

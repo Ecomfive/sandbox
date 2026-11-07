@@ -130,7 +130,7 @@ export function VentasDropiProducto({ id, pais }: { id: string; /** Solo ese pa√
       ))}
       {puedeVerVentas && (
         <Link href="/ventas-dropi" className={`inline-flex w-fit items-center rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium hover:bg-accent ${anilloFoco}`}>
-          Ver en Ventas Dropi
+          Ver en Ventas Proveedur√≠a
         </Link>
       )}
     </div>

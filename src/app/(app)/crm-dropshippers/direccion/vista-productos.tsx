@@ -65,7 +65,7 @@ export function VistaProductos({ datos, clientes, codigoPais }: { datos: DatosPr
     <>
       {datos.sinStock && (
         <p role="status" className="m-0 rounded-lg border border-warning bg-warning-soft px-4 py-3 text-sm text-warning">
-          No hay ventas de Dropi cargadas para {codigoPais} (Desempeño › Ventas Dropi): sin ellas no se sabe el stock ni cuánto dura.
+          No hay ventas de Dropi cargadas para {codigoPais} (Desempeño › Ventas Proveeduría): sin ellas no se sabe el stock ni cuánto dura.
         </p>
       )}
       <Cifras>
@@ -180,7 +180,7 @@ export function VistaProductos({ datos, clientes, codigoPais }: { datos: DatosPr
         </div>
       )}
       <p className="m-0 text-xs text-muted-foreground">
-        Pedidos de los dropshippers con cuenta vinculada en {codigoPais}, sin cancelados. El stock y los días de stock son los de Dropi (Desempeño › Ventas Dropi); lo que viene en camino sale de Compras, por el producto vinculado en Gestión de IDs Dropi.
+        Pedidos de los dropshippers con cuenta vinculada en {codigoPais}, sin cancelados. El stock y los días de stock son los de Dropi (Desempeño › Ventas Proveeduría); lo que viene en camino sale de Compras, por el producto vinculado en Gestión de IDs Dropi.
       </p>
     </>
   );

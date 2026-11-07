@@ -1,4 +1,4 @@
-// Desempeño › Ventas Dropi: la plata de cada producto (migración 0130), sacada de la hoja ÓRDENES del Excel «ECOMFIVE DROPI 2026
+// Desempeño › Ventas Proveeduría: la plata de cada producto (migración 0130), sacada de la hoja ÓRDENES del Excel «ECOMFIVE DROPI 2026
 // DIARIO» que lleva la oficina. Usa las mismas reglas de su hoja RESUMEN: la ganancia es lo que Dropi le paga a ECOMFIVE por la
 // orden, la comisión B280 (1,50 por orden de esa bodega) se suma tal como viene, el coste real solo existe en las entregadas y los
 // descuentos son los cobros de garantía o indemnización de esa guía. Los fletes los paga el dropshipper: no entran.

@@ -5,7 +5,7 @@ export interface Modulo {
 
 export const MODULOS: Modulo[] = [
   { clave: "dashboard", etiqueta: "Dashboard operativo" },
-  { clave: "ventas-dropi", etiqueta: "Ventas Dropi" },
+  { clave: "ventas-dropi", etiqueta: "Ventas Proveeduría" },
   { clave: "inventario", etiqueta: "Inventario" },
   { clave: "alertas", etiqueta: "Alertas de inventario" },
   { clave: "pedidos-dropi", etiqueta: "Pedidos Dropi" },

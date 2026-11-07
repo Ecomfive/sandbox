@@ -38,7 +38,7 @@ export default async function ReponerComprasPage() {
       <Pagina ancho="ancha" className="flex flex-col gap-6">
         <EncabezadoPagina titulo="Reponer" oculto />
         <p role="status" className="rounded-lg border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
-          Todavía no hay ventas de Dropi cargadas para {pais.nombre} (Desempeño › Ventas Dropi): sin ellas no se sabe qué reponer.
+          Todavía no hay ventas de Dropi cargadas para {pais.nombre} (Desempeño › Ventas Proveeduría): sin ellas no se sabe qué reponer.
         </p>
       </Pagina>
     );

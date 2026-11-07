@@ -967,7 +967,7 @@ convenciones técnicas del código.
   **El stock manda la lectura de «Mis productos»**: `ventasDePublicacion(ids, resumen, stockActual)` usa el stock de esa lectura por
   ID antes que el de la carga de Ventas Dropi (que puede tener días), así «Stock», días de inventario, «Sin stock» y «Se acaba» salen
   con lo último de Dropi (la antena 8684 salía «Sin stock» con la carga del 21 oct y Dropi ya tenía 2). Lo mismo en
-  `cargarResumenVentas` (Compras › Reponer, el asistente de IA; devuelve `stockLeidoEn`) y en Desempeño › Ventas Dropi:
+  `cargarResumenVentas` (Compras › Reponer, el asistente de IA; devuelve `stockLeidoEn`) y en Desempeño › Ventas Proveeduría:
   `cargarStockProveedor` + `stockVigente` (`proveedor-datos.ts`) reemplazan el stock de la carga por ID antes de `resumirProductos`,
   y las dos pantallas dicen de qué actualización sale el stock. El MCP de Dropi ve el catálogo como dropshipper: no trae los privados.
   **Todas con bodega** (pedido de Hernán): **Dropi solo lista la bodega de un producto con stock** (sin stock, `warehouses` y hasta
@@ -980,7 +980,8 @@ convenciones técnicas del código.
   existía sin publicación (envíos y seguros de Dropi, «P-MA Aceite de semilla de calabaza» 11178) no se crea solo.
   **Fase 2** (pendiente): Claude propone con el historial de decisiones; **fase 3**: automático por tipo cuando su tasa de aceptación lo
   justifique, con bitácora y deshacer.
-- **Ventas de Dropi cada día** (21 oct 2026). Desempeño › Ventas Dropi, las ventas de cada publicación en Gestión de IDs Dropi,
+- **Ventas Proveeduría por plataforma** (7 nov 2026, pedido de Hernán; antes «Ventas Dropi», la ruta `/ventas-dropi` y el módulo `ventas-dropi` no cambian). `selector-vista-ventas.tsx` pone arriba «Todas» (el análisis general) y una opción por plataforma del país (`plataformasDePais`: Costa Rica = Dropi, Drop y Effi; los demás países solo Dropi y no se dibuja), con los logos del selector de Análisis de competencia. Es un enlace a `?ver=todas|dropi|drop|effi` (`vistaVentasValida`, `src/lib/plataformas.ts`, con prueba), no la cookie `plataforma_actual`: la barra no tiene «todas». **Hoy solo hay datos de Dropi**: «Todas» = Dropi (con un aviso en países con más plataformas) y Drop y Effi dicen que sus ventas todavía no se leen. Al conectarlas, las consultas de `page.tsx` pasan a ser por plataforma y «Todas» las suma.
+- **Ventas de Dropi cada día** (21 oct 2026). Desempeño › Ventas Proveeduría, las ventas de cada publicación en Gestión de IDs Dropi,
   Reponer y la ficha del dropshipper leen `dropi_ventas_*` (migraciones 0120 y 0122), que se llena desde el Historial de Existencia
   de Dropi. La tarea programada «ventas-dropi-diario» (Claude, navegador integrado) corre `npx tsx scripts/ventas-dropi.ts subida`
   (dos direcciones firmadas de subida a `wms-compras/tmp-dropi/`), la función de `scripts/ventas-dropi-navegador.js` en
