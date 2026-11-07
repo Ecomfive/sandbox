@@ -15,6 +15,7 @@ import { useMonedaCompetencia } from "@/components/competencia/moneda-competenci
 import { formatearFechaHoraCompleta } from "@/lib/formato";
 import { ActualizarIcon, AlertaIcon, AnalisisCompetenciaIcon, EnlaceIcon, ProveedorIcon, TiendaIcon, VentasIcon } from "@/lib/nav-icons";
 import { marcarAlertasVistas } from "./actions";
+import { RevisarDudosos } from "./revisar-dudosos";
 import { decisionesDeHoy, posicionPrecio, precioEquivalente, type Decision, type EstadoPosicion, type Posicion, type TipoDecision } from "@/lib/competencia/analisis";
 import type { AlertaC, CompetidorC, DatosCompetencia, FilaNuestro, ProductoC } from "./def-competencia";
 
@@ -536,11 +537,15 @@ function ProductosDelCompetidor({ productos, nuestros, busqueda }: { productos: 
                           {dif !== null && dif < 0 && <InsigniaPosicion estado="perdiendo" detalle={`él ${usd(-dif)} más barato${eq?.nota ? " (equivalente)" : ""}`} />}
                           {dif !== null && dif > 0 && <InsigniaPosicion estado="ganando" detalle={`nosotros ${usd(dif)} más baratos${eq?.nota ? " (equivalente)" : ""}`} />}
                           {dif === 0 && <InsigniaPosicion estado="empatado" detalle="mismo precio" />}
+                          {p.revision?.veredicto === "mismo" && <span className="text-xs text-muted-foreground">Confirmado por la IA{p.revision.motivo ? `: ${p.revision.motivo}` : ""}</span>}
                         </span>
                       ) : p.dudosoDe && nuestros.get(p.dudosoDe) ? (
                         <span className="flex flex-col items-start gap-0.5">
                           <Badge tone="neutral">Dudoso</Badge>
-                          <span className="text-xs text-muted-foreground">Se parece a «{nuestros.get(p.dudosoDe)!.nombre}», pero no es seguro que sea el mismo: no se compara su precio.</span>
+                          <span className="text-xs text-muted-foreground">
+                            Se parece a «{nuestros.get(p.dudosoDe)!.nombre}», pero no es seguro que sea el mismo: no se compara su precio.
+                            {p.revision?.motivo && ` La IA: ${p.revision.motivo}`}
+                          </span>
                         </span>
                       ) : (
                         <span className="text-muted-foreground">—</span>
@@ -716,6 +721,7 @@ export function VistaCompetidores({ datos, puedeEscribir }: { datos: DatosCompet
       <TableroCompetencia datos={datos} filas={conDatos} activa={tarjeta} alPulsar={setTarjeta} />
       {!tarjeta && <QueHacerHoy decisiones={decisiones} alAbrir={abrirCompetidor} />}
       {!tarjeta && <NuestrosFrente filas={posiciones} alAbrir={abrirCompetidor} plataforma={plataformaDe(datos.plataforma).nombre} />}
+      {!tarjeta && puedeEscribir && <RevisarDudosos pendientes={datos.dudososSinRevisar} />}
       {(!tarjeta || tarjeta === "novedades") && <Novedades alertas={datos.alertas} alAbrir={abrirNovedad} puedeEscribir={puedeEscribir} busquedas={datos.busquedas} />}
 
       <div className="flex flex-wrap items-center gap-2">
