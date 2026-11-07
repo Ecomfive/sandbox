@@ -109,6 +109,7 @@ export default async function LevantamientoPage({ searchParams }: { searchParams
           puedeEscribir={!usuario.modulosSoloLectura.includes("inventario")}
           puedeRestar={puedeMoverAMano("salida", pais.codigo, esAdministrador(usuario))}
           restarPideMotivo={pideMotivo("salida", pais.codigo)}
+          codigoPais={pais.codigo}
         />
       )}
     </Pagina>
