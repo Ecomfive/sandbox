@@ -1,6 +1,6 @@
-import type { DefTabla } from "@/lib/tabla/motor";
+import { SIN_VALOR, type DefTabla } from "@/lib/tabla/motor";
 import { FILTRO_SOLO_SIMPLES } from "@/lib/tabla/tipo-producto";
-import type { StockPlataformas } from "@/lib/wms/stock-plataformas";
+import { ETIQUETA_PLATAFORMA, type Plataforma, type StockPlataformas } from "@/lib/wms/stock-plataformas";
 import { numeroProducto, textoCodigos } from "@/lib/wms/codigos-producto";
 import { existencia } from "@/lib/wms/total-stock";
 
@@ -105,10 +105,30 @@ export const DEF_STOCK: DefTabla<FilaStock> = {
   ],
 };
 
-/** En los países que muestran las plataformas, además se filtra y se descarga por ellas. */
+export const PLATAFORMAS_STOCK: Plataforma[] = ["dropi", "effi", "drop"];
+
+/** Las plataformas donde el producto tiene unidades. */
+export const plataformasConStock = (f: Pick<FilaStock, "plataformas">): Plataforma[] => PLATAFORMAS_STOCK.filter((p) => (f.plataformas?.[p] ?? 0) > 0);
+
+/** En los países que muestran las plataformas, además se filtra y se descarga por ellas. «Plataforma» filtra por una (7 nov 2026, pedido de Hernán: separadas). */
 export const DEF_STOCK_PLATAFORMAS: DefTabla<FilaStock> = {
   ...DEF_STOCK,
-  campos: [...DEF_STOCK.campos, { id: "plataformas", etiqueta: "En plataformas", tipo: "numero", sinCsv: true, valor: (f) => f.plataformas?.total ?? 0 }],
+  campos: [
+    ...DEF_STOCK.campos,
+    { id: "plataformas", etiqueta: "En plataformas", tipo: "numero", sinCsv: true, valor: (f) => f.plataformas?.total ?? 0 },
+    {
+      id: "plataforma",
+      etiqueta: "Plataforma",
+      tipo: "seleccion",
+      sinCsv: true,
+      valores: (f) => {
+        const p = plataformasConStock(f);
+        return p.length ? p : [SIN_VALOR];
+      },
+      opciones: () => PLATAFORMAS_STOCK.map((p) => ({ valor: p, etiqueta: ETIQUETA_PLATAFORMA[p] })),
+      etiquetaSinValor: "En ninguna",
+    },
+  ],
   csvAntes: [
     ...(DEF_STOCK.csvAntes ?? []),
     { etiqueta: "Dropi", valor: (f) => f.plataformas?.dropi ?? 0 },
