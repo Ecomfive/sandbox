@@ -2457,6 +2457,10 @@ convenciones técnicas del código.
   (crea un seguimiento). **Toda acción nueva del CRM** empieza con `requireModuloEscritura` del módulo de su área y
   devuelve `{ error }`; una lectura que muestre algo comercial exige `crm-comercial`.
 
+- **Aviso de inactividad** (7 nov 2026, pedido de Alcides): a las personas de `AVISO_INACTIVIDAD` (`src/lib/rendimiento/aviso-inactividad.ts`, por id
+  de perfil; hoy solo Nicol Muñoz, Atención) el layout de `(app)` les monta `AvisoInactividad` (`src/components/aviso-inactividad.tsx`): con la pestaña a la vista y
+  5 minutos sin mouse, teclado, desplazarse ni tocar (`EVENTOS_USO` del latido, la misma regla de Equipo › Rendimiento) sale arriba al centro «Sin actividad en el
+  sistema desde las 10:12 (6 min)», y al volver «Estuviste 8 min sin actividad…» (20 s o «Entendido»). Solo avisa a la persona: no guarda nada nuevo.
 - **Rendimiento** (27 oct 2026): las funciones de Vercel van en **Oregón (`pdx1`, `vercel.json` › `regions`)**, la misma región que la base
   de Supabase (us-west-2): antes corrían en Washington (`iad1`) y cada consulta cruzaba EE. UU. No quitar esa línea. Índices de la
   migración 0162; `obtenerPendientesHoy` se guarda 45 s por país; la presencia late cada 60 s. Segunda tanda (migración 0163): las
