@@ -12,7 +12,11 @@ import { ingerirPedidos, type PedidoDropi } from "@/lib/dropi-actualizar/ingerir
 import { ingerirRetiros, type FilaRetiro } from "@/lib/dropi-actualizar/ingerir-retiros";
 import { ingerirVentas, type MovimientosDropi, type ResumenDropi } from "@/lib/dropi-actualizar/ingerir-ventas";
 import { LECTORES, PARTES, archivoSubido, esParte, lectoresDe, parte as parteDe, puedeActualizarDropi, type ClaveLector, type ClaveParte } from "@/lib/dropi-actualizar/partes";
+import { textoLecturaEffi } from "@/lib/effi/resumen";
+import { sincronizarEffi } from "@/lib/effi/sincronizar";
+import { guardarVentasDrop, type LecturaVentasDrop } from "@/lib/publicaciones-drop/ventas";
 import { createServiceClient } from "@/lib/supabase/server";
+import { guardarDrop, type LecturaDrop } from "../../../../../scripts/drop-guardar";
 import { guardarNuestrosProductos, type LecturaNuestros } from "../../../../../scripts/publicaciones-sincronizar-dropi";
 
 const BUCKET = "wms-compras";
@@ -155,6 +159,22 @@ export async function procesarParte(id: string, parte: string): Promise<{ error?
       datos = { productos: r.productos, activos: r.activos, archivados: r.archivados };
       // La sesión de proveedor del país funcionó: lo mismo que marca la tarea diaria.
       await supabase.from("dropi_sesiones").upsert({ pais_codigo: codigo, tipo: "proveedor", renovada_en: new Date().toISOString(), ok: true, mensaje: "Actualizar Dropi" });
+    } else if (p.tipo === "drop_productos") {
+      // Costa Rica › Drop (7 nov 2026): «Mis productos» de la cuenta de proveedor, como la lectura que antes se hacía a mano.
+      const r = await guardarDrop(supabase, await bajar<LecturaDrop>(supabase, id, archivo("drop")));
+      resumen = `${n(r.productos)} productos${r.nuevos ? ` · ${n(r.nuevos)} nuevos` : ""}${r.yaNoEstan ? ` · ${n(r.yaNoEstan)} ya no están` : ""}`;
+      datos = { productos: r.productos, nuevos: r.nuevos, yaNoEstan: r.yaNoEstan };
+    } else if (p.tipo === "drop_ventas") {
+      const r = await guardarVentasDrop(supabase, await bajar<LecturaVentasDrop>(supabase, id, archivo("dropventas")), log);
+      resumen = `${n(r.pedidos)} pedidos del ${r.desde} al ${r.hasta} · ${n(r.filas)} filas por producto y día${r.sinProducto ? ` · ${n(r.sinProducto)} sin producto reconocido` : ""}`;
+      datos = r as unknown as Record<string, unknown>;
+    } else if (p.tipo === "effi") {
+      // Effi va por su API desde el servidor: artículos (stock), nuestros precios del análisis de competencia y las ventas del cuadro.
+      const r = await sincronizarEffi(supabase);
+      const t = textoLecturaEffi(r);
+      if (t.error) log(t.texto);
+      resumen = t.texto.replace(/^Effi leído: /, "");
+      datos = { articulos: r.articulos, nuevos: r.nuevos, yaNoEstan: r.yaNoEstan };
     } else {
       const r = await ingerirVentas(supabase, await bajar<MovimientosDropi>(supabase, id, archivo("movimientos")), await bajar<ResumenDropi>(supabase, id, archivo("resumen")), log, codigo);
       resumen = `corte ${r.corte} · ${n(r.productos)} productos · ${n(r.movimientos)} movimientos`;

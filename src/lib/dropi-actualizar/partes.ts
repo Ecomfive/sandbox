@@ -13,14 +13,26 @@ export const puedeActualizarDropi = (u: { email: string | null | undefined }) =>
 
 export type CodigoPaisDropi = "pa" | "cr" | "mx";
 
-/** Las cuentas de Dropi: cada país es un dominio distinto (app.dropi.pa, app.dropi.cr, app.dropi.mx), así que las sesiones conviven. */
-export const CUENTAS: Record<CodigoPaisDropi, { nombre: string; cuenta: string; tipoUsuario: string | null; tienda: string | null; origen: string }> = {
+/**
+ * Dónde lee un lector: la pestaña de Dropi de un país o, desde el 7 nov 2026 (pedido de Hernán: «el botón de actualizar así como en Panamá» para Costa Rica),
+ * la de Drop (app.soydrop.com) con la cuenta de proveedor de Costa Rica.
+ */
+export type Sitio = CodigoPaisDropi | "drop";
+
+/** Las cuentas de Dropi: cada país es un dominio distinto (app.dropi.pa, app.dropi.cr, app.dropi.mx), así que las sesiones conviven. Y la de Drop. */
+export const CUENTAS: Record<Sitio, { nombre: string; cuenta: string; tipoUsuario: string | null; tienda: string | null; origen: string }> = {
   pa: { nombre: "Panamá", cuenta: "cuenta de proveedor ECOMFIVE", tipoUsuario: "SUPPLIER", tienda: "ECOMFIVE", origen: "https://app.dropi.pa" },
   // La de proveedor de Costa Rica (el nombre de su tienda no se exige: basta que sea de proveedor).
   cr: { nombre: "Costa Rica", cuenta: "cuenta de proveedor", tipoUsuario: "SUPPLIER", tienda: null, origen: "https://app.dropi.cr" },
   // La de proveedor de México (30 oct 2026), como la de Costa Rica.
   mx: { nombre: "México", cuenta: "cuenta de proveedor", tipoUsuario: "SUPPLIER", tienda: null, origen: "https://app.dropi.mx" },
+  // Drop no guarda la sesión en la página (va en una cookie que no se puede leer): la extensión ve si «Mis productos» de proveedor abre («VENDOR») o si
+  // Drop la manda al catálogo de dropshipper («DROPSHIPPER»). No dice cuándo vence.
+  drop: { nombre: "Drop", cuenta: "cuenta de proveedor de Costa Rica", tipoUsuario: "VENDOR", tienda: null, origen: "https://app.soydrop.com" },
 };
+
+/** Cómo se nombra un sitio en los avisos: «Dropi Costa Rica» o «Drop». */
+export const nombreSitio = (s: Sitio) => (s === "drop" ? "Drop" : `Dropi ${CUENTAS[s].nombre}`);
 
 /**
  * «Descubrir proveedores» (Scraping) lee el catálogo de México con una cuenta de **dropshipper** (una de proveedor no ve el catálogo).
@@ -28,18 +40,22 @@ export const CUENTAS: Record<CodigoPaisDropi, { nombre: string; cuenta: string; 
  */
 export const CUENTA_CATALOGO_MX = { nombre: "México", cuenta: "cuenta de dropshipper", tipoUsuario: null, tienda: null, origen: "https://app.dropi.mx" };
 
-export type ClaveLector = "proveedor" | "ventas" | "proveedor_cr" | "ventas_cr" | "proveedor_mx" | "ventas_mx" | "catalogo_mx";
+export type ClaveLector = "proveedor" | "ventas" | "proveedor_cr" | "ventas_cr" | "drop_cr" | "effi_cr" | "proveedor_mx" | "ventas_mx" | "catalogo_mx";
 
 /**
  * Los lectores de la extensión (copias de scripts/dropi-diario-navegador.js y scripts/ventas-dropi-navegador.js, que siguen
  * usando las tareas programadas): la función que arranca, la variable de la página donde deja el avance y los archivos que sube.
  * Los de Costa Rica son los mismos archivos corridos en la pestaña de app.dropi.cr.
  */
-export const LECTORES: Record<ClaveLector, { pais: CodigoPaisDropi; archivo: string; funcion: string; estado: string; archivos: string[] }> = {
+export const LECTORES: Record<ClaveLector, { pais: CodigoPaisDropi; sitio?: Sitio; archivo: string; funcion: string; estado: string; archivos: string[] }> = {
   proveedor: { pais: "pa", archivo: "lectores/dropi-diario.js", funcion: "dropiDiario", estado: "__dropiDiario", archivos: ["pedidos", "cartera", "retiros", "stock"] },
   ventas: { pais: "pa", archivo: "lectores/ventas-dropi.js", funcion: "ventasDropi", estado: "__ventasDropi", archivos: ["resumen", "movimientos"] },
   proveedor_cr: { pais: "cr", archivo: "lectores/dropi-diario.js", funcion: "dropiDiario", estado: "__dropiDiario", archivos: ["pedidos", "cartera", "retiros", "stock"] },
   ventas_cr: { pais: "cr", archivo: "lectores/ventas-dropi.js", funcion: "ventasDropi", estado: "__ventasDropi", archivos: ["resumen", "movimientos"] },
+  // Drop (7 nov 2026): «Mis productos» (precio, stock) y los pedidos (las ventas del cuadro), en la pestaña de app.soydrop.com con la cuenta de proveedor.
+  drop_cr: { pais: "cr", sitio: "drop", archivo: "lectores/drop.js", funcion: "leerDropProveedor", estado: "__leerDrop", archivos: ["drop", "dropventas"] },
+  // Effi (7 nov 2026): no usa la extensión, el servidor lo lee por la API (sin archivo ni pestaña).
+  effi_cr: { pais: "cr", archivo: "", funcion: "", estado: "", archivos: [] },
   proveedor_mx: { pais: "mx", archivo: "lectores/dropi-diario.js", funcion: "dropiDiario", estado: "__dropiDiario", archivos: ["pedidos", "cartera", "retiros", "stock"] },
   ventas_mx: { pais: "mx", archivo: "lectores/ventas-dropi.js", funcion: "ventasDropi", estado: "__ventasDropi", archivos: ["resumen", "movimientos"] },
   // «Descubrir proveedores» (Scraping de proveedores): todo el catálogo de México, con la sesión de dropshipper.
@@ -52,8 +68,13 @@ export const LECTORES: Record<ClaveLector, { pais: CodigoPaisDropi; archivo: str
  */
 export const archivoSubido = (lector: ClaveLector, archivo: string) => (LECTORES[lector].pais === "pa" ? archivo : `${archivo}${LECTORES[lector].pais}`);
 
-export type TipoParte = "pedidos" | "cartera" | "retiros" | "stock" | "ventas";
-export type ClaveParte = TipoParte | "pedidos_cr" | "cartera_cr" | "retiros_cr" | "stock_cr" | "ventas_cr" | "pedidos_mx" | "cartera_mx" | "retiros_mx" | "stock_mx" | "ventas_mx";
+/** Dónde lee un lector (la pestaña de su país en Dropi, o Drop). */
+export const sitioDe = (l: ClaveLector): Sitio => LECTORES[l].sitio ?? LECTORES[l].pais;
+/** El lector no usa la extensión: el servidor lee solo (Effi, por su API). */
+export const sinExtension = (l: ClaveLector) => !LECTORES[l].archivo;
+
+export type TipoParte = "pedidos" | "cartera" | "retiros" | "stock" | "ventas" | "drop_productos" | "drop_ventas" | "effi";
+export type ClaveParte = TipoParte | "pedidos_cr" | "cartera_cr" | "retiros_cr" | "stock_cr" | "ventas_cr" | "drop_productos_cr" | "drop_ventas_cr" | "effi_cr" | "pedidos_mx" | "cartera_mx" | "retiros_mx" | "stock_mx" | "ventas_mx";
 
 export interface Parte {
   clave: ClaveParte;
@@ -78,6 +99,9 @@ export const PARTES: Parte[] = [
   { clave: "retiros_cr", tipo: "retiros", etiqueta: "Retiros y saldo", pais: "cr", donde: "Conciliación de Retiros", ruta: "/retiros", lector: "proveedor_cr" },
   { clave: "stock_cr", tipo: "stock", etiqueta: "Stock por bodega", pais: "cr", donde: "Gestión de IDs Dropi", ruta: "/publicaciones-dropi", lector: "proveedor_cr" },
   { clave: "ventas_cr", tipo: "ventas", etiqueta: "Ventas (historial de existencias)", pais: "cr", donde: "Ventas Proveeduría · Reponer", ruta: "/ventas-dropi", lector: "ventas_cr" },
+  { clave: "drop_productos_cr", tipo: "drop_productos", etiqueta: "Drop: productos, precio y stock", pais: "cr", donde: "Gestión de IDs Drop · Inventario", ruta: "/publicaciones-drop", lector: "drop_cr" },
+  { clave: "drop_ventas_cr", tipo: "drop_ventas", etiqueta: "Drop: ventas por día", pais: "cr", donde: "Inventario › Cuadro", ruta: "/inventario/cuadro", lector: "drop_cr" },
+  { clave: "effi_cr", tipo: "effi", etiqueta: "Effi: stock, precios y ventas", pais: "cr", donde: "Gestión de IDs Effi · Competencia · Cuadro", ruta: "/publicaciones-effi", lector: "effi_cr" },
   { clave: "pedidos_mx", tipo: "pedidos", etiqueta: "Pedidos y estados (30 días)", pais: "mx", donde: "Pedidos Dropi · CRM", ruta: "/pedidos-dropi", lector: "proveedor_mx" },
   { clave: "cartera_mx", tipo: "cartera", etiqueta: "Cartera (7 días)", pais: "mx", donde: "Pedidos Dropi (cartera)", ruta: "/pedidos-dropi", lector: "proveedor_mx" },
   { clave: "retiros_mx", tipo: "retiros", etiqueta: "Retiros y saldo", pais: "mx", donde: "Conciliación de Retiros", ruta: "/retiros", lector: "proveedor_mx" },
@@ -94,12 +118,14 @@ export const GRUPOS: { lector: ClaveLector; etiqueta: string; detalle: string }[
   { lector: "ventas", etiqueta: "Ventas", detalle: "Panamá · 3 a 6 minutos" },
   { lector: "proveedor_cr", etiqueta: "Pedidos, cartera, retiros y stock", detalle: "Costa Rica · la primera vez tarda más" },
   { lector: "ventas_cr", etiqueta: "Ventas", detalle: "Costa Rica" },
+  { lector: "drop_cr", etiqueta: "Drop: productos, stock y ventas", detalle: "Costa Rica · cuenta de proveedor de Drop" },
+  { lector: "effi_cr", etiqueta: "Effi: stock, precios y ventas", detalle: "Costa Rica · por la API, sin sesión" },
   { lector: "proveedor_mx", etiqueta: "Pedidos, cartera, retiros y stock", detalle: "México" },
   { lector: "ventas_mx", etiqueta: "Ventas", detalle: "México" },
 ];
 
 /** Los lectores de cada país, en el orden en que corren. */
-export const LECTORES_PAIS: Record<CodigoPaisDropi, ClaveLector[]> = { pa: ["proveedor", "ventas"], cr: ["proveedor_cr", "ventas_cr"], mx: ["proveedor_mx", "ventas_mx"] };
+export const LECTORES_PAIS: Record<CodigoPaisDropi, ClaveLector[]> = { pa: ["proveedor", "ventas"], cr: ["proveedor_cr", "ventas_cr", "drop_cr", "effi_cr"], mx: ["proveedor_mx", "ventas_mx"] };
 
 /** Los lectores que hacen falta para esas partes, en orden (Panamá primero). */
 export const lectoresDe = (partes: ClaveParte[]): ClaveLector[] =>
@@ -129,7 +155,7 @@ type SesionVista = { hay: boolean; tipoUsuario: string | null; tienda: string | 
 type EstadoSesion = "ok" | "sin_sesion" | "otra_cuenta" | "vencida";
 
 /** Si la sesión que ve la extensión en la pestaña de un país es la que hace falta (la de proveedor de «Actualizar datos»). */
-export function sesionValida(pais: CodigoPaisDropi, s: SesionVista | null, ahora = Date.now()): EstadoSesion {
+export function sesionValida(pais: Sitio, s: SesionVista | null, ahora = Date.now()): EstadoSesion {
   return sesionDeCuenta(CUENTAS[pais], s, ahora);
 }
 
