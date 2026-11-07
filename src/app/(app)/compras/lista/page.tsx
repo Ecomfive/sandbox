@@ -19,7 +19,7 @@ function leerReponer(v: string | string[] | undefined): { skuId: string; cantida
   return UUID.test(skuId ?? "") && Number.isInteger(cantidad) && cantidad > 0 && cantidad < 1e7 ? { skuId, cantidad } : null;
 }
 
-const GRUPOS: Grupo[] = ["abiertas", "cotizando", "produccion", "transito", "atrasadas", "cerradas"];
+const GRUPOS: Grupo[] = ["abiertas", "cotizando", "por_cotizar", "cotizado", "produccion", "transito", "atrasadas", "cerradas"];
 
 /** Compras › Compras: el tablero (todas las columnas, agrupar, filtros de un toque) con la ficha de resumen a la derecha. */
 export default async function ListaComprasPage({ searchParams }: { searchParams: Promise<{ [k: string]: string | string[] | undefined }> }) {

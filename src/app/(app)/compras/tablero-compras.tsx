@@ -16,11 +16,12 @@ export interface TarjetaCompras {
 }
 
 /**
- * Las etapas que se miran todos los días (30 oct 2026, pedido de Hernán: «como el tablero de Gestión de IDs»): cotizando, en producción, en
+ * Las etapas que se miran todos los días (30 oct 2026, pedido de Hernán: «como el tablero de Gestión de IDs»): por cotizar y cotizado (separadas el 7 nov 2026), en producción, en
  * tránsito, atrasadas y las compras de país que todavía no tienen sus productos. Los mismos filtros de un toque de antes, ahora como tarjetas.
  */
 export const TARJETAS_COMPRAS: TarjetaCompras[] = [
-  { id: "cotizando", titulo: "Cotizando", icono: ComprasIcon, color: "azul", detalle: "Por cotizar o cotizadas, esperando decisión" },
+  { id: "por_cotizar", titulo: "Por cotizar", icono: ComprasIcon, color: "azul", detalle: "Falta pedir o recibir la cotización" },
+  { id: "cotizado", titulo: "Cotizado", icono: ComprasIcon, color: "azul", detalle: "Ya cotizadas, esperando decisión" },
   { id: "produccion", titulo: "En producción", icono: ProveedorIcon, color: "violeta", detalle: "Confirmadas: el proveedor las está fabricando" },
   { id: "transito", titulo: "En tránsito", icono: EnvioIcon, color: "ambar", detalle: "Enviadas y todavía sin llegar a la bodega" },
   { id: "atrasadas", titulo: "Atrasadas", icono: AlertaIcon, color: "rojo", detalle: "Más días en tránsito de lo normal para su vía" },
