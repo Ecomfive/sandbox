@@ -10,7 +10,7 @@ import { almacen } from "./almacen";
 export function useFiltros<F>(def: DefTabla<F>): [Filtro[], (filtros: Filtro[]) => void] {
   const a = almacen(`${def.clave}-filtros-v1`, "sesion");
   const json = useSyncExternalStore(a.suscribir, a.leer, () => "");
-  const filtros = useMemo(() => parsearFiltros(def, json), [def, json]);
+  const filtros = useMemo(() => (json === "" && def.filtrosIniciales ? def.filtrosIniciales : parsearFiltros(def, json)), [def, json]);
   const cambiar = useCallback((nuevos: Filtro[]) => a.guardar(JSON.stringify(nuevos)), [a]);
   return [filtros, cambiar];
 }

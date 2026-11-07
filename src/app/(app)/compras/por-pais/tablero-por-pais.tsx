@@ -3,6 +3,7 @@
 import type { ComponentType } from "react";
 import { Bandera } from "@/components/paises/bandera";
 import { useFiltros } from "@/components/tabla/ganchos";
+import { filasDelTipo, opcionElegida } from "@/lib/tabla/tipo-producto";
 import { anilloFoco } from "@/components/ui/field";
 import { AlertaIcon, ArchivarIcon, ComprasIcon, EnvioIcon, MundoIcon, OjoTachadoIcon, PapeleraIcon } from "@/lib/nav-icons";
 import type { AccionPorPais } from "@/lib/producto/por-pais";
@@ -92,7 +93,10 @@ function TarjetaPorPais({ t, valor }: { t: Tarjeta; valor: number }) {
  * que hacer y abajo, por cada país, cuántos productos activos son una oportunidad por decidir ahí. Cada tarjeta cuenta y filtra la lista;
  * pulsarla otra vez quita el filtro, y se pueden juntar varias.
  */
-export function TableroPorPais({ filas, paises }: { filas: FilaPorPais[]; paises: PaisColumna[] }) {
+export function TableroPorPais({ filas: todas, paises }: { filas: FilaPorPais[]; paises: PaisColumna[] }) {
+  // Cuenta lo que muestra la lista: con «Productos simples» elegido, sin los packs y combos.
+  const [filtrosLista] = useFiltros(DEF_POR_PAIS);
+  const filas = filasDelTipo(todas, opcionElegida(filtrosLista, "tipo", "simple", "combo"), (f) => f.tipo === "combo");
   const porPais: Tarjeta[] = paises.map((p) => ({
     id: `decidir-${p.codigo}`,
     titulo: p.nombre,
