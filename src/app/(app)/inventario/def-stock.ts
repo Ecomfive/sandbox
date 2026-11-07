@@ -1,4 +1,5 @@
 import type { DefTabla } from "@/lib/tabla/motor";
+import { FILTRO_SOLO_SIMPLES } from "@/lib/tabla/tipo-producto";
 import type { StockPlataformas } from "@/lib/wms/stock-plataformas";
 import { numeroProducto, textoCodigos } from "@/lib/wms/codigos-producto";
 import { existencia } from "@/lib/wms/total-stock";
@@ -49,6 +50,7 @@ export function existenciaDe(f: Pick<FilaStock, "fisico" | "plataformas">): "neg
 }
 
 export const DEF_STOCK: DefTabla<FilaStock> = {
+  filtrosIniciales: FILTRO_SOLO_SIMPLES,
   clave: "wms-stock",
   campos: [
     { id: "sku", etiqueta: "SKU", tipo: "texto", sinCsv: true, valor: (f) => `${f.codigo} ${f.nombre} ${textoCodigos(f)}` },

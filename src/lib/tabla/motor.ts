@@ -87,6 +87,11 @@ export interface DefTabla<F> {
    * retiro, por ejemplo). Los campos de `campos` salen después, todos.
    */
   csvAntes?: { etiqueta: string; valor: (fila: F) => string | number | null }[];
+  /**
+   * Filtros con los que arranca quien aún no eligió ninguno en esta sesión (7 nov 2026: las listas de productos arrancan con «Productos simples»). Quien elige otra cosa, o
+   * quita los filtros, conserva lo suyo: «quitar» deja una lista vacía guardada, que no vuelve a este valor.
+   */
+  filtrosIniciales?: Filtro[];
   /** Vista con la que arranca quien aún no eligió una (por ejemplo, agrupada por extracto). */
   vistaInicial?: { agrupar: string; orden?: "asc" | "desc" };
   /**

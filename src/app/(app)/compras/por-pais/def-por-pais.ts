@@ -1,6 +1,7 @@
 import { ETIQUETA_ESTADO_PAIS, type AccionPorPais, type CeldaPais, type EstadoPais } from "@/lib/producto/por-pais";
 import { textoCodigos } from "@/lib/wms/codigos-producto";
 import type { DefTabla } from "@/lib/tabla/motor";
+import { FILTRO_SOLO_SIMPLES } from "@/lib/tabla/tipo-producto";
 import { ETIQUETA_CLASE } from "@/app/(app)/producto/def-producto";
 
 /**
@@ -66,6 +67,7 @@ const NOMBRE_PAIS = (codigo: string) => PAISES_GESTION.find((p) => p.codigo === 
  * una constante del módulo; uno que la persona no puede ver simplemente no tiene casillas.
  */
 export const DEF_POR_PAIS: DefTabla<FilaPorPais> = {
+  filtrosIniciales: FILTRO_SOLO_SIMPLES,
   clave: "producto-por-pais",
   campos: [
     {

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { conOpcion, opcionElegida } from "./tipo-producto";
+import { conOpcion, FILTRO_SOLO_SIMPLES, filasDelTipo, opcionElegida } from "./tipo-producto";
 import type { Filtro } from "./motor";
 
 const sel = (campo: string, ...valores: string[]): Filtro => ({ campo, valor: { tipo: "seleccion", valores } });
@@ -21,5 +21,15 @@ describe("selector de tipo de producto", () => {
     assert.deepEqual(conOpcion(base, "tipo", "pack", "simple", "combo"), [sel("clase", "fisico"), sel("tipo", "combo")]);
     assert.deepEqual(conOpcion(base, "tipo", "todos", "simple", "combo"), [sel("clase", "fisico")]);
     assert.deepEqual(conOpcion([], "tipo", "simple", "simple", "combo"), [sel("tipo", "simple")]);
+  });
+  it("las listas de productos arrancan con solo los simples", () => {
+    assert.equal(opcionElegida(FILTRO_SOLO_SIMPLES, "tipo", "simple", "combo"), "simple");
+  });
+  it("las filas del tipo elegido, para que los tableros cuenten lo que muestra la lista", () => {
+    const filas = [{ t: "simple" }, { t: "combo" }, { t: "simple" }];
+    const esPack = (f: { t: string }) => f.t === "combo";
+    assert.equal(filasDelTipo(filas, "todos", esPack).length, 3);
+    assert.equal(filasDelTipo(filas, "simple", esPack).length, 2);
+    assert.deepEqual(filasDelTipo(filas, "pack", esPack), [{ t: "combo" }]);
   });
 });

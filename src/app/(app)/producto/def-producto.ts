@@ -1,6 +1,7 @@
 import { SIN_VALOR } from "@/lib/tabla/motor";
 import { grupoReporte, primerNivel, rutaLegible } from "@/lib/categorias/taxonomia";
 import type { DefTabla } from "@/lib/tabla/motor";
+import { FILTRO_SOLO_SIMPLES } from "@/lib/tabla/tipo-producto";
 import { ETIQUETA_PUNTO, puntosParaDecidir, type PuntoDecidir } from "@/lib/producto/para-decidir";
 
 /** Simple: un solo producto. Pack o combo (en el sistema, «compuesto»): varias unidades de un producto o una combinación de productos simples (al venderlo se descuenta cada uno). */
@@ -127,6 +128,7 @@ export interface ReferenciasTest {
 
 /** Cómo se filtra y agrupa la lista de productos. */
 export const DEF_PRODUCTO: DefTabla<FilaProducto> = {
+  filtrosIniciales: FILTRO_SOLO_SIMPLES,
   imagen: { ambito: "producto", id: (f) => f.id },
   clave: "producto",
   campos: [

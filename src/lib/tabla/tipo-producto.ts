@@ -20,3 +20,11 @@ export function conOpcion(filtros: Filtro[], campo: string, opcion: OpcionTipoPr
   if (opcion === "todos") return resto;
   return [...resto, { campo, valor: { tipo: "seleccion", valores: [opcion === "simple" ? valorSimple : valorPack] } }];
 }
+
+/** Con lo que arrancan las listas de productos: solo los productos simples (los packs y combos se piden con el selector). */
+export const FILTRO_SOLO_SIMPLES: Filtro[] = [{ campo: "tipo", valor: { tipo: "seleccion", valores: ["simple"] } }];
+
+/** Las filas del tipo elegido en el selector («todos» las deja todas): lo usan los tableros de arriba para contar lo mismo que muestra la lista. */
+export function filasDelTipo<T>(filas: T[], opcion: OpcionTipoProducto, esPack: (fila: T) => boolean): T[] {
+  return opcion === "todos" ? filas : filas.filter((f) => (opcion === "pack") === esPack(f));
+}
