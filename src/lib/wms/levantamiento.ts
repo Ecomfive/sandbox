@@ -83,8 +83,47 @@ export interface LoteDeFila {
 /** Lo escrito en una fila del levantamiento: el contado deja el producto en esa cantidad y el sumar se le agrega. */
 export type FilaConteo = { sku: string; contado: number | null; sumar: number | null } | { sku: string; lotes: LoteDeFila[] };
 
-/** Con qué se queda el producto: lo contado si se contó (si no, lo que ya hay) más lo que se suma. */
-export const quedaDespues = (contado: number | null, sumar: number | null, enSistema: number) => (contado ?? enSistema) + (sumar ?? 0);
+/** Con qué se queda el producto: lo contado si se contó (si no, lo que ya hay), más lo que se suma, menos lo que sale (se resta o se transfiere). */
+export const quedaDespues = (contado: number | null, sumar: number | null, enSistema: number, sale = 0) => (contado ?? enSistema) + (sumar ?? 0) - sale;
+
+/** Lo que una fila manda a otra bodega: cuánto y a cuál. */
+export interface Transferencia {
+  sku: string;
+  cantidad: number;
+  destino: string;
+}
+
+/** Las transferencias agrupadas por bodega de destino: cada destino es un traslado (con su número) en la base. */
+export interface TrasladoDeLevantamiento {
+  destino: string;
+  items: { sku: string; cantidad: number }[];
+}
+
+/**
+ * Revisa y agrupa lo que se quiere transferir desde el levantamiento (7 nov 2026, pedido de Hernán: casilla de cantidad y desplegable de depósitos en cada fila): el producto y el
+ * destino son ids, la cantidad un entero mayor que cero, el destino no es la bodega de origen y un producto sale a un solo destino. Lista vacía = nada que transferir.
+ */
+export function revisarTransferencias(lista: unknown, origen: string): { traslados: TrasladoDeLevantamiento[] } | { error: string } {
+  if (lista === undefined || lista === null || (Array.isArray(lista) && lista.length === 0)) return { traslados: [] };
+  if (!Array.isArray(lista)) return { error: "Las transferencias no son válidas." };
+  if (lista.length > MAX_ITEMS_CONTEO) return { error: `Son demasiados productos a la vez (máximo ${MAX_ITEMS_CONTEO}).` };
+  const vistos = new Set<string>();
+  const porDestino = new Map<string, { sku: string; cantidad: number }[]>();
+  for (const t of lista) {
+    const o = (t ?? {}) as Record<string, unknown>;
+    const sku = typeof o.sku === "string" ? o.sku : "";
+    const destino = typeof o.destino === "string" ? o.destino : "";
+    if (!ES_ID.test(sku)) return { error: "Un producto a transferir no es válido." };
+    if (!ES_ID.test(destino)) return { error: "Elige el depósito al que se transfiere." };
+    if (destino === origen) return { error: "El depósito de destino es el mismo de origen." };
+    if (vistos.has(sku)) return { error: "Un producto viene dos veces." };
+    vistos.add(sku);
+    const cantidad = entera(o.cantidad);
+    if (cantidad === null || cantidad <= 0) return { error: "Una cantidad a transferir no es válida." };
+    porDestino.set(destino, [...(porDestino.get(destino) ?? []), { sku, cantidad }]);
+  }
+  return { traslados: [...porDestino].map(([destino, items]) => ({ destino, items })) };
+}
 
 /**
  * Reparte las filas (pedido de Hernán, 6 nov 2026: el «Sumar» pasó de un botón arriba a cada fila, porque despacho se equivocaba). Una fila contada va al conteo con lo
