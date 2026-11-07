@@ -104,7 +104,8 @@ const conColor = (v: string | null, color: (x: string) => string | undefined) =>
 
 /** Filtros de un toque sobre las abiertas (las cerradas se ven con el botón «Cerrados» de la barra). */
 const RAPIDOS: { valor: Grupo; etiqueta: string }[] = [
-  { valor: "cotizando", etiqueta: "Cotizando" },
+  { valor: "por_cotizar", etiqueta: "Por cotizar" },
+  { valor: "cotizado", etiqueta: "Cotizado" },
   { valor: "produccion", etiqueta: "Producción" },
   { valor: "transito", etiqueta: "En tránsito" },
   { valor: "atrasadas", etiqueta: "Atrasadas" },
@@ -388,7 +389,9 @@ export function TablaCompras({
   coloresTiendas?: Record<string, string>;
 }) {
   const { mostrarToast } = useToast();
-  const [rapido, setRapido] = useState<Grupo | null>(grupoInicial && RAPIDOS.some((r) => r.valor === grupoInicial) ? grupoInicial : null);
+  // Un enlace viejo con «cotizando» abre «Por cotizar», que es la mayor parte de lo que juntaba.
+  const grupoPedido = grupoInicial === "cotizando" ? "por_cotizar" : grupoInicial;
+  const [rapido, setRapido] = useState<Grupo | null>(grupoPedido && RAPIDOS.some((r) => r.valor === grupoPedido) ? grupoPedido : null);
   const [soloSinProductos, setSoloSinProductos] = useState(false);
   const [etapa, setEtapa] = useState(etapaInicial);
   const [abierta, setAbierta] = useState<{ id: string; orden: string[] } | null>(abrirInicial && comprasServidor.some((c) => c.id === abrirInicial) ? { id: abrirInicial, orden: [abrirInicial] } : null);

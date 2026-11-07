@@ -140,8 +140,10 @@ export function estaAtrasada(c: FilaCompra, umbral: Record<string, number>, dia:
 export const enTransito = (c: FilaCompra) => estaAbierta(c) && !!c.fechaEnvio && !c.fechaLlegada;
 
 /** El grupo del filtro rápido de la lista. */
-export type Grupo = "abiertas" | "cotizando" | "produccion" | "transito" | "atrasadas" | "cerradas";
+export type Grupo = "abiertas" | "cotizando" | "por_cotizar" | "cotizado" | "produccion" | "transito" | "atrasadas" | "cerradas";
 const ETAPAS_COTIZANDO = ["backlog", "solicitud_local", "solicitud_internacional", "cotizar", "cotizado", "evaluacion_proveedor", "solicitud_proveedor"];
+/** «Cotizando» se ve en dos tarjetas (7 nov 2026, pedido de Hernán): lo que falta cotizar y lo ya cotizado que espera decisión. */
+const ETAPAS_COTIZADO = ["cotizado"];
 const ETAPAS_PRODUCCION = ["compra_pago", "produccion"];
 
 export function enGrupo(c: FilaCompra, g: Grupo, umbral: Record<string, number>): boolean {
@@ -149,6 +151,8 @@ export function enGrupo(c: FilaCompra, g: Grupo, umbral: Record<string, number>)
   if (!estaAbierta(c)) return false;
   if (g === "abiertas") return true;
   if (g === "cotizando") return ETAPAS_COTIZANDO.includes(c.etapa);
+  if (g === "cotizado") return ETAPAS_COTIZADO.includes(c.etapa);
+  if (g === "por_cotizar") return ETAPAS_COTIZANDO.includes(c.etapa) && !ETAPAS_COTIZADO.includes(c.etapa);
   if (g === "produccion") return ETAPAS_PRODUCCION.includes(c.etapa);
   if (g === "transito") return enTransito(c) || ["tracking", "aviso_logistica"].includes(c.etapa);
   return estaAtrasada(c, umbral);
