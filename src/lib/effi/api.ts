@@ -62,21 +62,6 @@ export async function consultarEffi<T = Record<string, unknown>>(
   return { ok: false, status: 429, error: mensajeErrorEffi(429) };
 }
 
-/**
- * Cómo viene un recurso de Effi, sin sus datos: los nombres de los campos, también los de las listas de adentro, y de qué tipo es cada uno. Para conocer las órdenes de venta desde
- * Configuración, porque la llave solo está en el servidor y su documentación dentro de la cuenta. Los valores no se devuelven: traen datos de clientes.
- */
-export function estructuraDe(filas: readonly unknown[]): string {
-  const campos = new Map<string, string>();
-  const mirar = (v: unknown, ruta: string) => {
-    if (Array.isArray(v)) return v.forEach((x) => mirar(x, `${ruta}[]`));
-    if (v && typeof v === "object") return Object.entries(v).forEach(([k, x]) => mirar(x, ruta ? `${ruta}.${k}` : k));
-    if (ruta && (!campos.has(ruta) || campos.get(ruta) === "null")) campos.set(ruta, v === null ? "null" : typeof v);
-  };
-  filas.forEach((f) => mirar(f, ""));
-  return [...campos].map(([k, t]) => `${k}: ${t}`).join(", ");
-}
-
 /** Todas las páginas de un recurso (de 100 en 100, o `porPagina`). */
 export async function consultarTodoEffi<T = Record<string, unknown>>(
   recurso: string,
@@ -102,16 +87,16 @@ export type ResumenConexionEffi = {
   ejemplo: { id: string; nombre: string } | null;
   /** El texto de las tarifas tal como lo manda Effi, para revisar la lectura de precios. */
   tarifas: string | null;
-  /** Cuántas órdenes de venta ve la llave y cómo vienen, solo los nombres de los campos (o por qué no se pudo). */
-  ordenes: { total: number | null; campos: string };
+  /** Las ventas: cuántas filas de remisiones de venta de ayer y hoy ve la llave, o por qué no (falta el permiso de reportes). */
+  ventas: { total: number | null; error: string | null };
 };
 
 /** Prueba la llave con dos consultas livianas: un artículo (y el total) y las bodegas. Solo lee. */
 export async function probarConexionEffi(): Promise<{ ok: true; resumen: ResumenConexionEffi } | { ok: false; error: string }> {
-  const [articulos, bodegas, ordenes] = await Promise.all([
+  const [articulos, bodegas, ventas] = await Promise.all([
     consultarEffi<Record<string, unknown>>("articulo", { pagina: 1, por_pagina: 1 }),
     consultarEffi<Record<string, unknown>>("bodega", { pagina: 1, por_pagina: 100 }),
-    consultarEffi<Record<string, unknown>>("orden_v", { pagina: 1, por_pagina: 5 }),
+    consultarEffi<Record<string, unknown>>("detalle_remision_v", { desde: new Date(Date.now() - 2 * 86_400_000).toISOString().slice(0, 10), pagina: 1, por_pagina: 1 }),
   ]);
   if (!articulos.ok) return { ok: false, error: articulos.error };
   const a = articulos.data[0];
@@ -124,7 +109,7 @@ export async function probarConexionEffi(): Promise<{ ok: true; resumen: Resumen
       conStock: !!a && "stock_empresa" in a,
       ejemplo: a ? { id: String(a.id ?? ""), nombre: String(a.descripcion ?? "") } : null,
       tarifas: typeof a?.precios_venta === "string" ? a.precios_venta.slice(0, 300) : null,
-      ordenes: ordenes.ok ? { total: ordenes.paginacion?.total ?? ordenes.data.length, campos: estructuraDe(ordenes.data) } : { total: null, campos: ordenes.error },
+      ventas: ventas.ok ? { total: ventas.paginacion?.total ?? ventas.data.length, error: null } : { total: null, error: ventas.error },
     },
   };
 }

@@ -78,13 +78,29 @@ export default async function CuadroPage({ searchParams }: { searchParams: Promi
     // Sin la migración 0243 no hay novedades: el cuadro sale igual.
     const { data: filasNovedad } = await supabase.from("wms_novedades_plataforma").select("sku_maestro_id, estado, cantidad").eq("bodega_id", bodega.id).neq("estado", "por_revisar").gte("resuelto_en", desde).limit(2000);
     novedades = (filasNovedad ?? []).map((n) => ({ sku: n.sku_maestro_id as string, estado: n.estado as string, cantidad: Number(n.cantidad) }));
-    if (CON_VENTAS[plataforma]) {
+    if (plataforma === "dropi") {
       const { data: dias } = await traerTodasConError<{ dropi_producto_id: number; dia: string; pedidas: number; canceladas: number; rechazadas: number; devueltas: number }>((d, h) =>
         supabase.from("dropi_ventas_diarias").select("dropi_producto_id, dia, pedidas, canceladas, rechazadas, devueltas").eq("pais_id", pais.id).gte("dia", desde).order("dia").order("dropi_producto_id").range(d, h),
       );
       ventas = (dias ?? []).flatMap((v) => {
         const sku = skuDeDropi.get(v.dropi_producto_id);
         return sku ? [{ sku, pedidas: v.pedidas, canceladas: v.canceladas, rechazadas: v.rechazadas, devueltas: v.devueltas }] : [];
+      });
+      ventasHasta = (dias ?? []).reduce<string | null>((a, v) => (!a || v.dia > a ? v.dia : a), null);
+    } else if (CON_VENTAS[plataforma]) {
+      // Effi (migración 0244): remisiones y devoluciones de la bodega Principal por artículo y día; el artículo se pasa a producto por su publicación de Effi.
+      const [{ data: dias }, { data: pubs }] = await Promise.all([
+        traerTodasConError<{ producto_id: string; dia: string; salidas: number; devueltas: number }>((d, h) =>
+          supabase.from("plataforma_ventas_diarias").select("producto_id, dia, salidas, devueltas").eq("pais_id", pais.id).eq("plataforma", plataforma).gte("dia", desde).order("dia").order("producto_id").range(d, h),
+        ),
+        traerTodasConError<{ effi_id: string; sku_maestro_id: string }>((d, h) =>
+          supabase.from("effi_publicaciones").select("effi_id, sku_maestro_id").eq("pais_id", pais.id).not("sku_maestro_id", "is", null).order("id").range(d, h),
+        ),
+      ]);
+      const skuDeEffi = new Map((pubs ?? []).map((p) => [String(p.effi_id), p.sku_maestro_id]));
+      ventas = (dias ?? []).flatMap((v) => {
+        const sku = skuDeEffi.get(v.producto_id);
+        return sku ? [{ sku, pedidas: v.salidas, canceladas: 0, rechazadas: 0, devueltas: v.devueltas }] : [];
       });
       ventasHasta = (dias ?? []).reduce<string | null>((a, v) => (!a || v.dia > a ? v.dia : a), null);
     }

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { consultarEffi, estructuraDe, mensajeErrorEffi } from "./api";
+import { consultarEffi, mensajeErrorEffi } from "./api";
 
 test("los errores de Effi se explican sin repetir la llave", () => {
   assert.match(mensajeErrorEffi(401), /venció/);
@@ -52,11 +52,4 @@ test("la llave va solo en la cabecera y la página se lee tal cual", async () =>
     if (antes === undefined) delete process.env.EFFI_API_KEY;
     else process.env.EFFI_API_KEY = antes;
   }
-});
-
-test("la estructura de un recurso dice los campos, nunca los valores", () => {
-  const t = estructuraDe([{ id: 7, cliente: { nombre: "Ana Pérez", telefono: "8888" }, lineas: [{ articulo: 42, cantidad: "2" }], nota: null }, { nota: "hola" }]);
-  assert.equal(t, "id: number, cliente.nombre: string, cliente.telefono: string, lineas[].articulo: number, lineas[].cantidad: string, nota: string");
-  assert.ok(!t.includes("Ana") && !t.includes("8888") && !t.includes("hola"));
-  assert.equal(estructuraDe([]), "");
 });
