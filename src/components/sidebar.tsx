@@ -9,6 +9,7 @@ import { almacen } from "@/components/tabla/almacen";
 import { ContadorMenu, ContadorSobreIcono } from "@/components/sidebar-contador";
 import { FavoritoToggle } from "@/components/favorito-toggle";
 import { anilloFoco } from "@/components/ui/field";
+import { Tooltip } from "@/components/ui/tooltip";
 import { SIN_PENDIENTES, type PendientesMenu } from "@/lib/contadores-menu";
 import { FRENTES, PRONTO_NAV, encontrarSeccionActiva, moduloDeHref, type NavItem, type NavSection } from "@/lib/nav-data";
 import { AjustesIcon, AvisosIcon, AyudaIcon, BabyYodaIcon, ConfiguracionIcon, DashboardIcon, HistorialIcon, ICONOS_PAGINA, SECTION_ICONS } from "@/lib/nav-icons";
@@ -21,6 +22,15 @@ function ToggleIcon(props: React.SVGProps<SVGSVGElement>) {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} {...props}>
       <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
       <path d="M9.5 4.5v15" />
+    </svg>
+  );
+}
+
+function ContraerIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="m11 17-5-5 5-5" />
+      <path d="m18 17-5-5 5-5" />
     </svg>
   );
 }
@@ -334,6 +344,19 @@ function RielYPanel({
         <Link href="/" aria-label="Ecomfive, ir al inicio" className={`mb-2 flex h-9 w-full items-center justify-center rounded ${anilloRiel}`}>
           <Image src="/brand/ecomfive-blanco.png" alt="" width={161} height={44} className="h-3 w-auto" />
         </Link>
+        <div className="mb-1 w-full [&>span]:w-full">
+        <Tooltip texto={panelOculto ? "Mostrar panel" : "Ocultar panel"}>
+          <button
+            type="button"
+            aria-expanded={!panelOculto}
+            aria-label={panelOculto ? "Mostrar el panel de páginas" : "Ocultar el panel de páginas"}
+            onClick={() => guardado.guardar(panelOculto ? "" : "cerrado")}
+            className={claseRiel(false)}
+          >
+            <ToggleIcon className="h-5 w-5" />
+          </button>
+        </Tooltip>
+        </div>
         {delRiel.map((v, i) => {
           const Icono = SECTION_ICONS[v.area.title] ?? DashboardIcon;
           const boton = botonRiel(v.area.title, !verFavoritos && !verYoda && !verAyuda && v.area.title === mostrada?.area.title, Icono);
@@ -381,23 +404,26 @@ function RielYPanel({
               <span>Ajustes</span>
             </Link>
           )}
-          <button
-            type="button"
-            aria-expanded={!panelOculto}
-            aria-label={panelOculto ? "Mostrar el panel de páginas" : "Ocultar el panel de páginas"}
-            onClick={() => guardado.guardar(panelOculto ? "" : "cerrado")}
-            className={claseRiel(false)}
-          >
-            <ToggleIcon className="h-5 w-5" />
-          </button>
         </div>
       </nav>
 
       {!panelOculto && (verFavoritos || verYoda || verAyuda || mostrada) && (
         <nav
           aria-label={verFavoritos ? "Páginas favoritas" : verYoda ? "Baby Yoda" : verAyuda ? "Ayuda" : `Páginas de ${mostrada?.area.title}`}
-          className="flex w-60 shrink-0 flex-col gap-4 overflow-y-auto border-r border-border bg-card p-2.5"
+          className="relative flex w-60 shrink-0 flex-col gap-4 overflow-y-auto border-r border-border bg-card p-2.5"
         >
+          <div className="absolute right-1.5 top-1.5 z-10">
+            <Tooltip texto="Ocultar panel">
+              <button
+                type="button"
+                aria-label="Ocultar el panel de páginas"
+                onClick={() => guardado.guardar("cerrado")}
+                className={`flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground ${anilloFoco}`}
+              >
+                <ContraerIcon className="h-4 w-4" />
+              </button>
+            </Tooltip>
+          </div>
           {verAyuda ? (
             <PanelAyuda pathname={pathname} />
           ) : verYoda ? (

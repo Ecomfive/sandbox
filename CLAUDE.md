@@ -1852,7 +1852,7 @@ convenciones técnicas del código.
   contadores y `encontrarSeccionActiva` no cambian); un área con `oculta: true` (Avisos) no tiene botón en el riel pero cuenta
   para migas, buscador y fijados. **Una página nueva del menú se agrega a su área y frente en `AREAS`** (con una prueba en
   `nav-data.test.ts` si cambia el reparto). Al pulsar un área solo cambia el panel; al navegar, el panel pasa al área de la
-  página nueva. El panel se oculta **solo con el botón de abajo del riel** (7 nov 2026, pedido de Jhokser: antes un clic fuera lo recogía y el primer clic en el contenido se gastaba en eso; no vuelvas a cerrarlo por un clic fuera); se guarda en el
+  página nueva. El panel se oculta **solo con un botón**: el del riel, justo bajo el logo (siempre a la vista; el de abajo se cortaba en pantallas bajas), o la flecha « de la esquina del panel; el mismo del riel lo vuelve a mostrar (7 nov 2026, pedido de Jhokser: antes un clic fuera lo recogía y el primer clic en el contenido se gastaba en eso; no vuelvas a cerrarlo por un clic fuera); se guarda en el
   navegador (`sidebar-panel-v1`). En móvil, un cajón lista las áreas con sus frentes una debajo de la otra. Una página con
   `dropi: true` solo sale si Dropi tiene datos en el país (`construirAreas`). **Contadores:** Alertas, Pedidos Dropi y Conciliación
   de Retiros muestran una pastilla con cuántos hay, **Avisos** muestra el total, y cada área del riel muestra lo que suman
