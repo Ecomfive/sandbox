@@ -67,7 +67,7 @@ export default async function VentasDropiPage({ searchParams }: { searchParams: 
     // Rendimiento (27 oct 2026, migración 0163): los últimos 90 días día por día y lo anterior sumado por mes; las cuentas dan lo mismo.
     traerVentasDiarias(supabase, pais.id, corte),
     traerTodasConError<Record<string, unknown>>((d, h) => supabase.from("dropi_ventas_dropshippers").select("dropi_usuario_id, nombre, pedidas, ordenes, no_efectivas, netas_30d, productos, ultima_orden").eq("pais_id", pais.id).order("dropi_usuario_id").range(d, h)),
-    traerTodasConError<Record<string, unknown>>((d, h) => supabase.from("dropi_publicaciones").select("dropi_id, skus_maestros(codigo, nombre)").eq("pais_id", pais.id).not("sku_maestro_id", "is", null).order("id").range(d, h)),
+    traerTodasConError<Record<string, unknown>>((d, h) => supabase.from("dropi_publicaciones").select("dropi_id, skus_maestros(codigo, nombre, numero, codigo_barras)").eq("pais_id", pais.id).not("sku_maestro_id", "is", null).order("id").range(d, h)),
     // La plata (migración 0130): sin la migración o sin carga, la página sigue solo con las unidades.
     // Sumada por producto y mes en la base (migración 0163): aquí solo se usa por mes.
     traerDineroPorMes(supabase, pais.id),
@@ -89,9 +89,12 @@ export default async function VentasDropiPage({ searchParams }: { searchParams: 
 
   // El SKU del sistema de cada producto de Dropi, por el vínculo de Gestión de IDs Dropi.
   const skuDe = new Map<number, { clave: string; nombre: string }>();
+  // El N.º y el código de barras de cada producto del sistema, por su SKU.
+  const codigosDe = new Map<string, { numero: number | null; barras: string | null }>();
   for (const p of pubsR.data ?? []) {
-    const sku = p.skus_maestros as { codigo: string; nombre: string } | null;
+    const sku = p.skus_maestros as { codigo: string; nombre: string; numero: number | null; codigo_barras: string | null } | null;
     if (!sku?.codigo) continue;
+    codigosDe.set(sku.codigo, { numero: sku.numero ?? null, barras: sku.codigo_barras || null });
     for (const id of String(p.dropi_id ?? "").match(/\d{3,6}/g) ?? []) skuDe.set(Number(id), { clave: sku.codigo, nombre: sku.nombre || sku.codigo });
   }
 
@@ -160,12 +163,13 @@ export default async function VentasDropiPage({ searchParams }: { searchParams: 
           meses: [...dineroPorMes(filasDinero)].sort(([a], [b]) => a.localeCompare(b)).map(([mes, x]) => ({ mes, ...x })),
         }
       : null;
-  const resumen: ProductoVentas[] = resumirProductos(productos, dias, corte).map((r) => ({ ...r, ids: [r.id], sku: skuDe.get(r.id)?.clave ?? null, dinero: dineroDe([r.id]) }));
+  const resumen: ProductoVentas[] = resumirProductos(productos, dias, corte).map((r) => ({ ...r, ids: [r.id], sku: skuDe.get(r.id)?.clave ?? null, numero: codigosDe.get(skuDe.get(r.id)?.clave ?? "")?.numero ?? null, barras: codigosDe.get(skuDe.get(r.id)?.clave ?? "")?.barras ?? null, dinero: dineroDe([r.id]) }));
   // Los mismos datos con los IDs de Dropi de un mismo producto del sistema juntos (públicos, privados, archivados, de la B280…).
   const grupos = agruparProductos(productos, dias, (id) => skuDe.get(id) ?? null);
   const porProducto: ProductoVentas[] = resumirProductos(grupos.productos, grupos.dias, corte).map((r) => {
     const ids = grupos.ids.get(r.id) ?? [r.id];
-    return { ...r, ids, sku: grupos.clave.get(r.id) ?? skuDe.get(r.id)?.clave ?? null, dinero: dineroDe(ids) };
+    const clave = grupos.clave.get(r.id) ?? skuDe.get(r.id)?.clave ?? null;
+    return { ...r, ids, sku: clave, numero: codigosDe.get(clave ?? "")?.numero ?? null, barras: codigosDe.get(clave ?? "")?.barras ?? null, dinero: dineroDe(ids) };
   });
   const desdeMes = restarDias(`${corte.slice(0, 7)}-15`, MESES_ATRAS * 30.5);
   const dropshippers: DropshipperVentas[] = (dsR.data ?? []).map((d) => ({

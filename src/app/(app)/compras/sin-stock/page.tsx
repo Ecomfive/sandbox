@@ -40,12 +40,14 @@ export default async function SinStockPage() {
   ]);
   // El código y la foto de los productos de las alertas (solo esos).
   const skus = [...new Set((alertasR.data ?? []).map((a) => a.sku_maestro_id as string | null).filter((x): x is string => !!x))];
-  const productosR = skus.length ? await supabase.from("skus_maestros").select("id, codigo, foto_url").in("id", skus) : { data: [] };
+  const productosR = skus.length ? await supabase.from("skus_maestros").select("id, codigo, foto_url, numero, codigo_barras").in("id", skus) : { data: [] };
   const producto = new Map(
     (productosR.data ?? []).map((p) => [
       p.id as string,
       {
         codigo: p.codigo as string,
+        numero: (p.numero as number | null) ?? null,
+        barras: (p.codigo_barras as string | null) || null,
         foto: (p.foto_url as string | null) ?? null,
       },
     ]),
@@ -57,6 +59,8 @@ export default async function SinStockPage() {
       nombre: a.nombre as string,
       skuId: sku,
       codigo: sku ? (producto.get(sku)?.codigo ?? null) : null,
+      numero: sku ? (producto.get(sku)?.numero ?? null) : null,
+      barras: sku ? (producto.get(sku)?.barras ?? null) : null,
       foto: sku ? (producto.get(sku)?.foto ?? null) : null,
       dropiIds: (a.dropi_ids as string[]) ?? [],
       detectadaEn: a.detectada_en as string,

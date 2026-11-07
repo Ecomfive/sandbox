@@ -14,6 +14,9 @@ export interface ProductoDelChat {
   id: string;
   nombre: string;
   codigo: string | null;
+  /** El N.º correlativo y el código de barras del producto (7 nov 2026, pedido de Hernán). */
+  numero: number | null;
+  barras: string | null;
   foto: string | null;
   /** Lo fijó alguien en la ficha; si no, es una sugerencia porque el chat lo nombra. */
   fijado: boolean;
@@ -56,12 +59,12 @@ export interface ProductosDelChat {
   sePuedeFijar: boolean;
 }
 
-type FilaSku = { id: string; codigo: string | null; nombre: string; foto_url: string | null };
+type FilaSku = { id: string; codigo: string | null; nombre: string; foto_url: string | null; numero: number | null; codigo_barras: string | null };
 const TABLA = "whatsapp_conversacion_productos";
 const ES_ID = (s: string) => /^[0-9a-f-]{36}$/i.test(s);
 /** Los productos que se ofrecen: los simples (no variantes ni combos) que no están descontinuados. */
 const productosBase = (supabase: ReturnType<typeof createServiceClient>) =>
-  supabase.from("skus_maestros").select("id, codigo, nombre, foto_url").is("padre_id", null).eq("tipo", "simple").neq("clase", "descontinuado");
+  supabase.from("skus_maestros").select("id, codigo, nombre, foto_url, numero, codigo_barras").is("padre_id", null).eq("tipo", "simple").neq("clase", "descontinuado");
 
 /** Cuántos mensajes del chat se leen para saber de qué productos se habló (los más recientes): toda la conversación en la práctica. */
 const MENSAJES_A_LEER = 2000;
@@ -142,7 +145,7 @@ export async function productosDelChat(conversacionId: string): Promise<Producto
     const { data } = await consulta;
     const filas = (data ?? []) as { dropi_id: string; sku_maestro_id: string }[];
     const faltan = [...new Set(filas.map((f) => f.sku_maestro_id).filter((id) => !porId.has(id)))];
-    if (faltan.length) for (const p of ((await supabase.from("skus_maestros").select("id, codigo, nombre, foto_url").in("id", faltan)).data ?? []) as FilaSku[]) porId.set(p.id, p);
+    if (faltan.length) for (const p of ((await supabase.from("skus_maestros").select("id, codigo, nombre, foto_url, numero, codigo_barras").in("id", faltan)).data ?? []) as FilaSku[]) porId.set(p.id, p);
     for (const id of ids) {
       const suyos = [...new Set(filas.filter((f) => String(f.dropi_id) === id).map((f) => f.sku_maestro_id))];
       const p = suyos.length === 1 ? porId.get(suyos[0]) : undefined;
@@ -164,7 +167,7 @@ export async function productosDelChat(conversacionId: string): Promise<Producto
   }
   const mencionDe = new Map(detectados.map((d) => [d.p.id, d.mencion]));
 
-  const fijados: FilaSku[] = fijadosIds.length ? (((await supabase.from("skus_maestros").select("id, codigo, nombre, foto_url").in("id", fijadosIds)).data ?? []) as FilaSku[]) : [];
+  const fijados: FilaSku[] = fijadosIds.length ? (((await supabase.from("skus_maestros").select("id, codigo, nombre, foto_url, numero, codigo_barras").in("id", fijadosIds)).data ?? []) as FilaSku[]) : [];
   const fijadosEnOrden = fijadosIds.map((id) => fijados.find((f) => f.id === id)).filter((f): f is FilaSku => !!f);
   const sugeridos = detectados.map((d) => d.p).filter((p) => !fijadosIds.includes(p.id));
   const lista = [...fijadosEnOrden.map((p) => ({ p, fijado: true })), ...sugeridos.map((p) => ({ p, fijado: false }))];
@@ -184,6 +187,8 @@ export async function productosDelChat(conversacionId: string): Promise<Producto
         id: p.id,
         nombre: p.nombre,
         codigo: p.codigo,
+        numero: p.numero ?? null,
+        barras: p.codigo_barras || null,
         foto: p.foto_url,
         fijado,
         mencion: mencionDe.get(p.id) ?? null,
@@ -235,7 +240,7 @@ async function preciosDropi(supabase: ReturnType<typeof createServiceClient>, pa
 }
 
 /** «Agregar producto» en la ficha: busca en el catálogo por nombre o código. */
-export async function buscarProductosChat(conversacionId: string, consulta: string): Promise<{ productos: { id: string; nombre: string; codigo: string | null }[] } | { error: string }> {
+export async function buscarProductosChat(conversacionId: string, consulta: string): Promise<{ productos: { id: string; nombre: string; codigo: string | null; numero: number | null; barras: string | null }[] } | { error: string }> {
   const u = await usuarioBandeja(false);
   if (!u) return { error: "No tienes acceso." };
   const supabase = createServiceClient();
@@ -244,13 +249,20 @@ export async function buscarProductosChat(conversacionId: string, consulta: stri
   if (t.length < 2) return { productos: [] };
   // El texto va como valor de un filtro (nunca armado dentro de un `.or()`) y sus comodines de LIKE se escapan.
   const patron = `%${t.replace(/[\\%_]/g, "\\$&")}%`;
-  const [porNombre, porCodigo] = await Promise.all([productosBase(supabase).ilike("nombre", patron).order("nombre").limit(8), productosBase(supabase).ilike("codigo", patron).order("nombre").limit(8)]);
-  if (porNombre.error || porCodigo.error) return { error: "No se pudo buscar." };
+  // También por el N.º («123», «#0123») y por el código de barras.
+  const soloNumero = /^#?\d{1,9}$/.test(t) ? Number(t.replace("#", "")) : null;
+  const [porNombre, porCodigo, porBarras, porNumero] = await Promise.all([
+    productosBase(supabase).ilike("nombre", patron).order("nombre").limit(8),
+    productosBase(supabase).ilike("codigo", patron).order("nombre").limit(8),
+    productosBase(supabase).ilike("codigo_barras", patron).order("nombre").limit(8),
+    soloNumero === null ? Promise.resolve({ data: [], error: null }) : productosBase(supabase).eq("numero", soloNumero).limit(8),
+  ]);
+  if (porNombre.error || porCodigo.error || porBarras.error || porNumero.error) return { error: "No se pudo buscar." };
   const vistos = new Set<string>();
-  const productos = [...(porNombre.data ?? []), ...(porCodigo.data ?? [])]
+  const productos = [...(porNumero.data ?? []), ...(porNombre.data ?? []), ...(porCodigo.data ?? []), ...(porBarras.data ?? [])]
     .filter((p) => !vistos.has(p.id as string) && vistos.add(p.id as string))
     .slice(0, 8)
-    .map((p) => ({ id: p.id as string, nombre: p.nombre as string, codigo: (p.codigo as string | null) ?? null }));
+    .map((p) => ({ id: p.id as string, nombre: p.nombre as string, codigo: (p.codigo as string | null) ?? null, numero: (p.numero as number | null) ?? null, barras: (p.codigo_barras as string | null) || null }));
   return { productos };
 }
 

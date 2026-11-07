@@ -1234,6 +1234,9 @@ export interface ItemCompra {
   origen: string;
   /** La foto comercial del producto (la de Producto o la de otro con el mismo nombre). */
   foto: string | null;
+  /** El N.º correlativo y el código de barras del producto. */
+  numero: number | null;
+  barras: string | null;
 }
 
 /** Un producto de la ficha que se puede agregar a una compra (los compuestos no: no se compran, salen de sus componentes). */
@@ -1246,12 +1249,13 @@ export interface ProductoComprable {
   /** Si es una variante, su producto padre; un producto con variantes se compra por variante. */
   padreId: string | null;
   opciones: Record<string, string> | null;
-  /** El N.º correlativo y la foto, para reconocerlo al buscarlo. */
+  /** El N.º correlativo, el código de barras y la foto, para reconocerlo al buscarlo. */
   numero: number | null;
+  barras: string | null;
   foto: string | null;
 }
 
-type FilaProductoComprable = { id: string; codigo: string; nombre: string; estado: string; clase: string; padre_id: string | null; opciones: Record<string, string> | null; numero: number | null; foto_url: string | null };
+type FilaProductoComprable = { id: string; codigo: string; nombre: string; estado: string; clase: string; padre_id: string | null; opciones: Record<string, string> | null; numero: number | null; foto_url: string | null; codigo_barras: string | null };
 
 /**
  * Todos los productos que se pueden elegir en una compra, paginando: el catálogo ya pasa de 1 000 filas (el tope de cada consulta)
@@ -1260,14 +1264,14 @@ type FilaProductoComprable = { id: string; codigo: string; nombre: string; estad
 async function cargarProductosComprables(supabase: ReturnType<typeof createServiceClient>): Promise<FilaProductoComprable[] | null> {
   try {
     return await traerTodasLasFilas<FilaProductoComprable>((desde, hasta) =>
-      supabase.from("skus_maestros").select("id, codigo, nombre, estado, clase, padre_id, opciones, numero, foto_url").neq("tipo", "combo").order("nombre").order("id").range(desde, hasta),
+      supabase.from("skus_maestros").select("id, codigo, nombre, estado, clase, padre_id, opciones, numero, foto_url, codigo_barras").neq("tipo", "combo").order("nombre").order("id").range(desde, hasta),
     );
   } catch {
     return null;
   }
 }
 
-const aProductoComprable = (p: FilaProductoComprable) => ({ id: p.id, codigo: p.codigo, nombre: p.nombre, estado: p.estado, clase: p.clase, padreId: p.padre_id, opciones: p.opciones, numero: p.numero ?? null, foto: p.foto_url ?? null });
+const aProductoComprable = (p: FilaProductoComprable) => ({ id: p.id, codigo: p.codigo, nombre: p.nombre, estado: p.estado, clase: p.clase, padreId: p.padre_id, opciones: p.opciones, numero: p.numero ?? null, barras: p.codigo_barras || null, foto: p.foto_url ?? null });
 
 /** Los productos de una compra y los que se le pueden agregar. Basta poder abrir Compras. */
 export async function obtenerProductosCompra(compraId: string): Promise<{ items: ItemCompra[]; productos: ProductoComprable[] } | { error: string }> {
@@ -1281,7 +1285,7 @@ export async function obtenerProductosCompra(compraId: string): Promise<{ items:
   const [items, productos] = await Promise.all([
     supabase
       .from("wms_compra_items")
-      .select("id, sku_maestro_id, cantidad_pedida, costo_unitario, lote_numero, cantidad_recibida, fecha_recepcion, origen, skus_maestros(codigo, nombre, foto_url)")
+      .select("id, sku_maestro_id, cantidad_pedida, costo_unitario, lote_numero, cantidad_recibida, fecha_recepcion, origen, skus_maestros(codigo, nombre, foto_url, numero, codigo_barras)")
       .eq("compra_id", compraId)
       .order("creado_en"),
     cargarProductosComprables(supabase),
@@ -1291,9 +1295,11 @@ export async function obtenerProductosCompra(compraId: string): Promise<{ items:
   const porNombre = fotosPorNombre(productos.map((p) => ({ nombre: p.nombre, foto: p.foto_url ?? null })));
   return {
     items: (items.data ?? []).map((i) => {
-      const sku = (Array.isArray(i.skus_maestros) ? i.skus_maestros[0] : i.skus_maestros) as { codigo: string; nombre: string; foto_url: string | null } | null;
+      const sku = (Array.isArray(i.skus_maestros) ? i.skus_maestros[0] : i.skus_maestros) as { codigo: string; nombre: string; foto_url: string | null; numero: number | null; codigo_barras: string | null } | null;
       return {
         id: i.id,
+        numero: sku?.numero ?? null,
+        barras: sku?.codigo_barras || null,
         skuId: i.sku_maestro_id,
         codigo: sku?.codigo ?? "",
         nombre: sku?.nombre ?? "",

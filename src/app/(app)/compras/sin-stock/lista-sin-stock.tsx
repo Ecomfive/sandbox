@@ -1,6 +1,7 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element -- fotos de Storage */
+import { CodigosProducto } from "@/components/ui/codigos-producto";
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { usePuedeAbrir } from "@/components/modulos-contexto";
@@ -14,6 +15,9 @@ export interface AlertaSinStock {
   nombre: string;
   skuId: string | null;
   codigo: string | null;
+  /** El N.º y el código de barras del producto vinculado. */
+  numero: number | null;
+  barras: string | null;
   foto: string | null;
   dropiIds: string[];
   detectadaEn: string;
@@ -115,6 +119,7 @@ function FilaAlerta({ a, puedeEscribir }: { a: AlertaSinStock; puedeEscribir: bo
             {a.codigo ? <span className="font-mono">{a.codigo}</span> : "Sin producto vinculado"} · ID{a.dropiIds.length > 1 ? "s" : ""} de Dropi{" "}
             {a.dropiIds.join(", ")}
           </span>
+          {a.codigo && <CodigosProducto numero={a.numero} barras={a.barras} />}
           <span className="text-sm text-muted-foreground">
             {a.estado === "cerrada" && a.cerradaEn
               ? `Sin stock desde el ${fecha(a.detectadaEn)} · volvió el ${fecha(a.cerradaEn)}`

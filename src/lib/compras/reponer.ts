@@ -18,7 +18,7 @@ export interface EnCamino {
 
 export interface FilaReponer {
   /** El SKU del sistema; `null` si sus publicaciones de Dropi no están vinculadas (no se puede comprar desde aquí). */
-  sku: { id: string; codigo: string; nombre: string } | null;
+  sku: { id: string; codigo: string; nombre: string; numero?: number | null; barras?: string | null } | null;
   /** El nombre a mostrar: el del SKU, o el del producto de Dropi si no está vinculado. */
   nombre: string;
   /** Los productos de Dropi que suma. */
@@ -38,7 +38,7 @@ export interface FilaReponer {
  */
 export function filasReponer(
   resumen: ResumenProducto[],
-  skuDe: Map<number, { id: string; codigo: string; nombre: string }>,
+  skuDe: Map<number, { id: string; codigo: string; nombre: string; numero?: number | null; barras?: string | null }>,
   enCamino: Map<string, EnCamino>,
   dias: number = DIAS_COBERTURA,
 ): FilaReponer[] {

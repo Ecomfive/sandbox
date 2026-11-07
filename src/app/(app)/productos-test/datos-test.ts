@@ -63,9 +63,9 @@ export async function obtenerProductosTest(supabase: SupabaseClient, paisId: str
  */
 export async function obtenerOpcionesProducto(
   supabase: SupabaseClient,
-): Promise<{ id: string; codigo: string; nombre: string; estado: string; numero: number | null; foto: string | null; compuesto: boolean }[]> {
+): Promise<{ id: string; codigo: string; nombre: string; estado: string; numero: number | null; barras: string | null; foto: string | null; compuesto: boolean }[]> {
   const { data } = await traerTodasConError<Record<string, unknown>>((desde, hasta) =>
-    supabase.from("skus_maestros").select("id, codigo, nombre, clase, tipo, padre_id, numero, foto_url").order("nombre").order("id").range(desde, hasta),
+    supabase.from("skus_maestros").select("id, codigo, nombre, clase, tipo, padre_id, numero, foto_url, codigo_barras").order("nombre").order("id").range(desde, hasta),
   );
   const filas = data ?? [];
   const padres = new Set(filas.filter((p) => p.padre_id).map((p) => p.padre_id as string));
@@ -77,6 +77,7 @@ export async function obtenerOpcionesProducto(
       nombre: p.nombre as string,
       estado: p.clase === "test" || p.clase === "inactivo" || p.clase === "descontinuado" ? (p.clase as string) : "aprobado",
       numero: (p.numero as number | null) ?? null,
+      barras: (p.codigo_barras as string | null) || null,
       foto: (p.foto_url as string | null) ?? null,
       compuesto: p.tipo === "combo",
     }));

@@ -1,5 +1,7 @@
 "use client";
 
+import { textoCodigos } from "@/lib/wms/codigos-producto";
+import { CodigosProducto } from "@/components/ui/codigos-producto";
 import { useCodigoPais } from "@/components/pais-contexto";
 import { montoDePais } from "@/lib/moneda/simbolo";
 import { useMemo, useState, type ReactNode } from "react";
@@ -13,6 +15,9 @@ export interface ProductoVentas extends ResumenProducto {
   ids: number[];
   /** El SKU del sistema, si alguna publicación de Gestión de IDs Dropi lo vincula. */
   sku: string | null;
+  /** El N.º correlativo y el código de barras del producto del sistema (7 nov 2026, pedido de Hernán). */
+  numero: number | null;
+  barras: string | null;
   /** La plata del producto en todo lo cargado del Excel de la oficina (migración 0130); null si no tiene órdenes ahí. */
   dinero: { ganancia: number; utilidad: number; margen: number | null; porMes: Record<string, number> } | null;
 }
@@ -191,6 +196,12 @@ function NombreProducto({ p }: { p: ProductoVentas }) {
       <span className="text-xs text-muted-foreground tabular-nums">
         {textoIds(p)}
         {p.sku && <span className="font-mono"> · {p.sku}</span>}
+        {p.sku && (p.numero !== null || p.barras) && (
+          <>
+            {" · "}
+            <CodigosProducto numero={p.numero} barras={p.barras} />
+          </>
+        )}
         {p.privado && " · privado"}
         {p.lista === "archivado" && " · archivado"}
       </span>
@@ -313,7 +324,7 @@ export function TableroVentas({ corte, stockLeido = null, movimientos, productos
   const quietos = useMemo(() => productos.filter((p) => p.lista === "activo" && p.stock > 0 && p.netas30 <= 0), [productos]);
   const filtrados = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
-    return lista.filter((p) => (categoria === "todas" || p.categoria === categoria) && (!q || `${p.ids.join(" ")} ${p.nombre} ${p.sku ?? ""}`.toLowerCase().includes(q)));
+    return lista.filter((p) => (categoria === "todas" || p.categoria === categoria) && (!q || `${p.ids.join(" ")} ${p.nombre} ${p.sku ?? ""} ${textoCodigos(p)}`.toLowerCase().includes(q)));
   }, [lista, categoria, busqueda]);
   const dsFiltrados = useMemo(() => {
     const q = buscaDs.trim().toLowerCase();
