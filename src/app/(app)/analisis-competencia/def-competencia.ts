@@ -14,8 +14,11 @@ export interface ProductoC {
   categoria: string | null;
   estado: "activo" | "desaparecido";
   esNuestro: boolean;
-  /** El nuestro al que es igual (en uno de la competencia), con el parecido y si fue por nombre o por foto. */
+  /** El nuestro al que es igual (en uno de la competencia), con el parecido y si fue por nombre o por foto. Solo si es **el mismo producto** (`certezaIgual`): solo
+   * esos cuentan para precios, posiciones y alertas. */
   igualA: string | null;
+  /** El nuestro al que se parece sin ser seguro que sea el mismo (`certezaIgual` = dudoso): se muestra como dudoso y no se compara. */
+  dudosoDe: string | null;
   parecido: number | null;
   metodo: string | null;
   primeraVez: string;

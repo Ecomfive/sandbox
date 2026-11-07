@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { unidadesBajadas, vigiladoDe, type CambioStock } from "@/lib/competencia/analisis";
+import { certezaIgual } from "@/lib/competencia/certeza";
 import { idDeProveedorDrop } from "@/lib/competencia/drop";
 import type { PlataformaId } from "@/lib/plataformas";
 import { traerTodasConError } from "@/lib/supabase/paginar";
@@ -122,6 +123,7 @@ export async function cargarDatosCompetencia(supabase: SupabaseClient, pais: { i
       estado: p.estado,
       esNuestro: p.es_nuestro,
       igualA: p.igual_a,
+      dudosoDe: null,
       parecido: n(p.igual_parecido),
       metodo: p.igual_metodo,
       primeraVez: p.primera_vez,
@@ -134,6 +136,15 @@ export async function cargarDatosCompetencia(supabase: SupabaseClient, pais: { i
     };
   };
   const productos = filas.map(aProducto);
+  // Solo el mismo producto cuenta como igual (7 nov 2026, pedido de Hernán): el que solo se parece queda como dudoso y no se compara.
+  const porIdProducto = new Map(productos.map((p) => [p.id, p]));
+  for (const p of productos) {
+    if (!p.igualA) continue;
+    const nuestro = porIdProducto.get(p.igualA);
+    if (nuestro && certezaIgual(nuestro.nombre, p.nombre, p.metodo) === "exacto") continue;
+    p.dudosoDe = p.igualA;
+    p.igualA = null;
+  }
 
   // La primera búsqueda marca desde cuándo un producto de un competidor cuenta como «nuevo» suyo.
   const listas = (busq.data ?? []).filter((b) => b.estado === "lista");
