@@ -45,7 +45,7 @@ export default async function RecepcionPage() {
     ? await traerTodasConError<FilaItem>((d, h) =>
         supabase
           .from("wms_compra_items")
-          .select("id, compra_id, cantidad_pedida, lote_numero, skus_maestros(codigo, nombre, foto_url, tipo, clase, maneja_vencimiento, opciones_variantes)")
+          .select("id, compra_id, cantidad_pedida, lote_numero, skus_maestros(codigo, nombre, foto_url, tipo, clase, maneja_vencimiento, opciones_variantes, numero, codigo_barras)")
           .in("compra_id", ids)
           .is("cantidad_recibida", null)
           .order("id")
@@ -58,13 +58,15 @@ export default async function RecepcionPage() {
 
   const lineasDe = new Map<string, LineaPorRecibir[]>();
   for (const i of items ?? []) {
-    const s = uno(i.skus_maestros as { codigo: string; nombre: string; foto_url: string | null; tipo: string; clase: string; maneja_vencimiento: boolean; opciones_variantes: unknown } | null);
+    const s = uno(i.skus_maestros as { codigo: string; nombre: string; foto_url: string | null; tipo: string; clase: string; maneja_vencimiento: boolean; opciones_variantes: unknown; numero: number | null; codigo_barras: string | null } | null);
     if (!s) continue;
     const linea: LineaPorRecibir = {
       id: i.id,
       codigo: s.codigo,
       nombre: s.nombre,
       foto: s.foto_url,
+      numero: s.numero ?? null,
+      barras: s.codigo_barras ?? null,
       pedida: i.cantidad_pedida,
       lote: i.lote_numero,
       manejaVencimiento: s.maneja_vencimiento === true,

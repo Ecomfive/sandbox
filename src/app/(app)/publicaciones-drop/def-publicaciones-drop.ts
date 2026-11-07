@@ -14,6 +14,9 @@ export interface ProductoDrop {
   foto: string | null;
   /** simple o combo (compuesto). */
   tipo: string;
+  /** El N.º correlativo y el código de barras del producto. */
+  numero: number | null;
+  barras: string | null;
 }
 
 /**

@@ -19,7 +19,7 @@ export interface DatosEffi {
   faltaMigracion: boolean;
 }
 
-type SkuFila = { id: string; codigo: string; nombre: string; foto_url: string | null; tipo: string };
+type SkuFila = { id: string; codigo: string; nombre: string; foto_url: string | null; tipo: string; numero: number | null; codigo_barras: string | null };
 type Fila = {
   id: string;
   effi_id: string;
@@ -44,7 +44,7 @@ type Fila = {
 
 const uno = <T,>(v: T | T[] | null): T | null => (Array.isArray(v) ? (v[0] ?? null) : v);
 const num = (v: number | null) => (v === null ? null : Number(v));
-const aProducto = (s: SkuFila | null): ProductoEffi | null => (s ? { id: s.id, codigo: s.codigo, nombre: s.nombre, foto: s.foto_url, tipo: s.tipo } : null);
+const aProducto = (s: SkuFila | null): ProductoEffi | null => (s ? { id: s.id, codigo: s.codigo, nombre: s.nombre, foto: s.foto_url, tipo: s.tipo, numero: s.numero ?? null, barras: s.codigo_barras || null } : null);
 
 /** Los artículos de Effi del país con su producto, la sugerencia, el margen (precio de dropshipping − costo en Effi − fulfillment de la fila «Effi» de Configuración) y lo que viene en camino. */
 export async function cargarDatosEffi(supabase: SupabaseClient, pais: { id: string; codigo: string }, usuario: UsuarioActual): Promise<DatosEffi> {
@@ -56,7 +56,7 @@ export async function cargarDatosEffi(supabase: SupabaseClient, pais: { id: stri
       supabase
         .from("effi_publicaciones")
         .select(
-          "id, effi_id, nombre, referencia, gtin, categoria, foto_url, precio_dropshipping, precio_sugerido, precio_minimo, costo, stock_principal, stock_garantias, compartido, en_effi, ultima_vez, sugerencia, producto:skus_maestros!effi_publicaciones_sku_maestro_id_fkey(id, codigo, nombre, foto_url, tipo), sugerido:skus_maestros!effi_publicaciones_sugerido_sku_id_fkey(id, codigo, nombre, foto_url, tipo)",
+          "id, effi_id, nombre, referencia, gtin, categoria, foto_url, precio_dropshipping, precio_sugerido, precio_minimo, costo, stock_principal, stock_garantias, compartido, en_effi, ultima_vez, sugerencia, producto:skus_maestros!effi_publicaciones_sku_maestro_id_fkey(id, codigo, nombre, foto_url, tipo, numero, codigo_barras), sugerido:skus_maestros!effi_publicaciones_sugerido_sku_id_fkey(id, codigo, nombre, foto_url, tipo, numero, codigo_barras)",
         )
         .eq("pais_id", pais.id)
         .order("nombre")

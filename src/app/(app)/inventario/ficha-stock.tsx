@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { CodigosProducto } from "@/components/ui/codigos-producto";
 import { Badge } from "@/components/ui/badge";
 import { Seccion } from "@/components/ui/seccion-ficha";
 import { cuantasCajas, textoCaja, unidadesDeCajas } from "@/lib/wms/cajas";
@@ -131,7 +132,10 @@ export function FichaStock({
     >
       {sku && (
         <div className="flex flex-1 flex-col">
-          <p className="px-5 pt-5 pb-4 text-sm text-muted-foreground">{sku.nombre}</p>
+          <div className="flex flex-col gap-1 px-5 pt-5 pb-4">
+            <p className="m-0 text-sm text-muted-foreground">{sku.nombre}</p>
+            <CodigosProducto numero={sku.numero} barras={sku.barras} />
+          </div>
 
           {puedeEscribir && !esCombo && !esTest && (
             <div className="flex flex-wrap gap-2 border-y border-border px-5 py-3">

@@ -11,6 +11,8 @@ import { useToast } from "@/components/ui/toast";
 import { formatearFecha, formatearTiempoRelativo } from "@/lib/formato";
 import { BuscarIcon } from "@/lib/nav-icons";
 import { CON_VENTAS, resumenCuadro, type FilaCuadro } from "@/lib/wms/cuadro-plataformas";
+import { CodigosProducto } from "@/components/ui/codigos-producto";
+import { coincideCodigo } from "@/lib/wms/codigos-producto";
 import { ETIQUETA_PLATAFORMA, lecturaVieja, type Plataforma } from "@/lib/wms/stock-plataformas";
 import { tomarCorte } from "./actions";
 
@@ -18,6 +20,9 @@ export interface FilaVista extends FilaCuadro {
   codigo: string;
   nombre: string;
   foto: string | null;
+  /** El N.º y el código de barras del producto. */
+  numero: number | null;
+  barras: string | null;
 }
 
 const entero = (n: number) => n.toLocaleString("es-PA");
@@ -66,7 +71,7 @@ export function Cuadro({
   const resumen = useMemo(() => resumenCuadro(filas), [filas]);
   const visibles = useMemo(() => {
     const q = sinAcentos(buscar.trim());
-    return filas.filter((f) => (todas || q || f.diferencia !== 0) && (!q || sinAcentos(`${f.codigo} ${f.nombre}`).includes(q)));
+    return filas.filter((f) => (todas || q || f.diferencia !== 0) && (!q || coincideCodigo(q, `${f.codigo} ${f.nombre}`, f)));
   }, [filas, buscar, todas]);
 
   const corte = () => {
@@ -180,6 +185,7 @@ export function Cuadro({
                     <td className={claseCeldaColumna}>
                       <span className="block font-medium">{f.codigo}</span>
                       <span className="block text-xs text-muted-foreground">{f.nombre}</span>
+                      <CodigosProducto numero={f.numero} barras={f.barras} className="block" />
                     </td>
                     <td className={`${claseCeldaColumna} text-right tabular-nums`}>{entero(f.corte)}</td>
                     <td className={`${claseCeldaColumna} text-right tabular-nums`}>

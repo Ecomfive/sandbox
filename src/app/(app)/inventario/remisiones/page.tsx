@@ -31,7 +31,7 @@ export default async function RemisionesPage() {
   const { data, error } = await supabase
     .from("wms_envios_dropi")
     .select(
-      "id, enviado_en, enviada, recibida, estado, referencia, motivo_diferencia, recibido_en, remision_id, wms_remisiones(notas), skus_maestros(codigo, nombre, foto_url), wms_bodegas!wms_envios_dropi_bodega_origen_id_fkey!inner(nombre, pais_id), destino:wms_bodegas!wms_envios_dropi_bodega_dropi_id_fkey(nombre)",
+      "id, enviado_en, enviada, recibida, estado, referencia, motivo_diferencia, recibido_en, remision_id, wms_remisiones(notas), skus_maestros(codigo, nombre, foto_url, numero, codigo_barras), wms_bodegas!wms_envios_dropi_bodega_origen_id_fkey!inner(nombre, pais_id), destino:wms_bodegas!wms_envios_dropi_bodega_dropi_id_fkey(nombre)",
     )
     .eq("wms_bodegas.pais_id", pais.id)
     .order("estado")
@@ -43,12 +43,14 @@ export default async function RemisionesPage() {
   const cajasDeLinea = new Map((conCajas ?? []).map((c) => [c.id as string, textoCajasEnviadas(c.cajas)]));
 
   const filas: FilaEnvio[] = (data ?? []).map((e) => {
-    const sku = uno(e.skus_maestros as { codigo: string; nombre: string; foto_url: string | null } | { codigo: string; nombre: string; foto_url: string | null }[] | null);
+    const sku = uno(e.skus_maestros as { codigo: string; nombre: string; foto_url: string | null; numero: number | null; codigo_barras: string | null } | { codigo: string; nombre: string; foto_url: string | null; numero: number | null; codigo_barras: string | null }[] | null);
     return {
       id: e.id as string,
       codigo: sku?.codigo ?? "—",
       nombre: sku?.nombre ?? "",
       foto: sku?.foto_url ?? null,
+      numero: sku?.numero ?? null,
+      barras: sku?.codigo_barras ?? null,
       desde: uno(e.wms_bodegas as { nombre: string } | { nombre: string }[] | null)?.nombre ?? "—",
       hacia: uno(e.destino as { nombre: string } | { nombre: string }[] | null)?.nombre ?? "—",
       enviadoEn: e.enviado_en as string,
@@ -108,8 +110,8 @@ export default async function RemisionesPage() {
         traerTodasConError<{ bodega_id: string; sku_maestro_id: string; disponible: number }>((d, h) =>
           supabase.from("wms_stock").select("bodega_id, sku_maestro_id, disponible").in("bodega_id", propias.map((b) => b.id)).gt("disponible", 0).order("sku_maestro_id").range(d, h),
         ),
-        traerTodasConError<{ id: string; codigo: string; nombre: string; estado: string; numero: number | null; foto_url: string | null }>((d, h) =>
-          supabase.from("skus_maestros").select("id, codigo, nombre, estado, numero, foto_url").neq("tipo", "combo").is("opciones_variantes", null).order("codigo").range(d, h),
+        traerTodasConError<{ id: string; codigo: string; nombre: string; estado: string; numero: number | null; foto_url: string | null; codigo_barras: string | null }>((d, h) =>
+          supabase.from("skus_maestros").select("id, codigo, nombre, estado, numero, foto_url, codigo_barras").neq("tipo", "combo").is("opciones_variantes", null).order("codigo").range(d, h),
         ),
       ])
     : [{ data: [] }, { data: [] }];
@@ -144,7 +146,7 @@ export default async function RemisionesPage() {
     ((cajas[c.bodega_id] ??= {})[c.sku_maestro_id] ??= []).push(caja);
   }
   for (const porSku of Object.values(cajas)) for (const lista of Object.values(porSku)) lista.sort((a, b) => a.ubicacion.localeCompare(b.ubicacion) || b.porCaja - a.porCaja);
-  const opciones = (productos.data ?? []).filter((p) => hay.has(p.id)).map((p) => ({ id: p.id, codigo: p.codigo, nombre: p.nombre, estado: p.estado, numero: p.numero, foto: p.foto_url }));
+  const opciones = (productos.data ?? []).filter((p) => hay.has(p.id)).map((p) => ({ id: p.id, codigo: p.codigo, nombre: p.nombre, estado: p.estado, numero: p.numero, barras: p.codigo_barras, foto: p.foto_url }));
 
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">

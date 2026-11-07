@@ -12,6 +12,8 @@ export interface OpcionSkuMaestro {
   estado: string;
   /** El N.º correlativo del producto, si se cargó. */
   numero?: number | null;
+  /** El código de barras del producto (del fabricante o interno), si tiene. */
+  barras?: string | null;
   /** La foto del producto, si tiene. */
   foto?: string | null;
   /** Si es un compuesto (no puede ser componente de otro compuesto). */
@@ -42,9 +44,10 @@ function buscar(opciones: OpcionSkuMaestro[], texto: string, limite = 8): Opcion
       const codigo = normal(o.codigo);
       const nombre = normal(o.nombre);
       const numero = numeroTexto(o.numero).slice(1).replace(/^0+/, "");
-      const todo = `${codigo} ${nombre} ${numero}`;
+      const barras = (o.barras ?? "").toLowerCase();
+      const todo = `${codigo} ${nombre} ${numero} ${barras}`;
       if (!palabras.every((p) => todo.includes(p))) return null;
-      const puntos = (codigo.startsWith(q) ? 4 : 0) + (nombre.startsWith(q) ? 3 : 0) + (numero === q ? 5 : 0) + (codigo.includes(q) ? 1 : 0);
+      const puntos = (codigo.startsWith(q) ? 4 : 0) + (nombre.startsWith(q) ? 3 : 0) + (numero === q || (barras !== "" && barras === q) ? 5 : 0) + (codigo.includes(q) ? 1 : 0);
       return { o, puntos };
     })
     .filter((x): x is { o: OpcionSkuMaestro; puntos: number } => x !== null)
@@ -64,7 +67,7 @@ function Miniatura({ foto }: { foto?: string | null }) {
 }
 
 /**
- * Elige un producto: mientras se escribe (parte del SKU, del nombre o el N.º) se abre la lista de sugerencias con la foto en
+ * Elige un producto: mientras se escribe (parte del SKU, del nombre, el N.º o el código de barras) se abre la lista de sugerencias con la foto en
  * miniatura, el SKU, el nombre y el N.º; se elige con el ratón o con flechas y Enter (Escape cierra). No acepta texto libre:
  * si lo escrito no es uno de la lista, al salir del campo se vuelve al que estaba.
  */
@@ -206,6 +209,7 @@ export function CampoSkuMaestro({
                     <span className="truncate text-xs text-muted-foreground">
                       <span className="font-medium text-foreground-soft">{o.codigo}</span>
                       {o.numero !== undefined && o.numero !== null ? ` · ${numeroTexto(o.numero)}` : ""}
+                      {o.barras ? ` · ${o.barras}` : ""}
                       {o.estado === "test" ? " · Test" : o.estado === "inactivo" ? " · Inactivo" : o.estado === "descontinuado" ? " · Descontinuado" : ""}
                     </span>
                   </span>

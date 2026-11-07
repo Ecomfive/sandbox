@@ -8,6 +8,8 @@ import { claseCeldaColumna, claseEncabezadoColumna, claseFilaEncabezado } from "
 import { Badge } from "@/components/ui/badge";
 import { VentanaBuscarImagen } from "@/components/buscar-imagen/ventana-buscar-imagen";
 import { anilloFoco, fieldClassSm } from "@/components/ui/field";
+import { CodigosProducto } from "@/components/ui/codigos-producto";
+import { coincideCodigo } from "@/lib/wms/codigos-producto";
 import { MiniaturaFoto } from "@/components/ui/miniatura-foto";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -25,6 +27,9 @@ export interface ProductoConteo {
   clase: string;
   manejaVencimiento: boolean;
   foto: string | null;
+  /** El N.º y el código de barras del producto. */
+  numero: number | null;
+  barras: string | null;
   /** Lo que el sistema tiene hoy en esta bodega. */
   enSistema: number;
   /** Sus lotes con unidades en esta bodega (solo si maneja vencimiento). */
@@ -162,7 +167,7 @@ export function Levantamiento({
     const orden = porImagen ? new Map(porImagen.map((id, i) => [id, i])) : null;
     const lista = productos.filter((p) => {
       if (orden && !orden.has(p.id)) return false;
-      if (q && !sinAcentos(`${p.codigo} ${p.nombre}`).includes(q)) return false;
+      if (q && !coincideCodigo(q, `${p.codigo} ${p.nombre}`, p)) return false;
       if (verTodos || q || orden) return true;
       return p.clase === "fisico" || p.enSistema !== 0 || contados[p.id] !== undefined || lotes[p.id] !== undefined || cajas[p.id] !== undefined || sumas[p.id] !== undefined || restas[p.id] !== undefined || traslados[p.id] !== undefined;
     });
@@ -394,6 +399,7 @@ export function Levantamiento({
                   <td className={claseCeldaColumna}>
                     <span className="block font-medium">{p.codigo}</span>
                     <span className="block text-xs text-muted-foreground">{p.nombre}</span>
+                    <CodigosProducto numero={p.numero} barras={p.barras} className="block" />
                     {ETIQUETA_CLASE[p.clase] && (
                       <span className="mt-1 inline-block">
                         <Badge tone="neutral">{ETIQUETA_CLASE[p.clase]}</Badge>

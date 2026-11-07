@@ -4,6 +4,7 @@
 import { useState, type ReactNode } from "react";
 import { BotonIconoFila } from "@/app/(app)/publicaciones-dropi/boton-icono-fila";
 import { EtapaCotizando, LlegadaCamino } from "@/app/(app)/publicaciones-dropi/llegada-camino";
+import { CodigosProducto } from "@/components/ui/codigos-producto";
 import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -154,7 +155,10 @@ export function FilaPublicacionDropLista({ f, moneda, alAbrir }: { f: FilaPublic
                 <span className="tabular-nums">{f.idDrop || "Sin ID de Drop"}</span>
                 <InsigniaConectadoDrop conectado={f.conectado} />
                 {f.producto ? (
-                  <span className="font-mono font-semibold text-foreground">{f.producto.codigo}</span>
+                  <>
+                    <span className="font-mono font-semibold text-foreground">{f.producto.codigo}</span>
+                    <CodigosProducto numero={f.producto.numero} barras={f.producto.barras} />
+                  </>
                 ) : (
                   <span className="inline-flex items-center gap-1.5">
                     <Punto clase="bg-warning" texto="Sin vincular producto" />
