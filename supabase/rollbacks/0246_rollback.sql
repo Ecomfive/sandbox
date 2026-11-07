@@ -1,4 +1,2 @@
--- Reversa de 0246_fulfillment_quien_paga.sql: todas vuelven a pagar el fulfillment «nosotros» (su monto en Configuración no se tocó).
-
-alter table pais_plataformas drop constraint if exists pais_plataformas_fulfillment_paga_check;
-alter table pais_plataformas drop column if exists fulfillment_paga;
+-- Reversa de 0246_competencia_verificaciones.sql: se olvida lo que dijo la IA; los pares vuelven a decidirse solo por la regla de nombres y fotos.
+drop table if exists competencia_verificaciones;

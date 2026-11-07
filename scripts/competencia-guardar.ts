@@ -191,8 +191,13 @@ export async function guardarCompetencia(
     if (!primera) {
       // Las alertas que comparan con lo nuestro (bajó el precio, vende más barato, bajó el stock) solo si es el mismo producto (`certezaIgual`, 7 nov 2026).
       const porIdActual = new Map(actuales.map((p) => [p.id, p]));
-      const exacto = (p: { nombre: string; foto_huella: string | null; igual_a: string | null; igual_metodo: string | null }) => {
+      // Lo que ya revisó la IA manda (migración 0246; sin ella, nada).
+      const { data: verificaciones } = await supabase.from("competencia_verificaciones").select("producto_id, nuestro_id, veredicto").eq("plataforma", "dropi");
+      const veredicto = new Map((verificaciones ?? []).map((v) => [`${v.producto_id}|${v.nuestro_id}`, v.veredicto as string]));
+      const exacto = (p: { id: string; nombre: string; foto_huella: string | null; igual_a: string | null; igual_metodo: string | null }) => {
         const n = p.igual_a ? porIdActual.get(p.igual_a) : undefined;
+        const v = p.igual_a ? veredicto.get(`${p.id}|${p.igual_a}`) : undefined;
+        if (v) return v === "mismo" ? p.igual_a : null;
         return n && certezaIgual({ nombre: n.nombre, huella: n.foto_huella }, { nombre: p.nombre, huella: p.foto_huella }, p.igual_metodo) === "exacto" ? p.igual_a : null;
       };
       const productos = new Map<string, ProductoAlerta>(

@@ -74,7 +74,7 @@ export async function fulfillmentDePais(supabase: SupabaseClient, paisId: string
 }
 
 /**
- * Quién paga el fulfillment de una plataforma (7 nov 2026, pedido de Hernán; migración 0246): «nosotros» (cuenta en el margen) o «dropshipper» (lo paga el mismo dropshipper: no se toma en
+ * Quién paga el fulfillment de una plataforma (7 nov 2026, pedido de Hernán; migración 0247): «nosotros» (cuenta en el margen) o «dropshipper» (lo paga el mismo dropshipper: no se toma en
  * cuenta). Se elige en Configuración › Plataformas del país. Un valor desconocido, o la columna que todavía no existe, es «nosotros».
  */
 export type QuienPagaFulfillment = "nosotros" | "dropshipper";
@@ -88,7 +88,7 @@ export const fulfillmentQueCuenta = (monto: number | null, paga: QuienPagaFulfil
 export const puedeElegirQuienPaga = (nombrePlataforma: string): boolean => nombrePlataforma.trim().toLowerCase() !== "dropi";
 
 /**
- * El fulfillment de una plataforma del país por su nombre (Drop, Effi…): su monto y moneda de Configuración y quién lo paga (migración 0246). Sin la 0246 se lee sin esa columna (todas
+ * El fulfillment de una plataforma del país por su nombre (Drop, Effi…): su monto y moneda de Configuración y quién lo paga (migración 0247). Sin la 0247 se lee sin esa columna (todas
  * «nosotros»); null si el país no tiene esa plataforma.
  */
 export async function leerFulfillmentPlataforma(supabase: SupabaseClient, paisId: string, nombre: string): Promise<{ monto: number | null; moneda: string; paga: QuienPagaFulfillment } | null> {

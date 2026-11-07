@@ -107,7 +107,7 @@ export async function guardarFulfillmentPlataforma(paisPlataformaId: string, tex
 }
 
 /**
- * Quién paga el fulfillment de una plataforma del país (Configuración, 7 nov 2026, pedido de Hernán; migración 0246): «nosotros» o «dropshipper». Si lo paga el dropshipper no se toma en
+ * Quién paga el fulfillment de una plataforma del país (Configuración, 7 nov 2026, pedido de Hernán; migración 0247): «nosotros» o «dropshipper». Si lo paga el dropshipper no se toma en
  * cuenta en el margen (Gestión de IDs Drop y Effi). Dropi no se elige: su fulfillment va escrito en cada publicación. Pide poder escribir en Configuración. Devuelve el error como valor.
  */
 export async function guardarQuienPagaFulfillment(paisPlataformaId: string, paga: string): Promise<{ ok: true; paga: QuienPagaFulfillment } | { error: string }> {
@@ -116,7 +116,7 @@ export async function guardarQuienPagaFulfillment(paisPlataformaId: string, paga
   if (paga !== "nosotros" && paga !== "dropshipper") return { error: "Elige quién paga el fulfillment." };
   const supabase = createServiceClient();
   const { data: fila, error: errorFila } = await supabase.from("pais_plataformas").select("id, pais_id, fulfillment_paga, plataformas(nombre), paises(nombre)").eq("id", paisPlataformaId).maybeSingle();
-  if (errorFila) return { error: /fulfillment_paga|column|schema cache/i.test(errorFila.message) ? "Falta correr la migración 0246 (quién paga el fulfillment) en la base." : "No se pudo leer la plataforma." };
+  if (errorFila) return { error: /fulfillment_paga|column|schema cache/i.test(errorFila.message) ? "Falta correr la migración 0247 (quién paga el fulfillment) en la base." : "No se pudo leer la plataforma." };
   if (!fila) return { error: "Esa plataforma no existe en este país." };
   if (!(await puedeVerPaisId(supabase, usuario.paisesPermitidos, fila.pais_id as string))) return { error: "No tienes acceso a este país." };
   const plataforma = (fila.plataformas as unknown as { nombre: string } | null)?.nombre ?? "?";

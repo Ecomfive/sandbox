@@ -14,7 +14,7 @@ export interface DatosEffi {
   ultimaLectura: string | null;
   /** El fulfillment de Effi que cuenta en el margen; null si no está en Configuración o si lo paga el dropshipper. */
   fulfillment: number | null;
-  /** Quién paga el fulfillment de Effi (Configuración, migración 0246). */
+  /** Quién paga el fulfillment de Effi (Configuración, migración 0247). */
   fulfillmentPaga: QuienPagaFulfillment;
   faltaMigracion: boolean;
 }

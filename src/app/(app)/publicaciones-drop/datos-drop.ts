@@ -15,7 +15,7 @@ export interface DatosDrop {
   ultimaLectura: string | null;
   /** El fulfillment de Drop del país en la moneda de las publicaciones que cuenta en el margen; null si no está en Configuración o si lo paga el dropshipper. */
   fulfillment: number | null;
-  /** Quién paga el fulfillment de Drop (Configuración, migración 0246). */
+  /** Quién paga el fulfillment de Drop (Configuración, migración 0247). */
   fulfillmentPaga: QuienPagaFulfillment;
   /** Falta correr la migración 0221. */
   faltaMigracion: boolean;

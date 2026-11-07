@@ -29,7 +29,7 @@ export default async function ConfiguracionPage() {
     supabase.from("cuentas_retiro").select(columnas).eq("pais_id", pais.id).order("creado_en", { ascending: false });
 
   const [{ data: paisPlataformas }, cuentasConBinance, { data: todosLosPaises }, { data: correlativos }, umbralesR] = await Promise.all([
-    // `fulfillment` lo agrega la migración 0213 y `fulfillment_paga` la 0246: sin ellas, se repite sin esas columnas.
+    // `fulfillment` lo agrega la migración 0213 y `fulfillment_paga` la 0247: sin ellas, se repite sin esas columnas.
     supabase
       .from("pais_plataformas")
       .select("id, disponible_para_retiro, fulfillment, fulfillment_moneda, fulfillment_paga, plataformas(nombre)")

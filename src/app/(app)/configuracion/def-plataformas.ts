@@ -12,7 +12,7 @@ export interface FilaPlataforma {
   fulfillmentMoneda: string;
   /** El mismo monto en la otra moneda del país («≈ US$2.00», «≈ ₡1 011»), o null. */
   fulfillmentEquivalente: string | null;
-  /** Quién paga el fulfillment (migración 0246): si es el dropshipper, no se toma en cuenta en el margen. */
+  /** Quién paga el fulfillment (migración 0247): si es el dropshipper, no se toma en cuenta en el margen. */
   fulfillmentPaga: QuienPagaFulfillment;
 }
 

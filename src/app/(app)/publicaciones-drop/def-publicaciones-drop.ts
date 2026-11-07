@@ -53,7 +53,7 @@ export interface FilaPublicacionDrop {
   costo: number | null;
   /** El fulfillment de Drop del país (Configuración), en la moneda de Drop, que cuenta en el margen; null si no está puesto o si lo paga el dropshipper. */
   fulfillment: number | null;
-  /** Quién paga el fulfillment de Drop (migración 0246): con «dropshipper» no se toma en cuenta. */
+  /** Quién paga el fulfillment de Drop (migración 0247): con «dropshipper» no se toma en cuenta. */
   fulfillmentPaga: "nosotros" | "dropshipper";
   utilidad: number | null;
   margen: number | null;
