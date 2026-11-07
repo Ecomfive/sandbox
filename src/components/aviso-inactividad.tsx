@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { EVENTOS_USO } from "@/components/latido-presencia";
+import { anilloFoco } from "@/components/ui/field";
 import { sinActividad, textoSinActividad, textoVolvio } from "@/lib/rendimiento/aviso-inactividad";
 
 /** Cada cuánto se revisa (y se actualiza el contador del aviso). */
@@ -143,7 +144,8 @@ export function AvisoInactividad() {
         <p id="aviso-inactividad-texto" className="m-0 text-sm text-muted-foreground">
           {texto}
         </p>
-        <button ref={boton} type="button" onClick={entendido} className="mt-1 w-full rounded-lg bg-foreground px-4 py-2.5 text-sm font-medium text-background hover:bg-foreground/85 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground">
+        {/* Con el color del botón «Agregar» (`boton-neon`), pedido de Alcides. */}
+        <button ref={boton} type="button" onClick={entendido} className={`boton-neon mt-1 w-full border border-transparent px-4 py-2.5 text-sm font-medium text-white ${anilloFoco} !rounded-md`}>
           Entendido
         </button>
       </div>
