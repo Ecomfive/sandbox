@@ -16,6 +16,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { formatearTiempoRelativo } from "@/lib/formato";
 import type { Ambito } from "@/lib/imagen/buscar";
 import { BuscarIcon, CamaraIcon, MasIcon, PapeleraIcon } from "@/lib/nav-icons";
+import { FichaStock } from "../ficha-stock";
 import { guardarLevantamiento } from "./actions";
 import { ImportarLista } from "./importar-lista";
 import { LineasCajas, unidadesFormulario, type LineaCajasForm, type UbicacionConteo } from "./lineas-cajas";
@@ -83,6 +84,7 @@ export function Levantamiento({
   puedeEscribir,
   puedeRestar,
   restarPideMotivo,
+  codigoPais,
 }: {
   bodegas: { id: string; nombre: string }[];
   bodegaElegida: string;
@@ -94,6 +96,8 @@ export function Levantamiento({
   puedeRestar: boolean;
   /** Si restar pide motivo (en la Referencia). */
   restarPideMotivo: boolean;
+  /** El país que se está viendo: la ficha muestra sus compras. */
+  codigoPais: string;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -114,6 +118,9 @@ export function Levantamiento({
   const [sumas, setSumas] = useState<Record<string, string>>({});
   const [restas, setRestas] = useState<Record<string, string>>({});
   const [traslados, setTraslados] = useState<Record<string, { cantidad: string; destino: string }>>({});
+  // La ficha del producto (7 nov 2026, pedido de Hernán): al tocar su nombre, para ver lo último que pasó y dejar notas.
+  const [ficha, setFicha] = useState<string | null>(null);
+  const productoFicha = ficha ? productos.find((p) => p.id === ficha) : undefined;
 
   const lineasDe = (p: ProductoConteo): LineaLote[] =>
     lotes[p.id] ?? p.lotes.map((l) => ({ codigo: l.codigo, vencimiento: l.vencimiento, cantidad: "", sumar: "", existente: true }));
@@ -397,8 +404,15 @@ export function Levantamiento({
                     <MiniaturaFoto url={p.foto} nombre={p.nombre} />
                   </td>
                   <td className={claseCeldaColumna}>
-                    <span className="block font-medium">{p.codigo}</span>
-                    <span className="block text-xs text-muted-foreground">{p.nombre}</span>
+                    <button
+                      type="button"
+                      onClick={() => setFicha(p.id)}
+                      aria-label={`Abrir la ficha de ${p.codigo}`}
+                      className={`block cursor-pointer rounded-sm text-left hover:underline ${anilloFoco}`}
+                    >
+                      <span className="block font-medium">{p.codigo}</span>
+                      <span className="block text-xs text-muted-foreground">{p.nombre}</span>
+                    </button>
                     <CodigosProducto numero={p.numero} barras={p.barras} className="block" />
                     {ETIQUETA_CLASE[p.clase] && (
                       <span className="mt-1 inline-block">
@@ -654,6 +668,18 @@ export function Levantamiento({
           </button>
         </div>
       )}
+      {/* Solo para consultar y dejar notas: lo que entra o sale se anota en el levantamiento. */}
+      <FichaStock
+        sku={productoFicha && { ...productoFicha, tipo: "simple" }}
+        bodegasPropias={[]}
+        bodegasExternas={[]}
+        ubicaciones={[]}
+        puedeEscribir={false}
+        puedeComentar={puedeEscribir}
+        codigoPais={codigoPais}
+        alCerrar={() => setFicha(null)}
+        alCambiar={() => router.refresh()}
+      />
     </div>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { fieldClassSm } from "@/components/ui/field";
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { SelectorTipoProducto } from "@/components/tabla/selector-tipo-producto";
@@ -96,7 +96,9 @@ export function ListaStock({
   esAdmin: boolean;
 }) {
   const router = useRouter();
-  const [abierto, setAbierto] = useState<string | null>(null);
+  // `?abrir=<producto>`: el enlace de los avisos de una nota (@mención o respuesta) abre su ficha.
+  const abrir = useSearchParams().get("abrir");
+  const [abierto, setAbierto] = useState<string | null>(abrir);
   const sku = abierto ? filas.find((f) => f.id === abierto) : undefined;
   const conPlataformas = lecturas !== null;
   const def = conPlataformas ? DEF_STOCK_PLATAFORMAS : DEF_STOCK;

@@ -13,11 +13,15 @@ import { pideMotivo, puedeMoverAMano } from "@/lib/wms/recepcion";
 import { ETIQUETA_PLATAFORMA } from "@/lib/wms/stock-plataformas";
 import { ComprasProducto } from "../producto/compras-producto";
 import { CorregirStock } from "./corregir-stock";
+import { NotasProducto } from "./notas-producto";
 import { ETIQUETA_TIPO_SKU, type FilaStock } from "./def-stock";
 import { DESCRIPCION_CUBETA } from "./descripciones-stock";
 import { PanelMovimiento, type BodegaOpcion, type UbicacionOpcion } from "./panel-movimiento";
 import { PanelRemision, PanelTransferencia } from "./panel-transferencia";
 import { obtenerStockDeSku, type EnvioDropi, type CajaDeBodega, type LoteStock, type MovimientoStock, type StockBodega } from "./stock-actions";
+
+/** Lo que la ficha necesita del producto (el Levantamiento la abre con sus propios datos). */
+export type SkuFicha = Pick<FilaStock, "id" | "codigo" | "nombre" | "numero" | "barras" | "tipo" | "clase" | "manejaVencimiento"> & { plataformas?: FilaStock["plataformas"] };
 
 const ETIQUETA_TIPO_MOV: Record<string, string> = { entrada: "Entrada", salida: "Salida", ajuste: "Ajuste", reserva: "Reserva", liberacion: "Liberación", traslado: "Traslado" };
 const ETIQUETA_CUBETA: Record<string, string> = {
@@ -73,10 +77,12 @@ export function FichaStock({
   bodegasExternas,
   conPlataformas = false,
   esAdmin = false,
+  puedeComentar = puedeEscribir,
   alCerrar,
   alCambiar,
 }: {
-  sku: FilaStock | undefined;
+  /** Lo que la ficha usa del producto: desde el Levantamiento llega sin lo de las plataformas. */
+  sku: SkuFicha | undefined;
   bodegasPropias: BodegaOpcion[];
   /** Las bodegas externas activas del país (Dropi, Effi…): a dónde va una remisión. */
   bodegasExternas: BodegaOpcion[];
@@ -88,6 +94,8 @@ export function FichaStock({
   conPlataformas?: boolean;
   /** Es administrador: en los países donde toda salida va con remisión, solo él hace salidas y ajustes a mano. */
   esAdmin?: boolean;
+  /** Si puede escribir notas en el producto (por omisión, quien puede escribir en el inventario). */
+  puedeComentar?: boolean;
   alCerrar: () => void;
   /** Se llama tras guardar un movimiento, para que la tabla vuelva a pedir sus totales. */
   alCambiar: () => void;
@@ -400,6 +408,10 @@ export function FichaStock({
               </Seccion>
             )}
           </div>
+          {/* Notas del producto y sus cambios (7 nov 2026, pedido de Hernán), al final como en Compras y Producto. */}
+          <section aria-label="Notas del producto" className="border-t border-border bg-muted/30">
+            <NotasProducto key={sku.id} id={sku.id} puedeComentar={puedeComentar} version={version} />
+          </section>
         </div>
       )}
     </Ventana>
