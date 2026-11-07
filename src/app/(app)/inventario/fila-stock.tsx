@@ -7,7 +7,7 @@ import { CodigosProducto } from "@/components/ui/codigos-producto";
 import { MiniaturaFoto } from "@/components/ui/miniatura-foto";
 import { Tooltip } from "@/components/ui/tooltip";
 import { ChevronRightIcon } from "@/lib/nav-icons";
-import { textoPlataformas } from "@/lib/wms/stock-plataformas";
+import { ETIQUETA_PLATAFORMA, textoPlataformas, type Plataforma } from "@/lib/wms/stock-plataformas";
 import { ETIQUETA_CLASE_SKU, ETIQUETA_TIPO_SKU, type FilaStock } from "./def-stock";
 import { DESCRIPCION_CUBETA } from "./descripciones-stock";
 
@@ -37,12 +37,18 @@ function Cifra({ nombre, n, apoyo, fuerte = false }: { nombre: string; n: number
   );
 }
 
-export function EncabezadoFilasStock({ conPlataformas = false }: { conPlataformas?: boolean }) {
+export function EncabezadoFilasStock({ conPlataformas = false, plataforma = null }: { conPlataformas?: boolean; plataforma?: Plataforma | null }) {
   const columnas = [
     { nombre: "Disponible", ayuda: DESCRIPCION_CUBETA.disponible },
     { nombre: "Físico", ayuda: DESCRIPCION_CUBETA.fisico },
     { nombre: "Cajas", ayuda: "Cuántas cajas hay guardadas. En la ficha se ve de qué tamaño son y en qué lugar. Si no suman el stock físico, sale aviso." },
-    ...(conPlataformas ? [{ nombre: "En plataformas", ayuda: "Lo que hay en Dropi, Effi y Drop según su última lectura. No se mezcla con el físico de tus bodegas." }] : []),
+    ...(conPlataformas
+      ? [
+          plataforma
+            ? { nombre: `En ${ETIQUETA_PLATAFORMA[plataforma]}`, ayuda: `Lo que hay en ${ETIQUETA_PLATAFORMA[plataforma]} según su última lectura. No se mezcla con el físico de tus bodegas.` }
+            : { nombre: "En plataformas", ayuda: "Lo que hay en Dropi, Effi y Drop según su última lectura. No se mezcla con el físico de tus bodegas." },
+        ]
+      : []),
     { nombre: "Reservado", ayuda: DESCRIPCION_CUBETA.reservado },
     { nombre: "En camino", ayuda: DESCRIPCION_CUBETA.enCamino },
     { nombre: "Fuera de venta", ayuda: "En la bodega pero sin poder venderse: dañado, en inspección, retenido o vencido." },
@@ -65,7 +71,7 @@ export function EncabezadoFilasStock({ conPlataformas = false }: { conPlataforma
 }
 
 /** Un SKU como fila: foto, nombre, SKU y lo que lo distingue, y sus cifras. Toda la fila abre su ficha, donde están el stock por bodega y los movimientos. */
-export function FilaStockLista({ f, alAbrir, conPlataformas = false }: { f: FilaStock; alAbrir: () => void; conPlataformas?: boolean }) {
+export function FilaStockLista({ f, alAbrir, conPlataformas = false, plataforma = null }: { f: FilaStock; alAbrir: () => void; conPlataformas?: boolean; plataforma?: Plataforma | null }) {
   const compuesto = f.tipo === "combo";
   const armables = compuesto && f.fisico !== 0 ? "armables" : undefined;
   const fuera = fueraDeVenta(f);
@@ -97,7 +103,12 @@ export function FilaStockLista({ f, alAbrir, conPlataformas = false }: { f: Fila
         <Cifra nombre="Disponible" n={f.disponible} fuerte apoyo={armables} />
         <Cifra nombre="Físico" n={f.fisico} apoyo={armables} />
         <Cifra nombre="Cajas" n={f.cajas} apoyo={f.cajas > 0 && f.unidadesEnCajas !== f.fisico ? <span className="text-warning">No cuadra</span> : undefined} />
-        {conPlataformas && <Cifra nombre="En plataformas" n={f.plataformas?.total ?? 0} apoyo={textoPlataformas(f.plataformas) || undefined} />}
+        {conPlataformas &&
+          (plataforma ? (
+            <Cifra nombre={`En ${ETIQUETA_PLATAFORMA[plataforma]}`} n={f.plataformas?.[plataforma] ?? 0} />
+          ) : (
+            <Cifra nombre="En plataformas" n={f.plataformas?.total ?? 0} apoyo={textoPlataformas(f.plataformas) || undefined} />
+          ))}
         <Cifra nombre="Reservado" n={f.reservado} />
         <Cifra nombre="En camino" n={f.enCamino} />
         <Cifra

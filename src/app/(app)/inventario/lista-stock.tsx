@@ -5,20 +5,21 @@ import { usePathname, useRouter } from "next/navigation";
 import { fieldClassSm } from "@/components/ui/field";
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { SelectorTipoProducto } from "@/components/tabla/selector-tipo-producto";
+import { useFiltros } from "@/components/tabla/ganchos";
 import { ListaDatos } from "@/components/tabla/lista-datos";
 import { InventarioIcon, ProductoIcon } from "@/lib/nav-icons";
 import type { NombreFilas } from "@/lib/tabla/pie";
 import { conStockPrimero } from "@/lib/wms/total-stock";
 import { formatearTiempoRelativo } from "@/lib/formato";
 import { ETIQUETA_PLATAFORMA, lecturaVieja, type LecturasPlataformas, type Plataforma } from "@/lib/wms/stock-plataformas";
-import { DEF_STOCK, DEF_STOCK_PLATAFORMAS, type FilaStock } from "./def-stock";
+import { DEF_STOCK, DEF_STOCK_PLATAFORMAS, PLATAFORMAS_STOCK, type FilaStock } from "./def-stock";
 import { FichaStock } from "./ficha-stock";
 import { EncabezadoFilasStock, FilaStockLista } from "./fila-stock";
 import type { BodegaOpcion, UbicacionOpcion } from "./panel-movimiento";
 import { TableroStock } from "./tablero-stock";
 
 const NOMBRE: NombreFilas = { singular: "SKU", plural: "SKUs" };
-const ICONOS: Record<string, IconoComp> = { sku: ProductoIcon, existencia: InventarioIcon, tipo: ProductoIcon, clase: ProductoIcon, fisico: InventarioIcon, plataformas: InventarioIcon, disponible: InventarioIcon, vencido: InventarioIcon, enCamino: InventarioIcon };
+const ICONOS: Record<string, IconoComp> = { sku: ProductoIcon, existencia: InventarioIcon, tipo: ProductoIcon, clase: ProductoIcon, fisico: InventarioIcon, plataformas: InventarioIcon, disponible: InventarioIcon, vencido: InventarioIcon, enCamino: InventarioIcon , plataforma: InventarioIcon };
 
 /** Elige de qué bodega se ve el stock (todas las del país, o una): se guarda en la dirección, `?bodega=`. */
 function SelectorBodega({ bodegas, elegida }: { bodegas: { id: string; nombre: string; externa: boolean }[]; elegida: string }) {
@@ -100,6 +101,10 @@ export function ListaStock({
   const conPlataformas = lecturas !== null;
   const def = conPlataformas ? DEF_STOCK_PLATAFORMAS : DEF_STOCK;
   const enOrden = useMemo(() => conStockPrimero(filas, (f) => f.plataformas?.total ?? 0), [filas]);
+  // Con una plataforma elegida (su tarjeta o el filtro «Plataforma»), la columna muestra solo lo de esa plataforma.
+  const [filtros] = useFiltros(def);
+  const filtroPlataforma = filtros.find((x) => x.campo === "plataforma")?.valor;
+  const plataforma = conPlataformas && filtroPlataforma?.tipo === "seleccion" && filtroPlataforma.valores.length === 1 && PLATAFORMAS_STOCK.includes(filtroPlataforma.valores[0] as Plataforma) ? (filtroPlataforma.valores[0] as Plataforma) : null;
 
   return (
     <>
@@ -110,8 +115,8 @@ export function ListaStock({
         nombre={NOMBRE}
         claveFila={(f) => f.id}
         variante="filas"
-        encabezado={<EncabezadoFilasStock conPlataformas={conPlataformas} />}
-        renderFila={(f) => <FilaStockLista f={f} conPlataformas={conPlataformas} alAbrir={() => setAbierto(f.id)} />}
+        encabezado={<EncabezadoFilasStock conPlataformas={conPlataformas} plataforma={plataforma} />}
+        renderFila={(f) => <FilaStockLista f={f} conPlataformas={conPlataformas} plataforma={plataforma} alAbrir={() => setAbierto(f.id)} />}
         formatearTotal={(n) => `${n.toLocaleString("es-PA")} u.`}
         accionPrincipal={<SelectorBodega bodegas={bodegas} elegida={bodegaElegida} />}
         resumen={(visibles) => (

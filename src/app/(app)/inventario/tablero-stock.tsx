@@ -4,12 +4,12 @@ import type { ComponentType } from "react";
 import { COLORES, type Color } from "@/components/panel/colores-tablero";
 import { useFiltros } from "@/components/tabla/ganchos";
 import { anilloFoco } from "@/components/ui/field";
-import { AlertaIcon, CalendarioIcon, CheckIcon, EnvioIcon, InventarioIcon } from "@/lib/nav-icons";
+import { AlertaIcon, CalendarioIcon, CheckIcon, DropIcon, DropiIcon, EffiIcon, EnvioIcon, InventarioIcon } from "@/lib/nav-icons";
 import { alternarAtajo, atajoActivo, type AtajoFiltro } from "@/lib/tabla/atajos";
 import type { DefTabla } from "@/lib/tabla/motor";
-import { textoPlataformas, type StockPlataformas } from "@/lib/wms/stock-plataformas";
+import { ETIQUETA_PLATAFORMA, type Plataforma } from "@/lib/wms/stock-plataformas";
 import { sumaSinCompuestos } from "@/lib/wms/total-stock";
-import { DEF_STOCK, existenciaDe, type FilaStock } from "./def-stock";
+import { DEF_STOCK, PLATAFORMAS_STOCK, existenciaDe, type FilaStock } from "./def-stock";
 
 const num = (n: number) => n.toLocaleString("es-PA");
 const conExistencia = (e: ReturnType<typeof existenciaDe>) => ({ campo: "existencia", valor: { tipo: "seleccion" as const, valores: [e] } });
@@ -27,24 +27,34 @@ interface Tarjeta {
   atajo?: AtajoFiltro;
 }
 
+/** El logo de cada plataforma, en el cuadro del ícono de su tarjeta. */
+const LOGO: Record<Plataforma, ComponentType<{ className?: string }>> = {
+  dropi: (p) => <DropiIcon marca {...p} />,
+  effi: (p) => <EffiIcon marca {...p} />,
+  drop: (p) => <DropIcon marca {...p} />,
+};
+
 /** Las tarjetas de lo que se está viendo: cambian con la bodega, la búsqueda y los filtros. Un compuesto no suma unidades, porque ya están en sus componentes. */
 function tarjetas(filas: FilaStock[], conPlataformas: boolean): Tarjeta[] {
   const conStock = filas.filter((f) => existenciaDe(f) === "con_stock");
   const compuestos = conStock.filter((f) => f.tipo === "combo").length;
-  // Aquí los compuestos sí suman: en una plataforma un compuesto es una publicación con su propio stock.
-  const enPlataforma = (valor: (p: StockPlataformas) => number) => filas.reduce((t, f) => t + (f.plataformas ? valor(f.plataformas) : 0), 0);
-  const enPlataformas: Tarjeta = {
-    id: "plataformas",
-    titulo: "En plataformas",
-    numero: enPlataforma((p) => p.total),
-    detalle: textoPlataformas({ dropi: enPlataforma((p) => p.dropi), effi: enPlataforma((p) => p.effi), drop: enPlataforma((p) => p.drop) }) || "Sin unidades",
-    icono: EnvioIcon,
-    color: "azul",
-    atajo: { id: "plataformas", etiqueta: "En plataformas", ayuda: "Filtrar la lista: con unidades en plataformas", filtro: desdeUna("plataformas") },
-  };
+  // Una tarjeta por plataforma (7 nov 2026, pedido de Hernán: «tienen que estar separados»). Cada una filtra la lista a lo que tiene unidades ahí, y elegir otra la
+  // reemplaza: es un solo campo («plataforma»). Aquí los compuestos sí suman: en una plataforma un compuesto es una publicación con su propio stock.
+  const porPlataforma = PLATAFORMAS_STOCK.map((p): Tarjeta => {
+    const con = filas.filter((f) => (f.plataformas?.[p] ?? 0) > 0);
+    return {
+      id: `en-${p}`,
+      titulo: `En ${ETIQUETA_PLATAFORMA[p]}`,
+      numero: con.reduce((t, f) => t + (f.plataformas?.[p] ?? 0), 0),
+      detalle: `${num(con.length)} ${con.length === 1 ? "producto" : "productos"}`,
+      icono: LOGO[p],
+      color: "azul",
+      atajo: { id: `en-${p}`, etiqueta: `En ${ETIQUETA_PLATAFORMA[p]}`, ayuda: `Filtrar la lista: solo lo que hay en ${ETIQUETA_PLATAFORMA[p]}`, filtro: { campo: "plataforma", valor: { tipo: "seleccion", valores: [p] } } },
+    };
+  });
   return [
     { id: "fisicas", titulo: "Unidades físicas", numero: sumaSinCompuestos(filas, (f) => f.fisico), detalle: "Sin contar compuestos", icono: InventarioIcon, color: "violeta" },
-    ...(conPlataformas ? [enPlataformas] : []),
+    ...(conPlataformas ? porPlataforma : []),
     { id: "disponibles", titulo: "Disponibles", numero: sumaSinCompuestos(filas, (f) => f.disponible), detalle: "Las que se pueden vender", icono: CheckIcon, color: "verde" },
     {
       id: "con-stock",
