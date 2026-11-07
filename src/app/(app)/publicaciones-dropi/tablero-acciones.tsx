@@ -88,7 +88,15 @@ const TARJETAS: Tarjeta[] = [
     cuenta: (f) => !!f.liquidacionDesde,
     atajo: { id: "liquidacion", etiqueta: "En liquidación", ayuda: "Filtrar la lista: en liquidación", filtro: seleccion("liquidacion", "si") },
   },
-  porAccion("vende_poco", VentasIcon, "violeta"),
+  {
+    ...porAccion("vende_poco", VentasIcon, "violeta"),
+    // Las que ya tuvieron un cambio de precio esperan 30 días con el precio nuevo antes de volver a contarse.
+    extra: (abiertas) => {
+      const n = abiertas.filter((f) => f.vendePocoVuelve).length;
+      return n ? `${n.toLocaleString("es-PA")} esperando: les cambiaste el precio hace menos de 30 días` : null;
+    },
+    extraColor: "verde",
+  },
   porAccion("ventas_caida", VentasIcon, "ambar"),
   porAccion("bajar_precio", AnalisisCompetenciaIcon, "rojo"),
   porAccion("verificar_dropshipper", DropshipperIcon, "azul"),
