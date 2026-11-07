@@ -135,7 +135,6 @@ export function FichaStock({
 
           {puedeEscribir && !esCombo && !esTest && (
             <div className="flex flex-wrap gap-2 border-y border-border px-5 py-3">
-              {/* Corregir un valor va en cada bodega de «Stock por bodega» (`CorregirStock`): se escribe el número correcto, no la diferencia. */}
               {(["entrada", "salida"] as const).filter((tipo) => puedeMoverAMano(tipo, codigoPais, esAdmin)).map((tipo) => (
                 <PanelMovimiento
                   key={`${sku.id}-${tipo}`}
@@ -152,6 +151,20 @@ export function FichaStock({
                   }}
                 />
               ))}
+              {/* Corregir un valor: se escribe el número correcto, no la diferencia, y por qué (reemplaza a «Ajuste»). */}
+              {puedeCorregir && (
+                <CorregirStock
+                  key={`${sku.id}-corregir-${version}`}
+                  skuId={sku.id}
+                  bodegas={datos && datos !== "error" ? datos.bodegas.filter((b) => b.tipo !== "externa").map((b) => ({ bodegaId: b.bodegaId, nombre: b.nombre, fisico: b.fisico })) : []}
+                  lotes={datos && datos !== "error" ? datos.lotes : []}
+                  manejaVencimiento={sku.manejaVencimiento}
+                  alGuardar={() => {
+                    setVersion((v) => v + 1);
+                    alCambiar();
+                  }}
+                />
+              )}
               <PanelTransferencia
                 key={`${sku.id}-transferir`}
                 skuId={sku.id}
@@ -220,11 +233,6 @@ export function FichaStock({
                             </Tooltip>
                           </th>
                         ))}
-                        {puedeCorregir && (
-                          <th scope="col" className="py-1.5 pl-1.5">
-                            <span className="sr-only">Corregir</span>
-                          </th>
-                        )}
                       </tr>
                     </thead>
                     <tbody>
@@ -239,25 +247,6 @@ export function FichaStock({
                               <Cifra n={n} />
                             </td>
                           ))}
-                          {puedeCorregir && (
-                            <td className="py-1 pl-1.5 text-right">
-                              {b.tipo !== "externa" && (
-                                <CorregirStock
-                                  key={`${sku.id}-${b.bodegaId}-${b.fisico}`}
-                                  skuId={sku.id}
-                                  bodegaId={b.bodegaId}
-                                  bodega={b.nombre}
-                                  fisico={b.fisico}
-                                  manejaVencimiento={sku.manejaVencimiento}
-                                  lotes={datos.lotes.filter((l) => l.bodegaId === b.bodegaId)}
-                                  alGuardar={() => {
-                                    setVersion((v) => v + 1);
-                                    alCambiar();
-                                  }}
-                                />
-                              )}
-                            </td>
-                          )}
                         </tr>
                       ))}
                     </tbody>
