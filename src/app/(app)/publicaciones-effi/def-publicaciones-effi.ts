@@ -33,7 +33,10 @@ export interface FilaPublicacionEffi {
   precioMinimo: number | null;
   /** El último costo de compra en Effi (si no hay, el manual). */
   costo: number | null;
+  /** El fulfillment de Effi que cuenta en el margen; null si no está puesto o si lo paga el dropshipper. */
   fulfillment: number | null;
+  /** Quién paga el fulfillment de Effi (migración 0247): con «dropshipper» no se toma en cuenta. */
+  fulfillmentPaga: "nosotros" | "dropshipper";
   utilidad: number | null;
   margen: number | null;
   /** Unidades en la bodega Principal; null si Effi no la lista para este artículo. */
