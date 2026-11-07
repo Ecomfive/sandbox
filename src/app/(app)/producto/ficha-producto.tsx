@@ -5,7 +5,6 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { usePuedeAbrir } from "@/components/modulos-contexto";
 import { anilloFoco } from "@/components/ui/field";
-import { HistorialGenerico } from "@/components/ui/historial-generico";
 import { Seccion } from "@/components/ui/seccion-ficha";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/toast";
@@ -15,7 +14,8 @@ import { CalendarioIcon, CatalogoIcon, ComprasIcon, EnlaceIcon, EnvioIcon, Flech
 import { BloqueCompetencia } from "@/components/competencia/piezas-competencia";
 import { ResultadoTestProducto } from "./test-producto";
 import { formatearFecha } from "@/lib/formato";
-import { cambiarClaseProducto, eliminarProducto, obtenerHistorialProducto } from "./actions";
+import { NotasProducto } from "../inventario/notas-producto";
+import { cambiarClaseProducto, eliminarProducto } from "./actions";
 import { CodigoBarrasProducto } from "./codigo-barras-producto";
 import { VencimientoProducto } from "./vencimiento-producto";
 import { EnvioProductoBloque } from "./envio-producto";
@@ -71,7 +71,6 @@ function BotonNavegar({ texto, icono: Icono, activo, alHacerClic }: { texto: str
 export function FichaProducto({
   producto,
   orden,
-  codigoPais,
   puedeEscribir,
   puedeEliminar,
   referenciasTest,
@@ -82,7 +81,7 @@ export function FichaProducto({
   producto: FilaProducto | undefined;
   /** Las claves de los productos en el orden de la tabla. */
   orden: string[];
-  /** El producto es igual para todos los países; el código de país solo da formato a las fechas de la actividad. */
+  /** El producto es igual para todos los países (las notas dan formato a sus fechas por su cuenta). */
   codigoPais: string;
   puedeEscribir: boolean;
   /** Solo un administrador con edición en Producto: elimina el producto de verdad (si nada depende de él) o lo une con un duplicado. */
@@ -384,7 +383,10 @@ export function FichaProducto({
             </div>
           </div>
           <section aria-label="Actividad del producto" className="border-t border-border bg-muted/30">
-          <HistorialGenerico id={producto.id} codigoPais={codigoPais} version={version} obtener={obtenerHistorialProducto} />
+          {/* Notas con fotos y videos reales del producto, y debajo sus cambios: las mismas que en la ficha del inventario (7 nov 2026, pedido de Hernán). */}
+          <div className="p-5">
+            <NotasProducto key={producto.id} id={producto.id} puedeComentar={puedeEscribir} version={version} />
+          </div>
           </section>
         </div>
       )}

@@ -5,7 +5,24 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { pedirExtension, type AvanceLector, type SesionDropi } from "@/lib/dropi-actualizar/extension";
-import { CUENTAS, GRUPOS, LECTORES, LECTORES_PAIS, PARTES, PRIMERA_LECTURA_DESDE, archivoSubido, diasPrimeraLectura, lectoresDe, sesionValida, type ClaveLector, type ClaveParte } from "@/lib/dropi-actualizar/partes";
+import {
+  CUENTAS,
+  GRUPOS,
+  LECTORES,
+  LECTORES_PAIS,
+  PARTES,
+  PRIMERA_LECTURA_DESDE,
+  archivoSubido,
+  diasPrimeraLectura,
+  lectoresDe,
+  nombreSitio,
+  sesionValida,
+  sinExtension,
+  sitioDe,
+  type ClaveLector,
+  type ClaveParte,
+  type Sitio,
+} from "@/lib/dropi-actualizar/partes";
 import { archivosSubidos, empezarActualizacion, marcarPartesConError, procesarParte, subidasDeLector, terminarActualizacion } from "./actions";
 import type { Corrida, UltimaParte } from "./datos";
 
@@ -13,9 +30,11 @@ type EstadoExtension = "buscando" | "lista" | "no_instalada" | "recargar";
 /** Los países que se actualizan desde aquí con la cuenta de proveedor. */
 type PaisProveedor = "pa" | "cr" | "mx";
 const PAISES: PaisProveedor[] = ["pa", "cr", "mx"];
+/** Las pestañas cuya sesión se revisa: las de Dropi de cada país y la de Drop (Costa Rica, 7 nov 2026). */
+const SITIOS: Sitio[] = ["pa", "cr", "mx", "drop"];
 
-/** Costa Rica llegó a la extensión en la 0.3.0 (28 oct 2026) y México en la 0.4.0 (30 oct 2026): una anterior no sabe de ese país. */
-const VERSION_PARA: Record<PaisProveedor, string> = { pa: "0.0.0", cr: "0.3.0", mx: "0.4.0" };
+/** Costa Rica llegó a la extensión en la 0.3.0 (28 oct 2026), México en la 0.4.0 (30 oct 2026) y Drop en la 0.6.0 (7 nov 2026): una anterior no sabe de ese sitio. */
+const VERSION_PARA: Record<Sitio, string> = { pa: "0.0.0", cr: "0.3.0", mx: "0.4.0", drop: "0.6.0" };
 /** «0.2.3» es anterior a «0.3.0». */
 const versionAnterior = (tiene: string | null, pide: string) => {
   if (!tiene) return false;
@@ -35,8 +54,8 @@ interface Corriendo {
   pasos: Partial<Record<ClaveParte, Paso>>;
   /** Lo que muestra la barra: «Leyendo pedidos: 4.200…». */
   avance: string;
-  /** El país cuya sesión falta (la pestaña queda al frente y se avisa), o null. */
-  esperandoSesion: PaisProveedor | null;
+  /** La pestaña (Dropi de un país, o Drop) cuya sesión falta (queda al frente y se avisa), o null. */
+  esperandoSesion: Sitio | null;
   terminado: string | null;
 }
 
@@ -52,6 +71,13 @@ const VIGENCIA_MS = 40 * 60000;
 
 /** Lo que dice la barra mientras un lector trabaja en la pestaña de Dropi. */
 function textoAvance(lector: ClaveLector, a: AvanceLector | null): string {
+  if (lector === "drop_cr") {
+    if (!a) return "Arrancando en la pestaña de Drop…";
+    if (a.fase === "productos") return `Leyendo «Mis productos» en Drop: ${n(a.productos)}…`;
+    if (a.fase === "pedidos") return `Leyendo los pedidos de Drop: ${n(a.pedidos)}…`;
+    if (a.fase === "subida") return "Pasando lo leído al sistema…";
+    return "Leyendo en Drop…";
+  }
   if (!a) return "Arrancando en la pestaña de Dropi…";
   if (lector.startsWith("proveedor")) {
     if (a.fase === "pedidos") return `Leyendo pedidos en Dropi: ${n(a.pedidos)}…`;
@@ -79,9 +105,9 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
   const router = useRouter();
   const [extension, setExtension] = useState<EstadoExtension>("buscando");
   const [version, setVersion] = useState<string | null>(null);
-  const [sesiones, setSesiones] = useState<Record<PaisProveedor, SesionDropi | null>>({ pa: null, cr: null, mx: null });
+  const [sesiones, setSesiones] = useState<Record<Sitio, SesionDropi | null>>({ pa: null, cr: null, mx: null, drop: null });
   /** Por qué no se pudo revisar la sesión de un país (la extensión no respondió); antes se callaba y la tarjeta quedaba en «Revisando…». */
-  const [fallos, setFallos] = useState<Record<PaisProveedor, string | null>>({ pa: null, cr: null, mx: null });
+  const [fallos, setFallos] = useState<Record<Sitio, string | null>>({ pa: null, cr: null, mx: null, drop: null });
   const [corriendo, setCorriendo] = useState<Corriendo | null>(null);
   const [eligiendo, setEligiendo] = useState(false);
   const [elegidos, setElegidos] = useState<ClaveLector[]>([...LECTORES_PAIS.pa, ...LECTORES_PAIS.cr, ...LECTORES_PAIS.mx]);
@@ -94,7 +120,7 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
   const [empezando, setEmpezando] = useState(false);
   const retomada = useRef(false);
 
-  const revisarSesion = useCallback(async (pais: PaisProveedor, abrir: boolean) => {
+  const revisarSesion = useCallback(async (pais: Sitio, abrir: boolean) => {
     try {
       const s = await pedirExtension<SesionDropi>({ tipo: "sesion", pais, abrir }, abrir ? 45000 : 10000);
       setSesiones((x) => ({ ...x, [pais]: s }));
@@ -116,7 +142,7 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
           if (!vivo) return;
           setVersion(r.version);
           setExtension("lista");
-          for (const p of PAISES) await revisarSesion(p, false).catch(() => null);
+          for (const p of SITIOS) await revisarSesion(p, false).catch(() => null);
           return;
         } catch (e) {
           // La extensión se recargó con esta página abierta: el puente viejo ya no llega a ella.
@@ -135,22 +161,22 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
   }, [revisarSesion]);
 
   const ponerPaso = (clave: ClaveParte, paso: Paso) => setCorriendo((c) => (c ? { ...c, pasos: { ...c.pasos, [clave]: paso } } : c));
-  const ponerAvance = (avance: string, esperandoSesion: PaisProveedor | null = null) => setCorriendo((c) => (c ? { ...c, avance, esperandoSesion } : c));
+  const ponerAvance = (avance: string, esperandoSesion: Sitio | null = null) => setCorriendo((c) => (c ? { ...c, avance, esperandoSesion } : c));
 
-  /** Espera a que la pestaña del país tenga la sesión de proveedor: si falta, la pone al frente y avisa. */
-  async function asegurarSesion(pais: PaisProveedor): Promise<boolean> {
+  /** Espera a que la pestaña del país (o la de Drop) tenga la sesión de proveedor: si falta, la pone al frente y avisa. */
+  async function asegurarSesion(pais: Sitio): Promise<boolean> {
     let mostrada = false;
     while (!detener.current) {
       const s = await revisarSesion(pais, true).catch(() => null);
       if (sesionValida(pais, s) === "ok") {
-        ponerAvance(`Sesión de Dropi ${CUENTAS[pais].nombre} lista.`);
+        ponerAvance(`Sesión de ${nombreSitio(pais)} lista.`);
         return true;
       }
       if (!mostrada) {
         await pedirExtension({ tipo: "mostrar", pais }).catch(() => null);
         mostrada = true;
       }
-      ponerAvance(`Esperando que inicies sesión en Dropi ${CUENTAS[pais].nombre}…`, pais);
+      ponerAvance(`Esperando que inicies sesión en ${nombreSitio(pais)}…`, pais);
       await esperar(3000);
     }
     return false;
@@ -189,19 +215,21 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
       const subidos = retomando ? ((await archivosSubidos(id).catch(() => null))?.archivos ?? []) : [];
       const yaLeido = retomando && LECTORES[lector].archivos.every((a) => subidos.includes(archivoSubido(lector, a)));
       const pais = LECTORES[lector].pais as PaisProveedor;
+      const sitio = sitioDe(lector);
       try {
-        if (!yaLeido) {
+        // Effi no pasa por la extensión: el servidor lo lee por la API al guardar su parte.
+        if (!yaLeido && !sinExtension(lector)) {
           // Al retomar: ¿la pestaña de Dropi sigue leyendo? Entonces se espera sin lanzar otra lectura.
           const previo = retomando ? await pedirExtension<AvanceLector | null>({ tipo: "avance", lector }).catch(() => null) : null;
           if (!previo || previo.fin) {
-            if (!(await asegurarSesion(pais))) break;
+            if (!(await asegurarSesion(sitio))) break;
             let subida = subidas[lector];
             if (!subida) {
               const s = await subidasDeLector(id, lector).catch(() => ({ error: "No se pudo preparar la subida.", subida: undefined }));
               if (s.error || !s.subida) throw new Error(s.error ?? "No se pudo preparar la subida.");
               subida = s.subida;
             }
-            for (const p of suyas) ponerPaso(p, { estado: "leyendo", detalle: "Leyendo en Dropi…" });
+            for (const p of suyas) ponerPaso(p, { estado: "leyendo", detalle: `Leyendo en ${sitio === "drop" ? "Drop" : "Dropi"}…` });
             // La primera vez que se leen los pedidos de un país, o con «Traer historial», desde su fecha de arranque (Costa Rica: 1 abr 2026;
             // México: 1 jul 2024).
             const primera =
@@ -218,7 +246,7 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
       }
       if (fallo) {
         const sesion = /401|sesi[oó]n/i.test(fallo);
-        for (const p of suyas) ponerPaso(p, { estado: "error", detalle: sesion ? "La sesión de Dropi venció en medio: vuelve a pulsar «Actualizar»." : fallo });
+        for (const p of suyas) ponerPaso(p, { estado: "error", detalle: sesion ? `La sesión de ${sitio === "drop" ? "Drop" : "Dropi"} venció en medio: vuelve a pulsar «Actualizar».` : fallo });
         await marcarPartesConError(id, suyas, fallo).catch(() => null);
         continue;
       }
@@ -291,7 +319,7 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
       </p>
     );
 
-  const estadoDe = (p: PaisProveedor) => {
+  const estadoDe = (p: Sitio) => {
     const s = sesiones[p];
     return s ? (s.pestana ? sesionValida(p, s) : "sin_pestana") : null;
   };
@@ -307,8 +335,8 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
           </Link>
           <h1 className="m-0 text-2xl font-bold">{ocupado ? "Actualizando datos…" : "Actualizar datos"}</h1>
           <p className="m-0 text-sm text-muted-foreground">
-            Trae de Dropi los pedidos, la cartera, los retiros, el stock y las ventas, de un país a la vez. Solo lee: no crea ni cambia nada en Dropi ni en tus
-            publicaciones (la primera vez de un país crea sus publicaciones).
+            Trae de Dropi los pedidos, la cartera, los retiros, el stock y las ventas, de un país a la vez; en Costa Rica, también Drop (productos, stock y pedidos) y
+            Effi (por su API). Solo lee: no crea ni cambia nada en Dropi, Drop, Effi ni en tus publicaciones (la primera vez de un país crea sus publicaciones).
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -410,9 +438,11 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
       {corriendo?.esperandoSesion && (
         <div role="alert" className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-warning/50 bg-warning/10 px-5 py-4">
           <div className="flex flex-col gap-1 text-sm">
-            <span className="font-semibold">Falta iniciar sesión en Dropi {CUENTAS[corriendo.esperandoSesion].nombre}</span>
+            <span className="font-semibold">Falta iniciar sesión en {nombreSitio(corriendo.esperandoSesion)}</span>
             <span>
-              Te dejamos la pestaña de Dropi al frente. Entra con la {CUENTAS[corriendo.esperandoSesion].cuenta} (con el código de dos pasos) y la actualización sigue sola.
+              {corriendo.esperandoSesion === "drop"
+                ? `Te dejamos la pestaña de Drop al frente. Entra con la ${CUENTAS.drop.cuenta} (no la de dropshipper) y la actualización sigue sola.`
+                : `Te dejamos la pestaña de Dropi al frente. Entra con la ${CUENTAS[corriendo.esperandoSesion].cuenta} (con el código de dos pasos) y la actualización sigue sola.`}
             </span>
           </div>
           <button type="button" className={botonPrincipal} onClick={() => void pedirExtension({ tipo: "mostrar", pais: corriendo.esperandoSesion! }).catch(() => null)}>
@@ -422,18 +452,18 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
       )}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {PAISES.map((p) => (
+        {SITIOS.map((p) => (
           <TarjetaCuenta
             key={p}
-            sigla={p.toUpperCase()}
-            titulo={CUENTAS[p].nombre}
+            sigla={p === "drop" ? "CR" : p.toUpperCase()}
+            titulo={p === "drop" ? "Drop · Costa Rica" : CUENTAS[p].nombre}
             detalle={`${CUENTAS[p].origen.replace("https://", "")} · ${CUENTAS[p].cuenta}`}
             cuenta={CUENTAS[p].cuenta}
             estado={estadoDe(p)}
             vence={sesiones[p]?.vence ?? null}
             fallo={fallos[p]}
             historial={
-              PRIMERA_LECTURA_DESDE[p] && extension === "lista" && !ocupado
+              p !== "drop" && PRIMERA_LECTURA_DESDE[p] && extension === "lista" && !ocupado
                 ? { desde: PRIMERA_LECTURA_DESDE[p]!, alPulsar: () => void actualizar([p === "pa" ? "proveedor" : (`proveedor_${p}` as ClaveLector)], p) }
                 : null
             }
@@ -449,7 +479,9 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
             }
             alRevisar={extension === "lista" ? () => void revisarSesion(p, false).catch(() => null) : undefined}
             que={
-              p !== "pa" && PRIMERA_LECTURA_DESDE[p] && !ultima[`pedidos_${p}` as ClaveParte]
+              p === "drop"
+                ? "Mis productos (precio y stock) y los pedidos (ventas por día). Effi se lee solo, por su API"
+                : p !== "pa" && PRIMERA_LECTURA_DESDE[p] && !ultima[`pedidos_${p}` as ClaveParte]
                 ? `La primera vez trae todo el historial: pedidos y cartera desde el ${new Date(`${PRIMERA_LECTURA_DESDE[p]}T12:00:00`).toLocaleDateString("es-PA", { day: "numeric", month: "long", year: "numeric" })}, retiros, stock y ventas · tarda más`
                 : "Pedidos, cartera, retiros, stock y ventas"
             }

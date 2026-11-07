@@ -4,14 +4,14 @@
 // nunca llega aquí: la extensión solo responde si hay sesión, de qué cuenta y cuándo vence.
 // Solo en el navegador.
 
-import type { ClaveLector, CodigoPaisDropi } from "./partes";
+import type { ClaveLector, Sitio } from "./partes";
 
 const CANAL = "ecomfive-dropi";
 
 export type MensajeExtension =
   | { tipo: "hola" }
-  | { tipo: "sesion"; pais: CodigoPaisDropi | "tw"; abrir: boolean }
-  | { tipo: "mostrar"; pais: CodigoPaisDropi | "tw" }
+  | { tipo: "sesion"; pais: Sitio | "tw"; abrir: boolean }
+  | { tipo: "mostrar"; pais: Sitio | "tw" }
   | { tipo: "lanzar"; lector: ClaveLector | "tuwinner"; subida: Record<string, string>; dias?: { pedidos: number; cartera: number } | null }
   | { tipo: "avance"; lector: ClaveLector | "tuwinner" };
 

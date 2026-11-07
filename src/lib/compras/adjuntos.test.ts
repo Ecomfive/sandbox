@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { detectarAdjunto, MAX_BYTES_ADJUNTO, motivoDeRechazo, nombreSeguro } from "./adjuntos";
+import { detectarAdjunto, MAX_BYTES_ADJUNTO, MAX_BYTES_VIDEO, motivoDeRechazo, nombreSeguro } from "./adjuntos";
 
 const bytes = (...partes: (number | string)[]) => Uint8Array.from(partes.flatMap((p) => (typeof p === "number" ? [p] : [...p].map((c) => c.charCodeAt(0)))));
 
@@ -21,6 +21,29 @@ describe("motivoDeRechazo", () => {
   it("rechaza lo vacío y lo muy pesado", () => {
     assert.match(motivoDeRechazo({ tipo: "image/png", tamano: 0 }) ?? "", /vacío/);
     assert.match(motivoDeRechazo({ tipo: "image/png", tamano: MAX_BYTES_ADJUNTO + 1 }) ?? "", /pesa más/);
+  });
+});
+
+describe("videos", () => {
+  const mp4 = bytes(0, 0, 0, 0x20, "ftypisom", 0, 0, 2, 0);
+  const mov = bytes(0, 0, 0, 0x14, "ftypqt  ", 0, 0, 0, 0);
+  const heic = bytes(0, 0, 0, 0x18, "ftypheic", 0, 0, 0, 0);
+  const webm = bytes(0x1a, 0x45, 0xdf, 0xa3, 0x9f, 0x42, 0x86, 0x81, 0x01, 0x42, 0x82, 0x84, "webm");
+  it("solo se aceptan donde el módulo los pide", () => {
+    assert.equal(detectarAdjunto(mp4, "video.mp4"), null);
+    assert.match(motivoDeRechazo({ tipo: "video/mp4", tamano: 1000, nombre: "video.mp4" }) ?? "", /imágenes/);
+    assert.equal(motivoDeRechazo({ tipo: "video/mp4", tamano: 1000, nombre: "video.mp4" }, { videos: true }), null);
+  });
+  it("reconoce MP4, MOV y WebM por su contenido, y no confunde una foto HEIC", () => {
+    assert.deepEqual(detectarAdjunto(mp4, "x", { videos: true }), { clase: "video", tipo: "video/mp4", extension: "mp4" });
+    assert.deepEqual(detectarAdjunto(mov, "x", { videos: true }), { clase: "video", tipo: "video/quicktime", extension: "mov" });
+    assert.deepEqual(detectarAdjunto(webm, "x", { videos: true }), { clase: "video", tipo: "video/webm", extension: "webm" });
+    assert.equal(detectarAdjunto(heic, "foto.heic", { videos: true }), null);
+  });
+  it("un video puede pesar más que un documento, hasta su propio máximo", () => {
+    assert.equal(motivoDeRechazo({ tipo: "video/quicktime", tamano: MAX_BYTES_ADJUNTO + 1, nombre: "IMG_1.MOV" }, { videos: true }), null);
+    assert.match(motivoDeRechazo({ tipo: "video/mp4", tamano: MAX_BYTES_VIDEO + 1, nombre: "v.mp4" }, { videos: true }) ?? "", /video pesa más/);
+    assert.match(motivoDeRechazo({ tipo: "application/pdf", tamano: MAX_BYTES_ADJUNTO + 1, nombre: "a.pdf" }, { videos: true }) ?? "", /archivo pesa más/);
   });
 });
 

@@ -19,6 +19,7 @@ export function calcularCambios(
 export const ETIQUETA_ACCION: Record<string, string> = {
   aviso_inactividad: "Cambió el aviso de inactividad",
   correccion_inventario: "Corrigió el inventario",
+  eliminar_nota_producto: "Eliminó una nota",
   vincular_publicacion_effi: "Vinculó una publicación de Effi",
   desvincular_publicacion_effi: "Desvinculó una publicación de Effi",
   decidir_producto_pais: "Decidió en Por país",

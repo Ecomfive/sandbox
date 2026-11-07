@@ -1,7 +1,22 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { CUENTAS, LECTORES, LECTORES_PAIS, MAX_DIAS_LECTURA, PARTES, archivoSubido, diasPrimeraLectura, lectoresDe, puedeActualizarDropi, sesionCatalogoMx, sesionValida } from "./partes";
+import {
+  CUENTAS,
+  LECTORES,
+  LECTORES_PAIS,
+  MAX_DIAS_LECTURA,
+  PARTES,
+  archivoSubido,
+  diasPrimeraLectura,
+  lectoresDe,
+  nombreSitio,
+  puedeActualizarDropi,
+  sesionCatalogoMx,
+  sesionValida,
+  sinExtension,
+  sitioDe,
+} from "./partes";
 
 const ext = (f: string) => readFileSync(`extension/ecomfive-dropi/${f}`, "utf8");
 
@@ -13,7 +28,10 @@ test("los lectores de la extensión son copias exactas de los que usan las tarea
 test("la extensión conoce los mismos lectores que el panel (archivo, función, avance y archivos que sube)", () => {
   const fondo = ext("fondo.js");
   for (const [clave, l] of Object.entries(LECTORES)) {
-    assert.ok(fondo.includes(`${clave}: { pais: "${l.pais}", archivo: "${l.archivo}", funcion: "${l.funcion}", estado: "${l.estado}", archivos: ${JSON.stringify(l.archivos).replace(/,/g, ", ")} }`), clave);
+    // Effi no pasa por la extensión: el servidor lo lee por su API.
+    if (sinExtension(clave as keyof typeof LECTORES)) continue;
+    // En la extensión, «pais» es la pestaña donde corre: la de Dropi del país o la de Drop.
+    assert.ok(fondo.includes(`${clave}: { pais: "${sitioDe(clave as keyof typeof LECTORES)}", archivo: "${l.archivo}", funcion: "${l.funcion}", estado: "${l.estado}", archivos: ${JSON.stringify(l.archivos).replace(/,/g, ", ")} }`), clave);
     assert.ok(ext(l.archivo).includes(`async function ${l.funcion}(`), l.archivo);
   }
 });
@@ -33,7 +51,7 @@ test("la extensión solo sube a la carpeta temporal del sistema en SU proyecto d
 
 test("el puente solo va en las páginas del sistema y la extensión solo entra a Dropi", () => {
   const m = JSON.parse(ext("manifest.json")) as { host_permissions: string[]; content_scripts: { matches: string[] }[]; permissions: string[] };
-  assert.deepEqual(m.host_permissions, ["https://app.dropi.pa/*", "https://app.dropi.cr/*", "https://app.dropi.mx/*", "https://app.tuwinner.com/*"]);
+  assert.deepEqual(m.host_permissions, ["https://app.dropi.pa/*", "https://app.dropi.cr/*", "https://app.dropi.mx/*", "https://app.tuwinner.com/*", "https://app.soydrop.com/*"]);
   // Solo la página del sistema: ninguna página de localhost puede usar la sesión de Dropi (auditoría 27 oct 2026).
   assert.deepEqual(m.content_scripts[0].matches, ["https://mom-beta-proveduria.vercel.app/*"]);
   assert.ok(ext("fondo.js").includes(`remitente.origin !== SISTEMA`));
@@ -73,7 +91,7 @@ test("México en «Actualizar datos»: la cuenta de proveedor de app.dropi.mx, s
 
 test("Costa Rica: sus partes, sus lectores en app.dropi.cr y sus archivos con otro nombre que los de Panamá", () => {
   const cr = PARTES.filter((p) => p.pais === "cr");
-  assert.deepEqual(cr.map((p) => p.tipo), ["pedidos", "cartera", "retiros", "stock", "ventas"]);
+  assert.deepEqual(cr.map((p) => p.tipo), ["pedidos", "cartera", "retiros", "stock", "ventas", "drop_productos", "drop_ventas", "effi"]);
   assert.deepEqual(lectoresDe(cr.map((p) => p.clave)), LECTORES_PAIS.cr);
   assert.deepEqual(lectoresDe(["ventas_cr", "pedidos"]), ["proveedor", "ventas_cr"]);
   assert.equal(CUENTAS.cr.origen, "https://app.dropi.cr");
@@ -85,6 +103,27 @@ test("Costa Rica: sus partes, sus lectores en app.dropi.cr y sus archivos con ot
   const ahora = Date.parse("2026-10-28T15:00:00Z");
   assert.equal(sesionValida("cr", { hay: true, tipoUsuario: "SUPPLIER", tienda: "ECOMFIVE CR", vence: null }, ahora), "ok");
   assert.equal(sesionValida("cr", { hay: true, tipoUsuario: "DROPSHIPPER", tienda: null, vence: null }, ahora), "otra_cuenta");
+});
+
+test("Costa Rica también trae Drop (con la cuenta de proveedor de Drop) y Effi (por la API, sin extensión)", () => {
+  assert.deepEqual(LECTORES_PAIS.cr, ["proveedor_cr", "ventas_cr", "drop_cr", "effi_cr"]);
+  assert.equal(sitioDe("drop_cr"), "drop");
+  assert.equal(sitioDe("ventas_cr"), "cr");
+  assert.ok(sinExtension("effi_cr"));
+  assert.ok(!sinExtension("drop_cr"));
+  assert.deepEqual(LECTORES.effi_cr.archivos, []);
+  // Sus archivos no pisan los de Dropi Costa Rica («pedidoscr») y pasan el filtro de la extensión.
+  assert.deepEqual(LECTORES.drop_cr.archivos.map((a) => archivoSubido("drop_cr", a)), ["dropcr", "dropventascr"]);
+  for (const a of LECTORES.drop_cr.archivos) assert.match(`${archivoSubido("drop_cr", a)}.json`, /^[a-z]+\.json$/);
+  assert.equal(CUENTAS.drop.origen, "https://app.soydrop.com");
+  assert.equal(nombreSitio("drop"), "Drop");
+  assert.equal(nombreSitio("cr"), "Dropi Costa Rica");
+  assert.equal(sesionValida("drop", { hay: true, tipoUsuario: "VENDOR", tienda: null, vence: null }), "ok");
+  assert.equal(sesionValida("drop", { hay: true, tipoUsuario: "DROPSHIPPER", tienda: null, vence: null }), "otra_cuenta");
+  assert.equal(sesionValida("drop", { hay: false, tipoUsuario: null, tienda: null, vence: null }), "sin_sesion");
+  // El lector de Drop no sube nada del cliente.
+  const lector = ext("lectores/drop.js");
+  for (const campo of ["customer", "address", "phone", "email"]) assert.ok(!new RegExp(`o\\.${campo}|\\.${campo}\\b`).test(lector.replace(/^\/\/.*$/gm, "")), campo);
 });
 
 test("la primera lectura (y «Traer historial») de Costa Rica trae desde el 1 de abril de 2026; Panamá, los días de siempre", () => {

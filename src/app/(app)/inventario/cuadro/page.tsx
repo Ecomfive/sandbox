@@ -89,15 +89,20 @@ export default async function CuadroPage({ searchParams }: { searchParams: Promi
       ventasHasta = (dias ?? []).reduce<string | null>((a, v) => (!a || v.dia > a ? v.dia : a), null);
     } else if (CON_VENTAS[plataforma]) {
       // Effi (migración 0244): remisiones y devoluciones de la bodega Principal por artículo y día; el artículo se pasa a producto por su publicación de Effi.
+      // Drop (7 nov 2026): lo despachado y lo «No entregado» por producto de Drop y día; el producto de Drop se pasa a producto por su publicación de Drop.
       const [{ data: dias }, { data: pubs }] = await Promise.all([
         traerTodasConError<{ producto_id: string; dia: string; salidas: number; devueltas: number }>((d, h) =>
           supabase.from("plataforma_ventas_diarias").select("producto_id, dia, salidas, devueltas").eq("pais_id", pais.id).eq("plataforma", plataforma).gte("dia", desde).order("dia").order("producto_id").range(d, h),
         ),
-        traerTodasConError<{ effi_id: string; sku_maestro_id: string }>((d, h) =>
-          supabase.from("effi_publicaciones").select("effi_id, sku_maestro_id").eq("pais_id", pais.id).not("sku_maestro_id", "is", null).order("id").range(d, h),
-        ),
+        plataforma === "drop"
+          ? traerTodasConError<{ id_plataforma: string; sku_maestro_id: string }>((d, h) =>
+              supabase.from("drop_publicaciones").select("id_plataforma:drop_id, sku_maestro_id").eq("pais_id", pais.id).not("sku_maestro_id", "is", null).order("id").range(d, h),
+            )
+          : traerTodasConError<{ id_plataforma: string; sku_maestro_id: string }>((d, h) =>
+              supabase.from("effi_publicaciones").select("id_plataforma:effi_id, sku_maestro_id").eq("pais_id", pais.id).not("sku_maestro_id", "is", null).order("id").range(d, h),
+            ),
       ]);
-      const skuDeEffi = new Map((pubs ?? []).map((p) => [String(p.effi_id), p.sku_maestro_id]));
+      const skuDeEffi = new Map((pubs ?? []).map((p) => [String(p.id_plataforma), p.sku_maestro_id]));
       ventas = (dias ?? []).flatMap((v) => {
         const sku = skuDeEffi.get(v.producto_id);
         return sku ? [{ sku, pedidas: v.salidas, canceladas: 0, rechazadas: 0, devueltas: v.devueltas }] : [];

@@ -9,8 +9,8 @@ import type { Plataforma } from "./stock-plataformas";
 /** El código de la bodega externa de cada plataforma. Drop es la bodega «Drop (Boxfull)». */
 export const BODEGA_DE_PLATAFORMA: Record<Plataforma, string> = { dropi: "dropi", effi: "effi", drop: "boxfull" };
 
-/** De Dropi y de Effi (migración 0244) se conocen las ventas por producto y día: en Drop, la diferencia incluye lo vendido. */
-export const CON_VENTAS: Record<Plataforma, boolean> = { dropi: true, effi: true, drop: false };
+/** De las tres se conocen las ventas por producto y día: Dropi, Effi (migración 0244, por su API) y Drop (7 nov 2026, con «Actualizar datos» de Costa Rica). */
+export const CON_VENTAS: Record<Plataforma, boolean> = { dropi: true, effi: true, drop: true };
 
 export interface RemisionCuadro {
   sku: string;
