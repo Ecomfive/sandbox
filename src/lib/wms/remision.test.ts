@@ -73,3 +73,14 @@ test("una línea anulada no cuenta en la remisión; si se anulan todas, la remis
   const [todas] = agruparRemisiones([l("a", "anulado")]);
   assert.deepEqual([todas.estado, todas.productos, todas.enviadas, todas.porConfirmar], ["anulada", 0, 0, 0]);
 });
+
+test("las cajas elegidas pueden llevar unidades sueltas de una caja que se abre", () => {
+  const C = "0194f0a2-0000-7000-8000-00000000000c";
+  const D = "0194f0a2-0000-7000-8000-00000000000d";
+  assert.deepEqual(revisarLineasRemision([{ sku: A, cantidad: 200, cajas: [{ id: C, cajas: 4 }, { id: D, cajas: 0, sueltas: 8 }] }]), {
+    lineas: [{ sku: A, cantidad: 200, cajas: [{ id: C, cajas: 4 }, { id: D, cajas: 0, sueltas: 8 }] }],
+  });
+  assert.match((revisarLineasRemision([{ sku: A, cantidad: 1, cajas: [{ id: C, cajas: 0, sueltas: 0 }] }]) as { error: string }).error, /cajas elegidas/);
+  assert.match((revisarLineasRemision([{ sku: A, cantidad: 1, cajas: [{ id: C, cajas: 1, sueltas: -2 }] }]) as { error: string }).error, /cajas elegidas/);
+  assert.match((revisarLineasRemision([{ sku: A, cantidad: 1, cajas: [{ id: C, cajas: 1.5 }] }]) as { error: string }).error, /cajas elegidas/);
+});

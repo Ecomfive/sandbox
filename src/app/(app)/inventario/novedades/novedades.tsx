@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Segmentado } from "@/components/panel/piezas-panel";
 import { Badge } from "@/components/ui/badge";
 import { anilloFoco, fieldClass, labelClassSm } from "@/components/ui/field";
+import { CodigosProducto } from "@/components/ui/codigos-producto";
 import { MiniaturaFoto } from "@/components/ui/miniatura-foto";
 import { CampoSkuMaestro, ProveedorSkusMaestros, type OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import { useToast } from "@/components/ui/toast";
@@ -22,6 +23,9 @@ export interface NovedadVista {
   cantidad: number;
   plataforma: string;
   codigo: string;
+  /** El N.º y el código de barras del producto. */
+  numeroProducto: number | null;
+  barras: string | null;
   nombre: string;
   foto: string | null;
   referencia: string | null;
@@ -235,6 +239,7 @@ export function Novedades({ filas, plataformas, productos, puedeEscribir }: { fi
         <p className="m-0 text-sm">
           <span className="font-medium tabular-nums">{f.cantidad.toLocaleString("es-PA")} u.</span> · {f.codigo} · {f.plataforma}
         </p>
+        <CodigosProducto numero={f.numeroProducto} barras={f.barras} />
         <p className="m-0 text-xs text-muted-foreground">
           {f.creadoPor} · {formatearTiempoRelativo(f.creadoEn)}
           {f.referencia ? ` · ${f.referencia}` : ""}

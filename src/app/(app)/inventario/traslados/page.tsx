@@ -28,7 +28,7 @@ export default async function TrasladosPage() {
   const { data, error } = await supabase
     .from("wms_traslados")
     .select(
-      "id, numero, creado_en, creado_por_nombre, notas, origen:wms_bodegas!wms_traslados_bodega_origen_id_fkey!inner(nombre, pais_id), destino:wms_bodegas!wms_traslados_bodega_destino_id_fkey(nombre), wms_traslado_items(cantidad, skus_maestros(codigo, nombre, foto_url))",
+      "id, numero, creado_en, creado_por_nombre, notas, origen:wms_bodegas!wms_traslados_bodega_origen_id_fkey!inner(nombre, pais_id), destino:wms_bodegas!wms_traslados_bodega_destino_id_fkey(nombre), wms_traslado_items(cantidad, skus_maestros(codigo, nombre, foto_url, numero, codigo_barras))",
     )
     .eq("origen.pais_id", pais.id)
     .order("creado_en", { ascending: false })
@@ -50,8 +50,8 @@ export default async function TrasladosPage() {
     quien: (t.creado_por_nombre as string | null) ?? null,
     notas: (t.notas as string | null) ?? "",
     lineas: ((t.wms_traslado_items as { cantidad: number; skus_maestros: unknown }[] | null) ?? []).map((l) => {
-      const s = uno(l.skus_maestros as { codigo: string; nombre: string; foto_url: string | null } | { codigo: string; nombre: string; foto_url: string | null }[] | null);
-      return { codigo: s?.codigo ?? "—", nombre: s?.nombre ?? "", foto: s?.foto_url ?? null, cantidad: Number(l.cantidad), cajas: cajasDeLinea.get(`${t.id}|${s?.codigo}`) ?? null };
+      const s = uno(l.skus_maestros as { codigo: string; nombre: string; foto_url: string | null; numero: number | null; codigo_barras: string | null } | { codigo: string; nombre: string; foto_url: string | null; numero: number | null; codigo_barras: string | null }[] | null);
+      return { codigo: s?.codigo ?? "—", nombre: s?.nombre ?? "", foto: s?.foto_url ?? null, numero: s?.numero ?? null, barras: s?.codigo_barras ?? null, cantidad: Number(l.cantidad), cajas: cajasDeLinea.get(`${t.id}|${s?.codigo}`) ?? null };
     }),
   }));
 
@@ -62,14 +62,14 @@ export default async function TrasladosPage() {
           traerTodasConError<{ bodega_id: string; sku_maestro_id: string; disponible: number }>((d, h) =>
             supabase.from("wms_stock").select("bodega_id, sku_maestro_id, disponible").in("bodega_id", propias.map((b) => b.id)).gt("disponible", 0).order("sku_maestro_id").range(d, h),
           ),
-          traerTodasConError<{ id: string; codigo: string; nombre: string; estado: string; numero: number | null; foto_url: string | null }>((d, h) =>
-            supabase.from("skus_maestros").select("id, codigo, nombre, estado, numero, foto_url").neq("tipo", "combo").is("opciones_variantes", null).order("codigo").range(d, h),
+          traerTodasConError<{ id: string; codigo: string; nombre: string; estado: string; numero: number | null; foto_url: string | null; codigo_barras: string | null }>((d, h) =>
+            supabase.from("skus_maestros").select("id, codigo, nombre, estado, numero, foto_url, codigo_barras").neq("tipo", "combo").is("opciones_variantes", null).order("codigo").range(d, h),
           ),
         ])
       : [{ data: [] }, { data: [] }];
   const stock: Record<string, Record<string, number>> = {};
   for (const s of conStock.data ?? []) (stock[s.bodega_id] ??= {})[s.sku_maestro_id] = Number(s.disponible);
-  const opciones = (productos.data ?? []).map((p) => ({ id: p.id, codigo: p.codigo, nombre: p.nombre, estado: p.estado, numero: p.numero, foto: p.foto_url }));
+  const opciones = (productos.data ?? []).map((p) => ({ id: p.id, codigo: p.codigo, nombre: p.nombre, estado: p.estado, numero: p.numero, barras: p.codigo_barras, foto: p.foto_url }));
   // Las cajas de cada producto y las ubicaciones de cada bodega, para mover las cajas con el traslado (migraciones 0236 y 0238).
   const idsPropias = propias.map((b) => b.id);
   const { data: guardadas } =

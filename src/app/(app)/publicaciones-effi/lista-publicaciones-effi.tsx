@@ -1,5 +1,6 @@
 "use client";
 
+import { SelectorTipoProducto } from "@/components/tabla/selector-tipo-producto";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { ListaDatos } from "@/components/tabla/lista-datos";
@@ -63,6 +64,7 @@ export function ListaPublicacionesEffi({
   );
   return (
     <>
+      <SelectorTipoProducto def={DEF_PUBLICACIONES_EFFI} campo="tipoProducto" cuentas={{ todos: publicaciones.length, simple: publicaciones.filter((f) => f.producto && f.producto.tipo !== "combo").length, pack: publicaciones.filter((f) => f.producto?.tipo === "combo").length }} />
       <ListaDatos
         def={DEF_PUBLICACIONES_EFFI}
         filas={publicaciones}

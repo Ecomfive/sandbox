@@ -14,6 +14,9 @@ export interface ProductoDrop {
   foto: string | null;
   /** simple o combo (compuesto). */
   tipo: string;
+  /** El N.º correlativo y el código de barras del producto. */
+  numero: number | null;
+  barras: string | null;
 }
 
 /**
@@ -110,6 +113,16 @@ export const DEF_PUBLICACIONES_DROP: DefTabla<FilaPublicacionDrop> = {
       opciones: () => [
         { valor: "conectado", etiqueta: "Conectado con Drop" },
         { valor: "no_aparece", etiqueta: "Ya no aparece en Drop" },
+      ],
+    },
+    {
+      id: "tipoProducto",
+      etiqueta: "Tipo de producto",
+      tipo: "seleccion",
+      valores: (f) => (f.producto ? [f.producto.tipo === "combo" ? "combo" : "simple"] : []),
+      opciones: () => [
+        { valor: "simple", etiqueta: "Producto simple" },
+        { valor: "combo", etiqueta: "Pack o combo" },
       ],
     },
     {

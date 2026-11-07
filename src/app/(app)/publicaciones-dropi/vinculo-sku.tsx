@@ -11,6 +11,7 @@ import { useToast } from "@/components/ui/toast";
 import type { SkuResumen } from "@/lib/publicaciones/sugerencias";
 import { ETIQUETA_SUGERENCIA } from "@/lib/publicaciones/vincular";
 import { crearProducto } from "../producto/actions";
+import { CodigosProducto } from "@/components/ui/codigos-producto";
 import { CrearProductoPanel } from "../producto/crear-producto-panel";
 import { vincularSkuPublicacion } from "./actions";
 import { CrearProductoDePublicacion } from "./crear-producto-de-publicacion";
@@ -22,6 +23,7 @@ function Producto({ sku, pequeño = false }: { sku: SkuResumen; pequeño?: boole
       <FotoAmpliable url={sku.foto} nombre={sku.codigo} tam={pequeño ? "h-8 w-8" : "h-10 w-10"} />
       <span className="flex min-w-0 flex-col">
         <SkuCopiable codigo={sku.codigo} className="font-mono text-xs font-semibold" />
+        <CodigosProducto numero={sku.numero} barras={sku.barras} />
         <span className="truncate text-xs text-muted-foreground">
           {sku.nombre}
           {sku.tipo === "combo" && " · compuesto"}

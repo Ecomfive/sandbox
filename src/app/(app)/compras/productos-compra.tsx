@@ -1,5 +1,6 @@
 "use client";
 
+import { CodigosProducto } from "@/components/ui/codigos-producto";
 import { startTransition, useCallback, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CompetenciaDesplegable, FotoAmpliable } from "@/components/competencia/piezas-competencia";
@@ -94,6 +95,7 @@ function FilaItem({
             <span className="mr-1.5 text-muted-foreground">{item.codigo}</span>
             {item.nombre}
           </p>
+          <CodigosProducto numero={item.numero} barras={item.barras} className="block" />
           <p className="m-0 text-xs text-muted-foreground">
             Lote #{item.loteNumero}
             {item.origen === "clickup" ? " · de ClickUp" : ""}
@@ -270,7 +272,7 @@ export function ProductosCompra({
   const sinCosto = items.filter((i) => lineaVivo(i).subtotal === null).length + lineasBorrador.filter((l) => l.costoUnitario === null).length;
   const totalLineas = items.length + lineasBorrador.length;
   // Se busca el producto (o el padre); las variantes se piden al elegirlo.
-  const opciones: OpcionSkuMaestro[] = (datos?.productos ?? []).filter((p) => !p.padreId && !yaEstan.has(p.id)).map((p) => ({ id: p.id, codigo: p.codigo, nombre: p.nombre, estado: p.clase === "test" || p.clase === "inactivo" ? p.clase : p.estado, numero: p.numero, foto: p.foto }));
+  const opciones: OpcionSkuMaestro[] = (datos?.productos ?? []).filter((p) => !p.padreId && !yaEstan.has(p.id)).map((p) => ({ id: p.id, codigo: p.codigo, nombre: p.nombre, estado: p.clase === "test" || p.clase === "inactivo" ? p.clase : p.estado, numero: p.numero, barras: p.barras, foto: p.foto }));
   const listo = !!elegido && cantidadNueva > 0;
 
   // Incrustado (dentro del bloque «Compra» del formulario, bajo Etiquetas) va entre dos líneas, sin el margen de una sección

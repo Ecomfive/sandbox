@@ -38,8 +38,8 @@ export default async function LevantamientoPage({ searchParams }: { searchParams
   const elegida = bodegas.some((b) => b.id === pedida) ? pedida : (bodegas[0]?.id ?? "");
 
   const [productos, stock, lotes, ultimo] = await Promise.all([
-    traerTodasConError<{ id: string; codigo: string; nombre: string; clase: string | null; maneja_vencimiento: boolean | null; foto_url: string | null }>((d, h) =>
-      supabase.from("skus_maestros").select("id, codigo, nombre, clase, maneja_vencimiento, foto_url").neq("tipo", "combo").neq("clase", "test").is("opciones_variantes", null).order("codigo").range(d, h),
+    traerTodasConError<{ id: string; codigo: string; nombre: string; clase: string | null; maneja_vencimiento: boolean | null; foto_url: string | null; numero: number | null; codigo_barras: string | null }>((d, h) =>
+      supabase.from("skus_maestros").select("id, codigo, nombre, clase, maneja_vencimiento, foto_url, numero, codigo_barras").neq("tipo", "combo").neq("clase", "test").is("opciones_variantes", null).order("codigo").range(d, h),
     ),
     elegida
       ? traerTodasConError<{ sku_maestro_id: string; fisico: number }>((d, h) => supabase.from("wms_stock").select("sku_maestro_id, fisico").eq("bodega_id", elegida).order("sku_maestro_id").range(d, h))
@@ -81,6 +81,8 @@ export default async function LevantamientoPage({ searchParams }: { searchParams
     clase: p.clase ?? "fisico",
     manejaVencimiento: p.maneja_vencimiento === true,
     foto: p.foto_url,
+    numero: p.numero ?? null,
+    barras: p.codigo_barras || null,
     enSistema: enBodega.get(p.id) ?? 0,
     lotes: lotesPorSku.get(p.id) ?? [],
     cajas: cajasPorSku.get(p.id) ?? [],

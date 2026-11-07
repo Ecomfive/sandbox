@@ -11,6 +11,9 @@ export interface SkuResumen {
   nombre: string;
   foto: string | null;
   tipo: string;
+  /** El N.º correlativo y el código de barras del producto (7 nov 2026, pedido de Hernán). */
+  numero?: number | null;
+  barras?: string | null;
 }
 
 export interface SugerenciaVista extends Omit<Sugerencia, "skuId" | "alternativas"> {
@@ -28,8 +31,8 @@ export async function cargarSugerencias(
   publicaciones: { id: string; nombre: string; dropiId: string; skuId: string | null }[],
 ): Promise<{ skus: Map<string, SkuResumen>; sugerencias: Map<string, SugerenciaVista>; combosX2: Map<string, { id: string; codigo: string }> }> {
   const [skusR, comps, catalogoR, huellasR] = await Promise.all([
-    traerTodasLasFilas<{ id: string; codigo: string; nombre: string; tipo: string; foto_url: string | null; foto_huella: string | null }>((d, h) =>
-      supabase.from("skus_maestros").select("id, codigo, nombre, tipo, foto_url, foto_huella").is("padre_id", null).order("id").range(d, h),
+    traerTodasLasFilas<{ id: string; codigo: string; nombre: string; tipo: string; foto_url: string | null; foto_huella: string | null; numero: number | null; codigo_barras: string | null }>((d, h) =>
+      supabase.from("skus_maestros").select("id, codigo, nombre, tipo, foto_url, foto_huella, numero, codigo_barras").is("padre_id", null).order("id").range(d, h),
     ),
     traerTodasLasFilas<{ combo_id: string; componente_id: string; cantidad: number }>((d, h) =>
       supabase.from("sku_maestro_componentes").select("combo_id, componente_id, cantidad").order("combo_id").order("componente_id").range(d, h),
@@ -37,7 +40,7 @@ export async function cargarSugerencias(
     supabase.from("competencia_productos").select("dropi_producto_id, sku, nombre").eq("pais_id", paisId).eq("es_nuestro", true).limit(2000),
     supabase.from("dropi_publicaciones").select("id, foto_huella").eq("pais_id", paisId).not("foto_huella", "is", null).limit(5000),
   ]);
-  const skus = new Map(skusR.map((s) => [s.id, { id: s.id, codigo: s.codigo, nombre: s.nombre, foto: s.foto_url, tipo: s.tipo }]));
+  const skus = new Map<string, SkuResumen>(skusR.map((s) => [s.id, { id: s.id, codigo: s.codigo, nombre: s.nombre, foto: s.foto_url, tipo: s.tipo, numero: s.numero ?? null, barras: s.codigo_barras || null }]));
   const enDropi = new Map((catalogoR.data ?? []).map((c) => [String(c.dropi_producto_id), [c.sku, c.nombre].filter((x): x is string => !!x)]));
   const huella = new Map((huellasR.error ? [] : (huellasR.data ?? [])).map((h) => [h.id as string, h.foto_huella as string]));
   const ctx = prepararContexto(

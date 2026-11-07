@@ -3,6 +3,7 @@ import { Pagina } from "@/components/ui/pagina";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
 import { requireModulo } from "@/lib/auth";
+import { cargarCodigosProductos } from "@/lib/wms/codigos-producto";
 import type { FilaVencimiento } from "./def-vencimientos";
 import { TablaVencimientos } from "./tabla-vencimientos";
 
@@ -17,11 +18,14 @@ export default async function VencimientosPage() {
   const pais = await getPaisActual(supabase);
   const { data, error } = await supabase.rpc("wms_vigilancia_vencimientos", { p_pais: pais.id });
 
+  const codigos = await cargarCodigosProductos(supabase, ((data ?? []) as Record<string, unknown>[]).map((r) => String(r.sku_maestro_id)));
   const filas: FilaVencimiento[] = ((data ?? []) as Record<string, unknown>[]).map((r) => ({
     id: `${r.sku_maestro_id}-${r.lote_id}`,
     skuId: String(r.sku_maestro_id),
     sku: String(r.sku),
     producto: String(r.nombre),
+    numero: codigos.get(String(r.sku_maestro_id))?.numero ?? null,
+    barras: codigos.get(String(r.sku_maestro_id))?.barras ?? null,
     lote: String(r.lote),
     vence: String(r.fecha_vencimiento),
     dias: Number(r.dias_restantes),

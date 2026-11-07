@@ -3,6 +3,7 @@
 /* eslint-disable @next/next/no-img-element -- fotos de Effi */
 import type { ReactNode } from "react";
 import { EtapaCotizando, LlegadaCamino } from "@/app/(app)/publicaciones-dropi/llegada-camino";
+import { CodigosProducto } from "@/components/ui/codigos-producto";
 import { anilloFoco } from "@/components/ui/field";
 import { ChevronRightIcon } from "@/lib/nav-icons";
 import { formatoEnDolares, formatoMonto, type MonedaPublicaciones } from "@/lib/publicaciones/moneda";
@@ -108,7 +109,10 @@ export function FilaPublicacionEffiLista({ f, moneda, alAbrir }: { f: FilaPublic
             <span className="tabular-nums">ID {f.idEffi}</span>
             <InsigniaConectadoEffi conectado={f.conectado} />
             {f.producto ? (
-              <span className="font-mono font-semibold text-foreground">{f.producto.codigo}</span>
+              <>
+                <span className="font-mono font-semibold text-foreground">{f.producto.codigo}</span>
+                <CodigosProducto numero={f.producto.numero} barras={f.producto.barras} />
+              </>
             ) : (
               <span className="inline-flex items-center gap-1.5">
                 <Punto clase="bg-warning" texto="Sin vincular producto" />

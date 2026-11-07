@@ -1,5 +1,7 @@
 import type { DefTabla } from "@/lib/tabla/motor";
+import { FILTRO_SOLO_SIMPLES } from "@/lib/tabla/tipo-producto";
 import type { StockPlataformas } from "@/lib/wms/stock-plataformas";
+import { numeroProducto, textoCodigos } from "@/lib/wms/codigos-producto";
 import { existencia } from "@/lib/wms/total-stock";
 
 /** Una fila del inventario: un SKU maestro con lo que hay en las bodegas elegidas (todas las del país o una). */
@@ -7,6 +9,9 @@ export interface FilaStock {
   id: string;
   codigo: string;
   nombre: string;
+  /** El N.º correlativo y el código de barras del producto (7 nov 2026, pedido de Hernán). */
+  numero: number | null;
+  barras: string | null;
   tipo: string;
   /** Estado del producto, «fisico» (Activo) o «test»: un producto de prueba aparece aquí pero no tiene stock. */
   clase: string;
@@ -30,7 +35,7 @@ export interface FilaStock {
   plataformas: StockPlataformas | null;
 }
 
-export const ETIQUETA_TIPO_SKU: Record<string, string> = { simple: "Simple", combo: "Compuesto" };
+export const ETIQUETA_TIPO_SKU: Record<string, string> = { simple: "Simple", combo: "Pack o combo" };
 export const ETIQUETA_CLASE_SKU: Record<string, string> = { fisico: "Activo", test: "Test", inactivo: "Inactivo", descontinuado: "Descontinuado" };
 
 export const ETIQUETA_EXISTENCIA: Record<string, string> = {
@@ -45,9 +50,10 @@ export function existenciaDe(f: Pick<FilaStock, "fisico" | "plataformas">): "neg
 }
 
 export const DEF_STOCK: DefTabla<FilaStock> = {
+  filtrosIniciales: FILTRO_SOLO_SIMPLES,
   clave: "wms-stock",
   campos: [
-    { id: "sku", etiqueta: "SKU", tipo: "texto", sinCsv: true, valor: (f) => `${f.codigo} ${f.nombre}` },
+    { id: "sku", etiqueta: "SKU", tipo: "texto", sinCsv: true, valor: (f) => `${f.codigo} ${f.nombre} ${textoCodigos(f)}` },
     {
       id: "existencia",
       etiqueta: "Existencia",
@@ -84,6 +90,8 @@ export const DEF_STOCK: DefTabla<FilaStock> = {
   total: (f) => (f.tipo === "combo" ? 0 : f.fisico),
   csvAntes: [
     { etiqueta: "Código", valor: (f) => f.codigo },
+    { etiqueta: "N.º", valor: (f) => numeroProducto(f.numero) },
+    { etiqueta: "Código de barras", valor: (f) => f.barras ?? "" },
     { etiqueta: "Producto", valor: (f) => f.nombre },
     { etiqueta: "Físico", valor: (f) => f.fisico },
     { etiqueta: "Reservado", valor: (f) => f.reservado },

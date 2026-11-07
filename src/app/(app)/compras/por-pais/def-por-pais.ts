@@ -1,5 +1,7 @@
 import { ETIQUETA_ESTADO_PAIS, type AccionPorPais, type CeldaPais, type EstadoPais } from "@/lib/producto/por-pais";
+import { textoCodigos } from "@/lib/wms/codigos-producto";
 import type { DefTabla } from "@/lib/tabla/motor";
+import { FILTRO_SOLO_SIMPLES } from "@/lib/tabla/tipo-producto";
 import { ETIQUETA_CLASE } from "@/app/(app)/producto/def-producto";
 
 /**
@@ -27,6 +29,8 @@ export interface PaisColumna {
 export interface FilaPorPais {
   id: string;
   numero: number | null;
+  /** El código de barras del producto. */
+  barras: string | null;
   codigo: string;
   nombre: string;
   foto: string | null;
@@ -63,6 +67,7 @@ const NOMBRE_PAIS = (codigo: string) => PAISES_GESTION.find((p) => p.codigo === 
  * una constante del módulo; uno que la persona no puede ver simplemente no tiene casillas.
  */
 export const DEF_POR_PAIS: DefTabla<FilaPorPais> = {
+  filtrosIniciales: FILTRO_SOLO_SIMPLES,
   clave: "producto-por-pais",
   campos: [
     {
@@ -110,7 +115,7 @@ export const DEF_POR_PAIS: DefTabla<FilaPorPais> = {
       valores: (f) => [f.tipo],
       opciones: () => [
         { valor: "simple", etiqueta: "Simple" },
-        { valor: "compuesto", etiqueta: "Compuesto" },
+        { valor: "combo", etiqueta: "Pack o combo" },
       ],
       agrupable: true,
     },
@@ -124,7 +129,7 @@ export const DEF_POR_PAIS: DefTabla<FilaPorPais> = {
     },
     { id: "creado", etiqueta: "Creado el", tipo: "fecha", valor: (f) => f.creado || null },
     { id: "nombre", etiqueta: "Nombre", tipo: "texto", valor: (f) => f.nombre },
-    { id: "codigo", etiqueta: "SKU", tipo: "texto", valor: (f) => f.codigo },
+    { id: "codigo", etiqueta: "SKU", tipo: "texto", valor: (f) => `${f.codigo} ${textoCodigos(f)}` },
   ],
   csvAntes: [
     { etiqueta: "N.º", valor: (f) => f.numero },

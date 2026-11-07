@@ -4,6 +4,7 @@
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import type { IconoComp } from "@/components/tabla/botones-vista";
+import { SelectorTipoProducto } from "@/components/tabla/selector-tipo-producto";
 import { TablaDatos, type ColumnaTabla } from "@/components/tabla/tabla-datos";
 import { usePuedeAbrir } from "@/components/modulos-contexto";
 import { Bandera } from "@/components/paises/bandera";
@@ -100,6 +101,7 @@ export function TablaPorPais({ filas: iniciales, paises, puedeEscribir, codigoPa
             <span className="truncate text-xs text-muted-foreground">
               {f.numero ? `N.º ${f.numero} · ` : ""}
               {f.codigo}
+              {f.barras ? ` · ${f.barras}` : ""}
             </span>
           </span>
         ),
@@ -169,6 +171,10 @@ export function TablaPorPais({ filas: iniciales, paises, puedeEscribir, codigoPa
 
   return (
     <>
+      <SelectorTipoProducto
+        def={DEF_POR_PAIS}
+        cuentas={{ todos: filas.length, simple: filas.filter((f) => f.tipo !== "combo").length, pack: filas.filter((f) => f.tipo === "combo").length }}
+      />
       <TableroPorPais filas={filas} paises={paises} />
       <TablaDatos
         def={DEF_POR_PAIS}

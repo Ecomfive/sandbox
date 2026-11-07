@@ -1,5 +1,6 @@
 "use client";
 
+import { numeroProducto } from "@/lib/wms/codigos-producto";
 import { useMemo, useState } from "react";
 import { BotonBarra, BotonDescargar, MarcoTabla, Pastilla, Punto, claseConFicha, claseTd, claseTh } from "@/components/panel/piezas-panel";
 import { anilloFoco } from "@/components/ui/field";
@@ -79,7 +80,7 @@ export function ListaProductosTest({
   const [editando, setEditando] = useState<string | null>(null);
 
   // El SKU de cada producto de Producto, para decir con cuál está vinculado cada fila.
-  const skuPorId = useMemo(() => new Map(opcionesProducto.map((o) => [o.id, o.codigo])), [opcionesProducto]);
+  const skuPorId = useMemo(() => new Map(opcionesProducto.map((o) => [o.id, [o.codigo, numeroProducto(o.numero), o.barras].filter(Boolean).join(" · ")])), [opcionesProducto]);
   const categorias = useMemo(() => [...new Set(productos.map((p) => limpiarCategoria(p.categoria)))].sort((a, b) => a.localeCompare(b)), [productos]);
   const ganadores = useMemo(() => productos.filter((p) => resultadoDe(p.estado) === "ganador"), [productos]);
 

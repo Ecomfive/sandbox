@@ -6,11 +6,17 @@ const MAX_CANTIDAD = 1_000_000;
 /** Cuántos productos caben en una remisión. */
 export const MAX_LINEAS_REMISION = 200;
 
+export interface CajaElegida {
+  id: string;
+  cajas: number;
+  sueltas?: number;
+}
+
 export interface LineaRemision {
   sku: string;
   cantidad: number;
-  /** Las cajas elegidas (migración 0236): `id` de `wms_cajas` y cuántas. */
-  cajas?: { id: string; cajas: number }[];
+  /** Las cajas elegidas (migración 0236): `id` de `wms_cajas`, cuántas enteras y, si se abre una más, cuántas unidades salen de ella (migración 0248). */
+  cajas?: CajaElegida[];
 }
 
 /** «REM-0012»: el número que sale en el papel y en la lista. */
@@ -31,12 +37,14 @@ export function revisarLineasRemision(lineas: unknown): { lineas: LineaRemision[
     const cantidad = Number(o.cantidad);
     if (!Number.isInteger(cantidad) || cantidad <= 0 || cantidad > MAX_CANTIDAD) return { error: "Cada producto necesita una cantidad entera mayor que cero." };
     const elegidas = Array.isArray(o.cajas) ? o.cajas : [];
-    const cajas: { id: string; cajas: number }[] = [];
+    const cajas: CajaElegida[] = [];
     for (const c of elegidas) {
       const x = (c ?? {}) as Record<string, unknown>;
-      const n = Number(x.cajas);
-      if (typeof x.id !== "string" || !ES_ID.test(x.id) || !Number.isInteger(n) || n <= 0 || n > MAX_CANTIDAD) return { error: "Las cajas elegidas no son válidas." };
-      cajas.push({ id: x.id, cajas: n });
+      const n = Number(x.cajas ?? 0);
+      const sueltas = Number(x.sueltas ?? 0);
+      const valido = (v: number) => Number.isInteger(v) && v >= 0 && v <= MAX_CANTIDAD;
+      if (typeof x.id !== "string" || !ES_ID.test(x.id) || !valido(n) || !valido(sueltas) || n + sueltas === 0) return { error: "Las cajas elegidas no son válidas." };
+      cajas.push(sueltas > 0 ? { id: x.id, cajas: n, sueltas } : { id: x.id, cajas: n });
     }
     limpias.push(cajas.length ? { sku, cantidad, cajas } : { sku, cantidad });
   }

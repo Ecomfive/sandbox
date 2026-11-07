@@ -24,8 +24,8 @@ export async function cargarPorPais(usuario: UsuarioActual, supabase: SupabaseCl
   const paisDe = (id: string | null | undefined) => (id ? (codigoPorId.get(id) ?? null) : null);
 
   const [productos, fotos, dropi, drop, lineas, stock, descontinuados, decisiones, stockDropi] = await Promise.all([
-    traerTodasConError<{ id: string; codigo: string; nombre: string; tipo: string; clase: string; padre_id: string | null; numero: number | null; creado_en: string }>((d, h) =>
-      supabase.from("skus_maestros").select("id, codigo, nombre, tipo, clase, padre_id, numero, creado_en").order("id").range(d, h),
+    traerTodasConError<{ id: string; codigo: string; nombre: string; tipo: string; clase: string; padre_id: string | null; numero: number | null; creado_en: string; codigo_barras: string | null }>((d, h) =>
+      supabase.from("skus_maestros").select("id, codigo, nombre, tipo, clase, padre_id, numero, creado_en, codigo_barras").order("id").range(d, h),
     ),
     traerTodasConError<{ id: string; foto_url: string }>((d, h) => supabase.from("skus_maestros").select("id, foto_url").not("foto_url", "is", null).order("id").range(d, h)),
     traerTodasConError<{ id: string; sku_maestro_id: string; dropi_id: string | null; estado: string | null; estado_publicacion: string | null; pais_id: string }>((d, h) =>
@@ -126,6 +126,7 @@ export async function cargarPorPais(usuario: UsuarioActual, supabase: SupabaseCl
       return {
         id: p.id,
         numero: p.numero ?? null,
+        barras: p.codigo_barras || null,
         codigo: p.codigo,
         nombre: p.nombre,
         foto: fotoPorId.get(p.id) ?? null,

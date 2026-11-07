@@ -11,6 +11,7 @@ import { useToast } from "@/components/ui/toast";
 import { Ventana } from "@/components/ui/ventana";
 import { anilloFoco } from "@/components/ui/field";
 import { formatearFechaHoraCompleta } from "@/lib/formato";
+import { CodigosProducto } from "@/components/ui/codigos-producto";
 import { agruparRemisiones, type EstadoRemision, type LineaEnviada, type RemisionAgrupada } from "@/lib/wms/remision";
 import { recibirEnvioDropi } from "../stock-actions";
 import { PedirCorreccion } from "./correcciones";
@@ -20,6 +21,9 @@ export interface FilaEnvio extends LineaEnviada {
   codigo: string;
   nombre: string;
   foto: string | null;
+  /** El N.º y el código de barras del producto. */
+  numero: number | null;
+  barras: string | null;
   motivo: string | null;
   /** Las cajas que salieron, en palabras (migración 0236). */
   cajas: string | null;
@@ -181,6 +185,7 @@ function FichaRemision({
                     <span className="min-w-0">
                       <span className="block font-medium">{f.codigo}</span>
                       <span className="block text-xs text-muted-foreground">{f.nombre}</span>
+                      <CodigosProducto numero={f.numero} barras={f.barras} className="block" />
                       {f.cajas && <span className="block text-xs text-muted-foreground">{f.cajas}</span>}
                     </span>
                   </span>

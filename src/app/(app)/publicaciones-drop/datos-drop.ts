@@ -38,9 +38,9 @@ type Fila = {
   producto: SkuFila | SkuFila[] | null;
   sugerido: SkuFila | SkuFila[] | null;
 };
-type SkuFila = { id: string; codigo: string; nombre: string; foto_url: string | null; tipo: string };
+type SkuFila = { id: string; codigo: string; nombre: string; foto_url: string | null; tipo: string; numero: number | null; codigo_barras: string | null };
 
-const aProducto = (s: SkuFila | null): ProductoDrop | null => (s ? { id: s.id, codigo: s.codigo, nombre: s.nombre, foto: s.foto_url, tipo: s.tipo } : null);
+const aProducto = (s: SkuFila | null): ProductoDrop | null => (s ? { id: s.id, codigo: s.codigo, nombre: s.nombre, foto: s.foto_url, tipo: s.tipo, numero: s.numero ?? null, barras: s.codigo_barras || null } : null);
 
 const uno = <T,>(v: T | T[] | null): T | null => (Array.isArray(v) ? (v[0] ?? null) : v);
 
@@ -58,7 +58,7 @@ export async function cargarDatosDrop(supabase: SupabaseClient, pais: { id: stri
       supabase
         .from("drop_publicaciones")
         .select(
-          "id, drop_id, codigo, nombre, sku_drop, estado, precio, inventario, foto_url, ultima_vez, en_drop, creado_en_drop, sugerencia, producto:skus_maestros!drop_publicaciones_sku_maestro_id_fkey(id, codigo, nombre, foto_url, tipo), sugerido:skus_maestros!drop_publicaciones_sugerido_sku_id_fkey(id, codigo, nombre, foto_url, tipo)",
+          "id, drop_id, codigo, nombre, sku_drop, estado, precio, inventario, foto_url, ultima_vez, en_drop, creado_en_drop, sugerencia, producto:skus_maestros!drop_publicaciones_sku_maestro_id_fkey(id, codigo, nombre, foto_url, tipo, numero, codigo_barras), sugerido:skus_maestros!drop_publicaciones_sugerido_sku_id_fkey(id, codigo, nombre, foto_url, tipo, numero, codigo_barras)",
         )
         .eq("pais_id", pais.id)
         .order("nombre")

@@ -6,6 +6,7 @@ import { anilloFoco } from "@/components/ui/field";
 import { ComprasIcon, DesconectadoIcon, EtiquetaIcon, InventarioIcon, OjoTachadoIcon, ProductoIcon, SinFotoIcon, TestIcon, TuWinnerIcon } from "@/lib/nav-icons";
 import { puntosParaDecidir, STOCK_BAJO, type PuntoDecidir } from "@/lib/producto/para-decidir";
 import { alternarAtajo, atajoActivo, type AtajoFiltro } from "@/lib/tabla/atajos";
+import { filasDelTipo, opcionElegida } from "@/lib/tabla/tipo-producto";
 import { DEF_PRODUCTO, type FilaProducto } from "./def-producto";
 
 const seleccion = (campo: string, ...valores: string[]) => ({ campo, valor: { tipo: "seleccion" as const, valores } });
@@ -117,7 +118,10 @@ function TarjetaProducto({ t, valor, total, extra }: { t: Tarjeta; valor: number
  * «Para decidir», lo que le falta a los activos (foto, conexión, stock, compras, categoría) y los winners sin comprar. Cada
  * tarjeta cuenta y, al pulsarla, filtra la lista de abajo; pulsarla otra vez quita el filtro. Se pueden juntar varias.
  */
-export function TableroProducto({ productos }: { productos: FilaProducto[] }) {
+export function TableroProducto({ productos: todos }: { productos: FilaProducto[] }) {
+  // Cuenta lo que muestra la lista: con «Productos simples» elegido, sin los packs y combos.
+  const [filtrosLista] = useFiltros(DEF_PRODUCTO);
+  const productos = filasDelTipo(todos, opcionElegida(filtrosLista, "tipo", "simple", "combo"), (p) => p.tipo === "combo");
   const filas = productos.map((p) => ({ p, puntos: puntosParaDecidir(p) }));
   const fila = (lista: Tarjeta[], etiqueta: string) => (
     <section aria-label={etiqueta} className="flex flex-col gap-2">

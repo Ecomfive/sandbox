@@ -1,4 +1,5 @@
 import type { DefTabla } from "@/lib/tabla/motor";
+import { textoCodigos } from "@/lib/wms/codigos-producto";
 
 /** Un lote con unidades y su estado de vencimiento. */
 export interface FilaVencimiento {
@@ -6,6 +7,9 @@ export interface FilaVencimiento {
   skuId: string;
   sku: string;
   producto: string;
+  /** El N.º y el código de barras del producto. */
+  numero: number | null;
+  barras: string | null;
   lote: string;
   /** Fecha de vencimiento (AAAA-MM-DD). */
   vence: string;
@@ -29,7 +33,7 @@ export const DEF_VENCIMIENTOS: DefTabla<FilaVencimiento> = {
       agrupable: true,
       ordenGrupos: ["vencido", "por_vencer", "vigente"],
     },
-    { id: "sku", etiqueta: "SKU", tipo: "texto", valor: (f) => `${f.sku} ${f.producto}` },
+    { id: "sku", etiqueta: "SKU", tipo: "texto", valor: (f) => `${f.sku} ${f.producto} ${textoCodigos(f)}` },
     { id: "lote", etiqueta: "Lote", tipo: "texto", valor: (f) => f.lote },
     { id: "vence", etiqueta: "Vence", tipo: "fecha", valor: (f) => f.vence },
     { id: "cantidad", etiqueta: "Unidades", tipo: "numero", valor: (f) => f.cantidad },

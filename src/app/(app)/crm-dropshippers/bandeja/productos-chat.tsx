@@ -6,6 +6,7 @@ import { cuantoFalta, type MencionEnChat } from "@/lib/crm/productos-chat";
 import { formatoMonto, monedaPublicaciones } from "@/lib/publicaciones/moneda";
 import { EtapaCotizando, LlegadaCamino } from "../../publicaciones-dropi/llegada-camino";
 import { avisarCuandoLlegue } from "../tareas/actions";
+import { textoCodigos } from "@/lib/wms/codigos-producto";
 import { buscarProductosChat, fijarProductoChat, productosDelChat, type PrecioDropi, type ProductoDelChat, type ProductosDelChat } from "./productos-chat-actions";
 
 const entero = (n: number) => n.toLocaleString("es-PA");
@@ -46,7 +47,7 @@ export function ProductosDelChatFicha({
   const [datos, setDatos] = useState<ProductosDelChat | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [buscar, setBuscar] = useState("");
-  const [resultados, setResultados] = useState<{ id: string; nombre: string; codigo: string | null }[]>([]);
+  const [resultados, setResultados] = useState<{ id: string; nombre: string; codigo: string | null; numero: number | null; barras: string | null }[]>([]);
   const [ocupado, setOcupado] = useState<string | null>(null);
   // La bandeja lo monta de nuevo con cada chat (`key`), así que lo que llega siempre es de este chat.
   const vigente = useRef(true);
@@ -131,6 +132,7 @@ export function ProductosDelChatFicha({
               <div className="flex min-w-0 flex-1 flex-col gap-0.5 text-[13px] [overflow-wrap:anywhere]">
                 <span className="font-medium leading-tight">{p.nombre}</span>
                 {p.codigo && <span className="text-[11.5px] text-[var(--wa-sec)]">{p.codigo}</span>}
+                {(p.numero !== null || p.barras) && <span className="text-[11.5px] text-[var(--wa-sec)] tabular-nums">{textoCodigos(p)}</span>}
                 {p.mencion ? (
                   <span className="text-[11.5px] text-[var(--wa-sec)] italic">{textoMencion(p.mencion)}</span>
                 ) : (
@@ -192,6 +194,7 @@ export function ProductosDelChatFicha({
                       >
                         {r.nombre}
                         {r.codigo && <span className="text-[11.5px] text-[var(--wa-sec)]">{r.codigo}</span>}
+                        {(r.numero !== null || r.barras) && <span className="text-[11.5px] text-[var(--wa-sec)] tabular-nums">{textoCodigos(r)}</span>}
                       </button>
                     </li>
                   ))}

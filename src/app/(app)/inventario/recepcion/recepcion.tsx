@@ -11,6 +11,8 @@ import { useToast } from "@/components/ui/toast";
 import { formatearFecha } from "@/lib/formato";
 import { BuscarIcon } from "@/lib/nav-icons";
 import { diferenciaRecepcion } from "@/lib/wms/recepcion";
+import { CodigosProducto } from "@/components/ui/codigos-producto";
+import { textoCodigos } from "@/lib/wms/codigos-producto";
 import { recibirCompra } from "./actions";
 
 export interface LineaPorRecibir {
@@ -18,6 +20,9 @@ export interface LineaPorRecibir {
   codigo: string;
   nombre: string;
   foto: string | null;
+  /** El N.º y el código de barras del producto. */
+  numero: number | null;
+  barras: string | null;
   pedida: number;
   lote: number;
   manejaVencimiento: boolean;
@@ -77,7 +82,7 @@ export function Recepcion({
 
   const visibles = useMemo(() => {
     const q = sinAcentos(buscar.trim());
-    return compras.filter((c) => !q || sinAcentos(`${c.codigo} ${c.nombre} ${c.lineas.map((l) => `${l.codigo} ${l.nombre}`).join(" ")}`).includes(q));
+    return compras.filter((c) => !q || sinAcentos(`${c.codigo} ${c.nombre} ${c.lineas.map((l) => `${l.codigo} ${l.nombre} ${textoCodigos(l)}`).join(" ")}`).includes(q));
   }, [compras, buscar]);
   const compra = compras.find((c) => c.id === abierta) ?? null;
   const delaBodega = ubicaciones.filter((u) => u.bodegaId === bodega);
@@ -169,6 +174,7 @@ export function Recepcion({
                     </td>
                     <td className={claseCeldaColumna}>
                       <span className="block font-medium">{l.codigo}</span>
+                      <CodigosProducto numero={l.numero} barras={l.barras} className="block" />
                       <span className="block text-xs text-muted-foreground">{l.nombre}</span>
                       <span className="block text-xs text-muted-foreground">Lote #{l.lote}</span>
                     </td>
