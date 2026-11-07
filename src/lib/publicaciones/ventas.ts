@@ -1,4 +1,4 @@
-// Desempeño › Ventas Dropi: cómo se resumen las ventas de cada producto de Dropi a partir de sus unidades por día
+// Desempeño › Ventas Proveeduría: cómo se resumen las ventas de cada producto de Dropi a partir de sus unidades por día
 // (`dropi_ventas_diarias`, migración 0120). Lógica pura, sin base ni React: la usan la página y su prueba.
 
 /** Las unidades de un producto en un día (hora de Panamá). */

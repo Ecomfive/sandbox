@@ -72,17 +72,17 @@ export const PARTES: Parte[] = [
   { clave: "cartera", tipo: "cartera", etiqueta: "Cartera (7 días)", pais: "pa", donde: "Pedidos Dropi (cartera)", ruta: "/pedidos-dropi", lector: "proveedor" },
   { clave: "retiros", tipo: "retiros", etiqueta: "Retiros y saldo", pais: "pa", donde: "Conciliación de Retiros", ruta: "/retiros", lector: "proveedor" },
   { clave: "stock", tipo: "stock", etiqueta: "Stock por bodega", pais: "pa", donde: "Gestión de IDs Dropi", ruta: "/publicaciones-dropi", lector: "proveedor" },
-  { clave: "ventas", tipo: "ventas", etiqueta: "Ventas (historial de existencias)", pais: "pa", donde: "Ventas Dropi · Reponer", ruta: "/ventas-dropi", lector: "ventas" },
+  { clave: "ventas", tipo: "ventas", etiqueta: "Ventas (historial de existencias)", pais: "pa", donde: "Ventas Proveeduría · Reponer", ruta: "/ventas-dropi", lector: "ventas" },
   { clave: "pedidos_cr", tipo: "pedidos", etiqueta: "Pedidos y estados (30 días)", pais: "cr", donde: "Pedidos Dropi · CRM", ruta: "/pedidos-dropi", lector: "proveedor_cr" },
   { clave: "cartera_cr", tipo: "cartera", etiqueta: "Cartera (7 días)", pais: "cr", donde: "Pedidos Dropi (cartera)", ruta: "/pedidos-dropi", lector: "proveedor_cr" },
   { clave: "retiros_cr", tipo: "retiros", etiqueta: "Retiros y saldo", pais: "cr", donde: "Conciliación de Retiros", ruta: "/retiros", lector: "proveedor_cr" },
   { clave: "stock_cr", tipo: "stock", etiqueta: "Stock por bodega", pais: "cr", donde: "Gestión de IDs Dropi", ruta: "/publicaciones-dropi", lector: "proveedor_cr" },
-  { clave: "ventas_cr", tipo: "ventas", etiqueta: "Ventas (historial de existencias)", pais: "cr", donde: "Ventas Dropi · Reponer", ruta: "/ventas-dropi", lector: "ventas_cr" },
+  { clave: "ventas_cr", tipo: "ventas", etiqueta: "Ventas (historial de existencias)", pais: "cr", donde: "Ventas Proveeduría · Reponer", ruta: "/ventas-dropi", lector: "ventas_cr" },
   { clave: "pedidos_mx", tipo: "pedidos", etiqueta: "Pedidos y estados (30 días)", pais: "mx", donde: "Pedidos Dropi · CRM", ruta: "/pedidos-dropi", lector: "proveedor_mx" },
   { clave: "cartera_mx", tipo: "cartera", etiqueta: "Cartera (7 días)", pais: "mx", donde: "Pedidos Dropi (cartera)", ruta: "/pedidos-dropi", lector: "proveedor_mx" },
   { clave: "retiros_mx", tipo: "retiros", etiqueta: "Retiros y saldo", pais: "mx", donde: "Conciliación de Retiros", ruta: "/retiros", lector: "proveedor_mx" },
   { clave: "stock_mx", tipo: "stock", etiqueta: "Stock por bodega", pais: "mx", donde: "Gestión de IDs Dropi", ruta: "/publicaciones-dropi", lector: "proveedor_mx" },
-  { clave: "ventas_mx", tipo: "ventas", etiqueta: "Ventas (historial de existencias)", pais: "mx", donde: "Ventas Dropi · Reponer", ruta: "/ventas-dropi", lector: "ventas_mx" },
+  { clave: "ventas_mx", tipo: "ventas", etiqueta: "Ventas (historial de existencias)", pais: "mx", donde: "Ventas Proveeduría · Reponer", ruta: "/ventas-dropi", lector: "ventas_mx" },
 ];
 
 export const esParte = (x: unknown): x is ClaveParte => typeof x === "string" && PARTES.some((p) => p.clave === x);

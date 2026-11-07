@@ -49,7 +49,7 @@ export function ReponerCompras({
           Lo que se vende en Dropi {pais.nombre} y no tiene stock o le alcanza para menos de {DIAS_REPONER} días. Lo sugerido cubre {dias} días de venta al ritmo de los últimos 30, menos el stock y lo que ya viene en compras abiertas.
         </p>
         <p className="text-xs text-muted-foreground">
-          Ventas de Dropi hasta el {fecha(corte)} (Desempeño › Ventas Dropi)
+          Ventas de Dropi hasta el {fecha(corte)} (Desempeño › Ventas Proveeduría)
           {stockLeido ? `; el stock es el de la última actualización desde Dropi (${stockLeido})` : ""}. Solo lo ven los administradores.
         </p>
       </header>

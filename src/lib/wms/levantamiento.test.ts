@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { itemsParaSumar, quedaDespues, repartirFilas, revisarConteo, varianteDeLinea } from "./levantamiento";
+import { itemsParaSumar, quedaDespues, repartirFilas, revisarConteo, revisarTransferencias, varianteDeLinea } from "./levantamiento";
 
 const A = "0194f0a2-0000-7000-8000-000000000001";
 const B = "0194f0a2-0000-7000-8000-000000000002";
@@ -95,4 +95,47 @@ test("para sumar solo cuenta lo que entra", () => {
     { sku: "d", lotes: [{ codigo: "L3", vencimiento: null, cantidad: 0 }] },
   ];
   assert.deepEqual(itemsParaSumar(items), [{ sku: A, cantidad: 25 }, { sku: "c", lotes: [{ codigo: "L1", vencimiento: null, cantidad: 5 }] }]);
+});
+
+const SKU = "11111111-1111-1111-1111-111111111111";
+const SKU2 = "22222222-2222-2222-2222-222222222222";
+const ORIGEN = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+const DESTINO = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
+const OTRO = "cccccccc-cccc-cccc-cccc-cccccccccccc";
+
+test("lo que queda descuenta lo que sale (resta o transferencia)", () => {
+  assert.equal(quedaDespues(null, null, 100, 30), 70);
+  assert.equal(quedaDespues(80, 20, 100, 30), 70);
+  assert.equal(quedaDespues(null, 50, 100), 150);
+});
+
+test("transferencias: se agrupan por destino y se revisan", () => {
+  assert.deepEqual(revisarTransferencias([], ORIGEN), { traslados: [] });
+  assert.deepEqual(revisarTransferencias(undefined, ORIGEN), { traslados: [] });
+  const r = revisarTransferencias(
+    [
+      { sku: SKU, cantidad: 3, destino: DESTINO },
+      { sku: SKU2, cantidad: "5", destino: OTRO },
+    ],
+    ORIGEN,
+  );
+  assert.deepEqual(r, {
+    traslados: [
+      { destino: DESTINO, items: [{ sku: SKU, cantidad: 3 }] },
+      { destino: OTRO, items: [{ sku: SKU2, cantidad: 5 }] },
+    ],
+  });
+  const juntas = revisarTransferencias([{ sku: SKU, cantidad: 3, destino: DESTINO }, { sku: SKU2, cantidad: 1, destino: DESTINO }], ORIGEN);
+  assert.deepEqual(juntas, { traslados: [{ destino: DESTINO, items: [{ sku: SKU, cantidad: 3 }, { sku: SKU2, cantidad: 1 }] }] });
+});
+
+test("transferencias: lo que no vale se rechaza", () => {
+  assert.ok("error" in revisarTransferencias([{ sku: SKU, cantidad: 0, destino: DESTINO }], ORIGEN));
+  assert.ok("error" in revisarTransferencias([{ sku: SKU, cantidad: -2, destino: DESTINO }], ORIGEN));
+  assert.ok("error" in revisarTransferencias([{ sku: SKU, cantidad: 1.5, destino: DESTINO }], ORIGEN));
+  assert.ok("error" in revisarTransferencias([{ sku: SKU, cantidad: 2, destino: "" }], ORIGEN));
+  assert.ok("error" in revisarTransferencias([{ sku: SKU, cantidad: 2, destino: ORIGEN }], ORIGEN));
+  assert.ok("error" in revisarTransferencias([{ sku: "x", cantidad: 2, destino: DESTINO }], ORIGEN));
+  assert.ok("error" in revisarTransferencias([{ sku: SKU, cantidad: 2, destino: DESTINO }, { sku: SKU, cantidad: 1, destino: OTRO }], ORIGEN));
+  assert.ok("error" in revisarTransferencias("no", ORIGEN));
 });

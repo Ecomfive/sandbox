@@ -18,7 +18,7 @@ export interface DatosProductos {
 
 /**
  * Lo que vende la cartera en el país (pedidos de 30 días por producto y dropshipper, migraciones 0198 y 0201) con el stock y el ritmo de venta de
- * cada producto (Desempeño › Ventas Dropi) y lo que viene en camino (Compras, por el producto del sistema vinculado en Gestión de IDs).
+ * cada producto (Desempeño › Ventas Proveeduría) y lo que viene en camino (Compras, por el producto del sistema vinculado en Gestión de IDs).
  * `ids`: los dropshippers del panel (para armar lo de cada uno). Sin esas migraciones devuelve el error para avisarlo.
  */
 export async function cargarProductos(supabase: SupabaseClient, paisId: string, usuario: UsuarioActual, ids: string[]): Promise<DatosProductos | { error: string }> {

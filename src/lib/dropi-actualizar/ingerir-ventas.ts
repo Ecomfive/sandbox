@@ -1,4 +1,4 @@
-// Desempeño › Ventas Dropi (migraciones 0120 y 0122): carga el Historial de Existencia de Dropi (cada movimiento de stock de cada
+// Desempeño › Ventas Proveeduría (migraciones 0120 y 0122): carga el Historial de Existencia de Dropi (cada movimiento de stock de cada
 // producto, `movimientos`) y la lista de productos (`resumen`: nombre, lista, si es privado y su stock) que lee
 // ventas-dropi-navegador.js. Agrupa por producto y día en hora de Panamá, y por dropshipper (lo cancelado o devuelto se le carga a
 // quien creó la orden). Cada carga reemplaza lo de los productos que trae; los que ya no vienen (eliminados en Dropi) conservan su

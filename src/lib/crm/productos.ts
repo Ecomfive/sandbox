@@ -14,7 +14,7 @@ export interface VentaProducto {
   pedidos: number;
 }
 
-/** Del resumen de ventas de Dropi (Desempeño › Ventas Dropi): stock y ritmo de venta del producto en el país. */
+/** Del resumen de ventas de Dropi (Desempeño › Ventas Proveeduría): stock y ritmo de venta del producto en el país. */
 export interface StockProducto {
   stock: number;
   /** Unidades netas por día de los últimos 30 días. */

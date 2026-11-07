@@ -6,7 +6,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 const ES_ID = (v: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 
 export interface VentasDropiDropshipper {
-  /** Hasta qué día llegan los datos (la última carga de Desempeño › Ventas Dropi). */
+  /** Hasta qué día llegan los datos (la última carga de Desempeño › Ventas Proveeduría). */
   corte: string | null;
   paises: {
     codigoPais: string;
@@ -24,7 +24,7 @@ export interface VentasDropiDropshipper {
 }
 
 /**
- * Las ventas en Dropi del dropshipper (Desempeño › Ventas Dropi, migraciones 0120 y 0122), por sus cuentas de Dropi vinculadas:
+ * Las ventas en Dropi del dropshipper (Desempeño › Ventas Proveeduría, migraciones 0120 y 0122), por sus cuentas de Dropi vinculadas:
  * unidades pedidas y netas, lo no efectivo (cancelado, rechazado o devuelto), por mes y por producto. Es una lectura: basta
  * poder abrir el CRM. Devuelve el error como valor.
  */

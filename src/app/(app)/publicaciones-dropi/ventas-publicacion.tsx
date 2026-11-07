@@ -111,7 +111,7 @@ export function VentasEnDropi({ v, corte }: { v: VentasPublicacion; corte: strin
       </figure>
       <p className="text-xs text-muted-foreground">
         Datos de Dropi hasta el {fecha(corte)}
-        {v.ids.length > 1 ? ` · suma los IDs ${v.ids.join(" y ")}` : ""}. El detalle está en Desempeño › Ventas Dropi.
+        {v.ids.length > 1 ? ` · suma los IDs ${v.ids.join(" y ")}` : ""}. El detalle está en Desempeño › Ventas Proveeduría.
       </p>
     </div>
   );

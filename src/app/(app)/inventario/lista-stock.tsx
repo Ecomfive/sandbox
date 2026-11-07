@@ -42,11 +42,11 @@ function SelectorBodega({ bodegas, elegida }: { bodegas: { id: string; nombre: s
 }
 
 /** Cuándo se leyó cada plataforma: una lectura vieja se avisa, porque lo que se ve es lo de ese momento. Dunamixfy todavía no se lee. */
-function AvisoLecturas({ lecturas, fallaron }: { lecturas: LecturasPlataformas; fallaron: boolean }) {
+function AvisoLecturas({ lecturas, fallaron, conDunamixfy }: { lecturas: LecturasPlataformas; fallaron: boolean; conDunamixfy: boolean }) {
   return (
     <p className="m-0 mt-3 text-xs text-muted-foreground">
       Plataformas, según su última lectura:{" "}
-      {(["dropi", "effi", "drop"] as Plataforma[]).map((p, i) => (
+      {(["dropi", "effi", "drop"] as Plataforma[]).filter((p) => lecturas[p] !== null || conDunamixfy).map((p, i) => (
         <span key={p}>
           {i > 0 && " · "}
           <span className={lecturaVieja(lecturas[p]) ? "font-medium text-warning" : ""}>
@@ -54,7 +54,7 @@ function AvisoLecturas({ lecturas, fallaron }: { lecturas: LecturasPlataformas; 
           </span>
         </span>
       ))}
-      {" · "}Dunamixfy sin conectar
+      {conDunamixfy && " · Dunamixfy sin conectar"}
       {fallaron && <span className="font-medium text-destructive"> · Una lectura no cargó: faltan unidades. Recarga la página.</span>}
     </p>
   );
@@ -116,7 +116,7 @@ export function ListaStock({
         resumen={(visibles) => (
           <>
             <TableroStock filas={visibles} def={def} conPlataformas={conPlataformas} />
-            {lecturas && <AvisoLecturas lecturas={lecturas} fallaron={lecturasFallaron} />}
+            {lecturas && <AvisoLecturas lecturas={lecturas} fallaron={lecturasFallaron} conDunamixfy={codigoPais === "CR"} />}
           </>
         )}
         vacio="Todavía no hay SKUs maestros."
