@@ -1,7 +1,7 @@
 "use client";
 
 import { PanelAyuda } from "@/components/ayuda/panel-ayuda";
-import { Fragment, Suspense, use, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { Fragment, Suspense, use, useState, useSyncExternalStore, type ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -296,22 +296,6 @@ function RielYPanel({
   const [elegida, setElegida] = useState<{ ruta: string; titulo: string } | null>(null);
   const guardado = almacen(CLAVE_PANEL, "local");
   const panelOculto = useSyncExternalStore(guardado.suscribir, guardado.leer, () => "") === "cerrado";
-  const rielRef = useRef<HTMLElement>(null);
-
-  // Un clic fuera del menú recoge el panel (el riel se queda): se pulsa un área para volver a abrirlo. Dentro del menú
-  // (el riel, el panel, una estrella) no pasa nada. En móvil el menú de escritorio no se ve y no hace nada.
-  useEffect(() => {
-    if (panelOculto) return;
-    function alPulsar(e: PointerEvent) {
-      const menu = rielRef.current?.closest("aside");
-      if (!menu || menu.getClientRects().length === 0) return;
-      if (e.target instanceof Node && !menu.contains(e.target)) guardado.guardar("cerrado");
-    }
-    document.addEventListener("pointerdown", alPulsar);
-    return () => document.removeEventListener("pointerdown", alPulsar);
-    // `guardado` se vuelve a crear en cada dibujo pero apunta siempre a la misma clave guardada.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [panelOculto]);
 
   const titulo = elegida && elegida.ruta === pathname ? elegida.titulo : activa;
   const verFavoritos = titulo === "Favoritos";
@@ -346,7 +330,7 @@ function RielYPanel({
 
   return (
     <>
-      <nav ref={rielRef} aria-label="Áreas del menú" className="m-1.5 flex w-20 shrink-0 flex-col items-center gap-1 rounded-2xl bg-riel px-1 py-2.5">
+      <nav aria-label="Áreas del menú" className="m-1.5 flex w-20 shrink-0 flex-col items-center gap-1 rounded-2xl bg-riel px-1 py-2.5">
         <Link href="/" aria-label="Ecomfive, ir al inicio" className={`mb-2 flex h-9 w-full items-center justify-center rounded ${anilloRiel}`}>
           <Image src="/brand/ecomfive-blanco.png" alt="" width={161} height={44} className="h-3 w-auto" />
         </Link>
