@@ -1,14 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { Bandera } from "@/components/paises/bandera";
 import { claseCeldaColumna, claseEncabezadoColumna, claseFilaEncabezado } from "@/components/tabla/estilos-tabla";
 import { Badge } from "@/components/ui/badge";
 import { anilloFoco } from "@/components/ui/field";
+import { useToast } from "@/components/ui/toast";
 import { VisorImagen } from "@/components/ui/visor-imagen";
 import { formatearFechaHoraCompleta } from "@/lib/formato";
 import { useMonedaCompetencia } from "./moneda-competencia";
-import { obtenerCompetenciaProducto, obtenerHistorialCompetencia, type CompetenciaDeProducto, type EventoCompetencia } from "@/lib/competencia/actions";
+import { descartarCompetidor, obtenerCompetenciaProducto, obtenerHistorialCompetencia, type CompetenciaDeProducto, type EventoCompetencia } from "@/lib/competencia/actions";
 
 const num = (n: number | null) => (n === null ? "—" : n.toLocaleString("es-PA"));
 
@@ -139,15 +140,46 @@ export function HistorialCompetencia({ productoId, limite = 30, pais: paisProduc
 /**
  * «Competencia en Dropi» de un producto de Producto (en su ficha y en cada línea de una compra): quién más lo vende, a qué
  * precio frente al nuestro, su stock, cuánto vendió en 7 y 30 días y el historial de cada uno (al desplegarlo).
+ *
+ * Con `descartar` (la ficha de Gestión de IDs Dropi, 8 nov 2026, pedido de Alcides) cada competidor trae «No es el mismo»: deja de contar aquí, en
+ * «Competidor más barato» y en las recomendaciones de precio. Los descartados se ven aparte, con «Volver a contar».
  */
-export function BloqueCompetencia({ skuId }: { skuId: string }) {
+export function BloqueCompetencia({ skuId, descartar = false }: { skuId: string; descartar?: boolean }) {
   const { precio: usd } = useMonedaCompetencia();
+  const { mostrarToast } = useToast();
   const [datos, setDatos] = useState<CompetenciaDeProducto[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [abierto, setAbierto] = useState<string | null>(null);
+  const [verDescartados, setVerDescartados] = useState<string | null>(null);
+  const [ocupado, setOcupado] = useState<string | null>(null);
+  const [, empezar] = useTransition();
+  // Mueve un competidor entre los que cuentan y los descartados al guardar, sin volver a pedir todo.
+  const mover = (codigo: string, id: string, volver: boolean) =>
+    setDatos((ds) =>
+      (ds ?? []).map((d) => {
+        if (d.codigo !== codigo) return d;
+        const desde = volver ? d.descartados : d.competidores;
+        const c = desde.find((x) => x.id === id);
+        if (!c) return d;
+        const sin = <T extends { id: string }>(l: T[]) => l.filter((x) => x.id !== id);
+        const precio = (a: { precio: number | null }, b: { precio: number | null }) => (a.precio ?? 1e9) - (b.precio ?? 1e9);
+        return volver
+          ? { ...d, descartados: sin(d.descartados), competidores: [...d.competidores, c].sort(precio) }
+          : { ...d, competidores: sin(d.competidores), descartados: [...d.descartados, { ...c, motivo: "Descartado a mano: no es el mismo producto" }].sort(precio) };
+      }),
+    );
+  const cambiar = (d: CompetenciaDeProducto, id: string, volver: boolean) => {
+    setOcupado(id);
+    empezar(async () => {
+      const r = await descartarCompetidor(skuId, id, d.nuestrosIds, volver).catch(() => ({ error: "No se pudo. Inténtalo de nuevo.", detalle: undefined }));
+      setOcupado(null);
+      if (!r.error) mover(d.codigo, id, volver);
+      mostrarToast(r.error ?? r.detalle ?? "Listo", r.error ? "destructive" : undefined);
+    });
+  };
   useEffect(() => {
+    // Cada uso lleva `key={skuId}`: con otro producto el bloque se vuelve a montar vacío.
     let vigente = true;
-    setDatos(null);
     obtenerCompetenciaProducto(skuId).then((r) => {
       if (!vigente) return;
       if (r.error) setError(r.error);
@@ -212,6 +244,17 @@ export function BloqueCompetencia({ skuId }: { skuId: string }) {
                           >
                             {abierto === c.id ? "Ocultar historial" : "Historial"}
                           </button>
+                          {descartar && d.nuestrosIds.length > 0 && (
+                            <button
+                              type="button"
+                              disabled={ocupado === c.id}
+                              onClick={() => cambiar(d, c.id, false)}
+                              aria-label={`No es el mismo producto: dejar de contar «${c.nombre}» de ${c.proveedor}`}
+                              className={`rounded-md px-1.5 py-0.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-60 ${anilloFoco}`}
+                            >
+                              {ocupado === c.id ? "Guardando…" : "No es el mismo"}
+                            </button>
+                          )}
                         </span>
                       </div>
                       {abierto === c.id && <HistorialCompetencia productoId={c.id} pais={d.codigo} />}
@@ -219,6 +262,43 @@ export function BloqueCompetencia({ skuId }: { skuId: string }) {
                   );
                 })}
               </ul>
+            )}
+            {d.descartados.length > 0 && (
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  aria-expanded={verDescartados === d.codigo}
+                  onClick={() => setVerDescartados(verDescartados === d.codigo ? null : d.codigo)}
+                  className={`self-start rounded-md px-1.5 py-0.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground ${anilloFoco}`}
+                >
+                  {verDescartados === d.codigo ? "Ocultar" : "Ver"} {d.descartados.length === 1 ? "1 descartado" : `${d.descartados.length} descartados`}: no son el mismo producto
+                </button>
+                {verDescartados === d.codigo && (
+                  <ul className="flex flex-col divide-y divide-border rounded-lg border border-dashed border-border-control">
+                    {d.descartados.map((c) => (
+                      <li key={c.id} className="flex items-start gap-3 px-3 py-2.5">
+                        <FotoAmpliable url={c.foto} nombre={c.nombre} tam="h-10 w-10" />
+                        <span className="flex min-w-0 flex-1 flex-col">
+                          <span className="text-sm font-medium break-words">{c.proveedor}</span>
+                          <span className="text-xs break-words text-muted-foreground">«{c.nombre}» · {usd(c.precio)}</span>
+                          {c.motivo && <span className="text-xs break-words text-muted-foreground">{c.motivo}</span>}
+                        </span>
+                        {descartar && d.nuestrosIds.length > 0 && (
+                          <button
+                            type="button"
+                            disabled={ocupado === c.id}
+                            onClick={() => cambiar(d, c.id, true)}
+                            aria-label={`Volver a contar «${c.nombre}» de ${c.proveedor} como competencia`}
+                            className={`shrink-0 rounded-md px-1.5 py-0.5 text-xs text-primario hover:bg-muted disabled:opacity-60 ${anilloFoco}`}
+                          >
+                            {ocupado === c.id ? "Guardando…" : "Volver a contar"}
+                          </button>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             )}
           </div>
         );

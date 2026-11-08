@@ -45,7 +45,7 @@ test("republicar: 30 días sin ninguna venta, activa y de nuestra bodega (nunca 
   assert.equal(r({ ...base, bodegaId: b280 }, hoy), false, "la B280 es de Dropi: no se republica");
   assert.equal(r({ ...base, privada: true }, hoy), false, "una privada no se republica");
   assert.equal(r({ ...base, stock: 0 }, hoy), false, "sin stock no se republica");
-  assert.equal(r({ ...base, stock: 12 }, hoy), true);
+  assert.equal(r({ ...base, stock: 12 }, hoy, { dias_republicar: 30, stock_minimo_republicar: 0 }), true);
   // Un pedido en 30 días que se canceló no cuenta: sin ventas netas, sale.
   assert.equal(r({ ...base, ultimaVenta: "2026-10-04", netas30: 0 }, hoy), true, "su único pedido se canceló");
   assert.equal(r({ ...base, ultimaVenta: "2026-10-04", netas30: 2 }, hoy), false, "vendió en 30 días");
@@ -59,6 +59,10 @@ test("republicar: 30 días sin ninguna venta, activa y de nuestra bodega (nunca 
   assert.equal(r({ ...base, enDropi: "archivado" }, hoy), false);
   assert.equal(r({ ...base, hayVentas: false }, hoy), false, "sin datos de Dropi no se sabe");
   assert.equal(r(base, hoy, { dias_republicar: 60 }), false, "el plazo sale de las reglas");
+  assert.equal(r({ ...base, stock: 29 }, hoy), false, "con menos de 30 unidades no se invita a republicar");
+  assert.equal(r({ ...base, stock: 30 }, hoy), true, "30 ya alcanza");
+  assert.equal(r({ ...base, stock: 10 }, hoy, { dias_republicar: 30, stock_minimo_republicar: 0 }), true, "en 0 no hay mínimo");
+  assert.equal(r({ ...base, stock: 40 }, hoy, { dias_republicar: 30, stock_minimo_republicar: 50 }), false, "el mínimo sale de las reglas");
 });
 
 test("la bodega de Dropi de cada país: B280 Panamá, B15 Costa Rica, B49 México", async () => {
