@@ -1,13 +1,15 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModuloEscritura } from "@/lib/auth";
+import { MOTIVO_A_MANO } from "@/lib/competencia/descartar";
 import { getPaisActual } from "@/lib/pais";
 import { getPlataformaActual } from "@/lib/plataforma-actual";
 import { leerVerificacion } from "@/lib/imagen/ia-imagen";
 import { MAX_POR_PEDIDO, pedidoCompararCompetencia } from "@/lib/competencia/verificar-ia";
 import { pedirIA, proveedorTexto } from "@/lib/publicaciones/ia/proveedor";
-import { cargarDatosCompetencia } from "./datos-competencia";
+import { cargarDatosCompetencia, TABLAS } from "./datos-competencia";
 import type { ProductoC } from "./def-competencia";
 import { createServiceClient } from "@/lib/supabase/server";
 import { PAIS_DE_EFFI, sincronizarEffi, type ResumenLecturaEffi } from "@/lib/effi/sincronizar";
@@ -93,4 +95,43 @@ export async function revisarDudososConIA(): Promise<{ error: string } | { revis
   revalidatePath("/analisis-competencia/resumen");
   const cuenta = (v: string) => filas.filter((f) => f.veredicto === v).length;
   return { revisados: filas.length, mismos: cuenta("mismo"), parecidos: cuenta("parecido"), distintos: cuenta("distinto"), quedan: Math.max(0, datos.dudososSinRevisar - filas.length) };
+}
+
+/**
+ * «Es el mismo» / «No es el mismo» de un producto de la competencia frente a uno nuestro (8 nov 2026, pedido de Alcides: los dudosos se confirman o se quitan a
+ * mano, como en la ficha de Gestión de IDs Dropi). Guarda el veredicto del par en `competencia_verificaciones` (migración 0246) para la plataforma de la barra:
+ * «mismo» lo cuenta como igual (precio, posición, alertas), «distinto» lo quita. Con `null` borra el veredicto y el par vuelve a la regla de nombres y fotos.
+ * La IA no vuelve a revisar un par con veredicto.
+ */
+export async function decidirParCompetencia(productoId: string, nuestroId: string, veredicto: "mismo" | "distinto" | null): Promise<{ error?: string; detalle?: string }> {
+  const usuario = await requireModuloEscritura("analisis-competencia");
+  if (!UUID.test(productoId) || !UUID.test(nuestroId) || (veredicto !== null && veredicto !== "mismo" && veredicto !== "distinto")) return { error: "Datos no válidos." };
+  const supabase = createServiceClient();
+  const pais = await getPaisActual(supabase);
+  const plataforma = await getPlataformaActual(pais.codigo);
+  const tabla = TABLAS[plataforma].productos;
+  const { data: filas } = await supabase.from(tabla).select("id, pais_id, es_nuestro, nombre, proveedor_nombre").in("id", [productoId, nuestroId]);
+  const otro = (filas ?? []).find((f) => f.id === productoId);
+  const nuestro = (filas ?? []).find((f) => f.id === nuestroId);
+  if (!otro || otro.es_nuestro || otro.pais_id !== pais.id) return { error: "Ese producto de la competencia ya no está en el país elegido." };
+  if (!nuestro || !nuestro.es_nuestro || nuestro.pais_id !== pais.id) return { error: "Nuestro producto ya no está en el país elegido." };
+  const par = { plataforma, producto_id: productoId, nuestro_id: nuestroId };
+  const { error } =
+    veredicto === null
+      ? await supabase.from("competencia_verificaciones").delete().match(par)
+      : await supabase
+          .from("competencia_verificaciones")
+          .upsert({ ...par, veredicto, motivo: veredicto === "mismo" ? `Confirmado a mano (${usuario.nombre ?? "sin nombre"})` : `${MOTIVO_A_MANO} (${usuario.nombre ?? "sin nombre"})`, creado_por: usuario.id }, { onConflict: "plataforma,producto_id,nuestro_id" });
+  if (error) return { error: "No se pudo guardar (¿falta la migración 0246?)." };
+  await registrarAuditoria({
+    accion: veredicto === "mismo" ? "competencia_es_el_mismo" : veredicto === "distinto" ? "competencia_no_es_el_mismo" : "competencia_volver_a_revisar",
+    entidad: tabla,
+    entidadId: productoId,
+    detalle: `«${otro.nombre}» de ${otro.proveedor_nombre} frente a «${nuestro.nombre}» · ${pais.nombre}`,
+  });
+  revalidatePath("/analisis-competencia", "layout");
+  revalidatePath("/publicaciones-dropi");
+  return {
+    detalle: veredicto === "mismo" ? `«${otro.nombre}» cuenta como el mismo producto.` : veredicto === "distinto" ? `«${otro.nombre}» ya no cuenta como competencia de «${nuestro.nombre}».` : `«${otro.nombre}» vuelve a la regla de nombres y fotos.`,
+  };
 }

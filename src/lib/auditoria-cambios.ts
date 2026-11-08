@@ -85,6 +85,8 @@ export const ETIQUETA_ACCION: Record<string, string> = {
   crear_tarea_publicacion: "Agregó una tarea",
   resolver_tarea_publicacion: "Resolvió una tarea",
   publicacion_liquidacion: "La puso en liquidación",
+  competencia_es_el_mismo: "Confirmó que es el mismo producto",
+  competencia_volver_a_revisar: "Quitó la decisión: vuelve a la regla de nombres y fotos",
   competencia_no_es_el_mismo: "Descartó un competidor: no es el mismo producto",
   competencia_volver_a_contar: "Volvió a contar un competidor",
   publicacion_vende_poco_espera: "Eligió esperar un mes en «Vende poco»",

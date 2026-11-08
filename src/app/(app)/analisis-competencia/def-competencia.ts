@@ -21,6 +21,8 @@ export interface ProductoC {
   dudosoDe: string | null;
   /** Lo que dijo la IA al revisar el par (migración 0246): «mismo» lo vuelve igual, «distinto» lo quita, «parecido» lo deja dudoso. `null` si no lo revisó. */
   revision: { veredicto: "mismo" | "parecido" | "distinto"; motivo: string | null } | null;
+  /** El nuestro con el que una persona o la IA dijo «No es el mismo» (8 nov 2026): ya no cuenta, pero se puede volver a revisar. */
+  descartadoDe: string | null;
   parecido: number | null;
   metodo: string | null;
   primeraVez: string;
