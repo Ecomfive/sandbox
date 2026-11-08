@@ -27,8 +27,11 @@ export default async function ReglasPage() {
       <EncabezadoPagina titulo="Reglas" oculto />
       <ContadorPestana href="/publicaciones-dropi/recomendaciones" cargar={contarRecomendacionesPendientes} />
       <FormularioReglas reglas={guardadas.reglas} cambios={guardadas.cambios} disponible={guardadas.disponible} puedeEscribir={puedeEscribir} />
-      <IndicacionesIA indicaciones={ia.indicaciones} disponible={ia.disponible} puedeEscribir={puedeEscribir} />
-      <EstilosImagen estilos={imagenes.estilos} disponible={imagenes.disponible} puedeEscribir={puedeEscribir} conectado={proveedorTexto() !== null} />
+      {/* Lo de la IA también en dos columnas en pantalla ancha. */}
+      <div className="grid gap-6 xl:grid-cols-2 xl:items-start">
+        <IndicacionesIA indicaciones={ia.indicaciones} disponible={ia.disponible} puedeEscribir={puedeEscribir} />
+        <EstilosImagen estilos={imagenes.estilos} disponible={imagenes.disponible} puedeEscribir={puedeEscribir} conectado={proveedorTexto() !== null} />
+      </div>
     </Pagina>
   );
 }

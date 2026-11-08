@@ -78,7 +78,7 @@ export function EstilosImagen({ estilos, disponible, puedeEscribir, conectado }:
   }
 
   return (
-    <section aria-labelledby="estilos-imagen-ia" aria-busy={ocupado} className="flex max-w-3xl flex-col rounded-xl border border-border bg-card">
+    <section aria-labelledby="estilos-imagen-ia" aria-busy={ocupado} className="flex min-w-0 flex-col rounded-xl border border-border bg-card">
       <div className="flex items-center justify-between gap-3 border-b border-border bg-muted px-4 py-2">
         <h2 id="estilos-imagen-ia" className="m-0 flex items-center gap-2 text-sm font-semibold">
           <ImagenIcono className="h-4 w-4 text-primario" />
