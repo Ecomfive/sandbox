@@ -744,7 +744,7 @@ function ContenidoFicha({
           {/* La competencia del producto vinculado: los mismos datos que se ven en su ficha de Producto y en Compras. Un compuesto no la tiene. */}
           {p.sku && p.sku.tipo !== "combo" && (
             <Seccion icono={InteligenciaIcon} titulo="Competencia del producto">
-              <BloqueCompetencia key={p.sku.id} skuId={p.sku.id} />
+              <BloqueCompetencia key={p.sku.id} skuId={p.sku.id} descartar={puedeEscribir} />
             </Seccion>
           )}
 

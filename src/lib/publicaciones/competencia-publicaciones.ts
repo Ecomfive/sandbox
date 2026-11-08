@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { precioEquivalente, unidadesBajadas, type CambioStock } from "@/lib/competencia/analisis";
+import { clavesDistintas, descartadoPara } from "@/lib/competencia/descartar";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 
 export interface CompetidorBarato {
@@ -42,7 +43,18 @@ export async function cargarCompetidores(supabase: SupabaseClient, paisId: strin
       ),
     ]);
     const dropiDe = new Map(nuestros.map((n) => [n.id, Number(n.dropi_producto_id)]));
-    const deNuestros = otros.filter((o) => dropiDe.has(o.igual_a));
+    // «No es el mismo» (8 nov 2026): lo que una persona o la IA descartó no cuenta (migración 0246; sin ella, nada).
+    let distintas = new Set<string>();
+    try {
+      distintas = clavesDistintas(
+        await traerTodasLasFilas<{ id: string; producto_id: string; nuestro_id: string; veredicto: string }>((d, h) =>
+          supabase.from("competencia_verificaciones").select("id, producto_id, nuestro_id, veredicto").eq("plataforma", "dropi").eq("veredicto", "distinto").order("id").range(d, h),
+        ),
+      );
+    } catch {
+      // Sin la tabla: nada descartado.
+    }
+    const deNuestros = otros.filter((o) => dropiDe.has(o.igual_a) && !descartadoPara(o.id, [o.igual_a], distintas));
     const vendido = await vendidoEn30Dias(
       supabase,
       deNuestros.map((o) => o.id),

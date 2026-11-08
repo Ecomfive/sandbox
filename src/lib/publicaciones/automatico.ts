@@ -54,7 +54,7 @@ export const ACCIONES: { valor: Accion | "al_dia"; etiqueta: string; color: stri
 export function detalleAccion(valor: Accion | "al_dia", r: Reglas, codigoPais?: string): string {
   const pct = (v: number) => `${(Math.round(v * 1000) / 10).toLocaleString("es-PA")} %`;
   if (valor === "margen_bajo") return `Margen bruto menor a ${pct(r.margen_minimo)}`;
-  if (valor === "republicar") return `${r.dias_republicar} días sin ninguna venta y es de nuestra bodega (no la ${codigoBodegaDropi(codigoPais)})`;
+  if (valor === "republicar") return `${r.dias_republicar} días sin ninguna venta, es de nuestra bodega (no la ${codigoBodegaDropi(codigoPais)})${r.stock_minimo_republicar > 0 ? ` y tiene ${r.stock_minimo_republicar.toLocaleString("es-PA")} unidades o más` : ""}`;
   if (valor === "vende_poco") return `Activas con stock que venden menos de ${r.venta_minima_mes.toLocaleString("es-PA")} unidades en 30 días: revisar el precio`;
   if (valor === "ventas_caida") return `En 30 días vende menos del ${pct(r.caida_ventas)} de los 30 anteriores`;
   return ACCIONES.find((a) => a.valor === valor)?.detalle ?? "";
@@ -171,11 +171,15 @@ export const esBodegaDropi = (id: number | null | undefined): boolean => id !== 
 export function necesitaRepublicar(
   p: { archivada: boolean; enDropi: EnDropi; bodegaId: number | null; hayVentas: boolean; ultimaVenta: string | null; publicadaDesde: string | null; privada?: boolean; stock?: number | null; netas30?: number | null },
   hoy: string,
-  reglas: Pick<Reglas, "dias_republicar"> = REGLAS_DEFECTO,
+  reglas: Pick<Reglas, "dias_republicar"> & Partial<Pick<Reglas, "stock_minimo_republicar">> = REGLAS_DEFECTO,
 ): boolean {
   // Una privada no se republica (pedido de Alcides, 25 oct 2026): es de un solo dropshipper y republicarla le cambia el ID.
   // Sin stock no se republica (25 oct 2026, pedido de Alcides): no vende porque no hay qué vender, no porque esté vieja.
   if (p.stock != null && p.stock <= 0) return false;
+  // Con poco stock tampoco (8 nov 2026, pedido de Alcides: con casi nada de inventario quizá no se vuelva a comprar): menos de
+  // `stock_minimo_republicar` (30) unidades no sale. En 0 no hay mínimo. Sin stock conocido, no se sabe: sale como antes.
+  const minimo = reglas.stock_minimo_republicar ?? REGLAS_DEFECTO.stock_minimo_republicar;
+  if (p.stock != null && minimo > 0 && p.stock < minimo) return false;
   if (p.privada || p.archivada || p.enDropi !== "activo" || !p.hayVentas || p.bodegaId === null || esBodegaDropi(p.bodegaId)) return false;
   const n = reglas.dias_republicar;
   // Con la regla en 30 días, cuentan las ventas netas (un pedido cancelado, rechazado o devuelto no es venta; 25 oct 2026, PUB-0132:

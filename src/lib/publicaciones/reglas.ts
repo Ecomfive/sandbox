@@ -25,6 +25,7 @@ export type ClaveRegla =
   | "min_ventas_antes"
   | "dias_nuevo"
   | "dias_republicar"
+  | "stock_minimo_republicar"
   | "venta_minima_mes"
   | "combo_min_ventas"
   | "combo_descuento"
@@ -42,6 +43,7 @@ export const REGLAS: DefRegla[] = [
   { clave: "min_ventas_antes", grupo: "ventas", etiqueta: "Ventas mínimas para comparar", descripcion: "La caída solo se mide si en los 30 días anteriores vendió al menos esto.", unidad: "unidades", defecto: 10, min: 1, max: 1000 },
   { clave: "dias_nuevo", grupo: "ventas", etiqueta: "Días de producto nuevo", descripcion: "Un producto publicado hace menos de estos días todavía no se verifica con su dropshipper.", unidad: "dias", defecto: 30, min: 1, max: 365 },
   { clave: "dias_republicar", grupo: "ventas", etiqueta: "Días sin vender para republicar", descripcion: "Una publicación de nuestra bodega (no de la bodega de Dropi: B280 en Panamá, B15 en Costa Rica, B49 en México) que lleva estos días sin ninguna venta sale en «Republicar».", unidad: "dias", defecto: 30, min: 7, max: 365 },
+  { clave: "stock_minimo_republicar", grupo: "ventas", etiqueta: "Stock mínimo para republicar", descripcion: "Con menos unidades que esto no sale en «Republicar»: con casi nada de inventario no vale la pena (en 0 no hay mínimo). Desde la ficha se puede republicar igual.", unidad: "unidades", defecto: 30, min: 0, max: 100000 },
   { clave: "venta_minima_mes", grupo: "ventas", etiqueta: "Ventas mínimas al mes", descripcion: "Una publicación activa, con stock y publicada hace más de un mes que en 30 días vende menos que esto sale en «Vende poco», para revisar su precio.", unidad: "unidades", defecto: 100, min: 1, max: 100000 },
   { clave: "combo_min_ventas", grupo: "combo", etiqueta: "Ventas mínimas para sugerir un combo", descripcion: "Solo se sugiere un combo x2 si vendió al menos esto en 30 días.", unidad: "unidades", defecto: 5, min: 0, max: 1000 },
   { clave: "min_titulo", grupo: "optimizacion", etiqueta: "Largo mínimo del título", descripcion: "Un título más corto desaprovecha espacio para la cantidad y para qué sirve: se recomienda alargarlo.", unidad: "unidades", defecto: 35, min: 5, max: 200 },
