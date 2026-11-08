@@ -2,7 +2,7 @@
 // orden que el CSV de «Descargar», con las columnas de `def.pdf` (o las primeras con datos), en una hoja horizontal con su título, la fecha y el número de
 // página. Se arma en el navegador con pdf-lib, sin pedirle nada al servidor. Lógica sin React, con prueba.
 
-import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
+import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFImage, type PDFPage } from "pdf-lib";
 import { columnasDeDescarga, type CeldaCsv, type ColumnaDescarga } from "./csv";
 import type { DefTabla } from "./motor";
 
@@ -15,6 +15,11 @@ const LINEA = 9.5;
 const MAX_LINEAS = 3;
 const PADDING = 4;
 const MAX_COLUMNAS = 9;
+/** La foto de cada fila (8 nov 2026, pedido de Alcides), si la tabla la da con `def.pdfFoto`: un cuadrado de este lado, en la primera columna. */
+const FOTO = 36;
+const ANCHO_FOTO = FOTO + PADDING * 2;
+/** Fotos que se piden a la vez. */
+const A_LA_VEZ = 6;
 
 const TEXTO = rgb(0.09, 0.09, 0.11);
 const GRIS = rgb(0.42, 0.42, 0.44);
@@ -89,17 +94,39 @@ export function partirEnLineas(texto: string, medir: (t: string) => number, anch
 }
 
 /** El ancho de cada columna: lo que ocupa su texto más largo (entre un mínimo y un máximo), repartido para llenar la hoja. */
-function anchos(textos: string[][], encabezados: string[], fuente: PDFFont, negrita: PDFFont): number[] {
+function anchos(textos: string[][], encabezados: string[], fuente: PDFFont, negrita: PDFFont, util = UTIL): number[] {
   const natural = encabezados.map((h, i) => {
     const largo = Math.max(negrita.widthOfTextAtSize(h, TAM), ...textos.map((fila) => fuente.widthOfTextAtSize(fila[i], TAM)));
     return Math.min(Math.max(largo + PADDING * 2, 42), 230);
   });
   const total = natural.reduce((a, b) => a + b, 0);
-  return natural.map((w) => (w / total) * UTIL);
+  return natural.map((w) => (w / total) * util);
 }
 
-/** El PDF de las filas que se ven, con `titulo` arriba (el de la página). */
-export async function filasAPdf<F>(def: DefTabla<F>, filas: F[], titulo: string, fecha = new Date()): Promise<Uint8Array> {
+/** Una foto lista para el PDF: los bytes de un JPEG (lo achica quien la trae, en el navegador). null si no se pudo traer. */
+export type CargarFoto = (url: string) => Promise<Uint8Array | null>;
+
+/** Las fotos de las filas, cada dirección una vez y de a `A_LA_VEZ`. Una que falla queda sin foto. */
+async function fotosDeFilas(doc: PDFDocument, urls: (string | null)[], cargar: CargarFoto): Promise<Map<string, PDFImage>> {
+  const unicas = [...new Set(urls.filter((u): u is string => !!u))];
+  const out = new Map<string, PDFImage>();
+  for (let i = 0; i < unicas.length; i += A_LA_VEZ) {
+    await Promise.all(
+      unicas.slice(i, i + A_LA_VEZ).map(async (url) => {
+        try {
+          const bytes = await cargar(url);
+          if (bytes) out.set(url, await doc.embedJpg(bytes));
+        } catch {
+          // Sin esa foto.
+        }
+      }),
+    );
+  }
+  return out;
+}
+
+/** El PDF de las filas que se ven, con `titulo` arriba (el de la página). Con `def.pdfFoto` y `cargarFoto`, la primera columna es la foto de cada fila. */
+export async function filasAPdf<F>(def: DefTabla<F>, filas: F[], titulo: string, fecha = new Date(), cargarFoto?: CargarFoto): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   doc.setTitle(textoPdf(titulo));
   doc.setAuthor("Ecomfive");
@@ -110,7 +137,11 @@ export async function filasAPdf<F>(def: DefTabla<F>, filas: F[], titulo: string,
   const columnas = columnasPdf(def, filas);
   const encabezados = columnas.map((c) => textoPdf(c.etiqueta));
   const textos = filas.map((f) => columnas.map((c) => textoPdf(celdaPdf(c.valor(f), c.tipo))));
-  const w = anchos(textos, encabezados, fuente, negrita);
+  const urlsFoto = def.pdfFoto && cargarFoto ? filas.map((f) => def.pdfFoto!(f)) : null;
+  const fotos = urlsFoto ? await fotosDeFilas(doc, urlsFoto, cargarFoto!) : new Map<string, PDFImage>();
+  const conFoto = !!urlsFoto;
+  const izquierda = conFoto ? ANCHO_FOTO : 0;
+  const w = anchos(textos, encabezados, fuente, negrita, UTIL - izquierda);
   const derecha = columnas.map((c) => c.tipo === "numero");
   const cuando = fecha.toLocaleString("es-PA", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/Panama" });
   const subtitulo = textoPdf(`${filas.length.toLocaleString("es-PA")} ${filas.length === 1 ? "fila" : "filas"} · descargado el ${cuando}`);
@@ -119,14 +150,28 @@ export async function filasAPdf<F>(def: DefTabla<F>, filas: F[], titulo: string,
   let pagina!: PDFPage;
   let y = 0;
 
-  const filaDeTexto = (celdas: string[], fuenteFila: PDFFont, fondo: ReturnType<typeof rgb> | null) => {
+  const filaDeTexto = (celdas: string[], fuenteFila: PDFFont, fondo: ReturnType<typeof rgb> | null, foto?: PDFImage | null) => {
     const lineas = celdas.map((t, i) => partirEnLineas(t, (x) => fuenteFila.widthOfTextAtSize(x, TAM), w[i] - PADDING * 2));
-    const alto = Math.max(1, ...lineas.map((l) => l.length)) * LINEA + PADDING * 2 - 2;
-    return { lineas, alto, fondo, fuenteFila };
+    const texto = Math.max(1, ...lineas.map((l) => l.length)) * LINEA + PADDING * 2 - 2;
+    // Con fotos, toda fila de datos (con foto o sin ella) tiene el alto de la foto: así las filas se ven parejas.
+    const alto = conFoto && foto !== undefined ? Math.max(texto, FOTO + PADDING * 2) : texto;
+    return { lineas, alto, fondo, fuenteFila, foto };
   };
   const dibujar = (f: ReturnType<typeof filaDeTexto>) => {
     if (f.fondo) pagina.drawRectangle({ x: MARGEN, y: y - f.alto, width: UTIL, height: f.alto, color: f.fondo });
-    let x = MARGEN;
+    if (conFoto && f.foto !== undefined) {
+      const caja = { x: MARGEN + PADDING, y: y - PADDING - FOTO, lado: FOTO };
+      if (f.foto) {
+        // La foto entera, sin estirar, centrada en su cuadrado.
+        const k = Math.min(caja.lado / f.foto.width, caja.lado / f.foto.height);
+        const fw = f.foto.width * k;
+        const fh = f.foto.height * k;
+        pagina.drawImage(f.foto, { x: caja.x + (caja.lado - fw) / 2, y: caja.y + (caja.lado - fh) / 2, width: fw, height: fh });
+      } else {
+        pagina.drawRectangle({ x: caja.x, y: caja.y, width: caja.lado, height: caja.lado, borderColor: BORDE, borderWidth: 0.6, borderDashArray: [2, 2] });
+      }
+    }
+    let x = MARGEN + izquierda;
     f.lineas.forEach((ls, i) => {
       ls.forEach((linea, j) => {
         const ancho = f.fuenteFila.widthOfTextAtSize(linea, TAM);
@@ -139,6 +184,12 @@ export async function filasAPdf<F>(def: DefTabla<F>, filas: F[], titulo: string,
     pagina.drawLine({ start: { x: MARGEN, y }, end: { x: MARGEN + UTIL, y }, thickness: 0.4, color: BORDE });
   };
   const cabecera = filaDeTexto(encabezados, negrita, CABECERA);
+  // «Foto» en la cabecera, sobre la columna de las fotos.
+  const dibujarCabecera = () => {
+    const arriba = y;
+    dibujar(cabecera);
+    if (conFoto) pagina.drawText("Foto", { x: MARGEN + PADDING, y: arriba - PADDING - TAM + 1, size: TAM, font: negrita, color: TEXTO });
+  };
   const nuevaPagina = () => {
     pagina = doc.addPage([ANCHO, ALTO]);
     paginas.push(pagina);
@@ -148,7 +199,7 @@ export async function filasAPdf<F>(def: DefTabla<F>, filas: F[], titulo: string,
       pagina.drawText(subtitulo, { x: MARGEN, y: y - 28, size: 8.5, font: fuente, color: GRIS });
       y -= 40;
     }
-    dibujar(cabecera);
+    dibujarCabecera();
   };
 
   nuevaPagina();
@@ -156,7 +207,8 @@ export async function filasAPdf<F>(def: DefTabla<F>, filas: F[], titulo: string,
     pagina.drawText("No hay filas para mostrar.", { x: MARGEN, y: y - 16, size: 9, font: fuente, color: GRIS });
   }
   textos.forEach((celdas, n) => {
-    const f = filaDeTexto(celdas, fuente, n % 2 ? CEBRA : null);
+    const url = urlsFoto?.[n] ?? null;
+    const f = filaDeTexto(celdas, fuente, n % 2 ? CEBRA : null, conFoto ? (url ? (fotos.get(url) ?? null) : null) : undefined);
     if (y - f.alto < MARGEN + 18) nuevaPagina();
     dibujar(f);
   });

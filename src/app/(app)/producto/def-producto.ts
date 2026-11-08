@@ -218,6 +218,7 @@ export const DEF_PRODUCTO: DefTabla<FilaProducto> = {
   ],
   // El PDF de «Descargar» (8 nov 2026): lo que hace falta para enviarlo a alguien.
   pdf: ["N.º", "SKU", "Producto", "Tipo", "Estado", "Categoría", "Código de barras", "Unidades compradas"],
+  pdfFoto: (p) => p.foto,
   csvAntes: [
     { etiqueta: "N.º", valor: (p) => (p.numero === null ? "" : String(p.numero)) },
     { etiqueta: "SKU", valor: (p) => p.codigo },

@@ -440,6 +440,7 @@ export const DEF_PUBLICACIONES: DefTabla<FilaPublicacion> = {
   ],
   // El PDF de «Descargar» (8 nov 2026): lo que hace falta para enviarlo a alguien.
   pdf: ["N.º", "ID Dropi", "Nombre", "SKU", "Precio de venta", "Margen (%)", "Ventas 30 días (Dropi)", "Stock en Dropi", "Acción"],
+  pdfFoto: (f) => f.fotoUrl,
 };
 
 

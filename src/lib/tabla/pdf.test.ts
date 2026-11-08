@@ -42,4 +42,7 @@ test("PDF de una tabla: columnas, celdas y texto que se puede dibujar", async ()
   const bytes = await filasAPdf(DEF, Array.from({ length: 120 }, (_, i) => ({ ...FILAS[i % 2], n: i + 1 })), "Gestión de IDs Dropi");
   assert.equal(new TextDecoder().decode(bytes.slice(0, 5)), "%PDF-");
   assert.ok(bytes.length > 1000);
+  // Con foto por fila: una que no se pudo traer queda sin foto y el PDF se arma igual.
+  const conFoto = await filasAPdf({ ...DEF, pdfFoto: (f) => (f.n === 1 ? "https://ejemplo/x.jpg" : null) }, FILAS, "Con fotos", new Date(), async () => null);
+  assert.equal(new TextDecoder().decode(conFoto.slice(0, 5)), "%PDF-");
 });
