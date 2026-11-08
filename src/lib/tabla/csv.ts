@@ -37,8 +37,15 @@ function valorDeCampo<F>(campo: CampoDef<F>, fila: F, etiquetas: Map<string, str
   }
 }
 
-/** Encabezado y una línea por fila: primero las columnas de `csvAntes` de la tabla y luego cada campo. */
-export function filasACsv<F>(def: DefTabla<F>, filas: F[]): string {
+/** Una columna de lo que se descarga (CSV o PDF): su nombre, su tipo y cómo se lee de una fila. */
+export interface ColumnaDescarga<F> {
+  etiqueta: string;
+  tipo: "texto" | "numero" | "fecha" | "seleccion";
+  valor: (fila: F) => CeldaCsv;
+}
+
+/** Las columnas que se descargan: primero las de `csvAntes` de la tabla y luego cada campo (sin los `sinCsv`). */
+export function columnasDeDescarga<F>(def: DefTabla<F>, filas: F[]): ColumnaDescarga<F>[] {
   const antes = def.csvAntes ?? [];
   const campos = def.campos.filter((c) => !c.sinCsv);
   const etiquetas = new Map<string, Map<string, string>>();
@@ -47,11 +54,17 @@ export function filasACsv<F>(def: DefTabla<F>, filas: F[]): string {
       etiquetas.set(campo.id, new Map(opcionesDeSeleccion(def, filas, campo.id).map((o) => [o.valor, o.etiqueta])));
     }
   }
-  const lineas = [[...antes.map((a) => a.etiqueta), ...campos.map((c) => c.etiqueta)].map(celdaCsv).join(",")];
-  for (const fila of filas) {
-    const celdas = [...antes.map((a) => a.valor(fila)), ...campos.map((c) => valorDeCampo(c, fila, etiquetas.get(c.id)))];
-    lineas.push(celdas.map(celdaCsv).join(","));
-  }
+  return [
+    ...antes.map((a) => ({ etiqueta: a.etiqueta, tipo: "texto" as const, valor: (f: F) => a.valor(f) })),
+    ...campos.map((c) => ({ etiqueta: c.etiqueta, tipo: c.tipo, valor: (f: F) => valorDeCampo(c, f, etiquetas.get(c.id)) })),
+  ];
+}
+
+/** Encabezado y una línea por fila: primero las columnas de `csvAntes` de la tabla y luego cada campo. */
+export function filasACsv<F>(def: DefTabla<F>, filas: F[]): string {
+  const columnas = columnasDeDescarga(def, filas);
+  const lineas = [columnas.map((c) => c.etiqueta).map(celdaCsv).join(",")];
+  for (const fila of filas) lineas.push(columnas.map((c) => celdaCsv(c.valor(fila))).join(","));
   return lineas.join("\r\n");
 }
 

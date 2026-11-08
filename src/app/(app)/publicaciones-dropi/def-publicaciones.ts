@@ -431,12 +431,15 @@ export const DEF_PUBLICACIONES: DefTabla<FilaPublicacion> = {
   csvAntes: [
     { etiqueta: "N.º", valor: (f) => numeroPublicacion(f.numero) },
     { etiqueta: "ID Dropi", valor: (f) => f.dropiId },
+    { etiqueta: "Nombre", valor: (f) => f.nombre },
     { etiqueta: "SKU", valor: (f) => f.sku?.codigo ?? "" },
     { etiqueta: "Ventas 30 días (Dropi)", valor: (f) => (f.ventas ? String(f.ventas.netas30) : "") },
     { etiqueta: "Stock en Dropi", valor: (f) => (f.stockProveedor !== null ? String(f.stockProveedor) : f.ventas ? String(f.ventas.stock) : "") },
     { etiqueta: "Bodega", valor: (f) => (f.bodega ? `${codigoBodega(f.bodega.id)} ${f.bodega.nombre}` : "") },
     { etiqueta: "Stock por bodega en Dropi", valor: (f) => (f.bodegasDropi ?? []).map((b) => `${codigoBodega(b.id)} ${b.nombre}: ${b.stock}`).join(" | ") },
   ],
+  // El PDF de «Descargar» (8 nov 2026): lo que hace falta para enviarlo a alguien.
+  pdf: ["N.º", "ID Dropi", "Nombre", "SKU", "Precio de venta", "Margen (%)", "Ventas 30 días (Dropi)", "Stock en Dropi", "Acción"],
 };
 
 
