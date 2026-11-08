@@ -41,6 +41,7 @@ import { BotonPrivatizarDropi, puedePrivatizar } from "./privatizar-dropi";
 import { EstadoCambioDropi } from "./estado-cambio-dropi";
 import { BodegasStockDropi } from "./stock-dropi";
 import { BotonLiquidacionFicha } from "./liquidacion";
+import { VendePocoEspera } from "./vende-poco-espera";
 import { TareasPublicacion } from "./tareas-publicacion";
 import { codigoBodega } from "@/lib/publicaciones/sincronizar-dropi";
 import { VinculoSku } from "./vinculo-sku";
@@ -447,6 +448,8 @@ function ContenidoFicha({
       {confirmandoRepublicar && <ConfirmarRepublicar p={p} enviando={republicando} alCerrar={() => setConfirmandoRepublicar(false)} alConfirmar={confirmarRepublicar} />}
       {/* Una publicación «Sin publicar»: lo que Dropi pide para crearla. Es un formulario aparte (uno no va dentro de otro). */}
       {p.sinPublicar && puedeEscribir && <DatosParaDropi p={p} opciones={opcionesCrear} />}
+      {/* «Vende poco» con «Esperar un mes» (8 nov 2026): fuera del formulario, su nota no enciende «Guardar cambios». */}
+      <VendePocoEspera p={p} puedeEscribir={puedeEscribir} />
       <form id={idFormulario} onSubmit={guardar} aria-busy={pendiente} className="flex flex-1 flex-col">
         {/* El cambio que espera «Aplicar en Dropi» se ve arriba; los botones van en la barra fija de abajo. */}
         {cambioEsperando && (

@@ -85,6 +85,8 @@ export const ETIQUETA_ACCION: Record<string, string> = {
   crear_tarea_publicacion: "Agregó una tarea",
   resolver_tarea_publicacion: "Resolvió una tarea",
   publicacion_liquidacion: "La puso en liquidación",
+  publicacion_vende_poco_espera: "Eligió esperar un mes en «Vende poco»",
+  publicacion_vende_poco_sin_espera: "Quitó la espera de «Vende poco»",
   publicacion_fin_liquidacion: "La sacó de liquidación",
   dropi_stock_pendiente: "Dejó pendiente un cambio de stock en Dropi",
   dropi_stock_cancelado: "Deshizo el cambio de stock antes de aplicarlo en Dropi",
