@@ -42,6 +42,7 @@ import { EstadoCambioDropi } from "./estado-cambio-dropi";
 import { BodegasStockDropi } from "./stock-dropi";
 import { BotonLiquidacionFicha } from "./liquidacion";
 import { VendePocoEspera } from "./vende-poco-espera";
+import { BarraOrdenable, ItemOrden } from "./orden-botones-ficha";
 import { TareasPublicacion } from "./tareas-publicacion";
 import { codigoBodega } from "@/lib/publicaciones/sincronizar-dropi";
 import { VinculoSku } from "./vinculo-sku";
@@ -764,7 +765,8 @@ function ContenidoFicha({
           Está fuera del formulario: «Guardar cambios» lo envía con el atributo form. */}
       {puedeEscribir && (
         <div role="region" aria-label="Acciones de la publicación" className="sticky bottom-0 z-[5] mt-auto flex flex-col gap-2 border-t border-border bg-card px-5 py-3 shadow-[0_-4px_12px_-6px_rgb(0_0_0/0.15)]">
-          <div className="flex flex-wrap gap-2">
+          {/* Cada persona ordena los botones como quiera (8 nov 2026): arrastrándolos o con Alt + flechas. «Guardar cambios» y «Cancelar» van primero. */}
+          <BarraOrdenable>
             {sinGuardar && (
               <>
                 <button type="submit" form={idFormulario} disabled={pendiente} className="inline-flex items-center gap-1.5 rounded-md bg-success px-3 py-2 text-sm font-medium text-background hover:bg-success/85 disabled:opacity-50">
@@ -777,18 +779,23 @@ function ContenidoFicha({
                 </button>
               </>
             )}
-            {!sinGuardar && puedeArchivar && p.sinPublicar && (
+            <ItemOrden id="publicar">
+              {!sinGuardar && puedeArchivar && p.sinPublicar && (
               <BotonAccion icono={CheckIcon} tono="exito" className={PENDIENTE_EN_COLOR} disabled={pendiente || p.publicarPendiente} onClick={publicar}>
                 {publicando ? "Un momento..." : p.publicarPendiente ? "Publicación pendiente" : "Publicar en Dropi"}
               </BotonAccion>
             )}
-            {!sinGuardar && puedeArchivar && eliminable && (
+            </ItemOrden>
+            <ItemOrden id="eliminar">
+              {!sinGuardar && puedeArchivar && eliminable && (
               <BotonAccion icono={PapeleraIcon} tono="peligro" disabled={pendiente} onClick={eliminar}>
                 {eliminando ? "Un momento..." : p.sinPublicar ? "Eliminar borrador" : "Eliminar"}
               </BotonAccion>
             )}
+            </ItemOrden>
             {/* Republicar, Apagar, Privatizar, Pausar y Archivar siempre se ven: si no se pueden usar, van apagados y dicen por qué (27 oct 2026). */}
-            {!sinGuardar && puedeArchivar && !p.sinPublicar &&
+            <ItemOrden id="republicar">
+              {!sinGuardar && puedeArchivar && !p.sinPublicar &&
               (sePuedeRepublicar ? (
                 <BotonAccion icono={ActualizarIcon} tono="info" className={PENDIENTE_EN_COLOR} disabled={pendiente || yaRepublicando} onClick={republicar}>
                   {republicando ? "Un momento..." : yaRepublicando ? "Republicación pendiente" : "Republicar"}
@@ -796,12 +803,16 @@ function ContenidoFicha({
               ) : (
                 <BotonAccionApagado icono={ActualizarIcon} texto="Republicar" motivo={motivoRepublicar(botones) ?? "No disponible"} />
               ))}
+            </ItemOrden>
             {/* «Apagar en Dropi»: sacar el stock y archivar allá, con sus privadas a elección. Queda pendiente para «Aplicar en Dropi». */}
-            {!sinGuardar && puedeArchivar && !p.sinPublicar &&
+            <ItemOrden id="apagar">
+              {!sinGuardar && puedeArchivar && !p.sinPublicar &&
               (puedeApagar(p) ? <BotonApagarDropi p={p} deshabilitado={pendiente} /> : <BotonAccionApagado icono={ApagarIcon} texto="Apagar en Dropi" motivo={motivoApagar(botones) ?? "No disponible"} />)}
+            </ItemOrden>
             {/* El candado: abierto en un público («Privatizar en Dropi», a un solo dropshipper en un producto privado nuevo); cerrado en un privado
                 («Quitar privatización», 30 oct 2026: sus unidades vuelven al público). */}
-            {!sinGuardar && puedeArchivar && !p.sinPublicar &&
+            <ItemOrden id="privatizar">
+              {!sinGuardar && puedeArchivar && !p.sinPublicar &&
               (p.tipoDropi === "privado" ? (
                 motivoQuitarPrivatizacion(botones) === null ? (
                   <BotonPrivatizarDropi p={p} deshabilitado={pendiente} />
@@ -813,7 +824,9 @@ function ContenidoFicha({
               ) : (
                 <BotonAccionApagado icono={CandadoAbiertoIcon} texto="Privatizar en Dropi" motivo={motivoPrivatizar(botones) ?? "No disponible"} />
               ))}
-            {!sinGuardar && puedeArchivar && !p.sinPublicar &&
+            </ItemOrden>
+            <ItemOrden id="pausar">
+              {!sinGuardar && puedeArchivar && !p.sinPublicar &&
               (estaPausada ? (
                 <BotonAccion icono={ReactivarIcon} tono="exito" disabled={pendiente} onClick={() => archivar()}>
                   {archivando ? "Un momento..." : "Reactivar"}
@@ -825,8 +838,12 @@ function ContenidoFicha({
               ) : (
                 <BotonAccionApagado icono={PausaIcon} texto="Pausar por falta de stock" motivo={motivoPausar(botones) ?? "No disponible"} />
               ))}
-            {!sinGuardar && puedeArchivar && <BotonLiquidacionFicha f={p} />}
-            {!sinGuardar && puedeArchivar &&
+            </ItemOrden>
+            <ItemOrden id="liquidacion">
+              {!sinGuardar && puedeArchivar && <BotonLiquidacionFicha f={p} />}
+            </ItemOrden>
+            <ItemOrden id="archivar">
+              {!sinGuardar && puedeArchivar &&
               (motivoArchivar(botones) === null ? (
                 <BotonAccion icono={ArchivarIcon} tono={p.archivada ? "exito" : "alerta"} disabled={pendiente} onClick={() => archivar()}>
                   {archivando ? "Un momento..." : p.archivada ? "Sacar de Archivados" : "Archivar"}
@@ -834,7 +851,8 @@ function ContenidoFicha({
               ) : (
                 <BotonAccionApagado icono={ArchivarIcon} texto={p.archivada ? "Sacar de Archivados" : "Archivar"} motivo={motivoArchivar(botones)!} />
               ))}
-          </div>
+            </ItemOrden>
+          </BarraOrdenable>
           {error && (
             <p role="alert" className="text-sm text-destructive">
               {error}
