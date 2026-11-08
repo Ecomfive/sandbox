@@ -99,6 +99,10 @@ export function FichaProducto({
   // Sube cada vez que se cambia el estado, para que la línea de tiempo se vuelva a pedir.
   const [version, setVersion] = useState(0);
   const [unirAbierto, setUnirAbierto] = useState(false);
+  // El estado recién cambiado (8 nov 2026): la ficha abierta encima de otro módulo (Gestión de IDs, Compras…) no recibe la fila nueva del servidor,
+  // y seguía mostrando el estado de antes aunque ya estuviera guardado («no se deja cambiar»). Vale solo para el producto en que se cambió.
+  const [claseCambiada, setClaseCambiada] = useState<{ id: string; clase: string } | null>(null);
+  const clase = producto ? (claseCambiada?.id === producto.id ? claseCambiada.clase : producto.clase) : "";
 
   const indice = producto ? orden.indexOf(producto.id) : -1;
   const anterior = indice > 0 ? orden[indice - 1] : null;
@@ -117,6 +121,7 @@ export function FichaProducto({
       const r = await cambiarClaseProducto(producto.id, nueva);
       if (r.error) setError(r.error);
       else {
+        setClaseCambiada({ id: producto.id, clase: nueva });
         mostrarToast(
           r.compra
             ? `Estado: Activo. Se creó su orden de compra OC-${String(r.compra.numero).padStart(4, "0")}${r.compra.codigo ? ` · ${r.compra.codigo}` : ""} (${r.compra.pais}) en Cotizar`
@@ -151,7 +156,7 @@ export function FichaProducto({
 
   // Una variante o un producto con variantes no se une con otro: la base se negaría.
   const sePuedeUnir = !!producto && puedeEliminar && !producto.padre && producto.variantes.length === 0;
-  const esTest = producto?.clase === "test";
+  const esTest = clase === "test";
   return (
     <Ventana
       abierto={!!producto}
@@ -164,7 +169,7 @@ export function FichaProducto({
             {producto.numero !== null && <span className="text-sm font-medium text-muted-foreground tabular-nums">{numeroProducto(producto.numero)}</span>}
             <SkuCopiable codigo={producto.codigo} className="text-lg font-semibold" />
             <Badge tone="neutral">{ETIQUETA_TIPO[producto.tipo] ?? producto.tipo}</Badge>
-            <Badge tone={TONO_CLASE[producto.clase]}>{ETIQUETA_CLASE[producto.clase] ?? producto.clase}</Badge>
+            <Badge tone={TONO_CLASE[clase]}>{ETIQUETA_CLASE[clase] ?? clase}</Badge>
           </>
         )
       }
@@ -229,9 +234,9 @@ export function FichaProducto({
                 <Dato etiqueta="Tipo">{ETIQUETA_TIPO[producto.tipo] ?? producto.tipo}</Dato>
                 <Dato etiqueta="Estado">
                   {puedeEscribir ? (
-                    <SelectorClaseProducto clase={producto.clase} deshabilitado={pending} alCambiar={cambiarClase} />
+                    <SelectorClaseProducto clase={clase} deshabilitado={pending} alCambiar={cambiarClase} />
                   ) : (
-                    (ETIQUETA_CLASE[producto.clase] ?? producto.clase)
+                    (ETIQUETA_CLASE[clase] ?? clase)
                   )}
                   {error && (
                     <span role="alert" className="mt-1 block text-xs text-destructive">
@@ -352,7 +357,7 @@ export function FichaProducto({
             )}
             {/* Descontinuado solo en algunos países (migración 0211), en su propia sección (5 nov 2026, pedido de Alcides: junto al estado se
                 veía cortado), al final de la columna, debajo de Vencimiento: se usa poco. Con el estado «Descontinuado» ya vale para todos, y un compuesto no se compra: no sale. */}
-            {producto.clase !== "descontinuado" && producto.tipo !== "combo" && (
+            {clase !== "descontinuado" && producto.tipo !== "combo" && (
               <Seccion icono={MundoIcon} titulo="Descontinuado por país">
                 <DescontinuadoPorPais key={`desc-${producto.id}`} skuId={producto.id} puedeEscribir={puedeEscribir} />
               </Seccion>
