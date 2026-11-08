@@ -51,6 +51,7 @@ export const ETIQUETA_ACCION: Record<string, string> = {
   decidir_recomendacion_publicacion: "Decidió una recomendación",
   tarea_hecha_publicacion: "Marcó una tarea como hecha",
   eliminar_comentario_publicacion: "Eliminó un comentario",
+  eliminar_comentario_reglas: "Eliminó un comentario",
   igualar_nombre_dropi: "Igualó el nombre con Dropi",
   restaurar_nombre_dropi: "Devolvió el nombre de la publicación",
   sincronizar_dropi_publicacion: "Actualizó con lo que dice Dropi",
