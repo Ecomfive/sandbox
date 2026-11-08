@@ -1,8 +1,7 @@
 "use client";
 
 import { createContext, useContext, useId, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
-import { anilloFoco } from "@/components/ui/field";
-import { esOrdenDefecto, leerOrden, moverUnPaso, soltarSobre } from "@/lib/orden/orden-guardado";
+import { leerOrden, moverUnPaso, soltarSobre } from "@/lib/orden/orden-guardado";
 
 /** Lo guardado de cada fila, por su clave de `localStorage`. Si el navegador no deja guardar, vale mientras la página está abierta. */
 const oyentes = new Map<string, Set<() => void>>();
@@ -58,7 +57,7 @@ const Ctx = createContext<Contexto | null>(null);
 /**
  * Una fila de elementos que cada persona ordena a su gusto (8 nov 2026, pedido de Alcides): cada `ItemArrastrable` se arrastra a donde se quiera, o se mueve
  * con Alt + flecha izquierda o derecha teniendo el foco dentro de él. Se ordena con `order` de CSS (sirve en una fila flex o en una rejilla) y el orden queda
- * en el navegador de la persona con `clave`. «Orden de siempre» aparece debajo cuando cambió. Lo que no va en un `ItemArrastrable` queda primero.
+ * en el navegador de la persona con `clave`. Lo que no va en un `ItemArrastrable` queda primero.
  */
 export function OrdenArrastrable({
   clave,
@@ -106,18 +105,6 @@ export function OrdenArrastrable({
       <div ref={caja} role={etiqueta ? "region" : undefined} aria-label={etiqueta} aria-describedby={idAyuda} className={className}>
         {children}
       </div>
-      {!esOrdenDefecto(orden, ids) && (
-        <button
-          type="button"
-          onClick={() => {
-            escribir(clave, null);
-            setAviso(`${queSon[0].toUpperCase()}${queSon.slice(1)} volvieron al orden de siempre.`);
-          }}
-          className={`self-end rounded-md px-1.5 py-0.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground ${anilloFoco}`}
-        >
-          Orden de siempre
-        </button>
-      )}
       <p id={idAyuda} className="sr-only">
         Puedes ordenar {queSon}: arrástralos, o con el foco en uno pulsa Alt y la flecha izquierda o derecha.
       </p>
