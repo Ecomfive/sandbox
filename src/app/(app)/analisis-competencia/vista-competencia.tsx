@@ -15,6 +15,7 @@ import { useMonedaCompetencia } from "@/components/competencia/moneda-competenci
 import { formatearFechaHoraCompleta } from "@/lib/formato";
 import { ActualizarIcon, AlertaIcon, AnalisisCompetenciaIcon, EnlaceIcon, ProveedorIcon, TiendaIcon, VentasIcon } from "@/lib/nav-icons";
 import { marcarAlertasVistas } from "./actions";
+import { DecisionPar } from "./decision-par";
 import { RevisarDudosos } from "./revisar-dudosos";
 import { decisionesDeHoy, posicionPrecio, precioEquivalente, type Decision, type EstadoPosicion, type Posicion, type TipoDecision } from "@/lib/competencia/analisis";
 import type { AlertaC, CompetidorC, DatosCompetencia, FilaNuestro, ProductoC } from "./def-competencia";
@@ -471,7 +472,7 @@ function Novedades({ alertas, alAbrir, puedeEscribir, busquedas }: { alertas: Al
 
 // ---------- Un competidor (se abre en su sitio) ----------
 
-function ProductosDelCompetidor({ productos, nuestros, busqueda }: { productos: ProductoC[]; nuestros: Map<string, ProductoC>; busqueda: string }) {
+function ProductosDelCompetidor({ productos, nuestros, busqueda, puedeEscribir }: { productos: ProductoC[]; nuestros: Map<string, ProductoC>; busqueda: string; puedeEscribir: boolean }) {
   const { moneda, precio: usd } = useMonedaCompetencia();
   const [abierto, setAbierto] = useState<string | null>(null);
   const [todos, setTodos] = useState(false);
@@ -537,7 +538,10 @@ function ProductosDelCompetidor({ productos, nuestros, busqueda }: { productos: 
                           {dif !== null && dif < 0 && <InsigniaPosicion estado="perdiendo" detalle={`él ${usd(-dif)} más barato${eq?.nota ? " (equivalente)" : ""}`} />}
                           {dif !== null && dif > 0 && <InsigniaPosicion estado="ganando" detalle={`nosotros ${usd(dif)} más baratos${eq?.nota ? " (equivalente)" : ""}`} />}
                           {dif === 0 && <InsigniaPosicion estado="empatado" detalle="mismo precio" />}
-                          {p.revision?.veredicto === "mismo" && <span className="text-xs text-muted-foreground">Confirmado por la IA{p.revision.motivo ? `: ${p.revision.motivo}` : ""}</span>}
+                          {p.revision?.veredicto === "mismo" && (
+                            <span className="text-xs text-muted-foreground">{p.revision.motivo?.startsWith("Confirmado a mano") ? p.revision.motivo : `Confirmado por la IA${p.revision.motivo ? `: ${p.revision.motivo}` : ""}`}</span>
+                          )}
+                          {puedeEscribir && <DecisionPar productoId={p.id} nuestroId={p.igualA!} nombre={p.nombre} modo={p.revision?.veredicto === "mismo" ? "decidido" : "igual"} />}
                         </span>
                       ) : p.dudosoDe && nuestros.get(p.dudosoDe) ? (
                         <span className="flex flex-col items-start gap-0.5">
@@ -546,6 +550,14 @@ function ProductosDelCompetidor({ productos, nuestros, busqueda }: { productos: 
                             Se parece a «{nuestros.get(p.dudosoDe)!.nombre}», pero no es seguro que sea el mismo: no se compara su precio.
                             {p.revision?.motivo && ` La IA: ${p.revision.motivo}`}
                           </span>
+                          {puedeEscribir && <DecisionPar productoId={p.id} nuestroId={p.dudosoDe} nombre={p.nombre} modo="dudoso" />}
+                        </span>
+                      ) : p.descartadoDe && nuestros.get(p.descartadoDe) ? (
+                        <span className="flex flex-col items-start gap-0.5">
+                          <span className="text-xs text-muted-foreground">
+                            No es el mismo que «{nuestros.get(p.descartadoDe)!.nombre}»{p.revision?.motivo ? `: ${p.revision.motivo}` : ""}
+                          </span>
+                          {puedeEscribir && <DecisionPar productoId={p.id} nuestroId={p.descartadoDe} nombre={p.nombre} modo="decidido" />}
                         </span>
                       ) : (
                         <span className="text-muted-foreground">—</span>
@@ -585,6 +597,7 @@ function TarjetaCompetidor({
   abierto,
   alAlternar,
   busqueda,
+  puedeEscribir,
 }: {
   c: CompetidorFila;
   productos: ProductoC[];
@@ -592,6 +605,7 @@ function TarjetaCompetidor({
   abierto: boolean;
   alAlternar: () => void;
   busqueda: string;
+  puedeEscribir: boolean;
 }) {
   return (
     <article id={`competidor-${c.id}`} className={`overflow-hidden rounded-[10px] border bg-card ${abierto ? "border-primario shadow-[0_0_0_1px_var(--primario)]" : "border-border"}`}>
@@ -626,7 +640,7 @@ function TarjetaCompetidor({
               {c.enlace}
             </a>
           </div>
-          <ProductosDelCompetidor productos={productos} nuestros={nuestros} busqueda={busqueda} />
+          <ProductosDelCompetidor productos={productos} nuestros={nuestros} busqueda={busqueda} puedeEscribir={puedeEscribir} />
         </div>
       )}
     </article>
@@ -761,6 +775,7 @@ export function VistaCompetidores({ datos, puedeEscribir }: { datos: DatosCompet
             abierto={abierto === c.id}
             alAlternar={() => setAbierto(abierto === c.id ? null : c.id)}
             busqueda={busqueda && !c.nombre.toLowerCase().includes(busqueda) ? busqueda : ""}
+            puedeEscribir={puedeEscribir}
           />
         ))}
         {!competidores.length && <p className="rounded-[10px] border border-border bg-card px-4 py-8 text-center text-sm text-muted-foreground">Ningún competidor con estos filtros.</p>}
