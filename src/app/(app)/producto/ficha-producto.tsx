@@ -30,7 +30,7 @@ import { VentasDropiProducto } from "./ventas-dropi-producto";
 import { ExclusividadProducto } from "./exclusividad-producto";
 import { CategoriaProducto } from "./categoria-producto";
 import { SelectorClaseProducto } from "./selector-clase";
-import { DescontinuadoPorPais } from "./descontinuado-pais";
+import { DescontinuadoHeredado, DescontinuadoPorPais } from "./descontinuado-pais";
 import { UnirProducto } from "./unir-producto";
 import type { ResumenUnion } from "@/lib/wms/unir-productos";
 
@@ -362,6 +362,8 @@ export function FichaProducto({
                 <DescontinuadoPorPais key={`desc-${producto.id}`} skuId={producto.id} puedeEscribir={puedeEscribir} />
               </Seccion>
             )}
+            {/* Un pack o combo hereda el descontinuado de sus simples en cada país (8 nov 2026): solo se ve si alguno lo está. */}
+            {clase !== "descontinuado" && producto.tipo === "combo" && <DescontinuadoHeredado key={`heredado-${producto.id}`} skuId={producto.id} />}
             </div>
             <div className="flex min-w-0 flex-col divide-y divide-border border-t border-border pt-5 @3xl:border-t-0 @3xl:pt-0">
             {producto.nombresDropi.length > 0 && (
@@ -398,3 +400,4 @@ export function FichaProducto({
     </Ventana>
   );
 }
+

@@ -1,3 +1,4 @@
+import { conCompuestos, leerComponentes } from "@/lib/producto/descontinuado-pais";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { UsuarioActual } from "@/lib/auth";
 import { compraCuenta } from "@/lib/compras/cuenta";
@@ -105,10 +106,15 @@ export async function cargarPorPais(usuario: UsuarioActual, supabase: SupabaseCl
     const pais = paisDe(d.pais_id as string);
     return pais ? [{ skuId: d.sku_id as string, pais, decision: d.decision as DecisionPais["decision"], motivo: (d.motivo as string | null) ?? null, por: (d.decidido_por as string | null) ?? null, en: String(d.decidido_en).slice(0, 10) }] : [];
   });
-  const listaDescontinuados = ((descontinuados.error ? [] : descontinuados.data) ?? []).flatMap((d) => {
-    const pais = paisDe(d.pais_id as string);
-    return pais ? [{ skuId: d.sku_id as string, pais }] : [];
-  });
+  // Un pack o combo hereda el descontinuado de sus simples en cada país (8 nov 2026, pedido de Alcides).
+  const directos = new Map<string, Set<string>>();
+  for (const d of (descontinuados.error ? [] : descontinuados.data) ?? []) directos.set(d.sku_id as string, (directos.get(d.sku_id as string) ?? new Set<string>()).add(d.pais_id as string));
+  const listaDescontinuados = [...conCompuestos(directos, await leerComponentes(supabase))].flatMap(([skuId, ids]) =>
+    [...ids].flatMap((id) => {
+      const pais = paisDe(id);
+      return pais ? [{ skuId, pais }] : [];
+    }),
+  );
 
   const base = productos.data ?? [];
   const celdas = armarPorPais(
