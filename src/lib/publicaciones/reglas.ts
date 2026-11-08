@@ -114,3 +114,6 @@ export function nivelMargen(margen: number | null, r: Pick<Reglas, "margen_criti
   if (margen < r.margen_sano) return "aceptable";
   return "sano";
 }
+
+/** El id fijo de «las reglas» para su Actividad (comentarios, migración 0253): las reglas son una sola para todo el sistema y no tienen una fila propia. */
+export const REGLAS_ID = "019a5e00-0000-7000-8000-00000000a001";
