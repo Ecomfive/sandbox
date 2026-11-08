@@ -88,6 +88,11 @@ export interface DefTabla<F> {
    */
   csvAntes?: { etiqueta: string; valor: (fila: F) => string | number | null }[];
   /**
+   * Las columnas del PDF de «Descargar» (8 nov 2026), por su nombre (de `csvAntes` o de `campos`; si se repite, la primera). Sin esto, las primeras del CSV
+   * que traen algo, hasta 9: un PDF con todas las del CSV no se puede leer.
+   */
+  pdf?: string[];
+  /**
    * Filtros con los que arranca quien aún no eligió ninguno en esta sesión (7 nov 2026: las listas de productos arrancan con «Productos simples»). Quien elige otra cosa, o
    * quita los filtros, conserva lo suyo: «quitar» deja una lista vacía guardada, que no vuelve a este valor.
    */

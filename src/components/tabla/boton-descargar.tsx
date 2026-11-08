@@ -6,6 +6,7 @@ import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
 import { ChevronRightIcon, DescargarIcon } from "@/lib/nav-icons";
 import { filasACsv, nombreArchivoCsv } from "@/lib/tabla/csv";
+import { usePuedeDescargarPdf } from "./descarga-pdf-contexto";
 import type { DefTabla } from "@/lib/tabla/motor";
 
 /** Una descarga que arma el servidor con más datos de los que la tabla tiene cargados (todo un período, todo el historial). */
@@ -28,6 +29,9 @@ const OPCION =
  * Si la tabla solo tiene cargada una parte de los datos (500 órdenes de 1 790; los últimos extractos) y el
  * servidor sabe armar el total, la página pasa `completa` y el botón ofrece las dos cosas en un menú pequeño:
  * «Lo que se ve» y la descarga completa. Es un solo botón: no hay un segundo enlace «Descargar CSV» al lado.
+ *
+ * Quien está en `PUEDEN_DESCARGAR_PDF` (8 nov 2026, solo Alcides) ve además «Lo que se ve en PDF»: las mismas filas en una hoja para enviar
+ * (`filasAPdf`, `src/lib/tabla/pdf.ts`, que se carga al pulsar).
  */
 export function BotonDescargar<F>({
   def,
@@ -44,6 +48,8 @@ export function BotonDescargar<F>({
   completa?: DescargaCompleta;
 }) {
   const { mostrarToast } = useToast();
+  const puedePdf = usePuedeDescargarPdf();
+  const [armandoPdf, setArmandoPdf] = useState(false);
   const [abierto, setAbierto] = useState(false);
   const raiz = useRef<HTMLDivElement>(null);
   const boton = useRef<HTMLButtonElement>(null);
@@ -62,6 +68,29 @@ export function BotonDescargar<F>({
     enlace.remove();
     URL.revokeObjectURL(url);
     mostrarToast(`Descargadas ${cantidad} (${nombreFilas})`);
+  }
+
+  async function descargarPdf() {
+    if (vacio || armandoPdf) return;
+    setArmandoPdf(true);
+    try {
+      const { filasAPdf, nombreArchivoPdf } = await import("@/lib/tabla/pdf");
+      const titulo = document.title.replace(/\s*·\s*Ecomfive\s*$/, "") || nombreFilas;
+      const bytes = await filasAPdf(def, filas, titulo);
+      const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: "application/pdf" }));
+      const enlace = document.createElement("a");
+      enlace.href = url;
+      enlace.download = nombreArchivoPdf(def.clave, new Date());
+      document.body.appendChild(enlace);
+      enlace.click();
+      enlace.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      mostrarToast(`Descargadas ${cantidad} en PDF (${nombreFilas})`);
+    } catch {
+      mostrarToast("No se pudo armar el PDF. Inténtalo de nuevo.", "destructive");
+    } finally {
+      setArmandoPdf(false);
+    }
   }
 
   // Menú abierto: el foco pasa a la primera opción; Escape o pulsar fuera lo cierran.
@@ -85,7 +114,7 @@ export function BotonDescargar<F>({
     };
   }, [abierto]);
 
-  if (!completa) {
+  if (!completa && !puedePdf) {
     return (
       <Tooltip texto={vacio ? "No hay filas para descargar" : ayuda}>
         <button
@@ -144,13 +173,31 @@ export function BotonDescargar<F>({
             }}
             className={`${OPCION} disabled:cursor-not-allowed disabled:opacity-50`}
           >
-            <span>Lo que se ve</span>
+            <span>{puedePdf ? "Lo que se ve en CSV (Excel)" : "Lo que se ve"}</span>
             <span className="text-xs text-muted-foreground tabular-nums">{vacio ? "sin filas" : cantidad}</span>
           </button>
-          <a href={completa.href} download data-opcion="" onClick={() => setAbierto(false)} className={OPCION}>
-            <span>{completa.etiqueta}</span>
-            {completa.detalle && <span className="text-xs text-muted-foreground tabular-nums">{completa.detalle}</span>}
-          </a>
+          {puedePdf && (
+            <button
+              type="button"
+              data-opcion=""
+              disabled={vacio || armandoPdf}
+              onClick={async () => {
+                await descargarPdf();
+                setAbierto(false);
+                boton.current?.focus();
+              }}
+              className={`${OPCION} disabled:cursor-not-allowed disabled:opacity-50`}
+            >
+              <span>{armandoPdf ? "Armando el PDF…" : "Lo que se ve en PDF"}</span>
+              <span className="text-xs text-muted-foreground tabular-nums">{vacio ? "sin filas" : cantidad}</span>
+            </button>
+          )}
+          {completa && (
+            <a href={completa.href} download data-opcion="" onClick={() => setAbierto(false)} className={OPCION}>
+              <span>{completa.etiqueta}</span>
+              {completa.detalle && <span className="text-xs text-muted-foreground tabular-nums">{completa.detalle}</span>}
+            </a>
+          )}
         </div>
       )}
     </div>
