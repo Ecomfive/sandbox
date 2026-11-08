@@ -96,9 +96,25 @@ test("vende poco: después de un cambio de precio espera 30 días con el precio 
   const { vendePoco } = await import("./automatico");
   const hoy = "2026-11-07";
   const base = { archivada: false, enDropi: "activo" as const, netas30: 40, stock: 200, publicadaDesde: "2026-08-01" };
-  assert.deepEqual(vendePoco({ ...base, ultimoCambioPrecio: "2026-11-01" }, hoy), { vende: false, espera: "2026-12-01" }, "cambió hace 6 días: vuelve el 1 dic");
-  assert.deepEqual(vendePoco({ ...base, ultimoCambioPrecio: "2026-11-07T15:30:00Z" }, hoy), { vende: false, espera: "2026-12-07" }, "con hora: el día de Panamá");
+  assert.deepEqual(vendePoco({ ...base, ultimoCambioPrecio: "2026-11-01" }, hoy), { vende: false, espera: "2026-12-01", por: "precio" }, "cambió hace 6 días: vuelve el 1 dic");
+  assert.deepEqual(vendePoco({ ...base, ultimoCambioPrecio: "2026-11-07T15:30:00Z" }, hoy), { vende: false, espera: "2026-12-07", por: "precio" }, "con hora: el día de Panamá");
   assert.deepEqual(vendePoco({ ...base, ultimoCambioPrecio: "2026-10-08" }, hoy), { vende: true }, "ya pasaron 30 días con el precio nuevo y sigue vendiendo poco");
   assert.deepEqual(vendePoco({ ...base, ultimoCambioPrecio: "2026-08-15" }, hoy), { vende: true });
   assert.deepEqual(vendePoco({ ...base, netas30: 150, ultimoCambioPrecio: "2026-11-01" }, hoy), { vende: false, espera: null }, "si ya vende bien no espera nada");
+});
+
+test("vende poco: «Esperar un mes» la saca hasta el día elegido sin cambiar el precio", async () => {
+  const { vendePoco, masDias, revisarNotaEspera } = await import("./automatico");
+  const hoy = "2026-11-08";
+  const base = { archivada: false, enDropi: "activo" as const, netas30: 40, stock: 200, publicadaDesde: "2026-08-01" };
+  assert.equal(masDias(hoy, 30), "2026-12-08");
+  assert.deepEqual(vendePoco({ ...base, esperaHasta: "2026-12-08" }, hoy), { vende: false, espera: "2026-12-08", por: "decision" });
+  assert.deepEqual(vendePoco({ ...base, esperaHasta: "2026-11-08" }, hoy), { vende: true }, "el día que vence vuelve a salir");
+  assert.deepEqual(vendePoco({ ...base, esperaHasta: "2026-10-01" }, hoy), { vende: true }, "una espera vencida no cuenta");
+  assert.deepEqual(vendePoco({ ...base, esperaHasta: "2026-12-08", ultimoCambioPrecio: "2026-11-20" }, hoy), { vende: false, espera: "2026-12-20", por: "precio" }, "manda la que termina más tarde");
+  assert.deepEqual(vendePoco({ ...base, esperaHasta: "2026-12-30", ultimoCambioPrecio: "2026-11-01" }, hoy), { vende: false, espera: "2026-12-30", por: "decision" });
+  assert.deepEqual(vendePoco({ ...base, netas30: 150, esperaHasta: "2026-12-08" }, hoy), { vende: false, espera: null }, "si ya vende bien no hay espera");
+  assert.ok("error" in revisarNotaEspera("  "));
+  assert.ok("error" in revisarNotaEspera("x".repeat(301)));
+  assert.deepEqual(revisarNotaEspera("  esperando   la temporada "), { nota: "esperando la temporada" });
 });

@@ -90,10 +90,12 @@ const TARJETAS: Tarjeta[] = [
   },
   {
     ...porAccion("vende_poco", VentasIcon, "violeta"),
-    // Las que ya tuvieron un cambio de precio esperan 30 días con el precio nuevo antes de volver a contarse.
+    // Las que esperan no se cuentan: les cambiaron el precio hace menos de 30 días o alguien eligió «Esperar un mes» (8 nov 2026).
     extra: (abiertas) => {
-      const n = abiertas.filter((f) => f.vendePocoVuelve).length;
-      return n ? `${n.toLocaleString("es-PA")} esperando: les cambiaste el precio hace menos de 30 días` : null;
+      const precio = abiertas.filter((f) => f.vendePocoVuelve && f.vendePocoPor === "precio").length;
+      const decision = abiertas.filter((f) => f.vendePocoVuelve && f.vendePocoPor === "decision").length;
+      const partes = [precio ? `${precio.toLocaleString("es-PA")} por un cambio de precio` : null, decision ? `${decision.toLocaleString("es-PA")} porque elegiste esperar un mes` : null].filter(Boolean);
+      return partes.length ? `${(precio + decision).toLocaleString("es-PA")} esperando: ${partes.join(" y ")}` : null;
     },
     extraColor: "verde",
   },

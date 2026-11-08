@@ -280,6 +280,11 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
     tareasDe.set(t.publicacion_id, x);
   }
   const liquidacionEn = new Map(liquidacionR.error ? [] : (liquidacionR.data ?? []).map((n) => [n.id, n.liquidacion_en as string]));
+  // «Esperar un mes» de «Vende poco» (migración 0252), igual: sin la migración, ninguna espera.
+  const esperasR = await traerTodasConError<{ id: string; vende_poco_espera_hasta: string; vende_poco_espera_nota: string | null; vende_poco_espera_por: string | null }>((desde, hasta) =>
+    supabase.from("dropi_publicaciones").select("id, vende_poco_espera_hasta, vende_poco_espera_nota, vende_poco_espera_por").eq("pais_id", paisId).gt("vende_poco_espera_hasta", hoy).order("id").range(desde, hasta),
+  );
+  const esperaVendePoco = new Map(esperasR.error ? [] : (esperasR.data ?? []).map((n) => [n.id, { hasta: n.vende_poco_espera_hasta, nota: n.vende_poco_espera_nota, por: n.vende_poco_espera_por }]));
   // Los productos descontinuados en este país (migración 0211): sin la migración, ninguno.
   const descontinuados = await descontinuadosEnPais(supabase, paisId);
 
@@ -449,6 +454,8 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
       pausadaDesde: pausadaEn.get(d.id as string) ?? null,
       liquidacionDesde: liquidacionEn.get(d.id as string) ?? null,
       vendePocoVuelve: null,
+      vendePocoPor: null,
+      vendePocoEspera: esperaVendePoco.get(d.id as string) ?? null,
       descontinuadoPais: !!d.sku_maestro_id && descontinuados.has(d.sku_maestro_id as string),
       tareasPendientes: tareasDe.get(d.id as string) ?? { total: 0, atrasadas: 0 },
       grupo: [],
@@ -483,12 +490,15 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
     // Republicar: necesita la bodega de la fila (se conoce después de armarla).
     if (necesitaRepublicar({ archivada: f.archivada, enDropi: f.enDropi, bodegaId: f.bodega?.id ?? null, hayVentas: !!f.ventas, ultimaVenta: f.ventas?.ultimaVenta ?? null, publicadaDesde: f.fechaPublicacion ?? f.ventas?.primeraVenta ?? null, privada: f.tipoDropi === "privado", stock: f.stockProveedor ?? f.ventas?.stock ?? null, netas30: f.ventas?.netas30 ?? null }, hoy, r))
       f.acciones = [...f.acciones, "republicar"];
-    // Vende poco: también necesita el stock de la lectura de «Mis productos». Con un cambio de precio de menos de 30 días, espera.
+    // Vende poco: también necesita el stock de la lectura de «Mis productos». Con un cambio de precio de menos de 30 días o «Esperar un mes», espera.
     if (!f.apagadoPendiente && !f.duplicadaDe && !f.sinPublicar) {
       const cambio = masReciente([f.cambioPrecioDropi, f.ultimoCambioPrecio ? { fecha: f.ultimoCambioPrecio } : null]);
-      const vp = vendePoco({ archivada: f.archivada, enDropi: f.enDropi, netas30: f.ventas?.netas30 ?? null, stock: f.stockProveedor ?? f.ventas?.stock ?? null, publicadaDesde: f.fechaPublicacion ?? f.ventas?.primeraVenta ?? null, ultimoCambioPrecio: cambio?.fecha ?? null }, hoy, r);
+      const vp = vendePoco({ archivada: f.archivada, enDropi: f.enDropi, netas30: f.ventas?.netas30 ?? null, stock: f.stockProveedor ?? f.ventas?.stock ?? null, publicadaDesde: f.fechaPublicacion ?? f.ventas?.primeraVenta ?? null, ultimoCambioPrecio: cambio?.fecha ?? null, esperaHasta: f.vendePocoEspera?.hasta ?? null }, hoy, r);
       if (vp.vende) f.acciones = [...f.acciones, "vende_poco"];
-      else f.vendePocoVuelve = vp.espera;
+      else {
+        f.vendePocoVuelve = vp.espera;
+        f.vendePocoPor = vp.espera ? (vp.por ?? null) : null;
+      }
     }
     const combo = f.sku ? combosX2.get(f.sku.id) : undefined;
     const comboPublicado = !!combo && publicados.has(combo.id);

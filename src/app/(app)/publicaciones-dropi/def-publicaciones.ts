@@ -137,6 +137,10 @@ export interface FilaPublicacion {
   liquidacionDesde: string | null;
   /** Vende poco, pero le cambiaron el precio hace menos de 30 días: el día en que se vuelve a revisar (7 nov 2026). */
   vendePocoVuelve: string | null;
+  /** Por qué espera: le cambiaron el precio o alguien eligió «Esperar un mes» (8 nov 2026). */
+  vendePocoPor: "precio" | "decision" | null;
+  /** «Esperar un mes» que sigue corriendo (migración 0252): hasta cuándo, por qué y quién lo decidió. */
+  vendePocoEspera: { hasta: string; nota: string | null; por: string | null } | null;
   /** Su producto está descontinuado en este país (ficha del producto, migración 0211): ya no se compra para aquí. */
   descontinuadoPais: boolean;
   /** Cambios de stock esperando «Aplicar en Dropi» (migración 0173): en qué bodega y cuántas unidades deben quedar. */

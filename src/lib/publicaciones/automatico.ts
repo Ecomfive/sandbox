@@ -114,21 +114,39 @@ export const DIAS_VENDE_POCO = 30;
  * **Después de un cambio de precio espera 30 días** (7 nov 2026, Alcides: «si le bajo el precio, que salga de ahí y no vuelva hasta que
  * pasen 30 días»): los 30 días que se miran tienen que ser todos con el precio nuevo. Entonces devuelve `espera` con el día en que se
  * vuelve a revisar (el cambio + 30 días), y la tarjeta las cuenta aparte.
+ *
+ * **«Esperar un mes»** (8 nov 2026, pedido de Alcides: «si después de analizarlo prefiero esperar un mes más»): `esperaHasta` es el día que
+ * eligió una persona sin cambiar el precio; hasta ese día no sale. Si las dos esperas corren, manda la que termina más tarde (`por` dice cuál).
  */
 export function vendePoco(
-  p: { archivada: boolean; enDropi: EnDropi; netas30: number | null; stock: number | null; publicadaDesde: string | null; ultimoCambioPrecio?: string | null },
+  p: { archivada: boolean; enDropi: EnDropi; netas30: number | null; stock: number | null; publicadaDesde: string | null; ultimoCambioPrecio?: string | null; esperaHasta?: string | null },
   hoy: string,
   reglas: Pick<Reglas, "venta_minima_mes" | "dias_nuevo"> = REGLAS_DEFECTO,
-): { vende: false; espera: string | null } | { vende: true } {
+): { vende: false; espera: string | null; por?: "precio" | "decision" } | { vende: true } {
   const no = { vende: false as const, espera: null };
   if (p.archivada || p.enDropi !== "activo" || p.netas30 === null || p.stock === null || p.stock <= 0) return no;
   if (!p.publicadaDesde || dias(p.publicadaDesde, hoy) <= reglas.dias_nuevo) return no;
   if (p.netas30 >= reglas.venta_minima_mes) return no;
+  let espera: { espera: string; por: "precio" | "decision" } | null = null;
   if (p.ultimoCambioPrecio) {
     const dia = claveFecha(p.ultimoCambioPrecio).slice(0, 10);
-    if (dias(dia, hoy) < DIAS_VENDE_POCO) return { vende: false, espera: new Date(Date.parse(dia) + DIAS_VENDE_POCO * 86_400_000).toISOString().slice(0, 10) };
+    if (dias(dia, hoy) < DIAS_VENDE_POCO) espera = { espera: masDias(dia, DIAS_VENDE_POCO), por: "precio" };
   }
-  return { vende: true };
+  const decidida = p.esperaHasta?.slice(0, 10);
+  if (decidida && decidida > hoy && (!espera || decidida > espera.espera)) espera = { espera: decidida, por: "decision" };
+  return espera ? { vende: false, ...espera } : { vende: true };
+}
+
+/** El día `n` días después de `dia` (AAAA-MM-DD). */
+export const masDias = (dia: string, n: number): string => new Date(Date.parse(`${dia.slice(0, 10)}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
+
+/** La nota de «Esperar un mes»: obligatoria, de 3 a 300 letras. */
+export const MAX_NOTA_ESPERA = 300;
+export function revisarNotaEspera(nota: unknown): { nota: string } | { error: string } {
+  const t = typeof nota === "string" ? nota.trim().replace(/\s+/g, " ") : "";
+  if (t.length < 3) return { error: "Escribe por qué prefieres esperar (por ejemplo: «esperando la temporada»)." };
+  if (t.length > MAX_NOTA_ESPERA) return { error: `La nota admite hasta ${MAX_NOTA_ESPERA} letras.` };
+  return { nota: t };
 }
 
 /** La bodega de Dropi (B280, «Bodega Dropi Panama»): lo que está ahí no se puede republicar, porque la publicación es de Dropi. */

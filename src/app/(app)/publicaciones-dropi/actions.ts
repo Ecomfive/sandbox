@@ -11,7 +11,7 @@ import { ESTADOS_PUBLICACION, TIPOS, UBICACIONES, etiqueta, numeroPublicacion, t
 import { codigoBodega, idsDeDropi } from "@/lib/publicaciones/sincronizar-dropi";
 import { grupoDe, nombreDelPublico } from "@/lib/publicaciones/apagar-dropi";
 import { encolarApagar, encolarArchivar, encolarCrear, encolarPrivatizar, encolarRepublicar, encolarStock, enviarNombreADropi, enviarPrecioADropi } from "@/lib/publicaciones/cambios-dropi";
-import { esBodegaDropi } from "@/lib/publicaciones/automatico";
+import { DIAS_VENDE_POCO, esBodegaDropi, masDias, revisarNotaEspera } from "@/lib/publicaciones/automatico";
 import { faltantesStock, normalizarDatosStock, productoDelCambio, textoVariacion } from "@/lib/publicaciones/stock-dropi";
 import { destinosDe, faltantesPrivatizar, nombrePrivado, normalizarDatosPrivatizar, quienesDe, unidadesTotales } from "@/lib/publicaciones/privatizar-dropi";
 import { faltantesVariaciones, stockEnBodega, textoVariaciones, type VariacionLeida } from "@/lib/publicaciones/privatizar-variable";
@@ -975,6 +975,44 @@ export async function marcarLiquidacion(id: string, enLiquidacion: boolean): Pro
   });
   revalidatePath(RUTA);
   return { detalle: enLiquidacion ? "En liquidación: ya no sale como margen bajo." : "Fuera de liquidación." };
+}
+
+/**
+ * «Esperar un mes» de «Vende poco» (8 nov 2026, pedido de Alcides): después de analizarla, se decide no cambiar el precio todavía. La publicación sale de
+ * «Vende poco» por 30 días con una nota del porqué; pasado ese día, si sigue vendiendo poco, vuelve a salir sola. Con `nota` null se quita la espera.
+ * Solo cambia el sistema, no Dropi.
+ */
+export async function esperarVendePoco(id: string, nota: string | null): Promise<{ error?: string; detalle?: string }> {
+  const usuario = await requireModuloEscritura(MODULO);
+  const antes = await publicacionPermitida(id, usuario.paisesPermitidos);
+  if (!antes) return { error: "La publicación ya no existe o no es de tus países." };
+  const supabase = createServiceClient();
+  const hoy = new Date().toLocaleDateString("en-CA", { timeZone: "America/Panama" });
+  const fecha = (dia: string) => new Date(`${dia}T12:00:00Z`).toLocaleDateString("es-PA", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+  const { data: actual, error: errorLeer } = await supabase.from("dropi_publicaciones").select("vende_poco_espera_hasta").eq("id", id).maybeSingle();
+  if (errorLeer) return { error: /vende_poco_espera/.test(errorLeer.message) ? "Falta correr en Supabase la migración 0252." : "No se pudo leer la publicación." };
+  const tenia = actual?.vende_poco_espera_hasta && actual.vende_poco_espera_hasta > hoy ? (actual.vende_poco_espera_hasta as string) : null;
+  let cambio: { vende_poco_espera_hasta: string | null; vende_poco_espera_nota: string | null; vende_poco_espera_por: string | null };
+  if (nota === null) {
+    if (!tenia) return { detalle: "No estaba esperando." };
+    cambio = { vende_poco_espera_hasta: null, vende_poco_espera_nota: null, vende_poco_espera_por: null };
+  } else {
+    const r = revisarNotaEspera(nota);
+    if ("error" in r) return { error: r.error };
+    cambio = { vende_poco_espera_hasta: masDias(hoy, DIAS_VENDE_POCO), vende_poco_espera_nota: r.nota, vende_poco_espera_por: usuario.nombre ?? null };
+  }
+  const { error } = await supabase.from("dropi_publicaciones").update({ ...cambio, actualizado_en: new Date().toISOString() }).eq("id", id);
+  if (error) return { error: "No se pudo guardar." };
+  await registrarAuditoria({
+    accion: nota === null ? "publicacion_vende_poco_sin_espera" : "publicacion_vende_poco_espera",
+    entidad: "dropi_publicaciones",
+    entidadId: id,
+    detalle: `${antes.nombre}${antes.dropi_id ? ` · ID Dropi ${antes.dropi_id}` : ""}: ${nota === null ? "quitó la espera de «Vende poco»" : `espera un mes sin cambiar el precio: ${cambio.vende_poco_espera_nota}`}`,
+    antes: { "Espera en «Vende poco»": tenia ? `Hasta el ${fecha(tenia)}` : "No" },
+    despues: { "Espera en «Vende poco»": cambio.vende_poco_espera_hasta ? `Hasta el ${fecha(cambio.vende_poco_espera_hasta)}` : "No" },
+  });
+  revalidatePath(RUTA);
+  return { detalle: cambio.vende_poco_espera_hasta ? `Sale de «Vende poco» hasta el ${fecha(cambio.vende_poco_espera_hasta)}.` : "Quitaste la espera: si vende poco, vuelve a salir." };
 }
 
 /**
