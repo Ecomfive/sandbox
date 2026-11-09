@@ -10,6 +10,8 @@ import { agruparProductos, resumirProductos, restarDias, totalesPorDia, totalesP
 import { traerTodasConError } from "@/lib/supabase/paginar";
 import { traerDineroPorMes, traerVentasDiarias } from "@/lib/publicaciones/ventas-compactas";
 import { createServiceClient } from "@/lib/supabase/server";
+import { NOMBRE_PLATAFORMA_VENTAS, textoEtiquetas, type PlataformaVentas, type VentasDePlataforma } from "@/lib/publicaciones/ventas-plataformas";
+import { cargarVentasPlataforma } from "./datos-plataformas";
 import { SelectorVistaVentas } from "./selector-vista-ventas";
 import { TableroVentas, type DineroVentas, type DropshipperVentas, type ProductoVentas } from "./tablero-ventas";
 
@@ -23,8 +25,8 @@ const MESES_ATRAS = 13;
 /**
  * Desempeño › Ventas Proveeduría (antes «Ventas Dropi»; 7 nov 2026, pedido de Hernán): cuánto vende cada producto de ECOMFIVE (del país de la barra), qué se está acabando, qué
  * crece y qué cae, y quién vende. Con más de una plataforma en el país (Costa Rica: Dropi, Drop y Effi) arriba hay un selector: «Todas» (el análisis general) o una sola plataforma
- * (`?ver=`). Hoy solo hay datos de Dropi: sale del Historial de Existencia que carga scripts/importar-ventas-dropi.ts (migración 0120), muestra la última carga, y «Todas» es lo mismo
- * que Dropi; las ventas de Drop y Effi todavía no se leen, así que su vista lo dice. Cuando se lean, las consultas de abajo se vuelven por plataforma y «Todas» las suma.
+ * (`?ver=`). Dropi sale del Historial de Existencia que carga scripts/importar-ventas-dropi.ts (migración 0120). Drop y Effi, de `plataforma_ventas_diarias` (migración 0244: lo
+ * que salió y lo que volvió, por artículo y día; 9 nov 2026), en el mismo tablero sin cancelaciones ni dropshippers. «Todas» suma las tres y junta por producto del sistema.
  * La ruta y el módulo de permisos siguen siendo `ventas-dropi`.
  */
 export default async function VentasDropiPage({ searchParams }: { searchParams: Promise<{ ver?: string | string[] }> }) {
@@ -35,15 +37,51 @@ export default async function VentasDropiPage({ searchParams }: { searchParams: 
   const vista = vistaVentasValida(Array.isArray(ver) ? ver[0] : ver, pais.codigo);
   const selector = <SelectorVistaVentas vista={vista} codigoPais={pais.codigo} />;
 
-  // Drop y Effi: la plataforma existe en el país, pero sus ventas todavía no se leen.
+  // Drop y Effi: sus ventas leídas (salidas y devoluciones por artículo y día), en el mismo tablero.
   if (vista === "drop" || vista === "effi") {
+    const datos = await cargarVentasPlataforma(supabase, pais.id, vista);
+    if (!datos || !datos.ultimoDia) {
+      return (
+        <Pagina ancho="ancha" className="flex flex-col gap-6">
+          <EncabezadoPagina titulo="Ventas Proveeduría" oculto />
+          {selector}
+          <p role="status" className="rounded-xl border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">
+            {!datos
+              ? "No se pudieron cargar las ventas. Falta correr en Supabase la migración 0244."
+              : vista === "effi"
+                ? "Todavía no hay ventas de Effi leídas. La lectura diaria las pide por la API de Effi: si «Actualizar desde Effi» (Gestión de IDs) avisa que falta un permiso, en Effi › Administración › Perfiles de usuario dale al perfil del usuario del sistema la consulta de «Notas de remisión de venta» y «Devoluciones de venta»."
+                : `Todavía no hay ventas de ${plataformaDe(vista).nombre} leídas. Se leen con «Actualizar» en la pestaña de Drop, con la cuenta de proveedor.`}
+          </p>
+        </Pagina>
+      );
+    }
+    const corteP = datos.ultimoDia;
+    const desdeMesP = restarDias(`${corteP.slice(0, 7)}-15`, MESES_ATRAS * 30.5);
+    const conEtiquetas = (r: ReturnType<typeof resumirProductos>[number], ids: number[], clave: string | null): ProductoVentas => {
+      const s = clave ? [...datos.skuDe.values()].find((x) => x.codigo === clave) : datos.skuDe.get(r.id);
+      return { ...r, ids, etiquetas: textoEtiquetas(ids, datos.etiquetaDe), sku: s?.codigo ?? null, numero: s?.numero ?? null, barras: s?.barras ?? null, dinero: null };
+    };
+    const gruposP = agruparProductos(datos.productos, datos.dias, (id) => {
+      const s = datos.skuDe.get(id);
+      return s ? { clave: s.codigo, nombre: s.nombre } : null;
+    });
     return (
       <Pagina ancho="ancha" className="flex flex-col gap-6">
         <EncabezadoPagina titulo="Ventas Proveeduría" oculto />
         {selector}
-        <p role="status" className="rounded-xl border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">
-          Todavía no se leen las ventas de {plataformaDe(vista).nombre}. Cuando se conecten, saldrán aquí y también sumarán en «Todas».
-        </p>
+        <TableroVentas
+          plataforma={NOMBRE_PLATAFORMA_VENTAS[vista]}
+          soloSalidas
+          fuente={`Ventas leídas de ${NOMBRE_PLATAFORMA_VENTAS[vista]} hasta el ${new Date(`${corteP}T12:00:00Z`).toLocaleDateString("es-PA", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })} · ${datos.productos.length.toLocaleString("es-PA")} artículos. Netas = lo que salió − lo devuelto; ${NOMBRE_PLATAFORMA_VENTAS[vista]} no dice cancelaciones ni rechazos. El stock es el de la última lectura de ${NOMBRE_PLATAFORMA_VENTAS[vista]}.`}
+          corte={corteP}
+          movimientos={datos.dias.length}
+          productos={resumirProductos(datos.productos, datos.dias, corteP).map((r) => conEtiquetas(r, [r.id], null))}
+          porProducto={resumirProductos(gruposP.productos, gruposP.dias, corteP).map((r) => conEtiquetas(r, gruposP.ids.get(r.id) ?? [r.id], gruposP.clave.get(r.id) ?? null))}
+          meses={totalesPorMes(datos.dias, `${desdeMesP.slice(0, 7)}-01`, corteP)}
+          dias={totalesPorDia(datos.dias, corteP, 90)}
+          dropshippers={[]}
+          dinero={null}
+        />
       </Pagina>
     );
   }
@@ -117,6 +155,28 @@ export default async function VentasDropiPage({ searchParams }: { searchParams: 
     rechazadas: Number(d.rechazadas),
     devueltas: Number(d.devueltas),
   }));
+  // «Todas» en un país con más plataformas (Costa Rica): se suman Drop y Effi, cada artículo con su número propio y su producto del sistema.
+  const extras: { plataforma: PlataformaVentas; datos: VentasDePlataforma }[] = [];
+  if (vista === "todas") {
+    const otras = plataformasDePais(pais.codigo)
+      .map((p) => p.id)
+      .filter((p): p is PlataformaVentas => p === "drop" || p === "effi");
+    for (const plataforma of otras) {
+      const datos = await cargarVentasPlataforma(supabase, pais.id, plataforma);
+      if (datos?.ultimoDia) extras.push({ plataforma, datos });
+    }
+  }
+  const etiquetaDe = new Map<number, string>();
+  for (const { datos } of extras) {
+    productos.push(...datos.productos);
+    dias.push(...datos.dias);
+    for (const [id, e] of datos.etiquetaDe) etiquetaDe.set(id, e);
+    for (const [id, sku] of datos.skuDe) {
+      skuDe.set(id, { clave: sku.codigo, nombre: sku.nombre });
+      if (!codigosDe.has(sku.codigo)) codigosDe.set(sku.codigo, { numero: sku.numero, barras: sku.barras });
+    }
+  }
+  const etiquetas = (ids: number[]) => (extras.length ? textoEtiquetas(ids, etiquetaDe) : undefined);
   const filasDinero: DineroDia[] = dineroR.error
     ? []
     : (dineroR.data ?? []).map((d) => ({
@@ -163,13 +223,13 @@ export default async function VentasDropiPage({ searchParams }: { searchParams: 
           meses: [...dineroPorMes(filasDinero)].sort(([a], [b]) => a.localeCompare(b)).map(([mes, x]) => ({ mes, ...x })),
         }
       : null;
-  const resumen: ProductoVentas[] = resumirProductos(productos, dias, corte).map((r) => ({ ...r, ids: [r.id], sku: skuDe.get(r.id)?.clave ?? null, numero: codigosDe.get(skuDe.get(r.id)?.clave ?? "")?.numero ?? null, barras: codigosDe.get(skuDe.get(r.id)?.clave ?? "")?.barras ?? null, dinero: dineroDe([r.id]) }));
+  const resumen: ProductoVentas[] = resumirProductos(productos, dias, corte).map((r) => ({ ...r, ids: [r.id], etiquetas: etiquetas([r.id]), sku: skuDe.get(r.id)?.clave ?? null, numero: codigosDe.get(skuDe.get(r.id)?.clave ?? "")?.numero ?? null, barras: codigosDe.get(skuDe.get(r.id)?.clave ?? "")?.barras ?? null, dinero: dineroDe([r.id]) }));
   // Los mismos datos con los IDs de Dropi de un mismo producto del sistema juntos (públicos, privados, archivados, de la B280…).
   const grupos = agruparProductos(productos, dias, (id) => skuDe.get(id) ?? null);
   const porProducto: ProductoVentas[] = resumirProductos(grupos.productos, grupos.dias, corte).map((r) => {
     const ids = grupos.ids.get(r.id) ?? [r.id];
     const clave = grupos.clave.get(r.id) ?? skuDe.get(r.id)?.clave ?? null;
-    return { ...r, ids, sku: clave, numero: codigosDe.get(clave ?? "")?.numero ?? null, barras: codigosDe.get(clave ?? "")?.barras ?? null, dinero: dineroDe(ids) };
+    return { ...r, ids, etiquetas: etiquetas(ids), sku: clave, numero: codigosDe.get(clave ?? "")?.numero ?? null, barras: codigosDe.get(clave ?? "")?.barras ?? null, dinero: dineroDe(ids) };
   });
   const desdeMes = restarDias(`${corte.slice(0, 7)}-15`, MESES_ATRAS * 30.5);
   const dropshippers: DropshipperVentas[] = (dsR.data ?? []).map((d) => ({
@@ -190,7 +250,14 @@ export default async function VentasDropiPage({ searchParams }: { searchParams: 
       {selector}
       {vista === "todas" && plataformasDePais(pais.codigo).length > 1 && (
         <p role="status" className="m-0 -mt-3 text-xs text-muted-foreground">
-          Por ahora «Todas» solo suma Dropi: las ventas de Drop y Effi todavía no se leen.
+          «Todas» suma Dropi
+          {extras.map(({ plataforma, datos }) => ` y ${NOMBRE_PLATAFORMA_VENTAS[plataforma]} (leído hasta el ${new Date(`${datos.ultimoDia}T12:00:00Z`).toLocaleDateString("es-PA", { day: "numeric", month: "short", timeZone: "UTC" })})`).join("")}
+          {plataformasDePais(pais.codigo).some((p) => (p.id === "drop" || p.id === "effi") && !extras.some((x) => x.plataforma === p.id)) &&
+            `. Sin ventas leídas todavía: ${plataformasDePais(pais.codigo)
+              .filter((p) => (p.id === "drop" || p.id === "effi") && !extras.some((x) => x.plataforma === p.id))
+              .map((p) => p.nombre)
+              .join(" y ")}`}
+          . Cada producto del sistema junta sus ventas de todas las plataformas en «Por producto».
         </p>
       )}
       <TableroVentas

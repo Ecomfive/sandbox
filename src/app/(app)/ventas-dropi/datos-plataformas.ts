@@ -1,0 +1,41 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { armarVentasPlataforma, type PlataformaVentas, type PublicacionPlataforma, type VentasDePlataforma } from "@/lib/publicaciones/ventas-plataformas";
+import { traerTodasConError } from "@/lib/supabase/paginar";
+
+type SkuFila = { codigo: string; nombre: string | null; numero: number | null; codigo_barras: string | null } | null;
+
+const uno = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? (v[0] ?? null) : (v ?? null));
+const skuDe = (v: unknown): PublicacionPlataforma["sku"] => {
+  const s = uno(v as SkuFila | SkuFila[]);
+  return s?.codigo ? { codigo: s.codigo, nombre: s.nombre || s.codigo, numero: s.numero ?? null, barras: s.codigo_barras || null } : null;
+};
+
+/**
+ * Las ventas de Drop o Effi de un país (migración 0244) con sus publicaciones (`drop_publicaciones`, `effi_publicaciones`: nombre, stock y producto del sistema), en la
+ * forma del tablero de Ventas Proveeduría. `null` si falta la migración.
+ */
+export async function cargarVentasPlataforma(supabase: SupabaseClient, paisId: string, plataforma: PlataformaVentas): Promise<VentasDePlataforma | null> {
+  const ventas = traerTodasConError<{ producto_id: string; dia: string; salidas: number; devueltas: number }>((d, h) =>
+    supabase.from("plataforma_ventas_diarias").select("producto_id, dia, salidas, devueltas").eq("pais_id", paisId).eq("plataforma", plataforma).order("dia").order("producto_id").range(d, h),
+  );
+  const pubs =
+    plataforma === "drop"
+      ? traerTodasConError<Record<string, unknown>>((d, h) =>
+          supabase.from("drop_publicaciones").select("drop_id, codigo, nombre, inventario, en_drop, skus_maestros(codigo, nombre, numero, codigo_barras)").eq("pais_id", paisId).order("id").range(d, h),
+        )
+      : traerTodasConError<Record<string, unknown>>((d, h) =>
+          supabase.from("effi_publicaciones").select("effi_id, nombre, stock_principal, en_effi, skus_maestros(codigo, nombre, numero, codigo_barras)").eq("pais_id", paisId).order("id").range(d, h),
+        );
+  const [v, p] = await Promise.all([ventas, pubs]);
+  if (v.error) return null;
+  const publicaciones: PublicacionPlataforma[] = (p.data ?? []).map((x) =>
+    plataforma === "drop"
+      ? { idPlataforma: String(x.drop_id), nombre: String(x.nombre ?? x.drop_id), etiqueta: String(x.codigo || x.drop_id), stock: Number(x.inventario ?? 0), activa: x.en_drop !== false, sku: skuDe(x.skus_maestros) }
+      : { idPlataforma: String(x.effi_id), nombre: String(x.nombre ?? x.effi_id), etiqueta: `ID ${x.effi_id}`, stock: Number(x.stock_principal ?? 0), activa: x.en_effi !== false, sku: skuDe(x.skus_maestros) },
+  );
+  return armarVentasPlataforma(
+    plataforma,
+    publicaciones,
+    (v.data ?? []).map((r) => ({ producto: String(r.producto_id), dia: String(r.dia), salidas: Number(r.salidas), devueltas: Number(r.devueltas) })),
+  );
+}
