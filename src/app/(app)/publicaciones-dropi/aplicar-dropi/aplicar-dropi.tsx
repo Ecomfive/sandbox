@@ -178,7 +178,7 @@ export function AplicarDropi({ puedeEscribir }: { puedeEscribir: boolean }) {
                   {r
                     ? r.ok
                       ? c.tipo === "republicar"
-                        ? `Republicada: ID nuevo ${r.nuevo ?? "—"}; la vieja quedó archivada y sin stock`
+                        ? `Republicada: ID nuevo ${r.nuevo ?? "—"}; la vieja quedó archivada y sin stock${r.aviso ? `. ${r.aviso} Quedó una tarea para hacerlo.` : ""}`
                         : c.tipo === "apagar"
                           ? r.archivado
                             ? c.devolver

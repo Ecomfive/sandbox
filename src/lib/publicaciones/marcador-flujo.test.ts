@@ -442,11 +442,17 @@ test("republicar: si en un intento falló la foto principal, el reintento sube j
     { id: 2, main: false, urlS3: "panama/products/8751/1779932274veganic 4.png", url: null, variation_id: null },
   ] }));
   const [r1] = await aplicar(d, [{ ...base, id: "r1", tipo: "republicar", producto: 8751 }]);
-  assert.equal(r1.ok, false);
+  // Desde el 8 nov 2026 una foto que no se copia no detiene la republicación: termina y dice cuál falta (el sistema crea la tarea de subirla).
+  assert.equal(r1.ok, true, String(r1.error));
   assert.equal(r1.nuevo, 9001);
-  assert.equal(d.productos.get(9001)!.gallery.length, 1, "en el primer intento solo subió la otra");
+  assert.deepEqual(r1.fotosFaltan, ["1779932274veganic.jpg"]);
+  assert.match(String(r1.aviso), /1 foto\(s\).*ID 9001/);
+  assert.equal(d.productos.get(9001)!.gallery.length, 1, "subió la otra");
+  assert.equal(d.productos.get(8751)!.archived, true, "y el viejo quedó archivado");
+  // Si se vuelve a pedir (por ejemplo, desde un reintento), sube justo la que faltaba y no repite la otra.
   const [r2] = await aplicar(d, [{ ...base, id: "r1", tipo: "republicar", producto: 8751, nuevo: 9001 }]);
   assert.equal(r2.ok, true, String(r2.error));
+  assert.deepEqual(r2.fotosFaltan, []);
   const g = d.productos.get(9001)!.gallery as Obj[];
   assert.equal(g.length, 2, "las dos fotos, sin repetir");
   assert.ok(g.some((f) => f.main && String(f.urlS3).endsWith("veganic.jpg")), "la principal quedó como principal");
@@ -456,7 +462,8 @@ test("republicar: un error 5xx al subir una foto no se reintenta en el momento (
   const d = crearDropi({ fotos: "fallaLaPrincipal" });
   d.productos.set(8751, productoBase(8751, { gallery: [{ id: 1, main: true, urlS3: "panama/products/8751/1779932274veganic.jpg", url: null, variation_id: null }] }));
   const [r1] = await aplicar(d, [{ ...base, id: "r1", tipo: "republicar", producto: 8751 }]);
-  assert.equal(r1.ok, false);
+  assert.equal(r1.ok, true, "termina igual, con la foto en la lista de las que faltan");
+  assert.equal((r1.fotosFaltan as string[]).length, 1);
   assert.equal(d.llamadas.filter((l) => String(l).includes("/products/photos/upload")).length, 1, "un solo intento de subida");
 });
 
@@ -468,13 +475,14 @@ test("republicar: si el navegador no deja bajar la foto del CDN, la pide a la pl
   assert.equal(d.productos.get(9001)!.gallery.length, 1);
 });
 
-test("republicar: si la plataforma tampoco puede bajar la foto, el error lo dice", async () => {
+test("republicar: si la plataforma tampoco puede bajar la foto, termina igual y el aviso dice por qué falta", async () => {
   const d = crearDropi({ cdnBloqueado: true });
   d.fotoPorPlataforma = false;
   d.productos.set(10474, productoBase(10474));
   const [r] = await aplicar(d, [{ ...base, id: "r1", tipo: "republicar", producto: 10474 }]);
-  assert.equal(r.ok, false);
-  assert.match(String(r.error), /no se pudo bajar la foto por la plataforma \(502: sin foto\)/);
+  assert.equal(r.ok, true, String(r.error));
+  assert.equal((r.fotosFaltan as string[]).length, 1);
+  assert.match(String(r.aviso), /no se pudo bajar la foto por la plataforma \(502: sin foto\)/);
 });
 
 test("republicar: con fotos copiadas en el sistema, sube esas (la primera como principal) y no toca el CDN de Dropi", async () => {

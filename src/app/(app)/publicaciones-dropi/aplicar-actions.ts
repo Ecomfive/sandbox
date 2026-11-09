@@ -1,5 +1,6 @@
 "use server";
 
+import { numeroPublicacion } from "@/lib/publicaciones/publicacion";
 import { montoDePais } from "@/lib/moneda/simbolo";
 import { revalidatePath } from "next/cache";
 import { registrarAuditoria, registrarAuditoriaLote } from "@/lib/auditoria";
@@ -157,6 +158,61 @@ async function crearPrivada(
  * el ID nuevo de Dropi y el mismo producto vinculado, publicada hoy y activa, y archiva la vieja; cada una queda en «relacionados»
  * de la otra. Si la nueva ya existe (otro intento o alguien la cargó), la usa.
  */
+/**
+ * La tarea «subir la foto que faltó» de una republicación (8 nov 2026, pedido de Alcides): en la publicación nueva, con el ID nuevo donde subirla y el viejo de donde
+ * sacarla, los nombres de las fotos y por qué no se copiaron. Le toca a quien pidió republicar; si ya no está activa, al responsable de la publicación; si no, a quien
+ * pulsó «Aplicar en Dropi». Avisa en su campana. Si falla, la republicación no se pierde (solo no queda la tarea).
+ */
+async function tareaFotosQueFaltan(
+  supabase: ReturnType<typeof createServiceClient>,
+  fila: Record<string, unknown>,
+  nuevaId: string,
+  nuevo: number,
+  fotos: string[],
+  motivo: string | null,
+  usuario: { id: string; nombre?: string | null; email?: string | null },
+) {
+  const { data: vieja } = await supabase.from("dropi_publicaciones").select("numero, nombre, responsable_id").eq("id", fila.publicacion_id as string).maybeSingle();
+  const candidatos = [fila.creado_por, vieja?.responsable_id, usuario.id].filter((x): x is string => typeof x === "string" && UUID.test(x));
+  let responsable: { id: string; nombre: string } | null = null;
+  for (const id of candidatos) {
+    const { data } = await supabase.from("perfiles").select("nombre, email, activo").eq("id", id).maybeSingle();
+    if (data && data.activo !== false) {
+      responsable = { id, nombre: ((data.nombre as string | null) || (data.email as string | null) || "Sin nombre").trim() };
+      break;
+    }
+  }
+  if (!responsable) return;
+  const titulo = `Subir ${fotos.length === 1 ? "la foto que faltó" : `las ${fotos.length} fotos que faltaron`} en el ID ${nuevo}`;
+  const nota = [
+    `Al republicar no se pudo copiar ${fotos.length === 1 ? "esta foto" : "estas fotos"} al ID nuevo ${nuevo}: súbela${fotos.length === 1 ? "" : "s"} a mano en Dropi.`,
+    `Sácala${fotos.length === 1 ? "" : "s"} del ID viejo ${fila.dropi_producto_id}${vieja?.numero != null ? ` (${numeroPublicacion(Number(vieja.numero))})` : ""}, que quedó archivado.`,
+    `Foto${fotos.length === 1 ? "" : "s"}: ${fotos.join(", ")}.`,
+    motivo ? `Motivo: ${motivo}` : "",
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .slice(0, 1000);
+  const manana = new Date(Date.now() + 86_400_000).toLocaleDateString("en-CA", { timeZone: "America/Panama" });
+  const yo = usuario.nombre || usuario.email || null;
+  const base = { publicacion_id: nuevaId, titulo: titulo.slice(0, 200), nota, responsable_id: responsable.id, responsable_nombre: responsable.nombre, plazo: manana, creado_por: usuario.id, creado_por_nombre: yo };
+  let r = await supabase.from("dropi_publicaciones_tareas").insert({ ...base, estado: "por_hacer", prioridad: "alta" });
+  // Sin la migración 0178 se guarda sin estado ni prioridad.
+  if (r.error) r = await supabase.from("dropi_publicaciones_tareas").insert(base);
+  if (r.error) return;
+  await registrarAuditoria({ accion: "crear_tarea_publicacion", entidad: "dropi_publicaciones", entidadId: nuevaId, detalle: `Tarea: ${titulo} · le toca a ${responsable.nombre} · «${nota}»` });
+  if (responsable.id !== usuario.id)
+    await supabase.from("notificaciones_usuario").insert({
+      usuario_id: responsable.id,
+      tipo: "tarea",
+      titulo: `Tarea en Gestión de IDs Dropi: ${titulo}`.slice(0, 300),
+      texto: `${vieja?.nombre ?? "Publicación"} · ${nota}`.slice(0, 600),
+      href: "/publicaciones-dropi/tareas",
+      autor_id: usuario.id,
+      autor_nombre: yo,
+    });
+}
+
 async function crearRepublicada(
   supabase: ReturnType<typeof createServiceClient>,
   fila: Record<string, unknown>,
@@ -311,7 +367,7 @@ export async function guardarResultadosDropi(codigoPais: string, resultados: unk
   if (!pais) return { error: "País no válido." };
   if (!Array.isArray(resultados) || resultados.length > MAX) return { error: "Resultados no válidos." };
   const limpios = resultados
-    .map((r) => r as { id?: unknown; ok?: unknown; error?: unknown; nuevo?: unknown; archivado?: unknown; aviso?: unknown; salida?: unknown; antes?: unknown; stock?: unknown; bodegas?: unknown; variacion?: unknown; unidades?: unknown; devuelto?: unknown; reservas?: unknown; privado?: unknown })
+    .map((r) => r as { id?: unknown; ok?: unknown; error?: unknown; nuevo?: unknown; archivado?: unknown; aviso?: unknown; salida?: unknown; antes?: unknown; stock?: unknown; bodegas?: unknown; variacion?: unknown; unidades?: unknown; devuelto?: unknown; reservas?: unknown; privado?: unknown; fotosFaltan?: unknown })
     .filter((r) => typeof r.id === "string" && UUID.test(r.id))
     .map((r) => ({
       id: r.id as string,
@@ -341,6 +397,8 @@ export async function guardarResultadosDropi(codigoPais: string, resultados: unk
       // «reserva»: las reservas vivas que releyó el favorito y si Dropi lo tiene como producto privado.
       reservas: Array.isArray(r.reservas) ? reservasDeDropi({ private_product_inventories: (r.reservas as unknown[]).slice(0, 50) }) : null,
       privado: typeof r.privado === "boolean" ? r.privado : null,
+      // «republicar»: las fotos que no se pudieron copiar (8 nov 2026): se crea la tarea de subirlas a mano.
+      fotosFaltan: Array.isArray(r.fotosFaltan) ? (r.fotosFaltan as unknown[]).filter((x): x is string => typeof x === "string").slice(0, 20).map((x) => x.slice(0, 120)) : [],
       // El ID del producto que creó una republicación (aunque haya fallado un paso después).
       nuevo: Number.isInteger(r.nuevo) && (r.nuevo as number) > 0 && (r.nuevo as number) < 100_000_000 ? (r.nuevo as number) : null,
     }));
@@ -348,7 +406,7 @@ export async function guardarResultadosDropi(codigoPais: string, resultados: unk
   const supabase = createServiceClient();
   const leerFilas = (columnas: string) =>
     supabase.from("dropi_cambios_pendientes").select(columnas).eq("pais_id", pais.id).in("estado", ["pendiente", "error"]).in("id", limpios.map((r) => r.id));
-  let lectura = await leerFilas("id, tipo, restaurar, descripcion, fotos, datos, quitar_privados, nuevo_dropi_id, nueva_publicacion_id, publicacion_id, dropi_producto_id, nombre, nombre_guia, precio, precio_sugerido, intentos");
+  let lectura = await leerFilas("id, tipo, restaurar, descripcion, fotos, datos, quitar_privados, nuevo_dropi_id, nueva_publicacion_id, publicacion_id, dropi_producto_id, nombre, nombre_guia, precio, precio_sugerido, intentos, creado_por");
   if (lectura.error) lectura = await leerFilas("id, tipo, quitar_privados, nuevo_dropi_id, nueva_publicacion_id, publicacion_id, dropi_producto_id, nombre, nombre_guia, precio, precio_sugerido, intentos");
   if (lectura.error) lectura = await leerFilas("id, tipo, nuevo_dropi_id, nueva_publicacion_id, publicacion_id, dropi_producto_id, nombre, nombre_guia, precio, precio_sugerido, intentos");
   if (lectura.error) lectura = await leerFilas("id, publicacion_id, dropi_producto_id, nombre, nombre_guia, precio, precio_sugerido, intentos");
@@ -535,11 +593,16 @@ export async function guardarResultadosDropi(codigoPais: string, resultados: unk
           ...(creada && !("error" in creada) ? { nueva_publicacion_id: creada.id } : {}),
         })
         .eq("id", r.id);
+      // Fotos que no se pudieron copiar (8 nov 2026, pedido de Alcides): la republicación termina igual y queda una tarea en la publicación nueva para subirlas
+      // a mano, sacándolas del ID viejo. Le toca a quien pidió republicar (si sigue activa), si no al responsable de la publicación, si no a quien aplicó.
+      if (ok && creada && !("error" in creada) && r.fotosFaltan.length) await tareaFotosQueFaltan(supabase, f, creada.id, nuevo!, r.fotosFaltan, r.aviso, usuario);
       auditoria.push({
         accion: ok ? "dropi_republicada" : "dropi_republicar_error",
         entidad: "dropi_publicaciones",
         entidadId: f.publicacion_id as string,
-        detalle: ok ? `ID ${f.dropi_producto_id} → ID nuevo ${nuevo}: archivada en Dropi sin stock (desde Dropi)` : `ID ${f.dropi_producto_id}${nuevo ? ` · ID nuevo ${nuevo}` : ""} · ${error}`,
+        detalle: ok
+          ? `ID ${f.dropi_producto_id} → ID nuevo ${nuevo}: archivada en Dropi sin stock${r.fotosFaltan.length ? ` · faltan ${r.fotosFaltan.length} foto(s) por subir (tarea creada)` : ""} (desde Dropi)`
+          : `ID ${f.dropi_producto_id}${nuevo ? ` · ID nuevo ${nuevo}` : ""} · ${error}`,
       });
       if (ok) aplicados++;
       else errores++;
