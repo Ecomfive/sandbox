@@ -721,8 +721,9 @@ function ContenidoFicha({
           {/* Las unidades reservadas por correo en Dropi (8 nov 2026): una pública con reserva no es un producto privado. */}
           <ReservasPublicacion p={p} puedeEscribir={puedeEscribir} />
 
-          {/* Lo que viene en camino del producto vinculado: solo unidades, del país seleccionado (las órdenes que ya salieron y no han llegado). */}
-          {p.sku && p.sku.tipo !== "combo" && (
+          {/* Lo que viene en camino del producto vinculado (solo unidades, del país seleccionado). Quien ve «Compras» no lo necesita: ahí sale cada
+              compra con su llegada aprox. (9 nov 2026, pedido de Alcides). */}
+          {!puedeVerCompras && p.sku && p.sku.tipo !== "combo" && (
             <Seccion icono={ComprasIcon} titulo="En camino">
               <EnCaminoProducto key={`${p.sku.id}-${codigoPais}`} id={p.sku.id} pais={codigoPais} nombrePais={nombrePais} />
             </Seccion>

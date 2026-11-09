@@ -202,7 +202,7 @@ function ListaCompras({ compras, conPais }: { compras: CompraDeProducto[]; conPa
   );
 }
 
-/** Cuándo se pidió y cuándo llegó, con los días que tardó; sin llegada todavía, solo el pedido. */
+/** Cuándo se pidió y cuándo llegó, con los días que tardó; si viene en camino, cuándo llega aprox.; si no, «Sin llegar». */
 function FechasCompra({ c }: { c: CompraDeProducto }) {
   const dias = diasPedidoLlegada(c.fecha, c.llegada);
   return (
@@ -213,6 +213,8 @@ function FechasCompra({ c }: { c: CompraDeProducto }) {
           Llegó {formatearFecha(c.llegada)}
           {dias !== null && <span className="text-foreground"> · {entero(dias)} días</span>}
         </span>
+      ) : c.llegadaAprox ? (
+        <span>Llega aprox. {formatearFecha(c.llegadaAprox)}</span>
       ) : (
         compraCuenta(c) && <span>Sin llegar</span>
       )}

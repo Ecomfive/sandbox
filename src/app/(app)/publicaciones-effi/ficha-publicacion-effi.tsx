@@ -283,7 +283,8 @@ export function FichaPublicacionEffi({
           </div>
         </Seccion>
 
-        {p.producto && p.producto.tipo !== "combo" && (
+        {/* Quien ve «Compras» ya tiene ahí cada compra con su llegada aprox. (9 nov 2026, pedido de Alcides). */}
+        {!puedeVerCompras && p.producto && p.producto.tipo !== "combo" && (
           <Seccion icono={ComprasIcon} titulo="En camino">
             <EnCaminoProducto key={`${p.producto.id}-${codigoPais}`} id={p.producto.id} pais={codigoPais} nombrePais={nombrePais} />
           </Seccion>
