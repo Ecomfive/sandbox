@@ -188,8 +188,8 @@ export function iniciales(nombre: string | null): string {
 }
 
 /**
- * Tareas cerradas (8 nov 2026, pedido de Alcides): una tarea hecha hace más de `DIAS_PARA_CERRAR` días se cierra sola (en la base, `archivada_en`); también se
- * cierra a mano. Las cerradas salen de la lista y se ven con el botón «Cerradas».
+ * Archivado automático (8 nov 2026, pedido de Alcides): una tarea hecha hace más de `DIAS_PARA_CERRAR` días se archiva sola (`archivada_en`); también se
+ * archiva a mano. Las archivadas salen de la lista y se ven con el botón «Archivadas».
  */
 export const DIAS_PARA_CERRAR = 30;
 
