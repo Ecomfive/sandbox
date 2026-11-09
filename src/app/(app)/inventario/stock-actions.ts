@@ -10,6 +10,7 @@ import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { getPaisActual } from "@/lib/pais";
 import { puedeVerBodega } from "@/lib/seguridad/pais-acceso";
 import type { CajaGuardada } from "@/lib/wms/cajas";
+import { codigoLote } from "@/lib/wms/vencimiento";
 
 const MODULO = "inventario";
 const ES_ID = (v: string) => /^[0-9a-fA-F-]{8,64}$/.test(v);
@@ -211,7 +212,8 @@ export async function registrarMovimientoStock(formData: FormData): Promise<{ er
   const motivo = texto(formData, "motivo").slice(0, 500) || null;
   // Un producto con vencimiento se mueve por lote: entrada y ajuste nombran el lote (código y fecha si es nuevo); la salida puede no nombrarlo (sale primero lo que vence antes).
   const loteId = texto(formData, "lote_id") || null;
-  const loteCodigo = texto(formData, "lote_codigo").slice(0, 80) || null;
+  // Sin código, el lote se nombra con su fecha de vencimiento (9 nov 2026: el código del lote no se pide por ahora).
+  const loteCodigo = codigoLote(texto(formData, "lote_codigo"), texto(formData, "vencimiento")) || null;
   const vencimiento = texto(formData, "vencimiento") || null;
 
   if (!ES_ID(sku)) return { error: "SKU no válido." };
@@ -239,7 +241,7 @@ export async function registrarMovimientoStock(formData: FormData): Promise<{ er
   if (maestro.tipo === "combo") return { error: "Un producto compuesto no guarda stock: se calcula de sus componentes." };
   if (maestro.clase === "test") return { error: "Es un producto de prueba: no tiene stock hasta que se pase a Activo." };
 
-  if (maestro.maneja_vencimiento && tipo === "entrada" && !loteId && !(loteCodigo && vencimiento)) return { error: "Un producto con vencimiento necesita el lote y su fecha de vencimiento." };
+  if (maestro.maneja_vencimiento && tipo === "entrada" && !loteId && !(loteCodigo && vencimiento)) return { error: "Un producto con vencimiento necesita la fecha de vencimiento." };
   if (maestro.maneja_vencimiento && tipo === "ajuste" && !loteId && !loteCodigo) return { error: "Un ajuste de un producto con vencimiento necesita el lote." };
   if (!maestro.maneja_vencimiento && (loteId || loteCodigo || vencimiento)) return { error: "Este producto no maneja vencimiento." };
 

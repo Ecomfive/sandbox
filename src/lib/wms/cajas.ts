@@ -1,6 +1,12 @@
 // Cajas por producto y ubicación (7 nov 2026, pedido de Hernán, a través de Yanixia y Nicol; migración 0236): cuántas cajas hay, de qué tamaño y dónde. Un mismo
 // producto suele tener cajas de varios tamaños («16 de 175 y 1 de 58»), por eso va una línea por tamaño y lugar. Lógica pura, con prueba.
 
+/**
+ * Las cajas están apagadas por ahora (9 nov 2026, pedido de Hernán: cambiar las unidades de cada caja confundía). La migración 0265 pasó las guardadas a
+ * `wms_cajas_respaldo`; sin cajas, todo va por unidades. El Levantamiento no ofrece «Agregar cajas» mientras esto sea `false`.
+ */
+export const CAJAS_ACTIVAS = false;
+
 const ES_ID = /^[0-9a-fA-F-]{8,64}$/;
 const MAX_ENTERO = 1_000_000;
 export const MAX_LINEAS_CAJAS = 100;

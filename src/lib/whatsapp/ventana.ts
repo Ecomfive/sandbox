@@ -42,6 +42,8 @@ export function errorEnEspanol(codigo: number | null, mensaje: string | null): s
   switch (codigo) {
     case 131047:
       return "Pasaron más de 24 h desde su último mensaje: por WhatsApp solo se le puede escribir con una plantilla aprobada.";
+    case 130497:
+      return ERROR_PAIS_RESTRINGIDO(null);
     case 131026:
       return "Ese número no puede recibir el mensaje (no tiene WhatsApp o no aceptó los términos nuevos).";
     case 131051:
@@ -58,4 +60,35 @@ export function errorEnEspanol(codigo: number | null, mensaje: string | null): s
     default:
       return mensaje ? `WhatsApp no lo envió: ${mensaje}` : "WhatsApp no lo envió.";
   }
+}
+
+/** El nombre en español de un país por su código ISO («BR» → «Brasil»); null si no se sabe. */
+function nombrePais(codigo: string | null | undefined): string | null {
+  if (!codigo || !/^[A-Z]{2}$/.test(codigo)) return null;
+  try {
+    return new Intl.DisplayNames(["es"], { type: "region" }).of(codigo) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * El 130497 de Meta (9 nov 2026: el número de México no pudo responderle a un cliente de Brasil): Meta no deja que la cuenta de WhatsApp de ese número le escriba a usuarios de ese
+ * país. No es una falla del sistema ni se arregla reintentando.
+ */
+export const ERROR_PAIS_RESTRINGIDO = (pais: string | null) =>
+  `Meta no deja que este número de la empresa le escriba a clientes de ${nombrePais(pais) ?? "ese país"}. No es una falla del sistema: contáctalo por otro medio (Dropi, correo) o desde la app de WhatsApp del celular, si este número también está ahí.`;
+
+/**
+ * El motivo de un mensaje que WhatsApp no entregó, como se guarda desde el aviso del webhook («130497: Business account is restricted…»), en palabras para el equipo.
+ * `paisCliente` (código ISO, sale del teléfono del chat en el servidor) completa el país del 130497. Lo que no se reconoce queda como vino.
+ */
+export function errorDeEntrega(error: string | null, paisCliente: string | null = null): string | null {
+  if (!error) return error;
+  const m = /^(\d+):\s*([\s\S]*)$/.exec(error.trim());
+  if (!m) return error;
+  const codigo = Number(m[1]);
+  if (codigo === 130497) return ERROR_PAIS_RESTRINGIDO(paisCliente);
+  if (codigo === 131047 || codigo === 131026 || codigo === 131056 || codigo === 130429) return errorEnEspanol(codigo, m[2]);
+  return error;
 }
