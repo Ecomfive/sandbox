@@ -42,12 +42,44 @@ export function DescontinuadoPorPais({ skuId, puedeEscribir }: { skuId: string; 
     });
   }
 
+  // Marcar o quitar todos de una vez (9 nov 2026, pedido de Hernán): si ya están todos, los quita; si no, marca los que faltan. Va país por país, como las casillas.
+  const lista = paises;
+  const todos = lista.length > 0 && marcados.length === lista.length;
+  function cambiarTodos() {
+    const si = !todos;
+    const aCambiar = lista.filter((p) => p.descontinuado !== si);
+    empezar(async () => {
+      const hechos: string[] = [];
+      let error: string | null = null;
+      for (const p of aCambiar) {
+        const r = await cambiarDescontinuadoPais(skuId, p.codigo, si).catch(() => ({ error: "No se pudo guardar. Inténtalo de nuevo." }));
+        if ("error" in r) {
+          error = `${p.nombre}: ${r.error}`;
+          continue;
+        }
+        hechos.push(p.codigo);
+      }
+      setPaises((actual) => (Array.isArray(actual) ? actual.map((x) => (hechos.includes(x.codigo) ? { ...x, descontinuado: si } : x)) : actual));
+      if (hechos.length) mostrarToast(si ? `Descontinuado en ${hechos.length === lista.length ? "todos los países" : `${hechos.length} países más`}: ya no se compra.` : `Vuelve a comprarse para ${hechos.length === lista.length ? "todos los países" : `${hechos.length} países`}.`);
+      if (error) mostrarToast(error, "destructive");
+    });
+  }
+
   if (!puedeEscribir) {
     return <p className={`m-0 text-sm ${marcados.length ? "text-destructive" : "text-muted-foreground"}`}>{marcados.length ? `Descontinuado en ${marcados.map((p) => p.nombre).join(", ")}.` : "Se compra para todos los países."}</p>;
   }
   return (
     <fieldset className="flex flex-col gap-2 border-0 p-0">
       <legend className="sr-only">Países donde está descontinuado</legend>
+      <button
+        type="button"
+        onClick={cambiarTodos}
+        disabled={pendiente}
+        aria-pressed={todos}
+        className="w-fit rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium hover:bg-muted disabled:cursor-wait disabled:opacity-70"
+      >
+        {todos ? "Quitar todos" : "Marcar todos"}
+      </button>
       <div className="grid grid-cols-[repeat(auto-fill,minmax(9.5rem,1fr))] gap-2">
         {paises.map((p) => (
           <label
