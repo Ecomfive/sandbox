@@ -75,3 +75,13 @@ test("la fecha se dice en relación con hoy y las iniciales de una persona", () 
   assert.equal(iniciales("alcides"), "A");
   assert.equal(iniciales(null), "?");
 });
+
+test("una tarea hecha hace más de 30 días se cierra sola", async () => {
+  const { debeCerrarse, corteParaCerrar } = await import("./tareas");
+  const ahora = new Date("2026-11-08T12:00:00Z");
+  assert.equal(corteParaCerrar(ahora), "2026-10-09T12:00:00.000Z");
+  assert.equal(debeCerrarse({ estado: "hecha", hechaEn: "2026-10-01T10:00:00Z", archivadaEn: null }, ahora), true);
+  assert.equal(debeCerrarse({ estado: "hecha", hechaEn: "2026-10-20T10:00:00Z", archivadaEn: null }, ahora), false, "hecha hace menos de 30 días");
+  assert.equal(debeCerrarse({ estado: "en_curso", hechaEn: null, archivadaEn: null }, ahora), false, "sin hacer no se cierra");
+  assert.equal(debeCerrarse({ estado: "hecha", hechaEn: "2026-10-01T10:00:00Z", archivadaEn: "2026-10-02T10:00:00Z" }, ahora), false, "ya cerrada");
+});

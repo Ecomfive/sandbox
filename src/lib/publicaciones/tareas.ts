@@ -186,3 +186,15 @@ export function iniciales(nombre: string | null): string {
   if (!p.length) return "?";
   return ((p[0][0] ?? "") + (p.length > 1 ? (p[p.length - 1][0] ?? "") : "")).toUpperCase();
 }
+
+/**
+ * Tareas cerradas (8 nov 2026, pedido de Alcides): una tarea hecha hace más de `DIAS_PARA_CERRAR` días se cierra sola (en la base, `archivada_en`); también se
+ * cierra a mano. Las cerradas salen de la lista y se ven con el botón «Cerradas».
+ */
+export const DIAS_PARA_CERRAR = 30;
+
+/** Desde cuándo una tarea hecha ya se cierra sola: las hechas antes de esta fecha (ISO). */
+export const corteParaCerrar = (ahora: Date) => new Date(ahora.getTime() - DIAS_PARA_CERRAR * 86_400_000).toISOString();
+
+/** ¿Esta tarea ya se debe cerrar sola? */
+export const debeCerrarse = (t: Pick<TareaVista, "estado" | "hechaEn" | "archivadaEn">, ahora: Date) => t.estado === "hecha" && !t.archivadaEn && !!t.hechaEn && t.hechaEn < corteParaCerrar(ahora);

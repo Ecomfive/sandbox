@@ -107,7 +107,7 @@ function ContenidoFichaTarea({
     <div className="flex flex-col gap-5 px-5 py-5" onChange={(e) => e.stopPropagation()} onInput={(e) => e.stopPropagation()}>
       <div className="flex flex-wrap items-center gap-2">
         <MenuEstado pildora t={t} puedeEscribir={puedeEscribir} conEstados={conEstados} alElegir={(estado) => cambiar(t, { estado })} />
-        {t.archivadaEn && <span className="rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">Archivada</span>}
+        {t.archivadaEn && <span className="rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">Cerrada</span>}
         {!manual && <span className="rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">De una recomendación</span>}
       </div>
 
@@ -217,7 +217,7 @@ function ContenidoFichaTarea({
         )}
         {t.archivadaEn && (
           <div>
-            <dt className="inline">Archivada </dt>
+            <dt className="inline">Cerrada </dt>
             <dd className="inline">el {fechaHora(t.archivadaEn)}</dd>
           </div>
         )}
@@ -227,7 +227,7 @@ function ContenidoFichaTarea({
         <div>
           <button type="button" disabled={ocupado} onClick={() => cambiar(t, { archivar: !t.archivadaEn })} className={`${botonClaro} gap-2`}>
             <ArchivarIcon aria-hidden="true" className="h-4 w-4" />
-            {t.archivadaEn ? "Sacar de Archivadas" : "Archivar tarea"}
+            {t.archivadaEn ? "Volver a abrir" : "Cerrar tarea"}
           </button>
         </div>
       )}

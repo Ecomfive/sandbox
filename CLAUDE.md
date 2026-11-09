@@ -812,7 +812,7 @@ convenciones técnicas del código.
   (título, descripción y producto editables, Archivar). La pestaña Tareas es un `ListaDatos` con `DEF_TAREAS` (agrupada por estado; `cerrados` = Archivadas,
   exclusivo) y «Agregar tarea». Cada fila de publicación trae `BotonTareasFila` (`tareas-publicacion.tsx`; azul con pendientes, rojo con atrasadas) que abre las
   tareas de ese producto. Una tarea de recomendación solo pasa a Hecha (`marcarTareaHecha`). Sin la 0178 todo carga igual (solo Por hacer y Hecha, sin prioridad
-  ni archivar; `conEstados`). Reversa: `supabase/rollbacks/0178_rollback.sql`.
+  ni archivar; `conEstados`). **Cerradas** (8 nov 2026, pedido de Alcides): «Archivada» se llama «Cerrada» en pantalla (la columna sigue siendo `archivada_en`) y `cargarTareas` cierra sola toda tarea hecha hace más de `DIAS_PARA_CERRAR` (30) días (`corteParaCerrar`, `debeCerrarse`, con prueba) y trae también las cerradas para el botón «Cerradas». Reversa: `supabase/rollbacks/0178_rollback.sql`.
   **Costa Rica** (28 oct 2026, pedido de Alcides: lo nuevo de Gestión de IDs vale también ahí). La bodega de Dropi depende del país: `esBodegaDropi`
   (`automatico.ts`, `BODEGAS_DROPI` = 280 Panamá, 15 «Bodega Dropi San Jose» de Costa Rica y, desde el 31 oct 2026, 49 «BODEGA DROPI» de México; decisión de Alcides: son de Dropi como la B280; salen de `BODEGA_DROPI_POR_PAIS` y `codigoBodegaDropi(codigoPais)` da el código para los textos, como la tarjeta «Republicar» del tablero, que recibe `codigoPais`) reemplaza
   las comparaciones con `BODEGA_DROPI` en republicar, apagar, privatizar, el stock de la ficha y las bodegas que se ofrecen. Una bodega de Dropi de otro país se
