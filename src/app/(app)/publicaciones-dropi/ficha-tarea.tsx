@@ -1,5 +1,10 @@
 "use client";
 
+import { ActividadTarea } from "./actividad-tarea";
+
+/** Cambia cuando cambia algo de la tarea: así su Actividad se vuelve a pedir. */
+const firmaTarea = (t: { estado: string; titulo: string; plazo: string | null; prioridad: string | null; responsableId: string | null; otros: { id: string }[]; archivadaEn: string | null; nota: string | null; hechaEn: string | null }) =>
+  [t.estado, t.titulo, t.plazo, t.prioridad, t.responsableId, t.otros.map((o) => o.id).join(","), t.archivadaEn, t.nota, t.hechaEn].join("|").split("").reduce((h, c) => (Math.imul(h, 31) + c.charCodeAt(0)) | 0, 7);
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { anilloFoco, fieldClass } from "@/components/ui/field";
@@ -230,6 +235,16 @@ function ContenidoFichaTarea({
             {t.archivadaEn ? "Sacar de Archivadas" : "Archivar tarea"}
           </button>
         </div>
+      )}
+
+      {/* Comentarios con archivos, @menciones y lo que cambió (8 nov 2026). Una tarea de una recomendación se comenta en la recomendación. */}
+      {t.origen === "manual" && (
+        <ActividadTarea
+          key={t.id}
+          id={t.id}
+          puedeComentar={puedeEscribir}
+          version={firmaTarea(t)}
+        />
       )}
     </div>
   );

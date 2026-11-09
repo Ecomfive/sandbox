@@ -358,7 +358,7 @@ export function MenuPrioridad({ t, puedeEscribir, alElegir, conTexto = false }: 
 }
 
 /** Las iniciales de quienes hacen la tarea, encimadas (hasta 3 y «+N»). */
-function InicialesVarias({ personas }: { personas: { id: string; nombre: string }[] }) {
+export function InicialesVarias({ personas }: { personas: { id: string; nombre: string }[] }) {
   if (!personas.length) return <Iniciales nombre={null} />;
   const vistas = personas.slice(0, 3);
   return (
