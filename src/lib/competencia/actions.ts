@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { getUsuarioActual, requireAlgunModulo } from "@/lib/auth";
 import { unidadesBajadas, unirCoincidencias, type CambioStock } from "@/lib/competencia/analisis";
+import { certezaIgual } from "@/lib/competencia/certeza";
 import { clavesDistintas, MOTIVO_A_MANO, separarDescartados } from "@/lib/competencia/descartar";
 import { puedeVerPaisId } from "@/lib/seguridad/pais-acceso";
 import { idsDropi } from "@/lib/publicaciones/publicacion";
@@ -36,7 +37,10 @@ export interface CompetenciaDeProducto {
   nuestro: { nombre: string; precio: number | null; stock: number | null; foto: string | null } | null;
   /** Nuestras filas del análisis en ese país (con dos IDs de Dropi pueden ser dos): con ellas se guarda «No es el mismo». */
   nuestrosIds: string[];
+  /** Solo los que venden **el mismo** producto (`certezaIgual`, o «Es el mismo» de una persona o la IA): con estos se comparan precios (9 nov 2026, pedido de Hernán). */
   competidores: CompetidorDeProducto[];
+  /** Los que se parecen sin ser seguro que sean el mismo: se muestran aparte y no cuentan; una persona puede decir «Es el mismo» o «No es el mismo». */
+  dudosos: (CompetidorDeProducto & { motivo: string | null })[];
   /** Los que alguien (o la IA) dijo que no son el mismo producto (8 nov 2026): ya no cuentan, pero se pueden volver a contar. */
   descartados: (CompetidorDeProducto & { motivo: string | null })[];
 }
@@ -54,6 +58,7 @@ interface Fila {
   stock: number | null;
   es_nuestro: boolean;
   igual_a: string | null;
+  igual_metodo: string | null;
 }
 
 /**
@@ -82,7 +87,7 @@ export async function obtenerCompetenciaProducto(skuId: string, codigoPais?: str
   const { data: filas, error } = await traerTodasConError<Fila>((a, b) =>
     supabase
       .from("competencia_productos")
-      .select("id, dropi_producto_id, pais_id, proveedor_dropi_id, proveedor_nombre, nombre, foto_url, foto_huella, precio, stock, es_nuestro, igual_a")
+      .select("id, dropi_producto_id, pais_id, proveedor_dropi_id, proveedor_nombre, nombre, foto_url, foto_huella, precio, stock, es_nuestro, igual_a, igual_metodo")
       .eq("estado", "activo")
       .match(soloPais ? { pais_id: soloPais } : {})
       .order("id")
@@ -113,7 +118,7 @@ export async function obtenerCompetenciaProducto(skuId: string, codigoPais?: str
     const elegidos = new Map<string, { porFoto: boolean; parecido: number }>();
     for (const c of coincidencias) if (!porId.get(c.id)!.es_nuestro) elegidos.set(c.id, { porFoto: c.porFoto, parecido: Math.round(c.parecido * 100) });
     // Los que ya están emparejados con nuestro producto de ECOMFIVE cuentan aunque el nombre de Producto sea distinto.
-    if (nuestra) for (const f of delPais) if (f.igual_a && nuestrasIds.has(f.igual_a) && !elegidos.has(f.id)) elegidos.set(f.id, { porFoto: false, parecido: 0 });
+    if (nuestra) for (const f of delPais) if (f.igual_a && nuestrasIds.has(f.igual_a) && !elegidos.has(f.id)) elegidos.set(f.id, { porFoto: f.igual_metodo === "foto", parecido: 0 });
     if (!nuestra && !elegidos.size) continue;
 
     const ids = [...elegidos.keys()];
@@ -151,12 +156,21 @@ export async function obtenerCompetenciaProducto(skuId: string, codigoPais?: str
         })
         .sort((a, b) => (a.precio ?? 1e9) - (b.precio ?? 1e9));
     const { cuentan, descartados } = separarDescartados(todos, [...nuestrasIds], distintas);
+    // De los que cuentan, solo el mismo producto se compara: contra nuestra fila de Dropi, el nombre del producto y sus nombres en Dropi, con las fotos. Lo que
+    // una persona o la IA ya confirmó («mismo») vale; lo que la IA dijo «parecido» queda dudoso con su motivo.
+    const referencias = [...(nuestra ? [{ nombre: nuestra.nombre, huella: nuestra.foto_huella }] : []), ...nombres.map((nombre) => ({ nombre, huella: sku.foto_huella ?? null }))];
+    const confirmados = new Set((verif ?? []).filter((v) => v.veredicto === "mismo").map((v) => v.producto_id as string));
+    const parecidos = new Map((verif ?? []).filter((v) => v.veredicto === "parecido").map((v) => [v.producto_id as string, (v.motivo as string | null) ?? null]));
+    const exacto = (c: CompetidorDeProducto) =>
+      confirmados.has(c.id) ||
+      (!parecidos.has(c.id) && referencias.some((ref) => certezaIgual(ref, { nombre: c.nombre, huella: porId.get(c.id)?.foto_huella ?? null }, c.porFoto ? "foto" : "nombre") === "exacto"));
     salida.push({
       pais: pais?.nombre ?? "—",
       codigo: pais?.codigo ?? "",
       nuestro: nuestra ? { nombre: nuestra.nombre, precio: n(nuestra.precio), stock: nuestra.stock, foto: nuestra.foto_url } : null,
       nuestrosIds: [...nuestrasIds],
-      competidores: cuentan,
+      competidores: cuentan.filter(exacto),
+      dudosos: cuentan.filter((c) => !exacto(c)).map((c) => ({ ...c, motivo: parecidos.get(c.id) ?? null })),
       descartados: descartados.map((c) => ({ ...c, motivo: motivoDe.get(c.id) ?? null })),
     });
   }
@@ -193,7 +207,10 @@ export async function obtenerHistorialCompetencia(productoId: string): Promise<{
  * las recomendaciones de precio y en Análisis de competencia. La IA no vuelve a revisar un par que ya tiene veredicto. Pide modificar Gestión de IDs Dropi o
  * Análisis de competencia; los ids de nuestras filas se vuelven a comprobar aquí (los manda el navegador).
  */
-export async function descartarCompetidor(skuId: string, competidorId: string, nuestrosIds: string[], volver = false): Promise<{ error?: string; detalle?: string }> {
+export async function descartarCompetidor(skuId: string, competidorId: string, nuestrosIds: string[], modo: boolean | "mismo" = false): Promise<{ error?: string; detalle?: string }> {
+  // `true` vuelve a contar uno descartado; «mismo» confirma que un dudoso es el mismo producto (9 nov 2026: entonces se compara aunque los nombres no calcen).
+  const volver = modo === true;
+  const mismo = modo === "mismo";
   let usuario;
   try {
     usuario = await requireAlgunModulo(["publicaciones-dropi", "analisis-competencia"], true);
@@ -214,7 +231,11 @@ export async function descartarCompetidor(skuId: string, competidorId: string, n
   if (!validas.length) return { error: "Este producto no aparece como nuestro en el catálogo de Dropi de ese país." };
   if (!(await puedeVerPaisId(supabase, usuario.paisesPermitidos, otro.pais_id))) return { error: "No es de tus países." };
 
-  if (volver) {
+  if (mismo) {
+    const filas = validas.map((nuestro_id) => ({ plataforma: "dropi", producto_id: competidorId, nuestro_id, veredicto: "mismo", motivo: `Confirmado a mano: es el mismo producto (${usuario.nombre ?? "sin nombre"})`, creado_por: usuario.id }));
+    const { error } = await supabase.from("competencia_verificaciones").upsert(filas, { onConflict: "plataforma,producto_id,nuestro_id" });
+    if (error) return { error: "No se pudo guardar (¿falta la migración 0246?)." };
+  } else if (volver) {
     const { error } = await supabase.from("competencia_verificaciones").delete().eq("plataforma", "dropi").eq("producto_id", competidorId).in("nuestro_id", validas).eq("veredicto", "distinto");
     if (error) return { error: "No se pudo guardar (¿falta la migración 0246?)." };
   } else {
@@ -224,12 +245,18 @@ export async function descartarCompetidor(skuId: string, competidorId: string, n
   }
   const { data: pais } = await supabase.from("paises").select("nombre").eq("id", otro.pais_id).maybeSingle();
   await registrarAuditoria({
-    accion: volver ? "competencia_volver_a_contar" : "competencia_no_es_el_mismo",
+    accion: mismo ? "competencia_es_el_mismo" : volver ? "competencia_volver_a_contar" : "competencia_no_es_el_mismo",
     entidad: "skus_maestros",
     entidadId: skuId,
-    detalle: `${sku.nombre}: ${volver ? "vuelve a contar" : "no es el mismo"} «${otro.nombre}» de ${otro.proveedor_nombre} · ${pais?.nombre ?? ""}`,
+    detalle: `${sku.nombre}: ${mismo ? "es el mismo" : volver ? "vuelve a contar" : "no es el mismo"} «${otro.nombre}» de ${otro.proveedor_nombre} · ${pais?.nombre ?? ""}`,
   });
   revalidatePath("/publicaciones-dropi");
   revalidatePath("/analisis-competencia");
-  return { detalle: volver ? `«${otro.nombre}» vuelve a contar como competencia.` : `«${otro.nombre}» ya no cuenta como competencia de este producto.` };
+  return {
+    detalle: mismo
+      ? `«${otro.nombre}» es el mismo producto: ya se compara.`
+      : volver
+        ? `«${otro.nombre}» vuelve a contar como competencia.`
+        : `«${otro.nombre}» ya no cuenta como competencia de este producto.`,
+  };
 }

@@ -54,7 +54,7 @@ const COMERCIALES = new Set<string>(ACCIONES_COMERCIALES);
  * Acciones de un producto (`skus_maestros`, que no tiene país) que sí son de un país: la orden de compra creada al pasarlo a
  * Activo y un movimiento de inventario. Su país va al final del detalle («… · Panamá») y se lee con `paisEnDetalle`.
  */
-export const ACCIONES_PRODUCTO_CON_PAIS = new Set(["crear_compra", "movimiento_inventario", "envio_dropi_inventario", "envio_dropi_recibido", "competencia_no_es_el_mismo", "competencia_volver_a_contar"]);
+export const ACCIONES_PRODUCTO_CON_PAIS = new Set(["crear_compra", "movimiento_inventario", "envio_dropi_inventario", "envio_dropi_recibido", "competencia_no_es_el_mismo", "competencia_es_el_mismo", "competencia_volver_a_contar"]);
 
 /** El código del país nombrado en el detalle como « · <Nombre>», o undefined si no nombra ninguno. */
 export function paisEnDetalle(detalle: string | null | undefined, paises: { codigo: string; nombre: string }[]): string | undefined {
