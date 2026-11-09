@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import { useCodigoPais } from "@/components/pais-contexto";
 import { Bandera } from "@/components/paises/bandera";
 import { claseCeldaColumna, claseEncabezadoColumna, claseFilaEncabezado } from "@/components/tabla/estilos-tabla";
 import { Badge } from "@/components/ui/badge";
@@ -143,6 +144,9 @@ export function HistorialCompetencia({ productoId, limite = 30, pais: paisProduc
  *
  * Con `descartar` (la ficha de Gestión de IDs Dropi, 8 nov 2026, pedido de Alcides) cada competidor trae «No es el mismo»: deja de contar aquí, en
  * «Competidor más barato» y en las recomendaciones de precio. Los descartados se ven aparte, con «Volver a contar».
+ *
+ * Sin `pais` (todos los países: la ficha de Producto, una compra), el país de la barra va primero y abierto; los demás van debajo,
+ * plegados con su resumen, y se abren con un clic (9 nov 2026, pedido de Hernán).
  */
 export function BloqueCompetencia({ skuId, descartar = false, pais }: { skuId: string; descartar?: boolean; /** Solo la competencia de ese país (Gestión de IDs: el de la barra). */ pais?: string }) {
   const { precio: usd } = useMonedaCompetencia();
@@ -151,6 +155,16 @@ export function BloqueCompetencia({ skuId, descartar = false, pais }: { skuId: s
   const [error, setError] = useState<string | null>(null);
   const [abierto, setAbierto] = useState<string | null>(null);
   const [verDescartados, setVerDescartados] = useState<string | null>(null);
+  const codigoBarra = useCodigoPais();
+  // Los países desplegados: al empezar, solo el de la barra.
+  const [desplegados, setDesplegados] = useState<Set<string>>(() => new Set([codigoBarra]));
+  const alternar = (codigo: string) =>
+    setDesplegados((d) => {
+      const n = new Set(d);
+      if (n.has(codigo)) n.delete(codigo);
+      else n.add(codigo);
+      return n;
+    });
   const [ocupado, setOcupado] = useState<string | null>(null);
   const [, empezar] = useTransition();
   // Mueve un competidor entre los que cuentan y los descartados al guardar, sin volver a pedir todo.
@@ -194,19 +208,60 @@ export function BloqueCompetencia({ skuId, descartar = false, pais }: { skuId: s
   if (!datos) return <p className="text-sm text-muted-foreground">Buscando en la competencia…</p>;
   if (!datos.length) return <p className="text-sm text-muted-foreground">Ningún competidor vende este producto en Dropi{pais ? " en este país" : ""} (ni por nombre ni por foto).</p>;
 
+  // Con un solo país (el de la barra, o el único que tiene competencia) no hay nada que plegar.
+  const plegable = !pais && datos.length > 1;
+  const ordenados = plegable ? [...datos.filter((d) => d.codigo === codigoBarra), ...datos.filter((d) => d.codigo !== codigoBarra)] : datos;
+  const sinBarra = plegable && !datos.some((d) => d.codigo === codigoBarra);
+
   return (
     <div className="flex flex-col gap-6">
-      {datos.map((d) => {
+      {sinBarra && <p className="m-0 text-sm text-muted-foreground">En el país de la barra nadie más lo vende en Dropi. Abajo, los demás países.</p>}
+      {ordenados.map((d) => {
         const precios = d.competidores.map((c) => c.precio).filter((x): x is number => x !== null);
         const minimo = precios.length ? Math.min(...precios) : null;
         const masBaratos = d.nuestro?.precio != null ? d.competidores.filter((c) => c.precio !== null && c.precio < d.nuestro!.precio!).length : 0;
         const vendido7 = d.competidores.reduce((t, c) => t + c.vendido7, 0);
+        const abiertoPais = !plegable || desplegados.has(d.codigo);
+        if (!abiertoPais)
+          return (
+            <button
+              key={d.pais}
+              type="button"
+              aria-expanded={false}
+              onClick={() => alternar(d.codigo)}
+              className={`-mt-3 flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-left text-sm hover:bg-muted ${anilloFoco}`}
+            >
+              <span aria-hidden="true" className="text-xs text-muted-foreground">▸</span>
+              <Bandera codigo={d.codigo} />
+              <span className="font-semibold">{d.pais}</span>
+              <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground tabular-nums">
+                {d.competidores.length === 1 ? "1 competidor" : `${num(d.competidores.length)} competidores`}
+                {minimo !== null && ` · desde ${usd(minimo)}`}
+                {masBaratos > 0 && ` · ${num(masBaratos)} más baratos que nosotros`}
+              </span>
+              <span className="shrink-0 text-xs text-primario">Ver</span>
+            </button>
+          );
         return (
           <div key={d.pais} className="flex flex-col gap-3">
-            <h4 className="m-0 inline-flex items-center gap-2 text-sm font-semibold">
-              <Bandera codigo={d.codigo} />
-              {d.pais}
-            </h4>
+            {plegable ? (
+              <button
+                type="button"
+                aria-expanded
+                onClick={() => alternar(d.codigo)}
+                className={`-mx-1.5 inline-flex items-center gap-2 self-start rounded-md px-1.5 py-0.5 text-sm font-semibold hover:bg-muted ${anilloFoco}`}
+              >
+                <span aria-hidden="true" className="text-xs text-muted-foreground">▾</span>
+                <Bandera codigo={d.codigo} />
+                {d.pais}
+                {d.codigo === codigoBarra && <span className="text-xs font-normal text-muted-foreground">· país de la barra</span>}
+              </button>
+            ) : (
+              <h4 className="m-0 inline-flex items-center gap-2 text-sm font-semibold">
+                <Bandera codigo={d.codigo} />
+                {d.pais}
+              </h4>
+            )}
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               <Dato titulo="Competidores" valor={num(d.competidores.length)} />
               <Dato titulo="Precio más bajo" valor={usd(minimo)} sub={d.nuestro ? `nosotros ${usd(d.nuestro.precio)}` : "no lo vendemos en Dropi"} tono={masBaratos ? "destructive" : undefined} />
