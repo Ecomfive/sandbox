@@ -42,24 +42,28 @@ export async function obtenerNotasProducto(id: string): Promise<DatosActividad |
   const usuario = await requireAlgunModulo(MODULOS);
   if (!(await permitido(id))) return { error: "Producto no válido." };
   const supabase = createServiceClient();
+  // Un producto con variantes muestra también los cambios de cada variante (9 nov 2026, pedido de Hernán: el principal recién creado salía «Sin actividad»
+  // aunque su historia estaba en sus variantes). Cada línea de una variante dice cuál es.
+  const { data: hijas } = await supabase.from("skus_maestros").select("id, codigo").eq("padre_id", id);
+  const codigoDe = new Map((hijas ?? []).map((h) => [h.id as string, h.codigo as string]));
   const [comentarios, auditoria] = await Promise.all([
     motor.leerComentarios(CFG, id, usuario.id),
     supabase
       .from("historial_auditoria")
-      .select("id, accion, usuario_nombre, detalle, antes, despues, creado_en")
+      .select("id, entidad_id, accion, usuario_nombre, detalle, antes, despues, creado_en")
       .eq("entidad", "skus_maestros")
-      .eq("entidad_id", id)
+      .in("entidad_id", [id, ...codigoDe.keys()])
       .order("creado_en", { ascending: false })
-      .limit(30),
+      .limit(codigoDe.size ? 60 : 30),
   ]);
   // Como en la ficha de Producto: con países limitados, lo de otros países no se muestra.
   let cambios = auditoria.data ?? [];
   if (usuario.paisesPermitidos !== null) {
     const { data: paises } = await supabase.from("paises").select("codigo, nombre");
-    cambios = cambios.filter((e) => eventoVisible({ ...e, entidad: "skus_maestros", entidad_id: id }, usuario, () => undefined, (paises ?? []) as { codigo: string; nombre: string }[]));
+    cambios = cambios.filter((e) => eventoVisible({ ...e, entidad: "skus_maestros", entidad_id: e.entidad_id as string }, usuario, () => undefined, (paises ?? []) as { codigo: string; nombre: string }[]));
   }
   // Quién lo hizo va aparte (como en Compras): la línea va sin el nombre.
-  const eventos = cambios.map((e) => ({ id: e.id as string, campo: e.accion as string, antes: null, despues: null, ocurridoEn: e.creado_en as string, autor: (e.usuario_nombre as string | null) ?? null, origen: "auditoria", texto: formatearEventoAuditoria({ ...e, usuario_nombre: null }) }));
+  const eventos = cambios.map((e) => ({ id: e.id as string, campo: e.accion as string, antes: null, despues: null, ocurridoEn: e.creado_en as string, autor: (e.usuario_nombre as string | null) ?? null, origen: "auditoria", texto: `${codigoDe.has(e.entidad_id as string) ? `Variante ${codigoDe.get(e.entidad_id as string)}: ` : ""}${formatearEventoAuditoria({ ...e, usuario_nombre: null })}` }));
   // Sin la migración 0250 se ve igual, solo con los cambios.
   return { comentarios: "error" in comentarios ? [] : comentarios.comentarios, adjuntos: [], eventos };
 }
