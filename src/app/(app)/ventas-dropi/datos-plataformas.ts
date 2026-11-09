@@ -12,7 +12,8 @@ const skuDe = (v: unknown): PublicacionPlataforma["sku"] => {
 
 /**
  * Las ventas de Drop o Effi de un país (migración 0244) con sus publicaciones (`drop_publicaciones`, `effi_publicaciones`: nombre, stock y producto del sistema), en la
- * forma del tablero de Ventas Proveeduría. `null` si falta la migración.
+ * forma del tablero de Ventas Proveeduría. `null` si no se pudo leer (sin la migración, por ejemplo). Las publicaciones se unen a Producto por `sku_maestro_id`: también tienen
+ * `sugerido_sku_id`, y sin decir cuál la consulta falla.
  */
 export async function cargarVentasPlataforma(supabase: SupabaseClient, paisId: string, plataforma: PlataformaVentas): Promise<VentasDePlataforma | null> {
   const ventas = traerTodasConError<{ producto_id: string; dia: string; salidas: number; devueltas: number }>((d, h) =>
@@ -21,13 +22,13 @@ export async function cargarVentasPlataforma(supabase: SupabaseClient, paisId: s
   const pubs =
     plataforma === "drop"
       ? traerTodasConError<Record<string, unknown>>((d, h) =>
-          supabase.from("drop_publicaciones").select("drop_id, codigo, nombre, inventario, en_drop, skus_maestros(codigo, nombre, numero, codigo_barras)").eq("pais_id", paisId).order("id").range(d, h),
+          supabase.from("drop_publicaciones").select("drop_id, codigo, nombre, inventario, en_drop, skus_maestros!sku_maestro_id(codigo, nombre, numero, codigo_barras)").eq("pais_id", paisId).order("id").range(d, h),
         )
       : traerTodasConError<Record<string, unknown>>((d, h) =>
-          supabase.from("effi_publicaciones").select("effi_id, nombre, stock_principal, en_effi, skus_maestros(codigo, nombre, numero, codigo_barras)").eq("pais_id", paisId).order("id").range(d, h),
+          supabase.from("effi_publicaciones").select("effi_id, nombre, stock_principal, en_effi, skus_maestros!sku_maestro_id(codigo, nombre, numero, codigo_barras)").eq("pais_id", paisId).order("id").range(d, h),
         );
   const [v, p] = await Promise.all([ventas, pubs]);
-  if (v.error) return null;
+  if (v.error || p.error) return null;
   const publicaciones: PublicacionPlataforma[] = (p.data ?? []).map((x) =>
     plataforma === "drop"
       ? { idPlataforma: String(x.drop_id), nombre: String(x.nombre ?? x.drop_id), etiqueta: String(x.codigo || x.drop_id), stock: Number(x.inventario ?? 0), activa: x.en_drop !== false, sku: skuDe(x.skus_maestros) }

@@ -47,7 +47,7 @@ export default async function VentasDropiPage({ searchParams }: { searchParams: 
           {selector}
           <p role="status" className="rounded-xl border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">
             {!datos
-              ? "No se pudieron cargar las ventas. Falta correr en Supabase la migración 0244."
+              ? "No se pudieron cargar las ventas. Vuelve a intentarlo; si sigue, falta correr en Supabase la migración 0244."
               : vista === "effi"
                 ? "Todavía no hay ventas de Effi leídas. La lectura diaria las pide por la API de Effi: si «Actualizar desde Effi» (Gestión de IDs) avisa que falta un permiso, en Effi › Administración › Perfiles de usuario dale al perfil del usuario del sistema la consulta de «Notas de remisión de venta» y «Devoluciones de venta»."
                 : `Todavía no hay ventas de ${plataformaDe(vista).nombre} leídas. Se leen con «Actualizar» en la pestaña de Drop, con la cuenta de proveedor.`}
