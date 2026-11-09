@@ -15,6 +15,7 @@ import { BloqueCompetencia } from "@/components/competencia/piezas-competencia";
 import { ResultadoTestProducto } from "./test-producto";
 import { formatearFecha } from "@/lib/formato";
 import { NotasProducto } from "../inventario/notas-producto";
+import { InventarioProductoBloque } from "./inventario-producto";
 import { cambiarClaseProducto, eliminarProducto } from "./actions";
 import { CodigoBarrasProducto } from "./codigo-barras-producto";
 import { VencimientoProducto } from "./vencimiento-producto";
@@ -269,11 +270,9 @@ export function FichaProducto({
                 <p className="text-sm text-muted-foreground">Producto de prueba: no tiene stock hasta que se pase a Activo.</p>
               ) : producto.variantes.length > 0 ? (
                 <p className="text-sm text-muted-foreground">El stock se lleva en cada variante (ábrelas desde Variantes).</p>
-              ) : puedeVerInventario ? (
-                <Link href="/inventario" className={`inline-flex w-fit items-center rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium hover:bg-accent ${anilloFoco}`}>
-                  Ver en Inventario
-                </Link>
-              ) : null}
+              ) : (
+                <InventarioProductoBloque key={producto.id} id={producto.id} puedeVerInventario={puedeVerInventario} />
+              )}
             </Seccion>
             <Seccion icono={ProductoIcon} titulo="Asociaciones">
               {/* Sus publicaciones de Dropi como proveedor (Gestión de IDs Dropi): cómo se llama allá, en qué país y con qué ID. */}
