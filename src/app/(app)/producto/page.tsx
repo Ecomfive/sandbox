@@ -3,6 +3,7 @@ import { Pagina } from "@/components/ui/pagina";
 import { createServiceClient } from "@/lib/supabase/server";
 import { requireModulo } from "@/lib/auth";
 import { esAdministrador } from "@/lib/permisos/acceso";
+import { puedeUnirProductos } from "@/lib/permisos/unir-productos";
 import { getPaisActual } from "@/lib/pais";
 import { esUuid } from "@/lib/seguridad/ruta-almacen";
 import { cargarProductos } from "./datos-producto";
@@ -44,6 +45,7 @@ export default async function ProductoPage({ searchParams }: { searchParams: Pro
         compuestoInicial={compuestoInicial}
         puedeEscribir={!usuario.modulosSoloLectura.includes("producto")}
         puedeEliminar={!usuario.modulosSoloLectura.includes("producto") && esAdministrador(usuario)}
+        puedeUnir={puedeUnirProductos(usuario)}
         referenciasTest={referenciasTest}
       />
     </Pagina>

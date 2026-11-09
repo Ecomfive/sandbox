@@ -4,6 +4,7 @@ import { getUsuarioActual } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
 import { esAdministrador } from "@/lib/permisos/acceso";
+import { puedeUnirProductos } from "@/lib/permisos/unir-productos";
 import { cargarProductos } from "./datos-producto";
 import type { FilaProducto, ReferenciasTest } from "./def-producto";
 
@@ -14,6 +15,7 @@ export interface ProductoParaFicha {
   codigoPais: string;
   puedeEscribir: boolean;
   puedeEliminar: boolean;
+  puedeUnir: boolean;
   referenciasTest: ReferenciasTest;
 }
 
@@ -31,5 +33,5 @@ export async function obtenerProductoParaFicha(id: string): Promise<ProductoPara
   const producto = filas.find((f) => f.id === id);
   if (!producto) return { error: "No se encontró el producto." };
   const puedeEscribir = !usuario.modulosSoloLectura.includes("producto");
-  return { producto, codigoPais: pais.codigo, puedeEscribir, puedeEliminar: puedeEscribir && esAdministrador(usuario), referenciasTest };
+  return { producto, codigoPais: pais.codigo, puedeEscribir, puedeEliminar: puedeEscribir && esAdministrador(usuario), puedeUnir: puedeUnirProductos(usuario), referenciasTest };
 }
