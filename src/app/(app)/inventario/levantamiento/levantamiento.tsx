@@ -20,6 +20,7 @@ import { FichaStock } from "../ficha-stock";
 import { guardarLevantamiento } from "./actions";
 import { ImportarLista } from "./importar-lista";
 import { LineasCajas, unidadesFormulario, type LineaCajasForm, type UbicacionConteo } from "./lineas-cajas";
+import { CAJAS_ACTIVAS } from "@/lib/wms/cajas";
 
 export interface ProductoConteo {
   id: string;
@@ -432,6 +433,7 @@ export function Levantamiento({
                     {!conCajas && tieneCajas && !cajas[p.id] && (sumas[p.id] !== undefined || restas[p.id] !== undefined) && (
                       <p className="m-0 mt-1 text-xs text-warning">Tiene cajas: lo que se añade o se resta queda suelto, fuera de ellas.</p>
                     )}
+                    {CAJAS_ACTIVAS && (
                     <LineasCajas
                       codigo={p.codigo}
                       lineas={cajas[p.id] ?? p.cajas}
@@ -439,6 +441,7 @@ export function Levantamiento({
                       deshabilitado={!puedeEscribir || pendiente}
                       alCambiar={(lineas) => setCajas((x) => ({ ...x, [p.id]: lineas }))}
                     />
+                    )}
                   </td>
                   <td className={claseCeldaColumna}>
                     {p.manejaVencimiento ? (
