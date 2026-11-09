@@ -14,7 +14,7 @@
 --   * Se sigue negando con variantes, con tipos distintos (simple/compuesto) y si uno maneja vencimiento y el otro no y el duplicado
 --     tiene stock o lotes.
 -- Todo en una sola transacción; la simulación (`p_aplicar = false`) lo deshace igual que antes. Queda en la actividad del que se queda.
--- Reversa: supabase/rollbacks/0258_rollback.sql (vuelve a la regla de 0121; lo que ya se unió no se separa).
+-- Reversa: supabase/rollbacks/0260_rollback.sql (vuelve a la regla de 0121; lo que ya se unió no se separa).
 
 -- El libro no se edita ni se borra; solo la unión de productos cambia el producto de un movimiento, y nada más.
 create or replace function wms_movimientos_inmutable() returns trigger language plpgsql as $$

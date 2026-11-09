@@ -45,7 +45,7 @@ function FilaResultado({ rol, p }: { rol: "queda" | "elimina"; p: ProductoUnido 
 /**
  * Unir el producto abierto con su duplicado (28 oct 2026, solo administradores): se busca el otro, se ve qué se movería (la base lo
  * simula sin cambiar nada) y solo entonces se puede unir. Siempre se queda el más viejo y recibe todo lo del otro; el servidor lo decide
- * y lo vuelve a comprobar al unir. Si la base se niega (variantes, otro tipo o lotes que chocan, por ejemplo), dice por qué. Desde la migración 0258 el stock, los
+ * y lo vuelve a comprobar al unir. Si la base se niega (variantes, otro tipo o lotes que chocan, por ejemplo), dice por qué. Desde la migración 0260 el stock, los
  * movimientos, lotes y cajas del sobrante pasan al que queda.
  */
 export function UnirProducto({

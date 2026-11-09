@@ -183,6 +183,12 @@ export async function cargarProductos(usuario: UsuarioActual, supabase: Supabase
   for (const [id, extra] of deCombos) testsPorId.set(id, [...(testsPorId.get(id) ?? []), ...extra]);
   const numeroPorId = new Map(numeros.error ? [] : ((numeros.data ?? []) as { id: string; numero: number }[]).map((n) => [n.id, Number(n.numero)]));
   const fotoPorId = new Map(((fotos.data ?? []) as { id: string; foto_url: string }[]).map((f) => [f.id, f.foto_url]));
+  // Una variante sin foto propia usa la de su producto principal (9 nov 2026): la migración 0258 también la copia en la base, pero esto
+  // cubre las variantes que todavía no la tienen.
+  for (const p of lista) {
+    const deSuPadre = p.padre_id ? fotoPorId.get(p.padre_id as string) : undefined;
+    if (p.padre_id && !fotoPorId.has(p.id as string) && deSuPadre) fotoPorId.set(p.id as string, deSuPadre);
+  }
   // Unidades compradas por producto (las líneas vinculadas en Compras); un producto con variantes suma las de sus variantes.
   const padreDe = new Map(lista.filter((p) => p.padre_id).map((p) => [p.id as string, p.padre_id as string]));
   const compradoPorId = new Map<string, number>();
@@ -261,9 +267,16 @@ export async function cargarProductos(usuario: UsuarioActual, supabase: Supabase
   const variantesPorPadre = new Map<string, FilaProducto["variantes"]>();
   for (const p of lista) {
     if (!p.padre_id) continue;
-    const v = { id: p.id as string, codigo: p.codigo as string, nombre: p.nombre as string, opciones: (p.opciones ?? {}) as Record<string, string> };
+    const v = { id: p.id as string, codigo: p.codigo as string, nombre: p.nombre as string, opciones: (p.opciones ?? {}) as Record<string, string>, barras: (p.codigo_barras as string | null) ?? null, barrasOrigen: (p.codigo_barras_origen as string | null) ?? null, foto: fotoPorId.get(p.id as string) ?? null };
     variantesPorPadre.set(p.padre_id, [...(variantesPorPadre.get(p.padre_id) ?? []), v]);
   }
+
+  // Las unidades en Dropi de un producto con variantes son la suma de las de sus variantes (y las suyas, si las tuviera).
+  const stockDropiDe = (id: string): number | null => {
+    const propios = stockDropiPorSku.get(id);
+    const deVariantes = (variantesPorPadre.get(id) ?? []).map((v) => stockDropiPorSku.get(v.id)).filter((n): n is number => n !== undefined);
+    return propios === undefined && deVariantes.length === 0 ? null : (propios ?? 0) + deVariantes.reduce((t, n) => t + n, 0);
+  };
 
   const filas: FilaProducto[] = lista.map((p) => ({
     id: p.id,
@@ -295,14 +308,15 @@ export async function cargarProductos(usuario: UsuarioActual, supabase: Supabase
     listaComponentes: p.tipo === "combo" ? (listaPorCombo.get(p.id) ?? []).map((c) => ({ ...c, foto: fotoPorId.get(c.id) ?? null })) : [],
     compras: comprasDe(p.id),
     creado: p.creado_en.slice(0, 10),
-    asociaciones: asociacionesPorSku.get(p.id) ?? [],
-    nombresDropi: nombresDropiPorSku.get(p.id) ?? [],
+    // Un producto con variantes muestra lo de sus variantes (sus publicaciones y fichas cuelgan de ellas): así no sale «sin conectar».
+    asociaciones: [...(asociacionesPorSku.get(p.id) ?? []), ...(variantesPorPadre.get(p.id) ?? []).flatMap((v) => asociacionesPorSku.get(v.id) ?? [])],
+    nombresDropi: [...(nombresDropiPorSku.get(p.id) ?? []), ...(variantesPorPadre.get(p.id) ?? []).flatMap((v) => nombresDropiPorSku.get(v.id) ?? [])],
     tests: testsPorId.get(p.id) ?? [],
     padre: p.padre_id && porId.get(p.padre_id) ? { id: p.padre_id, codigo: porId.get(p.padre_id)!.codigo, nombre: porId.get(p.padre_id)!.nombre } : null,
     opciones: (p.opciones ?? null) as Record<string, string> | null,
     opcionesVariantes: (p.opciones_variantes ?? []) as { nombre: string; valores: string[] }[],
     variantes: (variantesPorPadre.get(p.id) ?? []).sort((a, b) => a.codigo.localeCompare(b.codigo, "es", { numeric: true })),
-    stockDropi: stockDropiPorSku.get(p.id) ?? null,
+    stockDropi: stockDropiDe(p.id),
   }));
 
   // Un compuesto se arma con productos simples y variantes, nunca con un producto que tiene variantes (no lleva stock:

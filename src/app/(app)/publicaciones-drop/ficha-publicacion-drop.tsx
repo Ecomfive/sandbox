@@ -40,12 +40,12 @@ function Producto({ sku, pequeño = false }: { sku: ProductoDrop; pequeño?: boo
     <span className="flex min-w-0 items-center gap-2.5">
       <FotoAmpliable url={sku.foto} nombre={sku.codigo} tam={pequeño ? "h-8 w-8" : "h-10 w-10"} />
       <span className="flex min-w-0 flex-col">
-        <SkuCopiable codigo={sku.codigo} className="font-mono text-xs font-semibold" />
-        <CodigosProducto numero={sku.numero} barras={sku.barras} />
-        <span className="truncate text-xs text-muted-foreground">
+        <span className="truncate text-sm font-medium">
           {sku.nombre}
           {sku.tipo === "combo" && " · compuesto"}
         </span>
+        <SkuCopiable codigo={sku.codigo} className="font-mono text-xs font-semibold" />
+        <CodigosProducto numero={sku.numero} barras={sku.barras} />
       </span>
     </span>
   );
@@ -389,7 +389,8 @@ export function FichaPublicacionDrop({
           </div>
         </Seccion>
 
-        {p.producto && p.producto.tipo !== "combo" && (
+        {/* Quien ve «Compras» ya tiene ahí cada compra con su llegada aprox. (9 nov 2026, pedido de Alcides). */}
+        {!puedeVerCompras && p.producto && p.producto.tipo !== "combo" && (
           <Seccion icono={ComprasIcon} titulo="En camino">
             <EnCaminoProducto key={`${p.producto.id}-${codigoPais}`} id={p.producto.id} pais={codigoPais} nombrePais={nombrePais} />
           </Seccion>

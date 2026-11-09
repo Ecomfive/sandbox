@@ -1,7 +1,7 @@
 "use client";
 
 import { quedaDespues, repartirFilas, type FilaConteo } from "@/lib/wms/levantamiento";
-import { useMemo, useState, useTransition } from "react";
+import { Fragment, useMemo, useState, useTransition } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { ContenedorTabla } from "@/components/tabla/contenedor-tabla";
 import { claseCeldaColumna, claseEncabezadoColumna, claseFilaEncabezado } from "@/components/tabla/estilos-tabla";
@@ -15,7 +15,7 @@ import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
 import { formatearTiempoRelativo } from "@/lib/formato";
 import type { Ambito } from "@/lib/imagen/buscar";
-import { BuscarIcon, CamaraIcon, MasIcon, PapeleraIcon } from "@/lib/nav-icons";
+import { BuscarIcon, CamaraIcon, ChevronRightIcon, MasIcon, PapeleraIcon } from "@/lib/nav-icons";
 import { FichaStock } from "../ficha-stock";
 import { guardarLevantamiento } from "./actions";
 import { ImportarLista } from "./importar-lista";
@@ -37,6 +37,9 @@ export interface ProductoConteo {
   lotes: { codigo: string; vencimiento: string; cantidad: number }[];
   /** Sus cajas guardadas en esta bodega (migración 0236). */
   cajas: LineaCajasForm[];
+  /** Si es una variante: su producto principal y sus valores («Rojo / M»). Las variantes se cuentan dentro de su principal. */
+  padre: { id: string; codigo: string; nombre: string; foto: string | null } | null;
+  opciones: string;
 }
 
 interface LineaLote {
@@ -120,6 +123,8 @@ export function Levantamiento({
   const [traslados, setTraslados] = useState<Record<string, { cantidad: string; destino: string }>>({});
   // La ficha del producto (7 nov 2026, pedido de Hernán): al tocar su nombre, para ver lo último que pasó y dejar notas.
   const [ficha, setFicha] = useState<string | null>(null);
+  // Los productos con variantes que están desplegados (se cuentan las variantes, no el principal).
+  const [abiertos, setAbiertos] = useState<Set<string>>(new Set());
   const productoFicha = ficha ? productos.find((p) => p.id === ficha) : undefined;
 
   const lineasDe = (p: ProductoConteo): LineaLote[] =>
@@ -173,13 +178,33 @@ export function Levantamiento({
     const q = sinAcentos(buscar.trim());
     const orden = porImagen ? new Map(porImagen.map((id, i) => [id, i])) : null;
     const lista = productos.filter((p) => {
-      if (orden && !orden.has(p.id)) return false;
-      if (q && !coincideCodigo(q, `${p.codigo} ${p.nombre}`, p)) return false;
+      if (orden && !orden.has(p.id) && !(p.padre && orden.has(p.padre.id))) return false;
+      if (q && !coincideCodigo(q, `${p.codigo} ${p.nombre} ${p.padre?.codigo ?? ""} ${p.padre?.nombre ?? ""}`, p)) return false;
       if (verTodos || q || orden) return true;
       return p.clase === "fisico" || p.enSistema !== 0 || contados[p.id] !== undefined || lotes[p.id] !== undefined || cajas[p.id] !== undefined || sumas[p.id] !== undefined || restas[p.id] !== undefined || traslados[p.id] !== undefined;
     });
-    return orden ? lista.sort((a, b) => (orden.get(a.id) ?? 0) - (orden.get(b.id) ?? 0)) : lista;
+    return orden ? lista.sort((a, b) => (orden.get(a.id) ?? orden.get(a.padre?.id ?? "") ?? 0) - (orden.get(b.id) ?? orden.get(b.padre?.id ?? "") ?? 0)) : lista;
   }, [productos, buscar, verTodos, porImagen, contados, lotes, cajas, sumas, restas, traslados]);
+
+  // Cada producto con variantes sale como una sola fila que se despliega; los demás, como siempre.
+  const entradas = useMemo(() => {
+    const grupos = new Map<string, { padre: NonNullable<ProductoConteo["padre"]>; hijos: ProductoConteo[] }>();
+    const lista: { p?: ProductoConteo; grupo?: { padre: NonNullable<ProductoConteo["padre"]>; hijos: ProductoConteo[] } }[] = [];
+    for (const p of visibles) {
+      if (!p.padre) {
+        lista.push({ p });
+        continue;
+      }
+      let g = grupos.get(p.padre.id);
+      if (!g) {
+        g = { padre: p.padre, hijos: [] };
+        grupos.set(p.padre.id, g);
+        lista.push({ grupo: g });
+      }
+      g.hijos.push(p);
+    }
+    return lista;
+  }, [visibles]);
 
   const contadosTotal = productos.filter((p) => contadoDe(p) !== null);
   const conDiferencia = contadosTotal.filter((p) => quedaDespues(contadoDe(p), sumarDe(p), p.enSistema, saleDe(p)) !== p.enSistema).length;
@@ -268,125 +293,7 @@ export function Levantamiento({
     });
   };
 
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-end gap-3 rounded-lg border border-border bg-card p-4">
-        <label className="flex flex-col gap-1">
-          <span className="text-xs font-semibold text-muted-foreground">Bodega</span>
-          <select
-            value={bodegaElegida}
-            onChange={(e) => router.replace(`${pathname}?bodega=${e.target.value}`)}
-            disabled={pendiente}
-            className={`${fieldClassSm} min-w-48`}
-          >
-            {bodegas.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.nombre}
-              </option>
-            ))}
-          </select>
-        </label>
-        {puedeEscribir && (
-          <label className="flex flex-col gap-1">
-            <span className="text-xs font-semibold text-muted-foreground">Referencia (opcional)</span>
-            <input value={referencia} onChange={(e) => setReferencia(e.target.value)} maxLength={120} placeholder="Ej: Conteo inicial" className={`${fieldClassSm} w-56`} />
-          </label>
-        )}
-        <label className="flex flex-col gap-1">
-          <span className="text-xs font-semibold text-muted-foreground">Buscar</span>
-          <span className="relative">
-            <BuscarIcon className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-            <input type="search" value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Código o nombre" className={`${fieldClassSm} w-56 pl-8`} />
-          </span>
-        </label>
-        <Tooltip texto="Buscar por imagen">
-          <button
-            type="button"
-            aria-label="Buscar por imagen"
-            onClick={() => setImagenAbierta(true)}
-            className={`inline-flex min-h-9 min-w-9 items-center justify-center rounded-md border border-border-control bg-card hover:bg-muted ${anilloFoco}`}
-          >
-            <CamaraIcon aria-hidden="true" className="h-4 w-4" />
-          </button>
-        </Tooltip>
-        {porImagen && (
-          <button
-            type="button"
-            onClick={() => setPorImagen(null)}
-            aria-label={`Quitar el filtro por imagen (${porImagen.length} productos)`}
-            className={`inline-flex min-h-9 items-center gap-1.5 rounded-md border border-foreground bg-foreground px-3 text-sm font-medium text-background ${anilloFoco}`}
-          >
-            Por imagen ({porImagen.length}) <span aria-hidden="true">×</span>
-          </button>
-        )}
-        {puedeEscribir && (
-          <ImportarLista
-            productos={productos}
-            deshabilitado={pendiente}
-            alAplicar={(cantidades, comoSuma) => {
-              const escritas = Object.fromEntries(Object.entries(cantidades).map(([id, n]) => [id, String(n)]));
-              if (!comoSuma) return setContados((x) => ({ ...x, ...escritas }));
-              setSumas((x) => ({ ...x, ...escritas }));
-            }}
-          />
-        )}
-        <button
-          type="button"
-          aria-pressed={verTodos}
-          onClick={() => setVerTodos((v) => !v)}
-          className={`min-h-9 rounded-md border px-3 text-sm ${verTodos ? "border-foreground bg-foreground text-background" : "border-border-control bg-card hover:bg-muted"}`}
-        >
-          Ver inactivos y descontinuados
-        </button>
-        {ultimo && (
-          <p className="text-xs text-muted-foreground">
-            Último levantamiento: {formatearTiempoRelativo(ultimo.fecha)}
-            {ultimo.referencia ? ` · ${ultimo.referencia}` : ""} · {ultimo.productos} productos
-          </p>
-        )}
-      </div>
-
-      <VentanaBuscarImagen abierta={imagenAbierta} alCerrar={() => setImagenAbierta(false)} ambitoPropio="producto" ambitos={AMBITOS_PRODUCTO} alFiltrar={(ids) => setPorImagen(ids)} />
-
-      <ContenedorTabla ariaLabel={`Levantamiento de ${nombreBodega}`}>
-        <table className="tabla-datos w-full min-w-[78rem] border-collapse text-sm">
-          <thead>
-            <tr className={claseFilaEncabezado}>
-              <th scope="col" className={claseEncabezadoColumna}>
-                Foto
-              </th>
-              <th scope="col" className={claseEncabezadoColumna}>
-                Producto
-              </th>
-              <th scope="col" className={`${claseEncabezadoColumna} text-right`}>
-                En sistema
-              </th>
-              <th scope="col" className={claseEncabezadoColumna}>
-                Contado
-              </th>
-              <th scope="col" className={claseEncabezadoColumna}>
-                Añadir
-              </th>
-              <th scope="col" className={claseEncabezadoColumna}>
-                Restar
-              </th>
-              <th scope="col" className={claseEncabezadoColumna}>
-                Transferir
-              </th>
-              <th scope="col" className={`${claseEncabezadoColumna} text-right`}>
-                Diferencia
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {visibles.length === 0 && (
-              <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
-                  {porImagen ? "Ningún producto de esta bodega coincide con la imagen." : "No hay productos con ese nombre."}
-                </td>
-              </tr>
-            )}
-            {visibles.map((p) => {
+  const filaDe = (p: ProductoConteo, hijo = false) => {
               const contado = contadoDe(p);
               const sumar = sumarDe(p);
               const restar = restarDe(p);
@@ -399,8 +306,8 @@ export function Levantamiento({
               const traslado = traslados[p.id];
               const destinos = bodegas.filter((b) => b.id !== bodegaElegida);
               return (
-                <tr key={p.id} className="border-b border-border align-top">
-                  <td className={claseCeldaColumna}>
+                <tr key={p.id} className={`border-b border-border align-top ${hijo ? "bg-muted/30" : ""}`}>
+                  <td className={`${claseCeldaColumna} ${hijo ? "pl-8" : ""}`}>
                     <MiniaturaFoto url={p.foto} nombre={p.nombre} />
                   </td>
                   <td className={claseCeldaColumna}>
@@ -410,7 +317,7 @@ export function Levantamiento({
                       aria-label={`Abrir la ficha de ${p.codigo}`}
                       className={`block cursor-pointer rounded-sm text-left hover:underline ${anilloFoco}`}
                     >
-                      <span className="block font-medium">{p.nombre}</span>
+                      <span className="block font-medium">{hijo && p.opciones ? p.opciones : p.nombre}</span>
                       <span className="block text-xs text-muted-foreground">{p.codigo}</span>
                     </button>
                     <CodigosProducto numero={p.numero} barras={p.barras} className="block" />
@@ -623,6 +530,167 @@ export function Levantamiento({
                     {(sumar !== null || sale > 0) && <span className="mt-0.5 block text-xs text-muted-foreground tabular-nums">Quedará {queda.toLocaleString("es-PA")}</span>}
                   </td>
                 </tr>
+              );
+  };
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-end gap-3 rounded-lg border border-border bg-card p-4">
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-semibold text-muted-foreground">Bodega</span>
+          <select
+            value={bodegaElegida}
+            onChange={(e) => router.replace(`${pathname}?bodega=${e.target.value}`)}
+            disabled={pendiente}
+            className={`${fieldClassSm} min-w-48`}
+          >
+            {bodegas.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.nombre}
+              </option>
+            ))}
+          </select>
+        </label>
+        {puedeEscribir && (
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-semibold text-muted-foreground">Referencia (opcional)</span>
+            <input value={referencia} onChange={(e) => setReferencia(e.target.value)} maxLength={120} placeholder="Ej: Conteo inicial" className={`${fieldClassSm} w-56`} />
+          </label>
+        )}
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-semibold text-muted-foreground">Buscar</span>
+          <span className="relative">
+            <BuscarIcon className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+            <input type="search" value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Código o nombre" className={`${fieldClassSm} w-56 pl-8`} />
+          </span>
+        </label>
+        <Tooltip texto="Buscar por imagen">
+          <button
+            type="button"
+            aria-label="Buscar por imagen"
+            onClick={() => setImagenAbierta(true)}
+            className={`inline-flex min-h-9 min-w-9 items-center justify-center rounded-md border border-border-control bg-card hover:bg-muted ${anilloFoco}`}
+          >
+            <CamaraIcon aria-hidden="true" className="h-4 w-4" />
+          </button>
+        </Tooltip>
+        {porImagen && (
+          <button
+            type="button"
+            onClick={() => setPorImagen(null)}
+            aria-label={`Quitar el filtro por imagen (${porImagen.length} productos)`}
+            className={`inline-flex min-h-9 items-center gap-1.5 rounded-md border border-foreground bg-foreground px-3 text-sm font-medium text-background ${anilloFoco}`}
+          >
+            Por imagen ({porImagen.length}) <span aria-hidden="true">×</span>
+          </button>
+        )}
+        {puedeEscribir && (
+          <ImportarLista
+            productos={productos}
+            deshabilitado={pendiente}
+            alAplicar={(cantidades, comoSuma) => {
+              const escritas = Object.fromEntries(Object.entries(cantidades).map(([id, n]) => [id, String(n)]));
+              if (!comoSuma) return setContados((x) => ({ ...x, ...escritas }));
+              setSumas((x) => ({ ...x, ...escritas }));
+            }}
+          />
+        )}
+        <button
+          type="button"
+          aria-pressed={verTodos}
+          onClick={() => setVerTodos((v) => !v)}
+          className={`min-h-9 rounded-md border px-3 text-sm ${verTodos ? "border-foreground bg-foreground text-background" : "border-border-control bg-card hover:bg-muted"}`}
+        >
+          Ver inactivos y descontinuados
+        </button>
+        {ultimo && (
+          <p className="text-xs text-muted-foreground">
+            Último levantamiento: {formatearTiempoRelativo(ultimo.fecha)}
+            {ultimo.referencia ? ` · ${ultimo.referencia}` : ""} · {ultimo.productos} productos
+          </p>
+        )}
+      </div>
+
+      <VentanaBuscarImagen abierta={imagenAbierta} alCerrar={() => setImagenAbierta(false)} ambitoPropio="producto" ambitos={AMBITOS_PRODUCTO} alFiltrar={(ids) => setPorImagen(ids)} />
+
+      <ContenedorTabla ariaLabel={`Levantamiento de ${nombreBodega}`}>
+        <table className="tabla-datos w-full min-w-[78rem] border-collapse text-sm">
+          <thead>
+            <tr className={claseFilaEncabezado}>
+              <th scope="col" className={claseEncabezadoColumna}>
+                Foto
+              </th>
+              <th scope="col" className={claseEncabezadoColumna}>
+                Producto
+              </th>
+              <th scope="col" className={`${claseEncabezadoColumna} text-right`}>
+                En sistema
+              </th>
+              <th scope="col" className={claseEncabezadoColumna}>
+                Contado
+              </th>
+              <th scope="col" className={claseEncabezadoColumna}>
+                Añadir
+              </th>
+              <th scope="col" className={claseEncabezadoColumna}>
+                Restar
+              </th>
+              <th scope="col" className={claseEncabezadoColumna}>
+                Transferir
+              </th>
+              <th scope="col" className={`${claseEncabezadoColumna} text-right`}>
+                Diferencia
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {visibles.length === 0 && (
+              <tr>
+                <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
+                  {porImagen ? "Ningún producto de esta bodega coincide con la imagen." : "No hay productos con ese nombre."}
+                </td>
+              </tr>
+            )}
+            {entradas.map((e) => {
+              if (!e.grupo) return filaDe(e.p!);
+              const g = e.grupo;
+              const abierto = abiertos.has(g.padre.id);
+              const conCantidad = g.hijos.filter((h) => contadoDe(h) !== null || sumarDe(h) !== null || restarDe(h) !== null || transferirDe(h) !== null).length;
+              const enSistema = g.hijos.reduce((suma, h) => suma + h.enSistema, 0);
+              return (
+                <Fragment key={g.padre.id}>
+                  <tr className="border-b border-border bg-muted/20">
+                    <td className={claseCeldaColumna}>
+                      <MiniaturaFoto url={g.padre.foto ?? g.hijos.find((h) => h.foto)?.foto ?? null} nombre={g.padre.nombre} />
+                    </td>
+                    <td colSpan={7} className={claseCeldaColumna}>
+                      <button
+                        type="button"
+                        aria-expanded={abierto}
+                        aria-label={`${abierto ? "Cerrar" : "Abrir"} las variantes de ${g.padre.nombre}`}
+                        onClick={() =>
+                          setAbiertos((x) => {
+                            const y = new Set(x);
+                            if (y.has(g.padre.id)) y.delete(g.padre.id);
+                            else y.add(g.padre.id);
+                            return y;
+                          })
+                        }
+                        className={`flex w-full cursor-pointer items-center gap-2 rounded-sm text-left ${anilloFoco}`}
+                      >
+                        <ChevronRightIcon aria-hidden="true" className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${abierto ? "rotate-90" : ""}`} />
+                        <span className="flex min-w-0 flex-col">
+                          <span className="font-medium">{g.padre.nombre}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {g.padre.codigo} · {g.hijos.length} variante{g.hijos.length === 1 ? "" : "s"} · {enSistema.toLocaleString("es-PA")} en el sistema
+                            {conCantidad > 0 ? ` · ${conCantidad} con cantidad` : ""}
+                          </span>
+                        </span>
+                      </button>
+                    </td>
+                  </tr>
+                  {abierto && g.hijos.map((h) => filaDe(h, true))}
+                </Fragment>
               );
             })}
           </tbody>

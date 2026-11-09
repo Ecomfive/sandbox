@@ -1,7 +1,7 @@
 "use client";
 
 import type { OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { SelectorTipoProducto } from "@/components/tabla/selector-tipo-producto";
@@ -63,9 +63,12 @@ export function TablaProducto({
   puedeUnir: boolean;
   referenciasTest: ReferenciasTest;
 }) {
+  // Las variantes no salen como filas (9 nov 2026, pedido de Hernán): van dentro de su producto, en «Variantes», y buscarlas encuentra al principal. Su ficha se
+  // sigue abriendo desde ahí o con `?abrir=`, así que `productos` las lleva todas.
+  const principales = useMemo(() => productos.filter((p) => !p.padre), [productos]);
   // Qué producto está abierto y en qué orden se veían las filas al abrirlo (para las flechas de anterior y siguiente).
   const [abierto, setAbierto] = useState<{ id: string; orden: string[] } | null>(() =>
-    abrirInicial && productos.some((p) => p.id === abrirInicial) ? { id: abrirInicial, orden: productos.map((p) => p.id) } : null,
+    abrirInicial && productos.some((p) => p.id === abrirInicial) ? { id: abrirInicial, orden: principales.map((p) => p.id) } : null,
   );
   // La ficha se dibuja en `<body>` (portal): con `?abrir=` arranca abierta, así que solo se monta ya en el navegador.
   const enNavegador = useSyncExternalStore(
@@ -85,12 +88,12 @@ export function TablaProducto({
     <>
       <SelectorTipoProducto
         def={DEF_PRODUCTO}
-        cuentas={{ todos: productos.length, simple: productos.filter((p) => p.tipo !== "combo").length, pack: productos.filter((p) => p.tipo === "combo").length }}
+        cuentas={{ todos: principales.length, simple: principales.filter((p) => p.tipo !== "combo").length, pack: principales.filter((p) => p.tipo === "combo").length }}
       />
-      <TableroProducto productos={productos} />
+      <TableroProducto productos={principales} />
       <ListaDatos
         def={DEF_PRODUCTO}
-        filas={productos}
+        filas={principales}
         iconos={ICONOS}
         nombre={NOMBRE}
         claveFila={(p) => p.id}

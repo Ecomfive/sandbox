@@ -93,7 +93,7 @@ export interface FilaProducto {
   opciones: Record<string, string> | null;
   /** Si tiene variantes: sus opciones con los valores, y las variantes. */
   opcionesVariantes: { nombre: string; valores: string[] }[];
-  variantes: { id: string; codigo: string; nombre: string; opciones: Record<string, string> }[];
+  variantes: { id: string; codigo: string; nombre: string; opciones: Record<string, string>; barras?: string | null; barrasOrigen?: string | null; foto?: string | null }[];
   /** Unidades en Dropi según la última lectura (suma de sus publicaciones abiertas); null si no tiene publicación leída. */
   stockDropi: number | null;
 }
@@ -132,7 +132,8 @@ export const DEF_PRODUCTO: DefTabla<FilaProducto> = {
   imagen: { ambito: "producto", id: (f) => f.id },
   clave: "producto",
   campos: [
-    { id: "producto", etiqueta: "Producto", tipo: "texto", valor: (p) => `${p.codigo} ${p.nombre} ${p.codigoBarras ?? ""}` },
+    // Las variantes no tienen fila propia (9 nov 2026, pedido de Hernán): buscar una encuentra a su producto principal.
+    { id: "producto", etiqueta: "Producto", tipo: "texto", valor: (p) => [p.codigo, p.nombre, p.codigoBarras ?? "", ...p.variantes.flatMap((v) => [v.codigo, v.nombre, v.barras ?? ""])].join(" ") },
     {
       id: "clase",
       etiqueta: "Estado",

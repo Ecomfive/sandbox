@@ -99,7 +99,7 @@ export function CrearProductoDropPanel({ opcionesSku }: { opcionesSku: OpcionSku
                       {parecidos.map((p) => (
                         <button key={p.id} type="button" onClick={() => vincular(p)} className={`flex min-w-0 items-center justify-between gap-3 rounded-lg border border-border bg-card px-3 py-2 text-left hover:bg-muted ${anilloFoco}`}>
                           <span className="min-w-0 [overflow-wrap:anywhere]">
-                            <span className="font-medium">{p.codigo}</span> <span className="text-muted-foreground">{p.nombre}</span>
+                            <span className="font-medium">{p.nombre}</span> <span className="text-muted-foreground">{p.codigo}</span>
                           </span>
                           <span className="shrink-0 text-xs font-semibold text-primario">Vincular</span>
                         </button>

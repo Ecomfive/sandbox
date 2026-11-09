@@ -608,7 +608,7 @@ export async function crearVariantes(padreId: string, opciones: OpcionVariante[]
   const supabase = createServiceClient();
   const { data: padre } = await supabase
     .from("skus_maestros")
-    .select("id, codigo, tipo, clase, padre_id, maneja_vencimiento, dias_aviso_vencimiento, es_fisico, embalaje, largo, ancho, alto, unidad_medida, peso, unidad_peso, pais_origen, codigo_sa")
+    .select("id, codigo, tipo, clase, padre_id, foto_url, maneja_vencimiento, dias_aviso_vencimiento, es_fisico, embalaje, largo, ancho, alto, unidad_medida, peso, unidad_peso, pais_origen, codigo_sa")
     .eq("id", padreId)
     .maybeSingle();
   if (!padre) return { error: "El producto ya no existe." };
@@ -635,6 +635,8 @@ export async function crearVariantes(padreId: string, opciones: OpcionVariante[]
     estado: "aprobado",
     padre_id: padreId,
     creado_por: usuario.id,
+    // Sin foto propia, la variante usa la de su producto principal (la migración 0258 lo mantiene al cambiar la foto del principal).
+    foto_url: (padre.foto_url as string | null) ?? null,
     maneja_vencimiento: padre.maneja_vencimiento,
     dias_aviso_vencimiento: padre.dias_aviso_vencimiento,
     es_fisico: padre.es_fisico,
@@ -804,7 +806,11 @@ export async function guardarFotoProducto(id: string, ruta: string | null): Prom
   // La huella va aparte: sin la migración 0103 la foto se guarda igual.
   await supabase.from("skus_maestros").update({ foto_huella: huella }).eq("id", id);
   const anterior = actual.foto_url as string | null;
-  if (anterior && anterior !== url && anterior.startsWith(PREFIJO_FOTOS)) await supabase.storage.from(BUCKET_FOTOS).remove([anterior.slice(PREFIJO_FOTOS.length)]);
+  // El archivo anterior solo se borra si ningún otro producto lo sigue usando (una variante comparte la foto de su producto principal).
+  if (anterior && anterior !== url && anterior.startsWith(PREFIJO_FOTOS)) {
+    const { count: sigueEnUso } = await supabase.from("skus_maestros").select("id", { count: "exact", head: true }).eq("foto_url", anterior);
+    if (!sigueEnUso) await supabase.storage.from(BUCKET_FOTOS).remove([anterior.slice(PREFIJO_FOTOS.length)]);
+  }
   await registrarAuditoria({
     accion: "cambiar_foto_producto",
     entidad: "skus_maestros",

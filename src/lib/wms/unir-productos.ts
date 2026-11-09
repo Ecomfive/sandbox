@@ -58,7 +58,7 @@ const NOMBRE_MOVIDO: Record<string, [string, string]> = {
   wms_compra_items: ["línea de compra", "líneas de compra"],
   "sku_maestro_componentes.combo_id": ["componente del combo", "componentes del combo"],
   "sku_maestro_componentes.componente_id": ["combo que lo usa", "combos que lo usan"],
-  // El inventario del duplicado también pasa (migración 0258): su stock en unidades, sus movimientos, lotes y cajas.
+  // El inventario del duplicado también pasa (migración 0260): su stock en unidades, sus movimientos, lotes y cajas.
   unidades: ["unidad de inventario", "unidades de inventario"],
   wms_movimientos: ["movimiento de inventario", "movimientos de inventario"],
   wms_cajas: ["línea de cajas", "líneas de cajas"],
