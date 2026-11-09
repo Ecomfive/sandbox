@@ -51,6 +51,10 @@ describe("lineasUnidas", () => {
     assert.deepEqual(lineasUnidas({ "sku_maestro_componentes.combo_id": 2 }), ["2 componentes del combo"]);
     assert.deepEqual(lineasUnidas({ "sku_maestro_componentes.componente_id": 1 }), ["1 combo que lo usa"]);
   });
+  it("dice el inventario que pasa: unidades, movimientos, lotes y cajas", () => {
+    assert.deepEqual(lineasUnidas({ unidades: 480, wms_movimientos: 1, "dropi_publicaciones.sku_maestro_id": 1 }), ["480 unidades de inventario", "1 movimiento de inventario", "1 publicación de Dropi"]);
+    assert.deepEqual(lineasUnidas({ wms_lotes: 2, wms_cajas: 1 }), ["2 lotes", "1 línea de cajas"]);
+  });
   it("la foto va al final y solo si de verdad pasó", () => {
     assert.deepEqual(lineasUnidas({ foto: true, "wms_productos_test.sku_maestro_id": 1 }), ["1 test de Test productos", "la foto del producto"]);
     assert.deepEqual(lineasUnidas({ foto: false }), []);
