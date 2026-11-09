@@ -211,7 +211,7 @@ export function useCambiarTarea(alCambiar: (t: TareaVista, p?: PublicacionDeTare
       }
       if (r.tarea) alCambiar(r.tarea, r.publicacion ?? publicacion);
       if (cambio.estado === "hecha" && t.estado !== "hecha") mostrarToast("Tarea hecha");
-      if (cambio.archivar !== undefined) mostrarToast(cambio.archivar ? "Tarea archivada" : "Tarea fuera de Archivadas");
+      if (cambio.archivar !== undefined) mostrarToast(cambio.archivar ? "Tarea cerrada" : "Tarea abierta de nuevo");
     });
   }
   return { cambiar, ocupado };
@@ -665,7 +665,7 @@ export function FilaTarea({
         <span className={`max-w-full truncate text-sm font-medium hover:underline ${hecha ? "text-muted-foreground line-through" : ""}`}>{t.titulo}</span>
         {(t.nota || t.origen === "recomendacion" || t.archivadaEn) && (
           <span className="max-w-full truncate text-xs text-muted-foreground">
-            {t.archivadaEn ? "Archivada · " : ""}
+            {t.archivadaEn ? "Cerrada · " : ""}
             {t.origen === "recomendacion" ? "De una recomendación" : t.nota}
           </span>
         )}

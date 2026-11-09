@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { etiquetaRecomendacion } from "@/lib/publicaciones/recomendaciones";
-import { esEstado, esPrioridad, tareasDe, type TareaVista } from "@/lib/publicaciones/tareas";
+import { esEstado, esPrioridad, tareasDe, type TareaVista, corteParaCerrar } from "@/lib/publicaciones/tareas";
 
 /** La publicación de una tarea, para mostrarla en la lista de tareas. */
 export interface PublicacionDeTarea {
@@ -60,12 +60,15 @@ export function deFilaManual(f: Fila): TareaVista {
  */
 export async function cargarTareas(supabase: SupabaseClient, paisId: string, yo: string, todas: boolean): Promise<DatosTareas> {
   const desde = new Date(Date.now() - DIAS_HECHAS * 86_400_000).toISOString();
+  // Las hechas hace más de 30 días se cierran solas (8 nov 2026, pedido de Alcides). Sin la migración 0178 no hay dónde: no pasa nada.
+  await supabase.from("dropi_publicaciones_tareas").update({ archivada_en: new Date().toISOString() }).eq("estado", "hecha").is("archivada_en", null).lt("hecha_en", corteParaCerrar(new Date()));
+  // Con estados (0178), también las cerradas, para el botón «Cerradas»; sin ella, como antes.
   const leerManuales = (columnas: string) =>
     supabase
       .from("dropi_publicaciones_tareas")
       .select(`${columnas}, dropi_publicaciones!inner(pais_id)` as "*")
       .eq("dropi_publicaciones.pais_id", paisId)
-      .or(`hecha_en.is.null,hecha_en.gte.${desde}`)
+      .or(columnas.includes("archivada_en") ? `hecha_en.is.null,hecha_en.gte.${desde},archivada_en.not.is.null` : `hecha_en.is.null,hecha_en.gte.${desde}`)
       .order("creado_en", { ascending: false })
       .limit(1000);
   const [manualesNuevasR, recsR] = await Promise.all([

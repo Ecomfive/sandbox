@@ -150,7 +150,7 @@ export async function actualizarTarea(tareaId: string, crudo: unknown): Promise<
   }
   if (c.archivar !== undefined && c.archivar !== !!antes.archivadaEn) {
     cambios.archivada_en = c.archivar ? new Date().toISOString() : null;
-    lineas.push(c.archivar ? "archivada" : "fuera de Archivadas");
+    lineas.push(c.archivar ? "cerrada" : "abierta de nuevo");
   }
   if (!Object.keys(cambios).length) return { tarea: antes };
 
