@@ -79,16 +79,16 @@ const DEF_TAREAS: DefTabla<FilaTareaLista> = {
     },
     {
       id: "archivo",
-      etiqueta: "Cerrada",
+      etiqueta: "Archivo",
       tipo: "seleccion",
       valores: (t) => [t.archivadaEn ? "archivada" : "activa"],
       opciones: () => [
-        { valor: "activa", etiqueta: "Abierta" },
-        { valor: "archivada", etiqueta: "Cerrada" },
+        { valor: "activa", etiqueta: "Activa" },
+        { valor: "archivada", etiqueta: "Archivada" },
       ],
     },
   ],
-  cerrados: { etiqueta: "Cerradas", esCerrado: (t) => !!t.archivadaEn, campoEstado: "archivo", valoresCerrados: ["archivada"], ocultosPorDefecto: true, exclusivo: true },
+  cerrados: { etiqueta: "Archivadas", esCerrado: (t) => !!t.archivadaEn, campoEstado: "archivo", valoresCerrados: ["archivada"], ocultosPorDefecto: true, exclusivo: true },
   csvAntes: [
     { etiqueta: "Tarea", valor: (t) => t.titulo },
     { etiqueta: "Producto", valor: (t) => (t.producto ? `${numeroPublicacion(t.producto.numero)} · ${t.producto.nombre}` : "") },
@@ -117,7 +117,7 @@ function Encabezado() {
 
 /**
  * La pestaña «Tareas» (29 oct 2026, al estilo de ClickUp, pedido de Alcides): las tareas agrupadas por estado (Por hacer, En curso, En revisión, Hecha),
- * cada fila con su estado, producto, quién, para cuándo y prioridad que se cambian ahí mismo, y su ficha a la derecha. «Cerradas» (antes «Archivadas»; una hecha hace más de 30 días se cierra sola) muestra las que se
+ * cada fila con su estado, producto, quién, para cuándo y prioridad que se cambian ahí mismo, y su ficha a la derecha. «Archivadas» (una hecha hace más de 30 días se archiva sola) muestra las que se
  * archivaron. «Mis tareas» son las que le tocan a la persona; un administrador puede pasar a «De todos».
  */
 export function ListaTareas({

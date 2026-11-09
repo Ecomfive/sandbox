@@ -60,9 +60,9 @@ export function deFilaManual(f: Fila): TareaVista {
  */
 export async function cargarTareas(supabase: SupabaseClient, paisId: string, yo: string, todas: boolean): Promise<DatosTareas> {
   const desde = new Date(Date.now() - DIAS_HECHAS * 86_400_000).toISOString();
-  // Las hechas hace más de 30 días se cierran solas (8 nov 2026, pedido de Alcides). Sin la migración 0178 no hay dónde: no pasa nada.
+  // Las hechas hace más de 30 días se archivan solas (8 nov 2026, pedido de Alcides). Sin la migración 0178 no hay dónde: no pasa nada.
   await supabase.from("dropi_publicaciones_tareas").update({ archivada_en: new Date().toISOString() }).eq("estado", "hecha").is("archivada_en", null).lt("hecha_en", corteParaCerrar(new Date()));
-  // Con estados (0178), también las cerradas, para el botón «Cerradas»; sin ella, como antes.
+  // Con estados (0178), también las archivadas, para el botón «Archivadas»; sin ella, como antes.
   const leerManuales = (columnas: string) =>
     supabase
       .from("dropi_publicaciones_tareas")
