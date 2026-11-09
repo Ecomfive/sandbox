@@ -62,7 +62,7 @@ interface Fila {
  * si está), con su precio, stock y lo que vendieron en 7 y 30 días. Basta poder abrir Producto, Compras, Gestión de
  * publicaciones Dropi o Análisis de competencia. Devuelve el error como valor.
  */
-export async function obtenerCompetenciaProducto(skuId: string): Promise<{ datos?: CompetenciaDeProducto[]; error?: string }> {
+export async function obtenerCompetenciaProducto(skuId: string, codigoPais?: string): Promise<{ datos?: CompetenciaDeProducto[]; error?: string }> {
   const usuario = await getUsuarioActual();
   if (!usuario) return { error: "No hay sesión activa." };
   if (!["producto", "compras", "analisis-competencia", "publicaciones-dropi"].some((m) => usuario.modulos.includes(m))) return { error: "No tienes acceso." };
@@ -70,12 +70,21 @@ export async function obtenerCompetenciaProducto(skuId: string): Promise<{ datos
   const supabase = createServiceClient();
   const { data: sku } = await supabase.from("skus_maestros").select("nombre, foto_huella").eq("id", skuId).maybeSingle();
   if (!sku) return { error: "El producto ya no existe." };
+  // Solo un país (8 nov 2026, pedido de Alcides: en Gestión de IDs interesa la competencia del país que se revisa): se lee solo ese catálogo.
+  let soloPais: string | null = null;
+  if (codigoPais) {
+    if (!/^[A-Z]{2}$/i.test(codigoPais)) return { error: "País no válido." };
+    const { data: p } = await supabase.from("paises").select("id").eq("codigo", codigoPais.toUpperCase()).maybeSingle();
+    if (!p) return { datos: [] };
+    soloPais = p.id as string;
+  }
 
   const { data: filas, error } = await traerTodasConError<Fila>((a, b) =>
     supabase
       .from("competencia_productos")
       .select("id, dropi_producto_id, pais_id, proveedor_dropi_id, proveedor_nombre, nombre, foto_url, foto_huella, precio, stock, es_nuestro, igual_a")
       .eq("estado", "activo")
+      .match(soloPais ? { pais_id: soloPais } : {})
       .order("id")
       .range(a, b),
   );

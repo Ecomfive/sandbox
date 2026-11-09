@@ -397,7 +397,7 @@ export function FichaPublicacionDrop({
 
         {p.producto && p.producto.tipo !== "combo" && (
           <Seccion icono={InteligenciaIcon} titulo="Competencia del producto">
-            <BloqueCompetencia key={p.producto.id} skuId={p.producto.id} />
+            <BloqueCompetencia key={`${p.producto.id}-${codigoPais}`} skuId={p.producto.id} pais={codigoPais} />
           </Seccion>
         )}
 
