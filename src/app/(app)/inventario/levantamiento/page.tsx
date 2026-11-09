@@ -37,9 +37,13 @@ export default async function LevantamientoPage({ searchParams }: { searchParams
   const pedida = typeof bodega === "string" && ES_ID(bodega) ? bodega : "";
   const elegida = bodegas.some((b) => b.id === pedida) ? pedida : (bodegas[0]?.id ?? "");
 
-  const [productos, stock, lotes, ultimo] = await Promise.all([
-    traerTodasConError<{ id: string; codigo: string; nombre: string; clase: string | null; maneja_vencimiento: boolean | null; foto_url: string | null; numero: number | null; codigo_barras: string | null }>((d, h) =>
-      supabase.from("skus_maestros").select("id, codigo, nombre, clase, maneja_vencimiento, foto_url, numero, codigo_barras").neq("tipo", "combo").neq("clase", "test").is("opciones_variantes", null).order("codigo").range(d, h),
+  const [productos, padres, stock, lotes, ultimo] = await Promise.all([
+    traerTodasConError<{ id: string; codigo: string; nombre: string; clase: string | null; maneja_vencimiento: boolean | null; foto_url: string | null; numero: number | null; codigo_barras: string | null; padre_id: string | null; opciones: Record<string, string> | null }>((d, h) =>
+      supabase.from("skus_maestros").select("id, codigo, nombre, clase, maneja_vencimiento, foto_url, numero, codigo_barras, padre_id, opciones").neq("tipo", "combo").neq("clase", "test").is("opciones_variantes", null).order("codigo").range(d, h),
+    ),
+    // Los productos con variantes no se cuentan: salen como una fila que se despliega con sus variantes.
+    traerTodasConError<{ id: string; codigo: string; nombre: string; foto_url: string | null }>((d, h) =>
+      supabase.from("skus_maestros").select("id, codigo, nombre, foto_url").not("opciones_variantes", "is", null).order("id").range(d, h),
     ),
     elegida
       ? traerTodasConError<{ sku_maestro_id: string; fisico: number }>((d, h) => supabase.from("wms_stock").select("sku_maestro_id, fisico").eq("bodega_id", elegida).order("sku_maestro_id").range(d, h))
@@ -74,13 +78,17 @@ export default async function LevantamientoPage({ searchParams }: { searchParams
     lista.push({ codigo: lote.codigo, vencimiento: lote.fecha_vencimiento, cantidad: Number(l.cantidad) });
     lotesPorSku.set(lote.sku_maestro_id, lista);
   }
+  const padrePorId = new Map((padres.data ?? []).map((p) => [p.id, { id: p.id, codigo: p.codigo, nombre: p.nombre, foto: p.foto_url }]));
   const filas: ProductoConteo[] = (productos.data ?? []).map((p) => ({
     id: p.id,
     codigo: p.codigo,
     nombre: p.nombre,
     clase: p.clase ?? "fisico",
     manejaVencimiento: p.maneja_vencimiento === true,
-    foto: p.foto_url,
+    // Una variante sin foto propia usa la de su producto principal.
+    foto: p.foto_url ?? (p.padre_id ? (padrePorId.get(p.padre_id)?.foto ?? null) : null),
+    padre: p.padre_id ? (padrePorId.get(p.padre_id) ?? null) : null,
+    opciones: Object.values(p.opciones ?? {}).join(" / "),
     numero: p.numero ?? null,
     barras: p.codigo_barras || null,
     enSistema: enBodega.get(p.id) ?? 0,
