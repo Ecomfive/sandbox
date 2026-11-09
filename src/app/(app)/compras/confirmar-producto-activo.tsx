@@ -70,7 +70,7 @@ export function useConfirmarProductoActivo() {
       {producto && (
         <div className="flex flex-col gap-4 p-5 text-sm">
           <p className="m-0">
-            <strong className="font-semibold">{producto.codigo}</strong> · {producto.nombre} está {estado === "Test" ? "en " : ""}<strong className="font-semibold">{estado}</strong>. Para
+            <strong className="font-semibold">{producto.nombre}</strong> · {producto.codigo} está {estado === "Test" ? "en " : ""}<strong className="font-semibold">{estado}</strong>. Para
             comprarlo debe cambiarse a <strong className="font-semibold">Activo</strong>. ¿Lo cambiamos ahora?
           </p>
           {error && (

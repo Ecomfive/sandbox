@@ -100,7 +100,7 @@ export function FichaAlerta({
       titulo={
         alerta && (
           <>
-            <span className="text-lg font-semibold">{alerta.sku}</span>
+            <span className="text-lg font-semibold">{alerta.nombre}</span>
             <Badge tone={ESTADO_TONO[alerta.estado]}>{ETIQUETA_ESTADO_ALERTA[alerta.estado]}</Badge>
           </>
         )
@@ -114,7 +114,7 @@ export function FichaAlerta({
     >
       {alerta && (
         <div className="flex flex-1 flex-col">
-          <p className="px-5 pt-5 pb-4 text-sm text-muted-foreground">{alerta.nombre}</p>
+          <p className="px-5 pt-5 pb-4 text-sm text-muted-foreground">{alerta.sku}</p>
 
           {puedeEscribir && alerta.estado !== "resuelta" && (
             <div className="flex flex-col gap-2 border-y border-border px-5 py-3">

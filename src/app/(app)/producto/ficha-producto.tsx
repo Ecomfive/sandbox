@@ -170,8 +170,9 @@ export function FichaProducto({
       titulo={
         producto && (
           <>
+            <span className="text-lg font-semibold">{producto.nombre}</span>
             {producto.numero !== null && <span className="text-sm font-medium text-muted-foreground tabular-nums">{numeroProducto(producto.numero)}</span>}
-            <SkuCopiable codigo={producto.codigo} className="text-lg font-semibold" />
+            <SkuCopiable codigo={producto.codigo} className="text-sm font-medium text-muted-foreground" />
             <Badge tone="neutral">{ETIQUETA_TIPO[producto.tipo] ?? producto.tipo}</Badge>
             <Badge tone={TONO_CLASE[clase]}>{ETIQUETA_CLASE[clase] ?? clase}</Badge>
           </>
