@@ -75,8 +75,8 @@ function Traslado({ t, puedeEscribir }: { t: FilaTraslado; puedeEscribir: boolea
           <li key={l.codigo} className="flex items-center gap-2.5 text-sm">
             <MiniaturaFoto url={l.foto} nombre={l.nombre} />
             <span className="min-w-0 flex-1">
-              <span className="block truncate font-medium">{l.codigo}</span>
-              <span className="block truncate text-xs text-muted-foreground">{l.nombre}</span>
+              <span className="block truncate font-medium">{l.nombre}</span>
+              <span className="block truncate text-xs text-muted-foreground">{l.codigo}</span>
               <CodigosProducto numero={l.numero} barras={l.barras} className="block" />
               {l.cajas && <span className="block text-xs text-muted-foreground">{l.cajas}</span>}
             </span>

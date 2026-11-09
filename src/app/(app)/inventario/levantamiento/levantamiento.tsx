@@ -410,8 +410,8 @@ export function Levantamiento({
                       aria-label={`Abrir la ficha de ${p.codigo}`}
                       className={`block cursor-pointer rounded-sm text-left hover:underline ${anilloFoco}`}
                     >
-                      <span className="block font-medium">{p.codigo}</span>
-                      <span className="block text-xs text-muted-foreground">{p.nombre}</span>
+                      <span className="block font-medium">{p.nombre}</span>
+                      <span className="block text-xs text-muted-foreground">{p.codigo}</span>
                     </button>
                     <CodigosProducto numero={p.numero} barras={p.barras} className="block" />
                     {ETIQUETA_CLASE[p.clase] && (
