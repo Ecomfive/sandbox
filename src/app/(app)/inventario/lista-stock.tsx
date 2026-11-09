@@ -17,6 +17,7 @@ import { FichaStock } from "./ficha-stock";
 import { EncabezadoFilasStock, FilaStockLista } from "./fila-stock";
 import type { BodegaOpcion, UbicacionOpcion } from "./panel-movimiento";
 import { TableroStock } from "./tablero-stock";
+import { aplanarVariantes } from "./variantes-stock";
 
 const NOMBRE: NombreFilas = { singular: "SKU", plural: "SKUs" };
 const ICONOS: Record<string, IconoComp> = { sku: ProductoIcon, existencia: InventarioIcon, tipo: ProductoIcon, clase: ProductoIcon, fisico: InventarioIcon, plataformas: InventarioIcon, disponible: InventarioIcon, vencido: InventarioIcon, enCamino: InventarioIcon , plataforma: InventarioIcon, bodega: InventarioIcon };
@@ -99,7 +100,17 @@ export function ListaStock({
   // `?abrir=<producto>`: el enlace de los avisos de una nota (@mención o respuesta) abre su ficha.
   const abrir = useSearchParams().get("abrir");
   const [abierto, setAbierto] = useState<string | null>(abrir);
-  const sku = abierto ? filas.find((f) => f.id === abierto) : undefined;
+  // Los productos con variantes que están desplegados (pulsarlos las muestra debajo, cada una con su fila).
+  const [desplegados, setDesplegados] = useState<Set<string>>(new Set());
+  const alternar = (id: string) =>
+    setDesplegados((x) => {
+      const y = new Set(x);
+      if (y.has(id)) y.delete(id);
+      else y.add(id);
+      return y;
+    });
+  // La ficha puede ser la de un producto o la de una de sus variantes.
+  const sku = abierto ? aplanarVariantes(filas).find((f) => f.id === abierto) : undefined;
   const conPlataformas = lecturas !== null;
   const def = useMemo(() => conBodegas(conPlataformas ? DEF_STOCK_PLATAFORMAS : DEF_STOCK, bodegasPropias), [conPlataformas, bodegasPropias]);
   const enOrden = useMemo(() => conStockPrimero(filas, (f) => f.plataformas?.total ?? 0), [filas]);
@@ -118,7 +129,22 @@ export function ListaStock({
         claveFila={(f) => f.id}
         variante="filas"
         encabezado={<EncabezadoFilasStock conPlataformas={conPlataformas} plataforma={plataforma} />}
-        renderFila={(f) => <FilaStockLista f={f} conPlataformas={conPlataformas} plataforma={plataforma} alAbrir={() => setAbierto(f.id)} />}
+        renderFila={(f) =>
+          f.variantes.length > 0 ? (
+            <>
+              <FilaStockLista f={f} conPlataformas={conPlataformas} plataforma={plataforma} abierto={desplegados.has(f.id)} alAbrir={() => alternar(f.id)} />
+              {desplegados.has(f.id) && (
+                <div className="divide-y divide-border border-t border-border">
+                  {f.variantes.map((v) => (
+                    <FilaStockLista key={v.id} f={v} hijo conPlataformas={conPlataformas} plataforma={plataforma} alAbrir={() => setAbierto(v.id)} />
+                  ))}
+                </div>
+              )}
+            </>
+          ) : (
+            <FilaStockLista f={f} conPlataformas={conPlataformas} plataforma={plataforma} alAbrir={() => setAbierto(f.id)} />
+          )
+        }
         formatearTotal={(n) => `${n.toLocaleString("es-PA")} u.`}
         accionPrincipal={<SelectorBodega bodegas={bodegas} elegida={bodegaElegida} />}
         resumen={(visibles) => (

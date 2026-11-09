@@ -57,10 +57,12 @@ export function BotonDescargar<F>({
   const boton = useRef<HTMLButtonElement>(null);
   const vacio = filas.length === 0;
   const cantidad = `${filas.length} ${filas.length === 1 ? "fila" : "filas"}`;
+  // Lo que baja: las filas que se ven o, si la tabla lo pide, el detalle de cada una (un producto con variantes baja una línea por variante).
+  const aDescargar = def.expandirDescarga ? filas.flatMap(def.expandirDescarga) : filas;
 
   function descargar() {
     if (vacio) return;
-    const contenido = "﻿" + filasACsv(def, filas);
+    const contenido = "﻿" + filasACsv(def, aDescargar);
     const url = URL.createObjectURL(new Blob([contenido], { type: "text/csv;charset=utf-8" }));
     const enlace = document.createElement("a");
     enlace.href = url;
@@ -79,7 +81,7 @@ export function BotonDescargar<F>({
     try {
       const { tablaAXlsx, nombreArchivoXlsx } = await import("@/lib/tabla/xlsx");
       const titulo = document.title.replace(/\s*·\s*Ecomfive\s*$/, "") || nombreFilas;
-      const bytes = await tablaAXlsx(def, filas, titulo);
+      const bytes = await tablaAXlsx(def, aDescargar, titulo);
       const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
       const enlace = document.createElement("a");
       enlace.href = url;
@@ -102,7 +104,7 @@ export function BotonDescargar<F>({
     try {
       const { filasAPdf, nombreArchivoPdf } = await import("@/lib/tabla/pdf");
       const titulo = document.title.replace(/\s*·\s*Ecomfive\s*$/, "") || nombreFilas;
-      const bytes = await filasAPdf(def, filas, titulo, new Date(), def.pdfFoto ? fotoParaPdf : undefined);
+      const bytes = await filasAPdf(def, aDescargar, titulo, new Date(), def.pdfFoto ? fotoParaPdf : undefined);
       const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: "application/pdf" }));
       const enlace = document.createElement("a");
       enlace.href = url;

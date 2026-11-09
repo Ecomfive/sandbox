@@ -70,8 +70,28 @@ export function EncabezadoFilasStock({ conPlataformas = false, plataforma = null
   );
 }
 
-/** Un SKU como fila: foto, nombre, SKU y lo que lo distingue, y sus cifras. Toda la fila abre su ficha, donde están el stock por bodega y los movimientos. */
-export function FilaStockLista({ f, alAbrir, conPlataformas = false, plataforma = null }: { f: FilaStock; alAbrir: () => void; conPlataformas?: boolean; plataforma?: Plataforma | null }) {
+/**
+ * Un SKU como fila: foto, nombre, SKU y lo que lo distingue, y sus cifras. Toda la fila abre su ficha, donde están el stock por bodega y los movimientos.
+ * Un producto con variantes (`f.variantes`) se despliega en vez de abrir su ficha: pulsarlo muestra sus variantes debajo, cada una con su fila y su ficha
+ * (el stock se lleva en cada variante, y las cifras del principal son la suma). `hijo` es la fila de una variante dentro de su producto.
+ */
+export function FilaStockLista({
+  f,
+  alAbrir,
+  conPlataformas = false,
+  plataforma = null,
+  hijo = false,
+  abierto,
+}: {
+  f: FilaStock;
+  alAbrir: () => void;
+  conPlataformas?: boolean;
+  plataforma?: Plataforma | null;
+  hijo?: boolean;
+  /** Solo en un producto con variantes: si está desplegado. */
+  abierto?: boolean;
+}) {
+  const conVariantes = f.variantes.length > 0;
   const compuesto = f.tipo === "combo";
   const armables = compuesto && f.fisico !== 0 ? "armables" : undefined;
   const fuera = fueraDeVenta(f);
@@ -79,18 +99,20 @@ export function FilaStockLista({ f, alAbrir, conPlataformas = false, plataforma 
     <button
       type="button"
       onClick={alAbrir}
-      aria-label={`Abrir el inventario del SKU ${f.codigo}`}
-      className={`group grid w-full cursor-pointer grid-cols-[minmax(0,1fr)_1rem] items-center gap-x-4 gap-y-3 px-4 py-3 text-left transition-colors hover:bg-muted/50 ${conPlataformas ? COLUMNAS_PLATAFORMAS : COLUMNAS} ${anilloFoco}`}
+      aria-label={conVariantes ? `${abierto ? "Cerrar" : "Abrir"} las ${f.variantes.length} variantes de ${f.nombre}` : `Abrir el inventario del SKU ${f.codigo}`}
+      aria-expanded={conVariantes ? abierto : undefined}
+      className={`group grid w-full cursor-pointer grid-cols-[minmax(0,1fr)_1rem] items-center gap-x-4 gap-y-3 py-3 pr-4 text-left transition-colors hover:bg-muted/50 ${hijo ? "bg-muted/30 pl-10" : "pl-4"} ${conPlataformas ? COLUMNAS_PLATAFORMAS : COLUMNAS} ${anilloFoco}`}
     >
       <span className="flex min-w-0 items-center gap-3">
         <span className="shrink-0">
           <MiniaturaFoto url={f.foto} nombre={f.nombre} />
         </span>
         <span className="flex min-w-0 flex-col gap-0.5">
-          <span className="truncate text-sm font-medium">{f.nombre}</span>
+          <span className="truncate text-sm font-medium">{hijo && f.opciones ? f.opciones : f.nombre}</span>
           <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground [overflow-wrap:anywhere]">
             <span className="font-mono font-semibold text-foreground">{f.codigo}</span>
             <CodigosProducto numero={f.numero} barras={f.barras} />
+            {conVariantes && <Badge tone="neutral">{f.variantes.length} variantes</Badge>}
             {compuesto && <Badge tone="neutral">{ETIQUETA_TIPO_SKU.combo}</Badge>}
             {f.clase === "test" && <Badge tone="azul">{ETIQUETA_CLASE_SKU.test}</Badge>}
             {f.clase === "inactivo" && <Badge tone="destructive">{ETIQUETA_CLASE_SKU.inactivo}</Badge>}
@@ -118,7 +140,10 @@ export function FilaStockLista({ f, alAbrir, conPlataformas = false, plataforma 
         />
       </span>
 
-      <ChevronRightIcon aria-hidden="true" className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 lg:order-last" />
+      <ChevronRightIcon
+        aria-hidden="true"
+        className={`h-4 w-4 text-muted-foreground transition-transform lg:order-last ${conVariantes ? (abierto ? "rotate-90" : "") : "group-hover:translate-x-0.5"}`}
+      />
     </button>
   );
 }

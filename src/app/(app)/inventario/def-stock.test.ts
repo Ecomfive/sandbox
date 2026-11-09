@@ -31,6 +31,9 @@ const fila = (porBodega: FilaStock["porBodega"]): FilaStock => ({
   unidadesEnCajas: 0,
   plataformas: null,
   porBodega,
+  padreId: null,
+  opciones: "",
+  variantes: [],
 });
 
 test("con varias bodegas se puede filtrar por bodega: los productos con unidades en ella", () => {
