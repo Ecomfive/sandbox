@@ -93,7 +93,7 @@ export interface FilaProducto {
   opciones: Record<string, string> | null;
   /** Si tiene variantes: sus opciones con los valores, y las variantes. */
   opcionesVariantes: { nombre: string; valores: string[] }[];
-  variantes: { id: string; codigo: string; nombre: string; opciones: Record<string, string>; barras?: string | null }[];
+  variantes: { id: string; codigo: string; nombre: string; opciones: Record<string, string>; barras?: string | null; barrasOrigen?: string | null; foto?: string | null }[];
   /** Unidades en Dropi según la última lectura (suma de sus publicaciones abiertas); null si no tiene publicación leída. */
   stockDropi: number | null;
 }

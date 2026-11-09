@@ -6,7 +6,11 @@ import { BotonBarra } from "@/components/panel/piezas-panel";
 import { anilloFoco, fieldClassSm } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { crearVariantes, quitarVariante, type OpcionVariante } from "./actions";
+import { CodigoBarrasProducto } from "./codigo-barras-producto";
 import type { FilaProducto } from "./def-producto";
+import { FotoVariante, MiniaturaVariante } from "./foto-variante";
+import { NombreProducto } from "./nombre-producto";
+import { SkuProducto } from "./sku-producto";
 
 const MAX_OPCIONES = 3;
 const separar = (t: string) => [...new Set(t.split(",").map((v) => v.trim().replace(/\s+/g, " ")).filter(Boolean))];
@@ -186,6 +190,7 @@ function EditorVariantes({ producto, alTerminar }: { producto: FilaProducto; alT
 export function VariantesProducto({ producto, puedeEscribir, alAbrir }: { producto: FilaProducto; puedeEscribir: boolean; alAbrir: (id: string) => void }) {
   const { mostrarToast } = useToast();
   const [editando, setEditando] = useState(false);
+  const [abierta, setAbierta] = useState<string | null>(null);
   const [pendiente, start] = useTransition();
 
   if (producto.padre) {
@@ -227,19 +232,61 @@ export function VariantesProducto({ producto, puedeEscribir, alAbrir }: { produc
             {producto.opcionesVariantes.map((o) => `${o.nombre}: ${o.valores.join(", ")}`).join(" · ")} — el stock se lleva en cada variante.
           </p>
           <ul className="m-0 flex list-none flex-col gap-1 p-0 text-sm">
-            {producto.variantes.map((v) => (
-              <li key={v.id} className="flex items-center justify-between gap-2">
-                <button type="button" onClick={() => alAbrir(v.id)} className={`min-w-0 text-left ${anilloFoco}`}>
-                  <span className="mr-2 font-medium">{v.codigo}</span>
-                  <span className="text-muted-foreground">{textoOpciones(v.opciones)}</span>
-                </button>
-                {puedeEscribir && (
-                  <button type="button" disabled={pendiente} onClick={() => quitar(v.id, v.codigo)} className={`shrink-0 text-xs text-muted-foreground hover:text-destructive ${anilloFoco}`}>
-                    Quitar
-                  </button>
-                )}
-              </li>
-            ))}
+            {producto.variantes.map((v) => {
+              const esta = abierta === v.id;
+              // Sin foto propia, la variante muestra la de su producto principal.
+              const foto = v.foto ?? producto.foto;
+              return (
+                <li key={v.id} className="flex flex-col rounded-lg border border-border">
+                  <div className="flex items-center justify-between gap-2 px-2 py-1.5">
+                    <button
+                      type="button"
+                      aria-expanded={esta}
+                      aria-label={`${esta ? "Cerrar" : "Abrir"} los datos de ${v.nombre}`}
+                      onClick={() => setAbierta(esta ? null : v.id)}
+                      className={`flex min-w-0 flex-1 items-center gap-2.5 text-left ${anilloFoco}`}
+                    >
+                      <MiniaturaVariante foto={foto} nombre={v.nombre} />
+                      <span className="flex min-w-0 flex-col">
+                        <span className="truncate font-medium">{textoOpciones(v.opciones) || v.nombre}</span>
+                        <span className="truncate text-xs text-muted-foreground">{v.codigo}</span>
+                      </span>
+                    </button>
+                    {puedeEscribir && (
+                      <button type="button" disabled={pendiente} onClick={() => quitar(v.id, v.codigo)} className={`shrink-0 text-xs text-muted-foreground hover:text-destructive ${anilloFoco}`}>
+                        Quitar
+                      </button>
+                    )}
+                  </div>
+                  {esta && (
+                    <div className="flex flex-col gap-3 border-t border-border px-3 py-3">
+                      <FotoVariante id={v.id} nombre={v.nombre} foto={foto} fotoDelPrincipal={producto.foto} puedeEscribir={puedeEscribir} />
+                      <dl className="m-0 grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
+                        <div className="flex min-w-0 flex-col gap-0.5 sm:col-span-2">
+                          <dt className="text-xs text-muted-foreground">Nombre</dt>
+                          <dd className="m-0">
+                            <NombreProducto key={`${v.id}-${v.nombre}`} id={v.id} nombre={v.nombre} puedeEscribir={puedeEscribir} />
+                          </dd>
+                        </div>
+                        <div className="flex min-w-0 flex-col gap-0.5">
+                          <dt className="text-xs text-muted-foreground">SKU</dt>
+                          <dd className="m-0">
+                            <SkuProducto key={`${v.id}-${v.codigo}`} id={v.id} codigo={v.codigo} puedeEscribir={puedeEscribir} />
+                          </dd>
+                        </div>
+                      </dl>
+                      <div className="flex flex-col gap-1">
+                        <span className="text-xs text-muted-foreground">Código de barras</span>
+                        <CodigoBarrasProducto key={v.id} id={v.id} codigoBarras={v.barras ?? null} origen={v.barrasOrigen ?? null} nombre={v.nombre} sku={v.codigo} puedeEscribir={puedeEscribir} />
+                      </div>
+                      <button type="button" onClick={() => alAbrir(v.id)} className={`w-fit text-xs text-muted-foreground underline-offset-2 hover:underline ${anilloFoco}`}>
+                        Ver su ficha completa (inventario, vencimiento, compras…)
+                      </button>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </>
       )}
