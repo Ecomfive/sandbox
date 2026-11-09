@@ -183,8 +183,8 @@ export function Cuadro({
                       <MiniaturaFoto url={f.foto} nombre={f.nombre} />
                     </td>
                     <td className={claseCeldaColumna}>
-                      <span className="block font-medium">{f.codigo}</span>
-                      <span className="block text-xs text-muted-foreground">{f.nombre}</span>
+                      <span className="block font-medium">{f.nombre}</span>
+                      <span className="block text-xs text-muted-foreground">{f.codigo}</span>
                       <CodigosProducto numero={f.numero} barras={f.barras} className="block" />
                     </td>
                     <td className={`${claseCeldaColumna} text-right tabular-nums`}>{entero(f.corte)}</td>
