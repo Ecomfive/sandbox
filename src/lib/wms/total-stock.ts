@@ -16,11 +16,18 @@ export function existencia(fisico: number, enPlataformas = 0): "negativo" | "sin
 }
 
 /**
- * Lo que pide atención va primero: los saldos negativos, luego lo que tiene stock y al final lo que está en cero, sin cambiar el orden dentro de cada parte.
- * `fuera` son las unidades que tiene en otra parte (en las plataformas): con ellas un producto no cuenta como en cero.
+ * Lo que pide atención va primero: los saldos negativos (el más negativo antes), luego lo que tiene stock **de mayor a menor** (9 nov 2026, pedido de Hernán: antes
+ * salía por orden alfabético de SKU) y al final lo que está en cero, que conserva su orden. Con las mismas unidades físicas, primero el que más tiene en las
+ * plataformas. `fuera` son las unidades que tiene en otra parte (en las plataformas): con ellas un producto no cuenta como en cero.
  */
 export function conStockPrimero<F extends { fisico: number }>(filas: F[], fuera: (f: F) => number = () => 0): F[] {
   const orden = { negativo: 0, con_stock: 1, sin_stock: 2 };
   const lugar = (f: F) => orden[existencia(f.fisico, fuera(f))];
-  return [...filas].sort((a, b) => lugar(a) - lugar(b));
+  return [...filas].sort((a, b) => {
+    const deLugar = lugar(a) - lugar(b);
+    if (deLugar !== 0) return deLugar;
+    if (lugar(a) === 0) return a.fisico - b.fisico;
+    if (lugar(a) === 1) return b.fisico - a.fisico || fuera(b) - fuera(a);
+    return 0;
+  });
 }
