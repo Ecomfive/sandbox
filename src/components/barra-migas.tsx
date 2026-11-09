@@ -13,7 +13,7 @@ import { MODULOS_CON_GUIA } from "@/lib/ayuda/guias-indice";
 import { construirMigas } from "@/lib/migas";
 import type { NavSection } from "@/lib/nav-data";
 import { textoContador, textoPendientes } from "@/lib/contadores-menu";
-import { pestanaActiva, pestanasDe } from "@/lib/pestanas";
+import { gruposDePestanas, pestanaActiva, pestanasDe, type Pestana } from "@/lib/pestanas";
 import { ChevronRightIcon, FlechaIzquierdaIcon } from "@/lib/nav-icons";
 
 /** La API de navegación solo cuenta entradas del mismo sitio; sin ella se cae al largo del historial. */
@@ -70,8 +70,8 @@ export function BarraMigas({
   }
 
   return (
-    <div className="border-b border-border bg-card">
-      <div className="flex min-h-11 items-center justify-between gap-3 py-1 pr-6 pl-14 md:pl-6">
+    <div data-sin-imprimir className="border-b border-border bg-card">
+      <div className="flex min-h-11 items-center justify-between gap-2 py-1 pr-4 pl-14 sm:gap-3 sm:pr-6 md:pl-6">
         <div className="flex min-w-0 items-center gap-1">
           {ruta !== "/" && (
             <Tooltip texto="Volver">
@@ -89,17 +89,18 @@ export function BarraMigas({
             <ol className="flex min-w-0 items-center gap-1 text-sm">
               {migas.map((miga, i) => {
                 const ultima = i === migas.length - 1;
-                // En pantallas angostas solo caben la miga actual y su anterior.
-                const ocultaEnMovil = i < migas.length - 2;
+                // En el celular solo cabe la miga actual (el botón de volver lleva a la anterior); desde sm, también su anterior.
+                const ocultaEnMovil = i < migas.length - 1;
+                const ocultaEnTableta = i < migas.length - 2;
                 return (
                   <li
                     key={`${i}-${miga.etiqueta}`}
-                    className={`min-w-0 items-center gap-1 ${ocultaEnMovil ? "hidden md:flex" : "flex"}`}
+                    className={`min-w-0 items-center gap-1 ${ocultaEnTableta ? "hidden md:flex" : ocultaEnMovil ? "hidden sm:flex" : "flex"}`}
                   >
                     {i > 0 && (
                       <ChevronRightIcon
                         aria-hidden="true"
-                        className={`h-3.5 w-3.5 shrink-0 text-muted-foreground ${i === migas.length - 2 ? "max-md:hidden" : ""}`}
+                        className={`h-3.5 w-3.5 shrink-0 text-muted-foreground ${i === migas.length - 1 ? "max-sm:hidden" : i === migas.length - 2 ? "max-md:hidden" : ""}`}
                       />
                     )}
                     {miga.href ? (
@@ -146,42 +147,58 @@ export function BarraMigas({
         </div>
       </div>
 
-      {/* Pestañas del módulo (como las vistas de ClickUp): solo si tiene subpáginas. */}
-      {pestanas.length > 1 && (
-        <nav aria-label={`Secciones de ${moduloEtiqueta}`} className="pr-6 pl-14 md:pl-6">
-          <ul className="flex gap-1 overflow-x-auto">
-            {pestanas.map((pestana) => {
-              const activa = pestana.href === pestanaActual;
-              return (
-                <li key={pestana.href} className="shrink-0">
-                  <Link
-                    href={pestana.href}
-                    aria-current={activa ? "page" : undefined}
-                    className={`relative inline-flex min-h-9 items-center px-3 text-sm whitespace-nowrap transition-colors ${anilloFoco} ${
-                      activa
-                        ? "font-semibold text-foreground after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:rounded-full after:[background-image:var(--neon)]"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    {pestana.etiqueta}
-                    {(contadores[pestana.href] ?? 0) > 0 && (
-                      <>
-                        <span
-                          aria-hidden="true"
-                          className="ml-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[0.6rem] leading-none font-semibold text-background tabular-nums"
-                        >
-                          {textoContador(contadores[pestana.href])}
-                        </span>
-                        <span className="sr-only">, {textoPendientes(contadores[pestana.href])}</span>
-                      </>
-                    )}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </nav>
-      )}
+      {/* Pestañas del módulo (como las vistas de ClickUp): solo si tiene subpáginas. Con grupos (Rentabilidad), una
+          franja de grupos y, debajo, las páginas del grupo elegido: así todo entra sin desplazar en ~1 200 px. */}
+      {pestanas.length > 1 &&
+        (() => {
+          const grupos = gruposDePestanas(pestanas);
+          const franja = (lista: Pestana[], activaHref: string | null, etiqueta: string, chica = false, grupo = false) => (
+            <nav aria-label={etiqueta} className="pr-4 pl-4 sm:pr-6 md:pl-6">
+              <ul className="desplazable-x flex gap-1 overflow-x-auto">
+                {lista.map((pestana) => {
+                  const activa = pestana.href === activaHref;
+                  return (
+                    <li key={pestana.href} className="shrink-0">
+                      <Link
+                        href={pestana.href}
+                        aria-current={activa ? (grupo ? "true" : "page") : undefined}
+                        className={`relative inline-flex items-center whitespace-nowrap transition-colors ${chica ? "min-h-8 px-2.5 text-[13px]" : "min-h-9 px-3 text-sm"} ${anilloFoco} ${
+                          activa
+                            ? "font-semibold text-foreground after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:rounded-full after:[background-image:var(--neon)]"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        {pestana.etiqueta}
+                        {(contadores[pestana.href] ?? 0) > 0 && (
+                          <>
+                            <span
+                              aria-hidden="true"
+                              className="ml-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[0.6rem] leading-none font-semibold text-background tabular-nums"
+                            >
+                              {textoContador(contadores[pestana.href])}
+                            </span>
+                            <span className="sr-only">, {textoPendientes(contadores[pestana.href])}</span>
+                          </>
+                        )}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </nav>
+          );
+          if (!grupos) return franja(pestanas, pestanaActual, `Secciones de ${moduloEtiqueta}`);
+          const grupoActivo = grupos.find((g) => g.pestanas.some((p) => p.href === pestanaActual)) ?? null;
+          const cabezas = grupos.map((g) => ({ etiqueta: g.etiqueta, href: g.href }));
+          return (
+            <>
+              {franja(cabezas, grupoActivo?.href ?? null, `Secciones de ${moduloEtiqueta}`, false, (grupoActivo?.pestanas.length ?? 0) > 1)}
+              {grupoActivo &&
+                grupoActivo.pestanas.length > 1 &&
+                franja(grupoActivo.pestanas, pestanaActual, `Páginas de ${grupoActivo.etiqueta}`, true)}
+            </>
+          );
+        })()}
     </div>
   );
 }

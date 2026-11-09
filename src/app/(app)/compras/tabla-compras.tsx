@@ -42,8 +42,11 @@ import {
   colorAgente,
   colorProveedor,
   otrosProductos,
+  AGENTES_ENVIO,
+  PROVEEDORES_COMPRA,
   type FilaCompra,
 } from "./def-compras";
+import { juntarLista, ProveedorListasCompras } from "./listas-compras";
 import { FichaCompra } from "./ficha-compra";
 import { diasEntre, enGrupo, estaAtrasada, hoy, umbralesTransito, type Grupo } from "./calculos-compras";
 
@@ -182,6 +185,8 @@ function columnas(
     guardar: GuardarCelda;
     etiquetas: string[];
     tiendas: string[];
+    proveedores: string[];
+    agentes: string[];
     colores: Record<string, string>;
     cambiarColor: (nombre: string, color: string) => void;
   },
@@ -299,13 +304,13 @@ function columnas(
         ),
     }),
     col("estado", "Estado", { ...resto, render: (c) => ed(c, "estado", <Badge color={colorEstado(c.estado)}>{etiquetaEstado(c.estado)}</Badge>) }),
-    col("proveedor", "Proveedor", { ...resto, clase: "text-muted-foreground", render: (c) => ed(c, "proveedor", conColor(c.proveedor, colorProveedor)) }),
+    col("proveedor", "Proveedor", { ...resto, clase: "text-muted-foreground", render: (c) => ed(c, "proveedor", conColor(c.proveedor, colorProveedor), edicion.proveedores) }),
     col("ventaImportacion", "Tipo de venta", {
       ...resto,
       clase: "whitespace-nowrap",
       render: (c) => ed(c, "ventaImportacion", c.ventaImportacion ? <Badge tone="info">🌍 Venta de importación</Badge> : <span className="text-muted-foreground">Proveeduría</span>),
     }),
-    col("agenteEnvio", "Agente de envío", { ...resto, clase: "text-muted-foreground", render: (c) => ed(c, "agenteEnvio", conColor(c.agenteEnvio, colorAgente)) }),
+    col("agenteEnvio", "Agente de envío", { ...resto, clase: "text-muted-foreground", render: (c) => ed(c, "agenteEnvio", conColor(c.agenteEnvio, colorAgente), edicion.agentes) }),
     col("tienda", "Tienda", {
       ...resto,
       clase: "text-muted-foreground",
@@ -520,6 +525,10 @@ export function TablaCompras({
   );
   // Las tiendas que ya existen en alguna compra (con lo recién creado, que se ve al instante), para elegir.
   const todasTiendas = useMemo(() => [...new Set(compras.flatMap((c) => c.tiendas))].sort((a, b) => a.localeCompare(b, "es")), [compras]);
+  const usadosProveedor = useMemo(() => compras.map((c) => c.proveedor), [compras]);
+  const usadosAgente = useMemo(() => compras.map((c) => c.agenteEnvio), [compras]);
+  const todosProveedores = useMemo(() => juntarLista(PROVEEDORES_COMPRA, usadosProveedor), [usadosProveedor]);
+  const todosAgentes = useMemo(() => juntarLista(AGENTES_ENVIO, usadosAgente), [usadosAgente]);
   // Las tiendas, como las etiquetas: su color (se ve al instante; si el servidor lo rechaza, vuelve) y su nombre, que se cambia
   // en todas las compras a la vez.
   const [coloresTiendas, setColoresTiendas] = useState(coloresTiendasServidor);
@@ -565,8 +574,8 @@ export function TablaCompras({
     [coloresTiendas, compras, mostrarToast],
   );
   const edicion = useMemo(
-    () => ({ puedeEscribir, restricciones, guardar: guardarCelda, etiquetas: todasEtiquetas, tiendas: todasTiendas, colores, cambiarColor }),
-    [puedeEscribir, restricciones, guardarCelda, todasEtiquetas, todasTiendas, colores, cambiarColor],
+    () => ({ puedeEscribir, restricciones, guardar: guardarCelda, etiquetas: todasEtiquetas, tiendas: todasTiendas, proveedores: todosProveedores, agentes: todosAgentes, colores, cambiarColor }),
+    [puedeEscribir, restricciones, guardarCelda, todasEtiquetas, todasTiendas, todosProveedores, todosAgentes, colores, cambiarColor],
   );
 
   // Una anulada es una descartada más (etapa Descartado, con su insignia «Anulada»): no va aparte.
@@ -592,6 +601,7 @@ export function TablaCompras({
 
   return (
     <ProveedorRestricciones value={restricciones}>
+    <ProveedorListasCompras proveedores={usadosProveedor} agentes={usadosAgente}>
     <ProveedorTiendas value={gestionTiendas}>
     <div className="flex flex-col">
       <div className="flex min-w-0 flex-col gap-3">
@@ -721,6 +731,7 @@ export function TablaCompras({
       />
     </div>
     </ProveedorTiendas>
+    </ProveedorListasCompras>
     </ProveedorRestricciones>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { SombraDerecha, useSombrasX } from "@/components/ui/desplazable-x";
 import { useDensidad } from "./densidad";
 import { claseEncabezadoColumna } from "./estilos-tabla";
 
@@ -64,7 +65,8 @@ export function ContenedorTabla({
   useEffect(() => {
     const caja = ref.current;
     const tabla = caja?.querySelector("table");
-    const tarjeta = caja?.parentElement;
+    // La caja va dentro de un envoltorio (`relative`, para la sombra del borde): la tarjeta es el padre de ese envoltorio.
+    const tarjeta = caja?.parentElement?.parentElement;
     if (!caja || !tabla || !tarjeta) return;
     const medir = () => {
       setDesborda(tabla.offsetWidth > tarjeta.clientWidth + 1);
@@ -130,29 +132,40 @@ export function ContenedorTabla({
           </thead>
         ) : (
           <tbody>
-            <tr>{celdas}</tr>
+            <tr className="bg-muted">{celdas}</tr>
           </tbody>
         )}
       </table>
     );
   };
   const copiasListas = anchos.length > 0 && anchos.length === columnas;
+  const { masDerecha, desplazada } = useSombrasX(ref, desborda);
 
   return (
     <>
       {encabezadoFijo && desborda && copiasListas && (
         // Sin alto propio: se pega bajo la barra de herramientas y la copia flota encima de las primeras filas.
-        <div data-densidad={densidad} aria-hidden="true" style={altoBarra ? { top: altoBarra } : undefined} className="sticky top-[var(--alto-barra-tabla)] z-[15] h-0">
+        <div
+          data-densidad={densidad}
+          data-primera-fija=""
+          data-desplazada={desplazada ? "" : undefined}
+          aria-hidden="true"
+          style={altoBarra ? { top: altoBarra } : undefined}
+          className="sticky top-[var(--alto-barra-tabla)] z-[15] h-0"
+        >
           <div ref={copiaEncabezado} className={`pointer-events-none absolute inset-x-0 top-0 overflow-hidden border-b border-border bg-card ${encabezadoFuera ? "" : "hidden"}`}>
             {tablaCopia(encabezadoFijo, "encabezado")}
           </div>
         </div>
       )}
+      <div className="relative min-w-0">
       <div
         ref={ref}
         onScroll={desborda ? alMoverTabla : undefined}
         data-densidad={densidad}
         data-encabezado-fijo={desborda || encabezadoQuieto ? undefined : ""}
+        data-primera-fija={desborda ? "" : undefined}
+        data-desplazada={desborda && desplazada ? "" : undefined}
         {...(desborda
           ? {
               role: "region",
@@ -160,7 +173,7 @@ export function ContenedorTabla({
               "aria-label": `${ariaLabel}, desplazable horizontalmente con las flechas izquierda y derecha`,
             }
           : {})}
-        className={`min-w-0 ${
+        className={`relative min-w-0 ${
           desborda
             ? "overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden focus-visible:ring-2 focus-visible:ring-foreground focus-visible:outline-none focus-visible:ring-inset"
             : ""
@@ -168,8 +181,15 @@ export function ContenedorTabla({
       >
         {children}
       </div>
+      <SombraDerecha visible={desborda && masDerecha} />
+      </div>
       {(desborda || (totales && copiasListas)) && (
-        <div data-densidad={densidad} className="sticky bottom-0 z-20 bg-card">
+        <div
+          data-densidad={densidad}
+          data-primera-fija={desborda ? "" : undefined}
+          data-desplazada={desborda && desplazada ? "" : undefined}
+          className="sticky bottom-0 z-20 bg-card"
+        >
           {totales && copiasListas && (
             <div ref={copiaTotales} aria-hidden="true" className="overflow-hidden border-t border-border bg-muted text-[13px] font-medium">
               {tablaCopia(totales, "totales")}

@@ -6,7 +6,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { origenDropi, VERSION_FAVORITO } from "@/lib/publicaciones/marcador-aplicar-dropi";
 import { quienesDe, unidadesTotales } from "@/lib/publicaciones/privatizar-dropi";
-import { CDN_FOTOS_DROPI } from "@/lib/publicaciones/republicar-dropi";
+import { CDN_FOTOS_DROPI, esFotoCdnDropi } from "@/lib/publicaciones/republicar-dropi";
 import { codigoBodega } from "@/lib/publicaciones/sincronizar-dropi";
 import { textoVariacion } from "@/lib/publicaciones/stock-dropi";
 import { porOrdenesPendientes } from "@/lib/publicaciones/archivar";
@@ -33,7 +33,7 @@ const claseSecundario = `inline-flex w-fit items-center rounded-md border border
  */
 /** Baja por el servidor una foto del CDN de Dropi (`/api/publicaciones-dropi/foto`, que solo acepta ese CDN) y se la manda al favorito. */
 async function pasarFoto(dropi: Window, origen: string, id: unknown, url: unknown) {
-  if (typeof id !== "string" || typeof url !== "string" || !url.startsWith(`${CDN_FOTOS_DROPI}/`)) return;
+  if (typeof id !== "string" || typeof url !== "string" || !esFotoCdnDropi(url)) return;
   try {
     const r = await fetch(`/api/publicaciones-dropi/foto?u=${encodeURIComponent(url)}`, { cache: "no-store" });
     if (!r.ok) return dropi.postMessage({ tipo: "foto", id, error: `${r.status}: ${(await r.text()).slice(0, 120)}` }, origen);

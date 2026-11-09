@@ -69,3 +69,6 @@ __pycache__/
 
 # Listas de dropshippers y otros datos de personas: nunca se versionan
 datos-privados/
+
+# vista previa local (scripts/preview)
+/.preview/

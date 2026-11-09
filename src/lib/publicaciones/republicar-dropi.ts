@@ -21,6 +21,17 @@ export const CDN_FOTOS_DROPI = "https://d39ru7awumhhs2.cloudfront.net";
  * están en `d3sk39qh2f4j46`). Se elige por la carpeta del país con que empieza la ruta; sin carpeta conocida, el de Panamá.
  */
 export const CDN_FOTOS_PAIS: Record<string, string> = { "costarica/": "https://d3sk39qh2f4j46.cloudfront.net" };
+/** Todos los hosts de fotos de Dropi que se aceptan (Panamá/México y los de cada país; mejora 43). */
+export const HOSTS_CDN_DROPI = [CDN_FOTOS_DROPI, ...Object.values(CDN_FOTOS_PAIS)].map((u) => new URL(u).host);
+/** ¿Esta dirección es una foto de alguno de los CDN de Dropi? */
+export const esFotoCdnDropi = (url: string) => {
+  try {
+    const u = new URL(url);
+    return u.protocol === "https:" && HOSTS_CDN_DROPI.includes(u.host);
+  } catch {
+    return false;
+  }
+};
 export const cdnDeRuta = (ruta: string) => Object.entries(CDN_FOTOS_PAIS).find(([carpeta]) => ruta.startsWith(carpeta))?.[1] ?? CDN_FOTOS_DROPI;
 
 /**

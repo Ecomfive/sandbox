@@ -52,6 +52,15 @@
   /* Insignia «Privado» de Gestión de IDs Dropi: violeta sólido con texto blanco (6,1:1), igual en los dos temas. */
   --privado: #8a35c9;
   --sin-acceso: #c9c6d1;
+  /* Portal AF4 360°: series de las gráficas (src/lib/af4/grafica.ts). Cada una mide ≥ 3:1 contra la tarjeta (WCAG 1.4.11)
+     en los dos temas. 1 = magnitud base, 2 = el resultado que importa, 3-4 = extra, 5 = referencia (presupuesto, anterior). */
+  --grafica-1: #52525b;
+  --grafica-2: #8a35c9;
+  --grafica-3: #0e7490;
+  --grafica-4: #b45309;
+  --grafica-5: #7c7c85;
+  --grafica-positivo: #15803d;
+  --grafica-negativo: #be123c;
 }
 
 @theme inline {
@@ -123,6 +132,13 @@
   --nivel-edicion: #8a35c9;
   --privado: #8a35c9;
   --sin-acceso: #4a4a52;
+  --grafica-1: #a1a1aa;
+  --grafica-2: #b07ae8;
+  --grafica-3: #22d3ee;
+  --grafica-4: #fbbf24;
+  --grafica-5: #80808a;
+  --grafica-positivo: #4ade80;
+  --grafica-negativo: #fb7185;
 }
 
 body {
@@ -138,6 +154,13 @@ body {
 
 /* El placeholder por defecto de Tailwind (texto al 50%) mide 3.4:1 sobre blanco; el mínimo es 4.5:1. */
 @layer base {
+  /* Una caja que se desplaza de lado contiene lo que va con posición absoluta adentro (un texto `sr-only` de una celda):
+     sin esto, ese texto se ubica respecto de la página y la ensancha aunque la tabla esté recortada en su caja.
+     En la capa base: una clase `absolute`, `sticky` o `fixed` del elemento sigue mandando. */
+  .overflow-x-auto,
+  .overflow-auto {
+    position: relative;
+  }
   ::placeholder {
     color: var(--muted-foreground);
     opacity: 1;
@@ -197,6 +220,34 @@ html {
   position: sticky;
   top: var(--alto-barra-tabla);
   z-index: 15;
+}
+
+/* Tabla más ancha que su tarjeta (ContenedorTabla le pone data-primera-fija): la primera columna queda fija a la
+   izquierda al desplazarse de lado, salvo que sea la columna de casillas. Fondo opaco para que no se vea lo que pasa
+   por debajo. */
+/* Una tabla que ya fija su primera columna (TablaFinanciera, con su fondo por tipo de fila) lleva `.sticky`: se respeta. */
+[data-primera-fija] table.tabla-datos tr > :first-child:not(.sticky, :has(input[type="checkbox"])) {
+  position: sticky;
+  left: 0;
+  z-index: 5;
+  background-color: var(--card);
+}
+[data-primera-fija] table.tabla-datos thead tr > :first-child:not(.sticky),
+[data-primera-fija] table.tabla-datos tr:is([class~="bg-muted"], [class~="bg-muted/40"], [class~="bg-muted/50"], [class~="bg-muted/60"]) > :first-child:not(.sticky) {
+  background-color: var(--muted);
+}
+[data-primera-fija] table.tabla-datos tbody tr:hover > :first-child:not(.sticky, :has(input[type="checkbox"])) {
+  background-color: color-mix(in oklab, var(--muted) 50%, var(--card));
+}
+/* Ya desplazada de lado: la columna fija proyecta una sombra sobre lo que pasa por debajo. */
+[data-desplazada] table.tabla-datos tr > :first-child:not(:has(input[type="checkbox"])) {
+  box-shadow: 6px 0 8px -6px color-mix(in oklab, var(--foreground) 22%, transparent);
+  clip-path: inset(0 -14px 0 0);
+}
+
+/* Una cifra nunca se parte en dos líneas (el signo arriba y el número abajo). */
+table.tabla-datos :is(td, th).tabular-nums {
+  white-space: nowrap;
 }
 
 @keyframes fade-in {
@@ -443,5 +494,18 @@ html {
   }
   .mp-fila > .mp-lv fieldset > div > label {
     flex: 1;
+  }
+}
+
+/* Imprimir una página (botón «Imprimir» del Portal AF4): sin menú, barra de arriba ni migas; solo el contenido. */
+@media print {
+  [data-sin-imprimir] {
+    display: none !important;
+  }
+  body {
+    background: #ffffff;
+  }
+  table.tabla-datos {
+    font-size: 10px;
   }
 }

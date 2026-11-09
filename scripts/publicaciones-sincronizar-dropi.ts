@@ -15,6 +15,7 @@ import { readFileSync } from "node:fs";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { copiarFotosDropi } from "./publicaciones-copiar-fotos";
 import { revisarSinStock } from "../src/lib/compras/sin-stock-datos";
+import { sincronizarStockDropiWms } from "../src/lib/wms/sync-dropi";
 import {
   bodegasEnOrden,
   cambiosDesdeDropi,
@@ -250,7 +251,14 @@ export async function guardarNuestrosProductos(supabase: SupabaseClient, l: Lect
   } catch (e) {
     sinStock = { error: String((e as Error)?.message ?? e) };
   }
-  return { ...resumen, creadasPrimeraCarga, fotos, sinStock, detalle };
+  // Mejora 34: la bodega «Dropi» del WMS queda igual al stock leído (ajustes `sync_dropi`). Un problema no tumba la lectura.
+  let wms: Awaited<ReturnType<typeof sincronizarStockDropiWms>> | { error: string };
+  try {
+    wms = await sincronizarStockDropiWms(supabase, pais.id);
+  } catch (e) {
+    wms = { error: String((e as Error)?.message ?? e) };
+  }
+  return { ...resumen, creadasPrimeraCarga, fotos, sinStock, wms, detalle };
 }
 
 // Uso directo con un archivo guardado.

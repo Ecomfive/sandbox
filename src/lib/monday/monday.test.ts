@@ -1,0 +1,189 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { CAUSA_OTRA, causaDeTexto, codigoDeNombre, leerPalabras, pesoCausas, porDimension, resumenPorMes, textosSinCausa, type Causa, type DespachoAnalisis } from "./causas";
+import {
+  cambioDesde,
+  despachoDeItem,
+  enlazarOrden,
+  errorMonday,
+  fechaDeColumna,
+  grupoDeEstado,
+  leerColumnas,
+  leerPagina,
+  leerReglasEstado,
+  normalizarPedido,
+  sugerirMapeo,
+  unidadDeTexto,
+  validarMapeo,
+  variantesPedido,
+} from "./columnas";
+
+// Respuestas inventadas con la forma de la API GraphQL v2 de Monday.
+const COLUMNAS = {
+  data: {
+    boards: [
+      {
+        id: "123",
+        name: "Despachos",
+        columns: [
+          { id: "name", title: "Name", type: "name" },
+          { id: "texto_pedido", title: "N° Pedido", type: "text" },
+          { id: "tienda", title: "Tienda", type: "dropdown" },
+          { id: "estado", title: "Estado", type: "status" },
+          { id: "motivo", title: "Motivo rechazo", type: "text" },
+          { id: "fecha", title: "Fecha despacho", type: "date" },
+          { id: "fecha4", title: "Fecha entrega", type: "date" },
+          { id: "repartidor", title: "Courier", type: "people" },
+          { id: "guia", title: "Remisión", type: "text" },
+        ],
+      },
+    ],
+  },
+};
+
+const PAGINA = {
+  data: {
+    boards: [
+      {
+        items_page: {
+          cursor: "MSw5NzI4MDA5MDAsaV9YcmxJb0p1VEdYc1VWeGlxeF9kLDg4MiwzNXw0MTQ1NzU1MTE5",
+          items: [
+            {
+              id: "9001",
+              name: "Pedido A",
+              updated_at: "2026-10-20T15:00:00Z",
+              column_values: [
+                { id: "texto_pedido", text: "#1001", value: '"#1001"', type: "text" },
+                { id: "tienda", text: "Tienda Uno", value: null, type: "dropdown" },
+                { id: "estado", text: "Rechazado", value: '{"index":2}', type: "status" },
+                { id: "motivo", text: "cliente no contesta el teléfono", value: null, type: "text" },
+                { id: "fecha", text: "2026-10-02", value: '{"date":"2026-10-02","time":null}', type: "date" },
+                { id: "fecha4", text: "", value: null, type: "date" },
+                { id: "repartidor", text: "Moto Sur", value: null, type: "people" },
+                { id: "guia", text: "R-55", value: null, type: "text" },
+              ],
+            },
+          ],
+        },
+      },
+    ],
+  },
+};
+
+test("columnas del tablero, mapeo sugerido y validado", () => {
+  const c = leerColumnas(COLUMNAS)!;
+  assert.equal(c.nombre, "Despachos");
+  const m = sugerirMapeo(c.columnas);
+  assert.equal(m.pedido, "texto_pedido");
+  assert.equal(m.estado, "estado");
+  assert.equal(m.causa, "motivo");
+  assert.equal(m.fecha_despacho, "fecha");
+  assert.equal(m.fecha_entrega, "fecha4");
+  assert.equal(m.courier, "repartidor");
+  assert.equal(m.remision, "guia");
+  assert.ok("mapeo" in validarMapeo(m, c.columnas));
+  assert.ok("error" in validarMapeo({ ...m, estado: "" }, c.columnas));
+  assert.ok("error" in validarMapeo({ ...m, causa: "no_existe" }, c.columnas));
+  assert.equal(leerColumnas({ data: { boards: [] } }), null);
+});
+
+test("paginación: primera página y siguientes, errores", () => {
+  const p = leerPagina(PAGINA);
+  assert.equal(p.items.length, 1);
+  assert.ok(p.cursor);
+  const sig = leerPagina({ data: { next_items_page: { cursor: null, items: [{ id: 9002, name: "B", column_values: [] }] } } });
+  assert.equal(sig.cursor, null);
+  assert.equal(sig.items[0].id, "9002");
+  assert.equal(errorMonday({ errors: [{ message: "Not Authenticated" }] }), "Not Authenticated");
+  assert.equal(errorMonday({ error_message: "Rate limit" }), "Rate limit");
+  assert.equal(errorMonday(PAGINA), null);
+});
+
+test("ítem → despacho con el mapeo, estados y fechas", () => {
+  const c = leerColumnas(COLUMNAS)!;
+  const d = despachoDeItem(leerPagina(PAGINA).items[0], sugerirMapeo(c.columnas));
+  assert.equal(d.numero_pedido, "#1001");
+  assert.equal(d.estado_grupo, "rechazado");
+  assert.equal(d.fecha_despacho, "2026-10-02");
+  assert.equal(d.fecha_entrega, null);
+  assert.equal(d.courier, "Moto Sur");
+  assert.equal(d.remision, "R-55");
+  assert.equal(despachoDeItem(leerPagina(PAGINA).items[0], { pedido: "name", estado: "estado" }).numero_pedido, "Pedido A");
+  assert.equal(grupoDeEstado("Entregado ✅"), "entregado");
+  assert.equal(grupoDeEstado("Devuelto"), "rechazado");
+  assert.equal(grupoDeEstado("Cancelada"), "cancelado");
+  assert.equal(grupoDeEstado("En ruta"), "en_ruta");
+  assert.equal(grupoDeEstado(""), "sin_estado");
+  assert.equal(grupoDeEstado("Listo", leerReglasEstado({ listo: "entregado", malo: "x" })), "entregado");
+  assert.equal(fechaDeColumna({ text: "2026-09-01 10:00", value: null }), "2026-09-01");
+  assert.equal(fechaDeColumna({ text: "", value: "{mal" }), null);
+});
+
+test("lectura incremental y enlace con la orden", () => {
+  assert.ok(cambioDesde({ updated_at: "2026-10-20T00:00:00Z" }, null));
+  assert.ok(cambioDesde({ updated_at: "2026-10-19T12:00:00Z" }, "2026-10-20T00:00:00Z"));
+  assert.ok(!cambioDesde({ updated_at: "2026-10-10T00:00:00Z" }, "2026-10-20T00:00:00Z"));
+  assert.equal(normalizarPedido(" #OF-1001 "), "OF1001");
+  assert.deepEqual(variantesPedido("#1001"), ["#1001", "1001"]);
+  const cand = [
+    { id: "a", unidad_id: "u1", numero: "#1001", periodo: "2026-10-01" },
+    { id: "b", unidad_id: "u2", numero: "#1001", periodo: "2026-10-01" },
+    { id: "c", unidad_id: "u2", numero: "#2002", periodo: "2026-10-01" },
+  ];
+  assert.equal(enlazarOrden("1001", "u2", cand)?.id, "b");
+  assert.equal(enlazarOrden("1001", null, cand), null);
+  assert.equal(enlazarOrden("2002", null, cand)?.id, "c");
+  const unidades = [{ id: "u1", nombre: "TIENDA UNO" }, { id: "u2", nombre: "OFERFY" }];
+  assert.equal(unidadDeTexto("Tienda uno", unidades), "u1");
+  assert.equal(unidadDeTexto("Oferfy Panamá", unidades), "u2");
+  assert.equal(unidadDeTexto("", unidades), null);
+});
+
+const CATALOGO: Causa[] = [
+  { codigo: "no_responde", nombre: "No responde", palabras: ["NO CONTESTA", "NO RESPONDE"], orden: 10, activo: true },
+  { codigo: "rechaza", nombre: "Rechaza", palabras: ["RECHAZ"], orden: 20, activo: true },
+  { codigo: "inactiva", nombre: "Inactiva", palabras: ["CLIENTE"], orden: 1, activo: false },
+  { codigo: CAUSA_OTRA, nombre: "Otra", palabras: [], orden: 999, activo: true },
+];
+
+test("causas: palabras clave, asignación a mano y otro", () => {
+  assert.equal(causaDeTexto("Cliente no contesta el teléfono", CATALOGO, new Map()), "no_responde");
+  assert.equal(causaDeTexto("lo rechazó en la puerta", CATALOGO, new Map()), "rechaza");
+  assert.equal(causaDeTexto("se mudó", CATALOGO, new Map()), CAUSA_OTRA);
+  assert.equal(causaDeTexto("se mudó", CATALOGO, new Map([["SE MUDO", "rechaza"]])), "rechaza");
+  assert.equal(causaDeTexto("", CATALOGO, new Map()), null);
+  assert.deepEqual(leerPalabras("no contesta, Apagado,, x"), ["NO CONTESTA", "APAGADO"]);
+  assert.equal(codigoDeNombre("Cliente de viaje"), "cliente_de_viaje");
+});
+
+const d = (p: Partial<DespachoAnalisis>): DespachoAnalisis => ({ periodo: "2026-09-01", unidadId: "u1", tienda: "A", courier: "X", estadoGrupo: "entregado", causa: null, fechaDespacho: "2026-09-05", monto: 50, costoEnvio: 4, ...p });
+
+test("peso de las causas, por tienda y courier, y resumen del mes", () => {
+  const lista = [
+    d({}),
+    d({ estadoGrupo: "rechazado", causa: "no_responde", monto: 30 }),
+    d({ estadoGrupo: "rechazado", causa: "no_responde", monto: 10, courier: "Y" }),
+    d({ estadoGrupo: "rechazado", causa: "rechaza", monto: 60, tienda: "B", unidadId: "u2" }),
+    d({ estadoGrupo: "en_ruta", fechaDespacho: "2026-09-28" }),
+    d({ estadoGrupo: "en_ruta", fechaDespacho: "2026-09-02" }),
+    d({ estadoGrupo: "cancelado", fechaDespacho: null }),
+  ];
+  const p = pesoCausas(lista);
+  assert.equal(p[0].codigo, "no_responde");
+  assert.equal(p[0].pedidos, 2);
+  assert.equal(Math.round(p[0].pctDinero), 40);
+  assert.equal(p[1].dinero, 60);
+  const t = porDimension(lista, "tienda");
+  assert.equal(t.find((x) => x.clave === "A")?.despachados, 5);
+  assert.equal(t.find((x) => x.clave === "B")?.tasaEntrega, 0);
+  assert.equal(porDimension(lista, "courier").find((x) => x.clave === "Y")?.causas.no_responde, 1);
+  const r = resumenPorMes(lista, "2026-10-01").get("2026-09-01")!;
+  assert.equal(r.despachados, 6);
+  assert.equal(r.entregados, 1);
+  // El del 28 de septiembre todavía no cumple 10 días al 1 de octubre.
+  assert.equal(r.elegibles, 5);
+  assert.equal(r.conEstado, 4);
+  assert.equal(r.pctConEstado, 80);
+  assert.equal(resumenPorMes(lista, "2026-10-01", new Set(["u2"])).get("2026-09-01")?.despachados, 1);
+  assert.deepEqual(textosSinCausa([{ texto: "se mudó", codigo: CAUSA_OTRA }, { texto: "Se mudo", codigo: CAUSA_OTRA }, { texto: "x", codigo: "rechaza" }]), [{ texto: "SE MUDO", pedidos: 2 }]);
+});

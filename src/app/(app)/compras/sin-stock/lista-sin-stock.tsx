@@ -7,7 +7,7 @@ import { useState, useTransition } from "react";
 import { usePuedeAbrir } from "@/components/modulos-contexto";
 import { anilloFoco, fieldClass, labelClassSm } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
-import { DECISIONES, type Decision } from "@/lib/compras/sin-stock";
+import { DECISIONES, DIAS_SIN_COMPRA, diasSinStock, sinCompraUrgente, type Decision } from "@/lib/compras/sin-stock";
 import { revisarAlertaSinStock } from "./actions";
 
 export interface AlertaSinStock {
@@ -53,7 +53,9 @@ const decisionDe = (d: Decision | null) => DECISIONES.find((x) => x.valor === d)
  */
 export function ListaSinStock({ alertas, pais, puedeEscribir }: { alertas: AlertaSinStock[]; pais: string; puedeEscribir: boolean }) {
   const [vista, setVista] = useState<AlertaSinStock["estado"]>("abierta");
-  const visibles = alertas.filter((a) => a.estado === vista);
+  const [soloUrgentes, setSoloUrgentes] = useState(false);
+  const urgentes = alertas.filter((a) => sinCompraUrgente(a)).length;
+  const visibles = alertas.filter((a) => a.estado === vista && (!soloUrgentes || sinCompraUrgente(a)));
   return (
     <div className="flex flex-col gap-4">
       <div role="group" aria-label="Qué alertas ver" className="flex flex-wrap items-center gap-2">
@@ -74,6 +76,18 @@ export function ListaSinStock({ alertas, pais, puedeEscribir }: { alertas: Alert
             </button>
           );
         })}
+        {urgentes > 0 && vista !== "cerrada" && (
+          <button
+            type="button"
+            aria-pressed={soloUrgentes}
+            onClick={() => setSoloUrgentes((v) => !v)}
+            className={`inline-flex min-h-9 items-center gap-2 rounded-lg border px-3 text-sm font-medium ${anilloFoco} ${soloUrgentes ? "border-foreground bg-foreground text-background" : "border-border bg-card hover:bg-muted"}`}
+          >
+            <span aria-hidden="true" className={`h-2 w-2 rounded-full ${soloUrgentes ? "bg-background" : "bg-destructive"}`} />
+            Sin compra hace {DIAS_SIN_COMPRA}+ días
+            <span className="tabular-nums opacity-70">{entero(urgentes)}</span>
+          </button>
+        )}
       </div>
       {visibles.length === 0 ? (
         <p className="rounded-xl border border-border bg-card px-5 py-8 text-center text-sm text-muted-foreground">
@@ -129,6 +143,11 @@ function FilaAlerta({ a, puedeEscribir }: { a: AlertaSinStock; puedeEscribir: bo
         <div className="flex shrink-0 flex-col items-end gap-1 text-sm">
           {a.enCamino > 0 ? (
             <span className="font-medium text-success tabular-nums">{entero(a.enCamino)} en camino</span>
+          ) : sinCompraUrgente(a) ? (
+            <span className="inline-flex items-center gap-1.5 font-medium">
+              <span aria-hidden="true" className="h-2 w-2 rounded-full bg-destructive" />
+              Sin compra · {diasSinStock(a.detectadaEn)} días
+            </span>
           ) : (
             <span className="text-muted-foreground">Nada en camino</span>
           )}

@@ -99,3 +99,21 @@ export function incumple(prometidoMax: number | null, r: { historico: ResumenRea
   const real = r.ultimos12.promedio ?? r.historico.promedio;
   return prometidoMax !== null && real !== null && real > prometidoMax;
 }
+
+/** Envíos seguidos fuera de plazo que encienden la alerta de una ruta aunque el promedio todavía esté bien (mejora 47). */
+export const RACHA_ALERTA = 3;
+
+/**
+ * Cuántos de los últimos envíos que llegaron (del más reciente hacia atrás) tardaron más que el máximo prometido, seguidos.
+ * 0 si la ruta no promete plazo o el último llegó a tiempo. Las fechas mal puestas no cuentan.
+ */
+export function rachaFueraDePlazo(envios: EnvioReal[], diasMax: number | null): number {
+  if (diasMax === null) return 0;
+  const orden = envios.filter((e) => e.dias >= 0 && e.dias <= 365).sort((a, b) => b.llegada.localeCompare(a.llegada));
+  let n = 0;
+  for (const e of orden) {
+    if (e.dias <= diasMax) break;
+    n++;
+  }
+  return n;
+}

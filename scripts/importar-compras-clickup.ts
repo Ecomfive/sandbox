@@ -50,7 +50,7 @@ const REASIGNAR: Record<string, string> = {
   "andreina andrade de morales": "Francis Aponte",
 };
 /**
- * Los códigos de orden de compra como los lleva el sistema (migración 0077): Panamá «ECOM-0241» → «ECOM01-0241» y el
+ * Los códigos de orden de compra como los lleva el sistema (migración 0077): Panamá «ECOM-0941» → «ECOM01-0941» y el
  * «COM02-0076» mal escrito de México → «ECOM02-0076». El formato viejo (PA-00191) queda igual.
  */
 const normalizarCodigos = (t: string) => t.replace(/\bECOM-(\d)/g, "ECOM01-$1").replace(/\bCOM02-(\d)/g, "ECOM02-$1");

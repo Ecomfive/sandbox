@@ -82,6 +82,7 @@ export const AREAS_ACCESO: AreaAcceso[] = [
       { clave: "wms-productos", etiqueta: "Ficha producto Shopify" },
       { clave: "wms-productos-dropi", etiqueta: "Ficha producto Dropi" },
       { clave: "publicaciones-dropi", etiqueta: "Gestión de IDs Dropi" },
+      { clave: "deliverys", etiqueta: "Deliverys" },
       { clave: "publicaciones-drop", etiqueta: "Gestión de IDs Drop" },
       { clave: "publicaciones-effi", etiqueta: "Gestión de IDs Effi" },
       { clave: "uso-sistema", etiqueta: "Uso del sistema (IDs Dropi)" },
@@ -100,6 +101,28 @@ export const AREAS_ACCESO: AreaAcceso[] = [
       { clave: "extractos", etiqueta: "Extractos bancarios" },
       { clave: "productos", etiqueta: "Productos y márgenes" },
       { clave: "gastos", etiqueta: "Nómina y gastos" },
+      // Portal AF4 360° (Finanzas consolidada)
+      { clave: "panel-financiero", etiqueta: "Panel financiero" },
+      { clave: "estado-resultados", etiqueta: "Estado de resultados" },
+      { clave: "rentabilidad", etiqueta: "Rentabilidad por tienda" },
+      { clave: "presupuesto", etiqueta: "Presupuesto y escenarios" },
+      { clave: "planificacion", etiqueta: "Planificación" },
+      { clave: "utilidades", etiqueta: "Distribución de utilidades" },
+      { clave: "capital-riesgo", etiqueta: "Capital y riesgo" },
+      { clave: "tesoreria", etiqueta: "Tesorería" },
+      { clave: "flujo-caja", etiqueta: "Flujo de caja" },
+      { clave: "proyeccion-caja", etiqueta: "Proyección de caja" },
+      { clave: "conciliacion-bancaria", etiqueta: "Conciliación bancaria" },
+      { clave: "cuentas-por-cobrar", etiqueta: "Cuentas por cobrar" },
+      { clave: "cuentas-por-pagar", etiqueta: "Cuentas por pagar" },
+      { clave: "cierre-mes", etiqueta: "Cierre de mes" },
+      { clave: "libro-movimientos", etiqueta: "Libro de movimientos" },
+      { clave: "balance-general", etiqueta: "Balance general" },
+      { clave: "costos-mercancia", etiqueta: "Costos de mercancía" },
+      { clave: "bienes-de-uso", etiqueta: "Bienes de uso" },
+      { clave: "ventas-tiendas", etiqueta: "Ventas por tienda" },
+      { clave: "clientes-marketing", etiqueta: "Clientes y marketing" },
+      { clave: "nomina", etiqueta: "Nómina (datos sensibles)" },
     ],
   },
   {
@@ -122,7 +145,7 @@ export const MODULOS_ACCESO: ModuloAcceso[] = AREAS_ACCESO.flatMap((a) => a.modu
 export const etiquetaDeModulo = (clave: string): string => MODULOS_ACCESO.find((m) => m.clave === clave)?.etiqueta ?? clave;
 
 /** Los módulos con datos sensibles (nómina, bancos, retiros, márgenes) y los que dan poder de administración: llevan su marca en la matriz. */
-export const MODULOS_SENSIBLES: ReadonlySet<string> = new Set(["retiros", "conciliaciones", "extractos", "productos", "gastos", "usuarios", "configuracion", "rendimiento", "unir-productos"]);
+export const MODULOS_SENSIBLES: ReadonlySet<string> = new Set(["retiros", "conciliaciones", "extractos", "productos", "gastos", "usuarios", "configuracion", "rendimiento", "unir-productos", "nomina", "utilidades", "tesoreria", "conciliacion-bancaria", "libro-movimientos"]);
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Lo que se puede afinar dentro de un módulo

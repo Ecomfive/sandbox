@@ -1,3 +1,4 @@
+import { conTtl } from "@/lib/cache-ttl";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { precioEquivalente, unidadesBajadas, type CambioStock } from "@/lib/competencia/analisis";
 import { clavesDistintas, descartadoPara } from "@/lib/competencia/descartar";
@@ -24,7 +25,7 @@ export interface CompetidorDePublicacion {
  * producto: los que lo venden igual (por nombre o foto), siguen publicados y tienen stock, con lo que vendieron en 30 días (28 oct 2026:
  * para decidir si igualar o bajar el precio). Sin la tabla o sin búsquedas, vacío.
  */
-export async function cargarCompetidores(supabase: SupabaseClient, paisId: string): Promise<Map<number, CompetidorDePublicacion[]>> {
+async function leerCompetidores(paisId: string, supabase: SupabaseClient): Promise<Map<number, CompetidorDePublicacion[]>> {
   const out = new Map<number, CompetidorDePublicacion[]>();
   try {
     const [nuestros, otros] = await Promise.all([
@@ -231,4 +232,14 @@ export function ultimoCambioDe(idsDropi: number[], cambios: Map<number, CambioPr
     if (c && (!ultimo || c.fecha > ultimo.fecha)) ultimo = c;
   }
   return ultimo;
+}
+
+/**
+ * Mejora 33: el catálogo de la competencia se lee una vez al día, así que se guarda 10 minutos en memoria por país (no depende de
+ * quién mira: son datos públicos de Dropi). Un resultado vacío no se guarda (puede ser un error pasajero).
+ */
+const competidoresGuardados = conTtl(10 * 60_000, (paisId: string) => paisId, leerCompetidores, { esValido: (m) => m.size > 0 });
+
+export function cargarCompetidores(supabase: SupabaseClient, paisId: string): Promise<Map<number, CompetidorDePublicacion[]>> {
+  return competidoresGuardados(paisId, supabase);
 }

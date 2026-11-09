@@ -5,7 +5,7 @@ import { BotonBarra, BotonDescargar, CabeceraTarjeta, Indicador, TableroIndicado
 import { anilloFoco } from "@/components/ui/field";
 import { almacen } from "@/components/tabla/almacen";
 import { estadoRuta, realQueManda } from "@/lib/compras/estado-ruta";
-import { etiquetaVia, prometidoJunto, textoPrometido } from "@/lib/compras/rutas-envio";
+import { etiquetaVia, prometidoJunto, rachaFueraDePlazo, RACHA_ALERTA, textoPrometido } from "@/lib/compras/rutas-envio";
 import { normalPais } from "@/lib/paises-mundo";
 import { MasIcon } from "@/lib/nav-icons";
 import { hoyPanama, realJunto } from "./barra-tiempos";
@@ -48,7 +48,11 @@ export function PanelEnvios({ rutas, agentes, tipos, puedeEscribir }: { rutas: F
   const lista = soloTarde ? filtradas.filter((r) => medidaRuta(r).estado === "tarde") : filtradas;
 
   const medidas = activas.filter((r) => ["tarde", "ok"].includes(medidaRuta(r).estado));
-  const tardes = activas.filter((r) => medidaRuta(r).estado === "tarde").sort((a, b) => (medidaRuta(b).delta ?? 0) - (medidaRuta(a).delta ?? 0));
+  // Fuera de plazo por promedio, o con los últimos envíos seguidos tarde aunque el promedio todavía aguante (mejora 47).
+  const racha = (r: FilaRuta) => rachaFueraDePlazo(r.envios, r.diasMax);
+  const tardes = activas
+    .filter((r) => medidaRuta(r).estado === "tarde" || racha(r) >= RACHA_ALERTA)
+    .sort((a, b) => racha(b) - racha(a) || (medidaRuta(b).delta ?? 0) - (medidaRuta(a).delta ?? 0));
   const sinPlazo = activas.filter((r) => r.diasMax === null);
 
   // El cumplimiento de cada agente: de sus rutas con plazo y envíos, cuántas están dentro del plazo.
@@ -147,9 +151,15 @@ export function PanelEnvios({ rutas, agentes, tipos, puedeEscribir }: { rutas: F
               <ul className="m-0 list-none p-0">
                 {tardes.map((r) => {
                   const { real, delta } = medidaRuta(r);
+                  const seguidos = racha(r);
                   return (
                     <li key={r.id} className="border-t border-border first:border-t-0">
-                      <ItemPrioridad titulo={tituloRuta(r)} detalle={`${real} d real · plazo ${plazoCorto(r)}`} alPulsar={() => setAbierta(r.id)} marca={<Pastilla tono="peligro">+{delta} d</Pastilla>} />
+                      <ItemPrioridad
+                        titulo={tituloRuta(r)}
+                        detalle={`${real} d real · plazo ${plazoCorto(r)}${seguidos >= RACHA_ALERTA ? ` · últimos ${seguidos} envíos tarde` : ""}`}
+                        alPulsar={() => setAbierta(r.id)}
+                        marca={<Pastilla tono="peligro">{delta !== null && delta > 0 ? `+${delta} d` : `${seguidos} seguidos`}</Pastilla>}
+                      />
                     </li>
                   );
                 })}

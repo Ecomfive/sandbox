@@ -142,6 +142,7 @@ export function CeldaEditable({
             ancla={boton}
             aria={aria}
             elegidas={inicial ? [inicial] : []}
+            extras={def.libre ? opcionesLista : undefined}
             alElegir={(v) => {
               cerrar("elegido");
               enviar(v[0] ?? "");
@@ -190,6 +191,7 @@ export function EditorOpciones({
   aria,
   elegidas: inicial,
   multiple = false,
+  extras,
   alElegir,
   alCerrar,
 }: {
@@ -198,6 +200,8 @@ export function EditorOpciones({
   aria: string;
   elegidas: string[];
   multiple?: boolean;
+  /** Más opciones además de las fijas (los proveedores ya usados en otras compras). */
+  extras?: string[];
   alElegir: (valores: string[]) => void;
   alCerrar: (motivo: MotivoCierre) => void;
 }) {
@@ -210,12 +214,20 @@ export function EditorOpciones({
             { valor: "si", etiqueta: def.siNo?.si ?? "Sí" },
             { valor: "no", etiqueta: def.siNo?.no ?? "No" },
           ]
-        : [...(def.opciones ?? [])];
+        : [
+            ...(def.opciones ?? []),
+            ...(extras ?? [])
+              .filter((x) => !(def.opciones ?? []).some((o) => o.valor.toLowerCase() === x.toLowerCase()))
+              .map((x) => ({ valor: x, etiqueta: x })),
+          ];
     return def.admiteVacio ? [...base, { valor: "", etiqueta: `Sin ${def.etiqueta.toLowerCase()}` }] : base;
-  }, [def]);
-  const conBuscador = todas.length > 6;
+  }, [def, extras]);
+  const conBuscador = todas.length > 6 || !!def.libre;
   const q = normal(busqueda);
-  const opciones = q ? todas.filter((o) => normal(o.etiqueta).includes(q)) : todas;
+  const filtradas = q ? todas.filter((o) => normal(o.etiqueta).includes(q)) : todas;
+  // Un proveedor o agente que no existe: se agrega con lo escrito.
+  const nuevo = def.libre && busqueda.trim() && !todas.some((o) => normal(o.etiqueta) === q) ? busqueda.trim().replace(/\s+/g, " ") : null;
+  const opciones = nuevo ? [...filtradas, { valor: nuevo, etiqueta: `Agregar «${nuevo}»` }] : filtradas;
   const [activa, setActiva] = useState(() =>
     Math.max(
       0,
@@ -263,7 +275,7 @@ export function EditorOpciones({
             setActiva(0);
           }}
           onKeyDown={teclas}
-          placeholder="Buscar…"
+          placeholder={def.libre ? "Buscar o agregar…" : "Buscar…"}
           aria-label={`Buscar ${def.etiqueta.toLowerCase()}`}
           className={claseCampoPanel}
         />
@@ -292,7 +304,13 @@ export function EditorOpciones({
               onClick={() => elegir(o.valor)}
               className={`${claseOpcionPanel} cursor-pointer ${i === activa ? "bg-muted" : ""}`}
             >
-              {o.valor ? <Opcion def={def} valor={o.valor} etiqueta={o.etiqueta} /> : <span className="text-muted-foreground">{o.etiqueta}</span>}
+              {o.valor && o.valor === nuevo ? (
+                <span className="font-medium text-primario">{o.etiqueta}</span>
+              ) : o.valor ? (
+                <Opcion def={def} valor={o.valor} etiqueta={o.etiqueta} />
+              ) : (
+                <span className="text-muted-foreground">{o.etiqueta}</span>
+              )}
               {marcada && (
                 <span aria-hidden="true" className="text-xs text-primario">
                   ✓
