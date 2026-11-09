@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { extraerAviso, resumenMensaje } from "./extraer";
-import { claves360, config360, urlDescarga360, variableClave360 } from "./proveedor";
+import { claves360, config360, numeroEmpresaNormal, urlDescarga360, variableClave360 } from "./proveedor";
 import { errorEnEspanol, leerErrorEnvio, minutosVentana, textoVentana } from "./ventana";
 import { canalesPlantillas, etiquetaDeCanal } from "./api-plantillas";
 
@@ -338,4 +338,22 @@ test("un mensaje sin texto que el sistema no sabe leer dice qué llegó, no un �
   assert.equal(caso({ type: "reaction", reaction: { message_id: "wamid.ORIGEN", emoji: "" } }).texto, null);
   assert.equal(caso({ type: "text", text: { body: "hola" } }).reaccionA, null);
   assert.equal(caso({ type: "image", image: { id: "m1", mime_type: "image/jpeg" } }).texto, null);
+});
+
+test("un celular de México de la empresa entra sin el «1» que WhatsApp pone después del 52 (9 nov 2026)", () => {
+  assert.equal(numeroEmpresaNormal("5215540921878"), "+525540921878");
+  assert.equal(numeroEmpresaNormal("+52 1 55 4092 1878"), "+525540921878");
+  assert.equal(numeroEmpresaNormal("+525540921878"), "+525540921878");
+  // Un fijo de México (sin el 1) y los de otros países quedan igual.
+  assert.equal(numeroEmpresaNormal("50766367426"), "+50766367426");
+  assert.equal(numeroEmpresaNormal(""), null);
+  const { mensajes } = extraerAviso(
+    aviso({
+      messaging_product: "whatsapp",
+      metadata: { display_phone_number: "5215540921878", phone_number_id: "1358624014010011" },
+      contacts: [{ profile: { name: "Prueba" }, wa_id: "50761112233" }],
+      messages: [{ from: "50761112233", id: "wamid.MX", timestamp: "1793040000", type: "text", text: { body: "Hola" } }],
+    }),
+  );
+  assert.equal(mensajes[0].numeroEmpresa, "+525540921878");
 });

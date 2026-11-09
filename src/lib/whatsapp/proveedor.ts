@@ -22,6 +22,16 @@ const ORIGEN_SANDBOX = "https://waba-sandbox.360dialog.io";
  * Las formas en que puede venir un número: WhatsApp escribe los celulares de México con un «1» después del 52 (+52 1 55…) y la clave se suele guardar
  * sin él (9 nov 2026: `D360_API_KEY_525540921878` para el +5215540921878; sin esto se respondía con la clave principal, desde otro número). Primero la tal cual.
  */
+/**
+ * Un número de la empresa como se guarda (9 nov 2026, pedido de Hernán): «+» y los dígitos, y un celular de México **sin el «1»** que WhatsApp pone después del 52
+ * («+52 1 55 4092 1878» → «+525540921878»), que es como se escribe el número y como se nombra su clave. Null si no hay dígitos.
+ */
+export function numeroEmpresaNormal(numero: string | null | undefined): string | null {
+  const d = (numero ?? "").replace(/\D/g, "");
+  if (!d) return null;
+  return `+${/^521\d{10}$/.test(d) ? `52${d.slice(3)}` : d}`;
+}
+
 export function variantesNumero(numero: string): string[] {
   const d = numero.replace(/\D/g, "");
   if (/^521\d{10}$/.test(d)) return [d, `52${d.slice(3)}`];

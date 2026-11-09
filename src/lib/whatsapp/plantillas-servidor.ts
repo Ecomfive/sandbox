@@ -14,7 +14,7 @@ import {
   listarPlantillasMeta,
   replicarPlantillaEnOtrosNumeros,
 } from "./api-plantillas";
-import { config360 } from "./proveedor";
+import { config360, numeroEmpresaNormal } from "./proveedor";
 import { alertaDeEvento, extraerEventosCuenta, type AlertaNueva, type EventoCuenta } from "./eventos";
 import {
   alinearVariables,
@@ -223,10 +223,11 @@ const soloNumeros = (v: string | null | undefined) => (v ?? "").replace(/\D/g, "
 
 async function aplicarUno(supabase: SupabaseClient, e: EventoCuenta): Promise<void> {
   if (e.tipo === "numero_limite") {
-    const objetivo = soloNumeros(e.numero);
+    // Con o sin el «1» de un celular de México: se comparan los dos ya normalizados.
+    const objetivo = soloNumeros(numeroEmpresaNormal(e.numero));
     if (!objetivo || !e.limite) return;
     const { data } = await supabase.from("whatsapp_numeros").select("id, numero");
-    const numero = (data ?? []).find((n) => soloNumeros(n.numero as string) === objetivo);
+    const numero = (data ?? []).find((n) => soloNumeros(numeroEmpresaNormal(n.numero as string)) === objetivo);
     if (numero) await supabase.from("whatsapp_numeros").update({ limite_mensajes: e.limite, limite_actualizado_en: new Date().toISOString() }).eq("id", numero.id);
     return;
   }

@@ -1288,7 +1288,7 @@ convenciones técnicas del código.
   (`ProductoDelChat.mencion`: «Lo pidió el 29 oct: “Para la creatina”», «Se le pasó el ID 51188 · 29 oct», «Lo encontró el análisis con IA del…»).
   filtro de áreas del CRM va por `whatsapp_conversaciones.area`, no por la del número. **Varios números** (29 oct 2026: +58 Comercial, de la líder
   comercial; +507 Atención): cada número de 360dialog tiene su clave; `config360(numero)` usa `D360_API_KEY_<dígitos del número>` si está y si no
-  `D360_API_KEY` (la principal, también la de plantillas). El envío (`NumeroEmpresa` en `api.ts`, `conversacionPermitida().numeroEmpresa`)
+  `D360_API_KEY` (la principal, también la de plantillas). **México** (9 nov 2026): WhatsApp manda un celular mexicano con un «1» después del 52 (+52 1 55…); `config360` busca la clave con y sin él (`variantesNumero`) y el número de la empresa se guarda **sin el 1** (`numeroEmpresaNormal` en `extraer.ts` y al aplicar el aviso de límite): +525540921878 «Ecomfive · Atención». Sin la clave propia, el envío salía por la principal (otro número) y Meta lo rechazaba con 131047. El envío (`NumeroEmpresa` en `api.ts`, `conversacionPermitida().numeroEmpresa`)
   y los archivos usan la del número del chat; `conectarWebhook360` registra el webhook en todas (`claves360`). Con `D360_API_KEY` el envío y los archivos van por
   360dialog (`src/lib/whatsapp/proveedor.ts`; `D360_SANDBOX=1` para el sandbox) y los avisos llegan a
   `/api/whatsapp/360dialog/[clave]` (sin firma: la puerta es `D360_WEBHOOK_CLAVE`, comparada en tiempo constante; `extraerAviso(aviso,
