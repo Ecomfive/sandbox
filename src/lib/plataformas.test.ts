@@ -12,7 +12,7 @@ describe("plataformas", () => {
     assert.equal(plataformaDisponible("dropi", "CR"), true);
   });
   it("qué plataformas hay en cada país", () => {
-    assert.deepEqual(plataformasDePais("CR").map((p) => p.id), ["dropi", "drop", "effi"]);
+    assert.deepEqual(plataformasDePais("CR").map((p) => p.id), ["dropi", "drop", "effi", "dunamixfy"]);
     assert.deepEqual(plataformasDePais("PA").map((p) => p.id), ["dropi"]);
   });
   it("un valor desconocido cae en Dropi", () => {
@@ -27,7 +27,9 @@ describe("plataformas", () => {
   });
   it("Gestión de IDs: las tres rutas y quién puede abrir cuáles", () => {
     assert.equal(GESTION_IDS.effi.ruta, "/publicaciones-effi");
-    assert.deepEqual(gestionesDePais("CR", null).map((p) => p.id), ["dropi", "drop", "effi"]);
+    assert.deepEqual(gestionesDePais("CR", null).map((p) => p.id), ["dropi", "drop", "effi", "dunamixfy"]);
+    assert.equal(GESTION_IDS.dunamixfy.ruta, "/publicaciones-dunamixfy");
+    assert.equal(plataformaDisponible("dunamixfy", "PA"), false);
     assert.deepEqual(gestionesDePais("CR", ["publicaciones-dropi", "publicaciones-effi"]).map((p) => p.id), ["dropi", "effi"]);
     assert.deepEqual(gestionesDePais("PA", null).map((p) => p.id), ["dropi"]);
     assert.deepEqual(gestionesDePais("CR", ["producto"]).map((p) => p.id), []);

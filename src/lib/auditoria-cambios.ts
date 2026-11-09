@@ -22,6 +22,8 @@ export const ETIQUETA_ACCION: Record<string, string> = {
   eliminar_nota_producto: "Eliminó una nota",
   vincular_publicacion_effi: "Vinculó una publicación de Effi",
   desvincular_publicacion_effi: "Desvinculó una publicación de Effi",
+  vincular_publicacion_dunamixfy: "Vinculó un producto de Dunamixfy",
+  desvincular_publicacion_dunamixfy: "Desvinculó un producto de Dunamixfy",
   decidir_producto_pais: "Decidió en Por país",
   cambiar_categoria_producto: "Cambió la categoría",
   confirmar_categoria_producto: "Confirmó la categoría",

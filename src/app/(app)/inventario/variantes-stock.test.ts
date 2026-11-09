@@ -39,7 +39,7 @@ const AZUL = fila("a", "BANDA/PEDALES/AZUL", {
   fisico: 378,
   disponible: 378,
   porBodega: [{ bodegaId: "b1", fisico: 300 }, { bodegaId: "b2", fisico: 78 }],
-  plataformas: { dropi: 10, effi: 0, drop: 0, total: 10, lineas: [] },
+  plataformas: { dropi: 10, effi: 0, drop: 0, dunamixfy: 0, total: 10, lineas: [] },
 });
 
 test("las variantes salen dentro de su producto, que suma sus cifras", () => {

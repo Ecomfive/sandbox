@@ -143,7 +143,7 @@ export function conBodegas(base: DefTabla<FilaStock>, bodegas: { id: string; nom
   };
 }
 
-export const PLATAFORMAS_STOCK: Plataforma[] = ["dropi", "effi", "drop"];
+export const PLATAFORMAS_STOCK: Plataforma[] = ["dropi", "effi", "drop", "dunamixfy"];
 
 /** Las plataformas donde el producto tiene unidades. */
 export const plataformasConStock = (f: Pick<FilaStock, "plataformas">): Plataforma[] => PLATAFORMAS_STOCK.filter((p) => (f.plataformas?.[p] ?? 0) > 0);
@@ -172,5 +172,6 @@ export const DEF_STOCK_PLATAFORMAS: DefTabla<FilaStock> = {
     { etiqueta: "Dropi", valor: (f) => f.plataformas?.dropi ?? 0 },
     { etiqueta: "Effi", valor: (f) => f.plataformas?.effi ?? 0 },
     { etiqueta: "Drop", valor: (f) => f.plataformas?.drop ?? 0 },
+    { etiqueta: "Dunamixfy", valor: (f) => f.plataformas?.dunamixfy ?? 0 },
   ],
 };

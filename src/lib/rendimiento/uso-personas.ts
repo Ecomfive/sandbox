@@ -7,7 +7,7 @@ import type { PlataformaExterna } from "./uso-externo";
 export const FRENTES_USO = [
   { id: "crm", etiqueta: "CRM", rutas: ["/crm-dropshippers"] },
   { id: "ids-dropi", etiqueta: "IDs Dropi", rutas: ["/publicaciones-dropi"] },
-  { id: "ids-drop-effi", etiqueta: "IDs Drop y Effi", rutas: ["/publicaciones-drop", "/publicaciones-effi"] },
+  { id: "ids-drop-effi", etiqueta: "IDs Drop y Effi", rutas: ["/publicaciones-drop", "/publicaciones-effi", "/publicaciones-dunamixfy"] },
   { id: "producto", etiqueta: "Producto", rutas: ["/producto", "/wms-productos", "/wms-productos-dropi", "/productos-test"] },
   { id: "compras", etiqueta: "Compras", rutas: ["/compras", "/portal-proveedor"] },
   { id: "inventario", etiqueta: "Inventario", rutas: ["/inventario", "/wms-bodegas", "/wms-ubicaciones"] },

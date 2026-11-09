@@ -30,6 +30,7 @@ export const MODULOS: Modulo[] = [
   { clave: "publicaciones-dropi", etiqueta: "Gestión de IDs Dropi (WMS)" },
   { clave: "publicaciones-drop", etiqueta: "Gestión de IDs Drop (WMS)" },
   { clave: "publicaciones-effi", etiqueta: "Gestión de IDs Effi (WMS)" },
+  { clave: "publicaciones-dunamixfy", etiqueta: "Gestión de IDs Dunamixfy (WMS)" },
   { clave: "uso-sistema", etiqueta: "Uso del sistema (Gestión de IDs Dropi)" },
   { clave: "tienda-dashboard", etiqueta: "Dashboard de tienda (Gestión de tienda)" },
   { clave: "tienda-pedidos", etiqueta: "Pedidos de tienda (Gestión de tienda)" },

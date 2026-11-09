@@ -6,11 +6,11 @@
 import { ESTADOS_QUE_RESTAN, type EstadoNovedad } from "./novedades";
 import type { Plataforma } from "./stock-plataformas";
 
-/** El código de la bodega externa de cada plataforma. Drop es la bodega «Drop (Boxfull)». */
-export const BODEGA_DE_PLATAFORMA: Record<Plataforma, string> = { dropi: "dropi", effi: "effi", drop: "boxfull" };
+/** El código de la bodega externa de cada plataforma. Drop es la bodega «Drop (Boxfull)»; Dunamixfy, la suya (0053). */
+export const BODEGA_DE_PLATAFORMA: Record<Plataforma, string> = { dropi: "dropi", effi: "effi", drop: "boxfull", dunamixfy: "dunamixfy" };
 
 /** De las tres se conocen las ventas por producto y día: Dropi, Effi (migración 0244, por su API) y Drop (7 nov 2026, con «Actualizar datos» de Costa Rica). */
-export const CON_VENTAS: Record<Plataforma, boolean> = { dropi: true, effi: true, drop: true };
+export const CON_VENTAS: Record<Plataforma, boolean> = { dropi: true, effi: true, drop: true, dunamixfy: true };
 
 export interface RemisionCuadro {
   sku: string;

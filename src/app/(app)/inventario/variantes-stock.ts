@@ -4,7 +4,7 @@ import type { FilaStock } from "./def-stock";
 const sumaPlataformas = (a: StockPlataformas | null, b: StockPlataformas | null): StockPlataformas | null => {
   if (!a) return b;
   if (!b) return a;
-  return { dropi: a.dropi + b.dropi, effi: a.effi + b.effi, drop: a.drop + b.drop, total: a.total + b.total, lineas: [...a.lineas, ...b.lineas] };
+  return { dropi: a.dropi + b.dropi, effi: a.effi + b.effi, drop: a.drop + b.drop, dunamixfy: a.dunamixfy + b.dunamixfy, total: a.total + b.total, lineas: [...a.lineas, ...b.lineas] };
 };
 
 /**

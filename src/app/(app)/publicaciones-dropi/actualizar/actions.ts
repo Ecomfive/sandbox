@@ -12,6 +12,8 @@ import { ingerirPedidos, type PedidoDropi } from "@/lib/dropi-actualizar/ingerir
 import { ingerirRetiros, type FilaRetiro } from "@/lib/dropi-actualizar/ingerir-retiros";
 import { ingerirVentas, type MovimientosDropi, type ResumenDropi } from "@/lib/dropi-actualizar/ingerir-ventas";
 import { LECTORES, PARTES, archivoSubido, esParte, lectoresDe, parte as parteDe, puedeActualizarDropi, type ClaveLector, type ClaveParte } from "@/lib/dropi-actualizar/partes";
+import { guardarPedidosDunamixfy, guardarProductosDunamixfy } from "@/lib/dunamixfy/guardar";
+import type { LecturaPedidosDunamixfy, LecturaProductosDunamixfy } from "@/lib/dunamixfy/lectura";
 import { textoLecturaEffi } from "@/lib/effi/resumen";
 import { sincronizarEffi } from "@/lib/effi/sincronizar";
 import { guardarVentasDrop, type LecturaVentasDrop } from "@/lib/publicaciones-drop/ventas";
@@ -167,6 +169,15 @@ export async function procesarParte(id: string, parte: string): Promise<{ error?
     } else if (p.tipo === "drop_ventas") {
       const r = await guardarVentasDrop(supabase, await bajar<LecturaVentasDrop>(supabase, id, archivo("dropventas")), log);
       resumen = `${n(r.pedidos)} pedidos del ${r.desde} al ${r.hasta} · ${n(r.filas)} filas por producto y día${r.sinProducto ? ` · ${n(r.sinProducto)} sin producto reconocido` : ""}`;
+      datos = r as unknown as Record<string, unknown>;
+    } else if (p.tipo === "dunamixfy_productos") {
+      // Costa Rica › Dunamixfy (9 nov 2026): los productos de la cuenta de proveedor, con su stock y precio.
+      const r = await guardarProductosDunamixfy(supabase, await bajar<LecturaProductosDunamixfy>(supabase, id, archivo("dunamixfy")));
+      resumen = `${n(r.productos)} productos${r.nuevos ? ` · ${n(r.nuevos)} nuevos` : ""}${r.yaNoEstan ? ` · ${n(r.yaNoEstan)} ya no están` : ""}${r.productos - r.vinculados ? ` · ${n(r.productos - r.vinculados)} sin vincular` : ""}`;
+      datos = r as unknown as Record<string, unknown>;
+    } else if (p.tipo === "dunamixfy_ventas") {
+      const r = await guardarPedidosDunamixfy(supabase, await bajar<LecturaPedidosDunamixfy>(supabase, id, archivo("dunamixfyventas")), log);
+      resumen = `${n(r.pedidos)} pedidos del ${r.desde} al ${r.hasta} · ${n(r.vendedores)} dropshippers${r.sinProducto ? ` · ${n(r.sinProducto)} productos sin vincular` : ""}`;
       datos = r as unknown as Record<string, unknown>;
     } else if (p.tipo === "effi") {
       // Effi va por su API desde el servidor: artículos (stock), nuestros precios del análisis de competencia y las ventas del cuadro.

@@ -1071,6 +1071,38 @@ export function DropIcon({ marca = false, ...props }: SVGProps<SVGSVGElement> & 
   );
 }
 
+/**
+ * El logo de Dunamixfy (9 nov 2026): la «X» de su marca dentro de un cuadrado redondeado. Por defecto (el menú) va relleno con el color del texto y la X es transparente
+ * (una máscara), como Drop. Con `marca` va con sus colores: cuadrado grafito y la X en su degradado azul verdoso.
+ */
+const X_DUNAMIXFY = "M5.6 6.2h3.9l2.5 3.5 2.5-3.5h3.9l-4.4 5.8 4.4 5.8h-3.9L12 14.3l-2.5 3.5H5.6l4.4-5.8-4.4-5.8Z";
+export function DunamixfyIcon({ marca = false, ...props }: SVGProps<SVGSVGElement> & { marca?: boolean }) {
+  if (marca)
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" {...props}>
+        <defs>
+          <linearGradient id="icono-dunamixfy-degradado" x1="0" y1="1" x2="1" y2="0">
+            <stop offset="0" stopColor="#19b4d8" />
+            <stop offset="1" stopColor="#0cf5b8" />
+          </linearGradient>
+        </defs>
+        <rect x="1" y="1" width="22" height="22" rx="6" fill="#1f2328" stroke="#ffffff" strokeOpacity=".3" strokeWidth="1" />
+        <path d={X_DUNAMIXFY} fill="url(#icono-dunamixfy-degradado)" />
+      </svg>
+    );
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" {...props}>
+      <defs>
+        <mask id="icono-dunamixfy-mascara" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24">
+          <rect width="24" height="24" fill="white" />
+          <path d={X_DUNAMIXFY} fill="black" />
+        </mask>
+      </defs>
+      <rect x="1.5" y="1.5" width="21" height="21" rx="6" fill="currentColor" mask="url(#icono-dunamixfy-mascara)" />
+    </svg>
+  );
+}
+
 /** Almacén con estantes: Bodegas. */
 export function BodegaIcon(props: SVGProps<SVGSVGElement>) {
   return (
@@ -1194,6 +1226,7 @@ export const ICONOS_PAGINA: Record<string, (props: SVGProps<SVGSVGElement>) => R
   "/publicaciones-dropi": DropiIcon,
   "/publicaciones-drop": DropIcon,
   "/publicaciones-effi": EffiIcon,
+  "/publicaciones-dunamixfy": DunamixfyIcon,
   "/productos-test": TestIcon,
   "/filtro-productos": FiltroIcon,
   "/crm-dropshippers": DropshipperIcon,

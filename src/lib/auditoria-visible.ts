@@ -37,6 +37,7 @@ export const MODULO_DE_ENTIDAD: Record<string, string> = {
   landings: "generador-landings",
   dropi_publicaciones: "publicaciones-dropi",
   effi_publicaciones: "publicaciones-effi",
+  dunamixfy_publicaciones: "publicaciones-dunamixfy",
   dropi_publicaciones_reglas: "publicaciones-dropi",
   instagram_capturas: "instagram",
   alertas_inventario_no_retornado: "alertas",

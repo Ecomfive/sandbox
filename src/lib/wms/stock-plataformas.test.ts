@@ -69,7 +69,7 @@ test("sin vincular, fuera de la plataforma o en cero no sale; las garantías no 
 
 test("la última lectura de cada plataforma, y cuándo está vieja", () => {
   const { lecturas } = armarStockPlataformas({ ...vacio, productosDropi: [prod(1, [], 0, "2026-11-01T10:00:00Z"), prod(2, [], 0, "2026-11-03T10:00:00Z"), prod(3, [], 0, null)] });
-  assert.deepEqual(lecturas, { dropi: "2026-11-03T10:00:00Z", effi: null, drop: null });
+  assert.deepEqual(lecturas, { dropi: "2026-11-03T10:00:00Z", effi: null, drop: null, dunamixfy: null });
   const ahora = Date.parse("2026-11-06T10:00:00Z");
   assert.equal(lecturaVieja("2026-11-05T10:00:00Z", ahora), false);
   assert.equal(lecturaVieja("2026-11-03T10:00:00Z", ahora), true);
@@ -77,6 +77,17 @@ test("la última lectura de cada plataforma, y cuándo está vieja", () => {
 });
 
 test("el texto solo dice las plataformas con algo", () => {
-  assert.equal(textoPlataformas({ dropi: 120, effi: 0, drop: 44 }), "Dropi 120 · Drop 44");
+  assert.equal(textoPlataformas({ dropi: 120, effi: 0, drop: 44, dunamixfy: 0 }), "Dropi 120 · Drop 44");
+  assert.equal(textoPlataformas({ dropi: 0, effi: 0, drop: 0, dunamixfy: 9 }), "Dunamixfy 9");
   assert.equal(textoPlataformas(null), "");
+});
+
+test("Dunamixfy: cuenta su stock en el producto vinculado; lo que ya no aparece o no está vinculado no cuenta", () => {
+  const duna = (sku: string | null, stock: number, en = true) => ({ sku_maestro_id: sku, dunamixfy_id: "837", nombre: "Truly", stock, en_dunamixfy: en, ultima_vez: "2026-11-09T18:00:00Z" });
+  const { porProducto, lecturas } = armarStockPlataformas({ ...vacio, dunamixfy: [duna("a", 3), duna("b", 50, false), duna(null, 9)] });
+  assert.equal(porProducto.get("a")?.dunamixfy, 3);
+  assert.equal(porProducto.get("a")?.total, 3);
+  assert.equal(porProducto.get("a")?.lineas[0].id, "#837");
+  assert.equal(porProducto.has("b"), false);
+  assert.equal(lecturas.dunamixfy, "2026-11-09T18:00:00Z");
 });

@@ -51,7 +51,7 @@ test("la extensión solo sube a la carpeta temporal del sistema en SU proyecto d
 
 test("el puente solo va en las páginas del sistema y la extensión solo entra a Dropi", () => {
   const m = JSON.parse(ext("manifest.json")) as { host_permissions: string[]; content_scripts: { matches: string[] }[]; permissions: string[] };
-  assert.deepEqual(m.host_permissions, ["https://app.dropi.pa/*", "https://app.dropi.cr/*", "https://app.dropi.mx/*", "https://app.tuwinner.com/*", "https://app.soydrop.com/*"]);
+  assert.deepEqual(m.host_permissions, ["https://app.dropi.pa/*", "https://app.dropi.cr/*", "https://app.dropi.mx/*", "https://app.tuwinner.com/*", "https://app.soydrop.com/*", "https://dunamixfy.cr/*"]);
   // Solo la página del sistema: ninguna página de localhost puede usar la sesión de Dropi (auditoría 27 oct 2026).
   assert.deepEqual(m.content_scripts[0].matches, ["https://mom-beta-proveduria.vercel.app/*"]);
   assert.ok(ext("fondo.js").includes(`remitente.origin !== SISTEMA`));
@@ -91,7 +91,7 @@ test("México en «Actualizar datos»: la cuenta de proveedor de app.dropi.mx, s
 
 test("Costa Rica: sus partes, sus lectores en app.dropi.cr y sus archivos con otro nombre que los de Panamá", () => {
   const cr = PARTES.filter((p) => p.pais === "cr");
-  assert.deepEqual(cr.map((p) => p.tipo), ["pedidos", "cartera", "retiros", "stock", "ventas", "drop_productos", "drop_ventas", "effi"]);
+  assert.deepEqual(cr.map((p) => p.tipo), ["pedidos", "cartera", "retiros", "stock", "ventas", "drop_productos", "drop_ventas", "dunamixfy_productos", "dunamixfy_ventas", "effi"]);
   assert.deepEqual(lectoresDe(cr.map((p) => p.clave)), LECTORES_PAIS.cr);
   assert.deepEqual(lectoresDe(["ventas_cr", "pedidos"]), ["proveedor", "ventas_cr"]);
   assert.equal(CUENTAS.cr.origen, "https://app.dropi.cr");
@@ -105,8 +105,18 @@ test("Costa Rica: sus partes, sus lectores en app.dropi.cr y sus archivos con ot
   assert.equal(sesionValida("cr", { hay: true, tipoUsuario: "DROPSHIPPER", tienda: null, vence: null }, ahora), "otra_cuenta");
 });
 
+test("Dunamixfy (9 nov 2026): su lector en dunamixfy.cr con la cuenta de proveedor, sin nada del cliente", () => {
+  assert.deepEqual(LECTORES.dunamixfy_cr.archivos.map((a) => archivoSubido("dunamixfy_cr", a)), ["dunamixfycr", "dunamixfyventascr"]);
+  for (const a of LECTORES.dunamixfy_cr.archivos) assert.match(`${archivoSubido("dunamixfy_cr", a)}.json`, /^[a-z]+\.json$/);
+  assert.equal(CUENTAS.duna.origen, "https://dunamixfy.cr");
+  assert.equal(sesionValida("duna", { hay: true, tipoUsuario: "SUPPLIER", tienda: null, vence: null }), "ok");
+  assert.equal(sesionValida("duna", { hay: true, tipoUsuario: "DROPSHIPPER", tienda: null, vence: null }), "otra_cuenta");
+  const lector = ext("lectores/dunamixfy.js").replace(/^\s*\/\/.*$/gm, "");
+  for (const campo of ["customer", "customerName", "shippingAddress", "shippingCity", "phone", "email"]) assert.ok(!new RegExp(`\\.${campo}\\b`).test(lector), campo);
+});
+
 test("Costa Rica también trae Drop (con la cuenta de proveedor de Drop) y Effi (por la API, sin extensión)", () => {
-  assert.deepEqual(LECTORES_PAIS.cr, ["proveedor_cr", "ventas_cr", "drop_cr", "effi_cr"]);
+  assert.deepEqual(LECTORES_PAIS.cr, ["proveedor_cr", "ventas_cr", "drop_cr", "dunamixfy_cr", "effi_cr"]);
   assert.equal(sitioDe("drop_cr"), "drop");
   assert.equal(sitioDe("ventas_cr"), "cr");
   assert.ok(sinExtension("effi_cr"));
@@ -117,6 +127,8 @@ test("Costa Rica también trae Drop (con la cuenta de proveedor de Drop) y Effi 
   for (const a of LECTORES.drop_cr.archivos) assert.match(`${archivoSubido("drop_cr", a)}.json`, /^[a-z]+\.json$/);
   assert.equal(CUENTAS.drop.origen, "https://app.soydrop.com");
   assert.equal(nombreSitio("drop"), "Drop");
+  assert.equal(nombreSitio("duna"), "Dunamixfy");
+  assert.equal(sitioDe("dunamixfy_cr"), "duna");
   assert.equal(nombreSitio("cr"), "Dropi Costa Rica");
   assert.equal(sesionValida("drop", { hay: true, tipoUsuario: "VENDOR", tienda: null, vence: null }), "ok");
   assert.equal(sesionValida("drop", { hay: true, tipoUsuario: "DROPSHIPPER", tienda: null, vence: null }), "otra_cuenta");
