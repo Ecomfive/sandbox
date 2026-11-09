@@ -2226,7 +2226,10 @@ convenciones técnicas del código.
   menos parecido; busca también entre las filas cerradas) y un chip «Por imagen ×» lo quita. **Levantamiento** (3 nov 2026, pedido de Jhokser): `/inventario/levantamiento` tiene la cámara junto a «Buscar» (`VentanaBuscarImagen` con `ambitos={["producto"]}`: solo busca en Producto, y la persona necesita poder abrir ese módulo); «Filtrar esta lista» deja
   solo los productos encontrados, de más a menos parecido y aunque estén inactivos o descontinuados, con el chip «Por imagen (N) ×» para quitarlo. **Pendiente**: la cámara en el buscador de Ctrl K, en Selección, Test productos,
   Compras y el Inventario de stock, y una función SQL que compare las huellas en la base (hoy se comparan en el servidor; con decenas de miles de fotos conviene pasarlo a Postgres).
-- **Descargar lo que se ve.** Toda tabla con barra de herramientas trae el botón
+- **Descargar lo que se ve.** Desde el 9 nov 2026 «Descargar» es un menú con **«Lo que se ve en Excel»** (`.xlsx`, `tablaAXlsx`, `src/lib/tabla/xlsx.ts`, con prueba: números como números, fechas como fecha,
+  texto como texto —un código de barras no se vuelve notación científica—, títulos con fondo, fijos y con filtro, columnas al ancho de su contenido; usa `filasAXlsx` del portal del proveedor) y «Lo que se ve en CSV»
+  (el CSV con comas se abría en una sola columna en un Excel en español). Inventario › Stock suma el filtro «Bodega» y una columna «Físico · bodega» por bodega propia (`conBodegas`, `def-stock.ts`).
+  Antes: toda tabla con barra de herramientas trae el botón
   «Descargar»: un CSV (con BOM para Excel) de las filas que dejan los filtros, en
   el orden de la pantalla, armado en el navegador con la `DefTabla`
   (`src/lib/tabla/csv.ts`). Salen todos los `campos` de la definición, con los

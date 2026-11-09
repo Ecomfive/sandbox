@@ -22,8 +22,9 @@ const OPCION =
   "flex w-full items-center justify-between gap-3 rounded-md px-3 py-2 text-left text-sm text-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-foreground focus-visible:outline-none";
 
 /**
- * «Descargar»: baja como CSV las filas que se ven ahora (con los filtros y en el orden de la pantalla). El
- * archivo se arma en el navegador con la definición de la tabla, sin pedirle nada al servidor. Lleva una
+ * «Descargar»: menú con las filas que se ven ahora (con los filtros y en el orden de la pantalla) como **Excel (.xlsx)** —con números, fechas y
+ * texto en su sitio, títulos fijos con filtro y columnas a su ancho (9 nov 2026: el CSV con comas se abría en una sola columna en un Excel en
+ * español)— o como CSV. El archivo se arma en el navegador con la definición de la tabla, sin pedirle nada al servidor; el CSV lleva una
  * marca al principio (BOM) para que Excel lea bien los acentos.
  *
  * Si la tabla solo tiene cargada una parte de los datos (500 órdenes de 1 790; los últimos extractos) y el
@@ -50,6 +51,7 @@ export function BotonDescargar<F>({
   const { mostrarToast } = useToast();
   const puedePdf = usePuedeDescargarPdf();
   const [armandoPdf, setArmandoPdf] = useState(false);
+  const [armandoExcel, setArmandoExcel] = useState(false);
   const [abierto, setAbierto] = useState(false);
   const raiz = useRef<HTMLDivElement>(null);
   const boton = useRef<HTMLButtonElement>(null);
@@ -68,6 +70,30 @@ export function BotonDescargar<F>({
     enlace.remove();
     URL.revokeObjectURL(url);
     mostrarToast(`Descargadas ${cantidad} (${nombreFilas})`);
+  }
+
+  // Excel (.xlsx): las mismas filas y columnas que el CSV, pero con números, fechas y texto en su sitio, títulos fijos con filtro y columnas a su ancho.
+  async function descargarExcel() {
+    if (vacio || armandoExcel) return;
+    setArmandoExcel(true);
+    try {
+      const { tablaAXlsx, nombreArchivoXlsx } = await import("@/lib/tabla/xlsx");
+      const titulo = document.title.replace(/\s*·\s*Ecomfive\s*$/, "") || nombreFilas;
+      const bytes = await tablaAXlsx(def, filas, titulo);
+      const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+      const enlace = document.createElement("a");
+      enlace.href = url;
+      enlace.download = nombreArchivoXlsx(def.clave, new Date());
+      document.body.appendChild(enlace);
+      enlace.click();
+      enlace.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      mostrarToast(`Descargadas ${cantidad} en Excel (${nombreFilas})`);
+    } catch {
+      mostrarToast("No se pudo armar el Excel. Inténtalo de nuevo.", "destructive");
+    } finally {
+      setArmandoExcel(false);
+    }
   }
 
   async function descargarPdf() {
@@ -114,25 +140,6 @@ export function BotonDescargar<F>({
     };
   }, [abierto]);
 
-  if (!completa && !puedePdf) {
-    return (
-      <Tooltip texto={vacio ? "No hay filas para descargar" : ayuda}>
-        <button
-          type="button"
-          onClick={descargar}
-          aria-disabled={vacio || undefined}
-          aria-label={vacio ? "Descargar, no hay filas" : `Descargar ${cantidad} en CSV`}
-          className={`flex min-h-8 items-center gap-1.5 !rounded-md px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted ${anilloFoco} ${
-            vacio ? "cursor-not-allowed opacity-60" : ""
-          }`}
-        >
-          <DescargarIcon className="h-4 w-4" />
-          <span className="sr-only">Descargar</span>
-        </button>
-      </Tooltip>
-    );
-  }
-
   return (
     <div
       ref={raiz}
@@ -165,6 +172,20 @@ export function BotonDescargar<F>({
           <button
             type="button"
             data-opcion=""
+            disabled={vacio || armandoExcel}
+            onClick={async () => {
+              await descargarExcel();
+              setAbierto(false);
+              boton.current?.focus();
+            }}
+            className={`${OPCION} disabled:cursor-not-allowed disabled:opacity-50`}
+          >
+            <span>{armandoExcel ? "Armando el Excel…" : "Lo que se ve en Excel"}</span>
+            <span className="text-xs text-muted-foreground tabular-nums">{vacio ? "sin filas" : cantidad}</span>
+          </button>
+          <button
+            type="button"
+            data-opcion=""
             disabled={vacio}
             onClick={() => {
               descargar();
@@ -173,7 +194,7 @@ export function BotonDescargar<F>({
             }}
             className={`${OPCION} disabled:cursor-not-allowed disabled:opacity-50`}
           >
-            <span>{puedePdf ? "Lo que se ve en CSV (Excel)" : "Lo que se ve"}</span>
+            <span>Lo que se ve en CSV</span>
             <span className="text-xs text-muted-foreground tabular-nums">{vacio ? "sin filas" : cantidad}</span>
           </button>
           {puedePdf && (
