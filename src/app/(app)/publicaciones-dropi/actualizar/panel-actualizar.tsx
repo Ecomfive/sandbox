@@ -36,7 +36,7 @@ const SITIOS: Sitio[] = ["pa", "cr", "mx", "drop", "duna"];
 
 /** Costa Rica llegó a la extensión en la 0.3.0 (28 oct 2026), México en la 0.4.0 (30 oct 2026) y Drop en la 0.6.0 (7 nov 2026): una anterior no sabe de ese sitio. Drop pide la
  * 0.6.2 (9 nov 2026): las anteriores solo traían los pedidos de los últimos 30 días. */
-const VERSION_PARA: Record<Sitio, string> = { pa: "0.0.0", cr: "0.3.0", mx: "0.4.0", drop: "0.6.2", duna: "0.7.0" };
+const VERSION_PARA: Record<Sitio, string> = { pa: "0.0.0", cr: "0.3.0", mx: "0.4.0", drop: "0.6.2", duna: "0.7.1" };
 /** «0.2.3» es anterior a «0.3.0». */
 const versionAnterior = (tiene: string | null, pide: string) => {
   if (!tiene) return false;

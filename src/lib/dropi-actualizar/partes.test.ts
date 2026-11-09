@@ -31,7 +31,7 @@ test("la extensión conoce los mismos lectores que el panel (archivo, función, 
     // Effi no pasa por la extensión: el servidor lo lee por su API.
     if (sinExtension(clave as keyof typeof LECTORES)) continue;
     // En la extensión, «pais» es la pestaña donde corre: la de Dropi del país o la de Drop.
-    assert.ok(fondo.includes(`${clave}: { pais: "${sitioDe(clave as keyof typeof LECTORES)}", archivo: "${l.archivo}", funcion: "${l.funcion}", estado: "${l.estado}", archivos: ${JSON.stringify(l.archivos).replace(/,/g, ", ")} }`), clave);
+    assert.ok(fondo.includes(`${clave}: { pais: "${sitioDe(clave as keyof typeof LECTORES)}", archivo: "${l.archivo}", funcion: "${l.funcion}", estado: "${l.estado}", archivos: ${JSON.stringify(l.archivos).replace(/,/g, ", ")}`), clave);
     assert.ok(ext(l.archivo).includes(`async function ${l.funcion}(`), l.archivo);
   }
 });
