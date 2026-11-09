@@ -80,8 +80,13 @@ export function armarGuardadoProducto(
   bodegasProveedor: Obj[],
   /** Lo que se cambia: el nombre (y el de la guía), el precio, el precio sugerido y la descripción. `null` o sin poner = se deja como está. */
   cambio: { nombre: string | null; nombreGuia: string | null; precio?: number | null; precioSugerido?: number | null; descripcion?: string | null },
-  /** `variable`: acepta un producto con variaciones (quien llama pone después las bodegas por variación); sin esto se rechaza. */
-  opciones: { variable?: boolean } = {},
+  /**
+   * `variable`: acepta un producto con variaciones (quien llama pone después las bodegas por variación); sin esto se rechaza.
+   * `precioEnVariaciones` (9 nov 2026, PUB de «Bandas de resistencia», ID 8405: cambiar el precio daba «Tiene variaciones»): con un precio nuevo,
+   * cada variación cambia en la misma proporción que el producto (si todas valían lo mismo, quedan en el precio nuevo) y su sugerido va
+   * igual al precio nuevo cuando se pidió sugerido; sin esto las variaciones conservan el suyo.
+   */
+  opciones: { variable?: boolean; precioEnVariaciones?: boolean } = {},
 ): { cuerpo: Obj } | { error: string } {
   const variable = producto.type === "VARIABLE" && opciones.variable === true;
   if (producto.type !== "SIMPLE" && !variable) return { error: "Tiene variaciones: cámbialo a mano en Dropi." };
@@ -114,6 +119,18 @@ export function armarGuardadoProducto(
   for (const b of bodegasProveedor) {
     if (!bodegas.some((x) => Number(x.warehouse_id) === Number(b.id))) bodegas.push({ fullName: `${b.name}(${b.address})`, warehouse_id: b.id, warehouse_white_brand: !!b.warehouse_white_brand });
   }
+  let variaciones: unknown = variable ? variacionesDeDropi(producto) : producto.variations;
+  if (variable && opciones.precioEnVariaciones === true && precio !== null) {
+    const viejo = Number(producto.sale_price);
+    const factor = viejo > 0 ? precio / viejo : null;
+    const aCentavos = (n: number) => Math.round(n * 100) / 100;
+    variaciones = (variaciones as Obj[]).map((v) => {
+      if (v.deleted_at) return v;
+      const venta = factor === null ? precio : aCentavos(Number(v.sale_price) * factor);
+      const sug = sugerido !== null || factor === null ? venta : Math.max(venta, aCentavos(Number(v.suggested_price) * factor));
+      return { ...v, sale_price: venta, suggested_price: sug };
+    });
+  }
   return {
     cuerpo: {
       id: producto.id,
@@ -132,7 +149,7 @@ export function armarGuardadoProducto(
       width: num(producto.width),
       height: num(producto.height),
       attribute: atributos,
-      variations: variable ? variacionesDeDropi(producto) : producto.variations,
+      variations: variaciones,
       categories: producto.categories,
       add_stock_in_return: producto.add_stock_in_return,
       private_product_inventories: producto.private_product_inventories,

@@ -126,6 +126,11 @@ function crearDropi(opciones: { noTomaEntradas?: boolean; usuarios?: Record<stri
       // Un producto con variaciones: Dropi pide los atributos y las bodegas van en una lista por variación; cada movimiento lleva su `variation_id`.
       if (p.type === "VARIABLE") {
         if (!Array.isArray(cuerpo!.attribute) || !cuerpo!.attribute.length) return responder({ isSuccess: false, message: "Faltan los atributos" }, 422);
+        // Los precios de cada variación (por ID), como los guarda Dropi.
+        for (const nv of (cuerpo!.variations as Obj[] | undefined) ?? []) {
+          const v = (p.variations as Obj[]).find((x) => x.id === nv.id);
+          if (v && nv.sale_price != null) Object.assign(v, { sale_price: String(nv.sale_price), suggested_price: String(nv.suggested_price) });
+        }
         // Las variaciones que no se tocan van en null, como en la pantalla.
         for (const grupo of cuerpo!.warehouselected as (Obj[] | null)[]) {
           for (const e of grupo ?? []) {
@@ -990,12 +995,49 @@ test("variaciones: republicar con stock en la bodega de Dropi (B280), unidades p
   assert.equal(sinAtr.llamadas.filter((l) => l === "POST /products").length, 0);
 });
 
-test("variaciones: lo demás (nombre, precio…) sigue sin tocar un producto con variaciones", async () => {
+test("variaciones: el precio nuevo va al producto y a cada variación y se comprueba en Dropi", async () => {
+  // Caso real (9 nov 2026, «Bandas de resistencia», ID 8405): cambiar el precio daba «Tiene variaciones: cámbialo a mano en Dropi».
+  const d = crearDropi();
+  d.productos.set(7000, conVariaciones(7000, "Bandas", false, { S: 10, M: 5 }, { sale_price: "9.90", suggested_price: "9.90" }));
+  const [r] = await aplicar(d, [{ ...base, id: "p1", producto: 7000, precio: 8.9, sugerido: 8.9 }]);
+  assert.equal(r.ok, true, String(r.error));
+  const p = d.productos.get(7000)!;
+  assert.equal(p.sale_price, "8.9");
+  assert.deepEqual((p.variations as Obj[]).map((v) => [v.sale_price, v.suggested_price]), [["8.9", "8.9"], ["8.9", "8.9"]]);
+  assert.equal(d.llamadas.filter((l) => l === "PUT /products/7000").length, 1);
+  assert.deepEqual(stockVariable(p), { S: 10, M: 5 }, "el stock no se mueve");
+});
+
+test("variaciones: con precios distintos, cada una cambia en la misma proporción y una borrada no se toca", async () => {
+  const d = crearDropi();
+  const o = conVariaciones(7000, "Bandas", false, { S: 10, M: 5, L: 2 }, { sale_price: "10.00", suggested_price: "10.00" });
+  const vs = o.variations as Obj[];
+  vs[0].sale_price = "10.00"; vs[0].suggested_price = "10.00";
+  vs[1].sale_price = "20.00"; vs[1].suggested_price = "25.00";
+  vs[2].sale_price = "7.00"; vs[2].suggested_price = "7.00"; vs[2].deleted_at = "2026-10-01";
+  d.productos.set(7000, o);
+  const [r] = await aplicar(d, [{ ...base, id: "p2", producto: 7000, precio: 5, sugerido: null }]);
+  assert.equal(r.ok, true, String(r.error));
+  assert.deepEqual((d.productos.get(7000)!.variations as Obj[]).map((v) => [Number(v.sale_price), Number(v.suggested_price)]), [[5, 5], [10, 12.5], [7, 7]]);
+});
+
+test("variaciones: el nombre se cambia sin tocar las variaciones ni su stock", async () => {
   const d = crearDropi();
   d.productos.set(7000, conVariaciones(7000, "Body Viral", false, { S: 10 }));
   const [r] = await aplicar(d, [{ ...base, id: "n1", producto: 7000, nombre: "Body Viral 2" }]);
+  assert.equal(r.ok, true, String(r.error));
+  const p = d.productos.get(7000)!;
+  assert.equal(p.name, "Body Viral 2");
+  assert.deepEqual((p.variations as Obj[]).map((v) => Number(v.sale_price)), [9.9]);
+  assert.deepEqual(stockVariable(p), { S: 10 });
+});
+
+test("variaciones: si Dropi no devolvió los atributos no se guarda nada (el precio tampoco)", async () => {
+  const d = crearDropi();
+  d.productos.set(7000, conVariaciones(7000, "Body Viral", false, { S: 10 }, { attributes: [] }));
+  const [r] = await aplicar(d, [{ ...base, id: "n2", producto: 7000, precio: 8 }]);
   assert.equal(r.ok, false);
-  assert.match(String(r.error), /Tiene variaciones/);
+  assert.match(String(r.error), /no devolvió los atributos/);
   assert.equal(d.llamadas.filter((l) => l.startsWith("PUT ")).length, 0);
 });
 
