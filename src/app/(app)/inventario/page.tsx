@@ -68,6 +68,13 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
     cajasPorSku.set(c.sku_maestro_id, x);
   }
 
+  // Las unidades de cada producto en cada bodega propia (9 nov 2026): para filtrar por bodega y para las columnas del Excel.
+  const { data: filasPorBodega } = idsPropias.length
+    ? await traerTodasConError<{ sku_maestro_id: string; bodega_id: string; fisico: number }>((d, h) => supabase.from("wms_stock").select("sku_maestro_id, bodega_id, fisico").in("bodega_id", idsPropias).order("sku_maestro_id").range(d, h))
+    : { data: [] };
+  const porBodegaPorSku = new Map<string, { bodegaId: string; fisico: number }[]>();
+  for (const s of filasPorBodega ?? []) porBodegaPorSku.set(s.sku_maestro_id, [...(porBodegaPorSku.get(s.sku_maestro_id) ?? []), { bodegaId: s.bodega_id, fisico: Number(s.fisico) }]);
+
   const conVariantes = new Set(((padres.data ?? []) as { id: string }[]).map((p) => p.id));
   // Lo que hay en las plataformas (6 nov 2026 en Costa Rica; en todos los países desde el 7 nov, pedido de Hernán): se lee de sus publicaciones, no de `wms_stock`.
   // Cuenta como stock: un producto con unidades en Dropi, Effi o Drop no está «sin stock».
@@ -95,6 +102,7 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
     cajas: cajasPorSku.get(String(r.sku_maestro_id))?.cajas ?? 0,
     unidadesEnCajas: cajasPorSku.get(String(r.sku_maestro_id))?.unidades ?? 0,
     plataformas: plataformas?.porProducto.get(String(r.sku_maestro_id)) ?? null,
+    porBodega: porBodegaPorSku.get(String(r.sku_maestro_id)) ?? [],
   }));
 
   return (
