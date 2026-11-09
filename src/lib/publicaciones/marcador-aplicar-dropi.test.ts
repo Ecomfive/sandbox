@@ -34,6 +34,27 @@ test("el favorito arma exactamente el mismo guardado que el sistema (el probado 
   for (const [p, c] of casos) assert.deepEqual(JSON.parse(JSON.stringify(armarDelFavorito(p, bp, c))), JSON.parse(JSON.stringify(armarGuardadoProducto(p as Record<string, unknown>, bp, c))));
 });
 
+test("el favorito arma con variaciones y precio nuevo lo mismo que el sistema", () => {
+  type CambioV = Cambio & { variable?: boolean; preciosV?: boolean };
+  const armarV = new Function(`${ARMAR_JS}; return armar;`)() as (o: object, bp: object[], c: CambioV) => object;
+  const atributo = { id: 10, product_id: 7587, description: "Talla", isVariation: true, deleted_at: null, values: [{ id: 1, value: "S", attribute_id: 10, attribute_name: "Talla", deleted_at: null }] };
+  const variacion = (id: number, venta: string, sugerido: string, borrada: string | null = null) => ({ id, sale_price: venta, suggested_price: sugerido, product_id: 7587, stock: 0, sku: "B/" + id, deleted_at: borrada, attribute_values: [] });
+  const variable = { ...base, type: "VARIABLE", sale_price: "10.00", suggested_price: "10.00", attributes: [atributo], variations: [variacion(1, "10.00", "10.00"), variacion(2, "20.00", "25.00"), variacion(3, "7.00", "7.00", "2026-10-01")] };
+  const casos: CambioV[] = [
+    { nombre: null, nombreGuia: null, precio: 5, precioSugerido: 5 },
+    { nombre: null, nombreGuia: null, precio: 5 },
+    { nombre: null, nombreGuia: null, precio: 12.5, precioSugerido: 12.5 },
+    { nombre: "Otro", nombreGuia: null },
+  ];
+  const json = (x: unknown) => JSON.parse(JSON.stringify(x));
+  for (const c of casos) {
+    const ts = armarGuardadoProducto(variable as Record<string, unknown>, bp, c, { variable: true, precioEnVariaciones: true });
+    assert.deepEqual(json(armarV(variable, bp, { ...c, variable: true, preciosV: true })), json(ts));
+  }
+  // Sin pedir variaciones se rechaza igual que en el sistema.
+  assert.deepEqual(json(armarV(variable, bp, casos[0])), json(armarGuardadoProducto(variable as Record<string, unknown>, bp, casos[0])));
+});
+
 test("el favorito lleva el origen de la plataforma, abre la ventana de aplicar y solo acepta https (o localhost)", () => {
   const codigo = decodeURIComponent(marcadorAplicarDropi("https://sistema.ecomfive.io/x").slice("javascript:".length));
   assert.ok(codigo.includes('var O="https://sistema.ecomfive.io"'));

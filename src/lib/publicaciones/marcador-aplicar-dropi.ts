@@ -53,7 +53,10 @@ export const ARMAR_JS = [
   "function num(v){return v===null||v===undefined||v===''?v:Number(v)}",
   "var b=(Array.isArray(o.warehouse_product)?o.warehouse_product:[]).map(function(w){var x=w.warehouse||{};return{warehouse_id:w.warehouse_id,fullName:(x.name!=null?x.name:'')+'('+(x.address!=null?x.address:'')+')',stock:w.stock,city:x.city,warehouse_white_brand:!!x.warehouse_white_brand}});",
   "bp.forEach(function(p){if(!b.some(function(x){return Number(x.warehouse_id)===Number(p.id)}))b.push({fullName:p.name+'('+p.address+')',warehouse_id:p.id,warehouse_white_brand:!!p.warehouse_white_brand})});",
-  "return{cuerpo:{id:o.id,name:c.nombre!==null?c.nombre:o.name,description:ds!==null?ds:o.description,dropi_app_description:o.dropi_app_description,type:o.type,sale_price:pr!==null?pr:num(o.sale_price),suggested_price:su!==null?su:(sa!==null?sa:num(o.suggested_price)),user_id:o.user_id,privated_product:o.privated_product,active:o.active,sku:o.sku,weight:num(o.weight),length:num(o.length),width:num(o.width),height:num(o.height),attribute:at,variations:vr?vars(o):o.variations,categories:o.categories,add_stock_in_return:o.add_stock_in_return,private_product_inventories:o.private_product_inventories,user_profit_percentage_product:o.user_profit_percentage_product,is_warehouse_white_brand:o.is_warehouse_white_brand,warehouselected:vr?[]:b,warehouse_previus:null,controlChangesPhotos:[],name_in_guide:c.nombreGuia!==null?c.nombreGuia:(o.name_in_guide!=null?o.name_in_guide:''),shipping_method:o.shipping_method,bar_code:o.bar_code,dropi_product_supplier_increment_fixed:o.dropi_product_supplier_increment_fixed}}",
+  // El precio nuevo también va a cada variación (9 nov 2026): la misma proporción que el producto; su sugerido, igual al precio si se pidió sugerido.
+  "var vv=vr?vars(o):o.variations;",
+  "if(vr&&c.preciosV===true&&pr!==null){var vj=Number(o.sale_price),fc=vj>0?pr/vj:null,cc=function(n){return Math.round(n*100)/100};vv=vv.map(function(v){if(v.deleted_at)return v;var vt=fc===null?pr:cc(Number(v.sale_price)*fc),sg=su!==null||fc===null?vt:Math.max(vt,cc(Number(v.suggested_price)*fc));return Object.assign({},v,{sale_price:vt,suggested_price:sg})})}",
+  "return{cuerpo:{id:o.id,name:c.nombre!==null?c.nombre:o.name,description:ds!==null?ds:o.description,dropi_app_description:o.dropi_app_description,type:o.type,sale_price:pr!==null?pr:num(o.sale_price),suggested_price:su!==null?su:(sa!==null?sa:num(o.suggested_price)),user_id:o.user_id,privated_product:o.privated_product,active:o.active,sku:o.sku,weight:num(o.weight),length:num(o.length),width:num(o.width),height:num(o.height),attribute:at,variations:vv,categories:o.categories,add_stock_in_return:o.add_stock_in_return,private_product_inventories:o.private_product_inventories,user_profit_percentage_product:o.user_profit_percentage_product,is_warehouse_white_brand:o.is_warehouse_white_brand,warehouselected:vr?[]:b,warehouse_previus:null,controlChangesPhotos:[],name_in_guide:c.nombreGuia!==null?c.nombreGuia:(o.name_in_guide!=null?o.name_in_guide:''),shipping_method:o.shipping_method,bar_code:o.bar_code,dropi_product_supplier_increment_fixed:o.dropi_product_supplier_increment_fixed}}",
   "}",
 ].join("");
 
@@ -354,13 +357,16 @@ const CODIGO = [
   "var o=a.j&&a.j.objects;if(!o||Number(o.id)!==Number(c.producto))return{ok:false,error:'Dropi no devolvió el producto.'};",
   "if(Number(o.user_id)!==Number(L.id))return{ok:false,error:'Ese producto no es de este proveedor en Dropi.'};",
   "var hay=c.nombre!=null||c.guia!=null||c.precio!=null||c.sugerido!=null||c.descripcion!=null;",
-  "if(hay){var r=armar(o,bp,{nombre:c.nombre,nombreGuia:c.guia,precio:c.precio,precioSugerido:c.sugerido,descripcion:c.descripcion});if(r.error)return{ok:false,error:r.error};",
+  // Con variaciones (9 nov 2026) el nombre, la descripción y el precio también se cambian: el precio va a cada variación (`preciosV`).
+  "if(hay){var vc=o.type==='VARIABLE';var r=armar(o,bp,{nombre:c.nombre,nombreGuia:c.guia,precio:c.precio,precioSugerido:c.sugerido,descripcion:c.descripcion,variable:vc,preciosV:vc});if(r.error)return{ok:false,error:r.error};",
   "var g=await pedir('/products/'+c.producto,'PUT',r.cuerpo);if(!g.ok)return{ok:false,error:motivo(g)}}",
   "var d=await pedir('/products/'+c.producto),n=d.j&&d.j.objects;",
   "if(!d.ok||!n)return{ok:false,error:'Se guardó, pero no se pudo comprobar en Dropi.'};",
   "if(c.descripcion!=null&&llano(n.description)!==llano(c.descripcion))return{ok:false,error:'Dropi sigue mostrando otra descripción.'};",
   "if(c.nombre!==null&&n.name!==c.nombre)return{ok:false,error:'Dropi sigue mostrando el nombre «'+n.name+'».'};",
   "if(c.precio!=null&&Math.abs(Number(n.sale_price)-c.precio)>0.005)return{ok:false,error:'Dropi sigue mostrando el precio $'+n.sale_price+'.'};",
+  // Con variaciones, cada una tiene que quedar con el precio que se le mandó.
+  "if(c.precio!=null&&hay&&vc){var ex={};(r.cuerpo.variations||[]).forEach(function(x){if(!x.deleted_at)ex[x.id]=x.sale_price});var mv=vars(n).filter(function(x){return!x.deleted_at&&ex[x.id]!=null&&Math.abs(Number(x.sale_price)-ex[x.id])>0.005});if(mv.length)return{ok:false,error:'Dropi sigue mostrando otro precio en '+mv.length+' variación(es).'}}",
   "if(c.sugerido!=null&&Math.abs(Number(n.suggested_price)-c.sugerido)>0.005)return{ok:false,error:'Dropi sigue mostrando el precio sugerido $'+n.suggested_price+'.'};",
   "if(c.guia!==null&&n.name_in_guide!==c.guia)return{ok:false,error:'Dropi sigue mostrando en la guía «'+n.name_in_guide+'».'};",
   "if(Array.isArray(c.fotos)&&c.fotos.length){var mal=await subirFotos(c.producto,n,c.fotos,false);if(mal)return{ok:false,error:'No se pudieron subir '+mal+' foto(s) a Dropi'+porque()+'.'}}",

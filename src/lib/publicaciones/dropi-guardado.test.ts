@@ -77,6 +77,29 @@ test("no se toca un producto con variaciones ni un nombre de más de 40", () => 
   assert.ok("error" in armarGuardadoProducto(producto7587, bodegasProveedor, { nombre: "ok", nombreGuia: "y".repeat(41) }));
 });
 
+test("un producto con variaciones: el precio nuevo va a cada variación (misma proporción) solo si se pide", () => {
+  const atributo = { id: 10, product_id: 7587, description: "Talla", isVariation: true, deleted_at: null, values: [{ id: 1, value: "S", attribute_id: 10, attribute_name: "Talla", deleted_at: null }] };
+  const variacion = (id: number, venta: string, sugerido: string, borrada: string | null = null) => ({ id, sale_price: venta, suggested_price: sugerido, product_id: 7587, stock: 0, sku: "B/" + id, deleted_at: borrada, attribute_values: [] });
+  const variable = { ...producto7587, type: "VARIABLE", sale_price: "10.00", suggested_price: "10.00", attributes: [atributo], variations: [variacion(1, "10.00", "10.00"), variacion(2, "20.00", "25.00"), variacion(3, "7.00", "7.00", "2026-10-01")] };
+  const precios = (r: ReturnType<typeof armarGuardadoProducto>, campo: "sale_price" | "suggested_price") => {
+    assert.ok("cuerpo" in r);
+    return "cuerpo" in r ? (r.cuerpo.variations as Record<string, number>[]).map((v) => v[campo]) : [];
+  };
+  const sin = armarGuardadoProducto(variable, bodegasProveedor, { nombre: null, nombreGuia: null, precio: 5, precioSugerido: 5 }, { variable: true });
+  assert.deepEqual(precios(sin, "sale_price"), [10, 20, 7], "sin la opción cada variación conserva su precio");
+  const con = armarGuardadoProducto(variable, bodegasProveedor, { nombre: null, nombreGuia: null, precio: 5, precioSugerido: 5 }, { variable: true, precioEnVariaciones: true });
+  assert.ok("cuerpo" in con);
+  if ("cuerpo" in con) assert.equal(con.cuerpo.sale_price, 5);
+  assert.deepEqual(precios(con, "sale_price"), [5, 10, 7], "la borrada no se toca");
+  assert.deepEqual(precios(con, "suggested_price"), [5, 10, 7]);
+  // Sin sugerido pedido, el de cada variación cambia con la misma proporción, sin quedar menor que su precio.
+  const sinSug = armarGuardadoProducto(variable, bodegasProveedor, { nombre: null, nombreGuia: null, precio: 5 }, { variable: true, precioEnVariaciones: true });
+  assert.deepEqual(precios(sinSug, "suggested_price"), [5, 12.5, 7]);
+  // Sin cambio de precio no se toca ninguna variación aunque se pida la opción.
+  const soloNombre = armarGuardadoProducto(variable, bodegasProveedor, { nombre: "Otro", nombreGuia: null }, { variable: true, precioEnVariaciones: true });
+  assert.deepEqual(precios(soloNombre, "sale_price"), [10, 20, 7]);
+});
+
 test("verificación después de guardar y lectura de la sesión", () => {
   assert.equal(faltaEnDropi({ name: "A", name_in_guide: "G" }, { nombre: "A", nombreGuia: "G" }), null);
   assert.match(faltaEnDropi({ name: "Viejo", name_in_guide: "G" }, { nombre: "A", nombreGuia: "G" })!, /Viejo/);
