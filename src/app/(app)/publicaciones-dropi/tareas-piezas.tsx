@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState, useTransition, type KeyboardEvent, 
 import { anilloFoco, fieldClass, labelClassSm } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
-import { SinFotoIcon } from "@/lib/nav-icons";
+import { PersonaIcon, SinFotoIcon } from "@/lib/nav-icons";
 import { numeroPublicacion } from "@/lib/publicaciones/publicacion";
 import {
   cuandoTarea,
@@ -29,7 +29,7 @@ import { claseCampoPanel, claseOpcionPanel, PanelCelda } from "../compras/panel-
 import { EditorFecha } from "../compras/celda-editable";
 import { marcarTareaHecha } from "./recomendaciones-actions";
 import { usePersonasTareas } from "./recomendacion-publicacion";
-import { actualizarTarea, buscarPublicacionesParaTarea, crearTareaPublicacion } from "./tareas-actions";
+import { actualizarTarea, buscarPublicacionesParaTarea, cambiarResponsableRecomendacion, crearTareaPublicacion } from "./tareas-actions";
 import type { PublicacionDeTarea } from "./tareas-datos";
 
 /** Hoy en Panamá (AAAA-MM-DD). */
@@ -199,7 +199,7 @@ function PanelLista({
 
 /**
  * Cambiar una tarea desde la fila o la ficha: se ve al instante y, si el servidor lo rechaza, vuelve como estaba con un aviso. Una tarea de una
- * recomendación solo se puede dar por hecha (como en Recomendaciones); lo demás se cambia en la recomendación.
+ * recomendación solo se da por hecha o se le cambia la persona (una sola); lo demás se cambia en la recomendación.
  */
 export function useCambiarTarea(alCambiar: (t: TareaVista, p?: PublicacionDeTarea) => void) {
   const { personas } = usePersonasTareas();
@@ -229,7 +229,11 @@ export function useCambiarTarea(alCambiar: (t: TareaVista, p?: PublicacionDeTare
     alCambiar(nueva, publicacion);
     empezar(async () => {
       const r =
-        t.origen === "recomendacion"
+        t.origen === "recomendacion" && cambio.responsablesIds?.length
+          ? await cambiarResponsableRecomendacion(t.id, cambio.responsablesIds[0])
+              .then((x) => ({ ...x, tarea: undefined, publicacion: undefined }))
+              .catch(() => ({ error: "No se pudo. Inténtalo de nuevo.", tarea: undefined, publicacion: undefined }))
+          : t.origen === "recomendacion"
           ? await marcarTareaHecha(t.id, "")
               .then((x) => ({ ...x, tarea: undefined, publicacion: undefined }))
               .catch(() => ({ error: "No se pudo. Inténtalo de nuevo.", tarea: undefined, publicacion: undefined }))
@@ -359,7 +363,13 @@ export function MenuPrioridad({ t, puedeEscribir, alElegir, conTexto = false }: 
 
 /** Las iniciales de quienes hacen la tarea, encimadas (hasta 3 y «+N»). */
 export function InicialesVarias({ personas }: { personas: { id: string; nombre: string }[] }) {
-  if (!personas.length) return <Iniciales nombre={null} />;
+  // Sin nadie: un círculo punteado con una persona (8 nov 2026, pedido de Alcides: el «?» no decía nada).
+  if (!personas.length)
+    return (
+      <span aria-hidden="true" className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-dashed border-border-control text-muted-foreground">
+        <PersonaIcon className="h-4 w-4" />
+      </span>
+    );
   const vistas = personas.slice(0, 3);
   return (
     <span className="inline-flex shrink-0 items-center">
@@ -382,13 +392,15 @@ export function MenuResponsable({ t, puedeEscribir, alElegir, conTexto = false }
   const [abierto, setAbierto] = useState(false);
   const quienes = responsablesDe(t);
   const nombre = quienes.length ? quienes.map((p) => p.nombre).join(", ") : "Sin asignar";
+  // Una de una recomendación tiene una sola persona: se cambia, no se suman otras (8 nov 2026). Una hecha ya no se cambia.
+  const unaSola = t.origen === "recomendacion";
   const contenido = (
     <>
       <InicialesVarias personas={quienes} />
-      {conTexto && <span className="truncate">{nombre}</span>}
+      {conTexto && <span className={`truncate ${quienes.length ? "" : "text-muted-foreground"}`}>{quienes.length ? nombre : "Persona asignada"}</span>}
     </>
   );
-  if (!puedeEscribir || t.origen === "recomendacion" || personas.length === 0)
+  if (!puedeEscribir || (unaSola && t.estado === "hecha") || personas.length === 0)
     return conTexto ? (
       <span className="inline-flex min-w-0 items-center gap-2 text-sm">{contenido}</span>
     ) : (
@@ -401,7 +413,7 @@ export function MenuResponsable({ t, puedeEscribir, alElegir, conTexto = false }
   const ids = quienes.map((p) => p.id);
   return (
     <>
-      <Tooltip texto={conTexto ? "Cambiar quién la hace" : `${nombre} · Cambiar`}>
+      <Tooltip texto={quienes.length ? (conTexto ? "Cambiar quién la hace" : `${nombre} · Cambiar`) : "Asignar persona"}>
         <button
           ref={ancla}
           type="button"
@@ -419,11 +431,16 @@ export function MenuResponsable({ t, puedeEscribir, alElegir, conTexto = false }
           ancla={ancla}
           aria="Quiénes hacen la tarea"
           opciones={personas.map((p) => ({ valor: p.id, etiqueta: p.id === yo ? `${p.nombre} (yo)` : p.nombre, icono: <Iniciales nombre={p.nombre} className="h-6 w-6 text-[10px]" /> }))}
-          elegida=""
-          varias={ids}
+          elegida={unaSola ? (ids[0] ?? "") : ""}
+          varias={unaSola ? undefined : ids}
           alCerrar={() => setAbierto(false)}
           alElegir={(v) => {
             if (!v) return;
+            if (unaSola) {
+              setAbierto(false);
+              if (v !== ids[0]) alElegir([v]);
+              return;
+            }
             if (ids.includes(v)) {
               if (ids.length === 1) return mostrarToast("La tarea tiene que tener al menos una persona.", "destructive");
               alElegir(ids.filter((x) => x !== v));

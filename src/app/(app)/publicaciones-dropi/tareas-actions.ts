@@ -263,3 +263,36 @@ export async function contarMisTareasPendientes(): Promise<number | null> {
   const { tareas } = await cargarTareas(supabase, pais.id, usuario.id, false);
   return tareas.filter(pendiente).length;
 }
+
+/**
+ * Cambiar quién hace una tarea que nació de una recomendación aceptada (8 nov 2026, pedido de Alcides: desde la columna de la lista no se podía). Una
+ * recomendación tiene una sola persona (`dropi_publicaciones_decisiones.responsable_id`); queda en la actividad de la publicación y avisa a quien le toca.
+ */
+export async function cambiarResponsableRecomendacion(decisionId: string, personaId: string): Promise<{ error?: string; tarea?: TareaVista }> {
+  const usuario = await requireModuloEscritura(MODULO);
+  if (typeof decisionId !== "string" || !UUID.test(decisionId) || typeof personaId !== "string" || !UUID.test(personaId)) return { error: "Tarea no válida." };
+  const supabase = createServiceClient();
+  const { data: d } = await supabase
+    .from("dropi_publicaciones_decisiones")
+    .select("id, publicacion_id, tipo, decision, hecha_en, recomendacion, responsable_id, responsable_nombre, plazo, dropi_publicaciones!inner(pais_id, nombre)")
+    .eq("id", decisionId)
+    .maybeSingle();
+  const pub = d?.dropi_publicaciones as unknown as { pais_id: string; nombre: string } | undefined;
+  if (!d || d.decision !== "aceptada" || !pub || !(await puedeVerPaisId(supabase, usuario.paisesPermitidos, pub.pais_id))) return { error: "No se encontró la tarea." };
+  if (d.hecha_en) return { error: "La tarea ya está hecha." };
+  if (d.responsable_id === personaId) return {};
+  const nombre = await personaActiva(personaId);
+  if (!nombre) return { error: "La persona elegida no está activa." };
+  const { error } = await supabase.from("dropi_publicaciones_decisiones").update({ responsable_id: personaId, responsable_nombre: nombre }).eq("id", decisionId);
+  if (error) return { error: "No se pudo guardar." };
+  const titulo = (d.recomendacion as { titulo?: string } | null)?.titulo || String(d.tipo ?? "Tarea");
+  await registrarAuditoria({
+    accion: "editar_tarea_publicacion",
+    entidad: "dropi_publicaciones",
+    entidadId: d.publicacion_id as string,
+    detalle: `Tarea «${titulo}»: le toca a ${nombre} (antes: ${(d.responsable_nombre as string | null) || "nadie"})`,
+  });
+  await avisarResponsable(personaId, usuario, titulo, `${pub.nombre}${d.plazo ? ` · para el ${fechaLarga(d.plazo as string)}` : ""}`);
+  revalidar();
+  return {};
+}
