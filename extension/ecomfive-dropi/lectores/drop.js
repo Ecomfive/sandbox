@@ -70,13 +70,16 @@ async function leerDropProveedor(subida) {
     if (!productos.size) throw new Error("No se leyó ningún producto de Drop: revisa que la sesión sea la del proveedor.");
     const lecturaProductos = { tipo: "drop", pais: "cr", inicio: estado.inicio, duracionMs: Math.round(performance.now() - t0), paginas, productos: [...productos.values()] };
 
-    // 2) Los pedidos: los datos de cada página de /vendor/orders, de a 500, del más nuevo al más viejo.
+    // 2) Los pedidos: los datos de cada página de /vendor/orders, de a 500, del más nuevo al más viejo. Sin periodo, Drop solo da los últimos 30 días (9 nov 2026: las
+    // ventas empezaban el 8 de octubre), así que se pide desde antes de que existiera la cuenta hasta hoy: unos 6.000 pedidos desde mayo de 2026, 2 a 3 minutos.
     estado.fase = "pedidos";
     const POR_PAGINA = 500;
+    const DESDE = "2025-01-01";
+    const HASTA = new Date().toLocaleDateString("en-CA", { timeZone: "America/Costa_Rica" });
     async function datosDePagina(n) {
       let html = null;
       for (let intento = 0; intento < 3 && html === null; intento++) {
-        const r = await fetch(`/vendor/orders?tab=all&limit=${POR_PAGINA}&all.page=${n}`, { credentials: "include" }).catch(() => null);
+        const r = await fetch(`/vendor/orders?tab=all&limit=${POR_PAGINA}&all.page=${n}&all.from=${DESDE}&all.to=${HASTA}`, { credentials: "include" }).catch(() => null);
         if (r && r.ok && new URL(r.url).pathname.startsWith("/vendor")) html = await r.text();
         else if (r && !new URL(r.url).pathname.startsWith("/vendor")) throw new Error("La sesión de Drop venció mientras se leían los pedidos.");
         else await pausa(3000);
