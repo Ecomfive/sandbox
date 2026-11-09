@@ -28,3 +28,11 @@ test("una pausada se reactiva cuando Dropi vuelve a verle unidades", () => {
   assert.equal(listaParaReactivar(25), true);
   assert.equal(listaParaReactivar(0, 3), true);
 });
+
+test("Dropi no deja archivar por órdenes en curso: se reconoce el motivo", async () => {
+  const { porOrdenesPendientes } = await import("./archivar");
+  assert.equal(porOrdenesPendientes("Dropi respondió 200: El producto 8768 - P-G Gel exfoliante orange tiene órdenes en estatus PENDIENTE, GUIA GENERADA o SIN MOVIMIENTOS, por lo tanto debe despacharlos primero"), true);
+  assert.equal(porOrdenesPendientes("Sin stock en Dropi, pero no dejó archivarlo: Dropi respondió 200: … tiene órdenes en estatus PENDIENTE …"), true);
+  assert.equal(porOrdenesPendientes("La sesión de Dropi venció: inicia sesión de nuevo en Dropi."), false);
+  assert.equal(porOrdenesPendientes(null), false);
+});

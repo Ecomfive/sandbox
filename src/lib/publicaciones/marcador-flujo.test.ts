@@ -168,7 +168,8 @@ function crearDropi(opciones: { noTomaEntradas?: boolean; usuarios?: Record<stri
     }
     if (metodo === "POST" && ruta === "/productwarranty/show") return responder(garantias.get(Number(cuerpo!.product_id)) ?? []);
     if (metodo === "POST" && m && m[2] === "/archiveProduct") {
-      if (opciones.noArchiva) return responder({ isSuccess: false, message: "Tiene órdenes pendientes" }, 409);
+      // Lo que dice Dropi de verdad (8 nov 2026): responde 200 con isSuccess false.
+      if (opciones.noArchiva) return responder({ isSuccess: false, message: `El producto ${m[1]} tiene órdenes en estatus PENDIENTE, GUIA GENERADA o SIN MOVIMIENTOS, por lo tanto debe despacharlos primero o comunicarse con soporte de Dropi` }, 200);
       productos.get(Number(m[1]))!.archived = true;
       return responder(true);
     }
@@ -245,7 +246,7 @@ test("archivar: si Dropi no deja (órdenes pendientes) queda con error y el moti
   d.productos.set(8751, productoBase(8751));
   const [r] = await aplicar(d, [{ ...base, id: "a1", tipo: "archivar", producto: 8751 }]);
   assert.equal(r.ok, false);
-  assert.match(String(r.error), /órdenes pendientes/);
+  assert.match(String(r.error), /órdenes en estatus PENDIENTE/);
   assert.ok(!d.productos.get(8751)!.archived);
 });
 
@@ -1122,4 +1123,13 @@ test("reserva por correo: si Dropi descuenta el stock al quitar la reserva, se a
   const [quita] = await aplicar(d, [{ ...base, id: "r1", tipo: "reserva", producto: 8744, datos: { correo: "ana@correo.com", unidades: 0 } }]);
   assert.equal(quita.ok, true, String(quita.error));
   assert.match(String(quita.aviso), /pasó de 66 a 0/);
+});
+
+test("republicar: si Dropi no deja archivar el viejo por órdenes en curso, termina igual y lo devuelve para dejar la tarea", async () => {
+  const d = crearDropi({ noArchiva: true });
+  d.productos.set(10488, productoBase(10488));
+  const [r] = await aplicar(d, [{ ...base, id: "r1", tipo: "republicar", producto: 10488 }]);
+  assert.equal(r.ok, true, String(r.error));
+  assert.match(String(r.archivoPendiente), /PENDIENTE|GUIA GENERADA|SIN MOVIMIENTOS/);
+  assert.deepEqual(d.stockDe(d.productos.get(10488)!), { 81: 0 }, "el viejo quedó sin stock");
 });
