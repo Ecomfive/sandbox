@@ -2,6 +2,8 @@
 
 import { getUsuarioActual } from "@/lib/auth";
 import { esAdministrador } from "@/lib/permisos/acceso";
+import { lineaEnCamino, llegadaDeCompra } from "@/lib/compras/en-camino";
+import { cargarTiempos, claveTransito } from "@/lib/compras/tiempos-datos";
 import { createServiceClient } from "@/lib/supabase/server";
 import { puedeVerPais } from "@/lib/paises-permitidos";
 import { campoOculto, dentroDelAlcance, restriccionesDe } from "../compras/permisos-compras";
@@ -17,6 +19,8 @@ export interface CompraDeProducto {
   fecha: string;
   /** Cuándo llegó (la «Fecha de llegada» de la compra); null si todavía no llega. */
   llegada: string | null;
+  /** Si todavía viene en camino, cuándo llega aprox. (la fecha límite o lo que tardan los envíos de su país por su vía); null si no se sabe. */
+  llegadaAprox: string | null;
   pais: string | null;
   etapa: string;
   /** El SKU de la línea (en un producto con variantes, la variante comprada). */
@@ -45,7 +49,7 @@ export async function obtenerComprasProducto(id: string): Promise<{ compras: Com
   const ids = [id, ...(variantes ?? []).map((v) => v.id as string)];
   const { data, error } = await supabase
     .from("wms_compra_items")
-    .select("cantidad_pedida, costo_unitario, lote_numero, sku_maestro_id, skus_maestros(codigo, nombre, opciones), wms_compras(id, numero, codigo, etapa, creado_en, fecha_llegada, anulada_en, asignado_a, creado_por, responsable_nombre, creador_nombre, paises(codigo))")
+    .select("cantidad_pedida, costo_unitario, lote_numero, sku_maestro_id, skus_maestros(codigo, nombre, opciones), wms_compras(id, numero, tipo, pais_id, codigo, etapa, creado_en, fecha_envio, fecha_limite, via_envio, fecha_llegada, anulada_en, asignado_a, creado_por, responsable_nombre, creador_nombre, paises(codigo))")
     .in("sku_maestro_id", ids);
   if (error) return { error: "No se pudieron cargar las compras." };
   // Lo que su rol tiene limitado en Compras (Usuarios y roles › Afinar) vale también aquí: sin ver el monto no se ven los costos, y
@@ -53,9 +57,10 @@ export async function obtenerComprasProducto(id: string): Promise<{ compras: Com
   const limites = restriccionesDe(usuario.afinado.compras);
   const verCostos = !campoOculto(limites, "monto");
   const uno = <T,>(v: T | T[] | null): T | null => (Array.isArray(v) ? (v[0] ?? null) : v);
+  const tiempos = await cargarTiempos();
   const compras: CompraDeProducto[] = (data ?? [])
     .map((l) => {
-      const c = uno(l.wms_compras as unknown as { id: string; numero: number; codigo: string | null; etapa: string; creado_en: string; fecha_llegada: string | null; anulada_en: string | null; asignado_a: string | null; creado_por: string | null; responsable_nombre: string | null; creador_nombre: string | null; paises: { codigo: string } | { codigo: string }[] | null } | null);
+      const c = uno(l.wms_compras as unknown as { id: string; numero: number; tipo: string; pais_id: string | null; codigo: string | null; etapa: string; creado_en: string; fecha_envio: string | null; fecha_limite: string | null; via_envio: string[] | null; fecha_llegada: string | null; anulada_en: string | null; asignado_a: string | null; creado_por: string | null; responsable_nombre: string | null; creador_nombre: string | null; paises: { codigo: string } | { codigo: string }[] | null } | null);
       const sku = uno(l.skus_maestros as unknown as { codigo: string; nombre: string; opciones: Record<string, string> | null } | null);
       if (!c || c.anulada_en) return null; // una compra anulada no cuenta en el histórico
       if (!dentroDelAlcance(limites.alcance, { asignadoId: c.asignado_a, creadoPorId: c.creado_por, responsableNombre: c.responsable_nombre, creadorNombre: c.creador_nombre }, usuario)) return null;
@@ -67,6 +72,10 @@ export async function obtenerComprasProducto(id: string): Promise<{ compras: Com
         codigo: c.codigo,
         fecha: c.creado_en,
         llegada: c.fecha_llegada,
+        // La llegada aproximada, solo de lo que viene en camino (la misma regla de «En camino»; 9 nov 2026, pedido de Alcides).
+        llegadaAprox: lineaEnCamino({ pais: null, codigoPais: null, unidades, etapa: c.etapa, fechaEnvio: c.fecha_envio, fechaLlegada: c.fecha_llegada, anulada: false })
+          ? (llegadaDeCompra(tiempos, { fechaLimite: c.fecha_limite, fechaEnvio: c.fecha_envio, vias: c.via_envio ?? [], clave: claveTransito(c.tipo, c.pais_id) })?.fecha ?? null)
+          : null,
         pais: uno(c.paises)?.codigo ?? null,
         etapa: c.etapa,
         sku: sku?.codigo ?? "",
