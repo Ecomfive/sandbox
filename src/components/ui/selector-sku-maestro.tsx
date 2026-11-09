@@ -18,6 +18,14 @@ export interface OpcionSkuMaestro {
   foto?: string | null;
   /** Si es un compuesto (no puede ser componente de otro compuesto). */
   compuesto?: boolean;
+  /** Si es una variante, el producto al que pertenece: la lista la muestra debajo de él, nunca suelta (9 nov 2026). */
+  padreId?: string | null;
+}
+
+/** Una fila de la lista de sugerencias: un producto o, con sangría, una variante de él. */
+interface Sugerencia {
+  o: OpcionSkuMaestro;
+  variante: boolean;
 }
 
 const SkusMaestrosContext = createContext<OpcionSkuMaestro[]>([]);
@@ -34,10 +42,28 @@ const etiqueta = (s: OpcionSkuMaestro) => `${s.codigo} · ${s.nombre}`;
 const normal = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 const numeroTexto = (n?: number | null) => (n === null || n === undefined ? "" : `#${String(n).padStart(4, "0")}`);
 
-/** Los que coinciden con lo escrito, los mejores primero: SKU que empieza igual, nombre que empieza igual, y luego el resto. */
-function buscar(opciones: OpcionSkuMaestro[], texto: string, limite = 8): OpcionSkuMaestro[] {
+/**
+ * Los que coinciden con lo escrito, con las variantes dentro de su producto (9 nov 2026, pedido de Hernán): una variante que coincide trae a su producto, y debajo, con
+ * sangría, van las variantes que coinciden (todas, si coincide el producto). `limite` cuenta productos. Una variante cuyo producto no está entre las opciones sale sola.
+ */
+function buscar(opciones: OpcionSkuMaestro[], texto: string, limite = 8): Sugerencia[] {
+  const porId = new Map(opciones.map((o) => [o.id, o]));
+  const grupoDe = (o: OpcionSkuMaestro) => (o.padreId && porId.has(o.padreId) ? o.padreId : o.id);
+  const hijasDe = new Map<string, OpcionSkuMaestro[]>();
+  for (const o of opciones) if (grupoDe(o) !== o.id) hijasDe.set(grupoDe(o), [...(hijasDe.get(grupoDe(o)) ?? []), o]);
+  const coinciden = coincidencias(opciones, texto);
+  const vistas = new Set(coinciden.map((o) => o.id));
+  const grupos = [...new Set(coinciden.map(grupoDe))].slice(0, limite);
+  return grupos.flatMap((g) => {
+    const todas = !texto.trim() || vistas.has(g);
+    return [{ o: porId.get(g)!, variante: false }, ...(hijasDe.get(g) ?? []).filter((h) => todas || vistas.has(h.id)).map((o) => ({ o, variante: true }))];
+  });
+}
+
+/** Los que coinciden con lo escrito, los mejores primero: SKU que empieza igual, nombre que empieza igual, y luego el resto. Sin texto, todos en su orden. */
+function coincidencias(opciones: OpcionSkuMaestro[], texto: string): OpcionSkuMaestro[] {
   const q = normal(texto);
-  if (!q) return opciones.slice(0, limite);
+  if (!q) return opciones;
   const palabras = q.split(/\s+/);
   return opciones
     .map((o) => {
@@ -52,7 +78,6 @@ function buscar(opciones: OpcionSkuMaestro[], texto: string, limite = 8): Opcion
     })
     .filter((x): x is { o: OpcionSkuMaestro; puntos: number } => x !== null)
     .sort((a, b) => b.puntos - a.puntos || a.o.nombre.localeCompare(b.o.nombre, "es"))
-    .slice(0, limite)
     .map((x) => x.o);
 }
 
@@ -162,7 +187,7 @@ export function CampoSkuMaestro({
               if (n) setActiva((i) => (i + (e.key === "ArrowDown" ? 1 : n - 1)) % n);
             } else if (e.key === "Enter" && abierto && sugerencias[activa]) {
               e.preventDefault();
-              elegir(sugerencias[activa]);
+              elegir(sugerencias[activa].o);
             } else if (e.key === "Escape" && abierto) {
               e.preventDefault();
               e.stopPropagation();
@@ -191,7 +216,7 @@ export function CampoSkuMaestro({
             {sugerencias.length === 0 ? (
               <li className="px-3 py-2 text-sm text-muted-foreground">Ningún producto coincide.</li>
             ) : (
-              sugerencias.map((o, i) => (
+              sugerencias.map(({ o, variante }, i) => (
                 <li
                   key={o.id}
                   id={`${id}-o${i}`}
@@ -201,11 +226,14 @@ export function CampoSkuMaestro({
                   onMouseEnter={() => setActiva(i)}
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => elegir(o)}
-                  className={`flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 ${i === activa ? "bg-primario-suave" : ""}`}
+                  className={`flex cursor-pointer items-center gap-2.5 rounded-lg py-1.5 pr-2 ${variante ? "pl-9" : "pl-2"} ${i === activa ? "bg-primario-suave" : ""}`}
                 >
                   <Miniatura foto={o.foto} />
                   <span className="flex min-w-0 flex-1 flex-col">
-                    <span className="truncate text-sm font-medium">{o.nombre}</span>
+                    <span className="truncate text-sm font-medium">
+                      {variante && <span className="font-normal text-muted-foreground">Variante · </span>}
+                      {o.nombre}
+                    </span>
                     <span className="truncate text-xs text-muted-foreground">
                       <span className="font-medium text-foreground-soft">{o.codigo}</span>
                       {o.numero !== undefined && o.numero !== null ? ` · ${numeroTexto(o.numero)}` : ""}
