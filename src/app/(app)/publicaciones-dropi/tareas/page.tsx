@@ -3,8 +3,7 @@ import { Pagina } from "@/components/ui/pagina";
 import { ContadorPestana } from "@/components/migas/contador-pestana";
 import { requireModulo } from "@/lib/auth";
 import { getPaisActual } from "@/lib/pais";
-import { esAdministrador } from "@/lib/permisos/acceso";
-import { pendiente } from "@/lib/publicaciones/tareas";
+import { pendiente, veTodasLasTareas } from "@/lib/publicaciones/tareas";
 import { createServiceClient } from "@/lib/supabase/server";
 import { cargarPersonas } from "../datos-publicaciones";
 import { ProveedorTareas } from "../recomendacion-publicacion";
@@ -18,15 +17,16 @@ export const dynamic = "force-dynamic";
 
 /**
  * Gestión de IDs Dropi › Tareas (pedido de Alcides, 28–29 oct 2026, al estilo de ClickUp): las tareas del país, las escritas a mano (desde aquí, el botón
- * de tareas de cada fila o la ficha de una publicación) y las que nacieron de aceptar una recomendación. Cada persona ve las suyas; un administrador
- * puede ver además las de todos («De todos»).
+ * de tareas de cada fila o la ficha de una publicación) y las que nacieron de aceptar una recomendación. Cada persona ve las suyas; solo quien está en
+ * `VEN_TODAS_LAS_TAREAS` (hoy Alcides) puede ver además las de todos («De todos»).
  */
 export default async function TareasPage({ searchParams }: { searchParams: Promise<{ ver?: string | string[] }> }) {
   const { ver } = await searchParams;
   const usuario = await requireModulo("publicaciones-dropi");
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
-  const admin = esAdministrador(usuario);
+  // Ver las de todos (8 nov 2026): solo quien está en `VEN_TODAS_LAS_TAREAS`, no cualquier administrador.
+  const admin = veTodasLasTareas(usuario.id);
   const todas = admin && ver === "todas";
   const [datos, personas] = await Promise.all([cargarTareas(supabase, pais.id, usuario.id, todas), cargarPersonas(supabase)]);
   const hoy = new Date().toLocaleDateString("en-CA", { timeZone: "America/Panama" });

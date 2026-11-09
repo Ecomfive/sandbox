@@ -10,7 +10,7 @@ import { anilloFoco } from "@/components/ui/field";
 import { Ventana } from "@/components/ui/ventana";
 import { CalendarioIcon, EstadoIcon, PersonaIcon, ProductoIcon, TareasIcon } from "@/lib/nav-icons";
 import { numeroPublicacion } from "@/lib/publicaciones/publicacion";
-import { ESTADOS_TAREA, PRIORIDADES, VENCIMIENTOS, etiquetaEstado, ordenarTareas, pendiente, vencimiento, type TareaVista, type Vencimiento } from "@/lib/publicaciones/tareas";
+import { ESTADOS_TAREA, PRIORIDADES, responsablesDe, VENCIMIENTOS, etiquetaEstado, ordenarTareas, pendiente, vencimiento, type TareaVista, type Vencimiento } from "@/lib/publicaciones/tareas";
 import { SIN_VALOR, type DefTabla } from "@/lib/tabla/motor";
 import { FichaTarea } from "../ficha-tarea";
 import type { PublicacionDeTarea } from "../tareas-datos";
@@ -28,6 +28,11 @@ const BanderaCampo: IconoComp = (props) => (
     <path d="M5 21V4M5 4h11l-2.5 4.5L16 13H5" />
   </svg>
 );
+const quienesDe = (t: TareaVista) => {
+  const n = responsablesDe(t).map((r) => r.nombre);
+  return n.length ? n : [SIN_VALOR];
+};
+
 const ICONOS: Record<string, IconoComp> = { estado: EstadoIcon, responsable: PersonaIcon, prioridad: BanderaCampo, vence: CalendarioIcon, plazo: CalendarioIcon, producto: ProductoIcon, origen: TareasIcon, archivo: TareasIcon };
 
 const DEF_TAREAS: DefTabla<FilaTareaLista> = {
@@ -44,7 +49,8 @@ const DEF_TAREAS: DefTabla<FilaTareaLista> = {
       ordenGrupos: ESTADOS_TAREA.map((e) => e.valor),
       colorValor: (v) => ESTADOS_TAREA.find((e) => e.valor === v)?.color,
     },
-    { id: "responsable", etiqueta: "Le toca a", tipo: "seleccion", valores: (t) => [t.responsableNombre ?? SIN_VALOR], etiquetaSinValor: "Sin asignar", agrupable: true },
+    // Con varios responsables (8 nov 2026), la tarea sale con cada uno.
+    { id: "responsable", etiqueta: "Le toca a", tipo: "seleccion", valores: (t) => quienesDe(t), etiquetaSinValor: "Sin asignar", agrupable: true },
     {
       id: "prioridad",
       etiqueta: "Prioridad",

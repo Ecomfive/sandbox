@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { descontinuadosEnPais } from "@/lib/producto/descontinuado-pais";
 import { after } from "next/server";
 import { tipoSegunDropi } from "@/lib/publicaciones/reservas-dropi";
+import { tareaVisiblePara } from "@/lib/publicaciones/tareas";
 import { accionesPublicacion, enDropi, esBodegaDropi, estaArchivada, necesitaRepublicar, vendePoco } from "@/lib/publicaciones/automatico";
 import { normalizarDatosCrear, type OpcionesCrear } from "@/lib/publicaciones/crear-dropi";
 import { monedaPublicaciones } from "@/lib/publicaciones/moneda";
@@ -271,14 +272,18 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
   // Las tareas escritas a mano sin resolver ni archivar (migraciones 0175 y 0178), para la marca de la fila: sin la 0178 cuentan también las archivadas
   // (no hay) y sin la 0175, ninguna.
   const leerTareas = (sinArchivadas: boolean) =>
-    traerTodasConError<{ publicacion_id: string; plazo: string | null }>((desde, hasta) => {
-      const q = supabase.from("dropi_publicaciones_tareas").select("publicacion_id, plazo, id, dropi_publicaciones!inner(pais_id)").eq("dropi_publicaciones.pais_id", paisId).is("hecha_en", null);
+    traerTodasConError<{ publicacion_id: string; plazo: string | null; id: string; responsable_id: string | null; creado_por: string | null }>((desde, hasta) => {
+      const q = supabase.from("dropi_publicaciones_tareas").select("publicacion_id, plazo, id, responsable_id, creado_por, dropi_publicaciones!inner(pais_id)").eq("dropi_publicaciones.pais_id", paisId).is("hecha_en", null);
       return (sinArchivadas ? q.is("archivada_en", null) : q).order("id").range(desde, hasta);
     });
   let tareasR = await leerTareas(true);
   if (tareasR.error) tareasR = await leerTareas(false);
   const tareasDe = new Map<string, { total: number; atrasadas: number }>();
+  // Solo las que la persona ve (8 nov 2026: cada una las suyas; quien ve las de todos, todas).
+  const { data: misOtras } = await supabase.from("dropi_tareas_responsables").select("tarea_id").eq("persona_id", usuario.id);
+  const mias = new Set((misOtras ?? []).map((x) => x.tarea_id as string));
   for (const t of tareasR.error ? [] : (tareasR.data ?? [])) {
+    if (!tareaVisiblePara({ responsableId: t.responsable_id, otrosIds: mias.has(t.id) ? [usuario.id] : [], creadoPor: t.creado_por }, usuario.id)) continue;
     const x = tareasDe.get(t.publicacion_id) ?? { total: 0, atrasadas: 0 };
     x.total++;
     if (t.plazo && t.plazo < hoy) x.atrasadas++;
