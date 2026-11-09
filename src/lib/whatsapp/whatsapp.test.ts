@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { extraerAviso, resumenMensaje } from "./extraer";
 import { claves360, config360, numeroEmpresaNormal, urlDescarga360, variableClave360 } from "./proveedor";
-import { errorEnEspanol, leerErrorEnvio, minutosVentana, textoVentana } from "./ventana";
+import { errorDeEntrega, errorEnEspanol, leerErrorEnvio, minutosVentana, textoVentana } from "./ventana";
 import { canalesPlantillas, etiquetaDeCanal } from "./api-plantillas";
 
 const aviso = (value: unknown) => ({ object: "whatsapp_business_account", entry: [{ id: "WABA", changes: [{ field: "messages", value }] }] });
@@ -356,4 +356,14 @@ test("un celular de México de la empresa entra sin el «1» que WhatsApp pone d
     }),
   );
   assert.equal(mensajes[0].numeroEmpresa, "+525540921878");
+});
+
+test("el 130497 de Meta se explica en español con el país del cliente (9 nov 2026)", () => {
+  const raw = "130497: Business account is restricted from messaging users in this country.";
+  assert.match(errorDeEntrega(raw, "BR")!, /clientes de Brasil\. No es una falla del sistema/);
+  assert.match(errorDeEntrega(raw)!, /clientes de ese país/);
+  assert.match(errorEnEspanol(130497, "x"), /Meta no deja/);
+  assert.match(errorDeEntrega("131047: Message failed to send because more than 24 hours have passed")!, /24 h/);
+  assert.equal(errorDeEntrega("No se pudo entregar."), "No se pudo entregar.");
+  assert.equal(errorDeEntrega(null), null);
 });

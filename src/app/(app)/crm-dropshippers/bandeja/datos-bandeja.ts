@@ -9,6 +9,8 @@ import { conversacionesOcultas, corteDeBorradoEnApp, mensajesBorrados, mensajesO
 import { esGrupo, type GrupoMotivo } from "@/lib/whatsapp/prioridad";
 import { dondeVende, paisDeNumeroEmpresa, paisesDondeVende, type VendeEn } from "@/lib/whatsapp/origen-chat";
 import { nombreSinNumero } from "@/lib/whatsapp/telefono-oculto";
+import { normalizarTelefono } from "@/lib/crm/telefono";
+import { errorDeEntrega } from "@/lib/whatsapp/ventana";
 
 /** Un número de WhatsApp de la empresa (Atención, Comercial…). */
 export interface NumeroVista {
@@ -426,6 +428,11 @@ export async function cargarConversacion(
     // Los borrados (migraciones 0171 y 0219): se muestran con su marca y, desde el sistema, quién los borró. Sin la columna, ninguno.
     mensajesBorrados(supabase, id),
   ]);
+  // El país del cliente, solo si algún mensaje no salió porque Meta no deja escribirle a ese país (130497).
+  const filasMensajes = (mensajesR.data ?? []) as { error?: string | null }[];
+  const paisCliente = filasMensajes.some((x) => /^130497\b/.test(x.error ?? ""))
+    ? (normalizarTelefono(((await supabase.from("whatsapp_conversaciones").select("telefono").eq("id", id).maybeSingle()).data?.telefono as string | null) ?? null)?.pais ?? null)
+    : null;
   const [ocultos, reaccionesR, editadosR, transcritosR] = await Promise.all([
     mensajesOcultos(supabase, id),
     // A qué mensaje va cada reacción (migración 0186), aparte: sin la columna la conversación se carga igual.
@@ -456,7 +463,8 @@ export async function cargarConversacion(
       mediaNombre: (m.media_nombre as string | null) ?? null,
       conArchivo: !!m.media_id,
       estado: m.estado as string,
-      error: (m.error as string | null) ?? null,
+      // En palabras para el equipo; el 130497 dice el país del cliente (su teléfono no sale a la pantalla, solo el nombre del país).
+      error: errorDeEntrega((m.error as string | null) ?? null, paisCliente),
       autor: (m.autor_nombre as string | null) ?? null,
       autorCargo: (m.autor_id && cargos.get(m.autor_id as string)) || null,
       autorFoto: (m.autor_id && fotos.get(m.autor_id as string)) || null,
