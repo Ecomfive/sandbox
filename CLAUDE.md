@@ -295,8 +295,12 @@ convenciones técnicas del código.
   **Tareas en cualquier módulo** (9 nov 2026, Hernán: «que todos los módulos puedan salir»): `BotonTareaModulo`
   (`src/components/tareas/boton-tarea-modulo.tsx`) en `BarraMigas` (prop `verTarea`: quien escribe en `tareas`; no en `/`, `/ayuda` ni `/tareas`) abre
   `NuevaTarea` con `moduloFijo` = `moduloDeHref(moduloHref)`: es una fila de `tareas_equipo` con ese `modulo`, así que sale en «Mis tareas por módulo»
-  de la persona en ese módulo. Las personas se piden al abrir (`datosNuevaTarea`). Asignar a otra persona sigue siendo de administrador
-  (`crearTarea`). Cada grupo del repositorio tiene «Ir a <módulo>» (`/<clave>`).
+  de la persona en ese módulo. Las personas se piden al abrir (`datosNuevaTarea`). Cada grupo del repositorio tiene «Ir a <módulo>» (`/<clave>`).
+  **Líderes que asignan tareas** (9 nov 2026, Hernán: «también los líderes»; migración 0263 `perfiles.lider_tareas`): `puedeAsignarTareas`
+  (`src/lib/tareas/lideres.ts`) = administrador, rol que empieza con «Líder» (`esRolLider`) o persona marcada en Configuración › «Líderes: asignan
+  tareas» (`LideresTareasConfig`, `cambiarLiderTareas`, auditoría `lider_tareas`). Lo usan `crearTarea`, `actualizarTarea` (`motivoNoPuede` con
+  `asigna`: un líder pasa a otra persona solo las tareas que ve —creadas o asignadas a él—), `datosNuevaTarea` y el tablero (`asigna`). «De todos»
+  sigue siendo de administrador.
 - **Perfiles de acceso por área** (migración 0115, 20 oct 2026; cuadro en `Perfiles-de-acceso-Ecomfive.pdf`, junto a la carpeta del proyecto). Roles
   listos con los módulos de cada área y qué es solo lectura: **nuevos** Investigación de producto, Contenido y ofertas, Compras, Producto / Catálogo,
   Talento humano y Consulta; **completados** Administrativo (Finanzas), Atención al cliente, Líder comercial y Operaciones (Bodega); Admin

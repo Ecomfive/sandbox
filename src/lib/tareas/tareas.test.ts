@@ -24,7 +24,10 @@ test("quién ve y quién cambia", () => {
   assert.equal(puedeVerTarea({ responsableId: null, creadoPor: B }, { id: A, admin: false }), false);
   assert.equal(puedeVerTarea({ responsableId: null, creadoPor: B }, { id: A, admin: true }), true);
   assert.equal(motivoNoPuede(t, { estado: "hecho" }, { id: A, admin: false }), null);
-  assert.match(motivoNoPuede(t, { responsableId: B }, { id: A, admin: false }) ?? "", /administrador/);
+  assert.match(motivoNoPuede(t, { responsableId: B }, { id: A, admin: false }) ?? "", /administrador o un líder/);
+  // Un líder pasa a otra persona una tarea que ve, pero no toca las ajenas.
+  assert.equal(motivoNoPuede(t, { responsableId: B }, { id: A, admin: false, asigna: true }), null);
+  assert.equal(motivoNoPuede({ responsableId: null, creadoPor: B }, { responsableId: A }, { id: A, admin: false, asigna: true }), "Esa tarea no es tuya.");
   assert.match(motivoNoPuede(t, { responsableId: null }, { id: A, admin: false }) ?? "", /no puedes soltar/i);
   assert.equal(motivoNoPuede(t, { responsableId: null }, { id: B, admin: false }), null, "quien la creó la puede soltar");
   assert.equal(motivoNoPuede({ responsableId: null, creadoPor: B }, { titulo: "x" }, { id: A, admin: false }), "Esa tarea no es tuya.");

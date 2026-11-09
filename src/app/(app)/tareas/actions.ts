@@ -8,6 +8,7 @@ import { formatearFecha } from "@/lib/formato";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { etiquetaDeModulo } from "@/lib/permisos/catalogo";
 import { createServiceClient } from "@/lib/supabase/server";
+import { puedeAsignarTareas } from "@/lib/tareas/lideres";
 import { etiquetaEstado, etiquetaPrioridad, motivoNoPuede, normalizarCambio, numeroTarea, puedeVerTarea, type CambioTarea } from "@/lib/tareas/tareas";
 import { aVista, COLUMNAS_TAREA, type TareaVista } from "./datos";
 
@@ -70,12 +71,12 @@ async function avisarAsignada(tarea: TareaVista, autor: { id: string; nombre: st
  */
 export async function crearTarea(entrada: unknown): Promise<{ tarea: TareaVista } | { error: string }> {
   const usuario = await requireModuloEscritura(MODULO);
-  const admin = esAdministrador(usuario);
   const leido = normalizarCambio(entrada);
   if ("error" in leido) return leido;
   const c = leido.cambio;
   if (!c.titulo) return { error: "La tarea necesita un título." };
-  if (!admin && c.responsableId && c.responsableId !== usuario.id) return { error: "Solo un administrador asigna tareas a otras personas." };
+  if (c.responsableId && c.responsableId !== usuario.id && !(await puedeAsignarTareas(createServiceClient(), usuario)))
+    return { error: "Solo un administrador o un líder asigna tareas a otras personas." };
   const autor = { id: usuario.id, nombre: usuario.nombre || usuario.email };
   const fila: Record<string, unknown> = { creado_por: usuario.id, creado_por_nombre: autor.nombre };
   for (const k of Object.keys(c) as (keyof CambioTarea)[]) fila[COLUMNA[k]] = c[k] ?? null;
@@ -109,7 +110,7 @@ export async function actualizarTarea(id: string, entrada: unknown): Promise<{ t
   if (errorAntes) return { error: /tareas_equipo|relation/i.test(errorAntes.message) ? FALTA : "No se pudo leer la tarea." };
   if (!antes) return { error: "Esa tarea ya no existe." };
   const previa = { responsableId: (antes.responsable_id as string | null) ?? null, creadoPor: (antes.creado_por as string | null) ?? null };
-  const persona = { id: usuario.id, admin: esAdministrador(usuario) };
+  const persona = { id: usuario.id, admin: esAdministrador(usuario), asigna: await puedeAsignarTareas(supabase, usuario) };
   const motivo = motivoNoPuede(previa, c, persona);
   if (motivo) return { error: motivo };
 
@@ -158,7 +159,8 @@ export async function obtenerHistorialTarea(id: string): Promise<{ eventos: { id
 export async function datosNuevaTarea(): Promise<{ personas: { id: string; nombre: string }[]; miId: string; admin: boolean }> {
   const usuario = await requireModuloEscritura(MODULO);
   const { data } = await createServiceClient().from("perfiles").select("id, nombre, email").eq("activo", true).order("nombre");
-  return { personas: (data ?? []).map((p) => ({ id: String(p.id), nombre: String(p.nombre || p.email || "Sin nombre") })), miId: usuario.id, admin: esAdministrador(usuario) };
+  const supabase = createServiceClient();
+  return { personas: (data ?? []).map((p) => ({ id: String(p.id), nombre: String(p.nombre || p.email || "Sin nombre") })), miId: usuario.id, admin: await puedeAsignarTareas(supabase, usuario) };
 }
 
 export async function crearTareaFormulario(f: FormData): Promise<{ error?: string }> {

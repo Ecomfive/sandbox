@@ -4,6 +4,7 @@ import { requireModulo } from "@/lib/auth";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { MODULOS_ACCESO } from "@/lib/permisos/catalogo";
 import { createServiceClient } from "@/lib/supabase/server";
+import { puedeAsignarTareas } from "@/lib/tareas/lideres";
 import { cargarTareas } from "./datos";
 import { TableroTareas } from "./tablero-tareas";
 
@@ -16,7 +17,8 @@ export const metadata = { title: "Tareas" };
  */
 export default async function TareasPage() {
   const usuario = await requireModulo("tareas");
-  const { tareas, personas, falta } = await cargarTareas(createServiceClient(), usuario);
+  const supabase = createServiceClient();
+  const [{ tareas, personas, falta }, asigna] = await Promise.all([cargarTareas(supabase, usuario), puedeAsignarTareas(supabase, usuario)]);
   const modulos = MODULOS_ACCESO.filter((m) => m.clave !== "tareas")
     .map((m) => ({ clave: m.clave, etiqueta: m.etiqueta }))
     .sort((a, b) => a.etiqueta.localeCompare(b.etiqueta, "es"));
@@ -29,7 +31,7 @@ export default async function TareasPage() {
           Falta correr en Supabase la migración 0215 (tareas del equipo).
         </p>
       ) : (
-        <TableroTareas tareas={tareas} personas={personas} modulos={modulos} miId={usuario.id} admin={esAdministrador(usuario)} />
+        <TableroTareas tareas={tareas} personas={personas} modulos={modulos} miId={usuario.id} admin={esAdministrador(usuario)} asigna={asigna} />
       )}
     </Pagina>
   );
