@@ -144,7 +144,7 @@ export function HistorialCompetencia({ productoId, limite = 30, pais: paisProduc
  * Con `descartar` (la ficha de Gestión de IDs Dropi, 8 nov 2026, pedido de Alcides) cada competidor trae «No es el mismo»: deja de contar aquí, en
  * «Competidor más barato» y en las recomendaciones de precio. Los descartados se ven aparte, con «Volver a contar».
  */
-export function BloqueCompetencia({ skuId, descartar = false }: { skuId: string; descartar?: boolean }) {
+export function BloqueCompetencia({ skuId, descartar = false, pais }: { skuId: string; descartar?: boolean; /** Solo la competencia de ese país (Gestión de IDs: el de la barra). */ pais?: string }) {
   const { precio: usd } = useMonedaCompetencia();
   const { mostrarToast } = useToast();
   const [datos, setDatos] = useState<CompetenciaDeProducto[] | null>(null);
@@ -180,7 +180,7 @@ export function BloqueCompetencia({ skuId, descartar = false }: { skuId: string;
   useEffect(() => {
     // Cada uso lleva `key={skuId}`: con otro producto el bloque se vuelve a montar vacío.
     let vigente = true;
-    obtenerCompetenciaProducto(skuId).then((r) => {
+    obtenerCompetenciaProducto(skuId, pais).then((r) => {
       if (!vigente) return;
       if (r.error) setError(r.error);
       else setDatos(r.datos ?? []);
@@ -188,11 +188,11 @@ export function BloqueCompetencia({ skuId, descartar = false }: { skuId: string;
     return () => {
       vigente = false;
     };
-  }, [skuId]);
+  }, [skuId, pais]);
 
   if (error) return <p className="text-sm text-destructive">{error}</p>;
   if (!datos) return <p className="text-sm text-muted-foreground">Buscando en la competencia…</p>;
-  if (!datos.length) return <p className="text-sm text-muted-foreground">Ningún competidor vende este producto en Dropi (ni por nombre ni por foto).</p>;
+  if (!datos.length) return <p className="text-sm text-muted-foreground">Ningún competidor vende este producto en Dropi{pais ? " en este país" : ""} (ni por nombre ni por foto).</p>;
 
   return (
     <div className="flex flex-col gap-6">
