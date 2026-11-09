@@ -165,29 +165,31 @@ export function BloqueCompetencia({ skuId, descartar = false, pais }: { skuId: s
       else n.add(codigo);
       return n;
     });
+  const [verDudosos, setVerDudosos] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState<string | null>(null);
   const [, empezar] = useTransition();
-  // Mueve un competidor entre los que cuentan y los descartados al guardar, sin volver a pedir todo.
-  const mover = (codigo: string, id: string, volver: boolean) =>
+  // Mueve un competidor entre los que cuentan, los dudosos y los descartados al guardar, sin volver a pedir todo. «Volver a contar» lo deja con los
+  // que cuentan; si no es el mismo producto, aparecerá como dudoso al abrir de nuevo la ficha.
+  const mover = (codigo: string, id: string, modo: boolean | "mismo") =>
     setDatos((ds) =>
       (ds ?? []).map((d) => {
         if (d.codigo !== codigo) return d;
-        const desde = volver ? d.descartados : d.competidores;
-        const c = desde.find((x) => x.id === id);
+        const c = [...d.competidores, ...d.dudosos, ...d.descartados].find((x) => x.id === id);
         if (!c) return d;
         const sin = <T extends { id: string }>(l: T[]) => l.filter((x) => x.id !== id);
         const precio = (a: { precio: number | null }, b: { precio: number | null }) => (a.precio ?? 1e9) - (b.precio ?? 1e9);
-        return volver
-          ? { ...d, descartados: sin(d.descartados), competidores: [...d.competidores, c].sort(precio) }
-          : { ...d, competidores: sin(d.competidores), descartados: [...d.descartados, { ...c, motivo: "Descartado a mano: no es el mismo producto" }].sort(precio) };
+        const base = { ...d, competidores: sin(d.competidores), dudosos: sin(d.dudosos), descartados: sin(d.descartados) };
+        return modo === false
+          ? { ...base, descartados: [...base.descartados, { ...c, motivo: "Descartado a mano: no es el mismo producto" }].sort(precio) }
+          : { ...base, competidores: [...base.competidores, c].sort(precio) };
       }),
     );
-  const cambiar = (d: CompetenciaDeProducto, id: string, volver: boolean) => {
+  const cambiar = (d: CompetenciaDeProducto, id: string, modo: boolean | "mismo") => {
     setOcupado(id);
     empezar(async () => {
-      const r = await descartarCompetidor(skuId, id, d.nuestrosIds, volver).catch(() => ({ error: "No se pudo. Inténtalo de nuevo.", detalle: undefined }));
+      const r = await descartarCompetidor(skuId, id, d.nuestrosIds, modo).catch(() => ({ error: "No se pudo. Inténtalo de nuevo.", detalle: undefined }));
       setOcupado(null);
-      if (!r.error) mover(d.codigo, id, volver);
+      if (!r.error) mover(d.codigo, id, modo);
       mostrarToast(r.error ?? r.detalle ?? "Listo", r.error ? "destructive" : undefined);
     });
   };
@@ -269,7 +271,7 @@ export function BloqueCompetencia({ skuId, descartar = false, pais }: { skuId: s
               <Dato titulo="Vendieron (7 días)" valor={num(vendido7)} sub="bajadas de stock" />
             </div>
             {d.competidores.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Lo vendemos en Dropi y nadie más lo tiene.</p>
+              <p className="text-sm text-muted-foreground">{d.dudosos.length ? "Nadie vende exactamente este producto." : "Lo vendemos en Dropi y nadie más lo tiene."}</p>
             ) : (
               <ul className="flex flex-col divide-y divide-border rounded-lg border border-border">
                 {d.competidores.map((c) => {
@@ -317,6 +319,56 @@ export function BloqueCompetencia({ skuId, descartar = false, pais }: { skuId: s
                   );
                 })}
               </ul>
+            )}
+            {d.dudosos.length > 0 && (
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  aria-expanded={verDudosos === d.codigo}
+                  onClick={() => setVerDudosos(verDudosos === d.codigo ? null : d.codigo)}
+                  className={`self-start rounded-md px-1.5 py-0.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground ${anilloFoco}`}
+                >
+                  {verDudosos === d.codigo ? "Ocultar" : "Ver"} {d.dudosos.length === 1 ? "1 parecido" : `${d.dudosos.length} parecidos`} que no se comparan: no es seguro que sean el mismo producto
+                </button>
+                {verDudosos === d.codigo && (
+                  <ul className="flex flex-col divide-y divide-border rounded-lg border border-dashed border-border-control">
+                    {d.dudosos.map((c) => (
+                      <li key={c.id} className="flex items-start gap-3 px-3 py-2.5">
+                        <FotoAmpliable url={c.foto} nombre={c.nombre} tam="h-10 w-10" />
+                        <span className="flex min-w-0 flex-1 flex-col">
+                          <span className="text-sm font-medium break-words">{c.proveedor}</span>
+                          <span className="text-xs break-words text-muted-foreground">
+                            «{c.nombre}» · {usd(c.precio)}
+                          </span>
+                          {c.motivo && <span className="text-xs break-words text-muted-foreground">La IA: {c.motivo}</span>}
+                        </span>
+                        {descartar && d.nuestrosIds.length > 0 && (
+                          <span className="flex shrink-0 flex-col items-end gap-1">
+                            <button
+                              type="button"
+                              disabled={ocupado === c.id}
+                              onClick={() => cambiar(d, c.id, "mismo")}
+                              aria-label={`Es el mismo producto: comparar «${c.nombre}» de ${c.proveedor}`}
+                              className={`rounded-md px-1.5 py-0.5 text-xs text-primario hover:bg-muted disabled:opacity-60 ${anilloFoco}`}
+                            >
+                              {ocupado === c.id ? "Guardando…" : "Es el mismo"}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={ocupado === c.id}
+                              onClick={() => cambiar(d, c.id, false)}
+                              aria-label={`No es el mismo producto: descartar «${c.nombre}» de ${c.proveedor}`}
+                              className={`rounded-md px-1.5 py-0.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-60 ${anilloFoco}`}
+                            >
+                              No es el mismo
+                            </button>
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             )}
             {d.descartados.length > 0 && (
               <div className="flex flex-col gap-2">

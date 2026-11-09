@@ -22,6 +22,11 @@ export const PESTANAS_POR_MODULO: Record<string, Pestana[]> = {
     { etiqueta: "Consumo de IA", href: "/publicaciones-dropi/consumo" },
     { etiqueta: "Uso del sistema", href: "/publicaciones-dropi/uso-sistema" },
   ],
+  // Equipo › Tareas (9 nov 2026, pedido de Hernán): el tablero del equipo y «Mis tareas por módulo», las tareas abiertas de cada persona en cada módulo.
+  "/tareas": [
+    { etiqueta: "Tablero del equipo", href: "/tareas" },
+    { etiqueta: "Mis tareas por módulo", href: "/tareas/por-modulo" },
+  ],
   "/retiros": [
     { etiqueta: "Retiros", href: "/retiros" },
     { etiqueta: "Cuentas destino", href: "/retiros/cuentas" },
