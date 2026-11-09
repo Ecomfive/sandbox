@@ -6,7 +6,7 @@ import { requireModuloEscritura } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/server";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const FALTA = "Falta correr la migración 0263 (Dunamixfy) en la base.";
+const FALTA = "Falta correr la migración 0264 (Dunamixfy) en la base.";
 
 /** Vincula un producto de Dunamixfy con su producto de Producto, lo cambia o le quita el vínculo (`skuId` null). Siempre lo decide una persona, como en Dropi, Drop y Effi. */
 export async function vincularPublicacionDunamixfy(

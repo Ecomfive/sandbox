@@ -14,7 +14,7 @@ const clase = `flex h-8 w-8 items-center justify-center rounded-full border bord
 /**
  * «Asignar tarea» en la barra de cada módulo (9 nov 2026, pedido de Hernán: «si se le asigna a alguien una tarea en Inventario o en Gestión de IDs, que le
  * aparezca y sepa en qué módulo es»). Abre la ficha de «Nueva tarea» del tablero del equipo con el módulo ya puesto; la tarea sale en «Mis tareas por
- * módulo» de la persona, en ese módulo. A quién se puede asignar lo decide el tablero (un administrador, a cualquiera; los demás, a sí mismos).
+ * módulo» de la persona, en ese módulo. A quién se puede asignar lo decide el tablero (un administrador o un líder, a cualquiera; los demás, a sí mismos).
  */
 export function BotonTareaModulo({ moduloClave, moduloEtiqueta }: { moduloClave: string; moduloEtiqueta: string }) {
   const [datos, setDatos] = useState<Datos | null>(null);

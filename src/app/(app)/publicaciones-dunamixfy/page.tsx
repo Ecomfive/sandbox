@@ -44,7 +44,7 @@ export default async function PublicacionesDunamixfyPage({ searchParams }: { sea
       <EncabezadoPagina titulo="Gestión de IDs Dunamixfy" oculto />
       {datos.faltaMigracion && (
         <p role="alert" className="m-0 rounded-lg border border-border bg-card px-4 py-3 text-sm text-destructive">
-          Falta correr en Supabase la migración 0263 (Dunamixfy).
+          Falta correr en Supabase la migración 0264 (Dunamixfy).
         </p>
       )}
       <TableroDunamixfy publicaciones={datos.publicaciones} />

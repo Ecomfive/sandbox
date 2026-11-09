@@ -10,7 +10,7 @@ import { crearTareaFormulario } from "./actions";
 import type { PersonaTarea } from "./datos";
 
 /**
- * «Agregar tarea»: la ficha de crear del sistema. Un administrador la asigna a cualquiera; los demás, a sí mismos o sin asignar.
+ * «Agregar tarea»: la ficha de crear del sistema. Un administrador o un líder (`admin`) la asigna a cualquiera; los demás, a sí mismos o sin asignar.
  * Con `moduloFijo` (el botón «Asignar tarea» de la barra de cada módulo, 9 nov 2026) la tarea queda de ese módulo, sin elegirlo.
  */
 export function NuevaTarea({

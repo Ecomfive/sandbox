@@ -12,6 +12,7 @@ import { TablaPaises } from "./tabla-paises";
 import { UmbralesTipoCliente } from "./umbrales-tipo-cliente";
 import { ConexionEffi } from "./conexion-effi";
 import { AvisoInactividadConfig, type PersonaAviso } from "./aviso-inactividad";
+import { LideresTareasConfig, type PersonaLider } from "./lideres-tareas";
 import { llaveEffi } from "@/lib/effi/api";
 
 export const metadata = { title: "Configuración" };
@@ -29,7 +30,7 @@ export default async function ConfiguracionPage() {
   const consultarCuentas = (columnas: string) =>
     supabase.from("cuentas_retiro").select(columnas).eq("pais_id", pais.id).order("creado_en", { ascending: false });
 
-  const [{ data: paisPlataformas }, cuentasConBinance, { data: todosLosPaises }, { data: correlativos }, umbralesR, avisoR] = await Promise.all([
+  const [{ data: paisPlataformas }, cuentasConBinance, { data: todosLosPaises }, { data: correlativos }, umbralesR, avisoR, lideresR] = await Promise.all([
     // `fulfillment` lo agrega la migración 0213 y `fulfillment_paga` la 0247: sin ellas, se repite sin esas columnas.
     supabase
       .from("pais_plataformas")
@@ -51,7 +52,14 @@ export default async function ConfiguracionPage() {
     supabase.from("crm_tipo_cliente_umbrales").select("pais_id, vip_desde, black_desde"),
     // A quién se le muestra el aviso de 5 minutos sin actividad (migración 0249). Sin ella, la sección no sale.
     supabase.from("perfiles").select("id, nombre, email, aviso_inactividad, roles(nombre)").eq("activo", true).order("nombre"),
+    // Quién asigna tareas a otras personas además de los administradores (migración 0263). Sin ella, la sección no sale.
+    supabase.from("perfiles").select("id, nombre, email, lider_tareas, roles(nombre)").eq("activo", true).order("nombre"),
   ]);
+  const personasLider: PersonaLider[] | null = lideresR.error
+    ? null
+    : ((lideresR.data ?? []) as unknown as { id: string; nombre: string | null; email: string; lider_tareas: boolean; roles: { nombre: string } | null }[])
+        .filter((p) => p.roles?.nombre !== "Admin")
+        .map((p) => ({ id: p.id, nombre: p.nombre || p.email, rol: p.roles?.nombre ?? null, activo: p.lider_tareas }));
   const personasAviso: PersonaAviso[] | null = avisoR.error
     ? null
     : ((avisoR.data ?? []) as unknown as { id: string; nombre: string | null; email: string; aviso_inactividad: boolean; roles: { nombre: string } | null }[]).map((p) => ({
@@ -123,6 +131,13 @@ export default async function ConfiguracionPage() {
         <div id="aviso-inactividad" className="flex flex-col gap-3">
           <h2 className="text-sm font-semibold tracking-tight">Aviso de inactividad</h2>
           <AvisoInactividadConfig personas={personasAviso} puedeEscribir={puedeEscribir} />
+        </div>
+      )}
+
+      {personasLider && (
+        <div id="lideres-tareas" className="flex flex-col gap-3">
+          <h2 className="text-sm font-semibold tracking-tight">Líderes: asignan tareas</h2>
+          <LideresTareasConfig personas={personasLider} puedeEscribir={puedeEscribir} />
         </div>
       )}
 

@@ -18,7 +18,7 @@ export interface ProductoDunamixfy {
 }
 
 /**
- * Un producto de Dunamixfy (migración 0263, 9 nov 2026): lo que da la lectura de la cuenta de proveedor más el producto de Producto con que se vinculó y el margen. Los
+ * Un producto de Dunamixfy (migración 0264, 9 nov 2026): lo que da la lectura de la cuenta de proveedor más el producto de Producto con que se vinculó y el margen. Los
  * montos van en colones. El stock es el de nuestra bodega en Dunamixfy, solo de los inventarios activos.
  */
 export interface FilaPublicacionDunamixfy {

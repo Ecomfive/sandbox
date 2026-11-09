@@ -1,5 +1,5 @@
 /**
- * Guarda lo leído de Dunamixfy (migración 0263; 9 nov 2026, pedido de Hernán). Lo llama «Actualizar datos» con los archivos que subió la extensión (lector
+ * Guarda lo leído de Dunamixfy (migración 0264; 9 nov 2026, pedido de Hernán). Lo llama «Actualizar datos» con los archivos que subió la extensión (lector
  * `dunamixfy_cr`) o el receptor local (scripts/scraping-proveedores.ts, `tipo: "dunamixfy"`). Solo escribe en el sistema: Dunamixfy no se toca.
  * - `guardarProductosDunamixfy`: una fila por producto en `dunamixfy_publicaciones`; lo que ya no aparece queda con `en_dunamixfy = false` (no se borra). **No vincula**
  *   el producto de Producto: deja la sugerencia (la publicación de Dropi, Effi o Drop del país con el mismo nombre, o `sugerirSku` por nombre y foto).

@@ -65,7 +65,7 @@ export interface PublicacionEffi {
   en_effi: boolean;
   ultima_vez: string | null;
 }
-/** Un producto de Dunamixfy (migración 0263, 9 nov 2026): su stock en nuestra bodega allá, solo de los inventarios activos. */
+/** Un producto de Dunamixfy (migración 0264, 9 nov 2026): su stock en nuestra bodega allá, solo de los inventarios activos. */
 export interface PublicacionDunamixfy {
   sku_maestro_id: string | null;
   dunamixfy_id: string;

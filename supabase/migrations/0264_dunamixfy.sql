@@ -7,7 +7,7 @@
 -- * dunamixfy_vendedores: los dropshippers que venden nuestros productos allá (su id y nombre en Dunamixfy, con sus pedidos), para el CRM.
 -- Además: «Dynamic 5» de Configuración › Plataformas de Costa Rica (cargada en 0014 con el nombre mal escrito, como «Drog» y «EFI») pasa a llamarse «Dunamixfy», y el
 -- módulo «publicaciones-dunamixfy» toma los permisos de Gestión de IDs Dropi. Solo el servidor lee y escribe (RLS sin políticas). Se puede correr de nuevo.
--- Reversa: supabase/rollbacks/0263_rollback.sql
+-- Reversa: supabase/rollbacks/0264_rollback.sql
 
 update plataformas set nombre = 'Dunamixfy'
 where nombre = 'Dynamic 5' and not exists (select 1 from plataformas where nombre = 'Dunamixfy');

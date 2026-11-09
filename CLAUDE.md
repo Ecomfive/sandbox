@@ -295,8 +295,12 @@ convenciones técnicas del código.
   **Tareas en cualquier módulo** (9 nov 2026, Hernán: «que todos los módulos puedan salir»): `BotonTareaModulo`
   (`src/components/tareas/boton-tarea-modulo.tsx`) en `BarraMigas` (prop `verTarea`: quien escribe en `tareas`; no en `/`, `/ayuda` ni `/tareas`) abre
   `NuevaTarea` con `moduloFijo` = `moduloDeHref(moduloHref)`: es una fila de `tareas_equipo` con ese `modulo`, así que sale en «Mis tareas por módulo»
-  de la persona en ese módulo. Las personas se piden al abrir (`datosNuevaTarea`). Asignar a otra persona sigue siendo de administrador
-  (`crearTarea`). Cada grupo del repositorio tiene «Ir a <módulo>» (`/<clave>`).
+  de la persona en ese módulo. Las personas se piden al abrir (`datosNuevaTarea`). Cada grupo del repositorio tiene «Ir a <módulo>» (`/<clave>`).
+  **Líderes que asignan tareas** (9 nov 2026, Hernán: «también los líderes»; migración 0263 `perfiles.lider_tareas`): `puedeAsignarTareas`
+  (`src/lib/tareas/lideres.ts`) = administrador, rol que empieza con «Líder» (`esRolLider`) o persona marcada en Configuración › «Líderes: asignan
+  tareas» (`LideresTareasConfig`, `cambiarLiderTareas`, auditoría `lider_tareas`). Lo usan `crearTarea`, `actualizarTarea` (`motivoNoPuede` con
+  `asigna`: un líder pasa a otra persona solo las tareas que ve —creadas o asignadas a él—), `datosNuevaTarea` y el tablero (`asigna`). «De todos»
+  sigue siendo de administrador.
 - **Perfiles de acceso por área** (migración 0115, 20 oct 2026; cuadro en `Perfiles-de-acceso-Ecomfive.pdf`, junto a la carpeta del proyecto). Roles
   listos con los módulos de cada área y qué es solo lectura: **nuevos** Investigación de producto, Contenido y ofertas, Compras, Producto / Catálogo,
   Talento humano y Consulta; **completados** Administrativo (Finanzas), Atención al cliente, Líder comercial y Operaciones (Bodega); Admin
@@ -585,7 +589,7 @@ convenciones técnicas del código.
   país del proveedor, precios en dólares, `scraping_producto_id` único). El receptor calcula `scraping_productos.foto_huella` de
   las fotos nuevas (`npx tsx scripts/scraping-proveedores.ts huellas` para las que falten).
 - **Operación › Gestión de IDs Effi** (`/publicaciones-effi`, módulo `publicaciones-effi`, migración 0230, 5 nov 2026, pedido de Hernán): los artículos de Effi de Costa Rica en `effi_publicaciones` (una fila por `(pais_id, effi_id)`; lo que ya no aparece queda `en_effi = false`, nada se borra; una lectura vacía no toca nada). `sincronizarEffi` (`src/lib/effi/sincronizar.ts`) la corre el cron diario `/api/cron/effi` y «Actualizar desde Effi»; `normalizarArticulo` (`src/lib/effi/articulos.ts`, con prueba) lee la tarifa Dropshipping y la Sugerida de `precios_venta`, el costo (`p_costo_ultimo`, si no `p_costo`) y **solo el stock de Principal y Garantías**: las demás bodegas (Conecta Shop, PuraOfertas, Amperilia, Natura Shoppy, ABO CR, Saint Digital, Tienda Vita) se le crean a cada dropshipper y **no se tocan en el sistema por ahora**; por eso no se usa `stock_empresa`, que las suma. **No vincula**: deja la sugerencia (Dropi del país con el mismo nombre o referencia, o `sugerirSku` por nombre, sin foto todavía) y una persona confirma en la ficha (`vincularPublicacionEffi`, auditoría `vincular_publicacion_effi`). Margen: tarifa Dropshipping − costo en Effi − fulfillment de la fila «EFFI» de `pais_plataformas`. Son solo pantallas con datos: tablero (`tablero-effi.tsx`), filas y ficha copiadas de Drop sin botones de escritura; **el sistema solo lee Effi**. Lo que Effi no usa no se dibuja.
-- **Dunamixfy** (9 nov 2026, pedido de Hernán: «lo que hicimos con Dropi, con Effi y con Drop… con Dunamixfy»; migración 0263, reversa `supabase/rollbacks/0263_rollback.sql`): plataforma de
+- **Dunamixfy** (9 nov 2026, pedido de Hernán: «lo que hicimos con Dropi, con Effi y con Drop… con Dunamixfy»; migración 0264, reversa `supabase/rollbacks/0264_rollback.sql`): plataforma de
   **Costa Rica** (`dunamixfy.cr`; tiene sitios por país: .com.co, .com.mx, .com.gt, .pa, ve.) donde ECOMFIVE es **proveedor** («Dunamix EF», rol `SUPPLIER`, bodega «Almacen Cielos Abiertos»). Es una app Next.js con
   **API interna** de sesión por cookie (`/api/me`, `/api/products?take&skip`, `/api/orders?page&limit&dateFrom&dateTo`, `/api/marketplace/products`): se lee **desde su pestaña** con el lector de la
   extensión `extension/ecomfive-dropi/lectores/dunamixfy.js` (`leerDunamixfy`, lector `dunamixfy_cr`, sitio `duna` en `partes.ts`/`fondo.js`; extensión **0.7.0**, `host_permissions` con `dunamixfy.cr`;

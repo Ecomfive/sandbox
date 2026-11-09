@@ -103,10 +103,14 @@ export const puedeVerTarea = (t: { responsableId: string | null; creadoPor: stri
  * Qué puede cambiar una persona: un administrador, todo; quien la tiene asignada o la creó, todo menos pasársela a otra persona (solo un
  * administrador asigna a otros: puede dejársela a sí mismo o soltarla si la creó).
  */
-export function motivoNoPuede(t: { responsableId: string | null; creadoPor: string | null }, cambio: CambioTarea, persona: { id: string; admin: boolean }): string | null {
+export function motivoNoPuede(
+  t: { responsableId: string | null; creadoPor: string | null },
+  cambio: CambioTarea,
+  persona: { id: string; admin: boolean; /** Un líder (9 nov 2026): asigna a otras personas las tareas que ve. */ asigna?: boolean },
+): string | null {
   if (persona.admin) return null;
   if (!puedeVerTarea(t, persona)) return "Esa tarea no es tuya.";
-  if ("responsableId" in cambio && cambio.responsableId && cambio.responsableId !== persona.id) return "Solo un administrador asigna tareas a otras personas.";
+  if ("responsableId" in cambio && cambio.responsableId && cambio.responsableId !== persona.id && !persona.asigna) return "Solo un administrador o un líder asigna tareas a otras personas.";
   if ("responsableId" in cambio && !cambio.responsableId && t.creadoPor !== persona.id) return "No puedes soltar una tarea que te asignaron.";
   return null;
 }
