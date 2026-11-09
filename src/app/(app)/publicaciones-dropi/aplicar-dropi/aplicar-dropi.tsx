@@ -9,12 +9,13 @@ import { quienesDe, unidadesTotales } from "@/lib/publicaciones/privatizar-dropi
 import { CDN_FOTOS_DROPI } from "@/lib/publicaciones/republicar-dropi";
 import { codigoBodega } from "@/lib/publicaciones/sincronizar-dropi";
 import { textoVariacion } from "@/lib/publicaciones/stock-dropi";
+import { porOrdenesPendientes } from "@/lib/publicaciones/archivar";
 import { guardarResultadosDropi, pendientesParaDropi, type CambioParaDropi } from "../aplicar-actions";
 
 /** Un monto con el símbolo de la moneda del país de esta ventana (`?p=` de la pestaña de Dropi que la abrió: «₡» en Costa Rica, «MX$» en México). */
 const montoUrl = (v: number) => montoDePais(v, typeof window === "undefined" ? "PA" : new URLSearchParams(window.location.search).get("p") ?? "PA");
 
-type Resultado = { id: string; ok: boolean; error?: string; nuevo?: number; archivado?: boolean; aviso?: string; salida?: boolean; antes?: number; stock?: number };
+type Resultado = { id: string; ok: boolean; error?: string; nuevo?: number; archivado?: boolean; aviso?: string; salida?: boolean; antes?: number; stock?: number; archivoPendiente?: string | null };
 type Estado =
   | { tipo: "cargando" }
   | { tipo: "sin_dropi"; mensaje: string }
@@ -156,8 +157,10 @@ export function AplicarDropi({ puedeEscribir }: { puedeEscribir: boolean }) {
     );
   const porId = new Map(estado.resultados.map((r) => [r.id, r]));
   // Un apagado que quedó sin stock pero sin archivar no está terminado: sigue pendiente (se reintenta en el próximo «Aplicar en Dropi»).
-  const sinArchivar = (c: CambioParaDropi, r: Resultado | undefined) => c.tipo === "apagar" && !!r?.ok && !r.archivado;
-  const aplicados = estado.cambios.filter((c) => porId.get(c.id)?.ok && !sinArchivar(c, porId.get(c.id))).length;
+  // Sin archivar por órdenes en curso no cuenta como pendiente (8 nov 2026): el sistema lo da por hecho y deja una tarea para archivarlo en un mes.
+  const conTarea = (c: CambioParaDropi, r: Resultado | undefined) => !!r && ((c.tipo === "apagar" && r.ok && !r.archivado) || (c.tipo === "archivar" && !r.ok && !c.restaurar)) && porOrdenesPendientes(r.error);
+  const sinArchivar = (c: CambioParaDropi, r: Resultado | undefined) => c.tipo === "apagar" && !!r?.ok && !r.archivado && !conTarea(c, r);
+  const aplicados = estado.cambios.filter((c) => (porId.get(c.id)?.ok && !sinArchivar(c, porId.get(c.id))) || conTarea(c, porId.get(c.id))).length;
   return (
     <div className="flex flex-col gap-3">
       <div role="status" className={`${caja} flex flex-col gap-1`}>
@@ -174,11 +177,13 @@ export function AplicarDropi({ puedeEscribir }: { puedeEscribir: boolean }) {
             return (
               <li key={c.id} className="flex flex-col gap-0.5 px-4 py-2.5">
                 <DetalleCambio c={c} />
-                <span className={`text-xs font-medium ${r?.ok && !sinArchivar(c, r) ? "text-success" : "text-destructive"}`}>
-                  {r
+                <span className={`text-xs font-medium ${(r?.ok && !sinArchivar(c, r)) || conTarea(c, r) ? "text-success" : "text-destructive"}`}>
+                  {r && conTarea(c, r)
+                    ? `Sin stock en Dropi, pero no deja archivarlo por órdenes en curso: quedó una tarea para archivarlo en un mes`
+                    : r
                     ? r.ok
                       ? c.tipo === "republicar"
-                        ? `Republicada: ID nuevo ${r.nuevo ?? "—"}; la vieja quedó archivada y sin stock${r.aviso ? `. ${r.aviso} Quedó una tarea para hacerlo.` : ""}`
+                        ? `Republicada: ID nuevo ${r.nuevo ?? "—"}; la vieja quedó ${r.archivoPendiente ? "sin stock (Dropi no deja archivarla por órdenes en curso: quedó una tarea para archivarla en un mes)" : "archivada y sin stock"}${r.aviso ? `. ${r.aviso} Quedó una tarea para hacerlo.` : ""}`
                         : c.tipo === "apagar"
                           ? r.archivado
                             ? c.devolver

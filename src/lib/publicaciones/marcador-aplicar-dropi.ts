@@ -145,10 +145,12 @@ const CODIGO = [
   "var sa={},hs=false;for(k in st){sa[k]=-st[k];hs=true}",
   "if(hs){var ms=mover(o,bp,sa,'Republicado como ID '+id);if(ms.error)return f(ms.error);",
   "var ps=await pedir('/products/'+c.producto,'PUT',ms.cuerpo);if(!ps.ok)return f('Se creó el '+id+', pero no se le pudo sacar el stock al '+c.producto+': '+motivo(ps))}}",
-  "if(!o.archived){var ar=await pedir('/products/'+c.producto+'/archiveProduct','POST',{});if(!ar.ok)return f('Se creó el '+id+' y el '+c.producto+' quedó sin stock, pero no se pudo archivar: '+motivo(ar))}",
+  // Si Dropi no deja archivar el viejo por órdenes en curso (8 nov 2026, pedido de Alcides), la republicación termina igual: vuelve en `archivoPendiente` y el
+  // sistema deja una tarea para archivarlo en un mes. Cualquier otro motivo sigue siendo un error.
+  "var pa=null;if(!o.archived){var ar=await pedir('/products/'+c.producto+'/archiveProduct','POST',{});if(!ar.ok){var ma=motivo(ar);if(/PENDIENTE|GUIA GENERADA|SIN MOVIMIENTOS/i.test(ma))pa=ma;else return f('Se creó el '+id+' y el '+c.producto+' quedó sin stock, pero no se pudo archivar: '+ma)}}",
   "var v=await pedir('/products/'+id),w=v.j&&v.j.objects,x=await pedir('/products/'+c.producto),q=x.j&&x.j.objects,tn=w?totalU(w):0,tv=q?totalU(q):0;",
   "if(tv>0)return f('El '+c.producto+' sigue con '+tv+' unidades en Dropi.');",
-  "return{ok:true,nuevo:id,stock:tn,fotos:w&&Array.isArray(w.gallery)?w.gallery.length:null,fotosFaltan:faltan,aviso:faltan.length?'No se pudieron copiar '+faltan.length+' foto(s)'+fe+': súbelas a mano en el ID '+id+'.':null}}",
+  "return{ok:true,nuevo:id,stock:tn,fotos:w&&Array.isArray(w.gallery)?w.gallery.length:null,fotosFaltan:faltan,archivoPendiente:pa,aviso:faltan.length?'No se pudieron copiar '+faltan.length+' foto(s)'+fe+': súbelas a mano en el ID '+id+'.':null}}",
   // El stock de cada variación viva de un producto con variaciones, como lo pide la pantalla de Dropi (`get_warehouses_stock`, un pedido por variación).
   "async function entradasV(o){var vs=vivasV(o),r=[];for(var i=0;i<vs.length;i++){var g=await pedir('/products/get_warehouses_stock','POST',{product_id:null,type:'VARIABLE',variation_id:vs[i].id});if(!g.ok||!Array.isArray(g.j&&g.j.objects))return{error:'No se pudo leer el stock de la variación '+(firmaV(vs[i])||vs[i].id)+': '+motivo(g)};r.push(g.j.objects)}return{ent:r}}",
   "async function apagar(c,bp){",

@@ -24,3 +24,11 @@ export function sePuedePausar(p: { dropiId: string; archivada: boolean; sinPubli
 export function listaParaReactivar(stock: number | null, privado: number | null = null): boolean {
   return (stock ?? 0) > 0 || (privado ?? 0) > 0;
 }
+
+/**
+ * Dropi no archiva un producto con órdenes en curso («tiene órdenes en estatus PENDIENTE, GUIA GENERADA o SIN MOVIMIENTOS») (8 nov 2026, pedido de
+ * Alcides): si eso es lo único que falta, el cambio se da por hecho y queda una tarea para archivarlo en `DIAS_PARA_ARCHIVAR` días, en vez de quedarse
+ * en la cola de «Aplicar en Dropi» reintentándose cada vez.
+ */
+export const DIAS_PARA_ARCHIVAR = 30;
+export const porOrdenesPendientes = (mensaje: string | null | undefined) => /PENDIENTE|GUIA GENERADA|SIN MOVIMIENTOS|órdenes pendientes/i.test(mensaje ?? "") && /[oó]rden/i.test(mensaje ?? "");
