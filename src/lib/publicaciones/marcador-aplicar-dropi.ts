@@ -125,8 +125,9 @@ const CODIGO = [
   // Sube las fotos que el nuevo no tiene, comparando por nombre (Dropi le antepone un número): contar cuántas tenía y seguir desde ahí
   // repetía una y dejaba fuera la principal si en un intento anterior subió una del medio (25 oct 2026, el 11309).
   // Las fotos copiadas en el sistema (migración 0153) mandan, la principal primero; sin ellas, las de Dropi.
-  "var fs=unicas(Array.isArray(c.fotos)&&c.fotos.length?c.fotos.map(function(x,j){return{url:x.url,nombre:x.nombre,main:j===0,alternas:[]}}):fotosDe(o)),mal=0;for(var i=0;i<fs.length;i++)if(!tiene(n,fs[i].nombre)&&!(await subir(id,fs[i])))mal++;",
-  "if(mal)return f('Se creó el '+id+', pero no se pudieron copiar '+mal+' foto(s)'+porque()+'.');",
+  // Una foto que no se pudo copiar ya no detiene la republicación (8 nov 2026, pedido de Alcides): se termina el trabajo y vuelve en `fotosFaltan`, y el
+  // sistema le deja una tarea a quien la pidió para subirla a mano en el ID nuevo (sacándola del viejo).
+  "var fs=unicas(Array.isArray(c.fotos)&&c.fotos.length?c.fotos.map(function(x,j){return{url:x.url,nombre:x.nombre,main:j===0,alternas:[]}}):fotosDe(o)),faltan=[],fe='';for(var i=0;i<fs.length;i++)if(!tiene(n,fs[i].nombre)&&!(await subir(id,fs[i]))){faltan.push(String(fs[i].nombre));fe=porque()}",
   // Las garantías del viejo pasan al nuevo (25 oct 2026: el 11309 quedó sin ellas; en Dropi la casilla de cada garantía se marca solo
   // si el producto la tiene guardada). Solo si el nuevo todavía no tiene ninguna, así un reintento no las repite.
   // Dropi ya no acepta una garantía sin observaciones salvo «Orden diferente»: si la del viejo no tenía, va «Ninguna» (pedido de Alcides).
@@ -147,7 +148,7 @@ const CODIGO = [
   "if(!o.archived){var ar=await pedir('/products/'+c.producto+'/archiveProduct','POST',{});if(!ar.ok)return f('Se creó el '+id+' y el '+c.producto+' quedó sin stock, pero no se pudo archivar: '+motivo(ar))}",
   "var v=await pedir('/products/'+id),w=v.j&&v.j.objects,x=await pedir('/products/'+c.producto),q=x.j&&x.j.objects,tn=w?totalU(w):0,tv=q?totalU(q):0;",
   "if(tv>0)return f('El '+c.producto+' sigue con '+tv+' unidades en Dropi.');",
-  "return{ok:true,nuevo:id,stock:tn,fotos:w&&Array.isArray(w.gallery)?w.gallery.length:null}}",
+  "return{ok:true,nuevo:id,stock:tn,fotos:w&&Array.isArray(w.gallery)?w.gallery.length:null,fotosFaltan:faltan,aviso:faltan.length?'No se pudieron copiar '+faltan.length+' foto(s)'+fe+': súbelas a mano en el ID '+id+'.':null}}",
   // El stock de cada variación viva de un producto con variaciones, como lo pide la pantalla de Dropi (`get_warehouses_stock`, un pedido por variación).
   "async function entradasV(o){var vs=vivasV(o),r=[];for(var i=0;i<vs.length;i++){var g=await pedir('/products/get_warehouses_stock','POST',{product_id:null,type:'VARIABLE',variation_id:vs[i].id});if(!g.ok||!Array.isArray(g.j&&g.j.objects))return{error:'No se pudo leer el stock de la variación '+(firmaV(vs[i])||vs[i].id)+': '+motivo(g)};r.push(g.j.objects)}return{ent:r}}",
   "async function apagar(c,bp){",
