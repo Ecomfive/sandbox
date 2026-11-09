@@ -134,7 +134,7 @@ function ContenidoFichaTarea({
 
       <div className="flex flex-col divide-y divide-border rounded-lg border border-border px-3 py-1">
         <Propiedad etiqueta="Le toca a">
-          <MenuResponsable conTexto t={t} puedeEscribir={puedeEscribir} alElegir={(responsableId) => cambiar(t, { responsableId })} />
+          <MenuResponsable conTexto t={t} puedeEscribir={puedeEscribir} alElegir={(responsablesIds) => cambiar(t, { responsablesIds })} />
         </Propiedad>
         <Propiedad etiqueta="Para cuándo">
           {t.estado === "hecha" ? <span className="text-sm text-muted-foreground">Hecha</span> : <MenuFecha t={t} hoy={hoy} puedeEscribir={puedeEscribir} alElegir={(plazo) => cambiar(t, { plazo })} />}

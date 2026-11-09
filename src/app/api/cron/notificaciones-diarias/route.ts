@@ -5,6 +5,7 @@ import { obtenerPendientesHoy } from "@/lib/pendientes-hoy";
 import { enviarCorreo } from "@/lib/notificaciones/correo";
 import { activarTareasDeLlegada, avisarTareasDeHoy } from "@/lib/crm/tareas-servidor";
 import { correrSecuenciaAlta } from "@/lib/crm/secuencia-alta-servidor";
+import { avisarTareasPublicacionesDeHoy } from "@/lib/publicaciones/tareas-aviso-servidor";
 
 const SITIO = "https://mom-beta-proveduria.vercel.app";
 
@@ -29,6 +30,8 @@ export async function GET(request: Request) {
   // La secuencia de alta (Dirección › Automatizaciones): solo si está encendida; sus tareas vencen hoy y las avisa la línea de abajo.
   await correrSecuenciaAlta(supabase);
   await avisarTareasDeHoy(supabase);
+  // Gestión de IDs Dropi (8 nov 2026): a cada persona de una tarea que vence hoy, su aviso en la campana.
+  await avisarTareasPublicacionesDeHoy(supabase);
 
   const { data: paises } = await supabase.from("paises").select("id, codigo, nombre").order("nombre");
 

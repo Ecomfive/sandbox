@@ -8,7 +8,7 @@ export const MAX_NOTA_TAREA = 1000;
 export const MAX_NOTA_CIERRE = 600;
 
 export type OrigenTarea = "manual" | "recomendacion";
-export type EstadoTarea = "por_hacer" | "en_curso" | "en_revision" | "hecha";
+export type EstadoTarea = "por_hacer" | "en_curso" | "en_revision" | "estancada" | "hecha";
 export type Prioridad = "urgente" | "alta" | "normal" | "baja";
 /** Cómo va la fecha de una tarea sin hacer. */
 export type Vencimiento = "atrasada" | "hoy" | "proxima" | "sin_fecha";
@@ -18,8 +18,34 @@ export const ESTADOS_TAREA: { valor: EstadoTarea; etiqueta: string; color: strin
   { valor: "por_hacer", etiqueta: "Por hacer", color: "#8b8d98" },
   { valor: "en_curso", etiqueta: "En curso", color: "#0090ff" },
   { valor: "en_revision", etiqueta: "En revisión", color: "#8e4ec6" },
+  // Estancada (8 nov 2026, pedido de Alcides): no se elige; la tarea queda así sola si pasaron más de `DIAS_ESTANCADA` días de su fecha sin hacerse.
+  { valor: "estancada", etiqueta: "Estancada", color: "#e5484d" },
   { valor: "hecha", etiqueta: "Hecha", color: "#30a46c" },
 ];
+
+/** Los estados que una persona puede elegir (Estancada lo pone el sistema). */
+export const ESTADOS_ELEGIBLES = ESTADOS_TAREA.filter((e) => e.valor !== "estancada");
+
+/** Días después de la fecha límite en que una tarea sin hacer pasa a «Estancada». */
+export const DIAS_ESTANCADA = 3;
+
+/** ¿Lleva más de `DIAS_ESTANCADA` días vencida sin hacerse? (AAAA-MM-DD de hoy, hora de Panamá). */
+export function estaEstancada(t: { estado: EstadoTarea; plazo: string | null; archivadaEn?: string | null }, hoy: string): boolean {
+  if (t.estado === "hecha" || t.archivadaEn || !t.plazo) return false;
+  const dias = Math.round((Date.parse(`${hoy}T12:00:00Z`) - Date.parse(`${t.plazo}T12:00:00Z`)) / 86_400_000);
+  return dias > DIAS_ESTANCADA;
+}
+
+/** Las tareas con su estado para mostrar: las que llevan más de 3 días vencidas, «Estancada» (no se guarda: si se hace o cambia la fecha, sale sola). */
+export const conEstancadas = <T extends { estado: EstadoTarea; plazo: string | null; archivadaEn?: string | null }>(tareas: T[], hoy: string): T[] =>
+  tareas.map((t) => (t.estado !== "estancada" && estaEstancada(t, hoy) ? { ...t, estado: "estancada" as const } : t));
+
+/** Hasta cuántas personas pueden hacer una tarea (8 nov 2026, pedido de Alcides: varios responsables). */
+export const MAX_RESPONSABLES = 5;
+
+/** Todas las personas que hacen la tarea: la principal y las demás. */
+export const responsablesDe = (t: Pick<TareaVista, "responsableId" | "responsableNombre" | "otros">) =>
+  [...(t.responsableId ? [{ id: t.responsableId, nombre: t.responsableNombre ?? "Sin nombre" }] : []), ...t.otros.filter((o) => o.id !== t.responsableId)];
 
 export const PRIORIDADES: { valor: Prioridad; etiqueta: string; color: string }[] = [
   { valor: "urgente", etiqueta: "Urgente", color: "#e5484d" },
@@ -49,6 +75,8 @@ export interface TareaVista {
   prioridad: Prioridad | null;
   responsableId: string | null;
   responsableNombre: string | null;
+  /** Las demás personas que la hacen (migración 0255); la principal es `responsableId`. */
+  otros: { id: string; nombre: string }[];
   /** Para cuándo (AAAA-MM-DD), o null sin fecha. */
   plazo: string | null;
   creadoPor: string | null;
@@ -93,7 +121,7 @@ export function normalizarTarea(crudo: unknown): { titulo: string; nota: string 
   return {
     titulo,
     nota: nota || null,
-    estado: esEstado(o.estado) ? o.estado : "por_hacer",
+    estado: esEstado(o.estado) && o.estado !== "estancada" ? o.estado : "por_hacer",
     prioridad: esPrioridad(o.prioridad) ? o.prioridad : null,
     responsableId: typeof o.responsableId === "string" && UUID.test(o.responsableId) ? o.responsableId : null,
     plazo: esFecha(o.plazo) ? o.plazo : null,
@@ -107,6 +135,8 @@ export interface CambioTarea {
   estado?: EstadoTarea;
   prioridad?: Prioridad | null;
   responsableId?: string;
+  /** Todas las personas que la hacen, la primera es la principal (8 nov 2026). */
+  responsablesIds?: string[];
   plazo?: string | null;
   publicacionId?: string;
   archivar?: boolean;
@@ -122,7 +152,7 @@ export function normalizarCambio(crudo: unknown): CambioTarea | { error: string 
   }
   if ("nota" in o) c.nota = typeof o.nota === "string" && o.nota.trim() ? o.nota.trim().slice(0, MAX_NOTA_TAREA) : null;
   if ("estado" in o) {
-    if (!esEstado(o.estado)) return { error: "Estado no válido." };
+    if (!esEstado(o.estado) || o.estado === "estancada") return { error: "Estado no válido." };
     c.estado = o.estado;
   }
   if ("prioridad" in o) {
@@ -132,6 +162,13 @@ export function normalizarCambio(crudo: unknown): CambioTarea | { error: string 
   if ("responsableId" in o) {
     if (typeof o.responsableId !== "string" || !UUID.test(o.responsableId)) return { error: "Persona no válida." };
     c.responsableId = o.responsableId;
+  }
+  if ("responsablesIds" in o) {
+    const ids = Array.isArray(o.responsablesIds) ? [...new Set(o.responsablesIds)] : [];
+    if (!ids.length) return { error: "La tarea tiene que tener al menos una persona." };
+    if (ids.length > MAX_RESPONSABLES) return { error: `Hasta ${MAX_RESPONSABLES} personas por tarea.` };
+    if (!ids.every((x) => typeof x === "string" && UUID.test(x))) return { error: "Persona no válida." };
+    c.responsablesIds = ids as string[];
   }
   if ("plazo" in o) {
     if (o.plazo !== null && !esFecha(o.plazo)) return { error: "Fecha no válida." };
@@ -162,7 +199,7 @@ export function ordenarTareas(tareas: TareaVista[]): TareaVista[] {
 /** Las tareas que ve una persona: las que le tocan a ella (o, si nadie las tiene, las que creó). Un administrador con «todas» ve todas. */
 export function tareasDe(tareas: TareaVista[], yo: string, todas: boolean): TareaVista[] {
   if (todas) return tareas;
-  return tareas.filter((t) => t.responsableId === yo || (!t.responsableId && t.creadoPor === yo));
+  return tareas.filter((t) => t.responsableId === yo || t.otros.some((o) => o.id === yo) || (!t.responsableId && !t.otros.length && t.creadoPor === yo));
 }
 
 /** Pendiente = sin hacer y sin archivar. */
@@ -198,3 +235,14 @@ export const corteParaCerrar = (ahora: Date) => new Date(ahora.getTime() - DIAS_
 
 /** ¿Esta tarea ya se debe cerrar sola? */
 export const debeCerrarse = (t: Pick<TareaVista, "estado" | "hechaEn" | "archivadaEn">, ahora: Date) => t.estado === "hecha" && !t.archivadaEn && !!t.hechaEn && t.hechaEn < corteParaCerrar(ahora);
+
+/**
+ * Quién ve las tareas de todos en Gestión de IDs Dropi (8 nov 2026, pedido de Alcides: «yo debo poder ver las de todos, y que los demás no vean las mías»): por
+ * id de perfil, hoy solo Alcides. Los demás, aunque sean administradores, ven solo las suyas (en la pestaña, en la ficha de la publicación y en la marca de la fila).
+ */
+export const VEN_TODAS_LAS_TAREAS: ReadonlySet<string> = new Set(["a3e6cde5-006a-42a6-91df-db2ac88dffbb"]);
+export const veTodasLasTareas = (usuarioId: string) => VEN_TODAS_LAS_TAREAS.has(usuarioId);
+
+/** ¿Esta persona ve esta tarea? La hace (principal u otra), o no tiene a nadie y la creó ella, o ve las de todos. */
+export const tareaVisiblePara = (t: { responsableId: string | null; otrosIds: string[]; creadoPor: string | null }, yo: string) =>
+  veTodasLasTareas(yo) || t.responsableId === yo || t.otrosIds.includes(yo) || (!t.responsableId && !t.otrosIds.length && t.creadoPor === yo);

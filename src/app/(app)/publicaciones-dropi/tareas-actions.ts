@@ -4,10 +4,10 @@ import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { getPaisActual } from "@/lib/pais";
-import { etiquetaEstado, etiquetaPrioridad, normalizarCambio, normalizarTarea, pendiente, type TareaVista } from "@/lib/publicaciones/tareas";
+import { etiquetaEstado, etiquetaPrioridad, normalizarCambio, normalizarTarea, pendiente, type TareaVista, tareaVisiblePara } from "@/lib/publicaciones/tareas";
 import { puedeVerPaisId } from "@/lib/seguridad/pais-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
-import { cargarTareas, COLUMNAS_0178, COLUMNAS_TAREA, deFilaManual, type PublicacionDeTarea } from "./tareas-datos";
+import { cargarTareas, COLUMNAS_0178, COLUMNAS_TAREA, deFilaManual, presentarTareas, type PublicacionDeTarea } from "./tareas-datos";
 
 const MODULO = "publicaciones-dropi";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -83,7 +83,7 @@ export async function crearTareaPublicacion(publicacionId: string, crudo: unknow
   await avisarResponsable(responsableId, usuario, t.titulo, `${pub.nombre}${t.plazo ? ` · para el ${fechaLarga(t.plazo)}` : ""}${t.nota ? ` · «${t.nota}»` : ""}`);
   revalidar();
   return {
-    tarea: deFilaManual(r.data as unknown as Record<string, unknown>),
+    tarea: (await presentarTareas(supabase, [deFilaManual(r.data as unknown as Record<string, unknown>)]))[0],
     publicacion: { id: pub.id, numero: pub.numero == null ? null : Number(pub.numero), nombre: pub.nombre, fotoUrl: pub.foto_url, dropiId: pub.dropi_id },
   };
 }
@@ -105,7 +105,9 @@ export async function actualizarTarea(tareaId: string, crudo: unknown): Promise<
   const fila = leida.data as unknown as Record<string, unknown> | null;
   const pubActual = fila?.dropi_publicaciones as { pais_id: string; nombre: string } | undefined;
   if (!fila || !pubActual || !(await puedeVerPaisId(supabase, usuario.paisesPermitidos, pubActual.pais_id))) return { error: "No se encontró la tarea." };
-  const antes = deFilaManual(fila);
+  // Con las demás personas que la hacen; el estado, el guardado (no «Estancada», que solo se muestra).
+  const guardada = deFilaManual(fila);
+  const antes = { ...(await presentarTareas(supabase, [guardada]))[0], estado: guardada.estado };
   if (!conEstados && (c.estado && c.estado !== "hecha" ? true : c.prioridad !== undefined || c.archivar !== undefined)) return { error: MIGRACION_0178 };
 
   const yo = usuario.nombre || usuario.email || null;
@@ -135,6 +137,25 @@ export async function actualizarTarea(tareaId: string, crudo: unknown): Promise<
     lineas.push(c.plazo ? `para el ${fechaLarga(c.plazo)}` : "sin fecha");
   }
   let nuevoResponsable: string | null = null;
+  // Varios responsables (8 nov 2026, migración 0255): la primera persona es la principal (`responsable_id`); las demás van a su tabla.
+  let otrosNuevos: { id: string; nombre: string }[] | null = null;
+  const nuevosAvisos: string[] = [];
+  if (c.responsablesIds) {
+    const [principal, ...demas] = c.responsablesIds;
+    const nombres = new Map<string, string>();
+    for (const id of c.responsablesIds) {
+      const nombre = await personaActiva(id);
+      if (!nombre) return { error: "Una de las personas elegidas no está activa." };
+      nombres.set(id, nombre);
+    }
+    const antesIds = new Set([antes.responsableId, ...antes.otros.map((o) => o.id)].filter(Boolean) as string[]);
+    for (const id of c.responsablesIds) if (!antesIds.has(id)) nuevosAvisos.push(id);
+    if (principal !== antes.responsableId) Object.assign(cambios, { responsable_id: principal, responsable_nombre: nombres.get(principal) });
+    otrosNuevos = demas.map((id) => ({ id, nombre: nombres.get(id)! }));
+    const antesTexto = [antes.responsableNombre, ...antes.otros.map((o) => o.nombre)].filter(Boolean).join(", ") || "nadie";
+    const despuesTexto = c.responsablesIds.map((id) => nombres.get(id)).join(", ");
+    if (antesTexto !== despuesTexto) lineas.push(`le toca a ${despuesTexto} (antes: ${antesTexto})`);
+  }
   if (c.responsableId !== undefined && c.responsableId !== antes.responsableId) {
     const nombre = await personaActiva(c.responsableId);
     if (!nombre) return { error: "La persona elegida no está activa." };
@@ -152,23 +173,41 @@ export async function actualizarTarea(tareaId: string, crudo: unknown): Promise<
     cambios.archivada_en = c.archivar ? new Date().toISOString() : null;
     lineas.push(c.archivar ? "archivada" : "fuera de Archivadas");
   }
-  if (!Object.keys(cambios).length) return { tarea: antes };
+  if (otrosNuevos) {
+    const antesOtros = antes.otros.map((o) => o.id).join(",");
+    if (otrosNuevos.map((o) => o.id).join(",") !== antesOtros) {
+      const { error: errorBorrar } = await supabase.from("dropi_tareas_responsables").delete().eq("tarea_id", tareaId);
+      if (errorBorrar) return { error: otrosNuevos.length ? "Falta correr en Supabase la migración 0255 para poner varias personas." : "No se pudo guardar." };
+      if (otrosNuevos.length) {
+        const { error: errorPoner } = await supabase.from("dropi_tareas_responsables").insert(otrosNuevos.map((o) => ({ tarea_id: tareaId, persona_id: o.id, persona_nombre: o.nombre })));
+        if (errorPoner) return { error: "No se pudieron guardar las personas de la tarea." };
+      }
+    }
+  }
+  if (!Object.keys(cambios).length && !otrosNuevos) return { tarea: antes };
 
-  const { data, error } = await supabase
-    .from("dropi_publicaciones_tareas")
-    .update(cambios)
-    .eq("id", tareaId)
-    .select(conEstados ? `${COLUMNAS_TAREA}, ${COLUMNAS_0178}` : COLUMNAS_TAREA)
-    .single();
+  const { data, error } = Object.keys(cambios).length
+    ? await supabase
+        .from("dropi_publicaciones_tareas")
+        .update(cambios)
+        .eq("id", tareaId)
+        .select(conEstados ? `${COLUMNAS_TAREA}, ${COLUMNAS_0178}` : COLUMNAS_TAREA)
+        .single()
+    : await supabase
+        .from("dropi_publicaciones_tareas")
+        .select(conEstados ? `${COLUMNAS_TAREA}, ${COLUMNAS_0178}` : COLUMNAS_TAREA)
+        .eq("id", tareaId)
+        .single();
   if (error || !data) return { error: error && falta0178(error.message) ? MIGRACION_0178 : "No se pudo guardar." };
-  const despues = deFilaManual(data as unknown as Record<string, unknown>);
+  const despues = (await presentarTareas(supabase, [deFilaManual(data as unknown as Record<string, unknown>)]))[0];
   await registrarAuditoria({
     accion: c.estado === "hecha" && antes.estado !== "hecha" ? "resolver_tarea_publicacion" : "editar_tarea_publicacion",
     entidad: "dropi_publicaciones",
     entidadId: despues.publicacionId,
     detalle: `Tarea «${despues.titulo}»: ${lineas.join(" · ")}`,
   });
-  if (nuevoResponsable) await avisarResponsable(nuevoResponsable, usuario, despues.titulo, `${pubNueva?.nombre ?? pubActual.nombre}${despues.plazo ? ` · para el ${fechaLarga(despues.plazo)}` : ""}`);
+  for (const id of new Set([...(nuevoResponsable ? [nuevoResponsable] : []), ...nuevosAvisos]))
+    await avisarResponsable(id, usuario, despues.titulo, `${pubNueva?.nombre ?? pubActual.nombre}${despues.plazo ? ` · para el ${fechaLarga(despues.plazo)}` : ""}`);
   revalidar();
   return {
     tarea: despues,
@@ -187,7 +226,9 @@ export async function obtenerTareasPublicacion(publicacionId: string): Promise<{
   const conEstados = !r.error;
   if (r.error) r = await leer(COLUMNAS_TAREA);
   if (r.error) return falta(r.error.message) ? { tareas: [], disponible: false, conEstados: false } : { error: "No se pudieron cargar las tareas." };
-  return { tareas: ((r.data ?? []) as unknown as Record<string, unknown>[]).map(deFilaManual), disponible: true, conEstados };
+  // Cada persona ve solo las suyas; quien ve las de todos, todas (8 nov 2026).
+  const tareas = await presentarTareas(supabase, ((r.data ?? []) as unknown as Record<string, unknown>[]).map(deFilaManual));
+  return { tareas: tareas.filter((t) => tareaVisiblePara({ responsableId: t.responsableId, otrosIds: t.otros.map((o) => o.id), creadoPor: t.creadoPor }, usuario.id)), disponible: true, conEstados };
 }
 
 /** Las publicaciones del país de la barra que se llaman como lo escrito (o su PUB-0000 o su ID de Dropi), para asociar una tarea a un producto. */
