@@ -12,8 +12,8 @@ const NOMBRE: NombreFilas = { singular: "producto", plural: "productos" };
 const ICONOS: Record<string, IconoComp> = { sku: ProductoIcon, producto: ProductoIcon, pendiente: InventarioIcon };
 
 const COLUMNAS: ColumnaTabla<FilaPendiente>[] = [
-  { id: "sku", label: "SKU", ocultable: false, clase: "font-medium", render: (p) => p.sku },
-  { id: "producto", label: "Producto", ocultable: true, clase: "text-muted-foreground", render: (p) => p.nombre },
+  { id: "producto", label: "Producto", ocultable: false, clase: "font-medium", render: (p) => p.nombre },
+  { id: "sku", label: "SKU", ocultable: true, clase: "text-muted-foreground", render: (p) => p.sku },
   { id: "pendiente", label: "Pendiente", ocultable: true, clase: "tabular-nums", render: (p) => p.pendiente },
 ];
 

@@ -67,8 +67,8 @@ const ICONOS: Record<string, IconoComp> = {
 type ColumnaId = "sku" | "producto" | "cantidad" | "detectada" | "reclamada" | "estado";
 
 const COLUMNAS: (ColumnaDef & { id: ColumnaId })[] = [
-  { id: "sku", label: "SKU", ocultable: false },
-  { id: "producto", label: "Producto", ocultable: true },
+  { id: "producto", label: "Producto", ocultable: false },
+  { id: "sku", label: "SKU", ocultable: true },
   { id: "cantidad", label: "Cantidad", ocultable: true },
   { id: "detectada", label: "Detectada", ocultable: true },
   { id: "reclamada", label: "Reclamada", ocultable: true },
@@ -153,8 +153,8 @@ export function TablaAlertas({
   }
 
   const claseCelda: Record<ColumnaId, string> = {
-    sku: "font-medium",
-    producto: "text-muted-foreground",
+    producto: "font-medium",
+    sku: "text-muted-foreground",
     cantidad: "tabular-nums",
     detectada: "",
     reclamada: "",
