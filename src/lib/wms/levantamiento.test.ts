@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { itemsParaSumar, quedaDespues, repartirFilas, revisarConteo, revisarTransferencias, varianteDeLinea } from "./levantamiento";
+import { codigoLote } from "./vencimiento";
 
 const A = "0194f0a2-0000-7000-8000-000000000001";
 const B = "0194f0a2-0000-7000-8000-000000000002";
@@ -138,4 +139,16 @@ test("transferencias: lo que no vale se rechaza", () => {
   assert.ok("error" in revisarTransferencias([{ sku: "x", cantidad: 2, destino: DESTINO }], ORIGEN));
   assert.ok("error" in revisarTransferencias([{ sku: SKU, cantidad: 2, destino: DESTINO }, { sku: SKU, cantidad: 1, destino: OTRO }], ORIGEN));
   assert.ok("error" in revisarTransferencias("no", ORIGEN));
+});
+
+test("un lote nuevo sin código se nombra con su fecha de vencimiento (9 nov 2026)", () => {
+  assert.equal(codigoLote("", "2029-08-18"), "Vence 2029-08-18");
+  assert.equal(codigoLote("  L-24  ", "2029-08-18"), "L-24");
+  assert.equal(codigoLote("", ""), "");
+  const { contados, sumas } = repartirFilas([
+    { sku: "a", lotes: [{ codigo: "", vencimiento: "2029-08-18", contado: null, sumar: 2100 }] },
+    { sku: "b", lotes: [{ codigo: "", vencimiento: null, contado: null, sumar: 5 }] },
+  ]);
+  assert.deepEqual(contados, []);
+  assert.deepEqual(sumas, [{ sku: "a", lotes: [{ codigo: "Vence 2029-08-18", vencimiento: "2029-08-18", cantidad: 2100 }] }]);
 });

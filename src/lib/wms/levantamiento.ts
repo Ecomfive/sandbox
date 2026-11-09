@@ -3,6 +3,8 @@
  * (`wms_registrar_conteo`, migración 0214). Lógica pura, con prueba.
  */
 
+import { codigoLote } from "./vencimiento";
+
 export interface LoteContado {
   codigo: string;
   /** Solo hace falta si el lote es nuevo (AAAA-MM-DD). */
@@ -135,13 +137,14 @@ export function repartirFilas(filas: FilaConteo[]): { contados: ItemConteo[]; su
   const sumas: ItemConteo[] = [];
   for (const f of filas) {
     if ("lotes" in f) {
-      const lotes = f.lotes.filter((l) => l.codigo.trim() !== "");
+      // Un lote nuevo sin código se nombra con su vencimiento (`codigoLote`, 9 nov 2026); sin ninguno de los dos no se toma.
+      const lotes = f.lotes.map((l) => ({ ...l, codigo: codigoLote(l.codigo, l.vencimiento) })).filter((l) => l.codigo !== "");
       if (lotes.some((l) => l.contado !== null)) {
-        contados.push({ sku: f.sku, lotes: lotes.map((l) => ({ codigo: l.codigo.trim(), vencimiento: l.vencimiento, cantidad: (l.contado ?? 0) + (l.sumar ?? 0) })) });
+        contados.push({ sku: f.sku, lotes: lotes.map((l) => ({ codigo: l.codigo, vencimiento: l.vencimiento, cantidad: (l.contado ?? 0) + (l.sumar ?? 0) })) });
         continue;
       }
       const entran = lotes.filter((l) => (l.sumar ?? 0) > 0);
-      if (entran.length) sumas.push({ sku: f.sku, lotes: entran.map((l) => ({ codigo: l.codigo.trim(), vencimiento: l.vencimiento, cantidad: l.sumar ?? 0 })) });
+      if (entran.length) sumas.push({ sku: f.sku, lotes: entran.map((l) => ({ codigo: l.codigo, vencimiento: l.vencimiento, cantidad: l.sumar ?? 0 })) });
       continue;
     }
     if (f.contado !== null) contados.push({ sku: f.sku, cantidad: f.contado + (f.sumar ?? 0) });

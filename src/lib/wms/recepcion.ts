@@ -1,6 +1,7 @@
 /**
  * Recepción de compras y reglas de Costa Rica (6 nov 2026, pedido de Hernán, flujograma de Proveeduría Costa Rica). Lógica pura, con prueba.
  */
+import { codigoLote } from "./vencimiento";
 
 /** Los países donde se reciben compras desde Inventario. Por ahora Costa Rica: los demás siguen como estaban. */
 export const PAISES_CON_RECEPCION = ["CR"];
@@ -64,7 +65,7 @@ export function revisarRecepcion(items: unknown): { items: LineaRecepcion[] } | 
     const vencimiento = typeof o.vencimiento === "string" && o.vencimiento ? o.vencimiento : null;
     if (vencimiento && (!FECHA.test(vencimiento) || Number.isNaN(Date.parse(vencimiento)))) return { error: "Una fecha de vencimiento no es válida." };
     const texto = (v: unknown, max: number) => (typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, max) : "");
-    limpios.push({ item, cantidad, nota: texto(o.nota, 300) || null, ubicacion, lote_codigo: texto(o.lote_codigo, 80) || null, vencimiento });
+    limpios.push({ item, cantidad, nota: texto(o.nota, 300) || null, ubicacion, lote_codigo: codigoLote(texto(o.lote_codigo, 80), vencimiento) || null, vencimiento });
   }
   return { items: limpios };
 }
