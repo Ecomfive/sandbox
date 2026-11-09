@@ -1,3 +1,4 @@
+import type { ReservaDropi } from "@/lib/publicaciones/reservas-dropi";
 import {
   numeroPublicacion,
   TIPOS,
@@ -137,6 +138,10 @@ export interface FilaPublicacion {
   liquidacionDesde: string | null;
   /** Vende poco, pero le cambiaron el precio hace menos de 30 días: el día en que se vuelve a revisar (7 nov 2026). */
   vendePocoVuelve: string | null;
+  /** Las unidades reservadas por correo en Dropi (migración 0254): en una pública, «Reservado a …»; en un privado, a quién se le asignó. Vacío si no tiene o no se leyó. */
+  reservas: ReservaDropi[];
+  /** Reservas por correo esperando «Aplicar en Dropi» (migración 0254), con el error si el último intento falló. */
+  reservasPendientes: { correo: string; unidades: number; nombre: string | null; error: string | null }[];
   /** Por qué espera: le cambiaron el precio o alguien eligió «Esperar un mes» (8 nov 2026). */
   vendePocoPor: "precio" | "decision" | null;
   /** «Esperar un mes» que sigue corriendo (migración 0252): hasta cuándo, por qué y quién lo decidió. */
@@ -418,6 +423,19 @@ export const DEF_PUBLICACIONES: DefTabla<FilaPublicacion> = {
         { valor: "pausada", etiqueta: "Pausada sin stock" },
         { valor: "no", etiqueta: "No pausada" },
       ],
+    },
+    // Pública con unidades reservadas a un correo (8 nov 2026): aparte de las privadas.
+    {
+      id: "reserva",
+      etiqueta: "Stock reservado por correo",
+      tipo: "seleccion",
+      valores: (f) => [f.reservas.length ? (f.tipoDropi === "privado" ? "privado" : "publica") : "no"],
+      opciones: () => [
+        { valor: "publica", etiqueta: "Pública con reserva" },
+        { valor: "privado", etiqueta: "Producto privado con reserva" },
+        { valor: "no", etiqueta: "Sin reserva" },
+      ],
+      agrupable: true,
     },
     { id: "privatizado", etiqueta: "Privatizado a", tipo: "seleccion", valores: (f) => uno(f.privatizadoA || null), etiquetaSinValor: "Sin privatizar", agrupable: true },
     { id: "nombre", etiqueta: "Producto", tipo: "texto", valor: (f) => `${numeroPublicacion(f.numero)} ${f.nombre} ${f.dropiId}` },

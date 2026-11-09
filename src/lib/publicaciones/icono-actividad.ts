@@ -33,7 +33,7 @@ export function iconoDeAccion(accion: string, texto = ""): { icono: IconoActivid
   if (/^pausar_/.test(accion)) return de("pausar");
   if (/^reactivar_/.test(accion)) return de("reactivar");
   if (/apagar|apagado/.test(accion)) return de("apagar");
-  if (/privatiz/.test(accion)) return de("privatizar");
+  if (/privatiz|reserva/.test(accion)) return de("privatizar");
   if (/republic/.test(accion)) return de("republicar");
   if (/archiv|restaur(ar|ada)_|_restaurada$/.test(accion) && accion !== "restaurar_nombre_dropi") return de("archivar");
   if (/stock/.test(accion)) return de("stock");

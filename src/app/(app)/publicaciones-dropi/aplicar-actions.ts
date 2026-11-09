@@ -10,6 +10,7 @@ import { unaPorFoto } from "@/lib/publicaciones/fotos-dropi";
 import { destinosDe, normalizarDatosPrivatizar, quienesDe, type DatosPrivatizar } from "@/lib/publicaciones/privatizar-dropi";
 import type { VariacionLeida } from "@/lib/publicaciones/privatizar-variable";
 import { normalizarDatosStock, textoVariacion, type DatosStock } from "@/lib/publicaciones/stock-dropi";
+import { normalizarDatosReserva, reservasDeDropi, type DatosReserva } from "@/lib/publicaciones/reservas-dropi";
 import { codigoBodega } from "@/lib/publicaciones/sincronizar-dropi";
 import { puedeVerPaisId } from "@/lib/seguridad/pais-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -37,9 +38,11 @@ export interface CambioParaDropi {
    * «archivar» = archivar o sacar de Archivados (0151); «crear» = publicar la publicación nueva en Dropi (0151); «privatizar» = dejarle
    * unidades a un dropshipper en un producto privado nuevo (0154); «stock» = dejar una bodega con unas unidades (0173).
    */
-  tipo: "cambio" | "republicar" | "apagar" | "archivar" | "crear" | "privatizar" | "stock";
+  tipo: "cambio" | "republicar" | "apagar" | "archivar" | "crear" | "privatizar" | "stock" | "reserva";
   /** «stock»: la bodega y las unidades que deben quedar (al favorito viaja como `datos`). */
   stock: DatosStock | null;
+  /** «reserva» (migración 0254): a qué correo y cuántas unidades deben quedar reservadas (al favorito viaja como `datos`). */
+  reserva: DatosReserva | null;
   /** «archivar»: true = sacarlo de Archivados. */
   restaurar: boolean;
   /** «cambio»: la descripción nueva (null = no se cambia) y las fotos que se suben. */
@@ -275,8 +278,9 @@ export async function pendientesParaDropi(codigoPais: string): Promise<{ error?:
     pais: pais.nombre,
     cambios: (data ?? []).map((f) => ({
       id: f.id as string,
-      tipo: f.tipo === "republicar" ? ("republicar" as const) : f.tipo === "apagar" ? ("apagar" as const) : f.tipo === "archivar" ? ("archivar" as const) : f.tipo === "crear" ? ("crear" as const) : f.tipo === "privatizar" ? ("privatizar" as const) : f.tipo === "stock" ? ("stock" as const) : ("cambio" as const),
+      tipo: f.tipo === "republicar" ? ("republicar" as const) : f.tipo === "apagar" ? ("apagar" as const) : f.tipo === "archivar" ? ("archivar" as const) : f.tipo === "crear" ? ("crear" as const) : f.tipo === "privatizar" ? ("privatizar" as const) : f.tipo === "stock" ? ("stock" as const) : f.tipo === "reserva" ? ("reserva" as const) : ("cambio" as const),
       stock: f.tipo === "stock" ? normalizarDatosStock(f.datos) : null,
+      reserva: f.tipo === "reserva" ? normalizarDatosReserva(f.datos) : null,
       restaurar: f.restaurar === true,
       descripcion: (f.descripcion as string | null | undefined) ?? null,
       fotos: f.tipo === "republicar" || f.tipo === "privatizar" ? (deSistema.get(f.publicacion_id as string) ?? []) : normalizarDatosCrear({ fotos: f.fotos }).fotos,
@@ -307,7 +311,7 @@ export async function guardarResultadosDropi(codigoPais: string, resultados: unk
   if (!pais) return { error: "País no válido." };
   if (!Array.isArray(resultados) || resultados.length > MAX) return { error: "Resultados no válidos." };
   const limpios = resultados
-    .map((r) => r as { id?: unknown; ok?: unknown; error?: unknown; nuevo?: unknown; archivado?: unknown; aviso?: unknown; salida?: unknown; antes?: unknown; stock?: unknown; bodegas?: unknown; variacion?: unknown; unidades?: unknown; devuelto?: unknown })
+    .map((r) => r as { id?: unknown; ok?: unknown; error?: unknown; nuevo?: unknown; archivado?: unknown; aviso?: unknown; salida?: unknown; antes?: unknown; stock?: unknown; bodegas?: unknown; variacion?: unknown; unidades?: unknown; devuelto?: unknown; reservas?: unknown; privado?: unknown })
     .filter((r) => typeof r.id === "string" && UUID.test(r.id))
     .map((r) => ({
       id: r.id as string,
@@ -334,6 +338,9 @@ export async function guardarResultadosDropi(codigoPais: string, resultados: unk
         : null,
       // «stock» de una variación: cómo quedó esa variación en cada bodega.
       variacion: normalizarVariacionReleida(r.variacion),
+      // «reserva»: las reservas vivas que releyó el favorito y si Dropi lo tiene como producto privado.
+      reservas: Array.isArray(r.reservas) ? reservasDeDropi({ private_product_inventories: (r.reservas as unknown[]).slice(0, 50) }) : null,
+      privado: typeof r.privado === "boolean" ? r.privado : null,
       // El ID del producto que creó una republicación (aunque haya fallado un paso después).
       nuevo: Number.isInteger(r.nuevo) && (r.nuevo as number) > 0 && (r.nuevo as number) < 100_000_000 ? (r.nuevo as number) : null,
     }));
@@ -391,6 +398,32 @@ export async function guardarResultadosDropi(codigoPais: string, resultados: unk
         detalle: hecho ? `ID ${f.dropi_producto_id}: sin stock y archivado en Dropi${privatizacion}${devuelta} (desde Dropi)` : `ID ${f.dropi_producto_id} · ${r.error}${privatizacion}${devuelta}`,
       });
       if (hecho) aplicados++;
+      else errores++;
+      continue;
+    }
+    if (f.tipo === "reserva") {
+      const d = normalizarDatosReserva(f.datos);
+      await supabase
+        .from("dropi_cambios_pendientes")
+        .update(r.ok ? { estado: "aplicado", aplicado_en: ahora, error: null, intentos: Number(f.intentos) + 1 } : { estado: "error", error: r.aviso ? `${r.error} ${r.aviso}`.slice(0, 500) : r.error, intentos: Number(f.intentos) + 1 })
+        .eq("id", r.id);
+      // Lo que releyó el favorito pasa al sistema sin esperar la próxima lectura (sin la migración 0254 no hay dónde: queda para la lectura).
+      if (r.reservas)
+        await supabase
+          .from("dropi_productos_proveedor")
+          .update({ reservas: r.reservas, ...(r.privado !== null ? { privado_producto: r.privado } : {}), ...(r.stock !== null ? { stock: r.stock } : {}) })
+          .eq("pais_id", pais.id)
+          .eq("dropi_producto_id", Number(f.dropi_producto_id));
+      const que = d.unidades === 0 ? `quitar la reserva de ${d.correo}` : `reservar ${d.unidades} u. a ${d.correo}`;
+      auditoria.push({
+        accion: r.ok ? "dropi_reserva_aplicada" : "dropi_reserva_error",
+        entidad: "dropi_publicaciones",
+        entidadId: f.publicacion_id as string,
+        detalle: r.ok
+          ? `ID ${f.dropi_producto_id} · ${d.unidades === 0 ? `sin reserva para ${d.correo}` : `${d.correo}: ${d.antes ?? 0} → ${d.unidades} u. reservadas`}${r.aviso ? ` · ${r.aviso}` : ""} (desde Dropi)`
+          : `ID ${f.dropi_producto_id} · ${que} · ${r.error}${r.aviso ? ` · ${r.aviso}` : ""}`,
+      });
+      if (r.ok) aplicados++;
       else errores++;
       continue;
     }

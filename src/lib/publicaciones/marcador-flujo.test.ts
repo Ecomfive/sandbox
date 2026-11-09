@@ -109,6 +109,9 @@ function crearDropi(opciones: { noTomaEntradas?: boolean; usuarios?: Record<stri
               const fila = (p.warehouse_product as Obj[]).find((w) => w.warehouse_id === 81)!;
               fila.stock = Number(fila.stock) - Number(viva.stock);
             }
+          } else if (viva) {
+            // Cambiar las unidades de una reserva que ya tenía (8 nov 2026, «Stock reservado por correo»).
+            viva.stock = x.stock;
           } else if (!viva) {
             // Con variaciones, la reserva se compara con el stock de su variación (`privateVariationStockFix`).
             const variacion = (p.variations as Obj[] | undefined)?.find((v) => v.id === x.variation_id);
@@ -1076,4 +1079,39 @@ test("stock: un cambio sin variación en un producto con variaciones (o al revé
   assert.match(String(b.error), /ya no tiene variaciones/);
   assert.match(String(c.error), /ya no tiene la variación XL/);
   assert.equal(d.llamadas.filter((l) => l.startsWith("PUT")).length, 0);
+});
+
+test("reserva por correo: agregar un correo, cambiar sus unidades y quitarla, sin tocar el stock (y avisar si Dropi lo cambia)", async () => {
+  const d = crearDropi({ usuarios: { "ana@correo.com": { id: 901, name: "Ana", email: "ana@correo.com", role_user: { name: "DROPSHIPPER" } }, "prov@correo.com": { id: 902, role_user: { name: "SUPPLIER" } } } });
+  d.productos.set(8744, productoBase(8744, { warehouse_product: [{ warehouse_id: 81, stock: 66, warehouse: BODEGA }] }));
+  const [agrega] = await aplicar(d, [{ ...base, id: "r1", tipo: "reserva", producto: 8744, datos: { correo: "ana@correo.com", unidades: 40 } }]);
+  assert.equal(agrega.ok, true, String(agrega.error));
+  assert.deepEqual((agrega.reservas as Obj[]).map((x) => [x.email, x.stock]), [["ana@correo.com", 40]]);
+  assert.equal(agrega.stock, 66);
+  assert.equal(agrega.aviso, null);
+  assert.deepEqual(d.stockDe(d.productos.get(8744)!), { 81: 66 }, "reservar no mueve el stock");
+  const [cambia] = await aplicar(d, [{ ...base, id: "r2", tipo: "reserva", producto: 8744, datos: { correo: "ANA@correo.com", unidades: 50 } }]);
+  assert.equal(cambia.ok, true, String(cambia.error));
+  assert.deepEqual((cambia.reservas as Obj[]).map((x) => x.stock), [50]);
+  const putsAntes = d.llamadas.filter((l) => l === "PUT /products/8744").length;
+  const [igual] = await aplicar(d, [{ ...base, id: "r3", tipo: "reserva", producto: 8744, datos: { correo: "ana@correo.com", unidades: 50 } }]);
+  assert.equal(igual.ok, true);
+  assert.equal(d.llamadas.filter((l) => l === "PUT /products/8744").length, putsAntes, "si ya está así, no guarda nada");
+  const [demasiado] = await aplicar(d, [{ ...base, id: "r4", tipo: "reserva", producto: 8744, datos: { correo: "ana@correo.com", unidades: 70 } }]);
+  assert.equal(demasiado.ok, false);
+  assert.match(String(demasiado.error), /66 unidades/);
+  const [proveedor] = await aplicar(d, [{ ...base, id: "r5", tipo: "reserva", producto: 8744, datos: { correo: "prov@correo.com", unidades: 5 } }]);
+  assert.equal(proveedor.ok, false);
+  assert.match(String(proveedor.error), /proveedor/);
+  const [quita] = await aplicar(d, [{ ...base, id: "r6", tipo: "reserva", producto: 8744, datos: { correo: "ana@correo.com", unidades: 0 } }]);
+  assert.equal(quita.ok, true, String(quita.error));
+  assert.deepEqual(quita.reservas, []);
+});
+
+test("reserva por correo: si Dropi descuenta el stock al quitar la reserva, se avisa con los números", async () => {
+  const d = crearDropi({ quitarReservaSaca: true });
+  d.productos.set(8744, productoBase(8744, { warehouse_product: [{ warehouse_id: 81, stock: 66, warehouse: BODEGA }], private_product_inventories: [{ id: 7, product_id: 8744, user_id: 901, email: "ana@correo.com", stock: 66, deleted_at: null }] }));
+  const [quita] = await aplicar(d, [{ ...base, id: "r1", tipo: "reserva", producto: 8744, datos: { correo: "ana@correo.com", unidades: 0 } }]);
+  assert.equal(quita.ok, true, String(quita.error));
+  assert.match(String(quita.aviso), /pasó de 66 a 0/);
 });

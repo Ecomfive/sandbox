@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { reservasGuardadas } from "./reservas-dropi";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import type { VariacionLeida } from "./privatizar-variable";
 import type { BodegaDropi, ProductoProveedor } from "./sincronizar-dropi";
@@ -31,14 +32,11 @@ export const stockVigente = (id: number, deLaCarga: number, actual: Map<number, 
  */
 export async function cargarProductosProveedor(supabase: SupabaseClient, paisId: string): Promise<{ leidoEn: string; productos: Map<number, ProductoProveedor> } | null> {
   try {
-    const filas = await traerTodasLasFilas<Record<string, unknown>>((d, h) =>
-      supabase
-        .from("dropi_productos_proveedor")
-        .select("dropi_producto_id, nombre, tipo, archivado, privado, precio, precio_sugerido, stock, stock_privado, bodegas, categorias, fotos, creado_dropi, leido_en, variaciones")
-        .eq("pais_id", paisId)
-        .order("dropi_producto_id")
-        .range(d, h),
-    );
+    const base = "dropi_producto_id, nombre, tipo, archivado, privado, precio, precio_sugerido, stock, stock_privado, bodegas, categorias, fotos, creado_dropi, leido_en, variaciones";
+    const leer = (columnas: string) =>
+      traerTodasLasFilas<Record<string, unknown>>((d, h) => supabase.from("dropi_productos_proveedor").select(columnas).eq("pais_id", paisId).order("dropi_producto_id").range(d, h) as unknown as PromiseLike<{ data: Record<string, unknown>[] | null; error: unknown }>);
+    // Sin la migración 0254 todavía no están `privado_producto` ni `reservas`: se lee como antes.
+    const filas = await leer(`${base}, privado_producto, reservas`).catch(() => leer(base));
     if (!filas.length) return null;
     const n = (v: unknown) => (v === null || v === undefined ? null : Number(v));
     let leidoEn = "";
@@ -61,6 +59,8 @@ export async function cargarProductosProveedor(supabase: SupabaseClient, paisId:
         fotos: Number(f.fotos ?? 0),
         creado: (f.creado_dropi as string | null) ?? null,
         variaciones: Array.isArray(f.variaciones) ? (f.variaciones as VariacionLeida[]) : null,
+        privadoProducto: typeof f.privado_producto === "boolean" ? f.privado_producto : null,
+        reservas: Array.isArray(f.reservas) ? reservasGuardadas(f.reservas) : null,
       });
     }
     return { leidoEn, productos };

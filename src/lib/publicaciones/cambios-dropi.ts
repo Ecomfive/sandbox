@@ -12,6 +12,7 @@ import { MAX_NOMBRE_DROPI } from "./dropi-guardado";
 import { normalizarDatosDevolver } from "./apagar-dropi";
 import { destinosDe, normalizarDatosPrivatizar, type DatosPrivatizar } from "./privatizar-dropi";
 import { idsDeDropi } from "./sincronizar-dropi";
+import { normalizarDatosReserva, type DatosReserva } from "./reservas-dropi";
 import { normalizarDatosStock, productoDelCambio, type DatosStock } from "./stock-dropi";
 
 export type EstadoCambioDropi = "pendiente" | "aplicado" | "error" | "reemplazado";
@@ -24,9 +25,11 @@ export interface CambioDropiVista {
    * stock y archivar (0148); «archivar» = archivar o sacar de Archivados (0151); «crear» = publicar una publicación nueva en Dropi (0151);
    * «privatizar» = dejarle unidades del producto a un dropshipper en un producto privado nuevo (0155); «stock» = dejar una bodega con unas unidades (0173).
    */
-  tipo: "cambio" | "republicar" | "apagar" | "archivar" | "crear" | "privatizar" | "stock";
+  tipo: "cambio" | "republicar" | "apagar" | "archivar" | "crear" | "privatizar" | "stock" | "reserva";
   /** «stock»: la bodega, las unidades que deben quedar y las que había. */
   stock: DatosStock | null;
+  /** «reserva» (migración 0254): a qué correo y cuántas unidades deben quedar reservadas (0 = quitarla). */
+  reserva: DatosReserva | null;
   /** «privatizar»: a quién, cuántas unidades y bajo qué nombre. */
   privatizacion: Pick<DatosPrivatizar, "correo" | "dropshipper" | "unidades" | "nombre" | "extras"> | null;
   /** «archivar»: true = sacarlo de Archivados. */
@@ -330,7 +333,7 @@ export async function encolarPrivatizar(
  */
 export function pesoCambio(tipo: unknown, estado: unknown): number {
   if (estado === "aplicado") return 0;
-  return tipo === "stock" ? 1 : 2;
+  return tipo === "stock" || tipo === "reserva" ? 1 : 2;
 }
 
 /**
@@ -377,6 +380,40 @@ export async function encolarStock(
   // El índice de antes solo admite un cambio por bodega: la segunda variación de la misma bodega choca hasta correr la 0229.
   if (error?.code === "23505") return { error: "Falta correr en Supabase la migración 0229 para dejar pendiente otra variación de la misma bodega." };
   if (error || !data) return { error: error && falta(error.message) ? "Falta correr en Supabase la migración 0173." : "No se pudo dejar el stock para Dropi." };
+  return { id: data.id as string, yaEstaba: false };
+}
+
+/**
+ * «Stock reservado por correo» (8 nov 2026, migración 0254): deja en la cola que `datos.correo` quede con `datos.unidades` reservadas (0 = quitarla). Una sola
+ * por publicación y correo: si ya había una esperando, se le ponen las unidades nuevas (y se conserva el «antes» de la primera).
+ */
+export async function encolarReserva(
+  supabase: SupabaseClient,
+  pub: { id: string; pais_id: string; dropi_id: string | null },
+  datos: DatosReserva,
+  por: { id: string; nombre: string },
+): Promise<{ id: string; yaEstaba: boolean } | { error: string }> {
+  const productoId = productoDelCambio(idsDeDropi(pub.dropi_id), datos.producto ?? null);
+  if (typeof productoId !== "number") return productoId;
+  const falta = (m: string) => /tipo|column|does not exist|schema cache|datos|check constraint/i.test(m);
+  const previo = await supabase.from("dropi_cambios_pendientes").select("id, datos").eq("publicacion_id", pub.id).eq("tipo", "reserva").in("estado", ["pendiente", "error"]);
+  if (previo.error) return { error: falta(previo.error.message) ? "Falta correr en Supabase la migración 0254." : "No se pudo dejar la reserva para Dropi." };
+  const igual = (previo.data ?? []).find((f) => normalizarDatosReserva(f.datos).correo === datos.correo);
+  if (igual) {
+    const antes = normalizarDatosReserva(igual.datos).antes;
+    const { error } = await supabase
+      .from("dropi_cambios_pendientes")
+      .update({ datos: { ...datos, producto: productoId, antes: antes ?? datos.antes }, dropi_producto_id: productoId, estado: "pendiente", error: null, creado_por: por.id, creado_por_nombre: por.nombre })
+      .eq("id", igual.id as string);
+    if (error) return { error: "No se pudo dejar la reserva para Dropi." };
+    return { id: igual.id as string, yaEstaba: true };
+  }
+  const { data, error } = await supabase
+    .from("dropi_cambios_pendientes")
+    .insert({ pais_id: pub.pais_id, publicacion_id: pub.id, dropi_producto_id: productoId, tipo: "reserva", datos: { ...datos, producto: productoId }, creado_por: por.id, creado_por_nombre: por.nombre })
+    .select("id")
+    .single();
+  if (error || !data) return { error: error && falta(error.message) ? "Falta correr en Supabase la migración 0254." : "No se pudo dejar la reserva para Dropi." };
   return { id: data.id as string, yaEstaba: false };
 }
 
@@ -476,6 +513,8 @@ export async function cargarCambiosDropi(
   privatizando: Map<string, Pick<DatosPrivatizar, "correo" | "dropshipper" | "unidades" | "nombre" | "extras">[]>;
   /** Cambios de stock esperando por publicación (pendientes o con error): ID de Dropi, bodega y unidades que deben quedar. */
   ajustandoStock: Map<string, DatosStock[]>;
+  /** Reservas por correo esperando por publicación (pendientes o con error, migración 0254). */
+  reservando: Map<string, (DatosReserva & { error: string | null })[]>;
 }> {
   const porPublicacion = new Map<string, CambioDropiVista>();
   // Las publicaciones con un apagado esperando (pendiente, a medias o con error): en el sistema ya se ven como apagadas. El valor es cuántas
@@ -486,6 +525,7 @@ export async function cargarCambiosDropi(
   const creando = new Map<string, number>();
   const privatizando = new Map<string, Pick<DatosPrivatizar, "correo" | "dropshipper" | "unidades" | "nombre" | "extras">[]>();
   const ajustandoStock = new Map<string, DatosStock[]>();
+  const reservando = new Map<string, (DatosReserva & { error: string | null })[]>();
   const leer = (columnas: string) =>
     supabase.from("dropi_cambios_pendientes").select(columnas).eq("pais_id", paisId).neq("estado", "reemplazado").order("creado_en", { ascending: false }).limit(2000);
   let r = await leer("id, publicacion_id, dropi_producto_id, tipo, restaurar, descripcion, fotos, datos, nuevo_dropi_id, intentos, estado, nombre, nombre_guia, precio, precio_sugerido, error, creado_en, aplicado_en");
@@ -494,7 +534,7 @@ export async function cargarCambiosDropi(
   if (r.error) r = await leer("id, publicacion_id, estado, nombre, nombre_guia, precio, precio_sugerido, error, creado_en, aplicado_en");
   if (r.error) r = await leer("id, publicacion_id, estado, nombre, nombre_guia, error, creado_en, aplicado_en");
   const { data, error } = r as unknown as { data: Record<string, unknown>[] | null; error: unknown };
-  if (error) return { porPublicacion, pendientes: 0, apagando, archivando, creando, privatizando, ajustandoStock };
+  if (error) return { porPublicacion, pendientes: 0, apagando, archivando, creando, privatizando, ajustandoStock, reservando };
   let pendientes = 0;
   for (const f of data ?? []) {
     if (f.estado === "pendiente") pendientes++;
@@ -508,6 +548,8 @@ export async function cargarCambiosDropi(
         ...(ajustandoStock.get(f.publicacion_id as string) ?? []),
         { ...normalizarDatosStock(f.datos), producto: Number(f.dropi_producto_id) || normalizarDatosStock(f.datos).producto },
       ]);
+    if (f.tipo === "reserva" && (f.estado === "pendiente" || f.estado === "error"))
+      reservando.set(f.publicacion_id as string, [...(reservando.get(f.publicacion_id as string) ?? []), { ...normalizarDatosReserva(f.datos), error: (f.error as string | null) ?? null }]);
     if (f.tipo === "apagar" && (f.estado === "pendiente" || f.estado === "error")) apagando.set(f.publicacion_id as string, Number(f.intentos ?? 0));
     if (f.tipo === "archivar" && (f.estado === "pendiente" || f.estado === "error") && !archivando.has(f.publicacion_id as string)) archivando.set(f.publicacion_id as string, f.restaurar === true);
     if (f.tipo === "crear" && (f.estado === "pendiente" || f.estado === "error")) creando.set(f.publicacion_id as string, Number(f.intentos ?? 0));
@@ -515,8 +557,9 @@ export async function cargarCambiosDropi(
     if (yaVisto && pesoCambio(f.tipo, f.estado) <= pesoCambio(yaVisto.tipo, yaVisto.estado)) continue;
     porPublicacion.set(f.publicacion_id as string, {
       id: f.id as string,
-      tipo: f.tipo === "republicar" ? "republicar" : f.tipo === "apagar" ? "apagar" : f.tipo === "archivar" ? "archivar" : f.tipo === "crear" ? "crear" : f.tipo === "privatizar" ? "privatizar" : f.tipo === "stock" ? "stock" : "cambio",
+      tipo: f.tipo === "republicar" ? "republicar" : f.tipo === "apagar" ? "apagar" : f.tipo === "archivar" ? "archivar" : f.tipo === "crear" ? "crear" : f.tipo === "privatizar" ? "privatizar" : f.tipo === "stock" ? "stock" : f.tipo === "reserva" ? "reserva" : "cambio",
       stock: f.tipo === "stock" ? normalizarDatosStock(f.datos) : null,
+      reserva: f.tipo === "reserva" ? normalizarDatosReserva(f.datos) : null,
       privatizacion: f.tipo === "privatizar" ? (({ correo, dropshipper, unidades, nombre, extras }) => ({ correo, dropshipper, unidades, nombre, extras }))(normalizarDatosPrivatizar(f.datos)) : null,
       restaurar: f.restaurar === true,
       descripcion: (f.descripcion as string | null | undefined) ?? null,
@@ -532,5 +575,5 @@ export async function cargarCambiosDropi(
       aplicadoEn: (f.aplicado_en as string | null) ?? null,
     });
   }
-  return { porPublicacion, pendientes, apagando, archivando, creando, privatizando, ajustandoStock };
+  return { porPublicacion, pendientes, apagando, archivando, creando, privatizando, ajustandoStock, reservando };
 }

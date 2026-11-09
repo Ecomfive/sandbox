@@ -131,10 +131,13 @@ async function dropiDiario(subida, dias = { pedidos: 30, cartera: 7 }) {
         await espera(1300);
       }
     }
-    // Las variaciones de cada producto activo con variaciones, para «Privatizar en Dropi»: la lista no las trae (5 nov 2026). Si una no se puede leer, la lectura sigue sin ella.
-    for (const p of productos.filter((x) => x.type === "VARIABLE" && !x.archivado)) {
+    // Las variaciones de cada producto activo con variaciones, para «Privatizar en Dropi»: la lista no las trae (5 nov 2026). Y, de lo que tiene algo reservado,
+    // si es un producto privado y a qué correos están reservadas sus unidades (8 nov 2026): la lista no los distingue. Si uno no se puede leer, la lectura sigue sin él.
+    for (const p of productos.filter((x) => !x.archivado && (x.type === "VARIABLE" || x.private_product || Number(x.private_stock) > 0))) {
       const j = await pedir(`https://${api}/api/products/${p.id}`).catch(() => null);
-      if (Array.isArray(j?.objects?.variations)) p.variations = j.objects.variations.map((v) => ({ id: v.id, sku: v.sku, deleted_at: v.deleted_at, attribute_values: v.attribute_values, warehouse_product_variation: (v.warehouse_product_variation || []).map((w) => ({ warehouse_id: w.warehouse_id, stock: w.stock })) }));
+      if (p.type === "VARIABLE" && Array.isArray(j?.objects?.variations)) p.variations = j.objects.variations.map((v) => ({ id: v.id, sku: v.sku, deleted_at: v.deleted_at, attribute_values: v.attribute_values, warehouse_product_variation: (v.warehouse_product_variation || []).map((w) => ({ warehouse_id: w.warehouse_id, stock: w.stock })) }));
+      if (j?.objects && (p.private_product || Number(p.private_stock) > 0))
+        p.detalle_privado = { privated_product: j.objects.privated_product === true, private_product_inventories: (j.objects.private_product_inventories || []).filter((x) => !x.deleted_at).map((x) => ({ id: x.id, user_id: x.user_id, email: x.email ?? x.user?.email ?? null, stock: x.stock, variation_id: x.variation_id ?? null, user: x.user ? { id: x.user.id, name: x.user.name, surname: x.user.surname, email: x.user.email } : null })) };
       await espera(300);
     }
     const stock = { tipo: "nuestros", pais, inicio: new Date().toISOString(), duracionMs: Math.round(performance.now() - t0), productos };

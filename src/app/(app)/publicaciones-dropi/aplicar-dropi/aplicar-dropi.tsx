@@ -103,7 +103,7 @@ export function AplicarDropi({ puedeEscribir }: { puedeEscribir: boolean }) {
     dropi.postMessage(
       {
         tipo: "pendientes",
-        cambios: cambios.map(({ id, tipo, quitarPrivados, restaurar, nuevo, producto, nombre, guia, precio, sugerido, descripcion, fotos, datos, privatizar, stock, devolver }) => ({
+        cambios: cambios.map(({ id, tipo, quitarPrivados, restaurar, nuevo, producto, nombre, guia, precio, sugerido, descripcion, fotos, datos, privatizar, stock, devolver, reserva }) => ({
           id,
           tipo,
           quitarPrivados,
@@ -116,7 +116,7 @@ export function AplicarDropi({ puedeEscribir }: { puedeEscribir: boolean }) {
           sugerido,
           descripcion,
           fotos,
-          datos: tipo === "privatizar" ? privatizar : tipo === "stock" ? stock : tipo === "apagar" ? devolver : datos,
+          datos: tipo === "privatizar" ? privatizar : tipo === "stock" ? stock : tipo === "reserva" ? reserva : tipo === "apagar" ? devolver : datos,
         })),
       },
       origen,
@@ -195,7 +195,9 @@ export function AplicarDropi({ puedeEscribir }: { puedeEscribir: boolean }) {
                                 ? `Privatizada: producto privado ID ${r.nuevo ?? "—"} para ${c.privatizar ? quienesDe(c.privatizar) : "el dropshipper"}${r.aviso ? `. Aviso: ${r.aviso}` : ""}`
                                 : c.tipo === "stock"
                                   ? `Stock en Dropi: ${r.antes ?? "—"} → ${r.stock ?? c.stock?.unidades ?? "—"} u.${r.aviso ? ` ${r.aviso}` : ""}`
-                                  : "Cambiado en Dropi"
+                                  : c.tipo === "reserva"
+                                    ? `${c.reserva?.unidades === 0 ? `Reserva quitada a ${c.reserva?.correo}` : `Reservadas ${c.reserva?.unidades ?? "—"} u. a ${c.reserva?.correo}`}${r.aviso ? `. Aviso: ${r.aviso}` : ""}`
+                                    : "Cambiado en Dropi"
                       : (c.tipo === "crear" || c.tipo === "privatizar") && r.nuevo
                         ? `Se creó el ID ${r.nuevo} en Dropi, pero falló un paso: ${r.error ?? "sin detalle"} Se sigue desde ahí en el próximo «Aplicar en Dropi».`
                         : `No se pudo: ${r.error ?? "sin detalle"}`
@@ -247,6 +249,20 @@ function DetalleCambio({ c }: { c: CambioParaDropi }) {
         <span className="text-xs text-muted-foreground">
           ID {c.producto} (público){c.nuevo ? ` · ya creado el privado ID ${c.nuevo}: sigue desde ahí` : ": se crea el privado en Dropi, se le asigna el correo y se le sacan las unidades al público"}
         </span>
+      </>
+    );
+  }
+  if (c.tipo === "reserva") {
+    const d = c.reserva;
+    return (
+      <>
+        <span className="font-medium">
+          Reserva por correo: {c.publicacion} · ID {c.producto}
+        </span>
+        <span className="text-xs tabular-nums">
+          {d ? `${d.nombre ? `${d.nombre} · ` : ""}${d.correo}: ${d.unidades === 0 ? "quitar la reserva" : `${d.antes !== null ? `${d.antes.toLocaleString("es-PA")} → ` : ""}${d.unidades.toLocaleString("es-PA")} u. reservadas`}` : ""}
+        </span>
+        <span className="text-xs text-muted-foreground">Solo cambia lo reservado a ese correo; después se vuelve a leer en Dropi</span>
       </>
     );
   }
@@ -351,7 +367,7 @@ function ElegirCambios({ cambios, alAplicar, cerrar }: { cambios: CambioParaDrop
               <button
                 type="button"
                 aria-pressed={pospuesto}
-                aria-label={`${pospuesto ? "Incluir de nuevo" : "Posponer"}: ${c.tipo === "republicar" ? `republicar ${c.publicacion}` : c.tipo === "archivar" ? `${c.restaurar ? "sacar de Archivados" : "archivar"} ${c.publicacion}` : c.tipo === "crear" ? `publicar ${c.datos?.nombre || c.publicacion}` : c.tipo === "privatizar" ? `privatizar ${c.publicacion} a ${c.privatizar?.dropshipper || c.privatizar?.correo}` : c.tipo === "stock" ? `stock de ${c.publicacion}` : (c.nombre ?? c.publicacion)}`}
+                aria-label={`${pospuesto ? "Incluir de nuevo" : "Posponer"}: ${c.tipo === "republicar" ? `republicar ${c.publicacion}` : c.tipo === "archivar" ? `${c.restaurar ? "sacar de Archivados" : "archivar"} ${c.publicacion}` : c.tipo === "crear" ? `publicar ${c.datos?.nombre || c.publicacion}` : c.tipo === "privatizar" ? `privatizar ${c.publicacion} a ${c.privatizar?.dropshipper || c.privatizar?.correo}` : c.tipo === "stock" ? `stock de ${c.publicacion}` : c.tipo === "reserva" ? `reserva de ${c.publicacion} para ${c.reserva?.correo}` : (c.nombre ?? c.publicacion)}`}
                 onClick={() => alternar(c.id)}
                 className={`inline-flex min-h-9 shrink-0 items-center rounded-md border px-3 py-1.5 text-xs font-medium ${anilloFoco} ${pospuesto ? "border-foreground bg-accent text-foreground" : "border-border bg-card hover:bg-muted"}`}
               >
