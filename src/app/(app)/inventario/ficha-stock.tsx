@@ -132,7 +132,7 @@ export function FichaStock({
       titulo={
         sku && (
           <>
-            <span className="text-lg font-semibold">{sku.codigo}</span>
+            <span className="text-lg font-semibold">{sku.nombre}</span>
             <Badge tone="neutral">{ETIQUETA_TIPO_SKU[sku.tipo] ?? sku.tipo}</Badge>
           </>
         )
@@ -141,7 +141,7 @@ export function FichaStock({
       {sku && (
         <div className="flex flex-1 flex-col">
           <div className="flex flex-col gap-1 px-5 pt-5 pb-4">
-            <p className="m-0 text-sm text-muted-foreground">{sku.nombre}</p>
+            <p className="m-0 text-sm text-muted-foreground">{sku.codigo}</p>
             <CodigosProducto numero={sku.numero} barras={sku.barras} />
           </div>
 

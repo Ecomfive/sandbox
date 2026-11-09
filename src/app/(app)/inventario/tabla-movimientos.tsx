@@ -20,8 +20,8 @@ const ICONOS: Record<string, IconoComp> = {
 
 const COLUMNAS: ColumnaTabla<FilaMovimiento>[] = [
   { id: "fecha", label: "Fecha", ocultable: false, render: (m) => formatearFecha(m.fecha) },
-  { id: "sku", label: "SKU", ocultable: true, clase: "font-medium", render: (m) => m.sku },
-  { id: "producto", label: "Producto", ocultable: true, clase: "text-muted-foreground", render: (m) => m.producto },
+  { id: "producto", label: "Producto", ocultable: true, clase: "font-medium", render: (m) => m.producto },
+  { id: "sku", label: "SKU", ocultable: true, clase: "text-muted-foreground", render: (m) => m.sku },
   { id: "tipo", label: "Tipo", ocultable: true, render: (m) => <Badge tone={m.tipo === "entrada" ? "success" : "neutral"}>{m.tipo}</Badge> },
   { id: "cantidad", label: "Cantidad", ocultable: true, clase: "tabular-nums", render: (m) => m.cantidad },
   { id: "fuente", label: "Fuente", ocultable: true, clase: "text-muted-foreground", render: (m) => m.fuente },
