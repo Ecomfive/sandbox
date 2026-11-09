@@ -85,3 +85,20 @@ test("reserva: lo que se pide se revisa", () => {
   assert.equal(faltantesReserva({ correo: "a@b.co", unidades: 30, nombre: null, antes: null }, { stock: 66, otras: 40, tieneReserva: false }).length, 1, "pasa del stock");
   assert.deepEqual(faltantesReserva({ correo: "a@b.co", unidades: 26, nombre: null, antes: null }, { stock: 66, otras: 40, tieneReserva: false }), []);
 });
+
+test("una reserva con el correo solo en su usuario se cambia, sin pedir la cuenta (PUB-0302)", () => {
+  const o: Obj = {
+    id: 8796,
+    type: "SIMPLE",
+    warehouse_product: [{ warehouse_id: 81, stock: 99 }],
+    private_product_inventories: [{ id: 4828, product_id: 8796, user_id: 25212, email: null, stock: 14, user: { id: 25212, email: "naturex.co0@gmail.com" } }],
+  };
+  const d = { correo: "naturex.co0@gmail.com", unidades: 99, nombre: null, antes: 14 };
+  for (const r of [reservasPara(o, null, d as never), delFavorito.reservasPara(o, null, d)]) {
+    assert.ok(!("error" in r), "no pide la cuenta: la reserva ya existe");
+    const reservas = (r as { reservas: Obj[] }).reservas;
+    assert.equal(reservas.length, 1, "cambia la que hay, no agrega otra");
+    assert.equal(reservas[0].stock, 99);
+    assert.equal(reservas[0].change, true);
+  }
+});

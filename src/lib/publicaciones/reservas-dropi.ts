@@ -162,9 +162,10 @@ export function reservasPara(
   const originales = Array.isArray(producto.private_product_inventories) ? (producto.private_product_inventories as Obj[]) : [];
   const pv = originales.map((x) => reservaParaDropi(x));
   const correo = d.correo.toLowerCase();
-  const i = originales.findIndex(
-    (x) => !x.deleted_at && ((typeof x.email === "string" && x.email.toLowerCase() === correo) || (usuario?.id != null && Number(x.user_id) === Number(usuario.id))),
-  );
+  // Dropi a veces deja el correo de la reserva solo en su usuario (`email: null`, `user.email`): también cuenta (9 nov 2026, PUB-0302: «Falta la cuenta de Dropi
+  // de ese correo» al cambiar la reserva de naturex.co0@gmail.com, que ya existía).
+  const correoDe = (x: Obj) => (typeof x.email === "string" ? x.email : typeof (x.user as Obj | null)?.email === "string" ? ((x.user as Obj).email as string) : "").toLowerCase();
+  const i = originales.findIndex((x) => !x.deleted_at && ((correoDe(x) !== "" && correoDe(x) === correo) || (usuario?.id != null && Number(x.user_id) === Number(usuario.id))));
   if (d.unidades === 0) {
     if (i < 0) return { sinCambio: true };
     pv[i] = reservaParaDropi(originales[i], { deleted_at: true, change: true });
@@ -186,7 +187,7 @@ export const RESERVA_JS = [
   "function rvP(x,e){var r={id:x.id!=null?x.id:null,product_id:x.product_id!=null?x.product_id:null,variation_id:x.variation_id!=null?x.variation_id:null,user_id:x.user_id!=null?x.user_id:null,variations:[],user:x.user!=null?x.user:null,stock:x.stock!=null?x.stock:null,last_quantity_separed:x.last_quantity_separed!=null?x.last_quantity_separed:null,created_at:null,deleted_at:x.deleted_at!=null?true:null,updated_at:null,email:x.email!=null?x.email:null,change:null};if(e)for(var k in e)r[k]=e[k];return r}",
   "function reservasPara(o,u,d){if(o.type!=='SIMPLE')return{error:'Tiene variaciones: la reserva es por variación y se hace en Dropi.'};",
   "var og=Array.isArray(o.private_product_inventories)?o.private_product_inventories:[],pv=og.map(function(x){return rvP(x)}),c=String(d.correo).toLowerCase(),i=-1;",
-  "for(var k=0;k<og.length;k++){var x=og[k];if(!x.deleted_at&&((typeof x.email==='string'&&x.email.toLowerCase()===c)||(u&&u.id!=null&&Number(x.user_id)===Number(u.id)))){i=k;break}}",
+  "for(var k=0;k<og.length;k++){var x=og[k],xe=typeof x.email==='string'?x.email:(x.user&&typeof x.user.email==='string'?x.user.email:'');if(!x.deleted_at&&((xe!==''&&xe.toLowerCase()===c)||(u&&u.id!=null&&Number(x.user_id)===Number(u.id)))){i=k;break}}",
   "if(d.unidades===0){if(i<0)return{sinCambio:true};pv[i]=rvP(og[i],{deleted_at:true,change:true})}",
   "else if(i>=0){if(Number(og[i].stock)===d.unidades)return{sinCambio:true};pv[i]=rvP(og[i],{stock:d.unidades,change:true})}",
   "else{if(!u||u.id==null)return{error:'Falta la cuenta de Dropi de ese correo.'};pv.push(rvP({id:null,product_id:o.id!=null?o.id:null,variation_id:null,user_id:u.id,user:u,stock:d.unidades,last_quantity_separed:null,email:d.correo},{change:true}))}",
