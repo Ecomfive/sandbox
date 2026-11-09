@@ -284,6 +284,14 @@ convenciones técnicas del código.
   «Lista» por estado o persona (se recuerda en el navegador), «Tablero» con columnas por estado y arrastrar para cambiar de estado, «Mías / De todos»
   para administradores, menús de celda en `piezas.tsx` (los paneles de Compras) y ficha `ficha-tarea.tsx` con `HistorialGenerico`. La 0215 da el
   módulo a todos los roles y carga 19 pendientes del sistema sin asignar (creados por Alcides).
+  **«Mis tareas por módulo»** (9 nov 2026, pedido de Hernán: «un repositorio donde vea las tareas que tengo en cada módulo por separado, según el
+  acceso»; pestaña `/tareas/por-modulo` en `PESTANAS_POR_MODULO["/tareas"]`, junto a «Tablero del equipo»). `cargarMisTareasPorModulo`
+  (`tareas/por-modulo/datos.ts`) junta las tareas **abiertas de la persona**: `tareas_equipo` asignadas (sin hecho/archivado/aprobado; van al módulo de
+  su campo `modulo`), `dropi_publicaciones_tareas` donde es responsable o está en `dropi_tareas_responsables` (no hechas ni archivadas, todos los
+  países, con el país), las recomendaciones aceptadas a su nombre (`dropi_publicaciones_decisiones`) y `tareas_dropshipper` a su cargo (no hechas).
+  Cada fuente se lee solo si la persona tiene ese módulo (`tareas`, `publicaciones-dropi`, `crm-dropshippers`) y una que falla no tapa las otras.
+  `agruparPorModulo` (`src/lib/tareas/por-modulo.ts`, con prueba): una del tablero que nombra un módulo sin acceso queda en «Tablero del equipo»;
+  atrasadas primero. Solo lectura: cada tarea abre en su módulo. **Una tabla de tareas nueva con responsable se suma aquí.**
 - **Perfiles de acceso por área** (migración 0115, 20 oct 2026; cuadro en `Perfiles-de-acceso-Ecomfive.pdf`, junto a la carpeta del proyecto). Roles
   listos con los módulos de cada área y qué es solo lectura: **nuevos** Investigación de producto, Contenido y ofertas, Compras, Producto / Catálogo,
   Talento humano y Consulta; **completados** Administrativo (Finanzas), Atención al cliente, Líder comercial y Operaciones (Bodega); Admin
