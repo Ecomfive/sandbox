@@ -68,7 +68,14 @@ async function enTandas<T>(items: T[], limite: number, tarea: (item: T) => Promi
  * `imagen` llevan la foto en miniatura si se pasa `cargarImagen` (cada dirección se trae una sola vez); si no, o si la foto no se pudo
  * traer, la celda queda vacía.
  */
-export async function filasAXlsx(hoja: string, columnas: ColumnaExcel[], filas: CeldaExcel[][], cargarImagen?: CargarImagen): Promise<Uint8Array> {
+export async function filasAXlsx(
+  hoja: string,
+  columnas: ColumnaExcel[],
+  filas: CeldaExcel[][],
+  cargarImagen?: CargarImagen,
+  /** `fondoTitulos`: la fila de títulos con fondo gris y borde, para que se distinga de los datos (las tablas del sistema). */
+  opciones: { fondoTitulos?: boolean } = {},
+): Promise<Uint8Array> {
   const libro = new ExcelJS.Workbook();
   const ws = libro.addWorksheet(nombreHoja(hoja), { views: [{ state: "frozen", ySplit: 1 }] });
   ws.columns = columnas.map((c) => ({ width: c.ancho ?? (c.tipo === "imagen" ? 11 : c.tipo === "texto" || !c.tipo ? 28 : 14) }));
@@ -77,6 +84,14 @@ export async function filasAXlsx(hoja: string, columnas: ColumnaExcel[], filas: 
     titulos.getCell(j + 1).value = c.titulo;
   });
   titulos.font = { bold: true };
+  if (opciones.fondoTitulos) {
+    titulos.eachCell((cell) => {
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE9EBF0" } };
+      cell.border = { bottom: { style: "thin", color: { argb: "FF9AA0AB" } } };
+      cell.alignment = { vertical: "middle", wrapText: true };
+    });
+    titulos.height = 30;
+  }
 
   const fotos: { fila: number; columna: number; url: string }[] = [];
   filas.forEach((fila, i) => {
