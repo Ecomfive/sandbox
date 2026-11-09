@@ -173,9 +173,9 @@ export function Recepcion({
                       <MiniaturaFoto url={l.foto} nombre={l.nombre} />
                     </td>
                     <td className={claseCeldaColumna}>
-                      <span className="block font-medium">{l.codigo}</span>
+                      <span className="block font-medium">{l.nombre}</span>
+                      <span className="block text-xs text-muted-foreground">{l.codigo}</span>
                       <CodigosProducto numero={l.numero} barras={l.barras} className="block" />
-                      <span className="block text-xs text-muted-foreground">{l.nombre}</span>
                       <span className="block text-xs text-muted-foreground">Lote #{l.lote}</span>
                     </td>
                     <td className={`${claseCeldaColumna} text-right tabular-nums`}>{entero(l.pedida)}</td>

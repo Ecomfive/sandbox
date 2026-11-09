@@ -159,7 +159,8 @@ export function NuevoTraslado({
                       <div className="flex items-center gap-3">
                         <MiniaturaFoto url={l.sku.foto ?? null} nombre={l.sku.nombre} />
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate font-medium">{l.sku.codigo}</span>
+                          <span className="block truncate font-medium">{l.sku.nombre}</span>
+                          <span className="block truncate text-xs text-muted-foreground">{l.sku.codigo}</span>
                           <CodigosProducto numero={l.sku.numero} barras={l.sku.barras} className="block" />
                           <span className={`block text-xs tabular-nums ${pasa ? "text-destructive" : "text-muted-foreground"}`}>{hay(l.sku.id).toLocaleString("es-PA")} disponibles en la bodega</span>
                         </span>

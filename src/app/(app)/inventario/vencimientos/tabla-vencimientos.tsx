@@ -22,8 +22,8 @@ function textoDias(d: number): string {
 
 const COLUMNAS: ColumnaTabla<FilaVencimiento>[] = [
   { id: "estado", label: "Estado", ocultable: false, render: (f) => <Badge tone={TONO[f.estado]}>{ETIQUETA_ESTADO_VENCIMIENTO[f.estado]}</Badge> },
-  { id: "sku", label: "SKU", ocultable: false, clase: "font-medium", render: (f) => f.sku },
-  { id: "producto", label: "Producto", ocultable: true, clase: "text-muted-foreground", render: (f) => f.producto },
+  { id: "producto", label: "Producto", ocultable: false, clase: "font-medium", render: (f) => f.producto },
+  { id: "sku", label: "SKU", ocultable: true, clase: "text-muted-foreground", render: (f) => f.sku },
   { id: "codigos", label: "N.º y barras", ocultable: true, render: (f) => <CodigosProducto numero={f.numero} barras={f.barras} /> },
   { id: "lote", label: "Lote", ocultable: true, render: (f) => f.lote },
   { id: "vence", label: "Vence", ocultable: true, render: (f) => `${formatearFecha(f.vence)} (${textoDias(f.dias)})` },

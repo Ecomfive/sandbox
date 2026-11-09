@@ -183,8 +183,8 @@ function FichaRemision({
                   <span className="flex items-center gap-3">
                     <MiniaturaFoto url={f.foto} nombre={f.nombre} />
                     <span className="min-w-0">
-                      <span className="block font-medium">{f.codigo}</span>
-                      <span className="block text-xs text-muted-foreground">{f.nombre}</span>
+                      <span className="block font-medium">{f.nombre}</span>
+                      <span className="block text-xs text-muted-foreground">{f.codigo}</span>
                       <CodigosProducto numero={f.numero} barras={f.barras} className="block" />
                       {f.cajas && <span className="block text-xs text-muted-foreground">{f.cajas}</span>}
                     </span>
