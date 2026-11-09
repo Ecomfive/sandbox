@@ -28,6 +28,7 @@ import { detectarPack } from "@/lib/publicaciones/vincular";
 import { traerTodasConError } from "@/lib/supabase/paginar";
 import { obtenerOpcionesSkuMaestro } from "@/lib/wms/skus-maestros";
 import type { OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
+import { cargarVariantesYVinculos } from "@/lib/publicaciones/vincular-variaciones-db";
 import { POCO_STOCK_VARIACION, type DecisionVista, type FilaPublicacion } from "./def-publicaciones";
 
 const num = (v: unknown) => (v === null || v === undefined ? null : Number(v));
@@ -324,6 +325,8 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
     cargarPreciosAplicados(supabase, paisId),
   ]);
   const { camino: enCaminoPorSku, cotizando: cotizandoPorSku, etapasCotizando } = enCaminoYCotizando;
+  // Las variantes de cada producto y qué variación de Dropi va con cuál (migración 0261).
+  const { variantesDe, vinculosDe } = await cargarVariantesYVinculos(supabase, paisId);
   const r = reglas.reglas;
   // Los componentes de los compuestos vinculados (packs y combos): lo que viene en camino de un compuesto es lo de sus componentes.
   const combos = [...new Set(datos.map((d) => d.sku_maestro_id as string | null).filter((id): id is string => !!id && skus.get(id)?.tipo === "combo"))];
@@ -437,6 +440,8 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
       reservas: prov?.reservas ?? [],
       reservasPendientes: (cambiosDropi.reservando.get(d.id as string) ?? []).map(({ correo, unidades, nombre, error }) => ({ correo, unidades, nombre, error })),
       variacionesBajas: variacionesBajas(prov?.variaciones, POCO_STOCK_VARIACION),
+      variantes: d.sku_maestro_id ? (variantesDe.get(d.sku_maestro_id as string) ?? []) : [],
+      vinculosVariacion: Object.fromEntries(idsDropi(d).flatMap((id) => vinculosDe.get(id) ?? [])),
       leidoProveedor: proveedor?.leidoEn ?? null,
       cambioDropi: cambiosDropi.porPublicacion.get(d.id) ?? null,
       bodega: bodegaDePublicacion({ ubicacion: (d.ubicacion as string | null) ?? null, nombre: d.nombre as string }, prov, bodegasPais),

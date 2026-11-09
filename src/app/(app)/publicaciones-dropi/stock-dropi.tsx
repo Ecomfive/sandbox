@@ -9,7 +9,9 @@ import { esBodegaDropi } from "@/lib/publicaciones/automatico";
 import { ordenarVariaciones, stockEnBodega } from "@/lib/publicaciones/privatizar-variable";
 import { codigoBodega, fechaHoraLectura, idsDeDropi } from "@/lib/publicaciones/sincronizar-dropi";
 import { CONCEPTO_STOCK, MAX_CONCEPTO_STOCK, MAX_UNIDADES_STOCK } from "@/lib/publicaciones/stock-dropi";
-import { cambiarStockDropi } from "./actions";
+import { claveVariacion } from "@/lib/publicaciones/vincular-variaciones";
+import { useRouter } from "next/navigation";
+import { cambiarStockDropi, vincularVariacionDropi } from "./actions";
 import { POCO_STOCK_VARIACION, textoVariacionesBajas, type FilaPublicacion } from "./def-publicaciones";
 
 interface BodegaVista {
@@ -123,6 +125,7 @@ export function BodegasStockDropi({
           />
         </div>
       ))}
+      <VariacionesYVariantes p={p} puedeEscribir={puedeEscribir} />
       {p.variacionesBajas.length > 0 && (
         <span className="text-xs text-warning tabular-nums">
           Con menos de {POCO_STOCK_VARIACION} unidades: {textoVariacionesBajas(p.variacionesBajas)}
@@ -343,6 +346,67 @@ function EditarStock({
           Cancelar
         </button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Cada variación de Dropi con su variante en Producto (9 nov 2026, pedido de Hernán: «que las variantes estén vinculadas con sus variantes»): la mayoría se vincula sola
+ * (mismo SKU, mismos valores o el mismo número); las demás se eligen aquí. Solo sale si el producto vinculado tiene variantes y la lectura trajo las variaciones.
+ */
+function VariacionesYVariantes({ p, puedeEscribir }: { p: FilaPublicacion; puedeEscribir: boolean }) {
+  const router = useRouter();
+  const { mostrarToast } = useToast();
+  const [pendiente, iniciar] = useTransition();
+  const ids = p.stockPorId.filter((g) => g.variaciones?.length);
+  if (!p.variantes.length || !ids.length) return null;
+  const varios = ids.length > 1;
+  const sinVincular = ids.reduce((t, g) => t + ordenarVariaciones(g.variaciones ?? []).filter((v) => !p.vinculosVariacion[claveVariacion(g.id, v.firma)]).length, 0);
+  const elegir = (dropiId: number, firma: string, skuId: string) =>
+    iniciar(async () => {
+      const r = await vincularVariacionDropi(p.id, dropiId, firma, skuId);
+      if (r.error) return mostrarToast(r.error, "destructive");
+      mostrarToast("Variación vinculada.");
+      router.refresh();
+    });
+  return (
+    <div className="mt-1 flex flex-col gap-1">
+      <span className={labelClassSm}>Cada variación y su variante en Producto</span>
+      {sinVincular > 0 && <span className="text-xs text-warning">{sinVincular === 1 ? "1 variación sin vincular" : `${sinVincular} variaciones sin vincular`}: elige su variante.</span>}
+      <ul className="m-0 flex list-none flex-col divide-y divide-border rounded-lg bg-muted p-0 px-4 text-sm">
+        {ids.flatMap((g) =>
+          ordenarVariaciones(g.variaciones ?? []).map((v) => {
+            const elegida = p.vinculosVariacion[claveVariacion(g.id, v.firma)] ?? "";
+            const variante = p.variantes.find((x) => x.id === elegida);
+            return (
+              <li key={`${g.id}|${v.firma}`} className="flex min-h-10 flex-wrap items-center justify-between gap-2 py-1.5">
+                <span className="min-w-0 truncate">
+                  {v.etiqueta}
+                  {varios && <span className="text-xs text-muted-foreground"> · ID {g.id}</span>}
+                </span>
+                {puedeEscribir ? (
+                  <select
+                    aria-label={`Variante de ${v.etiqueta}`}
+                    value={elegida}
+                    disabled={pendiente}
+                    onChange={(e) => e.target.value && elegir(g.id, v.firma, e.target.value)}
+                    className={`${fieldClass} !h-8 !w-auto max-w-[16rem] !text-xs ${elegida ? "" : "!border-warning"}`}
+                  >
+                    {!elegida && <option value="">Sin vincular</option>}
+                    {p.variantes.map((x) => (
+                      <option key={x.id} value={x.id}>
+                        {x.etiqueta} · {x.codigo}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <span className={`text-xs ${variante ? "font-mono" : "text-warning"}`}>{variante ? variante.codigo : "Sin vincular"}</span>
+                )}
+              </li>
+            );
+          }),
+        )}
+      </ul>
     </div>
   );
 }

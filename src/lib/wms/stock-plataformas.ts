@@ -45,6 +45,15 @@ export interface ProductoDropi {
   stock: number | null;
   bodegas: { id: number; stock: number }[] | null;
   leido_en: string | null;
+  /** Sus variaciones con el stock de cada una por bodega (un producto con colores, tallas…); null si no tiene o la lectura no las trajo. */
+  variaciones?: { firma: string; bodegas: { id: number; stock: number }[] }[] | null;
+}
+
+/** Una variación de Dropi vinculada a su variante de Producto (migración 0261). */
+export interface VinculoVariacion {
+  dropi_producto_id: number;
+  firma: string;
+  sku_maestro_id: string;
 }
 export interface PublicacionEffi {
   sku_maestro_id: string | null;
@@ -71,7 +80,7 @@ const masReciente = (fechas: (string | null)[]) => fechas.reduce<string | null>(
  * verdad (5 nov 2026, Alcides). Un ID de Dropi cuenta una sola vez, aunque dos publicaciones lo tengan. Effi cuenta su bodega Principal; las de las tiendas son de cada
  * dropshipper y aquí no llegan. Lo que ya no está en Effi o en Drop no cuenta. Un producto sin nada en ninguna plataforma no sale.
  */
-export function armarStockPlataformas(entrada: { dropi: PublicacionDropi[]; productosDropi: ProductoDropi[]; effi: PublicacionEffi[]; drop: PublicacionDrop[] }): {
+export function armarStockPlataformas(entrada: { dropi: PublicacionDropi[]; productosDropi: ProductoDropi[]; effi: PublicacionEffi[]; drop: PublicacionDrop[]; vinculos?: VinculoVariacion[] }): {
   porProducto: Map<string, StockPlataformas>;
   lecturas: LecturasPlataformas;
 } {
@@ -85,6 +94,7 @@ export function armarStockPlataformas(entrada: { dropi: PublicacionDropi[]; prod
   };
 
   const productos = new Map(entrada.productosDropi.map((p) => [p.dropi_producto_id, p]));
+  const vinculoDe = new Map((entrada.vinculos ?? []).map((v) => [`${v.dropi_producto_id}|${v.firma}`, v.sku_maestro_id]));
   const vistos = new Set<number>();
   for (const p of entrada.dropi) {
     if (p.estado_publicacion === "borrador") continue;
@@ -93,9 +103,19 @@ export function armarStockPlataformas(entrada: { dropi: PublicacionDropi[]; prod
       if (!producto || vistos.has(id)) continue;
       vistos.add(id);
       const bodegas = Array.isArray(producto.bodegas) ? producto.bodegas : null;
-      const unidades = (bodegas ?? []).filter((b) => esBodegaDropi(b.id)).reduce((t, b) => t + Number(b.stock ?? 0), 0);
+      let unidades = (bodegas ?? []).filter((b) => esBodegaDropi(b.id)).reduce((t, b) => t + Number(b.stock ?? 0), 0);
       // Sin el detalle por bodega no se sabe dónde está: el total queda como referencial.
-      const aparte = bodegas ? bodegas.filter((b) => !esBodegaDropi(b.id)).reduce((t, b) => t + Number(b.stock ?? 0), 0) : Number(producto.stock ?? 0);
+      let aparte = bodegas ? bodegas.filter((b) => !esBodegaDropi(b.id)).reduce((t, b) => t + Number(b.stock ?? 0), 0) : Number(producto.stock ?? 0);
+      // Una variación vinculada a su variante (9 nov 2026) pone su stock en la variante; lo que no está vinculado queda en el producto principal.
+      for (const v of Array.isArray(producto.variaciones) ? producto.variaciones : []) {
+        const sku = vinculoDe.get(`${id}|${v.firma}`);
+        if (!sku) continue;
+        const enDropi = v.bodegas.filter((b) => esBodegaDropi(b.id)).reduce((t, b) => t + Number(b.stock ?? 0), 0);
+        const fuera = v.bodegas.filter((b) => !esBodegaDropi(b.id)).reduce((t, b) => t + Number(b.stock ?? 0), 0);
+        if (enDropi || fuera) agregar(sku, { plataforma: "dropi", id: String(id), nombre: p.nombre, unidades: enDropi, aparte: fuera });
+        unidades = Math.max(0, unidades - enDropi);
+        aparte = Math.max(0, aparte - fuera);
+      }
       if (unidades || aparte) agregar(p.sku_maestro_id, { plataforma: "dropi", id: String(id), nombre: p.nombre, unidades, aparte });
     }
   }

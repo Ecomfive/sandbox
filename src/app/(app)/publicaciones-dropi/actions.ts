@@ -1134,3 +1134,30 @@ export async function buscarDropshippersParaPrivatizar(publicacionId: string, co
     if (!vistos.has(f.id as string)) vistos.set(f.id as string, { id: f.id as string, nombre: String(f.nombre ?? ""), correo: String(f.contacto_email ?? ""), tienda: String(f.tienda ?? "") });
   return { resultados: [...vistos.values()].slice(0, 8) };
 }
+
+/**
+ * Vincula una variación de Dropi de la publicación (`firma`, de la última lectura) con una variante del producto vinculado (9 nov 2026, pedido de Hernán; migración
+ * 0261). Queda como elegida a mano: la lectura de «Mis productos» ya no la cambia.
+ */
+export async function vincularVariacionDropi(id: string, dropiId: number, firma: string, skuId: string): Promise<{ error?: string }> {
+  const usuario = await requireModuloEscritura(MODULO);
+  const antes = await publicacionPermitida(id, usuario.paisesPermitidos);
+  if (!antes) return { error: "La publicación ya no existe o no es de tus países." };
+  if (!Number.isSafeInteger(dropiId) || !idsDeDropi((antes.dropi_id as string | null) ?? null).includes(dropiId)) return { error: "Ese ID de Dropi no es de esta publicación." };
+  if (typeof firma !== "string" || !firma.trim() || firma.length > 500) return { error: "Variación no válida." };
+  if (!UUID.test(skuId)) return { error: "Elige una variante." };
+  const supabase = createServiceClient();
+  const { data: variante } = await supabase.from("skus_maestros").select("id, codigo, padre_id").eq("id", skuId).maybeSingle();
+  if (!variante || !antes.sku_maestro_id || variante.padre_id !== antes.sku_maestro_id) return { error: "Esa variante no es del producto vinculado a la publicación." };
+  const { error } = await supabase
+    .from("dropi_variaciones_vinculo")
+    .upsert(
+      { pais_id: antes.pais_id, dropi_producto_id: dropiId, firma, sku_maestro_id: skuId, como: "manual", creado_por: usuario.id, actualizado_en: new Date().toISOString() },
+      { onConflict: "pais_id,dropi_producto_id,firma" },
+    );
+  if (error) return { error: "No se pudo guardar (¿falta correr la migración 0261?)." };
+  await registrarAuditoria({ accion: "vincular_variacion_dropi", entidad: "dropi_publicaciones", entidadId: id, detalle: `ID ${dropiId} → ${variante.codigo}` });
+  revalidatePath(RUTA);
+  revalidatePath("/inventario");
+  return {};
+}

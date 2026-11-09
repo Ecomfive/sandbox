@@ -15,6 +15,27 @@ test("junta las tres plataformas por producto", () => {
   assert.equal(a?.lineas.length, 3);
 });
 
+test("cada variación vinculada pone su stock de Dropi en su variante; lo demás queda en el principal", () => {
+  const variaciones = [
+    { firma: "natural", bodegas: [{ id: 15, stock: 10 }] },
+    { firma: "dark", bodegas: [{ id: 15, stock: 30 }, { id: 81, stock: 5 }] },
+    { firma: "sin", bodegas: [{ id: 15, stock: 2 }] },
+  ];
+  const { porProducto } = armarStockPlataformas({
+    ...vacio,
+    dropi: [pub("padre", "1001")],
+    productosDropi: [{ ...prod(1001, [{ id: 15, stock: 42 }, { id: 81, stock: 5 }]), variaciones }],
+    vinculos: [
+      { dropi_producto_id: 1001, firma: "natural", sku_maestro_id: "nat" },
+      { dropi_producto_id: 1001, firma: "dark", sku_maestro_id: "dark" },
+    ],
+  });
+  assert.equal(porProducto.get("nat")?.dropi, 10);
+  assert.equal(porProducto.get("dark")?.dropi, 30);
+  assert.equal(porProducto.get("dark")?.lineas[0].aparte, 5);
+  assert.equal(porProducto.get("padre")?.dropi, 2);
+});
+
 test("Dropi: solo cuenta su bodega; lo de otra es referencial y sin detalle todo lo es", () => {
   const { porProducto } = armarStockPlataformas({
     ...vacio,
