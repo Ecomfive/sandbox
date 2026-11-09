@@ -35,6 +35,11 @@ export interface FilaStock {
   plataformas: StockPlataformas | null;
   /** Unidades físicas en cada bodega (9 nov 2026, pedido de Hernán): para filtrar por bodega y para las columnas del Excel. Solo las bodegas donde hay registro. */
   porBodega: { bodegaId: string; fisico: number }[];
+  /** Si es una variante: el id de su producto principal y sus valores («Rojo / M»). */
+  padreId: string | null;
+  opciones: string;
+  /** Si es un producto con variantes: sus variantes (sus cifras ya suman las de ellas). Vacío en un producto sin variantes. */
+  variantes: FilaStock[];
 }
 
 export const ETIQUETA_TIPO_SKU: Record<string, string> = { simple: "Simple", combo: "Pack o combo" };
@@ -55,7 +60,8 @@ export const DEF_STOCK: DefTabla<FilaStock> = {
   filtrosIniciales: FILTRO_SOLO_SIMPLES,
   clave: "wms-stock",
   campos: [
-    { id: "sku", etiqueta: "SKU", tipo: "texto", sinCsv: true, valor: (f) => `${f.codigo} ${f.nombre} ${textoCodigos(f)}` },
+    // Buscar una variante encuentra a su producto principal (las variantes salen dentro de él).
+    { id: "sku", etiqueta: "SKU", tipo: "texto", sinCsv: true, valor: (f) => `${f.codigo} ${f.nombre} ${textoCodigos(f)} ${f.variantes.map((v) => `${v.codigo} ${v.nombre} ${textoCodigos(v)}`).join(" ")}` },
     {
       id: "existencia",
       etiqueta: "Existencia",
@@ -90,6 +96,8 @@ export const DEF_STOCK: DefTabla<FilaStock> = {
   ],
   // Al agrupar, cada grupo dice sus unidades físicas; un compuesto no suma, sus unidades ya están en sus componentes.
   total: (f) => (f.tipo === "combo" ? 0 : f.fisico),
+  // Un producto con variantes baja una línea por variante (no su suma): el archivo trae el detalle que la lista esconde en el desplegable.
+  expandirDescarga: (f) => (f.variantes.length > 0 ? f.variantes : [f]),
   csvAntes: [
     { etiqueta: "Código", valor: (f) => f.codigo },
     { etiqueta: "N.º", valor: (f) => numeroProducto(f.numero) },

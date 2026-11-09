@@ -9,6 +9,7 @@ import { traerTodasConError } from "@/lib/supabase/paginar";
 import { leerStockPlataformas } from "./datos-plataformas";
 import type { FilaStock } from "./def-stock";
 import { ListaStock } from "./lista-stock";
+import { agruparVariantes } from "./variantes-stock";
 
 export const metadata = { title: "Inventario" };
 
@@ -42,7 +43,7 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
   const bodegaElegida = bodegaPedida && bodegas.some((b) => b.id === bodegaPedida) ? bodegaPedida : "";
 
   const idsPropias = bodegas.filter((b) => b.tipo === "propia" && b.activa).map((b) => b.id as string);
-  const [resumen, ubicaciones, fotos, padres, codigos] = await Promise.all([
+  const [resumen, ubicaciones, fotos, padres, codigos, hijas] = await Promise.all([
     // Paginado: cada consulta trae 1 000 filas como máximo y hay más productos (2 nov 2026: la lista se cortaba en 1 000).
     traerTodasConError<Record<string, unknown>>((desde, hasta) => supabase.rpc("wms_stock_resumen", { p_pais: pais.id, p_bodega: bodegaElegida || null }).range(desde, hasta)),
     idsPropias.length > 0
@@ -53,6 +54,8 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
     traerTodasConError<{ id: string }>((desde, hasta) => supabase.from("skus_maestros").select("id").not("opciones_variantes", "is", null).order("id").range(desde, hasta)),
     // El N.º y el código de barras de cada producto (7 nov 2026, pedido de Hernán).
     cargarCodigosProductos(supabase),
+    // De qué producto es cada variante y sus valores («Rojo / M»): las variantes salen dentro de su producto (9 nov 2026).
+    traerTodasConError<{ id: string; padre_id: string; opciones: Record<string, string> | null }>((desde, hasta) => supabase.from("skus_maestros").select("id, padre_id, opciones").not("padre_id", "is", null).order("id").range(desde, hasta)),
   ]);
   const fotoPorId = new Map(((fotos.data ?? []) as { id: string; foto_url: string }[]).map((f) => [f.id, f.foto_url]));
   // Las cajas de cada producto, de las bodegas que se están viendo (migración 0236; sin ella, en cero).
@@ -80,8 +83,10 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
   // Cuenta como stock: un producto con unidades en Dropi, Effi o Drop no está «sin stock».
   const plataformas = await leerStockPlataformas(supabase, pais.id);
 
-  // Un producto con variantes no lleva stock: se ven sus variantes. Sale solo si le viene algo en camino (una compra hecha al producto general) o si una plataforma lo tiene publicado así.
-  const filas: FilaStock[] = ((resumen.data ?? []) as Record<string, unknown>[]).filter((r) => !conVariantes.has(String(r.sku_maestro_id)) || Number(r.en_camino) > 0 || !!plataformas?.porProducto.has(String(r.sku_maestro_id))).map((r) => ({
+  // Un producto con variantes es una fila que se despliega con sus variantes, y suma sus cifras (el stock se lleva en cada variante). Sin variantes a la vista, sale solo si le viene algo en camino (una compra hecha al producto general) o si una plataforma lo tiene publicado así.
+  const hijaDe = new Map(((hijas.data ?? []) as { id: string; padre_id: string; opciones: Record<string, string> | null }[]).map((h) => [h.id, h]));
+  const conHijas = new Set([...hijaDe.values()].map((h) => h.padre_id));
+  const todasLasFilas: FilaStock[] = ((resumen.data ?? []) as Record<string, unknown>[]).filter((r) => !conVariantes.has(String(r.sku_maestro_id)) || conHijas.has(String(r.sku_maestro_id)) || Number(r.en_camino) > 0 || !!plataformas?.porProducto.has(String(r.sku_maestro_id))).map((r) => ({
     id: String(r.sku_maestro_id),
     codigo: String(r.codigo),
     nombre: String(r.nombre),
@@ -103,7 +108,11 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
     unidadesEnCajas: cajasPorSku.get(String(r.sku_maestro_id))?.unidades ?? 0,
     plataformas: plataformas?.porProducto.get(String(r.sku_maestro_id)) ?? null,
     porBodega: porBodegaPorSku.get(String(r.sku_maestro_id)) ?? [],
+    padreId: hijaDe.get(String(r.sku_maestro_id))?.padre_id ?? null,
+    opciones: Object.values(hijaDe.get(String(r.sku_maestro_id))?.opciones ?? {}).join(" / "),
+    variantes: [],
   }));
+  const filas = agruparVariantes(todasLasFilas);
 
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
