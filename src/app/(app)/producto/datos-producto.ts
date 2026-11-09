@@ -261,7 +261,7 @@ export async function cargarProductos(usuario: UsuarioActual, supabase: Supabase
   const variantesPorPadre = new Map<string, FilaProducto["variantes"]>();
   for (const p of lista) {
     if (!p.padre_id) continue;
-    const v = { id: p.id as string, codigo: p.codigo as string, nombre: p.nombre as string, opciones: (p.opciones ?? {}) as Record<string, string> };
+    const v = { id: p.id as string, codigo: p.codigo as string, nombre: p.nombre as string, opciones: (p.opciones ?? {}) as Record<string, string>, barras: (p.codigo_barras as string | null) ?? null };
     variantesPorPadre.set(p.padre_id, [...(variantesPorPadre.get(p.padre_id) ?? []), v]);
   }
 
