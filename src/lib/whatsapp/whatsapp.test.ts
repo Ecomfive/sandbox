@@ -300,6 +300,11 @@ test("360dialog con varios números: cada uno usa su propia clave y, si no tiene
     assert.equal(variableClave360("+507 6123-4567"), "D360_API_KEY_50761234567");
     assert.equal(config360("+50761234567")?.clave, "clave-507");
     assert.equal(config360("+584220350576")?.clave, "clave-58");
+    // México: WhatsApp manda el celular con el «1» (+52 1 55…) y la clave se guarda sin él, o al revés.
+    process.env.D360_API_KEY_525540921878 = "clave-mx";
+    assert.equal(config360("+5215540921878")?.clave, "clave-mx");
+    assert.equal(config360("+525540921878")?.clave, "clave-mx");
+    delete process.env.D360_API_KEY_525540921878;
     assert.equal(config360()?.clave, "clave-58");
     assert.deepEqual(
       claves360().map((c) => [c.variable, c.config.clave]),
