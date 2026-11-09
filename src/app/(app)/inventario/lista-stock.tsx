@@ -12,14 +12,14 @@ import type { NombreFilas } from "@/lib/tabla/pie";
 import { conStockPrimero } from "@/lib/wms/total-stock";
 import { formatearTiempoRelativo } from "@/lib/formato";
 import { ETIQUETA_PLATAFORMA, lecturaVieja, type LecturasPlataformas, type Plataforma } from "@/lib/wms/stock-plataformas";
-import { DEF_STOCK, DEF_STOCK_PLATAFORMAS, PLATAFORMAS_STOCK, type FilaStock } from "./def-stock";
+import { DEF_STOCK, DEF_STOCK_PLATAFORMAS, PLATAFORMAS_STOCK, conBodegas, type FilaStock } from "./def-stock";
 import { FichaStock } from "./ficha-stock";
 import { EncabezadoFilasStock, FilaStockLista } from "./fila-stock";
 import type { BodegaOpcion, UbicacionOpcion } from "./panel-movimiento";
 import { TableroStock } from "./tablero-stock";
 
 const NOMBRE: NombreFilas = { singular: "SKU", plural: "SKUs" };
-const ICONOS: Record<string, IconoComp> = { sku: ProductoIcon, existencia: InventarioIcon, tipo: ProductoIcon, clase: ProductoIcon, fisico: InventarioIcon, plataformas: InventarioIcon, disponible: InventarioIcon, vencido: InventarioIcon, enCamino: InventarioIcon , plataforma: InventarioIcon };
+const ICONOS: Record<string, IconoComp> = { sku: ProductoIcon, existencia: InventarioIcon, tipo: ProductoIcon, clase: ProductoIcon, fisico: InventarioIcon, plataformas: InventarioIcon, disponible: InventarioIcon, vencido: InventarioIcon, enCamino: InventarioIcon , plataforma: InventarioIcon, bodega: InventarioIcon };
 
 /** Elige de qué bodega se ve el stock (todas las del país, o una): se guarda en la dirección, `?bodega=`. */
 function SelectorBodega({ bodegas, elegida }: { bodegas: { id: string; nombre: string; externa: boolean }[]; elegida: string }) {
@@ -101,7 +101,7 @@ export function ListaStock({
   const [abierto, setAbierto] = useState<string | null>(abrir);
   const sku = abierto ? filas.find((f) => f.id === abierto) : undefined;
   const conPlataformas = lecturas !== null;
-  const def = conPlataformas ? DEF_STOCK_PLATAFORMAS : DEF_STOCK;
+  const def = useMemo(() => conBodegas(conPlataformas ? DEF_STOCK_PLATAFORMAS : DEF_STOCK, bodegasPropias), [conPlataformas, bodegasPropias]);
   const enOrden = useMemo(() => conStockPrimero(filas, (f) => f.plataformas?.total ?? 0), [filas]);
   // Con una plataforma elegida (su tarjeta o el filtro «Plataforma»), la columna muestra solo lo de esa plataforma.
   const [filtros] = useFiltros(def);
