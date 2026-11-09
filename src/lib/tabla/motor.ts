@@ -92,6 +92,11 @@ export interface DefTabla<F> {
    * que traen algo, hasta 9: un PDF con todas las del CSV no se puede leer.
    */
   pdf?: string[];
+  /**
+   * Lo que se descarga de una fila: por defecto, ella misma. Una fila que lleva otras dentro (un producto con sus variantes) baja una línea por
+   * cada una (9 nov 2026), para que el archivo tenga el detalle que la pantalla esconde en el desplegable.
+   */
+  expandirDescarga?: (fila: F) => F[];
   /** La foto de cada fila en el PDF (8 nov 2026, pedido de Alcides): la dirección de la imagen o null. Con esto el PDF lleva una columna «Foto» primero. */
   pdfFoto?: (fila: F) => string | null;
   /**
