@@ -154,6 +154,13 @@ export async function obtenerHistorialTarea(id: string): Promise<{ eventos: { id
 }
 
 /** «Agregar tarea» (la ficha de crear del sistema manda un formulario): devuelve el error como valor. */
+/** Lo que necesita «Asignar tarea» de la barra de cada módulo para abrir su ficha: a quién se puede asignar. */
+export async function datosNuevaTarea(): Promise<{ personas: { id: string; nombre: string }[]; miId: string; admin: boolean }> {
+  const usuario = await requireModuloEscritura(MODULO);
+  const { data } = await createServiceClient().from("perfiles").select("id, nombre, email").eq("activo", true).order("nombre");
+  return { personas: (data ?? []).map((p) => ({ id: String(p.id), nombre: String(p.nombre || p.email || "Sin nombre") })), miId: usuario.id, admin: esAdministrador(usuario) };
+}
+
 export async function crearTareaFormulario(f: FormData): Promise<{ error?: string }> {
   const texto = (k: string) => String(f.get(k) ?? "").trim();
   const r = await crearTarea({

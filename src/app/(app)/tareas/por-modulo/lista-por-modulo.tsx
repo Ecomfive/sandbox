@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { formatearFecha } from "@/lib/formato";
-import { cuando, type Cuando, type GrupoModulo } from "@/lib/tareas/por-modulo";
+import { cuando, MODULO_EQUIPO, type Cuando, type GrupoModulo } from "@/lib/tareas/por-modulo";
 
 const CUANDO: Record<
   Cuando,
@@ -16,7 +16,7 @@ const CUANDO: Record<
   sin_fecha: { texto: () => "Sin fecha", clase: "text-muted-foreground" },
 };
 
-/** Los módulos con las tareas abiertas de la persona: cada uno se pliega, cada tarea abre en su módulo. */
+/** Los módulos con las tareas abiertas de la persona: cada uno se pliega y lleva a su módulo («Ir a …»); cada tarea abre en su módulo o en su ficha. */
 export function ListaPorModulo({
   grupos,
   hoy,
@@ -58,6 +58,14 @@ export function ListaPorModulo({
               <span className="text-xs font-semibold text-primary">
                 {g.paraHoy} para hoy
               </span>
+            )}
+            {g.modulo !== MODULO_EQUIPO && (
+              <Link
+                href={`/${g.modulo}`}
+                className="ml-auto rounded px-2 py-1 text-xs font-semibold text-primary hover:bg-primary/10"
+              >
+                Ir a {g.etiqueta} →
+              </Link>
             )}
           </summary>
           <ul className="m-0 list-none divide-y divide-border border-t border-border p-0">

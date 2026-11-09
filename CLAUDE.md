@@ -292,6 +292,11 @@ convenciones técnicas del código.
   Cada fuente se lee solo si la persona tiene ese módulo (`tareas`, `publicaciones-dropi`, `crm-dropshippers`) y una que falla no tapa las otras.
   `agruparPorModulo` (`src/lib/tareas/por-modulo.ts`, con prueba): una del tablero que nombra un módulo sin acceso queda en «Tablero del equipo»;
   atrasadas primero. Solo lectura: cada tarea abre en su módulo. **Una tabla de tareas nueva con responsable se suma aquí.**
+  **Tareas en cualquier módulo** (9 nov 2026, Hernán: «que todos los módulos puedan salir»): `BotonTareaModulo`
+  (`src/components/tareas/boton-tarea-modulo.tsx`) en `BarraMigas` (prop `verTarea`: quien escribe en `tareas`; no en `/`, `/ayuda` ni `/tareas`) abre
+  `NuevaTarea` con `moduloFijo` = `moduloDeHref(moduloHref)`: es una fila de `tareas_equipo` con ese `modulo`, así que sale en «Mis tareas por módulo»
+  de la persona en ese módulo. Las personas se piden al abrir (`datosNuevaTarea`). Asignar a otra persona sigue siendo de administrador
+  (`crearTarea`). Cada grupo del repositorio tiene «Ir a <módulo>» (`/<clave>`).
 - **Perfiles de acceso por área** (migración 0115, 20 oct 2026; cuadro en `Perfiles-de-acceso-Ecomfive.pdf`, junto a la carpeta del proyecto). Roles
   listos con los módulos de cada área y qué es solo lectura: **nuevos** Investigación de producto, Contenido y ofertas, Compras, Producto / Catálogo,
   Talento humano y Consulta; **completados** Administrativo (Finanzas), Atención al cliente, Líder comercial y Operaciones (Bodega); Admin
