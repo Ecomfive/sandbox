@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { descontinuadosEnPais } from "@/lib/producto/descontinuado-pais";
 import { after } from "next/server";
+import { tipoSegunDropi } from "@/lib/publicaciones/reservas-dropi";
 import { accionesPublicacion, enDropi, esBodegaDropi, estaArchivada, necesitaRepublicar, vendePoco } from "@/lib/publicaciones/automatico";
 import { normalizarDatosCrear, type OpcionesCrear } from "@/lib/publicaciones/crear-dropi";
 import { monedaPublicaciones } from "@/lib/publicaciones/moneda";
@@ -74,8 +75,12 @@ function automatico(
   // reporta Dropi solo cuenta si la publicación no tiene nada anotado.
   const estadoAnotado = (d.estado_publicacion as string | null) ?? null;
   const archivada = estadoAnotado ? manualArchivada : estaArchivada(estadoDropi, manualArchivada);
-  const tipoEnDropi: "publico" | "privado" | null = prov ? (prov.privado ? "privado" : "publico") : v ? (v.privadoEnDropi ? "privado" : "publico") : null;
-  const tipoAnotado = d.tipo_publicacion === "publico" || d.tipo_publicacion === "privado" ? (d.tipo_publicacion as "publico" | "privado") : null;
+  // Con la ficha de Dropi leída (migración 0254), `privated_product` dice si es un producto privado: una publicación pública con unidades reservadas a un correo
+  // ya no cuenta como privada (8 nov 2026, PUB-0010). Sin ella, lo de la lista de «Mis productos», como antes.
+  const tipoEnDropi: "publico" | "privado" | null = prov ? tipoSegunDropi({ privado: prov.privado, privadoProducto: prov.privadoProducto ?? null }) : v ? (v.privadoEnDropi ? "privado" : "publico") : null;
+  const tipoLeido = d.tipo_publicacion === "publico" || d.tipo_publicacion === "privado" ? (d.tipo_publicacion as "publico" | "privado") : null;
+  // Lo anotado manda, salvo un «Privado» que Dropi desmiente con su ficha: venía de la lista, que marcaba privadas las públicas con reserva.
+  const tipoAnotado = tipoLeido === "privado" && prov?.privadoProducto === false ? "publico" : tipoLeido;
   const tipo = tipoAnotado ?? tipoEnDropi;
   const barato = competidorMasBarato({ nombre: d.nombre as string, precio: num(d.precio_venta), idsDropi: ids }, competidores);
   return {
@@ -424,6 +429,8 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
         })),
       stockProveedor: prov?.stock ?? null,
       stockPrivadoProveedor: prov?.stockPrivado ?? null,
+      reservas: prov?.reservas ?? [],
+      reservasPendientes: (cambiosDropi.reservando.get(d.id as string) ?? []).map(({ correo, unidades, nombre, error }) => ({ correo, unidades, nombre, error })),
       variacionesBajas: variacionesBajas(prov?.variaciones, POCO_STOCK_VARIACION),
       leidoProveedor: proveedor?.leidoEn ?? null,
       cambioDropi: cambiosDropi.porPublicacion.get(d.id) ?? null,

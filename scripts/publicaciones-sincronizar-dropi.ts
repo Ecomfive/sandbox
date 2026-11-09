@@ -27,6 +27,7 @@ import {
   type ProductoProveedor,
 } from "../src/lib/publicaciones/sincronizar-dropi";
 import { variacionesDeLectura } from "../src/lib/publicaciones/privatizar-variable";
+import { detallePrivadoDeLectura } from "../src/lib/publicaciones/reservas-dropi";
 
 export interface LecturaNuestros {
   tipo: "nuestros";
@@ -64,6 +65,9 @@ export async function guardarNuestrosProductos(supabase: SupabaseClient, l: Lect
   // Las variaciones de los productos activos con variaciones, para «Privatizar en Dropi» (migración 0226).
   const conVariaciones = !(await supabase.from("dropi_productos_proveedor").select("variaciones").limit(1)).error;
   const variaciones = new Map(l.productos.map((o) => [Number(o.id), variacionesDeLectura(o)]));
+  // Si es un producto privado y a qué correos tiene unidades reservadas (migración 0254; la lectura abre la ficha de lo que tiene algo reservado).
+  const conReservas = !(await supabase.from("dropi_productos_proveedor").select("reservas").limit(1)).error;
+  const detallePrivado = new Map(l.productos.map((o) => [Number(o.id), detallePrivadoDeLectura(o)]));
 
   const pubs = revisar(
     await supabase.from("dropi_publicaciones").select("id, nombre, dropi_id, ubicacion, precio_venta, tipo_publicacion, estado_publicacion").eq("pais_id", pais.id),
@@ -148,6 +152,8 @@ export async function guardarNuestrosProductos(supabase: SupabaseClient, l: Lect
     leido_en: leidoEn,
     // Sin la migración 0226 todavía no está la columna: la lectura se guarda igual.
     ...(conVariaciones ? { variaciones: variaciones.get(p.id) ?? null } : {}),
+    // Sin la migración 0254 todavía no están las columnas. Una lectura de una extensión vieja no trae el detalle: queda null (como antes).
+    ...(conReservas ? { privado_producto: detallePrivado.get(p.id)?.privadoProducto ?? null, reservas: detallePrivado.get(p.id)?.reservas ?? null } : {}),
   }));
   await enTrozos(filas, 500, async (t) => void revisar(await supabase.from("dropi_productos_proveedor").upsert(t, { onConflict: "pais_id,dropi_producto_id" }), "Guardar productos"));
   // Lo que Dropi ya no lista (eliminado) sale de la tabla: se reemplaza en cada lectura.

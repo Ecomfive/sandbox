@@ -1,11 +1,12 @@
 "use client";
 
+import { textoReservas } from "@/lib/publicaciones/reservas-dropi";
 /* eslint-disable @next/next/no-img-element -- fotos de Storage */
 import { useState, useTransition, type ReactNode } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
-import { ActualizarIcon, ArchivarIcon, CandadoIcon, ChevronRightIcon, DropiIcon, EtiquetaIcon, PausaIcon, ReactivarIcon } from "@/lib/nav-icons";
+import { CandadoAbiertoIcon, ActualizarIcon, ArchivarIcon, CandadoIcon, ChevronRightIcon, DropiIcon, EtiquetaIcon, PausaIcon, ReactivarIcon } from "@/lib/nav-icons";
 import { UBICACIONES, numeroPublicacion, opcion } from "@/lib/publicaciones/publicacion";
 import { EN_DROPI } from "@/lib/publicaciones/automatico";
 import { ConfirmarRepublicar } from "./confirmar-republicar";
@@ -281,7 +282,14 @@ export function FilaPublicacionLista({ f, verVentas = false, alAbrir, puedeArchi
             {f.tipoDropi === "privado" && (
               <span className="inline-flex max-w-48 shrink-0 items-center gap-1 rounded-full bg-privado px-2 py-0.5 text-xs font-semibold text-white">
                 <CandadoIcon aria-hidden="true" className="h-3 w-3 shrink-0" />
-                <span className="truncate">Privado{f.privatizadoA ? ` · ${f.privatizadoA}` : ""}</span>
+                <span className="truncate">Privado{f.privatizadoA ? ` · ${f.privatizadoA}` : f.reservas[0] ? ` · ${f.reservas[0].nombre ?? f.reservas[0].correo ?? ""}` : ""}</span>
+              </span>
+            )}
+            {/* Pública con unidades reservadas a un correo (8 nov 2026, pedido de Alcides: no es un producto privado): azul y con el candado abierto. */}
+            {f.tipoDropi !== "privado" && f.reservas.length > 0 && (
+              <span className="inline-flex max-w-56 shrink-0 items-center gap-1 rounded-full bg-azul-soft px-2 py-0.5 text-xs font-semibold text-azul">
+                <CandadoAbiertoIcon aria-hidden="true" className="h-3 w-3 shrink-0" />
+                <span className="truncate">{textoReservas(f.reservas)}</span>
               </span>
             )}
             {/* En liquidación: insignia roja sólida junto al nombre, como «Privado» (29 oct 2026, pedido de Alcides; antes era un punto). */}

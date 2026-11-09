@@ -42,6 +42,7 @@ import { EstadoCambioDropi } from "./estado-cambio-dropi";
 import { BodegasStockDropi } from "./stock-dropi";
 import { BotonLiquidacionFicha } from "./liquidacion";
 import { VendePocoEspera } from "./vende-poco-espera";
+import { ReservasPublicacion } from "./reservas-dropi";
 import { BarraOrdenable, ItemOrden } from "./orden-botones-ficha";
 import { TareasPublicacion } from "./tareas-publicacion";
 import { codigoBodega } from "@/lib/publicaciones/sincronizar-dropi";
@@ -717,6 +718,8 @@ function ContenidoFicha({
             {/* Lo que dice «Mis productos» de Dropi (22 oct 2026) y, desde el 28 oct 2026, el lápiz que cambia el stock de una bodega de ECOMFIVE por «Aplicar en Dropi». */}
             <BodegasStockDropi p={p} bodegasEcomfive={opcionesCrear.bodegas} puedeEscribir={puedeEscribir} />
           </Seccion>
+          {/* Las unidades reservadas por correo en Dropi (8 nov 2026): una pública con reserva no es un producto privado. */}
+          <ReservasPublicacion p={p} puedeEscribir={puedeEscribir} />
 
           {/* Lo que viene en camino del producto vinculado: solo unidades, del país seleccionado (las órdenes que ya salieron y no han llegado). */}
           {p.sku && p.sku.tipo !== "combo" && (
