@@ -45,7 +45,7 @@ test("republicar: 30 días sin ninguna venta, activa y de nuestra bodega (nunca 
   assert.equal(r({ ...base, bodegaId: b280 }, hoy), false, "la B280 es de Dropi: no se republica");
   assert.equal(r({ ...base, privada: true }, hoy), false, "una privada no se republica");
   assert.equal(r({ ...base, stock: 0 }, hoy), false, "sin stock no se republica");
-  assert.equal(r({ ...base, stock: 12 }, hoy), true);
+  assert.equal(r({ ...base, stock: 12 }, hoy, { dias_republicar: 30, stock_minimo_republicar: 0 }), true);
   // Un pedido en 30 días que se canceló no cuenta: sin ventas netas, sale.
   assert.equal(r({ ...base, ultimaVenta: "2026-10-04", netas30: 0 }, hoy), true, "su único pedido se canceló");
   assert.equal(r({ ...base, ultimaVenta: "2026-10-04", netas30: 2 }, hoy), false, "vendió en 30 días");
@@ -59,6 +59,10 @@ test("republicar: 30 días sin ninguna venta, activa y de nuestra bodega (nunca 
   assert.equal(r({ ...base, enDropi: "archivado" }, hoy), false);
   assert.equal(r({ ...base, hayVentas: false }, hoy), false, "sin datos de Dropi no se sabe");
   assert.equal(r(base, hoy, { dias_republicar: 60 }), false, "el plazo sale de las reglas");
+  assert.equal(r({ ...base, stock: 29 }, hoy), false, "con menos de 30 unidades no se invita a republicar");
+  assert.equal(r({ ...base, stock: 30 }, hoy), true, "30 ya alcanza");
+  assert.equal(r({ ...base, stock: 10 }, hoy, { dias_republicar: 30, stock_minimo_republicar: 0 }), true, "en 0 no hay mínimo");
+  assert.equal(r({ ...base, stock: 40 }, hoy, { dias_republicar: 30, stock_minimo_republicar: 50 }), false, "el mínimo sale de las reglas");
 });
 
 test("la bodega de Dropi de cada país: B280 Panamá, B15 Costa Rica, B49 México", async () => {
@@ -96,9 +100,25 @@ test("vende poco: después de un cambio de precio espera 30 días con el precio 
   const { vendePoco } = await import("./automatico");
   const hoy = "2026-11-07";
   const base = { archivada: false, enDropi: "activo" as const, netas30: 40, stock: 200, publicadaDesde: "2026-08-01" };
-  assert.deepEqual(vendePoco({ ...base, ultimoCambioPrecio: "2026-11-01" }, hoy), { vende: false, espera: "2026-12-01" }, "cambió hace 6 días: vuelve el 1 dic");
-  assert.deepEqual(vendePoco({ ...base, ultimoCambioPrecio: "2026-11-07T15:30:00Z" }, hoy), { vende: false, espera: "2026-12-07" }, "con hora: el día de Panamá");
+  assert.deepEqual(vendePoco({ ...base, ultimoCambioPrecio: "2026-11-01" }, hoy), { vende: false, espera: "2026-12-01", por: "precio" }, "cambió hace 6 días: vuelve el 1 dic");
+  assert.deepEqual(vendePoco({ ...base, ultimoCambioPrecio: "2026-11-07T15:30:00Z" }, hoy), { vende: false, espera: "2026-12-07", por: "precio" }, "con hora: el día de Panamá");
   assert.deepEqual(vendePoco({ ...base, ultimoCambioPrecio: "2026-10-08" }, hoy), { vende: true }, "ya pasaron 30 días con el precio nuevo y sigue vendiendo poco");
   assert.deepEqual(vendePoco({ ...base, ultimoCambioPrecio: "2026-08-15" }, hoy), { vende: true });
   assert.deepEqual(vendePoco({ ...base, netas30: 150, ultimoCambioPrecio: "2026-11-01" }, hoy), { vende: false, espera: null }, "si ya vende bien no espera nada");
+});
+
+test("vende poco: «Esperar un mes» la saca hasta el día elegido sin cambiar el precio", async () => {
+  const { vendePoco, masDias, revisarNotaEspera } = await import("./automatico");
+  const hoy = "2026-11-08";
+  const base = { archivada: false, enDropi: "activo" as const, netas30: 40, stock: 200, publicadaDesde: "2026-08-01" };
+  assert.equal(masDias(hoy, 30), "2026-12-08");
+  assert.deepEqual(vendePoco({ ...base, esperaHasta: "2026-12-08" }, hoy), { vende: false, espera: "2026-12-08", por: "decision" });
+  assert.deepEqual(vendePoco({ ...base, esperaHasta: "2026-11-08" }, hoy), { vende: true }, "el día que vence vuelve a salir");
+  assert.deepEqual(vendePoco({ ...base, esperaHasta: "2026-10-01" }, hoy), { vende: true }, "una espera vencida no cuenta");
+  assert.deepEqual(vendePoco({ ...base, esperaHasta: "2026-12-08", ultimoCambioPrecio: "2026-11-20" }, hoy), { vende: false, espera: "2026-12-20", por: "precio" }, "manda la que termina más tarde");
+  assert.deepEqual(vendePoco({ ...base, esperaHasta: "2026-12-30", ultimoCambioPrecio: "2026-11-01" }, hoy), { vende: false, espera: "2026-12-30", por: "decision" });
+  assert.deepEqual(vendePoco({ ...base, netas30: 150, esperaHasta: "2026-12-08" }, hoy), { vende: false, espera: null }, "si ya vende bien no hay espera");
+  assert.ok("error" in revisarNotaEspera("  "));
+  assert.ok("error" in revisarNotaEspera("x".repeat(301)));
+  assert.deepEqual(revisarNotaEspera("  esperando   la temporada "), { nota: "esperando la temporada" });
 });

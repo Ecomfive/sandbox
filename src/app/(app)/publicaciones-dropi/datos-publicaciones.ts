@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { descontinuadosEnPais } from "@/lib/producto/descontinuado-pais";
 import { after } from "next/server";
+import { tipoSegunDropi } from "@/lib/publicaciones/reservas-dropi";
+import { tareaVisiblePara } from "@/lib/publicaciones/tareas";
 import { accionesPublicacion, enDropi, esBodegaDropi, estaArchivada, necesitaRepublicar, vendePoco } from "@/lib/publicaciones/automatico";
 import { normalizarDatosCrear, type OpcionesCrear } from "@/lib/publicaciones/crear-dropi";
 import { monedaPublicaciones } from "@/lib/publicaciones/moneda";
@@ -74,8 +76,12 @@ function automatico(
   // reporta Dropi solo cuenta si la publicación no tiene nada anotado.
   const estadoAnotado = (d.estado_publicacion as string | null) ?? null;
   const archivada = estadoAnotado ? manualArchivada : estaArchivada(estadoDropi, manualArchivada);
-  const tipoEnDropi: "publico" | "privado" | null = prov ? (prov.privado ? "privado" : "publico") : v ? (v.privadoEnDropi ? "privado" : "publico") : null;
-  const tipoAnotado = d.tipo_publicacion === "publico" || d.tipo_publicacion === "privado" ? (d.tipo_publicacion as "publico" | "privado") : null;
+  // Con la ficha de Dropi leída (migración 0254), `privated_product` dice si es un producto privado: una publicación pública con unidades reservadas a un correo
+  // ya no cuenta como privada (8 nov 2026, PUB-0010). Sin ella, lo de la lista de «Mis productos», como antes.
+  const tipoEnDropi: "publico" | "privado" | null = prov ? tipoSegunDropi({ privado: prov.privado, privadoProducto: prov.privadoProducto ?? null }) : v ? (v.privadoEnDropi ? "privado" : "publico") : null;
+  const tipoLeido = d.tipo_publicacion === "publico" || d.tipo_publicacion === "privado" ? (d.tipo_publicacion as "publico" | "privado") : null;
+  // Lo anotado manda, salvo un «Privado» que Dropi desmiente con su ficha: venía de la lista, que marcaba privadas las públicas con reserva.
+  const tipoAnotado = tipoLeido === "privado" && prov?.privadoProducto === false ? "publico" : tipoLeido;
   const tipo = tipoAnotado ?? tipoEnDropi;
   const barato = competidorMasBarato({ nombre: d.nombre as string, precio: num(d.precio_venta), idsDropi: ids }, competidores);
   return {
@@ -266,20 +272,29 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
   // Las tareas escritas a mano sin resolver ni archivar (migraciones 0175 y 0178), para la marca de la fila: sin la 0178 cuentan también las archivadas
   // (no hay) y sin la 0175, ninguna.
   const leerTareas = (sinArchivadas: boolean) =>
-    traerTodasConError<{ publicacion_id: string; plazo: string | null }>((desde, hasta) => {
-      const q = supabase.from("dropi_publicaciones_tareas").select("publicacion_id, plazo, id, dropi_publicaciones!inner(pais_id)").eq("dropi_publicaciones.pais_id", paisId).is("hecha_en", null);
+    traerTodasConError<{ publicacion_id: string; plazo: string | null; id: string; responsable_id: string | null; creado_por: string | null }>((desde, hasta) => {
+      const q = supabase.from("dropi_publicaciones_tareas").select("publicacion_id, plazo, id, responsable_id, creado_por, dropi_publicaciones!inner(pais_id)").eq("dropi_publicaciones.pais_id", paisId).is("hecha_en", null);
       return (sinArchivadas ? q.is("archivada_en", null) : q).order("id").range(desde, hasta);
     });
   let tareasR = await leerTareas(true);
   if (tareasR.error) tareasR = await leerTareas(false);
   const tareasDe = new Map<string, { total: number; atrasadas: number }>();
+  // Solo las que la persona ve (8 nov 2026: cada una las suyas; quien ve las de todos, todas).
+  const { data: misOtras } = await supabase.from("dropi_tareas_responsables").select("tarea_id").eq("persona_id", usuario.id);
+  const mias = new Set((misOtras ?? []).map((x) => x.tarea_id as string));
   for (const t of tareasR.error ? [] : (tareasR.data ?? [])) {
+    if (!tareaVisiblePara({ responsableId: t.responsable_id, otrosIds: mias.has(t.id) ? [usuario.id] : [], creadoPor: t.creado_por }, usuario.id)) continue;
     const x = tareasDe.get(t.publicacion_id) ?? { total: 0, atrasadas: 0 };
     x.total++;
     if (t.plazo && t.plazo < hoy) x.atrasadas++;
     tareasDe.set(t.publicacion_id, x);
   }
   const liquidacionEn = new Map(liquidacionR.error ? [] : (liquidacionR.data ?? []).map((n) => [n.id, n.liquidacion_en as string]));
+  // «Esperar un mes» de «Vende poco» (migración 0252), igual: sin la migración, ninguna espera.
+  const esperasR = await traerTodasConError<{ id: string; vende_poco_espera_hasta: string; vende_poco_espera_nota: string | null; vende_poco_espera_por: string | null }>((desde, hasta) =>
+    supabase.from("dropi_publicaciones").select("id, vende_poco_espera_hasta, vende_poco_espera_nota, vende_poco_espera_por").eq("pais_id", paisId).gt("vende_poco_espera_hasta", hoy).order("id").range(desde, hasta),
+  );
+  const esperaVendePoco = new Map(esperasR.error ? [] : (esperasR.data ?? []).map((n) => [n.id, { hasta: n.vende_poco_espera_hasta, nota: n.vende_poco_espera_nota, por: n.vende_poco_espera_por }]));
   // Los productos descontinuados en este país (migración 0211): sin la migración, ninguno.
   const descontinuados = await descontinuadosEnPais(supabase, paisId);
 
@@ -419,6 +434,8 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
         })),
       stockProveedor: prov?.stock ?? null,
       stockPrivadoProveedor: prov?.stockPrivado ?? null,
+      reservas: prov?.reservas ?? [],
+      reservasPendientes: (cambiosDropi.reservando.get(d.id as string) ?? []).map(({ correo, unidades, nombre, error }) => ({ correo, unidades, nombre, error })),
       variacionesBajas: variacionesBajas(prov?.variaciones, POCO_STOCK_VARIACION),
       leidoProveedor: proveedor?.leidoEn ?? null,
       cambioDropi: cambiosDropi.porPublicacion.get(d.id) ?? null,
@@ -449,6 +466,8 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
       pausadaDesde: pausadaEn.get(d.id as string) ?? null,
       liquidacionDesde: liquidacionEn.get(d.id as string) ?? null,
       vendePocoVuelve: null,
+      vendePocoPor: null,
+      vendePocoEspera: esperaVendePoco.get(d.id as string) ?? null,
       descontinuadoPais: !!d.sku_maestro_id && descontinuados.has(d.sku_maestro_id as string),
       tareasPendientes: tareasDe.get(d.id as string) ?? { total: 0, atrasadas: 0 },
       grupo: [],
@@ -483,12 +502,15 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
     // Republicar: necesita la bodega de la fila (se conoce después de armarla).
     if (necesitaRepublicar({ archivada: f.archivada, enDropi: f.enDropi, bodegaId: f.bodega?.id ?? null, hayVentas: !!f.ventas, ultimaVenta: f.ventas?.ultimaVenta ?? null, publicadaDesde: f.fechaPublicacion ?? f.ventas?.primeraVenta ?? null, privada: f.tipoDropi === "privado", stock: f.stockProveedor ?? f.ventas?.stock ?? null, netas30: f.ventas?.netas30 ?? null }, hoy, r))
       f.acciones = [...f.acciones, "republicar"];
-    // Vende poco: también necesita el stock de la lectura de «Mis productos». Con un cambio de precio de menos de 30 días, espera.
+    // Vende poco: también necesita el stock de la lectura de «Mis productos». Con un cambio de precio de menos de 30 días o «Esperar un mes», espera.
     if (!f.apagadoPendiente && !f.duplicadaDe && !f.sinPublicar) {
       const cambio = masReciente([f.cambioPrecioDropi, f.ultimoCambioPrecio ? { fecha: f.ultimoCambioPrecio } : null]);
-      const vp = vendePoco({ archivada: f.archivada, enDropi: f.enDropi, netas30: f.ventas?.netas30 ?? null, stock: f.stockProveedor ?? f.ventas?.stock ?? null, publicadaDesde: f.fechaPublicacion ?? f.ventas?.primeraVenta ?? null, ultimoCambioPrecio: cambio?.fecha ?? null }, hoy, r);
+      const vp = vendePoco({ archivada: f.archivada, enDropi: f.enDropi, netas30: f.ventas?.netas30 ?? null, stock: f.stockProveedor ?? f.ventas?.stock ?? null, publicadaDesde: f.fechaPublicacion ?? f.ventas?.primeraVenta ?? null, ultimoCambioPrecio: cambio?.fecha ?? null, esperaHasta: f.vendePocoEspera?.hasta ?? null }, hoy, r);
       if (vp.vende) f.acciones = [...f.acciones, "vende_poco"];
-      else f.vendePocoVuelve = vp.espera;
+      else {
+        f.vendePocoVuelve = vp.espera;
+        f.vendePocoPor = vp.espera ? (vp.por ?? null) : null;
+      }
     }
     const combo = f.sku ? combosX2.get(f.sku.id) : undefined;
     const comboPublicado = !!combo && publicados.has(combo.id);

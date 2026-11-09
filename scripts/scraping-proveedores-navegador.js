@@ -208,9 +208,12 @@ async function leerNuestrosProductos(puente) {
   }
   // Las variaciones de cada producto activo con variaciones, para «Privatizar en Dropi»: la lista no las trae (5 nov 2026). Si una no se puede leer, la lectura sigue sin ella.
   const api = location.hostname.replace(/^app\./, "api.");
-  for (const p of productos.filter((x) => x.type === "VARIABLE" && !x.archivado)) {
+  // Y, de lo que tiene algo reservado, si es un producto privado y a qué correos (8 nov 2026, igual que dropi-diario-navegador.js).
+  for (const p of productos.filter((x) => !x.archivado && (x.type === "VARIABLE" || x.private_product || Number(x.private_stock) > 0))) {
     const j = await fetch(`https://${api}/api/products/${p.id}`, { headers: { "X-Authorization": "Bearer " + token, Accept: "application/json" } }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
-    if (Array.isArray(j?.objects?.variations)) p.variations = j.objects.variations.map((v) => ({ id: v.id, sku: v.sku, deleted_at: v.deleted_at, attribute_values: v.attribute_values, warehouse_product_variation: (v.warehouse_product_variation || []).map((w) => ({ warehouse_id: w.warehouse_id, stock: w.stock })) }));
+    if (p.type === "VARIABLE" && Array.isArray(j?.objects?.variations)) p.variations = j.objects.variations.map((v) => ({ id: v.id, sku: v.sku, deleted_at: v.deleted_at, attribute_values: v.attribute_values, warehouse_product_variation: (v.warehouse_product_variation || []).map((w) => ({ warehouse_id: w.warehouse_id, stock: w.stock })) }));
+    if (j?.objects && (p.private_product || Number(p.private_stock) > 0))
+      p.detalle_privado = { privated_product: j.objects.privated_product === true, private_product_inventories: (j.objects.private_product_inventories || []).filter((x) => !x.deleted_at).map((x) => ({ id: x.id, user_id: x.user_id, email: x.email ?? x.user?.email ?? null, stock: x.stock, variation_id: x.variation_id ?? null, user: x.user ? { id: x.user.id, name: x.user.name, surname: x.user.surname, email: x.user.email } : null })) };
     await new Promise((ok) => setTimeout(ok, 300));
   }
   const cuerpo = { tipo: "nuestros", pais, inicio: inicio.toISOString(), duracionMs: Math.round(performance.now() - t0), productos };

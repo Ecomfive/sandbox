@@ -5,7 +5,6 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { usePuedeAbrir } from "@/components/modulos-contexto";
 import { anilloFoco } from "@/components/ui/field";
-import { HistorialGenerico } from "@/components/ui/historial-generico";
 import { Seccion } from "@/components/ui/seccion-ficha";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/toast";
@@ -15,7 +14,8 @@ import { CalendarioIcon, CatalogoIcon, ComprasIcon, EnlaceIcon, EnvioIcon, Flech
 import { BloqueCompetencia } from "@/components/competencia/piezas-competencia";
 import { ResultadoTestProducto } from "./test-producto";
 import { formatearFecha } from "@/lib/formato";
-import { cambiarClaseProducto, eliminarProducto, obtenerHistorialProducto } from "./actions";
+import { NotasProducto } from "../inventario/notas-producto";
+import { cambiarClaseProducto, eliminarProducto } from "./actions";
 import { CodigoBarrasProducto } from "./codigo-barras-producto";
 import { VencimientoProducto } from "./vencimiento-producto";
 import { EnvioProductoBloque } from "./envio-producto";
@@ -30,7 +30,7 @@ import { VentasDropiProducto } from "./ventas-dropi-producto";
 import { ExclusividadProducto } from "./exclusividad-producto";
 import { CategoriaProducto } from "./categoria-producto";
 import { SelectorClaseProducto } from "./selector-clase";
-import { DescontinuadoPorPais } from "./descontinuado-pais";
+import { DescontinuadoHeredado, DescontinuadoPorPais } from "./descontinuado-pais";
 import { UnirProducto } from "./unir-producto";
 import type { ResumenUnion } from "@/lib/wms/unir-productos";
 
@@ -71,7 +71,6 @@ function BotonNavegar({ texto, icono: Icono, activo, alHacerClic }: { texto: str
 export function FichaProducto({
   producto,
   orden,
-  codigoPais,
   puedeEscribir,
   puedeEliminar,
   referenciasTest,
@@ -82,7 +81,7 @@ export function FichaProducto({
   producto: FilaProducto | undefined;
   /** Las claves de los productos en el orden de la tabla. */
   orden: string[];
-  /** El producto es igual para todos los países; el código de país solo da formato a las fechas de la actividad. */
+  /** El producto es igual para todos los países (las notas dan formato a sus fechas por su cuenta). */
   codigoPais: string;
   puedeEscribir: boolean;
   /** Solo un administrador con edición en Producto: elimina el producto de verdad (si nada depende de él) o lo une con un duplicado. */
@@ -100,6 +99,10 @@ export function FichaProducto({
   // Sube cada vez que se cambia el estado, para que la línea de tiempo se vuelva a pedir.
   const [version, setVersion] = useState(0);
   const [unirAbierto, setUnirAbierto] = useState(false);
+  // El estado recién cambiado (8 nov 2026): la ficha abierta encima de otro módulo (Gestión de IDs, Compras…) no recibe la fila nueva del servidor,
+  // y seguía mostrando el estado de antes aunque ya estuviera guardado («no se deja cambiar»). Vale solo para el producto en que se cambió.
+  const [claseCambiada, setClaseCambiada] = useState<{ id: string; clase: string } | null>(null);
+  const clase = producto ? (claseCambiada?.id === producto.id ? claseCambiada.clase : producto.clase) : "";
 
   const indice = producto ? orden.indexOf(producto.id) : -1;
   const anterior = indice > 0 ? orden[indice - 1] : null;
@@ -118,6 +121,7 @@ export function FichaProducto({
       const r = await cambiarClaseProducto(producto.id, nueva);
       if (r.error) setError(r.error);
       else {
+        setClaseCambiada({ id: producto.id, clase: nueva });
         mostrarToast(
           r.compra
             ? `Estado: Activo. Se creó su orden de compra OC-${String(r.compra.numero).padStart(4, "0")}${r.compra.codigo ? ` · ${r.compra.codigo}` : ""} (${r.compra.pais}) en Cotizar`
@@ -152,7 +156,7 @@ export function FichaProducto({
 
   // Una variante o un producto con variantes no se une con otro: la base se negaría.
   const sePuedeUnir = !!producto && puedeEliminar && !producto.padre && producto.variantes.length === 0;
-  const esTest = producto?.clase === "test";
+  const esTest = clase === "test";
   return (
     <Ventana
       abierto={!!producto}
@@ -165,7 +169,7 @@ export function FichaProducto({
             {producto.numero !== null && <span className="text-sm font-medium text-muted-foreground tabular-nums">{numeroProducto(producto.numero)}</span>}
             <SkuCopiable codigo={producto.codigo} className="text-lg font-semibold" />
             <Badge tone="neutral">{ETIQUETA_TIPO[producto.tipo] ?? producto.tipo}</Badge>
-            <Badge tone={TONO_CLASE[producto.clase]}>{ETIQUETA_CLASE[producto.clase] ?? producto.clase}</Badge>
+            <Badge tone={TONO_CLASE[clase]}>{ETIQUETA_CLASE[clase] ?? clase}</Badge>
           </>
         )
       }
@@ -230,9 +234,9 @@ export function FichaProducto({
                 <Dato etiqueta="Tipo">{ETIQUETA_TIPO[producto.tipo] ?? producto.tipo}</Dato>
                 <Dato etiqueta="Estado">
                   {puedeEscribir ? (
-                    <SelectorClaseProducto clase={producto.clase} deshabilitado={pending} alCambiar={cambiarClase} />
+                    <SelectorClaseProducto clase={clase} deshabilitado={pending} alCambiar={cambiarClase} />
                   ) : (
-                    (ETIQUETA_CLASE[producto.clase] ?? producto.clase)
+                    (ETIQUETA_CLASE[clase] ?? clase)
                   )}
                   {error && (
                     <span role="alert" className="mt-1 block text-xs text-destructive">
@@ -353,11 +357,13 @@ export function FichaProducto({
             )}
             {/* Descontinuado solo en algunos países (migración 0211), en su propia sección (5 nov 2026, pedido de Alcides: junto al estado se
                 veía cortado), al final de la columna, debajo de Vencimiento: se usa poco. Con el estado «Descontinuado» ya vale para todos, y un compuesto no se compra: no sale. */}
-            {producto.clase !== "descontinuado" && producto.tipo !== "combo" && (
+            {clase !== "descontinuado" && producto.tipo !== "combo" && (
               <Seccion icono={MundoIcon} titulo="Descontinuado por país">
                 <DescontinuadoPorPais key={`desc-${producto.id}`} skuId={producto.id} puedeEscribir={puedeEscribir} />
               </Seccion>
             )}
+            {/* Un pack o combo hereda el descontinuado de sus simples en cada país (8 nov 2026): solo se ve si alguno lo está. */}
+            {clase !== "descontinuado" && producto.tipo === "combo" && <DescontinuadoHeredado key={`heredado-${producto.id}`} skuId={producto.id} />}
             </div>
             <div className="flex min-w-0 flex-col divide-y divide-border border-t border-border pt-5 @3xl:border-t-0 @3xl:pt-0">
             {producto.nombresDropi.length > 0 && (
@@ -384,10 +390,14 @@ export function FichaProducto({
             </div>
           </div>
           <section aria-label="Actividad del producto" className="border-t border-border bg-muted/30">
-          <HistorialGenerico id={producto.id} codigoPais={codigoPais} version={version} obtener={obtenerHistorialProducto} />
+          {/* Notas con fotos y videos reales del producto, y debajo sus cambios: las mismas que en la ficha del inventario (7 nov 2026, pedido de Hernán). */}
+          <div className="p-5">
+            <NotasProducto key={producto.id} id={producto.id} puedeComentar={puedeEscribir} version={version} />
+          </div>
           </section>
         </div>
       )}
     </Ventana>
   );
 }
+

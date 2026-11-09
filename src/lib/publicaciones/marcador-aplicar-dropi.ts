@@ -21,6 +21,9 @@
  * su correo en Dropi, crea el producto privado (copia del público), le pone fotos, garantías y stock, se lo asigna en «Productos privados» y le
  * saca esas unidades al público. Devuelve el ID nuevo aunque falle un paso después, y si ya le sacó el stock al público (`salida`).
  *
+ * Un cambio de tipo «reserva» (8 nov 2026, migración 0254; `reservar`, con `RESERVA_JS`) deja a un correo con unas unidades reservadas en el producto (0 = la quita):
+ * si el correo es nuevo comprueba que sea de un dropshipper, guarda solo las reservas, relee y avisa si Dropi cambió el stock al tocarla.
+ *
  * Un cambio de tipo «stock» (28 oct 2026, migración 0173; `stock`, con `STOCK_JS`; con variaciones `stockV`, 5 nov 2026) deja una bodega de ECOMFIVE con las unidades pedidas: lee el stock de
  * Dropi en ese momento, hace la entrada o la salida que falte y lo vuelve a leer para comprobar. Si ya tiene esas unidades, no guarda nada.
  */
@@ -30,6 +33,7 @@ import { CREAR_JS } from "./crear-dropi";
 import { PRIVATIZAR_JS } from "./privatizar-dropi";
 import { PRIVATIZAR_VARIABLE_JS } from "./privatizar-variable";
 import { CLAVE_FOTO_JS, REPUBLICAR_JS } from "./republicar-dropi";
+import { RESERVA_JS } from "./reservas-dropi";
 import { STOCK_JS } from "./stock-dropi";
 
 /** El armado del guardado de Dropi, en JavaScript simple para el favorito (el mismo de `armarGuardadoProducto`). */
@@ -80,6 +84,7 @@ const CODIGO = [
   REPUBLICAR_JS,
   STOCK_JS,
   PRIVATIZAR_JS,
+  RESERVA_JS,
   APAGAR_JS,
   PRIVATIZAR_VARIABLE_JS,
   CREAR_JS,
@@ -123,8 +128,9 @@ const CODIGO = [
   // Sube las fotos que el nuevo no tiene, comparando por nombre (Dropi le antepone un número): contar cuántas tenía y seguir desde ahí
   // repetía una y dejaba fuera la principal si en un intento anterior subió una del medio (25 oct 2026, el 11309).
   // Las fotos copiadas en el sistema (migración 0153) mandan, la principal primero; sin ellas, las de Dropi.
-  "var fs=unicas(Array.isArray(c.fotos)&&c.fotos.length?c.fotos.map(function(x,j){return{url:x.url,nombre:x.nombre,main:j===0,alternas:[]}}):fotosDe(o)),mal=0;for(var i=0;i<fs.length;i++)if(!tiene(n,fs[i].nombre)&&!(await subir(id,fs[i])))mal++;",
-  "if(mal)return f('Se creó el '+id+', pero no se pudieron copiar '+mal+' foto(s)'+porque()+'.');",
+  // Una foto que no se pudo copiar ya no detiene la republicación (8 nov 2026, pedido de Alcides): se termina el trabajo y vuelve en `fotosFaltan`, y el
+  // sistema le deja una tarea a quien la pidió para subirla a mano en el ID nuevo (sacándola del viejo).
+  "var fs=unicas(Array.isArray(c.fotos)&&c.fotos.length?c.fotos.map(function(x,j){return{url:x.url,nombre:x.nombre,main:j===0,alternas:[]}}):fotosDe(o)),faltan=[],fe='';for(var i=0;i<fs.length;i++)if(!tiene(n,fs[i].nombre)&&!(await subir(id,fs[i]))){faltan.push(String(fs[i].nombre));fe=porque()}",
   // Las garantías del viejo pasan al nuevo (25 oct 2026: el 11309 quedó sin ellas; en Dropi la casilla de cada garantía se marca solo
   // si el producto la tiene guardada). Solo si el nuevo todavía no tiene ninguna, así un reintento no las repite.
   // Dropi ya no acepta una garantía sin observaciones salvo «Orden diferente»: si la del viejo no tenía, va «Ninguna» (pedido de Alcides).
@@ -142,10 +148,12 @@ const CODIGO = [
   "var sa={},hs=false;for(k in st){sa[k]=-st[k];hs=true}",
   "if(hs){var ms=mover(o,bp,sa,'Republicado como ID '+id);if(ms.error)return f(ms.error);",
   "var ps=await pedir('/products/'+c.producto,'PUT',ms.cuerpo);if(!ps.ok)return f('Se creó el '+id+', pero no se le pudo sacar el stock al '+c.producto+': '+motivo(ps))}}",
-  "if(!o.archived){var ar=await pedir('/products/'+c.producto+'/archiveProduct','POST',{});if(!ar.ok)return f('Se creó el '+id+' y el '+c.producto+' quedó sin stock, pero no se pudo archivar: '+motivo(ar))}",
+  // Si Dropi no deja archivar el viejo por órdenes en curso (8 nov 2026, pedido de Alcides), la republicación termina igual: vuelve en `archivoPendiente` y el
+  // sistema deja una tarea para archivarlo en un mes. Cualquier otro motivo sigue siendo un error.
+  "var pa=null;if(!o.archived){var ar=await pedir('/products/'+c.producto+'/archiveProduct','POST',{});if(!ar.ok){var ma=motivo(ar);if(/PENDIENTE|GUIA GENERADA|SIN MOVIMIENTOS/i.test(ma))pa=ma;else return f('Se creó el '+id+' y el '+c.producto+' quedó sin stock, pero no se pudo archivar: '+ma)}}",
   "var v=await pedir('/products/'+id),w=v.j&&v.j.objects,x=await pedir('/products/'+c.producto),q=x.j&&x.j.objects,tn=w?totalU(w):0,tv=q?totalU(q):0;",
   "if(tv>0)return f('El '+c.producto+' sigue con '+tv+' unidades en Dropi.');",
-  "return{ok:true,nuevo:id,stock:tn,fotos:w&&Array.isArray(w.gallery)?w.gallery.length:null}}",
+  "return{ok:true,nuevo:id,stock:tn,fotos:w&&Array.isArray(w.gallery)?w.gallery.length:null,fotosFaltan:faltan,archivoPendiente:pa,aviso:faltan.length?'No se pudieron copiar '+faltan.length+' foto(s)'+fe+': súbelas a mano en el ID '+id+'.':null}}",
   // El stock de cada variación viva de un producto con variaciones, como lo pide la pantalla de Dropi (`get_warehouses_stock`, un pedido por variación).
   "async function entradasV(o){var vs=vivasV(o),r=[];for(var i=0;i<vs.length;i++){var g=await pedir('/products/get_warehouses_stock','POST',{product_id:null,type:'VARIABLE',variation_id:vs[i].id});if(!g.ok||!Array.isArray(g.j&&g.j.objects))return{error:'No se pudo leer el stock de la variación '+(firmaV(vs[i])||vs[i].id)+': '+motivo(g)};r.push(g.j.objects)}return{ent:r}}",
   "async function apagar(c,bp){",
@@ -346,7 +354,27 @@ const CODIGO = [
   "if(q!==Number(d.unidades))return{ok:false,error:'Dropi muestra '+q+' unidades de '+(d.etiqueta||d.firma)+' en esa bodega y se pidieron '+d.unidades+'.'};",
   "var bm={};vivasV(n).forEach(function(x){fw(x).forEach(function(w){var s=Number(w.stock)||0,y=w.warehouse||{},k=Number(w.warehouse_id);if(!bm[k])bm[k]={id:k,nombre:y.name!=null?String(y.name):'',stock:0};bm[k].stock+=s>0?s:0})});",
   "return{ok:true,antes:r.antes,stock:q,bodegas:Object.keys(bm).map(function(k){return bm[k]}),variacion:{firma:d.firma,bodegas:vb},aviso:d.antes!=null&&Number(d.antes)!==r.antes?'En Dropi había '+r.antes+' (el sistema mostraba '+d.antes+').':null}}",
+  // Reserva por correo (8 nov 2026, migración 0254): que un correo quede con unas unidades reservadas en el producto (0 = quitarla), sin tocar nada más.
+  // Si el correo es nuevo, se comprueba que sea de un dropshipper. Después se relee: si Dropi cambió el stock del producto al tocar la reserva, se avisa.
+  "async function reservar(c,bp){",
+  "var d=c.datos;if(!d||typeof d.correo!=='string'||!(Number(d.unidades)>=0))return{ok:false,error:'El cambio no trae el correo ni las unidades.'};d={correo:d.correo,unidades:Number(d.unidades)};",
+  "var a=await pedir('/products/'+c.producto);if(!a.ok)return{ok:false,error:motivo(a)};",
+  "var o=a.j&&a.j.objects;if(!o||Number(o.id)!==Number(c.producto))return{ok:false,error:'Dropi no devolvió el producto.'};",
+  "if(Number(o.user_id)!==Number(L.id))return{ok:false,error:'Ese producto no es de este proveedor en Dropi.'};",
+  "var c0=d.correo.toLowerCase(),ya=rvVivas(o).some(function(x){return x.email&&String(x.email).toLowerCase()===c0}),u=null;",
+  "if(d.unidades>0&&!ya){var ur=await pedir('/users/existemail/'+encodeURIComponent(d.correo)+'/false');u=ur.j&&ur.j.objects;",
+  "if(!ur.ok||!u||!u.id)return{ok:false,error:'Dropi no tiene una cuenta con el correo '+d.correo+': revisa que sea el correo con el que el dropshipper entra a Dropi.'};",
+  "if(u.role_user&&u.role_user.name==='SUPPLIER')return{ok:false,error:'El correo '+d.correo+' es de un proveedor: solo se reserva a un dropshipper.'}}",
+  "var antes=stockT(o),r=reservasPara(o,u,d);if(r.error)return{ok:false,error:r.error};",
+  "if(r.reservas){var b=armar(o,bp,{nombre:null,nombreGuia:null});if(b.error)return{ok:false,error:b.error};",
+  "var g=await pedir('/products/'+c.producto,'PUT',Object.assign({},b.cuerpo,{private_product_inventories:r.reservas}));if(!g.ok)return{ok:false,error:motivo(g)}}",
+  "var v=await pedir('/products/'+c.producto),n=v.j&&v.j.objects;if(!v.ok||!n)return{ok:false,error:'Se guardó, pero no se pudo comprobar en Dropi.'};",
+  "var vv=rvVivas(n),mi=vv.filter(function(x){return x.email&&String(x.email).toLowerCase()===c0})[0],tiene=mi?Number(mi.stock)||0:0,despues=stockT(n);",
+  "var av=despues!==antes?'El stock del producto en Dropi pasó de '+antes+' a '+despues+' al cambiar la reserva: revísalo.':null;",
+  "if(tiene!==d.unidades)return{ok:false,error:'Dropi muestra '+tiene+' unidades reservadas a '+d.correo+' y se pidieron '+d.unidades+'.',reservas:vv,privado:n.privated_product===true,stock:despues,aviso:av};",
+  "return{ok:true,reservas:vv,privado:n.privated_product===true,stock:despues,antes:antes,aviso:av}}",
   "async function aplicar(c,bp){",
+  "if(c.tipo==='reserva')return reservar(c,bp);",
   "if(c.tipo==='stock')return stock(c,bp);",
   "if(c.tipo==='privatizar')return privatizar(c,bp);",
   "if(c.tipo==='apagar')return apagar(c,bp);",

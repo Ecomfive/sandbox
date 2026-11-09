@@ -6,7 +6,7 @@ const HOY = "2026-10-28";
 const ID = "01a1762a-aa25-7b92-aec5-44512678bd04";
 const t = (extra: Partial<TareaVista>): TareaVista => ({
   id: "1", origen: "manual", publicacionId: "p", titulo: "Verificar inventario", nota: null, estado: "por_hacer", prioridad: null, responsableId: "yo", responsableNombre: "Yo",
-  plazo: null, creadoPor: "yo", creadoPorNombre: "Yo", creadoEn: "2026-10-20T10:00:00Z", hechaEn: null, hechaPor: null, hechaNota: null, archivadaEn: null, ...extra,
+  plazo: null, creadoPor: "yo", creadoPorNombre: "Yo", creadoEn: "2026-10-20T10:00:00Z", hechaEn: null, hechaPor: null, hechaNota: null, archivadaEn: null, otros: [], ...extra,
 });
 
 test("vencimiento por la fecha: atrasada, hoy, próxima y sin fecha; una hecha no vence", () => {
@@ -74,4 +74,50 @@ test("la fecha se dice en relación con hoy y las iniciales de una persona", () 
   assert.equal(iniciales("Nicole Pérez Gómez"), "NG");
   assert.equal(iniciales("alcides"), "A");
   assert.equal(iniciales(null), "?");
+});
+
+test("una tarea hecha hace más de 30 días se cierra sola", async () => {
+  const { debeCerrarse, corteParaCerrar } = await import("./tareas");
+  const ahora = new Date("2026-11-08T12:00:00Z");
+  assert.equal(corteParaCerrar(ahora), "2026-10-09T12:00:00.000Z");
+  assert.equal(debeCerrarse({ estado: "hecha", hechaEn: "2026-10-01T10:00:00Z", archivadaEn: null }, ahora), true);
+  assert.equal(debeCerrarse({ estado: "hecha", hechaEn: "2026-10-20T10:00:00Z", archivadaEn: null }, ahora), false, "hecha hace menos de 30 días");
+  assert.equal(debeCerrarse({ estado: "en_curso", hechaEn: null, archivadaEn: null }, ahora), false, "sin hacer no se cierra");
+  assert.equal(debeCerrarse({ estado: "hecha", hechaEn: "2026-10-01T10:00:00Z", archivadaEn: "2026-10-02T10:00:00Z" }, ahora), false, "ya cerrada");
+});
+
+test("estancada: más de 3 días vencida y sin hacer; no se elige a mano", async () => {
+  const { estaEstancada, conEstancadas, normalizarCambio, ESTADOS_ELEGIBLES } = await import("./tareas");
+  assert.equal(estaEstancada({ estado: "en_curso", plazo: "2026-10-24" }, HOY), true, "4 días vencida");
+  assert.equal(estaEstancada({ estado: "por_hacer", plazo: "2026-10-25" }, HOY), false, "3 días justos todavía no");
+  assert.equal(estaEstancada({ estado: "hecha", plazo: "2026-10-01" }, HOY), false);
+  assert.equal(estaEstancada({ estado: "por_hacer", plazo: null }, HOY), false);
+  assert.equal(estaEstancada({ estado: "por_hacer", plazo: "2026-10-01", archivadaEn: "2026-10-02" }, HOY), false, "archivada no");
+  assert.deepEqual(conEstancadas([t({ plazo: "2026-10-20" }), t({ id: "2", plazo: "2026-10-27" })], HOY).map((x) => x.estado), ["estancada", "por_hacer"]);
+  assert.ok("error" in normalizarCambio({ estado: "estancada" }));
+  assert.ok(!ESTADOS_ELEGIBLES.some((e) => e.valor === "estancada"));
+});
+
+test("varios responsables: cada uno la ve en «Mías»; se pide al menos uno y hasta 5", async () => {
+  const { tareasDe, normalizarCambio, responsablesDe } = await import("./tareas");
+  const tarea = t({ responsableId: "ana", responsableNombre: "Ana", otros: [{ id: "beto", nombre: "Beto" }] });
+  assert.equal(tareasDe([tarea], "beto", false).length, 1, "Beto también la ve");
+  assert.equal(tareasDe([tarea], "carla", false).length, 0);
+  assert.deepEqual(responsablesDe(tarea).map((r) => r.nombre), ["Ana", "Beto"]);
+  assert.ok("error" in normalizarCambio({ responsablesIds: [] }));
+  assert.ok("error" in normalizarCambio({ responsablesIds: [ID, "no-es-id"] }));
+  assert.deepEqual(normalizarCambio({ responsablesIds: [ID, ID] }), { responsablesIds: [ID] }, "sin repetir");
+});
+
+test("quién ve una tarea: la suya, la que hace con otros o la que creó sin asignar; Alcides ve todas", async () => {
+  const { tareaVisiblePara } = await import("./tareas");
+  const ALCIDES = "a3e6cde5-006a-42a6-91df-db2ac88dffbb";
+  const tarea = { responsableId: "ana", otrosIds: ["beto"], creadoPor: "carla" };
+  assert.equal(tareaVisiblePara(tarea, "ana"), true);
+  assert.equal(tareaVisiblePara(tarea, "beto"), true);
+  assert.equal(tareaVisiblePara(tarea, "carla"), false, "la creó, pero le toca a otras personas");
+  assert.equal(tareaVisiblePara(tarea, "dora"), false, "otra persona (aunque sea administradora) no la ve");
+  assert.equal(tareaVisiblePara(tarea, ALCIDES), true);
+  assert.equal(tareaVisiblePara({ responsableId: ALCIDES, otrosIds: [], creadoPor: ALCIDES }, "ana"), false, "las de Alcides no las ven los demás");
+  assert.equal(tareaVisiblePara({ responsableId: null, otrosIds: [], creadoPor: "carla" }, "carla"), true);
 });

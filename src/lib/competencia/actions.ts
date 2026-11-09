@@ -1,7 +1,11 @@
 "use server";
 
-import { getUsuarioActual } from "@/lib/auth";
+import { revalidatePath } from "next/cache";
+import { registrarAuditoria } from "@/lib/auditoria";
+import { getUsuarioActual, requireAlgunModulo } from "@/lib/auth";
 import { unidadesBajadas, unirCoincidencias, type CambioStock } from "@/lib/competencia/analisis";
+import { clavesDistintas, MOTIVO_A_MANO, separarDescartados } from "@/lib/competencia/descartar";
+import { puedeVerPaisId } from "@/lib/seguridad/pais-acceso";
 import { idsDropi } from "@/lib/publicaciones/publicacion";
 import { indexar, todasLasCoincidencias } from "@/lib/scraping/cruces";
 import { traerTodasConError } from "@/lib/supabase/paginar";
@@ -30,7 +34,11 @@ export interface CompetenciaDeProducto {
   codigo: string;
   /** Nuestro producto en ese Dropi (ECOMFIVE), si está. */
   nuestro: { nombre: string; precio: number | null; stock: number | null; foto: string | null } | null;
+  /** Nuestras filas del análisis en ese país (con dos IDs de Dropi pueden ser dos): con ellas se guarda «No es el mismo». */
+  nuestrosIds: string[];
   competidores: CompetidorDeProducto[];
+  /** Los que alguien (o la IA) dijo que no son el mismo producto (8 nov 2026): ya no cuentan, pero se pueden volver a contar. */
+  descartados: (CompetidorDeProducto & { motivo: string | null })[];
 }
 
 interface Fila {
@@ -54,7 +62,7 @@ interface Fila {
  * si está), con su precio, stock y lo que vendieron en 7 y 30 días. Basta poder abrir Producto, Compras, Gestión de
  * publicaciones Dropi o Análisis de competencia. Devuelve el error como valor.
  */
-export async function obtenerCompetenciaProducto(skuId: string): Promise<{ datos?: CompetenciaDeProducto[]; error?: string }> {
+export async function obtenerCompetenciaProducto(skuId: string, codigoPais?: string): Promise<{ datos?: CompetenciaDeProducto[]; error?: string }> {
   const usuario = await getUsuarioActual();
   if (!usuario) return { error: "No hay sesión activa." };
   if (!["producto", "compras", "analisis-competencia", "publicaciones-dropi"].some((m) => usuario.modulos.includes(m))) return { error: "No tienes acceso." };
@@ -62,12 +70,21 @@ export async function obtenerCompetenciaProducto(skuId: string): Promise<{ datos
   const supabase = createServiceClient();
   const { data: sku } = await supabase.from("skus_maestros").select("nombre, foto_huella").eq("id", skuId).maybeSingle();
   if (!sku) return { error: "El producto ya no existe." };
+  // Solo un país (8 nov 2026, pedido de Alcides: en Gestión de IDs interesa la competencia del país que se revisa): se lee solo ese catálogo.
+  let soloPais: string | null = null;
+  if (codigoPais) {
+    if (!/^[A-Z]{2}$/i.test(codigoPais)) return { error: "País no válido." };
+    const { data: p } = await supabase.from("paises").select("id").eq("codigo", codigoPais.toUpperCase()).maybeSingle();
+    if (!p) return { datos: [] };
+    soloPais = p.id as string;
+  }
 
   const { data: filas, error } = await traerTodasConError<Fila>((a, b) =>
     supabase
       .from("competencia_productos")
       .select("id, dropi_producto_id, pais_id, proveedor_dropi_id, proveedor_nombre, nombre, foto_url, foto_huella, precio, stock, es_nuestro, igual_a")
       .eq("estado", "activo")
+      .match(soloPais ? { pais_id: soloPais } : {})
       .order("id")
       .range(a, b),
   );
@@ -100,6 +117,10 @@ export async function obtenerCompetenciaProducto(skuId: string): Promise<{ datos
     if (!nuestra && !elegidos.size) continue;
 
     const ids = [...elegidos.keys()];
+    // Lo que se descartó como «No es el mismo» (a mano o por la IA, migración 0246; sin ella, nada) no cuenta.
+    const { data: verif } = ids.length && nuestrasIds.size ? await supabase.from("competencia_verificaciones").select("producto_id, nuestro_id, veredicto, motivo").eq("plataforma", "dropi").in("producto_id", ids).in("nuestro_id", [...nuestrasIds]) : { data: [] };
+    const distintas = clavesDistintas(verif ?? []);
+    const motivoDe = new Map((verif ?? []).filter((v) => v.veredicto === "distinto").map((v) => [v.producto_id as string, (v.motivo as string | null) ?? null]));
     const cambios = new Map<string, CambioStock[]>();
     if (ids.length) {
       const desde = new Date(Date.now() - 31 * 86_400_000).toISOString();
@@ -111,11 +132,7 @@ export async function obtenerCompetenciaProducto(skuId: string): Promise<{ datos
     }
     const pais = paisDe.get(paisId);
     const dominio = DOMINIO[pais?.codigo ?? ""] ?? (pais?.codigo ?? "pa").toLowerCase();
-    salida.push({
-      pais: pais?.nombre ?? "—",
-      codigo: pais?.codigo ?? "",
-      nuestro: nuestra ? { nombre: nuestra.nombre, precio: n(nuestra.precio), stock: nuestra.stock, foto: nuestra.foto_url } : null,
-      competidores: ids
+    const todos = ids
         .map((id) => {
           const f = porId.get(id)!;
           const c = cambios.get(id) ?? [];
@@ -132,7 +149,15 @@ export async function obtenerCompetenciaProducto(skuId: string): Promise<{ datos
             ...elegidos.get(id)!,
           };
         })
-        .sort((a, b) => (a.precio ?? 1e9) - (b.precio ?? 1e9)),
+        .sort((a, b) => (a.precio ?? 1e9) - (b.precio ?? 1e9));
+    const { cuentan, descartados } = separarDescartados(todos, [...nuestrasIds], distintas);
+    salida.push({
+      pais: pais?.nombre ?? "—",
+      codigo: pais?.codigo ?? "",
+      nuestro: nuestra ? { nombre: nuestra.nombre, precio: n(nuestra.precio), stock: nuestra.stock, foto: nuestra.foto_url } : null,
+      nuestrosIds: [...nuestrasIds],
+      competidores: cuentan,
+      descartados: descartados.map((c) => ({ ...c, motivo: motivoDe.get(c.id) ?? null })),
     });
   }
   return { datos: salida };
@@ -160,4 +185,51 @@ export async function obtenerHistorialCompetencia(productoId: string): Promise<{
   if (error) return { error: error.message };
   const n = (v: unknown) => (v === null || v === undefined ? null : Number(v));
   return { eventos: (data ?? []).map((e) => ({ fecha: e.fecha, evento: e.evento, precio: n(e.precio), stock: e.stock, precioAntes: n(e.precio_antes), stockAntes: e.stock_antes })) };
+}
+
+/**
+ * «No es el mismo» / «Volver a contar» de la competencia de un producto (8 nov 2026, pedido de Alcides): guarda (o quita) el veredicto «distinto» del par
+ * competidor–nuestro en `competencia_verificaciones`, para cada una de nuestras filas del país. Así deja de contar en la ficha, en «Competidor más barato», en
+ * las recomendaciones de precio y en Análisis de competencia. La IA no vuelve a revisar un par que ya tiene veredicto. Pide modificar Gestión de IDs Dropi o
+ * Análisis de competencia; los ids de nuestras filas se vuelven a comprobar aquí (los manda el navegador).
+ */
+export async function descartarCompetidor(skuId: string, competidorId: string, nuestrosIds: string[], volver = false): Promise<{ error?: string; detalle?: string }> {
+  let usuario;
+  try {
+    usuario = await requireAlgunModulo(["publicaciones-dropi", "analisis-competencia"], true);
+  } catch {
+    return { error: "No tienes permiso para esto." };
+  }
+  if (!UUID.test(skuId) || !UUID.test(competidorId) || !Array.isArray(nuestrosIds) || !nuestrosIds.length || nuestrosIds.length > 10 || !nuestrosIds.every((i) => typeof i === "string" && UUID.test(i)))
+    return { error: "Datos no válidos." };
+  const supabase = createServiceClient();
+  const [{ data: otro }, { data: nuestras }, { data: sku }] = await Promise.all([
+    supabase.from("competencia_productos").select("id, pais_id, es_nuestro, nombre, proveedor_nombre").eq("id", competidorId).maybeSingle(),
+    supabase.from("competencia_productos").select("id, pais_id").eq("es_nuestro", true).in("id", nuestrosIds),
+    supabase.from("skus_maestros").select("nombre").eq("id", skuId).maybeSingle(),
+  ]);
+  if (!otro || otro.es_nuestro) return { error: "Ese producto de la competencia ya no existe." };
+  if (!sku) return { error: "El producto ya no existe." };
+  const validas = (nuestras ?? []).filter((x) => x.pais_id === otro.pais_id).map((x) => x.id as string);
+  if (!validas.length) return { error: "Este producto no aparece como nuestro en el catálogo de Dropi de ese país." };
+  if (!(await puedeVerPaisId(supabase, usuario.paisesPermitidos, otro.pais_id))) return { error: "No es de tus países." };
+
+  if (volver) {
+    const { error } = await supabase.from("competencia_verificaciones").delete().eq("plataforma", "dropi").eq("producto_id", competidorId).in("nuestro_id", validas).eq("veredicto", "distinto");
+    if (error) return { error: "No se pudo guardar (¿falta la migración 0246?)." };
+  } else {
+    const filas = validas.map((nuestro_id) => ({ plataforma: "dropi", producto_id: competidorId, nuestro_id, veredicto: "distinto", motivo: `${MOTIVO_A_MANO} (${usuario.nombre ?? "sin nombre"})`, creado_por: usuario.id }));
+    const { error } = await supabase.from("competencia_verificaciones").upsert(filas, { onConflict: "plataforma,producto_id,nuestro_id" });
+    if (error) return { error: "No se pudo guardar (¿falta la migración 0246?)." };
+  }
+  const { data: pais } = await supabase.from("paises").select("nombre").eq("id", otro.pais_id).maybeSingle();
+  await registrarAuditoria({
+    accion: volver ? "competencia_volver_a_contar" : "competencia_no_es_el_mismo",
+    entidad: "skus_maestros",
+    entidadId: skuId,
+    detalle: `${sku.nombre}: ${volver ? "vuelve a contar" : "no es el mismo"} «${otro.nombre}» de ${otro.proveedor_nombre} · ${pais?.nombre ?? ""}`,
+  });
+  revalidatePath("/publicaciones-dropi");
+  revalidatePath("/analisis-competencia");
+  return { detalle: volver ? `«${otro.nombre}» vuelve a contar como competencia.` : `«${otro.nombre}» ya no cuenta como competencia de este producto.` };
 }

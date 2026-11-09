@@ -44,15 +44,18 @@ export function FormularioReglas({ reglas, cambios, disponible, puedeEscribir }:
   }, [estado, mostrarToast, router]);
 
   return (
-    <form action={accion} className="flex max-w-3xl flex-col gap-6">
+    <form action={accion} className="flex flex-col gap-6">
       {!disponible && (
         <p role="alert" className="m-0 rounded-lg border border-border bg-card px-4 py-3 text-sm text-destructive">
           Se usan los valores de siempre. Para cambiarlos falta correr en Supabase la migración 0127.
         </p>
       )}
-      <fieldset disabled={!editable} className="m-0 flex min-w-0 flex-col gap-6 border-0 p-0">
+      {/* En dos columnas en pantalla ancha (8 nov 2026, pedido de Alcides: usar el espacio de la derecha y bajar menos), sin huecos entre bloques. */}
+      <fieldset disabled={!editable} className="m-0 min-w-0 border-0 p-0">
+        {/* Columnas que se llenan de arriba abajo: cada bloque queda justo debajo del anterior, sin huecos (una rejilla los dejaba). */}
+        <div className="gap-6 xl:columns-2">
         {GRUPOS.map((g) => (
-          <section key={g.id} aria-labelledby={`regla-${g.id}`} className="rounded-xl border border-border bg-card">
+          <section key={g.id} aria-labelledby={`regla-${g.id}`} className="mb-6 break-inside-avoid rounded-xl border border-border bg-card last:mb-0">
             <h2 id={`regla-${g.id}`} className="m-0 border-b border-border bg-muted px-4 py-2.5 text-sm font-semibold">
               {g.titulo}
             </h2>
@@ -91,6 +94,7 @@ export function FormularioReglas({ reglas, cambios, disponible, puedeEscribir }:
             </ul>
           </section>
         ))}
+        </div>
       </fieldset>
 
       {estado?.error && (

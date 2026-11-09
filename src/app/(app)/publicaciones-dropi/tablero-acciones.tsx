@@ -3,6 +3,7 @@
 import type { ComponentType } from "react";
 import { useFiltros } from "@/components/tabla/ganchos";
 import { anilloFoco } from "@/components/ui/field";
+import { ItemArrastrable, OrdenArrastrable } from "@/components/ui/orden-arrastrable";
 import { ACCIONES as ACCIONES_CALCULADAS, detalleAccion, type Accion as AccionCalculada } from "@/lib/publicaciones/automatico";
 import type { Reglas } from "@/lib/publicaciones/reglas";
 import { alternarAtajo, atajoActivo, type AtajoFiltro } from "@/lib/tabla/atajos";
@@ -90,10 +91,12 @@ const TARJETAS: Tarjeta[] = [
   },
   {
     ...porAccion("vende_poco", VentasIcon, "violeta"),
-    // Las que ya tuvieron un cambio de precio esperan 30 días con el precio nuevo antes de volver a contarse.
+    // Las que esperan no se cuentan: les cambiaron el precio hace menos de 30 días o alguien eligió «Esperar un mes» (8 nov 2026).
     extra: (abiertas) => {
-      const n = abiertas.filter((f) => f.vendePocoVuelve).length;
-      return n ? `${n.toLocaleString("es-PA")} esperando: les cambiaste el precio hace menos de 30 días` : null;
+      const precio = abiertas.filter((f) => f.vendePocoVuelve && f.vendePocoPor === "precio").length;
+      const decision = abiertas.filter((f) => f.vendePocoVuelve && f.vendePocoPor === "decision").length;
+      const partes = [precio ? `${precio.toLocaleString("es-PA")} por un cambio de precio` : null, decision ? `${decision.toLocaleString("es-PA")} porque elegiste esperar un mes` : null].filter(Boolean);
+      return partes.length ? `${(precio + decision).toLocaleString("es-PA")} esperando: ${partes.join(" y ")}` : null;
     },
     extraColor: "verde",
   },
@@ -215,14 +218,22 @@ function TarjetaAccion({ t, valor, junto, extra, detalle, def }: { t: Tarjeta; v
  */
 export function TableroAcciones({ publicaciones, reglas, codigoPais, def = DEF_PUBLICACIONES }: { publicaciones: FilaPublicacion[]; reglas: Reglas; codigoPais?: string; def?: DefTabla<FilaPublicacion> }) {
   const abiertas = publicaciones.filter((f) => !f.archivada);
+  // Cada persona ordena las tarjetas a su gusto (8 nov 2026, pedido de Alcides): arrastrándolas o con Alt + flechas; queda en su navegador.
   return (
-    <section aria-label="Tablero de acciones" className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(12rem,1fr))]">
-      {TARJETAS.map((t) => {
-        const base = t.todas ? publicaciones : abiertas;
-        return (
-          <TarjetaAccion key={t.id} t={t} valor={base.filter(t.cuenta).length} junto={t.junto ? t.junto(base) : null} extra={t.extra ? t.extra(base, reglas) : null} detalle={typeof t.detalle === "function" ? t.detalle(reglas, codigoPais) : t.detalle} def={def} />
-        );
-      })}
-    </section>
+    <div className="flex flex-col gap-1">
+      <OrdenArrastrable clave="publicaciones-tablero-tarjetas-v1" ids={IDS_TARJETAS} etiquetas={ETIQUETAS_TARJETAS} queSon="las tarjetas" etiqueta="Tablero de acciones" className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(12rem,1fr))]">
+        {TARJETAS.map((t) => {
+          const base = t.todas ? publicaciones : abiertas;
+          return (
+            <ItemArrastrable key={t.id} id={t.id} className="flex [&>button]:flex-1">
+              <TarjetaAccion t={t} valor={base.filter(t.cuenta).length} junto={t.junto ? t.junto(base) : null} extra={t.extra ? t.extra(base, reglas) : null} detalle={typeof t.detalle === "function" ? t.detalle(reglas, codigoPais) : t.detalle} def={def} />
+            </ItemArrastrable>
+          );
+        })}
+      </OrdenArrastrable>
+    </div>
   );
 }
+
+const IDS_TARJETAS: readonly string[] = TARJETAS.map((t) => t.id);
+const ETIQUETAS_TARJETAS: Readonly<Record<string, string>> = Object.fromEntries(TARJETAS.map((t) => [t.id, t.titulo]));

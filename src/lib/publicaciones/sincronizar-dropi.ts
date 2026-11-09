@@ -1,3 +1,4 @@
+import type { ReservaDropi } from "./reservas-dropi";
 // Gestión de IDs Dropi › Bodegas (pedido de Hernán, 22 oct 2026): Dropi manda. La lectura de «Mis productos» del proveedor
 // (activos y archivados, con la bodega y el stock de cada uno) pone en cada publicación la ubicación, el precio, el tipo y el
 // estado que dice Dropi. Sin base ni React, con prueba. La lectura la hace scripts/scraping-proveedores-navegador.js ›
@@ -28,6 +29,10 @@ export interface ProductoProveedor {
   creado: string | null;
   /** Sus variaciones vivas, con el stock de cada una por bodega (migración 0226); null o sin poner = es simple o la lectura no las trajo. */
   variaciones?: VariacionLeida[] | null;
+  /** Si Dropi lo tiene como producto privado (`privated_product`, migración 0254); null o sin poner = la lectura no abrió su ficha. */
+  privadoProducto?: boolean | null;
+  /** Las unidades reservadas por correo (`private_product_inventories`, migración 0254); null o sin poner = no se leyó. */
+  reservas?: ReservaDropi[] | null;
 }
 
 /**

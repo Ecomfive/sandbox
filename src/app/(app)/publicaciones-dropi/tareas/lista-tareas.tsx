@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import { ListaDatos } from "@/components/tabla/lista-datos";
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import type { NombreFilas } from "@/lib/tabla/pie";
@@ -10,11 +10,12 @@ import { anilloFoco } from "@/components/ui/field";
 import { Ventana } from "@/components/ui/ventana";
 import { CalendarioIcon, EstadoIcon, PersonaIcon, ProductoIcon, TareasIcon } from "@/lib/nav-icons";
 import { numeroPublicacion } from "@/lib/publicaciones/publicacion";
-import { ESTADOS_TAREA, PRIORIDADES, VENCIMIENTOS, etiquetaEstado, ordenarTareas, pendiente, vencimiento, type TareaVista, type Vencimiento } from "@/lib/publicaciones/tareas";
+import { ESTADOS_TAREA, PRIORIDADES, responsablesDe, VENCIMIENTOS, etiquetaEstado, ordenarTareas, pendiente, vencimiento, type TareaVista, type Vencimiento } from "@/lib/publicaciones/tareas";
 import { SIN_VALOR, type DefTabla } from "@/lib/tabla/motor";
 import { FichaTarea } from "../ficha-tarea";
 import type { PublicacionDeTarea } from "../tareas-datos";
 import { BanderaIcon, CirculoEstado, COLUMNAS_TAREA, FilaTarea, FormularioTarea } from "../tareas-piezas";
+import { TableroTareas } from "./tablero-tareas";
 
 /** Una tarea de la lista con lo que se calcula para filtrar: cómo va su fecha y su producto. */
 export interface FilaTareaLista extends TareaVista {
@@ -28,6 +29,11 @@ const BanderaCampo: IconoComp = (props) => (
     <path d="M5 21V4M5 4h11l-2.5 4.5L16 13H5" />
   </svg>
 );
+const quienesDe = (t: TareaVista) => {
+  const n = responsablesDe(t).map((r) => r.nombre);
+  return n.length ? n : [SIN_VALOR];
+};
+
 const ICONOS: Record<string, IconoComp> = { estado: EstadoIcon, responsable: PersonaIcon, prioridad: BanderaCampo, vence: CalendarioIcon, plazo: CalendarioIcon, producto: ProductoIcon, origen: TareasIcon, archivo: TareasIcon };
 
 const DEF_TAREAS: DefTabla<FilaTareaLista> = {
@@ -44,7 +50,8 @@ const DEF_TAREAS: DefTabla<FilaTareaLista> = {
       ordenGrupos: ESTADOS_TAREA.map((e) => e.valor),
       colorValor: (v) => ESTADOS_TAREA.find((e) => e.valor === v)?.color,
     },
-    { id: "responsable", etiqueta: "Le toca a", tipo: "seleccion", valores: (t) => [t.responsableNombre ?? SIN_VALOR], etiquetaSinValor: "Sin asignar", agrupable: true },
+    // Con varios responsables (8 nov 2026), la tarea sale con cada uno.
+    { id: "responsable", etiqueta: "Le toca a", tipo: "seleccion", valores: (t) => quienesDe(t), etiquetaSinValor: "Sin asignar", agrupable: true },
     {
       id: "prioridad",
       etiqueta: "Prioridad",
@@ -115,9 +122,32 @@ function Encabezado() {
   );
 }
 
+/** Lista o tablero (8 nov 2026): lo elige cada persona y se recuerda en su navegador. */
+const CLAVE_VISTA = "publicaciones-tareas-vista-v1";
+const oyentesVista = new Set<() => void>();
+function leerVista(): "lista" | "tablero" {
+  try {
+    return localStorage.getItem(CLAVE_VISTA) === "tablero" ? "tablero" : "lista";
+  } catch {
+    return "lista";
+  }
+}
+function guardarVista(v: "lista" | "tablero") {
+  try {
+    localStorage.setItem(CLAVE_VISTA, v);
+  } catch {
+    // Sin almacenamiento: vale mientras la página está abierta.
+  }
+  oyentesVista.forEach((f) => f());
+}
+const suscribirVista = (f: () => void) => {
+  oyentesVista.add(f);
+  return () => void oyentesVista.delete(f);
+};
+
 /**
  * La pestaña «Tareas» (29 oct 2026, al estilo de ClickUp, pedido de Alcides): las tareas agrupadas por estado (Por hacer, En curso, En revisión, Hecha),
- * cada fila con su estado, producto, quién, para cuándo y prioridad que se cambian ahí mismo, y su ficha a la derecha. «Archivadas» muestra las que se
+ * cada fila con su estado, producto, quién, para cuándo y prioridad que se cambian ahí mismo, y su ficha a la derecha. «Archivadas» (una hecha hace más de 30 días se archiva sola) muestra las que se
  * archivaron. «Mis tareas» son las que le tocan a la persona; un administrador puede pasar a «De todos».
  */
 export function ListaTareas({
@@ -153,6 +183,7 @@ export function ListaTareas({
   };
   const abiertaT = filas.find((t) => t.id === abierta);
   const i = orden.indexOf(abierta ?? "");
+  const vista = useSyncExternalStore(suscribirVista, leerVista, () => "lista" as const);
 
   return (
     <div className="flex flex-col gap-4">
@@ -170,6 +201,14 @@ export function ListaTareas({
         <span className="text-sm text-muted-foreground tabular-nums">
           {pendientes} {pendientes === 1 ? "pendiente" : "pendientes"}
         </span>
+        <div role="group" aria-label="Cómo ver las tareas" className="ml-auto flex gap-2">
+          <button type="button" aria-pressed={vista === "lista"} onClick={() => guardarVista("lista")} className={pestana(vista === "lista")}>
+            Lista
+          </button>
+          <button type="button" aria-pressed={vista === "tablero"} onClick={() => guardarVista("tablero")} className={pestana(vista === "tablero")}>
+            Tablero
+          </button>
+        </div>
       </div>
 
       {(faltaMigracion || !conEstados) && (
@@ -181,6 +220,26 @@ export function ListaTareas({
         </p>
       )}
 
+      {vista === "tablero" ? (
+        <>
+          {puedeEscribir && !faltaMigracion && (
+            <div className="flex justify-end">
+              <BotonAgregar etiqueta="Agregar tarea" onClick={() => setAgregando(true)} />
+            </div>
+          )}
+          <TableroTareas
+            tareas={filas}
+            hoy={hoy}
+            conEstados={conEstados}
+            puedeEscribir={puedeEscribir}
+            alCambiar={cambiar}
+            alAbrir={(id, enOrden) => {
+              setOrden(enOrden);
+              setAbierta(id);
+            }}
+          />
+        </>
+      ) : (
       <ListaDatos
         def={DEF_TAREAS}
         filas={filas}
@@ -221,6 +280,7 @@ export function ListaTareas({
         accionPrincipal={puedeEscribir && !faltaMigracion ? <BotonAgregar etiqueta="Agregar tarea" onClick={() => setAgregando(true)} /> : undefined}
         vacio={todas ? "Nadie tiene tareas. Se agregan con «Agregar tarea» o con el botón de tareas de cada producto." : "No tienes tareas. Se agregan con «Agregar tarea» o con el botón de tareas de cada producto."}
       />
+      )}
 
       <Ventana abierto={agregando} alCerrar={() => setAgregando(false)} lado="derecha" ancho="lg" titulo="Nueva tarea">
         {agregando && (

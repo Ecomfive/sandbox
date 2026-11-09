@@ -18,6 +18,8 @@ export interface ProductoVentas extends ResumenProducto {
   /** El N.º correlativo y el código de barras del producto del sistema (7 nov 2026, pedido de Hernán). */
   numero: number | null;
   barras: string | null;
+  /** El texto de sus IDs cuando no son de Dropi («Drop · ABC-1», o los de cada plataforma en «Todas»); sin él, «ID 7591». */
+  etiquetas?: string;
   /** La plata del producto en todo lo cargado del Excel de la oficina (migración 0130); null si no tiene órdenes ahí. */
   dinero: { ganancia: number; utilidad: number; margen: number | null; porMes: Record<string, number> } | null;
 }
@@ -186,7 +188,7 @@ function TablaOrdenable<T>({ etiqueta, filas, columnas, clave, inicial, alElegir
 }
 
 /** «ID 7591» o, si la fila junta varios, «IDs 7591, 8406, 8770». */
-const textoIds = (p: ProductoVentas) => (p.ids.length > 1 ? `IDs ${p.ids.join(", ")}` : `ID ${p.ids[0] ?? p.id}`);
+const textoIds = (p: ProductoVentas) => p.etiquetas ?? (p.ids.length > 1 ? `IDs ${p.ids.join(", ")}` : `ID ${p.ids[0] ?? p.id}`);
 
 /** El nombre del producto con su ID de Dropi (o sus IDs) y su SKU debajo. */
 function NombreProducto({ p }: { p: ProductoVentas }) {
@@ -289,7 +291,27 @@ function DetalleProducto({ p, meses }: { p: ProductoVentas; meses: string[] }) {
  * El tablero de Ventas Proveeduría (antes Ventas Dropi): las cifras de arriba, la tendencia por mes y por día, lo que hay que reponer, lo que crece y cae,
  * el stock quieto, todos los productos (con búsqueda, categoría y su detalle por mes), los SKU del sistema y los dropshippers.
  */
-export function TableroVentas({ corte, stockLeido = null, movimientos, productos, porProducto, meses, dias, dropshippers, dinero }: { corte: string; /** La última lectura de «Mis productos» de Dropi, ya escrita en hora de Panamá: de ahí sale el stock. */ stockLeido?: string | null; movimientos: number; productos: ProductoVentas[]; /** Los mismos productos con los IDs de Dropi de un mismo SKU juntos. */ porProducto: ProductoVentas[]; meses: Mes[]; dias: { dia: string; pedidas: number; netas: number }[]; dropshippers: DropshipperVentas[]; dinero: DineroVentas | null }) {
+export function TableroVentas({
+  corte,
+  stockLeido = null,
+  movimientos,
+  productos,
+  porProducto,
+  meses,
+  dias,
+  dropshippers,
+  dinero,
+  plataforma = "Dropi",
+  fuente,
+  soloSalidas = false,
+}: {
+  /** De qué plataforma son las ventas («Dropi», «Drop», «Effi» o «las plataformas» en «Todas»). */
+  plataforma?: string;
+  /** De dónde salen los datos, en lugar de la línea del Historial de Existencia de Dropi. */
+  fuente?: ReactNode;
+  /** Drop y Effi solo dicen qué salió y qué volvió: sin cancelaciones, rechazos ni dropshippers. */
+  soloSalidas?: boolean;
+  corte: string; /** La última lectura de «Mis productos» de Dropi, ya escrita en hora de Panamá: de ahí sale el stock. */ stockLeido?: string | null; movimientos: number; productos: ProductoVentas[]; /** Los mismos productos con los IDs de Dropi de un mismo SKU juntos. */ porProducto: ProductoVentas[]; meses: Mes[]; dias: { dia: string; pedidas: number; netas: number }[]; dropshippers: DropshipperVentas[]; dinero: DineroVentas | null }) {
   const codigo = useCodigoPais();
   const [categoria, setCategoria] = useState<Categoria | "todas">("todas");
   const [busqueda, setBusqueda] = useState("");
@@ -364,7 +386,11 @@ export function TableroVentas({ corte, stockLeido = null, movimientos, productos
           {k.cambio !== null && `, ${Math.abs(k.cambio).toLocaleString("es-PA", { maximumFractionDigits: 1 })} % ${k.cambio < 0 ? "menos" : "más"} que los 30 días anteriores`}. {k.sinStock} productos que se venden ya no tienen stock y a {k.agotandose} más se les acaba en menos de dos semanas.
         </p>
         <p className="text-xs text-muted-foreground">
-          Del Historial de Existencia de Dropi hasta el {fecha(corte)} · {entero(productos.length)} productos y {entero(movimientos)} movimientos. Netas = pedidas − canceladas − rechazadas − devueltas.
+          {fuente ?? (
+            <>
+              Del Historial de Existencia de Dropi hasta el {fecha(corte)} · {entero(productos.length)} productos y {entero(movimientos)} movimientos. Netas = pedidas − canceladas − rechazadas − devueltas.
+            </>
+          )}
           {stockLeido && ` El stock es el de la última actualización desde Dropi (${stockLeido}).`}
           {dinero && ` La plata sale del Excel de la oficina (${dinero.fuente}), ${entero(dinero.ordenes)} órdenes hasta el ${fecha(dinero.hasta)}: utilidad = ganancia − comisión B280 − coste real − descuentos por garantía.`}
         </p>
@@ -374,10 +400,10 @@ export function TableroVentas({ corte, stockLeido = null, movimientos, productos
         <div className="flex flex-wrap">
           <Indicador titulo="Netas · últimos 30 días" valor={entero(k.n30)} detalle={<><Cambio valor={k.cambio} /> vs. los 30 anteriores ({entero(k.antes)})</>} />
           <Indicador titulo="Se venden y sin stock" punto={k.sinStock ? "peligro" : undefined} valor={entero(k.sinStock)} detalle={`${k.agotandose} más con menos de ${DIAS_REPONER} días`} />
-          <Indicador titulo="Canceladas" valor={pct(k.cancel)} detalle={`de ${entero(k.pedidas)} unidades pedidas`} />
-          <Indicador titulo="Devueltas o rechazadas" punto={k.dev !== null && k.dev > 0.15 ? "aviso" : undefined} valor={pct(k.dev)} detalle="de lo pedido, todo el historial" />
+          {!soloSalidas && <Indicador titulo="Canceladas" valor={pct(k.cancel)} detalle={`de ${entero(k.pedidas)} unidades pedidas`} />}
+          <Indicador titulo={soloSalidas ? "Devueltas" : "Devueltas o rechazadas"} punto={k.dev !== null && k.dev > 0.15 ? "aviso" : undefined} valor={pct(k.dev)} detalle={soloSalidas ? "de lo que salió, todo lo leído" : "de lo pedido, todo el historial"} />
           <Indicador titulo="Sin ventas en 30 días" valor={entero(k.sinVentas)} detalle={`de ${entero(productos.length)} productos · ${k.nunca} nunca vendieron`} />
-          <Indicador titulo="Dropshippers que pidieron" valor={entero(k.dsActivos)} detalle={`en 30 días, de ${entero(dropshippers.length)}`} />
+          {!soloSalidas && <Indicador titulo="Dropshippers que pidieron" valor={entero(k.dsActivos)} detalle={`en 30 días, de ${entero(dropshippers.length)}`} />}
           {plata?.ultimo && (
             <Indicador
               titulo={`Utilidad · ${nombreMes(plata.ultimo.mes)}`}
@@ -476,7 +502,7 @@ export function TableroVentas({ corte, stockLeido = null, movimientos, productos
       </div>
 
       <Tarjeta id="vd-quietos" titulo={`Stock que no se mueve (${quietos.length})`}>
-        <Nota>Productos activos en Dropi, con stock y sin ventas netas en los últimos 30 días.</Nota>
+        <Nota>Productos activos en {plataforma}, con stock y sin ventas netas en los últimos 30 días.</Nota>
         <TablaOrdenable
           etiqueta="Stock que no se mueve"
           filas={quietos}
@@ -504,7 +530,7 @@ export function TableroVentas({ corte, stockLeido = null, movimientos, productos
               setElegido(null);
             }}
             opciones={[
-              { valor: "id" as const, etiqueta: "Por ID de Dropi" },
+              { valor: "id" as const, etiqueta: plataforma === "Dropi" || plataforma === "Drop" || plataforma === "Effi" ? `Por ID de ${plataforma}` : "Por publicación" },
               { valor: "producto" as const, etiqueta: "Por producto" },
             ]}
           />
@@ -537,6 +563,7 @@ export function TableroVentas({ corte, stockLeido = null, movimientos, productos
 
       {detalle && <DetalleProducto p={detalle} meses={meses.map((m) => m.mes)} />}
 
+      {!soloSalidas && (
       <section aria-labelledby="vd-ds" className="min-w-0 rounded-[10px] border border-border bg-card">
         <CabeceraTarjeta id="vd-ds" titulo={`Dropshippers (${dsFiltrados.length})`} />
         <Nota>Quién creó cada orden. Lo cancelado, rechazado o devuelto se le carga por el número de orden.</Nota>
@@ -559,6 +586,7 @@ export function TableroVentas({ corte, stockLeido = null, movimientos, productos
           ]}
         />
       </section>
+      )}
     </div>
   );
 }

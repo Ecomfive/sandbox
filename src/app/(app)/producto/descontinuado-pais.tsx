@@ -2,8 +2,10 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { Bandera } from "@/components/paises/bandera";
+import { Seccion } from "@/components/ui/seccion-ficha";
 import { useToast } from "@/components/ui/toast";
-import { cambiarDescontinuadoPais, paisesDescontinuado, type PaisDescontinuado } from "./descontinuado-pais-actions";
+import { MundoIcon } from "@/lib/nav-icons";
+import { cambiarDescontinuadoPais, paisesDescontinuado, paisesDescontinuadoHeredado, type PaisDescontinuado } from "./descontinuado-pais-actions";
 
 /**
  * «Descontinuado en» de la ficha del producto (31 oct 2026, pedido de Hernán; migración 0211): una casilla por país. En el país marcado no se
@@ -35,7 +37,8 @@ export function DescontinuadoPorPais({ skuId, puedeEscribir }: { skuId: string; 
       const r = await cambiarDescontinuadoPais(skuId, p.codigo, si).catch(() => ({ error: "No se pudo guardar. Inténtalo de nuevo." }));
       if ("error" in r) return mostrarToast(r.error, "destructive");
       setPaises((actual) => (Array.isArray(actual) ? actual.map((x) => (x.codigo === p.codigo ? { ...x, descontinuado: si } : x)) : actual));
-      mostrarToast(si ? `Descontinuado en ${p.nombre}: ya no se compra para ese país.` : `Vuelve a comprarse para ${p.nombre}.`);
+      const packs = r.compuestos ? ` ${r.compuestos === 1 ? "Su pack o combo también" : `Sus ${r.compuestos} packs y combos también`}.` : "";
+      mostrarToast(si ? `Descontinuado en ${p.nombre}: ya no se compra para ese país.${packs}` : `Vuelve a comprarse para ${p.nombre}.${packs}`);
     });
   }
 
@@ -61,5 +64,39 @@ export function DescontinuadoPorPais({ skuId, puedeEscribir }: { skuId: string; 
       </div>
       {marcados.length > 0 && <span className="text-sm text-muted-foreground">{`No se compra para ${marcados.map((p) => p.nombre).join(", ")}. Los demás países siguen igual.`}</span>}
     </fieldset>
+  );
+}
+
+/**
+ * Lo mismo en un pack o combo (8 nov 2026, pedido de Alcides): no se marca a mano, hereda el descontinuado de sus productos simples en cada país. Solo
+ * se ve si alguno lo está, con cuál.
+ */
+export function DescontinuadoHeredado({ skuId }: { skuId: string }) {
+  const [paises, setPaises] = useState<{ pais: string; codigo: string; componentes: string[] }[] | null>(null);
+  useEffect(() => {
+    let vigente = true;
+    paisesDescontinuadoHeredado(skuId).then(
+      (r) => vigente && setPaises("error" in r ? [] : r.paises),
+      () => vigente && setPaises([]),
+    );
+    return () => {
+      vigente = false;
+    };
+  }, [skuId]);
+  if (!paises?.length) return null;
+  return (
+    <Seccion icono={MundoIcon} titulo="Descontinuado por país">
+    <ul className="m-0 flex list-none flex-col gap-1.5 p-0 text-sm">
+      {paises.map((p) => (
+        <li key={p.codigo} className="flex items-start gap-2">
+          <Bandera codigo={p.codigo} />
+          <span>
+            <span className="font-medium text-destructive">Descontinuado en {p.pais}</span>
+            <span className="text-muted-foreground"> porque {p.componentes.length === 1 ? `«${p.componentes[0]}» lo está` : `${p.componentes.map((c) => `«${c}»`).join(" y ")} lo están`}.</span>
+          </span>
+        </li>
+      ))}
+    </ul>
+    </Seccion>
   );
 }

@@ -10,8 +10,8 @@ import type { AlertaC, BitacoraC, CompetidorC, DatosCompetencia, ProductoC, Vent
 const n = (v: unknown) => (v === null || v === undefined ? null : Number(v));
 const DOMINIO: Record<string, string> = { PA: "pa", CR: "cr", MX: "mx", CO: "co" };
 
-/** Las tablas de cada plataforma: Dropi (0108), Drop (0234) y Effi (0239), iguales salvo por cómo se identifica un producto y su proveedor. */
-const TABLAS: Record<PlataformaId, Record<"productos" | "busquedas" | "historial" | "alertas" | "ids", string>> = {
+/** Las tablas de cada plataforma (también las usa `decidirParCompetencia`): Dropi (0108), Drop (0234) y Effi (0239), iguales salvo por cómo se identifica un producto y su proveedor. */
+export const TABLAS: Record<PlataformaId, Record<"productos" | "busquedas" | "historial" | "alertas" | "ids", string>> = {
   dropi: { productos: "competencia_productos", busquedas: "competencia_busquedas", historial: "competencia_historial", alertas: "competencia_alertas", ids: "dropi_producto_id, proveedor_dropi_id" },
   drop: { productos: "drop_competencia_productos", busquedas: "drop_competencia_busquedas", historial: "drop_competencia_historial", alertas: "drop_competencia_alertas", ids: "drop_producto_id" },
   effi: { productos: "effi_competencia_productos", busquedas: "effi_competencia_busquedas", historial: "effi_competencia_historial", alertas: "effi_competencia_alertas", ids: "proveedor_effi_id, ventas" },
@@ -126,6 +126,7 @@ export async function cargarDatosCompetencia(supabase: SupabaseClient, pais: { i
       igualA: p.igual_a,
       dudosoDe: null,
       revision: null,
+      descartadoDe: null,
       parecido: n(p.igual_parecido),
       metodo: p.igual_metodo,
       primeraVez: p.primera_vez,
@@ -150,6 +151,7 @@ export async function cargarDatosCompetencia(supabase: SupabaseClient, pais: { i
     p.revision = r;
     if (r?.veredicto === "mismo") continue;
     if (r?.veredicto === "distinto") {
+      p.descartadoDe = p.igualA;
       p.igualA = null;
       continue;
     }

@@ -109,6 +109,9 @@ function crearDropi(opciones: { noTomaEntradas?: boolean; usuarios?: Record<stri
               const fila = (p.warehouse_product as Obj[]).find((w) => w.warehouse_id === 81)!;
               fila.stock = Number(fila.stock) - Number(viva.stock);
             }
+          } else if (viva) {
+            // Cambiar las unidades de una reserva que ya tenía (8 nov 2026, «Stock reservado por correo»).
+            viva.stock = x.stock;
           } else if (!viva) {
             // Con variaciones, la reserva se compara con el stock de su variación (`privateVariationStockFix`).
             const variacion = (p.variations as Obj[] | undefined)?.find((v) => v.id === x.variation_id);
@@ -170,7 +173,8 @@ function crearDropi(opciones: { noTomaEntradas?: boolean; usuarios?: Record<stri
     }
     if (metodo === "POST" && ruta === "/productwarranty/show") return responder(garantias.get(Number(cuerpo!.product_id)) ?? []);
     if (metodo === "POST" && m && m[2] === "/archiveProduct") {
-      if (opciones.noArchiva) return responder({ isSuccess: false, message: "Tiene órdenes pendientes" }, 409);
+      // Lo que dice Dropi de verdad (8 nov 2026): responde 200 con isSuccess false.
+      if (opciones.noArchiva) return responder({ isSuccess: false, message: `El producto ${m[1]} tiene órdenes en estatus PENDIENTE, GUIA GENERADA o SIN MOVIMIENTOS, por lo tanto debe despacharlos primero o comunicarse con soporte de Dropi` }, 200);
       productos.get(Number(m[1]))!.archived = true;
       return responder(true);
     }
@@ -247,7 +251,7 @@ test("archivar: si Dropi no deja (órdenes pendientes) queda con error y el moti
   d.productos.set(8751, productoBase(8751));
   const [r] = await aplicar(d, [{ ...base, id: "a1", tipo: "archivar", producto: 8751 }]);
   assert.equal(r.ok, false);
-  assert.match(String(r.error), /órdenes pendientes/);
+  assert.match(String(r.error), /órdenes en estatus PENDIENTE/);
   assert.ok(!d.productos.get(8751)!.archived);
 });
 
@@ -444,11 +448,17 @@ test("republicar: si en un intento falló la foto principal, el reintento sube j
     { id: 2, main: false, urlS3: "panama/products/8751/1779932274veganic 4.png", url: null, variation_id: null },
   ] }));
   const [r1] = await aplicar(d, [{ ...base, id: "r1", tipo: "republicar", producto: 8751 }]);
-  assert.equal(r1.ok, false);
+  // Desde el 8 nov 2026 una foto que no se copia no detiene la republicación: termina y dice cuál falta (el sistema crea la tarea de subirla).
+  assert.equal(r1.ok, true, String(r1.error));
   assert.equal(r1.nuevo, 9001);
-  assert.equal(d.productos.get(9001)!.gallery.length, 1, "en el primer intento solo subió la otra");
+  assert.deepEqual(r1.fotosFaltan, ["1779932274veganic.jpg"]);
+  assert.match(String(r1.aviso), /1 foto\(s\).*ID 9001/);
+  assert.equal(d.productos.get(9001)!.gallery.length, 1, "subió la otra");
+  assert.equal(d.productos.get(8751)!.archived, true, "y el viejo quedó archivado");
+  // Si se vuelve a pedir (por ejemplo, desde un reintento), sube justo la que faltaba y no repite la otra.
   const [r2] = await aplicar(d, [{ ...base, id: "r1", tipo: "republicar", producto: 8751, nuevo: 9001 }]);
   assert.equal(r2.ok, true, String(r2.error));
+  assert.deepEqual(r2.fotosFaltan, []);
   const g = d.productos.get(9001)!.gallery as Obj[];
   assert.equal(g.length, 2, "las dos fotos, sin repetir");
   assert.ok(g.some((f) => f.main && String(f.urlS3).endsWith("veganic.jpg")), "la principal quedó como principal");
@@ -458,7 +468,8 @@ test("republicar: un error 5xx al subir una foto no se reintenta en el momento (
   const d = crearDropi({ fotos: "fallaLaPrincipal" });
   d.productos.set(8751, productoBase(8751, { gallery: [{ id: 1, main: true, urlS3: "panama/products/8751/1779932274veganic.jpg", url: null, variation_id: null }] }));
   const [r1] = await aplicar(d, [{ ...base, id: "r1", tipo: "republicar", producto: 8751 }]);
-  assert.equal(r1.ok, false);
+  assert.equal(r1.ok, true, "termina igual, con la foto en la lista de las que faltan");
+  assert.equal((r1.fotosFaltan as string[]).length, 1);
   assert.equal(d.llamadas.filter((l) => String(l).includes("/products/photos/upload")).length, 1, "un solo intento de subida");
 });
 
@@ -470,13 +481,14 @@ test("republicar: si el navegador no deja bajar la foto del CDN, la pide a la pl
   assert.equal(d.productos.get(9001)!.gallery.length, 1);
 });
 
-test("republicar: si la plataforma tampoco puede bajar la foto, el error lo dice", async () => {
+test("republicar: si la plataforma tampoco puede bajar la foto, termina igual y el aviso dice por qué falta", async () => {
   const d = crearDropi({ cdnBloqueado: true });
   d.fotoPorPlataforma = false;
   d.productos.set(10474, productoBase(10474));
   const [r] = await aplicar(d, [{ ...base, id: "r1", tipo: "republicar", producto: 10474 }]);
-  assert.equal(r.ok, false);
-  assert.match(String(r.error), /no se pudo bajar la foto por la plataforma \(502: sin foto\)/);
+  assert.equal(r.ok, true, String(r.error));
+  assert.equal((r.fotosFaltan as string[]).length, 1);
+  assert.match(String(r.aviso), /no se pudo bajar la foto por la plataforma \(502: sin foto\)/);
 });
 
 test("republicar: con fotos copiadas en el sistema, sube esas (la primera como principal) y no toca el CDN de Dropi", async () => {
@@ -1118,4 +1130,48 @@ test("stock: un cambio sin variación en un producto con variaciones (o al revé
   assert.match(String(b.error), /ya no tiene variaciones/);
   assert.match(String(c.error), /ya no tiene la variación XL/);
   assert.equal(d.llamadas.filter((l) => l.startsWith("PUT")).length, 0);
+});
+
+test("reserva por correo: agregar un correo, cambiar sus unidades y quitarla, sin tocar el stock (y avisar si Dropi lo cambia)", async () => {
+  const d = crearDropi({ usuarios: { "ana@correo.com": { id: 901, name: "Ana", email: "ana@correo.com", role_user: { name: "DROPSHIPPER" } }, "prov@correo.com": { id: 902, role_user: { name: "SUPPLIER" } } } });
+  d.productos.set(8744, productoBase(8744, { warehouse_product: [{ warehouse_id: 81, stock: 66, warehouse: BODEGA }] }));
+  const [agrega] = await aplicar(d, [{ ...base, id: "r1", tipo: "reserva", producto: 8744, datos: { correo: "ana@correo.com", unidades: 40 } }]);
+  assert.equal(agrega.ok, true, String(agrega.error));
+  assert.deepEqual((agrega.reservas as Obj[]).map((x) => [x.email, x.stock]), [["ana@correo.com", 40]]);
+  assert.equal(agrega.stock, 66);
+  assert.equal(agrega.aviso, null);
+  assert.deepEqual(d.stockDe(d.productos.get(8744)!), { 81: 66 }, "reservar no mueve el stock");
+  const [cambia] = await aplicar(d, [{ ...base, id: "r2", tipo: "reserva", producto: 8744, datos: { correo: "ANA@correo.com", unidades: 50 } }]);
+  assert.equal(cambia.ok, true, String(cambia.error));
+  assert.deepEqual((cambia.reservas as Obj[]).map((x) => x.stock), [50]);
+  const putsAntes = d.llamadas.filter((l) => l === "PUT /products/8744").length;
+  const [igual] = await aplicar(d, [{ ...base, id: "r3", tipo: "reserva", producto: 8744, datos: { correo: "ana@correo.com", unidades: 50 } }]);
+  assert.equal(igual.ok, true);
+  assert.equal(d.llamadas.filter((l) => l === "PUT /products/8744").length, putsAntes, "si ya está así, no guarda nada");
+  const [demasiado] = await aplicar(d, [{ ...base, id: "r4", tipo: "reserva", producto: 8744, datos: { correo: "ana@correo.com", unidades: 70 } }]);
+  assert.equal(demasiado.ok, false);
+  assert.match(String(demasiado.error), /66 unidades/);
+  const [proveedor] = await aplicar(d, [{ ...base, id: "r5", tipo: "reserva", producto: 8744, datos: { correo: "prov@correo.com", unidades: 5 } }]);
+  assert.equal(proveedor.ok, false);
+  assert.match(String(proveedor.error), /proveedor/);
+  const [quita] = await aplicar(d, [{ ...base, id: "r6", tipo: "reserva", producto: 8744, datos: { correo: "ana@correo.com", unidades: 0 } }]);
+  assert.equal(quita.ok, true, String(quita.error));
+  assert.deepEqual(quita.reservas, []);
+});
+
+test("reserva por correo: si Dropi descuenta el stock al quitar la reserva, se avisa con los números", async () => {
+  const d = crearDropi({ quitarReservaSaca: true });
+  d.productos.set(8744, productoBase(8744, { warehouse_product: [{ warehouse_id: 81, stock: 66, warehouse: BODEGA }], private_product_inventories: [{ id: 7, product_id: 8744, user_id: 901, email: "ana@correo.com", stock: 66, deleted_at: null }] }));
+  const [quita] = await aplicar(d, [{ ...base, id: "r1", tipo: "reserva", producto: 8744, datos: { correo: "ana@correo.com", unidades: 0 } }]);
+  assert.equal(quita.ok, true, String(quita.error));
+  assert.match(String(quita.aviso), /pasó de 66 a 0/);
+});
+
+test("republicar: si Dropi no deja archivar el viejo por órdenes en curso, termina igual y lo devuelve para dejar la tarea", async () => {
+  const d = crearDropi({ noArchiva: true });
+  d.productos.set(10488, productoBase(10488));
+  const [r] = await aplicar(d, [{ ...base, id: "r1", tipo: "republicar", producto: 10488 }]);
+  assert.equal(r.ok, true, String(r.error));
+  assert.match(String(r.archivoPendiente), /PENDIENTE|GUIA GENERADA|SIN MOVIMIENTOS/);
+  assert.deepEqual(d.stockDe(d.productos.get(10488)!), { 81: 0 }, "el viejo quedó sin stock");
 });

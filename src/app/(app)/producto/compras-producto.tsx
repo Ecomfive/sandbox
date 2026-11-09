@@ -3,8 +3,10 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Bandera } from "@/components/paises/bandera";
+import { useCodigoPais } from "@/components/pais-contexto";
 import { Badge } from "@/components/ui/badge";
 import { anilloFoco } from "@/components/ui/field";
+import { ChevronRightIcon } from "@/lib/nav-icons";
 import { compraCuenta } from "@/lib/compras/cuenta";
 import { diasPedidoLlegada, promedioDias } from "@/lib/compras/tiempo-compra";
 import { formatearFecha, formatearMoneda } from "@/lib/formato";
@@ -27,6 +29,16 @@ const entero = (n: number) => n.toLocaleString("es-PA");
  */
 export function ComprasProducto({ id, limite, pais }: { id: string; limite?: number; pais?: string }) {
   const [cargadas, setDatos] = useState<CompraDeProducto[] | "error" | null>(null);
+  // Agrupadas por país, solo el de la barra de arriba viene abierto; los demás, plegados con su flecha (8 nov 2026, pedido de Alcides: en Panamá interesa Panamá).
+  const paisBarra = useCodigoPais();
+  const [abiertos, setAbiertos] = useState<ReadonlySet<string>>(() => new Set([paisBarra]));
+  const alternar = (codigo: string) =>
+    setAbiertos((a) => {
+      const n = new Set(a);
+      if (n.has(codigo)) n.delete(codigo);
+      else n.add(codigo);
+      return n;
+    });
 
   useEffect(() => {
     let vigente = true;
@@ -78,7 +90,8 @@ export function ComprasProducto({ id, limite, pais }: { id: string; limite?: num
   const grupos =
     !pais && porPais.size > 1
       ? [...porPais]
-          .sort((a, b) => b[1] - a[1])
+          // El país de la barra primero; después, el que más unidades compró.
+          .sort((a, b) => Number(b[0] === paisBarra) - Number(a[0] === paisBarra) || b[1] - a[1])
           .map(([nombre, unidadesPais]) => ({ pais: nombre, unidades: unidadesPais, compras: vistas.filter((c) => (c.pais ?? "—") === nombre) }))
           .filter((g) => g.compras.length > 0)
       : null;
@@ -96,20 +109,33 @@ export function ComprasProducto({ id, limite, pais }: { id: string; limite?: num
         {primera === null || ultima === null ? "Todas las compras están descartadas" : vigentes.length === 1 ? `El ${formatearFecha(primera)}` : `Del ${formatearFecha(primera)} al ${formatearFecha(ultima)}`}
       </p>
       {grupos ? (
-        grupos.map((g) => (
-          <section key={g.pais} aria-label={`Compras en ${g.pais === "—" ? "sin país" : nombrePais(g.pais)}`} className="flex flex-col gap-1">
-            <h4 className="m-0 flex flex-wrap items-baseline justify-between gap-x-3 border-b border-border pb-1 text-xs font-semibold">
-              <span className="inline-flex items-center gap-1.5">
-                {g.pais !== "—" && <Bandera codigo={g.pais} />}
-                {g.pais === "—" ? "Sin país" : nombrePais(g.pais)}
-              </span>
-              <span className="font-normal text-muted-foreground tabular-nums">
-                {entero(g.compras.filter(compraCuenta).length)} {g.compras.filter(compraCuenta).length === 1 ? "compra" : "compras"} · {entero(g.unidades)} u.
-              </span>
-            </h4>
-            <ListaCompras compras={g.compras} conPais={false} />
-          </section>
-        ))
+        grupos.map((g) => {
+          const abierto = abiertos.has(g.pais);
+          const nombre = g.pais === "—" ? "Sin país" : nombrePais(g.pais);
+          return (
+            <section key={g.pais} aria-label={`Compras en ${g.pais === "—" ? "sin país" : nombrePais(g.pais)}`} className="flex flex-col gap-1">
+              <h4 className="m-0 border-b border-border pb-1 text-xs font-semibold">
+                <button
+                  type="button"
+                  aria-expanded={abierto}
+                  onClick={() => alternar(g.pais)}
+                  className={`flex w-full flex-wrap items-baseline justify-between gap-x-3 rounded-sm text-left hover:text-foreground ${anilloFoco}`}
+                >
+                  <span className="inline-flex items-center gap-1.5">
+                    <ChevronRightIcon aria-hidden="true" className={`h-3.5 w-3.5 self-center text-muted-foreground transition-transform motion-reduce:transition-none ${abierto ? "rotate-90" : ""}`} />
+                    {g.pais !== "—" && <Bandera codigo={g.pais} />}
+                    {nombre}
+                    <span className="sr-only">{abierto ? ", ocultar sus compras" : ", ver sus compras"}</span>
+                  </span>
+                  <span className="font-normal text-muted-foreground tabular-nums">
+                    {entero(g.compras.filter(compraCuenta).length)} {g.compras.filter(compraCuenta).length === 1 ? "compra" : "compras"} · {entero(g.unidades)} u.
+                  </span>
+                </button>
+              </h4>
+              {abierto && <ListaCompras compras={g.compras} conPais={false} />}
+            </section>
+          );
+        })
       ) : (
         <ListaCompras compras={vistas} conPais={!pais} />
       )}

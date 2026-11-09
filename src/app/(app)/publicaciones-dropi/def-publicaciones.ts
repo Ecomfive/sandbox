@@ -1,3 +1,4 @@
+import type { ReservaDropi } from "@/lib/publicaciones/reservas-dropi";
 import {
   numeroPublicacion,
   TIPOS,
@@ -137,6 +138,14 @@ export interface FilaPublicacion {
   liquidacionDesde: string | null;
   /** Vende poco, pero le cambiaron el precio hace menos de 30 días: el día en que se vuelve a revisar (7 nov 2026). */
   vendePocoVuelve: string | null;
+  /** Las unidades reservadas por correo en Dropi (migración 0254): en una pública, «Reservado a …»; en un privado, a quién se le asignó. Vacío si no tiene o no se leyó. */
+  reservas: ReservaDropi[];
+  /** Reservas por correo esperando «Aplicar en Dropi» (migración 0254), con el error si el último intento falló. */
+  reservasPendientes: { correo: string; unidades: number; nombre: string | null; error: string | null }[];
+  /** Por qué espera: le cambiaron el precio o alguien eligió «Esperar un mes» (8 nov 2026). */
+  vendePocoPor: "precio" | "decision" | null;
+  /** «Esperar un mes» que sigue corriendo (migración 0252): hasta cuándo, por qué y quién lo decidió. */
+  vendePocoEspera: { hasta: string; nota: string | null; por: string | null } | null;
   /** Su producto está descontinuado en este país (ficha del producto, migración 0211): ya no se compra para aquí. */
   descontinuadoPais: boolean;
   /** Cambios de stock esperando «Aplicar en Dropi» (migración 0173): en qué bodega y cuántas unidades deben quedar. */
@@ -415,6 +424,19 @@ export const DEF_PUBLICACIONES: DefTabla<FilaPublicacion> = {
         { valor: "no", etiqueta: "No pausada" },
       ],
     },
+    // Pública con unidades reservadas a un correo (8 nov 2026): aparte de las privadas.
+    {
+      id: "reserva",
+      etiqueta: "Stock reservado por correo",
+      tipo: "seleccion",
+      valores: (f) => [f.reservas.length ? (f.tipoDropi === "privado" ? "privado" : "publica") : "no"],
+      opciones: () => [
+        { valor: "publica", etiqueta: "Pública con reserva" },
+        { valor: "privado", etiqueta: "Producto privado con reserva" },
+        { valor: "no", etiqueta: "Sin reserva" },
+      ],
+      agrupable: true,
+    },
     { id: "privatizado", etiqueta: "Privatizado a", tipo: "seleccion", valores: (f) => uno(f.privatizadoA || null), etiquetaSinValor: "Sin privatizar", agrupable: true },
     { id: "nombre", etiqueta: "Producto", tipo: "texto", valor: (f) => `${numeroPublicacion(f.numero)} ${f.nombre} ${f.dropiId}` },
     { id: "precio", etiqueta: "Precio de venta", tipo: "numero", valor: (f) => f.precioVenta },
@@ -427,12 +449,16 @@ export const DEF_PUBLICACIONES: DefTabla<FilaPublicacion> = {
   csvAntes: [
     { etiqueta: "N.º", valor: (f) => numeroPublicacion(f.numero) },
     { etiqueta: "ID Dropi", valor: (f) => f.dropiId },
+    { etiqueta: "Nombre", valor: (f) => f.nombre },
     { etiqueta: "SKU", valor: (f) => f.sku?.codigo ?? "" },
     { etiqueta: "Ventas 30 días (Dropi)", valor: (f) => (f.ventas ? String(f.ventas.netas30) : "") },
     { etiqueta: "Stock en Dropi", valor: (f) => (f.stockProveedor !== null ? String(f.stockProveedor) : f.ventas ? String(f.ventas.stock) : "") },
     { etiqueta: "Bodega", valor: (f) => (f.bodega ? `${codigoBodega(f.bodega.id)} ${f.bodega.nombre}` : "") },
     { etiqueta: "Stock por bodega en Dropi", valor: (f) => (f.bodegasDropi ?? []).map((b) => `${codigoBodega(b.id)} ${b.nombre}: ${b.stock}`).join(" | ") },
   ],
+  // El PDF de «Descargar» (8 nov 2026): lo que hace falta para enviarlo a alguien.
+  pdf: ["N.º", "ID Dropi", "Nombre", "SKU", "Precio de venta", "Margen (%)", "Ventas 30 días (Dropi)", "Stock en Dropi", "Acción"],
+  pdfFoto: (f) => f.fotoUrl,
 };
 
 

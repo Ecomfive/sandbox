@@ -11,6 +11,9 @@ export const MODULO_DE_ENTIDAD: Record<string, string> = {
   puestos: "puestos",
   compras_alertas_sin_stock: "compras",
   skus_maestros: "producto",
+  competencia_productos: "analisis-competencia",
+  drop_competencia_productos: "analisis-competencia",
+  effi_competencia_productos: "analisis-competencia",
   dropshippers: "crm-dropshippers",
   whatsapp_conversaciones: "crm-dropshippers",
   crm_plataformas_venta: "crm-dropshippers",
@@ -51,7 +54,7 @@ const COMERCIALES = new Set<string>(ACCIONES_COMERCIALES);
  * Acciones de un producto (`skus_maestros`, que no tiene país) que sí son de un país: la orden de compra creada al pasarlo a
  * Activo y un movimiento de inventario. Su país va al final del detalle («… · Panamá») y se lee con `paisEnDetalle`.
  */
-export const ACCIONES_PRODUCTO_CON_PAIS = new Set(["crear_compra", "movimiento_inventario", "envio_dropi_inventario", "envio_dropi_recibido"]);
+export const ACCIONES_PRODUCTO_CON_PAIS = new Set(["crear_compra", "movimiento_inventario", "envio_dropi_inventario", "envio_dropi_recibido", "competencia_no_es_el_mismo", "competencia_volver_a_contar"]);
 
 /** El código del país nombrado en el detalle como « · <Nombre>», o undefined si no nombra ninguno. */
 export function paisEnDetalle(detalle: string | null | undefined, paises: { codigo: string; nombre: string }[]): string | undefined {
@@ -106,7 +109,8 @@ export function eventoVisible(
     // Sin saber el país (la compra se borró, por ejemplo) no se arriesga: se oculta.
     if (pais === undefined || !puedeVerPais(usuario.paisesPermitidos, pais)) return false;
   }
-  if (usuario.paisesPermitidos !== null && evento.entidad === "skus_maestros" && ACCIONES_PRODUCTO_CON_PAIS.has(evento.accion)) {
+  // Los productos de la competencia (8 nov 2026, «Es el mismo» / «No es el mismo») también llevan su país al final del detalle.
+  if (usuario.paisesPermitidos !== null && ((evento.entidad === "skus_maestros" && ACCIONES_PRODUCTO_CON_PAIS.has(evento.accion)) || MODULO_DE_ENTIDAD[evento.entidad] === "analisis-competencia")) {
     const pais = paisEnDetalle(evento.detalle, paises);
     if (pais === undefined || !puedeVerPais(usuario.paisesPermitidos, pais)) return false;
   }

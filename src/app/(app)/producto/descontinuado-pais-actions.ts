@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { puedeVerPais } from "@/lib/paises-permitidos";
+import { descontinuadoHeredado } from "@/lib/producto/descontinuado-pais";
 import { createServiceClient } from "@/lib/supabase/server";
 
 const MODULO = "producto";
@@ -40,7 +41,7 @@ export async function paisesDescontinuado(skuId: string): Promise<{ paises: Pais
  * Descontinúa un producto en un país (o lo vuelve a activar allí con `si` en false): en ese país no se puede comprar y se marca en Gestión de
  * IDs Dropi y en el chat. Los demás países no cambian. Queda en la auditoría del producto.
  */
-export async function cambiarDescontinuadoPais(skuId: string, codigo: string, si: boolean): Promise<{ ok: true } | { error: string }> {
+export async function cambiarDescontinuadoPais(skuId: string, codigo: string, si: boolean): Promise<{ ok: true; compuestos: number } | { error: string }> {
   const usuario = await requireModuloEscritura(MODULO);
   if (!ES_ID(skuId)) return { error: "Producto no válido." };
   if (typeof codigo !== "string" || !/^[A-Z]{2}$/.test(codigo)) return { error: "País no válido." };
@@ -66,5 +67,16 @@ export async function cambiarDescontinuadoPais(skuId: string, codigo: string, si
   });
   revalidatePath("/producto");
   revalidatePath("/publicaciones-dropi");
-  return { ok: true };
+  revalidatePath("/compras/por-pais");
+  // Sus packs y combos lo heredan en ese país (se calcula al leer): solo se dice cuántos son.
+  const { count } = await supabase.from("sku_maestro_componentes").select("id", { count: "exact", head: true }).eq("componente_id", skuId);
+  return { ok: true, compuestos: count ?? 0 };
+}
+
+/** Un pack o combo: en qué países está descontinuado porque lo está alguno de sus simples (8 nov 2026, pedido de Alcides). */
+export async function paisesDescontinuadoHeredado(comboId: string): Promise<{ paises: { pais: string; codigo: string; componentes: string[] }[] } | { error: string }> {
+  const usuario = await requireModulo(MODULO);
+  if (!ES_ID(comboId)) return { error: "Producto no válido." };
+  const paises = await descontinuadoHeredado(createServiceClient(), comboId);
+  return { paises: paises.filter((p) => !PAISES_FUERA.includes(p.codigo) && puedeVerPais(usuario.paisesPermitidos ?? null, p.codigo)) };
 }

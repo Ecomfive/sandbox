@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { etiquetaRecomendacion } from "@/lib/publicaciones/recomendaciones";
-import { esEstado, esPrioridad, tareasDe, type TareaVista } from "@/lib/publicaciones/tareas";
+import { esEstado, esPrioridad, tareasDe, type TareaVista, corteParaCerrar, conEstancadas } from "@/lib/publicaciones/tareas";
 
 /** La publicación de una tarea, para mostrarla en la lista de tareas. */
 export interface PublicacionDeTarea {
@@ -50,7 +50,27 @@ export function deFilaManual(f: Fila): TareaVista {
     hechaPor: texto(f.hecha_por_nombre),
     hechaNota: texto(f.hecha_nota),
     archivadaEn: texto(f.archivada_en),
+    otros: [],
   };
+}
+
+/**
+ * Las tareas listas para mostrar (8 nov 2026): con las demás personas que las hacen (migración 0255; sin ella, solo la principal) y con «Estancada» en las
+ * que llevan más de 3 días vencidas.
+ */
+export async function presentarTareas(supabase: SupabaseClient, tareas: TareaVista[]): Promise<TareaVista[]> {
+  const manuales = tareas.filter((t) => t.origen === "manual").map((t) => t.id);
+  const otros = new Map<string, { id: string; nombre: string }[]>();
+  for (let i = 0; i < manuales.length; i += 200) {
+    const { data, error } = await supabase.from("dropi_tareas_responsables").select("tarea_id, persona_id, persona_nombre, creado_en").in("tarea_id", manuales.slice(i, i + 200)).order("creado_en");
+    if (error) break;
+    for (const f of data ?? []) otros.set(f.tarea_id as string, [...(otros.get(f.tarea_id as string) ?? []), { id: f.persona_id as string, nombre: (f.persona_nombre as string | null) ?? "Sin nombre" }]);
+  }
+  const hoy = new Date().toLocaleDateString("en-CA", { timeZone: "America/Panama" });
+  return conEstancadas(
+    tareas.map((t) => ({ ...t, otros: (otros.get(t.id) ?? []).filter((o) => o.id !== t.responsableId) })),
+    hoy,
+  );
 }
 
 /**
@@ -60,12 +80,15 @@ export function deFilaManual(f: Fila): TareaVista {
  */
 export async function cargarTareas(supabase: SupabaseClient, paisId: string, yo: string, todas: boolean): Promise<DatosTareas> {
   const desde = new Date(Date.now() - DIAS_HECHAS * 86_400_000).toISOString();
+  // Las hechas hace más de 30 días se archivan solas (8 nov 2026, pedido de Alcides). Sin la migración 0178 no hay dónde: no pasa nada.
+  await supabase.from("dropi_publicaciones_tareas").update({ archivada_en: new Date().toISOString() }).eq("estado", "hecha").is("archivada_en", null).lt("hecha_en", corteParaCerrar(new Date()));
+  // Con estados (0178), también las archivadas, para el botón «Archivadas»; sin ella, como antes.
   const leerManuales = (columnas: string) =>
     supabase
       .from("dropi_publicaciones_tareas")
       .select(`${columnas}, dropi_publicaciones!inner(pais_id)` as "*")
       .eq("dropi_publicaciones.pais_id", paisId)
-      .or(`hecha_en.is.null,hecha_en.gte.${desde}`)
+      .or(columnas.includes("archivada_en") ? `hecha_en.is.null,hecha_en.gte.${desde},archivada_en.not.is.null` : `hecha_en.is.null,hecha_en.gte.${desde}`)
       .order("creado_en", { ascending: false })
       .limit(1000);
   const [manualesNuevasR, recsR] = await Promise.all([
@@ -102,8 +125,9 @@ export async function cargarTareas(supabase: SupabaseClient, paisId: string, yo:
         hechaPor: texto(f.hecha_por_nombre),
         hechaNota: texto(f.hecha_nota),
         archivadaEn: null,
+        otros: [],
       }));
-  const tareas = tareasDe([...manuales, ...deRecomendaciones], yo, todas);
+  const tareas = tareasDe(await presentarTareas(supabase, [...manuales, ...deRecomendaciones]), yo, todas);
   const ids = [...new Set(tareas.map((t) => t.publicacionId))];
   const publicaciones: Record<string, PublicacionDeTarea> = {};
   for (let i = 0; i < ids.length; i += 200) {

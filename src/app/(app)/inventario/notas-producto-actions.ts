@@ -19,6 +19,8 @@ const CFG: motor.ConfigComentarios = {
   reacciones: "sku_comentario_reacciones",
   fk: "sku_maestro_id",
   bucket: "producto-notas",
+  // Las fotos y videos reales del producto (7 nov 2026, pedido de Hernán; migración 0251 sube el bucket a 50 MB).
+  videos: true,
 };
 const MODULOS = ["inventario", "producto"];
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

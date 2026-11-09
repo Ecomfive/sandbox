@@ -4,12 +4,15 @@ import { useEffect, useId, useRef, useState, useTransition, type KeyboardEvent, 
 import { anilloFoco, fieldClass, labelClassSm } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
-import { SinFotoIcon } from "@/lib/nav-icons";
+import { PersonaIcon, SinFotoIcon } from "@/lib/nav-icons";
 import { numeroPublicacion } from "@/lib/publicaciones/publicacion";
 import {
   cuandoTarea,
   diaSiguiente,
+  ESTADOS_ELEGIBLES,
   ESTADOS_TAREA,
+  MAX_RESPONSABLES,
+  responsablesDe,
   etiquetaEstado,
   etiquetaPrioridad,
   iniciales,
@@ -26,7 +29,7 @@ import { claseCampoPanel, claseOpcionPanel, PanelCelda } from "../compras/panel-
 import { EditorFecha } from "../compras/celda-editable";
 import { marcarTareaHecha } from "./recomendaciones-actions";
 import { usePersonasTareas } from "./recomendacion-publicacion";
-import { actualizarTarea, buscarPublicacionesParaTarea, crearTareaPublicacion } from "./tareas-actions";
+import { actualizarTarea, buscarPublicacionesParaTarea, cambiarResponsableRecomendacion, crearTareaPublicacion } from "./tareas-actions";
 import type { PublicacionDeTarea } from "./tareas-datos";
 
 /** Hoy en Panamá (AAAA-MM-DD). */
@@ -62,6 +65,7 @@ export function CirculoEstado({ estado, className = "h-4 w-4" }: { estado: Estad
           <circle cx="8" cy="8" r="6.25" fill="none" stroke={c} strokeWidth="1.5" strokeDasharray={estado === "por_hacer" ? "2.2 1.6" : undefined} />
           {estado === "en_curso" && <path d="M8 3.6a4.4 4.4 0 0 1 0 8.8z" fill={c} />}
           {estado === "en_revision" && <path d="M8 3.6a4.4 4.4 0 1 1 -4.4 4.4H8z" fill={c} />}
+          {estado === "estancada" && <path d="M8 4.6v4.2M8 10.9v.4" stroke={c} strokeWidth="1.8" strokeLinecap="round" />}
         </>
       )}
     </svg>
@@ -95,7 +99,25 @@ interface OpcionLista {
 }
 
 /** La lista de un panel (estado, prioridad, persona): flechas, Enter y, si son muchas, un buscador. Guarda al elegir. */
-function PanelLista({ ancla, aria, opciones, elegida, alElegir, alCerrar }: { ancla: RefObject<HTMLElement | null>; aria: string; opciones: OpcionLista[]; elegida: string; alElegir: (v: string) => void; alCerrar: () => void }) {
+function PanelLista({
+  ancla,
+  aria,
+  opciones,
+  elegida,
+  alElegir,
+  alCerrar,
+  varias,
+}: {
+  ancla: RefObject<HTMLElement | null>;
+  aria: string;
+  opciones: OpcionLista[];
+  elegida: string;
+  alElegir: (v: string) => void;
+  alCerrar: () => void;
+  /** Con varias elegidas (las personas de una tarea): cada clic pone o quita una y el panel sigue abierto. */
+  varias?: string[];
+}) {
+  const marcada = (v: string) => (varias ? varias.includes(v) : v === elegida);
   const [busqueda, setBusqueda] = useState("");
   const conBuscador = opciones.length > 6;
   const q = busqueda.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -141,6 +163,7 @@ function PanelLista({ ancla, aria, opciones, elegida, alElegir, alCerrar }: { an
         ref={lista}
         role="listbox"
         aria-label={aria}
+        aria-multiselectable={varias ? true : undefined}
         aria-activedescendant={vistas.length ? `${id}-${activa}` : undefined}
         tabIndex={conBuscador ? -1 : 0}
         onKeyDown={teclas}
@@ -151,7 +174,7 @@ function PanelLista({ ancla, aria, opciones, elegida, alElegir, alCerrar }: { an
             key={o.valor || "vacio"}
             id={`${id}-${i}`}
             role="option"
-            aria-selected={o.valor === elegida}
+            aria-selected={marcada(o.valor)}
             onMouseEnter={() => setActiva(i)}
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => alElegir(o.valor)}
@@ -161,7 +184,7 @@ function PanelLista({ ancla, aria, opciones, elegida, alElegir, alCerrar }: { an
               {o.icono}
               <span className="truncate">{o.etiqueta}</span>
             </span>
-            {o.valor === elegida && (
+            {marcada(o.valor) && (
               <span aria-hidden="true" className="text-xs text-primario">
                 ✓
               </span>
@@ -176,7 +199,7 @@ function PanelLista({ ancla, aria, opciones, elegida, alElegir, alCerrar }: { an
 
 /**
  * Cambiar una tarea desde la fila o la ficha: se ve al instante y, si el servidor lo rechaza, vuelve como estaba con un aviso. Una tarea de una
- * recomendación solo se puede dar por hecha (como en Recomendaciones); lo demás se cambia en la recomendación.
+ * recomendación solo se da por hecha o se le cambia la persona (una sola); lo demás se cambia en la recomendación.
  */
 export function useCambiarTarea(alCambiar: (t: TareaVista, p?: PublicacionDeTarea) => void) {
   const { personas } = usePersonasTareas();
@@ -193,13 +216,24 @@ export function useCambiarTarea(alCambiar: (t: TareaVista, p?: PublicacionDeTare
       ...(cambio.plazo !== undefined ? { plazo: cambio.plazo } : {}),
       ...(cambio.publicacionId ? { publicacionId: cambio.publicacionId } : {}),
       ...(cambio.responsableId ? { responsableId: cambio.responsableId, responsableNombre: personas.find((p) => p.id === cambio.responsableId)?.nombre ?? t.responsableNombre } : {}),
+      ...(cambio.responsablesIds
+        ? {
+            responsableId: cambio.responsablesIds[0],
+            responsableNombre: personas.find((p) => p.id === cambio.responsablesIds![0])?.nombre ?? t.responsableNombre,
+            otros: cambio.responsablesIds.slice(1).map((id) => ({ id, nombre: personas.find((p) => p.id === id)?.nombre ?? "Sin nombre" })),
+          }
+        : {}),
       ...(cambio.estado ? { estado: cambio.estado, hechaEn: cambio.estado === "hecha" ? (t.hechaEn ?? ahora) : null, hechaPor: cambio.estado === "hecha" ? t.hechaPor : null } : {}),
       ...(cambio.archivar !== undefined ? { archivadaEn: cambio.archivar ? ahora : null } : {}),
     };
     alCambiar(nueva, publicacion);
     empezar(async () => {
       const r =
-        t.origen === "recomendacion"
+        t.origen === "recomendacion" && cambio.responsablesIds?.length
+          ? await cambiarResponsableRecomendacion(t.id, cambio.responsablesIds[0])
+              .then((x) => ({ ...x, tarea: undefined, publicacion: undefined }))
+              .catch(() => ({ error: "No se pudo. Inténtalo de nuevo.", tarea: undefined, publicacion: undefined }))
+          : t.origen === "recomendacion"
           ? await marcarTareaHecha(t.id, "")
               .then((x) => ({ ...x, tarea: undefined, publicacion: undefined }))
               .catch(() => ({ error: "No se pudo. Inténtalo de nuevo.", tarea: undefined, publicacion: undefined }))
@@ -224,7 +258,8 @@ export function MenuEstado({ t, puedeEscribir, conEstados, alElegir, pildora = f
   // Una de una recomendación (o sin la migración 0178) solo va de Por hacer a Hecha; una hecha de una recomendación ya no se reabre.
   const soloHecha = t.origen === "recomendacion" || !conEstados;
   const bloqueada = !puedeEscribir || (t.origen === "recomendacion" && t.estado === "hecha");
-  const opciones = (soloHecha ? ESTADOS_TAREA.filter((e) => e.valor === "hecha" || e.valor === t.estado || (t.origen === "manual" && e.valor === "por_hacer")) : ESTADOS_TAREA).map((e) => ({
+  // «Estancada» no se elige: la pone el sistema a los 3 días de vencida (8 nov 2026).
+  const opciones = (soloHecha ? ESTADOS_TAREA.filter((e) => e.valor === "hecha" || e.valor === t.estado || (t.origen === "manual" && e.valor === "por_hacer")) : ESTADOS_ELEGIBLES).map((e) => ({
     valor: e.valor,
     etiqueta: e.etiqueta,
     icono: <CirculoEstado estado={e.valor} />,
@@ -326,31 +361,59 @@ export function MenuPrioridad({ t, puedeEscribir, alElegir, conTexto = false }: 
   );
 }
 
-/** A quién le toca: el círculo con sus iniciales, que abre la lista de personas (con buscador). */
-export function MenuResponsable({ t, puedeEscribir, alElegir, conTexto = false }: { t: TareaVista; puedeEscribir: boolean; alElegir: (id: string) => void; conTexto?: boolean }) {
+/** Las iniciales de quienes hacen la tarea, encimadas (hasta 3 y «+N»). */
+export function InicialesVarias({ personas }: { personas: { id: string; nombre: string }[] }) {
+  // Sin nadie: un círculo punteado con una persona (8 nov 2026, pedido de Alcides: el «?» no decía nada).
+  if (!personas.length)
+    return (
+      <span aria-hidden="true" className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-dashed border-border-control text-muted-foreground">
+        <PersonaIcon className="h-4 w-4" />
+      </span>
+    );
+  const vistas = personas.slice(0, 3);
+  return (
+    <span className="inline-flex shrink-0 items-center">
+      {vistas.map((p, i) => (
+        <Iniciales key={p.id} nombre={p.nombre} className={`h-7 w-7 text-[11px] ring-2 ring-card ${i ? "-ml-2" : ""}`} />
+      ))}
+      {personas.length > 3 && <span className="-ml-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-muted text-[10px] font-semibold text-muted-foreground ring-2 ring-card">+{personas.length - 3}</span>}
+    </span>
+  );
+}
+
+/**
+ * Quién hace la tarea: las iniciales de cada persona, que abren la lista para marcar o desmarcar (8 nov 2026, pedido de Alcides: varios responsables, hasta
+ * `MAX_RESPONSABLES`). Cada clic guarda; la primera marcada es la principal. No se puede dejar sin nadie. Una tarea de una recomendación tiene una sola persona.
+ */
+export function MenuResponsable({ t, puedeEscribir, alElegir, conTexto = false }: { t: TareaVista; puedeEscribir: boolean; alElegir: (ids: string[]) => void; conTexto?: boolean }) {
   const { personas, yo } = usePersonasTareas();
+  const { mostrarToast } = useToast();
   const ancla = useRef<HTMLButtonElement>(null);
   const [abierto, setAbierto] = useState(false);
-  const nombre = t.responsableNombre ?? "Sin asignar";
+  const quienes = responsablesDe(t);
+  const nombre = quienes.length ? quienes.map((p) => p.nombre).join(", ") : "Sin asignar";
+  // Una de una recomendación tiene una sola persona: se cambia, no se suman otras (8 nov 2026). Una hecha ya no se cambia.
+  const unaSola = t.origen === "recomendacion";
   const contenido = (
     <>
-      <Iniciales nombre={t.responsableNombre} />
-      {conTexto && <span className="truncate">{nombre}</span>}
+      <InicialesVarias personas={quienes} />
+      {conTexto && <span className={`truncate ${quienes.length ? "" : "text-muted-foreground"}`}>{quienes.length ? nombre : "Persona asignada"}</span>}
     </>
   );
-  if (!puedeEscribir || t.origen === "recomendacion" || personas.length === 0)
+  if (!puedeEscribir || (unaSola && t.estado === "hecha") || personas.length === 0)
     return conTexto ? (
       <span className="inline-flex min-w-0 items-center gap-2 text-sm">{contenido}</span>
     ) : (
       <Tooltip texto={nombre}>
-        <span role="img" tabIndex={0} aria-label={`Le toca a ${nombre}`} className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${anilloFoco}`}>
+        <span role="img" tabIndex={0} aria-label={`Le toca a ${nombre}`} className={`inline-flex h-8 min-w-8 shrink-0 items-center justify-center rounded-md ${anilloFoco}`}>
           {contenido}
         </span>
       </Tooltip>
     );
+  const ids = quienes.map((p) => p.id);
   return (
     <>
-      <Tooltip texto={conTexto ? "Cambiar responsable" : `${nombre} · Cambiar`}>
+      <Tooltip texto={quienes.length ? (conTexto ? "Cambiar quién la hace" : `${nombre} · Cambiar`) : "Asignar persona"}>
         <button
           ref={ancla}
           type="button"
@@ -358,7 +421,7 @@ export function MenuResponsable({ t, puedeEscribir, alElegir, conTexto = false }
           aria-haspopup="listbox"
           aria-expanded={abierto}
           aria-label={`Le toca a ${nombre}. Cambiar quién hace «${t.titulo}»`}
-          className={`inline-flex min-w-0 shrink-0 items-center gap-2 rounded-md hover:bg-muted ${conTexto ? "min-h-8 px-1.5 text-sm" : "h-8 w-8 justify-center"} ${anilloFoco}`}
+          className={`inline-flex min-w-0 shrink-0 items-center gap-2 rounded-md hover:bg-muted ${conTexto ? "min-h-8 px-1.5 text-sm" : "h-8 min-w-8 justify-center"} ${anilloFoco}`}
         >
           {contenido}
         </button>
@@ -366,13 +429,25 @@ export function MenuResponsable({ t, puedeEscribir, alElegir, conTexto = false }
       {abierto && (
         <PanelLista
           ancla={ancla}
-          aria="Quién hace la tarea"
+          aria="Quiénes hacen la tarea"
           opciones={personas.map((p) => ({ valor: p.id, etiqueta: p.id === yo ? `${p.nombre} (yo)` : p.nombre, icono: <Iniciales nombre={p.nombre} className="h-6 w-6 text-[10px]" /> }))}
-          elegida={t.responsableId ?? ""}
+          elegida={unaSola ? (ids[0] ?? "") : ""}
+          varias={unaSola ? undefined : ids}
           alCerrar={() => setAbierto(false)}
           alElegir={(v) => {
-            setAbierto(false);
-            if (v && v !== t.responsableId) alElegir(v);
+            if (!v) return;
+            if (unaSola) {
+              setAbierto(false);
+              if (v !== ids[0]) alElegir([v]);
+              return;
+            }
+            if (ids.includes(v)) {
+              if (ids.length === 1) return mostrarToast("La tarea tiene que tener al menos una persona.", "destructive");
+              alElegir(ids.filter((x) => x !== v));
+            } else {
+              if (ids.length >= MAX_RESPONSABLES) return mostrarToast(`Hasta ${MAX_RESPONSABLES} personas por tarea.`, "destructive");
+              alElegir([...ids, v]);
+            }
           }}
         />
       )}
@@ -676,7 +751,7 @@ export function FilaTarea({
         </span>
       )}
       <span className={`col-start-2 flex items-center gap-1 ${conProducto ? "lg:col-start-auto lg:contents" : "sm:col-start-auto sm:contents"}`}>
-        <MenuResponsable t={t} puedeEscribir={puedeEscribir} alElegir={(responsableId) => cambiar(t, { responsableId })} />
+        <MenuResponsable t={t} puedeEscribir={puedeEscribir} alElegir={(responsablesIds) => cambiar(t, { responsablesIds })} />
         <span className="min-w-0">{!hecha && <MenuFecha t={t} hoy={hoy} puedeEscribir={puedeEscribir} alElegir={(plazo) => cambiar(t, { plazo })} />}</span>
         {conEstados ? <MenuPrioridad t={t} puedeEscribir={puedeEscribir} alElegir={(prioridad) => cambiar(t, { prioridad })} /> : <span />}
       </span>
