@@ -53,6 +53,7 @@ export function FichaProductoEmbebida({ productoId, alCerrar }: { productoId: st
       codigoPais={cargado.codigoPais}
       puedeEscribir={cargado.puedeEscribir}
       puedeEliminar={cargado.puedeEliminar}
+      puedeUnir={cargado.puedeUnir}
       referenciasTest={cargado.referenciasTest}
       alIr={() => {}}
       alCerrar={alCerrar}

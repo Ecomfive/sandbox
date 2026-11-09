@@ -73,6 +73,7 @@ export function FichaProducto({
   orden,
   puedeEscribir,
   puedeEliminar,
+  puedeUnir,
   referenciasTest,
   alIr,
   alCerrar,
@@ -86,6 +87,8 @@ export function FichaProducto({
   puedeEscribir: boolean;
   /** Solo un administrador con edición en Producto: elimina el producto de verdad (si nada depende de él) o lo une con un duplicado. */
   puedeEliminar: boolean;
+  /** Puede unir este producto con otro duplicado (administrador o con el módulo «Unir productos duplicados»). */
+  puedeUnir: boolean;
   /** El promedio de los winners: la marca negra del «Resultado del test». */
   referenciasTest: ReferenciasTest;
   alIr: (id: string) => void;
@@ -155,7 +158,7 @@ export function FichaProducto({
   }
 
   // Una variante o un producto con variantes no se une con otro: la base se negaría.
-  const sePuedeUnir = !!producto && puedeEliminar && !producto.padre && producto.variantes.length === 0;
+  const sePuedeUnir = !!producto && puedeUnir && !producto.padre && producto.variantes.length === 0;
   const esTest = clase === "test";
   return (
     <Ventana

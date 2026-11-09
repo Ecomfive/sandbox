@@ -78,6 +78,7 @@ export const AREAS_ACCESO: AreaAcceso[] = [
       { clave: "compras", etiqueta: "Compras" },
       { clave: "compras-por-pais", etiqueta: "Gestión por país (Compras)" },
       { clave: "producto", etiqueta: "Producto" },
+      { clave: "unir-productos", etiqueta: "Unir productos duplicados" },
       { clave: "wms-productos", etiqueta: "Ficha producto Shopify" },
       { clave: "wms-productos-dropi", etiqueta: "Ficha producto Dropi" },
       { clave: "publicaciones-dropi", etiqueta: "Gestión de IDs Dropi" },
@@ -121,7 +122,7 @@ export const MODULOS_ACCESO: ModuloAcceso[] = AREAS_ACCESO.flatMap((a) => a.modu
 export const etiquetaDeModulo = (clave: string): string => MODULOS_ACCESO.find((m) => m.clave === clave)?.etiqueta ?? clave;
 
 /** Los módulos con datos sensibles (nómina, bancos, retiros, márgenes) y los que dan poder de administración: llevan su marca en la matriz. */
-export const MODULOS_SENSIBLES: ReadonlySet<string> = new Set(["retiros", "conciliaciones", "extractos", "productos", "gastos", "usuarios", "configuracion", "rendimiento"]);
+export const MODULOS_SENSIBLES: ReadonlySet<string> = new Set(["retiros", "conciliaciones", "extractos", "productos", "gastos", "usuarios", "configuracion", "rendimiento", "unir-productos"]);
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Lo que se puede afinar dentro de un módulo

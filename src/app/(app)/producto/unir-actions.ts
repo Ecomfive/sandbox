@@ -3,16 +3,17 @@
 import { revalidatePath } from "next/cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createServiceClient } from "@/lib/supabase/server";
-import { requireModuloEscritura } from "@/lib/auth";
-import { esAdministrador } from "@/lib/permisos/acceso";
+import { requireModulo } from "@/lib/auth";
+import { puedeUnirProductos } from "@/lib/permisos/unir-productos";
 import { elegirConservado, lineasUnidas, mensajeErrorUnir, type CandidatoUnir, type ProductoUnido, type ResumenUnion } from "@/lib/wms/unir-productos";
 
-// Unir dos productos duplicados desde la ficha (28 oct 2026). Solo un administrador con edición en Producto: el que se queda es siempre
+// Unir dos productos duplicados desde la ficha (28 oct 2026). Solo un administrador o quien tenga el módulo «Unir productos duplicados» (9 nov 2026,
+// por persona; ver `puedeUnirProductos`): el que se queda es siempre
 // el más viejo (lo decide el servidor, no el navegador) y la base (`wms_unir_productos`, migración 0121) pasa a él todo lo vinculado al
 // otro y borra el sobrante en una sola transacción, o se niega y no cambia nada. Con `p_aplicar = false` solo simula.
 
 const MODULO = "producto";
-const SOLO_ADMIN = "Solo un administrador puede unir productos.";
+const SIN_PERMISO = "No tienes permiso para unir productos.";
 const ES_UUID = (v: unknown): v is string => typeof v === "string" && /^[0-9a-fA-F-]{36}$/.test(v);
 const BUCKET_FOTOS = "wms-productos";
 const PREFIJO_FOTOS = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${BUCKET_FOTOS}/`;
@@ -43,8 +44,8 @@ const aProducto = (f: FilaSku): ProductoUnido => ({
 
 /** Los productos que se pueden unir con el abierto: del mismo tipo (simple o combo), sin variantes y distintos de él. Busca por nombre, SKU o N.º. */
 export async function buscarParaUnir(idActual: string, consulta: string): Promise<{ candidatos: CandidatoUnir[] } | { error: string }> {
-  const usuario = await requireModuloEscritura(MODULO);
-  if (!esAdministrador(usuario)) return { error: SOLO_ADMIN };
+  const usuario = await requireModulo(MODULO);
+  if (!puedeUnirProductos(usuario)) return { error: SIN_PERMISO };
   if (!ES_UUID(idActual)) return { error: "Producto no válido." };
   const t = String(consulta ?? "").trim().slice(0, 80);
   if (t.length < 2) return { candidatos: [] };
@@ -95,8 +96,8 @@ async function llamarUnion(supabase: SupabaseClient, conservar: FilaSku, elimina
 
 /** Qué pasaría al unir los dos productos, sin cambiar nada: cuál queda, cuál se va y qué pasa al que queda. */
 export async function simularUnion(idA: string, idB: string): Promise<ResumenUnion | { error: string }> {
-  const usuario = await requireModuloEscritura(MODULO);
-  if (!esAdministrador(usuario)) return { error: SOLO_ADMIN };
+  const usuario = await requireModulo(MODULO);
+  if (!puedeUnirProductos(usuario)) return { error: SIN_PERMISO };
   const p = await preparar(idA, idB);
   if ("error" in p) return p;
   const r = await llamarUnion(p.supabase, p.conservar, p.eliminar, false);
@@ -110,8 +111,8 @@ export async function simularUnion(idA: string, idB: string): Promise<ResumenUni
  * la base se la pasa y no se borra).
  */
 export async function unirProductos(idA: string, idB: string): Promise<ResumenUnion | { error: string }> {
-  const usuario = await requireModuloEscritura(MODULO);
-  if (!esAdministrador(usuario)) return { error: SOLO_ADMIN };
+  const usuario = await requireModulo(MODULO);
+  if (!puedeUnirProductos(usuario)) return { error: SIN_PERMISO };
   const p = await preparar(idA, idB);
   if ("error" in p) return p;
   const { supabase, conservar, eliminar } = p;

@@ -20,6 +20,7 @@ export const MODULOS: Modulo[] = [
   { clave: "inteligencia-competitiva", etiqueta: "Inteligencia competitiva" },
   { clave: "analisis-competencia", etiqueta: "Análisis de competencia" },
   { clave: "producto", etiqueta: "Producto" },
+  { clave: "unir-productos", etiqueta: "Unir productos duplicados (Producto)" },
   { clave: "wms-bodegas", etiqueta: "Bodegas (WMS)" },
   { clave: "wms-ubicaciones", etiqueta: "Ubicaciones (WMS)" },
   { clave: "wms-productos", etiqueta: "Ficha producto Shopify (WMS)" },

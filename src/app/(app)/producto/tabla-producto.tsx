@@ -47,6 +47,7 @@ export function TablaProducto({
   compuestoInicial = null,
   puedeEscribir,
   puedeEliminar,
+  puedeUnir,
   referenciasTest,
 }: {
   productos: FilaProducto[];
@@ -59,6 +60,7 @@ export function TablaProducto({
   puedeEscribir: boolean;
   /** Solo un administrador: elimina el producto de verdad (si nada depende de él). */
   puedeEliminar: boolean;
+  puedeUnir: boolean;
   referenciasTest: ReferenciasTest;
 }) {
   // Qué producto está abierto y en qué orden se veían las filas al abrirlo (para las flechas de anterior y siguiente).
@@ -104,6 +106,7 @@ export function TablaProducto({
           codigoPais={codigoPais}
           puedeEscribir={puedeEscribir}
           puedeEliminar={puedeEliminar}
+          puedeUnir={puedeUnir}
           referenciasTest={referenciasTest}
           alIr={(id) => setAbierto((a) => (a ? { ...a, id } : a))}
           alCerrar={() => setAbierto(null)}
