@@ -41,6 +41,15 @@ export async function cargarSugerencias(
     supabase.from("dropi_publicaciones").select("id, foto_huella").eq("pais_id", paisId).not("foto_huella", "is", null).limit(5000),
   ]);
   const skus = new Map<string, SkuResumen>(skusR.map((s) => [s.id, { id: s.id, codigo: s.codigo, nombre: s.nombre, foto: s.foto_url, tipo: s.tipo, numero: s.numero ?? null, barras: s.codigo_barras || null }]));
+  // Una publicación vinculada a una variante (10 nov 2026: «Base Magica Zephoco Natural» de Costa Rica, a BASE/MAQUILLAJE/ZEPHOCO/NATURAL): la lista de
+  // arriba trae solo los productos sin padre, así que la variante no estaba y la ficha la mostraba sin vincular. Se suman las que falten; no entran en
+  // las sugerencias, que siguen proponiendo solo productos.
+  const faltan = [...new Set(publicaciones.map((p) => p.skuId).filter((id): id is string => !!id && !skus.has(id)))];
+  for (let i = 0; i < faltan.length; i += 200) {
+    const { data } = await supabase.from("skus_maestros").select("id, codigo, nombre, tipo, foto_url, numero, codigo_barras").in("id", faltan.slice(i, i + 200));
+    for (const s of (data ?? []) as { id: string; codigo: string; nombre: string; tipo: string; foto_url: string | null; numero: number | null; codigo_barras: string | null }[])
+      skus.set(s.id, { id: s.id, codigo: s.codigo, nombre: s.nombre, foto: s.foto_url, tipo: s.tipo, numero: s.numero ?? null, barras: s.codigo_barras || null });
+  }
   const enDropi = new Map((catalogoR.data ?? []).map((c) => [String(c.dropi_producto_id), [c.sku, c.nombre].filter((x): x is string => !!x)]));
   const huella = new Map((huellasR.error ? [] : (huellasR.data ?? [])).map((h) => [h.id as string, h.foto_huella as string]));
   const ctx = prepararContexto(
