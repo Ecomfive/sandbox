@@ -1,11 +1,13 @@
 "use client";
 
 import { useId, useState, useTransition, type KeyboardEvent } from "react";
+import { BotonAccion } from "@/components/ui/boton-accion";
 import { Seccion } from "@/components/ui/seccion-ficha";
 import { anilloFoco, fieldClassSm } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
-import { CandadoAbiertoIcon, LapizIcon, PapeleraIcon } from "@/lib/nav-icons";
+import { Ventana } from "@/components/ui/ventana";
+import { CandadoAbiertoIcon, CorreoIcon, LapizIcon, PapeleraIcon } from "@/lib/nav-icons";
 import { MAX_UNIDADES_RESERVA, type ReservaDropi } from "@/lib/publicaciones/reservas-dropi";
 import { cambiarReservaDropi } from "./actions";
 import type { FilaPublicacion } from "./def-publicaciones";
@@ -182,6 +184,101 @@ function AgregarReserva({ p }: { p: FilaPublicacion }) {
         </button>
       </div>
     </div>
+  );
+}
+
+/** Por qué no se puede privatizar a un correo desde esta publicación (null = se puede). La misma regla que el bloque «Stock reservado por correo». */
+export function motivoPrivatizarCorreo(p: FilaPublicacion, puedeEscribir: boolean): string | null {
+  if (!puedeEscribir) return "No tienes permiso para modificar este módulo";
+  if (p.stockPorId.some((x) => x.variable)) return "Tiene variaciones: la reserva es por variación y se hace en Dropi";
+  if (!p.dropiId.trim()) return "No tiene ID de Dropi";
+  if (p.sinPublicar) return "Todavía no está publicada en Dropi";
+  if (p.archivada) return "Está archivada";
+  if (p.duplicadaDe) return "Es una duplicada";
+  if (p.tipoDropi === "privado") return "Es un producto privado: sus correos se cambian en «Stock reservado por correo»";
+  return null;
+}
+
+/** La ventana de «Privatizar a un correo»: un correo (nuevo o de los que ya tienen reserva) y el **total** que debe quedar para él. */
+function VentanaPrivatizarCorreo({ p, alCerrar }: { p: FilaPublicacion; alCerrar: () => void }) {
+  const [correo, setCorreo] = useState("");
+  const [unidades, setUnidades] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const { pendiente, pedir } = usePedirReserva(p);
+  const idCorreo = useId();
+  const idUnidades = useId();
+  const guardar = () => {
+    const n = Number(unidades);
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo.trim())) return setError("Escribe el correo con que el dropshipper entra a Dropi.");
+    if (!Number.isInteger(n) || n < 1 || n > MAX_UNIDADES_RESERVA) return setError("Escribe el total de unidades que debe quedar reservado (1 o más).");
+    pedir({ correo: correo.trim(), unidades: n }, alCerrar, setError);
+  };
+  const enter = teclas(guardar, alCerrar);
+  return (
+    <Ventana abierto alCerrar={alCerrar} titulo="Privatizar a un correo" ancho="md">
+      <div className="flex flex-col gap-4 p-5 text-sm">
+        <p className="m-0 truncate font-medium">
+          {p.nombre} <span className="font-normal text-muted-foreground">· ID {p.dropiId}</span>
+        </p>
+        {p.reservas.length > 0 && (
+          <ul className="m-0 flex list-none flex-wrap gap-2 p-0">
+            {p.reservas.map((r, i) => (
+              <li key={r.id ?? `${r.correo}-${i}`}>
+                <button
+                  type="button"
+                  className={`${botonClaro} gap-1.5`}
+                  disabled={!r.correo}
+                  aria-label={`Cambiar el total reservado a ${quienReserva(r)} (hoy ${r.unidades} unidades)`}
+                  onClick={() => {
+                    setCorreo(r.correo ?? "");
+                    setUnidades(String(r.unidades));
+                    setError(null);
+                  }}
+                >
+                  {quienReserva(r)} · {r.unidades.toLocaleString("es-PA")} u.
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_8rem]">
+          <label htmlFor={idCorreo} className="flex flex-col gap-1 text-xs text-muted-foreground">
+            Correo del dropshipper en Dropi
+            <input id={idCorreo} type="email" autoFocus value={correo} onChange={(e) => setCorreo(e.target.value)} onKeyDown={enter} placeholder="Ej: tienda@correo.com" className={fieldClassSm} />
+          </label>
+          <label htmlFor={idUnidades} className="flex flex-col gap-1 text-xs text-muted-foreground">
+            Total de unidades
+            <input id={idUnidades} type="number" min={1} max={MAX_UNIDADES_RESERVA} inputMode="numeric" value={unidades} onChange={(e) => setUnidades(e.target.value)} onKeyDown={enter} placeholder="Ej: 99" className={`${fieldClassSm} text-right tabular-nums`} />
+          </label>
+        </div>
+        {error && (
+          <p role="alert" className="m-0 text-xs text-destructive">
+            {error}
+          </p>
+        )}
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className={botonOscuro} disabled={pendiente} onClick={guardar}>
+            {pendiente ? "Guardando…" : "Dejar pendiente para Dropi"}
+          </button>
+          <button type="button" className={botonClaro} disabled={pendiente} onClick={alCerrar}>
+            Cancelar
+          </button>
+        </div>
+      </div>
+    </Ventana>
+  );
+}
+
+/** El botón de la barra de la ficha: abre la ventana para privatizar (reservar) a un correo con el total de unidades. */
+export function BotonPrivatizarCorreo({ p, deshabilitado }: { p: FilaPublicacion; deshabilitado: boolean }) {
+  const [abierta, setAbierta] = useState(false);
+  return (
+    <>
+      <BotonAccion icono={CorreoIcon} tono="neutro" disabled={deshabilitado} onClick={() => setAbierta(true)}>
+        Privatizar a un correo
+      </BotonAccion>
+      {abierta && <VentanaPrivatizarCorreo p={p} alCerrar={() => setAbierta(false)} />}
+    </>
   );
 }
 
