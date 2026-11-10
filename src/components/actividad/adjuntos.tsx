@@ -9,7 +9,7 @@ import { ACEPTAR_ADJUNTOS, ACEPTAR_ADJUNTOS_CON_VIDEO, iconoArchivo, MAX_ADJUNTO
 import { AdjuntoIcon, CerrarIcon } from "@/lib/nav-icons";
 import { supabase } from "@/lib/supabase/client";
 import type { AdjuntoActividad, AdjuntoSubido } from "@/lib/comentarios/tipos";
-import { useAccionesActividad } from "./contexto";
+import { useAccionesActividad, useAccionesActividadOpcional } from "./contexto";
 
 /** Un archivo que se está adjuntando al comentario que se escribe: sube apenas se elige, sin esperar a «Comentar». */
 export interface Pendiente {
@@ -137,7 +137,7 @@ export function archivosDe(origen: ClipboardEvent | DragEvent): File[] {
 /** El botón «Adjuntar»: abre el selector de archivos (imágenes, PDF, Excel, Word, PowerPoint, CSV y texto; y videos donde el módulo los acepta). */
 export function BotonAdjuntar({ alElegir, deshabilitado }: { alElegir: (archivos: File[]) => void; deshabilitado?: boolean }) {
   const entrada = useRef<HTMLInputElement>(null);
-  const { videos } = useAccionesActividad();
+  const videos = useAccionesActividadOpcional()?.videos ?? false;
   return (
     <>
       <input
