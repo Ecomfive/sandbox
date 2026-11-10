@@ -195,7 +195,6 @@ export function motivoPrivatizarCorreo(p: FilaPublicacion, puedeEscribir: boolea
   if (p.sinPublicar) return "Todavía no está publicada en Dropi";
   if (p.archivada) return "Está archivada";
   if (p.duplicadaDe) return "Es una duplicada";
-  if (p.tipoDropi === "privado") return "Es un producto privado: sus correos se cambian en «Stock reservado por correo»";
   return null;
 }
 
@@ -290,7 +289,7 @@ export function BotonPrivatizarCorreo({ p, deshabilitado }: { p: FilaPublicacion
 export function ReservasPublicacion({ p, puedeEscribir }: { p: FilaPublicacion; puedeEscribir: boolean }) {
   const variable = p.stockPorId.some((x) => x.variable);
   const editable = puedeEscribir && !variable && !!p.dropiId.trim() && !p.sinPublicar && !p.archivada && !p.duplicadaDe;
-  const sePuedeAgregar = editable && p.tipoDropi !== "privado";
+  const sePuedeAgregar = editable;
   if (!p.reservas.length && !p.reservasPendientes.length && !sePuedeAgregar) return null;
   const total = p.reservas.reduce((t, r) => t + r.unidades, 0);
   return (
