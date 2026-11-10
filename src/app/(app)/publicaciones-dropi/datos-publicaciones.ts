@@ -3,7 +3,7 @@ import { descontinuadosEnPais } from "@/lib/producto/descontinuado-pais";
 import { after } from "next/server";
 import { tipoSegunDropi } from "@/lib/publicaciones/reservas-dropi";
 import { tareaVisiblePara } from "@/lib/publicaciones/tareas";
-import { accionesPublicacion, enDropi, esBodegaDropi, estaArchivada, necesitaRepublicar, vendePoco } from "@/lib/publicaciones/automatico";
+import { accionesPublicacion, BODEGAS_CONOCIDAS_POR_PAIS, enDropi, esBodegaDropi, estaArchivada, necesitaRepublicar, vendePoco } from "@/lib/publicaciones/automatico";
 import { normalizarDatosCrear, type OpcionesCrear } from "@/lib/publicaciones/crear-dropi";
 import { monedaPublicaciones } from "@/lib/publicaciones/moneda";
 import { cargarCambiosPrecio, cargarCompetidores, cargarNuestrosEnDropi, competidorMasBarato, competidorMinimo, competidoresEquivalentes, ultimoCambioDe } from "@/lib/publicaciones/competencia-publicaciones";
@@ -37,9 +37,10 @@ const idsDropi = (d: Fila) => (String(d.dropi_id ?? "").match(/\d{3,6}/g) ?? [])
 type Fila = Record<string, unknown> & { id: string };
 
 /** Lo que el formulario de publicar en Dropi puede ofrecer: las categorías de nuestros productos en Dropi y las bodegas del proveedor (no la B280, que es de Dropi). */
-function opcionesParaCrear(productos: Iterable<ProductoProveedor>): OpcionesCrear {
+function opcionesParaCrear(productos: Iterable<ProductoProveedor>, codigoPais: string): OpcionesCrear {
   const categorias = new Set<string>();
   const bodegas = new Map<number, string>();
+  for (const b of BODEGAS_CONOCIDAS_POR_PAIS[codigoPais.toUpperCase()] ?? []) bodegas.set(b.id, b.nombre);
   for (const p of productos) {
     for (const c of p.categorias) if (c.trim()) categorias.add(c.trim());
     for (const b of p.bodegas) if (!esBodegaDropi(b.id)) bodegas.set(b.id, b.nombre);
@@ -236,7 +237,8 @@ export interface DatosPublicaciones {
 export async function cargarPublicaciones(supabase: SupabaseClient, paisId: string, usuario: UsuarioActual): Promise<DatosPublicaciones | null> {
   const hoy = new Date().toLocaleDateString("en-CA", { timeZone: "America/Panama" });
   // La moneda del país, para los textos y el redondeo de las recomendaciones de precio (Costa Rica en colones).
-  const monedaPais = Promise.resolve(supabase.from("paises").select("codigo").eq("id", paisId).maybeSingle()).then(({ data }) => monedaPublicaciones(String(data?.codigo ?? "PA"), {}));
+  const codigoPaisP = Promise.resolve(supabase.from("paises").select("codigo").eq("id", paisId).maybeSingle()).then(({ data }) => String(data?.codigo ?? "PA"));
+  const monedaPais = codigoPaisP.then((codigo) => monedaPublicaciones(codigo, {}));
   const [filasR, numerosR, reglas, { decisiones, conTareas }, personas] = await Promise.all([
     traerTodasConError<Fila>((desde, hasta) =>
       supabase
@@ -567,7 +569,7 @@ export async function cargarPublicaciones(supabase: SupabaseClient, paisId: stri
   }
   if (cumplidas.length && conTareas) after(() => guardarCumplidas(supabase, cumplidas));
 
-  const opcionesCrear = opcionesParaCrear(proveedor?.productos.values() ?? []);
+  const opcionesCrear = opcionesParaCrear(proveedor?.productos.values() ?? [], await codigoPaisP);
   const sinPublicacion = proveedor
     ? enDropiSinPublicacion(
         proveedor.productos.values(),
