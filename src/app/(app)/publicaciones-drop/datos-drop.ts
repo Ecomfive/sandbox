@@ -1,3 +1,4 @@
+import { compraQueVale, costoDrop, type CostoCompra, type ProductoFamilia } from "@/lib/publicaciones-drop/costo";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { UsuarioActual } from "@/lib/auth";
 import { cargarEnCamino } from "@/lib/publicaciones/en-camino-datos";
@@ -88,6 +89,59 @@ export async function cargarDatosDrop(supabase: SupabaseClient, pais: { id: stri
       .order("actualizado_en", { ascending: false });
     for (const p of data ?? []) if (!costos.has(p.sku_maestro_id as string)) costos.set(p.sku_maestro_id as string, Number(p.costo_mercancia));
   }
+  // Una variante sin costo toma el de otra del mismo producto (10 nov 2026, `costoDrop`): se traen sus hermanos y su principal, con su costo en Dropi del país.
+  const familia: ProductoFamilia[] = [];
+  if (skuIds.length) {
+    const { data: vinculados } = await supabase.from("skus_maestros").select("id, codigo, padre_id").in("id", skuIds);
+    const grupos = [...new Set((vinculados ?? []).map((v) => (v.padre_id as string | null) ?? (v.id as string)))];
+    const { data: parientes } = grupos.length
+      ? await supabase.from("skus_maestros").select("id, codigo, padre_id").or(`id.in.(${grupos.join(",")}),padre_id.in.(${grupos.join(",")})`)
+      : { data: [] };
+    for (const f of parientes ?? []) familia.push({ id: f.id as string, codigo: f.codigo as string, padreId: (f.padre_id as string | null) ?? null });
+    const faltan = familia.map((f) => f.id).filter((id) => !costos.has(id));
+    if (faltan.length) {
+      const { data } = await supabase
+        .from("dropi_publicaciones")
+        .select("sku_maestro_id, costo_mercancia, actualizado_en")
+        .eq("pais_id", pais.id)
+        .in("sku_maestro_id", faltan)
+        .not("costo_mercancia", "is", null)
+        .order("actualizado_en", { ascending: false });
+      for (const p of data ?? []) if (!costos.has(p.sku_maestro_id as string)) costos.set(p.sku_maestro_id as string, Number(p.costo_mercancia));
+    }
+  }
+  // El de Compras de cada producto (o de su principal): lo que costó por unidad en la orden más reciente, del país si hay (10 nov 2026, pedido de Hernán).
+  const compraDe = new Map<string, CostoCompra>();
+  {
+    const ids = [...new Set([...skuIds, ...familia.map((f) => f.id)])];
+    if (ids.length) {
+      const { data } = await supabase
+        .from("wms_compra_items")
+        .select("sku_maestro_id, costo_unitario, compra:wms_compras!inner(pais_id, codigo, creado_en, anulada_en)")
+        .in("sku_maestro_id", ids)
+        .gt("costo_unitario", 0)
+        .is("compra.anulada_en", null);
+      const porSku = new Map<string, { usd: number; orden: string; paisId: string; fecha: string }[]>();
+      for (const l of data ?? []) {
+        const c = uno(l.compra as { pais_id: string; codigo: string | null; creado_en: string } | { pais_id: string; codigo: string | null; creado_en: string }[] | null);
+        if (!c) continue;
+        const lista = porSku.get(l.sku_maestro_id as string) ?? [];
+        lista.push({ usd: Number(l.costo_unitario), orden: c.codigo ?? "OC", paisId: c.pais_id, fecha: c.creado_en });
+        porSku.set(l.sku_maestro_id as string, lista);
+      }
+      for (const [sku, lineas] of porSku) {
+        const v = compraQueVale(lineas, pais.id);
+        if (v) compraDe.set(sku, v);
+      }
+    }
+  }
+  const padreDe = new Map(familia.map((f) => [f.id, f.padreId]));
+  // El escrito a mano (migración 0267); sin la migración, ninguno.
+  const manuales = new Map<string, number>();
+  {
+    const { data, error } = await supabase.from("drop_publicaciones").select("id, costo_manual").eq("pais_id", pais.id).not("costo_manual", "is", null);
+    if (!error) for (const f of data ?? []) manuales.set(f.id as string, Number(f.costo_manual));
+  }
 
   // El fulfillment de Drop del país, pasado a la moneda de las publicaciones si se escribió en otra.
   const plataforma = await leerFulfillmentPlataforma(supabase, pais.id, "drop");
@@ -103,7 +157,8 @@ export async function cargarDatosDrop(supabase: SupabaseClient, pais: { id: stri
 
   const publicaciones = filas.map((f): FilaPublicacionDrop => {
     const producto = aProducto(uno(f.producto));
-    const costo = producto ? (costos.get(producto.id) ?? null) : null;
+    const compra = producto ? (compraDe.get(producto.id) ?? compraDe.get(padreDe.get(producto.id) ?? "") ?? null) : null;
+    const { costo, origen: costoOrigen, de: costoDe } = costoDrop(producto?.id ?? null, costos, familia, manuales.get(f.id) ?? null, compra, moneda.porUsd);
     const precio = f.precio === null ? null : Number(f.precio);
     const precioProveedor = f.precio_proveedor == null ? null : Number(f.precio_proveedor);
     // Lo que recibimos es el precio sin la comisión de Drop: si ya se leyó, el margen va con ese (10 nov 2026); si no, con el de «Mis productos».
@@ -131,6 +186,8 @@ export async function cargarDatosDrop(supabase: SupabaseClient, pais: { id: stri
       creadoEnDrop: f.creado_en_drop,
       ultimaVez: f.ultima_vez,
       costo,
+      costoOrigen,
+      costoDe,
       utilidad: m?.utilidad ?? null,
       margen: m?.margen ?? null,
       fulfillment,

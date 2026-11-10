@@ -62,8 +62,11 @@ export interface FilaPublicacionDrop {
   /** Cuándo se creó en Drop y cuándo la vio la última lectura. */
   creadoEnDrop: string | null;
   ultimaVez: string;
-  /** El costo del producto vinculado (de su publicación de Dropi del mismo país); null si no hay. */
+  /** El costo del producto vinculado (`costoDrop`: el de Dropi del país, el de otra variante del mismo producto o el escrito a mano); null si no hay. */
   costo: number | null;
+  /** De dónde salió el costo, y el SKU de la variante si salió de otra. */
+  costoOrigen: "dropi" | "variante" | "manual" | "compras" | null;
+  costoDe: string | null;
   /** El fulfillment de Drop del país (Configuración), en la moneda de Drop, que cuenta en el margen; null si no está puesto o si lo paga el dropshipper. */
   fulfillment: number | null;
   /** Quién paga el fulfillment de Drop (migración 0247): con «dropshipper» no se toma en cuenta. */
