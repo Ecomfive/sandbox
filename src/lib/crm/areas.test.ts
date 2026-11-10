@@ -1,12 +1,22 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { accesoCrm, areaParaNota, areaPropia, areasVisibles, escribeEnArea, numerosDeAreas, supervisaArea, pierdeLoBorrado } from "./areas";
+import { accesoCrm, areaParaNota, areaPropia, areasVisibles, escribeEnArea, numerosDeAreas, supervisaArea, pierdeLoBorrado, vePresenciaEquipo } from "./areas";
 
 // Se corre con: npm run test:seguridad (incluye estas pruebas del CRM)
 const atencion = accesoCrm({ modulos: ["crm-dropshippers"], modulosSoloLectura: [] });
 const comercial = accesoCrm({ modulos: ["crm-dropshippers", "crm-comercial"], modulosSoloLectura: [] });
 const comercialLectura = accesoCrm({ modulos: ["crm-dropshippers", "crm-comercial"], modulosSoloLectura: ["crm-comercial"] });
 const sinAcceso = accesoCrm({ modulos: ["retiros"], modulosSoloLectura: [] });
+
+test("quién está conectado y dónde lo ven Comercial, Dirección y administradores; Atención no", () => {
+  assert.equal(vePresenciaEquipo({ modulos: ["crm-dropshippers"], modulosSoloLectura: [] }), false);
+  assert.equal(vePresenciaEquipo({ modulos: ["crm-dropshippers", "crm-comercial"], modulosSoloLectura: [] }), true);
+  assert.equal(vePresenciaEquipo({ modulos: ["crm-dropshippers", "crm-comercial"], modulosSoloLectura: ["crm-comercial"] }), true);
+  assert.equal(vePresenciaEquipo({ modulos: ["crm-dropshippers", "crm-direccion"], modulosSoloLectura: [] }), true);
+  assert.equal(vePresenciaEquipo({ modulos: ["crm-dropshippers", "usuarios"], modulosSoloLectura: [] }), true);
+  // Ver Usuarios y roles sin poder cambiarlo no es administrar.
+  assert.equal(vePresenciaEquipo({ modulos: ["crm-dropshippers", "usuarios"], modulosSoloLectura: ["usuarios"] }), false);
+});
 
 test("Atención no ve el área comercial; Comercial ve las dos", () => {
   assert.deepEqual(areasVisibles(atencion), ["atencion"]);

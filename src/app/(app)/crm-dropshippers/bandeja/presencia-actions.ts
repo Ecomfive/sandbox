@@ -1,6 +1,6 @@
 "use server";
 
-import { accesoCrm, MODULO_ATENCION, MODULO_COMERCIAL, MODULO_DIRECCION } from "@/lib/crm/areas";
+import { accesoCrm, MODULO_ATENCION, MODULO_COMERCIAL, MODULO_DIRECCION, vePresenciaEquipo } from "@/lib/crm/areas";
 import { VENTANA_EN_SISTEMA_MS, type PersonaEnSistema } from "@/lib/crm/presencia-chats";
 import { paginaDeRuta } from "@/lib/rendimiento/datos";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -17,7 +17,8 @@ const uno = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ?
  */
 export async function nombresDeChats(ids: unknown): Promise<Record<string, string>> {
   const usuario = await usuarioBandeja(false);
-  if (!usuario || !Array.isArray(ids)) return {};
+  // Solo para quien ve la presencia del equipo (Atención no ve dónde están los demás).
+  if (!usuario || !vePresenciaEquipo(usuario) || !Array.isArray(ids)) return {};
   const validos = ids.filter(ES_ID).slice(0, 50);
   if (!validos.length) return {};
   const { data } = await createServiceClient().from("whatsapp_conversaciones").select("id, nombre_perfil, dropshippers(nombre)").in("id", validos).in("area", areasDe(usuario));

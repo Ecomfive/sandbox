@@ -8,6 +8,7 @@
  * Sin dependencias de servidor a propósito: se usa en acciones, páginas y en las pruebas.
  */
 
+import { esAdministrador } from "@/lib/permisos/acceso";
 import { puedeVerTelefonos } from "@/lib/whatsapp/telefono-oculto";
 
 export type AreaCrm = "direccion" | "comercial" | "atencion";
@@ -88,6 +89,16 @@ export function escribeEnArea(acceso: AccesoCrm, area: AreaCrm): boolean {
  * El área propia de cada quien en la bandeja (pedido de Hernán, 29 oct 2026): la de más arriba que tiene. Es su panel; los de las áreas de
  * abajo los supervisa (Comercial mira Atención; Dirección mira Comercial y Atención).
  */
+/**
+ * Si la persona ve quién del equipo está conectado y en qué chat (la barra con las fotos y las fotos en cada chat de la bandeja): solo Comercial,
+ * Dirección y administradores, que son quienes supervisan (10 nov 2026, pedido de Hernán). Atención no la ve, aunque sí sigue avisando dónde está
+ * para que la vean los demás.
+ */
+export const vePresenciaEquipo = (u: PermisosCrm): boolean => {
+  const a = accesoCrm(u);
+  return a.comercial || a.direccion || esAdministrador(u);
+};
+
 export function areaPropia(acceso: AccesoCrm): AreaCrm {
   if (acceso.direccion) return "direccion";
   return acceso.comercial ? "comercial" : "atencion";
