@@ -85,7 +85,8 @@ export function faltantesStock(d: DatosStock, bodegas: { id: number }[]): string
   else if (!bodegas.some((b) => b.id === d.bodega)) faltan.push("Elige una bodega de ECOMFIVE.");
   if (!(d.unidades >= 0) || d.unidades > MAX_UNIDADES_STOCK)
     faltan.push(`Escribe las unidades que deben quedar (de 0 a ${MAX_UNIDADES_STOCK.toLocaleString("es-PA")}).`);
-  else if (d.antes !== null && d.unidades === d.antes) faltan.push("Es el mismo stock que tiene: no hay nada que cambiar.");
+  // No se compara con `d.antes`: es lo que mostraba la última lectura, que puede tener días (10 nov 2026, Lymphatic Drainage: el sistema mostraba 0 y Dropi tenía 100,
+  // y «dejarlo en 0» se rechazaba por «es el mismo stock»). El favorito lee el stock del momento y, si ya está en el objetivo, no guarda nada (`armarAjusteStock`).
   return faltan;
 }
 
