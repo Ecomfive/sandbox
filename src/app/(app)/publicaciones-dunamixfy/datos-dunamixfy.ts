@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { UsuarioActual } from "@/lib/auth";
 import { margenEffi } from "@/lib/effi/articulos";
 import { tasasUsd } from "@/lib/moneda/tipo-cambio";
+import { cambiosPrecioEsperando } from "@/lib/publicaciones/cambios-precio-datos";
 import { cargarEnCamino } from "@/lib/publicaciones/en-camino-datos";
 import { fulfillmentEnMoneda, fulfillmentQueCuenta, leerFulfillmentPlataforma, type QuienPagaFulfillment } from "@/lib/publicaciones/fulfillment-pais";
 import { monedaPublicaciones, type MonedaPublicaciones } from "@/lib/publicaciones/moneda";
@@ -87,7 +88,10 @@ export async function cargarDatosDunamixfy(supabase: SupabaseClient, pais: { id:
     for (const p of data ?? []) if (!costos.has(p.sku_maestro_id as string)) costos.set(p.sku_maestro_id as string, Number(p.costo_mercancia));
   }
 
-  const { camino, cotizando, etapasCotizando } = vinculados.length ? await cargarEnCamino(supabase, pais.id, usuario) : { camino: new Map(), cotizando: new Map(), etapasCotizando: new Map() };
+  const [{ camino, cotizando, etapasCotizando }, cambiosPrecio] = await Promise.all([
+    vinculados.length ? cargarEnCamino(supabase, pais.id, usuario) : { camino: new Map(), cotizando: new Map(), etapasCotizando: new Map() },
+    cambiosPrecioEsperando(supabase, "dunamixfy", pais.id),
+  ]);
 
   const publicaciones = filas.map((f): FilaPublicacionDunamixfy => {
     const producto = aProducto(uno(f.producto));
@@ -104,6 +108,7 @@ export async function cargarDatosDunamixfy(supabase: SupabaseClient, pais: { id:
       fotoUrl: f.foto_url,
       precio,
       precioSugerido: num(f.precio_sugerido),
+      cambioPrecio: cambiosPrecio.get(f.id) ?? null,
       costo,
       fulfillment,
       fulfillmentPaga,

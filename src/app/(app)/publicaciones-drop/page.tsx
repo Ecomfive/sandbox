@@ -1,3 +1,4 @@
+import { BarraAplicarPrecios } from "@/components/publicaciones/barra-aplicar-precios";
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { requireModulo } from "@/lib/auth";
@@ -42,6 +43,7 @@ export default async function PublicacionesDropPage({ searchParams }: { searchPa
         </p>
       )}
       <TableroDrop publicaciones={datos.publicaciones} />
+      {puedeEscribir && !datos.faltaMigracion && <BarraAplicarPrecios plataforma="drop" pendientes={datos.publicaciones.filter((x) => x.cambioPrecio).length} />}
       {datos.publicaciones.length > 0 && (
         <p className="m-0 -mt-3 text-xs text-muted-foreground">
           {datos.ultimaLectura ? `Última lectura de Drop: ${formatearFechaHora(datos.ultimaLectura)}. ` : ""}

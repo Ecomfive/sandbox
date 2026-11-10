@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { CambioPrecioPlataforma } from "@/components/publicaciones/cambio-precio-plataforma";
 import { useState, useTransition } from "react";
 import { BloqueCompetencia, FotoAmpliable } from "@/components/competencia/piezas-competencia";
 import { CodigosProducto } from "@/components/ui/codigos-producto";
@@ -256,6 +257,18 @@ export function FichaPublicacionDunamixfy({
               {p.fulfillmentPaga === "dropshipper" ? "Lo paga el dropshipper" : p.fulfillment === null ? "—" : <Monto valor={p.fulfillment} moneda={moneda} />}
             </Dato>
           </div>
+          <CambioPrecioPlataforma
+            key={p.id}
+            plataforma="dunamixfy"
+            publicacionId={p.id}
+            etiquetaPrecio="Precio al dropshipper"
+            precio={p.precio}
+            sugerido={p.precioSugerido}
+            moneda={moneda}
+            esperando={p.cambioPrecio}
+            puedeEscribir={puedeEscribir}
+            bloqueo={p.conectado ? null : "Ya no aparece en Dunamixfy: no se puede cambiar su precio."}
+          />
           <dl className="grid grid-cols-2 gap-3 rounded-lg bg-muted px-4 py-3 text-sm tabular-nums">
             <div>
               <dt className="text-xs text-muted-foreground">Utilidad bruta</dt>

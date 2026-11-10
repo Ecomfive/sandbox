@@ -1,3 +1,4 @@
+import type { CambioPrecioEsperando } from "@/lib/publicaciones/precios-plataforma-actions";
 import type { EtapaCotizacion } from "@/lib/compras/en-camino";
 import { ETIQUETA_ESTADO_DROP, type EstadoDrop } from "@/lib/publicaciones-drop/acciones";
 import { MARGEN_BAJO } from "@/lib/publicaciones/publicacion";
@@ -39,7 +40,16 @@ export interface FilaPublicacionDrop {
    */
   skuDrop: string;
   fotoUrl: string | null;
+  /** Lo que paga el dropshipper (con la comisión de Drop), como sale en «Mis productos». */
   precio: number | null;
+  /** El precio del proveedor, sin la comisión de Drop (el que se escribe en Drop), y el sugerido: los lee «Aplicar precios» (migración 0266); null si todavía no. */
+  precioProveedor: number | null;
+  precioSugerido: number | null;
+  /** Si tiene variantes en Drop (entonces su precio se cambia allá); null si todavía no se leyó. */
+  conVariantes: boolean | null;
+  preciosLeidosEn: string | null;
+  /** El cambio de precio que espera «Aplicar precios» (o que falló la última vez). */
+  cambioPrecio: CambioPrecioEsperando | null;
   inventario: number | null;
   /** El producto de Producto con que se vinculó el SKU de Drop; null mientras no se vincule. */
   producto: ProductoDrop | null;

@@ -1,4 +1,5 @@
 import type { EtapaCotizacion } from "@/lib/compras/en-camino";
+import type { CambioPrecioEsperando } from "@/lib/publicaciones/precios-plataforma-actions";
 import { MARGEN_BAJO } from "@/lib/publicaciones/publicacion";
 import type { DefTabla } from "@/lib/tabla/motor";
 
@@ -33,6 +34,8 @@ export interface FilaPublicacionDunamixfy {
   /** Lo que paga el dropshipper. */
   precio: number | null;
   precioSugerido: number | null;
+  /** El cambio de precio que espera «Aplicar precios» (o que falló la última vez; migración 0266). */
+  cambioPrecio: CambioPrecioEsperando | null;
   /** El costo del producto: el de su publicación de Gestión de IDs Dropi del país (Dunamixfy no lo sabe). */
   costo: number | null;
   /** El fulfillment de Dunamixfy que cuenta en el margen; null si no está puesto o si lo paga el dropshipper. */

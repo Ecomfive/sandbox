@@ -5,6 +5,7 @@ import { tasasUsd } from "@/lib/moneda/tipo-cambio";
 import { margenDrop } from "@/lib/publicaciones-drop/lectura";
 import { monedaPublicaciones, type MonedaPublicaciones } from "@/lib/publicaciones/moneda";
 import { fulfillmentEnMoneda, fulfillmentQueCuenta, leerFulfillmentPlataforma, type QuienPagaFulfillment } from "@/lib/publicaciones/fulfillment-pais";
+import { cambiosPrecioEsperando } from "@/lib/publicaciones/cambios-precio-datos";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import type { FilaPublicacionDrop, ProductoDrop } from "./def-publicaciones-drop";
 
@@ -29,6 +30,11 @@ type Fila = {
   sku_drop: string | null;
   estado: "activo" | "inactivo";
   precio: number | null;
+  /** Migración 0266 (los lee el favorito «Aplicar precios»): sin la migración no vienen. */
+  precio_proveedor?: number | null;
+  precio_sugerido?: number | null;
+  con_variantes?: boolean | null;
+  precios_leidos_en?: string | null;
   inventario: number | null;
   foto_url: string | null;
   ultima_vez: string;
@@ -54,17 +60,16 @@ export async function cargarDatosDrop(supabase: SupabaseClient, pais: { id: stri
   const moneda = monedaPublicaciones(pais.codigo, porUsd);
   let filas: Fila[];
   try {
-    filas = await traerTodasLasFilas<Fila>((d, h) =>
-      supabase
-        .from("drop_publicaciones")
-        .select(
-          "id, drop_id, codigo, nombre, sku_drop, estado, precio, inventario, foto_url, ultima_vez, en_drop, creado_en_drop, sugerencia, producto:skus_maestros!drop_publicaciones_sku_maestro_id_fkey(id, codigo, nombre, foto_url, tipo, numero, codigo_barras), sugerido:skus_maestros!drop_publicaciones_sugerido_sku_id_fkey(id, codigo, nombre, foto_url, tipo, numero, codigo_barras)",
-        )
-        .eq("pais_id", pais.id)
-        .order("nombre")
-        .order("id")
-        .range(d, h),
-    );
+    const columnas =
+      "id, drop_id, codigo, nombre, sku_drop, estado, precio, inventario, foto_url, ultima_vez, en_drop, creado_en_drop, sugerencia, producto:skus_maestros!drop_publicaciones_sku_maestro_id_fkey(id, codigo, nombre, foto_url, tipo, numero, codigo_barras), sugerido:skus_maestros!drop_publicaciones_sugerido_sku_id_fkey(id, codigo, nombre, foto_url, tipo, numero, codigo_barras)";
+    const leer = (cols: string) => traerTodasLasFilas<Fila>((d, h) => supabase.from("drop_publicaciones").select(cols).eq("pais_id", pais.id).order("nombre").order("id").range(d, h) as unknown as PromiseLike<{ data: Fila[] | null; error: unknown }>);
+    // Con los precios que lee «Aplicar precios» (migración 0266); sin la migración, como antes.
+    try {
+      filas = await leer(`${columnas}, precio_proveedor, precio_sugerido, con_variantes, precios_leidos_en`);
+    } catch (e) {
+      if (!/precio_proveedor|precio_sugerido|con_variantes|precios_leidos_en/i.test(String((e as { message?: string })?.message ?? e))) throw e;
+      filas = await leer(columnas);
+    }
   } catch (e) {
     if (/drop_publicaciones|schema cache|does not exist/i.test(String((e as { message?: string })?.message ?? e))) return { publicaciones: [], moneda, ultimaLectura: null, fulfillment: null, fulfillmentPaga: "nosotros", faltaMigracion: true };
     throw e;
@@ -91,13 +96,18 @@ export async function cargarDatosDrop(supabase: SupabaseClient, pais: { id: stri
   const fulfillment = fulfillmentQueCuenta(plataforma?.monto == null ? null : fulfillmentEnMoneda(plataforma.monto, plataforma.moneda, pais.codigo, porUsd), fulfillmentPaga);
 
   // Lo que viene en camino y lo que se cotiza de cada producto, en compras del país (lo mismo que muestra Gestión de IDs Dropi).
-  const { camino, cotizando, etapasCotizando } = skuIds.length ? await cargarEnCamino(supabase, pais.id, usuario) : { camino: new Map(), cotizando: new Map(), etapasCotizando: new Map() };
+  const [{ camino, cotizando, etapasCotizando }, cambiosPrecio] = await Promise.all([
+    skuIds.length ? cargarEnCamino(supabase, pais.id, usuario) : { camino: new Map(), cotizando: new Map(), etapasCotizando: new Map() },
+    cambiosPrecioEsperando(supabase, "drop", pais.id),
+  ]);
 
   const publicaciones = filas.map((f): FilaPublicacionDrop => {
     const producto = aProducto(uno(f.producto));
     const costo = producto ? (costos.get(producto.id) ?? null) : null;
     const precio = f.precio === null ? null : Number(f.precio);
-    const m = margenDrop(precio, costo, fulfillment);
+    const precioProveedor = f.precio_proveedor == null ? null : Number(f.precio_proveedor);
+    // Lo que recibimos es el precio sin la comisión de Drop: si ya se leyó, el margen va con ese (10 nov 2026); si no, con el de «Mis productos».
+    const m = margenDrop(precioProveedor ?? precio, costo, fulfillment);
     const viene = producto ? camino.get(producto.id) : undefined;
     return {
       id: f.id,
@@ -108,6 +118,11 @@ export async function cargarDatosDrop(supabase: SupabaseClient, pais: { id: stri
       skuDrop: f.sku_drop ?? "",
       fotoUrl: f.foto_url,
       precio,
+      precioProveedor,
+      precioSugerido: f.precio_sugerido == null ? null : Number(f.precio_sugerido),
+      conVariantes: f.con_variantes ?? null,
+      preciosLeidosEn: f.precios_leidos_en ?? null,
+      cambioPrecio: cambiosPrecio.get(f.id) ?? null,
       inventario: f.inventario,
       producto,
       sugerido: producto ? null : aProducto(uno(f.sugerido)),

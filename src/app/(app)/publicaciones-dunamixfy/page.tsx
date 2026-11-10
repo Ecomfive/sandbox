@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AvisoSoloPais } from "@/components/plataformas/aviso-solo-pais";
+import { BarraAplicarPrecios } from "@/components/publicaciones/barra-aplicar-precios";
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { requireModulo } from "@/lib/auth";
@@ -48,6 +49,7 @@ export default async function PublicacionesDunamixfyPage({ searchParams }: { sea
         </p>
       )}
       <TableroDunamixfy publicaciones={datos.publicaciones} />
+      {puedeEscribir && <BarraAplicarPrecios plataforma="dunamixfy" pendientes={datos.publicaciones.filter((x) => x.cambioPrecio).length} />}
       <div className="-mt-3 flex flex-wrap items-center justify-between gap-3">
         <p className="m-0 text-xs text-muted-foreground">
           {datos.ultimaLectura ? `Última lectura de Dunamixfy: ${formatearFechaHora(datos.ultimaLectura)}. ` : ""}
