@@ -8,6 +8,7 @@ export const BOTONES_FICHA = [
   { id: "republicar", texto: "Republicar" },
   { id: "apagar", texto: "Apagar en Dropi" },
   { id: "privatizar", texto: "Privatizar" },
+  { id: "reservar", texto: "Privatizar a un correo" },
   { id: "pausar", texto: "Pausar" },
   { id: "liquidacion", texto: "Liquidación" },
   { id: "archivar", texto: "Archivar" },

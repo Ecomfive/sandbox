@@ -9,7 +9,7 @@ import { Seccion } from "@/components/ui/seccion-ficha";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
-import { ActualizarIcon, CerrarIcon, CheckIcon, ComprasIcon, EstadoIcon, InteligenciaIcon, InventarioIcon, LapizIcon, MargenIcon, PapeleraIcon, ProductoIcon, ArchivarIcon, FotosIcon, PausaIcon, ReactivarIcon, ApagarIcon, CandadoAbiertoIcon, CandadoIcon } from "@/lib/nav-icons";
+import { ActualizarIcon, CerrarIcon, CheckIcon, ComprasIcon, EstadoIcon, InteligenciaIcon, InventarioIcon, LapizIcon, MargenIcon, PapeleraIcon, ProductoIcon, ArchivarIcon, FotosIcon, PausaIcon, ReactivarIcon, ApagarIcon, CandadoAbiertoIcon, CandadoIcon, CorreoIcon } from "@/lib/nav-icons";
 import {
   ESTADOS_PUBLICACION,
   TIPOS,
@@ -42,7 +42,7 @@ import { EstadoCambioDropi } from "./estado-cambio-dropi";
 import { BodegasStockDropi } from "./stock-dropi";
 import { BotonLiquidacionFicha } from "./liquidacion";
 import { VendePocoEspera } from "./vende-poco-espera";
-import { ReservasPublicacion } from "./reservas-dropi";
+import { BotonPrivatizarCorreo, motivoPrivatizarCorreo, ReservasPublicacion } from "./reservas-dropi";
 import { BarraOrdenable, ItemOrden } from "./orden-botones-ficha";
 import { TareasPublicacion } from "./tareas-publicacion";
 import { codigoBodega } from "@/lib/publicaciones/sincronizar-dropi";
@@ -827,6 +827,15 @@ function ContenidoFicha({
                 <BotonPrivatizarDropi p={p} deshabilitado={pendiente} />
               ) : (
                 <BotonAccionApagado icono={CandadoAbiertoIcon} texto="Privatizar en Dropi" motivo={motivoPrivatizar(botones) ?? "No disponible"} />
+              ))}
+            </ItemOrden>
+            {/* «Privatizar a un correo» (10 nov 2026, pedido de Alcides): reservar o subir las unidades de un correo con el total, sin esperar la lectura de Dropi. */}
+            <ItemOrden id="reservar">
+              {!sinGuardar && puedeArchivar && !p.sinPublicar &&
+              (motivoPrivatizarCorreo(p, puedeEscribir) === null ? (
+                <BotonPrivatizarCorreo p={p} deshabilitado={pendiente} />
+              ) : (
+                <BotonAccionApagado icono={CorreoIcon} texto="Privatizar a un correo" motivo={motivoPrivatizarCorreo(p, puedeEscribir) ?? "No disponible"} />
               ))}
             </ItemOrden>
             <ItemOrden id="pausar">
