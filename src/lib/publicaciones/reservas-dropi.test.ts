@@ -71,7 +71,8 @@ test("reserva: cambiar, quitar o agregar un correo, igual en el sistema y en el 
   assert.deepEqual(reservasPara(producto(), null, { correo: "ana@correo.com", unidades: 40, nombre: null, antes: 40 }), { sinCambio: true });
   const nueva = reservasPara(producto(), { id: 600 }, { correo: "beto@correo.com", unidades: 20, nombre: null, antes: null });
   assert.ok("reservas" in nueva && nueva.reservas.length === 3 && nueva.reservas[2].user_id === 600);
-  assert.ok("error" in reservasPara(producto(), { id: 600 }, { correo: "beto@correo.com", unidades: 30, nombre: null, antes: null }), "40 + 30 pasa de 66");
+  assert.ok("error" in reservasPara(producto(), { id: 600 }, { correo: "beto@correo.com", unidades: 70, nombre: null, antes: null }), "70 pasa de las 66 que hay libres");
+  assert.ok(!("error" in reservasPara(producto(), { id: 600 }, { correo: "beto@correo.com", unidades: 30, nombre: null, antes: null })), "la bodega muestra lo libre: 30 caben aunque ana tenga 40");
   assert.ok("error" in reservasPara(producto(), null, { correo: "beto@correo.com", unidades: 5, nombre: null, antes: null }), "sin cuenta de Dropi");
   assert.ok("error" in reservasPara(producto({ type: "VARIABLE" }), null, { correo: "ana@correo.com", unidades: 5, nombre: null, antes: 40 }));
   igual(delFavorito.rvVivas(producto()).map((x) => x.id), [7]);
@@ -80,10 +81,31 @@ test("reserva: cambiar, quitar o agregar un correo, igual en el sistema y en el 
 test("reserva: lo que se pide se revisa", () => {
   assert.deepEqual(normalizarDatosReserva({ correo: " Ana@Correo.com ", unidades: "12", nombre: "Ana" }), { correo: "ana@correo.com", unidades: 12, nombre: "Ana", antes: null });
   assert.equal(normalizarDatosReserva({ correo: "a@b.co", unidades: -3 }).unidades, -1);
-  assert.equal(faltantesReserva({ correo: "no-es-correo", unidades: 5, nombre: null, antes: null }, { stock: 66, otras: 0, tieneReserva: false }).length, 1);
-  assert.equal(faltantesReserva({ correo: "a@b.co", unidades: 0, nombre: null, antes: null }, { stock: 66, otras: 0, tieneReserva: false }).length, 1, "quitar sin reserva");
-  assert.equal(faltantesReserva({ correo: "a@b.co", unidades: 30, nombre: null, antes: null }, { stock: 66, otras: 40, tieneReserva: false }).length, 1, "pasa del stock");
-  assert.deepEqual(faltantesReserva({ correo: "a@b.co", unidades: 26, nombre: null, antes: null }, { stock: 66, otras: 40, tieneReserva: false }), []);
+  assert.equal(faltantesReserva({ correo: "no-es-correo", unidades: 5, nombre: null, antes: null }, { tieneReserva: false }).length, 1);
+  assert.equal(faltantesReserva({ correo: "a@b.co", unidades: 0, nombre: null, antes: null }, { tieneReserva: false }).length, 1, "quitar sin reserva");
+  assert.deepEqual(faltantesReserva({ correo: "a@b.co", unidades: 26, nombre: null, antes: null }, { tieneReserva: false }), [], "el stock lo comprueba el favorito, no la lectura vieja del sistema");
+  assert.deepEqual(faltantesReserva({ correo: "a@b.co", unidades: 0, nombre: null, antes: null }, { tieneReserva: true }), []);
+});
+
+test("reserva: lo que ya tiene el correo cuenta para su total (José Sinisterra: 14 reservadas + 85 libres = 99)", () => {
+  const o: Obj = {
+    id: 8796,
+    type: "SIMPLE",
+    warehouse_product: [{ warehouse_id: 81, stock: 85 }],
+    private_product_inventories: [{ id: 4828, product_id: 8796, user_id: 25212, email: "naturex.co0@gmail.com", stock: 14, user: { id: 25212, email: "naturex.co0@gmail.com" } }],
+  };
+  const pide = (unidades: number) => ({ correo: "naturex.co0@gmail.com", unidades, nombre: null, antes: 14 });
+  for (const f of [(u: number) => reservasPara(o, null, pide(u)), (u: number) => delFavorito.reservasPara(o, null, pide(u))]) {
+    const bien = f(99) as { reservas?: Obj[]; error?: string };
+    assert.ok(!bien.error, String(bien.error));
+    assert.equal(bien.reservas![0].stock, 99);
+    const mal = f(100) as { error?: string };
+    assert.match(String(mal.error), /85 unidades disponibles más las 14 que ya tiene reservadas ese correo/);
+  }
+  igual(delFavorito.reservasPara(o, null, pide(100)), reservasPara(o, null, pide(100)));
+  // Un correo nuevo solo puede tomar lo libre.
+  assert.ok("error" in reservasPara(o, { id: 600 }, { correo: "otro@correo.com", unidades: 86, nombre: null, antes: null }));
+  assert.ok(!("error" in reservasPara(o, { id: 600 }, { correo: "otro@correo.com", unidades: 85, nombre: null, antes: null })));
 });
 
 test("una reserva con el correo solo en su usuario se cambia, sin pedir la cuenta (PUB-0302)", () => {

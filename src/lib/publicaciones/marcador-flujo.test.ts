@@ -25,7 +25,7 @@ function productoBase(id: number, extra: Obj = {}): Obj {
 }
 
 /** Un Dropi de mentira con las rutas que usa el favorito. */
-function crearDropi(opciones: { noTomaEntradas?: boolean; usuarios?: Record<string, Obj>; fallaAsignar?: boolean; stockAlCrear?: boolean; noArchiva?: boolean; categorias?: Obj[]; fallaCrear?: boolean; respuestaCrear?: "sinId" | "anidado"; fotos?: "rechaza" | "soloXAuth" | "fallaLaPrincipal"; cdnSinCache?: boolean; cdnBloqueado?: boolean; fallaPutDe?: number; quitarReservaSaca?: boolean } = {}) {
+function crearDropi(opciones: { noTomaEntradas?: boolean; usuarios?: Record<string, Obj>; fallaAsignar?: boolean; stockAlCrear?: boolean; noArchiva?: boolean; categorias?: Obj[]; fallaCrear?: boolean; respuestaCrear?: "sinId" | "anidado"; fotos?: "rechaza" | "soloXAuth" | "fallaLaPrincipal"; cdnSinCache?: boolean; cdnBloqueado?: boolean; fallaPutDe?: number; quitarReservaSaca?: boolean; reservaLibre?: boolean } = {}) {
   const productos = new Map<number, Obj>();
   const llamadas: string[] = [];
   const garantias = new Map<number, Obj[]>();
@@ -102,6 +102,8 @@ function crearDropi(opciones: { noTomaEntradas?: boolean; usuarios?: Record<stri
         if (opciones.fallaAsignar) return responder({ isSuccess: false, message: "Error al asignar" }, 500);
         for (const x of reservas.filter((y) => y.change === true)) {
           const viva = (p.private_product_inventories as Obj[]).find((y) => y.user_id === x.user_id && !y.deleted_at && (y.variation_id ?? null) === (x.variation_id ?? null));
+          const bodega = (p.warehouse_product as Obj[]).find((w) => w.warehouse_id === 81);
+          const libreAhora = ((p.warehouse_product as Obj[]) ?? []).reduce((t, w) => t + Number(w.stock), 0);
           if (x.deleted_at) {
             if (viva) viva.deleted_at = "2026-10-26";
             // Como el Dropi de verdad (2 nov 2026, el 8822): al quitar la reserva, él mismo saca esas unidades de la bodega.
@@ -109,15 +111,28 @@ function crearDropi(opciones: { noTomaEntradas?: boolean; usuarios?: Record<stri
               const fila = (p.warehouse_product as Obj[]).find((w) => w.warehouse_id === 81)!;
               fila.stock = Number(fila.stock) - Number(viva.stock);
             }
+            // Dropi que muestra solo lo libre (10 nov 2026, José Sinisterra): al quitar la reserva sus unidades vuelven a la bodega.
+            if (viva && opciones.reservaLibre && bodega) bodega.stock = Number(bodega.stock) + Number(viva.stock);
           } else if (viva) {
-            // Cambiar las unidades de una reserva que ya tenía (8 nov 2026, «Stock reservado por correo»).
+            // Cambiar las unidades de una reserva que ya tenía (8 nov 2026, «Stock reservado por correo»). Dropi compara el valor nuevo con lo que muestra libre
+            // (reservaLibre) o, si la bodega cuenta todo, con lo reservado a los demás correos más el valor nuevo.
+            if (opciones.reservaLibre) {
+              if (Number(x.stock) > libreAhora) return responder({ isSuccess: false, message: "La cantidad en stock es menor" }, 422);
+              if (bodega) bodega.stock = libreAhora - (Number(x.stock) - Number(viva.stock));
+            } else {
+              const otras = (p.private_product_inventories as Obj[]).filter((y) => y !== viva && !y.deleted_at && (y.variation_id ?? null) === (x.variation_id ?? null)).reduce((t, y) => t + Number(y.stock), 0);
+              if (otras + Number(x.stock) > libreAhora) return responder({ isSuccess: false, message: "La cantidad en stock es menor" }, 422);
+            }
             viva.stock = x.stock;
           } else if (!viva) {
             // Con variaciones, la reserva se compara con el stock de su variación (`privateVariationStockFix`).
             const variacion = (p.variations as Obj[] | undefined)?.find((v) => v.id === x.variation_id);
             const stock = ((variacion?.warehouse_product_variation ?? p.warehouse_product) as Obj[]).reduce((t, w) => t + Number(w.stock), 0);
             const ya = (p.private_product_inventories as Obj[]).filter((y) => !y.deleted_at && (y.variation_id ?? null) === (x.variation_id ?? null)).reduce((t, y) => t + Number(y.stock), 0);
-            if (ya + Number(x.stock) > stock) return responder({ isSuccess: false, message: "La cantidad en stock es menor" }, 422);
+            if (opciones.reservaLibre && !variacion) {
+              if (Number(x.stock) > stock) return responder({ isSuccess: false, message: "La cantidad en stock es menor" }, 422);
+              if (bodega) bodega.stock = stock - Number(x.stock);
+            } else if (ya + Number(x.stock) > stock) return responder({ isSuccess: false, message: "La cantidad en stock es menor" }, 422);
             p.private_product_inventories.push({ id: 500 + p.private_product_inventories.length, product_id: p.id, variation_id: x.variation_id ?? null, user_id: x.user_id, email: x.email, stock: x.stock, deleted_at: null });
           }
         }
@@ -1151,12 +1166,52 @@ test("reserva por correo: agregar un correo, cambiar sus unidades y quitarla, si
   const [demasiado] = await aplicar(d, [{ ...base, id: "r4", tipo: "reserva", producto: 8744, datos: { correo: "ana@correo.com", unidades: 70 } }]);
   assert.equal(demasiado.ok, false);
   assert.match(String(demasiado.error), /66 unidades/);
+  assert.match(String(demasiado.error), /quedó como estaba \(50\)/, "al no alcanzar, devuelve la reserva que tenía");
+  const vivas = (d.productos.get(8744)!.private_product_inventories as Obj[]).filter((x) => !x.deleted_at);
+  assert.deepEqual(vivas.map((x) => [x.email, Number(x.stock)]), [["ana@correo.com", 50]]);
   const [proveedor] = await aplicar(d, [{ ...base, id: "r5", tipo: "reserva", producto: 8744, datos: { correo: "prov@correo.com", unidades: 5 } }]);
   assert.equal(proveedor.ok, false);
   assert.match(String(proveedor.error), /proveedor/);
   const [quita] = await aplicar(d, [{ ...base, id: "r6", tipo: "reserva", producto: 8744, datos: { correo: "ana@correo.com", unidades: 0 } }]);
   assert.equal(quita.ok, true, String(quita.error));
   assert.deepEqual(quita.reservas, []);
+});
+
+test("reserva por correo con Dropi que cuenta lo libre (José Sinisterra): 14 reservadas + 85 libres → total 99, quitando la reserva y poniéndola de nuevo", async () => {
+  const sinisterra = { id: 25212, name: "José", email: "naturex.co0@gmail.com", role_user: { name: "DROPSHIPPER" } };
+  const crear = () => {
+    const d = crearDropi({ reservaLibre: true, usuarios: { "naturex.co0@gmail.com": sinisterra } });
+    d.productos.set(8796, productoBase(8796, { warehouse_product: [{ warehouse_id: 81, stock: 85, warehouse: BODEGA }], private_product_inventories: [{ id: 4828, product_id: 8796, user_id: 25212, email: null, stock: 14, deleted_at: null, user: sinisterra }] }));
+    return d;
+  };
+  const d = crear();
+  const [r] = await aplicar(d, [{ ...base, id: "r1", tipo: "reserva", producto: 8796, datos: { correo: "naturex.co0@gmail.com", unidades: 99 } }]);
+  assert.equal(r.ok, true, String(r.error));
+  assert.deepEqual((r.reservas as Obj[]).map((x) => [x.email ?? (x.user as Obj).email, Number(x.stock)]), [["naturex.co0@gmail.com", 99]]);
+  assert.equal(d.llamadas.filter((l) => l === "PUT /products/8796").length, 3, "directo (rechazado), quitar y poner el total");
+  assert.deepEqual(d.stockDe(d.productos.get(8796)!), { 81: 0 });
+
+  // Un solo guardado alcanza si lo que se suma cabe en lo libre.
+  const d2 = crear();
+  const [r2] = await aplicar(d2, [{ ...base, id: "r2", tipo: "reserva", producto: 8796, datos: { correo: "naturex.co0@gmail.com", unidades: 60 } }]);
+  assert.equal(r2.ok, true, String(r2.error));
+  assert.equal(d2.llamadas.filter((l) => l === "PUT /products/8796").length, 1);
+
+  // Pasarse de 99 se rechaza antes de tocar nada.
+  const d3 = crear();
+  const [r3] = await aplicar(d3, [{ ...base, id: "r3", tipo: "reserva", producto: 8796, datos: { correo: "naturex.co0@gmail.com", unidades: 100 } }]);
+  assert.equal(r3.ok, false);
+  assert.match(String(r3.error), /85 unidades disponibles más las 14/);
+  assert.equal(d3.llamadas.filter((l) => l.startsWith("PUT")).length, 0, "no tocó la reserva");
+
+  // Si se rechaza el cambio directo y quitarla le baja el stock a Dropi (como el 8822), se detiene y devuelve la reserva.
+  const d4 = crearDropi({ quitarReservaSaca: true, usuarios: { "naturex.co0@gmail.com": sinisterra } });
+  d4.productos.set(8796, productoBase(8796, { warehouse_product: [{ warehouse_id: 81, stock: 85, warehouse: BODEGA }], private_product_inventories: [{ id: 4828, product_id: 8796, user_id: 25212, email: "naturex.co0@gmail.com", stock: 14, deleted_at: null, user: sinisterra }] }));
+  const [r4] = await aplicar(d4, [{ ...base, id: "r4", tipo: "reserva", producto: 8796, datos: { correo: "naturex.co0@gmail.com", unidades: 99 } }]);
+  assert.equal(r4.ok, false);
+  assert.match(String(r4.error), /el stock de Dropi bajó de 85 a 71 unidades/);
+  assert.match(String(r4.error), /quedó como estaba \(14\)/);
+  assert.deepEqual((d4.productos.get(8796)!.private_product_inventories as Obj[]).filter((x) => !x.deleted_at).map((x) => Number(x.stock)), [14]);
 });
 
 test("reserva por correo: si Dropi descuenta el stock al quitar la reserva, se avisa con los números", async () => {

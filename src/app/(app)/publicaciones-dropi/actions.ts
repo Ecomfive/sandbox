@@ -1018,8 +1018,9 @@ export async function esperarVendePoco(id: string, nota: string | null): Promise
 
 /**
  * «Stock reservado por correo» (8 nov 2026, pedido de Alcides; migración 0254): deja pendiente para «Aplicar en Dropi» que un correo quede con unas unidades reservadas
- * en esta publicación (0 = quitarle la reserva). No cambia nada en el sistema hasta que Dropi lo confirma. Revisa contra la última lectura de «Mis productos»
- * que no se reserve más de lo que hay (contando lo de los demás correos); el favorito lo vuelve a revisar con lo que Dropi tenga en ese momento.
+ * en esta publicación (0 = quitarle la reserva). No cambia nada en el sistema hasta que Dropi lo confirma. `unidades` es el **total** que debe quedar para ese correo
+ * (si ya tenía reserva, incluye lo que tenía); el favorito comprueba el stock con lo que Dropi tenga en ese momento y, si Dropi no deja subir la reserva
+ * existente, la quita, relee y la vuelve a poner con el total, como se hacía a mano.
  */
 export async function cambiarReservaDropi(id: string, crudo: unknown): Promise<{ error?: string; detalle?: string }> {
   const usuario = await requireModuloEscritura(MODULO);
@@ -1038,8 +1039,8 @@ export async function cambiarReservaDropi(id: string, crudo: unknown): Promise<{
   if (leida?.tipo === "VARIABLE") return { error: "Tiene variaciones: la reserva es por variación y por ahora se hace en Dropi." };
   const reservas = reservasGuardadas(leida?.reservas);
   const suya = reservas.find((r) => r.correo === pedido.correo);
-  const otras = reservas.filter((r) => r.correo !== pedido.correo).reduce((t, r) => t + r.unidades, 0);
-  const faltan = faltantesReserva(pedido, { stock: leida ? Number(leida.stock ?? 0) : null, otras, tieneReserva: !!suya });
+  // El stock no se revisa aquí: la lectura puede tener horas y el favorito lo comprueba con lo que Dropi tenga al aplicar (10 nov 2026).
+  const faltan = faltantesReserva(pedido, { tieneReserva: !!suya });
   if (faltan.length) return { error: faltan.join(" ") };
   if (suya && suya.unidades === pedido.unidades) return { detalle: "Ese correo ya tiene esas unidades reservadas en Dropi." };
   const d = { ...pedido, nombre: pedido.nombre ?? suya?.nombre ?? null, antes: suya ? suya.unidades : null, producto };
