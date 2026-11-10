@@ -11,6 +11,7 @@ import { normalizarDatosPrivatizar, quienesDe, unidadesTotales } from "@/lib/pub
 import { normalizarDatosStock, textoVariacion } from "@/lib/publicaciones/stock-dropi";
 import { normalizarDatosReserva } from "@/lib/publicaciones/reservas-dropi";
 import { republicacionSinTocarDropi } from "@/lib/publicaciones/republicar-dropi";
+import { publicacionSinCrearEnDropi } from "@/lib/publicaciones/crear-dropi";
 import { codigoBodega } from "@/lib/publicaciones/sincronizar-dropi";
 import { createServiceClient } from "@/lib/supabase/server";
 
@@ -103,9 +104,11 @@ export async function listarCambiosPendientes(): Promise<{ error?: string; cambi
         const d = normalizarDatosCrear(f.datos);
         lineas.push(`Publicar en Dropi: «${d.nombre || pub?.nombre || "Publicación"}»${d.precio != null ? ` · ${usd(d.precio)}` : ""} · ${d.fotos.length} ${d.fotos.length === 1 ? "foto" : "fotos"}`);
         alDeshacer = "Vuelve a «Sin publicar»: se queda guardada con todos sus datos, sin borrar nada.";
-        if (intentos > 0 || f.nuevo_dropi_id) {
+        if ((intentos > 0 || f.nuevo_dropi_id) && !(intentos > 0 && publicacionSinCrearEnDropi(f.error as string | null, f.nuevo_dropi_id))) {
           deshacible = false;
           motivoNo = "Ya se empezó a publicar en Dropi (puede existir el producto): no se puede deshacer desde aquí.";
+        } else if (intentos > 0) {
+          alDeshacer = "Vuelve a «Sin publicar»: se queda guardada con todos sus datos. Dropi no se tocó: el intento se detuvo antes de crear nada.";
         }
       } else if (tipo === "privatizar") {
         const d = normalizarDatosPrivatizar(f.datos);
@@ -209,12 +212,14 @@ export async function deshacerCambioPendiente(cambioId: string): Promise<{ error
   const nombrePub = pub?.nombre ?? "Publicación";
 
   if (tipo === "apagar" && intentos > 0) return { error: "Ya se intentó en Dropi (el stock puede estar en cero): no se puede deshacer desde aquí." };
+  // Una publicación que se detuvo antes de crear nada en Dropi (la bodega o la categoría no coinciden) también se deshace.
+  const crearSinTocar = tipo === "crear" && intentos > 0 && publicacionSinCrearEnDropi(f.error as string | null, f.nuevo_dropi_id);
   const republicarSinTocar = tipo === "republicar" && intentos > 0 && republicacionSinTocarDropi(f.error as string | null, f.nuevo_dropi_id);
   if (tipo === "republicar" && !republicarSinTocar && (intentos > 0 || f.nuevo_dropi_id)) return { error: "Ya se empezó en Dropi (puede haber un producto nuevo): no se puede deshacer desde aquí." };
   if (tipo === "archivar" && intentos > 0) return { error: "Ya se intentó en Dropi: no se puede deshacer desde aquí." };
   if (tipo === "stock" && intentos > 0) return { error: "Ya se intentó en Dropi (el stock pudo haber cambiado): no se puede deshacer desde aquí." };
   if (tipo === "reserva" && intentos > 0) return { error: "Ya se intentó en Dropi (la reserva pudo haber cambiado): no se puede deshacer desde aquí." };
-  if (tipo === "crear" && (intentos > 0 || f.nuevo_dropi_id)) return { error: "Ya se empezó a publicar en Dropi (puede existir el producto): no se puede deshacer desde aquí." };
+  if (tipo === "crear" && (intentos > 0 || f.nuevo_dropi_id) && !(intentos > 0 && publicacionSinCrearEnDropi(f.error as string | null, f.nuevo_dropi_id))) return { error: "Ya se empezó a publicar en Dropi (puede existir el producto): no se puede deshacer desde aquí." };
   // Una privatización que falló antes de crear nada en Dropi (un correo equivocado, por ejemplo) sí se puede deshacer: el stock solo se mueve después de crear el privado.
   if (tipo === "privatizar" && f.nuevo_dropi_id) return { error: `Ya se creó el producto privado en Dropi (ID ${f.nuevo_dropi_id}): no se puede deshacer desde aquí.` };
 
@@ -265,7 +270,7 @@ export async function deshacerCambioPendiente(cambioId: string): Promise<{ error
   // Se quita de la cola (con «reemplazado», que ya sale de las listas y libera los índices); solo si Dropi sigue sin tocarse.
   const q = supabase.from("dropi_cambios_pendientes").update({ estado: "reemplazado" }).eq("id", cambioId).in("estado", ["pendiente", "error"]);
   // Una republicación detenida antes de tocar Dropi: solo si nadie la volvió a intentar mientras tanto (mismos intentos, sin producto nuevo).
-  const { error: errorCola } = await (tipo === "cambio" ? q : tipo === "privatizar" ? q.is("nuevo_dropi_id", null) : republicarSinTocar ? q.is("nuevo_dropi_id", null).eq("intentos", intentos) : q.eq("intentos", 0));
+  const { error: errorCola } = await (tipo === "cambio" ? q : tipo === "privatizar" ? q.is("nuevo_dropi_id", null) : republicarSinTocar || crearSinTocar ? q.is("nuevo_dropi_id", null).eq("intentos", intentos) : q.eq("intentos", 0));
   if (errorCola) return { error: "No se pudo quitar el cambio de la cola." };
   await registrarAuditoria({
     accion: tipo === "apagar" ? "dropi_apagar_cancelado" : tipo === "republicar" ? "dropi_republicar_cancelado" : tipo === "archivar" ? "dropi_archivar_cancelado" : tipo === "crear" ? "dropi_crear_cancelado" : tipo === "privatizar" ? "dropi_privatizar_cancelado" : tipo === "stock" ? "dropi_stock_cancelado" : tipo === "reserva" ? "dropi_reserva_cancelada" : "dropi_cambio_deshecho",

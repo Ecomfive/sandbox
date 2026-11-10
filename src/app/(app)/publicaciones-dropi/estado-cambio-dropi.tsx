@@ -1,6 +1,7 @@
 import { useMoneda } from "./moneda-contexto";
 import type { CambioDropiVista } from "@/lib/publicaciones/cambios-dropi";
 import { republicacionSinTocarDropi } from "@/lib/publicaciones/republicar-dropi";
+import { publicacionSinCrearEnDropi } from "@/lib/publicaciones/crear-dropi";
 import { codigoBodega } from "@/lib/publicaciones/sincronizar-dropi";
 import { textoVariacion } from "@/lib/publicaciones/stock-dropi";
 import { quienesDe, unidadesTotales } from "@/lib/publicaciones/privatizar-dropi";
@@ -144,7 +145,9 @@ function EstadoCrear({ c }: { c: CambioDropiVista }) {
   return (
     <span className="flex items-center gap-1.5 text-xs text-destructive">
       <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-destructive" />
-      {c.estado === "error"
+      {c.estado === "error" && publicacionSinCrearEnDropi(c.error, c.nuevoDropiId)
+        ? `No se publicó en Dropi: ${c.error} Dropi no se tocó. Quítala de la cola con «Deshacer» en «Cambios pendientes para Dropi»: vuelve a «Sin publicar», con sus datos, para corregirla y publicarla de nuevo.`
+        : c.estado === "error"
         ? `No se pudo publicar en Dropi${c.nuevoDropiId ? ` (ya se creó el ID ${c.nuevoDropiId})` : ""}: ${c.error ?? "sin detalle"} Se sigue desde ahí al pulsar «Aplicar en Dropi».`
         : "Publicación pendiente en Dropi: pulsa «Aplicar en Dropi» con Dropi abierto."}
     </span>
