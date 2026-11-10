@@ -159,6 +159,12 @@ export const BODEGA_DROPI = 280;
  */
 export const BODEGA_DROPI_POR_PAIS: Readonly<Record<string, number>> = { PA: 280, CR: 15, MX: 49 };
 export const BODEGAS_DROPI: ReadonlySet<number> = new Set(Object.values(BODEGA_DROPI_POR_PAIS));
+/**
+ * Bodegas de ECOMFIVE que Dropi no muestra en «Mis productos» mientras no tienen stock (10 nov 2026, pedido de Alcides: México, la cuenta con que se aplica
+ * es la de «MARIA» y su bodega es la 552 Naucalpan, que no salía en «Publicar en Dropi»). Se ofrecen siempre en el formulario; al aplicar, el favorito
+ * comprueba que la bodega sea de la cuenta con que se entró a Dropi. Otra bodega sin stock se agrega aquí.
+ */
+export const BODEGAS_CONOCIDAS_POR_PAIS: Readonly<Record<string, readonly { id: number; nombre: string }[]>> = { MX: [{ id: 552, nombre: "BODEGA NAUCALPAN DE JUÁREZ" }] };
 /** El código de la bodega de Dropi del país para los textos: «B280» en Panamá, «B49» en México. Sin país conocido, «B280». */
 export const codigoBodegaDropi = (codigoPais?: string | null): string => `B${BODEGA_DROPI_POR_PAIS[(codigoPais ?? "").toUpperCase()] ?? BODEGA_DROPI}`;
 export const esBodegaDropi = (id: number | null | undefined): boolean => id !== null && id !== undefined && BODEGAS_DROPI.has(Number(id));
