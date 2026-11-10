@@ -12,7 +12,7 @@ import { codigoBodega, idsDeDropi } from "@/lib/publicaciones/sincronizar-dropi"
 import { grupoDe, nombreDelPublico } from "@/lib/publicaciones/apagar-dropi";
 import { encolarApagar, encolarArchivar, encolarCrear, encolarPrivatizar, encolarRepublicar, encolarReserva, encolarStock, enviarNombreADropi, enviarPrecioADropi } from "@/lib/publicaciones/cambios-dropi";
 import { faltantesReserva, normalizarDatosReserva, reservasGuardadas } from "@/lib/publicaciones/reservas-dropi";
-import { DIAS_VENDE_POCO, esBodegaDropi, masDias, revisarNotaEspera } from "@/lib/publicaciones/automatico";
+import { BODEGAS_CONOCIDAS_POR_PAIS, DIAS_VENDE_POCO, esBodegaDropi, masDias, revisarNotaEspera } from "@/lib/publicaciones/automatico";
 import { faltantesStock, normalizarDatosStock, productoDelCambio, textoVariacion } from "@/lib/publicaciones/stock-dropi";
 import { destinosDe, faltantesPrivatizar, nombrePrivado, normalizarDatosPrivatizar, quienesDe, unidadesTotales } from "@/lib/publicaciones/privatizar-dropi";
 import { faltantesVariaciones, stockEnBodega, textoVariaciones, type VariacionLeida } from "@/lib/publicaciones/privatizar-variable";
@@ -1077,6 +1077,9 @@ export async function cambiarStockDropi(id: string, crudo: unknown): Promise<{ e
   // Las bodegas de ECOMFIVE del país y lo que la última lectura mostraba de ese ID (el «antes»; la cuenta de verdad la hace el favorito).
   const { data: lecturas } = await supabase.from("dropi_productos_proveedor").select("dropi_producto_id, bodegas").eq("pais_id", antes.pais_id).limit(1000);
   const bodegas = new Map<number, string>();
+  // Las bodegas conocidas del país también valen aunque no salgan en la lectura (Dropi no lista las que no tienen stock; 10 nov 2026, la 552 Naucalpan de México).
+  const { data: paisDeLaPublicacion } = await supabase.from("paises").select("codigo").eq("id", antes.pais_id).maybeSingle();
+  for (const b of BODEGAS_CONOCIDAS_POR_PAIS[String(paisDeLaPublicacion?.codigo ?? "").toUpperCase()] ?? []) bodegas.set(b.id, b.nombre);
   let actual: { id: number; stock: number }[] = [];
   for (const l of lecturas ?? []) {
     const bs = Array.isArray(l.bodegas) ? (l.bodegas as { id: number; nombre?: string; stock?: number }[]) : [];
