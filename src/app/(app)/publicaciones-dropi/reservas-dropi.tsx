@@ -95,7 +95,7 @@ function FilaReserva({ p, r, editable }: { p: FilaPublicacion; r: ReservaDropi; 
       {editando && (
         <div className="flex flex-wrap items-center gap-2">
           <label htmlFor={id} className="text-xs text-muted-foreground">
-            Unidades reservadas
+            Total reservado
           </label>
           <input id={id} type="number" min={1} max={MAX_UNIDADES_RESERVA} inputMode="numeric" autoFocus value={valor} onChange={(e) => setValor(e.target.value)} onKeyDown={teclas(guardar, cerrar)} className={`${fieldClassSm} w-24 text-right tabular-nums`} />
           <button type="button" className={botonOscuro} disabled={pendiente} onClick={guardar}>
@@ -152,7 +152,7 @@ function AgregarReserva({ p }: { p: FilaPublicacion }) {
   if (!abierto)
     return (
       <button type="button" className={`${botonClaro} self-start`} onClick={() => setAbierto(true)}>
-        + Reservar a un correo
+        + Privatizar a un correo
       </button>
     );
   const enter = teclas(guardar, cerrar);
@@ -164,7 +164,7 @@ function AgregarReserva({ p }: { p: FilaPublicacion }) {
           <input id={idCorreo} type="email" autoFocus value={correo} onChange={(e) => setCorreo(e.target.value)} onKeyDown={enter} placeholder="Ej: tienda@correo.com" className={fieldClassSm} />
         </label>
         <label htmlFor={idUnidades} className="flex flex-col gap-1 text-xs text-muted-foreground">
-          Unidades
+          Total de unidades
           <input id={idUnidades} type="number" min={1} max={MAX_UNIDADES_RESERVA} inputMode="numeric" value={unidades} onChange={(e) => setUnidades(e.target.value)} onKeyDown={enter} placeholder="Ej: 20" className={`${fieldClassSm} text-right tabular-nums`} />
         </label>
       </div>
