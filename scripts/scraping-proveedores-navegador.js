@@ -226,6 +226,61 @@ async function leerNuestrosProductos(puente) {
   return { enviados: productos.length, activos: productos.filter((p) => !p.archivado).length, duracionMs: cuerpo.duracionMs, kb: Math.round(datos.length / 1024) };
 }
 
+// Análisis de competencia con Dunamixfy (11 nov 2026; migración 0271): TODO el Marketplace de dunamixfy.cr, con el proveedor de cada producto. Se corre en
+// dunamixfy.cr con la sesión de un DROPSHIPPER (con la de proveedor el Marketplace solo muestra nuestros productos). Lee la API interna del Marketplace
+// (`/api/marketplace/products`, 15 por página con `cursor`): no hace falta abrir cada página. Manda solo lo que se usa (sin descripciones ni bodegas). Los revisa
+// src/lib/competencia/dunamixfy.ts y los guarda scripts/competencia-catalogo-guardar.ts. Como arriba, la pestaña navega al puente.
+//   await scrapingCompetenciaDunamixfy("http://127.0.0.1:4322/puente/<código>")
+// Costa Rica, 11 nov 2026: 484 productos de 13 proveedores en 7 s.
+async function scrapingCompetenciaDunamixfy(puente) {
+  if (location.hostname !== "dunamixfy.cr") throw new Error("Esto se corre en dunamixfy.cr, con la sesión del dropshipper.");
+  const me = await fetch("/api/me", { credentials: "include" }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+  const rol = me && (me.role || (me.user && me.user.role));
+  if (rol !== "DROPSHIPPER") throw new Error("La sesión de Dunamixfy no es de dropshipper: con la de proveedor solo se ven nuestros productos.");
+  const inicio = new Date();
+  const t0 = performance.now();
+  const productos = [];
+  const paginas = [];
+  let cursor = null;
+  for (let i = 0; i < 400; i++) {
+    const r = await fetch(`/api/marketplace/products?take=50${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`, { credentials: "include" });
+    if (!r.ok) throw new Error(`Dunamixfy respondió ${r.status} en la página ${i + 1} del Marketplace.`);
+    const j = await r.json();
+    const lista = Array.isArray(j.products) ? j.products : [];
+    paginas.push(lista.length);
+    for (const p of lista)
+      productos.push({
+        num: p.productNumberId,
+        nombre: p.name,
+        // Con la cuenta de dropshipper el proveedor viene sin su id: el del producto (`supplierId`) es el mismo.
+        proveedorId: p.supplierId || (p.supplier && p.supplier.id),
+        proveedor: p.supplier && (p.supplier.supplierDisplayName || p.supplier.name),
+        categoria: p.category,
+        creado: p.createdAt,
+        foto: Array.isArray(p.images) ? p.images[0] : null,
+        inventarios: (Array.isArray(p.inventories) ? p.inventories : []).map((v) => ({
+          precio: v.price,
+          sugerido: v.suggestedPrice,
+          stock: v.stock,
+          activo: v.isActive === true,
+          eliminado: !!v.deletedAt,
+          privado: !!v.privateUserId,
+        })),
+      });
+    if (!j.hasMore || !j.nextCursor || String(j.nextCursor) === String(cursor)) break;
+    cursor = j.nextCursor;
+  }
+  if (!productos.length) throw new Error("El Marketplace de Dunamixfy no trajo productos: revisa que la sesión siga abierta.");
+  const cuerpo = { tipo: "competencia-dunamixfy", pais: "cr", inicio: inicio.toISOString(), duracionMs: Math.round(performance.now() - t0), paginas, productos };
+  const gz = new Blob([JSON.stringify(cuerpo)]).stream().pipeThrough(new CompressionStream("gzip"));
+  const bytes = new Uint8Array(await new Response(gz).arrayBuffer());
+  let binario = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) binario += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  const datos = btoa(binario).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  setTimeout(() => location.assign(`${puente}#${datos}`), 50);
+  return { enviados: productos.length, paginas: paginas.length, duracionMs: cuerpo.duracionMs, kb: Math.round(datos.length / 1024) };
+}
+
 // Análisis de competencia con Drop (6 nov 2026; migración 0234): TODO el catálogo de Drop, con el proveedor de cada producto. Se corre en
 // app.soydrop.com/dropshipping con la sesión de un DROPSHIPPER y sin «Ver en USD». Pulsa «Ver más productos» hasta el final (40 cada vez) y lee cada tarjeta;
 // la categoría y la fecha de creación salen de la ficha de cada producto, de a 4 a la vez (si una falla, queda sin ellas). Los revisa

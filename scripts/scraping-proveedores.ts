@@ -40,9 +40,9 @@ const ORIGENES = /^https:\/\/app\.dropi\.(mx|co|cr|pa|cl|ec|pe|gt|py|ar)$/;
 
 interface Lectura {
   /** «competencia»: todo el catálogo de un país para Análisis de competencia; «nuestros»: nuestros productos con sus bodegas
-   * (Gestión de IDs Dropi, publicaciones-sincronizar-dropi.ts); «drop»: nuestros productos en Drop (Gestión de IDs Drop, drop-guardar.ts); «competencia-drop» y «competencia-effi»: todo
-   * el catálogo de Drop o de Effi (competencia-catalogo-guardar.ts); sin él, un proveedor de Scraping. */
-  tipo?: "competencia" | "nuestros" | "drop" | "competencia-drop" | "competencia-effi" | "dunamixfy";
+   * (Gestión de IDs Dropi, publicaciones-sincronizar-dropi.ts); «drop»: nuestros productos en Drop (Gestión de IDs Drop, drop-guardar.ts); «competencia-drop», «competencia-effi» y «competencia-dunamixfy»:
+   * todo el catálogo de Drop, de Effi o del Marketplace de Dunamixfy (competencia-catalogo-guardar.ts); sin él, un proveedor de Scraping. */
+  tipo?: "competencia" | "nuestros" | "drop" | "competencia-drop" | "competencia-effi" | "competencia-dunamixfy" | "dunamixfy";
   /** Solo en «dunamixfy»: los pedidos (sin nada del cliente). */
   pedidos?: unknown[];
   dropiId: number;
@@ -256,7 +256,7 @@ export async function calcularHuellas(filtro: string, tabla = "scraping_producto
  */
 function guardarCopia(l: Lectura) {
   const pais = typeof l.pais === "string" && /^[a-z]{2}$/.test(l.pais) ? l.pais : "xx";
-  const que = l.tipo === "competencia" || l.tipo === "nuestros" || l.tipo === "drop" || l.tipo === "competencia-drop" || l.tipo === "competencia-effi" || l.tipo === "dunamixfy" ? l.tipo : Number.isInteger(l.dropiId) ? String(l.dropiId) : "lectura";
+  const que = l.tipo === "competencia" || l.tipo === "nuestros" || l.tipo === "drop" || l.tipo === "competencia-drop" || l.tipo === "competencia-effi" || l.tipo === "competencia-dunamixfy" || l.tipo === "dunamixfy" ? l.tipo : Number.isInteger(l.dropiId) ? String(l.dropiId) : "lectura";
   const carpeta = path.resolve("datos-privados", "scraping");
   const ruta = path.join(carpeta, `${pais}-${que}-${new Date().toISOString().slice(0, 19).replace(/:/g, "")}.json`);
   if (!ruta.startsWith(carpeta + path.sep)) throw new Error("Ruta de la copia no válida.");
@@ -275,7 +275,7 @@ function guardarSegunTipo(l: Lectura) {
   if (l.tipo === "competencia") return guardarCompetencia(supabase, l, calcularHuellas);
   if (l.tipo === "nuestros") return guardarNuestrosProductos(supabase, l as unknown as LecturaNuestros);
   if (l.tipo === "drop") return guardarDrop(supabase, l as unknown as LecturaDrop);
-  if (l.tipo === "competencia-drop" || l.tipo === "competencia-effi") return guardarCatalogo(supabase, l as unknown as LecturaCatalogo, calcularHuellas);
+  if (l.tipo === "competencia-drop" || l.tipo === "competencia-effi" || l.tipo === "competencia-dunamixfy") return guardarCatalogo(supabase, l as unknown as LecturaCatalogo, calcularHuellas);
   if (l.tipo === "dunamixfy")
     return (async () => {
       const productos = await guardarProductosDunamixfy(supabase, { tipo: "dunamixfy", pais: "cr", inicio: l.inicio, productos: l.productos });

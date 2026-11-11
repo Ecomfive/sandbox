@@ -3,6 +3,7 @@ import { unidadesBajadas, vigiladoDe, type CambioStock } from "@/lib/competencia
 import { certezaIgual } from "@/lib/competencia/certeza";
 import { claveVerificacion } from "@/lib/competencia/verificar-ia";
 import { idDeProveedorDrop } from "@/lib/competencia/drop";
+import { idDeProveedorDunamixfy, MARKETPLACE_DUNAMIXFY } from "@/lib/competencia/dunamixfy";
 import type { PlataformaId } from "@/lib/plataformas";
 import { traerTodasConError } from "@/lib/supabase/paginar";
 import type { AlertaC, BitacoraC, CompetidorC, DatosCompetencia, ProductoC, VentaC } from "./def-competencia";
@@ -11,13 +12,20 @@ const n = (v: unknown) => (v === null || v === undefined ? null : Number(v));
 const DOMINIO: Record<string, string> = { PA: "pa", CR: "cr", MX: "mx", CO: "co" };
 
 /**
- * Las tablas de cada plataforma (también las usa `decidirParCompetencia`): Dropi (0108), Drop (0234) y Effi (0239), iguales salvo por cómo se identifica un producto y su proveedor.
- * Dunamixfy todavía no tiene (9 nov 2026): su catálogo se lee con una cuenta de dropshipper, que aún no hay; la página la muestra vacía y lo dice.
+ * Las tablas de cada plataforma (también las usa `decidirParCompetencia`): Dropi (0108), Drop (0234), Effi (0239) y Dunamixfy (0271, 11 nov 2026: su Marketplace con
+ * una cuenta de dropshipper), iguales salvo por cómo se identifica un producto y su proveedor.
  */
 export const TABLAS: Partial<Record<PlataformaId, Record<"productos" | "busquedas" | "historial" | "alertas" | "ids", string>>> = {
   dropi: { productos: "competencia_productos", busquedas: "competencia_busquedas", historial: "competencia_historial", alertas: "competencia_alertas", ids: "dropi_producto_id, proveedor_dropi_id" },
   drop: { productos: "drop_competencia_productos", busquedas: "drop_competencia_busquedas", historial: "drop_competencia_historial", alertas: "drop_competencia_alertas", ids: "drop_producto_id" },
   effi: { productos: "effi_competencia_productos", busquedas: "effi_competencia_busquedas", historial: "effi_competencia_historial", alertas: "effi_competencia_alertas", ids: "proveedor_effi_id, ventas" },
+  dunamixfy: {
+    productos: "dunamixfy_competencia_productos",
+    busquedas: "dunamixfy_competencia_busquedas",
+    historial: "dunamixfy_competencia_historial",
+    alertas: "dunamixfy_competencia_alertas",
+    ids: "proveedor_dunamixfy_id",
+  },
 };
 
 /** El catálogo de Drop no tiene una página por proveedor. */
@@ -28,6 +36,7 @@ interface FilaProducto {
   dropi_producto_id?: number;
   proveedor_dropi_id?: number;
   proveedor_effi_id?: number;
+  proveedor_dunamixfy_id?: string;
   ventas?: number | null;
   proveedor_nombre: string;
   nombre: string;
@@ -64,6 +73,7 @@ export async function cargarDatosCompetencia(supabase: SupabaseClient, pais: { i
   if (!t) return null;
   const esDrop = plataforma === "drop";
   const esEffi = plataforma === "effi";
+  const esDuna = plataforma === "dunamixfy";
   // Como `string`: armadas con el nombre de la tabla, el tipo de Supabase no sabe leerlas.
   const columnasProducto: string = `id, ${t.ids}, proveedor_nombre, nombre, foto_url, foto_huella, precio, stock, categoria, es_nuestro, estado, igual_a, igual_parecido, igual_metodo, primera_vez, ultima_vez`;
   const columnasStock: string = `producto_id, fecha, stock, stock_antes, ${t.productos}!inner(pais_id)`;
@@ -117,8 +127,8 @@ export async function cargarDatosCompetencia(supabase: SupabaseClient, pais: { i
     const cambios = cambiosDe.get(p.id) ?? [];
     return {
       id: p.id,
-      dropiId: esDrop ? 0 : Number(p.dropi_producto_id),
-      proveedorId: esDrop ? idDeProveedorDrop(p.proveedor_nombre) : esEffi ? Number(p.proveedor_effi_id) : Number(p.proveedor_dropi_id),
+      dropiId: esDrop || esDuna ? 0 : Number(p.dropi_producto_id),
+      proveedorId: esDrop ? idDeProveedorDrop(p.proveedor_nombre) : esEffi ? Number(p.proveedor_effi_id) : esDuna ? idDeProveedorDunamixfy(String(p.proveedor_dunamixfy_id)) : Number(p.proveedor_dropi_id),
       proveedor: p.proveedor_nombre,
       nombre: p.nombre,
       foto: p.foto_url,
@@ -139,7 +149,7 @@ export async function cargarDatosCompetencia(supabase: SupabaseClient, pais: { i
       bajo7: unidadesBajadas(cambios, 7, ahora),
       bajo30: unidadesBajadas(cambios, 30, ahora),
       ventasTotal: esEffi ? (p.ventas ?? null) : null,
-      urlProveedor: esDrop ? CATALOGO_DROP : esEffi ? `https://effi.com.co/app/articulo_dropshipping?proveedor=${p.proveedor_effi_id}` : `https://app.dropi.${dominio}/dashboard/provider/${p.proveedor_dropi_id}/${encodeURIComponent(p.proveedor_nombre)}`,
+      urlProveedor: esDrop ? CATALOGO_DROP : esDuna ? MARKETPLACE_DUNAMIXFY : esEffi ? `https://effi.com.co/app/articulo_dropshipping?proveedor=${p.proveedor_effi_id}` : `https://app.dropi.${dominio}/dashboard/provider/${p.proveedor_dropi_id}/${encodeURIComponent(p.proveedor_nombre)}`,
     };
   };
   const productos = filas.map(aProducto);
@@ -175,7 +185,7 @@ export async function cargarDatosCompetencia(supabase: SupabaseClient, pais: { i
   const hace7 = new Date(Date.now() - 7 * 86_400_000).toISOString();
   for (const p of productos) {
     if (p.esNuestro || p.estado !== "activo") continue;
-    const c = porProveedor.get(p.proveedorId) ?? { id: p.proveedorId, nombre: p.proveedor, url: p.urlProveedor, enlace: esDrop ? "Abrir el catálogo de Drop ↗" : esEffi ? "Abrir su catálogo en Effi ↗" : "Abrir su página en Dropi ↗", ventasTotal: esEffi ? 0 : null, productos: 0, iguales: 0, nuevos7: 0, bajo1: 0, bajo7: 0, bajo30: 0, primeraVez: p.primeraVez, vigilado: vigiladoDe(pais.codigo, p.proveedorId) };
+    const c = porProveedor.get(p.proveedorId) ?? { id: p.proveedorId, nombre: p.proveedor, url: p.urlProveedor, enlace: esDrop ? "Abrir el catálogo de Drop ↗" : esDuna ? "Abrir el Marketplace de Dunamixfy ↗" : esEffi ? "Abrir su catálogo en Effi ↗" : "Abrir su página en Dropi ↗", ventasTotal: esEffi ? 0 : null, productos: 0, iguales: 0, nuevos7: 0, bajo1: 0, bajo7: 0, bajo30: 0, primeraVez: p.primeraVez, vigilado: vigiladoDe(pais.codigo, p.proveedorId) };
     c.productos++;
     if (p.igualA) c.iguales++;
     if (corte && p.primeraVez > corte && p.primeraVez > hace7) c.nuevos7++;
