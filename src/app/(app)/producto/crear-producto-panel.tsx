@@ -17,7 +17,7 @@ import { ENVIO_VACIO, EnvioProductoBloque } from "./envio-producto";
 import { EnvioIcon } from "@/lib/nav-icons";
 import { claseTono, type Tone } from "@/components/ui/badge";
 import { TONO_CLASE } from "./def-producto";
-import { DIAS_AVISO_PREDETERMINADO } from "@/lib/wms/vencimiento";
+import { DIAS_AVISO_PREDETERMINADO, VENCIMIENTO_ACTIVABLE } from "@/lib/wms/vencimiento";
 import { AvisoDuplicados } from "./aviso-duplicados";
 import { CategoriaNuevoProducto } from "./categoria-nuevo-producto";
 
@@ -345,7 +345,7 @@ export function CrearProductoPanel({
             <EnvioProductoBloque key={vueltaEnvio} id="nuevo" envio={ENVIO_VACIO} puedeEscribir enFormulario />
           </Seccion>
 
-          {!combo && (
+          {!combo && VENCIMIENTO_ACTIVABLE && (
             <Seccion icono={CalendarioIcon} titulo="Vencimiento">
               <label className="flex items-center gap-2 text-sm">
                 <input type="checkbox" name="maneja_vencimiento" value="1" className="h-4 w-4" />

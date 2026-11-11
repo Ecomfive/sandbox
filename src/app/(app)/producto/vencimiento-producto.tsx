@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { anilloFoco, fieldClassSm } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { configurarVencimiento } from "./actions";
-import { DIAS_AVISO_PREDETERMINADO } from "@/lib/wms/vencimiento";
+import { DIAS_AVISO_PREDETERMINADO, VENCIMIENTO_ACTIVABLE } from "@/lib/wms/vencimiento";
 
 const claseBoton = `rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-40 ${anilloFoco}`;
 
@@ -46,8 +46,8 @@ export function VencimientoProducto({
 
   return (
     <div className="flex flex-col gap-3 text-sm">
-      <p className="m-0">{maneja ? `Se controla por lote. Avisa ${diasAviso ?? DIAS_AVISO_PREDETERMINADO} días antes de que venza un lote.` : "No se controla el vencimiento."}</p>
-      {puedeEscribir && (
+      <p className="m-0">{maneja ? `Se controla por lote. Avisa ${diasAviso ?? DIAS_AVISO_PREDETERMINADO} días antes de que venza un lote.` : (VENCIMIENTO_ACTIVABLE ? "No se controla el vencimiento." : "No se controla el vencimiento: por ahora el inventario no usa lotes.")}</p>
+      {puedeEscribir && (maneja || VENCIMIENTO_ACTIVABLE) && (
         <div className="flex flex-col gap-2">
           {maneja && (
             <label className="flex flex-col gap-1">

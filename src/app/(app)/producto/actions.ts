@@ -16,7 +16,7 @@ import { crearCompraDesdeProducto } from "@/lib/compras/compra-desde-producto";
 import { pasarTestsAFiltro } from "@/lib/productos-test/pasar-a-filtro";
 import { getPaisActual } from "@/lib/pais";
 import { puedeVerPais } from "@/lib/paises-permitidos";
-import { DIAS_AVISO_PREDETERMINADO } from "@/lib/wms/vencimiento";
+import { DIAS_AVISO_PREDETERMINADO, VENCIMIENTO_ACTIVABLE } from "@/lib/wms/vencimiento";
 import { huellaFoto } from "@/lib/wms/huella-foto";
 import { posiblesDuplicados, type CandidatoDuplicado, type PosibleDuplicado } from "@/lib/wms/duplicados";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
@@ -64,7 +64,8 @@ export async function crearProducto(formData: FormData): Promise<{ error?: strin
   const reservado = normalizarCodigoBarras(texto(formData, "codigo_barras_interno"));
   const internoVisto = generarBarras && esCodigoInterno(reservado) ? reservado : "";
   // Un producto que caduca se controla por lote y fecha de vencimiento; un compuesto no (sale de sus componentes).
-  const manejaVencimiento = texto(formData, "maneja_vencimiento") === "1";
+  // Por ahora no se crea ningún producto con vencimiento (`VENCIMIENTO_ACTIVABLE`).
+  const manejaVencimiento = VENCIMIENTO_ACTIVABLE && texto(formData, "maneja_vencimiento") === "1";
   const diasAvisoTexto = texto(formData, "dias_aviso_vencimiento");
   const diasAviso = diasAvisoTexto ? Number(diasAvisoTexto) : null;
 
@@ -450,6 +451,7 @@ export async function configurarVencimiento(id: string, maneja: boolean, diasAvi
   const { data: actual } = await supabase.from("skus_maestros").select("codigo, tipo, maneja_vencimiento, dias_aviso_vencimiento").eq("id", id).maybeSingle();
   if (!actual) return { error: "El producto ya no existe." };
   if (maneja && actual.tipo === "combo") return { error: "Un producto compuesto no maneja vencimiento: sale de sus componentes." };
+  if (maneja && !actual.maneja_vencimiento && !VENCIMIENTO_ACTIVABLE) return { error: "Por ahora no se activa el vencimiento: el inventario no usa lotes." };
 
   const { error } = await supabase.from("skus_maestros").update({ maneja_vencimiento: maneja, dias_aviso_vencimiento: maneja ? (diasAviso ?? DIAS_AVISO_PREDETERMINADO) : null }).eq("id", id);
   if (error) return { error: error.message.length < 200 ? error.message : "No se pudo cambiar el control de vencimiento." };
