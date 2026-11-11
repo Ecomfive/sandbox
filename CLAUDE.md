@@ -2549,6 +2549,23 @@ convenciones técnicas del código.
   vuelvas a pedir filas sin `range`/paginar para sumarlas: Supabase entrega como mucho 1000.** Diagnóstico y lo que falta:
   `RENDIMIENTO-PENDIENTE.md`.
 
+- **Compras: «Enviado a cotización», plazos por etapa, prioridades y «Tu desempeño con Ecomfive»** (reunión con Alcides del 11 nov 2026;
+  prototipo aprobado por Hernán; migración 0270, reversa `supabase/rollbacks/0270_rollback.sql`). Etapa nueva `enviado_cotizacion`
+  («02 - Enviado a cotización», color #ff9f43) entre Cotizar y Cotizado; las de después se renumeraron (03 Cotizado … 07 Completado; las
+  claves no cambian). `wms_compras.etapa_desde` la pone un disparador (`wms_compras_etapa_desde`, al crear y al cambiar `etapa`); las viejas
+  tomaron su último evento de etapa o `creado_en`. **Plazos** (`src/lib/compras/plazos.ts`, con prueba): Cotizar 2 d, Enviado 5 d (meta 2),
+  Cotizado 2 d, Producción 15 d (`PLAZO_ETAPA`), Tracking el máximo prometido de `wms_rutas_envio` por agente/país/vía (o de cualquier agente)
+  desde `fecha_envio`; se miden en horas, ámbar el último día o el último 10 %. Compras: columnas «Prioridad» (editable, `prioridad` ya existía
+  en 0076; «Media» = `normal`) y «Plazo de la etapa» (con «Enviar a cotización» y «Decidir»), tarjeta «Enviado a cotización», «Fuera de plazo»
+  (grupo `fuera_plazo`, reemplaza a la tarjeta «Atrasadas»; `?grupo=atrasadas` abre «Fuera de plazo») y «N pasan del plazo» en cada tarjeta;
+  las urgentes primero. **Portal** (`proveedor_sincronizar` de 0270): `enviado_cotizacion` → `por_cotizar`; **«01 - Cotizar» ya no se
+  muestra** (la 0270 pasó a Enviado las de Cotizar que Shen Zhen ya veía, con su evento «Migración 0270»); el espejo copia `prioridad` y
+  `etapa_desde`. `PortalChin` (las dos vistas): panel `PanelDesempeno` (`src/lib/proveedor/desempeno.ts` + `desempeno-datos.ts`, con prueba:
+  envíos por semana/mes y país desde `fecha_envio`, y de los últimos 90 días los días de Enviado→Cotizado, producciones ≤ 15 d y llegadas
+  dentro del plazo), filtro por prioridad, columnas Prioridad, Tiempo para cotizar, Decisión de Ecomfive, Días en producción (desde
+  `confirmadoEn`) y Días en tránsito (barra; «En mar / En aire»; ya no «Prometido» ni «Estado» en la tabla, sí en el Excel). Sin la 0270 la
+  lista de Compras y el portal cargan igual (sin plazos). «En cotización» (En camino, Reponer, Sugerencias, Finanzas) incluye la etapa nueva.
+
 ## Dónde vive cada cosa
 
 - `supabase/migrations/` — cambios de esquema, en orden numerado. Correr

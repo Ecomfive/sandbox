@@ -75,7 +75,7 @@ export function filasReponer(
 }
 
 /** Etapas de una compra que todavía no llegó (las que se cuentan como «en camino»). */
-export const ETAPAS_EN_CAMINO = ["cotizar", "cotizado", "produccion", "tracking", "arribo_mercancia"];
+export const ETAPAS_EN_CAMINO = ["cotizar", "enviado_cotizacion", "cotizado", "produccion", "tracking", "arribo_mercancia"];
 
 /**
  * Suma lo que viene en compras abiertas de un país, por código de SKU. Cada compra trae sus líneas (código y cantidad), su etapa

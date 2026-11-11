@@ -6,7 +6,7 @@ import { IdiomaProveedor, Traducido, useIdioma } from "@/components/proveedor/id
 import { BotonExcel } from "@/components/proveedor/boton-excel";
 import { ColumnaCasilla, SeleccionProveedor, useSeleccion } from "@/components/proveedor/seleccion";
 import { BarraFiltroPortal, FiltroPortalProveedor, SinResultados, useFiltroPortal } from "@/components/proveedor/filtro-portal";
-import { Foto, Pestanas, Producto as ProductoBase, TONO, Tarjeta, Vacio, botonNormal, botonPrincipal, dinero, viaTexto } from "@/components/proveedor/piezas-proveedor";
+import { Foto, Pestanas, Producto as ProductoBase, Tarjeta, Vacio, botonNormal, botonPrincipal, dinero, viaTexto } from "@/components/proveedor/piezas-proveedor";
 import type { CambioRegistro } from "@/components/proveedor/registro-pagos";
 import type { FilaRegistro } from "@/lib/proveedor/registro-pagos";
 import { claseTdLista, claseThLista } from "@/components/panel/piezas-panel";
@@ -30,6 +30,10 @@ import { supabase } from "@/lib/supabase/client";
 import { cambiarIdiomaProveedor, cotizarPedido, historialPedidoProveedor, marcarEnviado, marcarVistoPorProveedor, prepararSubidaFotoReal } from "./actions";
 import { FormularioClave } from "./cambiar-clave";
 import { PagosChin } from "./pagos-chin";
+import { BarraPlazo, MarcaPrioridad } from "@/components/compras/plazo-prioridad";
+import { PanelDesempeno } from "@/components/proveedor/panel-desempeno";
+import { estadoPlazo, ordenPrioridad, PLAZO_ETAPA, PRIORIDADES, type EstadoPlazo } from "@/lib/compras/plazos";
+import type { DesempenoProveedor } from "@/lib/proveedor/desempeno";
 
 export interface AvisoEcomfive {
   id: string;
@@ -58,6 +62,8 @@ export interface DatosPortalChin {
   pagos: { resumen: ResumenPagos; filas: FilaRegistro[]; cambios: CambioRegistro[] } | null;
   /** Lo escrito por personas, ya traducido al idioma de la pantalla (texto original → traducción). */
   traducciones: Record<string, string>;
+  /** «Tu desempeño con Ecomfive» (reunión con Alcides del 11 nov 2026); null si no se pudo leer. */
+  desempeno?: DesempenoProveedor | null;
 }
 
 /**
@@ -78,7 +84,7 @@ export function PortalChin({ idioma, soloLectura = false, ...datos }: DatosPorta
   );
 }
 
-function PortalChinContenido({ cuenta, pedidos, plazos, fotosReales, avisos, pagos, soloLectura, pagosEcomfive, tabInicial, alCambiarTab }: DatosPortalChin & DesdeEcomfive & { soloLectura: boolean }) {
+function PortalChinContenido({ cuenta, pedidos, plazos, fotosReales, avisos, pagos, desempeno, soloLectura, pagosEcomfive, tabInicial, alCambiarTab }: DatosPortalChin & DesdeEcomfive & { soloLectura: boolean }) {
   const { t, tr, fecha, idioma } = useIdioma();
   const [lista, setLista] = useState(pedidos);
   const [fotos, setFotos] = useState(fotosReales);
@@ -100,11 +106,17 @@ function PortalChinContenido({ cuenta, pedidos, plazos, fotosReales, avisos, pag
 
   // El buscador y el país filtran todas las pestañas (también sus contadores y el Registro de pagos).
   const { pasa, activo } = useFiltroPortal();
-  const de = (e: PedidoPortal["etapa"]) => lista.filter((p) => p.etapa === e && pasa(p.producto, p.referencia, p.paisCodigo));
+  // La prioridad que marca Ecomfive filtra también todas las pestañas (menos Pagos); en cada una van primero las urgentes.
+  const [prioridad, setPrioridad] = useState<string | null>(null);
+  const hayPrioridades = lista.some((p) => p.prioridad);
+  const de = (e: PedidoPortal["etapa"]) =>
+    lista
+      .filter((p) => p.etapa === e && pasa(p.producto, p.referencia, p.paisCodigo) && (!prioridad || p.prioridad === prioridad))
+      .sort((a, b) => ordenPrioridad(a.prioridad) - ordenPrioridad(b.prioridad));
   const paises = useMemo(() => paisesDe([...lista.map((p) => p.paisCodigo), ...(pagos?.filas ?? []).map((f) => f.paisCodigo)]), [lista, pagos]);
   const filasPagos = (pagos?.filas ?? []).filter((f) => pasa(String(f.valores.producto ?? ""), f.referencia, f.paisCodigo));
   /** La pestaña, o el aviso de que el filtro la dejó vacía. */
-  const conFiltro = (n: number, contenido: ReactNode) => (activo && n === 0 ? <SinResultados /> : contenido);
+  const conFiltro = (n: number, contenido: ReactNode) => ((activo || prioridad) && n === 0 ? <SinResultados /> : contenido);
   const cambiar = (id: string, cambios: Partial<PedidoPortal>) => setLista((xs) => xs.map((p) => (p.id === id ? { ...p, ...cambios } : p)));
 
   const cuerpo = (
@@ -122,6 +134,8 @@ function PortalChinContenido({ cuenta, pedidos, plazos, fotosReales, avisos, pag
         </Tarjeta>
       )}
 
+      {desempeno && <PanelDesempeno datos={desempeno} hoy={hoy} />}
+
       <Pestanas
         etiqueta={t.marca}
         tabs={[
@@ -136,6 +150,22 @@ function PortalChinContenido({ cuenta, pedidos, plazos, fotosReales, avisos, pag
       />
 
       <BarraFiltroPortal paises={paises} />
+      {hayPrioridades && tab !== "pagos" && (
+        <span role="group" aria-label={t.colPrioridad} className="-mt-2 flex flex-wrap items-center gap-1.5">
+          <span className="mr-1 text-xs font-medium text-muted-foreground">{t.colPrioridad}</span>
+          {[null, ...PRIORIDADES.map((x) => x.valor)].map((v) => (
+            <button
+              key={v ?? "todas"}
+              type="button"
+              aria-pressed={prioridad === v}
+              onClick={() => setPrioridad(v)}
+              className={`min-h-8 rounded-full border px-3 text-xs font-semibold ${prioridad === v ? "border-foreground bg-foreground text-background" : "border-border-control bg-card hover:bg-muted"} ${anilloFoco}`}
+            >
+              {v ? t.prioridades[v] : t.todas}
+            </button>
+          ))}
+        </span>
+      )}
 
       {tab === "cotizar" && conFiltro(de("por_cotizar").length, <PorCotizar pedidos={de("por_cotizar")} alCotizar={soloLectura ? null : setCotizando} />)}
       {tab === "cotizado" && conFiltro(de("cotizado").length, <Cotizados pedidos={de("cotizado")} fotos={fotos} alCorregir={soloLectura ? null : setCotizando} />)}
@@ -271,6 +301,31 @@ function SelectorIdioma() {
   );
 }
 
+/** El plazo acordado de la pestaña (reunión con Alcides del 11 nov 2026), en una franja debajo del título. */
+function Regla({ texto }: { texto: string }) {
+  return <p className="m-0 border-b border-border bg-primario-suave px-4 py-2 text-xs font-medium text-foreground">{texto}</p>;
+}
+
+/** La prioridad de un pedido, en el idioma de la pantalla. */
+function Prioridad({ p }: { p: PedidoPortal }) {
+  const { t } = useIdioma();
+  return <MarcaPrioridad prioridad={p.prioridad} texto={p.prioridad ? (t.prioridades[p.prioridad] ?? p.prioridad) : t.sinPrioridad} />;
+}
+
+/** El plazo de su etapa (el tiempo para cotizar, la decisión de Ecomfive, los días en producción o en tránsito) con su barrita. */
+function Plazo({ estado }: { estado: EstadoPlazo | null }) {
+  const { t } = useIdioma();
+  return <BarraPlazo estado={estado} texto={estado ? (estado.tono === "vencido" ? t.vencidoHace(estado.vencidoHace) : t.plazoDe(estado.dias, estado.plazo)) : ""} />;
+}
+
+/** El plazo de la etapa en que está el pedido, desde que entró en ella (en producción, desde que Ecomfive lo confirmó). */
+function plazoEtapa(p: PedidoPortal, ahora: number): EstadoPlazo | null {
+  const etapa = p.etapa === "por_cotizar" ? "enviado_cotizacion" : p.etapa;
+  const desde = p.etapa === "produccion" ? (p.confirmadoEn ?? p.etapaDesde) : p.etapaDesde;
+  const plazo = PLAZO_ETAPA[etapa];
+  return desde && plazo ? estadoPlazo(desde, plazo, ahora) : null;
+}
+
 function Cabecera({ columnas, ids }: { columnas: { texto: string; derecha?: boolean }[]; ids: string[] }) {
   return (
     <thead className="sticky top-0 z-[1] bg-card">
@@ -303,6 +358,7 @@ function useContextoExcel(): ContextoExcel {
 function PorCotizar({ pedidos, alCotizar }: { pedidos: PedidoPortal[]; alCotizar: ((p: PedidoPortal) => void) | null }) {
   const { t, idioma, numero, tr } = useIdioma();
   const hoja = hojaPorCotizar(pedidos, useContextoExcel());
+  const [ahora] = useState(() => Date.now());
   return (
     <Tarjeta
       titulo={t.cotizarTitulo}
@@ -313,17 +369,27 @@ function PorCotizar({ pedidos, alCotizar }: { pedidos: PedidoPortal[]; alCotizar
         </span>
       }
     >
+      <Regla texto={t.reglaCotizar} />
       {pedidos.length === 0 ? (
         <Vacio>{t.cotizarVacio}</Vacio>
       ) : (
         <Tabla>
-          <Cabecera ids={pedidos.map((p) => p.id)} columnas={[{ texto: t.colProducto }, { texto: t.colDestino }, { texto: t.colVia }, { texto: t.colUnidades, derecha: true }, { texto: t.colNota }, { texto: "" }]} />
+          <Cabecera
+            ids={pedidos.map((p) => p.id)}
+            columnas={[{ texto: t.colProducto }, { texto: t.colPrioridad }, { texto: t.colTiempoCotizar }, { texto: t.colDestino }, { texto: t.colVia }, { texto: t.colUnidades, derecha: true }, { texto: t.colNota }, { texto: "" }]}
+          />
           <tbody>
             {pedidos.map((p) => (
               <tr key={p.id}>
                 <ColumnaCasilla id={p.id} nombre={tr(p.producto)} />
                 <td className={claseTdLista}>
                   <Producto p={p} />
+                </td>
+                <td className={claseTdLista}>
+                  <Prioridad p={p} />
+                </td>
+                <td className={claseTdLista}>
+                  <Plazo estado={plazoEtapa(p, ahora)} />
                 </td>
                 <td className={`${claseTdLista} font-semibold tabular-nums`}>{p.paisCodigo ?? "—"}</td>
                 <td className={claseTdLista}>{viaTexto(p, idioma)}</td>
@@ -346,8 +412,15 @@ function PorCotizar({ pedidos, alCotizar }: { pedidos: PedidoPortal[]; alCotizar
 function Cotizados({ pedidos, fotos, alCorregir }: { pedidos: PedidoPortal[]; fotos: Record<string, string>; alCorregir: ((p: PedidoPortal) => void) | null }) {
   const { t, idioma, numero, tr } = useIdioma();
   const hoja = hojaCotizados(pedidos, useContextoExcel(), fotos);
+  const [ahora] = useState(() => Date.now());
   return (
-    <Tarjeta titulo={t.cotizadoTitulo} accion={<BotonExcel clave="cotizado" titulo={t.tabCotizado} columnas={hoja.columnas} filas={hoja.filas} />}>
+    <Tarjeta
+      titulo={t.cotizadoTitulo}
+      accion={
+        <BotonExcel clave="cotizado" titulo={t.tabCotizado} columnas={hoja.columnas} filas={hoja.filas} />
+      }
+    >
+      <Regla texto={t.reglaCotizado} />
       {pedidos.length === 0 ? (
         <Vacio>{t.cotizadoVacio}</Vacio>
       ) : (
@@ -356,6 +429,8 @@ function Cotizados({ pedidos, fotos, alCorregir }: { pedidos: PedidoPortal[]; fo
             ids={pedidos.map((p) => p.id)}
             columnas={[
               { texto: t.colProducto },
+              { texto: t.colPrioridad },
+              { texto: t.colDecision },
               { texto: t.colDestino },
               { texto: t.colVia },
               { texto: t.colUnidades, derecha: true },
@@ -379,6 +454,12 @@ function Cotizados({ pedidos, fotos, alCorregir }: { pedidos: PedidoPortal[]; fo
                         «<Traducido texto={p.comentarioProveedor} />»
                       </span>
                     )}
+                  </td>
+                  <td className={claseTdLista}>
+                    <Prioridad p={p} />
+                  </td>
+                  <td className={claseTdLista}>
+                    <Plazo estado={plazoEtapa(p, ahora)} />
                   </td>
                   <td className={`${claseTdLista} font-semibold tabular-nums`}>{p.paisCodigo ?? "—"}</td>
                   <td className={claseTdLista}>{viaTexto(p, idioma)}</td>
@@ -436,6 +517,7 @@ function EnProduccion({
         </span>
       }
     >
+      <Regla texto={t.reglaProduccion} />
       {pedidos.length === 0 ? (
         <Vacio>{t.produccionVacio}</Vacio>
       ) : (
@@ -444,6 +526,8 @@ function EnProduccion({
             ids={pedidos.map((p) => p.id)}
             columnas={[
               { texto: t.colProducto },
+              { texto: t.colPrioridad },
+              { texto: t.colDiasProduccion },
               { texto: t.colDestino },
               { texto: t.colVia },
               { texto: t.colUnidades, derecha: true },
@@ -482,6 +566,7 @@ function FilaProduccion({
   const { t, idioma, numero, tr, fecha, error } = useIdioma();
   const { mostrarToast } = useToast();
   const [f, setF] = useState(hoy);
+  const [ahora] = useState(() => Date.now());
   const [confirmar, setConfirmar] = useState(false);
   const [ocupado, setOcupado] = useState(false);
   async function enviar() {
@@ -498,6 +583,12 @@ function FilaProduccion({
       <ColumnaCasilla id={p.id} nombre={tr(p.producto)} />
       <td className={claseTdLista}>
         <Producto p={p} />
+      </td>
+      <td className={claseTdLista}>
+        <Prioridad p={p} />
+      </td>
+      <td className={claseTdLista}>
+        <Plazo estado={plazoEtapa(p, ahora)} />
       </td>
       <td className={`${claseTdLista} font-semibold tabular-nums`}>{p.paisCodigo ?? "—"}</td>
       <td className={claseTdLista}>{viaTexto(p, idioma)}</td>
@@ -541,9 +632,10 @@ function Enviados({ pedidos, plazos, hoy }: { pedidos: PedidoPortal[]; plazos: R
       const e = estadoTransito(p.fechaEnvio!, null, plazo, hoy);
       const max = plazo?.max ?? plazo?.min ?? null;
       const texto = max == null ? t.sinPlazo : e.dias > max ? t.diasAtraso(e.dias - max) : t.faltanDias(max - e.dias);
-      return { p, plazo, e, texto };
+      const barra = max != null && max > 0 ? estadoPlazo(p.fechaEnvio!, max, Date.parse(`${hoy}T23:59:59-05:00`)) : null;
+      return { p, plazo, e, texto, barra };
     })
-    .sort((a, b) => b.p.fechaEnvio!.localeCompare(a.p.fechaEnvio!));
+    .sort((a, b) => ordenPrioridad(a.p.prioridad) - ordenPrioridad(b.p.prioridad) || b.p.fechaEnvio!.localeCompare(a.p.fechaEnvio!));
   const plazoTexto = (plazo: Plazo | null) => (idioma === "zh" ? textoPlazo(plazo).replace(/ d$/, " 天") : textoPlazo(plazo));
   const hoja = hojaEnviados(
     filas.map(({ p, plazo, e, texto }) => ({ p, dias: e.dias, plazo: plazoTexto(plazo), estado: texto })),
@@ -567,32 +659,43 @@ function Enviados({ pedidos, plazos, hoy }: { pedidos: PedidoPortal[]; plazos: R
             ids={filas.map(({ p }) => p.id)}
             columnas={[
               { texto: t.colProducto },
+              { texto: t.colPrioridad },
               { texto: t.colDestino },
               { texto: t.colVia },
               { texto: t.colUnidades, derecha: true },
               { texto: t.colConfirmado },
               { texto: t.colEnviado },
-              { texto: t.colDias, derecha: true },
-              { texto: t.colPrometido },
-              { texto: t.colEstado },
+              { texto: t.colDiasTransito },
             ]}
           />
           <tbody>
-            {filas.map(({ p, plazo, e, texto }) => (
+            {filas.map(({ p, e, barra }) => (
               <tr key={p.id}>
                 <ColumnaCasilla id={p.id} nombre={tr(p.producto)} />
                 <td className={claseTdLista}>
                   <Producto p={p} />
                 </td>
+                <td className={claseTdLista}>
+                  <Prioridad p={p} />
+                </td>
                 <td className={`${claseTdLista} font-semibold tabular-nums`}>{p.paisCodigo ?? "—"}</td>
-                <td className={claseTdLista}>{viaTexto(p, idioma)}</td>
+                <td className={`${claseTdLista} whitespace-nowrap`}>
+                  <span aria-hidden="true">{p.via === "aire" ? "✈️ " : "🚢 "}</span>
+                  {p.via === "aire" ? t.enAire : t.enMar}
+                  {p.modalidad && <span className="block text-xs text-muted-foreground">{viaTexto(p, idioma)}</span>}
+                </td>
                 <td className={`${claseTdLista} text-right tabular-nums`}>{numero(p.unidades)}</td>
                 <td className={`${claseTdLista} tabular-nums`}>{p.confirmadoEn ? fecha(diaPanama(p.confirmadoEn)) : "—"}</td>
                 <td className={`${claseTdLista} tabular-nums`}>{fecha(p.fechaEnvio)}</td>
-                <td className={`${claseTdLista} text-right tabular-nums`}>{t.dias(e.dias)}</td>
-                <td className={`${claseTdLista} text-muted-foreground tabular-nums`}>{plazoTexto(plazo)}</td>
                 <td className={claseTdLista}>
-                  <Badge tone={TONO[e.tono]}>{texto}</Badge>
+                  {barra ? (
+                    <Plazo estado={barra} />
+                  ) : (
+                    <span className="text-xs tabular-nums">
+                      {t.dias(e.dias)}
+                      <span className="block text-muted-foreground">{t.sinPlazo}</span>
+                    </span>
+                  )}
                 </td>
               </tr>
             ))}

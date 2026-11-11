@@ -1,6 +1,7 @@
 // Qué datos de una compra se editan directo en su celda de la lista y cómo se validan. Es lógica pura (sin base ni React): la
 // usan la celda (para mostrar el cambio al instante) y la acción del servidor (que vuelve a validar, es la que manda).
 
+import { colorPrioridad, PRIORIDADES } from "@/lib/compras/plazos";
 import { AGENTES_ENVIO, colorAgente, colorEstado, colorEtapa, colorProveedor, ESTADOS_COMPRA, ETAPAS_COMPRA, PROVEEDORES_COMPRA, VIAS_ENVIO, type FilaCompra } from "./def-compras";
 
 export type TipoCampoEditable = "texto" | "entero" | "dinero" | "fecha" | "seleccion" | "multiple" | "booleano" | "lista";
@@ -34,6 +35,8 @@ export interface CampoEditable {
 export const CAMPOS_EDITABLES: Record<string, CampoEditable> = {
   etapa: { etiqueta: "Etapa", prop: "etapa", columna: "etapa", tipo: "seleccion", opciones: ETAPAS_COMPRA, color: colorEtapa },
   estado: { etiqueta: "Estado", prop: "estado", columna: "estado", tipo: "seleccion", opciones: ESTADOS_COMPRA, color: colorEstado },
+  // Reunión con Alcides del 11 nov 2026: la marca Ecomfive y Shen Zhen la ve en su portal («Media» se guarda como `normal`).
+  prioridad: { etiqueta: "Prioridad", prop: "prioridad", columna: "prioridad", tipo: "seleccion", opciones: PRIORIDADES, admiteVacio: true, color: colorPrioridad },
   viaEnvio: { etiqueta: "Vía de envío", prop: "viaEnvio", columna: "via_envio", tipo: "multiple", opciones: VIAS_ENVIO, unica: true, admiteVacio: true },
   proveedor: { etiqueta: "Proveedor", prop: "proveedor", columna: "proveedor", tipo: "seleccion", opciones: PROVEEDORES_COMPRA, admiteVacio: true, color: colorProveedor },
   agenteEnvio: { etiqueta: "Agente de envío", prop: "agenteEnvio", columna: "agente_envio", tipo: "seleccion", opciones: AGENTES_ENVIO, admiteVacio: true, color: colorAgente },

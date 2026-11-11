@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { createServiceClient } from "@/lib/supabase/server";
+import { plazosTransitoDeRutas } from "@/lib/compras/plazos";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { getUsuarioActual } from "@/lib/auth";
 import { filtrarPaises, puedeVerPais } from "@/lib/paises-permitidos";
@@ -12,7 +13,7 @@ import { SIN_RESTRICCIONES, dentroDelAlcance, enmascarar, restriccionesDe, type 
 export const COOKIE_VISTA_COMPRAS = "compras-vista";
 
 const COLUMNAS =
-  "id, tipo, codigo, nombre, foto_url, etapa, estado, proveedor, agente_envio, venta_importacion, tiendas, qty_total, monto_total, primer_pago, segundo_pago, pagado_a_proveedor, anulada_en, anulada_por, motivo_anulacion, factura, financiamiento, fecha_limite, fecha_llegada, fecha_pago_1, fecha_pago_2, fecha_envio, planificacion, via_envio, etiquetas, responsable_nombre, creador_nombre, asignado_a, creado_por, descripcion, url_producto, nota_proveedor, paises_destino, fecha_inicio, cerrado_en, creado_en, paises(codigo), perfiles(nombre, email), numero, wms_compra_items(cantidad_pedida, creado_en, sku_maestro_id, skus_maestros(codigo, nombre))";
+  "id, tipo, codigo, nombre, foto_url, etapa, etapa_desde, prioridad, estado, proveedor, agente_envio, venta_importacion, tiendas, qty_total, monto_total, primer_pago, segundo_pago, pagado_a_proveedor, anulada_en, anulada_por, motivo_anulacion, factura, financiamiento, fecha_limite, fecha_llegada, fecha_pago_1, fecha_pago_2, fecha_envio, planificacion, via_envio, etiquetas, responsable_nombre, creador_nombre, asignado_a, creado_por, descripcion, url_producto, nota_proveedor, paises_destino, fecha_inicio, cerrado_en, creado_en, paises(codigo), perfiles(nombre, email), numero, wms_compra_items(cantidad_pedida, creado_en, sku_maestro_id, skus_maestros(codigo, nombre))";
 
 const num = (v: unknown) => (v === null || v === undefined ? null : Number(v));
 const uno = <T,>(r: unknown): T | null => (Array.isArray(r) ? ((r[0] as T) ?? null) : ((r as T) ?? null));
@@ -119,15 +120,19 @@ export async function cargarCompras(ver: string | string[] | undefined): Promise
   try {
     // «Todos» con países limitados: solo los suyos (sin ninguno, nada).
     if (vista === "todos" && permitidos !== null && paises.length === 0) filas = [];
-    else
-      filas = await traerTodasLasFilas<Record<string, unknown>>((desde, hasta) => {
-        let q = supabase.from("wms_compras").select(COLUMNAS);
-        if (vista === "importacion") q = q.eq("tipo", "importacion");
-        else if (paisVista) q = q.eq("tipo", "pais").eq("pais_id", paisVista.id);
-        else if (permitidos !== null) q = q.eq("tipo", "pais").in("pais_id", paises.map((p) => p.id));
-        else q = q.eq("tipo", "pais");
-        return q.order("creado_en", { ascending: false }).range(desde, hasta);
-      });
+    else {
+      const leer = (columnas: string) =>
+        traerTodasLasFilas<Record<string, unknown>>((desde, hasta) => {
+          let q = supabase.from("wms_compras").select(columnas);
+          if (vista === "importacion") q = q.eq("tipo", "importacion");
+          else if (paisVista) q = q.eq("tipo", "pais").eq("pais_id", paisVista.id);
+          else if (permitidos !== null) q = q.eq("tipo", "pais").in("pais_id", paises.map((p) => p.id));
+          else q = q.eq("tipo", "pais");
+          return q.order("creado_en", { ascending: false }).range(desde, hasta) as unknown as PromiseLike<{ data: Record<string, unknown>[] | null; error: unknown }>;
+        });
+      // Sin la migración 0270 (`etapa_desde`) la lista se ve igual, sin el plazo de cada etapa.
+      filas = await leer(COLUMNAS).catch(() => leer(COLUMNAS.replace(" etapa_desde,", "")));
+    }
   } catch {
     error = true;
   }
@@ -159,6 +164,8 @@ export async function cargarCompras(ver: string | string[] | undefined): Promise
       nombre: String(c.nombre),
       fotoUrl: txt(c.foto_url),
       etapa: String(c.etapa),
+      etapaDesde: txt(c.etapa_desde),
+      prioridad: txt(c.prioridad),
       estado: String(c.estado),
       proveedor: txt(c.proveedor),
       agenteEnvio: txt(c.agente_envio),
@@ -224,4 +231,18 @@ export async function cargarColoresEtiquetas(): Promise<Record<string, string>> 
   const { data, error } = await createServiceClient().from("wms_compras_etiquetas").select("nombre, color");
   if (error) return {};
   return Object.fromEntries((data ?? []).map((e) => [e.nombre as string, e.color as string]));
+}
+
+/** El plazo de tránsito prometido por agente, país y vía (Compras › Envíos), para el plazo de las compras en Tracking. */
+export async function cargarPlazosTransito(): Promise<Record<string, number>> {
+  const { data } = await createServiceClient().from("wms_rutas_envio").select("agente, pais_codigo, via, dias_min, dias_max").eq("activo", true);
+  return plazosTransitoDeRutas(
+    (data ?? []).map((r) => ({
+      agente: (r.agente as string | null) ?? null,
+      pais: (r.pais_codigo as string | null) ?? null,
+      via: String(r.via),
+      diasMin: r.dias_min == null ? null : Number(r.dias_min),
+      diasMax: r.dias_max == null ? null : Number(r.dias_max),
+    })),
+  );
 }

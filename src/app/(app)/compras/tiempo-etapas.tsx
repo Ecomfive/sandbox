@@ -9,9 +9,9 @@ import { etiquetaEtapa, numeroOC, type FilaCompra } from "./def-compras";
 import { entero, usd } from "./calculos-compras";
 
 /** Las etapas que se miden, en el orden del flujo (Completado y Descartado son el final: no se mide cuánto se quedan). */
-const ETAPAS = ["cotizar", "cotizado", "produccion", "tracking", "arribo_mercancia", "backlog"] as const;
+const ETAPAS = ["cotizar", "enviado_cotizacion", "cotizado", "produccion", "tracking", "arribo_mercancia", "backlog"] as const;
 /** Las del recorrido normal, para sumar el ciclo de Cotizar a Arribo. */
-const RECORRIDO = ["cotizar", "cotizado", "produccion", "tracking", "arribo_mercancia"];
+const RECORRIDO = ["cotizar", "enviado_cotizacion", "cotizado", "produccion", "tracking", "arribo_mercancia"];
 /** Con menos estancias que estas, «9 de cada 10» no dice mucho y no se marca a nadie como «más de lo normal». */
 const MIN_MUESTRA = 3;
 /** Pospuesta no tiene un tiempo «normal»: ahí no se marca a nadie. */

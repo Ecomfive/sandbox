@@ -40,7 +40,7 @@ const FALLIDOS = ["fallido", "descartado"];
 
 /** Las etapas de la compra que se le cuentan al cliente, en orden (sin cotizaciones ni montos). */
 const ETAPAS_COMPRA_CLIENTE: { clave: string; etiqueta: string; etapas: string[] }[] = [
-  { clave: "cotizando", etiqueta: "Cotizando con el proveedor", etapas: ["cotizar", "cotizado"] },
+  { clave: "cotizando", etiqueta: "Cotizando con el proveedor", etapas: ["cotizar", "enviado_cotizacion", "cotizado"] },
   { clave: "produccion", etiqueta: "En producción", etapas: ["produccion"] },
   { clave: "camino", etiqueta: "En camino", etapas: ["tracking"] },
   { clave: "llego", etiqueta: "Llegó a bodega", etapas: ["arribo_mercancia"] },

@@ -18,20 +18,40 @@ export interface TarjetaCompras {
 /**
  * Las etapas que se miran todos los días (30 oct 2026, pedido de Hernán: «como el tablero de Gestión de IDs»): por cotizar y cotizado (separadas el 7 nov 2026), en producción, en
  * tránsito, atrasadas y las compras de país que todavía no tienen sus productos. Los mismos filtros de un toque de antes, ahora como tarjetas.
+ * 11 nov 2026 (reunión con Alcides): «Enviado a cotización» y «Fuera de plazo» (cualquier etapa que pasó su plazo; reemplaza a «Atrasadas»,
+ * que solo miraba el tránsito), y cada tarjeta dice cuántas de las suyas pasan del plazo.
  */
 export const TARJETAS_COMPRAS: TarjetaCompras[] = [
-  { id: "por_cotizar", titulo: "Por cotizar", icono: ComprasIcon, color: "azul", detalle: "Falta pedir o recibir la cotización" },
-  { id: "cotizado", titulo: "Cotizado", icono: ComprasIcon, color: "azul", detalle: "Ya cotizadas, esperando decisión" },
-  { id: "produccion", titulo: "En producción", icono: ProveedorIcon, color: "violeta", detalle: "Confirmadas: el proveedor las está fabricando" },
+  { id: "por_cotizar", titulo: "Por cotizar", icono: ComprasIcon, color: "azul", detalle: "Falta enviarlas a cotizar (48 h)" },
+  { id: "enviado_cotizacion", titulo: "Enviado a cotización", icono: ProveedorIcon, color: "azul", detalle: "El proveedor las tiene para cotizar (máx. 5 días)" },
+  { id: "cotizado", titulo: "Cotizado", icono: ComprasIcon, color: "azul", detalle: "Ya cotizadas: decidir en 2 días" },
+  { id: "produccion", titulo: "En producción", icono: ProveedorIcon, color: "violeta", detalle: "Confirmadas: máx. 15 días en producción" },
   { id: "transito", titulo: "En tránsito", icono: EnvioIcon, color: "ambar", detalle: "Enviadas y todavía sin llegar a la bodega" },
-  { id: "atrasadas", titulo: "Atrasadas", icono: AlertaIcon, color: "rojo", detalle: "Más días en tránsito de lo normal para su vía" },
+  { id: "fuera_plazo", titulo: "Fuera de plazo", icono: AlertaIcon, color: "rojo", detalle: "Pasaron el plazo de su etapa" },
   { id: "sin_productos", titulo: "Sin productos", icono: EnlaceIcon, color: "ambar", detalle: "Compras de país sin sus productos vinculados" },
 ];
 
 /** Una tarjeta: botón que pone o quita su filtro en la lista de abajo, con el número grande y, si hay, las unidades y el monto. */
-function Tarjeta({ t, valor, unidades, monto, activa, alPulsar }: { t: TarjetaCompras; valor: number; unidades: number | null; monto: string | null; activa: boolean; alPulsar: () => void }) {
-  // Lo que avisa (atrasadas, sin productos) en 0 se ve en verde: está todo bien.
-  const c = COLORES[valor === 0 && (t.id === "atrasadas" || t.id === "sin_productos") ? "verde" : t.color];
+function Tarjeta({
+  t,
+  valor,
+  unidades,
+  monto,
+  fuera,
+  activa,
+  alPulsar,
+}: {
+  t: TarjetaCompras;
+  valor: number;
+  unidades: number | null;
+  monto: string | null;
+  /** Cuántas de la tarjeta pasan del plazo de su etapa (null: no se dice). */
+  fuera: number | null;
+  activa: boolean;
+  alPulsar: () => void;
+}) {
+  // Lo que avisa (fuera de plazo, sin productos) en 0 se ve en verde: está todo bien.
+  const c = COLORES[valor === 0 && (t.id === "fuera_plazo" || t.id === "atrasadas" || t.id === "sin_productos") ? "verde" : t.color];
   const Icono = t.icono;
   return (
     <button
@@ -61,6 +81,11 @@ function Tarjeta({ t, valor, unidades, monto, activa, alPulsar }: { t: TarjetaCo
             {monto}
           </span>
         )}
+        {fuera !== null && fuera > 0 && (
+          <span className="mt-0.5 block font-semibold text-destructive tabular-nums">
+            {fuera} {fuera === 1 ? "pasa" : "pasan"} del plazo
+          </span>
+        )}
         <span className="sr-only">. {activa ? "Filtrando la lista: pulsa para quitar el filtro." : `Pulsa para ver solo: ${t.titulo.toLowerCase()}.`}</span>
       </span>
     </button>
@@ -76,14 +101,14 @@ export function TableroCompras({
   activa,
   alPulsar,
 }: {
-  tarjetas: { t: TarjetaCompras; valor: number; unidades: number | null; monto: string | null }[];
+  tarjetas: { t: TarjetaCompras; valor: number; unidades: number | null; monto: string | null; fuera?: number | null }[];
   activa: (id: TarjetaCompras["id"]) => boolean;
   alPulsar: (id: TarjetaCompras["id"]) => void;
 }) {
   return (
     <section aria-label="Tablero de compras" className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(12rem,1fr))]">
-      {tarjetas.map(({ t, valor, unidades, monto }) => (
-        <Tarjeta key={t.id} t={t} valor={valor} unidades={unidades} monto={monto} activa={activa(t.id)} alPulsar={() => alPulsar(t.id)} />
+      {tarjetas.map(({ t, valor, unidades, monto, fuera }) => (
+        <Tarjeta key={t.id} t={t} valor={valor} unidades={unidades} monto={monto} fuera={fuera ?? null} activa={activa(t.id)} alPulsar={() => alPulsar(t.id)} />
       ))}
     </section>
   );

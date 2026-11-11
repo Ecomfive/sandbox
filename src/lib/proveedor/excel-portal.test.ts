@@ -9,7 +9,7 @@ const pedido = (extra: Partial<PedidoPortal> = {}): PedidoPortal => ({
   id: "p1", compraId: "c1", referencia: "OC-1088", producto: "Cepillo de vapor", fotoReferencia: null, paisCodigo: "PA", via: "mar", modalidad: "FCL", etapa: "produccion",
   unidadesPedidas: 1000, unidades: 960, montoTotal: 2400, costoUnitario: 2.5, notaParaProveedor: "Urgente", fechaEnvio: "2026-10-01", fechaLlegada: null, primerPago: null, fechaPago1: null,
   segundoPago: null, fechaPago2: null, pagadoAProveedor: null, fotoRealRuta: null, comentarioProveedor: "Caja de 48", cotizadoEn: null, actualizadoEn: "2026-10-20T00:00:00Z",
-  anticipoMonto: null, confirmadoEn: "2026-10-20T15:30:00Z", ...extra,
+  anticipoMonto: null, confirmadoEn: "2026-10-20T15:30:00Z", prioridad: null, etapaDesde: null, ...extra,
 });
 const ctx = (idioma: "es" | "zh"): ContextoExcel => ({ t: TEXTOS[idioma], tr: (s) => (s ? (idioma === "zh" ? `ZH ${s}` : s) : ""), via: (p) => `${p.via === "aire" ? "Aéreo" : "Marítimo"} ${p.modalidad ?? ""}`.trim() });
 

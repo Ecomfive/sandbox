@@ -140,19 +140,27 @@ export function estaAtrasada(c: FilaCompra, umbral: Record<string, number>, dia:
 export const enTransito = (c: FilaCompra) => estaAbierta(c) && !!c.fechaEnvio && !c.fechaLlegada;
 
 /** El grupo del filtro rápido de la lista. */
-export type Grupo = "abiertas" | "cotizando" | "por_cotizar" | "cotizado" | "produccion" | "transito" | "atrasadas" | "cerradas";
-const ETAPAS_COTIZANDO = ["backlog", "solicitud_local", "solicitud_internacional", "cotizar", "cotizado", "evaluacion_proveedor", "solicitud_proveedor"];
+export type Grupo = "abiertas" | "cotizando" | "por_cotizar" | "enviado_cotizacion" | "cotizado" | "produccion" | "transito" | "atrasadas" | "fuera_plazo" | "cerradas";
+const ETAPAS_COTIZANDO = ["backlog", "solicitud_local", "solicitud_internacional", "cotizar", "enviado_cotizacion", "cotizado", "evaluacion_proveedor", "solicitud_proveedor"];
+/** «Enviado a cotización» (11 nov 2026, reunión con Alcides): ya está con el proveedor, tiene su propia tarjeta. */
+const ETAPAS_ENVIADO = ["enviado_cotizacion"];
 /** «Cotizando» se ve en dos tarjetas (7 nov 2026, pedido de Hernán): lo que falta cotizar y lo ya cotizado que espera decisión. */
 const ETAPAS_COTIZADO = ["cotizado"];
 const ETAPAS_PRODUCCION = ["compra_pago", "produccion"];
 
-export function enGrupo(c: FilaCompra, g: Grupo, umbral: Record<string, number>): boolean {
+/**
+ * Si una compra está en un grupo de las tarjetas. «Fuera de plazo» (antes «Atrasadas», solo en tránsito) es cualquier compra abierta que
+ * pasó el plazo de su etapa: lo dice `fueraDePlazo` (ver `src/lib/compras/plazos.ts`); sin él, ninguna.
+ */
+export function enGrupo(c: FilaCompra, g: Grupo, umbral: Record<string, number>, fueraDePlazo?: (c: FilaCompra) => boolean): boolean {
   if (g === "cerradas") return !estaAbierta(c);
   if (!estaAbierta(c)) return false;
   if (g === "abiertas") return true;
   if (g === "cotizando") return ETAPAS_COTIZANDO.includes(c.etapa);
   if (g === "cotizado") return ETAPAS_COTIZADO.includes(c.etapa);
-  if (g === "por_cotizar") return ETAPAS_COTIZANDO.includes(c.etapa) && !ETAPAS_COTIZADO.includes(c.etapa);
+  if (g === "por_cotizar") return ETAPAS_COTIZANDO.includes(c.etapa) && !ETAPAS_COTIZADO.includes(c.etapa) && !ETAPAS_ENVIADO.includes(c.etapa);
+  if (g === "enviado_cotizacion") return ETAPAS_ENVIADO.includes(c.etapa);
+  if (g === "fuera_plazo") return fueraDePlazo?.(c) ?? false;
   if (g === "produccion") return ETAPAS_PRODUCCION.includes(c.etapa);
   if (g === "transito") return enTransito(c) || ["tracking", "aviso_logistica"].includes(c.etapa);
   return estaAtrasada(c, umbral);
@@ -172,7 +180,7 @@ export function paraRevisar(compras: FilaCompra[], umbral: Record<string, number
   return {
     atrasadas: abiertas.filter((c) => estaAtrasada(c, umbral, dia)).sort((a, b) => (a.fechaEnvio ?? "").localeCompare(b.fechaEnvio ?? "")),
     cotizacionLarga: abiertas
-      .filter((c) => ["cotizar", "solicitud_local", "solicitud_internacional"].includes(c.etapa) && (diasEntre(c.creadoEn, dia) ?? 0) > 21)
+      .filter((c) => ["cotizar", "enviado_cotizacion", "solicitud_local", "solicitud_internacional"].includes(c.etapa) && (diasEntre(c.creadoEn, dia) ?? 0) > 21)
       .sort((a, b) => a.creadoEn.localeCompare(b.creadoEn)),
     conInconveniente: abiertas.filter((c) => !!c.inconveniente),
   };

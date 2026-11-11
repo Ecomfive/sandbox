@@ -45,12 +45,16 @@ import {
   type FilaCompra,
 } from "./def-compras";
 import { FichaCompra } from "./ficha-compra";
-import { diasEntre, enGrupo, estaAtrasada, hoy, umbralesTransito, type Grupo } from "./calculos-compras";
+import { diasEntre, enGrupo, estaAbierta, estaAtrasada, hoy, umbralesTransito, type Grupo } from "./calculos-compras";
+import { BarraPlazo, MarcaPrioridad } from "@/components/compras/plazo-prioridad";
+import { etiquetaPrioridad, ordenPrioridad, plazoDeCompra, plazoTransitoDe, textoPlazoEtapa, type EstadoPlazo } from "@/lib/compras/plazos";
 
 const NOMBRE: NombreFilas = { singular: "compra", plural: "compras" };
+const SIN_PLAZOS: Record<string, number> = {};
 const ICONOS: Record<string, IconoComp> = {
   pais: ComprasIcon,
   etapa: EstadoIcon,
+  prioridad: EstadoIcon,
   estado: EstadoIcon,
   proveedor: ProductoIcon,
   agenteEnvio: ComprasIcon,
@@ -105,10 +109,11 @@ const conColor = (v: string | null, color: (x: string) => string | undefined) =>
 /** Filtros de un toque sobre las abiertas (las cerradas se ven con el botón «Cerrados» de la barra). */
 const RAPIDOS: { valor: Grupo; etiqueta: string }[] = [
   { valor: "por_cotizar", etiqueta: "Por cotizar" },
+  { valor: "enviado_cotizacion", etiqueta: "Enviado a cotización" },
   { valor: "cotizado", etiqueta: "Cotizado" },
   { valor: "produccion", etiqueta: "Producción" },
   { valor: "transito", etiqueta: "En tránsito" },
-  { valor: "atrasadas", etiqueta: "Atrasadas" },
+  { valor: "fuera_plazo", etiqueta: "Fuera de plazo" },
 ];
 
 /**
@@ -176,6 +181,7 @@ function col(id: string, nombre: string, resto: Omit<ColumnaTabla<FilaCompra>, "
 function columnas(
   umbral: Record<string, number>,
   dia: string,
+  plazoDe: (c: FilaCompra) => EstadoPlazo | null,
   edicion: {
     puedeEscribir: boolean;
     restricciones: RestriccionesCompras;
@@ -184,6 +190,8 @@ function columnas(
     tiendas: string[];
     colores: Record<string, string>;
     cambiarColor: (nombre: string, color: string) => void;
+    /** Abre la ficha de la compra («Decidir» de una cotizada). */
+    abrir: (c: FilaCompra) => void;
   },
 ): ColumnaTabla<FilaCompra>[] {
   const resto = { ocultable: true } as const;
@@ -219,12 +227,13 @@ function columnas(
       label: "Orden de compra",
       ocultable: false,
       render: (c) => {
-        const atrasada = estaAtrasada(c, umbral, dia);
+        // El punto rojo: pasó el plazo de su etapa (o, sin plazo conocido, lleva en tránsito más de lo normal para su vía).
+        const atrasada = plazoDe(c)?.tono === "vencido" || estaAtrasada(c, umbral, dia);
         return (
           <span className="flex min-w-0 flex-col">
             <span className="flex items-center gap-1.5">
               {atrasada && <Punto tono="peligro" />}
-              {atrasada && <span className="sr-only">Atrasada. </span>}
+              {atrasada && <span className="sr-only">Fuera de plazo. </span>}
               <span className="block max-w-[24rem] truncate font-medium" title={`${tituloCompra(c)}${c.codigo ? ` · ${c.codigo}` : ""}`}>
                 {c.codigo && <span className="mr-1.5 font-normal text-muted-foreground">{c.codigo}</span>}
                 {tituloCompra(c)}
@@ -254,6 +263,35 @@ function columnas(
       },
     },
     col("etapa", "Etapa", { ocultable: true, render: (c) => ed(c, "etapa", <Badge color={colorEtapa(c.etapa)}>{etiquetaEtapa(c.etapa)}</Badge>) }),
+    // Reunión con Alcides del 11 nov 2026: la prioridad (la ve Shen Zhen en su portal) y el plazo de la etapa en que está la compra.
+    col("prioridad", "Prioridad", { ocultable: true, render: (c) => ed(c, "prioridad", <MarcaPrioridad prioridad={c.prioridad} texto={etiquetaPrioridad(c.prioridad)} />) }),
+    col("plazo", "Plazo de la etapa", {
+      ocultable: true,
+      clase: "whitespace-nowrap",
+      render: (c) => {
+        const e = plazoDe(c);
+        const puede = edicion.puedeEscribir && celdaEditable(edicion.restricciones, "etapa");
+        return (
+          <span className="flex items-center gap-2">
+            <BarraPlazo estado={e} texto={e ? textoPlazoEtapa(e) : ""} titulo={e ? `${etiquetaEtapa(c.etapa)}: plazo de ${e.plazo} días` : undefined} />
+            {c.etapa === "cotizar" && puede && (
+              <button
+                type="button"
+                className="rounded-md border border-foreground bg-foreground px-2 py-0.5 text-xs font-medium whitespace-nowrap text-background hover:opacity-90"
+                onClick={() => edicion.guardar(c, "etapa", "enviado_cotizacion")}
+              >
+                Enviar a cotización
+              </button>
+            )}
+            {c.etapa === "cotizado" && (
+              <button type="button" className="rounded-md border border-border-control bg-card px-2 py-0.5 text-xs font-medium whitespace-nowrap hover:bg-muted" onClick={() => edicion.abrir(c)}>
+                Decidir
+              </button>
+            )}
+          </span>
+        );
+      },
+    }),
     col("viaEnvio", "Vía de envío", { ocultable: true, clase: "whitespace-nowrap text-muted-foreground", render: (c) => ed(c, "viaEnvio", lista(c.viaEnvio, etiquetaVia)) }),
     col("creado", "Creada", { ocultable: true, clase: "whitespace-nowrap", render: (c) => fecha(c.creadoEn) }),
     col("fechaLlegada", "Fecha de llegada", {
@@ -363,7 +401,10 @@ export function TablaCompras({
   coloresEtiquetas = {},
   coloresTiendas: coloresTiendasServidor = {},
   restricciones = SIN_RESTRICCIONES,
+  plazosTransito = SIN_PLAZOS,
 }: {
+  /** Plazo de tránsito prometido por agente, país y vía (Compras › Envíos), para el plazo de las compras en Tracking. */
+  plazosTransito?: Record<string, number>;
   compras: FilaCompra[];
   vista: string;
   paises: { id: string; codigo: string; nombre: string }[];
@@ -390,7 +431,8 @@ export function TablaCompras({
 }) {
   const { mostrarToast } = useToast();
   // Un enlace viejo con «cotizando» abre «Por cotizar», que es la mayor parte de lo que juntaba.
-  const grupoPedido = grupoInicial === "cotizando" ? "por_cotizar" : grupoInicial;
+  // «Atrasadas» (los enlaces del informe y del dashboard) es ahora parte de «Fuera de plazo».
+  const grupoPedido = grupoInicial === "cotizando" ? "por_cotizar" : grupoInicial === "atrasadas" ? "fuera_plazo" : grupoInicial;
   const [rapido, setRapido] = useState<Grupo | null>(grupoPedido && RAPIDOS.some((r) => r.valor === grupoPedido) ? grupoPedido : null);
   const [soloSinProductos, setSoloSinProductos] = useState(false);
   const [etapa, setEtapa] = useState(etapaInicial);
@@ -421,11 +463,14 @@ export function TablaCompras({
         return;
       }
       const anterior = compra[def.prop];
+      const etapaDesdeAntes = compra.etapaDesde;
       const poner = (p: Partial<FilaCompra>) => setCambios((o) => ({ ...o, [compra.id]: { ...o[compra.id], ...p } }));
-      poner({ [def.prop]: normalizado.valor } as Partial<FilaCompra>);
+      // Al cambiar de etapa, su plazo empieza a contar de nuevo (lo mismo que hace la base, migración 0270).
+      const cambiaEtapa = campo === "etapa" && normalizado.valor !== compra.etapa;
+      poner({ [def.prop]: normalizado.valor, ...(cambiaEtapa ? { etapaDesde: new Date().toISOString() } : {}) } as Partial<FilaCompra>);
       const resultado = await actualizarCampoCompra(compra.id, campo, normalizado.valor).catch(() => ({ error: "No se pudo guardar. Inténtalo de nuevo." }) as { error?: string; cerradoEn?: string | null; planificacion?: string | null });
       if (resultado.error) {
-        poner({ [def.prop]: anterior } as Partial<FilaCompra>);
+        poner({ [def.prop]: anterior, ...(cambiaEtapa ? { etapaDesde: etapaDesdeAntes } : {}) } as Partial<FilaCompra>);
         mostrarToast(resultado.error, "destructive");
         return;
       }
@@ -565,7 +610,16 @@ export function TablaCompras({
     [coloresTiendas, compras, mostrarToast],
   );
   const edicion = useMemo(
-    () => ({ puedeEscribir, restricciones, guardar: guardarCelda, etiquetas: todasEtiquetas, tiendas: todasTiendas, colores, cambiarColor }),
+    () => ({
+      puedeEscribir,
+      restricciones,
+      guardar: guardarCelda,
+      etiquetas: todasEtiquetas,
+      tiendas: todasTiendas,
+      colores,
+      cambiarColor,
+      abrir: (c: FilaCompra) => setAbierta({ id: c.id, orden: [c.id] }),
+    }),
     [puedeEscribir, restricciones, guardarCelda, todasEtiquetas, todasTiendas, colores, cambiarColor],
   );
 
@@ -573,16 +627,24 @@ export function TablaCompras({
   const base = compras;
   const umbral = useMemo(() => umbralesTransito(compras), [compras]);
   const dia = hoy();
+  // El plazo de la etapa de cada compra abierta (reunión con Alcides del 11 nov 2026); «ahora» queda fijo mientras la página está abierta.
+  const [ahora] = useState(() => Date.now());
+  const plazoDe = useCallback(
+    (c: FilaCompra) => (estaAbierta(c) && !c.anulada ? plazoDeCompra(c, plazoTransitoDe(plazosTransito, c), ahora) : null),
+    [plazosTransito, ahora],
+  );
+  const fueraDePlazo = useCallback((c: FilaCompra) => plazoDe(c)?.tono === "vencido", [plazoDe]);
   // Las columnas de datos que su rol no ve no se dibujan (y sus datos ni siquiera llegan del servidor).
   const cols = useMemo(() => {
     const ocultas = columnasOcultas(restricciones);
-    return columnas(umbral, dia, edicion).filter((c) => !ocultas.includes(c.id));
-  }, [umbral, dia, edicion, restricciones]);
-  const conteo = useMemo(() => Object.fromEntries(RAPIDOS.map((r) => [r.valor, base.filter((c) => enGrupo(c, r.valor, umbral)).length])), [base, umbral]);
-  const filas = useMemo(
-    () => base.filter((c) => (!rapido || enGrupo(c, rapido, umbral)) && (!etapa || c.etapa === etapa) && (!soloSinProductos || (c.tipo === "pais" && c.productos === 0))),
-    [base, rapido, etapa, umbral, soloSinProductos],
-  );
+    return columnas(umbral, dia, plazoDe, edicion).filter((c) => !ocultas.includes(c.id));
+  }, [umbral, dia, plazoDe, edicion, restricciones]);
+  const conteo = useMemo(() => Object.fromEntries(RAPIDOS.map((r) => [r.valor, base.filter((c) => enGrupo(c, r.valor, umbral, fueraDePlazo)).length])), [base, umbral, fueraDePlazo]);
+  const filas = useMemo(() => {
+    const quedan = base.filter((c) => (!rapido || enGrupo(c, rapido, umbral, fueraDePlazo)) && (!etapa || c.etapa === etapa) && (!soloSinProductos || (c.tipo === "pais" && c.productos === 0)));
+    // Dentro de cada grupo, las urgentes primero (entre las de la misma prioridad sigue el orden por código).
+    return quedan.some((c) => c.prioridad) ? [...quedan].sort((a, b) => ordenPrioridad(a.prioridad) - ordenPrioridad(b.prioridad)) : quedan;
+  }, [base, rapido, etapa, umbral, fueraDePlazo, soloSinProductos]);
   // El avance de vincular productos a las compras de país (las de ClickUp llegaron sin productos).
   const dePais = compras.filter((c) => c.tipo === "pais" && !c.anulada);
   const sinProductos = dePais.filter((c) => c.productos === 0);
@@ -598,10 +660,11 @@ export function TablaCompras({
         {/* El tablero de arriba, como el de Gestión de IDs (30 oct 2026): cada tarjeta cuenta y filtra la lista. */}
         <TableroCompras
           tarjetas={TARJETAS_COMPRAS.filter((t) => t.id !== "sin_productos" || dePais.length > 0).map((t) => {
-            const grupo = t.id === "sin_productos" ? sinProductos : base.filter((c) => enGrupo(c, t.id as Grupo, umbral));
+            const grupo = t.id === "sin_productos" ? sinProductos : base.filter((c) => enGrupo(c, t.id as Grupo, umbral, fueraDePlazo));
             const unidades = grupo.reduce((n, c) => n + (c.qtyTotal ?? 0), 0);
             return {
               t,
+              fuera: t.id === "sin_productos" || t.id === "fuera_plazo" ? null : grupo.filter(fueraDePlazo).length,
               valor: t.id === "sin_productos" ? sinProductos.length : conteo[t.id],
               unidades: unidades > 0 ? unidades : null,
               // Sin compras (o sin montos cargados) no se escribe «—» suelto: la línea no sale.
