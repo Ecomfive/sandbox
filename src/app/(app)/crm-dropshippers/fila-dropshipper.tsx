@@ -1,13 +1,12 @@
 "use client";
 
-import { nombrePais } from "@/lib/whatsapp/origen-chat";
 import { PastillaTipo } from "./tipo-cliente";
 import type { ReactNode } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { ChevronRightIcon } from "@/lib/nav-icons";
 import { etiquetaFase } from "@/lib/crm/areas";
 import { DIAS_SIN_PEDIR, diasEntre, etiquetaUltimoPedido, montoCorto, type FilaDropshipper } from "./def-crm";
-import { Bandera } from "@/components/paises/bandera";
+import { VendeEnPorPais } from "./vende-en-por-pais";
 
 /** Las columnas de la fila en pantalla ancha; las usa también el encabezado de la lista, así que van juntas. */
 const COLUMNAS = "lg:grid-cols-[minmax(0,2.4fr)_minmax(0,1.1fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_minmax(0,1.8fr)_minmax(0,0.8fr)_1rem]";
@@ -104,16 +103,9 @@ export function FilaDropshipperLista({ d, codigoPais, hoy, alAbrir }: { d: FilaD
           nombre="Vende en"
           principal={
             // La plataforma con la bandera de su país («🇵🇦 Dropi»), como «Dónde vende» del chat (29 oct 2026, pedido de Alcides).
-            d.vendeEn.length ? (
-              <span className="flex flex-wrap gap-1">
-                {d.vendeEn.map((v) => (
-                  <span key={`${v.plataforma}|${v.pais}`} className="inline-flex items-center gap-1 rounded-[5px] bg-muted px-1.5 py-px text-xs font-medium whitespace-nowrap text-foreground-soft">
-                    <Bandera codigo={v.pais} />
-                    <span className="sr-only">{nombrePais(v.pais)}: </span>
-                    {v.plataforma}
-                  </span>
-                ))}
-              </span>
+            d.vendeEn.length || d.paises.length ? (
+              // Un país con sus plataformas («🇵🇦 Dropi · 🇨🇷 Dropi EFFI»): puede vender en varios países y plataformas (11 nov 2026, pedido de Jhokser).
+              <VendeEnPorPais vende={d.vendeEn} soloPaises={d.paises} tamano="chico" />
             ) : (
               <span className="text-xs text-muted-foreground">Sin plataforma</span>
             )

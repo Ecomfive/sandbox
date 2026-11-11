@@ -10,7 +10,7 @@ import { mensajeBloqueos, mensajeBloqueosVariante } from "@/lib/wms/eliminar-pro
 import { esCodigoBarrasValido, esCodigoInterno, normalizarCodigoBarras } from "@/lib/wms/codigo-barras";
 import { detectarImagen } from "@/lib/seguridad/imagen";
 import { descargarPublico } from "@/lib/seguridad/url-externa";
-import { primeroLibre, sugerirSku } from "@/lib/wms/sugerir-sku";
+import { cantidadEnNombre, primeroLibre, sugerirSku } from "@/lib/wms/sugerir-sku";
 import { ETIQUETA_CLASE } from "./def-producto";
 import { crearCompraDesdeProducto } from "@/lib/compras/compra-desde-producto";
 import { pasarTestsAFiltro } from "@/lib/productos-test/pasar-a-filtro";
@@ -939,5 +939,6 @@ export async function sugerirSkuLibre(nombre: string, compuesto = false): Promis
   if (!base) return { codigo: "" };
   const { data } = await createServiceClient().from("skus_maestros").select("codigo").ilike("codigo", `${base}%`);
   const usados = new Set((data ?? []).map((p) => String(p.codigo).trim().toUpperCase()));
-  return { codigo: primeroLibre(base, (c) => usados.has(c)) };
+  // Un pack que choca con otro del mismo producto lleva la palabra de su cantidad (TRIO…), no un número.
+  return { codigo: primeroLibre(base, (c) => usados.has(c), compuesto === true ? cantidadEnNombre(String(nombre ?? "")) : null) };
 }

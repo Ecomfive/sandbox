@@ -5,6 +5,11 @@
 // que no haga falta un /2 y /3 que no dicen nada. Una variante agrega sus valores («/ROJO/M»). Es solo una sugerencia: la persona puede
 // borrarla y escribir otro; el sistema no deja repetir un SKU. **Un producto compuesto (pack o combo) siempre empieza por COMBO**
 // (27 oct 2026, pedido de Jhokser): «COMBO/OXIDO/NITRICO/SHILAJIT»; las palabras «combo» y «pack» del nombre no se repiten.
+// **Un pack del mismo producto por cantidad (2x1, pack de 2, x3…) NO lleva la cantidad en el SKU** (11 nov 2026, pedido de Jhokser):
+// «COMBO/ACEITE/NATURAL/VEGANIC», nunca «…/X2», «…/PACK/2» ni «…/2»; el SKU del compuesto es el del producto con COMBO delante. Dos
+// packs de productos distintos se separan por lo que de verdad los distingue (el color: «COMBO/BASE/MAQUILLAJE/ZEPHOCO/DARK»), no por
+// un número. Un combo de productos distintos une cada uno con «+» («COMBO/TRULY/JELLY+COCO/CLOUD»). Lo único numérico que se queda
+// es la cuenta de cápsulas, tabletas o gomitas del envase («…/TOPLUX/60»), que es del producto y no de la cantidad de unidades.
 
 const RELLENO = new Set(["de", "del", "la", "las", "el", "los", "y", "e", "o", "u", "para", "con", "sin", "en", "por", "a", "al", "un", "una", "x", "dr", "dra", "mr", "mrs"]);
 
@@ -90,9 +95,26 @@ export function sugerirSkuVariante(base: string, valores: string[]): string {
   return [base || "SKU", ...partes].join("/").slice(0, 60);
 }
 
-/** El primero libre: el sugerido o, si ya existe, con /2, /3… */
-export function primeroLibre(sugerido: string, existe: (codigo: string) => boolean): string {
+/** La palabra (no el número) con que se distingue un pack de más unidades cuando el SKU sin sufijo ya es de otro pack del mismo producto. */
+const PALABRA_DE_CANTIDAD: Record<number, string> = { 2: "DUO", 3: "TRIO", 4: "CUARTETO", 5: "QUINTETO", 6: "SEXTETO" };
+
+/** Cuántas unidades dice un nombre de pack («Pack 3», «x3», «Pack de 3», «3x1»); null si no dice. */
+export function cantidadEnNombre(nombre: string): number | null {
+  const t = String(nombre ?? "");
+  const m = /(?:\bx|\bpack(?:\s+de)?|\bcombo(?:\s+de)?)[\s-]*(\d{1,2})\b/i.exec(t) ?? /\b(\d{1,2})\s*x\s*1\b/i.exec(t);
+  const n = m ? Number(m[1]) : NaN;
+  return Number.isInteger(n) && n >= 2 ? n : null;
+}
+
+/**
+ * El primero libre: el sugerido o, si ya existe, el siguiente. Con la cantidad de un pack (11 nov 2026, pedido de Jhokser) el primer pack
+ * de un producto —el más vendido— se queda con «COMBO/CREMA/NIDA» y el que llega después lleva la palabra de su cantidad
+ * («COMBO/CREMA/NIDA/TRIO»), nunca un número; solo si esa palabra tampoco está libre o no se sabe la cantidad, va /2, /3…
+ */
+export function primeroLibre(sugerido: string, existe: (codigo: string) => boolean, cantidad?: number | null): string {
   if (!existe(sugerido)) return sugerido;
+  const palabra = cantidad ? PALABRA_DE_CANTIDAD[cantidad] : undefined;
+  if (palabra && !existe(`${sugerido}/${palabra}`)) return `${sugerido}/${palabra}`;
   for (let n = 2; n < 1000; n++) {
     const c = `${sugerido}/${n}`;
     if (!existe(c)) return c;

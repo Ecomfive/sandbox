@@ -26,6 +26,7 @@ import { MostrarTelefono } from "./mostrar-telefono";
 import { DestinoEnSitio, EnSitio } from "@/components/ui/en-sitio";
 import { FilaBotones, ItemFila } from "./botones-ficha";
 import { DatoEditable } from "./dato-editable";
+import { VendeEnPorPais } from "./vende-en-por-pais";
 import { NUMERO_REGISTRADO, type CampoDato } from "@/lib/crm/dato-dropshipper";
 import { CuentasDropshipper } from "./cuentas-dropshipper";
 import { DesempenoDropshipper } from "./desempeno-dropshipper";
@@ -231,6 +232,18 @@ export function DatosDropshipper({ d, acceso, conEtiquetas = true }: { d: FilaDr
       </span>,
     ],
     ["Ciudad", UbicacionIcon, dato("ciudad", d.ciudad)],
+    // Dónde vende, agrupado por país: la bandera del país donde vende y sus plataformas (puede vender en varios países y plataformas). En la ficha del chat va en su
+    // propia sección («Dónde vende»), con lo que se edita junto al nombre del chat.
+    ...(conEtiquetas
+      ? [
+          [
+            "Vende en",
+            EnlaceIcon,
+            d.vendeEn.length || d.paises.length ? <VendeEnPorPais key="vende" vende={d.vendeEn} soloPaises={d.paises} tamano="chico" /> : <span key="vende" className="text-muted-foreground">Sin plataforma</span>,
+            true,
+          ] as [string, ComponentType<SVGProps<SVGSVGElement>>, ReactNode, boolean],
+        ]
+      : []),
     ["Tiendas", TiendaIcon, dato("tiendas", d.tiendas.join(", ") || null), true],
     // Varios correos (migración 0206): el primero es el principal; sirven para reconocer sus cuentas en cada plataforma.
     ["Correos", CorreoIcon, dato("correo", d.correos.join(", ") || null), true],
