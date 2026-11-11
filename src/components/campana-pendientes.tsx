@@ -9,10 +9,10 @@ import { textoContador, textoPendientes, type PendientesMenu } from "@/lib/conta
 
 function Campana({ cantidad }: { cantidad: number }) {
   return (
-    <Tooltip texto="Centro de notificaciones">
+    <Tooltip texto={cantidad > 0 ? `Tus tareas: ${textoPendientes(cantidad)}` : "Tus tareas: nada pendiente"}>
       <Link
-        href="/notificaciones"
-        aria-label={cantidad > 0 ? `Centro de notificaciones, ${textoPendientes(cantidad)}` : "Centro de notificaciones"}
+        href="/tareas?mias=1"
+        aria-label={cantidad > 0 ? `Tus tareas, ${textoPendientes(cantidad)}` : "Tus tareas, nada pendiente"}
         className={`relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border-control bg-card text-muted-foreground hover:bg-muted hover:text-foreground ${anilloFoco}`}
       >
         <NotificacionesIcon className="h-4 w-4" />
@@ -30,12 +30,13 @@ function Campana({ cantidad }: { cantidad: number }) {
 }
 
 function ConConteo({ pendientes }: { pendientes: Promise<PendientesMenu> }) {
-  return <Campana cantidad={use(pendientes).total} />;
+  return <Campana cantidad={use(pendientes).tareasMias} />;
 }
 
 /**
- * Campana del Centro de notificaciones, con lo que hay por atender. Lleva la misma promesa que el menú lateral: la
- * barra sale al instante y el número llega por streaming; si la consulta falla, la campana sale sin número.
+ * La campana junto a la foto es personal (11 nov 2026, pedido de Hernán): cuenta solo las tareas del equipo asignadas a la persona y sin
+ * cerrar, y lleva a ellas. Lo general (pendientes del día, actividad, actualizaciones) está en «Avisos», debajo de Ayuda. Lleva la misma
+ * promesa que el menú lateral: la barra sale al instante y el número llega por streaming; si la consulta falla, sale sin número.
  */
 export function CampanaPendientes({ pendientes }: { pendientes: Promise<PendientesMenu> }) {
   return (
