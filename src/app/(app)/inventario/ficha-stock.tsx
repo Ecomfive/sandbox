@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { CodigosProducto } from "@/components/ui/codigos-producto";
 import { Badge } from "@/components/ui/badge";
 import { Seccion } from "@/components/ui/seccion-ficha";
@@ -271,8 +271,11 @@ export function FichaStock({
                         const enPlataforma = plataforma ? (sku.plataformas?.[plataforma] ?? 0) : null;
                         const fisico = enPlataforma ?? b.fisico;
                         const disponible = enPlataforma ?? b.disponible;
+                        // Junto a la de Dropi, nuestra bodega de proveedor en Dropi (B81 en Panamá): sus unidades son referenciales (11 nov 2026, Hernán).
+                        const enProveedor = plataforma === "dropi" ? (sku.plataformas?.lineas ?? []).filter((l) => l.plataforma === "dropi").reduce((t, l) => t + l.aparte, 0) : null;
                         return (
-                        <tr key={b.bodegaId} className="border-t border-border">
+                        <Fragment key={b.bodegaId}>
+                        <tr className="border-t border-border">
                           <th scope="row" className="py-1.5 pr-2 text-left font-medium">
                             {b.nombre}
                             {b.tipo === "externa" && <span className="ml-1.5 text-[11px] font-normal text-muted-foreground">{plataforma ? `según ${ETIQUETA_PLATAFORMA[plataforma]}` : "externa"}</span>}
@@ -283,6 +286,20 @@ export function FichaStock({
                             </td>
                           ))}
                         </tr>
+                        {enProveedor !== null && (
+                          <tr className="border-t border-border">
+                            <th scope="row" className="py-1.5 pr-2 text-left font-medium">
+                              Dropi · Proveedor Ecomfive{codigoPais.toUpperCase() === "PA" ? " (B81)" : ""}
+                              <span className="ml-1.5 text-[11px] font-normal text-muted-foreground">según Dropi · referencial</span>
+                            </th>
+                            {[enProveedor, 0, enProveedor, 0, 0, 0, 0, 0].map((n, i) => (
+                              <td key={i} className="px-1.5 py-1.5 text-right">
+                                <Cifra n={n} />
+                              </td>
+                            ))}
+                          </tr>
+                        )}
+                        </Fragment>
                         );
                       })}
                     </tbody>
