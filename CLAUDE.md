@@ -2488,7 +2488,7 @@ convenciones técnicas del código.
   Existencia (`inventories/history`, `m.user`). `scripts/dropi-usuarios-navegador.js` (en app.dropi.<país> con sesión de proveedor; recibe los
   productos y usuarios a buscar) los sube con la dirección de `scripts/dropi-usuarios.ts subida <país>`; `… cargar <país>` los baja a
   `datos-privados/dropi-usuarios-<país>.json`; `scripts/vincular-dropshippers-dropi.ts <país>` da el informe y `--aplicar` vincula (correo,
-  teléfono con el código del país o nombre idéntico) y crea las fichas. México: falta (sesión de proveedor de Dropi MX).
+  teléfono con el código del país o nombre idéntico) y crea las fichas. **México el 11 nov 2026** (pedido de Hernán): 253 de 254 usuarios leídos con la sesión de proveedor de app.dropi.mx, 21 vinculados, 229 fichas nuevas, 99,6 % de los pedidos con dropshipper; 3 quedaron para revisar a mano y 5 sin datos de Dropi.
   **Actividad con comentarios** (migración 0184, 29 oct 2026): `ActividadDropshipper` (`actividad-dropshipper.tsx`, el `Actividad` común de
   Compras) en la ficha del CRM y en la del chat de la bandeja; `actividad-dropshipper-actions.ts` usa el motor de `lib/comentarios` (tablas
   `dropshipper_comentarios`/`_adjuntos`/`_comentario_reacciones`, bucket `crm-dropshippers`) y toma los cambios de `obtenerLineaDeTiempo`,
