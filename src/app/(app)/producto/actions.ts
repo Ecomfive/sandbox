@@ -669,7 +669,7 @@ export async function crearVariantes(padreId: string, opciones: OpcionVariante[]
 }
 
 /**
- * Quita una variante que no se usa: sin compras, fichas enlazadas ni compuestos, y sin stock. Desde la migración 0970 (11 nov 2026, pedido de Hernán:
+ * Quita una variante que no se usa: sin compras, fichas enlazadas ni compuestos, y sin stock. Desde la migración 0269 (11 nov 2026, pedido de Hernán:
  * Dinora cargó por error las Botas Maxi Pro por talla, les sumó inventario y lo dejó en 0, y «Quitar» no la dejaba) también si tuvo movimientos de
  * inventario que se anulan entre sí: la base (`wms_quitar_variante`) lo revisa y borra sus movimientos, su stock en cero y la variante, todo junto.
  * Lo que tenía queda en la Actividad. Si la migración no se corrió, sigue la regla de antes (sin movimientos).
@@ -694,7 +694,7 @@ export async function quitarVariante(id: string): Promise<{ error?: string }> {
     revalidatePath("/inventario");
     return {};
   }
-  // Sin la migración 0970 (la función no existe): la regla de antes.
+  // Sin la migración 0269 (la función no existe): la regla de antes.
   if (!/wms_quitar_variante|function|schema cache/i.test(conBase.error.message)) return { error: "No se pudo quitar la variante." };
   const { count: enCombos } = await supabase.from("sku_maestro_componentes").select("id", { count: "exact", head: true }).eq("componente_id", id);
   if ((enCombos ?? 0) > 0) return { error: "La variante es parte de un producto compuesto: quítala del compuesto primero." };
@@ -705,7 +705,7 @@ export async function quitarVariante(id: string): Promise<{ error?: string }> {
     supabase.from("wms_dropi_productos").select("id", { count: "exact", head: true }).eq("sku_maestro_id", id),
   ]);
   if ((movs.count ?? 0) + (compras.count ?? 0) + (shopify.count ?? 0) + (dropi.count ?? 0) > 0)
-    return { error: "La variante ya tiene movimientos, compras o fichas enlazadas: no se puede quitar. (Falta correr en Supabase la migración 0970, que deja quitarla si sus movimientos se anulan entre sí.)" };
+    return { error: "La variante ya tiene movimientos, compras o fichas enlazadas: no se puede quitar. (Falta correr en Supabase la migración 0269, que deja quitarla si sus movimientos se anulan entre sí.)" };
   const { error } = await supabase.from("skus_maestros").delete().eq("id", id);
   if (error) return { error: "No se pudo quitar la variante." };
   await registrarAuditoria({ accion: "quitar_variante", entidad: "skus_maestros", entidadId: v.padre_id, detalle: v.codigo });

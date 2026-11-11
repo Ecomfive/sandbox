@@ -38,7 +38,7 @@ export function mensajeBloqueos(codigo: string, bloqueos: Record<string, number>
 }
 
 /**
- * Lo mismo para «Quitar» una variante (migración 0970, `wms_quitar_variante`): sus movimientos de inventario solo la bloquean si no se anulan
+ * Lo mismo para «Quitar» una variante (migración 0269, `wms_quitar_variante`): sus movimientos de inventario solo la bloquean si no se anulan
  * entre sí (le quedan unidades o se movieron entre bodegas sin cuadrar en cada una).
  */
 export function mensajeBloqueosVariante(codigo: string, bloqueos: Record<string, number>): string {

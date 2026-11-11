@@ -4,7 +4,7 @@
 -- y no le queda stock en ninguna parte. Todo lo demás que la use (compras, fichas de Shopify o Dropi, un compuesto, lotes, traslados…) la sigue
 -- bloqueando, como en `wms_eliminar_producto` (0125). Se borran sus movimientos, su stock en cero y la variante, todo junto o nada.
 -- Código: src/app/(app)/producto/actions.ts › quitarVariante (deja en la Actividad cuántos movimientos tenía).
--- Reversa: supabase/rollbacks/0970_rollback.sql
+-- Reversa: supabase/rollbacks/0269_rollback.sql
 
 create or replace function wms_quitar_variante(p_id uuid)
 returns jsonb
