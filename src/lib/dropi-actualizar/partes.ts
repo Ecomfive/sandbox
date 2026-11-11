@@ -17,7 +17,7 @@ export type CodigoPaisDropi = "pa" | "cr" | "mx";
  * Dónde lee un lector: la pestaña de Dropi de un país o, desde el 7 nov 2026 (pedido de Hernán: «el botón de actualizar así como en Panamá» para Costa Rica),
  * la de Drop (app.soydrop.com) con la cuenta de proveedor de Costa Rica.
  */
-export type Sitio = CodigoPaisDropi | "drop";
+export type Sitio = CodigoPaisDropi | "drop" | "duna";
 
 /** Las cuentas de Dropi: cada país es un dominio distinto (app.dropi.pa, app.dropi.cr, app.dropi.mx), así que las sesiones conviven. Y la de Drop. */
 export const CUENTAS: Record<Sitio, { nombre: string; cuenta: string; tipoUsuario: string | null; tienda: string | null; origen: string }> = {
@@ -29,10 +29,14 @@ export const CUENTAS: Record<Sitio, { nombre: string; cuenta: string; tipoUsuari
   // Drop no guarda la sesión en la página (va en una cookie que no se puede leer): la extensión ve si «Mis productos» de proveedor abre («VENDOR») o si
   // Drop la manda al catálogo de dropshipper («DROPSHIPPER»). No dice cuándo vence.
   drop: { nombre: "Drop", cuenta: "cuenta de proveedor de Costa Rica", tipoUsuario: "VENDOR", tienda: null, origen: "https://app.soydrop.com" },
+  // Dunamixfy (9 nov 2026): la sesión también es una cookie; la extensión pregunta el rol a /api/me («SUPPLIER» = la de proveedor). No dice cuándo vence.
+  duna: { nombre: "Dunamixfy", cuenta: "cuenta de proveedor de Costa Rica", tipoUsuario: "SUPPLIER", tienda: null, origen: "https://dunamixfy.cr" },
 };
 
 /** Cómo se nombra un sitio en los avisos: «Dropi Costa Rica» o «Drop». */
-export const nombreSitio = (s: Sitio) => (s === "drop" ? "Drop" : `Dropi ${CUENTAS[s].nombre}`);
+export const nombreSitio = (s: Sitio) => (s === "drop" || s === "duna" ? CUENTAS[s].nombre : `Dropi ${CUENTAS[s].nombre}`);
+/** La plataforma de un sitio, sin el país: «Dropi», «Drop» o «Dunamixfy». */
+export const plataformaDeSitio = (s: Sitio) => (s === "drop" || s === "duna" ? CUENTAS[s].nombre : "Dropi");
 
 /**
  * «Descubrir proveedores» (Scraping) lee el catálogo de México con una cuenta de **dropshipper** (una de proveedor no ve el catálogo).
@@ -40,7 +44,7 @@ export const nombreSitio = (s: Sitio) => (s === "drop" ? "Drop" : `Dropi ${CUENT
  */
 export const CUENTA_CATALOGO_MX = { nombre: "México", cuenta: "cuenta de dropshipper", tipoUsuario: null, tienda: null, origen: "https://app.dropi.mx" };
 
-export type ClaveLector = "proveedor" | "ventas" | "proveedor_cr" | "ventas_cr" | "drop_cr" | "effi_cr" | "proveedor_mx" | "ventas_mx" | "catalogo_mx";
+export type ClaveLector = "proveedor" | "ventas" | "proveedor_cr" | "ventas_cr" | "drop_cr" | "dunamixfy_cr" | "effi_cr" | "proveedor_mx" | "ventas_mx" | "catalogo_mx";
 
 /**
  * Los lectores de la extensión (copias de scripts/dropi-diario-navegador.js y scripts/ventas-dropi-navegador.js, que siguen
@@ -54,6 +58,8 @@ export const LECTORES: Record<ClaveLector, { pais: CodigoPaisDropi; sitio?: Siti
   ventas_cr: { pais: "cr", archivo: "lectores/ventas-dropi.js", funcion: "ventasDropi", estado: "__ventasDropi", archivos: ["resumen", "movimientos"] },
   // Drop (7 nov 2026): «Mis productos» (precio, stock) y los pedidos (las ventas del cuadro), en la pestaña de app.soydrop.com con la cuenta de proveedor.
   drop_cr: { pais: "cr", sitio: "drop", archivo: "lectores/drop.js", funcion: "leerDropProveedor", estado: "__leerDrop", archivos: ["drop", "dropventas"] },
+  // Dunamixfy (9 nov 2026): los productos (precio, stock) y los pedidos (ventas y dropshippers), en la pestaña de dunamixfy.cr con la cuenta de proveedor.
+  dunamixfy_cr: { pais: "cr", sitio: "duna", archivo: "lectores/dunamixfy.js", funcion: "leerDunamixfy", estado: "__leerDunamixfy", archivos: ["dunamixfy", "dunamixfyventas"] },
   // Effi (7 nov 2026): no usa la extensión, el servidor lo lee por la API (sin archivo ni pestaña).
   effi_cr: { pais: "cr", archivo: "", funcion: "", estado: "", archivos: [] },
   proveedor_mx: { pais: "mx", archivo: "lectores/dropi-diario.js", funcion: "dropiDiario", estado: "__dropiDiario", archivos: ["pedidos", "cartera", "retiros", "stock"] },
@@ -73,8 +79,8 @@ export const sitioDe = (l: ClaveLector): Sitio => LECTORES[l].sitio ?? LECTORES[
 /** El lector no usa la extensión: el servidor lee solo (Effi, por su API). */
 export const sinExtension = (l: ClaveLector) => !LECTORES[l].archivo;
 
-export type TipoParte = "pedidos" | "cartera" | "retiros" | "stock" | "ventas" | "drop_productos" | "drop_ventas" | "effi";
-export type ClaveParte = TipoParte | "pedidos_cr" | "cartera_cr" | "retiros_cr" | "stock_cr" | "ventas_cr" | "drop_productos_cr" | "drop_ventas_cr" | "effi_cr" | "pedidos_mx" | "cartera_mx" | "retiros_mx" | "stock_mx" | "ventas_mx";
+export type TipoParte = "pedidos" | "cartera" | "retiros" | "stock" | "ventas" | "drop_productos" | "drop_ventas" | "dunamixfy_productos" | "dunamixfy_ventas" | "effi";
+export type ClaveParte = TipoParte | "pedidos_cr" | "cartera_cr" | "retiros_cr" | "stock_cr" | "ventas_cr" | "drop_productos_cr" | "drop_ventas_cr" | "dunamixfy_productos_cr" | "dunamixfy_ventas_cr" | "effi_cr" | "pedidos_mx" | "cartera_mx" | "retiros_mx" | "stock_mx" | "ventas_mx";
 
 export interface Parte {
   clave: ClaveParte;
@@ -101,6 +107,8 @@ export const PARTES: Parte[] = [
   { clave: "ventas_cr", tipo: "ventas", etiqueta: "Ventas (historial de existencias)", pais: "cr", donde: "Ventas Proveeduría · Reponer", ruta: "/ventas-dropi", lector: "ventas_cr" },
   { clave: "drop_productos_cr", tipo: "drop_productos", etiqueta: "Drop: productos, precio y stock", pais: "cr", donde: "Gestión de IDs Drop · Inventario", ruta: "/publicaciones-drop", lector: "drop_cr" },
   { clave: "drop_ventas_cr", tipo: "drop_ventas", etiqueta: "Drop: ventas por día", pais: "cr", donde: "Inventario › Cuadro", ruta: "/inventario/cuadro", lector: "drop_cr" },
+  { clave: "dunamixfy_productos_cr", tipo: "dunamixfy_productos", etiqueta: "Dunamixfy: productos, precio y stock", pais: "cr", donde: "Gestión de IDs Dunamixfy · Inventario", ruta: "/publicaciones-dunamixfy", lector: "dunamixfy_cr" },
+  { clave: "dunamixfy_ventas_cr", tipo: "dunamixfy_ventas", etiqueta: "Dunamixfy: ventas y dropshippers", pais: "cr", donde: "Ventas Proveeduría · Inventario › Cuadro", ruta: "/inventario/cuadro", lector: "dunamixfy_cr" },
   { clave: "effi_cr", tipo: "effi", etiqueta: "Effi: stock, precios y ventas", pais: "cr", donde: "Gestión de IDs Effi · Competencia · Cuadro", ruta: "/publicaciones-effi", lector: "effi_cr" },
   { clave: "pedidos_mx", tipo: "pedidos", etiqueta: "Pedidos y estados (30 días)", pais: "mx", donde: "Pedidos Dropi · CRM", ruta: "/pedidos-dropi", lector: "proveedor_mx" },
   { clave: "cartera_mx", tipo: "cartera", etiqueta: "Cartera (7 días)", pais: "mx", donde: "Pedidos Dropi (cartera)", ruta: "/pedidos-dropi", lector: "proveedor_mx" },
@@ -119,13 +127,14 @@ export const GRUPOS: { lector: ClaveLector; etiqueta: string; detalle: string }[
   { lector: "proveedor_cr", etiqueta: "Pedidos, cartera, retiros y stock", detalle: "Costa Rica · la primera vez tarda más" },
   { lector: "ventas_cr", etiqueta: "Ventas", detalle: "Costa Rica" },
   { lector: "drop_cr", etiqueta: "Drop: productos, stock y ventas", detalle: "Costa Rica · cuenta de proveedor de Drop" },
+  { lector: "dunamixfy_cr", etiqueta: "Dunamixfy: productos, stock y ventas", detalle: "Costa Rica · cuenta de proveedor de Dunamixfy" },
   { lector: "effi_cr", etiqueta: "Effi: stock, precios y ventas", detalle: "Costa Rica · por la API, sin sesión" },
   { lector: "proveedor_mx", etiqueta: "Pedidos, cartera, retiros y stock", detalle: "México" },
   { lector: "ventas_mx", etiqueta: "Ventas", detalle: "México" },
 ];
 
 /** Los lectores de cada país, en el orden en que corren. */
-export const LECTORES_PAIS: Record<CodigoPaisDropi, ClaveLector[]> = { pa: ["proveedor", "ventas"], cr: ["proveedor_cr", "ventas_cr", "drop_cr", "effi_cr"], mx: ["proveedor_mx", "ventas_mx"] };
+export const LECTORES_PAIS: Record<CodigoPaisDropi, ClaveLector[]> = { pa: ["proveedor", "ventas"], cr: ["proveedor_cr", "ventas_cr", "drop_cr", "dunamixfy_cr", "effi_cr"], mx: ["proveedor_mx", "ventas_mx"] };
 
 /** Los lectores que hacen falta para esas partes, en orden (Panamá primero). */
 export const lectoresDe = (partes: ClaveParte[]): ClaveLector[] =>

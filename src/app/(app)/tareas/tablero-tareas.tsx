@@ -36,12 +36,15 @@ export function TableroTareas({
   modulos,
   miId,
   admin,
+  asigna = admin,
 }: {
   tareas: TareaVista[];
   personas: PersonaTarea[];
   modulos: { clave: string; etiqueta: string }[];
   miId: string;
   admin: boolean;
+  /** Asigna tareas a otras personas: un administrador o un líder (9 nov 2026). «De todos» sigue siendo de administrador. */
+  asigna?: boolean;
 }) {
   const { mostrarToast } = useToast();
   const router = useRouter();
@@ -108,7 +111,7 @@ export function TableroTareas({
           .map((e) => ({ clave: e.valor, titulo: e.etiqueta, icono: <CirculoEstado estado={e.valor} />, tareas: visibles.filter((t) => t.estado === e.valor) }))
           .filter((g) => vista === "tablero" || g.tareas.length > 0);
 
-  const personasMenu = admin ? personas : personas.filter((p) => p.id === miId);
+  const personasMenu = asigna ? personas : personas.filter((p) => p.id === miId);
   const opcionesPersona = [{ valor: "", etiqueta: "Sin asignar", icono: <Iniciales nombre={null} className="h-6 w-6 text-[10px]" /> }, ...personasMenu.map((p) => ({ valor: p.id, etiqueta: p.nombre, icono: <Iniciales nombre={p.nombre} className="h-6 w-6 text-[10px]" /> }))];
   const etiquetaModulo = (m: string | null) => (m ? (modulos.find((x) => x.clave === m)?.etiqueta ?? m) : null);
 
@@ -186,7 +189,7 @@ export function TableroTareas({
         <button type="button" aria-pressed={verArchivadas} onClick={() => setVerArchivadas((v) => !v)} className={`min-h-9 rounded-md border px-3 text-sm font-medium ${anilloFoco} ${verArchivadas ? "border-foreground bg-foreground text-background" : "border-border-control bg-card hover:bg-muted"}`}>
           Archivadas
         </button>
-        <NuevaTarea personas={personas} miId={miId} admin={admin} modulos={modulos} />
+        <NuevaTarea personas={personas} miId={miId} admin={asigna} modulos={modulos} />
       </div>
 
       <p className="m-0 text-xs text-muted-foreground tabular-nums" aria-live="polite">
@@ -284,7 +287,7 @@ export function TableroTareas({
           t={abierta}
           personas={personas}
           modulos={modulos}
-          puedeAsignarOtros={admin}
+          puedeAsignarOtros={asigna}
           miId={miId}
           version={version}
           alCambiar={cambiar}

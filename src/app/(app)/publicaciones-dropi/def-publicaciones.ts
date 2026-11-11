@@ -193,6 +193,10 @@ export interface FilaPublicacion {
   }[];
   stockProveedor: number | null;
   stockPrivadoProveedor: number | null;
+  /** Las variantes del producto vinculado, si tiene: con ellas se vincula cada variación de Dropi (9 nov 2026, migración 0261). */
+  variantes: { id: string; codigo: string; etiqueta: string }[];
+  /** A qué variante va cada variación de Dropi de esta publicación: `claveVariacion(idDeDropi, firma)` → id de la variante. */
+  vinculosVariacion: Record<string, string>;
   /** Las variaciones (tallas, colores, graduaciones) con menos de `POCO_STOCK_VARIACION` unidades; vacío en un producto simple. */
   variacionesBajas: { etiqueta: string; stock: number }[];
   /** Cuándo se leyó «Mis productos» por última vez (lo mismo en todas las filas del país). */

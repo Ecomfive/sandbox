@@ -17,10 +17,16 @@
 // 0.5.1 (2 nov 2026): una pestaña dormida o con error ya no traba la lectura («Cannot access contents of the page»): se recarga antes de usarla.
 // 0.6.0 (7 nov 2026): «drop» es la pestaña de app.soydrop.com (Drop, Costa Rica) con la cuenta de proveedor, con el lector `drop_cr` («Mis productos» y
 // pedidos). Su sesión es una cookie que no se puede leer: se ve si «Mis productos» de proveedor abre o si Drop manda a otra página.
+// 0.6.3 (9 nov 2026): el lector de Drop corre con su pestaña AL FRENTE (`frente`) y al terminar vuelve al frente la pestaña del sistema que lo pidió. En segundo
+// plano Chrome frena sus esperas (la lectura de todos los pedidos pasó de 70 s a 9-13 min) y puede descartar la pestaña para ahorrar memoria: se perdía lo leído
+// y el panel decía «Se perdió la pestaña». Una pestaña descartada ahora se dice como tal.
+// 0.7.0 (9 nov 2026): «duna» es la pestaña de dunamixfy.cr (Dunamixfy, Costa Rica) con la cuenta de proveedor, con el lector `dunamixfy_cr` (productos y
+// pedidos, por la API interna de la página). Su sesión también es una cookie: se ve con /api/me, que dice el rol de la cuenta (nunca sale nada más).
+// 0.7.1 (9 nov 2026): junta la 0.6.3 (que solo estaba en la carpeta de la extensión, no en el sistema) con la 0.7.0; Dunamixfy también lee con su pestaña al frente.
 
-const ORIGEN = { pa: "https://app.dropi.pa", cr: "https://app.dropi.cr", mx: "https://app.dropi.mx", tw: "https://app.tuwinner.com", drop: "https://app.soydrop.com" };
+const ORIGEN = { pa: "https://app.dropi.pa", cr: "https://app.dropi.cr", mx: "https://app.dropi.mx", tw: "https://app.tuwinner.com", drop: "https://app.soydrop.com", duna: "https://dunamixfy.cr" };
 /** Dónde abrir una pestaña nueva de cada sitio. */
-const INICIO = { tw: "/dashboard/winners", drop: "/vendor/products" };
+const INICIO = { tw: "/dashboard/winners", drop: "/vendor/products", duna: "/inventory" };
 const LECTORES = {
   proveedor: { pais: "pa", archivo: "lectores/dropi-diario.js", funcion: "dropiDiario", estado: "__dropiDiario", archivos: ["pedidos", "cartera", "retiros", "stock"] },
   ventas: { pais: "pa", archivo: "lectores/ventas-dropi.js", funcion: "ventasDropi", estado: "__ventasDropi", archivos: ["resumen", "movimientos"] },
@@ -28,7 +34,9 @@ const LECTORES = {
   proveedor_cr: { pais: "cr", archivo: "lectores/dropi-diario.js", funcion: "dropiDiario", estado: "__dropiDiario", archivos: ["pedidos", "cartera", "retiros", "stock"] },
   ventas_cr: { pais: "cr", archivo: "lectores/ventas-dropi.js", funcion: "ventasDropi", estado: "__ventasDropi", archivos: ["resumen", "movimientos"] },
   // Drop (0.6.0): «Mis productos» y los pedidos en la pestaña de app.soydrop.com, con la cuenta de proveedor de Costa Rica.
-  drop_cr: { pais: "drop", archivo: "lectores/drop.js", funcion: "leerDropProveedor", estado: "__leerDrop", archivos: ["drop", "dropventas"] },
+  drop_cr: { pais: "drop", archivo: "lectores/drop.js", funcion: "leerDropProveedor", estado: "__leerDrop", archivos: ["drop", "dropventas"], frente: true },
+  // Dunamixfy (0.7.0): los productos y los pedidos en la pestaña de dunamixfy.cr, con la cuenta de proveedor de Costa Rica.
+  dunamixfy_cr: { pais: "duna", archivo: "lectores/dunamixfy.js", funcion: "leerDunamixfy", estado: "__leerDunamixfy", archivos: ["dunamixfy", "dunamixfyventas"], frente: true },
   // México (0.4.0, 30 oct 2026): los mismos lectores en la pestaña de app.dropi.mx, con la cuenta de proveedor.
   proveedor_mx: { pais: "mx", archivo: "lectores/dropi-diario.js", funcion: "dropiDiario", estado: "__dropiDiario", archivos: ["pedidos", "cartera", "retiros", "stock"] },
   ventas_mx: { pais: "mx", archivo: "lectores/ventas-dropi.js", funcion: "ventasDropi", estado: "__ventasDropi", archivos: ["resumen", "movimientos"] },
@@ -136,14 +144,26 @@ async function leerSesionDrop() {
   }
 }
 
-async function atender(m) {
+// Corre dentro de la pestaña de Dunamixfy: si hay sesión y de qué cuenta (el rol que dice /api/me: «SUPPLIER» es la de proveedor). La cookie nunca sale de la página.
+async function leerSesionDunamixfy() {
+  try {
+    const r = await fetch("/api/me", { credentials: "include" });
+    if (!r.ok) return { hay: false, tipoUsuario: null, tienda: null, vence: null };
+    const u = ((await r.json()) || {}).user || {};
+    return { hay: true, tipoUsuario: typeof u.role === "string" ? u.role : null, tienda: null, vence: null };
+  } catch {
+    return { hay: false, tipoUsuario: null, tienda: null, vence: null };
+  }
+}
+
+async function atender(m, remitente) {
   switch (m && m.tipo) {
     case "hola":
       return { version: chrome.runtime.getManifest().version };
     case "sesion": {
       const t = await pestana(validarPais(m.pais), !!m.abrir, false);
       if (!t) return { pestana: false, hay: false, tipoUsuario: null, tienda: null, vence: null };
-      return { pestana: true, ...(await enPagina(t.id, m.pais === "tw" ? leerSesionTuWinner : m.pais === "drop" ? leerSesionDrop : leerSesion)) };
+      return { pestana: true, ...(await enPagina(t.id, m.pais === "tw" ? leerSesionTuWinner : m.pais === "drop" ? leerSesionDrop : m.pais === "duna" ? leerSesionDunamixfy : leerSesion)) };
     }
     case "mostrar":
       await pestana(validarPais(m.pais), true, true);
@@ -161,7 +181,7 @@ async function atender(m) {
       // Hasta 1.000 días (MAX_DIAS_LECTURA del sistema): la primera lectura de México trae desde julio de 2024.
       const entero = (x) => Number.isInteger(x) && x > 0 && x <= 1000;
       const dias = d && entero(d.pedidos) && entero(d.cartera) ? { pedidos: d.pedidos, cartera: d.cartera } : null;
-      const t = await pestana(l.pais, true, false);
+      const t = await pestana(l.pais, true, !!l.frente);
       await chrome.scripting.executeScript({ target: { tabId: t.id }, world: "MAIN", files: [l.archivo] });
       await enPagina(
         t.id,
@@ -172,6 +192,8 @@ async function atender(m) {
         [l.funcion, subida, dias],
       );
       await chrome.storage.session.set({ [`pestana-${m.lector}`]: t.id });
+      // La pestaña del sistema que lo pidió, para devolverla al frente cuando termine.
+      if (l.frente && remitente && remitente.tab) await chrome.storage.session.set({ [`volver-${m.lector}`]: remitente.tab.id });
       return { ok: true };
     }
     case "avance": {
@@ -180,8 +202,10 @@ async function atender(m) {
       const guardada = (await chrome.storage.session.get(`pestana-${m.lector}`))[`pestana-${m.lector}`];
       // Si la extensión se recargó a medias, no recuerda la pestaña: se busca la de Dropi del país (27 oct 2026).
       const t = (guardada ? await chrome.tabs.get(guardada).catch(() => null) : null) || (await pestana(l.pais, false, false));
-      if (!t) throw new Error("Se cerró la pestaña de Dropi mientras se leía.");
-      return enPagina(
+      const nombre = l.pais === "drop" ? "Drop" : l.pais === "duna" ? "Dunamixfy" : l.pais === "tw" ? "Tu Winner" : "Dropi";
+      if (!t) throw new Error(`Se cerró la pestaña de ${nombre} mientras se leía.`);
+      if (t.discarded) throw new Error(`Chrome cerró la pestaña de ${nombre} para ahorrar memoria y se perdió lo leído: vuelve a pulsar «Actualizar» y deja esa pestaña abierta.`);
+      const a = await enPagina(
         t.id,
         (variable) => {
           const e = window[variable];
@@ -191,6 +215,15 @@ async function atender(m) {
         },
         [l.estado],
       );
+      // Terminó: vuelve al frente la pestaña del sistema (una sola vez).
+      const clave = `volver-${m.lector}`;
+      const volver = a && a.fin ? (await chrome.storage.session.get(clave))[clave] : null;
+      if (volver) {
+        await chrome.storage.session.remove(clave);
+        const s = await chrome.tabs.get(volver).catch(() => null);
+        if (s) await chrome.tabs.update(s.id, { active: true }).catch(() => null);
+      }
+      return a;
     }
   }
   throw new Error("Pedido desconocido.");
@@ -204,6 +237,6 @@ chrome.runtime.onMessage.addListener((msg, remitente, responder) => {
   if (remitente.id !== chrome.runtime.id) return false;
   const desdeVentanita = !remitente.tab && (remitente.url || "").startsWith(chrome.runtime.getURL(""));
   if (!desdeVentanita && remitente.origin !== SISTEMA) return false;
-  atender(msg).then(responder, (e) => responder({ error: String((e && e.message) || e) }));
+  atender(msg, remitente).then(responder, (e) => responder({ error: String((e && e.message) || e) }));
   return true;
 });

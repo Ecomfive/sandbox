@@ -12,7 +12,7 @@ import { codigoBodega, idsDeDropi } from "@/lib/publicaciones/sincronizar-dropi"
 import { grupoDe, nombreDelPublico } from "@/lib/publicaciones/apagar-dropi";
 import { encolarApagar, encolarArchivar, encolarCrear, encolarPrivatizar, encolarRepublicar, encolarReserva, encolarStock, enviarNombreADropi, enviarPrecioADropi } from "@/lib/publicaciones/cambios-dropi";
 import { faltantesReserva, normalizarDatosReserva, reservasGuardadas } from "@/lib/publicaciones/reservas-dropi";
-import { DIAS_VENDE_POCO, esBodegaDropi, masDias, revisarNotaEspera } from "@/lib/publicaciones/automatico";
+import { BODEGAS_CONOCIDAS_POR_PAIS, DIAS_VENDE_POCO, esBodegaDropi, masDias, revisarNotaEspera } from "@/lib/publicaciones/automatico";
 import { faltantesStock, normalizarDatosStock, productoDelCambio, textoVariacion } from "@/lib/publicaciones/stock-dropi";
 import { destinosDe, faltantesPrivatizar, nombrePrivado, normalizarDatosPrivatizar, quienesDe, unidadesTotales } from "@/lib/publicaciones/privatizar-dropi";
 import { faltantesVariaciones, stockEnBodega, textoVariaciones, type VariacionLeida } from "@/lib/publicaciones/privatizar-variable";
@@ -1018,8 +1018,9 @@ export async function esperarVendePoco(id: string, nota: string | null): Promise
 
 /**
  * «Stock reservado por correo» (8 nov 2026, pedido de Alcides; migración 0254): deja pendiente para «Aplicar en Dropi» que un correo quede con unas unidades reservadas
- * en esta publicación (0 = quitarle la reserva). No cambia nada en el sistema hasta que Dropi lo confirma. Revisa contra la última lectura de «Mis productos»
- * que no se reserve más de lo que hay (contando lo de los demás correos); el favorito lo vuelve a revisar con lo que Dropi tenga en ese momento.
+ * en esta publicación (0 = quitarle la reserva). No cambia nada en el sistema hasta que Dropi lo confirma. `unidades` es el **total** que debe quedar para ese correo
+ * (si ya tenía reserva, incluye lo que tenía); el favorito comprueba el stock con lo que Dropi tenga en ese momento y, si Dropi no deja subir la reserva
+ * existente, la quita, relee y la vuelve a poner con el total, como se hacía a mano.
  */
 export async function cambiarReservaDropi(id: string, crudo: unknown): Promise<{ error?: string; detalle?: string }> {
   const usuario = await requireModuloEscritura(MODULO);
@@ -1038,8 +1039,8 @@ export async function cambiarReservaDropi(id: string, crudo: unknown): Promise<{
   if (leida?.tipo === "VARIABLE") return { error: "Tiene variaciones: la reserva es por variación y por ahora se hace en Dropi." };
   const reservas = reservasGuardadas(leida?.reservas);
   const suya = reservas.find((r) => r.correo === pedido.correo);
-  const otras = reservas.filter((r) => r.correo !== pedido.correo).reduce((t, r) => t + r.unidades, 0);
-  const faltan = faltantesReserva(pedido, { stock: leida ? Number(leida.stock ?? 0) : null, otras, tieneReserva: !!suya });
+  // El stock no se revisa aquí: la lectura puede tener horas y el favorito lo comprueba con lo que Dropi tenga al aplicar (10 nov 2026).
+  const faltan = faltantesReserva(pedido, { tieneReserva: !!suya });
   if (faltan.length) return { error: faltan.join(" ") };
   if (suya && suya.unidades === pedido.unidades) return { detalle: "Ese correo ya tiene esas unidades reservadas en Dropi." };
   const d = { ...pedido, nombre: pedido.nombre ?? suya?.nombre ?? null, antes: suya ? suya.unidades : null, producto };
@@ -1076,6 +1077,9 @@ export async function cambiarStockDropi(id: string, crudo: unknown): Promise<{ e
   // Las bodegas de ECOMFIVE del país y lo que la última lectura mostraba de ese ID (el «antes»; la cuenta de verdad la hace el favorito).
   const { data: lecturas } = await supabase.from("dropi_productos_proveedor").select("dropi_producto_id, bodegas").eq("pais_id", antes.pais_id).limit(1000);
   const bodegas = new Map<number, string>();
+  // Las bodegas conocidas del país también valen aunque no salgan en la lectura (Dropi no lista las que no tienen stock; 10 nov 2026, la 552 Naucalpan de México).
+  const { data: paisDeLaPublicacion } = await supabase.from("paises").select("codigo").eq("id", antes.pais_id).maybeSingle();
+  for (const b of BODEGAS_CONOCIDAS_POR_PAIS[String(paisDeLaPublicacion?.codigo ?? "").toUpperCase()] ?? []) bodegas.set(b.id, b.nombre);
   let actual: { id: number; stock: number }[] = [];
   for (const l of lecturas ?? []) {
     const bs = Array.isArray(l.bodegas) ? (l.bodegas as { id: number; nombre?: string; stock?: number }[]) : [];
@@ -1133,4 +1137,31 @@ export async function buscarDropshippersParaPrivatizar(publicacionId: string, co
   for (const f of [...(porNombre.data ?? []), ...(porCorreo.data ?? []), ...(porTienda.data ?? [])] as Record<string, unknown>[])
     if (!vistos.has(f.id as string)) vistos.set(f.id as string, { id: f.id as string, nombre: String(f.nombre ?? ""), correo: String(f.contacto_email ?? ""), tienda: String(f.tienda ?? "") });
   return { resultados: [...vistos.values()].slice(0, 8) };
+}
+
+/**
+ * Vincula una variación de Dropi de la publicación (`firma`, de la última lectura) con una variante del producto vinculado (9 nov 2026, pedido de Hernán; migración
+ * 0261). Queda como elegida a mano: la lectura de «Mis productos» ya no la cambia.
+ */
+export async function vincularVariacionDropi(id: string, dropiId: number, firma: string, skuId: string): Promise<{ error?: string }> {
+  const usuario = await requireModuloEscritura(MODULO);
+  const antes = await publicacionPermitida(id, usuario.paisesPermitidos);
+  if (!antes) return { error: "La publicación ya no existe o no es de tus países." };
+  if (!Number.isSafeInteger(dropiId) || !idsDeDropi((antes.dropi_id as string | null) ?? null).includes(dropiId)) return { error: "Ese ID de Dropi no es de esta publicación." };
+  if (typeof firma !== "string" || !firma.trim() || firma.length > 500) return { error: "Variación no válida." };
+  if (!UUID.test(skuId)) return { error: "Elige una variante." };
+  const supabase = createServiceClient();
+  const { data: variante } = await supabase.from("skus_maestros").select("id, codigo, padre_id").eq("id", skuId).maybeSingle();
+  if (!variante || !antes.sku_maestro_id || variante.padre_id !== antes.sku_maestro_id) return { error: "Esa variante no es del producto vinculado a la publicación." };
+  const { error } = await supabase
+    .from("dropi_variaciones_vinculo")
+    .upsert(
+      { pais_id: antes.pais_id, dropi_producto_id: dropiId, firma, sku_maestro_id: skuId, como: "manual", creado_por: usuario.id, actualizado_en: new Date().toISOString() },
+      { onConflict: "pais_id,dropi_producto_id,firma" },
+    );
+  if (error) return { error: "No se pudo guardar (¿falta correr la migración 0261?)." };
+  await registrarAuditoria({ accion: "vincular_variacion_dropi", entidad: "dropi_publicaciones", entidadId: id, detalle: `ID ${dropiId} → ${variante.codigo}` });
+  revalidatePath(RUTA);
+  revalidatePath("/inventario");
+  return {};
 }

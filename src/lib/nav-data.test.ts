@@ -186,6 +186,7 @@ test("Gestión de IDs es una sola entrada del menú que sigue a la plataforma el
   // Con otro país solo existe Dropi; sin el módulo de la elegida, la primera que pueda abrir.
   assert.equal(colapsarGestionDeIds(areas, { ...todos, codigoPais: "PA" }).flatMap((a) => a.items).find((i) => i.label === "Gestión de IDs")!.href, "/publicaciones-dropi");
   assert.equal(colapsarGestionDeIds(areas, { ...todos, modulos: ["publicaciones-effi"] }).flatMap((a) => a.items).find((i) => i.label === "Gestión de IDs")!.href, "/publicaciones-effi");
-  // El menú original no cambia: las migas y el buscador siguen viendo las tres páginas.
-  assert.equal(areas.flatMap((a) => a.items).filter((i) => i.href?.startsWith("/publicaciones-")).length, 3);
+  // El menú original no cambia: las migas y el buscador siguen viendo las cuatro páginas (Dropi, Drop, Effi y Dunamixfy).
+  assert.equal(areas.flatMap((a) => a.items).filter((i) => i.href?.startsWith("/publicaciones-")).length, 4);
+  assert.equal(encontrarSeccionActiva("/publicaciones-dunamixfy", menu), "Operación");
 });

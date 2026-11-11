@@ -8,6 +8,8 @@
 //   (Una lectura con `tipo: "competencia"` es todo el catálogo de un país para Análisis de competencia: competencia-guardar.ts.)
 //   (Una lectura con `tipo: "drop"` es «Mis productos» de Drop, app.soydrop.com, para Gestión de IDs Drop: drop-guardar.ts.)
 //   (Una lectura con `tipo: "competencia-drop"` o `"competencia-effi"` es todo el catálogo de Drop o de Effi para Análisis de competencia: competencia-catalogo-guardar.ts.)
+//   (Una lectura con `tipo: "dunamixfy"` son los productos y los pedidos de Dunamixfy, dunamixfy.cr, con la cuenta de proveedor: src/lib/dunamixfy/guardar.ts. Lo mismo que
+//   trae «Actualizar datos» con la extensión; sirve para leer desde una pestaña sin la extensión, corriendo en la consola el lector extension/ecomfive-dropi/lectores/dunamixfy.js.)
 //   npx tsx scripts/scraping-proveedores.ts pendientes         lista los proveedores con una búsqueda pedida desde el sistema
 //   npx tsx scripts/scraping-proveedores.ts lista              los proveedores activos (la búsqueda diaria de las 5:00 los recorre)
 //   npx tsx scripts/scraping-proveedores.ts huellas            calcula las huellas de foto que falten (también lo hace cada búsqueda)
@@ -24,6 +26,7 @@ import { huellaFoto } from "../src/lib/wms/huella-foto";
 import { guardarCompetencia } from "./competencia-guardar";
 import { guardarCatalogo, type LecturaCatalogo } from "./competencia-catalogo-guardar";
 import { guardarDrop, type LecturaDrop } from "./drop-guardar";
+import { guardarPedidosDunamixfy, guardarProductosDunamixfy } from "../src/lib/dunamixfy/guardar";
 import { guardarNuestrosProductos, type LecturaNuestros } from "./publicaciones-sincronizar-dropi";
 import { comparar, mejorPareja, normalizarDropi, type Evento, type ProductoGuardado, type ProductoVisto } from "../src/lib/scraping/comparar";
 import { urlLogoDropi } from "../src/lib/scraping/descubrir";
@@ -39,7 +42,9 @@ interface Lectura {
   /** «competencia»: todo el catálogo de un país para Análisis de competencia; «nuestros»: nuestros productos con sus bodegas
    * (Gestión de IDs Dropi, publicaciones-sincronizar-dropi.ts); «drop»: nuestros productos en Drop (Gestión de IDs Drop, drop-guardar.ts); «competencia-drop» y «competencia-effi»: todo
    * el catálogo de Drop o de Effi (competencia-catalogo-guardar.ts); sin él, un proveedor de Scraping. */
-  tipo?: "competencia" | "nuestros" | "drop" | "competencia-drop" | "competencia-effi";
+  tipo?: "competencia" | "nuestros" | "drop" | "competencia-drop" | "competencia-effi" | "dunamixfy";
+  /** Solo en «dunamixfy»: los pedidos (sin nada del cliente). */
+  pedidos?: unknown[];
   dropiId: number;
   pais: string;
   url: string;
@@ -251,7 +256,7 @@ export async function calcularHuellas(filtro: string, tabla = "scraping_producto
  */
 function guardarCopia(l: Lectura) {
   const pais = typeof l.pais === "string" && /^[a-z]{2}$/.test(l.pais) ? l.pais : "xx";
-  const que = l.tipo === "competencia" || l.tipo === "nuestros" || l.tipo === "drop" || l.tipo === "competencia-drop" || l.tipo === "competencia-effi" ? l.tipo : Number.isInteger(l.dropiId) ? String(l.dropiId) : "lectura";
+  const que = l.tipo === "competencia" || l.tipo === "nuestros" || l.tipo === "drop" || l.tipo === "competencia-drop" || l.tipo === "competencia-effi" || l.tipo === "dunamixfy" ? l.tipo : Number.isInteger(l.dropiId) ? String(l.dropiId) : "lectura";
   const carpeta = path.resolve("datos-privados", "scraping");
   const ruta = path.join(carpeta, `${pais}-${que}-${new Date().toISOString().slice(0, 19).replace(/:/g, "")}.json`);
   if (!ruta.startsWith(carpeta + path.sep)) throw new Error("Ruta de la copia no válida.");
@@ -271,6 +276,13 @@ function guardarSegunTipo(l: Lectura) {
   if (l.tipo === "nuestros") return guardarNuestrosProductos(supabase, l as unknown as LecturaNuestros);
   if (l.tipo === "drop") return guardarDrop(supabase, l as unknown as LecturaDrop);
   if (l.tipo === "competencia-drop" || l.tipo === "competencia-effi") return guardarCatalogo(supabase, l as unknown as LecturaCatalogo, calcularHuellas);
+  if (l.tipo === "dunamixfy")
+    return (async () => {
+      const productos = await guardarProductosDunamixfy(supabase, { tipo: "dunamixfy", pais: "cr", inicio: l.inicio, productos: l.productos });
+      const avisos: string[] = [];
+      const pedidos = Array.isArray(l.pedidos) && l.pedidos.length ? await guardarPedidosDunamixfy(supabase, { tipo: "dunamixfy-pedidos", pais: "cr", inicio: l.inicio, pedidos: l.pedidos }, (t) => avisos.push(t)) : null;
+      return { productos, pedidos, avisos };
+    })();
   return guardarLectura(l);
 }
 

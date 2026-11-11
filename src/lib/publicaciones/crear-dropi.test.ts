@@ -4,10 +4,12 @@ import { ARMAR_JS } from "./marcador-aplicar-dropi";
 import {
   armarProductoCrear,
   CREAR_JS,
+  errorBodegaAjena,
   datosCrearVacios,
   faltantesCrearDropi,
   GARANTIAS_DROPI,
   normalizarDatosCrear,
+  publicacionSinCrearEnDropi,
   resolverCategorias,
   textoPlanoDropi,
   type DatosCrearDropi,
@@ -126,6 +128,28 @@ test("no se crea: con datos que faltan, con una categoría que Dropi no tiene o 
   assert.ok("error" in armarProductoCrear({ ...completo, peso: null }, 2094, bp, categorias));
   assert.match(String((armarProductoCrear({ ...completo, categorias: ["Mascotas"] }, 2094, bp, categorias) as { error: string }).error), /Mascotas/);
   assert.match(String((armarProductoCrear({ ...completo, bodegas: [{ id: 280, unidades: 200 }] }, 2094, bp, categorias) as { error: string }).error), /280/);
+});
+
+test("una bodega que no es de la cuenta dice con qué usuario se entró y cuáles bodegas tiene (PUB-0682, México: la 3903)", () => {
+  const d = { ...completo, bodegas: [{ id: 3903, unidades: 100 }] };
+  const sistema = armarProductoCrear(d, 20538, bp, categorias) as { error: string };
+  assert.match(sistema.error, /^La bodega 3903 no es de la cuenta con la que entraste a Dropi \(usuario 20538\)\./);
+  assert.match(sistema.error, /Las bodegas de esa cuenta: 81 «Proveedor Ecomfive»\./);
+  assert.equal(delFavorito.nuevoProducto(d, 20538, bp, categorias).error, sistema.error, "el favorito dice lo mismo");
+  assert.match(errorBodegaAjena(3903, 20538, []), /Esa cuenta no tiene bodegas\./);
+  assert.equal((delFavorito.nuevoProducto(d, 20538, [], categorias) as { error: string }).error, errorBodegaAjena(3903, 20538, []));
+});
+
+test("una publicación que se detuvo antes de crear nada en Dropi se puede deshacer; si ya se creó algo, no", () => {
+  const bodega = errorBodegaAjena(3903, 20538, bp);
+  assert.equal(publicacionSinCrearEnDropi(bodega, null), true);
+  assert.equal(publicacionSinCrearEnDropi("Dropi no tiene la categoría «Mascotas».", null), true);
+  assert.equal(publicacionSinCrearEnDropi("Dropi no devolvió las categorías.", null), true);
+  assert.equal(publicacionSinCrearEnDropi(bodega, 12345), false, "ya hay un ID creado");
+  assert.equal(publicacionSinCrearEnDropi("Se creó el 12345, pero no se pudieron subir 1 foto(s).", null), false);
+  assert.equal(publicacionSinCrearEnDropi("Dropi respondió 500.", null), false, "no se sabe si se creó");
+  assert.equal(publicacionSinCrearEnDropi("Dropi no devolvió el ID del producto nuevo (respondió 200).", null), false);
+  assert.equal(publicacionSinCrearEnDropi(null, null), false);
 });
 
 test("el favorito arma exactamente lo mismo que el sistema", () => {

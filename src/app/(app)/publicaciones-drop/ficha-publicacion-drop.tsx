@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { BloqueCompetencia, FotoAmpliable } from "@/components/competencia/piezas-competencia";
+import { CambioPrecioPlataforma } from "@/components/publicaciones/cambio-precio-plataforma";
 import { CodigosProducto } from "@/components/ui/codigos-producto";
 import { usePuedeAbrir } from "@/components/modulos-contexto";
 import { Badge } from "@/components/ui/badge";
@@ -25,7 +26,7 @@ import { AvisoEnCamino } from "../publicaciones-dropi/ventas-publicacion";
 import { ComprasProducto } from "../producto/compras-producto";
 import { EnCaminoProducto } from "../producto/en-camino-producto";
 import { FichaProductoEmbebida } from "../producto/ficha-producto-embebida";
-import { vincularPublicacionDrop } from "./actions";
+import { guardarCostoManualDrop, vincularPublicacionDrop } from "./actions";
 import { DialogoAccesoPrivado, DialogoSolicitudInventario } from "./dialogos-fila-drop";
 import type { FilaPublicacionDrop, ProductoDrop } from "./def-publicaciones-drop";
 import { InsigniaConectadoDrop } from "./insignia-conectado-drop";
@@ -167,6 +168,72 @@ function VinculoSkuDrop({ p, puedeEscribir, siguiente, alAbrirProducto }: { p: F
  * Producto vinculado (con la sugerencia y «Vincular»), otras publicaciones de Drop del mismo producto, Producto (foto, nombre, ID y SKU de Drop, conexión),
  * Estado, Precio y margen, Stock, En camino, Competencia y Compras del producto. Los datos de Drop no se editan aquí: se leen de Drop.
  */
+/**
+ * El costo de producto (10 nov 2026, `costoDrop`): el de Gestión de IDs Dropi del país, el de otra variante del mismo producto o, si no hay ninguno, uno escrito a mano
+ * aquí (migración 0267). El campo solo sale cuando no hay costo en Dropi.
+ */
+function CostoProductoDrop({ p, moneda, puedeEscribir }: { p: FilaPublicacionDrop; moneda: MonedaPublicaciones; puedeEscribir: boolean }) {
+  const { mostrarToast } = useToast();
+  const [valor, setValor] = useState(p.costoOrigen === "manual" && p.costo !== null ? String(p.costo) : "");
+  const deCompras = p.costoOrigen === "compras" && p.costo !== null;
+  const [pendiente, empezar] = useTransition();
+  const editable = puedeEscribir && !!p.producto && (p.costoOrigen === null || p.costoOrigen === "manual" || p.costoOrigen === "compras");
+  const nota = !p.producto
+    ? "Vincula el producto para verlo"
+    : p.costoOrigen === "dropi"
+      ? "El de su producto en Gestión de IDs Dropi"
+      : p.costoOrigen === "variante"
+        ? `El de la variante ${p.costoDe} en Gestión de IDs Dropi`
+        : p.costoOrigen === "manual"
+          ? "Escrito a mano: su producto no tiene costo en Gestión de IDs Dropi"
+          : p.costoOrigen === "compras"
+            ? `De Compras: ${p.costoDe}, pasado a la moneda de Drop. Escribe otro si no es ese`
+            : "Su producto no tiene costo en Gestión de IDs Dropi: escríbelo aquí";
+  function guardar() {
+    const t = valor.trim().replace(",", ".");
+    const n = t === "" ? null : Number(t);
+    if (n !== null && (!Number.isFinite(n) || n < 0)) return mostrarToast("Escribe un costo válido.", "destructive");
+    empezar(async () => {
+      const r = await guardarCostoManualDrop(p.id, n).catch(() => ({ error: "No se pudo guardar. Inténtalo de nuevo." }));
+      if ("error" in r) return mostrarToast(r.error, "destructive");
+      mostrarToast(n === null ? "Se quitó el costo escrito a mano." : "Costo guardado.");
+    });
+  }
+  return (
+    <div className="flex min-w-0 flex-col gap-1">
+      <span className={labelClassSm}>Costo de producto</span>
+      {editable ? (
+        <span className="flex items-center gap-1.5">
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            inputMode="decimal"
+            aria-label="Costo de producto escrito a mano"
+            value={valor}
+            disabled={pendiente}
+            onChange={(e) => setValor(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && guardar()}
+            placeholder={deCompras ? String(p.costo) : moneda.moneda}
+            className="h-8 w-28 rounded-md border border-border bg-card px-2 text-right text-sm tabular-nums"
+          />
+          <Button type="button" variant="secondary" disabled={pendiente} onClick={guardar} className="h-8 px-3 text-xs">
+            Guardar
+          </Button>
+        </span>
+      ) : (
+        <span className="text-sm tabular-nums">{p.costo === null ? "—" : <Monto valor={p.costo} moneda={moneda} />}</span>
+      )}
+      {editable && deCompras && (
+        <span className="text-sm tabular-nums">
+          <Monto valor={p.costo} moneda={moneda} />
+        </span>
+      )}
+      <span className="text-xs text-muted-foreground">{nota}</span>
+    </div>
+  );
+}
+
 export function FichaPublicacionDrop({
   publicacion,
   moneda,
@@ -343,22 +410,49 @@ export function FichaPublicacionDrop({
         <Seccion icono={MargenIcon} titulo="Precio y margen">
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="flex min-w-0 flex-col gap-1">
-              <span className={labelClassSm}>Precio en Drop</span>
-              <span className="text-sm font-semibold tabular-nums">
-                <Monto valor={p.precio} moneda={moneda} />
-              </span>
+              <span className={labelClassSm}>Precio sin comisión</span>
+              <span className="text-sm font-semibold tabular-nums">{p.precioProveedor === null ? "—" : <Monto valor={p.precioProveedor} moneda={moneda} />}</span>
+              <span className="text-xs text-muted-foreground">{p.precioProveedor === null ? "Se lee al pulsar «Aplicar precios» en Drop" : "El nuestro: lo que se escribe en Drop"}</span>
             </div>
             <div className="flex min-w-0 flex-col gap-1">
-              <span className={labelClassSm}>Costo de producto</span>
-              <span className="text-sm tabular-nums">{p.costo === null ? "—" : <Monto valor={p.costo} moneda={moneda} />}</span>
-              <span className="text-xs text-muted-foreground">{p.producto ? (p.costo === null ? "Su producto no tiene costo en Gestión de IDs Dropi" : "El de su producto en Gestión de IDs Dropi") : "Vincula el producto para verlo"}</span>
+              <span className={labelClassSm}>Precio en Drop</span>
+              <span className="text-sm tabular-nums">
+                <Monto valor={p.precio} moneda={moneda} />
+              </span>
+              <span className="text-xs text-muted-foreground">Lo que paga el dropshipper, con la comisión de Drop</span>
             </div>
+            <div className="flex min-w-0 flex-col gap-1">
+              <span className={labelClassSm}>Precio sugerido</span>
+              <span className="text-sm tabular-nums">{p.precioSugerido === null ? "—" : <Monto valor={p.precioSugerido} moneda={moneda} />}</span>
+            </div>
+            <CostoProductoDrop p={p} moneda={moneda} puedeEscribir={puedeEscribir} />
             <div className="flex min-w-0 flex-col gap-1">
               <span className={labelClassSm}>Fulfillment</span>
               <span className="text-sm tabular-nums">{p.fulfillmentPaga === "dropshipper" ? "Lo paga el dropshipper" : p.fulfillment === null ? "—" : <Monto valor={p.fulfillment} moneda={moneda} />}</span>
               <span className="text-xs text-muted-foreground">{p.fulfillmentPaga === "dropshipper" ? "No cuenta en el margen" : p.fulfillment === null ? "Ponlo en Configuración, fila «Drop»" : "El de Drop en Configuración"}</span>
             </div>
           </div>
+          <CambioPrecioPlataforma
+            key={p.id}
+            plataforma="drop"
+            publicacionId={p.id}
+            etiquetaPrecio="Precio sin comisión"
+            ayudaPrecio="Drop le suma su comisión"
+            precio={p.precioProveedor}
+            sugerido={p.precioSugerido}
+            moneda={moneda}
+            esperando={p.cambioPrecio}
+            puedeEscribir={puedeEscribir}
+            bloqueo={
+              !p.conectado
+                ? "Ya no aparece en Drop: no se puede cambiar su precio."
+                : p.conVariantes
+                  ? "Tiene variantes en Drop: su precio se cambia allá."
+                  : p.precioProveedor === null
+                    ? "Para cambiar el precio desde aquí, primero pulsa «Aplicar precios» con Drop abierto: así se lee el precio sin comisión."
+                    : null
+            }
+          />
           <dl className="grid grid-cols-2 gap-3 rounded-lg bg-muted px-4 py-3 text-sm tabular-nums">
             <div>
               <dt className="text-xs text-muted-foreground">Utilidad bruta</dt>

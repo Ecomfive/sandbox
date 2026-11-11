@@ -1,6 +1,7 @@
 import { conTtl } from "@/lib/cache-ttl";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { precioEquivalente, unidadesBajadas, type CambioStock } from "@/lib/competencia/analisis";
+import { certezaIgual } from "@/lib/competencia/certeza";
 import { clavesDistintas, descartadoPara } from "@/lib/competencia/descartar";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 
@@ -29,11 +30,13 @@ async function leerCompetidores(paisId: string, supabase: SupabaseClient): Promi
   const out = new Map<number, CompetidorDePublicacion[]>();
   try {
     const [nuestros, otros] = await Promise.all([
-      traerTodasLasFilas<{ id: string; dropi_producto_id: number }>((d, h) => supabase.from("competencia_productos").select("id, dropi_producto_id").eq("pais_id", paisId).eq("es_nuestro", true).order("id").range(d, h)),
-      traerTodasLasFilas<{ id: string; igual_a: string; nombre: string; proveedor_nombre: string; precio: number | null; stock: number | null }>((d, h) =>
+      traerTodasLasFilas<{ id: string; dropi_producto_id: number; nombre: string; foto_huella: string | null }>((d, h) =>
+        supabase.from("competencia_productos").select("id, dropi_producto_id, nombre, foto_huella").eq("pais_id", paisId).eq("es_nuestro", true).order("id").range(d, h),
+      ),
+      traerTodasLasFilas<{ id: string; igual_a: string; igual_metodo: string | null; nombre: string; foto_huella: string | null; proveedor_nombre: string; precio: number | null; stock: number | null }>((d, h) =>
         supabase
           .from("competencia_productos")
-          .select("id, igual_a, nombre, proveedor_nombre, precio, stock")
+          .select("id, igual_a, igual_metodo, nombre, foto_huella, proveedor_nombre, precio, stock")
           .eq("pais_id", paisId)
           .eq("es_nuestro", false)
           .eq("estado", "activo")
@@ -45,17 +48,27 @@ async function leerCompetidores(paisId: string, supabase: SupabaseClient): Promi
     ]);
     const dropiDe = new Map(nuestros.map((n) => [n.id, Number(n.dropi_producto_id)]));
     // «No es el mismo» (8 nov 2026): lo que una persona o la IA descartó no cuenta (migración 0246; sin ella, nada).
+    // Y solo el mismo producto (9 nov 2026, pedido de Hernán): `certezaIgual`, o lo que una persona o la IA confirmó («mismo»); lo que la IA dijo «parecido», no.
     let distintas = new Set<string>();
+    let veredictos = new Map<string, string>();
     try {
-      distintas = clavesDistintas(
-        await traerTodasLasFilas<{ id: string; producto_id: string; nuestro_id: string; veredicto: string }>((d, h) =>
-          supabase.from("competencia_verificaciones").select("id, producto_id, nuestro_id, veredicto").eq("plataforma", "dropi").eq("veredicto", "distinto").order("id").range(d, h),
-        ),
+      const filas = await traerTodasLasFilas<{ id: string; producto_id: string; nuestro_id: string; veredicto: string }>((d, h) =>
+        supabase.from("competencia_verificaciones").select("id, producto_id, nuestro_id, veredicto").eq("plataforma", "dropi").order("id").range(d, h),
       );
+      distintas = clavesDistintas(filas.filter((f) => f.veredicto === "distinto"));
+      veredictos = new Map(filas.map((f) => [`${f.producto_id}|${f.nuestro_id}`, f.veredicto]));
     } catch {
-      // Sin la tabla: nada descartado.
+      // Sin la tabla: nada descartado ni confirmado.
     }
-    const deNuestros = otros.filter((o) => dropiDe.has(o.igual_a) && !descartadoPara(o.id, [o.igual_a], distintas));
+    const nuestroDe = new Map(nuestros.map((n) => [n.id, n]));
+    const elMismo = (o: (typeof otros)[number]) => {
+      const v = veredictos.get(`${o.id}|${o.igual_a}`);
+      if (v === "mismo") return true;
+      if (v === "parecido") return false;
+      const n = nuestroDe.get(o.igual_a);
+      return !!n && certezaIgual({ nombre: n.nombre, huella: n.foto_huella }, { nombre: o.nombre, huella: o.foto_huella }, o.igual_metodo) === "exacto";
+    };
+    const deNuestros = otros.filter((o) => dropiDe.has(o.igual_a) && !descartadoPara(o.id, [o.igual_a], distintas) && elMismo(o));
     const vendido = await vendidoEn30Dias(
       supabase,
       deNuestros.map((o) => o.id),

@@ -4,7 +4,7 @@ import type { ComponentType } from "react";
 import { COLORES, type Color } from "@/components/panel/colores-tablero";
 import { useFiltros } from "@/components/tabla/ganchos";
 import { anilloFoco } from "@/components/ui/field";
-import { AlertaIcon, CalendarioIcon, CheckIcon, DropIcon, DropiIcon, EffiIcon, EnvioIcon, InventarioIcon } from "@/lib/nav-icons";
+import { AlertaIcon, CalendarioIcon, CheckIcon, DropIcon, DropiIcon, DunamixfyIcon, EffiIcon, EnvioIcon, InventarioIcon } from "@/lib/nav-icons";
 import { alternarAtajo, atajoActivo, type AtajoFiltro } from "@/lib/tabla/atajos";
 import type { DefTabla } from "@/lib/tabla/motor";
 import { ETIQUETA_PLATAFORMA, type Plataforma } from "@/lib/wms/stock-plataformas";
@@ -32,6 +32,7 @@ const LOGO: Record<Plataforma, ComponentType<{ className?: string }>> = {
   dropi: (p) => <DropiIcon marca {...p} />,
   effi: (p) => <EffiIcon marca {...p} />,
   drop: (p) => <DropIcon marca {...p} />,
+  dunamixfy: (p) => <DunamixfyIcon marca {...p} />,
 };
 
 /** Las tarjetas de lo que se está viendo: cambian con la bodega, la búsqueda y los filtros. Un compuesto no suma unidades, porque ya están en sus componentes. */

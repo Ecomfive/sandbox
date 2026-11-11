@@ -8,6 +8,7 @@ import { FichaCrear } from "@/components/ui/ficha-crear";
 import { Seccion } from "@/components/ui/seccion-ficha";
 import { FlechaAbajoIcon, FlechaArribaIcon, InventarioIcon, LapizIcon } from "@/lib/nav-icons";
 import { registrarMovimientoStock, type LoteStock } from "./stock-actions";
+import { PEDIR_CODIGO_LOTE } from "@/lib/wms/vencimiento";
 
 export interface BodegaOpcion {
   id: string;
@@ -110,14 +111,16 @@ export function PanelMovimiento({
           )}
           {manejaVencimiento && lotePorTexto && (
             <>
-              <Campo etiqueta="Lote" id="campo-lote-mov" obligatorio faltante={faltante}>
-                <input id="campo-lote-mov" type="text" name="lote_codigo" required maxLength={80} autoComplete="off" list="lotes-existentes-mov" aria-invalid={invalido("campo-lote-mov")} placeholder="Ej: L2411-A" className={`${fieldClass} w-full`} />
+              {PEDIR_CODIGO_LOTE && (
+              <Campo etiqueta="Lote" id="campo-lote-mov" faltante={faltante}>
+                <input id="campo-lote-mov" type="text" name="lote_codigo" maxLength={80} autoComplete="off" list="lotes-existentes-mov" aria-invalid={invalido("campo-lote-mov")} placeholder="Ej: L2411-A" className={`${fieldClass} w-full`} />
                 <datalist id="lotes-existentes-mov">
                   {lotes.map((l) => (
                     <option key={l.loteId + l.bodegaId} value={l.lote} />
                   ))}
                 </datalist>
               </Campo>
+              )}
               <Campo etiqueta="Fecha de vencimiento" id="campo-vencimiento-mov" obligatorio faltante={faltante}>
                 <input id="campo-vencimiento-mov" type="date" name="vencimiento" required aria-invalid={invalido("campo-vencimiento-mov")} className={`${fieldClass} w-full`} />
               </Campo>

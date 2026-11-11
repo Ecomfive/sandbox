@@ -7,7 +7,7 @@ import { CodigosProducto } from "@/components/ui/codigos-producto";
 import { usePuedeAbrir } from "@/components/modulos-contexto";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { labelClassSm } from "@/components/ui/field";
+import { fieldClass, labelClassSm } from "@/components/ui/field";
 import { Seccion } from "@/components/ui/seccion-ficha";
 import { CampoSkuMaestro, type OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import { SkuCopiable } from "@/components/ui/sku-copiable";
@@ -15,6 +15,7 @@ import { useToast } from "@/components/ui/toast";
 import { Ventana } from "@/components/ui/ventana";
 import { formatearFechaHora } from "@/lib/formato";
 import { ComprasIcon, EffiIcon, InteligenciaIcon, InventarioIcon, MargenIcon, ProductoIcon } from "@/lib/nav-icons";
+import { margenEffi } from "@/lib/effi/articulos";
 import { formatoEnDolares, formatoMonto, type MonedaPublicaciones } from "@/lib/publicaciones/moneda";
 import { MARGEN_BAJO } from "@/lib/publicaciones/publicacion";
 import { ETIQUETA_SUGERENCIA, type TipoSugerencia } from "@/lib/publicaciones/vincular";
@@ -22,7 +23,7 @@ import { ComprasProducto } from "../producto/compras-producto";
 import { EnCaminoProducto } from "../producto/en-camino-producto";
 import { FichaProductoEmbebida } from "../producto/ficha-producto-embebida";
 import { AvisoEnCamino } from "../publicaciones-dropi/ventas-publicacion";
-import { vincularPublicacionEffi } from "./actions";
+import { cambiarPreciosEffi, vincularPublicacionEffi } from "./actions";
 import type { FilaPublicacionEffi, ProductoEffi } from "./def-publicaciones-effi";
 import { InsigniaConectadoEffi } from "./insignia-conectado-effi";
 
@@ -49,6 +50,107 @@ function Monto({ valor, moneda }: { valor: number | null; moneda: MonedaPublicac
       {formatoMonto(valor, moneda)}
       {usd && <span className="ml-1 text-xs font-normal text-muted-foreground">{usd}</span>}
     </>
+  );
+}
+
+const simboloDe = (moneda: MonedaPublicaciones) => (moneda.moneda === "CRC" ? "₡" : moneda.moneda === "MXN" ? "MX$" : "$");
+const texto = (n: number | null) => (n === null ? "" : String(n));
+
+/** Un precio editable de la ficha, con el símbolo de la moneda delante y, debajo, cuánto es en dólares. */
+function CampoPrecio({ etiqueta, valor, alCambiar, moneda }: { etiqueta: string; valor: string; alCambiar: (v: string) => void; moneda: MonedaPublicaciones }) {
+  const n = valor.trim() === "" ? null : Number(valor);
+  const usd = n === null || !Number.isFinite(n) ? null : formatoEnDolares(n, moneda);
+  return (
+    <label className="flex min-w-0 flex-col gap-1">
+      <span className={labelClassSm}>{etiqueta}</span>
+      <span className={`flex items-center gap-1.5 ${fieldClass} w-full focus-within:border-foreground focus-within:ring-2 focus-within:ring-foreground`}>
+        <span aria-hidden="true" className="shrink-0 text-sm text-muted-foreground">
+          {simboloDe(moneda)}
+        </span>
+        <input type="number" min={0} step="0.01" inputMode="decimal" value={valor} onChange={(e) => alCambiar(e.target.value)} className="w-full min-w-0 bg-transparent tabular-nums outline-none" />
+      </span>
+      {usd && <span className="text-xs text-muted-foreground">≈ {usd}</span>}
+    </label>
+  );
+}
+
+/**
+ * «Precio y margen» de la ficha. Quien puede escribir en Gestión de IDs Effi cambia aquí la Tarifa Dropshipping, la Sugerida y el
+ * precio mínimo, y «Guardar precios en Effi» los cambia en Effi al instante (9 nov 2026, pedido de Hernán para Nicol). La utilidad
+ * y el margen se recalculan mientras se escribe.
+ */
+function PreciosEffi({ p, moneda, puedeEscribir }: { p: FilaPublicacionEffi; moneda: MonedaPublicaciones; puedeEscribir: boolean }) {
+  const { mostrarToast } = useToast();
+  const [guardando, empezar] = useTransition();
+  const [guardado, setGuardado] = useState({ precio: p.precio, precioSugerido: p.precioSugerido, precioMinimo: p.precioMinimo });
+  const [valores, setValores] = useState({ precio: texto(p.precio), precioSugerido: texto(p.precioSugerido), precioMinimo: texto(p.precioMinimo) });
+  const editable = puedeEscribir && p.conectado;
+  const cambio = (["precio", "precioSugerido", "precioMinimo"] as const).some((k) => valores[k].trim() !== "" && Number(valores[k]) !== guardado[k]);
+  const precioVivo = editable && valores.precio.trim() !== "" && Number.isFinite(Number(valores.precio)) ? Number(valores.precio) : guardado.precio;
+  const m = margenEffi(precioVivo, p.costo, p.fulfillment);
+  const deshacer = () => setValores({ precio: texto(guardado.precio), precioSugerido: texto(guardado.precioSugerido), precioMinimo: texto(guardado.precioMinimo) });
+
+  const guardar = () =>
+    empezar(async () => {
+      const r = await cambiarPreciosEffi(p.id, valores).catch(() => ({ error: "No se pudo. Inténtalo de nuevo." }));
+      if ("error" in r) return mostrarToast(r.error, "destructive");
+      setGuardado({ precio: r.precio, precioSugerido: r.precioSugerido, precioMinimo: r.precioMinimo });
+      setValores({ precio: texto(r.precio), precioSugerido: texto(r.precioSugerido), precioMinimo: texto(r.precioMinimo) });
+      mostrarToast("Precios cambiados en Effi");
+    });
+
+  return (
+    <Seccion icono={MargenIcon} titulo="Precio y margen">
+      {editable ? (
+        <div className="grid gap-3 sm:grid-cols-3">
+          <CampoPrecio etiqueta="Tarifa Dropshipping" valor={valores.precio} alCambiar={(v) => setValores((x) => ({ ...x, precio: v }))} moneda={moneda} />
+          <CampoPrecio etiqueta="Tarifa Sugerida" valor={valores.precioSugerido} alCambiar={(v) => setValores((x) => ({ ...x, precioSugerido: v }))} moneda={moneda} />
+          <CampoPrecio etiqueta="Precio mínimo" valor={valores.precioMinimo} alCambiar={(v) => setValores((x) => ({ ...x, precioMinimo: v }))} moneda={moneda} />
+        </div>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Dato etiqueta="Tarifa Dropshipping">
+            <span className="font-semibold">
+              <Monto valor={guardado.precio} moneda={moneda} />
+            </span>
+          </Dato>
+          <Dato etiqueta="Tarifa Sugerida">{guardado.precioSugerido === null ? "—" : <Monto valor={guardado.precioSugerido} moneda={moneda} />}</Dato>
+          <Dato etiqueta="Precio mínimo">{guardado.precioMinimo === null ? "—" : <Monto valor={guardado.precioMinimo} moneda={moneda} />}</Dato>
+        </div>
+      )}
+      {editable && cambio && (
+        <div className="flex flex-wrap items-center gap-2">
+          <Button type="button" disabled={guardando} onClick={guardar}>
+            {guardando ? "Guardando en Effi…" : "Guardar precios en Effi"}
+          </Button>
+          <Button type="button" variant="ghost" disabled={guardando} onClick={deshacer}>
+            Deshacer
+          </Button>
+          <span className="text-xs text-muted-foreground">Se cambian en Effi al instante.</span>
+        </div>
+      )}
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Dato etiqueta="Costo" ayuda="El último costo de compra en Effi">
+          {p.costo === null ? "—" : <Monto valor={p.costo} moneda={moneda} />}
+        </Dato>
+        <Dato etiqueta="Fulfillment" ayuda={p.fulfillmentPaga === "dropshipper" ? "No cuenta en el margen" : p.fulfillment === null ? "Ponlo en Configuración, fila «EFFI»" : "El de Effi en Configuración"}>
+          {p.fulfillmentPaga === "dropshipper" ? "Lo paga el dropshipper" : p.fulfillment === null ? "—" : <Monto valor={p.fulfillment} moneda={moneda} />}
+        </Dato>
+      </div>
+      <dl className="grid grid-cols-2 gap-3 rounded-lg bg-muted px-4 py-3 text-sm tabular-nums">
+        <div>
+          <dt className="text-xs text-muted-foreground">Utilidad bruta</dt>
+          <dd className="font-semibold">{m === null ? "—" : <Monto valor={m.utilidad} moneda={moneda} />}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-muted-foreground">Margen bruto</dt>
+          <dd className="flex items-center gap-1.5 font-semibold">
+            {m !== null && m.margen < MARGEN_BAJO && <span role="img" aria-label="Margen bajo" className="h-2 w-2 rounded-full bg-destructive" />}
+            {m === null ? "—" : `${Math.round(m.margen * 100)} %`}
+          </dd>
+        </div>
+      </dl>
+    </Seccion>
   );
 }
 
@@ -157,7 +259,7 @@ function VinculoSkuEffi({ p, puedeEscribir, siguiente, alAbrirProducto }: { p: F
   );
 }
 
-/** La ficha de un artículo de Effi, con la forma de la de Drop. Los datos no se editan aquí: se leen de Effi. Lo único que se guarda es el vínculo con Producto. */
+/** La ficha de un artículo de Effi, con la forma de la de Drop. Los datos se leen de Effi; aquí se guardan el vínculo con Producto y los precios (que se cambian en Effi). */
 export function FichaPublicacionEffi({
   publicacion,
   moneda,
@@ -242,36 +344,7 @@ export function FichaPublicacionEffi({
           </div>
         </Seccion>
 
-        <Seccion icono={MargenIcon} titulo="Precio y margen">
-          <div className="grid gap-3 sm:grid-cols-3">
-            <Dato etiqueta="Tarifa Dropshipping">
-              <span className="font-semibold">
-                <Monto valor={p.precio} moneda={moneda} />
-              </span>
-            </Dato>
-            <Dato etiqueta="Tarifa Sugerida">{p.precioSugerido === null ? "—" : <Monto valor={p.precioSugerido} moneda={moneda} />}</Dato>
-            <Dato etiqueta="Precio mínimo">{p.precioMinimo === null ? "—" : <Monto valor={p.precioMinimo} moneda={moneda} />}</Dato>
-            <Dato etiqueta="Costo" ayuda="El último costo de compra en Effi">
-              {p.costo === null ? "—" : <Monto valor={p.costo} moneda={moneda} />}
-            </Dato>
-            <Dato etiqueta="Fulfillment" ayuda={p.fulfillmentPaga === "dropshipper" ? "No cuenta en el margen" : p.fulfillment === null ? "Ponlo en Configuración, fila «EFFI»" : "El de Effi en Configuración"}>
-              {p.fulfillmentPaga === "dropshipper" ? "Lo paga el dropshipper" : p.fulfillment === null ? "—" : <Monto valor={p.fulfillment} moneda={moneda} />}
-            </Dato>
-          </div>
-          <dl className="grid grid-cols-2 gap-3 rounded-lg bg-muted px-4 py-3 text-sm tabular-nums">
-            <div>
-              <dt className="text-xs text-muted-foreground">Utilidad bruta</dt>
-              <dd className="font-semibold">{p.utilidad === null ? "—" : <Monto valor={p.utilidad} moneda={moneda} />}</dd>
-            </div>
-            <div>
-              <dt className="text-xs text-muted-foreground">Margen bruto</dt>
-              <dd className="flex items-center gap-1.5 font-semibold">
-                {p.margen !== null && p.margen < MARGEN_BAJO && <span role="img" aria-label="Margen bajo" className="h-2 w-2 rounded-full bg-destructive" />}
-                {p.margen === null ? "—" : `${Math.round(p.margen * 100)} %`}
-              </dd>
-            </div>
-          </dl>
-        </Seccion>
+        <PreciosEffi key={p.id} p={p} moneda={moneda} puedeEscribir={puedeEscribir} />
 
         <Seccion icono={InventarioIcon} titulo="Stock">
           <AvisoEnCamino enCamino={p.enCamino} llegada={p.llegadaCamino} sinFecha={p.sinFechaCamino} sinEnvio={p.sinEnvioCamino} enCotizacion={p.enCotizacion} etapaCotizacion={p.etapaCotizacion} />

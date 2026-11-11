@@ -27,7 +27,7 @@ export interface FilaVista extends FilaCuadro {
 
 const entero = (n: number) => n.toLocaleString("es-PA");
 const sinAcentos = (t: string) => t.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
-const OPCIONES = (["dropi", "effi", "drop"] as const).map((p) => ({ valor: p, etiqueta: ETIQUETA_PLATAFORMA[p] }));
+const OPCIONES = (["dropi", "effi", "drop", "dunamixfy"] as const).map((p) => ({ valor: p, etiqueta: ETIQUETA_PLATAFORMA[p] }));
 
 function Cifra({ titulo, valor, tono = "" }: { titulo: string; valor: string; tono?: string }) {
   return (

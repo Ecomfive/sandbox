@@ -371,6 +371,7 @@ export function Bandeja({
   miId,
   equipo,
   direccion,
+  verPresencia,
   verTelefono = false,
   areas: misAreas,
   miArea,
@@ -384,6 +385,8 @@ export function Bandeja({
   equipo: PersonaEquipo[];
   /** Quien tiene Dirección ve además a los de Atención y Comercial que están en otra parte del sistema. */
   direccion: boolean;
+  /** Ve quién del equipo está conectado y en qué chat (Comercial, Dirección y administradores; Atención no: `vePresenciaEquipo`). */
+  verPresencia: boolean;
   /** Puede usar «Mostrar número» (por ahora, administradores). */
   verTelefono?: boolean;
   /** Los paneles que ve la persona (las áreas, de la suya hacia abajo). */
@@ -1083,7 +1086,7 @@ export function Bandeja({
                 <span className="flex items-center gap-2">
                   <BanderaNumero pais={numeroDe.get(c.numeroId)?.pais} />
                   <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">{c.nombre}</span>
-                  <PersonasEnChat ids={enChats[c.id]} equipo={equipoPorId} />
+                  {verPresencia && <PersonasEnChat ids={enChats[c.id]} equipo={equipoPorId} />}
                   {c.vip && <EtiquetaVip tipo={c.tipoCliente} />}
                   {c.noLeidos > 0 && (
                     <span className="flex h-[18px] min-w-[18px] flex-none items-center justify-center rounded-full bg-[var(--wa-acento)] px-1 text-[11px] font-semibold text-[var(--wa-acento-texto)] tabular-nums">
@@ -1163,7 +1166,7 @@ export function Bandeja({
         <span className="flex items-baseline gap-2">
           <BanderaNumero pais={numeroDe.get(c.numeroId)?.pais} />
           <span className="min-w-0 flex-1 truncate text-[16px]">{c.nombre}</span>
-          <PersonasEnChat ids={enChats[c.id]} equipo={equipoPorId} />
+          {verPresencia && <PersonasEnChat ids={enChats[c.id]} equipo={equipoPorId} />}
           {c.vip && <EtiquetaVip tipo={c.tipoCliente} />}
           <span className={`flex-none text-xs tabular-nums ${c.noLeidos ? "font-semibold text-[var(--wa-acento)]" : "text-[var(--wa-sec)]"}`}>{enNavegador ? horaCorta(c.ultimoMensajeEn) : ""}</span>
         </span>
@@ -1541,6 +1544,7 @@ export function Bandeja({
         {estado360 && <BotonNumerosPais alCambiar={() => void refrescar(elegido)} />}
       </div>
 
+      {verPresencia && (
       <BarraPresencia
         miId={miId}
         miChat={elegido}
@@ -1553,6 +1557,7 @@ export function Bandeja({
           if (c) abrirChat(c);
         }}
       />
+      )}
 
       {/* ===== El tablero (29 oct 2026; por estado desde el 30 oct): un área a la vez, en columnas Por atender, En conversación y Cerrados ===== */}
       {enTablero &&
@@ -1720,7 +1725,7 @@ export function Bandeja({
                   ) : (
                     <span className="flex min-w-0 items-center gap-1">
                       <span className="min-w-0 text-lg leading-tight font-semibold [overflow-wrap:anywhere]">{sel.nombre}</span>
-                      <PersonasEnChat ids={enChats[sel.id]} equipo={equipoPorId} tamano="sm" />
+                      {verPresencia && <PersonasEnChat ids={enChats[sel.id]} equipo={equipoPorId} tamano="sm" />}
                       {escribe && (
                         <button type="button" onClick={() => setEditandoNombre("cabecera")} aria-label="Cambiar el nombre del contacto" title="Cambiar el nombre" className={`${botonIcono} !h-8 !w-8`}>
                           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

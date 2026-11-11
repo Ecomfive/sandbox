@@ -16,7 +16,7 @@ export const metadata = { title: "Cuadro" };
 
 export const dynamic = "force-dynamic";
 
-const ES_PLATAFORMA = (v: unknown): v is Plataforma => v === "dropi" || v === "effi" || v === "drop";
+const ES_PLATAFORMA = (v: unknown): v is Plataforma => v === "dropi" || v === "effi" || v === "drop" || v === "dunamixfy";
 
 /** El cuadro de una plataforma: corte + remisiones − ventas contra su última lectura. No cambia nada; solo «Tomar corte» escribe, y solo en una plataforma que no lo tiene. */
 export default async function CuadroPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
@@ -97,6 +97,10 @@ export default async function CuadroPage({ searchParams }: { searchParams: Promi
         plataforma === "drop"
           ? traerTodasConError<{ id_plataforma: string; sku_maestro_id: string }>((d, h) =>
               supabase.from("drop_publicaciones").select("id_plataforma:drop_id, sku_maestro_id").eq("pais_id", pais.id).not("sku_maestro_id", "is", null).order("id").range(d, h),
+            )
+          : plataforma === "dunamixfy"
+          ? traerTodasConError<{ id_plataforma: string; sku_maestro_id: string }>((d, h) =>
+              supabase.from("dunamixfy_publicaciones").select("id_plataforma:dunamixfy_id, sku_maestro_id").eq("pais_id", pais.id).not("sku_maestro_id", "is", null).order("id").range(d, h),
             )
           : traerTodasConError<{ id_plataforma: string; sku_maestro_id: string }>((d, h) =>
               supabase.from("effi_publicaciones").select("id_plataforma:effi_id, sku_maestro_id").eq("pais_id", pais.id).not("sku_maestro_id", "is", null).order("id").range(d, h),

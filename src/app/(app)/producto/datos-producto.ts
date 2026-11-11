@@ -271,6 +271,13 @@ export async function cargarProductos(usuario: UsuarioActual, supabase: Supabase
     variantesPorPadre.set(p.padre_id, [...(variantesPorPadre.get(p.padre_id) ?? []), v]);
   }
 
+  // Las unidades en Dropi de un producto con variantes son la suma de las de sus variantes (y las suyas, si las tuviera).
+  const stockDropiDe = (id: string): number | null => {
+    const propios = stockDropiPorSku.get(id);
+    const deVariantes = (variantesPorPadre.get(id) ?? []).map((v) => stockDropiPorSku.get(v.id)).filter((n): n is number => n !== undefined);
+    return propios === undefined && deVariantes.length === 0 ? null : (propios ?? 0) + deVariantes.reduce((t, n) => t + n, 0);
+  };
+
   const filas: FilaProducto[] = lista.map((p) => ({
     id: p.id,
     codigo: p.codigo,
@@ -301,14 +308,15 @@ export async function cargarProductos(usuario: UsuarioActual, supabase: Supabase
     listaComponentes: p.tipo === "combo" ? (listaPorCombo.get(p.id) ?? []).map((c) => ({ ...c, foto: fotoPorId.get(c.id) ?? null })) : [],
     compras: comprasDe(p.id),
     creado: p.creado_en.slice(0, 10),
-    asociaciones: asociacionesPorSku.get(p.id) ?? [],
-    nombresDropi: nombresDropiPorSku.get(p.id) ?? [],
+    // Un producto con variantes muestra lo de sus variantes (sus publicaciones y fichas cuelgan de ellas): así no sale «sin conectar».
+    asociaciones: [...(asociacionesPorSku.get(p.id) ?? []), ...(variantesPorPadre.get(p.id) ?? []).flatMap((v) => asociacionesPorSku.get(v.id) ?? [])],
+    nombresDropi: [...(nombresDropiPorSku.get(p.id) ?? []), ...(variantesPorPadre.get(p.id) ?? []).flatMap((v) => nombresDropiPorSku.get(v.id) ?? [])],
     tests: testsPorId.get(p.id) ?? [],
     padre: p.padre_id && porId.get(p.padre_id) ? { id: p.padre_id, codigo: porId.get(p.padre_id)!.codigo, nombre: porId.get(p.padre_id)!.nombre } : null,
     opciones: (p.opciones ?? null) as Record<string, string> | null,
     opcionesVariantes: (p.opciones_variantes ?? []) as { nombre: string; valores: string[] }[],
     variantes: (variantesPorPadre.get(p.id) ?? []).sort((a, b) => a.codigo.localeCompare(b.codigo, "es", { numeric: true })),
-    stockDropi: stockDropiPorSku.get(p.id) ?? null,
+    stockDropi: stockDropiDe(p.id),
   }));
 
   // Un compuesto se arma con productos simples y variantes, nunca con un producto que tiene variantes (no lleva stock:

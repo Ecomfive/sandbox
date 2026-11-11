@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useMemo } from "react";
 import { BotonAccesos } from "@/components/accesos/boton-accesos";
+import { BotonTareaModulo } from "@/components/tareas/boton-tarea-modulo";
 import { FavoritoToggle } from "@/components/favorito-toggle";
 import { useContadoresPestanas } from "@/components/migas/contador-pestana";
 import { useEtiquetaMiga } from "@/components/migas/etiqueta-miga";
@@ -11,7 +12,7 @@ import { anilloFoco } from "@/components/ui/field";
 import { Tooltip } from "@/components/ui/tooltip";
 import { MODULOS_CON_GUIA } from "@/lib/ayuda/guias-indice";
 import { construirMigas } from "@/lib/migas";
-import type { NavSection } from "@/lib/nav-data";
+import { moduloDeHref, type NavSection } from "@/lib/nav-data";
 import { textoContador, textoPendientes } from "@/lib/contadores-menu";
 import { gruposDePestanas, pestanaActiva, pestanasDe, type Pestana } from "@/lib/pestanas";
 import { ChevronRightIcon, FlechaIzquierdaIcon } from "@/lib/nav-icons";
@@ -34,6 +35,7 @@ export function BarraMigas({
   favoritos,
   pestanasOcultas = [],
   verAccesos = false,
+  verTarea = false,
   rutaActual,
 }: {
   areas: NavSection[];
@@ -42,6 +44,8 @@ export function BarraMigas({
   pestanasOcultas?: string[];
   /** El botón «Accesos» (quién tiene acceso a la sección): solo para un administrador (29 oct 2026, pedido de Hernán). */
   verAccesos?: boolean;
+  /** El botón «Asignar tarea» (una tarea del tablero del equipo con el módulo ya puesto): quien puede escribir en Equipo › Tareas (9 nov 2026). */
+  verTarea?: boolean;
   /** Solo para pruebas visuales: fuerza la ruta en vez de leerla del navegador. */
   rutaActual?: string;
 }) {
@@ -140,6 +144,9 @@ export function BarraMigas({
                 ?
               </Link>
             </Tooltip>
+          )}
+          {verTarea && moduloHref && moduloEtiqueta && moduloHref !== "/" && moduloHref !== "/ayuda" && moduloHref !== "/tareas" && (
+            <BotonTareaModulo key={moduloHref} moduloClave={moduloDeHref(moduloHref)} moduloEtiqueta={moduloEtiqueta} />
           )}
           {verAccesos && moduloHref && moduloEtiqueta && moduloHref !== "/ayuda" && (
             <BotonAccesos key={ruta} moduloHref={moduloHref} moduloEtiqueta={moduloEtiqueta} />

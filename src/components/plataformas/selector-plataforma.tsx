@@ -4,10 +4,10 @@ import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { setPlataformaActual } from "@/lib/plataforma-actions";
-import { DropIcon, DropiIcon, EffiIcon } from "@/lib/nav-icons";
+import { DropIcon, DropiIcon, DunamixfyIcon, EffiIcon } from "@/lib/nav-icons";
 import type { Plataforma, PlataformaId } from "@/lib/plataformas";
 
-export const LOGO_PLATAFORMA: Record<PlataformaId, typeof DropiIcon> = { dropi: DropiIcon, drop: DropIcon, effi: EffiIcon };
+export const LOGO_PLATAFORMA: Record<PlataformaId, typeof DropiIcon> = { dropi: DropiIcon, drop: DropIcon, effi: EffiIcon, dunamixfy: DunamixfyIcon };
 
 /**
  * Elige la plataforma (Dropi o Drop; 3 nov 2026, pedido de Hernán). Es la misma que se elige arriba a la derecha, junto al país: cambiar una cambia la otra (comparten la cookie

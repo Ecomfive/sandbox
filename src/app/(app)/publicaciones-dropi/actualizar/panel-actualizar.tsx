@@ -16,6 +16,7 @@ import {
   diasPrimeraLectura,
   lectoresDe,
   nombreSitio,
+  plataformaDeSitio,
   sesionValida,
   sinExtension,
   sitioDe,
@@ -31,11 +32,11 @@ type EstadoExtension = "buscando" | "lista" | "no_instalada" | "recargar";
 type PaisProveedor = "pa" | "cr" | "mx";
 const PAISES: PaisProveedor[] = ["pa", "cr", "mx"];
 /** Las pestañas cuya sesión se revisa: las de Dropi de cada país y la de Drop (Costa Rica, 7 nov 2026). */
-const SITIOS: Sitio[] = ["pa", "cr", "mx", "drop"];
+const SITIOS: Sitio[] = ["pa", "cr", "mx", "drop", "duna"];
 
 /** Costa Rica llegó a la extensión en la 0.3.0 (28 oct 2026), México en la 0.4.0 (30 oct 2026) y Drop en la 0.6.0 (7 nov 2026): una anterior no sabe de ese sitio. Drop pide la
  * 0.6.2 (9 nov 2026): las anteriores solo traían los pedidos de los últimos 30 días. */
-const VERSION_PARA: Record<Sitio, string> = { pa: "0.0.0", cr: "0.3.0", mx: "0.4.0", drop: "0.6.2" };
+const VERSION_PARA: Record<Sitio, string> = { pa: "0.0.0", cr: "0.3.0", mx: "0.4.0", drop: "0.6.2", duna: "0.7.1" };
 /** «0.2.3» es anterior a «0.3.0». */
 const versionAnterior = (tiene: string | null, pide: string) => {
   if (!tiene) return false;
@@ -72,6 +73,13 @@ const VIGENCIA_MS = 40 * 60000;
 
 /** Lo que dice la barra mientras un lector trabaja en la pestaña de Dropi. */
 function textoAvance(lector: ClaveLector, a: AvanceLector | null): string {
+  if (lector === "dunamixfy_cr") {
+    if (!a) return "Arrancando en la pestaña de Dunamixfy…";
+    if (a.fase === "productos") return `Leyendo los productos de Dunamixfy: ${n(a.productos)}…`;
+    if (a.fase === "pedidos") return `Leyendo los pedidos de Dunamixfy: ${n(a.pedidos)}…`;
+    if (a.fase === "subida") return "Pasando lo leído de Dunamixfy al sistema…";
+    return "Leyendo en Dunamixfy…";
+  }
   if (lector === "drop_cr") {
     if (!a) return "Arrancando en la pestaña de Drop…";
     if (a.fase === "productos") return `Leyendo «Mis productos» en Drop: ${n(a.productos)}…`;
@@ -106,9 +114,9 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
   const router = useRouter();
   const [extension, setExtension] = useState<EstadoExtension>("buscando");
   const [version, setVersion] = useState<string | null>(null);
-  const [sesiones, setSesiones] = useState<Record<Sitio, SesionDropi | null>>({ pa: null, cr: null, mx: null, drop: null });
+  const [sesiones, setSesiones] = useState<Record<Sitio, SesionDropi | null>>({ pa: null, cr: null, mx: null, drop: null, duna: null });
   /** Por qué no se pudo revisar la sesión de un país (la extensión no respondió); antes se callaba y la tarjeta quedaba en «Revisando…». */
-  const [fallos, setFallos] = useState<Record<Sitio, string | null>>({ pa: null, cr: null, mx: null, drop: null });
+  const [fallos, setFallos] = useState<Record<Sitio, string | null>>({ pa: null, cr: null, mx: null, drop: null, duna: null });
   const [corriendo, setCorriendo] = useState<Corriendo | null>(null);
   const [eligiendo, setEligiendo] = useState(false);
   const [elegidos, setElegidos] = useState<ClaveLector[]>([...LECTORES_PAIS.pa, ...LECTORES_PAIS.cr, ...LECTORES_PAIS.mx]);
@@ -230,7 +238,7 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
               if (s.error || !s.subida) throw new Error(s.error ?? "No se pudo preparar la subida.");
               subida = s.subida;
             }
-            for (const p of suyas) ponerPaso(p, { estado: "leyendo", detalle: `Leyendo en ${sitio === "drop" ? "Drop" : "Dropi"}…` });
+            for (const p of suyas) ponerPaso(p, { estado: "leyendo", detalle: `Leyendo en ${plataformaDeSitio(sitio)}…` });
             // La primera vez que se leen los pedidos de un país, o con «Traer historial», desde su fecha de arranque (Costa Rica: 1 abr 2026;
             // México: 1 jul 2024).
             const primera =
@@ -247,7 +255,7 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
       }
       if (fallo) {
         const sesion = /401|sesi[oó]n/i.test(fallo);
-        for (const p of suyas) ponerPaso(p, { estado: "error", detalle: sesion ? `La sesión de ${sitio === "drop" ? "Drop" : "Dropi"} venció en medio: vuelve a pulsar «Actualizar».` : fallo });
+        for (const p of suyas) ponerPaso(p, { estado: "error", detalle: sesion ? `La sesión de ${plataformaDeSitio(sitio)} venció en medio: vuelve a pulsar «Actualizar».` : fallo });
         await marcarPartesConError(id, suyas, fallo).catch(() => null);
         continue;
       }
@@ -336,8 +344,8 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
           </Link>
           <h1 className="m-0 text-2xl font-bold">{ocupado ? "Actualizando datos…" : "Actualizar datos"}</h1>
           <p className="m-0 text-sm text-muted-foreground">
-            Trae de Dropi los pedidos, la cartera, los retiros, el stock y las ventas, de un país a la vez; en Costa Rica, también Drop (productos, stock y pedidos) y
-            Effi (por su API). Solo lee: no crea ni cambia nada en Dropi, Drop, Effi ni en tus publicaciones (la primera vez de un país crea sus publicaciones).
+            Trae de Dropi los pedidos, la cartera, los retiros, el stock y las ventas, de un país a la vez; en Costa Rica, también Drop y Dunamixfy (productos, stock y
+            pedidos) y Effi (por su API). Solo lee: no crea ni cambia nada en Dropi, Drop, Dunamixfy, Effi ni en tus publicaciones (la primera vez de un país crea sus publicaciones).
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -441,8 +449,8 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
           <div className="flex flex-col gap-1 text-sm">
             <span className="font-semibold">Falta iniciar sesión en {nombreSitio(corriendo.esperandoSesion)}</span>
             <span>
-              {corriendo.esperandoSesion === "drop"
-                ? `Te dejamos la pestaña de Drop al frente. Entra con la ${CUENTAS.drop.cuenta} (no la de dropshipper) y la actualización sigue sola.`
+              {corriendo.esperandoSesion === "drop" || corriendo.esperandoSesion === "duna"
+                ? `Te dejamos la pestaña de ${CUENTAS[corriendo.esperandoSesion].nombre} al frente. Entra con la ${CUENTAS[corriendo.esperandoSesion].cuenta} (no la de dropshipper) y la actualización sigue sola.`
                 : `Te dejamos la pestaña de Dropi al frente. Entra con la ${CUENTAS[corriendo.esperandoSesion].cuenta} (con el código de dos pasos) y la actualización sigue sola.`}
             </span>
           </div>
@@ -456,15 +464,15 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
         {SITIOS.map((p) => (
           <TarjetaCuenta
             key={p}
-            sigla={p === "drop" ? "CR" : p.toUpperCase()}
-            titulo={p === "drop" ? "Drop · Costa Rica" : CUENTAS[p].nombre}
+            sigla={p === "drop" || p === "duna" ? "CR" : p.toUpperCase()}
+            titulo={p === "drop" || p === "duna" ? `${CUENTAS[p].nombre} · Costa Rica` : CUENTAS[p].nombre}
             detalle={`${CUENTAS[p].origen.replace("https://", "")} · ${CUENTAS[p].cuenta}`}
             cuenta={CUENTAS[p].cuenta}
             estado={estadoDe(p)}
             vence={sesiones[p]?.vence ?? null}
             fallo={fallos[p]}
             historial={
-              p !== "drop" && PRIMERA_LECTURA_DESDE[p] && extension === "lista" && !ocupado
+              p !== "drop" && p !== "duna" && PRIMERA_LECTURA_DESDE[p] && extension === "lista" && !ocupado
                 ? { desde: PRIMERA_LECTURA_DESDE[p]!, alPulsar: () => void actualizar([p === "pa" ? "proveedor" : (`proveedor_${p}` as ClaveLector)], p) }
                 : null
             }
@@ -482,6 +490,8 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
             que={
               p === "drop"
                 ? "Mis productos (precio y stock) y los pedidos (ventas por día). Effi se lee solo, por su API"
+                : p === "duna"
+                ? "Los productos (precio y stock) y los pedidos (ventas por día y los dropshippers que venden)"
                 : p !== "pa" && PRIMERA_LECTURA_DESDE[p] && !ultima[`pedidos_${p}` as ClaveParte]
                 ? `La primera vez trae todo el historial: pedidos y cartera desde el ${new Date(`${PRIMERA_LECTURA_DESDE[p]}T12:00:00`).toLocaleDateString("es-PA", { day: "numeric", month: "long", year: "numeric" })}, retiros, stock y ventas · tarda más`
                 : "Pedidos, cartera, retiros, stock y ventas"

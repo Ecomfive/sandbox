@@ -183,6 +183,27 @@ export function resolverCategorias(nombres: string[], lista: Obj[]): { categoria
 }
 
 /**
+ * Cuando la bodega elegida no está entre las de la cuenta con que se entró a Dropi (10 nov 2026, PUB-0682 en México: la bodega 3903): dice con qué usuario
+ * se entró y cuáles bodegas tiene esa cuenta, para ver si se entró con la cuenta equivocada o hay que elegir otra. Empieza con «La bodega » (ver `ERRORES_ANTES_DE_CREAR`).
+ */
+export function errorBodegaAjena(bodega: number, usuarioId: number, bodegasProveedor: Obj[]): string {
+  const lista = bodegasProveedor.map((x) => `${x.id} «${x.name ?? ""}»`).join(", ");
+  return `La bodega ${bodega} no es de la cuenta con la que entraste a Dropi (usuario ${usuarioId}). ${lista ? `Las bodegas de esa cuenta: ${lista}.` : "Esa cuenta no tiene bodegas."} Si es la cuenta de ECOMFIVE, elige otra bodega; si no, entra a Dropi con la cuenta correcta.`;
+}
+
+/**
+ * Los errores con que «publicar» se detiene ANTES de crear nada en Dropi (la bodega o la categoría no coinciden con las de la cuenta, o Dropi no dio las
+ * categorías). Con uno de estos y sin `nuevo_dropi_id`, Dropi no se tocó: la publicación pendiente se puede deshacer y queda como borrador.
+ */
+export const ERRORES_ANTES_DE_CREAR = ["La bodega ", "Dropi no tiene la categoría", "Dropi no devolvió las categorías", "El cambio no trae los datos del producto"] as const;
+
+export function publicacionSinCrearEnDropi(error: string | null | undefined, nuevoDropiId: unknown): boolean {
+  if (nuevoDropiId !== null && nuevoDropiId !== undefined && nuevoDropiId !== "") return false;
+  const e = String(error ?? "").trim();
+  return ERRORES_ANTES_DE_CREAR.some((p) => e.startsWith(p));
+}
+
+/**
  * El cuerpo del `POST api/products` que crea el producto: los mismos campos y en el mismo orden que el guardado de la pantalla de Dropi
  * para un producto simple y público. `bodegasProveedor` = las bodegas del usuario (`GET api/users/<id>` › `objects.warehouses`);
  * `categoriasDropi` = `GET api/categories`. Error si falta algo de lo que Dropi exige o si una bodega no es del proveedor.
@@ -195,7 +216,7 @@ export function armarProductoCrear(d: DatosCrearDropi, usuarioId: number, bodega
   const bodegas: Obj[] = [];
   for (const b of d.bodegas) {
     const w = bodegasProveedor.find((x) => Number(x.id) === b.id);
-    if (!w) return { error: `La bodega ${b.id} no es de ECOMFIVE en Dropi: no se le puede poner stock desde aquí.` };
+    if (!w) return { error: errorBodegaAjena(b.id, usuarioId, bodegasProveedor) };
     bodegas.push({ warehouse_id: w.id, fullName: `${w.name}(${w.address})`, stock: b.unidades, city: w.city, warehouse_white_brand: !!w.warehouse_white_brand });
   }
   return {
@@ -232,6 +253,7 @@ export function armarProductoCrear(d: DatosCrearDropi, usuarioId: number, bodega
 
 /** Lo mismo en JavaScript simple para el favorito. La prueba compara los dos. */
 export const CREAR_JS = [
+  "function errorBodegaAjena(b,u,bp){var l=bp.map(function(x){return x.id+' «'+(x.name!=null?x.name:'')+'»'}).join(', ');return 'La bodega '+b+' no es de la cuenta con la que entraste a Dropi (usuario '+u+'). '+(l?'Las bodegas de esa cuenta: '+l+'.':'Esa cuenta no tiene bodegas.')+' Si es la cuenta de ECOMFIVE, elige otra bodega; si no, entra a Dropi con la cuenta correcta.'}",
   "var GARANTIAS=" + JSON.stringify(GARANTIAS_DROPI) + ";",
   "function claveCat(t){return String(t==null?'':t).normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim()}",
   "function resolverCats(ns,ls){var m={};ls.forEach(function(c){m[claveCat(c.name)]=c});var out=[];",
@@ -240,7 +262,7 @@ export const CREAR_JS = [
   "function nuevoProducto(d,uid,bp,cs){",
   "var rc=resolverCats(d.categorias,cs);if(rc.error)return rc;",
   "var bs=[];for(var i=0;i<d.bodegas.length;i++){var b=d.bodegas[i],w=null;bp.forEach(function(x){if(Number(x.id)===b.id)w=x});",
-  "if(!w)return{error:'La bodega '+b.id+' no es de ECOMFIVE en Dropi: no se le puede poner stock desde aquí.'};",
+  "if(!w)return{error:errorBodegaAjena(b.id,uid,bp)};",
   "bs.push({warehouse_id:w.id,fullName:w.name+'('+w.address+')',stock:b.unidades,city:w.city,warehouse_white_brand:!!w.warehouse_white_brand})}",
   "return{cuerpo:{user_id:uid,id:null,name:d.nombre,description:d.descripcion,type:'SIMPLE',sale_price:Number(d.precio),suggested_price:Number(d.precioSugerido),privated_product:false,active:true,sku:d.sku!=null?d.sku:'',weight:Number(d.peso),length:Number(d.largo),width:Number(d.ancho),height:Number(d.alto),attribute:[],variations:[],categories:rc.categorias,dropi_app_description:d.descripcionApp,add_stock_in_return:false,private_product_inventories:[],user_profit_percentage_product:[],is_warehouse_white_brand:false,warehouselected:bs,name_in_guide:d.nombreGuia!=null?d.nombreGuia:'',shipping_method:'',bar_code:d.codigoBarras!=null?d.codigoBarras:''}}}",
 ].join("");

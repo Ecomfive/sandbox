@@ -3,7 +3,7 @@
 import { requireModulo } from "@/lib/auth";
 import { getPaisActual } from "@/lib/pais";
 import { createServiceClient } from "@/lib/supabase/server";
-import { armarStockPlataformas, type ProductoDropi, type PublicacionDrop, type PublicacionDropi, type PublicacionEffi, type StockPlataformas } from "@/lib/wms/stock-plataformas";
+import { armarStockPlataformas, type ProductoDropi, type PublicacionDrop, type PublicacionDunamixfy, type PublicacionDropi, type PublicacionEffi, type StockPlataformas } from "@/lib/wms/stock-plataformas";
 
 const ES_ID = (v: string) => /^[0-9a-fA-F-]{8,64}$/.test(v);
 
@@ -34,11 +34,12 @@ export async function obtenerInventarioProducto(id: string): Promise<InventarioP
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
 
-  const [porBodega, dropi, effi, drop] = await Promise.all([
+  const [porBodega, dropi, effi, drop, dunamixfy] = await Promise.all([
     supabase.rpc("wms_stock_por_bodega", { p_sku: id, p_pais: pais.id }),
     supabase.from("dropi_publicaciones").select("sku_maestro_id, dropi_id, nombre, estado_publicacion").eq("pais_id", pais.id).eq("sku_maestro_id", id).not("dropi_id", "is", null),
     supabase.from("effi_publicaciones").select("sku_maestro_id, effi_id, nombre, stock_principal, stock_garantias, en_effi, ultima_vez").eq("pais_id", pais.id).eq("sku_maestro_id", id),
     supabase.from("drop_publicaciones").select("sku_maestro_id, codigo, nombre, inventario, en_drop, ultima_vez").eq("pais_id", pais.id).eq("sku_maestro_id", id),
+    supabase.from("dunamixfy_publicaciones").select("sku_maestro_id, dunamixfy_id, nombre, stock, en_dunamixfy, ultima_vez").eq("pais_id", pais.id).eq("sku_maestro_id", id),
   ]);
   if (porBodega.error) return { error: "No se pudo cargar el inventario." };
 
@@ -53,6 +54,7 @@ export async function obtenerInventarioProducto(id: string): Promise<InventarioP
     productosDropi: productosDropi as ProductoDropi[],
     effi: (effi.data ?? []) as PublicacionEffi[],
     drop: (drop.data ?? []) as PublicacionDrop[],
+    dunamixfy: (dunamixfy.data ?? []) as PublicacionDunamixfy[],
   });
   const plataformas = porProducto.get(id) ?? null;
 

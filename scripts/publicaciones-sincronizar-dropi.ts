@@ -11,11 +11,11 @@
 // Además copia las fotos de cada publicación al sistema (migración 0153, `copiarFotosDropi`): hasta 300 por lectura (las demás, en la
 // siguiente); `--todas-las-fotos` quita el tope.
 
+import { autoVincularVariaciones } from "../src/lib/publicaciones/vincular-variaciones-db";
 import { readFileSync } from "node:fs";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { copiarFotosDropi } from "./publicaciones-copiar-fotos";
 import { revisarSinStock } from "../src/lib/compras/sin-stock-datos";
-import { sincronizarStockDropiWms } from "../src/lib/wms/sync-dropi";
 import {
   bodegasEnOrden,
   cambiosDesdeDropi,
@@ -251,14 +251,14 @@ export async function guardarNuestrosProductos(supabase: SupabaseClient, l: Lect
   } catch (e) {
     sinStock = { error: String((e as Error)?.message ?? e) };
   }
-  // Mejora 34: la bodega «Dropi» del WMS queda igual al stock leído (ajustes `sync_dropi`). Un problema no tumba la lectura.
-  let wms: Awaited<ReturnType<typeof sincronizarStockDropiWms>> | { error: string };
+  // Las variaciones de Dropi con sus variantes de Producto (migración 0261): solo agrega lo que falta; lo elegido a mano no se toca.
+  let vinculosVariaciones: Awaited<ReturnType<typeof autoVincularVariaciones>> | { error: string } = null;
   try {
-    wms = await sincronizarStockDropiWms(supabase, pais.id);
+    vinculosVariaciones = await autoVincularVariaciones(supabase, { paisId: pais.id });
   } catch (e) {
-    wms = { error: String((e as Error)?.message ?? e) };
+    vinculosVariaciones = { error: String((e as Error)?.message ?? e) };
   }
-  return { ...resumen, creadasPrimeraCarga, fotos, sinStock, wms, detalle };
+  return { ...resumen, creadasPrimeraCarga, fotos, sinStock, vinculosVariaciones, detalle };
 }
 
 // Uso directo con un archivo guardado.

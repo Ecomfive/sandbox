@@ -131,7 +131,7 @@ test("lo que llega se limpia y se revisa antes de encolar", () => {
   assert.equal(faltantesStock({ ...d, bodega: 280 }, [{ id: 81 }]).length, 1);
   assert.equal(faltantesStock({ ...d, bodega: 7 }, [{ id: 81 }]).length, 1);
   assert.equal(faltantesStock({ ...d, unidades: -1 }, [{ id: 81 }]).length, 1);
-  assert.equal(faltantesStock({ ...d, unidades: 12 }, [{ id: 81 }]).length, 1, "mismo stock que tiene");
+  assert.deepEqual(faltantesStock({ ...d, unidades: 12 }, [{ id: 81 }]), [], "la lectura puede estar vieja: lo decide el favorito con el stock de Dropi en ese momento");
   assert.deepEqual(faltantesStock({ ...d, antes: null, unidades: 0 }, [{ id: 81 }]), []);
 });
 

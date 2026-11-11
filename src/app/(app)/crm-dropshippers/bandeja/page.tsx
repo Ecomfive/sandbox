@@ -1,7 +1,7 @@
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { requireModulo } from "@/lib/auth";
-import { accesoCrm, areaPropia, areasVisibles } from "@/lib/crm/areas";
+import { accesoCrm, areaPropia, areasVisibles, vePresenciaEquipo } from "@/lib/crm/areas";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 import { config360 } from "@/lib/whatsapp/proveedor";
@@ -77,6 +77,7 @@ export default async function BandejaWhatsappPage({ searchParams }: { searchPara
           miId={usuario.id}
           equipo={equipo}
           direccion={a.direccion}
+          verPresencia={vePresenciaEquipo(usuario)}
           verTelefono={a.verTelefonos}
           areas={areasVisibles(a)}
           miArea={areaPropia(a)}

@@ -8,6 +8,7 @@ export const MODULOS_CON_GUIA: Record<string, string> = {
   "/creacion-ofertas": "creacion-ofertas",
   "/generador-landings": "generador-landings",
   "/publicaciones-dropi": "publicaciones-dropi",
+  "/publicaciones-dunamixfy": "publicaciones-dunamixfy",
   "/wms-productos": "wms-productos",
   "/wms-productos-dropi": "wms-productos-dropi",
   "/ventas-dropi": "ventas-dropi",

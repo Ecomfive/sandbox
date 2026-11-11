@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { extraerAviso, resumenMensaje } from "./extraer";
-import { claves360, config360, urlDescarga360, variableClave360 } from "./proveedor";
-import { errorEnEspanol, leerErrorEnvio, minutosVentana, textoVentana } from "./ventana";
+import { claves360, config360, numeroEmpresaNormal, urlDescarga360, variableClave360 } from "./proveedor";
+import { errorDeEntrega, errorEnEspanol, leerErrorEnvio, minutosVentana, textoVentana } from "./ventana";
 import { canalesPlantillas, etiquetaDeCanal } from "./api-plantillas";
 
 const aviso = (value: unknown) => ({ object: "whatsapp_business_account", entry: [{ id: "WABA", changes: [{ field: "messages", value }] }] });
@@ -300,6 +300,11 @@ test("360dialog con varios números: cada uno usa su propia clave y, si no tiene
     assert.equal(variableClave360("+507 6123-4567"), "D360_API_KEY_50761234567");
     assert.equal(config360("+50761234567")?.clave, "clave-507");
     assert.equal(config360("+584220350576")?.clave, "clave-58");
+    // México: WhatsApp manda el celular con el «1» (+52 1 55…) y la clave se guarda sin él, o al revés.
+    process.env.D360_API_KEY_525540921878 = "clave-mx";
+    assert.equal(config360("+5215540921878")?.clave, "clave-mx");
+    assert.equal(config360("+525540921878")?.clave, "clave-mx");
+    delete process.env.D360_API_KEY_525540921878;
     assert.equal(config360()?.clave, "clave-58");
     assert.deepEqual(
       claves360().map((c) => [c.variable, c.config.clave]),
@@ -333,4 +338,32 @@ test("un mensaje sin texto que el sistema no sabe leer dice qué llegó, no un �
   assert.equal(caso({ type: "reaction", reaction: { message_id: "wamid.ORIGEN", emoji: "" } }).texto, null);
   assert.equal(caso({ type: "text", text: { body: "hola" } }).reaccionA, null);
   assert.equal(caso({ type: "image", image: { id: "m1", mime_type: "image/jpeg" } }).texto, null);
+});
+
+test("un celular de México de la empresa entra sin el «1» que WhatsApp pone después del 52 (9 nov 2026)", () => {
+  assert.equal(numeroEmpresaNormal("5215540921878"), "+525540921878");
+  assert.equal(numeroEmpresaNormal("+52 1 55 4092 1878"), "+525540921878");
+  assert.equal(numeroEmpresaNormal("+525540921878"), "+525540921878");
+  // Un fijo de México (sin el 1) y los de otros países quedan igual.
+  assert.equal(numeroEmpresaNormal("50766367426"), "+50766367426");
+  assert.equal(numeroEmpresaNormal(""), null);
+  const { mensajes } = extraerAviso(
+    aviso({
+      messaging_product: "whatsapp",
+      metadata: { display_phone_number: "5215540921878", phone_number_id: "1358624014010011" },
+      contacts: [{ profile: { name: "Prueba" }, wa_id: "50761112233" }],
+      messages: [{ from: "50761112233", id: "wamid.MX", timestamp: "1793040000", type: "text", text: { body: "Hola" } }],
+    }),
+  );
+  assert.equal(mensajes[0].numeroEmpresa, "+525540921878");
+});
+
+test("el 130497 de Meta se explica en español con el país del cliente (9 nov 2026)", () => {
+  const raw = "130497: Business account is restricted from messaging users in this country.";
+  assert.match(errorDeEntrega(raw, "BR")!, /clientes de Brasil\. No es una falla del sistema/);
+  assert.match(errorDeEntrega(raw)!, /clientes de ese país/);
+  assert.match(errorEnEspanol(130497, "x"), /Meta no deja/);
+  assert.match(errorDeEntrega("131047: Message failed to send because more than 24 hours have passed")!, /24 h/);
+  assert.equal(errorDeEntrega("No se pudo entregar."), "No se pudo entregar.");
+  assert.equal(errorDeEntrega(null), null);
 });

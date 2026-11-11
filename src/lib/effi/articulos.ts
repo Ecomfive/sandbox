@@ -24,7 +24,7 @@ const texto = (v: unknown, max = 300): string | null => {
   return s ? s.slice(0, max) : null;
 };
 
-const sinTildes = (s: string) =>
+export const sinTildes = (s: string) =>
   s
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")

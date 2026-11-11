@@ -2,6 +2,8 @@
 // que llegan (de un dropshipper a un número de la empresa) y estados de los que mandó el equipo (enviado, entregado, leído, fallido).
 // Sin base ni red, para poder probarlo: src/lib/whatsapp/whatsapp.test.ts.
 
+import { numeroEmpresaNormal } from "./proveedor";
+
 export interface MensajeEntrante {
   /** El número de la empresa que recibió el mensaje (su id en Meta y cómo se ve: «+50760000000»). */
   phoneNumberId: string;
@@ -173,7 +175,8 @@ export function extraerAviso(
       const meta = obj(valor.metadata);
       const phoneNumberId = texto(meta.phone_number_id) ?? sinMetadata ?? null;
       if (!phoneNumberId) continue;
-      const numeroEmpresa = conMas(texto(meta.display_phone_number));
+      // El número de la empresa, sin el «1» de un celular de México (se guarda como se escribe y como se nombra su clave).
+      const numeroEmpresa = numeroEmpresaNormal(texto(meta.display_phone_number));
       if (campo === "smb_message_echoes") {
         for (const m of lista(valor.message_echoes).map(obj)) {
           const para = texto(m.to);

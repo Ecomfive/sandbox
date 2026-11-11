@@ -7,10 +7,10 @@
 import { esBodegaDropi } from "@/lib/publicaciones/automatico";
 import { idsDeDropi } from "@/lib/publicaciones/sincronizar-dropi";
 
-export type Plataforma = "dropi" | "effi" | "drop";
+export type Plataforma = "dropi" | "effi" | "drop" | "dunamixfy";
 
 /** Drop es la bodega y Boxfull quien entrega: son lo mismo (Hernán, 6 nov 2026). */
-export const ETIQUETA_PLATAFORMA: Record<Plataforma, string> = { dropi: "Dropi", effi: "Effi", drop: "Drop" };
+export const ETIQUETA_PLATAFORMA: Record<Plataforma, string> = { dropi: "Dropi", effi: "Effi", drop: "Drop", dunamixfy: "Dunamixfy" };
 
 /** Una publicación con su stock, para la ficha del producto. */
 export interface LineaPlataforma {
@@ -27,6 +27,7 @@ export interface StockPlataformas {
   dropi: number;
   effi: number;
   drop: number;
+  dunamixfy: number;
   total: number;
   lineas: LineaPlataforma[];
 }
@@ -45,6 +46,15 @@ export interface ProductoDropi {
   stock: number | null;
   bodegas: { id: number; stock: number }[] | null;
   leido_en: string | null;
+  /** Sus variaciones con el stock de cada una por bodega (un producto con colores, tallas…); null si no tiene o la lectura no las trajo. */
+  variaciones?: { firma: string; bodegas: { id: number; stock: number }[] }[] | null;
+}
+
+/** Una variación de Dropi vinculada a su variante de Producto (migración 0261). */
+export interface VinculoVariacion {
+  dropi_producto_id: number;
+  firma: string;
+  sku_maestro_id: string;
 }
 export interface PublicacionEffi {
   sku_maestro_id: string | null;
@@ -53,6 +63,15 @@ export interface PublicacionEffi {
   stock_principal: number | null;
   stock_garantias: number | null;
   en_effi: boolean;
+  ultima_vez: string | null;
+}
+/** Un producto de Dunamixfy (migración 0264, 9 nov 2026): su stock en nuestra bodega allá, solo de los inventarios activos. */
+export interface PublicacionDunamixfy {
+  sku_maestro_id: string | null;
+  dunamixfy_id: string;
+  nombre: string;
+  stock: number | null;
+  en_dunamixfy: boolean;
   ultima_vez: string | null;
 }
 export interface PublicacionDrop {
@@ -71,13 +90,20 @@ const masReciente = (fechas: (string | null)[]) => fechas.reduce<string | null>(
  * verdad (5 nov 2026, Alcides). Un ID de Dropi cuenta una sola vez, aunque dos publicaciones lo tengan. Effi cuenta su bodega Principal; las de las tiendas son de cada
  * dropshipper y aquí no llegan. Lo que ya no está en Effi o en Drop no cuenta. Un producto sin nada en ninguna plataforma no sale.
  */
-export function armarStockPlataformas(entrada: { dropi: PublicacionDropi[]; productosDropi: ProductoDropi[]; effi: PublicacionEffi[]; drop: PublicacionDrop[] }): {
+export function armarStockPlataformas(entrada: {
+  dropi: PublicacionDropi[];
+  productosDropi: ProductoDropi[];
+  effi: PublicacionEffi[];
+  drop: PublicacionDrop[];
+  dunamixfy?: PublicacionDunamixfy[];
+  vinculos?: VinculoVariacion[];
+}): {
   porProducto: Map<string, StockPlataformas>;
   lecturas: LecturasPlataformas;
 } {
   const porProducto = new Map<string, StockPlataformas>();
   const agregar = (sku: string, l: LineaPlataforma) => {
-    const x = porProducto.get(sku) ?? { dropi: 0, effi: 0, drop: 0, total: 0, lineas: [] };
+    const x = porProducto.get(sku) ?? { dropi: 0, effi: 0, drop: 0, dunamixfy: 0, total: 0, lineas: [] };
     x[l.plataforma] += l.unidades;
     x.total += l.unidades;
     x.lineas.push(l);
@@ -85,6 +111,7 @@ export function armarStockPlataformas(entrada: { dropi: PublicacionDropi[]; prod
   };
 
   const productos = new Map(entrada.productosDropi.map((p) => [p.dropi_producto_id, p]));
+  const vinculoDe = new Map((entrada.vinculos ?? []).map((v) => [`${v.dropi_producto_id}|${v.firma}`, v.sku_maestro_id]));
   const vistos = new Set<number>();
   for (const p of entrada.dropi) {
     if (p.estado_publicacion === "borrador") continue;
@@ -93,9 +120,19 @@ export function armarStockPlataformas(entrada: { dropi: PublicacionDropi[]; prod
       if (!producto || vistos.has(id)) continue;
       vistos.add(id);
       const bodegas = Array.isArray(producto.bodegas) ? producto.bodegas : null;
-      const unidades = (bodegas ?? []).filter((b) => esBodegaDropi(b.id)).reduce((t, b) => t + Number(b.stock ?? 0), 0);
+      let unidades = (bodegas ?? []).filter((b) => esBodegaDropi(b.id)).reduce((t, b) => t + Number(b.stock ?? 0), 0);
       // Sin el detalle por bodega no se sabe dónde está: el total queda como referencial.
-      const aparte = bodegas ? bodegas.filter((b) => !esBodegaDropi(b.id)).reduce((t, b) => t + Number(b.stock ?? 0), 0) : Number(producto.stock ?? 0);
+      let aparte = bodegas ? bodegas.filter((b) => !esBodegaDropi(b.id)).reduce((t, b) => t + Number(b.stock ?? 0), 0) : Number(producto.stock ?? 0);
+      // Una variación vinculada a su variante (9 nov 2026) pone su stock en la variante; lo que no está vinculado queda en el producto principal.
+      for (const v of Array.isArray(producto.variaciones) ? producto.variaciones : []) {
+        const sku = vinculoDe.get(`${id}|${v.firma}`);
+        if (!sku) continue;
+        const enDropi = v.bodegas.filter((b) => esBodegaDropi(b.id)).reduce((t, b) => t + Number(b.stock ?? 0), 0);
+        const fuera = v.bodegas.filter((b) => !esBodegaDropi(b.id)).reduce((t, b) => t + Number(b.stock ?? 0), 0);
+        if (enDropi || fuera) agregar(sku, { plataforma: "dropi", id: String(id), nombre: p.nombre, unidades: enDropi, aparte: fuera });
+        unidades = Math.max(0, unidades - enDropi);
+        aparte = Math.max(0, aparte - fuera);
+      }
       if (unidades || aparte) agregar(p.sku_maestro_id, { plataforma: "dropi", id: String(id), nombre: p.nombre, unidades, aparte });
     }
   }
@@ -108,12 +145,18 @@ export function armarStockPlataformas(entrada: { dropi: PublicacionDropi[]; prod
     const unidades = Number(p.inventario ?? 0);
     if (p.sku_maestro_id && p.en_drop && unidades) agregar(p.sku_maestro_id, { plataforma: "drop", id: p.codigo ?? "Drop", nombre: p.nombre, unidades, aparte: 0 });
   }
+  // Dunamixfy (9 nov 2026): lo de nuestra bodega allá; lo que ya no aparece no cuenta.
+  for (const p of entrada.dunamixfy ?? []) {
+    const unidades = Number(p.stock ?? 0);
+    if (p.sku_maestro_id && p.en_dunamixfy && unidades) agregar(p.sku_maestro_id, { plataforma: "dunamixfy", id: `#${p.dunamixfy_id}`, nombre: p.nombre, unidades, aparte: 0 });
+  }
   return {
     porProducto,
     lecturas: {
       dropi: masReciente(entrada.productosDropi.map((p) => p.leido_en)),
       effi: masReciente(entrada.effi.map((p) => p.ultima_vez)),
       drop: masReciente(entrada.drop.map((p) => p.ultima_vez)),
+      dunamixfy: masReciente((entrada.dunamixfy ?? []).map((p) => p.ultima_vez)),
     },
   };
 }
@@ -125,7 +168,7 @@ export const lecturaVieja = (fecha: string | null, ahora = Date.now()) => !fecha
 /** «Dropi 120 · Drop 44»: lo que hay, solo las plataformas que tienen algo. */
 export function textoPlataformas(s: Pick<StockPlataformas, Plataforma> | null | undefined): string {
   if (!s) return "";
-  return (["dropi", "effi", "drop"] as const)
+  return (["dropi", "effi", "drop", "dunamixfy"] as const)
     .filter((p) => s[p] !== 0)
     .map((p) => `${ETIQUETA_PLATAFORMA[p]} ${s[p].toLocaleString("es-PA")}`)
     .join(" · ");

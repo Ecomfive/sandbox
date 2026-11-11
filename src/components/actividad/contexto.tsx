@@ -10,6 +10,11 @@ export function ProveedorAccionesActividad({ acciones, children }: { acciones: A
   return <Contexto.Provider value={acciones}>{children}</Contexto.Provider>;
 }
 
+/** Las acciones si hay una Actividad alrededor; fuera de ella (el comentario de una compra que aún no existe) es null. */
+export function useAccionesActividadOpcional(): AccionesActividad | null {
+  return useContext(Contexto);
+}
+
 export function useAccionesActividad(): AccionesActividad {
   const a = useContext(Contexto);
   if (!a) throw new Error("La Actividad necesita un ProveedorAccionesActividad con las acciones de su módulo.");

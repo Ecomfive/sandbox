@@ -62,6 +62,33 @@ export async function consultarEffi<T = Record<string, unknown>>(
   return { ok: false, status: 429, error: mensajeErrorEffi(429) };
 }
 
+/**
+ * Modifica un registro de Effi (`PUT api/<recurso>`, cuerpo JSON con su `id`). Lo usa «Guardar precios en Effi» de Gestión de IDs
+ * Effi (9 nov 2026): exige que el perfil del usuario «Sistema MOM» tenga permiso de **modificar** sobre la función (Artículos); sin
+ * él Effi responde 403. No se reintenta: un PUT repetido no hace daño, pero se avisa a la persona en vez de insistir.
+ */
+export async function modificarEffi<T = Record<string, unknown>>(recurso: string, cuerpo: Record<string, unknown>): Promise<{ ok: true; data: T } | { ok: false; error: string; status: number }> {
+  const llave = llaveEffi();
+  if (!llave) return { ok: false, status: 0, error: "Falta la llave de Effi (variable EFFI_API_KEY en Vercel)." };
+  let res: Response;
+  try {
+    res = await fetch(`${EFFI_API}/${recurso}`, {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${llave}`, Accept: "application/json", "Content-Type": "application/json" },
+      body: JSON.stringify(cuerpo),
+      cache: "no-store",
+      signal: AbortSignal.timeout(20_000),
+    });
+  } catch {
+    return { ok: false, status: 0, error: "No se pudo llegar a Effi (sin respuesta o tardó más de 20 s)." };
+  }
+  const respuesta = (await res.json().catch(() => null)) as { ok?: boolean; data?: T; mensaje?: string } | null;
+  if (res.status === 403)
+    return { ok: false, status: 403, error: "Effi no deja modificar: el perfil del usuario «Sistema MOM» necesita permiso de Modificar en Artículos (Effi › Administración › Perfiles de usuario)." };
+  if (!res.ok || !respuesta?.ok) return { ok: false, status: res.status, error: mensajeErrorEffi(res.status, respuesta?.mensaje) };
+  return { ok: true, data: (respuesta.data ?? {}) as T };
+}
+
 /** Todas las páginas de un recurso (de 100 en 100, o `porPagina`). */
 export async function consultarTodoEffi<T = Record<string, unknown>>(
   recurso: string,

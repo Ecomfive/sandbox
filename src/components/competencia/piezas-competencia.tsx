@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import { useCodigoPais } from "@/components/pais-contexto";
 import { Bandera } from "@/components/paises/bandera";
 import { claseCeldaColumna, claseEncabezadoColumna, claseFilaEncabezado } from "@/components/tabla/estilos-tabla";
 import { Badge } from "@/components/ui/badge";
@@ -143,6 +144,9 @@ export function HistorialCompetencia({ productoId, limite = 30, pais: paisProduc
  *
  * Con `descartar` (la ficha de Gestión de IDs Dropi, 8 nov 2026, pedido de Alcides) cada competidor trae «No es el mismo»: deja de contar aquí, en
  * «Competidor más barato» y en las recomendaciones de precio. Los descartados se ven aparte, con «Volver a contar».
+ *
+ * Sin `pais` (todos los países: la ficha de Producto, una compra), el país de la barra va primero y abierto; los demás van debajo,
+ * plegados con su resumen, y se abren con un clic (9 nov 2026, pedido de Hernán).
  */
 export function BloqueCompetencia({ skuId, descartar = false, pais }: { skuId: string; descartar?: boolean; /** Solo la competencia de ese país (Gestión de IDs: el de la barra). */ pais?: string }) {
   const { precio: usd } = useMonedaCompetencia();
@@ -151,29 +155,41 @@ export function BloqueCompetencia({ skuId, descartar = false, pais }: { skuId: s
   const [error, setError] = useState<string | null>(null);
   const [abierto, setAbierto] = useState<string | null>(null);
   const [verDescartados, setVerDescartados] = useState<string | null>(null);
+  const codigoBarra = useCodigoPais();
+  // Los países desplegados: al empezar, solo el de la barra.
+  const [desplegados, setDesplegados] = useState<Set<string>>(() => new Set([codigoBarra]));
+  const alternar = (codigo: string) =>
+    setDesplegados((d) => {
+      const n = new Set(d);
+      if (n.has(codigo)) n.delete(codigo);
+      else n.add(codigo);
+      return n;
+    });
+  const [verDudosos, setVerDudosos] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState<string | null>(null);
   const [, empezar] = useTransition();
-  // Mueve un competidor entre los que cuentan y los descartados al guardar, sin volver a pedir todo.
-  const mover = (codigo: string, id: string, volver: boolean) =>
+  // Mueve un competidor entre los que cuentan, los dudosos y los descartados al guardar, sin volver a pedir todo. «Volver a contar» lo deja con los
+  // que cuentan; si no es el mismo producto, aparecerá como dudoso al abrir de nuevo la ficha.
+  const mover = (codigo: string, id: string, modo: boolean | "mismo") =>
     setDatos((ds) =>
       (ds ?? []).map((d) => {
         if (d.codigo !== codigo) return d;
-        const desde = volver ? d.descartados : d.competidores;
-        const c = desde.find((x) => x.id === id);
+        const c = [...d.competidores, ...d.dudosos, ...d.descartados].find((x) => x.id === id);
         if (!c) return d;
         const sin = <T extends { id: string }>(l: T[]) => l.filter((x) => x.id !== id);
         const precio = (a: { precio: number | null }, b: { precio: number | null }) => (a.precio ?? 1e9) - (b.precio ?? 1e9);
-        return volver
-          ? { ...d, descartados: sin(d.descartados), competidores: [...d.competidores, c].sort(precio) }
-          : { ...d, competidores: sin(d.competidores), descartados: [...d.descartados, { ...c, motivo: "Descartado a mano: no es el mismo producto" }].sort(precio) };
+        const base = { ...d, competidores: sin(d.competidores), dudosos: sin(d.dudosos), descartados: sin(d.descartados) };
+        return modo === false
+          ? { ...base, descartados: [...base.descartados, { ...c, motivo: "Descartado a mano: no es el mismo producto" }].sort(precio) }
+          : { ...base, competidores: [...base.competidores, c].sort(precio) };
       }),
     );
-  const cambiar = (d: CompetenciaDeProducto, id: string, volver: boolean) => {
+  const cambiar = (d: CompetenciaDeProducto, id: string, modo: boolean | "mismo") => {
     setOcupado(id);
     empezar(async () => {
-      const r = await descartarCompetidor(skuId, id, d.nuestrosIds, volver).catch(() => ({ error: "No se pudo. Inténtalo de nuevo.", detalle: undefined }));
+      const r = await descartarCompetidor(skuId, id, d.nuestrosIds, modo).catch(() => ({ error: "No se pudo. Inténtalo de nuevo.", detalle: undefined }));
       setOcupado(null);
-      if (!r.error) mover(d.codigo, id, volver);
+      if (!r.error) mover(d.codigo, id, modo);
       mostrarToast(r.error ?? r.detalle ?? "Listo", r.error ? "destructive" : undefined);
     });
   };
@@ -194,19 +210,60 @@ export function BloqueCompetencia({ skuId, descartar = false, pais }: { skuId: s
   if (!datos) return <p className="text-sm text-muted-foreground">Buscando en la competencia…</p>;
   if (!datos.length) return <p className="text-sm text-muted-foreground">Ningún competidor vende este producto en Dropi{pais ? " en este país" : ""} (ni por nombre ni por foto).</p>;
 
+  // Con un solo país (el de la barra, o el único que tiene competencia) no hay nada que plegar.
+  const plegable = !pais && datos.length > 1;
+  const ordenados = plegable ? [...datos.filter((d) => d.codigo === codigoBarra), ...datos.filter((d) => d.codigo !== codigoBarra)] : datos;
+  const sinBarra = plegable && !datos.some((d) => d.codigo === codigoBarra);
+
   return (
     <div className="flex flex-col gap-6">
-      {datos.map((d) => {
+      {sinBarra && <p className="m-0 text-sm text-muted-foreground">En el país de la barra nadie más lo vende en Dropi. Abajo, los demás países.</p>}
+      {ordenados.map((d) => {
         const precios = d.competidores.map((c) => c.precio).filter((x): x is number => x !== null);
         const minimo = precios.length ? Math.min(...precios) : null;
         const masBaratos = d.nuestro?.precio != null ? d.competidores.filter((c) => c.precio !== null && c.precio < d.nuestro!.precio!).length : 0;
         const vendido7 = d.competidores.reduce((t, c) => t + c.vendido7, 0);
+        const abiertoPais = !plegable || desplegados.has(d.codigo);
+        if (!abiertoPais)
+          return (
+            <button
+              key={d.pais}
+              type="button"
+              aria-expanded={false}
+              onClick={() => alternar(d.codigo)}
+              className={`-mt-3 flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-left text-sm hover:bg-muted ${anilloFoco}`}
+            >
+              <span aria-hidden="true" className="text-xs text-muted-foreground">▸</span>
+              <Bandera codigo={d.codigo} />
+              <span className="font-semibold">{d.pais}</span>
+              <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground tabular-nums">
+                {d.competidores.length === 1 ? "1 competidor" : `${num(d.competidores.length)} competidores`}
+                {minimo !== null && ` · desde ${usd(minimo)}`}
+                {masBaratos > 0 && ` · ${num(masBaratos)} más baratos que nosotros`}
+              </span>
+              <span className="shrink-0 text-xs text-primario">Ver</span>
+            </button>
+          );
         return (
           <div key={d.pais} className="flex flex-col gap-3">
-            <h4 className="m-0 inline-flex items-center gap-2 text-sm font-semibold">
-              <Bandera codigo={d.codigo} />
-              {d.pais}
-            </h4>
+            {plegable ? (
+              <button
+                type="button"
+                aria-expanded
+                onClick={() => alternar(d.codigo)}
+                className={`-mx-1.5 inline-flex items-center gap-2 self-start rounded-md px-1.5 py-0.5 text-sm font-semibold hover:bg-muted ${anilloFoco}`}
+              >
+                <span aria-hidden="true" className="text-xs text-muted-foreground">▾</span>
+                <Bandera codigo={d.codigo} />
+                {d.pais}
+                {d.codigo === codigoBarra && <span className="text-xs font-normal text-muted-foreground">· país de la barra</span>}
+              </button>
+            ) : (
+              <h4 className="m-0 inline-flex items-center gap-2 text-sm font-semibold">
+                <Bandera codigo={d.codigo} />
+                {d.pais}
+              </h4>
+            )}
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               <Dato titulo="Competidores" valor={num(d.competidores.length)} />
               <Dato titulo="Precio más bajo" valor={usd(minimo)} sub={d.nuestro ? `nosotros ${usd(d.nuestro.precio)}` : "no lo vendemos en Dropi"} tono={masBaratos ? "destructive" : undefined} />
@@ -214,7 +271,7 @@ export function BloqueCompetencia({ skuId, descartar = false, pais }: { skuId: s
               <Dato titulo="Vendieron (7 días)" valor={num(vendido7)} sub="bajadas de stock" />
             </div>
             {d.competidores.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Lo vendemos en Dropi y nadie más lo tiene.</p>
+              <p className="text-sm text-muted-foreground">{d.dudosos.length ? "Nadie vende exactamente este producto." : "Lo vendemos en Dropi y nadie más lo tiene."}</p>
             ) : (
               <ul className="flex flex-col divide-y divide-border rounded-lg border border-border">
                 {d.competidores.map((c) => {
@@ -262,6 +319,56 @@ export function BloqueCompetencia({ skuId, descartar = false, pais }: { skuId: s
                   );
                 })}
               </ul>
+            )}
+            {d.dudosos.length > 0 && (
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  aria-expanded={verDudosos === d.codigo}
+                  onClick={() => setVerDudosos(verDudosos === d.codigo ? null : d.codigo)}
+                  className={`self-start rounded-md px-1.5 py-0.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground ${anilloFoco}`}
+                >
+                  {verDudosos === d.codigo ? "Ocultar" : "Ver"} {d.dudosos.length === 1 ? "1 parecido" : `${d.dudosos.length} parecidos`} que no se comparan: no es seguro que sean el mismo producto
+                </button>
+                {verDudosos === d.codigo && (
+                  <ul className="flex flex-col divide-y divide-border rounded-lg border border-dashed border-border-control">
+                    {d.dudosos.map((c) => (
+                      <li key={c.id} className="flex items-start gap-3 px-3 py-2.5">
+                        <FotoAmpliable url={c.foto} nombre={c.nombre} tam="h-10 w-10" />
+                        <span className="flex min-w-0 flex-1 flex-col">
+                          <span className="text-sm font-medium break-words">{c.proveedor}</span>
+                          <span className="text-xs break-words text-muted-foreground">
+                            «{c.nombre}» · {usd(c.precio)}
+                          </span>
+                          {c.motivo && <span className="text-xs break-words text-muted-foreground">La IA: {c.motivo}</span>}
+                        </span>
+                        {descartar && d.nuestrosIds.length > 0 && (
+                          <span className="flex shrink-0 flex-col items-end gap-1">
+                            <button
+                              type="button"
+                              disabled={ocupado === c.id}
+                              onClick={() => cambiar(d, c.id, "mismo")}
+                              aria-label={`Es el mismo producto: comparar «${c.nombre}» de ${c.proveedor}`}
+                              className={`rounded-md px-1.5 py-0.5 text-xs text-primario hover:bg-muted disabled:opacity-60 ${anilloFoco}`}
+                            >
+                              {ocupado === c.id ? "Guardando…" : "Es el mismo"}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={ocupado === c.id}
+                              onClick={() => cambiar(d, c.id, false)}
+                              aria-label={`No es el mismo producto: descartar «${c.nombre}» de ${c.proveedor}`}
+                              className={`rounded-md px-1.5 py-0.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-60 ${anilloFoco}`}
+                            >
+                              No es el mismo
+                            </button>
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             )}
             {d.descartados.length > 0 && (
               <div className="flex flex-col gap-2">

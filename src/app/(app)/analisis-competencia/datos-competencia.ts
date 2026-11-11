@@ -10,8 +10,11 @@ import type { AlertaC, BitacoraC, CompetidorC, DatosCompetencia, ProductoC, Vent
 const n = (v: unknown) => (v === null || v === undefined ? null : Number(v));
 const DOMINIO: Record<string, string> = { PA: "pa", CR: "cr", MX: "mx", CO: "co" };
 
-/** Las tablas de cada plataforma (también las usa `decidirParCompetencia`): Dropi (0108), Drop (0234) y Effi (0239), iguales salvo por cómo se identifica un producto y su proveedor. */
-export const TABLAS: Record<PlataformaId, Record<"productos" | "busquedas" | "historial" | "alertas" | "ids", string>> = {
+/**
+ * Las tablas de cada plataforma (también las usa `decidirParCompetencia`): Dropi (0108), Drop (0234) y Effi (0239), iguales salvo por cómo se identifica un producto y su proveedor.
+ * Dunamixfy todavía no tiene (9 nov 2026): su catálogo se lee con una cuenta de dropshipper, que aún no hay; la página la muestra vacía y lo dice.
+ */
+export const TABLAS: Partial<Record<PlataformaId, Record<"productos" | "busquedas" | "historial" | "alertas" | "ids", string>>> = {
   dropi: { productos: "competencia_productos", busquedas: "competencia_busquedas", historial: "competencia_historial", alertas: "competencia_alertas", ids: "dropi_producto_id, proveedor_dropi_id" },
   drop: { productos: "drop_competencia_productos", busquedas: "drop_competencia_busquedas", historial: "drop_competencia_historial", alertas: "drop_competencia_alertas", ids: "drop_producto_id" },
   effi: { productos: "effi_competencia_productos", busquedas: "effi_competencia_busquedas", historial: "effi_competencia_historial", alertas: "effi_competencia_alertas", ids: "proveedor_effi_id, ventas" },
@@ -58,6 +61,7 @@ export function datosCompetenciaVacios(plataforma: DatosCompetencia["plataforma"
 export async function cargarDatosCompetencia(supabase: SupabaseClient, pais: { id: string; codigo: string; nombre: string }, plataforma: PlataformaId = "dropi"): Promise<DatosCompetencia | null> {
   const desde31 = new Date(Date.now() - 31 * 86_400_000).toISOString();
   const t = TABLAS[plataforma];
+  if (!t) return null;
   const esDrop = plataforma === "drop";
   const esEffi = plataforma === "effi";
   // Como `string`: armadas con el nombre de la tabla, el tipo de Supabase no sabe leerlas.

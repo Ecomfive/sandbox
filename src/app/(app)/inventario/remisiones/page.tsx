@@ -118,7 +118,7 @@ export default async function RemisionesPage() {
   const stock: StockPorBodega = {};
   for (const s of conStock.data ?? []) (stock[s.bodega_id] ??= {})[s.sku_maestro_id] = Number(s.disponible);
   const hay = new Set((conStock.data ?? []).map((s) => s.sku_maestro_id));
-  // Donde toda salida va con remisión, también se remite de una plataforma a otra: lo que hay allá es lo de su última lectura (Dunamixfy todavía no se lee).
+  // Donde toda salida va con remisión, también se remite de una plataforma a otra: lo que hay allá es lo de su última lectura.
   const plataformas: BodegaRemision[] = [];
   if (puedeEscribir && PAISES_SALIDA_CON_REMISION.includes(pais.codigo)) {
     const { porProducto } = await leerStockPlataformas(supabase, pais.id);

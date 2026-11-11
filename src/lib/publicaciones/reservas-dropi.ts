@@ -117,14 +117,16 @@ export function normalizarDatosReserva(v: unknown): DatosReserva {
   };
 }
 
-/** Lo que falta o está mal en un pedido de reserva, con el stock de la última lectura y lo reservado a los demás correos. */
-export function faltantesReserva(d: DatosReserva, contexto: { stock: number | null; otras: number; tieneReserva: boolean }): string[] {
+/**
+ * Lo que falta o está mal en un pedido de reserva. **No mira el stock** (10 nov 2026, pedido de Alcides: la lectura de «Mis productos» es de hace horas y él
+ * acaba de ingresar unidades en Dropi, así que el sistema le decía «solo hay 85» cuando ya había más): quien manda es el stock que Dropi tenga cuando el
+ * favorito aplica el cambio.
+ */
+export function faltantesReserva(d: DatosReserva, contexto: { tieneReserva: boolean }): string[] {
   const f: string[] = [];
   if (!CORREO.test(d.correo)) f.push("El correo con que el dropshipper entra a Dropi.");
   if (!(d.unidades >= 0) || d.unidades > MAX_UNIDADES_RESERVA) f.push("Las unidades: un número entero, 0 o más.");
   if (d.unidades === 0 && !contexto.tieneReserva) f.push("Ese correo no tiene unidades reservadas: no hay nada que quitar.");
-  if (contexto.stock !== null && d.unidades > 0 && contexto.otras + d.unidades > contexto.stock)
-    f.push(`Solo hay ${contexto.stock.toLocaleString("es-PA")} unidades en Dropi y ya hay ${contexto.otras.toLocaleString("es-PA")} reservadas a otros correos.`);
   return f;
 }
 
@@ -162,9 +164,10 @@ export function reservasPara(
   const originales = Array.isArray(producto.private_product_inventories) ? (producto.private_product_inventories as Obj[]) : [];
   const pv = originales.map((x) => reservaParaDropi(x));
   const correo = d.correo.toLowerCase();
-  const i = originales.findIndex(
-    (x) => !x.deleted_at && ((typeof x.email === "string" && x.email.toLowerCase() === correo) || (usuario?.id != null && Number(x.user_id) === Number(usuario.id))),
-  );
+  // Dropi a veces deja el correo de la reserva solo en su usuario (`email: null`, `user.email`): también cuenta (9 nov 2026, PUB-0302: «Falta la cuenta de Dropi
+  // de ese correo» al cambiar la reserva de naturex.co0@gmail.com, que ya existía).
+  const correoDe = (x: Obj) => (typeof x.email === "string" ? x.email : typeof (x.user as Obj | null)?.email === "string" ? ((x.user as Obj).email as string) : "").toLowerCase();
+  const i = originales.findIndex((x) => !x.deleted_at && ((correoDe(x) !== "" && correoDe(x) === correo) || (usuario?.id != null && Number(x.user_id) === Number(usuario.id))));
   if (d.unidades === 0) {
     if (i < 0) return { sinCambio: true };
     pv[i] = reservaParaDropi(originales[i], { deleted_at: true, change: true });
@@ -175,9 +178,13 @@ export function reservasPara(
     if (!usuario || usuario.id == null) return { error: "Falta la cuenta de Dropi de ese correo." };
     pv.push(reservaParaDropi({ id: null, product_id: producto.id ?? null, variation_id: null, user_id: usuario.id, user: usuario, stock: d.unidades, last_quantity_separed: null, email: d.correo }, { change: true }));
   }
-  const reservado = pv.filter((x) => !x.deleted_at).reduce((t, x) => t + Number(x.stock ?? 0), 0);
+  // Lo que Dropi muestra en la bodega es lo **libre** (10 nov 2026: «solo me contó las 85 que ingresé y no las 14 que ya tenía privatizadas»): lo que se le
+  // suma a un correo no puede pasar de eso, pero lo que ese correo ya tiene reservado sí cuenta para su total. Es una cota para no mandar algo imposible;
+  // la última palabra es de Dropi.
   const stock = (Array.isArray(producto.warehouse_product) ? (producto.warehouse_product as Obj[]) : []).reduce((t, w) => t + Number(w.stock ?? 0), 0);
-  if (reservado > stock) return { error: `El producto tiene ${stock.toLocaleString("es-PA")} unidades en Dropi y se quieren reservar ${reservado.toLocaleString("es-PA")}.` };
+  const ya = i >= 0 ? Number(originales[i].stock ?? 0) : 0;
+  if (d.unidades - ya > stock)
+    return { error: `En Dropi hay ${stock.toLocaleString("es-PA")} unidades disponibles${ya > 0 ? ` más las ${ya.toLocaleString("es-PA")} que ya tiene reservadas ese correo` : ""}: se quieren reservar ${d.unidades.toLocaleString("es-PA")}.` };
   return { reservas: pv };
 }
 
@@ -186,13 +193,12 @@ export const RESERVA_JS = [
   "function rvP(x,e){var r={id:x.id!=null?x.id:null,product_id:x.product_id!=null?x.product_id:null,variation_id:x.variation_id!=null?x.variation_id:null,user_id:x.user_id!=null?x.user_id:null,variations:[],user:x.user!=null?x.user:null,stock:x.stock!=null?x.stock:null,last_quantity_separed:x.last_quantity_separed!=null?x.last_quantity_separed:null,created_at:null,deleted_at:x.deleted_at!=null?true:null,updated_at:null,email:x.email!=null?x.email:null,change:null};if(e)for(var k in e)r[k]=e[k];return r}",
   "function reservasPara(o,u,d){if(o.type!=='SIMPLE')return{error:'Tiene variaciones: la reserva es por variación y se hace en Dropi.'};",
   "var og=Array.isArray(o.private_product_inventories)?o.private_product_inventories:[],pv=og.map(function(x){return rvP(x)}),c=String(d.correo).toLowerCase(),i=-1;",
-  "for(var k=0;k<og.length;k++){var x=og[k];if(!x.deleted_at&&((typeof x.email==='string'&&x.email.toLowerCase()===c)||(u&&u.id!=null&&Number(x.user_id)===Number(u.id)))){i=k;break}}",
+  "for(var k=0;k<og.length;k++){var x=og[k],xe=typeof x.email==='string'?x.email:(x.user&&typeof x.user.email==='string'?x.user.email:'');if(!x.deleted_at&&((xe!==''&&xe.toLowerCase()===c)||(u&&u.id!=null&&Number(x.user_id)===Number(u.id)))){i=k;break}}",
   "if(d.unidades===0){if(i<0)return{sinCambio:true};pv[i]=rvP(og[i],{deleted_at:true,change:true})}",
   "else if(i>=0){if(Number(og[i].stock)===d.unidades)return{sinCambio:true};pv[i]=rvP(og[i],{stock:d.unidades,change:true})}",
   "else{if(!u||u.id==null)return{error:'Falta la cuenta de Dropi de ese correo.'};pv.push(rvP({id:null,product_id:o.id!=null?o.id:null,variation_id:null,user_id:u.id,user:u,stock:d.unidades,last_quantity_separed:null,email:d.correo},{change:true}))}",
-  "var rs=pv.filter(function(x){return!x.deleted_at}).reduce(function(t,x){return t+Number(x.stock!=null?x.stock:0)},0);",
-  "var st=(Array.isArray(o.warehouse_product)?o.warehouse_product:[]).reduce(function(t,w){return t+Number(w.stock!=null?w.stock:0)},0);",
-  "if(rs>st)return{error:'El producto tiene '+st.toLocaleString('es-PA')+' unidades en Dropi y se quieren reservar '+rs.toLocaleString('es-PA')+'.'};",
+  "var st=(Array.isArray(o.warehouse_product)?o.warehouse_product:[]).reduce(function(t,w){return t+Number(w.stock!=null?w.stock:0)},0),ya=i>=0?Number(og[i].stock!=null?og[i].stock:0):0;",
+  "if(d.unidades-ya>st)return{error:'En Dropi hay '+st.toLocaleString('es-PA')+' unidades disponibles'+(ya>0?' más las '+ya.toLocaleString('es-PA')+' que ya tiene reservadas ese correo':'')+': se quieren reservar '+d.unidades.toLocaleString('es-PA')+'.'};",
   "return{reservas:pv}}",
   "function stockT(o){return(Array.isArray(o.warehouse_product)?o.warehouse_product:[]).reduce(function(t,w){return t+(Number(w.stock)||0)},0)}",
   // Las reservas vivas que se devuelven al sistema (como las guarda la lectura).

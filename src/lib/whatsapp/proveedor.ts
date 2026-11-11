@@ -18,6 +18,27 @@ export const NUMERO_360_SIN_ID = "360dialog";
 const ORIGEN = "https://waba-v2.360dialog.io";
 const ORIGEN_SANDBOX = "https://waba-sandbox.360dialog.io";
 
+/**
+ * Las formas en que puede venir un número: WhatsApp escribe los celulares de México con un «1» después del 52 (+52 1 55…) y la clave se suele guardar
+ * sin él (9 nov 2026: `D360_API_KEY_525540921878` para el +5215540921878; sin esto se respondía con la clave principal, desde otro número). Primero la tal cual.
+ */
+/**
+ * Un número de la empresa como se guarda (9 nov 2026, pedido de Hernán): «+» y los dígitos, y un celular de México **sin el «1»** que WhatsApp pone después del 52
+ * («+52 1 55 4092 1878» → «+525540921878»), que es como se escribe el número y como se nombra su clave. Null si no hay dígitos.
+ */
+export function numeroEmpresaNormal(numero: string | null | undefined): string | null {
+  const d = (numero ?? "").replace(/\D/g, "");
+  if (!d) return null;
+  return `+${/^521\d{10}$/.test(d) ? `52${d.slice(3)}` : d}`;
+}
+
+export function variantesNumero(numero: string): string[] {
+  const d = numero.replace(/\D/g, "");
+  if (/^521\d{10}$/.test(d)) return [d, `52${d.slice(3)}`];
+  if (/^52\d{10}$/.test(d)) return [d, `521${d.slice(2)}`];
+  return [d];
+}
+
 /** El nombre de la variable con la clave propia de un número de la empresa: «D360_API_KEY_584220350576». */
 export const variableClave360 = (numero: string) => `D360_API_KEY_${numero.replace(/\D/g, "")}`;
 
@@ -26,7 +47,7 @@ export const variableClave360 = (numero: string) => `D360_API_KEY_${numero.repla
  * principal. Sin `numero`, la principal (plantillas, el sandbox).
  */
 export function config360(numero?: string | null): Config360 | null {
-  const propia = numero && /\d{7,}/.test(numero) ? process.env[variableClave360(numero)]?.trim() : undefined;
+  const propia = numero && /\d{7,}/.test(numero) ? variantesNumero(numero).map((n) => process.env[variableClave360(n)]?.trim()).find(Boolean) : undefined;
   const clave = propia || process.env.D360_API_KEY?.trim();
   return clave ? { clave, sandbox: process.env.D360_SANDBOX === "1" } : null;
 }

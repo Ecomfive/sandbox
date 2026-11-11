@@ -109,7 +109,8 @@ export async function decidirParCompetencia(productoId: string, nuestroId: strin
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
   const plataforma = await getPlataformaActual(pais.codigo);
-  const tabla = TABLAS[plataforma].productos;
+  const tabla = TABLAS[plataforma]?.productos;
+  if (!tabla) return { error: "Esta plataforma todavía no tiene análisis de competencia." };
   const { data: filas } = await supabase.from(tabla).select("id, pais_id, es_nuestro, nombre, proveedor_nombre").in("id", [productoId, nuestroId]);
   const otro = (filas ?? []).find((f) => f.id === productoId);
   const nuestro = (filas ?? []).find((f) => f.id === nuestroId);

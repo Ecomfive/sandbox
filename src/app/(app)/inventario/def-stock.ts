@@ -33,6 +33,13 @@ export interface FilaStock {
   unidadesEnCajas: number;
   /** Lo que tiene en las plataformas (Dropi, Effi, Drop) del país; `null` si no tiene. */
   plataformas: StockPlataformas | null;
+  /** Unidades físicas en cada bodega (9 nov 2026, pedido de Hernán): para filtrar por bodega y para las columnas del Excel. Solo las bodegas donde hay registro. */
+  porBodega: { bodegaId: string; fisico: number }[];
+  /** Si es una variante: el id de su producto principal y sus valores («Rojo / M»). */
+  padreId: string | null;
+  opciones: string;
+  /** Si es un producto con variantes: sus variantes (sus cifras ya suman las de ellas). Vacío en un producto sin variantes. */
+  variantes: FilaStock[];
 }
 
 export const ETIQUETA_TIPO_SKU: Record<string, string> = { simple: "Simple", combo: "Pack o combo" };
@@ -53,7 +60,8 @@ export const DEF_STOCK: DefTabla<FilaStock> = {
   filtrosIniciales: FILTRO_SOLO_SIMPLES,
   clave: "wms-stock",
   campos: [
-    { id: "sku", etiqueta: "SKU", tipo: "texto", sinCsv: true, valor: (f) => `${f.codigo} ${f.nombre} ${textoCodigos(f)}` },
+    // Buscar una variante encuentra a su producto principal (las variantes salen dentro de él).
+    { id: "sku", etiqueta: "SKU", tipo: "texto", sinCsv: true, valor: (f) => `${f.codigo} ${f.nombre} ${textoCodigos(f)} ${f.variantes.map((v) => `${v.codigo} ${v.nombre} ${textoCodigos(v)}`).join(" ")}` },
     {
       id: "existencia",
       etiqueta: "Existencia",
@@ -88,6 +96,8 @@ export const DEF_STOCK: DefTabla<FilaStock> = {
   ],
   // Al agrupar, cada grupo dice sus unidades físicas; un compuesto no suma, sus unidades ya están en sus componentes.
   total: (f) => (f.tipo === "combo" ? 0 : f.fisico),
+  // Un producto con variantes baja una línea por variante (no su suma): el archivo trae el detalle que la lista esconde en el desplegable.
+  expandirDescarga: (f) => (f.variantes.length > 0 ? f.variantes : [f]),
   csvAntes: [
     { etiqueta: "Código", valor: (f) => f.codigo },
     { etiqueta: "N.º", valor: (f) => numeroProducto(f.numero) },
@@ -105,7 +115,35 @@ export const DEF_STOCK: DefTabla<FilaStock> = {
   ],
 };
 
-export const PLATAFORMAS_STOCK: Plataforma[] = ["dropi", "effi", "drop"];
+/**
+ * Suma a una definición el filtro «Bodega» (los productos que tienen unidades en esa bodega, sea una o varias a la vez) y una columna «Físico ·
+ * <bodega>» por cada bodega en lo que se descarga, para ver el inventario repartido por bodega. Con una sola bodega no suma nada (no hay qué repartir).
+ */
+export function conBodegas(base: DefTabla<FilaStock>, bodegas: { id: string; nombre: string }[]): DefTabla<FilaStock> {
+  if (bodegas.length < 2) return base;
+  const fisicoEn = (f: FilaStock, id: string) => f.porBodega.find((b) => b.bodegaId === id)?.fisico ?? 0;
+  return {
+    ...base,
+    campos: [
+      ...base.campos,
+      {
+        id: "bodega",
+        etiqueta: "Bodega",
+        tipo: "seleccion",
+        sinCsv: true,
+        valores: (f) => {
+          const en = f.porBodega.filter((b) => b.fisico !== 0).map((b) => b.bodegaId);
+          return en.length ? en : [SIN_VALOR];
+        },
+        opciones: () => bodegas.map((b) => ({ valor: b.id, etiqueta: b.nombre })),
+        etiquetaSinValor: "En ninguna",
+      },
+    ],
+    csvAntes: [...(base.csvAntes ?? []), ...bodegas.map((b) => ({ etiqueta: `Físico · ${b.nombre}`, valor: (f: FilaStock) => fisicoEn(f, b.id) }))],
+  };
+}
+
+export const PLATAFORMAS_STOCK: Plataforma[] = ["dropi", "effi", "drop", "dunamixfy"];
 
 /** Las plataformas donde el producto tiene unidades. */
 export const plataformasConStock = (f: Pick<FilaStock, "plataformas">): Plataforma[] => PLATAFORMAS_STOCK.filter((p) => (f.plataformas?.[p] ?? 0) > 0);
@@ -134,5 +172,6 @@ export const DEF_STOCK_PLATAFORMAS: DefTabla<FilaStock> = {
     { etiqueta: "Dropi", valor: (f) => f.plataformas?.dropi ?? 0 },
     { etiqueta: "Effi", valor: (f) => f.plataformas?.effi ?? 0 },
     { etiqueta: "Drop", valor: (f) => f.plataformas?.drop ?? 0 },
+    { etiqueta: "Dunamixfy", valor: (f) => f.plataformas?.dunamixfy ?? 0 },
   ],
 };

@@ -38,7 +38,7 @@ export default async function VentasDropiPage({ searchParams }: { searchParams: 
   const selector = <SelectorVistaVentas vista={vista} codigoPais={pais.codigo} />;
 
   // Drop y Effi: sus ventas leídas (salidas y devoluciones por artículo y día), en el mismo tablero.
-  if (vista === "drop" || vista === "effi") {
+  if (vista === "drop" || vista === "effi" || vista === "dunamixfy") {
     const datos = await cargarVentasPlataforma(supabase, pais.id, vista);
     if (!datos || !datos.ultimoDia) {
       return (
@@ -50,7 +50,7 @@ export default async function VentasDropiPage({ searchParams }: { searchParams: 
               ? "No se pudieron cargar las ventas. Vuelve a intentarlo; si sigue, falta correr en Supabase la migración 0244."
               : vista === "effi"
                 ? "Todavía no hay ventas de Effi leídas. La lectura diaria las pide por la API de Effi: si «Actualizar desde Effi» (Gestión de IDs) avisa que falta un permiso, en Effi › Administración › Perfiles de usuario dale al perfil del usuario del sistema la consulta de «Notas de remisión de venta» y «Devoluciones de venta»."
-                : `Todavía no hay ventas de ${plataformaDe(vista).nombre} leídas. Se leen con «Actualizar» en la pestaña de Drop, con la cuenta de proveedor.`}
+                : `Todavía no hay ventas de ${plataformaDe(vista).nombre} leídas. Se leen con «Actualizar datos», en la pestaña de ${plataformaDe(vista).nombre}, con la cuenta de proveedor.`}
           </p>
         </Pagina>
       );
@@ -155,12 +155,12 @@ export default async function VentasDropiPage({ searchParams }: { searchParams: 
     rechazadas: Number(d.rechazadas),
     devueltas: Number(d.devueltas),
   }));
-  // «Todas» en un país con más plataformas (Costa Rica): se suman Drop y Effi, cada artículo con su número propio y su producto del sistema.
+  // «Todas» en un país con más plataformas (Costa Rica): se suman Drop, Effi y Dunamixfy, cada artículo con su número propio y su producto del sistema.
   const extras: { plataforma: PlataformaVentas; datos: VentasDePlataforma }[] = [];
   if (vista === "todas") {
     const otras = plataformasDePais(pais.codigo)
       .map((p) => p.id)
-      .filter((p): p is PlataformaVentas => p === "drop" || p === "effi");
+      .filter((p): p is PlataformaVentas => p === "drop" || p === "effi" || p === "dunamixfy");
     for (const plataforma of otras) {
       const datos = await cargarVentasPlataforma(supabase, pais.id, plataforma);
       if (datos?.ultimoDia) extras.push({ plataforma, datos });
@@ -252,9 +252,9 @@ export default async function VentasDropiPage({ searchParams }: { searchParams: 
         <p role="status" className="m-0 -mt-3 text-xs text-muted-foreground">
           «Todas» suma Dropi
           {extras.map(({ plataforma, datos }) => ` y ${NOMBRE_PLATAFORMA_VENTAS[plataforma]} (leído hasta el ${new Date(`${datos.ultimoDia}T12:00:00Z`).toLocaleDateString("es-PA", { day: "numeric", month: "short", timeZone: "UTC" })})`).join("")}
-          {plataformasDePais(pais.codigo).some((p) => (p.id === "drop" || p.id === "effi") && !extras.some((x) => x.plataforma === p.id)) &&
+          {plataformasDePais(pais.codigo).some((p) => (p.id === "drop" || p.id === "effi" || p.id === "dunamixfy") && !extras.some((x) => x.plataforma === p.id)) &&
             `. Sin ventas leídas todavía: ${plataformasDePais(pais.codigo)
-              .filter((p) => (p.id === "drop" || p.id === "effi") && !extras.some((x) => x.plataforma === p.id))
+              .filter((p) => (p.id === "drop" || p.id === "effi" || p.id === "dunamixfy") && !extras.some((x) => x.plataforma === p.id))
               .map((p) => p.nombre)
               .join(" y ")}`}
           . Cada producto del sistema junta sus ventas de todas las plataformas en «Por producto».

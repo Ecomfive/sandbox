@@ -43,6 +43,7 @@ const SUBPAGINAS: Record<string, string> = {
   "/usuarios/auditoria": "Historial de auditoría",
   "/usuarios/roles": "Roles",
   "/puestos/organigrama": "Organigrama",
+  "/tareas/por-modulo": "Mis tareas por módulo",
   "/publicaciones-drop/recomendaciones": "Recomendaciones",
   "/publicaciones-drop/tareas": "Tareas",
   "/publicaciones-drop/reglas": "Reglas",

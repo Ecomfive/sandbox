@@ -20,6 +20,8 @@ import { FichaStock } from "../ficha-stock";
 import { guardarLevantamiento } from "./actions";
 import { ImportarLista } from "./importar-lista";
 import { LineasCajas, unidadesFormulario, type LineaCajasForm, type UbicacionConteo } from "./lineas-cajas";
+import { CAJAS_ACTIVAS } from "@/lib/wms/cajas";
+import { codigoLote, PEDIR_CODIGO_LOTE } from "@/lib/wms/vencimiento";
 
 export interface ProductoConteo {
   id: string;
@@ -226,6 +228,11 @@ export function Levantamiento({
     const sinDestino = conTraslado.find((p) => !traslados[p.id]?.destino);
     if (sinDestino) return setError(`Elige el depósito al que se transfiere ${sinDestino.codigo}.`);
     if (conResta.length > 0 && restarPideMotivo && !referencia.trim()) return setError("Para restar, escribe el motivo en «Referencia».");
+    // Un lote nuevo con unidades necesita su código y su vencimiento: sin código, la línea se descartaba sin avisar.
+    for (const p of productos.filter((x) => x.manejaVencimiento)) {
+      const falta = (lotes[p.id] ?? []).find((l) => !l.existente && (l.sumar.trim() !== "" || l.cantidad.trim() !== "") && !codigoLote(l.codigo, l.vencimiento));
+      if (falta) return setError(`Escribe la fecha de vencimiento de ${p.codigo} (en Contado, en la línea del lote nuevo).`);
+    }
     const filas = productos.map(
       (p): FilaConteo =>
         p.manejaVencimiento
@@ -353,8 +360,11 @@ export function Levantamiento({
                       <div className="flex flex-col gap-1.5">
                         {lineasDe(p).map((l, i) => (
                           <div key={i} className="flex flex-wrap items-center gap-1.5">
+                            {/* El código del lote no se pide por ahora (PEDIR_CODIGO_LOTE): el lote nuevo se nombra con su fecha. Uno que ya existe muestra el suyo. */}
+                            {(PEDIR_CODIGO_LOTE || l.existente) && (
                             <input
                               aria-label={`Lote de ${p.codigo}`}
+                              data-lote-de={p.id}
                               value={l.codigo}
                               readOnly={l.existente}
                               disabled={!puedeEscribir || pendiente}
@@ -363,6 +373,7 @@ export function Levantamiento({
                               maxLength={80}
                               className={`${fieldClassSm} w-28 ${l.existente ? "bg-muted" : ""}`}
                             />
+                            )}
                             <input
                               type="date"
                               aria-label={`Vencimiento del lote de ${p.codigo}`}
@@ -426,6 +437,7 @@ export function Levantamiento({
                     {!conCajas && tieneCajas && !cajas[p.id] && (sumas[p.id] !== undefined || restas[p.id] !== undefined) && (
                       <p className="m-0 mt-1 text-xs text-warning">Tiene cajas: lo que se añade o se resta queda suelto, fuera de ellas.</p>
                     )}
+                    {CAJAS_ACTIVAS && (
                     <LineasCajas
                       codigo={p.codigo}
                       lineas={cajas[p.id] ?? p.cajas}
@@ -433,10 +445,44 @@ export function Levantamiento({
                       deshabilitado={!puedeEscribir || pendiente}
                       alCambiar={(lineas) => setCajas((x) => ({ ...x, [p.id]: lineas }))}
                     />
+                    )}
                   </td>
                   <td className={claseCeldaColumna}>
                     {p.manejaVencimiento ? (
-                      <span className="text-xs text-muted-foreground">En cada lote</span>
+                      // Con vencimiento (9 nov 2026, pedido de Hernán: «la idea es que en todos se pueda agregar»): la misma casilla que en los demás. Lo escrito va a la
+                      // línea de un lote nuevo (la de «Agregar lote»), que se abre sola; en ella falta poner su vencimiento (el código del lote no se pide: PEDIR_CODIGO_LOTE).
+                      (() => {
+                        const lineas = lineasDe(p);
+                        const iNueva = lineas.map((l, i) => (l.existente ? -1 : i)).filter((i) => i >= 0).at(-1) ?? -1;
+                        const valor = iNueva >= 0 ? lineas[iNueva].sumar : "";
+                        const sinDatos = iNueva >= 0 && valor !== "" && !codigoLote(lineas[iNueva].codigo, lineas[iNueva].vencimiento);
+                        return (
+                          <span className="flex flex-col gap-1">
+                            <span className="relative inline-block">
+                              <span aria-hidden="true" className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-sm font-semibold text-success">
+                                +
+                              </span>
+                              <input
+                                type="number"
+                                min="0"
+                                step="1"
+                                inputMode="numeric"
+                                aria-label={`Añadir a ${p.codigo} en un lote nuevo`}
+                                disabled={!puedeEscribir || pendiente || conCajas}
+                                value={valor}
+                                onChange={(e) => {
+                                  const v = e.target.value;
+                                  if (iNueva >= 0) cambiarLinea(p, iNueva, { sumar: v });
+                                  else if (v !== "") setLotes((x) => ({ ...x, [p.id]: [...lineas, { codigo: "", vencimiento: "", cantidad: "", sumar: v, existente: false }] }));
+                                }}
+                                placeholder="—"
+                                className={`${fieldClassSm} w-24 pl-6 text-right tabular-nums`}
+                              />
+                            </span>
+                            {sinDatos && <span className="max-w-[10rem] text-xs text-warning">Escribe su fecha de vencimiento en Contado.</span>}
+                          </span>
+                        );
+                      })()
                     ) : (
                       <span className="relative inline-block">
                         <span aria-hidden="true" className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-sm font-semibold text-success">

@@ -14,6 +14,7 @@ import { diferenciaRecepcion } from "@/lib/wms/recepcion";
 import { CodigosProducto } from "@/components/ui/codigos-producto";
 import { textoCodigos } from "@/lib/wms/codigos-producto";
 import { recibirCompra } from "./actions";
+import { codigoLote, PEDIR_CODIGO_LOTE } from "@/lib/wms/vencimiento";
 
 export interface LineaPorRecibir {
   id: string;
@@ -91,7 +92,7 @@ export function Recepcion({
   const cambiar = (id: string, cambio: Partial<Escrito>) => setEscritos((x) => ({ ...x, [id]: { ...escritoDe(id), ...cambio } }));
   const lineasEscritas = (compra?.lineas ?? []).filter((l) => !l.bloqueo && cantidadDe(escritoDe(l.id).llego) !== null);
   const faltaNota = lineasEscritas.some((l) => cantidadDe(escritoDe(l.id).llego) !== l.pedida && !escritoDe(l.id).nota.trim());
-  const faltaLote = lineasEscritas.some((l) => l.manejaVencimiento && cantidadDe(escritoDe(l.id).llego) !== 0 && (!escritoDe(l.id).lote.trim() || !escritoDe(l.id).vencimiento));
+  const faltaLote = lineasEscritas.some((l) => l.manejaVencimiento && cantidadDe(escritoDe(l.id).llego) !== 0 && !escritoDe(l.id).vencimiento);
   const unidades = lineasEscritas.reduce((t, l) => t + (cantidadDe(escritoDe(l.id).llego) ?? 0), 0);
   const nombreBodega = bodegas.find((b) => b.id === bodega)?.nombre ?? "";
 
@@ -100,7 +101,7 @@ export function Recepcion({
     setError(null);
     const items = lineasEscritas.map((l) => {
       const e = escritoDe(l.id);
-      return { item: l.id, cantidad: cantidadDe(e.llego), nota: e.nota, ubicacion: ubicacion || null, lote_codigo: l.manejaVencimiento ? e.lote : null, vencimiento: l.manejaVencimiento ? e.vencimiento : null };
+      return { item: l.id, cantidad: cantidadDe(e.llego), nota: e.nota, ubicacion: ubicacion || null, lote_codigo: l.manejaVencimiento ? codigoLote(e.lote, e.vencimiento) : null, vencimiento: l.manejaVencimiento ? e.vencimiento : null };
     });
     startTransition(async () => {
       const r = await recibirCompra(compra.id, bodega, items);
@@ -216,7 +217,7 @@ export function Recepcion({
                           )}
                           {l.manejaVencimiento && llego !== null && llego > 0 && (
                             <div className="flex flex-wrap items-center gap-1.5">
-                              <input aria-label={`Lote de ${l.codigo}`} disabled={!puedeEscribir || pendiente} value={e.lote} onChange={(ev) => cambiar(l.id, { lote: ev.target.value })} maxLength={80} placeholder="Lote" className={`${fieldClassSm} w-28`} />
+                              {PEDIR_CODIGO_LOTE && <input aria-label={`Lote de ${l.codigo}`} disabled={!puedeEscribir || pendiente} value={e.lote} onChange={(ev) => cambiar(l.id, { lote: ev.target.value })} maxLength={80} placeholder="Lote" className={`${fieldClassSm} w-28`} />}
                               <input type="date" aria-label={`Vencimiento de ${l.codigo}`} disabled={!puedeEscribir || pendiente} value={e.vencimiento} onChange={(ev) => cambiar(l.id, { vencimiento: ev.target.value })} className={`${fieldClassSm} w-36`} />
                             </div>
                           )}
@@ -247,7 +248,7 @@ export function Recepcion({
               <strong className="tabular-nums">{lineasEscritas.length}</strong> de {compra.lineas.length} {compra.lineas.length === 1 ? "producto" : "productos"} · <strong className="tabular-nums">{entero(unidades)}</strong> unidades. Lo que dejes en blanco sigue pendiente.
             </p>
             {faltaNota && <p className="m-0 text-sm text-warning">Anota qué pasó con lo que no cuadra.</p>}
-            {faltaLote && <p className="m-0 text-sm text-warning">Falta el lote y su vencimiento.</p>}
+            {faltaLote && <p className="m-0 text-sm text-warning">Falta la fecha de vencimiento.</p>}
             {error && (
               <p role="alert" className="m-0 text-sm text-destructive">
                 {error}

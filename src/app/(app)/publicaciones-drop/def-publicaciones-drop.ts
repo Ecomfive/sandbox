@@ -1,3 +1,4 @@
+import type { CambioPrecioEsperando } from "@/lib/publicaciones/precios-plataforma-actions";
 import type { EtapaCotizacion } from "@/lib/compras/en-camino";
 import { ETIQUETA_ESTADO_DROP, type EstadoDrop } from "@/lib/publicaciones-drop/acciones";
 import { MARGEN_BAJO } from "@/lib/publicaciones/publicacion";
@@ -39,7 +40,16 @@ export interface FilaPublicacionDrop {
    */
   skuDrop: string;
   fotoUrl: string | null;
+  /** Lo que paga el dropshipper (con la comisión de Drop), como sale en «Mis productos». */
   precio: number | null;
+  /** El precio del proveedor, sin la comisión de Drop (el que se escribe en Drop), y el sugerido: los lee «Aplicar precios» (migración 0266); null si todavía no. */
+  precioProveedor: number | null;
+  precioSugerido: number | null;
+  /** Si tiene variantes en Drop (entonces su precio se cambia allá); null si todavía no se leyó. */
+  conVariantes: boolean | null;
+  preciosLeidosEn: string | null;
+  /** El cambio de precio que espera «Aplicar precios» (o que falló la última vez). */
+  cambioPrecio: CambioPrecioEsperando | null;
   inventario: number | null;
   /** El producto de Producto con que se vinculó el SKU de Drop; null mientras no se vincule. */
   producto: ProductoDrop | null;
@@ -52,8 +62,11 @@ export interface FilaPublicacionDrop {
   /** Cuándo se creó en Drop y cuándo la vio la última lectura. */
   creadoEnDrop: string | null;
   ultimaVez: string;
-  /** El costo del producto vinculado (de su publicación de Dropi del mismo país); null si no hay. */
+  /** El costo del producto vinculado (`costoDrop`: el de Dropi del país, el de otra variante del mismo producto o el escrito a mano); null si no hay. */
   costo: number | null;
+  /** De dónde salió el costo, y el SKU de la variante si salió de otra. */
+  costoOrigen: "dropi" | "variante" | "manual" | "compras" | null;
+  costoDe: string | null;
   /** El fulfillment de Drop del país (Configuración), en la moneda de Drop, que cuenta en el margen; null si no está puesto o si lo paga el dropshipper. */
   fulfillment: number | null;
   /** Quién paga el fulfillment de Drop (migración 0247): con «dropshipper» no se toma en cuenta. */

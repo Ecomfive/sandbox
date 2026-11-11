@@ -2,7 +2,7 @@
 // Todo lo que se agregue de Drop (módulos, datos, búsquedas) es de Costa Rica; con otro país elegido en la barra se avisa y se ofrece pasar a Costa Rica. Sin base ni React, con prueba
 // (plataformas.test.ts).
 
-export type PlataformaId = "dropi" | "drop" | "effi";
+export type PlataformaId = "dropi" | "drop" | "effi" | "dunamixfy";
 
 export interface Plataforma {
   id: PlataformaId;
@@ -15,6 +15,8 @@ export const PLATAFORMAS: readonly Plataforma[] = [
   { id: "dropi", nombre: "Dropi", paises: null },
   { id: "drop", nombre: "Drop", paises: ["CR"] },
   { id: "effi", nombre: "Effi", paises: ["CR"] },
+  // Dunamixfy (9 nov 2026, pedido de Hernán): dunamixfy.cr, donde ECOMFIVE es proveedor. Tiene sitios en otros países, pero allí solo vendemos en Costa Rica.
+  { id: "dunamixfy", nombre: "Dunamixfy", paises: ["CR"] },
 ];
 
 export const PLATAFORMA_POR_DEFECTO: PlataformaId = "dropi";
@@ -50,6 +52,7 @@ export const GESTION_IDS: Record<PlataformaId, { ruta: string; modulo: string }>
   dropi: { ruta: "/publicaciones-dropi", modulo: "publicaciones-dropi" },
   drop: { ruta: "/publicaciones-drop", modulo: "publicaciones-drop" },
   effi: { ruta: "/publicaciones-effi", modulo: "publicaciones-effi" },
+  dunamixfy: { ruta: "/publicaciones-dunamixfy", modulo: "publicaciones-dunamixfy" },
 };
 
 /** Las gestiones de IDs que una persona puede abrir en un país, en el orden de las plataformas (`modulos` null = todos los módulos). */
@@ -59,7 +62,7 @@ export function gestionesDePais(codigoPais: string, modulos: readonly string[] |
 
 /**
  * Ventas Proveeduría (7 nov 2026, pedido de Hernán): las ventas de todas las plataformas juntas («todas») o de una sola. Es un parámetro de la página (`?ver=`), no la plataforma de la barra
- * de arriba: la barra no tiene «todas». Solo hay datos de Dropi; Drop y Effi existen pero sus ventas todavía no se leen.
+ * de arriba: la barra no tiene «todas». Drop, Effi y Dunamixfy suman sus ventas leídas (`plataforma_ventas_diarias`).
  */
 export type VistaVentas = "todas" | PlataformaId;
 

@@ -5,12 +5,12 @@
 
 import type { ProductoDropi, VentaDia } from "./ventas";
 
-export type PlataformaVentas = "drop" | "effi";
+export type PlataformaVentas = "drop" | "effi" | "dunamixfy";
 
-export const NOMBRE_PLATAFORMA_VENTAS: Record<PlataformaVentas | "dropi", string> = { dropi: "Dropi", drop: "Drop", effi: "Effi" };
+export const NOMBRE_PLATAFORMA_VENTAS: Record<PlataformaVentas | "dropi", string> = { dropi: "Dropi", drop: "Drop", effi: "Effi", dunamixfy: "Dunamixfy" };
 
 /** Desde dónde se numeran los artículos de cada plataforma: muy por encima de los IDs de Dropi (6 cifras), para que en «Todas» no choquen. */
-const BASE: Record<PlataformaVentas, number> = { drop: 10_000_000, effi: 20_000_000 };
+const BASE: Record<PlataformaVentas, number> = { drop: 10_000_000, effi: 20_000_000, dunamixfy: 30_000_000 };
 
 export interface PublicacionPlataforma {
   /** El id del artículo en la plataforma (`drop_id`, `effi_id`). */

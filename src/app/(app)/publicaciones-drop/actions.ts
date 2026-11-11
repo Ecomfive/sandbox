@@ -45,6 +45,33 @@ export async function vincularPublicacionDrop(
   return { ok: true, producto: sku };
 }
 
+/**
+ * El costo escrito a mano de una publicación de Drop (10 nov 2026, migración 0267): solo cuenta cuando su producto no tiene costo en Gestión de IDs Dropi del país, ni
+ * otra variante del mismo producto. `valor` null lo quita. En la moneda de Drop. Queda en la auditoría.
+ */
+export async function guardarCostoManualDrop(id: string, valor: number | null): Promise<{ ok: true } | { error: string }> {
+  await requireModuloEscritura("publicaciones-drop");
+  if (typeof id !== "string" || !UUID.test(id)) return { error: "Datos no válidos." };
+  if (valor !== null && (typeof valor !== "number" || !Number.isFinite(valor) || valor < 0 || valor > 100_000_000)) return { error: "Escribe un costo válido." };
+  const supabase = createServiceClient();
+  const { data: antes, error: e } = await supabase.from("drop_publicaciones").select("nombre, codigo, costo_manual").eq("id", id).maybeSingle();
+  if (e) return { error: /costo_manual|schema cache|does not exist/i.test(e.message) ? "Falta correr la migración 0267 en la base." : "No se pudo leer la publicación." };
+  if (!antes) return { error: "Esa publicación ya no existe. Recarga la página." };
+  const nuevo = valor === null ? null : Math.round(valor * 100) / 100;
+  const { error } = await supabase.from("drop_publicaciones").update({ costo_manual: nuevo }).eq("id", id);
+  if (error) return { error: "No se pudo guardar el costo." };
+  await registrarAuditoria({
+    accion: "costo_manual_publicacion_drop",
+    entidad: "drop_publicaciones",
+    entidadId: id,
+    detalle: `${antes.nombre as string}${antes.codigo ? ` (${antes.codigo as string})` : ""}`,
+    antes: { "Costo a mano": antes.costo_manual == null ? "—" : String(antes.costo_manual) },
+    despues: { "Costo a mano": nuevo === null ? "—" : String(nuevo) },
+  });
+  revalidatePath("/publicaciones-drop");
+  return { ok: true };
+}
+
 const SIN_ESCRITURA = "Todavía no se escribe en Drop desde el sistema: por ahora solo se leen sus publicaciones. Créalo en Drop.";
 
 /**
