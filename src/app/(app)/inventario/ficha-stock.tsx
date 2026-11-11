@@ -10,7 +10,10 @@ import { Ventana } from "@/components/ui/ventana";
 import { formatearTiempoRelativo } from "@/lib/formato";
 import { CalendarioIcon, ComprasIcon, EnvioIcon, HistorialIcon, InventarioIcon } from "@/lib/nav-icons";
 import { pideMotivo, puedeMoverAMano } from "@/lib/wms/recepcion";
-import { ETIQUETA_PLATAFORMA } from "@/lib/wms/stock-plataformas";
+import { ETIQUETA_PLATAFORMA, type Plataforma } from "@/lib/wms/stock-plataformas";
+
+/** De qué plataforma lee cada bodega externa su stock (por su código): la fila de la bodega muestra lo que dice la plataforma (11 nov 2026, Hernán). */
+const PLATAFORMA_DE_BODEGA: Record<string, Plataforma> = { dropi: "dropi", effi: "effi", boxfull: "drop", dunamixfy: "dunamixfy" };
 import { usePuedeAbrir } from "@/components/modulos-contexto";
 import { ComprasProducto } from "../producto/compras-producto";
 import { FichaProductoEmbebida } from "../producto/ficha-producto-embebida";
@@ -262,19 +265,26 @@ export function FichaStock({
                       </tr>
                     </thead>
                     <tbody>
-                      {datos.bodegas.filter((b) => !conPlataformas || b.tipo !== "externa" || b.fisico !== 0 || b.enCamino !== 0).map((b) => (
+                      {datos.bodegas.map((b) => {
+                        // Una bodega de plataforma (Dropi B280, Effi, Drop, Dunamixfy) muestra lo de la última lectura de la plataforma: el sistema no la mueve.
+                        const plataforma = conPlataformas && b.tipo === "externa" ? PLATAFORMA_DE_BODEGA[b.codigo] : undefined;
+                        const enPlataforma = plataforma ? (sku.plataformas?.[plataforma] ?? 0) : null;
+                        const fisico = enPlataforma ?? b.fisico;
+                        const disponible = enPlataforma ?? b.disponible;
+                        return (
                         <tr key={b.bodegaId} className="border-t border-border">
                           <th scope="row" className="py-1.5 pr-2 text-left font-medium">
                             {b.nombre}
-                            {b.tipo === "externa" && <span className="ml-1.5 text-[11px] font-normal text-muted-foreground">externa</span>}
+                            {b.tipo === "externa" && <span className="ml-1.5 text-[11px] font-normal text-muted-foreground">{plataforma ? `según ${ETIQUETA_PLATAFORMA[plataforma]}` : "externa"}</span>}
                           </th>
-                          {[b.fisico, b.reservado, b.disponible, b.danado, b.inspeccion, b.retenido, b.vencido, b.enCamino].map((n, i) => (
+                          {[fisico, b.reservado, disponible, b.danado, b.inspeccion, b.retenido, b.vencido, b.enCamino].map((n, i) => (
                             <td key={i} className="px-1.5 py-1.5 text-right">
                               <Cifra n={n} />
                             </td>
                           ))}
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
