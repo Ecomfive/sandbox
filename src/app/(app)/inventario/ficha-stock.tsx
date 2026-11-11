@@ -26,7 +26,7 @@ import { PanelRemision, PanelTransferencia } from "./panel-transferencia";
 import { obtenerStockDeSku, type EnvioDropi, type CajaDeBodega, type LoteStock, type MovimientoStock, type StockBodega } from "./stock-actions";
 
 /** Lo que la ficha necesita del producto (el Levantamiento la abre con sus propios datos). */
-export type SkuFicha = Pick<FilaStock, "id" | "codigo" | "nombre" | "numero" | "barras" | "tipo" | "clase" | "manejaVencimiento"> & { plataformas?: FilaStock["plataformas"] };
+export type SkuFicha = Pick<FilaStock, "id" | "codigo" | "nombre" | "numero" | "barras" | "tipo" | "clase" | "manejaVencimiento"> & { plataformas?: FilaStock["plataformas"]; /** Un producto principal con variantes: la etiqueta dice «Con variantes». */ conVariantes?: boolean };
 
 const ETIQUETA_TIPO_MOV: Record<string, string> = { entrada: "Entrada", salida: "Salida", ajuste: "Ajuste", reserva: "Reserva", liberacion: "Liberación", traslado: "Traslado" };
 const ETIQUETA_CUBETA: Record<string, string> = {
@@ -141,7 +141,7 @@ export function FichaStock({
         sku && (
           <>
             <span className="text-lg font-semibold">{sku.nombre}</span>
-            <Badge tone="neutral">{ETIQUETA_TIPO_SKU[sku.tipo] ?? sku.tipo}</Badge>
+            <Badge tone="neutral">{sku.conVariantes ? "Con variantes" : (ETIQUETA_TIPO_SKU[sku.tipo] ?? sku.tipo)}</Badge>
           </>
         )
       }

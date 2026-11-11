@@ -156,7 +156,7 @@ export function Levantamiento({
     const p = productos.find((x) => x.id === ficha);
     if (p) return p;
     const padre = productos.find((x) => x.padre?.id === ficha)?.padre;
-    return padre ? { id: padre.id, codigo: padre.codigo, nombre: padre.nombre, numero: padre.numero, barras: padre.barras, clase: "fisico", manejaVencimiento: false, plataformas: padre.plataformas ?? null } : undefined;
+    return padre ? { id: padre.id, codigo: padre.codigo, nombre: padre.nombre, numero: padre.numero, barras: padre.barras, clase: "fisico", manejaVencimiento: false, plataformas: padre.plataformas ?? null, conVariantes: true } : undefined;
   }, [ficha, productos]);
 
   const lineasDe = (p: ProductoConteo): LineaLote[] =>
