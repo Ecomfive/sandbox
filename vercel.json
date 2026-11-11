@@ -12,6 +12,74 @@
       "schedule": "0 13 * * *"
     },
     {
+      "path": "/api/cron/efectivo-repartidores",
+      "schedule": "0 10 * * *"
+    },
+    {
+      "path": "/api/cron/conciliacion",
+      "schedule": "10 10 * * *"
+    },
+    {
+      "path": "/api/cron/conciliacion",
+      "schedule": "40 10 * * *"
+    },
+    {
+      "path": "/api/cron/cierre-mes",
+      "schedule": "20 10 * * *"
+    },
+    {
+      "path": "/api/cron/proyeccion-caja",
+      "schedule": "0 11 * * 1"
+    },
+    {
+      "path": "/api/cron/alertas",
+      "schedule": "30 11 * * *"
+    },
+    {
+      "path": "/api/cron/dropi-finanzas",
+      "schedule": "30 9 * * *"
+    },
+    {
+      "path": "/api/cron/shopify-ventas",
+      "schedule": "40 9 * * *"
+    },
+    {
+      "path": "/api/cron/informe-mensual",
+      "schedule": "0 12 5 * *"
+    },
+    {
+      "path": "/api/cron/resumen-semanal",
+      "schedule": "30 12 * * 1"
+    },
+    {
+      "path": "/api/cron/respaldo-finanzas",
+      "schedule": "0 8 * * 0"
+    },
+    {
+      "path": "/api/cron/respaldo-finanzas",
+      "schedule": "10 8 * * 0"
+    },
+    {
+      "path": "/api/cron/respaldo-finanzas",
+      "schedule": "20 8 * * 0"
+    },
+    {
+      "path": "/api/cron/quickbooks",
+      "schedule": "50 9 * * *"
+    },
+    {
+      "path": "/api/cron/monday",
+      "schedule": "30 10 * * *"
+    },
+    {
+      "path": "/api/cron/monday",
+      "schedule": "40 10 * * *"
+    },
+    {
+      "path": "/api/cron/monday",
+      "schedule": "50 10 * * *"
+    },
+    {
       "path": "/api/cron/effi",
       "schedule": "0 11 * * *"
     },

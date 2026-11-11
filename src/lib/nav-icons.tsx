@@ -1,3 +1,15 @@
+import { NominaIcon } from "@/app/(app)/nomina/icono-nomina";
+import { FlujoCajaIcon, UtilidadesIcon } from "@/components/finanzas/iconos";
+import { PresupuestoIcon } from "@/components/finanzas/icono-presupuesto";
+import { ProyeccionCajaIcon } from "@/components/finanzas/icono-proyeccion";
+import { TesoreriaIcon } from "@/components/finanzas/icono-tesoreria";
+import { CapitalRiesgoIcon } from "@/components/finanzas/icono-capital-riesgo";
+import { VentasTiendasIcon } from "@/app/(app)/ventas-tiendas/icono-ventas";
+import { DeliverysIcon } from "@/app/(app)/deliverys/icono-deliverys";
+import { ConciliacionBancariaIcon } from "@/app/(app)/conciliacion-bancaria/icono-conciliacion";
+import { RentabilidadIcon } from "@/app/(app)/rentabilidad/icono-rentabilidad";
+import { CierreMesIcon } from "@/app/(app)/cierre-mes/icono-cierre";
+import { ClientesMarketingIcon } from "@/app/(app)/clientes-marketing/icono-clientes-marketing";
 import type { SVGProps } from "react";
 
 function Icon(props: SVGProps<SVGSVGElement>) {
@@ -144,6 +156,49 @@ export function ExtractoIcon(props: SVGProps<SVGSVGElement>) {
       <path d="M7 3h7l4 4v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" />
       <path d="M14 3v4h4" />
       <path d="M9 13h6M9 17h6" />
+    </Icon>
+  );
+}
+
+/** Laptop: Bienes de uso (activo fijo y su depreciación). */
+export function BienesUsoIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <IconoLucide {...props}>
+      <path d="M18 5a2 2 0 0 1 2 2v8.526a2 2 0 0 0 .212.897l1.068 2.127a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45l1.068-2.127A2 2 0 0 0 4 15.526V7a2 2 0 0 1 2-2z" />
+      <path d="M20.054 15.987H3.946" />
+    </IconoLucide>
+  );
+}
+
+/** Balanza: Balance general (activo contra pasivo y patrimonio). */
+export function BalanceIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <IconoLucide {...props}>
+      <path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z" />
+      <path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z" />
+      <path d="M7 21h10" />
+      <path d="M12 3v18" />
+      <path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2" />
+    </IconoLucide>
+  );
+}
+
+/** Velocímetro: Panel financiero (la vista de CFO). */
+export function PanelFinancieroIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <IconoLucide {...props}>
+      <path d="m12 14 4-4" />
+      <path d="M3.34 19a10 10 0 1 1 17.32 0" />
+    </IconoLucide>
+  );
+}
+
+export function ResultadosIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M4 20h16" />
+      <path d="M7 16v-4M12 16V8M17 16v-7" />
+      <path d="m6 7 5-3 4 2 4-3" />
     </Icon>
   );
 }
@@ -1243,6 +1298,30 @@ export const ICONOS_PAGINA: Record<string, (props: SVGProps<SVGSVGElement>) => R
   "/retiros": ConciliacionIcon,
   "/extractos": ExtractoIcon,
   "/gastos": GastoIcon,
+  "/panel-financiero": PanelFinancieroIcon,
+  "/presupuesto": PresupuestoIcon,
+  "/planificacion": ProyeccionCajaIcon,
+  "/rentabilidad": RentabilidadIcon,
+  "/cierre-mes": CierreMesIcon,
+  "/clientes-marketing": ClientesMarketingIcon,
+  "/ventas-tiendas": VentasTiendasIcon,
+  "/ventas-tiendas/pipeline": VentasTiendasIcon,
+  "/ventas-tiendas/ordenes": VentasTiendasIcon,
+  "/deliverys": DeliverysIcon,
+  "/conciliacion-bancaria": ConciliacionBancariaIcon,
+  "/estado-resultados": ResultadosIcon,
+  "/libro-movimientos": ExtractoIcon,
+  "/costos-mercancia": MargenIcon,
+  "/bienes-de-uso": BienesUsoIcon,
+  "/balance-general": BalanceIcon,
+  "/flujo-caja": FlujoCajaIcon,
+  "/utilidades": UtilidadesIcon,
+  "/proyeccion-caja": ProyeccionCajaIcon,
+  "/tesoreria": TesoreriaIcon,
+  "/capital-riesgo": CapitalRiesgoIcon,
+  "/cuentas-por-cobrar": WalletIcon,
+  "/cuentas-por-pagar": GastoIcon,
+  "/nomina": NominaIcon,
   "/productos": MargenIcon,
   "/usuarios": UsuariosIcon,
   "/puestos": PuestosIcon,

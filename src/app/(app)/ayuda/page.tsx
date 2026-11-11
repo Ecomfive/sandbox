@@ -4,7 +4,7 @@ import { ICONO_MODULO, tonoModulo } from "@/components/ayuda/iconos-modulo";
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { anilloFoco } from "@/components/ui/field";
 import { Pagina } from "@/components/ui/pagina";
-import { glosarioPara, guiasPara, novedadesPara } from "@/lib/ayuda/contenido";
+import { claveGuia, glosarioPara, guiasPara, novedadesPara } from "@/lib/ayuda/contenido";
 import { cursosPara } from "@/lib/ayuda/cursos";
 import { formatearFecha } from "@/lib/formato";
 import { AyudaIcon, CatalogoIcon, HistorialIcon, UniversidadIcon } from "@/lib/nav-icons";
@@ -88,8 +88,8 @@ export default async function AyudaPage() {
               const Icono = ICONO_MODULO[g.modulo] ?? AyudaIcon;
               const tono = tonoModulo(g.modulo);
               return (
-                <li key={g.modulo}>
-                  <Link href={`/ayuda/guias/${g.modulo}`} className={`flex h-full items-start gap-3 rounded-xl border border-border bg-card p-3 transition-colors hover:bg-muted ${anilloFoco}`}>
+                <li key={claveGuia(g)}>
+                  <Link href={`/ayuda/guias/${claveGuia(g)}`} className={`flex h-full items-start gap-3 rounded-xl border border-border bg-card p-3 transition-colors hover:bg-muted ${anilloFoco}`}>
                     <span aria-hidden="true" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" style={{ backgroundColor: `${tono}1f`, color: tono }}>
                       <Icono className="h-4 w-4" />
                     </span>

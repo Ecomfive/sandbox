@@ -22,6 +22,8 @@ export default function manifest(): MetadataRoute.Manifest {
       { src: "/pwa/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
       { src: "/pwa/icon-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
     ],
+    // Acceso directo de la app instalada a las cifras del día de Finanzas (mantener pulsado el ícono).
+    shortcuts: [{ name: "Finanzas · Hoy", short_name: "Hoy", url: "/panel-financiero/hoy", icons: [{ src: "/pwa/icon-192.png", sizes: "192x192", type: "image/png" }] }],
     share_target: {
       action: "/instagram/compartir",
       method: "GET",

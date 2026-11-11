@@ -27,6 +27,8 @@ import { contarNovedadesSinVer } from "@/lib/ayuda/novedades-vistas";
 import { PESTANAS_POR_PAIS, PESTANAS_SOLO_ADMIN, PESTANAS_USO_SISTEMA, pestanasOcultasDe } from "@/lib/permisos/ocultas";
 import { createServiceClient } from "@/lib/supabase/server";
 import { obtenerFavoritos } from "@/lib/favoritos";
+import { cargarTiendasPermitidas } from "@/lib/finanzas/cargar-tiendas-permitidas";
+import { modulosSegunTiendas } from "@/lib/finanzas/tiendas-permitidas";
 import { obtenerPendientesHoy } from "@/lib/pendientes-hoy";
 import { contarParaTi } from "@/lib/menciones";
 import {
@@ -59,10 +61,12 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       ]).then(([menu, paraTi, novedades]) => conParaTi(menu, paraTi, novedades))
     )
     .catch(() => SIN_PENDIENTES);
-  const [plataformasPais, favoritosDeSesion, usuario, paisActual, avisoInactividad] = await Promise.all([
+  const [plataformasPais, favoritosDeSesion, usuario, permitidas, paisActual, avisoInactividad] = await Promise.all([
     paisP.then((p) => obtenerPlataformasPais(supabase, p.id)),
     getUsuarioIdSesion().then((id) => (id ? obtenerFavoritos(supabase, id) : [])),
     usuarioP,
+    // Tiendas permitidas (mejora 99): con límite, el menú no muestra lo que es de toda la empresa.
+    usuarioP.then((u) => (u ? cargarTiendasPermitidas() : null)).catch(() => null),
     paisP,
     // Si se le muestra el aviso de 5 minutos sin actividad (Configuración, migración 0249). Sin la migración, a nadie.
     getUsuarioIdSesion().then((id) =>
@@ -78,6 +82,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   }
   const favoritos = usuario ? favoritosDeSesion : [];
   const areas = construirAreas(plataformasPais);
+  const modulosMenu = usuario ? modulosSegunTiendas(usuario.modulos, permitidas) : null;
   const pestanasOcultas = usuario
     ? [
         ...pestanasOcultasDe(usuario.afinado),
@@ -88,9 +93,9 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         // Los KPIs de atención y el panel de Dirección ya no son pestañas: desde el 30 oct 2026 son la Bandeja de Dirección.
       ]
     : [];
-  const paginas = paginasBuscables(areas, usuario?.modulos ?? null, pestanasOcultas);
+  const paginas = paginasBuscables(areas, modulosMenu, pestanasOcultas);
   // Gestión de IDs es una sola entrada del menú (Dropi, Drop o Effi según la plataforma de la barra); las migas y el buscador siguen viendo las tres.
-  const areasMenu = colapsarGestionDeIds(areas, { plataforma: await getPlataformaActual(paisActual.codigo), codigoPais: paisActual.codigo, modulos: usuario?.modulos ?? null });
+  const areasMenu = colapsarGestionDeIds(areas, { plataforma: await getPlataformaActual(paisActual.codigo), codigoPais: paisActual.codigo, modulos: modulosMenu });
 
   return (
     <ProveedorModulos modulos={usuario?.modulos ?? null}>
@@ -101,7 +106,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       {usuario && avisoInactividad && <AvisoInactividad />}
       {usuario?.vistaPrevia && <BannerVistaPrevia rolNombre={usuario.vistaPrevia.rolNombre} />}
       <div className="flex min-h-full">
-        <Sidebar modulosPermitidos={usuario?.modulos ?? null} areas={areasMenu} favoritos={favoritos} pendientes={pendientes} verActualizaciones={!!usuario && REVISAN_CAMBIOS.has(usuario.id)} />
+        <Sidebar modulosPermitidos={modulosMenu} areas={areasMenu} favoritos={favoritos} pendientes={pendientes} verActualizaciones={!!usuario && REVISAN_CAMBIOS.has(usuario.id)} />
         <div className="flex min-h-full min-w-0 flex-1 flex-col">
           <NavBar paginas={paginas} pendientes={pendientes} />
           <BarraMigas areas={areas} favoritos={favoritos} pestanasOcultas={pestanasOcultas} verAccesos={!!usuario && esAdministrador(usuario)}

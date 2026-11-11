@@ -11,7 +11,7 @@ import { FavoritoToggle } from "@/components/favorito-toggle";
 import { anilloFoco } from "@/components/ui/field";
 import { Tooltip } from "@/components/ui/tooltip";
 import { SIN_PENDIENTES, type PendientesMenu } from "@/lib/contadores-menu";
-import { FRENTES, PRONTO_NAV, encontrarSeccionActiva, moduloDeHref, type NavItem, type NavSection } from "@/lib/nav-data";
+import { FRENTES, PRONTO_NAV, agruparPaginas, encontrarSeccionActiva, moduloDeHref, type NavItem, type NavSection } from "@/lib/nav-data";
 import { AjustesIcon, AvisosIcon, AyudaIcon, BabyYodaIcon, ConfiguracionIcon, DashboardIcon, HistorialIcon, ICONOS_PAGINA, SECTION_ICONS } from "@/lib/nav-icons";
 
 /** Si el panel de páginas está oculto («cerrado»); se guarda en el navegador de cada persona. */
@@ -128,66 +128,55 @@ function SubTitulo({ children }: { children: ReactNode }) {
   return <h3 className="mb-0.5 px-3 text-[0.68rem] font-medium tracking-wide text-muted-foreground">{children}</h3>;
 }
 
+type PropsPaginas = { pathname: string; favoritos: string[]; pendientes: PendientesMenu; alNavegar?: () => void };
+
 /**
- * Las páginas de un área. Si el área se reparte en frentes (Proveeduría, Gestión de tienda, Fulfillment) cada uno lleva su
- * subtítulo y el que no tiene páginas dice «Próximamente»; lo que no es de ningún frente va arriba, sin subtítulo.
+ * Páginas repartidas en grupos con título (Testing Lab: Fuentes, Selección…; Finanzas: Dirección, Tesorería…). Las que
+ * no tienen grupo van primero, sin título. El título es un `h3` en un área sin frentes y un texto dentro de un frente
+ * (que ya tiene su `h3`).
  */
-function PaginasDeArea({
-  area,
-  items,
-  limitado = false,
-  ...resto
-}: {
-  area: NavSection;
-  items: NavItem[];
-  /** Con acceso limitado solo se dibujan los frentes que tienen páginas suyas. */
-  limitado?: boolean;
-  pathname: string;
-  favoritos: string[];
-  pendientes: PendientesMenu;
-  alNavegar?: () => void;
-}) {
-  if (!area.frentes) {
-    return (
-      <div className="flex flex-col gap-0.5">
-        {items.map((item) => (
-          <ItemPagina key={item.href} item={item} {...resto} />
-        ))}
-      </div>
-    );
-  }
-  const generales = items.filter((i) => !i.frente);
+function GruposDePaginas({ items, enFrente, ...resto }: PropsPaginas & { items: NavItem[]; enFrente: boolean }) {
+  const grupos = agruparPaginas(items);
+  const EtiquetaGrupo = enFrente ? "p" : "h3";
   return (
-    <div className="flex flex-col gap-3">
-      {generales.length > 0 && (
-        <div className="flex flex-col gap-0.5">
-          {generales.map((item) => (
+    <div className={`flex flex-col ${grupos.some((g) => g.grupo) ? "gap-3" : "gap-0.5"}`}>
+      {grupos.map((g) => (
+        <div key={g.grupo ?? "-"} role={g.grupo ? "group" : undefined} aria-label={g.grupo ?? undefined} className="flex flex-col gap-0.5">
+          {g.grupo && (
+            <EtiquetaGrupo className="m-0 px-3 pb-0.5 text-[0.65rem] font-semibold tracking-wide text-muted-foreground uppercase">
+              {g.grupo}
+            </EtiquetaGrupo>
+          )}
+          {g.items.map((item) => (
             <ItemPagina key={item.href} item={item} {...resto} />
           ))}
         </div>
-      )}
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Las páginas de un área. Si el área se reparte en frentes (Proveeduría, Gestión de tienda, Fulfillment) cada uno lleva su
+ * subtítulo y el que no tiene páginas dice «Próximamente»; lo que no es de ningún frente va arriba, sin subtítulo. Dentro
+ * de un frente, o de un área sin frentes, las páginas pueden ir en grupos con título (`grupo`).
+ */
+function PaginasDeArea({ area, items, limitado = false, ...resto }: PropsPaginas & { area: NavSection; items: NavItem[]; limitado?: boolean }) {
+  if (!area.frentes) return <GruposDePaginas items={items} enFrente={false} {...resto} />;
+  const generales = items.filter((i) => !i.frente);
+  return (
+    <div className="flex flex-col gap-3">
+      {generales.length > 0 && <GruposDePaginas items={generales} enFrente={false} {...resto} />}
       {FRENTES.filter((f) => !area.soloFrentes || area.soloFrentes.includes(f.id))
         // Un frente sin páginas suyas simplemente no está; el «Próximamente» de un frente vacío por diseño es solo del acceso completo.
         .filter((f) => items.some((i) => i.frente === f.id) || (!limitado && !area.items.some((i) => i.frente === f.id)))
         .map((f) => {
         const delFrente = items.filter((i) => i.frente === f.id);
-        const grupos = [...new Set(delFrente.map((i) => i.grupo))];
         return (
           <div key={f.id} role="group" aria-label={f.titulo}>
             <SubTitulo>{f.titulo}</SubTitulo>
             {delFrente.length > 0 ? (
-              <div className="flex flex-col gap-2">
-                {grupos.map((g) => (
-                  <div key={g ?? "-"} role={g ? "group" : undefined} aria-label={g} className="flex flex-col gap-0.5">
-                    {g && <p className="m-0 px-3 pt-0.5 text-[0.65rem] font-medium tracking-wide text-muted-foreground/80 uppercase">{g}</p>}
-                    {delFrente
-                      .filter((i) => i.grupo === g)
-                      .map((item) => (
-                        <ItemPagina key={item.href} item={item} {...resto} />
-                      ))}
-                  </div>
-                ))}
-              </div>
+              <GruposDePaginas items={delFrente} enFrente {...resto} />
             ) : (
               <p className="m-0 px-3 py-1 text-xs text-muted-foreground/70">Próximamente</p>
             )}
@@ -578,7 +567,7 @@ export function Sidebar({
   return (
     <>
       {/* Riel y panel — escritorio */}
-      <aside className="sticky top-0 hidden h-screen shrink-0 md:flex">
+      <aside data-sin-imprimir className="sticky top-0 hidden h-screen shrink-0 md:flex">
         <ConPendientes pendientes={pendientes}>
           {(p) => <RielYPanel areas={areas} modulosPermitidos={modulosPermitidos} favoritos={favoritos} pendientes={p} verActualizaciones={verActualizaciones} />}
         </ConPendientes>
@@ -588,6 +577,7 @@ export function Sidebar({
       <button
         type="button"
         aria-label="Abrir menú"
+        data-sin-imprimir
         onClick={() => setMovilAbierto(true)}
         className={`fixed top-3 left-3 z-40 rounded-md bg-card p-2 text-muted-foreground shadow-sm hover:bg-muted hover:text-foreground transition-colors md:hidden ${anilloFoco}`}
       >

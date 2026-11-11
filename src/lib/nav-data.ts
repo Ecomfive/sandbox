@@ -21,8 +21,9 @@ export interface NavItem {
   /** Cómo se ve el nombre en el menú lateral cuando no cabe en una línea: cada texto va en su propia línea. El nombre completo
    * (`label`) sigue en las migas, el buscador y los favoritos. */
   lineasMenu?: [string, string];
-  /** Una sección dentro del frente, con su título (Testing Lab: Fuentes, Selección, Producción, Resultados). Las
-   * secciones salen en el orden en que aparecen sus páginas. */
+  /** Un grupo con título dentro del frente (Testing Lab: Fuentes, Selección, Producción, Resultados) o, en un área sin
+   * frentes, dentro del área (Finanzas: Dirección, Tesorería…). Los grupos salen en el orden en que aparecen sus páginas;
+   * las páginas sin grupo van primero, sin título. */
   grupo?: string;
 }
 
@@ -129,14 +130,37 @@ const AREAS: NavSection[] = [
       { label: "Producto", href: "/producto", frente: "fulfillment" },
     ],
   },
+  // Finanzas es el Portal AF4 360°: es de toda la empresa (consolida las tiendas de los tres frentes), así que no se reparte
+  // en frentes sino en grupos por función, en el orden en que se trabaja: dirigir, mover la caja, cerrar los números y
+  // vender. Lo de la wallet de Dropi (proveeduría) va al final, en su grupo.
   {
     title: "Finanzas",
-    frentes: true,
+    panel: "Portal AF4 360°",
     items: [
-      { label: "Conciliación de Retiros", href: "/retiros", dropi: true, frente: "proveeduria" },
-      { label: "Extractos bancarios", href: "/extractos", dropi: true, frente: "proveeduria" },
-      { label: "Nómina y gastos", href: "/gastos", dropi: true, frente: "proveeduria" },
-      { label: "Productos y márgenes", href: "/productos", dropi: true, frente: "proveeduria" },
+      { label: "Panel financiero", href: "/panel-financiero", grupo: "Dirección" },
+      { label: "Estado de resultados", href: "/estado-resultados", grupo: "Dirección" },
+      { label: "Rentabilidad por tienda", href: "/rentabilidad", grupo: "Dirección" },
+      { label: "Presupuesto", href: "/presupuesto", grupo: "Dirección" },
+      { label: "Planificación", href: "/planificacion", grupo: "Dirección" },
+      { label: "Distribución de utilidades", href: "/utilidades", grupo: "Dirección" },
+      { label: "Capital y riesgo", href: "/capital-riesgo", grupo: "Dirección" },
+      { label: "Tesorería", href: "/tesoreria", grupo: "Tesorería" },
+      { label: "Flujo de caja", href: "/flujo-caja", grupo: "Tesorería" },
+      { label: "Proyección de caja", href: "/proyeccion-caja", grupo: "Tesorería" },
+      { label: "Conciliación bancaria", href: "/conciliacion-bancaria", grupo: "Tesorería" },
+      { label: "Cuentas por cobrar", href: "/cuentas-por-cobrar", grupo: "Tesorería" },
+      { label: "Cuentas por pagar", href: "/cuentas-por-pagar", grupo: "Tesorería" },
+      { label: "Cierre de mes", href: "/cierre-mes", grupo: "Contabilidad y cierre" },
+      { label: "Libro de movimientos", href: "/libro-movimientos", grupo: "Contabilidad y cierre" },
+      { label: "Balance general", href: "/balance-general", grupo: "Contabilidad y cierre" },
+      { label: "Costos de mercancía", href: "/costos-mercancia", grupo: "Contabilidad y cierre" },
+      { label: "Bienes de uso", href: "/bienes-de-uso", grupo: "Contabilidad y cierre" },
+      { label: "Ventas por tienda", href: "/ventas-tiendas", grupo: "Comercial" },
+      { label: "Clientes y marketing", href: "/clientes-marketing", grupo: "Comercial" },
+      { label: "Conciliación de Retiros", href: "/retiros", dropi: true, grupo: "Proveeduría Dropi" },
+      { label: "Extractos bancarios", href: "/extractos", dropi: true, grupo: "Proveeduría Dropi" },
+      { label: "Nómina y gastos", href: "/gastos", dropi: true, grupo: "Proveeduría Dropi" },
+      { label: "Productos y márgenes", href: "/productos", dropi: true, grupo: "Proveeduría Dropi" },
     ],
   },
   {
@@ -149,6 +173,7 @@ const AREAS: NavSection[] = [
       { label: "Puestos", href: "/puestos" },
       { label: "Tareas", href: "/tareas" },
       { label: "Rendimiento", href: "/rendimiento" },
+      { label: "Nómina", href: "/nomina" },
     ],
   },
   // Las fichas de producto de Shopify y de Dropi ya no están en el menú (se llega a ellas desde Producto); la página y su
@@ -168,6 +193,20 @@ const AREAS: NavSection[] = [
     items: [{ label: "Centro de notificaciones", href: "/notificaciones" }],
   },
 ];
+
+/** Las páginas repartidas en sus grupos, en el orden en que aparece el primero de cada uno; las sin grupo van primero. */
+export function agruparPaginas(items: NavItem[]): { grupo: string | null; items: NavItem[] }[] {
+  const grupos: { grupo: string | null; items: NavItem[] }[] = [];
+  const sinGrupo = items.filter((i) => !i.grupo);
+  if (sinGrupo.length) grupos.push({ grupo: null, items: sinGrupo });
+  for (const item of items) {
+    if (!item.grupo) continue;
+    const g = grupos.find((x) => x.grupo === item.grupo);
+    if (g) g.items.push(item);
+    else grupos.push({ grupo: item.grupo, items: [item] });
+  }
+  return grupos;
+}
 
 /** Lo que todavía no se puede abrir: va aparte, en «Próximamente», para no ocupar lugar en el menú. */
 export const PRONTO_NAV: string[] = ["Contrataciones"];

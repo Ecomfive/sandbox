@@ -3,14 +3,14 @@ import { Badge } from "@/components/ui/badge";
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { anilloFoco } from "@/components/ui/field";
 import { Pagina } from "@/components/ui/pagina";
-import { GUIAS } from "@/lib/ayuda/contenido";
+import { GUIAS_DE_MODULO } from "@/lib/ayuda/contenido";
 import { formatearFecha } from "@/lib/formato";
 import { cargarManuales, puedeEditarManuales, requireSesion } from "../datos-ayuda";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Manuales de proceso" };
 
-const NOMBRE_MODULO: Record<string, string> = Object.fromEntries(GUIAS.map((g) => [g.modulo, g.titulo]));
+const NOMBRE_MODULO: Record<string, string> = Object.fromEntries(GUIAS_DE_MODULO.map((g) => [g.modulo, g.titulo]));
 
 /** Los manuales de proceso que la persona puede ver (los de sus módulos y los de todos). La administración los crea y edita. */
 export default async function ManualesPage() {

@@ -1,6 +1,8 @@
 export interface Pestana {
   etiqueta: string;
   href: string;
+  /** Las pestañas seguidas con el mismo grupo van juntas, separadas de las demás (como los grupos del menú). */
+  grupo?: string;
 }
 
 /**
@@ -39,6 +41,149 @@ export const PESTANAS_POR_MODULO: Record<string, Pestana[]> = {
   "/puestos": [
     { etiqueta: "Puestos", href: "/puestos" },
     { etiqueta: "Organigrama", href: "/puestos/organigrama" },
+  ],
+  "/estado-resultados": [
+    { etiqueta: "Estado de resultados", href: "/estado-resultados" },
+    { etiqueta: "Precio de transferencia", href: "/estado-resultados/precio-transferencia" },
+    { etiqueta: "Ajustes", href: "/estado-resultados/ajustes" },
+    { etiqueta: "Tipos de cambio", href: "/estado-resultados/tipos-cambio" },
+  ],
+  "/rentabilidad": [
+    // Resumen, unidad económica, inventario y compras, capital y palancas.
+    { etiqueta: "Rentabilidad", href: "/rentabilidad" },
+    { etiqueta: "Productos", href: "/rentabilidad/productos", grupo: "Unidad económica" },
+    { etiqueta: "Pedidos", href: "/rentabilidad/pedidos", grupo: "Unidad económica" },
+    { etiqueta: "Zonas y repartidores", href: "/rentabilidad/zonas", grupo: "Unidad económica" },
+    { etiqueta: "Marketing", href: "/rentabilidad/marketing", grupo: "Unidad económica" },
+    { etiqueta: "Equilibrio", href: "/rentabilidad/equilibrio", grupo: "Unidad económica" },
+    { etiqueta: "Inventario", href: "/rentabilidad/inventario", grupo: "Inventario y compras" },
+    { etiqueta: "Reorden", href: "/rentabilidad/reorden", grupo: "Inventario y compras" },
+    { etiqueta: "Compras y costos", href: "/rentabilidad/compras", grupo: "Inventario y compras" },
+    { etiqueta: "Plan de compras", href: "/rentabilidad/plan-compras", grupo: "Inventario y compras" },
+    { etiqueta: "Capital de trabajo", href: "/rentabilidad/capital-trabajo", grupo: "Capital y valor" },
+    { etiqueta: "Palancas de valor", href: "/rentabilidad/palancas", grupo: "Capital y valor" },
+  ],
+  "/cierre-mes": [
+    { etiqueta: "Meses", href: "/cierre-mes" },
+    { etiqueta: "Asientos de ajuste", href: "/cierre-mes/ajustes" },
+    { etiqueta: "Gastos prepagados", href: "/cierre-mes/prepagos" },
+    { etiqueta: "Calendario fiscal", href: "/cierre-mes/calendario-fiscal" },
+    { etiqueta: "QuickBooks", href: "/cierre-mes/quickbooks" },
+    { etiqueta: "Configuración", href: "/cierre-mes/configuracion" },
+  ],
+  "/panel-financiero": [
+    { etiqueta: "Panel", href: "/panel-financiero" },
+    { etiqueta: "Hoy", href: "/panel-financiero/hoy" },
+    { etiqueta: "Tiendas y proveeduría", href: "/panel-financiero/canales" },
+    { etiqueta: "Comité", href: "/panel-financiero/comite" },
+    { etiqueta: "Informe mensual", href: "/panel-financiero/informe" },
+    { etiqueta: "Paquete bancario", href: "/panel-financiero/paquete-bancario" },
+    { etiqueta: "Envíos", href: "/panel-financiero/envios" },
+    { etiqueta: "Versiones", href: "/panel-financiero/versiones" },
+    { etiqueta: "Valoración", href: "/panel-financiero/valoracion" },
+    { etiqueta: "Tareas programadas", href: "/panel-financiero/tareas" },
+    { etiqueta: "Respaldos", href: "/panel-financiero/respaldos" },
+    { etiqueta: "Estado del sistema", href: "/panel-financiero/estado-sistema" },
+  ],
+  "/conciliacion-bancaria": [
+    { etiqueta: "Conciliación", href: "/conciliacion-bancaria" },
+    { etiqueta: "Cobros", href: "/conciliacion-bancaria/cobros" },
+    { etiqueta: "Importar", href: "/conciliacion-bancaria/importar" },
+  ],
+  "/deliverys": [
+    { etiqueta: "Semana", href: "/deliverys" },
+    { etiqueta: "Entregas", href: "/deliverys/entregas" },
+    { etiqueta: "Cierres", href: "/deliverys/cierres" },
+    { etiqueta: "Repartidores", href: "/deliverys/repartidores" },
+    { etiqueta: "Monday", href: "/deliverys/monday" },
+    { etiqueta: "Importar Excel", href: "/deliverys/importar" },
+  ],
+  "/clientes-marketing": [
+    { etiqueta: "Resumen", href: "/clientes-marketing" },
+    { etiqueta: "Cohortes", href: "/clientes-marketing/cohortes" },
+    { etiqueta: "Marketing", href: "/clientes-marketing/marketing" },
+  ],
+  "/ventas-tiendas": [
+    { etiqueta: "Resumen", href: "/ventas-tiendas" },
+    { etiqueta: "Órdenes", href: "/ventas-tiendas/ordenes" },
+    { etiqueta: "Pipeline", href: "/ventas-tiendas/pipeline" },
+    { etiqueta: "Cuadre", href: "/ventas-tiendas/cuadre" },
+    { etiqueta: "Importar Excel", href: "/ventas-tiendas/importar" },
+  ],
+  "/nomina": [
+    { etiqueta: "Nómina", href: "/nomina" },
+    { etiqueta: "Conciliación con el libro", href: "/nomina/conciliacion" },
+    { etiqueta: "Importar Excel", href: "/nomina/importar" },
+  ],
+  "/cuentas-por-cobrar": [
+    { etiqueta: "Cuentas por cobrar", href: "/cuentas-por-cobrar" },
+    { etiqueta: "Importar Excel", href: "/cuentas-por-cobrar/importar" },
+  ],
+  "/cuentas-por-pagar": [
+    { etiqueta: "Cuentas por pagar", href: "/cuentas-por-pagar" },
+    { etiqueta: "Importar Excel", href: "/cuentas-por-pagar/importar" },
+  ],
+  "/capital-riesgo": [
+    { etiqueta: "Riesgos", href: "/capital-riesgo" },
+    { etiqueta: "Proyectos", href: "/capital-riesgo/proyectos" },
+    { etiqueta: "Asignación de capital", href: "/capital-riesgo/asignacion" },
+  ],
+  "/tesoreria": [
+    { etiqueta: "Posición", href: "/tesoreria" },
+    { etiqueta: "Saldos bancarios", href: "/tesoreria/saldos" },
+    { etiqueta: "Pagos", href: "/tesoreria/pagos" },
+    { etiqueta: "Repartidores", href: "/tesoreria/repartidores" },
+    { etiqueta: "Costos de cobro", href: "/tesoreria/comisiones" },
+    { etiqueta: "Deuda", href: "/tesoreria/deuda" },
+    { etiqueta: "Optimizar deuda", href: "/tesoreria/optimizar" },
+    { etiqueta: "Refinanciamiento", href: "/tesoreria/refinanciamiento" },
+    { etiqueta: "Covenants", href: "/tesoreria/covenants" },
+    { etiqueta: "Capital para crecer", href: "/tesoreria/crecimiento" },
+    { etiqueta: "Ajustes", href: "/tesoreria/ajustes" },
+  ],
+  "/planificacion": [
+    { etiqueta: "Pronóstico", href: "/planificacion" },
+    { etiqueta: "Motores", href: "/planificacion/motores" },
+    { etiqueta: "Plan anual", href: "/planificacion/plan-anual" },
+    { etiqueta: "18 meses", href: "/planificacion/18-meses" },
+    { etiqueta: "Escenarios", href: "/planificacion/escenarios" },
+    { etiqueta: "Metas", href: "/planificacion/metas" },
+  ],
+  "/proyeccion-caja": [
+    { etiqueta: "Proyección", href: "/proyeccion-caja" },
+    { etiqueta: "Precisión", href: "/proyeccion-caja/precision" },
+  ],
+  "/balance-general": [
+    { etiqueta: "Balance", href: "/balance-general" },
+    { etiqueta: "Partidas", href: "/balance-general/partidas" },
+  ],
+  "/flujo-caja": [
+    { etiqueta: "Flujo", href: "/flujo-caja" },
+    { etiqueta: "Saldos iniciales", href: "/flujo-caja/saldos" },
+  ],
+  "/utilidades": [
+    { etiqueta: "Distribución", href: "/utilidades" },
+    { etiqueta: "Participaciones", href: "/utilidades/participaciones" },
+    { etiqueta: "Retiros", href: "/utilidades/retiros" },
+  ],
+  "/bienes-de-uso": [
+    { etiqueta: "Bienes", href: "/bienes-de-uso" },
+    { etiqueta: "Importar Excel", href: "/bienes-de-uso/importar" },
+  ],
+  "/costos-mercancia": [
+    { etiqueta: "Productos", href: "/costos-mercancia" },
+    { etiqueta: "Lotes", href: "/costos-mercancia/lotes" },
+    { etiqueta: "Mapeo con Dropi", href: "/costos-mercancia/mapeo" },
+    { etiqueta: "Importar Excel", href: "/costos-mercancia/importar" },
+  ],
+  "/libro-movimientos": [
+    { etiqueta: "Movimientos", href: "/libro-movimientos" },
+    { etiqueta: "Por clasificar", href: "/libro-movimientos/pendientes" },
+    { etiqueta: "Reglas", href: "/libro-movimientos/reglas" },
+    { etiqueta: "Revisar", href: "/libro-movimientos/revisar" },
+    { etiqueta: "Proveedores", href: "/libro-movimientos/proveedores" },
+    { etiqueta: "Salud de datos", href: "/libro-movimientos/salud" },
+    { etiqueta: "Importar Excel", href: "/libro-movimientos/importar" },
   ],
   "/extractos": [
     { etiqueta: "Cargar extracto", href: "/extractos" },
@@ -114,4 +259,27 @@ export function pestanaActiva(pestanas: Pestana[], ruta: string): string | null 
   const limpia = ruta.length > 1 ? ruta.replace(/\/+$/, "") : ruta;
   const candidatas = pestanas.filter((p) => limpia === p.href || limpia.startsWith(`${p.href}/`));
   return candidatas.sort((a, b) => b.href.length - a.href.length)[0]?.href ?? null;
+}
+
+export interface GrupoPestanas {
+  /** El nombre del grupo, o el de la pestaña si va sola. */
+  etiqueta: string;
+  /** A dónde lleva la pestaña del grupo: su primera página. */
+  href: string;
+  pestanas: Pestana[];
+}
+
+/**
+ * Las pestañas juntadas por `grupo` (en el orden en que aparecen): una franja de grupos y, debajo, las páginas del grupo
+ * elegido. Sin grupos, null (la franja de siempre).
+ */
+export function gruposDePestanas(pestanas: Pestana[]): GrupoPestanas[] | null {
+  if (!pestanas.some((p) => p.grupo)) return null;
+  const grupos: GrupoPestanas[] = [];
+  for (const p of pestanas) {
+    const ultimo = grupos[grupos.length - 1];
+    if (p.grupo && ultimo && ultimo.etiqueta === p.grupo && ultimo.pestanas[0].grupo === p.grupo) ultimo.pestanas.push(p);
+    else grupos.push({ etiqueta: p.grupo ?? p.etiqueta, href: p.href, pestanas: [p] });
+  }
+  return grupos;
 }

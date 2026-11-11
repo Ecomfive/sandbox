@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { FRENTES, colapsarGestionDeIds, construirAreas, encontrarSeccionActiva, paginaInicialDe } from "./nav-data";
+import { FRENTES, agruparPaginas, colapsarGestionDeIds, construirAreas, encontrarSeccionActiva, paginaInicialDe } from "./nav-data";
 import { ICONOS_PAGINA } from "./nav-icons";
 
 // Se corre con: npm run test:seguridad (incluye estas pruebas del menú)
@@ -121,6 +121,54 @@ test("sin acceso a una página, la persona cae en la primera suya y nunca en el 
   // Un rol con un solo módulo cuyas pestañas están todas ocultas no tiene a dónde ir: se queda sin página.
   assert.equal(paginaInicialDe(["compras"], "compras"), null);
   assert.equal(paginaInicialDe([]), null);
+});
+
+test("Finanzas es el Portal AF4 360°: sin frentes y agrupado por función", () => {
+  const fin = area("Finanzas");
+  assert.equal(fin?.panel, "Portal AF4 360°");
+  assert.ok(!fin?.frentes);
+  assert.deepEqual(
+    agruparPaginas(fin?.items ?? []).map((g) => g.grupo),
+    ["Dirección", "Tesorería", "Contabilidad y cierre", "Comercial", "Proveeduría Dropi"],
+  );
+  assert.equal(fin?.items[0].href, "/panel-financiero");
+  assert.ok(fin?.items.every((i) => i.grupo), "toda página de Finanzas tiene su grupo");
+  assert.equal(encontrarSeccionActiva("/panel-financiero/informe", areas), "Finanzas");
+  assert.equal(encontrarSeccionActiva("/proyeccion-caja/precision", areas), "Finanzas");
+});
+
+test("agruparPaginas: las sin grupo primero y los grupos en el orden en que aparecen", () => {
+  const g = agruparPaginas([
+    { label: "B", href: "/b", grupo: "Uno" },
+    { label: "A", href: "/a" },
+    { label: "C", href: "/c", grupo: "Dos" },
+    { label: "D", href: "/d", grupo: "Uno" },
+  ]);
+  assert.deepEqual(
+    g.map((x) => [x.grupo, x.items.map((i) => i.href)]),
+    [
+      [null, ["/a"]],
+      ["Uno", ["/b", "/d"]],
+      ["Dos", ["/c"]],
+    ],
+  );
+});
+
+test("sin Dropi, Finanzas no muestra el grupo de proveeduría Dropi", () => {
+  const sinDropi = construirAreas([{ nombre: "Dropi", tieneDatos: false }]);
+  const grupos = agruparPaginas(sinDropi.find((a) => a.title === "Finanzas")?.items ?? []).map((g) => g.grupo);
+  assert.ok(!grupos.includes("Proveeduría Dropi"));
+});
+
+test("pestañas de Rentabilidad: juntadas en grupos, cada página en uno solo", async () => {
+  const { gruposDePestanas, pestanasDe } = await import("./pestanas");
+  const grupos = gruposDePestanas(pestanasDe("/rentabilidad"))!;
+  assert.deepEqual(
+    grupos.map((g) => [g.etiqueta, g.pestanas.length]),
+    [["Rentabilidad", 1], ["Unidad económica", 5], ["Inventario y compras", 4], ["Capital y valor", 2]],
+  );
+  assert.equal(grupos[1].href, "/rentabilidad/productos");
+  assert.equal(gruposDePestanas(pestanasDe("/retiros")), null);
 });
 
 test("Gestión de IDs es una sola entrada del menú que sigue a la plataforma elegida y se marca activa en las tres rutas", () => {

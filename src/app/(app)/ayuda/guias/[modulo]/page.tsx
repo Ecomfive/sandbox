@@ -5,7 +5,7 @@ import { EtiquetaMiga } from "@/components/migas/etiqueta-miga";
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { anilloFoco } from "@/components/ui/field";
 import { Pagina } from "@/components/ui/pagina";
-import { GLOSARIO, guiasPara } from "@/lib/ayuda/contenido";
+import { GLOSARIO, claveGuia, guiasPara } from "@/lib/ayuda/contenido";
 import { cursosPara } from "@/lib/ayuda/cursos";
 import { AyudaIcon, HistorialIcon, UniversidadIcon } from "@/lib/nav-icons";
 import { cargarManuales, cargarProgreso, requireSesion } from "../../datos-ayuda";
@@ -21,14 +21,15 @@ export const metadata = { title: "Guía" };
 export default async function GuiaPage({ params }: { params: Promise<{ modulo: string }> }) {
   const { modulo } = await params;
   const usuario = await requireSesion();
-  const guia = guiasPara(usuario.modulos).find((g) => g.modulo === modulo);
+  const guia = guiasPara(usuario.modulos).find((g) => claveGuia(g) === modulo);
   if (!guia) notFound();
   const [progreso, manuales] = await Promise.all([cargarProgreso(usuario.id), cargarManuales(usuario)]);
-  const curso = cursosPara(usuario.modulos).find((c) => c.modulo === modulo);
-  const terminos = GLOSARIO.filter((t) => t.modulos?.includes(modulo));
-  const manualesDelModulo = (manuales ?? []).filter((m) => m.modulos.includes(modulo));
-  const Icono = ICONO_MODULO[modulo] ?? AyudaIcon;
-  const tono = tonoModulo(modulo);
+  const mod = guia.modulo;
+  const curso = guia.clave ? undefined : cursosPara(usuario.modulos).find((c) => c.modulo === mod);
+  const terminos = GLOSARIO.filter((t) => t.modulos?.includes(mod));
+  const manualesDelModulo = (manuales ?? []).filter((m) => m.modulos.includes(mod));
+  const Icono = ICONO_MODULO[mod] ?? AyudaIcon;
+  const tono = tonoModulo(mod);
 
   return (
     <Pagina ancho="media" className="flex flex-col gap-6">

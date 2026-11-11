@@ -9,7 +9,15 @@ export interface Periodo {
   preset: string;
   etiqueta: string;
   etiquetaComparacion: string;
+  /** El rango pedido pasaba de `MAX_DIAS_PERIODO` y se recortó (se quedan los días más recientes). */
+  recortado?: boolean;
 }
+
+/** Tope de un rango personalizado: un año. Un rango más largo traería la tabla entera (RENDIMIENTO-PENDIENTE.md, punto 4). */
+export const MAX_DIAS_PERIODO = 366;
+
+const FECHA_ISO = /^\d{4}-\d{2}-\d{2}$/;
+const fechaValida = (t: string | undefined) => !!t && FECHA_ISO.test(t) && !Number.isNaN(new Date(t).getTime());
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 
@@ -32,10 +40,18 @@ export function resolverPeriodo(sp: {
   let etiqueta: string;
   let preset = sp.preset ?? "7d";
 
-  if (sp.desde && sp.hasta) {
-    desde = new Date(sp.desde);
-    hasta = new Date(sp.hasta);
-    etiqueta = "Personalizado";
+  let recortado = false;
+  if (fechaValida(sp.desde) && fechaValida(sp.hasta)) {
+    desde = new Date(sp.desde as string);
+    hasta = new Date(sp.hasta as string);
+    if (desde > hasta) [desde, hasta] = [hasta, desde];
+    const largo = Math.round((hasta.getTime() - desde.getTime()) / 86400000) + 1;
+    if (largo > MAX_DIAS_PERIODO) {
+      desde = new Date(hasta);
+      desde.setDate(desde.getDate() - (MAX_DIAS_PERIODO - 1));
+      recortado = true;
+    }
+    etiqueta = recortado ? "Personalizado (último año)" : "Personalizado";
     preset = "personalizado";
   } else {
     const h = hoy();
@@ -90,6 +106,7 @@ export function resolverPeriodo(sp: {
     preset,
     etiqueta,
     etiquetaComparacion: modoComparacion === "anio_pasado" ? "mismo período año pasado" : "período anterior",
+    ...(recortado ? { recortado } : {}),
   };
 }
 

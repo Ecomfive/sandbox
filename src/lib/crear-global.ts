@@ -10,6 +10,8 @@ export interface AccionCrear {
   href: string;
   /** Módulo que hay que poder abrir (y modificar) para ver esta opción. */
   modulo: string;
+  /** Alternativa a `modulo`: basta poder abrir y modificar uno de estos. */
+  modulosAlguno?: string[];
 }
 
 export const ACCIONES_CREAR: AccionCrear[] = [
@@ -23,11 +25,20 @@ export const ACCIONES_CREAR: AccionCrear[] = [
     href: "/inventario",
     modulo: "inventario",
   },
+  {
+    id: "importar",
+    etiqueta: "Importar Excel",
+    detalle: "Libro, carteras, costos, nómina, ventas, deliverys y bancos",
+    href: "/importar",
+    modulo: "libro-movimientos",
+    modulosAlguno: ["libro-movimientos", "bienes-de-uso", "cuentas-por-cobrar", "cuentas-por-pagar", "costos-mercancia", "nomina", "ventas-tiendas", "deliverys", "conciliacion-bancaria"],
+  },
 ];
 
 /** Las opciones para esta persona: solo las de módulos que puede abrir Y modificar (con solo lectura no se crea nada). */
 export function accionesCrearPermitidas(modulos: string[], modulosSoloLectura: string[]): AccionCrear[] {
-  return ACCIONES_CREAR.filter((a) => modulos.includes(a.modulo) && !modulosSoloLectura.includes(a.modulo));
+  const puede = (m: string) => modulos.includes(m) && !modulosSoloLectura.includes(m);
+  return ACCIONES_CREAR.filter((a) => (a.modulosAlguno ? a.modulosAlguno.some(puede) : puede(a.modulo)));
 }
 
 /** ¿La dirección pide abrir directo el formulario de creación (`?nuevo=1`)? */

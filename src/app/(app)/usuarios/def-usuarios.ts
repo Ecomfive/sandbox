@@ -30,6 +30,8 @@ export interface FilaUsuario {
   fotoRecordadaEn: string | null;
   /** Los países que puede ver (null = todos). `undefined` si falta la migración 0087. */
   paisesPermitidos?: string[] | null;
+  /** Las tiendas de Finanzas que ve (migración 0937); null = todas; undefined = falta la migración. */
+  tiendasPermitidas?: string[] | null;
 }
 
 /** Qué le falta a una persona para estar completa: cuenta creada (siempre), primer ingreso, foto y

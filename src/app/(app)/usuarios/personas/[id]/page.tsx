@@ -11,6 +11,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { cargarPuestosDeUsuarios, consultarRoles, consultaSegura } from "../../datos-usuarios";
 import { ProveedorPuestosPersona } from "../../puestos-persona";
 import { PaisesPersona } from "../../paises-persona";
+import { TiendasPersona } from "../../tiendas-persona";
 import { PuestosPersona } from "../../puestos-persona";
 import { AccesoEfectivo } from "./acceso-efectivo";
 import { CabeceraPersona } from "./cabecera-persona";
@@ -27,10 +28,12 @@ export default async function PersonaPage({ params }: { params: Promise<{ id: st
   if (!esUuid(id)) notFound();
   const supabase = createServiceClient();
 
-  const [{ data: perfil }, paisesPersona, roles, authUsuario] = await Promise.all([
+  const [{ data: perfil }, paisesPersona, tiendasPersona, roles, authUsuario] = await Promise.all([
     supabase.from("perfiles").select("id, email, nombre, avatar_url, activo, rol_id, creado_en, primer_ingreso_en, foto_recordada_en, ultima_actividad_en").eq("id", id).maybeSingle(),
     // Aparte: sin la migración 0087 la columna no existe y la ficha se carga igual.
     supabase.from("perfiles").select("paises_permitidos").eq("id", id).maybeSingle(),
+    // Igual con las tiendas de Finanzas (migración 0150).
+    supabase.from("perfiles").select("tiendas_permitidas").eq("id", id).maybeSingle(),
     consultarRoles(supabase),
     supabase.auth.admin.getUserById(id),
   ]);
@@ -119,6 +122,7 @@ export default async function PersonaPage({ params }: { params: Promise<{ id: st
             puedeEscribir={puedeEscribir}
           />
           {!esYo && puedeEscribir && <PaisesPersona key={perfil.id} id={perfil.id} nombre={nombre} inicial={paisesPersona.error ? undefined : ((paisesPersona.data?.paises_permitidos as string[] | null) ?? null)} />}
+          {!esYo && puedeEscribir && <TiendasPersona key={`t-${perfil.id}`} id={perfil.id} nombre={nombre} inicial={tiendasPersona.error ? undefined : ((tiendasPersona.data?.tiendas_permitidas as string[] | null) ?? null)} />}
           <ProveedorPuestosPersona valor={puestos}>
             <PuestosPersona key={`puesto-${perfil.id}`} personaId={perfil.id} nombre={nombre} />
           </ProveedorPuestosPersona>

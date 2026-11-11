@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { EtiquetaMiga } from "@/components/migas/etiqueta-miga";
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
-import { GUIAS } from "@/lib/ayuda/contenido";
+import { GUIAS_DE_MODULO } from "@/lib/ayuda/contenido";
 import { manualesDeMisPuestos } from "@/lib/puestos/datos";
 import { createServiceClient } from "@/lib/supabase/server";
 import { BotonLeido } from "../boton-leido";
@@ -18,7 +18,7 @@ export default async function ManualPage({ params }: { params: Promise<{ id: str
   const { id } = await params;
   const usuario = await requireSesion();
   const editor = puedeEditarManuales(usuario);
-  const modulos = GUIAS.map((g) => ({ valor: g.modulo, etiqueta: g.titulo }));
+  const modulos = GUIAS_DE_MODULO.map((g) => ({ valor: g.modulo, etiqueta: g.titulo }));
 
   if (id === "nuevo") {
     if (!editor) notFound();

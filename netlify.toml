@@ -1,0 +1,15 @@
+# Despliegue en Netlify. Netlify reconoce Next.js y usa su adaptador; aquí solo se fija el comando y la versión de Node.
+# Las tareas programadas de vercel.json corren en Netlify con netlify/functions/tareas-programadas.mts.
+
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "22"
+  NEXT_TELEMETRY_DISABLED = "1"
+  # El chequeo de TypeScript de un proyecto de este tamaño pasa de los 2 GB que Node usa por defecto.
+  NODE_OPTIONS = "--max-old-space-size=6144"
+
+[functions]
+  node_bundler = "esbuild"

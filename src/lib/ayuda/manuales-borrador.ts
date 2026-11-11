@@ -1,6 +1,15 @@
 ﻿// Los primeros manuales de proceso (borradores para revisar y completar desde el sistema). Los carga una vez
 // `scripts/cargar-manuales-borrador.ts`; después se editan en Ayuda › Manuales y el código ya no los toca.
 
+import { GUIAS } from "./contenido";
+
+/** Un manual en el formato simple («## título», «1. paso») a partir de una guía del Centro de ayuda. */
+export function manualDesdeGuia(clave: string): string {
+  const g = GUIAS.find((x) => (x.clave ?? x.modulo) === clave);
+  if (!g) return "";
+  return [g.resumen, ...g.secciones.map((sec) => [`## ${sec.titulo}`, ...sec.pasos.map((p, i) => `${i + 1}. ${p}`)].join("\n"))].join("\n\n");
+}
+
 export const MANUALES_BORRADOR: { titulo: string; modulos: string[]; contenido: string }[] = [
   {
     titulo: "Crear y seguir una orden de compra",
@@ -100,5 +109,10 @@ Vincular cada compra con su producto alimenta el histórico de compras: unidades
 1. Pídele que entre y cambie su contraseña.
 2. Que haga en Ayuda › Universidad el curso «Primeros pasos en el sistema» y los de sus módulos.
 3. Revisa en Universidad › Progreso que los haya completado.`,
+  },
+  {
+    titulo: "Operación y contingencia del portal financiero",
+    modulos: ["panel-financiero", "libro-movimientos"],
+    contenido: manualDesdeGuia("operacion-contingencia"),
   },
 ];

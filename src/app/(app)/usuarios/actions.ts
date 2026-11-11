@@ -3,6 +3,7 @@
 import { randomInt } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
+import { leerTiendasPermitidas, textoTiendasPermitidas } from "@/lib/finanzas/tiendas-permitidas";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModuloEscritura } from "@/lib/auth";
 import { detectarImagen } from "@/lib/seguridad/imagen";
@@ -263,4 +264,42 @@ export async function listarPaisesParaPermisos(): Promise<{ codigo: string; nomb
   await requireModuloEscritura("usuarios");
   const { data } = await createServiceClient().from("paises").select("codigo, nombre").order("nombre");
   return (data ?? []) as { codigo: string; nombre: string }[];
+}
+
+/**
+ * Las tiendas de Finanzas que puede ver una persona (migración 0937): `null` = todas; una lista = solo esas
+ * (`fin_unidades`). Limita Estado de resultados, Panel, Rentabilidad, Ventas por tienda y el Libro de movimientos.
+ */
+export async function guardarTiendasUsuario(id: string, tiendas: string[] | null): Promise<{ error?: string }> {
+  await requireModuloEscritura("usuarios");
+  if (typeof id !== "string" || !/^[0-9a-fA-F-]{8,64}$/.test(id)) return { error: "Persona no válida." };
+  const supabase = createServiceClient();
+  let lista: string[] | null = null;
+  if (tiendas !== null) {
+    if (!Array.isArray(tiendas)) return { error: "Tiendas no válidas." };
+    const { data: existentes } = await supabase.from("fin_unidades").select("id");
+    const validas = new Set((existentes ?? []).map((u) => String(u.id).toLowerCase()));
+    lista = [...new Set(tiendas.map((t) => String(t).toLowerCase()))].filter((t) => validas.has(t));
+  }
+  const { data: antes } = await supabase.from("perfiles").select("email, tiendas_permitidas").eq("id", id).maybeSingle();
+  const { error } = await supabase.from("perfiles").update({ tiendas_permitidas: lista }).eq("id", id);
+  if (error) return { error: error.message.includes("tiendas_permitidas") ? "Falta correr la migración 0937 en Supabase." : "No se pudo guardar." };
+  const { data: unidades } = await supabase.from("fin_unidades").select("id, nombre");
+  const nombres = Object.fromEntries((unidades ?? []).map((u) => [String(u.id), String(u.nombre)]));
+  const previo = leerTiendasPermitidas((antes as { tiendas_permitidas?: unknown } | null)?.tiendas_permitidas ?? null);
+  await registrarAuditoria({
+    accion: "cambiar_tiendas_usuario",
+    entidad: "perfiles",
+    entidadId: id,
+    detalle: `${antes?.email ?? id}: tiendas ${textoTiendasPermitidas(previo, nombres)} → ${textoTiendasPermitidas(lista, nombres)}`,
+  });
+  revalidatePath("/usuarios");
+  return {};
+}
+
+/** Las tiendas que se pueden elegir en la ficha de una persona. */
+export async function listarTiendasParaPermisos(): Promise<{ id: string; nombre: string }[]> {
+  await requireModuloEscritura("usuarios");
+  const { data } = await createServiceClient().from("fin_unidades").select("id, nombre").eq("clase", "tienda").eq("activo", true).order("orden");
+  return (data ?? []).map((u) => ({ id: String(u.id), nombre: String(u.nombre) }));
 }
