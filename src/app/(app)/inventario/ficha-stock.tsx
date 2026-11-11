@@ -11,7 +11,9 @@ import { formatearTiempoRelativo } from "@/lib/formato";
 import { CalendarioIcon, ComprasIcon, EnvioIcon, HistorialIcon, InventarioIcon } from "@/lib/nav-icons";
 import { pideMotivo, puedeMoverAMano } from "@/lib/wms/recepcion";
 import { ETIQUETA_PLATAFORMA } from "@/lib/wms/stock-plataformas";
+import { usePuedeAbrir } from "@/components/modulos-contexto";
 import { ComprasProducto } from "../producto/compras-producto";
+import { FichaProductoEmbebida } from "../producto/ficha-producto-embebida";
 import { CorregirStock } from "./corregir-stock";
 import { NotasProducto } from "./notas-producto";
 import { ETIQUETA_TIPO_SKU, type FilaStock } from "./def-stock";
@@ -104,6 +106,9 @@ export function FichaStock({
   // Sube cuando se guarda un movimiento, para volver a pedir el stock y el libro.
   const [version, setVersion] = useState(0);
   const id = sku?.id;
+  // La ficha de Producto encima de esta (11 nov 2026, pedido de Hernán: que Dinora cree variantes, una productos, etc. sin salir del Levantamiento).
+  const puedeVerProducto = usePuedeAbrir("producto");
+  const [productoAbierto, setProductoAbierto] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -143,6 +148,15 @@ export function FichaStock({
           <div className="flex flex-col gap-1 px-5 pt-5 pb-4">
             <p className="m-0 text-sm text-muted-foreground">{sku.codigo}</p>
             <CodigosProducto numero={sku.numero} barras={sku.barras} />
+            {puedeVerProducto && (
+              <button
+                type="button"
+                onClick={() => setProductoAbierto(sku.id)}
+                className="mt-1 w-fit rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium hover:bg-accent"
+              >
+                Editar en Producto
+              </button>
+            )}
           </div>
 
           {puedeEscribir && !esCombo && !esTest && (
@@ -414,6 +428,15 @@ export function FichaStock({
           </section>
         </div>
       )}
+    <FichaProductoEmbebida
+      productoId={productoAbierto}
+      alCerrar={() => {
+        setProductoAbierto(null);
+        // Lo cambiado allá (variantes, nombre, unir) se vuelve a pedir aquí y en la tabla.
+        setVersion((v) => v + 1);
+        alCambiar();
+      }}
+    />
     </Ventana>
   );
 }
