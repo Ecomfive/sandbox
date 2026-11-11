@@ -6,7 +6,7 @@ import { registrarAuditoria } from "@/lib/auditoria";
 import { formatearEventoAuditoria } from "@/lib/auditoria-cambios";
 import { requireAlgunModulo, requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { esAdministrador } from "@/lib/permisos/acceso";
-import { mensajeBloqueos } from "@/lib/wms/eliminar-producto";
+import { mensajeBloqueos, mensajeBloqueosVariante } from "@/lib/wms/eliminar-producto";
 import { esCodigoBarrasValido, esCodigoInterno, normalizarCodigoBarras } from "@/lib/wms/codigo-barras";
 import { detectarImagen } from "@/lib/seguridad/imagen";
 import { descargarPublico } from "@/lib/seguridad/url-externa";
@@ -669,8 +669,10 @@ export async function crearVariantes(padreId: string, opciones: OpcionVariante[]
 }
 
 /**
- * Quita una variante que todavía no se usó: sin movimientos de inventario, sin compras y sin fichas enlazadas. Si ya tiene
- * historia, se conserva (se puede pasar a Test o dejar sin stock).
+ * Quita una variante que no se usa: sin compras, fichas enlazadas ni compuestos, y sin stock. Desde la migración 0269 (11 nov 2026, pedido de Hernán:
+ * Dinora cargó por error las Botas Maxi Pro por talla, les sumó inventario y lo dejó en 0, y «Quitar» no la dejaba) también si tuvo movimientos de
+ * inventario que se anulan entre sí: la base (`wms_quitar_variante`) lo revisa y borra sus movimientos, su stock en cero y la variante, todo junto.
+ * Lo que tenía queda en la Actividad. Si la migración no se corrió, sigue la regla de antes (sin movimientos).
  */
 export async function quitarVariante(id: string): Promise<{ error?: string }> {
   await requireModuloEscritura(MODULO);
@@ -678,6 +680,22 @@ export async function quitarVariante(id: string): Promise<{ error?: string }> {
   const supabase = createServiceClient();
   const { data: v } = await supabase.from("skus_maestros").select("codigo, padre_id").eq("id", id).maybeSingle();
   if (!v || !v.padre_id) return { error: "No es una variante." };
+  const conBase = await supabase.rpc("wms_quitar_variante", { p_id: id });
+  if (!conBase.error) {
+    const r = conBase.data as { quitada: boolean; codigo: string; movimientos?: number; bloqueos: Record<string, number> };
+    if (!r.quitada) return { error: mensajeBloqueosVariante(r.codigo, r.bloqueos) };
+    await registrarAuditoria({
+      accion: "quitar_variante",
+      entidad: "skus_maestros",
+      entidadId: v.padre_id,
+      detalle: r.movimientos ? `${v.codigo} (con ${r.movimientos} movimiento${r.movimientos === 1 ? "" : "s"} de inventario que se anulaban entre sí, borrados con ella)` : v.codigo,
+    });
+    revalidatePath("/producto");
+    revalidatePath("/inventario");
+    return {};
+  }
+  // Sin la migración 0269 (la función no existe): la regla de antes.
+  if (!/wms_quitar_variante|function|schema cache/i.test(conBase.error.message)) return { error: "No se pudo quitar la variante." };
   const { count: enCombos } = await supabase.from("sku_maestro_componentes").select("id", { count: "exact", head: true }).eq("componente_id", id);
   if ((enCombos ?? 0) > 0) return { error: "La variante es parte de un producto compuesto: quítala del compuesto primero." };
   const [movs, compras, shopify, dropi] = await Promise.all([
@@ -687,7 +705,7 @@ export async function quitarVariante(id: string): Promise<{ error?: string }> {
     supabase.from("wms_dropi_productos").select("id", { count: "exact", head: true }).eq("sku_maestro_id", id),
   ]);
   if ((movs.count ?? 0) + (compras.count ?? 0) + (shopify.count ?? 0) + (dropi.count ?? 0) > 0)
-    return { error: "La variante ya tiene movimientos, compras o fichas enlazadas: no se puede quitar." };
+    return { error: "La variante ya tiene movimientos, compras o fichas enlazadas: no se puede quitar. (Falta correr en Supabase la migración 0269, que deja quitarla si sus movimientos se anulan entre sí.)" };
   const { error } = await supabase.from("skus_maestros").delete().eq("id", id);
   if (error) return { error: "No se pudo quitar la variante." };
   await registrarAuditoria({ accion: "quitar_variante", entidad: "skus_maestros", entidadId: v.padre_id, detalle: v.codigo });

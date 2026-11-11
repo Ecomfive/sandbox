@@ -214,7 +214,7 @@ export function VariantesProducto({ producto, puedeEscribir, alAbrir }: { produc
   }
 
   function quitar(id: string, codigo: string) {
-    if (!confirm(`¿Quitar la variante ${codigo}? Solo se puede si todavía no tiene movimientos, compras ni fichas enlazadas.`)) return;
+    if (!confirm(`¿Quitar la variante ${codigo}? Se puede si no tiene stock, compras, fichas enlazadas ni compuestos. Si tuvo movimientos de inventario que se anulan entre sí (sumó y restó lo mismo), se borran con ella.`)) return;
     start(async () => {
       const r = await quitarVariante(id);
       if (r.error) mostrarToast(r.error, "destructive");
