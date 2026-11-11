@@ -10,7 +10,7 @@ import { pedirExtension, type AvanceLector, type SesionDropi } from "@/lib/dropi
 import { sesionCatalogoMx } from "@/lib/dropi-actualizar/partes";
 import { formatearFechaHora } from "@/lib/formato";
 import { BuscarIcon } from "@/lib/nav-icons";
-import { cdnDeRuta } from "@/lib/publicaciones/republicar-dropi";
+import { CDN_FOTOS_DROPI } from "@/lib/publicaciones/republicar-dropi";
 import { formatoNumero } from "../def-scraping";
 import { empezarDescubrir, fallarDescubrir, procesarDescubrir, seguirProveedor } from "./descubrir-actions";
 
@@ -38,7 +38,7 @@ export interface LecturaDescubrir {
 
 const esperar = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
 const sinAcentos = (t: string) => t.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
-const foto = (f: string | null) => (!f ? null : /^https?:\/\//i.test(f) ? f : `${cdnDeRuta(f)}/${encodeURI(f)}`);
+const foto = (f: string | null) => (!f ? null : /^https?:\/\//i.test(f) ? f : `${CDN_FOTOS_DROPI}/${encodeURI(f)}`);
 const VERSION_MINIMA = [0, 2, 0];
 const versionVieja = (v: string) => {
   const p = v.split(".").map(Number);

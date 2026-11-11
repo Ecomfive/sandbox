@@ -232,10 +232,10 @@ export function BusquedaGlobal({ paginas, acciones }: { paginas: PaginaBuscable[
         aria-haspopup="dialog"
         aria-keyshortcuts="Control+K Meta+K"
         onClick={abrir}
-        className={`flex min-h-8 items-center gap-2 rounded-full border border-border-control bg-background text-left text-sm text-muted-foreground hover:bg-muted max-sm:h-8 max-sm:w-8 max-sm:shrink-0 max-sm:justify-center sm:w-full sm:max-w-xs sm:py-1.5 sm:pr-2 sm:pl-3.5 ${anilloFoco}`}
+        className={`flex min-h-8 w-full max-w-xs items-center gap-2 rounded-full border border-border-control bg-background py-1.5 pr-2 pl-3.5 text-left text-sm text-muted-foreground hover:bg-muted ${anilloFoco}`}
       >
         <BuscarIcon className="h-4 w-4 shrink-0" />
-        <span className="min-w-0 flex-1 truncate max-sm:sr-only">Buscar retiro, pedido, página…</span>
+        <span className="min-w-0 flex-1 truncate">Buscar retiro, pedido, página…</span>
         <kbd aria-hidden="true" className="hidden rounded border border-border bg-card px-1.5 py-0.5 text-[0.65rem] font-medium md:block">
           {esMac ? "⌘ K" : "Ctrl K"}
         </kbd>

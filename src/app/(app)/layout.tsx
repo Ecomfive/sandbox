@@ -4,7 +4,6 @@ import { RUTA_PORTAL_PROVEEDOR, cuentaDeProveedor } from "@/lib/proveedor/cuenta
 import { BannerVistaPrevia } from "@/components/banner-vista-previa";
 import { BarraMigas } from "@/components/barra-migas";
 import { LatidoPresencia } from "@/components/latido-presencia";
-import { MedirPaginas } from "@/components/medir-paginas";
 import { AvisoInactividad } from "@/components/aviso-inactividad";
 import { ProveedorModulos } from "@/components/modulos-contexto";
 import { ProveedorPais } from "@/components/pais-contexto";
@@ -104,7 +103,6 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     <ProveedorDescargaPdf puede={!!usuario && PUEDEN_DESCARGAR_PDF.has(usuario.id)}>
     <ToastProvider>
       {usuario && <LatidoPresencia />}
-      {usuario && <MedirPaginas />}
       {usuario && avisoInactividad && <AvisoInactividad />}
       {usuario?.vistaPrevia && <BannerVistaPrevia rolNombre={usuario.vistaPrevia.rolNombre} />}
       <div className="flex min-h-full">

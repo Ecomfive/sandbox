@@ -11,9 +11,7 @@ test("el proveedor se elige de la lista", () => {
   const def = CAMPOS_EDITABLES.proveedor;
   assert.deepEqual(normalizarValor(def, "Zion"), { valor: "Zion" });
   assert.deepEqual(normalizarValor(def, ""), { valor: null });
-  assert.deepEqual(normalizarValor(def, " Otro  proveedor "), { valor: "Otro proveedor" }); // uno nuevo se agrega (mejora 52)
-  assert.deepEqual(normalizarValor(def, "shen zhen"), { valor: "Shen Zhen" });
-  assert.ok("error" in normalizarValor(def, "x".repeat(61)));
+  assert.ok("error" in normalizarValor(def, "Otro proveedor"));
 });
 
 test("el agente de envío se elige de la lista", () => {
@@ -22,7 +20,7 @@ test("el agente de envío se elige de la lista", () => {
   const def = CAMPOS_EDITABLES.agenteEnvio;
   assert.deepEqual(normalizarValor(def, "Shen Zhen"), { valor: "Shen Zhen" });
   assert.deepEqual(normalizarValor(def, ""), { valor: null });
-  assert.deepEqual(normalizarValor(def, "DHL"), { valor: "DHL" });
+  assert.ok("error" in normalizarValor(def, "DHL"));
 });
 
 test("proveedores y agentes tienen color propio, sin repetirse ni chocar con Etapa y Estado", () => {

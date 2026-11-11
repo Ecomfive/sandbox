@@ -1,10 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getUsuarioActual } from "@/lib/auth";
-import { HOSTS_CDN_DROPI } from "@/lib/publicaciones/republicar-dropi";
+import { CDN_FOTOS_DROPI } from "@/lib/publicaciones/republicar-dropi";
 import { detectarImagen } from "@/lib/seguridad/imagen";
 import { descargarPublico } from "@/lib/seguridad/url-externa";
 
 const MAX_BYTES = 15 * 1024 * 1024;
+const HOST_CDN = new URL(CDN_FOTOS_DROPI).host;
 
 /**
  * Una foto de un producto de Dropi, bajada por el servidor para el favorito «Aplicar en Dropi» (25 oct 2026). El CDN de Dropi
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest) {
   } catch {
     return new NextResponse("Dirección no válida", { status: 400 });
   }
-  if (url.protocol !== "https:" || !HOSTS_CDN_DROPI.includes(url.host) || !/^\/[a-z]+\/products\/\d+\/[^/]+$/i.test(url.pathname)) {
+  if (url.protocol !== "https:" || url.host !== HOST_CDN || !/^\/[a-z]+\/products\/\d+\/[^/]+$/i.test(url.pathname)) {
     return new NextResponse("Solo fotos de productos del CDN de Dropi", { status: 400 });
   }
 

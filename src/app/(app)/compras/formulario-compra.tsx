@@ -4,7 +4,6 @@ import { useEffect, useState, useTransition, type ReactNode } from "react";
 import { actualizarCompra, crearCompra, prepararSubidaFotoCompra, subirFotoCompraDesdeUrl, vistaPreviaCompra } from "./actions";
 import { numeroOC, otrosProductos } from "./def-compras";
 import { SelectorPais } from "./selector-pais";
-import { useListasCompras } from "./listas-compras";
 import { PastillaTienda, useTiendas } from "./tiendas";
 import { useRouter } from "next/navigation";
 import { EstimacionEnvio } from "./estimacion-envio";
@@ -104,7 +103,6 @@ export function FormularioCompra({
   etiquetas?: string[];
   colores?: Record<string, string>;
 }) {
-  const listas = useListasCompras();
   const [modificado, setModificado] = useState(false);
   const gestionTiendas = useTiendas();
   const router = useRouter();
@@ -375,12 +373,12 @@ export function FormularioCompra({
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <CampoGobernado clave="proveedor">
               <Campo etiqueta={conEmoji("proveedor", "Proveedor")} id="campo-proveedor">
-                <SelectorDeLista id="campo-proveedor" nombre="proveedor" opciones={PROVEEDORES_COMPRA} extras={listas.proveedores} vacio="Sin proveedor" valor={compra?.proveedor ?? proveedorInicial ?? ""} />
+                <SelectorDeLista id="campo-proveedor" nombre="proveedor" opciones={PROVEEDORES_COMPRA} vacio="Sin proveedor" valor={compra?.proveedor ?? proveedorInicial ?? ""} />
               </Campo>
             </CampoGobernado>
             <CampoGobernado clave="agente">
               <Campo etiqueta={conEmoji("agenteEnvio", "Agente de envío")} id="campo-agente-envio">
-                <SelectorDeLista id="campo-agente-envio" nombre="agente_envio" opciones={AGENTES_ENVIO} extras={listas.agentes} vacio="Sin agente" valor={compra?.agenteEnvio ?? proveedorInicial ?? ""} />
+                <SelectorDeLista id="campo-agente-envio" nombre="agente_envio" opciones={AGENTES_ENVIO} vacio="Sin agente" valor={compra?.agenteEnvio ?? proveedorInicial ?? ""} />
               </Campo>
             </CampoGobernado>
             <CampoGobernado clave="tienda">
@@ -509,44 +507,17 @@ export function FormularioCompra({
 
 /** Un dato de la compra que se elige de una lista (el proveedor, el agente de envío). Una compra vieja con otro valor lo sigue
  * mostrando como opción, para que guardar la ficha no lo borre. */
-function SelectorDeLista({
-  id,
-  nombre,
-  opciones,
-  extras = [],
-  vacio,
-  valor,
-}: {
-  id: string;
-  nombre: string;
-  opciones: readonly { valor: string; etiqueta: string }[];
-  extras?: string[];
-  vacio: string;
-  valor: string;
-}) {
-  // La lista fija, lo que ya se usó en otras compras y, si hace falta, uno nuevo escrito a mano (mejora 52).
-  const todas = [...opciones, ...extras.filter((x) => !opciones.some((o) => o.valor.toLowerCase() === x.toLowerCase())).map((x) => ({ valor: x, etiqueta: x }))];
-  const fuera = valor && !todas.some((p) => p.valor === valor) ? valor : null;
-  const [otro, setOtro] = useState(false);
-  if (otro)
-    return (
-      <span className="flex gap-2">
-        <input id={id} name={nombre} maxLength={60} autoFocus placeholder="Ej: Proveedor nuevo" className={fieldClass} />
-        <button type="button" onClick={() => setOtro(false)} className="shrink-0 text-sm text-muted-foreground underline-offset-2 hover:underline">
-          Volver a la lista
-        </button>
-      </span>
-    );
+function SelectorDeLista({ id, nombre, opciones, vacio, valor }: { id: string; nombre: string; opciones: readonly { valor: string; etiqueta: string }[]; vacio: string; valor: string }) {
+  const fuera = valor && !opciones.some((p) => p.valor === valor) ? valor : null;
   return (
-    <select id={id} name={nombre} defaultValue={valor} className={fieldClass} onChange={(e) => e.target.value === "__otro" && setOtro(true)}>
+    <select id={id} name={nombre} defaultValue={valor} className={fieldClass}>
       <option value="">{vacio}</option>
-      {todas.map((p) => (
+      {opciones.map((p) => (
         <option key={p.valor} value={p.valor}>
           {p.etiqueta}
         </option>
       ))}
       {fuera && <option value={fuera}>{fuera}</option>}
-      <option value="__otro">＋ Otro…</option>
     </select>
   );
 }

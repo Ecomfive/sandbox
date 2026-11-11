@@ -76,27 +76,3 @@ export function conciliarAlertas(productos: EstadoProducto[], vivas: { id: strin
     cerrar: vivas.filter((a) => conStock.has(a.clave)).map((a) => a.id),
   };
 }
-
-/** Días sin stock a partir de los cuales una alerta sin nada en camino ni en cotización es urgente (mejora 42). */
-export const DIAS_SIN_COMPRA = 3;
-
-/** Días enteros desde que se detectó, en hora de Panamá. */
-export function diasSinStock(detectadaEn: string, ahora: Date = new Date()): number {
-  const t = Date.parse(detectadaEn);
-  if (Number.isNaN(t)) return 0;
-  return Math.max(0, Math.floor((ahora.getTime() - t) / 86_400_000));
-}
-
-/**
- * Urgente = sigue sin stock (no cerrada), lleva `DIAS_SIN_COMPRA` días o más y no tiene ninguna compra en camino ni en cotización,
- * salvo que Compras ya decidió que hay inventario manual o que no se repone.
- */
-export function sinCompraUrgente(
-  a: { estado: string; detectadaEn: string; enCamino: number; cotizando: number; decision: Decision | null },
-  ahora: Date = new Date(),
-): boolean {
-  if (a.estado === "cerrada") return false;
-  if (a.decision === "inventario_manual" || a.decision === "no_reponer") return false;
-  if (a.enCamino > 0 || a.cotizando > 0) return false;
-  return diasSinStock(a.detectadaEn, ahora) >= DIAS_SIN_COMPRA;
-}

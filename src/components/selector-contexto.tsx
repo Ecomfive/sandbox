@@ -36,7 +36,7 @@ export function SelectorContexto({ pais, plataforma, plataformas, permitidos = n
   return (
     <MenuDesplegable
       etiqueta={`País y plataforma: ${nombrePais}, ${nombrePlataforma}`}
-      claseBoton={`inline-flex min-h-8 items-center justify-center gap-1.5 rounded-full border border-border-control bg-card py-1 text-sm hover:bg-muted max-sm:w-8 sm:px-3 ${pending ? "opacity-60" : ""}`}
+      claseBoton={`inline-flex min-h-8 items-center gap-1.5 rounded-full border border-border-control bg-card px-3 py-1 text-sm hover:bg-muted ${pending ? "opacity-60" : ""}`}
       contenidoBoton={
         <>
           {conBandera ? <Bandera codigo={pais} /> : <GloboIcon className="h-4 w-4 text-muted-foreground" />}
@@ -44,7 +44,7 @@ export function SelectorContexto({ pais, plataforma, plataformas, permitidos = n
             {nombrePais}
             <span className="text-muted-foreground"> · {nombrePlataforma}</span>
           </span>
-          <ChevronRightIcon className="h-3.5 w-3.5 rotate-90 text-muted-foreground max-sm:hidden" />
+          <ChevronRightIcon className="h-3.5 w-3.5 rotate-90 text-muted-foreground" />
         </>
       }
       claseMenu="w-64"

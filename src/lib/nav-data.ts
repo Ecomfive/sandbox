@@ -122,17 +122,12 @@ const AREAS: NavSection[] = [
       { label: "Pedidos de tienda", href: "/tienda-pedidos", frente: "tienda" },
       { label: "Productos de Shopify", href: "/tienda-productos", frente: "tienda" },
       { label: "Tiendas Shopify", href: "/tienda-tiendas", frente: "tienda" },
-      // Lo operativo de Shopify (confirmar, despachar, efectivo contra entrega, conexión de tiendas) vive en Operación; lo
-      // financiero (resumen, cuadre, importar) queda en Finanzas › Ventas por tienda. Mismo módulo de permisos.
-      { label: "Pipeline de tiendas", href: "/ventas-tiendas/pipeline", frente: "tienda" },
-      { label: "Órdenes de tiendas", href: "/ventas-tiendas/ordenes", frente: "tienda" },
       { label: "Alertas de inventario", href: "/alertas", dropi: true, frente: "fulfillment" },
       { label: "Inventario", href: "/inventario", dropi: true, frente: "fulfillment" },
       { label: "Bodegas", href: "/wms-bodegas", frente: "fulfillment" },
       { label: "Ubicaciones", href: "/wms-ubicaciones", frente: "fulfillment" },
       { label: "Compras", href: "/compras", frente: "fulfillment" },
       { label: "Producto", href: "/producto", frente: "fulfillment" },
-      { label: "Deliverys", href: "/deliverys", frente: "fulfillment" },
     ],
   },
   // Finanzas es el Portal AF4 360°: es de toda la empresa (consolida las tiendas de los tres frentes), así que no se reparte
@@ -262,7 +257,7 @@ export function paginaInicialDe(modulos: readonly string[], excluirModulo?: stri
 
 /** Clave de módulo (permisos) correspondiente a un href de navegación. */
 export function moduloDeHref(href: string): string {
-  return href === "/" ? "dashboard" : href.slice(1).split("/")[0];
+  return href === "/" ? "dashboard" : href.slice(1);
 }
 
 /**

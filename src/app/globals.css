@@ -154,13 +154,6 @@ body {
 
 /* El placeholder por defecto de Tailwind (texto al 50%) mide 3.4:1 sobre blanco; el mínimo es 4.5:1. */
 @layer base {
-  /* Una caja que se desplaza de lado contiene lo que va con posición absoluta adentro (un texto `sr-only` de una celda):
-     sin esto, ese texto se ubica respecto de la página y la ensancha aunque la tabla esté recortada en su caja.
-     En la capa base: una clase `absolute`, `sticky` o `fixed` del elemento sigue mandando. */
-  .overflow-x-auto,
-  .overflow-auto {
-    position: relative;
-  }
   ::placeholder {
     color: var(--muted-foreground);
     opacity: 1;

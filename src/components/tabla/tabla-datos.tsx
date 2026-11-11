@@ -274,7 +274,7 @@ export function TablaDatos<F, C = undefined>({
     <tr key={`${grupo.clave}-subtotal`} className="border-t border-border bg-muted/60 text-[13px] font-medium">
       {seleccion && <td className="w-10 px-2 py-2" />}
       {visibles_.map((c, i) => (
-        <td key={c.id} className={`border-r border-border/40 px-4 py-2 tabular-nums whitespace-nowrap ${c.clase ?? ""} ${c.total ? "" : "text-muted-foreground"}`}>
+        <td key={c.id} className={`border-r border-border/40 px-4 py-2 tabular-nums whitespace-nowrap ${c.total ? "" : "text-muted-foreground"}`}>
           {c.total ? c.total(grupo.filas) : i === 0 ? "Subtotal" : null}
         </td>
       ))}
@@ -296,8 +296,7 @@ export function TablaDatos<F, C = undefined>({
         ...(seleccion ? [{ contenido: null, clase: "w-10 px-2 py-3" }] : []),
         ...visibles_.map((c, i) => ({
           contenido: c.total ? c.total(resultado.filas) : i === 0 ? "Total" : null,
-          // Con la clase de la columna (su alineación): una cifra de total queda bajo las cifras de su columna.
-          clase: `${claseCeldaColumna} ${c.clase ?? ""} tabular-nums whitespace-nowrap`,
+          clase: `${claseCeldaColumna} tabular-nums whitespace-nowrap`,
         })),
         ...(accion ? [{ contenido: null, clase: "px-4 py-3" }] : []),
       ]

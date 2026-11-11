@@ -82,7 +82,7 @@ begin
   loop
     execute format('alter table notificaciones_usuario drop constraint %I', r.conname);
   end loop;
-  alter table notificaciones_usuario add constraint notificaciones_usuario_tipo_check check (tipo in ('mencion', 'proveedor', 'tarea', 'sin_stock', 'whatsapp', 'cierre')) not valid;
+  alter table notificaciones_usuario add constraint notificaciones_usuario_tipo_check check (tipo in ('mencion', 'proveedor', 'tarea', 'sin_stock', 'whatsapp', 'remision', 'cierre')) not valid;
 end $$;
 
 comment on table fin_obligaciones_fiscales is 'Portal AF4 360°: calendario fiscal de Panamá (qué se presenta, cada cuánto y cuándo vence).';

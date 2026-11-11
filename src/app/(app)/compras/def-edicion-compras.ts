@@ -21,8 +21,6 @@ export interface CampoEditable {
   soloSinProductos?: boolean;
   /** En una lista guardada como lista (la vía de envío, la tienda): se elige una sola. */
   unica?: boolean;
-  /** Una selección que también acepta un valor nuevo escrito a mano (el proveedor, el agente de envío; mejora 52). */
-  libre?: boolean;
   /** En un sí/no: cómo se llama cada lado («Venta de importación» / «Proveeduría»); por defecto «Sí» y «No». */
   siNo?: { si: string; no: string };
 }
@@ -37,8 +35,8 @@ export const CAMPOS_EDITABLES: Record<string, CampoEditable> = {
   etapa: { etiqueta: "Etapa", prop: "etapa", columna: "etapa", tipo: "seleccion", opciones: ETAPAS_COMPRA, color: colorEtapa },
   estado: { etiqueta: "Estado", prop: "estado", columna: "estado", tipo: "seleccion", opciones: ESTADOS_COMPRA, color: colorEstado },
   viaEnvio: { etiqueta: "Vía de envío", prop: "viaEnvio", columna: "via_envio", tipo: "multiple", opciones: VIAS_ENVIO, unica: true, admiteVacio: true },
-  proveedor: { etiqueta: "Proveedor", prop: "proveedor", columna: "proveedor", tipo: "seleccion", opciones: PROVEEDORES_COMPRA, admiteVacio: true, libre: true, color: colorProveedor },
-  agenteEnvio: { etiqueta: "Agente de envío", prop: "agenteEnvio", columna: "agente_envio", tipo: "seleccion", opciones: AGENTES_ENVIO, admiteVacio: true, libre: true, color: colorAgente },
+  proveedor: { etiqueta: "Proveedor", prop: "proveedor", columna: "proveedor", tipo: "seleccion", opciones: PROVEEDORES_COMPRA, admiteVacio: true, color: colorProveedor },
+  agenteEnvio: { etiqueta: "Agente de envío", prop: "agenteEnvio", columna: "agente_envio", tipo: "seleccion", opciones: AGENTES_ENVIO, admiteVacio: true, color: colorAgente },
   ventaImportacion: {
     etiqueta: "Tipo de venta",
     prop: "ventaImportacion",
@@ -109,11 +107,6 @@ export function normalizarValor(def: CampoEditable, bruto: unknown): { valor: Va
     case "seleccion": {
       if (vacio) return def.admiteVacio ? { valor: null } : { error: `Elige ${def.etiqueta.toLowerCase()}.` };
       const valor = String(bruto);
-      if (def.libre) {
-        const texto = valor.trim().replace(/\s+/g, " ");
-        if (!texto || texto.length > 60 || /[|<>]/.test(texto)) return { error: `${def.etiqueta}: hasta 60 caracteres, sin | ni < >.` };
-        return { valor: def.opciones?.find((o) => o.valor.toLowerCase() === texto.toLowerCase())?.valor ?? texto };
-      }
       return def.opciones?.some((o) => o.valor === valor) ? { valor } : { error: `${def.etiqueta} no es válida.` };
     }
     case "multiple": {

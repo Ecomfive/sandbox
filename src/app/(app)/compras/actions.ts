@@ -114,8 +114,8 @@ function leerCambios(formData: FormData) {
   return {
     foto_url: textoOptativo(formData, "foto_url"),
     // De la lista (`PROVEEDORES_COMPRA`); una compra vieja con otro proveedor lo conserva tal cual.
-    proveedor: proveedorDeLista(textoOptativo(formData, "proveedor")?.slice(0, 60) ?? null),
-    agente_envio: agenteDeLista(textoOptativo(formData, "agente_envio")?.slice(0, 60) ?? null),
+    proveedor: proveedorDeLista(textoOptativo(formData, "proveedor")),
+    agente_envio: agenteDeLista(textoOptativo(formData, "agente_envio")),
     venta_importacion: formData.get("venta_importacion") === "si",
     // Una sola tienda por orden (se guarda como lista por las de antes).
     tiendas: listaDeTexto(textoOptativo(formData, "tiendas")).slice(0, 1),

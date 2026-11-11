@@ -70,10 +70,10 @@ export function MenuCrear({ acciones }: { acciones: AccionCrear[] }) {
             setAbierto(true);
           }
         }}
-        className={`inline-flex min-h-8 items-center justify-center gap-1 rounded-full boton-neon py-1 text-sm font-medium text-white max-sm:w-8 sm:px-3 ${anilloFoco}`}
+        className={`inline-flex min-h-8 items-center gap-1 rounded-full boton-neon px-3 py-1 text-sm font-medium text-white ${anilloFoco}`}
       >
-        <MasIcon className="h-4 w-4" aria-hidden="true" />
-        <span className="max-sm:sr-only">Crear</span>
+        <MasIcon className="h-4 w-4" />
+        Crear
       </button>
       {abierto && (
         <div
