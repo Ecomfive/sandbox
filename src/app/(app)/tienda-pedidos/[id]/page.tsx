@@ -7,8 +7,10 @@ import { requireModulo } from "@/lib/auth";
 import { formatearFechaHora, formatearMoneda } from "@/lib/formato";
 import { getPaisActual } from "@/lib/pais";
 import { createServiceClient } from "@/lib/supabase/server";
+import { nombreComparable } from "@/lib/tienda/ordenes-finanzas";
 import { ESTADOS_PEDIDO, esEstadoPedido } from "@/lib/tienda/resumen";
 import { tituloVariante } from "@/lib/tienda/vincular-variante";
+import { DetalleOrdenFinanzas, type LineaOrdenFinanzas, type OrdenFinanzas } from "./detalle-finanzas";
 import { NotaPedido } from "./nota-pedido";
 
 export const metadata = { title: "Pedido de tienda" };
@@ -53,8 +55,28 @@ export default async function PedidoTiendaPage({ params }: { params: Promise<{ i
     .eq("id", id)
     .maybeSingle();
   const tienda = (p?.tiendas ?? null) as unknown as { nombre: string; dominio: string | null; pais_id: string } | null;
+  // Una tienda sin conectar muestra las órdenes de Finanzas (11 nov 2026): si no es un pedido de Shopify, puede ser una de ellas.
+  if (!p) {
+    const { data: o } = await supabase
+      .from("ven_ordenes")
+      .select(
+        "numero, fecha, estado_entrega, etiquetas, subtotal, descuento, envio, total, estado_pago, forma_pago_texto, transportista, guia, fecha_envio, fecha_devolucion, resultado_courier, motivo_cancelacion, origen, fin_unidades(nombre, pais_id, clase)",
+      )
+      .eq("id", id)
+      .maybeSingle();
+    const unidad = (o?.fin_unidades ?? null) as unknown as { nombre: string; pais_id: string; clase: string } | null;
+    // Solo las órdenes de tiendas del país elegido arriba.
+    if (!o || !unidad || unidad.clase !== "tienda" || unidad.pais_id !== pais.id) notFound();
+    const [{ data: lineasFin }, { data: tiendasPais }] = await Promise.all([
+      supabase.from("ven_orden_lineas").select("linea, producto, cantidad, precio, es_servicio, skus_maestros(codigo, nombre)").eq("orden_id", id).order("linea"),
+      supabase.from("tiendas").select("nombre").eq("pais_id", pais.id),
+    ]);
+    // El nombre como está en Tiendas («Kenku»), no el de Finanzas («KENKU»).
+    const nombre = (tiendasPais ?? []).find((t) => nombreComparable(t.nombre as string) === nombreComparable(unidad.nombre))?.nombre ?? unidad.nombre;
+    return <DetalleOrdenFinanzas o={o as unknown as OrdenFinanzas} lineas={(lineasFin ?? []) as unknown as LineaOrdenFinanzas[]} tienda={nombre as string} codigoPais={pais.codigo} />;
+  }
   // Solo los pedidos de las tiendas del país elegido arriba.
-  if (!p || !tienda || tienda.pais_id !== pais.id) notFound();
+  if (!tienda || tienda.pais_id !== pais.id) notFound();
 
   const [{ data: lineas }, { data: notas }] = await Promise.all([
     supabase.from("tienda_pedido_lineas").select("id, shopify_variante_id, titulo, variante_titulo, sku, cantidad, precio").eq("pedido_id", id).order("shopify_linea_id"),
