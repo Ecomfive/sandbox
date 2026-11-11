@@ -17,6 +17,7 @@ import { formatearTiempoRelativo } from "@/lib/formato";
 import type { Ambito } from "@/lib/imagen/buscar";
 import { BuscarIcon, CamaraIcon, ChevronRightIcon, MasIcon, PapeleraIcon } from "@/lib/nav-icons";
 import { FichaStock } from "../ficha-stock";
+import type { StockPlataformas } from "@/lib/wms/stock-plataformas";
 import { guardarLevantamiento } from "./actions";
 import { ImportarLista } from "./importar-lista";
 import { LineasCajas, unidadesFormulario, type LineaCajasForm, type UbicacionConteo } from "./lineas-cajas";
@@ -25,6 +26,8 @@ import { codigoLote, PEDIR_CODIGO_LOTE } from "@/lib/wms/vencimiento";
 
 export interface ProductoConteo {
   id: string;
+  /** Lo que tiene en las plataformas del país (Dropi B280, Effi, Drop…), para la ficha; `null` si no tiene. */
+  plataformas?: StockPlataformas | null;
   codigo: string;
   nombre: string;
   clase: string;
@@ -791,6 +794,7 @@ export function Levantamiento({
         puedeEscribir={false}
         puedeComentar={puedeEscribir}
         codigoPais={codigoPais}
+        conPlataformas
         alCerrar={() => setFicha(null)}
         alCambiar={() => router.refresh()}
       />

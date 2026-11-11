@@ -6,6 +6,7 @@ import { pideMotivo, puedeMoverAMano } from "@/lib/wms/recepcion";
 import { getPaisActual } from "@/lib/pais";
 import { createServiceClient } from "@/lib/supabase/server";
 import { traerTodasConError } from "@/lib/supabase/paginar";
+import { leerStockPlataformas } from "../datos-plataformas";
 import { Levantamiento, type ProductoConteo } from "./levantamiento";
 
 export const metadata = { title: "Levantamiento" };
@@ -37,7 +38,7 @@ export default async function LevantamientoPage({ searchParams }: { searchParams
   const pedida = typeof bodega === "string" && ES_ID(bodega) ? bodega : "";
   const elegida = bodegas.some((b) => b.id === pedida) ? pedida : (bodegas[0]?.id ?? "");
 
-  const [productos, padres, stock, lotes, ultimo] = await Promise.all([
+  const [productos, padres, stock, lotes, ultimo, plataformas] = await Promise.all([
     traerTodasConError<{ id: string; codigo: string; nombre: string; clase: string | null; maneja_vencimiento: boolean | null; foto_url: string | null; numero: number | null; codigo_barras: string | null; padre_id: string | null; opciones: Record<string, string> | null }>((d, h) =>
       supabase.from("skus_maestros").select("id, codigo, nombre, clase, maneja_vencimiento, foto_url, numero, codigo_barras, padre_id, opciones").neq("tipo", "combo").neq("clase", "test").is("opciones_variantes", null).order("codigo").range(d, h),
     ),
@@ -56,6 +57,8 @@ export default async function LevantamientoPage({ searchParams }: { searchParams
     elegida
       ? supabase.from("wms_conteos").select("creado_en, referencia, productos").eq("bodega_id", elegida).order("creado_en", { ascending: false }).limit(1).maybeSingle()
       : Promise.resolve({ data: null }),
+    // Lo que hay en Dropi (B280), Effi y Drop del país, para «Stock por bodega» de la ficha (11 nov 2026, pedido de Hernán). Si falla, la ficha sale sin eso.
+    leerStockPlataformas(supabase, pais.id).catch(() => null),
   ]);
 
   const enBodega = new Map((stock.data ?? []).map((s) => [s.sku_maestro_id, Number(s.fisico)]));
@@ -94,6 +97,7 @@ export default async function LevantamientoPage({ searchParams }: { searchParams
     enSistema: enBodega.get(p.id) ?? 0,
     lotes: lotesPorSku.get(p.id) ?? [],
     cajas: cajasPorSku.get(p.id) ?? [],
+    plataformas: plataformas?.porProducto.get(p.id) ?? null,
   }));
   const ultimoConteo = ultimo.data as { creado_en: string; referencia: string | null; productos: number } | null;
 
