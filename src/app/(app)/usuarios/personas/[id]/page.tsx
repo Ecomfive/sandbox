@@ -116,7 +116,7 @@ export default async function PersonaPage({ params }: { params: Promise<{ id: st
             roles={roles.map((r) => ({ id: r.id, nombre: r.nombre }))}
             rolId={perfil.rol_id}
             lista={lista}
-            modulosConPropio={[...propiosPorModulo.keys()]}
+            efectivos={efectivos}
             nivelesDelRol={delRol}
             ajustesTotales={ajustesTotales}
             puedeEscribir={puedeEscribir}

@@ -317,7 +317,9 @@ convenciones técnicas del código.
   acciones (`permisos-actions.ts`) devuelven `{ error }`, exigen poder modificar Usuarios y roles y **no dejan que alguien se quite a sí
   misma la edición de Usuarios y roles**. El rol tiene `color` (`color-rol.ts`) y se puede duplicar, copiar de otro o crear desde otro.
   *Persona* (`/usuarios/personas/[id]`, ya no es un panel): rol base, **permisos propios** (`permisos_persona`: sin acceso, lectura o
-  edición por módulo, mandan sobre el rol; igual al del rol no se guarda), países, puestos, alta y datos, y «Acceso efectivo»
+  edición por módulo, mandan sobre el rol; igual al del rol no se guarda; **desde el 11 nov 2026 se editan en la misma matriz del rol**,
+  `matriz-persona.tsx` con `fijarNivelPersonaLote` —botones por área y «Como el rol», marca «Propio» y «Volver al rol», filtro «Propios»—, pedido de
+  Hernán para organizar Finanzas), países, puestos, alta y datos, y «Acceso efectivo»
   (`src/lib/permisos/acceso.ts`: `nivelesEfectivos`, `diferencias`). «Ver así» ahora también va por persona (cookie `<dueno>:p-<persona>`).
   **Afinar** (`/usuarios/roles/[id]/afinar/[modulo]` y `/usuarios/personas/[id]/afinar/[modulo]`, `afinar/afinar-modulo.tsx`): dentro de un
   módulo que tiene catálogo (`CATALOGO_COMPRAS`; **solo Compras por ahora**; los demás módulos se dan o se quitan completos) se decide qué

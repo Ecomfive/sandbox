@@ -274,6 +274,49 @@ export async function fijarNivelPersona(perfilId: string, modulo: string, nivel:
   return {};
 }
 
+/**
+ * El nivel de uno o varios módulos de una persona (la matriz de su ficha y los botones de cada área, 11 nov 2026, pedido de Hernán: «cambiarlo por
+ * persona, con el panel como el del rol»). Lo que queda igual a lo que da su rol no se guarda (se borra su permiso propio); lo demás queda propio.
+ * No toca lo afinado dentro de cada módulo.
+ */
+export async function fijarNivelPersonaLote(perfilId: string, modulos: string[], nivel: Nivel): Promise<Resultado> {
+  const usuario = await exigir();
+  if (fallo(usuario)) return usuario;
+  if (!esUuid(perfilId)) return { error: "Persona no válida." };
+  if (!NIVELES.includes(nivel)) return { error: "Nivel no válido." };
+  if (!Array.isArray(modulos) || modulos.length === 0 || modulos.length > MODULOS_ACCESO.length || !modulos.every((m) => CLAVES_MODULO.has(m))) return { error: "Módulo no válido." };
+  const unicos = [...new Set(modulos)];
+  if (usuario.id === perfilId && unicos.includes("usuarios") && nivel !== "w") return { error: SE_QUEDARIA_FUERA };
+
+  const supabase = createServiceClient();
+  const { data: persona } = await supabase.from("perfiles").select("nombre, email, rol_id").eq("id", perfilId).maybeSingle();
+  if (!persona) return { error: "Esa persona ya no existe." };
+  const { data: delRolFilas } = persona.rol_id ? await supabase.from("permisos_rol").select("modulo, solo_lectura").eq("rol_id", persona.rol_id).in("modulo", unicos) : { data: [] };
+  const delRol = new Map((delRolFilas ?? []).map((f) => [f.modulo as string, (f.solo_lectura ? "r" : "w") as Nivel]));
+  const igualAlRol = unicos.filter((m) => (delRol.get(m) ?? "n") === nivel);
+  const propios = unicos.filter((m) => (delRol.get(m) ?? "n") !== nivel);
+  const falta = (m: string) => (m.includes("permisos_persona") ? "Falta correr la migración 0118 en Supabase." : m);
+  if (igualAlRol.length) {
+    const { error } = await supabase.from("permisos_persona").delete().eq("perfil_id", perfilId).in("modulo", igualAlRol);
+    if (error) return { error: falta(error.message) };
+  }
+  if (propios.length) {
+    const { error } = await supabase.from("permisos_persona").upsert(
+      propios.map((modulo) => ({ perfil_id: perfilId, modulo, nivel: propioDeNivel(nivel) })),
+      { onConflict: "perfil_id,modulo" },
+    );
+    if (error) return { error: falta(error.message) };
+  }
+  await registrarAuditoria({
+    accion: "cambiar_permiso_persona",
+    entidad: "perfiles",
+    entidadId: perfilId,
+    detalle: `${persona.nombre ?? persona.email}: ${unicos.length === 1 ? etiquetaDeModulo(unicos[0]) : `${unicos.length} módulos`} → ${textoNivel(nivel)}${igualAlRol.length === unicos.length ? " (lo que da su rol)" : ""}`,
+  });
+  refrescar();
+  return {};
+}
+
 /** Quita todo lo propio de la persona en un módulo: su permiso y lo que había afinado. */
 export async function quitarAjustesPersona(perfilId: string, modulo: string): Promise<Resultado> {
   const usuario = await exigir();
