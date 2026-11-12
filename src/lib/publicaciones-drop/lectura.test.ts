@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { fotoDeDrop, leerFechaDrop, leerInventarioDrop, leerPrecioDrop, margenDrop, nombreComparable, normalizarFilaDrop, publicacionesDeLectura } from "./lectura";
+import { fotoDeDrop, leerExclusivosDrop, leerFechaDrop, leerInventarioDrop, leerPrecioDrop, margenDrop, nombreComparable, normalizarFilaDrop, publicacionesDeLectura, unidadesExclusivas } from "./lectura";
 
 const fila = {
   dropId: "6ae5e72d907fa0ea62f7ff79",
@@ -61,8 +61,25 @@ describe("lectura de Drop", () => {
       inventario: 494,
       creadoEnDrop: "2026-10-31T14:03:00.000Z",
       fotoUrl: "https://storage.googleapis.com/boxful-drop-shipping-dev/6ae5-foto",
+      exclusivos: null,
     });
     assert.equal(normalizarFilaDrop({ ...fila, estado: "Inactivo" })?.estado, "inactivo");
+  });
+
+  it("lee los exclusivos de la ficha (Aceite Magic: 144 para Nuvo Costa Rica) y suma solo los activos", () => {
+    const l = leerExclusivosDrop([
+      { cliente: "Nuvo Costa Rica", variante: null, cantidad: 144, activo: true },
+      { cliente: "Tuanis Store CR", variante: null, cantidad: 0, activo: true },
+      { cliente: "Otro", variante: "Rojo", cantidad: "7", activo: false },
+      { cliente: "Raro", cantidad: -5 },
+      "basura",
+    ]);
+    assert.equal(l?.length, 4);
+    assert.deepEqual(l?.[2], { cliente: "Otro", variante: "Rojo", cantidad: 7, activo: false });
+    assert.equal(l?.[3].cantidad, 0);
+    assert.equal(unidadesExclusivas(l ?? []), 144);
+    assert.equal(leerExclusivosDrop(undefined), null, "una lectura vieja no trae exclusivos: se conserva lo que había");
+    assert.equal(normalizarFilaDrop({ ...fila, exclusivos: [{ cliente: "A", cantidad: 3, activo: true }] })?.exclusivos?.length, 1);
   });
 
   it("descarta lo que no es una fila de Drop", () => {

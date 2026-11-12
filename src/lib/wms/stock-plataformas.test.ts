@@ -8,6 +8,13 @@ const prod = (dropi_producto_id: number, bodegas: { id: number; stock: number }[
 const effi = (sku: string | null, stock_principal: number, stock_garantias = 0, en_effi = true) => ({ sku_maestro_id: sku, effi_id: 7, nombre: "E", stock_principal, stock_garantias, en_effi, ultima_vez: null });
 const drop = (sku: string | null, inventario: number | null, en_drop = true) => ({ sku_maestro_id: sku, codigo: "D1", nombre: "D", inventario, en_drop, ultima_vez: null });
 
+test("Drop suma su inventario y los exclusivos de clientes, y lo dice en la línea", () => {
+  const { porProducto } = armarStockPlataformas({ ...vacio, drop: [{ ...drop("magic", 0), inventario_exclusivo: 144 }, { ...drop("b", 10), inventario_exclusivo: null }] });
+  assert.equal(porProducto.get("magic")?.drop, 144);
+  assert.equal(porProducto.get("magic")?.lineas[0].exclusivo, 144);
+  assert.equal(porProducto.get("b")?.drop, 10);
+});
+
 test("junta las tres plataformas por producto", () => {
   const { porProducto } = armarStockPlataformas({ ...vacio, dropi: [pub("a", "1001")], productosDropi: [prod(1001, [{ id: 15, stock: 100 }])], effi: [effi("a", 30)], drop: [drop("a", 44)] });
   const a = porProducto.get("a");

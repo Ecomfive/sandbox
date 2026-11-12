@@ -21,6 +21,16 @@ export interface FilaLeidaDrop {
   creado: string;
   /** El `src` de la foto: la dirección de la imagen o `/_next/image?url=…`. */
   foto: string | null;
+  /** «Producto exclusivo» de su ficha (extensión 0.7.2): lo que Drop guarda aparte para cada cliente; null si no se pudo leer, ausente en lecturas viejas. */
+  exclusivos?: unknown;
+}
+
+/** Lo que Drop guarda aparte para un cliente: no entra en el «Inventario» de la tabla, pero es stock nuestro en la bodega de Drop. */
+export interface ExclusivoDrop {
+  cliente: string;
+  variante: string | null;
+  cantidad: number;
+  activo: boolean;
 }
 
 /** Una publicación de Drop ya revisada, lista para guardar. */
@@ -35,7 +45,23 @@ export interface PublicacionLeidaDrop {
   inventario: number | null;
   creadoEnDrop: string | null;
   fotoUrl: string | null;
+  /** Los exclusivos leídos (null = la lectura no los trajo: se conserva lo que había). */
+  exclusivos: ExclusivoDrop[] | null;
 }
+
+/** Los exclusivos de una fila, revisados: cliente, variante, unidades (entero ≥ 0) y si está activo; null si no vinieron. */
+export function leerExclusivosDrop(v: unknown): ExclusivoDrop[] | null {
+  if (!Array.isArray(v)) return null;
+  return v.slice(0, 200).flatMap((x) => {
+    if (!x || typeof x !== "object") return [];
+    const o = x as Record<string, unknown>;
+    const cantidad = Math.max(0, Math.floor(Number(o.cantidad) || 0));
+    return [{ cliente: texto(o.cliente, 120), variante: texto(o.variante, 120) || null, cantidad, activo: o.activo !== false }];
+  });
+}
+
+/** Las unidades exclusivas que cuentan como stock: las de los exclusivos activos. */
+export const unidadesExclusivas = (l: ExclusivoDrop[]): number => l.filter((x) => x.activo).reduce((t, x) => t + x.cantidad, 0);
 
 const texto = (v: unknown, max = 300): string => (typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, max) : "");
 
@@ -110,6 +136,7 @@ export function normalizarFilaDrop(o: unknown): PublicacionLeidaDrop | null {
     inventario: leerInventarioDrop(texto(f.inventario, 40)),
     creadoEnDrop: leerFechaDrop(texto(f.creado, 60)),
     fotoUrl: fotoDeDrop(typeof f.foto === "string" ? f.foto : null),
+    exclusivos: leerExclusivosDrop(f.exclusivos),
   };
 }
 

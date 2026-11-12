@@ -325,6 +325,7 @@ export function FichaStock({
                               · {l.id} · {l.nombre}
                             </span>
                             {l.aparte !== 0 && <span className="text-muted-foreground"> · {l.aparte.toLocaleString("es-PA")} u. {l.plataforma === "effi" ? "en garantías" : "en otra bodega (referencial)"}</span>}
+                            {!!l.exclusivo && <span className="text-muted-foreground"> · {l.exclusivo.toLocaleString("es-PA")} u. exclusivas de clientes</span>}
                           </span>
                           <span className="tabular-nums">{l.unidades.toLocaleString("es-PA")} u.</span>
                         </li>

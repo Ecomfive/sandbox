@@ -26,7 +26,7 @@ export async function cargarVentasPlataforma(supabase: SupabaseClient, paisId: s
         )
       : plataforma === "drop"
       ? traerTodasConError<Record<string, unknown>>((d, h) =>
-          supabase.from("drop_publicaciones").select("drop_id, codigo, nombre, inventario, en_drop, skus_maestros!sku_maestro_id(codigo, nombre, numero, codigo_barras)").eq("pais_id", paisId).order("id").range(d, h),
+          supabase.from("drop_publicaciones").select("drop_id, codigo, nombre, inventario, inventario_exclusivo, en_drop, skus_maestros!sku_maestro_id(codigo, nombre, numero, codigo_barras)").eq("pais_id", paisId).order("id").range(d, h),
         )
       : traerTodasConError<Record<string, unknown>>((d, h) =>
           supabase.from("effi_publicaciones").select("effi_id, nombre, stock_principal, en_effi, skus_maestros!sku_maestro_id(codigo, nombre, numero, codigo_barras)").eq("pais_id", paisId).order("id").range(d, h),
@@ -37,7 +37,7 @@ export async function cargarVentasPlataforma(supabase: SupabaseClient, paisId: s
     plataforma === "dunamixfy"
       ? { idPlataforma: String(x.dunamixfy_id), nombre: String(x.nombre ?? x.dunamixfy_id), etiqueta: `#${x.dunamixfy_id}`, stock: Number(x.stock ?? 0), activa: x.en_dunamixfy !== false, sku: skuDe(x.skus_maestros) }
       : plataforma === "drop"
-      ? { idPlataforma: String(x.drop_id), nombre: String(x.nombre ?? x.drop_id), etiqueta: String(x.codigo || x.drop_id), stock: Number(x.inventario ?? 0), activa: x.en_drop !== false, sku: skuDe(x.skus_maestros) }
+      ? { idPlataforma: String(x.drop_id), nombre: String(x.nombre ?? x.drop_id), etiqueta: String(x.codigo || x.drop_id), stock: Number(x.inventario ?? 0) + Number(x.inventario_exclusivo ?? 0), activa: x.en_drop !== false, sku: skuDe(x.skus_maestros) }
       : { idPlataforma: String(x.effi_id), nombre: String(x.nombre ?? x.effi_id), etiqueta: `ID ${x.effi_id}`, stock: Number(x.stock_principal ?? 0), activa: x.en_effi !== false, sku: skuDe(x.skus_maestros) },
   );
   return armarVentasPlataforma(
