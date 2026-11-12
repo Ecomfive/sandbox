@@ -8,16 +8,20 @@ import { formatearMoneda } from "@/lib/formato";
 import { AlertaIcon, CalendarioIcon, CerrarIcon, CheckIcon, ChatIcon } from "@/lib/nav-icons";
 import { ETAPAS_CONFIRMACION, META_CONFIRMACION, etapaConfirmacion, resumirConfirmacion, tiempoEsperando, type EtapaConfirmacion } from "@/lib/tienda/confirmacion";
 import type { PedidoFila } from "@/lib/tienda/datos";
+import { diasHasta } from "@/lib/tienda/programado";
+import { columnaProgramado } from "../tienda-pedidos/columnas-extra";
 import { FichaPedido } from "../tienda-pedidos/ficha-pedido";
 import { COLUMNAS, ICONOS, NOMBRE, defPedidos, type Contexto } from "../tienda-pedidos/pedidos-tienda";
 
 const ETAPA = new Map(ETAPAS_CONFIRMACION.map((e) => [e.id, e]));
 const TONO: Record<EtapaConfirmacion, "aviso" | "neutro" | "exito" | "peligro"> = { por_confirmar: "aviso", esperando: "neutro", confirmado: "exito", cancelado: "peligro" };
 
-type Vista = "sin_confirmar" | "por_confirmar" | "esperando" | "confirmado" | "cancelado";
+type Vista = "sin_confirmar" | "por_confirmar" | "esperando" | "programado" | "confirmado" | "cancelado";
+
 
 /** Las columnas de Pedidos, con «Espera» (cuánto lleva sin confirmar) y «Confirmación» en lugar de «Estado». */
-function columnasConfirmacion(ahora: number, multiTienda: boolean): ColumnaTabla<PedidoFila, Contexto>[] {
+function columnasConfirmacion(ahora: number, hoy: string, multiTienda: boolean): ColumnaTabla<PedidoFila, Contexto>[] {
+  const programado = columnaProgramado(hoy);
   const espera: ColumnaTabla<PedidoFila, Contexto> = {
     id: "espera",
     label: "Espera",
@@ -38,7 +42,7 @@ function columnasConfirmacion(ahora: number, multiTienda: boolean): ColumnaTabla
   const base = COLUMNAS.filter((c) => (multiTienda || c.id !== "tienda") && c.id !== "estado");
   const i = base.findIndex((c) => c.id === "fecha") + 1;
   const j = base.findIndex((c) => c.id === "total") + 1;
-  return [...base.slice(0, i), espera, ...base.slice(i, j), confirmacion, ...base.slice(j)];
+  return [...base.slice(0, i), espera, programado, ...base.slice(i, j), confirmacion, ...base.slice(j)];
 }
 
 /**
@@ -47,20 +51,26 @@ function columnasConfirmacion(ahora: number, multiTienda: boolean): ColumnaTabla
  */
 export function ConfirmacionTienda({
   sinConfirmar,
+  programados,
   delPeriodo,
   periodo,
   codigoPais,
   tiendas,
   ahora,
+  hoy,
 }: {
   /** Los pedidos sin confirmar (de todo el tiempo que se mira), lo más viejo primero. */
   sinConfirmar: PedidoFila[];
+  /** Los que todavía no salen y tienen fecha en la nota, por fecha. */
+  programados: PedidoFila[];
   /** Todos los pedidos del periodo elegido (para confirmados, cancelados y la tasa). */
   delPeriodo: PedidoFila[];
   periodo: string;
   codigoPais: string;
   tiendas: Record<string, string>;
   ahora: number;
+  /** Hoy en Panamá (AAAA-MM-DD). */
+  hoy: string;
 }) {
   const router = useRouter();
   const [vista, setVista] = useState<Vista>("sin_confirmar");
@@ -74,9 +84,12 @@ export function ConfirmacionTienda({
     if (vista === "sin_confirmar") return sinConfirmar;
     if (vista === "por_confirmar") return porConfirmar;
     if (vista === "esperando") return esperando;
+    if (vista === "programado") return programados;
     return delPeriodo.filter((p) => etapaConfirmacion(p) === vista);
-  }, [vista, sinConfirmar, porConfirmar, esperando, delPeriodo]);
-  const columnas = useMemo(() => columnasConfirmacion(ahora, multiTienda), [ahora, multiTienda]);
+  }, [vista, sinConfirmar, porConfirmar, esperando, programados, delPeriodo]);
+  const columnas = useMemo(() => columnasConfirmacion(ahora, hoy, multiTienda), [ahora, hoy, multiTienda]);
+  const sePasaron = programados.filter((p) => diasHasta(p.programado!.fecha, hoy) < 0).length;
+  const paraHoy = programados.filter((p) => diasHasta(p.programado!.fecha, hoy) === 0).length;
   const def = useMemo(() => ({ ...defPedidos(tiendas), clave: "tienda-confirmacion" }), [tiendas]);
   const contexto = useMemo(() => ({ codigoPais, tiendas }), [codigoPais, tiendas]);
   const num = (n: number) => n.toLocaleString("es-PA");
@@ -108,7 +121,11 @@ export function ConfirmacionTienda({
 
   const barra = r.tasa === null ? 0 : Math.min(100, r.tasa);
   const vacio =
-    vista === "sin_confirmar" || vista === "por_confirmar" || vista === "esperando" ? "No hay pedidos sin confirmar. ¡Al día!" : `No hay pedidos así en ${periodo}.`;
+    vista === "programado"
+      ? "No hay pedidos programados: salen cuando la nota del pedido dice para qué día los quiere el cliente."
+      : vista === "sin_confirmar" || vista === "por_confirmar" || vista === "esperando"
+        ? "No hay pedidos sin confirmar. ¡Al día!"
+        : `No hay pedidos así en ${periodo}.`;
 
   return (
     <div className="flex flex-col gap-5">
@@ -132,7 +149,16 @@ export function ConfirmacionTienda({
           alPulsar={() => alternar("esperando")}
           activo={vista === "esperando"}
         />
-        <Indicador titulo="Programados" icono={CalendarioIcon} color="azul" valor="—" detalle="llegan al conectar WhatsApp" />
+        <Indicador
+          titulo="Programados"
+          icono={CalendarioIcon}
+          color="azul"
+          punto={sePasaron ? "peligro" : paraHoy ? "aviso" : undefined}
+          valor={num(programados.length)}
+          detalle={programados.length ? `${num(sePasaron)} se pasaron · ${num(paraHoy)} para hoy` : "con fecha en la nota del pedido"}
+          alPulsar={() => alternar("programado")}
+          activo={vista === "programado"}
+        />
         <Indicador titulo="Confirmados" icono={CheckIcon} color="verde" valor={num(r.porEtapa.confirmado)} detalle={`${pct(r.tasa)} · ${periodo}`} alPulsar={() => alternar("confirmado")} activo={vista === "confirmado"} />
         <Indicador titulo="Cancelados" icono={CerrarIcon} color="rojo" valor={num(r.porEtapa.cancelado)} detalle={`${pct(r.cancelacion)} · ${periodo}`} alPulsar={() => alternar("cancelado")} activo={vista === "cancelado"} />
       </TableroIndicadores>
