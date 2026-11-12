@@ -189,6 +189,14 @@ table.tabla-datos[data-aspecto="lista"] thead th {
   letter-spacing: 0;
   font-weight: 500;
 }
+/* Encabezado en mayúsculas y un poco más grande, también en una lista (Pedidos de tienda, 12 nov 2026: como Mi Reto Digital). */
+table.tabla-datos[data-aspecto][data-encabezado="mayusculas"] thead th {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted-foreground);
+}
 table.tabla-datos[data-aspecto="lista"] tbody tr {
   border-bottom-color: color-mix(in srgb, var(--border) 45%, transparent);
 }

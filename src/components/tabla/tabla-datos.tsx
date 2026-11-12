@@ -70,6 +70,7 @@ export function TablaDatos<F, C = undefined>({
   vacio,
   aspecto = "tabla",
   asaColumnas = false,
+  encabezadoMayusculas = false,
 }: {
   def: DefTabla<F>;
   filas: F[];
@@ -140,6 +141,8 @@ export function TablaDatos<F, C = undefined>({
   aspecto?: "tabla" | "lista";
   /** Muestra la agarradera (⠿) en cada encabezado, para que se vea que la columna se arrastra (Pedidos de tienda, como Mi Reto Digital). */
   asaColumnas?: boolean;
+  /** Los nombres de las columnas en mayúsculas y un poco más grandes, aunque sea una lista (Pedidos de tienda, como Mi Reto Digital). */
+  encabezadoMayusculas?: boolean;
 }) {
   const tabla = useTablaInteractiva(def, filas, { limiteSinFiltros, porPagina, paginarSiempre });
   const [guardadas, cambiarColumnas] = useColumnas(def.clave, columnas);
@@ -333,7 +336,12 @@ export function TablaDatos<F, C = undefined>({
         accionPrincipal={accionPrincipal}
       />
       <ContenedorTabla ariaLabel={ariaLabel} aspecto={aspecto} encabezadoFijo={encabezadoFijo} totales={totales}>
-        <table data-aspecto={aspecto} className="tabla-datos w-full border-collapse text-sm" style={{ minWidth: anchoMinimo }}>
+        <table
+          data-aspecto={aspecto}
+          data-encabezado={encabezadoMayusculas ? "mayusculas" : undefined}
+          className="tabla-datos w-full border-collapse text-sm"
+          style={{ minWidth: anchoMinimo }}
+        >
           <thead>
             <tr className={claseFilaEncabezado}>
               {seleccion && (
