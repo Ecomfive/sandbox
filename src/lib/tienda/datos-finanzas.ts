@@ -18,7 +18,7 @@ export interface FuenteFinanzas {
 }
 
 let horaLista = false;
-/** Si ya se corrió la migración 0275 (la hora de Shopify en `ven_ordenes.creado_origen`). Una vez que existe, no se vuelve a preguntar. */
+/** Si ya se corrió la migración 0276 (la hora de Shopify en `ven_ordenes.creado_origen`). Una vez que existe, no se vuelve a preguntar. */
 export async function hayHoraDeShopify(supabase: SupabaseClient): Promise<boolean> {
   if (horaLista) return true;
   const { error } = await supabase.from("ven_ordenes").select("creado_origen").limit(1);
@@ -66,7 +66,7 @@ interface FilaOrden {
   moneda: string | null;
   transportista: string | null;
   guia: string | null;
-  /** Sin la migración 0275 no viene. */
+  /** Sin la migración 0276 no viene. */
   creado_origen?: string | null;
   ven_ordenes_clientes: { nombre: string | null; corregimiento: string | null } | { nombre: string | null; corregimiento: string | null }[] | null;
 }
@@ -86,7 +86,7 @@ export async function cargarPedidosFinanzas(
   }
   if (!tiendaDeUnidad.size) return { pedidos: [], lineas: [] };
   const unidades = [...tiendaDeUnidad.keys()];
-  // Con la migración 0275, también la hora de Shopify (un texto armado: por eso se declara como `string`).
+  // Con la migración 0276, también la hora de Shopify (un texto armado: por eso se declara como `string`).
   const columnas: string = `id, unidad_id, numero, fecha, estado_entrega, etiquetas, total, moneda, transportista, guia, ${(await hayHoraDeShopify(supabase)) ? "creado_origen, " : ""}ven_ordenes_clientes(nombre, corregimiento)`;
   const [ordenes, lineas] = await Promise.all([
     traerTodasLasFilas<FilaOrden>(

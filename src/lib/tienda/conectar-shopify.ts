@@ -94,7 +94,7 @@ export async function conectarTienda(supabase: SupabaseClient, tiendaId: string,
   return { tienda: t.nombre as string, avisos, traidos: r.texto, completa: r.completa };
 }
 
-/** El día (ISO) de la orden de Shopify más vieja de esa tienda que todavía no tiene su hora, o undefined (o sin la migración 0275). */
+/** El día (ISO) de la orden de Shopify más vieja de esa tienda que todavía no tiene su hora, o undefined (o sin la migración 0276). */
 async function desdeSinHora(supabase: SupabaseClient, tienda: string): Promise<string | undefined> {
   const { data: u } = await supabase.from("fin_unidades").select("id").ilike("nombre", tienda).maybeSingle();
   if (!u) return undefined;
@@ -116,7 +116,7 @@ export async function revisarTienda(supabase: SupabaseClient, tienda: { id: stri
   const app = appDeTienda(tienda.nombre);
   if (!app) throw new Error(`Faltan las variables de ${tienda.nombre} en Vercel.`);
   const token = (await accesoDeApp(app)).token;
-  // Las órdenes de Shopify que entraron antes de guardar su hora (migración 0275) se vuelven a leer desde la más vieja, para completarla.
+  // Las órdenes de Shopify que entraron antes de guardar su hora (migración 0276) se vuelven a leer desde la más vieja, para completarla.
   const desde = await desdeSinHora(supabase, app.tienda);
   const r = await sincronizarTienda(supabase, { tienda: app.tienda, dominio: app.dominio, token }, Date.now() + limiteMs, desde);
   await supabase.from("tiendas").update({ ultima_revision_en: new Date().toISOString() }).eq("id", tienda.id);

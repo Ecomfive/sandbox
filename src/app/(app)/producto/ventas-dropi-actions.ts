@@ -5,6 +5,7 @@ import { puedeVerPais } from "@/lib/paises-permitidos";
 import { mesesEntre, resumirProductos, ventasDePublicacion } from "@/lib/publicaciones/ventas";
 import { traerTodasConError } from "@/lib/supabase/paginar";
 import { createServiceClient } from "@/lib/supabase/server";
+import { leerEntrega, type EntregaDropshipper } from "@/lib/publicaciones/entregas-dropshipper";
 
 const ES_ID = (v: string) => /^[0-9a-fA-F-]{8,64}$/.test(v);
 
@@ -40,6 +41,11 @@ export interface VentasDropiPais {
   /** Netas por mes, desde el primer mes con ventas hasta el del corte (los meses sin ventas en 0). */
   meses: { mes: string; netas: number }[];
   ids: IdDropiVentas[];
+  /**
+   * Quién lo vende: los pedidos ENTREGADOS de estos IDs por dropshipper (12 nov 2026, pedido de Alcides; migración 0275). null si la
+   * consulta no está (sin la migración) o falló.
+   */
+  porDropshipper: EntregaDropshipper[] | null;
 }
 
 /**
@@ -77,11 +83,13 @@ export async function obtenerVentasDropiProducto(id: string, soloPais?: string):
   const paises: VentasDropiPais[] = [];
   for (const [paisId, { nombre, codigo, ids: set }] of porPais) {
     const ids = [...set];
-    const [cargaR, productosR, diasR, stockR] = await Promise.all([
+    const [cargaR, productosR, diasR, stockR, entregasR] = await Promise.all([
       supabase.from("dropi_ventas_cargas").select("corte").eq("pais_id", paisId).order("corte", { ascending: false }).limit(1).maybeSingle(),
       supabase.from("dropi_ventas_productos").select("dropi_producto_id, nombre, lista, privado, variable, stock, primera_venta, ultima_venta").eq("pais_id", paisId).in("dropi_producto_id", ids),
       traerTodasConError<Record<string, unknown>>((d, h) => supabase.from("dropi_ventas_diarias").select("dropi_producto_id, dia, pedidas, ordenes, canceladas, rechazadas, devueltas").eq("pais_id", paisId).in("dropi_producto_id", ids).order("dropi_producto_id").order("dia").range(d, h)),
       supabase.from("dropi_productos_proveedor").select("dropi_producto_id, stock").eq("pais_id", paisId).in("dropi_producto_id", ids),
+      // «Hoy» en hora de Panamá: los pedidos se guardan con la fecha de Panamá.
+      supabase.rpc("crm_entregas_por_producto", { p_pais: paisId, p_ids: ids, p_hoy: new Date(Date.now() - 5 * 3600e3).toISOString().slice(0, 10) }),
     ]);
     if (cargaR.error || !cargaR.data || productosR.error || diasR.error) continue;
     const corte = new Date(new Date(cargaR.data.corte as string).getTime() - 5 * 3600e3).toISOString().slice(0, 10);
@@ -121,6 +129,7 @@ export async function obtenerVentasDropiProducto(id: string, soloPais?: string):
       ids: resumen
         .map((r) => ({ id: r.id, nombre: r.nombre, archivado: r.lista === "archivado", privado: r.privado, netas30: r.netas30, netasTotal: r.netasTotal, ultimaVenta: r.ultimaVenta, stock: r.stock }))
         .sort((a, b) => b.netasTotal - a.netasTotal),
+      porDropshipper: entregasR.error ? null : ((entregasR.data ?? []) as Record<string, unknown>[]).map(leerEntrega),
     });
   }
   paises.sort((a, b) => b.netasTotal - a.netasTotal);

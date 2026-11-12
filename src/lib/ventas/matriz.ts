@@ -87,7 +87,7 @@ export interface OrdenVenta {
   mes_gestion: string | null;
   motivo_cancelacion: string | null;
   etiquetas: string | null;
-  /** La hora en que se creó en Shopify (migración 0275); el Excel no la trae. */
+  /** La hora en que se creó en Shopify (migración 0276); el Excel no la trae. */
   creado_origen?: string | null;
   lineas: LineaVenta[];
   cliente: ClienteVenta;

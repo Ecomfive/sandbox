@@ -1,3 +1,3 @@
--- Reversa de 0275_ordenes_hora_shopify.sql: quita la hora de Shopify de las órdenes (las pantallas vuelven a mostrar solo el día).
-alter table ven_ordenes drop column if exists creado_origen;
-notify pgrst, 'reload schema';
+-- Reversa de 0275_entregas_por_dropshipper.sql: quita la consulta y su índice (no hay datos que deshacer).
+drop function if exists crm_entregas_por_producto(uuid, bigint[], date);
+drop index if exists crm_ordenes_items_producto;

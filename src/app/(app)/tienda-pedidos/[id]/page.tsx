@@ -58,7 +58,7 @@ export default async function PedidoTiendaPage({ params }: { params: Promise<{ i
   const tienda = (p?.tiendas ?? null) as unknown as { nombre: string; dominio: string | null; pais_id: string } | null;
   // Una tienda sin conectar muestra las órdenes de Finanzas (11 nov 2026): si no es un pedido de Shopify, puede ser una de ellas.
   if (!p) {
-    // Con la migración 0275, también la hora de Shopify (texto armado: se declara como `string`).
+    // Con la migración 0276, también la hora de Shopify (texto armado: se declara como `string`).
     const columnasOrden: string = `numero, fecha, estado_entrega, etiquetas, subtotal, descuento, envio, total, estado_pago, forma_pago_texto, transportista, guia, fecha_envio, fecha_devolucion, resultado_courier, motivo_cancelacion, origen, ${(await hayHoraDeShopify(supabase)) ? "creado_origen, " : ""}creado_en, fin_unidades(nombre, pais_id, clase)`;
     const { data: oRaw } = await supabase.from("ven_ordenes").select(columnasOrden).eq("id", id).maybeSingle();
     const o = oRaw as unknown as (OrdenFinanzas & { fin_unidades: unknown }) | null;

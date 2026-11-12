@@ -174,7 +174,7 @@ export async function guardarLoteOrdenes(supabase: SupabaseClient, origen: strin
     mes_gestion: o.mes_gestion,
     motivo_cancelacion: o.motivo_cancelacion,
     etiquetas: o.etiquetas,
-    // La hora de Shopify (migración 0275): solo si la orden la trae, así el Excel no la borra.
+    // La hora de Shopify (migración 0276): solo si la orden la trae, así el Excel no la borra.
     ...(o.creado_origen ? { creado_origen: o.creado_origen } : {}),
     origen,
     origen_clave: o.origen_clave,
@@ -183,7 +183,7 @@ export async function guardarLoteOrdenes(supabase: SupabaseClient, origen: strin
   }));
   const subir = (f: typeof filas) => supabase.from("ven_ordenes").upsert(f, { onConflict: "origen_clave" }).select("id, origen_clave");
   let { data: guardadas, error } = await subir(filas);
-  // Sin la migración 0275 la columna de la hora no existe todavía: se guarda igual, sin la hora (no se pierde ningún pedido).
+  // Sin la migración 0276 la columna de la hora no existe todavía: se guarda igual, sin la hora (no se pierde ningún pedido).
   if (error && /creado_origen/.test(error.message)) ({ data: guardadas, error } = await subir(filas.map(({ creado_origen: _sinHora, ...resto }) => resto)));
   if (error) throw new Error(`ven_ordenes: ${error.message}`);
   const idDe = new Map((guardadas ?? []).map((r) => [r.origen_clave as string, r.id as string]));

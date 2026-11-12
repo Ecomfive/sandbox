@@ -9,6 +9,7 @@ import { anilloFoco } from "@/components/ui/field";
 import { useCodigoPais } from "@/components/pais-contexto";
 import { ChevronRightIcon } from "@/lib/nav-icons";
 import { obtenerVentasDropiProducto, type VentasDropiPais } from "./ventas-dropi-actions";
+import { EntregasPorDropshipper } from "./entregas-por-dropshipper";
 
 const entero = (n: number) => n.toLocaleString("es-PA", { maximumFractionDigits: 0 });
 const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
@@ -89,6 +90,7 @@ function VentasDePais({ v, conPais }: { v: VentasDropiPais; conPais: boolean }) 
           ))}
         </ul>
       </div>
+      {v.porDropshipper && <EntregasPorDropshipper filas={v.porDropshipper} pais={v.pais} />}
     </div>
   );
 }

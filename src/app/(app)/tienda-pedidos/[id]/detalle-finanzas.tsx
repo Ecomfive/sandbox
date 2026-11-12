@@ -24,7 +24,7 @@ export interface OrdenFinanzas {
   resultado_courier: string | null;
   motivo_cancelacion: string | null;
   origen: string | null;
-  /** La hora en que se creó en Shopify (migración 0275); null en las del Excel. */
+  /** La hora en que se creó en Shopify (migración 0276); null en las del Excel. */
   creado_origen?: string | null;
   /** Cuándo entró al sistema. */
   creado_en?: string | null;
