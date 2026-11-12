@@ -13,6 +13,7 @@ import { after } from "next/server";
 import { pedidosDeTiendas } from "@/lib/tienda/datos-finanzas";
 import { revisarSiHaceFalta } from "@/lib/tienda/conectar-shopify";
 import { vendidosDeFinanzas } from "@/lib/tienda/ordenes-finanzas";
+import { NOMBRE_FUENTE_COSTO, costosDeProductos } from "@/lib/tienda/costos";
 import { diaPanama, pedidosPorDia, productosVendidos, resumirPedidos, type LineaVendida } from "@/lib/tienda/resumen";
 import { TableroDashboard, type Tarjeta } from "./tablero-dashboard";
 
@@ -76,7 +77,11 @@ export default async function DashboardTiendaPage({ searchParams }: { searchPara
     ...vendidosDeFinanzas(lineasFinanzas, pedidoFinanzas),
   ].sort((x, y) => y.ingreso - x.ingreso);
   const skuIds = vendidos.map((v) => v.skuId).filter((x): x is string => !!x);
-  const { data: skus } = skuIds.length ? await supabase.from("skus_maestros").select("id, codigo, nombre").in("id", skuIds) : { data: [] };
+  const [{ data: skus }, costos] = await Promise.all([
+    skuIds.length ? supabase.from("skus_maestros").select("id, codigo, nombre").in("id", skuIds) : Promise.resolve({ data: [] as { id: string; codigo: string; nombre: string }[] }),
+    // El costo de cada producto en el país (Dropi del país o la última compra), para el margen (12 nov 2026).
+    costosDeProductos(supabase, skuIds, pais.id),
+  ]);
   const skuDe = new Map((skus ?? []).map((s) => [s.id as string, s as { codigo: string; nombre: string }]));
 
   const dias = pedidosPorDia(actuales, desde, hoy);
@@ -167,6 +172,8 @@ export default async function DashboardTiendaPage({ searchParams }: { searchPara
                       <th scope="col" className={`${claseThLista} text-right`}>Pedidos</th>
                       <th scope="col" className={`${claseThLista} text-right`}>Ingreso</th>
                       <th scope="col" className={`${claseThLista} text-right`}>% del total</th>
+                      <th scope="col" className={`${claseThLista} text-right`}>Costo</th>
+                      <th scope="col" className={`${claseThLista} text-right`}>Margen</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -193,6 +200,20 @@ export default async function DashboardTiendaPage({ searchParams }: { searchPara
                           <td className={`${claseTdLista} text-right tabular-nums`}>{v.pedidos.toLocaleString("es-PA")}</td>
                           <td className={`${claseTdLista} text-right tabular-nums`}>{dinero(v.ingreso)}</td>
                           <td className={`${claseTdLista} text-right tabular-nums`}>{pct(v.porcentaje)}</td>
+                          {(() => {
+                            const c = v.skuId ? costos.get(v.skuId) : undefined;
+                            const costo = c ? c.costo * v.unidades : null;
+                            return (
+                              <>
+                                <td className={`${claseTdLista} text-right tabular-nums`} title={c ? `${dinero(c.costo)} por unidad · ${NOMBRE_FUENTE_COSTO[c.fuente]}` : undefined}>
+                                  {costo === null ? "—" : dinero(costo)}
+                                </td>
+                                <td className={`${claseTdLista} text-right tabular-nums`}>
+                                  {costo === null ? "—" : `${dinero(v.ingreso - costo)}${v.ingreso > 0 ? ` · ${Math.round(((v.ingreso - costo) / v.ingreso) * 100)} %` : ""}`}
+                                </td>
+                              </>
+                            );
+                          })()}
                         </tr>
                       );
                     })}
