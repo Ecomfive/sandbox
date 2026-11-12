@@ -26,6 +26,14 @@ export interface OrdenFinanzas {
   origen: string | null;
 }
 
+export interface ClienteOrdenFinanzas {
+  nombre: string | null;
+  telefono: string | null;
+  direccion: string | null;
+  corregimiento: string | null;
+  notas: string | null;
+}
+
 export interface LineaOrdenFinanzas {
   linea: number;
   producto: string | null;
@@ -56,10 +64,22 @@ function Dato({ etiqueta, children }: { etiqueta: string; children: ReactNode })
 }
 
 /**
- * El detalle de una orden que viene de Finanzas (tienda sin conectar a Shopify, 11 nov 2026): lo que trae su Excel de gestión. No tiene cliente ni
- * dirección, ni notas del equipo (las notas son de los pedidos que llegan de Shopify). Solo lectura.
+ * El detalle de una orden que viene de Finanzas (tienda sin conectar a Shopify, 11 nov 2026): lo que trae su Excel de gestión, con el cliente y la
+ * dirección (`ven_ordenes_clientes`). No lleva notas del equipo (las notas son de los pedidos que llegan de Shopify). Solo lectura.
  */
-export function DetalleOrdenFinanzas({ o, lineas, tienda, codigoPais }: { o: OrdenFinanzas; lineas: LineaOrdenFinanzas[]; tienda: string; codigoPais: string }) {
+export function DetalleOrdenFinanzas({
+  o,
+  lineas,
+  cliente,
+  tienda,
+  codigoPais,
+}: {
+  o: OrdenFinanzas;
+  lineas: LineaOrdenFinanzas[];
+  cliente: ClienteOrdenFinanzas | null;
+  tienda: string;
+  codigoPais: string;
+}) {
   const estado = ESTADOS_PEDIDO.find((e) => e.id === estadoDesdeFinanzas(o.estado_entrega, o.etiquetas))!;
   const dinero = (n: number | null) => (n === null ? "—" : formatearMoneda(Number(n), codigoPais));
   const etiquetas = etiquetasDe(o.etiquetas);
@@ -127,9 +147,17 @@ export function DetalleOrdenFinanzas({ o, lineas, tienda, codigoPais }: { o: Ord
         </Tarjeta>
 
         <div className="flex min-w-0 flex-col gap-5">
+          <Tarjeta id="t-cli" titulo="Cliente y dirección">
+            <dl className="m-0 flex flex-col gap-1.5">
+              <Dato etiqueta="Nombre">{cliente?.nombre ?? "—"}</Dato>
+              <Dato etiqueta="Teléfono">{cliente?.telefono ?? "—"}</Dato>
+              <Dato etiqueta="Zona">{[zonaDeEtiquetas(o.etiquetas), cliente?.corregimiento].filter(Boolean).join(", ") || "—"}</Dato>
+              <Dato etiqueta="Dirección">{cliente?.direccion ?? "—"}</Dato>
+              {cliente?.notas && <Dato etiqueta="Notas">{cliente.notas}</Dato>}
+            </dl>
+          </Tarjeta>
           <Tarjeta id="t-ent" titulo="Entrega">
             <dl className="m-0 flex flex-col gap-1.5">
-              <Dato etiqueta="Zona">{zonaDeEtiquetas(o.etiquetas) ?? "—"}</Dato>
               <Dato etiqueta="Transportista">{o.transportista ?? "—"}</Dato>
               <Dato etiqueta="Guía">{o.guia ?? "—"}</Dato>
               {o.fecha_envio && <Dato etiqueta="Enviado">{formatearFecha(o.fecha_envio)}</Dato>}

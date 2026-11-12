@@ -59,10 +59,23 @@ export async function cargarPedidosFinanzas(
   if (!tiendaDeUnidad.size) return { pedidos: [], lineas: [] };
   const unidades = [...tiendaDeUnidad.keys()];
   const [ordenes, lineas] = await Promise.all([
-    traerTodasLasFilas<{ id: string; unidad_id: string; numero: string | null; fecha: string; estado_entrega: string | null; etiquetas: string | null; total: number | null; moneda: string | null; transportista: string | null; guia: string | null }>((d, h) =>
+    traerTodasLasFilas<{
+      id: string;
+      unidad_id: string;
+      numero: string | null;
+      fecha: string;
+      estado_entrega: string | null;
+      etiquetas: string | null;
+      total: number | null;
+      moneda: string | null;
+      transportista: string | null;
+      guia: string | null;
+      ven_ordenes_clientes: { nombre: string | null; corregimiento: string | null } | { nombre: string | null; corregimiento: string | null }[] | null;
+    }>((d, h) =>
       supabase
         .from("ven_ordenes")
-        .select("id, unidad_id, numero, fecha, estado_entrega, etiquetas, total, moneda, transportista, guia")
+        // El cliente está aparte, en `ven_ordenes_clientes` (lo trae el Excel y lo trae Shopify).
+        .select("id, unidad_id, numero, fecha, estado_entrega, etiquetas, total, moneda, transportista, guia, ven_ordenes_clientes(nombre, corregimiento)")
         .in("unidad_id", unidades)
         .gte("fecha", desde)
         .lte("fecha", hasta)
@@ -74,14 +87,15 @@ export async function cargarPedidosFinanzas(
   ]);
   const unidadesDe = new Map<string, number>();
   for (const l of lineas) if (!l.esServicio) unidadesDe.set(l.pedidoId, (unidadesDe.get(l.pedidoId) ?? 0) + l.cantidad);
+  const clienteDe = (o: (typeof ordenes)[number]) => (Array.isArray(o.ven_ordenes_clientes) ? (o.ven_ordenes_clientes[0] ?? null) : o.ven_ordenes_clientes);
   const pedidos = ordenes.map((o) => ({
     id: o.id,
     tiendaId: tiendaDeUnidad.get(o.unidad_id) ?? "",
     numero: o.numero ?? "—",
     creado: momentoDeFecha(o.fecha),
-    cliente: null,
+    cliente: clienteDe(o)?.nombre ?? null,
     provincia: zonaDeEtiquetas(o.etiquetas),
-    ciudad: null,
+    ciudad: clienteDe(o)?.corregimiento ?? null,
     moneda: o.moneda ?? "USD",
     total: Number(o.total) || 0,
     unidades: unidadesDe.get(o.id) ?? 0,

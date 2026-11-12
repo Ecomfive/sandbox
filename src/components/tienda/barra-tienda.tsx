@@ -96,8 +96,8 @@ function AvisoDatosFinanzas({ nombres, hasta, origen }: { nombres: string[]; has
       <b>
         {nombres.join(", ")} {nombres.length === 1 ? "muestra" : "muestran"} las órdenes que cargó Finanzas{origen ? ` (${origen})` : ""}, hasta el {formatearFecha(hasta)}.
       </b>{" "}
-      Es una foto: lo nuevo llega al conectar Shopify o con otro Excel. Los periodos cuentan hacia atrás desde ese día. El Excel no trae el cliente ni la
-      dirección; la zona sale de las etiquetas de la orden.
+      Es una foto: lo nuevo llega al conectar Shopify o con otro Excel. Los periodos cuentan hacia atrás desde ese día. La zona (Ciudad o Interior) sale de las
+      etiquetas de la orden.
     </p>
   );
 }

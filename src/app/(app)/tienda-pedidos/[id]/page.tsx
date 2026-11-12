@@ -10,7 +10,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { nombreComparable } from "@/lib/tienda/ordenes-finanzas";
 import { ESTADOS_PEDIDO, esEstadoPedido } from "@/lib/tienda/resumen";
 import { tituloVariante } from "@/lib/tienda/vincular-variante";
-import { DetalleOrdenFinanzas, type LineaOrdenFinanzas, type OrdenFinanzas } from "./detalle-finanzas";
+import { DetalleOrdenFinanzas, type ClienteOrdenFinanzas, type LineaOrdenFinanzas, type OrdenFinanzas } from "./detalle-finanzas";
 import { NotaPedido } from "./nota-pedido";
 
 export const metadata = { title: "Pedido de tienda" };
@@ -67,13 +67,14 @@ export default async function PedidoTiendaPage({ params }: { params: Promise<{ i
     const unidad = (o?.fin_unidades ?? null) as unknown as { nombre: string; pais_id: string; clase: string } | null;
     // Solo las órdenes de tiendas del país elegido arriba.
     if (!o || !unidad || unidad.clase !== "tienda" || unidad.pais_id !== pais.id) notFound();
-    const [{ data: lineasFin }, { data: tiendasPais }] = await Promise.all([
+    const [{ data: lineasFin }, { data: tiendasPais }, { data: cliente }] = await Promise.all([
       supabase.from("ven_orden_lineas").select("linea, producto, cantidad, precio, es_servicio, skus_maestros(codigo, nombre)").eq("orden_id", id).order("linea"),
       supabase.from("tiendas").select("nombre").eq("pais_id", pais.id),
+      supabase.from("ven_ordenes_clientes").select("nombre, telefono, direccion, corregimiento, notas").eq("orden_id", id).maybeSingle(),
     ]);
     // El nombre como está en Tiendas («Kenku»), no el de Finanzas («KENKU»).
     const nombre = (tiendasPais ?? []).find((t) => nombreComparable(t.nombre as string) === nombreComparable(unidad.nombre))?.nombre ?? unidad.nombre;
-    return <DetalleOrdenFinanzas o={o as unknown as OrdenFinanzas} lineas={(lineasFin ?? []) as unknown as LineaOrdenFinanzas[]} tienda={nombre as string} codigoPais={pais.codigo} />;
+    return <DetalleOrdenFinanzas o={o as unknown as OrdenFinanzas} lineas={(lineasFin ?? []) as unknown as LineaOrdenFinanzas[]} cliente={(cliente ?? null) as ClienteOrdenFinanzas | null} tienda={nombre as string} codigoPais={pais.codigo} />;
   }
   // Solo los pedidos de las tiendas del país elegido arriba.
   if (!tienda || tienda.pais_id !== pais.id) notFound();
