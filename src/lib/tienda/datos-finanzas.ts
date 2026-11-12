@@ -5,7 +5,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { cargarPedidos, inicioPeriodo, type PedidoFila, type Tienda } from "./datos";
-import { estadoDesdeFinanzas, momentoDeFecha, nombreComparable, zonaDeEtiquetas, type LineaFinanzas } from "./ordenes-finanzas";
+import { estadoDesdeFinanzas, momentoDeFecha, nombreComparable, textoProductos, zonaDeEtiquetas, type LineaFinanzas } from "./ordenes-finanzas";
 
 /** De dónde salen los datos de las tiendas sin conectar: su unidad en Finanzas y hasta qué día llegan sus órdenes. */
 export interface FuenteFinanzas {
@@ -15,6 +15,15 @@ export interface FuenteFinanzas {
   hasta: string | null;
   /** El archivo del que vienen (lo que dice `ven_ordenes.origen`). */
   origen: string | null;
+}
+
+let horaLista = false;
+/** Si ya se corrió la migración 0275 (la hora de Shopify en `ven_ordenes.creado_origen`). Una vez que existe, no se vuelve a preguntar. */
+export async function hayHoraDeShopify(supabase: SupabaseClient): Promise<boolean> {
+  if (horaLista) return true;
+  const { error } = await supabase.from("ven_ordenes").select("creado_origen").limit(1);
+  horaLista = !error;
+  return horaLista;
 }
 
 const SIN_FUENTE: FuenteFinanzas = { unidadDe: new Map(), hasta: null, origen: null };
@@ -46,6 +55,22 @@ export async function fuenteFinanzas(supabase: SupabaseClient, tiendas: Tienda[]
   return { unidadDe, hasta: ultima.fecha as string, origen: (ultima.origen as string | null) ?? null };
 }
 
+interface FilaOrden {
+  id: string;
+  unidad_id: string;
+  numero: string | null;
+  fecha: string;
+  estado_entrega: string | null;
+  etiquetas: string | null;
+  total: number | null;
+  moneda: string | null;
+  transportista: string | null;
+  guia: string | null;
+  /** Sin la migración 0275 no viene. */
+  creado_origen?: string | null;
+  ven_ordenes_clientes: { nombre: string | null; corregimiento: string | null } | { nombre: string | null; corregimiento: string | null }[] | null;
+}
+
 /** Las órdenes de Finanzas de esas tiendas entre `desde` y `hasta` (días AAAA-MM-DD), con sus unidades, como pedidos de la pantalla; y sus líneas. */
 export async function cargarPedidosFinanzas(
   supabase: SupabaseClient,
@@ -61,41 +86,39 @@ export async function cargarPedidosFinanzas(
   }
   if (!tiendaDeUnidad.size) return { pedidos: [], lineas: [] };
   const unidades = [...tiendaDeUnidad.keys()];
+  // Con la migración 0275, también la hora de Shopify (un texto armado: por eso se declara como `string`).
+  const columnas: string = `id, unidad_id, numero, fecha, estado_entrega, etiquetas, total, moneda, transportista, guia, ${(await hayHoraDeShopify(supabase)) ? "creado_origen, " : ""}ven_ordenes_clientes(nombre, corregimiento)`;
   const [ordenes, lineas] = await Promise.all([
-    traerTodasLasFilas<{
-      id: string;
-      unidad_id: string;
-      numero: string | null;
-      fecha: string;
-      estado_entrega: string | null;
-      etiquetas: string | null;
-      total: number | null;
-      moneda: string | null;
-      transportista: string | null;
-      guia: string | null;
-      ven_ordenes_clientes: { nombre: string | null; corregimiento: string | null } | { nombre: string | null; corregimiento: string | null }[] | null;
-    }>((d, h) =>
-      supabase
-        .from("ven_ordenes")
-        // El cliente está aparte, en `ven_ordenes_clientes` (lo trae el Excel y lo trae Shopify).
-        .select("id, unidad_id, numero, fecha, estado_entrega, etiquetas, total, moneda, transportista, guia, ven_ordenes_clientes(nombre, corregimiento)")
-        .in("unidad_id", unidades)
-        .gte("fecha", desde)
-        .lte("fecha", hasta)
-        .order("fecha", { ascending: false })
-        .order("id")
-        .range(d, h),
-    ).catch(() => []),
+    traerTodasLasFilas<FilaOrden>(
+      (d, h) =>
+        supabase
+          .from("ven_ordenes")
+          // El cliente está aparte, en `ven_ordenes_clientes` (lo trae el Excel y lo trae Shopify).
+          .select(columnas)
+          .in("unidad_id", unidades)
+          .gte("fecha", desde)
+          .lte("fecha", hasta)
+          .order("fecha", { ascending: false })
+          .order("id")
+          .range(d, h) as unknown as PromiseLike<{ data: FilaOrden[] | null; error: unknown }>,
+    ).catch(() => [] as FilaOrden[]),
     cargarLineasFinanzas(supabase, unidades, desde, hasta),
   ]);
   const unidadesDe = new Map<string, number>();
-  for (const l of lineas) if (!l.esServicio) unidadesDe.set(l.pedidoId, (unidadesDe.get(l.pedidoId) ?? 0) + l.cantidad);
+  const productosDe = new Map<string, string[]>();
+  for (const l of lineas) {
+    if (l.esServicio) continue;
+    unidadesDe.set(l.pedidoId, (unidadesDe.get(l.pedidoId) ?? 0) + l.cantidad);
+    productosDe.set(l.pedidoId, [...(productosDe.get(l.pedidoId) ?? []), l.titulo]);
+  }
   const clienteDe = (o: (typeof ordenes)[number]) => (Array.isArray(o.ven_ordenes_clientes) ? (o.ven_ordenes_clientes[0] ?? null) : o.ven_ordenes_clientes);
   const pedidos = ordenes.map((o) => ({
     id: o.id,
     tiendaId: tiendaDeUnidad.get(o.unidad_id) ?? "",
     numero: o.numero ?? "—",
-    creado: momentoDeFecha(o.fecha),
+    creado: o.creado_origen ?? momentoDeFecha(o.fecha),
+    sinHora: !o.creado_origen,
+    productos: textoProductos(productosDe.get(o.id) ?? []),
     cliente: clienteDe(o)?.nombre ?? null,
     provincia: zonaDeEtiquetas(o.etiquetas),
     ciudad: clienteDe(o)?.corregimiento ?? null,

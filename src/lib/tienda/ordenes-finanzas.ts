@@ -44,6 +44,12 @@ export function zonaDeEtiquetas(etiquetas: string | null): string | null {
   return null;
 }
 
+/** Los productos de un pedido para la lista: el primero y cuántos más («Magnesio +1»). Null sin productos. */
+export function textoProductos(titulos: string[]): string | null {
+  if (!titulos.length) return null;
+  return titulos.length === 1 ? titulos[0] : `${titulos[0]} +${titulos.length - 1}`;
+}
+
 /** La fecha del Excel (solo el día, AAAA-MM-DD) como momento: el mediodía de Panamá, para que caiga en el mismo día en cualquier cuenta. */
 export const momentoDeFecha = (fecha: string) => `${fecha}T17:00:00.000Z`;
 
