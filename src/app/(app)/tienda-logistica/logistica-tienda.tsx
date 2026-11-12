@@ -13,7 +13,7 @@ import { columnaProgramado } from "../tienda-pedidos/columnas-extra";
 import { FichaPedido } from "../tienda-pedidos/ficha-pedido";
 import { COLUMNAS, ICONOS, NOMBRE, defPedidos, type Contexto } from "../tienda-pedidos/pedidos-tienda";
 
-type Vista = "preparar_hoy" | "preparar_despues" | "en_ruta" | "demorados" | "entregados" | "devueltos" | "sin_zona";
+type Vista = "preparar_hoy" | "preparar_despues" | "en_ruta" | "novedad" | "demorados" | "entregados" | "devueltos" | "sin_zona";
 
 /** Las columnas de Pedidos, con «Días» (desde el pedido), «Programado» y «Logística» en lugar de «Estado»; la transportista, visible. */
 function columnasLogistica(hoy: string, multiTienda: boolean): ColumnaTabla<PedidoFila, Contexto>[] {
@@ -34,7 +34,9 @@ function columnasLogistica(hoy: string, multiTienda: boolean): ColumnaTabla<Pedi
     ocultable: true,
     render: (p) => {
       const e = etapaConEntrega(p.estado, p.entrega);
-      const monday = p.entrega ? `Monday: ${p.entrega.estado ?? "sin estado"}${p.entrega.repartidor ? ` · ${p.entrega.repartidor}` : ""}${p.entrega.fecha ? ` · ${p.entrega.fecha}` : ""}${p.entrega.causa ? ` · ${p.entrega.causa}` : ""}` : undefined;
+      const monday = p.entrega
+        ? `${p.entrega.fuente === "siscore" ? `Servientrega${p.entrega.guia ? ` · guía ${p.entrega.guia}` : ""}` : "Monday"}: ${p.entrega.estado ?? "sin estado"}${p.entrega.fuente !== "siscore" && p.entrega.repartidor ? ` · ${p.entrega.repartidor}` : ""}${p.entrega.fecha ? ` · ${p.entrega.fecha}` : ""}${p.entrega.visitas ? ` · ${p.entrega.visitas} ${p.entrega.visitas === 1 ? "visita" : "visitas"} sin entregar` : ""}${p.entrega.causa ? ` · ${p.entrega.causa}` : ""}`
+        : undefined;
       if (e === "entregado")
         return (
           <span title={monday}>
@@ -49,7 +51,7 @@ function columnasLogistica(hoy: string, multiTienda: boolean): ColumnaTabla<Pedi
         );
       return etapaLogistica(p.estado) === "en_ruta" ? (
         <span title={monday}>
-          <Pastilla>{p.entrega?.estado ? `En ruta · ${p.entrega.estado.toLowerCase()}` : "En ruta"}</Pastilla>
+          <Pastilla tono={p.entrega?.novedad ? "aviso" : undefined}>{p.entrega?.estado ? `En ruta · ${p.entrega.estado.toLowerCase()}` : "En ruta"}</Pastilla>
         </span>
       ) : listoParaPreparar(p.programado, p.provincia, hoy) ? (
         <Pastilla tono="aviso">Por preparar</Pastilla>
@@ -82,6 +84,7 @@ export function LogisticaTienda({ pedidos, codigoPais, tiendas, hoy }: { pedidos
       preparar_hoy: porPreparar.filter((p) => listoParaPreparar(p.programado, p.provincia, hoy)),
       preparar_despues: porPreparar.filter((p) => !listoParaPreparar(p.programado, p.provincia, hoy)).sort((a, b) => a.programado!.fecha.localeCompare(b.programado!.fecha)),
       en_ruta: enRuta,
+      novedad: enRuta.filter((p) => p.entrega?.novedad || (p.entrega?.visitas ?? 0) > 0),
       demorados: enRuta.filter((p) => diasDesde(diaPanama(p.creado), hoy) >= DIAS_DEMORA),
       entregados: pedidos.filter((p) => etapaConEntrega(p.estado, p.entrega) === "entregado"),
       devueltos: pedidos.filter((p) => etapaConEntrega(p.estado, p.entrega) === "devuelto"),
@@ -118,6 +121,7 @@ export function LogisticaTienda({ pedidos, codigoPais, tiendas, hoy }: { pedidos
     preparar_despues: "No hay pedidos programados para más adelante.",
     en_ruta: "No hay pedidos en ruta.",
     demorados: `Ningún pedido lleva ${DIAS_DEMORA} días o más en ruta.`,
+    novedad: "Ningún pedido en ruta con visitas sin entregar.",
     entregados: "Ninguna entrega registrada en Monday para estos pedidos.",
     devueltos: "Ningún rechazo registrado en Monday para estos pedidos.",
     sin_zona: "Todos los pedidos tienen zona.",
@@ -147,6 +151,16 @@ export function LogisticaTienda({ pedidos, codigoPais, tiendas, hoy }: { pedidos
         />
         <Indicador titulo="En ruta" icono={EnvioIcon} color="violeta" valor={num(grupos.en_ruta.length)} detalle={zonas(grupos.en_ruta)} alPulsar={() => alternar("en_ruta")} activo={vista === "en_ruta"} />
         <Indicador
+          titulo="Con novedad"
+          icono={AlertaIcon}
+          color="ambar"
+          punto={grupos.novedad.length ? "aviso" : undefined}
+          valor={num(grupos.novedad.length)}
+          detalle="visitas sin entregar (Servientrega)"
+          alPulsar={() => alternar("novedad")}
+          activo={vista === "novedad"}
+        />
+        <Indicador
           titulo={`En ruta ${DIAS_DEMORA}+ días`}
           icono={AlertaIcon}
           color="rojo"
@@ -161,7 +175,7 @@ export function LogisticaTienda({ pedidos, codigoPais, tiendas, hoy }: { pedidos
           icono={CheckIcon}
           color="verde"
           valor={num(grupos.entregados.length)}
-          detalle={hayMonday ? "según Monday (ciudad)" : "llegan al conectar Monday"}
+          detalle={hayMonday ? "según Monday y Servientrega" : "llegan con Monday y SISCORE"}
           alPulsar={() => alternar("entregados")}
           activo={vista === "entregados"}
         />
@@ -170,7 +184,7 @@ export function LogisticaTienda({ pedidos, codigoPais, tiendas, hoy }: { pedidos
           icono={CerrarIcon}
           color="rojo"
           valor={num(grupos.devueltos.length)}
-          detalle={hayMonday ? "según Monday (ciudad)" : "llegan al conectar Monday"}
+          detalle={hayMonday ? "fallidos (Monday) o devueltos (Servientrega)" : "llegan con Monday y SISCORE"}
           alPulsar={() => alternar("devueltos")}
           activo={vista === "devueltos"}
         />
@@ -187,7 +201,8 @@ export function LogisticaTienda({ pedidos, codigoPais, tiendas, hoy }: { pedidos
 
       <p role="note" className="m-0 rounded-lg border border-primario/30 bg-primario-suave px-4 py-2 text-xs">
         Shopify no trae la guía, la fecha de despacho ni si el pedido se entregó: lo de ciudad se completa con Monday (entregado, rechazado y el
-        repartidor); lo de interior (Servientrega) llegará con SISCORE. Los días se cuentan desde el pedido. La zona y la transportista salen de la
+        repartidor); lo de interior, con la guía de Servientrega leída de SISCORE («Actualizar Servientrega»: estado, visitas sin entregar y
+        devoluciones). Los días se cuentan desde el pedido. La zona y la transportista salen de la
         etiqueta (CIUDAD, INTERIOR/SERVIENTREGA) y la fecha programada, de la nota del pedido.
       </p>
 

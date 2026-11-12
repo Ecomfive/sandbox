@@ -51,7 +51,10 @@ test("la extensión solo sube a la carpeta temporal del sistema en SU proyecto d
 
 test("el puente solo va en las páginas del sistema y la extensión solo entra a Dropi", () => {
   const m = JSON.parse(ext("manifest.json")) as { host_permissions: string[]; content_scripts: { matches: string[] }[]; permissions: string[] };
-  assert.deepEqual(m.host_permissions, ["https://app.dropi.pa/*", "https://app.dropi.cr/*", "https://app.dropi.mx/*", "https://app.tuwinner.com/*", "https://app.soydrop.com/*", "https://dunamixfy.cr/*"]);
+  assert.deepEqual(m.host_permissions, ["https://app.dropi.pa/*", "https://app.dropi.cr/*", "https://app.dropi.mx/*", "https://app.tuwinner.com/*", "https://app.soydrop.com/*", "https://dunamixfy.cr/*", "https://servientrega-clientes.appsiscore.com/*"]);
+  // SISCORE (0.8.0, 12 nov 2026): el lector solo consulta (informe y rastreo); nunca las páginas que anulan o crean.
+  const siscore = ext("lectores/siscore.js");
+  for (const prohibida of ["guias_anular", "crea_recogida", "confirma_gestion", "credito_v2", "planilla.php"]) assert.ok(!siscore.includes(prohibida), prohibida);
   // Solo la página del sistema: ninguna página de localhost puede usar la sesión de Dropi (auditoría 27 oct 2026).
   assert.deepEqual(m.content_scripts[0].matches, ["https://mom-beta-proveduria.vercel.app/*"]);
   assert.ok(ext("fondo.js").includes(`remitente.origin !== SISTEMA`));
