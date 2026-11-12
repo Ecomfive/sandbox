@@ -37,6 +37,8 @@ export interface FilaStock {
   porBodega: { bodegaId: string; fisico: number }[];
   /** Si es una variante: el id de su producto principal y sus valores («Rojo / M»). */
   padreId: string | null;
+  /** El stock del producto principal está como general, pendiente de repartir entre sus variantes (migración 0273); lo marcan el principal y cada variante. */
+  repartoPendiente?: boolean;
   opciones: string;
   /** Si es un producto con variantes: sus variantes (sus cifras ya suman las de ellas). Vacío en un producto sin variantes. */
   variantes: FilaStock[];

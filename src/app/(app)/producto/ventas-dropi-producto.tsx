@@ -6,6 +6,8 @@ import Link from "next/link";
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { usePuedeAbrir } from "@/components/modulos-contexto";
 import { anilloFoco } from "@/components/ui/field";
+import { useCodigoPais } from "@/components/pais-contexto";
+import { ChevronRightIcon } from "@/lib/nav-icons";
 import { obtenerVentasDropiProducto, type VentasDropiPais } from "./ventas-dropi-actions";
 
 const entero = (n: number) => n.toLocaleString("es-PA", { maximumFractionDigits: 0 });
@@ -31,12 +33,6 @@ function VentasDePais({ v, conPais }: { v: VentasDropiPais; conPais: boolean }) 
   const cambio = v.netas30Antes ? Math.round(((v.netas30 - v.netas30Antes) / v.netas30Antes) * 100) : null;
   return (
     <div className="flex flex-col gap-3">
-      {conPais && (
-        <h4 className="m-0 inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-          <Bandera codigo={v.codigo} />
-          {v.pais}
-        </h4>
-      )}
       <dl className="m-0 grid grid-cols-3 gap-3">
         <Cifra titulo="Netas · 30 días" valor={entero(v.netas30)} detalle={cambio === null ? undefined : `${cambio > 0 ? "+" : ""}${cambio} % vs. 30 anteriores`} />
         <Cifra titulo="Netas en total" valor={entero(v.netasTotal)} detalle={v.primeraVenta ? `desde ${fecha(v.primeraVenta)}` : undefined} />
@@ -104,6 +100,16 @@ function VentasDePais({ v, conPais }: { v: VentasDropiPais; conPais: boolean }) 
 export function VentasDropiProducto({ id, pais }: { id: string; /** Solo ese país (su código), como en Gestión de IDs Dropi; sin él, todos los que la persona ve. */ pais?: string }) {
   const [datos, setDatos] = useState<VentasDropiPais[] | "error" | null>(null);
   const puedeVerVentas = usePuedeAbrir("ventas-dropi");
+  // Con varios países, solo el de la barra de arriba viene abierto y primero; los demás, plegados con su flecha (11 nov 2026, pedido de Alcides).
+  const paisBarra = useCodigoPais();
+  const [abiertos, setAbiertos] = useState<ReadonlySet<string>>(() => new Set([paisBarra]));
+  const alternar = (codigo: string) =>
+    setAbiertos((a) => {
+      const n = new Set(a);
+      if (n.has(codigo)) n.delete(codigo);
+      else n.add(codigo);
+      return n;
+    });
 
   useEffect(() => {
     let vigente = true;
@@ -125,9 +131,38 @@ export function VentasDropiProducto({ id, pais }: { id: string; /** Solo ese pa�
   if (!datos.length) return <p className="text-sm text-muted-foreground">Sin ventas en Dropi.</p>;
   return (
     <div className="flex flex-col gap-5">
-      {datos.map((v) => (
-        <VentasDePais key={v.pais} v={v} conPais={datos.length > 1} />
-      ))}
+      {datos.length === 1 ? (
+        <VentasDePais v={datos[0]} conPais={false} />
+      ) : (
+        [...datos]
+          .sort((a, b) => Number(b.codigo === paisBarra) - Number(a.codigo === paisBarra))
+          .map((v) => {
+            const abierto = abiertos.has(v.codigo);
+            return (
+              <section key={v.pais} aria-label={`Ventas en Dropi en ${v.pais}`} className="flex flex-col gap-2">
+                <h4 className="m-0 border-b border-border pb-1 text-xs font-semibold">
+                  <button
+                    type="button"
+                    aria-expanded={abierto}
+                    onClick={() => alternar(v.codigo)}
+                    className={`flex w-full flex-wrap items-baseline justify-between gap-x-3 rounded-sm text-left hover:text-foreground ${anilloFoco}`}
+                  >
+                    <span className="inline-flex items-center gap-1.5">
+                      <ChevronRightIcon aria-hidden="true" className={`h-3.5 w-3.5 self-center text-muted-foreground transition-transform motion-reduce:transition-none ${abierto ? "rotate-90" : ""}`} />
+                      <Bandera codigo={v.codigo} />
+                      {v.pais}
+                      <span className="sr-only">{abierto ? ", ocultar sus ventas" : ", ver sus ventas"}</span>
+                    </span>
+                    <span className="font-normal text-muted-foreground tabular-nums">
+                      {entero(v.netas30)} netas en 30 días · stock {entero(v.stock)}
+                    </span>
+                  </button>
+                </h4>
+                {abierto && <VentasDePais v={v} conPais={false} />}
+              </section>
+            );
+          })
+      )}
       {puedeVerVentas && (
         <Link href="/ventas-dropi" className={`inline-flex w-fit items-center rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium hover:bg-accent ${anilloFoco}`}>
           Ver en Ventas Proveeduría

@@ -51,6 +51,9 @@ export async function cargarProductos(usuario: UsuarioActual, supabase: Supabase
       .range(desde, hasta),
   );
   const lista: ProductoBd[] = productos ?? [];
+  // Los productos con el stock general pendiente de repartir entre sus variantes (migración 0273). Va aparte: sin la migración la columna no existe y la lista se carga igual.
+  const { data: filasPendientes } = await supabase.from("skus_maestros").select("id").eq("reparto_pendiente", true);
+  const repartoPendiente = new Set(((filasPendientes ?? []) as { id: string }[]).map((f) => f.id));
 
   // Los componentes de cada compuesto y lo enlazado a cada producto. Se trae lo que tiene enlace (no un `in` con todos los
   // ids: la dirección sería enorme).
@@ -312,7 +315,8 @@ export async function cargarProductos(usuario: UsuarioActual, supabase: Supabase
     asociaciones: [...(asociacionesPorSku.get(p.id) ?? []), ...(variantesPorPadre.get(p.id) ?? []).flatMap((v) => asociacionesPorSku.get(v.id) ?? [])],
     nombresDropi: [...(nombresDropiPorSku.get(p.id) ?? []), ...(variantesPorPadre.get(p.id) ?? []).flatMap((v) => nombresDropiPorSku.get(v.id) ?? [])],
     tests: testsPorId.get(p.id) ?? [],
-    padre: p.padre_id && porId.get(p.padre_id) ? { id: p.padre_id, codigo: porId.get(p.padre_id)!.codigo, nombre: porId.get(p.padre_id)!.nombre } : null,
+    padre: p.padre_id && porId.get(p.padre_id) ? { id: p.padre_id, codigo: porId.get(p.padre_id)!.codigo, nombre: porId.get(p.padre_id)!.nombre, repartoPendiente: repartoPendiente.has(p.padre_id) } : null,
+    repartoPendiente: repartoPendiente.has(p.id),
     opciones: (p.opciones ?? null) as Record<string, string> | null,
     opcionesVariantes: (p.opciones_variantes ?? []) as { nombre: string; valores: string[] }[],
     variantes: (variantesPorPadre.get(p.id) ?? []).sort((a, b) => a.codigo.localeCompare(b.codigo, "es", { numeric: true })),

@@ -23,7 +23,7 @@ import { AlertaIcon, SugerenciaIcon, TareasIcon } from "@/lib/nav-icons";
 import { RecomendacionesDropshipper } from "../recomendaciones-dropshipper";
 import { PastillaTipo, TipoCliente } from "../tipo-cliente";
 import { VentasDropiDropshipperBloque } from "../ventas-dropi-dropshipper";
-import { PastillaVendeEn } from "./vende-en";
+import { VendeEnPorPais } from "../vende-en-por-pais";
 import { ActividadDelClienteFicha } from "./actividad-cliente";
 import { ActividadDelEquipoFicha } from "./actividad-equipo";
 import type { FichaCrmChat } from "./actions";
@@ -413,11 +413,10 @@ export function FichaDelChat({
                   // La plataforma con la bandera del país donde vende («🇵🇦 Dropi»), lo mismo que junto al nombre del chat; no las tiendas que vinieron de
                   // ClickUp (29 oct 2026, pedido de Alcides). Se edita con el lápiz de arriba.
                   <Seccion titulo="Dónde vende">
+                    {/* Un país con sus plataformas: vende en varios países y plataformas (11 nov 2026, pedido de Jhokser). La bandera de afuera del chat es la del número de atención. */}
                     <div className="flex flex-wrap gap-1.5">
-                      {sel.vendeEn.map((v) => (
-                        <PastillaVendeEn key={`${v.plataforma}|${v.pais}`} v={v} />
-                      ))}
-                      {!sel.vendeEn.length && <span className="text-[13px] text-[var(--wa-sec)]">Sin plataformas. Agrégalas con el lápiz junto al nombre del chat.</span>}
+                      <VendeEnPorPais vende={sel.vendeEn} soloPaises={sel.paises} />
+                      {!sel.vendeEn.length && !sel.paises.length && <span className="text-[13px] text-[var(--wa-sec)]">Sin plataformas. Agrégalas con el lápiz junto al nombre del chat.</span>}
                     </div>
                   </Seccion>
                 )}

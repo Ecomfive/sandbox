@@ -89,7 +89,9 @@ export interface FilaProducto {
   /** Sus tests en Test productos (los vinculados a este producto), el más reciente primero. */
   tests: TestProducto[];
   /** Si es una variante: su producto padre y sus valores ({ Color: "Beige", Talla: "S" }). */
-  padre: { id: string; codigo: string; nombre: string } | null;
+  padre: { id: string; codigo: string; nombre: string; /** Su stock general está pendiente de repartir entre las variantes (migración 0273). */ repartoPendiente?: boolean } | null;
+  /** Tiene variantes y su stock está como general, pendiente de repartir entre ellas (migración 0273). */
+  repartoPendiente?: boolean;
   opciones: Record<string, string> | null;
   /** Si tiene variantes: sus opciones con los valores, y las variantes. */
   opcionesVariantes: { nombre: string; valores: string[] }[];
@@ -133,7 +135,7 @@ export const DEF_PRODUCTO: DefTabla<FilaProducto> = {
   clave: "producto",
   campos: [
     // Las variantes no tienen fila propia (9 nov 2026, pedido de Hernán): buscar una encuentra a su producto principal.
-    { id: "producto", etiqueta: "Producto", tipo: "texto", valor: (p) => [p.codigo, p.nombre, p.codigoBarras ?? "", ...p.variantes.flatMap((v) => [v.codigo, v.nombre, v.barras ?? ""])].join(" ") },
+    { id: "producto", etiqueta: "Producto", tipo: "texto", valor: (p) => [p.codigo, p.nombre, p.codigoBarras ?? "", p.numero === null ? "" : `${numeroProducto(p.numero)} ${p.numero}`, ...p.variantes.flatMap((v) => [v.codigo, v.nombre, v.barras ?? ""])].join(" ") },
     {
       id: "clase",
       etiqueta: "Estado",

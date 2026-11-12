@@ -113,6 +113,7 @@ export function FilaStockLista({
             <span className="font-mono font-semibold text-foreground">{f.codigo}</span>
             <CodigosProducto numero={f.numero} barras={f.barras} />
             {conVariantes && <Badge tone="neutral">{f.variantes.length} variantes</Badge>}
+            {f.repartoPendiente && <Badge tone="neutral">{hijo ? "Sin repartir: sale del general" : "Stock sin repartir"}</Badge>}
             {compuesto && <Badge tone="neutral">{ETIQUETA_TIPO_SKU.combo}</Badge>}
             {f.clase === "test" && <Badge tone="azul">{ETIQUETA_CLASE_SKU.test}</Badge>}
             {f.clase === "inactivo" && <Badge tone="destructive">{ETIQUETA_CLASE_SKU.inactivo}</Badge>}

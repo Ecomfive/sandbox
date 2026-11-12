@@ -585,7 +585,7 @@ function FichaCliente({
         </div>
       )}
 
-      {duplicado && <BloqueDuplicado d={duplicado} abrirAqui={abrirAqui} alAbrir={alAbrirOtro} />}
+      {duplicado && <BloqueDuplicado id={f.id} d={duplicado} abrirAqui={abrirAqui} alAbrir={alAbrirOtro} puedeUnir={escribe} />}
 
       <div className="flex flex-col gap-2">
         <h3 className="m-0 text-sm font-semibold">Por qué</h3>
