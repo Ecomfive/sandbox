@@ -7,6 +7,7 @@ import { NOMBRE_FUENTE_COSTO } from "@/lib/tienda/costos";
 import type { OrdenFinanzas, OrdenTienda } from "@/lib/tienda/orden-detalle";
 import { estadoDesdeFinanzas, etiquetasDe, zonaDeEtiquetas } from "@/lib/tienda/ordenes-finanzas";
 import { ESTADOS_PEDIDO } from "@/lib/tienda/resumen";
+import { NotasOrden } from "./notas-orden";
 
 export type { ClienteOrdenFinanzas, LineaOrdenFinanzas, OrdenFinanzas } from "@/lib/tienda/orden-detalle";
 
@@ -66,9 +67,20 @@ export function subtituloOrden(o: OrdenFinanzas, tienda: string): string {
 
 /**
  * El contenido de la ficha de una orden de tienda (12 nov 2026, como en Mi Reto Digital), en una columna para la ficha lateral de Pedidos y en dos para su
- * página: Cliente y dirección, Productos, Entrega, Etiquetas e Historial. Solo lectura.
+ * página: Cliente y dirección, Productos, Ingresos y costos, Entrega, Etiquetas, Notas del equipo e Historial. Lo único que se escribe son las notas,
+ * que quedan en el sistema y no van a Shopify.
  */
-export function ContenidoOrdenTienda({ orden, codigoPais, dosColumnas = false }: { orden: OrdenTienda; codigoPais: string; dosColumnas?: boolean }) {
+export function ContenidoOrdenTienda({
+  orden,
+  codigoPais,
+  puedeEscribir,
+  dosColumnas = false,
+}: {
+  orden: OrdenTienda;
+  codigoPais: string;
+  puedeEscribir: boolean;
+  dosColumnas?: boolean;
+}) {
   const { o, lineas, cliente, anteriores } = orden;
   const deShopify = o.origen === "shopify";
   const entregados = anteriores.filter((e) => e === "entregada").length;
@@ -197,6 +209,11 @@ export function ContenidoOrdenTienda({ orden, codigoPais, dosColumnas = false }:
         </div>
       </Tarjeta>
     ) : null;
+  const notasT = (
+    <Tarjeta id={`t-notas-${orden.id}`} titulo="Notas del equipo">
+      <NotasOrden key={orden.id} ordenId={orden.id} notas={orden.notas} puedeEscribir={puedeEscribir} />
+    </Tarjeta>
+  );
   const historial = (
     <Tarjeta id={`t-hist-${orden.id}`} titulo="Historial">
       <ol className="m-0 flex list-disc flex-col gap-2 pl-5 text-sm">
@@ -249,6 +266,7 @@ export function ContenidoOrdenTienda({ orden, codigoPais, dosColumnas = false }:
         {ingresosYCostos}
         {entrega}
         {etiquetasT}
+        {notasT}
         {historial}
       </div>
     );
@@ -265,6 +283,7 @@ export function ContenidoOrdenTienda({ orden, codigoPais, dosColumnas = false }:
           {clienteYDireccion}
           {entrega}
           {etiquetasT}
+          {notasT}
         </div>
       </div>
     </div>
@@ -272,7 +291,7 @@ export function ContenidoOrdenTienda({ orden, codigoPais, dosColumnas = false }:
 }
 
 /** La página de una orden de tienda (se llega por enlace directo); la lista abre la misma ficha a un lado. */
-export function DetalleOrdenFinanzas({ orden, codigoPais }: { orden: OrdenTienda; codigoPais: string }) {
+export function DetalleOrdenFinanzas({ orden, codigoPais, puedeEscribir }: { orden: OrdenTienda; codigoPais: string; puedeEscribir: boolean }) {
   const estado = estadoDeOrden(orden.o);
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-5">
@@ -289,7 +308,7 @@ export function DetalleOrdenFinanzas({ orden, codigoPais }: { orden: OrdenTienda
           </a>
         )}
       </div>
-      <ContenidoOrdenTienda orden={orden} codigoPais={codigoPais} dosColumnas />
+      <ContenidoOrdenTienda orden={orden} codigoPais={codigoPais} puedeEscribir={puedeEscribir} dosColumnas />
     </Pagina>
   );
 }
