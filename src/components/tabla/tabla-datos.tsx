@@ -1,5 +1,6 @@
 "use client";
 
+import { ArrastrarIcon } from "@/lib/nav-icons";
 import { Tooltip } from "@/components/ui/tooltip";
 import { ContenedorTabla, type CeldaFija } from "./contenedor-tabla";
 import { useState, type ReactNode } from "react";
@@ -68,6 +69,7 @@ export function TablaDatos<F, C = undefined>({
   fijarEncabezado,
   vacio,
   aspecto = "tabla",
+  asaColumnas = false,
 }: {
   def: DefTabla<F>;
   filas: F[];
@@ -136,6 +138,8 @@ export function TablaDatos<F, C = undefined>({
   vacio: string;
   /** «lista»: más limpia, como una lista de ClickUp (sin rayas entre columnas y apenas una línea suave entre filas). */
   aspecto?: "tabla" | "lista";
+  /** Muestra la agarradera (⠿) en cada encabezado, para que se vea que la columna se arrastra (Pedidos de tienda, como Mi Reto Digital). */
+  asaColumnas?: boolean;
 }) {
   const tabla = useTablaInteractiva(def, filas, { limiteSinFiltros, porPagina, paginarSiempre });
   const [guardadas, cambiarColumnas] = useColumnas(def.clave, columnas);
@@ -377,6 +381,7 @@ export function TablaDatos<F, C = undefined>({
                     sobre === c.id && arrastrada && arrastrada !== c.id ? "outline-2 -outline-offset-2 outline-foreground" : ""
                   }`}
                 >
+                  {asaColumnas && <ArrastrarIcon className="mr-1 -ml-1.5 inline-block h-3.5 w-3.5 align-[-2px] text-muted-foreground/70" />}
                   {c.descripcion ? (
                     <Tooltip texto={c.descripcion}>
                       <span tabIndex={0} className="cursor-help border-b border-dotted border-muted-foreground/60">
