@@ -50,6 +50,14 @@ export interface LineaOrdenFinanzas {
   costo?: CostoProducto | null;
 }
 
+/** Una nota del equipo en el pedido (`ven_orden_notas`, la misma tabla del portal de Finanzas). No va a Shopify. */
+export interface NotaOrden {
+  id: string;
+  texto: string;
+  autor: string | null;
+  creado_en: string;
+}
+
 export interface OrdenTienda {
   id: string;
   o: OrdenFinanzas;
@@ -63,6 +71,8 @@ export interface OrdenTienda {
   tienda: string;
   /** «Ingresos y costos» (12 nov 2026): venta, costo de los productos, fulfillment, flete y margen. */
   cuentas: IngresosYCostos;
+  /** Las notas del equipo, de la más vieja a la más nueva (12 nov 2026). */
+  notas: NotaOrden[];
 }
 
 export async function cargarOrdenTienda(supabase: SupabaseClient, id: string, paisId: string): Promise<OrdenTienda | null> {
@@ -73,10 +83,11 @@ export async function cargarOrdenTienda(supabase: SupabaseClient, id: string, pa
   const o = crudo as unknown as (OrdenFinanzas & { fin_unidades: unknown; costo_envio?: number | null; costo_envio_real?: number | null }) | null;
   const unidad = (o?.fin_unidades ?? null) as { nombre: string; pais_id: string; clase: string; tarifa_fulfillment: number | null } | null;
   if (!o || !unidad || unidad.clase !== "tienda" || unidad.pais_id !== paisId) return null;
-  const [{ data: lineas }, { data: tiendasPais }, { data: cliente }] = await Promise.all([
+  const [{ data: lineas }, { data: tiendasPais }, { data: cliente }, { data: notas }] = await Promise.all([
     supabase.from("ven_orden_lineas").select("linea, producto, cantidad, precio, es_servicio, sku_maestro_id, skus_maestros(codigo, nombre)").eq("orden_id", id).order("linea"),
     supabase.from("tiendas").select("nombre, dominio").eq("pais_id", paisId),
     supabase.from("ven_ordenes_clientes").select("nombre, telefono, direccion, corregimiento, notas, telefono_clave").eq("orden_id", id).maybeSingle(),
+    supabase.from("ven_orden_notas").select("id, texto, autor, creado_en").eq("orden_id", id).order("creado_en").limit(200),
   ]);
   // Los otros pedidos del mismo cliente (por su teléfono normalizado), como en Mi Reto Digital: cuántos y cuántos se entregaron.
   const clave = (cliente as { telefono_clave?: string | null } | null)?.telefono_clave ?? null;
@@ -117,5 +128,6 @@ export async function cargarOrdenTienda(supabase: SupabaseClient, id: string, pa
     enShopify,
     tienda: ((tiendaSistema?.nombre as string | undefined) ?? unidad.nombre) as string,
     cuentas,
+    notas: (notas ?? []) as NotaOrden[],
   };
 }

@@ -13,6 +13,7 @@ import { TIPOS_RECOMENDACION, type GrupoRecomendacion } from "@/lib/publicacione
 
 const grupoDe = (t: string) => TIPOS_RECOMENDACION.find((x) => x.valor === t)?.grupo;
 const tiposDe = (g: GrupoRecomendacion) => TIPOS_RECOMENDACION.filter((t) => t.grupo === g).map((t) => t.valor);
+import { TarjetaParetoClientes } from "./pareto-clientes";
 import { DEF_PUBLICACIONES, POCO_STOCK, POCO_STOCK_VARIACION, estadoVinculo, paraReactivar, pocoStock, sinStock, type FilaPublicacion } from "./def-publicaciones";
 
 const seleccion = (campo: string, ...valores: string[]) => ({ campo, valor: { tipo: "seleccion" as const, valores } });
@@ -230,10 +231,15 @@ export function TableroAcciones({ publicaciones, reglas, codigoPais, def = DEF_P
             </ItemArrastrable>
           );
         })}
+        {/* El Pareto de clientes (12 nov 2026, pedido de Hernán) cuenta clientes, no publicaciones: no filtra la lista, abre la de esos clientes. */}
+        <ItemArrastrable id={ID_PARETO} className="flex [&>button]:flex-1">
+          <TarjetaParetoClientes />
+        </ItemArrastrable>
       </OrdenArrastrable>
     </div>
   );
 }
 
-const IDS_TARJETAS: readonly string[] = TARJETAS.map((t) => t.id);
-const ETIQUETAS_TARJETAS: Readonly<Record<string, string>> = Object.fromEntries(TARJETAS.map((t) => [t.id, t.titulo]));
+const ID_PARETO = "pareto-clientes";
+const IDS_TARJETAS: readonly string[] = [...TARJETAS.map((t) => t.id), ID_PARETO];
+const ETIQUETAS_TARJETAS: Readonly<Record<string, string>> = { ...Object.fromEntries(TARJETAS.map((t) => [t.id, t.titulo])), [ID_PARETO]: "Pareto de clientes" };
