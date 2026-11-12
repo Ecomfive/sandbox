@@ -20,6 +20,7 @@ export const ETIQUETA_ACCION: Record<string, string> = {
   aviso_inactividad: "Cambió el aviso de inactividad",
   lider_tareas: "Cambió quién asigna tareas (líderes)",
   correccion_inventario: "Corrigió el inventario",
+  conectar_tienda_shopify: "Conectó la tienda a Shopify",
   eliminar_nota_producto: "Eliminó una nota",
   vincular_publicacion_effi: "Vinculó una publicación de Effi",
   desvincular_publicacion_effi: "Desvinculó una publicación de Effi",

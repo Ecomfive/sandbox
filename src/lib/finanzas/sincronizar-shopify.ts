@@ -12,6 +12,7 @@ import type { OrdenVenta } from "../ventas/matriz";
 import { leerTiendasShopify, ordenDeShopify, siguientePagina, type TiendaShopify } from "./shopify";
 import { leerConexiones } from "../ventas/conexion-tienda";
 import { sincronizarFases } from "../ventas/sincronizar-fases";
+import { appsDeEntorno, tokenDeApp } from "../tienda/shopify-app";
 
 const VERSION_API = "2024-10";
 const CAMPOS = "name,created_at,updated_at,cancelled_at,cancel_reason,financial_status,fulfillment_status,total_price,subtotal_price,total_discounts,total_shipping_price_set,line_items,refunds,payment_gateway_names,gateway,tags,note,phone,shipping_address,billing_address";
@@ -22,7 +23,18 @@ export const shopifyConfigurado = () => leerTiendasShopify(process.env.SHOPIFY_T
 export async function tiendasConfiguradas(supabase: SupabaseClient): Promise<TiendaShopify[]> {
   const delPortal = await leerConexiones(supabase);
   const nombres = new Set(delPortal.map((t) => t.tienda.toUpperCase()));
-  return [...delPortal, ...leerTiendasShopify(process.env.SHOPIFY_TIENDAS).filter((t) => !nombres.has(t.tienda.toUpperCase()))];
+  // Las tiendas conectadas con su app del Dev Dashboard (Gestión de tienda, 12 nov 2026): su token se pide al momento y dura 24 horas.
+  const deApps: TiendaShopify[] = [];
+  for (const app of appsDeEntorno()) {
+    if (nombres.has(app.tienda.toUpperCase())) continue;
+    try {
+      deApps.push({ tienda: app.tienda, dominio: app.dominio, token: await tokenDeApp(app) });
+      nombres.add(app.tienda.toUpperCase());
+    } catch {
+      // Sin acceso (app desinstalada, secreto cambiado): esa tienda no se lee; la pantalla Tiendas lo muestra al revisarla.
+    }
+  }
+  return [...delPortal, ...deApps, ...leerTiendasShopify(process.env.SHOPIFY_TIENDAS).filter((t) => !nombres.has(t.tienda.toUpperCase()))];
 }
 
 export async function guardarOrdenesShopify(supabase: SupabaseClient, ordenes: OrdenVenta[]): Promise<{ nuevas: number; actualizadas: number; soloEstado: number }> {

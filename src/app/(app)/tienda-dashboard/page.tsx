@@ -9,7 +9,9 @@ import { formatearMoneda } from "@/lib/formato";
 import { getPaisActual } from "@/lib/pais";
 import { createServiceClient } from "@/lib/supabase/server";
 import { cargarTiendas, cargarVariantes, inicioPeriodo, periodoElegido, sinConfirmarDesde, tiendaElegida } from "@/lib/tienda/datos";
+import { after } from "next/server";
 import { pedidosDeTiendas } from "@/lib/tienda/datos-finanzas";
+import { revisarSiHaceFalta } from "@/lib/tienda/conectar-shopify";
 import { vendidosDeFinanzas } from "@/lib/tienda/ordenes-finanzas";
 import { diaPanama, pedidosPorDia, productosVendidos, resumirPedidos, type LineaVendida } from "@/lib/tienda/resumen";
 import { TableroDashboard, type Tarjeta } from "./tablero-dashboard";
@@ -40,6 +42,8 @@ export default async function DashboardTiendaPage({ searchParams }: { searchPara
   const tienda = tiendaElegida(tiendas, sp.tienda);
   const periodo = periodoElegido(sp.periodo);
   const miradas = tienda ? [tienda] : tiendas;
+  // La revisión de Shopify (por si se perdió algún aviso), después de mostrar la página y como mucho cada 10 minutos.
+  after(() => revisarSiHaceFalta(createServiceClient(), tiendas));
   const ids = miradas.map((t) => t.id);
   // Las tiendas sin conectar se ven con las órdenes de Finanzas (11 nov 2026); si todo sale de ahí, los periodos terminan en su último día.
   const [{ pedidos: todos, lineasFinanzas, fuente, referencia }, variantes] = await Promise.all([pedidosDeTiendas(supabase, miradas, pais.codigo, periodo.dias * 2), cargarVariantes(supabase, ids)]);
@@ -81,7 +85,7 @@ export default async function DashboardTiendaPage({ searchParams }: { searchPara
   const pct = (n: number | null) => (n === null ? "—" : `${n.toLocaleString("es-PA")} %`);
   const sinVincular = variantes.filter((v) => !v.skuMaestroId && !v.noFisico && v.enShopify).length;
   // Con una foto de Finanzas, «hace más de un día» se cuenta desde el cierre de su último día, no desde hoy.
-  const soloFinanzas = miradas.every((t) => fuente.unidadDe.has(t.id));
+  const soloFinanzas = miradas.every((t) => fuente.unidadDe.has(t.id) && t.estado !== "conectada");
   const viejosSinConfirmar = sinConfirmarDesde(actuales, 24, soloFinanzas ? referencia.getTime() + 7 * 3_600_000 : Date.now());
   const conectadas = miradas.filter((t) => t.estado === "conectada").length;
 

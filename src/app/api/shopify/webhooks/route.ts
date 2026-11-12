@@ -4,6 +4,7 @@ import { guardarOrdenesShopify, tiendasConfiguradas } from "@/lib/finanzas/sincr
 import { ordenDeShopify } from "@/lib/finanzas/shopify";
 import { DOMINIO_SHOPIFY } from "@/lib/ventas/conexion-tienda";
 import { TEMAS_ORDEN, firmaShopifyValida } from "@/lib/ventas/shopify-webhook";
+import { appDeDominio } from "@/lib/tienda/shopify-app";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -19,11 +20,14 @@ export async function POST(request: Request) {
   if (Number(request.headers.get("content-length") ?? 0) > MAX_CUERPO) return new NextResponse("Payload Too Large", { status: 413 });
   const cuerpo = await request.text();
   if (cuerpo.length > MAX_CUERPO) return new NextResponse("Payload Too Large", { status: 413 });
-  const secreto = process.env.SHOPIFY_WEBHOOK_SECRET ?? process.env.SHOPIFY_CLIENT_SECRET;
+  const dominio = (request.headers.get("x-shopify-shop-domain") ?? "").toLowerCase();
+  // Una tienda conectada con su app del Dev Dashboard (12 nov 2026, Kenku) firma con el secreto de esa app; el dominio solo elige qué secreto probar:
+  // sin la firma correcta no entra nada.
+  const app = appDeDominio(dominio);
+  const secreto = app ? app.clientSecret : (process.env.SHOPIFY_WEBHOOK_SECRET ?? process.env.SHOPIFY_CLIENT_SECRET);
   if (!firmaShopifyValida(cuerpo, request.headers.get("x-shopify-hmac-sha256"), secreto)) return new NextResponse("Forbidden", { status: 403 });
 
   const tema = request.headers.get("x-shopify-topic") ?? "";
-  const dominio = (request.headers.get("x-shopify-shop-domain") ?? "").toLowerCase();
   const id = (request.headers.get("x-shopify-webhook-id") ?? "").slice(0, 120);
   if (!(TEMAS_ORDEN as readonly string[]).includes(tema)) return NextResponse.json({ ok: true, ignorado: true });
   if (!DOMINIO_SHOPIFY.test(dominio) || !id) return new NextResponse("Bad Request", { status: 400 });
@@ -36,11 +40,13 @@ export async function POST(request: Request) {
     const { error: dup } = await supabase.from("ven_shopify_webhooks").insert({ webhook_id: id, tema, dominio });
     if (dup) return NextResponse.json({ ok: true, repetido: true });
     marcada = true;
-    const tienda = (await tiendasConfiguradas(supabase)).find((t) => t.dominio.toLowerCase() === dominio) as ({ unidadId?: string; tienda: string }) | undefined;
+    const tienda = (app ? { tienda: app.tienda } : (await tiendasConfiguradas(supabase)).find((t) => t.dominio.toLowerCase() === dominio)) as ({ unidadId?: string; tienda: string }) | undefined;
     // Una tienda que no tenemos conectada no es un error de Shopify: se confirma y se ignora.
     if (!tienda) return NextResponse.json({ ok: true, tiendaDesconocida: true });
     const o = ordenDeShopify(tienda.tienda, orden);
     if (o) await guardarOrdenesShopify(supabase, [o]);
+    // Gestión de tienda: la hora del último aviso, para la pantalla Tiendas (si la tienda es una de las del sistema).
+    if (app) await supabase.from("tiendas").update({ ultimo_aviso_en: new Date().toISOString() }).eq("dominio", dominio);
     if (tienda.unidadId) {
       const { data: c } = await supabase.from("ven_tiendas_conexion").select("webhooks_recibidos").eq("unidad_id", tienda.unidadId).maybeSingle();
       await supabase.from("ven_tiendas_conexion").update({ ultimo_webhook: new Date().toISOString(), webhooks_recibidos: Number(c?.webhooks_recibidos ?? 0) + 1 }).eq("unidad_id", tienda.unidadId);

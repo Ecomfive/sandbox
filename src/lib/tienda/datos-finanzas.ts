@@ -19,9 +19,12 @@ export interface FuenteFinanzas {
 
 const SIN_FUENTE: FuenteFinanzas = { unidadDe: new Map(), hasta: null, origen: null };
 
-/** Las tiendas sin conectar que tienen órdenes en Finanzas: se emparejan por nombre (Kenku = KENKU) dentro del mismo país. */
+/**
+ * Las tiendas con órdenes en Finanzas: se emparejan por nombre (Kenku = KENKU) dentro del mismo país. También las conectadas a Shopify desde el 12 nov
+ * 2026: sus pedidos en vivo entran a las mismas órdenes (`ven_ordenes`, origen «shopify»), así que se leen de ahí igual.
+ */
 export async function fuenteFinanzas(supabase: SupabaseClient, tiendas: Tienda[], codigoPais: string): Promise<FuenteFinanzas> {
-  const sinConectar = tiendas.filter((t) => t.estado !== "conectada");
+  const sinConectar = tiendas;
   if (!sinConectar.length) return SIN_FUENTE;
   const { data: unidades, error } = await supabase.from("fin_unidades").select("id, nombre").eq("pais", codigoPais).eq("clase", "tienda").eq("activo", true);
   if (error || !unidades?.length) return SIN_FUENTE;
@@ -141,7 +144,8 @@ export async function pedidosDeTiendas(
   dias: number,
 ): Promise<{ pedidos: PedidoFila[]; lineasFinanzas: LineaFinanzas[]; fuente: FuenteFinanzas; referencia: Date }> {
   const fuente = await fuenteFinanzas(supabase, miradas, codigoPais);
-  const soloFinanzas = miradas.length > 0 && miradas.every((t) => fuente.unidadDe.has(t.id));
+  // Una foto (todo sale del Excel y ninguna tienda está conectada): los periodos terminan en su último día. Con una conectada, en hoy.
+  const soloFinanzas = miradas.length > 0 && miradas.every((t) => fuente.unidadDe.has(t.id) && t.estado !== "conectada");
   const referencia = soloFinanzas && fuente.hasta ? new Date(momentoDeFecha(fuente.hasta)) : new Date();
   const desde = inicioPeriodo(dias, referencia);
   const hasta = inicioPeriodo(1, referencia);
