@@ -97,9 +97,14 @@ const COLUMNAS: ColumnaTabla<PedidoFila, Contexto>[] = [
     id: "productos",
     label: "Productos",
     ocultable: true,
+    // Con la foto del producto (la de Shopify), como en Mi Reto Digital.
     render: (p) => (
-      <span className="block max-w-[16rem] truncate" title={p.productos ?? undefined}>
-        {p.productos ?? "—"}
+      <span className="flex max-w-[18rem] items-center gap-2" title={p.productos ?? undefined}>
+        {p.foto && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={p.foto} alt="" loading="lazy" className="h-7 w-7 shrink-0 rounded border border-border object-cover" />
+        )}
+        <span className="truncate">{p.productos ?? "—"}</span>
       </span>
     ),
   },

@@ -14,6 +14,7 @@ import { leerConexiones } from "../ventas/conexion-tienda";
 import { sincronizarFases } from "../ventas/sincronizar-fases";
 import { appsDeEntorno, tokenDeApp } from "../tienda/shopify-app";
 import { completarTelefonosDeOrdenes } from "../tienda/telefono-cliente";
+import { aplicarVinculosDeOrdenes } from "../tienda/productos-shopify";
 
 const VERSION_API = "2024-10";
 const CAMPOS = "name,created_at,updated_at,cancelled_at,cancel_reason,financial_status,fulfillment_status,total_price,subtotal_price,total_discounts,total_shipping_price_set,line_items,refunds,payment_gateway_names,gateway,tags,note,phone,shipping_address,billing_address";
@@ -59,6 +60,8 @@ export async function guardarOrdenesShopify(supabase: SupabaseClient, ordenes: O
   }
   // El teléfono normalizado de cada cliente, para juntar sus pedidos (Gestión de tienda, 12 nov 2026). No falla nunca.
   await completarTelefonosDeOrdenes(supabase, ordenes.map((o) => o.origen_clave));
+  // Y el producto nuestro de cada línea, por las uniones de Productos de Shopify (las líneas se reescriben al guardar). No falla nunca.
+  await aplicarVinculosDeOrdenes(supabase, ordenes.map((o) => o.origen_clave));
   return { nuevas: r.nuevas, actualizadas: r.actualizadas, soloEstado: deExcel.length };
 }
 
@@ -85,8 +88,10 @@ export async function sincronizarTienda(supabase: SupabaseClient, t: TiendaShopi
     totales.actualizadas += g.actualizadas;
     totales.soloEstado += g.soloEstado;
     leidas += crudas.length;
-    const ultima = crudas.map((o) => String(o.updated_at ?? "")).filter(Boolean).sort().at(-1);
-    if (ultima && ultima > cursor) cursor = ultima;
+    // Shopify manda la hora con la zona de la tienda («…-05:00») y el cursor está en UTC: se comparan como fechas, no como texto (12 nov 2026).
+    const ms = crudas.map((o) => Date.parse(String(o.updated_at ?? ""))).filter(Number.isFinite);
+    const ultima = ms.length ? new Date(Math.max(...ms)).toISOString() : null;
+    if (ultima && Date.parse(ultima) > Date.parse(cursor)) cursor = ultima;
     url = siguientePagina(r.headers.get("link"));
   }
   await supabase

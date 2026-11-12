@@ -75,6 +75,8 @@ export interface LineaFinanzas {
   cantidad: number;
   /** El precio de la línea; el Excel casi nunca lo trae. */
   precio: number | null;
+  /** El SKU de Shopify de la línea (el Excel no lo trae). */
+  sku?: string | null;
   esServicio: boolean;
 }
 
