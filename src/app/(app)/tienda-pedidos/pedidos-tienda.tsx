@@ -54,7 +54,8 @@ function NumeroPedido({ p }: { p: PedidoFila }) {
   );
 }
 
-const RIESGO: Record<string, { etiqueta: string; tono: "aviso" | "peligro" }> = { medio: { etiqueta: "Medio", tono: "aviso" }, alto: { etiqueta: "Alto", tono: "peligro" } };
+// «Bajo» en gris (12 nov 2026, como en Mi Reto Digital): sin nada en contra o su primer pedido.
+const RIESGO: Record<string, { etiqueta: string; tono?: "aviso" | "peligro" }> = { bajo: { etiqueta: "Bajo" }, medio: { etiqueta: "Medio", tono: "aviso" }, alto: { etiqueta: "Alto", tono: "peligro" } };
 
 function cuando(iso: string, sinHora = false): string {
   const d = new Date(iso);
@@ -203,7 +204,8 @@ export function defPedidos(tiendas: Record<string, string>): DefTabla<PedidoFila
         opciones: () => [
           { valor: "alto", etiqueta: "Alto" },
           { valor: "medio", etiqueta: "Medio" },
-          { valor: "ninguno", etiqueta: "Sin riesgo" },
+          { valor: "bajo", etiqueta: "Bajo" },
+          { valor: "ninguno", etiqueta: "Sin dato (sin teléfono)" },
         ],
       },
       { id: "transportista", etiqueta: "Transportista", tipo: "seleccion", valores: (p) => [p.transportista ?? SIN_VALOR], etiquetaSinValor: "Sin transportista", agrupable: true },

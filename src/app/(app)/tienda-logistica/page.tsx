@@ -35,7 +35,7 @@ export default async function LogisticaTiendaPage({ searchParams }: { searchPara
   const tienda = tiendaElegida(tiendas, sp.tienda);
   const miradas = tienda ? [tienda] : tiendas;
   after(() => revisarSiHaceFalta(createServiceClient(), tiendas));
-  const { pedidos, fuente } = await pedidosDeTiendas(supabase, miradas, pais.codigo, DIAS_LOGISTICA);
+  const { pedidos, fuente } = await pedidosDeTiendas(supabase, miradas, pais.codigo, { tipo: "atajo", id: "hoy" }, { minDias: DIAS_LOGISTICA });
   // Lo que se gestiona: los que llegaron de Shopify (los del Excel de Finanzas son una foto vieja), por preparar o en ruta, lo más viejo arriba.
   const activos = pedidos
     .filter((p) => !p.sinHora && (etapaLogistica(p.estado) === "por_preparar" || etapaLogistica(p.estado) === "en_ruta"))

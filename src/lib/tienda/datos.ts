@@ -5,6 +5,7 @@ import type { Programado } from "./programado";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { esEstadoPedido, type EstadoPedido, type PedidoResumen } from "./resumen";
+import { leerPeriodo, sumarDias, type EleccionPeriodo } from "./rango";
 
 export interface Tienda {
   id: string;
@@ -54,15 +55,12 @@ export function tiendaElegida(tiendas: Tienda[], param: string | string[] | unde
   return typeof param === "string" ? (tiendas.find((t) => t.id === param) ?? null) : null;
 }
 
-/** Los periodos de la barra de fechas, en días hacia atrás (contando hoy). */
-export const PERIODOS = [
-  { id: "7", etiqueta: "Últimos 7 días", dias: 7 },
-  { id: "30", etiqueta: "Últimos 30 días", dias: 30 },
-  { id: "90", etiqueta: "Últimos 90 días", dias: 90 },
-] as const;
-
-export function periodoElegido(param: string | string[] | undefined) {
-  return PERIODOS.find((p) => p.id === param) ?? PERIODOS[1];
+/**
+ * El periodo elegido en la dirección (`?periodo=` con un atajo, o `?periodo=rango&desde=&hasta=`; 12 nov 2026: el selector de fechas con calendario,
+ * src/lib/tienda/rango.ts). Sus días se calculan al cargar, con el «hoy» de las tiendas que se miran (`pedidosDeTiendas`).
+ */
+export function periodoElegido(sp: { periodo?: string | string[]; desde?: string | string[]; hasta?: string | string[] }): EleccionPeriodo {
+  return leerPeriodo(sp.periodo, sp.desde, sp.hasta);
 }
 
 /** El primer día (AAAA-MM-DD, en Panamá) de un periodo de `dias` días que termina hoy. */
@@ -89,8 +87,8 @@ export interface PedidoFila extends PedidoResumen {
   pedidosCliente?: number | null;
   /** Por dónde entró (como en Mi Reto Digital): «bot» si lo tomó el bot por WhatsApp (etiqueta «chatbot»), «shopify» si entró por la tienda; null si vino del Excel. */
   entrada?: "bot" | "shopify" | null;
-  /** El riesgo del cliente por su historial (la misma regla de Finanzas): «medio» o «alto»; null si no hay riesgo o no se sabe. */
-  riesgo?: "medio" | "alto" | null;
+  /** El riesgo del cliente por su historial (la misma regla de Finanzas): «bajo» (nada en contra, o su primer pedido), «medio» o «alto»; null si no se sabe (sin teléfono). */
+  riesgo?: "bajo" | "medio" | "alto" | null;
   /** El día que pidió el cliente, leído de la nota del pedido en Shopify («para el jueves 19/11»); null si no hay (12 nov 2026). */
   programado?: Programado | null;
   tiendaId: string;
@@ -103,8 +101,8 @@ export interface PedidoFila extends PedidoResumen {
   guia: string | null;
 }
 
-/** Los pedidos de esas tiendas desde `desde` (AAAA-MM-DD en Panamá), del más nuevo al más viejo. */
-export async function cargarPedidos(supabase: SupabaseClient, tiendaIds: string[], desde: string): Promise<PedidoFila[]> {
+/** Los pedidos de esas tiendas desde `desde` hasta `hasta` (AAAA-MM-DD en Panamá; sin `hasta`, hasta hoy), del más nuevo al más viejo. */
+export async function cargarPedidos(supabase: SupabaseClient, tiendaIds: string[], desde: string, hasta?: string): Promise<PedidoFila[]> {
   if (!tiendaIds.length) return [];
   const filas = await traerTodasLasFilas<{
     id: string;
@@ -126,6 +124,8 @@ export async function cargarPedidos(supabase: SupabaseClient, tiendaIds: string[
       .select("id, tienda_id, numero, creado_shopify, cliente_nombre, provincia, ciudad, moneda, total, unidades, estado, transportista, guia")
       .in("tienda_id", tiendaIds)
       .gte("creado_shopify", `${desde}T05:00:00Z`)
+      // El día de Panamá termina a las 5:00 UTC del siguiente.
+      .lt("creado_shopify", `${sumarDias(hasta ?? "2999-12-30", 1)}T05:00:00Z`)
       .order("creado_shopify", { ascending: false })
       .order("id")
       .range(d, h),
