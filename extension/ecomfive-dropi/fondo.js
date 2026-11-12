@@ -24,10 +24,21 @@
 // pedidos, por la API interna de la página). Su sesión también es una cookie: se ve con /api/me, que dice el rol de la cuenta (nunca sale nada más).
 // 0.7.1 (9 nov 2026): junta la 0.6.3 (que solo estaba en la carpeta de la extensión, no en el sistema) con la 0.7.0; Dunamixfy también lee con su pestaña al frente.
 // 0.7.2 (12 nov 2026): el lector de Drop también lee los exclusivos de cada producto (lo que Drop guarda aparte para un cliente), de su ficha.
+// 0.8.0 (12 nov 2026): «siscore» es la pestaña de servientrega-clientes.appsiscore.com (SISCORE, el portal de clientes de Servientrega Panamá) con la cuenta
+// de la tienda (Kenku primero), con el lector `siscore` (informe de guías y rastreo de cada una) para Logística de tienda. SOLO LECTURA: solo consultas;
+// nunca anula, crea guías, recolecciones ni confirmaciones. Su sesión es una cookie: se ve si la página es la del cliente (no la de entrar).
 
-const ORIGEN = { pa: "https://app.dropi.pa", cr: "https://app.dropi.cr", mx: "https://app.dropi.mx", tw: "https://app.tuwinner.com", drop: "https://app.soydrop.com", duna: "https://dunamixfy.cr" };
+const ORIGEN = {
+  pa: "https://app.dropi.pa",
+  cr: "https://app.dropi.cr",
+  mx: "https://app.dropi.mx",
+  tw: "https://app.tuwinner.com",
+  drop: "https://app.soydrop.com",
+  duna: "https://dunamixfy.cr",
+  siscore: "https://servientrega-clientes.appsiscore.com",
+};
 /** Dónde abrir una pestaña nueva de cada sitio. */
-const INICIO = { tw: "/dashboard/winners", drop: "/vendor/products", duna: "/inventory" };
+const INICIO = { tw: "/dashboard/winners", drop: "/vendor/products", duna: "/inventory", siscore: "/app/app-cliente/index.php" };
 const LECTORES = {
   proveedor: { pais: "pa", archivo: "lectores/dropi-diario.js", funcion: "dropiDiario", estado: "__dropiDiario", archivos: ["pedidos", "cartera", "retiros", "stock"] },
   ventas: { pais: "pa", archivo: "lectores/ventas-dropi.js", funcion: "ventasDropi", estado: "__ventasDropi", archivos: ["resumen", "movimientos"] },
@@ -44,6 +55,8 @@ const LECTORES = {
   catalogo_mx: { pais: "mx", archivo: "lectores/catalogo.js", funcion: "leerCatalogo", estado: "__catalogo", archivos: ["catalogo"] },
   // Tu Winner (0.5.0): los ganadores de Panamá y México en la pestaña de app.tuwinner.com.
   tuwinner: { pais: "tw", archivo: "lectores/tuwinner.js", funcion: "leerTuWinner", estado: "__tuwinner", archivos: ["tuwinner"] },
+  // SISCORE (0.8.0): las guías de Servientrega de la cuenta de la tienda, para Logística de tienda. Solo lectura.
+  siscore: { pais: "siscore", archivo: "lectores/siscore.js", funcion: "leerSiscore", estado: "__siscore", archivos: ["siscore"], frente: true },
 };
 // Las direcciones firmadas de subida del sistema: solo a su carpeta temporal de «Actualizar Dropi» y solo en el proyecto de Supabase
 // del sistema (auditoría 27 oct 2026: antes cualquier proyecto *.supabase.co pasaba y lo leído podía terminar en otro lado).
@@ -157,6 +170,14 @@ async function leerSesionDunamixfy() {
   }
 }
 
+// Corre dentro de la pestaña de SISCORE: si hay sesión (la página es la del cliente, no la de entrar) y de qué tienda es la cuenta («sent=KENKU»).
+// La sesión es una cookie: nunca se lee ni sale de la página.
+function leerSesionSiscore() {
+  const enCliente = location.pathname.startsWith("/app/app-cliente/") && !/index\.php$/.test(location.pathname);
+  const tienda = new URLSearchParams(location.search).get("sent") || ((document.body && document.body.innerText.match(/Desde\s+([A-Z0-9 ._-]{2,40})/)) || [])[1] || null;
+  return { hay: enCliente, tipoUsuario: enCliente ? "CLIENTE" : null, tienda: tienda ? tienda.trim() : null, vence: null };
+}
+
 async function atender(m, remitente) {
   switch (m && m.tipo) {
     case "hola":
@@ -164,7 +185,8 @@ async function atender(m, remitente) {
     case "sesion": {
       const t = await pestana(validarPais(m.pais), !!m.abrir, false);
       if (!t) return { pestana: false, hay: false, tipoUsuario: null, tienda: null, vence: null };
-      return { pestana: true, ...(await enPagina(t.id, m.pais === "tw" ? leerSesionTuWinner : m.pais === "drop" ? leerSesionDrop : m.pais === "duna" ? leerSesionDunamixfy : leerSesion)) };
+      const lector = m.pais === "tw" ? leerSesionTuWinner : m.pais === "drop" ? leerSesionDrop : m.pais === "duna" ? leerSesionDunamixfy : m.pais === "siscore" ? leerSesionSiscore : leerSesion;
+      return { pestana: true, ...(await enPagina(t.id, lector)) };
     }
     case "mostrar":
       await pestana(validarPais(m.pais), true, true);
@@ -203,7 +225,7 @@ async function atender(m, remitente) {
       const guardada = (await chrome.storage.session.get(`pestana-${m.lector}`))[`pestana-${m.lector}`];
       // Si la extensión se recargó a medias, no recuerda la pestaña: se busca la de Dropi del país (27 oct 2026).
       const t = (guardada ? await chrome.tabs.get(guardada).catch(() => null) : null) || (await pestana(l.pais, false, false));
-      const nombre = l.pais === "drop" ? "Drop" : l.pais === "duna" ? "Dunamixfy" : l.pais === "tw" ? "Tu Winner" : "Dropi";
+      const nombre = l.pais === "drop" ? "Drop" : l.pais === "duna" ? "Dunamixfy" : l.pais === "tw" ? "Tu Winner" : l.pais === "siscore" ? "SISCORE" : "Dropi";
       if (!t) throw new Error(`Se cerró la pestaña de ${nombre} mientras se leía.`);
       if (t.discarded) throw new Error(`Chrome cerró la pestaña de ${nombre} para ahorrar memoria y se perdió lo leído: vuelve a pulsar «Actualizar» y deja esa pestaña abierta.`);
       const a = await enPagina(
