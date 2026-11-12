@@ -16,6 +16,8 @@ import { VinculosTienda, type FilaVinculo } from "./vinculos-tienda";
 export const metadata = { title: "Productos de Shopify" };
 
 export const dynamic = "force-dynamic";
+// Traer de Shopify y pasar las uniones a los pedidos puede tardar más de lo normal (sus acciones corren en esta página).
+export const maxDuration = 60;
 
 /**
  * Gestión de tienda › Productos de Shopify ↔ Producto (3 nov 2026): cada variante de Shopify de las tiendas del país se une a uno de nuestros productos.

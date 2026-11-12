@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { prepararContexto } from "../publicaciones/vincular";
 import { pedidosPorDia, productosVendidos, resumirPedidos, type LineaVendida, type PedidoResumen } from "./resumen";
-import { nombreVariante, sugerirParaVariante, tituloVariante } from "./vincular-variante";
+import { nombreVariante, sugerirParaVariante, textosDeSku, tituloVariante } from "./vincular-variante";
 
 const p = (estado: PedidoResumen["estado"], total: number, unidades = 1, creado = "2026-11-02T15:00:00Z"): PedidoResumen => ({ estado, total, unidades, creado });
 
@@ -80,4 +80,14 @@ test("sugerencia: el SKU de Shopify igual al nuestro es exacta; con otro SKU, po
   assert.equal(porNombre.skuId, "cc");
   const nada = sugerirParaVariante({ productoTitulo: "Cepillo alisador", varianteTitulo: "Negro", sku: "KN-CEP", huella: null }, ctx);
   assert.equal(nada.tipo, "ninguno");
+});
+
+test("sugerencia: un SKU de Shopify «N.º/CÓDIGO» (así está en Kenku) es exacto con nuestro código", () => {
+  assert.deepEqual(textosDeSku("0007/ACEITE/BATANA/ROMERO"), ["0007/ACEITE/BATANA/ROMERO", "ACEITE/BATANA/ROMERO"]);
+  assert.deepEqual(textosDeSku(" NEOCELL "), ["NEOCELL"]);
+  assert.deepEqual(textosDeSku(null), []);
+  const ctx = prepararContexto([{ id: "ab", codigo: "ACEITE/BATANA/ROMERO", nombre: "Aceite de Batana y Romero", tipo: "simple", huella: null }], []);
+  const r = sugerirParaVariante({ productoTitulo: "Batana Oil Premium", varianteTitulo: "Default Title", sku: "0007/ACEITE/BATANA/ROMERO", huella: null }, ctx);
+  assert.equal(r.tipo, "seguro");
+  assert.equal(r.skuId, "ab");
 });

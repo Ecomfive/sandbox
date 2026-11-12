@@ -14,6 +14,8 @@ import { ConectarTienda } from "./conectar-tienda";
 export const metadata = { title: "Tiendas Shopify" };
 
 export const dynamic = "force-dynamic";
+// Traer de Shopify y pasar las uniones a los pedidos puede tardar más de lo normal (sus acciones corren en esta página).
+export const maxDuration = 60;
 
 const ESTADO: Record<Tienda["estado"], { texto: string; tono: "exito" | "aviso" | "neutro" }> = {
   conectada: { texto: "Conectada", tono: "exito" },

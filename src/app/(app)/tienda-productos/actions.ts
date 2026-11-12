@@ -36,6 +36,37 @@ export async function vincularVariante(varianteId: string, skuId: string | null)
 }
 
 /**
+ * Confirma varias uniones de una vez (el botón «Confirmar las N con SKU o nombre igual»): las guarda todas y después pasa las uniones a los pedidos de
+ * cada tienda una sola vez (12 nov 2026: confirmarlas de a una recorría todos los pedidos por cada una). Hasta 500 por vez.
+ */
+export async function vincularVariantesEnBloque(pares: { varianteId: string; skuId: string }[]): Promise<{ error?: string; hechas?: number }> {
+  const usuario = await requireModuloEscritura("tienda-productos");
+  if (!Array.isArray(pares) || pares.length > 500 || pares.some((p) => !uuid(p?.varianteId) || !uuid(p?.skuId))) return { error: "Datos no válidos." };
+  const supabase = createServiceClient();
+  const skuIds = [...new Set(pares.map((p) => p.skuId))];
+  const { data: existen } = await supabase.from("skus_maestros").select("id").in("id", skuIds);
+  const validos = new Set((existen ?? []).map((x) => x.id as string));
+  const ahora = new Date().toISOString();
+  let hechas = 0;
+  const tiendas = new Set<string>();
+  for (const p of pares) {
+    if (!validos.has(p.skuId)) continue;
+    const { data, error } = await supabase
+      .from("tienda_variantes")
+      .update({ sku_maestro_id: p.skuId, no_fisico: false, vinculado_por: usuario.id, vinculado_en: ahora })
+      .eq("id", p.varianteId)
+      .select("tienda_id");
+    if (error) return { error: `Se guardaron ${hechas}; la siguiente falló.` };
+    if (data?.[0]) tiendas.add(data[0].tienda_id as string);
+    hechas++;
+  }
+  for (const t of tiendas) await aplicarVinculosDeTienda(supabase, t);
+  revalidatePath("/tienda-productos");
+  revalidatePath("/tienda-pedidos");
+  return { hechas };
+}
+
+/**
  * Trae de Shopify los productos y variantes de una tienda conectada (12 nov 2026; solo lectura) y pasa las uniones que ya hay a sus pedidos. Basta poder
  * modificar Productos de Shopify. La unión con nuestros productos no se toca.
  */

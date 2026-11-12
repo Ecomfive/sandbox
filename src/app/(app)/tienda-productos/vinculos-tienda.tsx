@@ -8,7 +8,7 @@ import { fieldClass } from "@/components/ui/field";
 import { CampoSkuMaestro, useOpcionesSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import { useToast } from "@/components/ui/toast";
 import { AlertaIcon, CheckIcon, EnlaceIcon, InventarioIcon, TiendaIcon } from "@/lib/nav-icons";
-import { marcarNoFisico, vincularVariante } from "./actions";
+import { marcarNoFisico, vincularVariante, vincularVariantesEnBloque } from "./actions";
 
 export interface FilaVinculo {
   id: string;
@@ -84,13 +84,8 @@ export function VinculosTienda({ filas, varias, puedeEscribir }: { filas: FilaVi
             type="button"
             disabled={pendiente}
             onClick={() =>
-              correr(async () => {
-                for (const f of sugeridasExactas) {
-                  const r = await vincularVariante(f.id, f.sugerencia!.id);
-                  if (r.error) return r;
-                }
-                return {};
-              }, `${sugeridasExactas.length} variantes vinculadas.`)
+              // Todas juntas: los pedidos de la tienda se actualizan una sola vez.
+              correr(() => vincularVariantesEnBloque(sugeridasExactas.map((f) => ({ varianteId: f.id, skuId: f.sugerencia!.id }))), `${sugeridasExactas.length} variantes vinculadas.`)
             }
           >
             Confirmar las {sugeridasExactas.length} con SKU o nombre igual

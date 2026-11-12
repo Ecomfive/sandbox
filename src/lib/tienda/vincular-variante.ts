@@ -24,9 +24,20 @@ export function nombreVariante(v: Pick<VarianteShopify, "productoTitulo" | "vari
   return t ? `${v.productoTitulo} · ${t}` : v.productoTitulo;
 }
 
+/**
+ * Los textos del SKU de Shopify que cuentan para la coincidencia exacta: el SKU tal cual y, si viene como «N.º/CÓDIGO» (12 nov 2026: así está en Kenku,
+ * «0007/ACEITE/BATANA/ROMERO»), también el código solo, que es el nuestro.
+ */
+export function textosDeSku(sku: string | null | undefined): string[] {
+  const s = (sku ?? "").trim();
+  if (!s) return [];
+  const m = /^\d{1,5}\/(.+)$/.exec(s);
+  return m ? [s, m[1].trim()] : [s];
+}
+
 /** La sugerencia para una variante: primero con el nombre completo (producto y variante) y, si no da nada, con el del producto solo. */
 export function sugerirParaVariante(v: VarianteShopify, ctx: ContextoVincular): Sugerencia {
-  const textos = v.sku?.trim() ? [v.sku.trim()] : [];
+  const textos = textosDeSku(v.sku);
   const completa = sugerirSku({ nombre: nombreVariante(v).replace(" · ", " "), huella: v.huella, textosDropi: textos }, ctx);
   if (completa.tipo !== "ninguno" || !tituloVariante(v.varianteTitulo)) return completa;
   return sugerirSku({ nombre: v.productoTitulo, huella: v.huella, textosDropi: textos }, ctx);

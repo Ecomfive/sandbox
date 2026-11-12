@@ -165,7 +165,9 @@ export async function aplicarVinculosDeTienda(supabase: SupabaseClient, tiendaId
       if (l.sku) {
         destino = porSku.get(skuLimpio(l.sku));
         valor = l.sku;
-      } else if (l.producto) {
+      }
+      // Sin SKU (el Excel) o con un SKU que ya no está en Shopify (el pedido guarda el SKU que tenía el producto ese día): por el nombre exacto.
+      if (!destino && l.producto) {
         const s = porTitulo.get(nombreComparable(l.producto));
         if (s?.size === 1) destino = [...s][0];
         campo = "producto";
@@ -179,18 +181,18 @@ export async function aplicarVinculosDeTienda(supabase: SupabaseClient, tiendaId
     }
     if (data.length < 1000) break;
   }
-  // Cada grupo se actualiza de a 150 pedidos (por su SKU o su nombre exacto dentro de esos pedidos).
-  let total = 0;
+  // Cada grupo se actualiza de a 150 pedidos (por su SKU o su nombre exacto dentro de esos pedidos), 8 consultas a la vez.
+  const tareas: { destino: string; campo: "sku" | "producto"; valor: string; ordenes: string[] }[] = [];
   for (const g of grupos.values()) {
     const ordenes = [...g.ordenes];
-    for (let i = 0; i < ordenes.length; i += 150) {
-      const { error, count } = await supabase
-        .from("ven_orden_lineas")
-        .update({ sku_maestro_id: g.destino }, { count: "exact" })
-        .eq(g.campo, g.valor)
-        .in("orden_id", ordenes.slice(i, i + 150));
-      if (!error) total += count ?? 0;
-    }
+    for (let i = 0; i < ordenes.length; i += 150) tareas.push({ destino: g.destino, campo: g.campo, valor: g.valor, ordenes: ordenes.slice(i, i + 150) });
+  }
+  let total = 0;
+  for (let i = 0; i < tareas.length; i += 8) {
+    const hechas = await Promise.all(
+      tareas.slice(i, i + 8).map((t) => supabase.from("ven_orden_lineas").update({ sku_maestro_id: t.destino }, { count: "exact" }).eq(t.campo, t.valor).in("orden_id", t.ordenes)),
+    );
+    for (const { error, count } of hechas) if (!error) total += count ?? 0;
   }
   return total;
 }
