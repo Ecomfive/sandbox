@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition, type ReactNode } from "react";
 import { claseThLista, claseTdLista, Indicador, MarcoTabla, Pastilla, TableroIndicadores } from "@/components/panel/piezas-panel";
 import { Button } from "@/components/ui/button";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
-import { fieldClass } from "@/components/ui/field";
+import { anilloFoco, fieldClass } from "@/components/ui/field";
 import { CampoSkuMaestro, useOpcionesSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import { useToast } from "@/components/ui/toast";
 import { AlertaIcon, CheckIcon, EnlaceIcon, InventarioIcon, TiendaIcon } from "@/lib/nav-icons";
@@ -26,6 +26,27 @@ type Filtro = "todas" | "vinculadas" | "sugeridas" | "sin" | "no_fisico";
 
 const POR_QUE: Record<string, string> = { codigo: "SKU igual", nombre: "Nombre igual", foto: "Misma foto", parecido: "Nombre parecido" };
 const normal = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+
+// Botones chicos de la fila (12 nov 2026: los de antes ocupaban media fila).
+const BOTON_BASE = `inline-flex h-8 shrink-0 items-center rounded-md px-2.5 text-[13px] font-medium whitespace-nowrap transition-colors disabled:pointer-events-none disabled:opacity-40 ${anilloFoco}`;
+const BOTON_PRINCIPAL = `${BOTON_BASE} boton-neon text-white`;
+const BOTON_SECUNDARIO = `${BOTON_BASE} border border-border bg-card hover:bg-muted`;
+const BOTON_TEXTO = `${BOTON_BASE} text-muted-foreground hover:bg-muted hover:text-foreground`;
+
+/** El producto nuestro en una celda: el nombre (hasta dos líneas), su código en gris y, si hay, por qué se sugiere. */
+function ProductoNuestro({ nombre, codigo, pastilla }: { nombre: string; codigo: string | null; pastilla?: ReactNode }) {
+  return (
+    <span className="flex min-w-0 flex-col gap-1">
+      <span className="line-clamp-2 leading-snug" title={nombre}>
+        {nombre}
+      </span>
+      <span className="flex min-w-0 items-center gap-1.5">
+        {codigo && <span className="truncate font-mono text-[11px] text-muted-foreground">{codigo}</span>}
+        {pastilla}
+      </span>
+    </span>
+  );
+}
 
 const grupo = (f: FilaVinculo): Exclude<Filtro, "todas"> => (f.noFisico ? "no_fisico" : f.skuMaestroId ? "vinculadas" : f.sugerencia ? "sugeridas" : "sin");
 
@@ -99,7 +120,15 @@ export function VinculosTienda({ filas, varias, puedeEscribir }: { filas: FilaVi
         </div>
       ) : (
         <MarcoTabla ariaLabel="Variantes de Shopify">
-          <table className="w-full border-collapse">
+          {/* Anchos fijos (12 nov 2026): los nombres y los SKU largos de Shopify ya no se montan sobre la columna de al lado. */}
+          <table className="w-full min-w-[56rem] table-fixed border-collapse">
+            <colgroup>
+              <col className="w-14" />
+              <col />
+              {varias && <col className="w-28" />}
+              <col />
+              <col className="w-[17rem]" />
+            </colgroup>
             <thead>
               <tr>
                 <th scope="col" className={claseThLista}>
@@ -107,7 +136,6 @@ export function VinculosTienda({ filas, varias, puedeEscribir }: { filas: FilaVi
                 </th>
                 <th scope="col" className={claseThLista}>En Shopify</th>
                 {varias && <th scope="col" className={claseThLista}>Tienda</th>}
-                <th scope="col" className={claseThLista}>SKU de Shopify</th>
                 <th scope="col" className={claseThLista}>Producto nuestro</th>
                 <th scope="col" className={claseThLista}>Acción</th>
               </tr>
@@ -117,7 +145,7 @@ export function VinculosTienda({ filas, varias, puedeEscribir }: { filas: FilaVi
                 const g = grupo(f);
                 const vinculado = f.skuMaestroId ? porId.get(f.skuMaestroId) : undefined;
                 return (
-                  <tr key={f.id} className="align-middle">
+                  <tr key={f.id} className="align-middle hover:bg-muted/40">
                     <td className={claseTdLista}>
                       {f.foto ? (
                         // eslint-disable-next-line @next/next/no-img-element
@@ -126,13 +154,17 @@ export function VinculosTienda({ filas, varias, puedeEscribir }: { filas: FilaVi
                         <span aria-hidden="true" className="block h-10 w-10 rounded-md border border-dashed border-border" />
                       )}
                     </td>
-                    <td className={`${claseTdLista} max-w-[22rem] whitespace-normal`}>
-                      <span className="font-medium">{f.nombre}</span>
-                      {!f.enShopify && <span className="block text-xs text-muted-foreground">Ya no está en Shopify</span>}
+                    <td className={`${claseTdLista} !whitespace-normal`}>
+                      <span className="line-clamp-2 leading-snug font-medium" title={f.nombre}>
+                        {f.nombre}
+                      </span>
+                      <span className="mt-0.5 block truncate font-mono text-[11px] text-muted-foreground" title={f.sku ?? undefined}>
+                        {f.sku || "sin SKU"}
+                        {!f.enShopify && <span className="font-sans"> · ya no está en Shopify</span>}
+                      </span>
                     </td>
-                    {varias && <td className={claseTdLista}>{f.tienda}</td>}
-                    <td className={`${claseTdLista} font-mono text-xs`}>{f.sku || "(sin SKU)"}</td>
-                    <td className={`${claseTdLista} max-w-[22rem] whitespace-normal`}>
+                    {varias && <td className={`${claseTdLista} truncate`}>{f.tienda}</td>}
+                    <td className={`${claseTdLista} !whitespace-normal`}>
                       {eligiendo === f.id ? (
                         <CampoSkuMaestro
                           valor={f.skuMaestroId}
@@ -145,18 +177,13 @@ export function VinculosTienda({ filas, varias, puedeEscribir }: { filas: FilaVi
                       ) : g === "no_fisico" ? (
                         <Pastilla>No sale de bodega</Pastilla>
                       ) : vinculado || f.skuMaestroId ? (
-                        <span>
-                          {vinculado?.nombre ?? "Producto vinculado"} <span className="font-mono text-xs text-muted-foreground">{vinculado?.codigo}</span>
-                        </span>
+                        <ProductoNuestro nombre={vinculado?.nombre ?? "Producto vinculado"} codigo={vinculado?.codigo ?? null} />
                       ) : f.sugerencia ? (
-                        <span className="flex flex-col gap-1">
-                          <span>
-                            {f.sugerencia.nombre} <span className="font-mono text-xs text-muted-foreground">{f.sugerencia.codigo}</span>
-                          </span>
-                          <span>
-                            <Pastilla tono={f.sugerencia.exacta ? "exito" : "aviso"}>{(f.sugerencia.metodo && POR_QUE[f.sugerencia.metodo]) || "Sugerido"}</Pastilla>
-                          </span>
-                        </span>
+                        <ProductoNuestro
+                          nombre={f.sugerencia.nombre}
+                          codigo={f.sugerencia.codigo}
+                          pastilla={<Pastilla tono={f.sugerencia.exacta ? "exito" : "aviso"}>{(f.sugerencia.metodo && POR_QUE[f.sugerencia.metodo]) || "Sugerido"}</Pastilla>}
+                        />
                       ) : (
                         <Pastilla tono="peligro">Sin sugerencia</Pastilla>
                       )}
@@ -165,35 +192,41 @@ export function VinculosTienda({ filas, varias, puedeEscribir }: { filas: FilaVi
                       {!puedeEscribir ? (
                         <span className="text-xs text-muted-foreground">Solo lectura</span>
                       ) : eligiendo === f.id ? (
-                        <Button type="button" variant="ghost" onClick={() => setEligiendo(null)}>
+                        <button type="button" className={BOTON_TEXTO} onClick={() => setEligiendo(null)}>
                           Cancelar
-                        </Button>
+                        </button>
                       ) : (
-                        <div className="flex flex-wrap gap-1.5">
+                        <div className="flex items-center gap-1.5">
                           {g === "sugeridas" && (
-                            <Button type="button" disabled={pendiente} onClick={() => correr(() => vincularVariante(f.id, f.sugerencia!.id), `Vinculada a ${f.sugerencia!.codigo}.`)}>
+                            <button type="button" className={BOTON_PRINCIPAL} disabled={pendiente} onClick={() => correr(() => vincularVariante(f.id, f.sugerencia!.id), `Vinculada a ${f.sugerencia!.codigo}.`)}>
                               Confirmar
-                            </Button>
+                            </button>
                           )}
                           {g !== "no_fisico" && (
-                            <Button type="button" variant="secondary" disabled={pendiente} onClick={() => setEligiendo(f.id)}>
+                            <button type="button" className={BOTON_SECUNDARIO} disabled={pendiente} onClick={() => setEligiendo(f.id)}>
                               {g === "vinculadas" ? "Cambiar" : g === "sugeridas" ? "Elegir otro" : "Buscar producto"}
-                            </Button>
+                            </button>
                           )}
                           {g === "vinculadas" && (
-                            <Button type="button" variant="ghost" disabled={pendiente} onClick={() => correr(() => vincularVariante(f.id, null), "Vínculo quitado.")}>
+                            <button type="button" className={BOTON_TEXTO} disabled={pendiente} onClick={() => correr(() => vincularVariante(f.id, null), "Vínculo quitado.")}>
                               Quitar
-                            </Button>
+                            </button>
                           )}
                           {(g === "sin" || g === "sugeridas") && (
-                            <Button type="button" variant="ghost" disabled={pendiente} onClick={() => correr(() => marcarNoFisico(f.id, true), "Marcada: no sale de bodega.")}>
+                            <button
+                              type="button"
+                              className={BOTON_TEXTO}
+                              title="No es un producto físico (garantía, envío prioritario…): no se vincula ni cuenta como vendido"
+                              disabled={pendiente}
+                              onClick={() => correr(() => marcarNoFisico(f.id, true), "Marcada: no sale de bodega.")}
+                            >
                               No sale de bodega
-                            </Button>
+                            </button>
                           )}
                           {g === "no_fisico" && (
-                            <Button type="button" variant="ghost" disabled={pendiente} onClick={() => correr(() => marcarNoFisico(f.id, false), "Vuelve a estar sin vincular.")}>
+                            <button type="button" className={BOTON_TEXTO} disabled={pendiente} onClick={() => correr(() => marcarNoFisico(f.id, false), "Vuelve a estar sin vincular.")}>
                               Deshacer
-                            </Button>
+                            </button>
                           )}
                         </div>
                       )}
