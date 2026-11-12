@@ -2,6 +2,8 @@
 // Ver src/lib/tienda/ordenes-finanzas.ts. Solo lectura: nada de aquí escribe. Si las tablas de Finanzas no existen, no hay datos y las pantallas
 // siguen como antes (vacías hasta conectar la tienda).
 
+import { fechaProgramada } from "./programado";
+import { transportistaDe } from "./logistica";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { cargarPedidos, inicioPeriodo, type PedidoFila, type Tienda } from "./datos";
@@ -85,6 +87,7 @@ interface ClienteFila {
   corregimiento: string | null;
   direccion: string | null;
   telefono_clave: string | null;
+  notas: string | null;
 }
 
 /**
@@ -130,7 +133,7 @@ export async function cargarPedidosFinanzas(
   if (!tiendaDeUnidad.size) return { pedidos: [], lineas: [] };
   const unidades = [...tiendaDeUnidad.keys()];
   // Con la migración 0276, también la hora de Shopify (un texto armado: por eso se declara como `string`).
-  const columnas: string = `id, unidad_id, numero, fecha, estado_entrega, etiquetas, total, moneda, transportista, guia, origen, ${(await hayHoraDeShopify(supabase)) ? "creado_origen, " : ""}ven_ordenes_clientes(nombre, corregimiento, direccion, telefono_clave)`;
+  const columnas: string = `id, unidad_id, numero, fecha, estado_entrega, etiquetas, total, moneda, transportista, guia, origen, ${(await hayHoraDeShopify(supabase)) ? "creado_origen, " : ""}ven_ordenes_clientes(nombre, corregimiento, direccion, telefono_clave, notas)`;
   const [ordenes, lineas] = await Promise.all([
     traerTodasLasFilas<FilaOrden>(
       (d, h) =>
@@ -178,6 +181,8 @@ export async function cargarPedidosFinanzas(
     etiquetas: etiquetasDe(o.etiquetas),
     entrada: entradaDeOrden(o.origen, o.etiquetas),
     ...datosDelCliente(historial.get(clienteDe(o)?.telefono_clave ?? "")),
+    // La fecha que pidió el cliente, de la nota del pedido (solo en los que llegan de Shopify: así la deja el equipo al confirmar).
+    programado: o.origen === "shopify" ? fechaProgramada(clienteDe(o)?.notas, o.fecha) : null,
     cliente: clienteDe(o)?.nombre ?? null,
     provincia: zonaDeEtiquetas(o.etiquetas),
     ciudad: clienteDe(o)?.corregimiento ?? null,
@@ -185,7 +190,8 @@ export async function cargarPedidosFinanzas(
     total: Number(o.total) || 0,
     unidades: unidadesDe.get(o.id) ?? 0,
     estado: estadoDesdeFinanzas(o.estado_entrega, o.etiquetas),
-    transportista: o.transportista,
+    // La transportista guardada o la de la etiqueta de zona («INTERIOR/SERVIENTREGA» → Servientrega).
+    transportista: transportistaDe(o.transportista, o.etiquetas),
     guia: o.guia,
   }));
   return { pedidos, lineas };

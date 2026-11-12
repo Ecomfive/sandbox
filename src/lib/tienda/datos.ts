@@ -1,6 +1,7 @@
 // Gestión de tienda (3 nov 2026): lo que leen sus páginas de la base (migración 0224). Todo es de las tiendas del país elegido arriba; por ahora se
 // trabaja con las de Panamá (Kenku primero). Sin la migración, las páginas dicen que falta correrla en vez de romperse.
 
+import type { Programado } from "./programado";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { esEstadoPedido, type EstadoPedido, type PedidoResumen } from "./resumen";
@@ -90,6 +91,8 @@ export interface PedidoFila extends PedidoResumen {
   entrada?: "bot" | "shopify" | null;
   /** El riesgo del cliente por su historial (la misma regla de Finanzas): «medio» o «alto»; null si no hay riesgo o no se sabe. */
   riesgo?: "medio" | "alto" | null;
+  /** El día que pidió el cliente, leído de la nota del pedido en Shopify («para el jueves 19/11»); null si no hay (12 nov 2026). */
+  programado?: Programado | null;
   tiendaId: string;
   numero: string;
   cliente: string | null;

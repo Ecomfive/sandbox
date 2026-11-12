@@ -24,7 +24,7 @@ const ahoraMismo = () => Date.now();
 /**
  * Gestión de tienda › Confirmación (12 nov 2026, como la pantalla de Mi Reto Digital): la cola de pedidos sin confirmar (lo más viejo arriba), los
  * que esperan respuesta del cliente, los confirmados y cancelados del periodo y la tasa de confirmación contra la meta. Solo lectura: lo marca el
- * equipo en Shopify con etiquetas. Programados llega con WhatsApp (allá la fecha sale de la conversación).
+ * equipo en Shopify con etiquetas. Programados: la fecha que pidió el cliente, leída de la nota del pedido (así la deja el equipo al confirmar).
  */
 export default async function ConfirmacionTiendaPage({ searchParams }: { searchParams: Promise<{ [k: string]: string | string[] | undefined }> }) {
   await requireModulo("tienda-confirmacion");
@@ -41,6 +41,10 @@ export default async function ConfirmacionTiendaPage({ searchParams }: { searchP
   const delPeriodo = pedidos.filter((p) => diaPanama(p.creado) >= desde);
   // La cola: los sin confirmar que llegaron de Shopify (los del Excel de Finanzas son una foto vieja: ya no se gestionan), lo más viejo arriba.
   const sinConfirmar = pedidos.filter((p) => p.estado === "nuevo" && !p.sinHora).sort((a, b) => a.creado.localeCompare(b.creado));
+  // Programados: los que todavía no salen (sin confirmar o confirmados) y tienen fecha en la nota, por fecha (12 nov 2026).
+  const programados = pedidos
+    .filter((p) => (p.estado === "nuevo" || p.estado === "confirmado") && p.programado)
+    .sort((a, b) => a.programado!.fecha.localeCompare(b.programado!.fecha));
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-5">
       <EncabezadoPagina titulo="Confirmación" oculto>
@@ -56,11 +60,13 @@ export default async function ConfirmacionTiendaPage({ searchParams }: { searchP
           <AvisoConexion tiendas={miradas} finanzas={fuente} />
           <ConfirmacionTienda
             sinConfirmar={sinConfirmar}
+            programados={programados}
             delPeriodo={delPeriodo}
             periodo={periodo.etiqueta.toLowerCase()}
             codigoPais={pais.codigo}
             tiendas={Object.fromEntries(tiendas.map((t) => [t.id, t.nombre]))}
             ahora={ahoraMismo()}
+            hoy={diaPanama(new Date(ahoraMismo()).toISOString())}
           />
         </>
       )}
