@@ -68,6 +68,71 @@ async function leerDropProveedor(subida) {
       if (filas.length < 10 || !nuevas) break;
     }
     if (!productos.size) throw new Error("No se leyó ningún producto de Drop: revisa que la sesión sea la del proveedor.");
+
+    // 1b) Los exclusivos de cada producto (12 nov 2026, pedido de Hernán): lo que Drop guarda aparte para un cliente («Producto exclusivo» en la ficha) no
+    // entra en el «Inventario» de la tabla. Viene en los datos con que Drop dibuja la ficha (`exclusiveSellers`): cliente, variante, unidades y si está activo.
+    estado.fase = "exclusivos";
+    estado.exclusivos = 0;
+    const flujoDe = (html) => {
+      let flujo = "";
+      const re = /self\.__next_f\.push\(\[1,("(?:[^"\\]|\\.)*")\]\)/g;
+      let m;
+      while ((m = re.exec(html))) flujo += JSON.parse(m[1]);
+      return flujo;
+    };
+    const listaDe = (flujo, clave) => {
+      const i = flujo.indexOf(`"${clave}":`);
+      if (i < 0) return null;
+      const j = flujo.indexOf("[", i);
+      if (j < 0 || j > i + clave.length + 4) return null;
+      let d = 0;
+      let enTexto = false;
+      let escape = false;
+      for (let k = j; k < flujo.length; k++) {
+        const c = flujo[k];
+        if (enTexto) {
+          if (escape) escape = false;
+          else if (c === "\\") escape = true;
+          else if (c === '"') enTexto = false;
+          continue;
+        }
+        if (c === '"') enTexto = true;
+        else if (c === "[" || c === "{") d++;
+        else if (c === "]" || c === "}") {
+          d--;
+          if (d === 0) return JSON.parse(flujo.slice(j, k + 1));
+        }
+      }
+      return null;
+    };
+    const ids = [...productos.keys()];
+    async function exclusivosDe(id) {
+      for (let intento = 0; intento < 3; intento++) {
+        const r = await fetch(`/vendor/products/details/${id}`, { credentials: "include" }).catch(() => null);
+        if (r && r.ok && new URL(r.url).pathname.startsWith("/vendor")) {
+          const lista = listaDe(flujoDe(await r.text()), "exclusiveSellers");
+          return (Array.isArray(lista) ? lista : []).map((x) => ({
+            cliente: String(x?.sellerName ?? "").slice(0, 120),
+            variante: x?.variantName ? String(x.variantName).slice(0, 120) : null,
+            cantidad: Number(x?.quantity) || 0,
+            activo: x?.active !== false,
+          }));
+        }
+        if (r && !new URL(r.url).pathname.startsWith("/vendor")) throw new Error("La sesión de Drop venció mientras se leían los exclusivos.");
+        await pausa(2000);
+      }
+      return null; // no se pudo leer: el sistema conserva lo que tenía
+    }
+    let siguiente = 0;
+    await Promise.all(
+      Array.from({ length: 4 }, async () => {
+        while (siguiente < ids.length) {
+          const id = ids[siguiente++];
+          productos.get(id).exclusivos = await exclusivosDe(id);
+          estado.exclusivos++;
+        }
+      }),
+    );
     const lecturaProductos = { tipo: "drop", pais: "cr", inicio: estado.inicio, duracionMs: Math.round(performance.now() - t0), paginas, productos: [...productos.values()] };
 
     // 2) Los pedidos: los datos de cada página de /vendor/orders, de a 500, del más nuevo al más viejo. Sin periodo, Drop solo da los últimos 30 días (9 nov 2026: las

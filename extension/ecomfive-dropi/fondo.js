@@ -23,6 +23,7 @@
 // 0.7.0 (9 nov 2026): «duna» es la pestaña de dunamixfy.cr (Dunamixfy, Costa Rica) con la cuenta de proveedor, con el lector `dunamixfy_cr` (productos y
 // pedidos, por la API interna de la página). Su sesión también es una cookie: se ve con /api/me, que dice el rol de la cuenta (nunca sale nada más).
 // 0.7.1 (9 nov 2026): junta la 0.6.3 (que solo estaba en la carpeta de la extensión, no en el sistema) con la 0.7.0; Dunamixfy también lee con su pestaña al frente.
+// 0.7.2 (12 nov 2026): el lector de Drop también lee los exclusivos de cada producto (lo que Drop guarda aparte para un cliente), de su ficha.
 
 const ORIGEN = { pa: "https://app.dropi.pa", cr: "https://app.dropi.cr", mx: "https://app.dropi.mx", tw: "https://app.tuwinner.com", drop: "https://app.soydrop.com", duna: "https://dunamixfy.cr" };
 /** Dónde abrir una pestaña nueva de cada sitio. */
