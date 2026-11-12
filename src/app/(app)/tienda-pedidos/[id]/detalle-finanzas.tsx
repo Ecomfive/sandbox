@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { claseThLista, claseTdLista, Pastilla } from "@/components/panel/piezas-panel";
 import { Pagina } from "@/components/ui/pagina";
 import { formatearFecha, formatearMoneda } from "@/lib/formato";
+import { NOMBRE_FUENTE_COSTO } from "@/lib/tienda/costos";
 import type { OrdenFinanzas, OrdenTienda } from "@/lib/tienda/orden-detalle";
 import { estadoDesdeFinanzas, etiquetasDe, zonaDeEtiquetas } from "@/lib/tienda/ordenes-finanzas";
 import { ESTADOS_PEDIDO } from "@/lib/tienda/resumen";
@@ -25,6 +26,21 @@ function Dato({ etiqueta, children }: { etiqueta: string; children: ReactNode })
     <div className="flex justify-between gap-3 text-sm">
       <dt className="shrink-0 text-muted-foreground">{etiqueta}</dt>
       <dd className="m-0 min-w-0 text-right break-words">{children}</dd>
+    </div>
+  );
+}
+
+/** Una cifra de «Ingresos y costos»: el nombre, el valor y, si hay, una nota corta debajo. */
+function Caja({ titulo, valor, nota, fuerte = false }: { titulo: string; valor: string; nota?: string; fuerte?: boolean }) {
+  return (
+    <div className="flex min-w-0 flex-col gap-0.5 rounded-lg bg-muted/60 px-3 py-2">
+      <span className="text-xs text-muted-foreground">{titulo}</span>
+      <b className={`text-base tabular-nums ${fuerte ? "text-primario" : ""}`}>{valor}</b>
+      {nota && (
+        <span className="truncate text-[11px] text-muted-foreground" title={nota}>
+          {nota}
+        </span>
+      )}
     </div>
   );
 }
@@ -94,6 +110,9 @@ export function ContenidoOrdenTienda({ orden, codigoPais, dosColumnas = false }:
               <th scope="col" className={`${claseThLista} text-right`}>
                 Precio
               </th>
+              <th scope="col" className={`${claseThLista} text-right`}>
+                Costo
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -114,6 +133,9 @@ export function ContenidoOrdenTienda({ orden, codigoPais, dosColumnas = false }:
                 </td>
                 <td className={`${claseTdLista} text-right tabular-nums`}>{l.cantidad ?? "—"}</td>
                 <td className={`${claseTdLista} text-right tabular-nums`}>{dinero(l.precio)}</td>
+                <td className={`${claseTdLista} text-right tabular-nums`} title={l.costo ? `${dinero(l.costo.costo)} por unidad · ${NOMBRE_FUENTE_COSTO[l.costo.fuente]}` : undefined}>
+                  {l.es_servicio ? "—" : l.costo ? dinero(l.costo.costo * (Number(l.cantidad) || 0)) : <span className="text-muted-foreground">—</span>}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -129,6 +151,28 @@ export function ContenidoOrdenTienda({ orden, codigoPais, dosColumnas = false }:
         {o.estado_pago && <Dato etiqueta="Pago">{o.estado_pago}</Dato>}
         {o.forma_pago_texto && <Dato etiqueta="Forma de pago">{o.forma_pago_texto}</Dato>}
       </dl>
+    </Tarjeta>
+  );
+  const c = orden.cuentas;
+  // «Ingresos y costos» (12 nov 2026, como en Mi Reto Digital): el costo de cada producto es el de Dropi del país o, si falta, la última compra.
+  const ingresosYCostos = (
+    <Tarjeta id={`t-cost-${orden.id}`} titulo="Ingresos y costos">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        <Caja titulo="Venta" valor={dinero(c.venta)} />
+        <Caja
+          titulo="Costo del producto"
+          valor={c.costoProductos > 0 || c.lineasSinCosto === 0 ? dinero(c.costoProductos) : "—"}
+          nota={c.lineasSinCosto ? `${c.lineasSinCosto} ${c.lineasSinCosto === 1 ? "producto sin costo" : "productos sin costo"}: falta vincular o costear` : c.fuentes.map((f) => NOMBRE_FUENTE_COSTO[f]).join(" y ") || undefined}
+        />
+        <Caja titulo="Fulfillment" valor={c.fulfillment === null ? "—" : dinero(c.fulfillment)} nota={c.fulfillment === null ? "sin tarifa de la tienda" : undefined} />
+        <Caja titulo="Flete" valor={c.flete === null ? "—" : dinero(c.flete)} nota={c.flete === null ? "cuando tenga guía" : undefined} />
+        <Caja
+          titulo="Margen"
+          valor={c.margen === null ? "—" : dinero(c.margen)}
+          nota={c.margenPct === null ? undefined : `${c.margenPct.toLocaleString("es-PA")} % de la venta${c.lineasSinCosto || c.fulfillment === null || c.flete === null ? " · con lo que se sabe" : ""}`}
+          fuerte
+        />
+      </div>
     </Tarjeta>
   );
   const entrega = (
@@ -202,6 +246,7 @@ export function ContenidoOrdenTienda({ orden, codigoPais, dosColumnas = false }:
         {aviso}
         {clienteYDireccion}
         {productos}
+        {ingresosYCostos}
         {entrega}
         {etiquetasT}
         {historial}
@@ -213,6 +258,7 @@ export function ContenidoOrdenTienda({ orden, codigoPais, dosColumnas = false }:
       <div className="grid grid-cols-1 items-start gap-5 min-[1100px]:grid-cols-[minmax(0,1fr)_360px]">
         <div className="flex min-w-0 flex-col gap-5">
           {productos}
+          {ingresosYCostos}
           {historial}
         </div>
         <div className="flex min-w-0 flex-col gap-5">

@@ -7,7 +7,7 @@ import { TablaDatos, type ColumnaTabla } from "@/components/tabla/tabla-datos";
 import { Indicador, Pastilla, TableroIndicadores } from "@/components/panel/piezas-panel";
 import { formatearMoneda } from "@/lib/formato";
 import { Tooltip } from "@/components/ui/tooltip";
-import { AlertaIcon, CalendarioIcon, CerrarIcon, ChatIcon, CheckIcon, DeshacerIcon, EnvioIcon, EtiquetaIcon, InventarioIcon, MargenIcon, PedidoIcon, ProductoIcon, TiendaIcon } from "@/lib/nav-icons";
+import { AlertaIcon, CalendarioIcon, CerrarIcon, ChatIcon, CheckIcon, ShopifyLogo, WhatsAppLogo, DeshacerIcon, EnvioIcon, EtiquetaIcon, InventarioIcon, MargenIcon, PedidoIcon, ProductoIcon, TiendaIcon } from "@/lib/nav-icons";
 import { SIN_VALOR, type DefTabla } from "@/lib/tabla/motor";
 import type { NombreFilas } from "@/lib/tabla/pie";
 import { ESTADOS_PEDIDO, diaPanama, resumirPedidos, type EstadoPedido } from "@/lib/tienda/resumen";
@@ -31,8 +31,8 @@ const ICONOS: Record<string, IconoComp> = {
 };
 /** Por dónde entró el pedido, como en Mi Reto Digital: el ícono va antes del número. */
 const ENTRADA = {
-  bot: { texto: "Lo tomó el bot por WhatsApp", icono: ChatIcon, clase: "text-success" },
-  shopify: { texto: "Entró por Shopify", icono: TiendaIcon, clase: "text-muted-foreground" },
+  bot: { texto: "Lo tomó el bot por WhatsApp", icono: WhatsAppLogo, clase: "" },
+  shopify: { texto: "Entró por Shopify", icono: ShopifyLogo, clase: "" },
 } as const;
 
 function NumeroPedido({ p }: { p: PedidoFila }) {
@@ -42,7 +42,7 @@ function NumeroPedido({ p }: { p: PedidoFila }) {
       {e ? (
         <Tooltip texto={e.texto}>
           <span tabIndex={0} aria-label={e.texto} className="inline-flex">
-            <e.icono className={`h-4 w-4 ${e.clase}`} />
+            <e.icono className={`h-4 w-4 ${e.clase}`.trim()} />
           </span>
         </Tooltip>
       ) : (
