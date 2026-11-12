@@ -51,6 +51,8 @@ import { FotosPublicacion } from "./fotos-publicacion";
 import { PublicacionesDelProducto } from "./mismo-producto";
 import { Monto, useMoneda } from "./moneda-contexto";
 import { VentasDropiProducto } from "../producto/ventas-dropi-producto";
+import { plataformasDePais } from "@/lib/plataformas";
+import { VentasPlataformasProducto } from "../producto/ventas-plataformas-producto";
 
 interface Formulario {
   nombre: string;
@@ -682,6 +684,12 @@ function ContenidoFicha({
             </Seccion>
           )}
 
+          {/* Ventas por plataforma (12 nov 2026, pedido de Hernán): en un país con varias plataformas, lo del producto en cada una y en todas. */}
+          {p.sku && plataformasDePais(codigoPais).length > 1 && (
+            <Seccion icono={MargenIcon} titulo={`Ventas por plataforma en ${nombrePais}`}>
+              <VentasPlataformasProducto key={`${p.sku.id}-${codigoPais}`} id={p.sku.id} pais={codigoPais} />
+            </Seccion>
+          )}
           {/* Las ventas de todo el producto vinculado, con todos sus IDs de Dropi (activos, archivados, públicos y privados), como en Producto. */}
           {p.sku && corteVentas && (
             <Seccion icono={MargenIcon} titulo={`Ventas del producto en Dropi en ${nombrePais} (todos sus IDs)`}>

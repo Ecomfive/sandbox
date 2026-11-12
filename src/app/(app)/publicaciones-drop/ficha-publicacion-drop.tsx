@@ -15,7 +15,7 @@ import { CampoSkuMaestro, type OpcionSkuMaestro } from "@/components/ui/selector
 import { SkuCopiable } from "@/components/ui/sku-copiable";
 import { useToast } from "@/components/ui/toast";
 import { Ventana } from "@/components/ui/ventana";
-import { ApagarIcon, CandadoAbiertoIcon, ComprasIcon, DropIcon, EstadoIcon, EtiquetaIcon, InteligenciaIcon, InventarioIcon, MargenIcon, PapeleraIcon, ProductoIcon, ReactivarIcon } from "@/lib/nav-icons";
+import { ApagarIcon, CandadoAbiertoIcon, ComprasIcon, DropIcon, EstadoIcon, EtiquetaIcon, InteligenciaIcon, InventarioIcon, MargenIcon, PapeleraIcon, ProductoIcon, ReactivarIcon, VentasIcon } from "@/lib/nav-icons";
 import { formatearFechaHora } from "@/lib/formato";
 import { accionDeEstado, ETIQUETA_ESTADO_DROP, motivoAccesoPrivado, motivoCambioEstado, motivoEliminar, motivoGestionarInventario, motivoLiquidacion } from "@/lib/publicaciones-drop/acciones";
 import { formatoEnDolares, formatoMonto, type MonedaPublicaciones } from "@/lib/publicaciones/moneda";
@@ -30,6 +30,8 @@ import { guardarCostoManualDrop, vincularPublicacionDrop } from "./actions";
 import { DialogoAccesoPrivado, DialogoSolicitudInventario } from "./dialogos-fila-drop";
 import type { FilaPublicacionDrop, ProductoDrop } from "./def-publicaciones-drop";
 import { InsigniaConectadoDrop } from "./insignia-conectado-drop";
+import { plataformasDePais } from "@/lib/plataformas";
+import { VentasPlataformasProducto } from "../producto/ventas-plataformas-producto";
 
 const AVISO_SIN_CONEXION = "Todavía no se escribe en Drop desde el sistema: por ahora solo se leen sus publicaciones. Hazlo en Drop.";
 const urlDrop = (p: FilaPublicacionDrop) => `https://app.soydrop.com/vendor/products/details/${p.dropInterno}/inventory`;
@@ -467,6 +469,12 @@ export function FichaPublicacionDrop({
             </div>
           </dl>
         </Seccion>
+
+        {p.producto && plataformasDePais(codigoPais).length > 1 && (
+          <Seccion icono={VentasIcon} titulo={`Ventas por plataforma en ${nombrePais}`}>
+            <VentasPlataformasProducto key={`${p.producto.id}-${codigoPais}`} id={p.producto.id} pais={codigoPais} />
+          </Seccion>
+        )}
 
         <Seccion icono={InventarioIcon} titulo="Stock">
           <AvisoEnCamino enCamino={p.enCamino} llegada={p.llegadaCamino} sinFecha={p.sinFechaCamino} sinEnvio={p.sinEnvioCamino} enCotizacion={p.enCotizacion} etapaCotizacion={p.etapaCotizacion} />

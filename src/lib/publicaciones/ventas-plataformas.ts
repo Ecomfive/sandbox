@@ -84,3 +84,25 @@ export function armarVentasPlataforma(plataforma: PlataformaVentas, publicacione
 export function textoEtiquetas(ids: number[], etiquetaDe: Map<number, string>): string {
   return ids.map((id) => etiquetaDe.get(id) ?? `Dropi · ID ${id}`).join(", ");
 }
+
+/**
+ * Lo vendido por un producto en una plataforma (Drop, Effi, Dunamixfy) para su ficha (12 nov 2026, pedido de Hernán: «mostrar las ventas por plataforma en las fichas de los
+ * productos»): netas (salidas − devueltas) de los últimos 30 días hasta `corte` (el último día leído de esa plataforma en el país) y en total, con la primera y la última venta.
+ */
+export function resumenVentasPlataforma(ventas: readonly Pick<VentaPlataformaDia, "dia" | "salidas" | "devueltas">[], corte: string | null): { netas30: number; netasTotal: number; primeraVenta: string | null; ultimaVenta: string | null } {
+  const desde = corte ? new Date(Date.parse(`${corte}T00:00:00Z`) - 29 * 86_400_000).toISOString().slice(0, 10) : null;
+  let netas30 = 0;
+  let netasTotal = 0;
+  let primeraVenta: string | null = null;
+  let ultimaVenta: string | null = null;
+  for (const v of ventas) {
+    const netas = v.salidas - v.devueltas;
+    netasTotal += netas;
+    if (desde && v.dia >= desde && v.dia <= corte!) netas30 += netas;
+    if (v.salidas > 0) {
+      if (!primeraVenta || v.dia < primeraVenta) primeraVenta = v.dia;
+      if (!ultimaVenta || v.dia > ultimaVenta) ultimaVenta = v.dia;
+    }
+  }
+  return { netas30, netasTotal, primeraVenta, ultimaVenta };
+}
