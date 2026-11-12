@@ -5,20 +5,33 @@ import { useEffect, useMemo, useState } from "react";
 import { COLORES } from "@/components/panel/colores-tablero";
 import { anilloFoco } from "@/components/ui/field";
 import { Ventana } from "@/components/ui/ventana";
-import { fraseDelAnalisis, GRUPOS_PARETO, paretoDe, textoParte, type GrupoPareto, type ResultadoPareto } from "@/lib/crm/pareto";
+import { fraseDelAnalisis, GRUPOS_PARETO, pareto, paretoDe, textoParte, type GrupoPareto, type ResultadoPareto } from "@/lib/crm/pareto";
 import { DropshipperIcon } from "@/lib/nav-icons";
 import { Barra, Chip } from "../crm-dropshippers/direccion/piezas-direccion";
 import { cargarParetoClientes, type ParetoClientes } from "./pareto-actions";
 
-/** Los periodos que se pueden mirar (como en Dirección); la tarjeta muestra el de 12 meses. */
-const PERIODOS = [3, 6, 12];
+/** Los periodos que se pueden mirar: los últimos 30 días (lo que muestra la tarjeta) y, como en Dirección, 3, 6 o 12 meses. */
+type Periodo = "30d" | 3 | 6 | 12;
+const PERIODOS: { valor: Periodo; etiqueta: string; texto: string }[] = [
+  { valor: "30d", etiqueta: "30 días", texto: "30 días" },
+  { valor: 3, etiqueta: "3 meses", texto: "3 meses" },
+  { valor: 6, etiqueta: "6 meses", texto: "6 meses" },
+  { valor: 12, etiqueta: "12 meses", texto: "12 meses" },
+];
+type Datos = Exclude<ParetoClientes, { error: string }>;
+
+/** El análisis del periodo: los 30 días salen de las guías por día; los meses, de las guías mes a mes. */
+function analisis(datos: Datos | null, series: Map<string, number[]>, periodo: Periodo): ResultadoPareto {
+  if (periodo === "30d") return pareto(Object.entries(datos?.dias30 ?? {}).map(([id, valor]) => ({ id, valor })));
+  return paretoDe(series, periodo);
+}
 const LEYENDA: Record<GrupoPareto, string> = { top: "El 20 % de los clientes", resto: "El 80 % restante" };
 const n = (v: number) => v.toLocaleString("es-PA");
 const guias = (v: number) => `${n(v)} ${v === 1 ? "guía" : "guías"}`;
 
 /**
  * La tarjeta «Pareto de clientes» del tablero (12 nov 2026, pedido de Hernán): cuántos clientes son el 20 % que más guías hace y qué parte de las guías
- * hacen, en los últimos 12 meses. No filtra la lista de publicaciones (cuenta clientes, no publicaciones): abre la lista de esos clientes. Las guías son
+ * hacen, en los últimos 30 días. No filtra la lista de publicaciones (cuenta clientes, no publicaciones): abre la lista de esos clientes. Las guías son
  * las del Pareto de Dirección en el CRM y se piden al abrir la página.
  */
 export function TarjetaParetoClientes() {
@@ -34,7 +47,7 @@ export function TarjetaParetoClientes() {
     };
   }, []);
   const series = useMemo(() => new Map(Object.entries(datos && !("error" in datos) ? datos.porMes : {})), [datos]);
-  const r12 = useMemo(() => paretoDe(series, 12), [series]);
+  const r30 = useMemo(() => analisis(datos && !("error" in datos) ? datos : null, series, "30d"), [datos, series]);
   const c = COLORES.violeta;
   const cargando = !datos;
   const error = datos && "error" in datos ? datos.error : null;
@@ -56,19 +69,19 @@ export function TarjetaParetoClientes() {
           <span className="min-w-0 text-xs leading-tight font-medium tracking-wide text-muted-foreground uppercase hyphens-auto">Pareto de clientes</span>
         </span>
         <span className="flex items-baseline gap-1">
-          <span className={`text-3xl leading-none font-semibold tabular-nums ${c.numero}`}>{cargando ? "…" : error ? "—" : n(r12.grupos.top.n)}</span>
-          {!cargando && !error && r12.n > 0 && <span className="text-sm text-muted-foreground tabular-nums">/ {n(r12.n)} clientes</span>}
+          <span className={`text-3xl leading-none font-semibold tabular-nums ${c.numero}`}>{cargando ? "…" : error ? "—" : n(r30.grupos.top.n)}</span>
+          {!cargando && !error && r30.n > 0 && <span className="text-sm text-muted-foreground tabular-nums">/ {n(r30.n)} clientes</span>}
         </span>
         <span className="text-xs text-muted-foreground">
           {cargando ? (
-            "Contando las guías de 12 meses…"
+            "Contando las guías de 30 días…"
           ) : error ? (
             <span className="text-destructive">{error}</span>
-          ) : r12.n === 0 ? (
-            "Sin guías de clientes en 12 meses"
+          ) : r30.n === 0 ? (
+            "Sin guías de clientes en 30 días"
           ) : (
             <>
-              El 20 % que más guías trae: hace el <span className="font-semibold text-foreground">{textoParte(r12.grupos.top.parteDelTotal)}</span> de las guías (12 meses)
+              El 20 % que más guías trae: hace el <span className="font-semibold text-foreground">{textoParte(r30.grupos.top.parteDelTotal)}</span> de las guías (30 días)
             </>
           )}
           <span className="sr-only">. Abre la lista de esos clientes.</span>
@@ -79,11 +92,12 @@ export function TarjetaParetoClientes() {
   );
 }
 
-/** La lista de los clientes por guías, de más a menos: el 20 % que más trae primero y, si se pide, el resto. Con el periodo (3, 6 o 12 meses). */
-function VentanaPareto({ abierta, alCerrar, datos, series }: { abierta: boolean; alCerrar: () => void; datos: Exclude<ParetoClientes, { error: string }>; series: Map<string, number[]> }) {
-  const [meses, setMeses] = useState(12);
+/** La lista de los clientes por guías, de más a menos: el 20 % que más trae primero y, si se pide, el resto. Con el periodo (30 días o 3, 6 o 12 meses). */
+function VentanaPareto({ abierta, alCerrar, datos, series }: { abierta: boolean; alCerrar: () => void; datos: Datos; series: Map<string, number[]> }) {
+  const [periodo, setPeriodo] = useState<Periodo>("30d");
   const [verTodos, setVerTodos] = useState(false);
-  const r = useMemo(() => paretoDe(series, meses), [series, meses]);
+  const r = useMemo(() => analisis(datos, series, periodo), [datos, series, periodo]);
+  const enPeriodo = `en ${PERIODOS.find((x) => x.valor === periodo)!.texto}`;
   const filas = verTodos ? r.filas : r.filas.filter((f) => f.grupo === "top");
   const nombre = (id: string) => datos.clientes[id]?.nombre ?? "Cliente sin ficha";
 
@@ -91,14 +105,14 @@ function VentanaPareto({ abierta, alCerrar, datos, series }: { abierta: boolean;
     <Ventana abierto={abierta} alCerrar={alCerrar} titulo={`Pareto de clientes · ${datos.nombrePais}`} ancho="lg">
       <div className="flex flex-col gap-4 p-5">
         <div className="flex flex-wrap items-center gap-1.5">
-          {PERIODOS.map((m) => (
-            <Chip key={m} activo={meses === m} onClick={() => setMeses(m)}>
-              {m} meses
+          {PERIODOS.map((x) => (
+            <Chip key={x.valor} activo={periodo === x.valor} onClick={() => setPeriodo(x.valor)}>
+              {x.etiqueta}
             </Chip>
           ))}
         </div>
         {r.n === 0 ? (
-          <p className="m-0 text-sm text-muted-foreground">Sin guías de clientes en {meses} meses.</p>
+          <p className="m-0 text-sm text-muted-foreground">Sin guías de clientes {enPeriodo}.</p>
         ) : (
           <>
             <p className="m-0 text-base font-semibold">{fraseDelAnalisis(r, "los clientes", "las guías")}</p>
@@ -116,7 +130,7 @@ function VentanaPareto({ abierta, alCerrar, datos, series }: { abierta: boolean;
             <div className="overflow-x-auto rounded-lg border border-border">
               <table className="w-full text-sm">
                 <caption className="sr-only">
-                  {verTodos ? "Todos los clientes con guías" : "El 20 % de los clientes que más guías trae"}, de más a menos guías, en {meses} meses
+                  {verTodos ? "Todos los clientes con guías" : "El 20 % de los clientes que más guías trae"}, de más a menos guías, {enPeriodo}
                 </caption>
                 <thead className="bg-muted/50 text-xs text-muted-foreground">
                   <tr>
