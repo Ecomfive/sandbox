@@ -1065,7 +1065,7 @@ convenciones técnicas del código.
   `ProductoVentas.ids` dice qué IDs suma cada fila (la plata se suma igual). La tarjeta «Por SKU del sistema» se quitó. La ficha de
   Producto trae «Ventas en Dropi» (`ventas-dropi-producto.tsx` + `obtenerVentasDropiProducto`, `ventas-dropi-actions.ts`: Producto o
   Inventario, países permitidos; todos los IDs de sus publicaciones y variantes, activas y archivadas, por país, con
-  `ventasDePublicacion`), solo si tiene publicaciones en Dropi.
+  `ventasDePublicacion`), solo si tiene publicaciones en Dropi. Con varios países, solo el de la barra va abierto y primero; los demás, plegados con su flecha y sus netas de 30 días (11 nov 2026, pedido de Alcides; `useCodigoPais`).
 - **Portal del proveedor (Shen Zhen)** **(El proveedor se llamaba «Chin»: desde el 23 oct 2026, migración 0143, es «Shen Zhen» en la base —`proveedores`, `wms_compras.proveedor`/`agente_envio`, `wms_rutas_envio.agente`— y en todas las pantallas. Las rutas y archivos conservan `chin` en su nombre —`/compras/tablero-chin`, `portal-chin.tsx`—: no se ven y renombrarlos rompería enlaces y favoritos. Las migraciones antiguas y `scripts/importar-rutas-envio.ts` (de una sola vez) siguen diciendo «Chin».)** (plan en [PORTAL-PROVEEDOR.md](PORTAL-PROVEEDOR.md); fase 1 = migración 0124, 21 oct 2026). Shen Zhen
   cotiza, marca envíos y confirma pagos desde un portal aparte que lee un **espejo**, nunca `wms_compras`: `proveedor_pedidos` lo
   llena el disparador `proveedor_sincronizar` (en `wms_compras` y `wms_compra_items`) con las compras de un proveedor de
