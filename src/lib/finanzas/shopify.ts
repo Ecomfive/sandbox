@@ -98,6 +98,7 @@ export function ordenDeShopify(tienda: string, o: Record<string, unknown>): Orde
   const llave = llaveOrden(unidad, nombre);
   const orden: Omit<OrdenVenta, "huella_contenido"> = {
     tienda: unidad,
+    creado_origen: new Date(creada).toISOString(),
     numero: nombre.toUpperCase(),
     fecha,
     periodo: `${fecha.slice(0, 7)}-01`,

@@ -149,42 +149,42 @@ export async function guardarLoteOrdenes(supabase: SupabaseClient, origen: strin
   if (!aGuardar.length) return { nuevas: 0, actualizadas: 0, sinCambios, tiendasNuevas };
 
   const ahora = new Date().toISOString();
-  const { data: guardadas, error } = await supabase
-    .from("ven_ordenes")
-    .upsert(
-      aGuardar.map((o) => ({
-        unidad_id: mapa.get(claveCatalogo(o.tienda))!,
-        numero: o.numero,
-        fecha: o.fecha,
-        periodo: o.periodo,
-        estado_pago: o.estado_pago,
-        estado_entrega: o.estado_entrega,
-        metodo_pago: o.metodo_pago,
-        forma_pago_texto: o.forma_pago_texto,
-        informe_servientrega: o.informe_servientrega,
-        transportista: o.transportista,
-        guia: o.guia,
-        fecha_envio: o.fecha_envio,
-        fecha_devolucion: o.fecha_devolucion,
-        resultado_courier: o.resultado_courier,
-        subtotal: o.subtotal,
-        envio: o.envio,
-        descuento: o.descuento,
-        total: o.total,
-        costo_envio: o.costo_envio,
-        facturado: o.facturado,
-        factura_numero: o.factura_numero,
-        mes_gestion: o.mes_gestion,
-        motivo_cancelacion: o.motivo_cancelacion,
-        etiquetas: o.etiquetas,
-        origen,
-        origen_clave: o.origen_clave,
-        huella_contenido: o.huella_contenido || null,
-        actualizado_en: ahora,
-      })),
-      { onConflict: "origen_clave" },
-    )
-    .select("id, origen_clave");
+  const filas = aGuardar.map((o) => ({
+    unidad_id: mapa.get(claveCatalogo(o.tienda))!,
+    numero: o.numero,
+    fecha: o.fecha,
+    periodo: o.periodo,
+    estado_pago: o.estado_pago,
+    estado_entrega: o.estado_entrega,
+    metodo_pago: o.metodo_pago,
+    forma_pago_texto: o.forma_pago_texto,
+    informe_servientrega: o.informe_servientrega,
+    transportista: o.transportista,
+    guia: o.guia,
+    fecha_envio: o.fecha_envio,
+    fecha_devolucion: o.fecha_devolucion,
+    resultado_courier: o.resultado_courier,
+    subtotal: o.subtotal,
+    envio: o.envio,
+    descuento: o.descuento,
+    total: o.total,
+    costo_envio: o.costo_envio,
+    facturado: o.facturado,
+    factura_numero: o.factura_numero,
+    mes_gestion: o.mes_gestion,
+    motivo_cancelacion: o.motivo_cancelacion,
+    etiquetas: o.etiquetas,
+    // La hora de Shopify (migración 0276): solo si la orden la trae, así el Excel no la borra.
+    ...(o.creado_origen ? { creado_origen: o.creado_origen } : {}),
+    origen,
+    origen_clave: o.origen_clave,
+    huella_contenido: o.huella_contenido || null,
+    actualizado_en: ahora,
+  }));
+  const subir = (f: typeof filas) => supabase.from("ven_ordenes").upsert(f, { onConflict: "origen_clave" }).select("id, origen_clave");
+  let { data: guardadas, error } = await subir(filas);
+  // Sin la migración 0276 la columna de la hora no existe todavía: se guarda igual, sin la hora (no se pierde ningún pedido).
+  if (error && /creado_origen/.test(error.message)) ({ data: guardadas, error } = await subir(filas.map(({ creado_origen: _sinHora, ...resto }) => resto)));
   if (error) throw new Error(`ven_ordenes: ${error.message}`);
   const idDe = new Map((guardadas ?? []).map((r) => [r.origen_clave as string, r.id as string]));
   const ids = [...idDe.values()];

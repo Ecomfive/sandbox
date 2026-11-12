@@ -72,6 +72,10 @@ export function inicioPeriodo(dias: number, hoy = new Date()): string {
 
 export interface PedidoFila extends PedidoResumen {
   id: string;
+  /** Sin hora: la orden vino del Excel de Finanzas, que solo trae el día (`creado` es el mediodía de ese día). */
+  sinHora?: boolean;
+  /** Los productos del pedido, para la lista («Magnesio +1»). */
+  productos?: string | null;
   tiendaId: string;
   numero: string;
   cliente: string | null;

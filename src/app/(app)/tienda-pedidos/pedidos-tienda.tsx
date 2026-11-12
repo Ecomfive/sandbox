@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { claseThLista, claseTdLista, Indicador, MarcoTabla, Pastilla, TableroIndicadores } from "@/components/panel/piezas-panel";
 import { EstadoVacio } from "@/components/ui/estado-vacio";
@@ -15,8 +16,10 @@ const ESTADO = new Map(ESTADOS_PEDIDO.map((e) => [e.id, e]));
 const MAX_FILAS = 300;
 
 /** La fecha del pedido como se lee en la lista: hoy y ayer con la hora; si no, el día. */
-function cuando(iso: string): string {
+function cuando(iso: string, sinHora = false): string {
   const d = new Date(iso);
+  // Del Excel de Finanzas: solo el día (no tiene hora).
+  if (sinHora) return d.toLocaleDateString("es-PA", { day: "numeric", month: "short", timeZone: "America/Panama" });
   const dia = (x: Date) => x.toLocaleDateString("en-CA", { timeZone: "America/Panama" });
   const hoy = new Date();
   const hora = d.toLocaleTimeString("es-PA", { hour: "2-digit", minute: "2-digit", timeZone: "America/Panama" });
@@ -45,6 +48,7 @@ export function PedidosTienda({
   conectada: boolean;
 }) {
   const [estado, setEstado] = useState<EstadoPedido | null>(null);
+  const router = useRouter();
   const [q, setQ] = useState("");
   const r = useMemo(() => resumirPedidos(pedidos), [pedidos]);
   const filtrados = useMemo(() => {
@@ -52,7 +56,7 @@ export function PedidosTienda({
     return pedidos.filter(
       (p) =>
         (!estado || p.estado === estado) &&
-        (!t || [p.numero, p.cliente, p.provincia, p.ciudad, p.guia].some((x) => x && normal(x).includes(t))),
+        (!t || [p.numero, p.cliente, p.provincia, p.ciudad, p.guia, p.productos].some((x) => x && normal(x).includes(t))),
     );
   }, [pedidos, estado, q]);
   const pct = (n: number | null) => (n === null ? "—" : `${n.toLocaleString("es-PA")} %`);
@@ -77,7 +81,7 @@ export function PedidosTienda({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <label className="flex min-w-[16rem] flex-1 items-center gap-2 text-sm text-muted-foreground sm:max-w-md">
             <span className="sr-only">Buscar</span>
-            <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar pedido, cliente, zona o guía" className={`${fieldClass} w-full`} />
+            <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar pedido, cliente, producto, zona o guía" className={`${fieldClass} w-full`} />
           </label>
           <span className="text-sm text-muted-foreground" aria-live="polite">
             {filtrados.length > MAX_FILAS ? `${num(MAX_FILAS)} de ${num(filtrados.length)} pedidos` : `${num(filtrados.length)} pedido${filtrados.length === 1 ? "" : "s"}`}
@@ -97,6 +101,7 @@ export function PedidosTienda({
                   {varias && <th scope="col" className={claseThLista}>Tienda</th>}
                   <th scope="col" className={claseThLista}>Fecha</th>
                   <th scope="col" className={claseThLista}>Cliente</th>
+                  <th scope="col" className={claseThLista}>Productos</th>
                   <th scope="col" className={`${claseThLista} text-right`}>Unid.</th>
                   <th scope="col" className={`${claseThLista} text-right`}>Total</th>
                   <th scope="col" className={claseThLista}>Estado</th>
@@ -108,15 +113,21 @@ export function PedidosTienda({
                 {filtrados.slice(0, MAX_FILAS).map((p) => {
                   const e = ESTADO.get(p.estado)!;
                   return (
-                    <tr key={p.id} className="hover:bg-muted/60">
+                    // Toda la fila abre la ficha del pedido (12 nov 2026, como en Mi Reto Digital); el número sigue siendo el enlace.
+                    <tr key={p.id} onClick={() => router.push(`/tienda-pedidos/${p.id}`)} className="cursor-pointer hover:bg-muted/60">
                       <td className={claseTdLista}>
                         <Link href={`/tienda-pedidos/${p.id}`} className="font-semibold text-primario underline-offset-2 hover:underline">
                           {p.numero}
                         </Link>
                       </td>
                       {varias && <td className={claseTdLista}>{tiendas[p.tiendaId] ?? "—"}</td>}
-                      <td className={`${claseTdLista} text-muted-foreground`}>{cuando(p.creado)}</td>
+                      <td className={`${claseTdLista} text-muted-foreground`}>{cuando(p.creado, p.sinHora)}</td>
                       <td className={claseTdLista}>{p.cliente ?? "—"}</td>
+                      <td className={claseTdLista}>
+                        <span className="block max-w-[18rem] truncate" title={p.productos ?? undefined}>
+                          {p.productos ?? "—"}
+                        </span>
+                      </td>
                       <td className={`${claseTdLista} text-right tabular-nums`}>{p.unidades}</td>
                       <td className={`${claseTdLista} text-right tabular-nums`}>{formatearMoneda(p.total, codigoPais)}</td>
                       <td className={claseTdLista}>

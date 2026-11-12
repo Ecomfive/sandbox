@@ -94,12 +94,31 @@ export async function conectarTienda(supabase: SupabaseClient, tiendaId: string,
   return { tienda: t.nombre as string, avisos, traidos: r.texto, completa: r.completa };
 }
 
+/** El día (ISO) de la orden de Shopify más vieja de esa tienda que todavía no tiene su hora, o undefined (o sin la migración 0276). */
+async function desdeSinHora(supabase: SupabaseClient, tienda: string): Promise<string | undefined> {
+  const { data: u } = await supabase.from("fin_unidades").select("id").ilike("nombre", tienda).maybeSingle();
+  if (!u) return undefined;
+  const { data, error } = await supabase
+    .from("ven_ordenes")
+    .select("fecha")
+    .eq("unidad_id", u.id)
+    .eq("origen", "shopify")
+    .is("creado_origen", null)
+    .order("fecha")
+    .limit(1)
+    .maybeSingle();
+  if (error || !data) return undefined;
+  return new Date(Date.parse(`${data.fecha}T00:00:00Z`) - 86_400_000).toISOString();
+}
+
 /** La revisión: trae lo que cambió en Shopify desde la última lectura (por si se perdió algún aviso). */
 export async function revisarTienda(supabase: SupabaseClient, tienda: { id: string; nombre: string }, limiteMs = 25_000): Promise<{ texto: string; completa: boolean }> {
   const app = appDeTienda(tienda.nombre);
   if (!app) throw new Error(`Faltan las variables de ${tienda.nombre} en Vercel.`);
   const token = (await accesoDeApp(app)).token;
-  const r = await sincronizarTienda(supabase, { tienda: app.tienda, dominio: app.dominio, token }, Date.now() + limiteMs);
+  // Las órdenes de Shopify que entraron antes de guardar su hora (migración 0276) se vuelven a leer desde la más vieja, para completarla.
+  const desde = await desdeSinHora(supabase, app.tienda);
+  const r = await sincronizarTienda(supabase, { tienda: app.tienda, dominio: app.dominio, token }, Date.now() + limiteMs, desde);
   await supabase.from("tiendas").update({ ultima_revision_en: new Date().toISOString() }).eq("id", tienda.id);
   return r;
 }
