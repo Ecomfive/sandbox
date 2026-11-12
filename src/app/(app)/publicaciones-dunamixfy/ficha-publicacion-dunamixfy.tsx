@@ -287,7 +287,7 @@ export function FichaPublicacionDunamixfy({
         </Seccion>
 
         {p.producto && plataformasDePais(codigoPais).length > 1 && (
-          <Seccion icono={VentasIcon} titulo={`Ventas por plataforma en ${nombrePais}`}>
+          <Seccion icono={VentasIcon} titulo={`Ventas globales del país · ${nombrePais}`}>
             <VentasPlataformasProducto key={`${p.producto.id}-${codigoPais}`} id={p.producto.id} pais={codigoPais} />
           </Seccion>
         )}

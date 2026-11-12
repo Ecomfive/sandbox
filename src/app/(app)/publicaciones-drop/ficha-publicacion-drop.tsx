@@ -28,7 +28,7 @@ import { EnCaminoProducto } from "../producto/en-camino-producto";
 import { FichaProductoEmbebida } from "../producto/ficha-producto-embebida";
 import { guardarCostoManualDrop, vincularPublicacionDrop } from "./actions";
 import { DialogoAccesoPrivado, DialogoSolicitudInventario } from "./dialogos-fila-drop";
-import type { FilaPublicacionDrop, ProductoDrop } from "./def-publicaciones-drop";
+import { stockDrop, type FilaPublicacionDrop, type ProductoDrop } from "./def-publicaciones-drop";
 import { InsigniaConectadoDrop } from "./insignia-conectado-drop";
 import { plataformasDePais } from "@/lib/plataformas";
 import { VentasPlataformasProducto } from "../producto/ventas-plataformas-producto";
@@ -471,7 +471,7 @@ export function FichaPublicacionDrop({
         </Seccion>
 
         {p.producto && plataformasDePais(codigoPais).length > 1 && (
-          <Seccion icono={VentasIcon} titulo={`Ventas por plataforma en ${nombrePais}`}>
+          <Seccion icono={VentasIcon} titulo={`Ventas globales del país · ${nombrePais}`}>
             <VentasPlataformasProducto key={`${p.producto.id}-${codigoPais}`} id={p.producto.id} pais={codigoPais} />
           </Seccion>
         )}
@@ -485,7 +485,12 @@ export function FichaPublicacionDrop({
             </div>
             <div className="flex min-w-0 flex-col gap-1">
               <span className={labelClassSm}>Inventario en Drop</span>
-              <span className={`text-sm font-semibold tabular-nums ${p.inventario === 0 ? "text-destructive" : ""}`}>{p.inventario === null ? "—" : `${p.inventario.toLocaleString("es-PA")} unidades`}</span>
+              <span className={`text-sm font-semibold tabular-nums ${stockDrop(p) === 0 ? "text-destructive" : ""}`}>{p.inventario === null ? "—" : `${(stockDrop(p) ?? 0).toLocaleString("es-PA")} unidades`}</span>
+              {p.inventarioExclusivo > 0 && (
+                <span className="text-xs text-muted-foreground tabular-nums">
+                  {Math.max(0, p.inventario ?? 0).toLocaleString("es-PA")} para todos · {p.inventarioExclusivo.toLocaleString("es-PA")} exclusivas de clientes
+                </span>
+              )}
               <span className="text-xs text-muted-foreground">No se edita: entra con «Gestionar inventario» (una solicitud de ingreso que la bodega aprueba).</span>
             </div>
           </div>
