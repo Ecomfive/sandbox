@@ -33,7 +33,7 @@ function BotonCabecera({ texto, icono: Icono, activo = true, alHacerClic }: { te
  */
 export function FichaPedido({ id, orden: ordenLista, alCerrar, alIr }: { id: string | null; orden: string[]; alCerrar: () => void; alIr: (id: string) => void }) {
   const { mostrarToast } = useToast();
-  const [datos, setDatos] = useState<{ id: string; orden: OrdenTienda; codigoPais: string } | { id: string; error: string } | null>(null);
+  const [datos, setDatos] = useState<{ id: string; orden: OrdenTienda; codigoPais: string; puedeEscribir: boolean } | { id: string; error: string } | null>(null);
   const indice = id ? ordenLista.indexOf(id) : -1;
   const anterior = indice > 0 ? ordenLista[indice - 1] : null;
   const siguiente = indice >= 0 && indice < ordenLista.length - 1 ? ordenLista[indice + 1] : null;
@@ -114,7 +114,7 @@ export function FichaPedido({ id, orden: ordenLista, alCerrar, alIr }: { id: str
                 Abrir en Shopify ↗
               </a>
             )}
-            <ContenidoOrdenTienda orden={actual.orden} codigoPais={actual.codigoPais} />
+            <ContenidoOrdenTienda orden={actual.orden} codigoPais={actual.codigoPais} puedeEscribir={actual.puedeEscribir} />
           </>
         )}
       </div>
