@@ -7,12 +7,16 @@ import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { cargarPedidos, inicioPeriodo, type PedidoFila, type Tienda } from "./datos";
 import { riesgoCliente } from "@/lib/ventas/operacion";
 import { entradaDeOrden, estadoDesdeFinanzas, etiquetasDe, momentoDeFecha, nombreComparable, textoProductos, zonaDeEtiquetas, type LineaFinanzas } from "./ordenes-finanzas";
+import { periodoDe, sumarDias, type EleccionPeriodo, type Periodo } from "./rango";
 
-/** Cuántos pedidos tiene el cliente y su riesgo («medio» o «alto»; null si no hay). Sin historial (sin teléfono), null en los dos. */
-function datosDelCliente(h: { total: number; entregadas: number; devueltas: number; canceladas: number } | undefined): { pedidosCliente: number | null; riesgo: "medio" | "alto" | null } {
+/**
+ * Cuántos pedidos tiene el cliente y su riesgo: «medio» o «alto» por su historial, y «bajo» si no tiene nada en contra (12 nov 2026, pedido de Hernán: un cliente sin
+ * pedidos anteriores sale «Bajo» en gris, como en Mi Reto Digital). Sin historial (sin teléfono), null en los dos.
+ */
+function datosDelCliente(h: { total: number; entregadas: number; devueltas: number; canceladas: number } | undefined): { pedidosCliente: number | null; riesgo: "bajo" | "medio" | "alto" | null } {
   if (!h) return { pedidosCliente: null, riesgo: null };
   const r = riesgoCliente({ entregadas: h.entregadas, devueltas: h.devueltas, canceladas: h.canceladas, fallidas: 0 });
-  return { pedidosCliente: h.total, riesgo: r === "medio" || r === "alto" ? r : null };
+  return { pedidosCliente: h.total, riesgo: r === "medio" || r === "alto" ? r : "bajo" };
 }
 
 /** De dónde salen los datos de las tiendas sin conectar: su unidad en Finanzas y hasta qué día llegan sus órdenes. */
@@ -148,11 +152,18 @@ export async function cargarPedidosFinanzas(
     cargarLineasFinanzas(supabase, unidades, desde, hasta),
   ]);
   // La foto de cada pedido (12 nov 2026, como Mi Reto Digital): la de la variante de Shopify con el SKU de su primera línea.
-  const { data: variantesFoto } = await supabase.from("tienda_variantes").select("sku, foto_url").in("tienda_id", [...tiendaDeUnidad.values()]).not("sku", "is", null).not("foto_url", "is", null);
-  const fotoDeSku = new Map((variantesFoto ?? []).map((v) => [String(v.sku).trim().toLowerCase(), v.foto_url as string]));
+  // Si no la encuentra por el SKU (Shopify le cambió el SKU a la variante y los pedidos viejos traen el de antes: «CAPS.MULTI.COLLAGEN.COMPLEX»), por el nombre
+  // del producto en Shopify (12 nov 2026: el Multi Collagen salía con y sin foto siendo el mismo).
+  const { data: variantesFoto } = await supabase.from("tienda_variantes").select("sku, producto_titulo, foto_url").in("tienda_id", [...tiendaDeUnidad.values()]).not("foto_url", "is", null);
+  const fotoDeSku = new Map((variantesFoto ?? []).filter((v) => v.sku).map((v) => [String(v.sku).trim().toLowerCase(), v.foto_url as string]));
+  const fotoDeNombre = new Map<string, string>();
+  for (const v of variantesFoto ?? []) {
+    const k = nombreComparable(String(v.producto_titulo ?? ""));
+    if (k && !fotoDeNombre.has(k)) fotoDeNombre.set(k, v.foto_url as string);
+  }
   const fotoDe = new Map<string, string>();
-  for (const l of lineas) if (!l.esServicio && l.sku && !fotoDe.has(l.pedidoId)) {
-    const f = fotoDeSku.get(l.sku.trim().toLowerCase());
+  for (const l of lineas) if (!l.esServicio && !fotoDe.has(l.pedidoId)) {
+    const f = (l.sku ? fotoDeSku.get(l.sku.trim().toLowerCase()) : undefined) ?? fotoDeNombre.get(nombreComparable(l.titulo));
     if (f) fotoDe.set(l.pedidoId, f);
   }
   const unidadesDe = new Map<string, number>();
@@ -218,29 +229,39 @@ export async function cargarLineasFinanzas(supabase: SupabaseClient, unidades: s
 
 /**
  * Los pedidos de las tiendas que se miran, de Shopify (las conectadas) y de Finanzas (las demás), y el día desde el que cuentan los periodos: si todo
- * sale de Finanzas, el último día con órdenes (es una foto); si no, hoy. `dias` es cuántos días hacia atrás se traen (el doble para comparar).
+ * sale de Finanzas, el último día con órdenes (es una foto); si no, hoy. El periodo es el elegido en la barra (`EleccionPeriodo`), con sus días ya calculados.
  */
 export async function pedidosDeTiendas(
   supabase: SupabaseClient,
   miradas: Tienda[],
   codigoPais: string,
-  dias: number,
-): Promise<{ pedidos: PedidoFila[]; lineasFinanzas: LineaFinanzas[]; fuente: FuenteFinanzas; referencia: Date }> {
+  eleccion: EleccionPeriodo,
+  /** `comparar`: también el periodo anterior del mismo largo (Dashboard); `minDias`: traer al menos esos días hasta hoy (la cola de Confirmación). */
+  opciones: { comparar?: boolean; minDias?: number } = {},
+): Promise<{ pedidos: PedidoFila[]; lineasFinanzas: LineaFinanzas[]; fuente: FuenteFinanzas; referencia: Date; periodo: Periodo & { hoy: string } }> {
   const fuente = await fuenteFinanzas(supabase, miradas, codigoPais);
   // Una foto (todo sale del Excel y ninguna tienda está conectada): los periodos terminan en su último día. Con una conectada, en hoy.
   const soloFinanzas = miradas.length > 0 && miradas.every((t) => fuente.unidadDe.has(t.id) && t.estado !== "conectada");
   const referencia = soloFinanzas && fuente.hasta ? new Date(momentoDeFecha(fuente.hasta)) : new Date();
-  const desde = inicioPeriodo(dias, referencia);
-  const hasta = inicioPeriodo(1, referencia);
+  const hoy = inicioPeriodo(1, referencia);
+  const periodo = periodoDe(eleccion, hoy);
+  let desde = opciones.comparar ? sumarDias(periodo.desde, -periodo.dias) : periodo.desde;
+  let hasta = periodo.hasta;
+  if (opciones.minDias) {
+    const minimo = sumarDias(hoy, -(opciones.minDias - 1));
+    if (minimo < desde) desde = minimo;
+    hasta = hoy;
+  }
   const ids = miradas.map((t) => t.id);
   const [deShopify, deFinanzas] = await Promise.all([
     cargarPedidos(
       supabase,
       ids.filter((id) => !fuente.unidadDe.has(id)),
       desde,
+      hasta,
     ),
     cargarPedidosFinanzas(supabase, fuente, ids, desde, hasta),
   ]);
   const pedidos = [...deShopify, ...deFinanzas.pedidos].sort((x, y) => y.creado.localeCompare(x.creado));
-  return { pedidos, lineasFinanzas: deFinanzas.lineas, fuente, referencia };
+  return { pedidos, lineasFinanzas: deFinanzas.lineas, fuente, referencia, periodo: { ...periodo, hoy } };
 }

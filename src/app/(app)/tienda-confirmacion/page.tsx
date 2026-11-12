@@ -6,7 +6,7 @@ import { requireModulo } from "@/lib/auth";
 import { getPaisActual } from "@/lib/pais";
 import { createServiceClient } from "@/lib/supabase/server";
 import { revisarSiHaceFalta } from "@/lib/tienda/conectar-shopify";
-import { cargarTiendas, inicioPeriodo, periodoElegido, tiendaElegida } from "@/lib/tienda/datos";
+import { cargarTiendas, periodoElegido, tiendaElegida } from "@/lib/tienda/datos";
 import { pedidosDeTiendas } from "@/lib/tienda/datos-finanzas";
 import { diaPanama } from "@/lib/tienda/resumen";
 import { ConfirmacionTienda } from "./confirmacion-tienda";
@@ -33,12 +33,11 @@ export default async function ConfirmacionTiendaPage({ searchParams }: { searchP
   const pais = await getPaisActual(supabase);
   const { tiendas, faltaMigracion } = await cargarTiendas(supabase, pais.id);
   const tienda = tiendaElegida(tiendas, sp.tienda);
-  const periodo = periodoElegido(sp.periodo);
+  const eleccion = periodoElegido(sp);
   const miradas = tienda ? [tienda] : tiendas;
   after(() => revisarSiHaceFalta(createServiceClient(), tiendas));
-  const { pedidos, fuente, referencia } = await pedidosDeTiendas(supabase, miradas, pais.codigo, Math.max(periodo.dias, DIAS_COLA));
-  const desde = inicioPeriodo(periodo.dias, referencia);
-  const delPeriodo = pedidos.filter((p) => diaPanama(p.creado) >= desde);
+  const { pedidos, fuente, periodo } = await pedidosDeTiendas(supabase, miradas, pais.codigo, eleccion, { minDias: DIAS_COLA });
+  const delPeriodo = pedidos.filter((p) => diaPanama(p.creado) >= periodo.desde && diaPanama(p.creado) <= periodo.hasta);
   // La cola: los sin confirmar que llegaron de Shopify (los del Excel de Finanzas son una foto vieja: ya no se gestionan), lo más viejo arriba.
   const sinConfirmar = pedidos.filter((p) => p.estado === "nuevo" && !p.sinHora).sort((a, b) => a.creado.localeCompare(b.creado));
   return (
@@ -52,7 +51,7 @@ export default async function ConfirmacionTiendaPage({ searchParams }: { searchP
         <SinTiendas pais={pais.nombre} />
       ) : (
         <>
-          <BarraTienda ruta="/tienda-confirmacion" tiendas={tiendas} tiendaId={tienda?.id ?? null} periodo={periodo.id} />
+          <BarraTienda ruta="/tienda-confirmacion" tiendas={tiendas} tiendaId={tienda?.id ?? null} periodo={periodo} />
           <AvisoConexion tiendas={miradas} finanzas={fuente} />
           <ConfirmacionTienda
             sinConfirmar={sinConfirmar}

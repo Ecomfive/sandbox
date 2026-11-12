@@ -2,7 +2,9 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { formatearFecha } from "@/lib/formato";
-import { PERIODOS, type Tienda } from "@/lib/tienda/datos";
+import type { Tienda } from "@/lib/tienda/datos";
+import { parametrosPeriodo, type Periodo } from "@/lib/tienda/rango";
+import { SelectorPeriodo } from "./selector-periodo";
 import type { FuenteFinanzas } from "@/lib/tienda/datos-finanzas";
 
 /** Arma la dirección de la página con los parámetros dados (los vacíos se quitan). */
@@ -28,8 +30,8 @@ function Chip({ href, activo, children }: { href: string; activo: boolean; child
 }
 
 /**
- * La barra de arriba de las páginas de Gestión de tienda: qué tienda se mira (todas las del país o una) y, si la página lo usa, el periodo. Son
- * enlaces: la página se vuelve a cargar con lo elegido en la dirección (`?tienda=` y `?periodo=`).
+ * La barra de arriba de las páginas de Gestión de tienda: qué tienda se mira (todas las del país o una) y, si la página lo usa, el periodo (el selector de
+ * fechas con calendario, 12 nov 2026). Las tiendas son enlaces: la página se vuelve a cargar con lo elegido en la dirección (`?tienda=`, `?periodo=`, `?desde=`, `?hasta=`).
  */
 export function BarraTienda({
   ruta,
@@ -41,32 +43,25 @@ export function BarraTienda({
   ruta: string;
   tiendas: Tienda[];
   tiendaId: string | null;
-  /** El periodo elegido; sin él no se muestran los periodos. */
-  periodo?: string;
+  /** El periodo elegido, con el «hoy» de las tiendas que se miran; sin él no se muestra el selector de fechas. */
+  periodo?: Periodo & { hoy: string };
   /** Otros parámetros que se conservan al cambiar de tienda o periodo. */
   extra?: Record<string, string | null | undefined>;
 }) {
+  const deFechas = periodo ? parametrosPeriodo(periodo.id === "rango" ? { tipo: "rango", desde: periodo.desde, hasta: periodo.hasta } : { tipo: "atajo", id: periodo.id }) : {};
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
       <nav aria-label="Tienda" className="flex flex-wrap gap-2">
-        <Chip href={rutaCon(ruta, { ...extra, periodo })} activo={!tiendaId}>
+        <Chip href={rutaCon(ruta, { ...extra, ...deFechas })} activo={!tiendaId}>
           Todas las tiendas
         </Chip>
         {tiendas.map((t) => (
-          <Chip key={t.id} href={rutaCon(ruta, { ...extra, periodo, tienda: t.id })} activo={tiendaId === t.id}>
+          <Chip key={t.id} href={rutaCon(ruta, { ...extra, ...deFechas, tienda: t.id })} activo={tiendaId === t.id}>
             {t.nombre}
           </Chip>
         ))}
       </nav>
-      {periodo && (
-        <nav aria-label="Periodo" className="flex flex-wrap gap-2">
-          {PERIODOS.map((p) => (
-            <Chip key={p.id} href={rutaCon(ruta, { ...extra, tienda: tiendaId, periodo: p.id })} activo={periodo === p.id}>
-              {p.etiqueta}
-            </Chip>
-          ))}
-        </nav>
-      )}
+      {periodo && <SelectorPeriodo key={`${periodo.id}-${periodo.desde}-${periodo.hasta}`} periodo={periodo} hoy={periodo.hoy} />}
     </div>
   );
 }
