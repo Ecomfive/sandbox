@@ -1,6 +1,26 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { distintivosDeNombre, primeroLibre, sugerirSku, sugerirSkuVariante } from "./sugerir-sku";
+import { cantidadEnNombre, distintivosDeNombre, primeroLibre, sugerirSku, sugerirSkuVariante } from "./sugerir-sku";
+
+test("un pack que choca lleva la palabra de su cantidad, no un número", () => {
+  const usados = new Set(["COMBO/CREMA/NIDA"]);
+  assert.equal(primeroLibre("COMBO/CREMA/NIDA", (c) => usados.has(c), 3), "COMBO/CREMA/NIDA/TRIO");
+  // Sin choque no se agrega nada, ni siquiera con cantidad.
+  assert.equal(primeroLibre("COMBO/CREMA/OTRA", (c) => usados.has(c), 3), "COMBO/CREMA/OTRA");
+  // Si la palabra ya está tomada o no se sabe la cantidad, vuelve al número.
+  usados.add("COMBO/CREMA/NIDA/TRIO");
+  assert.equal(primeroLibre("COMBO/CREMA/NIDA", (c) => usados.has(c), 3), "COMBO/CREMA/NIDA/2");
+  assert.equal(primeroLibre("COMBO/CREMA/NIDA", (c) => usados.has(c)), "COMBO/CREMA/NIDA/2");
+});
+
+test("cantidad que dice el nombre de un pack", () => {
+  assert.equal(cantidadEnNombre("Crema Nida Pack 3"), 3);
+  assert.equal(cantidadEnNombre("Crema Nida x3"), 3);
+  assert.equal(cantidadEnNombre("Crema Nida Pack de 4"), 4);
+  assert.equal(cantidadEnNombre("Crema Nida 3x1"), 3);
+  assert.equal(cantidadEnNombre("Crema Nida 30g"), null);
+  assert.equal(cantidadEnNombre("Crema Nida"), null);
+});
 
 test("las palabras del nombre, sin relleno, títulos ni medidas", () => {
   assert.equal(sugerirSku("Bálsamo Púrpura Dr. Melaxin 9g"), "BALSAMO/PURPURA/MELAXIN");
@@ -53,6 +73,12 @@ test("el SKU de un compuesto (pack o combo) siempre empieza por COMBO, sin repet
   assert.equal(sugerirSku("Oxido Nítrico + Shilajit 8 EN 1 Regalo", 3, { compuesto: true }), "COMBO/OXIDO/NITRICO/SHILAJIT");
   assert.equal(sugerirSku("Pack x2 Crema Nida", 3, { compuesto: true }), "COMBO/CREMA/NIDA");
   assert.equal(sugerirSku("Combo Aceite de Orégano 300 capsulas Verde", 3, { compuesto: true }), "COMBO/ACEITE/OREGANO/CAPSULAS/300/VERDE");
+  // Un pack por cantidad del mismo producto no lleva la cantidad en el SKU (X2, PACK/2, 2x1, x3, «de 2», «por 3»).
+  assert.equal(sugerirSku("Creatina For Women PACK-2", 3, { compuesto: true }), "COMBO/CREATINA/FOR/WOMEN");
+  assert.equal(sugerirSku("Super PROMO 2x1 Shampoo Anticaspa Hoegoa", 3, { compuesto: true }), "COMBO/SUPER/PROMO/SHAMPOO");
+  assert.equal(sugerirSku("Espuma de Depilación ELHOOE Pack de 2", 3, { compuesto: true }), "COMBO/ESPUMA/DEPILACION/ELHOOE");
+  assert.equal(sugerirSku("Seapuri Tratamiento capilar x3", 3, { compuesto: true }), "COMBO/SEAPURI/TRATAMIENTO/CAPILAR");
+  assert.equal(sugerirSku("Crema Perfectx Terapia Articular 30g PACK 2", 3, { compuesto: true }), "COMBO/CREMA/PERFECTX/TERAPIA");
   assert.equal(sugerirSku("Combo", 3, { compuesto: true }), "COMBO");
   assert.equal(sugerirSku("", 3, { compuesto: true }), "");
   // Un producto simple no cambia, ni siquiera si su nombre dice «combo».

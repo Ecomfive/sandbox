@@ -8,6 +8,7 @@ import { useToast } from "@/components/ui/toast";
 import { nombrePais, type VendeEn } from "@/lib/whatsapp/origen-chat";
 import { cambiarVendeEn, crearPlataformaVenta, eliminarPlataformaVenta, opcionesVendeEn, renombrarPlataformaVenta } from "./vende-en-actions";
 import { Bandera } from "@/components/paises/bandera";
+import { VendeEnPorPais } from "../vende-en-por-pais";
 
 type Opciones = { plataformas: string[]; paises: { codigo: string; nombre: string }[] };
 
@@ -134,9 +135,7 @@ export function VendeEnChat({
 
   return (
     <>
-      {vendeEn.map((v) => (
-        <PastillaVendeEn key={`${v.plataforma}|${v.pais}`} v={v} alQuitar={puede ? () => cambiar(v.plataforma, v.pais, false) : undefined} />
-      ))}
+      <VendeEnPorPais vende={vendeEn} tamano="chico" alQuitar={puede ? (v) => cambiar(v.plataforma, v.pais, false) : undefined} />
       {puede && (
         // Solo el ícono del lápiz (29 oct 2026, pedido de Alcides); el tooltip y el aria-label dicen qué hace.
         <Tooltip texto={vendeEn.length ? "Editar dónde vende" : "Agregar dónde vende"}>

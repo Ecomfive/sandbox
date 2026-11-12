@@ -135,7 +135,7 @@ export const DEF_PRODUCTO: DefTabla<FilaProducto> = {
   clave: "producto",
   campos: [
     // Las variantes no tienen fila propia (9 nov 2026, pedido de Hernán): buscar una encuentra a su producto principal.
-    { id: "producto", etiqueta: "Producto", tipo: "texto", valor: (p) => [p.codigo, p.nombre, p.codigoBarras ?? "", ...p.variantes.flatMap((v) => [v.codigo, v.nombre, v.barras ?? ""])].join(" ") },
+    { id: "producto", etiqueta: "Producto", tipo: "texto", valor: (p) => [p.codigo, p.nombre, p.codigoBarras ?? "", p.numero === null ? "" : `${numeroProducto(p.numero)} ${p.numero}`, ...p.variantes.flatMap((v) => [v.codigo, v.nombre, v.barras ?? ""])].join(" ") },
     {
       id: "clase",
       etiqueta: "Estado",
