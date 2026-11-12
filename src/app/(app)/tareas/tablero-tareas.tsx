@@ -56,7 +56,8 @@ export function TableroTareas({
   const [version, setVersion] = useState(0);
   const vista = (useSyncExternalStore(VISTA.suscribir, VISTA.leer, () => "") || "lista") as Vista;
   const agrupar = (useSyncExternalStore(AGRUPAR.suscribir, AGRUPAR.leer, () => "") || (admin ? "persona" : "estado")) as Agrupar;
-  const [deTodos, setDeTodos] = useState(admin);
+  // `?mias=1` (la campana) abre en «Mías» también a un administrador.
+  const [deTodos, setDeTodos] = useState(() => admin && parametros.get("mias") !== "1");
   const [busqueda, setBusqueda] = useState("");
   const [persona, setPersona] = useState("");
   const [verArchivadas, setVerArchivadas] = useState(false);
@@ -66,7 +67,7 @@ export function TableroTareas({
 
   // `?abrir=<id>` (el aviso «Para ti») abre la ficha; el parámetro se quita de la dirección.
   useEffect(() => {
-    if (parametros.get("abrir")) router.replace(pathname, { scroll: false });
+    if (parametros.get("abrir") || parametros.get("mias")) router.replace(pathname, { scroll: false });
     // Solo al entrar.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

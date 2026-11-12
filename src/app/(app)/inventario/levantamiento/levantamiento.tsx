@@ -17,6 +17,7 @@ import { formatearTiempoRelativo } from "@/lib/formato";
 import type { Ambito } from "@/lib/imagen/buscar";
 import { BuscarIcon, CamaraIcon, ChevronRightIcon, MasIcon, PapeleraIcon } from "@/lib/nav-icons";
 import { FichaStock } from "../ficha-stock";
+import type { StockPlataformas } from "@/lib/wms/stock-plataformas";
 import { guardarLevantamiento } from "./actions";
 import { ImportarLista } from "./importar-lista";
 import { LineasCajas, unidadesFormulario, type LineaCajasForm, type UbicacionConteo } from "./lineas-cajas";
@@ -25,6 +26,8 @@ import { codigoLote, PEDIR_CODIGO_LOTE } from "@/lib/wms/vencimiento";
 
 export interface ProductoConteo {
   id: string;
+  /** Lo que tiene en las plataformas del país (Dropi B280, Effi, Drop…), para la ficha; `null` si no tiene. */
+  plataformas?: StockPlataformas | null;
   codigo: string;
   nombre: string;
   clase: string;
@@ -40,8 +43,11 @@ export interface ProductoConteo {
   /** Sus cajas guardadas en esta bodega (migración 0236). */
   cajas: LineaCajasForm[];
   /** Si es una variante: su producto principal y sus valores («Rojo / M»). Las variantes se cuentan dentro de su principal. */
-  padre: { id: string; codigo: string; nombre: string; foto: string | null } | null;
+  padre: { id: string; codigo: string; nombre: string; foto: string | null; numero: number | null; barras: string | null; plataformas?: StockPlataformas | null } | null;
   opciones: string;
+  /** Su color, si además tiene otra opción (talla…): las variantes de un mismo color van juntas y plegadas. `resto` es lo demás («M», «43»). */
+  color: string | null;
+  resto: string;
 }
 
 interface LineaLote {
@@ -55,6 +61,14 @@ interface LineaLote {
 }
 
 const AMBITOS_PRODUCTO: Ambito[] = ["producto"];
+
+/** Las variantes de un producto juntas por color, en el orden en que salen; las que no tienen color (o solo color) van sueltas, primero. */
+function porColor(hijos: ProductoConteo[]): { color: string | null; hijos: ProductoConteo[] }[] {
+  const sueltas = hijos.filter((h) => !h.color);
+  const grupos = new Map<string, ProductoConteo[]>();
+  for (const h of hijos) if (h.color) grupos.set(h.color, [...(grupos.get(h.color) ?? []), h]);
+  return [...(sueltas.length ? [{ color: null, hijos: sueltas }] : []), ...[...grupos].map(([color, lista]) => ({ color, hijos: lista }))];
+}
 const ETIQUETA_CLASE: Record<string, string> = { inactivo: "Inactivo", descontinuado: "Descontinuado" };
 const sinAcentos = (t: string) => t.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
 const numero = (t: string) => (t.trim() === "" ? null : Number(t));
@@ -127,7 +141,23 @@ export function Levantamiento({
   const [ficha, setFicha] = useState<string | null>(null);
   // Los productos con variantes que están desplegados (se cuentan las variantes, no el principal).
   const [abiertos, setAbiertos] = useState<Set<string>>(new Set());
-  const productoFicha = ficha ? productos.find((p) => p.id === ficha) : undefined;
+  // Los colores desplegados dentro de un producto («idPrincipal|Azul»): nacen plegados (11 nov 2026, pedido de Hernán).
+  const [coloresAbiertos, setColoresAbiertos] = useState<Set<string>>(new Set());
+  const alternar = (set: (f: (x: Set<string>) => Set<string>) => void, clave: string) =>
+    set((x) => {
+      const y = new Set(x);
+      if (y.has(clave)) y.delete(clave);
+      else y.add(clave);
+      return y;
+    });
+  // La ficha puede ser de un producto o variante, o del producto principal (al tocar su nombre).
+  const productoFicha = useMemo(() => {
+    if (!ficha) return undefined;
+    const p = productos.find((x) => x.id === ficha);
+    if (p) return p;
+    const padre = productos.find((x) => x.padre?.id === ficha)?.padre;
+    return padre ? { id: padre.id, codigo: padre.codigo, nombre: padre.nombre, numero: padre.numero, barras: padre.barras, clase: "fisico", manejaVencimiento: false, plataformas: padre.plataformas ?? null, conVariantes: true } : undefined;
+  }, [ficha, productos]);
 
   const lineasDe = (p: ProductoConteo): LineaLote[] =>
     lotes[p.id] ?? p.lotes.map((l) => ({ codigo: l.codigo, vencimiento: l.vencimiento, cantidad: "", sumar: "", existente: true }));
@@ -324,7 +354,7 @@ export function Levantamiento({
                       aria-label={`Abrir la ficha de ${p.codigo}`}
                       className={`block cursor-pointer rounded-sm text-left hover:underline ${anilloFoco}`}
                     >
-                      <span className="block font-medium">{hijo && p.opciones ? p.opciones : p.nombre}</span>
+                      <span className="block font-medium">{hijo && p.color && p.resto ? p.resto : hijo && p.opciones ? p.opciones : p.nombre}</span>
                       <span className="block text-xs text-muted-foreground">{p.codigo}</span>
                     </button>
                     <CodigosProducto numero={p.numero} barras={p.barras} className="block" />
@@ -710,32 +740,68 @@ export function Levantamiento({
                       <MiniaturaFoto url={g.padre.foto ?? g.hijos.find((h) => h.foto)?.foto ?? null} nombre={g.padre.nombre} />
                     </td>
                     <td colSpan={7} className={claseCeldaColumna}>
-                      <button
-                        type="button"
-                        aria-expanded={abierto}
-                        aria-label={`${abierto ? "Cerrar" : "Abrir"} las variantes de ${g.padre.nombre}`}
-                        onClick={() =>
-                          setAbiertos((x) => {
-                            const y = new Set(x);
-                            if (y.has(g.padre.id)) y.delete(g.padre.id);
-                            else y.add(g.padre.id);
-                            return y;
-                          })
-                        }
-                        className={`flex w-full cursor-pointer items-center gap-2 rounded-sm text-left ${anilloFoco}`}
-                      >
-                        <ChevronRightIcon aria-hidden="true" className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${abierto ? "rotate-90" : ""}`} />
+                      {/* La flecha despliega las variantes; el nombre abre la ficha del producto principal (11 nov 2026, pedido de Hernán). */}
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          aria-expanded={abierto}
+                          aria-label={`${abierto ? "Cerrar" : "Abrir"} las variantes de ${g.padre.nombre}`}
+                          onClick={() => alternar(setAbiertos, g.padre.id)}
+                          className={`-m-1 flex shrink-0 cursor-pointer items-center justify-center rounded-md p-1 hover:bg-accent ${anilloFoco}`}
+                        >
+                          <ChevronRightIcon aria-hidden="true" className={`h-4 w-4 text-muted-foreground transition-transform ${abierto ? "rotate-90" : ""}`} />
+                        </button>
                         <span className="flex min-w-0 flex-col">
-                          <span className="font-medium">{g.padre.nombre}</span>
+                          <button
+                            type="button"
+                            onClick={() => setFicha(g.padre.id)}
+                            aria-label={`Abrir la ficha de ${g.padre.codigo}`}
+                            className={`w-fit cursor-pointer rounded-sm text-left font-medium hover:underline ${anilloFoco}`}
+                          >
+                            {g.padre.nombre}
+                          </button>
                           <span className="text-xs text-muted-foreground">
                             {g.padre.codigo} · {g.hijos.length} variante{g.hijos.length === 1 ? "" : "s"} · {enSistema.toLocaleString("es-PA")} en el sistema
                             {conCantidad > 0 ? ` · ${conCantidad} con cantidad` : ""}
                           </span>
                         </span>
-                      </button>
+                      </div>
                     </td>
                   </tr>
-                  {abierto && g.hijos.map((h) => filaDe(h, true))}
+                  {abierto &&
+                    porColor(g.hijos).map((c) => {
+                      if (!c.color) return c.hijos.map((h) => filaDe(h, true));
+                      const clave = `${g.padre.id}|${c.color}`;
+                      const colorAbierto = coloresAbiertos.has(clave);
+                      const enSistemaColor = c.hijos.reduce((suma, h) => suma + h.enSistema, 0);
+                      const conCantidadColor = c.hijos.filter((h) => contadoDe(h) !== null || sumarDe(h) !== null || restarDe(h) !== null || transferirDe(h) !== null).length;
+                      return (
+                        <Fragment key={clave}>
+                          <tr className="border-b border-border bg-muted/30">
+                            <td className={`${claseCeldaColumna} pl-8`}>
+                              <MiniaturaFoto url={c.hijos.find((h) => h.foto)?.foto ?? null} nombre={c.color} />
+                            </td>
+                            <td colSpan={7} className={claseCeldaColumna}>
+                              <button
+                                type="button"
+                                aria-expanded={colorAbierto}
+                                aria-label={`${colorAbierto ? "Cerrar" : "Abrir"} las variantes ${c.color} de ${g.padre.nombre}`}
+                                onClick={() => alternar(setColoresAbiertos, clave)}
+                                className={`flex w-full cursor-pointer items-center gap-2 rounded-sm text-left ${anilloFoco}`}
+                              >
+                                <ChevronRightIcon aria-hidden="true" className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${colorAbierto ? "rotate-90" : ""}`} />
+                                <span className="font-medium">{c.color}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  {c.hijos.length} variante{c.hijos.length === 1 ? "" : "s"} ({c.hijos.map((h) => h.resto).join(", ")}) · {enSistemaColor.toLocaleString("es-PA")} en el sistema
+                                  {conCantidadColor > 0 ? ` · ${conCantidadColor} con cantidad` : ""}
+                                </span>
+                              </button>
+                            </td>
+                          </tr>
+                          {colorAbierto && c.hijos.map((h) => filaDe(h, true))}
+                        </Fragment>
+                      );
+                    })}
                 </Fragment>
               );
             })}
@@ -791,6 +857,7 @@ export function Levantamiento({
         puedeEscribir={false}
         puedeComentar={puedeEscribir}
         codigoPais={codigoPais}
+        conPlataformas
         alCerrar={() => setFicha(null)}
         alCambiar={() => router.refresh()}
       />

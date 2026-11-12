@@ -195,7 +195,8 @@ export async function obtenerHistorialCompetencia(productoId: string): Promise<{
   const leer = (tabla: string) => supabase.from(tabla).select("fecha, evento, precio, stock, precio_antes, stock_antes").eq("producto_id", productoId).order("fecha", { ascending: false }).limit(200);
   const dropi = await leer("competencia_historial");
   const drop = dropi.data?.length ? dropi : await leer("drop_competencia_historial");
-  const { data, error } = drop.data?.length ? drop : await leer("effi_competencia_historial");
+  const effi = drop.data?.length ? drop : await leer("effi_competencia_historial");
+  const { data, error } = effi.data?.length ? effi : await leer("dunamixfy_competencia_historial");
   if (error) return { error: error.message };
   const n = (v: unknown) => (v === null || v === undefined ? null : Number(v));
   return { eventos: (data ?? []).map((e) => ({ fecha: e.fecha, evento: e.evento, precio: n(e.precio), stock: e.stock, precioAntes: n(e.precio_antes), stockAntes: e.stock_antes })) };

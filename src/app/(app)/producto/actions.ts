@@ -6,11 +6,11 @@ import { registrarAuditoria } from "@/lib/auditoria";
 import { formatearEventoAuditoria } from "@/lib/auditoria-cambios";
 import { requireAlgunModulo, requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { esAdministrador } from "@/lib/permisos/acceso";
-import { mensajeBloqueos } from "@/lib/wms/eliminar-producto";
+import { mensajeBloqueos, mensajeBloqueosVariante } from "@/lib/wms/eliminar-producto";
 import { esCodigoBarrasValido, esCodigoInterno, normalizarCodigoBarras } from "@/lib/wms/codigo-barras";
 import { detectarImagen } from "@/lib/seguridad/imagen";
 import { descargarPublico } from "@/lib/seguridad/url-externa";
-import { primeroLibre, sugerirSku } from "@/lib/wms/sugerir-sku";
+import { cantidadEnNombre, primeroLibre, sugerirSku } from "@/lib/wms/sugerir-sku";
 import { ETIQUETA_CLASE } from "./def-producto";
 import { crearCompraDesdeProducto } from "@/lib/compras/compra-desde-producto";
 import { pasarTestsAFiltro } from "@/lib/productos-test/pasar-a-filtro";
@@ -584,7 +584,7 @@ const limpiar = (t: string) => String(t ?? "").trim().replace(/\s+/g, " ");
 /**
  * Crea variantes de un producto (cada una es un producto simple con su SKU, su stock y sus lotes) y guarda en el padre sus
  * opciones con los valores. Las variantes heredan del padre el estado (Activo/Test), el vencimiento y los datos de envío. El
- * padre deja de tener stock propio: para darle variantes no puede tener unidades. Una variante no tiene variantes y un
+ * padre deja de llevar el stock en sí mismo: si tenía unidades, quedan como stock general «pendiente de repartir» entre las variantes (migración 0273). Una variante no tiene variantes y un
  * compuesto tampoco. Devuelve el error como valor.
  */
 export async function crearVariantes(padreId: string, opciones: OpcionVariante[], variantes: VarianteNueva[]): Promise<{ error?: string; creadas?: number }> {
@@ -618,9 +618,15 @@ export async function crearVariantes(padreId: string, opciones: OpcionVariante[]
   if (padre.padre_id) return { error: "Una variante no puede tener variantes." };
 
   const { data: hijas } = await supabase.from("skus_maestros").select("opciones").eq("padre_id", padreId);
+  // Un producto con stock ya no tiene que llevarse a cero para darle variantes (11 nov 2026, pedido de Jhokser): su stock queda como general, «pendiente de repartir», y
+  // mientras tanto lo que sale de una variante se descuenta de ahí (migración 0273). Un producto con vencimiento sí tiene que repartirlo antes, por lote.
+  let repartoPendiente = false;
   if (!hijas || hijas.length === 0) {
     const { data: stock } = await supabase.from("wms_stock").select("fisico").eq("sku_maestro_id", padreId);
-    if ((stock ?? []).some((s) => Number(s.fisico) !== 0)) return { error: "El producto tiene stock: llévalo a cero antes de darle variantes (el stock pasa a llevarse en cada variante)." };
+    if ((stock ?? []).some((s) => Number(s.fisico) !== 0)) {
+      if (padre.maneja_vencimiento) return { error: "El producto maneja vencimiento y tiene stock: llévalo a cero antes de darle variantes (el stock se lleva por lote en cada variante)." };
+      repartoPendiente = true;
+    }
   }
   // Una combinación que ya existe no se vuelve a crear.
   const clave = (o: Record<string, string>) => ops.map((x) => `${x.nombre}=${o?.[x.nombre] ?? ""}`).join("|");
@@ -628,8 +634,16 @@ export async function crearVariantes(padreId: string, opciones: OpcionVariante[]
   const aCrear = nuevas.filter((v) => !existentes.has(clave(v.opciones)));
   if (aCrear.length === 0) return { error: "Esas variantes ya existen." };
 
+  // La marca va antes de crear las variantes: sin la migración 0273 falla aquí y no queda un producto con variantes y stock que la base no deja mover.
+  if (repartoPendiente) {
+    const { error: errorMarca } = await supabase.from("skus_maestros").update({ reparto_pendiente: true, reparto_pendiente_desde: new Date().toISOString() }).eq("id", padreId);
+    if (errorMarca) return { error: "El producto tiene stock: llévalo a cero antes de darle variantes, o corre la migración 0273 (reparto del stock entre variantes) para dejarlo pendiente de repartir." };
+  }
   const { error: errorPadre } = await supabase.from("skus_maestros").update({ opciones_variantes: ops }).eq("id", padreId);
-  if (errorPadre) return { error: "No se pudieron guardar las opciones." };
+  if (errorPadre) {
+    if (repartoPendiente) await supabase.from("skus_maestros").update({ reparto_pendiente: false, reparto_pendiente_desde: null }).eq("id", padreId);
+    return { error: "No se pudieron guardar las opciones." };
+  }
 
   const heredado = {
     tipo: "simple",
@@ -654,6 +668,7 @@ export async function crearVariantes(padreId: string, opciones: OpcionVariante[]
   };
   const { error } = await supabase.from("skus_maestros").insert(aCrear.map((v) => ({ ...heredado, codigo: v.codigo, nombre: v.nombre, opciones: v.opciones })));
   if (error) {
+    if (repartoPendiente) await supabase.from("skus_maestros").update({ reparto_pendiente: false, reparto_pendiente_desde: null }).eq("id", padreId);
     if (error.code === "23505") return { error: "Uno de esos SKU ya lo tiene otro producto." };
     return { error: error.message.length < 200 ? error.message : "No se pudieron crear las variantes." };
   }
@@ -661,7 +676,7 @@ export async function crearVariantes(padreId: string, opciones: OpcionVariante[]
     accion: "crear_variantes",
     entidad: "skus_maestros",
     entidadId: padreId,
-    detalle: `${aCrear.length} variante${aCrear.length === 1 ? "" : "s"}: ${aCrear.map((v) => v.codigo).join(", ")}`.slice(0, 500),
+    detalle: `${aCrear.length} variante${aCrear.length === 1 ? "" : "s"}: ${aCrear.map((v) => v.codigo).join(", ")}${repartoPendiente ? " (su stock queda como general, pendiente de repartir)" : ""}`.slice(0, 500),
   });
   revalidatePath("/producto");
   revalidatePath("/inventario");
@@ -669,8 +684,10 @@ export async function crearVariantes(padreId: string, opciones: OpcionVariante[]
 }
 
 /**
- * Quita una variante que todavía no se usó: sin movimientos de inventario, sin compras y sin fichas enlazadas. Si ya tiene
- * historia, se conserva (se puede pasar a Test o dejar sin stock).
+ * Quita una variante que no se usa: sin compras, fichas enlazadas ni compuestos, y sin stock. Desde la migración 0269 (11 nov 2026, pedido de Hernán:
+ * Dinora cargó por error las Botas Maxi Pro por talla, les sumó inventario y lo dejó en 0, y «Quitar» no la dejaba) también si tuvo movimientos de
+ * inventario que se anulan entre sí: la base (`wms_quitar_variante`) lo revisa y borra sus movimientos, su stock en cero y la variante, todo junto.
+ * Lo que tenía queda en la Actividad. Si la migración no se corrió, sigue la regla de antes (sin movimientos).
  */
 export async function quitarVariante(id: string): Promise<{ error?: string }> {
   await requireModuloEscritura(MODULO);
@@ -678,6 +695,22 @@ export async function quitarVariante(id: string): Promise<{ error?: string }> {
   const supabase = createServiceClient();
   const { data: v } = await supabase.from("skus_maestros").select("codigo, padre_id").eq("id", id).maybeSingle();
   if (!v || !v.padre_id) return { error: "No es una variante." };
+  const conBase = await supabase.rpc("wms_quitar_variante", { p_id: id });
+  if (!conBase.error) {
+    const r = conBase.data as { quitada: boolean; codigo: string; movimientos?: number; bloqueos: Record<string, number> };
+    if (!r.quitada) return { error: mensajeBloqueosVariante(r.codigo, r.bloqueos) };
+    await registrarAuditoria({
+      accion: "quitar_variante",
+      entidad: "skus_maestros",
+      entidadId: v.padre_id,
+      detalle: r.movimientos ? `${v.codigo} (con ${r.movimientos} movimiento${r.movimientos === 1 ? "" : "s"} de inventario que se anulaban entre sí, borrados con ella)` : v.codigo,
+    });
+    revalidatePath("/producto");
+    revalidatePath("/inventario");
+    return {};
+  }
+  // Sin la migración 0269 (la función no existe): la regla de antes.
+  if (!/wms_quitar_variante|function|schema cache/i.test(conBase.error.message)) return { error: "No se pudo quitar la variante." };
   const { count: enCombos } = await supabase.from("sku_maestro_componentes").select("id", { count: "exact", head: true }).eq("componente_id", id);
   if ((enCombos ?? 0) > 0) return { error: "La variante es parte de un producto compuesto: quítala del compuesto primero." };
   const [movs, compras, shopify, dropi] = await Promise.all([
@@ -687,7 +720,7 @@ export async function quitarVariante(id: string): Promise<{ error?: string }> {
     supabase.from("wms_dropi_productos").select("id", { count: "exact", head: true }).eq("sku_maestro_id", id),
   ]);
   if ((movs.count ?? 0) + (compras.count ?? 0) + (shopify.count ?? 0) + (dropi.count ?? 0) > 0)
-    return { error: "La variante ya tiene movimientos, compras o fichas enlazadas: no se puede quitar." };
+    return { error: "La variante ya tiene movimientos, compras o fichas enlazadas: no se puede quitar. (Falta correr en Supabase la migración 0269, que deja quitarla si sus movimientos se anulan entre sí.)" };
   const { error } = await supabase.from("skus_maestros").delete().eq("id", id);
   if (error) return { error: "No se pudo quitar la variante." };
   await registrarAuditoria({ accion: "quitar_variante", entidad: "skus_maestros", entidadId: v.padre_id, detalle: v.codigo });
@@ -921,5 +954,6 @@ export async function sugerirSkuLibre(nombre: string, compuesto = false): Promis
   if (!base) return { codigo: "" };
   const { data } = await createServiceClient().from("skus_maestros").select("codigo").ilike("codigo", `${base}%`);
   const usados = new Set((data ?? []).map((p) => String(p.codigo).trim().toUpperCase()));
-  return { codigo: primeroLibre(base, (c) => usados.has(c)) };
+  // Un pack que choca con otro del mismo producto lleva la palabra de su cantidad (TRIO…), no un número.
+  return { codigo: primeroLibre(base, (c) => usados.has(c), compuesto === true ? cantidadEnNombre(String(nombre ?? "")) : null) };
 }

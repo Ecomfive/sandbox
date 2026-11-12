@@ -6,6 +6,7 @@ import { pideMotivo, puedeMoverAMano } from "@/lib/wms/recepcion";
 import { getPaisActual } from "@/lib/pais";
 import { createServiceClient } from "@/lib/supabase/server";
 import { traerTodasConError } from "@/lib/supabase/paginar";
+import { leerStockPlataformas } from "../datos-plataformas";
 import { Levantamiento, type ProductoConteo } from "./levantamiento";
 
 export const metadata = { title: "Levantamiento" };
@@ -19,6 +20,17 @@ const ES_ID = (v: string) => /^[0-9a-fA-F-]{8,64}$/.test(v);
  * cada producto y, al guardar, cada uno queda en lo contado (la diferencia se anota como ajuste en el libro). Un producto con
  * variantes no sale: no lleva stock propio y la base rechazaría todo el conteo; se cuenta cada variante.
  */
+/**
+ * El color de una variante que además tiene otra opción (talla…): con él se agrupan sus variantes en el Levantamiento (11 nov 2026, pedido de Hernán), y `resto`
+ * es lo demás («M», «43»). Una variante solo de color, o sin color, no se agrupa.
+ */
+function colorDeVariante(opciones: Record<string, string> | null): { color: string | null; resto: string } {
+  const pares = Object.entries(opciones ?? {}).filter(([, v]) => String(v ?? "").trim() !== "");
+  const color = pares.find(([k]) => /^(colou?r|tono)$/i.test(k.trim()));
+  if (!color || pares.length < 2) return { color: null, resto: "" };
+  return { color: String(color[1]).trim(), resto: pares.filter((x) => x !== color).map(([, v]) => v).join(" / ") };
+}
+
 export default async function LevantamientoPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
   const usuario = await requireModulo("inventario");
   const supabase = createServiceClient();
@@ -37,13 +49,13 @@ export default async function LevantamientoPage({ searchParams }: { searchParams
   const pedida = typeof bodega === "string" && ES_ID(bodega) ? bodega : "";
   const elegida = bodegas.some((b) => b.id === pedida) ? pedida : (bodegas[0]?.id ?? "");
 
-  const [productos, padres, stock, lotes, ultimo] = await Promise.all([
+  const [productos, padres, stock, lotes, ultimo, plataformas] = await Promise.all([
     traerTodasConError<{ id: string; codigo: string; nombre: string; clase: string | null; maneja_vencimiento: boolean | null; foto_url: string | null; numero: number | null; codigo_barras: string | null; padre_id: string | null; opciones: Record<string, string> | null }>((d, h) =>
       supabase.from("skus_maestros").select("id, codigo, nombre, clase, maneja_vencimiento, foto_url, numero, codigo_barras, padre_id, opciones").neq("tipo", "combo").neq("clase", "test").is("opciones_variantes", null).order("codigo").range(d, h),
     ),
     // Los productos con variantes no se cuentan: salen como una fila que se despliega con sus variantes.
-    traerTodasConError<{ id: string; codigo: string; nombre: string; foto_url: string | null }>((d, h) =>
-      supabase.from("skus_maestros").select("id, codigo, nombre, foto_url").not("opciones_variantes", "is", null).order("id").range(d, h),
+    traerTodasConError<{ id: string; codigo: string; nombre: string; foto_url: string | null; numero: number | null; codigo_barras: string | null }>((d, h) =>
+      supabase.from("skus_maestros").select("id, codigo, nombre, foto_url, numero, codigo_barras").not("opciones_variantes", "is", null).order("id").range(d, h),
     ),
     elegida
       ? traerTodasConError<{ sku_maestro_id: string; fisico: number }>((d, h) => supabase.from("wms_stock").select("sku_maestro_id, fisico").eq("bodega_id", elegida).order("sku_maestro_id").range(d, h))
@@ -56,6 +68,8 @@ export default async function LevantamientoPage({ searchParams }: { searchParams
     elegida
       ? supabase.from("wms_conteos").select("creado_en, referencia, productos").eq("bodega_id", elegida).order("creado_en", { ascending: false }).limit(1).maybeSingle()
       : Promise.resolve({ data: null }),
+    // Lo que hay en Dropi (B280), Effi y Drop del país, para «Stock por bodega» de la ficha (11 nov 2026, pedido de Hernán). Si falla, la ficha sale sin eso.
+    leerStockPlataformas(supabase, pais.id).catch(() => null),
   ]);
 
   const enBodega = new Map((stock.data ?? []).map((s) => [s.sku_maestro_id, Number(s.fisico)]));
@@ -78,7 +92,12 @@ export default async function LevantamientoPage({ searchParams }: { searchParams
     lista.push({ codigo: lote.codigo, vencimiento: lote.fecha_vencimiento, cantidad: Number(l.cantidad) });
     lotesPorSku.set(lote.sku_maestro_id, lista);
   }
-  const padrePorId = new Map((padres.data ?? []).map((p) => [p.id, { id: p.id, codigo: p.codigo, nombre: p.nombre, foto: p.foto_url }]));
+  const padrePorId = new Map(
+    (padres.data ?? []).map((p) => [
+      p.id,
+      { id: p.id, codigo: p.codigo, nombre: p.nombre, foto: p.foto_url, numero: p.numero ?? null, barras: p.codigo_barras || null, plataformas: plataformas?.porProducto.get(p.id) ?? null },
+    ]),
+  );
   const filas: ProductoConteo[] = (productos.data ?? []).map((p) => ({
     id: p.id,
     codigo: p.codigo,
@@ -89,11 +108,13 @@ export default async function LevantamientoPage({ searchParams }: { searchParams
     foto: p.foto_url ?? (p.padre_id ? (padrePorId.get(p.padre_id)?.foto ?? null) : null),
     padre: p.padre_id ? (padrePorId.get(p.padre_id) ?? null) : null,
     opciones: Object.values(p.opciones ?? {}).join(" / "),
+    ...colorDeVariante(p.opciones),
     numero: p.numero ?? null,
     barras: p.codigo_barras || null,
     enSistema: enBodega.get(p.id) ?? 0,
     lotes: lotesPorSku.get(p.id) ?? [],
     cajas: cajasPorSku.get(p.id) ?? [],
+    plataformas: plataformas?.porProducto.get(p.id) ?? null,
   }));
   const ultimoConteo = ultimo.data as { creado_en: string; referencia: string | null; productos: number } | null;
 

@@ -7,6 +7,7 @@ import { accesoCrm } from "@/lib/crm/areas";
 import { puedeVerTelefonos } from "@/lib/whatsapp/telefono-oculto";
 import { DIAS_ATENDIDA, ETIQUETA_ALERTA, SUGERENCIA_ALERTA, type TipoAlerta } from "@/lib/crm/salud";
 import { avisarTarea } from "@/lib/crm/tareas-servidor";
+import { elegirFichaConservada, lineasDeUnion, mensajeErrorUnirDropshippers } from "@/lib/crm/unir-dropshippers";
 import { getPaisActual } from "@/lib/pais";
 import { createServiceClient } from "@/lib/supabase/server";
 import { olvidarDireccion } from "./guardado";
@@ -206,5 +207,51 @@ export async function productosParaPareto(dropshipperId: string): Promise<{ prod
       nombre: p.producto ?? `Producto ${p.producto_id}`,
       pedidos: Number(p.pedidos),
     })),
+  };
+}
+
+export interface FichaUnida {
+  id: string;
+  codigo: string;
+  nombre: string;
+}
+export type ResultadoUnion = { ok: true; simulacion: boolean; conservado: FichaUnida; eliminado: FichaUnida; lineas: string[] } | { error: string };
+
+/**
+ * Une dos fichas del mismo dropshipper (11 nov 2026, pedido de Jhokser: puede vender en varios países y plataformas y tener una ficha por país). `aplicar = false` solo
+ * simula (la base hace los cambios y los deshace) y dice qué pasaría; con `true` los aplica. **Se queda la ficha más antigua y lo decide el servidor**, no el navegador
+ * (`elegirFichaConservada`). La base pasa a esa ficha todo lo de la otra (cuentas, países, dónde vende, chats, casos, tareas…) y se niega si algo chocaría
+ * (`crm_unir_dropshippers`, migración 0272). Solo Dirección con escritura; queda en la auditoría. Devuelve el error como valor.
+ */
+export async function unirDropshippers(idA: string, idB: string, aplicar: boolean): Promise<ResultadoUnion> {
+  const u = await usuarioDireccion();
+  if (!u) return { error: "Solo Dirección puede unir fichas." };
+  if (!ES_ID(idA) || !ES_ID(idB) || idA === idB) return { error: "Elige dos fichas distintas." };
+  const supabase = createServiceClient();
+  const { data: fichas } = await supabase.from("dropshippers").select("id, codigo, nombre, fecha_ingreso, creado_en").in("id", [idA, idB]);
+  if (!fichas || fichas.length !== 2) return { error: "Una de las fichas ya no existe." };
+  const [a, b] = fichas.map((f) => ({
+    id: f.id as string,
+    codigo: String(f.codigo ?? ""),
+    nombre: String(f.nombre ?? ""),
+    desde: ((f.fecha_ingreso as string | null) ?? (f.creado_en as string | null))?.slice(0, 10) ?? null,
+  }));
+  const { conservar, eliminar } = elegirFichaConservada(a, b);
+  const { data, error } = await supabase.rpc("crm_unir_dropshippers", { p_conservar: conservar.id, p_eliminar: eliminar.id, p_usuario: u.nombre || u.email, p_aplicar: aplicar });
+  if (error) {
+    if (error.code === "PGRST202" || /Could not find the function/i.test(error.message)) return { error: "Falta correr la migración 0272 (unir fichas del CRM) en la base." };
+    return { error: mensajeErrorUnirDropshippers(error.message) };
+  }
+  const informe = (data ?? {}) as { movido?: Record<string, unknown>; simulacion?: boolean };
+  if (aplicar) {
+    olvidarDireccion();
+    revalidatePath("/crm-dropshippers", "layout");
+  }
+  return {
+    ok: true,
+    simulacion: !aplicar,
+    conservado: { id: conservar.id, codigo: conservar.codigo, nombre: conservar.nombre },
+    eliminado: { id: eliminar.id, codigo: eliminar.codigo, nombre: eliminar.nombre },
+    lineas: lineasDeUnion(informe.movido),
   };
 }

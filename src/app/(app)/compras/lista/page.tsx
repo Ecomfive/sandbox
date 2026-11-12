@@ -1,7 +1,7 @@
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { requirePestana } from "@/lib/auth";
-import { cargarColoresEtiquetas, cargarColoresTiendas, cargarCompras } from "../datos-compras";
+import { cargarColoresEtiquetas, cargarColoresTiendas, cargarCompras, cargarPlazosTransito } from "../datos-compras";
 import type { Grupo } from "../calculos-compras";
 import { TablaCompras } from "../tabla-compras";
 
@@ -19,7 +19,7 @@ function leerReponer(v: string | string[] | undefined): { skuId: string; cantida
   return UUID.test(skuId ?? "") && Number.isInteger(cantidad) && cantidad > 0 && cantidad < 1e7 ? { skuId, cantidad } : null;
 }
 
-const GRUPOS: Grupo[] = ["abiertas", "cotizando", "por_cotizar", "cotizado", "produccion", "transito", "atrasadas", "cerradas"];
+const GRUPOS: Grupo[] = ["abiertas", "cotizando", "por_cotizar", "enviado_cotizacion", "cotizado", "produccion", "transito", "atrasadas", "fuera_plazo", "cerradas"];
 
 /** Compras › Compras: el tablero (todas las columnas, agrupar, filtros de un toque) con la ficha de resumen a la derecha. */
 export default async function ListaComprasPage({ searchParams }: { searchParams: Promise<{ [k: string]: string | string[] | undefined }> }) {
@@ -28,7 +28,7 @@ export default async function ListaComprasPage({ searchParams }: { searchParams:
   const reponerInicial = leerReponer(reponer);
   // Solo letras, números y espacios (lo pone el enlace del Portal del proveedor).
   const proveedorInicial = typeof proveedor === "string" && /^[\p{L}\p{N} .-]{1,60}$/u.test(proveedor) ? proveedor : null;
-  const [{ compras, paises, vista, error, restricciones }, coloresEtiquetas, coloresTiendas] = await Promise.all([cargarCompras(ver), cargarColoresEtiquetas(), cargarColoresTiendas()]);
+  const [{ compras, paises, vista, error, restricciones }, coloresEtiquetas, coloresTiendas, plazosTransito] = await Promise.all([cargarCompras(ver), cargarColoresEtiquetas(), cargarColoresTiendas(), cargarPlazosTransito()]);
   const grupoInicial = typeof grupo === "string" && (GRUPOS as string[]).includes(grupo) ? (grupo as Grupo) : null;
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
@@ -55,6 +55,7 @@ export default async function ListaComprasPage({ searchParams }: { searchParams:
           comentarioInicial={typeof comentario === "string" ? comentario : null}
           reponerInicial={reponerInicial}
           proveedorInicial={proveedorInicial}
+          plazosTransito={plazosTransito}
         />
       )}
     </Pagina>

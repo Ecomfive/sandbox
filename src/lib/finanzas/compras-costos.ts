@@ -550,7 +550,7 @@ export function armarReorden(compras: CompraFin[], items: ItemCompra[], paisClav
   for (const c of compras) {
     const its = porCompra.get(c.id) ?? [];
     const llego = !!c.fechaLlegada && c.fechaLlegada <= hoy;
-    if (compraAbierta(c) && !llego && c.etapa !== "backlog" && c.etapa !== "cotizar") {
+    if (compraAbierta(c) && !llego && c.etapa !== "backlog" && c.etapa !== "cotizar" && c.etapa !== "enviado_cotizacion") {
       if (its.length) for (const i of its) enCamino.set(i.skuId, (enCamino.get(i.skuId) ?? 0) + Math.max(i.cantidad - (i.recibida ?? 0), 0));
       else if (c.skuId && c.qtyTotal) enCamino.set(c.skuId, (enCamino.get(c.skuId) ?? 0) + c.qtyTotal);
     }

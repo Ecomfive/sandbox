@@ -32,6 +32,28 @@ export function nombreBloqueo(clave: string): [string, string] {
  * nombre se suma: el stock y el stock por ubicación son «stock»).
  */
 export function mensajeBloqueos(codigo: string, bloqueos: Record<string, number>): string {
+  const partes = listaBloqueos(bloqueos);
+  if (partes.length === 0) return `No se pudo eliminar ${codigo}.`;
+  return `No se puede eliminar ${codigo}: lo usan ${partes.join(", ")}. Quita esos vínculos o pásalo a Inactivo o Descontinuado.`;
+}
+
+/**
+ * Lo mismo para «Quitar» una variante (migración 0269, `wms_quitar_variante`): sus movimientos de inventario solo la bloquean si no se anulan
+ * entre sí (le quedan unidades o se movieron entre bodegas sin cuadrar en cada una).
+ */
+export function mensajeBloqueosVariante(codigo: string, bloqueos: Record<string, number>): string {
+  const { "wms_movimientos.sku_maestro_id": movimientos, ...resto } = bloqueos;
+  const partes = listaBloqueos(resto);
+  const motivos = [
+    ...(partes.length ? [`la usan ${partes.join(", ")}`] : []),
+    ...(movimientos > 0 ? ["sus movimientos de inventario no suman cero (todavía tiene unidades o se movieron entre bodegas)"] : []),
+  ];
+  if (motivos.length === 0) return `No se pudo quitar la variante ${codigo}.`;
+  return `No se puede quitar la variante ${codigo}: ${motivos.join(" y ")}. Si ya no se usa, déjala en 0 o pásala a Inactivo.`;
+}
+
+/** «3 compras, 1 publicación de Dropi»: lo que bloquea, de más a menos (lo que cae en el mismo nombre se suma). */
+function listaBloqueos(bloqueos: Record<string, number>): string[] {
   const suma = new Map<string, { n: number; nombre: [string, string] }>();
   for (const [clave, n] of Object.entries(bloqueos)) {
     if (!(n > 0)) continue;
@@ -39,7 +61,5 @@ export function mensajeBloqueos(codigo: string, bloqueos: Record<string, number>
     const antes = suma.get(nombre[0]);
     suma.set(nombre[0], { n: (antes?.n ?? 0) + n, nombre });
   }
-  const partes = [...suma.values()].sort((a, b) => b.n - a.n).map(({ n, nombre }) => `${n} ${n === 1 ? nombre[0] : nombre[1]}`);
-  if (partes.length === 0) return `No se pudo eliminar ${codigo}.`;
-  return `No se puede eliminar ${codigo}: lo usan ${partes.join(", ")}. Quita esos vínculos o pásalo a Inactivo o Descontinuado.`;
+  return [...suma.values()].sort((a, b) => b.n - a.n).map(({ n, nombre }) => `${n} ${n === 1 ? nombre[0] : nombre[1]}`);
 }

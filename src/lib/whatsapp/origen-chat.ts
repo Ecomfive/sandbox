@@ -54,6 +54,25 @@ export function dondeVende(
   return [...vistos.values()].sort((a, b) => a.pais.localeCompare(b.pais) || a.plataforma.localeCompare(b.plataforma, "es"));
 }
 
+/** Un país con las plataformas donde el cliente vende en él («🇵🇦» → Dropi, EFFI). */
+export interface VendeEnPais {
+  pais: string;
+  plataformas: VendeEn[];
+}
+
+/**
+ * Lo mismo que `dondeVende`, agrupado por país (11 nov 2026, pedido de Jhokser): un dropshipper puede vender en varios países y en varias plataformas en cada uno, y se
+ * muestra la bandera del país una sola vez seguida de sus plataformas («🇵🇦 Dropi · 🇨🇷 Dropi, EFFI»). El orden es el de `dondeVende`. Los países que vende pero sin
+ * plataforma conocida (`soloPaises`, los de su ficha del CRM) salen sin plataformas, al final.
+ */
+export function vendeEnPorPais(vende: readonly VendeEn[], soloPaises: readonly string[] = []): VendeEnPais[] {
+  const grupos = new Map<string, VendeEn[]>();
+  for (const v of vende) grupos.set(v.pais, [...(grupos.get(v.pais) ?? []), v]);
+  const r = [...grupos.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([pais, plataformas]) => ({ pais, plataformas }));
+  for (const p of soloPaises) if (/^[A-Z]{2}$/.test(p) && !grupos.has(p)) r.push({ pais: p, plataformas: [] });
+  return r;
+}
+
 /** Los países donde vende (sin repetir): los de su ficha del CRM y los de dónde vende. */
 export function paisesDondeVende(paisesDropshipper: readonly (string | null)[], vende: readonly { pais: string }[]): string[] {
   return [...new Set([...paisesDropshipper, ...vende.map((v) => v.pais)].filter((p): p is string => !!p && /^[A-Z]{2}$/.test(p)))];

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { mensajeBloqueos, nombreBloqueo } from "./eliminar-producto";
+import { mensajeBloqueos, mensajeBloqueosVariante, nombreBloqueo } from "./eliminar-producto";
 
 describe("nombreBloqueo", () => {
   it("dice con palabras del equipo qué tabla lo bloquea", () => {
@@ -25,5 +25,16 @@ describe("mensajeBloqueos", () => {
   });
   it("sin bloqueos conocidos, un aviso simple", () => {
     assert.equal(mensajeBloqueos("X", {}), "No se pudo eliminar X.");
+  });
+});
+
+describe("mensajeBloqueosVariante", () => {
+  it("los movimientos que no suman cero se dicen como tales; lo demás, como lo que la usa", () => {
+    assert.equal(
+      mensajeBloqueosVariante("BOTAS/47", { "wms_movimientos.sku_maestro_id": 2, "wms_stock.sku_maestro_id": 1 }),
+      "No se puede quitar la variante BOTAS/47: la usan 1 registro de stock y sus movimientos de inventario no suman cero (todavía tiene unidades o se movieron entre bodegas). Si ya no se usa, déjala en 0 o pásala a Inactivo.",
+    );
+    assert.match(mensajeBloqueosVariante("X", { "wms_compra_items.sku_maestro_id": 2 }), /la usan 2 compras\. /);
+    assert.equal(mensajeBloqueosVariante("X", {}), "No se pudo quitar la variante X.");
   });
 });

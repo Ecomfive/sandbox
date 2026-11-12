@@ -34,6 +34,8 @@ const pedido = (p: Partial<PedidoPortal>): PedidoPortal => ({
   actualizadoEn: "2026-10-17T10:00:00Z",
   anticipoMonto: null,
   confirmadoEn: null,
+  prioridad: null,
+  etapaDesde: null,
   ...p,
 });
 

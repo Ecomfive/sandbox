@@ -3,17 +3,19 @@
 // competencia-guardar.ts con Dropi, en sus propias tablas: anota cada cambio, empareja cada producto de la competencia con el nuestro igual (por nombre y por
 // foto) y deja las alertas. La primera búsqueda no deja alertas: todo es nuevo. Una lectura que trae mucho menos que lo guardado no toca nada: sería un catálogo
 // a medias. Effi además dice las ventas de cada artículo: lo que subieron entre lecturas queda en el historial (evento `ventas`).
+// Dunamixfy (11 nov 2026, migración 0271): su Marketplace con una cuenta de dropshipper (`scrapingCompetenciaDunamixfy`), igual que Drop.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { certezaIgual } from "../src/lib/competencia/certeza";
 import { armarAlertas, type ProductoAlerta } from "../src/lib/competencia/analisis";
 import { catalogoDrop } from "../src/lib/competencia/drop";
+import { catalogoDunamixfy } from "../src/lib/competencia/dunamixfy";
 import { catalogoEffi } from "../src/lib/competencia/effi";
 import { comparar, type Evento, type ProductoGuardado, type ProductoVisto } from "../src/lib/scraping/comparar";
 import { indexar, yaVisto } from "../src/lib/scraping/cruces";
 
 export interface LecturaCatalogo {
-  tipo: "competencia-drop" | "competencia-effi";
+  tipo: "competencia-drop" | "competencia-effi" | "competencia-dunamixfy";
   pais: string;
   inicio: string;
   duracionMs: number;
@@ -63,7 +65,18 @@ const CATALOGOS: Record<LecturaCatalogo["tipo"], Catalogo> = {
     conservar: ["ventas"],
     leer: (filas) => catalogoEffi(filas).map((v) => ({ ...v, extras: { codigo: v.codigo, proveedor_effi_id: v.proveedorId, ventas: v.ventas } })),
   },
+  "competencia-dunamixfy": {
+    nombre: "Dunamixfy",
+    tablas: { productos: "dunamixfy_competencia_productos", busquedas: "dunamixfy_competencia_busquedas", historial: "dunamixfy_competencia_historial", alertas: "dunamixfy_competencia_alertas" },
+    columnaClave: "dunamixfy_producto_id",
+    conservar: ["creado_en_dunamixfy"],
+    leer: (filas) =>
+      catalogoDunamixfy(filas).map((v) => ({ ...v, ventas: null, extras: { proveedor_dunamixfy_id: v.proveedorId, creado_en_dunamixfy: v.creadoEnDunamixfy } })),
+  },
 };
+
+/** La plataforma de cada lectura, como la guarda `competencia_verificaciones` (migración 0246). */
+const PLATAFORMA: Record<LecturaCatalogo["tipo"], string> = { "competencia-drop": "drop", "competencia-effi": "effi", "competencia-dunamixfy": "dunamixfy" };
 
 type FilaGuardada = Record<string, unknown> & {
   id: string;
@@ -241,7 +254,7 @@ export async function guardarCatalogo(supabase: SupabaseClient, l: LecturaCatalo
       // Las alertas que comparan con lo nuestro (bajó el precio, vende más barato, bajó el stock) solo si es el mismo producto (`certezaIgual`, 7 nov 2026).
       const porIdActual = new Map(actuales.map((p) => [p.id, p]));
       // Lo que ya revisó la IA manda (migración 0246; sin ella, nada).
-      const { data: verificaciones } = await supabase.from("competencia_verificaciones").select("producto_id, nuestro_id, veredicto").eq("plataforma", (l.tipo === "competencia-drop" ? "drop" : "effi"));
+      const { data: verificaciones } = await supabase.from("competencia_verificaciones").select("producto_id, nuestro_id, veredicto").eq("plataforma", PLATAFORMA[l.tipo]);
       const veredicto = new Map((verificaciones ?? []).map((v) => [`${v.producto_id}|${v.nuestro_id}`, v.veredicto as string]));
       const exacto = (p: { id: string; nombre: string; foto_huella: string | null; igual_a: string | null; igual_metodo: string | null }) => {
         const n = p.igual_a ? porIdActual.get(p.igual_a) : undefined;

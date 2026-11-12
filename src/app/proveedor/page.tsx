@@ -1,5 +1,7 @@
 import { idiomaDeCuenta } from "@/lib/proveedor/cuenta";
 import { cargarEspejo } from "@/lib/proveedor/datos";
+import { cargarDesempeno } from "@/lib/proveedor/desempeno-datos";
+import { hoyPanama } from "@/lib/proveedor/fechas";
 import { conFotosDeCompras } from "@/lib/proveedor/fotos-pedidos";
 import { estadoPagos } from "@/lib/proveedor/pagos-servidor";
 import { cargarCambiosRegistro, cargarRegistro } from "@/lib/proveedor/registro-datos";
@@ -55,7 +57,11 @@ export default async function PortalProveedorPage() {
     .limit(20);
   const nuevos: AvisoEcomfive[] = (avisos ?? []).map((a) => ({ id: a.id as string, texto: a.texto as string, creadoEn: a.creado_en as string }));
 
-  const estado = await estadoPagos(supabase, { ...espejo, pedidos: conFotos });
+  const [estado, desempeno] = await Promise.all([
+    estadoPagos(supabase, { ...espejo, pedidos: conFotos }),
+    // «Tu desempeño con Ecomfive»: si no se puede leer, el portal se ve igual, sin el panel.
+    cargarDesempeno(supabase, espejo.pedidos, espejo.plazos, hoyPanama()).catch(() => null),
+  ]);
   const pagos =
     "error" in estado
       ? null
@@ -81,6 +87,7 @@ export default async function PortalProveedorPage() {
       fotosReales={fotosReales}
       avisos={nuevos}
       pagos={pagos}
+      desempeno={desempeno}
     />
   );
 }

@@ -58,7 +58,13 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         u ? contarParaTi(u.id).catch(() => 0) : 0,
         // Las actualizaciones del sistema recientes de sus módulos que no ha visto (migración 0218).
         u ? contarNovedadesSinVer(supabase, u).catch(() => 0) : 0,
-      ]).then(([menu, paraTi, novedades]) => conParaTi(menu, paraTi, novedades))
+        // Sus tareas del equipo sin cerrar (Equipo › Tareas, migración 0215): lo único que cuenta la campana.
+        u && u.modulos.includes("tareas")
+          ? Promise.resolve(
+              supabase.from("tareas_equipo").select("id", { count: "exact", head: true }).eq("responsable_id", u.id).not("estado", "in", "(hecho,archivado)"),
+            ).then((r) => (r.error ? 0 : (r.count ?? 0)), () => 0)
+          : 0,
+      ]).then(([menu, paraTi, novedades, tareasMias]) => conParaTi(menu, paraTi, novedades, tareasMias))
     )
     .catch(() => SIN_PENDIENTES);
   const [plataformasPais, favoritosDeSesion, usuario, permitidas, paisActual, avisoInactividad] = await Promise.all([

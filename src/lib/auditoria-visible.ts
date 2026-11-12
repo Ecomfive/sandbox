@@ -84,6 +84,7 @@ export const MODULO_DE_ENTIDAD: Record<string, string> = {
   competencia_productos: "analisis-competencia",
   drop_competencia_productos: "analisis-competencia",
   effi_competencia_productos: "analisis-competencia",
+  dunamixfy_competencia_productos: "analisis-competencia",
   dropshippers: "crm-dropshippers",
   whatsapp_conversaciones: "crm-dropshippers",
   crm_plataformas_venta: "crm-dropshippers",

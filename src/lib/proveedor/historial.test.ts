@@ -43,8 +43,10 @@ test("etapas: se ven como las del portal y se saltan las que el proveedor no ve"
   const h = historialDePedido(
     [
       ev("etapa", "produccion", "tracking", "2026-10-20T00:00:00Z", "proveedor", "Shen Zhen"),
-      ev("etapa", "backlog", "cotizar", "2026-10-01T00:00:00Z"),
-      ev("etapa", "cotizar", "backlog", "2026-10-02T00:00:00Z"),
+      // «01 - Cotizar» ya no lo ve el proveedor (11 nov 2026): su «Por cotizar» empieza cuando Ecomfive se la envía.
+      ev("etapa", "backlog", "cotizar", "2026-09-30T00:00:00Z"),
+      ev("etapa", "cotizar", "enviado_cotizacion", "2026-10-01T00:00:00Z"),
+      ev("etapa", "enviado_cotizacion", "backlog", "2026-10-02T00:00:00Z"),
       ev("etapa", "arribo_mercancia", "completado", "2026-10-30T00:00:00Z"),
     ],
     { conAutor: false },

@@ -1,3 +1,4 @@
+import { colorPrioridad, PRIORIDADES } from "@/lib/compras/plazos";
 import { SIN_VALOR, type DefTabla } from "@/lib/tabla/motor";
 
 export interface FilaCompra {
@@ -20,6 +21,10 @@ export interface FilaCompra {
   nombre: string;
   fotoUrl: string | null;
   etapa: string;
+  /** Desde cuándo está en su etapa (`etapa_desde`, migración 0270): de aquí sale el plazo de la etapa. */
+  etapaDesde: string | null;
+  /** Urgente, alta, normal (se ve «Media») o baja; null sin prioridad. La ve también Shen Zhen en su portal. */
+  prioridad: string | null;
   estado: string;
   proveedor: string | null;
   /** Tipo de venta: venta de importación (para un cliente que nos pide mercancía, antes «Importadora»; migración 0094) o
@@ -69,6 +74,8 @@ export const EMOJI_CAMPO: Record<string, string> = {
   codigo: "🔖",
   pais: "🗺️",
   etapa: "👣",
+  prioridad: "🚩",
+  plazo: "⏱️",
   estado: "🚦",
   proveedor: "🏭",
   agenteEnvio: "🚢",
@@ -160,15 +167,17 @@ export function diasDeCompra(c: Pick<FilaCompra, "creadoEn" | "cerradoEn">, ahor
  * (6 oct 2026: ninguna compra estaba ahí y no se usaba desde marzo de 2025) y, el 10 oct 2026, «Solicitud
  * Internacional» (solo se usa Cotizar), «Evaluación de Proveedor» y «Solicitud a Proveedor» (se hacen dentro de
  * Cotizado), «Compra y Pago» (ocurre durante el tracking) y «Aviso Logística» (solo se usa Arribo Mercancía). El resto
- * se renumeró; las claves guardadas son las mismas. */
+ * se renumeró; las claves guardadas son las mismas. El 11 nov 2026 (reunión con Alcides) entró «02 - Enviado a cotización»
+ * (`enviado_cotizacion`, migración 0270): el momento en que Francis le manda la compra al proveedor; las de después se renumeraron. */
 export const ETAPAS_COMPRA = [
   { valor: "backlog", etiqueta: "Backlog - Pospuesto" },
   { valor: "cotizar", etiqueta: "01 - Cotizar" },
-  { valor: "cotizado", etiqueta: "02 - Cotizado" },
-  { valor: "produccion", etiqueta: "03 - En Producción" },
-  { valor: "tracking", etiqueta: "04 - Tracking" },
-  { valor: "arribo_mercancia", etiqueta: "05 - Arribo Mercancía" },
-  { valor: "completado", etiqueta: "06 - Completado" },
+  { valor: "enviado_cotizacion", etiqueta: "02 - Enviado a cotización" },
+  { valor: "cotizado", etiqueta: "03 - Cotizado" },
+  { valor: "produccion", etiqueta: "04 - En Producción" },
+  { valor: "tracking", etiqueta: "05 - Tracking" },
+  { valor: "arribo_mercancia", etiqueta: "06 - Arribo Mercancía" },
+  { valor: "completado", etiqueta: "07 - Completado" },
   { valor: "descartado", etiqueta: "Descartado" },
 ] as const;
 
@@ -197,6 +206,7 @@ const ETAPA_COLOR: Record<string, string> = {
   solicitud_local: "#ffc500",
   solicitud_internacional: "#3082B7",
   cotizar: "#f9d900",
+  enviado_cotizacion: "#ff9f43",
   cotizado: "#7C4DFF",
   evaluacion_proveedor: "#04A9F4",
   solicitud_proveedor: "#12cdd4",
@@ -312,6 +322,17 @@ export const DEF_COMPRAS: DefTabla<FilaCompra> = {
       agrupable: true,
       ordenGrupos: ETAPAS_COMPRA.map((e) => e.valor),
       colorValor: (v) => colorEtapa(v),
+    },
+    {
+      id: "prioridad",
+      etiqueta: "Prioridad",
+      tipo: "seleccion",
+      valores: (c) => [c.prioridad ?? SIN_VALOR],
+      opciones: () => PRIORIDADES.map((p) => ({ valor: p.valor, etiqueta: p.etiqueta })),
+      etiquetaSinValor: "Sin prioridad",
+      agrupable: true,
+      ordenGrupos: PRIORIDADES.map((p) => p.valor),
+      colorValor: (v) => colorPrioridad(v),
     },
     {
       id: "estado",

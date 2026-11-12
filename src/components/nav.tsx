@@ -51,7 +51,7 @@ export async function NavBar({
           )}
           <SelectorContexto pais={pais.codigo} plataforma={plataforma} plataformas={plataformasDePais(pais.codigo)} permitidos={usuario?.paisesPermitidos ?? null} />
           <MenuCrear acciones={accionesCrear} />
-          {usuario?.modulos.includes("notificaciones") && <CampanaPendientes pendientes={pendientes} />}
+          {usuario?.modulos.includes("tareas") && <CampanaPendientes pendientes={pendientes} />}
           {/* Los atajos de teclado siguen activos; su ayuda se abre desde el menú de la persona. */}
           <AtajosTeclado paginas={paginas} conBoton={false} />
           {usuario && (

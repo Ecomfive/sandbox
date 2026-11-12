@@ -5,6 +5,8 @@ import { requirePestana } from "@/lib/auth";
 import { puedeVerPais } from "@/lib/paises-permitidos";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { cargarEspejo } from "@/lib/proveedor/datos";
+import { cargarDesempeno } from "@/lib/proveedor/desempeno-datos";
+import { hoyPanama } from "@/lib/proveedor/fechas";
 import { conFotosDeCompras } from "@/lib/proveedor/fotos-pedidos";
 import { estadoPagos } from "@/lib/proveedor/pagos-servidor";
 import { BUCKET_PROVEEDOR } from "@/lib/proveedor/rutas";
@@ -70,12 +72,14 @@ export default async function TableroChinPage({ searchParams }: { searchParams: 
   // Pagos: quien no ve los montos de Compras tampoco ve los pagos a Shen Zhen.
   const veMontos = !campoOculto(restriccionesDe(usuario.afinado.compras), "monto");
   const admin = esAdministrador(usuario);
-  const [firmadas, estado, { data: nuevasParaChin }, { data: filasCuentas }, chin] = await Promise.all([
+  const [firmadas, estado, { data: nuevasParaChin }, { data: filasCuentas }, chin, desempeno] = await Promise.all([
     rutas.length ? supabase.storage.from(BUCKET_PROVEEDOR).createSignedUrls(rutas, 3600).then((r) => r.data ?? []) : Promise.resolve([]),
     veMontos ? estadoPagos(supabase, { ...espejo, pedidos }) : Promise.resolve(null),
     supabase.from("proveedor_novedades").select("id, texto, creado_en").eq("proveedor_id", espejo.proveedor.id).eq("lado", "ecomfive").is("leida_en", null).order("creado_en", { ascending: false }).limit(20),
     supabase.from("proveedor_usuarios").select("id, nombre, email, activo, ultimo_ingreso_en").eq("proveedor_id", espejo.proveedor.id).order("creado_en"),
     cargarTareasChin(supabase, { paisesPermitidos: usuario.paisesPermitidos, veMontos }),
+    // El mismo panel que ve Shen Zhen arriba de su portal (de los países que la persona ve).
+    cargarDesempeno(supabase, pedidos, espejo.plazos, hoyPanama()).catch(() => null),
   ]);
   const porRuta = new Map(firmadas.map((f) => [f.path, f.signedUrl]));
   for (const p of activos) if (p.fotoRealRuta && porRuta.get(p.fotoRealRuta)) fotosReales[p.id] = porRuta.get(p.fotoRealRuta)!;
@@ -121,6 +125,7 @@ export default async function TableroChinPage({ searchParams }: { searchParams: 
     avisos: (nuevasParaChin ?? []).map((a) => ({ id: a.id as string, texto: a.texto as string, creadoEn: a.creado_en as string })),
     pagos: pagos ? { resumen: pagos.resumen, filas: pagos.filas, cambios: pagos.cambios } : null,
     traducciones,
+    desempeno,
   };
 
   return (

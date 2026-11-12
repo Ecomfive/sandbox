@@ -1,12 +1,15 @@
 // Portal del proveedor: qué etapa de la compra corresponde a cuál del portal y qué vía se muestra. La misma regla vive en el
-// disparador de la migración 0124 (`proveedor_sincronizar`); una prueba comprueba que las dos digan lo mismo. Lógica pura.
+// disparador de la migración 0270 (`proveedor_sincronizar`, antes 0124 y 0150); una prueba comprueba que las dos digan lo mismo. Lógica pura.
 
 export const ETAPAS_PORTAL = ["por_cotizar", "cotizado", "produccion", "enviado", "llegado", "descartado"] as const;
 export type EtapaPortal = (typeof ETAPAS_PORTAL)[number];
 
-/** Etapa de la compra (`wms_compras.etapa`) → etapa del portal. Las que no están (Backlog y las retiradas) no se muestran. */
+/**
+ * Etapa de la compra (`wms_compras.etapa`) → etapa del portal. Las que no están no se muestran: Backlog, las retiradas y, desde el
+ * 11 nov 2026 (reunión con Alcides), «01 - Cotizar»: el proveedor ve en «Por cotizar» lo que Ecomfive le envió («02 - Enviado a cotización»).
+ */
 export const ETAPA_PORTAL_DE_COMPRA: Readonly<Record<string, EtapaPortal>> = {
-  cotizar: "por_cotizar",
+  enviado_cotizacion: "por_cotizar",
   cotizado: "cotizado",
   produccion: "produccion",
   tracking: "enviado",

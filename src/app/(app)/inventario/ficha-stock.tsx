@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { CodigosProducto } from "@/components/ui/codigos-producto";
 import { Badge } from "@/components/ui/badge";
 import { Seccion } from "@/components/ui/seccion-ficha";
@@ -10,7 +10,10 @@ import { Ventana } from "@/components/ui/ventana";
 import { formatearTiempoRelativo } from "@/lib/formato";
 import { CalendarioIcon, ComprasIcon, EnvioIcon, HistorialIcon, InventarioIcon } from "@/lib/nav-icons";
 import { pideMotivo, puedeMoverAMano } from "@/lib/wms/recepcion";
-import { ETIQUETA_PLATAFORMA } from "@/lib/wms/stock-plataformas";
+import { ETIQUETA_PLATAFORMA, type Plataforma } from "@/lib/wms/stock-plataformas";
+
+/** De qué plataforma lee cada bodega externa su stock (por su código): la fila de la bodega muestra lo que dice la plataforma (11 nov 2026, Hernán). */
+const PLATAFORMA_DE_BODEGA: Record<string, Plataforma> = { dropi: "dropi", effi: "effi", boxfull: "drop", dunamixfy: "dunamixfy" };
 import { usePuedeAbrir } from "@/components/modulos-contexto";
 import { ComprasProducto } from "../producto/compras-producto";
 import { FichaProductoEmbebida } from "../producto/ficha-producto-embebida";
@@ -23,7 +26,7 @@ import { PanelRemision, PanelTransferencia } from "./panel-transferencia";
 import { obtenerStockDeSku, type EnvioDropi, type CajaDeBodega, type LoteStock, type MovimientoStock, type StockBodega } from "./stock-actions";
 
 /** Lo que la ficha necesita del producto (el Levantamiento la abre con sus propios datos). */
-export type SkuFicha = Pick<FilaStock, "id" | "codigo" | "nombre" | "numero" | "barras" | "tipo" | "clase" | "manejaVencimiento"> & { plataformas?: FilaStock["plataformas"] };
+export type SkuFicha = Pick<FilaStock, "id" | "codigo" | "nombre" | "numero" | "barras" | "tipo" | "clase" | "manejaVencimiento"> & { /** Su stock está como general en el producto principal, pendiente de repartir entre las variantes (migración 0273). */ repartoPendiente?: boolean; plataformas?: FilaStock["plataformas"]; /** Un producto principal con variantes: la etiqueta dice «Con variantes». */ conVariantes?: boolean };
 
 const ETIQUETA_TIPO_MOV: Record<string, string> = { entrada: "Entrada", salida: "Salida", ajuste: "Ajuste", reserva: "Reserva", liberacion: "Liberación", traslado: "Traslado" };
 const ETIQUETA_CUBETA: Record<string, string> = {
@@ -138,7 +141,8 @@ export function FichaStock({
         sku && (
           <>
             <span className="text-lg font-semibold">{sku.nombre}</span>
-            <Badge tone="neutral">{ETIQUETA_TIPO_SKU[sku.tipo] ?? sku.tipo}</Badge>
+            <Badge tone="neutral">{sku.conVariantes ? "Con variantes" : (ETIQUETA_TIPO_SKU[sku.tipo] ?? sku.tipo)}</Badge>
+            {sku.repartoPendiente && <Badge tone="neutral">{sku.conVariantes ? "Stock sin repartir" : "Sin repartir: sale del stock general"}</Badge>}
           </>
         )
       }
@@ -262,19 +266,43 @@ export function FichaStock({
                       </tr>
                     </thead>
                     <tbody>
-                      {datos.bodegas.filter((b) => !conPlataformas || b.tipo !== "externa" || b.fisico !== 0 || b.enCamino !== 0).map((b) => (
-                        <tr key={b.bodegaId} className="border-t border-border">
+                      {datos.bodegas.map((b) => {
+                        // Una bodega de plataforma (Dropi B280, Effi, Drop, Dunamixfy) muestra lo de la última lectura de la plataforma: el sistema no la mueve.
+                        const plataforma = conPlataformas && b.tipo === "externa" ? PLATAFORMA_DE_BODEGA[b.codigo] : undefined;
+                        const enPlataforma = plataforma ? (sku.plataformas?.[plataforma] ?? 0) : null;
+                        const fisico = enPlataforma ?? b.fisico;
+                        const disponible = enPlataforma ?? b.disponible;
+                        // Junto a la de Dropi, nuestra bodega de proveedor en Dropi (B81 en Panamá): sus unidades son referenciales (11 nov 2026, Hernán).
+                        const enProveedor = plataforma === "dropi" ? (sku.plataformas?.lineas ?? []).filter((l) => l.plataforma === "dropi").reduce((t, l) => t + l.aparte, 0) : null;
+                        return (
+                        <Fragment key={b.bodegaId}>
+                        <tr className="border-t border-border">
                           <th scope="row" className="py-1.5 pr-2 text-left font-medium">
                             {b.nombre}
-                            {b.tipo === "externa" && <span className="ml-1.5 text-[11px] font-normal text-muted-foreground">externa</span>}
+                            {b.tipo === "externa" && <span className="ml-1.5 text-[11px] font-normal text-muted-foreground">{plataforma ? `según ${ETIQUETA_PLATAFORMA[plataforma]}` : "externa"}</span>}
                           </th>
-                          {[b.fisico, b.reservado, b.disponible, b.danado, b.inspeccion, b.retenido, b.vencido, b.enCamino].map((n, i) => (
+                          {[fisico, b.reservado, disponible, b.danado, b.inspeccion, b.retenido, b.vencido, b.enCamino].map((n, i) => (
                             <td key={i} className="px-1.5 py-1.5 text-right">
                               <Cifra n={n} />
                             </td>
                           ))}
                         </tr>
-                      ))}
+                        {enProveedor !== null && (
+                          <tr className="border-t border-border">
+                            <th scope="row" className="py-1.5 pr-2 text-left font-medium">
+                              Dropi · Proveedor Ecomfive{codigoPais.toUpperCase() === "PA" ? " (B81)" : ""}
+                              <span className="ml-1.5 text-[11px] font-normal text-muted-foreground">según Dropi · referencial</span>
+                            </th>
+                            {[enProveedor, 0, enProveedor, 0, 0, 0, 0, 0].map((n, i) => (
+                              <td key={i} className="px-1.5 py-1.5 text-right">
+                                <Cifra n={n} />
+                              </td>
+                            ))}
+                          </tr>
+                        )}
+                        </Fragment>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

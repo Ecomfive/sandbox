@@ -12,13 +12,15 @@ export interface PendientesMenu {
   paraTi: number;
   /** Actualizaciones del sistema recientes que la persona no ha visto (Centro de notificaciones, migración 0218). */
   novedades: number;
+  /** Las tareas del equipo asignadas a la persona y sin cerrar: el número de la campana, que es personal (11 nov 2026, pedido de Hernán). */
+  tareasMias: number;
 }
 
-export const SIN_PENDIENTES: PendientesMenu = { contadores: {}, total: 0, paraTi: 0, novedades: 0 };
+export const SIN_PENDIENTES: PendientesMenu = { contadores: {}, total: 0, paraTi: 0, novedades: 0, tareasMias: 0 };
 
 /** Suma al total de Avisos los avisos «Para ti» sin leer y las actualizaciones del sistema sin ver. */
-export function conParaTi(p: PendientesMenu, paraTi: number, novedades = 0): PendientesMenu {
-  return { ...p, total: p.total + paraTi + novedades, paraTi, novedades };
+export function conParaTi(p: PendientesMenu, paraTi: number, novedades = 0, tareasMias = 0): PendientesMenu {
+  return { ...p, total: p.total + paraTi + novedades, paraTi, novedades, tareasMias };
 }
 
 /** Páginas del menú que muestran un contador; el resto no cuenta nada. */
@@ -63,7 +65,7 @@ export function calcularPendientesMenu(pendientes: PendientesHoy, modulos: strin
       pendientes.creditosIA +
       pendientes.sinStockPorRevisar
     : 0;
-  return { contadores, total, paraTi: 0, novedades: 0 };
+  return { contadores, total, paraTi: 0, novedades: 0, tareasMias: 0 };
 }
 
 /**

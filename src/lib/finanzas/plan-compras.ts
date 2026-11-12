@@ -215,7 +215,7 @@ export function llegadasEnCamino(compras: CompraFin[], items: ItemCompra[], plaz
   const salida = new Map<string, Llegada[]>();
   for (const c of compras) {
     const llego = !!c.fechaLlegada && c.fechaLlegada <= hoy;
-    if (!compraAbierta(c) || llego || c.etapa === "backlog" || c.etapa === "cotizar") continue;
+    if (!compraAbierta(c) || llego || c.etapa === "backlog" || c.etapa === "cotizar" || c.etapa === "enviado_cotizacion") continue;
     const its = porCompra.get(c.id) ?? [];
     const lineas = its.length
       ? its.map((i) => ({ sku: i.skuId, unidades: Math.max(i.cantidad - (i.recibida ?? 0), 0) }))

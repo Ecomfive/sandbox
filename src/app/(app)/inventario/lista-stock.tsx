@@ -156,7 +156,7 @@ export function ListaStock({
         vacio="Todavía no hay SKUs maestros."
       />
       <FichaStock
-        sku={sku}
+        sku={sku && { ...sku, conVariantes: sku.variantes.length > 0 }}
         bodegasPropias={bodegasPropias}
         ubicaciones={ubicaciones}
         puedeEscribir={puedeEscribir}
