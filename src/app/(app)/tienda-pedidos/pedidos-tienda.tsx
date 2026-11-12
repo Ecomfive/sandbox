@@ -313,6 +313,7 @@ export function PedidosTienda({
         anchoMinimo="64rem"
         aspecto="lista"
         asaColumnas
+        encabezadoMayusculas
         vacio={conectada ? "No hay pedidos en este periodo." : "Los pedidos aparecen aquí al conectar la tienda a Shopify."}
       />
 
