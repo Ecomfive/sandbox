@@ -584,7 +584,7 @@ const limpiar = (t: string) => String(t ?? "").trim().replace(/\s+/g, " ");
 /**
  * Crea variantes de un producto (cada una es un producto simple con su SKU, su stock y sus lotes) y guarda en el padre sus
  * opciones con los valores. Las variantes heredan del padre el estado (Activo/Test), el vencimiento y los datos de envío. El
- * padre deja de tener stock propio: para darle variantes no puede tener unidades. Una variante no tiene variantes y un
+ * padre deja de llevar el stock en sí mismo: si tenía unidades, quedan como stock general «pendiente de repartir» entre las variantes (migración 0273). Una variante no tiene variantes y un
  * compuesto tampoco. Devuelve el error como valor.
  */
 export async function crearVariantes(padreId: string, opciones: OpcionVariante[], variantes: VarianteNueva[]): Promise<{ error?: string; creadas?: number }> {
@@ -618,9 +618,15 @@ export async function crearVariantes(padreId: string, opciones: OpcionVariante[]
   if (padre.padre_id) return { error: "Una variante no puede tener variantes." };
 
   const { data: hijas } = await supabase.from("skus_maestros").select("opciones").eq("padre_id", padreId);
+  // Un producto con stock ya no tiene que llevarse a cero para darle variantes (11 nov 2026, pedido de Jhokser): su stock queda como general, «pendiente de repartir», y
+  // mientras tanto lo que sale de una variante se descuenta de ahí (migración 0273). Un producto con vencimiento sí tiene que repartirlo antes, por lote.
+  let repartoPendiente = false;
   if (!hijas || hijas.length === 0) {
     const { data: stock } = await supabase.from("wms_stock").select("fisico").eq("sku_maestro_id", padreId);
-    if ((stock ?? []).some((s) => Number(s.fisico) !== 0)) return { error: "El producto tiene stock: llévalo a cero antes de darle variantes (el stock pasa a llevarse en cada variante)." };
+    if ((stock ?? []).some((s) => Number(s.fisico) !== 0)) {
+      if (padre.maneja_vencimiento) return { error: "El producto maneja vencimiento y tiene stock: llévalo a cero antes de darle variantes (el stock se lleva por lote en cada variante)." };
+      repartoPendiente = true;
+    }
   }
   // Una combinación que ya existe no se vuelve a crear.
   const clave = (o: Record<string, string>) => ops.map((x) => `${x.nombre}=${o?.[x.nombre] ?? ""}`).join("|");
@@ -628,8 +634,16 @@ export async function crearVariantes(padreId: string, opciones: OpcionVariante[]
   const aCrear = nuevas.filter((v) => !existentes.has(clave(v.opciones)));
   if (aCrear.length === 0) return { error: "Esas variantes ya existen." };
 
+  // La marca va antes de crear las variantes: sin la migración 0273 falla aquí y no queda un producto con variantes y stock que la base no deja mover.
+  if (repartoPendiente) {
+    const { error: errorMarca } = await supabase.from("skus_maestros").update({ reparto_pendiente: true, reparto_pendiente_desde: new Date().toISOString() }).eq("id", padreId);
+    if (errorMarca) return { error: "El producto tiene stock: llévalo a cero antes de darle variantes, o corre la migración 0273 (reparto del stock entre variantes) para dejarlo pendiente de repartir." };
+  }
   const { error: errorPadre } = await supabase.from("skus_maestros").update({ opciones_variantes: ops }).eq("id", padreId);
-  if (errorPadre) return { error: "No se pudieron guardar las opciones." };
+  if (errorPadre) {
+    if (repartoPendiente) await supabase.from("skus_maestros").update({ reparto_pendiente: false, reparto_pendiente_desde: null }).eq("id", padreId);
+    return { error: "No se pudieron guardar las opciones." };
+  }
 
   const heredado = {
     tipo: "simple",
@@ -654,6 +668,7 @@ export async function crearVariantes(padreId: string, opciones: OpcionVariante[]
   };
   const { error } = await supabase.from("skus_maestros").insert(aCrear.map((v) => ({ ...heredado, codigo: v.codigo, nombre: v.nombre, opciones: v.opciones })));
   if (error) {
+    if (repartoPendiente) await supabase.from("skus_maestros").update({ reparto_pendiente: false, reparto_pendiente_desde: null }).eq("id", padreId);
     if (error.code === "23505") return { error: "Uno de esos SKU ya lo tiene otro producto." };
     return { error: error.message.length < 200 ? error.message : "No se pudieron crear las variantes." };
   }
@@ -661,7 +676,7 @@ export async function crearVariantes(padreId: string, opciones: OpcionVariante[]
     accion: "crear_variantes",
     entidad: "skus_maestros",
     entidadId: padreId,
-    detalle: `${aCrear.length} variante${aCrear.length === 1 ? "" : "s"}: ${aCrear.map((v) => v.codigo).join(", ")}`.slice(0, 500),
+    detalle: `${aCrear.length} variante${aCrear.length === 1 ? "" : "s"}: ${aCrear.map((v) => v.codigo).join(", ")}${repartoPendiente ? " (su stock queda como general, pendiente de repartir)" : ""}`.slice(0, 500),
   });
   revalidatePath("/producto");
   revalidatePath("/inventario");
