@@ -18,6 +18,18 @@ export function etapaLogistica(estado: EstadoPedido): EtapaLogistica | null {
   return null;
 }
 
+/**
+ * La etapa con lo que dice Monday (las entregas de ciudad): un pedido despachado que Monday marca entregado está entregado; rechazado o
+ * cancelado, devuelto. Sin Monday, lo de Shopify.
+ */
+export function etapaConEntrega(estado: EstadoPedido, entrega: { grupo: string } | null | undefined): EtapaLogistica | null {
+  const e = etapaLogistica(estado);
+  if (e !== "en_ruta" || !entrega) return e;
+  if (entrega.grupo === "entregado") return "entregado";
+  if (entrega.grupo === "rechazado" || entrega.grupo === "cancelado") return "devuelto";
+  return "en_ruta";
+}
+
 /** Desde cuántos días en ruta (contados desde el pedido) se marca como demorado. */
 export const DIAS_DEMORA = 5;
 

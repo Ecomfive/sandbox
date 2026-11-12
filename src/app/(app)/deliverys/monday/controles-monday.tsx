@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { anilloFoco, fieldClassSm, labelClassSm } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
-import { CAMPOS_MONDAY, COLUMNA_NOMBRE, ETIQUETA_GRUPO, GRUPOS_ESTADO, sugerirMapeo, type ColumnaTablero, type GrupoEstado, type MapeoColumnas } from "@/lib/monday/columnas";
+import { CAMPOS_MONDAY, COLUMNA_GRUPO, COLUMNA_NOMBRE, ETIQUETA_GRUPO, GRUPOS_ESTADO, sugerirMapeo, type ColumnaTablero, type GrupoEstado, type MapeoColumnas } from "@/lib/monday/columnas";
 import { asignarTextoCausa, guardarCausa, guardarConfigMonday, guardarReglaEstado, leerColumnasMonday, leerMondayAhora } from "./actions";
 
 const botonBorde = `inline-flex h-8 items-center rounded-lg border border-border bg-card px-3 text-[13px] font-medium hover:bg-muted disabled:opacity-50 ${anilloFoco}`;
@@ -64,7 +64,7 @@ export function ConfigTablero({ tableroId, mapeo }: { tableroId: string | null; 
       setColumnas(r.columnas);
       setNombre(r.nombre ?? null);
       // Si no había mapeo (o era de otro tablero), se sugiere por los títulos.
-      const ids = new Set([COLUMNA_NOMBRE, ...r.columnas.map((c) => c.id)]);
+      const ids = new Set([COLUMNA_NOMBRE, COLUMNA_GRUPO, ...r.columnas.map((c) => c.id)]);
       const valido = Object.values(elegido).length > 0 && Object.values(elegido).every((v) => !v || ids.has(v));
       if (!valido) setElegido(sugerirMapeo(r.columnas));
     });
@@ -101,6 +101,7 @@ export function ConfigTablero({ tableroId, mapeo }: { tableroId: string | null; 
                 <select value={elegido[c.clave] ?? ""} onChange={(e) => setElegido({ ...elegido, [c.clave]: e.target.value || undefined })} className={fieldClassSm}>
                   <option value="">{c.obligatorio ? "Elegir…" : "Sin columna"}</option>
                   {c.clave === "pedido" && <option value={COLUMNA_NOMBRE}>Nombre del ítem</option>}
+                  {c.clave.startsWith("fecha") && <option value={COLUMNA_GRUPO}>El grupo (el día, «02/11/2026»)</option>}
                   {columnas
                     .filter((x) => x.id !== COLUMNA_NOMBRE)
                     .map((x) => (

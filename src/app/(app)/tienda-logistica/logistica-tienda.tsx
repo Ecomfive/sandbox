@@ -5,15 +5,15 @@ import { useRouter } from "next/navigation";
 import { Indicador, Pastilla, TableroIndicadores } from "@/components/panel/piezas-panel";
 import { TablaDatos, type ColumnaTabla } from "@/components/tabla/tabla-datos";
 import { formatearMoneda } from "@/lib/formato";
-import { AlertaIcon, CalendarioIcon, EnvioIcon, InventarioIcon } from "@/lib/nav-icons";
+import { AlertaIcon, CalendarioIcon, CerrarIcon, CheckIcon, EnvioIcon, InventarioIcon } from "@/lib/nav-icons";
 import type { PedidoFila } from "@/lib/tienda/datos";
-import { DIAS_DEMORA, diasDesde, etapaLogistica, listoParaPreparar } from "@/lib/tienda/logistica";
+import { DIAS_DEMORA, diasDesde, etapaConEntrega, etapaLogistica, listoParaPreparar } from "@/lib/tienda/logistica";
 import { diaPanama } from "@/lib/tienda/resumen";
 import { columnaProgramado } from "../tienda-pedidos/columnas-extra";
 import { FichaPedido } from "../tienda-pedidos/ficha-pedido";
 import { COLUMNAS, ICONOS, NOMBRE, defPedidos, type Contexto } from "../tienda-pedidos/pedidos-tienda";
 
-type Vista = "preparar_hoy" | "preparar_despues" | "en_ruta" | "demorados" | "sin_zona";
+type Vista = "preparar_hoy" | "preparar_despues" | "en_ruta" | "demorados" | "entregados" | "devueltos" | "sin_zona";
 
 /** Las columnas de Pedidos, con «Días» (desde el pedido), «Programado» y «Logística» en lugar de «Estado»; la transportista, visible. */
 function columnasLogistica(hoy: string, multiTienda: boolean): ColumnaTabla<PedidoFila, Contexto>[] {
@@ -32,14 +32,31 @@ function columnasLogistica(hoy: string, multiTienda: boolean): ColumnaTabla<Pedi
     id: "logistica",
     label: "Logística",
     ocultable: true,
-    render: (p) =>
-      etapaLogistica(p.estado) === "en_ruta" ? (
-        <Pastilla>En ruta</Pastilla>
+    render: (p) => {
+      const e = etapaConEntrega(p.estado, p.entrega);
+      const monday = p.entrega ? `Monday: ${p.entrega.estado ?? "sin estado"}${p.entrega.repartidor ? ` · ${p.entrega.repartidor}` : ""}${p.entrega.fecha ? ` · ${p.entrega.fecha}` : ""}${p.entrega.causa ? ` · ${p.entrega.causa}` : ""}` : undefined;
+      if (e === "entregado")
+        return (
+          <span title={monday}>
+            <Pastilla tono="exito">Entregado</Pastilla>
+          </span>
+        );
+      if (e === "devuelto")
+        return (
+          <span title={monday}>
+            <Pastilla tono="peligro">Rechazado</Pastilla>
+          </span>
+        );
+      return etapaLogistica(p.estado) === "en_ruta" ? (
+        <span title={monday}>
+          <Pastilla>{p.entrega?.estado ? `En ruta · ${p.entrega.estado.toLowerCase()}` : "En ruta"}</Pastilla>
+        </span>
       ) : listoParaPreparar(p.programado, p.provincia, hoy) ? (
         <Pastilla tono="aviso">Por preparar</Pastilla>
       ) : (
         <Pastilla tono="neutro">Programado</Pastilla>
-      ),
+      );
+    },
   };
   const base = COLUMNAS.filter((c) => (multiTienda || c.id !== "tienda") && c.id !== "estado").map((c) => (c.id === "transportista" ? { ...c, oculta: false } : c));
   const i = base.findIndex((c) => c.id === "fecha") + 1;
@@ -60,13 +77,15 @@ export function LogisticaTienda({ pedidos, codigoPais, tiendas, hoy }: { pedidos
 
   const grupos = useMemo(() => {
     const porPreparar = pedidos.filter((p) => etapaLogistica(p.estado) === "por_preparar");
-    const enRuta = pedidos.filter((p) => etapaLogistica(p.estado) === "en_ruta");
+    const enRuta = pedidos.filter((p) => etapaConEntrega(p.estado, p.entrega) === "en_ruta");
     return {
       preparar_hoy: porPreparar.filter((p) => listoParaPreparar(p.programado, p.provincia, hoy)),
       preparar_despues: porPreparar.filter((p) => !listoParaPreparar(p.programado, p.provincia, hoy)).sort((a, b) => a.programado!.fecha.localeCompare(b.programado!.fecha)),
       en_ruta: enRuta,
       demorados: enRuta.filter((p) => diasDesde(diaPanama(p.creado), hoy) >= DIAS_DEMORA),
-      sin_zona: pedidos.filter((p) => !p.provincia),
+      entregados: pedidos.filter((p) => etapaConEntrega(p.estado, p.entrega) === "entregado"),
+      devueltos: pedidos.filter((p) => etapaConEntrega(p.estado, p.entrega) === "devuelto"),
+      sin_zona: pedidos.filter((p) => !p.provincia && etapaConEntrega(p.estado, p.entrega) !== "entregado"),
     } satisfies Record<Vista, PedidoFila[]>;
   }, [pedidos, hoy]);
   const zonas = (ps: PedidoFila[]) => {
@@ -74,6 +93,7 @@ export function LogisticaTienda({ pedidos, codigoPais, tiendas, hoy }: { pedidos
     return `${num(n("Ciudad"))} ciudad · ${num(n("Interior"))} interior · ${num(n(null))} sin zona`;
   };
   const filas = grupos[vista];
+  const hayMonday = pedidos.some((p) => p.entrega);
   const columnas = useMemo(() => columnasLogistica(hoy, multiTienda), [hoy, multiTienda]);
   const def = useMemo(() => ({ ...defPedidos(tiendas), clave: "tienda-logistica" }), [tiendas]);
   const contexto = useMemo(() => ({ codigoPais, tiendas }), [codigoPais, tiendas]);
@@ -98,6 +118,8 @@ export function LogisticaTienda({ pedidos, codigoPais, tiendas, hoy }: { pedidos
     preparar_despues: "No hay pedidos programados para más adelante.",
     en_ruta: "No hay pedidos en ruta.",
     demorados: `Ningún pedido lleva ${DIAS_DEMORA} días o más en ruta.`,
+    entregados: "Ninguna entrega registrada en Monday para estos pedidos.",
+    devueltos: "Ningún rechazo registrado en Monday para estos pedidos.",
     sin_zona: "Todos los pedidos tienen zona.",
   };
 
@@ -135,6 +157,24 @@ export function LogisticaTienda({ pedidos, codigoPais, tiendas, hoy }: { pedidos
           activo={vista === "demorados"}
         />
         <Indicador
+          titulo="Entregados"
+          icono={CheckIcon}
+          color="verde"
+          valor={num(grupos.entregados.length)}
+          detalle={hayMonday ? "según Monday (ciudad)" : "llegan al conectar Monday"}
+          alPulsar={() => alternar("entregados")}
+          activo={vista === "entregados"}
+        />
+        <Indicador
+          titulo="Rechazados"
+          icono={CerrarIcon}
+          color="rojo"
+          valor={num(grupos.devueltos.length)}
+          detalle={hayMonday ? "según Monday (ciudad)" : "llegan al conectar Monday"}
+          alPulsar={() => alternar("devueltos")}
+          activo={vista === "devueltos"}
+        />
+        <Indicador
           titulo="Sin zona"
           icono={AlertaIcon}
           color="ambar"
@@ -146,8 +186,9 @@ export function LogisticaTienda({ pedidos, codigoPais, tiendas, hoy }: { pedidos
       </TableroIndicadores>
 
       <p role="note" className="m-0 rounded-lg border border-primario/30 bg-primario-suave px-4 py-2 text-xs">
-        Shopify no trae la guía, la fecha de despacho ni si el pedido se entregó o se devolvió: lo despachado queda en ruta y los días se cuentan desde el
-        pedido. La zona y la transportista salen de la etiqueta (CIUDAD, INTERIOR/SERVIENTREGA) y la fecha programada, de la nota del pedido.
+        Shopify no trae la guía, la fecha de despacho ni si el pedido se entregó: lo de ciudad se completa con Monday (entregado, rechazado y el
+        repartidor); lo de interior (Servientrega) llegará con SISCORE. Los días se cuentan desde el pedido. La zona y la transportista salen de la
+        etiqueta (CIUDAD, INTERIOR/SERVIENTREGA) y la fecha programada, de la nota del pedido.
       </p>
 
       <TablaDatos
