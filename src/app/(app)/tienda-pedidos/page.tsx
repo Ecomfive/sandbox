@@ -4,7 +4,8 @@ import { Pagina } from "@/components/ui/pagina";
 import { requireModulo } from "@/lib/auth";
 import { getPaisActual } from "@/lib/pais";
 import { createServiceClient } from "@/lib/supabase/server";
-import { cargarPedidos, cargarTiendas, inicioPeriodo, periodoElegido, tiendaElegida } from "@/lib/tienda/datos";
+import { cargarTiendas, periodoElegido, tiendaElegida } from "@/lib/tienda/datos";
+import { pedidosDeTiendas } from "@/lib/tienda/datos-finanzas";
 import { PedidosTienda } from "./pedidos-tienda";
 
 export const metadata = { title: "Pedidos de tienda" };
@@ -25,8 +26,9 @@ export default async function PedidosTiendaPage({ searchParams }: { searchParams
   const periodo = periodoElegido(sp.periodo);
   const miradas = tienda ? [tienda] : tiendas;
   const ids = miradas.map((t) => t.id);
-  const [pedidos, sinVincular] = await Promise.all([
-    cargarPedidos(supabase, ids, inicioPeriodo(periodo.dias)),
+  // Las tiendas sin conectar muestran las órdenes que cargó Finanzas (11 nov 2026; ver src/lib/tienda/ordenes-finanzas.ts).
+  const [{ pedidos, fuente }, sinVincular] = await Promise.all([
+    pedidosDeTiendas(supabase, miradas, pais.codigo, periodo.dias),
     ids.length
       ? supabase
           .from("tienda_variantes")
@@ -50,13 +52,13 @@ export default async function PedidosTiendaPage({ searchParams }: { searchParams
       ) : (
         <>
           <BarraTienda ruta="/tienda-pedidos" tiendas={tiendas} tiendaId={tienda?.id ?? null} periodo={periodo.id} />
-          <AvisoConexion tiendas={miradas} />
+          <AvisoConexion tiendas={miradas} finanzas={fuente} />
           <PedidosTienda
             pedidos={pedidos}
             codigoPais={pais.codigo}
             tiendas={Object.fromEntries(tiendas.map((t) => [t.id, t.nombre]))}
             sinVincular={sinVincular}
-            conectada={miradas.some((t) => t.estado === "conectada")}
+            conectada={miradas.some((t) => t.estado === "conectada" || fuente.unidadDe.has(t.id))}
           />
         </>
       )}
