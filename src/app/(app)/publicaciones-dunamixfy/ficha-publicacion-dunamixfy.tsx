@@ -15,7 +15,7 @@ import { SkuCopiable } from "@/components/ui/sku-copiable";
 import { useToast } from "@/components/ui/toast";
 import { Ventana } from "@/components/ui/ventana";
 import { formatearFechaHora } from "@/lib/formato";
-import { ComprasIcon, DunamixfyIcon, InteligenciaIcon, InventarioIcon, MargenIcon, ProductoIcon } from "@/lib/nav-icons";
+import { ComprasIcon, DunamixfyIcon, InteligenciaIcon, InventarioIcon, MargenIcon, ProductoIcon, VentasIcon } from "@/lib/nav-icons";
 import { formatoEnDolares, formatoMonto, type MonedaPublicaciones } from "@/lib/publicaciones/moneda";
 import { MARGEN_BAJO } from "@/lib/publicaciones/publicacion";
 import { ETIQUETA_SUGERENCIA, type TipoSugerencia } from "@/lib/publicaciones/vincular";
@@ -26,6 +26,8 @@ import { AvisoEnCamino } from "../publicaciones-dropi/ventas-publicacion";
 import { vincularPublicacionDunamixfy } from "./actions";
 import type { FilaPublicacionDunamixfy, ProductoDunamixfy } from "./def-publicaciones-dunamixfy";
 import { InsigniaConectadoDunamixfy } from "./insignia-conectado-dunamixfy";
+import { plataformasDePais } from "@/lib/plataformas";
+import { VentasPlataformasProducto } from "../producto/ventas-plataformas-producto";
 
 function Producto({ sku }: { sku: ProductoDunamixfy }) {
   return (
@@ -283,6 +285,12 @@ export function FichaPublicacionDunamixfy({
             </div>
           </dl>
         </Seccion>
+
+        {p.producto && plataformasDePais(codigoPais).length > 1 && (
+          <Seccion icono={VentasIcon} titulo={`Ventas por plataforma en ${nombrePais}`}>
+            <VentasPlataformasProducto key={`${p.producto.id}-${codigoPais}`} id={p.producto.id} pais={codigoPais} />
+          </Seccion>
+        )}
 
         <Seccion icono={InventarioIcon} titulo="Stock">
           <AvisoEnCamino enCamino={p.enCamino} llegada={p.llegadaCamino} sinFecha={p.sinFechaCamino} sinEnvio={p.sinEnvioCamino} enCotizacion={p.enCotizacion} etapaCotizacion={p.etapaCotizacion} />

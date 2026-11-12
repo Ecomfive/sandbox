@@ -34,6 +34,9 @@ import { SelectorClaseProducto } from "./selector-clase";
 import { DescontinuadoHeredado, DescontinuadoPorPais } from "./descontinuado-pais";
 import { UnirProducto } from "./unir-producto";
 import type { ResumenUnion } from "@/lib/wms/unir-productos";
+import { plataformasDePais } from "@/lib/plataformas";
+import { VentasPlataformasProducto } from "./ventas-plataformas-producto";
+import { useCodigoPais } from "@/components/pais-contexto";
 
 function Dato({ etiqueta, children, className = "" }: { etiqueta: string; children: React.ReactNode; className?: string }) {
   return (
@@ -96,6 +99,8 @@ export function FichaProducto({
   alCerrar: () => void;
 }) {
   const { mostrarToast } = useToast();
+  // El país de la barra: «Ventas por plataforma» lo muestra solo donde hay varias plataformas (Costa Rica).
+  const codigoPais = useCodigoPais();
   const puedeVerInventario = usePuedeAbrir("inventario");
   const puedeVerPublicaciones = usePuedeAbrir("publicaciones-dropi");
   const [pending, startTransition] = useTransition();
@@ -369,6 +374,12 @@ export function FichaProducto({
             {clase !== "descontinuado" && producto.tipo === "combo" && <DescontinuadoHeredado key={`heredado-${producto.id}`} skuId={producto.id} />}
             </div>
             <div className="flex min-w-0 flex-col divide-y divide-border border-t border-border pt-5 @3xl:border-t-0 @3xl:pt-0">
+            {/* Ventas por plataforma (12 nov 2026, pedido de Hernán): en el país de la barra, si tiene varias plataformas. */}
+            {plataformasDePais(codigoPais).length > 1 && (
+              <Seccion icono={VentasIcon} titulo="Ventas por plataforma">
+                <VentasPlataformasProducto key={`${producto.id}-${codigoPais}`} id={producto.id} pais={codigoPais} />
+              </Seccion>
+            )}
             {producto.nombresDropi.length > 0 && (
               <Seccion icono={VentasIcon} titulo="Ventas en Dropi">
                 <VentasDropiProducto key={producto.id} id={producto.id} />

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { armarVentasPlataforma, textoEtiquetas, type PublicacionPlataforma } from "./ventas-plataformas";
+import { armarVentasPlataforma, resumenVentasPlataforma, textoEtiquetas, type PublicacionPlataforma } from "./ventas-plataformas";
 import { agruparProductos, netas, resumirProductos } from "./ventas";
 
 const sku = { codigo: "ACEITE/BATANA", nombre: "Aceite de batana", numero: 7, barras: null };
@@ -47,4 +47,19 @@ test("en «Todas», el mismo producto del sistema junta Dropi, Drop y Effi", () 
   assert.equal(r[0].netas30, 2 + 4 + 5);
   assert.equal(r[0].stock, 10 + 40 + 40);
   assert.equal(textoEtiquetas(g.ids.get(r[0].id)!, new Map([...d.etiquetaDe, ...e.etiquetaDe])), "Dropi · ID 7591, Drop · BAT-1, Effi · 9");
+});
+
+test("la ficha: netas de 30 días hasta el último día leído y en total, con la primera y la última venta", () => {
+  const r = resumenVentasPlataforma(
+    [
+      { dia: "2026-09-10", salidas: 10, devueltas: 0 },
+      { dia: "2026-10-14", salidas: 5, devueltas: 2 },
+      { dia: "2026-11-09", salidas: 4, devueltas: 1 },
+      { dia: "2026-11-10", salidas: 0, devueltas: 3 },
+    ],
+    "2026-11-10",
+  );
+  // Del 12 oct al 10 nov: 5 − 2 + 4 − 1 − 3.
+  assert.deepEqual(r, { netas30: 3, netasTotal: 13, primeraVenta: "2026-09-10", ultimaVenta: "2026-11-09" });
+  assert.deepEqual(resumenVentasPlataforma([], null), { netas30: 0, netasTotal: 0, primeraVenta: null, ultimaVenta: null });
 });

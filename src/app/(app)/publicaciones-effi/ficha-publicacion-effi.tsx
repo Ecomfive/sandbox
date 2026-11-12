@@ -14,7 +14,7 @@ import { SkuCopiable } from "@/components/ui/sku-copiable";
 import { useToast } from "@/components/ui/toast";
 import { Ventana } from "@/components/ui/ventana";
 import { formatearFechaHora } from "@/lib/formato";
-import { ComprasIcon, EffiIcon, InteligenciaIcon, InventarioIcon, MargenIcon, ProductoIcon } from "@/lib/nav-icons";
+import { ComprasIcon, EffiIcon, InteligenciaIcon, InventarioIcon, MargenIcon, ProductoIcon, VentasIcon } from "@/lib/nav-icons";
 import { margenEffi } from "@/lib/effi/articulos";
 import { formatoEnDolares, formatoMonto, type MonedaPublicaciones } from "@/lib/publicaciones/moneda";
 import { MARGEN_BAJO } from "@/lib/publicaciones/publicacion";
@@ -26,6 +26,8 @@ import { AvisoEnCamino } from "../publicaciones-dropi/ventas-publicacion";
 import { cambiarPreciosEffi, vincularPublicacionEffi } from "./actions";
 import type { FilaPublicacionEffi, ProductoEffi } from "./def-publicaciones-effi";
 import { InsigniaConectadoEffi } from "./insignia-conectado-effi";
+import { plataformasDePais } from "@/lib/plataformas";
+import { VentasPlataformasProducto } from "../producto/ventas-plataformas-producto";
 
 function Producto({ sku }: { sku: ProductoEffi }) {
   return (
@@ -345,6 +347,12 @@ export function FichaPublicacionEffi({
         </Seccion>
 
         <PreciosEffi key={p.id} p={p} moneda={moneda} puedeEscribir={puedeEscribir} />
+
+        {p.producto && plataformasDePais(codigoPais).length > 1 && (
+          <Seccion icono={VentasIcon} titulo={`Ventas por plataforma en ${nombrePais}`}>
+            <VentasPlataformasProducto key={`${p.producto.id}-${codigoPais}`} id={p.producto.id} pais={codigoPais} />
+          </Seccion>
+        )}
 
         <Seccion icono={InventarioIcon} titulo="Stock">
           <AvisoEnCamino enCamino={p.enCamino} llegada={p.llegadaCamino} sinFecha={p.sinFechaCamino} sinEnvio={p.sinEnvioCamino} enCotizacion={p.enCotizacion} etapaCotizacion={p.etapaCotizacion} />
