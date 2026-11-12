@@ -10,6 +10,7 @@ import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { cargarTiendas, cargarVariantes, tiendaElegida } from "@/lib/tienda/datos";
 import { nombreVariante, sugerirParaVariante } from "@/lib/tienda/vincular-variante";
 import { obtenerOpcionesSkuMaestro } from "@/lib/wms/skus-maestros";
+import { TraerProductos } from "./traer-productos";
 import { VinculosTienda, type FilaVinculo } from "./vinculos-tienda";
 
 export const metadata = { title: "Productos de Shopify" };
@@ -61,6 +62,11 @@ export default async function ProductosTiendaPage({ searchParams }: { searchPara
     );
   }
   const nombreTienda = new Map(tiendas.map((t) => [t.id, t.nombre]));
+  // «Traer de Shopify» (12 nov 2026): para las tiendas conectadas que se miran, con la última vez que se trajeron.
+  const conectadas = miradas.filter((t) => t.estado === "conectada");
+  const { data: ultimaFila } = conectadas.length
+    ? await supabase.from("tienda_variantes").select("actualizado_en").in("tienda_id", conectadas.map((t) => t.id)).order("actualizado_en", { ascending: false }).limit(1).maybeSingle()
+    : { data: null };
   const filas: FilaVinculo[] = variantes.map((v) => {
     const s = sugeridos.get(v.id);
     const sugerido = s ? porId.get(s.skuId) : undefined;
@@ -90,6 +96,9 @@ export default async function ProductosTiendaPage({ searchParams }: { searchPara
         <>
           <BarraTienda ruta="/tienda-productos" tiendas={tiendas} tiendaId={tienda?.id ?? null} />
           <AvisoConexion tiendas={miradas} />
+          {puedeEscribir && conectadas.length > 0 && (
+            <TraerProductos tiendas={conectadas.map((t) => ({ id: t.id, nombre: t.nombre }))} ultima={(ultimaFila?.actualizado_en as string | undefined) ?? null} />
+          )}
           <ProveedorSkusMaestros opciones={opciones}>
             <VinculosTienda filas={filas} varias={miradas.length > 1} puedeEscribir={puedeEscribir} />
           </ProveedorSkusMaestros>

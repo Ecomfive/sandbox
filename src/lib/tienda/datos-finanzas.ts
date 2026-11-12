@@ -147,6 +147,14 @@ export async function cargarPedidosFinanzas(
     ).catch(() => [] as FilaOrden[]),
     cargarLineasFinanzas(supabase, unidades, desde, hasta),
   ]);
+  // La foto de cada pedido (12 nov 2026, como Mi Reto Digital): la de la variante de Shopify con el SKU de su primera línea.
+  const { data: variantesFoto } = await supabase.from("tienda_variantes").select("sku, foto_url").in("tienda_id", [...tiendaDeUnidad.values()]).not("sku", "is", null).not("foto_url", "is", null);
+  const fotoDeSku = new Map((variantesFoto ?? []).map((v) => [String(v.sku).trim().toLowerCase(), v.foto_url as string]));
+  const fotoDe = new Map<string, string>();
+  for (const l of lineas) if (!l.esServicio && l.sku && !fotoDe.has(l.pedidoId)) {
+    const f = fotoDeSku.get(l.sku.trim().toLowerCase());
+    if (f) fotoDe.set(l.pedidoId, f);
+  }
   const unidadesDe = new Map<string, number>();
   const productosDe = new Map<string, string[]>();
   for (const l of lineas) {
@@ -165,6 +173,7 @@ export async function cargarPedidosFinanzas(
     sinHora: !o.creado_origen,
     productos: textoProductos(productosDe.get(o.id) ?? []),
     productosLista: productosDe.get(o.id) ?? [],
+    foto: fotoDe.get(o.id) ?? null,
     direccion: clienteDe(o)?.direccion ?? null,
     etiquetas: etiquetasDe(o.etiquetas),
     entrada: entradaDeOrden(o.origen, o.etiquetas),
@@ -185,10 +194,10 @@ export async function cargarPedidosFinanzas(
 /** Las líneas de las órdenes de esas unidades entre esos días (por la fecha de su orden). */
 export async function cargarLineasFinanzas(supabase: SupabaseClient, unidades: string[], desde: string, hasta: string): Promise<LineaFinanzas[]> {
   if (!unidades.length) return [];
-  const filas = await traerTodasLasFilas<{ orden_id: string; linea: number; producto: string | null; cantidad: number | null; precio: number | null; sku_maestro_id: string | null; es_servicio: boolean | null }>((d, h) =>
+  const filas = await traerTodasLasFilas<{ orden_id: string; linea: number; producto: string | null; cantidad: number | null; precio: number | null; sku: string | null; sku_maestro_id: string | null; es_servicio: boolean | null }>((d, h) =>
     supabase
       .from("ven_orden_lineas")
-      .select("orden_id, linea, producto, cantidad, precio, sku_maestro_id, es_servicio, ven_ordenes!inner(unidad_id, fecha)")
+      .select("orden_id, linea, producto, cantidad, precio, sku, sku_maestro_id, es_servicio, ven_ordenes!inner(unidad_id, fecha)")
       .in("ven_ordenes.unidad_id", unidades)
       .gte("ven_ordenes.fecha", desde)
       .lte("ven_ordenes.fecha", hasta)
@@ -202,6 +211,7 @@ export async function cargarLineasFinanzas(supabase: SupabaseClient, unidades: s
     skuId: l.sku_maestro_id,
     cantidad: Number(l.cantidad) || 0,
     precio: l.precio === null ? null : Number(l.precio),
+    sku: l.sku,
     esServicio: l.es_servicio === true,
   }));
 }

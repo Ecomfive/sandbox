@@ -76,6 +76,8 @@ export interface PedidoFila extends PedidoResumen {
   sinHora?: boolean;
   /** Los productos del pedido, para la lista («Magnesio +1»). */
   productos?: string | null;
+  /** La foto del primer producto (la de Shopify, por el SKU de la línea), o null. */
+  foto?: string | null;
   /** Cada producto del pedido, para filtrar por producto. */
   productosLista?: string[];
   /** La dirección del cliente (sin la zona). */
