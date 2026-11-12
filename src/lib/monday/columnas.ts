@@ -25,6 +25,11 @@ export type MapeoColumnas = Partial<Record<CampoMonday, string>>;
 
 /** El nombre del ítem (no es una columna): se puede elegir como número de pedido. */
 export const COLUMNA_NOMBRE = "name";
+/**
+ * El grupo del ítem (no es una columna): en el tablero «DELIVERY REPORTES DIARIOS» de Panamá cada grupo es un día («02/11/2026») y no hay
+ * columna de fecha (12 nov 2026). Se puede elegir como fecha de despacho o de entrega.
+ */
+export const COLUMNA_GRUPO = "group";
 
 export const GRUPOS_ESTADO = ["entregado", "rechazado", "cancelado", "en_ruta", "sin_estado"] as const;
 export type GrupoEstado = (typeof GRUPOS_ESTADO)[number];
@@ -36,7 +41,7 @@ export const FINALES = new Set<GrupoEstado>(["entregado", "rechazado", "cancelad
 // ---------------------------------------------------------------------------------------------------------------------
 // Consultas
 // ---------------------------------------------------------------------------------------------------------------------
-const CAMPOS_ITEM = "id name updated_at column_values { id text value type }";
+const CAMPOS_ITEM = "id name updated_at group { title } column_values { id text value type }";
 export const CONSULTA_COLUMNAS = "query ($ids: [ID!]) { boards(ids: $ids) { id name columns { id title type } } }";
 export const CONSULTA_PRIMERA = `query ($ids: [ID!], $limit: Int!) { boards(ids: $ids) { id name items_page(limit: $limit) { cursor items { ${CAMPOS_ITEM} } } } }`;
 export const CONSULTA_SIGUIENTE = `query ($cursor: String!, $limit: Int!) { next_items_page(cursor: $cursor, limit: $limit) { cursor items { ${CAMPOS_ITEM} } } }`;
@@ -78,6 +83,8 @@ export interface ItemMonday {
   id: string;
   name: string;
   updated_at: string | null;
+  /** El título del grupo del ítem (en el tablero de Panamá, el día). */
+  grupo?: string | null;
   column_values: { id: string; text: string | null; value: string | null; type?: string }[];
 }
 
@@ -92,6 +99,7 @@ export function leerPagina(respuesta: unknown): { cursor: string | null; items: 
       id: String(i.id),
       name: String(i.name ?? ""),
       updated_at: typeof i.updated_at === "string" ? i.updated_at : null,
+      grupo: typeof obj(i.group).title === "string" ? (obj(i.group).title as string) : null,
       column_values: arr(i.column_values)
         .map(obj)
         .map((c) => ({ id: String(c.id ?? ""), text: typeof c.text === "string" ? c.text : null, value: typeof c.value === "string" ? c.value : null, type: typeof c.type === "string" ? c.type : undefined })),
@@ -104,7 +112,7 @@ export function leerPagina(respuesta: unknown): { cursor: string | null; items: 
 // ---------------------------------------------------------------------------------------------------------------------
 /** Valida el mapeo elegido contra las columnas del tablero. */
 export function validarMapeo(mapeo: Record<string, unknown>, columnas: ColumnaTablero[]): { error: string } | { mapeo: MapeoColumnas } {
-  const ids = new Set([COLUMNA_NOMBRE, ...columnas.map((c) => c.id)]);
+  const ids = new Set([COLUMNA_NOMBRE, COLUMNA_GRUPO, ...columnas.map((c) => c.id)]);
   const salida: MapeoColumnas = {};
   for (const c of CAMPOS_MONDAY) {
     const v = typeof mapeo[c.clave] === "string" ? (mapeo[c.clave] as string).trim() : "";
@@ -148,6 +156,8 @@ export function sugerirMapeo(columnas: ColumnaTablero[]): MapeoColumnas {
     }
   }
   if (!salida.pedido) salida.pedido = COLUMNA_NOMBRE;
+  // Sin columna de fecha de despacho, el día del grupo (como en el tablero de Panamá).
+  if (!salida.fecha_despacho) salida.fecha_despacho = COLUMNA_GRUPO;
   return salida;
 }
 
@@ -184,7 +194,13 @@ export function fechaDeColumna(c: { text: string | null; value: string | null } 
     }
   }
   const m = (c.text ?? "").match(/\d{4}-\d{2}-\d{2}/);
-  return m ? m[0] : null;
+  if (m) return m[0];
+  // «02/11/2026» (día/mes/año, como los grupos del tablero de Panamá).
+  const d = (c.text ?? "").match(/(?<!\d)(\d{1,2})\/(\d{1,2})\/(\d{4})(?!\d)/);
+  if (!d) return null;
+  const [dia, mes, anio] = [Number(d[1]), Number(d[2]), Number(d[3])];
+  if (mes < 1 || mes > 12 || dia < 1 || dia > new Date(Date.UTC(anio, mes, 0)).getUTCDate()) return null;
+  return `${anio}-${String(mes).padStart(2, "0")}-${String(dia).padStart(2, "0")}`;
 }
 
 /** El número de pedido para comparar: mayúsculas, sin «#», espacios ni guiones. */
@@ -213,6 +229,7 @@ export function despachoDeItem(item: ItemMonday, mapeo: MapeoColumnas, reglas: R
     const id = mapeo[campo];
     if (!id) return undefined;
     if (id === COLUMNA_NOMBRE) return { id, text: item.name, value: null };
+    if (id === COLUMNA_GRUPO) return { id, text: item.grupo ?? null, value: null };
     return item.column_values.find((c) => c.id === id);
   };
   const texto = (campo: CampoMonday, max = 200) => corto(col(campo)?.text, max);

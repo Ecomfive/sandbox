@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { diasDesde, etapaLogistica, listoParaPreparar, transportistaDe } from "./logistica";
+import { diasDesde, etapaConEntrega, etapaLogistica, listoParaPreparar, transportistaDe } from "./logistica";
 
 test("etapa de logística", () => {
   assert.equal(etapaLogistica("confirmado"), "por_preparar");
@@ -27,4 +27,13 @@ test("listo para preparar según la fecha que pidió el cliente y la zona", () =
   assert.equal(listoParaPreparar(p("2026-11-19"), "Interior", hoy), false);
   assert.equal(diasDesde("2026-11-05", hoy), 7);
   assert.equal(diasDesde("2026-11-13", hoy), 0);
+});
+
+test("etapa con la entrega de Monday", () => {
+  assert.equal(etapaConEntrega("en_camino", { grupo: "entregado" }), "entregado");
+  assert.equal(etapaConEntrega("en_camino", { grupo: "rechazado" }), "devuelto");
+  assert.equal(etapaConEntrega("en_camino", { grupo: "en_ruta" }), "en_ruta");
+  assert.equal(etapaConEntrega("en_camino", null), "en_ruta");
+  // Monday no cambia lo que todavía no sale.
+  assert.equal(etapaConEntrega("confirmado", { grupo: "entregado" }), "por_preparar");
 });
