@@ -22,6 +22,8 @@ export interface EstadoBotones {
   stockPropio: boolean;
   /** Está en liquidación (migración 0174). */
   liquidacion: boolean;
+  /** Tiene variaciones (colores, tallas…) en Dropi. */
+  variable?: boolean;
 }
 
 /** Lo que impide casi todo, en el orden en que se le dice a la persona. */
@@ -34,8 +36,23 @@ function comun(e: EstadoBotones): string | null {
 
 const B280 = "Su stock es de la bodega de Dropi";
 
+/**
+ * Republicar: desde el 12 nov 2026 también lo de la bodega de Dropi (B280/B15), con el proceso de Nicol («Republicar (B280)»: el ID nuevo nace con unidades temporales y Dropi
+ * traslada las suyas); por ahora solo productos simples.
+ */
 export function motivoRepublicar(e: EstadoBotones): string | null {
-  return comun(e) ?? (e.archivada ? "Está archivada" : e.apagadoPendiente ? "Tiene un apagado pendiente" : e.tipo === "privado" ? "Una privada no se republica" : esBodegaDropi(e.bodegaId) ? B280 : null);
+  return (
+    comun(e) ??
+    (e.archivada
+      ? "Está archivada"
+      : e.apagadoPendiente
+        ? "Tiene un apagado pendiente"
+        : e.tipo === "privado"
+          ? "Una privada no se republica"
+          : esBodegaDropi(e.bodegaId) && e.variable
+            ? "Con variaciones en la bodega de Dropi: se republica a mano"
+            : null)
+  );
 }
 
 export function motivoPrivatizar(e: EstadoBotones): string | null {

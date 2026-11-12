@@ -9,6 +9,8 @@ import { esAdministrador } from "@/lib/permisos/acceso";
 import { fulfillmentDePais } from "@/lib/publicaciones/fulfillment-pais";
 import { ESTADOS_PUBLICACION, TIPOS, UBICACIONES, etiqueta, numeroPublicacion, type OpcionPublicacion } from "@/lib/publicaciones/publicacion";
 import { codigoBodega, idsDeDropi } from "@/lib/publicaciones/sincronizar-dropi";
+import { unidadesEnBodegaDropi } from "@/lib/publicaciones/traslado-b280";
+import { UNIDADES_TEMPORALES_B280 } from "@/lib/publicaciones/republicar-dropi";
 import { grupoDe, nombreDelPublico } from "@/lib/publicaciones/apagar-dropi";
 import { encolarApagar, encolarArchivar, encolarCrear, encolarPrivatizar, encolarRepublicar, encolarReserva, encolarStock, enviarNombreADropi, enviarPrecioADropi } from "@/lib/publicaciones/cambios-dropi";
 import { faltantesReserva, normalizarDatosReserva, reservasGuardadas } from "@/lib/publicaciones/reservas-dropi";
@@ -863,17 +865,30 @@ export async function republicarPublicacion(id: string, precio: number): Promise
   if (antes.estado === "archivado" || antes.estado_publicacion === "archivado") return { error: "Está archivada: sácala de Archivados antes de republicarla." };
   if (await esPrivada(antes)) return { error: "Es una publicación privada: las privadas no se republican." };
   const precioAntes = antes.precio_venta === null || antes.precio_venta === undefined ? null : Number(antes.precio_venta);
+  // «Republicar (B280)» (12 nov 2026, proceso de Nicol): si su stock está en la bodega de Dropi, el ID nuevo nace con 100 temporales en la nuestra y Dropi traslada las suyas.
+  const primerId = idsDeDropi((antes.dropi_id as string | null) ?? null)[0];
+  const { data: lectura } = primerId
+    ? await createServiceClient().from("dropi_productos_proveedor").select("tipo, bodegas").eq("pais_id", antes.pais_id).eq("dropi_producto_id", primerId).maybeSingle()
+    : { data: null };
+  const enBodegaDropi = unidadesEnBodegaDropi(lectura?.bodegas);
+  if (enBodegaDropi > 0 && lectura?.tipo === "VARIABLE") return { error: "Tiene variaciones y su stock está en la bodega de Dropi: por ahora se republica a mano." };
   const r = await encolarRepublicar(
     createServiceClient(),
     { id, pais_id: antes.pais_id, dropi_id: (antes.dropi_id as string | null) ?? null },
     { id: usuario.id, nombre: usuario.nombre || usuario.email },
     { precio: precioNuevo, precioAntes },
+    enBodegaDropi > 0 ? { temporal: UNIDADES_TEMPORALES_B280, unidades: enBodegaDropi } : undefined,
   );
   if ("error" in r) return { error: r.error };
   const codigoRep = await codigoDePais(antes.pais_id);
   const m = (n: number) => montoDePais(n, codigoRep);
   const cambioPrecio = precioAntes === null || Math.abs(precioAntes - precioNuevo) > 0.004 ? `, con precio ${m(precioNuevo)}${precioAntes !== null ? ` (antes ${m(precioAntes)})` : ""}` : `, con el mismo precio ${m(precioNuevo)}`;
-  await registrarAuditoria({ accion: "dropi_republicar_pendiente", entidad: "dropi_publicaciones", entidadId: id, detalle: `${antes.nombre} · ID Dropi ${antes.dropi_id}: pendiente para «Aplicar en Dropi»${cambioPrecio}` });
+  await registrarAuditoria({
+    accion: "dropi_republicar_pendiente",
+    entidad: "dropi_publicaciones",
+    entidadId: id,
+    detalle: `${antes.nombre} · ID Dropi ${antes.dropi_id}: pendiente para «Aplicar en Dropi»${cambioPrecio}${enBodegaDropi > 0 ? ` · de la bodega de Dropi (${enBodegaDropi} u.): el ID nuevo nace con ${UNIDADES_TEMPORALES_B280} temporales que se sacan, y Dropi traslada las suyas` : ""}` ,
+  });
   revalidatePath(RUTA);
   return { detalle: r.yaEstaba ? "Ya estaba pendiente: pulsa «Aplicar en Dropi» con Dropi abierto." : "Republicación pendiente: pulsa «Aplicar en Dropi» con Dropi abierto." };
 }

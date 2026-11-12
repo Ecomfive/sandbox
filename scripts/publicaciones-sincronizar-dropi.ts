@@ -16,6 +16,7 @@ import { readFileSync } from "node:fs";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { copiarFotosDropi } from "./publicaciones-copiar-fotos";
 import { revisarSinStock } from "../src/lib/compras/sin-stock-datos";
+import { cerrarTrasladosB280 } from "../src/lib/publicaciones/traslado-b280";
 import {
   bodegasEnOrden,
   cambiosDesdeDropi,
@@ -258,7 +259,14 @@ export async function guardarNuestrosProductos(supabase: SupabaseClient, l: Lect
   } catch (e) {
     vinculosVariaciones = { error: String((e as Error)?.message ?? e) };
   }
-  return { ...resumen, creadasPrimeraCarga, fotos, sinStock, vinculosVariaciones, detalle };
+  // «Republicar (B280)» (12 nov 2026): si Dropi ya trasladó el stock de su bodega al ID nuevo, la tarea de pedírselo se cierra sola.
+  let traslados: { cerrados: number } | { error: string };
+  try {
+    traslados = await cerrarTrasladosB280(supabase, pais.id);
+  } catch (e) {
+    traslados = { error: String((e as Error)?.message ?? e) };
+  }
+  return { ...resumen, creadasPrimeraCarga, fotos, sinStock, vinculosVariaciones, traslados, detalle };
 }
 
 // Uso directo con un archivo guardado.

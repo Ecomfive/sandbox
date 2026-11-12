@@ -226,9 +226,13 @@ export function sinStock(f: Pick<FilaPublicacion, "archivada" | "enDropi" | "sto
  * Si se ofrece «Republicar» (23 oct 2026; en la fila desde el 27 oct 2026): con ID de Dropi, sin archivar ni apagar, ya publicada, pública y de
  * nuestra bodega (lo de la B280 es de Dropi). El servidor lo vuelve a comprobar en `republicarPublicacion`.
  */
-export function puedeRepublicar(f: Pick<FilaPublicacion, "dropiId" | "archivada" | "bodega" | "tipoDropi" | "sinPublicar" | "apagadoPendiente" | "duplicadaDe">): boolean {
-  return f.dropiId.trim() !== "" && !f.archivada && !f.sinPublicar && !f.apagadoPendiente && !f.duplicadaDe && !esBodegaDropi(f.bodega?.id) && f.tipoDropi !== "privado";
+export function puedeRepublicar(f: Pick<FilaPublicacion, "dropiId" | "archivada" | "bodega" | "tipoDropi" | "sinPublicar" | "apagadoPendiente" | "duplicadaDe" | "stockPorId">): boolean {
+  // La de la bodega de Dropi (12 nov 2026) se republica con el proceso de la B280, solo si es simple.
+  return f.dropiId.trim() !== "" && !f.archivada && !f.sinPublicar && !f.apagadoPendiente && !f.duplicadaDe && !(republicaDeBodegaDropi(f) && conVariaciones(f)) && f.tipoDropi !== "privado";
 }
+/** Si se republica con el proceso de la B280: su stock está en la bodega de Dropi. */
+export const republicaDeBodegaDropi = (f: Pick<FilaPublicacion, "bodega">) => esBodegaDropi(f.bodega?.id);
+const conVariaciones = (f: Pick<FilaPublicacion, "stockPorId">) => (f.stockPorId ?? []).some((x) => x.variable);
 /** Si tiene una republicación esperando «Aplicar en Dropi» (o que dio error y se reintenta). */
 export const republicacionPendiente = (f: Pick<FilaPublicacion, "cambioDropi">) => f.cambioDropi?.tipo === "republicar" && f.cambioDropi.estado !== "aplicado";
 /** El aviso antes de republicar: lo mismo en la fila y en la ficha. */
@@ -482,5 +486,6 @@ export function estadoBotones(f: FilaPublicacion): EstadoBotones {
     privado: privadoDe(f),
     stockPropio: (f.bodegasDropi ?? []).some((b) => !esBodegaDropi(b.id) && b.stock > 0),
     liquidacion: !!f.liquidacionDesde,
+    variable: conVariaciones(f),
   };
 }
