@@ -154,7 +154,7 @@ export function ContenidoOrdenTienda({ orden, codigoPais, dosColumnas = false }:
     </Tarjeta>
   );
   const c = orden.cuentas;
-  // «Ingresos y costos» (12 nov 2026, como en Mi Reto Digital): el costo de cada producto es el de Dropi del país o, si falta, la última compra.
+  // «Ingresos y costos» (12 nov 2026, como en Mi Reto Digital): el costo de cada producto es su costo promedio de compra (del país o, si no hay, de todos; pedido de Alcides).
   const ingresosYCostos = (
     <Tarjeta id={`t-cost-${orden.id}`} titulo="Ingresos y costos">
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">

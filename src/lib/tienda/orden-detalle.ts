@@ -90,7 +90,7 @@ export async function cargarOrdenTienda(supabase: SupabaseClient, id: string, pa
   const tiendaSistema = (tiendasPais ?? []).find((t) => nombreComparable(t.nombre as string) === nombreComparable(unidad.nombre));
   const dominio = (tiendaSistema?.dominio as string | null | undefined) ?? null;
   const enShopify = o.origen === "shopify" && dominio && o.numero ? `https://${dominio}/admin/orders?query=${encodeURIComponent(String(o.numero).replace(/^#/, ""))}` : null;
-  // Ingresos y costos: el costo de cada producto en el país (Dropi del país o la última compra), el fulfillment de la unidad y el flete del pedido.
+  // Ingresos y costos: el costo de cada producto en el país (el costo promedio de compra del producto: del país o, si no hay, de todos), el fulfillment de la unidad y el flete del pedido.
   const lineasT = (lineas ?? []) as unknown as LineaOrdenFinanzas[];
   const costos = await costosDeProductos(supabase, lineasT.map((l) => l.sku_maestro_id ?? "").filter(Boolean), paisId);
   for (const l of lineasT) l.costo = l.sku_maestro_id ? (costos.get(l.sku_maestro_id) ?? null) : null;

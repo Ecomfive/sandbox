@@ -79,7 +79,7 @@ export default async function DashboardTiendaPage({ searchParams }: { searchPara
   const skuIds = vendidos.map((v) => v.skuId).filter((x): x is string => !!x);
   const [{ data: skus }, costos] = await Promise.all([
     skuIds.length ? supabase.from("skus_maestros").select("id, codigo, nombre").in("id", skuIds) : Promise.resolve({ data: [] as { id: string; codigo: string; nombre: string }[] }),
-    // El costo de cada producto en el país (Dropi del país o la última compra), para el margen (12 nov 2026).
+    // El costo de cada producto en el país (el costo promedio de compra del producto: del país o, si no hay, de todos), para el margen (12 nov 2026).
     costosDeProductos(supabase, skuIds, pais.id),
   ]);
   const skuDe = new Map((skus ?? []).map((s) => [s.id as string, s as { codigo: string; nombre: string }]));
