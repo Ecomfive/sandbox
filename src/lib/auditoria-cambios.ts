@@ -368,6 +368,7 @@ export const ETIQUETA_ACCION: Record<string, string> = {
   editar_dropshipper: "Editó los datos",
   movimiento_inventario: "Registró un movimiento de inventario",
   envio_dropi_inventario: "Hizo una remisión a una bodega externa",
+  agregar_a_remision: "Agregó productos a una remisión",
   envio_dropi_recibido: "Anotó lo que recibió la bodega externa",
   remision_correccion_pedida: "Pidió corregir una remisión",
   remision_correccion_autorizada: "Autorizó la corrección de una remisión",
