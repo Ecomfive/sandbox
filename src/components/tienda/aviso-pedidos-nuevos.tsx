@@ -94,7 +94,7 @@ export function AvisoPedidosNuevos({ codigoPais }: { codigoPais: string }) {
               {p.numero} · {formatearMoneda(p.total, codigoPais)}
             </p>
           </div>
-          <Link href={`/tienda-pedidos/${p.id}`} className={`shrink-0 rounded-md px-2 py-1 text-sm font-semibold text-primario hover:bg-primario-suave ${anilloFoco}`}>
+          <Link href={`/tienda-pedidos?pedido=${p.id}`} className={`shrink-0 rounded-md px-2 py-1 text-sm font-semibold text-primario hover:bg-primario-suave ${anilloFoco}`}>
             Ver
           </Link>
           <button

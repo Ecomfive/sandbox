@@ -76,6 +76,16 @@ export interface PedidoFila extends PedidoResumen {
   sinHora?: boolean;
   /** Los productos del pedido, para la lista («Magnesio +1»). */
   productos?: string | null;
+  /** Cada producto del pedido, para filtrar por producto. */
+  productosLista?: string[];
+  /** La dirección del cliente (sin la zona). */
+  direccion?: string | null;
+  /** Las etiquetas de Shopify de la orden. */
+  etiquetas?: string[];
+  /** Cuántos pedidos tiene el cliente en total (por su teléfono), contando este; null sin teléfono. */
+  pedidosCliente?: number | null;
+  /** El riesgo del cliente por su historial (la misma regla de Finanzas): «medio» o «alto»; null si no hay riesgo o no se sabe. */
+  riesgo?: "medio" | "alto" | null;
   tiendaId: string;
   numero: string;
   cliente: string | null;

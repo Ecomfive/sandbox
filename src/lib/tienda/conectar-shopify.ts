@@ -5,6 +5,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { sincronizarTienda } from "@/lib/finanzas/sincronizar-shopify";
 import { accesoDeApp, appDeTienda, permisosDeEscritura, type AppTienda } from "./shopify-app";
+import { completarTelefonosDeTienda } from "./telefono-cliente";
 
 const VERSION_API = "2026-07";
 /** Los avisos que se piden: pedido nuevo, cambios, cancelación, pago y edición (los mismos que entiende el receptor). */
@@ -119,6 +120,9 @@ export async function revisarTienda(supabase: SupabaseClient, tienda: { id: stri
   // Las órdenes de Shopify que entraron antes de guardar su hora (migración 0276) se vuelven a leer desde la más vieja, para completarla.
   const desde = await desdeSinHora(supabase, app.tienda);
   const r = await sincronizarTienda(supabase, { tienda: app.tienda, dominio: app.dominio, token }, Date.now() + limiteMs, desde);
+  // Los clientes de los pedidos que llegaron antes sin su teléfono normalizado (para juntar sus pedidos).
+  const { data: u } = await supabase.from("fin_unidades").select("id").ilike("nombre", app.tienda).maybeSingle();
+  if (u) await completarTelefonosDeTienda(supabase, u.id as string);
   await supabase.from("tiendas").update({ ultima_revision_en: new Date().toISOString() }).eq("id", tienda.id);
   return r;
 }

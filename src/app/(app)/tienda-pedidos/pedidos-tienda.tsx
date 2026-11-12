@@ -1,21 +1,34 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
-import { claseThLista, claseTdLista, Indicador, MarcoTabla, Pastilla, TableroIndicadores } from "@/components/panel/piezas-panel";
-import { EstadoVacio } from "@/components/ui/estado-vacio";
-import { fieldClass } from "@/components/ui/field";
+import { useCallback, useMemo, useState } from "react";
+import type { IconoComp } from "@/components/tabla/botones-vista";
+import { TablaDatos, type ColumnaTabla } from "@/components/tabla/tabla-datos";
+import { Indicador, Pastilla, TableroIndicadores } from "@/components/panel/piezas-panel";
 import { formatearMoneda } from "@/lib/formato";
-import { AlertaIcon, CerrarIcon, CheckIcon, DeshacerIcon, EnvioIcon, InventarioIcon, PedidoIcon } from "@/lib/nav-icons";
-import { ESTADOS_PEDIDO, resumirPedidos, type EstadoPedido } from "@/lib/tienda/resumen";
+import { AlertaIcon, CalendarioIcon, CerrarIcon, CheckIcon, DeshacerIcon, EnvioIcon, EtiquetaIcon, InventarioIcon, MargenIcon, PedidoIcon, ProductoIcon, TiendaIcon } from "@/lib/nav-icons";
+import { SIN_VALOR, type DefTabla } from "@/lib/tabla/motor";
+import type { NombreFilas } from "@/lib/tabla/pie";
+import { ESTADOS_PEDIDO, diaPanama, resumirPedidos, type EstadoPedido } from "@/lib/tienda/resumen";
 import type { PedidoFila } from "@/lib/tienda/datos";
+import { FichaPedido } from "./ficha-pedido";
 
-const normal = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 const ESTADO = new Map(ESTADOS_PEDIDO.map((e) => [e.id, e]));
-const MAX_FILAS = 300;
+const NOMBRE: NombreFilas = { singular: "pedido", plural: "pedidos" };
+const ICONOS: Record<string, IconoComp> = {
+  estado: PedidoIcon,
+  tienda: TiendaIcon,
+  zona: EnvioIcon,
+  corregimiento: EnvioIcon,
+  producto: ProductoIcon,
+  etiqueta: EtiquetaIcon,
+  riesgo: AlertaIcon,
+  transportista: EnvioIcon,
+  fecha: CalendarioIcon,
+  total: MargenIcon,
+};
+const RIESGO: Record<string, { etiqueta: string; tono: "aviso" | "peligro" }> = { medio: { etiqueta: "Medio", tono: "aviso" }, alto: { etiqueta: "Alto", tono: "peligro" } };
 
-/** La fecha del pedido como se lee en la lista: hoy y ayer con la hora; si no, el día. */
 function cuando(iso: string, sinHora = false): string {
   const d = new Date(iso);
   // Del Excel de Finanzas: solo el día (no tiene hora).
@@ -25,12 +38,152 @@ function cuando(iso: string, sinHora = false): string {
   const hora = d.toLocaleTimeString("es-PA", { hour: "2-digit", minute: "2-digit", timeZone: "America/Panama" });
   if (dia(d) === dia(hoy)) return `hoy ${hora}`;
   if (dia(d) === dia(new Date(hoy.getTime() - 86_400_000))) return `ayer ${hora}`;
-  return d.toLocaleDateString("es-PA", { day: "numeric", month: "short", timeZone: "America/Panama" });
+  return `${d.toLocaleDateString("es-PA", { day: "numeric", month: "short", timeZone: "America/Panama" })} ${hora}`;
+}
+
+interface Contexto {
+  codigoPais: string;
+  tiendas: Record<string, string>;
+}
+
+/** Las columnas, como en Mi Reto Digital: se ocultan y se reordenan desde «Columnas». */
+const COLUMNAS: ColumnaTabla<PedidoFila, Contexto>[] = [
+  { id: "pedido", label: "Pedido", ocultable: false, clase: "font-semibold text-primario whitespace-nowrap", render: (p) => p.numero },
+  { id: "tienda", label: "Tienda", ocultable: true, clase: "whitespace-nowrap", render: (p, c) => c.tiendas[p.tiendaId] ?? "—" },
+  { id: "fecha", label: "Fecha", ocultable: true, clase: "text-muted-foreground whitespace-nowrap", render: (p) => cuando(p.creado, p.sinHora) },
+  { id: "cliente", label: "Cliente", ocultable: true, render: (p) => <span className="block max-w-[14rem] truncate">{p.cliente ?? "—"}</span> },
+  {
+    id: "pedidos",
+    label: "Pedidos",
+    descripcion: "Cuántos pedidos tiene el cliente en total (por su teléfono), contando este.",
+    ocultable: true,
+    clase: "text-right tabular-nums",
+    render: (p) => p.pedidosCliente ?? "—",
+  },
+  {
+    id: "riesgo",
+    label: "Riesgo",
+    descripcion: "Por el historial del cliente: medio si tuvo una devolución o cancelación y pocas entregas; alto si tuvo dos o más y más que entregas.",
+    ocultable: true,
+    render: (p) => (p.riesgo ? <Pastilla tono={RIESGO[p.riesgo].tono}>{RIESGO[p.riesgo].etiqueta}</Pastilla> : <span className="text-muted-foreground">—</span>),
+  },
+  {
+    id: "productos",
+    label: "Productos",
+    ocultable: true,
+    render: (p) => (
+      <span className="block max-w-[16rem] truncate" title={p.productos ?? undefined}>
+        {p.productos ?? "—"}
+      </span>
+    ),
+  },
+  { id: "total", label: "Total", ocultable: true, clase: "text-right tabular-nums whitespace-nowrap", render: (p, c) => formatearMoneda(p.total, c.codigoPais) },
+  {
+    id: "estado",
+    label: "Estado",
+    ocultable: true,
+    render: (p) => {
+      const e = ESTADO.get(p.estado)!;
+      return <Pastilla tono={e.tono}>{e.etiqueta}</Pastilla>;
+    },
+  },
+  {
+    id: "direccion",
+    label: "Dirección",
+    ocultable: true,
+    render: (p) => {
+      const lugar = [p.provincia, p.ciudad].filter(Boolean).join(", ");
+      return (
+        <span className="block max-w-[18rem]" title={[lugar, p.direccion].filter(Boolean).join(" · ") || undefined}>
+          <span className="block truncate">{lugar || "—"}</span>
+          {p.direccion && <span className="block truncate text-xs text-muted-foreground">{p.direccion}</span>}
+        </span>
+      );
+    },
+  },
+  {
+    id: "etiquetas",
+    label: "Etiquetas",
+    ocultable: true,
+    render: (p) =>
+      p.etiquetas?.length ? (
+        <span className="flex max-w-[16rem] flex-wrap gap-1" title={p.etiquetas.join(", ")}>
+          {p.etiquetas.slice(0, 3).map((e) => (
+            <Pastilla key={e}>{e}</Pastilla>
+          ))}
+          {p.etiquetas.length > 3 && <span className="text-xs text-muted-foreground">+{p.etiquetas.length - 3}</span>}
+        </span>
+      ) : (
+        <span className="text-muted-foreground">—</span>
+      ),
+  },
+  {
+    id: "transportista",
+    label: "Transportista",
+    ocultable: true,
+    oculta: true,
+    clase: "text-muted-foreground whitespace-nowrap",
+    render: (p) => (p.transportista ? `${p.transportista}${p.guia ? ` · ${p.guia}` : ""}` : "—"),
+  },
+];
+
+/** Los filtros y la descarga de la lista (la tienda solo si hay varias). */
+function defPedidos(tiendas: Record<string, string>): DefTabla<PedidoFila> {
+  return {
+    clave: "tienda-pedidos",
+    campos: [
+      // La búsqueda de la barra: número, cliente, guía, dirección y productos.
+      { id: "buscar", etiqueta: "Buscar", tipo: "texto", sinCsv: true, valor: (p) => [p.numero, p.cliente, p.guia, p.direccion, p.ciudad, p.provincia, p.productos].filter(Boolean).join(" ") },
+      {
+        id: "estado",
+        etiqueta: "Estado",
+        tipo: "seleccion",
+        valores: (p) => [p.estado],
+        opciones: () => ESTADOS_PEDIDO.map((e) => ({ valor: e.id, etiqueta: e.etiqueta })),
+        agrupable: true,
+      },
+      ...(Object.keys(tiendas).length > 1
+        ? [{ id: "tienda", etiqueta: "Tienda", tipo: "seleccion" as const, valores: (p: PedidoFila) => [p.tiendaId], formatearValor: (v: string) => tiendas[v] ?? v, agrupable: true }]
+        : []),
+      { id: "zona", etiqueta: "Zona", tipo: "seleccion", valores: (p) => [p.provincia ?? SIN_VALOR], etiquetaSinValor: "Sin zona", agrupable: true },
+      { id: "corregimiento", etiqueta: "Lugar", tipo: "seleccion", valores: (p) => [p.ciudad ?? SIN_VALOR], etiquetaSinValor: "Sin lugar", agrupable: true },
+      { id: "producto", etiqueta: "Producto", tipo: "seleccion", valores: (p) => (p.productosLista?.length ? p.productosLista : [SIN_VALOR]), etiquetaSinValor: "Sin producto" },
+      { id: "etiqueta", etiqueta: "Etiqueta", tipo: "seleccion", valores: (p) => (p.etiquetas?.length ? p.etiquetas : [SIN_VALOR]), etiquetaSinValor: "Sin etiquetas" },
+      {
+        id: "riesgo",
+        etiqueta: "Riesgo",
+        tipo: "seleccion",
+        valores: (p) => [p.riesgo ?? "ninguno"],
+        opciones: () => [
+          { valor: "alto", etiqueta: "Alto" },
+          { valor: "medio", etiqueta: "Medio" },
+          { valor: "ninguno", etiqueta: "Sin riesgo" },
+        ],
+      },
+      { id: "transportista", etiqueta: "Transportista", tipo: "seleccion", valores: (p) => [p.transportista ?? SIN_VALOR], etiquetaSinValor: "Sin transportista", agrupable: true },
+      { id: "fecha", etiqueta: "Fecha", tipo: "fecha", valor: (p) => diaPanama(p.creado) },
+      { id: "total", etiqueta: "Total", tipo: "numero", valor: (p) => p.total },
+    ],
+    total: (p) => p.total,
+    csvAntes: [
+      { etiqueta: "Pedido", valor: (p) => p.numero },
+      { etiqueta: "Tienda", valor: (p) => tiendas[p.tiendaId] ?? "" },
+      { etiqueta: "Fecha y hora", valor: (p) => cuando(p.creado, p.sinHora) },
+      { etiqueta: "Cliente", valor: (p) => p.cliente },
+      { etiqueta: "Pedidos del cliente", valor: (p) => p.pedidosCliente ?? null },
+      { etiqueta: "Productos", valor: (p) => (p.productosLista ?? []).join(" | ") },
+      { etiqueta: "Unidades", valor: (p) => p.unidades },
+      { etiqueta: "Dirección", valor: (p) => p.direccion ?? "" },
+      { etiqueta: "Guía", valor: (p) => p.guia ?? "" },
+    ],
+    pdf: ["Pedido", "Fecha y hora", "Cliente", "Productos", "Total", "Estado", "Zona", "Lugar"],
+  };
 }
 
 /**
- * Gestión de tienda › Pedidos: el tablero de tarjetas (filtran la lista al pulsarlas, como en Gestión de IDs) y la lista de pedidos del periodo, con
- * búsqueda por número, cliente, zona o guía. Cada pedido abre su detalle.
+ * Gestión de tienda › Pedidos (12 nov 2026, como en Mi Reto Digital): el tablero de tarjetas (filtran la lista al pulsarlas) y la lista con la barra común
+ * —buscar, filtros por estado, zona, lugar, producto, etiqueta, riesgo y transportista, columnas que se ocultan y se reordenan, y Descargar—. Tocar
+ * cualquier parte de una fila abre la ficha del pedido a un lado, sin salir de la lista.
  */
 export function PedidosTienda({
   pedidos,
@@ -38,6 +191,7 @@ export function PedidosTienda({
   tiendas,
   sinVincular,
   conectada,
+  abrirInicial = null,
 }: {
   pedidos: PedidoFila[];
   codigoPais: string;
@@ -46,23 +200,42 @@ export function PedidosTienda({
   sinVincular: number;
   /** Si alguna de las tiendas que se miran ya está conectada (sin eso, la lista vacía lo explica). */
   conectada: boolean;
+  /** El pedido que llega en la dirección (`?pedido=`): se abre su ficha al entrar (el enlace copiado o el aviso de «Nuevo pedido»). */
+  abrirInicial?: string | null;
 }) {
-  const [estado, setEstado] = useState<EstadoPedido | null>(null);
   const router = useRouter();
-  const [q, setQ] = useState("");
+  const [estado, setEstado] = useState<EstadoPedido | null>(null);
+  const [abierto, setAbierto] = useState<string | null>(abrirInicial);
+  const [orden, setOrden] = useState<string[]>([]);
+  // Si ya se está en Pedidos y llega otro `?pedido=` (el «Ver» del aviso de «Nuevo pedido»), se abre esa ficha (se ajusta al dibujar, sin efecto).
+  const [inicialVisto, setInicialVisto] = useState(abrirInicial);
+  if (abrirInicial !== inicialVisto) {
+    setInicialVisto(abrirInicial);
+    if (abrirInicial) setAbierto(abrirInicial);
+  }
   const r = useMemo(() => resumirPedidos(pedidos), [pedidos]);
-  const filtrados = useMemo(() => {
-    const t = normal(q.trim());
-    return pedidos.filter(
-      (p) =>
-        (!estado || p.estado === estado) &&
-        (!t || [p.numero, p.cliente, p.provincia, p.ciudad, p.guia, p.productos].some((x) => x && normal(x).includes(t))),
-    );
-  }, [pedidos, estado, q]);
+  const filas = useMemo(() => (estado ? pedidos.filter((p) => p.estado === estado) : pedidos), [pedidos, estado]);
+  const def = useMemo(() => defPedidos(tiendas), [tiendas]);
+  const contexto = useMemo(() => ({ codigoPais, tiendas }), [codigoPais, tiendas]);
+  const columnas = useMemo(() => (Object.keys(tiendas).length > 1 ? COLUMNAS : COLUMNAS.filter((c) => c.id !== "tienda")), [tiendas]);
   const pct = (n: number | null) => (n === null ? "—" : `${n.toLocaleString("es-PA")} %`);
   const num = (n: number) => n.toLocaleString("es-PA");
   const alternar = (e: EstadoPedido) => setEstado((x) => (x === e ? null : e));
-  const varias = Object.keys(tiendas).length > 1;
+
+  // La ficha abierta queda en la dirección (`?pedido=`), así se puede copiar o recargar.
+  const marcarEnDireccion = useCallback((id: string | null) => {
+    const u = new URL(window.location.href);
+    if (id) u.searchParams.set("pedido", id);
+    else u.searchParams.delete("pedido");
+    window.history.replaceState(window.history.state, "", u.toString());
+  }, []);
+  const abrir = useCallback(
+    (id: string) => {
+      setAbierto(id);
+      marcarEnDireccion(id);
+    },
+    [marcarEnDireccion],
+  );
 
   return (
     <div className="flex flex-col gap-5">
@@ -77,72 +250,38 @@ export function PedidosTienda({
         <Indicador titulo="SKU sin vincular" icono={AlertaIcon} color="ambar" punto={sinVincular ? "aviso" : undefined} valor={num(sinVincular)} detalle="variantes de Shopify sin producto nuestro" href="/tienda-productos" />
       </TableroIndicadores>
 
-      <section aria-label="Lista de pedidos" className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <label className="flex min-w-[16rem] flex-1 items-center gap-2 text-sm text-muted-foreground sm:max-w-md">
-            <span className="sr-only">Buscar</span>
-            <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar pedido, cliente, producto, zona o guía" className={`${fieldClass} w-full`} />
-          </label>
-          <span className="text-sm text-muted-foreground" aria-live="polite">
-            {filtrados.length > MAX_FILAS ? `${num(MAX_FILAS)} de ${num(filtrados.length)} pedidos` : `${num(filtrados.length)} pedido${filtrados.length === 1 ? "" : "s"}`}
-            {estado ? ` · ${ESTADO.get(estado)?.etiqueta.toLowerCase()}` : ""}
-          </span>
-        </div>
-        {!filtrados.length ? (
-          <div className="rounded-[10px] border border-border bg-card">
-            <EstadoVacio mensaje={!pedidos.length ? (conectada ? "No hay pedidos en este periodo." : "Los pedidos aparecen aquí al conectar la tienda a Shopify.") : "Ningún pedido cumple con lo que estás filtrando."} />
-          </div>
-        ) : (
-          <MarcoTabla ariaLabel="Pedidos">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr>
-                  <th scope="col" className={claseThLista}>Pedido</th>
-                  {varias && <th scope="col" className={claseThLista}>Tienda</th>}
-                  <th scope="col" className={claseThLista}>Fecha</th>
-                  <th scope="col" className={claseThLista}>Cliente</th>
-                  <th scope="col" className={claseThLista}>Productos</th>
-                  <th scope="col" className={`${claseThLista} text-right`}>Unid.</th>
-                  <th scope="col" className={`${claseThLista} text-right`}>Total</th>
-                  <th scope="col" className={claseThLista}>Estado</th>
-                  <th scope="col" className={claseThLista}>Zona</th>
-                  <th scope="col" className={claseThLista}>Transportista</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtrados.slice(0, MAX_FILAS).map((p) => {
-                  const e = ESTADO.get(p.estado)!;
-                  return (
-                    // Toda la fila abre la ficha del pedido (12 nov 2026, como en Mi Reto Digital); el número sigue siendo el enlace.
-                    <tr key={p.id} onClick={() => router.push(`/tienda-pedidos/${p.id}`)} className="cursor-pointer hover:bg-muted/60">
-                      <td className={claseTdLista}>
-                        <Link href={`/tienda-pedidos/${p.id}`} className="font-semibold text-primario underline-offset-2 hover:underline">
-                          {p.numero}
-                        </Link>
-                      </td>
-                      {varias && <td className={claseTdLista}>{tiendas[p.tiendaId] ?? "—"}</td>}
-                      <td className={`${claseTdLista} text-muted-foreground`}>{cuando(p.creado, p.sinHora)}</td>
-                      <td className={claseTdLista}>{p.cliente ?? "—"}</td>
-                      <td className={claseTdLista}>
-                        <span className="block max-w-[18rem] truncate" title={p.productos ?? undefined}>
-                          {p.productos ?? "—"}
-                        </span>
-                      </td>
-                      <td className={`${claseTdLista} text-right tabular-nums`}>{p.unidades}</td>
-                      <td className={`${claseTdLista} text-right tabular-nums`}>{formatearMoneda(p.total, codigoPais)}</td>
-                      <td className={claseTdLista}>
-                        <Pastilla tono={e.tono}>{e.etiqueta}</Pastilla>
-                      </td>
-                      <td className={`${claseTdLista} text-muted-foreground`}>{[p.provincia, p.ciudad].filter(Boolean).join(", ") || "—"}</td>
-                      <td className={`${claseTdLista} text-muted-foreground`}>{p.transportista ? `${p.transportista}${p.guia ? ` · ${p.guia}` : ""}` : "—"}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </MarcoTabla>
-        )}
-      </section>
+      <TablaDatos
+        def={def}
+        filas={filas}
+        columnas={columnas}
+        contexto={contexto}
+        iconos={ICONOS}
+        nombre={NOMBRE}
+        claveFila={(p) => p.id}
+        formatearTotal={(n) => formatearMoneda(n, codigoPais)}
+        abrirFila={{
+          etiqueta: (p) => `Abrir el pedido ${p.numero}`,
+          alAbrir: (p, ids) => {
+            // Los pedidos que llegan por la conexión propia de Shopify (sin datos de Finanzas) siguen en su página.
+            if (!p.productosLista) return router.push(`/tienda-pedidos/${p.id}`);
+            setOrden(ids);
+            abrir(p.id);
+          },
+        }}
+        ariaLabel="Pedidos"
+        anchoMinimo="64rem"
+        vacio={conectada ? "No hay pedidos en este periodo." : "Los pedidos aparecen aquí al conectar la tienda a Shopify."}
+      />
+
+      <FichaPedido
+        id={abierto}
+        orden={orden.length ? orden : filas.map((p) => p.id)}
+        alCerrar={() => {
+          setAbierto(null);
+          marcarEnDireccion(null);
+        }}
+        alIr={abrir}
+      />
     </div>
   );
 }
