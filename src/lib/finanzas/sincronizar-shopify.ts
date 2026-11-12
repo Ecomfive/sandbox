@@ -13,6 +13,7 @@ import { leerTiendasShopify, ordenDeShopify, siguientePagina, type TiendaShopify
 import { leerConexiones } from "../ventas/conexion-tienda";
 import { sincronizarFases } from "../ventas/sincronizar-fases";
 import { appsDeEntorno, tokenDeApp } from "../tienda/shopify-app";
+import { completarTelefonosDeOrdenes } from "../tienda/telefono-cliente";
 
 const VERSION_API = "2024-10";
 const CAMPOS = "name,created_at,updated_at,cancelled_at,cancel_reason,financial_status,fulfillment_status,total_price,subtotal_price,total_discounts,total_shipping_price_set,line_items,refunds,payment_gateway_names,gateway,tags,note,phone,shipping_address,billing_address";
@@ -56,6 +57,8 @@ export async function guardarOrdenesShopify(supabase: SupabaseClient, ordenes: O
     const { error } = await supabase.from("ven_ordenes").update(cambio).eq("origen_clave", o.origen_clave);
     if (error) throw new Error(`ven_ordenes: ${error.message}`);
   }
+  // El teléfono normalizado de cada cliente, para juntar sus pedidos (Gestión de tienda, 12 nov 2026). No falla nunca.
+  await completarTelefonosDeOrdenes(supabase, ordenes.map((o) => o.origen_clave));
   return { nuevas: r.nuevas, actualizadas: r.actualizadas, soloEstado: deExcel.length };
 }
 

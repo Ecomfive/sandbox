@@ -63,6 +63,7 @@ export default async function PedidosTiendaPage({ searchParams }: { searchParams
             tiendas={Object.fromEntries(tiendas.map((t) => [t.id, t.nombre]))}
             sinVincular={sinVincular}
             conectada={miradas.some((t) => t.estado === "conectada" || fuente.unidadDe.has(t.id))}
+            abrirInicial={typeof sp.pedido === "string" && /^[0-9a-f-]{36}$/i.test(sp.pedido) ? sp.pedido : null}
           />
         </>
       )}

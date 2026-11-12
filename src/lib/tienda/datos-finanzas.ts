@@ -5,7 +5,15 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { cargarPedidos, inicioPeriodo, type PedidoFila, type Tienda } from "./datos";
-import { estadoDesdeFinanzas, momentoDeFecha, nombreComparable, textoProductos, zonaDeEtiquetas, type LineaFinanzas } from "./ordenes-finanzas";
+import { riesgoCliente } from "@/lib/ventas/operacion";
+import { estadoDesdeFinanzas, etiquetasDe, momentoDeFecha, nombreComparable, textoProductos, zonaDeEtiquetas, type LineaFinanzas } from "./ordenes-finanzas";
+
+/** Cuántos pedidos tiene el cliente y su riesgo («medio» o «alto»; null si no hay). Sin historial (sin teléfono), null en los dos. */
+function datosDelCliente(h: { total: number; entregadas: number; devueltas: number; canceladas: number } | undefined): { pedidosCliente: number | null; riesgo: "medio" | "alto" | null } {
+  if (!h) return { pedidosCliente: null, riesgo: null };
+  const r = riesgoCliente({ entregadas: h.entregadas, devueltas: h.devueltas, canceladas: h.canceladas, fallidas: 0 });
+  return { pedidosCliente: h.total, riesgo: r === "medio" || r === "alto" ? r : null };
+}
 
 /** De dónde salen los datos de las tiendas sin conectar: su unidad en Finanzas y hasta qué día llegan sus órdenes. */
 export interface FuenteFinanzas {
@@ -68,7 +76,41 @@ interface FilaOrden {
   guia: string | null;
   /** Sin la migración 0276 no viene. */
   creado_origen?: string | null;
-  ven_ordenes_clientes: { nombre: string | null; corregimiento: string | null } | { nombre: string | null; corregimiento: string | null }[] | null;
+  ven_ordenes_clientes: ClienteFila | ClienteFila[] | null;
+}
+
+interface ClienteFila {
+  nombre: string | null;
+  corregimiento: string | null;
+  direccion: string | null;
+  telefono_clave: string | null;
+}
+
+/**
+ * El historial de cada cliente por su teléfono normalizado (`telefono_clave`), con todas sus órdenes (de cualquier fecha y tienda): cuántas tiene y cuántas
+ * terminaron entregadas, devueltas o canceladas. De a 150 teléfonos por consulta, 6 a la vez.
+ */
+async function historialDeClientes(supabase: SupabaseClient, claves: string[]): Promise<Map<string, { total: number; entregadas: number; devueltas: number; canceladas: number }>> {
+  const unicas = [...new Set(claves.filter(Boolean))];
+  const mapa = new Map<string, { total: number; entregadas: number; devueltas: number; canceladas: number }>();
+  const tandas: string[][] = [];
+  for (let i = 0; i < unicas.length; i += 150) tandas.push(unicas.slice(i, i + 150));
+  for (let i = 0; i < tandas.length; i += 6) {
+    const respuestas = await Promise.all(
+      tandas.slice(i, i + 6).map((t) => supabase.from("ven_ordenes_clientes").select("telefono_clave, ven_ordenes(estado_entrega)").in("telefono_clave", t).limit(5000)),
+    );
+    for (const { data } of respuestas)
+      for (const r of (data ?? []) as { telefono_clave: string; ven_ordenes: { estado_entrega: string | null } | { estado_entrega: string | null }[] | null }[]) {
+        const o = Array.isArray(r.ven_ordenes) ? r.ven_ordenes[0] : r.ven_ordenes;
+        const h = mapa.get(r.telefono_clave) ?? { total: 0, entregadas: 0, devueltas: 0, canceladas: 0 };
+        h.total++;
+        if (o?.estado_entrega === "entregada") h.entregadas++;
+        else if (o?.estado_entrega === "devuelta") h.devueltas++;
+        else if (o?.estado_entrega === "cancelada" || o?.estado_entrega === "no_gestionada") h.canceladas++;
+        mapa.set(r.telefono_clave, h);
+      }
+  }
+  return mapa;
 }
 
 /** Las órdenes de Finanzas de esas tiendas entre `desde` y `hasta` (días AAAA-MM-DD), con sus unidades, como pedidos de la pantalla; y sus líneas. */
@@ -87,7 +129,7 @@ export async function cargarPedidosFinanzas(
   if (!tiendaDeUnidad.size) return { pedidos: [], lineas: [] };
   const unidades = [...tiendaDeUnidad.keys()];
   // Con la migración 0276, también la hora de Shopify (un texto armado: por eso se declara como `string`).
-  const columnas: string = `id, unidad_id, numero, fecha, estado_entrega, etiquetas, total, moneda, transportista, guia, ${(await hayHoraDeShopify(supabase)) ? "creado_origen, " : ""}ven_ordenes_clientes(nombre, corregimiento)`;
+  const columnas: string = `id, unidad_id, numero, fecha, estado_entrega, etiquetas, total, moneda, transportista, guia, ${(await hayHoraDeShopify(supabase)) ? "creado_origen, " : ""}ven_ordenes_clientes(nombre, corregimiento, direccion, telefono_clave)`;
   const [ordenes, lineas] = await Promise.all([
     traerTodasLasFilas<FilaOrden>(
       (d, h) =>
@@ -112,6 +154,8 @@ export async function cargarPedidosFinanzas(
     productosDe.set(l.pedidoId, [...(productosDe.get(l.pedidoId) ?? []), l.titulo]);
   }
   const clienteDe = (o: (typeof ordenes)[number]) => (Array.isArray(o.ven_ordenes_clientes) ? (o.ven_ordenes_clientes[0] ?? null) : o.ven_ordenes_clientes);
+  // El historial de cada cliente: cuántos pedidos tiene y su riesgo (la regla de Finanzas, `riesgoCliente`).
+  const historial = await historialDeClientes(supabase, ordenes.map((o) => clienteDe(o)?.telefono_clave ?? ""));
   const pedidos = ordenes.map((o) => ({
     id: o.id,
     tiendaId: tiendaDeUnidad.get(o.unidad_id) ?? "",
@@ -119,6 +163,10 @@ export async function cargarPedidosFinanzas(
     creado: o.creado_origen ?? momentoDeFecha(o.fecha),
     sinHora: !o.creado_origen,
     productos: textoProductos(productosDe.get(o.id) ?? []),
+    productosLista: productosDe.get(o.id) ?? [],
+    direccion: clienteDe(o)?.direccion ?? null,
+    etiquetas: etiquetasDe(o.etiquetas),
+    ...datosDelCliente(historial.get(clienteDe(o)?.telefono_clave ?? "")),
     cliente: clienteDe(o)?.nombre ?? null,
     provincia: zonaDeEtiquetas(o.etiquetas),
     ciudad: clienteDe(o)?.corregimiento ?? null,
