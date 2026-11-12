@@ -5,7 +5,7 @@
 // publicación sin vincular: la publicación de Dropi del mismo país con el mismo nombre y su producto, o `sugerirSku` (nombre y foto).
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { nombreComparable, publicacionesDeLectura, type PublicacionLeidaDrop } from "../src/lib/publicaciones-drop/lectura";
+import { nombreComparable, publicacionesDeLectura, unidadesExclusivas, type PublicacionLeidaDrop } from "../src/lib/publicaciones-drop/lectura";
 import { prepararContexto, sugerirSku, type Sugerencia } from "../src/lib/publicaciones/vincular";
 import { traerTodasLasFilas } from "../src/lib/supabase/paginar";
 import { huellaFoto } from "../src/lib/wms/huella-foto";
@@ -108,6 +108,8 @@ export async function guardarDrop(supabase: SupabaseClient, l: LecturaDrop) {
       estado: v.estado,
       precio: v.precio,
       inventario: v.inventario,
+      // Los exclusivos (migración 0277, extensión 0.7.2); una lectura que no los trajo deja los que había.
+      ...(v.exclusivos ? { inventario_exclusivo: unidadesExclusivas(v.exclusivos), exclusivos: v.exclusivos } : {}),
       foto_url: v.fotoUrl,
       foto_huella: huellas.get(v.dropId) ?? null,
       creado_en_drop: v.creadoEnDrop,

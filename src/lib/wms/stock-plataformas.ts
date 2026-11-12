@@ -21,6 +21,8 @@ export interface LineaPlataforma {
   unidades: number;
   /** Dropi: lo de una bodega que no es la de Dropi, solo referencial; Effi: lo de la bodega de garantías. No suma al total. */
   aparte: number;
+  /** Drop: de `unidades`, cuántas son exclusivas de un cliente (12 nov 2026). */
+  exclusivo?: number;
 }
 
 export interface StockPlataformas {
@@ -79,6 +81,8 @@ export interface PublicacionDrop {
   codigo: string | null;
   nombre: string;
   inventario: number | null;
+  /** Lo que Drop guarda aparte para clientes (migración 0277): también es stock nuestro en Drop. */
+  inventario_exclusivo?: number | null;
   en_drop: boolean;
   ultima_vez: string | null;
 }
@@ -141,9 +145,11 @@ export function armarStockPlataformas(entrada: {
     const aparte = Number(p.stock_garantias ?? 0);
     if (p.sku_maestro_id && p.en_effi && (unidades || aparte)) agregar(p.sku_maestro_id, { plataforma: "effi", id: String(p.effi_id), nombre: p.nombre, unidades, aparte });
   }
+  // Drop: su «Inventario» más los exclusivos de clientes (12 nov 2026, pedido de Hernán: también son stock en la bodega de Drop).
   for (const p of entrada.drop) {
-    const unidades = Number(p.inventario ?? 0);
-    if (p.sku_maestro_id && p.en_drop && unidades) agregar(p.sku_maestro_id, { plataforma: "drop", id: p.codigo ?? "Drop", nombre: p.nombre, unidades, aparte: 0 });
+    const exclusivo = Number(p.inventario_exclusivo ?? 0);
+    const unidades = Number(p.inventario ?? 0) + exclusivo;
+    if (p.sku_maestro_id && p.en_drop && unidades) agregar(p.sku_maestro_id, { plataforma: "drop", id: p.codigo ?? "Drop", nombre: p.nombre, unidades, aparte: 0, exclusivo });
   }
   // Dunamixfy (9 nov 2026): lo de nuestra bodega allá; lo que ya no aparece no cuenta.
   for (const p of entrada.dunamixfy ?? []) {

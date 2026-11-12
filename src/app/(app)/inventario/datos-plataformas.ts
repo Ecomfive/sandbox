@@ -17,7 +17,7 @@ export async function leerStockPlataformas(
     traerTodasConError<PublicacionEffi>((d, h) =>
       supabase.from("effi_publicaciones").select("sku_maestro_id, effi_id, nombre, stock_principal, stock_garantias, en_effi, ultima_vez").eq("pais_id", paisId).order("id").range(d, h),
     ),
-    traerTodasConError<PublicacionDrop>((d, h) => supabase.from("drop_publicaciones").select("sku_maestro_id, codigo, nombre, inventario, en_drop, ultima_vez").eq("pais_id", paisId).order("id").range(d, h)),
+    traerTodasConError<PublicacionDrop>((d, h) => supabase.from("drop_publicaciones").select("sku_maestro_id, codigo, nombre, inventario, inventario_exclusivo, en_drop, ultima_vez").eq("pais_id", paisId).order("id").range(d, h)),
     // Qué variación de Dropi va con qué variante (migración 0261; sin ella, todo queda en el producto principal).
     traerTodasConError<VinculoVariacion>((d, h) => supabase.from("dropi_variaciones_vinculo").select("dropi_producto_id, firma, sku_maestro_id").eq("pais_id", paisId).order("id").range(d, h)),
     // Dunamixfy (migración 0264; sin ella, no se muestra y el resto carga igual).

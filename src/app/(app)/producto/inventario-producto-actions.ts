@@ -38,7 +38,7 @@ export async function obtenerInventarioProducto(id: string): Promise<InventarioP
     supabase.rpc("wms_stock_por_bodega", { p_sku: id, p_pais: pais.id }),
     supabase.from("dropi_publicaciones").select("sku_maestro_id, dropi_id, nombre, estado_publicacion").eq("pais_id", pais.id).eq("sku_maestro_id", id).not("dropi_id", "is", null),
     supabase.from("effi_publicaciones").select("sku_maestro_id, effi_id, nombre, stock_principal, stock_garantias, en_effi, ultima_vez").eq("pais_id", pais.id).eq("sku_maestro_id", id),
-    supabase.from("drop_publicaciones").select("sku_maestro_id, codigo, nombre, inventario, en_drop, ultima_vez").eq("pais_id", pais.id).eq("sku_maestro_id", id),
+    supabase.from("drop_publicaciones").select("sku_maestro_id, codigo, nombre, inventario, inventario_exclusivo, en_drop, ultima_vez").eq("pais_id", pais.id).eq("sku_maestro_id", id),
     supabase.from("dunamixfy_publicaciones").select("sku_maestro_id, dunamixfy_id, nombre, stock, en_dunamixfy, ultima_vez").eq("pais_id", pais.id).eq("sku_maestro_id", id),
   ]);
   if (porBodega.error) return { error: "No se pudo cargar el inventario." };
