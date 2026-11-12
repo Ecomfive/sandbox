@@ -8,7 +8,11 @@ import { requireModulo } from "@/lib/auth";
 import { formatearMoneda } from "@/lib/formato";
 import { getPaisActual } from "@/lib/pais";
 import { createServiceClient } from "@/lib/supabase/server";
-import { cargarPedidos, cargarTiendas, cargarVariantes, inicioPeriodo, periodoElegido, sinConfirmarDesde, tiendaElegida } from "@/lib/tienda/datos";
+import { cargarTiendas, cargarVariantes, inicioPeriodo, periodoElegido, sinConfirmarDesde, tiendaElegida } from "@/lib/tienda/datos";
+import { after } from "next/server";
+import { pedidosDeTiendas } from "@/lib/tienda/datos-finanzas";
+import { revisarSiHaceFalta } from "@/lib/tienda/conectar-shopify";
+import { vendidosDeFinanzas } from "@/lib/tienda/ordenes-finanzas";
 import { diaPanama, pedidosPorDia, productosVendidos, resumirPedidos, type LineaVendida } from "@/lib/tienda/resumen";
 import { TableroDashboard, type Tarjeta } from "./tablero-dashboard";
 
@@ -38,10 +42,13 @@ export default async function DashboardTiendaPage({ searchParams }: { searchPara
   const tienda = tiendaElegida(tiendas, sp.tienda);
   const periodo = periodoElegido(sp.periodo);
   const miradas = tienda ? [tienda] : tiendas;
+  // La revisión de Shopify (por si se perdió algún aviso), después de mostrar la página y como mucho cada 10 minutos.
+  after(() => revisarSiHaceFalta(createServiceClient(), tiendas));
   const ids = miradas.map((t) => t.id);
-  const desde = inicioPeriodo(periodo.dias);
-  const hoy = inicioPeriodo(1);
-  const [todos, variantes] = await Promise.all([cargarPedidos(supabase, ids, inicioPeriodo(periodo.dias * 2)), cargarVariantes(supabase, ids)]);
+  // Las tiendas sin conectar se ven con las órdenes de Finanzas (11 nov 2026); si todo sale de ahí, los periodos terminan en su último día.
+  const [{ pedidos: todos, lineasFinanzas, fuente, referencia }, variantes] = await Promise.all([pedidosDeTiendas(supabase, miradas, pais.codigo, periodo.dias * 2), cargarVariantes(supabase, ids)]);
+  const desde = inicioPeriodo(periodo.dias, referencia);
+  const hoy = inicioPeriodo(1, referencia);
   const actuales = todos.filter((p) => diaPanama(p.creado) >= desde);
   const anteriores = todos.filter((p) => diaPanama(p.creado) < desde);
   const r = resumirPedidos(actuales);
@@ -50,19 +57,24 @@ export default async function DashboardTiendaPage({ searchParams }: { searchPara
   // Las líneas de los pedidos del periodo, para lo vendido por producto (de a 200 pedidos por consulta).
   const estadoDe = new Map(actuales.map((p) => [p.id, p.estado]));
   const lineas: LineaVendida[] = [];
-  for (let i = 0; i < actuales.length; i += 200) {
+  const deShopify = actuales.filter((p) => !fuente.unidadDe.has(p.tiendaId));
+  for (let i = 0; i < deShopify.length; i += 200) {
     const { data } = await supabase
       .from("tienda_pedido_lineas")
       .select("pedido_id, shopify_variante_id, titulo, cantidad, precio")
       .in(
         "pedido_id",
-        actuales.slice(i, i + 200).map((p) => p.id),
+        deShopify.slice(i, i + 200).map((p) => p.id),
       );
     for (const l of data ?? [])
       lineas.push({ pedidoId: l.pedido_id, shopifyVarianteId: l.shopify_variante_id === null ? null : Number(l.shopify_variante_id), titulo: l.titulo, cantidad: Number(l.cantidad), precio: Number(l.precio), estado: estadoDe.get(l.pedido_id) ?? "nuevo" });
   }
   const vinculos = new Map(variantes.flatMap((v) => (v.noFisico ? [[v.shopifyVarianteId, "no_fisico" as const] as const] : v.skuMaestroId ? [[v.shopifyVarianteId, v.skuMaestroId] as const] : [])));
-  const vendidos = productosVendidos(lineas, new Map(vinculos));
+  const pedidoFinanzas = new Map(actuales.filter((p) => fuente.unidadDe.has(p.tiendaId)).map((p) => [p.id, { estado: p.estado, total: p.total }]));
+  const vendidos: (ReturnType<typeof productosVendidos>[number] & { titulo?: string })[] = [
+    ...productosVendidos(lineas, new Map(vinculos)),
+    ...vendidosDeFinanzas(lineasFinanzas, pedidoFinanzas),
+  ].sort((x, y) => y.ingreso - x.ingreso);
   const skuIds = vendidos.map((v) => v.skuId).filter((x): x is string => !!x);
   const { data: skus } = skuIds.length ? await supabase.from("skus_maestros").select("id, codigo, nombre").in("id", skuIds) : { data: [] };
   const skuDe = new Map((skus ?? []).map((s) => [s.id as string, s as { codigo: string; nombre: string }]));
@@ -72,7 +84,9 @@ export default async function DashboardTiendaPage({ searchParams }: { searchPara
   const dinero = (n: number | null) => (n === null ? "—" : formatearMoneda(n, pais.codigo));
   const pct = (n: number | null) => (n === null ? "—" : `${n.toLocaleString("es-PA")} %`);
   const sinVincular = variantes.filter((v) => !v.skuMaestroId && !v.noFisico && v.enShopify).length;
-  const viejosSinConfirmar = sinConfirmarDesde(actuales);
+  // Con una foto de Finanzas, «hace más de un día» se cuenta desde el cierre de su último día, no desde hoy.
+  const soloFinanzas = miradas.every((t) => fuente.unidadDe.has(t.id) && t.estado !== "conectada");
+  const viejosSinConfirmar = sinConfirmarDesde(actuales, 24, soloFinanzas ? referencia.getTime() + 7 * 3_600_000 : Date.now());
   const conectadas = miradas.filter((t) => t.estado === "conectada").length;
 
   const operacion: Tarjeta[] = [
@@ -108,7 +122,7 @@ export default async function DashboardTiendaPage({ searchParams }: { searchPara
       ) : (
         <>
           <BarraTienda ruta="/tienda-dashboard" tiendas={tiendas} tiendaId={tienda?.id ?? null} periodo={periodo.id} />
-          <AvisoConexion tiendas={miradas} />
+          <AvisoConexion tiendas={miradas} finanzas={fuente} />
           <TableroDashboard etiqueta="Operación" titulo="Operación" tarjetas={operacion} />
           <TableroDashboard etiqueta="Dinero" titulo="Dinero (contra entrega)" tarjetas={plata} />
           <TableroDashboard etiqueta="Avisos" titulo="Avisos" tarjetas={avisos} />
@@ -159,10 +173,15 @@ export default async function DashboardTiendaPage({ searchParams }: { searchPara
                     {vendidos.map((v) => {
                       const s = v.skuId ? skuDe.get(v.skuId) : undefined;
                       return (
-                        <tr key={v.skuId ?? "sin"}>
+                        <tr key={v.skuId ?? `t:${v.titulo ?? "sin"}`}>
                           <td className={claseTdLista}>
                             {s ? (
                               s.nombre
+                            ) : v.titulo ? (
+                              <span className="flex max-w-[34rem] items-baseline gap-1.5" title={v.titulo}>
+                                <span className="truncate">{v.titulo}</span>
+                                <span className="shrink-0 text-xs text-muted-foreground">· sin vincular</span>
+                              </span>
                             ) : (
                               <Link href="/tienda-productos" className="text-warning underline underline-offset-2">
                                 Sin vincular

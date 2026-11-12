@@ -4,6 +4,7 @@ import { RUTA_PORTAL_PROVEEDOR, cuentaDeProveedor } from "@/lib/proveedor/cuenta
 import { BannerVistaPrevia } from "@/components/banner-vista-previa";
 import { BarraMigas } from "@/components/barra-migas";
 import { LatidoPresencia } from "@/components/latido-presencia";
+import { AvisoPedidosNuevos } from "@/components/tienda/aviso-pedidos-nuevos";
 import { AvisoInactividad } from "@/components/aviso-inactividad";
 import { ProveedorModulos } from "@/components/modulos-contexto";
 import { ProveedorPais } from "@/components/pais-contexto";
@@ -109,6 +110,8 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     <ProveedorDescargaPdf puede={!!usuario && PUEDEN_DESCARGAR_PDF.has(usuario.id)}>
     <ToastProvider>
       {usuario && <LatidoPresencia />}
+      {/* «Nuevo pedido» de las tiendas conectadas a Shopify (12 nov 2026). */}
+      {usuario?.modulos.includes("tienda-pedidos") && <AvisoPedidosNuevos codigoPais={paisActual.codigo} />}
       {usuario && avisoInactividad && <AvisoInactividad />}
       {usuario?.vistaPrevia && <BannerVistaPrevia rolNombre={usuario.vistaPrevia.rolNombre} />}
       <div className="flex min-h-full">

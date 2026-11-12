@@ -42,7 +42,7 @@ export interface VentasDropiPais {
   meses: { mes: string; netas: number }[];
   ids: IdDropiVentas[];
   /**
-   * Quién lo vende: los pedidos ENTREGADOS de estos IDs por dropshipper (12 nov 2026, pedido de Alcides; migración 0274). null si la
+   * Quién lo vende: los pedidos ENTREGADOS de estos IDs por dropshipper (12 nov 2026, pedido de Alcides; migración 0275). null si la
    * consulta no está (sin la migración) o falló.
    */
   porDropshipper: EntregaDropshipper[] | null;

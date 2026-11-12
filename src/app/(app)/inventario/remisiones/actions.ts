@@ -51,6 +51,39 @@ export async function crearRemision(datos: { desde: unknown; hacia: unknown; not
   return { id: creada.id, numero };
 }
 
+/**
+ * Agrega productos a una remisión que ya existe (`wms_agregar_a_remision`, migración 0274; 12 nov 2026, pedido de Hernán). Mismo número y misma referencia: el papel sigue siendo uno.
+ * Solo mientras ninguna línea esté recibida; salen igual que al crearla (de una bodega propia descuentan stock). Todo o nada. Devuelve el error como valor.
+ */
+export async function agregarAremision(remisionId: string, lineas: unknown): Promise<{ error: string } | { numero: string; agregadas: number; unidades: number }> {
+  const usuario = await requireModuloEscritura("inventario");
+  if (!ES_ID(remisionId)) return { error: "Remisión no válida." };
+  const revisadas = revisarLineasRemision(lineas);
+  if ("error" in revisadas) return revisadas;
+  const supabase = createServiceClient();
+  const { data: remision } = await supabase.from("wms_remisiones").select("numero, bodega_origen_id, bodega_destino_id").eq("id", remisionId).maybeSingle();
+  if (!remision) return { error: "La remisión ya no existe." };
+  if (!(await puedeVerBodega(supabase, usuario.paisesPermitidos, remision.bodega_origen_id as string))) return { error: "No tienes acceso al país de esa remisión." };
+  // Una caja elegida no entra por aquí: solo producto y cantidad.
+  const items = revisadas.lineas.map((l) => ({ sku: l.sku, cantidad: l.cantidad }));
+  const { data, error } = await supabase.rpc("wms_agregar_a_remision", { p_remision: remisionId, p_items: items, p_usuario: usuario.id });
+  if (error) {
+    if (/wms_agregar_a_remision|schema cache|Could not find the function/i.test(error.message)) return { error: "Falta correr la migración 0274 (agregar productos a una remisión) en la base." };
+    return { error: error.message.length < 220 ? error.message : "No se pudieron agregar los productos." };
+  }
+  const r = data as { numero: number; agregadas: number; unidades: number };
+  const numero = numeroRemision(r.numero);
+  await registrarAuditoria({
+    accion: "agregar_a_remision",
+    entidad: "wms_remisiones",
+    entidadId: remisionId,
+    detalle: `${numero}: se agregaron ${r.agregadas} ${r.agregadas === 1 ? "producto" : "productos"}, ${Number(r.unidades).toLocaleString("es-PA")} unidades`,
+  });
+  revalidatePath("/inventario");
+  revalidatePath("/inventario/remisiones");
+  return { numero, agregadas: r.agregadas, unidades: Number(r.unidades) };
+}
+
 const RUTA = "/inventario/remisiones";
 
 /** El aviso en la campana de cada persona (no falla la acción si no se puede mandar). */

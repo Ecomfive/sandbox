@@ -1,7 +1,9 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { anilloFoco } from "@/components/ui/field";
+import { formatearFecha } from "@/lib/formato";
 import { PERIODOS, type Tienda } from "@/lib/tienda/datos";
+import type { FuenteFinanzas } from "@/lib/tienda/datos-finanzas";
 
 /** Arma la dirección de la página con los parámetros dados (los vacíos se quitan). */
 export function rutaCon(ruta: string, params: Record<string, string | null | undefined>): string {
@@ -73,9 +75,34 @@ export function BarraTienda({
  * Lo que se dice arriba mientras las tiendas no estén conectadas a Shopify (etapa 2): que la página está lista y vacía, y que la conexión será solo
  * de lectura. Nada si todas las tiendas que se miran ya están conectadas.
  */
-export function AvisoConexion({ tiendas }: { tiendas: Tienda[] }) {
-  const sinConectar = tiendas.filter((t) => t.estado !== "conectada");
-  if (!sinConectar.length) return null;
+export function AvisoConexion({ tiendas, finanzas }: { tiendas: Tienda[]; finanzas?: FuenteFinanzas }) {
+  const conFinanzas = tiendas.filter((t) => finanzas?.unidadDe.has(t.id) && t.estado !== "conectada");
+  const sinConectar = tiendas.filter((t) => t.estado !== "conectada" && !finanzas?.unidadDe.has(t.id));
+  return (
+    <>
+      {conFinanzas.length > 0 && finanzas?.hasta && <AvisoDatosFinanzas nombres={conFinanzas.map((t) => t.nombre)} hasta={finanzas.hasta} origen={finanzas.origen} />}
+      {sinConectar.length > 0 && <AvisoSinConectar sinConectar={sinConectar} />}
+    </>
+  );
+}
+
+/**
+ * Las tiendas sin conectar que ya tienen órdenes en Finanzas (11 nov 2026): se ven con esas órdenes, que vienen del Excel de gestión. Es una foto: lo
+ * nuevo no llega hasta conectar Shopify o cargar otro Excel, por eso los periodos cuentan hacia atrás desde el último día con órdenes.
+ */
+function AvisoDatosFinanzas({ nombres, hasta, origen }: { nombres: string[]; hasta: string; origen: string | null }) {
+  return (
+    <p role="note" className="m-0 rounded-lg border border-primario/30 bg-primario-suave px-4 py-3 text-sm text-foreground">
+      <b>
+        {nombres.join(", ")} {nombres.length === 1 ? "muestra" : "muestran"} las órdenes que cargó Finanzas{origen ? ` (${origen})` : ""}, hasta el {formatearFecha(hasta)}.
+      </b>{" "}
+      Es una foto: lo nuevo llega al conectar Shopify o con otro Excel. Los periodos cuentan hacia atrás desde ese día. La zona (Ciudad o Interior) sale de las
+      etiquetas de la orden.
+    </p>
+  );
+}
+
+function AvisoSinConectar({ sinConectar }: { sinConectar: Tienda[] }) {
   const nombres = sinConectar.map((t) => t.nombre).join(", ");
   return (
     <p role="note" className="m-0 rounded-lg border border-warning/40 bg-warning-soft px-4 py-3 text-sm text-foreground">

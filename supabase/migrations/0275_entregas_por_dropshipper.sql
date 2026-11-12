@@ -1,4 +1,4 @@
--- 0274 · Quién vende cada producto en Dropi: pedidos ENTREGADOS por dropshipper (12 nov 2026, pedido de Alcides).
+-- 0275 · Quién vende cada producto en Dropi: pedidos ENTREGADOS por dropshipper (12 nov 2026, pedido de Alcides).
 --
 -- La ficha de una publicación de Gestión de IDs Dropi muestra, dentro de «Ventas del producto en Dropi», cómo se reparten las ventas
 -- concretadas entre los usuarios de Dropi: solo los pedidos con estado ENTREGADO (no los que solo salieron ni los que van en camino).
@@ -7,7 +7,7 @@
 -- vinculado, sale solo con su usuario y su tienda (`dropshipper_id` null).
 --
 -- La fecha es la del pedido (en hora de Panamá, como la guarda `crm_sincronizar_ordenes`). Solo lee; se puede correr dos veces.
--- Reversa: supabase/rollbacks/0274_rollback.sql.
+-- Reversa: supabase/rollbacks/0275_rollback.sql.
 
 create index if not exists crm_ordenes_items_producto on crm_ordenes_items (producto_id);
 

@@ -1,6 +1,6 @@
 /**
  * Quién vende un producto en Dropi (12 nov 2026, pedido de Alcides): los pedidos ENTREGADOS de sus IDs de Dropi repartidos por dropshipper.
- * Las filas salen de `crm_entregas_por_producto` (migración 0274); aquí solo se eligen las del periodo y se calcula la parte de cada uno.
+ * Las filas salen de `crm_entregas_por_producto` (migración 0275); aquí solo se eligen las del periodo y se calcula la parte de cada uno.
  */
 
 export type PeriodoEntregas = "30" | "90" | "total";

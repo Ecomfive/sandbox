@@ -6,7 +6,10 @@ import { requireModulo } from "@/lib/auth";
 import { formatearTiempoRelativo } from "@/lib/formato";
 import { getPaisActual } from "@/lib/pais";
 import { createServiceClient } from "@/lib/supabase/server";
+import { esAdministrador } from "@/lib/permisos/acceso";
 import { cargarTiendas, type Tienda } from "@/lib/tienda/datos";
+import { appDeTienda } from "@/lib/tienda/shopify-app";
+import { ConectarTienda } from "./conectar-tienda";
 
 export const metadata = { title: "Tiendas Shopify" };
 
@@ -23,10 +26,12 @@ const hace = (iso: string | null) => (iso ? formatearTiempoRelativo(iso) : "—"
 /**
  * Gestión de tienda › Tiendas (3 nov 2026): las tiendas de Shopify del país y si sus pedidos están llegando bien (el último aviso de Shopify, la
  * revisión cada 10 minutos y la conciliación con Shopify), como la pantalla de conexiones de Mi Reto Digital. Se conectan de una en una, empezando
- * por Kenku, y siempre solo de lectura. Conectar llega en la etapa 2: aquí se explica cómo será.
+ * por Kenku, y siempre solo de lectura. Desde el 12 nov 2026 un administrador la conecta aquí («Conectar») con la app de la tienda en el Dev Dashboard de
+ * Shopify, cuyas claves están en Vercel (src/lib/tienda/shopify-app.ts).
  */
 export default async function TiendasPage() {
-  await requireModulo("tienda-tiendas");
+  const usuario = await requireModulo("tienda-tiendas");
+  const admin = esAdministrador(usuario) && !usuario.modulosSoloLectura.includes("tienda-tiendas");
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
   const { tiendas, faltaMigracion } = await cargarTiendas(supabase, pais.id);
@@ -50,6 +55,7 @@ export default async function TiendasPage() {
                 <th scope="col" className={claseThLista}>Revisión cada 10 min</th>
                 <th scope="col" className={claseThLista}>Conciliación</th>
                 <th scope="col" className={claseThLista}>Permiso</th>
+                {admin && <th scope="col" className={claseThLista}>Conexión</th>}
               </tr>
             </thead>
             <tbody>
@@ -82,6 +88,15 @@ export default async function TiendasPage() {
                   <td className={claseTdLista}>
                     <Pastilla>Solo lectura</Pastilla>
                   </td>
+                  {admin && (
+                    <td className={claseTdLista}>
+                      {appDeTienda(t.nombre) ? (
+                        <ConectarTienda tiendaId={t.id} conectada={t.estado === "conectada"} />
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Faltan sus claves en Vercel</span>
+                      )}
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -96,23 +111,30 @@ export default async function TiendasPage() {
           </h2>
           <ol className="m-0 flex list-decimal flex-col gap-2.5 pl-5 text-sm leading-relaxed">
             <li>
-              <b>En el admin de Shopify de la tienda</b> se crea una app propia «Ecomfive sistema» solo con permisos de lectura.
+              <b>En el Dev Dashboard de Shopify</b> (dev.shopify.com, la misma organización de la tienda) se crea la app «Ecomfive Sistema (solo lectura)» con
+              read_orders, read_customers, read_products y read_fulfillments, con acceso a los datos protegidos de clientes, y se instala en la tienda.
             </li>
             <li>
-              <b>La clave se guarda en el sistema</b>, nunca en un chat. Antes de guardarla se prueba con una lectura pequeña: si no responde bien, no se guarda.
+              <b>Sus claves van en Vercel</b>, nunca en un chat: SHOPIFY_KENKU_CLIENT_ID, SHOPIFY_KENKU_CLIENT_SECRET y SHOPIFY_KENKU_DOMINIO (para otra tienda,
+              su nombre en lugar de KENKU). Luego, «Redeploy».
+            </li>
+            <li>
+              <b>Un administrador pulsa «Conectar»</b>: se prueba el acceso (si la app puede escribir en Shopify, no se conecta) y se piden a Shopify los avisos de
+              pedidos.
             </li>
             <li>
               <b>Se traen los pedidos y productos de antes</b>, sin tocar nada en Shopify.
             </li>
             <li>
-              <b>Se activan los avisos de Shopify</b>: cada pedido nuevo o cambio llega al instante, y cada 10 minutos se revisa por si se perdió alguno.
+              <b>Se activan los avisos de Shopify</b>: cada pedido nuevo o cambio llega al instante. Al abrir Pedidos o el Dashboard, si pasaron más de 10
+              minutos desde la última revisión, se revisa Shopify por si se perdió alguno (y dos veces al día, solo).
             </li>
             <li>
               <b>Unos días de prueba</b>: la conciliación compara los pedidos del sistema con los de Shopify hasta que coincidan siempre. Recién ahí se pasa a la
               siguiente tienda.
             </li>
           </ol>
-          <p className="m-0 text-xs text-muted-foreground">Primero Kenku (Panamá). Conectar se habilita en la siguiente etapa.</p>
+          <p className="m-0 text-xs text-muted-foreground">Primero Kenku (Panamá). Al caer un pedido nuevo, a quien tenga Pedidos de tienda le sale un aviso.</p>
         </section>
         <div className="flex flex-col gap-4">
           <section aria-labelledby="t-lee" className="flex flex-col gap-2 rounded-2xl border border-border bg-card p-5">
