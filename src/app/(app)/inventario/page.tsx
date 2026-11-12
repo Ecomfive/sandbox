@@ -84,6 +84,9 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
   const plataformas = await leerStockPlataformas(supabase, pais.id);
 
   // Un producto con variantes es una fila que se despliega con sus variantes, y suma sus cifras (el stock se lleva en cada variante). Sin variantes a la vista, sale solo si le viene algo en camino (una compra hecha al producto general) o si una plataforma lo tiene publicado así.
+  // Los productos con el stock general pendiente de repartir entre sus variantes (migración 0273; sin ella, ninguno).
+  const { data: filasPendientes } = await supabase.from("skus_maestros").select("id").eq("reparto_pendiente", true);
+  const repartoPendiente = new Set(((filasPendientes ?? []) as { id: string }[]).map((f) => f.id));
   const hijaDe = new Map(((hijas.data ?? []) as { id: string; padre_id: string; opciones: Record<string, string> | null }[]).map((h) => [h.id, h]));
   const conHijas = new Set([...hijaDe.values()].map((h) => h.padre_id));
   const todasLasFilas: FilaStock[] = ((resumen.data ?? []) as Record<string, unknown>[]).filter((r) => !conVariantes.has(String(r.sku_maestro_id)) || conHijas.has(String(r.sku_maestro_id)) || Number(r.en_camino) > 0 || !!plataformas?.porProducto.has(String(r.sku_maestro_id))).map((r) => ({
@@ -109,6 +112,7 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
     plataformas: plataformas?.porProducto.get(String(r.sku_maestro_id)) ?? null,
     porBodega: porBodegaPorSku.get(String(r.sku_maestro_id)) ?? [],
     padreId: hijaDe.get(String(r.sku_maestro_id))?.padre_id ?? null,
+    repartoPendiente: repartoPendiente.has(String(r.sku_maestro_id)) || repartoPendiente.has(hijaDe.get(String(r.sku_maestro_id))?.padre_id ?? ""),
     opciones: Object.values(hijaDe.get(String(r.sku_maestro_id))?.opciones ?? {}).join(" / "),
     variantes: [],
   }));

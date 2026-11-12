@@ -10,6 +10,7 @@ import { CodigoBarrasProducto } from "./codigo-barras-producto";
 import type { FilaProducto } from "./def-producto";
 import { FotoVariante, MiniaturaVariante } from "./foto-variante";
 import { NombreProducto } from "./nombre-producto";
+import { AvisoRepartoEnVariante, RepartoStock } from "./reparto-stock";
 import { SkuProducto } from "./sku-producto";
 
 const MAX_OPCIONES = 3;
@@ -209,6 +210,11 @@ export function VariantesProducto({ producto, puedeEscribir, alAbrir }: { produc
               .join(" · ")}
           </p>
         )}
+        {producto.padre.repartoPendiente && (
+          <div className="mt-2">
+            <AvisoRepartoEnVariante padre={producto.padre} alAbrir={alAbrir} />
+          </div>
+        )}
       </div>
     );
   }
@@ -229,8 +235,9 @@ export function VariantesProducto({ producto, puedeEscribir, alAbrir }: { produc
       ) : (
         <>
           <p className="m-0 text-xs text-muted-foreground">
-            {producto.opcionesVariantes.map((o) => `${o.nombre}: ${o.valores.join(", ")}`).join(" · ")} — el stock se lleva en cada variante.
+            {producto.opcionesVariantes.map((o) => `${o.nombre}: ${o.valores.join(", ")}`).join(" · ")} — {producto.repartoPendiente ? "el stock está como general, todavía sin repartir." : "el stock se lleva en cada variante."}
           </p>
+          <RepartoStock id={producto.id} codigo={producto.codigo} pendiente={!!producto.repartoPendiente} puedeEscribir={puedeEscribir} />
           <ul className="m-0 flex list-none flex-col gap-1 p-0 text-sm">
             {producto.variantes.map((v) => {
               const esta = abierta === v.id;
@@ -248,7 +255,15 @@ export function VariantesProducto({ producto, puedeEscribir, alAbrir }: { produc
                     >
                       <MiniaturaVariante foto={foto} nombre={v.nombre} />
                       <span className="flex min-w-0 flex-col">
-                        <span className="truncate font-medium">{textoOpciones(v.opciones) || v.nombre}</span>
+                        <span className="flex items-center gap-1.5 truncate font-medium">
+                          {textoOpciones(v.opciones) || v.nombre}
+                          {producto.repartoPendiente && (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-normal text-muted-foreground">
+                              <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-warning" />
+                              Sin repartir
+                            </span>
+                          )}
+                        </span>
                         <span className="truncate text-xs text-muted-foreground">{v.codigo}</span>
                       </span>
                     </button>
