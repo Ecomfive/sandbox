@@ -15,9 +15,16 @@ import { CodigosProducto } from "@/components/ui/codigos-producto";
 import { agruparRemisiones, type EstadoRemision, type LineaEnviada, type RemisionAgrupada } from "@/lib/wms/remision";
 import { recibirEnvioDropi } from "../stock-actions";
 import { PedirCorreccion } from "./correcciones";
+import { AgregarAremision } from "./agregar-a-remision";
+import type { StockPorBodega } from "./nueva-remision";
+import type { OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
 
 /** Un producto enviado: una línea de una remisión, con su foto y el motivo si llegó distinto. */
 export interface FilaEnvio extends LineaEnviada {
+  /** La bodega de la que salió (para saber cuánto hay al agregar productos). */
+  origenId: string;
+  /** El producto (id de `skus_maestros`). */
+  skuId: string;
   codigo: string;
   nombre: string;
   foto: string | null;
@@ -123,12 +130,16 @@ function VerPapel({ r, grande = false }: { r: RemisionAgrupada; grande?: boolean
 /** La ficha de una remisión: sus datos, el papel y cada producto enviado, con lo que llegó (ahí se confirma). */
 function FichaRemision({
   r,
+  productos,
+  stock,
   puedeEscribir,
   codigoPais,
   conPendiente,
   resueltas,
 }: {
   r: RemisionAgrupada<FilaEnvio>;
+  productos: OpcionSkuMaestro[];
+  stock: StockPorBodega;
   puedeEscribir: boolean;
   codigoPais: string;
   conPendiente: Set<string>;
@@ -230,6 +241,17 @@ function FichaRemision({
           </tbody>
         </table>
       </ContenedorTabla>
+      {/* Agregar productos (12 nov 2026, pedido de Hernán): solo mientras ninguna línea esté recibida y haya una en camino. */}
+      {puedeEscribir && r.remisionId && !r.lineas.some((l) => l.estado === "recibido") && r.lineas.some((l) => l.estado === "en_camino") && r.lineas[0] && (
+        <AgregarAremision
+          remisionId={r.remisionId}
+          numero={r.numero}
+          origenId={r.lineas[0].origenId}
+          productos={productos}
+          stock={stock}
+          yaEstan={r.lineas.filter((l) => l.estado !== "anulado").map((l) => l.skuId)}
+        />
+      )}
     </div>
   );
 }
@@ -240,12 +262,17 @@ function FichaRemision({
  */
 export function ListaEnvios({
   filas,
+  productos,
+  stock,
   puedeEscribir,
   codigoPais,
   conPendiente,
   resueltas,
 }: {
   filas: FilaEnvio[];
+  /** Los productos que se pueden agregar a una remisión y cuánto hay de cada uno en cada bodega. */
+  productos: OpcionSkuMaestro[];
+  stock: StockPorBodega;
   puedeEscribir: boolean;
   codigoPais: string;
   /** Las líneas con una corrección esperando autorización. */
@@ -320,7 +347,7 @@ export function ListaEnvios({
         </table>
       </ContenedorTabla>
       <Ventana abierto={!!elegida} alCerrar={() => setAbierta(null)} titulo={elegida?.numero ?? ""} lado="derecha" ancho="lg">
-        {elegida && <FichaRemision r={elegida} puedeEscribir={puedeEscribir} codigoPais={codigoPais} conPendiente={pendientes} resueltas={resueltas} />}
+        {elegida && <FichaRemision r={elegida} productos={productos} stock={stock} puedeEscribir={puedeEscribir} codigoPais={codigoPais} conPendiente={pendientes} resueltas={resueltas} />}
       </Ventana>
     </div>
   );

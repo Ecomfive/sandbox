@@ -31,7 +31,7 @@ export default async function RemisionesPage() {
   const { data, error } = await supabase
     .from("wms_envios_dropi")
     .select(
-      "id, enviado_en, enviada, recibida, estado, referencia, motivo_diferencia, recibido_en, remision_id, wms_remisiones(notas), skus_maestros(codigo, nombre, foto_url, numero, codigo_barras), wms_bodegas!wms_envios_dropi_bodega_origen_id_fkey!inner(nombre, pais_id), destino:wms_bodegas!wms_envios_dropi_bodega_dropi_id_fkey(nombre)",
+      "id, enviado_en, enviada, recibida, estado, referencia, motivo_diferencia, recibido_en, remision_id, bodega_origen_id, sku_maestro_id, wms_remisiones(notas), skus_maestros(codigo, nombre, foto_url, numero, codigo_barras), wms_bodegas!wms_envios_dropi_bodega_origen_id_fkey!inner(nombre, pais_id), destino:wms_bodegas!wms_envios_dropi_bodega_dropi_id_fkey(nombre)",
     )
     .eq("wms_bodegas.pais_id", pais.id)
     .order("estado")
@@ -51,6 +51,8 @@ export default async function RemisionesPage() {
       foto: sku?.foto_url ?? null,
       numero: sku?.numero ?? null,
       barras: sku?.codigo_barras ?? null,
+      origenId: e.bodega_origen_id as string,
+      skuId: e.sku_maestro_id as string,
       desde: uno(e.wms_bodegas as { nombre: string } | { nombre: string }[] | null)?.nombre ?? "—",
       hacia: uno(e.destino as { nombre: string } | { nombre: string }[] | null)?.nombre ?? "—",
       enviadoEn: e.enviado_en as string,
@@ -162,7 +164,7 @@ export default async function RemisionesPage() {
           {/remision_id/.test(error.message) ? "Falta correr la migración 0233 en la base." : "No se pudieron cargar las remisiones."}
         </p>
       ) : (
-        <ListaEnvios filas={filas} puedeEscribir={puedeEscribir} codigoPais={pais.codigo} conPendiente={[...conPendiente]} resueltas={Object.fromEntries(ultimas)} />
+        <ListaEnvios filas={filas} productos={opciones} stock={stock} puedeEscribir={puedeEscribir} codigoPais={pais.codigo} conPendiente={[...conPendiente]} resueltas={Object.fromEntries(ultimas)} />
       )}
     </Pagina>
   );
