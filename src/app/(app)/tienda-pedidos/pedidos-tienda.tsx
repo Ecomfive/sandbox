@@ -6,7 +6,8 @@ import type { IconoComp } from "@/components/tabla/botones-vista";
 import { TablaDatos, type ColumnaTabla } from "@/components/tabla/tabla-datos";
 import { Indicador, Pastilla, TableroIndicadores } from "@/components/panel/piezas-panel";
 import { formatearMoneda } from "@/lib/formato";
-import { AlertaIcon, CalendarioIcon, CerrarIcon, CheckIcon, DeshacerIcon, EnvioIcon, EtiquetaIcon, InventarioIcon, MargenIcon, PedidoIcon, ProductoIcon, TiendaIcon } from "@/lib/nav-icons";
+import { Tooltip } from "@/components/ui/tooltip";
+import { AlertaIcon, CalendarioIcon, CerrarIcon, ChatIcon, CheckIcon, DeshacerIcon, EnvioIcon, EtiquetaIcon, InventarioIcon, MargenIcon, PedidoIcon, ProductoIcon, TiendaIcon } from "@/lib/nav-icons";
 import { SIN_VALOR, type DefTabla } from "@/lib/tabla/motor";
 import type { NombreFilas } from "@/lib/tabla/pie";
 import { ESTADOS_PEDIDO, diaPanama, resumirPedidos, type EstadoPedido } from "@/lib/tienda/resumen";
@@ -17,6 +18,7 @@ const ESTADO = new Map(ESTADOS_PEDIDO.map((e) => [e.id, e]));
 const NOMBRE: NombreFilas = { singular: "pedido", plural: "pedidos" };
 const ICONOS: Record<string, IconoComp> = {
   estado: PedidoIcon,
+  entrada: ChatIcon,
   tienda: TiendaIcon,
   zona: EnvioIcon,
   corregimiento: EnvioIcon,
@@ -27,6 +29,30 @@ const ICONOS: Record<string, IconoComp> = {
   fecha: CalendarioIcon,
   total: MargenIcon,
 };
+/** Por dónde entró el pedido, como en Mi Reto Digital: el ícono va antes del número. */
+const ENTRADA = {
+  bot: { texto: "Lo tomó el bot por WhatsApp", icono: ChatIcon, clase: "text-success" },
+  shopify: { texto: "Entró por Shopify", icono: TiendaIcon, clase: "text-muted-foreground" },
+} as const;
+
+function NumeroPedido({ p }: { p: PedidoFila }) {
+  const e = p.entrada ? ENTRADA[p.entrada] : null;
+  return (
+    <span className="flex items-center gap-1.5 whitespace-nowrap">
+      {e ? (
+        <Tooltip texto={e.texto}>
+          <span tabIndex={0} aria-label={e.texto} className="inline-flex">
+            <e.icono className={`h-4 w-4 ${e.clase}`} />
+          </span>
+        </Tooltip>
+      ) : (
+        <span aria-hidden="true" className="inline-block w-4" />
+      )}
+      {p.numero}
+    </span>
+  );
+}
+
 const RIESGO: Record<string, { etiqueta: string; tono: "aviso" | "peligro" }> = { medio: { etiqueta: "Medio", tono: "aviso" }, alto: { etiqueta: "Alto", tono: "peligro" } };
 
 function cuando(iso: string, sinHora = false): string {
@@ -48,7 +74,7 @@ interface Contexto {
 
 /** Las columnas, como en Mi Reto Digital: se ocultan y se reordenan desde «Columnas». */
 const COLUMNAS: ColumnaTabla<PedidoFila, Contexto>[] = [
-  { id: "pedido", label: "Pedido", ocultable: false, clase: "font-semibold text-primario whitespace-nowrap", render: (p) => p.numero },
+  { id: "pedido", label: "Pedido", ocultable: false, clase: "font-semibold text-primario whitespace-nowrap", render: (p) => <NumeroPedido p={p} /> },
   { id: "tienda", label: "Tienda", ocultable: true, clase: "whitespace-nowrap", render: (p, c) => c.tiendas[p.tiendaId] ?? "—" },
   { id: "fecha", label: "Fecha", ocultable: true, clase: "text-muted-foreground whitespace-nowrap", render: (p) => cuando(p.creado, p.sinHora) },
   { id: "cliente", label: "Cliente", ocultable: true, render: (p) => <span className="block max-w-[14rem] truncate">{p.cliente ?? "—"}</span> },
@@ -91,12 +117,14 @@ const COLUMNAS: ColumnaTabla<PedidoFila, Contexto>[] = [
     id: "direccion",
     label: "Dirección",
     ocultable: true,
+    // Una sola línea, como una lista: la zona y el lugar, y la dirección en gris; entera al pasar el cursor.
     render: (p) => {
       const lugar = [p.provincia, p.ciudad].filter(Boolean).join(", ");
+      const todo = [lugar, p.direccion].filter(Boolean).join(" · ");
       return (
-        <span className="block max-w-[18rem]" title={[lugar, p.direccion].filter(Boolean).join(" · ") || undefined}>
-          <span className="block truncate">{lugar || "—"}</span>
-          {p.direccion && <span className="block truncate text-xs text-muted-foreground">{p.direccion}</span>}
+        <span className="block max-w-[20rem] truncate" title={todo || undefined}>
+          {lugar || "—"}
+          {p.direccion && <span className="text-muted-foreground"> · {p.direccion}</span>}
         </span>
       );
     },
@@ -107,11 +135,11 @@ const COLUMNAS: ColumnaTabla<PedidoFila, Contexto>[] = [
     ocultable: true,
     render: (p) =>
       p.etiquetas?.length ? (
-        <span className="flex max-w-[16rem] flex-wrap gap-1" title={p.etiquetas.join(", ")}>
-          {p.etiquetas.slice(0, 3).map((e) => (
+        <span className="flex max-w-[18rem] items-center gap-1 overflow-hidden whitespace-nowrap" title={p.etiquetas.join(", ")}>
+          {p.etiquetas.slice(0, 2).map((e) => (
             <Pastilla key={e}>{e}</Pastilla>
           ))}
-          {p.etiquetas.length > 3 && <span className="text-xs text-muted-foreground">+{p.etiquetas.length - 3}</span>}
+          {p.etiquetas.length > 2 && <span className="shrink-0 text-xs text-muted-foreground">+{p.etiquetas.length - 2}</span>}
         </span>
       ) : (
         <span className="text-muted-foreground">—</span>
@@ -145,6 +173,18 @@ function defPedidos(tiendas: Record<string, string>): DefTabla<PedidoFila> {
       ...(Object.keys(tiendas).length > 1
         ? [{ id: "tienda", etiqueta: "Tienda", tipo: "seleccion" as const, valores: (p: PedidoFila) => [p.tiendaId], formatearValor: (v: string) => tiendas[v] ?? v, agrupable: true }]
         : []),
+      {
+        id: "entrada",
+        etiqueta: "Entró por",
+        tipo: "seleccion",
+        valores: (p) => [p.entrada ?? "excel"],
+        opciones: () => [
+          { valor: "shopify", etiqueta: "Shopify" },
+          { valor: "bot", etiqueta: "El bot por WhatsApp" },
+          { valor: "excel", etiqueta: "Excel de Finanzas" },
+        ],
+        agrupable: true,
+      },
       { id: "zona", etiqueta: "Zona", tipo: "seleccion", valores: (p) => [p.provincia ?? SIN_VALOR], etiquetaSinValor: "Sin zona", agrupable: true },
       { id: "corregimiento", etiqueta: "Lugar", tipo: "seleccion", valores: (p) => [p.ciudad ?? SIN_VALOR], etiquetaSinValor: "Sin lugar", agrupable: true },
       { id: "producto", etiqueta: "Producto", tipo: "seleccion", valores: (p) => (p.productosLista?.length ? p.productosLista : [SIN_VALOR]), etiquetaSinValor: "Sin producto" },
@@ -167,6 +207,7 @@ function defPedidos(tiendas: Record<string, string>): DefTabla<PedidoFila> {
     total: (p) => p.total,
     csvAntes: [
       { etiqueta: "Pedido", valor: (p) => p.numero },
+      { etiqueta: "Entró por", valor: (p) => (p.entrada ? ENTRADA[p.entrada].texto : "Excel de Finanzas") },
       { etiqueta: "Tienda", valor: (p) => tiendas[p.tiendaId] ?? "" },
       { etiqueta: "Fecha y hora", valor: (p) => cuando(p.creado, p.sinHora) },
       { etiqueta: "Cliente", valor: (p) => p.cliente },
@@ -270,6 +311,8 @@ export function PedidosTienda({
         }}
         ariaLabel="Pedidos"
         anchoMinimo="64rem"
+        aspecto="lista"
+        asaColumnas
         vacio={conectada ? "No hay pedidos en este periodo." : "Los pedidos aparecen aquí al conectar la tienda a Shopify."}
       />
 

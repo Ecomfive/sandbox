@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { estadoDesdeFinanzas, momentoDeFecha, nombreComparable, vendidosDeFinanzas, zonaDeEtiquetas } from "./ordenes-finanzas";
+import { entradaDeOrden, estadoDesdeFinanzas, momentoDeFecha, nombreComparable, vendidosDeFinanzas, zonaDeEtiquetas } from "./ordenes-finanzas";
 import { diaPanama } from "./resumen";
 
 test("el estado del Excel de Finanzas pasa al de la pantalla, igual que el ciclo de Finanzas", () => {
@@ -54,4 +54,12 @@ test("lo vendido: por producto vinculado o por nombre; sin cancelados ni servici
     ],
   );
   assert.equal(v[0].porcentaje, 80);
+});
+
+test("por dónde entró: el bot (etiqueta «chatbot»), Shopify o el Excel", () => {
+  assert.equal(entradaDeOrden("shopify", "CIUDAD, chatbot, Confirmada"), "bot");
+  assert.equal(entradaDeOrden("shopify", "Chatbot"), "bot");
+  assert.equal(entradaDeOrden("shopify", "easysell_cod_form, CIUDAD"), "shopify");
+  assert.equal(entradaDeOrden("shopify", null), "shopify");
+  assert.equal(entradaDeOrden("GESTION_OCEANS_PANAMA.xlsx", "chatbot"), null);
 });

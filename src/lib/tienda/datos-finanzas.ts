@@ -6,7 +6,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { cargarPedidos, inicioPeriodo, type PedidoFila, type Tienda } from "./datos";
 import { riesgoCliente } from "@/lib/ventas/operacion";
-import { estadoDesdeFinanzas, etiquetasDe, momentoDeFecha, nombreComparable, textoProductos, zonaDeEtiquetas, type LineaFinanzas } from "./ordenes-finanzas";
+import { entradaDeOrden, estadoDesdeFinanzas, etiquetasDe, momentoDeFecha, nombreComparable, textoProductos, zonaDeEtiquetas, type LineaFinanzas } from "./ordenes-finanzas";
 
 /** Cuántos pedidos tiene el cliente y su riesgo («medio» o «alto»; null si no hay). Sin historial (sin teléfono), null en los dos. */
 function datosDelCliente(h: { total: number; entregadas: number; devueltas: number; canceladas: number } | undefined): { pedidosCliente: number | null; riesgo: "medio" | "alto" | null } {
@@ -74,6 +74,7 @@ interface FilaOrden {
   moneda: string | null;
   transportista: string | null;
   guia: string | null;
+  origen: string | null;
   /** Sin la migración 0276 no viene. */
   creado_origen?: string | null;
   ven_ordenes_clientes: ClienteFila | ClienteFila[] | null;
@@ -129,7 +130,7 @@ export async function cargarPedidosFinanzas(
   if (!tiendaDeUnidad.size) return { pedidos: [], lineas: [] };
   const unidades = [...tiendaDeUnidad.keys()];
   // Con la migración 0276, también la hora de Shopify (un texto armado: por eso se declara como `string`).
-  const columnas: string = `id, unidad_id, numero, fecha, estado_entrega, etiquetas, total, moneda, transportista, guia, ${(await hayHoraDeShopify(supabase)) ? "creado_origen, " : ""}ven_ordenes_clientes(nombre, corregimiento, direccion, telefono_clave)`;
+  const columnas: string = `id, unidad_id, numero, fecha, estado_entrega, etiquetas, total, moneda, transportista, guia, origen, ${(await hayHoraDeShopify(supabase)) ? "creado_origen, " : ""}ven_ordenes_clientes(nombre, corregimiento, direccion, telefono_clave)`;
   const [ordenes, lineas] = await Promise.all([
     traerTodasLasFilas<FilaOrden>(
       (d, h) =>
@@ -166,6 +167,7 @@ export async function cargarPedidosFinanzas(
     productosLista: productosDe.get(o.id) ?? [],
     direccion: clienteDe(o)?.direccion ?? null,
     etiquetas: etiquetasDe(o.etiquetas),
+    entrada: entradaDeOrden(o.origen, o.etiquetas),
     ...datosDelCliente(historial.get(clienteDe(o)?.telefono_clave ?? "")),
     cliente: clienteDe(o)?.nombre ?? null,
     provincia: zonaDeEtiquetas(o.etiquetas),

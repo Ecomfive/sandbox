@@ -84,6 +84,8 @@ export interface PedidoFila extends PedidoResumen {
   etiquetas?: string[];
   /** Cuántos pedidos tiene el cliente en total (por su teléfono), contando este; null sin teléfono. */
   pedidosCliente?: number | null;
+  /** Por dónde entró (como en Mi Reto Digital): «bot» si lo tomó el bot por WhatsApp (etiqueta «chatbot»), «shopify» si entró por la tienda; null si vino del Excel. */
+  entrada?: "bot" | "shopify" | null;
   /** El riesgo del cliente por su historial (la misma regla de Finanzas): «medio» o «alto»; null si no hay riesgo o no se sabe. */
   riesgo?: "medio" | "alto" | null;
   tiendaId: string;

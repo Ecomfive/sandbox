@@ -34,6 +34,12 @@ export function etiquetasDe(etiquetas: string | null): string[] {
     .filter(Boolean);
 }
 
+/** Por dónde entró una orden: «bot» si la tomó el bot por WhatsApp (etiqueta «chatbot», como la usa Mi Reto Digital), «shopify» si entró por la tienda; null si no vino de Shopify (el Excel). */
+export function entradaDeOrden(origen: string | null | undefined, etiquetas: string | null): "bot" | "shopify" | null {
+  if (origen !== "shopify") return null;
+  return etiquetasDe(etiquetas).some((e) => e.toLowerCase() === "chatbot") ? "bot" : "shopify";
+}
+
 /** La zona que dicen las etiquetas: «CIUDAD» o «INTERIOR» (también «INTERIOR/SERVIENTREGA»). Null si no dicen. */
 export function zonaDeEtiquetas(etiquetas: string | null): string | null {
   for (const e of etiquetasDe(etiquetas)) {
