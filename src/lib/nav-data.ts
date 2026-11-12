@@ -120,6 +120,7 @@ const AREAS: NavSection[] = [
       { label: "Gestión de IDs Dunamixfy", href: "/publicaciones-dunamixfy", frente: "proveeduria" },
       // Gestión de tienda (3 nov 2026): las tiendas de Shopify (Kenku primero), conectadas solo de lectura.
       { label: "Pedidos de tienda", href: "/tienda-pedidos", frente: "tienda" },
+      { label: "Confirmación", href: "/tienda-confirmacion", frente: "tienda" },
       { label: "Productos de Shopify", href: "/tienda-productos", frente: "tienda" },
       { label: "Tiendas Shopify", href: "/tienda-tiendas", frente: "tienda" },
       { label: "Alertas de inventario", href: "/alertas", dropi: true, frente: "fulfillment" },

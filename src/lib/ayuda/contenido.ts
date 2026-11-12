@@ -1777,6 +1777,24 @@ export const GUIAS: GuiaModulo[] = [
     ],
   },
   {
+    modulo: "tienda-confirmacion",
+    titulo: "Confirmación",
+    ruta: "/tienda-confirmacion",
+    resumen: "Los pedidos de tienda por confirmar, los que esperan respuesta y cómo va la confirmación contra la meta.",
+    secciones: [
+      {
+        titulo: "Uso",
+        pasos: [
+          "Está en Operación, en el frente Gestión de tienda, debajo de Pedidos de tienda. Arriba eliges una tienda (o todas) y el periodo.",
+          "Las tarjetas: Por confirmar (todos los pedidos sin confirmar, con cuánto lleva el más viejo), Esperando respuesta (sin confirmar pero con una etiqueta de gestión como «Pendiente», «Modificar Dirección», «Modificar Pedido» o «POR CONFIRMAR DATOS»), Programados, Confirmados y Cancelados (estos dos, del periodo). Tocar una tarjeta filtra la lista; tocarla otra vez vuelve a todo lo sin confirmar.",
+          "Debajo, la meta de confirmación: el % confirmado del periodo contra la meta de 85 %, con lo pendiente y lo cancelado (por tienda si miras varias).",
+          "La lista muestra primero lo más viejo, con la columna Espera (cuánto lleva sin confirmar) y Confirmación. Tiene la misma barra de Pedidos (buscar, filtros, columnas y Descargar), y al tocar un pedido se abre su ficha a un lado, con sus notas del equipo.",
+          "Es solo de lectura: un pedido se confirma o se cancela en Shopify con sus etiquetas («Confirmada», «Cancelado»), y aquí se ve al instante. Programados queda vacío por ahora: en Mi Reto Digital la fecha sale de la conversación de WhatsApp, y llegará cuando se conecte.",
+        ],
+      },
+    ],
+  },
+  {
     modulo: "tienda-productos",
     titulo: "Productos de Shopify",
     ruta: "/tienda-productos",
@@ -1987,6 +2005,7 @@ export const NOVEDADES: Novedad[] = [
   { fecha: "2026-11-12", titulo: "Gestión de IDs Dropi: tarjeta «Pareto de clientes»", texto: "Arriba, en el tablero, hay una tarjeta nueva: «Pareto de clientes». Dice cuántos clientes son el 20 % que más guías trae y qué parte de las guías hacen en los últimos 30 días, en el país de la barra. Al pulsarla se abre la lista de esos clientes, de más a menos guías, con su parte y el acumulado; ahí se elige el periodo (30 días, 3, 6 o 12 meses) y se puede ver también el 80 % restante. Son las mismas guías del Pareto de Dirección en el CRM. Si ya tenías las tarjetas ordenadas a tu gusto, la nueva aparece al final.", modulo: "publicaciones-dropi", href: "/publicaciones-dropi" },
   { fecha: "2026-11-12", titulo: "Ventas por plataforma en las fichas", texto: "En Costa Rica, la ficha de un producto (en Producto y en Gestión de IDs de Dropi, Drop, Effi y Dunamixfy) tiene un bloque nuevo, «Ventas por plataforma»: una fila por plataforma donde está publicado con sus netas de los últimos 30 días, sus netas en total y su stock allá, y la suma de todas. Cuenta también sus variantes. El detalle de Dropi (gráfica e IDs) sigue debajo.", modulo: "producto", href: "/producto" },
   { fecha: "2026-11-12", titulo: "Drop: los exclusivos de clientes cuentan como stock", texto: "Lo que Drop guarda aparte para un cliente («Producto exclusivo» en la ficha del producto en Drop) no sale en su «Inventario», pero es stock nuestro en la bodega de Drop. Desde la extensión «Ecomfive · Dropi» 0.7.2, «Actualizar Costa Rica» también lee los exclusivos de cada producto, y la fila «Drop (Boxfull)» de «Stock por bodega», el inventario de la ficha de Producto y Ventas Proveeduría los suman. En «En plataformas» se ve cuántas son exclusivas. Hay que recargar la extensión en chrome://extensions.", modulo: "inventario", href: "/inventario" },
+  { fecha: "2026-11-12", titulo: "Nueva pantalla: Confirmación de tienda", texto: "En Gestión de tienda, debajo de Pedidos de tienda, está Confirmación, como en Mi Reto Digital: las tarjetas Por confirmar (con cuánto lleva el más viejo), Esperando respuesta (con etiqueta de gestión como «Pendiente» o «Modificar Dirección»), Confirmados y Cancelados del periodo, la meta de confirmación (85 %) y la lista de lo sin confirmar, lo más viejo arriba, con la columna Espera. Es solo de lectura: se confirma en Shopify con las etiquetas. Programados llegará con WhatsApp. Hace falta correr la migración 0278.", modulo: "tienda-confirmacion", href: "/tienda-confirmacion" },
   { fecha: "2026-11-12", titulo: "Pedidos de tienda: notas del equipo", texto: "La ficha de cada pedido tiene ahora «Notas del equipo», como en Mi Reto Digital: se escribe una nota y queda con tu nombre y la hora, a la vista de todo el equipo que abra el pedido. Son internas: nunca se mandan a Shopify. Para escribir hace falta permiso de escritura en Pedidos de tienda; con solo lectura se ven.", modulo: "tienda-pedidos", href: "/tienda-pedidos" },
   { fecha: "2026-11-12", titulo: "Pedidos de tienda: ingresos, costos y margen", texto: "La ficha de cada pedido tiene ahora «Ingresos y costos», como en Mi Reto Digital: venta, costo del producto, fulfillment, flete y margen (con su % de la venta). El costo de cada producto es su costo promedio de compra, el mismo de la ficha del producto (lo invertido ÷ las unidades compradas, sin compras descartadas): el de las compras del país y, si en el país no hay, el de todos los países; al pasar el cursor se ve cuál se usó. Si a algún producto le falta el vínculo o el costo, lo dice, y el margen se calcula con lo que se sabe. En Productos de la ficha hay una columna Costo, y en el Dashboard, Productos vendidos suma Costo y Margen. En la lista, el número del pedido lleva el logo de Shopify o el de WhatsApp (si lo tomó el bot).", modulo: "tienda-pedidos", href: "/tienda-pedidos" },
   { fecha: "2026-11-12", titulo: "Productos de Shopify: el SKU «N.º/CÓDIGO» ya se reconoce", texto: "Cuando el SKU de Shopify viene como «0007/ACEITE/BATANA/ROMERO» (N.º y código nuestro, como en Kenku), la sugerencia ahora es exacta. Con eso, «Confirmar las N con SKU o nombre igual» confirma todas juntas de una vez. Los pedidos que guardaron un SKU viejo del producto se unen por el nombre exacto del producto.", modulo: "tienda-productos", href: "/tienda-productos" },
