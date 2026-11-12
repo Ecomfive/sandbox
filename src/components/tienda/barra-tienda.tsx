@@ -76,7 +76,7 @@ export function BarraTienda({
  * de lectura. Nada si todas las tiendas que se miran ya están conectadas.
  */
 export function AvisoConexion({ tiendas, finanzas }: { tiendas: Tienda[]; finanzas?: FuenteFinanzas }) {
-  const conFinanzas = tiendas.filter((t) => finanzas?.unidadDe.has(t.id));
+  const conFinanzas = tiendas.filter((t) => finanzas?.unidadDe.has(t.id) && t.estado !== "conectada");
   const sinConectar = tiendas.filter((t) => t.estado !== "conectada" && !finanzas?.unidadDe.has(t.id));
   return (
     <>

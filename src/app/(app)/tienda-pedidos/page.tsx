@@ -5,7 +5,9 @@ import { requireModulo } from "@/lib/auth";
 import { getPaisActual } from "@/lib/pais";
 import { createServiceClient } from "@/lib/supabase/server";
 import { cargarTiendas, periodoElegido, tiendaElegida } from "@/lib/tienda/datos";
+import { after } from "next/server";
 import { pedidosDeTiendas } from "@/lib/tienda/datos-finanzas";
+import { revisarSiHaceFalta } from "@/lib/tienda/conectar-shopify";
 import { PedidosTienda } from "./pedidos-tienda";
 
 export const metadata = { title: "Pedidos de tienda" };
@@ -25,6 +27,8 @@ export default async function PedidosTiendaPage({ searchParams }: { searchParams
   const tienda = tiendaElegida(tiendas, sp.tienda);
   const periodo = periodoElegido(sp.periodo);
   const miradas = tienda ? [tienda] : tiendas;
+  // La revisión de Shopify (por si se perdió algún aviso), después de mostrar la página y como mucho cada 10 minutos.
+  after(() => revisarSiHaceFalta(createServiceClient(), tiendas));
   const ids = miradas.map((t) => t.id);
   // Las tiendas sin conectar muestran las órdenes que cargó Finanzas (11 nov 2026; ver src/lib/tienda/ordenes-finanzas.ts).
   const [{ pedidos, fuente }, sinVincular] = await Promise.all([
