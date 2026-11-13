@@ -94,7 +94,7 @@ export interface PedidoFila extends PedidoResumen {
   riesgo?: "bajo" | "medio" | "alto" | null;
   /** El día que pidió el cliente, leído de la nota del pedido en Shopify («para el jueves 19/11»); null si no hay (12 nov 2026). */
   programado?: Programado | null;
-  /** La entrega registrada en Monday (ciudad), si la hay: solo en Logística (12 nov 2026). */
+  /** La entrega registrada en Monday (ciudad) o SISCORE (interior), si la hay: en Logística (12 nov 2026) y, para los en camino, en Pedidos (13 nov 2026). */
   entrega?: EntregaMonday | null;
   tiendaId: string;
   numero: string;

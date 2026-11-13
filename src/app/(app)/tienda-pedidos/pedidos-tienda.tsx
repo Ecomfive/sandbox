@@ -12,6 +12,7 @@ import { SIN_VALOR, type DefTabla } from "@/lib/tabla/motor";
 import type { NombreFilas } from "@/lib/tabla/pie";
 import { ESTADOS_PEDIDO, diaPanama, resumirPedidos, type EstadoPedido } from "@/lib/tienda/resumen";
 import type { PedidoFila } from "@/lib/tienda/datos";
+import { etiquetaEntrega } from "@/lib/tienda/entregas-monday";
 import { FichaPedido } from "./ficha-pedido";
 import { pendientesWhatsapp } from "./chat-actions";
 import { pendientesPorPedido, type ChatPendiente } from "@/lib/tienda/chat-tienda";
@@ -149,7 +150,18 @@ export const COLUMNAS: ColumnaTabla<PedidoFila, Contexto>[] = [
     ocultable: true,
     render: (p) => {
       const e = ESTADO.get(p.estado)!;
-      return <Pastilla tono={e.tono}>{e.etiqueta}</Pastilla>;
+      // En camino: lo último que dice Monday (o SISCORE) del pedido, con el motivo al pasar el cursor.
+      const monday = p.estado === "en_camino" ? etiquetaEntrega(p.entrega) : null;
+      return (
+        <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+          <Pastilla tono={e.tono}>{e.etiqueta}</Pastilla>
+          {monday && (
+            <span className="max-w-[9rem] truncate text-xs font-medium text-primary" title={[monday, p.entrega?.repartidor, p.entrega?.causa].filter(Boolean).join(" · ")}>
+              {monday}
+            </span>
+          )}
+        </span>
+      );
     },
   },
   {
@@ -241,6 +253,15 @@ export function defPedidos(tiendas: Record<string, string>): DefTabla<PedidoFila
         ],
       },
       { id: "transportista", etiqueta: "Transportista", tipo: "seleccion", valores: (p) => [p.transportista ?? SIN_VALOR], etiquetaSinValor: "Sin transportista", agrupable: true },
+      // Lo que dice Monday (o SISCORE) de los que van en camino (13 nov 2026): para filtrar y contar los POSPUESTO, FALLIDO, RECOLECTADO, DESINTEGRADO.
+      {
+        id: "monday",
+        etiqueta: "Monday",
+        tipo: "seleccion",
+        valores: (p) => (p.estado === "en_camino" ? [etiquetaEntrega(p.entrega) ?? SIN_VALOR] : []),
+        etiquetaSinValor: "En camino sin registro",
+        agrupable: true,
+      },
       { id: "fecha", etiqueta: "Fecha", tipo: "fecha", valor: (p) => diaPanama(p.creado) },
       { id: "total", etiqueta: "Total", tipo: "numero", valor: (p) => p.total },
     ],
@@ -256,6 +277,8 @@ export function defPedidos(tiendas: Record<string, string>): DefTabla<PedidoFila
       { etiqueta: "Unidades", valor: (p) => p.unidades },
       { etiqueta: "Dirección", valor: (p) => p.direccion ?? "" },
       { etiqueta: "Guía", valor: (p) => p.guia ?? "" },
+      { etiqueta: "Monday / SISCORE", valor: (p) => (p.estado === "en_camino" ? (etiquetaEntrega(p.entrega) ?? "") : "") },
+      { etiqueta: "Motivo (Monday)", valor: (p) => (p.estado === "en_camino" ? (p.entrega?.causa ?? "") : "") },
     ],
     pdf: ["Pedido", "Fecha y hora", "Cliente", "Productos", "Total", "Estado", "Zona", "Lugar"],
   };

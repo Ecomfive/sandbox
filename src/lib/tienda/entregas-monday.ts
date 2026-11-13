@@ -21,6 +21,20 @@ export interface EntregaMonday {
   guia?: string | null;
   visitas?: number;
   novedad?: boolean;
+  /** Monday, tablero de devoluciones: lo que decidieron los asesores (DESINTEGRADO, PROCESADO, PENDIENTE). */
+  asesores?: string | null;
+}
+
+/**
+ * La etiqueta corta de la entrega para la lista de Pedidos (13 nov 2026, pedido de Hernán: un pedido «En camino» debe decir lo que dice Monday —
+ * POSPUESTO, FALLIDO, RECOLECTADO, DESINTEGRADO—). DESINTEGRADO de los asesores manda sobre el estado del repartidor; de interior, el estado de SISCORE.
+ */
+export function etiquetaEntrega(e: EntregaMonday | null | undefined): string | null {
+  if (!e) return null;
+  if (e.asesores && /DESINTEGRAD/i.test(e.asesores)) return "DESINTEGRADO";
+  const estado = (e.estado ?? "").replace(/\s+/g, " ").trim();
+  if (!estado) return null;
+  return e.fuente === "siscore" ? `Servientrega: ${estado}` : estado.toUpperCase();
 }
 
 /** La entrega más reciente de cada orden (por el día del reparto y la última actualización en Monday). */
@@ -51,7 +65,7 @@ export async function entregasDeOrdenes(supabase: SupabaseClient, ordenIds: stri
       const previa = mapa.get(d.orden_id);
       if (previa && previa.clave >= clave) continue;
       const causa = causaDespacho(d.causa_rechazo, d.estado_asesores, d.observaciones_asesores);
-      mapa.set(d.orden_id, { clave, grupo: d.estado_grupo, estado: d.estado, repartidor: d.courier, fecha, causa });
+      mapa.set(d.orden_id, { clave, grupo: d.estado_grupo, estado: d.estado, repartidor: d.courier, fecha, causa, asesores: d.estado_asesores ?? null });
     }
   }
   return new Map(

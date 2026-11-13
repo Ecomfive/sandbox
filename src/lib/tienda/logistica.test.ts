@@ -46,3 +46,15 @@ test("anulado por la etiqueta del equipo", () => {
   assert.equal(anuladoPorEtiqueta(["Carrito recuperado", "easysell-abandoned-checkout"]), false);
   assert.equal(anuladoPorEtiqueta(null), false);
 });
+
+test("etiqueta de Monday en Pedidos (13 nov 2026): el estado del repartidor; DESINTEGRADO de los asesores manda; de interior, SISCORE", async () => {
+  const { etiquetaEntrega } = await import("./entregas-monday");
+  const base = { grupo: "en_ruta" as const, repartidor: "JULY CALLE", fecha: null, causa: null };
+  assert.equal(etiquetaEntrega(null), null);
+  assert.equal(etiquetaEntrega({ ...base, estado: "pospuesto" }), "POSPUESTO");
+  assert.equal(etiquetaEntrega({ ...base, estado: "RECOLECTADO" }), "RECOLECTADO");
+  assert.equal(etiquetaEntrega({ ...base, estado: "POSPUESTO", asesores: "DESINTEGRADO" }), "DESINTEGRADO");
+  assert.equal(etiquetaEntrega({ ...base, estado: "FALLIDO", asesores: "PROCESADO" }), "FALLIDO");
+  assert.equal(etiquetaEntrega({ ...base, estado: "Impresion de guia", fuente: "siscore" }), "Servientrega: Impresion de guia");
+  assert.equal(etiquetaEntrega({ ...base, estado: null }), null);
+});

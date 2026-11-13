@@ -7,6 +7,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { cargarTiendas, periodoElegido, tiendaElegida } from "@/lib/tienda/datos";
 import { after } from "next/server";
 import { pedidosDeTiendas } from "@/lib/tienda/datos-finanzas";
+import { entregasDeOrdenes, guiasDeOrdenes } from "@/lib/tienda/entregas-monday";
 import { revisarSiHaceFalta } from "@/lib/tienda/conectar-shopify";
 import { PedidosTienda } from "./pedidos-tienda";
 import { parametrosPeriodo } from "@/lib/tienda/rango";
@@ -49,6 +50,12 @@ export default async function PedidosTiendaPage({ searchParams }: { searchParams
           .then((r) => r.count ?? 0)
       : Promise.resolve(0),
   ]);
+  // Lo que dice Monday (ciudad) o SISCORE (interior) de los que van en camino (13 nov 2026): el pedido sale «En camino · POSPUESTO», etc.
+  const enCamino = pedidos.filter((p) => p.estado === "en_camino").map((p) => p.id);
+  if (enCamino.length) {
+    const [entregas, guias] = await Promise.all([entregasDeOrdenes(supabase, enCamino), guiasDeOrdenes(supabase, enCamino)]);
+    for (const p of pedidos) if (p.estado === "en_camino") p.entrega = guias.get(p.id) ?? entregas.get(p.id) ?? null;
+  }
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-5">
       <EncabezadoPagina titulo="Pedidos de tienda" oculto>
