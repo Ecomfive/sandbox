@@ -195,6 +195,8 @@ export function VariantesProducto({ producto, puedeEscribir, alAbrir }: { produc
   const { mostrarToast } = useToast();
   const [editando, setEditando] = useState(false);
   const [abierta, setAbierta] = useState<string | null>(null);
+  // Por qué no se pudo quitar una variante: se queda escrito bajo ella (un aviso que desaparece no deja leer el motivo).
+  const [noQuitada, setNoQuitada] = useState<{ id: string; texto: string } | null>(null);
   const [pendiente, start] = useTransition();
   const { descendente } = useOrdenVariantes();
 
@@ -225,10 +227,13 @@ export function VariantesProducto({ producto, puedeEscribir, alAbrir }: { produc
 
   function quitar(id: string, codigo: string) {
     if (!confirm(`¿Quitar la variante ${codigo}? Se puede si no tiene stock, compras, fichas enlazadas ni compuestos. Si tuvo movimientos de inventario que se anulan entre sí (sumó y restó lo mismo), se borran con ella.`)) return;
+    setNoQuitada(null);
     start(async () => {
-      const r = await quitarVariante(id);
-      if (r.error) mostrarToast(r.error, "destructive");
-      else mostrarToast(`Variante ${codigo} quitada`);
+      const r = await quitarVariante(id).catch(() => ({ error: "No se pudo quitar la variante. Inténtalo de nuevo." }));
+      if (r.error) {
+        setNoQuitada({ id, texto: r.error });
+        mostrarToast(r.error, "destructive");
+      } else mostrarToast(`Variante ${codigo} quitada`);
     });
   }
 
@@ -280,6 +285,11 @@ export function VariantesProducto({ producto, puedeEscribir, alAbrir }: { produc
                       </button>
                     )}
                   </div>
+                  {noQuitada?.id === v.id && (
+                    <p role="alert" className="m-0 border-t border-border px-3 py-2 text-xs text-destructive">
+                      {noQuitada.texto}
+                    </p>
+                  )}
                   {esta && (
                     <div className="flex flex-col gap-3 border-t border-border px-3 py-3">
                       <FotoVariante id={v.id} nombre={v.nombre} foto={foto} fotoDelPrincipal={producto.foto} puedeEscribir={puedeEscribir} />
