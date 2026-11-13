@@ -6,7 +6,7 @@ import { registrarAuditoria } from "@/lib/auditoria";
 import { formatearEventoAuditoria } from "@/lib/auditoria-cambios";
 import { requireAlgunModulo, requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { esAdministrador } from "@/lib/permisos/acceso";
-import { mensajeBloqueos, mensajeBloqueosVariante } from "@/lib/wms/eliminar-producto";
+import { mensajeBloqueos, mensajeBloqueosVariante, mensajeErrorQuitarVariante } from "@/lib/wms/eliminar-producto";
 import { esCodigoBarrasValido, esCodigoInterno, normalizarCodigoBarras } from "@/lib/wms/codigo-barras";
 import { detectarImagen } from "@/lib/seguridad/imagen";
 import { descargarPublico } from "@/lib/seguridad/url-externa";
@@ -710,7 +710,7 @@ export async function quitarVariante(id: string): Promise<{ error?: string }> {
     return {};
   }
   // Sin la migración 0269 (la función no existe): la regla de antes.
-  if (!/wms_quitar_variante|function|schema cache/i.test(conBase.error.message)) return { error: "No se pudo quitar la variante." };
+  if (!/wms_quitar_variante|function|schema cache/i.test(conBase.error.message)) return { error: mensajeErrorQuitarVariante(conBase.error.message) };
   const { count: enCombos } = await supabase.from("sku_maestro_componentes").select("id", { count: "exact", head: true }).eq("componente_id", id);
   if ((enCombos ?? 0) > 0) return { error: "La variante es parte de un producto compuesto: quítala del compuesto primero." };
   const [movs, compras, shopify, dropi] = await Promise.all([
@@ -722,7 +722,7 @@ export async function quitarVariante(id: string): Promise<{ error?: string }> {
   if ((movs.count ?? 0) + (compras.count ?? 0) + (shopify.count ?? 0) + (dropi.count ?? 0) > 0)
     return { error: "La variante ya tiene movimientos, compras o fichas enlazadas: no se puede quitar. (Falta correr en Supabase la migración 0269, que deja quitarla si sus movimientos se anulan entre sí.)" };
   const { error } = await supabase.from("skus_maestros").delete().eq("id", id);
-  if (error) return { error: "No se pudo quitar la variante." };
+  if (error) return { error: mensajeErrorQuitarVariante(error.message) };
   await registrarAuditoria({ accion: "quitar_variante", entidad: "skus_maestros", entidadId: v.padre_id, detalle: v.codigo });
   revalidatePath("/producto");
   revalidatePath("/inventario");

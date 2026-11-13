@@ -53,6 +53,17 @@ export function mensajeBloqueosVariante(codigo: string, bloqueos: Record<string,
   return `No se puede quitar la variante ${codigo}: ${motivos.join(" y ")}. Si ya no se usa, déjala en 0 o pásala a Inactivo.`;
 }
 
+/**
+ * El motivo cuando la base falla al quitar una variante (13 nov 2026: la 44-45 de las plantillas decía solo «No se pudo quitar la variante»): si es una llave foránea, qué tabla la usa; si no,
+ * el texto de la base, recortado. Lo ve el equipo de Producto, así que se dice tal cual.
+ */
+export function mensajeErrorQuitarVariante(mensaje: string | null | undefined): string {
+  const m = (mensaje ?? "").trim();
+  const tabla = m.match(/violates foreign key constraint[^]*?on table "([^"]+)"/i)?.[1];
+  if (tabla) return `No se pudo quitar la variante: todavía la usa «${nombreBloqueo(tabla)[0]}» (${tabla}).`;
+  return m ? `No se pudo quitar la variante: ${m.length > 200 ? `${m.slice(0, 200)}…` : m}` : "No se pudo quitar la variante.";
+}
+
 /** «3 compras, 1 publicación de Dropi»: lo que bloquea, de más a menos (lo que cae en el mismo nombre se suma). */
 function listaBloqueos(bloqueos: Record<string, number>): string[] {
   const suma = new Map<string, { n: number; nombre: [string, string] }>();
