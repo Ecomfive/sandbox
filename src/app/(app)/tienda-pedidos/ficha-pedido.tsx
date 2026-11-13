@@ -8,7 +8,8 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
 import { CopiarIcon, FlechaAbajoIcon, FlechaArribaIcon } from "@/lib/nav-icons";
 import type { OrdenTienda } from "@/lib/tienda/orden-detalle";
-import { ContenidoOrdenTienda, estadoDeOrden, subtituloOrden } from "./[id]/detalle-finanzas";
+import { estadoDeOrden, subtituloOrden } from "./[id]/detalle-finanzas";
+import { FichaOrdenTienda } from "./[id]/ficha-orden";
 import { obtenerPedidoTienda } from "./ficha-actions";
 
 function BotonCabecera({ texto, icono: Icono, activo = true, alHacerClic }: { texto: string; icono: typeof FlechaArribaIcon; activo?: boolean; alHacerClic: () => void }) {
@@ -82,11 +83,11 @@ export function FichaPedido({ id, orden: ordenLista, alCerrar, alIr }: { id: str
       abierto={!!id}
       alCerrar={alCerrar}
       lado="derecha"
-      ancho="lg"
+      ancho="xl"
       titulo={
         <span className="flex min-w-0 flex-col">
           <span className="flex flex-wrap items-center gap-2">
-            <span className="text-lg font-semibold">Pedido {orden?.o.numero ?? ""}</span>
+            <span className="text-lg font-semibold">{orden?.o.numero ?? "Pedido"}</span>
             {estado && <Pastilla tono={estado.tono}>{estado.etiqueta}</Pastilla>}
           </span>
           {orden && <span className="text-xs font-normal text-muted-foreground">{subtituloOrden(orden.o, orden.tienda)}</span>}
@@ -100,24 +101,15 @@ export function FichaPedido({ id, orden: ordenLista, alCerrar, alIr }: { id: str
         </>
       }
     >
-      <div className="flex flex-col gap-4 p-5">
-        {!actual ? (
-          <p className="m-0 text-sm text-muted-foreground">Cargando el pedido…</p>
-        ) : "error" in actual ? (
-          <p role="alert" className="m-0 text-sm text-destructive">
-            {actual.error}
-          </p>
-        ) : (
-          <>
-            {actual.orden.enShopify && (
-              <a href={actual.orden.enShopify} target="_blank" rel="noreferrer" className={`self-start rounded-md border border-border bg-card px-3 py-1.5 text-sm font-medium hover:bg-muted ${anilloFoco}`}>
-                Abrir en Shopify ↗
-              </a>
-            )}
-            <ContenidoOrdenTienda orden={actual.orden} codigoPais={actual.codigoPais} puedeEscribir={actual.puedeEscribir} />
-          </>
-        )}
-      </div>
+      {!actual ? (
+        <p className="m-0 p-5 text-sm text-muted-foreground">Cargando el pedido…</p>
+      ) : "error" in actual ? (
+        <p role="alert" className="m-0 p-5 text-sm text-destructive">
+          {actual.error}
+        </p>
+      ) : (
+        <FichaOrdenTienda key={actual.id} orden={actual.orden} codigoPais={actual.codigoPais} puedeEscribir={actual.puedeEscribir} />
+      )}
     </Ventana>
   );
 }
