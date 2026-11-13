@@ -201,6 +201,17 @@ table.tabla-datos[data-aspecto="lista"] tbody tr {
   border-bottom-color: color-mix(in srgb, var(--border) 45%, transparent);
 }
 
+/* Tabla densa (Pedidos de tienda, 13 nov 2026): como Mi Reto Digital con el navegador al 80 %, para que quepan todas las columnas. */
+table.tabla-datos[data-densa] {
+  font-size: 13px;
+}
+table.tabla-datos[data-densa] :is(td, th) {
+  padding: 0.5rem;
+}
+table.tabla-datos[data-densa][data-encabezado="mayusculas"] thead th {
+  font-size: 12px;
+}
+
 /* Densidad compacta: filas más bajas. Elegida por cada persona en el menú "Columnas". */
 [data-densidad="compacta"] table.tabla-datos :is(td, th) {
   padding-block: 0.25rem;
