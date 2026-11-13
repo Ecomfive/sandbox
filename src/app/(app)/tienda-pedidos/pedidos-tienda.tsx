@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { TablaDatos, type ColumnaTabla } from "@/components/tabla/tabla-datos";
 import { Indicador, Pastilla, TableroIndicadores } from "@/components/panel/piezas-panel";
@@ -13,6 +13,8 @@ import type { NombreFilas } from "@/lib/tabla/pie";
 import { ESTADOS_PEDIDO, diaPanama, resumirPedidos, type EstadoPedido } from "@/lib/tienda/resumen";
 import type { PedidoFila } from "@/lib/tienda/datos";
 import { FichaPedido } from "./ficha-pedido";
+import { pendientesWhatsapp } from "./chat-actions";
+import { pendientesPorPedido, type ChatPendiente } from "@/lib/tienda/chat-tienda";
 
 const ESTADO = new Map(ESTADOS_PEDIDO.map((e) => [e.id, e]));
 export const NOMBRE: NombreFilas = { singular: "pedido", plural: "pedidos" };
@@ -72,6 +74,8 @@ function cuando(iso: string, sinHora = false): string {
 export interface Contexto {
   codigoPais: string;
   tiendas: Record<string, string>;
+  /** Mensajes de WhatsApp pendientes por pedido (iComfly): el numerito sobre el logo del cliente. Solo en Pedidos de tienda. */
+  whatsapp?: Record<string, number>;
 }
 
 /** Las columnas, como en Mi Reto Digital: se ocultan y se reordenan desde «Columnas». */
@@ -79,7 +83,32 @@ export const COLUMNAS: ColumnaTabla<PedidoFila, Contexto>[] = [
   { id: "pedido", label: "Pedido", ocultable: false, clase: "font-semibold text-primario whitespace-nowrap", render: (p) => <NumeroPedido p={p} /> },
   { id: "tienda", label: "Tienda", ocultable: true, clase: "whitespace-nowrap", render: (p, c) => c.tiendas[p.tiendaId] ?? "—" },
   { id: "fecha", label: "Fecha", ocultable: true, clase: "text-muted-foreground whitespace-nowrap", render: (p) => cuando(p.creado, p.sinHora) },
-  { id: "cliente", label: "Cliente", ocultable: true, render: (p) => <span className="block max-w-[14rem] truncate">{p.cliente ?? "—"}</span> },
+  {
+    id: "cliente",
+    label: "Cliente",
+    ocultable: true,
+    // El logo de WhatsApp si el cliente tiene teléfono (13 nov 2026, pedido de Hernán): su chat se ve a la derecha de la ficha del pedido. Con mensajes
+    // pendientes en iComfly (sin leer, o el cliente espera respuesta), el numerito encima; se borra al abrir su chat en la ficha.
+    render: (p, c) => {
+      const n = c.whatsapp?.[p.id] ?? 0;
+      const pendientes = `${n} ${n === 1 ? "mensaje pendiente" : "mensajes pendientes"}`;
+      return (
+        <span className="flex max-w-[14rem] items-center gap-1.5">
+          {p.pedidosCliente != null && (
+            <span role="img" aria-label={n ? `WhatsApp: ${pendientes}` : "Tiene WhatsApp"} title={n ? `${pendientes} por WhatsApp: ábrelo para verlo` : "Tiene WhatsApp: su chat se ve en la ficha del pedido"} className="relative shrink-0">
+              <WhatsAppLogo className="h-3.5 w-3.5" />
+              {n > 0 && (
+                <span aria-hidden="true" className="absolute -top-2 -right-2 min-w-[15px] rounded-full bg-destructive px-1 text-center text-[9px] leading-[15px] font-bold text-white tabular-nums">
+                  {n > 99 ? "99+" : n}
+                </span>
+              )}
+            </span>
+          )}
+          <span className={`truncate ${n > 0 ? "ml-1 font-semibold" : ""}`}>{p.cliente ?? "—"}</span>
+        </span>
+      );
+    },
+  },
   {
     id: "pedidos",
     label: "Pedidos",
@@ -268,7 +297,23 @@ export function PedidosTienda({
   const r = useMemo(() => resumirPedidos(pedidos), [pedidos]);
   const filas = useMemo(() => (estado ? pedidos.filter((p) => p.estado === estado) : pedidos), [pedidos, estado]);
   const def = useMemo(() => defPedidos(tiendas), [tiendas]);
-  const contexto = useMemo(() => ({ codigoPais, tiendas }), [codigoPais, tiendas]);
+  // Los mensajes de WhatsApp pendientes (iComfly) de la tienda que se mira, cada 30 segundos con la página a la vista (y al abrir o cerrar una ficha).
+  const tiendaUnica = pedidos.length && pedidos.every((p) => p.tiendaId === pedidos[0].tiendaId) ? pedidos[0].tiendaId : null;
+  const [chats, setChats] = useState<ChatPendiente[]>([]);
+  useEffect(() => {
+    if (!tiendaUnica) return;
+    let vivo = true;
+    const leer = () => void pendientesWhatsapp(tiendaUnica).then((r) => vivo && setChats(r)).catch(() => undefined);
+    const primera = setTimeout(leer, 0);
+    const t = setInterval(() => document.visibilityState === "visible" && leer(), 30_000);
+    return () => {
+      vivo = false;
+      clearTimeout(primera);
+      clearInterval(t);
+    };
+  }, [tiendaUnica, abierto]);
+  const whatsapp = useMemo(() => pendientesPorPedido(pedidos, chats), [pedidos, chats]);
+  const contexto = useMemo(() => ({ codigoPais, tiendas, whatsapp }), [codigoPais, tiendas, whatsapp]);
   const columnas = useMemo(() => (Object.keys(tiendas).length > 1 ? COLUMNAS : COLUMNAS.filter((c) => c.id !== "tienda")), [tiendas]);
   const pct = (n: number | null) => (n === null ? "—" : `${n.toLocaleString("es-PA")} %`);
   const num = (n: number) => n.toLocaleString("es-PA");

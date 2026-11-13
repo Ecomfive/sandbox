@@ -84,6 +84,8 @@ export interface PedidoFila extends PedidoResumen {
   direccion?: string | null;
   /** Las etiquetas de Shopify de la orden. */
   etiquetas?: string[];
+  /** Los 4 últimos dígitos del teléfono del cliente (para cruzar los chats de iComfly, que dan el número oculto); null sin teléfono. */
+  colaTel?: string | null;
   /** Cuántos pedidos tiene el cliente en total (por su teléfono), contando este; null sin teléfono. */
   pedidosCliente?: number | null;
   /** Por dónde entró (como en Mi Reto Digital): «bot» si lo tomó el bot por WhatsApp (etiqueta «chatbot»), «shopify» si entró por la tienda; null si vino del Excel. */

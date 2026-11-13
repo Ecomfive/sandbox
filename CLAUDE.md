@@ -2591,6 +2591,26 @@ convenciones técnicas del código.
   resume con `resumirTienda`; `juntarTiendas` da los indicadores de arriba y `alertasTiendas` «Para decidir hoy» (umbrales en `UMBRALES`: caída ≥ 30 % en la última semana,
   entrega < 60 %, cancelación ≥ 25 %, ≥ 100 por confirmar, SKU sin vincular, crecimiento ≥ 50 %; tiendas con < 20 pedidos no se miden). Todo en
   `src/lib/tienda/tablero-tiendas.ts`, con prueba. Colores por tienda en `COLORES_TIENDA` (validados con la skill dataviz en claro y oscuro; por orden de la lista).
+- **Chat de WhatsApp del cliente en Pedidos de tienda, con iComfly** (13 nov 2026, pedido de Hernán; prototipo aprobado): el WhatsApp de los clientes de cada
+  tienda lo atiende el bot de **iComfly** (cada tienda, su número); 360dialog sigue siendo solo de la proveeduría (CRM). **Sin apartado propio** (Hernán lo pidió
+  así antes de publicar: nada de «Chats de tienda»): el chat va a la derecha de la ficha del pedido (`ficha-orden.tsx`, un solo `ChatTienda` montado en el
+  `aside`, desde `@2xl`) y la lista lleva el logo de WhatsApp junto al cliente con teléfono (`pedidosCliente != null`), con **numerito de pendientes**: `pendientesWhatsapp`
+  (cada 30 s y al abrir/cerrar una ficha) → `chatsPendientes` (sin leer de `listar_conversaciones_recientes`, o 1 si espera respuesta) y `pendientesPorPedido`
+  (`chat-tienda.ts`, con prueba) los cruza con `colaTel` (4 últimos dígitos del teléfono del pedido, `datos-finanzas.ts`) porque iComfly da el número oculto:
+  además tiene que compartir una palabra del nombre (Hernán: que coincidan los dos; si no, ninguno). Abrir el chat en la ficha lo marca leído
+  en iComfly (`marcar_chat_leido`, solo con permiso de escritura y solo si hay un mensaje nuevo: `leidoHasta`). **Conexión** (migración 0284,
+  `tienda_icomfly`, RLS sin políticas): el admin pega en Tiendas Shopify (columna «WhatsApp (iComfly)», `conectar-icomfly.tsx`) la URL del «Conector Claude»
+  de iComfly (`https://api.icomfly.com/mcp/c_…`, chequeada) y `/api/icomfly/conectar` → `/retorno` hace OAuth 2.1 (registro dinámico `/register`, PKCE S256,
+  `state` firmado, cookie `icomfly_oauth_nonce`); los tokens se guardan cifrados (`claveIcomfly`: `ICOMFLY_TOKEN_KEY` o derivada de la service key) y se refrescan
+  solos (`tokenVigente`). Es un servidor **MCP** (JSON-RPC `initialize` → `tools/call`, con `Mcp-Session-Id`, respuesta JSON o SSE): `src/lib/tienda/icomfly.ts`
+  (`herramientaIcomfly`) e `icomfly-oauth.ts` (puro, con prueba). **Chat** (migración 0285: `tienda_chat_mensajes`, `tienda_chat_conversaciones`; usa el permiso
+  de `tienda-pedidos`): `ChatTienda` (`src/components/tienda/chat-tienda.tsx`), acciones en `tienda-pedidos/chat-actions.ts` (el teléfono sale del pedido, en el
+  servidor), datos en `chat-tienda-datos.ts`, lógica pura en `chat-tienda.ts` (con prueba). Se lee cada 8 s: iComfly **no tiene webhooks de salida**. Quirks:
+  **iComfly devuelve `created_at`/`last_message_at` vacíos (`{}`)**, así que el sistema anota cuándo vio cada mensaje (`visto_en`; null = historial de la primera
+  lectura) y quién de nosotros lo mandó; la ventana de 24 h sale de eso (`ventana24`, «sin_saber» si no hay dato). Enviar texto pausa el bot del chat; fuera de
+  24 h solo plantillas aprobadas (`listar_plantillas_whatsapp` + `ver_plantilla_whatsapp`, caché 10 min). Enviar pide el teléfono completo (en
+  `listar_conversaciones_recientes` iComfly lo da oculto, «•••1958»: por eso no hay bandeja). Límite del conector: 5 mensajes por minuto. Falta: adjuntos
+  (`enviar_media_whatsapp` pide una URL pública).
 
 ## Dónde vive cada cosa
 

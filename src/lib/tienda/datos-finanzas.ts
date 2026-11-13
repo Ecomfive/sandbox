@@ -3,6 +3,7 @@
 // siguen como antes (vacías hasta conectar la tienda).
 
 import { fechaProgramada } from "./programado";
+import { colaTelefono } from "./chat-tienda";
 import { transportistaDe } from "./logistica";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
@@ -90,6 +91,7 @@ interface ClienteFila {
   nombre: string | null;
   corregimiento: string | null;
   direccion: string | null;
+  telefono?: string | null;
   telefono_clave: string | null;
   notas: string | null;
 }
@@ -137,7 +139,7 @@ export async function cargarPedidosFinanzas(
   if (!tiendaDeUnidad.size) return { pedidos: [], lineas: [] };
   const unidades = [...tiendaDeUnidad.keys()];
   // Con la migración 0276, también la hora de Shopify (un texto armado: por eso se declara como `string`).
-  const columnas: string = `id, unidad_id, numero, fecha, estado_entrega, etiquetas, total, moneda, transportista, guia, origen, ${(await hayHoraDeShopify(supabase)) ? "creado_origen, " : ""}ven_ordenes_clientes(nombre, corregimiento, direccion, telefono_clave, notas)`;
+  const columnas: string = `id, unidad_id, numero, fecha, estado_entrega, etiquetas, total, moneda, transportista, guia, origen, ${(await hayHoraDeShopify(supabase)) ? "creado_origen, " : ""}ven_ordenes_clientes(nombre, corregimiento, direccion, telefono, telefono_clave, notas)`;
   const [ordenes, lineas] = await Promise.all([
     traerTodasLasFilas<FilaOrden>(
       (d, h) =>
@@ -195,6 +197,8 @@ export async function cargarPedidosFinanzas(
     // La fecha que pidió el cliente, de la nota del pedido (solo en los que llegan de Shopify: así la deja el equipo al confirmar).
     programado: o.origen === "shopify" ? fechaProgramada(clienteDe(o)?.notas, o.fecha) : null,
     cliente: clienteDe(o)?.nombre ?? null,
+    // Los 4 últimos dígitos del teléfono: con eso (y el nombre) se cruzan los chats de iComfly, que dan el número oculto (13 nov 2026).
+    colaTel: colaTelefono(clienteDe(o)?.telefono),
     provincia: zonaDeEtiquetas(o.etiquetas),
     ciudad: clienteDe(o)?.corregimiento ?? null,
     moneda: o.moneda ?? "USD",

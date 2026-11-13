@@ -10,6 +10,8 @@ import { esAdministrador } from "@/lib/permisos/acceso";
 import { cargarTiendas, type Tienda } from "@/lib/tienda/datos";
 import { appDeTienda } from "@/lib/tienda/shopify-app";
 import { ConectarTienda } from "./conectar-tienda";
+import { ConectarIcomfly } from "./conectar-icomfly";
+import { conexionesIcomfly } from "@/lib/tienda/icomfly";
 
 export const metadata = { title: "Tiendas Shopify" };
 
@@ -31,17 +33,36 @@ const hace = (iso: string | null) => (iso ? formatearTiempoRelativo(iso) : "—"
  * por Kenku, y siempre solo de lectura. Desde el 12 nov 2026 un administrador la conecta aquí («Conectar») con la app de la tienda en el Dev Dashboard de
  * Shopify, cuyas claves están en Vercel (src/lib/tienda/shopify-app.ts).
  */
-export default async function TiendasPage() {
+/** Lo que vuelve de la autorización de iComfly (`?icomfly=`). */
+const AVISO_ICOMFLY: Record<string, { texto: string; error: boolean }> = {
+  conectado: { texto: "iComfly quedó conectado.", error: false },
+  cancelado: { texto: "Se canceló la autorización en iComfly.", error: true },
+  "sin-clave": { texto: "Falta la clave para cifrar los tokens en el servidor.", error: true },
+  "tienda-invalida": { texto: "Esa tienda no es válida.", error: true },
+  error: { texto: "No se pudo conectar iComfly.", error: true },
+};
+
+export default async function TiendasPage({ searchParams }: { searchParams: Promise<{ icomfly?: string; motivo?: string }> }) {
   const usuario = await requireModulo("tienda-tiendas");
+  const { icomfly, motivo } = await searchParams;
+  const aviso = icomfly ? AVISO_ICOMFLY[icomfly] : undefined;
   const admin = esAdministrador(usuario) && !usuario.modulosSoloLectura.includes("tienda-tiendas");
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
   const { tiendas, faltaMigracion } = await cargarTiendas(supabase, pais.id);
+  // La conexión con iComfly (el bot de WhatsApp de las tiendas, 13 nov 2026); null si falta la migración 0284.
+  const icomflyDe = admin ? await conexionesIcomfly(supabase, tiendas.map((t) => t.id)) : new Map();
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
       <EncabezadoPagina titulo="Tiendas Shopify" oculto>
         Las tiendas de Shopify conectadas y si sus pedidos están llegando bien. Se conectan de una en una.
       </EncabezadoPagina>
+      {aviso && (
+        <p role={aviso.error ? "alert" : "status"} className={`m-0 rounded-lg border px-4 py-3 text-sm ${aviso.error ? "border-destructive/40 bg-destructive-soft text-destructive" : "border-border bg-card text-success"}`}>
+          {aviso.texto}
+          {aviso.error && motivo ? ` ${motivo.slice(0, 160)}` : ""}
+        </p>
+      )}
       {faltaMigracion ? (
         <FaltaMigracionTienda />
       ) : !tiendas.length ? (
@@ -58,6 +79,7 @@ export default async function TiendasPage() {
                 <th scope="col" className={claseThLista}>Conciliación</th>
                 <th scope="col" className={claseThLista}>Permiso</th>
                 {admin && <th scope="col" className={claseThLista}>Conexión</th>}
+                {admin && <th scope="col" className={claseThLista}>WhatsApp (iComfly)</th>}
               </tr>
             </thead>
             <tbody>
@@ -96,6 +118,21 @@ export default async function TiendasPage() {
                         <ConectarTienda tiendaId={t.id} conectada={t.estado === "conectada"} />
                       ) : (
                         <span className="text-xs text-muted-foreground">Faltan sus claves en Vercel</span>
+                      )}
+                    </td>
+                  )}
+                  {admin && (
+                    <td className={claseTdLista}>
+                      {icomflyDe === null ? (
+                        <span className="text-xs text-muted-foreground">Falta la migración 0284</span>
+                      ) : (
+                        <ConectarIcomfly
+                          tiendaId={t.id}
+                          url={icomflyDe.get(t.id)?.mcpUrl ?? null}
+                          conectado={icomflyDe.get(t.id)?.conectado ?? false}
+                          ultimaPrueba={icomflyDe.get(t.id)?.ultimaPrueba ?? null}
+                          ultimoError={icomflyDe.get(t.id)?.ultimoError ?? null}
+                        />
                       )}
                     </td>
                   )}

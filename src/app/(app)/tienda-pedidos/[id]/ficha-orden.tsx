@@ -13,6 +13,7 @@ import { pasosDelPedido, type PasoPedido } from "@/lib/tienda/linea-tiempo";
 import type { OrdenTienda } from "@/lib/tienda/orden-detalle";
 import { etiquetasDe, zonaDeEtiquetas } from "@/lib/tienda/ordenes-finanzas";
 import { NotasOrden } from "./notas-orden";
+import { ChatTienda } from "@/components/tienda/chat-tienda";
 
 // La ficha de un pedido de tienda (13 nov 2026, pedido de Hernán: «como la ficha de pedido de la app de Jorge»): la línea de tiempo del pedido, las
 // pestañas que llevan a cada parte, el chat de WhatsApp del cliente al lado y los botones de acción abajo. Todo sale de lo registrado (la orden, Monday,
@@ -160,7 +161,7 @@ function AsistenteConfirmacion({ a }: { a: Asistente }) {
   );
 }
 
-/** El chat del cliente en el CRM (solo lectura): los últimos mensajes y el enlace a la Bandeja. */
+/** El chat del cliente en el CRM (solo lectura): los últimos mensajes y el enlace a la Bandeja. Desde el 13 nov 2026 es el respaldo: si la tienda está conectada a iComfly, la ficha muestra su chat (`ChatTienda`). */
 function ChatCliente({ orden }: { orden: OrdenTienda }) {
   const w = orden.whatsapp;
   return (
@@ -224,7 +225,7 @@ export function FichaOrdenTienda({ orden, codigoPais, puedeEscribir }: { orden: 
 
   return (
     <div className="@container flex min-h-0 flex-1 flex-col">
-      <div className="grid min-h-0 flex-1 grid-cols-1 @4xl:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)]">
+      <div className="grid min-h-0 flex-1 grid-cols-1 @2xl:grid-cols-[minmax(0,1fr)_minmax(16rem,20rem)] @5xl:grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)]">
         <div className="flex min-w-0 flex-col">
           <LineaTiempo pasos={pasos} />
           {/* Las pestañas llevan a cada parte de la ficha (como en la app de Jorge): se quedan arriba al desplazarse. */}
@@ -444,11 +445,6 @@ export function FichaOrdenTienda({ orden, codigoPais, puedeEscribir }: { orden: 
             </ol>
           </Seccion>
 
-          {/* En una ficha angosta el chat va al final; en la ancha, a la derecha. */}
-          <section aria-label="WhatsApp del cliente" className="h-96 border-t border-border @4xl:hidden">
-            <ChatCliente orden={orden} />
-          </section>
-
           {/* Los botones de acción, como en la app de Jorge: apagados mientras Shopify sea de solo lectura (nada cambia de estado sin registro). */}
           <div className="sticky bottom-0 z-[5] mt-auto flex flex-wrap items-center gap-2 border-t border-border bg-card px-4 py-3">
             {ACCIONES.map((a) => (
@@ -465,8 +461,10 @@ export function FichaOrdenTienda({ orden, codigoPais, puedeEscribir }: { orden: 
             )}
           </div>
         </div>
-        <aside aria-label="WhatsApp del cliente" className="hidden min-h-0 border-l border-border @4xl:sticky @4xl:top-[var(--alto-cabecera,0px)] @4xl:flex @4xl:h-[calc(92vh-var(--alto-cabecera,0px))] @4xl:self-start @4xl:flex-col">
-          <ChatCliente orden={orden} />
+        {/* El chat del cliente (13 nov 2026, pedido de Hernán): a la derecha de la ficha, tenga o no chat; un solo chat montado (cada uno se lee cada 8 s).
+            Solo en una ficha muy angosta (celular) baja al final. */}
+        <aside aria-label="WhatsApp del cliente" className="flex h-[28rem] min-h-0 flex-col border-t border-border @2xl:sticky @2xl:top-[var(--alto-cabecera,0px)] @2xl:h-[calc(92vh-var(--alto-cabecera,0px))] @2xl:self-start @2xl:border-t-0 @2xl:border-l">
+          <ChatTienda destino={{ pedido: orden.id }} nombreCliente={orden.cliente?.nombre ?? null} puedeEscribir={puedeEscribir} respaldo={<ChatCliente orden={orden} />} />
         </aside>
       </div>
     </div>

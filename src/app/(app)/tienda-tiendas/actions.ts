@@ -6,6 +6,8 @@ import { requireModuloEscritura } from "@/lib/auth";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 import { conectarTienda, revisarTienda } from "@/lib/tienda/conectar-shopify";
+import { desconectarIcomfly, guardarUrlConector, probarIcomfly } from "@/lib/tienda/icomfly";
+import { leerUrlConector } from "@/lib/tienda/icomfly-oauth";
 
 // Gestión de tienda › Tiendas (12 nov 2026): conectar una tienda de Shopify en vivo y revisarla a mano. Solo un administrador: conectar pide a Shopify
 // los avisos de pedidos de la tienda. Nada cambia en Shopify (la app es de solo lectura; si tuviera permisos de escritura, no se conecta).
@@ -52,4 +54,35 @@ export async function revisarTiendaShopify(tiendaId: string): Promise<{ error?: 
   } catch (e) {
     return { error: e instanceof Error ? e.message : "No se pudo revisar la tienda." };
   }
+}
+
+// iComfly (13 nov 2026): el bot de WhatsApp de las tiendas. Un administrador pega la dirección del conector de la tienda y autoriza en iComfly
+// (/api/icomfly/conectar); aquí se guarda la dirección, se prueba la conexión y se desconecta. Los tokens nunca pasan por aquí.
+
+export async function guardarConectorIcomfly(tiendaId: string, url: string): Promise<{ error?: string }> {
+  if (!(await soloAdmin())) return { error: "Solo un administrador conecta una tienda." };
+  if (!UUID.test(String(tiendaId))) return { error: "Tienda no válida." };
+  const limpia = leerUrlConector(url);
+  if (!limpia) return { error: "Pega la «URL del servidor MCP» de iComfly › Conector Claude (https://api.icomfly.com/mcp/c_…)." };
+  const r = await guardarUrlConector(createServiceClient(), tiendaId, limpia);
+  if (r.error) return r;
+  revalidatePath("/tienda-tiendas");
+  return {};
+}
+
+export async function probarIcomflyTienda(tiendaId: string): Promise<{ resumen: string } | { error: string }> {
+  if (!(await soloAdmin())) return { error: "Solo un administrador prueba la conexión." };
+  if (!UUID.test(String(tiendaId))) return { error: "Tienda no válida." };
+  const r = await probarIcomfly(createServiceClient(), tiendaId);
+  revalidatePath("/tienda-tiendas");
+  return r;
+}
+
+export async function desconectarIcomflyTienda(tiendaId: string): Promise<{ error?: string }> {
+  if (!(await soloAdmin())) return { error: "Solo un administrador desconecta una tienda." };
+  if (!UUID.test(String(tiendaId))) return { error: "Tienda no válida." };
+  const r = await desconectarIcomfly(createServiceClient(), tiendaId);
+  if (!r.error) await registrarAuditoria({ accion: "desconectar_icomfly", entidad: "tiendas", entidadId: tiendaId, detalle: "Se borraron los tokens de iComfly" });
+  revalidatePath("/tienda-tiendas");
+  return r;
 }
