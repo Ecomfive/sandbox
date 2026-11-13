@@ -113,7 +113,7 @@ export default async function RetirosPage() {
   const cerrados = (retiros ?? []).filter((r) => r.estado === "cerrado").length;
   const totalRetiros = (retiros ?? []).length;
   const diferenciaMeses = diferenciaPorMes(
-    (retiros ?? []).map((r) => ({ fecha: r.fecha, estado: r.estado, monto: Number(r.monto), montoRecibido: r.monto_recibido === null ? null : Number(r.monto_recibido) }))
+    (retiros ?? []).map((r) => ({ id: r.id, numero: r.numero_correlativo, fecha: r.fecha, estado: r.estado, monto: Number(r.monto), montoRecibido: r.monto_recibido === null ? null : Number(r.monto_recibido) }))
   );
 
   const nombrePerfil = new Map((perfiles ?? []).map((p) => [p.id, p.nombre ?? p.email]));

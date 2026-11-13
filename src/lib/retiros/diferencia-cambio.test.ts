@@ -22,9 +22,9 @@ test("los cancelados y abiertos no cuentan; los cerrados sin lo recibido se avis
     { fecha: "2026-05-04", estado: "cancelado", monto: 10000, montoRecibido: null },
     { fecha: "2026-05-10", estado: "abierto", monto: 5000, montoRecibido: null },
     { fecha: "2026-05-20", estado: "cerrado", monto: 6035, montoRecibido: 5980 },
-    { fecha: "2026-05-21", estado: "cerrado", monto: 3000, montoRecibido: null },
+    { id: "r136", numero: 136, fecha: "2026-05-21", estado: "cerrado", monto: 3000, montoRecibido: null },
   ]);
-  assert.deepEqual(m, { mes: "2026-05", retiros: 1, monto: 6035, recibido: 5980, diferencia: 55, sinRecibido: 1 });
+  assert.deepEqual(m, { mes: "2026-05", retiros: 1, monto: 6035, recibido: 5980, diferencia: 55, sinRecibido: 1, faltan: [{ id: "r136", numero: 136 }] });
 });
 
 test("redondea a centavos", () => {

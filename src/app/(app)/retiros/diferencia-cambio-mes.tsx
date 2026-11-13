@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { KpiGroup } from "@/components/ui/kpi-card";
 import { anilloFoco } from "@/components/ui/field";
@@ -7,6 +8,7 @@ import { formatearMes, formatearMoneda } from "@/lib/formato";
 import type { DiferenciaMes } from "@/lib/retiros/diferencia-cambio";
 
 const MESES_VISIBLES = 6;
+const formatoCorrelativo = (numero: number) => `#${String(numero).padStart(4, "0")}`;
 const pct = (dif: number, monto: number) => (monto > 0 ? `${((dif / monto) * 100).toFixed(2)} %` : "—");
 
 /**
@@ -46,7 +48,17 @@ export function DiferenciaCambioMes({ meses, codigoPais }: { meses: DiferenciaMe
                   {formatearMes(`${m.mes}-01`)}
                   {m.sinRecibido > 0 && (
                     <span className="block text-xs font-normal whitespace-nowrap text-warning normal-case">
-                      {m.sinRecibido === 1 ? "1 cerrado sin monto recibido" : `${m.sinRecibido} cerrados sin monto recibido`}: no suma
+                      Sin monto recibido, no suman:{" "}
+                      {m.faltan.length
+                        ? m.faltan.map((f, k) => (
+                            <span key={f.id}>
+                              {k > 0 && ", "}
+                              <Link href={`/retiros/${f.id}`} className={`underline ${anilloFoco}`}>
+                                {f.numero === null ? "sin número" : formatoCorrelativo(f.numero)}
+                              </Link>
+                            </span>
+                          ))
+                        : m.sinRecibido}
                     </span>
                   )}
                 </th>
