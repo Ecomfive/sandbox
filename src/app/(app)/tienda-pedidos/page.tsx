@@ -1,4 +1,4 @@
-import { AvisoConexion, BarraTienda, FaltaMigracionTienda, SinTiendas } from "@/components/tienda/barra-tienda";
+import { AvisoConexion, BarraTienda, FaltaMigracionTienda, SinTiendas, rutaCon } from "@/components/tienda/barra-tienda";
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { requireModulo } from "@/lib/auth";
@@ -9,6 +9,9 @@ import { after } from "next/server";
 import { pedidosDeTiendas } from "@/lib/tienda/datos-finanzas";
 import { revisarSiHaceFalta } from "@/lib/tienda/conectar-shopify";
 import { PedidosTienda } from "./pedidos-tienda";
+import { parametrosPeriodo } from "@/lib/tienda/rango";
+import { alertasTiendas, juntarTiendas, resumirTienda } from "@/lib/tienda/tablero-tiendas";
+import { TableroTiendas } from "./tablero-tiendas";
 
 export const metadata = { title: "Pedidos de tienda" };
 
@@ -17,6 +20,7 @@ export const dynamic = "force-dynamic";
 /**
  * Gestión de tienda › Pedidos (3 nov 2026): los pedidos de Shopify de las tiendas del país (todas o una), del periodo elegido, con el tablero de
  * estados arriba, como la pantalla de pedidos de Mi Reto Digital. Llegan de Shopify al conectar cada tienda (solo lectura); hasta entonces está vacía.
+ * Con «Todas las tiendas» (13 nov 2026, pedido de Hernán; prototipo aprobado) no sale la lista: sale el tablero que compara las tiendas (`TableroTiendas`).
  */
 export default async function PedidosTiendaPage({ searchParams }: { searchParams: Promise<{ [k: string]: string | string[] | undefined }> }) {
   await requireModulo("tienda-pedidos");
@@ -30,6 +34,7 @@ export default async function PedidosTiendaPage({ searchParams }: { searchParams
   // La revisión de Shopify (por si se perdió algún aviso), después de mostrar la página y como mucho cada 10 minutos.
   after(() => revisarSiHaceFalta(createServiceClient(), tiendas));
   const ids = miradas.map((t) => t.id);
+  if (!tienda && tiendas.length && !faltaMigracion) return <TodasLasTiendas tiendas={tiendas} pais={pais} eleccion={eleccion} />;
   // Las tiendas sin conectar muestran las órdenes que cargó Finanzas (11 nov 2026; ver src/lib/tienda/ordenes-finanzas.ts).
   const [{ pedidos, fuente, periodo }, sinVincular] = await Promise.all([
     pedidosDeTiendas(supabase, miradas, pais.codigo, eleccion),
@@ -67,6 +72,61 @@ export default async function PedidosTiendaPage({ searchParams }: { searchParams
           />
         </>
       )}
+    </Pagina>
+  );
+}
+
+/**
+ * «Todas las tiendas»: el tablero que compara las tiendas del país (13 nov 2026). Cada tienda se lee por su lado (su periodo y el anterior, de Shopify o de
+ * Finanzas) y se resume con `resumirTienda`; una tienda nueva aparece sola, con su tarjeta y en las gráficas.
+ */
+async function TodasLasTiendas({
+  tiendas,
+  pais,
+  eleccion,
+}: {
+  tiendas: Awaited<ReturnType<typeof cargarTiendas>>["tiendas"];
+  pais: Awaited<ReturnType<typeof getPaisActual>>;
+  eleccion: ReturnType<typeof periodoElegido>;
+}) {
+  const supabase = createServiceClient();
+  const leidas = await Promise.all(
+    tiendas.map(async (t) => {
+      const [r, sinVincular] = await Promise.all([
+        pedidosDeTiendas(supabase, [t], pais.codigo, eleccion, { comparar: true }),
+        supabase
+          .from("tienda_variantes")
+          .select("id", { count: "exact", head: true })
+          .eq("tienda_id", t.id)
+          .is("sku_maestro_id", null)
+          .eq("no_fisico", false)
+          .eq("en_shopify", true)
+          .then((x) => x.count ?? 0),
+      ]);
+      return { t, r, sinVincular };
+    }),
+  );
+  const resumenes = leidas.map(({ t, r, sinVincular }, i) =>
+    resumirTienda(
+      { id: t.id, nombre: t.nombre, fuente: t.estado === "conectada" ? "En vivo · Shopify" : r.fuente.unidadDe.has(t.id) ? "Finanzas (Excel)" : "Sin conectar", sinVincular },
+      i,
+      r.pedidos,
+      r.periodo.desde,
+      r.periodo.hasta,
+    ),
+  );
+  // El periodo de la barra: el de la primera tienda en vivo (o el de la primera).
+  const principal = leidas.find((x) => x.t.estado === "conectada") ?? leidas[0];
+  const periodo = principal.r.periodo;
+  const deFechas = parametrosPeriodo(periodo.id === "rango" ? { tipo: "rango", desde: periodo.desde, hasta: periodo.hasta } : { tipo: "atajo", id: periodo.id });
+  const hrefs = Object.fromEntries(tiendas.map((t) => [t.id, rutaCon("/tienda-pedidos", { ...deFechas, tienda: t.id })]));
+  return (
+    <Pagina ancho="ancha" className="flex flex-col gap-5">
+      <EncabezadoPagina titulo="Pedidos de tienda" oculto>
+        Cómo van las tiendas de {pais.nombre}: elige una tienda para ver sus pedidos.
+      </EncabezadoPagina>
+      <BarraTienda ruta="/tienda-pedidos" tiendas={tiendas} tiendaId={null} periodo={periodo} />
+      <TableroTiendas tiendas={resumenes} todas={juntarTiendas(resumenes)} alertas={alertasTiendas(resumenes)} hrefs={hrefs} moneda={pais.codigo} dias={periodo.dias} />
     </Pagina>
   );
 }

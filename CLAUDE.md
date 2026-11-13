@@ -2586,6 +2586,12 @@ convenciones técnicas del código.
   `confirmadoEn`) y Días en tránsito (barra; «En mar / En aire»; ya no «Prometido» ni «Estado» en la tabla, sí en el Excel). Sin la 0270 la
   lista de Compras y el portal cargan igual (sin plazos). «En cotización» (En camino, Reponer, Sugerencias, Finanzas) incluye la etapa nueva.
 
+- **Pedidos de tienda › «Todas las tiendas» = tablero** (13 nov 2026, pedido de Hernán; prototipo aprobado): sin `?tienda=`, `tienda-pedidos/page.tsx` dibuja
+  `TodasLasTiendas` → `TableroTiendas` (`tienda-pedidos/tablero-tiendas.tsx`) en vez de la lista. Cada tienda se lee por su lado (`pedidosDeTiendas` con `comparar`) y se
+  resume con `resumirTienda`; `juntarTiendas` da los indicadores de arriba y `alertasTiendas` «Para decidir hoy» (umbrales en `UMBRALES`: caída ≥ 30 % en la última semana,
+  entrega < 60 %, cancelación ≥ 25 %, ≥ 100 por confirmar, SKU sin vincular, crecimiento ≥ 50 %; tiendas con < 20 pedidos no se miden). Todo en
+  `src/lib/tienda/tablero-tiendas.ts`, con prueba. Colores por tienda en `COLORES_TIENDA` (validados con la skill dataviz en claro y oscuro; por orden de la lista).
+
 ## Dónde vive cada cosa
 
 - `supabase/migrations/` — cambios de esquema, en orden numerado. Correr
