@@ -25,8 +25,10 @@ const sinTildes = (s: string) =>
     .trim();
 
 export interface FilaDetalleEffi {
-  /** La remisión de la fila; en una devolución, la remisión a la que se abona (`id_remision_v`). */
+  /** La remisión de la fila (en `detalle_remision_v`). */
   id_remision_v?: unknown;
+  /** La devolución de la fila (en `detalle_devolucion_v`): su remisión viene en la cabecera (`devolucion_v`). */
+  id_devolucion_v?: unknown;
   articulo?: unknown;
   cantidad?: unknown;
   fecha_trans?: unknown;
@@ -51,7 +53,15 @@ const idDe = (v: unknown) => (typeof v === "string" || typeof v === "number" ? S
  * fechas mezclaba devoluciones de pedidos de antes y daba casi tanto devuelto como salido. Una devolución sin su remisión entre las leídas no cuenta. Una
  * anulada no cuenta, ni una de otra bodega, ni una sin artículo, fecha o cantidad.
  */
-export function ventasPorDia(remisiones: readonly FilaDetalleEffi[], devoluciones: readonly FilaDetalleEffi[]): VentaEffiDia[] {
+/** Una devolución de venta (cabecera, `devolucion_v`): a qué remisión se abona. */
+export interface CabeceraDevolucionEffi {
+  id_devolucion_v?: unknown;
+  id_remision_v?: unknown;
+}
+
+export function ventasPorDia(remisiones: readonly FilaDetalleEffi[], devoluciones: readonly FilaDetalleEffi[], cabeceras: readonly CabeceraDevolucionEffi[] = []): VentaEffiDia[] {
+  // El detalle de una devolución no trae su remisión: la trae la cabecera.
+  const remisionDeDevolucion = new Map(cabeceras.map((c) => [idDe(c.id_devolucion_v), idDe(c.id_remision_v)] as const).filter(([d, r]) => d && r));
   const porClave = new Map<string, VentaEffiDia>();
   const diaDeRemision = new Map<string, string>();
   const valida = (f: FilaDetalleEffi) => String(f.vigente ?? "") === "1" && typeof f.nombre_bodega === "string" && sinTildes(f.nombre_bodega) === BODEGA_NUESTRA;
@@ -74,7 +84,7 @@ export function ventasPorDia(remisiones: readonly FilaDetalleEffi[], devolucione
   for (const d of devoluciones) {
     if (!valida(d)) continue;
     const productoId = idDe(d.articulo);
-    const dia = diaDeRemision.get(idDe(d.id_remision_v));
+    const dia = diaDeRemision.get(idDe(d.id_remision_v) || remisionDeDevolucion.get(idDe(d.id_devolucion_v)) || "");
     const cantidad = Math.round(Number(d.cantidad));
     if (!productoId || !dia || !Number.isFinite(cantidad) || cantidad <= 0) continue;
     sumar(productoId, dia, cantidad, "devueltas");
