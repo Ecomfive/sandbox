@@ -30,6 +30,8 @@ const ACCIONES = ["Confirmar pedido", "Marcar despachado", "Marcar entregado", "
 
 const hora = (iso: string) => new Date(iso).toLocaleTimeString("es-PA", { hour: "2-digit", minute: "2-digit", timeZone: "America/Panama" });
 const esMomento = (v: string) => /T\d{2}:\d{2}/.test(v);
+/** El mediodía UTC (17:00) es el que se pone cuando solo se sabe el día (Monday, Servientrega): ahí no se muestra la hora. */
+const soloDia = (v: string) => /T17:00:00(\.0+)?(Z|\+00(:00)?)$/.test(v);
 const ETIQUETA_FASE: Record<string, string> = { por_confirmar: "Por confirmar", confirmada: "Confirmada", despachada: "Despachada", entregada: "Entregada", fallida: "Fallida", devuelta: "Devuelta", cancelada: "Cancelada" };
 
 function Seccion({ id, titulo, icono: Icono, extra, children }: { id: string; titulo: string; icono: (typeof SECCIONES)[number]["icono"]; extra?: ReactNode; children: ReactNode }) {
@@ -112,7 +114,7 @@ function LineaTiempo({ pasos }: { pasos: PasoPedido[] }) {
           {p.fecha && (
             <span className="text-[11px] leading-tight text-muted-foreground">
               {formatearFecha(p.fecha.slice(0, 10))}
-              {esMomento(p.fecha) && !p.fecha.endsWith("T17:00:00.000Z") ? <> · {hora(p.fecha)}</> : null}
+              {esMomento(p.fecha) && !soloDia(p.fecha) ? <> · {hora(p.fecha)}</> : null}
             </span>
           )}
           {p.nota && <span className={`line-clamp-2 text-[11px] leading-tight ${p.tono === "malo" ? "text-destructive" : "text-muted-foreground"}`}>{p.nota}</span>}
@@ -232,7 +234,7 @@ export function FichaOrdenTienda({ orden, codigoPais, puedeEscribir }: { orden: 
 
           <Seccion id={sid("productos")} titulo={S("productos").titulo} icono={S("productos").icono} extra={<span className="text-xs text-muted-foreground">{lineas.reduce((t, l) => t + (Number(l.cantidad) || 0), 0)} unidades</span>}>
             <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
+              <table className="w-full table-fixed border-collapse">
                 <thead>
                   <tr>
                     <th scope="col" className={claseThLista}>
@@ -241,10 +243,10 @@ export function FichaOrdenTienda({ orden, codigoPais, puedeEscribir }: { orden: 
                     <th scope="col" className={claseThLista}>
                       Producto nuestro
                     </th>
-                    <th scope="col" className={`${claseThLista} text-right`}>
+                    <th scope="col" className={`${claseThLista} w-14 text-right`}>
                       Cant.
                     </th>
-                    <th scope="col" className={`${claseThLista} text-right`}>
+                    <th scope="col" className={`${claseThLista} w-24 text-right`}>
                       Precio
                     </th>
                   </tr>
@@ -252,11 +254,11 @@ export function FichaOrdenTienda({ orden, codigoPais, puedeEscribir }: { orden: 
                 <tbody>
                   {lineas.map((l) => (
                     <tr key={l.linea}>
-                      <td className={claseTdLista}>
+                      <td className={`${claseTdLista} !whitespace-normal break-words`}>
                         {l.producto ?? "(sin nombre)"}
                         {l.es_servicio ? <span className="text-muted-foreground"> · servicio</span> : null}
                       </td>
-                      <td className={claseTdLista}>
+                      <td className={`${claseTdLista} !whitespace-normal break-words`}>
                         {l.skus_maestros ? (
                           <span>
                             {l.skus_maestros.nombre} <span className="font-mono text-xs text-muted-foreground">{l.skus_maestros.codigo}</span>
