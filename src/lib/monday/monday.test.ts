@@ -272,6 +272,7 @@ test("prioridad entre tableros (13 nov 2026): ENTREGADO, luego DESINTEGRADO; PRO
   assert.equal(prioridadDespacho("en_ruta", "PENDIENTE"), "1");
   assert.equal(prioridadDespacho("en_ruta", null), "1");
   assert.equal(causaDespacho(null, "DESINTEGRADO", "no quiere el pedido"), "Devolución (desintegrado): no quiere el pedido");
-  assert.equal(causaDespacho("No contesta", "PROCESADO", "quiere recibir el sábado"), "Asesores (procesado): quiere recibir el sábado");
+  assert.equal(causaDespacho("No contesta", "PROCESADO", "quiere recibir el sábado"), "Asesores (procesado): quiere recibir el sábado · repartidor: No contesta");
+  assert.equal(causaDespacho("no rpd llamada", "DESINTEGRADO", "3er msj sin respuesta"), "Devolución (desintegrado): 3er msj sin respuesta · repartidor: no rpd llamada");
   assert.equal(causaDespacho("No contesta", null, null), "No contesta");
 });

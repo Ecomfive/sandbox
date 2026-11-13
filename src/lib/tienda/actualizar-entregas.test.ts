@@ -54,3 +54,15 @@ test("sin fecha en Monday, el momento de ahora; el transportista que ya tenía n
   assert.ok(typeof c?.set.entregada_en === "string");
   assert.equal(c?.set.transportista, undefined);
 });
+
+test("DESINTEGRADO de los asesores (13 nov 2026): devuelta, con lo que anotaron los asesores y lo del repartidor como evidencia", () => {
+  const c = cambioDeEntrega(
+    orden(),
+    monday({ estado_grupo: "rechazado", estado: "POSPUESTO", causa_rechazo: "no contesta", estado_asesores: "DESINTEGRADO", observaciones_asesores: "3er msj sin respuesta", fecha: "2026-11-09" }),
+    null,
+    nada,
+  );
+  assert.equal(c?.fase, "devuelta");
+  assert.equal(c?.set.motivo_cancelacion, "Monday · asesores: DESINTEGRADO (3er msj sin respuesta) · repartidor: POSPUESTO (no contesta)");
+  assert.equal(c?.set.fecha_devolucion, "2026-11-09");
+});

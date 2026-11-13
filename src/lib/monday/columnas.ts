@@ -245,7 +245,9 @@ export const prioridadDespacho = (grupo: string | null | undefined, estadoAsesor
 export function causaDespacho(causa: string | null, estadoAsesores: string | null | undefined, observaciones: string | null | undefined): string | null {
   if (!estadoAsesores) return causa;
   const que = esDesintegrado(estadoAsesores) ? "Devolución (desintegrado)" : `Asesores (${estadoAsesores.toLowerCase()})`;
-  return observaciones ? `${que}: ${observaciones}` : causa ? `${que}: ${causa}` : que;
+  // Las dos cosas son evidencia: lo que anotaron los asesores y lo que dijo el repartidor.
+  const partes = [observaciones, causa && causa !== observaciones ? `repartidor: ${causa}` : null].filter(Boolean);
+  return partes.length ? `${que}: ${partes.join(" · ")}` : que;
 }
 
 const corto = (v: string | null | undefined, max: number) => (v && v.trim() ? v.trim().slice(0, max) : null);

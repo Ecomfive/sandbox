@@ -7,7 +7,7 @@
 // remitir, con lo que cobró Servientrega (recaudo) si lo dice (Hernán: «que salgan pendientes»). La regla, pura y con prueba: `cambioDeEntrega`.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { prioridadDespacho } from "@/lib/monday/columnas";
+import { esDesintegrado, prioridadDespacho } from "@/lib/monday/columnas";
 
 export interface OrdenParaEntrega {
   id: string;
@@ -27,6 +27,9 @@ export interface DatoMonday {
   courier: string | null;
   causa_rechazo: string | null;
   fecha: string | null;
+  /** Del tablero de devoluciones: lo que decidieron los asesores (DESINTEGRADO…) y por qué («3er msj sin respuesta»): la evidencia de que se llamó al cliente. */
+  estado_asesores?: string | null;
+  observaciones_asesores?: string | null;
 }
 
 /** Lo último que dice Servientrega (SISCORE, interior) de una orden. */
@@ -77,7 +80,11 @@ export function cambioDeEntrega(o: OrdenParaEntrega, monday: DatoMonday | null, 
     return { fase: "entregada", fuente: "monday", set, detalle: `Monday: ${monday.estado ?? "ENTREGADO"}${monday.courier ? ` · ${monday.courier}` : ""}${monday.fecha ? ` · ${monday.fecha}` : ""}` };
   }
   if (monday.estado_grupo === "rechazado") {
-    const motivo = `Monday: ${monday.estado ?? "RECHAZADO"}${monday.causa_rechazo ? ` (${monday.causa_rechazo})` : ""}`.slice(0, 300);
+    const repartidor = `${monday.estado ?? "RECHAZADO"}${monday.causa_rechazo ? ` (${monday.causa_rechazo})` : ""}`;
+    const motivo = (esDesintegrado(monday.estado_asesores)
+      ? `Monday · asesores: ${monday.estado_asesores}${monday.observaciones_asesores ? ` (${monday.observaciones_asesores})` : ""} · repartidor: ${repartidor}`
+      : `Monday: ${repartidor}`
+    ).slice(0, 300);
     const set: Record<string, unknown> = { fase: "devuelta", estado_entrega: "devuelta", motivo_cancelacion: motivo, cod_esperado: null, fecha_devolucion: monday.fecha };
     if (!o.transportista && monday.courier) set.transportista = monday.courier.slice(0, 80);
     return { fase: "devuelta", fuente: "monday", set, detalle: motivo };
@@ -105,7 +112,7 @@ export async function actualizarEntregas(supabase: SupabaseClient, quien = "Sist
   for (let i = 0; i < ids.length; i += 200) {
     const parte = ids.slice(i, i + 200);
     const [m, g] = await Promise.all([
-      supabase.from("mon_despachos").select("orden_id, estado, estado_grupo, courier, causa_rechazo, fecha_despacho, fecha_entrega, actualizado_monday, estado_asesores").in("orden_id", parte),
+      supabase.from("mon_despachos").select("orden_id, estado, estado_grupo, courier, causa_rechazo, fecha_despacho, fecha_entrega, actualizado_monday, estado_asesores, observaciones_asesores").in("orden_id", parte),
       supabase.from("tienda_guias").select("orden_id, guia, estado, estado_grupo, fecha_estado, fecha_emision, recaudo, ultimo_motivo").in("orden_id", parte),
     ]);
     // Sin la tabla de una fuente (migración sin correr), esa fuente no cuenta.
@@ -115,7 +122,18 @@ export async function actualizarEntregas(supabase: SupabaseClient, quien = "Sist
       const clave = `${prioridadDespacho(x.estado_grupo, x.estado_asesores)}|${fecha ?? ""}|${x.actualizado_monday ?? ""}`;
       const previa = monday.get(String(x.orden_id));
       if (previa && previa.clave >= clave) continue;
-      monday.set(String(x.orden_id), { clave, estado_grupo: String(x.estado_grupo), estado: x.estado, courier: x.courier, causa_rechazo: x.causa_rechazo, fecha });
+      // El tablero de devoluciones no tiene fecha: la de su última actualización en Monday (cuando los asesores decidieron).
+      const dia = fecha ?? (x.estado_asesores ? (x.actualizado_monday?.slice(0, 10) ?? null) : null);
+      monday.set(String(x.orden_id), {
+        clave,
+        estado_grupo: String(x.estado_grupo),
+        estado: x.estado,
+        courier: x.courier,
+        causa_rechazo: x.causa_rechazo,
+        fecha: dia,
+        estado_asesores: x.estado_asesores,
+        observaciones_asesores: x.observaciones_asesores,
+      });
     }
     for (const x of (g.error ? [] : (g.data ?? [])) as Record<string, unknown>[]) {
       const clave = `${x.fecha_emision ?? ""}|${x.fecha_estado ?? ""}`;
