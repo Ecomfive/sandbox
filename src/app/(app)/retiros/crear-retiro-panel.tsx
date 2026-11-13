@@ -359,9 +359,9 @@ export function CrearRetiroPanel({
                   </div>
                 </div>
                 <div className="sm:col-span-2">
+                  {/* Opcional (14 nov 2026, pedido de Hernán): al crear no se sabe cuánto cobrarán; si se deja vacía, al conciliar sale de lo recibido. */}
                   <p className={labelClassSm} id="etiqueta-comision">
-                    Comisión
-                    <Obligatorio />
+                    Comisión <span className="font-normal text-muted-foreground">(opcional: si no la sabes, se calcula al conciliar)</span>
                   </p>
                   <div className="mt-1 grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div className="flex min-w-0 items-center gap-1">
@@ -372,8 +372,6 @@ export function CrearRetiroPanel({
                         step="0.01"
                         min="0"
                         name="comision"
-                        required
-                        aria-invalid={invalido("campo-comision")}
                         aria-label="Comisión"
                         aria-describedby="etiqueta-comision"
                         placeholder="Ej: 3.00"
@@ -396,9 +394,6 @@ export function CrearRetiroPanel({
                       />
                       <span className="text-sm text-muted-foreground">%</span>
                     </div>
-                  </div>
-                  <div className="mt-1">
-                    <AvisoFaltante id="campo-comision" faltante={faltante} />
                   </div>
                 </div>
               </div>

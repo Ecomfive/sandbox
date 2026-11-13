@@ -9,6 +9,7 @@ import { formatearMoneda } from "@/lib/formato";
 import { getUsuarioActual, requireModuloEscritura } from "@/lib/auth";
 import { insertarConCorrelativo, leerCorrelativo } from "@/lib/retiros/correlativo";
 import { ESTADO_ETIQUETA as ETIQUETA_ESTADO } from "@/lib/retiros/estados";
+import { revisarConciliacion } from "@/lib/retiros/comision";
 
 const TOLERANCIA_DISCREPANCIA = 3;
 
@@ -118,17 +119,17 @@ export async function crearRetiro(formData: FormData) {
   const monto = Number(formData.get("monto"));
   const comisionTexto = String(formData.get("comision") ?? "").trim();
   const comision = Number(comisionTexto);
-  // Lo que la ficha ya exige (cuenta elegida, monto mayor a cero y comisión escrita, aunque sea 0): se vuelve a
-  // comprobar aquí porque un server action se puede invocar sin pasar por la ficha.
+  // Lo que la ficha ya exige (cuenta elegida y monto mayor a cero): se vuelve a comprobar aquí porque un server action se puede invocar sin pasar por la
+  // ficha. La comisión es opcional (14 nov 2026): vacía queda en 0 y al conciliar sale de lo recibido.
   if (!cuenta_retiro_id) throw new Error("Elige la cuenta destino.");
   if (!(monto > 0)) throw new Error("El monto debe ser mayor a cero.");
-  if (comisionTexto === "" || !(comision >= 0)) throw new Error("Escribe la comisión (puede ser 0).");
+  if (comisionTexto !== "" && !(comision >= 0)) throw new Error("La comisión no puede ser negativa.");
   const fecha = formData.get("fecha") as string;
   const notas = (formData.get("notas") as string) || null;
   const fecha_limite = (formData.get("fecha_limite") as string) || null;
   // "A recibir" ya no se edita a mano: siempre es monto menos comisión, para que la comisión
   // configurada en la cuenta destino se refleje tal cual, sin que alguien la pise sin querer.
-  const a_recibir = monto - comision;
+  const a_recibir = monto - (comisionTexto === "" ? 0 : comision);
   const gestionadoPorTexto = formData.get("gestionado_por") as string;
   const gestionado_por = gestionadoPorTexto === "correo" ? "correo" : "plataforma";
   // La persona asignada la pone el sistema: quien crea el retiro.
@@ -271,6 +272,8 @@ export async function conciliarRetiro(formData: FormData): Promise<{ error?: str
   // Fecha de consolidación: arranca en hoy (el día en que se marca como consolidado) pero se puede cambiar a mano.
   const fecha_cierre = ((formData.get("fecha_cierre") as string) || hoyISO()).trim();
   const comprobante = formData.get("comprobante") as File | null;
+  // La comisión que sale de lo recibido (14 nov 2026): la ficha la llena sola; vacía = se compara contra «A recibir» como antes.
+  const comisionTexto = String(formData.get("comision") ?? "").trim();
 
   const supabase = createServiceClient();
   // `*` y no una lista: `novedad_resuelta` (migración 0048) puede no existir todavía.
@@ -293,9 +296,16 @@ export async function conciliarRetiro(formData: FormData): Promise<{ error?: str
   if (!esFechaISO(fecha_cierre)) return { error: "La fecha de consolidación no es válida." };
   if (!soporte_numero?.trim()) return { error: "Falta el ID / referencia." };
 
-  const esperado = Number(retiro.a_recibir ?? retiro.monto_neto);
-  const diferencia = montoRecibido - esperado;
   const m = await formatoDelPais(supabase, retiro.pais_id as string);
+  // Con la comisión escrita (o calculada) al conciliar, lo que vale es que cuadre: monto − comisión = recibido; esa comisión se guarda y «A recibir» pasa
+  // a ser lo recibido. Sin ella, como antes: lo recibido contra «A recibir», con tolerancia.
+  const comisionNueva = comisionTexto === "" ? null : Number(comisionTexto);
+  if (comisionNueva !== null) {
+    const problema = revisarConciliacion(Number(retiro.monto), montoRecibido, comisionNueva);
+    if (problema) return { error: problema };
+  }
+  const esperado = comisionNueva !== null ? Number(retiro.monto) - comisionNueva : Number(retiro.a_recibir ?? retiro.monto_neto);
+  const diferencia = montoRecibido - esperado;
   if (Math.abs(diferencia) > TOLERANCIA_DISCREPANCIA) {
     return {
       error: `No se puede conciliar: se esperaban ${m(esperado)} y se recibieron ${m(montoRecibido)} (diferencia de ${m(diferencia)}, máximo permitido ${m(TOLERANCIA_DISCREPANCIA)}). Corrige el monto o investiga antes de conciliar.`,
@@ -323,11 +333,12 @@ export async function conciliarRetiro(formData: FormData): Promise<{ error?: str
       fecha_recibido,
       fecha_cierre,
       consolidado: true,
+      ...(comisionNueva !== null ? { comision: Math.round(comisionNueva * 100) / 100, a_recibir: Math.round((Number(retiro.monto) - comisionNueva) * 100) / 100 } : {}),
     })
     .eq("id", id);
   if (error) return { error: error.message };
 
-  await registrarEvento(supabase, id, `Retiro conciliado: monto recibido ${m(montoRecibido)}`);
+  await registrarEvento(supabase, id, `Retiro conciliado: monto recibido ${m(montoRecibido)}${comisionNueva !== null && Math.abs(comisionNueva - Number(retiro.comision ?? 0)) > 0.004 ? ` · comisión ${m(comisionNueva)} (antes ${m(Number(retiro.comision ?? 0))})` : ""}`);
   // Línea aparte en la línea de tiempo: además de conciliarse, queda consolidado — se registra como su
   // propio hecho, con su propia fecha, no solo como un dato dentro del texto de arriba.
   await registrarEvento(supabase, id, "Consolidado");

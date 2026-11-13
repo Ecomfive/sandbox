@@ -11,6 +11,7 @@ import { Seccion } from "@/components/ui/seccion-ficha";
 import { useFaltantes } from "@/components/ui/usar-faltantes";
 import { formatearMoneda } from "@/lib/formato";
 import { ConciliarIcon } from "@/lib/nav-icons";
+import { comisionDesdeRecibido, desdePorcentaje } from "@/lib/retiros/comision";
 
 const hoy = () => new Date().toISOString().slice(0, 10);
 
@@ -18,8 +19,9 @@ const hoy = () => new Date().toISOString().slice(0, 10);
  * Lo que se pide para conciliar un retiro, al final de su ficha (el botón «Conciliar» lleva hasta aquí; ya no se abre
  * una ventana en el medio). Lo demás (plataforma, cuenta destino, montos, fechas) ya está en la ficha. **Recibido**,
  * **Fecha de recibido** e **ID / Referencia** son obligatorios:
- *  - **Recibido**: lo que llegó de verdad. Se compara con «A recibir»; si se aleja más de lo tolerado, el servidor no
- *    concilia y lo dice (`conciliarRetiro`).
+ *  - **Recibido**: lo que llegó de verdad. Al escribirlo se llenan solos **Comisión** y **%** (14 nov 2026, pedido de Hernán: la comisión no se sabe
+ *    al crear el retiro): comisión = monto − recibido. Se pueden corregir a mano (cambiar la comisión o el % ajusta lo recibido); el servidor
+ *    guarda esa comisión y concilia si monto − comisión = recibido (`conciliarRetiro`, `revisarConciliacion`).
  *  - **Fecha de recibido**: cuándo llegó de verdad el dinero al banco — arranca en hoy, pero se puede cambiar a mano
  *    al validarlo contra el banco (puede ser otro día que cuando se hace la conciliación).
  *  - **Fecha de consolidación** (`fecha_cierre`): el día en que se marca como consolidado — arranca en hoy y también se
@@ -35,6 +37,7 @@ export function SeccionConciliarRetiro({
   paisId,
   codigoPais,
   aRecibir,
+  monto,
   soporteNumero,
   montoRecibido,
   fechaRecibido,
@@ -46,6 +49,8 @@ export function SeccionConciliarRetiro({
   codigoPais: string;
   /** Lo esperado (monto menos comisión): se muestra para comparar con lo recibido. */
   aRecibir: number;
+  /** El monto del retiro (bruto): de él sale la comisión al escribir lo recibido. */
+  monto: number;
   soporteNumero: string | null;
   montoRecibido: number | null;
   fechaRecibido: string | null;
@@ -61,6 +66,36 @@ export function SeccionConciliarRetiro({
   const idFechaConsolidacion = `campo-fecha-consolidacion-${id}`;
   const idReferencia = `campo-referencia-${id}`;
   const idSoporte = `campo-soporte-${id}`;
+  const idComision = `campo-comision-${id}`;
+  const idPorcentaje = `campo-porcentaje-${id}`;
+  // Recibido, comisión y % van juntos: al escribir uno se calculan los otros (monto − comisión = recibido).
+  const inicial = montoRecibido;
+  const deInicio = inicial !== null ? comisionDesdeRecibido(monto, inicial) : null;
+  const [recibido, setRecibido] = useState(inicial !== null ? String(inicial) : "");
+  const [comisionTxt, setComisionTxt] = useState(deInicio ? deInicio.comision.toFixed(2) : "");
+  const [porcentajeTxt, setPorcentajeTxt] = useState(deInicio ? deInicio.porcentaje.toFixed(2) : "");
+  const fijo = (n: number) => n.toFixed(2);
+
+  function alCambiarRecibido(v: string) {
+    setRecibido(v);
+    const c = v.trim() === "" ? null : comisionDesdeRecibido(monto, Number(v));
+    setComisionTxt(c ? fijo(c.comision) : "");
+    setPorcentajeTxt(c ? fijo(c.porcentaje) : "");
+  }
+  function alCambiarComision(v: string) {
+    setComisionTxt(v);
+    const n = Number(v);
+    if (v.trim() === "" || !Number.isFinite(n) || !(monto > 0)) return;
+    setRecibido(fijo(monto - n));
+    setPorcentajeTxt(fijo((n / monto) * 100));
+  }
+  function alCambiarPorcentaje(v: string) {
+    setPorcentajeTxt(v);
+    const r = v.trim() === "" ? null : desdePorcentaje(monto, Number(v));
+    if (!r) return;
+    setComisionTxt(fijo(r.comision));
+    setRecibido(fijo(r.recibido));
+  }
 
   function alEnviar(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -87,9 +122,15 @@ export function SeccionConciliarRetiro({
           <input type="hidden" name="id" value={id} />
           <input type="hidden" name="pais_id" value={paisId} />
 
-          <div className="flex flex-col gap-0.5">
-            <span className={labelClassSm}>A recibir</span>
-            <span className="text-sm font-semibold tabular-nums">{formatearMoneda(aRecibir, codigoPais)}</span>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-0.5">
+              <span className={labelClassSm}>Monto del retiro</span>
+              <span className="text-sm font-semibold tabular-nums">{formatearMoneda(monto, codigoPais)}</span>
+            </div>
+            <div className="flex flex-col gap-0.5">
+              <span className={labelClassSm}>A recibir (estimado)</span>
+              <span className="text-sm tabular-nums text-muted-foreground">{formatearMoneda(aRecibir, codigoPais)}</span>
+            </div>
           </div>
 
           <div className="flex flex-col gap-1">
@@ -107,12 +148,52 @@ export function SeccionConciliarRetiro({
                 name="monto_recibido"
                 required
                 aria-invalid={faltante === idRecibido || undefined}
-                defaultValue={montoRecibido ?? ""}
+                value={recibido}
+                onChange={(e) => alCambiarRecibido(e.target.value)}
                 placeholder="Ej: 1500.00"
                 className={`${fieldClass} w-full min-w-0 tabular-nums`}
               />
             </div>
             <AvisoFaltante id={idRecibido} faltante={faltante} />
+          </div>
+
+          {/* Se llenan solos al escribir lo recibido; se pueden corregir. */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex min-w-0 flex-col gap-1">
+              <label className={labelClassSm} htmlFor={idComision}>
+                Comisión
+              </label>
+              <div className="flex items-center gap-1">
+                <span className="text-sm text-muted-foreground">{simbolo}</span>
+                <input
+                  id={idComision}
+                  type="number"
+                  step="0.01"
+                  name="comision"
+                  value={comisionTxt}
+                  onChange={(e) => alCambiarComision(e.target.value)}
+                  placeholder="Sale de lo recibido"
+                  className={`${fieldClass} w-full min-w-0 tabular-nums`}
+                />
+              </div>
+            </div>
+            <div className="flex min-w-0 flex-col gap-1">
+              <label className={labelClassSm} htmlFor={idPorcentaje}>
+                Porcentaje
+              </label>
+              <div className="flex items-center gap-1">
+                <input
+                  id={idPorcentaje}
+                  type="number"
+                  step="0.01"
+                  value={porcentajeTxt}
+                  onChange={(e) => alCambiarPorcentaje(e.target.value)}
+                  placeholder="Sale de lo recibido"
+                  className={`${fieldClass} w-full min-w-0 tabular-nums`}
+                />
+                <span className="text-sm text-muted-foreground">%</span>
+              </div>
+            </div>
           </div>
 
           <div className="flex flex-col gap-1">
@@ -167,9 +248,9 @@ export function SeccionConciliarRetiro({
             <AvisoFaltante id={idReferencia} faltante={faltante} />
           </div>
 
-          {/* El soporte se adjunta con solo un ícono (sin texto): imagen o PDF. Opcional. */}
-          <div className="flex flex-col gap-1">
-            <BotonAdjuntar id={idSoporte} name="comprobante" accept="image/*,application/pdf" nombreAccesible="Adjuntar soporte" />
+          {/* El soporte: imagen o PDF, opcional. Se elige el archivo, o se pega la captura del ingreso (Ctrl+V) o se arrastra. */}
+          <div className="flex flex-wrap items-center gap-3">
+            <BotonAdjuntar id={idSoporte} name="comprobante" accept="image/*,application/pdf" nombreAccesible="Adjuntar soporte" pegarCaptura />
           </div>
 
           {error && (

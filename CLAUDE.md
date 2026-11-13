@@ -1792,8 +1792,11 @@ convenciones técnicas del código.
   `SeccionResolverNovedad`; solo una a la vez), la ficha
   baja hasta ella (`irAlPanel`, sin movimiento suave si se pidió menos animación) y el foco
   entra en su primer campo. Conciliar pide **Recibido** e **ID / Referencia**, ambos
-  obligatorios (Recibido: si se aleja de «A recibir» más de lo tolerado, `conciliarRetiro`
-  no concilia y lo dice). El **soporte** es **opcional**: se adjunta con un botón que es
+  obligatorios. **Comisión al conciliar** (14 nov 2026, pedido de Hernán: al crear no se sabe la comisión): al crear, la comisión es opcional (vacía = 0);
+  al conciliar, **Comisión** y **%** se llenan solos con lo recibido (monto − recibido; editar uno ajusta los otros) y `conciliarRetiro` guarda esa
+  comisión y `a_recibir`, y solo exige que cuadre (`revisarConciliacion`, `src/lib/retiros/comision.ts`, con prueba). Sin comisión en el formulario, como
+  antes: lo recibido contra «A recibir» con `TOLERANCIA_DISCREPANCIA`. El **soporte** se puede **pegar** (Ctrl+V) o arrastrar: `BotonAdjuntar` con
+  `pegarCaptura` (lo pone en el `input` con `DataTransfer`, miniatura al lado). El **soporte** es **opcional**: se adjunta con un botón que es
   **solo un ícono**, sin texto (`BotonAdjuntar` con `AdjuntoIcon`; ya con archivo se marca
   en verde y su nombre queda en el tooltip), pero no bloquea conciliar si no se adjunta uno
   — ni en la ficha ni en el servidor (`conciliarRetiro`). Al conciliar, deja el retiro
