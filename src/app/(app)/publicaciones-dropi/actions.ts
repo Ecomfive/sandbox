@@ -871,13 +871,12 @@ export async function republicarPublicacion(id: string, precio: number): Promise
     ? await createServiceClient().from("dropi_productos_proveedor").select("tipo, bodegas").eq("pais_id", antes.pais_id).eq("dropi_producto_id", primerId).maybeSingle()
     : { data: null };
   const enBodegaDropi = unidadesEnBodegaDropi(lectura?.bodegas);
-  if (enBodegaDropi > 0 && lectura?.tipo === "VARIABLE") return { error: "Tiene variaciones y su stock está en la bodega de Dropi: por ahora se republica a mano." };
   const r = await encolarRepublicar(
     createServiceClient(),
     { id, pais_id: antes.pais_id, dropi_id: (antes.dropi_id as string | null) ?? null },
     { id: usuario.id, nombre: usuario.nombre || usuario.email },
     { precio: precioNuevo, precioAntes },
-    enBodegaDropi > 0 ? { temporal: UNIDADES_TEMPORALES_B280, unidades: enBodegaDropi } : undefined,
+    enBodegaDropi > 0 ? { temporal: UNIDADES_TEMPORALES_B280, unidades: enBodegaDropi, variable: lectura?.tipo === "VARIABLE" } : undefined,
   );
   if ("error" in r) return { error: r.error };
   const codigoRep = await codigoDePais(antes.pais_id);

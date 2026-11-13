@@ -1023,6 +1023,26 @@ test("variaciones: si el nuevo no queda con el stock de cada talla, no se le sac
   assert.deepEqual(stockVariable(bien.productos.get(7000)!), { S: 0, M: 0 });
 });
 
+test("republicar (B280) con variaciones: cada talla nace con 100 temporales en la B81 y queda en 0; el viejo conserva sus tallas en la B280", async () => {
+  const d = crearDropi();
+  const o = conVariaciones(7000, "Rodillera", false, { S: 10, M: 8 });
+  for (const v of o.variations as Obj[]) ((v.warehouse_product_variation as Obj[])[0].warehouse_id = 280);
+  d.productos.set(7000, o);
+  const datos = { b280: true, temporal: 100 };
+  const [r] = await aplicar(d, [{ ...base, id: "v1", tipo: "republicar", producto: 7000, datos }]);
+  assert.equal(r.ok, true, String(r.error));
+  assert.equal(r.b280, 18, "las unidades del viejo en la bodega de Dropi, de todas las tallas");
+  const nuevo = d.productos.get(Number(r.nuevo))!;
+  assert.equal(nuevo.type, "VARIABLE");
+  assert.deepEqual(stockVariable(nuevo), { S: 0, M: 0 }, "las temporales de cada talla salieron");
+  assert.deepEqual(stockVariable(d.productos.get(7000)!), { S: 10, M: 8 }, "el viejo no se tocó");
+  assert.notEqual(d.productos.get(7000)!.archived, true);
+  // El reintento sigue desde el ID creado y no mueve nada más.
+  const [r2] = await aplicar(d, [{ ...base, id: "v1", tipo: "republicar", producto: 7000, nuevo: r.nuevo, datos }]);
+  assert.equal(r2.ok, true, String(r2.error));
+  assert.equal(d.llamadas.filter((l) => l === "POST /products").length, 1);
+});
+
 test("variaciones: republicar con stock en la bodega de Dropi (B280), unidades privatizadas o sin atributos, se detiene antes de crear nada", async () => {
   const b280 = crearDropi();
   const o = conVariaciones(7000, "Rodillera", false, { S: 10 });

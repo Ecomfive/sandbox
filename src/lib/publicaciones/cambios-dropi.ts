@@ -162,7 +162,7 @@ export async function encolarRepublicar(
   /** El precio del producto nuevo (27 oct 2026: se elige al republicar; el sugerido va igual) y el que tenía. Sin él, se copia el del viejo. */
   precio?: { precio: number; precioAntes: number | null },
   /** «Republicar (B280)» (12 nov 2026): el stock está en la bodega de Dropi; el ID nuevo nace con `temporal` unidades en la nuestra y Dropi traslada `unidades`. */
-  b280?: { temporal: number; unidades: number },
+  b280?: { temporal: number; unidades: number; variable?: boolean },
 ): Promise<{ id: string; yaEstaba: boolean } | { error: string }> {
   const productoId = idsDeDropi(pub.dropi_id)[0];
   if (!productoId) return { error: "La publicación no tiene ID de Dropi." };
@@ -183,7 +183,7 @@ export async function encolarRepublicar(
       dropi_producto_id: productoId,
       tipo: "republicar",
       ...precios,
-      ...(b280 ? { datos: { b280: true, temporal: b280.temporal, unidadesB280: b280.unidades } } : {}),
+      ...(b280 ? { datos: { b280: true, temporal: b280.temporal, unidadesB280: b280.unidades, variable: b280.variable === true } } : {}),
       creado_por: por.id,
       creado_por_nombre: por.nombre,
     })

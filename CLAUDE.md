@@ -788,8 +788,10 @@ convenciones técnicas del código.
   mientras no exista el producto nuevo). El favorito lo pasa a `nuevo(o,bp,{precio,precioSugerido})` (`REPUBLICAR_JS`, gemelo de
   `armarProductoNuevo(..., precios)`, con prueba) y `crearRepublicada` (`aplicar-actions.ts`) le pone ese precio (y `ultimo_cambio_precio`
   si cambió) a la publicación nueva. Cambia `VERSION_FAVORITO`: hay que volver a arrastrar «Aplicar en Dropi».
-  **Republicar (B280)** (12 nov 2026, proceso de Nicol; tarea de Alcides): lo de la bodega de Dropi (B280/B15, `esBodegaDropi`) ya se republica si es simple
-  (`motivoRepublicar`/`puedeRepublicar`; con variaciones, «a mano»). `republicarPublicacion` lo detecta con la lectura de «Mis productos» y encola con `datos: { b280,
+  **Republicar (B280)** (12 nov 2026, proceso de Nicol; tarea de Alcides): lo de la bodega de Dropi (B280/B15, `esBodegaDropi`) ya se republica, simple o
+  con variaciones (`motivoRepublicar`/`puedeRepublicar`). Con variaciones (12 nov 2026, pedido de Hernán): `armarProductoNuevoVariable(..., { bodega, temporal })` / `nuevoV(o,bp,p,b2)`
+  crea cada variación con 100 temporales en nuestra bodega (sin la B280); el favorito las saca con `entradasV` + `apagadoV` y comprueba 0 con `nuestras`; `datos.variable` hace que
+  el mensaje pida pasar cada variación a la misma del ID nuevo. `republicarPublicacion` lo detecta con la lectura de «Mis productos» y encola con `datos: { b280,
   temporal: 100, unidadesB280 }` (`normalizarDatosRepublicar`, `src/lib/publicaciones/traslado-b280.ts`, con prueba). En el favorito, `republicar280`: crea con
   `nuevo280` (= `armarProductoNuevoB280`, sin la B280 y con 100 en «Proveedor Ecomfive», `bodegaTemporalB280`), copia fotos y garantías (`FOTOS_GARANTIAS_JS`, compartido
   con republicar), saca las 100 y comprueba 0; **no toca el viejo** (sigue activo); devuelve `b280` = unidades del viejo en la bodega de Dropi (prueba de punta a punta en

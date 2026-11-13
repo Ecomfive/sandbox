@@ -14,6 +14,8 @@ export interface DatosRepublicar {
   temporal: number;
   /** Las unidades que el ID viejo tenía en la bodega de Dropi al republicar (las que Dropi debe trasladar). */
   unidadesB280: number | null;
+  /** Tiene variaciones (tallas, colores…): cada una se crea con las temporales y Dropi traslada cada una a la misma del ID nuevo. */
+  variable: boolean;
   /** La tarea «Pedir a Dropi el traslado» (se cierra sola al ver el traslado). */
   trasladoTarea: string | null;
   /** Cuándo la lectura vio el stock en la bodega de Dropi del ID nuevo. */
@@ -26,7 +28,7 @@ export function normalizarDatosRepublicar(v: unknown): DatosRepublicar | null {
   if (!d || d.b280 !== true) return null;
   const entero = (x: unknown) => (typeof x === "number" && Number.isFinite(x) && x >= 0 ? Math.round(x) : null);
   const texto = (x: unknown) => (typeof x === "string" && x.trim() ? x.trim().slice(0, 100) : null);
-  return { b280: true, temporal: entero(d.temporal) || 100, unidadesB280: entero(d.unidadesB280), trasladoTarea: texto(d.trasladoTarea), trasladado: texto(d.trasladado) };
+  return { b280: true, temporal: entero(d.temporal) || 100, unidadesB280: entero(d.unidadesB280), variable: d.variable === true, trasladoTarea: texto(d.trasladoTarea), trasladado: texto(d.trasladado) };
 }
 
 /** Las unidades en la bodega de Dropi (B280 o B15) de una lectura de «Mis productos». */
@@ -40,9 +42,10 @@ export function unidadesEnBodegaDropi(bodegas: unknown): number {
 export const bodegaDropiDePais = (codigo: string) => (codigo.toUpperCase() === "CR" ? "la bodega de Dropi Costa Rica (B15)" : "la Bodega Dropi Panamá (B280)");
 
 /** El mensaje para el grupo de Dropi, listo para copiar. */
-export function mensajeTrasladoDropi(m: { viejo: number | string; nuevo: number | string; nombre: string; unidades: number | null; pais: string }): string {
+export function mensajeTrasladoDropi(m: { viejo: number | string; nuevo: number | string; nombre: string; unidades: number | null; pais: string; variable?: boolean }): string {
   const cuantas = m.unidades && m.unidades > 0 ? `las ${m.unidades.toLocaleString("es-PA")} unidades` : "todas las unidades";
-  return `Hola equipo Dropi 👋 Por favor trasladar ${cuantas} de ${bodegaDropiDePais(m.pais)} del ID ${m.viejo} al ID nuevo ${m.nuevo} («${m.nombre}»). Republicamos el producto y el ID ${m.viejo} se archiva más adelante. ¡Gracias!`;
+  const porVariacion = m.variable ? ", cada variación (talla, color…) a la misma variación del ID nuevo" : "";
+  return `Hola equipo Dropi 👋 Por favor trasladar ${cuantas} de ${bodegaDropiDePais(m.pais)} del ID ${m.viejo} al ID nuevo ${m.nuevo} («${m.nombre}»)${porVariacion}. Republicamos el producto y el ID ${m.viejo} se archiva más adelante. ¡Gracias!`;
 }
 
 /**

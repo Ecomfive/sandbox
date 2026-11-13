@@ -227,8 +227,8 @@ export function sinStock(f: Pick<FilaPublicacion, "archivada" | "enDropi" | "sto
  * nuestra bodega (lo de la B280 es de Dropi). El servidor lo vuelve a comprobar en `republicarPublicacion`.
  */
 export function puedeRepublicar(f: Pick<FilaPublicacion, "dropiId" | "archivada" | "bodega" | "tipoDropi" | "sinPublicar" | "apagadoPendiente" | "duplicadaDe" | "stockPorId">): boolean {
-  // La de la bodega de Dropi (12 nov 2026) se republica con el proceso de la B280, solo si es simple.
-  return f.dropiId.trim() !== "" && !f.archivada && !f.sinPublicar && !f.apagadoPendiente && !f.duplicadaDe && !(republicaDeBodegaDropi(f) && conVariaciones(f)) && f.tipoDropi !== "privado";
+  // La de la bodega de Dropi (12 nov 2026) se republica con el proceso de la B280, con o sin variaciones.
+  return f.dropiId.trim() !== "" && !f.archivada && !f.sinPublicar && !f.apagadoPendiente && !f.duplicadaDe && f.tipoDropi !== "privado";
 }
 /** Si se republica con el proceso de la B280: su stock está en la bodega de Dropi. */
 export const republicaDeBodegaDropi = (f: Pick<FilaPublicacion, "bodega">) => esBodegaDropi(f.bodega?.id);
