@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { mensajeBloqueos, mensajeBloqueosVariante, nombreBloqueo } from "./eliminar-producto";
+import { mensajeBloqueos, mensajeBloqueosVariante, mensajeErrorQuitarVariante, nombreBloqueo } from "./eliminar-producto";
 
 describe("nombreBloqueo", () => {
   it("dice con palabras del equipo qué tabla lo bloquea", () => {
@@ -37,4 +37,15 @@ describe("mensajeBloqueosVariante", () => {
     assert.match(mensajeBloqueosVariante("X", { "wms_compra_items.sku_maestro_id": 2 }), /la usan 2 compras\. /);
     assert.equal(mensajeBloqueosVariante("X", {}), "No se pudo quitar la variante X.");
   });
+});
+
+describe("mensajeErrorQuitarVariante", () => {
+  it("el error de la base al quitar una variante dice qué la usa", () => {
+  assert.equal(
+    mensajeErrorQuitarVariante('update or delete on table "skus_maestros" violates foreign key constraint "x_sku_fkey" on table "wms_compra_items"'),
+    "No se pudo quitar la variante: todavía la usa «compra» (wms_compra_items).",
+  );
+  assert.match(mensajeErrorQuitarVariante("canceling statement due to statement timeout"), /^No se pudo quitar la variante: canceling/);
+  assert.equal(mensajeErrorQuitarVariante(null), "No se pudo quitar la variante.");
+});
 });
