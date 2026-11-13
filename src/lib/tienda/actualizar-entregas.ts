@@ -7,6 +7,7 @@
 // remitir, con lo que cobró Servientrega (recaudo) si lo dice (Hernán: «que salgan pendientes»). La regla, pura y con prueba: `cambioDeEntrega`.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { prioridadDespacho } from "@/lib/monday/columnas";
 
 export interface OrdenParaEntrega {
   id: string;
@@ -110,8 +111,8 @@ export async function actualizarEntregas(supabase: SupabaseClient, quien = "Sist
     // Sin la tabla de una fuente (migración sin correr), esa fuente no cuenta.
     for (const x of (m.error ? [] : (m.data ?? [])) as Record<string, string | null>[]) {
       const fecha = x.fecha_entrega ?? x.fecha_despacho;
-      // Lo del tablero de devoluciones (con decisión de los asesores) va después de lo del repartidor: es lo último que pasa con el pedido.
-      const clave = `${x.estado_asesores ? "2" : "1"}|${fecha ?? ""}|${x.actualizado_monday ?? ""}`;
+      // Manda un ENTREGADO, luego un DESINTEGRADO de los asesores y, entre lo demás, lo más reciente (`prioridadDespacho`).
+      const clave = `${prioridadDespacho(x.estado_grupo, x.estado_asesores)}|${fecha ?? ""}|${x.actualizado_monday ?? ""}`;
       const previa = monday.get(String(x.orden_id));
       if (previa && previa.clave >= clave) continue;
       monday.set(String(x.orden_id), { clave, estado_grupo: String(x.estado_grupo), estado: x.estado, courier: x.courier, causa_rechazo: x.causa_rechazo, fecha });

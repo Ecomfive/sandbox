@@ -3,6 +3,7 @@ import test from "node:test";
 import { CAUSA_OTRA, causaDeTexto, codigoDeNombre, leerPalabras, pesoCausas, porDimension, resumenPorMes, textosSinCausa, type Causa, type DespachoAnalisis } from "./causas";
 import {
   cambioDesde,
+  causaDespacho,
   despachoDeItem,
   enlazarOrden,
   errorMonday,
@@ -12,6 +13,7 @@ import {
   leerPagina,
   leerReglasEstado,
   normalizarPedido,
+  prioridadDespacho,
   sugerirMapeo,
   unidadDeTexto,
   validarMapeo,
@@ -260,4 +262,16 @@ test("tablero de devoluciones (13 nov 2026): FALLIDO y POSPUESTO siguen en ruta;
   const cerrado = despachoDeItem(item("DESINTEGRADO"), { ...m, pedido: "name" });
   assert.equal(cerrado.estado_grupo, "rechazado");
   assert.equal(cerrado.causa_rechazo, "no quiere el pedido");
+});
+
+test("prioridad entre tableros (13 nov 2026): ENTREGADO, luego DESINTEGRADO; PROCESADO no tapa al repartidor", () => {
+  assert.equal(prioridadDespacho("entregado", null), "3");
+  assert.equal(prioridadDespacho("entregado", "PROCESADO"), "3");
+  assert.equal(prioridadDespacho("rechazado", "DESINTEGRADO"), "2");
+  assert.equal(prioridadDespacho("en_ruta", "PROCESADO"), "1");
+  assert.equal(prioridadDespacho("en_ruta", "PENDIENTE"), "1");
+  assert.equal(prioridadDespacho("en_ruta", null), "1");
+  assert.equal(causaDespacho(null, "DESINTEGRADO", "no quiere el pedido"), "Devolución (desintegrado): no quiere el pedido");
+  assert.equal(causaDespacho("No contesta", "PROCESADO", "quiere recibir el sábado"), "Asesores (procesado): quiere recibir el sábado");
+  assert.equal(causaDespacho("No contesta", null, null), "No contesta");
 });

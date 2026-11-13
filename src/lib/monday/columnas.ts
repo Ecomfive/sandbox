@@ -233,6 +233,21 @@ export interface Despacho {
 /** DESINTEGRADO: los asesores cerraron el pedido y el producto vuelve al inventario (Hernán, 13 nov 2026). Eso sí es una devolución. */
 export const esDesintegrado = (estadoAsesores: string | null | undefined) => /DESINTEGRAD/.test(normalizar(estadoAsesores ?? ""));
 
+/**
+ * Qué fila de Monday manda cuando un pedido está en varios tableros (13 nov 2026): primero un ENTREGADO (de cualquier tablero: es lo más seguro),
+ * luego un DESINTEGRADO de los asesores (el pedido se cerró), y entre las demás la más reciente. PROCESADO (los asesores reprogramaron la entrega) o
+ * PENDIENTE no tienen prioridad: no tapan lo que diga después el repartidor. Se antepone a la fecha en la clave de orden.
+ */
+export const prioridadDespacho = (grupo: string | null | undefined, estadoAsesores: string | null | undefined): string =>
+  grupo === "entregado" ? "3" : esDesintegrado(estadoAsesores) ? "2" : "1";
+
+/** El motivo que se muestra: el de los asesores si lo hay (devolución si lo desintegraron; si no, lo que anotaron), o la causa del repartidor. */
+export function causaDespacho(causa: string | null, estadoAsesores: string | null | undefined, observaciones: string | null | undefined): string | null {
+  if (!estadoAsesores) return causa;
+  const que = esDesintegrado(estadoAsesores) ? "Devolución (desintegrado)" : `Asesores (${estadoAsesores.toLowerCase()})`;
+  return observaciones ? `${que}: ${observaciones}` : causa ? `${que}: ${causa}` : que;
+}
+
 const corto = (v: string | null | undefined, max: number) => (v && v.trim() ? v.trim().slice(0, max) : null);
 
 /** Un ítem del tablero como despacho, según el mapeo. */

@@ -3,7 +3,7 @@
 // por número de pedido y tienda. Aquí solo se leen. Si la tabla no existe o Monday no está configurado, no hay entregas (Logística sigue igual).
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { GrupoEstado } from "@/lib/monday/columnas";
+import { causaDespacho, prioridadDespacho, type GrupoEstado } from "@/lib/monday/columnas";
 
 export interface EntregaMonday {
   /** entregado, rechazado, cancelado, en_ruta o sin_estado (la regla de estados de Monday). */
@@ -46,11 +46,11 @@ export async function entregasDeOrdenes(supabase: SupabaseClient, ordenIds: stri
       observaciones_asesores?: string | null;
     }[]) {
       const fecha = d.fecha_entrega ?? d.fecha_despacho;
-      // Lo del tablero de devoluciones (13 nov 2026) va después de lo del repartidor: es lo último que pasa con el pedido.
-      const clave = `${d.estado_asesores ? "2" : "1"}|${fecha ?? ""}|${d.actualizado_monday ?? ""}`;
+      // Manda un ENTREGADO, luego un DESINTEGRADO de los asesores y, entre lo demás, lo más reciente (`prioridadDespacho`).
+      const clave = `${prioridadDespacho(d.estado_grupo, d.estado_asesores)}|${fecha ?? ""}|${d.actualizado_monday ?? ""}`;
       const previa = mapa.get(d.orden_id);
       if (previa && previa.clave >= clave) continue;
-      const causa = d.estado_asesores ? `Devolución (${d.estado_asesores.toLowerCase()})${d.observaciones_asesores ? `: ${d.observaciones_asesores}` : ""}` : d.causa_rechazo;
+      const causa = causaDespacho(d.causa_rechazo, d.estado_asesores, d.observaciones_asesores);
       mapa.set(d.orden_id, { clave, grupo: d.estado_grupo, estado: d.estado, repartidor: d.courier, fecha, causa });
     }
   }
