@@ -4,6 +4,7 @@
 // republicar (`apagar-dropi.ts`). Va un solo correo por producto privado: repartir cada variación entre varios correos no se pidió.
 // Aquí van las piezas puras (sin base ni red), con prueba que también compara la versión en JavaScript del favorito.
 
+import { compararOpciones, esTallaConocida } from "@/lib/wms/talla";
 import { firmaVariacion, variacionesVivas } from "./apagar-dropi";
 import { armarGuardadoProducto } from "./dropi-guardado";
 import { reservaDeDropi, type DatosPrivatizar } from "./privatizar-dropi";
@@ -45,9 +46,11 @@ function numeroDeEtiqueta(etiqueta: string): number | null {
   return m ? Number(`${m[1]}.${m[2] ?? 0}`) : null;
 }
 
-/** Las variaciones en el orden en que se muestran: de menor a mayor si todas son números (graduaciones); las demás, en el orden de Dropi (S, M, L…). */
+/** Las variaciones en el orden en que se muestran: de menor a mayor si todas son números (graduaciones), de la talla más chica a la más grande si todas traen una talla (S, M, L, XL, 2XL); las demás, en el orden de Dropi. */
 export function ordenarVariaciones<T extends { etiqueta: string }>(lista: T[]): T[] {
-  return lista.every((v) => numeroDeEtiqueta(v.etiqueta) !== null) ? [...lista].sort((a, b) => numeroDeEtiqueta(a.etiqueta)! - numeroDeEtiqueta(b.etiqueta)!) : lista;
+  if (lista.every((v) => numeroDeEtiqueta(v.etiqueta) !== null)) return [...lista].sort((a, b) => numeroDeEtiqueta(a.etiqueta)! - numeroDeEtiqueta(b.etiqueta)!);
+  if (lista.length > 1 && lista.every((v) => v.etiqueta.split(" / ").some(esTallaConocida))) return [...lista].sort((a, b) => compararOpciones(a.etiqueta, b.etiqueta));
+  return lista;
 }
 
 /** Lo que la lectura dice que hay de una variación en una bodega. */

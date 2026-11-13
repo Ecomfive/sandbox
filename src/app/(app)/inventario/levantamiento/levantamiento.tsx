@@ -24,6 +24,7 @@ import { LineasCajas, unidadesFormulario, type LineaCajasForm, type UbicacionCon
 import { CAJAS_ACTIVAS } from "@/lib/wms/cajas";
 import { codigoLote, PEDIR_CODIGO_LOTE } from "@/lib/wms/vencimiento";
 import { ordenarVariantes } from "@/lib/wms/orden-variantes";
+import { compararOpciones } from "@/lib/wms/talla";
 import { BotonOrdenVariantes, useOrdenVariantes } from "@/components/ui/orden-variantes";
 
 export interface ProductoConteo {
@@ -238,6 +239,8 @@ export function Levantamiento({
       }
       g.hijos.push(p);
     }
+    // Las variantes de cada producto, de la talla más chica a la más grande (S, M, L, XL, 2XL).
+    for (const g of grupos.values()) g.hijos.sort((a, b) => compararOpciones(a.opciones, b.opciones) || a.codigo.localeCompare(b.codigo, "es", { numeric: true }));
     return lista;
   }, [visibles]);
 
