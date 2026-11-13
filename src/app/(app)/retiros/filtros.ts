@@ -89,9 +89,10 @@ export const DEF_RETIROS: DefTabla<FilaRetiro> = {
     etiqueta: "Cerrados",
     // Una novedad resuelta no sigue el flujo normal (no cuenta como pendiente ni como conciliado):
     // se oculta por defecto junto con lo cerrado, para no dejar el listado lleno de novedades viejas.
-    esCerrado: (f) => f.estado === "cerrado" || f.estado === "novedad_resuelta",
+    // Un retiro cancelado (reversado) tampoco tiene nada más que conciliar: va al mismo embudo.
+    esCerrado: (f) => f.estado === "cerrado" || f.estado === "novedad_resuelta" || f.estado === "cancelado",
     campoEstado: "estado",
-    valoresCerrados: ["cerrado", "novedad_resuelta"],
+    valoresCerrados: ["cerrado", "novedad_resuelta", "cancelado"],
     ocultosPorDefecto: true,
     // Aislado, como Cuentas destino: el botón «Cerrados» muestra solo lo cerrado (o solo lo abierto),
     // nunca los dos juntos.
