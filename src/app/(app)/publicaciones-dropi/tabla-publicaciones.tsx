@@ -150,7 +150,7 @@ export function TablaPublicaciones({
     <ProveedorMoneda moneda={moneda}>
     <ProveedorTareas {...tareas}>
     <ProveedorSkusMaestros opciones={opcionesSku}>
-      <TableroAcciones publicaciones={publicaciones} def={def} reglas={reglas} codigoPais={codigoPais} />
+      <TableroAcciones publicaciones={publicaciones} def={def} reglas={reglas} codigoPais={codigoPais} alAbrir={setAbierta} />
       <p className="-mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
         <span>
           {actualizadoDropi
