@@ -13,7 +13,7 @@ import { TIPOS_RECOMENDACION, type GrupoRecomendacion } from "@/lib/publicacione
 
 const grupoDe = (t: string) => TIPOS_RECOMENDACION.find((x) => x.valor === t)?.grupo;
 const tiposDe = (g: GrupoRecomendacion) => TIPOS_RECOMENDACION.filter((t) => t.grupo === g).map((t) => t.valor);
-import { TarjetaParetoClientes } from "./pareto-clientes";
+import { TarjetaParetoPublicaciones } from "./pareto-publicaciones";
 import { DEF_PUBLICACIONES, POCO_STOCK, POCO_STOCK_VARIACION, estadoVinculo, paraReactivar, pocoStock, sinStock, type FilaPublicacion } from "./def-publicaciones";
 
 const seleccion = (campo: string, ...valores: string[]) => ({ campo, valor: { tipo: "seleccion" as const, valores } });
@@ -217,7 +217,20 @@ function TarjetaAccion({ t, valor, junto, extra, detalle, def }: { t: Tarjeta; v
  * (las acciones calculadas, lo que falta vincular y lo que no tiene stock). Cada tarjeta cuenta las publicaciones abiertas y, al
  * pulsarla, filtra la lista de abajo; pulsarla otra vez quita el filtro.
  */
-export function TableroAcciones({ publicaciones, reglas, codigoPais, def = DEF_PUBLICACIONES }: { publicaciones: FilaPublicacion[]; reglas: Reglas; codigoPais?: string; def?: DefTabla<FilaPublicacion> }) {
+export function TableroAcciones({
+  publicaciones,
+  reglas,
+  codigoPais,
+  def = DEF_PUBLICACIONES,
+  alAbrir,
+}: {
+  publicaciones: FilaPublicacion[];
+  reglas: Reglas;
+  codigoPais?: string;
+  def?: DefTabla<FilaPublicacion>;
+  /** Abre la ficha de una publicación (desde la lista del Pareto). */
+  alAbrir?: (id: string) => void;
+}) {
   const abiertas = publicaciones.filter((f) => !f.archivada);
   // Cada persona ordena las tarjetas a su gusto (8 nov 2026, pedido de Alcides): arrastrándolas o con Alt + flechas; queda en su navegador.
   return (
@@ -231,15 +244,15 @@ export function TableroAcciones({ publicaciones, reglas, codigoPais, def = DEF_P
             </ItemArrastrable>
           );
         })}
-        {/* El Pareto de clientes (12 nov 2026, pedido de Hernán) cuenta clientes, no publicaciones: no filtra la lista, abre la de esos clientes. */}
+        {/* El Pareto de publicaciones (12 nov 2026, pedido de Hernán): no filtra la lista, abre la de las publicaciones que más guías traen. */}
         <ItemArrastrable id={ID_PARETO} className="flex [&>button]:flex-1">
-          <TarjetaParetoClientes />
+          <TarjetaParetoPublicaciones publicaciones={publicaciones} alAbrir={alAbrir} />
         </ItemArrastrable>
       </OrdenArrastrable>
     </div>
   );
 }
 
-const ID_PARETO = "pareto-clientes";
+const ID_PARETO = "pareto-publicaciones";
 const IDS_TARJETAS: readonly string[] = [...TARJETAS.map((t) => t.id), ID_PARETO];
-const ETIQUETAS_TARJETAS: Readonly<Record<string, string>> = { ...Object.fromEntries(TARJETAS.map((t) => [t.id, t.titulo])), [ID_PARETO]: "Pareto de clientes" };
+const ETIQUETAS_TARJETAS: Readonly<Record<string, string>> = { ...Object.fromEntries(TARJETAS.map((t) => [t.id, t.titulo])), [ID_PARETO]: "Pareto de publicaciones" };
