@@ -212,6 +212,9 @@ export function fechaDeColumna(c: { text: string | null; value: string | null } 
 /** El número de pedido para comparar: mayúsculas, sin «#», espacios ni guiones. */
 export const normalizarPedido = (v: string | null | undefined): string => (v ?? "").toUpperCase().replace(/[#\s-]/g, "").slice(0, 60);
 
+/** El número del pedido sin el «(copy)» que agrega Monday al duplicar un ítem («1437 (copy)» → «1437»; 13 nov 2026). */
+export const sinCopia = (v: string | null): string | null => (v ? v.replace(/\s*\((?:copy|copia)\)\s*/gi, " ").trim() || null : null);
+
 export interface Despacho {
   item_id: string;
   nombre: string | null;
@@ -268,7 +271,7 @@ export function despachoDeItem(item: ItemMonday, mapeo: MapeoColumnas, reglas: R
   return {
     item_id: item.id,
     nombre: corto(item.name, 300),
-    numero_pedido: texto("pedido", 60),
+    numero_pedido: sinCopia(texto("pedido", 60)),
     tienda_texto: texto("tienda", 120),
     courier: texto("courier", 120),
     estado,

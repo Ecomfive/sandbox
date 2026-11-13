@@ -14,6 +14,7 @@ import {
   leerReglasEstado,
   normalizarPedido,
   prioridadDespacho,
+  sinCopia,
   sugerirMapeo,
   unidadDeTexto,
   validarMapeo,
@@ -275,4 +276,12 @@ test("prioridad entre tableros (13 nov 2026): ENTREGADO, luego DESINTEGRADO; PRO
   assert.equal(causaDespacho("No contesta", "PROCESADO", "quiere recibir el sábado"), "Asesores (procesado): quiere recibir el sábado · repartidor: No contesta");
   assert.equal(causaDespacho("no rpd llamada", "DESINTEGRADO", "3er msj sin respuesta"), "Devolución (desintegrado): 3er msj sin respuesta · repartidor: no rpd llamada");
   assert.equal(causaDespacho("No contesta", null, null), "No contesta");
+});
+
+test("ítems duplicados en Monday (13 nov 2026): «1437 (copy)» es el pedido 1437", () => {
+  assert.equal(sinCopia("1437 (copy)"), "1437");
+  assert.equal(sinCopia("1437 (Copia)"), "1437");
+  assert.equal(sinCopia("1437"), "1437");
+  assert.equal(sinCopia(" (copy)"), null);
+  assert.equal(sinCopia(null), null);
 });
