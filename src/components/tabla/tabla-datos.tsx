@@ -31,12 +31,20 @@ export interface ColumnaTabla<F, C = undefined> extends ColumnaDef {
   /** Clases de la celda (color, alineación...). */
   clase?: string;
   /**
+   * La alineación de la columna, en el encabezado y en las celdas (13 nov 2026). «centro» además la deja del ancho de su contenido (el espacio que sobra
+   * va a las demás columnas), para cifras y pastillas cortas.
+   */
+  alinear?: "centro" | "derecha";
+  /**
    * La suma (o lo que corresponda) de esta columna sobre **todas** las filas que deja ver la tabla (con sus filtros, no solo la
    * página). Si alguna columna a la vista la trae, la tabla muestra una fila de totales pegada abajo, como ClickUp. Al agrupar,
    * además, cada grupo cierra con una fila de subtotal que suma solo sus filas.
    */
   total?: (filas: F[]) => ReactNode;
 }
+
+/** Las clases de la alineación de una columna: centrada (y del ancho de su contenido) o a la derecha. */
+const claseAlinear = (a: ColumnaTabla<unknown, unknown>["alinear"]) => (a === "centro" ? "w-px whitespace-nowrap text-center" : a === "derecha" ? "text-right" : "");
 
 /**
  * Tabla estándar con la barra de herramientas común: agrupar, filas cerradas, filtros y columnas. Sirve
@@ -242,7 +250,7 @@ export function TablaDatos<F, C = undefined>({
         </td>
       )}
       {visibles_.map((c, i) => (
-        <td key={c.id} className={`${claseCeldaColumna} ${c.clase ?? ""}`}>
+        <td key={c.id} className={`${claseCeldaColumna} ${claseAlinear(c.alinear)} ${c.clase ?? ""}`}>
           {abrirFila && (abrirFila.columna ? c.id === abrirFila.columna : i === 0) ? (
             <span className={abrirFila.junto ? "flex items-start gap-1" : "contents"}>
               <button
@@ -293,7 +301,7 @@ export function TablaDatos<F, C = undefined>({
   const encabezadoFijo: CeldaFija[] | undefined = fijarEncabezado
     ? [
         ...(seleccion ? [{ contenido: null, clase: claseEncabezadoCasilla }] : []),
-        ...visibles_.map((c) => ({ contenido: c.label, clase: claseEncabezadoColumna })),
+        ...visibles_.map((c) => ({ contenido: c.label, clase: `${claseEncabezadoColumna} ${claseAlinear(c.alinear)}` })),
         ...(accion ? [{ contenido: accion.fija ? accion.etiqueta : null, clase: claseEncabezadoColumna }] : []),
       ]
     : undefined;
@@ -385,7 +393,7 @@ export function TablaDatos<F, C = undefined>({
                     setArrastrada(null);
                     setSobre(null);
                   }}
-                  className={`${claseEncabezadoColumna} cursor-grab active:cursor-grabbing ${arrastrada === c.id ? "opacity-50" : ""} ${
+                  className={`${claseEncabezadoColumna} ${claseAlinear(c.alinear)} cursor-grab active:cursor-grabbing ${arrastrada === c.id ? "opacity-50" : ""} ${
                     sobre === c.id && arrastrada && arrastrada !== c.id ? "outline-2 -outline-offset-2 outline-foreground" : ""
                   }`}
                 >
