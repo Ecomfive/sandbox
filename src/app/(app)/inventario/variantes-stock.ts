@@ -1,3 +1,4 @@
+import { compararOpciones } from "@/lib/wms/talla";
 import type { StockPlataformas } from "@/lib/wms/stock-plataformas";
 import type { FilaStock } from "./def-stock";
 
@@ -12,7 +13,7 @@ const sumaPlataformas = (a: StockPlataformas | null, b: StockPlataformas | null)
  * variantes (y las propias del principal, que casi siempre son solo lo que viene en camino), y las variantes quedan dentro, ordenadas por SKU.
  */
 export function conSusVariantes(principal: FilaStock, variantes: FilaStock[]): FilaStock {
-  const dentro = [...variantes].sort((a, b) => a.codigo.localeCompare(b.codigo, "es", { numeric: true }));
+  const dentro = [...variantes].sort((a, b) => compararOpciones(a.opciones, b.opciones) || a.codigo.localeCompare(b.codigo, "es", { numeric: true }));
   const todos = [principal, ...dentro];
   const suma = (valor: (f: FilaStock) => number) => todos.reduce((t, f) => t + valor(f), 0);
   const porBodega = new Map<string, number>();

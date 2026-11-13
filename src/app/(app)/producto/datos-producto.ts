@@ -1,6 +1,7 @@
 import { traerTodasConError, traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { puedeVerPais } from "@/lib/paises-permitidos";
 import { compraCuenta } from "@/lib/compras/cuenta";
+import { compararOpciones } from "@/lib/wms/talla";
 import { idsDeDropi } from "@/lib/publicaciones/sincronizar-dropi";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { UsuarioActual } from "@/lib/auth";
@@ -319,7 +320,7 @@ export async function cargarProductos(usuario: UsuarioActual, supabase: Supabase
     repartoPendiente: repartoPendiente.has(p.id),
     opciones: (p.opciones ?? null) as Record<string, string> | null,
     opcionesVariantes: (p.opciones_variantes ?? []) as { nombre: string; valores: string[] }[],
-    variantes: (variantesPorPadre.get(p.id) ?? []).sort((a, b) => a.codigo.localeCompare(b.codigo, "es", { numeric: true })),
+    variantes: (variantesPorPadre.get(p.id) ?? []).sort((a, b) => compararOpciones(Object.values(a.opciones ?? {}).join(" / "), Object.values(b.opciones ?? {}).join(" / ")) || a.codigo.localeCompare(b.codigo, "es", { numeric: true })),
     stockDropi: stockDropiDe(p.id),
   }));
 
