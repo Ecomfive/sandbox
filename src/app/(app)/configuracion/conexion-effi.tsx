@@ -47,6 +47,16 @@ export function ConexionEffi({ hayLlave }: { hayLlave: boolean }) {
           </div>
           {resultado.resumen.bodegas.length > 0 && <p className="text-muted-foreground">Bodegas: {resultado.resumen.bodegas.join(", ")}</p>}
           <p className="text-muted-foreground">Tarifas que manda Effi: {resultado.resumen.tarifas ?? "Effi no mandó tarifas"}</p>
+          {resultado.resumen.campos && (
+            <details className="text-xs text-muted-foreground">
+              <summary className="cursor-pointer">Campos de las ventas que manda Effi</summary>
+              {resultado.resumen.campos.map((c) => (
+                <p key={c.lista} className="m-0 mt-1 break-words font-mono" data-campos-effi={c.lista}>
+                  {c.lista}: {c.campos.join(" · ")}
+                </p>
+              ))}
+            </details>
+          )}
           <p className={`break-words ${resultado.resumen.ventas.error ? "text-warning" : "text-muted-foreground"}`}>
             {resultado.resumen.ventas.error
               ? `Ventas: no se pueden leer. ${resultado.resumen.ventas.error} Al perfil «Sistema MOM solo consulta» le falta el permiso de reportes en «Notas de remisión de venta» y «Devoluciones de venta».`

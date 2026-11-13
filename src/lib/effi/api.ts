@@ -116,15 +116,27 @@ export type ResumenConexionEffi = {
   tarifas: string | null;
   /** Las ventas: cuántas filas de remisiones de venta de ayer y hoy ve la llave, o por qué no (falta el permiso de reportes). */
   ventas: { total: number | null; error: string | null };
+  /** Para revisar cómo se enlaza una devolución con su remisión (13 nov 2026): los campos de identificación que manda Effi en cada lista (solo ids, nada del cliente). */
+  campos?: { lista: string; campos: string[] }[];
 };
 
 /** Prueba la llave con dos consultas livianas: un artículo (y el total) y las bodegas. Solo lee. */
 export async function probarConexionEffi(): Promise<{ ok: true; resumen: ResumenConexionEffi } | { ok: false; error: string }> {
-  const [articulos, bodegas, ventas] = await Promise.all([
+  const hace30 = new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10);
+  const [articulos, bodegas, ventas, ...listas] = await Promise.all([
     consultarEffi<Record<string, unknown>>("articulo", { pagina: 1, por_pagina: 1 }),
     consultarEffi<Record<string, unknown>>("bodega", { pagina: 1, por_pagina: 100 }),
     consultarEffi<Record<string, unknown>>("detalle_remision_v", { desde: new Date(Date.now() - 2 * 86_400_000).toISOString().slice(0, 10), pagina: 1, por_pagina: 1 }),
+    consultarEffi<Record<string, unknown>>("detalle_remision_v", { desde: hace30, pagina: 1, por_pagina: 1 }),
+    consultarEffi<Record<string, unknown>>("detalle_devolucion_v", { desde: hace30, pagina: 1, por_pagina: 1 }),
+    consultarEffi<Record<string, unknown>>("devolucion_v", { desde: hace30, pagina: 1, por_pagina: 1 }),
   ]);
+  const NOMBRES = ["detalle_remision_v", "detalle_devolucion_v", "devolucion_v"];
+  // Solo los campos de identificación y fecha, con su valor (números de documento), para ver cómo se enlazan.
+  const campos = listas.map((l, i) => ({
+    lista: NOMBRES[i],
+    campos: !l.ok ? [`error: ${l.error}`] : !l.data[0] ? ["sin filas"] : Object.entries(l.data[0]).filter(([k]) => /^(id|id_[a-z_]*v|id_remision[a-z_]*|id_devolucion[a-z_]*|prefijo[a-z_]*|sucursal[a-z_]*|fecha_trans|vigente|nombre_bodega|articulo|cantidad|transaccion[a-z_]*)$/.test(k)).map(([k, v]) => `${k}=${String(v ?? "null").slice(0, 20)}`),
+  }));
   if (!articulos.ok) return { ok: false, error: articulos.error };
   const a = articulos.data[0];
   return {
@@ -137,6 +149,7 @@ export async function probarConexionEffi(): Promise<{ ok: true; resumen: Resumen
       ejemplo: a ? { id: String(a.id ?? ""), nombre: String(a.descripcion ?? "") } : null,
       tarifas: typeof a?.precios_venta === "string" ? a.precios_venta.slice(0, 300) : null,
       ventas: ventas.ok ? { total: ventas.paginacion?.total ?? ventas.data.length, error: null } : { total: null, error: ventas.error },
+      campos,
     },
   };
 }
