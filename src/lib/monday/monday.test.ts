@@ -210,3 +210,21 @@ test("tablero de Panamá: la fecha es el grupo («02/11/2026») y el pedido, el 
   assert.equal(fechaDeColumna({ text: "31/10/2026", value: null }), "2026-10-31");
   assert.equal(fechaDeColumna({ text: "31/02/2026", value: null }), null);
 });
+
+test("los tableros de repartidores toman las columnas del consolidado por su título", async () => {
+  const { mapeoPorTitulos } = await import("./tableros-extra");
+  const principal = [
+    { id: "estado_15", titulo: "Estado", tipo: "status" },
+    { id: "estado_11", titulo: "Tienda", tipo: "status" },
+    { id: "estado_18", titulo: "Delivery", tipo: "status" },
+    { id: "texto", titulo: "Comentario", tipo: "text" },
+  ];
+  const extra = [
+    { id: "status", titulo: "ESTADO", tipo: "status" },
+    { id: "status_1", titulo: "tienda", tipo: "status" },
+    { id: "people", titulo: "Delivery", tipo: "status" },
+  ];
+  const m = mapeoPorTitulos({ pedido: "name", estado: "estado_15", tienda: "estado_11", courier: "estado_18", causa: "texto", fecha_despacho: "group" }, principal, extra);
+  assert.deepEqual(m, { pedido: "name", estado: "status", tienda: "status_1", courier: "people", fecha_despacho: "group" });
+  assert.equal(mapeoPorTitulos({ pedido: "name", estado: "estado_15" }, principal, [{ id: "x", titulo: "Otra", tipo: "text" }]), null, "sin columna de estado no se lee");
+});

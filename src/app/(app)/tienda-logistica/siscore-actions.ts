@@ -8,6 +8,7 @@ import { cargarTiendas } from "@/lib/tienda/datos";
 import { fuenteFinanzas } from "@/lib/tienda/datos-finanzas";
 import { nombreComparable } from "@/lib/tienda/ordenes-finanzas";
 import { grupoDeEstadoGuia, leerLecturaSiscore, momentoEntrega, pedidoDeFactura, visitasSinEntregar } from "@/lib/tienda/siscore";
+import { actualizarEntregas } from "@/lib/tienda/actualizar-entregas";
 
 const RUTA = "/tienda-logistica";
 const BUCKET = "wms-compras";
@@ -118,6 +119,8 @@ export async function procesarLecturaSiscore(id: string): Promise<{ guias: numbe
     const resumen = { cliente: lectura.cliente, guias: filas.length, conPedido: filas.filter((f) => f.orden_id).length, desde: lectura.desde, hasta: lectura.hasta };
     await supabase.from("tienda_guias_lecturas").update({ estado: "listo", fin: new Date().toISOString(), cliente: lectura.cliente, resumen, error: null }).eq("id", id);
     await supabase.storage.from(BUCKET).remove([ruta]);
+    // Las órdenes despachadas que Servientrega (o Monday) ya dan por entregadas o devueltas pasan a esa fase (12 nov 2026, pedido de Hernán).
+    await actualizarEntregas(supabase, "Servientrega (lectura de SISCORE)").catch(() => null);
     revalidatePath(RUTA);
     return { guias: resumen.guias, conPedido: resumen.conPedido, cliente: lectura.cliente };
   } catch (e) {

@@ -21,6 +21,8 @@ export const dynamic = "force-dynamic";
 
 /** Hasta dónde se buscan pedidos por preparar y en ruta (todos los pendientes, como Mi Reto Digital). */
 const DIAS_LOGISTICA = 60;
+/** Cuántos días se siguen viendo en Entregados y Rechazados los pedidos que cerraron Monday o Servientrega. */
+const DIAS_CERRADOS = 7;
 
 const ahoraMismo = () => Date.now();
 
@@ -40,17 +42,17 @@ export default async function LogisticaTiendaPage({ searchParams }: { searchPara
   after(() => revisarSiHaceFalta(createServiceClient(), tiendas));
   const { pedidos, fuente } = await pedidosDeTiendas(supabase, miradas, pais.codigo, { tipo: "atajo", id: "hoy" }, { minDias: DIAS_LOGISTICA });
   // Lo que se gestiona: los que llegaron de Shopify (los del Excel de Finanzas son una foto vieja), por preparar o en ruta, lo más viejo arriba.
-  const activos = pedidos
-    .filter((p) => !p.sinHora && (etapaLogistica(p.estado) === "por_preparar" || etapaLogistica(p.estado) === "en_ruta"))
-    .sort((a, b) => a.creado.localeCompare(b.creado));
+  // Desde el 12 nov 2026 lo que Monday o Servientrega dan por entregado o devuelto pasa a esa fase en la orden: para que las tarjetas Entregados y
+  // Rechazados sigan diciendo algo, también van los cerrados por ellos en los últimos días (`DIAS_CERRADOS`).
+  const candidatos = pedidos.filter((p) => !p.sinHora && etapaLogistica(p.estado) !== null).sort((a, b) => a.creado.localeCompare(b.creado));
   // Las entregas: de interior, la guía de Servientrega leída de SISCORE; de ciudad, lo registrado en Monday (entregado, rechazado, el repartidor).
-  const ids = activos.map((p) => p.id);
+  const ids = candidatos.map((p) => p.id);
   const [entregas, guias, { data: lecturas }] = await Promise.all([
     entregasDeOrdenes(supabase, ids),
     guiasDeOrdenes(supabase, ids),
     supabase.from("tienda_guias_lecturas").select("fin").eq("estado", "listo").order("fin", { ascending: false }).limit(1),
   ]);
-  for (const p of activos) {
+  for (const p of candidatos) {
     const g = guias.get(p.id) ?? null;
     p.entrega = g ?? entregas.get(p.id) ?? null;
     if (g?.guia) {
@@ -58,6 +60,11 @@ export default async function LogisticaTiendaPage({ searchParams }: { searchPara
       p.guia = g.guia;
     } else if (!p.transportista && p.entrega?.repartidor) p.transportista = p.entrega.repartidor;
   }
+  const desde = new Date(ahoraMismo() - DIAS_CERRADOS * 86_400_000).toISOString().slice(0, 10);
+  const activos = candidatos.filter((p) => {
+    const e = etapaLogistica(p.estado);
+    return e === "por_preparar" || e === "en_ruta" || (!!p.entrega?.fecha && p.entrega.fecha >= desde);
+  });
   const ultimaSiscore = (lecturas?.[0]?.fin as string | undefined) ?? null;
   const puedeLeer = !usuario.modulosSoloLectura.includes("tienda-logistica");
   return (

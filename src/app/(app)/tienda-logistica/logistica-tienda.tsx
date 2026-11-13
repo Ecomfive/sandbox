@@ -175,7 +175,7 @@ export function LogisticaTienda({ pedidos, codigoPais, tiendas, hoy }: { pedidos
           icono={CheckIcon}
           color="verde"
           valor={num(grupos.entregados.length)}
-          detalle={hayMonday ? "según Monday y Servientrega" : "llegan con Monday y SISCORE"}
+          detalle={hayMonday ? "últimos 7 días · Monday y Servientrega" : "llegan con Monday y SISCORE"}
           alPulsar={() => alternar("entregados")}
           activo={vista === "entregados"}
         />
@@ -184,7 +184,7 @@ export function LogisticaTienda({ pedidos, codigoPais, tiendas, hoy }: { pedidos
           icono={CerrarIcon}
           color="rojo"
           valor={num(grupos.devueltos.length)}
-          detalle={hayMonday ? "fallidos (Monday) o devueltos (Servientrega)" : "llegan con Monday y SISCORE"}
+          detalle={hayMonday ? "últimos 7 días · fallidos o devueltos" : "llegan con Monday y SISCORE"}
           alPulsar={() => alternar("devueltos")}
           activo={vista === "devueltos"}
         />

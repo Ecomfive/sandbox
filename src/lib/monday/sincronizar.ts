@@ -34,7 +34,8 @@ export const mondayConfigurado = () => Boolean(process.env.MONDAY_API_TOKEN?.tri
 /** Vida del cursor de `items_page` en Monday. */
 const VIDA_CURSOR_MS = 55 * 60_000;
 
-async function consultarMonday(query: string, variables: Record<string, unknown>): Promise<unknown> {
+/** Una consulta a la API de Monday con el token del servidor (también la usan los tableros de repartidores, `tableros-extra.ts`). */
+export async function consultarMonday(query: string, variables: Record<string, unknown>): Promise<unknown> {
   const token = process.env.MONDAY_API_TOKEN?.trim();
   if (!token) throw new Error("Falta MONDAY_API_TOKEN en el servidor.");
   const r = await fetch(URL_API_MONDAY, {
@@ -78,7 +79,7 @@ const leerPendiente = (v: unknown): Pendiente | null => {
 };
 
 /** Enlaza y guarda un lote de despachos. */
-async function guardarDespachos(supabase: SupabaseClient, tableroId: string, lote: Despacho[], unidades: { id: string; nombre: string }[]): Promise<number> {
+export async function guardarDespachos(supabase: SupabaseClient, tableroId: string, lote: Despacho[], unidades: { id: string; nombre: string }[]): Promise<number> {
   if (!lote.length) return 0;
   const variantes = [...new Set(lote.flatMap((d) => variantesPedido(d.numero_pedido)))];
   const candidatas: OrdenCandidata[] = [];

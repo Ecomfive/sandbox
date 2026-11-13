@@ -30,6 +30,8 @@ import { respaldarFinanzas } from "../finanzas/respaldar-finanzas";
 import { sincronizarShopify } from "../finanzas/sincronizar-shopify";
 import { sincronizarQuickbooks } from "../quickbooks/cliente";
 import { sincronizarMonday } from "../monday/sincronizar";
+import { sincronizarTablerosExtra } from "../monday/tableros-extra";
+import { actualizarEntregas } from "../tienda/actualizar-entregas";
 import { CORRIENDO_MS, PRESUPUESTO_MS, hoyPanama, mesesAbiertos, pendienteDeHoy, resumenCorto, type ClaveTarea } from "./definiciones";
 
 export interface Contexto {
@@ -321,7 +323,12 @@ async function tareaQuickbooks(c: Contexto): Promise<Resultado> {
 
 async function tareaMonday(c: Contexto): Promise<Resultado> {
   const r = await sincronizarMonday(c.supabase, c.limite, c.pendiente);
-  return { resumen: r.resumen, pendiente: r.pendiente };
+  if (r.pendiente) return { resumen: r.resumen, pendiente: r.pendiente };
+  // Terminado el consolidado: los tableros de cada repartidor (migración 0282) y, con todo leído, los pedidos de tienda que Monday o Servientrega ya
+  // dan por entregados o devueltos pasan a esa fase (12 nov 2026, pedido de Hernán). Si algo de esto falla, la lectura del consolidado ya quedó.
+  const extra = await sincronizarTablerosExtra(c.supabase, c.limite).catch((e) => `Tableros de repartidores: ${e instanceof Error ? e.message : "falló"}.`);
+  const entregas = await actualizarEntregas(c.supabase, "Monday (tarea diaria)").then((x) => x.resumen).catch((e) => `Entregas: ${e instanceof Error ? e.message : "falló"}.`);
+  return { resumen: [r.resumen, extra, entregas].filter(Boolean).join(" "), pendiente: null };
 }
 
 // ---------------------------------------------------------------------------------------------
