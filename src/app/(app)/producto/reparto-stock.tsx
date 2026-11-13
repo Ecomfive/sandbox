@@ -109,6 +109,15 @@ function PanelReparto({ id, alTerminar }: { id: string; alTerminar: (cambio: boo
   );
   const revision = useMemo(() => (datos ? revisarReparto(datos.general, lineas) : null), [datos, lineas]);
 
+  function quitarMarca() {
+    empezar(async () => {
+      const r = await repartirStockVariantes(id, []);
+      if (r.error) return setError(r.error);
+      mostrarToast("Listo: el producto ya no figura como sin repartir");
+      alTerminar(true);
+    });
+  }
+
   function guardar() {
     empezar(async () => {
       const r = await repartirStockVariantes(id, lineas);
@@ -127,12 +136,23 @@ function PanelReparto({ id, alTerminar }: { id: string; alTerminar: (cambio: boo
   }
   if (!datos || !revision) return <p className="m-0 text-xs text-muted-foreground">Cargando…</p>;
   if (datos.general.length === 0) {
+    // Sin stock general no hay nada que repartir: todo el stock ya está en las variantes y solo queda la marca. Quitarla evita que lo que salga de una variante se descuente de un principal en 0.
     return (
       <div className="flex flex-col gap-2 rounded-lg border border-dashed border-border p-3 text-[13px]">
-        <p className="m-0">El producto ya no tiene stock general en ninguna bodega propia.</p>
-        <BotonBarra className="w-fit" onClick={() => alTerminar(false)}>
-          Cerrar
-        </BotonBarra>
+        <p className="m-0">El producto ya no tiene stock general en ninguna bodega propia: todo el stock está en sus variantes.</p>
+        {error && (
+          <p role="alert" className="m-0 text-xs text-destructive">
+            {error}
+          </p>
+        )}
+        <div className="flex flex-wrap gap-2">
+          <BotonBarra principal disabled={ocupado} onClick={quitarMarca}>
+            {ocupado ? "Quitando…" : "Quitar la marca de sin repartir"}
+          </BotonBarra>
+          <BotonBarra disabled={ocupado} onClick={() => alTerminar(false)}>
+            Cerrar
+          </BotonBarra>
+        </div>
       </div>
     );
   }
