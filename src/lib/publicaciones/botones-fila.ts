@@ -38,7 +38,7 @@ const B280 = "Su stock es de la bodega de Dropi";
 
 /**
  * Republicar: desde el 12 nov 2026 también lo de la bodega de Dropi (B280/B15), con el proceso de Nicol («Republicar (B280)»: el ID nuevo nace con unidades temporales y Dropi
- * traslada las suyas); por ahora solo productos simples.
+ * traslada las suyas), con o sin variaciones.
  */
 export function motivoRepublicar(e: EstadoBotones): string | null {
   return (
@@ -49,9 +49,7 @@ export function motivoRepublicar(e: EstadoBotones): string | null {
         ? "Tiene un apagado pendiente"
         : e.tipo === "privado"
           ? "Una privada no se republica"
-          : esBodegaDropi(e.bodegaId) && e.variable
-            ? "Con variaciones en la bodega de Dropi: se republica a mano"
-            : null)
+          : null)
   );
 }
 

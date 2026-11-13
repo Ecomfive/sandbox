@@ -7,7 +7,7 @@ import { REPUBLICAR_JS } from "./republicar-dropi";
 
 type Obj = Record<string, unknown>;
 const delFavorito = new Function(`${ARMAR_JS};${REPUBLICAR_JS};${PRIVATIZAR_JS};${APAGAR_JS}; return { apagado, apagadoV, emparejarV, entradaV, unidadesV, firmaV, nuevoV };`)() as {
-  nuevoV: (o: Obj, bp: Obj[], p?: { precio?: number | null; precioSugerido?: number | null }) => Obj;
+  nuevoV: (o: Obj, bp: Obj[], p?: { precio?: number | null; precioSugerido?: number | null }, b2?: { bodega: number; temporal: number }) => Obj;
   apagado: (o: Obj, bp: Obj[], q: boolean) => Obj;
   apagadoV: (o: Obj, bp: Obj[], q: boolean, en: Obj[][], cp?: string) => Obj;
   emparejarV: (o: Obj, u: Record<string, number>) => Obj;
@@ -286,6 +286,17 @@ test("variaciones: no se republica con stock en la B280, unidades privatizadas, 
   assert.match((armarProductoNuevoVariable(conTallas(7000, { S: 4 }, { private_product_inventories: [{ stock: 3, deleted_at: null }] }), bp) as { error: string }).error, /privatizadas/);
   assert.match((armarProductoNuevoVariable(conTallas(7000, { S: 4 }, { user_profit_percentage_product: [{ id: 1 }] }), bp) as { error: string }).error, /porcentajes/);
   assert.match((armarProductoNuevoVariable(conTallas(7000, { S: 4 }, { attributes: [] }), bp) as { error: string }).error, /no devolvió los atributos/);
+});
+
+test("«Republicar (B280)» con variaciones: cada talla nace con las temporales en nuestra bodega, sin la B280 (en el favorito igual)", () => {
+  const o = conTallas(7000, { S: 4, M: 6 });
+  for (const v of o.variations as Obj[]) ((v.warehouse_product_variation as Obj[])[0].warehouse_id = 280);
+  const r = armarProductoNuevoVariable(o, bp, { precio: 8 }, { bodega: 81, temporal: 100 });
+  assert.ok("cuerpo" in r, JSON.stringify(r));
+  assert.deepEqual((r.cuerpo.variations as Obj[]).map((v) => v.stock), [100, 100]);
+  assert.deepEqual((r.cuerpo.warehouselected as Obj[][]).map((b) => b.map((x) => [x.warehouse_id, x.stock])), [[[81, 100]], [[81, 100]]]);
+  assert.deepEqual(JSON.parse(JSON.stringify(delFavorito.nuevoV(o, bp, { precio: 8 }, { bodega: 81, temporal: 100 }))), JSON.parse(JSON.stringify(r)));
+  assert.match((armarProductoNuevoVariable(o, bp, undefined, { bodega: 280, temporal: 100 }) as { error: string }).error, /no es de ECOMFIVE/);
 });
 
 test("variaciones: el favorito arma exactamente lo mismo que el sistema", () => {

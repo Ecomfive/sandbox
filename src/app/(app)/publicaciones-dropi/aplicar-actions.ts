@@ -221,7 +221,8 @@ async function tareasRepublicacionB280(
   const { data: vieja } = await supabase.from("dropi_publicaciones").select("nombre").eq("id", fila.publicacion_id as string).maybeSingle();
   const nombre = String(vieja?.nombre ?? "");
   const viejo = Number(fila.dropi_producto_id);
-  const mensaje = mensajeTrasladoDropi({ viejo, nuevo, nombre, unidades, pais: codigoPais });
+  const variable = normalizarDatosRepublicar(fila.datos)?.variable === true;
+  const mensaje = mensajeTrasladoDropi({ viejo, nuevo, nombre, unidades, pais: codigoPais, variable });
   const traslado = await tareaDelSistema(
     supabase,
     fila,

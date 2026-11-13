@@ -145,11 +145,21 @@ export function armarApagadoVariable(producto: Obj, bodegasProveedor: Obj[], qui
  * el precio bajo) va al producto y a cada variación: cada una cambia en la misma proporción que el producto (si todas valían lo mismo, quedan en el precio nuevo) y su sugerido va igual
  * al precio. Sin `precios`, cada variación conserva el suyo.
  */
-export function armarProductoNuevoVariable(producto: Obj, bodegasProveedor: Obj[], precios?: { precio?: number | null; precioSugerido?: number | null }): { cuerpo: Obj } | { error: string } {
+export function armarProductoNuevoVariable(
+  producto: Obj,
+  bodegasProveedor: Obj[],
+  precios?: { precio?: number | null; precioSugerido?: number | null },
+  /**
+   * «Republicar (B280)» con variaciones (12 nov 2026, pedido de Hernán): el stock del viejo está en la bodega de Dropi; cada variación del nuevo nace con `temporal` unidades en
+   * `bodega` (una de ECOMFIVE) y sin la bodega de Dropi. Después el favorito se las saca y Dropi traslada las suyas.
+   */
+  b280?: { bodega: number; temporal: number },
+): { cuerpo: Obj } | { error: string } {
   const r = armarGuardadoProducto(producto, bodegasProveedor, { nombre: null, nombreGuia: null, precio: precios?.precio ?? null, precioSugerido: precios?.precioSugerido ?? null }, { variable: true });
   if ("error" in r) return r;
   const propias = new Set(bodegasProveedor.map((b) => Number(b.id)));
-  if (Object.keys(unidadesDeVariable(producto)).some((k) => !propias.has(Number(k.slice(0, k.indexOf("|")))))) return { error: "Tiene stock en una bodega que no es de ECOMFIVE (la B280 de Dropi): no se republica." };
+  if (b280 && !propias.has(b280.bodega)) return { error: "La bodega para las unidades temporales no es de ECOMFIVE." };
+  if (!b280 && Object.keys(unidadesDeVariable(producto)).some((k) => !propias.has(Number(k.slice(0, k.indexOf("|")))))) return { error: "Tiene stock en una bodega que no es de ECOMFIVE (la B280 de Dropi): no se republica." };
   const privados = Array.isArray(producto.private_product_inventories) ? (producto.private_product_inventories as Obj[]) : [];
   if (privados.some((p) => !p.deleted_at && Number(p.stock) > 0)) return { error: "Tiene unidades privatizadas: quítalas en Dropi antes de republicar." };
   if (Array.isArray(producto.user_profit_percentage_product) && producto.user_profit_percentage_product.length) return { error: "Tiene porcentajes por dropshipper: republícala a mano en Dropi." };
@@ -173,11 +183,14 @@ export function armarProductoNuevoVariable(producto: Obj, bodegasProveedor: Obj[
           })()),
       id: null,
       product_id: null,
-      stock: bodegasDe(vivas[i]).reduce((t, w) => t + (Number(w.stock) > 0 ? Number(w.stock) : 0), 0),
+      stock: b280 ? b280.temporal : bodegasDe(vivas[i]).reduce((t, w) => t + (Number(w.stock) > 0 ? Number(w.stock) : 0), 0),
       attribute_values: (v.attribute_values as Obj[]).filter((x) => !x.deleted_at).map((x) => ({ ...x, id: null, attribute_id: null })),
     }));
+  const temporal = b280 ? bodegasProveedor.find((b) => Number(b.id) === b280.bodega) : null;
   const bodegas = vivas.map((v) =>
-    bodegasDe(v)
+    b280
+      ? [{ warehouse_id: b280.bodega, fullName: `${temporal?.name ?? ""}(${temporal?.address ?? ""})`, stock: b280.temporal }]
+      : bodegasDe(v)
       .filter((w) => Number(w.stock) > 0)
       .map((w) => {
         const x = (w.warehouse ?? {}) as Obj;
@@ -345,16 +358,19 @@ export const APAGAR_JS = [
   "var qt=q&&pi>0;if(!un&&!qt)return{cuerpo:null,unidades:0,privadas:pi};",
   "var c=Object.assign({},r.cuerpo,{warehouselected:un?wh:[]});if(qt)c.private_product_inventories=reservasQuitadas(o.private_product_inventories);",
   "return{cuerpo:c,unidades:un,privadas:pi}}",
-  "function nuevoV(o,bp,p){var r=armar(o,bp,{nombre:null,nombreGuia:null,precio:p&&p.precio!=null?p.precio:null,precioSugerido:p&&p.precioSugerido!=null?p.precioSugerido:null,variable:true});if(r.error)return r;var pr={};bp.forEach(function(p){pr[Number(p.id)]=1});",
-  "var u=unidadesV(o),k;for(k in u)if(!pr[Number(k.slice(0,k.indexOf('|')))])return{error:'Tiene stock en una bodega que no es de ECOMFIVE (la B280 de Dropi): no se republica.'};",
+  "function nuevoV(o,bp,p,b2){var r=armar(o,bp,{nombre:null,nombreGuia:null,precio:p&&p.precio!=null?p.precio:null,precioSugerido:p&&p.precioSugerido!=null?p.precioSugerido:null,variable:true});if(r.error)return r;var pr={};bp.forEach(function(p){pr[Number(p.id)]=1});",
+  // «Republicar (B280)» con variaciones (12 nov 2026): `b2` = { bodega, temporal } (igual que `armarProductoNuevoVariable`).
+  "if(b2&&!pr[b2.bodega])return{error:'La bodega para las unidades temporales no es de ECOMFIVE.'};",
+  "var u=unidadesV(o),k;if(!b2)for(k in u)if(!pr[Number(k.slice(0,k.indexOf('|')))])return{error:'Tiene stock en una bodega que no es de ECOMFIVE (la B280 de Dropi): no se republica.'};",
   "var pi=Array.isArray(o.private_product_inventories)?o.private_product_inventories:[];",
   "if(pi.some(function(p){return!p.deleted_at&&Number(p.stock)>0}))return{error:'Tiene unidades privatizadas: quítalas en Dropi antes de republicar.'};",
   "if(Array.isArray(o.user_profit_percentage_product)&&o.user_profit_percentage_product.length)return{error:'Tiene porcentajes por dropshipper: republícala a mano en Dropi.'};",
   "var vv=vivasV(o),bd=function(v){return Array.isArray(v.warehouse_product_variation)?v.warehouse_product_variation:[]};",
   "var at=r.cuerpo.attribute.filter(function(a){return!a.deleted_at}).map(function(a){return Object.assign({},a,{id:null,product_id:null,values:a.values.filter(function(x){return!x.deleted_at}).map(function(x){return Object.assign({},x,{id:null,attribute_id:null})})})});",
   "var vj=Number(o.sale_price),fc=p&&p.precio!=null&&p.precio>0&&vj>0?p.precio/vj:null,cc=function(n){return Math.round(n*100)/100};",
-  "var va=r.cuerpo.variations.filter(function(v){return!v.deleted_at}).map(function(v,i){var t=0;bd(vv[i]).forEach(function(w){t+=Number(w.stock)>0?Number(w.stock):0});var pv={};if(fc!==null){var vn=cc(Number(v.sale_price)*fc);pv={sale_price:vn,suggested_price:p.precioSugerido!=null?vn:Math.max(vn,cc(Number(v.suggested_price)*fc))}}return Object.assign({},v,pv,{id:null,product_id:null,stock:t,attribute_values:v.attribute_values.filter(function(x){return!x.deleted_at}).map(function(x){return Object.assign({},x,{id:null,attribute_id:null})})})});",
-  "var wh=vv.map(function(v){return bd(v).filter(function(w){return Number(w.stock)>0}).map(function(w){var x=w.warehouse||{};return{warehouse_id:Number(w.warehouse_id!=null?w.warehouse_id:x.id),fullName:(x.name!=null?x.name:'')+'('+(x.address!=null?x.address:'')+')',stock:Number(w.stock)}})});",
+  "var va=r.cuerpo.variations.filter(function(v){return!v.deleted_at}).map(function(v,i){var t=0;bd(vv[i]).forEach(function(w){t+=Number(w.stock)>0?Number(w.stock):0});var pv={};if(fc!==null){var vn=cc(Number(v.sale_price)*fc);pv={sale_price:vn,suggested_price:p.precioSugerido!=null?vn:Math.max(vn,cc(Number(v.suggested_price)*fc))}}return Object.assign({},v,pv,{id:null,product_id:null,stock:b2?b2.temporal:t,attribute_values:v.attribute_values.filter(function(x){return!x.deleted_at}).map(function(x){return Object.assign({},x,{id:null,attribute_id:null})})})});",
+  "var tb=b2?bp.filter(function(x){return Number(x.id)===b2.bodega})[0]||{}:null;",
+  "var wh=vv.map(function(v){if(b2)return[{warehouse_id:b2.bodega,fullName:(tb.name!=null?tb.name:'')+'('+(tb.address!=null?tb.address:'')+')',stock:b2.temporal}];return bd(v).filter(function(w){return Number(w.stock)>0}).map(function(w){var x=w.warehouse||{};return{warehouse_id:Number(w.warehouse_id!=null?w.warehouse_id:x.id),fullName:(x.name!=null?x.name:'')+'('+(x.address!=null?x.address:'')+')',stock:Number(w.stock)}})});",
   "return{cuerpo:Object.assign({},r.cuerpo,{id:null,private_product_inventories:[],attribute:at,variations:va,warehouselected:wh})}}",
   "function emparejarV(po,u){var pv=vivasV(po),por={},sp=[],k;",
   "for(k in u){var i0=k.indexOf('|');if(i0<0)return{error:'El público tiene variaciones y este privado no: devuelve esas unidades a mano.'};",

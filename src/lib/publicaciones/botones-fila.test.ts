@@ -63,11 +63,11 @@ test("liquidación: se pone sin ID de Dropi (es del sistema); no en una archivad
   assert.equal(motivoLiquidacion({ ...base, archivada: true, liquidacion: true }), null);
 });
 
-test("la bodega de Dropi de Costa Rica (B15) cuenta como la B280 de Panamá: no se apaga desde aquí; se republica con el proceso de la B280 (solo simples)", () => {
+test("la bodega de Dropi de Costa Rica (B15) cuenta como la B280 de Panamá: no se apaga desde aquí; se republica con el proceso de la B280, también con variaciones", () => {
   assert.equal(motivoApagar({ ...base, bodegaId: 15 }), "Su stock es de la bodega de Dropi");
   assert.equal(motivoRepublicar({ ...base, bodegaId: 15 }), null);
   assert.equal(motivoRepublicar({ ...base, bodegaId: 280 }), null);
-  assert.equal(motivoRepublicar({ ...base, bodegaId: 280, variable: true }), "Con variaciones en la bodega de Dropi: se republica a mano");
+  assert.equal(motivoRepublicar({ ...base, bodegaId: 280, variable: true }), null);
   assert.equal(motivoRepublicar({ ...base, bodegaId: 81, variable: true }), null, "con variaciones de nuestra bodega se republica como siempre");
 });
 
