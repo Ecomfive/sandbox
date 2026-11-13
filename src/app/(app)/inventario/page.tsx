@@ -7,6 +7,7 @@ import { requireModulo } from "@/lib/auth";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { traerTodasConError } from "@/lib/supabase/paginar";
 import { leerStockPlataformas } from "./datos-plataformas";
+import { etiquetaTalla } from "@/lib/wms/talla";
 import type { FilaStock } from "./def-stock";
 import { ListaStock } from "./lista-stock";
 import { agruparVariantes } from "./variantes-stock";
@@ -113,7 +114,7 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
     porBodega: porBodegaPorSku.get(String(r.sku_maestro_id)) ?? [],
     padreId: hijaDe.get(String(r.sku_maestro_id))?.padre_id ?? null,
     repartoPendiente: repartoPendiente.has(String(r.sku_maestro_id)) || repartoPendiente.has(hijaDe.get(String(r.sku_maestro_id))?.padre_id ?? ""),
-    opciones: Object.values(hijaDe.get(String(r.sku_maestro_id))?.opciones ?? {}).join(" / "),
+    opciones: etiquetaTalla(Object.values(hijaDe.get(String(r.sku_maestro_id))?.opciones ?? {}).join(" / ")),
     variantes: [],
   }));
   const filas = agruparVariantes(todasLasFilas);
