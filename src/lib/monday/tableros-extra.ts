@@ -6,7 +6,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { normalizar } from "../finanzas/clasificacion";
-import { COLUMNA_GRUPO, COLUMNA_NOMBRE, CONSULTA_COLUMNAS, CONSULTA_PRIMERA, CONSULTA_SIGUIENTE, ITEMS_POR_PAGINA, cambioDesde, despachoDeItem, leerColumnas, leerMapeo, leerPagina, leerReglasEstado, type ColumnaTablero, type MapeoColumnas } from "./columnas";
+import { COLUMNA_GRUPO, COLUMNA_NOMBRE, CONSULTA_COLUMNAS, CONSULTA_PRIMERA, CONSULTA_SIGUIENTE, ITEMS_POR_PAGINA, cambioDesde, despachoDeItem, leerColumnas, leerMapeo, leerPagina, leerReglasEstado, sugerirMapeo, type ColumnaTablero, type MapeoColumnas } from "./columnas";
 import { consultarMonday, guardarDespachos, mondayConfigurado } from "./sincronizar";
 
 /**
@@ -54,6 +54,10 @@ export async function sincronizarTablerosExtra(supabase: SupabaseClient, limite:
         if (!propias) throw new Error("El tablero no existe o el token de Monday no tiene acceso a él.");
         mapeo = mapeoPorTitulos(mapeoPrincipal, columnasPrincipal, propias.columnas);
         if (!mapeo) throw new Error("No tiene columnas con el mismo título que las de pedido y estado del consolidado.");
+        // Las de los asesores (solo las tiene el tablero de devoluciones; migración 0287), por su título.
+        const sugeridas = sugerirMapeo(propias.columnas);
+        if (sugeridas.estado_asesores) mapeo.estado_asesores = sugeridas.estado_asesores;
+        if (sugeridas.observaciones_asesores) mapeo.observaciones_asesores = sugeridas.observaciones_asesores;
         await supabase.from("mon_tableros_extra").update({ columnas: mapeo }).eq("tablero_id", t.tablero_id);
       }
       let cursor: string | null = null;

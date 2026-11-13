@@ -104,13 +104,14 @@ export async function actualizarEntregas(supabase: SupabaseClient, quien = "Sist
   for (let i = 0; i < ids.length; i += 200) {
     const parte = ids.slice(i, i + 200);
     const [m, g] = await Promise.all([
-      supabase.from("mon_despachos").select("orden_id, estado, estado_grupo, courier, causa_rechazo, fecha_despacho, fecha_entrega, actualizado_monday").in("orden_id", parte),
+      supabase.from("mon_despachos").select("orden_id, estado, estado_grupo, courier, causa_rechazo, fecha_despacho, fecha_entrega, actualizado_monday, estado_asesores").in("orden_id", parte),
       supabase.from("tienda_guias").select("orden_id, guia, estado, estado_grupo, fecha_estado, fecha_emision, recaudo, ultimo_motivo").in("orden_id", parte),
     ]);
     // Sin la tabla de una fuente (migración sin correr), esa fuente no cuenta.
     for (const x of (m.error ? [] : (m.data ?? [])) as Record<string, string | null>[]) {
       const fecha = x.fecha_entrega ?? x.fecha_despacho;
-      const clave = `${fecha ?? ""}|${x.actualizado_monday ?? ""}`;
+      // Lo del tablero de devoluciones (con decisión de los asesores) va después de lo del repartidor: es lo último que pasa con el pedido.
+      const clave = `${x.estado_asesores ? "2" : "1"}|${fecha ?? ""}|${x.actualizado_monday ?? ""}`;
       const previa = monday.get(String(x.orden_id));
       if (previa && previa.clave >= clave) continue;
       monday.set(String(x.orden_id), { clave, estado_grupo: String(x.estado_grupo), estado: x.estado, courier: x.courier, causa_rechazo: x.causa_rechazo, fecha });

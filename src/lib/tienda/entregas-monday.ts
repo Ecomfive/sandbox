@@ -30,7 +30,7 @@ export async function entregasDeOrdenes(supabase: SupabaseClient, ordenIds: stri
   for (let i = 0; i < ids.length; i += 200) {
     const { data, error } = await supabase
       .from("mon_despachos")
-      .select("orden_id, estado, estado_grupo, courier, fecha_despacho, fecha_entrega, causa_rechazo, actualizado_monday")
+      .select("orden_id, estado, estado_grupo, courier, fecha_despacho, fecha_entrega, causa_rechazo, actualizado_monday, estado_asesores, observaciones_asesores")
       .in("orden_id", ids.slice(i, i + 200));
     if (error) return new Map();
     for (const d of (data ?? []) as {
@@ -42,12 +42,16 @@ export async function entregasDeOrdenes(supabase: SupabaseClient, ordenIds: stri
       fecha_entrega: string | null;
       causa_rechazo: string | null;
       actualizado_monday: string | null;
+      estado_asesores?: string | null;
+      observaciones_asesores?: string | null;
     }[]) {
       const fecha = d.fecha_entrega ?? d.fecha_despacho;
-      const clave = `${fecha ?? ""}|${d.actualizado_monday ?? ""}`;
+      // Lo del tablero de devoluciones (13 nov 2026) va después de lo del repartidor: es lo último que pasa con el pedido.
+      const clave = `${d.estado_asesores ? "2" : "1"}|${fecha ?? ""}|${d.actualizado_monday ?? ""}`;
       const previa = mapa.get(d.orden_id);
       if (previa && previa.clave >= clave) continue;
-      mapa.set(d.orden_id, { clave, grupo: d.estado_grupo, estado: d.estado, repartidor: d.courier, fecha, causa: d.causa_rechazo });
+      const causa = d.estado_asesores ? `Devolución (${d.estado_asesores.toLowerCase()})${d.observaciones_asesores ? `: ${d.observaciones_asesores}` : ""}` : d.causa_rechazo;
+      mapa.set(d.orden_id, { clave, grupo: d.estado_grupo, estado: d.estado, repartidor: d.courier, fecha, causa });
     }
   }
   return new Map(

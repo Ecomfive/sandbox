@@ -228,3 +228,36 @@ test("los tableros de repartidores toman las columnas del consolidado por su tí
   assert.deepEqual(m, { pedido: "name", estado: "status", tienda: "status_1", courier: "people", fecha_despacho: "group" });
   assert.equal(mapeoPorTitulos({ pedido: "name", estado: "estado_15" }, principal, [{ id: "x", titulo: "Otra", tipo: "text" }]), null, "sin columna de estado no se lee");
 });
+
+test("tablero de devoluciones (13 nov 2026): FALLIDO y POSPUESTO siguen en ruta; DESINTEGRADO de los asesores es devuelto", () => {
+  assert.equal(grupoDeEstado("FALLIDO"), "en_ruta");
+  assert.equal(grupoDeEstado("POSPUESTO"), "en_ruta");
+  assert.equal(grupoDeEstado("RECHAZADO"), "rechazado");
+  const columnas = [
+    { id: "name", titulo: "Elemento", tipo: "name" },
+    { id: "estado_1", titulo: "Estado", tipo: "status" },
+    { id: "estado_9", titulo: "ESTADO ASESORES", tipo: "status" },
+    { id: "texto_9", titulo: "OBSERVACIONES ASESORES", tipo: "text" },
+  ];
+  const m = sugerirMapeo(columnas as never);
+  assert.equal(m.estado, "estado_1");
+  assert.equal(m.estado_asesores, "estado_9");
+  assert.equal(m.observaciones_asesores, "texto_9");
+  const item = (asesores: string) => ({
+    id: "1",
+    name: "1468",
+    updated_at: "2026-11-13T10:00:00Z",
+    grupo: "DEVOLUCION CIUDAD",
+    column_values: [
+      { id: "estado_1", text: "POSPUESTO", value: null },
+      { id: "estado_9", text: asesores, value: null },
+      { id: "texto_9", text: "no quiere el pedido", value: null },
+    ],
+  });
+  const pendiente = despachoDeItem(item("PENDIENTE"), { ...m, pedido: "name" });
+  assert.equal(pendiente.estado_grupo, "en_ruta");
+  assert.equal(pendiente.observaciones_asesores, "no quiere el pedido");
+  const cerrado = despachoDeItem(item("DESINTEGRADO"), { ...m, pedido: "name" });
+  assert.equal(cerrado.estado_grupo, "rechazado");
+  assert.equal(cerrado.causa_rechazo, "no quiere el pedido");
+});

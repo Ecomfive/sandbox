@@ -19,6 +19,9 @@ export const CAMPOS_MONDAY = [
   { clave: "fecha_despacho", etiqueta: "Fecha de despacho", obligatorio: true },
   { clave: "fecha_entrega", etiqueta: "Fecha de entrega", obligatorio: false },
   { clave: "remision", etiqueta: "Remisión", obligatorio: false },
+  // Los del tablero de devoluciones (13 nov 2026, migración 0287): lo que deciden los asesores con el pedido que volvió.
+  { clave: "estado_asesores", etiqueta: "Estado de los asesores (devoluciones)", obligatorio: false },
+  { clave: "observaciones_asesores", etiqueta: "Observaciones de los asesores (devoluciones)", obligatorio: false },
 ] as const;
 export type CampoMonday = (typeof CAMPOS_MONDAY)[number]["clave"];
 export type MapeoColumnas = Partial<Record<CampoMonday, string>>;
@@ -140,11 +143,13 @@ export function sugerirMapeo(columnas: ColumnaTablero[]): MapeoColumnas {
     pedido: /PEDIDO|ORDEN|ORDER/,
     tienda: /TIENDA|STORE|MARCA/,
     courier: /COURIER|REPARTIDOR|TRANSPORT|MENSAJER/,
-    estado: /ESTADO|STATUS/,
+    estado: /^(?!.*ASESOR)(?=.*(ESTADO|STATUS))/,
     causa: /CAUSA|MOTIVO|RAZON|RECHAZO/,
     fecha_despacho: /DESPACHO|ENVIO|SALIDA/,
     fecha_entrega: /ENTREGA/,
     remision: /REMISION|GUIA/,
+    estado_asesores: /ESTADO.*ASESOR/,
+    observaciones_asesores: /OBSERVACION.*ASESOR/,
   };
   const salida: MapeoColumnas = {};
   const usadas = new Set<string>();
@@ -170,7 +175,8 @@ export function grupoDeEstado(etiqueta: string | null, reglas: Record<string, Gr
   if (!n) return "sin_estado";
   if (reglas[n]) return reglas[n];
   if (/CANCELAD|ANULAD/.test(n)) return "cancelado";
-  if (/RECHAZ|DEVUEL|DEVOLU|NO ENTREGAD|FALLID|RETURN/.test(n)) return "rechazado";
+  // FALLIDO no es rechazado (Hernán, 13 nov 2026): el pedido todavía se puede volver a entregar; sigue en ruta.
+  if (/RECHAZ|DEVUEL|DEVOLU|NO ENTREGAD|RETURN/.test(n)) return "rechazado";
   if (/ENTREGAD|DELIVERED|COMPLETAD/.test(n)) return "entregado";
   return "en_ruta";
 }
@@ -219,7 +225,13 @@ export interface Despacho {
   fecha_entrega: string | null;
   remision: string | null;
   actualizado_monday: string | null;
+  /** Solo en el tablero de devoluciones: lo que deciden los asesores (PENDIENTE, DESINTEGRADO) y su motivo. */
+  estado_asesores: string | null;
+  observaciones_asesores: string | null;
 }
+
+/** DESINTEGRADO: los asesores cerraron el pedido y el producto vuelve al inventario (Hernán, 13 nov 2026). Eso sí es una devolución. */
+export const esDesintegrado = (estadoAsesores: string | null | undefined) => /DESINTEGRAD/.test(normalizar(estadoAsesores ?? ""));
 
 const corto = (v: string | null | undefined, max: number) => (v && v.trim() ? v.trim().slice(0, max) : null);
 
@@ -234,6 +246,8 @@ export function despachoDeItem(item: ItemMonday, mapeo: MapeoColumnas, reglas: R
   };
   const texto = (campo: CampoMonday, max = 200) => corto(col(campo)?.text, max);
   const estado = texto("estado", 120);
+  const estadoAsesores = texto("estado_asesores", 120);
+  const observaciones = texto("observaciones_asesores", 500);
   return {
     item_id: item.id,
     nombre: corto(item.name, 300),
@@ -241,12 +255,15 @@ export function despachoDeItem(item: ItemMonday, mapeo: MapeoColumnas, reglas: R
     tienda_texto: texto("tienda", 120),
     courier: texto("courier", 120),
     estado,
-    estado_grupo: grupoDeEstado(estado, reglas),
-    causa_rechazo: texto("causa", 300),
+    // Con DESINTEGRADO de los asesores el pedido se dio por devuelto, diga lo que diga la columna Estado (FALLIDO, POSPUESTO).
+    estado_grupo: esDesintegrado(estadoAsesores) ? "rechazado" : grupoDeEstado(estado, reglas),
+    causa_rechazo: texto("causa", 300) ?? (observaciones ? observaciones.slice(0, 300) : null),
     fecha_despacho: fechaDeColumna(col("fecha_despacho")),
     fecha_entrega: fechaDeColumna(col("fecha_entrega")),
     remision: texto("remision", 120),
     actualizado_monday: item.updated_at,
+    estado_asesores: estadoAsesores,
+    observaciones_asesores: observaciones,
   };
 }
 
