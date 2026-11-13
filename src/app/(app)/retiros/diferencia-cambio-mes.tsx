@@ -12,7 +12,7 @@ const formatoCorrelativo = (numero: number) => `#${String(numero).padStart(4, "0
 const pct = (dif: number, monto: number) => (monto > 0 ? `${((dif / monto) * 100).toFixed(2)} %` : "—");
 
 /**
- * La diferencia por cambio de cada mes (13 nov 2026, pedido de Hernán): lo pedido menos lo recibido de los retiros cerrados, por el mes de la solicitud,
+ * La diferencia de cambio de cada mes (antes «por cambio»; Hernán corrigió el nombre) (13 nov 2026, pedido de Hernán): lo pedido menos lo recibido de los retiros cerrados, por el mes de la solicitud,
  * como la columna «Diferencia por cambio» de su Excel. Muestra los últimos 6 meses y se puede abrir el resto; al pie, el total de los meses que se ven.
  */
 export function DiferenciaCambioMes({ meses, codigoPais }: { meses: DiferenciaMes[]; codigoPais: string }) {
@@ -26,7 +26,7 @@ export function DiferenciaCambioMes({ meses, codigoPais }: { meses: DiferenciaMe
 
   return (
     <KpiGroup
-      titulo="Diferencia por cambio por mes"
+      titulo="Diferencia de cambio por mes"
       accion={<span className="font-normal">Lo pedido menos lo recibido de los retiros cerrados, por el mes de la solicitud</span>}
     >
       <div className="overflow-x-auto">
@@ -37,7 +37,7 @@ export function DiferenciaCambioMes({ meses, codigoPais }: { meses: DiferenciaMe
               <th scope="col" className={`${th} text-right`}>Retiros</th>
               <th scope="col" className={`${th} text-right`}>Pedido</th>
               <th scope="col" className={`${th} text-right`}>Recibido</th>
-              <th scope="col" className={`${th} text-right`}>Diferencia por cambio</th>
+              <th scope="col" className={`${th} text-right`}>Diferencia de cambio</th>
               <th scope="col" className={`${th} text-right`}>% del pedido</th>
             </tr>
           </thead>

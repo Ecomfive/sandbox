@@ -1,5 +1,5 @@
 /**
- * La diferencia por cambio de cada mes (13 nov 2026, pedido de Hernán): lo que se pidió retirar menos lo que llegó a la cuenta, sumado por el mes de la
+ * La diferencia de cambio de cada mes (13 nov 2026, pedido de Hernán): lo que se pidió retirar menos lo que llegó a la cuenta, sumado por el mes de la
  * solicitud. Es la columna «Diferencia por cambio» de su Excel (Total − Total neto recibido) y le sirve para cargar ese gasto global de comisión a los
  * gastos de Ecomfive. Cuenta solo los retiros cerrados con lo recibido anotado; los cancelados no cuentan (el dinero volvió a la wallet). Los cerrados sin
  * monto recibido se cuentan aparte para avisar que a ese mes le falta un dato.

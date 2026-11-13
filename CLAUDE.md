@@ -97,7 +97,7 @@ convenciones técnicas del código.
   `group by`) en vez de traer todo y calcularlo en JavaScript — ver
   [RENDIMIENTO-PENDIENTE.md](RENDIMIENTO-PENDIENTE.md) para el diagnóstico
   detallado de dónde falta esto todavía.
-- **Retiros: diferencia por cambio por mes** (13 nov 2026, pedido de Hernán: la columna «Diferencia por cambio» de su Excel, para cargar ese gasto global a los
+- **Retiros: diferencia de cambio por mes** (13 nov 2026, pedido de Hernán: la columna «Diferencia por cambio» de su Excel, para cargar ese gasto global a los
   gastos de Ecomfive): bloque `DiferenciaCambioMes` (`retiros/diferencia-cambio-mes.tsx`) bajo el «Dashboard»; cálculo puro `diferenciaPorMes`
   (`src/lib/retiros/diferencia-cambio.ts`, con prueba): lo pedido (`monto`) menos lo recibido (`monto_recibido`) de los retiros **cerrados**, por el mes de
   la solicitud (`fecha`); los cancelados no cuentan y los cerrados sin lo recibido se avisan aparte. Últimos 6 meses y «Ver los N meses», con total al pie.
