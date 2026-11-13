@@ -41,7 +41,8 @@ export function DetalleOrdenFinanzas({ orden, codigoPais, puedeEscribir }: { ord
         <Pastilla tono={estado.tono}>{estado.etiqueta}</Pastilla>
         <span className="text-sm text-muted-foreground">{subtituloOrden(orden.o, orden.tienda)}</span>
       </div>
-      <div className="overflow-hidden rounded-2xl border border-border bg-card">
+      {/* Alto fijo: la ficha se desplaza por dentro y el chat de la derecha queda quieto. */}
+      <div className="flex h-[calc(100vh-11rem)] min-h-[32rem] flex-col overflow-hidden rounded-2xl border border-border bg-card">
         <FichaOrdenTienda orden={orden} codigoPais={codigoPais} puedeEscribir={puedeEscribir} />
       </div>
     </Pagina>

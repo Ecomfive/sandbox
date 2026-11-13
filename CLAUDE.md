@@ -2610,7 +2610,9 @@ convenciones técnicas del código.
   lectura) y quién de nosotros lo mandó; la ventana de 24 h sale de eso (`ventana24`, «sin_saber» si no hay dato). Enviar texto pausa el bot del chat; fuera de
   24 h solo plantillas aprobadas (`listar_plantillas_whatsapp` + `ver_plantilla_whatsapp`, caché 10 min). Enviar pide el teléfono completo (en
   `listar_conversaciones_recientes` iComfly lo da oculto, «•••1958»: por eso no hay bandeja). Límite del conector: 5 mensajes por minuto. Falta: adjuntos
-  (`enviar_media_whatsapp` pide una URL pública).
+  (`enviar_media_whatsapp` pide una URL pública). **El chat queda quieto** (13 nov 2026, pedido de Hernán): en `ficha-orden.tsx`, con el chat a la derecha
+  (`@2xl`), la fila de la grilla es `minmax(0,1fr)` y solo se desplaza la columna de la ficha (`overflow-y-auto`; pestañas `@2xl:top-0`, secciones
+  `@2xl:scroll-mt-12`); el `aside` ocupa todo el alto sin `sticky`. La página de una orden (`detalle-finanzas.tsx`) le da alto fijo para lo mismo.
 
 ## Dónde vive cada cosa
 

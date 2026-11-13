@@ -39,7 +39,7 @@ const ETIQUETA_FASE: Record<string, string> = { por_confirmar: "Por confirmar", 
 
 function Seccion({ id, titulo, icono: Icono, extra, children }: { id: string; titulo: string; icono: (typeof SECCIONES)[number]["icono"]; extra?: ReactNode; children: ReactNode }) {
   return (
-    <section id={id} aria-labelledby={`${id}-t`} className="flex min-w-0 scroll-mt-28 flex-col gap-3 border-b border-border px-5 py-4 last:border-b-0">
+    <section id={id} aria-labelledby={`${id}-t`} className="flex min-w-0 scroll-mt-28 flex-col gap-3 border-b @2xl:scroll-mt-12 border-border px-5 py-4 last:border-b-0">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 id={`${id}-t`} className="m-0 flex items-center gap-2 text-[15px] font-semibold">
           <span className="flex h-7 w-7 items-center justify-center rounded-md bg-primario-suave text-primario">
@@ -225,11 +225,13 @@ export function FichaOrdenTienda({ orden, codigoPais, puedeEscribir }: { orden: 
 
   return (
     <div className="@container flex min-h-0 flex-1 flex-col">
-      <div className="grid min-h-0 flex-1 grid-cols-1 @2xl:grid-cols-[minmax(0,1fr)_minmax(16rem,20rem)] @5xl:grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)]">
-        <div className="flex min-w-0 flex-col">
+      {/* Con el chat a la derecha (13 nov 2026, pedido de Hernán: «el chat tiene que quedar estático»), solo se desplaza la columna de la ficha; el chat ocupa
+          todo el alto y no se mueve. En una ficha angosta (celular) se desplaza todo junto y el chat baja al final. */}
+      <div className="grid min-h-0 flex-1 grid-cols-1 @2xl:grid-cols-[minmax(0,1fr)_minmax(16rem,20rem)] @2xl:grid-rows-[minmax(0,1fr)] @5xl:grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)]">
+        <div className="flex min-w-0 flex-col @2xl:min-h-0 @2xl:overflow-y-auto">
           <LineaTiempo pasos={pasos} />
           {/* Las pestañas llevan a cada parte de la ficha (como en la app de Jorge): se quedan arriba al desplazarse. */}
-          <nav aria-label="Partes del pedido" className="sticky top-[var(--alto-cabecera,0px)] z-[5] flex gap-1 overflow-x-auto border-y border-border bg-card px-3">
+          <nav aria-label="Partes del pedido" className="sticky top-[var(--alto-cabecera,0px)] z-[5] flex gap-1 overflow-x-auto border-y @2xl:top-0 border-border bg-card px-3">
             {SECCIONES.map((s) => (
               <button key={s.id} type="button" onClick={() => ir(s.id)} className={`flex shrink-0 items-center gap-1.5 border-b-2 border-transparent px-2.5 py-2.5 text-[13px] font-medium whitespace-nowrap text-muted-foreground hover:border-primario hover:text-foreground ${anilloFoco}`}>
                 <s.icono className="h-3.5 w-3.5" aria-hidden="true" />
@@ -463,7 +465,7 @@ export function FichaOrdenTienda({ orden, codigoPais, puedeEscribir }: { orden: 
         </div>
         {/* El chat del cliente (13 nov 2026, pedido de Hernán): a la derecha de la ficha, tenga o no chat; un solo chat montado (cada uno se lee cada 8 s).
             Solo en una ficha muy angosta (celular) baja al final. */}
-        <aside aria-label="WhatsApp del cliente" className="flex h-[28rem] min-h-0 flex-col border-t border-border @2xl:sticky @2xl:top-[var(--alto-cabecera,0px)] @2xl:h-[calc(92vh-var(--alto-cabecera,0px))] @2xl:self-start @2xl:border-t-0 @2xl:border-l">
+        <aside aria-label="WhatsApp del cliente" className="flex h-[28rem] min-h-0 flex-col border-t border-border @2xl:h-auto @2xl:border-t-0 @2xl:border-l">
           <ChatTienda destino={{ pedido: orden.id }} nombreCliente={orden.cliente?.nombre ?? null} puedeEscribir={puedeEscribir} respaldo={<ChatCliente orden={orden} />} />
         </aside>
       </div>
