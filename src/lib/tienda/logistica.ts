@@ -30,6 +30,16 @@ export function etapaConEntrega(estado: EstadoPedido, entrega: { grupo: string }
   return "en_ruta";
 }
 
+/**
+ * Si el equipo marcó el pedido como anulado (13 nov 2026, despacho de Kenku): con la etiqueta «ANULADO/VERIFICADO» el pedido **no se prepara** y se
+ * procede a cancelar (puede estar mal etiquetado, con la dirección por mejorar, sin stock o reprogramado para una fecha que aún no se puede enviar);
+ * «Cancelado» igual. Para Logística no está por preparar ni en ruta. No cambia el estado de la orden: es solo cómo se agrupa en Logística.
+ */
+export function anuladoPorEtiqueta(etiquetas: string[] | string | null | undefined): boolean {
+  const lista = Array.isArray(etiquetas) ? etiquetas : etiquetasDe(etiquetas ?? null);
+  return lista.some((e) => /^anulad[oa](\s*\/|\s*$)/i.test(e.trim()) || /^cancelad[oa]$/i.test(e.trim()));
+}
+
 /** Desde cuántos días en ruta (contados desde el pedido) se marca como demorado. */
 export const DIAS_DEMORA = 5;
 
