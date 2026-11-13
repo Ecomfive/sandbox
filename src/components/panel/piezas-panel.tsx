@@ -202,6 +202,7 @@ export function Indicador({
   activo,
   icono,
   color,
+  angosto = false,
 }: {
   titulo: string;
   punto?: "aviso" | "peligro" | "exito";
@@ -214,6 +215,8 @@ export function Indicador({
   /** La celda es un botón (con `aria-pressed` = `activo`): enciende o apaga un filtro de la misma página. */
   alPulsar?: () => void;
   activo?: boolean;
+  /** Fuera de un `TableroIndicadores`: celdas más angostas, para que una franja de 8 indicadores quepa en una fila (Pedidos de tienda). */
+  angosto?: boolean;
 }) {
   const enTablero = useContext(EnTablero);
   if (enTablero) {
@@ -257,7 +260,7 @@ export function Indicador({
       <span className="block text-xs text-muted-foreground">{detalle}</span>
     </>
   );
-  const clase = "-mr-px -mb-px block min-w-0 flex-[1_1_10.5rem] border-r border-b border-border px-3.5 py-3 text-left";
+  const clase = `-mr-px -mb-px block min-w-0 ${angosto ? "flex-[1_1_7.5rem] px-3 py-2.5" : "flex-[1_1_10.5rem] px-3.5 py-3"} border-r border-b border-border text-left`;
   if (alPulsar)
     return (
       <button type="button" aria-pressed={activo} onClick={alPulsar} className={`${clase} cursor-pointer hover:bg-muted ${anilloFoco} ${activo ? "bg-primario-suave" : "bg-transparent"}`}>

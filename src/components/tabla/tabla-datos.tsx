@@ -79,6 +79,7 @@ export function TablaDatos<F, C = undefined>({
   aspecto = "tabla",
   asaColumnas = false,
   encabezadoMayusculas = false,
+  densa = false,
 }: {
   def: DefTabla<F>;
   filas: F[];
@@ -151,6 +152,11 @@ export function TablaDatos<F, C = undefined>({
   asaColumnas?: boolean;
   /** Los nombres de las columnas en mayúsculas y un poco más grandes, aunque sea una lista (Pedidos de tienda, como Mi Reto Digital). */
   encabezadoMayusculas?: boolean;
+  /**
+   * Más compacta: letra de 13 px y menos espacio en cada celda, para que quepan todas las columnas sin desplazarse de lado (Pedidos de tienda,
+   * 13 nov 2026, pedido de Hernán: que se vea como Mi Reto Digital con el navegador al 80 %). Los textos largos los corta cada columna con «…».
+   */
+  densa?: boolean;
 }) {
   const tabla = useTablaInteractiva(def, filas, { limiteSinFiltros, porPagina, paginarSiempre });
   const [guardadas, cambiarColumnas] = useColumnas(def.clave, columnas);
@@ -347,6 +353,7 @@ export function TablaDatos<F, C = undefined>({
         <table
           data-aspecto={aspecto}
           data-encabezado={encabezadoMayusculas ? "mayusculas" : undefined}
+          data-densa={densa ? "" : undefined}
           className="tabla-datos w-full border-collapse text-sm"
           style={{ minWidth: anchoMinimo }}
         >
