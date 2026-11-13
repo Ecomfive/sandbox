@@ -85,7 +85,9 @@ export const COLUMNAS: ColumnaTabla<PedidoFila, Contexto>[] = [
     label: "Pedidos",
     descripcion: "Cuántos pedidos tiene el cliente en total (por su teléfono), contando este.",
     ocultable: true,
-    clase: "text-right tabular-nums",
+    // Centradas y del ancho de su contenido (13 nov 2026, pedido de Hernán: había mucho espacio entre el cliente y los números).
+    alinear: "centro",
+    clase: "tabular-nums",
     render: (p) => p.pedidosCliente ?? "—",
   },
   {
@@ -93,6 +95,7 @@ export const COLUMNAS: ColumnaTabla<PedidoFila, Contexto>[] = [
     label: "Riesgo",
     descripcion: "Por el historial del cliente: medio si tuvo una devolución o cancelación y pocas entregas; alto si tuvo dos o más y más que entregas.",
     ocultable: true,
+    alinear: "centro",
     render: (p) => (p.riesgo ? <Pastilla tono={RIESGO[p.riesgo].tono}>{RIESGO[p.riesgo].etiqueta}</Pastilla> : <span className="text-muted-foreground">—</span>),
   },
   {
