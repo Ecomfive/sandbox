@@ -2,6 +2,7 @@
 // (12 nov 2026). Solo lectura. Solo órdenes de tiendas del país que se pide (si no, null).
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { datosAsistente, evaluarAsistente, type Asistente } from "./asistente";
 import { costosDeProductos, cuentasDelPedido, type CostoProducto, type IngresosYCostos } from "./costos";
 import { hayHoraDeShopify } from "./datos-finanzas";
 import { nombreComparable } from "./ordenes-finanzas";
@@ -120,12 +121,14 @@ export interface OrdenTienda {
   entrega: EntregaOrden | null;
   /** El chat de WhatsApp del cliente, si escribió a algún número del sistema. */
   whatsapp: WhatsappOrden | null;
+  /** El asistente de confirmación (13 nov 2026): riesgo, dirección, transportadora y conversación, con lo registrado. */
+  asistente: Asistente | null;
 }
 
 export async function cargarOrdenTienda(supabase: SupabaseClient, id: string, paisId: string): Promise<OrdenTienda | null> {
   if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
   // Con la migración 0276, también la hora de Shopify (texto armado: se declara como `string`).
-  const columnas: string = `numero, fecha, estado_entrega, etiquetas, subtotal, descuento, envio, total, estado_pago, forma_pago_texto, transportista, guia, fecha_envio, fecha_devolucion, resultado_courier, motivo_cancelacion, origen, costo_envio, costo_envio_real, fase, confirmada_en, confirmada_por, despachada_en, entregada_en, cod_esperado, cod_cobrado, metodo_pago, ${(await hayHoraDeShopify(supabase)) ? "creado_origen, " : ""}creado_en, fin_unidades(nombre, pais_id, clase, tarifa_fulfillment)`;
+  const columnas: string = `numero, fecha, estado_entrega, etiquetas, subtotal, descuento, envio, total, estado_pago, forma_pago_texto, transportista, guia, fecha_envio, fecha_devolucion, resultado_courier, motivo_cancelacion, origen, costo_envio, costo_envio_real, fase, confirmada_en, confirmada_por, despachada_en, entregada_en, cod_esperado, cod_cobrado, metodo_pago, unidad_id, ${(await hayHoraDeShopify(supabase)) ? "creado_origen, " : ""}creado_en, fin_unidades(nombre, pais_id, clase, tarifa_fulfillment)`;
   const { data: crudo } = await supabase.from("ven_ordenes").select(columnas).eq("id", id).maybeSingle();
   const o = crudo as unknown as (OrdenFinanzas & { fin_unidades: unknown; costo_envio?: number | null; costo_envio_real?: number | null }) | null;
   const unidad = (o?.fin_unidades ?? null) as { nombre: string; pais_id: string; clase: string; tarifa_fulfillment: number | null } | null;
@@ -172,9 +175,23 @@ export async function cargarOrdenTienda(supabase: SupabaseClient, id: string, pa
   delete orden.fin_unidades;
   delete orden.costo_envio;
   delete orden.costo_envio_real;
+  delete (orden as { unidad_id?: unknown }).unidad_id;
   const datosCliente: ClienteOrdenFinanzas & { telefono_clave?: string | null } = { ...((cliente ?? {}) as ClienteOrdenFinanzas & { telefono_clave?: string | null }) };
   delete datosCliente.telefono_clave;
   const whatsapp = await whatsappDeCliente(supabase, (cliente as { telefono?: string | null } | null)?.telefono ?? null).catch(() => null);
+  const unidadId = (o as { unidad_id?: string }).unidad_id ?? null;
+  const ultimoDelCliente = whatsapp?.mensajes.filter((m) => m.entrante).at(-1)?.momento ?? null;
+  const asistente = unidadId
+    ? await datosAsistente(supabase, unidadId, {
+        fase: o.fase ?? null,
+        etiquetas: o.etiquetas,
+        cliente: cliente ? { nombre: cliente.nombre as string | null, telefono: cliente.telefono as string | null, direccion: cliente.direccion as string | null, corregimiento: cliente.corregimiento as string | null } : null,
+        anteriores,
+        whatsapp: { existe: !!whatsapp, ultimoDelCliente },
+      })
+        .then(evaluarAsistente)
+        .catch(() => null)
+    : null;
   return {
     id,
     o: orden,
@@ -188,6 +205,7 @@ export async function cargarOrdenTienda(supabase: SupabaseClient, id: string, pa
     eventos,
     entrega,
     whatsapp,
+    asistente,
   };
 }
 

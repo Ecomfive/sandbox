@@ -6,7 +6,8 @@ import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
 import { formatearFecha, formatearFechaHora, formatearMoneda } from "@/lib/formato";
-import { CheckIcon, CopiarIcon, EnvioIcon, HistorialIcon, MargenIcon, PersonaIcon, ProductoIcon, TareasIcon, ChatIcon } from "@/lib/nav-icons";
+import { CheckIcon, CopiarIcon, EnvioIcon, HistorialIcon, InteligenciaIcon, MargenIcon, PersonaIcon, ProductoIcon, TareasIcon, ChatIcon } from "@/lib/nav-icons";
+import type { Asistente, Nivel } from "@/lib/tienda/asistente";
 import { NOMBRE_FUENTE_COSTO } from "@/lib/tienda/costos";
 import { pasosDelPedido, type PasoPedido } from "@/lib/tienda/linea-tiempo";
 import type { OrdenTienda } from "@/lib/tienda/orden-detalle";
@@ -18,6 +19,7 @@ import { NotasOrden } from "./notas-orden";
 // Servientrega, el CRM); los botones están apagados mientras Shopify sea de solo lectura. Lo único que se escribe son las notas del equipo.
 
 const SECCIONES = [
+  { id: "asistente", titulo: "Asistente", icono: InteligenciaIcon },
   { id: "cliente", titulo: "Cliente y dirección", icono: PersonaIcon },
   { id: "productos", titulo: "Productos", icono: ProductoIcon },
   { id: "costos", titulo: "Ingresos y costos", icono: MargenIcon },
@@ -124,6 +126,40 @@ function LineaTiempo({ pasos }: { pasos: PasoPedido[] }) {
   );
 }
 
+const COLOR_NIVEL: Record<Nivel, string> = { bien: "bg-success", aviso: "bg-warning", mal: "bg-destructive", gris: "bg-border-control" };
+const TEXTO_NIVEL: Record<Nivel, string> = { bien: "", aviso: "text-warning", mal: "text-destructive", gris: "text-muted-foreground" };
+
+/** El asistente de confirmación: cuatro partes con lo registrado (riesgo y zona, dirección, transportadora, pedido y conversación). */
+function AsistenteConfirmacion({ a }: { a: Asistente }) {
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="overflow-hidden rounded-lg border border-border">
+        {a.partes.map((p, i) => (
+          <div key={p.titulo} className="flex flex-col gap-1.5 border-b border-border px-4 py-3 last:border-b-0">
+            <div className="flex items-center gap-2">
+              <span aria-hidden="true" className={`h-2 w-2 shrink-0 rounded-full ${COLOR_NIVEL[p.nivel]}`} />
+              <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                {i + 1} · {p.titulo}
+              </span>
+              {i === 0 && <Pastilla tono={a.riesgo === "alto" ? "peligro" : a.riesgo === "medio" ? "aviso" : "exito"}>Riesgo {a.riesgo}</Pastilla>}
+            </div>
+            <ul className="m-0 flex list-none flex-col gap-1 p-0 pl-4">
+              {p.lineas.map((l, j) => (
+                <li key={j} className={`flex gap-2 text-sm ${TEXTO_NIVEL[l.nivel]}`}>
+                  <span aria-hidden="true" className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${COLOR_NIVEL[l.nivel]}`} />
+                  <span>{l.texto}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+      <p className="m-0 text-sm font-medium">{a.resumen}</p>
+      <p className="m-0 text-[11px] text-muted-foreground">Reglas sobre lo registrado: pedidos de la tienda (últimos 6 meses), Monday, Servientrega, etiquetas de Shopify y el chat del CRM.</p>
+    </div>
+  );
+}
+
 /** El chat del cliente en el CRM (solo lectura): los últimos mensajes y el enlace a la Bandeja. */
 function ChatCliente({ orden }: { orden: OrdenTienda }) {
   const w = orden.whatsapp;
@@ -200,6 +236,12 @@ export function FichaOrdenTienda({ orden, codigoPais, puedeEscribir }: { orden: 
               </button>
             ))}
           </nav>
+
+          {orden.asistente && (
+            <Seccion id={sid("asistente")} titulo="Asistente de confirmación" icono={S("asistente").icono}>
+              <AsistenteConfirmacion a={orden.asistente} />
+            </Seccion>
+          )}
 
           {!deShopify && (
             <p role="note" className="m-0 mx-5 mt-4 rounded-lg border border-primario/30 bg-primario-suave px-4 py-3 text-sm">
