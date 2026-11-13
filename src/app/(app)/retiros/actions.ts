@@ -503,13 +503,14 @@ export async function resolverNovedadRetiro(formData: FormData): Promise<{ error
   // El retiro queda «Cerrado» y consolidado, con la etapa Recibido + Consolidado (cada una con su fecha) y la
   // Consolidación «Novedad resuelta» (`novedad_resuelta`, migración 0048). Sin la migración se guarda con el estado
   // antiguo «novedad_resuelta», que la ficha y la tabla entienden igual.
-  let { error, cambios } = await actualizarTolerante(
+  const resultado = await actualizarTolerante(
     supabase,
     id,
     { estado: "cerrado", consolidado: true, novedad_resuelta: true, fecha_recibido, fecha_cierre },
     ["novedad_resuelta", "fecha_recibido"]
   );
-  if (!error && !("novedad_resuelta" in cambios)) {
+  let { error } = resultado;
+  if (!error && !("novedad_resuelta" in resultado.cambios)) {
     ({ error } = await supabase.from("retiros").update({ estado: "novedad_resuelta" }).eq("id", id));
   }
   if (error) return { error: error.message };

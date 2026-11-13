@@ -181,16 +181,17 @@ export function CrearRetiroPanel({
   }
 
   // Si ya hay una sugerencia activa (no se tocó a mano) y la persona escribe el monto
-  // después de elegir la cuenta, recalcula la comisión sugerida con el monto nuevo.
-  useEffect(() => {
+  // después de elegir la cuenta, recalcula la comisión sugerida con el monto nuevo (al escribirlo, no en un efecto).
+  function alCambiarMonto(valor: string) {
+    setMonto(valor);
     if (comisionManual) return;
+    const nuevo = parseFloat(valor) || 0;
     const cuenta = cuentas.find((c) => c.id === cuentaSeleccionadaId);
-    const sugerido = cuenta ? calcularComisionSugerida(cuenta, montoNum) : null;
+    const sugerido = cuenta ? calcularComisionSugerida(cuenta, nuevo) : null;
     if (sugerido == null) return;
     setComisionValor(sugerido.toFixed(2));
-    setComisionPorcentaje(montoNum > 0 ? ((sugerido / montoNum) * 100).toFixed(2) : "0");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [montoNum]);
+    setComisionPorcentaje(nuevo > 0 ? ((sugerido / nuevo) * 100).toFixed(2) : "0");
+  }
 
   // Sin cuentas activas no hay retiro que crear aunque el resto esté lleno: el botón pide llevar a ese aviso.
   const puedeCrear = completo && cuentas.length > 0;
@@ -330,7 +331,7 @@ export function CrearRetiroPanel({
                       aria-invalid={invalido("campo-monto")}
                       placeholder="Ej: 1500.00"
                       value={monto}
-                      onChange={(e) => setMonto(e.target.value)}
+                      onChange={(e) => alCambiarMonto(e.target.value)}
                       className={`${fieldClass} w-full min-w-0 tabular-nums`}
                     />
                   </div>

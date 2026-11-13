@@ -123,16 +123,17 @@ export function FormularioEditarRetiro({
     setComisionPorcentaje(montoNum > 0 ? ((sugerido / montoNum) * 100).toFixed(2) : "0");
   }
 
-  // Si la comisión sigue siendo la sugerida (no se tocó a mano) y cambia el monto, se recalcula.
-  useEffect(() => {
+  // Si la comisión sigue siendo la sugerida (no se tocó a mano) y cambia el monto, se recalcula al escribirlo.
+  function alCambiarMonto(valor: string) {
+    setMonto(valor);
     if (comisionManual) return;
+    const nuevo = parseFloat(valor) || 0;
     const cuenta = cuentas.find((c) => c.id === cuentaSeleccionadaId);
-    const sugerido = cuenta ? calcularComisionSugerida(cuenta, montoNum) : null;
+    const sugerido = cuenta ? calcularComisionSugerida(cuenta, nuevo) : null;
     if (sugerido == null) return;
     setComisionValor(sugerido.toFixed(2));
-    setComisionPorcentaje(montoNum > 0 ? ((sugerido / montoNum) * 100).toFixed(2) : "0");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [montoNum]);
+    setComisionPorcentaje(nuevo > 0 ? ((sugerido / nuevo) * 100).toFixed(2) : "0");
+  }
 
   function alEnviar(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -297,7 +298,7 @@ export function FormularioEditarRetiro({
               required
               data-enfocar
               value={monto}
-              onChange={(e) => setMonto(e.target.value)}
+              onChange={(e) => alCambiarMonto(e.target.value)}
               className={`${fieldClassSm} w-full min-w-0 tabular-nums`}
             />
           </div>
