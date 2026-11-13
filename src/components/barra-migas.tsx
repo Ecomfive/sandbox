@@ -146,10 +146,10 @@ export function BarraMigas({
             </Tooltip>
           )}
           {verTarea && moduloHref && moduloEtiqueta && moduloHref !== "/" && moduloHref !== "/ayuda" && moduloHref !== "/tareas" && (
-            <BotonTareaModulo key={moduloHref} moduloClave={moduloDeHref(moduloHref)} moduloEtiqueta={moduloEtiqueta} />
+            <BotonTareaModulo key={`tarea:${moduloHref}`} moduloClave={moduloDeHref(moduloHref)} moduloEtiqueta={moduloEtiqueta} />
           )}
           {verAccesos && moduloHref && moduloEtiqueta && moduloHref !== "/ayuda" && (
-            <BotonAccesos key={ruta} moduloHref={moduloHref} moduloEtiqueta={moduloEtiqueta} />
+            <BotonAccesos key={`accesos:${ruta}`} moduloHref={moduloHref} moduloEtiqueta={moduloEtiqueta} />
           )}
         </div>
       </div>
