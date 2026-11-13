@@ -37,6 +37,7 @@ type Fila = {
   con_variantes?: boolean | null;
   precios_leidos_en?: string | null;
   inventario: number | null;
+  inventario_exclusivo?: number | null;
   foto_url: string | null;
   ultima_vez: string;
   en_drop: boolean;
@@ -65,11 +66,17 @@ export async function cargarDatosDrop(supabase: SupabaseClient, pais: { id: stri
       "id, drop_id, codigo, nombre, sku_drop, estado, precio, inventario, foto_url, ultima_vez, en_drop, creado_en_drop, sugerencia, producto:skus_maestros!drop_publicaciones_sku_maestro_id_fkey(id, codigo, nombre, foto_url, tipo, numero, codigo_barras), sugerido:skus_maestros!drop_publicaciones_sugerido_sku_id_fkey(id, codigo, nombre, foto_url, tipo, numero, codigo_barras)";
     const leer = (cols: string) => traerTodasLasFilas<Fila>((d, h) => supabase.from("drop_publicaciones").select(cols).eq("pais_id", pais.id).order("nombre").order("id").range(d, h) as unknown as PromiseLike<{ data: Fila[] | null; error: unknown }>);
     // Con los precios que lee «Aplicar precios» (migración 0266); sin la migración, como antes.
+    // Y con los exclusivos de clientes (migración 0277); sin ella, sin exclusivos.
     try {
-      filas = await leer(`${columnas}, precio_proveedor, precio_sugerido, con_variantes, precios_leidos_en`);
+      filas = await leer(`${columnas}, precio_proveedor, precio_sugerido, con_variantes, precios_leidos_en, inventario_exclusivo`);
     } catch (e) {
-      if (!/precio_proveedor|precio_sugerido|con_variantes|precios_leidos_en/i.test(String((e as { message?: string })?.message ?? e))) throw e;
-      filas = await leer(columnas);
+      if (!/precio_proveedor|precio_sugerido|con_variantes|precios_leidos_en|inventario_exclusivo/i.test(String((e as { message?: string })?.message ?? e))) throw e;
+      try {
+        filas = await leer(`${columnas}, precio_proveedor, precio_sugerido, con_variantes, precios_leidos_en`);
+      } catch (e2) {
+        if (!/precio_proveedor|precio_sugerido|con_variantes|precios_leidos_en/i.test(String((e2 as { message?: string })?.message ?? e2))) throw e2;
+        filas = await leer(columnas);
+      }
     }
   } catch (e) {
     if (/drop_publicaciones|schema cache|does not exist/i.test(String((e as { message?: string })?.message ?? e))) return { publicaciones: [], moneda, ultimaLectura: null, fulfillment: null, fulfillmentPaga: "nosotros", faltaMigracion: true };
@@ -179,6 +186,7 @@ export async function cargarDatosDrop(supabase: SupabaseClient, pais: { id: stri
       preciosLeidosEn: f.precios_leidos_en ?? null,
       cambioPrecio: cambiosPrecio.get(f.id) ?? null,
       inventario: f.inventario,
+      inventarioExclusivo: Math.max(0, Number(f.inventario_exclusivo ?? 0)),
       producto,
       sugerido: producto ? null : aProducto(uno(f.sugerido)),
       sugerencia: producto ? null : f.sugerencia,

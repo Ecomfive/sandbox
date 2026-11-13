@@ -456,6 +456,41 @@ test("republicar: crea el nuevo con sus fotos, le copia las garantías del viejo
   assert.equal(d.llamadas.filter((l) => l === "POST /productwarranty/create").length, llamadasAntes);
 });
 
+test("republicar (B280): crea el nuevo con 100 temporales en la B81 y lo deja en 0; el viejo sigue igual, con su stock en la B280", async () => {
+  const d = crearDropi();
+  const B280 = { id: 280, name: "Bodega Dropi Panama", address: "Panamá", warehouse_white_brand: false };
+  d.productos.set(8946, productoBase(8946, { warehouse_product: [{ warehouse_id: 280, stock: 237, warehouse: B280 }] }));
+  d.garantias.set(8946, GARANTIAS_DROPI.map((g) => ({ name: g.name, time: "DIAS", quantity_time: 15, description: "NULL" })));
+  const datos = { b280: true, temporal: 100 };
+  const [r] = await aplicar(d, [{ ...base, id: "b1", tipo: "republicar", producto: 8946, precio: 6.99, datos }]);
+  assert.equal(r.ok, true, String(r.error));
+  assert.equal(r.nuevo, 9001);
+  assert.equal(r.b280, 237, "las unidades del viejo en la B280, para el mensaje a Dropi");
+  const nuevo = d.productos.get(9001)!;
+  assert.deepEqual(d.stockDe(nuevo), { 81: 0 }, "las 100 temporales salieron");
+  assert.equal(Number(nuevo.sale_price), 6.99);
+  assert.equal(d.garantias.get(9001)!.length, GARANTIAS_DROPI.length);
+  assert.equal(nuevo.gallery.length, 1);
+  const viejo = d.productos.get(8946)!;
+  assert.notEqual(viejo.archived, true, "el viejo no se archiva");
+  assert.deepEqual(d.stockDe(viejo), { 280: 237 }, "el viejo conserva su stock de la B280");
+
+  // Un reintento sigue desde el ID creado: no crea otro ni vuelve a mover nada.
+  const posts = d.llamadas.filter((l) => l === "POST /products").length;
+  const [r2] = await aplicar(d, [{ ...base, id: "b1", tipo: "republicar", producto: 8946, nuevo: 9001, datos }]);
+  assert.equal(r2.ok, true, String(r2.error));
+  assert.equal(d.llamadas.filter((l) => l === "POST /products").length, posts);
+});
+
+test("republicar (B280): si el viejo ya no tiene stock en la B280, no crea nada", async () => {
+  const d = crearDropi();
+  d.productos.set(8946, productoBase(8946));
+  const [r] = await aplicar(d, [{ ...base, id: "b2", tipo: "republicar", producto: 8946, datos: { b280: true, temporal: 100 } }]);
+  assert.equal(r.ok, false);
+  assert.match(String(r.error), /no tiene stock en la bodega de Dropi/);
+  assert.equal(d.productos.has(9001), false);
+});
+
 test("republicar: si en un intento falló la foto principal, el reintento sube justo esa (no repite la otra)", async () => {
   const d = crearDropi({ fotos: "fallaLaPrincipal" });
   d.productos.set(8751, productoBase(8751, { gallery: [

@@ -36,6 +36,21 @@ import { CLAVE_FOTO_JS, REPUBLICAR_JS } from "./republicar-dropi";
 import { RESERVA_JS } from "./reservas-dropi";
 import { STOCK_JS } from "./stock-dropi";
 
+/**
+ * Copiar al producto nuevo `id` (`n`, ya leído) las fotos y las garantías del viejo `o`, para «republicar» y «republicar (B280)». Deja en `faltan` las fotos que no
+ * se pudieron subir (y en `fe` el motivo); un fallo de las garantías termina con `f(...)`.
+ */
+const FOTOS_GARANTIAS_JS = [
+  "var fs=unicas(Array.isArray(c.fotos)&&c.fotos.length?c.fotos.map(function(x,j){return{url:x.url,nombre:x.nombre,main:j===0,alternas:[]}}):fotosDe(o)),faltan=[],fe='';for(var i=0;i<fs.length;i++)if(!tiene(n,fs[i].nombre)&&!(await subir(id,fs[i]))){faltan.push(String(fs[i].nombre));fe=porque()}",
+  // Las garantías del viejo pasan al nuevo (25 oct 2026: el 11309 quedó sin ellas; en Dropi la casilla de cada garantía se marca solo
+  // si el producto la tiene guardada). Solo si el nuevo todavía no tiene ninguna, así un reintento no las repite.
+  // Dropi ya no acepta una garantía sin observaciones salvo «Orden diferente»: si la del viejo no tenía, va «Ninguna» (pedido de Alcides).
+  "var gv=await pedir('/productwarranty/show','POST',{product_id:Number(c.producto)}),gn=await pedir('/productwarranty/show','POST',{product_id:id});",
+  "var lv=gv.ok&&Array.isArray(gv.j&&gv.j.objects)?gv.j.objects:[],ln=gn.ok&&Array.isArray(gn.j&&gn.j.objects)?gn.j.objects:[];",
+  "if(lv.length&&!ln.length){var gw=lv.filter(function(w){return w&&w.name}).map(function(w){return{name:w.name,time:w.time||w.type_time||'DIAS',quantity:Number(w.quantity_time!=null?w.quantity_time:w.quantity)||10,description:w.description&&w.description!=='NULL'&&String(w.description).trim()?w.description:(w.name==='Different order'?'':'Ninguna')}});",
+  "var gc=await pedir('/productwarranty/create','POST',{id:id,warranties:gw});if(!gc.ok)return f('Se creó el '+id+', pero no se le pudieron poner las garantías: '+motivo(gc))}",
+];
+
 /** El armado del guardado de Dropi, en JavaScript simple para el favorito (el mismo de `armarGuardadoProducto`). */
 export const ARMAR_JS = [
   // Los atributos y las variaciones de un producto con variaciones, como los manda la pantalla de Dropi (`atributosDeDropi` y `variacionesDeDropi`).
@@ -113,10 +128,30 @@ const CODIGO = [
   "ST=x.status;if(!ok)FE='Dropi no aceptó la foto '+f.nombre+' (respondió '+x.status+(j&&(j.message||j.error)?': '+String(j.message||j.error).slice(0,120):t?': '+t.replace(/\\s+/g,' ').slice(0,120):'')+')';return ok})},function(e){ST=0;FE='no se pudo subir la foto '+f.nombre+' ('+String(e&&e.message||e)+')';return false})};",
   "return mandar({Accept:'application/json',Authorization:'Bearer '+T,'x-authorization':'Bearer '+T}).then(function(ok){return ok||(ST>=500?false:mandar({Accept:'application/json','X-Authorization':'Bearer '+T}))})})}",
   "function porque(){return FE?': '+FE:''}",
+  // «Republicar (B280)» (12 nov 2026, proceso de Nicol): el ID viejo tiene su stock en la bodega de Dropi (B280), que no podemos mover. Se crea el ID nuevo con
+  // `temporal` unidades (100) en una bodega de ECOMFIVE, porque Dropi no deja publicar con 0; se le copian fotos y garantías; se le sacan esas unidades y queda en 0.
+  // El viejo NO se toca: sigue vendiendo hasta que Dropi traslada a mano el stock de la B280 al ID nuevo, y se archiva un mes después (tareas del sistema).
+  // Un reintento (`c.nuevo`) sigue desde el ID ya creado. Devuelve en `b280` las unidades que el viejo tiene en la bodega de Dropi (para el mensaje a Dropi).
+  "async function republicar280(c,bp,o){",
+  "var d=c.datos,bo=bod280(bp),t=Number(d.temporal)||100,id=Number(c.nuevo)||0,k,pr={},ex=0;if(!bo)return{ok:false,error:'No hay una bodega de ECOMFIVE en Dropi para las unidades temporales.'};",
+  "bp.forEach(function(x){pr[Number(x.id)]=1});(Array.isArray(o.warehouse_product)?o.warehouse_product:[]).forEach(function(w){if(!pr[Number(w.warehouse_id)]&&Number(w.stock)>0)ex+=Number(w.stock)});",
+  "if(!id){if(!ex)return{ok:false,error:'El ID '+c.producto+' no tiene stock en la bodega de Dropi (B280): usa «Republicar».'};",
+  "var r=nuevo280(o,bp,bo,t,{precio:c.precio,precioSugerido:c.sugerido});if(r.error)return{ok:false,error:r.error};",
+  "var g=await pedir('/products','POST',r.cuerpo);if(!g.ok)return{ok:false,error:motivo(g)};id=idCreado(g.j);if(!id)return{ok:false,error:sinId(g)}}",
+  "var f=function(e){return{ok:false,nuevo:id,error:e}};",
+  "var b=await pedir('/products/'+id),n=b.j&&b.j.objects;if(!b.ok||!n)return f('Se creó el '+id+', pero no se pudo leer: '+motivo(b));",
+  ...FOTOS_GARANTIAS_JS,
+  "var sn=stockDe(n),q=sn[String(bo)]||0;if(q>0){var mm={};mm[String(bo)]=-q;var me=mover(n,bp,mm,'Unidades temporales de la republicación desde el ID '+c.producto);if(me.error)return f(me.error);",
+  "var pe=await pedir('/products/'+id,'PUT',me.cuerpo);if(!pe.ok)return f('Se creó el '+id+', pero no se le pudieron sacar las '+q+' unidades temporales: '+motivo(pe))}",
+  "var v=await pedir('/products/'+id),w=v.j&&v.j.objects,s2=w?stockDe(w):{},rest=0;for(k in s2)if(pr[Number(k)])rest+=s2[k];",
+  "if(!w)return f('Se creó el '+id+', pero no se pudo comprobar su stock: '+motivo(v));if(rest>0)return f('El '+id+' sigue con '+rest+' unidades en la bodega de ECOMFIVE.');",
+  "return{ok:true,nuevo:id,b280:ex,stock:0,fotos:Array.isArray(w.gallery)?w.gallery.length:null,fotosFaltan:faltan,archivoPendiente:null,aviso:faltan.length?'No se pudieron copiar '+faltan.length+' foto(s)'+fe+': súbelas a mano en el ID '+id+'.':null}}",
   "async function republicar(c,bp){",
   "var a=await pedir('/products/'+c.producto);if(!a.ok)return{ok:false,error:motivo(a)};",
   "var o=a.j&&a.j.objects;if(!o||Number(o.id)!==Number(c.producto))return{ok:false,error:'Dropi no devolvió el producto.'};",
   "if(Number(o.user_id)!==Number(L.id))return{ok:false,error:'Ese producto no es de este proveedor en Dropi.'};",
+  // «Republicar (B280)» (12 nov 2026, proceso de Nicol): el stock está en la bodega de Dropi; se republica aparte (`republicar280`).
+  "if(c.datos&&c.datos.b280)return republicar280(c,bp,o);",
   // Con variaciones (1 nov 2026) las unidades se cuentan por bodega y variación y el producto nuevo se arma con sus atributos y variaciones (el precio de cada una se copia igual).
   "var vr=esV(o),id=Number(c.nuevo)||0,st=vr?unidadesV(o):stockDe(o),k;",
   // El precio elegido al republicar (27 oct 2026) va al producto nuevo; sin él, queda el del viejo.
@@ -130,14 +165,7 @@ const CODIGO = [
   // Las fotos copiadas en el sistema (migración 0153) mandan, la principal primero; sin ellas, las de Dropi.
   // Una foto que no se pudo copiar ya no detiene la republicación (8 nov 2026, pedido de Alcides): se termina el trabajo y vuelve en `fotosFaltan`, y el
   // sistema le deja una tarea a quien la pidió para subirla a mano en el ID nuevo (sacándola del viejo).
-  "var fs=unicas(Array.isArray(c.fotos)&&c.fotos.length?c.fotos.map(function(x,j){return{url:x.url,nombre:x.nombre,main:j===0,alternas:[]}}):fotosDe(o)),faltan=[],fe='';for(var i=0;i<fs.length;i++)if(!tiene(n,fs[i].nombre)&&!(await subir(id,fs[i]))){faltan.push(String(fs[i].nombre));fe=porque()}",
-  // Las garantías del viejo pasan al nuevo (25 oct 2026: el 11309 quedó sin ellas; en Dropi la casilla de cada garantía se marca solo
-  // si el producto la tiene guardada). Solo si el nuevo todavía no tiene ninguna, así un reintento no las repite.
-  // Dropi ya no acepta una garantía sin observaciones salvo «Orden diferente»: si la del viejo no tenía, va «Ninguna» (pedido de Alcides).
-  "var gv=await pedir('/productwarranty/show','POST',{product_id:Number(c.producto)}),gn=await pedir('/productwarranty/show','POST',{product_id:id});",
-  "var lv=gv.ok&&Array.isArray(gv.j&&gv.j.objects)?gv.j.objects:[],ln=gn.ok&&Array.isArray(gn.j&&gn.j.objects)?gn.j.objects:[];",
-  "if(lv.length&&!ln.length){var gw=lv.filter(function(w){return w&&w.name}).map(function(w){return{name:w.name,time:w.time||w.type_time||'DIAS',quantity:Number(w.quantity_time!=null?w.quantity_time:w.quantity)||10,description:w.description&&w.description!=='NULL'&&String(w.description).trim()?w.description:(w.name==='Different order'?'':'Ninguna')}});",
-  "var gc=await pedir('/productwarranty/create','POST',{id:id,warranties:gw});if(!gc.ok)return f('Se creó el '+id+', pero no se le pudieron poner las garantías: '+motivo(gc))}",
+  ...FOTOS_GARANTIAS_JS,
   "var sn=vr?unidadesV(n):stockDe(n),en={},hay=false;for(k in st)if((sn[k]||0)<st[k]){en[k]=st[k]-(sn[k]||0);hay=true}",
   "if(hay){var me;if(vr){var em=emparejarV(n,en);if(em.error)return f('Se creó el '+id+', pero no se le pudo poner el stock: '+em.error);var e1=await entradasV(n);if(e1.error)return f('Se creó el '+id+', pero no se le pudo poner el stock: '+e1.error);me=entradaV(n,bp,em.porVariacion,e1.ent,'Republicado desde el ID '+c.producto)}else me=mover(n,bp,en,'Republicado desde el ID '+c.producto);if(me.error)return f(me.error);",
   "var pe=await pedir('/products/'+id,'PUT',me.cuerpo);if(!pe.ok)return f('Se creó el '+id+', pero no se le pudo poner el stock: '+motivo(pe))}",

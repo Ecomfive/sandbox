@@ -376,7 +376,7 @@ export function FichaProducto({
             <div className="flex min-w-0 flex-col divide-y divide-border border-t border-border pt-5 @3xl:border-t-0 @3xl:pt-0">
             {/* Ventas por plataforma (12 nov 2026, pedido de Hernán): en el país de la barra, si tiene varias plataformas. */}
             {plataformasDePais(codigoPais).length > 1 && (
-              <Seccion icono={VentasIcon} titulo="Ventas por plataforma">
+              <Seccion icono={VentasIcon} titulo="Ventas globales del país">
                 <VentasPlataformasProducto key={`${producto.id}-${codigoPais}`} id={producto.id} pais={codigoPais} />
               </Seccion>
             )}

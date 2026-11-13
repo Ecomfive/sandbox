@@ -50,7 +50,10 @@ export interface FilaPublicacionDrop {
   preciosLeidosEn: string | null;
   /** El cambio de precio que espera «Aplicar precios» (o que falló la última vez). */
   cambioPrecio: CambioPrecioEsperando | null;
+  /** El «Inventario» de la tabla de Drop (lo que cualquier cliente puede vender). */
   inventario: number | null;
+  /** Lo que Drop guarda aparte para clientes («Producto exclusivo» de su ficha, migración 0277): también es stock nuestro en su bodega. */
+  inventarioExclusivo: number;
   /** El producto de Producto con que se vinculó el SKU de Drop; null mientras no se vincule. */
   producto: ProductoDrop | null;
   /** El producto que sugirió la lectura, mientras no esté vinculada. */
@@ -89,10 +92,18 @@ export const estadoVinculoDrop = (f: FilaPublicacionDrop): "vinculado" | "sugeri
 
 /** Activa en Drop (y todavía en Drop). */
 export const activaDrop = (f: FilaPublicacionDrop) => f.conectado && f.estado === "activo";
+/**
+ * El stock en Drop: su «Inventario» más lo exclusivo de clientes (12 nov 2026, pedido de Hernán: «tiene que reconocer también las exclusivas»; el Aceite reafirmante
+ * magic tenía 0 de inventario y 144 exclusivas y salía «Sin stock»). null sin lectura.
+ */
+export const stockDrop = (f: Pick<FilaPublicacionDrop, "inventario" | "inventarioExclusivo">): number | null => (f.inventario === null ? null : Math.max(0, f.inventario) + f.inventarioExclusivo);
 /** Sin unidades en Drop (y todavía en Drop). Activa o no: al quedarse sin stock, Drop **inactiva el producto sola** (Nicole, 3 nov 2026), así que mirar solo las activas nunca contaría ninguna. */
-export const sinStockDrop = (f: FilaPublicacionDrop) => f.conectado && f.inventario === 0;
+export const sinStockDrop = (f: FilaPublicacionDrop) => f.conectado && stockDrop(f) === 0;
 /** Activa en Drop con menos de `POCO_STOCK_DROP` unidades. */
-export const pocoStockDrop = (f: FilaPublicacionDrop) => activaDrop(f) && f.inventario !== null && f.inventario > 0 && f.inventario < POCO_STOCK_DROP;
+export const pocoStockDrop = (f: FilaPublicacionDrop) => {
+  const stock = stockDrop(f);
+  return activaDrop(f) && stock !== null && stock > 0 && stock < POCO_STOCK_DROP;
+};
 export const margenBajoDrop = (f: FilaPublicacionDrop) => f.margen !== null && f.margen < MARGEN_BAJO;
 
 export const DEF_PUBLICACIONES_DROP: DefTabla<FilaPublicacionDrop> = {
@@ -173,6 +184,6 @@ export const DEF_PUBLICACIONES_DROP: DefTabla<FilaPublicacionDrop> = {
       ],
     },
     { id: "precio", etiqueta: "Precio", tipo: "numero", valor: (f) => f.precio },
-    { id: "inventario", etiqueta: "Inventario", tipo: "numero", valor: (f) => f.inventario },
+    { id: "inventario", etiqueta: "Inventario", tipo: "numero", valor: (f) => stockDrop(f) },
   ],
 };

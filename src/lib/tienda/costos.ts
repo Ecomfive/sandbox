@@ -1,48 +1,84 @@
-// El costo de cada producto para los pedidos de tienda (12 nov 2026, «Ingresos y costos» como en Mi Reto Digital). En Panamá hay dos y casi nunca
-// coinciden: el costo de mercancía de Gestión de IDs Dropi del país (el que se usa como costo del país; suele incluir flete e importación) y el costo
-// unitario de la última compra del país en Compras. Se toma el de Dropi y, si falta, el de la compra; siempre se dice de dónde salió, para revisarlo
-// con Finanzas. Solo lectura.
+// El costo de cada producto para los pedidos de tienda (12 nov 2026, «Ingresos y costos» como en Mi Reto Digital). **Es el costo promedio de
+// compra del producto** (pedido de Alcides, 12 nov 2026), el mismo «Costo promedio» del bloque Compras de su ficha en Producto: lo invertido ÷ las
+// unidades compradas, contando solo las compras que suman (`compraCuenta`: ni descartadas ni anuladas) y con costo; un producto con variantes
+// suma las de sus variantes. Se toman las compras del país del pedido y, si en ese país no hay, las de todos los países; siempre se dice cuál.
+// Ya no se usa el costo de Gestión de IDs Dropi. Solo lectura.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { compraCuenta } from "@/lib/compras/cuenta";
 
-export type FuenteCosto = "dropi" | "compra";
+export type FuenteCosto = "promedio_pais" | "promedio_todos";
 export interface CostoProducto {
   costo: number;
   fuente: FuenteCosto;
 }
 
-export const NOMBRE_FUENTE_COSTO: Record<FuenteCosto, string> = { dropi: "costo de Dropi del país", compra: "última compra del país" };
+export const NOMBRE_FUENTE_COSTO: Record<FuenteCosto, string> = {
+  promedio_pais: "costo promedio de compra del país",
+  promedio_todos: "costo promedio de compra (todos los países)",
+};
 
-/** El costo por unidad de esos productos en el país (`paisId`; por su id de `skus_maestros`). Los que no tienen ninguno no salen. */
+/** Una línea de compra, para el promedio. */
+export interface CompraParaCosto {
+  unidades: number;
+  costoUnitario: number | null;
+  paisId: string | null;
+  etapa: string;
+  anulada: boolean;
+}
+
+/**
+ * El costo promedio de compra (lo invertido ÷ las unidades con costo), como en la ficha del producto: del país si hay compras con costo allí,
+ * si no de todos los países; null si ninguna compra que suma tiene costo. Sin base: con prueba.
+ */
+export function costoPromedioDeCompras(compras: CompraParaCosto[], paisId: string): CostoProducto | null {
+  const conCosto = compras.filter((c) => compraCuenta(c) && c.costoUnitario !== null && c.costoUnitario > 0 && c.unidades > 0);
+  const promedio = (cs: CompraParaCosto[]) => {
+    const unidades = cs.reduce((t, c) => t + c.unidades, 0);
+    const total = cs.reduce((t, c) => t + c.unidades * (c.costoUnitario ?? 0), 0);
+    return unidades > 0 ? Math.round((total / unidades) * 10000) / 10000 : null;
+  };
+  const delPais = promedio(conCosto.filter((c) => c.paisId === paisId));
+  if (delPais !== null) return { costo: delPais, fuente: "promedio_pais" };
+  const todos = promedio(conCosto);
+  return todos === null ? null : { costo: todos, fuente: "promedio_todos" };
+}
+
+/** El costo por unidad de esos productos para un pedido del país `paisId` (por su id de `skus_maestros`). Los que no tienen ninguno no salen. */
 export async function costosDeProductos(supabase: SupabaseClient, skuIds: string[], paisId: string): Promise<Map<string, CostoProducto>> {
   const ids = [...new Set(skuIds.filter(Boolean))];
   const mapa = new Map<string, CostoProducto>();
   if (!ids.length) return mapa;
-  const pais = { id: paisId };
-  for (let i = 0; i < ids.length; i += 200) {
-    const parte = ids.slice(i, i + 200);
-    const [dropi, compras] = await Promise.all([
-      supabase.from("dropi_publicaciones").select("sku_maestro_id, costo_mercancia, actualizado_en").eq("pais_id", pais.id).in("sku_maestro_id", parte).gt("costo_mercancia", 0),
-      supabase
+  for (let i = 0; i < ids.length; i += 150) {
+    const parte = ids.slice(i, i + 150);
+    // Un producto con variantes suma las compras de sus variantes (como su ficha).
+    const { data: hijos } = await supabase.from("skus_maestros").select("id, padre_id").in("padre_id", parte);
+    const hijosDe = new Map<string, string[]>();
+    for (const h of (hijos ?? []) as { id: string; padre_id: string }[]) hijosDe.set(h.padre_id, [...(hijosDe.get(h.padre_id) ?? []), h.id]);
+    const todos = [...new Set([...parte, ...[...hijosDe.values()].flat()])];
+    const deSku = new Map<string, CompraParaCosto[]>();
+    for (let j = 0; j < todos.length; j += 200) {
+      const { data } = await supabase
         .from("wms_compra_items")
-        .select("sku_maestro_id, costo_unitario, creado_en, wms_compras!inner(pais_id, anulada_en)")
-        .in("sku_maestro_id", parte)
-        .eq("wms_compras.pais_id", pais.id)
-        .is("wms_compras.anulada_en", null)
-        .gt("costo_unitario", 0)
-        .order("creado_en", { ascending: false }),
-    ]);
-    // Dropi: si el producto tiene varias publicaciones, la más reciente.
-    const deDropi = new Map<string, { costo: number; cuando: string }>();
-    for (const d of (dropi.data ?? []) as { sku_maestro_id: string; costo_mercancia: number; actualizado_en: string | null }[]) {
-      const previo = deDropi.get(d.sku_maestro_id);
-      const cuando = d.actualizado_en ?? "";
-      if (!previo || cuando > previo.cuando) deDropi.set(d.sku_maestro_id, { costo: Number(d.costo_mercancia), cuando });
+        .select("sku_maestro_id, cantidad_pedida, costo_unitario, wms_compras!inner(pais_id, etapa, anulada_en)")
+        .in("sku_maestro_id", todos.slice(j, j + 200));
+      for (const l of (data ?? []) as unknown as { sku_maestro_id: string; cantidad_pedida: number | null; costo_unitario: number | null; wms_compras: unknown }[]) {
+        const c = (Array.isArray(l.wms_compras) ? l.wms_compras[0] : l.wms_compras) as { pais_id: string | null; etapa: string; anulada_en: string | null } | null;
+        if (!c) continue;
+        const fila: CompraParaCosto = {
+          unidades: Number(l.cantidad_pedida) || 0,
+          costoUnitario: l.costo_unitario === null ? null : Number(l.costo_unitario),
+          paisId: c.pais_id,
+          etapa: c.etapa,
+          anulada: !!c.anulada_en,
+        };
+        deSku.set(l.sku_maestro_id, [...(deSku.get(l.sku_maestro_id) ?? []), fila]);
+      }
     }
-    for (const [id, d] of deDropi) mapa.set(id, { costo: d.costo, fuente: "dropi" });
-    // La compra más reciente, para lo que no tiene costo en Dropi.
-    for (const c of (compras.data ?? []) as { sku_maestro_id: string; costo_unitario: number }[])
-      if (!mapa.has(c.sku_maestro_id)) mapa.set(c.sku_maestro_id, { costo: Number(c.costo_unitario), fuente: "compra" });
+    for (const id of parte) {
+      const costo = costoPromedioDeCompras([id, ...(hijosDe.get(id) ?? [])].flatMap((s) => deSku.get(s) ?? []), paisId);
+      if (costo) mapa.set(id, costo);
+    }
   }
   return mapa;
 }

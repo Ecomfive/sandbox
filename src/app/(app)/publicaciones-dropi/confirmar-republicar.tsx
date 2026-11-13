@@ -4,7 +4,8 @@ import { useId, useState } from "react";
 import { anilloFoco, labelClass } from "@/components/ui/field";
 import { Ventana } from "@/components/ui/ventana";
 import { calcularMargen, leerMonto } from "@/lib/publicaciones/calculadora";
-import type { FilaPublicacion } from "./def-publicaciones";
+import { UNIDADES_TEMPORALES_B280 } from "@/lib/publicaciones/republicar-dropi";
+import { republicaDeBodegaDropi, type FilaPublicacion } from "./def-publicaciones";
 import { useMoneda } from "./moneda-contexto";
 
 /**
@@ -30,10 +31,25 @@ export function ConfirmarRepublicar({ p, alCerrar, alConfirmar, enviando }: { p:
           if (valido && !enviando) alConfirmar(precio);
         }}
       >
-        <p className="m-0 text-sm text-foreground-soft">
-          Se va a crear en Dropi una publicación nueva igual a <span className="font-medium text-foreground">{p.nombre}</span> (datos, fotos y stock) y la del ID {p.dropiId} queda
-          archivada y sin stock. Se hace al pulsar «Aplicar en Dropi» con Dropi abierto.
-        </p>
+        {republicaDeBodegaDropi(p) ? (
+          <div className="flex flex-col gap-2 text-sm text-foreground-soft">
+            <p className="m-0">
+              Su stock está en la bodega de Dropi, que no podemos mover. Al pulsar «Aplicar en Dropi» con Dropi abierto se crea un ID nuevo igual a{" "}
+              <span className="font-medium text-foreground">{p.nombre}</span> (datos y fotos) con {UNIDADES_TEMPORALES_B280} unidades temporales en nuestra bodega, que enseguida se
+              sacan: queda en 0.
+            </p>
+            <ol className="m-0 flex list-decimal flex-col gap-1 pl-5 text-xs">
+              <li>El ID {p.dropiId} no se toca: sigue vendiendo con su stock.</li>
+              <li>Te queda la tarea de pedirle a Dropi el traslado de su stock al ID nuevo, con el mensaje listo para copiar en el grupo. Se cierra sola cuando el sistema lo ve.</li>
+              <li>Y la tarea de archivar el ID {p.dropiId} en un mes (no antes, por las devoluciones tardías).</li>
+            </ol>
+          </div>
+        ) : (
+          <p className="m-0 text-sm text-foreground-soft">
+            Se va a crear en Dropi una publicación nueva igual a <span className="font-medium text-foreground">{p.nombre}</span> (datos, fotos y stock) y la del ID {p.dropiId} queda
+            archivada y sin stock. Se hace al pulsar «Aplicar en Dropi» con Dropi abierto.
+          </p>
+        )}
         <div className="flex flex-col gap-1.5">
           <label htmlFor={`${id}-precio`} className={labelClass}>
             Precio de venta del producto nuevo

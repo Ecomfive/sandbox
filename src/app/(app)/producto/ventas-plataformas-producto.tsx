@@ -9,7 +9,7 @@ const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "o
 const fecha = (d: string | null) => (d ? `${Number(d.slice(8, 10))} ${MESES[Number(d.slice(5, 7)) - 1]}` : "—");
 
 /**
- * «Ventas por plataforma» de la ficha de un producto (12 nov 2026, pedido de Hernán): una fila por plataforma del país donde el producto está publicado (Dropi, Drop, Effi,
+ * «Ventas globales del país» (antes «Ventas por plataforma»; nombre del 12 nov 2026) de la ficha de un producto (12 nov 2026, pedido de Hernán): una fila por plataforma del país donde el producto está publicado (Dropi, Drop, Effi,
  * Dunamixfy) con sus netas de 30 días, en total y su stock allá, y la suma de todas. Solo se dibuja en un país con más de una plataforma (hoy Costa Rica) y con al menos una
  * plataforma; el detalle de Dropi sigue en su propio bloque.
  */
@@ -29,7 +29,7 @@ export function VentasPlataformasProducto({ id, pais }: { id: string; pais: stri
   if (filas === "error")
     return (
       <p role="alert" className="m-0 text-sm text-destructive">
-        No se pudieron cargar las ventas por plataforma.
+        No se pudieron cargar las ventas del país.
       </p>
     );
   if (!filas.length) return <p className="m-0 text-sm text-muted-foreground">El producto no está publicado en ninguna plataforma de este país.</p>;
@@ -72,7 +72,10 @@ export function VentasPlataformasProducto({ id, pais }: { id: string; pais: stri
                 </th>
                 <td className="py-1.5 pl-2 text-right tabular-nums">{entero(f.netas30)}</td>
                 <td className="py-1.5 pl-2 text-right tabular-nums">{entero(f.netasTotal)}</td>
-                <td className={`py-1.5 pl-2 text-right tabular-nums ${f.stock > 0 ? "" : "font-medium text-destructive"}`}>{f.stock > 0 ? entero(f.stock) : "Sin stock"}</td>
+                <td className={`py-1.5 pl-2 text-right tabular-nums ${f.stock > 0 ? "" : "font-medium text-destructive"}`}>
+                  {f.stock > 0 ? entero(f.stock) : "Sin stock"}
+                  {f.exclusivo > 0 && <span className="block text-xs font-normal text-muted-foreground">{f.exclusivo === f.stock ? "todas exclusivas" : `${entero(f.exclusivo)} exclusivas`}</span>}
+                </td>
               </tr>
             );
           })}
@@ -90,7 +93,7 @@ export function VentasPlataformasProducto({ id, pais }: { id: string; pais: stri
           </tfoot>
         )}
       </table>
-      <p className="m-0 text-xs text-muted-foreground">Netas = lo que salió − lo devuelto (en Dropi también se restan cancelaciones y rechazos). Incluye las variantes del producto.</p>
+      <p className="m-0 text-xs text-muted-foreground">Netas = lo que salió − lo devuelto (en Dropi también se restan cancelaciones y rechazos). Incluye las variantes del producto. En Drop, el stock suma lo exclusivo de clientes.</p>
     </div>
   );
 }

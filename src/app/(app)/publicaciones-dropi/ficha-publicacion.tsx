@@ -686,7 +686,7 @@ function ContenidoFicha({
 
           {/* Ventas por plataforma (12 nov 2026, pedido de Hernán): en un país con varias plataformas, lo del producto en cada una y en todas. */}
           {p.sku && plataformasDePais(codigoPais).length > 1 && (
-            <Seccion icono={MargenIcon} titulo={`Ventas por plataforma en ${nombrePais}`}>
+            <Seccion icono={MargenIcon} titulo={`Ventas globales del país · ${nombrePais}`}>
               <VentasPlataformasProducto key={`${p.sku.id}-${codigoPais}`} id={p.sku.id} pais={codigoPais} />
             </Seccion>
           )}

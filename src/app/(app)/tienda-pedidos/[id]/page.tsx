@@ -60,7 +60,7 @@ export default async function PedidoTiendaPage({ params }: { params: Promise<{ i
     // Una tienda sin conectar (o conectada en vivo) muestra sus órdenes de `ven_ordenes` (11 y 12 nov 2026): la misma ficha que se abre al lado en Pedidos.
     const orden = await cargarOrdenTienda(supabase, id, pais.id);
     if (!orden) notFound();
-    return <DetalleOrdenFinanzas orden={orden} codigoPais={pais.codigo} />;
+    return <DetalleOrdenFinanzas orden={orden} codigoPais={pais.codigo} puedeEscribir={!usuario.modulosSoloLectura.includes("tienda-pedidos")} />;
   }
   // Solo los pedidos de las tiendas del país elegido arriba.
   if (!tienda || tienda.pais_id !== pais.id) notFound();

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { ARMAR_JS, marcadorAplicarDropi } from "./marcador-aplicar-dropi";
-import { armarMovimientoStock, armarProductoNuevo, CDN_FOTOS_DROPI, fotosParaCopiar, REPUBLICAR_JS, republicacionSinTocarDropi, stockPorBodega } from "./republicar-dropi";
+import { armarMovimientoStock, armarProductoNuevo, armarProductoNuevoB280, bodegaTemporalB280, CDN_FOTOS_DROPI, fotosParaCopiar, REPUBLICAR_JS, republicacionSinTocarDropi, stockPorBodega, UNIDADES_TEMPORALES_B280 } from "./republicar-dropi";
 
 type Obj = Record<string, unknown>;
 const delFavorito = new Function(`${ARMAR_JS};${REPUBLICAR_JS}; return { nuevo, mover, stockDe, fotosDe };`)() as {
@@ -142,4 +142,33 @@ test("si ninguna foto dice la carpeta del CDN, se usa la del país (en el favori
   assert.deepEqual(fotosParaCopiar(o)[0].alternas, []);
   const conPais = new Function(`var P="pa";${ARMAR_JS};${REPUBLICAR_JS}; return fotosDe;`)() as (o: Obj) => Obj[];
   igual(conPais(o), fotosParaCopiar(o, "pa"));
+});
+
+test("«Republicar (B280)»: el nuevo sin la B280, con 100 u. temporales en nuestra bodega (en el favorito igual)", () => {
+  const fn = new Function(`${ARMAR_JS};${REPUBLICAR_JS}; return { nuevo280, bod280 };`)() as {
+    nuevo280: (o: Obj, bp: Obj[], bo: number, t: number, p?: { precio?: number | null; precioSugerido?: number | null }) => Obj;
+    bod280: (bp: Obj[]) => number | null;
+  };
+  const truly: Obj = {
+    ...veganic,
+    id: 8946,
+    warehouse_product: [{ warehouse_id: 280, stock: 237, warehouse: { id: 280, name: "Bodega Dropi Panama", address: "Panamá", warehouse_white_brand: false } }],
+  };
+  assert.equal(bodegaTemporalB280(bp), 81);
+  assert.equal(fn.bod280(bp), 81);
+  assert.equal(bodegaTemporalB280([{ id: 5, name: "Otra" }, { id: 81, name: "Proveedor Ecomfive" }]), 81);
+  assert.equal(bodegaTemporalB280([]), null);
+  const r = armarProductoNuevoB280(truly, bp, 81, UNIDADES_TEMPORALES_B280, { precio: 6.99 });
+  assert.ok("cuerpo" in r);
+  const bodegas = r.cuerpo.warehouselected as Obj[];
+  assert.deepEqual(bodegas.map((b) => [b.warehouse_id, b.stock]), [[81, 100]], "la B280 no va y la nuestra lleva las 100 temporales");
+  assert.equal(r.cuerpo.id, null);
+  assert.equal(r.cuerpo.sale_price, 6.99);
+  igual(fn.nuevo280(truly, bp, 81, 100, { precio: 6.99 }), r);
+  const variable = { ...truly, type: "VARIABLE" };
+  assert.match(String((armarProductoNuevoB280(variable, bp, 81, 100) as { error: string }).error), /solo para productos simples/);
+  igual(fn.nuevo280(variable, bp, 81, 100), armarProductoNuevoB280(variable, bp, 81, 100));
+  assert.match(String((armarProductoNuevoB280(truly, bp, 280, 100) as { error: string }).error), /no es de ECOMFIVE/);
+  const privatizado = { ...truly, private_product_inventories: [{ stock: 5, deleted_at: null }] };
+  igual(fn.nuevo280(privatizado, bp, 81, 100), armarProductoNuevoB280(privatizado, bp, 81, 100));
 });

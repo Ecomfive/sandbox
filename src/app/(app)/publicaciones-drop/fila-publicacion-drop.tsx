@@ -13,7 +13,7 @@ import { MOTIVOS_PENDIENTES_DROP, accionDeEstado, ETIQUETA_ESTADO_DROP, motivoAc
 import { formatoEnDolares, formatoMonto, type MonedaPublicaciones } from "@/lib/publicaciones/moneda";
 import { ETIQUETA_SUGERENCIA, type TipoSugerencia } from "@/lib/publicaciones/vincular";
 import { DialogoAccesoPrivado, DialogoSolicitudInventario } from "./dialogos-fila-drop";
-import { margenBajoDrop, sinStockDrop, type FilaPublicacionDrop } from "./def-publicaciones-drop";
+import { margenBajoDrop, sinStockDrop, stockDrop, type FilaPublicacionDrop } from "./def-publicaciones-drop";
 import { InsigniaConectadoDrop } from "./insignia-conectado-drop";
 
 /** Las columnas de la fila en pantalla ancha (las mismas de Gestión de IDs Dropi con ventas); las usa también el encabezado, así que van juntas. */
@@ -208,7 +208,10 @@ export function FilaPublicacionDropLista({ f, moneda, alAbrir }: { f: FilaPublic
                 ) : sinStockDrop(f) ? (
                   <span className="font-medium text-destructive">Sin stock</span>
                 ) : (
-                  <span className="tabular-nums">Stock {entero(f.inventario)}</span>
+                  <span className="tabular-nums">
+                    Stock {entero(stockDrop(f) ?? 0)}
+                    {f.inventarioExclusivo > 0 && <span className="text-muted-foreground"> · {entero(f.inventarioExclusivo)} excl.</span>}
+                  </span>
                 )
               }
             />
@@ -221,7 +224,7 @@ export function FilaPublicacionDropLista({ f, moneda, alAbrir }: { f: FilaPublic
                   <span className="truncate">Bodega Drop</span>
                 </span>
               }
-              apoyo={f.inventario !== null ? <span className="tabular-nums">{entero(f.inventario)} u. en Drop</span> : undefined}
+              apoyo={f.inventario !== null ? <span className="tabular-nums">{entero(stockDrop(f) ?? 0)} u. en Drop</span> : undefined}
             />
             <Celda nombre="En Drop" principal={<IconoEnDrop f={f} />} />
           </span>

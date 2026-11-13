@@ -161,6 +161,8 @@ export async function encolarRepublicar(
   por: { id: string; nombre: string },
   /** El precio del producto nuevo (27 oct 2026: se elige al republicar; el sugerido va igual) y el que tenía. Sin él, se copia el del viejo. */
   precio?: { precio: number; precioAntes: number | null },
+  /** «Republicar (B280)» (12 nov 2026): el stock está en la bodega de Dropi; el ID nuevo nace con `temporal` unidades en la nuestra y Dropi traslada `unidades`. */
+  b280?: { temporal: number; unidades: number },
 ): Promise<{ id: string; yaEstaba: boolean } | { error: string }> {
   const productoId = idsDeDropi(pub.dropi_id)[0];
   if (!productoId) return { error: "La publicación no tiene ID de Dropi." };
@@ -175,7 +177,16 @@ export async function encolarRepublicar(
   }
   const { data, error } = await supabase
     .from("dropi_cambios_pendientes")
-    .insert({ pais_id: pub.pais_id, publicacion_id: pub.id, dropi_producto_id: productoId, tipo: "republicar", ...precios, creado_por: por.id, creado_por_nombre: por.nombre })
+    .insert({
+      pais_id: pub.pais_id,
+      publicacion_id: pub.id,
+      dropi_producto_id: productoId,
+      tipo: "republicar",
+      ...precios,
+      ...(b280 ? { datos: { b280: true, temporal: b280.temporal, unidadesB280: b280.unidades } } : {}),
+      creado_por: por.id,
+      creado_por_nombre: por.nombre,
+    })
     .select("id")
     .single();
   if (error || !data) return { error: error && falta(error.message) ? "Falta correr en Supabase la migración 0145." : "No se pudo dejar la republicación para Dropi." };

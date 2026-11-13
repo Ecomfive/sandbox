@@ -187,3 +187,26 @@ test("peso de las causas, por tienda y courier, y resumen del mes", () => {
   assert.equal(resumenPorMes(lista, "2026-10-01", new Set(["u2"])).get("2026-09-01")?.despachados, 1);
   assert.deepEqual(textosSinCausa([{ texto: "se mudó", codigo: CAUSA_OTRA }, { texto: "Se mudo", codigo: CAUSA_OTRA }, { texto: "x", codigo: "rechaza" }]), [{ texto: "SE MUDO", pedidos: 2 }]);
 });
+
+test("tablero de Panamá: la fecha es el grupo («02/11/2026») y el pedido, el nombre del ítem", () => {
+  // «DELIVERY REPORTES DIARIOS»: sin columna de fecha; cada grupo es un día.
+  const columnas = [
+    { id: "tienda", titulo: "Tienda", tipo: "status" },
+    { id: "delivery", titulo: "Delivery", tipo: "status" },
+    { id: "estado", titulo: "Estado", tipo: "status" },
+  ];
+  const m = sugerirMapeo(columnas);
+  assert.equal(m.pedido, "name");
+  assert.equal(m.fecha_despacho, "group");
+  assert.ok("mapeo" in validarMapeo({ ...m, estado: "estado" }, columnas));
+  const pagina = leerPagina({
+    data: { boards: [{ items_page: { cursor: null, items: [{ id: "77", name: "1377", updated_at: "2026-11-02T20:00:00Z", group: { title: "02/11/2026" }, column_values: [{ id: "estado", text: "ENTREGADO", value: null }] }] } }] },
+  });
+  assert.equal(pagina.items[0].grupo, "02/11/2026");
+  const d = despachoDeItem(pagina.items[0], { ...m, estado: "estado" });
+  assert.equal(d.numero_pedido, "1377");
+  assert.equal(d.fecha_despacho, "2026-11-02");
+  assert.equal(d.estado_grupo, "entregado");
+  assert.equal(fechaDeColumna({ text: "31/10/2026", value: null }), "2026-10-31");
+  assert.equal(fechaDeColumna({ text: "31/02/2026", value: null }), null);
+});

@@ -14,6 +14,7 @@ import type { VariacionLeida } from "@/lib/publicaciones/privatizar-variable";
 import { normalizarDatosStock, textoVariacion, type DatosStock } from "@/lib/publicaciones/stock-dropi";
 import { normalizarDatosReserva, reservasDeDropi, type DatosReserva } from "@/lib/publicaciones/reservas-dropi";
 import { codigoBodega } from "@/lib/publicaciones/sincronizar-dropi";
+import { mensajeTrasladoDropi, normalizarDatosRepublicar, type DatosRepublicar } from "@/lib/publicaciones/traslado-b280";
 import { puedeVerPaisId } from "@/lib/seguridad/pais-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 
@@ -60,6 +61,8 @@ export interface CambioParaDropi {
   devolver: DatosDevolver | null;
   /** El producto nuevo que un intento anterior de republicar ya creó en Dropi (el favorito sigue desde ahí). */
   nuevo: number | null;
+  /** «republicar» de la B280 (12 nov 2026): nace con unidades temporales y Dropi traslada las suyas (al favorito viaja como `datos`); null = la de siempre. */
+  republicar: DatosRepublicar | null;
   producto: number;
   /** null = no se cambia el nombre. */
   nombre: string | null;
@@ -169,7 +172,7 @@ async function tareaDelSistema(
   publicacionId: string,
   t: { titulo: string; nota: string; dias: number; prioridad: "alta" | "normal" },
   usuario: { id: string; nombre?: string | null; email?: string | null },
-) {
+): Promise<string | null> {
   const { data: pub } = await supabase.from("dropi_publicaciones").select("nombre, responsable_id").eq("id", publicacionId).maybeSingle();
   const candidatos = [fila.creado_por, pub?.responsable_id, usuario.id].filter((x): x is string => typeof x === "string" && UUID.test(x));
   let responsable: { id: string; nombre: string } | null = null;
@@ -180,14 +183,14 @@ async function tareaDelSistema(
       break;
     }
   }
-  if (!responsable) return;
+  if (!responsable) return null;
   const plazo = new Date(Date.now() + t.dias * 86_400_000).toLocaleDateString("en-CA", { timeZone: "America/Panama" });
   const yo = usuario.nombre || usuario.email || null;
   const base = { publicacion_id: publicacionId, titulo: t.titulo.slice(0, 200), nota: t.nota.slice(0, 1000), responsable_id: responsable.id, responsable_nombre: responsable.nombre, plazo, creado_por: usuario.id, creado_por_nombre: yo };
-  let r = await supabase.from("dropi_publicaciones_tareas").insert({ ...base, estado: "por_hacer", prioridad: t.prioridad });
+  let r = await supabase.from("dropi_publicaciones_tareas").insert({ ...base, estado: "por_hacer", prioridad: t.prioridad }).select("id").single();
   // Sin la migración 0178 se guarda sin estado ni prioridad.
-  if (r.error) r = await supabase.from("dropi_publicaciones_tareas").insert(base);
-  if (r.error) return;
+  if (r.error) r = await supabase.from("dropi_publicaciones_tareas").insert(base).select("id").single();
+  if (r.error) return null;
   await registrarAuditoria({ accion: "crear_tarea_publicacion", entidad: "dropi_publicaciones", entidadId: publicacionId, detalle: `Tarea: ${t.titulo} · le toca a ${responsable.nombre} · «${base.nota}»` });
   if (responsable.id !== usuario.id)
     await supabase.from("notificaciones_usuario").insert({
@@ -199,6 +202,51 @@ async function tareaDelSistema(
       autor_id: usuario.id,
       autor_nombre: yo,
     });
+  return (r.data?.id as string | undefined) ?? null;
+}
+
+/**
+ * «Republicar (B280)» (12 nov 2026, proceso de Nicol): al terminar en Dropi, la tarea de pedirle a Dropi el traslado (en la publicación nueva, para mañana, con el mensaje
+ * listo para copiar; se cierra sola cuando la lectura ve el stock en la bodega de Dropi del ID nuevo) y la de archivar el ID viejo en un mes (no antes: devoluciones tardías).
+ */
+async function tareasRepublicacionB280(
+  supabase: ReturnType<typeof createServiceClient>,
+  fila: Record<string, unknown>,
+  nuevaId: string,
+  nuevo: number,
+  unidades: number | null,
+  codigoPais: string,
+  usuario: { id: string; nombre?: string | null; email?: string | null },
+): Promise<string | null> {
+  const { data: vieja } = await supabase.from("dropi_publicaciones").select("nombre").eq("id", fila.publicacion_id as string).maybeSingle();
+  const nombre = String(vieja?.nombre ?? "");
+  const viejo = Number(fila.dropi_producto_id);
+  const mensaje = mensajeTrasladoDropi({ viejo, nuevo, nombre, unidades, pais: codigoPais });
+  const traslado = await tareaDelSistema(
+    supabase,
+    fila,
+    nuevaId,
+    {
+      titulo: `Pedir a Dropi el traslado del ID ${viejo} al ${nuevo}`,
+      nota: `Republicado desde la bodega de Dropi: el ID nuevo ${nuevo} quedó en 0. Copia este mensaje en el grupo de Dropi: «${mensaje}» La tarea se cierra sola cuando el sistema lea el stock en la bodega de Dropi del ID ${nuevo}.`,
+      dias: 1,
+      prioridad: "alta",
+    },
+    usuario,
+  );
+  await tareaDelSistema(
+    supabase,
+    fila,
+    fila.publicacion_id as string,
+    {
+      titulo: `Archivar en Dropi el ID ${viejo}`,
+      nota: `Se republicó como ID ${nuevo} (stock de la bodega de Dropi). No se archiva enseguida para no perder devoluciones tardías: archívalo cuando Dropi ya haya trasladado el stock al ID ${nuevo}.`,
+      dias: DIAS_PARA_ARCHIVAR,
+      prioridad: "normal",
+    },
+    usuario,
+  );
+  return traslado;
 }
 
 /** La tarea «subir la foto que faltó» de una republicación (8 nov 2026): en la publicación nueva, con el ID viejo de donde sacarla, para mañana. */
@@ -271,6 +319,8 @@ async function crearRepublicada(
   fila: Record<string, unknown>,
   nuevo: number,
   usuario: { id: string },
+  /** «Republicar (B280)»: la vieja sigue activa (vende hasta que Dropi traslade su stock) y se archiva en un mes. */
+  opciones: { archivarVieja: boolean } = { archivarVieja: true },
 ): Promise<{ id: string } | { error: string }> {
   if (typeof fila.nueva_publicacion_id === "string") return { id: fila.nueva_publicacion_id };
   const { data: vieja } = await supabase.from("dropi_publicaciones").select("*").eq("id", fila.publicacion_id as string).maybeSingle();
@@ -306,7 +356,11 @@ async function crearRepublicada(
   }
   await supabase
     .from("dropi_publicaciones")
-    .update({ estado: "archivado", estado_publicacion: "archivado", relacionados: [...new Set([...((vieja.relacionados as string[] | null) ?? []), id])], actualizado_en: new Date().toISOString() })
+    .update({
+      ...(opciones.archivarVieja ? { estado: "archivado", estado_publicacion: "archivado" } : {}),
+      relacionados: [...new Set([...((vieja.relacionados as string[] | null) ?? []), id])],
+      actualizado_en: new Date().toISOString(),
+    })
     .eq("id", vieja.id as string);
   return { id };
 }
@@ -397,6 +451,7 @@ export async function pendientesParaDropi(codigoPais: string): Promise<{ error?:
       privatizar: f.tipo === "privatizar" ? normalizarDatosPrivatizar(f.datos) : null,
       quitarPrivados: f.quitar_privados === true,
       devolver: f.tipo === "apagar" ? normalizarDatosDevolver(f.datos) : null,
+      republicar: f.tipo === "republicar" ? normalizarDatosRepublicar(f.datos) : null,
       nuevo: num(f.nuevo_dropi_id),
       producto: f.dropi_producto_id == null ? 0 : Number(f.dropi_producto_id),
       nombre: (f.nombre as string | null) ?? null,
@@ -420,7 +475,7 @@ export async function guardarResultadosDropi(codigoPais: string, resultados: unk
   if (!pais) return { error: "País no válido." };
   if (!Array.isArray(resultados) || resultados.length > MAX) return { error: "Resultados no válidos." };
   const limpios = resultados
-    .map((r) => r as { id?: unknown; ok?: unknown; error?: unknown; nuevo?: unknown; archivado?: unknown; aviso?: unknown; salida?: unknown; antes?: unknown; stock?: unknown; bodegas?: unknown; variacion?: unknown; unidades?: unknown; devuelto?: unknown; reservas?: unknown; privado?: unknown; fotosFaltan?: unknown; archivoPendiente?: unknown })
+    .map((r) => r as { id?: unknown; ok?: unknown; error?: unknown; nuevo?: unknown; archivado?: unknown; aviso?: unknown; salida?: unknown; antes?: unknown; stock?: unknown; bodegas?: unknown; variacion?: unknown; unidades?: unknown; devuelto?: unknown; reservas?: unknown; privado?: unknown; fotosFaltan?: unknown; archivoPendiente?: unknown; b280?: unknown })
     .filter((r) => typeof r.id === "string" && UUID.test(r.id))
     .map((r) => ({
       id: r.id as string,
@@ -453,6 +508,8 @@ export async function guardarResultadosDropi(codigoPais: string, resultados: unk
       // «republicar»: las fotos que no se pudieron copiar (8 nov 2026): se crea la tarea de subirlas a mano.
       // «republicar»: Dropi no dejó archivar el viejo por órdenes en curso (se da por hecha y queda la tarea).
       archivoPendiente: typeof r.archivoPendiente === "string" ? r.archivoPendiente.slice(0, 500) : null,
+      // «republicar» de la B280: las unidades que el ID viejo tenía en la bodega de Dropi (las que Dropi debe trasladar).
+      b280: Number.isInteger(r.b280) && (r.b280 as number) >= 0 && (r.b280 as number) < 10_000_000 ? (r.b280 as number) : null,
       fotosFaltan: Array.isArray(r.fotosFaltan) ? (r.fotosFaltan as unknown[]).filter((x): x is string => typeof x === "string").slice(0, 20).map((x) => x.slice(0, 120)) : [],
       // El ID del producto que creó una republicación (aunque haya fallado un paso después).
       nuevo: Number.isInteger(r.nuevo) && (r.nuevo as number) > 0 && (r.nuevo as number) < 100_000_000 ? (r.nuevo as number) : null,
@@ -646,8 +703,9 @@ export async function guardarResultadosDropi(codigoPais: string, resultados: unk
     }
     if (f.tipo === "republicar") {
       const nuevo = r.nuevo ?? (f.nuevo_dropi_id == null ? null : Number(f.nuevo_dropi_id));
-      // Terminó en Dropi: la publicación nueva en el sistema (una sola vez) y la vieja archivada.
-      const creada = r.ok && nuevo ? await crearRepublicada(supabase, f, nuevo, usuario) : null;
+      const b280 = normalizarDatosRepublicar(f.datos);
+      // Terminó en Dropi: la publicación nueva en el sistema (una sola vez) y la vieja archivada (la de la B280 sigue activa hasta que Dropi traslade).
+      const creada = r.ok && nuevo ? await crearRepublicada(supabase, f, nuevo, usuario, { archivarVieja: !b280 }) : null;
       const ok = r.ok && !!nuevo && !!creada && !("error" in creada);
       const error = !r.ok ? r.error : !nuevo ? "Dropi no devolvió el ID del producto nuevo." : creada && "error" in creada ? creada.error : "Sin detalle";
       await supabase
@@ -659,6 +717,15 @@ export async function guardarResultadosDropi(codigoPais: string, resultados: unk
           ...(creada && !("error" in creada) ? { nueva_publicacion_id: creada.id } : {}),
         })
         .eq("id", r.id);
+      // De la B280: las tareas de pedir el traslado (se cierra sola) y de archivar el viejo en un mes; la del traslado queda anotada en el cambio.
+      if (ok && b280 && creada && !("error" in creada) && !b280.trasladoTarea) {
+        const unidades = r.b280 ?? b280.unidadesB280;
+        const tarea = await tareasRepublicacionB280(supabase, f, creada.id, nuevo!, unidades, codigoPais, usuario);
+        await supabase
+          .from("dropi_cambios_pendientes")
+          .update({ datos: { ...(f.datos as Record<string, unknown>), unidadesB280: unidades, trasladoTarea: tarea } })
+          .eq("id", r.id);
+      }
       // Fotos que no se pudieron copiar (8 nov 2026, pedido de Alcides): la republicación termina igual y queda una tarea en la publicación nueva para subirlas
       // a mano, sacándolas del ID viejo. Le toca a quien pidió republicar (si sigue activa), si no al responsable de la publicación, si no a quien aplicó.
       if (ok && creada && !("error" in creada) && r.fotosFaltan.length) await tareaFotosQueFaltan(supabase, f, creada.id, nuevo!, r.fotosFaltan, r.aviso, usuario);
@@ -668,7 +735,7 @@ export async function guardarResultadosDropi(codigoPais: string, resultados: unk
         entidad: "dropi_publicaciones",
         entidadId: f.publicacion_id as string,
         detalle: ok
-          ? `ID ${f.dropi_producto_id} → ID nuevo ${nuevo}: ${r.archivoPendiente ? "sin stock; Dropi no dejó archivarlo por órdenes en curso (tarea para archivarlo en un mes)" : "archivada en Dropi sin stock"}${r.fotosFaltan.length ? ` · faltan ${r.fotosFaltan.length} foto(s) por subir (tarea creada)` : ""} (desde Dropi)`
+          ? `ID ${f.dropi_producto_id} → ID nuevo ${nuevo}: ${b280 ? `de la bodega de Dropi: el nuevo nació con ${b280.temporal} u. temporales y quedó en 0; el viejo sigue activo con ${r.b280 ?? b280.unidadesB280 ?? "sus"} u. hasta que Dropi las traslade (tareas: pedir el traslado y archivarlo en un mes)` : r.archivoPendiente ? "sin stock; Dropi no dejó archivarlo por órdenes en curso (tarea para archivarlo en un mes)" : "archivada en Dropi sin stock"}${r.fotosFaltan.length ? ` · faltan ${r.fotosFaltan.length} foto(s) por subir (tarea creada)` : ""} (desde Dropi)`
           : `ID ${f.dropi_producto_id}${nuevo ? ` · ID nuevo ${nuevo}` : ""} · ${error}`,
       });
       if (ok) aplicados++;

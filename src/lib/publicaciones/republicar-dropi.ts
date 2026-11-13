@@ -47,6 +47,43 @@ export function armarProductoNuevo(
   return { cuerpo };
 }
 
+/** Unidades temporales con que se crea en Dropi el producto nuevo de una republicación de la B280 (Dropi no deja publicar con 0; reunión con Nicol, 12 nov 2026). */
+export const UNIDADES_TEMPORALES_B280 = 100;
+
+/** La bodega de ECOMFIVE donde van las unidades temporales: «Proveedor Ecomfive» si está, si no la primera del proveedor. */
+export function bodegaTemporalB280(bodegasProveedor: Obj[]): number | null {
+  const b = bodegasProveedor.find((x) => /ecomfive/i.test(String(x.name ?? ""))) ?? bodegasProveedor[0];
+  return b ? Number(b.id) : null;
+}
+
+/**
+ * «Republicar (B280)» (12 nov 2026, proceso de Nicol): el cuerpo del `POST api/products` del producto nuevo cuando el stock del viejo está en la bodega de Dropi
+ * (B280), que no podemos mover. Es el mismo guardado del viejo sin ID ni reservas, pero **sin la B280** y con `temporal` unidades en `bodega` (una de ECOMFIVE): Dropi no
+ * deja publicar con 0. Después el favorito le saca esas unidades y Dropi traslada a mano el stock de la B280 del ID viejo al nuevo. Solo productos simples, sin
+ * unidades privatizadas ni porcentajes por dropshipper. `REPUBLICAR_JS` (`nuevo280`) es lo mismo para el favorito; la prueba compara los dos.
+ */
+export function armarProductoNuevoB280(
+  producto: Obj,
+  bodegasProveedor: Obj[],
+  bodega: number,
+  temporal: number,
+  precios?: { precio?: number | null; precioSugerido?: number | null },
+): { cuerpo: Obj } | { error: string } {
+  if (producto.type !== "SIMPLE") return { error: "Tiene variaciones: la republicación de la B280 por ahora es solo para productos simples." };
+  const r = armarGuardadoProducto(producto, bodegasProveedor, { nombre: null, nombreGuia: null, precio: precios?.precio ?? null, precioSugerido: precios?.precioSugerido ?? null });
+  if ("error" in r) return r;
+  const propias = new Set(bodegasProveedor.map((b) => Number(b.id)));
+  if (!propias.has(bodega)) return { error: "La bodega para las unidades temporales no es de ECOMFIVE." };
+  const privados = Array.isArray(producto.private_product_inventories) ? (producto.private_product_inventories as Obj[]) : [];
+  if (privados.some((p) => !p.deleted_at && Number(p.stock) > 0)) return { error: "Tiene unidades privatizadas: quítalas en Dropi antes de republicar." };
+  if (Array.isArray(producto.user_profit_percentage_product) && producto.user_profit_percentage_product.length) return { error: "Tiene porcentajes por dropshipper: republícala a mano en Dropi." };
+  const cuerpo: Obj = { ...r.cuerpo, id: null, private_product_inventories: [] };
+  cuerpo.warehouselected = (r.cuerpo.warehouselected as Obj[])
+    .filter((b) => propias.has(Number(b.warehouse_id)))
+    .map((b) => ({ ...b, stock: Number(b.warehouse_id) === bodega ? temporal : 0 }));
+  return { cuerpo };
+}
+
 /**
  * Los errores con que el favorito se detiene ANTES de crear nada en Dropi (lee el producto y ve que no se puede republicar desde aquí: variaciones,
  * la B280, unidades privatizadas, porcentajes, otro proveedor). Con uno de estos y sin `nuevo_dropi_id`, Dropi no se tocó: la republicación se puede
@@ -54,6 +91,8 @@ export function armarProductoNuevo(
  */
 export const ERRORES_ANTES_DE_DROPI = [
   "Tiene variaciones",
+  "La bodega para las unidades temporales",
+  "No hay una bodega de ECOMFIVE",
   "Dropi no devolvió los atributos",
   "Tiene stock en una bodega que no es de ECOMFIVE",
   "Tiene unidades privatizadas",
@@ -161,6 +200,17 @@ export const REPUBLICAR_JS = [
   "if(Array.isArray(o.user_profit_percentage_product)&&o.user_profit_percentage_product.length)return{error:'Tiene porcentajes por dropshipper: republícala a mano en Dropi.'};",
   "var c=Object.assign({},r.cuerpo,{id:null,private_product_inventories:[]});",
   "c.warehouselected=r.cuerpo.warehouselected.map(function(b){return Object.assign({},b,{stock:Number(b.stock!=null?b.stock:0)})});",
+  "return{cuerpo:c}}",
+  // «Republicar (B280)» (12 nov 2026): lo mismo que `armarProductoNuevoB280`.
+  "function bod280(bp){var b=bp.filter(function(x){return/ecomfive/i.test(String(x.name!=null?x.name:''))})[0]||bp[0];return b?Number(b.id):null}",
+  "function nuevo280(o,bp,bo,t,p){if(o.type!=='SIMPLE')return{error:'Tiene variaciones: la republicación de la B280 por ahora es solo para productos simples.'};",
+  "var r=armar(o,bp,{nombre:null,nombreGuia:null,precio:p&&p.precio!=null?p.precio:null,precioSugerido:p&&p.precioSugerido!=null?p.precioSugerido:null});if(r.error)return r;",
+  "var pr={};bp.forEach(function(x){pr[Number(x.id)]=1});if(!pr[bo])return{error:'La bodega para las unidades temporales no es de ECOMFIVE.'};",
+  "var pi=Array.isArray(o.private_product_inventories)?o.private_product_inventories:[];",
+  "if(pi.some(function(x){return!x.deleted_at&&Number(x.stock)>0}))return{error:'Tiene unidades privatizadas: quítalas en Dropi antes de republicar.'};",
+  "if(Array.isArray(o.user_profit_percentage_product)&&o.user_profit_percentage_product.length)return{error:'Tiene porcentajes por dropshipper: republícala a mano en Dropi.'};",
+  "var c=Object.assign({},r.cuerpo,{id:null,private_product_inventories:[]});",
+  "c.warehouselected=r.cuerpo.warehouselected.filter(function(b){return pr[Number(b.warehouse_id)]}).map(function(b){return Object.assign({},b,{stock:Number(b.warehouse_id)===bo?t:0})});",
   "return{cuerpo:c}}",
   "function mover(o,bp,m,k){var r=armar(o,bp,{nombre:null,nombreGuia:null});if(r.error)return r;var n=0,c=Object.assign({},r.cuerpo);",
   "c.warehouselected=r.cuerpo.warehouselected.map(function(b){var q=Number(m[String(b.warehouse_id)]||0);if(!q)return b;n++;",

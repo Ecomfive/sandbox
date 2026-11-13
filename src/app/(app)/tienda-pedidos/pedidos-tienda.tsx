@@ -15,8 +15,8 @@ import type { PedidoFila } from "@/lib/tienda/datos";
 import { FichaPedido } from "./ficha-pedido";
 
 const ESTADO = new Map(ESTADOS_PEDIDO.map((e) => [e.id, e]));
-const NOMBRE: NombreFilas = { singular: "pedido", plural: "pedidos" };
-const ICONOS: Record<string, IconoComp> = {
+export const NOMBRE: NombreFilas = { singular: "pedido", plural: "pedidos" };
+export const ICONOS: Record<string, IconoComp> = {
   estado: PedidoIcon,
   entrada: ChatIcon,
   tienda: TiendaIcon,
@@ -27,6 +27,7 @@ const ICONOS: Record<string, IconoComp> = {
   riesgo: AlertaIcon,
   transportista: EnvioIcon,
   fecha: CalendarioIcon,
+  confirmacion: CheckIcon,
   total: MargenIcon,
 };
 /** Por dónde entró el pedido, como en Mi Reto Digital: el ícono va antes del número. */
@@ -53,7 +54,8 @@ function NumeroPedido({ p }: { p: PedidoFila }) {
   );
 }
 
-const RIESGO: Record<string, { etiqueta: string; tono: "aviso" | "peligro" }> = { medio: { etiqueta: "Medio", tono: "aviso" }, alto: { etiqueta: "Alto", tono: "peligro" } };
+// «Bajo» en gris (12 nov 2026, como en Mi Reto Digital): sin nada en contra o su primer pedido.
+const RIESGO: Record<string, { etiqueta: string; tono?: "aviso" | "peligro" }> = { bajo: { etiqueta: "Bajo" }, medio: { etiqueta: "Medio", tono: "aviso" }, alto: { etiqueta: "Alto", tono: "peligro" } };
 
 function cuando(iso: string, sinHora = false): string {
   const d = new Date(iso);
@@ -67,13 +69,13 @@ function cuando(iso: string, sinHora = false): string {
   return `${d.toLocaleDateString("es-PA", { day: "numeric", month: "short", timeZone: "America/Panama" })} ${hora}`;
 }
 
-interface Contexto {
+export interface Contexto {
   codigoPais: string;
   tiendas: Record<string, string>;
 }
 
 /** Las columnas, como en Mi Reto Digital: se ocultan y se reordenan desde «Columnas». */
-const COLUMNAS: ColumnaTabla<PedidoFila, Contexto>[] = [
+export const COLUMNAS: ColumnaTabla<PedidoFila, Contexto>[] = [
   { id: "pedido", label: "Pedido", ocultable: false, clase: "font-semibold text-primario whitespace-nowrap", render: (p) => <NumeroPedido p={p} /> },
   { id: "tienda", label: "Tienda", ocultable: true, clase: "whitespace-nowrap", render: (p, c) => c.tiendas[p.tiendaId] ?? "—" },
   { id: "fecha", label: "Fecha", ocultable: true, clase: "text-muted-foreground whitespace-nowrap", render: (p) => cuando(p.creado, p.sinHora) },
@@ -161,7 +163,7 @@ const COLUMNAS: ColumnaTabla<PedidoFila, Contexto>[] = [
 ];
 
 /** Los filtros y la descarga de la lista (la tienda solo si hay varias). */
-function defPedidos(tiendas: Record<string, string>): DefTabla<PedidoFila> {
+export function defPedidos(tiendas: Record<string, string>): DefTabla<PedidoFila> {
   return {
     clave: "tienda-pedidos",
     campos: [
@@ -202,7 +204,8 @@ function defPedidos(tiendas: Record<string, string>): DefTabla<PedidoFila> {
         opciones: () => [
           { valor: "alto", etiqueta: "Alto" },
           { valor: "medio", etiqueta: "Medio" },
-          { valor: "ninguno", etiqueta: "Sin riesgo" },
+          { valor: "bajo", etiqueta: "Bajo" },
+          { valor: "ninguno", etiqueta: "Sin dato (sin teléfono)" },
         ],
       },
       { id: "transportista", etiqueta: "Transportista", tipo: "seleccion", valores: (p) => [p.transportista ?? SIN_VALOR], etiquetaSinValor: "Sin transportista", agrupable: true },

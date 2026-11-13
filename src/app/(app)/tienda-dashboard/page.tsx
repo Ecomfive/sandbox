@@ -8,7 +8,7 @@ import { requireModulo } from "@/lib/auth";
 import { formatearMoneda } from "@/lib/formato";
 import { getPaisActual } from "@/lib/pais";
 import { createServiceClient } from "@/lib/supabase/server";
-import { cargarTiendas, cargarVariantes, inicioPeriodo, periodoElegido, sinConfirmarDesde, tiendaElegida } from "@/lib/tienda/datos";
+import { cargarTiendas, cargarVariantes, periodoElegido, sinConfirmarDesde, tiendaElegida } from "@/lib/tienda/datos";
 import { after } from "next/server";
 import { pedidosDeTiendas } from "@/lib/tienda/datos-finanzas";
 import { revisarSiHaceFalta } from "@/lib/tienda/conectar-shopify";
@@ -41,16 +41,18 @@ export default async function DashboardTiendaPage({ searchParams }: { searchPara
   const pais = await getPaisActual(supabase);
   const { tiendas, faltaMigracion } = await cargarTiendas(supabase, pais.id);
   const tienda = tiendaElegida(tiendas, sp.tienda);
-  const periodo = periodoElegido(sp.periodo);
+  const eleccion = periodoElegido(sp);
   const miradas = tienda ? [tienda] : tiendas;
   // La revisión de Shopify (por si se perdió algún aviso), después de mostrar la página y como mucho cada 10 minutos.
   after(() => revisarSiHaceFalta(createServiceClient(), tiendas));
   const ids = miradas.map((t) => t.id);
   // Las tiendas sin conectar se ven con las órdenes de Finanzas (11 nov 2026); si todo sale de ahí, los periodos terminan en su último día.
-  const [{ pedidos: todos, lineasFinanzas, fuente, referencia }, variantes] = await Promise.all([pedidosDeTiendas(supabase, miradas, pais.codigo, periodo.dias * 2), cargarVariantes(supabase, ids)]);
-  const desde = inicioPeriodo(periodo.dias, referencia);
-  const hoy = inicioPeriodo(1, referencia);
-  const actuales = todos.filter((p) => diaPanama(p.creado) >= desde);
+  const [{ pedidos: todos, lineasFinanzas, fuente, referencia, periodo }, variantes] = await Promise.all([
+    pedidosDeTiendas(supabase, miradas, pais.codigo, eleccion, { comparar: true }),
+    cargarVariantes(supabase, ids),
+  ]);
+  const { desde, hasta } = periodo;
+  const actuales = todos.filter((p) => diaPanama(p.creado) >= desde && diaPanama(p.creado) <= hasta);
   const anteriores = todos.filter((p) => diaPanama(p.creado) < desde);
   const r = resumirPedidos(actuales);
   const a = resumirPedidos(anteriores);
@@ -79,12 +81,14 @@ export default async function DashboardTiendaPage({ searchParams }: { searchPara
   const skuIds = vendidos.map((v) => v.skuId).filter((x): x is string => !!x);
   const [{ data: skus }, costos] = await Promise.all([
     skuIds.length ? supabase.from("skus_maestros").select("id, codigo, nombre").in("id", skuIds) : Promise.resolve({ data: [] as { id: string; codigo: string; nombre: string }[] }),
-    // El costo de cada producto en el país (Dropi del país o la última compra), para el margen (12 nov 2026).
+    // El costo de cada producto en el país (el costo promedio de compra del producto: del país o, si no hay, de todos), para el margen (12 nov 2026).
     costosDeProductos(supabase, skuIds, pais.id),
   ]);
   const skuDe = new Map((skus ?? []).map((s) => [s.id as string, s as { codigo: string; nombre: string }]));
 
-  const dias = pedidosPorDia(actuales, desde, hoy);
+  // La gráfica empieza en el primer día con pedidos (con «Todo» no se dibujan años vacíos).
+  const primerDia = actuales.reduce<string | null>((m, p) => (m === null || diaPanama(p.creado) < m ? diaPanama(p.creado) : m), null);
+  const dias = pedidosPorDia(actuales, primerDia && primerDia > desde ? primerDia : desde, hasta);
   const max = Math.max(1, ...dias.map((d) => d.pedidos));
   const dinero = (n: number | null) => (n === null ? "—" : formatearMoneda(n, pais.codigo));
   const pct = (n: number | null) => (n === null ? "—" : `${n.toLocaleString("es-PA")} %`);
@@ -126,7 +130,7 @@ export default async function DashboardTiendaPage({ searchParams }: { searchPara
         <SinTiendas pais={pais.nombre} />
       ) : (
         <>
-          <BarraTienda ruta="/tienda-dashboard" tiendas={tiendas} tiendaId={tienda?.id ?? null} periodo={periodo.id} />
+          <BarraTienda ruta="/tienda-dashboard" tiendas={tiendas} tiendaId={tienda?.id ?? null} periodo={periodo} />
           <AvisoConexion tiendas={miradas} finanzas={fuente} />
           <TableroDashboard etiqueta="Operación" titulo="Operación" tarjetas={operacion} />
           <TableroDashboard etiqueta="Dinero" titulo="Dinero (contra entrega)" tarjetas={plata} />

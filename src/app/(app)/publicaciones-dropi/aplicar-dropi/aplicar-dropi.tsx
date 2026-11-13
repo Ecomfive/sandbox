@@ -15,7 +15,7 @@ import { guardarResultadosDropi, pendientesParaDropi, type CambioParaDropi } fro
 /** Un monto con el símbolo de la moneda del país de esta ventana (`?p=` de la pestaña de Dropi que la abrió: «₡» en Costa Rica, «MX$» en México). */
 const montoUrl = (v: number) => montoDePais(v, typeof window === "undefined" ? "PA" : new URLSearchParams(window.location.search).get("p") ?? "PA");
 
-type Resultado = { id: string; ok: boolean; error?: string; nuevo?: number; archivado?: boolean; aviso?: string; salida?: boolean; antes?: number; stock?: number; archivoPendiente?: string | null };
+type Resultado = { id: string; ok: boolean; error?: string; nuevo?: number; archivado?: boolean; aviso?: string; salida?: boolean; antes?: number; stock?: number; archivoPendiente?: string | null; b280?: number };
 type Estado =
   | { tipo: "cargando" }
   | { tipo: "sin_dropi"; mensaje: string }
@@ -104,7 +104,7 @@ export function AplicarDropi({ puedeEscribir }: { puedeEscribir: boolean }) {
     dropi.postMessage(
       {
         tipo: "pendientes",
-        cambios: cambios.map(({ id, tipo, quitarPrivados, restaurar, nuevo, producto, nombre, guia, precio, sugerido, descripcion, fotos, datos, privatizar, stock, devolver, reserva }) => ({
+        cambios: cambios.map(({ id, tipo, quitarPrivados, restaurar, nuevo, producto, nombre, guia, precio, sugerido, descripcion, fotos, datos, privatizar, stock, devolver, reserva, republicar }) => ({
           id,
           tipo,
           quitarPrivados,
@@ -117,7 +117,7 @@ export function AplicarDropi({ puedeEscribir }: { puedeEscribir: boolean }) {
           sugerido,
           descripcion,
           fotos,
-          datos: tipo === "privatizar" ? privatizar : tipo === "stock" ? stock : tipo === "reserva" ? reserva : tipo === "apagar" ? devolver : datos,
+          datos: tipo === "privatizar" ? privatizar : tipo === "stock" ? stock : tipo === "reserva" ? reserva : tipo === "apagar" ? devolver : tipo === "republicar" ? republicar : datos,
         })),
       },
       origen,
@@ -182,7 +182,9 @@ export function AplicarDropi({ puedeEscribir }: { puedeEscribir: boolean }) {
                     ? `Sin stock en Dropi, pero no deja archivarlo por órdenes en curso: quedó una tarea para archivarlo en un mes`
                     : r
                     ? r.ok
-                      ? c.tipo === "republicar"
+                      ? c.tipo === "republicar" && c.republicar
+                        ? `Republicada: ID nuevo ${r.nuevo ?? "—"} en 0 (las ${c.republicar.temporal} temporales ya salieron). El ID ${c.producto} sigue activo con su stock de la bodega de Dropi: quedó la tarea de pedirle a Dropi el traslado${r.b280 ? ` de ${r.b280} u.` : ""} (con el mensaje listo) y la de archivarlo en un mes${r.aviso ? `. ${r.aviso}` : ""}`
+                        : c.tipo === "republicar"
                         ? `Republicada: ID nuevo ${r.nuevo ?? "—"}; la vieja quedó ${r.archivoPendiente ? "sin stock (Dropi no deja archivarla por órdenes en curso: quedó una tarea para archivarla en un mes)" : "archivada y sin stock"}${r.aviso ? `. ${r.aviso} Quedó una tarea para hacerlo.` : ""}`
                         : c.tipo === "apagar"
                           ? r.archivado
@@ -307,8 +309,12 @@ function DetalleCambio({ c }: { c: CambioParaDropi }) {
   if (c.tipo === "republicar")
     return (
       <>
-        <span className="font-medium">Republicar: {c.publicacion}</span>
-        <span className="text-xs">Un producto nuevo en Dropi con los mismos datos, fotos y stock; el ID {c.producto} queda archivado y sin stock.</span>
+        <span className="font-medium">Republicar{c.republicar ? " (bodega de Dropi)" : ""}: {c.publicacion}</span>
+        <span className="text-xs">
+          {c.republicar
+            ? `Un producto nuevo en Dropi con los mismos datos y fotos, creado con ${c.republicar.temporal} unidades temporales en nuestra bodega que enseguida se sacan (queda en 0). El ID ${c.producto} no se toca: Dropi traslada su stock al nuevo.`
+            : `Un producto nuevo en Dropi con los mismos datos, fotos y stock; el ID ${c.producto} queda archivado y sin stock.`}
+        </span>
         <span className="text-xs text-muted-foreground">
           ID {c.producto}
           {c.nuevo ? ` · ya creado como ID ${c.nuevo}: sigue desde ahí` : ""}

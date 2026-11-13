@@ -25,14 +25,14 @@ export default async function PedidosTiendaPage({ searchParams }: { searchParams
   const pais = await getPaisActual(supabase);
   const { tiendas, faltaMigracion } = await cargarTiendas(supabase, pais.id);
   const tienda = tiendaElegida(tiendas, sp.tienda);
-  const periodo = periodoElegido(sp.periodo);
+  const eleccion = periodoElegido(sp);
   const miradas = tienda ? [tienda] : tiendas;
   // La revisión de Shopify (por si se perdió algún aviso), después de mostrar la página y como mucho cada 10 minutos.
   after(() => revisarSiHaceFalta(createServiceClient(), tiendas));
   const ids = miradas.map((t) => t.id);
   // Las tiendas sin conectar muestran las órdenes que cargó Finanzas (11 nov 2026; ver src/lib/tienda/ordenes-finanzas.ts).
-  const [{ pedidos, fuente }, sinVincular] = await Promise.all([
-    pedidosDeTiendas(supabase, miradas, pais.codigo, periodo.dias),
+  const [{ pedidos, fuente, periodo }, sinVincular] = await Promise.all([
+    pedidosDeTiendas(supabase, miradas, pais.codigo, eleccion),
     ids.length
       ? supabase
           .from("tienda_variantes")
@@ -55,7 +55,7 @@ export default async function PedidosTiendaPage({ searchParams }: { searchParams
         <SinTiendas pais={pais.nombre} />
       ) : (
         <>
-          <BarraTienda ruta="/tienda-pedidos" tiendas={tiendas} tiendaId={tienda?.id ?? null} periodo={periodo.id} />
+          <BarraTienda ruta="/tienda-pedidos" tiendas={tiendas} tiendaId={tienda?.id ?? null} periodo={periodo} />
           <AvisoConexion tiendas={miradas} finanzas={fuente} />
           <PedidosTienda
             pedidos={pedidos}
