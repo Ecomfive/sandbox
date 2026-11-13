@@ -7,6 +7,7 @@ import { getPaisActual } from "@/lib/pais";
 import { createServiceClient } from "@/lib/supabase/server";
 import { traerTodasConError } from "@/lib/supabase/paginar";
 import { leerStockPlataformas } from "../datos-plataformas";
+import { etiquetaTalla } from "@/lib/wms/talla";
 import { Levantamiento, type ProductoConteo } from "./levantamiento";
 
 export const metadata = { title: "Levantamiento" };
@@ -28,7 +29,7 @@ function colorDeVariante(opciones: Record<string, string> | null): { color: stri
   const pares = Object.entries(opciones ?? {}).filter(([, v]) => String(v ?? "").trim() !== "");
   const color = pares.find(([k]) => /^(colou?r|tono)$/i.test(k.trim()));
   if (!color || pares.length < 2) return { color: null, resto: "" };
-  return { color: String(color[1]).trim(), resto: pares.filter((x) => x !== color).map(([, v]) => v).join(" / ") };
+  return { color: String(color[1]).trim(), resto: etiquetaTalla(pares.filter((x) => x !== color).map(([, v]) => v).join(" / ")) };
 }
 
 export default async function LevantamientoPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
@@ -107,7 +108,7 @@ export default async function LevantamientoPage({ searchParams }: { searchParams
     // Una variante sin foto propia usa la de su producto principal.
     foto: p.foto_url ?? (p.padre_id ? (padrePorId.get(p.padre_id)?.foto ?? null) : null),
     padre: p.padre_id ? (padrePorId.get(p.padre_id) ?? null) : null,
-    opciones: Object.values(p.opciones ?? {}).join(" / "),
+    opciones: etiquetaTalla(Object.values(p.opciones ?? {}).join(" / ")),
     ...colorDeVariante(p.opciones),
     numero: p.numero ?? null,
     barras: p.codigo_barras || null,

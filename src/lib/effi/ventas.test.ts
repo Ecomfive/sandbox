@@ -42,3 +42,13 @@ test("la ventana de lectura va en la hora de Costa Rica", () => {
   // 7 nov a las 03:00 UTC son las 21:00 del 6 nov en Costa Rica.
   assert.deepEqual(ventanaVentas(new Date("2026-11-07T03:00:00Z"), 10), { desde: "2026-10-27", hasta: "2026-11-06" });
 });
+
+test("la remisión de una devolución sale de su cabecera (el detalle de Effi no la trae)", () => {
+  const r = ventasPorDia(
+    [fila("42", "3", "2026-10-20 09:00:00", { id_remision_v: "14414" })],
+    [fila("42", "2", "2026-11-11 10:52:30", { id_remision_v: undefined, id_devolucion_v: "5330" })],
+    // Así viene de Effi: la cabecera trae el número como «id».
+    [{ id: "5330", id_remision_v: "14414" }],
+  );
+  assert.deepEqual(r, [{ productoId: "42", dia: "2026-10-20", salidas: 3, devueltas: 2 }]);
+});

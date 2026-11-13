@@ -4,7 +4,7 @@ import { prepararContexto, sugerirSku, type Sugerencia } from "@/lib/publicacion
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { consultarTodoEffi } from "./api";
 import { articulosDeLectura, type ArticuloEffi } from "./articulos";
-import { DIAS_VENTAS_EFFI, INICIO_VENTAS_EFFI, ventanaVentas, ventasPorDia, type FilaDetalleEffi } from "./ventas";
+import { DIAS_VENTAS_EFFI, INICIO_VENTAS_EFFI, ventanaVentas, ventasPorDia, type CabeceraDevolucionEffi, type FilaDetalleEffi } from "./ventas";
 import { cambiosPrecioNuestros } from "@/lib/competencia/effi-precios";
 
 /** Effi es de la cuenta de Costa Rica. */
@@ -129,13 +129,16 @@ export async function sincronizarVentasEffi(supabase: SupabaseClient, paisId: st
   const desde = historial ? INICIO_VENTAS_EFFI : ventana.desde;
   const hasta = ventana.hasta;
   const filtros = { desde, hasta: `${hasta} 23:59:59`, vigente: 1 };
-  const [remisiones, devoluciones] = await Promise.all([
+  const [remisiones, devoluciones, cabeceras] = await Promise.all([
     consultarTodoEffi<FilaDetalleEffi>("detalle_remision_v", filtros, 1000),
     consultarTodoEffi<FilaDetalleEffi>("detalle_devolucion_v", filtros, 1000),
+    // La cabecera de cada devolución dice a qué remisión se abona (el detalle no lo trae).
+    consultarTodoEffi<CabeceraDevolucionEffi>("devolucion_v", filtros, 1000),
   ]);
   if (!remisiones.ok) throw new Error(`Remisiones de venta: ${remisiones.error}`);
   if (!devoluciones.ok) throw new Error(`Devoluciones de venta: ${devoluciones.error}`);
-  const ventas = ventasPorDia(remisiones.data, devoluciones.data);
+  if (!cabeceras.ok) throw new Error(`Devoluciones de venta (cabeceras): ${cabeceras.error}`);
+  const ventas = ventasPorDia(remisiones.data, devoluciones.data, cabeceras.data);
   revisar(await supabase.from("plataforma_ventas_diarias").delete().eq("pais_id", paisId).eq("plataforma", "effi").gte("dia", desde), "Borrar la ventana de ventas de Effi");
   const filas = ventas.map((v) => ({ pais_id: paisId, plataforma: "effi", producto_id: v.productoId, dia: v.dia, salidas: v.salidas, devueltas: v.devueltas }));
   for (let i = 0; i < filas.length; i += 500) revisar(await supabase.from("plataforma_ventas_diarias").insert(filas.slice(i, i + 500)), "Guardar las ventas de Effi");
