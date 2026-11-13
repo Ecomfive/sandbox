@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { fieldClassSm } from "@/components/ui/field";
+import { anilloFoco, fieldClassSm } from "@/components/ui/field";
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { SelectorTipoProducto } from "@/components/tabla/selector-tipo-producto";
 import { useFiltros } from "@/components/tabla/ganchos";
@@ -137,6 +137,16 @@ export function ListaStock({
                   {f.variantes.map((v) => (
                     <FilaStockLista key={v.id} f={v} hijo conPlataformas={conPlataformas} plataforma={plataforma} alAbrir={() => setAbierto(v.id)} />
                   ))}
+                  {/* El principal también tiene su ficha (su stock general, sus movimientos y Corregir), por si quedó con un saldo propio, como un negativo (13 nov 2026). */}
+                  <div className="bg-muted/30 py-2 pr-4 pl-10">
+                    <button
+                      type="button"
+                      onClick={() => setAbierto(f.id)}
+                      className={`min-h-9 rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium hover:bg-muted ${anilloFoco}`}
+                    >
+                      Abrir la ficha de {f.nombre} (stock general)
+                    </button>
+                  </div>
                 </div>
               )}
             </>
