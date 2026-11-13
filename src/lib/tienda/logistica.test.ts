@@ -59,3 +59,14 @@ test("etiqueta de Monday en Pedidos (13 nov 2026): el estado del repartidor; DES
   assert.equal(etiquetaEntrega({ ...base, estado: "Impresion de guia", fuente: "siscore" }), "Servientrega: Impresion de guia");
   assert.equal(etiquetaEntrega({ ...base, estado: null }), null);
 });
+
+test("A verificar (13 nov 2026): en camino sin registro y cerrados que Monday o Servientrega contradicen; los anulados no", async () => {
+  const { razonAVerificar } = await import("./logistica");
+  assert.match(String(razonAVerificar({ estado: "en_camino", entrega: null })), /Sin registro/);
+  assert.equal(razonAVerificar({ estado: "en_camino", entrega: { grupo: "en_ruta", estado: "POSPUESTO" } }), null);
+  assert.equal(razonAVerificar({ estado: "en_camino", entrega: null, etiquetas: ["ANULADO/VERIFICADO"] }), null);
+  assert.match(String(razonAVerificar({ estado: "entregado", entrega: { grupo: "rechazado", estado: "RECHAZADO" } })), /entregado y Monday dice RECHAZADO/);
+  assert.match(String(razonAVerificar({ estado: "devuelto", entrega: { grupo: "entregado", estado: "Entregada", fuente: "siscore" } })), /devuelto y Servientrega dice Entregada/);
+  assert.equal(razonAVerificar({ estado: "devuelto", entrega: { grupo: "devuelto", estado: "DEVOLUCION ENTREGADA", fuente: "siscore" } }), null);
+  assert.equal(razonAVerificar({ estado: "confirmado", entrega: null }), null);
+});

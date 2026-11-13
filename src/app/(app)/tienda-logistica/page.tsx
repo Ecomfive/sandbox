@@ -10,7 +10,8 @@ import { revisarSiHaceFalta } from "@/lib/tienda/conectar-shopify";
 import { cargarTiendas, tiendaElegida } from "@/lib/tienda/datos";
 import { pedidosDeTiendas } from "@/lib/tienda/datos-finanzas";
 import { entregasDeOrdenes, guiasDeOrdenes } from "@/lib/tienda/entregas-monday";
-import { etapaLogistica } from "@/lib/tienda/logistica";
+import { etapaLogistica, razonAVerificar } from "@/lib/tienda/logistica";
+import type { SinPedidoMonday } from "./logistica-tienda";
 import { diaPanama } from "@/lib/tienda/resumen";
 import { LeerSiscore } from "./leer-siscore";
 import { LogisticaTienda } from "./logistica-tienda";
@@ -61,10 +62,13 @@ export default async function LogisticaTiendaPage({ searchParams }: { searchPara
     } else if (!p.transportista && p.entrega?.repartidor) p.transportista = p.entrega.repartidor;
   }
   const desde = new Date(ahoraMismo() - DIAS_CERRADOS * 86_400_000).toISOString().slice(0, 10);
+  // A verificar (13 nov 2026): lo que Monday o Servientrega no dejan asignar solo (en camino sin registro, cerrados que contradicen); van aunque sean viejos.
+  for (const p of candidatos) p.aVerificar = razonAVerificar(p);
   const activos = candidatos.filter((p) => {
     const e = etapaLogistica(p.estado);
-    return e === "por_preparar" || e === "en_ruta" || (!!p.entrega?.fecha && p.entrega.fecha >= desde);
+    return e === "por_preparar" || e === "en_ruta" || !!p.aVerificar || (!!p.entrega?.fecha && p.entrega.fecha >= desde);
   });
+  const sinPedido = await mondaySinPedido(supabase, [...new Set(miradas.map((t) => fuente.unidadDe.get(t.id)).filter((u): u is string => !!u))]);
   const ultimaSiscore = (lecturas?.[0]?.fin as string | undefined) ?? null;
   const puedeLeer = !usuario.modulosSoloLectura.includes("tienda-logistica");
   return (
@@ -88,9 +92,53 @@ export default async function LogisticaTiendaPage({ searchParams }: { searchPara
             codigoPais={pais.codigo}
             tiendas={Object.fromEntries(tiendas.map((t) => [t.id, t.nombre]))}
             hoy={diaPanama(new Date(ahoraMismo()).toISOString())}
+            sinPedido={sinPedido}
           />
         </>
       )}
     </Pagina>
   );
+}
+
+/** Cuántos días atrás se buscan filas de Monday sin pedido (por la última actualización del ítem). */
+const DIAS_SIN_PEDIDO = 45;
+
+/**
+ * Las filas de Monday de esas tiendas que no se enlazaron con ningún pedido del sistema (13 nov 2026, «A verificar»: un número mal escrito o un pedido
+ * que no entró), actualizadas en los últimos `DIAS_SIN_PEDIDO` días; una por número, la más reciente. Sin la migración, ninguna.
+ */
+async function mondaySinPedido(supabase: ReturnType<typeof createServiceClient>, unidades: string[]): Promise<SinPedidoMonday[]> {
+  if (!unidades.length) return [];
+  const desde = new Date(ahoraMismo() - DIAS_SIN_PEDIDO * 86_400_000).toISOString();
+  const [{ data, error }, { data: extra }, { data: cfg }] = await Promise.all([
+    supabase
+      .from("mon_despachos")
+      .select("numero_pedido, tablero_id, estado, estado_asesores, observaciones_asesores, courier, actualizado_monday")
+      .is("orden_id", null)
+      .in("unidad_id", unidades)
+      .gte("actualizado_monday", desde)
+      .order("actualizado_monday", { ascending: false })
+      .limit(300),
+    supabase.from("mon_tableros_extra").select("tablero_id, nombre"),
+    supabase.from("mon_config").select("tablero_id, tablero_nombre").eq("id", 1).maybeSingle(),
+  ]);
+  if (error) return [];
+  const nombres = new Map<string, string>(((extra ?? []) as { tablero_id: string; nombre: string }[]).map((t) => [t.tablero_id, t.nombre]));
+  if (cfg?.tablero_id) nombres.set(String(cfg.tablero_id), "Consolidado");
+  const vistos = new Set<string>();
+  const filas: SinPedidoMonday[] = [];
+  for (const x of (data ?? []) as Record<string, string | null>[]) {
+    const numero = (x.numero_pedido ?? "").trim();
+    if (!numero || vistos.has(numero)) continue;
+    vistos.add(numero);
+    filas.push({
+      numero,
+      tablero: nombres.get(String(x.tablero_id)) ?? String(x.tablero_id),
+      estado: [x.estado, x.estado_asesores ? `asesores: ${x.estado_asesores}` : null].filter(Boolean).join(" · ") || "sin estado",
+      nota: x.observaciones_asesores ?? null,
+      repartidor: (x.courier ?? "").replace(/\s+/g, " ").trim() || null,
+      fecha: x.actualizado_monday ? String(x.actualizado_monday).slice(0, 10) : null,
+    });
+  }
+  return filas;
 }

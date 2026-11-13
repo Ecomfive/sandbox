@@ -71,3 +71,23 @@ export function listoParaPreparar(programado: Programado | null | undefined, zon
 export function diasDesde(dia: string, hoy: string): number {
   return Math.max(0, -diasHasta(dia, hoy));
 }
+
+/**
+ * Por qué un pedido va a «A verificar» en Logística (13 nov 2026, regla de Hernán: «si en Monday dice algo, lo asignamos; si le falta asignarle, hay que
+ * verificar por qué»); null si no hay nada que verificar. Lo que Monday o Servientrega dicen se asigna solo al leerlos; aquí queda lo que no se puede:
+ * en camino sin ningún registro, o un pedido cerrado en el sistema que Monday o Servientrega contradicen. Los anulados van aparte.
+ */
+export function razonAVerificar(p: {
+  estado: EstadoPedido;
+  etiquetas?: string[] | null;
+  entrega?: { grupo: string; estado: string | null; fuente?: "monday" | "siscore" } | null;
+}): string | null {
+  if (anuladoPorEtiqueta(p.etiquetas ?? null)) return null;
+  const e = p.entrega;
+  const quien = e?.fuente === "siscore" ? "Servientrega" : "Monday";
+  if (p.estado === "en_camino" && !e) return "Sin registro en Monday ni en Servientrega: preguntar al repartidor o buscar la guía";
+  if (p.estado === "entregado" && e && (e.grupo === "rechazado" || e.grupo === "cancelado" || e.grupo === "devuelto"))
+    return `El sistema lo tiene entregado y ${quien} dice ${e.estado ?? "devuelto"}`;
+  if (p.estado === "devuelto" && e?.grupo === "entregado") return `El sistema lo tiene devuelto y ${quien} dice ${e.estado ?? "entregado"}`;
+  return null;
+}

@@ -13,7 +13,17 @@ import { columnaProgramado } from "../tienda-pedidos/columnas-extra";
 import { FichaPedido } from "../tienda-pedidos/ficha-pedido";
 import { COLUMNAS, ICONOS, NOMBRE, defPedidos, type Contexto } from "../tienda-pedidos/pedidos-tienda";
 
-type Vista = "preparar_hoy" | "preparar_despues" | "en_ruta" | "novedad" | "demorados" | "entregados" | "devueltos" | "anulados" | "sin_zona";
+type Vista = "preparar_hoy" | "preparar_despues" | "en_ruta" | "novedad" | "demorados" | "entregados" | "devueltos" | "anulados" | "sin_zona" | "verificar";
+
+/** Una fila de Monday sin pedido en el sistema («A verificar»). */
+export interface SinPedidoMonday {
+  numero: string;
+  tablero: string;
+  estado: string;
+  nota: string | null;
+  repartidor: string | null;
+  fecha: string | null;
+}
 
 /** Las columnas de Pedidos, con «Días» (desde el pedido), «Programado» y «Logística» en lugar de «Estado»; la transportista, visible. */
 function columnasLogistica(hoy: string, multiTienda: boolean): ColumnaTabla<PedidoFila, Contexto>[] {
@@ -33,6 +43,13 @@ function columnasLogistica(hoy: string, multiTienda: boolean): ColumnaTabla<Pedi
     label: "Logística",
     ocultable: true,
     render: (p) => {
+      if (p.aVerificar)
+        return (
+          <span className="inline-flex max-w-[22rem] items-center gap-1.5" title={p.aVerificar}>
+            <Pastilla tono="peligro">A verificar</Pastilla>
+            <span className="truncate text-xs text-muted-foreground">{p.aVerificar}</span>
+          </span>
+        );
       const e = etapaConEntrega(p.estado, p.entrega);
       const monday = p.entrega
         ? `${p.entrega.fuente === "siscore" ? `Servientrega${p.entrega.guia ? ` · guía ${p.entrega.guia}` : ""}` : "Monday"}: ${p.entrega.estado ?? "sin estado"}${p.entrega.fuente !== "siscore" && p.entrega.repartidor ? ` · ${p.entrega.repartidor}` : ""}${p.entrega.fecha ? ` · ${p.entrega.fecha}` : ""}${p.entrega.visitas ? ` · ${p.entrega.visitas} ${p.entrega.visitas === 1 ? "visita" : "visitas"} sin entregar` : ""}${p.entrega.causa ? ` · ${p.entrega.causa}` : ""}`
@@ -76,7 +93,19 @@ function columnasLogistica(hoy: string, multiTienda: boolean): ColumnaTabla<Pedi
  * Logística (12 nov 2026, como Mi Reto Digital, con lo que hay): tarjetas que filtran la lista —por preparar hoy (en las mañanas), programados para
  * después, en ruta por zona, demorados y sin zona— y la lista con la barra y la ficha de Pedidos. Solo lectura.
  */
-export function LogisticaTienda({ pedidos, codigoPais, tiendas, hoy }: { pedidos: PedidoFila[]; codigoPais: string; tiendas: Record<string, string>; hoy: string }) {
+export function LogisticaTienda({
+  pedidos,
+  codigoPais,
+  tiendas,
+  hoy,
+  sinPedido = [],
+}: {
+  pedidos: PedidoFila[];
+  codigoPais: string;
+  tiendas: Record<string, string>;
+  hoy: string;
+  sinPedido?: SinPedidoMonday[];
+}) {
   const router = useRouter();
   const [vista, setVista] = useState<Vista>("preparar_hoy");
   const [abierto, setAbierto] = useState<string | null>(null);
@@ -99,8 +128,10 @@ export function LogisticaTienda({ pedidos, codigoPais, tiendas, hoy }: { pedidos
       en_ruta: enRuta,
       novedad: enRuta.filter((p) => p.entrega?.novedad || (p.entrega?.visitas ?? 0) > 0),
       demorados: enRuta.filter((p) => diasDesde(diaPanama(p.creado), hoy) >= DIAS_DEMORA),
-      entregados: pedidos.filter((p) => etapaConEntrega(p.estado, p.entrega) === "entregado"),
-      devueltos: pedidos.filter((p) => etapaConEntrega(p.estado, p.entrega) === "devuelto"),
+      // Los cerrados que llegan solo para verificarlos (pueden ser viejos) no cuentan en Entregados ni Rechazados.
+      entregados: pedidos.filter((p) => etapaConEntrega(p.estado, p.entrega) === "entregado" && !p.aVerificar),
+      devueltos: pedidos.filter((p) => etapaConEntrega(p.estado, p.entrega) === "devuelto" && !p.aVerificar),
+      verificar: pedidos.filter((p) => !!p.aVerificar),
       anulados,
       sin_zona: vigentes.filter((p) => !p.provincia),
     } satisfies Record<Vista, PedidoFila[]>;
@@ -140,6 +171,7 @@ export function LogisticaTienda({ pedidos, codigoPais, tiendas, hoy }: { pedidos
     devueltos: "Ningún rechazo registrado en Monday para estos pedidos.",
     anulados: "Ningún pedido abierto con la etiqueta ANULADO/VERIFICADO.",
     sin_zona: "Todos los pedidos tienen zona.",
+    verificar: sinPedido.length ? "Ningún pedido del sistema por verificar (abajo, lo de Monday sin pedido)." : "Nada por verificar: todo lo que dice Monday y Servientrega está asignado.",
   };
 
   return (
@@ -213,6 +245,16 @@ export function LogisticaTienda({ pedidos, codigoPais, tiendas, hoy }: { pedidos
           activo={vista === "anulados"}
         />
         <Indicador
+          titulo="A verificar"
+          icono={AlertaIcon}
+          color="rojo"
+          punto={grupos.verificar.length + sinPedido.length ? "peligro" : undefined}
+          valor={num(grupos.verificar.length + sinPedido.length)}
+          detalle={`${num(grupos.verificar.length)} pedidos · ${num(sinPedido.length)} de Monday sin pedido`}
+          alPulsar={() => alternar("verificar")}
+          activo={vista === "verificar"}
+        />
+        <Indicador
           titulo="Sin zona"
           icono={AlertaIcon}
           color="ambar"
@@ -230,6 +272,14 @@ export function LogisticaTienda({ pedidos, codigoPais, tiendas, hoy }: { pedidos
         etiqueta (CIUDAD, INTERIOR/SERVIENTREGA) y la fecha programada, de la nota del pedido. Los etiquetados ANULADO/VERIFICADO (o Cancelado) no se
         preparan: van aparte en «Anulados» (mal etiquetados, dirección por mejorar, sin stock o reprogramados) y no cuentan en ruta.
       </p>
+
+      {vista === "verificar" && (
+        <p role="note" className="m-0 rounded-lg border border-primario/30 bg-primario-suave px-4 py-2 text-xs">
+          Lo que Monday y Servientrega dicen se asigna solo en cada lectura. Aquí queda lo que no se pudo asignar y hay que averiguar por qué: pedidos en
+          camino sin ningún registro, pedidos cerrados que Monday o Servientrega contradicen (el motivo sale en la columna Logística) y filas de Monday
+          que no tienen pedido en el sistema.
+        </p>
+      )}
 
       <TablaDatos
         def={def}
@@ -255,6 +305,39 @@ export function LogisticaTienda({ pedidos, codigoPais, tiendas, hoy }: { pedidos
         encabezadoMayusculas
         vacio={VACIO[vista]}
       />
+
+      {vista === "verificar" && sinPedido.length > 0 && (
+        <section aria-label="Filas de Monday sin pedido" className="flex flex-col gap-2">
+          <h3 className="m-0 text-sm font-semibold">En Monday sin pedido en el sistema ({num(sinPedido.length)})</h3>
+          <p className="m-0 text-xs text-muted-foreground">Un número mal escrito en Monday o un pedido que no entró al sistema: buscarlo en Shopify o corregirlo en Monday.</p>
+          <div className="overflow-x-auto rounded-lg border border-border">
+            <table className="w-full min-w-[40rem] text-sm">
+              <thead className="bg-muted text-left text-xs uppercase text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-2 font-medium">Pedido en Monday</th>
+                  <th className="px-3 py-2 font-medium">Tablero</th>
+                  <th className="px-3 py-2 font-medium">Estado</th>
+                  <th className="px-3 py-2 font-medium">Repartidor</th>
+                  <th className="px-3 py-2 font-medium">Nota</th>
+                  <th className="px-3 py-2 font-medium">Actualizado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sinPedido.map((f) => (
+                  <tr key={`${f.tablero}-${f.numero}`} className="border-t border-border">
+                    <td className="px-3 py-2 font-medium tabular-nums">{f.numero}</td>
+                    <td className="px-3 py-2">{f.tablero}</td>
+                    <td className="px-3 py-2">{f.estado}</td>
+                    <td className="px-3 py-2">{f.repartidor ?? "—"}</td>
+                    <td className="px-3 py-2 text-muted-foreground">{f.nota ?? "—"}</td>
+                    <td className="px-3 py-2 tabular-nums whitespace-nowrap">{f.fecha ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       <FichaPedido
         id={abierto}

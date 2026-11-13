@@ -96,6 +96,8 @@ export interface PedidoFila extends PedidoResumen {
   programado?: Programado | null;
   /** La entrega registrada en Monday (ciudad) o SISCORE (interior), si la hay: en Logística (12 nov 2026) y, para los en camino, en Pedidos (13 nov 2026). */
   entrega?: EntregaMonday | null;
+  /** Logística (13 nov 2026): por qué hay que verificar el pedido (`razonAVerificar`); sin el campo, nada. */
+  aVerificar?: string | null;
   tiendaId: string;
   numero: string;
   cliente: string | null;

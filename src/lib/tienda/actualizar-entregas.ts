@@ -43,7 +43,7 @@ export interface DatoGuia {
 }
 
 export interface CambioEntrega {
-  fase: "entregada" | "devuelta";
+  fase: "entregada" | "devuelta" | "cancelada";
   fuente: "monday" | "servientrega";
   /** Las columnas de `ven_ordenes` que cambian. */
   set: Record<string, unknown>;
@@ -59,7 +59,22 @@ const mediodia = (dia: string | null): string | null => (dia && /^\d{4}-\d{2}-\d
  * `mesesCerrados` son los periodos «AAAA-MM» cerrados en Finanzas.
  */
 export function cambioDeEntrega(o: OrdenParaEntrega, monday: DatoMonday | null, guia: DatoGuia | null, mesesCerrados: Set<string>): CambioEntrega | null {
-  if (o.fase !== "despachada" || o.congelada) return null;
+  const cerrado = cambioCerrado(o, monday, guia, mesesCerrados);
+  if (!cerrado || o.fase === "despachada") return cerrado;
+  // Sin despachar en el sistema (por confirmar o confirmada) y Monday o Servientrega ya lo cerraron (Hernán, 13 nov 2026: «si en Monday dice algo, lo
+  // asignamos»): entregado pasa a entregada; devuelto o rechazado (DESINTEGRADO/RECHAZADO de los asesores) se cancela, porque nunca se confirmó.
+  if (cerrado.fase === "entregada") return { ...cerrado, detalle: `${cerrado.detalle} (estaba ${FASE_TEXTO[o.fase ?? ""] ?? o.fase})` };
+  const set: Record<string, unknown> = { fase: "cancelada", motivo_cancelacion: cerrado.set.motivo_cancelacion, cod_esperado: null };
+  if (cerrado.set.transportista && !o.transportista) set.transportista = cerrado.set.transportista;
+  return { fase: "cancelada", fuente: cerrado.fuente, set, detalle: `${cerrado.detalle} (estaba ${FASE_TEXTO[o.fase ?? ""] ?? o.fase}: se cancela)` };
+}
+
+/** Las fases que Monday o Servientrega pueden cerrar: la despachada y la que todavía no se despachó en el sistema. */
+export const FASES_ABIERTAS = ["despachada", "por_confirmar", "confirmada"] as const;
+const FASE_TEXTO: Record<string, string> = { por_confirmar: "por confirmar", confirmada: "confirmada" };
+
+function cambioCerrado(o: OrdenParaEntrega, monday: DatoMonday | null, guia: DatoGuia | null, mesesCerrados: Set<string>): CambioEntrega | null {
+  if (!(FASES_ABIERTAS as readonly string[]).includes(o.fase ?? "") || o.congelada) return null;
   if (mesesCerrados.has(String(o.fecha).slice(0, 7))) return null;
   const cod = Number(o.cod_esperado ?? 0) > 0;
   if (guia && (guia.estado_grupo === "entregado" || guia.estado_grupo === "devuelto")) {
@@ -100,8 +115,13 @@ export function cambioDeEntrega(o: OrdenParaEntrega, monday: DatoMonday | null, 
 export async function actualizarEntregas(supabase: SupabaseClient, quien = "Sistema"): Promise<{ entregadas: number; devueltas: number; resumen: string }> {
   const ordenes: OrdenParaEntrega[] = [];
   for (let d = 0; ; d += 1000) {
-    const { data, error } = await supabase.from("ven_ordenes").select("id, numero, fase, fecha, congelada, cod_esperado, transportista, guia").eq("fase", "despachada").order("id").range(d, d + 999);
-    if (error) throw new Error(`Órdenes despachadas: ${error.message}`);
+    const { data, error } = await supabase
+      .from("ven_ordenes")
+      .select("id, numero, fase, fecha, congelada, cod_esperado, transportista, guia")
+      .in("fase", [...FASES_ABIERTAS])
+      .order("id")
+      .range(d, d + 999);
+    if (error) throw new Error(`Órdenes abiertas: ${error.message}`);
     ordenes.push(...((data ?? []) as OrdenParaEntrega[]));
     if ((data ?? []).length < 1000) break;
   }
@@ -155,19 +175,21 @@ export async function actualizarEntregas(supabase: SupabaseClient, quien = "Sist
 
   let entregadas = 0;
   let devueltas = 0;
+  let canceladas = 0;
   const ahora = new Date().toISOString();
   for (const o of ordenes) {
     const c = cambioDeEntrega(o, monday.get(o.id) ?? null, guias.get(o.id) ?? null, cerrados);
     if (!c) continue;
-    const { data: hecho, error } = await supabase.from("ven_ordenes").update({ ...c.set, actualizado_en: ahora }).eq("id", o.id).eq("fase", "despachada").select("id");
+    const { data: hecho, error } = await supabase.from("ven_ordenes").update({ ...c.set, actualizado_en: ahora }).eq("id", o.id).eq("fase", String(o.fase)).select("id");
     if (error) throw new Error(`Orden ${o.numero}: ${error.message}`);
     if (!hecho?.length) continue;
-    await supabase.from("ven_orden_eventos").insert({ orden_id: o.id, tipo: "fase", fase_antes: "despachada", fase_despues: c.fase, detalle: c.detalle, usuario: c.fuente === "monday" ? "Monday (entregas de ciudad)" : "Servientrega (SISCORE)" });
+    await supabase.from("ven_orden_eventos").insert({ orden_id: o.id, tipo: "fase", fase_antes: o.fase, fase_despues: c.fase, detalle: c.detalle, usuario: c.fuente === "monday" ? "Monday (entregas de ciudad)" : "Servientrega (SISCORE)" });
     if (c.fase === "entregada") entregadas++;
+    else if (c.fase === "cancelada") canceladas++;
     else devueltas++;
   }
-  const resumen = `${entregadas} órdenes pasaron a entregadas y ${devueltas} a devueltas según Monday y Servientrega.`;
-  if (entregadas + devueltas > 0)
+  const resumen = `${entregadas} órdenes pasaron a entregadas y ${devueltas} a devueltas según Monday y Servientrega.${canceladas ? ` ${canceladas} sin despachar se cancelaron (Monday las cerró).` : ""}`;
+  if (entregadas + devueltas + canceladas > 0)
     await supabase.from("historial_auditoria").insert({ usuario_nombre: quien, accion: "entregas_monday_servientrega", entidad: "ven_ordenes", entidad_id: null, detalle: resumen });
   return { entregadas, devueltas, resumen };
 }

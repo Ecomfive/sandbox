@@ -41,7 +41,6 @@ test("Servientrega devuelta; en ruta o con novedad no cambia nada, aunque Monday
 
 test("solo órdenes despachadas, sin congelar y de un mes abierto", () => {
   assert.equal(cambioDeEntrega(orden({ fase: "entregada" }), monday(), null, nada), null);
-  assert.equal(cambioDeEntrega(orden({ fase: "confirmada" }), monday(), null, nada), null);
   assert.equal(cambioDeEntrega(orden({ congelada: true }), monday(), null, nada), null);
   assert.equal(cambioDeEntrega(orden(), monday(), null, new Set(["2026-10"])), null);
   assert.equal(cambioDeEntrega(orden(), monday({ estado_grupo: "en_ruta" }), null, nada), null);
@@ -65,4 +64,19 @@ test("DESINTEGRADO de los asesores (13 nov 2026): devuelta, con lo que anotaron 
   assert.equal(c?.fase, "devuelta");
   assert.equal(c?.set.motivo_cancelacion, "Monday · asesores: DESINTEGRADO (3er msj sin respuesta) · repartidor: POSPUESTO (no contesta)");
   assert.equal(c?.set.fecha_devolucion, "2026-11-09");
+});
+
+test("sin despachar en el sistema (13 nov 2026, «si en Monday dice algo, lo asignamos»): ENTREGADO pasa a entregada; DESINTEGRADO o RECHAZADO, cancelada", () => {
+  const e = cambioDeEntrega(orden({ fase: "por_confirmar" }), monday(), null, nada);
+  assert.equal(e?.fase, "entregada");
+  assert.match(String(e?.detalle), /estaba por confirmar/);
+  assert.equal(cambioDeEntrega(orden({ fase: "confirmada" }), monday(), null, nada)?.fase, "entregada");
+  const c = cambioDeEntrega(orden({ fase: "por_confirmar" }), monday({ estado_grupo: "rechazado", estado: "POSPUESTO", estado_asesores: "DESINTEGRADO", observaciones_asesores: "sin respuesta" }), null, nada);
+  assert.equal(c?.fase, "cancelada");
+  assert.equal(c?.set.fase, "cancelada");
+  assert.match(String(c?.set.motivo_cancelacion), /asesores: DESINTEGRADO \(sin respuesta\)/);
+  assert.equal(c?.set.fecha_devolucion, undefined);
+  assert.equal(cambioDeEntrega(orden({ fase: "por_confirmar" }), monday({ estado_grupo: "en_ruta" }), null, nada), null, "en ruta no cambia nada");
+  assert.equal(cambioDeEntrega(orden({ fase: "cancelada" }), monday(), null, nada), null, "lo cancelado no se toca");
+  assert.equal(cambioDeEntrega(orden({ fase: "devuelta" }), monday(), null, nada), null, "lo devuelto no se toca (va a «A verificar»)");
 });
