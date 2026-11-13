@@ -7,13 +7,13 @@ import { TablaDatos, type ColumnaTabla } from "@/components/tabla/tabla-datos";
 import { formatearMoneda } from "@/lib/formato";
 import { AlertaIcon, CalendarioIcon, CerrarIcon, CheckIcon, EnvioIcon, InventarioIcon } from "@/lib/nav-icons";
 import type { PedidoFila } from "@/lib/tienda/datos";
-import { DIAS_DEMORA, diasDesde, etapaConEntrega, etapaLogistica, listoParaPreparar } from "@/lib/tienda/logistica";
+import { DIAS_DEMORA, anuladoPorEtiqueta, diasDesde, etapaConEntrega, etapaLogistica, listoParaPreparar } from "@/lib/tienda/logistica";
 import { diaPanama } from "@/lib/tienda/resumen";
 import { columnaProgramado } from "../tienda-pedidos/columnas-extra";
 import { FichaPedido } from "../tienda-pedidos/ficha-pedido";
 import { COLUMNAS, ICONOS, NOMBRE, defPedidos, type Contexto } from "../tienda-pedidos/pedidos-tienda";
 
-type Vista = "preparar_hoy" | "preparar_despues" | "en_ruta" | "novedad" | "demorados" | "entregados" | "devueltos" | "sin_zona";
+type Vista = "preparar_hoy" | "preparar_despues" | "en_ruta" | "novedad" | "demorados" | "entregados" | "devueltos" | "anulados" | "sin_zona";
 
 /** Las columnas de Pedidos, con «Días» (desde el pedido), «Programado» y «Logística» en lugar de «Estado»; la transportista, visible. */
 function columnasLogistica(hoy: string, multiTienda: boolean): ColumnaTabla<PedidoFila, Contexto>[] {
@@ -49,6 +49,12 @@ function columnasLogistica(hoy: string, multiTienda: boolean): ColumnaTabla<Pedi
             <Pastilla tono="peligro">Rechazado</Pastilla>
           </span>
         );
+      if (anuladoPorEtiqueta(p.etiquetas))
+        return (
+          <span title={monday ?? "Etiqueta ANULADO/VERIFICADO o Cancelado: no se prepara y se procede a cancelar."}>
+            <Pastilla tono="neutro">Anulado</Pastilla>
+          </span>
+        );
       return etapaLogistica(p.estado) === "en_ruta" ? (
         <span title={monday}>
           <Pastilla tono={p.entrega?.novedad ? "aviso" : undefined}>{p.entrega?.estado ? `En ruta · ${p.entrega.estado.toLowerCase()}` : "En ruta"}</Pastilla>
@@ -78,8 +84,15 @@ export function LogisticaTienda({ pedidos, codigoPais, tiendas, hoy }: { pedidos
   const multiTienda = Object.keys(tiendas).length > 1;
 
   const grupos = useMemo(() => {
-    const porPreparar = pedidos.filter((p) => etapaLogistica(p.estado) === "por_preparar");
-    const enRuta = pedidos.filter((p) => etapaConEntrega(p.estado, p.entrega) === "en_ruta");
+    // Los que el equipo etiquetó ANULADO/VERIFICADO (o Cancelado) no se preparan ni van en ruta: aparte, salvo que Monday o Servientrega registren la entrega.
+    const abiertos = pedidos.filter((p) => {
+      const e = etapaConEntrega(p.estado, p.entrega);
+      return e === "por_preparar" || e === "en_ruta";
+    });
+    const anulados = abiertos.filter((p) => anuladoPorEtiqueta(p.etiquetas));
+    const vigentes = abiertos.filter((p) => !anuladoPorEtiqueta(p.etiquetas));
+    const porPreparar = vigentes.filter((p) => etapaLogistica(p.estado) === "por_preparar");
+    const enRuta = vigentes.filter((p) => etapaConEntrega(p.estado, p.entrega) === "en_ruta");
     return {
       preparar_hoy: porPreparar.filter((p) => listoParaPreparar(p.programado, p.provincia, hoy)),
       preparar_despues: porPreparar.filter((p) => !listoParaPreparar(p.programado, p.provincia, hoy)).sort((a, b) => a.programado!.fecha.localeCompare(b.programado!.fecha)),
@@ -88,7 +101,8 @@ export function LogisticaTienda({ pedidos, codigoPais, tiendas, hoy }: { pedidos
       demorados: enRuta.filter((p) => diasDesde(diaPanama(p.creado), hoy) >= DIAS_DEMORA),
       entregados: pedidos.filter((p) => etapaConEntrega(p.estado, p.entrega) === "entregado"),
       devueltos: pedidos.filter((p) => etapaConEntrega(p.estado, p.entrega) === "devuelto"),
-      sin_zona: pedidos.filter((p) => !p.provincia && etapaConEntrega(p.estado, p.entrega) !== "entregado"),
+      anulados,
+      sin_zona: vigentes.filter((p) => !p.provincia),
     } satisfies Record<Vista, PedidoFila[]>;
   }, [pedidos, hoy]);
   const zonas = (ps: PedidoFila[]) => {
@@ -124,6 +138,7 @@ export function LogisticaTienda({ pedidos, codigoPais, tiendas, hoy }: { pedidos
     novedad: "Ningún pedido en ruta con visitas sin entregar.",
     entregados: "Ninguna entrega registrada en Monday para estos pedidos.",
     devueltos: "Ningún rechazo registrado en Monday para estos pedidos.",
+    anulados: "Ningún pedido abierto con la etiqueta ANULADO/VERIFICADO.",
     sin_zona: "Todos los pedidos tienen zona.",
   };
 
@@ -189,6 +204,15 @@ export function LogisticaTienda({ pedidos, codigoPais, tiendas, hoy }: { pedidos
           activo={vista === "devueltos"}
         />
         <Indicador
+          titulo="Anulados"
+          icono={CerrarIcon}
+          color="ambar"
+          valor={num(grupos.anulados.length)}
+          detalle="ANULADO/VERIFICADO: no se preparan, por cancelar"
+          alPulsar={() => alternar("anulados")}
+          activo={vista === "anulados"}
+        />
+        <Indicador
           titulo="Sin zona"
           icono={AlertaIcon}
           color="ambar"
@@ -203,7 +227,8 @@ export function LogisticaTienda({ pedidos, codigoPais, tiendas, hoy }: { pedidos
         Shopify no trae la guía, la fecha de despacho ni si el pedido se entregó: lo de ciudad se completa con Monday (entregado, rechazado y el
         repartidor); lo de interior, con la guía de Servientrega leída de SISCORE («Actualizar Servientrega»: estado, visitas sin entregar y
         devoluciones). Los días se cuentan desde el pedido. La zona y la transportista salen de la
-        etiqueta (CIUDAD, INTERIOR/SERVIENTREGA) y la fecha programada, de la nota del pedido.
+        etiqueta (CIUDAD, INTERIOR/SERVIENTREGA) y la fecha programada, de la nota del pedido. Los etiquetados ANULADO/VERIFICADO (o Cancelado) no se
+        preparan: van aparte en «Anulados» (mal etiquetados, dirección por mejorar, sin stock o reprogramados) y no cuentan en ruta.
       </p>
 
       <TablaDatos

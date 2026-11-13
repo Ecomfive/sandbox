@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { diasDesde, etapaConEntrega, etapaLogistica, listoParaPreparar, transportistaDe } from "./logistica";
+import { anuladoPorEtiqueta, diasDesde, etapaConEntrega, etapaLogistica, listoParaPreparar, transportistaDe } from "./logistica";
 
 test("etapa de logística", () => {
   assert.equal(etapaLogistica("confirmado"), "por_preparar");
@@ -36,4 +36,13 @@ test("etapa con la entrega de Monday", () => {
   assert.equal(etapaConEntrega("en_camino", null), "en_ruta");
   // Monday no cambia lo que todavía no sale.
   assert.equal(etapaConEntrega("confirmado", { grupo: "entregado" }), "por_preparar");
+});
+
+test("anulado por la etiqueta del equipo", () => {
+  assert.equal(anuladoPorEtiqueta(["ANULADO/VERIFICADO", "CIUDAD", "easysell_cod_form"]), true);
+  assert.equal(anuladoPorEtiqueta("Cancelado, CIUDAD, easysell_cod_form"), true);
+  assert.equal(anuladoPorEtiqueta(["anulado"]), true);
+  assert.equal(anuladoPorEtiqueta(["CIUDAD", "Confirmada", "easysell_cod_form"]), false);
+  assert.equal(anuladoPorEtiqueta(["Carrito recuperado", "easysell-abandoned-checkout"]), false);
+  assert.equal(anuladoPorEtiqueta(null), false);
 });
