@@ -7,8 +7,10 @@ import type { IconoComp } from "@/components/tabla/botones-vista";
 import { SelectorTipoProducto } from "@/components/tabla/selector-tipo-producto";
 import { useFiltros } from "@/components/tabla/ganchos";
 import { ListaDatos } from "@/components/tabla/lista-datos";
+import { BotonOrdenVariantes, useOrdenVariantes } from "@/components/ui/orden-variantes";
 import { InventarioIcon, ProductoIcon } from "@/lib/nav-icons";
 import type { NombreFilas } from "@/lib/tabla/pie";
+import { ordenarVariantes } from "@/lib/wms/orden-variantes";
 import { conStockPrimero } from "@/lib/wms/total-stock";
 import { formatearTiempoRelativo } from "@/lib/formato";
 import { ETIQUETA_PLATAFORMA, lecturaVieja, type LecturasPlataformas, type Plataforma } from "@/lib/wms/stock-plataformas";
@@ -96,6 +98,7 @@ export function ListaStock({
   esAdmin: boolean;
 }) {
   const router = useRouter();
+  const { descendente } = useOrdenVariantes();
   // `?abrir=<producto>`: el enlace de los avisos de una nota (@mención o respuesta) abre su ficha.
   const abrir = useSearchParams().get("abrir");
   const [abierto, setAbierto] = useState<string | null>(abrir);
@@ -134,11 +137,11 @@ export function ListaStock({
               <FilaStockLista f={f} conPlataformas={conPlataformas} plataforma={plataforma} abierto={desplegados.has(f.id)} alAbrir={() => alternar(f.id)} />
               {desplegados.has(f.id) && (
                 <div className="divide-y divide-border border-t border-border">
-                  {f.variantes.map((v) => (
+                  {ordenarVariantes(f.variantes, descendente).map((v) => (
                     <FilaStockLista key={v.id} f={v} hijo conPlataformas={conPlataformas} plataforma={plataforma} alAbrir={() => setAbierto(v.id)} />
                   ))}
                   {/* El principal también tiene su ficha (su stock general, sus movimientos y Corregir), por si quedó con un saldo propio, como un negativo (13 nov 2026). */}
-                  <div className="bg-muted/30 py-2 pr-4 pl-10">
+                  <div className="flex items-center justify-between gap-3 bg-muted/30 py-2 pr-4 pl-10">
                     <button
                       type="button"
                       onClick={() => setAbierto(f.id)}
@@ -146,6 +149,7 @@ export function ListaStock({
                     >
                       Abrir la ficha de {f.nombre} (stock general)
                     </button>
+                    <BotonOrdenVariantes />
                   </div>
                 </div>
               )}

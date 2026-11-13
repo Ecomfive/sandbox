@@ -23,6 +23,8 @@ import { ImportarLista } from "./importar-lista";
 import { LineasCajas, unidadesFormulario, type LineaCajasForm, type UbicacionConteo } from "./lineas-cajas";
 import { CAJAS_ACTIVAS } from "@/lib/wms/cajas";
 import { codigoLote, PEDIR_CODIGO_LOTE } from "@/lib/wms/vencimiento";
+import { ordenarVariantes } from "@/lib/wms/orden-variantes";
+import { BotonOrdenVariantes, useOrdenVariantes } from "@/components/ui/orden-variantes";
 
 export interface ProductoConteo {
   id: string;
@@ -141,6 +143,7 @@ export function Levantamiento({
   const [ficha, setFicha] = useState<string | null>(null);
   // Los productos con variantes que están desplegados (se cuentan las variantes, no el principal).
   const [abiertos, setAbiertos] = useState<Set<string>>(new Set());
+  const { descendente } = useOrdenVariantes();
   // Los colores desplegados dentro de un producto («idPrincipal|Azul»): nacen plegados (11 nov 2026, pedido de Hernán).
   const [coloresAbiertos, setColoresAbiertos] = useState<Set<string>>(new Set());
   const alternar = (set: (f: (x: Set<string>) => Set<string>) => void, clave: string) =>
@@ -765,11 +768,12 @@ export function Levantamiento({
                             {conCantidad > 0 ? ` · ${conCantidad} con cantidad` : ""}
                           </span>
                         </span>
+                        {abierto && <BotonOrdenVariantes className="ml-auto" />}
                       </div>
                     </td>
                   </tr>
                   {abierto &&
-                    porColor(g.hijos).map((c) => {
+                    porColor(ordenarVariantes(g.hijos, descendente)).map((c) => {
                       if (!c.color) return c.hijos.map((h) => filaDe(h, true));
                       const clave = `${g.padre.id}|${c.color}`;
                       const colorAbierto = coloresAbiertos.has(clave);

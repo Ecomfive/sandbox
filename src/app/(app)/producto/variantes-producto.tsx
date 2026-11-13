@@ -1,6 +1,9 @@
 "use client";
 
 import { primeroLibre, sugerirSkuVariante } from "@/lib/wms/sugerir-sku";
+import { ordenarVariantes } from "@/lib/wms/orden-variantes";
+import { etiquetaTalla } from "@/lib/wms/talla";
+import { BotonOrdenVariantes, useOrdenVariantes } from "@/components/ui/orden-variantes";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { BotonBarra } from "@/components/panel/piezas-panel";
 import { anilloFoco, fieldClassSm } from "@/components/ui/field";
@@ -15,7 +18,7 @@ import { SkuProducto } from "./sku-producto";
 
 const MAX_OPCIONES = 3;
 const separar = (t: string) => [...new Set(t.split(",").map((v) => v.trim().replace(/\s+/g, " ")).filter(Boolean))];
-const textoOpciones = (o: Record<string, string>) => Object.values(o).join(" / ");
+const textoOpciones = (o: Record<string, string>) => etiquetaTalla(Object.values(o).join(" / "));
 
 /** Todas las combinaciones de los valores de las opciones, en orden (Beige/S, Beige/M… Negro/S…). */
 function combinaciones(opciones: OpcionVariante[]): Record<string, string>[] {
@@ -193,6 +196,7 @@ export function VariantesProducto({ producto, puedeEscribir, alAbrir }: { produc
   const [editando, setEditando] = useState(false);
   const [abierta, setAbierta] = useState<string | null>(null);
   const [pendiente, start] = useTransition();
+  const { descendente } = useOrdenVariantes();
 
   if (producto.padre) {
     return (
@@ -206,7 +210,7 @@ export function VariantesProducto({ producto, puedeEscribir, alAbrir }: { produc
         {producto.opciones && (
           <p className="m-0 text-xs text-muted-foreground">
             {Object.entries(producto.opciones)
-              .map(([k, v]) => `${k}: ${v}`)
+              .map(([k, v]) => `${k}: ${etiquetaTalla(v)}`)
               .join(" · ")}
           </p>
         )}
@@ -234,12 +238,15 @@ export function VariantesProducto({ producto, puedeEscribir, alAbrir }: { produc
         <p className="m-0 text-sm text-muted-foreground">Sin variantes. Si se vende en colores, tallas u otras opciones, agrégalas: cada una lleva su propio stock.</p>
       ) : (
         <>
-          <p className="m-0 text-xs text-muted-foreground">
-            {producto.opcionesVariantes.map((o) => `${o.nombre}: ${o.valores.join(", ")}`).join(" · ")} — {producto.repartoPendiente ? "el stock está como general, todavía sin repartir." : "el stock se lleva en cada variante."}
-          </p>
+          <div className="flex items-start justify-between gap-3">
+            <p className="m-0 text-xs text-muted-foreground">
+              {producto.opcionesVariantes.map((o) => `${o.nombre}: ${etiquetaTalla(o.valores.join(", "))}`).join(" · ")} — {producto.repartoPendiente ? "el stock está como general, todavía sin repartir." : "el stock se lleva en cada variante."}
+            </p>
+            <BotonOrdenVariantes />
+          </div>
           <RepartoStock id={producto.id} codigo={producto.codigo} pendiente={!!producto.repartoPendiente} puedeEscribir={puedeEscribir} />
           <ul className="m-0 flex list-none flex-col gap-1 p-0 text-sm">
-            {producto.variantes.map((v) => {
+            {ordenarVariantes(producto.variantes, descendente).map((v) => {
               const esta = abierta === v.id;
               // Sin foto propia, la variante muestra la de su producto principal.
               const foto = v.foto ?? producto.foto;
