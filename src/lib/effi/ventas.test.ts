@@ -2,17 +2,23 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { ventanaVentas, ventasPorDia } from "./ventas";
 
-const fila = (articulo: string, cantidad: string, fecha: string, extra: Record<string, unknown> = {}) => ({ articulo, cantidad, fecha_trans: fecha, vigente: "1", nombre_bodega: "Principal", ...extra });
+const fila = (articulo: string, cantidad: string, fecha: string, extra: Record<string, unknown> = {}) => ({ id_remision_v: "100", articulo, cantidad, fecha_trans: fecha, vigente: "1", nombre_bodega: "Principal", ...extra });
 
-test("junta remisiones y devoluciones por artículo y día", () => {
+test("junta las remisiones por artículo y día, y cada devolución resta en el día de su remisión", () => {
   const r = ventasPorDia(
-    [fila("42", "2.000", "2026-11-07 08:30:22"), fila("42", "1.000", "2026-11-07 09:00:00"), fila("7", "1.000", "2026-11-06 23:59:00")],
-    [fila("42", "1.000", "2026-11-07 10:00:00")],
+    [fila("42", "2.000", "2026-11-07 08:30:22", { id_remision_v: "500" }), fila("42", "1.000", "2026-11-07 09:00:00", { id_remision_v: "501" }), fila("7", "1.000", "2026-11-06 23:59:00", { id_remision_v: "499" })],
+    // La devolución de la remisión 500 se hizo semanas después: cuenta el 7 de noviembre, no el día en que se hizo.
+    [fila("42", "1.000", "2026-11-28 10:00:00", { id_remision_v: "500" })],
   );
   assert.deepEqual(r, [
     { productoId: "7", dia: "2026-11-06", salidas: 1, devueltas: 0 },
     { productoId: "42", dia: "2026-11-07", salidas: 3, devueltas: 1 },
   ]);
+});
+
+test("una devolución de una remisión que no está entre las leídas (de antes de la ventana) no cuenta", () => {
+  const r = ventasPorDia([fila("42", "3", "2026-11-07", { id_remision_v: "500" })], [fila("42", "5", "2026-11-08", { id_remision_v: "12" }), fila("42", "1", "2026-11-08", { id_remision_v: "" })]);
+  assert.deepEqual(r, [{ productoId: "42", dia: "2026-11-07", salidas: 3, devueltas: 0 }]);
 });
 
 test("no cuenta lo anulado, lo de bodegas de dropshippers ni lo que viene incompleto", () => {
@@ -27,7 +33,7 @@ test("no cuenta lo anulado, lo de bodegas de dropshippers ni lo que viene incomp
       fila("1", "5", "ayer"),
       fila("1", "2", "2026-11-07", { nombre_bodega: " PRINCIPAL " }),
     ],
-    [],
+    [fila("1", "1", "2026-11-09", { vigente: "0" }), fila("1", "1", "2026-11-09", { nombre_bodega: "Saint Digital" })],
   );
   assert.deepEqual(r, [{ productoId: "1", dia: "2026-11-07", salidas: 2, devueltas: 0 }]);
 });

@@ -4,8 +4,15 @@
  * la bodega Principal: las bodegas con nombre de tienda son de cada dropshipper. Sin base ni red, con prueba.
  */
 
-/** Cuántos días hacia atrás se vuelven a leer en cada lectura: cubre el corte y lo que se anule o devuelva tarde. */
-export const DIAS_VENTAS_EFFI = 45;
+/**
+ * Cuántos días hacia atrás se vuelven a leer en cada lectura (13 nov 2026, pedido de Hernán: «la primera corrida trae todo el historial, después solo los
+ * últimos 30 días»). Una devolución se cuenta en el día de su remisión: lo de los últimos 30 días se rehace entero, con sus devoluciones aunque lleguen
+ * después; un día más viejo queda como estaba.
+ */
+export const DIAS_VENTAS_EFFI = 30;
+
+/** Desde cuándo se lee en la primera corrida (todo el historial de la cuenta de Effi). */
+export const INICIO_VENTAS_EFFI = "2026-01-01";
 
 /** La bodega nuestra en Effi, la misma de `stock_principal`. */
 const BODEGA_NUESTRA = "principal";
@@ -18,6 +25,8 @@ const sinTildes = (s: string) =>
     .trim();
 
 export interface FilaDetalleEffi {
+  /** La remisión de la fila; en una devolución, la remisión a la que se abona (`id_remision_v`). */
+  id_remision_v?: unknown;
   articulo?: unknown;
   cantidad?: unknown;
   fecha_trans?: unknown;
@@ -34,23 +43,42 @@ export interface VentaEffiDia {
 
 const FECHA = /^(\d{4}-\d{2}-\d{2})/;
 
-/** Junta las filas de remisiones y devoluciones por artículo y día. Una anulada no cuenta, ni una de otra bodega, ni una sin artículo, fecha o cantidad. */
+const idDe = (v: unknown) => (typeof v === "string" || typeof v === "number" ? String(v).trim() : "");
+
+/**
+ * Junta las filas de remisiones y devoluciones por artículo y día. La devolución se cuenta en el **día de su remisión** (13 nov 2026): en Effi un pedido de
+ * dropshipper es una remisión y, si no se concreta, se le abona una devolución días o semanas después, en tandas; contada en su propio día, una ventana de
+ * fechas mezclaba devoluciones de pedidos de antes y daba casi tanto devuelto como salido. Una devolución sin su remisión entre las leídas no cuenta. Una
+ * anulada no cuenta, ni una de otra bodega, ni una sin artículo, fecha o cantidad.
+ */
 export function ventasPorDia(remisiones: readonly FilaDetalleEffi[], devoluciones: readonly FilaDetalleEffi[]): VentaEffiDia[] {
   const porClave = new Map<string, VentaEffiDia>();
-  const sumar = (f: FilaDetalleEffi, campo: "salidas" | "devueltas") => {
-    if (String(f.vigente ?? "") !== "1") return;
-    if (typeof f.nombre_bodega !== "string" || sinTildes(f.nombre_bodega) !== BODEGA_NUESTRA) return;
-    const productoId = typeof f.articulo === "string" || typeof f.articulo === "number" ? String(f.articulo).trim() : "";
-    const dia = typeof f.fecha_trans === "string" ? FECHA.exec(f.fecha_trans)?.[1] : undefined;
-    const cantidad = Math.round(Number(f.cantidad));
-    if (!productoId || !dia || !Number.isFinite(cantidad) || cantidad <= 0) return;
+  const diaDeRemision = new Map<string, string>();
+  const valida = (f: FilaDetalleEffi) => String(f.vigente ?? "") === "1" && typeof f.nombre_bodega === "string" && sinTildes(f.nombre_bodega) === BODEGA_NUESTRA;
+  const sumar = (productoId: string, dia: string, cantidad: number, campo: "salidas" | "devueltas") => {
     const clave = `${productoId}|${dia}`;
     const v = porClave.get(clave) ?? { productoId, dia, salidas: 0, devueltas: 0 };
     v[campo] += cantidad;
     porClave.set(clave, v);
   };
-  for (const r of remisiones) sumar(r, "salidas");
-  for (const d of devoluciones) sumar(d, "devueltas");
+  for (const r of remisiones) {
+    if (!valida(r)) continue;
+    const productoId = idDe(r.articulo);
+    const dia = typeof r.fecha_trans === "string" ? FECHA.exec(r.fecha_trans)?.[1] : undefined;
+    const cantidad = Math.round(Number(r.cantidad));
+    if (!productoId || !dia || !Number.isFinite(cantidad) || cantidad <= 0) continue;
+    const remision = idDe(r.id_remision_v);
+    if (remision) diaDeRemision.set(remision, dia);
+    sumar(productoId, dia, cantidad, "salidas");
+  }
+  for (const d of devoluciones) {
+    if (!valida(d)) continue;
+    const productoId = idDe(d.articulo);
+    const dia = diaDeRemision.get(idDe(d.id_remision_v));
+    const cantidad = Math.round(Number(d.cantidad));
+    if (!productoId || !dia || !Number.isFinite(cantidad) || cantidad <= 0) continue;
+    sumar(productoId, dia, cantidad, "devueltas");
+  }
   return [...porClave.values()].sort((a, b) => (a.dia === b.dia ? a.productoId.localeCompare(b.productoId) : a.dia.localeCompare(b.dia)));
 }
 
