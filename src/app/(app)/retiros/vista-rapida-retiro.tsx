@@ -308,6 +308,7 @@ export function VistaRapidaRetiro({
               paisId={paisId}
               codigoPais={codigoPais}
               aRecibir={fila.aRecibir}
+              monto={fila.monto}
               soporteNumero={fila.soporteNumero}
               montoRecibido={fila.montoRecibido}
               fechaRecibido={fila.fechaRecibido}
