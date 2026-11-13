@@ -9,6 +9,8 @@ import { formatearFecha, formatearFechaHoraCompleta, formatearMoneda } from "@/l
 import { ActualizarIcon, WalletIcon } from "@/lib/nav-icons";
 import { TablaRetiros, type FilaRetiro } from "./tabla-retiros";
 import { TarjetasResumenRetiros } from "./tarjetas-resumen";
+import { DiferenciaCambioMes } from "./diferencia-cambio-mes";
+import { diferenciaPorMes } from "@/lib/retiros/diferencia-cambio";
 
 export const metadata = { title: "Conciliación de Retiros" };
 
@@ -110,6 +112,9 @@ export default async function RetirosPage() {
   const totalCerradoMes = cerradosDelMes.reduce((acc, r) => acc + Number(r.monto), 0);
   const cerrados = (retiros ?? []).filter((r) => r.estado === "cerrado").length;
   const totalRetiros = (retiros ?? []).length;
+  const diferenciaMeses = diferenciaPorMes(
+    (retiros ?? []).map((r) => ({ fecha: r.fecha, estado: r.estado, monto: Number(r.monto), montoRecibido: r.monto_recibido === null ? null : Number(r.monto_recibido) }))
+  );
 
   const nombrePerfil = new Map((perfiles ?? []).map((p) => [p.id, p.nombre ?? p.email]));
   const filasRetiro: FilaRetiro[] = (retiros ?? []).map((r) => ({
@@ -205,6 +210,8 @@ export default async function RetirosPage() {
           />
         </KpiGrid>
       </KpiGroup>
+
+      <DiferenciaCambioMes meses={diferenciaMeses} codigoPais={pais.codigo} />
 
       <div>
         <TablaRetiros
