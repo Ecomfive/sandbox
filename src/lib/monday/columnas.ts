@@ -49,6 +49,18 @@ export const CONSULTA_COLUMNAS = "query ($ids: [ID!]) { boards(ids: $ids) { id n
 export const CONSULTA_PRIMERA = `query ($ids: [ID!], $limit: Int!) { boards(ids: $ids) { id name items_page(limit: $limit) { cursor items { ${CAMPOS_ITEM} } } } }`;
 export const CONSULTA_SIGUIENTE = `query ($cursor: String!, $limit: Int!) { next_items_page(cursor: $cursor, limit: $limit) { cursor items { ${CAMPOS_ITEM} } } }`;
 
+/**
+ * La primera página con solo los ítems actualizados desde el día anterior a `desde` (13 nov 2026): Monday filtra por «última actualización», así una
+ * lectura recorre lo que cambió (decenas de ítems) y no el tablero entero (casi 6.000 en el consolidado, que no cabía en una vuelta). Se pide desde
+ * el día anterior para no perder nada por la zona horaria; lo fino lo sigue filtrando `cambioDesde`. Sin `desde` (primera lectura), el tablero entero.
+ */
+export function consultaPrimeraDesde(desde: string | null): string {
+  const dia = desde && /^\d{4}-\d{2}-\d{2}/.test(desde) ? new Date(Date.parse(desde.slice(0, 10) + "T00:00:00Z") - 86_400_000).toISOString().slice(0, 10) : null;
+  if (!dia) return CONSULTA_PRIMERA;
+  const reglas = `query_params: { rules: [{ column_id: "__last_updated__", compare_value: ["EXACT", "${dia}"], operator: greater_than_or_equals, compare_attribute: "UPDATED_AT" }] }`;
+  return `query ($ids: [ID!], $limit: Int!) { boards(ids: $ids) { id name items_page(limit: $limit, ${reglas}) { cursor items { ${CAMPOS_ITEM} } } } }`;
+}
+
 export const esIdTablero = (v: unknown): v is string => typeof v === "string" && /^[0-9]{1,20}$/.test(v);
 
 type Obj = Record<string, unknown>;

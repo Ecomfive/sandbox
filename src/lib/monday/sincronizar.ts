@@ -10,7 +10,7 @@ import { unidadDeTienda } from "../ventas/matriz";
 import {
   cambioDesde,
   CONSULTA_COLUMNAS,
-  CONSULTA_PRIMERA,
+  consultaPrimeraDesde,
   CONSULTA_SIGUIENTE,
   despachoDeItem,
   enlazarOrden,
@@ -123,7 +123,7 @@ export async function sincronizarMonday(supabase: SupabaseClient, limite: number
     while (primera || cursor) {
       if (!primera && Date.now() > limite) break;
       const json = primera
-        ? await consultarMonday(CONSULTA_PRIMERA, { ids: [tablero], limit: ITEMS_POR_PAGINA })
+        ? await consultarMonday(consultaPrimeraDesde(cursorActualizado), { ids: [tablero], limit: ITEMS_POR_PAGINA })
         : await consultarMonday(CONSULTA_SIGUIENTE, { cursor, limit: ITEMS_POR_PAGINA });
       primera = false;
       const pagina = leerPagina(json);

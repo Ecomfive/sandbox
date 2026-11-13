@@ -4,6 +4,8 @@ import { CAUSA_OTRA, causaDeTexto, codigoDeNombre, leerPalabras, pesoCausas, por
 import {
   cambioDesde,
   causaDespacho,
+  consultaPrimeraDesde,
+  CONSULTA_PRIMERA,
   despachoDeItem,
   enlazarOrden,
   errorMonday,
@@ -294,4 +296,14 @@ test("RECHAZADO de los asesores también es devuelto (Hernán, 13 nov 2026)", ()
   assert.equal(esDesintegrado("PENDIENTE"), false);
   assert.equal(prioridadDespacho("rechazado", "RECHAZADO"), "2");
   assert.equal(causaDespacho("no contesta", "RECHAZADO", "3er msj sin respuesta"), "Devolución (rechazado): 3er msj sin respuesta · repartidor: no contesta");
+});
+
+test("lectura en una vuelta (13 nov 2026): solo lo actualizado desde el día anterior; sin avance, el tablero entero", () => {
+  assert.equal(consultaPrimeraDesde(null), CONSULTA_PRIMERA);
+  assert.equal(consultaPrimeraDesde("basura"), CONSULTA_PRIMERA);
+  const q = consultaPrimeraDesde("2026-11-13T14:09:22Z");
+  assert.match(q, /__last_updated__/);
+  assert.match(q, /"EXACT", "2026-11-12"/);
+  assert.match(q, /greater_than_or_equals/);
+  assert.equal(consultaPrimeraDesde("2026-11-01T03:00:00Z").includes('"2026-10-31"'), true);
 });

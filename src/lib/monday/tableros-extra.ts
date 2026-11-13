@@ -6,7 +6,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { normalizar } from "../finanzas/clasificacion";
-import { COLUMNA_GRUPO, COLUMNA_NOMBRE, CONSULTA_COLUMNAS, CONSULTA_PRIMERA, CONSULTA_SIGUIENTE, ITEMS_POR_PAGINA, cambioDesde, despachoDeItem, leerColumnas, leerMapeo, leerPagina, leerReglasEstado, sugerirMapeo, type ColumnaTablero, type MapeoColumnas } from "./columnas";
+import { COLUMNA_GRUPO, COLUMNA_NOMBRE, CONSULTA_COLUMNAS, CONSULTA_SIGUIENTE, consultaPrimeraDesde, ITEMS_POR_PAGINA, cambioDesde, despachoDeItem, leerColumnas, leerMapeo, leerPagina, leerReglasEstado, sugerirMapeo, type ColumnaTablero, type MapeoColumnas } from "./columnas";
 import { consultarMonday, guardarDespachos, mondayConfigurado } from "./sincronizar";
 
 /**
@@ -67,7 +67,7 @@ export async function sincronizarTablerosExtra(supabase: SupabaseClient, limite:
       let guardados = 0;
       while (primera || cursor) {
         if (!primera && Date.now() > limite) break;
-        const json = primera ? await consultarMonday(CONSULTA_PRIMERA, { ids: [t.tablero_id], limit: ITEMS_POR_PAGINA }) : await consultarMonday(CONSULTA_SIGUIENTE, { cursor, limit: ITEMS_POR_PAGINA });
+        const json = primera ? await consultarMonday(consultaPrimeraDesde(t.cursor_actualizado), { ids: [t.tablero_id], limit: ITEMS_POR_PAGINA }) : await consultarMonday(CONSULTA_SIGUIENTE, { cursor, limit: ITEMS_POR_PAGINA });
         primera = false;
         const pagina = leerPagina(json);
         const cambiados = pagina.items.filter((i) => cambioDesde(i, t.cursor_actualizado));
