@@ -55,6 +55,7 @@ test("etiqueta de Monday en Pedidos (13 nov 2026): el estado del repartidor; DES
   assert.equal(etiquetaEntrega({ ...base, estado: "RECOLECTADO" }), "RECOLECTADO");
   assert.equal(etiquetaEntrega({ ...base, estado: "POSPUESTO", asesores: "DESINTEGRADO" }), "DESINTEGRADO");
   assert.equal(etiquetaEntrega({ ...base, estado: "FALLIDO", asesores: "PROCESADO" }), "FALLIDO");
+  assert.equal(etiquetaEntrega({ ...base, estado: "POSPUESTO", asesores: "Rechazado" }), "RECHAZADO");
   assert.equal(etiquetaEntrega({ ...base, estado: "Impresion de guia", fuente: "siscore" }), "Servientrega: Impresion de guia");
   assert.equal(etiquetaEntrega({ ...base, estado: null }), null);
 });

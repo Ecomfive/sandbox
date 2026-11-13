@@ -233,8 +233,11 @@ export interface Despacho {
   observaciones_asesores: string | null;
 }
 
-/** DESINTEGRADO: los asesores cerraron el pedido y el producto vuelve al inventario (Hernán, 13 nov 2026). Eso sí es una devolución. */
-export const esDesintegrado = (estadoAsesores: string | null | undefined) => /DESINTEGRAD/.test(normalizar(estadoAsesores ?? ""));
+/**
+ * DESINTEGRADO o RECHAZADO: los asesores cerraron el pedido y el producto vuelve al inventario (Hernán, 13 nov 2026: «rechazado también es devuelto»).
+ * Eso sí es una devolución (PROCESADO = reprogramado y PENDIENTE no lo son).
+ */
+export const esDesintegrado = (estadoAsesores: string | null | undefined) => /DESINTEGRAD|RECHAZ/.test(normalizar(estadoAsesores ?? ""));
 
 /**
  * Qué fila de Monday manda cuando un pedido está en varios tableros (13 nov 2026): primero un ENTREGADO (de cualquier tablero: es lo más seguro),
@@ -247,7 +250,7 @@ export const prioridadDespacho = (grupo: string | null | undefined, estadoAsesor
 /** El motivo que se muestra: el de los asesores si lo hay (devolución si lo desintegraron; si no, lo que anotaron), o la causa del repartidor. */
 export function causaDespacho(causa: string | null, estadoAsesores: string | null | undefined, observaciones: string | null | undefined): string | null {
   if (!estadoAsesores) return causa;
-  const que = esDesintegrado(estadoAsesores) ? "Devolución (desintegrado)" : `Asesores (${estadoAsesores.toLowerCase()})`;
+  const que = esDesintegrado(estadoAsesores) ? `Devolución (${estadoAsesores.trim().toLowerCase()})` : `Asesores (${estadoAsesores.toLowerCase()})`;
   // Las dos cosas son evidencia: lo que anotaron los asesores y lo que dijo el repartidor.
   const partes = [observaciones, causa && causa !== observaciones ? `repartidor: ${causa}` : null].filter(Boolean);
   return partes.length ? `${que}: ${partes.join(" · ")}` : que;

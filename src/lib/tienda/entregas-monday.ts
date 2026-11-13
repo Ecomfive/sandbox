@@ -3,7 +3,7 @@
 // por número de pedido y tienda. Aquí solo se leen. Si la tabla no existe o Monday no está configurado, no hay entregas (Logística sigue igual).
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { causaDespacho, prioridadDespacho, type GrupoEstado } from "@/lib/monday/columnas";
+import { causaDespacho, esDesintegrado, prioridadDespacho, type GrupoEstado } from "@/lib/monday/columnas";
 
 export interface EntregaMonday {
   /** entregado, rechazado, cancelado, en_ruta o sin_estado (la regla de estados de Monday). */
@@ -31,7 +31,7 @@ export interface EntregaMonday {
  */
 export function etiquetaEntrega(e: EntregaMonday | null | undefined): string | null {
   if (!e) return null;
-  if (e.asesores && /DESINTEGRAD/i.test(e.asesores)) return "DESINTEGRADO";
+  if (e.asesores && esDesintegrado(e.asesores)) return e.asesores.trim().toUpperCase();
   const estado = (e.estado ?? "").replace(/\s+/g, " ").trim();
   if (!estado) return null;
   return e.fuente === "siscore" ? `Servientrega: ${estado}` : estado.toUpperCase();

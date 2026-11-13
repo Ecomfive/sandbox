@@ -7,6 +7,7 @@ import {
   despachoDeItem,
   enlazarOrden,
   errorMonday,
+  esDesintegrado,
   fechaDeColumna,
   grupoDeEstado,
   leerColumnas,
@@ -284,4 +285,13 @@ test("ítems duplicados en Monday (13 nov 2026): «1437 (copy)» es el pedido 14
   assert.equal(sinCopia("1437"), "1437");
   assert.equal(sinCopia(" (copy)"), null);
   assert.equal(sinCopia(null), null);
+});
+
+test("RECHAZADO de los asesores también es devuelto (Hernán, 13 nov 2026)", () => {
+  assert.equal(esDesintegrado("RECHAZADO"), true);
+  assert.equal(esDesintegrado("Desintegrado"), true);
+  assert.equal(esDesintegrado("PROCESADO"), false);
+  assert.equal(esDesintegrado("PENDIENTE"), false);
+  assert.equal(prioridadDespacho("rechazado", "RECHAZADO"), "2");
+  assert.equal(causaDespacho("no contesta", "RECHAZADO", "3er msj sin respuesta"), "Devolución (rechazado): 3er msj sin respuesta · repartidor: no contesta");
 });
