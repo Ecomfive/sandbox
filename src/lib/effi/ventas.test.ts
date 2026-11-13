@@ -47,7 +47,8 @@ test("la remisión de una devolución sale de su cabecera (el detalle de Effi no
   const r = ventasPorDia(
     [fila("42", "3", "2026-10-20 09:00:00", { id_remision_v: "14414" })],
     [fila("42", "2", "2026-11-11 10:52:30", { id_remision_v: undefined, id_devolucion_v: "5330" })],
-    [{ id_devolucion_v: "5330", id_remision_v: "14414" }],
+    // Así viene de Effi: la cabecera trae el número como «id».
+    [{ id: "5330", id_remision_v: "14414" }],
   );
   assert.deepEqual(r, [{ productoId: "42", dia: "2026-10-20", salidas: 3, devueltas: 2 }]);
 });

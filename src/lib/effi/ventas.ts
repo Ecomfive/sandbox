@@ -55,13 +55,15 @@ const idDe = (v: unknown) => (typeof v === "string" || typeof v === "number" ? S
  */
 /** Una devolución de venta (cabecera, `devolucion_v`): a qué remisión se abona. */
 export interface CabeceraDevolucionEffi {
+  /** El número de la devolución (así lo manda `devolucion_v`, visto el 13 nov 2026: «id=5330»). */
+  id?: unknown;
   id_devolucion_v?: unknown;
   id_remision_v?: unknown;
 }
 
 export function ventasPorDia(remisiones: readonly FilaDetalleEffi[], devoluciones: readonly FilaDetalleEffi[], cabeceras: readonly CabeceraDevolucionEffi[] = []): VentaEffiDia[] {
   // El detalle de una devolución no trae su remisión: la trae la cabecera.
-  const remisionDeDevolucion = new Map(cabeceras.map((c) => [idDe(c.id_devolucion_v), idDe(c.id_remision_v)] as const).filter(([d, r]) => d && r));
+  const remisionDeDevolucion = new Map(cabeceras.map((c) => [idDe(c.id_devolucion_v) || idDe(c.id), idDe(c.id_remision_v)] as const).filter(([d, r]) => d && r));
   const porClave = new Map<string, VentaEffiDia>();
   const diaDeRemision = new Map<string, string>();
   const valida = (f: FilaDetalleEffi) => String(f.vigente ?? "") === "1" && typeof f.nombre_bodega === "string" && sinTildes(f.nombre_bodega) === BODEGA_NUESTRA;
