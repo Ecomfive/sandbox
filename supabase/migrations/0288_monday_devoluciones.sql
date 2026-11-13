@@ -6,7 +6,7 @@
 --   * el tablero de devoluciones de Kenku se lee con los de los repartidores (`mon_tableros_extra`; por ahora solo Kenku);
 --   * un FALLIDO deja de contar como rechazado (vuelve a «en ruta») y los 3 pedidos de Kenku que la lectura del 12-13 nov había pasado a devueltos solo por
 --     un FALLIDO vuelven a despachados (con su cobro contra entrega de vuelta), dejando el evento en su historial.
--- Se puede correr de nuevo sin efecto. Reversa: supabase/rollbacks/0287_rollback.sql
+-- Se puede correr de nuevo sin efecto. Reversa: supabase/rollbacks/0288_rollback.sql
 
 alter table mon_despachos add column if not exists estado_asesores text check (estado_asesores is null or length(estado_asesores) <= 120);
 alter table mon_despachos add column if not exists observaciones_asesores text check (observaciones_asesores is null or length(observaciones_asesores) <= 500);

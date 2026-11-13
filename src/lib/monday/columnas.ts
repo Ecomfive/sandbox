@@ -19,7 +19,7 @@ export const CAMPOS_MONDAY = [
   { clave: "fecha_despacho", etiqueta: "Fecha de despacho", obligatorio: true },
   { clave: "fecha_entrega", etiqueta: "Fecha de entrega", obligatorio: false },
   { clave: "remision", etiqueta: "Remisión", obligatorio: false },
-  // Los del tablero de devoluciones (13 nov 2026, migración 0287): lo que deciden los asesores con el pedido que volvió.
+  // Los del tablero de devoluciones (13 nov 2026, migración 0288): lo que deciden los asesores con el pedido que volvió.
   { clave: "estado_asesores", etiqueta: "Estado de los asesores (devoluciones)", obligatorio: false },
   { clave: "observaciones_asesores", etiqueta: "Observaciones de los asesores (devoluciones)", obligatorio: false },
 ] as const;

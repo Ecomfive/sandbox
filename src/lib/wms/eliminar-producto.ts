@@ -14,6 +14,7 @@ const NOMBRE_BLOQUEO: Record<string, [string, string]> = {
   wms_filtro_productos: ["producto de Filtro de productos", "productos de Filtro de productos"],
   wms_producto_variantes: ["ficha de Shopify", "fichas de Shopify"],
   wms_dropi_productos: ["ficha de Dropi", "fichas de Dropi"],
+  dropi_variaciones_vinculo: ["vínculo hecho a mano con una variación de Dropi", "vínculos hechos a mano con variaciones de Dropi"],
   productos: ["producto de pedidos", "productos de pedidos"],
   "skus_maestros.padre_id": ["variante", "variantes"],
   "sku_maestro_componentes.componente_id": ["compuesto que lo usa", "compuestos que lo usan"],
