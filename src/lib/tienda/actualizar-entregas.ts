@@ -233,25 +233,40 @@ export async function actualizarEntregas(supabase: SupabaseClient, quien = "Sist
  * Completa en los pedidos lo que Monday y Servientrega saben y el pedido no tiene (14 nov 2026, al comparar con el Excel Matriz): la forma de pago y lo
  * cobrado de un ENTREGADO de Monday, y la fecha de despacho (el día del reparto en Monday o la emisión de la guía de Servientrega) de los que salieron
  * sin la fecha de Shopify. Solo las tiendas creadas en el sistema. Nunca cambia la fase ni pisa un dato que ya está. Devuelve cuántos pedidos tocó.
+ * Parte de lo que Monday o Servientrega movieron en los últimos `dias` (no de todos los pedidos: con 23 mil no cabía en la lectura); lo de antes se
+ * completó una vez el 14 nov 2026.
  */
-export async function completarDatosEntrega(supabase: SupabaseClient, limite = Number.POSITIVE_INFINITY): Promise<number> {
+export async function completarDatosEntrega(supabase: SupabaseClient, limite = Number.POSITIVE_INFINITY, dias = 30): Promise<number> {
   const [{ data: tiendas }, { data: unidades }] = await Promise.all([supabase.from("tiendas").select("nombre"), supabase.from("fin_unidades").select("id, nombre").eq("clase", "tienda")]);
   const mias = ((unidades ?? []) as { id: string; nombre: string }[]).filter((u) => ((tiendas ?? []) as { nombre: string }[]).some((t) => mismaTiendaUnidad(t.nombre, u.nombre))).map((u) => u.id);
   if (!mias.length) return 0;
+  const desde = new Date(Date.now() - dias * 86_400_000).toISOString();
+  // Los pedidos que Monday o Servientrega tocaron hace poco.
+  const candidatos = new Set<string>();
+  for (const [tabla, columna] of [
+    ["mon_despachos", "actualizado_monday"],
+    ["tienda_guias", "fecha_emision"],
+  ] as const) {
+    for (let d = 0; ; d += 1000) {
+      const { data, error } = await supabase.from(tabla).select("orden_id").not("orden_id", "is", null).gte(columna, columna === "fecha_emision" ? desde.slice(0, 10) : desde).order("orden_id").range(d, d + 999);
+      if (error) break;
+      for (const x of (data ?? []) as { orden_id: string }[]) candidatos.add(String(x.orden_id));
+      if ((data ?? []).length < 1000) break;
+    }
+  }
   type Falta = { id: string; fase: string; cod_esperado: number | null; cod_cobrado: number | null; forma_pago_entrega: string | null; despachada_en: string | null; fecha_envio: string | null };
   const faltan: Falta[] = [];
-  for (let d = 0; ; d += 1000) {
+  const ids = [...candidatos];
+  for (let i = 0; i < ids.length; i += 200) {
     const { data, error } = await supabase
       .from("ven_ordenes")
       .select("id, fase, cod_esperado, cod_cobrado, forma_pago_entrega, despachada_en, fecha_envio")
+      .in("id", ids.slice(i, i + 200))
       .in("unidad_id", mias)
       .in("fase", ["despachada", "entregada", "devuelta"])
-      .or("despachada_en.is.null,and(fase.eq.entregada,forma_pago_entrega.is.null)")
-      .order("id")
-      .range(d, d + 999);
+      .or("despachada_en.is.null,and(fase.eq.entregada,forma_pago_entrega.is.null)");
     if (error) return 0; // sin la migración 0295
     faltan.push(...((data ?? []) as Falta[]));
-    if ((data ?? []).length < 1000) break;
   }
   const cambios: { id: string; set: Record<string, unknown> }[] = [];
   for (let i = 0; i < faltan.length; i += 200) {
@@ -276,7 +291,7 @@ export async function completarDatosEntrega(supabase: SupabaseClient, limite = N
   }
   let hechos = 0;
   for (let i = 0; i < cambios.length; i += 15) {
-    if (Date.now() > limite) break;
+    if (i > 0 && Date.now() > limite) break; // el primer grupo siempre va
     const r = await Promise.all(cambios.slice(i, i + 15).map(({ id, set }) => supabase.from("ven_ordenes").update(set).eq("id", id)));
     hechos += r.filter((x) => !x.error).length;
   }
