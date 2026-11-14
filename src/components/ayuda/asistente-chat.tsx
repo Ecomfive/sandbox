@@ -38,10 +38,42 @@ function enLinea(t: string): ReactNode[] {
   return partes;
 }
 
-/** El texto de la respuesta: párrafos, listas con «-» o «1.» y títulos «#», sin HTML. */
+/** El texto de la respuesta: párrafos, listas con «-» o «1.», títulos «#» y tablas «| a | b |», sin HTML. */
 function TextoRespuesta({ texto }: { texto: string }) {
   const bloques: ReactNode[] = [];
   let lista: { tipo: "ul" | "ol"; items: string[] } | null = null;
+  let tabla: string[][] | null = null;
+  const cerrarTabla = () => {
+    if (!tabla) return;
+    const [cabeza, ...filas] = tabla;
+    bloques.push(
+      <div key={`t${bloques.length}`} className="overflow-x-auto">
+        <table className="w-full border-collapse text-[13px]">
+          <thead>
+            <tr>
+              {cabeza.map((c, i) => (
+                <th key={i} className="border-b border-border px-2 py-1 text-left font-semibold">
+                  {enLinea(c)}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filas.map((f, i) => (
+              <tr key={i}>
+                {f.map((c, j) => (
+                  <td key={j} className="border-b border-border/50 px-2 py-1 tabular-nums">
+                    {enLinea(c)}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>,
+    );
+    tabla = null;
+  };
   const cerrar = () => {
     if (!lista) return;
     const { tipo, items } = lista;
@@ -55,8 +87,21 @@ function TextoRespuesta({ texto }: { texto: string }) {
     );
     lista = null;
   };
-  for (const linea of texto.split(/\r?\n/)) {
+  for (const linea of texto.trim().split(/\r?\n/)) {
     const l = linea.trim();
+    // Una fila de tabla: «| a | b |»; la línea de guiones que separa la cabecera no se muestra.
+    if (/^\|.*\|$/.test(l)) {
+      cerrar();
+      if (/^\|[\s:|-]+\|$/.test(l)) continue;
+      (tabla ??= []).push(
+        l
+          .slice(1, -1)
+          .split("|")
+          .map((c) => c.trim()),
+      );
+      continue;
+    }
+    cerrarTabla();
     const punto = l.match(/^[-*•]\s+(.*)$/);
     const paso = l.match(/^\d+[.)]\s+(.*)$/);
     if (punto || paso) {
@@ -82,6 +127,7 @@ function TextoRespuesta({ texto }: { texto: string }) {
     );
   }
   cerrar();
+  cerrarTabla();
   return <div className="flex flex-col gap-1.5">{bloques}</div>;
 }
 
