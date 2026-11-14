@@ -112,7 +112,7 @@ function cambioCerrado(o: OrdenParaEntrega, monday: DatoMonday | null, guia: Dat
  * tiendas), lo último de Monday y de SISCORE de cada una y aplica `cambioDeEntrega`. Cada cambio deja su evento en la orden. Si otra persona la movió
  * a la vez, no se pisa (la condición es que siga despachada).
  */
-export async function actualizarEntregas(supabase: SupabaseClient, quien = "Sistema"): Promise<{ entregadas: number; devueltas: number; resumen: string }> {
+export async function actualizarEntregas(supabase: SupabaseClient, quien = "Sistema", limite = Number.POSITIVE_INFINITY): Promise<{ entregadas: number; devueltas: number; resumen: string }> {
   const ordenes: OrdenParaEntrega[] = [];
   for (let d = 0; ; d += 1000) {
     const { data, error } = await supabase
@@ -177,18 +177,34 @@ export async function actualizarEntregas(supabase: SupabaseClient, quien = "Sist
   let devueltas = 0;
   let canceladas = 0;
   const ahora = new Date().toISOString();
-  for (const o of ordenes) {
+  // De 15 en 15 en paralelo y mirando el reloj (14 nov 2026: al unirse cientos de pedidos de Oferfy a la vez, uno por uno no cabía en los 60 s de
+  // Vercel y la lectura quedaba cortada). Lo que no alcanza queda abierto y lo toma la próxima lectura.
+  const cambios = ordenes.flatMap((o) => {
     const c = cambioDeEntrega(o, monday.get(o.id) ?? null, guias.get(o.id) ?? null, cerrados);
-    if (!c) continue;
-    const { data: hecho, error } = await supabase.from("ven_ordenes").update({ ...c.set, actualizado_en: ahora }).eq("id", o.id).eq("fase", String(o.fase)).select("id");
-    if (error) throw new Error(`Orden ${o.numero}: ${error.message}`);
-    if (!hecho?.length) continue;
-    await supabase.from("ven_orden_eventos").insert({ orden_id: o.id, tipo: "fase", fase_antes: o.fase, fase_despues: c.fase, detalle: c.detalle, usuario: c.fuente === "monday" ? "Monday (entregas de ciudad)" : "Servientrega (SISCORE)" });
-    if (c.fase === "entregada") entregadas++;
-    else if (c.fase === "cancelada") canceladas++;
-    else devueltas++;
+    return c ? [{ o, c }] : [];
+  });
+  let pendientes = 0;
+  for (let i = 0; i < cambios.length; i += 15) {
+    if (Date.now() > limite) {
+      pendientes = cambios.length - i;
+      break;
+    }
+    const hechos = await Promise.all(
+      cambios.slice(i, i + 15).map(async ({ o, c }) => {
+        const { data: hecho, error } = await supabase.from("ven_ordenes").update({ ...c.set, actualizado_en: ahora }).eq("id", o.id).eq("fase", String(o.fase)).select("id");
+        if (error) throw new Error(`Orden ${o.numero}: ${error.message}`);
+        if (!hecho?.length) return null;
+        await supabase.from("ven_orden_eventos").insert({ orden_id: o.id, tipo: "fase", fase_antes: o.fase, fase_despues: c.fase, detalle: c.detalle, usuario: c.fuente === "monday" ? "Monday (entregas de ciudad)" : "Servientrega (SISCORE)" });
+        return c.fase;
+      }),
+    );
+    for (const f of hechos) {
+      if (f === "entregada") entregadas++;
+      else if (f === "cancelada") canceladas++;
+      else if (f) devueltas++;
+    }
   }
-  const resumen = `${entregadas} órdenes pasaron a entregadas y ${devueltas} a devueltas según Monday y Servientrega.${canceladas ? ` ${canceladas} sin despachar se cancelaron (Monday las cerró).` : ""}`;
+  const resumen = `${entregadas} órdenes pasaron a entregadas y ${devueltas} a devueltas según Monday y Servientrega.${canceladas ? ` ${canceladas} sin despachar se cancelaron (Monday las cerró).` : ""}${pendientes ? ` Faltan ${pendientes}: siguen en la próxima lectura.` : ""}`;
   if (entregadas + devueltas + canceladas > 0)
     await supabase.from("historial_auditoria").insert({ usuario_nombre: quien, accion: "entregas_monday_servientrega", entidad: "ven_ordenes", entidad_id: null, detalle: resumen });
   return { entregadas, devueltas, resumen };

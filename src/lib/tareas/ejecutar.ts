@@ -332,7 +332,7 @@ async function tareaMonday(c: Contexto): Promise<Resultado> {
   const postventa = await sincronizarPostventa(c.supabase, c.limite).catch((e) => `Cambios y reembolsos: ${e instanceof Error ? e.message : "falló"}.`);
   // Las filas de Monday que se guardaron antes de que su pedido entrara al sistema (14 nov 2026): se vuelven a enlazar antes de asignar entregas.
   const reenlazadas = await enlazarSinPedido(c.supabase).catch(() => 0);
-  const entregas = await actualizarEntregas(c.supabase, "Monday (tarea diaria)").then((x) => x.resumen).catch((e) => `Entregas: ${e instanceof Error ? e.message : "falló"}.`);
+  const entregas = await actualizarEntregas(c.supabase, "Monday (tarea diaria)", Math.max(c.limite, Date.now() + 8_000)).then((x) => x.resumen).catch((e) => `Entregas: ${e instanceof Error ? e.message : "falló"}.`);
   const enlazadas = reenlazadas ? `${reenlazadas} filas de Monday encontraron su pedido.` : "";
   return { resumen: [r.resumen, extra, postventa, enlazadas, entregas].filter(Boolean).join(" "), pendiente: null };
 }
