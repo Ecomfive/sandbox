@@ -6,7 +6,7 @@ import { getPaisActual } from "@/lib/pais";
 import { createServiceClient } from "@/lib/supabase/server";
 import { cargarTiendas } from "@/lib/tienda/datos";
 import { fuenteFinanzas } from "@/lib/tienda/datos-finanzas";
-import { nombreComparable } from "@/lib/tienda/ordenes-finanzas";
+import { tiendaDeClienteSiscore } from "@/lib/tienda/siscore";
 import { grupoDeEstadoGuia, leerLecturaSiscore, momentoEntrega, pedidoDeFactura, visitasSinEntregar } from "@/lib/tienda/siscore";
 import { actualizarEntregas } from "@/lib/tienda/actualizar-entregas";
 
@@ -78,7 +78,7 @@ export async function procesarLecturaSiscore(id: string): Promise<{ guias: numbe
     // La tienda del cliente de SISCORE y su unidad de Finanzas (donde están sus órdenes).
     const pais = await getPaisActual(supabase);
     const { tiendas } = await cargarTiendas(supabase, pais.id);
-    const tienda = tiendas.find((t) => nombreComparable(t.nombre) === nombreComparable(lectura.cliente)) ?? null;
+    const tienda = tiendaDeClienteSiscore(lectura.cliente, tiendas);
     const unidad = tienda ? ((await fuenteFinanzas(supabase, [tienda], pais.codigo)).unidadDe.get(tienda.id) ?? null) : null;
     // Los pedidos de esas guías, por su número en esa unidad.
     const numeros = [...new Set(lectura.guias.map((g) => pedidoDeFactura(g.factura)).filter((n): n is string => !!n))];
@@ -120,7 +120,8 @@ export async function procesarLecturaSiscore(id: string): Promise<{ guias: numbe
     await supabase.from("tienda_guias_lecturas").update({ estado: "listo", fin: new Date().toISOString(), cliente: lectura.cliente, resumen, error: null }).eq("id", id);
     await supabase.storage.from(BUCKET).remove([ruta]);
     // Las órdenes despachadas que Servientrega (o Monday) ya dan por entregadas o devueltas pasan a esa fase (12 nov 2026, pedido de Hernán).
-    await actualizarEntregas(supabase, "Servientrega (lectura de SISCORE)").catch(() => null);
+    // Con un tope de tiempo (14 nov 2026): con cientos de guías (Oferfy) lo que no alcance lo toma la próxima lectura de Monday o de SISCORE.
+    await actualizarEntregas(supabase, "Servientrega (lectura de SISCORE)", Date.now() + 30_000).catch(() => null);
     revalidatePath(RUTA);
     return { guias: resumen.guias, conPedido: resumen.conPedido, cliente: lectura.cliente };
   } catch (e) {

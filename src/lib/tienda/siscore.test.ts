@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { grupoDeEstadoGuia, leerLecturaSiscore, momentoEntrega, pedidoDeFactura, visitasSinEntregar } from "./siscore";
+import { grupoDeEstadoGuia, leerLecturaSiscore, momentoEntrega, pedidoDeFactura, tiendaDeClienteSiscore, visitasSinEntregar } from "./siscore";
 
 test("estados de SISCORE (los que se vieron en la cuenta de Kenku)", () => {
   assert.equal(grupoDeEstadoGuia("Entrega App"), "entregado");
@@ -50,4 +50,13 @@ test("la lectura que sube el lector se valida", () => {
   assert.equal(l.guias[0].cliente, "KENKU");
   assert.equal(l.guias[0].recaudo, 32.9);
   assert.equal(l.guias[0].historial.length, 1);
+});
+
+test("SISCORE: la cuenta se une a su tienda por el nombre, la unidad o el comienzo", () => {
+  const tiendas = [{ nombre: "Kenku" }, { nombre: "Oferfy" }];
+  assert.equal(tiendaDeClienteSiscore("KENKU", tiendas)?.nombre, "Kenku");
+  assert.equal(tiendaDeClienteSiscore("OFERFY", tiendas)?.nombre, "Oferfy");
+  assert.equal(tiendaDeClienteSiscore("OFERFY PAN", tiendas)?.nombre, "Oferfy");
+  assert.equal(tiendaDeClienteSiscore("Oferfy Panamá", tiendas)?.nombre, "Oferfy");
+  assert.equal(tiendaDeClienteSiscore("NUVO", tiendas), null);
 });

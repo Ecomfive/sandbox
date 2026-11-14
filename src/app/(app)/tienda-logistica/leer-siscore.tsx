@@ -60,9 +60,10 @@ export function LeerSiscore({ ultima }: { ultima: string | null }) {
       if ("error" in r) throw new Error(r.error);
       id = r.id;
       setEstado({ texto: `Leyendo las guías de ${s.tienda ?? "la tienda"} en SISCORE…`, tipo: "info" });
-      await pedirExtension({ tipo: "lanzar", lector: "siscore", subida: r.subida, dias: { pedidos: 45, cartera: 45 } }, 45000);
+      await pedirExtension({ tipo: "lanzar", lector: "siscore", subida: r.subida, dias: { pedidos: 75, cartera: 75 } }, 45000);
       let a: (AvanceLector & { hechos?: number }) | null = null;
-      for (let i = 0; i < 300; i++) {
+      // Hasta 30 minutos: una tienda con muchas guías (Oferfy, unas 1.400 en 75 días) tarda más que Kenku.
+      for (let i = 0; i < 900; i++) {
         await esperar(2000);
         a = await pedirExtension<(AvanceLector & { hechos?: number }) | null>({ tipo: "avance", lector: "siscore" }).catch(() => a);
         if (a?.productos) setEstado({ texto: `Leyendo el rastreo de las guías: ${a.hechos ?? 0} de ${a.productos}…`, tipo: "info" });

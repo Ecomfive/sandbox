@@ -3,6 +3,8 @@
 // rastreo de cada guía, y lo sube al sistema. **Solo lectura**: no se anula, no se crea ni se cambia nada en SISCORE (regla de Hernán).
 // Aquí, sin base y con prueba: cómo viene la lectura, qué quiere decir cada estado y cuántas visitas sin entregar lleva una guía.
 
+import { mismaTiendaUnidad, nombreComparable } from "./ordenes-finanzas";
+
 export interface PasoGuia {
   estado: string;
   /** AAAA-MM-DD */
@@ -110,4 +112,16 @@ export function pedidoDeFactura(factura: string | null): string | null {
   const t = (factura ?? "").trim().toUpperCase();
   if (!t) return null;
   return /^\d+$/.test(t) ? `#${t}` : t;
+}
+
+/**
+ * La tienda del sistema de una cuenta de SISCORE (14 nov 2026, al sumar Oferfy): el cliente de la cuenta es el nombre de la tienda («KENKU»), su unidad
+ * de Finanzas («OFERFY PAN») o empieza con él («OFERFY PANAMA»). Con dos tiendas posibles, ninguna.
+ */
+export function tiendaDeClienteSiscore<T extends { nombre: string }>(cliente: string, tiendas: T[]): T | null {
+  const c = nombreComparable(cliente);
+  const exacta = tiendas.filter((t) => nombreComparable(t.nombre) === c || mismaTiendaUnidad(t.nombre, cliente));
+  if (exacta.length === 1) return exacta[0];
+  const parcial = tiendas.filter((t) => c.split(" ")[0] === nombreComparable(t.nombre).split(" ")[0]);
+  return parcial.length === 1 ? parcial[0] : null;
 }
