@@ -96,7 +96,8 @@ export async function correrHerramienta(nombre: string, entrada: unknown, usuari
         return JSON.stringify({
           pais: pais.nombre,
           bodegas: r.bodegas.map((b) => ({ bodega: b.nombre, externa: b.tipo === "externa", fisico: b.fisico, reservado: b.reservado, disponible: b.disponible, enCamino: b.enCamino, danado: b.danado, vencido: b.vencido })),
-          plataformas: p ? { dropi: p.dropi, effi: p.effi, drop: p.drop, dunamixfy: p.dunamixfy, total: p.total, detalle: p.lineas.slice(0, 10).map((l) => ({ plataforma: l.plataforma, id: l.id, unidades: l.unidades, aparteReferencial: l.aparte })) } : null,
+          plataformas: p ? { dropi: p.dropi, effi: p.effi, drop: p.drop, dunamixfy: p.dunamixfy, total: p.total, detalle: p.lineas.slice(0, 10).map((l) => ({ plataforma: l.plataforma, id: l.id, unidades: l.unidades, ...(l.aparte ? { [l.plataforma === "effi" ? "enGarantias" : "enBodegaProveedorReferencial"]: l.aparte } : {}), ...(l.exclusivo ? { exclusivasDeClientes: l.exclusivo } : {}) })) } : null,
+          notaPlataformas: "unidades = stock que cuenta. enBodegaProveedorReferencial (Dropi) = lo que Dropi muestra en nuestra bodega de proveedor (B81 en Panamá): se pone a mano para la publicación, es solo referencia y no suma al stock. enGarantias (Effi) = la bodega de garantías. exclusivasDeClientes (Drop) = lo guardado para un cliente, ya incluido en unidades.",
           lotes: r.lotes.slice(0, 10),
         });
       }
