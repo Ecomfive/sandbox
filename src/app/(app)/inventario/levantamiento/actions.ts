@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
-import { esAdministrador } from "@/lib/permisos/acceso";
+import { autorizadaParaSalidaManual } from "@/lib/permisos/salida-manual";
 import { puedeVerBodega } from "@/lib/seguridad/pais-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 import { indexar, parecidos, todasLasCoincidencias } from "@/lib/scraping/cruces";
@@ -92,7 +92,7 @@ export async function guardarLevantamiento(
     const { data: bodegaFila } = await supabase.from("wms_bodegas").select("paises(codigo)").eq("id", bodegaId).maybeSingle();
     const pais = bodegaFila?.paises as { codigo: string } | { codigo: string }[] | null | undefined;
     const codigoPais = (Array.isArray(pais) ? pais[0] : pais)?.codigo;
-    if (!puedeMoverAMano("salida", codigoPais, esAdministrador(usuario))) return { error: SOLO_ADMIN_MOVIMIENTO };
+    if (!puedeMoverAMano("salida", codigoPais, autorizadaParaSalidaManual(usuario))) return { error: SOLO_ADMIN_MOVIMIENTO };
     if (pideMotivo("salida", codigoPais) && !ref) return { error: "Para restar, escribe el motivo en «Referencia»." };
   }
 

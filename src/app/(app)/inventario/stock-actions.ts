@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { revisarCorreccionStock } from "@/lib/wms/correccion-stock";
 import { createServiceClient } from "@/lib/supabase/server";
-import { esAdministrador } from "@/lib/permisos/acceso";
+import { autorizadaParaSalidaManual } from "@/lib/permisos/salida-manual";
 import { pideMotivo, puedeMoverAMano, SOLO_ADMIN_MOVIMIENTO } from "@/lib/wms/recepcion";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
@@ -234,7 +234,7 @@ export async function registrarMovimientoStock(formData: FormData): Promise<{ er
   const paisDeLaBodega = Array.isArray(paisBodega) ? paisBodega[0] : paisBodega;
   const nombrePais = paisDeLaBodega?.nombre;
   // Donde toda salida va con remisión, la salida y el ajuste a mano son de un administrador y llevan motivo (6 nov 2026, flujograma de Costa Rica).
-  if (!puedeMoverAMano(tipo, paisDeLaBodega?.codigo, esAdministrador(usuario))) return { error: SOLO_ADMIN_MOVIMIENTO };
+  if (!puedeMoverAMano(tipo, paisDeLaBodega?.codigo, autorizadaParaSalidaManual(usuario))) return { error: SOLO_ADMIN_MOVIMIENTO };
   if (pideMotivo(tipo, paisDeLaBodega?.codigo) && !motivo) return { error: "Una salida a mano necesita un motivo." };
   const { data: maestro } = await supabase.from("skus_maestros").select("codigo, tipo, clase, maneja_vencimiento").eq("id", sku).maybeSingle();
   if (!maestro) return { error: "El SKU no existe." };
