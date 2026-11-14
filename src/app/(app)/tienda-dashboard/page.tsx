@@ -44,7 +44,8 @@ export default async function DashboardTiendaPage({ searchParams }: { searchPara
   const eleccion = periodoElegido(sp);
   const miradas = tienda ? [tienda] : tiendas;
   // La revisión de Shopify (por si se perdió algún aviso), después de mostrar la página y como mucho cada 10 minutos.
-  after(() => revisarSiHaceFalta(createServiceClient(), tiendas));
+  // Solo la tienda que se mira (14 nov 2026: «si abro Kenku, que se actualice Kenku»); con «Todas», todas.
+  after(() => revisarSiHaceFalta(createServiceClient(), miradas));
   const ids = miradas.map((t) => t.id);
   // Las tiendas sin conectar se ven con las órdenes de Finanzas (11 nov 2026); si todo sale de ahí, los periodos terminan en su último día.
   const [{ pedidos: todos, lineasFinanzas, fuente, referencia, periodo }, variantes] = await Promise.all([

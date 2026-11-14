@@ -34,7 +34,8 @@ export default async function PedidosTiendaPage({ searchParams }: { searchParams
   const eleccion = periodoElegido(sp);
   const miradas = tienda ? [tienda] : tiendas;
   // La revisión de Shopify (por si se perdió algún aviso), después de mostrar la página y como mucho cada 10 minutos.
-  after(() => revisarSiHaceFalta(createServiceClient(), tiendas));
+  // Solo la tienda que se mira (14 nov 2026: «si abro Kenku, que se actualice Kenku»); con «Todas», todas.
+  after(() => revisarSiHaceFalta(createServiceClient(), miradas));
   const ids = miradas.map((t) => t.id);
   if (!tienda && tiendas.length && !faltaMigracion) return <TodasLasTiendas tiendas={tiendas} pais={pais} eleccion={eleccion} />;
   // Las tiendas sin conectar muestran las órdenes que cargó Finanzas (11 nov 2026; ver src/lib/tienda/ordenes-finanzas.ts).

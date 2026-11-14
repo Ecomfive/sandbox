@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireModuloEscritura } from "@/lib/auth";
+import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { getPaisActual } from "@/lib/pais";
 import { createServiceClient } from "@/lib/supabase/server";
 import { cargarTiendas } from "@/lib/tienda/datos";
@@ -17,11 +17,62 @@ const CARPETA = "tmp-dropi-panel";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const FALTA = "Falta correr en Supabase la migración 0280 (guías de SISCORE).";
 
+/** Una lectura en curso que no avanzó en este tiempo se da por abandonada (se cerró la pestaña o se cortó) y ya no frena otra. */
+const VIVA_MS = 2 * 60_000;
+const FALTA_AVANCE = "Falta correr en Supabase la migración 0294 (avance de SISCORE por tienda).";
+
+export interface LecturaEnCurso {
+  id: string;
+  tiendaId: string | null;
+  tienda: string;
+  hechos: number;
+  total: number;
+  inicio: string;
+  por: string | null;
+}
+
+const porcentaje = (hechos: number, total: number) => (total > 0 ? Math.min(99, Math.floor((hechos / total) * 100)) : 0);
+
+/** Las lecturas de SISCORE que siguen avanzando (de cualquier tienda), para mostrar su porcentaje. Las que dejaron de avanzar se cierran. */
+async function lecturasVivas(supabase: ReturnType<typeof createServiceClient>): Promise<LecturaEnCurso[] | null> {
+  const { data, error } = await supabase
+    .from("tienda_guias_lecturas")
+    .select("id, tienda_id, hechos, total, inicio, avance_en, iniciado_por_nombre, tiendas(nombre)")
+    .eq("estado", "corriendo")
+    .gte("inicio", new Date(Date.now() - 6 * 60 * 60_000).toISOString());
+  if (error) return null;
+  const vivas: LecturaEnCurso[] = [];
+  const muertas: string[] = [];
+  for (const x of (data ?? []) as Record<string, unknown>[]) {
+    const ultimo = Date.parse(String(x.avance_en ?? x.inicio));
+    if (Date.now() - ultimo > VIVA_MS) {
+      muertas.push(String(x.id));
+      continue;
+    }
+    const t = (Array.isArray(x.tiendas) ? x.tiendas[0] : x.tiendas) as { nombre?: string } | null;
+    vivas.push({ id: String(x.id), tiendaId: (x.tienda_id as string | null) ?? null, tienda: t?.nombre ?? "la tienda", hechos: Number(x.hechos ?? 0), total: Number(x.total ?? 0), inicio: String(x.inicio), por: (x.iniciado_por_nombre as string | null) ?? null });
+  }
+  if (muertas.length)
+    await supabase.from("tienda_guias_lecturas").update({ estado: "error", fin: new Date().toISOString(), error: "Se dejó de actualizar (se cerró la pestaña o se cortó)." }).in("id", muertas);
+  return vivas;
+}
+
+/** Lo que se está leyendo ahora en SISCORE, con su avance (lo pide la pantalla cada pocos segundos). */
+export async function lecturasSiscoreEnCurso(): Promise<LecturaEnCurso[]> {
+  try {
+    await requireModulo("tienda-logistica");
+  } catch {
+    return [];
+  }
+  return (await lecturasVivas(createServiceClient())) ?? [];
+}
+
 /**
- * Empieza una lectura de SISCORE (Servientrega): la deja anotada y da la dirección firmada donde la extensión sube lo leído. Una sola a la vez: si hay
- * una de los últimos 10 minutos todavía en curso, no empieza otra. Solo quien puede modificar Logística de tienda.
+ * Empieza una lectura de SISCORE (14 nov 2026: por tienda). `clienteSesion` es la cuenta abierta en SISCORE («KENKU»); `tiendaElegida`, la tienda
+ * que se mira en Logística. Si no coinciden, no lee (avisa con qué cuenta entrar). Solo frena una lectura de la **misma** tienda que siga avanzando.
+ * Da la dirección firmada donde la extensión sube lo leído. Solo quien puede modificar Logística de tienda.
  */
-export async function empezarLecturaSiscore(): Promise<{ id: string; subida: { siscore: string } } | { error: string }> {
+export async function empezarLecturaSiscore(clienteSesion: string | null, tiendaElegida: string | null): Promise<{ id: string; tienda: string | null; subida: { siscore: string } } | { error: string }> {
   let u;
   try {
     u = await requireModuloEscritura("tienda-logistica");
@@ -29,23 +80,44 @@ export async function empezarLecturaSiscore(): Promise<{ id: string; subida: { s
     return { error: "Tu rol solo puede ver Logística." };
   }
   const supabase = createServiceClient();
-  const { data: enCurso, error: errCurso } = await supabase
+  const pais = await getPaisActual(supabase);
+  const { tiendas } = await cargarTiendas(supabase, pais.id);
+  const deSesion = clienteSesion ? tiendaDeClienteSiscore(clienteSesion, tiendas) : null;
+  const elegida = tiendaElegida && UUID.test(tiendaElegida) ? (tiendas.find((t) => t.id === tiendaElegida) ?? null) : null;
+  if (elegida && clienteSesion && deSesion?.id !== elegida.id)
+    return { error: `La sesión abierta en SISCORE es de ${clienteSesion}. Para ${elegida.nombre}, cierra sesión en SISCORE y entra con la cuenta de ${elegida.nombre}.` };
+  const tienda = deSesion ?? elegida;
+  const vivas = await lecturasVivas(supabase);
+  if (!vivas) return { error: FALTA_AVANCE };
+  const misma = vivas.find((v) => v.tiendaId === (tienda?.id ?? null));
+  if (misma) return { error: `Ya se está leyendo Servientrega de ${misma.tienda}: ${porcentaje(misma.hechos, misma.total)} %${misma.total ? ` (${misma.hechos} de ${misma.total} guías)` : ""}. Espera a que termine.` };
+  const { data, error } = await supabase
     .from("tienda_guias_lecturas")
+    .insert({ iniciado_por: u.id, iniciado_por_nombre: u.nombre || u.email, tienda_id: tienda?.id ?? null, avance_en: new Date().toISOString() })
     .select("id")
-    .eq("estado", "corriendo")
-    .gte("inicio", new Date(Date.now() - 10 * 60_000).toISOString())
-    .limit(1);
-  if (errCurso) return { error: FALTA };
-  if (enCurso?.length) return { error: "Ya se está leyendo SISCORE. Espera a que termine." };
-  const { data, error } = await supabase.from("tienda_guias_lecturas").insert({ iniciado_por: u.id, iniciado_por_nombre: u.nombre || u.email }).select("id").single();
-  if (error || !data) return { error: FALTA };
+    .single();
+  if (error || !data) return { error: /tienda_id|avance_en/.test(error?.message ?? "") ? FALTA_AVANCE : FALTA };
   const id = data.id as string;
   const { data: s, error: e } = await supabase.storage.from(BUCKET).createSignedUploadUrl(`${CARPETA}/${id}/siscore.json`, { upsert: true });
   if (e || !s) {
     await supabase.from("tienda_guias_lecturas").update({ estado: "error", fin: new Date().toISOString(), error: "No se pudo preparar la subida." }).eq("id", id);
     return { error: "No se pudo preparar la subida." };
   }
-  return { id, subida: { siscore: s.signedUrl } };
+  return { id, tienda: tienda?.nombre ?? null, subida: { siscore: s.signedUrl } };
+}
+
+/** El avance de una lectura (guías con su rastreo leídas de cuántas): lo manda la pantalla que lee, para que cualquiera vea el porcentaje. */
+export async function avanceLecturaSiscore(id: string, hechos: number, total: number): Promise<{ ok: true }> {
+  try {
+    await requireModuloEscritura("tienda-logistica");
+  } catch {
+    return { ok: true };
+  }
+  if (!UUID.test(String(id))) return { ok: true };
+  const h = Math.max(0, Math.floor(Number(hechos) || 0));
+  const t = Math.max(h, Math.floor(Number(total) || 0));
+  await createServiceClient().from("tienda_guias_lecturas").update({ hechos: h, total: t, avance_en: new Date().toISOString() }).eq("id", id).eq("estado", "corriendo");
+  return { ok: true };
 }
 
 /**
@@ -117,7 +189,7 @@ export async function procesarLecturaSiscore(id: string): Promise<{ guias: numbe
       if (e) return fallar(`No se pudieron guardar las guías: ${e.message}`);
     }
     const resumen = { cliente: lectura.cliente, guias: filas.length, conPedido: filas.filter((f) => f.orden_id).length, desde: lectura.desde, hasta: lectura.hasta };
-    await supabase.from("tienda_guias_lecturas").update({ estado: "listo", fin: new Date().toISOString(), cliente: lectura.cliente, resumen, error: null }).eq("id", id);
+    await supabase.from("tienda_guias_lecturas").update({ estado: "listo", fin: new Date().toISOString(), cliente: lectura.cliente, resumen, error: null, ...(tienda ? { tienda_id: tienda.id, hechos: resumen.guias, total: resumen.guias } : {}) }).eq("id", id);
     await supabase.storage.from(BUCKET).remove([ruta]);
     // Las órdenes despachadas que Servientrega (o Monday) ya dan por entregadas o devueltas pasan a esa fase (12 nov 2026, pedido de Hernán).
     // Con un tope de tiempo (14 nov 2026): con cientos de guías (Oferfy) lo que no alcance lo toma la próxima lectura de Monday o de SISCORE.

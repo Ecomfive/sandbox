@@ -41,7 +41,8 @@ export default async function LogisticaTiendaPage({ searchParams }: { searchPara
   const { tiendas, faltaMigracion } = await cargarTiendas(supabase, pais.id);
   const tienda = tiendaElegida(tiendas, sp.tienda);
   const miradas = tienda ? [tienda] : tiendas;
-  after(() => revisarSiHaceFalta(createServiceClient(), tiendas));
+  // Solo la tienda que se mira (14 nov 2026: «si abro Kenku, que se actualice Kenku»); con «Todas», todas.
+  after(() => revisarSiHaceFalta(createServiceClient(), miradas));
   const { pedidos, fuente } = await pedidosDeTiendas(supabase, miradas, pais.codigo, { tipo: "atajo", id: "hoy" }, { minDias: DIAS_LOGISTICA });
   // Lo que se gestiona: los que llegaron de Shopify (los del Excel de Finanzas son una foto vieja), por preparar o en ruta, lo más viejo arriba.
   // Desde el 12 nov 2026 lo que Monday o Servientrega dan por entregado o devuelto pasa a esa fase en la orden: para que las tarjetas Entregados y
@@ -52,7 +53,10 @@ export default async function LogisticaTiendaPage({ searchParams }: { searchPara
   const [entregas, guias, { data: lecturas }] = await Promise.all([
     entregasDeOrdenes(supabase, ids),
     guiasDeOrdenes(supabase, ids),
-    supabase.from("tienda_guias_lecturas").select("fin").eq("estado", "listo").order("fin", { ascending: false }).limit(1),
+    // La última lectura de SISCORE de la tienda que se mira (14 nov 2026: van por tienda); con «Todas», la última de cualquiera.
+    (tienda ? supabase.from("tienda_guias_lecturas").select("fin").eq("estado", "listo").eq("tienda_id", tienda.id) : supabase.from("tienda_guias_lecturas").select("fin").eq("estado", "listo"))
+      .order("fin", { ascending: false })
+      .limit(1),
   ]);
   for (const p of candidatos) {
     const g = guias.get(p.id) ?? null;
@@ -85,7 +89,7 @@ export default async function LogisticaTiendaPage({ searchParams }: { searchPara
         <>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <BarraTienda ruta="/tienda-logistica" tiendas={tiendas} tiendaId={tienda?.id ?? null} />
-            {puedeLeer && <LeerSiscore ultima={ultimaSiscore ? formatearFechaHora(ultimaSiscore) : null} />}
+            {puedeLeer && <LeerSiscore key={tienda?.id ?? "todas"} ultima={ultimaSiscore ? formatearFechaHora(ultimaSiscore) : null} tiendaId={tienda?.id ?? null} tiendaNombre={tienda?.nombre ?? null} />}
           </div>
           <AvisoConexion tiendas={miradas} finanzas={fuente} />
           <LogisticaTienda
