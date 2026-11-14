@@ -160,6 +160,12 @@ export const COLUMNAS: ColumnaTabla<PedidoFila, Contexto>[] = [
               {monday}
             </span>
           )}
+          {/* El caso de cambios y reembolsos de Monday (14 nov 2026), en cualquier estado del pedido. */}
+          {p.postventa && (
+            <span className="max-w-[10rem] truncate text-xs font-medium text-primary" title={`Cambios y reembolsos (Monday): ${p.postventa}`}>
+              {p.postventa}
+            </span>
+          )}
         </span>
       );
     },
@@ -262,6 +268,15 @@ export function defPedidos(tiendas: Record<string, string>): DefTabla<PedidoFila
         etiquetaSinValor: "En camino sin registro",
         agrupable: true,
       },
+      // Monday «CAMBIOS Y REEMBOLSOS» (14 nov 2026): el caso más reciente del pedido («Reembolso · Hecho», «Cambio · En Proceso»).
+      {
+        id: "postventa",
+        etiqueta: "Cambios y reembolsos",
+        tipo: "seleccion",
+        valores: (p) => [p.postventa ?? SIN_VALOR],
+        etiquetaSinValor: "Sin cambios ni reembolsos",
+        agrupable: true,
+      },
       { id: "fecha", etiqueta: "Fecha", tipo: "fecha", valor: (p) => diaPanama(p.creado) },
       { id: "total", etiqueta: "Total", tipo: "numero", valor: (p) => p.total },
     ],
@@ -279,6 +294,7 @@ export function defPedidos(tiendas: Record<string, string>): DefTabla<PedidoFila
       { etiqueta: "Guía", valor: (p) => p.guia ?? "" },
       { etiqueta: "Monday / SISCORE", valor: (p) => (p.estado === "en_camino" ? (etiquetaEntrega(p.entrega) ?? "") : "") },
       { etiqueta: "Motivo (Monday)", valor: (p) => (p.estado === "en_camino" ? (p.entrega?.causa ?? "") : "") },
+      { etiqueta: "Cambios y reembolsos", valor: (p) => p.postventa ?? "" },
     ],
     pdf: ["Pedido", "Fecha y hora", "Cliente", "Productos", "Total", "Estado", "Zona", "Lugar"],
   };

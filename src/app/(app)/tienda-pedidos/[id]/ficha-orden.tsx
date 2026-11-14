@@ -6,11 +6,12 @@ import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
 import { formatearFecha, formatearFechaHora, formatearMoneda } from "@/lib/formato";
-import { CheckIcon, CopiarIcon, EnvioIcon, HistorialIcon, InteligenciaIcon, MargenIcon, PersonaIcon, ProductoIcon, TareasIcon, ChatIcon } from "@/lib/nav-icons";
+import { CheckIcon, CopiarIcon, EnvioIcon, HistorialIcon, InteligenciaIcon, MargenIcon, PersonaIcon, ProductoIcon, TareasIcon, ChatIcon, TransferirIcon } from "@/lib/nav-icons";
 import type { Asistente, Nivel } from "@/lib/tienda/asistente";
 import { NOMBRE_FUENTE_COSTO } from "@/lib/tienda/costos";
 import { pasosDelPedido, type PasoPedido } from "@/lib/tienda/linea-tiempo";
 import type { OrdenTienda } from "@/lib/tienda/orden-detalle";
+import { casoAbierto, tipoPrincipal, type CasoPedido } from "@/lib/tienda/postventa-tienda";
 import { etiquetasDe, zonaDeEtiquetas } from "@/lib/tienda/ordenes-finanzas";
 import { NotasOrden } from "./notas-orden";
 import { ChatTienda } from "@/components/tienda/chat-tienda";
@@ -25,6 +26,7 @@ const SECCIONES = [
   { id: "productos", titulo: "Productos", icono: ProductoIcon },
   { id: "costos", titulo: "Ingresos y costos", icono: MargenIcon },
   { id: "entrega", titulo: "Entrega", icono: EnvioIcon },
+  { id: "postventa", titulo: "Cambios y reembolsos", icono: TransferirIcon },
   { id: "notas", titulo: "Notas del equipo", icono: TareasIcon },
   { id: "historial", titulo: "Historial", icono: HistorialIcon },
 ] as const;
@@ -51,6 +53,40 @@ function Seccion({ id, titulo, icono: Icono, extra, children }: { id: string; ti
       </div>
       {children}
     </section>
+  );
+}
+
+/** Un caso del tablero «CAMBIOS Y REEMBOLSOS» de Monday (14 nov 2026): qué se hizo, en qué estado está y el detalle que escribió el equipo. */
+function CasoPostventa({ c, codigoPais }: { c: CasoPedido; codigoPais: string }) {
+  const abierto = casoAbierto(c);
+  const filas: [string, string | null][] = [
+    ["Retirar", c.retirar],
+    ["Enviar", c.enviar],
+    ["Reembolso", c.reembolso !== null ? `${formatearMoneda(c.reembolso, codigoPais)}${c.reembolsoTexto && !/^\$?\s*[\d.,]+\s*\$?$/.test(c.reembolsoTexto) ? ` · ${c.reembolsoTexto}` : ""}` : c.reembolsoTexto],
+    ["Penalización", c.penalizacion],
+    ["Costo del envío", c.costoEnvio],
+    ["Motivo", c.motivo],
+    ["Observación", c.observacion],
+    ["Última nota", c.ultimaNota],
+  ];
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-border p-3">
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <b>{c.tipos.length > 1 ? c.tipos.map((t) => tipoPrincipal([t])).join(" y ") : tipoPrincipal(c.tipos)}</b>
+        <Pastilla tono={abierto ? "aviso" : "exito"}>{c.estado ?? (abierto ? "En proceso" : "Hecho")}</Pastilla>
+        {c.fecha && <span className="text-muted-foreground">{formatearFecha(c.fecha)}</span>}
+      </div>
+      <dl className="m-0 flex flex-col gap-1">
+        {filas
+          .filter(([, v]) => v)
+          .map(([e, v]) => (
+            <div key={e} className="flex gap-3 text-xs">
+              <dt className="w-28 shrink-0 text-muted-foreground">{e}</dt>
+              <dd className="m-0 min-w-0 break-words">{v}</dd>
+            </div>
+          ))}
+      </dl>
+    </div>
   );
 }
 
@@ -396,6 +432,14 @@ export function FichaOrdenTienda({ orden, codigoPais, puedeEscribir }: { orden: 
                   <Pastilla key={e}>{e}</Pastilla>
                 ))}
               </div>
+            )}
+          </Seccion>
+
+          <Seccion id={sid("postventa")} titulo={S("postventa").titulo} icono={S("postventa").icono} extra={<span className="text-xs text-muted-foreground">del tablero de Monday</span>}>
+            {orden.postventa.length ? (
+              orden.postventa.map((c, i) => <CasoPostventa key={i} c={c} codigoPais={codigoPais} />)
+            ) : (
+              <p className="m-0 text-sm text-muted-foreground">Monday no tiene cambios, reembolsos ni complementos de este pedido.</p>
             )}
           </Seccion>
 

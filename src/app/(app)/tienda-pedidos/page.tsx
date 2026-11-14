@@ -8,6 +8,7 @@ import { cargarTiendas, periodoElegido, tiendaElegida } from "@/lib/tienda/datos
 import { after } from "next/server";
 import { pedidosDeTiendas } from "@/lib/tienda/datos-finanzas";
 import { entregasDeOrdenes, guiasDeOrdenes } from "@/lib/tienda/entregas-monday";
+import { etiquetaPostventa, postventaDePedidos } from "@/lib/tienda/postventa-tienda";
 import { revisarSiHaceFalta } from "@/lib/tienda/conectar-shopify";
 import { PedidosTienda } from "./pedidos-tienda";
 import { parametrosPeriodo } from "@/lib/tienda/rango";
@@ -56,6 +57,9 @@ export default async function PedidosTiendaPage({ searchParams }: { searchParams
     const [entregas, guias] = await Promise.all([entregasDeOrdenes(supabase, enCamino), guiasDeOrdenes(supabase, enCamino)]);
     for (const p of pedidos) if (p.estado === "en_camino") p.entrega = guias.get(p.id) ?? entregas.get(p.id) ?? null;
   }
+  // Los cambios, reembolsos, retiros y complementos de Monday (14 nov 2026): la etiqueta del caso más reciente de cada pedido.
+  const casos = await postventaDePedidos(supabase, pedidos.map((p) => p.id));
+  for (const p of pedidos) p.postventa = etiquetaPostventa(casos.get(p.id));
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-5">
       <EncabezadoPagina titulo="Pedidos de tienda" oculto>

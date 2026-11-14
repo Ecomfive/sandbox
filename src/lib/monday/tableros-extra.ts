@@ -33,7 +33,13 @@ export function mapeoPorTitulos(mapeo: MapeoColumnas, principal: ColumnaTablero[
 /** Lee los tableros de los repartidores que alcancen antes de `limite`. Sin la migración 0282 o sin tableros, no hace nada. */
 export async function sincronizarTablerosExtra(supabase: SupabaseClient, limite: number): Promise<string> {
   if (!mondayConfigurado()) return "";
-  const { data: tableros, error } = await supabase.from("mon_tableros_extra").select("tablero_id, nombre, columnas, cursor_actualizado").eq("activo", true).order("ultima_lectura", { ascending: true, nullsFirst: true });
+  // Solo los de despachos: el de cambios y reembolsos (clase «postventa», migración 0290) lo lee `postventa.ts`. Sin la 0290 no hay columna `clase`.
+  const consulta = (conClase: boolean) => {
+    const q = supabase.from("mon_tableros_extra").select("tablero_id, nombre, columnas, cursor_actualizado").eq("activo", true);
+    return (conClase ? q.eq("clase", "despachos") : q).order("ultima_lectura", { ascending: true, nullsFirst: true });
+  };
+  let { data: tableros, error } = await consulta(true);
+  if (error && /clase/.test(error.message)) ({ data: tableros, error } = await consulta(false));
   if (error || !tableros?.length) return "";
   const { data: cfg } = await supabase.from("mon_config").select("tablero_id, columnas, estados").eq("id", 1).maybeSingle();
   const mapeoPrincipal = leerMapeo(cfg?.columnas);

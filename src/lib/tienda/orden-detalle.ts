@@ -2,6 +2,7 @@
 // (12 nov 2026). Solo lectura. Solo órdenes de tiendas del país que se pide (si no, null).
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { postventaDeOrdenes, type CasoPedido } from "./postventa-tienda";
 import { datosAsistente, evaluarAsistente, type Asistente } from "./asistente";
 import { costosDeProductos, cuentasDelPedido, type CostoProducto, type IngresosYCostos } from "./costos";
 import { hayHoraDeShopify } from "./datos-finanzas";
@@ -119,6 +120,8 @@ export interface OrdenTienda {
   eventos: EventoOrden[];
   /** Lo que dicen Monday o Servientrega; null si ninguno lo tiene. */
   entrega: EntregaOrden | null;
+  /** Los cambios, reembolsos, retiros y complementos del tablero «CAMBIOS Y REEMBOLSOS» de Monday, del más nuevo al más viejo (14 nov 2026). */
+  postventa: CasoPedido[];
   /** El chat de WhatsApp del cliente, si escribió a algún número del sistema. */
   whatsapp: WhatsappOrden | null;
   /** El asistente de confirmación (13 nov 2026): riesgo, dirección, transportadora y conversación, con lo registrado. */
@@ -133,7 +136,7 @@ export async function cargarOrdenTienda(supabase: SupabaseClient, id: string, pa
   const o = crudo as unknown as (OrdenFinanzas & { fin_unidades: unknown; costo_envio?: number | null; costo_envio_real?: number | null }) | null;
   const unidad = (o?.fin_unidades ?? null) as { nombre: string; pais_id: string; clase: string; tarifa_fulfillment: number | null } | null;
   if (!o || !unidad || unidad.clase !== "tienda" || unidad.pais_id !== paisId) return null;
-  const [{ data: lineas }, { data: tiendasPais }, { data: cliente }, { data: notas }, eventos, entrega] = await Promise.all([
+  const [{ data: lineas }, { data: tiendasPais }, { data: cliente }, { data: notas }, eventos, entrega, postventa] = await Promise.all([
     supabase.from("ven_orden_lineas").select("linea, producto, cantidad, precio, es_servicio, sku_maestro_id, skus_maestros(codigo, nombre)").eq("orden_id", id).order("linea"),
     supabase.from("tiendas").select("nombre, dominio").eq("pais_id", paisId),
     supabase.from("ven_ordenes_clientes").select("nombre, telefono, direccion, corregimiento, notas, telefono_clave").eq("orden_id", id).maybeSingle(),
@@ -146,6 +149,7 @@ export async function cargarOrdenTienda(supabase: SupabaseClient, id: string, pa
       .limit(100)
       .then((r) => (r.error ? [] : ((r.data ?? []) as EventoOrden[]))),
     entregaDeOrden(supabase, id),
+    postventaDeOrdenes(supabase, [id]).then((m) => m.get(id) ?? []),
   ]);
   // Los otros pedidos del mismo cliente (por su teléfono normalizado), como en Mi Reto Digital: cuántos y cuántos se entregaron.
   const clave = (cliente as { telefono_clave?: string | null } | null)?.telefono_clave ?? null;
@@ -204,6 +208,7 @@ export async function cargarOrdenTienda(supabase: SupabaseClient, id: string, pa
     notas: (notas ?? []) as NotaOrden[],
     eventos,
     entrega,
+    postventa,
     whatsapp,
     asistente,
   };

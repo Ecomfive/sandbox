@@ -98,6 +98,8 @@ export interface PedidoFila extends PedidoResumen {
   entrega?: EntregaMonday | null;
   /** Logística (13 nov 2026): por qué hay que verificar el pedido (`razonAVerificar`); sin el campo, nada. */
   aVerificar?: string | null;
+  /** Monday «CAMBIOS Y REEMBOLSOS» (14 nov 2026): la etiqueta del caso más reciente del pedido («Reembolso · Hecho»); sin el campo, ninguno. */
+  postventa?: string | null;
   tiendaId: string;
   numero: string;
   cliente: string | null;

@@ -11,6 +11,7 @@ import { cargarTiendas, tiendaElegida } from "@/lib/tienda/datos";
 import { pedidosDeTiendas } from "@/lib/tienda/datos-finanzas";
 import { entregasDeOrdenes, guiasDeOrdenes } from "@/lib/tienda/entregas-monday";
 import { etapaLogistica, razonAVerificar } from "@/lib/tienda/logistica";
+import { tipoPrincipal } from "@/lib/tienda/postventa-tienda";
 import type { SinPedidoMonday } from "./logistica-tienda";
 import { diaPanama } from "@/lib/tienda/resumen";
 import { LeerSiscore } from "./leer-siscore";
@@ -110,7 +111,7 @@ const DIAS_SIN_PEDIDO = 45;
 async function mondaySinPedido(supabase: ReturnType<typeof createServiceClient>, unidades: string[]): Promise<SinPedidoMonday[]> {
   if (!unidades.length) return [];
   const desde = new Date(ahoraMismo() - DIAS_SIN_PEDIDO * 86_400_000).toISOString();
-  const [{ data, error }, { data: extra }, { data: cfg }] = await Promise.all([
+  const [{ data, error }, { data: extra }, { data: cfg }, { data: casos }] = await Promise.all([
     supabase
       .from("mon_despachos")
       .select("numero_pedido, tablero_id, estado, estado_asesores, observaciones_asesores, courier, actualizado_monday")
@@ -121,6 +122,15 @@ async function mondaySinPedido(supabase: ReturnType<typeof createServiceClient>,
       .limit(300),
     supabase.from("mon_tableros_extra").select("tablero_id, nombre"),
     supabase.from("mon_config").select("tablero_id, tablero_nombre").eq("id", 1).maybeSingle(),
+    // Los cambios y reembolsos de Monday (migración 0290) cuyo pedido no está en el sistema; sin la tabla, ninguno.
+    supabase
+      .from("mon_postventa")
+      .select("numero_pedido, nombre, tipos, estado, motivo, creado_monday")
+      .is("orden_id", null)
+      .in("unidad_id", unidades)
+      .gte("creado_monday", desde)
+      .order("creado_monday", { ascending: false })
+      .limit(100),
   ]);
   if (error) return [];
   const nombres = new Map<string, string>(((extra ?? []) as { tablero_id: string; nombre: string }[]).map((t) => [t.tablero_id, t.nombre]));
@@ -138,6 +148,16 @@ async function mondaySinPedido(supabase: ReturnType<typeof createServiceClient>,
       nota: x.observaciones_asesores ?? null,
       repartidor: (x.courier ?? "").replace(/\s+/g, " ").trim() || null,
       fecha: x.actualizado_monday ? String(x.actualizado_monday).slice(0, 10) : null,
+    });
+  }
+  for (const x of (casos ?? []) as Record<string, unknown>[]) {
+    filas.push({
+      numero: String(x.numero_pedido ?? x.nombre ?? "").trim() || "sin número",
+      tablero: "Cambios y reembolsos",
+      estado: [tipoPrincipal(Array.isArray(x.tipos) ? (x.tipos as string[]) : []), x.estado].filter(Boolean).join(" · "),
+      nota: (x.motivo as string | null) ?? null,
+      repartidor: null,
+      fecha: x.creado_monday ? String(x.creado_monday).slice(0, 10) : null,
     });
   }
   return filas;
