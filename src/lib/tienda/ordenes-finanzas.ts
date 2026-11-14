@@ -4,6 +4,7 @@
 // Aquí, sin base ni React, cómo se traduce cada orden a lo que muestran las pantallas. Con prueba.
 
 import type { EstadoPedido, Vendido } from "./resumen";
+import { unidadDeTienda } from "../ventas/matriz";
 
 /**
  * El estado de un pedido a partir del estado de entrega del Excel de Finanzas y sus etiquetas de Shopify. Igual que el ciclo de Finanzas
@@ -67,6 +68,15 @@ export const nombreComparable = (t: string) =>
     .toUpperCase()
     .replace(/\s+/g, " ")
     .trim();
+
+/**
+ * Si la tienda del sistema es esa unidad de Finanzas: por el nombre («Kenku» = KENKU) o por el alias de la Matriz de ventas (14 nov 2026, al crear
+ * Oferfy: la tienda se llama «Oferfy» y su unidad «OFERFY PAN»; igual Nuvo → NUVO PAN).
+ */
+export const mismaTiendaUnidad = (tienda: string, unidad: string): boolean => {
+  const u = nombreComparable(unidad);
+  return nombreComparable(tienda) === u || nombreComparable(unidadDeTienda(tienda)) === u;
+};
 
 export interface LineaFinanzas {
   pedidoId: string;

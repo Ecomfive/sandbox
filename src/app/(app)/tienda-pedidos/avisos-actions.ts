@@ -3,7 +3,7 @@
 import { getUsuarioActual } from "@/lib/auth";
 import { puedeVerPais } from "@/lib/paises-permitidos";
 import { createServiceClient } from "@/lib/supabase/server";
-import { nombreComparable } from "@/lib/tienda/ordenes-finanzas";
+import { mismaTiendaUnidad } from "@/lib/tienda/ordenes-finanzas";
 
 // El aviso de «Nuevo pedido» (12 nov 2026, pedido de Hernán: «si cae un pedido, nos cae a nosotros en el sistema y nos da un aviso, como lo hace el de
 // Jorge»). El navegador pregunta cada 30 segundos por los pedidos que llegaron de Shopify desde la última vez; solo los de tiendas conectadas, de los
@@ -37,7 +37,7 @@ export async function pedidosNuevos(desde: string): Promise<{ pedidos: PedidoNue
   const { data: unidades } = await supabase.from("fin_unidades").select("id, nombre, pais").eq("clase", "tienda").in("pais", [...new Set(visibles.map((v) => v.pais))]);
   const nombreDe = new Map<string, string>();
   for (const u of unidades ?? []) {
-    const t = visibles.find((v) => v.pais === u.pais && nombreComparable(v.nombre) === nombreComparable(u.nombre as string));
+    const t = visibles.find((v) => v.pais === u.pais && mismaTiendaUnidad(v.nombre, u.nombre as string));
     if (t) nombreDe.set(u.id as string, t.nombre);
   }
   if (!nombreDe.size) return { pedidos: [], hasta: ahora };

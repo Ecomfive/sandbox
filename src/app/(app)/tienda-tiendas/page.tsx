@@ -154,7 +154,7 @@ export default async function TiendasPage({ searchParams }: { searchParams: Prom
               read_orders, read_customers, read_products y read_fulfillments, con acceso a los datos protegidos de clientes, y se instala en la tienda.
             </li>
             <li>
-              <b>Sus claves van en Vercel</b>, nunca en un chat: SHOPIFY_KENKU_CLIENT_ID, SHOPIFY_KENKU_CLIENT_SECRET y SHOPIFY_KENKU_DOMINIO (para otra tienda,
+              <b>Sus claves van en Vercel</b>, nunca en un chat: SHOPIFY_KENKU_CLIENT_ID, SHOPIFY_KENKU_CLIENT_SECRET y SHOPIFY_KENKU_DOMINIO (para Oferfy, SHOPIFY_OFERFY_…; para otra tienda,
               su nombre en lugar de KENKU). Luego, «Redeploy».
             </li>
             <li>
