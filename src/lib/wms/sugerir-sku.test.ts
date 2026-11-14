@@ -22,12 +22,21 @@ test("cantidad que dice el nombre de un pack", () => {
   assert.equal(cantidadEnNombre("Crema Nida"), null);
 });
 
+test("«N en 1» distingue al producto y va como NEN1", () => {
+  assert.equal(sugerirSku("Shilajit en Capsula (8 en 1)"), "SHILAJIT/CAPSULA/8EN1");
+  assert.equal(sugerirSku("Shilajit 8-en-1 cápsulas"), "SHILAJIT/CAPSULAS/8EN1");
+  assert.equal(sugerirSku("Shilajit 8EN1"), "SHILAJIT/8EN1");
+  assert.deepEqual(distintivosDeNombre("Multivitamínico 10 en 1 60 capsulas"), ["10EN1", "60"]);
+  // «2x1» es un pack, no un «N en 1».
+  assert.deepEqual(distintivosDeNombre("Crema 2x1"), []);
+});
+
 test("las palabras del nombre, sin relleno, títulos ni medidas", () => {
   assert.equal(sugerirSku("Bálsamo Púrpura Dr. Melaxin 9g"), "BALSAMO/PURPURA/MELAXIN");
   assert.equal(sugerirSku("Crema Lifting Botox Veneno de Abeja"), "CREMA/LIFTING/BOTOX");
   assert.equal(sugerirSku("Aceite de Oregano 300 capsulas Verde"), "ACEITE/OREGANO/CAPSULAS/300/VERDE");
   assert.equal(sugerirSku("Set De Pestañas Magneticas"), "SET/PESTANAS/MAGNETICAS");
-  assert.equal(sugerirSku("2x1 Escoba 3 en 1"), "ESCOBA");
+  assert.equal(sugerirSku("2x1 Escoba 3 en 1"), "ESCOBA/3EN1");
   assert.equal(sugerirSku(""), "");
 });
 
@@ -70,7 +79,7 @@ test("un SKU muy largo se corta en una barra", () => {
 });
 
 test("el SKU de un compuesto (pack o combo) siempre empieza por COMBO, sin repetir «combo» ni «pack» del nombre", () => {
-  assert.equal(sugerirSku("Oxido Nítrico + Shilajit 8 EN 1 Regalo", 3, { compuesto: true }), "COMBO/OXIDO/NITRICO/SHILAJIT");
+  assert.equal(sugerirSku("Oxido Nítrico + Shilajit 8 EN 1 Regalo", 3, { compuesto: true }), "COMBO/OXIDO/NITRICO/SHILAJIT/8EN1");
   assert.equal(sugerirSku("Pack x2 Crema Nida", 3, { compuesto: true }), "COMBO/CREMA/NIDA");
   assert.equal(sugerirSku("Combo Aceite de Orégano 300 capsulas Verde", 3, { compuesto: true }), "COMBO/ACEITE/OREGANO/CAPSULAS/300/VERDE");
   // Un pack por cantidad del mismo producto no lleva la cantidad en el SKU (X2, PACK/2, 2x1, x3, «de 2», «por 3»).

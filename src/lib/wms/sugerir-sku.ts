@@ -35,7 +35,7 @@ const separar = (nombre: string) =>
     .map((p) => p.trim())
     .filter(Boolean);
 
-/** Lo que distingue al producto según su nombre, en orden de aparición: cantidad de cápsulas, colores y talla («300», «VERDE»). */
+/** Lo que distingue al producto según su nombre, en orden de aparición: «8 en 1», cantidad de cápsulas, colores y talla («8EN1», «300», «VERDE»). */
 export function distintivosDeNombre(nombre: string): string[] {
   const partes = separar(nombre).map(palabraSku);
   const salida: string[] = [];
@@ -46,7 +46,11 @@ export function distintivosDeNombre(nombre: string): string[] {
     const p = partes[i];
     if (!p) continue;
     const pegado = /^(\d{2,4})([A-Z]+)$/.exec(p);
-    if (pegado && CONTEO.has(pegado[2])) agregar(pegado[1]);
+    const nEnUno = /^(\d{1,2})EN1$/.exec(p);
+    // «8 en 1», «8-en-1», «8en1»: dice qué es el producto (11 nov 2026, pedido de Jhokser: «Shilajit 8 en 1» es más descriptivo que «Shilajit cápsula»); va como «8EN1».
+    if (nEnUno) agregar(`${nEnUno[1]}EN1`);
+    else if (/^\d{1,2}$/.test(p) && partes[i + 1] === "EN" && partes[i + 2] === "1") agregar(`${p}EN1`);
+    else if (pegado && CONTEO.has(pegado[2])) agregar(pegado[1]);
     else if (/^\d{2,4}$/.test(p) && CONTEO.has(partes[i + 1] ?? "")) agregar(p);
     else if (COLORES.has(p)) agregar(p);
     else if (TALLAS.has(p)) agregar(p);
