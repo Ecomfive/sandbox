@@ -66,6 +66,8 @@ test("postventa: del comentario solo se guardan los datos del caso, nunca la cue
   const todo = JSON.stringify(d);
   assert.doesNotMatch(todo, /Persona Inventada|Banco Inventado|123456|ahorros/);
   assert.equal(taparDatos("llamar al +507 6123-4567 o a alguien@correo.com"), "llamar al ••• o a •••");
+  // El número de pedido (hasta 6 cifras) queda a la vista.
+  assert.equal(taparDatos("Oferfy: Realizar cambio #146665"), "Oferfy: Realizar cambio #146665");
 });
 
 test("postventa: «ENVIO:» puede ser el producto o lo que cuesta; «RETIRO: costeado…» es el costo", () => {

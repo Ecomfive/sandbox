@@ -5,7 +5,7 @@
 // clase «postventa», migración 0290) y guarda cada caso en `mon_postventa`, enlazado a su pedido por tienda y número.
 //
 // Del comentario solo se guardan los datos del caso, por su rótulo. Nunca se guardan el nombre, la cuenta bancaria, el banco, el correo, la dirección
-// ni el teléfono que el equipo escribe para hacer el reembolso; además, en todo lo guardado los números largos (6 cifras o más) se tapan.
+// ni el teléfono que el equipo escribe para hacer el reembolso; además, en todo lo guardado los números largos (7 cifras o más) se tapan.
 //
 // Cada lectura trae los ítems actualizados desde la última lectura y, además, los creados en los últimos 60 días (un comentario nuevo no siempre
 // cambia la «última actualización» del ítem). La primera vez, los creados desde el 1 de abril de 2026 (las órdenes del sistema empiezan ahí).
@@ -67,9 +67,10 @@ const corto = (v: string | null | undefined, n: number): string | null => {
   return t ? t.slice(0, n) : null;
 };
 
-/** Tapa lo que puede ser una cuenta, un teléfono o un correo: números de 6 cifras o más (con espacios o guiones en medio) y direcciones de correo. */
+/** Tapa lo que puede ser una cuenta, un teléfono o un correo: números de 7 cifras o más (con espacios o guiones en medio) y direcciones de correo. Los
+ * números de pedido tienen hasta 6 cifras (Oferfy #146665) y quedan a la vista; un teléfono (8) o una cuenta (10 o más) no. */
 export function taparDatos(texto: string): string {
-  return texto.replace(/[\w.+-]+@[\w-]+\.[\w.]+/g, "•••").replace(/\+?\d(?:[\s-]?\d){5,}/g, "•••");
+  return texto.replace(/[\w.+-]+@[\w-]+\.[\w.]+/g, "•••").replace(/\+?\d(?:[\s-]?\d){6,}/g, "•••");
 }
 
 /** La tienda escrita en el nombre o el comentario del caso («KENKU», «Oferfy», «ClickSI»…), con el nombre con que se busca la unidad. */
@@ -330,5 +331,5 @@ export async function sincronizarPostventa(supabase: SupabaseClient, limite: num
       hechos.push(`${t.nombre}: ${msg}`);
     }
   }
-  return hechos.length ? `Cambios y reembolsos: ${hechos.join("; ")}.` : "";
+  return hechos.length ? `${hechos.join("; ")}.` : "";
 }
