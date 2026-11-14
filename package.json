@@ -11,6 +11,7 @@
     "revisar:consultas": "node scripts/revisar-consultas.cjs --estricto"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.8.0",
     "@breezystack/lamejs": "1.2.7",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.116.0",

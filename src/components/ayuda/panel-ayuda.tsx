@@ -5,7 +5,8 @@ import Link from "next/link";
 import { anilloFoco } from "@/components/ui/field";
 import { MODULOS_CON_GUIA } from "@/lib/ayuda/guias-indice";
 import { formatearFecha } from "@/lib/formato";
-import { AyudaIcon, CatalogoIcon, HistorialIcon, UniversidadIcon } from "@/lib/nav-icons";
+import { AyudaIcon, CatalogoIcon, HistorialIcon, InteligenciaIcon, UniversidadIcon } from "@/lib/nav-icons";
+import { AsistenteChat } from "./asistente-chat";
 import { obtenerPanelAyuda } from "@/app/(app)/ayuda/actions";
 import { BuscadorAyuda } from "./buscador-ayuda";
 
@@ -25,6 +26,7 @@ function guiaDeRuta(pathname: string): string | null {
  */
 export function PanelAyuda({ pathname }: { pathname: string }) {
   const [datos, setDatos] = useState<Datos | null>(null);
+  const [chat, setChat] = useState(false);
   useEffect(() => {
     let vigente = true;
     obtenerPanelAyuda()
@@ -48,6 +50,16 @@ export function PanelAyuda({ pathname }: { pathname: string }) {
         <p className="m-0 text-sm font-semibold">¿En qué te ayudamos?</p>
         <div className="mt-2">{datos ? <BuscadorAyuda indice={datos.indice} autoFocus /> : <p className="m-0 text-xs opacity-80">Cargando…</p>}</div>
       </div>
+
+      {/* El asistente con IA (14 nov 2026): responde desde el Centro de ayuda y con datos del sistema, con los permisos de quien pregunta. */}
+      <button type="button" onClick={() => setChat(true)} className={`flex items-center gap-2 rounded-lg border border-primario/40 bg-card px-3 py-2.5 text-left text-sm font-medium hover:border-primario hover:bg-primario-suave ${anilloFoco}`}>
+        <InteligenciaIcon className="h-4 w-4 shrink-0 text-primario" aria-hidden="true" />
+        <span className="flex flex-col">
+          Pregúntale al sistema
+          <span className="text-[11px] font-normal text-muted-foreground">Con IA: cómo se hace algo, stock, compras, pedidos</span>
+        </span>
+      </button>
+      <AsistenteChat abierto={chat} alCerrar={() => setChat(false)} />
 
       {guia && (
         <Link href={`/ayuda/guias/${guia}`} className={`flex items-center gap-2 rounded-lg border border-primario/40 bg-primario-suave px-3 py-2 text-sm font-medium text-primario hover:border-primario ${anilloFoco}`}>
