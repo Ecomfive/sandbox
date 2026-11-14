@@ -7,6 +7,7 @@ import { sincronizarTienda } from "@/lib/finanzas/sincronizar-shopify";
 import { accesoDeApp, appDeTienda, permisosDeEscritura, type AppTienda } from "./shopify-app";
 import { completarTelefonosDeTienda } from "./telefono-cliente";
 import { aplicarVinculosDeTienda, traerProductosTienda } from "./productos-shopify";
+import { unidadDeTienda } from "@/lib/ventas/matriz";
 
 /** Cada cuánto, como mínimo, se vuelven a traer los productos de Shopify en la revisión. */
 const PRODUCTOS_CADA_MS = 12 * 3_600_000;
@@ -73,7 +74,7 @@ export async function registrarAvisos(app: AppTienda, token: string, urlBase: st
 
 /** El último día con órdenes de esa unidad que no vinieron de Shopify (el Excel de Finanzas), para traer desde un poco antes. */
 async function ultimoDiaDelExcel(supabase: SupabaseClient, tienda: string): Promise<string | null> {
-  const { data: u } = await supabase.from("fin_unidades").select("id").ilike("nombre", tienda).maybeSingle();
+  const { data: u } = await supabase.from("fin_unidades").select("id").ilike("nombre", unidadDeTienda(tienda)).maybeSingle();
   if (!u) return null;
   const { data } = await supabase.from("ven_ordenes").select("fecha").eq("unidad_id", u.id).neq("origen", "shopify").order("fecha", { ascending: false }).limit(1).maybeSingle();
   return (data?.fecha as string | undefined) ?? null;
@@ -114,7 +115,7 @@ export async function conectarTienda(supabase: SupabaseClient, tiendaId: string,
 
 /** El día (ISO) de la orden de Shopify más vieja de esa tienda que todavía no tiene su hora, o undefined (o sin la migración 0276). */
 async function desdeSinHora(supabase: SupabaseClient, tienda: string): Promise<string | undefined> {
-  const { data: u } = await supabase.from("fin_unidades").select("id").ilike("nombre", tienda).maybeSingle();
+  const { data: u } = await supabase.from("fin_unidades").select("id").ilike("nombre", unidadDeTienda(tienda)).maybeSingle();
   if (!u) return undefined;
   const { data, error } = await supabase
     .from("ven_ordenes")
@@ -138,7 +139,7 @@ export async function revisarTienda(supabase: SupabaseClient, tienda: { id: stri
   const desde = await desdeSinHora(supabase, app.tienda);
   const r = await sincronizarTienda(supabase, { tienda: app.tienda, dominio: app.dominio, token }, Date.now() + limiteMs, desde);
   // Los clientes de los pedidos que llegaron antes sin su teléfono normalizado (para juntar sus pedidos).
-  const { data: u } = await supabase.from("fin_unidades").select("id").ilike("nombre", app.tienda).maybeSingle();
+  const { data: u } = await supabase.from("fin_unidades").select("id").ilike("nombre", unidadDeTienda(app.tienda)).maybeSingle();
   if (u) await completarTelefonosDeTienda(supabase, u.id as string);
   await productosSiHaceFalta(supabase, tienda);
   await supabase.from("tiendas").update({ ultima_revision_en: new Date().toISOString() }).eq("id", tienda.id);

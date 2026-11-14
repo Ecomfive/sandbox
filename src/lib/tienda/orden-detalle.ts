@@ -6,7 +6,7 @@ import { postventaDeOrdenes, type CasoPedido } from "./postventa-tienda";
 import { datosAsistente, evaluarAsistente, type Asistente } from "./asistente";
 import { costosDeProductos, cuentasDelPedido, type CostoProducto, type IngresosYCostos } from "./costos";
 import { hayHoraDeShopify } from "./datos-finanzas";
-import { nombreComparable } from "./ordenes-finanzas";
+import { mismaTiendaUnidad } from "./ordenes-finanzas";
 
 export interface OrdenFinanzas {
   numero: string | null;
@@ -160,7 +160,7 @@ export async function cargarOrdenTienda(supabase: SupabaseClient, id: string, pa
     const r = (Array.isArray(x.ven_ordenes) ? x.ven_ordenes[0] : x.ven_ordenes) as { estado_entrega: string | null } | null;
     return r?.estado_entrega ?? null;
   });
-  const tiendaSistema = (tiendasPais ?? []).find((t) => nombreComparable(t.nombre as string) === nombreComparable(unidad.nombre));
+  const tiendaSistema = (tiendasPais ?? []).find((t) => mismaTiendaUnidad(t.nombre as string, unidad.nombre));
   const dominio = (tiendaSistema?.dominio as string | null | undefined) ?? null;
   const enShopify = o.origen === "shopify" && dominio && o.numero ? `https://${dominio}/admin/orders?query=${encodeURIComponent(String(o.numero).replace(/^#/, ""))}` : null;
   // Ingresos y costos: el costo de cada producto en el país (el costo promedio de compra del producto: del país o, si no hay, de todos), el fulfillment de la unidad y el flete del pedido.

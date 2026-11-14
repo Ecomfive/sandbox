@@ -6,7 +6,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { huellaFoto } from "@/lib/wms/huella-foto";
 import { descargarPublico } from "@/lib/seguridad/url-externa";
-import { nombreComparable } from "./ordenes-finanzas";
+import { mismaTiendaUnidad, nombreComparable } from "./ordenes-finanzas";
 import { accesoDeApp, appDeTienda } from "./shopify-app";
 
 const VERSION_API = "2026-07";
@@ -132,7 +132,7 @@ async function unidadDeTienda(supabase: SupabaseClient, tiendaId: string): Promi
   if (!t) return null;
   const pais = (Array.isArray(t.paises) ? t.paises[0] : t.paises) as { codigo: string } | null;
   const { data: us } = await supabase.from("fin_unidades").select("id, nombre").eq("clase", "tienda").eq("pais", pais?.codigo ?? "");
-  return (us ?? []).find((u) => nombreComparable(u.nombre as string) === nombreComparable(t.nombre as string))?.id ?? null;
+  return (us ?? []).find((u) => mismaTiendaUnidad(t.nombre as string, u.nombre as string))?.id ?? null;
 }
 
 /**

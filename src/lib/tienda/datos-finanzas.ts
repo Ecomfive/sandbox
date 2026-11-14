@@ -9,7 +9,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { cargarPedidos, inicioPeriodo, type PedidoFila, type Tienda } from "./datos";
 import { riesgoCliente } from "@/lib/ventas/operacion";
-import { entradaDeOrden, estadoDesdeFinanzas, etiquetasDe, momentoDeFecha, nombreComparable, textoProductos, zonaDeEtiquetas, type LineaFinanzas } from "./ordenes-finanzas";
+import { entradaDeOrden, estadoDesdeFinanzas, etiquetasDe, mismaTiendaUnidad, momentoDeFecha, nombreComparable, textoProductos, zonaDeEtiquetas, type LineaFinanzas } from "./ordenes-finanzas";
 import { periodoDe, sumarDias, type EleccionPeriodo, type Periodo } from "./rango";
 
 /**
@@ -52,10 +52,9 @@ export async function fuenteFinanzas(supabase: SupabaseClient, tiendas: Tienda[]
   if (!sinConectar.length) return SIN_FUENTE;
   const { data: unidades, error } = await supabase.from("fin_unidades").select("id, nombre").eq("pais", codigoPais).eq("clase", "tienda").eq("activo", true);
   if (error || !unidades?.length) return SIN_FUENTE;
-  const porNombre = new Map(unidades.map((u) => [nombreComparable(u.nombre as string), u.id as string]));
   const unidadDe = new Map<string, string>();
   for (const t of sinConectar) {
-    const u = porNombre.get(nombreComparable(t.nombre));
+    const u = unidades.find((x) => mismaTiendaUnidad(t.nombre, x.nombre as string))?.id as string | undefined;
     if (u) unidadDe.set(t.id, u);
   }
   if (!unidadDe.size) return SIN_FUENTE;
