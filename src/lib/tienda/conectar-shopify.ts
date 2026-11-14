@@ -166,7 +166,9 @@ export async function revisarSiHaceFalta(supabase: SupabaseClient, tiendas: { id
       .select("id");
     if (!tomada?.length) continue;
     try {
-      await revisarTienda(supabase, { id: t.id, nombre: t.nombre });
+      const r = await revisarTienda(supabase, { id: t.id, nombre: t.nombre });
+      // Mientras falte historial (una tienda recién conectada: Oferfy, 14 nov 2026), la próxima apertura sigue sin esperar los 10 minutos.
+      if (!r.completa) await supabase.from("tiendas").update({ ultima_revision_en: new Date(Date.now() - REVISION_MS - 1000).toISOString() }).eq("id", t.id);
     } catch {
       // Si Shopify no responde, la próxima apertura vuelve a intentar; «Revisar ahora» en Tiendas muestra el error.
     }

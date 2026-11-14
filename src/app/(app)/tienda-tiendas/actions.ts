@@ -47,7 +47,8 @@ export async function revisarTiendaShopify(tiendaId: string): Promise<{ error?: 
   const { data: t } = await supabase.from("tiendas").select("id, nombre, estado").eq("id", tiendaId).maybeSingle();
   if (!t || t.estado !== "conectada") return { error: "La tienda no está conectada." };
   try {
-    const r = await revisarTienda(supabase, { id: t.id as string, nombre: t.nombre as string });
+    // 50 segundos (la página tiene 60): con una tienda recién conectada, cada pulsación trae el doble de historial (14 nov 2026).
+    const r = await revisarTienda(supabase, { id: t.id as string, nombre: t.nombre as string }, 50_000);
     revalidatePath("/tienda-tiendas");
     revalidatePath("/tienda-pedidos");
     return { resumen: `${r.texto}.${r.completa ? "" : " Falta una parte: vuelve a pulsar «Revisar ahora»."}` };
