@@ -29,7 +29,7 @@ import { DIA_INFORME, mesAInformar } from "../finanzas/informe-envio";
 import { respaldarFinanzas } from "../finanzas/respaldar-finanzas";
 import { sincronizarShopify } from "../finanzas/sincronizar-shopify";
 import { sincronizarQuickbooks } from "../quickbooks/cliente";
-import { sincronizarMonday } from "../monday/sincronizar";
+import { enlazarSinPedido, sincronizarMonday } from "../monday/sincronizar";
 import { sincronizarTablerosExtra } from "../monday/tableros-extra";
 import { sincronizarPostventa } from "../monday/postventa";
 import { actualizarEntregas } from "../tienda/actualizar-entregas";
@@ -330,8 +330,11 @@ async function tareaMonday(c: Contexto): Promise<Resultado> {
   const extra = await sincronizarTablerosExtra(c.supabase, c.limite).catch((e) => `Tableros de repartidores: ${e instanceof Error ? e.message : "falló"}.`);
   // Los cambios, reembolsos, retiros y complementos (tablero «CAMBIOS Y REEMBOLSOS», migración 0290; 14 nov 2026).
   const postventa = await sincronizarPostventa(c.supabase, c.limite).catch((e) => `Cambios y reembolsos: ${e instanceof Error ? e.message : "falló"}.`);
+  // Las filas de Monday que se guardaron antes de que su pedido entrara al sistema (14 nov 2026): se vuelven a enlazar antes de asignar entregas.
+  const reenlazadas = await enlazarSinPedido(c.supabase).catch(() => 0);
   const entregas = await actualizarEntregas(c.supabase, "Monday (tarea diaria)").then((x) => x.resumen).catch((e) => `Entregas: ${e instanceof Error ? e.message : "falló"}.`);
-  return { resumen: [r.resumen, extra, postventa, entregas].filter(Boolean).join(" "), pendiente: null };
+  const enlazadas = reenlazadas ? `${reenlazadas} filas de Monday encontraron su pedido.` : "";
+  return { resumen: [r.resumen, extra, postventa, enlazadas, entregas].filter(Boolean).join(" "), pendiente: null };
 }
 
 // ---------------------------------------------------------------------------------------------

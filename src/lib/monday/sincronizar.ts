@@ -153,3 +153,57 @@ export async function sincronizarMonday(supabase: SupabaseClient, limite: number
     .eq("id", 1);
   return { resumen: texto, pendiente: null };
 }
+
+/**
+ * Vuelve a buscar el pedido de las filas de Monday que se guardaron sin él (14 nov 2026). Una fila se enlaza al guardarse, y solo se vuelve a guardar si
+ * cambia en Monday; si el pedido entró después al sistema (Oferfy: sus pedidos de Shopify desde el 14 oct llegaron después que su tablero de
+ * devoluciones), la fila quedaba sin pedido para siempre. Revisa las filas de los últimos `dias` con tienda y número, en `mon_despachos` y en
+ * `mon_postventa` (cambios y reembolsos; sin la migración 0290, solo la primera). Devuelve cuántas enlazó.
+ */
+export async function enlazarSinPedido(supabase: SupabaseClient, dias = 120): Promise<number> {
+  const desde = new Date(Date.now() - dias * 86_400_000).toISOString();
+  let enlazadas = 0;
+  for (const [tabla, fecha] of [
+    ["mon_despachos", "actualizado_monday"],
+    ["mon_postventa", "creado_monday"],
+  ] as const) {
+    const filas: { item_id: string; numero_pedido: string; unidad_id: string }[] = [];
+    for (let d = 0; d < 20_000; d += 1000) {
+      const { data, error } = await supabase
+        .from(tabla)
+        .select("item_id, numero_pedido, unidad_id")
+        .is("orden_id", null)
+        .not("numero_pedido", "is", null)
+        .not("unidad_id", "is", null)
+        .gte(fecha, desde)
+        .order("item_id")
+        .range(d, d + 999);
+      if (error) break;
+      filas.push(...((data ?? []) as typeof filas));
+      if ((data ?? []).length < 1000) break;
+    }
+    if (!filas.length) continue;
+    const variantes = [...new Set(filas.flatMap((f) => variantesPedido(f.numero_pedido)))];
+    const candidatas: OrdenCandidata[] = [];
+    for (let i = 0; i < variantes.length; i += 200) {
+      const { data, error } = await supabase.from("ven_ordenes").select("id, unidad_id, numero, periodo").in("numero", variantes.slice(i, i + 200));
+      if (error) throw new Error(`ven_ordenes: ${error.message}`);
+      for (const o of data ?? []) candidatas.push({ id: o.id as string, unidad_id: o.unidad_id as string, numero: o.numero as string, periodo: String(o.periodo).slice(0, 10) });
+    }
+    const cambios = filas.flatMap((f) => {
+      const orden = enlazarOrden(f.numero_pedido, f.unidad_id, candidatas);
+      return orden ? [{ item_id: f.item_id, orden }] : [];
+    });
+    for (let i = 0; i < cambios.length; i += 20) {
+      await Promise.all(
+        cambios.slice(i, i + 20).map(async ({ item_id, orden }) => {
+          const cambio: Record<string, unknown> = { orden_id: orden.id };
+          if (tabla === "mon_despachos") cambio.periodo = orden.periodo;
+          const { error } = await supabase.from(tabla).update(cambio).eq("item_id", item_id).is("orden_id", null);
+          if (!error) enlazadas++;
+        }),
+      );
+    }
+  }
+  return enlazadas;
+}
