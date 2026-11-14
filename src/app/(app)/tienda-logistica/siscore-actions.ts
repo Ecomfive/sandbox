@@ -8,7 +8,7 @@ import { cargarTiendas } from "@/lib/tienda/datos";
 import { fuenteFinanzas } from "@/lib/tienda/datos-finanzas";
 import { tiendaDeClienteSiscore } from "@/lib/tienda/siscore";
 import { grupoDeEstadoGuia, leerLecturaSiscore, momentoEntrega, pedidoDeFactura, visitasSinEntregar } from "@/lib/tienda/siscore";
-import { actualizarEntregas } from "@/lib/tienda/actualizar-entregas";
+import { actualizarEntregas, completarDatosEntrega } from "@/lib/tienda/actualizar-entregas";
 
 const RUTA = "/tienda-logistica";
 const BUCKET = "wms-compras";
@@ -194,6 +194,8 @@ export async function procesarLecturaSiscore(id: string): Promise<{ guias: numbe
     // Las órdenes despachadas que Servientrega (o Monday) ya dan por entregadas o devueltas pasan a esa fase (12 nov 2026, pedido de Hernán).
     // Con un tope de tiempo (14 nov 2026): con cientos de guías (Oferfy) lo que no alcance lo toma la próxima lectura de Monday o de SISCORE.
     await actualizarEntregas(supabase, "Servientrega (lectura de SISCORE)", Date.now() + 30_000).catch(() => null);
+    // La fecha de despacho de los que salieron por Servientrega sin la fecha de Shopify (la emisión de la guía), 14 nov 2026.
+    await completarDatosEntrega(supabase, Date.now() + 10_000).catch(() => 0);
     revalidatePath(RUTA);
     return { guias: resumen.guias, conPedido: resumen.conPedido, cliente: lectura.cliente };
   } catch (e) {

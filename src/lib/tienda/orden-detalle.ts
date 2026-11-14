@@ -5,7 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { postventaDeOrdenes, type CasoPedido } from "./postventa-tienda";
 import { datosAsistente, evaluarAsistente, type Asistente } from "./asistente";
 import { costosDeProductos, cuentasDelPedido, type CostoProducto, type IngresosYCostos } from "./costos";
-import { hayHoraDeShopify } from "./datos-finanzas";
+import { hayFormaPagoEntrega, hayHoraDeShopify } from "./datos-finanzas";
 import { mismaTiendaUnidad } from "./ordenes-finanzas";
 
 export interface OrdenFinanzas {
@@ -39,6 +39,8 @@ export interface OrdenFinanzas {
   cod_esperado?: number | null;
   cod_cobrado?: number | null;
   metodo_pago?: string | null;
+  /** Cómo pagó al recibir, según el repartidor en Monday (migración 0295). */
+  forma_pago_entrega?: string | null;
 }
 
 /** Un cambio registrado en la orden (`ven_orden_eventos`): de qué fase a cuál, quién y por qué. */
@@ -131,7 +133,7 @@ export interface OrdenTienda {
 export async function cargarOrdenTienda(supabase: SupabaseClient, id: string, paisId: string): Promise<OrdenTienda | null> {
   if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
   // Con la migración 0276, también la hora de Shopify (texto armado: se declara como `string`).
-  const columnas: string = `numero, fecha, estado_entrega, etiquetas, subtotal, descuento, envio, total, estado_pago, forma_pago_texto, transportista, guia, fecha_envio, fecha_devolucion, resultado_courier, motivo_cancelacion, origen, costo_envio, costo_envio_real, fase, confirmada_en, confirmada_por, despachada_en, entregada_en, cod_esperado, cod_cobrado, metodo_pago, unidad_id, ${(await hayHoraDeShopify(supabase)) ? "creado_origen, " : ""}creado_en, fin_unidades(nombre, pais_id, clase, tarifa_fulfillment)`;
+  const columnas: string = `numero, fecha, estado_entrega, etiquetas, subtotal, descuento, envio, total, estado_pago, forma_pago_texto, transportista, guia, fecha_envio, fecha_devolucion, resultado_courier, motivo_cancelacion, origen, costo_envio, costo_envio_real, fase, confirmada_en, confirmada_por, despachada_en, entregada_en, cod_esperado, cod_cobrado, metodo_pago, unidad_id, ${(await hayFormaPagoEntrega(supabase)) ? "forma_pago_entrega, " : ""}${(await hayHoraDeShopify(supabase)) ? "creado_origen, " : ""}creado_en, fin_unidades(nombre, pais_id, clase, tarifa_fulfillment)`;
   const { data: crudo } = await supabase.from("ven_ordenes").select(columnas).eq("id", id).maybeSingle();
   const o = crudo as unknown as (OrdenFinanzas & { fin_unidades: unknown; costo_envio?: number | null; costo_envio_real?: number | null }) | null;
   const unidad = (o?.fin_unidades ?? null) as { nombre: string; pais_id: string; clase: string; tarifa_fulfillment: number | null } | null;

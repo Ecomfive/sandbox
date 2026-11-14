@@ -132,7 +132,18 @@ export function ordenDeShopify(tienda: string, o: Record<string, unknown>): Orde
     },
     origen_clave: huella(`ventas|${llave}`),
   };
-  return { ...orden, huella_contenido: huella(JSON.stringify(orden)) };
+  return { ...orden, huella_contenido: huella(JSON.stringify(orden)), despachada_en: despachoDeShopify(o) };
+}
+
+/** Cuándo se preparó en Shopify: el primer «fulfillment» que no se canceló (14 nov 2026); null si no hay. */
+export function despachoDeShopify(o: Record<string, unknown>): string | null {
+  const fs = Array.isArray(o.fulfillments) ? (o.fulfillments as Record<string, unknown>[]) : [];
+  const fechas = fs
+    .filter((f) => f && f.status !== "cancelled" && typeof f.created_at === "string")
+    .map((f) => Date.parse(String(f.created_at)))
+    .filter((t) => Number.isFinite(t))
+    .sort((a, b) => a - b);
+  return fechas.length ? new Date(fechas[0]).toISOString() : null;
 }
 
 /** La página siguiente del encabezado `Link` de Shopify (`<…page_info=…>; rel="next"`), o null. */

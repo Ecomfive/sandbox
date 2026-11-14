@@ -17,7 +17,7 @@ import { completarTelefonosDeOrdenes } from "../tienda/telefono-cliente";
 import { aplicarVinculosDeOrdenes } from "../tienda/productos-shopify";
 
 const VERSION_API = "2024-10";
-const CAMPOS = "name,created_at,updated_at,cancelled_at,cancel_reason,financial_status,fulfillment_status,total_price,subtotal_price,total_discounts,total_shipping_price_set,line_items,refunds,payment_gateway_names,gateway,tags,note,phone,shipping_address,billing_address";
+const CAMPOS = "name,created_at,updated_at,cancelled_at,cancel_reason,financial_status,fulfillment_status,fulfillments,total_price,subtotal_price,total_discounts,total_shipping_price_set,line_items,refunds,payment_gateway_names,gateway,tags,note,phone,shipping_address,billing_address";
 
 export const shopifyConfigurado = () => leerTiendasShopify(process.env.SHOPIFY_TIENDAS).length > 0;
 

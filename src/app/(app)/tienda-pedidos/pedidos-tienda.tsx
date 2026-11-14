@@ -13,6 +13,9 @@ import type { NombreFilas } from "@/lib/tabla/pie";
 import { ESTADOS_PEDIDO, diaPanama, resumirPedidos, type EstadoPedido } from "@/lib/tienda/resumen";
 import type { PedidoFila } from "@/lib/tienda/datos";
 import { etiquetaEntrega } from "@/lib/tienda/entregas-monday";
+
+/** Cómo pagó al recibir (14 nov 2026). */
+const PAGO_ENTREGA: Record<string, string> = { efectivo: "Efectivo", yappy: "Yappy", transferencia: "Transferencia", tarjeta: "Tarjeta", otro: "Otro" };
 import { FichaPedido } from "./ficha-pedido";
 import { pendientesWhatsapp } from "./chat-actions";
 import { pendientesPorPedido, type ChatPendiente } from "@/lib/tienda/chat-tienda";
@@ -268,6 +271,15 @@ export function defPedidos(tiendas: Record<string, string>): DefTabla<PedidoFila
         etiquetaSinValor: "En camino sin registro",
         agrupable: true,
       },
+      // Cómo pagó al recibir, según el repartidor en Monday (14 nov 2026): la «FORMA DE PAGO» del Excel Matriz.
+      {
+        id: "pago",
+        etiqueta: "Pagó con",
+        tipo: "seleccion",
+        valores: (p) => (p.estado === "entregado" ? [PAGO_ENTREGA[p.pagoEntrega ?? ""] ?? SIN_VALOR] : []),
+        etiquetaSinValor: "Entregado sin forma de pago",
+        agrupable: true,
+      },
       // Monday «CAMBIOS Y REEMBOLSOS» (14 nov 2026): el caso más reciente del pedido («Reembolso · Hecho», «Cambio · En Proceso»).
       {
         id: "postventa",
@@ -295,6 +307,8 @@ export function defPedidos(tiendas: Record<string, string>): DefTabla<PedidoFila
       { etiqueta: "Monday / SISCORE", valor: (p) => (p.estado === "en_camino" ? (etiquetaEntrega(p.entrega) ?? "") : "") },
       { etiqueta: "Motivo (Monday)", valor: (p) => (p.estado === "en_camino" ? (p.entrega?.causa ?? "") : "") },
       { etiqueta: "Cambios y reembolsos", valor: (p) => p.postventa ?? "" },
+      { etiqueta: "Despachado", valor: (p) => (p.despachadoEn ? diaPanama(p.despachadoEn) : "") },
+      { etiqueta: "Pagó con", valor: (p) => PAGO_ENTREGA[p.pagoEntrega ?? ""] ?? "" },
     ],
     pdf: ["Pedido", "Fecha y hora", "Cliente", "Productos", "Total", "Estado", "Zona", "Lugar"],
   };

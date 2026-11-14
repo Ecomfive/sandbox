@@ -32,6 +32,15 @@ export interface FuenteFinanzas {
   origen: string | null;
 }
 
+let pagoListo = false;
+/** Si ya se corrió la migración 0295 (la forma de pago al recibir, `ven_ordenes.forma_pago_entrega`). Una vez que existe, no se vuelve a preguntar. */
+export async function hayFormaPagoEntrega(supabase: SupabaseClient): Promise<boolean> {
+  if (pagoListo) return true;
+  const { error } = await supabase.from("ven_ordenes").select("forma_pago_entrega").limit(1);
+  pagoListo = !error;
+  return pagoListo;
+}
+
 let horaLista = false;
 /** Si ya se corrió la migración 0276 (la hora de Shopify en `ven_ordenes.creado_origen`). Una vez que existe, no se vuelve a preguntar. */
 export async function hayHoraDeShopify(supabase: SupabaseClient): Promise<boolean> {
@@ -83,6 +92,9 @@ interface FilaOrden {
   origen: string | null;
   /** Sin la migración 0276 no viene. */
   creado_origen?: string | null;
+  /** Sin la migración 0295 no vienen. */
+  forma_pago_entrega?: string | null;
+  despachada_en?: string | null;
   ven_ordenes_clientes: ClienteFila | ClienteFila[] | null;
 }
 
@@ -138,7 +150,7 @@ export async function cargarPedidosFinanzas(
   if (!tiendaDeUnidad.size) return { pedidos: [], lineas: [] };
   const unidades = [...tiendaDeUnidad.keys()];
   // Con la migración 0276, también la hora de Shopify (un texto armado: por eso se declara como `string`).
-  const columnas: string = `id, unidad_id, numero, fecha, estado_entrega, etiquetas, total, moneda, transportista, guia, origen, ${(await hayHoraDeShopify(supabase)) ? "creado_origen, " : ""}ven_ordenes_clientes(nombre, corregimiento, direccion, telefono, telefono_clave, notas)`;
+  const columnas: string = `id, unidad_id, numero, fecha, estado_entrega, etiquetas, total, moneda, transportista, guia, origen, ${(await hayHoraDeShopify(supabase)) ? "creado_origen, " : ""}${(await hayFormaPagoEntrega(supabase)) ? "forma_pago_entrega, despachada_en, " : ""}ven_ordenes_clientes(nombre, corregimiento, direccion, telefono, telefono_clave, notas)`;
   const [ordenes, lineas] = await Promise.all([
     traerTodasLasFilas<FilaOrden>(
       (d, h) =>
@@ -207,6 +219,9 @@ export async function cargarPedidosFinanzas(
     // La transportista guardada o la de la etiqueta de zona («INTERIOR/SERVIENTREGA» → Servientrega).
     transportista: transportistaDe(o.transportista, o.etiquetas),
     guia: o.guia,
+    // Cómo pagó al recibir (Monday) y cuándo salió (Shopify, Monday o Servientrega), 14 nov 2026.
+    pagoEntrega: o.forma_pago_entrega ?? null,
+    despachadoEn: o.despachada_en ?? null,
   }));
   return { pedidos, lineas };
 }

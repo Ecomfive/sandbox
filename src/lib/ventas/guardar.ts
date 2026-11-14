@@ -138,12 +138,25 @@ export async function guardarLoteOrdenes(supabase: SupabaseClient, origen: strin
   const { mapa, nuevas: tiendasNuevas } = await unidades(supabase, ordenes.map((o) => o.tienda));
 
   const previas = new Map<string, string | null>();
+  // Lo que el sistema ya anotó en las órdenes de Shopify (14 nov 2026): Monday, Servientrega o la Matriz ponen el transportista, la guía, las fechas,
+  // el motivo y el estado de entrega; una actualización de Shopify (que trae esos campos vacíos) no los borra.
+  const anotado = new Map<string, Record<string, unknown>>();
+  const MANTENER = "fase, estado_entrega, transportista, guia, fecha_envio, fecha_devolucion, motivo_cancelacion";
   const claves = ordenes.map((o) => o.origen_clave);
   for (let i = 0; i < claves.length; i += 100) {
-    const { data, error } = await supabase.from("ven_ordenes").select("origen_clave, huella_contenido").in("origen_clave", claves.slice(i, i + 100));
+    const { data, error } = await supabase.from("ven_ordenes").select(`origen_clave, huella_contenido${origen === "shopify" ? `, ${MANTENER}` : ""}`).in("origen_clave", claves.slice(i, i + 100));
     if (error) throw new Error(`ven_ordenes: ${error.message}`);
-    for (const r of data ?? []) previas.set(r.origen_clave as string, (r.huella_contenido as string | null) ?? null);
+    for (const r of (data ?? []) as unknown as Record<string, unknown>[]) {
+      previas.set(r.origen_clave as string, (r.huella_contenido as string | null) ?? null);
+      if (origen === "shopify") anotado.set(r.origen_clave as string, r);
+    }
   }
+  const CERRADAS = new Set(["entregada", "devuelta", "cancelada"]);
+  /** El valor de Shopify, salvo que venga vacío y el sistema ya tenga uno. */
+  const conservar = <T>(o: OrdenVenta, campo: string, nuevo: T): T | unknown => {
+    const a = anotado.get(o.origen_clave);
+    return nuevo === null || nuevo === undefined || nuevo === "" ? (a?.[campo] ?? nuevo) : nuevo;
+  };
   const aGuardar = ordenes.filter((o) => !o.huella_contenido || previas.get(o.origen_clave) !== o.huella_contenido);
   const sinCambios = ordenes.length - aGuardar.length;
   if (!aGuardar.length) return { nuevas: 0, actualizadas: 0, sinCambios, tiendasNuevas };
@@ -155,14 +168,15 @@ export async function guardarLoteOrdenes(supabase: SupabaseClient, origen: strin
     fecha: o.fecha,
     periodo: o.periodo,
     estado_pago: o.estado_pago,
-    estado_entrega: o.estado_entrega,
+    // Una orden que el sistema ya cerró (entregada, devuelta, cancelada) conserva su estado de entrega aunque Shopify diga otra cosa.
+    estado_entrega: CERRADAS.has(String(anotado.get(o.origen_clave)?.fase ?? "")) ? (anotado.get(o.origen_clave)?.estado_entrega ?? o.estado_entrega) : o.estado_entrega,
     metodo_pago: o.metodo_pago,
     forma_pago_texto: o.forma_pago_texto,
     informe_servientrega: o.informe_servientrega,
-    transportista: o.transportista,
-    guia: o.guia,
-    fecha_envio: o.fecha_envio,
-    fecha_devolucion: o.fecha_devolucion,
+    transportista: conservar(o, "transportista", o.transportista),
+    guia: conservar(o, "guia", o.guia),
+    fecha_envio: conservar(o, "fecha_envio", o.fecha_envio),
+    fecha_devolucion: conservar(o, "fecha_devolucion", o.fecha_devolucion),
     resultado_courier: o.resultado_courier,
     subtotal: o.subtotal,
     envio: o.envio,
@@ -172,7 +186,8 @@ export async function guardarLoteOrdenes(supabase: SupabaseClient, origen: strin
     facturado: o.facturado,
     factura_numero: o.factura_numero,
     mes_gestion: o.mes_gestion,
-    motivo_cancelacion: o.motivo_cancelacion,
+    // El motivo que dejó el sistema (la nota de los asesores de Monday, Servientrega o la Matriz) es la evidencia: Shopify no lo reemplaza.
+    motivo_cancelacion: anotado.get(o.origen_clave)?.motivo_cancelacion ?? o.motivo_cancelacion,
     etiquetas: o.etiquetas,
     // La hora de Shopify (migración 0276): solo si la orden la trae, así el Excel no la borra.
     ...(o.creado_origen ? { creado_origen: o.creado_origen } : {}),

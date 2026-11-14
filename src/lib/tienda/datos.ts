@@ -100,6 +100,10 @@ export interface PedidoFila extends PedidoResumen {
   aVerificar?: string | null;
   /** Monday «CAMBIOS Y REEMBOLSOS» (14 nov 2026): la etiqueta del caso más reciente del pedido («Reembolso · Hecho»); sin el campo, ninguno. */
   postventa?: string | null;
+  /** Cómo pagó el cliente al recibir (efectivo, yappy, transferencia, tarjeta, otro), según el repartidor en Monday (14 nov 2026). */
+  pagoEntrega?: string | null;
+  /** Cuándo salió el pedido (Shopify, Monday o Servientrega), 14 nov 2026. */
+  despachadoEn?: string | null;
   tiendaId: string;
   numero: string;
   cliente: string | null;

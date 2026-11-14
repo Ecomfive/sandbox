@@ -32,7 +32,7 @@ import { sincronizarQuickbooks } from "../quickbooks/cliente";
 import { enlazarSinPedido, sincronizarMonday } from "../monday/sincronizar";
 import { sincronizarTablerosExtra } from "../monday/tableros-extra";
 import { sincronizarPostventa } from "../monday/postventa";
-import { actualizarEntregas } from "../tienda/actualizar-entregas";
+import { actualizarEntregas, completarDatosEntrega } from "../tienda/actualizar-entregas";
 import { CORRIENDO_MS, PRESUPUESTO_MS, hoyPanama, mesesAbiertos, pendienteDeHoy, resumenCorto, type ClaveTarea } from "./definiciones";
 
 export interface Contexto {
@@ -334,7 +334,10 @@ async function tareaMonday(c: Contexto): Promise<Resultado> {
   const reenlazadas = await enlazarSinPedido(c.supabase).catch(() => 0);
   const entregas = await actualizarEntregas(c.supabase, "Monday (tarea diaria)", Math.max(c.limite, Date.now() + 8_000)).then((x) => x.resumen).catch((e) => `Entregas: ${e instanceof Error ? e.message : "falló"}.`);
   const enlazadas = reenlazadas ? `${reenlazadas} filas de Monday encontraron su pedido.` : "";
-  return { resumen: [r.resumen, extra, postventa, enlazadas, entregas].filter(Boolean).join(" "), pendiente: null };
+  // La forma de pago, lo cobrado y la fecha de despacho que Monday o Servientrega saben y el pedido no tiene (14 nov 2026).
+  const completados = await completarDatosEntrega(c.supabase, Math.max(c.limite, Date.now() + 5_000)).catch(() => 0);
+  const datos = completados ? `${completados} pedidos completaron su forma de pago o su fecha de despacho.` : "";
+  return { resumen: [r.resumen, extra, postventa, enlazadas, entregas, datos].filter(Boolean).join(" "), pendiente: null };
 }
 
 // ---------------------------------------------------------------------------------------------

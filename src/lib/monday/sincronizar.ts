@@ -9,6 +9,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { unidadDeTienda } from "../ventas/matriz";
 import {
   cambioDesde,
+  completarMapeo,
   CONSULTA_COLUMNAS,
   consultaPrimeraDesde,
   CONSULTA_SIGUIENTE,
@@ -96,7 +97,10 @@ export async function guardarDespachos(supabase: SupabaseClient, tableroId: stri
     return { ...d, tablero_id: tableroId, unidad_id: unidad ?? orden?.unidad_id ?? null, orden_id: orden?.id ?? null, periodo, leido_en: ahora };
   });
   for (let i = 0; i < filas.length; i += 500) {
-    const { error } = await supabase.from("mon_despachos").upsert(filas.slice(i, i + 500), { onConflict: "item_id" });
+    let { error } = await supabase.from("mon_despachos").upsert(filas.slice(i, i + 500), { onConflict: "item_id" });
+    // Sin la migración 0295 no existen la forma de pago ni el monto cobrado: se guarda sin ellos.
+    if (error && /forma_pago|monto_cobrado/.test(error.message))
+      ({ error } = await supabase.from("mon_despachos").upsert(filas.slice(i, i + 500).map(({ forma_pago: _f, monto_cobrado: _m, ...resto }) => resto), { onConflict: "item_id" }));
     if (error) throw new Error(`mon_despachos: ${error.message}`);
   }
   return filas.length;
@@ -107,9 +111,18 @@ export async function sincronizarMonday(supabase: SupabaseClient, limite: number
   if (!mondayConfigurado()) return { resumen: "Apagada: falta MONDAY_API_TOKEN en las variables de entorno.", pendiente: null };
   const { data: cfg, error } = await supabase.from("mon_config").select("tablero_id, columnas, estados, cursor_actualizado, items").eq("id", 1).maybeSingle();
   if (error) throw new Error(SIN_MIGRACION_MONDAY);
-  const mapeo = leerMapeo(cfg?.columnas);
+  let mapeo = leerMapeo(cfg?.columnas);
   if (!cfg?.tablero_id || !mapeo.pedido || !mapeo.estado) return { resumen: "Apagada: falta elegir el tablero y sus columnas (Deliverys › Monday).", pendiente: null };
   const tablero = String(cfg.tablero_id);
+  // La forma de pago y el monto cobrado (14 nov 2026) se agregan solos al mapeo guardado, por el título de las columnas.
+  if (!mapeo.forma_pago || !mapeo.monto_cobrado) {
+    const columnas = leerColumnas(await consultarMonday(CONSULTA_COLUMNAS, { ids: [tablero] }))?.columnas ?? [];
+    const completo = columnas.length ? completarMapeo(mapeo, columnas) : null;
+    if (completo) {
+      mapeo = completo;
+      await supabase.from("mon_config").update({ columnas: completo }).eq("id", 1);
+    }
+  }
   const reglas = leerReglasEstado(cfg.estados);
   const cursorActualizado = (cfg.cursor_actualizado as string | null) ?? null;
   const { data: unidadesData } = await supabase.from("fin_unidades").select("id, nombre");

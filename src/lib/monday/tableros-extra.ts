@@ -6,7 +6,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { normalizar } from "../finanzas/clasificacion";
-import { COLUMNA_GRUPO, COLUMNA_NOMBRE, CONSULTA_COLUMNAS, CONSULTA_SIGUIENTE, consultaPrimeraDesde, ITEMS_POR_PAGINA, cambioDesde, despachoDeItem, leerColumnas, leerMapeo, leerPagina, leerReglasEstado, sugerirMapeo, type ColumnaTablero, type MapeoColumnas } from "./columnas";
+import { COLUMNA_GRUPO, COLUMNA_NOMBRE, completarMapeo, CONSULTA_COLUMNAS, CONSULTA_SIGUIENTE, consultaPrimeraDesde, ITEMS_POR_PAGINA, cambioDesde, despachoDeItem, leerColumnas, leerMapeo, leerPagina, leerReglasEstado, sugerirMapeo, type ColumnaTablero, type MapeoColumnas } from "./columnas";
 import { consultarMonday, guardarDespachos, mondayConfigurado } from "./sincronizar";
 
 /**
@@ -65,6 +65,15 @@ export async function sincronizarTablerosExtra(supabase: SupabaseClient, limite:
         if (sugeridas.estado_asesores) mapeo.estado_asesores = sugeridas.estado_asesores;
         if (sugeridas.observaciones_asesores) mapeo.observaciones_asesores = sugeridas.observaciones_asesores;
         await supabase.from("mon_tableros_extra").update({ columnas: mapeo }).eq("tablero_id", t.tablero_id);
+      }
+      // La forma de pago y el monto cobrado (14 nov 2026), por su título, en los tableros que ya tenían su mapeo guardado.
+      if (!mapeo.forma_pago || !mapeo.monto_cobrado) {
+        const propias = leerColumnas(await consultarMonday(CONSULTA_COLUMNAS, { ids: [t.tablero_id] }));
+        const completo = propias ? completarMapeo(mapeo, propias.columnas) : null;
+        if (completo) {
+          mapeo = completo;
+          await supabase.from("mon_tableros_extra").update({ columnas: completo }).eq("tablero_id", t.tablero_id);
+        }
       }
       let cursor: string | null = null;
       let primera = true;

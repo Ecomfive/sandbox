@@ -22,6 +22,9 @@ export const CAMPOS_MONDAY = [
   // Los del tablero de devoluciones (13 nov 2026, migración 0288): lo que deciden los asesores con el pedido que volvió.
   { clave: "estado_asesores", etiqueta: "Estado de los asesores (devoluciones)", obligatorio: false },
   { clave: "observaciones_asesores", etiqueta: "Observaciones de los asesores (devoluciones)", obligatorio: false },
+  // Cómo pagó el cliente y cuánto cobró el repartidor (14 nov 2026, migración 0295): la «FORMA DE PAGO» del Excel Matriz.
+  { clave: "forma_pago", etiqueta: "Forma de pago (efectivo, Yappy…)", obligatorio: false },
+  { clave: "monto_cobrado", etiqueta: "Monto cobrado", obligatorio: false },
 ] as const;
 export type CampoMonday = (typeof CAMPOS_MONDAY)[number]["clave"];
 export type MapeoColumnas = Partial<Record<CampoMonday, string>>;
@@ -131,7 +134,7 @@ export function validarMapeo(mapeo: Record<string, unknown>, columnas: ColumnaTa
   const salida: MapeoColumnas = {};
   for (const c of CAMPOS_MONDAY) {
     const v = typeof mapeo[c.clave] === "string" ? (mapeo[c.clave] as string).trim() : "";
-    if (!v) {
+    if (!v || v === SIN_COLUMNA) {
       if (c.obligatorio) return { error: `Elige la columna de «${c.etiqueta}».` };
       continue;
     }
@@ -149,6 +152,19 @@ export function leerMapeo(v: unknown): MapeoColumnas {
   return salida;
 }
 
+/**
+ * Completa un mapeo guardado con los datos que se agregaron después (forma de pago y monto cobrado, 14 nov 2026), por el título de las columnas del
+ * tablero (pura). Lo que el tablero no tiene queda como `SIN_COLUMNA`, para no buscarlo en cada lectura. Devuelve null si no faltaba nada.
+ */
+export function completarMapeo(mapeo: MapeoColumnas, columnas: ColumnaTablero[]): MapeoColumnas | null {
+  const nuevos: CampoMonday[] = ["forma_pago", "monto_cobrado"];
+  if (nuevos.every((c) => mapeo[c])) return null;
+  const s = sugerirMapeo(columnas);
+  const salida: MapeoColumnas = { ...mapeo };
+  for (const c of nuevos) salida[c] = mapeo[c] ?? s[c] ?? SIN_COLUMNA;
+  return salida;
+}
+
 /** Sugiere la columna de cada dato por su título (para el primer mapeo). */
 export function sugerirMapeo(columnas: ColumnaTablero[]): MapeoColumnas {
   const reglas: Record<CampoMonday, RegExp> = {
@@ -162,6 +178,8 @@ export function sugerirMapeo(columnas: ColumnaTablero[]): MapeoColumnas {
     remision: /REMISION|GUIA/,
     estado_asesores: /ESTADO.*ASESOR/,
     observaciones_asesores: /OBSERVACION.*ASESOR/,
+    forma_pago: /FORMA DE PAGO/,
+    monto_cobrado: /^COBRADO$|MONTO COBRADO/,
   };
   const salida: MapeoColumnas = {};
   const usadas = new Set<string>();
@@ -243,6 +261,23 @@ export interface Despacho {
   /** Solo en el tablero de devoluciones: lo que deciden los asesores (PENDIENTE, DESINTEGRADO) y su motivo. */
   estado_asesores: string | null;
   observaciones_asesores: string | null;
+  /** Cómo pagó el cliente (EFECTIVO, YAPPY, MiPOS…) y cuánto cobró el repartidor (14 nov 2026). */
+  forma_pago: string | null;
+  monto_cobrado: number | null;
+}
+
+/** «Sin columna» en un mapeo guardado: se buscó y el tablero no la tiene (así no se vuelve a buscar en cada lectura). */
+export const SIN_COLUMNA = "-";
+
+/** La forma de pago del sistema a partir del texto de Monday o de la Matriz (pura): efectivo, yappy, transferencia, tarjeta u otro; null si no dice. */
+export function formaDePago(texto: string | null | undefined): "efectivo" | "yappy" | "transferencia" | "tarjeta" | "otro" | null {
+  const t = normalizar(texto ?? "");
+  if (!t || /^(CANCELAD|NO GESTION|PENDIENTE|ANULAD)/.test(t)) return null;
+  if (/EFECTIVO|CASH/.test(t)) return "efectivo";
+  if (/YAPPY/.test(t)) return "yappy";
+  if (/TRANSF|ACH|BANCO|DEPOSITO/.test(t)) return "transferencia";
+  if (/MIPOS|POS|TARJETA|CARD|VISA|CLAVE/.test(t)) return "tarjeta";
+  return "otro";
 }
 
 /**
@@ -299,7 +334,17 @@ export function despachoDeItem(item: ItemMonday, mapeo: MapeoColumnas, reglas: R
     actualizado_monday: item.updated_at,
     estado_asesores: estadoAsesores,
     observaciones_asesores: observaciones,
+    forma_pago: texto("forma_pago", 60),
+    monto_cobrado: montoDeColumna(texto("monto_cobrado", 30)),
   };
+}
+
+/** Un monto de una columna de números de Monday («32.9», «$32,90»); null si no hay o no es un número razonable. */
+export function montoDeColumna(t: string | null | undefined): number | null {
+  const m = (t ?? "").replace(/[^\d.,-]/g, "").replace(",", ".");
+  if (!m) return null;
+  const v = Number(m);
+  return Number.isFinite(v) && v > 0 && v < 100_000 ? Math.round(v * 100) / 100 : null;
 }
 
 /** ¿Hay que guardar el ítem? (lectura incremental: los actualizados desde el cursor, con un día de margen). */

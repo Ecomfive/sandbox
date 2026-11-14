@@ -89,6 +89,11 @@ export interface OrdenVenta {
   etiquetas: string | null;
   /** La hora en que se creó en Shopify (migración 0276); el Excel no la trae. */
   creado_origen?: string | null;
+  /**
+   * Shopify: cuándo se preparó (el primer «fulfillment»), 14 nov 2026. No entra en la huella ni se guarda con el resto de la orden (así no se
+   * reescriben las órdenes ya guardadas): lo guarda `sincronizarFases` en `despachada_en` y `fecha_envio` si están vacías.
+   */
+  despachada_en?: string | null;
   lineas: LineaVenta[];
   cliente: ClienteVenta;
   /** Huella estable de la orden (tienda + número): la llave de la importación. */

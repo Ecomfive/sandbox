@@ -37,6 +37,8 @@ const hora = (iso: string) => new Date(iso).toLocaleTimeString("es-PA", { hour: 
 const esMomento = (v: string) => /T\d{2}:\d{2}/.test(v);
 /** El mediodía UTC (17:00) es el que se pone cuando solo se sabe el día (Monday, Servientrega): ahí no se muestra la hora. */
 const soloDia = (v: string) => /T17:00:00(\.0+)?(Z|\+00(:00)?)$/.test(v);
+/** Cómo pagó al recibir (14 nov 2026). */
+const PAGO_ENTREGA: Record<string, string> = { efectivo: "Efectivo", yappy: "Yappy", transferencia: "Transferencia", tarjeta: "Tarjeta", otro: "Otro" };
 const ETIQUETA_FASE: Record<string, string> = { por_confirmar: "Por confirmar", confirmada: "Confirmada", despachada: "Despachada", entregada: "Entregada", fallida: "Fallida", devuelta: "Devuelta", cancelada: "Cancelada" };
 
 function Seccion({ id, titulo, icono: Icono, extra, children }: { id: string; titulo: string; icono: (typeof SECCIONES)[number]["icono"]; extra?: ReactNode; children: ReactNode }) {
@@ -364,6 +366,7 @@ export function FichaOrdenTienda({ orden, codigoPais, puedeEscribir }: { orden: 
               </Dato>
               {(o.forma_pago_texto || o.metodo_pago) && <Dato etiqueta="Forma de pago">{o.forma_pago_texto ?? o.metodo_pago}</Dato>}
               {o.estado_pago && <Dato etiqueta="Pago en Shopify">{/^paid$/i.test(o.estado_pago) ? "Pagado" : /^pending$/i.test(o.estado_pago) ? "Pendiente" : o.estado_pago}</Dato>}
+              {o.forma_pago_entrega && <Dato etiqueta="Pagó con">{PAGO_ENTREGA[o.forma_pago_entrega] ?? o.forma_pago_entrega} <span className="text-xs text-muted-foreground">(repartidor, Monday)</span></Dato>}
               {Number(o.cod_esperado ?? 0) > 0 && <Dato etiqueta="Contra entrega">{o.cod_cobrado !== null && o.cod_cobrado !== undefined ? `cobrado ${dinero(o.cod_cobrado)}` : `por cobrar ${dinero(o.cod_esperado)}`}</Dato>}
             </dl>
           </Seccion>
