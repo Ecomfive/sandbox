@@ -29,7 +29,7 @@ export function AvisoRepartoEnVariante({ padre, alAbrir }: { padre: { id: string
         <button type="button" onClick={() => alAbrir(padre.id)} className={`font-medium underline-offset-2 hover:underline ${anilloFoco}`}>
           {padre.codigo}
         </button>
-        , todavía sin repartir entre sus variantes: lo que salga de esta variante se descuenta de ahí.
+        , todavía sin repartir entre sus variantes: lo que salga de esta variante en una bodega que todavía no se repartió se descuenta de ahí.
       </p>
     </Aviso>
   );
@@ -66,7 +66,7 @@ export function RepartoStock({ id, codigo, pendiente, puedeEscribir, alCambiar }
     <div className="flex flex-col gap-2">
       <Aviso>
         <p className="m-0">
-          <strong>El stock está pendiente de repartir entre las variantes.</strong> Se lleva como un número general del producto; mientras tanto, lo que sale de una variante se descuenta de ahí. Cuando se cuente lo
+          <strong>El stock está pendiente de repartir entre las variantes.</strong> Se lleva como un número general del producto; mientras tanto, lo que sale de una variante en una bodega que todavía no se repartió se descuenta de ahí (en las bodegas ya repartidas sale de la variante). Cuando se cuente lo
           que hay de cada una, se reparte.
         </p>
       </Aviso>
