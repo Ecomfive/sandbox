@@ -1334,6 +1334,8 @@ export const ICONOS_PAGINA: Record<string, (props: SVGProps<SVGSVGElement>) => R
   "/tienda-pedidos": PedidoIcon,
   "/tienda-confirmacion": CheckIcon,
   "/tienda-logistica": EnvioIcon,
+  "/despacho-ciudad": PedidoIcon,
+  "/despacho-devoluciones": DeshacerIcon,
   "/tienda-productos": EnlaceIcon,
   "/tienda-tiendas": TiendaIcon,
 };

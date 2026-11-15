@@ -6,7 +6,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { normalizar } from "../finanzas/clasificacion";
-import { COLUMNA_GRUPO, COLUMNA_NOMBRE, completarMapeo, CONSULTA_COLUMNAS, CONSULTA_SIGUIENTE, consultaPrimeraDesde, ITEMS_POR_PAGINA, cambioDesde, despachoDeItem, leerColumnas, leerMapeo, leerPagina, leerReglasEstado, sugerirMapeo, type ColumnaTablero, type MapeoColumnas } from "./columnas";
+import { COLUMNA_GRUPO, COLUMNA_NOMBRE, completarMapeo, CONSULTA_COLUMNAS, CONSULTA_SIGUIENTE, consultaPrimeraDesde, ITEMS_POR_PAGINA, cambioDesde, despachoDeItem, faltaCompletar, leerColumnas, leerMapeo, leerPagina, leerReglasEstado, sugerirMapeo, type ColumnaTablero, type MapeoColumnas } from "./columnas";
 import { consultarMonday, guardarDespachos, mondayConfigurado } from "./sincronizar";
 
 /**
@@ -67,7 +67,7 @@ export async function sincronizarTablerosExtra(supabase: SupabaseClient, limite:
         await supabase.from("mon_tableros_extra").update({ columnas: mapeo }).eq("tablero_id", t.tablero_id);
       }
       // La forma de pago y el monto cobrado (14 nov 2026), por su título, en los tableros que ya tenían su mapeo guardado.
-      if (!mapeo.forma_pago || !mapeo.monto_cobrado) {
+      if (faltaCompletar(mapeo)) {
         const propias = leerColumnas(await consultarMonday(CONSULTA_COLUMNAS, { ids: [t.tablero_id] }));
         const completo = propias ? completarMapeo(mapeo, propias.columnas) : null;
         if (completo) {
@@ -86,7 +86,7 @@ export async function sincronizarTablerosExtra(supabase: SupabaseClient, limite:
         primera = false;
         const pagina = leerPagina(json);
         const cambiados = pagina.items.filter((i) => cambioDesde(i, t.cursor_actualizado));
-        guardados += await guardarDespachos(supabase, t.tablero_id, cambiados.map((i) => despachoDeItem(i, mapeo, reglas)), unidades);
+        guardados += await guardarDespachos(supabase, t.tablero_id, cambiados.map((i) => despachoDeItem(i, mapeo, reglas)), unidades, /^devoluc/i.test(t.nombre) ? "devolucion" : "ciudad");
         leidos += pagina.items.length;
         const max = pagina.items.map((i) => i.updated_at ?? "").filter(Boolean).sort().at(-1) ?? null;
         if (max && (!maximo || max > maximo)) maximo = max;

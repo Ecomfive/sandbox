@@ -25,6 +25,13 @@ export const CAMPOS_MONDAY = [
   // Cómo pagó el cliente y cuánto cobró el repartidor (14 nov 2026, migración 0295): la «FORMA DE PAGO» del Excel Matriz.
   { clave: "forma_pago", etiqueta: "Forma de pago (efectivo, Yappy…)", obligatorio: false },
   { clave: "monto_cobrado", etiqueta: "Monto cobrado", obligatorio: false },
+  // Las demás columnas de los tableros de Panamá (15 nov 2026, migración 0970: Despacho ciudad las muestra y las edita en el sistema).
+  { clave: "edo_pago", etiqueta: "Estado del pago (Edo. Pago)", obligatorio: false },
+  { clave: "por_cobrar", etiqueta: "$ Por cobrar", obligatorio: false },
+  { clave: "coste_envio", etiqueta: "Coste de envío", obligatorio: false },
+  { clave: "turno", etiqueta: "Cambio / retiro / turno", obligatorio: false },
+  { clave: "comentario", etiqueta: "Comentario del repartidor", obligatorio: false },
+  { clave: "comprobante", etiqueta: "Comprobante", obligatorio: false },
 ] as const;
 export type CampoMonday = (typeof CAMPOS_MONDAY)[number]["clave"];
 export type MapeoColumnas = Partial<Record<CampoMonday, string>>;
@@ -157,13 +164,17 @@ export function leerMapeo(v: unknown): MapeoColumnas {
  * tablero (pura). Lo que el tablero no tiene queda como `SIN_COLUMNA`, para no buscarlo en cada lectura. Devuelve null si no faltaba nada.
  */
 export function completarMapeo(mapeo: MapeoColumnas, columnas: ColumnaTablero[]): MapeoColumnas | null {
-  const nuevos: CampoMonday[] = ["forma_pago", "monto_cobrado"];
+  const nuevos = CAMPOS_AGREGADOS;
   if (nuevos.every((c) => mapeo[c])) return null;
   const s = sugerirMapeo(columnas);
   const salida: MapeoColumnas = { ...mapeo };
   for (const c of nuevos) salida[c] = mapeo[c] ?? s[c] ?? SIN_COLUMNA;
   return salida;
 }
+
+/** Los datos que se agregaron al mapeo después del primero: si a un mapeo guardado le falta alguno, se completa por el título (`completarMapeo`). */
+export const CAMPOS_AGREGADOS: CampoMonday[] = ["forma_pago", "monto_cobrado", "edo_pago", "por_cobrar", "coste_envio", "turno", "comentario", "comprobante"];
+export const faltaCompletar = (mapeo: MapeoColumnas) => CAMPOS_AGREGADOS.some((c) => !mapeo[c]);
 
 /** Sugiere la columna de cada dato por su título (para el primer mapeo). */
 export function sugerirMapeo(columnas: ColumnaTablero[]): MapeoColumnas {
@@ -180,6 +191,12 @@ export function sugerirMapeo(columnas: ColumnaTablero[]): MapeoColumnas {
     observaciones_asesores: /OBSERVACION.*ASESOR/,
     forma_pago: /FORMA DE PAGO/,
     monto_cobrado: /^COBRADO$|MONTO COBRADO/,
+    edo_pago: /^EDO ?PAGO|ESTADO DE(L)? PAGO/,
+    por_cobrar: /POR COBRAR/,
+    coste_envio: /^COST[EO] (DE )?ENVIO/,
+    turno: /TURNO/,
+    comentario: /^COMENTARIO/,
+    comprobante: /COMPROBANTE/,
   };
   const salida: MapeoColumnas = {};
   const usadas = new Set<string>();
@@ -264,6 +281,14 @@ export interface Despacho {
   /** Cómo pagó el cliente (EFECTIVO, YAPPY, MiPOS…) y cuánto cobró el repartidor (14 nov 2026). */
   forma_pago: string | null;
   monto_cobrado: number | null;
+  /** Las demás columnas de los tableros de Panamá y el grupo del ítem (el día, o DEVOLUCIÓN CIUDAD… en el de devoluciones), migración 0970. */
+  grupo: string | null;
+  edo_pago: string | null;
+  por_cobrar: number | null;
+  coste_envio: number | null;
+  turno: string | null;
+  comentario: string | null;
+  comprobantes: string[];
 }
 
 /** «Sin columna» en un mapeo guardado: se buscó y el tablero no la tiene (así no se vuelve a buscar en cada lectura). */
@@ -336,6 +361,14 @@ export function despachoDeItem(item: ItemMonday, mapeo: MapeoColumnas, reglas: R
     observaciones_asesores: observaciones,
     forma_pago: texto("forma_pago", 60),
     monto_cobrado: montoDeColumna(texto("monto_cobrado", 30)),
+    grupo: corto(item.grupo, 120),
+    edo_pago: texto("edo_pago", 60),
+    por_cobrar: montoDeColumna(texto("por_cobrar", 30)),
+    coste_envio: montoDeColumna(texto("coste_envio", 30)),
+    turno: texto("turno", 60),
+    comentario: texto("comentario", 1000),
+    // La columna de archivos da los enlaces separados por coma.
+    comprobantes: (col("comprobante")?.text ?? "").split(/,\s*/).map((u) => u.trim()).filter((u) => /^https:\/\//.test(u)).slice(0, 10),
   };
 }
 
