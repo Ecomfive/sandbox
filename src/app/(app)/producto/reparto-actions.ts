@@ -51,17 +51,20 @@ export async function obtenerRepartoVariantes(padreId: string): Promise<DatosRep
 }
 
 /**
- * Reparte el stock general entre las variantes: en cada bodega, lo repartido tiene que ser exactamente lo que hay (la base lo vuelve a comprobar). Al terminar, el producto ya no
- * tiene stock general ni la marca de pendiente. Devuelve el error como valor.
+ * Reparte el stock general entre las variantes. Se puede repartir solo algunas bodegas, o solo una parte de una bodega (14 nov 2026, migración 0296): en cada bodega no se
+ * puede repartir más de lo que hay (la base lo vuelve a comprobar) y lo que no se reparte sigue como stock general. El producto deja de estar pendiente cuando ya no le queda
+ * stock general en ninguna bodega. Devuelve el error como valor.
  */
-export async function repartirStockVariantes(padreId: string, lineas: LineaReparto[]): Promise<{ error?: string; repartidas?: number }> {
+export async function repartirStockVariantes(padreId: string, lineas: LineaReparto[]): Promise<{ error?: string; repartidas?: number; queda?: number }> {
   const usuario = await requireModuloEscritura("inventario");
   if (!ES_ID(padreId) || !Array.isArray(lineas) || lineas.length > 2000 || lineas.some((l) => !ES_ID(l?.varianteId) || !ES_ID(l?.bodegaId))) return { error: "El reparto no es válido." };
   const datos = await obtenerRepartoVariantes(padreId);
   if ("error" in datos) return datos;
   if (!datos.pendiente) return { error: "Este producto no tiene stock pendiente de repartir." };
   const revision = revisarReparto(datos.general, lineas);
-  if (!revision.completo) return { error: revision.error ?? "El reparto no cuadra." };
+  if (!revision.valido) return { error: revision.error ?? "El reparto no es válido." };
+  // Con stock general por repartir, un reparto sin ninguna unidad no hace nada: se pide escribir alguna (sin stock general, el reparto vacío solo quita la marca de pendiente).
+  if (revision.total === 0 && datos.general.length > 0) return { error: "Escribe cuántas unidades van a cada variante." };
   const supabase = createServiceClient();
   const { data, error } = await supabase.rpc("wms_repartir_stock_variantes", {
     p_padre: padreId,
@@ -70,15 +73,17 @@ export async function repartirStockVariantes(padreId: string, lineas: LineaRepar
   });
   if (error) return { error: mensajeErrorReparto(error.message) };
   const repartidas = Number((data as { repartidas?: number } | null)?.repartidas ?? 0);
+  // Sin la migración 0296 la base no devuelve `queda`: reparte todo o nada, así que no queda nada.
+  const queda = Number((data as { queda?: number } | null)?.queda ?? 0);
   await registrarAuditoria({
     accion: "repartir_stock_variantes",
     entidad: "skus_maestros",
     entidadId: padreId,
-    detalle: `${repartidas} unidades de ${datos.codigo} repartidas entre sus variantes`,
+    detalle: `${repartidas} unidades de ${datos.codigo} repartidas entre sus variantes${queda > 0 ? ` (siguen ${queda} como stock general)` : ""}`,
   });
   revalidatePath("/producto");
   revalidatePath("/inventario");
-  return { repartidas };
+  return { repartidas, queda };
 }
 
 /**

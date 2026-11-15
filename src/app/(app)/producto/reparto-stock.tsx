@@ -122,7 +122,7 @@ function PanelReparto({ id, alTerminar }: { id: string; alTerminar: (cambio: boo
     empezar(async () => {
       const r = await repartirStockVariantes(id, lineas);
       if (r.error) return setError(r.error);
-      mostrarToast(`${r.repartidas} unidades repartidas entre las variantes`);
+      mostrarToast(r.queda ? `${r.repartidas} unidades repartidas; siguen ${r.queda} como stock general` : `${r.repartidas} unidades repartidas entre las variantes`);
       alTerminar(true);
     });
   }
@@ -167,8 +167,8 @@ function PanelReparto({ id, alTerminar }: { id: string; alTerminar: (cambio: boo
               <span>
                 {g.nombre} · hay {g.fisico}
               </span>
-              <span className={`text-xs tabular-nums ${r.falta === 0 ? "text-muted-foreground" : "text-foreground"}`}>
-                {r.falta === 0 ? "Repartido todo" : r.falta > 0 ? `Faltan ${r.falta}` : `Te pasaste por ${-r.falta}`}
+              <span className={`text-xs tabular-nums ${r.falta < 0 ? "text-destructive" : "text-muted-foreground"}`}>
+                {r.falta === 0 ? "Repartido todo" : r.falta > 0 ? (r.repartido === 0 ? "Sigue como stock general" : `Quedan ${r.falta} como stock general`) : `Te pasaste por ${-r.falta}`}
               </span>
             </legend>
             <ul className="m-0 grid list-none grid-cols-1 gap-2 p-0 sm:grid-cols-2">
@@ -194,7 +194,7 @@ function PanelReparto({ id, alTerminar }: { id: string; alTerminar: (cambio: boo
           </fieldset>
         );
       })}
-      {(error || (revision.error && lineas.some((l) => l.cantidad > 0))) && (
+      {(error || revision.error) && (
         <p role="alert" className="m-0 text-xs text-destructive">
           {error ?? revision.error}
         </p>
@@ -203,7 +203,7 @@ function PanelReparto({ id, alTerminar }: { id: string; alTerminar: (cambio: boo
         <BotonBarra onClick={() => alTerminar(false)} disabled={ocupado}>
           Cancelar
         </BotonBarra>
-        <BotonBarra principal onClick={guardar} disabled={ocupado || !revision.completo}>
+        <BotonBarra principal onClick={guardar} disabled={ocupado || !revision.valido || revision.total === 0}>
           {ocupado ? "Repartiendo…" : "Guardar el reparto"}
         </BotonBarra>
       </div>
