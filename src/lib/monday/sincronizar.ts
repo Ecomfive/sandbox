@@ -16,6 +16,7 @@ import {
   despachoDeItem,
   enlazarOrden,
   errorMonday,
+  faltaCompletar,
   ITEMS_POR_PAGINA,
   leerColumnas,
   leerMapeo,
@@ -79,8 +80,22 @@ const leerPendiente = (v: unknown): Pendiente | null => {
   return { cursor: o.cursor, maximo: typeof o.maximo === "string" ? o.maximo : null, inicio: o.inicio, leidos: Number(o.leidos) || 0, guardados: Number(o.guardados) || 0 };
 };
 
-/** Enlaza y guarda un lote de despachos. */
-export async function guardarDespachos(supabase: SupabaseClient, tableroId: string, lote: Despacho[], unidades: { id: string; nombre: string }[]): Promise<number> {
+/** Las columnas de la migración 0970 (Despacho ciudad): sin ella, se guarda sin ellas. */
+const COLUMNAS_0970 = ["grupo", "edo_pago", "por_cobrar", "coste_envio", "turno", "comentario", "comprobantes", "clase"] as const;
+
+/**
+ * Enlaza y guarda un lote de despachos. `clase`: de qué tablero son (los repartos de ciudad o las devoluciones). Lo que ya se editó en el sistema
+ * (Despacho ciudad, migración 0970: `editado_en`) no se pisa: desde ahí manda el sistema.
+ */
+export async function guardarDespachos(supabase: SupabaseClient, tableroId: string, todo: Despacho[], unidades: { id: string; nombre: string }[], clase: "ciudad" | "devolucion" = "ciudad"): Promise<number> {
+  if (!todo.length) return 0;
+  const editados = new Set<string>();
+  for (let i = 0; i < todo.length; i += 200) {
+    const { data, error } = await supabase.from("mon_despachos").select("item_id").in("item_id", todo.slice(i, i + 200).map((d) => d.item_id)).not("editado_en", "is", null);
+    if (error) break;
+    for (const x of data ?? []) editados.add(String(x.item_id));
+  }
+  const lote = todo.filter((d) => !editados.has(d.item_id));
   if (!lote.length) return 0;
   const variantes = [...new Set(lote.flatMap((d) => variantesPedido(d.numero_pedido)))];
   const candidatas: OrdenCandidata[] = [];
@@ -94,10 +109,16 @@ export async function guardarDespachos(supabase: SupabaseClient, tableroId: stri
     const unidad = unidadDeTexto(d.tienda_texto, unidades, unidadDeTienda);
     const orden = enlazarOrden(d.numero_pedido, unidad, candidatas);
     const periodo = orden?.periodo ?? (d.fecha_despacho ? `${d.fecha_despacho.slice(0, 7)}-01` : null);
-    return { ...d, tablero_id: tableroId, unidad_id: unidad ?? orden?.unidad_id ?? null, orden_id: orden?.id ?? null, periodo, leido_en: ahora };
+    return { ...d, clase, tablero_id: tableroId, unidad_id: unidad ?? orden?.unidad_id ?? null, orden_id: orden?.id ?? null, periodo, leido_en: ahora };
   });
   for (let i = 0; i < filas.length; i += 500) {
     let { error } = await supabase.from("mon_despachos").upsert(filas.slice(i, i + 500), { onConflict: "item_id" });
+    // Sin la migración 0970, sin las columnas de Despacho ciudad.
+    if (error && new RegExp(COLUMNAS_0970.join("|")).test(error.message))
+      ({ error } = await supabase.from("mon_despachos").upsert(
+        filas.slice(i, i + 500).map((f) => Object.fromEntries(Object.entries(f).filter(([k]) => !(COLUMNAS_0970 as readonly string[]).includes(k)))),
+        { onConflict: "item_id" },
+      ));
     // Sin la migración 0295 no existen la forma de pago ni el monto cobrado: se guarda sin ellos.
     if (error && /forma_pago|monto_cobrado/.test(error.message))
       ({ error } = await supabase.from("mon_despachos").upsert(filas.slice(i, i + 500).map(({ forma_pago: _f, monto_cobrado: _m, ...resto }) => resto), { onConflict: "item_id" }));
@@ -115,7 +136,7 @@ export async function sincronizarMonday(supabase: SupabaseClient, limite: number
   if (!cfg?.tablero_id || !mapeo.pedido || !mapeo.estado) return { resumen: "Apagada: falta elegir el tablero y sus columnas (Deliverys › Monday).", pendiente: null };
   const tablero = String(cfg.tablero_id);
   // La forma de pago y el monto cobrado (14 nov 2026) se agregan solos al mapeo guardado, por el título de las columnas.
-  if (!mapeo.forma_pago || !mapeo.monto_cobrado) {
+  if (faltaCompletar(mapeo)) {
     const columnas = leerColumnas(await consultarMonday(CONSULTA_COLUMNAS, { ids: [tablero] }))?.columnas ?? [];
     const completo = columnas.length ? completarMapeo(mapeo, columnas) : null;
     if (completo) {

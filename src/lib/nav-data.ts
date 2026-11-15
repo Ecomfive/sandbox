@@ -122,6 +122,9 @@ const AREAS: NavSection[] = [
       { label: "Pedidos de tienda", href: "/tienda-pedidos", frente: "tienda" },
       { label: "Confirmación", href: "/tienda-confirmacion", frente: "tienda" },
       { label: "Logística de tienda", href: "/tienda-logistica", frente: "tienda" },
+      // Las entregas de ciudad y las devoluciones, que antes se anotaban en Monday (15 nov 2026, migración 0970).
+      { label: "Despacho ciudad", href: "/despacho-ciudad", frente: "tienda" },
+      { label: "Devoluciones", href: "/despacho-devoluciones", frente: "tienda" },
       { label: "Productos de Shopify", href: "/tienda-productos", frente: "tienda" },
       { label: "Tiendas Shopify", href: "/tienda-tiendas", frente: "tienda" },
       { label: "Alertas de inventario", href: "/alertas", dropi: true, frente: "fulfillment" },
