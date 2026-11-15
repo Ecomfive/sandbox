@@ -335,7 +335,8 @@ async function tareaMonday(c: Contexto): Promise<Resultado> {
   const entregas = await actualizarEntregas(c.supabase, "Monday (tarea diaria)", Math.max(c.limite, Date.now() + 8_000)).then((x) => x.resumen).catch((e) => `Entregas: ${e instanceof Error ? e.message : "falló"}.`);
   const enlazadas = reenlazadas ? `${reenlazadas} filas de Monday encontraron su pedido.` : "";
   // La forma de pago, lo cobrado y la fecha de despacho que Monday o Servientrega saben y el pedido no tiene (14 nov 2026).
-  const completados = await completarDatosEntrega(c.supabase, Math.max(c.limite, Date.now() + 5_000)).catch(() => 0);
+  // Toma unos 7 s (revisa lo que Monday o Servientrega movieron en 30 días): si la lectura ya se comió el tiempo, va en la próxima.
+  const completados = Date.now() < c.limite + 5_000 ? await completarDatosEntrega(c.supabase, Math.max(c.limite, Date.now() + 5_000)).catch(() => 0) : 0;
   const datos = completados ? `${completados} pedidos completaron su forma de pago o su fecha de despacho.` : "";
   return { resumen: [r.resumen, extra, postventa, enlazadas, entregas, datos].filter(Boolean).join(" "), pendiente: null };
 }
