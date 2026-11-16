@@ -7,7 +7,8 @@ import { mismaTiendaUnidad } from "@/lib/tienda/ordenes-finanzas";
 
 // El aviso de «Nuevo pedido» (12 nov 2026, pedido de Hernán: «si cae un pedido, nos cae a nosotros en el sistema y nos da un aviso, como lo hace el de
 // Jorge»). El navegador pregunta cada 30 segundos por los pedidos que llegaron de Shopify desde la última vez; solo los de tiendas conectadas, de los
-// países que la persona puede ver y de hoy o ayer (lo que se trae de antes al conectar no avisa). Basta poder abrir Pedidos de tienda.
+// países que la persona puede ver y de hoy o ayer (lo que se trae de antes al conectar no avisa). Basta poder abrir Pedidos de tienda o Despacho ciudad
+// (desde el 16 nov 2026 el aviso es para despacho y sale solo en sus páginas).
 
 export interface PedidoNuevo {
   id: string;
@@ -22,7 +23,7 @@ const ES_ISO = /^\d{4}-\d{2}-\d{2}T[\d:.]+(Z|[+-]\d{2}:?\d{2})$/;
 
 export async function pedidosNuevos(desde: string): Promise<{ pedidos: PedidoNuevo[]; hasta: string } | { error: string }> {
   const usuario = await getUsuarioActual();
-  if (!usuario || !usuario.modulos.includes("tienda-pedidos")) return { error: "Sin acceso." };
+  if (!usuario || !["tienda-pedidos", "despacho-ciudad"].some((m) => usuario.modulos.includes(m))) return { error: "Sin acceso." };
   const ahora = new Date().toISOString();
   if (typeof desde !== "string" || !ES_ISO.test(desde)) return { pedidos: [], hasta: ahora };
   // Como mucho, lo de la última hora (una pestaña dormida no trae una avalancha al despertar).

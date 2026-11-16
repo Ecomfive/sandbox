@@ -110,8 +110,10 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     <ProveedorDescargaPdf puede={!!usuario && PUEDEN_DESCARGAR_PDF.has(usuario.id)}>
     <ToastProvider>
       {usuario && <LatidoPresencia />}
-      {/* «Nuevo pedido» de las tiendas conectadas a Shopify (12 nov 2026). */}
-      {usuario?.modulos.includes("tienda-pedidos") && <AvisoPedidosNuevos codigoPais={paisActual.codigo} />}
+      {/* «Nuevo pedido» de las tiendas conectadas a Shopify (12 nov 2026): desde el 16 nov, solo para despacho y en sus páginas; Admin y CEO, sin sonido de entrada. */}
+      {usuario?.modulos.includes("despacho-ciudad") && (
+        <AvisoPedidosNuevos codigoPais={paisActual.codigo} sonidoPorDefecto={!["admin", "ceo"].includes((usuario.rolNombre ?? "").trim().toLowerCase())} />
+      )}
       {usuario && avisoInactividad && <AvisoInactividad />}
       {usuario?.vistaPrevia && <BannerVistaPrevia rolNombre={usuario.vistaPrevia.rolNombre} />}
       <div className="flex min-h-full">
