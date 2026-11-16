@@ -95,6 +95,8 @@ export const AREAS_ACCESO: AreaAcceso[] = [
       { clave: "despacho-devoluciones", etiqueta: "Devoluciones" },
       { clave: "despacho-cambios", etiqueta: "Cambios y reembolsos" },
       { clave: "despacho-cambios-cuentas", etiqueta: "Cambios y reembolsos: datos para reembolsar" },
+      { clave: "tienda-cuanto-hay", etiqueta: "Preguntar cuánto hay" },
+      { clave: "despacho-cuanto-hay", etiqueta: "Responder cuánto hay" },
       { clave: "tienda-productos", etiqueta: "Productos de Shopify" },
       { clave: "tienda-tiendas", etiqueta: "Tiendas Shopify" },
     ],

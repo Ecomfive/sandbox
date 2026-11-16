@@ -127,6 +127,9 @@ const AREAS: NavSection[] = [
       { label: "Devoluciones", href: "/despacho-devoluciones", frente: "tienda" },
       // El tablero «CAMBIOS Y REEMBOLSOS» de Monday (16 nov 2026, migración 0972).
       { label: "Cambios y reembolsos", href: "/despacho-cambios", frente: "tienda" },
+      // «¿Cuánto hay?» (16 nov 2026, migración 0301): la tienda pregunta y Yiletsi responde con lo que contó despacho.
+      { label: "Preguntar cuánto hay", href: "/tienda-cuanto-hay", frente: "tienda" },
+      { label: "Responder cuánto hay", href: "/despacho-cuanto-hay", frente: "tienda" },
       { label: "Productos de Shopify", href: "/tienda-productos", frente: "tienda" },
       { label: "Tiendas Shopify", href: "/tienda-tiendas", frente: "tienda" },
       { label: "Alertas de inventario", href: "/alertas", dropi: true, frente: "fulfillment" },

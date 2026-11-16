@@ -1894,6 +1894,40 @@ export const GUIAS: GuiaModulo[] = [
     ],
   },
   {
+    modulo: "tienda-cuanto-hay",
+    titulo: "Preguntar cuánto hay",
+    ruta: "/tienda-cuanto-hay",
+    resumen: "Para saber cuánto hay de un producto sin mandar mensajes: la tienda pregunta y Yiletsi responde con lo que contó despacho.",
+    secciones: [
+      {
+        titulo: "Uso",
+        pasos: [
+          "En «Producto» escribe parte del nombre, el SKU o el N.º y elige el producto (o la variante: color, talla) de la lista. Solo salen los productos del catálogo; los combos no, porque se cuenta cada producto.",
+          "Si quieres, escribe una nota para despacho (por ejemplo, «es para un cambio, cliente esperando») y pulsa «Preguntar». Si manejas más de una tienda, primero eliges la tienda.",
+          "Abajo están tus preguntas. La columna «Hay» dice «Esperando a Yiletsi» hasta que responde; después sale la cantidad, quién respondió y cuándo. También te llega el aviso en «Para ti».",
+          "Quien tiene tiendas asignadas ve las preguntas de sus tiendas (también las de un compañero); quien no, las suyas. Se ven las de los últimos 60 días.",
+        ],
+      },
+    ],
+  },
+  {
+    modulo: "despacho-cuanto-hay",
+    titulo: "Responder cuánto hay",
+    ruta: "/despacho-cuanto-hay",
+    resumen: "El panel de Yiletsi: las preguntas de cuánto hay de todas las tiendas, agrupadas por tienda, para responder con la cantidad que contó despacho.",
+    secciones: [
+      {
+        titulo: "Uso",
+        pasos: [
+          "Cada tienda es un renglón y debajo van sus preguntas, la que lleva más esperando primero. Arriba, los botones muestran una sola tienda y cuántas tiene pendientes.",
+          "Manda a contar a despacho, escribe la cantidad en «Hay» (0 si no hay) y pulsa «Responder». La respuesta le llega a quien preguntó en «Para ti» y la pregunta pasa a «Respondidas».",
+          "«Ver respondidas» muestra lo respondido en los últimos 7 días. Ahí se puede corregir una cantidad: cambia el número y pulsa «Corregir» (a la tienda le llega otra vez el aviso).",
+          "Cuando una tienda pregunta, a Yiletsi le llega el aviso en «Para ti».",
+        ],
+      },
+    ],
+  },
+  {
     modulo: "tienda-productos",
     titulo: "Productos de Shopify",
     ruta: "/tienda-productos",
@@ -2101,6 +2135,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-11-16", titulo: "Nuevo: ¿Cuánto hay? (la tienda pregunta, Yiletsi responde)", texto: "Las tiendas ya no tienen que escribir para saber cuánto hay de un producto: en «Preguntar cuánto hay» eligen el producto del catálogo, escriben una nota si quieren y preguntan. Yiletsi lo ve en «Responder cuánto hay», separado por tienda, manda a contar a despacho y responde con la cantidad; a quien preguntó le llega en «Para ti».", modulo: "tienda-cuanto-hay", href: "/tienda-cuanto-hay" },
   { fecha: "2026-11-16", titulo: "Retiros: las novedades resueltas ya se encuentran con el filtro", texto: "Un retiro con la novedad resuelta queda cerrado y su Consolidación dice «Novedad resuelta», pero el filtro de Estado «Novedad resuelta» no lo encontraba. Ya sale con ese filtro (dentro de «Cerrados») y también hay un filtro nuevo de Consolidación (Pendiente, Consolidado o Novedad resuelta). La tarjeta «Retiros cerrados» cuenta solo los conciliados, igual que su filtro. Además, la lupa de la tabla ya busca por el número del retiro (#0143, 0143 o 143), en abiertos y cerrados.", modulo: "retiros", href: "/retiros" },
   { fecha: "2026-11-16", titulo: "Aviso «Nuevo pedido» solo para despacho", texto: "El aviso de pedido nuevo ya no sale en todo el sistema: aparece solo en Pedidos de tienda, Logística de tienda, Despacho ciudad y Devoluciones, y solo a quien tiene Despacho ciudad. Así no distrae a quien trabaja en Compras, Producto u otros paneles. A Admin y CEO les llega sin sonido de entrada (la cornetita del aviso lo activa).", modulo: "tienda-pedidos", href: "/tienda-pedidos" },
   { fecha: "2026-11-16", titulo: "Retiros: la fecha de creación se puede elegir al crear", texto: "Al crear un retiro, la «Fecha de creación» ya no queda fija en hoy: la puedes cambiar (nunca a una fecha futura) para registrar un retiro que ya habías pedido. Así cuenta en el mes en que se solicitó y no altera las solicitudes ni el porcentaje de retiros de otro mes.", modulo: "retiros", href: "/retiros" },
