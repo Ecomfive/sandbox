@@ -16,6 +16,7 @@ import { EjemplosDirecciones } from "./ejemplos-direcciones";
 import { InstruccionesIA } from "./instrucciones-ia";
 import { LineaModelo } from "./lineas-modelo";
 import { PalabrasZona } from "./palabras-zona";
+import { PreguntaMensaje } from "./pedir-dato";
 import { BotonesVeredicto, ColaRevision, type AlElegir } from "./revision-pedidos";
 import { SeccionCard } from "./seccion";
 import {
@@ -24,6 +25,8 @@ import {
   cambiarInterruptor,
   probarDireccion,
   revisarAnalisis,
+  vistaPreviaMensajeDato,
+  type PedirDato,
   type InterruptorConfirmacion,
   type PalabraZona,
 } from "../ia-actions";
@@ -33,6 +36,7 @@ const MENSAJE: Record<FilaAnalisis["mensajeEstado"], { texto: string; tono: "neu
   no_aplica: { texto: "No hace falta", tono: "neutro" },
   apagado: { texto: "Sin enviar (apagado)", tono: "neutro" },
   enviado: { texto: "Enviado", tono: "exito" },
+  manual: { texto: "Enviado a mano", tono: "exito" },
   pendiente_plantilla: { texto: "Falta plantilla", tono: "aviso" },
   sin_chat: { texto: "Sin chat", tono: "aviso" },
   error: { texto: "No se pudo enviar", tono: "peligro" },
@@ -106,6 +110,8 @@ export function ConfirmacionIA({
   const [abrirCorregir, setAbrirCorregir] = useState(false);
   // Lo recién marcado en la cola de revisión: sale al instante, sin esperar a que la página vuelva a cargar.
   const [marcados, setMarcados] = useState<Set<string>>(() => new Set());
+  // «Falta un dato»: la pregunta de si se le manda el mensaje al cliente o ya se le mandó a mano.
+  const [pregunta, setPregunta] = useState<PedirDato | null>(null);
   const [pidiendoClave, setPidiendoClave] = useState<{ campo: InterruptorConfirmacion; valor: boolean } | null>(null);
   const [clave, setClave] = useState("");
   const [errorClave, setErrorClave] = useState<string | null>(null);
@@ -124,8 +130,15 @@ export function ConfirmacionIA({
     setMarcados((m) => new Set(m).add(f.id));
     mostrarToast("acierto" in d ? "Anotado: estaba bien." : "Guardado: la IA aprende de esta respuesta.");
     router.refresh();
+    if (r.pedirDato) setPregunta(r.pedirDato);
     return null;
   };
+  // Desde la ficha: preguntar de nuevo si se le pide el dato al cliente (por ejemplo, tras «Ahora no»).
+  async function preguntarMensaje(f: FilaAnalisis) {
+    const r = await vistaPreviaMensajeDato(f.id);
+    if (r.error || !r.pedirDato) return mostrarToast(r.error ?? "No se pudo preparar el mensaje.", "destructive");
+    setPregunta(r.pedirDato);
+  }
 
   function cambiar(campo: InterruptorConfirmacion, valor: boolean, claveEscrita?: string) {
     empezar(async () => {
@@ -342,7 +355,9 @@ export function ConfirmacionIA({
 
       {esAdmin && <InstruccionesIA paisNombre={paisNombre} inicial={instrucciones ?? ""} />}
 
-      {ficha && <FichaAnalisis key={ficha.id} f={ficha} distingueZona={config.distingueZona} puedeEscribir={puedeEscribir} abrirCorregir={abrirCorregir} alElegir={elegir} alCerrar={() => setAbierta(null)} />}
+      {ficha && <FichaAnalisis key={ficha.id} f={ficha} distingueZona={config.distingueZona} puedeEscribir={puedeEscribir} abrirCorregir={abrirCorregir} alElegir={elegir} alPreguntar={preguntarMensaje} alCerrar={() => setAbierta(null)} />}
+
+      {pregunta && <PreguntaMensaje key={pregunta.analisisId} p={pregunta} alCerrar={() => setPregunta(null)} />}
 
       {pidiendoClave && (
         <Ventana abierto alCerrar={() => !pendiente && setPidiendoClave(null)} ancho="sm" titulo={<span className="text-base font-semibold">Escribe la contraseña</span>}>
@@ -379,7 +394,7 @@ export function ConfirmacionIA({
   );
 }
 
-function FichaAnalisis({ f, distingueZona, puedeEscribir, abrirCorregir, alElegir, alCerrar }: { f: FilaAnalisis; distingueZona: boolean; puedeEscribir: boolean; abrirCorregir: boolean; alElegir: AlElegir; alCerrar: () => void }) {
+function FichaAnalisis({ f, distingueZona, puedeEscribir, abrirCorregir, alElegir, alPreguntar, alCerrar }: { f: FilaAnalisis; distingueZona: boolean; puedeEscribir: boolean; abrirCorregir: boolean; alElegir: AlElegir; alPreguntar: (f: FilaAnalisis) => Promise<void>; alCerrar: () => void }) {
   const router = useRouter();
   const { mostrarToast } = useToast();
   const [pendiente, empezar] = useTransition();
@@ -422,6 +437,17 @@ function FichaAnalisis({ f, distingueZona, puedeEscribir, abrirCorregir, alElegi
               {m.texto}
               {f.mensajeEstado === "pendiente_plantilla" ? ": pasaron más de 24 horas del último mensaje del cliente; hay que usar una plantilla de iComfly." : f.mensajeEstado === "sin_chat" ? ": el cliente no tiene chat con la tienda." : f.mensajeError ? `: ${f.mensajeError}` : ""}
             </p>
+          </div>
+        )}
+        {puedeEscribir && f.final.estado === "falta_dato" && f.final.falta && (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border px-3 py-2.5">
+            <p className="m-0 text-sm">
+              Falta <b>{f.final.falta}</b>.{" "}
+              {f.mensajeEstado === "enviado" || f.mensajeEstado === "manual" ? "Ya se le pidió al cliente." : "Todavía no se le ha pedido al cliente."}
+            </p>
+            <button type="button" disabled={pendiente} onClick={() => empezar(() => alPreguntar(f))} className={`rounded-md border border-border-control bg-card px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50 ${anilloFoco}`}>
+              {f.mensajeEstado === "enviado" || f.mensajeEstado === "manual" ? "Volver a pedirlo" : "Pedirlo al cliente"}
+            </button>
           </div>
         )}
         {f.revision && (

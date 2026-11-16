@@ -6,9 +6,9 @@ import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { claveCoincide } from "@/lib/confirmacion-ia/clave";
 import { tiendasVisibles } from "@/lib/confirmacion-ia/acceso";
 import { etiquetaDeZona, type Combinado, type EstadoAnalisis, type ResultadoModelo } from "@/lib/confirmacion-ia/combinar";
-import { coincideConPropuesta, revisarVeredicto, type DecisionRevision, type Veredicto } from "@/lib/confirmacion-ia/revision";
+import { coincideConPropuesta, faltaVigente, revisarVeredicto, type DecisionRevision, type Veredicto } from "@/lib/confirmacion-ia/revision";
 import { MAX_INSTRUCCIONES } from "@/lib/confirmacion-ia/prompt";
-import { analizarOrden, analizarPendientes, cargarConfig, evaluarDireccion, SIN_MIGRACION_CONFIRMACION } from "@/lib/confirmacion-ia/servidor";
+import { analizarOrden, analizarPendientes, armarMensajeDato, cargarConfig, enviarMensajeDato as mandarMensajeDato, evaluarDireccion, MAX_MENSAJES, SIN_MIGRACION_CONFIRMACION, type EstadoMensaje } from "@/lib/confirmacion-ia/servidor";
 import { errorDeRegla, normalizarTexto, ZONAS, type Zona } from "@/lib/confirmacion-ia/zonas";
 import { getPaisActual } from "@/lib/pais";
 import { esAdministrador } from "@/lib/permisos/acceso";
@@ -345,7 +345,7 @@ export async function probarDireccion(direccion: string, ciudad: string, tiendaI
 export async function revisarAnalisis(
   analisisId: string,
   d: DecisionRevision,
-): Promise<Resultado> {
+): Promise<Resultado & { pedirDato?: PedirDato }> {
   const usuario = await requireModuloEscritura(MODULO);
   if (!UUID.test(String(analisisId))) return { error: "Análisis no válido." };
   const supabase = createServiceClient();
@@ -427,5 +427,100 @@ export async function revisarAnalisis(
   });
   revalidatePath("/tienda-confirmacion/ia");
   revalidatePath("/tienda-confirmacion/ejemplos");
+  // Falta un dato: la pantalla le pregunta a la persona si le manda el mensaje al cliente o si ya se lo mandó a mano (no se manda solo).
+  if (!veredicto.completa && veredicto.falta) {
+    const p = await prepararPedirDato(supabase, analisisId);
+    if (!("error" in p)) return { pedirDato: p };
+  }
+  return {};
+}
+
+// --- Pedirle al cliente el dato que falta (lo decide una persona) ----------------------------------------------------------------------------------
+
+/** Lo que la pantalla muestra para preguntar si se le manda el mensaje al cliente. */
+export interface PedirDato {
+  analisisId: string;
+  numero: string | null;
+  /** Lo que falta de la dirección, como se le pediría. */
+  falta: string;
+  /** El mensaje que se le mandaría. */
+  mensaje: string;
+  /** Qué pasó antes con el mensaje de este pedido (por ejemplo «enviado»: ya se le había pedido). */
+  estado: EstadoMensaje;
+  enviados: number;
+}
+
+/** Lee el análisis (del país y de las tiendas que la persona ve) y arma la pregunta. Sin migración 0307, lo que falta se toma de lo que dijo la IA. */
+async function prepararPedirDato(supabase: ReturnType<typeof createServiceClient>, analisisId: string): Promise<PedirDato | { error: string }> {
+  const pais = await getPaisActual(supabase);
+  const leer = (columnas: string) => supabase.from("confirmacion_ia_analisis").select(columnas).eq("id", analisisId).eq("pais_id", pais.id).maybeSingle();
+  let r = await leer("id, orden_id, tienda_id, estado, falta, mensaje_estado, mensajes_enviados, rev_completa, rev_falta, rev_en");
+  if (r.error) r = await leer("id, orden_id, tienda_id, estado, falta, mensaje_estado, mensajes_enviados");
+  const a = r.data as unknown as Record<string, unknown> | null;
+  if (r.error || !a) return { error: "Ese análisis ya no existe." };
+  const { tiendas, limitado } = await tiendasVisibles(supabase, pais.id);
+  if (limitado && !tiendas.some((t) => t.id === a.tienda_id)) return { error: "Ese pedido no es de las tiendas que ves." };
+  const falta = faltaVigente(a);
+  if (!falta) return { error: "A este pedido ya no le falta ningún dato." };
+  const m = await armarMensajeDato(supabase, a.orden_id as string, falta);
+  if ("error" in m) return m;
+  const { data: o } = await supabase.from("ven_ordenes").select("numero").eq("id", a.orden_id as string).maybeSingle();
+  return { analisisId, numero: (o?.numero as string | null) ?? null, falta, mensaje: m.mensaje, estado: (a.mensaje_estado as EstadoMensaje) ?? "no_aplica", enviados: Number(a.mensajes_enviados ?? 0) };
+}
+
+/** La pregunta «¿le mando el mensaje?» de un pedido que falta un dato (para pedirlo desde su ficha). */
+export async function vistaPreviaMensajeDato(analisisId: string): Promise<{ error?: string; pedirDato?: PedirDato }> {
+  await requireModuloEscritura(MODULO);
+  if (!UUID.test(String(analisisId))) return { error: "Análisis no válido." };
+  const p = await prepararPedirDato(createServiceClient(), analisisId);
+  return "error" in p ? p : { pedirDato: p };
+}
+
+/**
+ * Manda por iComfly el mensaje que pide el dato que falta. Lo pide una persona con un botón (no depende del interruptor del WhatsApp automático) y se manda lo mismo que vio en pantalla.
+ * Solo con la ventana de 24 horas abierta: si no, devuelve `pendiente_plantilla` y no se manda nada. Como mucho `MAX_MENSAJES` veces por pedido.
+ */
+export async function enviarMensajeDato(analisisId: string): Promise<{ error?: string; estado?: EstadoMensaje }> {
+  const usuario = await requireModuloEscritura(MODULO);
+  if (!UUID.test(String(analisisId))) return { error: "Análisis no válido." };
+  const supabase = createServiceClient();
+  const p = await prepararPedirDato(supabase, analisisId);
+  if ("error" in p) return p;
+  if (p.enviados >= MAX_MENSAJES) return { error: `A este cliente ya se le pidió el dato ${MAX_MENSAJES} veces.` };
+  const { data: a } = await supabase.from("confirmacion_ia_analisis").select("orden_id").eq("id", analisisId).maybeSingle();
+  if (!a) return { error: "Ese análisis ya no existe." };
+  const r = await mandarMensajeDato(supabase, a.orden_id as string, p.mensaje);
+  const { error } = await supabase
+    .from("confirmacion_ia_analisis")
+    .update({
+      mensaje: p.mensaje,
+      mensaje_estado: r.estado,
+      mensaje_error: r.error ?? null,
+      ...(r.estado === "enviado" ? { mensajes_enviados: p.enviados + 1, mensaje_enviado_en: new Date().toISOString() } : {}),
+      actualizado_en: new Date().toISOString(),
+    })
+    .eq("id", analisisId);
+  if (error) return { error: "El mensaje salió, pero no se pudo anotar. Revisa el pedido." };
+  const pais = await getPaisActual(supabase);
+  await registrarAuditoria({ accion: "enviar_mensaje_dato_confirmacion_ia", entidad: "paises", entidadId: pais.id, detalle: `${pais.nombre}: pidió el dato que falta al cliente de un pedido (${r.estado}) por ${nombreDe(usuario)}` });
+  revalidatePath("/tienda-confirmacion/ia");
+  return r.estado === "error" ? { error: r.error ?? "No se pudo enviar el mensaje.", estado: r.estado } : { estado: r.estado };
+}
+
+/** «Ya se le envió»: la persona le escribió al cliente a mano; se anota para no volver a preguntar ni a mandarlo. */
+export async function marcarMensajeManual(analisisId: string): Promise<Resultado> {
+  const usuario = await requireModuloEscritura(MODULO);
+  if (!UUID.test(String(analisisId))) return { error: "Análisis no válido." };
+  const supabase = createServiceClient();
+  const p = await prepararPedirDato(supabase, analisisId);
+  if ("error" in p) return p;
+  const { error } = await supabase
+    .from("confirmacion_ia_analisis")
+    .update({ mensaje: p.mensaje, mensaje_estado: "manual", mensaje_error: null, mensajes_enviados: p.enviados + 1, mensaje_enviado_en: new Date().toISOString(), actualizado_en: new Date().toISOString() })
+    .eq("id", analisisId);
+  if (error) return { error: /mensaje_estado|check|constraint/i.test(error.message) ? "Falta correr la migración 0308 (mensaje enviado a mano) en Supabase." : "No se pudo guardar." };
+  const pais = await getPaisActual(supabase);
+  await registrarAuditoria({ accion: "marcar_mensaje_manual_confirmacion_ia", entidad: "paises", entidadId: pais.id, detalle: `${pais.nombre}: ${nombreDe(usuario)} marcó que ya le pidió el dato al cliente de un pedido` });
+  revalidatePath("/tienda-confirmacion/ia");
   return {};
 }

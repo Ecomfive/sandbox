@@ -102,3 +102,9 @@ export function seleccionarEjemplos<T extends { completa: boolean; zona: Zona | 
   for (let i = 0; completas.length < porTipo && grupos.some((g) => i < g.length); i += 1) for (const g of grupos) if (i < g.length && completas.length < porTipo) completas.push(g[i]);
   return [...completas, ...recientesPrimero.filter((x) => !x.completa).slice(0, porTipo)];
 }
+
+/** Lo que falta de la dirección de un pedido según lo que vale hoy: lo que marcó el equipo, o lo que dijo la IA si nadie lo revisó. Null si ya no le falta nada. */
+export function faltaVigente(a: { estado?: unknown; falta?: unknown; rev_en?: unknown; rev_completa?: unknown; rev_falta?: unknown }): string | null {
+  if (a.rev_en) return a.rev_completa === false ? ((a.rev_falta as string | null) ?? null) : null;
+  return a.estado === "falta_dato" ? ((a.falta as string | null) ?? null) : null;
+}

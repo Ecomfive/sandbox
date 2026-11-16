@@ -129,7 +129,8 @@ async function cargarOrden(supabase: SupabaseClient, ordenId: string): Promise<O
   };
 }
 
-type EstadoMensaje = "no_aplica" | "apagado" | "enviado" | "pendiente_plantilla" | "sin_chat" | "error";
+/** Qué pasó con el mensaje que pide el dato que falta. `manual`: una persona dijo que ya se lo mandó a mano. */
+export type EstadoMensaje = "no_aplica" | "apagado" | "enviado" | "manual" | "pendiente_plantilla" | "sin_chat" | "error";
 
 /**
  * Le pide al cliente por WhatsApp (iComfly) lo que falta de la dirección. Solo escribe libre con la ventana de 24 horas abierta; si no, queda pendiente de una plantilla (nunca escribe
@@ -148,6 +149,23 @@ async function pedirDatoPorWhatsapp(supabase: SupabaseClient, o: OrdenParaAnaliz
   const r = await herramientaIcomfly(supabase, o.tiendaId, "enviar_mensaje_whatsapp", { telefono, mensaje: texto });
   if ("error" in r) return esErrorDeVentana(r.error) ? { estado: "pendiente_plantilla" } : { estado: "error", error: r.error };
   return { estado: "enviado" };
+}
+
+/**
+ * El mensaje que se le mandaría al cliente de un pedido para pedirle lo que falta (con su nombre, su pedido y su tienda). Sin escribirle a nadie: la pantalla se lo muestra a la persona, que decide
+ * si se envía o si ya se le mandó a mano.
+ */
+export async function armarMensajeDato(supabase: SupabaseClient, ordenId: string, falta: string): Promise<{ mensaje: string } | { error: string }> {
+  const o = await cargarOrden(supabase, ordenId);
+  if (!o) return { error: "El pedido no es de una tienda." };
+  return { mensaje: mensajePedirDetalle({ nombre: o.cliente.nombre, numero: o.numero, tienda: o.tiendaNombre, falta }) };
+}
+
+/** Manda ese mensaje por iComfly (solo con la ventana de 24 horas abierta; si no, queda pendiente de una plantilla). Lo llama una persona desde la pantalla, nunca el análisis. */
+export async function enviarMensajeDato(supabase: SupabaseClient, ordenId: string, texto: string): Promise<{ estado: EstadoMensaje; error?: string }> {
+  const o = await cargarOrden(supabase, ordenId);
+  if (!o) return { estado: "error", error: "El pedido no es de una tienda." };
+  return pedirDatoPorWhatsapp(supabase, o, texto);
 }
 
 async function pedirAlModelo(proveedor: ProveedorIA, entrada: ReturnType<typeof armarEntrada>, numero: string | null): Promise<ResultadoModelo> {
