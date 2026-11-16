@@ -2629,6 +2629,17 @@ convenciones técnicas del código.
   vuelvas a pedir filas sin `range`/paginar para sumarlas: Supabase entrega como mucho 1000.** Diagnóstico y lo que falta:
   `RENDIMIENTO-PENDIENTE.md`.
 
+- **Compras: «Llegada a Puerto», «En Bodega» y avisos automáticos** (16 nov 2026, pedido de Hernán; migración 0304, reversa `supabase/rollbacks/0304_rollback.sql`). El flujo termina en 04 En Producción → 05 Tracking →
+  **06 Llegada a Puerto** (`arribo_mercancia`: solo cambió el nombre, la clave es la misma) → **07 En Bodega** (`en_bodega`, nueva) → **08 Completado** (solo con la mercancía en bodega y el segundo pago hecho). Etapas en `ETAPAS_COMPRA`
+  (`def-compras.ts`), la restricción `wms_compras_etapa_check` y `proveedor_sincronizar` (el portal de Shen Zhen ve «En Bodega» como «Llegado»; `proveedor.test.ts` lee la migración 0304). Lo que cuenta cada etapa: `en_bodega` no es «en camino»
+  (ya llegó), sí «ya llegó» (`llegadas.ts`), «por recibir» en Inventario (`ETAPAS_POR_RECIBIR`) y comprometida en la proyección de caja; en el recorrido al cliente, «Llegó a bodega» es En Bodega y Llegada a Puerto sigue en «En camino».
+  **Avisos** (`src/lib/compras/llegadas-avisos.ts` puro con prueba + `llegadas-servidor.ts`): al pasar compras a esas etapas (`actualizarCompra`, `actualizarCampoCompra` y el lote, con `avisarCambioDeEtapa` en `compras/actions.ts`, después de responder con `after()`)
+  se guarda una llegada (`compras_llegadas` + `compras_llegada_items`: **una por acción**, así que lo que se cambia junto con la barra del lote es una sola llegada) y le llega un aviso «Para ti» (tipo `llegada`) a quien esté en `compras_avisos_destinatarios`:
+  `llegada_puerto` → **Logística (el usuario de Dinora Gomez)**, `llegada_bodega` → María José (la 0304 las deja sembradas por nombre; se cambian en Configuración › «Avisos de Compras», `avisos-compras.tsx`). Un fallo del aviso nunca deshace el cambio de etapa.
+  La página `/llegadas/<id>` (`src/app/(app)/llegadas/`, no está en el menú: migas en `construirMigas`) la abre quien recibe el aviso, un administrador o quien tiene Compras (con su país y alcance). **Puerto**: producto (código · nombre), unidades, cajas y etiqueta de las cajas
+  (`proveedor_pedidos.cajas/etiquetas_rutas`, direcciones firmadas) y totales. **Bodega**: segundo pago por compra y total (los montos solo para quien recibe el aviso, un administrador o quien no los tiene ocultos en «Afinar»), y «Registrar pago»
+  (`registrarPagoLlegada`: monto y día, guarda quién; `pagado_a_proveedor` = lo mayor entre lo que había y primer pago + este pago; si la compra no tenía segundo pago lo toma de aquí; la compra pasa a `completado` y se sella `cerrado_en`; el Estado no se toca).
+  Cuando un aviso nuevo muestre otra cosa, se arma en `armarAviso`. Compras sin cajas anotadas por el proveedor salen «Sin anotar».
 - **Compras: «Enviado a cotización», plazos por etapa, prioridades y «Tu desempeño con Ecomfive»** (reunión con Alcides del 11 nov 2026;
   prototipo aprobado por Hernán; migración 0270, reversa `supabase/rollbacks/0270_rollback.sql`). Etapa nueva `enviado_cotizacion`
   («02 - Enviado a cotización», color #ff9f43) entre Cotizar y Cotizado; las de después se renumeraron (03 Cotizado … 07 Completado; las
