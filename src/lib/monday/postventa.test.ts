@@ -184,3 +184,10 @@ test("postventa: las notas con datos de pago se quedan solo con el formato de la
   assert.equal(notaSinDatos("Jilma jaen\nESPERANDO QUE REGRESE EL PRODUCTO"), "ESPERANDO QUE REGRESE EL PRODUCTO");
   assert.equal(notaSinDatos("Cliente: VERONICA VEGA\nREEMBOLSAR: $46.99"), "REEMBOLSAR: $46.99");
 });
+
+test("postventa: una línea con banco se queda solo con Motivo, Monto, Retirar o Enviar", () => {
+  assert.equal(notaSinDatos("✅Realizar reembolso: Fulano Pérez Banco General Cuenta de Ahorros ••• Motivo: no le funcionan. Monto a reembolsar: $18.49"), "Motivo: no le funcionan. Monto a reembolsar: $18.49");
+  assert.equal(notaSinDatos("✅Retirar 2 Aspiradoras. ✅Realizar reembolso: Fulano Cuenta de ahorros"), "Retirar 2 Aspiradoras.");
+  assert.equal(notaSinDatos("✅ Realizar reembolso. Fulana castro vallejo Banco general Cuenta de Ahorros 0400123456789"), "");
+  assert.equal(notaSinDatos("Motivo: no enciende, no pasa corriente."), "Motivo: no enciende, no pasa corriente.");
+});
