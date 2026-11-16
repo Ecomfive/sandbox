@@ -108,11 +108,32 @@ export function notaSinDatos(texto: string): string {
   return taparDatos(
     texto
       .split(/\r?\n/)
+      .map(sinTramosDePago)
+      .filter((l): l is string => l !== null)
       .filter((l) => !LINEA_PERSONAL.test(l) && !esNombreSuelto(l) && (!conPago || !l.trim() || LINEA_DE_SOLICITUD.test(normalizar(l).trim())))
       .join("\n"),
   )
     .replace(/(\n\s*){3,}/g, "\n\n")
     .trim();
+}
+
+/** Un banco o una cuenta nombrados en la línea («Banco General Cuenta de ahorros», «Bco. Nacional», «a nombre de…»). */
+const BANCO_EN_LINEA = /banco|\bbco\b|\bbac\b|banistmo|banismo|banesco|caja de ahorros|cuenta\s+(de\s+)?(ahorros?|corriente)|cuenta\s+ahorro|\bahorros?\b\s*[:.]|a\s+nombre\s+de|titular/i;
+/** Donde empieza cada tramo de una línea con varias instrucciones («✅Retirar … ✅Realizar reembolso: … Motivo: … Monto a reembolsar: …»). */
+const CORTE_DE_TRAMO = /(?=✅|\bmotiv[oó]\s*:|\bmonto\b|\bretir(?:ar|o)\b|\benv[ií]ar\b|\bentregar\b|\bpenalizaci[oó]n\b)/i;
+
+/**
+ * Una línea que nombra un banco o una cuenta se queda solo con sus tramos de Motivo, Monto, Retirar, Enviar o Penalización, sin el banco ni el nombre
+ * de a quién se le paga («✅Realizar reembolso: Fulano. Banco General Cuenta de ahorros ••• Motivo: no funciona» → «Motivo: no funciona»).
+ */
+function sinTramosDePago(linea: string): string | null {
+  if (!BANCO_EN_LINEA.test(linea)) return linea;
+  return linea
+    .split(CORTE_DE_TRAMO)
+    .map((t) => t.trim())
+    .filter((t) => t && !BANCO_EN_LINEA.test(t) && !/^[^\p{L}]*(realizar\s+)?re[e]?m?bols\w*/iu.test(t) && /^[^\p{L}]*(motiv|monto|retir|env[ií]|entreg|penaliz)/iu.test(t))
+    .join(" ")
+    .trim() || null;
 }
 
 /** Señales de que la nota trae datos para pagarle al cliente. */
