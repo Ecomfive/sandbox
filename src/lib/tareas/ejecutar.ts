@@ -32,6 +32,7 @@ import { sincronizarQuickbooks } from "../quickbooks/cliente";
 import { enlazarSinPedido, sincronizarMonday } from "../monday/sincronizar";
 import { sincronizarTablerosExtra } from "../monday/tableros-extra";
 import { sincronizarPostventa } from "../monday/postventa";
+import { copiarComprobantesRecientes } from "../monday/comprobantes";
 import { actualizarEntregas, completarDatosEntrega } from "../tienda/actualizar-entregas";
 import { CORRIENDO_MS, PRESUPUESTO_MS, hoyPanama, mesesAbiertos, pendienteDeHoy, resumenCorto, type ClaveTarea } from "./definiciones";
 
@@ -338,7 +339,9 @@ async function tareaMonday(c: Contexto): Promise<Resultado> {
   // Toma unos 7 s (revisa lo que Monday o Servientrega movieron en 30 días): si la lectura ya se comió el tiempo, va en la próxima.
   const completados = Date.now() < c.limite + 5_000 ? await completarDatosEntrega(c.supabase, Math.max(c.limite, Date.now() + 5_000)).catch(() => 0) : 0;
   const datos = completados ? `${completados} pedidos completaron su forma de pago o su fecha de despacho.` : "";
-  return { resumen: [r.resumen, extra, postventa, enlazadas, entregas, datos].filter(Boolean).join(" "), pendiente: null };
+  // Los comprobantes de los repartos de los últimos 30 días se copian al sistema, para verlos sin Monday (16 nov 2026). Solo con el tiempo que quede.
+  const comprobantes = await copiarComprobantesRecientes(c.supabase, c.limite).catch(() => "");
+  return { resumen: [r.resumen, extra, postventa, enlazadas, entregas, datos, comprobantes].filter(Boolean).join(" "), pendiente: null };
 }
 
 // ---------------------------------------------------------------------------------------------

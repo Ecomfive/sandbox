@@ -8,6 +8,7 @@ import { archivarFila, cambiarCelda, comentarFila, crearFila, detalleFila, mover
 import { colorDe, diaTexto, ETIQUETAS, GRUPOS_DEVOLUCION, grupoPorAsesores, sumasGrupo, textoSobre, type Columna } from "@/lib/despacho/etiquetas";
 import type { Clase, FilaTablero } from "@/lib/despacho/datos";
 import { formatearTiempoRelativo } from "@/lib/formato";
+import { VisorArchivos } from "./visor-archivos";
 
 type Agrupar = "dia" | "courier" | "tienda";
 type CampoNumero = "por_cobrar" | "cobrado" | "coste_envio";
@@ -453,16 +454,7 @@ function PanelFila({
           Comprobante
         </h3>
         {detalle?.comprobantes.length ? (
-          <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
-            {detalle.comprobantes.map((c, i) => (
-              <li key={c.url}>
-                <a href={c.url} target="_blank" rel="noreferrer" className="text-sm font-medium text-primario underline underline-offset-2">
-                  Comprobante {i + 1}
-                  {c.enMonday ? " (en Monday)" : ""} ↗
-                </a>
-              </li>
-            ))}
-          </ul>
+          <VisorArchivos archivos={detalle.comprobantes} titulo="Comprobante" />
         ) : (
           <p className="m-0 text-xs text-muted-foreground">{detalle ? "Sin comprobante." : "Cargando…"}</p>
         )}

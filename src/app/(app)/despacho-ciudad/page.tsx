@@ -50,7 +50,10 @@ export default async function DespachoCiudadPage({ searchParams }: { searchParam
                 {r.etiqueta}
               </Link>
             ))}
-            <Link href="/despacho-ciudad?archivados=1" aria-current={archivados ? "page" : undefined} className={`${chip(archivados)} ml-auto`}>
+            <Link href="/despacho-ciudad/hoja" className={`${chip(false)} ml-auto`}>
+              Hoja del día
+            </Link>
+            <Link href="/despacho-ciudad?archivados=1" aria-current={archivados ? "page" : undefined} className={chip(archivados)}>
               Archivados
             </Link>
           </nav>

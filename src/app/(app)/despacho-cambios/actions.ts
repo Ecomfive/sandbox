@@ -1,8 +1,10 @@
 "use server";
 
+import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { requireModulo, requireModuloEscritura, type UsuarioActual } from "@/lib/auth";
 import { enlazarOrden, unidadDeTexto, variantesPedido, type OrdenCandidata } from "@/lib/monday/columnas";
+import { archivosVisibles, copiarPendientes, type ArchivoVisible } from "@/lib/monday/comprobantes";
 import { hoyPanama } from "@/lib/postventa/datos";
 import {
   ESTADOS,
@@ -305,7 +307,7 @@ export async function restaurarCaso(itemId: string): Promise<Resultado> {
 export interface DetalleCaso {
   notas: { id: string; texto: string; autor: string; cuando: string }[];
   actividad: { id: string; texto: string; autor: string; cuando: string }[];
-  adjuntos: { url: string; enMonday: boolean }[];
+  adjuntos: ArchivoVisible[];
   /** Los datos para el reembolso: null si no hay; undefined si no tiene permiso para verlos. */
   cuenta?: string | null;
   hayCuenta: boolean;
@@ -328,13 +330,8 @@ export async function detalleCaso(itemId: string): Promise<DetalleCaso | { error
       ? supabase.from("mon_despachos").select("fecha_despacho, courier, estado").eq("item_id", fila.despacho_item_id as string).maybeSingle().then((x) => x.data)
       : Promise.resolve(null),
   ]);
-  const adjuntos: DetalleCaso["adjuntos"] = [];
-  for (const a of (fila.adjuntos as string[] | null) ?? []) {
-    if (a.startsWith("storage:")) {
-      const { data } = await supabase.storage.from(BUCKET).createSignedUrl(a.slice(8), 600);
-      if (data?.signedUrl) adjuntos.push({ url: data.signedUrl, enMonday: false });
-    } else if (/^https:\/\/[a-z0-9-]+\.monday\.com\//.test(a)) adjuntos.push({ url: a, enMonday: true });
-  }
+  const { archivos: adjuntos, porCopiar } = await archivosVisibles(supabase, (fila.adjuntos as string[] | null) ?? [], BUCKET);
+  if (porCopiar.length) after(() => copiarPendientes(createServiceClient(), porCopiar));
   const fmt = (x: { id: string; texto: string; autor_nombre: string | null; creado_en: string }) => ({ id: x.id, texto: x.texto, autor: x.autor_nombre ?? "Alguien del equipo", cuando: x.creado_en });
   return {
     notas: (notas ?? []).map(fmt),
