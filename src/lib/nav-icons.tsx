@@ -1542,3 +1542,35 @@ export function WhatsAppLogo(props: SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+
+/** Un robot: la IA que responde sola (el control del bot en el chat de WhatsApp de tienda). */
+export function RobotIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <rect x="4" y="8" width="16" height="11" rx="3" />
+      <path d="M12 8V5M10 4h4" />
+      <path d="M9 13v1M15 13v1" />
+      <path d="M2 13v2M22 13v2" />
+    </Icon>
+  );
+}
+
+/** Una corneta con ondas de sonido (el aviso suena). */
+export function SonidoIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M11 5L6 9H3v6h3l5 4z" />
+      <path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" />
+    </Icon>
+  );
+}
+
+/** Una corneta tachada (el aviso está silenciado). */
+export function SilencioIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M11 5L6 9H3v6h3l5 4z" />
+      <path d="M16 9.5l5 5M21 9.5l-5 5" />
+    </Icon>
+  );
+}

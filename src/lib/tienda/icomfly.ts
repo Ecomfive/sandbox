@@ -271,7 +271,9 @@ export async function probarIcomfly(supabase: SupabaseClient, tiendaId: string):
   }
   const d = "datos" in info && info.datos && typeof info.datos === "object" ? (info.datos as Fila) : null;
   const nombre = d ? String(d.nombre ?? d.name ?? d.tienda ?? "").trim() : "";
-  const resumen = `${nombre || "Conectada"} · ${lista.herramientas.length} funciones`;
+  // Las funciones de pausa y de flujos, para ver con qué se pausa cada cosa en un chat (14 nov 2026).
+  const pausa = lista.herramientas.map((h) => h.name).filter((n) => /paus|flujo|flow/i.test(n));
+  const resumen = `${nombre || "Conectada"} · ${lista.herramientas.length} funciones${pausa.length ? ` · pausa: ${pausa.join(", ")}` : ""}`;
   await supabase.from("tienda_icomfly").update({ ultima_prueba: resumen, ultimo_error: null }).eq("tienda_id", tiendaId);
   return { resumen };
 }

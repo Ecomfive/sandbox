@@ -18,7 +18,9 @@ import {
   marcarLeido,
   notaInterna,
   pausarBot,
+  pausarFlujos,
   plantillasAprobadas,
+  puedePausarFlujos,
   SIN_MIGRACION_CHATS,
   type PlantillaChat,
 } from "@/lib/tienda/chat-tienda-datos";
@@ -81,6 +83,10 @@ export interface EstadoChat {
   mensajes: MensajeChat[];
   botPausado: boolean;
   pausadoPor: string | null;
+  /** Los flujos (mensajes programados y plantillas automáticas) de este chat están en pausa. */
+  flujosPausados: boolean;
+  /** El conector de la tienda deja pausar los flujos de un chat. */
+  flujosDisponibles: boolean;
   /** Se puede escribir (hay teléfono a quién mandar). */
   puedeEnviar: boolean;
   /** El último mensaje con el que el chat quedó marcado leído en iComfly (lo devuelve el navegador en la siguiente lectura). */
@@ -99,6 +105,8 @@ const vacio = (
   mensajes: [],
   botPausado: false,
   pausadoPor: null,
+  flujosPausados: false,
+  flujosDisponibles: false,
   puedeEnviar: false,
   ...(error ? { error } : {}),
 });
@@ -142,6 +150,8 @@ export async function leerChatTienda(
     mensajes: c.mensajes,
     botPausado: c.botPausado,
     pausadoPor: c.pausadoPor,
+    flujosPausados: c.flujosPausados,
+    flujosDisponibles: await puedePausarFlujos(supabase, r.tiendaId).catch(() => false),
     puedeEnviar: true,
     leidoHasta: marcado,
   };
@@ -275,6 +285,35 @@ export async function pausarBotChat(
       entidad: "tiendas",
       entidadId: d.tiendaId,
       detalle: `${d.tiendaNombre}: ${pausar ? "pausó" : "reanudó"} el bot de iComfly en un chat`,
+    });
+  return r;
+}
+
+/** Pausa o reanuda los flujos (mensajes programados y plantillas automáticas) de iComfly en el chat de un pedido. */
+export async function pausarFlujosChat(
+  destino: DestinoChat,
+  pausar: boolean,
+): Promise<{ error?: string }> {
+  const usuario = await requireModuloEscritura(MODULO);
+  const d = await resolver(destino);
+  if ("estado" in d) return { error: "La tienda no está conectada a iComfly." };
+  const supabase = createServiceClient();
+  const c = await leerChat(supabase, d.tiendaId, d.telefono);
+  const conversacionId = "error" in c ? null : c.conversacionId;
+  const r = await pausarFlujos(
+    supabase,
+    d.tiendaId,
+    d.telefono,
+    conversacionId,
+    pausar === true,
+    usuario.nombre || usuario.email,
+  );
+  if (!r.error)
+    await registrarAuditoria({
+      accion: pausar ? "chat_tienda_pausar_flujos" : "chat_tienda_reanudar_flujos",
+      entidad: "tiendas",
+      entidadId: d.tiendaId,
+      detalle: `${d.tiendaNombre}: ${pausar ? "pausó" : "reanudó"} los flujos de iComfly en un chat`,
     });
   return r;
 }

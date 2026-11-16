@@ -12,16 +12,21 @@ import {
   type ChatPendiente,
   type MensajeChat,
 } from "./chat-tienda";
-import { herramientaIcomfly } from "./icomfly";
+import { armarLlamadaFlujos, herramientaDeFlujos, type HerramientaConEsquema } from "./flujos-chat";
+import { herramientaIcomfly, herramientasIcomfly } from "./icomfly";
 
 export const SIN_MIGRACION_CHATS =
   "Falta correr la migración 0285 (chat de WhatsApp de tienda) en Supabase.";
+
+export const SIN_MIGRACION_FLUJOS = "Falta correr la migración 0298 (flujos pausados del chat de tienda) en Supabase.";
 
 export interface ChatLeido {
   conversacionId: number | null;
   mensajes: MensajeChat[];
   botPausado: boolean;
   pausadoPor: string | null;
+  /** Los flujos (mensajes programados y plantillas automáticas) de este chat están en pausa. */
+  flujosPausados: boolean;
 }
 
 /**
@@ -93,6 +98,7 @@ export async function leerChat(
           mensajes: [],
           botPausado: false,
           pausadoPor: null,
+          flujosPausados: false,
         }
       : r;
   const mensajes = mensajesDeIcomfly(r.datos);
@@ -101,6 +107,7 @@ export async function leerChat(
   const nuestros = await anotarVistos(supabase, tiendaId, mensajes);
   let botPausado = false;
   let pausadoPor: string | null = null;
+  let flujosPausados = false;
   if (conversacionId !== null) {
     const { data } = await supabase
       .from("tienda_chat_conversaciones")
@@ -110,12 +117,21 @@ export async function leerChat(
       .maybeSingle();
     botPausado = data?.bot_pausado === true;
     pausadoPor = (data?.pausado_por as string | null) ?? null;
+    // Aparte: sin la migración 0298 la columna no existe y los flujos se ven como activos.
+    const { data: f } = await supabase
+      .from("tienda_chat_conversaciones")
+      .select("flujos_pausados")
+      .eq("tienda_id", tiendaId)
+      .eq("conversacion_id", conversacionId)
+      .maybeSingle();
+    flujosPausados = f?.flujos_pausados === true;
   }
   return {
     conversacionId,
     mensajes: conLoNuestro(mensajes, nuestros),
     botPausado,
     pausadoPor,
+    flujosPausados,
   };
 }
 
@@ -155,6 +171,61 @@ export async function pausarBot(
         { onConflict: "tienda_id,conversacion_id" },
       );
   return {};
+}
+
+const cacheHerramientas = new Map<string, { vence: number; herramientas: HerramientaConEsquema[] }>();
+
+/** Las funciones que el conector de la tienda permite (guardadas 10 minutos: no cambian y preguntarlas en cada lectura del chat sobraría). */
+async function herramientasDeLaTienda(supabase: SupabaseClient, tiendaId: string): Promise<HerramientaConEsquema[]> {
+  const c = cacheHerramientas.get(tiendaId);
+  if (c && c.vence > Date.now()) return c.herramientas;
+  const r = await herramientasIcomfly(supabase, tiendaId);
+  if ("error" in r) return [];
+  cacheHerramientas.set(tiendaId, { vence: Date.now() + 10 * 60_000, herramientas: r.herramientas });
+  return r.herramientas;
+}
+
+/** El conector de la tienda deja pausar los flujos de un chat (si no, el interruptor de «Los flujos» se ve apagado). */
+export async function puedePausarFlujos(supabase: SupabaseClient, tiendaId: string): Promise<boolean> {
+  return herramientaDeFlujos(await herramientasDeLaTienda(supabase, tiendaId)) !== null;
+}
+
+/** Pausa o reanuda los flujos de iComfly en el chat de ese teléfono, y lo anota (iComfly no dice si están en pausa). */
+export async function pausarFlujos(
+  supabase: SupabaseClient,
+  tiendaId: string,
+  telefono: string,
+  conversacionId: number | null,
+  pausar: boolean,
+  quien: string,
+): Promise<{ error?: string }> {
+  if (conversacionId === null) return { error: "El cliente todavía no tiene conversación en iComfly." };
+  const columna = await supabase.from("tienda_chat_conversaciones").select("flujos_pausados").limit(1);
+  if (columna.error) return { error: /flujos_pausados|schema cache/i.test(columna.error.message) ? SIN_MIGRACION_FLUJOS : "No se pudo leer el estado de los flujos." };
+  const herramienta = herramientaDeFlujos(await herramientasDeLaTienda(supabase, tiendaId));
+  if (!herramienta) return { error: "iComfly no deja pausar los flujos desde el conector de esta tienda." };
+  const llamada = armarLlamadaFlujos(herramienta, {
+    conversacionId,
+    telefono,
+    pausar,
+    motivo: `${pausar ? "Pausó los flujos" : "Reanudó los flujos"} ${quien} desde el sistema de Ecomfive`,
+  });
+  if ("error" in llamada) return llamada;
+  const r = await herramientaIcomfly(supabase, tiendaId, herramienta.name, llamada.args);
+  if ("error" in r) return r;
+  const { error } = await supabase.from("tienda_chat_conversaciones").upsert(
+    {
+      tienda_id: tiendaId,
+      conversacion_id: conversacionId,
+      telefono,
+      flujos_pausados: pausar,
+      flujos_pausado_por: pausar ? quien : null,
+      flujos_pausado_en: pausar ? new Date().toISOString() : null,
+      actualizado_en: new Date().toISOString(),
+    },
+    { onConflict: "tienda_id,conversacion_id" },
+  );
+  return error ? { error: "Se cambió en iComfly pero no se pudo anotar aquí." } : {};
 }
 
 /** Después de mandar: el mensaje nuevo que salió (el más reciente que el sistema no tenía) queda con su autor y su hora. */
