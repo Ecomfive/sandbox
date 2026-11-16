@@ -82,3 +82,13 @@ export async function pedirIA(entrada: EntradaTexto, buscar = true, consumo?: Co
   if (!p) return { error: "Falta conectar una IA de texto (la clave OPENAI_API_KEY o ANTHROPIC_API_KEY en Vercel)." };
   return p === "anthropic" ? pedirClaude(entrada, buscar, consumo, uso) : pedirTexto(entrada, buscar, consumo);
 }
+
+/** Las IA de texto que tienen clave (la confirmación con IA usa las dos a la vez y compara). */
+export function proveedoresConectados(): ProveedorIA[] {
+  return [...(openaiConectado() ? (["openai"] as const) : []), ...(claudeConectado() ? (["anthropic"] as const) : [])];
+}
+
+/** Pide un texto a una IA en particular (sin búsqueda en internet). Claude con esfuerzo bajo: es clasificar y resumir. Nunca lanza. */
+export async function pedirIAEn(proveedor: ProveedorIA, entrada: EntradaTexto, consumo?: ContextoConsumo): Promise<RespuestaTexto> {
+  return proveedor === "anthropic" ? pedirClaude(entrada, false, consumo, "crm") : pedirTexto(entrada, false, consumo);
+}

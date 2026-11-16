@@ -38,6 +38,7 @@ const SUBPAGINAS_AYUDA: [string, string][] = [
 
 /** Subpáginas fijas de un módulo (no dinámicas): cuelgan de su módulo y llevan este nombre. */
 const SUBPAGINAS: Record<string, string> = {
+  "/tienda-confirmacion/ia": "Con IA",
   "/retiros/cuentas": "Cuentas destino",
   "/compras/por-pais": "Gestión por país",
   "/usuarios/auditoria": "Historial de auditoría",
