@@ -1,16 +1,17 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { aplicarCotizacion, aplicarEnvio } from "@/lib/proveedor/aplicar";
+import { aplicarCajas, aplicarCotizacion, aplicarEnvio } from "@/lib/proveedor/aplicar";
 import { idiomaDeCuenta } from "@/lib/proveedor/cuenta";
 import type { LineaHistorial } from "@/lib/proveedor/historial";
+import { direccionesDeEtiquetas, type EtiquetaPedido } from "@/lib/proveedor/etiquetas-datos";
 import { cargarHistorialPedido } from "@/lib/proveedor/historial-datos";
 import { guardarCeldaRegistro } from "@/lib/proveedor/registro-datos";
 import { traducirTextos } from "@/lib/proveedor/traducir";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { getUsuarioSesion } from "@/lib/auth";
 import { cuentaProveedorActual } from "@/lib/proveedor/sesion";
-import { BUCKET_PROVEEDOR, rutaFotoReal } from "@/lib/proveedor/rutas";
+import { BUCKET_PROVEEDOR, rutaEtiqueta, rutaFotoReal } from "@/lib/proveedor/rutas";
 import { esUuid } from "@/lib/seguridad/ruta-almacen";
 import { createAnonClient, createServiceClient, createSessionClient } from "@/lib/supabase/server";
 
@@ -51,12 +52,48 @@ export async function cotizarPedido(
   });
 }
 
-/** Marcar enviado, con la fecha en que salió. */
-export async function marcarEnviado(pedidoId: string, fecha: string): Promise<{ error?: string; fechaEnvio?: string }> {
+/** Dirección firmada para subir una imagen de la etiqueta de las cajas de un pedido (en producción o ya enviado) directo al almacenamiento. */
+export async function prepararSubidaEtiqueta(pedidoId: string, nombreArchivo: string): Promise<{ ruta: string; token: string } | { error: string }> {
   const cuenta = await cuentaProveedorActual();
   if (!cuenta) return SIN_SESION;
   if (!esUuid(pedidoId)) return { error: "Pedido no válido." };
-  return aplicarEnvio(cuenta, pedidoId, fecha);
+  const supabase = createServiceClient();
+  const { data } = await supabase.from("proveedor_pedidos").select("proveedor_id, etapa, visible").eq("id", pedidoId).maybeSingle();
+  if (!data || data.proveedor_id !== cuenta.proveedor.id || !data.visible) return { error: "Ese pedido ya no está en tu portal." };
+  if (data.etapa !== "produccion" && data.etapa !== "enviado") return { error: "Las cajas se anotan cuando el pedido está en producción o ya salió." };
+  const ruta = rutaEtiqueta(cuenta.proveedor.id, pedidoId, String(nombreArchivo ?? ""), randomUUID());
+  if (!ruta) return { error: "No se pudo preparar la subida." };
+  const { data: firmada, error } = await supabase.storage.from(BUCKET_PROVEEDOR).createSignedUploadUrl(ruta);
+  if (error || !firmada) return { error: "No se pudo preparar la subida." };
+  return { ruta, token: firmada.token };
+}
+
+/** Marcar enviado, con la fecha en que salió, las cajas del envío y la etiqueta de las cajas (imágenes ya subidas). */
+export async function marcarEnviado(
+  pedidoId: string,
+  fecha: string,
+  cajas: string,
+  etiquetas: string[],
+): Promise<{ error?: string; fechaEnvio?: string; cajas?: number; etiquetas?: EtiquetaPedido[] }> {
+  const cuenta = await cuentaProveedorActual();
+  if (!cuenta) return SIN_SESION;
+  if (!esUuid(pedidoId)) return { error: "Pedido no válido." };
+  const r = await aplicarEnvio(cuenta, pedidoId, fecha, { cajas, nuevas: Array.isArray(etiquetas) ? etiquetas : [] });
+  if (r.error) return { error: r.error };
+  return { fechaEnvio: r.fechaEnvio, cajas: r.cajas, etiquetas: await direccionesDeEtiquetas(createServiceClient(), r.etiquetas ?? []) };
+}
+
+/** Anotar o corregir las cajas y la etiqueta de un pedido en producción o ya enviado: `nuevas` recién subidas, `quitar` las que ya tenía y se retiran. */
+export async function guardarCajasPedido(
+  pedidoId: string,
+  datos: { cajas: string; nuevas: string[]; quitar: string[] },
+): Promise<{ error?: string; cajas?: number; etiquetas?: EtiquetaPedido[] }> {
+  const cuenta = await cuentaProveedorActual();
+  if (!cuenta) return SIN_SESION;
+  if (!esUuid(pedidoId) || !datos || typeof datos !== "object") return { error: "Pedido no válido." };
+  const r = await aplicarCajas(cuenta, pedidoId, { cajas: datos.cajas, nuevas: datos.nuevas, quitar: datos.quitar });
+  if ("error" in r) return r;
+  return { cajas: r.cajas, etiquetas: await direccionesDeEtiquetas(createServiceClient(), r.etiquetas) };
 }
 
 /** «Registro de pagos»: el proveedor cambia una celda de su tabla (vacía, vuelve al valor de siempre). Ecomfive recibe el aviso. */

@@ -36,6 +36,8 @@ const pedido = (p: Partial<PedidoPortal>): PedidoPortal => ({
   confirmadoEn: null,
   prioridad: null,
   etapaDesde: null,
+  cajas: null,
+  etiquetasRutas: [],
   ...p,
 });
 
