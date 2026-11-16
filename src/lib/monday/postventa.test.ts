@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { casoDeItem, columnasPostventa, extrasDeItem, notaSinDatos, consultaPostventa, datosDeComentario, leerPaginaPostventa, montoDeTexto, numeroDeTexto, taparDatos, tiendaDeTexto, tiposDeTexto, type ItemPostventa } from "./postventa";
+import { casoDeItem, columnasPostventa, consultaHistorial, extrasDeItem, notaSinDatos, consultaPostventa, datosDeComentario, leerPaginaPostventa, montoDeTexto, numeroDeTexto, taparDatos, tiendaDeTexto, tiposDeTexto, type ItemPostventa } from "./postventa";
 
 // Textos como los del tablero «CAMBIOS Y REEMBOLSOS PANAMA» (14 nov 2026), con nombres y cuentas inventados.
 const item = (name: string, comentarios: string[], extra: Partial<ItemPostventa> = {}): ItemPostventa => ({
@@ -165,4 +165,10 @@ test("postventa: lee la página de Monday y reconoce las columnas por su título
   assert.equal(p.items[0].valorReembolso, "12.5");
   assert.equal(p.items[0].comentarios.length, 1);
   assert.equal(casoDeItem(p.items[0]).reembolso, 12.5);
+});
+
+test("postventa: el historial se pide hacia atrás desde el caso más viejo", () => {
+  const q = consultaHistorial("2026-04-01");
+  assert.match(q, /compare_value: \["EXACT", "2026-04-01"\], operator: lower_than_or_equal/);
+  assert.match(q, /direction: desc/);
 });

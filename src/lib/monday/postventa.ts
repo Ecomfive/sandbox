@@ -373,6 +373,51 @@ async function guardarNotasYCuentas(supabase: SupabaseClient, items: ItemPostven
   if (cuentas.length) await supabase.from("postventa_cuentas").upsert(cuentas, { onConflict: "item_id", ignoreDuplicates: true });
 }
 
+/**
+ * La consulta del historial (16 nov 2026, Hernán: «traer todo el historial»): los ítems creados hasta `dia` (AAAA-MM-DD), del más nuevo al más viejo.
+ */
+export const consultaHistorial = (dia: string) =>
+  `query ($ids: [ID!], $limit: Int!) { boards(ids: $ids) { items_page(limit: $limit, query_params: { rules: [{ column_id: "__creation_log__", compare_value: ["EXACT", "${dia}"], operator: lower_than_or_equal }], order_by: [{ column_id: "__creation_log__", direction: desc }] }) { cursor items { ${CAMPOS} } } } }`;
+
+/**
+ * Trae, mientras quede tiempo, los casos más viejos que el más viejo que ya hay (del tablero, venidos de Monday), de a 100 hacia atrás. Cada lectura
+ * sigue donde quedó la anterior, hasta llegar al primero del tablero; entonces solo hace una consulta corta. Devuelve qué hizo, o "" si no había nada.
+ */
+async function traerHistorial(supabase: SupabaseClient, tableroId: string, columnas: ColumnasPostventa, unidades: UnidadSimple[], limite: number): Promise<string> {
+  if (Date.now() > limite - 8_000) return "";
+  const { data: viejo, error } = await supabase
+    .from("mon_postventa")
+    .select("creado_monday")
+    .eq("tablero_id", tableroId)
+    .eq("origen", "monday")
+    .not("creado_monday", "is", null)
+    .order("creado_monday", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (error || !viejo?.creado_monday) return "";
+  const desde = String(viejo.creado_monday);
+  let cursor: string | null = null;
+  let primera = true;
+  let nuevos = 0;
+  let masViejo = desde;
+  while (primera || cursor) {
+    if (Date.now() > limite - 5_000) break;
+    const json = primera ? await consultarMonday(consultaHistorial(desde.slice(0, 10)), { ids: [tableroId], limit: POR_PAGINA }) : await consultarMonday(CONSULTA_SIGUIENTE_POSTVENTA, { cursor, limit: POR_PAGINA });
+    primera = false;
+    const pagina = leerPaginaPostventa(json, columnas);
+    const viejos = pagina.items.filter((i) => i.created_at && i.created_at < desde);
+    if (viejos.length) {
+      await guardarCasos(supabase, tableroId, viejos, unidades);
+      nuevos += viejos.length;
+      const min = viejos.map((i) => i.created_at!).sort()[0];
+      if (min < masViejo) masViejo = min;
+    }
+    cursor = pagina.cursor;
+  }
+  if (!nuevos) return "";
+  return `historial: ${nuevos} casos más viejos traídos (hasta el ${masViejo.slice(0, 10)})${cursor ? ", sigue en la próxima" : ""}`;
+}
+
 /** Lee los tableros de cambios y reembolsos (clase «postventa») antes de `limite`. Sin la migración 0290 o sin tableros, no hace nada. */
 export async function sincronizarPostventa(supabase: SupabaseClient, limite: number): Promise<string> {
   if (!mondayConfigurado()) return "";
@@ -410,6 +455,8 @@ export async function sincronizarPostventa(supabase: SupabaseClient, limite: num
         hechos.push(`${t.nombre}: ${guardados} guardados, sigue en la próxima`);
         continue;
       }
+      const historial = await traerHistorial(supabase, t.tablero_id, columnas, unidades, limite);
+      if (historial) hechos.push(`${t.nombre}: ${historial}`);
       const { count } = await supabase.from("mon_postventa").select("item_id", { count: "exact", head: true }).eq("tablero_id", t.tablero_id);
       await supabase
         .from("mon_tableros_extra")
