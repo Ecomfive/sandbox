@@ -59,4 +59,9 @@ test("SISCORE: la cuenta se une a su tienda por el nombre, la unidad o el comien
   assert.equal(tiendaDeClienteSiscore("OFERFY PAN", tiendas)?.nombre, "Oferfy");
   assert.equal(tiendaDeClienteSiscore("Oferfy Panamá", tiendas)?.nombre, "Oferfy");
   assert.equal(tiendaDeClienteSiscore("NUVO", tiendas), null);
+  // Con Nuvo creada (16 nov 2026) su cuenta de SISCORE la encuentra por el nombre o por su unidad.
+  const conNuvo = [...tiendas, { nombre: "Nuvo" }];
+  assert.equal(tiendaDeClienteSiscore("NUVO", conNuvo)?.nombre, "Nuvo");
+  assert.equal(tiendaDeClienteSiscore("NUVO PAN", conNuvo)?.nombre, "Nuvo");
+  assert.equal(tiendaDeClienteSiscore("OFERFY", conNuvo)?.nombre, "Oferfy");
 });
