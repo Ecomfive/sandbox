@@ -130,10 +130,13 @@ const AREAS: NavSection[] = [
       // «¿Cuánto hay?» (16 nov 2026, migración 0301): la tienda pregunta y Yiletsi responde con lo que contó despacho.
       { label: "Preguntar cuánto hay", href: "/tienda-cuanto-hay", frente: "tienda" },
       { label: "Responder cuánto hay", href: "/despacho-cuanto-hay", frente: "tienda" },
+      // Pedir a inventario (16 nov 2026, migración 0304): despacho pide lo que se agotó; inventario lo envía (hace el traslado).
+      { label: "Pedir a inventario", href: "/despacho-pedir-inventario", frente: "tienda" },
       { label: "Productos de Shopify", href: "/tienda-productos", frente: "tienda" },
       { label: "Tiendas Shopify", href: "/tienda-tiendas", frente: "tienda" },
       { label: "Alertas de inventario", href: "/alertas", dropi: true, frente: "fulfillment" },
       { label: "Inventario", href: "/inventario", dropi: true, frente: "fulfillment" },
+      { label: "Pedidos de despacho", href: "/inventario-pedidos-despacho", frente: "fulfillment" },
       { label: "Bodegas", href: "/wms-bodegas", frente: "fulfillment" },
       { label: "Ubicaciones", href: "/wms-ubicaciones", frente: "fulfillment" },
       { label: "Compras", href: "/compras", frente: "fulfillment" },

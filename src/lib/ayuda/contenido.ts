@@ -1931,6 +1931,41 @@ export const GUIAS: GuiaModulo[] = [
     ],
   },
   {
+    modulo: "despacho-pedir-inventario",
+    titulo: "Pedir a inventario",
+    ruta: "/despacho-pedir-inventario",
+    resumen: "Despacho le pide a inventario lo que se le agotó, sin Excel ni mensajes: ve en qué va cada pedido y marca «Recibido» cuando llega.",
+    secciones: [
+      {
+        titulo: "Uso",
+        pasos: [
+          "Pulsa «+ Nuevo pedido». En cada línea elige el producto de la lista (escribe parte del nombre, el SKU o el N.º), la cantidad y, si quieres, una nota. «+ Otro producto» agrega más líneas; «Pedir a inventario» lo envía. A inventario le llega el aviso en «Para ti».",
+          "La tabla es como el Excel: N.º de pedido, código, producto, cantidad pedida, fecha, quién pidió, responsable de bodega, cantidad entregada, estado y observaciones. Los contadores de arriba filtran por estado.",
+          "Estados: Solicitud (registrado), En proceso (inventario lo prepara), Enviado (va en camino: el traslado ya está hecho), Recibido (cerrado). Te llega un aviso cuando inventario lo pone en proceso y cuando lo envía.",
+          "Cuando llegue, pulsa «Recibido». Mientras inventario no lo tome, puedes «Cancelar» el pedido.",
+          "Se ven todos los pedidos abiertos y los cerrados de los últimos 30 días. Por ahora es para Panamá (llega a Despacho Plaza 100).",
+        ],
+      },
+    ],
+  },
+  {
+    modulo: "inventario-pedidos-despacho",
+    titulo: "Pedidos de despacho",
+    ruta: "/inventario-pedidos-despacho",
+    resumen: "Lo que despacho le pide a inventario: se pone en proceso, se escribe cuánto se envía y «Enviar» hace el traslado a la bodega de despacho.",
+    secciones: [
+      {
+        titulo: "Uso",
+        pasos: [
+          "Cuando despacho hace un pedido te llega el aviso en «Para ti». Pulsa «Pasar a “En proceso”» para que sepan que lo estás preparando.",
+          "En «Cantidad entregada» escribe cuánto envías de cada producto (viene con lo pedido; 0 si no hay) y, si hace falta, una observación (por ejemplo, «solo quedaban 12»). «Hay en bodega» muestra lo disponible en la bodega elegida en «Sale de».",
+          "Elige en «Sale de» la bodega de donde sale y pulsa «Enviar»: el sistema hace el traslado a Despacho Plaza 100 con esas cantidades (no hay que hacerlo aparte en Inventario › Traslados) y el número del traslado queda en Observaciones. A despacho le llega el aviso.",
+          "Si la bodega no tiene suficiente, el traslado no se hace y el pedido queda como estaba: cambia la cantidad o la bodega. Cuando despacho marca «Recibido», te llega el aviso y el pedido se cierra.",
+        ],
+      },
+    ],
+  },
+  {
     modulo: "tienda-productos",
     titulo: "Productos de Shopify",
     ruta: "/tienda-productos",
@@ -2138,6 +2173,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-11-16", titulo: "Nuevo: Pedir a inventario (despacho pide, inventario envía)", texto: "El Excel de solicitudes a bodega pasa al sistema. Despacho pide en «Pedir a inventario» los productos que se agotaron (de la lista del catálogo, con cantidad y nota); Dinora los ve en «Pedidos de despacho», los pone en proceso y al pulsar «Enviar» el sistema hace el traslado a Despacho Plaza 100. Despacho marca «Recibido» al llegar. Cada paso avisa en «Para ti».", modulo: "despacho-pedir-inventario", href: "/despacho-pedir-inventario" },
   { fecha: "2026-11-16", titulo: "Compras: columnas de cajas y etiqueta de las cajas", texto: "La lista de Compras ahora trae las columnas «Cajas (Cartons)» y «Etiqueta de las cajas» (cuántas imágenes subió Shen Zhen), que se pueden ordenar, filtrar (con o sin etiqueta) y ocultar desde «Columnas». La imagen de la etiqueta se abre en la ficha de la compra.", modulo: "compras", href: "/compras/lista" },
   { fecha: "2026-11-16", titulo: "Nuevo: ¿Cuánto hay? (la tienda pregunta, Yiletsi responde)", texto: "Las tiendas ya no tienen que escribir para saber cuánto hay de un producto: en «Preguntar cuánto hay» eligen el producto del catálogo, escriben una nota si quieren y preguntan. Yiletsi lo ve en «Responder cuánto hay», separado por tienda, manda a contar a despacho y responde con la cantidad; a quien preguntó le llega en «Para ti».", modulo: "tienda-cuanto-hay", href: "/tienda-cuanto-hay" },
   { fecha: "2026-11-16", titulo: "Retiros: las novedades resueltas ya se encuentran con el filtro", texto: "Un retiro con la novedad resuelta queda cerrado y su Consolidación dice «Novedad resuelta», pero el filtro de Estado «Novedad resuelta» no lo encontraba. Ya sale con ese filtro (dentro de «Cerrados») y también hay un filtro nuevo de Consolidación (Pendiente, Consolidado o Novedad resuelta). La tarjeta «Retiros cerrados» cuenta solo los conciliados, igual que su filtro. Además, la lupa de la tabla ya busca por el número del retiro (#0143, 0143 o 143), en abiertos y cerrados.", modulo: "retiros", href: "/retiros" },
