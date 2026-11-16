@@ -92,6 +92,9 @@ export const DEF_RETIROS: DefTabla<FilaRetiro> = {
     { id: "comision", etiqueta: "Comisión", tipo: "numero", valor: (f) => f.comision },
     { id: "arecibir", etiqueta: "A recibir", tipo: "numero", valor: (f) => f.aRecibir },
     { id: "recibido", etiqueta: "Monto recibido", tipo: "numero", valor: (f) => f.montoRecibido },
+    // El número del retiro también para la lupa (16 nov 2026: buscar «#0143» no encontraba nada, porque la lupa solo mira los campos de texto y el
+    // número no era uno). Va «#0143» y «143», así sirve como se escriba.
+    { id: "numero", etiqueta: "N.º de retiro", tipo: "texto", sinCsv: true, valor: (f) => `#${String(f.numeroCorrelativo).padStart(4, "0")} ${f.numeroCorrelativo}` },
     { id: "notas", etiqueta: "Notas", tipo: "texto", valor: (f) => f.notas ?? "" },
     { id: "soporte", etiqueta: "N.º de soporte", tipo: "texto", valor: (f) => f.soporteNumero ?? "" },
   ],

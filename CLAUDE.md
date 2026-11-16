@@ -1824,7 +1824,8 @@ convenciones técnicas del código.
   antes: lo recibido contra «A recibir» con `TOLERANCIA_DISCREPANCIA`. El **soporte** se puede **pegar** (Ctrl+V) o arrastrar: `BotonAdjuntar` con
   `pegarCaptura` (lo pone en el `input` con `DataTransfer`, miniatura al lado). **Filtro de novedad resuelta** (16 nov 2026): resuelta = `estado`
   «cerrado» + `novedad_resuelta` (0048), así que el campo Estado de `DEF_RETIROS` la cuenta como «novedad_resuelta» (antes solo el estado viejo: no salía) y
-  hay un campo «Consolidación» (`estadoConsolidacion`); la tarjeta «Retiros cerrados» y «Cerrados este mes» cuentan solo los conciliados. El **soporte** es **opcional**: se adjunta con un botón que es
+  hay un campo «Consolidación» (`estadoConsolidacion`); la tarjeta «Retiros cerrados» y «Cerrados este mes» cuentan solo los conciliados. La lupa busca también por número: campo de texto
+  `numero` («#0143 143», `sinCsv`), porque la lupa solo mira los campos `texto` (antes, Notas y Soporte: el número no se encontraba). El **soporte** es **opcional**: se adjunta con un botón que es
   **solo un ícono**, sin texto (`BotonAdjuntar` con `AdjuntoIcon`; ya con archivo se marca
   en verde y su nombre queda en el tooltip), pero no bloquea conciliar si no se adjunta uno
   — ni en la ficha ni en el servidor (`conciliarRetiro`). Al conciliar, deja el retiro
