@@ -9,11 +9,12 @@ import { cargarTiempos, claveTransito } from "@/lib/compras/tiempos-datos";
 import { detectarImagen } from "@/lib/seguridad/imagen";
 import { createServiceClient } from "@/lib/supabase/server";
 import type { CuentaProveedor } from "./cuenta";
+import { validarCajas } from "./cajas";
 import { validarCotizacion } from "./cotizacion";
 import type { EtapaPortal } from "./espejo";
 import { diasEntre, hoyPanama } from "./fechas";
 import { puedePasar } from "./permisos-proveedor";
-import { BUCKET_PROVEEDOR, MAX_BYTES_FOTO, rutaEsDelPedido } from "./rutas";
+import { BUCKET_PROVEEDOR, MAX_BYTES_FOTO, MAX_ETIQUETAS, rutaEsDelPedido, rutaEsEtiquetaDelPedido } from "./rutas";
 
 const BUCKET_COMPRAS = "wms-compras";
 const MAX_COMENTARIO = 600;
@@ -64,9 +65,19 @@ async function anotarEtapa(supabase: Supabase, cuenta: CuentaProveedor, compraId
   await supabase.from("wms_compra_eventos").insert({ compra_id: compraId, campo: "etapa", valor_antes: antes, valor_despues: despues, autor: autorDe(cuenta), origen: "proveedor" });
 }
 
-/** Revisa la foto subida (por su contenido, no por su nombre) y la copia a las fotos de la compra. Devuelve su ruta en Compras. */
-async function revisarFoto(supabase: Supabase, cuenta: CuentaProveedor, p: Pedido, ruta: string): Promise<{ rutaCompra: string; nombre: string; extension: string; tamano: number } | { error: string }> {
-  if (!rutaEsDelPedido(ruta, cuenta.proveedor.id, p.id)) return { error: "La foto no es de este pedido." };
+/**
+ * Revisa la imagen subida (por su contenido, no por su nombre) y la copia a las fotos de la compra. Devuelve su ruta en Compras. `tipo`: la foto real del producto o la
+ * etiqueta de las cajas (16 nov 2026): cada una vive en su carpeta del pedido y una no vale como la otra.
+ */
+async function revisarFoto(
+  supabase: Supabase,
+  cuenta: CuentaProveedor,
+  p: Pedido,
+  ruta: string,
+  tipo: "foto" | "etiqueta" = "foto",
+): Promise<{ rutaCompra: string; nombre: string; extension: string; tamano: number } | { error: string }> {
+  const esDelPedido = tipo === "foto" ? rutaEsDelPedido(ruta, cuenta.proveedor.id, p.id) : rutaEsEtiquetaDelPedido(ruta, cuenta.proveedor.id, p.id);
+  if (!esDelPedido) return { error: tipo === "foto" ? "La foto no es de este pedido." : "La etiqueta no es de este pedido." };
   const { data: archivo, error } = await supabase.storage.from(BUCKET_PROVEEDOR).download(ruta);
   if (error || !archivo) return { error: "No se encontró la foto subida. Vuelve a elegirla." };
   const bytes = new Uint8Array(await archivo.arrayBuffer());
@@ -78,7 +89,94 @@ async function revisarFoto(supabase: Supabase, cuenta: CuentaProveedor, p: Pedid
   const rutaCompra = `comentarios/${p.compra_id}/proveedor-${randomUUID()}.${imagen.extension}`;
   const { error: errorCopia } = await supabase.storage.from(BUCKET_COMPRAS).upload(rutaCompra, bytes, { contentType: imagen.tipo, upsert: false });
   if (errorCopia) return { error: "No se pudo guardar la foto. Inténtalo de nuevo." };
-  return { rutaCompra, nombre: `Foto real (${cuenta.proveedor.nombre}).${imagen.extension}`, extension: imagen.extension, tamano: bytes.length };
+  const nombre = tipo === "foto" ? `Foto real (${cuenta.proveedor.nombre}).${imagen.extension}` : `Etiqueta de las cajas (${cuenta.proveedor.nombre}).${imagen.extension}`;
+  return { rutaCompra, nombre, extension: imagen.extension, tamano: bytes.length };
+}
+
+const SIN_MIGRACION_CAJAS = "Falta correr la migración 0299 (cajas y etiquetas del proveedor) en Supabase.";
+
+/**
+ * Las cajas («Cartons») de un envío y la etiqueta de las cajas (16 nov 2026, pedido de Hernán). Las cajas y las imágenes quedan en el espejo (`proveedor_pedidos`) para el portal y,
+ * para Compras, en la Actividad de la compra: un comentario del proveedor con las etiquetas adjuntas (copiadas a las fotos de la compra) y el cambio de «Cajas». `nuevas` son rutas
+ * recién subidas al bucket del portal y `quitar` rutas que ya tenía y se retiran (la copia que ya está en Compras se queda como historia). Devuelve las rutas que quedan.
+ */
+async function guardarCajas(
+  supabase: Supabase,
+  cuenta: CuentaProveedor,
+  p: Pedido,
+  entrada: { cajas: unknown; nuevas?: unknown; quitar?: unknown },
+  opciones: { avisar: boolean },
+): Promise<{ cajas: number; etiquetas: string[] } | { error: string }> {
+  const valida = validarCajas(entrada.cajas);
+  if ("error" in valida) return valida;
+  const nuevas = Array.isArray(entrada.nuevas) ? entrada.nuevas.map(String) : [];
+  const quitar = Array.isArray(entrada.quitar) ? entrada.quitar.map(String) : [];
+  const { data: fila, error: errorLectura } = await supabase.from("proveedor_pedidos").select("cajas, etiquetas_rutas").eq("id", p.id).maybeSingle();
+  if (errorLectura || !fila) return { error: /cajas|etiquetas_rutas|schema cache/i.test(errorLectura?.message ?? "") ? SIN_MIGRACION_CAJAS : "No se pudieron guardar las cajas." };
+  const actuales = ((fila.etiquetas_rutas as string[] | null) ?? []).map(String);
+  if (quitar.some((r) => !actuales.includes(r))) return { error: "Esa etiqueta ya no está en el pedido." };
+  if (new Set(nuevas).size !== nuevas.length || nuevas.some((r) => actuales.includes(r))) return { error: "La etiqueta no es de este pedido." };
+  const quedan = [...actuales.filter((r) => !quitar.includes(r)), ...nuevas];
+  if (quedan.length > MAX_ETIQUETAS) return { error: `Un pedido lleva hasta ${MAX_ETIQUETAS} imágenes de etiqueta.` };
+
+  const revisadas: { rutaCompra: string; nombre: string; extension: string; tamano: number }[] = [];
+  for (const ruta of nuevas) {
+    const r = await revisarFoto(supabase, cuenta, p, ruta, "etiqueta");
+    if ("error" in r) {
+      // Lo ya copiado a Compras en esta vuelta no se deja suelto.
+      if (revisadas.length) await supabase.storage.from(BUCKET_COMPRAS).remove(revisadas.map((x) => x.rutaCompra));
+      return r;
+    }
+    revisadas.push(r);
+  }
+
+  const { error } = await supabase.from("proveedor_pedidos").update({ cajas: valida.cajas, etiquetas_rutas: quedan }).eq("id", p.id);
+  if (error) {
+    if (revisadas.length) await supabase.storage.from(BUCKET_COMPRAS).remove(revisadas.map((x) => x.rutaCompra));
+    return { error: "No se pudieron guardar las cajas." };
+  }
+  if (quitar.length) await supabase.storage.from(BUCKET_PROVEEDOR).remove(quitar);
+
+  const cajasAntes = fila.cajas == null ? null : Number(fila.cajas);
+  const cambioCajas = cajasAntes !== valida.cajas;
+  if (cambioCajas) {
+    await supabase
+      .from("wms_compra_eventos")
+      .insert({ compra_id: p.compra_id, campo: "cajas", valor_antes: cajasAntes == null ? null : String(cajasAntes), valor_despues: String(valida.cajas), autor: autorDe(cuenta), origen: "proveedor" });
+  }
+  if (cambioCajas || revisadas.length) {
+    const texto = `Cajas de ${cuenta.proveedor.nombre}: ${entero(valida.cajas)} ${valida.cajas === 1 ? "caja" : "cajas"}${revisadas.length ? ` · etiqueta de las cajas adjunta (${revisadas.length})` : ""}`;
+    const { data: nota } = await supabase.from("wms_compra_comentarios").insert({ compra_id: p.compra_id, autor: autorDe(cuenta), texto }).select("id").single();
+    if (nota && revisadas.length) {
+      await supabase
+        .from("wms_compra_adjuntos")
+        .insert(revisadas.map((f) => ({ compra_id: p.compra_id, comentario_id: nota.id, nombre: f.nombre, extension: f.extension, tamano: f.tamano, clase: "foto", origen: "proveedor", ruta: f.rutaCompra, subido_por: autorDe(cuenta) })));
+    }
+    if (opciones.avisar) {
+      await avisarAEcomfive(
+        supabase,
+        cuenta,
+        p,
+        "envio",
+        `${cuenta.proveedor.nombre} ${cambioCajas ? "anotó las cajas de" : "subió la etiqueta de las cajas de"} ${p.producto}`,
+        `${entero(valida.cajas)} ${valida.cajas === 1 ? "caja" : "cajas"}${revisadas.length ? ` · ${revisadas.length} ${revisadas.length === 1 ? "imagen de etiqueta" : "imágenes de etiqueta"}` : ""}`,
+      );
+    }
+  }
+  return { cajas: valida.cajas, etiquetas: quedan };
+}
+
+/** Anotar o corregir las cajas y la etiqueta de un pedido que está en producción o ya enviado. */
+export async function aplicarCajas(
+  cuenta: CuentaProveedor,
+  pedidoId: string,
+  entrada: { cajas: unknown; nuevas?: unknown; quitar?: unknown },
+): Promise<{ error: string } | { cajas: number; etiquetas: string[] }> {
+  const supabase = createServiceClient();
+  const p = await pedidoDe(supabase, cuenta, pedidoId);
+  if ("error" in p) return p;
+  if (p.etapa !== "produccion" && p.etapa !== "enviado") return { error: "Las cajas se anotan cuando el pedido está en producción o ya salió." };
+  return guardarCajas(supabase, cuenta, p, entrada, { avisar: true });
 }
 
 /**
@@ -155,7 +253,12 @@ export async function aplicarCotizacion(
 }
 
 /** Marcar enviado: la compra pasa a «Tracking» con su fecha de envío (y su planificación, como en Compras). Empiezan los plazos de pago. */
-export async function aplicarEnvio(cuenta: CuentaProveedor, pedidoId: string, fecha: unknown): Promise<Resultado & { fechaEnvio?: string }> {
+export async function aplicarEnvio(
+  cuenta: CuentaProveedor,
+  pedidoId: string,
+  fecha: unknown,
+  cajas?: { cajas: unknown; nuevas?: unknown },
+): Promise<Resultado & { fechaEnvio?: string; cajas?: number; etiquetas?: string[] }> {
   const supabase = createServiceClient();
   const p = await pedidoDe(supabase, cuenta, pedidoId);
   if ("error" in p) return p;
@@ -167,6 +270,13 @@ export async function aplicarEnvio(cuenta: CuentaProveedor, pedidoId: string, fe
 
   const { data: compra } = await supabase.from("wms_compras").select("id, etapa, tipo, pais_id, via_envio, fecha_envio, planificacion, anulada_en").eq("id", p.compra_id).maybeSingle();
   if (!compra || compra.anulada_en) return { error: "Este pedido ya no está activo." };
+  // Las cajas y la etiqueta primero: si algo falla, el pedido sigue en producción y se corrige sin haber marcado el envío. El aviso del envío ya las menciona.
+  let guardadas: { cajas: number; etiquetas: string[] } | null = null;
+  if (cajas) {
+    const r = await guardarCajas(supabase, cuenta, p, { cajas: cajas.cajas, nuevas: cajas.nuevas }, { avisar: false });
+    if ("error" in r) return r;
+    guardadas = r;
+  }
   const planificacion = nuevaPlanificacion(
     await cargarTiempos(),
     { fechaEnvio: compra.fecha_envio as string | null, planificacion: compra.planificacion as string | null },
@@ -179,6 +289,13 @@ export async function aplicarEnvio(cuenta: CuentaProveedor, pedidoId: string, fe
   await supabase.from("proveedor_pedidos").update({ enviado_marcado_en: new Date().toISOString() }).eq("id", p.id);
 
   const vence = new Date(Date.parse(f) + cuenta.proveedor.diasAnticipo * 864e5).toISOString().slice(0, 10);
-  await avisarAEcomfive(supabase, cuenta, p, "envio", `${cuenta.proveedor.nombre} marcó ${p.producto} como enviado el ${fechaCorta(f)}`, `El anticipo vence el ${fechaCorta(vence)}`);
-  return { fechaEnvio: f };
+  await avisarAEcomfive(
+    supabase,
+    cuenta,
+    p,
+    "envio",
+    `${cuenta.proveedor.nombre} marcó ${p.producto} como enviado el ${fechaCorta(f)}`,
+    `El anticipo vence el ${fechaCorta(vence)}${guardadas ? ` · ${entero(guardadas.cajas)} ${guardadas.cajas === 1 ? "caja" : "cajas"}${guardadas.etiquetas.length ? " · con etiqueta" : ""}` : ""}`,
+  );
+  return { fechaEnvio: f, ...(guardadas ?? {}) };
 }

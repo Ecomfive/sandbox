@@ -50,10 +50,16 @@ export interface PedidoPortal {
   prioridad: string | null;
   /** Desde cuándo está la compra en su etapa (migración 0270): de aquí salen el tiempo para cotizar, la decisión y los días en producción. */
   etapaDesde: string | null;
+  /** Cuántas cajas («Cartons») lleva el envío (migración 0299); null mientras no las anote. */
+  cajas: number | null;
+  /** Las imágenes de la etiqueta de las cajas que subió el proveedor (rutas del bucket del portal, migración 0299). */
+  etiquetasRutas: string[];
 }
 
 const COLUMNAS =
-  "id, compra_id, referencia, producto, foto_referencia, pais_codigo, via, modalidad, etapa, unidades_pedidas, unidades, monto_total, costo_unitario, nota_para_proveedor, fecha_envio, fecha_llegada, primer_pago, fecha_pago_1, segundo_pago, fecha_pago_2, pagado_a_proveedor, foto_real_ruta, comentario_proveedor, cotizado_en, actualizado_en, anticipo_monto, prioridad, etapa_desde";
+  "id, compra_id, referencia, producto, foto_referencia, pais_codigo, via, modalidad, etapa, unidades_pedidas, unidades, monto_total, costo_unitario, nota_para_proveedor, fecha_envio, fecha_llegada, primer_pago, fecha_pago_1, segundo_pago, fecha_pago_2, pagado_a_proveedor, foto_real_ruta, comentario_proveedor, cotizado_en, actualizado_en, anticipo_monto, prioridad, etapa_desde, cajas, etiquetas_rutas";
+/** Lo que agregó la migración 0299: sin ella el portal sigue funcionando, sin cajas ni etiquetas. */
+const COLUMNAS_0299 = ", cajas, etiquetas_rutas";
 /** Lo que agregó la migración 0270: sin ella el portal sigue funcionando, sin prioridades ni plazos. */
 const COLUMNAS_0270 = ", prioridad, etapa_desde";
 
@@ -92,6 +98,8 @@ export function pedidoDesdeFila(f: Fila): PedidoPortal {
     confirmadoEn: null,
     prioridad: txt(f.prioridad),
     etapaDesde: txt(f.etapa_desde),
+    cajas: num(f.cajas),
+    etiquetasRutas: Array.isArray(f.etiquetas_rutas) ? (f.etiquetas_rutas as unknown[]).map(String) : [],
   };
 }
 
@@ -130,10 +138,12 @@ export async function cargarEspejo(supabase: SupabaseClient, proveedorId: string
     leerPedidos(COLUMNAS),
     supabase.from("wms_rutas_envio").select("agente, pais_codigo, via, dias_min, dias_max").eq("activo", true).ilike("agente", proveedor.nombreEnCompras).order("actualizado_en"),
   ]);
-  // Sin la migración 0270 (prioridad y plazos) o sin la 0127 (anticipo distinto) el portal sigue funcionando sin esos datos.
-  const sin0270 = COLUMNAS.replace(COLUMNAS_0270, "");
-  const segundos = primeros.error ? await leerPedidos(sin0270) : primeros;
-  const pedidos = segundos.error ? await leerPedidos(sin0270.replace(", anticipo_monto", "")) : segundos;
+  // Sin la migración 0299 (cajas), la 0270 (prioridad y plazos) o la 0127 (anticipo distinto) el portal sigue funcionando sin esos datos.
+  const sin0299 = COLUMNAS.replace(COLUMNAS_0299, "");
+  const sin0270 = sin0299.replace(COLUMNAS_0270, "");
+  const segundos = primeros.error ? await leerPedidos(sin0299) : primeros;
+  const terceros = segundos.error ? await leerPedidos(sin0270) : segundos;
+  const pedidos = terceros.error ? await leerPedidos(sin0270.replace(", anticipo_monto", "")) : terceros;
   if (pedidos.error) return { error: "No se pudieron cargar los pedidos del proveedor." };
   // Si un país y vía tienen dos rutas activas, manda la que se cambió por último (van en orden).
   const plazos: Record<string, Plazo> = {};

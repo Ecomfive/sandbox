@@ -56,6 +56,23 @@ const ES = {
   produccionPista: "Al despacharlo, márcalo enviado: Ecomfive recibe el aviso y empiezan a correr los plazos de pago",
   produccionVacio: "No hay nada en producción.",
   marcarEnviado: "Marcar enviado",
+  colCajas: "Cajas",
+  colEtiqueta: "Etiqueta de las cajas",
+  cajasCartons: "Cajas (Cartons)",
+  ejemploCajas: "Ej: 29",
+  etiquetaCajas: "Etiqueta de las cajas",
+  agregarEtiqueta: "Agregar imagen de la etiqueta",
+  subiendoEtiqueta: "Subiendo la etiqueta…",
+  etiquetaLista: "La etiqueta está lista para enviarse.",
+  quitarEtiqueta: "Quitar esta etiqueta",
+  anotarCajas: "Anotar cajas",
+  cajasYEtiqueta: "Cajas y etiqueta",
+  fechaDeEnvio: "Fecha en que salió",
+  confirmarEnvio: "Marcar como enviado",
+  cajasGuardadas: "Cajas y etiqueta guardadas. Ecomfive recibió el aviso.",
+  errorCajas: "Escribe cuántas cajas lleva el envío.",
+  verEtiqueta: (n: number) => `Ver etiqueta ${n}`,
+  maxEtiquetas: (n: number) => `Hasta ${n} imágenes por pedido.`,
   no: "No",
   salioEl: (f: string) => `Sí, salió el ${f}`,
   guardando: "Guardando…",
@@ -261,6 +278,23 @@ const ZH: Textos = {
   produccionPista: "发货时请标记为已发货：Ecomfive 会收到通知，付款期限开始计算",
   produccionVacio: "暂无生产中的订单。",
   marcarEnviado: "标记为已发货",
+  colCajas: "箱数",
+  colEtiqueta: "箱唛标签",
+  cajasCartons: "箱数（Cartons）",
+  ejemploCajas: "例如：29",
+  etiquetaCajas: "箱唛标签",
+  agregarEtiqueta: "添加标签图片",
+  subiendoEtiqueta: "标签上传中…",
+  etiquetaLista: "标签已就绪，待提交。",
+  quitarEtiqueta: "删除此标签",
+  anotarCajas: "填写箱数",
+  cajasYEtiqueta: "箱数与标签",
+  fechaDeEnvio: "发货日期",
+  confirmarEnvio: "标记为已发货",
+  cajasGuardadas: "已保存箱数和标签。Ecomfive 已收到通知。",
+  errorCajas: "请填写发货的箱数。",
+  verEtiqueta: (n: number) => `查看标签 ${n}`,
+  maxEtiquetas: (n: number) => `每个订单最多 ${n} 张图片。`,
   no: "否",
   salioEl: (f: string) => `是，已于 ${f} 发货`,
   guardando: "保存中…",
@@ -480,6 +514,12 @@ const ERRORES_ZH: Record<string, string> = {
   "La clave nueva debe ser distinta de la actual.": "新密码必须与当前密码不同。",
   "La clave actual no es correcta.": "当前密码不正确。",
   "No se pudo cambiar la clave.": "无法修改密码。",
+  "Escribe cuántas cajas lleva el envío.": "请填写发货的箱数。",
+  "Las cajas deben ser un número entero mayor que cero.": "箱数必须是大于零的整数。",
+  "Esa etiqueta ya no está en el pedido.": "该标签已不在订单中。",
+  "La etiqueta no es de este pedido.": "该标签不属于此订单。",
+  "Las cajas se anotan cuando el pedido está en producción o ya salió.": "只有生产中或已发货的订单才能填写箱数。",
+  "No se pudieron guardar las cajas.": "箱数保存失败。",
 };
 
 /** Un error de una acción del portal en el idioma de la cuenta (si no está en la lista, va en español). */
@@ -487,5 +527,7 @@ export function errorEn(mensaje: string, idioma: Idioma): string {
   if (idioma === "es") return mensaje;
   if (ERRORES_ZH[mensaje]) return ERRORES_ZH[mensaje];
   const dias = /^La fecha de envío no puede ser de hace más de (\d+) días\.$/.exec(mensaje);
-  return dias ? `发货日期不能早于 ${dias[1]} 天前。` : mensaje;
+  if (dias) return `发货日期不能早于 ${dias[1]} 天前。`;
+  const etiquetas = /^Un pedido lleva hasta (\d+) imágenes de etiqueta\.$/.exec(mensaje);
+  return etiquetas ? `每个订单最多 ${etiquetas[1]} 张标签图片。` : mensaje;
 }

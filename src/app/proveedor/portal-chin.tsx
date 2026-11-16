@@ -27,7 +27,9 @@ import { BUCKET_PROVEEDOR } from "@/lib/proveedor/rutas";
 import type { Idioma } from "@/lib/proveedor/textos";
 import { estadoTransito, textoPlazo, type Plazo } from "@/lib/proveedor/transito";
 import { supabase } from "@/lib/supabase/client";
-import { cambiarIdiomaProveedor, cotizarPedido, historialPedidoProveedor, marcarEnviado, marcarVistoPorProveedor, prepararSubidaFotoReal } from "./actions";
+import type { EtiquetaPedido } from "@/lib/proveedor/etiquetas-datos";
+import { cambiarIdiomaProveedor, cotizarPedido, historialPedidoProveedor, marcarVistoPorProveedor, prepararSubidaFotoReal } from "./actions";
+import { PanelCajas, type ResultadoCajas } from "./panel-cajas";
 import { FormularioClave } from "./cambiar-clave";
 import { PagosChin } from "./pagos-chin";
 import { BarraPlazo, MarcaPrioridad } from "@/components/compras/plazo-prioridad";
@@ -57,6 +59,8 @@ export interface DatosPortalChin {
   pedidos: PedidoPortal[];
   plazos: Record<string, Plazo>;
   fotosReales: Record<string, string>;
+  /** Las imágenes de la etiqueta de las cajas de cada pedido (con su dirección para verlas), por id de pedido. */
+  etiquetas?: Record<string, EtiquetaPedido[]>;
   avisos: AvisoEcomfive[];
   /** Pagos (fase 4); null si falta la migración 0127. */
   pagos: { resumen: ResumenPagos; filas: FilaRegistro[]; cambios: CambioRegistro[] } | null;
@@ -84,10 +88,14 @@ export function PortalChin({ idioma, soloLectura = false, ...datos }: DatosPorta
   );
 }
 
-function PortalChinContenido({ cuenta, pedidos, plazos, fotosReales, avisos, pagos, desempeno, soloLectura, pagosEcomfive, tabInicial, alCambiarTab }: DatosPortalChin & DesdeEcomfive & { soloLectura: boolean }) {
+function PortalChinContenido({ cuenta, pedidos, plazos, fotosReales, etiquetas, avisos, pagos, desempeno, soloLectura, pagosEcomfive, tabInicial, alCambiarTab }: DatosPortalChin & DesdeEcomfive & { soloLectura: boolean }) {
   const { t, tr, fecha, idioma } = useIdioma();
+  const { mostrarToast } = useToast();
   const [lista, setLista] = useState(pedidos);
   const [fotos, setFotos] = useState(fotosReales);
+  const [etiquetasDe, setEtiquetasDe] = useState(etiquetas ?? {});
+  // Las cajas y la etiqueta: «Marcar enviado» (en producción) o corregirlas (ya enviado).
+  const [cajasDe, setCajasDe] = useState<{ p: PedidoPortal; modo: "enviar" | "editar" } | null>(null);
   const [tab, setTabEstado] = useState<Tab>(tabInicial === "pagos" && !pagos ? "cotizar" : (tabInicial ?? "cotizar"));
   const seleccion = useSeleccion();
   const setTab = (t: Tab) => {
@@ -174,14 +182,16 @@ function PortalChinContenido({ cuenta, pedidos, plazos, fotosReales, avisos, pag
           de("produccion").length,
           <EnProduccion
             pedidos={de("produccion")}
-            hoy={hoy}
-            diasAnticipo={cuenta.diasAnticipo}
             soloLectura={soloLectura}
-            alEnviar={(id, f) => cambiar(id, { etapa: "enviado", fechaEnvio: f })}
+            alMarcarEnviado={(p) => setCajasDe({ p, modo: "enviar" })}
             alEditar={soloLectura ? null : setCotizando}
           />,
         )}
-      {tab === "enviado" && conFiltro(de("enviado").length, <Enviados pedidos={de("enviado")} plazos={plazos} hoy={hoy} />)}
+      {tab === "enviado" &&
+        conFiltro(
+          de("enviado").length,
+          <Enviados pedidos={de("enviado")} plazos={plazos} hoy={hoy} etiquetas={etiquetasDe} alEditarCajas={soloLectura ? null : (p) => setCajasDe({ p, modo: "editar" })} />,
+        )}
       {tab === "pagos" && pagos && (soloLectura && pagosEcomfive ? pagosEcomfive : <PagosChin resumen={pagos.resumen} filas={pagos.filas} cambios={pagos.cambios} soloLectura={soloLectura} />)}
 
       {cotizando && (
@@ -195,6 +205,26 @@ function PortalChinContenido({ cuenta, pedidos, plazos, fotosReales, avisos, pag
             cambiar(cotizando.id, { ...cambios, etapa: cotizando.etapa === "produccion" ? "produccion" : "cotizado" });
             if (preview) setFotos((f) => ({ ...f, [cotizando.id]: preview }));
             setCotizando(null);
+          }}
+        />
+      )}
+      {cajasDe && (
+        <PanelCajas
+          key={`${cajasDe.p.id}-${cajasDe.modo}`}
+          p={cajasDe.p}
+          modo={cajasDe.modo}
+          existentes={etiquetasDe[cajasDe.p.id] ?? []}
+          hoy={hoy}
+          alCerrar={() => setCajasDe(null)}
+          alTerminar={(r: ResultadoCajas) => {
+            const id = cajasDe.p.id;
+            cambiar(id, { cajas: r.cajas, etiquetasRutas: r.etiquetas.map((e) => e.ruta), ...(r.fechaEnvio ? { etapa: "enviado" as const, fechaEnvio: r.fechaEnvio } : {}) });
+            setEtiquetasDe((xs) => ({ ...xs, [id]: r.etiquetas }));
+            if (r.fechaEnvio) {
+              const vence = new Date(Date.parse(r.fechaEnvio) + cuenta.diasAnticipo * 864e5).toISOString().slice(0, 10);
+              mostrarToast(t.enviadoOk(fecha(vence)));
+            }
+            setCajasDe(null);
           }}
         />
       )}
@@ -492,17 +522,13 @@ function Cotizados({ pedidos, fotos, alCorregir }: { pedidos: PedidoPortal[]; fo
 
 function EnProduccion({
   pedidos,
-  hoy,
-  diasAnticipo,
   soloLectura,
-  alEnviar,
+  alMarcarEnviado,
   alEditar,
 }: {
   pedidos: PedidoPortal[];
-  hoy: string;
-  diasAnticipo: number;
   soloLectura: boolean;
-  alEnviar: (id: string, fecha: string) => void;
+  alMarcarEnviado: (p: PedidoPortal) => void;
   alEditar: ((p: PedidoPortal) => void) | null;
 }) {
   const { t } = useIdioma();
@@ -533,13 +559,12 @@ function EnProduccion({
               { texto: t.colUnidades, derecha: true },
               { texto: t.colTotal, derecha: true },
               { texto: t.colConfirmado },
-              { texto: t.colFechaEnvio },
               { texto: "" },
             ]}
           />
           <tbody>
             {pedidos.map((p) => (
-              <FilaProduccion key={p.id} p={p} hoy={hoy} diasAnticipo={diasAnticipo} soloLectura={soloLectura} alEnviar={alEnviar} alEditar={alEditar} />
+              <FilaProduccion key={p.id} p={p} soloLectura={soloLectura} alMarcarEnviado={alMarcarEnviado} alEditar={alEditar} />
             ))}
           </tbody>
         </Tabla>
@@ -550,34 +575,17 @@ function EnProduccion({
 
 function FilaProduccion({
   p,
-  hoy,
-  diasAnticipo,
   soloLectura,
-  alEnviar,
+  alMarcarEnviado,
   alEditar,
 }: {
   p: PedidoPortal;
-  hoy: string;
-  diasAnticipo: number;
   soloLectura: boolean;
-  alEnviar: (id: string, fecha: string) => void;
+  alMarcarEnviado: (p: PedidoPortal) => void;
   alEditar: ((p: PedidoPortal) => void) | null;
 }) {
-  const { t, idioma, numero, tr, fecha, error } = useIdioma();
-  const { mostrarToast } = useToast();
-  const [f, setF] = useState(hoy);
+  const { t, idioma, numero, tr, fecha } = useIdioma();
   const [ahora] = useState(() => Date.now());
-  const [confirmar, setConfirmar] = useState(false);
-  const [ocupado, setOcupado] = useState(false);
-  async function enviar() {
-    setOcupado(true);
-    const r = await marcarEnviado(p.id, f);
-    setOcupado(false);
-    if (r.error || !r.fechaEnvio) return mostrarToast(error(r.error ?? "No se pudo marcar el envío."), "destructive");
-    alEnviar(p.id, r.fechaEnvio);
-    const vence = new Date(Date.parse(r.fechaEnvio) + diasAnticipo * 864e5).toISOString().slice(0, 10);
-    mostrarToast(t.enviadoOk(fecha(vence)));
-  }
   return (
     <tr>
       <ColumnaCasilla id={p.id} nombre={tr(p.producto)} />
@@ -595,35 +603,33 @@ function FilaProduccion({
       <td className={`${claseTdLista} text-right tabular-nums`}>{numero(p.unidades)}</td>
       <td className={`${claseTdLista} text-right tabular-nums`}>{dinero(p.montoTotal)}</td>
       <td className={`${claseTdLista} tabular-nums`}>{p.confirmadoEn ? fecha(diaPanama(p.confirmadoEn)) : "—"}</td>
-      <td className={claseTdLista}>
-        <input type="date" value={f} max={hoy} onChange={(e) => setF(e.target.value)} disabled={confirmar || soloLectura} aria-label={`${t.colFechaEnvio}: ${tr(p.producto)}`} className={`h-8 rounded-md border border-border-control bg-card px-2 text-[13px] ${anilloFoco}`} />
-      </td>
       <td className={`${claseTdLista} text-right`}>
-        {confirmar ? (
-          <span className="inline-flex gap-1.5">
-            <button type="button" className={botonNormal} disabled={ocupado} onClick={() => setConfirmar(false)}>
-              {t.no}
-            </button>
-            <button type="button" className={botonPrincipal} disabled={ocupado} onClick={enviar}>
-              {ocupado ? t.guardando : t.salioEl(fecha(f))}
-            </button>
-          </span>
-        ) : (
-          <span className="inline-flex gap-1.5">
-            <button type="button" className={botonNormal} disabled={!alEditar} onClick={() => alEditar?.(p)} aria-label={`${t.editarCotizacion}: ${tr(p.producto)}`}>
-              {t.editarCotizacion}
-            </button>
-            <button type="button" className={botonPrincipal} disabled={!f || soloLectura} onClick={() => setConfirmar(true)}>
-              {t.marcarEnviado}
-            </button>
-          </span>
-        )}
+        <span className="inline-flex gap-1.5">
+          <button type="button" className={botonNormal} disabled={!alEditar} onClick={() => alEditar?.(p)} aria-label={`${t.editarCotizacion}: ${tr(p.producto)}`}>
+            {t.editarCotizacion}
+          </button>
+          <button type="button" className={botonPrincipal} disabled={soloLectura} onClick={() => alMarcarEnviado(p)} aria-label={`${t.marcarEnviado}: ${tr(p.producto)}`}>
+            {t.marcarEnviado}
+          </button>
+        </span>
       </td>
     </tr>
   );
 }
 
-function Enviados({ pedidos, plazos, hoy }: { pedidos: PedidoPortal[]; plazos: Record<string, Plazo>; hoy: string }) {
+function Enviados({
+  pedidos,
+  plazos,
+  hoy,
+  etiquetas,
+  alEditarCajas,
+}: {
+  pedidos: PedidoPortal[];
+  plazos: Record<string, Plazo>;
+  hoy: string;
+  etiquetas: Record<string, EtiquetaPedido[]>;
+  alEditarCajas: ((p: PedidoPortal) => void) | null;
+}) {
   const { t, idioma, numero, fecha, tr } = useIdioma();
   const filas = pedidos
     .filter((p) => p.fechaEnvio)
@@ -640,6 +646,7 @@ function Enviados({ pedidos, plazos, hoy }: { pedidos: PedidoPortal[]; plazos: R
   const hoja = hojaEnviados(
     filas.map(({ p, plazo, e, texto }) => ({ p, dias: e.dias, plazo: plazoTexto(plazo), estado: texto })),
     useContextoExcel(),
+    Object.fromEntries(Object.entries(etiquetas).flatMap(([id, e]) => (e[0] ? [[id, e[0].url]] : []))),
   );
   return (
     <Tarjeta
@@ -663,9 +670,12 @@ function Enviados({ pedidos, plazos, hoy }: { pedidos: PedidoPortal[]; plazos: R
               { texto: t.colDestino },
               { texto: t.colVia },
               { texto: t.colUnidades, derecha: true },
+              { texto: t.colCajas, derecha: true },
+              { texto: t.colEtiqueta },
               { texto: t.colConfirmado },
               { texto: t.colEnviado },
               { texto: t.colDiasTransito },
+              ...(alEditarCajas ? [{ texto: "" }] : []),
             ]}
           />
           <tbody>
@@ -685,6 +695,21 @@ function Enviados({ pedidos, plazos, hoy }: { pedidos: PedidoPortal[]; plazos: R
                   {p.modalidad && <span className="block text-xs text-muted-foreground">{viaTexto(p, idioma)}</span>}
                 </td>
                 <td className={`${claseTdLista} text-right tabular-nums`}>{numero(p.unidades)}</td>
+                <td className={`${claseTdLista} text-right tabular-nums`}>{p.cajas != null ? numero(p.cajas) : "—"}</td>
+                <td className={claseTdLista}>
+                  {(etiquetas[p.id] ?? []).length > 0 ? (
+                    <span className="flex flex-wrap gap-1">
+                      {(etiquetas[p.id] ?? []).map((e, i) => (
+                        <a key={e.ruta} href={e.url} target="_blank" rel="noopener noreferrer" aria-label={`${t.verEtiqueta(i + 1)}: ${tr(p.producto)}`} className={`block overflow-hidden rounded border border-border bg-card ${anilloFoco}`}>
+                          {/* eslint-disable-next-line @next/next/no-img-element -- la etiqueta es una dirección firmada del almacenamiento privado */}
+                          <img src={e.url} alt="" className="h-10 w-10 object-contain" />
+                        </a>
+                      ))}
+                    </span>
+                  ) : (
+                    "—"
+                  )}
+                </td>
                 <td className={`${claseTdLista} tabular-nums`}>{p.confirmadoEn ? fecha(diaPanama(p.confirmadoEn)) : "—"}</td>
                 <td className={`${claseTdLista} tabular-nums`}>{fecha(p.fechaEnvio)}</td>
                 <td className={claseTdLista}>
@@ -697,6 +722,13 @@ function Enviados({ pedidos, plazos, hoy }: { pedidos: PedidoPortal[]; plazos: R
                     </span>
                   )}
                 </td>
+                {alEditarCajas && (
+                  <td className={`${claseTdLista} text-right`}>
+                    <button type="button" className={botonNormal} onClick={() => alEditarCajas(p)} aria-label={`${p.cajas != null ? t.cajasYEtiqueta : t.anotarCajas}: ${tr(p.producto)}`}>
+                      {p.cajas != null ? t.cajasYEtiqueta : t.anotarCajas}
+                    </button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

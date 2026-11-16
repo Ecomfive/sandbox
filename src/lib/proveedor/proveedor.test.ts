@@ -7,7 +7,8 @@ import { ETAPA_PORTAL_DE_COMPRA, viaPortal } from "./espejo";
 import { sumarDias } from "./fechas";
 import { puedeAvisarPago, puedeConfirmarPago, puedePasar } from "./permisos-proveedor";
 import { emparejar, leerHojaPagos, unidadesDelProveedor } from "./hoja-pagos";
-import { rutaEsDelPedido, rutaFotoReal } from "./rutas";
+import { rutaEsDelPedido, rutaEsEtiquetaDelPedido, rutaEtiqueta, rutaFotoReal } from "./rutas";
+import { validarCajas } from "./cajas";
 import { estadoTransito, textoPlazo } from "./transito";
 
 const pedido = { montoTotal: 5000, fechaEnvio: "2026-10-21", fechaLlegada: null as string | null, pagosAnticipo: [] as { monto: number; fecha: string }[], pagosSaldo: [] as { monto: number; fecha: string }[] };
@@ -172,4 +173,27 @@ test("unidades del proveedor: la compra abierta toma la cantidad de la hoja de S
   const pareja = new Map([[0, "a"], [1, "b"], [2, "c"], [3, "d"]]);
   const cambios = unidadesDelProveedor(filas, pareja, [pedido("a", "enviado", 1000), pedido("b", "llegado", 1000), pedido("c", "produccion", 1000), pedido("d", "cotizado", 1000)]);
   assert.deepEqual(cambios, [{ pedidoId: "a", antes: 1000, ahora: 960 }]);
+});
+
+test("las etiquetas de las cajas quedan en su carpeta y no se confunden con las fotos", () => {
+  const prov = "01a1f0e2-1111-7000-8000-000000000001";
+  const ped = "01a1f0e2-2222-7000-8000-000000000002";
+  const otro = "01a1f0e2-3333-7000-8000-000000000003";
+  const id = "0f8b6a2c-9d1e-4c3b-8a7f-123456789abc";
+  const ruta = rutaEtiqueta(prov, ped, "Etiqueta.PNG", id);
+  assert.equal(ruta, `${prov}/${ped}/etiquetas/${id}.png`);
+  assert.equal(rutaEtiqueta(prov, ped, "x.pdf", id), `${prov}/${ped}/etiquetas/${id}.jpg`);
+  assert.equal(rutaEtiqueta("../x", ped, "a.jpg", id), null);
+  assert.ok(rutaEsEtiquetaDelPedido(ruta, prov, ped));
+  assert.ok(!rutaEsEtiquetaDelPedido(ruta, prov, otro));
+  assert.ok(!rutaEsEtiquetaDelPedido(ruta, otro, ped));
+  assert.ok(!rutaEsEtiquetaDelPedido(`${prov}/${ped}/fotos/${id}.png`, prov, ped));
+  assert.ok(!rutaEsDelPedido(ruta, prov, ped)); // una etiqueta no vale como foto real
+  assert.ok(!rutaEsEtiquetaDelPedido(`${prov}/${ped}/etiquetas/../../${otro}/x.jpg`, prov, ped));
+});
+
+test("las cajas son un entero de 1 a 9,999", () => {
+  assert.deepEqual(validarCajas("29"), { cajas: 29 });
+  assert.deepEqual(validarCajas(7), { cajas: 7 });
+  for (const malo of ["", null, undefined, "0", "-3", "2.5", "abc", 10000, "1e9"]) assert.ok("error" in validarCajas(malo), String(malo));
 });

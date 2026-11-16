@@ -9,6 +9,7 @@ import { requireProveedor, tieneClaveTemporal } from "@/lib/proveedor/sesion";
 import { traducirTextos } from "@/lib/proveedor/traducir";
 import { BUCKET_PROVEEDOR } from "@/lib/proveedor/rutas";
 import { createServiceClient } from "@/lib/supabase/server";
+import { etiquetasDePedidos } from "@/lib/proveedor/etiquetas-datos";
 import { ElegirClave } from "./cambiar-clave";
 import { PortalChin, type AvisoEcomfive } from "./portal-chin";
 
@@ -46,6 +47,8 @@ export default async function PortalProveedorPage() {
     const porRuta = new Map((data ?? []).map((f) => [f.path, f.signedUrl]));
     for (const p of activos) if (p.fotoRealRuta && porRuta.get(p.fotoRealRuta)) fotosReales[p.id] = porRuta.get(p.fotoRealRuta)!;
   }
+
+  const etiquetas = await etiquetasDePedidos(supabase, activos).catch(() => ({}));
 
   const { data: avisos } = await supabase
     .from("proveedor_novedades")
@@ -85,6 +88,7 @@ export default async function PortalProveedorPage() {
       pedidos={activos}
       plazos={espejo.plazos}
       fotosReales={fotosReales}
+      etiquetas={etiquetas}
       avisos={nuevos}
       pagos={pagos}
       desempeno={desempeno}

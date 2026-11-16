@@ -83,18 +83,20 @@ export function hojaProduccion(pedidos: PedidoPortal[], c: ContextoExcel): HojaE
 }
 
 /** `filas` son las de la pestaña ya calculadas (días en tránsito, plazo prometido y estado en el texto de la pantalla). */
-export function hojaEnviados(filas: { p: PedidoPortal; dias: number; plazo: string; estado: string }[], c: ContextoExcel): HojaExcel {
+export function hojaEnviados(filas: { p: PedidoPortal; dias: number; plazo: string; estado: string }[], c: ContextoExcel, etiquetas: Record<string, string> = {}): HojaExcel {
   return {
     columnas: [
       ...columnasBase(c.t),
       { titulo: c.t.colUnidades, tipo: "entero" },
+      { titulo: c.t.colCajas, tipo: "entero" },
+      columnaFoto(c.t.colEtiqueta),
       { titulo: c.t.colConfirmado, tipo: "fecha" },
       { titulo: c.t.colEnviado, tipo: "fecha" },
       { titulo: c.t.colDias, tipo: "entero" },
       { titulo: c.t.colPrometido, tipo: "texto", ancho: 14 },
       { titulo: c.t.colEstado, tipo: "texto", ancho: 22 },
     ],
-    filas: filas.map(({ p, dias, plazo, estado }) => ({ id: p.id, celdas: [...celdasBase(p, c), p.unidades, dia(p.confirmadoEn), p.fechaEnvio, dias, plazo, estado] })),
+    filas: filas.map(({ p, dias, plazo, estado }) => ({ id: p.id, celdas: [...celdasBase(p, c), p.unidades, p.cajas, etiquetas[p.id] ?? null, dia(p.confirmadoEn), p.fechaEnvio, dias, plazo, estado] })),
   };
 }
 
