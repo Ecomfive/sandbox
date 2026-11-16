@@ -1,12 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { usePathname } from "next/navigation";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { Tooltip } from "@/components/ui/tooltip";
 import { pedidosNuevos, type PedidoNuevo } from "@/app/(app)/tienda-pedidos/avisos-actions";
 import { formatearMoneda } from "@/lib/formato";
 import { CerrarIcon, PedidoIcon, SilencioIcon, SonidoIcon } from "@/lib/nav-icons";
+
+/**
+ * Dónde sale el aviso (16 nov 2026, pedido de Hernán): solo en Pedidos de tienda y en las páginas de despacho, para que no distraiga a quien trabaja en
+ * Compras, Producto u otro panel. Fuera de estas páginas no se pregunta ni se muestra nada.
+ */
+const PAGINAS_DEL_AVISO = ["/tienda-pedidos", "/tienda-logistica", "/despacho-ciudad", "/despacho-devoluciones"];
+
+export function paginaConAvisoDePedidos(ruta: string | null): boolean {
+  return !!ruta && PAGINAS_DEL_AVISO.some((p) => ruta === p || ruta.startsWith(`${p}/`));
+}
 
 /** Cada cuánto se pregunta por pedidos nuevos (solo con la pestaña a la vista). */
 const CADA_MS = 30_000;
@@ -41,27 +52,27 @@ function sonar() {
 const CLAVE_SILENCIO = "aviso-pedidos-silenciado-v1";
 const oyentes = new Set<() => void>();
 // Respaldo cuando el navegador no deja guardar (ventana privada o sitio bloqueado): vale hasta recargar.
-let memoria = false;
+// «1» = silenciado, «0» = con sonido; sin nada, lo que toque por el rol (`sonidoPorDefecto`).
+let memoria: boolean | null = null;
 
-function leerSilencio(): boolean {
+function leerSilencio(): boolean | null {
   try {
-    return window.localStorage.getItem(CLAVE_SILENCIO) === "1";
+    const v = window.localStorage.getItem(CLAVE_SILENCIO);
+    return v === "1" ? true : v === "0" ? false : memoria;
   } catch {
-    return false;
+    return memoria;
   }
 }
 
 function guardarSilencio(silenciado: boolean) {
+  memoria = silenciado;
   try {
-    if (silenciado) window.localStorage.setItem(CLAVE_SILENCIO, "1");
-    else window.localStorage.removeItem(CLAVE_SILENCIO);
+    window.localStorage.setItem(CLAVE_SILENCIO, silenciado ? "1" : "0");
   } catch {
-    memoria = silenciado;
+    // Queda en memoria hasta recargar.
   }
   for (const o of oyentes) o();
 }
-
-const silenciado = () => leerSilencio() || memoria;
 
 function suscribir(alCambiar: () => void) {
   oyentes.add(alCambiar);
@@ -75,13 +86,16 @@ function suscribir(alCambiar: () => void) {
 /**
  * El aviso de «Nuevo pedido» (12 nov 2026, pedido de Hernán, como en la app de Jorge): cuando cae un pedido en una tienda conectada a Shopify, abajo a la
  * derecha sale una tarjeta con la tienda, el número y el total, y un sonido corto; «Ver» abre el pedido. Se pregunta cada 30 segundos mientras la pestaña
- * está a la vista. Va en todas las páginas para quien puede abrir Pedidos de tienda.
+ * está a la vista. Desde el 16 nov 2026 es para el equipo de despacho (quien tiene Despacho ciudad) y sale solo en Pedidos de tienda, Logística y las
+ * páginas de despacho; a Admin y CEO les llega sin sonido de entrada (`sonidoPorDefecto`), y cada uno lo activa o silencia con la cornetita.
  */
-export function AvisoPedidosNuevos({ codigoPais }: { codigoPais: string }) {
+export function AvisoPedidosNuevos({ codigoPais, sonidoPorDefecto }: { codigoPais: string; sonidoPorDefecto: boolean }) {
   const [avisos, setAvisos] = useState<PedidoNuevo[]>([]);
   const desde = useRef<string>(new Date().toISOString());
   const vistos = useRef(new Set<string>());
-  const sinSonido = useSyncExternalStore(suscribir, silenciado, () => false);
+  const activo = paginaConAvisoDePedidos(usePathname());
+  const silenciado = useCallback(() => leerSilencio() ?? !sonidoPorDefecto, [sonidoPorDefecto]);
+  const sinSonido = useSyncExternalStore(suscribir, silenciado, () => !sonidoPorDefecto);
   // El ciclo de revisión vive todo el tiempo: lee el estado actual y no el del momento en que se montó.
   const sinSonidoAhora = useRef(sinSonido);
   useEffect(() => {
@@ -89,6 +103,9 @@ export function AvisoPedidosNuevos({ codigoPais }: { codigoPais: string }) {
   }, [sinSonido]);
 
   useEffect(() => {
+    if (!activo) return;
+    // Al entrar a una página del aviso se cuenta desde ahora: lo que cayó mientras estaba en otro panel ya está en la lista de Pedidos.
+    desde.current = new Date().toISOString();
     let vivo = true;
     let temporizador: ReturnType<typeof setTimeout> | null = null;
     async function revisar() {
@@ -121,9 +138,9 @@ export function AvisoPedidosNuevos({ codigoPais }: { codigoPais: string }) {
       if (temporizador) clearTimeout(temporizador);
       document.removeEventListener("visibilitychange", alVolver);
     };
-  }, []);
+  }, [activo]);
 
-  if (!avisos.length) return null;
+  if (!activo || !avisos.length) return null;
   return (
     <div aria-live="polite" className="fixed right-4 bottom-4 z-50 flex w-80 flex-col gap-2">
       {avisos.map((p) => (
