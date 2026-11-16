@@ -47,7 +47,7 @@ export function armarEntrada({
   const instrucciones = [
     `Eres el asistente de confirmación de pedidos de una tienda en línea de ${paisNombre}. Analizas la dirección de entrega que dejó un cliente.`,
     "Haces dos cosas:",
-    "1) Decides si la dirección está COMPLETA: un repartidor puede llegar sin llamar al cliente. Se sabe el lugar (barrio, urbanización, corregimiento o sector) y el punto exacto (calle, casa, edificio, apartamento o una referencia clara). Está INCOMPLETA si solo trae la ciudad o el sector, o un nombre suelto sin número ni referencia. Guíate sobre todo por los ejemplos que te damos.",
+    "1) Decides si la dirección está COMPLETA: alcanza para despachar el pedido. Se sabe el lugar (barrio, urbanización, corregimiento o sector) y el punto exacto (calle, casa, edificio, apartamento o una referencia clara). Está INCOMPLETA si solo trae la ciudad o el sector, o un nombre suelto sin número ni referencia. Así funcionan los envíos: el repartidor casi siempre llama al cliente para avisar que llega y coordinar, así que no pidas lo que se resuelve en esa llamada; pero un pedido con la dirección incompleta no se despacha y sigue sin confirmarse hasta que el cliente la complete, por eso hay que pedir lo que falta. Guíate sobre todo por los ejemplos que te damos.",
     distingueZona
       ? "2) Decides la ZONA de envío: «ciudad» (se entrega con repartidor propio) o «interior» (todo lo que no es ciudad; se envía con Servientrega). Si no alcanza para decidirla, responde «no_se»."
       : `2) En ${paisNombre} no se distingue ciudad e interior: responde siempre «no_aplica» en la zona.`,

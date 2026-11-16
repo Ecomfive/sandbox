@@ -9,7 +9,7 @@ import { useToast } from "@/components/ui/toast";
 import { AlertaIcon, CheckIcon, ChatIcon, PedidoIcon, RobotIcon, SugerenciaIcon } from "@/lib/nav-icons";
 import type { Combinado, ResultadoModelo } from "@/lib/confirmacion-ia/combinar";
 import type { ConfigConfirmacion, FilaAnalisis } from "@/lib/confirmacion-ia/servidor";
-import type { Zona } from "@/lib/confirmacion-ia/zonas";
+import { NOMBRE_ZONA, type Zona } from "@/lib/confirmacion-ia/zonas";
 import { tiempoEsperando } from "@/lib/tienda/confirmacion";
 import { EjemplosDirecciones } from "./ejemplos-direcciones";
 import { InstruccionesIA } from "./instrucciones-ia";
@@ -25,7 +25,7 @@ import {
   type PalabraZona,
 } from "../ia-actions";
 
-const ZONA_TEXTO: Record<Zona, string> = { ciudad: "Ciudad", interior: "Interior" };
+const ZONA_TEXTO = NOMBRE_ZONA;
 const NOMBRE_IA: Record<string, string> = { openai: "ChatGPT", anthropic: "Claude" };
 const MENSAJE: Record<FilaAnalisis["mensajeEstado"], { texto: string; tono: "neutro" | "exito" | "aviso" | "peligro" }> = {
   no_aplica: { texto: "No hace falta", tono: "neutro" },
@@ -401,8 +401,8 @@ function FichaAnalisis({ f, distingueZona, puedeEscribir, alCerrar }: { f: FilaA
                     <span className={labelClass}>Zona</span>
                     <select value={zona} onChange={(e) => setZona(e.target.value as Zona | "")} className={fieldClass}>
                       <option value="">No sé</option>
-                      <option value="ciudad">Ciudad</option>
-                      <option value="interior">Interior</option>
+                      <option value="ciudad">{NOMBRE_ZONA.ciudad}</option>
+                      <option value="interior">{NOMBRE_ZONA.interior}</option>
                     </select>
                   </label>
                 )}
