@@ -6,11 +6,11 @@ import { ListaIcon } from "@/lib/nav-icons";
 import { SeccionCard } from "./seccion";
 import { anilloFoco, fieldClass, labelClass } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
-import type { Zona } from "@/lib/confirmacion-ia/zonas";
+import { NOMBRE_ZONA, type Zona } from "@/lib/confirmacion-ia/zonas";
 import { agregarEjemplo, editarEjemplo, eliminarEjemplo, listarEjemplos, type EjemploDireccion } from "../ia-actions";
 
 const POR_VEZ = 20;
-const ZONA_TEXTO: Record<Zona, string> = { ciudad: "Ciudad", interior: "Interior" };
+const ZONA_TEXTO = NOMBRE_ZONA;
 const boton = `rounded-md border border-border-control bg-card px-3 py-1.5 text-sm font-medium hover:bg-muted disabled:opacity-50 ${anilloFoco}`;
 const botonPrincipal = `rounded-md bg-foreground px-3 py-2 text-sm font-semibold text-background disabled:opacity-50 ${anilloFoco}`;
 
@@ -77,10 +77,10 @@ function FormularioEjemplo({
         <legend className={`${labelClass} mb-1 p-0`}>¿La dirección está completa?</legend>
         <div className="flex flex-wrap gap-5 text-sm">
           <label className="flex items-center gap-2">
-            <input type="radio" name={`completa-${id}`} checked={completa} onChange={() => setCompleta(true)} /> Completa: un repartidor llega sin llamar
+            <input type="radio" name={`completa-${id}`} checked={completa} onChange={() => setCompleta(true)} /> Completa
           </label>
           <label className="flex items-center gap-2">
-            <input type="radio" name={`completa-${id}`} checked={!completa} onChange={() => setCompleta(false)} /> Incompleta: falta algo
+            <input type="radio" name={`completa-${id}`} checked={!completa} onChange={() => setCompleta(false)} /> Incompleta
           </label>
         </div>
       </fieldset>
@@ -95,8 +95,8 @@ function FormularioEjemplo({
           <span className={labelClass}>Zona de envío (opcional)</span>
           <select value={zona} onChange={(e) => setZona(e.target.value as Zona | "")} className={fieldClass}>
             <option value="">No sé</option>
-            <option value="ciudad">Ciudad</option>
-            <option value="interior">Interior (Servientrega)</option>
+            <option value="ciudad">{NOMBRE_ZONA.ciudad}</option>
+            <option value="interior">{NOMBRE_ZONA.interior}</option>
           </select>
         </label>
       )}
