@@ -14,6 +14,7 @@ export const ETAPA_PORTAL_DE_COMPRA: Readonly<Record<string, EtapaPortal>> = {
   produccion: "produccion",
   tracking: "enviado",
   arribo_mercancia: "llegado",
+  en_bodega: "llegado",
   completado: "llegado",
   descartado: "descartado",
 };
