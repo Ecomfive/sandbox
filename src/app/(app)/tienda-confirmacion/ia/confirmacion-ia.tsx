@@ -325,6 +325,7 @@ function FichaAnalisis({ f, distingueZona, puedeEscribir, alCerrar }: { f: FilaA
   const [completa, setCompleta] = useState(f.completa ?? true);
   const [falta, setFalta] = useState(f.falta ?? "");
   const [zona, setZona] = useState<Zona | "">(f.zona ?? "");
+  const [ciudadEjemplo, setCiudadEjemplo] = useState(f.ciudad ?? "");
   const m = MENSAJE[f.mensajeEstado];
 
   function analizar() {
@@ -337,7 +338,7 @@ function FichaAnalisis({ f, distingueZona, puedeEscribir, alCerrar }: { f: FilaA
   }
   function guardar() {
     empezar(async () => {
-      const r = await guardarAnalisisComoEjemplo(f.id, { completa, falta: completa ? null : falta, zona: zona || null });
+      const r = await guardarAnalisisComoEjemplo(f.id, { ciudad: ciudadEjemplo, completa, falta: completa ? null : falta, zona: zona || null });
       if (r.error) return mostrarToast(r.error, "destructive");
       mostrarToast("Guardada como ejemplo.");
       setGuardando(false);
@@ -386,6 +387,10 @@ function FichaAnalisis({ f, distingueZona, puedeEscribir, alCerrar }: { f: FilaA
             {guardando && (
               <div className="flex flex-col gap-3 rounded-lg border border-border p-3">
                 <p className="m-0 text-xs text-muted-foreground">Dile a la IA lo correcto. Así aprende de lo que ves aquí.</p>
+                <label className="flex flex-col gap-1">
+                  <span className={labelClass}>Ciudad o corregimiento *</span>
+                  <input value={ciudadEjemplo} maxLength={120} onChange={(e) => setCiudadEjemplo(e.target.value)} placeholder="Ej: Bella Vista" className={fieldClass} />
+                </label>
                 <div role="radiogroup" aria-label="La dirección está" className="flex gap-4 text-sm">
                   <label className="flex items-center gap-1.5"><input type="radio" checked={completa} onChange={() => setCompleta(true)} /> Completa</label>
                   <label className="flex items-center gap-1.5"><input type="radio" checked={!completa} onChange={() => setCompleta(false)} /> Incompleta</label>
@@ -406,7 +411,7 @@ function FichaAnalisis({ f, distingueZona, puedeEscribir, alCerrar }: { f: FilaA
                     </select>
                   </label>
                 )}
-                <button type="button" disabled={pendiente || (!completa && !falta.trim())} onClick={guardar} className={`self-end rounded-md bg-foreground px-3 py-2 text-sm font-semibold text-background disabled:opacity-50 ${anilloFoco}`}>
+                <button type="button" disabled={pendiente || ciudadEjemplo.trim().length < 2 || (!completa && !falta.trim())} onClick={guardar} className={`self-end rounded-md bg-foreground px-3 py-2 text-sm font-semibold text-background disabled:opacity-50 ${anilloFoco}`}>
                   Guardar ejemplo
                 </button>
               </div>
@@ -434,18 +439,19 @@ function ProbarDireccion({ tiendas, puedeEscribir, tiendaElegida }: { tiendas: {
       </summary>
       <div className="flex flex-col gap-3 border-t border-border p-4">
         <p className="m-0 text-sm text-muted-foreground">Escribe una dirección y mira qué diría el sistema. No se guarda ni se le escribe a nadie.</p>
-        <label className="flex flex-col gap-1">
-          <span className={labelClass}>Dirección</span>
-          <textarea rows={2} maxLength={600} value={direccion} onChange={(e) => setDireccion(e.target.value)} placeholder="Ej: Urb. Los Pinos, calle 5, casa 12, frente a la tienda" className={fieldClass} />
-        </label>
         <label className="flex flex-col gap-1 sm:max-w-sm">
-          <span className={labelClass}>Ciudad o corregimiento (opcional)</span>
-          <input value={ciudad} maxLength={120} onChange={(e) => setCiudad(e.target.value)} className={fieldClass} />
+          <span className={labelClass}>Ciudad o corregimiento *</span>
+          <input value={ciudad} required maxLength={120} onChange={(e) => setCiudad(e.target.value)} placeholder="Ej: Bella Vista, Colón, Arraiján" className={fieldClass} />
+          <span className="text-xs text-muted-foreground">Lo primero que mira la IA: dice de dónde es el pedido.</span>
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className={labelClass}>Dirección *</span>
+          <textarea rows={2} maxLength={600} required value={direccion} onChange={(e) => setDireccion(e.target.value)} placeholder="Ej: Urb. Los Pinos, calle 5, casa 12, frente a la tienda" className={fieldClass} />
         </label>
         <div className="flex items-center gap-3">
           <button
             type="button"
-            disabled={pendiente || direccion.trim().length < 3}
+            disabled={pendiente || direccion.trim().length < 3 || ciudad.trim().length < 2}
             onClick={() =>
               empezar(async () => {
                 const r = await probarDireccion(direccion, ciudad, tiendaElegida ?? tiendas[0]?.id ?? null);
