@@ -1224,7 +1224,7 @@ convenciones técnicas del código.
   bucket del portal). Para Compras: cada guardado deja el evento `cajas` (antes → después), un comentario del proveedor en la Actividad con las etiquetas **copiadas a las fotos de la compra** (adjuntos
   `origen proveedor`, revisadas por su contenido como la foto real), el aviso en la campana de quien recibe los de Shen Zhen y, en la ficha de la compra, el bloque `CajasProveedorCompraBloque`
   («Cajas de Shen Zhen», solo lectura, país y alcance de la persona). El Tablero de Shen Zhen (el mismo `PortalChin`) muestra las columnas y el Excel de «Enviado» trae «Cajas» y la etiqueta como imagen.
-  Sin la 0299 el portal carga igual (sin cajas) y guardarlas avisa que falta la migración. Textos nuevos en español y chino (`textos.ts`, errores en `ERRORES_ZH`).
+  **Lista de Compras** (16 nov 2026, pedido de Hernán para Francis): columnas «Cajas (Cartons)» (con total) y «Etiqueta de las cajas» («N imágenes»; filtro Con/Sin etiqueta) en `tabla-compras.tsx`; `cargarCajasDeProveedor` (`datos-compras.ts`) lee `proveedor_pedidos` con cajas anotadas (`FilaCompra.cajasProveedor`, `etiquetasCajas`); las imágenes se abren en la ficha de la compra. Sin la 0299 el portal carga igual (sin cajas) y guardarlas avisa que falta la migración. Textos nuevos en español y chino (`textos.ts`, errores en `ERRORES_ZH`).
   **Buscador y país** (26 oct 2026, pedido de Hernán y Francis): arriba de las pestañas del portal (el de Shen Zhen y el Tablero)
   `BarraFiltroPortal` (`src/components/proveedor/filtro-portal.tsx`, contexto `FiltroPortalProveedor` / `useFiltroPortal`; lógica pura en
   `src/lib/proveedor/filtro.ts`, con prueba: cada palabra en el nombre, su traducción o el código, sin acentos) filtra todas las pestañas y sus

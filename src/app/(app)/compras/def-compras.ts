@@ -37,6 +37,10 @@ export interface FilaCompra {
   /** Las tiendas de las que sale la compra (una o varias; se eligen o se crean al escribirlas, como las etiquetas). */
   tiendas: string[];
   qtyTotal: number | null;
+  /** Cuántas cajas («Cartons») anotó el proveedor al marcar el envío (migración 0299); null si no las anotó o la compra no es de un proveedor con portal. */
+  cajasProveedor: number | null;
+  /** Cuántas imágenes de la etiqueta de las cajas subió el proveedor (se ven en la ficha de la compra). */
+  etiquetasCajas: number;
   montoTotal: number | null;
   primerPago: number | null;
   segundoPago: number | null;
@@ -84,6 +88,8 @@ export const EMOJI_CAMPO: Record<string, string> = {
   viaEnvio: "🏗️",
   etiquetas: "🏷️",
   qtyTotal: "🧾",
+  cajasProveedor: "📦",
+  etiquetaCajas: "🏷️",
   montoTotal: "💲",
   valorUnitario: "💲",
   primerPago: "⚠️",
@@ -422,6 +428,18 @@ export const DEF_COMPRAS: DefTabla<FilaCompra> = {
     { id: "nombreCompra", etiqueta: "Orden de compra", tipo: "texto", valor: (c) => `${numeroOC(c.numero)} ${c.codigo ?? ""} ${c.proveedor ?? ""} ${c.lineas.map((l) => `${l.codigo} ${l.nombre}`).join(" ")}` },
     { id: "codigo", etiqueta: "Código", tipo: "texto", valor: (c) => c.codigo ?? "" },
     { id: "qtyTotal", etiqueta: "Cantidad total", tipo: "numero", valor: (c) => c.qtyTotal },
+    { id: "cajasProveedor", etiqueta: "Cajas (Cartons)", tipo: "numero", valor: (c) => c.cajasProveedor },
+    {
+      id: "etiquetaCajas",
+      etiqueta: "Etiqueta de las cajas",
+      tipo: "seleccion",
+      valores: (c) => [c.etiquetasCajas > 0 ? "con" : "sin"],
+      opciones: () => [
+        { valor: "con", etiqueta: "Con etiqueta" },
+        { valor: "sin", etiqueta: "Sin etiqueta" },
+      ],
+      agrupable: true,
+    },
     { id: "montoTotal", etiqueta: "Monto Total", tipo: "numero", valor: (c) => c.montoTotal },
     { id: "valorUnitario", etiqueta: "Valor Unitario", tipo: "numero", valor: (c) => valorUnitario(c) },
     { id: "primerPago", etiqueta: "Primer Pago", tipo: "numero", valor: (c) => c.primerPago },

@@ -65,6 +65,8 @@ const ICONOS: Record<string, IconoComp> = {
   planificacionMes: CalendarioIcon,
   codigo: EtiquetaIcon,
   qtyTotal: ProductoIcon,
+  cajasProveedor: ProductoIcon,
+  etiquetaCajas: EtiquetaIcon,
   montoTotal: GastoIcon,
   valorUnitario: GastoIcon,
   primerPago: GastoIcon,
@@ -311,6 +313,11 @@ function columnas(
         ),
     }),
     col("qtyTotal", "Cantidad total", { ocultable: true, clase: "tabular-nums", total: (f) => sumar(f, (c) => c.qtyTotal, (n) => n.toLocaleString("es-PA")), render: (c) => ed(c, "qtyTotal", c.qtyTotal ?? "—") }),
+    col("cajasProveedor", "Cajas (Cartons)", { ocultable: true, clase: "tabular-nums", total: (f) => sumar(f, (c) => c.cajasProveedor, (n) => n.toLocaleString("es-PA")), render: (c) => c.cajasProveedor ?? <span className="text-muted-foreground">—</span> }),
+    col("etiquetaCajas", "Etiqueta de las cajas", {
+      ocultable: true,
+      render: (c) => (c.etiquetasCajas > 0 ? <Badge tone="info">{c.etiquetasCajas === 1 ? "1 imagen" : `${c.etiquetasCajas} imágenes`}</Badge> : <span className="text-muted-foreground">—</span>),
+    }),
     col("pagadoAProveedor", "Pagado a Proveedor", { ocultable: true, clase: "tabular-nums", total: (f) => sumar(f, (c) => c.pagadoAProveedor, usd), render: (c) => ed(c, "pagadoAProveedor", usd(c.pagadoAProveedor)) }),
     col("dias", "Días", { ocultable: true, clase: "tabular-nums", render: (c) => diasDeCompra(c) }),
     col("pais", "País", {
