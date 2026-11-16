@@ -10,7 +10,8 @@ const ETAPA: Record<string, string> = {
   cotizado: "Cotizado",
   produccion: "En producción",
   tracking: "En camino",
-  arribo_mercancia: "Arribo",
+  arribo_mercancia: "Llegada a puerto",
+  en_bodega: "En bodega",
   completado: "Completada",
 };
 

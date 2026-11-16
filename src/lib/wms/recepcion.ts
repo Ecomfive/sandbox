@@ -21,7 +21,7 @@ export const puedeMoverAMano = (tipo: string, codigoPais: string | null | undefi
 export const pideMotivo = (tipo: string, codigoPais: string | null | undefined) => tipo === "ajuste" || (tipo === "salida" && PAISES_SALIDA_CON_REMISION.includes(codigoPais ?? ""));
 
 /** Las etapas en que una compra se puede recibir: en camino o ya llegó. Las completadas quedaron dentro del levantamiento y recibirlas las contaría dos veces. */
-export const ETAPAS_POR_RECIBIR = ["tracking", "arribo_mercancia"];
+export const ETAPAS_POR_RECIBIR = ["tracking", "arribo_mercancia", "en_bodega"];
 
 export interface LineaRecepcion {
   item: string;

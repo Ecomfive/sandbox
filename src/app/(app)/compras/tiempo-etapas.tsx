@@ -9,9 +9,9 @@ import { etiquetaEtapa, numeroOC, type FilaCompra } from "./def-compras";
 import { entero, usd } from "./calculos-compras";
 
 /** Las etapas que se miden, en el orden del flujo (Completado y Descartado son el final: no se mide cuánto se quedan). */
-const ETAPAS = ["cotizar", "enviado_cotizacion", "cotizado", "produccion", "tracking", "arribo_mercancia", "backlog"] as const;
+const ETAPAS = ["cotizar", "enviado_cotizacion", "cotizado", "produccion", "tracking", "arribo_mercancia", "en_bodega", "backlog"] as const;
 /** Las del recorrido normal, para sumar el ciclo de Cotizar a Arribo. */
-const RECORRIDO = ["cotizar", "enviado_cotizacion", "cotizado", "produccion", "tracking", "arribo_mercancia"];
+const RECORRIDO = ["cotizar", "enviado_cotizacion", "cotizado", "produccion", "tracking", "arribo_mercancia", "en_bodega"];
 /** Con menos estancias que estas, «9 de cada 10» no dice mucho y no se marca a nadie como «más de lo normal». */
 const MIN_MUESTRA = 3;
 /** Pospuesta no tiene un tiempo «normal»: ahí no se marca a nadie. */
@@ -36,7 +36,7 @@ export function TiempoEtapas({ compras, eventos, dia, vista }: { compras: FilaCo
     <section aria-labelledby="d-tiempo-etapas" className="min-w-0 rounded-[10px] border border-border bg-card">
       <CabeceraTarjeta id="d-tiempo-etapas" titulo="Tiempo en cada etapa">
         <span className="text-xs text-muted-foreground">
-          De Cotizar a Arribo: <b className="font-semibold text-foreground tabular-nums">{entero(ciclo)} días</b> (suma de medianas) · pulsa una etapa para ver sus compras
+          De Cotizar a En Bodega: <b className="font-semibold text-foreground tabular-nums">{entero(ciclo)} días</b> (suma de medianas) · pulsa una etapa para ver sus compras
         </span>
       </CabeceraTarjeta>
       <div className="overflow-x-auto">

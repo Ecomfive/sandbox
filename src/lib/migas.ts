@@ -211,6 +211,9 @@ export function construirMigas(
     return { migas, favoritoHref: null, moduloHref: "/ayuda", moduloEtiqueta: "Centro de ayuda" };
   }
 
+  // Una llegada de compras (el aviso de Llegada a Puerto o de En Bodega) no es un módulo del menú: la abre quien recibe el aviso o tiene Compras.
+  if (ruta.startsWith("/llegadas/")) return { migas: [{ etiqueta: "Compras" }, { etiqueta: "Llegada de compras" }], favoritoHref: null, moduloHref: null, moduloEtiqueta: null };
+
   const titulo = TITULOS_APARTE[ruta];
   if (titulo) {
     // "Sin acceso" no es un módulo: no hay permisos que mostrar.

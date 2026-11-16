@@ -13,6 +13,8 @@ import { UmbralesTipoCliente } from "./umbrales-tipo-cliente";
 import { ConexionEffi } from "./conexion-effi";
 import { AvisoInactividadConfig, type PersonaAviso } from "./aviso-inactividad";
 import { LideresTareasConfig, type PersonaLider } from "./lideres-tareas";
+import { AvisosComprasConfig } from "./avisos-compras";
+import type { EventoAviso } from "@/lib/compras/llegadas-avisos";
 import { llaveEffi } from "@/lib/effi/api";
 
 export const metadata = { title: "Configuración" };
@@ -30,7 +32,7 @@ export default async function ConfiguracionPage() {
   const consultarCuentas = (columnas: string) =>
     supabase.from("cuentas_retiro").select(columnas).eq("pais_id", pais.id).order("creado_en", { ascending: false });
 
-  const [{ data: paisPlataformas }, cuentasConBinance, { data: todosLosPaises }, { data: correlativos }, umbralesR, avisoR, lideresR] = await Promise.all([
+  const [{ data: paisPlataformas }, cuentasConBinance, { data: todosLosPaises }, { data: correlativos }, umbralesR, avisoR, lideresR, destinatariosR, personasComprasR] = await Promise.all([
     // `fulfillment` lo agrega la migración 0213 y `fulfillment_paga` la 0247: sin ellas, se repite sin esas columnas.
     supabase
       .from("pais_plataformas")
@@ -54,7 +56,13 @@ export default async function ConfiguracionPage() {
     supabase.from("perfiles").select("id, nombre, email, aviso_inactividad, roles(nombre)").eq("activo", true).order("nombre"),
     // Quién asigna tareas a otras personas además de los administradores (migración 0263). Sin ella, la sección no sale.
     supabase.from("perfiles").select("id, nombre, email, lider_tareas, roles(nombre)").eq("activo", true).order("nombre"),
+    // Quién recibe los avisos de Llegada a Puerto y En Bodega de Compras (migración 0304). Sin ella, la sección no sale.
+    supabase.from("compras_avisos_destinatarios").select("evento, perfil_id"),
+    supabase.from("perfiles").select("id, nombre, email, roles(nombre)").eq("activo", true).order("nombre"),
   ]);
+  const marcadosAvisosCompras: Record<EventoAviso, string[]> = { llegada_puerto: [], llegada_bodega: [] };
+  for (const d of (destinatariosR.data ?? []) as { evento: EventoAviso; perfil_id: string }[]) marcadosAvisosCompras[d.evento]?.push(d.perfil_id);
+  const personasAvisosCompras = ((personasComprasR.data ?? []) as unknown as { id: string; nombre: string | null; email: string; roles: { nombre: string } | null }[]).map((p) => ({ id: p.id, nombre: p.nombre || p.email, rol: p.roles?.nombre ?? null }));
   const personasLider: PersonaLider[] | null = lideresR.error
     ? null
     : ((lideresR.data ?? []) as unknown as { id: string; nombre: string | null; email: string; lider_tareas: boolean; roles: { nombre: string } | null }[])
@@ -131,6 +139,13 @@ export default async function ConfiguracionPage() {
         <div id="aviso-inactividad" className="flex flex-col gap-3">
           <h2 className="text-sm font-semibold tracking-tight">Aviso de inactividad</h2>
           <AvisoInactividadConfig personas={personasAviso} puedeEscribir={puedeEscribir} />
+        </div>
+      )}
+
+      {!destinatariosR.error && (
+        <div id="avisos-compras" className="flex flex-col gap-3">
+          <h2 className="text-sm font-semibold tracking-tight">Avisos de Compras</h2>
+          <AvisosComprasConfig personas={personasAvisosCompras} marcados={marcadosAvisosCompras} puedeEscribir={puedeEscribir} />
         </div>
       )}
 

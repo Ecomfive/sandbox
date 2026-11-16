@@ -9,7 +9,7 @@ import { obtenerOpcionesSkuMaestro } from "@/lib/wms/skus-maestros";
 import { LeyendaPedidos, NuevoPedido, TablaPedidos } from "./pedidos";
 
 /**
- * Las dos páginas de «Pedir a inventario» (16 nov 2026, migración 0304; prototipo aprobado https://claude.ai/artifact/ReVGwYZrBG11rmKFUT7V5T):
+ * Las dos páginas de «Pedir a inventario» (16 nov 2026, migración 0305; prototipo aprobado https://claude.ai/artifact/ReVGwYZrBG11rmKFUT7V5T):
  * los contadores por estado (filtran la tabla con `?estado=`), la tabla del Excel y la leyenda. Despacho además hace pedidos nuevos;
  * inventario ve lo que hay en la bodega de donde sale y envía.
  */
@@ -61,7 +61,7 @@ export async function PaginaPedidos({ modo, usuario, estado }: { modo: "despacho
       </EncabezadoPagina>
       {faltaMigracion ? (
         <p role="alert" className="m-0 rounded-lg border border-border bg-card px-4 py-3 text-sm text-destructive">
-          Falta correr en Supabase la migración 0304 («Pedir a inventario»).
+          Falta correr en Supabase la migración 0305 («Pedir a inventario»).
         </p>
       ) : (
         <>

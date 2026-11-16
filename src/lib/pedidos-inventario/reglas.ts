@@ -1,4 +1,4 @@
-// Pedir a inventario (16 nov 2026, migración 0304): despacho le pide a inventario lo que se le agotó. Reglas puras, con prueba.
+// Pedir a inventario (16 nov 2026, migración 0305): despacho le pide a inventario lo que se le agotó. Reglas puras, con prueba.
 
 import type { Tone } from "@/components/ui/badge";
 

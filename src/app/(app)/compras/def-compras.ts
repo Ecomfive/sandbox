@@ -172,9 +172,12 @@ export function diasDeCompra(c: Pick<FilaCompra, "creadoEn" | "cerradoEn">, ahor
  * Compras > Lista PA): del backlog a completado o descartado. Se quitaron las que el equipo no usa: «Solicitud Local»
  * (6 oct 2026: ninguna compra estaba ahí y no se usaba desde marzo de 2025) y, el 10 oct 2026, «Solicitud
  * Internacional» (solo se usa Cotizar), «Evaluación de Proveedor» y «Solicitud a Proveedor» (se hacen dentro de
- * Cotizado), «Compra y Pago» (ocurre durante el tracking) y «Aviso Logística» (solo se usa Arribo Mercancía). El resto
+ * Cotizado), «Compra y Pago» (ocurre durante el tracking) y «Aviso Logística» (solo se usa Llegada a Puerto, antes Arribo Mercancía). El resto
  * se renumeró; las claves guardadas son las mismas. El 11 nov 2026 (reunión con Alcides) entró «02 - Enviado a cotización»
- * (`enviado_cotizacion`, migración 0270): el momento en que Francis le manda la compra al proveedor; las de después se renumeraron. */
+ * (`enviado_cotizacion`, migración 0270): el momento en que Francis le manda la compra al proveedor; las de después se renumeraron. El 16 nov 2026 (pedido de
+ * Hernán) «Arribo Mercancía» pasó a llamarse «06 - Llegada a Puerto» (misma clave `arribo_mercancia`) y entró «07 - En Bodega» (`en_bodega`, migración 0304):
+ * Completado es solo cuando la mercancía ya está en bodega y el segundo pago está hecho. Pasar a Llegada a Puerto avisa a Logística y pasar a En Bodega avisa a
+ * quien paga (`src/lib/compras/llegadas-servidor.ts`). */
 export const ETAPAS_COMPRA = [
   { valor: "backlog", etiqueta: "Backlog - Pospuesto" },
   { valor: "cotizar", etiqueta: "01 - Cotizar" },
@@ -182,8 +185,9 @@ export const ETAPAS_COMPRA = [
   { valor: "cotizado", etiqueta: "03 - Cotizado" },
   { valor: "produccion", etiqueta: "04 - En Producción" },
   { valor: "tracking", etiqueta: "05 - Tracking" },
-  { valor: "arribo_mercancia", etiqueta: "06 - Arribo Mercancía" },
-  { valor: "completado", etiqueta: "07 - Completado" },
+  { valor: "arribo_mercancia", etiqueta: "06 - Llegada a Puerto" },
+  { valor: "en_bodega", etiqueta: "07 - En Bodega" },
+  { valor: "completado", etiqueta: "08 - Completado" },
   { valor: "descartado", etiqueta: "Descartado" },
 ] as const;
 
@@ -221,6 +225,7 @@ const ETAPA_COLOR: Record<string, string> = {
   tracking: "#8ed401",
   aviso_logistica: "#FF7FAB",
   arribo_mercancia: "#EA80FC",
+  en_bodega: "#26C6DA",
   completado: "#1bbc9c",
   descartado: "#e50000",
 };

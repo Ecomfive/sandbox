@@ -1,4 +1,4 @@
-// Pedir a inventario (16 nov 2026, migración 0304): lo que leen las dos pantallas. Despacho (Pedir a inventario) e inventario
+// Pedir a inventario (16 nov 2026, migración 0305): lo que leen las dos pantallas. Despacho (Pedir a inventario) e inventario
 // (Pedidos de despacho) ven la misma lista; cambian los botones. Por ahora solo Panamá: el destino es su bodega «Despacho…».
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -38,7 +38,7 @@ const uno = <T,>(r: T | T[] | null): T | null => (Array.isArray(r) ? (r[0] ?? nu
 
 /**
  * Los pedidos: todos los abiertos (Solicitud, En proceso, Enviado) y los cerrados de los últimos 30 días, el más nuevo arriba.
- * Si falta la migración 0304, `faltaMigracion`.
+ * Si falta la migración 0305, `faltaMigracion`.
  */
 export async function cargarPedidos(supabase: SupabaseClient): Promise<{ pedidos: PedidoInventario[]; faltaMigracion: boolean }> {
   const desde = new Date(Date.now() - 30 * 86_400_000).toISOString();

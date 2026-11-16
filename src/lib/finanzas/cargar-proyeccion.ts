@@ -57,7 +57,7 @@ import {
 export const SIN_MIGRACION_PROYECCION = "Falta correr la migración 0918 (proyección de caja) en Supabase.";
 
 /** Etapas de una compra ya hecha (lo anterior es cotizar: todavía no hay nada que pagar). */
-const ETAPAS_COMPROMETIDAS = ["compra_pago", "produccion", "tracking", "aviso_logistica", "arribo_mercancia"];
+const ETAPAS_COMPROMETIDAS = ["compra_pago", "produccion", "tracking", "aviso_logistica", "arribo_mercancia", "en_bodega"];
 
 export const CLAVES_CONFIG = ["caja_minima", "proyeccion_caja_inicial", "proyeccion_probabilidades"] as const;
 

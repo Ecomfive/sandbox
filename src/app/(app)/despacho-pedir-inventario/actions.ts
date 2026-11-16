@@ -9,14 +9,14 @@ import { puedeVerBodega } from "@/lib/seguridad/pais-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 import { numeroTraslado } from "@/lib/wms/traslado";
 
-// Pedir a inventario (16 nov 2026, migración 0304): despacho pide, inventario pone en proceso y envía (hace el traslado), despacho recibe.
+// Pedir a inventario (16 nov 2026, migración 0305): despacho pide, inventario pone en proceso y envía (hace el traslado), despacho recibe.
 // Cada acción revisa su permiso en el servidor y cambia el estado solo si el pedido sigue en el estado que corresponde (dos clics no hacen dos traslados).
 
 const MODULO_DESPACHO = "despacho-pedir-inventario";
 const MODULO_INVENTARIO = "inventario-pedidos-despacho";
 const RUTAS = ["/despacho-pedir-inventario", "/inventario-pedidos-despacho"];
 const ES_UUID = (v: unknown): v is string => typeof v === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
-const SIN_MIGRACION = "Falta correr en Supabase la migración 0304 («Pedir a inventario»).";
+const SIN_MIGRACION = "Falta correr en Supabase la migración 0305 («Pedir a inventario»).";
 const nombreDe = (u: UsuarioActual) => (u.nombre || u.email || "Alguien").trim();
 
 type Resultado = { ok: true; mensaje?: string } | { error: string };
@@ -44,7 +44,7 @@ async function avisar(supabase: Supa, a: (string | null | undefined)[], u: Usuar
     .insert(destinos.map((id) => ({ usuario_id: id, tipo: "tarea", titulo: aviso.titulo, texto: aviso.texto, href, autor_id: u.id, autor_nombre: nombreDe(u) })));
 }
 
-/** Quienes atienden los pedidos como permiso propio (Dinora, migración 0304); a los administradores no, para no llenarles la campana. */
+/** Quienes atienden los pedidos como permiso propio (Dinora, migración 0305); a los administradores no, para no llenarles la campana. */
 async function quienesAtienden(supabase: Supa): Promise<string[]> {
   const { data } = await supabase.from("permisos_persona").select("perfil_id").eq("modulo", MODULO_INVENTARIO).eq("nivel", "edicion");
   return ((data ?? []) as { perfil_id: string }[]).map((r) => r.perfil_id);
