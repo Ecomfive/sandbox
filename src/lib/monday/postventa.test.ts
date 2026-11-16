@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { casoDeItem, columnasPostventa, consultaPostventa, datosDeComentario, leerPaginaPostventa, montoDeTexto, numeroDeTexto, taparDatos, tiendaDeTexto, tiposDeTexto, type ItemPostventa } from "./postventa";
+import { casoDeItem, columnasPostventa, extrasDeItem, notaSinDatos, consultaPostventa, datosDeComentario, leerPaginaPostventa, montoDeTexto, numeroDeTexto, taparDatos, tiendaDeTexto, tiposDeTexto, type ItemPostventa } from "./postventa";
 
 // Textos como los del tablero «CAMBIOS Y REEMBOLSOS PANAMA» (14 nov 2026), con nombres y cuentas inventados.
 const item = (name: string, comentarios: string[], extra: Partial<ItemPostventa> = {}): ItemPostventa => ({
@@ -104,7 +104,37 @@ test("postventa: la consulta trae lo actualizado o lo creado hace poco; la prime
   assert.match(q, /operator: or/);
   assert.match(q, /"2026-11-12"/);
   assert.match(q, /"2026-09-15"/);
-  assert.match(q, /updates\(limit: 15\)/);
+  assert.match(q, /updates\(limit: 25\) \{ id created_at text_body creator \{ name \} \}/);
+});
+
+test("postventa: las otras columnas del tablero (0972) y las notas sin datos personales", () => {
+  const cols = columnasPostventa([
+    { id: "status", titulo: "Estado", tipo: "status" },
+    { id: "person", titulo: "Responsable", tipo: "people" },
+    { id: "date", titulo: "Fecha", tipo: "date" },
+    { id: "texto8", titulo: "Seguimiento", tipo: "text" },
+    { id: "texto_largo", titulo: "Cuenta Reembolso", tipo: "long_text" },
+    { id: "archivo", titulo: "Adjunto", tipo: "file" },
+    { id: "estado_152", titulo: "Notificar al cliente", tipo: "status" },
+    { id: "fecha", titulo: "Fecha Notificación", tipo: "date" },
+  ]);
+  assert.equal(cols.responsable, "person");
+  assert.equal(cols.fecha, "date");
+  assert.equal(cols.fechaNotificacion, "fecha");
+  assert.equal(cols.notificar, "estado_152");
+  assert.equal(cols.cuenta, "texto_largo");
+  const p = leerPaginaPostventa(
+    { data: { boards: [{ items_page: { cursor: null, items: [{ id: "7", name: "Nuvo: cambio #44510", group: { title: "Realizados" }, column_values: [{ id: "person", text: "Despacho" }, { id: "date", text: "2026-11-14" }, { id: "estado_152", text: "Notificar" }, { id: "archivo", text: "https://oferfly.monday.com/protected_static/1/a.jpg, http://otro.com/b" }], updates: [{ id: 55, creator: { name: "Asesora" }, created_at: "2026-11-14T10:00:00Z", text_body: "Hola" }] }] } }] } },
+    cols,
+  );
+  const x = extrasDeItem(p.items[0]);
+  assert.equal(x.responsable_texto, "Despacho");
+  assert.equal(x.fecha, "2026-11-14");
+  assert.equal(x.notificar, "Notificar");
+  assert.deepEqual(x.adjuntos, ["https://oferfly.monday.com/protected_static/1/a.jpg"]);
+  assert.equal(p.items[0].comentarios[0].id, "55");
+  assert.equal(p.items[0].comentarios[0].autor, "Asesora");
+  assert.equal(notaSinDatos("REEMBOLSAR: 26.49$\nNombre: Fulano Pérez\nBanco General\nN° cuenta: 04-69-98-134265-5\nMotivo: no funciona"), "REEMBOLSAR: 26.49$\nMotivo: no funciona");
 });
 
 test("postventa: lee la página de Monday y reconoce las columnas por su título", () => {

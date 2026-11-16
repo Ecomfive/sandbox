@@ -146,6 +146,7 @@ export const MIGRACIONES_CLAVE: { migracion: string; que: string; prueba: Prueba
   { migracion: "0969", que: "Tiempo de carga de cada página", prueba: { tipo: "tabla", nombre: "app_metricas" } },
   { migracion: "0970", que: "Despacho ciudad y Devoluciones: Monday dentro del sistema", prueba: { tipo: "tabla", nombre: "despacho_actividad" } },
   { migracion: "0971", que: "Despacho ciudad: archivar y restaurar una fila", prueba: { tipo: "columna", nombre: "mon_despachos", columna: "archivado_en" } },
+  { migracion: "0972", que: "Cambios y reembolsos: el tablero de Monday dentro del sistema", prueba: { tipo: "tabla", nombre: "postventa_actividad" } },
 ];
 
 /** Lo que se muestra de una prueba («Falta …»). */

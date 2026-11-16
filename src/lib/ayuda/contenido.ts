@@ -1839,6 +1839,27 @@ export const GUIAS: GuiaModulo[] = [
     ],
   },
   {
+    modulo: "despacho-cambios",
+    titulo: "Cambios y reembolsos",
+    ruta: "/despacho-cambios",
+    resumen: "Las solicitudes de cambio, reembolso, retiro y complemento de todas las tiendas, como el tablero «CAMBIOS Y REEMBOLSOS PANAMA» de Monday.",
+    secciones: [
+      {
+        titulo: "Uso",
+        pasos: [
+          "Tiene los tres grupos de Monday: Asuntos de Finanzas, Cambios/Retiros/Reembolsos/Complementos y Realizados, con las mismas columnas, etiquetas y colores. Arriba filtras por tienda y por tipo, y buscas por pedido, producto o responsable. Realizados muestra los últimos 60 días; «Todos los realizados» trae el resto.",
+          "«+ Nueva solicitud» abre el formulario: eliges la tienda y escribes el número de pedido (el sistema lo busca y trae sus productos), marcas qué hay que hacer (cambio, reembolso, retiro, complemento…), qué retirar, qué enviar, el monto, el motivo, el costo del envío y quién lo paga, el responsable y la fecha. A la derecha ves cómo queda, con el formato de siempre (SOLICITUD, RETIRAR, ENTREGAR, REEMBOLSAR, Motivo).",
+          "El Estado funciona como en Monday: Hecho pasa la solicitud a Realizados, Esperando Comprobante de Reembolso a Asuntos de Finanzas y Pagado Enviar al Cliente a Cambios/Retiros/…. Hecho pone «Notificar al cliente» en Notificar con la fecha de hoy. También se puede arrastrar una fila a otro grupo.",
+          "Avisos (campana): Asignado avisa al responsable; Hecho avisa a quien creó la solicitud (reembolso: mandar el comprobante al cliente; cambio: avisarle). Cada mañana, lo que sigue en Asignado con la fecha para mañana o antes pasa a Estancado, y lo que sigue en Notificar desde ayer pasa a Estancado, con su aviso.",
+          "Despacho ciudad: un cambio, retiro o complemento se programa con «Programar en Despacho ciudad» (o al crearlo, marcando la casilla). Se crea la fila del reparto con forma de pago CAMBIO, RETIRO o COMPLEMENTO; si el envío lo paga el cliente, va como por cobrar. Cuando el repartidor la marca ENTREGADO, la solicitud pasa a Hecho sola.",
+          "Datos para el reembolso (titular, banco, cuenta): solo los ven y escriben quienes tienen el permiso «Cambios y reembolsos: datos para reembolsar» (Admin y CEO; se le da a Finanzas en Usuarios y roles). Se borran solos al pasar la solicitud a Hecho.",
+          "«Abrir» muestra la solicitud, el adjunto (subir foto o PDF, como el comprobante), las actualizaciones (también las que se escribieron en Monday, sin datos personales) y el registro de quién cambió qué. Una solicitud que sobra no se borra: «Archivar solicitud»; se ve en «Archivados» y se puede restaurar.",
+          "Lo que se anotaba en Monday sigue llegando mientras se use; una solicitud que ya se cambió en el sistema no la vuelve a pisar Monday.",
+        ],
+      },
+    ],
+  },
+  {
     modulo: "tienda-logistica",
     titulo: "Logística de tienda",
     ruta: "/tienda-logistica",
@@ -2066,6 +2087,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-11-16", titulo: "Nuevo: Cambios y reembolsos, sin Monday", texto: "El tablero «CAMBIOS Y REEMBOLSOS» de Monday ya está en el sistema, en Gestión de tienda › Operación: los mismos grupos, columnas, etiquetas y colores, y sus automatizaciones (el Estado mueve de grupo, Notificar al cliente y los avisos). Las solicitudes nuevas se crean con un formulario que trae los productos del pedido y escribe el texto de siempre; los cambios, retiros y complementos se programan en Despacho ciudad y pasan a Hecho al entregarse. Los datos bancarios para reembolsar solo los ve Finanzas y se borran al terminar.", modulo: "despacho-cambios", href: "/despacho-cambios" },
   { fecha: "2026-11-16", titulo: "Despacho ciudad y Devoluciones: archivar una fila", texto: "Una fila creada por error o que sobra ya se puede archivar: ábrela y usa «Archivar fila». Sale del tablero y deja de contar en el pedido y en Cobros, pero no se borra: está en «Archivados» y se puede restaurar.", modulo: "despacho-ciudad", href: "/despacho-ciudad" },
   { fecha: "2026-11-15", titulo: "Nuevo: Despacho ciudad y Devoluciones, sin Monday", texto: "Las entregas de ciudad y las devoluciones ya se llevan en el sistema, en Gestión de tienda › Operación: «Despacho ciudad» (por día y por repartidor, con el consolidado) y «Devoluciones» (por tienda). Funcionan como Monday: las mismas columnas, etiquetas y colores, grupos que se abren y se cierran, arrastrar filas a otro día o grupo, sumas al pie, comentarios, comprobantes y la regla de DESINTEGRADO. Lo que se anota actualiza el pedido igual que antes Monday. Monday queda de respaldo mientras dure el cambio.", modulo: "despacho-ciudad", href: "/despacho-ciudad" },
   { fecha: "2026-11-14", titulo: "Variantes: repartir el stock solo en las bodegas que quieras", texto: "Al repartir el stock general de un producto entre sus variantes ya no hace falta repartir todas las bodegas: escribe cuántas unidades van a cada variante solo en la bodega que quieras (o solo una parte) y guarda. Lo que no repartiste sigue como stock general, y el producto queda «sin repartir» hasta que no le quede stock en ninguna bodega.", modulo: "producto", href: "/producto" },

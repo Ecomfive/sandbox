@@ -83,7 +83,7 @@ export function casoDeFila(x: Record<string, unknown>): CasoPedido {
 export async function postventaDeOrdenes(supabase: SupabaseClient, ids: string[]): Promise<Map<string, CasoPedido[]>> {
   const mapa = new Map<string, CasoPedido[]>();
   for (let i = 0; i < ids.length; i += 200) {
-    const { data, error } = await supabase.from("mon_postventa").select(COLUMNAS).in("orden_id", ids.slice(i, i + 200)).order("creado_monday", { ascending: false });
+    const { data, error } = await supabase.from("mon_postventa").select(COLUMNAS).in("orden_id", ids.slice(i, i + 200)).is("archivado_en", null).order("creado_monday", { ascending: false });
     if (error) return mapa;
     for (const x of (data ?? []) as Record<string, unknown>[]) {
       const id = String(x.orden_id);
@@ -104,7 +104,7 @@ export async function postventaDePedidos(supabase: SupabaseClient, ids: string[]
   const quiero = new Set(ids);
   const mapa = new Map<string, CasoPedido[]>();
   for (let d = 0; d < 20_000; d += 1000) {
-    const { data, error } = await supabase.from("mon_postventa").select(COLUMNAS).not("orden_id", "is", null).order("creado_monday", { ascending: false }).range(d, d + 999);
+    const { data, error } = await supabase.from("mon_postventa").select(COLUMNAS).not("orden_id", "is", null).is("archivado_en", null).order("creado_monday", { ascending: false }).range(d, d + 999);
     if (error) return mapa;
     for (const x of (data ?? []) as Record<string, unknown>[]) {
       const id = String(x.orden_id);

@@ -6,6 +6,7 @@ import { enviarCorreo } from "@/lib/notificaciones/correo";
 import { activarTareasDeLlegada, avisarTareasDeHoy } from "@/lib/crm/tareas-servidor";
 import { correrSecuenciaAlta } from "@/lib/crm/secuencia-alta-servidor";
 import { avisarTareasPublicacionesDeHoy } from "@/lib/publicaciones/tareas-aviso-servidor";
+import { correrReglasDelDia } from "@/lib/postventa/servidor";
 
 const SITIO = "https://mom-beta-proveduria.vercel.app";
 
@@ -32,6 +33,8 @@ export async function GET(request: Request) {
   await avisarTareasDeHoy(supabase);
   // Gestión de IDs Dropi (8 nov 2026): a cada persona de una tarea que vence hoy, su aviso en la campana.
   await avisarTareasPublicacionesDeHoy(supabase);
+  // Cambios y reembolsos (16 nov 2026): las reglas de cada mañana de Monday (Asignado con la fecha encima o Notificar sin hacer → Estancado y aviso).
+  await correrReglasDelDia(supabase).catch(() => 0);
 
   const { data: paises } = await supabase.from("paises").select("id, codigo, nombre").order("nombre");
 
