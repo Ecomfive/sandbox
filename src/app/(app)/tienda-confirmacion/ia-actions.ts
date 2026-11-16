@@ -80,6 +80,8 @@ export async function guardarInstrucciones(texto: string): Promise<Resultado> {
 
 export interface EjemploDireccion {
   id: string;
+  /** La ciudad o el corregimiento que puso el cliente. */
+  ciudad: string | null;
   direccion: string;
   completa: boolean;
   falta: string | null;
@@ -93,6 +95,7 @@ export interface EjemploDireccion {
 }
 
 export interface DatosEjemplo {
+  ciudad: string;
   direccion: string;
   completa: boolean;
   falta?: string | null;
@@ -101,7 +104,10 @@ export interface DatosEjemplo {
 }
 
 /** Valida lo que manda el navegador y lo deja listo para guardar (la tienda debe ser del país y de las que la persona ve). */
-async function leerEjemplo(d: DatosEjemplo, distingueZona: boolean, tiendasOk: string[]): Promise<{ fila: { direccion: string; completa: boolean; falta: string | null; zona: Zona | null; tienda_id: string | null } } | { error: string }> {
+async function leerEjemplo(d: DatosEjemplo, distingueZona: boolean, tiendasOk: string[]): Promise<{ fila: { ciudad: string; direccion: string; completa: boolean; falta: string | null; zona: Zona | null; tienda_id: string | null } } | { error: string }> {
+  const ciudad = String(d?.ciudad ?? "").replace(/\s+/g, " ").trim();
+  if (ciudad.length < 2) return { error: "Escribe la ciudad o el corregimiento: es lo más importante para saber de dónde es." };
+  if (ciudad.length > 120) return { error: "La ciudad o el corregimiento es muy largo (hasta 120 letras)." };
   const direccion = String(d?.direccion ?? "").replace(/\s+/g, " ").trim();
   if (direccion.length < 5) return { error: "Escribe la dirección completa tal como la dejó el cliente." };
   if (direccion.length > 600) return { error: "La dirección es muy larga (hasta 600 letras)." };
@@ -111,7 +117,7 @@ async function leerEjemplo(d: DatosEjemplo, distingueZona: boolean, tiendasOk: s
   const zona = distingueZona && d.zona && (ZONAS as string[]).includes(d.zona) ? d.zona : null;
   const tienda = d.tiendaId ? String(d.tiendaId) : null;
   if (tienda && (!UUID.test(tienda) || !tiendasOk.includes(tienda))) return { error: "Esa tienda no es de este país o no tienes acceso a ella." };
-  return { fila: { direccion, completa: d.completa, falta, zona, tienda_id: tienda } };
+  return { fila: { ciudad, direccion, completa: d.completa, falta, zona, tienda_id: tienda } };
 }
 
 /** Las últimas direcciones de ejemplo agregadas (de las tiendas que la persona ve y las generales del país), del más nuevo al más viejo. `solo: "mios"` deja las que agregó ella. */
@@ -120,7 +126,7 @@ export async function listarEjemplos(solo: "todos" | "mios" = "todos", limite = 
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
   const { tiendas, limitado } = await tiendasVisibles(supabase, pais.id);
-  let q = supabase.from("confirmacion_ia_ejemplos").select("id, direccion, completa, falta, zona, tienda_id, creado_por, creado_por_nombre, creado_en", { count: "exact" }).eq("pais_id", pais.id);
+  let q = supabase.from("confirmacion_ia_ejemplos").select("id, ciudad, direccion, completa, falta, zona, tienda_id, creado_por, creado_por_nombre, creado_en", { count: "exact" }).eq("pais_id", pais.id);
   if (limitado) q = tiendas.length ? q.in("tienda_id", tiendas.map((t) => t.id)) : q.eq("tienda_id", "00000000-0000-0000-0000-000000000000");
   if (solo === "mios") q = q.eq("creado_por", usuario.id);
   const { data, count, error } = await q.order("creado_en", { ascending: false }).limit(Math.min(Math.max(1, limite), 100));
@@ -130,6 +136,7 @@ export async function listarEjemplos(solo: "todos" | "mios" = "todos", limite = 
     total: count ?? (data ?? []).length,
     ejemplos: (data ?? []).map((e) => ({
       id: e.id as string,
+      ciudad: (e.ciudad as string | null) ?? null,
       direccion: e.direccion as string,
       completa: e.completa === true,
       falta: (e.falta as string | null) ?? null,
@@ -166,7 +173,7 @@ export async function agregarEjemplo(d: DatosEjemplo): Promise<Resultado> {
   const l = await leerEjemplo(d, config.distingueZona, tiendas.map((t) => t.id));
   if ("error" in l) return l;
   const { error } = await supabase.from("confirmacion_ia_ejemplos").insert({ ...l.fila, pais_id: pais.id, creado_por: usuario.id, creado_por_nombre: nombreDe(usuario) });
-  if (error) return { error: "No se pudo guardar la dirección." };
+  if (error) return { error: /ciudad|schema cache/i.test(error.message) ? "Falta correr la migración 0301 (ciudad o corregimiento de los ejemplos) en Supabase." : "No se pudo guardar la dirección." };
   await registrarAuditoria({ accion: "agregar_ejemplo_confirmacion_ia", entidad: "paises", entidadId: pais.id, detalle: `${pais.nombre}: dirección ${l.fila.completa ? "completa" : "incompleta"} de ejemplo` });
   revalidatePath("/tienda-confirmacion/ejemplos");
   return {};
@@ -192,7 +199,7 @@ export async function editarEjemplo(id: string, d: DatosEjemplo): Promise<Result
   const l = await leerEjemplo(d, config.distingueZona, ctx.tiendas.map((t) => t.id));
   if ("error" in l) return l;
   const { error } = await ctx.supabase.from("confirmacion_ia_ejemplos").update(l.fila).eq("id", id);
-  if (error) return { error: "No se pudo guardar." };
+  if (error) return { error: /ciudad|schema cache/i.test(error.message) ? "Falta correr la migración 0301 (ciudad o corregimiento de los ejemplos) en Supabase." : "No se pudo guardar." };
   await registrarAuditoria({ accion: "editar_ejemplo_confirmacion_ia", entidad: "paises", entidadId: ctx.pais.id, detalle: `${ctx.pais.nombre}: cambió una dirección de ejemplo` });
   revalidatePath("/tienda-confirmacion/ejemplos");
   return {};
@@ -318,18 +325,19 @@ export async function probarDireccion(direccion: string, ciudad: string, tiendaI
   await requireModuloEscritura(MODULO);
   const texto = String(direccion ?? "").replace(/\s+/g, " ").trim();
   if (texto.length < 3) return { error: "Escribe la dirección que quieres probar." };
+  if (String(ciudad ?? "").trim().length < 2) return { error: "Escribe la ciudad o el corregimiento: es lo más importante para saber de dónde es." };
   if (texto.length > 600) return { error: "La dirección es muy larga (hasta 600 letras)." };
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
   const [{ config, faltaMigracion }, { tiendas }] = await Promise.all([cargarConfig(supabase, pais.id), tiendasVisibles(supabase, pais.id)]);
   if (faltaMigracion) return { error: SIN_MIGRACION_CONFIRMACION };
   const tienda = tiendaId && UUID.test(tiendaId) && tiendas.some((t) => t.id === tiendaId) ? tiendaId : null;
-  const r = await evaluarDireccion(supabase, { paisId: pais.id, paisNombre: pais.nombre, tiendaId: tienda, numero: null, direccion: texto, ciudad: String(ciudad ?? "").trim().slice(0, 120) || null, config });
+  const r = await evaluarDireccion(supabase, { paisId: pais.id, paisNombre: pais.nombre, paisCodigo: pais.codigo, tiendaId: tienda, numero: null, direccion: texto, ciudad: String(ciudad ?? "").trim().slice(0, 120) || null, config });
   return { combinado: r.combinado, modelos: r.modelos, palabras: r.coinc.map((p) => ({ texto: p.texto, resultado: p.resultado })), etiqueta: r.combinado.estado === "listo" ? etiquetaDeZona(r.combinado.zona, config) : null };
 }
 
 /** Guarda la dirección de un análisis como ejemplo (con lo correcto: completa o incompleta y su zona), para que la IA aprenda de lo que el equipo corrige. */
-export async function guardarAnalisisComoEjemplo(analisisId: string, d: { completa: boolean; falta?: string | null; zona?: Zona | null }): Promise<Resultado> {
+export async function guardarAnalisisComoEjemplo(analisisId: string, d: { ciudad: string; completa: boolean; falta?: string | null; zona?: Zona | null }): Promise<Resultado> {
   const usuario = await requireModuloEscritura(MODULO);
   if (!UUID.test(String(analisisId))) return { error: "Análisis no válido." };
   const supabase = createServiceClient();
@@ -338,8 +346,7 @@ export async function guardarAnalisisComoEjemplo(analisisId: string, d: { comple
   if (!a?.direccion) return { error: "Ese análisis no tiene dirección." };
   const [{ config }, { tiendas, limitado }] = await Promise.all([cargarConfig(supabase, pais.id), tiendasVisibles(supabase, pais.id)]);
   if (limitado && !tiendas.some((t) => t.id === a.tienda_id)) return { error: "Ese pedido no es de las tiendas que ves." };
-  const texto = `${a.direccion as string}${a.ciudad ? `, ${a.ciudad as string}` : ""}`;
-  const l = await leerEjemplo({ direccion: texto, completa: d.completa, falta: d.falta, zona: d.zona, tiendaId: (a.tienda_id as string | null) ?? null }, config.distingueZona, tiendas.map((t) => t.id));
+  const l = await leerEjemplo({ ciudad: d.ciudad, direccion: a.direccion as string, completa: d.completa, falta: d.falta, zona: d.zona, tiendaId: (a.tienda_id as string | null) ?? null }, config.distingueZona, tiendas.map((t) => t.id));
   if ("error" in l) return l;
   const { error } = await supabase.from("confirmacion_ia_ejemplos").insert({ ...l.fila, pais_id: pais.id, creado_por: usuario.id, creado_por_nombre: nombreDe(usuario) });
   if (error) return { error: "No se pudo guardar." };

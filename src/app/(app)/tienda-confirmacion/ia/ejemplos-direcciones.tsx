@@ -30,9 +30,10 @@ function FormularioEjemplo({
   /** La persona ve solo algunas tiendas: tiene que elegir una (no hay «todas»). */
   tiendaObligatoria: boolean;
   etiquetaBoton: string;
-  alGuardar: (d: { direccion: string; completa: boolean; falta: string | null; zona: Zona | null; tiendaId: string | null }) => Promise<string | null>;
+  alGuardar: (d: { ciudad: string; direccion: string; completa: boolean; falta: string | null; zona: Zona | null; tiendaId: string | null }) => Promise<string | null>;
   alCancelar?: () => void;
 }) {
+  const [ciudad, setCiudad] = useState(inicial?.ciudad ?? "");
   const [direccion, setDireccion] = useState(inicial?.direccion ?? "");
   const [completa, setCompleta] = useState(inicial?.completa ?? true);
   const [falta, setFalta] = useState(inicial?.falta ?? "");
@@ -41,7 +42,7 @@ function FormularioEjemplo({
   const [error, setError] = useState<string | null>(null);
   const [pendiente, empezar] = useTransition();
   const id = inicial?.id ?? "nuevo";
-  const lista = direccion.trim().length >= 5 && (completa || falta.trim().length > 0) && (!tiendaObligatoria || !!tiendaId);
+  const lista = ciudad.trim().length >= 2 && direccion.trim().length >= 5 && (completa || falta.trim().length > 0) && (!tiendaObligatoria || !!tiendaId);
 
   return (
     <form
@@ -50,9 +51,10 @@ function FormularioEjemplo({
         e.preventDefault();
         setError(null);
         empezar(async () => {
-          const r = await alGuardar({ direccion, completa, falta: completa ? null : falta, zona: completa && distingueZona ? zona || null : null, tiendaId: tiendaId || null });
+          const r = await alGuardar({ ciudad, direccion, completa, falta: completa ? null : falta, zona: completa && distingueZona ? zona || null : null, tiendaId: tiendaId || null });
           if (r) setError(r);
           else if (!inicial) {
+            setCiudad("");
             setDireccion("");
             setFalta("");
             setZona("");
@@ -61,8 +63,13 @@ function FormularioEjemplo({
         });
       }}
     >
+      <label className="flex flex-col gap-1 sm:max-w-sm">
+        <span className={labelClass}>Ciudad o corregimiento *</span>
+        <input value={ciudad} required maxLength={120} onChange={(e) => setCiudad(e.target.value)} placeholder="Ej: Bella Vista, Colón, Arraiján" className={fieldClass} />
+        <span className="text-xs text-muted-foreground">Lo que el cliente puso en ese campo: es lo primero que mira la IA.</span>
+      </label>
       <label className="flex flex-col gap-1">
-        <span className={labelClass}>Dirección, tal como la dejó el cliente</span>
+        <span className={labelClass}>Dirección, tal como la dejó el cliente *</span>
         <textarea
           rows={3}
           maxLength={600}
@@ -254,7 +261,10 @@ export function EjemplosDirecciones({
                     />
                   ) : (
                     <>
-                      <p className="m-0 text-sm">{e.direccion}</p>
+                      <p className="m-0 text-sm">
+                        {e.ciudad && <b>{e.ciudad} · </b>}
+                        {e.direccion}
+                      </p>
                       <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                         <Pastilla tono={e.completa ? "exito" : "aviso"}>{e.completa ? "Completa" : "Incompleta"}</Pastilla>
                         {!e.completa && e.falta && <span>Falta {e.falta}</span>}
