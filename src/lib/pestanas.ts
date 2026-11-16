@@ -185,6 +185,7 @@ export const PESTANAS_POR_MODULO: Record<string, Pestana[]> = {
     { etiqueta: "Movimientos", href: "/libro-movimientos" },
     { etiqueta: "Por clasificar", href: "/libro-movimientos/pendientes" },
     { etiqueta: "Reglas", href: "/libro-movimientos/reglas" },
+    { etiqueta: "Recurrentes", href: "/libro-movimientos/recurrentes" },
     { etiqueta: "Revisar", href: "/libro-movimientos/revisar" },
     { etiqueta: "Proveedores", href: "/libro-movimientos/proveedores" },
     { etiqueta: "Salud de datos", href: "/libro-movimientos/salud" },

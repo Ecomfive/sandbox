@@ -14,7 +14,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
 import { ActualizarIcon, CalendarioIcon, CerrarIcon, CheckIcon, ExtractoIcon, FlechaAbajoIcon, FlechaArribaIcon, GastoIcon, PapeleraIcon, TiendaIcon } from "@/lib/nav-icons";
 import type { Opcion } from "@/lib/finanzas/cargar-pendientes";
-import { ORIGEN_MANUAL, ORIGEN_PEGADO, ORIGENES_ELIMINABLES } from "@/lib/finanzas/movimiento-manual";
+import { ORIGEN_MANUAL, ORIGEN_PEGADO, ORIGEN_RECURRENTE, ORIGENES_ELIMINABLES } from "@/lib/finanzas/movimiento-manual";
 import type { FilaMovimiento } from "./def-movimientos";
 import { actualizarMovimiento, eliminarMovimiento, obtenerHistorialMovimiento } from "./movimiento-actions";
 import { anularMovimiento, restaurarMovimiento } from "./calidad-actions";
@@ -54,7 +54,7 @@ const desde = (m: FilaMovimiento): Formulario => ({
   ruc: m.ruc ?? "",
 });
 
-const etiquetaOrigen = (origen: string) => (origen === ORIGEN_MANUAL ? "Cargado a mano" : origen === ORIGEN_PEGADO ? "Pegado desde Excel" : origen);
+const etiquetaOrigen = (origen: string) => (origen === ORIGEN_MANUAL ? "Cargado a mano" : origen === ORIGEN_PEGADO ? "Pegado desde Excel" : origen === ORIGEN_RECURRENTE ? "Recurrente (lo creó su plantilla)" : origen);
 
 /** Botón de la cabecera para pasar al movimiento anterior o siguiente (apagado con `aria-disabled` para no soltar el foco). */
 function BotonNavegar({ texto, icono: Icono, activo, alHacerClic }: { texto: string; icono: typeof FlechaArribaIcon; activo: boolean; alHacerClic: () => void }) {

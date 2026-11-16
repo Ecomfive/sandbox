@@ -130,6 +130,7 @@ const SUBPAGINAS: Record<string, string> = {
   "/costos-mercancia/importar": "Importar Excel",
   "/libro-movimientos/pendientes": "Por clasificar",
   "/libro-movimientos/reglas": "Reglas",
+  "/libro-movimientos/recurrentes": "Recurrentes",
   "/libro-movimientos/revisar": "Revisar",
   "/libro-movimientos/proveedores": "Proveedores",
   "/libro-movimientos/salud": "Salud de datos",

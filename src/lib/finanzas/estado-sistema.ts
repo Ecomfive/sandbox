@@ -148,6 +148,7 @@ export const MIGRACIONES_CLAVE: { migracion: string; que: string; prueba: Prueba
   { migracion: "0971", que: "Despacho ciudad: archivar y restaurar una fila", prueba: { tipo: "columna", nombre: "mon_despachos", columna: "archivado_en" } },
   { migracion: "0972", que: "Cambios y reembolsos: el tablero de Monday dentro del sistema", prueba: { tipo: "tabla", nombre: "postventa_actividad" } },
   { migracion: "0980", que: "Alertas de desvío contra el presupuesto y de gastos fuera de lo normal", prueba: { tipo: "check", nombre: "fin_alertas_tipo_check", valor: "gasto_anomalo" } },
+  { migracion: "0981", que: "Movimientos recurrentes del libro (plantillas que se registran solas cada mes)", prueba: { tipo: "tabla", nombre: "fin_recurrentes" } },
 ];
 
 /** Lo que se muestra de una prueba («Falta …»). */

@@ -23,6 +23,7 @@ import { cargarPresupuestoVigente, cargarRealPorUnidad } from "../finanzas/carga
 import { serieDeLineas } from "../finanzas/presupuesto";
 import { ANOMALIA_VENTANA, desviosPresupuesto, gastosAnomalos, mesesAntes } from "../finanzas/desvios";
 import type { Seccion } from "../finanzas/eerr";
+import { generarRecurrentes, textoRecurrentes } from "../finanzas/recurrentes-servidor";
 import { alertasDePosicion, cargarPosicion } from "../finanzas/cargar-tesoreria";
 import { cargarBaseCovenants, cargarBaseDeuda, cargarCovenants, cargarOfertas } from "../finanzas/cargar-deuda-avanzada";
 import { alertaCovenant, contratosCovenant, evaluarCovenants, nombreContrato } from "../finanzas/escenarios-deuda";
@@ -103,12 +104,15 @@ async function tareaConciliacion(c: Contexto): Promise<Resultado> {
 // (b) Checklist del cierre del mes anterior y del actual
 // ---------------------------------------------------------------------------------------------
 async function tareaCierre(c: Contexto): Promise<Resultado> {
+  // Primero los movimientos recurrentes del mes (migración 0981): así el checklist ya los cuenta.
+  const g = await generarRecurrentes(c.supabase, c.hoy);
+  const rec = "error" in g ? `Recurrentes: ${g.error}` : textoRecurrentes(g);
   const actual = `${c.hoy.slice(0, 7)}-01`;
   const meses = [mesAnterior(actual), actual];
   const { data: cierres, error } = await c.supabase.from("fin_cierres").select("id, periodo, estado").in("periodo", meses);
   if (error) throw new Error("Falta correr la migración 0914 (cierre de mes) en Supabase.");
   const abiertos = meses.filter((m) => (cierres ?? []).find((x) => String(x.periodo).slice(0, 10) === m)?.estado !== "cerrado");
-  if (!abiertos.length) return { resumen: "Los dos meses están cerrados: no se tocan." };
+  if (!abiertos.length) return { resumen: `${rec} Los dos meses están cerrados: no se tocan.` };
   const [datos, { config }] = await Promise.all([cargarDatosMeses(c.supabase, abiertos), cargarConfigCierre(c.supabase)]);
   const partes: string[] = [];
   for (const m of abiertos) {
@@ -144,7 +148,7 @@ async function tareaCierre(c: Contexto): Promise<Resultado> {
     const av = await avisarTareasCierre(c.supabase, { id: cierre.id, periodo: m }, tareas, c.hoy, config);
     partes.push(`${nombreMes(m)}: ${listas} de ${tareas.length} en verde${av.atrasadas ? `, ${av.atrasadas} atrasadas` : ""}${av.avisos ? `, ${av.avisos} avisos` : ""}`);
   }
-  return { resumen: partes.join(" · ") || "Nada que evaluar." };
+  return { resumen: [rec, ...partes].join(" · ") || "Nada que evaluar." };
 }
 
 // ---------------------------------------------------------------------------------------------

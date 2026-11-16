@@ -8,8 +8,11 @@ import { claveCatalogo, leerLibro, leerPeriodo, ubicarColumnas, UNIDAD_SIN_ASIGN
 export const ORIGEN_PEGADO = "pegado";
 /** Lo que se crea con «Agregar». */
 export const ORIGEN_MANUAL = "manual";
-/** Solo estos se pueden eliminar: lo importado de un archivo se corrige o se saca del EERR, no se borra. */
-export const ORIGENES_ELIMINABLES = [ORIGEN_MANUAL, ORIGEN_PEGADO];
+/** Lo que crea una plantilla recurrente (migración 0981). Igual a `ORIGEN_RECURRENTE` de `recurrentes.ts`. */
+export const ORIGEN_RECURRENTE = "recurrente";
+/** Solo estos se pueden eliminar: lo importado de un archivo se corrige o se saca del EERR, no se borra. Un recurrente
+ *  borrado no vuelve (la plantilla ya pasó ese mes). */
+export const ORIGENES_ELIMINABLES = [ORIGEN_MANUAL, ORIGEN_PEGADO, ORIGEN_RECURRENTE];
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
