@@ -28,6 +28,8 @@ export interface FilaTablero {
   turno: string | null;
   comentario: string | null;
   comprobantes: number;
+  /** Los comprobantes tal como están guardados (enlace de Monday o `storage:<ruta>`), para verlos en el sistema. */
+  archivos: string[];
   estadoAsesores: string | null;
   obsAsesores: string | null;
   /** El día (ciudad, AAAA-MM-DD) o el grupo (devoluciones). */
@@ -63,6 +65,7 @@ function aFila(r: Record<string, unknown>, clase: Clase): FilaTablero {
     turno: etiquetaLimpia("turno", r.turno as string | null),
     comentario: (r.comentario as string | null) ?? null,
     comprobantes: Array.isArray(r.comprobantes) ? r.comprobantes.length : 0,
+    archivos: Array.isArray(r.comprobantes) ? (r.comprobantes as string[]) : [],
     estadoAsesores: etiquetaLimpia("estado_asesores", r.estado_asesores as string | null),
     obsAsesores: (r.observaciones_asesores as string | null) ?? null,
     dia,

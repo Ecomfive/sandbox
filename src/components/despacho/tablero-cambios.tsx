@@ -21,6 +21,7 @@ import type { FilaCaso, Persona } from "@/lib/postventa/datos";
 import { colorDe, ESTADOS, grupoPorEstado, GRUPOS, NOTIFICAR, TIENDAS, TIPOS, type Etiqueta } from "@/lib/postventa/reglas";
 import { textoSobre } from "@/lib/despacho/etiquetas";
 import { formatearTiempoRelativo } from "@/lib/formato";
+import { VisorArchivos } from "./visor-archivos";
 
 type Pill = "tienda" | "tipo" | "responsable" | "estado" | "notificar";
 type Celda = "nombre" | "seguimiento" | "valor_envio" | "reembolso" | "fecha" | "fecha_notificacion";
@@ -452,16 +453,7 @@ function PanelCaso({ fila, puedeEscribir, puedeArchivar, archivada, alCerrar }: 
           Adjunto
         </h3>
         {detalle?.adjuntos.length ? (
-          <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
-            {detalle.adjuntos.map((a, i) => (
-              <li key={a.url}>
-                <a href={a.url} target="_blank" rel="noreferrer" className="text-sm font-medium text-primario underline underline-offset-2">
-                  Adjunto {i + 1}
-                  {a.enMonday ? " (en Monday)" : ""} ↗
-                </a>
-              </li>
-            ))}
-          </ul>
+          <VisorArchivos archivos={detalle.adjuntos} titulo="Adjunto" />
         ) : (
           <p className="m-0 text-xs text-muted-foreground">{detalle ? "Sin adjunto." : "Cargando…"}</p>
         )}

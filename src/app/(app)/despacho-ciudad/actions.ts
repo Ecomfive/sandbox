@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireModulo, requireModuloEscritura, type UsuarioActual } from "@/lib/auth";
 import { esColumnaEtiqueta, ETIQUETAS, GRUPOS_DEVOLUCION, grupoPorAsesores, type Columna } from "@/lib/despacho/etiquetas";
 import { enlazarOrden, esDesintegrado, grupoDeEstado, leerReglasEstado, unidadDeTexto, variantesPedido, type OrdenCandidata } from "@/lib/monday/columnas";
+import { archivosVisibles, copiarPendientes, type ArchivoVisible } from "@/lib/monday/comprobantes";
 import { hechoDesdeDespacho } from "@/lib/postventa/servidor";
 import { createServiceClient } from "@/lib/supabase/server";
 import { actualizarEntregas } from "@/lib/tienda/actualizar-entregas";
@@ -267,10 +268,13 @@ export async function subirComprobante(itemId: string, datos: FormData): Promise
 export interface DetalleFila {
   notas: { id: string; texto: string; autor: string; cuando: string }[];
   actividad: { id: string; texto: string; autor: string; cuando: string }[];
-  comprobantes: { url: string; enMonday: boolean }[];
+  comprobantes: ArchivoVisible[];
 }
 
-/** Lo que muestra el panel de una fila: actualizaciones, actividad y comprobantes (los del sistema con un enlace que vence en 10 minutos). */
+/**
+ * Lo que muestra el panel de una fila: actualizaciones, actividad y comprobantes, listos para verse en el sistema (los de Monday, con su copia o con
+ * el enlace temporal de Monday; los que aún no tienen copia se copian después de responder).
+ */
 export async function detalleFila(itemId: string): Promise<DetalleFila | { error: string }> {
   if (!esItem(itemId)) return { error: "Fila no válida." };
   const supabase = createServiceClient();
@@ -281,13 +285,8 @@ export async function detalleFila(itemId: string): Promise<DetalleFila | { error
     supabase.from("despacho_notas").select("id, texto, autor_nombre, creado_en").eq("item_id", itemId).order("creado_en", { ascending: false }).limit(100),
     supabase.from("despacho_actividad").select("id, texto, autor_nombre, creado_en").eq("item_id", itemId).order("creado_en", { ascending: false }).limit(100),
   ]);
-  const comprobantes: DetalleFila["comprobantes"] = [];
-  for (const c of (fila.comprobantes as string[] | null) ?? []) {
-    if (c.startsWith("storage:")) {
-      const { data } = await supabase.storage.from(BUCKET).createSignedUrl(c.slice(8), 600);
-      if (data?.signedUrl) comprobantes.push({ url: data.signedUrl, enMonday: false });
-    } else if (/^https:\/\/[a-z0-9-]+\.monday\.com\//.test(c)) comprobantes.push({ url: c, enMonday: true });
-  }
+  const { archivos: comprobantes, porCopiar } = await archivosVisibles(supabase, (fila.comprobantes as string[] | null) ?? [], BUCKET);
+  if (porCopiar.length) after(() => copiarPendientes(createServiceClient(), porCopiar));
   const fmt = (x: { id: string; texto: string; autor_nombre: string | null; creado_en: string }) => ({ id: x.id, texto: x.texto, autor: x.autor_nombre ?? "Alguien del equipo", cuando: x.creado_en });
   return { notas: (notas ?? []).map(fmt), actividad: (actividad ?? []).map(fmt), comprobantes };
 }
