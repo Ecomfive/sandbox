@@ -28,6 +28,8 @@ const VALOR_TEXTO: Record<CampoTexto, keyof FilaTablero> = { numero: "numero", c
 
 const plata = (n: number) => `$${n.toLocaleString("es-PA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const normal = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+/** Los viajes que se hacen después de la entrega original (en Monday van en «Forma de pago»): cada uno es otro pago al mensajero. */
+const TIPOS_VIAJE = ["CAMBIO", "RETIRO", "COMPLEMENTO"];
 const COLOR_DIA = ["#8a35c9", "#037f4c", "#007eb5", "#ff6d3b", "#9d50dd", "#fdab3d", "#df2f4a"];
 
 const th = "sticky top-0 z-[1] border-b border-border bg-muted px-2 py-2 text-left text-[11px] font-semibold tracking-[0.04em] whitespace-nowrap text-muted-foreground uppercase";
@@ -55,7 +57,7 @@ export function TableroDespacho({
   const puedeEscribir = puedeArchivar && !archivados;
   const router = useRouter();
   const { mostrarToast } = useToast();
-  const [, empezar] = useTransition();
+  const [guardando, empezar] = useTransition();
   const [filas, setFilas] = useState(iniciales);
   // Cuando el servidor manda filas nuevas (tras guardar), reemplazan a las de pantalla.
   const [previas, setPrevias] = useState(iniciales);
@@ -66,6 +68,8 @@ export function TableroDespacho({
   const esCiudad = clase === "ciudad";
   const [vista, setVista] = useState<string>(esCiudad ? "TODOS" : "KENKU");
   const [filtro, setFiltro] = useState("");
+  const [tienda, setTienda] = useState("");
+  const [tipo, setTipo] = useState("");
   const [busqueda, setBusqueda] = useState("");
   const [agrupar, setAgrupar] = useState<Agrupar>("dia");
   const [cerrados, setCerrados] = useState<Record<string, boolean>>({});
@@ -90,6 +94,27 @@ export function TableroDespacho({
     guardar(f.itemId, local, () => cambiarCelda(f.itemId, col, nombre));
   };
 
+  // Como en Monday, lo que anotan los demás aparece solo: cada 20 s se vuelve a leer, salvo mientras alguien escribe en una celda, tiene una lista
+  // abierta, arrastra una fila o se está guardando un cambio (para no borrarle lo que está haciendo). Con la pestaña oculta no se lee.
+  const quieto = useRef(true);
+  useEffect(() => {
+    quieto.current = !menu && !arrastrando && !guardando;
+  }, [menu, arrastrando, guardando]);
+  useEffect(() => {
+    if (archivados) return;
+    const id = setInterval(() => {
+      const foco = document.activeElement;
+      const escribiendo = foco instanceof HTMLInputElement || foco instanceof HTMLTextAreaElement || foco instanceof HTMLSelectElement;
+      if (document.visibilityState === "visible" && quieto.current && !escribiendo) router.refresh();
+    }, 20_000);
+    return () => clearInterval(id);
+  }, [router, archivados]);
+
+  const tiendas = useMemo(() => {
+    const presentes = new Set(filas.map((f) => f.tienda).filter(Boolean) as string[]);
+    return [...ETIQUETAS.tienda.opciones.map((o) => o.nombre).filter((n) => presentes.has(n)), ...[...presentes].filter((p) => !ETIQUETAS.tienda.opciones.some((o) => o.nombre === p))];
+  }, [filas]);
+
   const vistas = useMemo(() => {
     if (!esCiudad) return ETIQUETAS.tienda.opciones.map((o) => o.nombre).filter((t) => t === "KENKU" || filas.some((f) => f.tienda === t));
     const presentes = new Set(filas.map((f) => f.courier).filter(Boolean) as string[]);
@@ -102,9 +127,11 @@ export function TableroDespacho({
       (f) =>
         (esCiudad ? vista === "TODOS" || f.courier === vista : f.tienda === vista) &&
         (!filtro || (filtro === "SIN" ? !f.estado : f.estado === filtro)) &&
+        (!tienda || f.tienda === tienda) &&
+        (!tipo || (tipo === "TODOS" ? TIPOS_VIAJE.includes(f.formaPago ?? "") : f.formaPago === tipo)) &&
         (!q || normal(`${f.numero ?? ""} ${f.comentario ?? ""} ${f.obsAsesores ?? ""}`).includes(q)),
     );
-  }, [filas, vista, filtro, busqueda, esCiudad]);
+  }, [filas, vista, filtro, tienda, tipo, busqueda, esCiudad]);
 
   const grupos = useMemo(() => {
     const modo: Agrupar | "grupo" = esCiudad ? agrupar : "grupo";
@@ -248,6 +275,23 @@ export function TableroDespacho({
           {visibles.length} pedidos · {plata(total)} por cobrar · {visibles.filter((f) => f.estado === "ENTREGADO").length} entregados
         </span>
       </div>
+
+      {esCiudad && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-muted-foreground">Tienda:</span>
+          {["", ...tiendas].map((t) => (
+            <button key={t || "todas"} type="button" aria-pressed={tienda === t} onClick={() => setTienda(t)} className={chip(tienda === t)}>
+              {t || "Todas"}
+            </button>
+          ))}
+          <span className="ml-1 text-xs text-muted-foreground">Cambios:</span>
+          {[["", "Todos los pedidos"], ["TODOS", "Cambios, retiros y complementos"], ["CAMBIO", "Cambios"], ["RETIRO", "Retiros"], ["COMPLEMENTO", "Complementos"]].map(([id, nombre]) => (
+            <button key={id || "todos"} type="button" aria-pressed={tipo === id} onClick={() => setTipo(id)} className={chip(tipo === id)}>
+              {nombre}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 items-start gap-4 min-[1300px]:grid-cols-[minmax(0,1fr)_auto]">
         <div className="flex min-w-0 flex-col gap-5">
