@@ -15,6 +15,7 @@ import { etiquetasDe, mismaTiendaUnidad, zonaDeEtiquetas } from "@/lib/tienda/or
 import { geografiaDe } from "./geografia";
 import { combinar, etiquetaDeZona, leerRespuesta, mensajePedirDetalle, type Combinado, type EstadoAnalisis, type ResultadoModelo } from "./combinar";
 import { armarEntrada, type EjemploPrompt } from "./prompt";
+import { resultadoFinal, seleccionarEjemplos, type RevisionPedido, type ResultadoPedido } from "./revision";
 import { coincidencias, normalizarTexto, zonaPorReglas, type ReglaZona, type Zona } from "./zonas";
 
 export const SIN_MIGRACION_CONFIRMACION = "Falta correr la migración 0300 (confirmación con IA) en Supabase.";
@@ -64,7 +65,7 @@ export async function cargarReglas(supabase: SupabaseClient, paisId: string): Pr
 }
 
 /** Los ejemplos que entran al pedido: los generales del país y los de esa tienda, los más recientes de cada tipo. */
-export async function cargarEjemplos(supabase: SupabaseClient, paisId: string, tiendaId: string | null, porTipo = 15): Promise<EjemploPrompt[]> {
+export async function cargarEjemplos(supabase: SupabaseClient, paisId: string, tiendaId: string | null, porTipo = 20): Promise<EjemploPrompt[]> {
   // Con la migración 0301 trae también la ciudad o el corregimiento; sin ella, las columnas de siempre.
   const leer = (columnas: string) => {
     const q = supabase.from("confirmacion_ia_ejemplos").select(columnas).eq("pais_id", paisId);
@@ -74,7 +75,8 @@ export async function cargarEjemplos(supabase: SupabaseClient, paisId: string, t
   if (r.error) r = await leer("direccion, completa, falta, zona");
   const data = (r.data ?? []) as unknown as Record<string, unknown>[];
   const filas = (data ?? []).map((e) => ({ ciudad: (e.ciudad as string | null | undefined) ?? null, direccion: e.direccion as string, completa: e.completa === true, falta: (e.falta as string | null) ?? null, zona: (e.zona as Zona | null) ?? null }));
-  return [...filas.filter((e) => e.completa).slice(0, porTipo), ...filas.filter((e) => !e.completa).slice(0, porTipo)];
+  // Las completas se reparten entre ciudad e interior (si no, la IA aprende solo del lado que más se corrige).
+  return seleccionarEjemplos(filas, porTipo);
 }
 
 /** Lo que cambia si el cliente corrige su dirección: la dirección y la ciudad, sin acentos ni mayúsculas. */
@@ -262,7 +264,11 @@ export async function analizarOrden(supabase: SupabaseClient, ordenId: string, o
     analizado_por: opciones.por ?? (opciones.origen === "pantalla" ? null : "Sistema"),
     actualizado_en: new Date().toISOString(),
   };
-  const { error } = await supabase.from("confirmacion_ia_analisis").upsert(fila, { onConflict: "orden_id" });
+  // Si el cliente corrigió su dirección, lo que el equipo había marcado era de la dirección anterior: ya no vale.
+  const sinRevision = previo && previo.huella !== huella ? { rev_completa: null, rev_zona: null, rev_falta: null, rev_ok: null, rev_por: null, rev_por_nombre: null, rev_en: null } : null;
+  let { error } = await supabase.from("confirmacion_ia_analisis").upsert(sinRevision ? { ...fila, ...sinRevision } : fila, { onConflict: "orden_id" });
+  // Sin la migración 0307 (revisión del equipo) esas columnas no existen: se guarda igual, sin ellas.
+  if (error && sinRevision && /rev_|schema cache/i.test(error.message)) ({ error } = await supabase.from("confirmacion_ia_analisis").upsert(fila, { onConflict: "orden_id" }));
   if (error) return { resultado: "omitida", motivo: /confirmacion_ia|schema cache/i.test(error.message) ? SIN_MIGRACION_CONFIRMACION : "No se pudo guardar el análisis." };
   return { resultado: "analizada", estado: c.estado };
 }
@@ -330,16 +336,31 @@ export interface FilaAnalisis {
   mensajesEnviados: number;
   analizadoPor: string | null;
   actualizadoEn: string;
+  /** Lo que el equipo marcó como correcto (null si nadie lo revisó). */
+  revision: RevisionPedido | null;
+  /** Lo que vale para el pedido: lo que dijo el equipo si lo revisó; si no, lo que propuso el sistema. */
+  final: ResultadoPedido;
 }
 
 /** Los últimos análisis del país (de las tiendas dadas, o de todas si es null), del más nuevo al más viejo. */
-export async function cargarAnalisis(supabase: SupabaseClient, paisId: string, tiendaIds: string[] | null, limite = 60): Promise<{ filas: FilaAnalisis[]; faltaMigracion: boolean }> {
-  let q = supabase
-    .from("confirmacion_ia_analisis")
-    .select("id, orden_id, tienda_id, direccion, ciudad, estado, zona, zona_por, completa, falta, etiqueta, acuerdo, motivo, modelos, reglas, mensaje, mensaje_estado, mensaje_error, mensajes_enviados, analizado_por, actualizado_en")
-    .eq("pais_id", paisId);
-  if (tiendaIds) q = q.in("tienda_id", tiendaIds.length ? tiendaIds : ["00000000-0000-0000-0000-000000000000"]);
-  const { data, error } = await q.order("actualizado_en", { ascending: false }).limit(limite);
+export async function cargarAnalisis(
+  supabase: SupabaseClient,
+  paisId: string,
+  tiendaIds: string[] | null,
+  config: { etiquetaCiudad: string | null; etiquetaInterior: string | null },
+  limite = 120,
+): Promise<{ filas: FilaAnalisis[]; faltaMigracion: boolean }> {
+  const COLUMNAS = "id, orden_id, tienda_id, direccion, ciudad, estado, zona, zona_por, completa, falta, etiqueta, acuerdo, motivo, modelos, reglas, mensaje, mensaje_estado, mensaje_error, mensajes_enviados, analizado_por, actualizado_en";
+  const leer = (columnas: string) => {
+    let q = supabase.from("confirmacion_ia_analisis").select(columnas).eq("pais_id", paisId);
+    if (tiendaIds) q = q.in("tienda_id", tiendaIds.length ? tiendaIds : ["00000000-0000-0000-0000-000000000000"]);
+    return q.order("actualizado_en", { ascending: false }).limit(limite);
+  };
+  // Con la migración 0307 trae también lo que el equipo marcó como correcto; sin ella, lo de siempre.
+  let r = await leer(`${COLUMNAS}, rev_completa, rev_zona, rev_falta, rev_ok, rev_por_nombre, rev_en`);
+  if (r.error) r = await leer(COLUMNAS);
+  const data = r.data as unknown as Record<string, unknown>[] | null;
+  const error = r.error;
   if (error) return { filas: [], faltaMigracion: /confirmacion_ia|schema cache|does not exist/i.test(error.message) };
   const ordenIds = (data ?? []).map((a) => a.orden_id as string);
   const tiendaIdsUsados = [...new Set((data ?? []).map((a) => a.tienda_id as string | null).filter((x): x is string => !!x))];
@@ -352,6 +373,14 @@ export async function cargarAnalisis(supabase: SupabaseClient, paisId: string, t
   const filas = (data ?? []).map((a) => {
     const o = porOrden.get(a.orden_id as string);
     const actual = etiquetasDe((o?.etiquetas as string | null) ?? null).find((e) => /^(ciudad|interior)\b/i.test(e)) ?? null;
+    const revision: RevisionPedido | null =
+      typeof a.rev_completa === "boolean" && a.rev_en
+        ? { completa: a.rev_completa, zona: (a.rev_zona as Zona | null) ?? null, falta: (a.rev_falta as string | null) ?? null, ok: typeof a.rev_ok === "boolean" ? a.rev_ok : null, por: (a.rev_por_nombre as string | null) ?? null, en: String(a.rev_en) }
+        : null;
+    const estado = a.estado as EstadoAnalisis;
+    const zona = (a.zona as Zona | null) ?? null;
+    const etiqueta = (a.etiqueta as string | null) ?? null;
+    const falta = (a.falta as string | null) ?? null;
     return {
       id: a.id as string,
       ordenId: a.orden_id as string,
@@ -361,12 +390,12 @@ export async function cargarAnalisis(supabase: SupabaseClient, paisId: string, t
       fecha: (o?.fecha as string | null) ?? null,
       direccion: (a.direccion as string | null) ?? null,
       ciudad: (a.ciudad as string | null) ?? null,
-      estado: a.estado as EstadoAnalisis,
-      zona: (a.zona as Zona | null) ?? null,
+      estado,
+      zona,
       zonaPor: (a.zona_por as "regla" | "ia" | null) ?? null,
       completa: (a.completa as boolean | null) ?? null,
-      falta: (a.falta as string | null) ?? null,
-      etiqueta: (a.etiqueta as string | null) ?? null,
+      falta,
+      etiqueta,
       etiquetaActual: actual,
       acuerdo: (a.acuerdo as boolean | null) ?? null,
       motivo: (a.motivo as string | null) ?? null,
@@ -378,6 +407,8 @@ export async function cargarAnalisis(supabase: SupabaseClient, paisId: string, t
       mensajesEnviados: Number(a.mensajes_enviados ?? 0),
       analizadoPor: (a.analizado_por as string | null) ?? null,
       actualizadoEn: a.actualizado_en as string,
+      revision,
+      final: resultadoFinal({ estado, zona, etiqueta, falta, revision }, config),
     } satisfies FilaAnalisis;
   });
   return { filas, faltaMigracion: false };

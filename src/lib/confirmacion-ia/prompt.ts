@@ -15,7 +15,7 @@ export interface EjemploPrompt {
 }
 
 /** Cuántos ejemplos de cada tipo (completas e incompletas) entran al pedido: los más recientes. */
-export const MAX_EJEMPLOS_POR_TIPO = 15;
+export const MAX_EJEMPLOS_POR_TIPO = 20;
 /** Cuántas letras puede tener lo que escribe un administrador como instrucciones extra. */
 export const MAX_INSTRUCCIONES = 2000;
 /** Cuántas palabras de zona entran al pedido. */

@@ -5,7 +5,8 @@ import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { claveCoincide } from "@/lib/confirmacion-ia/clave";
 import { tiendasVisibles } from "@/lib/confirmacion-ia/acceso";
-import { etiquetaDeZona, type Combinado, type ResultadoModelo } from "@/lib/confirmacion-ia/combinar";
+import { etiquetaDeZona, type Combinado, type EstadoAnalisis, type ResultadoModelo } from "@/lib/confirmacion-ia/combinar";
+import { coincideConPropuesta, revisarVeredicto, type DecisionRevision, type Veredicto } from "@/lib/confirmacion-ia/revision";
 import { MAX_INSTRUCCIONES } from "@/lib/confirmacion-ia/prompt";
 import { analizarOrden, analizarPendientes, cargarConfig, evaluarDireccion, SIN_MIGRACION_CONFIRMACION } from "@/lib/confirmacion-ia/servidor";
 import { errorDeRegla, normalizarTexto, ZONAS, type Zona } from "@/lib/confirmacion-ia/zonas";
@@ -336,21 +337,95 @@ export async function probarDireccion(direccion: string, ciudad: string, tiendaI
   return { combinado: r.combinado, modelos: r.modelos, palabras: r.coinc.map((p) => ({ texto: p.texto, resultado: p.resultado })), etiqueta: r.combinado.estado === "listo" ? etiquetaDeZona(r.combinado.zona, config) : null };
 }
 
-/** Guarda la dirección de un análisis como ejemplo (con lo correcto: completa o incompleta y su zona), para que la IA aprenda de lo que el equipo corrige. */
-export async function guardarAnalisisComoEjemplo(analisisId: string, d: { ciudad: string; completa: boolean; falta?: string | null; zona?: Zona | null }): Promise<Resultado> {
+/**
+ * Lo que el equipo marca como correcto en un pedido analizado (16 nov 2026, pedido de Hernán). Tres casos con los mismos botones: resolver uno que las IA no pudieron decidir («Para revisar»),
+ * corregir uno que salió «listo» o «falta un dato», o dar el visto bueno (`{ acierto: true }`) a lo que propuso el sistema. Lo marcado manda sobre lo que dijo la IA para ese pedido y, si no es un
+ * simple visto bueno, se guarda además como dirección de ejemplo (de origen «revision») para que la IA aprenda; si se vuelve a marcar, el ejemplo se cambia, no se repite.
+ */
+export async function revisarAnalisis(
+  analisisId: string,
+  d: DecisionRevision,
+): Promise<Resultado> {
   const usuario = await requireModuloEscritura(MODULO);
   if (!UUID.test(String(analisisId))) return { error: "Análisis no válido." };
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
-  const { data: a } = await supabase.from("confirmacion_ia_analisis").select("direccion, ciudad, tienda_id").eq("id", analisisId).eq("pais_id", pais.id).maybeSingle();
-  if (!a?.direccion) return { error: "Ese análisis no tiene dirección." };
+  const { data: a, error: errLeer } = await supabase
+    .from("confirmacion_ia_analisis")
+    .select("id, direccion, ciudad, tienda_id, estado, zona, completa, falta, rev_ejemplo_id")
+    .eq("id", analisisId)
+    .eq("pais_id", pais.id)
+    .maybeSingle();
+  if (errLeer) return { error: /rev_|schema cache|column/i.test(errLeer.message) ? "Falta correr la migración 0307 (revisión de la confirmación con IA) en Supabase." : "No se pudo leer el análisis." };
+  if (!a) return { error: "Ese análisis ya no existe." };
   const [{ config }, { tiendas, limitado }] = await Promise.all([cargarConfig(supabase, pais.id), tiendasVisibles(supabase, pais.id)]);
   if (limitado && !tiendas.some((t) => t.id === a.tienda_id)) return { error: "Ese pedido no es de las tiendas que ves." };
-  const l = await leerEjemplo({ ciudad: d.ciudad, direccion: a.direccion as string, completa: d.completa, falta: d.falta, zona: d.zona, tiendaId: (a.tienda_id as string | null) ?? null }, config.distingueZona, tiendas.map((t) => t.id));
-  if ("error" in l) return l;
-  const { error } = await supabase.from("confirmacion_ia_ejemplos").insert({ ...l.fila, pais_id: pais.id, creado_por: usuario.id, creado_por_nombre: nombreDe(usuario) });
-  if (error) return { error: "No se pudo guardar." };
-  await registrarAuditoria({ accion: "agregar_ejemplo_confirmacion_ia", entidad: "paises", entidadId: pais.id, detalle: `${pais.nombre}: guardó una dirección analizada como ejemplo` });
+  const estado = a.estado as EstadoAnalisis;
+  const nombre = nombreDe(usuario);
+  const ahora = new Date().toISOString();
+  const propuesta = { estado, zona: (a.zona as Zona | null) ?? null };
+
+  let veredicto: Veredicto;
+  let ok: boolean | null;
+  if ("acierto" in d) {
+    // «Está bien»: solo tiene sentido cuando el sistema había propuesto algo.
+    if (estado !== "listo" && estado !== "falta_dato") return { error: "Este pedido no tiene una propuesta que confirmar: elige lo correcto." };
+    veredicto = { completa: estado === "listo", zona: estado === "listo" ? propuesta.zona : null, falta: estado === "falta_dato" ? ((a.falta as string | null) ?? null) : null };
+    ok = true;
+  } else {
+    const v = revisarVeredicto(d, config.distingueZona);
+    if ("error" in v) return v;
+    veredicto = v.veredicto;
+    ok = coincideConPropuesta(propuesta, veredicto, config.distingueZona);
+  }
+
+  // El ejemplo para la IA: solo cuando el equipo cambió o decidió algo (un visto bueno no enseña nada nuevo y llenaría la lista).
+  let ejemploId: string | null = null;
+  const direccion = String(a.direccion ?? "").replace(/\s+/g, " ").trim();
+  if (!("acierto" in d)) {
+    const ciudad = String(("ciudad" in d ? d.ciudad : null) ?? a.ciudad ?? "").replace(/\s+/g, " ").trim().slice(0, 120);
+    if (veredicto.completa && ciudad.length < 2) return { error: "Escribe la ciudad o el corregimiento: es lo más importante para saber de dónde es." };
+    if (direccion.length >= 5) {
+      const fila = {
+        pais_id: pais.id,
+        tienda_id: (a.tienda_id as string | null) ?? null,
+        ciudad: ciudad.length >= 2 ? ciudad : null,
+        direccion: direccion.slice(0, 600),
+        completa: veredicto.completa,
+        falta: veredicto.completa ? null : veredicto.falta,
+        zona: veredicto.completa ? veredicto.zona : null,
+        origen: "revision",
+        creado_por: usuario.id,
+        creado_por_nombre: nombre,
+      };
+      const previoId = (a.rev_ejemplo_id as string | null) ?? null;
+      if (previoId) {
+        const { error } = await supabase.from("confirmacion_ia_ejemplos").update(fila).eq("id", previoId);
+        if (!error) ejemploId = previoId;
+      }
+      if (!ejemploId) {
+        const { data: nuevo, error } = await supabase.from("confirmacion_ia_ejemplos").insert(fila).select("id").single();
+        if (error) return { error: /origen|schema cache|column/i.test(error.message) ? "Falta correr la migración 0307 (revisión de la confirmación con IA) en Supabase." : "No se pudo guardar el ejemplo." };
+        ejemploId = nuevo.id as string;
+      }
+    }
+  } else if (a.rev_ejemplo_id) {
+    // Antes se había corregido y ahora se deja «está bien»: ese ejemplo ya no vale.
+    await supabase.from("confirmacion_ia_ejemplos").delete().eq("id", a.rev_ejemplo_id as string);
+  }
+
+  const { error } = await supabase
+    .from("confirmacion_ia_analisis")
+    .update({ rev_completa: veredicto.completa, rev_zona: veredicto.zona, rev_falta: veredicto.falta, rev_ok: ok, rev_por: usuario.id, rev_por_nombre: nombre, rev_en: ahora, rev_ejemplo_id: ejemploId })
+    .eq("id", analisisId);
+  if (error) return { error: /rev_|schema cache|column/i.test(error.message) ? "Falta correr la migración 0307 (revisión de la confirmación con IA) en Supabase." : "No se pudo guardar." };
+  await registrarAuditoria({
+    accion: "revisar_confirmacion_ia",
+    entidad: "paises",
+    entidadId: pais.id,
+    detalle: `${pais.nombre}: ${"acierto" in d ? "dio el visto bueno a" : "marcó como correcto"} un pedido (${veredicto.completa ? `completa${veredicto.zona ? ` · ${veredicto.zona}` : ""}` : `falta ${veredicto.falta}`})`,
+  });
+  revalidatePath("/tienda-confirmacion/ia");
   revalidatePath("/tienda-confirmacion/ejemplos");
   return {};
 }
