@@ -1,8 +1,11 @@
 // Confirmación con IA: lo que la IA sabe de la geografía de cada país antes de leer una dirección (16 nov 2026, pedido de Hernán: «que tengas más o menos la geografía para saber cuál es ciudad y
 // cuál es lo demás»). Es solo referencia: las palabras de zona que agrega el equipo mandan sobre esto, y lo que de verdad es dudoso se deja como «no sé» para que el equipo lo defina. Lógica pura, con su prueba.
 
-/** Los corregimientos del distrito de Panamá según la lista consultada (24; el listado oficial habla de 26, así que puede faltar alguno: por eso es solo referencia). */
-const CORREGIMIENTOS_DISTRITO_PANAMA = [
+/**
+ * Los 26 corregimientos del distrito de Panamá, verificados el 16 nov 2026 contra Wikipedia (distrito de Panamá: «veintiséis corregimientos») y las leyes que crearon los últimos: Las Garzas (Ley 40 de 2017,
+ * segregado de Pacora) y Don Bosco (Ley 42 de 2017, segregado de Juan Díaz). La lista en inglés que se consultó primero tenía 24 porque no incluía esos dos.
+ */
+export const CORREGIMIENTOS_DISTRITO_PANAMA = [
   "24 de Diciembre",
   "Alcalde Díaz",
   "Ancón",
@@ -12,10 +15,12 @@ const CORREGIMIENTOS_DISTRITO_PANAMA = [
   "Calidonia",
   "Chilibre",
   "Curundú",
+  "Don Bosco",
   "El Chorrillo",
   "Ernesto Córdoba Campos",
   "Juan Díaz",
   "Las Cumbres",
+  "Las Garzas",
   "Las Mañanitas",
   "Pacora",
   "Parque Lefevre",
@@ -29,7 +34,7 @@ const CORREGIMIENTOS_DISTRITO_PANAMA = [
   "Tocumen",
 ];
 
-/** El corazón de la ciudad de Panamá: corregimientos y barrios que casi seguro son CIUDAD. */
+/** El corazón de la ciudad de Panamá: los 13 corregimientos urbanos según Wikipedia (San Felipe a Pedregal), Ancón (Albrook, Clayton) y barrios conocidos; casi seguro CIUDAD. */
 const NUCLEO_URBANO = [
   "Bella Vista",
   "Betania",
@@ -58,7 +63,7 @@ const NUCLEO_URBANO = [
 ];
 
 /** Lo que depende de cómo lo clasifique el equipo: la IA no lo decide sola. */
-const DUDOSAS = ["San Miguelito y sus corregimientos", "Tocumen", "24 de Diciembre", "Las Mañanitas", "Pacora", "San Martín", "Chilibre", "Alcalde Díaz", "Caimitillo", "Las Cumbres", "Ernesto Córdoba Campos"];
+const DUDOSAS = ["San Miguelito y sus corregimientos", "Don Bosco (segregado de Juan Díaz)", "Tocumen", "24 de Diciembre", "Las Mañanitas", "Pacora", "Las Garzas (segregado de Pacora)", "San Martín", "Chilibre", "Alcalde Díaz", "Caimitillo", "Las Cumbres", "Ernesto Córdoba Campos"];
 
 /** La geografía de Panamá como texto para el pedido a la IA. */
 export function geografiaDePanama(): string {
