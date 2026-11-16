@@ -19,6 +19,10 @@ import { alertasTesoreriaANuevas, DEF_ALERTA, generarAlertas, guardarAlertas, ty
 import { cargarBasePauta } from "../finanzas/cargar-comite";
 import { evaluarYGuardarRiesgos } from "../finanzas/cargar-riesgos";
 import { alertasPauta, mesPrevio } from "../finanzas/pauta";
+import { cargarPresupuestoVigente, cargarRealPorUnidad } from "../finanzas/cargar-presupuesto";
+import { serieDeLineas } from "../finanzas/presupuesto";
+import { ANOMALIA_VENTANA, desviosPresupuesto, gastosAnomalos, mesesAntes } from "../finanzas/desvios";
+import type { Seccion } from "../finanzas/eerr";
 import { alertasDePosicion, cargarPosicion } from "../finanzas/cargar-tesoreria";
 import { cargarBaseCovenants, cargarBaseDeuda, cargarCovenants, cargarOfertas } from "../finanzas/cargar-deuda-avanzada";
 import { alertaCovenant, contratosCovenant, evaluarCovenants, nombreContrato } from "../finanzas/escenarios-deuda";
@@ -197,7 +201,74 @@ async function tareaAlertas(c: Contexto): Promise<Resultado> {
   // Matriz de riesgos (migración 0948): guarda los cambios de nivel y las alertas de los que subieron.
   const rg = await evaluarYGuardarRiesgos(c.supabase, c.hoy);
   const rie = "error" in rg ? ` Riesgos: ${rg.error}` : ` Riesgos: ${rg.cambios} cambios de nivel, ${rg.alertas} alertas.`;
-  return { resumen: `${r.activas} alertas activas (${r.nuevas} nuevas), ${r.resueltas} resueltas. Evaluado: ${r.evaluados.join(", ") || "nada"}.${fiscal}${tes}${pau}${cov}${rie}` };
+  // Presupuesto contra real y gastos fuera de lo normal (migración 0980).
+  const dv = await generarAlertasDesvios(c.supabase, c.hoy);
+  const des = "error" in dv ? ` Desvíos: ${dv.error}` : ` Desvíos: ${dv.presupuesto} contra el presupuesto, ${dv.anomalias} gastos fuera de lo normal.`;
+  return { resumen: `${r.activas} alertas activas (${r.nuevas} nuevas), ${r.resueltas} resueltas. Evaluado: ${r.evaluados.join(", ") || "nada"}.${fiscal}${tes}${pau}${cov}${rie}${des}` };
+}
+
+const usdCorto = (v: number) => `US$${Math.round(v).toLocaleString("en-US")}`;
+
+/**
+ * El último mes cerrado: cada sección del EERR contra el presupuesto vigente del año (escenario base) y cada tipo de gasto
+ * contra su promedio de 6 meses. Sin presupuesto del año, solo se evalúan los gastos fuera de lo normal.
+ */
+export async function generarAlertasDesvios(
+  supabase: SupabaseClient,
+  hoy: string,
+): Promise<{ error: string } | { presupuesto: number; anomalias: number }> {
+  const mes = mesPrevio(`${hoy.slice(0, 7)}-01`);
+  const meses = [...mesesAntes(mes, ANOMALIA_VENTANA).reverse(), mes];
+  const [real, vigente] = await Promise.all([cargarRealPorUnidad(supabase, meses), cargarPresupuestoVigente(supabase, Number(mes.slice(0, 4)))]);
+  if ("error" in real) return { error: real.error };
+  const evaluados: TipoAlerta[] = ["gasto_anomalo"];
+  const nuevas: AlertaNueva[] = [];
+
+  if (vigente && real.conDatos.has(mes)) {
+    evaluados.push("presupuesto_desvio");
+    const presu = serieDeLineas(vigente.lineas, "base", [mes]);
+    const porSeccion = (fuente: Record<Seccion, Record<string, number>>) =>
+      Object.fromEntries(Object.entries(fuente).map(([s, porMes]) => [s, porMes[mes] ?? 0])) as Partial<Record<Seccion, number>>;
+    const realMes: Partial<Record<Seccion, number>> = {};
+    for (const serie of real.porUnidad.values()) {
+      for (const [s, v] of Object.entries(porSeccion(serie))) realMes[s as Seccion] = (realMes[s as Seccion] ?? 0) + (v ?? 0);
+    }
+    for (const d of desviosPresupuesto(mes, realMes, porSeccion(presu))) {
+      const sentido = d.seccion === "ingresos" ? "por debajo de" : "sobre";
+      nuevas.push({
+        clave: d.clave,
+        tipo: "presupuesto_desvio",
+        severidad: d.severidad,
+        mensaje: `${nombreMes(mes)} · ${d.etiqueta}: ${usdCorto(d.real)}, ${d.desvio} % ${sentido} lo presupuestado (${usdCorto(d.presupuesto)}) en «${vigente.presupuesto.nombre}»`,
+        enlace: `/presupuesto/${vigente.presupuesto.id}`,
+        modulo: DEF_ALERTA.presupuesto_desvio.modulo,
+        monto: d.real,
+      });
+    }
+  }
+
+  const porTipo = new Map<string, { nombre: string; seccion: Seccion; meses: Record<string, number> }>();
+  for (const t of real.tipos) {
+    const x = porTipo.get(t.tipo_id) ?? { nombre: real.nombresTipo[t.tipo_id] ?? "—", seccion: t.seccion, meses: {} };
+    x.meses[t.periodo] = (x.meses[t.periodo] ?? 0) + t.valor;
+    porTipo.set(t.tipo_id, x);
+  }
+  const anomalias = real.conDatos.has(mes) ? gastosAnomalos(mes, porTipo) : [];
+  for (const a of anomalias) {
+    nuevas.push({
+      clave: a.clave,
+      tipo: "gasto_anomalo",
+      severidad: "aviso",
+      mensaje: `${nombreMes(mes)} · ${a.tipo}: ${usdCorto(a.real)}, ${a.sube} % sobre su promedio de los meses anteriores (${usdCorto(a.promedio)})`,
+      enlace: DEF_ALERTA.gasto_anomalo.href,
+      modulo: DEF_ALERTA.gasto_anomalo.modulo,
+      monto: a.real,
+    });
+  }
+
+  const r = await guardarAlertas(supabase, nuevas, evaluados);
+  if ("error" in r) return { error: /check|tipo/i.test(r.error) ? "falta correr la migración 0980." : r.error };
+  return { presupuesto: nuevas.length - anomalias.length, anomalias: anomalias.length };
 }
 
 /**

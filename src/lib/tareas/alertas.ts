@@ -35,6 +35,9 @@ export const TIPOS_ALERTA = [
   "tesoreria_covenant",
   // Migración 0948: un riesgo de la matriz subió de nivel (`evaluarYGuardarRiesgos`, src/lib/finanzas/cargar-riesgos.ts).
   "riesgo_sube",
+  // Migración 0980: presupuesto contra real y gastos fuera de lo normal (`generarAlertasDesvios`, src/lib/tareas/ejecutar.ts).
+  "presupuesto_desvio",
+  "gasto_anomalo",
 ] as const;
 export type TipoAlerta = (typeof TIPOS_ALERTA)[number];
 export type Severidad = "info" | "aviso" | "critica";
@@ -60,6 +63,8 @@ export const DEF_ALERTA: Record<TipoAlerta, { modulo: string; titulo: string; ac
   pauta_techo: { modulo: "rentabilidad", titulo: "Tienda sobre el techo de pauta", accion: "Ver pauta", href: "/rentabilidad" },
   tesoreria_covenant: { modulo: "tesoreria", titulo: "Covenant en riesgo", accion: "Ver covenants", href: "/tesoreria/covenants" },
   riesgo_sube: { modulo: "capital-riesgo", titulo: "Riesgo financiero que subió de nivel", accion: "Ver riesgos", href: "/capital-riesgo" },
+  presupuesto_desvio: { modulo: "presupuesto", titulo: "Desvío contra el presupuesto", accion: "Ver presupuesto", href: "/presupuesto" },
+  gasto_anomalo: { modulo: "libro-movimientos", titulo: "Gasto fuera de lo normal", accion: "Revisar gastos", href: "/libro-movimientos" },
 };
 
 /** Los tipos de Tesorería y de qué alerta de la página sale cada uno (por el comienzo de su clave). */
