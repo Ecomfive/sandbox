@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { casoDeItem, columnasPostventa, extrasDeItem, notaSinDatos, consultaPostventa, datosDeComentario, leerPaginaPostventa, montoDeTexto, numeroDeTexto, taparDatos, tiendaDeTexto, tiposDeTexto, type ItemPostventa } from "./postventa";
+import { casoDeItem, columnasPostventa, consultaHistorial, extrasDeItem, notaSinDatos, consultaPostventa, datosDeComentario, leerPaginaPostventa, montoDeTexto, numeroDeTexto, taparDatos, tiendaDeTexto, tiposDeTexto, type ItemPostventa } from "./postventa";
 
 // Textos como los del tablero «CAMBIOS Y REEMBOLSOS PANAMA» (14 nov 2026), con nombres y cuentas inventados.
 const item = (name: string, comentarios: string[], extra: Partial<ItemPostventa> = {}): ItemPostventa => ({
@@ -165,4 +165,22 @@ test("postventa: lee la página de Monday y reconoce las columnas por su título
   assert.equal(p.items[0].valorReembolso, "12.5");
   assert.equal(p.items[0].comentarios.length, 1);
   assert.equal(casoDeItem(p.items[0]).reembolso, 12.5);
+});
+
+test("postventa: el historial se pide hacia atrás desde el caso más viejo", () => {
+  const q = consultaHistorial("2026-04-01");
+  assert.match(q, /compare_value: \["EXACT", "2026-04-01"\], operator: lower_than_or_equal/);
+  assert.match(q, /direction: desc/);
+});
+
+test("postventa: las notas con datos de pago se quedan solo con el formato de la solicitud", () => {
+  const nota = ["Pedido #17222 KENKU", "", "✅Retirar: 1 Lemme Burn", "", "Lucero Sanjur", "", "Ahorro", "", "0400123456789", "Banismo", "A nombre de Lina Vargas", "✅motivo: dice que no es el original", "Monto a reembolsar: 26.91"].join("\n");
+  const limpia = notaSinDatos(nota);
+  assert.doesNotMatch(limpia, /Lucero|Sanjur|Ahorro|Banismo|Lina|Vargas|0400/);
+  assert.match(limpia, /Retirar: 1 Lemme Burn/);
+  assert.match(limpia, /motivo: dice que no es el original/);
+  assert.match(limpia, /Monto a reembolsar: 26.91/);
+  assert.equal(notaSinDatos("JESSIKA DEL CARMEN QUEZADA de DE LA HOZ\nNO SE RETIRA EL PRODUCTO"), "NO SE RETIRA EL PRODUCTO");
+  assert.equal(notaSinDatos("Jilma jaen\nESPERANDO QUE REGRESE EL PRODUCTO"), "ESPERANDO QUE REGRESE EL PRODUCTO");
+  assert.equal(notaSinDatos("Cliente: VERONICA VEGA\nREEMBOLSAR: $46.99"), "REEMBOLSAR: $46.99");
 });
