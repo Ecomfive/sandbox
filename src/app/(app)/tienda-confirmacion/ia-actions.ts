@@ -6,6 +6,7 @@ import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { claveCoincide } from "@/lib/confirmacion-ia/clave";
 import { tiendasVisibles } from "@/lib/confirmacion-ia/acceso";
 import { etiquetaDeZona, type Combinado, type ResultadoModelo } from "@/lib/confirmacion-ia/combinar";
+import { MAX_INSTRUCCIONES } from "@/lib/confirmacion-ia/prompt";
 import { analizarOrden, analizarPendientes, cargarConfig, evaluarDireccion, SIN_MIGRACION_CONFIRMACION } from "@/lib/confirmacion-ia/servidor";
 import { errorDeRegla, normalizarTexto, ZONAS, type Zona } from "@/lib/confirmacion-ia/zonas";
 import { getPaisActual } from "@/lib/pais";
@@ -52,6 +53,25 @@ export async function cambiarInterruptor(campo: InterruptorConfirmacion, valor: 
     entidadId: pais.id,
     detalle: `${pais.nombre}: ${valor ? "encendió" : "apagó"} ${NOMBRE_INTERRUPTOR[campo]}${esAdministrador(usuario) ? "" : " (con la contraseña)"}`,
   });
+  revalidatePath("/tienda-confirmacion/ia");
+  return {};
+}
+
+// --- Instrucciones de la IA (solo administradores) ------------------------------------------------------------------------------------------------
+
+/** Guarda las instrucciones extra que se suman a las internas de la IA en este país. Solo un administrador. */
+export async function guardarInstrucciones(texto: string): Promise<Resultado> {
+  const usuario = await requireModulo(MODULO);
+  if (!esAdministrador(usuario)) return { error: "Solo un administrador puede cambiar las instrucciones de la IA." };
+  const limpio = String(texto ?? "").replace(/\r\n/g, "\n").trim();
+  if (limpio.length > MAX_INSTRUCCIONES) return { error: `Son muchas letras: el máximo es ${MAX_INSTRUCCIONES}.` };
+  const supabase = createServiceClient();
+  const pais = await getPaisActual(supabase);
+  const { faltaMigracion } = await cargarConfig(supabase, pais.id);
+  if (faltaMigracion) return { error: SIN_MIGRACION_CONFIRMACION };
+  const { error } = await supabase.from("confirmacion_ia_config").upsert({ pais_id: pais.id, instrucciones: limpio || null, actualizado_en: new Date().toISOString(), actualizado_por: nombreDe(usuario) }, { onConflict: "pais_id" });
+  if (error) return { error: "No se pudo guardar." };
+  await registrarAuditoria({ accion: "cambiar_instrucciones_confirmacion_ia", entidad: "paises", entidadId: pais.id, detalle: `${pais.nombre}: cambió las instrucciones de la IA (${limpio.length} letras)` });
   revalidatePath("/tienda-confirmacion/ia");
   return {};
 }

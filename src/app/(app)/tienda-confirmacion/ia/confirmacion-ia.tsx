@@ -6,11 +6,15 @@ import { Indicador, Pastilla, TableroIndicadores, claseTdLista, claseThLista } f
 import { anilloFoco, fieldClass, labelClass } from "@/components/ui/field";
 import { Ventana } from "@/components/ui/ventana";
 import { useToast } from "@/components/ui/toast";
-import { AlertaIcon, CheckIcon, ChatIcon, RobotIcon } from "@/lib/nav-icons";
+import { AlertaIcon, CheckIcon, ChatIcon, PedidoIcon, RobotIcon, SugerenciaIcon } from "@/lib/nav-icons";
 import type { Combinado, ResultadoModelo } from "@/lib/confirmacion-ia/combinar";
 import type { ConfigConfirmacion, FilaAnalisis } from "@/lib/confirmacion-ia/servidor";
 import type { Zona } from "@/lib/confirmacion-ia/zonas";
 import { tiempoEsperando } from "@/lib/tienda/confirmacion";
+import { EjemplosDirecciones } from "./ejemplos-direcciones";
+import { InstruccionesIA } from "./instrucciones-ia";
+import { PalabrasZona } from "./palabras-zona";
+import { SeccionCard } from "./seccion";
 import {
   analizarPedidoAhora,
   analizarPendientesAhora,
@@ -18,6 +22,7 @@ import {
   guardarAnalisisComoEjemplo,
   probarDireccion,
   type InterruptorConfirmacion,
+  type PalabraZona,
 } from "../ia-actions";
 
 const ZONA_TEXTO: Record<Zona, string> = { ciudad: "Ciudad", interior: "Interior" };
@@ -68,6 +73,9 @@ export function ConfirmacionIA({
   tiendaElegida,
   ahora,
   apagadaPorFaltaDeIA,
+  ejemplos,
+  palabras,
+  instrucciones,
 }: {
   config: ConfigConfirmacion;
   paisNombre: string;
@@ -81,6 +89,11 @@ export function ConfirmacionIA({
   ahora: number;
   /** Ninguna IA de texto tiene clave: sin ellas no se puede analizar. */
   apagadaPorFaltaDeIA: boolean;
+  /** Las direcciones de ejemplo: cuántas hay y a qué tiendas se pueden agregar. */
+  ejemplos: { total: number; tiendaObligatoria: boolean };
+  palabras: PalabraZona[];
+  /** Las instrucciones extra de la IA; solo llegan (y se muestran) a un administrador. */
+  instrucciones: string | null;
 }) {
   const router = useRouter();
   const { mostrarToast } = useToast();
@@ -122,27 +135,31 @@ export function ConfirmacionIA({
     });
   }
 
+  const indice = [
+    { id: "pedidos", texto: "Pedidos analizados" },
+    { id: "ejemplos", texto: "Direcciones de ejemplo" },
+    { id: "zonas", texto: "Palabras de zona" },
+    ...(esAdmin ? [{ id: "instrucciones", texto: "Instrucciones de la IA" }] : []),
+  ];
+
   return (
-    <div className="flex flex-col gap-5">
-      <section aria-label="Confirmación automática" className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-4 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-3">
-            <span aria-hidden="true" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primario-suave text-primario">
-              <RobotIcon className="h-5 w-5" />
-            </span>
-            <div className="min-w-0">
-              <h2 className="m-0 text-base font-semibold">Confirmación automática · {paisNombre}</h2>
-              <p className="m-0 text-sm text-muted-foreground">
-                {config.activa ? "Encendida: analiza la dirección de cada pedido que iComfly deja «Confirmada»." : "Apagada: no analiza ningún pedido."}
-              </p>
-            </div>
-          </div>
-          <Interruptor activo={config.activa} etiqueta="Confirmación automática" deshabilitado={pendiente} alCambiar={() => pulsar("activa", !config.activa)} />
-        </div>
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3">
+    <div className="flex flex-col gap-6">
+      <SeccionCard
+        id="estado"
+        icono={RobotIcon}
+        titulo={`Confirmación automática · ${paisNombre}`}
+        derecha={
+          <span className="flex items-center gap-2.5">
+            <span className="text-xs font-medium text-muted-foreground">{config.activa ? "Encendida" : "Apagada"}</span>
+            <Interruptor activo={config.activa} etiqueta="Confirmación automática" deshabilitado={pendiente} alCambiar={() => pulsar("activa", !config.activa)} />
+          </span>
+        }
+        ayuda={config.activa ? "Analiza la dirección de cada pedido que iComfly deja «Confirmada»." : "Apagada: no analiza ningún pedido. Enciéndela para que empiece."}
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border px-3 py-2.5">
           <div className="min-w-0">
             <p className="m-0 text-sm font-medium">Pedir por WhatsApp el dato que falta</p>
-            <p className="m-0 text-xs text-muted-foreground">Si la dirección está incompleta, le escribe al cliente por iComfly pidiendo solo eso. Solo con el chat abierto (24 h).</p>
+            <p className="m-0 text-xs text-muted-foreground">Si la dirección está incompleta, le escribe al cliente solo lo que falta. Solo con el chat abierto (24 h).</p>
           </div>
           <Interruptor activo={config.enviarMensajes} etiqueta="Pedir por WhatsApp el dato que falta" deshabilitado={pendiente} alCambiar={() => pulsar("enviar_mensajes", !config.enviarMensajes)} />
         </div>
@@ -156,31 +173,41 @@ export function ConfirmacionIA({
             Falta conectar ChatGPT o Claude: sin sus claves no se puede analizar ninguna dirección.
           </p>
         )}
-      </section>
+      </SeccionCard>
 
-      <TableroIndicadores etiqueta="Resumen de los análisis" titulo="Lo analizado" extra={filas.length ? `Los últimos ${filas.length}` : undefined}>
-        <Indicador titulo="Listos para etiquetar" valor={String(cuenta.listo)} detalle="Dirección completa y zona clara" icono={CheckIcon} color="verde" alPulsar={() => setFiltro(filtro === "listo" ? "todos" : "listo")} activo={filtro === "listo"} />
-        <Indicador titulo="Falta un dato" valor={String(cuenta.falta_dato)} detalle="Hay que pedirle algo al cliente" icono={ChatIcon} color="ambar" punto={cuenta.falta_dato ? "aviso" : undefined} alPulsar={() => setFiltro(filtro === "falta_dato" ? "todos" : "falta_dato")} activo={filtro === "falta_dato"} />
-        <Indicador titulo="Para revisar" valor={String(cuenta.revisar)} detalle="Las IA no coinciden o fallaron" icono={AlertaIcon} color="rojo" punto={cuenta.revisar ? "peligro" : undefined} alPulsar={() => setFiltro(filtro === "revisar" ? "todos" : "revisar")} activo={filtro === "revisar"} />
-      </TableroIndicadores>
+      <nav aria-label="Secciones de esta pantalla" className="-mt-2 flex flex-wrap items-center gap-2">
+        <span className="text-xs font-medium text-muted-foreground">Ir a</span>
+        {indice.map((i) => (
+          <a key={i.id} href={`#${i.id}`} className={`inline-flex min-h-8 items-center rounded-full border border-border bg-card px-3 text-xs font-semibold text-foreground-soft hover:bg-muted ${anilloFoco}`}>
+            {i.texto}
+          </a>
+        ))}
+      </nav>
 
-      <ProbarDireccion tiendas={tiendas} puedeEscribir={puedeEscribir} tiendaElegida={tiendaElegida} />
-
-      <section aria-label="Pedidos analizados" className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
-          <h2 className="m-0 text-sm font-semibold">Pedidos analizados</h2>
-          {puedeEscribir && (
-            <button type="button" disabled={pendiente || !config.activa} onClick={analizarPendientes} className={`rounded-md border border-border-control bg-card px-3 py-1.5 text-sm font-medium hover:bg-muted disabled:opacity-50 ${anilloFoco}`}>
+      <SeccionCard
+        id="pedidos"
+        icono={PedidoIcon}
+        titulo="Pedidos analizados"
+        derecha={
+          puedeEscribir && (
+            <button type="button" disabled={pendiente || !config.activa} onClick={analizarPendientes} className={`rounded-md border border-border-control bg-card px-3 py-1 text-xs font-medium hover:bg-muted disabled:opacity-50 ${anilloFoco}`}>
               {pendiente ? "Analizando…" : "Analizar los confirmados pendientes"}
             </button>
-          )}
-        </div>
+          )
+        }
+        ayuda="Los pedidos que iComfly dejó «Confirmada» y qué propone el sistema para cada uno. Toca uno para ver el detalle."
+      >
+        <TableroIndicadores etiqueta="Resumen de los análisis" extra={filas.length ? `Los últimos ${filas.length}` : undefined}>
+          <Indicador titulo="Listos para etiquetar" valor={String(cuenta.listo)} detalle="Dirección completa y zona clara" icono={CheckIcon} color="verde" alPulsar={() => setFiltro(filtro === "listo" ? "todos" : "listo")} activo={filtro === "listo"} />
+          <Indicador titulo="Falta un dato" valor={String(cuenta.falta_dato)} detalle="Hay que pedirle algo al cliente" icono={ChatIcon} color="ambar" punto={cuenta.falta_dato ? "aviso" : undefined} alPulsar={() => setFiltro(filtro === "falta_dato" ? "todos" : "falta_dato")} activo={filtro === "falta_dato"} />
+          <Indicador titulo="Para revisar" valor={String(cuenta.revisar)} detalle="Las IA no coinciden o fallaron" icono={AlertaIcon} color="rojo" punto={cuenta.revisar ? "peligro" : undefined} alPulsar={() => setFiltro(filtro === "revisar" ? "todos" : "revisar")} activo={filtro === "revisar"} />
+        </TableroIndicadores>
         {visibles.length === 0 ? (
-          <p className="m-0 px-4 py-10 text-center text-sm text-muted-foreground">
+          <p className="m-0 rounded-lg border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
             {filas.length === 0 ? "Todavía no se analizó ningún pedido. Cuando iComfly deje uno «Confirmada», aparecerá aquí." : "Ningún pedido con ese filtro."}
           </p>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="-mx-4 -mb-4 overflow-x-auto border-t border-border">
             <table className="w-full border-collapse text-left">
               <thead>
                 <tr>
@@ -227,7 +254,17 @@ export function ConfirmacionIA({
             </table>
           </div>
         )}
-      </section>
+      </SeccionCard>
+
+      <ProbarDireccion tiendas={tiendas} puedeEscribir={puedeEscribir} tiendaElegida={tiendaElegida} />
+
+      {/* Lo que el equipo le enseña a la IA, lado a lado en pantalla ancha. */}
+      <div className="grid gap-6 xl:grid-cols-2 xl:items-start">
+        <EjemplosDirecciones paisNombre={paisNombre} distingueZona={config.distingueZona} tiendas={tiendas} tiendaObligatoria={ejemplos.tiendaObligatoria} puedeEscribir={puedeEscribir} total={ejemplos.total} />
+        <PalabrasZona paisNombre={paisNombre} distingueZona={config.distingueZona} puedeEscribir={puedeEscribir} inicial={palabras} />
+      </div>
+
+      {esAdmin && <InstruccionesIA paisNombre={paisNombre} inicial={instrucciones ?? ""} />}
 
       {ficha && <FichaAnalisis key={ficha.id} f={ficha} distingueZona={config.distingueZona} puedeEscribir={puedeEscribir} alCerrar={() => setAbierta(null)} />}
 
@@ -390,8 +427,11 @@ function ProbarDireccion({ tiendas, puedeEscribir, tiendaElegida }: { tiendas: {
   const [resultado, setResultado] = useState<{ combinado: Combinado; modelos: ResultadoModelo[]; palabras: { texto: string; resultado: Zona }[]; etiqueta: string | null } | null>(null);
   if (!puedeEscribir) return null;
   return (
-    <details className="rounded-2xl border border-border bg-card shadow-sm">
-      <summary className={`cursor-pointer rounded-2xl px-4 py-3 text-sm font-semibold ${anilloFoco}`}>Probar una dirección</summary>
+    <details className="rounded-xl border border-border bg-card">
+      <summary className={`flex cursor-pointer items-center gap-2 rounded-xl bg-muted px-4 py-2.5 text-sm font-semibold ${anilloFoco}`}>
+        <SugerenciaIcon aria-hidden="true" className="h-4 w-4 text-primario" />
+        Probar una dirección
+      </summary>
       <div className="flex flex-col gap-3 border-t border-border p-4">
         <p className="m-0 text-sm text-muted-foreground">Escribe una dirección y mira qué diría el sistema. No se guarda ni se le escribe a nadie.</p>
         <label className="flex flex-col gap-1">

@@ -10,6 +10,7 @@ import { esAdministrador } from "@/lib/permisos/acceso";
 import { proveedoresConectados } from "@/lib/publicaciones/ia/proveedor";
 import { createServiceClient } from "@/lib/supabase/server";
 import { tiendaElegida } from "@/lib/tienda/datos";
+import { contarEjemplos, listarPalabrasZona } from "../ia-actions";
 import { ConfirmacionIA } from "./confirmacion-ia";
 
 export const metadata = { title: "Confirmación con IA" };
@@ -34,14 +35,16 @@ export default async function ConfirmacionIAPage({ searchParams }: { searchParam
   const tienda = tiendaElegida(tiendas, sp.tienda);
   const { config, faltaMigracion: sinTablas } = await cargarConfig(supabase, pais.id);
   const ids = tienda ? [tienda.id] : limitado ? tiendas.map((t) => t.id) : null;
-  const { filas } = sinTablas ? { filas: [] } : await cargarAnalisis(supabase, pais.id, ids);
+  const [{ filas }, totalEjemplos, { palabras }] = sinTablas
+    ? [{ filas: [] }, 0, { palabras: [] }]
+    : await Promise.all([cargarAnalisis(supabase, pais.id, ids), contarEjemplos(), listarPalabrasZona()]);
   if (config.activa) after(() => analizarPendientes(createServiceClient(), pais.id, 5));
   const ahora = ahoraMismo();
 
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-5">
       <EncabezadoPagina titulo="Confirmación con IA" oculto>
-        Analiza la dirección de los pedidos que iComfly deja confirmados y propone si van por ciudad o por interior.
+        Analiza la dirección de los pedidos que iComfly deja confirmados y propone si van por ciudad o por interior. Aquí mismo se le enseña con ejemplos y palabras de zona.
       </EncabezadoPagina>
       {faltaMigracion ? (
         <FaltaMigracionTienda />
@@ -65,6 +68,9 @@ export default async function ConfirmacionIAPage({ searchParams }: { searchParam
             tiendaElegida={tienda?.id ?? null}
             ahora={ahora}
             apagadaPorFaltaDeIA={proveedoresConectados().length === 0}
+            ejemplos={{ total: totalEjemplos, tiendaObligatoria: limitado }}
+            palabras={palabras}
+            instrucciones={esAdministrador(usuario) ? config.instrucciones : null}
           />
         </>
       )}

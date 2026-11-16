@@ -15,6 +15,8 @@ create table if not exists confirmacion_ia_config (
   etiqueta_ciudad text,
   etiqueta_interior text,
   clave_cambio_hash text,
+  -- Instrucciones extra para la IA que escribe un administrador (se suman a las internas; el equipo no las ve).
+  instrucciones text check (instrucciones is null or char_length(instrucciones) <= 2000),
   actualizado_en timestamptz not null default now(),
   actualizado_por text
 );

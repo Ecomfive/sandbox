@@ -29,6 +29,12 @@ test("el pedido lleva las palabras de zona, los ejemplos y la dirección, y pide
   assert.deepEqual(e.imagenes, []);
 });
 
+test("las instrucciones del administrador se suman a las de siempre", () => {
+  const e = armarEntrada({ ...base, coincidencias: [], instruccionesExtra: "  Una dirección con solo el nombre del edificio es completa.  " });
+  assert.match(e.instrucciones, /INSTRUCCIONES ADICIONALES[\s\S]*Una dirección con solo el nombre del edificio es completa\./);
+  assert.doesNotMatch(armarEntrada({ ...base, coincidencias: [], instruccionesExtra: "   " }).instrucciones, /ADICIONALES/);
+});
+
 test("sin zona en el país no se piden ni se muestran las palabras de zona", () => {
   const e = armarEntrada({ ...base, distingueZona: false, coincidencias: [] });
   assert.match(e.instrucciones, /no_aplica/);

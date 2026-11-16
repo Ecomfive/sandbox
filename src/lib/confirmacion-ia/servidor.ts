@@ -31,13 +31,15 @@ export interface ConfigConfirmacion {
   etiquetaInterior: string | null;
   /** Ya hay una contraseña definida para que quien no es administrador cambie los interruptores. */
   tieneClave: boolean;
+  /** Instrucciones extra para la IA que escribió un administrador (las ve y las cambia solo un administrador). */
+  instrucciones: string | null;
 }
 
-const configVacia = (paisId: string): ConfigConfirmacion => ({ paisId, activa: false, enviarMensajes: false, distingueZona: false, etiquetaCiudad: null, etiquetaInterior: null, tieneClave: false });
+const configVacia = (paisId: string): ConfigConfirmacion => ({ paisId, activa: false, enviarMensajes: false, distingueZona: false, etiquetaCiudad: null, etiquetaInterior: null, tieneClave: false, instrucciones: null });
 
 /** La configuración del país (todo apagado si todavía no hay). Con `faltaMigracion`, las tablas no existen. */
 export async function cargarConfig(supabase: SupabaseClient, paisId: string): Promise<{ config: ConfigConfirmacion; faltaMigracion: boolean }> {
-  const { data, error } = await supabase.from("confirmacion_ia_config").select("activa, enviar_mensajes, distingue_zona, etiqueta_ciudad, etiqueta_interior, clave_cambio_hash").eq("pais_id", paisId).maybeSingle();
+  const { data, error } = await supabase.from("confirmacion_ia_config").select("activa, enviar_mensajes, distingue_zona, etiqueta_ciudad, etiqueta_interior, clave_cambio_hash, instrucciones").eq("pais_id", paisId).maybeSingle();
   if (error) return { config: configVacia(paisId), faltaMigracion: /confirmacion_ia|schema cache|does not exist/i.test(error.message) };
   if (!data) return { config: configVacia(paisId), faltaMigracion: false };
   return {
@@ -50,6 +52,7 @@ export async function cargarConfig(supabase: SupabaseClient, paisId: string): Pr
       etiquetaCiudad: (data.etiqueta_ciudad as string | null) ?? null,
       etiquetaInterior: (data.etiqueta_interior as string | null) ?? null,
       tieneClave: !!data.clave_cambio_hash,
+      instrucciones: (data.instrucciones as string | null) ?? null,
     },
   };
 }
@@ -168,7 +171,7 @@ export async function evaluarDireccion(
     if (!proveedores.length) modelos = [{ proveedor: "openai", ok: false, error: "Falta conectar ChatGPT o Claude (las claves OPENAI_API_KEY o ANTHROPIC_API_KEY)." }];
     else {
       const ejemplos = await cargarEjemplos(supabase, d.paisId, d.tiendaId);
-      const entrada = armarEntrada({ paisNombre: d.paisNombre, distingueZona: config.distingueZona, reglas, ejemplos, direccion, ciudad, coincidencias: coinc });
+      const entrada = armarEntrada({ paisNombre: d.paisNombre, distingueZona: config.distingueZona, reglas, ejemplos, direccion, ciudad, coincidencias: coinc, instruccionesExtra: config.instrucciones });
       modelos = await Promise.all(proveedores.map((p) => pedirAlModelo(p, entrada, d.numero)));
     }
   }

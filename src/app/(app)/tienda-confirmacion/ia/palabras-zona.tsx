@@ -3,7 +3,8 @@
 import { useState, useTransition } from "react";
 import { anilloFoco, fieldClass, labelClass } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
-import { CerrarIcon } from "@/lib/nav-icons";
+import { CerrarIcon, UbicacionIcon } from "@/lib/nav-icons";
+import { SeccionCard } from "./seccion";
 import type { Zona } from "@/lib/confirmacion-ia/zonas";
 import { agregarPalabraZona, eliminarPalabraZona, listarPalabrasZona, type PalabraZona } from "../ia-actions";
 
@@ -11,14 +12,14 @@ const ZONA_TEXTO: Record<Zona, string> = { ciudad: "Ciudad", interior: "Interior
 
 function Grupo({ titulo, ayuda, palabras, puedeEscribir, alQuitar }: { titulo: string; ayuda: string; palabras: PalabraZona[]; puedeEscribir: boolean; alQuitar: (p: PalabraZona) => void }) {
   return (
-    <details className="rounded-2xl border border-border bg-card shadow-sm">
-      <summary className={`flex cursor-pointer flex-wrap items-baseline justify-between gap-2 rounded-2xl px-4 py-3 text-sm font-semibold ${anilloFoco}`}>
+    <details className="rounded-lg border border-border">
+      <summary className={`flex cursor-pointer flex-wrap items-baseline justify-between gap-2 rounded-lg px-3 py-2.5 text-sm font-medium ${anilloFoco}`}>
         <span>
           {titulo} <span className="font-normal text-muted-foreground">({palabras.length})</span>
         </span>
         <span className="text-xs font-normal text-muted-foreground">{ayuda}</span>
       </summary>
-      <div className="border-t border-border p-4">
+      <div className="border-t border-border p-3">
         {palabras.length === 0 ? (
           <p className="m-0 text-sm text-muted-foreground">Todavía no hay ninguna.</p>
         ) : (
@@ -53,20 +54,26 @@ export function PalabrasZona({ paisNombre, distingueZona, puedeEscribir, inicial
 
   if (!distingueZona)
     return (
-      <p className="m-0 max-w-3xl rounded-2xl border border-border bg-card px-4 py-6 text-sm text-muted-foreground shadow-sm">
-        En {paisNombre} todavía no se distingue entre ciudad e interior, así que no se usan palabras de zona. Cuando se confirme cómo se envía, se activan aquí.
-      </p>
+      <SeccionCard id="zonas" icono={UbicacionIcon} titulo="Palabras de zona" derecha={<span className="text-xs text-muted-foreground">{paisNombre}</span>}>
+        <p className="m-0 text-sm text-muted-foreground">En {paisNombre} todavía no se distingue entre ciudad e interior, así que no se usan palabras de zona. Cuando se confirme cómo se envía, se activan aquí.</p>
+      </SeccionCard>
     );
 
   const sueltas = palabras.filter((p) => !p.compuesta);
   const juntas = palabras.filter((p) => p.compuesta);
   return (
-    <div className="flex max-w-5xl flex-col gap-5">
-      <section aria-label="Agregar una palabra de zona" className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-4 shadow-sm">
-        <div>
-          <h2 className="m-0 text-base font-semibold">Agregar una palabra de zona · {paisNombre}</h2>
-          <p className="m-0 text-sm text-muted-foreground">Si sale en la dirección, la IA toma esa zona. Una palabra sola (Colón) o varias juntas (Panamá Este); las juntas pesan más que las sueltas.</p>
-        </div>
+    <SeccionCard
+      id="zonas"
+      icono={UbicacionIcon}
+      titulo="Palabras de zona"
+      derecha={
+        <span className="text-xs text-muted-foreground">
+          {paisNombre} · {palabras.length} {palabras.length === 1 ? "guardada" : "guardadas"}
+        </span>
+      }
+      ayuda="Si una de estas palabras sale en la dirección, la IA toma esa zona. Una palabra sola (Colón) o varias juntas (Panamá Este); las juntas pesan más."
+    >
+      <div className="flex flex-col gap-4">
         {puedeEscribir ? (
           <form
             className="flex flex-wrap items-end gap-3"
@@ -106,13 +113,13 @@ export function PalabrasZona({ paisNombre, distingueZona, puedeEscribir, inicial
             {error}
           </p>
         )}
-      </section>
+      </div>
 
       <Grupo titulo="Una palabra" ayuda="Ej: Colón" palabras={sueltas} puedeEscribir={puedeEscribir} alQuitar={setQuitando} />
       <Grupo titulo="Varias palabras juntas" ayuda="Ej: Panamá Este" palabras={juntas} puedeEscribir={puedeEscribir} alQuitar={setQuitando} />
 
       {quitando && (
-        <div role="alertdialog" aria-label="Quitar palabra" className="flex flex-wrap items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 shadow-sm">
+        <div role="alertdialog" aria-label="Quitar palabra" className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-muted px-3 py-2.5">
           <span className="text-sm">
             ¿Quitar <b>{quitando.texto}</b>?
           </span>
@@ -136,6 +143,6 @@ export function PalabrasZona({ paisNombre, distingueZona, puedeEscribir, inicial
           </button>
         </div>
       )}
-    </div>
+    </SeccionCard>
   );
 }

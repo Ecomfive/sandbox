@@ -2,6 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { Pastilla } from "@/components/panel/piezas-panel";
+import { ListaIcon } from "@/lib/nav-icons";
+import { SeccionCard } from "./seccion";
 import { anilloFoco, fieldClass, labelClass } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import type { Zona } from "@/lib/confirmacion-ia/zonas";
@@ -166,14 +168,18 @@ export function EjemplosDirecciones({
   }
 
   return (
-    <div className="flex max-w-5xl flex-col gap-5">
-      <section aria-label="Agregar una dirección" className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-4 shadow-sm">
-        <div>
-          <h2 className="m-0 text-base font-semibold">Agregar una dirección de ejemplo · {paisNombre}</h2>
-          <p className="m-0 text-sm text-muted-foreground">
-            Cuantas más direcciones completas e incompletas agregues, mejor distingue la IA lo que falta. {total} {total === 1 ? "guardada" : "guardadas"}.
-          </p>
-        </div>
+    <SeccionCard
+      id="ejemplos"
+      icono={ListaIcon}
+      titulo="Direcciones de ejemplo"
+      derecha={
+        <span className="text-xs text-muted-foreground">
+          {paisNombre} · {total} {total === 1 ? "guardada" : "guardadas"}
+        </span>
+      }
+      ayuda="Escribe una dirección como la dejó el cliente y marca si está completa o incompleta. Cuantas más agregues, mejor distingue la IA qué falta."
+    >
+      <div className="flex flex-col gap-4">
         {puedeEscribir ? (
           <FormularioEjemplo
             distingueZona={distingueZona}
@@ -192,17 +198,17 @@ export function EjemplosDirecciones({
         ) : (
           <p className="m-0 text-sm text-muted-foreground">Solo lectura: tu rol no puede agregar direcciones.</p>
         )}
-      </section>
+      </div>
 
       <details
-        className="rounded-2xl border border-border bg-card shadow-sm"
+        className="rounded-lg border border-border"
         onToggle={(e) => {
           const abre = (e.currentTarget as HTMLDetailsElement).open;
           setAbierto(abre);
           if (abre && !lista) void cargar(solo, limite);
         }}
       >
-        <summary className={`cursor-pointer rounded-2xl px-4 py-3 text-sm font-semibold ${anilloFoco}`}>Ver y corregir las últimas agregadas</summary>
+        <summary className={`cursor-pointer rounded-lg px-3 py-2.5 text-sm font-medium ${anilloFoco}`}>Ver y corregir las últimas agregadas</summary>
         <div className="flex flex-col gap-3 border-t border-border p-4">
           <div role="group" aria-label="Quién las agregó" className="flex gap-2">
             {(["todos", "mios"] as const).map((s) => (
@@ -315,6 +321,6 @@ export function EjemplosDirecciones({
           )}
         </div>
       </details>
-    </div>
+    </SeccionCard>
   );
 }
