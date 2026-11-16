@@ -144,6 +144,8 @@ export const MIGRACIONES_CLAVE: { migracion: string; que: string; prueba: Prueba
   { migracion: "0967", que: "El costo de las órdenes de Shopify entra al EERR por canal", prueba: { tipo: "funcion", nombre: "fin_costos_desde_ordenes" } },
   { migracion: "0968", que: "Etiquetas y franja horaria de las órdenes de tienda", prueba: { tipo: "columna", nombre: "ven_ordenes", columna: "franja" } },
   { migracion: "0969", que: "Tiempo de carga de cada página", prueba: { tipo: "tabla", nombre: "app_metricas" } },
+  { migracion: "0970", que: "Despacho ciudad y Devoluciones: Monday dentro del sistema", prueba: { tipo: "tabla", nombre: "despacho_actividad" } },
+  { migracion: "0971", que: "Despacho ciudad: archivar y restaurar una fila", prueba: { tipo: "columna", nombre: "mon_despachos", columna: "archivado_en" } },
 ];
 
 /** Lo que se muestra de una prueba («Falta …»). */
