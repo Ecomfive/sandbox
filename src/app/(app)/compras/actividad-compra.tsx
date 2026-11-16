@@ -35,6 +35,7 @@ const NOMBRE_CAMPO: Record<string, string> = {
   paisesDestino: "Países de destino",
   codigo: "Código",
   registroPagos: "Registro de pagos de Shen Zhen",
+  cajas: "Cajas (Cartons)",
 };
 const corto = (t: string | null, max = 120) => (t && t.length > max ? `${t.slice(0, max)}…` : t);
 

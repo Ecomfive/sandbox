@@ -17,6 +17,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { sinAccesoAlTablero } from "../acceso-compras";
 import { campoOculto, restriccionesDe } from "../permisos-compras";
 import type { CuentaPortal } from "./cuenta-proveedor";
+import { etiquetasDePedidos } from "@/lib/proveedor/etiquetas-datos";
 import { QueHacerChin } from "./que-hacer-chin";
 import { TableroChin } from "./tablero-chin";
 
@@ -122,6 +123,7 @@ export default async function TableroChinPage({ searchParams }: { searchParams: 
     pedidos: activos,
     plazos: espejo.plazos,
     fotosReales,
+    etiquetas: await etiquetasDePedidos(supabase, activos).catch(() => ({})),
     avisos: (nuevasParaChin ?? []).map((a) => ({ id: a.id as string, texto: a.texto as string, creadoEn: a.creado_en as string })),
     pagos: pagos ? { resumen: pagos.resumen, filas: pagos.filas, cambios: pagos.cambios } : null,
     traducciones,
