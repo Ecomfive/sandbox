@@ -4,7 +4,7 @@
 import { MESES_PLANIFICACION } from "./planificacion";
 
 /** Las etapas en que la mercancía ya llegó o la compra terminó: no cuentan como «por llegar». */
-const ETAPAS_YA_LLEGO = ["arribo_mercancia", "completado", "descartado"];
+const ETAPAS_YA_LLEGO = ["arribo_mercancia", "en_bodega", "completado", "descartado"];
 
 export interface CompraPorLlegar {
   etapa: string;

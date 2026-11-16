@@ -10,6 +10,8 @@ import { registrarAuditoria, registrarAuditoriaLote } from "@/lib/auditoria";
 import { MENSAJE_ACCION_BLOQUEADA, requireModulo, requireModuloEscritura, getUsuarioActual } from "@/lib/auth";
 import { EMOJIS_REACCION } from "@/lib/compras/reacciones";
 import { detectarAdjunto, MAX_ADJUNTOS_COMENTARIO, MAX_BYTES_ADJUNTO, nombreSeguro } from "@/lib/compras/adjuntos";
+import { avisarLlegada } from "@/lib/compras/llegadas-servidor";
+import { llegadaDeEtapa } from "@/lib/compras/llegadas-avisos";
 import { cierreAlCambiarEtapa, combinarLista, MAX_COMPRAS_LOTE, type ModoLote } from "@/lib/compras/lote";
 import { mencionadosValidos, notificarMenciones } from "@/lib/menciones";
 import { puedeVerPais } from "@/lib/paises-permitidos";
@@ -260,6 +262,17 @@ async function anotarEventos(compraId: string, antes: { etapa: string; estado: s
   if (filas.length) await createServiceClient().from("wms_compra_eventos").insert(filas);
 }
 
+/**
+ * Pasar compras a «06 - Llegada a Puerto» o «07 - En Bodega» avisa a quien le toca (migración 0304): se hace después de responder, con todas las compras del cambio como una
+ * sola llegada. Otra etapa no hace nada.
+ */
+async function avisarCambioDeEtapa(etapa: string, compraIds: string[]) {
+  if (!llegadaDeEtapa(etapa) || compraIds.length === 0) return;
+  const usuario = await getUsuarioActual();
+  const autor = { id: usuario?.id ?? null, nombre: usuario?.nombre || usuario?.email || null };
+  after(() => avisarLlegada(createServiceClient(), { etapa, compraIds, autor }));
+}
+
 /** Devuelve el error como valor, no lo lanza: en producción Next.js oculta el mensaje de una excepción de una acción. */
 export async function crearCompra(formData: FormData): Promise<{ error?: string; codigo?: string | null; id?: string }> {
   const creador = await requireModuloEscritura("compras");
@@ -413,6 +426,7 @@ export async function actualizarCompra(formData: FormData): Promise<{ error?: st
   if (error) return { error: error.message };
   if (actual) {
     await anotarEventos(id, { etapa: actual.etapa, estado: actual.estado }, { etapa, estado });
+    if (actual.etapa !== etapa) await avisarCambioDeEtapa(etapa, [id]);
     // Lo demás que cambió en la ficha, en palabras, para la Actividad.
     const nuevo: Record<string, unknown> = { ...actual, ...tipoYPais, nombre, ...cambios };
     await anotarCambios(id, [
@@ -481,6 +495,7 @@ export async function actualizarCampoCompra(
       { etapa: String(actual.etapa), estado: String(actual.estado) },
       { etapa: campo === "etapa" ? String(normalizado.valor) : String(actual.etapa), estado: campo === "estado" ? String(normalizado.valor) : String(actual.estado) },
     );
+    if (campo === "etapa" && String(actual.etapa) !== String(normalizado.valor)) await avisarCambioDeEtapa(String(normalizado.valor), [id]);
   }
   if (campo !== "etapa" && campo !== "estado") {
     await anotarCambios(id, [
@@ -613,6 +628,8 @@ export async function actualizarCampoComprasLote(
       origen: "sistema",
     }));
     await supabase.from("wms_compra_eventos").insert([...filas, ...filasPlan]);
+    // Las que pasaron a Llegada a Puerto o a En Bodega (juntas, como una sola llegada) avisan a Logística o a Pagos.
+    if (campo === "etapa") await avisarCambioDeEtapa(String(normalizado.valor), cambiaron);
     await registrarAuditoriaLote(
       cambiaron.map((id) => ({
         accion: "editar_campo_compra",

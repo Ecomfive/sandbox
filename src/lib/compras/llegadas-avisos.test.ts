@@ -1,0 +1,92 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import test from "node:test";
+import { ETAPAS_COMPRA } from "../../app/(app)/compras/def-compras";
+import { armarAviso, llegadaDeEtapa, pagadoTrasSegundoPago, revisarPago, textoProductos, totalesDeLlegada, type FilaLlegada } from "./llegadas-avisos";
+
+const fila = (o: Partial<FilaLlegada> = {}): FilaLlegada => ({
+  compraId: "c1",
+  orden: "OC-0101",
+  codigo: "ECOM01-0525",
+  productos: [{ codigo: "ACEITE/OREGANO", nombre: "Aceite de orégano" }],
+  unidades: 500,
+  cajas: 10,
+  etiquetasRutas: [],
+  segundoPago: 1200,
+  pagadoEn: null,
+  montoPagado: null,
+  pagadoPor: null,
+  etapa: "en_bodega",
+  ...o,
+});
+
+test("el flujo de etapas queda 04 Producción → 05 Tracking → 06 Llegada a Puerto → 07 En Bodega → 08 Completado", () => {
+  const etiquetas = Object.fromEntries(ETAPAS_COMPRA.map((e) => [e.valor, e.etiqueta]));
+  assert.equal(etiquetas.produccion, "04 - En Producción");
+  assert.equal(etiquetas.tracking, "05 - Tracking");
+  assert.equal(etiquetas.arribo_mercancia, "06 - Llegada a Puerto");
+  assert.equal(etiquetas.en_bodega, "07 - En Bodega");
+  assert.equal(etiquetas.completado, "08 - Completado");
+  const orden = ETAPAS_COMPRA.map((e) => e.valor);
+  assert.ok(orden.indexOf("arribo_mercancia") < orden.indexOf("en_bodega") && orden.indexOf("en_bodega") < orden.indexOf("completado"));
+});
+
+test("la migración acepta la etapa nueva y la de las acciones es la misma que la del código", () => {
+  const sql = readFileSync(new URL("../../../supabase/migrations/0304_compras_llegadas.sql", import.meta.url), "utf8");
+  for (const e of ETAPAS_COMPRA) assert.match(sql, new RegExp(`'${e.valor}'`), e.valor);
+});
+
+test("solo Llegada a Puerto y En Bodega avisan", () => {
+  assert.deepEqual(llegadaDeEtapa("arribo_mercancia"), { tipo: "puerto", evento: "llegada_puerto" });
+  assert.deepEqual(llegadaDeEtapa("en_bodega"), { tipo: "bodega", evento: "llegada_bodega" });
+  for (const e of ["tracking", "completado", "produccion", "descartado"]) assert.equal(llegadaDeEtapa(e), null, e);
+});
+
+test("totales: unidades, cajas, por pagar y ya pagado", () => {
+  const t = totalesDeLlegada([
+    fila(),
+    fila({ compraId: "c2", unidades: 300, cajas: null, segundoPago: 800 }),
+    fila({ compraId: "c3", unidades: null, cajas: 4, segundoPago: null }),
+    fila({ compraId: "c4", pagadoEn: "2026-11-20", montoPagado: 500, segundoPago: 500 }),
+  ]);
+  assert.equal(t.compras, 4);
+  assert.equal(t.unidades, 500 + 300 + 500);
+  assert.equal(t.cajas, 10 + 4 + 10);
+  assert.equal(t.sinCajas, 1);
+  assert.equal(t.porPagar, 1200 + 800);
+  assert.equal(t.sinMonto, 1);
+  assert.equal(t.pagado, 500);
+  assert.equal(t.pendientes, 3);
+});
+
+test("el aviso a Logística trae productos, unidades y cajas", () => {
+  const a = armarAviso("puerto", [fila(), fila({ compraId: "c2", orden: "OC-0102", productos: [{ codigo: null, nombre: "Crema Nida" }], unidades: 1000, cajas: 25 })]);
+  assert.match(a.titulo, /2 compras/);
+  assert.match(a.titulo, /1\.500 unidades|1,500 unidades|1500 unidades/);
+  assert.match(a.texto, /ACEITE\/OREGANO · Aceite de orégano/);
+  assert.match(a.texto, /Crema Nida/);
+  assert.match(a.texto, /35 cajas/);
+});
+
+test("el aviso a Pagos trae el monto de cada compra y el total", () => {
+  const a = armarAviso("bodega", [fila(), fila({ compraId: "c2", segundoPago: 800.5 }), fila({ compraId: "c3", segundoPago: null })]);
+  assert.match(a.titulo, /\$2[.,]000\.50|\$2[.,]000,50|\$2000\.50/);
+  assert.match(a.texto, /sin monto/);
+});
+
+test("un aviso largo se resume con «+N más»", () => {
+  const filas = Array.from({ length: 7 }, (_, i) => fila({ compraId: `c${i}` }));
+  assert.match(armarAviso("puerto", filas).texto, /\+3 más/);
+  assert.match(textoProductos(fila({ productos: [{ codigo: "A", nombre: "a" }, { codigo: "B", nombre: "b" }, { codigo: "C", nombre: "c" }] })), /\+1 más/);
+  assert.equal(textoProductos(fila({ productos: [] })), "ECOM01-0525");
+});
+
+test("registrar el pago: monto y día válidos, y el pagado a proveedor nunca baja", () => {
+  assert.deepEqual(revisarPago("1200,50", "2026-11-16", "2026-11-16"), { monto: 1200.5, dia: "2026-11-16" });
+  assert.ok("error" in revisarPago(0, "2026-11-16", "2026-11-16"));
+  assert.ok("error" in revisarPago(100, "2026-11-17", "2026-11-16"));
+  assert.ok("error" in revisarPago(100, "mañana", "2026-11-16"));
+  assert.equal(pagadoTrasSegundoPago(null, 1000, 1200), 2200);
+  assert.equal(pagadoTrasSegundoPago(5000, 1000, 1200), 5000);
+  assert.equal(pagadoTrasSegundoPago(2000, null, 1200), 2000);
+});
