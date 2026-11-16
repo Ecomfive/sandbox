@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { acierto, coincideConPropuesta, resultadoFinal, revisarVeredicto, seleccionarEjemplos } from "./revision";
+import { acierto, coincideConPropuesta, faltaVigente, resultadoFinal, revisarVeredicto, seleccionarEjemplos } from "./revision";
 
 const etiquetas = { etiquetaCiudad: "CIUDAD", etiquetaInterior: "INTERIOR/SERVIENTREGA" };
 
@@ -47,4 +47,12 @@ test("seleccionarEjemplos reparte las completas entre ciudad e interior y deja l
   assert.deepEqual(r.filter((x) => x.completa).map((x) => x.id), [1, 5, 2], "ciudad, interior y otra vez ciudad: no solo ciudad");
   assert.deepEqual(r.filter((x) => !x.completa).map((x) => x.id), [6, 7, 8]);
   assert.equal(seleccionarEjemplos([e(1, true, "ciudad"), e(2, true, "ciudad")], 5).length, 2, "si no hay más, no inventa");
+});
+
+test("faltaVigente: lo que marcó el equipo manda; sin revisión, lo que dijo la IA", () => {
+  assert.equal(faltaVigente({ estado: "falta_dato", falta: "la calle" }), "la calle");
+  assert.equal(faltaVigente({ estado: "listo", falta: null }), null);
+  assert.equal(faltaVigente({ estado: "revisar", rev_en: "2026-11-16", rev_completa: false, rev_falta: "el número de casa" }), "el número de casa", "marcado a mano como falta un dato");
+  assert.equal(faltaVigente({ estado: "falta_dato", falta: "la calle", rev_en: "2026-11-16", rev_completa: true }), null, "el equipo dijo que estaba completa");
+  assert.equal(faltaVigente({ estado: "falta_dato", falta: "la calle", rev_en: null }), "la calle");
 });
