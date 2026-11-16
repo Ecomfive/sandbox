@@ -16,7 +16,7 @@ export interface AccionCrear {
 
 export const ACCIONES_CREAR: AccionCrear[] = [
   { id: "retiro", etiqueta: "Nuevo retiro", detalle: "Registrar un retiro de una plataforma", href: "/retiros?nuevo=1", modulo: "retiros" },
-  { id: "gasto", etiqueta: "Registrar gasto", detalle: "Nómina y gastos operativos", href: "/gastos?nuevo=1", modulo: "gastos" },
+  { id: "gasto", etiqueta: "Registrar gasto", detalle: "Se anota en el Libro de movimientos", href: "/libro-movimientos?nuevo=1", modulo: "libro-movimientos" },
   { id: "extracto", etiqueta: "Cargar extracto bancario", detalle: "Subir el extracto del banco", href: "/extractos", modulo: "extractos" },
   {
     id: "inventario",

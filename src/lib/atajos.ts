@@ -16,7 +16,7 @@ const ATAJOS_IR: AtajoIr[] = [
   { tecla: "i", href: "/inventario", etiqueta: "Inventario" },
   { tecla: "o", href: "/productos", etiqueta: "Productos" },
   { tecla: "m", href: "/producto", etiqueta: "Producto" },
-  { tecla: "s", href: "/gastos", etiqueta: "Gastos" },
+  { tecla: "s", href: "/libro-movimientos", etiqueta: "Libro de movimientos" },
   { tecla: "f", href: "/estado-resultados", etiqueta: "Estado de resultados" },
   { tecla: "e", href: "/extractos", etiqueta: "Extractos" },
   { tecla: "n", href: "/notificaciones", etiqueta: "Notificaciones" },

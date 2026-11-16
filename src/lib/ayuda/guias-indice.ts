@@ -22,7 +22,6 @@ export const MODULOS_CON_GUIA: Record<string, string> = {
   "/pedidos-dropi": "pedidos-dropi",
   "/retiros": "retiros",
   "/extractos": "extractos",
-  "/gastos": "gastos",
   "/estado-resultados": "estado-resultados",
   "/estado-resultados/precio-transferencia": "estado-resultados",
   "/libro-movimientos": "libro-movimientos",

@@ -1297,7 +1297,6 @@ export const ICONOS_PAGINA: Record<string, (props: SVGProps<SVGSVGElement>) => R
   "/producto": ProductoIcon,
   "/retiros": ConciliacionIcon,
   "/extractos": ExtractoIcon,
-  "/gastos": GastoIcon,
   "/panel-financiero": PanelFinancieroIcon,
   "/presupuesto": PresupuestoIcon,
   "/planificacion": ProyeccionCajaIcon,

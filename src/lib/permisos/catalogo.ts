@@ -110,7 +110,6 @@ export const AREAS_ACCESO: AreaAcceso[] = [
       { clave: "conciliaciones", etiqueta: "Conciliación" },
       { clave: "extractos", etiqueta: "Extractos bancarios" },
       { clave: "productos", etiqueta: "Productos y márgenes" },
-      { clave: "gastos", etiqueta: "Nómina y gastos" },
       // Portal AF4 360° (Finanzas consolidada)
       { clave: "panel-financiero", etiqueta: "Panel financiero" },
       { clave: "estado-resultados", etiqueta: "Estado de resultados" },
@@ -155,7 +154,7 @@ export const MODULOS_ACCESO: ModuloAcceso[] = AREAS_ACCESO.flatMap((a) => a.modu
 export const etiquetaDeModulo = (clave: string): string => MODULOS_ACCESO.find((m) => m.clave === clave)?.etiqueta ?? clave;
 
 /** Los módulos con datos sensibles (nómina, bancos, retiros, márgenes) y los que dan poder de administración: llevan su marca en la matriz. */
-export const MODULOS_SENSIBLES: ReadonlySet<string> = new Set(["retiros", "conciliaciones", "extractos", "productos", "gastos", "usuarios", "configuracion", "rendimiento", "unir-productos", "salida-manual", "nomina", "utilidades", "tesoreria", "conciliacion-bancaria", "libro-movimientos"]);
+export const MODULOS_SENSIBLES: ReadonlySet<string> = new Set(["retiros", "conciliaciones", "extractos", "productos", "usuarios", "configuracion", "rendimiento", "unir-productos", "salida-manual", "nomina", "utilidades", "tesoreria", "conciliacion-bancaria", "libro-movimientos"]);
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Lo que se puede afinar dentro de un módulo

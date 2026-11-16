@@ -13,7 +13,6 @@ export const MODULOS: Modulo[] = [
   { clave: "conciliaciones", etiqueta: "Conciliación" },
   { clave: "productos", etiqueta: "Productos y márgenes" },
   { clave: "retiros", etiqueta: "Conciliación de Retiros" },
-  { clave: "gastos", etiqueta: "Nómina y gastos" },
   { clave: "estado-resultados", etiqueta: "Estado de resultados" },
   { clave: "panel-financiero", etiqueta: "Panel financiero" },
   { clave: "presupuesto", etiqueta: "Presupuesto y escenarios" },

@@ -400,13 +400,6 @@ export const GUIAS: GuiaModulo[] = [
     secciones: [{ titulo: "Uso", pasos: ["Sube el archivo del banco; los movimientos se clasifican con el Diccionario de patrones.", "Agrega un patrón para que un tipo de movimiento se reconozca solo la próxima vez."] }],
   },
   {
-    modulo: "gastos",
-    titulo: "Nómina y gastos",
-    ruta: "/gastos",
-    resumen: "Registro de gastos y nómina por categoría y mes.",
-    secciones: [{ titulo: "Uso", pasos: ["«Agregar» registra un gasto con su categoría.", "Las tarjetas de categoría filtran la tabla del mes."] }],
-  },
-  {
     modulo: "estado-resultados",
     titulo: "Estado de resultados",
     ruta: "/estado-resultados",
@@ -2138,6 +2131,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-11-16", titulo: "Se quitó «Nómina y gastos»: los gastos van al Libro de movimientos", texto: "La pantalla «Nómina y gastos» (Proveeduría Dropi) se quitó: nunca tuvo registros y repetía lo que ya hace el Libro de movimientos, que queda como el único lugar para registrar gastos. «Crear › Registrar gasto» y el atajo de la tecla S llevan ahora al Libro de movimientos. La nómina y la planilla siguen en «Nómina» (Finanzas).", modulo: "libro-movimientos", href: "/libro-movimientos" },
   { fecha: "2026-11-16", titulo: "Compras: columnas de cajas y etiqueta de las cajas", texto: "La lista de Compras ahora trae las columnas «Cajas (Cartons)» y «Etiqueta de las cajas» (cuántas imágenes subió Shen Zhen), que se pueden ordenar, filtrar (con o sin etiqueta) y ocultar desde «Columnas». La imagen de la etiqueta se abre en la ficha de la compra.", modulo: "compras", href: "/compras/lista" },
   { fecha: "2026-11-16", titulo: "Nuevo: ¿Cuánto hay? (la tienda pregunta, Yiletsi responde)", texto: "Las tiendas ya no tienen que escribir para saber cuánto hay de un producto: en «Preguntar cuánto hay» eligen el producto del catálogo, escriben una nota si quieren y preguntan. Yiletsi lo ve en «Responder cuánto hay», separado por tienda, manda a contar a despacho y responde con la cantidad; a quien preguntó le llega en «Para ti».", modulo: "tienda-cuanto-hay", href: "/tienda-cuanto-hay" },
   { fecha: "2026-11-16", titulo: "Retiros: las novedades resueltas ya se encuentran con el filtro", texto: "Un retiro con la novedad resuelta queda cerrado y su Consolidación dice «Novedad resuelta», pero el filtro de Estado «Novedad resuelta» no lo encontraba. Ya sale con ese filtro (dentro de «Cerrados») y también hay un filtro nuevo de Consolidación (Pendiente, Consolidado o Novedad resuelta). La tarjeta «Retiros cerrados» cuenta solo los conciliados, igual que su filtro. Además, la lupa de la tabla ya busca por el número del retiro (#0143, 0143 o 143), en abiertos y cerrados.", modulo: "retiros", href: "/retiros" },

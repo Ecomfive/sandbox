@@ -169,7 +169,6 @@ const AREAS: NavSection[] = [
       { label: "Clientes y marketing", href: "/clientes-marketing", grupo: "Comercial" },
       { label: "Conciliación de Retiros", href: "/retiros", dropi: true, grupo: "Proveeduría Dropi" },
       { label: "Extractos bancarios", href: "/extractos", dropi: true, grupo: "Proveeduría Dropi" },
-      { label: "Nómina y gastos", href: "/gastos", dropi: true, grupo: "Proveeduría Dropi" },
       { label: "Productos y márgenes", href: "/productos", dropi: true, grupo: "Proveeduría Dropi" },
     ],
   },

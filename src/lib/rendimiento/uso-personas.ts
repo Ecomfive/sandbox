@@ -12,7 +12,7 @@ export const FRENTES_USO = [
   { id: "compras", etiqueta: "Compras", rutas: ["/compras", "/portal-proveedor"] },
   { id: "inventario", etiqueta: "Inventario", rutas: ["/inventario", "/wms-bodegas", "/wms-ubicaciones"] },
   { id: "pedidos", etiqueta: "Pedidos y ventas", rutas: ["/pedidos-dropi", "/tienda-pedidos", "/tienda-confirmacion", "/tienda-logistica", "/tienda-productos", "/tienda-tiendas", "/tienda-dashboard", "/ventas-dropi", "/ventas-tiendas", "/deliverys"] },
-  { id: "finanzas", etiqueta: "Finanzas", rutas: ["/retiros", "/conciliaciones", "/extractos", "/gastos", "/productos", "/panel-financiero"] },
+  { id: "finanzas", etiqueta: "Finanzas", rutas: ["/retiros", "/conciliaciones", "/extractos", "/productos", "/panel-financiero"] },
   {
     id: "investigacion",
     etiqueta: "Investigación y testing",
