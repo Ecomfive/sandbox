@@ -15,6 +15,7 @@ import {
   leerChatTienda,
   notaChat,
   pausarBotChat,
+  pausarFlujosChat,
   plantillasChat,
   type DestinoChat,
   type EstadoChat,
@@ -26,6 +27,7 @@ import {
 } from "@/lib/tienda/chat-tienda";
 import type { PlantillaChat } from "@/lib/tienda/chat-tienda-datos";
 import { ChatIcon } from "@/lib/nav-icons";
+import { ControlBotChat } from "./control-bot-chat";
 
 // El chat de WhatsApp de un cliente en el número de su tienda, por iComfly (13 nov 2026; prototipo «Chat de tiendas con iComfly» aprobado). Se usa en la ficha
 // del pedido (sin apartado propio). Se vuelve a leer cada 8 segundos mientras está a la vista (iComfly no avisa de los mensajes nuevos).
@@ -340,12 +342,20 @@ export function ChatTienda({
     setNota(false);
     void leer();
   }
-  async function cambiarBot() {
-    if (!chat) return;
+  async function cambiarBot(pausar: boolean) {
     setOcupado(true);
-    const r = await pausarBotChat(destino, !chat.botPausado);
+    const r = await pausarBotChat(destino, pausar);
     setOcupado(false);
     if (r.error) return mostrarToast(r.error, "destructive");
+    mostrarToast(pausar ? "La IA quedó en pausa en este chat." : "La IA vuelve a responder en este chat.");
+    void leer();
+  }
+  async function cambiarFlujos(pausar: boolean) {
+    setOcupado(true);
+    const r = await pausarFlujosChat(destino, pausar);
+    setOcupado(false);
+    if (r.error) return mostrarToast(r.error, "destructive");
+    mostrarToast(pausar ? "Los flujos quedaron en pausa en este chat." : "Los flujos siguen en este chat.");
     void leer();
   }
 
@@ -365,24 +375,15 @@ export function ChatTienda({
           <span className="text-[11px] text-muted-foreground">vía iComfly</span>
         </div>
         <div className="flex items-center justify-between gap-2 text-xs">
-          <span className="inline-flex items-center gap-2">
-            <button
-              type="button"
-              role="switch"
-              aria-checked={!chat.botPausado}
-              aria-label="Bot de iComfly en este chat"
-              disabled={!escribir || ocupado || chat.conversacionId === null}
-              onClick={cambiarBot}
-              className={`relative h-5 w-9 rounded-full transition-colors disabled:opacity-50 ${chat.botPausado ? "bg-border-control" : "bg-success"} ${anilloFoco}`}
-            >
-              <span
-                className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all ${chat.botPausado ? "left-0.5" : "left-[18px]"}`}
-              />
-            </button>
-            {chat.botPausado
-              ? `Bot en pausa${chat.pausadoPor ? ` · lo atiende ${chat.pausadoPor}` : ""}`
-              : "Bot respondiendo"}
-          </span>
+          <ControlBotChat
+            iaPausada={chat.botPausado}
+            flujosPausados={chat.flujosPausados}
+            flujosDisponibles={chat.flujosDisponibles}
+            pausadoPor={chat.pausadoPor}
+            deshabilitado={!escribir || ocupado || chat.conversacionId === null}
+            alCambiarIA={(p) => void cambiarBot(p)}
+            alCambiarFlujos={(p) => void cambiarFlujos(p)}
+          />
         </div>
       </div>
 

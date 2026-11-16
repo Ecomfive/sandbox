@@ -2639,6 +2639,15 @@ convenciones técnicas del código.
   (`enviar_media_whatsapp` pide una URL pública). **El chat queda quieto** (13 nov 2026, pedido de Hernán): en `ficha-orden.tsx`, con el chat a la derecha
   (`@2xl`), la fila de la grilla es `minmax(0,1fr)` y solo se desplaza la columna de la ficha (`overflow-y-auto`; pestañas `@2xl:top-0`, secciones
   `@2xl:scroll-mt-12`); el `aside` ocupa todo el alto sin `sticky`. La página de una orden (`detalle-finanzas.tsx`) le da alto fijo para lo mismo.
+  **IA y flujos por separado, y silenciar el aviso** (16 nov 2026, pedido de Hernán; migración 0298, reversa `supabase/rollbacks/0298_rollback.sql`): iComfly separa por chat «La IA» (responde sola) y «Los flujos» (mensajes
+  programados y plantillas automáticas). `ControlBotChat` (`src/components/tienda/control-bot-chat.tsx`) reemplaza el interruptor único: un botón con el estado («Bot respondiendo», «IA en pausa», «Flujos en
+  pausa», «Bot en pausa · lo atiende X») que despliega «Solo este chat» con los dos interruptores. La IA sigue con `pausar_bot_conversacion` (`pausarBotChat`); los flujos con `pausarFlujosChat` →
+  `pausarFlujos` (`chat-tienda-datos.ts`), que **busca en la lista del conector** (`tools/list`, guardada 10 min) la herramienta de pausa de flujos —no hay un nombre documentado— con
+  `herramientaDeFlujos` y arma los argumentos por su esquema con `armarLlamadaFlujos` (`src/lib/tienda/flujos-chat.ts`, con prueba). Si el conector no tiene una, el interruptor sale «No disponible»
+  (`EstadoChat.flujosDisponibles`). Lo pausado se anota en `tienda_chat_conversaciones.flujos_pausados` (iComfly no dice cómo está; sin la 0298 los flujos se ven activos y pausarlos avisa que falta
+  la migración). «Probar conexión» (Tiendas Shopify) ahora lista también las funciones de pausa y flujos que ve (`· pausa: …`). **Pendiente de probar con iComfly real**: qué función pausa los flujos.
+  **Silenciar el aviso «Nuevo pedido»**: `AvisoPedidosNuevos` trae una cornetita en cada tarjeta (`SonidoIcon`/`SilencioIcon`); silencia el «ding» sin quitar los avisos y se vuelve a activar desde otro
+  aviso (suena una vez al activar). Se recuerda en el navegador de cada persona (`aviso-pedidos-silenciado-v1`, `useSyncExternalStore`, vale en todas sus pestañas).
 
 ## Dónde vive cada cosa
 

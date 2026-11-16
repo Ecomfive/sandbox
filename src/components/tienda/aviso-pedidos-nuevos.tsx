@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { anilloFoco } from "@/components/ui/field";
+import { Tooltip } from "@/components/ui/tooltip";
 import { pedidosNuevos, type PedidoNuevo } from "@/app/(app)/tienda-pedidos/avisos-actions";
 import { formatearMoneda } from "@/lib/formato";
-import { CerrarIcon, PedidoIcon } from "@/lib/nav-icons";
+import { CerrarIcon, PedidoIcon, SilencioIcon, SonidoIcon } from "@/lib/nav-icons";
 
 /** Cada cuánto se pregunta por pedidos nuevos (solo con la pestaña a la vista). */
 const CADA_MS = 30_000;
@@ -35,6 +36,42 @@ function sonar() {
   }
 }
 
+// El sonido se puede silenciar desde el mismo aviso (14 nov 2026, pedido de Hernán): los avisos siguen cayendo, solo no suenan. Se recuerda en el navegador de cada
+// persona y vale para todas sus pestañas; desde un aviso se vuelve a activar.
+const CLAVE_SILENCIO = "aviso-pedidos-silenciado-v1";
+const oyentes = new Set<() => void>();
+// Respaldo cuando el navegador no deja guardar (ventana privada o sitio bloqueado): vale hasta recargar.
+let memoria = false;
+
+function leerSilencio(): boolean {
+  try {
+    return window.localStorage.getItem(CLAVE_SILENCIO) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function guardarSilencio(silenciado: boolean) {
+  try {
+    if (silenciado) window.localStorage.setItem(CLAVE_SILENCIO, "1");
+    else window.localStorage.removeItem(CLAVE_SILENCIO);
+  } catch {
+    memoria = silenciado;
+  }
+  for (const o of oyentes) o();
+}
+
+const silenciado = () => leerSilencio() || memoria;
+
+function suscribir(alCambiar: () => void) {
+  oyentes.add(alCambiar);
+  window.addEventListener("storage", alCambiar);
+  return () => {
+    oyentes.delete(alCambiar);
+    window.removeEventListener("storage", alCambiar);
+  };
+}
+
 /**
  * El aviso de «Nuevo pedido» (12 nov 2026, pedido de Hernán, como en la app de Jorge): cuando cae un pedido en una tienda conectada a Shopify, abajo a la
  * derecha sale una tarjeta con la tienda, el número y el total, y un sonido corto; «Ver» abre el pedido. Se pregunta cada 30 segundos mientras la pestaña
@@ -44,6 +81,12 @@ export function AvisoPedidosNuevos({ codigoPais }: { codigoPais: string }) {
   const [avisos, setAvisos] = useState<PedidoNuevo[]>([]);
   const desde = useRef<string>(new Date().toISOString());
   const vistos = useRef(new Set<string>());
+  const sinSonido = useSyncExternalStore(suscribir, silenciado, () => false);
+  // El ciclo de revisión vive todo el tiempo: lee el estado actual y no el del momento en que se montó.
+  const sinSonidoAhora = useRef(sinSonido);
+  useEffect(() => {
+    sinSonidoAhora.current = sinSonido;
+  }, [sinSonido]);
 
   useEffect(() => {
     let vivo = true;
@@ -58,7 +101,7 @@ export function AvisoPedidosNuevos({ codigoPais }: { codigoPais: string }) {
         if (!nuevos.length) return;
         for (const p of nuevos) vistos.current.add(p.id);
         setAvisos((a) => [...a, ...nuevos].slice(-4));
-        sonar();
+        if (!sinSonidoAhora.current) sonar();
         for (const p of nuevos) setTimeout(() => setAvisos((a) => a.filter((x) => x.id !== p.id)), DURA_MS);
       } catch {
         // Sin red: se vuelve a intentar en la próxima vuelta.
@@ -94,6 +137,21 @@ export function AvisoPedidosNuevos({ codigoPais }: { codigoPais: string }) {
               {p.numero} · {formatearMoneda(p.total, codigoPais)}
             </p>
           </div>
+          <Tooltip texto={sinSonido ? "Activar sonido" : "Silenciar avisos"}>
+            <button
+              type="button"
+              aria-label={sinSonido ? "Activar el sonido de los avisos de pedidos nuevos" : "Silenciar el sonido de los avisos de pedidos nuevos"}
+              aria-pressed={sinSonido}
+              onClick={() => {
+                guardarSilencio(!sinSonido);
+                // Al volver a activarlo suena una vez, para saber que funciona.
+                if (sinSonido) sonar();
+              }}
+              className={`shrink-0 rounded-md p-1 hover:bg-muted ${sinSonido ? "text-warning" : "text-muted-foreground"} ${anilloFoco}`}
+            >
+              {sinSonido ? <SilencioIcon className="h-4 w-4" /> : <SonidoIcon className="h-4 w-4" />}
+            </button>
+          </Tooltip>
           <Link href={`/tienda-pedidos?pedido=${p.id}`} className={`shrink-0 rounded-md px-2 py-1 text-sm font-semibold text-primario hover:bg-primario-suave ${anilloFoco}`}>
             Ver
           </Link>
