@@ -1797,6 +1797,17 @@ export const GUIAS: GuiaModulo[] = [
           "Es solo de lectura: un pedido se confirma o se cancela en Shopify con sus etiquetas («Confirmada», «Cancelado»), y aquí se ve al instante. La fecha programada sale de la nota del pedido.",
         ],
       },
+      {
+        titulo: "Confirmación con IA",
+        pasos: [
+          "Arriba hay cuatro pestañas: Confirmación, Con IA, Direcciones de ejemplo y Palabras de zona. Todo es del país elegido arriba; quien ve solo algunas tiendas ve y agrega solo lo de esas tiendas.",
+          "Con IA: cuando iComfly deja un pedido «Confirmada», el sistema lee su dirección con ChatGPT y Claude y propone la etiqueta de zona (en Panamá: CIUDAD, o INTERIOR/SERVIENTREGA para todo lo que no es ciudad). Si las dos IA no coinciden, queda «Para revisar». Por ahora solo propone: no cambia etiquetas en Shopify; en la lista ves «En Shopify» (la etiqueta que le puso el equipo) y si coincide.",
+          "El interruptor de arriba enciende o apaga la confirmación automática (empieza apagado). Solo un administrador lo cambia; los demás tienen que escribir una contraseña. El segundo interruptor deja que el sistema le escriba al cliente por WhatsApp pidiéndole solo el dato que falta (también empieza apagado y solo escribe con el chat abierto, dentro de las 24 horas; pasado ese tiempo queda «Falta plantilla»).",
+          "Toca un pedido para ver lo que dijo cada IA, las palabras de zona que salieron y el mensaje que se le mandaría. Ahí puedes «Analizar de nuevo» o «Guardar como ejemplo» (para decirle a la IA lo correcto). «Probar una dirección» deja escribir una a mano sin guardar nada.",
+          "Direcciones de ejemplo: agrega direcciones completas e incompletas tal como las dejan los clientes (y qué les faltaba). No se ven todas: «Ver y corregir las últimas agregadas» las despliega para editarlas o borrarlas.",
+          "Palabras de zona: una palabra sola (Colón) o varias juntas (Panamá Este) que, si salen en la dirección, deciden la zona. Las juntas pesan más que las sueltas. En un país que no distingue ciudad e interior no se usan.",
+        ],
+      },
     ],
   },
   {
@@ -2090,6 +2101,7 @@ export interface Novedad {
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
   { fecha: "2026-11-16", titulo: "Retiros: la fecha de creación se puede elegir al crear", texto: "Al crear un retiro, la «Fecha de creación» ya no queda fija en hoy: la puedes cambiar (nunca a una fecha futura) para registrar un retiro que ya habías pedido. Así cuenta en el mes en que se solicitó y no altera las solicitudes ni el porcentaje de retiros de otro mes.", modulo: "retiros", href: "/retiros" },
+  { fecha: "2026-11-16", titulo: "Nuevo: Confirmación con IA (analiza la dirección de lo confirmado)", texto: "En Confirmación hay tres pestañas nuevas. «Con IA»: cuando iComfly deja un pedido «Confirmada», ChatGPT y Claude analizan su dirección, proponen la etiqueta (CIUDAD o INTERIOR/SERVIENTREGA en Panamá) y, si falta un dato, pueden pedírselo al cliente por WhatsApp. Empieza apagada, con un interruptor que solo cambian los administradores, y por ahora no cambia nada en Shopify. «Direcciones de ejemplo» y «Palabras de zona» son donde el equipo la va enseñando.", modulo: "tienda-confirmacion", href: "/tienda-confirmacion/ia" },
   { fecha: "2026-11-16", titulo: "Portal de Shen Zhen: cajas y etiqueta de las cajas en los envíos", texto: "Al marcar un pedido como enviado, Shen Zhen ahora anota cuántas cajas lleva el envío («Cartons») y sube la imagen de la etiqueta de las cajas; en «Enviado» puede anotarlas o corregirlas después. Lo ves en Compras › Tablero de Shen Zhen (columnas «Cajas» y «Etiqueta de las cajas»), en la ficha de la compra (bloque «Cajas de Shen Zhen») y en la Actividad de la compra, con la imagen adjunta.", modulo: "compras", href: "/compras/tablero-chin" },
   { fecha: "2026-11-16", titulo: "Despacho ciudad: hoja del día y comprobantes sin salir del sistema", texto: "Nueva «Hoja del día» en Despacho ciudad: los pedidos que Despacho cargó para el día, por repartidor, con las columnas de Monday; se imprime (una página por repartidor) o se baja en Excel, de respaldo si se cae la conexión. Y los comprobantes (también los adjuntos de Cambios y reembolsos) se ven en grande ahí mismo, sin abrir Monday.", modulo: "despacho-ciudad", href: "/despacho-ciudad/hoja" },
   { fecha: "2026-11-16", titulo: "Chat de pedidos: pausar la IA y los flujos por separado; silenciar el aviso de pedidos", texto: "En el chat de WhatsApp de un pedido, el botón del bot ahora se despliega con dos interruptores solo para ese chat: «La IA» (responde sola) y «Los flujos» (mensajes programados y plantillas automáticas); puedes pausar uno, el otro o los dos. Y el aviso «Nuevo pedido» trae una cornetita para silenciar el sonido —los avisos siguen cayendo— y volver a activarlo desde el mismo aviso.", modulo: "tienda-pedidos", href: "/tienda-pedidos" },

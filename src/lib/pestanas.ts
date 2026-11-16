@@ -10,6 +10,13 @@ export interface Pestana {
  * una es el título de su página. La primera es la página del módulo; las demás cuelgan de ella.
  */
 export const PESTANAS_POR_MODULO: Record<string, Pestana[]> = {
+  // Gestión de tienda › Confirmación (16 nov 2026): la cola de confirmación y la confirmación con IA (analiza la dirección de lo confirmado), con sus direcciones de ejemplo y palabras de zona.
+  "/tienda-confirmacion": [
+    { etiqueta: "Confirmación", href: "/tienda-confirmacion" },
+    { etiqueta: "Con IA", href: "/tienda-confirmacion/ia" },
+    { etiqueta: "Direcciones de ejemplo", href: "/tienda-confirmacion/ejemplos" },
+    { etiqueta: "Palabras de zona", href: "/tienda-confirmacion/zonas" },
+  ],
   "/publicaciones-drop": [
     { etiqueta: "Publicaciones", href: "/publicaciones-drop" },
     { etiqueta: "Recomendaciones", href: "/publicaciones-drop/recomendaciones" },

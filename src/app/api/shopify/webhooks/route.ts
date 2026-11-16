@@ -1,4 +1,5 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
+import { dispararDesdeWebhook } from "@/lib/confirmacion-ia/servidor";
 import { createServiceClient } from "@/lib/supabase/server";
 import { guardarOrdenesShopify, tiendasConfiguradas } from "@/lib/finanzas/sincronizar-shopify";
 import { ordenDeShopify } from "@/lib/finanzas/shopify";
@@ -7,7 +8,8 @@ import { TEMAS_ORDEN, firmaShopifyValida } from "@/lib/ventas/shopify-webhook";
 import { appDeDominio } from "@/lib/tienda/shopify-app";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 30;
+// 60 s: después de responder a Shopify, la confirmación con IA analiza la dirección con dos IA (puede tardar unos segundos).
+export const maxDuration = 60;
 const MAX_CUERPO = 2_000_000;
 
 /**
@@ -45,6 +47,8 @@ export async function POST(request: Request) {
     if (!tienda) return NextResponse.json({ ok: true, tiendaDesconocida: true });
     const o = ordenDeShopify(tienda.tienda, orden);
     if (o) await guardarOrdenesShopify(supabase, [o]);
+    // Confirmación con IA (16 nov 2026): si iComfly dejó el pedido «Confirmada», se analiza su dirección sin hacer esperar a Shopify.
+    if (o) after(() => dispararDesdeWebhook(createServiceClient(), o.origen_clave, o.etiquetas));
     // Gestión de tienda: la hora del último aviso, para la pantalla Tiendas (si la tienda es una de las del sistema).
     if (app) await supabase.from("tiendas").update({ ultimo_aviso_en: new Date().toISOString() }).eq("dominio", dominio);
     if (tienda.unidadId) {

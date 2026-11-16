@@ -1,0 +1,375 @@
+// Confirmación con IA (16 nov 2026, pedido de Hernán): lo que lee y escribe la base y lo que llama a las IA y a iComfly. Solo servidor, con el cliente de servicio; quien llama ya comprobó el
+// permiso (la pantalla) o la firma (el webhook de Shopify). Las reglas puras están en `zonas.ts`, `prompt.ts` y `combinar.ts`.
+//
+// El camino: iComfly deja el pedido «Confirmada» en Shopify → el webhook (`orders/updated`) lo guarda y llama a `dispararDesdeWebhook` → `analizarOrden` mira la dirección con ChatGPT y
+// Claude y las palabras de zona del país → guarda el análisis (la etiqueta que correspondería: CIUDAD o INTERIOR/SERVIENTREGA) y, si falta un dato de la dirección y el envío del
+// WhatsApp está encendido, se lo pide al cliente por iComfly. Por ahora no cambia etiquetas en Shopify: el sistema solo lee.
+
+import { createHash } from "node:crypto";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { pedirIAEn, proveedoresConectados, type ProveedorIA } from "@/lib/publicaciones/ia/proveedor";
+import { esErrorDeVentana, telefonoParaIcomfly, ventana24 } from "@/lib/tienda/chat-tienda";
+import { leerChat } from "@/lib/tienda/chat-tienda-datos";
+import { herramientaIcomfly, conexionesIcomfly } from "@/lib/tienda/icomfly";
+import { etiquetasDe, mismaTiendaUnidad, zonaDeEtiquetas } from "@/lib/tienda/ordenes-finanzas";
+import { combinar, etiquetaDeZona, leerRespuesta, mensajePedirDetalle, type Combinado, type EstadoAnalisis, type ResultadoModelo } from "./combinar";
+import { armarEntrada, type EjemploPrompt } from "./prompt";
+import { coincidencias, normalizarTexto, zonaPorReglas, type ReglaZona, type Zona } from "./zonas";
+
+export const SIN_MIGRACION_CONFIRMACION = "Falta correr la migración 0300 (confirmación con IA) en Supabase.";
+/** Cuántos mensajes se le piden a un mismo pedido (el primero y, si contesta pero sigue incompleta, uno más). */
+export const MAX_MENSAJES = 2;
+/** Hasta cuántos días atrás se buscan pedidos confirmados sin analizar. */
+const DIAS_PENDIENTES = 7;
+
+export interface ConfigConfirmacion {
+  paisId: string;
+  activa: boolean;
+  enviarMensajes: boolean;
+  distingueZona: boolean;
+  etiquetaCiudad: string | null;
+  etiquetaInterior: string | null;
+  /** Ya hay una contraseña definida para que quien no es administrador cambie los interruptores. */
+  tieneClave: boolean;
+}
+
+const configVacia = (paisId: string): ConfigConfirmacion => ({ paisId, activa: false, enviarMensajes: false, distingueZona: false, etiquetaCiudad: null, etiquetaInterior: null, tieneClave: false });
+
+/** La configuración del país (todo apagado si todavía no hay). Con `faltaMigracion`, las tablas no existen. */
+export async function cargarConfig(supabase: SupabaseClient, paisId: string): Promise<{ config: ConfigConfirmacion; faltaMigracion: boolean }> {
+  const { data, error } = await supabase.from("confirmacion_ia_config").select("activa, enviar_mensajes, distingue_zona, etiqueta_ciudad, etiqueta_interior, clave_cambio_hash").eq("pais_id", paisId).maybeSingle();
+  if (error) return { config: configVacia(paisId), faltaMigracion: /confirmacion_ia|schema cache|does not exist/i.test(error.message) };
+  if (!data) return { config: configVacia(paisId), faltaMigracion: false };
+  return {
+    faltaMigracion: false,
+    config: {
+      paisId,
+      activa: data.activa === true,
+      enviarMensajes: data.enviar_mensajes === true,
+      distingueZona: data.distingue_zona === true,
+      etiquetaCiudad: (data.etiqueta_ciudad as string | null) ?? null,
+      etiquetaInterior: (data.etiqueta_interior as string | null) ?? null,
+      tieneClave: !!data.clave_cambio_hash,
+    },
+  };
+}
+
+export async function cargarReglas(supabase: SupabaseClient, paisId: string): Promise<ReglaZona[]> {
+  const { data } = await supabase.from("confirmacion_ia_zonas").select("id, texto, clave, resultado").eq("pais_id", paisId).order("creado_en", { ascending: false }).limit(500);
+  return (data ?? []).map((r) => ({ id: r.id as string, texto: r.texto as string, clave: r.clave as string, resultado: r.resultado as Zona }));
+}
+
+/** Los ejemplos que entran al pedido: los generales del país y los de esa tienda, los más recientes de cada tipo. */
+export async function cargarEjemplos(supabase: SupabaseClient, paisId: string, tiendaId: string | null, porTipo = 15): Promise<EjemploPrompt[]> {
+  let q = supabase.from("confirmacion_ia_ejemplos").select("direccion, completa, falta, zona, tienda_id").eq("pais_id", paisId);
+  q = tiendaId ? q.or(`tienda_id.is.null,tienda_id.eq.${tiendaId}`) : q.is("tienda_id", null);
+  const { data } = await q.order("creado_en", { ascending: false }).limit(porTipo * 6);
+  const filas = (data ?? []).map((e) => ({ direccion: e.direccion as string, completa: e.completa === true, falta: (e.falta as string | null) ?? null, zona: (e.zona as Zona | null) ?? null }));
+  return [...filas.filter((e) => e.completa).slice(0, porTipo), ...filas.filter((e) => !e.completa).slice(0, porTipo)];
+}
+
+/** Lo que cambia si el cliente corrige su dirección: la dirección y la ciudad, sin acentos ni mayúsculas. */
+export const huellaDireccion = (direccion: string | null, ciudad: string | null): string =>
+  createHash("sha256").update(`${normalizarTexto(direccion ?? "")}|${normalizarTexto(ciudad ?? "")}`).digest("hex").slice(0, 32);
+
+export const tieneEtiquetaConfirmada = (etiquetas: string | null): boolean => etiquetasDe(etiquetas).some((e) => /^confirmad[ao]$/i.test(e));
+export const tieneEtiquetaDeZona = (etiquetas: string | null): boolean => zonaDeEtiquetas(etiquetas) !== null;
+
+interface OrdenParaAnalizar {
+  id: string;
+  numero: string | null;
+  etiquetas: string | null;
+  origen: string | null;
+  paisId: string;
+  paisCodigo: string;
+  paisNombre: string;
+  tiendaId: string | null;
+  tiendaNombre: string | null;
+  cliente: { nombre: string | null; telefono: string | null; direccion: string | null; corregimiento: string | null };
+}
+
+async function cargarOrden(supabase: SupabaseClient, ordenId: string): Promise<OrdenParaAnalizar | null> {
+  const { data: o } = await supabase.from("ven_ordenes").select("id, numero, etiquetas, origen, unidad_id, fin_unidades(nombre, pais_id, clase)").eq("id", ordenId).maybeSingle();
+  if (!o) return null;
+  const unidad = (Array.isArray(o.fin_unidades) ? o.fin_unidades[0] : o.fin_unidades) as { nombre: string; pais_id: string; clase: string } | null;
+  if (!unidad || unidad.clase !== "tienda") return null;
+  const [{ data: cliente }, { data: pais }, { data: tiendas }] = await Promise.all([
+    supabase.from("ven_ordenes_clientes").select("nombre, telefono, direccion, corregimiento").eq("orden_id", ordenId).maybeSingle(),
+    supabase.from("paises").select("codigo, nombre").eq("id", unidad.pais_id).maybeSingle(),
+    supabase.from("tiendas").select("id, nombre").eq("pais_id", unidad.pais_id),
+  ]);
+  const tienda = (tiendas ?? []).find((t) => mismaTiendaUnidad(t.nombre as string, unidad.nombre));
+  return {
+    id: o.id as string,
+    numero: (o.numero as string | null) ?? null,
+    etiquetas: (o.etiquetas as string | null) ?? null,
+    origen: (o.origen as string | null) ?? null,
+    paisId: unidad.pais_id,
+    paisCodigo: (pais?.codigo as string | undefined) ?? "",
+    paisNombre: (pais?.nombre as string | undefined) ?? "el país",
+    tiendaId: (tienda?.id as string | undefined) ?? null,
+    tiendaNombre: (tienda?.nombre as string | undefined) ?? unidad.nombre,
+    cliente: {
+      nombre: (cliente?.nombre as string | null) ?? null,
+      telefono: (cliente?.telefono as string | null) ?? null,
+      direccion: (cliente?.direccion as string | null) ?? null,
+      corregimiento: (cliente?.corregimiento as string | null) ?? null,
+    },
+  };
+}
+
+type EstadoMensaje = "no_aplica" | "apagado" | "enviado" | "pendiente_plantilla" | "sin_chat" | "error";
+
+/**
+ * Le pide al cliente por WhatsApp (iComfly) lo que falta de la dirección. Solo escribe libre con la ventana de 24 horas abierta; si no, queda pendiente de una plantilla (nunca escribe
+ * libre fuera de ella). No pausa el bot del chat: el cliente va a contestar y esa respuesta le llega.
+ */
+async function pedirDatoPorWhatsapp(supabase: SupabaseClient, o: OrdenParaAnalizar, texto: string): Promise<{ estado: EstadoMensaje; error?: string }> {
+  if (!o.tiendaId) return { estado: "error", error: "La tienda no está en Gestión de tienda." };
+  const con = await conexionesIcomfly(supabase, [o.tiendaId]);
+  if (!con?.get(o.tiendaId)?.conectado) return { estado: "error", error: "La tienda no está conectada a iComfly." };
+  const telefono = telefonoParaIcomfly(o.cliente.telefono, o.paisCodigo);
+  if (!telefono) return { estado: "error", error: "El pedido no tiene un teléfono válido." };
+  const chat = await leerChat(supabase, o.tiendaId, telefono);
+  if ("error" in chat) return { estado: "error", error: chat.error };
+  if (!chat.mensajes.length) return { estado: "sin_chat" };
+  if (ventana24(chat.mensajes, Date.now()) === "cerrada") return { estado: "pendiente_plantilla" };
+  const r = await herramientaIcomfly(supabase, o.tiendaId, "enviar_mensaje_whatsapp", { telefono, mensaje: texto });
+  if ("error" in r) return esErrorDeVentana(r.error) ? { estado: "pendiente_plantilla" } : { estado: "error", error: r.error };
+  return { estado: "enviado" };
+}
+
+async function pedirAlModelo(proveedor: ProveedorIA, entrada: ReturnType<typeof armarEntrada>, numero: string | null): Promise<ResultadoModelo> {
+  const r = await pedirIAEn(proveedor, entrada, { operacion: "confirmacion_direccion", modulo: "tienda-confirmacion", referencia: numero });
+  if ("error" in r) return { proveedor, ok: false, error: r.error };
+  const respuesta = leerRespuesta(r.texto);
+  return respuesta ? { proveedor, ok: true, respuesta } : { proveedor, ok: false, error: "La respuesta no se pudo leer." };
+}
+
+/**
+ * Lo que dicen las palabras de zona y las dos IA de una dirección (sin guardar nada): la decisión junta, lo que contestó cada IA y las palabras de zona que salieron. Sirve para analizar
+ * un pedido y para «Probar una dirección» de la pantalla.
+ */
+export async function evaluarDireccion(
+  supabase: SupabaseClient,
+  d: { paisId: string; paisNombre: string; tiendaId: string | null; numero: string | null; direccion: string; ciudad: string | null; config: ConfigConfirmacion },
+): Promise<{ combinado: Combinado; modelos: ResultadoModelo[]; coinc: ReglaZona[] }> {
+  const { direccion, ciudad, config } = d;
+  const reglas = await cargarReglas(supabase, d.paisId);
+  const coinc = coincidencias(`${direccion} ${ciudad ?? ""}`, reglas);
+  const porReglas = config.distingueZona ? zonaPorReglas(coinc) : { zona: null, conflicto: false, reglas: [] };
+
+  let modelos: ResultadoModelo[];
+  if (!direccion.trim()) {
+    // Sin dirección no hay nada que analizar: se pide completa.
+    modelos = [{ proveedor: "openai", ok: true, respuesta: { zona: "no_se", completa: false, falta: "tu dirección de entrega: el sector, la calle y el número de casa o una referencia", motivo: "El pedido no trae dirección." } }];
+  } else {
+    const proveedores = proveedoresConectados();
+    if (!proveedores.length) modelos = [{ proveedor: "openai", ok: false, error: "Falta conectar ChatGPT o Claude (las claves OPENAI_API_KEY o ANTHROPIC_API_KEY)." }];
+    else {
+      const ejemplos = await cargarEjemplos(supabase, d.paisId, d.tiendaId);
+      const entrada = armarEntrada({ paisNombre: d.paisNombre, distingueZona: config.distingueZona, reglas, ejemplos, direccion, ciudad, coincidencias: coinc });
+      modelos = await Promise.all(proveedores.map((p) => pedirAlModelo(p, entrada, d.numero)));
+    }
+  }
+  return { combinado: combinar({ distingueZona: config.distingueZona, zonaReglas: porReglas.zona, modelos }), modelos, coinc };
+}
+
+export type ResultadoAnalisis = { resultado: "analizada"; estado: EstadoAnalisis } | { resultado: "omitida"; motivo: string };
+
+/**
+ * Analiza la dirección de un pedido y guarda el resultado. `forzar` (desde la pantalla) no mira si la confirmación automática está encendida, ni si ya estaba analizada, ni la etiqueta de
+ * confirmada. Sin `forzar` (webhook y pendientes) solo analiza lo que el equipo de iComfly ya dejó «Confirmada», sin zona todavía y con la dirección nueva.
+ */
+export async function analizarOrden(supabase: SupabaseClient, ordenId: string, opciones: { origen: "webhook" | "pantalla" | "pendientes"; forzar?: boolean; por?: string }): Promise<ResultadoAnalisis> {
+  const o = await cargarOrden(supabase, ordenId);
+  if (!o) return { resultado: "omitida", motivo: "El pedido no es de una tienda." };
+  if (o.origen !== "shopify") return { resultado: "omitida", motivo: "El pedido no vino de Shopify." };
+  const { config, faltaMigracion } = await cargarConfig(supabase, o.paisId);
+  if (faltaMigracion) return { resultado: "omitida", motivo: SIN_MIGRACION_CONFIRMACION };
+  if (!opciones.forzar) {
+    if (!config.activa) return { resultado: "omitida", motivo: "La confirmación automática está apagada." };
+    if (!tieneEtiquetaConfirmada(o.etiquetas)) return { resultado: "omitida", motivo: "Todavía no está confirmado." };
+    if (tieneEtiquetaDeZona(o.etiquetas)) return { resultado: "omitida", motivo: "Ya tiene etiqueta de zona." };
+  }
+
+  const direccion = (o.cliente.direccion ?? "").trim();
+  const ciudad = (o.cliente.corregimiento ?? "").trim() || null;
+  const huella = huellaDireccion(direccion, ciudad);
+  const { data: previo } = await supabase.from("confirmacion_ia_analisis").select("huella, mensajes_enviados, actualizado_en, mensaje_estado").eq("orden_id", ordenId).maybeSingle();
+  if (!opciones.forzar && previo) {
+    if (previo.huella === huella) return { resultado: "omitida", motivo: "Ya está analizada." };
+    // Dos avisos casi a la vez no repiten el análisis ni el mensaje.
+    if (Date.now() - Date.parse(String(previo.actualizado_en)) < 60_000) return { resultado: "omitida", motivo: "Se acaba de analizar." };
+  }
+
+  const { combinado: c, modelos, coinc } = await evaluarDireccion(supabase, { paisId: o.paisId, paisNombre: o.paisNombre, tiendaId: o.tiendaId, numero: o.numero, direccion, ciudad, config });
+  const etiqueta = c.estado === "listo" ? etiquetaDeZona(c.zona, config) : null;
+
+  // El WhatsApp que pide el dato que falta.
+  let mensaje: string | null = null;
+  let mensajeEstado: EstadoMensaje = "no_aplica";
+  let mensajeError: string | null = null;
+  let enviados = Number(previo?.mensajes_enviados ?? 0);
+  let enviadoEn: string | null = null;
+  if (c.estado === "falta_dato" && c.falta) {
+    mensaje = mensajePedirDetalle({ nombre: o.cliente.nombre, numero: o.numero, tienda: o.tiendaNombre, falta: c.falta });
+    if (!config.enviarMensajes) mensajeEstado = "apagado";
+    else if (enviados >= MAX_MENSAJES) mensajeEstado = (previo?.mensaje_estado as EstadoMensaje | undefined) ?? "enviado";
+    else {
+      const r = await pedirDatoPorWhatsapp(supabase, o, mensaje);
+      mensajeEstado = r.estado;
+      mensajeError = r.error ?? null;
+      if (r.estado === "enviado") {
+        enviados += 1;
+        enviadoEn = new Date().toISOString();
+      }
+    }
+  }
+
+  const fila = {
+    orden_id: ordenId,
+    pais_id: o.paisId,
+    tienda_id: o.tiendaId,
+    origen: opciones.origen,
+    direccion: direccion || null,
+    ciudad,
+    huella,
+    estado: c.estado,
+    zona: c.zona,
+    zona_por: c.zonaPor,
+    completa: c.completa,
+    falta: c.falta,
+    etiqueta,
+    acuerdo: c.acuerdo,
+    motivo: c.motivo || null,
+    modelos: modelos.map((m) => ({ proveedor: m.proveedor, ok: m.ok, error: m.error ?? null, ...(m.respuesta ?? {}) })),
+    reglas: coinc.map((r) => ({ texto: r.texto, resultado: r.resultado })),
+    mensaje,
+    mensaje_estado: mensajeEstado,
+    mensaje_error: mensajeError,
+    mensajes_enviados: enviados,
+    ...(enviadoEn ? { mensaje_enviado_en: enviadoEn } : {}),
+    analizado_por: opciones.por ?? (opciones.origen === "pantalla" ? null : "Sistema"),
+    actualizado_en: new Date().toISOString(),
+  };
+  const { error } = await supabase.from("confirmacion_ia_analisis").upsert(fila, { onConflict: "orden_id" });
+  if (error) return { resultado: "omitida", motivo: /confirmacion_ia|schema cache/i.test(error.message) ? SIN_MIGRACION_CONFIRMACION : "No se pudo guardar el análisis." };
+  return { resultado: "analizada", estado: c.estado };
+}
+
+/**
+ * Lo que llama el webhook de Shopify después de guardar la orden: si quedó «Confirmada» y sin zona, la analiza. Nunca lanza (el aviso de Shopify ya se guardó); lo que falle lo recoge
+ * `analizarPendientes` la próxima vez que se abra la pantalla.
+ */
+export async function dispararDesdeWebhook(supabase: SupabaseClient, origenClave: string, etiquetas: string | null): Promise<void> {
+  try {
+    if (!tieneEtiquetaConfirmada(etiquetas) || tieneEtiquetaDeZona(etiquetas)) return;
+    const { data } = await supabase.from("ven_ordenes").select("id").eq("origen_clave", origenClave).maybeSingle();
+    if (data?.id) await analizarOrden(supabase, data.id as string, { origen: "webhook" });
+  } catch {
+    // El análisis se reintenta desde la pantalla.
+  }
+}
+
+/** Los pedidos confirmados de los últimos días que todavía no se analizaron (por si un aviso de Shopify se perdió o la confirmación estaba apagada). Hasta `max` por vez. */
+export async function analizarPendientes(supabase: SupabaseClient, paisId: string, max: number, por?: string): Promise<{ analizadas: number; pendientes: number }> {
+  const { config, faltaMigracion } = await cargarConfig(supabase, paisId);
+  if (faltaMigracion || !config.activa) return { analizadas: 0, pendientes: 0 };
+  const { data: unidades } = await supabase.from("fin_unidades").select("id").eq("pais_id", paisId).eq("clase", "tienda");
+  const ids = (unidades ?? []).map((u) => u.id as string);
+  if (!ids.length) return { analizadas: 0, pendientes: 0 };
+  const desde = new Date(Date.now() - DIAS_PENDIENTES * 86_400_000).toISOString().slice(0, 10);
+  const { data: ordenes } = await supabase.from("ven_ordenes").select("id, etiquetas").in("unidad_id", ids).eq("origen", "shopify").gte("fecha", desde).ilike("etiquetas", "%confirmad%").order("fecha", { ascending: false }).limit(300);
+  const candidatas = (ordenes ?? []).filter((o) => tieneEtiquetaConfirmada(o.etiquetas as string | null) && !tieneEtiquetaDeZona(o.etiquetas as string | null)).map((o) => o.id as string);
+  if (!candidatas.length) return { analizadas: 0, pendientes: 0 };
+  const { data: hechas } = await supabase.from("confirmacion_ia_analisis").select("orden_id").in("orden_id", candidatas);
+  const yaHechas = new Set((hechas ?? []).map((h) => h.orden_id as string));
+  const faltan = candidatas.filter((id) => !yaHechas.has(id));
+  let analizadas = 0;
+  for (const id of faltan.slice(0, max)) {
+    const r = await analizarOrden(supabase, id, { origen: "pendientes", por });
+    if (r.resultado === "analizada") analizadas += 1;
+  }
+  return { analizadas, pendientes: Math.max(0, faltan.length - analizadas) };
+}
+
+export interface FilaAnalisis {
+  id: string;
+  ordenId: string;
+  numero: string | null;
+  tiendaId: string | null;
+  tienda: string | null;
+  fecha: string | null;
+  direccion: string | null;
+  ciudad: string | null;
+  estado: EstadoAnalisis;
+  zona: Zona | null;
+  zonaPor: "regla" | "ia" | null;
+  completa: boolean | null;
+  falta: string | null;
+  etiqueta: string | null;
+  /** La etiqueta de zona que el pedido ya tiene en Shopify (la puso el equipo); null si no tiene. */
+  etiquetaActual: string | null;
+  acuerdo: boolean | null;
+  motivo: string | null;
+  modelos: { proveedor: string; ok: boolean; error: string | null; zona?: string; completa?: boolean; falta?: string | null; motivo?: string }[];
+  reglas: { texto: string; resultado: Zona }[];
+  mensaje: string | null;
+  mensajeEstado: EstadoMensaje;
+  mensajeError: string | null;
+  mensajesEnviados: number;
+  analizadoPor: string | null;
+  actualizadoEn: string;
+}
+
+/** Los últimos análisis del país (de las tiendas dadas, o de todas si es null), del más nuevo al más viejo. */
+export async function cargarAnalisis(supabase: SupabaseClient, paisId: string, tiendaIds: string[] | null, limite = 60): Promise<{ filas: FilaAnalisis[]; faltaMigracion: boolean }> {
+  let q = supabase
+    .from("confirmacion_ia_analisis")
+    .select("id, orden_id, tienda_id, direccion, ciudad, estado, zona, zona_por, completa, falta, etiqueta, acuerdo, motivo, modelos, reglas, mensaje, mensaje_estado, mensaje_error, mensajes_enviados, analizado_por, actualizado_en")
+    .eq("pais_id", paisId);
+  if (tiendaIds) q = q.in("tienda_id", tiendaIds.length ? tiendaIds : ["00000000-0000-0000-0000-000000000000"]);
+  const { data, error } = await q.order("actualizado_en", { ascending: false }).limit(limite);
+  if (error) return { filas: [], faltaMigracion: /confirmacion_ia|schema cache|does not exist/i.test(error.message) };
+  const ordenIds = (data ?? []).map((a) => a.orden_id as string);
+  const tiendaIdsUsados = [...new Set((data ?? []).map((a) => a.tienda_id as string | null).filter((x): x is string => !!x))];
+  const [{ data: ordenes }, { data: tiendas }] = await Promise.all([
+    ordenIds.length ? supabase.from("ven_ordenes").select("id, numero, fecha, etiquetas").in("id", ordenIds) : Promise.resolve({ data: [] as { id: string; numero: string | null; fecha: string | null; etiquetas: string | null }[] }),
+    tiendaIdsUsados.length ? supabase.from("tiendas").select("id, nombre").in("id", tiendaIdsUsados) : Promise.resolve({ data: [] as { id: string; nombre: string }[] }),
+  ]);
+  const porOrden = new Map((ordenes ?? []).map((o) => [o.id as string, o]));
+  const nombreTienda = new Map((tiendas ?? []).map((t) => [t.id as string, t.nombre as string]));
+  const filas = (data ?? []).map((a) => {
+    const o = porOrden.get(a.orden_id as string);
+    const actual = etiquetasDe((o?.etiquetas as string | null) ?? null).find((e) => /^(ciudad|interior)\b/i.test(e)) ?? null;
+    return {
+      id: a.id as string,
+      ordenId: a.orden_id as string,
+      numero: (o?.numero as string | null) ?? null,
+      tiendaId: (a.tienda_id as string | null) ?? null,
+      tienda: a.tienda_id ? (nombreTienda.get(a.tienda_id as string) ?? null) : null,
+      fecha: (o?.fecha as string | null) ?? null,
+      direccion: (a.direccion as string | null) ?? null,
+      ciudad: (a.ciudad as string | null) ?? null,
+      estado: a.estado as EstadoAnalisis,
+      zona: (a.zona as Zona | null) ?? null,
+      zonaPor: (a.zona_por as "regla" | "ia" | null) ?? null,
+      completa: (a.completa as boolean | null) ?? null,
+      falta: (a.falta as string | null) ?? null,
+      etiqueta: (a.etiqueta as string | null) ?? null,
+      etiquetaActual: actual,
+      acuerdo: (a.acuerdo as boolean | null) ?? null,
+      motivo: (a.motivo as string | null) ?? null,
+      modelos: Array.isArray(a.modelos) ? (a.modelos as FilaAnalisis["modelos"]) : [],
+      reglas: Array.isArray(a.reglas) ? (a.reglas as FilaAnalisis["reglas"]) : [],
+      mensaje: (a.mensaje as string | null) ?? null,
+      mensajeEstado: (a.mensaje_estado as EstadoMensaje) ?? "no_aplica",
+      mensajeError: (a.mensaje_error as string | null) ?? null,
+      mensajesEnviados: Number(a.mensajes_enviados ?? 0),
+      analizadoPor: (a.analizado_por as string | null) ?? null,
+      actualizadoEn: a.actualizado_en as string,
+    } satisfies FilaAnalisis;
+  });
+  return { filas, faltaMigracion: false };
+}
