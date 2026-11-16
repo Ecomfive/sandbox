@@ -124,7 +124,10 @@ export async function crearRetiro(formData: FormData) {
   if (!cuenta_retiro_id) throw new Error("Elige la cuenta destino.");
   if (!(monto > 0)) throw new Error("El monto debe ser mayor a cero.");
   if (comisionTexto !== "" && !(comision >= 0)) throw new Error("La comisión no puede ser negativa.");
-  const fecha = formData.get("fecha") as string;
+  // La fecha de creación se puede elegir (para registrar un retiro que ya se había pedido y que cuente en su mes), pero no puede ser futura; sin ella, hoy.
+  const fecha = String(formData.get("fecha") ?? "").trim() || hoyISO();
+  if (!esFechaISO(fecha)) throw new Error("La fecha de creación no es válida.");
+  if (fecha > hoyISO()) throw new Error("La fecha de creación no puede ser futura.");
   const notas = (formData.get("notas") as string) || null;
   const fecha_limite = (formData.get("fecha_limite") as string) || null;
   // "A recibir" ya no se edita a mano: siempre es monto menos comisión, para que la comisión

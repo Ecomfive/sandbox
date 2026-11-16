@@ -12,7 +12,6 @@ import { Seccion } from "@/components/ui/seccion-ficha";
 import { useToast } from "@/components/ui/toast";
 import { useFaltantes } from "@/components/ui/usar-faltantes";
 import { Ventana } from "@/components/ui/ventana";
-import { formatearFecha } from "@/lib/formato";
 import { CalendarioIcon, ExtractoIcon, GastoIcon, WalletIcon } from "@/lib/nav-icons";
 import { leerCorrelativo } from "@/lib/retiros/correlativo";
 
@@ -79,6 +78,8 @@ export function CrearRetiroPanel({
   const [comisionManual, setComisionManual] = useState(false);
   const [cuentaSeleccionadaId, setCuentaSeleccionadaId] = useState("");
   const [fechaLimite, setFechaLimite] = useState("");
+  // La fecha de creación arranca en hoy y se puede cambiar para registrar un retiro que ya se había pedido (nunca una fecha futura).
+  const [fechaCreacion, setFechaCreacion] = useState(hoy());
   const [correlativo, setCorrelativo] = useState<number | null>(null);
   const [consultando, setConsultando] = useState(false);
   const [enviando, setEnviando] = useState(false);
@@ -104,6 +105,7 @@ export function CrearRetiroPanel({
     setComisionPorcentaje("");
     setComisionManual(false);
     setFechaLimite("");
+    setFechaCreacion(hoy());
     // Ninguna cuenta destino viene elegida: la persona tiene que escoger una de la lista.
     setCuentaSeleccionadaId("");
     setAbierto(true);
@@ -408,14 +410,15 @@ export function CrearRetiroPanel({
                   </label>
                   <input
                     id="campo-fecha"
-                    type="text"
-                    readOnly
-                    tabIndex={-1}
-                    value={formatearFecha(hoy())}
-                    className={`${fieldClass} w-full min-w-0 cursor-not-allowed bg-muted`}
+                    type="date"
+                    name="fecha"
+                    required
+                    max={hoy()}
+                    value={fechaCreacion}
+                    onChange={(e) => setFechaCreacion(e.target.value)}
+                    aria-invalid={invalido("campo-fecha")}
+                    className={`${fieldClass} w-full min-w-0`}
                   />
-                  {/* Siempre es el día de hoy: no se elige a mano, así que va como oculto en vez de en el `<input>` de arriba. */}
-                  <input type="hidden" name="fecha" value={hoy()} />
                 </div>
                 <div className="flex min-w-0 flex-col gap-1">
                   <label className={labelClassSm} htmlFor="campo-fecha-limite">
