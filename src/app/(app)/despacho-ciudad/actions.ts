@@ -40,12 +40,13 @@ const TEXTOS: Record<string, { columna: string; titulo: string; max: number }> =
 };
 
 /** La fila, con permiso de escritura en el módulo de su tablero. */
-async function filaConPermiso(itemId: string): Promise<{ supabase: Supabase; usuario: UsuarioActual; fila: Record<string, unknown> } | { error: string }> {
+async function filaConPermiso(itemId: string, esArchivo = false): Promise<{ supabase: Supabase; usuario: UsuarioActual; fila: Record<string, unknown> } | { error: string }> {
   if (!esItem(itemId)) return { error: "Fila no válida." };
   const supabase = createServiceClient();
   const { data: fila, error } = await supabase.from("mon_despachos").select("*").eq("item_id", itemId).maybeSingle();
   if (error || !fila) return { error: "Esa fila ya no existe." };
   const usuario = await requireModuloEscritura(modulo(String(fila.clase)));
+  if (fila.archivado_en && !esArchivo) return { error: "Esa fila está archivada: restáurala para cambiarla." };
   return { supabase, usuario, fila };
 }
 
@@ -193,6 +194,40 @@ export async function crearFila(clase: "ciudad" | "devolucion", destino: string,
   await registrar(supabase, itemId, usuario, "Creada en el sistema");
   for (const p of RUTAS) revalidatePath(p);
   return { itemId };
+}
+
+/**
+ * Archiva una fila (creada por error o que sobra): sale del tablero y se suelta del pedido, para que no cuente en sus entregas ni en Cobros. No se borra:
+ * se ve en «Archivados» y se puede restaurar. La lectura de Monday no la vuelve a traer (queda editada en el sistema).
+ */
+export async function archivarFila(itemId: string): Promise<Resultado> {
+  const r = await filaConPermiso(itemId, true);
+  if ("error" in r) return r;
+  const { supabase, usuario, fila } = r;
+  if (fila.archivado_en) return {};
+  const { error } = await supabase
+    .from("mon_despachos")
+    .update({ ...sello(usuario), archivado_en: new Date().toISOString(), archivado_por: usuario.id, orden_id: null })
+    .eq("item_id", itemId);
+  if (error) return { error: /archivado/.test(error.message) ? "Falta correr en Supabase la migración 0971." : "No se pudo archivar." };
+  await registrar(supabase, itemId, usuario, "Archivada");
+  for (const p of RUTAS) revalidatePath(p);
+  return {};
+}
+
+/** Devuelve una fila archivada a su tablero y la vuelve a enlazar con su pedido. */
+export async function restaurarFila(itemId: string): Promise<Resultado> {
+  const r = await filaConPermiso(itemId, true);
+  if ("error" in r) return r;
+  const { supabase, usuario, fila } = r;
+  if (!fila.archivado_en) return {};
+  const enlace = await enlazar(supabase, fila.numero_pedido as string | null, fila.tienda_texto as string | null);
+  const { error } = await supabase.from("mon_despachos").update({ ...sello(usuario), archivado_en: null, archivado_por: null, ...enlace }).eq("item_id", itemId);
+  if (error) return { error: "No se pudo restaurar." };
+  await registrar(supabase, itemId, usuario, "Restaurada desde Archivados");
+  if (enlace.orden_id) actualizarPedidosDespues(usuario);
+  for (const p of RUTAS) revalidatePath(p);
+  return {};
 }
 
 /** Una actualización (comentario) en la fila, como los de Monday. */

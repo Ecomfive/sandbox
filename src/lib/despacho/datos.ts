@@ -78,27 +78,30 @@ export async function tableroConsolidado(supabase: SupabaseClient): Promise<stri
 }
 
 /**
- * Los repartos de ciudad de `desde` a `hasta` (AAAA-MM-DD). `faltaMigracion` si no existe la columna `clase` (migración 0970 sin correr).
+ * Los repartos de ciudad de `desde` a `hasta` (AAAA-MM-DD), sin los archivados; con `archivados`, solo los archivados (de cualquier día).
+ * `faltaMigracion` si faltan las columnas `clase` o `archivado_en` (migraciones 0970 y 0971 sin correr).
  */
-export async function cargarCiudad(supabase: SupabaseClient, desde: string, hasta: string): Promise<{ filas: FilaTablero[]; faltaMigracion: boolean }> {
+export async function cargarCiudad(supabase: SupabaseClient, desde: string, hasta: string, archivados = false): Promise<{ filas: FilaTablero[]; faltaMigracion: boolean }> {
   let faltaMigracion = false;
-  const crudas = await traerTodasLasFilas<Record<string, unknown>>((d, h) =>
-    supabase.from("mon_despachos").select(COLUMNAS).eq("clase", "ciudad").gte("fecha_despacho", desde).lte("fecha_despacho", hasta).order("item_id").range(d, h),
-  ).catch(() => {
+  const crudas = await traerTodasLasFilas<Record<string, unknown>>((d, h) => {
+    const q = supabase.from("mon_despachos").select(COLUMNAS).eq("clase", "ciudad");
+    return (archivados ? q.not("archivado_en", "is", null) : q.is("archivado_en", null).gte("fecha_despacho", desde).lte("fecha_despacho", hasta)).order("item_id").range(d, h);
+  }).catch(() => {
     faltaMigracion = true;
     return [] as Record<string, unknown>[];
   });
   const consolidado = await tableroConsolidado(supabase);
   const filas = crudas.map((r) => aFila(r, "ciudad"));
-  return { filas: sinDuplicados(filas, consolidado), faltaMigracion };
+  return { filas: archivados ? filas : sinDuplicados(filas, consolidado), faltaMigracion };
 }
 
-/** Las devoluciones (todas las tiendas). */
-export async function cargarDevoluciones(supabase: SupabaseClient): Promise<{ filas: FilaTablero[]; faltaMigracion: boolean }> {
+/** Las devoluciones (todas las tiendas), sin las archivadas; con `archivados`, solo las archivadas. */
+export async function cargarDevoluciones(supabase: SupabaseClient, archivados = false): Promise<{ filas: FilaTablero[]; faltaMigracion: boolean }> {
   let faltaMigracion = false;
-  const crudas = await traerTodasLasFilas<Record<string, unknown>>((d, h) =>
-    supabase.from("mon_despachos").select(COLUMNAS).eq("clase", "devolucion").order("item_id").range(d, h),
-  ).catch(() => {
+  const crudas = await traerTodasLasFilas<Record<string, unknown>>((d, h) => {
+    const q = supabase.from("mon_despachos").select(COLUMNAS).eq("clase", "devolucion");
+    return (archivados ? q.not("archivado_en", "is", null) : q.is("archivado_en", null)).order("item_id").range(d, h);
+  }).catch(() => {
     faltaMigracion = true;
     return [] as Record<string, unknown>[];
   });

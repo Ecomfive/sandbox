@@ -120,6 +120,7 @@ async function mondaySinPedido(supabase: ReturnType<typeof createServiceClient>,
       .from("mon_despachos")
       .select("numero_pedido, tablero_id, estado, estado_asesores, observaciones_asesores, courier, actualizado_monday")
       .is("orden_id", null)
+      .is("archivado_en", null)
       .in("unidad_id", unidades)
       .gte("actualizado_monday", desde)
       .order("actualizado_monday", { ascending: false })

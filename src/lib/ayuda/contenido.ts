@@ -1815,6 +1815,7 @@ export const GUIAS: GuiaModulo[] = [
           "«Abrir» muestra el panel del pedido: el comprobante (ver o subir una foto o un PDF), las actualizaciones del equipo y el registro de quién cambió qué. «+ Agregar pedido» crea una fila en el día de hoy, con el repartidor que estás mirando.",
           "Lo que se anota aquí actualiza el pedido igual que antes Monday: ENTREGADO lo pasa a entregado, con su forma de pago y lo cobrado. Lo que viene de Monday sigue llegando mientras se use; una fila que ya se cambió en el sistema no la vuelve a pisar Monday.",
           "Si el sistema no reconoce el número de pedido, el panel lo avisa: revisa el número y la tienda.",
+          "Una fila creada por error o que sobra no se borra: se archiva. En «Abrir», abajo, «Archivar fila» (pide confirmar). Sale del tablero y deja de contar en el pedido y en Cobros. Se ve en «Archivados» (arriba a la derecha) y desde ahí, con «Restaurar al tablero», vuelve a su lugar.",
         ],
       },
     ],
@@ -1832,6 +1833,7 @@ export const GUIAS: GuiaModulo[] = [
           "Los asesores cambian «Estado asesores» (PENDIENTE, VERIFICADO, RECHAZADO, DESINTEGRADO, POSPUESTO, PROCESADO, FALLIDO) y escriben sus observaciones. Igual que en Monday, DESINTEGRADO pasa la fila sola a Rechazados / cancelados.",
           "DESINTEGRADO o RECHAZADO dan el pedido por devuelto en el sistema; FALLIDO o POSPUESTO no: todavía se puede volver a entregar.",
           "Para cambiar una fila de grupo, arrástrala. «Abrir» muestra el comprobante, las actualizaciones y el registro de cambios.",
+          "Una fila creada por error o que sobra no se borra: se archiva. En «Abrir», abajo, «Archivar fila» (pide confirmar). Sale del tablero y deja de contar en el pedido. Se ve en «Archivados» (arriba) y desde ahí, con «Restaurar al tablero», vuelve a su lugar.",
         ],
       },
     ],
@@ -2064,6 +2066,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-11-16", titulo: "Despacho ciudad y Devoluciones: archivar una fila", texto: "Una fila creada por error o que sobra ya se puede archivar: ábrela y usa «Archivar fila». Sale del tablero y deja de contar en el pedido y en Cobros, pero no se borra: está en «Archivados» y se puede restaurar.", modulo: "despacho-ciudad", href: "/despacho-ciudad" },
   { fecha: "2026-11-15", titulo: "Nuevo: Despacho ciudad y Devoluciones, sin Monday", texto: "Las entregas de ciudad y las devoluciones ya se llevan en el sistema, en Gestión de tienda › Operación: «Despacho ciudad» (por día y por repartidor, con el consolidado) y «Devoluciones» (por tienda). Funcionan como Monday: las mismas columnas, etiquetas y colores, grupos que se abren y se cierran, arrastrar filas a otro día o grupo, sumas al pie, comentarios, comprobantes y la regla de DESINTEGRADO. Lo que se anota actualiza el pedido igual que antes Monday. Monday queda de respaldo mientras dure el cambio.", modulo: "despacho-ciudad", href: "/despacho-ciudad" },
   { fecha: "2026-11-14", titulo: "Variantes: repartir el stock solo en las bodegas que quieras", texto: "Al repartir el stock general de un producto entre sus variantes ya no hace falta repartir todas las bodegas: escribe cuántas unidades van a cada variante solo en la bodega que quieras (o solo una parte) y guarda. Lo que no repartiste sigue como stock general, y el producto queda «sin repartir» hasta que no le quede stock en ninguna bodega.", modulo: "producto", href: "/producto" },
   { fecha: "2026-11-14", titulo: "Variantes: en una bodega ya repartida, cada variante vende de su stock", texto: "Cuando repartes el stock general de una sola bodega (por ejemplo, las 100 unidades de Despacho Plaza 100 al color Blanco), desde ese momento lo que sale de una variante en esa bodega (ventas, reservas, remisiones, traslados) se descuenta de la variante y no del stock general. En las bodegas que todavía no repartiste sigue como antes: sale del stock general del producto. Si vuelves a dejar el stock sin repartir, todas las bodegas vuelven a contar como sin repartir.", modulo: "producto", href: "/producto" },
