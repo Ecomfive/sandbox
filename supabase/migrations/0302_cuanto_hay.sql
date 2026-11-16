@@ -5,7 +5,7 @@
 --     quién y cuándo). El nombre del producto se guarda como estaba al preguntar.
 --   * Módulos: `tienda-cuanto-hay` (preguntar) para los roles que tienen Pedidos de tienda; `despacho-cuanto-hay` (responder)
 --     para los que tienen Logística de tienda y, a ella sola, para Yiletsi (permiso propio: el resto del rol Administrativo no lo ve).
--- Se puede correr de nuevo. Reversa: supabase/rollbacks/0301_rollback.sql
+-- Se puede correr de nuevo. Reversa: supabase/rollbacks/0302_rollback.sql
 create table if not exists tienda_cuanto_hay (
   id uuid primary key default gen_random_uuid(),
   tienda_id uuid not null references tiendas (id),

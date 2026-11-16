@@ -7,13 +7,13 @@ import { avisoPregunta, avisoRespuesta, leerCantidad, limpiarNota, tiendasDePers
 import { cargarTiendasPermitidas } from "@/lib/finanzas/cargar-tiendas-permitidas";
 import { createServiceClient } from "@/lib/supabase/server";
 
-// «¿Cuánto hay?» (16 nov 2026, migración 0301): la tienda pregunta y Yiletsi responde. Cada acción revisa su permiso en el servidor.
+// «¿Cuánto hay?» (16 nov 2026, migración 0302): la tienda pregunta y Yiletsi responde. Cada acción revisa su permiso en el servidor.
 
 const MODULO_TIENDA = "tienda-cuanto-hay";
 const MODULO_DESPACHO = "despacho-cuanto-hay";
 const RUTAS = ["/tienda-cuanto-hay", "/despacho-cuanto-hay"];
 const ES_UUID = (v: unknown): v is string => typeof v === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
-const SIN_MIGRACION = "Falta correr en Supabase la migración 0301 («¿Cuánto hay?»).";
+const SIN_MIGRACION = "Falta correr en Supabase la migración 0302 («¿Cuánto hay?»).";
 const nombreDe = (u: UsuarioActual) => (u.nombre || u.email || "Alguien").trim();
 
 type Resultado = { ok: true } | { error: string };
@@ -42,7 +42,7 @@ export async function preguntarCuantoHay(tiendaId: string, skuId: string, nota: 
     const fila = { tienda_id: tienda.id, sku_id: sku.id as string, producto: String(sku.nombre).slice(0, 300), nota: limpiarNota(nota), pedido_por: u.id, pedido_por_nombre: nombreDe(u) };
     const { error } = await supabase.from("tienda_cuanto_hay").insert(fila);
     if (error) return { error: /tienda_cuanto_hay/.test(error.message) ? SIN_MIGRACION : "No se pudo guardar la pregunta." };
-    // El aviso «Para ti» a quien tiene el panel para ella sola (Yiletsi, migración 0301); a los administradores no, para no llenarles la campana.
+    // El aviso «Para ti» a quien tiene el panel para ella sola (Yiletsi, migración 0302); a los administradores no, para no llenarles la campana.
     const { data: responden } = await supabase.from("permisos_persona").select("perfil_id").eq("modulo", MODULO_DESPACHO).eq("nivel", "edicion");
     const aviso = avisoPregunta({ producto: fila.producto, tienda: tienda.nombre, nota: fila.nota }, nombreDe(u));
     const destinos = ((responden ?? []) as { perfil_id: string }[]).map((r) => r.perfil_id).filter((id) => id !== u.id);

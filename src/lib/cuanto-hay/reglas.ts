@@ -1,4 +1,4 @@
-// «¿Cuánto hay?» (16 nov 2026, migración 0301): las reglas puras. Una tienda pregunta cuánto hay de un producto (con una nota) y
+// «¿Cuánto hay?» (16 nov 2026, migración 0302): las reglas puras. Una tienda pregunta cuánto hay de un producto (con una nota) y
 // Yiletsi responde con la cantidad que contó despacho. Prueba en `reglas.test.ts`.
 
 export const MAX_NOTA = 300;

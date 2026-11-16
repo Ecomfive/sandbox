@@ -1,4 +1,4 @@
-// «¿Cuánto hay?» (16 nov 2026, migración 0301): lo que leen las dos pantallas. La tienda (Gestión de tienda › Preguntar cuánto hay)
+// «¿Cuánto hay?» (16 nov 2026, migración 0302): lo que leen las dos pantallas. La tienda (Gestión de tienda › Preguntar cuánto hay)
 // ve sus preguntas; Yiletsi (Despacho › Responder cuánto hay) ve las de todas las tiendas, agrupadas. Reglas puras: `reglas.ts`.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -51,7 +51,7 @@ const aPregunta = (f: Fila, tiendas: TiendaCuantoHay[]): PreguntaCuantoHay => ({
   respondidoEn: f.respondido_en,
 });
 
-/** Si falta la migración 0301, `faltaMigracion`. */
+/** Si falta la migración 0302, `faltaMigracion`. */
 type Resultado = { preguntas: PreguntaCuantoHay[]; faltaMigracion: boolean };
 
 /**

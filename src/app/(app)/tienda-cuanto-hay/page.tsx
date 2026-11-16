@@ -13,7 +13,7 @@ export const metadata = { title: "Preguntar cuánto hay" };
 export const dynamic = "force-dynamic";
 
 /**
- * Gestión de tienda › Preguntar cuánto hay (16 nov 2026, migración 0301; prototipo aprobado: https://claude.ai/artifact/BK449CDGnYApU2eQ9BqvxL).
+ * Gestión de tienda › Preguntar cuánto hay (16 nov 2026, migración 0302; prototipo aprobado: https://claude.ai/artifact/BK449CDGnYApU2eQ9BqvxL).
  * La tienda elige un producto del catálogo, escribe una nota si quiere y pregunta; Yiletsi manda a contar a despacho y responde con la cantidad.
  */
 export default async function PreguntarCuantoHayPage() {
@@ -29,7 +29,7 @@ export default async function PreguntarCuantoHayPage() {
       </EncabezadoPagina>
       {faltaMigracion ? (
         <p role="alert" className="m-0 rounded-lg border border-border bg-card px-4 py-3 text-sm text-destructive">
-          Falta correr en Supabase la migración 0301 («¿Cuánto hay?»).
+          Falta correr en Supabase la migración 0302 («¿Cuánto hay?»).
         </p>
       ) : (
         <PreguntarCuantoHay

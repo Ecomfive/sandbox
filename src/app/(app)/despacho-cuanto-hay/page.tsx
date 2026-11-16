@@ -13,7 +13,7 @@ export const metadata = { title: "Responder cuánto hay" };
 export const dynamic = "force-dynamic";
 
 /**
- * Gestión de tienda › Responder cuánto hay (16 nov 2026, migración 0301; prototipo aprobado: https://claude.ai/artifact/BK449CDGnYApU2eQ9BqvxL).
+ * Gestión de tienda › Responder cuánto hay (16 nov 2026, migración 0302; prototipo aprobado: https://claude.ai/artifact/BK449CDGnYApU2eQ9BqvxL).
  * El panel de Yiletsi: las preguntas de todas las tiendas, agrupadas por tienda (botones para ver una sola); escribe la cantidad que contó
  * despacho y «Responder» se la manda a quien preguntó. «Respondidas» muestra las de los últimos 7 días.
  */
@@ -47,7 +47,7 @@ export default async function ResponderCuantoHayPage({ searchParams }: { searchP
       </EncabezadoPagina>
       {faltaMigracion ? (
         <p role="alert" className="m-0 rounded-lg border border-border bg-card px-4 py-3 text-sm text-destructive">
-          Falta correr en Supabase la migración 0301 («¿Cuánto hay?»).
+          Falta correr en Supabase la migración 0302 («¿Cuánto hay?»).
         </p>
       ) : (
         <>
