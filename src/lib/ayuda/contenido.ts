@@ -562,6 +562,7 @@ export const GUIAS: GuiaModulo[] = [
         pasos: [
           "Los domingos se guarda una copia de todas las tablas financieras (libro, cartera, ventas, conciliación, deliverys, clientes y nómina) en un almacenamiento privado, una carpeta por fecha; se conservan las últimas 8.",
           "En Panel › Respaldos (quien puede modificar Usuarios y roles) se descarga cada tabla como JSON comprimido y «Correr ahora» hace un respaldo en el momento.",
+          "Cada respaldo completo dice si está verificado: al terminar (si queda tiempo) o con «Verificar», el portal descarga cada archivo, lo descomprime y cuenta sus filas contra lo anotado. Verde = se puede restaurar; rojo = una tabla no se lee o le faltan filas (haz un respaldo nuevo con «Correr ahora»).",
         ],
       },
     ],
@@ -2172,6 +2173,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-11-16", titulo: "Respaldos verificados: se comprueba que se puedan restaurar", texto: "Panel › Respaldos ahora verifica cada respaldo: descarga cada archivo, lo descomprime y cuenta sus filas. Un punto verde dice que se puede restaurar. Hace falta correr la migración 0982.", modulo: "usuarios", href: "/panel-financiero/respaldos" },
   { fecha: "2026-11-16", titulo: "Conciliación: importar el estado de cuenta en PDF", texto: "En Conciliación bancaria › Importar ahora se puede subir el estado de cuenta en PDF: la IA lo lee, propone la cuenta y avisa si cuadra con los saldos del extracto antes de cargarlo. Necesita ANTHROPIC_API_KEY.", modulo: "conciliacion-bancaria", href: "/conciliacion-bancaria/importar" },
   { fecha: "2026-11-16", titulo: "Calendario fiscal: el ITBMS del mes estimado", texto: "El Calendario fiscal muestra arriba el ITBMS del mes anterior: débito de las ventas facturadas menos crédito de las compras con ITBMS cargado, lo que se paga o queda a favor, y cuántas compras no tienen el ITBMS cargado.", modulo: "cierre-mes", href: "/cierre-mes/calendario-fiscal" },
   { fecha: "2026-11-16", titulo: "Libro: movimientos recurrentes que se registran solos", texto: "Nueva pestaña «Recurrentes» en Libro de movimientos: cargas una vez un gasto que se repite (alquiler, software, una cuota) con su día del mes y el libro lo registra solo cada mes. Hace falta correr la migración 0981.", modulo: "libro-movimientos", href: "/libro-movimientos/recurrentes" },

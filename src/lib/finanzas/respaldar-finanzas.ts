@@ -3,9 +3,9 @@
 // presupuesto de tiempo de las tareas: si no alcanza, deja las tablas que faltan en `pendiente` y la siguiente ejecución
 // del día sigue de ahí (por eso la tarea tiene tres horarios). Las páginas solo lo listan y dan enlaces firmados.
 
-import { gzipSync } from "node:zlib";
+import { gunzipSync, gzipSync } from "node:zlib";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { BUCKET_RESPALDOS, CONSERVAR_PREDETERMINADO, carpetasABorrar, ordenDe, rutaArchivo, tablasPendientes } from "./respaldo";
+import { BUCKET_RESPALDOS, CONSERVAR_PREDETERMINADO, carpetasABorrar, compararRespaldo, ordenDe, rutaArchivo, tablasPendientes, type Verificacion } from "./respaldo";
 
 const POR_PAGINA = 1000;
 
@@ -73,7 +73,39 @@ export async function respaldarFinanzas(
     await supabase.from("fin_respaldos").delete().eq("ruta", c);
   }
   const filas = Object.values(tablas).filter((n) => n > 0).reduce((a, n) => a + n, 0);
+  // Si queda tiempo, se comprueba que cada archivo se pueda leer (migración 0982); si no, se hace con «Verificar».
+  const v = await verificarRespaldo(supabase, carpeta, o.limite).catch(() => null);
+  const ver = !v || "error" in v ? "" : v.faltan.length ? " Verificación: sigue con «Verificar»." : v.ok ? " Verificado: se puede restaurar." : ` Verificación con problemas en ${v.tablas.filter((t) => t.estado !== "ok").length} tablas.`;
   return {
-    resumen: `Respaldo ${carpeta} completo: ${filas.toLocaleString("es-PA")} filas de ${Object.values(tablas).filter((n) => n >= 0).length} tablas.${omitidas.length ? ` Sin tabla: ${omitidas.join(", ")}.` : ""}${borrar.length ? ` Borrados: ${borrar.join(", ")}.` : ""}`,
+    resumen: `Respaldo ${carpeta} completo: ${filas.toLocaleString("es-PA")} filas de ${Object.values(tablas).filter((n) => n >= 0).length} tablas.${omitidas.length ? ` Sin tabla: ${omitidas.join(", ")}.` : ""}${borrar.length ? ` Borrados: ${borrar.join(", ")}.` : ""}${ver}`,
   };
+}
+
+/**
+ * Descarga cada archivo del respaldo, lo descomprime, cuenta sus filas contra lo anotado y cuenta la tabla viva; guarda el
+ * resultado en `fin_respaldos.verificacion`. Con `limite` (ms de reloj) deja en `faltan` lo que no alcanzó.
+ */
+export async function verificarRespaldo(supabase: SupabaseClient, carpeta: string, limite: number): Promise<{ error: string } | Verificacion> {
+  const { data: r, error } = await supabase.from("fin_respaldos").select("tablas").eq("ruta", carpeta).maybeSingle();
+  if (error || !r) return { error: error?.message ?? "No existe ese respaldo." };
+  const anotado = (r.tablas as Record<string, number> | null) ?? {};
+  const leido: Record<string, number | null> = {};
+  const actual: Record<string, number | null> = {};
+  for (const [t, n] of Object.entries(anotado)) {
+    if (n < 0) continue;
+    if (Date.now() > limite) break;
+    try {
+      const { data, error: e } = await supabase.storage.from(BUCKET_RESPALDOS).download(rutaArchivo(carpeta, t));
+      if (e || !data) throw new Error("sin archivo");
+      const json = JSON.parse(gunzipSync(Buffer.from(await data.arrayBuffer())).toString("utf8")) as { tabla?: string; filas?: unknown[] };
+      leido[t] = json.tabla === t && Array.isArray(json.filas) ? json.filas.length : null;
+    } catch {
+      leido[t] = null;
+    }
+    const c = await supabase.from(t).select("*", { count: "exact", head: true });
+    actual[t] = c.error ? null : (c.count ?? null);
+  }
+  const v = compararRespaldo(anotado, leido, actual);
+  await supabase.from("fin_respaldos").update({ verificacion: v, verificado_en: new Date().toISOString() }).eq("ruta", carpeta);
+  return v;
 }
