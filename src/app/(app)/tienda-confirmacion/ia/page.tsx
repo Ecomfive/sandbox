@@ -37,7 +37,7 @@ export default async function ConfirmacionIAPage({ searchParams }: { searchParam
   const ids = tienda ? [tienda.id] : limitado ? tiendas.map((t) => t.id) : null;
   const [{ filas }, totalEjemplos, { palabras }] = sinTablas
     ? [{ filas: [] }, 0, { palabras: [] }]
-    : await Promise.all([cargarAnalisis(supabase, pais.id, ids), contarEjemplos(), listarPalabrasZona()]);
+    : await Promise.all([cargarAnalisis(supabase, pais.id, ids, config), contarEjemplos(), listarPalabrasZona()]);
   if (config.activa) after(() => analizarPendientes(createServiceClient(), pais.id, 5));
   const ahora = ahoraMismo();
 
