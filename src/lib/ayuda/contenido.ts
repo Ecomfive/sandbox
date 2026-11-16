@@ -1925,6 +1925,41 @@ export const GUIAS: GuiaModulo[] = [
     ],
   },
   {
+    modulo: "despacho-pedir-inventario",
+    titulo: "Pedir a inventario",
+    ruta: "/despacho-pedir-inventario",
+    resumen: "Despacho le pide a inventario lo que se le agotó, sin Excel ni mensajes: ve en qué va cada pedido y marca «Recibido» cuando llega.",
+    secciones: [
+      {
+        titulo: "Uso",
+        pasos: [
+          "Pulsa «+ Nuevo pedido». En cada línea elige el producto de la lista (escribe parte del nombre, el SKU o el N.º), la cantidad y, si quieres, una nota. «+ Otro producto» agrega más líneas; «Pedir a inventario» lo envía. A inventario le llega el aviso en «Para ti».",
+          "La tabla es como el Excel: N.º de pedido, código, producto, cantidad pedida, fecha, quién pidió, responsable de bodega, cantidad entregada, estado y observaciones. Los contadores de arriba filtran por estado.",
+          "Estados: Solicitud (registrado), En proceso (inventario lo prepara), Enviado (va en camino: el traslado ya está hecho), Recibido (cerrado). Te llega un aviso cuando inventario lo pone en proceso y cuando lo envía.",
+          "Cuando llegue, pulsa «Recibido». Mientras inventario no lo tome, puedes «Cancelar» el pedido.",
+          "Se ven todos los pedidos abiertos y los cerrados de los últimos 30 días. Por ahora es para Panamá (llega a Despacho Plaza 100).",
+        ],
+      },
+    ],
+  },
+  {
+    modulo: "inventario-pedidos-despacho",
+    titulo: "Pedidos de despacho",
+    ruta: "/inventario-pedidos-despacho",
+    resumen: "Lo que despacho le pide a inventario: se pone en proceso, se escribe cuánto se envía y «Enviar» hace el traslado a la bodega de despacho.",
+    secciones: [
+      {
+        titulo: "Uso",
+        pasos: [
+          "Cuando despacho hace un pedido te llega el aviso en «Para ti». Pulsa «Pasar a “En proceso”» para que sepan que lo estás preparando.",
+          "En «Cantidad entregada» escribe cuánto envías de cada producto (viene con lo pedido; 0 si no hay) y, si hace falta, una observación (por ejemplo, «solo quedaban 12»). «Hay en bodega» muestra lo disponible en la bodega elegida en «Sale de».",
+          "Elige en «Sale de» la bodega de donde sale y pulsa «Enviar»: el sistema hace el traslado a Despacho Plaza 100 con esas cantidades (no hay que hacerlo aparte en Inventario › Traslados) y el número del traslado queda en Observaciones. A despacho le llega el aviso.",
+          "Si la bodega no tiene suficiente, el traslado no se hace y el pedido queda como estaba: cambia la cantidad o la bodega. Cuando despacho marca «Recibido», te llega el aviso y el pedido se cierra.",
+        ],
+      },
+    ],
+  },
+  {
     modulo: "tienda-productos",
     titulo: "Productos de Shopify",
     ruta: "/tienda-productos",
@@ -2133,6 +2168,8 @@ export interface Novedad {
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
   { fecha: "2026-11-16", titulo: "Se quitó «Nómina y gastos»: los gastos van al Libro de movimientos", texto: "La pantalla «Nómina y gastos» (Proveeduría Dropi) se quitó: nunca tuvo registros y repetía lo que ya hace el Libro de movimientos, que queda como el único lugar para registrar gastos. «Crear › Registrar gasto» y el atajo de la tecla S llevan ahora al Libro de movimientos. La nómina y la planilla siguen en «Nómina» (Finanzas).", modulo: "libro-movimientos", href: "/libro-movimientos" },
+  { fecha: "2026-11-16", titulo: "Tiendas: Nuvo ya está en el sistema", texto: "Nuvo es la tercera tienda de Gestión de tienda, después de Kenku y Oferfy. Al elegirla en Pedidos, Dashboard, Confirmación, Programados y Logística salen sus pedidos del Excel de Finanzas (del 1 de abril al 13 de octubre), con su ficha, sus devoluciones y cambios de Monday y sus entregas. Queda «por conectar»: cuando su app de Shopify (solo lectura) tenga las claves en Vercel, se pulsa «Conectar» en Tiendas y empiezan a entrar sus pedidos nuevos al instante, como los de Kenku y Oferfy. «Leer SISCORE» en Logística reconoce también la cuenta de Servientrega de Nuvo.", modulo: "tienda-tiendas", href: "/tienda-tiendas" },
+  { fecha: "2026-11-16", titulo: "Nuevo: Pedir a inventario (despacho pide, inventario envía)", texto: "El Excel de solicitudes a bodega pasa al sistema. Despacho pide en «Pedir a inventario» los productos que se agotaron (de la lista del catálogo, con cantidad y nota); Dinora los ve en «Pedidos de despacho», los pone en proceso y al pulsar «Enviar» el sistema hace el traslado a Despacho Plaza 100. Despacho marca «Recibido» al llegar. Cada paso avisa en «Para ti».", modulo: "despacho-pedir-inventario", href: "/despacho-pedir-inventario" },
   { fecha: "2026-11-16", titulo: "Compras: Llegada a Puerto, En Bodega y avisos automáticos", texto: "«06 - Arribo Mercancía» se llama ahora «06 - Llegada a Puerto» y hay una etapa nueva, «07 - En Bodega»; Completado pasa a ser la 08 y es solo cuando la mercancía ya está en bodega y el segundo pago está hecho. Al pasar una compra a Llegada a Puerto, Logística recibe la lista de lo que viene (producto, unidades, cajas y etiqueta de las cajas); al pasar a En Bodega, quien paga recibe el segundo pago de cada compra y el total, y al registrar el pago la compra pasa a Completado. Quién recibe cada aviso se elige en Configuración › Avisos de Compras.", modulo: "compras", href: "/compras/lista" },
   { fecha: "2026-11-16", titulo: "Compras: columnas de cajas y etiqueta de las cajas", texto: "La lista de Compras ahora trae las columnas «Cajas (Cartons)» y «Etiqueta de las cajas» (cuántas imágenes subió Shen Zhen), que se pueden ordenar, filtrar (con o sin etiqueta) y ocultar desde «Columnas». La imagen de la etiqueta se abre en la ficha de la compra.", modulo: "compras", href: "/compras/lista" },
   { fecha: "2026-11-16", titulo: "Nuevo: ¿Cuánto hay? (la tienda pregunta, Yiletsi responde)", texto: "Las tiendas ya no tienen que escribir para saber cuánto hay de un producto: en «Preguntar cuánto hay» eligen el producto del catálogo, escriben una nota si quieren y preguntan. Yiletsi lo ve en «Responder cuánto hay», separado por tienda, manda a contar a despacho y responde con la cantidad; a quien preguntó le llega en «Para ti».", modulo: "tienda-cuanto-hay", href: "/tienda-cuanto-hay" },
