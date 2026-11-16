@@ -10,7 +10,9 @@ import { ProgresoCarga } from "@/components/ui/progreso-carga";
 import { fechaCorta } from "@/lib/af4/fecha";
 import { cuentaSugerida, type FormatoHoja, type HojaLeida } from "@/lib/conciliacion/leer-excel";
 import { cargarConciliacion, esExtracto, leerConciliacion } from "@/lib/importar/cargas/conciliacion";
-import { entero } from "@/lib/af4/formato";
+import { dinero, entero } from "@/lib/af4/formato";
+import { supabase } from "@/lib/supabase/client";
+import { leerExtractoPdf, prepararSubidaExtractoPdf } from "./actions";
 const MAX_BYTES = 30 * 1024 * 1024;
 
 const ETIQUETA_FORMATO: Record<FormatoHoja, string> = {
@@ -42,6 +44,22 @@ export function ImportarConciliacion({ cuentas }: { cuentas: { id: string; nombr
   const [hojas, setHojas] = useState<HojaLeida[]>([]);
   // La cuenta de cada hoja de extracto ("" = no importar esa hoja).
   const [cuentaDe, setCuentaDe] = useState<Record<string, string>>({});
+  // Lo que dijo un extracto en PDF: banco, cuenta y si cuadra con sus saldos.
+  const [pdf, setPdf] = useState<{ banco: string | null; cuenta: string | null; diferencia: number | null } | null>(null);
+
+  async function leerPdf(f: File) {
+    const permiso = await prepararSubidaExtractoPdf().catch(() => ({ error: "Se cortó la conexión." }));
+    if ("error" in permiso) return setPaso({ tipo: "error", mensaje: permiso.error });
+    const { error: e } = await supabase.storage.from("fin-comprobantes").uploadToSignedUrl(permiso.ruta, permiso.token, f, { contentType: "application/pdf" });
+    if (e) return setPaso({ tipo: "error", mensaje: "No se pudo subir el PDF." });
+    const r = await leerExtractoPdf(permiso.ruta, f.name).catch(() => ({ error: "Se cortó la conexión mientras se leía el PDF." }));
+    if ("error" in r) return setPaso({ tipo: "error", mensaje: r.error });
+    setArchivo(f.name);
+    setHojas([r.hoja]);
+    setPdf({ banco: r.banco, cuenta: r.cuenta, diferencia: r.diferencia });
+    setCuentaDe({ [r.hoja.hoja]: cuentaSugerida(`${r.banco ?? ""} ${r.cuenta ?? ""} ${r.hoja.hoja}`, cuentas) ?? "" });
+    setPaso({ tipo: "revisar" });
+  }
 
   async function alElegir(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
@@ -51,6 +69,8 @@ export function ImportarConciliacion({ cuentas }: { cuentas: { id: string; nombr
       return;
     }
     setPaso({ tipo: "leyendo" });
+    setPdf(null);
+    if (f.type === "application/pdf" || /\.pdf$/i.test(f.name)) return leerPdf(f);
     try {
       const leidas = leerConciliacion(await f.arrayBuffer(), f.name);
       if (!leidas.length) {
@@ -80,17 +100,17 @@ export function ImportarConciliacion({ cuentas }: { cuentas: { id: string; nombr
   return (
     <div className="flex max-w-5xl flex-col gap-5">
       <label className="flex flex-col gap-1">
-        <span className={labelClass}>Libro de conciliación o extracto del banco (.xlsx o .csv)</span>
+        <span className={labelClass}>Libro de conciliación o extracto del banco (.xlsx, .csv o PDF)</span>
         <input
           type="file"
-          accept=".xlsx,.xlsm,.xls,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          accept=".xlsx,.xlsm,.xls,.csv,.pdf,text/csv,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
           onChange={alElegir}
           disabled={paso.tipo === "leyendo" || paso.tipo === "cargando"}
           className={fieldClass}
         />
       </label>
 
-      {paso.tipo === "leyendo" && <ProgresoCarga mensaje="Leyendo el archivo…" />}
+      {paso.tipo === "leyendo" && <ProgresoCarga mensaje="Leyendo el archivo… (un PDF puede tardar hasta un minuto)" />}
 
       {paso.tipo === "error" && (
         <p role="alert" className="flex items-start gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm">
@@ -101,6 +121,19 @@ export function ImportarConciliacion({ cuentas }: { cuentas: { id: string; nombr
 
       {hojas.length > 0 && (paso.tipo === "revisar" || paso.tipo === "cargando") && (
         <>
+          {pdf && (
+            <p className="flex items-start gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm">
+              <span aria-hidden="true" className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${pdf.diferencia === null ? "bg-muted-foreground" : Math.abs(pdf.diferencia) < 0.01 ? "bg-success" : "bg-warning"}`} />
+              <span>
+                Leído del PDF{pdf.banco ? ` · ${pdf.banco}` : ""}{pdf.cuenta ? ` · cuenta …${pdf.cuenta}` : ""}.{" "}
+                {pdf.diferencia === null
+                  ? "El extracto no trae saldo inicial y final: revisa las líneas antes de cargar."
+                  : Math.abs(pdf.diferencia) < 0.01
+                    ? "Cuadra con el saldo inicial y final del extracto."
+                    : `No cuadra con los saldos del extracto por ${dinero(Math.abs(pdf.diferencia), "USD", { decimales: 2 })}: puede faltar o sobrar una línea. Revisa antes de cargar.`}
+              </span>
+            </p>
+          )}
           <section aria-labelledby="titulo-hojas" className="rounded-xl border border-border bg-card">
             <h2 id="titulo-hojas" className="border-b border-border bg-muted px-4 py-1.5 text-xs font-medium text-muted-foreground">
               {archivo}
