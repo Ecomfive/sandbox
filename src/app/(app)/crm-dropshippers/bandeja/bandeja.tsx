@@ -50,6 +50,7 @@ import { agruparReacciones, miReaccion, REACCIONES_RAPIDAS, type ReaccionVista }
 import { COLUMNAS_TABLERO, GRUPOS, grupoPorId, ordenarPorUrgencia, plazoDelChat, repartirTablero, textoPlazo, type ColumnaTablero, type GrupoMotivo } from "@/lib/whatsapp/prioridad";
 import { cambiarMotivoChat, clasificarChatsPendientes } from "./motivo-actions";
 import { Bandera } from "@/components/paises/bandera";
+import { PERMISOS_BANDEJA_COMPLETOS, type PermisosBandeja } from "@/lib/crm/permisos-bandeja";
 
 /** Qué conversaciones del panel se ven. */
 type Filtro = "sinResponder" | "mias" | "resueltas" | "todas";
@@ -376,6 +377,7 @@ export function Bandeja({
   areas: misAreas,
   miArea,
   estado360 = null,
+  permisos: p = PERMISOS_BANDEJA_COMPLETOS,
 }: {
   inicial: DatosBandeja;
   abrirInicial: string | null;
@@ -395,6 +397,8 @@ export function Bandeja({
   miArea: AreaCrm;
   /** Solo para quien administra: qué datos de 360dialog tiene el servidor (si están, no su valor). Con la clave, puede registrar el webhook. */
   estado360?: { clave: boolean; sandbox: boolean; palabraSecreta: boolean } | null;
+  /** Lo afinado por persona (CATALOGO_CRM): qué puede hacer en un chat. El servidor lo vuelve a revisar en cada acción. */
+  permisos?: PermisosBandeja;
 }) {
   const { mostrarToast } = useToast();
   // Las horas («14:05», «Ayer») y lo que queda de las 24 h dependen de la zona y del reloj de quien mira: el servidor no las sabe, así
@@ -762,7 +766,8 @@ export function Bandeja({
   // Supervisión: un chat de otro panel se mira sin dejar rastro; para responderle al dropshipper hay que «Intervenir» (queda a su cargo).
   const supervisando = !!sel && sel.area !== miArea;
   const mirando = supervisando && sel?.asignadaAId !== miId;
-  const esNota = modo === "nota" || mirando;
+  // Sin «responder» (lo afinado), lo que escribe va siempre como nota privada.
+  const esNota = modo === "nota" || mirando || !p.responder;
   const bloqueado = !escribe || (!esNota && !ventana);
   const mensajes = chat && sel && chat.id === sel.id ? chat.mensajes : null;
   // Las reacciones no son mensajes sueltos: van sobre el mensaje al que se reaccionó, como en WhatsApp (29 oct 2026).
@@ -789,6 +794,7 @@ export function Bandeja({
     if (!f || !sel) return;
     if (mirando) return mostrarToast("Estás supervisando este chat: para mandarle un archivo, toca «Intervenir».", "destructive");
     if (!escribe) return mostrarToast("No tienes permiso para escribir en este chat.", "destructive");
+    if (!p.archivos) return mostrarToast("Tu acceso no incluye mandar fotos, videos y documentos. Lo da quien administra, en Usuarios y roles.", "destructive");
     if (!ventana) return mostrarToast("Pasaron más de 24 h desde su último mensaje: por WhatsApp solo se le puede escribir con una plantilla aprobada.", "destructive");
     if (lista.length > 1) mostrarToast("Se manda un archivo a la vez: va el primero.");
     setModo("responder");
@@ -1262,7 +1268,7 @@ export function Bandeja({
   const accionesChat =
     sel && escribe ? (
       mirando ? (
-        <BotonBarra
+        p.tomar && <BotonBarra
           id="tomar"
           principal
           disabled={enviando}
@@ -1273,7 +1279,7 @@ export function Bandeja({
         />
       ) : (
         <>
-          {sel.asignadaAId === miId ? (
+          {!p.tomar ? null : sel.asignadaAId === miId ? (
             <BotonBarra
               id="tomar"
               disabled={enviando}
@@ -1293,7 +1299,7 @@ export function Bandeja({
               alPulsar={() => accion(() => tomarConversacion(sel.id), "La conversación quedó a tu cargo.")}
             />
           )}
-          {sel.estado === "abierta" ? (
+          {!p.resolver ? null : sel.estado === "abierta" ? (
             <BotonBarra
               id="resuelta"
               disabled={enviando}
@@ -1323,7 +1329,7 @@ export function Bandeja({
         { id: "no_leido", texto: "Marcar como no leído", corto: "No leído", icono: NoLeidoIcon, alPulsar: () => marcarLeido(sel, false) },
         ...(escribe && !mirando
           ? [
-              ...AREAS_CHAT.filter((a) => a.valor !== sel.area).map((a) => ({ id: `pasar_${a.valor}` as AccionExtra["id"], texto: `Pasar el chat a ${a.etiqueta}`, corto: `A ${a.etiqueta}`, icono: ActualizarIcon, alPulsar: () => pasarA(a.valor) })),
+              ...AREAS_CHAT.filter((a) => p.pasarArea && a.valor !== sel.area).map((a) => ({ id: `pasar_${a.valor}` as AccionExtra["id"], texto: `Pasar el chat a ${a.etiqueta}`, corto: `A ${a.etiqueta}`, icono: ActualizarIcon, alPulsar: () => pasarA(a.valor) })),
               { id: "importar" as const, texto: "Importar chat del celular", corto: "Importar", icono: DescargarIcon, alPulsar: () => setImportar({ conversacion: sel }) },
               ...(sel.borradaEnApp?.sistema
                 ? []
@@ -1931,7 +1937,7 @@ export function Bandeja({
                             alPedirBorrar={escribe && !mirando && !esLocal(m) ? (x) => setBorrar({ tipo: "mensaje", mensajeId: x.id, resumen: vistaPreviaTexto(x.texto) || `(${x.tipo})` }) : undefined}
                             alGuardarRapida={escribe && !mirando ? guardarComoRapida : undefined}
                             // Se reacciona a lo que ya tiene su id en WhatsApp, con la ventana de 24 h abierta y no solo supervisando.
-                            alReaccionar={escribe && !mirando && ventana && !esLocal(m) && !m.importado && m.waId && m.estado !== "fallido" ? (emoji) => void reaccionar(m, emoji) : undefined}
+                            alReaccionar={escribe && p.responder && !mirando && ventana && !esLocal(m) && !m.importado && m.waId && m.estado !== "fallido" ? (emoji) => void reaccionar(m, emoji) : undefined}
                             // Solo se reintenta lo que no salió: «Se envió, pero no se pudo guardar» ya le llegó al dropshipper.
                             alReintentar={esLocal(m) && m.estado === "fallido" && !/^Se envió/.test(m.error ?? "") && m.texto ? () => enviarTexto(sel.id, m.texto ?? "", m.direccion === "nota", m.id) : undefined}
                           />
@@ -1945,7 +1951,7 @@ export function Bandeja({
                 {/* Aquí la ficha dibuja la barra de acciones (Tomar, Resuelta, Tarea…) y el formulario que se abra, justo arriba del cuadro de escribir: donde
                     ya está el mouse al responder (30 oct 2026, pedido de Alcides). */}
                 <div ref={setRanuraAcciones} className="contents" />
-                {escribe ? (
+                {escribe && (p.responder || p.notas) ? (
                   <div className="relative flex flex-col bg-[var(--wa-panel)]">
                     {mirando && (
                       <p className="m-0 border-b border-[var(--wa-borde)] px-4 py-2 text-[12.5px] text-[var(--wa-sec)]">
@@ -1972,7 +1978,7 @@ export function Bandeja({
                     {/* Arriba, si va como mensaje o como nota privada y, escribiendo un mensaje, los mensajes rápidos: así el cuadro de texto queda ancho. */}
                     {(!mirando || (!esNota && !bloqueado)) && (
                       <div className="flex items-center gap-2 px-3 pt-2">
-                        {!mirando && (
+                        {!mirando && p.responder && p.notas && (
                           <div role="group" aria-label="Tipo de mensaje" className="flex flex-none rounded-full bg-[var(--wa-fondo)] p-[3px]">
                             <button
                               type="button"
@@ -2038,12 +2044,14 @@ export function Bandeja({
                               if (f) setArchivo(f);
                             }}
                           />
+                          {p.archivos && (
                           <button type="button" disabled={bloqueado || enviando} onClick={() => inputArchivo.current?.click()} aria-label="Adjuntar una foto, audio, video o documento" title="Adjuntar un archivo" className={`${botonIcono} mb-px`}>
                             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                               <path d="m21 11.5-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.9-8.9a3.7 3.7 0 0 1 5.2 5.2l-8.9 8.9a1.8 1.8 0 0 1-2.6-2.6l8.2-8.2" />
                             </svg>
                           </button>
-                          <GrabarVoz deshabilitado={bloqueado || enviando} alGrabado={setArchivo} />
+                          )}
+                          {p.archivos && <GrabarVoz deshabilitado={bloqueado || enviando} alGrabado={setArchivo} />}
                           <Expresiones
                             conversacionId={sel.id}
                             deshabilitado={bloqueado || enviando}
@@ -2064,7 +2072,7 @@ export function Bandeja({
                           onChange={(e) => setBorrador(e.target.value)}
                           onPaste={(e) => {
                             const pegado = e.clipboardData.files[0];
-                            if (pegado && !esNota && !bloqueado && /^image\/(jpeg|png)$/.test(pegado.type)) {
+                            if (pegado && !esNota && !bloqueado && p.archivos && /^image\/(jpeg|png)$/.test(pegado.type)) {
                               e.preventDefault();
                               setArchivo(pegado);
                             }

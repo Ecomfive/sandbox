@@ -25,6 +25,7 @@ import { avisoSupervision, BUCKET_ARCHIVOS, chatParaEnviar, mandarMedioGuardado,
 import { obtenerDatosCrm } from "../datos-crm";
 import type { FilaCaso, FilaDropshipper } from "../def-crm";
 import { areasDe, cargarBandeja, cargarConversacion, conversacionPermitida, usuarioBandeja, type DatosBandeja, type MensajeVista, type ResumenDropshipper, type VistaPreviaMensaje } from "./datos-bandeja";
+import { accionBandejaBloqueada, soloSuyosYLibres } from "@/lib/crm/permisos-bandeja";
 
 /** WhatsApp acepta hasta 4096 caracteres por mensaje de texto. */
 const MAX_TEXTO = 4096;
@@ -48,7 +49,7 @@ export async function fichaCrmDelChat(dropshipperId: string): Promise<FichaCrmCh
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
   const acceso = accesoCrm(u);
-  const datos = await obtenerDatosCrm(supabase, pais.id, areasDe(u), dropshipperId);
+  const datos = await obtenerDatosCrm(supabase, pais.id, areasDe(u), dropshipperId, soloSuyosYLibres(u));
   const d = datos.dropshippers[0];
   if (!d) return { error: "No se encontró el dropshipper." };
   return { d, casos: datos.casos, hoy: datos.hoy, codigoPais: pais.codigo, acceso };
@@ -155,6 +156,8 @@ export async function mensajesAnteriores(id: string, antesDe: string): Promise<{
 export async function enviarWhatsapp(id: string, texto: string): Promise<{ ok: true; mensajeId: string; momento: string } | { error: string }> {
   const u = await usuarioBandeja(true);
   if (!u) return { error: "No tienes permiso para escribir en el CRM." };
+  const bloqueo = accionBandejaBloqueada(u, "responder");
+  if (bloqueo) return { error: bloqueo };
   const cuerpo = String(texto ?? "").trim();
   if (!cuerpo) return { error: "Escribe el mensaje." };
   if (cuerpo.length > MAX_TEXTO) return { error: `El mensaje es muy largo (máximo ${MAX_TEXTO} caracteres).` };
@@ -204,7 +207,7 @@ export async function enviarWhatsapp(id: string, texto: string): Promise<{ ok: t
  * servidor no admite archivos grandes). Todavía no se manda nada: `enviarArchivoPorWhatsapp` revisa el contenido y lo manda.
  */
 export async function prepararEnvioArchivo(id: string, nombre: string, tamano: number): Promise<{ ruta: string; token: string } | { error: string }> {
-  const e = await chatParaEnviar(id);
+  const e = await chatParaEnviar(id, "archivos");
   if ("error" in e) return e;
   if (!Number.isFinite(tamano) || tamano <= 0) return { error: "El archivo está vacío." };
   if (tamano > MAX_BYTES_ENVIO) return { error: `El archivo pesa más de ${MAX_BYTES_ENVIO / 1024 / 1024} MB.` };
@@ -219,7 +222,7 @@ export async function prepararEnvioArchivo(id: string, nombre: string, tamano: n
  * WhatsApp, se manda con su texto al pie (menos el audio) y queda en el chat. Si algo falla, el archivo subido se borra.
  */
 export async function enviarArchivoPorWhatsapp(id: string, ruta: string, nombre: string, texto: string): Promise<{ ok: true } | { error: string }> {
-  const e = await chatParaEnviar(id);
+  const e = await chatParaEnviar(id, "archivos");
   if ("error" in e) return e;
   const { supabase } = e;
   if (typeof ruta !== "string" || !ruta.startsWith(`${id}/enviados/`) || ruta.includes("..")) return { error: "Archivo no válido." };
@@ -246,6 +249,8 @@ export async function enviarArchivoPorWhatsapp(id: string, ruta: string, nombre:
 export async function notaWhatsapp(id: string, texto: string): Promise<{ ok: true; mensajeId: string; momento: string } | { error: string }> {
   const u = await usuarioBandeja(true);
   if (!u) return { error: "No tienes permiso para escribir en el CRM." };
+  const bloqueo = accionBandejaBloqueada(u, "notas");
+  if (bloqueo) return { error: bloqueo };
   const cuerpo = String(texto ?? "").trim();
   if (!cuerpo) return { error: "Escribe la nota." };
   if (cuerpo.length > MAX_TEXTO) return { error: `La nota es muy larga (máximo ${MAX_TEXTO} caracteres).` };
@@ -266,6 +271,8 @@ export async function notaWhatsapp(id: string, texto: string): Promise<{ ok: tru
 export async function cambiarEstadoConversacion(id: string, estado: "abierta" | "resuelta"): Promise<{ ok: true } | { error: string }> {
   const u = await usuarioBandeja(true);
   if (!u) return { error: "No tienes permiso para escribir en el CRM." };
+  const bloqueo = accionBandejaBloqueada(u, "resolver");
+  if (bloqueo) return { error: bloqueo };
   if (estado !== "abierta" && estado !== "resuelta") return { error: "Estado no válido." };
   const supabase = createServiceClient();
   if (!(await conversacionPermitida(supabase, id, u, true))) return { error: "Esa conversación no existe o no es de tu área." };
@@ -305,6 +312,8 @@ export async function marcarChatLeido(id: string, leido: boolean): Promise<{ ok:
 export async function pasarConversacionDeArea(id: string, area: string): Promise<{ ok: true } | { error: string }> {
   const u = await usuarioBandeja(true);
   if (!u) return { error: "No tienes permiso para escribir en el CRM." };
+  const bloqueo = accionBandejaBloqueada(u, "pasar-area");
+  if (bloqueo) return { error: bloqueo };
   if (!Object.hasOwn(NOMBRE_AREA, area)) return { error: "Área no válida." };
   const destino = area as AreaCrm;
   const supabase = createServiceClient();
@@ -361,6 +370,8 @@ export async function marcarChatBorradoEnApp(id: string, borrado: boolean): Prom
 export async function tomarConversacion(id: string, soltar = false): Promise<{ ok: true } | { error: string }> {
   const u = await usuarioBandeja(true);
   if (!u) return { error: "No tienes permiso para escribir en el CRM." };
+  const bloqueo = accionBandejaBloqueada(u, "tomar");
+  if (bloqueo) return { error: bloqueo };
   const supabase = createServiceClient();
   if (!(await conversacionPermitida(supabase, id, u, true))) return { error: "Esa conversación no existe o no es de tu área." };
   const { error } = await supabase.from("whatsapp_conversaciones").update({ asignada_a: soltar ? null : u.id }).eq("id", id);
@@ -376,6 +387,8 @@ export async function tomarConversacion(id: string, soltar = false): Promise<{ o
 export async function intervenirConversacion(id: string): Promise<{ ok: true } | { error: string }> {
   const u = await usuarioBandeja(true);
   if (!u) return { error: "No tienes permiso para escribir en el CRM." };
+  const bloqueo = accionBandejaBloqueada(u, "tomar");
+  if (bloqueo) return { error: bloqueo };
   const supabase = createServiceClient();
   const c = await conversacionPermitida(supabase, id, u, true);
   if (!c) return { error: "Esa conversación no existe o no es de tu área." };
@@ -533,6 +546,8 @@ export async function plantillasParaConversacion(id: string): Promise<{ plantill
 export async function enviarPlantillaConversacion(id: string, plantillaId: string, manuales: string[]): Promise<{ ok: true } | { error: string }> {
   const u = await usuarioBandeja(true);
   if (!u) return { error: "No tienes permiso para escribir en el CRM." };
+  const bloqueo = accionBandejaBloqueada(u, "responder");
+  if (bloqueo) return { error: bloqueo };
   if (!/^[0-9a-f-]{36}$/i.test(String(plantillaId))) return { error: "Plantilla no válida." };
   const supabase = createServiceClient();
   const c = await conversacionPermitida(supabase, id, u, true);

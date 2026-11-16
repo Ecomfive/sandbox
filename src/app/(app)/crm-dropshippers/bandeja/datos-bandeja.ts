@@ -11,6 +11,11 @@ import { dondeVende, paisDeNumeroEmpresa, paisesDondeVende, type VendeEn } from 
 import { nombreSinNumero } from "@/lib/whatsapp/telefono-oculto";
 import { normalizarTelefono } from "@/lib/crm/telefono";
 import { errorDeEntrega } from "@/lib/whatsapp/ventana";
+import { chatEnAlcance, permisosBandeja, soloSuyosYLibres } from "@/lib/crm/permisos-bandeja";
+import type { Afinado } from "@/lib/permisos/afinado";
+
+/** Quien mira, con lo afinado (opcional: sin él ve y puede todo lo que su nivel le deja). */
+type ConAfinado = { id?: string; afinado?: Record<string, Afinado> };
 
 /** Un número de WhatsApp de la empresa (Atención, Comercial…). */
 export interface NumeroVista {
@@ -174,22 +179,24 @@ export async function numerosActivos(supabase: SupabaseClient): Promise<NumeroVi
  * Los números de la empresa y las conversaciones (las 300 más recientes) que esta persona puede ver: las de las áreas que ve. El área es
  * de cada conversación desde la migración 0168, así un solo número sirve a todo el equipo. `null` si falta la migración 0158.
  */
-export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosCrm): Promise<DatosBandeja | null> {
+export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosCrm & ConAfinado): Promise<DatosBandeja | null> {
   const areas = areasDe(usuario);
   const sinBorrados = pierdeLoBorrado(accesoCrm(usuario));
   const numeros = await numerosActivos(supabase);
   if (numeros === null) return null;
   if (!numeros.length) return { numeros, numerosEmpresa: [], conversaciones: [], colores: {} };
-  const { data } = await supabase
+  // Lo afinado (CATALOGO_CRM): con «los suyos y los libres», el chat que lleva otra persona no se lista.
+  const suyos = soloSuyosYLibres(usuario);
+  let consulta = supabase
     .from("whatsapp_conversaciones")
     .select(
       "id, numero_id, area, telefono, nombre_perfil, dropshipper_id, asignada_a, estado, no_leidos, ultimo_entrante_en, ultimo_mensaje_en, ultimo_texto, ultimo_de, dropshippers(nombre, codigo, tiendas, tienda, nivel, etiquetas, dropshipper_paises(paises(codigo)), dropshipper_cuentas(plataformas(nombre), paises(codigo))), perfiles:asignada_a(nombre, avatar_url)",
     )
     .in("area", areas)
     // Solo los chats de los números activos: uno desactivado (el de prueba del sandbox, 28 oct 2026) sale de la bandeja con sus chats.
-    .in("numero_id", numeros.map((n) => n.id))
-    .order("ultimo_mensaje_en", { ascending: false, nullsFirst: false })
-    .limit(300);
+    .in("numero_id", numeros.map((n) => n.id));
+  if (suyos) consulta = consulta.or(`asignada_a.is.null,asignada_a.eq.${suyos}`);
+  const { data } = await consulta.order("ultimo_mensaje_en", { ascending: false, nullsFirst: false }).limit(300);
   // Los números de la empresa, en dígitos: un chat con uno de ellos es interno (el número de la otra área). El teléfono no viaja a la pantalla.
   const digitos = (t: unknown) => String(t ?? "").replace(/\D/g, "");
   const empresa = new Map(numeros.filter((n) => digitos(n.numero).length >= 7).map((n) => [digitos(n.numero), n]));
@@ -332,7 +339,7 @@ export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosC
 export async function conversacionPermitida(
   supabase: SupabaseClient,
   id: string,
-  usuario: PermisosCrm,
+  usuario: PermisosCrm & ConAfinado,
   /** Para mandar, anotar, resolver o tomar: además, poder escribir en el área del número (auditoría del 27 oct 2026). */
   escribe = false,
 ): Promise<{ id: string; area: AreaCrm; telefono: string; dropshipperId: string | null; asignadaA: string | null; ultimoEntranteEn: string | null; phoneNumberId: string; numeroEmpresa: string | null } | null> {
@@ -348,6 +355,8 @@ export async function conversacionPermitida(
   // Una sala de notas vieja del chat interno ya no se abre.
   if (esTelefonoInterno(data.telefono as string)) return null;
   if (escribe && !escribeEnArea(accesoCrm(usuario), area)) return null;
+  // Lo afinado (CATALOGO_CRM): con «los suyos y los libres», el chat que lleva otra persona no se abre ni se toca.
+  if (!chatEnAlcance(permisosBandeja(usuario).alcance, (data.asignada_a as string | null) ?? null, usuario.id)) return null;
   return {
     id: data.id as string,
     area,

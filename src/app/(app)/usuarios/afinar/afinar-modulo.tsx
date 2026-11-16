@@ -242,45 +242,48 @@ export function AfinarModulo({ datos }: { datos: DatosAfinarCliente }) {
             })}
           </SeccionTarjeta>
 
-          <SeccionTarjeta id="h-campos" icono={ListaIcon} titulo="Campos de la ficha y de la tabla" sinRelleno acciones={<Chip>{camposOcultos.length} ocultos · {camposVer.length} solo ver</Chip>}>
-            {catalogo.grupos.map((g) => (
-              <div key={g.nombre}>
-                <div className="flex flex-wrap items-center gap-2.5 border-b border-border bg-muted px-[18px] py-2.5 text-[12.5px] font-bold">
-                  <span>{g.nombre}</span>
-                  {g.sensible && <ChipSensible />}
-                  {puedeEscribir && (
-                    <div role="group" aria-label={`Aplicar a todo el grupo ${g.nombre}`} className="ml-auto flex gap-1.5">
-                      <button type="button" onClick={() => campoBulk(g, "editar")} className={botonChico}>
-                        Editar
-                      </button>
-                      <button type="button" onClick={() => campoBulk(g, "ver")} className={botonChico}>
-                        Solo ver
-                      </button>
-                      <button type="button" onClick={() => campoBulk(g, "oculto")} className={botonChico}>
-                        Ocultar
-                      </button>
-                    </div>
-                  )}
-                </div>
-                {g.campos.map((c) => (
-                  <div key={c.clave} className="flex flex-wrap items-center gap-3.5 border-b border-border px-[18px] py-[11px] last:border-0 hover:bg-muted/50">
-                    <span className="grow font-medium">{c.etiqueta}</span>
-                    {!c.editable && <Chip>Calculado</Chip>}
-                    {!c.ocultable && <Chip>Necesario</Chip>}
-                    <SelectorCampo
-                      nombre={`campo-${c.clave}`}
-                      campo={c.etiqueta}
-                      valor={v("campo", c.clave) as ValorCampo}
-                      alCambiar={(valor) => cambiar([{ tipo: "campo", clave: c.clave, valor }])}
-                      editable={c.editable}
-                      ocultable={c.ocultable}
-                      deshabilitado={!puedeEscribir}
-                    />
+          {/* Un módulo sin campos afinables (el CRM) no muestra la sección vacía. */}
+          {catalogo.grupos.length > 0 && (
+            <SeccionTarjeta id="h-campos" icono={ListaIcon} titulo="Campos de la ficha y de la tabla" sinRelleno acciones={<Chip>{camposOcultos.length} ocultos · {camposVer.length} solo ver</Chip>}>
+              {catalogo.grupos.map((g) => (
+                <div key={g.nombre}>
+                  <div className="flex flex-wrap items-center gap-2.5 border-b border-border bg-muted px-[18px] py-2.5 text-[12.5px] font-bold">
+                    <span>{g.nombre}</span>
+                    {g.sensible && <ChipSensible />}
+                    {puedeEscribir && (
+                      <div role="group" aria-label={`Aplicar a todo el grupo ${g.nombre}`} className="ml-auto flex gap-1.5">
+                        <button type="button" onClick={() => campoBulk(g, "editar")} className={botonChico}>
+                          Editar
+                        </button>
+                        <button type="button" onClick={() => campoBulk(g, "ver")} className={botonChico}>
+                          Solo ver
+                        </button>
+                        <button type="button" onClick={() => campoBulk(g, "oculto")} className={botonChico}>
+                          Ocultar
+                        </button>
+                      </div>
+                    )}
                   </div>
-                ))}
-              </div>
-            ))}
-          </SeccionTarjeta>
+                  {g.campos.map((c) => (
+                    <div key={c.clave} className="flex flex-wrap items-center gap-3.5 border-b border-border px-[18px] py-[11px] last:border-0 hover:bg-muted/50">
+                      <span className="grow font-medium">{c.etiqueta}</span>
+                      {!c.editable && <Chip>Calculado</Chip>}
+                      {!c.ocultable && <Chip>Necesario</Chip>}
+                      <SelectorCampo
+                        nombre={`campo-${c.clave}`}
+                        campo={c.etiqueta}
+                        valor={v("campo", c.clave) as ValorCampo}
+                        alCambiar={(valor) => cambiar([{ tipo: "campo", clave: c.clave, valor }])}
+                        editable={c.editable}
+                        ocultable={c.ocultable}
+                        deshabilitado={!puedeEscribir}
+                      />
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </SeccionTarjeta>
+          )}
 
           {catalogo.alcance && (
             <SeccionTarjeta id="h-alcance" icono={EmbudoIcon} titulo={catalogo.alcance.titulo} sinRelleno>

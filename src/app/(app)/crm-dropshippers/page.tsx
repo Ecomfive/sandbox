@@ -8,6 +8,7 @@ import { normalizar } from "@/lib/tabla/motor";
 import { contarSinResponder } from "./bandeja/sin-responder";
 import { obtenerDatosCrm } from "./datos-crm";
 import { ListaDropshippers } from "./lista-dropshippers";
+import { soloSuyosYLibres } from "@/lib/crm/permisos-bandeja";
 
 export const metadata = { title: "CRM Dropshippers" };
 
@@ -25,7 +26,7 @@ export default async function CrmDropshippersPage({ searchParams }: { searchPara
   const pais = await getPaisActual(supabase);
   const acceso = accesoCrm(usuario);
   const areas = areasVisibles(acceso);
-  const [datos, sinResponder] = await Promise.all([obtenerDatosCrm(supabase, pais.id, areas), contarSinResponder(supabase, areas, pierdeLoBorrado(acceso))]);
+  const [datos, sinResponder] = await Promise.all([obtenerDatosCrm(supabase, pais.id, areas, undefined, soloSuyosYLibres(usuario)), contarSinResponder(supabase, areas, pierdeLoBorrado(acceso), soloSuyosYLibres(usuario))]);
   let abrirInicial = typeof abrir === "string" ? abrir : null;
   if (!abrirInicial && typeof buscar === "string" && buscar.trim()) {
     const q = normalizar(buscar.trim());

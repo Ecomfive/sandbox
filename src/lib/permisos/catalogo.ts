@@ -278,7 +278,45 @@ export const CATALOGO_COMPRAS: CatalogoModulo = {
   },
 };
 
-const CATALOGOS: Record<string, CatalogoModulo> = { compras: CATALOGO_COMPRAS };
+/**
+ * CRM Dropshippers (pedido de Hernán del 28 oct 2026, rehecho sobre main el 16 nov 2026 en lugar del PR #345): con un solo número de
+ * WhatsApp para todo el equipo, cada persona ve la bandeja según su rol y, encima, lo afinado. Las áreas (Atención, Comercial, Dirección)
+ * siguen saliendo de los módulos `crm-dropshippers`, `crm-comercial` y `crm-direccion` (`src/lib/crm/areas.ts`); aquí se afina dentro de
+ * ellas: qué pestañas ve, qué puede hacer en un chat y qué chats ve. El teléfono no va aquí: ya está oculto para todos menos administración
+ * (`telefono-oculto.ts`). Lo aplican las acciones de la bandeja en el servidor (`src/lib/crm/permisos-bandeja.ts`) y la bandeja en pantalla.
+ */
+export const CATALOGO_CRM: CatalogoModulo = {
+  modulo: "crm-dropshippers",
+  etiqueta: "CRM Dropshippers",
+  pestanas: [
+    { clave: "bandeja", etiqueta: "Bandeja de WhatsApp", href: "/crm-dropshippers/bandeja" },
+    { clave: "tareas", etiqueta: "Tareas", href: "/crm-dropshippers/tareas" },
+    { clave: "plantillas", etiqueta: "Plantillas", href: "/crm-dropshippers/plantillas" },
+    { clave: "borrados", etiqueta: "Borrados", href: "/crm-dropshippers/borrados" },
+    { clave: "casos", etiqueta: "Casos", href: "/crm-dropshippers/casos" },
+    { clave: "motivos", etiqueta: "Motivos", href: "/crm-dropshippers/motivos" },
+    { clave: "ranking", etiqueta: "Ranking", href: "/crm-dropshippers/ranking" },
+    { clave: "vinculos", etiqueta: "Vínculos", href: "/crm-dropshippers/vinculos" },
+  ],
+  acciones: [
+    { clave: "responder", etiqueta: "Responder por WhatsApp (texto, plantillas, stickers y reacciones)", requiereEdicion: true },
+    { clave: "archivos", etiqueta: "Mandar fotos, videos y documentos", requiereEdicion: true },
+    { clave: "notas", etiqueta: "Dejar notas privadas en el chat", requiereEdicion: true },
+    { clave: "pasar-area", etiqueta: "Pasar un chat a otra área", requiereEdicion: true },
+    { clave: "tomar", etiqueta: "Tomar, soltar e intervenir chats", requiereEdicion: true },
+    { clave: "resolver", etiqueta: "Marcar resuelto y reabrir", requiereEdicion: true },
+  ],
+  grupos: [],
+  alcance: {
+    titulo: "Qué chats de WhatsApp ve",
+    opciones: [
+      { valor: "todas", etiqueta: "Todos los chats de sus áreas" },
+      { valor: "mias-y-libres", etiqueta: "Los que tiene a cargo y los que nadie tomó" },
+    ],
+  },
+};
+
+const CATALOGOS: Record<string, CatalogoModulo> = { compras: CATALOGO_COMPRAS, "crm-dropshippers": CATALOGO_CRM };
 
 /** El catálogo de lo afinable de un módulo, o `undefined` si ese módulo todavía solo se da o se quita completo. */
 export const catalogoDe = (modulo: string): CatalogoModulo | undefined => CATALOGOS[modulo];

@@ -3,9 +3,10 @@ import { Pagina } from "@/components/ui/pagina";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
 import { accesoCrm, areasVisibles } from "@/lib/crm/areas";
-import { requireModulo } from "@/lib/auth";
+import { requirePestana } from "@/lib/auth";
 import { obtenerDatosCrm } from "../datos-crm";
 import { ResumenCrm } from "../resumen-crm";
+import { soloSuyosYLibres } from "@/lib/crm/permisos-bandeja";
 
 export const metadata = { title: "Ranking de dropshippers" };
 
@@ -13,11 +14,11 @@ export const dynamic = "force-dynamic";
 
 /** CRM › Ranking: los indicadores del mes, quién vende más y los casos que piden atención (la portada del CRM hasta el 26 oct 2026). */
 export default async function RankingDropshippersPage() {
-  const usuario = await requireModulo("crm-dropshippers");
+  const usuario = await requirePestana("crm-dropshippers", "ranking");
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
   const acceso = accesoCrm(usuario);
-  const datos = await obtenerDatosCrm(supabase, pais.id, areasVisibles(acceso));
+  const datos = await obtenerDatosCrm(supabase, pais.id, areasVisibles(acceso), undefined, soloSuyosYLibres(usuario));
 
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">

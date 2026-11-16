@@ -14,6 +14,7 @@ import { COLUMNAS_PLANTILLA, type PlantillaGuardada } from "@/lib/whatsapp/plant
 import { dropshipperPorTelefonos } from "@/lib/whatsapp/vinculo";
 import { minutosVentana } from "@/lib/whatsapp/ventana";
 import { usuarioBandeja } from "./datos-bandeja";
+import { accionBandejaBloqueada } from "@/lib/crm/permisos-bandeja";
 
 /** Una plantilla que se puede usar para un primer contacto, con lo que la ventana necesita para pedir y mostrar sus datos. */
 export interface PlantillaNuevoContacto {
@@ -79,6 +80,8 @@ export interface PedidoNuevoContacto {
 export async function iniciarChatConPlantilla(p: PedidoNuevoContacto): Promise<{ id: string; yaExistia: boolean; escribirDirecto: boolean } | { error: string }> {
   const u = await usuarioBandeja(true);
   if (!u) return { error: "No tienes permiso para escribir en el CRM." };
+  const bloqueo = accionBandejaBloqueada(u, "responder");
+  if (bloqueo) return { error: bloqueo };
   const falta = validarNuevoContacto({ nombre: String(p.nombre ?? ""), medio: String(p.medio ?? ""), nota: String(p.nota ?? ""), confirmo: p.confirmo === true });
   if (falta) return { error: falta };
   const tel = normalizarTelefono(String(p.telefono ?? ""));

@@ -28,7 +28,7 @@ const uno = <T>(r: Relacion<T>): T | null => (Array.isArray(r) ? (r[0] ?? null) 
  * El chat de WhatsApp de cada dropshipper (migración 0158) en los números de las áreas que ve la persona: la conversación más
  * reciente y la suma de no leídos de todas. Sin la migración (o sin áreas), ninguno.
  */
-async function cargarChats(supabase: SupabaseClient, areas: AreaCrm[], soloId?: string): Promise<Map<string, ChatDropshipper>> {
+async function cargarChats(supabase: SupabaseClient, areas: AreaCrm[], soloId?: string, soloSuyos: string | null = null): Promise<Map<string, ChatDropshipper>> {
   const chats = new Map<string, ChatDropshipper>();
   if (!areas.length) return chats;
   let consulta = supabase
@@ -37,6 +37,8 @@ async function cargarChats(supabase: SupabaseClient, areas: AreaCrm[], soloId?: 
     .not("dropshipper_id", "is", null)
     .in("area", areas);
   if (soloId) consulta = consulta.eq("dropshipper_id", soloId);
+  // Lo afinado (CATALOGO_CRM): con «los suyos y los libres», el chat que lleva otra persona no se ve en la lista.
+  if (soloSuyos && /^[0-9a-f-]{36}$/i.test(soloSuyos)) consulta = consulta.or(`asignada_a.is.null,asignada_a.eq.${soloSuyos}`);
   const { data, error } = await consulta.order("ultimo_mensaje_en", { ascending: false, nullsFirst: false }).limit(2000);
   if (error) return chats;
   // Un chat que se autorizó borrar (migración 0172) ya no cuenta.
@@ -68,7 +70,14 @@ async function cargarChats(supabase: SupabaseClient, areas: AreaCrm[], soloId?: 
  * `crm_dropshippers_resumen` (migración 0062), no JavaScript. Con `soloId` trae solo ese dropshipper y sus casos (la ficha del chat
  * de la Bandeja de WhatsApp, 29 oct 2026).
  */
-export async function obtenerDatosCrm(supabase: SupabaseClient, paisId: string, areasWhatsapp: AreaCrm[] = [], soloId?: string): Promise<DatosCrm> {
+export async function obtenerDatosCrm(
+  supabase: SupabaseClient,
+  paisId: string,
+  areasWhatsapp: AreaCrm[] = [],
+  soloId?: string,
+  /** El id de quien mira si lo afinado le deja ver solo sus chats y los libres (`soloSuyosYLibres`); null = todos los de sus áreas. */
+  soloSuyos: string | null = null,
+): Promise<DatosCrm> {
   const hoy = new Date().toISOString().slice(0, 10);
 
   const CAMPOS_DROPSHIPPER =
@@ -114,7 +123,7 @@ export async function obtenerDatosCrm(supabase: SupabaseClient, paisId: string, 
     // Una fila por dropshipper y país: las ventas de este país no se mezclan con las de otro (otra moneda).
     soloId ? consultaSumas.eq("id", soloId) : consultaSumas,
     (soloId ? consultaCasos.eq("dropshipper_id", soloId) : consultaCasos).order("abierto_en", { ascending: false }).limit(500),
-    cargarChats(supabase, areasWhatsapp, soloId),
+    cargarChats(supabase, areasWhatsapp, soloId, soloSuyos),
     traerTodasConError<Record<string, unknown>>(consultaVendeEn),
     traerTodasConError<EventoTipo & { entidad_id: string }>(consultaCambiosTipo),
     traerTodasConError<{ dropshipper_id: string; correo: string }>(consultaCorreos),

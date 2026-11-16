@@ -11,6 +11,7 @@ import { TIPO_DE_MENSAJE, type TipoEnvio } from "@/lib/whatsapp/archivos";
 import { resumenMensaje } from "@/lib/whatsapp/extraer";
 import { minutosVentana } from "@/lib/whatsapp/ventana";
 import { conversacionPermitida, usuarioBandeja } from "./datos-bandeja";
+import { accionBandejaBloqueada } from "@/lib/crm/permisos-bandeja";
 
 export const NOMBRE_AREA: Record<AreaCrm, string> = { atencion: "Atención", comercial: "Comercial", direccion: "Dirección" };
 
@@ -32,9 +33,12 @@ type ChatPermitido = NonNullable<Awaited<ReturnType<typeof conversacionPermitida
 export type ChatParaEnviar = { u: NonNullable<Awaited<ReturnType<typeof usuarioBandeja>>>; c: ChatPermitido; supabase: ReturnType<typeof createServiceClient> };
 
 /** Lo que hace falta para mandarle algo a un dropshipper: poder escribir en el chat, no estar solo supervisando y la ventana de 24 h abierta. */
-export async function chatParaEnviar(id: string): Promise<ChatParaEnviar | { error: string }> {
+export async function chatParaEnviar(id: string, accion: "responder" | "archivos" = "responder"): Promise<ChatParaEnviar | { error: string }> {
   const u = await usuarioBandeja(true);
   if (!u) return { error: "No tienes permiso para escribir en el CRM." };
+  // Lo afinado por persona (CATALOGO_CRM): responder, y para fotos, videos y documentos además «archivos».
+  const bloqueo = accionBandejaBloqueada(u, accion);
+  if (bloqueo) return { error: bloqueo };
   const supabase = createServiceClient();
   const c = await conversacionPermitida(supabase, id, u, true);
   if (!c) return { error: "Esa conversación no existe o no es de tu área." };

@@ -9,14 +9,21 @@ import { esTelefonoInterno } from "@/lib/crm/chat-interno";
  * Comercial las suyas y las de Atención, Dirección las tres (`areas`). Un chat que se autorizó borrar (migración 0172) no cuenta, ni —para quien tiene solo
  * Atención— uno borrado en la app de WhatsApp Business (`sinBorrados`). Lo usan el globo de la pestaña «Bandeja de WhatsApp» y la burbuja de la lista.
  */
-export async function contarSinResponder(supabase: SupabaseClient, areas: AreaCrm[], sinBorrados = false): Promise<number> {
-  const { data, error } = await supabase
+export async function contarSinResponder(
+  supabase: SupabaseClient,
+  areas: AreaCrm[],
+  sinBorrados = false,
+  /** Lo afinado (CATALOGO_CRM): el id de quien solo ve sus chats y los libres; no cuenta los que lleva otra persona. */
+  soloSuyos: string | null = null,
+): Promise<number> {
+  let consulta = supabase
     .from("whatsapp_conversaciones")
     .select("id, telefono, ultimo_mensaje_en")
     .eq("estado", "abierta")
     .or("no_leidos.gt.0,ultimo_de.eq.entrante")
-    .in("area", areas)
-    .limit(2000);
+    .in("area", areas);
+  if (soloSuyos && /^[0-9a-f-]{36}$/i.test(soloSuyos)) consulta = consulta.or(`asignada_a.is.null,asignada_a.eq.${soloSuyos}`);
+  const { data, error } = await consulta.limit(2000);
   if (error) return 0;
   const ocultas = await conversacionesOcultas(supabase);
   // El chat interno entre las áreas (el teléfono es otro número de la empresa) no es un cliente que espera respuesta.

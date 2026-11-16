@@ -4,7 +4,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
 import { accesoCrm } from "@/lib/crm/areas";
 import { sugerirDropshippers } from "@/lib/crm/sugerencias";
-import { requireModulo } from "@/lib/auth";
+import { requirePestana } from "@/lib/auth";
 import { TablaVinculos, type FilaVinculo } from "../tabla-vinculos";
 
 export const metadata = { title: "Vínculos" };
@@ -15,7 +15,7 @@ const PLATAFORMA = "Dropi";
 
 /** Usuarios de la plataforma con pedidos que todavía no están vinculados a ningún dropshipper, con una sugerencia por nombre de tienda. */
 export default async function VinculosDropshippersPage() {
-  const usuario = await requireModulo("crm-dropshippers");
+  const usuario = await requirePestana("crm-dropshippers", "vinculos");
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
 

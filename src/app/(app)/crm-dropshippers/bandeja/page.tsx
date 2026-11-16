@@ -1,6 +1,6 @@
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
-import { requireModulo } from "@/lib/auth";
+import { requirePestana } from "@/lib/auth";
 import { accesoCrm, areaPropia, areasVisibles, vePresenciaEquipo } from "@/lib/crm/areas";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -12,6 +12,7 @@ import { VISTAS_DIRECCION, type VistaDireccion } from "../direccion/ruta";
 import { Bandeja } from "./bandeja";
 import { cargarBandeja } from "./datos-bandeja";
 import { PresenciaDireccion, type PersonaEquipo } from "./personas-en-chat";
+import { permisosBandeja } from "@/lib/crm/permisos-bandeja";
 
 export const metadata = { title: "Bandeja de WhatsApp" };
 
@@ -32,7 +33,7 @@ async function cargarEquipo(supabase: ReturnType<typeof createServiceClient>): P
  * WhatsApp. Un enlace para abrir un chat (`?abrir=`) va directo a Chats. Los demás ven la bandeja de siempre.
  */
 export default async function BandejaWhatsappPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
-  const usuario = await requireModulo("crm-dropshippers");
+  const usuario = await requirePestana("crm-dropshippers", "bandeja");
   const { abrir, vista: vistaParam, dias, segmento, cliente } = await searchParams;
   const a = accesoCrm(usuario);
   const vistaDireccion: VistaDireccion | null = !a.direccion
@@ -81,6 +82,7 @@ export default async function BandejaWhatsappPage({ searchParams }: { searchPara
           verTelefono={a.verTelefonos}
           areas={areasVisibles(a)}
           miArea={areaPropia(a)}
+          permisos={permisosBandeja(usuario)}
           estado360={
             // Solo para quien administra: qué datos de 360dialog tiene el servidor (si están, nunca su valor).
             esAdministrador(usuario)

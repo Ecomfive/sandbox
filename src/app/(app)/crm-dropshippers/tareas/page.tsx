@@ -1,6 +1,6 @@
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
-import { requireModulo } from "@/lib/auth";
+import { requirePestana } from "@/lib/auth";
 import { listarTareas } from "./actions";
 import { PanelTareas } from "./panel-tareas";
 
@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 /** CRM Dropshippers › Tareas (29 oct 2026): lo que hay que hacer con cada cliente, sacado de sus chats y de los seguimientos. */
 export default async function TareasCrmPage() {
-  await requireModulo("crm-dropshippers");
+  await requirePestana("crm-dropshippers", "tareas");
   const inicial = await listarTareas("mias");
   return (
     <Pagina ancho="media" className="flex flex-col gap-4">
