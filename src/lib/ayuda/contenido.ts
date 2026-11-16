@@ -401,13 +401,6 @@ export const GUIAS: GuiaModulo[] = [
     secciones: [{ titulo: "Uso", pasos: ["Sube el archivo del banco; los movimientos se clasifican con el Diccionario de patrones.", "Agrega un patrón para que un tipo de movimiento se reconozca solo la próxima vez."] }],
   },
   {
-    modulo: "gastos",
-    titulo: "Nómina y gastos",
-    ruta: "/gastos",
-    resumen: "Registro de gastos y nómina por categoría y mes.",
-    secciones: [{ titulo: "Uso", pasos: ["«Agregar» registra un gasto con su categoría.", "Las tarjetas de categoría filtran la tabla del mes."] }],
-  },
-  {
     modulo: "estado-resultados",
     titulo: "Estado de resultados",
     ruta: "/estado-resultados",
@@ -2176,6 +2169,7 @@ export interface Novedad {
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
   { fecha: "2026-11-16", titulo: "Confirmación con IA: los asesores marcan lo correcto y la IA aprende", texto: "En Gestión de tienda › Confirmación › Con IA, los pedidos que las IA no pudieron decidir («Para revisar») se resuelven con botones: «Completa · Ciudad», «Completa · Interior» o «Falta un dato» (con lo que suele faltar a un toque), uno tras otro. Los pedidos que ya salieron listos o con un dato faltante tienen «Está bien» y «Corregir». Lo que marcas manda sobre lo que dijo la IA, queda con tu nombre y se guarda como ejemplo para los siguientes pedidos; una tarjeta nueva muestra cuántas veces acertó la IA.", modulo: "tienda-confirmacion", href: "/tienda-confirmacion/ia" },
+  { fecha: "2026-11-16", titulo: "Se quitó «Nómina y gastos»: los gastos van al Libro de movimientos", texto: "La pantalla «Nómina y gastos» (Proveeduría Dropi) se quitó: nunca tuvo registros y repetía lo que ya hace el Libro de movimientos, que queda como el único lugar para registrar gastos. «Crear › Registrar gasto» y el atajo de la tecla S llevan ahora al Libro de movimientos. La nómina y la planilla siguen en «Nómina» (Finanzas).", modulo: "libro-movimientos", href: "/libro-movimientos" },
   { fecha: "2026-11-16", titulo: "Tiendas: Nuvo ya está en el sistema", texto: "Nuvo es la tercera tienda de Gestión de tienda, después de Kenku y Oferfy. Al elegirla en Pedidos, Dashboard, Confirmación, Programados y Logística salen sus pedidos del Excel de Finanzas (del 1 de abril al 13 de octubre), con su ficha, sus devoluciones y cambios de Monday y sus entregas. Queda «por conectar»: cuando su app de Shopify (solo lectura) tenga las claves en Vercel, se pulsa «Conectar» en Tiendas y empiezan a entrar sus pedidos nuevos al instante, como los de Kenku y Oferfy. «Leer SISCORE» en Logística reconoce también la cuenta de Servientrega de Nuvo.", modulo: "tienda-tiendas", href: "/tienda-tiendas" },
   { fecha: "2026-11-16", titulo: "Nuevo: Pedir a inventario (despacho pide, inventario envía)", texto: "El Excel de solicitudes a bodega pasa al sistema. Despacho pide en «Pedir a inventario» los productos que se agotaron (de la lista del catálogo, con cantidad y nota); Dinora los ve en «Pedidos de despacho», los pone en proceso y al pulsar «Enviar» el sistema hace el traslado a Despacho Plaza 100. Despacho marca «Recibido» al llegar. Cada paso avisa en «Para ti».", modulo: "despacho-pedir-inventario", href: "/despacho-pedir-inventario" },
   { fecha: "2026-11-16", titulo: "Compras: Llegada a Puerto, En Bodega y avisos automáticos", texto: "«06 - Arribo Mercancía» se llama ahora «06 - Llegada a Puerto» y hay una etapa nueva, «07 - En Bodega»; Completado pasa a ser la 08 y es solo cuando la mercancía ya está en bodega y el segundo pago está hecho. Al pasar una compra a Llegada a Puerto, Logística recibe la lista de lo que viene (producto, unidades, cajas y etiqueta de las cajas); al pasar a En Bodega, quien paga recibe el segundo pago de cada compra y el total, y al registrar el pago la compra pasa a Completado. Quién recibe cada aviso se elige en Configuración › Avisos de Compras.", modulo: "compras", href: "/compras/lista" },
