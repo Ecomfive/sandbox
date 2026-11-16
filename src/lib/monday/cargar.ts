@@ -68,6 +68,7 @@ export async function cargarDespachos(supabase: SupabaseClient, desde: string, h
       .select("periodo, unidad_id, tienda_texto, courier, estado, estado_grupo, causa_rechazo, fecha_despacho, fin_unidades(nombre), ven_ordenes(total, costo_envio)")
       .gte("periodo", desde)
       .lte("periodo", hasta)
+      .is("archivado_en", null)
       .order("item_id")
       .range(a, b) as unknown as PromiseLike<{ data: Fila[] | null; error: { message: string } | null }>,
   );

@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition, type DragEvent } from "react";
 import { anilloFoco, fieldClass } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
-import { cambiarCelda, comentarFila, crearFila, detalleFila, moverFila, subirComprobante, type DetalleFila } from "@/app/(app)/despacho-ciudad/actions";
+import { archivarFila, cambiarCelda, comentarFila, crearFila, detalleFila, moverFila, restaurarFila, subirComprobante, type DetalleFila } from "@/app/(app)/despacho-ciudad/actions";
 import { colorDe, diaTexto, ETIQUETAS, GRUPOS_DEVOLUCION, grupoPorAsesores, sumasGrupo, textoSobre, type Columna } from "@/lib/despacho/etiquetas";
 import type { Clase, FilaTablero } from "@/lib/despacho/datos";
 import { formatearTiempoRelativo } from "@/lib/formato";
@@ -37,7 +37,21 @@ const td = "relative h-[38px] border-r border-b border-border/60 bg-card p-0 whi
  * que se abren y se cierran, etiquetas de colores que se cambian con un toque, celdas que se escriben, filas que se arrastran a otro día o grupo, sumas
  * al pie, búsqueda y filtros, y el panel de cada fila con sus actualizaciones, su actividad y el comprobante.
  */
-export function TableroDespacho({ clase, filas: iniciales, puedeEscribir, hoy }: { clase: Clase; filas: FilaTablero[]; puedeEscribir: boolean; hoy: string }) {
+export function TableroDespacho({
+  clase,
+  filas: iniciales,
+  puedeEscribir: puedeArchivar,
+  hoy,
+  archivados = false,
+}: {
+  clase: Clase;
+  filas: FilaTablero[];
+  puedeEscribir: boolean;
+  hoy: string;
+  /** La vista de archivados: nada se edita, solo se restaura desde el panel. */
+  archivados?: boolean;
+}) {
+  const puedeEscribir = puedeArchivar && !archivados;
   const router = useRouter();
   const { mostrarToast } = useToast();
   const [, empezar] = useTransition();
@@ -375,19 +389,40 @@ export function TableroDespacho({ clase, filas: iniciales, puedeEscribir, hoy }:
             );
           })}
         </div>
-        {filaSel && <PanelFila fila={filaSel} puedeEscribir={puedeEscribir} alCerrar={() => setSel(null)} />}
+        {filaSel && <PanelFila key={filaSel.itemId} fila={filaSel} puedeEscribir={puedeEscribir} puedeArchivar={puedeArchivar} archivada={archivados} alCerrar={() => setSel(null)} />}
       </div>
       {menu && <button type="button" aria-label="Cerrar la lista" onClick={() => setMenu(null)} className="fixed inset-0 z-20 cursor-default bg-transparent" />}
     </div>
   );
 }
 
-/** El panel de una fila: comprobantes (subir y ver), actualizaciones del equipo y el registro de quién cambió qué. */
-function PanelFila({ fila, puedeEscribir, alCerrar }: { fila: FilaTablero; puedeEscribir: boolean; alCerrar: () => void }) {
+/** El panel de una fila: comprobantes (subir y ver), actualizaciones del equipo, el registro de quién cambió qué, y archivar o restaurar la fila. */
+function PanelFila({
+  fila,
+  puedeEscribir,
+  puedeArchivar,
+  archivada,
+  alCerrar,
+}: {
+  fila: FilaTablero;
+  puedeEscribir: boolean;
+  puedeArchivar: boolean;
+  archivada: boolean;
+  alCerrar: () => void;
+}) {
   const { mostrarToast } = useToast();
   const router = useRouter();
   const [detalle, setDetalle] = useState<DetalleFila | null>(null);
   const [texto, setTexto] = useState("");
+  const [confirmar, setConfirmar] = useState(false);
+  const archivarORestaurar = () =>
+    empezar(async () => {
+      const r = archivada ? await restaurarFila(fila.itemId) : await archivarFila(fila.itemId);
+      if (r.error) return mostrarToast(r.error, "destructive");
+      mostrarToast(archivada ? "Fila restaurada: vuelve a su tablero." : "Fila archivada: la encuentras en «Archivados».", "success");
+      alCerrar();
+      router.refresh();
+    });
   const [ocupado, empezar] = useTransition();
   const archivo = useRef<HTMLInputElement>(null);
   const cargar = () =>
@@ -512,6 +547,35 @@ function PanelFila({ fila, puedeEscribir, alCerrar }: { fila: FilaTablero; puede
           <p className="m-0 text-xs text-muted-foreground">{fila.origen === "monday" && !fila.editadoEn ? "Viene de Monday: todavía no se cambió en el sistema." : "Sin cambios registrados."}</p>
         )}
       </section>
+
+      {puedeArchivar && (
+        <section className="flex flex-col gap-2 border-t border-border pt-3" aria-label={archivada ? "Restaurar" : "Archivar"}>
+          {archivada ? (
+            <>
+              <p className="m-0 text-xs text-muted-foreground">Esta fila está archivada: no cuenta en el pedido ni en Cobros.</p>
+              <button type="button" disabled={ocupado} onClick={archivarORestaurar} className={`boton-neon self-start rounded-md px-3 py-1.5 text-xs font-medium text-white ${anilloFoco}`}>
+                Restaurar al tablero
+              </button>
+            </>
+          ) : confirmar ? (
+            <>
+              <p className="m-0 text-xs">¿Archivar esta fila? Sale del tablero y deja de contar en el pedido y en Cobros. No se borra: la puedes restaurar desde «Archivados».</p>
+              <div className="flex gap-2">
+                <button type="button" disabled={ocupado} onClick={archivarORestaurar} className={`rounded-md bg-destructive px-3 py-1.5 text-xs font-medium text-white ${anilloFoco}`}>
+                  Sí, archivar
+                </button>
+                <button type="button" onClick={() => setConfirmar(false)} className={`rounded-md border border-border px-3 py-1.5 text-xs ${anilloFoco}`}>
+                  Cancelar
+                </button>
+              </div>
+            </>
+          ) : (
+            <button type="button" onClick={() => setConfirmar(true)} className={`self-start rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground-soft hover:bg-muted ${anilloFoco}`}>
+              Archivar fila
+            </button>
+          )}
+        </section>
+      )}
     </aside>
   );
 }
