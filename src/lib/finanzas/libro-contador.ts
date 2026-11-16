@@ -176,3 +176,42 @@ export function libroContador(movimientos: MovimientoContador[], ventas: VentaCo
     { nombre: "Ventas facturadas", hoja: hojaVentas(ventas, `Libro de ventas facturadas · ${etiquetaPeriodo} · USD`), congelar: { filas: 3, columnas: 1 } },
   ]);
 }
+
+export interface LiquidacionItbms {
+  /** ITBMS cobrado: el 7 % incluido en las ventas facturadas. */
+  debito: number;
+  /** ITBMS pagado: el de las compras y gastos que lo tienen cargado. */
+  credito: number;
+  /** Débito − crédito si es positivo (lo que se paga); si no, 0. */
+  aPagar: number;
+  /** Crédito − débito si es positivo (queda a favor para el mes siguiente). */
+  aFavor: number;
+  ventas: number;
+  comprasConItbms: number;
+  /** Compras y gastos sin el ITBMS cargado (pueden ser exentos o faltar el dato): su crédito no se cuenta. */
+  comprasSinItbms: number;
+  montoSinItbms: number;
+}
+
+/**
+ * Estimación de la declaración de ITBMS del mes (mejora 16): débito de las ventas facturadas menos crédito de las compras
+ * con ITBMS cargado. Es una ayuda para preparar el formulario, no la declaración: lo que no tiene el ITBMS cargado no
+ * suma crédito y se cuenta aparte.
+ */
+export function liquidacionItbms(movimientos: MovimientoContador[], ventas: VentaContador[]): LiquidacionItbms {
+  const compras = comprasDelLibro(movimientos).filter((c) => c.total > 0);
+  const con = compras.filter((c) => c.itbms !== null && c.itbms > 0);
+  const sin = compras.filter((c) => c.itbms === null);
+  const debito = r2(ventas.reduce((a, v) => a + itbmsIncluido(v.total), 0));
+  const credito = r2(con.reduce((a, c) => a + (c.itbms ?? 0), 0));
+  return {
+    debito,
+    credito,
+    aPagar: r2(Math.max(0, debito - credito)),
+    aFavor: r2(Math.max(0, credito - debito)),
+    ventas: ventas.length,
+    comprasConItbms: con.length,
+    comprasSinItbms: sin.length,
+    montoSinItbms: r2(sin.reduce((a, c) => a + c.total, 0)),
+  };
+}
