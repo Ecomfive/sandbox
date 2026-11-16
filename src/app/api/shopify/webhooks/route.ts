@@ -1,5 +1,6 @@
 import { after, NextResponse } from "next/server";
 import { dispararDesdeWebhook } from "@/lib/confirmacion-ia/servidor";
+import { procesarNotaDelBot } from "@/lib/tienda/nota-bot-servidor";
 import { createServiceClient } from "@/lib/supabase/server";
 import { guardarOrdenesShopify, tiendasConfiguradas } from "@/lib/finanzas/sincronizar-shopify";
 import { ordenDeShopify } from "@/lib/finanzas/shopify";
@@ -49,6 +50,8 @@ export async function POST(request: Request) {
     if (o) await guardarOrdenesShopify(supabase, [o]);
     // Confirmación con IA (16 nov 2026): si iComfly dejó el pedido «Confirmada», se analiza su dirección sin hacer esperar a Shopify.
     if (o) after(() => dispararDesdeWebhook(createServiceClient(), o.origen_clave, o.etiquetas));
+    // La nota que el bot de iComfly deja al crear el pedido estorba los tickets de Despacho: se detecta y, con la escritura encendida, se quita (automatización interna, sin pantalla).
+    after(() => procesarNotaDelBot(createServiceClient(), { dominio, orden }));
     // Gestión de tienda: la hora del último aviso, para la pantalla Tiendas (si la tienda es una de las del sistema).
     if (app) await supabase.from("tiendas").update({ ultimo_aviso_en: new Date().toISOString() }).eq("dominio", dominio);
     if (tienda.unidadId) {
