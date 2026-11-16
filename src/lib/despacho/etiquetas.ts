@@ -80,6 +80,9 @@ export const ETIQUETAS: Record<Columna, { titulo: string; opciones: Etiqueta[] }
       { nombre: "RECIBIDO", color: "#00c875" },
       { nombre: "FUERA DE RUTA", color: "#ff6d3b" },
       { nombre: "PROPINAS", color: "#216edf" },
+      { nombre: "CAMBIO", color: "#5559df" },
+      { nombre: "RETIROS", color: "#037f4c" },
+      { nombre: "COMPLEMENTOS", color: "#ffadad" },
     ],
   },
   estado_asesores: {

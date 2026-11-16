@@ -4,6 +4,9 @@
 export type Zona = "ciudad" | "interior";
 export const ZONAS: Zona[] = ["ciudad", "interior"];
 
+/** Cómo se llama cada zona en las pantallas: la etiqueta de Shopify tal cual se escribe (Panamá). */
+export const NOMBRE_ZONA: Record<Zona, string> = { ciudad: "CIUDAD", interior: "INTERIOR/SERVIENTREGA" };
+
 export interface ReglaZona {
   id: string;
   /** Como la escribió la persona. */

@@ -25,7 +25,8 @@ test("el pedido lleva las palabras de zona, los ejemplos y la dirección, y pide
   assert.match(e.texto, /En esta dirección salen: Colón → INTERIOR/);
   assert.match(e.texto, /DIRECCIONES COMPLETAS[\s\S]*Casa 12, calle 5/);
   assert.match(e.texto, /DIRECCIONES INCOMPLETAS[\s\S]*Chorrera" → falta: "el sector y la calle"/);
-  assert.match(e.texto, /DIRECCIÓN A ANALIZAR[\s\S]*Colón, frente al súper/);
+  assert.match(e.texto, /DIRECCIÓN A ANALIZAR[\s\S]*Ciudad o corregimiento que puso: "Colón"\nDirección: "Colón, frente al súper"/);
+  assert.match(e.instrucciones, /LO MÁS IMPORTANTE de una dirección es de dónde es/);
   assert.deepEqual(e.imagenes, []);
 });
 
@@ -33,6 +34,15 @@ test("las instrucciones del administrador se suman a las de siempre", () => {
   const e = armarEntrada({ ...base, coincidencias: [], instruccionesExtra: "  Una dirección con solo el nombre del edificio es completa.  " });
   assert.match(e.instrucciones, /INSTRUCCIONES ADICIONALES[\s\S]*Una dirección con solo el nombre del edificio es completa\./);
   assert.doesNotMatch(armarEntrada({ ...base, coincidencias: [], instruccionesExtra: "   " }).instrucciones, /ADICIONALES/);
+});
+
+test("la ciudad o el corregimiento viaja aparte, en los ejemplos y en la dirección a analizar, y la geografía va si se da", () => {
+  const conCiudad = armarEntrada({ ...base, ejemplos: [{ ciudad: "Arraiján", direccion: "Calle 3, casa 8", completa: true, falta: null, zona: "interior" }], coincidencias: [], geografia: "GEOGRAFÍA DE PRUEBA" });
+  assert.match(conCiudad.texto, /^GEOGRAFÍA DE PRUEBA/);
+  assert.match(conCiudad.texto, /ciudad o corregimiento "Arraiján" · dirección "Calle 3, casa 8" → zona interior/);
+  assert.match(armarEntrada({ ...base, ciudad: null, coincidencias: [] }).texto, /Ciudad o corregimiento que puso: \(no puso ninguno\)/);
+  // Sin zona en el país no se manda la geografía.
+  assert.doesNotMatch(armarEntrada({ ...base, distingueZona: false, coincidencias: [], geografia: "GEOGRAFÍA DE PRUEBA" }).texto, /GEOGRAFÍA DE PRUEBA/);
 });
 
 test("sin zona en el país no se piden ni se muestran las palabras de zona", () => {

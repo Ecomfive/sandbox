@@ -5,10 +5,10 @@ import { anilloFoco, fieldClass, labelClass } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { CerrarIcon, UbicacionIcon } from "@/lib/nav-icons";
 import { SeccionCard } from "./seccion";
-import type { Zona } from "@/lib/confirmacion-ia/zonas";
+import { NOMBRE_ZONA, type Zona } from "@/lib/confirmacion-ia/zonas";
 import { agregarPalabraZona, eliminarPalabraZona, listarPalabrasZona, type PalabraZona } from "../ia-actions";
 
-const ZONA_TEXTO: Record<Zona, string> = { ciudad: "Ciudad", interior: "Interior" };
+const ZONA_TEXTO = NOMBRE_ZONA;
 
 function Grupo({ titulo, ayuda, palabras, puedeEscribir, alQuitar }: { titulo: string; ayuda: string; palabras: PalabraZona[]; puedeEscribir: boolean; alQuitar: (p: PalabraZona) => void }) {
   return (
@@ -97,8 +97,8 @@ export function PalabrasZona({ paisNombre, distingueZona, puedeEscribir, inicial
             <label className="flex flex-col gap-1">
               <span className={labelClass}>Entonces es de</span>
               <select value={resultado} onChange={(e) => setResultado(e.target.value as Zona)} className={fieldClass}>
-                <option value="interior">Interior (Servientrega)</option>
-                <option value="ciudad">Ciudad</option>
+                <option value="interior">{NOMBRE_ZONA.interior}</option>
+                <option value="ciudad">{NOMBRE_ZONA.ciudad}</option>
               </select>
             </label>
             <button type="submit" disabled={pendiente || texto.trim().length < 2} className={`rounded-md bg-foreground px-3 py-2 text-sm font-semibold text-background disabled:opacity-50 ${anilloFoco}`}>

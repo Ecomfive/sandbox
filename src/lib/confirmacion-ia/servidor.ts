@@ -12,6 +12,7 @@ import { esErrorDeVentana, telefonoParaIcomfly, ventana24 } from "@/lib/tienda/c
 import { leerChat } from "@/lib/tienda/chat-tienda-datos";
 import { herramientaIcomfly, conexionesIcomfly } from "@/lib/tienda/icomfly";
 import { etiquetasDe, mismaTiendaUnidad, zonaDeEtiquetas } from "@/lib/tienda/ordenes-finanzas";
+import { geografiaDe } from "./geografia";
 import { combinar, etiquetaDeZona, leerRespuesta, mensajePedirDetalle, type Combinado, type EstadoAnalisis, type ResultadoModelo } from "./combinar";
 import { armarEntrada, type EjemploPrompt } from "./prompt";
 import { coincidencias, normalizarTexto, zonaPorReglas, type ReglaZona, type Zona } from "./zonas";
@@ -64,10 +65,15 @@ export async function cargarReglas(supabase: SupabaseClient, paisId: string): Pr
 
 /** Los ejemplos que entran al pedido: los generales del país y los de esa tienda, los más recientes de cada tipo. */
 export async function cargarEjemplos(supabase: SupabaseClient, paisId: string, tiendaId: string | null, porTipo = 15): Promise<EjemploPrompt[]> {
-  let q = supabase.from("confirmacion_ia_ejemplos").select("direccion, completa, falta, zona, tienda_id").eq("pais_id", paisId);
-  q = tiendaId ? q.or(`tienda_id.is.null,tienda_id.eq.${tiendaId}`) : q.is("tienda_id", null);
-  const { data } = await q.order("creado_en", { ascending: false }).limit(porTipo * 6);
-  const filas = (data ?? []).map((e) => ({ direccion: e.direccion as string, completa: e.completa === true, falta: (e.falta as string | null) ?? null, zona: (e.zona as Zona | null) ?? null }));
+  // Con la migración 0301 trae también la ciudad o el corregimiento; sin ella, las columnas de siempre.
+  const leer = (columnas: string) => {
+    const q = supabase.from("confirmacion_ia_ejemplos").select(columnas).eq("pais_id", paisId);
+    return (tiendaId ? q.or(`tienda_id.is.null,tienda_id.eq.${tiendaId}`) : q.is("tienda_id", null)).order("creado_en", { ascending: false }).limit(porTipo * 6);
+  };
+  let r = await leer("direccion, completa, falta, zona, ciudad");
+  if (r.error) r = await leer("direccion, completa, falta, zona");
+  const data = (r.data ?? []) as unknown as Record<string, unknown>[];
+  const filas = (data ?? []).map((e) => ({ ciudad: (e.ciudad as string | null | undefined) ?? null, direccion: e.direccion as string, completa: e.completa === true, falta: (e.falta as string | null) ?? null, zona: (e.zona as Zona | null) ?? null }));
   return [...filas.filter((e) => e.completa).slice(0, porTipo), ...filas.filter((e) => !e.completa).slice(0, porTipo)];
 }
 
@@ -155,7 +161,7 @@ async function pedirAlModelo(proveedor: ProveedorIA, entrada: ReturnType<typeof 
  */
 export async function evaluarDireccion(
   supabase: SupabaseClient,
-  d: { paisId: string; paisNombre: string; tiendaId: string | null; numero: string | null; direccion: string; ciudad: string | null; config: ConfigConfirmacion },
+  d: { paisId: string; paisNombre: string; paisCodigo: string; tiendaId: string | null; numero: string | null; direccion: string; ciudad: string | null; config: ConfigConfirmacion },
 ): Promise<{ combinado: Combinado; modelos: ResultadoModelo[]; coinc: ReglaZona[] }> {
   const { direccion, ciudad, config } = d;
   const reglas = await cargarReglas(supabase, d.paisId);
@@ -171,7 +177,7 @@ export async function evaluarDireccion(
     if (!proveedores.length) modelos = [{ proveedor: "openai", ok: false, error: "Falta conectar ChatGPT o Claude (las claves OPENAI_API_KEY o ANTHROPIC_API_KEY)." }];
     else {
       const ejemplos = await cargarEjemplos(supabase, d.paisId, d.tiendaId);
-      const entrada = armarEntrada({ paisNombre: d.paisNombre, distingueZona: config.distingueZona, reglas, ejemplos, direccion, ciudad, coincidencias: coinc, instruccionesExtra: config.instrucciones });
+      const entrada = armarEntrada({ paisNombre: d.paisNombre, distingueZona: config.distingueZona, reglas, ejemplos, direccion, ciudad, coincidencias: coinc, instruccionesExtra: config.instrucciones, geografia: config.distingueZona ? geografiaDe(d.paisCodigo) : null });
       modelos = await Promise.all(proveedores.map((p) => pedirAlModelo(p, entrada, d.numero)));
     }
   }
@@ -206,7 +212,7 @@ export async function analizarOrden(supabase: SupabaseClient, ordenId: string, o
     if (Date.now() - Date.parse(String(previo.actualizado_en)) < 60_000) return { resultado: "omitida", motivo: "Se acaba de analizar." };
   }
 
-  const { combinado: c, modelos, coinc } = await evaluarDireccion(supabase, { paisId: o.paisId, paisNombre: o.paisNombre, tiendaId: o.tiendaId, numero: o.numero, direccion, ciudad, config });
+  const { combinado: c, modelos, coinc } = await evaluarDireccion(supabase, { paisId: o.paisId, paisNombre: o.paisNombre, paisCodigo: o.paisCodigo, tiendaId: o.tiendaId, numero: o.numero, direccion, ciudad, config });
   const etiqueta = c.estado === "listo" ? etiquetaDeZona(c.zona, config) : null;
 
   // El WhatsApp que pide el dato que falta.
