@@ -59,6 +59,8 @@ export const MODULOS: Modulo[] = [
   { clave: "tienda-logistica", etiqueta: "Logística (Gestión de tienda)" },
   { clave: "despacho-ciudad", etiqueta: "Despacho ciudad (Gestión de tienda)" },
   { clave: "despacho-devoluciones", etiqueta: "Devoluciones de ciudad (Gestión de tienda)" },
+  { clave: "despacho-cambios", etiqueta: "Cambios y reembolsos (Gestión de tienda)" },
+  { clave: "despacho-cambios-cuentas", etiqueta: "Cambios y reembolsos: ver los datos para reembolsar" },
   { clave: "tienda-productos", etiqueta: "Productos de Shopify (Gestión de tienda)" },
   { clave: "tienda-tiendas", etiqueta: "Tiendas Shopify (Gestión de tienda)" },
   { clave: "filtro-productos", etiqueta: "Filtro de productos" },

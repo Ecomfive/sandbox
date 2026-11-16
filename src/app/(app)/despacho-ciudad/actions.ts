@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireModulo, requireModuloEscritura, type UsuarioActual } from "@/lib/auth";
 import { esColumnaEtiqueta, ETIQUETAS, GRUPOS_DEVOLUCION, grupoPorAsesores, type Columna } from "@/lib/despacho/etiquetas";
 import { enlazarOrden, esDesintegrado, grupoDeEstado, leerReglasEstado, unidadDeTexto, variantesPedido, type OrdenCandidata } from "@/lib/monday/columnas";
+import { hechoDesdeDespacho } from "@/lib/postventa/servidor";
 import { createServiceClient } from "@/lib/supabase/server";
 import { actualizarEntregas } from "@/lib/tienda/actualizar-entregas";
 import { unidadDeTienda } from "@/lib/ventas/matriz";
@@ -130,6 +131,8 @@ export async function cambiarCelda(itemId: string, campo: string, valor: string)
   const { error } = await supabase.from("mon_despachos").update(set).eq("item_id", itemId);
   if (error) return { error: "No se pudo guardar." };
   await registrar(supabase, itemId, usuario, `${titulo}: ${antes ?? "vacío"} → ${nuevo ?? "vacío"}${set.grupo ? ` (pasa a ${set.grupo})` : ""}`);
+  // Un reparto de Cambios y reembolsos (migración 0972) entregado pasa su solicitud a Hecho.
+  if (campo === "estado" && nuevo === "ENTREGADO") await hechoDesdeDespacho(supabase, itemId, { id: usuario.id, nombre: quien(usuario) }).catch(() => null);
   if (["estado", "estado_asesores", "forma_pago", "cobrado"].includes(campo) || set.orden_id) actualizarPedidosDespues(usuario);
   for (const p of RUTAS) revalidatePath(p);
   return {};

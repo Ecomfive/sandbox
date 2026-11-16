@@ -36,9 +36,14 @@ export interface ItemPostventa {
   /** «Valor Reembolso» y «Valor de envío», si el equipo los llenó. */
   valorReembolso: string | null;
   valorEnvio: string | null;
-  /** Los comentarios del ítem (texto plano y cuándo), en cualquier orden. */
-  comentarios: { creado: string; texto: string }[];
+  /** Los comentarios del ítem (texto plano y cuándo), en cualquier orden; con su id y autor si la consulta los trae. */
+  comentarios: { id?: string; autor?: string | null; creado: string; texto: string }[];
+  /** Las otras columnas del tablero (migración 0972): Responsable, Fecha, Seguimiento, Notificar al cliente, Fecha Notificación, Adjunto y Cuenta Reembolso. */
+  otras?: Partial<Record<ColumnaOtra, string | null>>;
 }
+
+export type ColumnaOtra = "responsable" | "fecha" | "seguimiento" | "notificar" | "fechaNotificacion" | "adjunto" | "cuenta";
+export type ColumnasPostventa = { estado?: string; reembolso?: string; envio?: string } & Partial<Record<ColumnaOtra, string>>;
 
 export interface CasoPostventa {
   item_id: string;
@@ -71,6 +76,21 @@ const corto = (v: string | null | undefined, n: number): string | null => {
  * números de pedido tienen hasta 6 cifras (Oferfy #146665) y quedan a la vista; un teléfono (8) o una cuenta (10 o más) no. */
 export function taparDatos(texto: string): string {
   return texto.replace(/[\w.+-]+@[\w-]+\.[\w.]+/g, "•••").replace(/\+?\d(?:[\s-]?\d){6,}/g, "•••");
+}
+
+/**
+ * Las líneas de una actualización de Monday que se guardan: se quitan las de datos personales (nombre, banco, cuenta, cédula, teléfono, correo,
+ * dirección) y se tapan los números largos y los correos.
+ */
+export function notaSinDatos(texto: string): string {
+  return taparDatos(
+    texto
+      .split(/\r?\n/)
+      .filter((l) => !/^[^\p{L}\d]*(nombre|titular|banco|n\.?\s*[°º]?\s*(de\s+)?cuenta|cuenta|tipo\s+de\s+cuenta|correo|e-?mail|c[eé]dula|tel[eé]fono|celular|direcci[oó]n)\b/iu.test(l))
+      .join("\n"),
+  )
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 /** La tienda escrita en el nombre o el comentario del caso («KENKU», «Oferfy», «ClickSI»…), con el nombre con que se busca la unidad. */
@@ -205,7 +225,7 @@ export function casoDeItem(item: ItemPostventa): CasoPostventa {
 // ---------------------------------------------------------------------------------------------------------------------
 // Lectura
 // ---------------------------------------------------------------------------------------------------------------------
-const CAMPOS = "id name created_at updated_at group { title } column_values { id text type } updates(limit: 15) { created_at text_body }";
+const CAMPOS = "id name created_at updated_at group { title } column_values { id text type } updates(limit: 25) { id created_at text_body creator { name } }";
 
 /** La consulta de la primera página: los actualizados desde `desde` (un día antes) o creados en los últimos días; sin `desde`, los creados desde abril. */
 export function consultaPostventa(desde: string | null, hoy: string): string {
@@ -225,7 +245,7 @@ const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 const texto = (v: unknown): string | null => (typeof v === "string" ? v : null);
 
 /** Los ítems y el cursor de una página de respuesta (pura). Las columnas se reconocen por su título en el tablero: Estado, Valor Reembolso, Valor de envío. */
-export function leerPaginaPostventa(respuesta: unknown, columnas: { estado?: string; reembolso?: string; envio?: string }): { cursor: string | null; items: ItemPostventa[] } {
+export function leerPaginaPostventa(respuesta: unknown, columnas: ColumnasPostventa): { cursor: string | null; items: ItemPostventa[] } {
   const d = obj(obj(respuesta).data);
   const pagina = d.next_items_page ? obj(d.next_items_page) : obj(obj(arr(d.boards)[0]).items_page);
   const items = arr(pagina.items)
@@ -244,20 +264,61 @@ export function leerPaginaPostventa(respuesta: unknown, columnas: { estado?: str
         valorEnvio: columnas.envio ? (valores.get(columnas.envio) ?? null) : null,
         comentarios: arr(i.updates)
           .map(obj)
-          .map((u) => ({ creado: texto(u.created_at) ?? "", texto: texto(u.text_body) ?? "" }))
+          .map((u) => ({ ...(u.id !== undefined ? { id: String(u.id) } : {}), autor: texto(obj(u.creator).name), creado: texto(u.created_at) ?? "", texto: texto(u.text_body) ?? "" }))
           .filter((u) => u.texto.trim()),
+        otras: Object.fromEntries(OTRAS.filter((k) => columnas[k]).map((k) => [k, valores.get(columnas[k]!) ?? null])) as ItemPostventa["otras"],
       };
     });
   return { cursor: typeof pagina.cursor === "string" && pagina.cursor ? pagina.cursor : null, items };
 }
 
 /** Las columnas del tablero que se usan, por su título (pura): la primera «Estado» de tipo estado, «Valor Reembolso» y «Valor de envío». */
-export function columnasPostventa(columnas: { id: string; titulo: string; tipo: string }[]): { estado?: string; reembolso?: string; envio?: string } {
+export function columnasPostventa(columnas: { id: string; titulo: string; tipo: string }[]): ColumnasPostventa {
   const por = (re: RegExp, tipo?: string) => columnas.find((c) => re.test(normalizar(c.titulo)) && (!tipo || c.tipo === tipo))?.id;
-  return { estado: por(/^ESTADO$/, "status") ?? por(/^ESTADO$/), reembolso: por(/VALOR REEMBOLSO/), envio: por(/VALOR DE ENVIO/) };
+  const salida: ColumnasPostventa = { estado: por(/^ESTADO$/, "status") ?? por(/^ESTADO$/), reembolso: por(/VALOR REEMBOLSO/), envio: por(/VALOR DE ENVIO/) };
+  const otras: Record<ColumnaOtra, string | undefined> = {
+    responsable: por(/^RESPONSABLE/, "people") ?? por(/^RESPONSABLE/),
+    fecha: por(/^FECHA$/),
+    seguimiento: por(/SEGUIMIENTO/),
+    notificar: por(/NOTIFICAR/, "status") ?? por(/NOTIFICAR/),
+    fechaNotificacion: por(/FECHA NOTIFICACION/),
+    adjunto: por(/^ADJUNTO/),
+    cuenta: por(/CUENTA REEMBOLSO/),
+  };
+  for (const k of OTRAS) if (otras[k]) salida[k] = otras[k];
+  return salida;
 }
 
-async function guardarCasos(supabase: SupabaseClient, tableroId: string, casos: CasoPostventa[], unidades: UnidadSimple[]): Promise<{ guardados: number; enlazados: number }> {
+const OTRAS: ColumnaOtra[] = ["responsable", "fecha", "seguimiento", "notificar", "fechaNotificacion", "adjunto", "cuenta"];
+
+/** Las columnas nuevas de la solicitud (migración 0972) a partir del ítem de Monday (pura). */
+export function extrasDeItem(item: ItemPostventa) {
+  const o = item.otras ?? {};
+  const dia = (v: string | null | undefined) => (v && /^\d{4}-\d{2}-\d{2}/.test(v) ? v.slice(0, 10) : null);
+  return {
+    responsable_texto: corto(o.responsable, 120),
+    fecha: dia(o.fecha),
+    seguimiento: corto(taparDatos(o.seguimiento ?? ""), 300),
+    valor_envio: montoDeTexto(item.valorEnvio),
+    notificar: corto(o.notificar, 60),
+    fecha_notificacion: dia(o.fechaNotificacion),
+    adjuntos: (o.adjunto ?? "").split(/,\s*/).map((u) => u.trim()).filter((u) => /^https:\/\/[a-z0-9-]+\.monday\.com\//.test(u)).slice(0, 20),
+  };
+}
+
+/** Las columnas de la migración 0972 (sin ella, se guarda lo de siempre). */
+const COLUMNAS_0972 = ["responsable_texto", "fecha", "seguimiento", "valor_envio", "notificar", "fecha_notificacion", "adjuntos"] as const;
+
+async function guardarCasos(supabase: SupabaseClient, tableroId: string, items: ItemPostventa[], unidades: UnidadSimple[]): Promise<{ guardados: number; enlazados: number }> {
+  // Lo que ya se cambió en el sistema (Cambios y reembolsos, migración 0972) manda: Monday no lo pisa.
+  const propias = new Set<string>();
+  for (let i = 0; i < items.length; i += 200) {
+    const { data, error } = await supabase.from("mon_postventa").select("item_id").in("item_id", items.slice(i, i + 200).map((x) => x.id)).not("editado_en", "is", null);
+    if (error) break;
+    for (const d of data ?? []) propias.add(d.item_id as string);
+  }
+  const deMonday = items.filter((x) => !propias.has(x.id));
+  const casos = deMonday.map(casoDeItem);
   if (!casos.length) return { guardados: 0, enlazados: 0 };
   const variantes = [...new Set(casos.flatMap((c) => variantesPedido(c.numero_pedido)))];
   const candidatas: OrdenCandidata[] = [];
@@ -268,18 +329,48 @@ async function guardarCasos(supabase: SupabaseClient, tableroId: string, casos: 
   }
   const ahora = new Date().toISOString();
   let enlazados = 0;
-  const filas = casos.map((c) => {
+  const filas = casos.map((c, k) => {
     const unidad = unidadDeTexto(c.tienda_texto, unidades, unidadDeTienda);
     // Sin la tienda en el texto, solo se enlaza si el número es de un único pedido.
     const orden = enlazarOrden(c.numero_pedido, unidad, candidatas);
     if (orden) enlazados++;
-    return { ...c, tablero_id: tableroId, unidad_id: unidad ?? orden?.unidad_id ?? null, orden_id: orden?.id ?? null, leido_en: ahora };
+    return { ...c, ...extrasDeItem(deMonday[k]), tablero_id: tableroId, unidad_id: unidad ?? orden?.unidad_id ?? null, orden_id: orden?.id ?? null, leido_en: ahora };
   });
+  let con0972 = true;
   for (let i = 0; i < filas.length; i += 200) {
-    const { error } = await supabase.from("mon_postventa").upsert(filas.slice(i, i + 200), { onConflict: "item_id" });
+    let { error } = await supabase.from("mon_postventa").upsert(filas.slice(i, i + 200), { onConflict: "item_id" });
+    if (error && COLUMNAS_0972.some((c) => error!.message.includes(c))) {
+      con0972 = false;
+      ({ error } = await supabase.from("mon_postventa").upsert(
+        filas.slice(i, i + 200).map((f) => Object.fromEntries(Object.entries(f).filter(([k]) => !(COLUMNAS_0972 as readonly string[]).includes(k)))),
+        { onConflict: "item_id" },
+      ));
+    }
     if (error) throw new Error(`mon_postventa: ${error.message}`);
   }
+  if (con0972) await guardarNotasYCuentas(supabase, deMonday);
   return { guardados: filas.length, enlazados };
+}
+
+/**
+ * Las actualizaciones de Monday de cada caso, como notas (sin las líneas de datos personales), y la «Cuenta Reembolso» de los casos que no están
+ * hechos (en `postventa_cuentas`, que solo ve quien tiene el permiso). Sin la migración 0972, no hace nada.
+ */
+async function guardarNotasYCuentas(supabase: SupabaseClient, items: ItemPostventa[]) {
+  const notas = items.flatMap((x) =>
+    x.comentarios
+      .filter((c) => c.id)
+      .map((c) => ({ item_id: x.id, monday_id: c.id!, texto: notaSinDatos(c.texto).slice(0, 3000), autor_nombre: corto(c.autor, 120) ?? "Monday", creado_en: c.creado || new Date().toISOString() }))
+      .filter((n) => n.texto),
+  );
+  for (let i = 0; i < notas.length; i += 300) {
+    const { error } = await supabase.from("postventa_notas").upsert(notas.slice(i, i + 300), { onConflict: "monday_id", ignoreDuplicates: true });
+    if (error) return;
+  }
+  const cuentas = items
+    .filter((x) => x.otras?.cuenta?.trim() && normalizar(x.estado ?? "") !== "HECHO")
+    .map((x) => ({ item_id: x.id, datos: x.otras!.cuenta!.trim().slice(0, 1000) }));
+  if (cuentas.length) await supabase.from("postventa_cuentas").upsert(cuentas, { onConflict: "item_id", ignoreDuplicates: true });
 }
 
 /** Lee los tableros de cambios y reembolsos (clase «postventa») antes de `limite`. Sin la migración 0290 o sin tableros, no hace nada. */
@@ -307,7 +398,7 @@ export async function sincronizarPostventa(supabase: SupabaseClient, limite: num
         const json = primera ? await consultarMonday(consultaPostventa(t.cursor_actualizado, hoy), { ids: [t.tablero_id], limit: POR_PAGINA }) : await consultarMonday(CONSULTA_SIGUIENTE_POSTVENTA, { cursor, limit: POR_PAGINA });
         primera = false;
         const pagina = leerPaginaPostventa(json, columnas);
-        const r = await guardarCasos(supabase, t.tablero_id, pagina.items.map(casoDeItem), unidades);
+        const r = await guardarCasos(supabase, t.tablero_id, pagina.items, unidades);
         guardados += r.guardados;
         enlazados += r.enlazados;
         leidos += pagina.items.length;

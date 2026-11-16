@@ -132,6 +132,7 @@ async function mondaySinPedido(supabase: ReturnType<typeof createServiceClient>,
       .from("mon_postventa")
       .select("numero_pedido, nombre, tipos, estado, motivo, creado_monday")
       .is("orden_id", null)
+      .is("archivado_en", null)
       .in("unidad_id", unidades)
       .gte("creado_monday", desde)
       .order("creado_monday", { ascending: false })

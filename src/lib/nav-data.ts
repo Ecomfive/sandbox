@@ -125,6 +125,8 @@ const AREAS: NavSection[] = [
       // Las entregas de ciudad y las devoluciones, que antes se anotaban en Monday (15 nov 2026, migración 0970).
       { label: "Despacho ciudad", href: "/despacho-ciudad", frente: "tienda" },
       { label: "Devoluciones", href: "/despacho-devoluciones", frente: "tienda" },
+      // El tablero «CAMBIOS Y REEMBOLSOS» de Monday (16 nov 2026, migración 0972).
+      { label: "Cambios y reembolsos", href: "/despacho-cambios", frente: "tienda" },
       { label: "Productos de Shopify", href: "/tienda-productos", frente: "tienda" },
       { label: "Tiendas Shopify", href: "/tienda-tiendas", frente: "tienda" },
       { label: "Alertas de inventario", href: "/alertas", dropi: true, frente: "fulfillment" },
