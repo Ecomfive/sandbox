@@ -1,5 +1,5 @@
 import { ETIQUETA_ESTADO_DROPI } from "@/lib/dropi/emparejar-retiros";
-import { ESTADO_ETIQUETA } from "@/lib/retiros/estados";
+import { ESTADO_ETIQUETA, estadoConsolidacion } from "@/lib/retiros/estados";
 import {
   SIN_VALOR,
   filtrarFilas,
@@ -34,7 +34,9 @@ export const DEF_RETIROS: DefTabla<FilaRetiro> = {
       id: "estado",
       etiqueta: "Estado",
       tipo: "seleccion",
-      valores: (f) => [f.estado],
+      // Una novedad resuelta se guarda como «cerrado» + `novedad_resuelta` (migración 0048): para filtrar y agrupar cuenta como «Novedad resuelta»
+      // (16 nov 2026: el filtro solo encontraba el estado viejo y los retiros resueltos no salían).
+      valores: (f) => [f.novedadResuelta ? "novedad_resuelta" : f.estado],
       opciones: () => Object.entries(ESTADO_ETIQUETA).map(([valor, etiqueta]) => ({ valor, etiqueta })),
       agrupable: true,
       // Para agrupar, por urgencia de conciliación y no alfabéticamente.
@@ -73,6 +75,14 @@ export const DEF_RETIROS: DefTabla<FilaRetiro> = {
       tipo: "seleccion",
       valores: (f) => [f.asignadoNombre ?? SIN_VALOR],
       etiquetaSinValor: "Desconocido",
+      agrupable: true,
+    },
+    {
+      id: "consolidacion",
+      etiqueta: "Consolidación",
+      tipo: "seleccion",
+      valores: (f) => [estadoConsolidacion(f).texto],
+      opciones: () => ["Pendiente", "Consolidado", ESTADO_ETIQUETA.novedad_resuelta].map((v) => ({ valor: v, etiqueta: v })),
       agrupable: true,
     },
     { id: "creacion", etiqueta: "Fecha de creación", tipo: "fecha", valor: (f) => f.fecha },

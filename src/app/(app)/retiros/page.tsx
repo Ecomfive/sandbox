@@ -108,9 +108,12 @@ export default async function RetirosPage() {
   const ultimoDiaDelMes = `${mesActual}-${String(new Date(Number(mesActual.slice(0, 4)), Number(mesActual.slice(5, 7)), 0).getDate()).padStart(2, "0")}`;
   const abiertos = (retiros ?? []).filter((r) => r.estado === "abierto").length;
   const conNovedad = (retiros ?? []).filter((r) => r.estado === "novedad").length;
-  const cerradosDelMes = (retiros ?? []).filter((r) => r.estado === "cerrado" && r.fecha.slice(0, 7) === mesActual);
+  // Cerrado = conciliado: una novedad resuelta también queda «cerrado» (migración 0048) pero no es dinero conciliado; va con su propio filtro
+  // (16 nov 2026: así la tarjeta cuenta lo mismo que muestra su filtro).
+  const conciliado = (r: (typeof retiros & object)[number]) => r.estado === "cerrado" && (r as { novedad_resuelta?: boolean | null }).novedad_resuelta !== true;
+  const cerradosDelMes = (retiros ?? []).filter((r) => conciliado(r) && r.fecha.slice(0, 7) === mesActual);
   const totalCerradoMes = cerradosDelMes.reduce((acc, r) => acc + Number(r.monto), 0);
-  const cerrados = (retiros ?? []).filter((r) => r.estado === "cerrado").length;
+  const cerrados = (retiros ?? []).filter(conciliado).length;
   const totalRetiros = (retiros ?? []).length;
   const diferenciaMeses = diferenciaPorMes(
     (retiros ?? []).map((r) => ({ id: r.id, numero: r.numero_correlativo, fecha: r.fecha, estado: r.estado, monto: Number(r.monto), montoRecibido: r.monto_recibido === null ? null : Number(r.monto_recibido) }))
