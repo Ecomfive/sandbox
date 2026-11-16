@@ -8,25 +8,27 @@ import { Ventana } from "@/components/ui/ventana";
 import { useToast } from "@/components/ui/toast";
 import { AlertaIcon, CheckIcon, ChatIcon, PedidoIcon, RobotIcon, SugerenciaIcon } from "@/lib/nav-icons";
 import type { Combinado, ResultadoModelo } from "@/lib/confirmacion-ia/combinar";
+import { acierto, type DecisionRevision } from "@/lib/confirmacion-ia/revision";
 import type { ConfigConfirmacion, FilaAnalisis } from "@/lib/confirmacion-ia/servidor";
 import { NOMBRE_ZONA, type Zona } from "@/lib/confirmacion-ia/zonas";
 import { tiempoEsperando } from "@/lib/tienda/confirmacion";
 import { EjemplosDirecciones } from "./ejemplos-direcciones";
 import { InstruccionesIA } from "./instrucciones-ia";
+import { LineaModelo } from "./lineas-modelo";
 import { PalabrasZona } from "./palabras-zona";
+import { BotonesVeredicto, ColaRevision, type AlElegir } from "./revision-pedidos";
 import { SeccionCard } from "./seccion";
 import {
   analizarPedidoAhora,
   analizarPendientesAhora,
   cambiarInterruptor,
-  guardarAnalisisComoEjemplo,
   probarDireccion,
+  revisarAnalisis,
   type InterruptorConfirmacion,
   type PalabraZona,
 } from "../ia-actions";
 
 const ZONA_TEXTO = NOMBRE_ZONA;
-const NOMBRE_IA: Record<string, string> = { openai: "ChatGPT", anthropic: "Claude" };
 const MENSAJE: Record<FilaAnalisis["mensajeEstado"], { texto: string; tono: "neutro" | "exito" | "aviso" | "peligro" }> = {
   no_aplica: { texto: "No hace falta", tono: "neutro" },
   apagado: { texto: "Sin enviar (apagado)", tono: "neutro" },
@@ -60,7 +62,7 @@ function Resultado({ f }: { f: Pick<FilaAnalisis, "estado" | "zona" | "etiqueta"
   return <Pastilla tono="exito">{f.etiqueta ?? (f.zona ? ZONA_TEXTO[f.zona] : "Completa")}</Pastilla>;
 }
 
-type Filtro = "todos" | "listo" | "falta_dato" | "revisar";
+type Filtro = "todos" | "listo" | "falta_dato" | "revisar" | "revisados";
 
 export function ConfirmacionIA({
   config,
@@ -100,13 +102,30 @@ export function ConfirmacionIA({
   const [pendiente, empezar] = useTransition();
   const [filtro, setFiltro] = useState<Filtro>("todos");
   const [abierta, setAbierta] = useState<string | null>(null);
+  // Abrir la ficha ya con «¿Qué es lo correcto?» a la vista (el botón «Corregir» de la tabla).
+  const [abrirCorregir, setAbrirCorregir] = useState(false);
+  // Lo recién marcado en la cola de revisión: sale al instante, sin esperar a que la página vuelva a cargar.
+  const [marcados, setMarcados] = useState<Set<string>>(() => new Set());
   const [pidiendoClave, setPidiendoClave] = useState<{ campo: InterruptorConfirmacion; valor: boolean } | null>(null);
   const [clave, setClave] = useState("");
   const [errorClave, setErrorClave] = useState<string | null>(null);
 
-  const cuenta = useMemo(() => ({ listo: filas.filter((f) => f.estado === "listo").length, falta_dato: filas.filter((f) => f.estado === "falta_dato").length, revisar: filas.filter((f) => f.estado === "revisar" || f.estado === "error").length }), [filas]);
-  const visibles = filas.filter((f) => filtro === "todos" || (filtro === "revisar" ? f.estado === "revisar" || f.estado === "error" : f.estado === filtro));
+  // Lo que dijo el equipo manda sobre lo que dijo la IA: un pedido revisado cuenta como listo o como falta un dato, nunca como por revisar.
+  const cuenta = useMemo(() => ({ listo: filas.filter((f) => f.final.estado === "listo").length, falta_dato: filas.filter((f) => f.final.estado === "falta_dato").length, revisar: filas.filter((f) => f.final.estado === "revisar" || f.final.estado === "error").length, revisados: filas.filter((f) => f.revision).length }), [filas]);
+  const pendientesDeRevisar = useMemo(() => filas.filter((f) => !f.revision && (f.estado === "revisar" || f.estado === "error") && !marcados.has(f.id)), [filas, marcados]);
+  const precision = useMemo(() => acierto(filas), [filas]);
+  const visibles = filas.filter((f) => filtro === "todos" || (filtro === "revisados" ? !!f.revision : filtro === "revisar" ? f.final.estado === "revisar" || f.final.estado === "error" : f.final.estado === filtro));
   const ficha = filas.find((f) => f.id === abierta) ?? null;
+
+  // Un toque en un botón de «lo correcto»: guarda y devuelve el error (o null). En la cola, el pedido sale de la lista al momento.
+  const elegir: AlElegir = async (f, d: DecisionRevision) => {
+    const r = await revisarAnalisis(f.id, d);
+    if (r.error) return r.error;
+    setMarcados((m) => new Set(m).add(f.id));
+    mostrarToast("acierto" in d ? "Anotado: estaba bien." : "Guardado: la IA aprende de esta respuesta.");
+    router.refresh();
+    return null;
+  };
 
   function cambiar(campo: InterruptorConfirmacion, valor: boolean, claveEscrita?: string) {
     empezar(async () => {
@@ -201,8 +220,29 @@ export function ConfirmacionIA({
           <Indicador titulo="Listos para etiquetar" valor={String(cuenta.listo)} detalle="Dirección completa y zona clara" icono={CheckIcon} color="verde" alPulsar={() => setFiltro(filtro === "listo" ? "todos" : "listo")} activo={filtro === "listo"} />
           <Indicador titulo="Falta un dato" valor={String(cuenta.falta_dato)} detalle="Hay que pedirle algo al cliente" icono={ChatIcon} color="ambar" punto={cuenta.falta_dato ? "aviso" : undefined} alPulsar={() => setFiltro(filtro === "falta_dato" ? "todos" : "falta_dato")} activo={filtro === "falta_dato"} />
           <Indicador titulo="Para revisar" valor={String(cuenta.revisar)} detalle="Las IA no coinciden o fallaron" icono={AlertaIcon} color="rojo" punto={cuenta.revisar ? "peligro" : undefined} alPulsar={() => setFiltro(filtro === "revisar" ? "todos" : "revisar")} activo={filtro === "revisar"} />
+          <Indicador
+            titulo="Revisados por el equipo"
+            valor={String(cuenta.revisados)}
+            detalle={precision.conPropuesta ? `La IA acertó ${precision.acertados} de ${precision.conPropuesta}` : "Marca lo correcto para que la IA aprenda"}
+            icono={SugerenciaIcon}
+            color="violeta"
+            alPulsar={() => setFiltro(filtro === "revisados" ? "todos" : "revisados")}
+            activo={filtro === "revisados"}
+          />
         </TableroIndicadores>
-        {visibles.length === 0 ? (
+        {puedeEscribir && filtro === "todos" && pendientesDeRevisar.length > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card px-3 py-2.5">
+            <p className="m-0 text-sm">
+              <b>{pendientesDeRevisar.length}</b> {pendientesDeRevisar.length === 1 ? "pedido espera" : "pedidos esperan"} que alguien marque lo correcto.
+            </p>
+            <button type="button" onClick={() => setFiltro("revisar")} className={`rounded-md bg-foreground px-3 py-2 text-sm font-semibold text-background ${anilloFoco}`}>
+              Revisar ahora
+            </button>
+          </div>
+        )}
+        {filtro === "revisar" && puedeEscribir ? (
+          <ColaRevision pendientes={pendientesDeRevisar} distingueZona={config.distingueZona} ahora={ahora} mostrarTienda={tiendas.length > 1} alElegir={elegir} />
+        ) : visibles.length === 0 ? (
           <p className="m-0 rounded-lg border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
             {filas.length === 0 ? "Todavía no se analizó ningún pedido. Cuando iComfly deje uno «Confirmada», aparecerá aquí." : "Ningún pedido con ese filtro."}
           </p>
@@ -214,6 +254,7 @@ export function ConfirmacionIA({
                   <th scope="col" className={claseThLista}>Pedido</th>
                   <th scope="col" className={claseThLista}>Dirección</th>
                   <th scope="col" className={claseThLista}>Resultado</th>
+                  <th scope="col" className={claseThLista}>Revisión</th>
                   <th scope="col" className={claseThLista}>En Shopify</th>
                   <th scope="col" className={claseThLista}>WhatsApp</th>
                   <th scope="col" className={claseThLista}>Cuándo</th>
@@ -222,21 +263,56 @@ export function ConfirmacionIA({
               <tbody>
                 {visibles.map((f) => {
                   const m = MENSAJE[f.mensajeEstado];
-                  const coincide = f.etiqueta && f.etiquetaActual ? f.etiqueta.toUpperCase().startsWith(f.etiquetaActual.toUpperCase().split("/")[0]) : null;
+                  const coincide = f.final.etiqueta && f.etiquetaActual ? f.final.etiqueta.toUpperCase().startsWith(f.etiquetaActual.toUpperCase().split("/")[0]) : null;
                   return (
-                    <tr key={f.id} onClick={() => setAbierta(f.id)} className="cursor-pointer hover:bg-muted/50">
+                    <tr
+                      key={f.id}
+                      onClick={() => {
+                        setAbrirCorregir(false);
+                        setAbierta(f.id);
+                      }}
+                      className="cursor-pointer hover:bg-muted/50"
+                    >
                       <td className={claseTdLista}>
-                        <button type="button" onClick={() => setAbierta(f.id)} className={`rounded text-left font-medium ${anilloFoco}`}>
+                        <button type="button" className={`rounded text-left font-medium ${anilloFoco}`}>
                           {f.numero ?? "—"}
                         </button>
                         {tiendas.length > 1 && f.tienda && <span className="block text-xs text-muted-foreground">{f.tienda}</span>}
                       </td>
                       <td className={`${claseTdLista} max-w-[22rem] truncate`} title={f.direccion ?? undefined}>
                         {f.direccion ?? "—"}
-                        {f.falta && <span className="block truncate text-xs text-warning">Falta {f.falta}</span>}
+                        {f.final.falta && <span className="block truncate text-xs text-warning">Falta {f.final.falta}</span>}
                       </td>
                       <td className={claseTdLista}>
-                        <Resultado f={f} />
+                        <Resultado f={f.final} />
+                      </td>
+                      <td className={claseTdLista} onClick={(e) => e.stopPropagation()}>
+                        {f.revision ? (
+                          <>
+                            <Pastilla tono="exito">{f.revision.ok === false ? "Corregido" : "Revisado"}</Pastilla>
+                            {f.revision.por && <span className="block text-xs text-muted-foreground">{f.revision.por}</span>}
+                          </>
+                        ) : puedeEscribir ? (
+                          <span className="flex flex-wrap items-center gap-1.5">
+                            {(f.estado === "listo" || f.estado === "falta_dato") && (
+                              <button type="button" onClick={() => void elegir(f, { acierto: true }).then((e) => e && mostrarToast(e, "destructive"))} className={`rounded-md border border-border-control bg-card px-2 py-1 text-xs font-medium text-success hover:bg-muted ${anilloFoco}`}>
+                                Está bien
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAbrirCorregir(true);
+                                setAbierta(f.id);
+                              }}
+                              className={`rounded-md border border-border-control bg-card px-2 py-1 text-xs font-medium hover:bg-muted ${anilloFoco}`}
+                            >
+                              {f.estado === "revisar" || f.estado === "error" ? "Revisar" : "Corregir"}
+                            </button>
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
                       </td>
                       <td className={claseTdLista}>
                         {f.etiquetaActual ?? <span className="text-muted-foreground">—</span>}
@@ -266,7 +342,7 @@ export function ConfirmacionIA({
 
       {esAdmin && <InstruccionesIA paisNombre={paisNombre} inicial={instrucciones ?? ""} />}
 
-      {ficha && <FichaAnalisis key={ficha.id} f={ficha} distingueZona={config.distingueZona} puedeEscribir={puedeEscribir} alCerrar={() => setAbierta(null)} />}
+      {ficha && <FichaAnalisis key={ficha.id} f={ficha} distingueZona={config.distingueZona} puedeEscribir={puedeEscribir} abrirCorregir={abrirCorregir} alElegir={elegir} alCerrar={() => setAbierta(null)} />}
 
       {pidiendoClave && (
         <Ventana abierto alCerrar={() => !pendiente && setPidiendoClave(null)} ancho="sm" titulo={<span className="text-base font-semibold">Escribe la contraseña</span>}>
@@ -303,29 +379,11 @@ export function ConfirmacionIA({
   );
 }
 
-/** Lo que contestó cada IA, en una línea. */
-function LineaModelo({ m }: { m: ResultadoModelo | FilaAnalisis["modelos"][number] }) {
-  const r = "respuesta" in m ? m.respuesta : (m as FilaAnalisis["modelos"][number]);
-  if (!m.ok) return <li className="text-sm text-destructive">{NOMBRE_IA[m.proveedor] ?? m.proveedor}: {(m as { error?: string | null }).error ?? "no contestó"}</li>;
-  const zona = r && "zona" in r && r.zona ? (r.zona === "no_se" || r.zona === "no_aplica" ? "zona sin decidir" : `zona ${r.zona}`) : "";
-  const completa = r && "completa" in r ? (r.completa ? "completa" : `incompleta (falta ${r.falta ?? "algo"})`) : "";
-  return (
-    <li className="text-sm">
-      <b>{NOMBRE_IA[m.proveedor] ?? m.proveedor}:</b> {[zona, completa].filter(Boolean).join(" · ")}
-      {r && "motivo" in r && r.motivo ? <span className="block text-xs text-muted-foreground">{r.motivo}</span> : null}
-    </li>
-  );
-}
-
-function FichaAnalisis({ f, distingueZona, puedeEscribir, alCerrar }: { f: FilaAnalisis; distingueZona: boolean; puedeEscribir: boolean; alCerrar: () => void }) {
+function FichaAnalisis({ f, distingueZona, puedeEscribir, abrirCorregir, alElegir, alCerrar }: { f: FilaAnalisis; distingueZona: boolean; puedeEscribir: boolean; abrirCorregir: boolean; alElegir: AlElegir; alCerrar: () => void }) {
   const router = useRouter();
   const { mostrarToast } = useToast();
   const [pendiente, empezar] = useTransition();
-  const [guardando, setGuardando] = useState(false);
-  const [completa, setCompleta] = useState(f.completa ?? true);
-  const [falta, setFalta] = useState(f.falta ?? "");
-  const [zona, setZona] = useState<Zona | "">(f.zona ?? "");
-  const [ciudadEjemplo, setCiudadEjemplo] = useState(f.ciudad ?? "");
+  const [corrigiendo, setCorrigiendo] = useState(abrirCorregir || (!f.revision && (f.estado === "revisar" || f.estado === "error")));
   const m = MENSAJE[f.mensajeEstado];
 
   function analizar() {
@@ -334,14 +392,6 @@ function FichaAnalisis({ f, distingueZona, puedeEscribir, alCerrar }: { f: FilaA
       if (r.error) return mostrarToast(r.error, "destructive");
       mostrarToast("Analizado de nuevo.");
       router.refresh();
-    });
-  }
-  function guardar() {
-    empezar(async () => {
-      const r = await guardarAnalisisComoEjemplo(f.id, { ciudad: ciudadEjemplo, completa, falta: completa ? null : falta, zona: zona || null });
-      if (r.error) return mostrarToast(r.error, "destructive");
-      mostrarToast("Guardada como ejemplo.");
-      setGuardando(false);
     });
   }
 
@@ -354,11 +404,11 @@ function FichaAnalisis({ f, distingueZona, puedeEscribir, alCerrar }: { f: FilaA
           {f.ciudad && <p className="m-0 text-xs text-muted-foreground">Ciudad o corregimiento: {f.ciudad}</p>}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Resultado f={f} />
-          {f.zona && <Pastilla>{ZONA_TEXTO[f.zona]}{f.zonaPor === "regla" ? " · por palabra de zona" : " · por las IA"}</Pastilla>}
+          <Resultado f={f.final} />
+          {f.final.zona && <Pastilla>{ZONA_TEXTO[f.final.zona]}{f.revision ? " · lo marcó el equipo" : f.zonaPor === "regla" ? " · por palabra de zona" : " · por las IA"}</Pastilla>}
           {f.acuerdo === false && <Pastilla tono="aviso">Las IA no coinciden</Pastilla>}
         </div>
-        {f.etiqueta && <p className="m-0 text-sm">Etiqueta que se pondría: <b>{f.etiqueta}</b>{f.etiquetaActual ? ` · en Shopify tiene ${f.etiquetaActual}` : ""}</p>}
+        {f.final.etiqueta && <p className="m-0 text-sm">Etiqueta que se pondría: <b>{f.final.etiqueta}</b>{f.etiquetaActual ? ` · en Shopify tiene ${f.etiquetaActual}` : ""}</p>}
         {f.reglas.length > 0 && <p className="m-0 text-sm">Palabras de zona que salieron: {f.reglas.map((r) => `${r.texto} (${ZONA_TEXTO[r.resultado]})`).join(", ")}</p>}
         <div>
           <p className={`${labelClass} m-0`}>Lo que dijo cada IA</p>
@@ -374,46 +424,30 @@ function FichaAnalisis({ f, distingueZona, puedeEscribir, alCerrar }: { f: FilaA
             </p>
           </div>
         )}
+        {f.revision && (
+          <div className="rounded-lg border border-border bg-muted/40 px-3 py-2.5 text-sm">
+            <p className="m-0">
+              <b>{f.revision.por ?? "El equipo"}</b> marcó: {f.revision.completa ? `completa${f.revision.zona ? ` · ${ZONA_TEXTO[f.revision.zona]}` : ""}` : `falta ${f.revision.falta ?? "un dato"}`}.
+            </p>
+            <p className="m-0 text-xs text-muted-foreground">
+              {f.revision.ok === true ? "Coincidía con lo que propuso el sistema." : f.revision.ok === false ? "Era distinto de lo que propuso el sistema: la IA aprende de esta corrección." : "Las IA no habían decidido: la IA aprende de esta respuesta."}
+            </p>
+          </div>
+        )}
         {puedeEscribir && (
           <div className="flex flex-col gap-3 border-t border-border pt-4">
             <div className="flex flex-wrap gap-2">
               <button type="button" disabled={pendiente} onClick={analizar} className={`rounded-md border border-border-control bg-card px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50 ${anilloFoco}`}>
                 {pendiente ? "Analizando…" : "Analizar de nuevo"}
               </button>
-              <button type="button" aria-expanded={guardando} onClick={() => setGuardando((v) => !v)} className={`rounded-md border border-border-control bg-card px-3 py-2 text-sm font-medium hover:bg-muted ${anilloFoco}`}>
-                Guardar como ejemplo
+              <button type="button" aria-expanded={corrigiendo} onClick={() => setCorrigiendo((v) => !v)} className={`rounded-md border border-border-control bg-card px-3 py-2 text-sm font-medium hover:bg-muted ${anilloFoco}`}>
+                {f.revision ? "Cambiar lo correcto" : f.estado === "revisar" || f.estado === "error" ? "¿Qué es lo correcto?" : "Corregir"}
               </button>
             </div>
-            {guardando && (
+            {corrigiendo && (
               <div className="flex flex-col gap-3 rounded-lg border border-border p-3">
-                <p className="m-0 text-xs text-muted-foreground">Dile a la IA lo correcto. Así aprende de lo que ves aquí.</p>
-                <label className="flex flex-col gap-1">
-                  <span className={labelClass}>Ciudad o corregimiento *</span>
-                  <input value={ciudadEjemplo} maxLength={120} onChange={(e) => setCiudadEjemplo(e.target.value)} placeholder="Ej: Bella Vista" className={fieldClass} />
-                </label>
-                <div role="radiogroup" aria-label="La dirección está" className="flex gap-4 text-sm">
-                  <label className="flex items-center gap-1.5"><input type="radio" checked={completa} onChange={() => setCompleta(true)} /> Completa</label>
-                  <label className="flex items-center gap-1.5"><input type="radio" checked={!completa} onChange={() => setCompleta(false)} /> Incompleta</label>
-                </div>
-                {!completa && (
-                  <label className="flex flex-col gap-1">
-                    <span className={labelClass}>¿Qué le falta?</span>
-                    <input value={falta} maxLength={200} onChange={(e) => setFalta(e.target.value)} placeholder="Ej: el número de casa" className={fieldClass} />
-                  </label>
-                )}
-                {completa && distingueZona && (
-                  <label className="flex flex-col gap-1">
-                    <span className={labelClass}>Zona</span>
-                    <select value={zona} onChange={(e) => setZona(e.target.value as Zona | "")} className={fieldClass}>
-                      <option value="">No sé</option>
-                      <option value="ciudad">{NOMBRE_ZONA.ciudad}</option>
-                      <option value="interior">{NOMBRE_ZONA.interior}</option>
-                    </select>
-                  </label>
-                )}
-                <button type="button" disabled={pendiente || ciudadEjemplo.trim().length < 2 || (!completa && !falta.trim())} onClick={guardar} className={`self-end rounded-md bg-foreground px-3 py-2 text-sm font-semibold text-background disabled:opacity-50 ${anilloFoco}`}>
-                  Guardar ejemplo
-                </button>
+                <p className="m-0 text-xs text-muted-foreground">Marca lo correcto: manda sobre lo que dijo la IA y le enseña para la próxima vez.</p>
+                <BotonesVeredicto f={f} distingueZona={distingueZona} puedeConfirmar={f.estado === "listo" || f.estado === "falta_dato"} alElegir={alElegir} />
               </div>
             )}
           </div>
