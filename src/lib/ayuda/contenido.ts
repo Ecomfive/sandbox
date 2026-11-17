@@ -1775,6 +1775,27 @@ export const GUIAS: GuiaModulo[] = [
     ],
   },
   {
+    modulo: "tienda-reporteria",
+    titulo: "Reportería de pedidos",
+    ruta: "/tienda-reporteria",
+    resumen: "La Matriz de administración dentro del sistema: todos los pedidos de las tiendas con todas sus columnas, para trabajar aquí y no en el Excel.",
+    secciones: [
+      {
+        titulo: "Uso",
+        pasos: [
+          "Está en Operación, en el frente Gestión de tienda. Arriba eliges la tienda (o Todas) y el mes.",
+          "La tabla es como la hoja «Excel Matriz»: una fila por producto (las líneas extra del mismo pedido salen con ↳, lo que en el Excel decía «DUPLICADO»), con las columnas en grupos (Pedido, Cliente, Producto, Entrega, Cobro, Costos, Cambios y devoluciones, Facturación) que se muestran u ocultan con los botones de «Columnas». Se busca, se filtra, se agrupa y se descarga a Excel como en las demás tablas.",
+          "Lo que llega solo no se escribe: el pedido, el cliente y los productos vienen de Shopify; la entrega, el courier y la fecha de envío, de Monday y Servientrega; el costo, de la Matriz o de Compras (en gris). Al pasar el cursor por el título de cada columna dice de dónde sale.",
+          "Lo de administración se llena a mano con doble clic en la celda: preparación, verificado, motivo de cancelación, delivery, forma de pago, mes de cobro, montos de envío, cambios y facturación (facturado, N° factura, bloque). Lo cambiado queda marcado en morado y en «Movimientos» (quién, qué y antes/después), como la pestaña MOVIMIENTOS del Excel.",
+          "Las tarjetas de arriba cuentan los pedidos del mes y filtran la tabla: entregados, devoluciones, anulados, sin estado y los entregados sin facturar. «Difiere de la Matriz» muestra los pedidos en que el estado del sistema no coincide con lo que anotó la Matriz, para revisarlos.",
+          "Abajo, «Lo que pasa a Ventas por tienda»: por tienda, pedidos, entregados, ventas, costo, envío y margen. Finanzas no carga nada aparte: sale de estos mismos pedidos.",
+          "«Actualizar desde la Matriz», mientras el equipo siga llenando el Excel: se descarga como Excel (en Google Sheets: Archivo › Descargar › Microsoft Excel) y se carga aquí. No duplica ni borra: un pedido que llegó de Shopify solo se completa con lo que anota la Matriz, y lo que alguien cambió a mano en el sistema se queda como está.",
+          "Leer pide el permiso de Reportería de pedidos; editar y cargar la Matriz, poder modificarlo.",
+        ],
+      },
+    ],
+  },
+  {
     modulo: "tienda-confirmacion",
     titulo: "Confirmación",
     ruta: "/tienda-confirmacion",
@@ -2170,6 +2191,7 @@ export interface Novedad {
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
   { fecha: "2026-11-17", titulo: "Compras: el aviso de En Bodega es solo informativo; los pagos los registra Compras", texto: "El aviso de «07 - En Bodega» le sirve a María José para saber lo que se debe pagar (compra por compra y el total), pero ya no puede registrar el pago desde la llegada: lo registra quien gestiona Compras (Francis), que lo abre desde la ficha de la compra con «Registrar el pago», donde también está «Registrar pago total».", modulo: "compras", href: "/compras/lista" },
+  { fecha: "2026-11-17", titulo: "Reportería de pedidos: la Matriz dentro del sistema", texto: "Nuevo en Operación › Gestión de tienda: «Reportería de pedidos», la Matriz de administración (NUEVA GESTION OCEANS PANAMA) dentro del sistema, para dejar de trabajar en el Excel. Están todos los pedidos de las tiendas con todas las columnas de la Matriz, por tienda y por mes, una fila por producto como en el Excel. Lo que llega solo (Shopify, Monday, Servientrega, el costo) no se escribe; lo de administración (verificado, cobro, facturación, cambios, envíos…) se edita con doble clic y queda en «Movimientos». Arriba cuenta los entregados sin facturar y los pedidos en que la Matriz dice otra cosa que el sistema; abajo, lo que pasa a Ventas por tienda. Mientras el equipo siga llenando el Excel, «Actualizar desde la Matriz» lo carga sin duplicar ni pisar lo editado. Hace falta correr la migración 0310.", modulo: "tienda-reporteria", href: "/tienda-reporteria" },
   { fecha: "2026-11-17", titulo: "Compras: registrar el pago total de una llegada de una vez", texto: "En la página de una llegada «En Bodega» hay un botón «Registrar pago total»: con el día del pago, registra de una vez el segundo pago de todas las compras que faltan (cada una con su monto) y las pasa a Completado. Para pagar solo algunas o con otro monto, sigue «Registrar pago» en cada compra.", modulo: "compras", href: "/notificaciones" },
   { fecha: "2026-11-17", titulo: "El número de Avisos y la campana de tareas se actualizan solos", texto: "Ya no hace falta cambiar de página para ver un aviso nuevo o una tarea nueva: el número rojo de «Avisos» (menú lateral) y el de la campana de tareas se actualizan solos cada 30 segundos mientras tienes el sistema abierto, y al instante cuando sale una tarjeta de aviso.", modulo: "notificaciones", href: "/notificaciones" },
   { fecha: "2026-11-17", titulo: "Avisos en pantalla: Llegada a Puerto y En Bodega aparecen en cualquier página", texto: "Cuando una compra pasa a Llegada a Puerto (Logística) o a En Bodega (quien paga), a la persona le sale una tarjeta arriba a la derecha, esté en el módulo que esté, con el aviso y un sonido corto. Se pulsa para ver todo el detalle y «Ir a gestionarlo» lleva a la página de la llegada. Cerrarla no la marca como leída: sigue en Avisos › Para ti y en el contador del menú. Lo mismo vale para los avisos de remisiones de Inventario.", modulo: "compras", href: "/notificaciones" },
