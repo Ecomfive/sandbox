@@ -116,8 +116,9 @@ export interface OrdenTienda {
   enShopify: string | null;
   /** El nombre de la tienda como está en Tiendas («Kenku»). */
   tienda: string;
-  /** «Ingresos y costos» (12 nov 2026): venta, costo de los productos, fulfillment, flete y margen. */
-  cuentas: IngresosYCostos;
+  /** «Ingresos y costos» (12 nov 2026): venta, costo de los productos, fulfillment, flete y margen. null para quien tiene tiendas limitadas (la gente de
+   * una tienda cliente no ve nuestro costo: 17 nov 2026). */
+  cuentas: IngresosYCostos | null;
   /** Las notas del equipo, de la más vieja a la más nueva (12 nov 2026). */
   notas: NotaOrden[];
   /** Lo que pasó con la orden, del más nuevo al más viejo (13 nov 2026). */
@@ -173,10 +174,11 @@ export async function cargarOrdenTienda(supabase: SupabaseClient, id: string, pa
   const enShopify = o.origen === "shopify" && dominio && o.numero ? `https://${dominio}/admin/orders?query=${encodeURIComponent(String(o.numero).replace(/^#/, ""))}` : null;
   // Ingresos y costos: el costo de cada producto en el país (el costo promedio de compra del producto: del país o, si no hay, de todos), el fulfillment de la unidad y el flete del pedido.
   const lineasT = (lineas ?? []) as unknown as LineaOrdenFinanzas[];
-  const costos = await costosDeProductos(supabase, lineasT.map((l) => l.sku_maestro_id ?? "").filter(Boolean), paisId);
+  // La gente de una tienda cliente (tiendas limitadas) no ve el costo de compra ni el margen (17 nov 2026, Hernán: «no deben ver el costo del producto»).
+  const costos = permitidas ? new Map<string, CostoProducto>() : await costosDeProductos(supabase, lineasT.map((l) => l.sku_maestro_id ?? "").filter(Boolean), paisId);
   for (const l of lineasT) l.costo = l.sku_maestro_id ? (costos.get(l.sku_maestro_id) ?? null) : null;
   const flete = Number(o.costo_envio_real) > 0 ? Number(o.costo_envio_real) : Number(o.costo_envio) > 0 ? Number(o.costo_envio) : null;
-  const cuentas = cuentasDelPedido(
+  const cuentas = permitidas ? null : cuentasDelPedido(
     Number(o.total) || 0,
     lineasT.map((l) => ({ skuId: l.sku_maestro_id ?? null, cantidad: Number(l.cantidad) || 0, esServicio: l.es_servicio === true })),
     costos,

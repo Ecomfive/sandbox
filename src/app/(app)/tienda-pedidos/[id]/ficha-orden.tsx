@@ -270,7 +270,7 @@ export function FichaOrdenTienda({ orden, codigoPais, puedeEscribir }: { orden: 
           <LineaTiempo pasos={pasos} />
           {/* Las pestañas llevan a cada parte de la ficha (como en la app de Jorge): se quedan arriba al desplazarse. */}
           <nav aria-label="Partes del pedido" className="sticky top-[var(--alto-cabecera,0px)] z-[5] flex gap-1 overflow-x-auto border-y @2xl:top-0 border-border bg-card px-3">
-            {SECCIONES.map((s) => (
+            {SECCIONES.filter((s) => s.id !== "costos" || c).map((s) => (
               <button key={s.id} type="button" onClick={() => ir(s.id)} className={`flex shrink-0 items-center gap-1.5 border-b-2 border-transparent px-2.5 py-2.5 text-[13px] font-medium whitespace-nowrap text-muted-foreground hover:border-primario hover:text-foreground ${anilloFoco}`}>
                 <s.icono className="h-3.5 w-3.5" aria-hidden="true" />
                 {s.titulo}
@@ -371,6 +371,7 @@ export function FichaOrdenTienda({ orden, codigoPais, puedeEscribir }: { orden: 
             </dl>
           </Seccion>
 
+          {c && (
           <Seccion id={sid("costos")} titulo={S("costos").titulo} icono={S("costos").icono}>
             <div className="grid grid-cols-2 gap-2 @xl:grid-cols-3">
               <Caja titulo="Venta" valor={dinero(c.venta)} />
@@ -389,6 +390,7 @@ export function FichaOrdenTienda({ orden, codigoPais, puedeEscribir }: { orden: 
               />
             </div>
           </Seccion>
+          )}
 
           <Seccion id={sid("entrega")} titulo={S("entrega").titulo} icono={S("entrega").icono} extra={zona ? <span className="text-xs text-muted-foreground">{zona === "Interior" ? "Interior · por transportadora" : "Ciudad · repartidor"}</span> : undefined}>
             {entrega ? (

@@ -53,7 +53,8 @@ export default async function ReporteriaPage({ searchParams }: { searchParams: P
         </p>
       )}
       <Reporteria
-        filas={compactarFilas(filas)}
+        filas={compactarFilas(permitidas ? filas.map((f) => ({ ...f, costo: null, costoFuente: null })) : filas)}
+        sinCostos={permitidas !== null}
         tiendas={tiendas}
         tiendaId={tienda?.id ?? null}
         mes={mes}
