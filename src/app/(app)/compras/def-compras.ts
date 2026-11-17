@@ -41,6 +41,8 @@ export interface FilaCompra {
   cajasProveedor: number | null;
   /** Cuántas imágenes de la etiqueta de las cajas subió el proveedor (se ven en la ficha de la compra). */
   etiquetasCajas: number;
+  /** La compra está en el portal de un proveedor: ahí se anotan las cajas y la etiqueta (las puede anotar también el equipo). */
+  conPortal: boolean;
   montoTotal: number | null;
   primerPago: number | null;
   segundoPago: number | null;
