@@ -20,7 +20,8 @@ export interface ResultadoModelo {
   error?: string;
 }
 
-export type EstadoAnalisis = "listo" | "falta_dato" | "revisar" | "error";
+/** `adelantado`: la dirección es de una zona de pago por adelantado («En espera de pago»): no se propone etiqueta hasta que el asesor verifique el pago. */
+export type EstadoAnalisis = "listo" | "falta_dato" | "revisar" | "error" | "adelantado";
 
 export interface Combinado {
   estado: EstadoAnalisis;
@@ -110,6 +111,18 @@ export function mensajePedirDetalle({ nombre, numero, tienda, falta }: { nombre:
   const saludo = primero ? `Hola ${primero.charAt(0).toUpperCase()}${primero.slice(1).toLowerCase()} 👋` : "Hola 👋";
   const pedido = numero ? `tu pedido ${numero}${tienda ? ` de ${tienda}` : ""}` : "tu pedido";
   return `${saludo} Para poder enviar ${pedido} necesitamos completar tu dirección. ¿Nos puedes escribir ${falta}? ¡Gracias! 🙏`;
+}
+
+/**
+ * El mensaje que le avisa al cliente que su pedido es de una zona de pago por adelantado y cómo pagar (17 nov 2026). Los métodos de pago son los que se registran por tienda; sin ellos, el mensaje
+ * pide el comprobante y dice que un asesor le indica cómo pagar. Lo envía el asesor con un botón (nunca solo).
+ */
+export function mensajePagoAdelantado({ nombre, numero, tienda, metodos }: { nombre: string | null; numero: string | null; tienda: string | null; metodos: string | null }): string {
+  const primero = (nombre ?? "").trim().split(/\s+/)[0] ?? "";
+  const saludo = primero ? `Hola ${primero.charAt(0).toUpperCase()}${primero.slice(1).toLowerCase()} 👋` : "Hola 👋";
+  const pedido = numero ? `tu pedido ${numero}${tienda ? ` de ${tienda}` : ""}` : "tu pedido";
+  const como = metodos?.trim() ? `\n\nPuedes pagar así:\n${metodos.trim()}\n\n` : " Un asesor te indicará cómo pagar. ";
+  return `${saludo} ${pedido[0].toUpperCase()}${pedido.slice(1)} es para una zona con pago por adelantado. Para poder enviarlo necesitamos que realices el pago y nos envíes el comprobante por este chat.${como}Apenas lo recibamos, lo confirmamos y lo despachamos. ¡Gracias! 🙏`;
 }
 
 /** La etiqueta de Shopify que corresponde a una zona, según lo configurado en el país; null si el país no la tiene definida. */

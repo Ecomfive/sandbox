@@ -9,7 +9,7 @@ import { tiendasVisibles } from "@/lib/confirmacion-ia/acceso";
 import { etiquetaDeZona, type Combinado, type EstadoAnalisis, type ResultadoModelo } from "@/lib/confirmacion-ia/combinar";
 import { coincideConPropuesta, faltaVigente, revisarVeredicto, type DecisionRevision, type Veredicto } from "@/lib/confirmacion-ia/revision";
 import { MAX_INSTRUCCIONES } from "@/lib/confirmacion-ia/prompt";
-import { analizarOrden, analizarPendientes, armarMensajeDato, cargarConfig, enviarMensajeDato as mandarMensajeDato, evaluarDireccion, MAX_MENSAJES, SIN_MIGRACION_CONFIRMACION, type EstadoMensaje } from "@/lib/confirmacion-ia/servidor";
+import { analizarOrden, analizarPendientes, armarMensajeAdelanto, armarMensajeDato, cargarConfig, enviarMensajeDato as mandarMensajeDato, evaluarDireccion, MAX_MENSAJES, SIN_MIGRACION_CONFIRMACION, type EstadoMensaje } from "@/lib/confirmacion-ia/servidor";
 import { errorDeRegla, normalizarTexto, ZONAS, type Zona } from "@/lib/confirmacion-ia/zonas";
 import { getPaisActual } from "@/lib/pais";
 import { esAdministrador } from "@/lib/permisos/acceso";
@@ -290,6 +290,93 @@ export async function eliminarPalabraZona(id: string): Promise<Resultado> {
   return {};
 }
 
+// --- Pago por adelantado: zonas y métodos de pago por tienda ----------------------------------------------------------------------------------------------
+
+export interface ZonaAdelanto {
+  id: string;
+  texto: string;
+  creadoPor: string | null;
+  creadoEn: string;
+}
+
+/** Las zonas de pago por adelantado del país (17 nov 2026): lugares de difícil acceso o fronterizos que se pagan antes de enviar. Si una sale en la dirección, el pedido queda «en espera de pago». */
+export async function listarZonasAdelanto(): Promise<{ zonas: ZonaAdelanto[]; error?: string }> {
+  await requireModulo(MODULO);
+  const supabase = createServiceClient();
+  const pais = await getPaisActual(supabase);
+  const { data, error } = await supabase.from("confirmacion_ia_adelanto_zonas").select("id, texto, creado_por_nombre, creado_en").eq("pais_id", pais.id).order("texto").limit(500);
+  if (error) return { zonas: [], error: /adelanto|schema cache|does not exist/i.test(error.message) ? SIN_MIGRACION_ADELANTO : "No se pudieron leer las zonas." };
+  return { zonas: (data ?? []).map((z) => ({ id: z.id as string, texto: z.texto as string, creadoPor: (z.creado_por_nombre as string | null) ?? null, creadoEn: z.creado_en as string })) };
+}
+
+const SIN_MIGRACION_ADELANTO = "Falta correr la migración 0312 (pago por adelantado) en Supabase.";
+
+export async function agregarZonaAdelanto(texto: string): Promise<Resultado> {
+  const usuario = await requireModuloEscritura(MODULO);
+  const mal = errorDeRegla(texto);
+  if (mal) return { error: mal };
+  const supabase = createServiceClient();
+  const pais = await getPaisActual(supabase);
+  const limpio = String(texto).replace(/\s+/g, " ").trim();
+  const { error } = await supabase.from("confirmacion_ia_adelanto_zonas").insert({ pais_id: pais.id, texto: limpio, clave: normalizarTexto(limpio), creado_por: usuario.id, creado_por_nombre: nombreDe(usuario) });
+  if (error) return { error: error.code === "23505" ? "Esa zona ya está en la lista." : /adelanto|schema cache|does not exist/i.test(error.message) ? SIN_MIGRACION_ADELANTO : "No se pudo guardar." };
+  await registrarAuditoria({ accion: "agregar_zona_adelanto_confirmacion_ia", entidad: "paises", entidadId: pais.id, detalle: `${pais.nombre}: agregó la zona de pago por adelantado «${limpio}»` });
+  revalidatePath("/tienda-pedidos/confirmacion/ia");
+  return {};
+}
+
+export async function eliminarZonaAdelanto(id: string): Promise<Resultado> {
+  await requireModuloEscritura(MODULO);
+  if (!UUID.test(String(id))) return { error: "Zona no válida." };
+  const supabase = createServiceClient();
+  const pais = await getPaisActual(supabase);
+  const { data } = await supabase.from("confirmacion_ia_adelanto_zonas").select("texto").eq("id", id).eq("pais_id", pais.id).maybeSingle();
+  if (!data) return { error: "Esa zona ya no está." };
+  const { error } = await supabase.from("confirmacion_ia_adelanto_zonas").delete().eq("id", id);
+  if (error) return { error: "No se pudo borrar." };
+  await registrarAuditoria({ accion: "eliminar_zona_adelanto_confirmacion_ia", entidad: "paises", entidadId: pais.id, detalle: `${pais.nombre}: quitó la zona de pago por adelantado «${data.texto}»` });
+  revalidatePath("/tienda-pedidos/confirmacion/ia");
+  return {};
+}
+
+export interface MetodosPagoTienda {
+  tiendaId: string;
+  tienda: string;
+  /** Cómo paga el cliente en esa tienda (Yappy, cuenta…), tal como va en el mensaje; vacío si todavía no se registró. */
+  texto: string;
+}
+
+/** Los métodos de pago por adelantado de las tiendas que la persona ve (cada tienda tiene los suyos). Sin la migración, la lista sale vacía. */
+export async function listarMetodosPago(): Promise<{ metodos: MetodosPagoTienda[]; error?: string }> {
+  await requireModulo(MODULO);
+  const supabase = createServiceClient();
+  const pais = await getPaisActual(supabase);
+  const { tiendas } = await tiendasVisibles(supabase, pais.id);
+  if (!tiendas.length) return { metodos: [] };
+  const { data, error } = await supabase.from("tiendas").select("id, pago_adelantado_instrucciones").in("id", tiendas.map((t) => t.id));
+  if (error) return { metodos: tiendas.map((t) => ({ tiendaId: t.id, tienda: t.nombre, texto: "" })), error: SIN_MIGRACION_ADELANTO };
+  const porId = new Map((data ?? []).map((t) => [t.id as string, ((t.pago_adelantado_instrucciones as string | null) ?? "").trim()]));
+  return { metodos: tiendas.map((t) => ({ tiendaId: t.id, tienda: t.nombre, texto: porId.get(t.id) ?? "" })) };
+}
+
+/** Guarda cómo paga el cliente por adelantado en una tienda (vacío lo quita): va tal cual en el mensaje que el asesor le manda. */
+export async function guardarMetodosPago(tiendaId: string, texto: string): Promise<Resultado> {
+  const usuario = await requireModuloEscritura(MODULO);
+  if (!UUID.test(String(tiendaId))) return { error: "Tienda no válida." };
+  const limpio = String(texto ?? "").replace(/\r\n/g, "\n").trim();
+  if (limpio.length > 1000) return { error: "Es muy largo: el máximo es 1000 letras." };
+  const supabase = createServiceClient();
+  const pais = await getPaisActual(supabase);
+  const { tiendas } = await tiendasVisibles(supabase, pais.id);
+  const tienda = tiendas.find((t) => t.id === tiendaId);
+  if (!tienda) return { error: "Esa tienda no es de este país o no tienes acceso a ella." };
+  const { error } = await supabase.from("tiendas").update({ pago_adelantado_instrucciones: limpio || null }).eq("id", tiendaId);
+  if (error) return { error: /pago_adelantado|schema cache|column/i.test(error.message) ? SIN_MIGRACION_ADELANTO : "No se pudo guardar." };
+  await registrarAuditoria({ accion: "cambiar_metodos_pago_adelanto", entidad: "paises", entidadId: pais.id, detalle: `${pais.nombre}: ${nombreDe(usuario)} ${limpio ? "cambió" : "quitó"} los métodos de pago por adelantado de ${tienda.nombre}` });
+  revalidatePath("/tienda-pedidos/confirmacion/ia");
+  return {};
+}
+
 // --- Analizar ------------------------------------------------------------------------------------------------------------------------------------------------
 
 /** Un pedido de las tiendas que la persona ve (y del país elegido). */
@@ -454,10 +541,14 @@ export async function revisarAnalisis(
 export interface PedirDato {
   analisisId: string;
   numero: string | null;
-  /** Lo que falta de la dirección, como se le pediría. */
+  /** `dato`: falta algo de la dirección; `adelanto`: es una zona de pago por adelantado y se le pide el pago. */
+  tipo: "dato" | "adelanto";
+  /** Lo que falta de la dirección, como se le pediría («pago por adelantado» si es de esa zona). */
   falta: string;
   /** El mensaje que se le mandaría. */
   mensaje: string;
+  /** Solo en pago por adelantado: la tienda todavía no tiene métodos de pago registrados (el mensaje sale sin ellos). */
+  sinMetodos?: boolean;
   /** Qué pasó antes con el mensaje de este pedido (por ejemplo «enviado»: ya se le había pedido). */
   estado: EstadoMensaje;
   enviados: number;
@@ -473,12 +564,19 @@ async function prepararPedirDato(supabase: ReturnType<typeof createServiceClient
   if (r.error || !a) return { error: "Ese análisis ya no existe." };
   const { tiendas, limitado } = await tiendasVisibles(supabase, pais.id);
   if (limitado && !tiendas.some((t) => t.id === a.tienda_id)) return { error: "Ese pedido no es de las tiendas que ves." };
+  const { data: o } = await supabase.from("ven_ordenes").select("numero").eq("id", a.orden_id as string).maybeSingle();
+  const base = { analisisId, numero: (o?.numero as string | null) ?? null, estado: (a.mensaje_estado as EstadoMensaje) ?? "no_aplica", enviados: Number(a.mensajes_enviados ?? 0) };
+  // Pedido de una zona de pago por adelantado (y que nadie corrigió a mano): se le avisa del pago, no se le pide un dato.
+  if (a.estado === "adelantado" && !a.rev_en) {
+    const adelanto = await armarMensajeAdelanto(supabase, a.orden_id as string);
+    if ("error" in adelanto) return adelanto;
+    return { ...base, tipo: "adelanto", falta: "pago por adelantado", mensaje: adelanto.mensaje, sinMetodos: adelanto.sinMetodos };
+  }
   const falta = faltaVigente(a);
   if (!falta) return { error: "A este pedido ya no le falta ningún dato." };
   const m = await armarMensajeDato(supabase, a.orden_id as string, falta);
   if ("error" in m) return m;
-  const { data: o } = await supabase.from("ven_ordenes").select("numero").eq("id", a.orden_id as string).maybeSingle();
-  return { analisisId, numero: (o?.numero as string | null) ?? null, falta, mensaje: m.mensaje, estado: (a.mensaje_estado as EstadoMensaje) ?? "no_aplica", enviados: Number(a.mensajes_enviados ?? 0) };
+  return { ...base, tipo: "dato", falta, mensaje: m.mensaje };
 }
 
 /** La pregunta «¿le mando el mensaje?» de un pedido que falta un dato (para pedirlo desde su ficha). */

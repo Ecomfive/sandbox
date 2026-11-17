@@ -38,7 +38,7 @@ export interface Propuesta {
  * Un «falta un dato» coincide con otro «falta un dato» aunque el dato sea distinto; un «listo» coincide si también está completa y, donde se distingue, es la misma zona.
  */
 export function coincideConPropuesta(p: Propuesta, v: Veredicto, distingueZona: boolean): boolean | null {
-  if (p.estado === "revisar" || p.estado === "error") return null;
+  if (p.estado === "revisar" || p.estado === "error" || p.estado === "adelantado") return null;
   if (p.estado === "falta_dato") return !v.completa;
   return v.completa && (!distingueZona || p.zona === v.zona);
 }

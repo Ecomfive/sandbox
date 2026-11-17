@@ -4,7 +4,7 @@
 // Lógica pura, con prueba: qué etapa avisa a quién, cómo se arma la lista de una llegada y el texto del aviso. Lo que toca la base vive en `llegadas-servidor.ts`.
 
 export type TipoLlegada = "puerto" | "bodega";
-export type EventoAviso = "llegada_puerto" | "llegada_bodega";
+export type EventoAviso = "llegada_puerto" | "llegada_bodega" | "pago_adelantado";
 
 /** Qué etapa de la compra dispara el aviso de una llegada. */
 export const LLEGADA_DE_ETAPA: Readonly<Record<string, { tipo: TipoLlegada; evento: EventoAviso }>> = {
@@ -18,6 +18,7 @@ export const EVENTO_DE_TIPO: Readonly<Record<TipoLlegada, EventoAviso>> = { puer
 export const AVISOS_DE_COMPRAS: readonly { evento: EventoAviso; titulo: string; detalle: string }[] = [
   { evento: "llegada_puerto", titulo: "Logística · Llegada a Puerto", detalle: "Reciben la lista de lo que viene (producto, unidades, cajas y etiqueta de las cajas) cuando una compra pasa a «06 - Llegada a Puerto»." },
   { evento: "llegada_bodega", titulo: "Pagos (solo aviso) · En Bodega", detalle: "Se enteran de lo que hay que pagar del segundo pago (por compra y en total) cuando una compra pasa a «07 - En Bodega». El pago lo registra quien gestiona Compras." },
+  { evento: "pago_adelantado", titulo: "Pago por adelantado · Confirmación con IA", detalle: "Se enteran cuando un pedido confirmado es de una zona de pago por adelantado, para avisarle al cliente y esperar el pago. Sin nadie marcado, no se avisa a nadie." },
 ];
 
 export interface ProductoLlegada {

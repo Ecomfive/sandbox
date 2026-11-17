@@ -6,8 +6,9 @@
  * agrega su tipo aquí.
  *  - `llegada`: Llegada a Puerto (para Logística) y En Bodega (para quien paga) de Compras.
  *  - `remision`: remisiones, novedades de plataforma y correcciones de Inventario.
+ *  - `adelanto`: un pedido confirmado de una zona de pago por adelantado (Confirmación con IA).
  */
-export const TIPOS_CON_AVISO_EN_PANTALLA: readonly string[] = ["llegada", "remision"];
+export const TIPOS_CON_AVISO_EN_PANTALLA: readonly string[] = ["llegada", "remision", "adelanto"];
 
 export const esAvisoDePantalla = (tipo: string): boolean => TIPOS_CON_AVISO_EN_PANTALLA.includes(tipo);
 
