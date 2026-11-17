@@ -9,7 +9,7 @@ import { VisorImagen } from "@/components/ui/visor-imagen";
 import { etiquetaEtapa } from "../../compras/def-compras";
 import { textoProductos, totalesDeLlegada, type FilaLlegada, type TipoLlegada } from "@/lib/compras/llegadas-avisos";
 import type { EtiquetaPedido } from "@/lib/proveedor/etiquetas-datos";
-import { registrarPagoLlegada } from "../actions";
+import { registrarPagoLlegada, registrarPagoTotalLlegada } from "../actions";
 
 const entero = (n: number) => n.toLocaleString("es-PA");
 const dinero = (n: number) => `$${n.toLocaleString("es-PA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -65,6 +65,7 @@ export function VistaLlegada({
             </>
           ) : null}
         </dl>
+        {!puerto && puedePagar && verMontos && t.pendientes > 0 && <PagoTotal llegadaId={llegadaId} compras={t.pendientes} monto={t.porPagar} sinMonto={t.sinMonto} hoy={hoy} />}
       </header>
 
       {filas.length === 0 ? (
@@ -82,6 +83,80 @@ export function VistaLlegada({
       )}
       <VisorImagen src={foto?.src ?? null} alt={foto?.alt} onClose={() => setFoto(null)} />
     </div>
+  );
+}
+
+/** «Pago total»: la llegada se paga completa, así que se registran de una vez todas las compras que faltan, cada una con su monto de segundo pago y el mismo día. */
+function PagoTotal({ llegadaId, compras, monto, sinMonto, hoy }: { llegadaId: string; compras: number; monto: number; sinMonto: number; hoy: string }) {
+  const router = useRouter();
+  const { mostrarToast } = useToast();
+  const [abierto, setAbierto] = useState(false);
+  const [diaPago, setDiaPago] = useState(hoy);
+  const [error, setError] = useState<string | null>(null);
+  const [pendiente, startTransition] = useTransition();
+
+  const registrar = () => {
+    setError(null);
+    startTransition(async () => {
+      const r = await registrarPagoTotalLlegada(llegadaId, diaPago);
+      if (r.error) {
+        setError(r.error);
+        if (r.pagadas) router.refresh();
+        return;
+      }
+      mostrarToast(`Pago total registrado: ${r.pagadas} ${r.pagadas === 1 ? "compra pasó" : "compras pasaron"} a Completado.`);
+      setAbierto(false);
+      router.refresh();
+    });
+  };
+
+  if (!abierto) {
+    return (
+      <div>
+        <button
+          type="button"
+          onClick={() => setAbierto(true)}
+          className="min-h-10 cursor-pointer rounded-md bg-foreground px-4 text-sm font-semibold text-background focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        >
+          Registrar pago total · {dinero(monto)}
+        </button>
+      </div>
+    );
+  }
+  return (
+    <form
+      className="flex flex-col gap-3 rounded-md bg-muted p-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        registrar();
+      }}
+    >
+      <p className="m-0 text-sm">
+        Se registrará el pago de <b>{compras}</b> {compras === 1 ? "compra" : "compras"} por <b>{dinero(monto)}</b> (el segundo pago de cada una) y pasarán a Completado.
+      </p>
+      {sinMonto > 0 && (
+        <p role="alert" className="m-0 text-sm text-destructive">
+          {sinMonto === 1 ? "Una compra no tiene" : `${sinMonto} compras no tienen`} monto de segundo pago: regístralas una por una con el monto que pagaste.
+        </p>
+      )}
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="flex flex-col gap-1 text-xs font-medium">
+          Día del pago
+          <input type="date" required max={hoy} value={diaPago} onChange={(e) => setDiaPago(e.target.value)} className={`${fieldClass} w-44`} />
+        </label>
+        <button type="submit" disabled={pendiente || sinMonto > 0} className="min-h-10 cursor-pointer rounded-md bg-foreground px-4 text-sm font-semibold text-background disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+          {pendiente ? "Registrando…" : "Registrar pago total y completar"}
+        </button>
+        <button type="button" disabled={pendiente} onClick={() => setAbierto(false)} className="min-h-10 cursor-pointer rounded-md border border-border bg-card px-3 text-sm hover:bg-background focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+          Cancelar
+        </button>
+      </div>
+      {error && (
+        <p role="alert" className="m-0 text-sm text-destructive">
+          {error}
+        </p>
+      )}
+    </form>
   );
 }
 
