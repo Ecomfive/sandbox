@@ -1304,6 +1304,13 @@ convenciones técnicas del código.
   `SHOPIFY_CLIENT_SECRET`; el permiso dura 24 h y se guarda en memoria) o un token fijo de una app vieja (`SHOPIFY_ADMIN_TOKEN`);
   permisos `write_products`, `read_products`, `read_publications`, `write_publications`; versión `SHOPIFY_API_VERSION` o 2026-10.
   **Pendiente:** Claude (textos), con `BotonPendiente`. Las reseñas son de clientes reales: la IA no las inventa.
+- **Bandeja: Mi vista, archivar y aviso al pasar un chat** (17 nov 2026, pedido de Hernán para el líder comercial). (1) «Mi vista» en el selector «Ver
+  como» (`bandeja.tsx`, `todasMisAreas`) muestra solo el panel propio (`miArea`); «Todas mis áreas» los pone lado a lado; Dirección arranca con todas.
+  (2) Archivar (migración 0311, `archivada_en`/`archivada_por`, reversa `supabase/rollbacks/0311_rollback.sql`, probada con PGlite): `archivarConversacion`
+  (`bandeja/actions.ts`, pide «resolver» de lo afinado) deja el chat resuelto y fuera de listas y tablero; solo sale en «Archivadas». `whatsapp_registrar_entrante`
+  lo saca del archivo cuando el cliente escribe (una reacción no). `cargarBandeja` marca `archivada` con una consulta aparte (sin la migración, ninguno).
+  (3) `pasarConversacionDeArea` avisa «Para ti» (tipo `whatsapp`) a quienes tienen esa área como propia y escriben en ella, menos quien lo pasó
+  (`src/lib/crm/aviso-pase-area.ts`, `destinatariosPase` con prueba).
 - **CRM afinable por rol y por persona** (pedido de Hernán del 28 oct 2026; el PR #345 quedó 1030 commits atrás y se **rehízo sobre main** el 16 nov
   2026): `CATALOGO_CRM` en `src/lib/permisos/catalogo.ts` (módulo `crm-dropshippers`): 8 pestañas (bandeja, tareas, plantillas, borrados, casos, motivos,
   ranking, vínculos; cada página usa `requirePestana`), 6 acciones (`responder`, `archivos`, `notas`, `pasar-area`, `tomar`, `resolver`) y el alcance

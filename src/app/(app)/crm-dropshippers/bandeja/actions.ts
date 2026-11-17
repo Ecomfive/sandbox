@@ -26,6 +26,7 @@ import { obtenerDatosCrm } from "../datos-crm";
 import type { FilaCaso, FilaDropshipper } from "../def-crm";
 import { areasDe, cargarBandeja, cargarConversacion, conversacionPermitida, usuarioBandeja, type DatosBandeja, type MensajeVista, type ResumenDropshipper, type VistaPreviaMensaje } from "./datos-bandeja";
 import { accionBandejaBloqueada, soloSuyosYLibres } from "@/lib/crm/permisos-bandeja";
+import { avisarPaseDeArea } from "@/lib/crm/aviso-pase-area";
 
 /** WhatsApp acepta hasta 4096 caracteres por mensaje de texto. */
 const MAX_TEXTO = 4096;
@@ -333,6 +334,33 @@ export async function pasarConversacionDeArea(id: string, area: string): Promise
     autor_nombre: autor,
   });
   await registrarAuditoria({ accion: "pasar_area_whatsapp", entidad: "whatsapp_conversaciones", entidadId: id, detalle: `${NOMBRE_AREA[c.area]} → ${NOMBRE_AREA[destino]}` });
+  // El aviso a quienes tienen esa área como suya (17 nov 2026, pedido de Hernán: que Comercial se entere cuando Atención le pasa un chat).
+  const { data: chat } = await supabase.from("whatsapp_conversaciones").select("nombre_perfil, dropshippers(nombre)").eq("id", id).maybeSingle();
+  const ds = chat?.dropshippers as { nombre: string } | { nombre: string }[] | null | undefined;
+  const nombreChat = (Array.isArray(ds) ? ds[0]?.nombre : ds?.nombre) ?? (chat?.nombre_perfil as string | null) ?? "un dropshipper";
+  await avisarPaseDeArea(supabase, { conversacionId: id, nombreChat, desde: NOMBRE_AREA[c.area], hacia: destino, nombreHacia: NOMBRE_AREA[destino], autorId: u.id, autorNombre: autor });
+  await avisarBandeja();
+  return { ok: true };
+}
+
+/**
+ * Archiva un chat o lo saca del archivo (17 nov 2026, pedido de Hernán para Comercial; migración 0311). Archivado no sale en las listas ni en el
+ * tablero, solo en «Archivadas», y queda resuelto; cuando el cliente vuelve a escribir, sale solo del archivo (`whatsapp_registrar_entrante`).
+ * Lo puede hacer quien puede marcar resuelto (lo afinado: «resolver»).
+ */
+export async function archivarConversacion(id: string, archivar: boolean): Promise<{ ok: true } | { error: string }> {
+  const u = await usuarioBandeja(true);
+  if (!u) return { error: "No tienes permiso para escribir en el CRM." };
+  const bloqueo = accionBandejaBloqueada(u, "resolver");
+  if (bloqueo) return { error: bloqueo };
+  const supabase = createServiceClient();
+  if (!(await conversacionPermitida(supabase, id, u, true))) return { error: "Esa conversación no existe o no es de tu área." };
+  const cambios = archivar
+    ? { archivada_en: new Date().toISOString(), archivada_por: u.id, estado: "resuelta", no_leidos: 0 }
+    : { archivada_en: null, archivada_por: null };
+  const { error } = await supabase.from("whatsapp_conversaciones").update(cambios).eq("id", id);
+  if (error) return { error: /archivada/i.test(error.message) ? "Falta correr la migración 0311 (archivar chats) en la base." : "No se pudo cambiar." };
+  await registrarAuditoria({ accion: archivar ? "archivar_chat_whatsapp" : "desarchivar_chat_whatsapp", entidad: "whatsapp_conversaciones", entidadId: id });
   await avisarBandeja();
   return { ok: true };
 }

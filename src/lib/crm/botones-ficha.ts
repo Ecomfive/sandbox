@@ -10,6 +10,7 @@ export const BOTONES_FICHA = [
   "whatsapp",
   "tomar",
   "resuelta",
+  "archivar",
   "interno",
   "tarea",
   "caso",

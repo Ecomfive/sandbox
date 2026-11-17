@@ -28,7 +28,7 @@ const ETIQUETA_ACCION: Record<AccionBandeja, string> = {
   notas: "dejar notas privadas",
   "pasar-area": "pasar chats a otra área",
   tomar: "tomar, soltar o intervenir chats",
-  resolver: "marcar chats resueltos o reabrirlos",
+  resolver: "marcar chats resueltos, archivarlos o reabrirlos",
 };
 
 type ConAfinado = { afinado?: Record<string, Afinado> };
