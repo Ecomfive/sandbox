@@ -65,7 +65,6 @@ export function VistaLlegada({
             </>
           ) : null}
         </dl>
-        {!puerto && !puedePagar && verMontos && t.pendientes > 0 && <p className="m-0 text-sm text-muted-foreground">Es para que sepas lo que se debe pagar: el pago lo registra quien gestiona Compras.</p>}
         {!puerto && puedePagar && verMontos && t.pendientes > 0 && <PagoTotal llegadaId={llegadaId} compras={t.pendientes} monto={t.porPagar} sinMonto={t.sinMonto} hoy={hoy} />}
       </header>
 
