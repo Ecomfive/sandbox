@@ -117,7 +117,9 @@ export async function crearRetiro(formData: FormData) {
   const plataforma_id = formData.get("plataforma_id") as string;
   const cuenta_retiro_id = (formData.get("cuenta_retiro_id") as string) || null;
   const monto = Number(formData.get("monto"));
-  const comisionTexto = String(formData.get("comision") ?? "").trim();
+  // Retiro fallido (17 nov 2026, migración 0309): el envío se canceló pero cobraron la comisión; todo el monto es comisión y no se recibe nada.
+  const soloComision = formData.get("solo_comision") === "1";
+  const comisionTexto = soloComision ? String(monto) : String(formData.get("comision") ?? "").trim();
   const comision = Number(comisionTexto);
   // Lo que la ficha ya exige (cuenta elegida y monto mayor a cero): se vuelve a comprobar aquí porque un server action se puede invocar sin pasar por la
   // ficha. La comisión es opcional (14 nov 2026): vacía queda en 0 y al conciliar sale de lo recibido.
@@ -160,6 +162,7 @@ export async function crearRetiro(formData: FormData) {
           fecha_limite,
           gestionado_por,
           estado: "abierto",
+          ...(soloComision ? { solo_comision: true } : {}),
         })
         .select("id, numero_correlativo")
         .single(),
@@ -169,12 +172,12 @@ export async function crearRetiro(formData: FormData) {
   if (error || !data) throw new Error(error?.message ?? "No se pudo crear el retiro");
 
   const correlativoFinal = Number(data.numero_correlativo);
-  await registrarEvento(supabase, data.id, `Retiro creado por ${(await formatoDelPais(supabase, pais_id))(monto)}`);
+  await registrarEvento(supabase, data.id, `Retiro creado por ${(await formatoDelPais(supabase, pais_id))(monto)}${soloComision ? " · retiro fallido: solo se cobró la comisión" : ""}`);
   await registrarAuditoria({
     accion: "crear_retiro",
     entidad: "retiros",
     entidadId: data.id,
-    detalle: `correlativo=${correlativoFinal} monto=${monto.toFixed(2)} comision=${comision.toFixed(2)} a_recibir=${a_recibir.toFixed(2)}`,
+    detalle: `correlativo=${correlativoFinal} monto=${monto.toFixed(2)} comision=${comision.toFixed(2)} a_recibir=${a_recibir.toFixed(2)}${soloComision ? " solo_comision" : ""}`,
   });
 
   revalidatePath("/retiros");

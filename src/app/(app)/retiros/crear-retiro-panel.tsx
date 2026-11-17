@@ -76,6 +76,8 @@ export function CrearRetiroPanel({
   const [comisionValor, setComisionValor] = useState("");
   const [comisionPorcentaje, setComisionPorcentaje] = useState("");
   const [comisionManual, setComisionManual] = useState(false);
+  // Retiro fallido (17 nov 2026): el envío se canceló pero cobraron la comisión; todo el monto es comisión y A recibir queda en 0.
+  const [soloComision, setSoloComision] = useState(false);
   const [cuentaSeleccionadaId, setCuentaSeleccionadaId] = useState("");
   const [fechaLimite, setFechaLimite] = useState("");
   // La fecha de creación arranca en hoy y se puede cambiar para registrar un retiro que ya se había pedido (nunca una fecha futura).
@@ -151,7 +153,7 @@ export function CrearRetiroPanel({
   }
 
   const montoNum = parseFloat(monto) || 0;
-  const comisionNum = parseFloat(comisionValor) || 0;
+  const comisionNum = soloComision ? parseFloat(monto) || 0 : parseFloat(comisionValor) || 0;
   // "A recibir" ya no se edita a mano: siempre es monto menos comisión (ver crearRetiro()).
   const montoNeto = montoNum - comisionNum;
 
@@ -314,6 +316,14 @@ export function CrearRetiroPanel({
             </Seccion>
 
             <Seccion icono={GastoIcon} titulo="Montos">
+              <label className="mb-3 flex items-start gap-2 rounded-lg border border-border px-3 py-2 text-sm">
+                <input type="checkbox" checked={soloComision} onChange={(e) => setSoloComision(e.target.checked)} className="mt-0.5 h-4 w-4" />
+                <span>
+                  Retiro fallido: solo se cobró la comisión
+                  <span className="block text-xs text-muted-foreground">El envío se canceló pero la plataforma cobró la comisión. Escribe en Monto lo que cobraron: todo es comisión y A recibir queda en 0.</span>
+                </span>
+              </label>
+              {soloComision && <input type="hidden" name="solo_comision" value="1" />}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="flex min-w-0 flex-col gap-1">
                   <label className={labelClassSm} htmlFor="campo-monto">
@@ -361,7 +371,7 @@ export function CrearRetiroPanel({
                     />
                   </div>
                 </div>
-                <div className="sm:col-span-2">
+                <div className={`sm:col-span-2 ${soloComision ? "hidden" : ""}`}>
                   {/* Opcional (14 nov 2026, pedido de Hernán): al crear no se sabe cuánto cobrarán; si se deja vacía, al conciliar sale de lo recibido. */}
                   <p className={labelClassSm} id="etiqueta-comision">
                     Comisión <span className="font-normal text-muted-foreground">(opcional: si no la sabes, se calcula al conciliar)</span>

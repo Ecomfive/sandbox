@@ -41,6 +41,8 @@ import { VistaRapidaRetiro } from "./vista-rapida-retiro";
 
 export interface FilaRetiro {
   id: string;
+  /** Retiro fallido: solo se cobró la comisión (migración 0309). */
+  soloComision?: boolean;
   numeroCorrelativo: number;
   consolidado: boolean;
   fecha: string;
@@ -144,7 +146,14 @@ function renderCelda(id: ColumnaId, fila: FilaRetiro, codigoPais: string, alAbri
     case "destino":
       return fila.destino;
     case "monto":
-      return formatearMoneda(fila.monto, codigoPais);
+      return fila.soloComision ? (
+        <span className="inline-flex items-center gap-1.5">
+          {formatearMoneda(fila.monto, codigoPais)}
+          <Badge tone="warning">Solo comisión</Badge>
+        </span>
+      ) : (
+        formatearMoneda(fila.monto, codigoPais)
+      );
     case "consolidado": {
       const { texto, tono } = estadoConsolidacion(fila);
       return <Badge tone={tono}>{texto}</Badge>;

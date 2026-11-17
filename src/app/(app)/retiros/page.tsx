@@ -28,7 +28,7 @@ function consultarRetiros(supabase: ReturnType<typeof createServiceClient>, pais
   return supabase
     .from("retiros")
     .select(
-      `${COLUMNAS_RETIROS}, fecha_rechazo, fecha_aprobado, fecha_cancelado_dropi, fecha_novedad, fecha_recibido, novedad_resuelta`
+      `${COLUMNAS_RETIROS}, fecha_rechazo, fecha_aprobado, fecha_cancelado_dropi, fecha_novedad, fecha_recibido, novedad_resuelta, solo_comision`
     )
     .eq("pais_id", paisId)
     .order("fecha", { ascending: false })
@@ -136,6 +136,7 @@ export default async function RetirosPage() {
     montoRecibido: r.monto_recibido === null ? null : Number(r.monto_recibido),
     fechaRecibido: (r as { fecha_recibido?: string | null }).fecha_recibido ?? null,
     novedadResuelta: (r as { novedad_resuelta?: boolean | null }).novedad_resuelta === true,
+    soloComision: (r as { solo_comision?: boolean | null }).solo_comision === true,
     fechaCierre: r.fecha_cierre,
     fechaLimite: r.fecha_limite,
     asignadoNombre: r.asignado_a ? (nombrePerfil.get(r.asignado_a) ?? "Usuario inactivo") : null,
