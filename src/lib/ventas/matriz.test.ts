@@ -198,3 +198,10 @@ test("Reportería (0310): las columnas de administración salen tal cual, los mo
   assert.equal(o.costo_envio, 8.25);
   assert.equal(o.mes_gestion, "NOVIEMBRE");
 });
+
+test("un monto de envío que en realidad es una fecha (serie de Excel) no suma millones", () => {
+  const { ordenes } = leerMatriz([T, fila({ "N° Orden": "#300", "TOTAL VENTA": 20, "NOMBRE PRODUCTO": "Inventado", "MONTO ENVIO": 46323, "MONTO ENVIO SE": 4.5 })]);
+  assert.equal(ordenes[0].costo_envio, 4.5);
+  assert.equal(ordenes[0].matriz?.monto_envio, null);
+  assert.equal(ordenes[0].matriz?.monto_envio_se, 4.5);
+});

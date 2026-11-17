@@ -27,6 +27,8 @@ test("el estado de la Matriz se compara con el del sistema solo cuando dice algo
   assert.equal(difiereDeMatriz("entregada", "Entregado"), false);
   assert.equal(difiereDeMatriz("devuelta", "Entregado"), true);
   assert.equal(difiereDeMatriz("cancelada", "Anulado"), false);
+  assert.equal(difiereDeMatriz("no_gestionada", "Anulado"), false);
+  assert.equal(difiereDeMatriz("cancelada", "Devolución"), true);
   assert.equal(difiereDeMatriz("en_transito", null), false);
   assert.equal(difiereDeMatriz("en_transito", "  "), false);
 });
@@ -52,4 +54,11 @@ test("lo editado a mano se limpia antes de guardarse", () => {
   assert.equal(valorEditado(editablePorColumna("facturado")!, "sí").ok, false);
   assert.equal(editablePorColumna("estado_entrega"), null);
   assert.ok(EDITABLES.every((e) => e.columna !== "estado_entrega" && e.columna !== "total"));
+});
+
+test("las filas compactas vuelven a ser las mismas", async () => {
+  const { compactarFilas, expandirFilas } = await import("./reporteria");
+  const filas = [f({}), f({ id: "o2:1", ordenId: "o2", venta: null, editadas: ["verificado"] })];
+  assert.deepEqual(expandirFilas(compactarFilas(filas)), filas);
+  assert.deepEqual(expandirFilas(compactarFilas([])), []);
 });

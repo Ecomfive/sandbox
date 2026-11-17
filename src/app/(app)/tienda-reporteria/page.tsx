@@ -3,6 +3,7 @@ import { Pagina } from "@/components/ui/pagina";
 import { requireModulo } from "@/lib/auth";
 import { getPaisActual } from "@/lib/pais";
 import { createServiceClient } from "@/lib/supabase/server";
+import { compactarFilas } from "@/lib/ventas/reporteria";
 import { cargarReporteria, mesesReporteria, movimientosReporteria, SIN_MIGRACION_REPORTERIA, tiendasReporteria } from "@/lib/ventas/reporteria-datos";
 import { Reporteria } from "./reporteria";
 
@@ -48,7 +49,7 @@ export default async function ReporteriaPage({ searchParams }: { searchParams: P
         </p>
       )}
       <Reporteria
-        filas={filas}
+        filas={compactarFilas(filas)}
         tiendas={tiendas}
         tiendaId={tienda?.id ?? null}
         mes={mes}

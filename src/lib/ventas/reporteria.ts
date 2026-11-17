@@ -114,12 +114,17 @@ export const ESTADO_REPORTERIA: Record<EstadoEntrega, string> = {
   no_gestionada: "No gestionado",
 };
 
-/** Si el estado del sistema y el que anotó la Matriz dicen cosas distintas (para que administración lo revise). */
+/**
+ * Si el estado del sistema y el que anotó la Matriz dicen cosas distintas (para que administración lo revise). «Anulado» en la Matriz vale tanto
+ * para lo cancelado como para lo que nunca se gestionó (no salió): eso no es una diferencia.
+ */
 export function difiereDeMatriz(estado: EstadoEntrega, estadoMatriz: string | null): boolean {
   const m = (estadoMatriz ?? "").trim().toUpperCase();
   if (!m) return false;
-  const deMatriz = m.startsWith("ENTREG") ? "entregada" : m.startsWith("DEVOL") ? "devuelta" : m.startsWith("ANUL") || m.startsWith("CANCEL") ? "cancelada" : null;
-  return deMatriz !== null && deMatriz !== estado;
+  if (m.startsWith("ENTREG")) return estado !== "entregada";
+  if (m.startsWith("DEVOL")) return estado !== "devuelta";
+  if (m.startsWith("ANUL") || m.startsWith("CANCEL")) return estado !== "cancelada" && estado !== "no_gestionada";
+  return false;
 }
 
 export interface ResumenReporteria {
@@ -202,4 +207,22 @@ export function resumirParaFinanzas(filas: FilaReporteria[]): FilaFinanzas[] {
   return [...por.values()]
     .map(({ _ordenes, _entregadas, ...x }) => ({ ...x, pedidos: _ordenes.size, entregados: _entregadas.size, ventas: r2(x.ventas), costo: r2(x.costo), envio: r2(x.envio), margen: r2(x.ventas - x.costo - x.envio) }))
     .sort((a, b) => b.pedidos - a.pedidos);
+}
+
+/**
+ * Las filas en forma compacta para mandarlas al navegador (17 nov 2026): los nombres de los campos una sola vez y después solo los valores. Un mes de
+ * todas las tiendas pasaba de 10 MB con los nombres repetidos en cada fila.
+ */
+export interface FilasCompactas {
+  campos: (keyof FilaReporteria)[];
+  valores: unknown[][];
+}
+
+export function compactarFilas(filas: FilaReporteria[]): FilasCompactas {
+  const campos = (filas[0] ? Object.keys(filas[0]) : []) as (keyof FilaReporteria)[];
+  return { campos, valores: filas.map((f) => campos.map((c) => f[c])) };
+}
+
+export function expandirFilas({ campos, valores }: FilasCompactas): FilaReporteria[] {
+  return valores.map((v) => Object.fromEntries(campos.map((c, i) => [c, v[i]])) as unknown as FilaReporteria);
 }

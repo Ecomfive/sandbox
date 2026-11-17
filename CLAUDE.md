@@ -2700,7 +2700,9 @@ convenciones técnicas del código.
   ya anotó y no deja volver atrás un pedido cerrado) y vuelven a tomar el producto unido (`aplicarVinculosDeOrdenes`). La usan el botón «Actualizar desde la
   Matriz» (`importar-matriz.tsx`, lee el .xlsx en el navegador con `leerVentas`), el importador de Ventas por tienda y el script
   `scripts/finanzas/importar-ventas.ts <archivo.xlsx> --aplicar --reporteria`. `leerMatriz` lee además las columnas nuevas (`ExtrasMatriz`; un título que
-  termina en «*» en `ENCABEZADOS` vale por prefijo, para «FECHA- DEVOLUCION/CAMBIOS/…»). «Difiere de la Matriz» (`difiereDeMatriz`) compara el estado del
+  termina en «*» en `ENCABEZADOS` vale por prefijo, para «FECHA- DEVOLUCION/CAMBIOS/…»). Montos de envío, cambio y delivery de más de
+  `MAX_MONTO_ENVIO` ($500) se ignoran: en ClickSi esas celdas traían fechas (serie de Excel 46 323) y sumaban millones de envío. «VERIFICADO» no es un «OK» de
+  entregado (en agosto ningún entregado lo tiene; en octubre trae «SERVIENTREGA», «ENTREGADO 9-10»…): no hay tarjeta «Por verificar». «Difiere de la Matriz» (`difiereDeMatriz`) compara el estado del
   sistema con `estado_matriz`. «Lo que pasa a Ventas por tienda» es `resumirParaFinanzas` (misma regla que `ven_resumen_mensual`).
 - **Chat de WhatsApp del cliente en Pedidos de tienda, con iComfly** (13 nov 2026, pedido de Hernán; prototipo aprobado): el WhatsApp de los clientes de cada
   tienda lo atiende el bot de **iComfly** (cada tienda, su número); 360dialog sigue siendo solo de la proveeduría (CRM). **Sin apartado propio** (Hernán lo pidió

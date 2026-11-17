@@ -9,7 +9,7 @@ import { TablaDatos, type ColumnaTabla } from "@/components/tabla/tabla-datos";
 import { anilloFoco } from "@/components/ui/field";
 import { Ventana } from "@/components/ui/ventana";
 import { formatearMoneda } from "@/lib/formato";
-import { AlertaIcon, CalendarioIcon, CerrarIcon, CheckIcon, DeshacerIcon, EnvioIcon, InventarioIcon, MargenIcon, PedidoIcon, TiendaIcon } from "@/lib/nav-icons";
+import { AlertaIcon, CalendarioIcon, CerrarIcon, DeshacerIcon, EnvioIcon, InventarioIcon, MargenIcon, PedidoIcon, TiendaIcon } from "@/lib/nav-icons";
 import { SIN_VALOR, type DefTabla } from "@/lib/tabla/motor";
 import type { NombreFilas } from "@/lib/tabla/pie";
 import {
@@ -17,10 +17,12 @@ import {
   ESTADO_REPORTERIA,
   FILTROS_RAPIDOS,
   difiereDeMatriz,
+  expandirFilas,
   resumirParaFinanzas,
   resumirReporteria,
   type CampoEditable,
   type FilaReporteria,
+  type FilasCompactas,
 } from "@/lib/ventas/reporteria";
 import type { Movimiento, TiendaReporteria } from "@/lib/ventas/reporteria-datos";
 import { editarCampoReporteria } from "./actions";
@@ -303,10 +305,8 @@ const RAPIDOS: { id: keyof typeof FILTROS_RAPIDOS | "todos"; titulo: string; det
   { id: "devoluciones", titulo: "Devoluciones", detalle: "volvieron", icono: DeshacerIcon, color: "rojo" },
   { id: "anulados", titulo: "Anulados", detalle: "cancelados", icono: CerrarIcon, color: "rojo" },
   { id: "sinEstado", titulo: "Sin estado", detalle: "en camino o por gestionar", icono: EnvioIcon, color: "violeta" },
-  { id: "porVerificar", titulo: "Por verificar", detalle: "entregados sin «OK»", icono: CheckIcon, color: "ambar" },
-  { id: "sinMesCobro", titulo: "Sin mes de cobro", detalle: "entregados", icono: CalendarioIcon, color: "ambar" },
   { id: "sinFacturar", titulo: "Sin facturar", detalle: "entregados", icono: MargenIcon, color: "ambar" },
-  { id: "difieren", titulo: "Difiere de la Matriz", detalle: "el estado no coincide", icono: AlertaIcon, color: "ambar" },
+  { id: "difieren", titulo: "Difiere de la Matriz", detalle: "el estado no coincide: revisar", icono: AlertaIcon, color: "ambar" },
 ];
 const CLAVE_RESUMEN: Record<string, keyof ReturnType<typeof resumirReporteria>> = {
   todos: "pedidos",
@@ -324,7 +324,7 @@ const etiquetaMes = (m: string) => new Date(`${m}-15T12:00:00Z`).toLocaleDateStr
 const NOMBRE_CAMPO = new Map(EDITABLES.map((e) => [e.columna, e.etiqueta]));
 
 export function Reporteria({
-  filas: inicial,
+  filas: compactas,
   tiendas,
   tiendaId,
   mes,
@@ -333,7 +333,8 @@ export function Reporteria({
   codigoPais,
   puedeEscribir,
 }: {
-  filas: FilaReporteria[];
+  /** En forma compacta (`compactarFilas`): un mes de todas las tiendas pesa mucho menos así. */
+  filas: FilasCompactas;
   tiendas: TiendaReporteria[];
   tiendaId: string | null;
   mes: string;
@@ -343,6 +344,7 @@ export function Reporteria({
   puedeEscribir: boolean;
 }) {
   const router = useRouter();
+  const inicial = useMemo(() => expandirFilas(compactas), [compactas]);
   const [filas, setFilas] = useState(inicial);
   const [movimientos, setMovimientos] = useState(movInicial);
   const [base, setBase] = useState(inicial);

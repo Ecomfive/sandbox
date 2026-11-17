@@ -60,33 +60,33 @@ export async function cargarReporteria(
     traerTodasLasFilas<Orden>((d, h) =>
       supabase.from("ven_ordenes").select(cols).in("unidad_id", unidades).eq("periodo", periodo).order("fecha", { ascending: false }).order("numero", { ascending: false }).range(d, h) as unknown as PromiseLike<{ data: Orden[] | null; error: unknown }>,
     );
-  let faltaMigracion = false;
-  let ordenes: Orden[];
-  try {
-    ordenes = await leer(`${COLS_BASE}, ${COLS_0310}, ${COLS_REL}, provincia)`);
-  } catch {
-    faltaMigracion = true;
-    ordenes = await leer(`${COLS_BASE}, ${COLS_REL})`);
-  }
-
-  // El costo de Compras de cada línea (para las que la Matriz no trae «COSTO PRODUCTO») y lo editado a mano.
-  const costoCompras = new Map<string, number>();
-  const costos = await traerTodasLasFilas<{ orden_id: string; linea: number; costo: number | null; costo_fuente: string }>((d, h) =>
-    supabase.from("ven_lineas_costo").select("orden_id, linea, costo, costo_fuente").in("unidad_id", unidades).eq("periodo", periodo).order("orden_id").order("linea").range(d, h) as unknown as PromiseLike<{
-      data: { orden_id: string; linea: number; costo: number | null; costo_fuente: string }[] | null;
-      error: unknown;
-    }>,
-  ).catch(() => []);
-  for (const c of costos) if (c.costo !== null && c.costo_fuente === "costo_vigente") costoCompras.set(`${c.orden_id}:${c.linea}`, Number(c.costo));
-
-  const editadas = new Map<string, string[]>();
-  if (!faltaMigracion) {
-    const ids = ordenes.map((o) => o.id as string);
-    for (let i = 0; i < ids.length; i += 300) {
-      const { data } = await supabase.from("ven_orden_ediciones").select("orden_id, campo").in("orden_id", ids.slice(i, i + 300));
-      for (const e of data ?? []) editadas.set(e.orden_id as string, [...new Set([...(editadas.get(e.orden_id as string) ?? []), e.campo as string])]);
+  // Los pedidos, el costo de Compras de cada línea (para las que la Matriz no trae «COSTO PRODUCTO») y lo editado a mano, los tres a la vez.
+  const leerOrdenes = async (): Promise<{ ordenes: Orden[]; faltaMigracion: boolean }> => {
+    try {
+      return { ordenes: await leer(`${COLS_BASE}, ${COLS_0310}, ${COLS_REL}, provincia)`), faltaMigracion: false };
+    } catch {
+      return { ordenes: await leer(`${COLS_BASE}, ${COLS_REL})`), faltaMigracion: true };
     }
-  }
+  };
+  type Costo = { orden_id: string; linea: number; costo: number | null; costo_fuente: string };
+  const [{ ordenes, faltaMigracion }, costos, ediciones] = await Promise.all([
+    leerOrdenes(),
+    traerTodasLasFilas<Costo>((d, h) =>
+      supabase.from("ven_lineas_costo").select("orden_id, linea, costo, costo_fuente").in("unidad_id", unidades).eq("periodo", periodo).order("orden_id").order("linea").range(d, h) as unknown as PromiseLike<{ data: Costo[] | null; error: unknown }>,
+    ).catch(() => [] as Costo[]),
+    // Por el pedido (tienda y mes), en una sola consulta: de a 300 ids eran 26 viajes seguidos y la página tardaba 15 segundos.
+    supabase
+      .from("ven_orden_ediciones")
+      .select("orden_id, campo, ven_ordenes!inner(unidad_id, periodo)")
+      .in("ven_ordenes.unidad_id", unidades)
+      .eq("ven_ordenes.periodo", periodo)
+      .limit(20000)
+      .then((r) => (r.error ? [] : (r.data ?? []))),
+  ]);
+  const costoCompras = new Map<string, number>();
+  for (const c of costos) if (c.costo !== null && c.costo_fuente === "costo_vigente") costoCompras.set(`${c.orden_id}:${c.linea}`, Number(c.costo));
+  const editadas = new Map<string, string[]>();
+  for (const e of ediciones) editadas.set(e.orden_id as string, [...new Set([...(editadas.get(e.orden_id as string) ?? []), e.campo as string])]);
 
   const filas: FilaReporteria[] = [];
   for (const o of ordenes) {

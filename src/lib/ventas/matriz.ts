@@ -276,6 +276,15 @@ function fechaDe(v: Celda): string | null {
 
 /** Un número que en la Matriz también puede traer un estado escrito: solo vale si es número. */
 const numero = (v: Celda): number | null => (typeof v === "number" ? (Number.isFinite(v) ? v : null) : null);
+/**
+ * Un monto de envío, cambio o delivery (17 nov 2026): en esas columnas a veces se escribió una fecha, que Excel guarda como número (46 323 =
+ * 28/10/2026) y sumaba millones de envío en ClickSi. Más de $500 no es un envío: se ignora.
+ */
+export const MAX_MONTO_ENVIO = 500;
+const montoChico = (v: Celda): number | null => {
+  const n = numero(v);
+  return n !== null && n >= 0 && n <= MAX_MONTO_ENVIO ? n : null;
+};
 
 /** El teléfono como texto (a veces llega como número). */
 const telefono = (v: Celda): string | null => {
@@ -340,8 +349,8 @@ export function leerMatriz(
     const comp = complementos.get(llave);
     let formaPago = texto(p("forma_pago"));
     let courier = texto(p("courier"));
-    let costoRepartidor = Math.max(0, ...ls.map((l) => numero(celda(l, "monto_envio")) ?? 0));
-    const costoSe = Math.max(0, ...ls.map((l) => numero(celda(l, "monto_envio_se")) ?? 0));
+    let costoRepartidor = Math.max(0, ...ls.map((l) => montoChico(celda(l, "monto_envio")) ?? 0));
+    const costoSe = Math.max(0, ...ls.map((l) => montoChico(celda(l, "monto_envio_se")) ?? 0));
     // Monday solo completa lo que la Matriz todavía no dice (órdenes recientes).
     if (comp?.monday && !metodoDePago(formaPago) && !CANCELADO.test(normalizar(formaPago ?? "")) && comp.monday.pagado) {
       formaPago = comp.monday.formaPago ?? formaPago;
@@ -391,7 +400,7 @@ export function leerMatriz(
     };
     // Las columnas de administración (migración 0310): los montos, el mayor de las líneas (van en una sola); lo demás, de la línea principal.
     const mayor = (campo: Campo) => {
-      const ns = ls.map((l) => numero(celda(l, campo))).filter((n): n is number => n !== null && n >= 0);
+      const ns = ls.map((l) => montoChico(celda(l, campo))).filter((n): n is number => n !== null);
       return ns.length ? r2(Math.max(...ns)) : null;
     };
     const corto = (campo: Campo, max = 120) => texto(p(campo))?.slice(0, max) ?? null;
