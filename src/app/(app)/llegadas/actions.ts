@@ -5,7 +5,6 @@ import { registrarAuditoria } from "@/lib/auditoria";
 import { getUsuarioActual } from "@/lib/auth";
 import { hoyPanama } from "@/lib/af4/fecha";
 import { pagadoTrasSegundoPago, revisarPago } from "@/lib/compras/llegadas-avisos";
-import { destinatariosDe } from "@/lib/compras/llegadas-servidor";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { esUuid } from "@/lib/seguridad/ruta-almacen";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -15,15 +14,17 @@ import { campoOculto, restriccionesDe } from "../compras/permisos-compras";
 type Supabase = ReturnType<typeof createServiceClient>;
 type Usuario = NonNullable<Awaited<ReturnType<typeof getUsuarioActual>>>;
 
-/** La llegada (de bodega) y si la persona puede registrar pagos en ella: quien recibe el aviso de pagos, un administrador o quien modifica Compras y ve el segundo pago. Devuelve el error en palabras. */
+/**
+ * La llegada (de bodega) y si la persona puede registrar pagos en ella: un administrador o quien modifica Compras y ve el segundo pago (Francis). Quien recibe el aviso de En Bodega (María José) lo recibe para
+ * enterarse de lo que se debe pagar, no para registrarlo (17 nov 2026). Devuelve el error en palabras.
+ */
 async function autorizarPagos(supabase: Supabase, usuario: Usuario, llegadaId: string, compraIds: string[]): Promise<string | null> {
   const { data: llegada } = await supabase.from("compras_llegadas").select("id, tipo").eq("id", llegadaId).maybeSingle();
   if (!llegada) return "Esa llegada ya no existe.";
   if (llegada.tipo !== "bodega") return "Solo se paga en una llegada «En Bodega».";
-  const destinatarias = await destinatariosDe(supabase, "llegada_bodega");
   const comprasEscribe = usuario.modulos.includes("compras") && !usuario.modulosSoloLectura.includes("compras") && !campoOculto(restriccionesDe(usuario.afinado.compras), "pago2");
-  if (!destinatarias.includes(usuario.id) && !esAdministrador(usuario) && !comprasEscribe) return "Tu usuario no puede registrar este pago.";
-  if (!destinatarias.includes(usuario.id) && !esAdministrador(usuario)) {
+  if (!esAdministrador(usuario) && !comprasEscribe) return "Los pagos los registra quien gestiona Compras: tu usuario solo ve esta llegada.";
+  if (!esAdministrador(usuario)) {
     const sinAcceso = await sinAccesoACompras(compraIds, usuario);
     if (sinAcceso) return sinAcceso;
   }
