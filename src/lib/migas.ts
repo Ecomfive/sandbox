@@ -69,6 +69,7 @@ const SUBPAGINAS: Record<string, string> = {
   "/tesoreria/repartidores": "Repartidores",
   "/tesoreria/comisiones": "Costos de cobro",
   "/tesoreria/deuda": "Deuda",
+  "/tesoreria/grupo": "Préstamos del grupo",
   "/tesoreria/optimizar": "Optimizar deuda",
   "/tesoreria/refinanciamiento": "Refinanciamiento",
   "/tesoreria/covenants": "Covenants",

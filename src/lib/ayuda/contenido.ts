@@ -1220,6 +1220,16 @@ export const GUIAS: GuiaModulo[] = [
         ],
       },
       {
+        titulo: "Préstamos del grupo",
+        pasos: [
+          "Lleva lo que se prestan los países entre sí, lo que pone Alcides (por ejemplo, órdenes pagadas con su tarjeta) y los financiamientos de Ortoped&Co: cada movimiento dice quién debe, a quién, el monto, las órdenes de compra y cuándo vence.",
+          "Tipos: «Préstamo» (la plata que se recibió), «Costo financiero» (comisión o interés que cobra quien prestó) y «Abono» (lo que se devolvió). Los abonos pagan primero lo que vence antes.",
+          "«Quién le debe a quién» es el saldo neto de cada par (si los dos se deben, se resta). «Próximos vencimientos» lista lo pendiente con su fecha; lo vencido y lo que vence en 7 días sale como alerta en Tesorería y en el Panel.",
+          "El costo financiero del año se mide con su tasa efectiva anual: un 20 % cada 70 días equivale a cerca de 159 % al año.",
+          "Lo importado de ClickUp no se elimina: si algo está mal se corrige con otro movimiento. Para una empresa o persona nueva, «Agregar parte».",
+        ],
+      },
+      {
         titulo: "Optimizar deuda",
         pasos: [
           "Toma la caja que sobra sin bajar de la caja mínima en ninguna semana de la Proyección de caja (o el monto que escribas en «Caja para prepagar») y la reparte en avalancha: primero la deuda de mayor tasa efectiva anual neta de penalidad y comisión de prepago.",
@@ -2173,6 +2183,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-11-17", titulo: "Tesorería: préstamos del grupo", texto: "Nueva pestaña en Tesorería para llevar los préstamos entre Panamá, Costa Rica, México y Venezuela, lo que financia Alcides y los financiamientos de Ortoped&Co: quién le debe a quién (neto), vencimientos con alerta, abonos y el costo financiero del año con su tasa efectiva anual. Se cargan a mano o se importan las listas de ClickUp.", modulo: "tesoreria", href: "/tesoreria/grupo" },
   { fecha: "2026-11-16", titulo: "Respaldos verificados: se comprueba que se puedan restaurar", texto: "Panel › Respaldos ahora verifica cada respaldo: descarga cada archivo, lo descomprime y cuenta sus filas. Un punto verde dice que se puede restaurar. Hace falta correr la migración 0982.", modulo: "usuarios", href: "/panel-financiero/respaldos" },
   { fecha: "2026-11-16", titulo: "Conciliación: importar el estado de cuenta en PDF", texto: "En Conciliación bancaria › Importar ahora se puede subir el estado de cuenta en PDF: la IA lo lee, propone la cuenta y avisa si cuadra con los saldos del extracto antes de cargarlo. Necesita ANTHROPIC_API_KEY.", modulo: "conciliacion-bancaria", href: "/conciliacion-bancaria/importar" },
   { fecha: "2026-11-16", titulo: "Calendario fiscal: el ITBMS del mes estimado", texto: "El Calendario fiscal muestra arriba el ITBMS del mes anterior: débito de las ventas facturadas menos crédito de las compras con ITBMS cargado, lo que se paga o queda a favor, y cuántas compras no tienen el ITBMS cargado.", modulo: "cierre-mes", href: "/cierre-mes/calendario-fiscal" },

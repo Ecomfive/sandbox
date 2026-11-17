@@ -73,6 +73,8 @@ export const MODULO_DE_ENTIDAD: Record<string, string> = {
   fin_pagos_programados: "tesoreria",
   fin_lineas_credito: "tesoreria",
   fin_prestamos: "tesoreria",
+  fin_grupo_movimientos: "tesoreria",
+  fin_grupo_partes: "tesoreria",
   fin_financiamientos_ciclo: "tesoreria",
   fin_ofertas_refinanciamiento: "tesoreria",
   fin_covenants: "tesoreria",

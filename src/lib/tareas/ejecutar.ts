@@ -22,6 +22,8 @@ import { alertasPauta, mesPrevio } from "../finanzas/pauta";
 import { cargarPresupuestoVigente, cargarRealPorUnidad } from "../finanzas/cargar-presupuesto";
 import { serieDeLineas } from "../finanzas/presupuesto";
 import { ANOMALIA_VENTANA, desviosPresupuesto, gastosAnomalos, mesesAntes } from "../finanzas/desvios";
+import { cargarPrestamosGrupo } from "../finanzas/cargar-prestamos-grupo";
+import { pendientes } from "../finanzas/prestamos-grupo";
 import type { Seccion } from "../finanzas/eerr";
 import { generarRecurrentes, textoRecurrentes } from "../finanzas/recurrentes-servidor";
 import { alertasDePosicion, cargarPosicion } from "../finanzas/cargar-tesoreria";
@@ -208,10 +210,41 @@ async function tareaAlertas(c: Contexto): Promise<Resultado> {
   // Presupuesto contra real y gastos fuera de lo normal (migración 0980).
   const dv = await generarAlertasDesvios(c.supabase, c.hoy);
   const des = "error" in dv ? ` Desvíos: ${dv.error}` : ` Desvíos: ${dv.presupuesto} contra el presupuesto, ${dv.anomalias} gastos fuera de lo normal.`;
-  return { resumen: `${r.activas} alertas activas (${r.nuevas} nuevas), ${r.resueltas} resueltas. Evaluado: ${r.evaluados.join(", ") || "nada"}.${fiscal}${tes}${pau}${cov}${rie}${des}` };
+  // Préstamos del grupo (migración 0983): lo vencido o por vencer entre países, socios y financistas.
+  const pg = await generarAlertasPrestamosGrupo(c.supabase, c.hoy);
+  const gru = "error" in pg ? ` Préstamos del grupo: ${pg.error}` : ` Préstamos del grupo: ${pg.vencidos} vencidos, ${pg.porVencer} por vencer.`;
+  return { resumen: `${r.activas} alertas activas (${r.nuevas} nuevas), ${r.resueltas} resueltas. Evaluado: ${r.evaluados.join(", ") || "nada"}.${fiscal}${tes}${pau}${cov}${rie}${des}${gru}` };
 }
 
 const usdCorto = (v: number) => `US$${Math.round(v).toLocaleString("en-US")}`;
+
+/**
+ * Lo pendiente de los préstamos del grupo (después de aplicar los abonos) vencido = crítica, que vence en 7 días = aviso.
+ * Una alerta por préstamo o costo, con clave «grupo:<id>»; lo que se paga se resuelve solo.
+ */
+export async function generarAlertasPrestamosGrupo(supabase: SupabaseClient, hoy: string): Promise<{ error: string } | { vencidos: number; porVencer: number }> {
+  const datos = await cargarPrestamosGrupo(supabase);
+  if (!datos) return { error: "falta correr la migración 0983." };
+  const nombre = new Map(datos.partes.map((p) => [p.id, p.nombre]));
+  const nuevas: AlertaNueva[] = pendientes(datos.movs, hoy)
+    .filter((p) => p.estado === "vencido" || p.estado === "por_vencer")
+    .map((p) => {
+      const cuando = p.dias! < 0 ? `venció hace ${-p.dias!} días` : p.dias === 0 ? "vence hoy" : `vence en ${p.dias} días`;
+      const ordenes = p.ordenes.length ? ` (${p.ordenes.join(", ")})` : "";
+      return {
+        clave: `grupo:${p.id}`,
+        tipo: "prestamo_grupo_vence" as const,
+        severidad: p.estado === "vencido" ? ("critica" as const) : ("aviso" as const),
+        mensaje: `${nombre.get(p.deudorId) ?? "—"} le debe a ${nombre.get(p.acreedorId) ?? "—"}: ${usdCorto(p.pendiente)} ${cuando} · ${p.concepto}${ordenes}`.slice(0, 480),
+        enlace: DEF_ALERTA.prestamo_grupo_vence.href,
+        modulo: DEF_ALERTA.prestamo_grupo_vence.modulo,
+        monto: p.pendiente,
+      };
+    });
+  const r = await guardarAlertas(supabase, nuevas, ["prestamo_grupo_vence"]);
+  if ("error" in r) return { error: /check|tipo/i.test(r.error) ? "falta correr la migración 0983." : r.error };
+  return { vencidos: nuevas.filter((n) => n.severidad === "critica").length, porVencer: nuevas.filter((n) => n.severidad === "aviso").length };
+}
 
 /**
  * El último mes cerrado: cada sección del EERR contra el presupuesto vigente del año (escenario base) y cada tipo de gasto

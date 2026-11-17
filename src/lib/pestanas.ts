@@ -140,6 +140,7 @@ export const PESTANAS_POR_MODULO: Record<string, Pestana[]> = {
     { etiqueta: "Repartidores", href: "/tesoreria/repartidores" },
     { etiqueta: "Costos de cobro", href: "/tesoreria/comisiones" },
     { etiqueta: "Deuda", href: "/tesoreria/deuda" },
+    { etiqueta: "Préstamos del grupo", href: "/tesoreria/grupo" },
     { etiqueta: "Optimizar deuda", href: "/tesoreria/optimizar" },
     { etiqueta: "Refinanciamiento", href: "/tesoreria/refinanciamiento" },
     { etiqueta: "Covenants", href: "/tesoreria/covenants" },
