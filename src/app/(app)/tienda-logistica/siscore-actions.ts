@@ -1,5 +1,6 @@
 "use server";
 
+import { soloSinLimite } from "@/lib/tienda/acceso";
 import { revalidatePath } from "next/cache";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { getPaisActual } from "@/lib/pais";
@@ -64,6 +65,10 @@ export async function lecturasSiscoreEnCurso(): Promise<LecturaEnCurso[]> {
   } catch {
     return [];
   }
+  // Leer SISCORE es del equipo de Ecomfive (17 nov 2026): quien tiene tiendas limitadas no ve las lecturas de otras tiendas.
+  if (await soloSinLimite()) {
+    return [];
+  }
   return (await lecturasVivas(createServiceClient())) ?? [];
 }
 
@@ -73,6 +78,8 @@ export async function lecturasSiscoreEnCurso(): Promise<LecturaEnCurso[]> {
  * Da la dirección firmada donde la extensión sube lo leído. Solo quien puede modificar Logística de tienda.
  */
 export async function empezarLecturaSiscore(clienteSesion: string | null, tiendaElegida: string | null): Promise<{ id: string; tienda: string | null; subida: { siscore: string } } | { error: string }> {
+  const limite = await soloSinLimite();
+  if (limite) return { error: limite };
   let u;
   try {
     u = await requireModuloEscritura("tienda-logistica");
@@ -108,6 +115,7 @@ export async function empezarLecturaSiscore(clienteSesion: string | null, tienda
 
 /** El avance de una lectura (guías con su rastreo leídas de cuántas): lo manda la pantalla que lee, para que cualquiera vea el porcentaje. */
 export async function avanceLecturaSiscore(id: string, hechos: number, total: number): Promise<{ ok: true }> {
+  if (await soloSinLimite()) return { ok: true };
   try {
     await requireModuloEscritura("tienda-logistica");
   } catch {
@@ -125,6 +133,8 @@ export async function avanceLecturaSiscore(id: string, hechos: number, total: nu
  * el grupo de su estado, las visitas sin entregar, cuándo se entregó y el rastreo. Borra el archivo temporal.
  */
 export async function procesarLecturaSiscore(id: string): Promise<{ guias: number; conPedido: number; cliente: string } | { error: string }> {
+  const limite = await soloSinLimite();
+  if (limite) return { error: limite };
   try {
     await requireModuloEscritura("tienda-logistica");
   } catch {
@@ -205,6 +215,7 @@ export async function procesarLecturaSiscore(id: string): Promise<{ guias: numbe
 
 /** La lectura falló en la pestaña de SISCORE (sesión vencida, SISCORE no respondió…): queda anotada con el motivo. */
 export async function fallarLecturaSiscore(id: string, motivo: string): Promise<{ ok: true }> {
+  if (await soloSinLimite()) return { ok: true };
   try {
     await requireModuloEscritura("tienda-logistica");
   } catch {

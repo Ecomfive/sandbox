@@ -1,5 +1,6 @@
 "use server";
 
+import { sinAccesoATiendas } from "@/lib/tienda/acceso";
 import { revalidatePath } from "next/cache";
 import { requireModuloEscritura } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -20,6 +21,11 @@ export async function vincularVariante(varianteId: string, skuId: string | null)
     if (!data) return { error: "Ese producto ya no existe." };
   }
   const { data: antes } = await supabase.from("tienda_variantes").select("tienda_id, sku, sku_maestro_id").eq("id", varianteId).maybeSingle();
+  // Solo variantes de las tiendas de la persona (17 nov 2026).
+  if (antes) {
+    const sinAcceso = await sinAccesoATiendas(supabase, [antes.tienda_id as string]);
+    if (sinAcceso) return { error: sinAcceso };
+  }
   const { error } = await supabase
     .from("tienda_variantes")
     .update({ sku_maestro_id: skuId, no_fisico: false, vinculado_por: skuId ? usuario.id : null, vinculado_en: skuId ? new Date().toISOString() : null })
@@ -46,6 +52,10 @@ export async function vincularVariantesEnBloque(pares: { varianteId: string; sku
   const skuIds = [...new Set(pares.map((p) => p.skuId))];
   const { data: existen } = await supabase.from("skus_maestros").select("id").in("id", skuIds);
   const validos = new Set((existen ?? []).map((x) => x.id as string));
+  // Solo variantes de las tiendas de la persona (17 nov 2026).
+  const { data: deVariantes } = await supabase.from("tienda_variantes").select("tienda_id").in("id", [...new Set(pares.map((p) => p.varianteId))]);
+  const sinAcceso = await sinAccesoATiendas(supabase, (deVariantes ?? []).map((v) => v.tienda_id as string));
+  if (sinAcceso) return { error: sinAcceso };
   const ahora = new Date().toISOString();
   let hechas = 0;
   const tiendas = new Set<string>();
@@ -77,6 +87,8 @@ export async function traerProductosShopify(tiendaId: string): Promise<{ error?:
   const { data: t } = await supabase.from("tiendas").select("id, nombre, estado").eq("id", tiendaId).maybeSingle();
   if (!t) return { error: "La tienda ya no existe." };
   if (t.estado !== "conectada") return { error: `${t.nombre} todavía no está conectada a Shopify.` };
+  const sinAcceso = await sinAccesoATiendas(supabase, [t.id as string]);
+  if (sinAcceso) return { error: sinAcceso };
   try {
     const r = await traerProductosTienda(supabase, { id: t.id as string, nombre: t.nombre as string });
     const lineas = await aplicarVinculosDeTienda(supabase, t.id as string);
@@ -95,6 +107,11 @@ export async function marcarNoFisico(varianteId: string, noFisico: boolean): Pro
   const usuario = await requireModuloEscritura("tienda-productos");
   if (!uuid(varianteId)) return { error: "Datos no válidos." };
   const supabase = createServiceClient();
+  const { data: v } = await supabase.from("tienda_variantes").select("tienda_id").eq("id", varianteId).maybeSingle();
+  if (v) {
+    const sinAcceso = await sinAccesoATiendas(supabase, [v.tienda_id as string]);
+    if (sinAcceso) return { error: sinAcceso };
+  }
   const { error } = await supabase
     .from("tienda_variantes")
     .update({ no_fisico: noFisico, sku_maestro_id: null, vinculado_por: noFisico ? usuario.id : null, vinculado_en: noFisico ? new Date().toISOString() : null })

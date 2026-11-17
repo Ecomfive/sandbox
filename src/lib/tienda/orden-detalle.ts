@@ -7,6 +7,8 @@ import { datosAsistente, evaluarAsistente, type Asistente } from "./asistente";
 import { costosDeProductos, cuentasDelPedido, type CostoProducto, type IngresosYCostos } from "./costos";
 import { hayFormaPagoEntrega, hayHoraDeShopify } from "./datos-finanzas";
 import { mismaTiendaUnidad } from "./ordenes-finanzas";
+import { cargarTiendasPermitidas } from "@/lib/finanzas/cargar-tiendas-permitidas";
+import { puedeVerUnidad } from "@/lib/finanzas/tiendas-permitidas";
 
 export interface OrdenFinanzas {
   numero: string | null;
@@ -138,6 +140,9 @@ export async function cargarOrdenTienda(supabase: SupabaseClient, id: string, pa
   const o = crudo as unknown as (OrdenFinanzas & { fin_unidades: unknown; costo_envio?: number | null; costo_envio_real?: number | null }) | null;
   const unidad = (o?.fin_unidades ?? null) as { nombre: string; pais_id: string; clase: string; tarifa_fulfillment: number | null } | null;
   if (!o || !unidad || unidad.clase !== "tienda" || unidad.pais_id !== paisId) return null;
+  // Solo pedidos de las tiendas de la persona (17 nov 2026): con tiendas limitadas, un pedido de otra tienda es como si no existiera.
+  const permitidas = await cargarTiendasPermitidas();
+  if (!puedeVerUnidad(permitidas, (o as { unidad_id?: string | null }).unidad_id ?? null)) return null;
   const [{ data: lineas }, { data: tiendasPais }, { data: cliente }, { data: notas }, eventos, entrega, postventa] = await Promise.all([
     supabase.from("ven_orden_lineas").select("linea, producto, cantidad, precio, es_servicio, sku_maestro_id, skus_maestros(codigo, nombre)").eq("orden_id", id).order("linea"),
     supabase.from("tiendas").select("nombre, dominio").eq("pais_id", paisId),
@@ -156,11 +161,12 @@ export async function cargarOrdenTienda(supabase: SupabaseClient, id: string, pa
   // Los otros pedidos del mismo cliente (por su teléfono normalizado), como en Mi Reto Digital: cuántos y cuántos se entregaron.
   const clave = (cliente as { telefono_clave?: string | null } | null)?.telefono_clave ?? null;
   const { data: otros } = clave
-    ? await supabase.from("ven_ordenes_clientes").select("orden_id, ven_ordenes(estado_entrega)").eq("telefono_clave", clave).neq("orden_id", id).limit(200)
+    ? await supabase.from("ven_ordenes_clientes").select("orden_id, ven_ordenes(estado_entrega, unidad_id)").eq("telefono_clave", clave).neq("orden_id", id).limit(200)
     : { data: [] };
-  const anteriores = (otros ?? []).map((x) => {
-    const r = (Array.isArray(x.ven_ordenes) ? x.ven_ordenes[0] : x.ven_ordenes) as { estado_entrega: string | null } | null;
-    return r?.estado_entrega ?? null;
+  // Con tiendas limitadas, solo los pedidos del cliente en sus tiendas: lo que compró en otra tienda no es de esa persona.
+  const anteriores = (otros ?? []).flatMap((x) => {
+    const r = (Array.isArray(x.ven_ordenes) ? x.ven_ordenes[0] : x.ven_ordenes) as { estado_entrega: string | null; unidad_id: string | null } | null;
+    return puedeVerUnidad(permitidas, r?.unidad_id ?? null) ? [r?.estado_entrega ?? null] : [];
   });
   const tiendaSistema = (tiendasPais ?? []).find((t) => mismaTiendaUnidad(t.nombre as string, unidad.nombre));
   const dominio = (tiendaSistema?.dominio as string | null | undefined) ?? null;
@@ -184,7 +190,8 @@ export async function cargarOrdenTienda(supabase: SupabaseClient, id: string, pa
   delete (orden as { unidad_id?: unknown }).unidad_id;
   const datosCliente: ClienteOrdenFinanzas & { telefono_clave?: string | null } = { ...((cliente ?? {}) as ClienteOrdenFinanzas & { telefono_clave?: string | null }) };
   delete datosCliente.telefono_clave;
-  const whatsapp = await whatsappDeCliente(supabase, (cliente as { telefono?: string | null } | null)?.telefono ?? null).catch(() => null);
+  // El chat del CRM es la bandeja de Ecomfive (de todas las tiendas y de los dropshippers): quien tiene tiendas limitadas no la ve.
+  const whatsapp = permitidas ? null : await whatsappDeCliente(supabase, (cliente as { telefono?: string | null } | null)?.telefono ?? null).catch(() => null);
   const unidadId = (o as { unidad_id?: string }).unidad_id ?? null;
   const ultimoDelCliente = whatsapp?.mensajes.filter((m) => m.entrante).at(-1)?.momento ?? null;
   const asistente = unidadId

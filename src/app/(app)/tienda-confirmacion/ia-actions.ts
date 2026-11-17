@@ -1,5 +1,6 @@
 "use server";
 
+import { soloSinLimite } from "@/lib/tienda/acceso";
 import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
@@ -36,6 +37,9 @@ const NOMBRE_INTERRUPTOR: Record<InterruptorConfirmacion, string> = { activa: "l
  */
 export async function cambiarInterruptor(campo: InterruptorConfirmacion, valor: boolean, clave?: string): Promise<Resultado> {
   const usuario = await requireModulo(MODULO);
+  // Es del país entero (17 nov 2026): quien tiene tiendas limitadas no lo cambia.
+  const limite = await soloSinLimite();
+  if (limite) return { error: limite };
   if (!(campo in COLUMNA)) return { error: "Interruptor no válido." };
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
@@ -250,6 +254,9 @@ export async function listarPalabrasZona(): Promise<{ palabras: PalabraZona[]; e
 
 export async function agregarPalabraZona(texto: string, resultado: Zona): Promise<Resultado> {
   const usuario = await requireModuloEscritura(MODULO);
+  // Es del país entero (17 nov 2026): quien tiene tiendas limitadas no lo cambia.
+  const limite = await soloSinLimite();
+  if (limite) return { error: limite };
   const mal = errorDeRegla(texto);
   if (mal) return { error: mal };
   if (!(ZONAS as string[]).includes(resultado)) return { error: "Elige si es de ciudad o del interior." };
@@ -268,6 +275,9 @@ export async function agregarPalabraZona(texto: string, resultado: Zona): Promis
 
 export async function eliminarPalabraZona(id: string): Promise<Resultado> {
   await requireModuloEscritura(MODULO);
+  // Es del país entero (17 nov 2026): quien tiene tiendas limitadas no lo cambia.
+  const limite = await soloSinLimite();
+  if (limite) return { error: limite };
   if (!UUID.test(String(id))) return { error: "Palabra no válida." };
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
@@ -312,6 +322,9 @@ export async function analizarPedidoAhora(ordenId: string): Promise<Resultado & 
 /** Analiza los confirmados de los últimos días que todavía no tienen análisis (hasta 5 por vez). */
 export async function analizarPendientesAhora(): Promise<Resultado & { analizadas?: number; pendientes?: number }> {
   const usuario = await requireModuloEscritura(MODULO);
+  // Es del país entero (17 nov 2026): quien tiene tiendas limitadas no lo cambia.
+  const limite = await soloSinLimite();
+  if (limite) return { error: limite };
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
   const { config } = await cargarConfig(supabase, pais.id);

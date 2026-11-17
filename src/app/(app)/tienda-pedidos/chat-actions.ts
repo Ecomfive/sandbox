@@ -1,5 +1,6 @@
 "use server";
 
+import { sinAccesoATiendas } from "@/lib/tienda/acceso";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { getPaisActual } from "@/lib/pais";
@@ -358,6 +359,8 @@ export async function pendientesWhatsapp(
     .eq("pais_id", pais.id)
     .maybeSingle();
   if (!t) return [];
+  // Solo de las tiendas de la persona (17 nov 2026).
+  if (await sinAccesoATiendas(supabase, [tiendaId])) return [];
   const con = await conexionesIcomfly(supabase, [tiendaId]);
   if (!con?.get(tiendaId)?.conectado) return [];
   const r = await chatsPendientes(supabase, tiendaId);

@@ -8,7 +8,8 @@ import { requireModulo } from "@/lib/auth";
 import { formatearMoneda } from "@/lib/formato";
 import { getPaisActual } from "@/lib/pais";
 import { createServiceClient } from "@/lib/supabase/server";
-import { cargarTiendas, cargarVariantes, periodoElegido, sinConfirmarDesde, tiendaElegida } from "@/lib/tienda/datos";
+import { cargarVariantes, periodoElegido, sinConfirmarDesde } from "@/lib/tienda/datos";
+import { tiendasDeLaPersona } from "@/lib/tienda/acceso";
 import { after } from "next/server";
 import { pedidosDeTiendas } from "@/lib/tienda/datos-finanzas";
 import { revisarSiHaceFalta } from "@/lib/tienda/conectar-shopify";
@@ -39,8 +40,8 @@ export default async function DashboardTiendaPage({ searchParams }: { searchPara
   const sp = await searchParams;
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
-  const { tiendas, faltaMigracion } = await cargarTiendas(supabase, pais.id);
-  const tienda = tiendaElegida(tiendas, sp.tienda);
+  // Solo las tiendas de la persona (17 nov 2026: quien tiene tiendas limitadas, como la gente de Nuvo, ve solo las suyas y nunca «Todas»).
+  const { tiendas, tienda, limitado, faltaMigracion } = await tiendasDeLaPersona(supabase, pais.id, sp.tienda);
   const eleccion = periodoElegido(sp);
   const miradas = tienda ? [tienda] : tiendas;
   // La revisión de Shopify (por si se perdió algún aviso), después de mostrar la página y como mucho cada 10 minutos.
@@ -131,7 +132,7 @@ export default async function DashboardTiendaPage({ searchParams }: { searchPara
         <SinTiendas pais={pais.nombre} />
       ) : (
         <>
-          <BarraTienda ruta="/tienda-dashboard" tiendas={tiendas} tiendaId={tienda?.id ?? null} periodo={periodo} />
+          <BarraTienda ruta="/tienda-dashboard" tiendas={tiendas} tiendaId={tienda?.id ?? null} periodo={periodo} sinTodas={limitado} />
           <AvisoConexion tiendas={miradas} finanzas={fuente} />
           <TableroDashboard etiqueta="Operación" titulo="Operación" tarjetas={operacion} />
           <TableroDashboard etiqueta="Dinero" titulo="Dinero (contra entrega)" tarjetas={plata} />
