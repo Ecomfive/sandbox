@@ -6,7 +6,7 @@ import { Indicador, Pastilla, TableroIndicadores, claseTdLista, claseThLista } f
 import { anilloFoco, fieldClass, labelClass } from "@/components/ui/field";
 import { Ventana } from "@/components/ui/ventana";
 import { useToast } from "@/components/ui/toast";
-import { AlertaIcon, CheckIcon, ChatIcon, PedidoIcon, RobotIcon, SugerenciaIcon } from "@/lib/nav-icons";
+import { AlertaIcon, CheckIcon, ChatIcon, GastoIcon, PedidoIcon, RobotIcon, SugerenciaIcon } from "@/lib/nav-icons";
 import type { Combinado, ResultadoModelo } from "@/lib/confirmacion-ia/combinar";
 import { acierto, type DecisionRevision } from "@/lib/confirmacion-ia/revision";
 import type { ConfigConfirmacion, FilaAnalisis } from "@/lib/confirmacion-ia/servidor";
@@ -15,6 +15,7 @@ import { tiempoEsperando } from "@/lib/tienda/confirmacion";
 import { EjemplosDirecciones } from "./ejemplos-direcciones";
 import { InstruccionesIA } from "./instrucciones-ia";
 import { LineaModelo } from "./lineas-modelo";
+import { PagoPorAdelantado } from "./pago-adelanto";
 import { PalabrasZona } from "./palabras-zona";
 import { PreguntaMensaje } from "./pedir-dato";
 import { BotonesVeredicto, ColaRevision, type AlElegir } from "./revision-pedidos";
@@ -26,6 +27,7 @@ import {
   probarDireccion,
   revisarAnalisis,
   vistaPreviaMensajeDato,
+  type MetodosPagoTienda,
   type PedirDato,
   type InterruptorConfirmacion,
   type PalabraZona,
@@ -59,14 +61,16 @@ function Interruptor({ activo, etiqueta, deshabilitado, alCambiar }: { activo: b
 }
 
 /** El resultado de un análisis como lo ve la persona: la zona (con la etiqueta que se pondría) y si la dirección está completa. */
-function Resultado({ f }: { f: Pick<FilaAnalisis, "estado" | "zona" | "etiqueta" | "falta"> }) {
+function Resultado({ f, etiquetaActual }: { f: Pick<FilaAnalisis, "estado" | "zona" | "etiqueta" | "falta">; etiquetaActual?: string | null }) {
+  // Pago por adelantado: en espera hasta que el asesor le pone la etiqueta real en Shopify (cuando llega el pago).
+  if (f.estado === "adelantado") return etiquetaActual ? <Pastilla tono="exito">Pagó · etiquetado</Pastilla> : <Pastilla tono="aviso">En espera de pago</Pastilla>;
   if (f.estado === "error") return <Pastilla tono="peligro">No se pudo analizar</Pastilla>;
   if (f.estado === "falta_dato") return <Pastilla tono="aviso">Falta un dato</Pastilla>;
   if (f.estado === "revisar") return <Pastilla tono="neutro">Revisar</Pastilla>;
   return <Pastilla tono="exito">{f.etiqueta ?? (f.zona ? ZONA_TEXTO[f.zona] : "Completa")}</Pastilla>;
 }
 
-type Filtro = "todos" | "listo" | "falta_dato" | "revisar" | "revisados";
+type Filtro = "todos" | "listo" | "falta_dato" | "revisar" | "revisados" | "adelantado";
 
 export function ConfirmacionIA({
   config,
@@ -81,6 +85,7 @@ export function ConfirmacionIA({
   apagadaPorFaltaDeIA,
   ejemplos,
   palabras,
+  metodosPago,
   instrucciones,
 }: {
   config: ConfigConfirmacion;
@@ -98,6 +103,8 @@ export function ConfirmacionIA({
   /** Las direcciones de ejemplo: cuántas hay y a qué tiendas se pueden agregar. */
   ejemplos: { total: number; tiendaObligatoria: boolean };
   palabras: PalabraZona[];
+  /** Por tienda, cómo paga el cliente por adelantado. */
+  metodosPago: MetodosPagoTienda[];
   /** Las instrucciones extra de la IA; solo llegan (y se muestran) a un administrador. */
   instrucciones: string | null;
 }) {
@@ -117,10 +124,10 @@ export function ConfirmacionIA({
   const [errorClave, setErrorClave] = useState<string | null>(null);
 
   // Lo que dijo el equipo manda sobre lo que dijo la IA: un pedido revisado cuenta como listo o como falta un dato, nunca como por revisar.
-  const cuenta = useMemo(() => ({ listo: filas.filter((f) => f.final.estado === "listo").length, falta_dato: filas.filter((f) => f.final.estado === "falta_dato").length, revisar: filas.filter((f) => f.final.estado === "revisar" || f.final.estado === "error").length, revisados: filas.filter((f) => f.revision).length }), [filas]);
+  const cuenta = useMemo(() => ({ listo: filas.filter((f) => f.final.estado === "listo").length, falta_dato: filas.filter((f) => f.final.estado === "falta_dato").length, revisar: filas.filter((f) => f.final.estado === "revisar" || f.final.estado === "error").length, revisados: filas.filter((f) => f.revision).length, adelantado: filas.filter((f) => f.final.estado === "adelantado" && !f.etiquetaActual).length }), [filas]);
   const pendientesDeRevisar = useMemo(() => filas.filter((f) => !f.revision && (f.estado === "revisar" || f.estado === "error") && !marcados.has(f.id)), [filas, marcados]);
   const precision = useMemo(() => acierto(filas), [filas]);
-  const visibles = filas.filter((f) => filtro === "todos" || (filtro === "revisados" ? !!f.revision : filtro === "revisar" ? f.final.estado === "revisar" || f.final.estado === "error" : f.final.estado === filtro));
+  const visibles = filas.filter((f) => filtro === "todos" || (filtro === "adelantado" ? f.final.estado === "adelantado" : filtro === "revisados" ? !!f.revision : filtro === "revisar" ? f.final.estado === "revisar" || f.final.estado === "error" : f.final.estado === filtro));
   const ficha = filas.find((f) => f.id === abierta) ?? null;
 
   // Un toque en un botón de «lo correcto»: guarda y devuelve el error (o null). En la cola, el pedido sale de la lista al momento.
@@ -171,6 +178,7 @@ export function ConfirmacionIA({
     { id: "pedidos", texto: "Pedidos analizados" },
     { id: "ejemplos", texto: "Direcciones de ejemplo" },
     { id: "zonas", texto: "Palabras de zona" },
+    { id: "adelanto", texto: "Cómo paga el cliente" },
     ...(esAdmin ? [{ id: "instrucciones", texto: "Instrucciones de la IA" }] : []),
   ];
 
@@ -233,6 +241,17 @@ export function ConfirmacionIA({
           <Indicador titulo="Listos para etiquetar" valor={String(cuenta.listo)} detalle="Dirección completa y zona clara" icono={CheckIcon} color="verde" alPulsar={() => setFiltro(filtro === "listo" ? "todos" : "listo")} activo={filtro === "listo"} />
           <Indicador titulo="Falta un dato" valor={String(cuenta.falta_dato)} detalle="Hay que pedirle algo al cliente" icono={ChatIcon} color="ambar" punto={cuenta.falta_dato ? "aviso" : undefined} alPulsar={() => setFiltro(filtro === "falta_dato" ? "todos" : "falta_dato")} activo={filtro === "falta_dato"} />
           <Indicador titulo="Para revisar" valor={String(cuenta.revisar)} detalle="Las IA no coinciden o fallaron" icono={AlertaIcon} color="rojo" punto={cuenta.revisar ? "peligro" : undefined} alPulsar={() => setFiltro(filtro === "revisar" ? "todos" : "revisar")} activo={filtro === "revisar"} />
+          {(cuenta.adelantado > 0 || palabras.some((p) => p.resultado === "adelantado")) && (
+            <Indicador
+              titulo="En espera de pago"
+              valor={String(cuenta.adelantado)}
+              detalle="Zona de pago por adelantado: el asesor espera el comprobante"
+              icono={GastoIcon}
+              color="azul"
+              alPulsar={() => setFiltro(filtro === "adelantado" ? "todos" : "adelantado")}
+              activo={filtro === "adelantado"}
+            />
+          )}
           <Indicador
             titulo="Revisados por el equipo"
             valor={String(cuenta.revisados)}
@@ -297,7 +316,7 @@ export function ConfirmacionIA({
                         {f.final.falta && <span className="block truncate text-xs text-warning">Falta {f.final.falta}</span>}
                       </td>
                       <td className={claseTdLista}>
-                        <Resultado f={f.final} />
+                        <Resultado f={f.final} etiquetaActual={f.etiquetaActual} />
                       </td>
                       <td className={claseTdLista} onClick={(e) => e.stopPropagation()}>
                         {f.revision ? (
@@ -352,6 +371,8 @@ export function ConfirmacionIA({
         <EjemplosDirecciones paisNombre={paisNombre} distingueZona={config.distingueZona} tiendas={tiendas} tiendaObligatoria={ejemplos.tiendaObligatoria} puedeEscribir={puedeEscribir} total={ejemplos.total} />
         <PalabrasZona paisNombre={paisNombre} distingueZona={config.distingueZona} puedeEscribir={puedeEscribir} inicial={palabras} />
       </div>
+
+      <PagoPorAdelantado paisNombre={paisNombre} puedeEscribir={puedeEscribir} metodos={metodosPago} />
 
       {esAdmin && <InstruccionesIA paisNombre={paisNombre} inicial={instrucciones ?? ""} />}
 
@@ -419,7 +440,7 @@ function FichaAnalisis({ f, distingueZona, puedeEscribir, abrirCorregir, alElegi
           {f.ciudad && <p className="m-0 text-xs text-muted-foreground">Ciudad o corregimiento: {f.ciudad}</p>}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Resultado f={f.final} />
+          <Resultado f={f.final} etiquetaActual={f.etiquetaActual} />
           {f.final.zona && <Pastilla>{ZONA_TEXTO[f.final.zona]}{f.revision ? " · lo marcó el equipo" : f.zonaPor === "regla" ? " · por palabra de zona" : " · por las IA"}</Pastilla>}
           {f.acuerdo === false && <Pastilla tono="aviso">Las IA no coinciden</Pastilla>}
         </div>
@@ -437,6 +458,28 @@ function FichaAnalisis({ f, distingueZona, puedeEscribir, abrirCorregir, alElegi
               {m.texto}
               {f.mensajeEstado === "pendiente_plantilla" ? ": pasaron más de 24 horas del último mensaje del cliente; hay que usar una plantilla de iComfly." : f.mensajeEstado === "sin_chat" ? ": el cliente no tiene chat con la tienda." : f.mensajeError ? `: ${f.mensajeError}` : ""}
             </p>
+          </div>
+        )}
+        {f.estado === "adelantado" && !f.revision && (
+          <div className="flex flex-col gap-2 rounded-lg border border-border px-3 py-2.5">
+            <p className="m-0 text-sm">
+              {f.etiquetaActual ? (
+                <>
+                  Zona de pago por adelantado. <b>Ya tiene la etiqueta {f.etiquetaActual}</b>: el pago llegó y el asesor la puso.
+                </>
+              ) : (
+                <>
+                  <b>En espera de pago.</b> {f.motivo ?? "Zona de pago por adelantado."} La etiqueta de zona la pone el asesor cuando verifique el pago.
+                </>
+              )}
+            </p>
+            {puedeEscribir && !f.etiquetaActual && (
+              <div>
+                <button type="button" disabled={pendiente} onClick={() => empezar(() => alPreguntar(f))} className={`rounded-md border border-border-control bg-card px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50 ${anilloFoco}`}>
+                  {f.mensajeEstado === "enviado" || f.mensajeEstado === "manual" ? "Volver a avisarle el pago" : "Avisarle el pago al cliente"}
+                </button>
+              </div>
+            )}
           </div>
         )}
         {puedeEscribir && f.final.estado === "falta_dato" && f.final.falta && (

@@ -2,6 +2,7 @@
 
 import { getUsuarioActual } from "@/lib/auth";
 import { esAvisoDePantalla, HORAS_AVISOS_SIN_LEER, TIPOS_CON_AVISO_EN_PANTALLA, type AvisoEnPantalla } from "@/lib/avisos-pantalla";
+import { hrefDeAviso } from "@/lib/compras/llegadas-avisos";
 import { createServiceClient } from "@/lib/supabase/server";
 
 /**
@@ -26,7 +27,7 @@ export async function avisosParaPantalla(desde: string | null): Promise<{ avisos
     return {
       avisos: (data ?? [])
         .filter((a) => esAvisoDePantalla(String(a.tipo)))
-        .map((a) => ({ id: a.id as string, tipo: a.tipo as string, titulo: a.titulo as string, texto: (a.texto as string | null) ?? null, href: a.href as string, creadoEn: a.creado_en as string })),
+        .map((a) => ({ id: a.id as string, tipo: a.tipo as string, titulo: a.titulo as string, texto: (a.texto as string | null) ?? null, href: hrefDeAviso(a.titulo as string, a.href as string), creadoEn: a.creado_en as string })),
       hasta,
     };
   } catch {

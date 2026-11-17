@@ -6,6 +6,7 @@ import { usePendientesVivos } from "@/components/pendientes-vivos";
 import { sonar } from "@/components/tienda/aviso-pedidos-nuevos";
 import { anilloFoco } from "@/components/ui/field";
 import { avisosParaPantalla } from "@/lib/avisos-pantalla-actions";
+import { RUTA_LISTA_PUERTO } from "@/lib/compras/llegadas-avisos";
 import { MAX_TARJETAS, rutaInterna, sinMostrar, type AvisoEnPantalla } from "@/lib/avisos-pantalla";
 import { marcarAvisoLeido } from "@/lib/menciones-actions";
 import { CerrarIcon, NotificacionesIcon } from "@/lib/nav-icons";
@@ -111,7 +112,7 @@ export function AvisoPersonal() {
                   }}
                   className={`rounded-md bg-foreground px-3 py-2 text-sm font-semibold text-background ${anilloFoco}`}
                 >
-                  Ir a gestionarlo
+                  {t.href === RUTA_LISTA_PUERTO ? "Ver lista" : "Ir a gestionarlo"}
                 </Link>
               </div>
             )}

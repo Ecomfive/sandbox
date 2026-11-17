@@ -39,7 +39,7 @@ export function BotonesVeredicto({ f, distingueZona, puedeConfirmar, alElegir }:
       setOtro("");
     }
   }
-  const completa = (zona: "ciudad" | "interior" | null) => elegir({ completa: true, zona, ciudad: pedirCiudad ? ciudad : null });
+  const completa = (zona: "ciudad" | "interior" | "adelantado" | null) => elegir({ completa: true, zona, ciudad: pedirCiudad ? ciudad : null });
 
   return (
     <div className="flex flex-col gap-3">
@@ -58,6 +58,9 @@ export function BotonesVeredicto({ f, distingueZona, puedeConfirmar, alElegir }:
             </button>
             <button type="button" disabled={enviando || (pedirCiudad && sinCiudad)} onClick={() => completa("interior")} className={BOTON}>
               Completa · {NOMBRE_ZONA.interior}
+            </button>
+            <button type="button" disabled={enviando || (pedirCiudad && sinCiudad)} onClick={() => completa("adelantado")} className={BOTON}>
+              Completa · {NOMBRE_ZONA.adelantado}
             </button>
           </>
         ) : (

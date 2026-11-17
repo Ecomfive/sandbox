@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { coincidencias, errorDeRegla, esCompuesta, normalizarTexto, zonaPorReglas, type ReglaZona } from "./zonas";
 
-const regla = (texto: string, resultado: "ciudad" | "interior", id = texto): ReglaZona => ({ id, texto, clave: normalizarTexto(texto), resultado });
+const regla = (texto: string, resultado: "ciudad" | "interior" | "adelantado", id = texto): ReglaZona => ({ id, texto, clave: normalizarTexto(texto), resultado });
 const reglas = [regla("Colón", "interior"), regla("Panamá Este", "interior"), regla("Panamá Oeste", "interior"), regla("Ciudad de Panamá", "ciudad")];
 
 test("el texto se compara sin acentos, mayúsculas ni signos", () => {
@@ -36,4 +36,11 @@ test("qué se acepta como regla", () => {
   assert.ok(errorDeRegla("a"));
   assert.ok(errorDeRegla("!!"));
   assert.ok(errorDeRegla("x".repeat(81)));
+});
+
+test("una palabra de pago por adelantado gana sobre las demás, aunque la dirección diga interior", () => {
+  const todas = [...reglas, regla("Puerto Armuelles", "adelantado")];
+  const r = zonaPorReglas(coincidencias("Barrio Balboa, Puerto Armuelles, Colón", todas));
+  assert.equal(r.zona, "adelantado");
+  assert.equal(r.conflicto, false);
 });

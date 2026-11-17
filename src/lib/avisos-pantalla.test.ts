@@ -7,6 +7,7 @@ const aviso = (id: string, creadoEn: string): AvisoEnPantalla => ({ id, tipo: "l
 test("solo salen en pantalla los avisos de llegada de Compras y de remisión", () => {
   assert.equal(esAvisoDePantalla("llegada"), true);
   assert.equal(esAvisoDePantalla("remision"), true);
+  assert.equal(esAvisoDePantalla("adelanto"), true);
   for (const t of ["mencion", "tarea", "sin_stock", "whatsapp", "proveedor", "cierre"]) assert.equal(esAvisoDePantalla(t), false, t);
 });
 

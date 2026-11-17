@@ -2,7 +2,7 @@
 // Nunca lanza: pasar una compra de etapa ya se guardó y un aviso que falla no debe deshacerlo.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { armarAviso, llegadaDeEtapa, type EventoAviso, type FilaLlegada } from "./llegadas-avisos";
+import { armarAviso, llegadaDeEtapa, RUTA_LISTA_PUERTO, unaPorCompra, type EventoAviso, type FilaLlegada, type TipoLlegada } from "./llegadas-avisos";
 
 const num = (v: unknown): number | null => (v === null || v === undefined || v === "" ? null : Number.isFinite(Number(v)) ? Number(v) : null);
 export const numeroOrden = (n: unknown) => (num(n) == null ? "OC" : `OC-${String(num(n)).padStart(4, "0")}`);
@@ -29,17 +29,19 @@ interface CompraLeida {
   wms_compra_items: { cantidad_pedida: number | null; creado_en: string; skus_maestros: { codigo: string | null; nombre: string } | { codigo: string | null; nombre: string }[] | null }[] | null;
 }
 
-/** Las compras de una llegada, con lo que ya se pagó de cada una. El orden es el de la llegada. */
-export async function cargarFilasLlegada(supabase: SupabaseClient, llegadaId: string): Promise<FilaLlegada[]> {
-  const { data: items } = await supabase
-    .from("compras_llegada_items")
-    .select("compra_id, pagado_en, monto_pagado, pagado_por_nombre, creado_en")
-    .eq("llegada_id", llegadaId)
-    .order("creado_en")
-    .order("compra_id");
-  const lista = (items ?? []) as { compra_id: string; pagado_en: string | null; monto_pagado: number | string | null; pagado_por_nombre: string | null }[];
+interface ItemLeido {
+  compra_id: string;
+  pagado_en: string | null;
+  monto_pagado: number | string | null;
+  pagado_por_nombre: string | null;
+  llegada_id?: string;
+  creado_en?: string;
+}
+
+/** Arma las filas de una lista de compras de llegadas (en ese orden): sus productos, unidades, cajas, etiqueta y lo pagado. */
+async function armarFilas(supabase: SupabaseClient, lista: ItemLeido[], conLlegada: boolean): Promise<FilaLlegada[]> {
   if (lista.length === 0) return [];
-  const ids = lista.map((i) => i.compra_id);
+  const ids = [...new Set(lista.map((i) => i.compra_id))];
   const [{ data: compras }, { data: pedidos }] = await Promise.all([
     supabase.from("wms_compras").select("id, codigo, numero, nombre, etapa, qty_total, segundo_pago, wms_compra_items(cantidad_pedida, creado_en, skus_maestros(codigo, nombre))").in("id", ids),
     supabase.from("proveedor_pedidos").select("compra_id, cajas, etiquetas_rutas").in("compra_id", ids),
@@ -70,9 +72,39 @@ export async function cargarFilasLlegada(supabase: SupabaseClient, llegadaId: st
         montoPagado: num(i.monto_pagado),
         pagadoPor: i.pagado_por_nombre,
         etapa: c.etapa,
+        ...(conLlegada ? { llegadaId: i.llegada_id, llegadaEn: i.creado_en } : {}),
       },
     ];
   });
+}
+
+/** Las compras de una llegada, con lo que ya se pagó de cada una. El orden es el de la llegada. */
+export async function cargarFilasLlegada(supabase: SupabaseClient, llegadaId: string): Promise<FilaLlegada[]> {
+  const { data: items } = await supabase
+    .from("compras_llegada_items")
+    .select("compra_id, pagado_en, monto_pagado, pagado_por_nombre, creado_en")
+    .eq("llegada_id", llegadaId)
+    .order("creado_en")
+    .order("compra_id");
+  return armarFilas(supabase, (items ?? []) as ItemLeido[], false);
+}
+
+/** Tope de compras que trae «Todas las llegadas» (90 días de llegadas de una operación como la de Ecomfive caben de sobra). */
+export const MAX_LLEGADAS_LISTA = 500;
+
+/**
+ * Todas las llegadas de un tipo desde un instante (17 nov 2026, pedido de Logística: ver de una vez lo que llegó a puerto, no un aviso por compra): las compras de todas esas llegadas,
+ * la más reciente primero y cada compra una vez. Cada fila dice de qué llegada es, para abrirla.
+ */
+export async function cargarFilasDeLlegadas(supabase: SupabaseClient, tipo: TipoLlegada, desdeIso: string): Promise<FilaLlegada[]> {
+  const { data: items } = await supabase
+    .from("compras_llegada_items")
+    .select("llegada_id, compra_id, pagado_en, monto_pagado, pagado_por_nombre, creado_en, compras_llegadas!inner(tipo)")
+    .eq("compras_llegadas.tipo", tipo)
+    .gte("creado_en", desdeIso)
+    .order("creado_en", { ascending: false })
+    .limit(MAX_LLEGADAS_LISTA);
+  return unaPorCompra(await armarFilas(supabase, (items ?? []) as unknown as ItemLeido[], true));
 }
 
 /**
@@ -104,7 +136,7 @@ export async function avisarLlegada(
           tipo: "llegada",
           titulo: aviso.titulo.slice(0, 200),
           texto: aviso.texto.slice(0, 500),
-          href: `${RUTA_LLEGADA}/${llegadaId}`,
+          href: regla.tipo === "puerto" ? RUTA_LISTA_PUERTO : `${RUTA_LLEGADA}/${llegadaId}`,
           autor_id: d.autor.id,
           autor_nombre: d.autor.nombre ?? "Sistema",
         })),

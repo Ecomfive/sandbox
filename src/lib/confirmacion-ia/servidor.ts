@@ -12,8 +12,10 @@ import { esErrorDeVentana, telefonoParaIcomfly, ventana24 } from "@/lib/tienda/c
 import { leerChat } from "@/lib/tienda/chat-tienda-datos";
 import { herramientaIcomfly, conexionesIcomfly } from "@/lib/tienda/icomfly";
 import { etiquetasDe, mismaTiendaUnidad, zonaDeEtiquetas } from "@/lib/tienda/ordenes-finanzas";
+import { destinatariosDe } from "@/lib/compras/llegadas-servidor";
 import { geografiaDe } from "./geografia";
-import { combinar, etiquetaDeZona, leerRespuesta, mensajePedirDetalle, type Combinado, type EstadoAnalisis, type ResultadoModelo } from "./combinar";
+import { motivoDeAdelanto, zonasDeAdelanto } from "./adelanto";
+import { combinar, etiquetaDeZona, leerRespuesta, mensajePagoAdelantado, mensajePedirDetalle, type Combinado, type EstadoAnalisis, type ResultadoModelo } from "./combinar";
 import { armarEntrada, type EjemploPrompt } from "./prompt";
 import { resultadoFinal, seleccionarEjemplos, type RevisionPedido, type ResultadoPedido } from "./revision";
 import { coincidencias, normalizarTexto, zonaPorReglas, type ReglaZona, type Zona } from "./zonas";
@@ -151,6 +153,34 @@ async function pedirDatoPorWhatsapp(supabase: SupabaseClient, o: OrdenParaAnaliz
   return { estado: "enviado" };
 }
 
+/** El aviso «Para ti» de un pedido en espera de pago, para las personas marcadas (ninguna de entrada: no se le avisa a nadie). Nunca lanza. */
+async function avisarPagoAdelantado(supabase: SupabaseClient, d: { numero: string | null; tienda: string | null; ciudad: string | null; direccion: string }): Promise<void> {
+  try {
+    const personas = await destinatariosDe(supabase, "pago_adelantado");
+    if (!personas.length) return;
+    const titulo = `En espera de pago: pedido ${d.numero ?? ""}${d.tienda ? ` · ${d.tienda}` : ""}`.trim();
+    const texto = `Es de una zona de pago por adelantado${d.ciudad ? ` (${d.ciudad})` : ""}. Avísale al cliente y espera su comprobante; la etiqueta de zona la pones tú cuando llegue el pago.`;
+    await supabase.from("notificaciones_usuario").insert(personas.map((usuario_id) => ({ usuario_id, tipo: "adelanto", titulo: titulo.slice(0, 200), texto: texto.slice(0, 500), href: "/tienda-pedidos/confirmacion/ia", autor_nombre: "Sistema" })));
+  } catch {
+    // El análisis ya se guardó: un aviso que falla no lo deshace.
+  }
+}
+
+/**
+ * El mensaje que le avisa al cliente que su pedido es de pago por adelantado, con los métodos de pago de su tienda (los registra el equipo; sin ellos, el mensaje dice que un asesor le indica cómo pagar).
+ * Sin escribirle a nadie: la pantalla se lo muestra al asesor, que decide si se envía o ya se lo mandó a mano.
+ */
+export async function armarMensajeAdelanto(supabase: SupabaseClient, ordenId: string): Promise<{ mensaje: string; sinMetodos: boolean } | { error: string }> {
+  const o = await cargarOrden(supabase, ordenId);
+  if (!o) return { error: "El pedido no es de una tienda." };
+  let metodos: string | null = null;
+  if (o.tiendaId) {
+    const { data } = await supabase.from("tiendas").select("pago_adelantado_instrucciones").eq("id", o.tiendaId).maybeSingle();
+    metodos = ((data?.pago_adelantado_instrucciones as string | null | undefined) ?? "").trim() || null;
+  }
+  return { mensaje: mensajePagoAdelantado({ nombre: o.cliente.nombre, numero: o.numero, tienda: o.tiendaNombre, metodos }), sinMetodos: !metodos };
+}
+
 /**
  * El mensaje que se le mandaría al cliente de un pedido para pedirle lo que falta (con su nombre, su pedido y su tienda). Sin escribirle a nadie: la pantalla se lo muestra a la persona, que decide
  * si se envía o si ya se le mandó a mano.
@@ -225,14 +255,18 @@ export async function analizarOrden(supabase: SupabaseClient, ordenId: string, o
   const direccion = (o.cliente.direccion ?? "").trim();
   const ciudad = (o.cliente.corregimiento ?? "").trim() || null;
   const huella = huellaDireccion(direccion, ciudad);
-  const { data: previo } = await supabase.from("confirmacion_ia_analisis").select("huella, mensajes_enviados, actualizado_en, mensaje_estado").eq("orden_id", ordenId).maybeSingle();
+  const { data: previo } = await supabase.from("confirmacion_ia_analisis").select("huella, mensajes_enviados, actualizado_en, mensaje_estado, estado").eq("orden_id", ordenId).maybeSingle();
   if (!opciones.forzar && previo) {
     if (previo.huella === huella) return { resultado: "omitida", motivo: "Ya está analizada." };
     // Dos avisos casi a la vez no repiten el análisis ni el mensaje.
     if (Date.now() - Date.parse(String(previo.actualizado_en)) < 60_000) return { resultado: "omitida", motivo: "Se acaba de analizar." };
   }
 
-  const { combinado: c, modelos, coinc } = await evaluarDireccion(supabase, { paisId: o.paisId, paisNombre: o.paisNombre, paisCodigo: o.paisCodigo, tiendaId: o.tiendaId, numero: o.numero, direccion, ciudad, config });
+  // Una zona de pago por adelantado (Bocas del Toro, Puerto Armuelles…) manda sobre todo: el pedido queda «en espera de pago», sin etiqueta y sin gastar las IA; el asesor le avisa al cliente y pone la etiqueta real cuando llega el pago.
+  const adelanto = zonasDeAdelanto(direccion, ciudad, await cargarReglas(supabase, o.paisId));
+  const { combinado: c, modelos, coinc } = adelanto.length
+    ? { combinado: { estado: "adelantado", zona: null, zonaPor: null, completa: null, falta: null, acuerdo: null, motivo: motivoDeAdelanto(adelanto) } as Combinado, modelos: [] as ResultadoModelo[], coinc: [] as ReglaZona[] }
+    : await evaluarDireccion(supabase, { paisId: o.paisId, paisNombre: o.paisNombre, paisCodigo: o.paisCodigo, tiendaId: o.tiendaId, numero: o.numero, direccion, ciudad, config });
   const etiqueta = c.estado === "listo" ? etiquetaDeZona(c.zona, config) : null;
 
   // El WhatsApp que pide el dato que falta.
@@ -288,6 +322,8 @@ export async function analizarOrden(supabase: SupabaseClient, ordenId: string, o
   // Sin la migración 0307 (revisión del equipo) esas columnas no existen: se guarda igual, sin ellas.
   if (error && sinRevision && /rev_|schema cache/i.test(error.message)) ({ error } = await supabase.from("confirmacion_ia_analisis").upsert(fila, { onConflict: "orden_id" }));
   if (error) return { resultado: "omitida", motivo: /confirmacion_ia|schema cache/i.test(error.message) ? SIN_MIGRACION_CONFIRMACION : "No se pudo guardar el análisis." };
+  // Un pedido que entra a «en espera de pago» (no uno que ya lo estaba) se le avisa a quienes estén marcados en Configuración › Avisos a personas (nadie de entrada).
+  if (c.estado === "adelantado" && previo?.estado !== "adelantado") await avisarPagoAdelantado(supabase, { numero: o.numero, tienda: o.tiendaNombre, ciudad, direccion });
   return { resultado: "analizada", estado: c.estado };
 }
 

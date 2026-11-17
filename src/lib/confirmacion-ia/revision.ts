@@ -38,7 +38,7 @@ export interface Propuesta {
  * Un «falta un dato» coincide con otro «falta un dato» aunque el dato sea distinto; un «listo» coincide si también está completa y, donde se distingue, es la misma zona.
  */
 export function coincideConPropuesta(p: Propuesta, v: Veredicto, distingueZona: boolean): boolean | null {
-  if (p.estado === "revisar" || p.estado === "error") return null;
+  if (p.estado === "revisar" || p.estado === "error" || p.estado === "adelantado") return null;
   if (p.estado === "falta_dato") return !v.completa;
   return v.completa && (!distingueZona || p.zona === v.zona);
 }
@@ -54,7 +54,7 @@ export function revisarVeredicto(d: { completa?: unknown; zona?: unknown; falta?
     return { veredicto: { completa: false, zona: null, falta } };
   }
   if (!distingueZona) return { veredicto: { completa: true, zona: null, falta: null } };
-  if (d.zona !== "ciudad" && d.zona !== "interior") return { error: "Elige si es ciudad o interior." };
+  if (d.zona !== "ciudad" && d.zona !== "interior" && d.zona !== "adelantado") return { error: "Elige si es ciudad, interior o pago por adelantado." };
   return { veredicto: { completa: true, zona: d.zona, falta: null } };
 }
 
@@ -81,6 +81,8 @@ export function resultadoFinal(
   const r = f.revision;
   if (!r) return { estado: f.estado, zona: f.zona, etiqueta: f.etiqueta, falta: f.falta };
   if (!r.completa) return { estado: "falta_dato", zona: null, etiqueta: null, falta: r.falta };
+  // Marcado como pago por adelantado: queda en espera de pago, sin etiqueta.
+  if (r.zona === "adelantado") return { estado: "adelantado", zona: null, etiqueta: null, falta: null };
   return { estado: "listo", zona: r.zona, etiqueta: etiquetaDeZona(r.zona, config), falta: null };
 }
 
@@ -96,8 +98,8 @@ export function acierto(filas: { revision: { ok: boolean | null } | null }[]): {
  * lado del que más se corrige); de las incompletas, las más recientes.
  */
 export function seleccionarEjemplos<T extends { completa: boolean; zona: Zona | null }>(recientesPrimero: T[], porTipo: number): T[] {
-  const grupos: T[][] = [[], [], []];
-  for (const e of recientesPrimero.filter((x) => x.completa)) grupos[e.zona === "ciudad" ? 0 : e.zona === "interior" ? 1 : 2].push(e);
+  const grupos: T[][] = [[], [], [], []];
+  for (const e of recientesPrimero.filter((x) => x.completa)) grupos[e.zona === "ciudad" ? 0 : e.zona === "interior" ? 1 : e.zona === "adelantado" ? 3 : 2].push(e);
   const completas: T[] = [];
   for (let i = 0; completas.length < porTipo && grupos.some((g) => i < g.length); i += 1) for (const g of grupos) if (i < g.length && completas.length < porTipo) completas.push(g[i]);
   return [...completas, ...recientesPrimero.filter((x) => !x.completa).slice(0, porTipo)];
