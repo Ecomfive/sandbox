@@ -25,7 +25,7 @@ function Grupo({ titulo, ayuda, palabras, puedeEscribir, alQuitar }: { titulo: s
         ) : (
           <ul className="m-0 flex list-none flex-wrap gap-2 p-0">
             {palabras.map((p) => (
-              <li key={p.id} className={`inline-flex items-center gap-1.5 rounded-full border py-1 pr-1.5 pl-3 text-sm ${p.resultado === "ciudad" ? "border-success/40 bg-success-soft" : "border-warning/40 bg-warning-soft"}`}>
+              <li key={p.id} className={`inline-flex items-center gap-1.5 rounded-full border py-1 pr-1.5 pl-3 text-sm ${p.resultado === "ciudad" ? "border-success/40 bg-success-soft" : p.resultado === "adelantado" ? "border-primario/40 bg-primario-suave" : "border-warning/40 bg-warning-soft"}`}>
                 <span>
                   {p.texto} <span className="text-xs text-muted-foreground">· {ZONA_TEXTO[p.resultado]}</span>
                 </span>
@@ -71,7 +71,7 @@ export function PalabrasZona({ paisNombre, distingueZona, puedeEscribir, inicial
           {paisNombre} · {palabras.length} {palabras.length === 1 ? "guardada" : "guardadas"}
         </span>
       }
-      ayuda="Si una de estas palabras sale en la dirección, la IA toma esa zona. Una palabra sola (Colón) o varias juntas (Panamá Este); las juntas pesan más."
+      ayuda="Si una de estas palabras sale en la dirección, la IA toma esa zona. Una palabra sola (Colón) o varias juntas (Panamá Este); las juntas pesan más. «Pago por adelantado» (Bocas del Toro, Puerto Armuelles…) gana siempre: el pedido queda en espera de pago, sin etiqueta."
     >
       <div className="flex flex-col gap-4">
         {puedeEscribir ? (
@@ -99,6 +99,7 @@ export function PalabrasZona({ paisNombre, distingueZona, puedeEscribir, inicial
               <select value={resultado} onChange={(e) => setResultado(e.target.value as Zona)} className={fieldClass}>
                 <option value="interior">{NOMBRE_ZONA.interior}</option>
                 <option value="ciudad">{NOMBRE_ZONA.ciudad}</option>
+                <option value="adelantado">{NOMBRE_ZONA.adelantado}</option>
               </select>
             </label>
             <button type="submit" disabled={pendiente || texto.trim().length < 2} className={`rounded-md bg-foreground px-3 py-2 text-sm font-semibold text-background disabled:opacity-50 ${anilloFoco}`}>

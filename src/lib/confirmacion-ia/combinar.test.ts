@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { combinar, etiquetaDeZona, leerRespuesta, limpiarFalta, mensajePedirDetalle, type ResultadoModelo } from "./combinar";
 
-const ok = (proveedor: "openai" | "anthropic", zona: "ciudad" | "interior" | "no_se", completa: boolean, falta: string | null = null): ResultadoModelo => ({
+const ok = (proveedor: "openai" | "anthropic", zona: "ciudad" | "interior" | "adelantado" | "no_se", completa: boolean, falta: string | null = null): ResultadoModelo => ({
   proveedor,
   ok: true,
   respuesta: { zona, completa, falta, motivo: "porque sí" },
@@ -62,4 +62,13 @@ test("el mensaje que pide el dato y la etiqueta de cada zona", () => {
   assert.equal(etiquetaDeZona("interior", cfg), "INTERIOR/SERVIENTREGA");
   assert.equal(etiquetaDeZona("ciudad", { etiquetaCiudad: null, etiquetaInterior: null }), null);
   assert.equal(etiquetaDeZona(null, cfg), null);
+});
+
+test("pago por adelantado: si las dos IA lo ven así, queda en espera de pago y sin etiqueta", () => {
+  const r = combinar({ distingueZona: true, zonaReglas: null, modelos: [ok("openai", "adelantado", true), ok("anthropic", "adelantado", true)] });
+  assert.deepEqual([r.estado, r.zona, r.falta], ["adelantado", null, null]);
+  const dudan = combinar({ distingueZona: true, zonaReglas: null, modelos: [ok("openai", "adelantado", true), ok("anthropic", "interior", true)] });
+  assert.equal(dudan.estado, "revisar", "si una IA no coincide, se revisa");
+  assert.equal(etiquetaDeZona("adelantado", { etiquetaCiudad: "CIUDAD", etiquetaInterior: "INTERIOR/SERVIENTREGA" }), null);
+  assert.equal(leerRespuesta('{"zona":"adelantado","completa":true,"falta":null,"motivo":"x"}')?.zona, "adelantado");
 });
