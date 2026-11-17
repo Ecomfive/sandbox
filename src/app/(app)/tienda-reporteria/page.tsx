@@ -1,4 +1,6 @@
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
+import { cargarTiendasPermitidas } from "@/lib/finanzas/cargar-tiendas-permitidas";
+import { filtrarUnidades } from "@/lib/finanzas/tiendas-permitidas";
 import { Pagina } from "@/components/ui/pagina";
 import { requireModulo } from "@/lib/auth";
 import { getPaisActual } from "@/lib/pais";
@@ -25,11 +27,13 @@ export default async function ReporteriaPage({ searchParams }: { searchParams: P
   const sp = await searchParams;
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
-  const todas = await tiendasReporteria(supabase, pais.id);
+  // Solo las tiendas de la persona (17 nov 2026): con tiendas limitadas, solo las suyas y nunca «Todas».
+  const permitidas = await cargarTiendasPermitidas();
+  const todas = filtrarUnidades(permitidas, await tiendasReporteria(supabase, pais.id));
   // Solo las tiendas con pedidos (en el libro hay unidades de clase tienda sin pedidos, como «ECOMFIVE»).
   const { meses, conPedidos } = await mesesReporteria(supabase, todas.map((t) => t.id));
   const tiendas = todas.filter((t) => conPedidos.has(t.id));
-  const tienda = typeof sp.tienda === "string" ? (tiendas.find((t) => t.id === sp.tienda) ?? null) : null;
+  const tienda = (typeof sp.tienda === "string" ? (tiendas.find((t) => t.id === sp.tienda) ?? null) : null) ?? (permitidas ? (tiendas[0] ?? null) : null);
   const miradas = tienda ? [tienda] : tiendas;
   const actual = mesDePanama();
   const mes = typeof sp.mes === "string" && MES.test(sp.mes) ? sp.mes : (meses.includes(actual) ? actual : (meses[0] ?? actual));
