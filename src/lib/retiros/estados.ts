@@ -33,3 +33,11 @@ export function estadoConsolidacion(fila: {
   if (fila.novedadResuelta || fila.estado === "novedad_resuelta") return { texto: ESTADO_ETIQUETA.novedad_resuelta, tono: "warning" };
   return fila.consolidado ? { texto: "Consolidado", tono: "success" } : { texto: "Pendiente", tono: "warning" };
 }
+
+/**
+ * Si al cambiar el estado de un retiro a mano hay que quitarle lo que se anotó al conciliarlo (lo recibido, cuándo llegó y la fecha de consolidación): cuando estaba conciliado
+ * («Cerrado» o «Novedad resuelta») y pasa a Abierto o Novedad. Un retiro que se concilió por error o cuyo dinero se reversó no puede quedarse con un «Recibido» de algo que no llegó.
+ */
+export function quitaLoRecibidoAlReabrir(estadoAntes: string, estadoNuevo: string): boolean {
+  return (estadoAntes === "cerrado" || estadoAntes === "novedad_resuelta") && (estadoNuevo === "abierto" || estadoNuevo === "novedad");
+}
