@@ -17,7 +17,7 @@ export const EVENTO_DE_TIPO: Readonly<Record<TipoLlegada, EventoAviso>> = { puer
 /** A quién le toca cada aviso, como se dice en pantalla. */
 export const AVISOS_DE_COMPRAS: readonly { evento: EventoAviso; titulo: string; detalle: string }[] = [
   { evento: "llegada_puerto", titulo: "Logística · Llegada a Puerto", detalle: "Reciben la lista de lo que viene (producto, unidades, cajas y etiqueta de las cajas) cuando una compra pasa a «06 - Llegada a Puerto»." },
-  { evento: "llegada_bodega", titulo: "Pagos · En Bodega", detalle: "Reciben lo que hay que pagar del segundo pago (por compra y en total) cuando una compra pasa a «07 - En Bodega»." },
+  { evento: "llegada_bodega", titulo: "Pagos (solo aviso) · En Bodega", detalle: "Se enteran de lo que hay que pagar del segundo pago (por compra y en total) cuando una compra pasa a «07 - En Bodega». El pago lo registra quien gestiona Compras." },
 ];
 
 export interface ProductoLlegada {

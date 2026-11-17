@@ -120,6 +120,7 @@ const AREAS: NavSection[] = [
       { label: "Gestión de IDs Dunamixfy", href: "/publicaciones-dunamixfy", frente: "proveeduria" },
       // Gestión de tienda (3 nov 2026): las tiendas de Shopify (Kenku primero), conectadas solo de lectura.
       { label: "Pedidos de tienda", href: "/tienda-pedidos", frente: "tienda" },
+      { label: "Reportería de pedidos", href: "/tienda-reporteria", frente: "tienda" },
       { label: "Confirmación", href: "/tienda-confirmacion", frente: "tienda" },
       { label: "Logística de tienda", href: "/tienda-logistica", frente: "tienda" },
       // Las entregas de ciudad y las devoluciones, que antes se anotaban en Monday (15 nov 2026, migración 0970).

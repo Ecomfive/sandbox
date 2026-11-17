@@ -169,3 +169,39 @@ test("sin fila de títulos no lee nada", () => {
   assert.equal(r.ordenes.length, 0);
   assert.equal(r.descartadas[0].motivo, "no encontré la fila de títulos");
 });
+
+test("Reportería (0310): las columnas de administración salen tal cual, los montos de la línea que los trae", () => {
+  // Los títulos de la hoja «Excel Matriz» de NUEVA GESTION OCEANS PANAMA (17 nov 2026), con datos inventados.
+  const H = [
+    null, "TIENDA", "FECHA", "N° Orden", "NOMBRES Y APELLIDOS", "TOTAL VENTA", "CANTIDAD", "NOMBRE PRODUCTO", "SKU", "PROVINCIA", "CORREGIMIENTO",
+    "DIRECCION", "TELEFONO", "PREPARACIÓN DEL PEDIDO", "ESTADO PEDIDO SHOPIFY", "ETIQUETAS", "ETIQUETA DE ZONA", "NOTAS", "ENTREGADO / ANULADO / DEVOLUCIÓN",
+    "FORMA DE PAGO", "VERIFICADO", "COURIER", "MONTO ENVIO", "FECHA  DE ENVIO", "COSTO PRODUCTO", "MOTIVOS DE CANCELACIONES", "MONTO ENVIO SE",
+    "EXITOSA/FALLIDA", "MES", "MONTO DE CAMBIO", "FORMA DE PAGO DEL CAMBIO", "DEVUELTOS SE", "ENVÍO DE CAMBIO", "FECHA- DEVOLUCION/CAMBIOS/RETIROS/COMPLE",
+    "MONTO PAGADO AL DELIVERY", "DELIVERY", "NO USAR ESTA COLUMNA", "FACTURADO CON ITBMS", "N° FACTURA", "ID CON DUPLICADO", "BLOQUE FACTURADO",
+  ];
+  const f = (o: Record<string, Celda>): Celda[] => H.map((t) => (t && t in o ? o[t] : t === "TIENDA" ? "KENKU" : t === "FECHA" ? 46113 : t === "CANTIDAD" ? 1 : null));
+  const { ordenes } = leerMatriz([
+    H,
+    f({ "N° Orden": "#2001", "TOTAL VENTA": 32.9, "NOMBRE PRODUCTO": "Colágeno Inventado", PROVINCIA: "Chiriquí", "PREPARACIÓN DEL PEDIDO": "PREPARADO",
+      "ENTREGADO / ANULADO / DEVOLUCIÓN": "Entregado", "FORMA DE PAGO": "YAPPY", VERIFICADO: "OK", COURIER: "REPARTIDOR INVENTADO", "MONTO ENVIO": 3.5,
+      MES: "NOVIEMBRE", "MONTO DE CAMBIO": 5, "FORMA DE PAGO DEL CAMBIO": "YAPPY", "ENVÍO DE CAMBIO": 3.5, "FECHA- DEVOLUCION/CAMBIOS/RETIROS/COMPLE": "C-12/11/2026",
+      "MONTO PAGADO AL DELIVERY": 3.5, DELIVERY: "REPARTIDOR INVENTADO", "FACTURADO CON ITBMS": "FACTURADO", "N° FACTURA": "FE-1", "BLOQUE FACTURADO": "BLOQUE 46" }),
+    f({ "N° Orden": "#2001", "TOTAL VENTA": "DUPLICADO", "NOMBRE PRODUCTO": "Envío prioritario", "MONTO ENVIO SE": 4.75 }),
+  ]);
+  const o = ordenes[0];
+  assert.equal(o.cliente.provincia, "Chiriquí");
+  assert.deepEqual(o.matriz, {
+    estado_matriz: "Entregado", verificado: "OK", preparacion: "PREPARADO", courier_matriz: "REPARTIDOR INVENTADO", monto_envio: 3.5, monto_envio_se: 4.75,
+    monto_pagado_delivery: 3.5, delivery: "REPARTIDOR INVENTADO", cambio_monto: 5, cambio_forma_pago: "YAPPY", cambio_envio: 3.5,
+    fecha_devolucion_texto: "C-12/11/2026", bloque_facturado: "BLOQUE 46",
+  });
+  assert.equal(o.costo_envio, 8.25);
+  assert.equal(o.mes_gestion, "NOVIEMBRE");
+});
+
+test("un monto de envío que en realidad es una fecha (serie de Excel) no suma millones", () => {
+  const { ordenes } = leerMatriz([T, fila({ "N° Orden": "#300", "TOTAL VENTA": 20, "NOMBRE PRODUCTO": "Inventado", "MONTO ENVIO": 46323, "MONTO ENVIO SE": 4.5 })]);
+  assert.equal(ordenes[0].costo_envio, 4.5);
+  assert.equal(ordenes[0].matriz?.monto_envio, null);
+  assert.equal(ordenes[0].matriz?.monto_envio_se, 4.5);
+});

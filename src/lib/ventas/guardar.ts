@@ -4,7 +4,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { claveCatalogo } from "../finanzas/libro-excel";
-import { ESTADOS_ENTREGA, METODOS_PAGO, type EstadoEntrega, type LineaVenta, type MetodoPago, type OrdenVenta } from "./matriz";
+import { ESTADOS_ENTREGA, METODOS_PAGO, type EstadoEntrega, type ExtrasMatriz, type LineaVenta, type MetodoPago, type OrdenVenta } from "./matriz";
 
 /** Órdenes por lote: con sus líneas y datos de cliente quedan lejos del límite de 1 MB de una Server Action. */
 export const TAMANO_LOTE_VENTAS = 400;
@@ -65,6 +65,26 @@ export function validarOrden(v: unknown): { ok: true; orden: OrdenVenta } | { ok
     });
   }
   const c = (o.cliente && typeof o.cliente === "object" ? o.cliente : {}) as Record<string, unknown>;
+  // Las columnas de administración de la Matriz (Reportería de pedidos, migración 0310), si vienen.
+  const m = o.matriz && typeof o.matriz === "object" ? (o.matriz as Record<string, unknown>) : null;
+  const montoONulo = (v: unknown) => (v === null || v === undefined ? null : monto(v, 100_000));
+  const matriz: ExtrasMatriz | undefined = m
+    ? {
+        estado_matriz: txt(m.estado_matriz, 40),
+        verificado: txt(m.verificado, 60),
+        preparacion: txt(m.preparacion, 80),
+        courier_matriz: txt(m.courier_matriz, 80),
+        monto_envio: montoONulo(m.monto_envio),
+        monto_envio_se: montoONulo(m.monto_envio_se),
+        monto_pagado_delivery: montoONulo(m.monto_pagado_delivery),
+        delivery: txt(m.delivery, 80),
+        cambio_monto: montoONulo(m.cambio_monto),
+        cambio_forma_pago: txt(m.cambio_forma_pago, 60),
+        cambio_envio: montoONulo(m.cambio_envio),
+        fecha_devolucion_texto: txt(m.fecha_devolucion_texto, 80),
+        bloque_facturado: txt(m.bloque_facturado, 60),
+      }
+    : undefined;
   return {
     ok: true,
     orden: {
@@ -92,6 +112,7 @@ export function validarOrden(v: unknown): { ok: true; orden: OrdenVenta } | { ok
       mes_gestion: txt(o.mes_gestion, 60),
       motivo_cancelacion: txt(o.motivo_cancelacion, 200),
       etiquetas: txt(o.etiquetas, 300),
+      ...(matriz ? { matriz } : {}),
       lineas,
       cliente: {
         nombre: txt(c.nombre, 200),
@@ -99,6 +120,7 @@ export function validarOrden(v: unknown): { ok: true; orden: OrdenVenta } | { ok
         direccion: txt(c.direccion, 500),
         corregimiento: txt(c.corregimiento, 200),
         notas: txt(c.notas, 500),
+        ...("provincia" in c ? { provincia: txt(c.provincia, 100) } : {}),
       },
       origen_clave: o.origen_clave,
       huella_contenido: typeof o.huella_contenido === "string" && HUELLA.test(o.huella_contenido) ? o.huella_contenido : "",
@@ -138,17 +160,20 @@ export async function guardarLoteOrdenes(supabase: SupabaseClient, origen: strin
   const { mapa, nuevas: tiendasNuevas } = await unidades(supabase, ordenes.map((o) => o.tienda));
 
   const previas = new Map<string, string | null>();
-  // Lo que el sistema ya anotó en las órdenes de Shopify (14 nov 2026): Monday, Servientrega o la Matriz ponen el transportista, la guía, las fechas,
-  // el motivo y el estado de entrega; una actualización de Shopify (que trae esos campos vacíos) no los borra.
+  // Lo que el sistema ya anotó (14 nov 2026 en las de Shopify; 17 nov 2026 en todas, por la Reportería de pedidos): Monday, Servientrega o la Matriz
+  // ponen el transportista, la guía, las fechas, el motivo y el estado de entrega; una actualización que trae esos campos vacíos no los borra, y un
+  // pedido que el sistema ya cerró no vuelve atrás.
   const anotado = new Map<string, Record<string, unknown>>();
-  const MANTENER = "fase, estado_entrega, transportista, guia, fecha_envio, fecha_devolucion, motivo_cancelacion";
+  // También lo de administración (Reportería de pedidos, 17 nov 2026): forma de pago real, envío, facturación y mes de cobro no los borra una
+  // actualización de Shopify (que trae «Cash on Delivery», envío 0 y sin factura).
+  const MANTENER = "fase, estado_entrega, transportista, guia, fecha_envio, fecha_devolucion, motivo_cancelacion, metodo_pago, forma_pago_texto, costo_envio, facturado, factura_numero, mes_gestion, resultado_courier";
   const claves = ordenes.map((o) => o.origen_clave);
   for (let i = 0; i < claves.length; i += 100) {
-    const { data, error } = await supabase.from("ven_ordenes").select(`origen_clave, huella_contenido${origen === "shopify" ? `, ${MANTENER}` : ""}`).in("origen_clave", claves.slice(i, i + 100));
+    const { data, error } = await supabase.from("ven_ordenes").select(`origen_clave, huella_contenido, ${MANTENER}`).in("origen_clave", claves.slice(i, i + 100));
     if (error) throw new Error(`ven_ordenes: ${error.message}`);
     for (const r of (data ?? []) as unknown as Record<string, unknown>[]) {
       previas.set(r.origen_clave as string, (r.huella_contenido as string | null) ?? null);
-      if (origen === "shopify") anotado.set(r.origen_clave as string, r);
+      anotado.set(r.origen_clave as string, r);
     }
   }
   const CERRADAS = new Set(["entregada", "devuelta", "cancelada"]);
@@ -170,22 +195,24 @@ export async function guardarLoteOrdenes(supabase: SupabaseClient, origen: strin
     estado_pago: o.estado_pago,
     // Una orden que el sistema ya cerró (entregada, devuelta, cancelada) conserva su estado de entrega aunque Shopify diga otra cosa.
     estado_entrega: CERRADAS.has(String(anotado.get(o.origen_clave)?.fase ?? "")) ? (anotado.get(o.origen_clave)?.estado_entrega ?? o.estado_entrega) : o.estado_entrega,
-    metodo_pago: o.metodo_pago,
-    forma_pago_texto: o.forma_pago_texto,
+    // Una forma de pago de cobro ya anotada (EFECTIVO, YAPPY, INFORME…) no la reemplaza la de Shopify («Cash on Delivery», sin método).
+    ...(o.metodo_pago === null && anotado.get(o.origen_clave)?.metodo_pago
+      ? { metodo_pago: anotado.get(o.origen_clave)!.metodo_pago, forma_pago_texto: anotado.get(o.origen_clave)!.forma_pago_texto }
+      : { metodo_pago: o.metodo_pago, forma_pago_texto: o.forma_pago_texto }),
     informe_servientrega: o.informe_servientrega,
     transportista: conservar(o, "transportista", o.transportista),
     guia: conservar(o, "guia", o.guia),
     fecha_envio: conservar(o, "fecha_envio", o.fecha_envio),
     fecha_devolucion: conservar(o, "fecha_devolucion", o.fecha_devolucion),
-    resultado_courier: o.resultado_courier,
+    resultado_courier: conservar(o, "resultado_courier", o.resultado_courier),
     subtotal: o.subtotal,
     envio: o.envio,
     descuento: o.descuento,
     total: o.total,
-    costo_envio: o.costo_envio,
-    facturado: o.facturado,
-    factura_numero: o.factura_numero,
-    mes_gestion: o.mes_gestion,
+    costo_envio: o.costo_envio > 0 ? o.costo_envio : (Number(anotado.get(o.origen_clave)?.costo_envio) || o.costo_envio),
+    facturado: o.facturado || anotado.get(o.origen_clave)?.facturado === true,
+    factura_numero: conservar(o, "factura_numero", o.factura_numero),
+    mes_gestion: conservar(o, "mes_gestion", o.mes_gestion),
     // El motivo que dejó el sistema (la nota de los asesores de Monday, Servientrega o la Matriz) es la evidencia: Shopify no lo reemplaza.
     motivo_cancelacion: anotado.get(o.origen_clave)?.motivo_cancelacion ?? o.motivo_cancelacion,
     etiquetas: o.etiquetas,

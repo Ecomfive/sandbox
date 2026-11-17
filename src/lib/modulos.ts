@@ -54,6 +54,7 @@ export const MODULOS: Modulo[] = [
   { clave: "uso-sistema", etiqueta: "Uso del sistema (Gestión de IDs Dropi)" },
   { clave: "tienda-dashboard", etiqueta: "Dashboard de tienda (Gestión de tienda)" },
   { clave: "tienda-pedidos", etiqueta: "Pedidos de tienda (Gestión de tienda)" },
+  { clave: "tienda-reporteria", etiqueta: "Reportería de pedidos (Gestión de tienda)" },
   { clave: "tienda-confirmacion", etiqueta: "Confirmación (Gestión de tienda)" },
   { clave: "tienda-logistica", etiqueta: "Logística (Gestión de tienda)" },
   { clave: "despacho-ciudad", etiqueta: "Despacho ciudad (Gestión de tienda)" },
