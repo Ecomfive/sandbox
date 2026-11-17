@@ -221,6 +221,7 @@ export function construirMigas(
   }
 
   // Una llegada de compras (el aviso de Llegada a Puerto o de En Bodega) no es un módulo del menú: la abre quien recibe el aviso o tiene Compras.
+  if (ruta === "/llegadas") return { migas: [{ etiqueta: "Compras" }, { etiqueta: "Llegadas de compras" }], favoritoHref: null, moduloHref: null, moduloEtiqueta: null };
   if (ruta.startsWith("/llegadas/")) return { migas: [{ etiqueta: "Compras" }, { etiqueta: "Llegada de compras" }], favoritoHref: null, moduloHref: null, moduloEtiqueta: null };
 
   const titulo = TITULOS_APARTE[ruta];

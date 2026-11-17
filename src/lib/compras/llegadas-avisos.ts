@@ -44,6 +44,30 @@ export interface FilaLlegada {
   montoPagado: number | null;
   pagadoPor: string | null;
   etapa: string;
+  /** La llegada de la que sale esta fila y cuándo se avisó (solo en la lista de todas las llegadas). */
+  llegadaId?: string;
+  llegadaEn?: string;
+}
+
+/** Los periodos de «Todas las llegadas» (días contando hoy) y el de entrada. */
+export const DIAS_LISTA_LLEGADAS = [1, 7, 30, 90] as const;
+export const DIAS_LISTA_PREDETERMINADO = 7;
+export const diasDeLista = (v: unknown): number => {
+  const n = Number(Array.isArray(v) ? v[0] : v);
+  return (DIAS_LISTA_LLEGADAS as readonly number[]).includes(n) ? n : DIAS_LISTA_PREDETERMINADO;
+};
+
+/** El instante desde el que cuenta un periodo: las 00:00 de Panamá (UTC−5, sin horario de verano) de `dias − 1` días antes de `hoy` (AAAA-MM-DD). */
+export function desdeDeLista(hoy: string, dias: number): string {
+  const d = new Date(`${hoy}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - (Math.max(1, dias) - 1));
+  return `${d.toISOString().slice(0, 10)}T00:00:00-05:00`;
+}
+
+/** Una compra puede estar en dos llegadas (si se movió de etapa y volvió): en la lista de todas cuenta una vez, con su llegada más reciente (las filas vienen de la más nueva a la más vieja). */
+export function unaPorCompra<T extends { compraId: string }>(filas: readonly T[]): T[] {
+  const vistas = new Set<string>();
+  return filas.filter((f) => (vistas.has(f.compraId) ? false : (vistas.add(f.compraId), true)));
 }
 
 /** Solo las etapas de aviso tienen llegada. */

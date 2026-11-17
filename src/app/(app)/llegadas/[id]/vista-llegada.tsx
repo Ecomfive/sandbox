@@ -160,7 +160,7 @@ function PagoTotal({ llegadaId, compras, monto, sinMonto, hoy }: { llegadaId: st
   );
 }
 
-function Dato({ nombre, valor, fuerte = false }: { nombre: string; valor: string; fuerte?: boolean }) {
+export function Dato({ nombre, valor, fuerte = false }: { nombre: string; valor: string; fuerte?: boolean }) {
   return (
     <div className="flex flex-col">
       <dt className="text-xs text-muted-foreground">{nombre}</dt>
@@ -169,19 +169,20 @@ function Dato({ nombre, valor, fuerte = false }: { nombre: string; valor: string
   );
 }
 
-function Producto({ fila }: { fila: FilaLlegada }) {
+export function Producto({ fila }: { fila: FilaLlegada }) {
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-0.5">
       <span className="truncate text-sm font-medium">{textoProductos(fila)}</span>
       <span className="truncate text-xs text-muted-foreground">
         {fila.orden}
         {fila.codigo ? ` · ${fila.codigo}` : ""} · {etiquetaEtapa(fila.etapa)}
+        {fila.llegadaEn ? ` · llegó ${fechaHora(fila.llegadaEn)}` : ""}
       </span>
     </div>
   );
 }
 
-function FilaPuerto({ fila, etiquetas, abrir }: { fila: FilaLlegada; etiquetas: EtiquetaPedido[]; abrir: (e: EtiquetaPedido, alt: string) => void }) {
+export function FilaPuerto({ fila, etiquetas, abrir }: { fila: FilaLlegada; etiquetas: EtiquetaPedido[]; abrir: (e: EtiquetaPedido, alt: string) => void }) {
   return (
     <li className="flex flex-wrap items-center gap-x-6 gap-y-3 p-4">
       <Producto fila={fila} />
