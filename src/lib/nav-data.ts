@@ -122,6 +122,7 @@ const AREAS: NavSection[] = [
       // (`PESTANAS_POR_MODULO`). Pedidos: Confirmación, Con IA, Logística y Cuánto hay. Despacho ciudad, como el panel de Monday: Devoluciones,
       // Cambios y reembolsos, Cuánto hay y Pedir a inventario. Tiendas Shopify: Productos. Cada pestaña sigue con su propio permiso.
       { label: "Pedidos de tienda", href: "/tienda-pedidos", frente: "tienda" },
+      { label: "Reportería de pedidos", href: "/tienda-reporteria", frente: "tienda" },
       { label: "Despacho ciudad", href: "/despacho-ciudad", frente: "tienda" },
       { label: "Tiendas Shopify", href: "/tienda-tiendas", frente: "tienda" },
       { label: "Alertas de inventario", href: "/alertas", dropi: true, frente: "fulfillment" },

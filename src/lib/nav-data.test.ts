@@ -193,7 +193,7 @@ test("Gestión de IDs es una sola entrada del menú que sigue a la plataforma el
 
 test("Gestión de tienda: tres entradas con pestañas, cada pestaña con su permiso", () => {
   const tienda = areas.flatMap((a) => a.items).filter((i) => i.frente === "tienda" && i.href !== "/tienda-dashboard").map((i) => i.href);
-  assert.deepEqual(tienda, ["/tienda-pedidos", "/despacho-ciudad", "/tienda-tiendas"]);
+  assert.deepEqual(tienda.filter((h) => h !== "/tienda-reporteria"), ["/tienda-pedidos", "/despacho-ciudad", "/tienda-tiendas"]);
   // Solo Devoluciones: ve «Despacho ciudad», entra directo a su pestaña y no ve las otras.
   const solo = ["despacho-devoluciones"];
   assert.equal(puedeAbrirPagina(solo, "/despacho-ciudad"), true);

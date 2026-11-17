@@ -12,6 +12,7 @@ import { CalendarioIcon, ComprasIcon, FlechaAbajoIcon, FlechaArribaIcon, GastoIc
 import { colorEstado, colorEtapa, etiquetaEstado, etiquetaEtapa, MONEDA_COMPRAS, numeroOC, otrosProductos, valorUnitario, type FilaCompra } from "./def-compras";
 import { ActividadCompra } from "./actividad-compra";
 import { CajasProveedorCompraBloque } from "./cajas-proveedor-compra";
+import { LlegadaDePagoBloque } from "./llegada-pago-compra";
 import { PagosProveedorCompraBloque } from "./pagos-proveedor-compra";
 import { FotoAmpliable } from "@/components/competencia/piezas-competencia";
 import { CopiarCotizacionBoton } from "./copiar-cotizacion";
@@ -252,6 +253,7 @@ export function FichaCompra({
           )}
           {/* A solo lectura no hay formulario: los productos se ven al final, como antes. */}
           {!puedeEscribir && compra.tipo === "pais" && <ProductosCompra key={`productos-${compra.id}`} compraId={compra.id} puedeEscribir={false} />}
+          {puedeEscribir && compra.etapa === "en_bodega" && <LlegadaDePagoBloque key={`llegada-pago-${compra.id}`} compraId={compra.id} />}
           <CajasProveedorCompraBloque key={`cajas-${compra.id}`} compraId={compra.id} />
           <PagosProveedorCompraBloque key={`pagos-${compra.id}`} compraId={compra.id} />
           <ActividadCompra key={compra.id} id={compra.id} puedeComentar={puedeEscribir && puedeComentar} comentarioResaltado={comentarioResaltado} />

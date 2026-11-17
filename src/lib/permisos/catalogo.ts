@@ -89,6 +89,7 @@ export const AREAS_ACCESO: AreaAcceso[] = [
       { clave: "publicaciones-dunamixfy", etiqueta: "Gestión de IDs Dunamixfy" },
       { clave: "uso-sistema", etiqueta: "Uso del sistema (IDs Dropi)" },
       { clave: "tienda-pedidos", etiqueta: "Pedidos de tienda" },
+      { clave: "tienda-reporteria", etiqueta: "Reportería de pedidos" },
       { clave: "tienda-confirmacion", etiqueta: "Confirmación de tienda" },
       { clave: "tienda-logistica", etiqueta: "Logística de tienda" },
       { clave: "despacho-ciudad", etiqueta: "Despacho ciudad" },
