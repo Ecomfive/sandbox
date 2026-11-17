@@ -252,7 +252,7 @@ export async function agregarPalabraZona(texto: string, resultado: Zona): Promis
   const usuario = await requireModuloEscritura(MODULO);
   const mal = errorDeRegla(texto);
   if (mal) return { error: mal };
-  if (!(ZONAS as string[]).includes(resultado)) return { error: "Elige si es de ciudad o del interior." };
+  if (!(ZONAS as string[]).includes(resultado)) return { error: "Elige si es de ciudad, del interior o de pago por adelantado." };
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
   const { config, faltaMigracion } = await cargarConfig(supabase, pais.id);
@@ -280,54 +280,9 @@ export async function eliminarPalabraZona(id: string): Promise<Resultado> {
   return {};
 }
 
-// --- Pago por adelantado: zonas y métodos de pago por tienda ----------------------------------------------------------------------------------------------
-
-export interface ZonaAdelanto {
-  id: string;
-  texto: string;
-  creadoPor: string | null;
-  creadoEn: string;
-}
-
-/** Las zonas de pago por adelantado del país (17 nov 2026): lugares de difícil acceso o fronterizos que se pagan antes de enviar. Si una sale en la dirección, el pedido queda «en espera de pago». */
-export async function listarZonasAdelanto(): Promise<{ zonas: ZonaAdelanto[]; error?: string }> {
-  await requireModulo(MODULO);
-  const supabase = createServiceClient();
-  const pais = await getPaisActual(supabase);
-  const { data, error } = await supabase.from("confirmacion_ia_adelanto_zonas").select("id, texto, creado_por_nombre, creado_en").eq("pais_id", pais.id).order("texto").limit(500);
-  if (error) return { zonas: [], error: /adelanto|schema cache|does not exist/i.test(error.message) ? SIN_MIGRACION_ADELANTO : "No se pudieron leer las zonas." };
-  return { zonas: (data ?? []).map((z) => ({ id: z.id as string, texto: z.texto as string, creadoPor: (z.creado_por_nombre as string | null) ?? null, creadoEn: z.creado_en as string })) };
-}
+// --- Pago por adelantado: cómo paga el cliente, por tienda (las zonas son «palabras de zona») ----------------------------------------------------------------------------------------------
 
 const SIN_MIGRACION_ADELANTO = "Falta correr la migración 0312 (pago por adelantado) en Supabase.";
-
-export async function agregarZonaAdelanto(texto: string): Promise<Resultado> {
-  const usuario = await requireModuloEscritura(MODULO);
-  const mal = errorDeRegla(texto);
-  if (mal) return { error: mal };
-  const supabase = createServiceClient();
-  const pais = await getPaisActual(supabase);
-  const limpio = String(texto).replace(/\s+/g, " ").trim();
-  const { error } = await supabase.from("confirmacion_ia_adelanto_zonas").insert({ pais_id: pais.id, texto: limpio, clave: normalizarTexto(limpio), creado_por: usuario.id, creado_por_nombre: nombreDe(usuario) });
-  if (error) return { error: error.code === "23505" ? "Esa zona ya está en la lista." : /adelanto|schema cache|does not exist/i.test(error.message) ? SIN_MIGRACION_ADELANTO : "No se pudo guardar." };
-  await registrarAuditoria({ accion: "agregar_zona_adelanto_confirmacion_ia", entidad: "paises", entidadId: pais.id, detalle: `${pais.nombre}: agregó la zona de pago por adelantado «${limpio}»` });
-  revalidatePath("/tienda-pedidos/confirmacion/ia");
-  return {};
-}
-
-export async function eliminarZonaAdelanto(id: string): Promise<Resultado> {
-  await requireModuloEscritura(MODULO);
-  if (!UUID.test(String(id))) return { error: "Zona no válida." };
-  const supabase = createServiceClient();
-  const pais = await getPaisActual(supabase);
-  const { data } = await supabase.from("confirmacion_ia_adelanto_zonas").select("texto").eq("id", id).eq("pais_id", pais.id).maybeSingle();
-  if (!data) return { error: "Esa zona ya no está." };
-  const { error } = await supabase.from("confirmacion_ia_adelanto_zonas").delete().eq("id", id);
-  if (error) return { error: "No se pudo borrar." };
-  await registrarAuditoria({ accion: "eliminar_zona_adelanto_confirmacion_ia", entidad: "paises", entidadId: pais.id, detalle: `${pais.nombre}: quitó la zona de pago por adelantado «${data.texto}»` });
-  revalidatePath("/tienda-pedidos/confirmacion/ia");
-  return {};
-}
 
 export interface MetodosPagoTienda {
   tiendaId: string;
@@ -545,7 +500,7 @@ export interface PedirDato {
 async function prepararPedirDato(supabase: ReturnType<typeof createServiceClient>, analisisId: string): Promise<PedirDato | { error: string }> {
   const pais = await getPaisActual(supabase);
   const leer = (columnas: string) => supabase.from("confirmacion_ia_analisis").select(columnas).eq("id", analisisId).eq("pais_id", pais.id).maybeSingle();
-  let r = await leer("id, orden_id, tienda_id, estado, falta, mensaje_estado, mensajes_enviados, rev_completa, rev_falta, rev_en");
+  let r = await leer("id, orden_id, tienda_id, estado, falta, mensaje_estado, mensajes_enviados, rev_completa, rev_zona, rev_falta, rev_en");
   if (r.error) r = await leer("id, orden_id, tienda_id, estado, falta, mensaje_estado, mensajes_enviados");
   const a = r.data as unknown as Record<string, unknown> | null;
   if (r.error || !a) return { error: "Ese análisis ya no existe." };
@@ -553,8 +508,8 @@ async function prepararPedirDato(supabase: ReturnType<typeof createServiceClient
   if (limitado && !tiendas.some((t) => t.id === a.tienda_id)) return { error: "Ese pedido no es de las tiendas que ves." };
   const { data: o } = await supabase.from("ven_ordenes").select("numero").eq("id", a.orden_id as string).maybeSingle();
   const base = { analisisId, numero: (o?.numero as string | null) ?? null, estado: (a.mensaje_estado as EstadoMensaje) ?? "no_aplica", enviados: Number(a.mensajes_enviados ?? 0) };
-  // Pedido de una zona de pago por adelantado (y que nadie corrigió a mano): se le avisa del pago, no se le pide un dato.
-  if (a.estado === "adelantado" && !a.rev_en) {
+  // Pedido de una zona de pago por adelantado (por las palabras de zona o porque el equipo lo marcó así): se le avisa del pago, no se le pide un dato.
+  if ((a.estado === "adelantado" && !a.rev_en) || (a.rev_en && a.rev_completa && a.rev_zona === "adelantado")) {
     const adelanto = await armarMensajeAdelanto(supabase, a.orden_id as string);
     if ("error" in adelanto) return adelanto;
     return { ...base, tipo: "adelanto", falta: "pago por adelantado", mensaje: adelanto.mensaje, sinMetodos: adelanto.sinMetodos };

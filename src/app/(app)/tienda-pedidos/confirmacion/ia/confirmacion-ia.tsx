@@ -29,7 +29,6 @@ import {
   vistaPreviaMensajeDato,
   type MetodosPagoTienda,
   type PedirDato,
-  type ZonaAdelanto,
   type InterruptorConfirmacion,
   type PalabraZona,
 } from "../ia-actions";
@@ -86,7 +85,6 @@ export function ConfirmacionIA({
   apagadaPorFaltaDeIA,
   ejemplos,
   palabras,
-  zonasAdelanto,
   metodosPago,
   instrucciones,
 }: {
@@ -105,8 +103,7 @@ export function ConfirmacionIA({
   /** Las direcciones de ejemplo: cuántas hay y a qué tiendas se pueden agregar. */
   ejemplos: { total: number; tiendaObligatoria: boolean };
   palabras: PalabraZona[];
-  /** Las zonas de pago por adelantado del país y, por tienda, cómo paga el cliente. */
-  zonasAdelanto: ZonaAdelanto[];
+  /** Por tienda, cómo paga el cliente por adelantado. */
   metodosPago: MetodosPagoTienda[];
   /** Las instrucciones extra de la IA; solo llegan (y se muestran) a un administrador. */
   instrucciones: string | null;
@@ -181,7 +178,7 @@ export function ConfirmacionIA({
     { id: "pedidos", texto: "Pedidos analizados" },
     { id: "ejemplos", texto: "Direcciones de ejemplo" },
     { id: "zonas", texto: "Palabras de zona" },
-    { id: "adelanto", texto: "Pago por adelantado" },
+    { id: "adelanto", texto: "Cómo paga el cliente" },
     ...(esAdmin ? [{ id: "instrucciones", texto: "Instrucciones de la IA" }] : []),
   ];
 
@@ -244,7 +241,7 @@ export function ConfirmacionIA({
           <Indicador titulo="Listos para etiquetar" valor={String(cuenta.listo)} detalle="Dirección completa y zona clara" icono={CheckIcon} color="verde" alPulsar={() => setFiltro(filtro === "listo" ? "todos" : "listo")} activo={filtro === "listo"} />
           <Indicador titulo="Falta un dato" valor={String(cuenta.falta_dato)} detalle="Hay que pedirle algo al cliente" icono={ChatIcon} color="ambar" punto={cuenta.falta_dato ? "aviso" : undefined} alPulsar={() => setFiltro(filtro === "falta_dato" ? "todos" : "falta_dato")} activo={filtro === "falta_dato"} />
           <Indicador titulo="Para revisar" valor={String(cuenta.revisar)} detalle="Las IA no coinciden o fallaron" icono={AlertaIcon} color="rojo" punto={cuenta.revisar ? "peligro" : undefined} alPulsar={() => setFiltro(filtro === "revisar" ? "todos" : "revisar")} activo={filtro === "revisar"} />
-          {(cuenta.adelantado > 0 || zonasAdelanto.length > 0) && (
+          {(cuenta.adelantado > 0 || palabras.some((p) => p.resultado === "adelantado")) && (
             <Indicador
               titulo="En espera de pago"
               valor={String(cuenta.adelantado)}
@@ -375,7 +372,7 @@ export function ConfirmacionIA({
         <PalabrasZona paisNombre={paisNombre} distingueZona={config.distingueZona} puedeEscribir={puedeEscribir} inicial={palabras} />
       </div>
 
-      <PagoPorAdelantado paisNombre={paisNombre} puedeEscribir={puedeEscribir} zonasIniciales={zonasAdelanto} metodos={metodosPago} />
+      <PagoPorAdelantado paisNombre={paisNombre} puedeEscribir={puedeEscribir} metodos={metodosPago} />
 
       {esAdmin && <InstruccionesIA paisNombre={paisNombre} inicial={instrucciones ?? ""} />}
 

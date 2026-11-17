@@ -56,3 +56,14 @@ test("faltaVigente: lo que marcó el equipo manda; sin revisión, lo que dijo la
   assert.equal(faltaVigente({ estado: "falta_dato", falta: "la calle", rev_en: "2026-11-16", rev_completa: true }), null, "el equipo dijo que estaba completa");
   assert.equal(faltaVigente({ estado: "falta_dato", falta: "la calle", rev_en: null }), "la calle");
 });
+
+test("pago por adelantado marcado por el equipo: queda en espera de pago, sin etiqueta, y es un ejemplo propio", () => {
+  assert.deepEqual(revisarVeredicto({ completa: true, zona: "adelantado" }, true), { veredicto: { completa: true, zona: "adelantado", falta: null } });
+  const base = { estado: "revisar" as const, zona: null, etiqueta: null, falta: null };
+  const revision = { completa: true, zona: "adelantado" as const, falta: null, ok: null, por: "Ana", en: "2026-11-17T10:00:00Z" };
+  assert.deepEqual(resultadoFinal({ ...base, revision }, etiquetas), { estado: "adelantado", zona: null, etiqueta: null, falta: null });
+  assert.equal(coincideConPropuesta({ estado: "listo", zona: "interior" }, { completa: true, zona: "adelantado", falta: null }, true), false);
+  const ej = (zona: "ciudad" | "interior" | "adelantado", n: number) => ({ id: `${zona}${n}`, completa: true, zona });
+  const elegidos = seleccionarEjemplos([ej("ciudad", 1), ej("ciudad", 2), ej("interior", 1), ej("adelantado", 1), ej("adelantado", 2)], 4);
+  assert.ok(elegidos.some((e) => e.zona === "adelantado"), "el pago por adelantado entra entre los ejemplos aunque haya de las otras");
+});

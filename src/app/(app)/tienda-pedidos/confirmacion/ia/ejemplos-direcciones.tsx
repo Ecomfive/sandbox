@@ -104,6 +104,7 @@ function FormularioEjemplo({
             <option value="">No sé</option>
             <option value="ciudad">{NOMBRE_ZONA.ciudad}</option>
             <option value="interior">{NOMBRE_ZONA.interior}</option>
+            <option value="adelantado">{NOMBRE_ZONA.adelantado}</option>
           </select>
         </label>
       )}
