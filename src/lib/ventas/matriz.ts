@@ -58,6 +58,28 @@ export interface ClienteVenta {
   direccion: string | null;
   corregimiento: string | null;
   notas: string | null;
+  /** «PROVINCIA» de la Matriz (migración 0310). Shopify no la manda aparte. */
+  provincia?: string | null;
+}
+
+/**
+ * Las columnas de administración de la Matriz que la Reportería de pedidos guarda tal cual (migración 0310, 17 nov 2026): las escribe
+ * `ven_reporteria_aplicar` sin pisar lo que se editó a mano en el sistema.
+ */
+export interface ExtrasMatriz {
+  estado_matriz: string | null;
+  verificado: string | null;
+  preparacion: string | null;
+  courier_matriz: string | null;
+  monto_envio: number | null;
+  monto_envio_se: number | null;
+  monto_pagado_delivery: number | null;
+  delivery: string | null;
+  cambio_monto: number | null;
+  cambio_forma_pago: string | null;
+  cambio_envio: number | null;
+  fecha_devolucion_texto: string | null;
+  bloque_facturado: string | null;
 }
 
 export interface OrdenVenta {
@@ -94,6 +116,8 @@ export interface OrdenVenta {
    * reescriben las órdenes ya guardadas): lo guarda `sincronizarFases` en `despachada_en` y `fecha_envio` si están vacías.
    */
   despachada_en?: string | null;
+  /** Solo de la Matriz: las columnas de administración (ver `ExtrasMatriz`). */
+  matriz?: ExtrasMatriz;
   lineas: LineaVenta[];
   cliente: ClienteVenta;
   /** Huella estable de la orden (tienda + número): la llave de la importación. */
@@ -144,6 +168,17 @@ const ENCABEZADOS = {
   facturado: ["FACTURADO CON ITBMS"],
   factura: ["N FACTURA", "NO FACTURA"],
   sku: ["SKU"],
+  // Las de la Reportería de pedidos (migración 0310). Un nombre que termina en «*» vale si el título empieza así.
+  provincia: ["PROVINCIA"],
+  estado_matriz: ["ENTREGADO ANULADO DEVOLUCION"],
+  preparacion: ["PREPARACION DEL PEDIDO"],
+  monto_delivery: ["MONTO PAGADO AL DELIVERY"],
+  delivery: ["DELIVERY"],
+  cambio_monto: ["MONTO DE CAMBIO"],
+  cambio_pago: ["FORMA DE PAGO DEL CAMBIO"],
+  cambio_envio: ["ENVIO DE CAMBIO"],
+  fecha_dev_texto: ["FECHA DEVOLUCION*"],
+  bloque: ["BLOQUE FACTURADO"],
 } as const;
 type Campo = keyof typeof ENCABEZADOS;
 
@@ -154,7 +189,7 @@ export function ubicarColumnasMatriz(filas: Celda[][]): { fila: number; columnas
     if (!titulos.includes("TIENDA") || !titulos.includes("TOTAL VENTA")) continue;
     const columnas: Partial<Record<Campo, number>> = {};
     for (const [campo, nombres] of Object.entries(ENCABEZADOS) as [Campo, readonly string[]][]) {
-      const j = titulos.findIndex((t) => nombres.includes(t));
+      const j = titulos.findIndex((t) => nombres.includes(t) || nombres.some((n) => n.endsWith("*") && t.startsWith(n.slice(0, -1))));
       if (j >= 0) columnas[campo] = j;
     }
     if (columnas.numero === undefined || columnas.fecha === undefined) continue;
@@ -352,6 +387,28 @@ export function leerMatriz(
       direccion: texto(p("direccion"))?.slice(0, 500) ?? null,
       corregimiento: texto(p("corregimiento"))?.slice(0, 200) ?? null,
       notas: texto(p("notas"))?.slice(0, 500) ?? null,
+      ...(c.provincia !== undefined ? { provincia: texto(p("provincia"))?.slice(0, 100) ?? null } : {}),
+    };
+    // Las columnas de administración (migración 0310): los montos, el mayor de las líneas (van en una sola); lo demás, de la línea principal.
+    const mayor = (campo: Campo) => {
+      const ns = ls.map((l) => numero(celda(l, campo))).filter((n): n is number => n !== null && n >= 0);
+      return ns.length ? r2(Math.max(...ns)) : null;
+    };
+    const corto = (campo: Campo, max = 120) => texto(p(campo))?.slice(0, max) ?? null;
+    const matriz: ExtrasMatriz = {
+      estado_matriz: corto("estado_matriz", 40),
+      verificado: corto("verificado", 60),
+      preparacion: corto("preparacion", 80),
+      courier_matriz: courier?.slice(0, 80) ?? null,
+      monto_envio: mayor("monto_envio"),
+      monto_envio_se: mayor("monto_envio_se"),
+      monto_pagado_delivery: mayor("monto_delivery"),
+      delivery: corto("delivery", 80),
+      cambio_monto: mayor("cambio_monto"),
+      cambio_forma_pago: corto("cambio_pago", 60),
+      cambio_envio: mayor("cambio_envio"),
+      fecha_devolucion_texto: corto("fecha_dev_texto", 80),
+      bloque_facturado: corto("bloque", 60),
     };
     const orden: Omit<OrdenVenta, "huella_contenido"> = {
       tienda,
@@ -379,6 +436,7 @@ export function leerMatriz(
       // En algunas filas esa columna trae el costo (un número): no es un motivo.
       motivo_cancelacion: motivo && leerMonto(motivo) === null ? motivo.slice(0, 200) : null,
       etiquetas: texto(p("etiquetas"))?.slice(0, 300) ?? null,
+      matriz,
       lineas: lineasOrden,
       cliente,
       origen_clave: huella(`ventas|${llave}`),

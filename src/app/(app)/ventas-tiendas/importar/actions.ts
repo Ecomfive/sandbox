@@ -5,8 +5,9 @@ import { requireModuloEscritura } from "@/lib/auth";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { createServiceClient } from "@/lib/supabase/server";
 import { origenDeArchivo } from "@/lib/finanzas/guardar-libro";
-import { TAMANO_LOTE_VENTAS, guardarLoteOrdenes, guardarMapeoProductos, validarMapeoProducto, validarOrden, type MapeoProducto, type ResultadoLoteVentas } from "@/lib/ventas/guardar";
+import { TAMANO_LOTE_VENTAS, guardarMapeoProductos, validarMapeoProducto, validarOrden, type MapeoProducto, type ResultadoLoteVentas } from "@/lib/ventas/guardar";
 import type { OrdenVenta } from "@/lib/ventas/matriz";
+import { guardarLoteMatriz } from "@/lib/ventas/reporteria-importar";
 
 const MODULO = "ventas-tiendas";
 
@@ -23,7 +24,8 @@ export async function importarLoteVentas(
       const r = validarOrden(o);
       if (r.ok) buenas.push(r.orden);
     }
-    const r = await guardarLoteOrdenes(createServiceClient(), origenDeArchivo(String(archivo ?? "")), buenas);
+    // Como «Actualizar desde la Matriz» de la Reportería (17 nov 2026): un pedido que llegó de Shopify solo se completa, no se reescribe.
+    const r = await guardarLoteMatriz(createServiceClient(), buenas);
     return { ...r, rechazadas: ordenes.length - buenas.length };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "No se pudo guardar el lote." };

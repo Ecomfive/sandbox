@@ -4,6 +4,9 @@
 // Uso:
 //   npx tsx --env-file=.env.local scripts/finanzas/importar-ventas.ts [archivo]            # prueba: lee y resume
 //   npx tsx --env-file=.env.local scripts/finanzas/importar-ventas.ts [archivo] --aplicar  # escribe (migración 0909)
+//   … --aplicar --reporteria   # la Matriz nueva («NUEVA GESTION OCEANS PANAMA» descargada como .xlsx) a la Reportería de pedidos
+//                              # (migración 0310): no reescribe los pedidos de Shopify, solo los completa; guarda las columnas de
+//                              # administración sin pisar lo editado a mano (ver src/lib/ventas/reporteria-importar.ts).
 //
 // El archivo por defecto es datos-privados/GESTION_OCEANS_PANAMA.xlsx (la carpeta no se sube a git). Lee también
 // «Informe SE» (guías de Servientrega), «Monday» (estado de las órdenes recientes) y «BASE COSTO ECOMFIVE» (mapeo del
@@ -25,8 +28,11 @@ import { leerBaseDistribucion } from "../../src/lib/finanzas/libro-excel";
 import { origenDeArchivo } from "../../src/lib/finanzas/guardar-libro";
 import { complementos, leerGuias, leerMapeoProductos, leerMatriz, leerMonday, resumirLeido } from "../../src/lib/ventas/matriz";
 import { TAMANO_LOTE_VENTAS, guardarLoteOrdenes, guardarMapeoProductos } from "../../src/lib/ventas/guardar";
+import { guardarLoteMatriz } from "../../src/lib/ventas/reporteria-importar";
+import { aplicarVinculosDeTienda } from "../../src/lib/tienda/productos-shopify";
 
 const APLICAR = process.argv.includes("--aplicar");
+const REPORTERIA = process.argv.includes("--reporteria");
 const ARCHIVO = process.argv.slice(2).find((a) => !a.startsWith("--")) ?? "datos-privados/GESTION_OCEANS_PANAMA.xlsx";
 const GASTOS = join(dirname(ARCHIVO), "GASTOS_PANAMA_2026.xlsx");
 const ORIGEN = origenDeArchivo(basename(ARCHIVO));
@@ -96,14 +102,25 @@ async function main() {
   let nuevas = 0;
   let actualizadas = 0;
   let sinCambios = 0;
+  let completadas = 0;
+  let conColumnas = 0;
   const tiendas = new Set<string>();
   for (let i = 0; i < ordenes.length; i += TAMANO_LOTE_VENTAS) {
-    const r = await guardarLoteOrdenes(supabase, ORIGEN, ordenes.slice(i, i + TAMANO_LOTE_VENTAS));
+    const lote = ordenes.slice(i, i + TAMANO_LOTE_VENTAS);
+    const r = REPORTERIA ? await guardarLoteMatriz(supabase, lote, { vincular: false }) :{ ...(await guardarLoteOrdenes(supabase, ORIGEN, lote)), completadas: 0, conColumnas: 0 };
     nuevas += r.nuevas;
     actualizadas += r.actualizadas;
     sinCambios += r.sinCambios;
+    completadas += r.completadas;
+    conColumnas += r.conColumnas;
     r.tiendasNuevas.forEach((t) => tiendas.add(t));
     process.stdout.write(`\r  ${Math.min(i + TAMANO_LOTE_VENTAS, ordenes.length)} de ${ordenes.length}`);
+  }
+  if (REPORTERIA) {
+    console.log(`\nDe Shopify, solo completadas: ${completadas} · con columnas de administración: ${conColumnas}`);
+    // Las líneas reescritas vuelven a tomar el producto nuestro unido (Productos de Shopify): una vez por tienda, no por lote.
+    const { data: ts } = await supabase.from("tiendas").select("id, nombre");
+    for (const t of ts ?? []) console.log(`Productos unidos en ${t.nombre}: ${await aplicarVinculosDeTienda(supabase, t.id as string)} líneas`);
   }
   const mapeos = await guardarMapeoProductos(supabase, ORIGEN, mapeo);
   console.log(`\nNuevas: ${nuevas} · actualizadas: ${actualizadas} · sin cambios: ${sinCambios} · mapeo: ${mapeos}`);

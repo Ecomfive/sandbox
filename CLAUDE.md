@@ -2684,6 +2684,24 @@ convenciones técnicas del código.
   resume con `resumirTienda`; `juntarTiendas` da los indicadores de arriba y `alertasTiendas` «Para decidir hoy» (umbrales en `UMBRALES`: caída ≥ 30 % en la última semana,
   entrega < 60 %, cancelación ≥ 25 %, ≥ 100 por confirmar, SKU sin vincular, crecimiento ≥ 50 %; tiendas con < 20 pedidos no se miden). Todo en
   `src/lib/tienda/tablero-tiendas.ts`, con prueba. Colores por tienda en `COLORES_TIENDA` (validados con la skill dataviz en claro y oscuro; por orden de la lista).
+- **Reportería de pedidos (la Matriz dentro del sistema)** (17 nov 2026, pedido de Hernán para María José; prototipo https://claude.ai/artifact/TNhc38acs7JZzNcsLSgUze):
+  `/tienda-reporteria` (Operación › Gestión de tienda, módulo `tienda-reporteria`, migración 0310). Meta: dejar los Excel; la primera carga sale de la Matriz
+  «NUEVA GESTION OCEANS PANAMA» (Google Sheet de administración, hoja «Excel Matriz») y después se trabaja aquí. Una fila por línea de producto
+  (`FilaReporteria`, `cargarReporteria` en `src/lib/ventas/reporteria-datos.ts`, un mes a la vez, todas las tiendas o una), columnas en grupos con botones,
+  `TablaDatos` (buscar, filtros, descarga con las columnas de la Matriz en `csvAntes`). Lo que llega solo (Shopify, Monday/Servientrega, costo de la Matriz o
+  de Compras en gris) no se edita; `EDITABLES` (`src/lib/ventas/reporteria.ts`, con prueba) se edita con doble clic → `editarCampoReporteria` (whitelist;
+  recalcula `costo_envio` = `monto_envio` + `monto_envio_se` y `metodo_pago` desde la forma de pago; el estado del pedido nunca se edita a mano) y deja la fila
+  en `ven_orden_ediciones` (Movimientos). Migración 0310: columnas `estado_matriz`, `verificado`, `preparacion`, `courier_matriz`, `monto_envio`,
+  `monto_envio_se`, `monto_pagado_delivery`, `delivery`, `cambio_*`, `fecha_devolucion_texto`, `bloque_facturado`, `matriz_en` en `ven_ordenes`; `provincia` en
+  `ven_ordenes_clientes`; RPC `ven_reporteria_aplicar(datos)` (escribe en bloque sin pisar las columnas editadas a mano —`fijos`— ni borrar con vacíos).
+  **Carga de la Matriz** (`guardarLoteMatriz`, `src/lib/ventas/reporteria-importar.ts`): la llave es la misma que Shopify (`huella("ventas|TIENDA|#N")`), así
+  que no duplica; un pedido que llegó de Shopify **no se reescribe** (líneas con producto unido, estado de Monday/Servientrega): solo se completan costo por
+  línea, provincia y columnas de administración; los demás van completos por `guardarLoteOrdenes` (que desde ahora conserva, en todo origen, lo que el sistema
+  ya anotó y no deja volver atrás un pedido cerrado) y vuelven a tomar el producto unido (`aplicarVinculosDeOrdenes`). La usan el botón «Actualizar desde la
+  Matriz» (`importar-matriz.tsx`, lee el .xlsx en el navegador con `leerVentas`), el importador de Ventas por tienda y el script
+  `scripts/finanzas/importar-ventas.ts <archivo.xlsx> --aplicar --reporteria`. `leerMatriz` lee además las columnas nuevas (`ExtrasMatriz`; un título que
+  termina en «*» en `ENCABEZADOS` vale por prefijo, para «FECHA- DEVOLUCION/CAMBIOS/…»). «Difiere de la Matriz» (`difiereDeMatriz`) compara el estado del
+  sistema con `estado_matriz`. «Lo que pasa a Ventas por tienda» es `resumirParaFinanzas` (misma regla que `ven_resumen_mensual`).
 - **Chat de WhatsApp del cliente en Pedidos de tienda, con iComfly** (13 nov 2026, pedido de Hernán; prototipo aprobado): el WhatsApp de los clientes de cada
   tienda lo atiende el bot de **iComfly** (cada tienda, su número); 360dialog sigue siendo solo de la proveeduría (CRM). **Sin apartado propio** (Hernán lo pidió
   así antes de publicar: nada de «Chats de tienda»): el chat va a la derecha de la ficha del pedido (`ficha-orden.tsx`, un solo `ChatTienda` montado en el

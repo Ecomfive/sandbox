@@ -1775,6 +1775,27 @@ export const GUIAS: GuiaModulo[] = [
     ],
   },
   {
+    modulo: "tienda-reporteria",
+    titulo: "Reportería de pedidos",
+    ruta: "/tienda-reporteria",
+    resumen: "La Matriz de administración dentro del sistema: todos los pedidos de las tiendas con todas sus columnas, para trabajar aquí y no en el Excel.",
+    secciones: [
+      {
+        titulo: "Uso",
+        pasos: [
+          "Está en Operación, en el frente Gestión de tienda. Arriba eliges la tienda (o Todas) y el mes.",
+          "La tabla es como la hoja «Excel Matriz»: una fila por producto (las líneas extra del mismo pedido salen con ↳, lo que en el Excel decía «DUPLICADO»), con las columnas en grupos (Pedido, Cliente, Producto, Entrega, Cobro, Costos, Cambios y devoluciones, Facturación) que se muestran u ocultan con los botones de «Columnas». Se busca, se filtra, se agrupa y se descarga a Excel como en las demás tablas.",
+          "Lo que llega solo no se escribe: el pedido, el cliente y los productos vienen de Shopify; la entrega, el courier y la fecha de envío, de Monday y Servientrega; el costo, de la Matriz o de Compras (en gris). Al pasar el cursor por el título de cada columna dice de dónde sale.",
+          "Lo de administración se llena a mano con doble clic en la celda: preparación, verificado, motivo de cancelación, delivery, forma de pago, mes de cobro, montos de envío, cambios y facturación (facturado, N° factura, bloque). Lo cambiado queda marcado en morado y en «Movimientos» (quién, qué y antes/después), como la pestaña MOVIMIENTOS del Excel.",
+          "Las tarjetas de arriba cuentan los pedidos del mes y filtran la tabla: entregados, devoluciones, anulados, sin estado y lo que le falta a administración (por verificar, sin mes de cobro, sin facturar). «Difiere de la Matriz» muestra los pedidos en que el estado del sistema no coincide con lo que anotó la Matriz, para revisarlos.",
+          "Abajo, «Lo que pasa a Ventas por tienda»: por tienda, pedidos, entregados, ventas, costo, envío y margen. Finanzas no carga nada aparte: sale de estos mismos pedidos.",
+          "«Actualizar desde la Matriz», mientras el equipo siga llenando el Excel: se descarga como Excel (en Google Sheets: Archivo › Descargar › Microsoft Excel) y se carga aquí. No duplica ni borra: un pedido que llegó de Shopify solo se completa con lo que anota la Matriz, y lo que alguien cambió a mano en el sistema se queda como está.",
+          "Leer pide el permiso de Reportería de pedidos; editar y cargar la Matriz, poder modificarlo.",
+        ],
+      },
+    ],
+  },
+  {
     modulo: "tienda-confirmacion",
     titulo: "Confirmación",
     ruta: "/tienda-confirmacion",
@@ -2169,6 +2190,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-11-17", titulo: "Reportería de pedidos: la Matriz dentro del sistema", texto: "Nuevo en Operación › Gestión de tienda: «Reportería de pedidos», la Matriz de administración (NUEVA GESTION OCEANS PANAMA) dentro del sistema, para dejar de trabajar en el Excel. Están todos los pedidos de las tiendas con todas las columnas de la Matriz, por tienda y por mes, una fila por producto como en el Excel. Lo que llega solo (Shopify, Monday, Servientrega, el costo) no se escribe; lo de administración (verificado, cobro, facturación, cambios, envíos…) se edita con doble clic y queda en «Movimientos». Arriba cuenta lo que falta por verificar, cobrar o facturar y los pedidos en que la Matriz dice otra cosa que el sistema; abajo, lo que pasa a Ventas por tienda. Mientras el equipo siga llenando el Excel, «Actualizar desde la Matriz» lo carga sin duplicar ni pisar lo editado. Hace falta correr la migración 0310.", modulo: "tienda-reporteria", href: "/tienda-reporteria" },
   { fecha: "2026-11-17", titulo: "Compras: anotar las cajas y la etiqueta a mano", texto: "En la lista de Compras (y en la ficha de la compra) ya puedes anotar o corregir las cajas («Cartons», un número) y la etiqueta de las cajas (una foto) de los envíos viejos que Shen Zhen no anotó. Lo que guardas se ve en el portal del proveedor, igual que lo que anota él se ve en Compras.", modulo: "compras", href: "/compras/lista" },
   { fecha: "2026-11-17", titulo: "Retiros: retiro fallido en el que solo se cobró la comisión", texto: "Cuando la plataforma genera un envío para retirar, después se cancela, pero igual cobra la comisión: en «Crear retiro» marca «Retiro fallido: solo se cobró la comisión» y escribe en Monto lo que cobraron. Todo cuenta como comisión y A recibir queda en 0; al conciliarlo, el monto recibido es 0. En la lista sale «Solo comisión» junto al monto y en la ficha, «Retiro fallido».", modulo: "retiros", href: "/retiros" },
   { fecha: "2026-11-16", titulo: "Confirmación con IA: preguntar antes de pedirle el dato al cliente", texto: "Cuando marcas «Falta un dato» en un pedido, ahora sale un aviso con lo que falta y el mensaje de WhatsApp para el cliente, y eliges si se envía desde el sistema, si ya se le envió a mano o si lo dejas para después. Ya no hace falta que el envío automático esté encendido, y en la ficha del pedido queda el botón «Pedirlo al cliente».", modulo: "tienda-confirmacion", href: "/tienda-confirmacion/ia" },
