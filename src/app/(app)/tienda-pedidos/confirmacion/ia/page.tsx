@@ -10,7 +10,7 @@ import { esAdministrador } from "@/lib/permisos/acceso";
 import { proveedoresConectados } from "@/lib/publicaciones/ia/proveedor";
 import { createServiceClient } from "@/lib/supabase/server";
 import { tiendaElegida } from "@/lib/tienda/datos";
-import { contarEjemplos, listarPalabrasZona } from "../ia-actions";
+import { contarEjemplos, listarMetodosPago, listarPalabrasZona, listarZonasAdelanto } from "../ia-actions";
 import { ConfirmacionIA } from "./confirmacion-ia";
 
 export const metadata = { title: "Confirmación con IA" };
@@ -35,9 +35,9 @@ export default async function ConfirmacionIAPage({ searchParams }: { searchParam
   const tienda = tiendaElegida(tiendas, sp.tienda);
   const { config, faltaMigracion: sinTablas } = await cargarConfig(supabase, pais.id);
   const ids = tienda ? [tienda.id] : limitado ? tiendas.map((t) => t.id) : null;
-  const [{ filas }, totalEjemplos, { palabras }] = sinTablas
-    ? [{ filas: [] }, 0, { palabras: [] }]
-    : await Promise.all([cargarAnalisis(supabase, pais.id, ids, config), contarEjemplos(), listarPalabrasZona()]);
+  const [{ filas }, totalEjemplos, { palabras }, { zonas: zonasAdelanto }, { metodos: metodosPago }] = sinTablas
+    ? [{ filas: [] }, 0, { palabras: [] }, { zonas: [] }, { metodos: [] }]
+    : await Promise.all([cargarAnalisis(supabase, pais.id, ids, config), contarEjemplos(), listarPalabrasZona(), listarZonasAdelanto(), listarMetodosPago()]);
   if (config.activa) after(() => analizarPendientes(createServiceClient(), pais.id, 5));
   const ahora = ahoraMismo();
 
@@ -70,6 +70,8 @@ export default async function ConfirmacionIAPage({ searchParams }: { searchParam
             apagadaPorFaltaDeIA={proveedoresConectados().length === 0}
             ejemplos={{ total: totalEjemplos, tiendaObligatoria: limitado }}
             palabras={palabras}
+            zonasAdelanto={zonasAdelanto}
+            metodosPago={metodosPago}
             instrucciones={esAdministrador(usuario) ? config.instrucciones : null}
           />
         </>

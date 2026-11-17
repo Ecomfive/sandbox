@@ -60,14 +60,23 @@ export function PreguntaMensaje({ p, alCerrar }: { p: PedirDato; alCerrar: () =>
   }
 
   return (
-    <Ventana abierto alCerrar={() => !pendiente && alCerrar()} ancho="md" titulo={<span className="text-base font-semibold">{p.numero ? `Pedido ${p.numero}: falta un dato` : "Falta un dato"}</span>}>
+    <Ventana abierto alCerrar={() => !pendiente && alCerrar()} ancho="md" titulo={<span className="text-base font-semibold">{p.tipo === "adelanto" ? (p.numero ? `Pedido ${p.numero}: pago por adelantado` : "Pago por adelantado") : p.numero ? `Pedido ${p.numero}: falta un dato` : "Falta un dato"}</span>}>
       <div className="flex flex-col gap-4 p-4">
-        <p className="m-0 text-sm">
-          A la dirección le falta <b>{p.falta}</b>. ¿Le escribimos al cliente por WhatsApp para pedírselo?
-        </p>
+        {p.tipo === "adelanto" ? (
+          <p className="m-0 text-sm">
+            Este pedido es de una zona de <b>pago por adelantado</b>. ¿Le escribimos al cliente por WhatsApp para avisarle y pedirle el pago?
+          </p>
+        ) : (
+          <p className="m-0 text-sm">
+            A la dirección le falta <b>{p.falta}</b>. ¿Le escribimos al cliente por WhatsApp para pedírselo?
+          </p>
+        )}
+        {p.tipo === "adelanto" && p.sinMetodos && (
+          <p className="m-0 rounded-md bg-muted px-3 py-2 text-sm">Esta tienda todavía no tiene métodos de pago registrados: el mensaje sale sin ellos. Regístralos en la sección «Pago por adelantado» de esta pantalla.</p>
+        )}
         {yaPedido && (
           <p className="m-0 rounded-md bg-muted px-3 py-2 text-sm">
-            {p.estado === "manual" ? "Ya se le había enviado un mensaje a mano." : "Ya se le había pedido un dato por WhatsApp."} Envíalo de nuevo solo si es otro dato.
+            {p.estado === "manual" ? "Ya se le había enviado un mensaje a mano." : p.tipo === "adelanto" ? "Ya se le había avisado por WhatsApp." : "Ya se le había pedido un dato por WhatsApp."} {p.tipo === "adelanto" ? "Envíalo de nuevo solo si hace falta." : "Envíalo de nuevo solo si es otro dato."}
           </p>
         )}
         <div>

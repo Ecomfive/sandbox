@@ -60,7 +60,7 @@ export default async function ConfiguracionPage() {
     supabase.from("compras_avisos_destinatarios").select("evento, perfil_id"),
     supabase.from("perfiles").select("id, nombre, email, roles(nombre)").eq("activo", true).order("nombre"),
   ]);
-  const marcadosAvisosCompras: Record<EventoAviso, string[]> = { llegada_puerto: [], llegada_bodega: [] };
+  const marcadosAvisosCompras: Record<EventoAviso, string[]> = { llegada_puerto: [], llegada_bodega: [], pago_adelantado: [] };
   for (const d of (destinatariosR.data ?? []) as { evento: EventoAviso; perfil_id: string }[]) marcadosAvisosCompras[d.evento]?.push(d.perfil_id);
   const personasAvisosCompras = ((personasComprasR.data ?? []) as unknown as { id: string; nombre: string | null; email: string; roles: { nombre: string } | null }[]).map((p) => ({ id: p.id, nombre: p.nombre || p.email, rol: p.roles?.nombre ?? null }));
   const personasLider: PersonaLider[] | null = lideresR.error
@@ -144,7 +144,7 @@ export default async function ConfiguracionPage() {
 
       {!destinatariosR.error && (
         <div id="avisos-compras" className="flex flex-col gap-3">
-          <h2 className="text-sm font-semibold tracking-tight">Avisos de Compras</h2>
+          <h2 className="text-sm font-semibold tracking-tight">Avisos a personas</h2>
           <AvisosComprasConfig personas={personasAvisosCompras} marcados={marcadosAvisosCompras} puedeEscribir={puedeEscribir} />
         </div>
       )}
