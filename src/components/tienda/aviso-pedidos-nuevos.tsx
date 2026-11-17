@@ -25,7 +25,7 @@ const CADA_MS = 30_000;
 const DURA_MS = 60_000;
 
 /** Un «ding» corto con el audio del navegador (sin archivos). Si el navegador no deja sonar todavía, no pasa nada. */
-function sonar() {
+export function sonar() {
   try {
     const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!Ctx) return;
