@@ -2,6 +2,8 @@
 // que leen las entregas de los pedidos, Logística y la ficha del pedido. Las etiquetas se muestran limpias (`etiquetaLimpia`) y un pedido que está en el
 // consolidado y en el tablero del repartidor sale una sola vez (`sinDuplicados`).
 
+import { cargarTiendasPermitidas } from "@/lib/finanzas/cargar-tiendas-permitidas";
+import { SIN_TIENDA } from "@/lib/finanzas/tiendas-permitidas";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { etiquetaLimpia, grupoDevolucion, sinDuplicados } from "./etiquetas";
@@ -74,6 +76,15 @@ function aFila(r: Record<string, unknown>, clase: Clase): FilaTablero {
   };
 }
 
+/**
+ * Con tiendas limitadas (17 nov 2026: la gente de Nuvo ve solo lo de Nuvo), solo las filas de sus tiendas; las que no tienen tienda reconocida no se ven.
+ * Sin límite, todas.
+ */
+export function soloSusTiendas<Q>(q: Q, permitidas: string[] | null): Q {
+  if (permitidas === null) return q;
+  return (q as unknown as { in: (columna: string, valores: string[]) => Q }).in("unidad_id", permitidas.length ? permitidas : [SIN_TIENDA]);
+}
+
 /** El tablero consolidado de Monday (para preferir el del repartidor cuando un pedido está en los dos). */
 export async function tableroConsolidado(supabase: SupabaseClient): Promise<string | null> {
   const { data } = await supabase.from("mon_config").select("tablero_id").eq("id", 1).maybeSingle();
@@ -86,8 +97,9 @@ export async function tableroConsolidado(supabase: SupabaseClient): Promise<stri
  */
 export async function cargarCiudad(supabase: SupabaseClient, desde: string, hasta: string, archivados = false): Promise<{ filas: FilaTablero[]; faltaMigracion: boolean }> {
   let faltaMigracion = false;
+  const permitidas = await cargarTiendasPermitidas();
   const crudas = await traerTodasLasFilas<Record<string, unknown>>((d, h) => {
-    const q = supabase.from("mon_despachos").select(COLUMNAS).eq("clase", "ciudad");
+    const q = soloSusTiendas(supabase.from("mon_despachos").select(COLUMNAS).eq("clase", "ciudad"), permitidas);
     return (archivados ? q.not("archivado_en", "is", null) : q.is("archivado_en", null).gte("fecha_despacho", desde).lte("fecha_despacho", hasta)).order("item_id").range(d, h);
   }).catch(() => {
     faltaMigracion = true;
@@ -101,8 +113,9 @@ export async function cargarCiudad(supabase: SupabaseClient, desde: string, hast
 /** Las devoluciones (todas las tiendas), sin las archivadas; con `archivados`, solo las archivadas. */
 export async function cargarDevoluciones(supabase: SupabaseClient, archivados = false): Promise<{ filas: FilaTablero[]; faltaMigracion: boolean }> {
   let faltaMigracion = false;
+  const permitidas = await cargarTiendasPermitidas();
   const crudas = await traerTodasLasFilas<Record<string, unknown>>((d, h) => {
-    const q = supabase.from("mon_despachos").select(COLUMNAS).eq("clase", "devolucion");
+    const q = soloSusTiendas(supabase.from("mon_despachos").select(COLUMNAS).eq("clase", "devolucion"), permitidas);
     return (archivados ? q.not("archivado_en", "is", null) : q.is("archivado_en", null)).order("item_id").range(d, h);
   }).catch(() => {
     faltaMigracion = true;

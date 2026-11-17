@@ -7,7 +7,7 @@ import { formatearFechaHora } from "@/lib/formato";
 import { getPaisActual } from "@/lib/pais";
 import { createServiceClient } from "@/lib/supabase/server";
 import { revisarSiHaceFalta } from "@/lib/tienda/conectar-shopify";
-import { cargarTiendas, tiendaElegida } from "@/lib/tienda/datos";
+import { tiendasDeLaPersona } from "@/lib/tienda/acceso";
 import { pedidosDeTiendas } from "@/lib/tienda/datos-finanzas";
 import { entregasDeOrdenes, guiasDeOrdenes } from "@/lib/tienda/entregas-monday";
 import { etapaLogistica, razonAVerificar } from "@/lib/tienda/logistica";
@@ -38,8 +38,8 @@ export default async function LogisticaTiendaPage({ searchParams }: { searchPara
   const sp = await searchParams;
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
-  const { tiendas, faltaMigracion } = await cargarTiendas(supabase, pais.id);
-  const tienda = tiendaElegida(tiendas, sp.tienda);
+  // Solo las tiendas de la persona (17 nov 2026: quien tiene tiendas limitadas, como la gente de Nuvo, ve solo las suyas y nunca «Todas»).
+  const { tiendas, tienda, limitado, faltaMigracion } = await tiendasDeLaPersona(supabase, pais.id, sp.tienda);
   const miradas = tienda ? [tienda] : tiendas;
   // Solo la tienda que se mira (14 nov 2026: «si abro Kenku, que se actualice Kenku»); con «Todas», todas.
   after(() => revisarSiHaceFalta(createServiceClient(), miradas));
@@ -75,7 +75,8 @@ export default async function LogisticaTiendaPage({ searchParams }: { searchPara
   });
   const sinPedido = await mondaySinPedido(supabase, [...new Set(miradas.map((t) => fuente.unidadDe.get(t.id)).filter((u): u is string => !!u))]);
   const ultimaSiscore = (lecturas?.[0]?.fin as string | undefined) ?? null;
-  const puedeLeer = !usuario.modulosSoloLectura.includes("tienda-logistica");
+  // Leer SISCORE es del equipo de Ecomfive: quien tiene tiendas limitadas (17 nov 2026) no ve el botón.
+  const puedeLeer = !usuario.modulosSoloLectura.includes("tienda-logistica") && !limitado;
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-5">
       <EncabezadoPagina titulo="Logística" oculto>
@@ -88,7 +89,7 @@ export default async function LogisticaTiendaPage({ searchParams }: { searchPara
       ) : (
         <>
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <BarraTienda ruta="/tienda-pedidos/logistica" tiendas={tiendas} tiendaId={tienda?.id ?? null} />
+            <BarraTienda ruta="/tienda-pedidos/logistica" tiendas={tiendas} tiendaId={tienda?.id ?? null} sinTodas={limitado} />
             {puedeLeer && <LeerSiscore key={tienda?.id ?? "todas"} ultima={ultimaSiscore ? formatearFechaHora(ultimaSiscore) : null} tiendaId={tienda?.id ?? null} tiendaNombre={tienda?.nombre ?? null} />}
           </div>
           <AvisoConexion tiendas={miradas} finanzas={fuente} />

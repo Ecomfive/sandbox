@@ -1,5 +1,8 @@
 "use server";
 
+import { cargarTiendasPermitidas } from "@/lib/finanzas/cargar-tiendas-permitidas";
+import { puedeVerUnidad } from "@/lib/finanzas/tiendas-permitidas";
+import { SIN_ACCESO_TIENDA } from "@/lib/finanzas/acceso-tienda";
 import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { requireModulo, requireModuloEscritura, type UsuarioActual } from "@/lib/auth";
@@ -42,12 +45,19 @@ const revalidar = () => {
   for (const p of RUTAS) revalidatePath(p);
 };
 
+/** Si la persona puede ver esa tienda (unidad de Finanzas; sin tienda, solo quien no tiene límite). */
+async function puedeVerLa(unidadId: string | null): Promise<boolean> {
+  return puedeVerUnidad(await cargarTiendasPermitidas(), unidadId);
+}
+
 async function casoConPermiso(itemId: string, archivo = false): Promise<{ supabase: Supabase; usuario: UsuarioActual; fila: Record<string, unknown> } | { error: string }> {
   if (!esItem(itemId)) return { error: "Solicitud no válida." };
   const usuario = await requireModuloEscritura(MODULO);
   const supabase = createServiceClient();
   const { data: fila, error } = await supabase.from("mon_postventa").select("*").eq("item_id", itemId).maybeSingle();
   if (error || !fila) return { error: "Esa solicitud ya no existe." };
+  // Solo solicitudes de las tiendas de la persona (17 nov 2026: la gente de Nuvo, solo lo de Nuvo).
+  if (!(await puedeVerLa((fila.unidad_id as string | null) ?? null))) return { error: SIN_ACCESO_TIENDA };
   if (fila.archivado_en && !archivo) return { error: "Esa solicitud está archivada: restáurala para cambiarla." };
   return { supabase, usuario, fila };
 }
@@ -110,6 +120,7 @@ export async function cambiarCaso(itemId: string, campo: string, valor: string):
     despues = v || null;
     set.tienda_texto = despues;
     Object.assign(set, await enlazar(supabase, fila.numero_pedido as string | null, despues));
+    if (!(await puedeVerLa((set.unidad_id as string | null) ?? null))) return { error: SIN_ACCESO_TIENDA };
   } else if (campo === "tipo") {
     const t = TIPOS.find((x) => x.nombre === v);
     if (!t) return { error: "Ese tipo no está en la lista." };
@@ -320,8 +331,9 @@ export async function detalleCaso(itemId: string): Promise<DetalleCaso | { error
   if (!esItem(itemId)) return { error: "Solicitud no válida." };
   const usuario = await requireModulo(MODULO);
   const supabase = createServiceClient();
-  const { data: fila } = await supabase.from("mon_postventa").select("adjuntos, despacho_item_id, solicitud").eq("item_id", itemId).maybeSingle();
+  const { data: fila } = await supabase.from("mon_postventa").select("adjuntos, despacho_item_id, solicitud, unidad_id").eq("item_id", itemId).maybeSingle();
   if (!fila) return { error: "Esa solicitud ya no existe." };
+  if (!(await puedeVerLa((fila.unidad_id as string | null) ?? null))) return { error: SIN_ACCESO_TIENDA };
   const [{ data: notas }, { data: actividad }, { data: cuenta }, despacho] = await Promise.all([
     supabase.from("postventa_notas").select("id, texto, autor_nombre, creado_en").eq("item_id", itemId).order("creado_en", { ascending: false }).limit(100),
     supabase.from("postventa_actividad").select("id, texto, autor_nombre, creado_en").eq("item_id", itemId).order("creado_en", { ascending: false }).limit(100),
@@ -360,7 +372,8 @@ export async function buscarPedido(tienda: string, numero: string): Promise<{ pe
   const n = String(numero ?? "").trim();
   if (n.replace(/\D/g, "").length < 3) return { pedido: null };
   const supabase = createServiceClient();
-  const { orden_id } = await enlazar(supabase, `#${n.replace(/^#/, "")}`, tienda);
+  const { orden_id, unidad_id } = await enlazar(supabase, `#${n.replace(/^#/, "")}`, tienda);
+  if (!(await puedeVerLa(unidad_id))) return { error: SIN_ACCESO_TIENDA };
   if (!orden_id) return { pedido: null };
   const [{ data: o }, { data: lineas }] = await Promise.all([
     supabase.from("ven_ordenes").select("numero, fecha, total, estado_entrega, metodo_pago").eq("id", orden_id).maybeSingle(),
@@ -428,6 +441,7 @@ export async function crearSolicitud(d: NuevaSolicitud): Promise<Resultado & { i
   const datos: DatosSolicitud = { tienda: d.tienda, numero, tipos, retirar, enviar, reembolso, reembolsoComo: d.reembolsoComo ? String(d.reembolsoComo).slice(0, 40) : null, motivo, detalle, costoEnvio, enviaPaga: envioPaga };
   const supabase = createServiceClient();
   const enlace = await enlazar(supabase, `#${numero}`, d.tienda);
+  if (!(await puedeVerLa(enlace.unidad_id))) return { error: SIN_ACCESO_TIENDA };
   const itemId = nuevoId();
   const ahora = new Date().toISOString();
   const textoLineas = (l: Linea[]) => (l.length ? l.map((x) => `${x.cantidad} × ${x.producto}`).join(", ") : null);

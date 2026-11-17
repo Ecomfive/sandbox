@@ -1,6 +1,8 @@
 // Gestión de tienda › Cambios y reembolsos (migración 0972): lo que lee el tablero de `mon_postventa`, la misma tabla que llenaba Monday y que leen la
 // ficha del pedido, Pedidos y Logística. Los abiertos se muestran todos; los realizados, los de los últimos días (o todos, si se pide).
 
+import { cargarTiendasPermitidas } from "@/lib/finanzas/cargar-tiendas-permitidas";
+import { soloSusTiendas } from "@/lib/despacho/datos";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { ESTADOS, etiquetaDe, grupoDe, GRUPO_REALIZADOS, NOTIFICAR, TIPOS } from "./reglas";
@@ -101,8 +103,10 @@ export async function cargarCasos(
   const personas = await cargarPersonas(supabase);
   const mapa = new Map(personas.map((p) => [p.id, p.nombre]));
   const desde = opciones.diasRealizados === null ? null : new Date(Date.now() - opciones.diasRealizados * 86_400_000).toISOString();
+  // Con tiendas limitadas (17 nov 2026), solo las solicitudes de sus tiendas.
+  const permitidas = await cargarTiendasPermitidas();
   const crudas = await traerTodasLasFilas<Record<string, unknown>>((d, h) => {
-    const q = supabase.from("mon_postventa").select(COLUMNAS);
+    const q = soloSusTiendas(supabase.from("mon_postventa").select(COLUMNAS), permitidas);
     if (opciones.archivados) return q.not("archivado_en", "is", null).order("item_id").range(d, h);
     const base = q.is("archivado_en", null);
     // Los realizados de hace poco: por cuándo se abrieron o cuándo se cambiaron por última vez.
