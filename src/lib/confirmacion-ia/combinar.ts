@@ -62,7 +62,7 @@ export function leerRespuesta(texto: string): RespuestaModelo | null {
     return null;
   }
   const zona = String(j.zona ?? "").toLowerCase().trim();
-  if (zona !== "ciudad" && zona !== "interior" && zona !== "no_se" && zona !== "no_aplica") return null;
+  if (zona !== "ciudad" && zona !== "interior" && zona !== "adelantado" && zona !== "no_se" && zona !== "no_aplica") return null;
   if (typeof j.completa !== "boolean") return null;
   const falta = j.completa ? null : limpiarFalta(j.falta);
   return { zona: zona === "no_aplica" ? "no_se" : zona, completa: j.completa, falta, motivo: String(j.motivo ?? "").trim().slice(0, 400) };
@@ -88,7 +88,7 @@ export function combinar({ distingueZona, zonaReglas, modelos }: { distingueZona
       zonaPor = "regla";
     } else {
       const zonas = buenos.map((m) => m.respuesta.zona);
-      if (zonas.every((z) => z === "ciudad" || z === "interior") && new Set(zonas).size === 1) {
+      if (zonas.every((z) => z === "ciudad" || z === "interior" || z === "adelantado") && new Set(zonas).size === 1) {
         zona = zonas[0] as Zona;
         zonaPor = "ia";
       }
@@ -100,6 +100,8 @@ export function combinar({ distingueZona, zonaReglas, modelos }: { distingueZona
   const acuerdo = buenos.length < 2 ? null : mismaCompleta && mismaZona;
   const motivo = buenos.map((m) => m.respuesta.motivo).filter(Boolean)[0] ?? "";
 
+  // Pago por adelantado (por una palabra de zona o porque las dos IA lo ven así): queda «en espera de pago», sin etiqueta, aunque la dirección falte algo (el asesor se pone en contacto de todos modos).
+  if (zona === "adelantado") return { estado: "adelantado", zona: null, zonaPor, completa, falta: null, acuerdo, motivo };
   if (!completa) return { estado: "falta_dato", zona, zonaPor, completa, falta, acuerdo, motivo };
   if (distingueZona && !zona) return { estado: "revisar", zona: null, zonaPor: null, completa, falta: null, acuerdo, motivo };
   return { estado: "listo", zona, zonaPor, completa, falta: null, acuerdo, motivo };
@@ -127,6 +129,7 @@ export function mensajePagoAdelantado({ nombre, numero, tienda, metodos }: { nom
 
 /** La etiqueta de Shopify que corresponde a una zona, según lo configurado en el país; null si el país no la tiene definida. */
 export function etiquetaDeZona(zona: Zona | null, config: { etiquetaCiudad: string | null; etiquetaInterior: string | null }): string | null {
-  if (!zona) return null;
+  // El pago por adelantado no tiene etiqueta de envío: la pone el asesor cuando llega el pago.
+  if (!zona || zona === "adelantado") return null;
   return (zona === "ciudad" ? config.etiquetaCiudad : config.etiquetaInterior)?.trim() || null;
 }

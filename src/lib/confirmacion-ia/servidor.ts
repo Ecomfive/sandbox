@@ -61,13 +61,6 @@ export async function cargarConfig(supabase: SupabaseClient, paisId: string): Pr
   };
 }
 
-/** Las zonas de pago por adelantado del país (vacías si no hay o si falta la migración 0312). El `resultado` es solo de relleno: aquí no se decide ciudad o interior. */
-export async function cargarZonasAdelanto(supabase: SupabaseClient, paisId: string): Promise<ReglaZona[]> {
-  const { data, error } = await supabase.from("confirmacion_ia_adelanto_zonas").select("id, texto, clave").eq("pais_id", paisId).order("creado_en", { ascending: false }).limit(500);
-  if (error) return [];
-  return (data ?? []).map((r) => ({ id: r.id as string, texto: r.texto as string, clave: r.clave as string, resultado: "interior" as Zona }));
-}
-
 export async function cargarReglas(supabase: SupabaseClient, paisId: string): Promise<ReglaZona[]> {
   const { data } = await supabase.from("confirmacion_ia_zonas").select("id, texto, clave, resultado").eq("pais_id", paisId).order("creado_en", { ascending: false }).limit(500);
   return (data ?? []).map((r) => ({ id: r.id as string, texto: r.texto as string, clave: r.clave as string, resultado: r.resultado as Zona }));
@@ -270,7 +263,7 @@ export async function analizarOrden(supabase: SupabaseClient, ordenId: string, o
   }
 
   // Una zona de pago por adelantado (Bocas del Toro, Puerto Armuelles…) manda sobre todo: el pedido queda «en espera de pago», sin etiqueta y sin gastar las IA; el asesor le avisa al cliente y pone la etiqueta real cuando llega el pago.
-  const adelanto = zonasDeAdelanto(direccion, ciudad, await cargarZonasAdelanto(supabase, o.paisId));
+  const adelanto = zonasDeAdelanto(direccion, ciudad, await cargarReglas(supabase, o.paisId));
   const { combinado: c, modelos, coinc } = adelanto.length
     ? { combinado: { estado: "adelantado", zona: null, zonaPor: null, completa: null, falta: null, acuerdo: null, motivo: motivoDeAdelanto(adelanto) } as Combinado, modelos: [] as ResultadoModelo[], coinc: [] as ReglaZona[] }
     : await evaluarDireccion(supabase, { paisId: o.paisId, paisNombre: o.paisNombre, paisCodigo: o.paisCodigo, tiendaId: o.tiendaId, numero: o.numero, direccion, ciudad, config });

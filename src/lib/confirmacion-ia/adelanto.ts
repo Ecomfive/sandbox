@@ -1,10 +1,11 @@
-// Confirmación con IA › pago por adelantado (17 nov 2026): las zonas de difícil acceso o fronterizas (Bocas del Toro, Puerto Armuelles…) que se pagan por adelantado. Una palabra sola o varias juntas que, si salen en la
-// dirección o en la ciudad, vuelven el pedido «En espera de pago». Lógica pura, con prueba; usa las mismas reglas de comparación que las palabras de zona.
+// Confirmación con IA › pago por adelantado (17 nov 2026): las zonas de difícil acceso o fronterizas (Bocas del Toro, Puerto Armuelles…) que se pagan por adelantado. Son palabras de zona (una sola o varias juntas) con
+// «Pago por adelantado» como zona: si salen en la dirección o en la ciudad, el pedido queda «En espera de pago». Lógica pura, con prueba.
 
 import { coincidencias, type ReglaZona } from "./zonas";
 
-/** Las zonas de pago por adelantado que salen en la dirección o en la ciudad (completas y en ese orden). Sin zonas cargadas, ninguna: el pago por adelantado no se activa solo. */
-export function zonasDeAdelanto(direccion: string | null, ciudad: string | null, zonas: ReglaZona[]): ReglaZona[] {
+/** Las palabras de pago por adelantado (de todas las palabras de zona del país) que salen en la dirección o en la ciudad, completas y en ese orden. Sin ninguna cargada, ninguna: el pago por adelantado no se activa solo. */
+export function zonasDeAdelanto(direccion: string | null, ciudad: string | null, reglas: ReglaZona[]): ReglaZona[] {
+  const zonas = reglas.filter((r) => r.resultado === "adelantado");
   if (!zonas.length) return [];
   return coincidencias(`${direccion ?? ""} ${ciudad ?? ""}`, zonas);
 }

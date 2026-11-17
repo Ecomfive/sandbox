@@ -4,7 +4,7 @@ import { enEspera, motivoDeAdelanto, zonasDeAdelanto } from "./adelanto";
 import { mensajePagoAdelantado } from "./combinar";
 import type { ReglaZona } from "./zonas";
 
-const z = (texto: string): ReglaZona => ({ id: texto, texto, clave: texto.toLowerCase().normalize("NFD").replace(/\p{M}/gu, ""), resultado: "interior" });
+const z = (texto: string, resultado: ReglaZona["resultado"] = "adelantado"): ReglaZona => ({ id: texto, texto, clave: texto.toLowerCase().normalize("NFD").replace(/\p{M}/gu, ""), resultado });
 
 test("una zona de pago por adelantado sale en la dirección o en la ciudad, completa", () => {
   const zonas = [z("Bocas del Toro"), z("Puerto Armuelles")];
@@ -42,4 +42,10 @@ test("el mensaje al cliente lleva los métodos de pago de la tienda, o dice que 
   assert.match(sin, /^Hola 👋 Tu pedido es para una zona con pago por adelantado/);
   assert.match(sin, /Un asesor te indicará cómo pagar/);
   assert.doesNotMatch(sin, /Puedes pagar así/);
+});
+
+test("solo cuentan las palabras de zona marcadas como pago por adelantado", () => {
+  const reglas = [z("Bocas del Toro"), z("Colón", "interior"), z("Ciudad de Panamá", "ciudad")];
+  assert.deepEqual(zonasDeAdelanto("Casa 4, Colón", null, reglas), [], "Colón es interior, no pago por adelantado");
+  assert.deepEqual(zonasDeAdelanto("Calle 3", "Bocas del Toro", reglas).map((r) => r.texto), ["Bocas del Toro"]);
 });
