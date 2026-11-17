@@ -5,6 +5,8 @@ import { Suspense, use } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { Tooltip } from "@/components/ui/tooltip";
 import { NotificacionesIcon } from "@/lib/nav-icons";
+import { usePendientesVivos } from "@/components/pendientes-vivos";
+import { conPendientesVivos } from "@/lib/pendientes-vivos";
 import { textoContador, textoPendientes, type PendientesMenu } from "@/lib/contadores-menu";
 
 function Campana({ cantidad }: { cantidad: number }) {
@@ -30,7 +32,8 @@ function Campana({ cantidad }: { cantidad: number }) {
 }
 
 function ConConteo({ pendientes }: { pendientes: Promise<PendientesMenu> }) {
-  return <Campana cantidad={use(pendientes).tareasMias} />;
+  const { vivos } = usePendientesVivos();
+  return <Campana cantidad={conPendientesVivos(use(pendientes), vivos).tareasMias} />;
 }
 
 /**

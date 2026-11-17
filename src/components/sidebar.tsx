@@ -10,7 +10,9 @@ import { ContadorMenu, ContadorSobreIcono } from "@/components/sidebar-contador"
 import { FavoritoToggle } from "@/components/favorito-toggle";
 import { anilloFoco } from "@/components/ui/field";
 import { Tooltip } from "@/components/ui/tooltip";
+import { usePendientesVivos } from "@/components/pendientes-vivos";
 import { SIN_PENDIENTES, type PendientesMenu } from "@/lib/contadores-menu";
+import { conPendientesVivos } from "@/lib/pendientes-vivos";
 import { FRENTES, PRONTO_NAV, agruparPaginas, encontrarSeccionActiva, moduloDeHref, type NavItem, type NavSection } from "@/lib/nav-data";
 import { AjustesIcon, AvisosIcon, AyudaIcon, BabyYodaIcon, ConfiguracionIcon, DashboardIcon, HistorialIcon, ICONOS_PAGINA, SECTION_ICONS } from "@/lib/nav-icons";
 
@@ -532,7 +534,9 @@ function ListaMovil({
 }
 
 function Resuelto({ pendientes, children }: { pendientes: Promise<PendientesMenu>; children: (p: PendientesMenu) => ReactNode }) {
-  return <>{children(use(pendientes))}</>;
+  // Los avisos «Para ti» y las tareas se vuelven a preguntar solos cada 30 s: el número del menú se actualiza sin cambiar de página.
+  const { vivos } = usePendientesVivos();
+  return <>{children(conPendientesVivos(use(pendientes), vivos))}</>;
 }
 
 /**

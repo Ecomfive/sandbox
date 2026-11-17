@@ -7,6 +7,7 @@ import { LatidoPresencia } from "@/components/latido-presencia";
 import { AvisoPedidosNuevos } from "@/components/tienda/aviso-pedidos-nuevos";
 import { AvisoInactividad } from "@/components/aviso-inactividad";
 import { AvisoPersonal } from "@/components/aviso-personal";
+import { ProveedorPendientesVivos } from "@/components/pendientes-vivos";
 import { ProveedorModulos } from "@/components/modulos-contexto";
 import { ProveedorPais } from "@/components/pais-contexto";
 import { ProveedorDescargaPdf } from "@/components/tabla/descarga-pdf-contexto";
@@ -108,6 +109,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   return (
     <ProveedorModulos modulos={usuario?.modulos ?? null}>
     <ProveedorPais codigo={paisActual.codigo}>
+    <ProveedorPendientesVivos>
     <ProveedorDescargaPdf puede={!!usuario && PUEDEN_DESCARGAR_PDF.has(usuario.id)}>
     <ToastProvider>
       {usuario && <LatidoPresencia />}
@@ -131,6 +133,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       </div>
     </ToastProvider>
     </ProveedorDescargaPdf>
+    </ProveedorPendientesVivos>
     </ProveedorPais>
     </ProveedorModulos>
   );
