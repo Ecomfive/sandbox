@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import { ETAPAS_COMPRA } from "../../app/(app)/compras/def-compras";
-import { armarAviso, llegadaDeEtapa, pagadoTrasSegundoPago, revisarPago, textoProductos, totalesDeLlegada, type FilaLlegada } from "./llegadas-avisos";
+import { armarAviso, desdeDeLista, diasDeLista, llegadaDeEtapa, unaPorCompra, pagadoTrasSegundoPago, revisarPago, textoProductos, totalesDeLlegada, type FilaLlegada } from "./llegadas-avisos";
 
 const fila = (o: Partial<FilaLlegada> = {}): FilaLlegada => ({
   compraId: "c1",
@@ -89,4 +89,25 @@ test("registrar el pago: monto y día válidos, y el pagado a proveedor nunca ba
   assert.equal(pagadoTrasSegundoPago(null, 1000, 1200), 2200);
   assert.equal(pagadoTrasSegundoPago(5000, 1000, 1200), 5000);
   assert.equal(pagadoTrasSegundoPago(2000, null, 1200), 2000);
+});
+
+test("la lista de todas las llegadas: periodos válidos, desde las 00:00 de Panamá y una vez por compra", () => {
+  assert.equal(diasDeLista("30"), 30);
+  assert.equal(diasDeLista(["1"]), 1);
+  assert.equal(diasDeLista("5"), 7, "un periodo que no existe vuelve al de entrada");
+  assert.equal(diasDeLista(undefined), 7);
+  assert.equal(desdeDeLista("2026-11-17", 1), "2026-11-17T00:00:00-05:00");
+  assert.equal(desdeDeLista("2026-11-17", 7), "2026-11-11T00:00:00-05:00");
+  assert.equal(desdeDeLista("2026-03-02", 7), "2026-02-24T00:00:00-05:00");
+  const filas = [fila({ compraId: "a", llegadaId: "nueva" }), fila({ compraId: "b" }), fila({ compraId: "a", llegadaId: "vieja" })];
+  assert.deepEqual(unaPorCompra(filas).map((f) => [f.compraId, f.llegadaId]), [["a", "nueva"], ["b", undefined]]);
+});
+
+test("el aviso de llegada a puerto lleva a la lista; el de bodega conserva su llegada", async () => {
+  const { hrefDeAviso, esAvisoDePuerto, RUTA_LISTA_PUERTO } = await import("./llegadas-avisos");
+  assert.equal(esAvisoDePuerto("Llega a puerto: 3 compras · 900 unidades"), true);
+  assert.equal(esAvisoDePuerto("En bodega: $120.00 por pagar de 1 compra"), false);
+  assert.equal(hrefDeAviso("Llega a puerto: 1 compra · 10 unidades", "/llegadas/abc"), RUTA_LISTA_PUERTO);
+  assert.equal(hrefDeAviso("En bodega: $120.00 por pagar de 1 compra", "/llegadas/abc"), "/llegadas/abc");
+  assert.equal(hrefDeAviso("Llega a puerto: x", "/compras/lista"), "/compras/lista");
 });

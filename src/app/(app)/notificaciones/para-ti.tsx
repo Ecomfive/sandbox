@@ -4,6 +4,7 @@ import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { BotonBarra } from "@/components/panel/piezas-panel";
 import { anilloFoco } from "@/components/ui/field";
+import { RUTA_LISTA_PUERTO } from "@/lib/compras/llegadas-avisos";
 import { marcarAvisoLeido, marcarTodosLeidos } from "@/lib/menciones-actions";
 
 export interface AvisoParaTi {
@@ -65,7 +66,10 @@ export function ParaTi({ avisos }: { avisos: AvisoParaTi[] }) {
                   {!a.leida && <span className="sr-only">(sin leer)</span>}
                 </span>
                 {a.texto && <span className="line-clamp-2 text-xs text-muted-foreground">«{a.texto}»</span>}
-                <span className="text-xs text-muted-foreground">{fechaHora(a.creadoEn)}</span>
+                <span className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  {fechaHora(a.creadoEn)}
+                  {a.href === RUTA_LISTA_PUERTO && <span className="rounded-md border border-border-control bg-card px-2 py-0.5 font-medium text-foreground">Ver lista</span>}
+                </span>
               </button>
             </li>
           ))}
