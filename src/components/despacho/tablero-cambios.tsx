@@ -16,7 +16,7 @@ import {
   restaurarCaso,
   subirAdjuntoCaso,
   type DetalleCaso,
-} from "@/app/(app)/despacho-cambios/actions";
+} from "@/app/(app)/despacho-ciudad/cambios/actions";
 import type { FilaCaso, Persona } from "@/lib/postventa/datos";
 import { colorDe, ESTADOS, grupoPorEstado, GRUPOS, NOTIFICAR, TIENDAS, TIPOS, type Etiqueta } from "@/lib/postventa/reglas";
 import { textoSobre } from "@/lib/despacho/etiquetas";
@@ -201,7 +201,7 @@ export function TableroCambios({
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
         {puedeEscribir && (
-          <Link href="/despacho-cambios/nueva" className={`boton-neon inline-flex min-h-9 items-center rounded-md px-3.5 text-[13px] font-medium text-white ${anilloFoco}`}>
+          <Link href="/despacho-ciudad/cambios/nueva" className={`boton-neon inline-flex min-h-9 items-center rounded-md px-3.5 text-[13px] font-medium text-white ${anilloFoco}`}>
             + Nueva solicitud
           </Link>
         )}

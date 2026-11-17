@@ -118,21 +118,11 @@ const AREAS: NavSection[] = [
       { label: "Gestión de IDs Drop", href: "/publicaciones-drop", frente: "proveeduria" },
       { label: "Gestión de IDs Effi", href: "/publicaciones-effi", frente: "proveeduria" },
       { label: "Gestión de IDs Dunamixfy", href: "/publicaciones-dunamixfy", frente: "proveeduria" },
-      // Gestión de tienda (3 nov 2026): las tiendas de Shopify (Kenku primero), conectadas solo de lectura.
+      // Gestión de tienda (17 nov 2026, pedido de Hernán: «que no esté todo repartido»): tres entradas y lo demás son pestañas de ellas
+      // (`PESTANAS_POR_MODULO`). Pedidos: Confirmación, Con IA, Logística y Cuánto hay. Despacho ciudad, como el panel de Monday: Devoluciones,
+      // Cambios y reembolsos, Cuánto hay y Pedir a inventario. Tiendas Shopify: Productos. Cada pestaña sigue con su propio permiso.
       { label: "Pedidos de tienda", href: "/tienda-pedidos", frente: "tienda" },
-      { label: "Confirmación", href: "/tienda-confirmacion", frente: "tienda" },
-      { label: "Logística de tienda", href: "/tienda-logistica", frente: "tienda" },
-      // Las entregas de ciudad y las devoluciones, que antes se anotaban en Monday (15 nov 2026, migración 0970).
       { label: "Despacho ciudad", href: "/despacho-ciudad", frente: "tienda" },
-      { label: "Devoluciones", href: "/despacho-devoluciones", frente: "tienda" },
-      // El tablero «CAMBIOS Y REEMBOLSOS» de Monday (16 nov 2026, migración 0972).
-      { label: "Cambios y reembolsos", href: "/despacho-cambios", frente: "tienda" },
-      // «¿Cuánto hay?» (16 nov 2026, migración 0301): la tienda pregunta y Yiletsi responde con lo que contó despacho.
-      { label: "Preguntar cuánto hay", href: "/tienda-cuanto-hay", frente: "tienda" },
-      { label: "Responder cuánto hay", href: "/despacho-cuanto-hay", frente: "tienda" },
-      // Pedir a inventario (16 nov 2026, migración 0305): despacho pide lo que se agotó; inventario lo envía (hace el traslado).
-      { label: "Pedir a inventario", href: "/despacho-pedir-inventario", frente: "tienda" },
-      { label: "Productos de Shopify", href: "/tienda-productos", frente: "tienda" },
       { label: "Tiendas Shopify", href: "/tienda-tiendas", frente: "tienda" },
       { label: "Alertas de inventario", href: "/alertas", dropi: true, frente: "fulfillment" },
       { label: "Inventario", href: "/inventario", dropi: true, frente: "fulfillment" },
@@ -262,6 +252,9 @@ export function paginaInicialDe(modulos: readonly string[], excluirModulo?: stri
       if (!item.href) continue;
       const modulo = moduloDeHref(item.href);
       if (modulo !== excluirModulo && modulos.includes(modulo)) return item.href;
+      // Una entrada con pestañas: la primera pestaña suya (si no es del módulo que la rechazó).
+      const pestana = (PESTANAS_CON_MODULO[item.href] ?? []).find((p) => p.modulo !== excluirModulo && modulos.includes(p.modulo));
+      if (pestana) return pestana.href;
     }
   }
   return null;
@@ -270,6 +263,50 @@ export function paginaInicialDe(modulos: readonly string[], excluirModulo?: stri
 /** Clave de módulo (permisos) correspondiente a un href de navegación. */
 export function moduloDeHref(href: string): string {
   return href === "/" ? "dashboard" : href.slice(1);
+}
+
+/**
+ * Las entradas del menú que juntan varios módulos en pestañas (17 nov 2026): cada pestaña con el módulo que pide, en el orden de las pestañas.
+ * La entrada sale en el menú si la persona tiene cualquiera de ellos, y la lleva a la primera pestaña que puede abrir.
+ */
+export const PESTANAS_CON_MODULO: Record<string, { href: string; modulo: string }[]> = {
+  "/tienda-pedidos": [
+    { href: "/tienda-pedidos", modulo: "tienda-pedidos" },
+    { href: "/tienda-pedidos/confirmacion", modulo: "tienda-confirmacion" },
+    { href: "/tienda-pedidos/confirmacion/ia", modulo: "tienda-confirmacion" },
+    { href: "/tienda-pedidos/logistica", modulo: "tienda-logistica" },
+    { href: "/tienda-pedidos/cuanto-hay", modulo: "tienda-cuanto-hay" },
+  ],
+  "/despacho-ciudad": [
+    { href: "/despacho-ciudad", modulo: "despacho-ciudad" },
+    { href: "/despacho-ciudad/devoluciones", modulo: "despacho-devoluciones" },
+    { href: "/despacho-ciudad/cambios", modulo: "despacho-cambios" },
+    { href: "/despacho-ciudad/cuanto-hay", modulo: "despacho-cuanto-hay" },
+    { href: "/despacho-ciudad/pedir-inventario", modulo: "despacho-pedir-inventario" },
+  ],
+  "/tienda-tiendas": [
+    { href: "/tienda-tiendas", modulo: "tienda-tiendas" },
+    { href: "/tienda-tiendas/productos", modulo: "tienda-productos" },
+  ],
+};
+
+/** ¿Puede abrir esta entrada del menú? Su módulo o, si junta pestañas, cualquiera de los de sus pestañas. */
+export function puedeAbrirPagina(modulos: readonly string[], href: string): boolean {
+  if (modulos.includes(moduloDeHref(href))) return true;
+  return (PESTANAS_CON_MODULO[href] ?? []).some((p) => modulos.includes(p.modulo));
+}
+
+/** La primera pestaña de esa entrada que la persona puede abrir (null si ninguna). */
+export function primeraPestanaPermitida(modulos: readonly string[], href: string): string | null {
+  return (PESTANAS_CON_MODULO[href] ?? []).find((p) => modulos.includes(p.modulo))?.href ?? null;
+}
+
+/** Las pestañas que la persona no puede abrir porque no tiene su módulo: se esconden de la franja. */
+export function pestanasSinModulo(modulos: readonly string[]): string[] {
+  return Object.values(PESTANAS_CON_MODULO)
+    .flat()
+    .filter((p) => !modulos.includes(p.modulo))
+    .map((p) => p.href);
 }
 
 /**

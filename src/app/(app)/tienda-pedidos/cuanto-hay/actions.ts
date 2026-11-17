@@ -11,7 +11,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 
 const MODULO_TIENDA = "tienda-cuanto-hay";
 const MODULO_DESPACHO = "despacho-cuanto-hay";
-const RUTAS = ["/tienda-cuanto-hay", "/despacho-cuanto-hay"];
+const RUTAS = ["/tienda-pedidos/cuanto-hay", "/despacho-ciudad/cuanto-hay"];
 const ES_UUID = (v: unknown): v is string => typeof v === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 const SIN_MIGRACION = "Falta correr en Supabase la migración 0302 («¿Cuánto hay?»).";
 const nombreDe = (u: UsuarioActual) => (u.nombre || u.email || "Alguien").trim();
@@ -49,7 +49,7 @@ export async function preguntarCuantoHay(tiendaId: string, skuId: string, nota: 
     if (destinos.length)
       await supabase
         .from("notificaciones_usuario")
-        .insert(destinos.map((id) => ({ usuario_id: id, tipo: "tarea", titulo: aviso.titulo, texto: aviso.texto, href: "/despacho-cuanto-hay", autor_id: u.id, autor_nombre: nombreDe(u) })));
+        .insert(destinos.map((id) => ({ usuario_id: id, tipo: "tarea", titulo: aviso.titulo, texto: aviso.texto, href: "/despacho-ciudad/cuanto-hay", autor_id: u.id, autor_nombre: nombreDe(u) })));
     for (const r of RUTAS) revalidatePath(r);
     return { ok: true as const };
   });
@@ -75,7 +75,7 @@ export async function responderCuantoHay(id: string, cantidadCruda: string): Pro
       const aviso = avisoRespuesta({ producto: p.producto as string, tienda: (t?.nombre as string | undefined) ?? "tu tienda" }, cantidad, nombreDe(u));
       await supabase
         .from("notificaciones_usuario")
-        .insert({ usuario_id: p.pedido_por, tipo: "tarea", titulo: aviso.titulo, texto: aviso.texto, href: "/tienda-cuanto-hay", autor_id: u.id, autor_nombre: nombreDe(u) });
+        .insert({ usuario_id: p.pedido_por, tipo: "tarea", titulo: aviso.titulo, texto: aviso.texto, href: "/tienda-pedidos/cuanto-hay", autor_id: u.id, autor_nombre: nombreDe(u) });
     }
     for (const r of RUTAS) revalidatePath(r);
     return { ok: true as const };

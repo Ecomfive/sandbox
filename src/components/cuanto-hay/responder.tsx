@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { responderCuantoHay } from "@/app/(app)/tienda-cuanto-hay/actions";
+import { responderCuantoHay } from "@/app/(app)/tienda-pedidos/cuanto-hay/actions";
 import { fieldClass } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { cuandoCorto, type PreguntaCuantoHay } from "@/lib/cuanto-hay/reglas";

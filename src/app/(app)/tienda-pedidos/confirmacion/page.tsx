@@ -56,7 +56,7 @@ export default async function ConfirmacionTiendaPage({ searchParams }: { searchP
         <SinTiendas pais={pais.nombre} />
       ) : (
         <>
-          <BarraTienda ruta="/tienda-confirmacion" tiendas={tiendas} tiendaId={tienda?.id ?? null} periodo={periodo} />
+          <BarraTienda ruta="/tienda-pedidos/confirmacion" tiendas={tiendas} tiendaId={tienda?.id ?? null} periodo={periodo} />
           <AvisoConexion tiendas={miradas} finanzas={fuente} />
           <ConfirmacionTienda
             sinConfirmar={sinConfirmar}

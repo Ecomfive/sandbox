@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { preguntarCuantoHay } from "@/app/(app)/tienda-cuanto-hay/actions";
+import { preguntarCuantoHay } from "@/app/(app)/tienda-pedidos/cuanto-hay/actions";
 import { fieldClass } from "@/components/ui/field";
 import { CampoSkuMaestro, ProveedorSkusMaestros, type OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import { useToast } from "@/components/ui/toast";

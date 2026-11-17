@@ -14,7 +14,7 @@ import { numeroTraslado } from "@/lib/wms/traslado";
 
 const MODULO_DESPACHO = "despacho-pedir-inventario";
 const MODULO_INVENTARIO = "inventario-pedidos-despacho";
-const RUTAS = ["/despacho-pedir-inventario", "/inventario-pedidos-despacho"];
+const RUTAS = ["/despacho-ciudad/pedir-inventario", "/inventario-pedidos-despacho"];
 const ES_UUID = (v: unknown): v is string => typeof v === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 const SIN_MIGRACION = "Falta correr en Supabase la migración 0305 («Pedir a inventario»).";
 const nombreDe = (u: UsuarioActual) => (u.nombre || u.email || "Alguien").trim();
@@ -120,7 +120,7 @@ export async function ponerEnProcesoPedido(id: string): Promise<Resultado> {
     const p = data?.[0];
     if (!p) return { error: "Ese pedido ya cambió de estado: recarga la página." };
     const items = (p.despacho_pedidos_inventario_items as unknown[] | null)?.length ?? 0;
-    await avisar(supabase, [p.pedido_por as string], u, avisoPedido({ numero: p.numero as number, items }, nombreDe(u), "en_proceso"), "/despacho-pedir-inventario");
+    await avisar(supabase, [p.pedido_por as string], u, avisoPedido({ numero: p.numero as number, items }, nombreDe(u), "en_proceso"), "/despacho-ciudad/pedir-inventario");
     return { ok: true, mensaje: `${numeroPedido(p.numero as number)} en proceso.` };
   });
 }
@@ -182,7 +182,7 @@ export async function enviarPedidoInventario(id: string, origenId: string, entre
       entidadId: creado.id,
       detalle: `${numTr}: ${lineas.length} ${lineas.length === 1 ? "producto" : "productos"}, ${unidades.toLocaleString("es-PA")} unidades · ${nota}`,
     });
-    await avisar(supabase, [p.pedido_por as string], u, avisoPedido({ numero: p.numero as number, items: items.length }, nombreDe(u), "enviado", numTr), "/despacho-pedir-inventario");
+    await avisar(supabase, [p.pedido_por as string], u, avisoPedido({ numero: p.numero as number, items: items.length }, nombreDe(u), "enviado", numTr), "/despacho-ciudad/pedir-inventario");
     revalidatePath("/inventario");
     revalidatePath("/inventario/traslados");
     return { ok: true, mensaje: `Enviado: se hizo el traslado ${numTr} a ${destino.nombre}.` };

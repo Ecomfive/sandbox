@@ -10,7 +10,7 @@ import { tiendaDeClienteSiscore } from "@/lib/tienda/siscore";
 import { grupoDeEstadoGuia, leerLecturaSiscore, momentoEntrega, pedidoDeFactura, visitasSinEntregar } from "@/lib/tienda/siscore";
 import { actualizarEntregas, completarDatosEntrega } from "@/lib/tienda/actualizar-entregas";
 
-const RUTA = "/tienda-logistica";
+const RUTA = "/tienda-pedidos/logistica";
 const BUCKET = "wms-compras";
 // La misma carpeta temporal de «Actualizar Dropi»: la extensión solo acepta subir ahí.
 const CARPETA = "tmp-dropi-panel";

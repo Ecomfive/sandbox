@@ -11,7 +11,7 @@ export interface Autor {
   nombre: string;
 }
 
-const HREF = "/despacho-cambios";
+const HREF = "/despacho-ciudad/cambios";
 
 /** Un sello de edición: desde aquí la lectura de Monday no pisa la solicitud. */
 export const selloCaso = (autor: Autor) => {

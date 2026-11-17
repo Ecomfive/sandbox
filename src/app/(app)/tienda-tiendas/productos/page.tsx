@@ -96,7 +96,7 @@ export default async function ProductosTiendaPage({ searchParams }: { searchPara
         <SinTiendas pais={pais.nombre} />
       ) : (
         <>
-          <BarraTienda ruta="/tienda-productos" tiendas={tiendas} tiendaId={tienda?.id ?? null} />
+          <BarraTienda ruta="/tienda-tiendas/productos" tiendas={tiendas} tiendaId={tienda?.id ?? null} />
           <AvisoConexion tiendas={miradas} />
           {puedeEscribir && conectadas.length > 0 && (
             <TraerProductos tiendas={conectadas.map((t) => ({ id: t.id, nombre: t.nombre }))} ultima={(ultimaFila?.actualizado_en as string | undefined) ?? null} />

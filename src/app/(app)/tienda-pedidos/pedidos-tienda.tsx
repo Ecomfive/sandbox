@@ -399,7 +399,7 @@ export function PedidosTienda({
           <Indicador angosto titulo="Entregados" icono={InventarioIcon} color="verde" punto={r.porEstado.entregado ? "exito" : undefined} valor={num(r.porEstado.entregado)} detalle={`${pct(r.entrega)} de lo que salió`} alPulsar={() => alternar("entregado")} activo={estado === "entregado"} />
           <Indicador angosto titulo="Cancelados" icono={CerrarIcon} color="rojo" punto={r.porEstado.cancelado ? "peligro" : undefined} valor={num(r.porEstado.cancelado)} detalle={pct(r.cancelacion)} alPulsar={() => alternar("cancelado")} activo={estado === "cancelado"} />
           <Indicador angosto titulo="Devoluciones" icono={DeshacerIcon} color="rojo" punto={r.porEstado.devuelto ? "peligro" : undefined} valor={num(r.porEstado.devuelto)} detalle={pct(r.devolucion)} alPulsar={() => alternar("devuelto")} activo={estado === "devuelto"} />
-          <Indicador angosto titulo="SKU sin vincular" icono={AlertaIcon} color="ambar" punto={sinVincular ? "aviso" : undefined} valor={num(sinVincular)} detalle="variantes de Shopify sin producto nuestro" href="/tienda-productos" />
+          <Indicador angosto titulo="SKU sin vincular" icono={AlertaIcon} color="ambar" punto={sinVincular ? "aviso" : undefined} valor={num(sinVincular)} detalle="variantes de Shopify sin producto nuestro" href="/tienda-tiendas/productos" />
         </div>
       </section>
 

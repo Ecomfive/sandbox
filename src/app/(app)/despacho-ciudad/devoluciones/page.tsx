@@ -36,10 +36,10 @@ export default async function DevolucionesPage({ searchParams }: { searchParams:
       ) : (
         <>
           <nav aria-label="Ver" className="flex flex-wrap gap-1.5">
-            <Link href="/despacho-devoluciones" aria-current={!archivados ? "page" : undefined} className={chip(!archivados)}>
+            <Link href="/despacho-ciudad/devoluciones" aria-current={!archivados ? "page" : undefined} className={chip(!archivados)}>
               Devoluciones
             </Link>
-            <Link href="/despacho-devoluciones?archivados=1" aria-current={archivados ? "page" : undefined} className={chip(archivados)}>
+            <Link href="/despacho-ciudad/devoluciones?archivados=1" aria-current={archivados ? "page" : undefined} className={chip(archivados)}>
               Archivados
             </Link>
           </nav>

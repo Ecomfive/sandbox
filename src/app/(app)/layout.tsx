@@ -21,7 +21,7 @@ import { tieneContrasenaTemporal } from "@/lib/cuenta/contrasena";
 import { getPaisActual } from "@/lib/pais";
 import { PAISES_CON_RECEPCION } from "@/lib/wms/recepcion";
 import { obtenerPlataformasPais } from "@/lib/pais-plataformas";
-import { colapsarGestionDeIds, construirAreas } from "@/lib/nav-data";
+import { colapsarGestionDeIds, construirAreas, pestanasSinModulo } from "@/lib/nav-data";
 import { getPlataformaActual } from "@/lib/plataforma-actual";
 import { paginasBuscables } from "@/lib/paleta";
 import { esAdministrador } from "@/lib/permisos/acceso";
@@ -95,6 +95,8 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   const pestanasOcultas = usuario
     ? [
         ...pestanasOcultasDe(usuario.afinado),
+        // Las pestañas de Gestión de tienda cuyo módulo no tiene (17 nov 2026).
+        ...pestanasSinModulo(usuario.modulos),
         ...(esAdministrador(usuario) ? [] : PESTANAS_SOLO_ADMIN),
         ...(usuario.modulos.includes("uso-sistema") ? [] : PESTANAS_USO_SISTEMA),
         ...(usuario.modulos.includes("compras-por-pais") ? [] : PESTANAS_POR_PAIS),

@@ -42,11 +42,11 @@ export default async function CambiosPage({ searchParams }: { searchParams: Prom
         <>
           <nav aria-label="Ver" className="flex flex-wrap gap-1.5">
             {VISTAS.map((v) => (
-              <Link key={v.id} href={`/despacho-cambios?realizados=${v.id}`} aria-current={!archivados && v.id === vista.id ? "page" : undefined} className={chip(!archivados && v.id === vista.id)}>
+              <Link key={v.id} href={`/despacho-ciudad/cambios?realizados=${v.id}`} aria-current={!archivados && v.id === vista.id ? "page" : undefined} className={chip(!archivados && v.id === vista.id)}>
                 {v.etiqueta}
               </Link>
             ))}
-            <Link href="/despacho-cambios?archivados=1" aria-current={archivados ? "page" : undefined} className={`${chip(archivados)} ml-auto`}>
+            <Link href="/despacho-ciudad/cambios?archivados=1" aria-current={archivados ? "page" : undefined} className={`${chip(archivados)} ml-auto`}>
               Archivados
             </Link>
           </nav>

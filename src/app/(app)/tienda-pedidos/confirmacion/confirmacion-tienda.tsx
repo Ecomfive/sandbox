@@ -9,9 +9,9 @@ import { AlertaIcon, CalendarioIcon, CerrarIcon, CheckIcon, ChatIcon } from "@/l
 import { ETAPAS_CONFIRMACION, META_CONFIRMACION, etapaConfirmacion, resumirConfirmacion, tiempoEsperando, type EtapaConfirmacion } from "@/lib/tienda/confirmacion";
 import type { PedidoFila } from "@/lib/tienda/datos";
 import { diasHasta } from "@/lib/tienda/programado";
-import { columnaProgramado } from "../tienda-pedidos/columnas-extra";
-import { FichaPedido } from "../tienda-pedidos/ficha-pedido";
-import { COLUMNAS, ICONOS, NOMBRE, defPedidos, type Contexto } from "../tienda-pedidos/pedidos-tienda";
+import { columnaProgramado } from "../columnas-extra";
+import { FichaPedido } from "../ficha-pedido";
+import { COLUMNAS, ICONOS, NOMBRE, defPedidos, type Contexto } from "../pedidos-tienda";
 
 const ETAPA = new Map(ETAPAS_CONFIRMACION.map((e) => [e.id, e]));
 const TONO: Record<EtapaConfirmacion, "aviso" | "neutro" | "exito" | "peligro"> = { por_confirmar: "aviso", esperando: "neutro", confirmado: "exito", cancelado: "peligro" };

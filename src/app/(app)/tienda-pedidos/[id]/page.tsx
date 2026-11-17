@@ -133,7 +133,7 @@ export default async function PedidoTiendaPage({ params }: { params: Promise<{ i
                               {sku.nombre} <span className="font-mono text-xs text-muted-foreground">{sku.codigo}</span>
                             </span>
                           ) : (
-                            <Link href="/tienda-productos" className="no-underline">
+                            <Link href="/tienda-tiendas/productos" className="no-underline">
                               <Pastilla tono="aviso">Sin vincular · vincular</Pastilla>
                             </Link>
                           )}

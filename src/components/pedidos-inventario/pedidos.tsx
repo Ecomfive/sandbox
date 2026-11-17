@@ -8,7 +8,7 @@ import {
   enviarPedidoInventario,
   ponerEnProcesoPedido,
   recibirPedidoInventario,
-} from "@/app/(app)/despacho-pedir-inventario/actions";
+} from "@/app/(app)/despacho-ciudad/pedir-inventario/actions";
 import { Badge } from "@/components/ui/badge";
 import { fieldClass } from "@/components/ui/field";
 import { CampoSkuMaestro, ProveedorSkusMaestros, type OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
