@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { usePendientesVivos } from "@/components/pendientes-vivos";
 import { sonar } from "@/components/tienda/aviso-pedidos-nuevos";
 import { anilloFoco } from "@/components/ui/field";
 import { avisosParaPantalla } from "@/lib/avisos-pantalla-actions";
@@ -23,6 +24,12 @@ export function AvisoPersonal() {
   const vistos = useRef(new Set<string>());
   const desde = useRef<string | null>(null);
   const cola = useRef<AvisoEnPantalla[]>([]);
+  // Cuando sale un aviso nuevo, el número de «Avisos» del menú se actualiza en el momento.
+  const { refrescar } = usePendientesVivos();
+  const refrescarAhora = useRef(refrescar);
+  useEffect(() => {
+    refrescarAhora.current = refrescar;
+  }, [refrescar]);
 
   useEffect(() => {
     let vivo = true;
@@ -43,6 +50,7 @@ export function AvisoPersonal() {
           return [...actuales, ...entran];
         });
         sonar();
+        refrescarAhora.current();
       } catch {
         // Sin red: se vuelve a intentar en la próxima vuelta.
       }
