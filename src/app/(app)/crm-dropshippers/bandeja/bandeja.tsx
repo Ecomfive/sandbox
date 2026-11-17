@@ -715,7 +715,7 @@ export function Bandeja({
     [datos.conversaciones, numero, areas, paisSel, numeroDe],
   );
   // Los filtros cuentan los chats de todos los paneles que se ven.
-  // Los archivados (migración 0311) no cuentan en los demás filtros: solo en «Archivadas», que aparece cuando hay alguno.
+  // Los archivados (migración 0314) no cuentan en los demás filtros: solo en «Archivadas», que aparece cuando hay alguno.
   const vivos = delNumero.filter((c) => !c.archivada);
   const nArchivadas = delNumero.length - vivos.length;
   const opciones: { id: Filtro; texto: string; cuenta: number }[] = [

@@ -4,7 +4,8 @@ import { Pagina } from "@/components/ui/pagina";
 import { requirePanel } from "@/lib/auth";
 import { getPaisActual } from "@/lib/pais";
 import { createServiceClient } from "@/lib/supabase/server";
-import { cargarTiendas, periodoElegido, tiendaElegida } from "@/lib/tienda/datos";
+import { periodoElegido, type Tienda } from "@/lib/tienda/datos";
+import { tiendasDeLaPersona } from "@/lib/tienda/acceso";
 import { after } from "next/server";
 import { pedidosDeTiendas } from "@/lib/tienda/datos-finanzas";
 import { entregasDeOrdenes, guiasDeOrdenes } from "@/lib/tienda/entregas-monday";
@@ -29,8 +30,8 @@ export default async function PedidosTiendaPage({ searchParams }: { searchParams
   const sp = await searchParams;
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
-  const { tiendas, faltaMigracion } = await cargarTiendas(supabase, pais.id);
-  const tienda = tiendaElegida(tiendas, sp.tienda);
+  // Solo las tiendas de la persona (17 nov 2026: quien tiene tiendas limitadas, como la gente de Nuvo, ve solo las suyas y nunca «Todas»).
+  const { tiendas, tienda, limitado, faltaMigracion } = await tiendasDeLaPersona(supabase, pais.id, sp.tienda);
   const eleccion = periodoElegido(sp);
   const miradas = tienda ? [tienda] : tiendas;
   // La revisión de Shopify (por si se perdió algún aviso), después de mostrar la página y como mucho cada 10 minutos.
@@ -72,7 +73,7 @@ export default async function PedidosTiendaPage({ searchParams }: { searchParams
         <SinTiendas pais={pais.nombre} />
       ) : (
         <>
-          <BarraTienda ruta="/tienda-pedidos" tiendas={tiendas} tiendaId={tienda?.id ?? null} periodo={periodo} />
+          <BarraTienda ruta="/tienda-pedidos" tiendas={tiendas} tiendaId={tienda?.id ?? null} periodo={periodo} sinTodas={limitado} />
           <AvisoConexion tiendas={miradas} finanzas={fuente} />
           <PedidosTienda
             pedidos={pedidos}
@@ -97,7 +98,7 @@ async function TodasLasTiendas({
   pais,
   eleccion,
 }: {
-  tiendas: Awaited<ReturnType<typeof cargarTiendas>>["tiendas"];
+  tiendas: Tienda[];
   pais: Awaited<ReturnType<typeof getPaisActual>>;
   eleccion: ReturnType<typeof periodoElegido>;
 }) {

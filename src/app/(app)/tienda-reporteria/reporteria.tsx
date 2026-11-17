@@ -298,6 +298,8 @@ function defReporteria(): DefTabla<FilaReporteria> {
   };
 }
 const DEF = defReporteria();
+// Para la gente de una tienda cliente (tiendas limitadas, 17 nov 2026): sin el costo del producto, tampoco en el Excel.
+const DEF_SIN_COSTOS: DefTabla<FilaReporteria> = { ...DEF, csvAntes: DEF.csvAntes?.filter((c) => c.etiqueta !== "Costo producto") };
 
 const RAPIDOS: { id: keyof typeof FILTROS_RAPIDOS | "todos"; titulo: string; detalle: string; icono: IconoComp; color: "violeta" | "verde" | "ambar" | "rojo" | "azul" }[] = [
   { id: "todos", titulo: "Pedidos", detalle: "del mes", icono: PedidoIcon, color: "violeta" },
@@ -332,6 +334,7 @@ export function Reporteria({
   movimientos: movInicial,
   codigoPais,
   puedeEscribir,
+  sinCostos = false,
 }: {
   /** En forma compacta (`compactarFilas`): un mes de todas las tiendas pesa mucho menos así. */
   filas: FilasCompactas;
@@ -342,6 +345,8 @@ export function Reporteria({
   movimientos: Movimiento[];
   codigoPais: string;
   puedeEscribir: boolean;
+  /** Quien tiene tiendas limitadas no ve el costo del producto ni el margen (17 nov 2026). */
+  sinCostos?: boolean;
 }) {
   const router = useRouter();
   const inicial = useMemo(() => expandirFilas(compactas), [compactas]);
@@ -360,7 +365,7 @@ export function Reporteria({
 
   const r = useMemo(() => resumirReporteria(filas), [filas]);
   const visibles = useMemo(() => (rapido === "todos" ? filas : filas.filter(FILTROS_RAPIDOS[rapido as keyof typeof FILTROS_RAPIDOS])), [filas, rapido]);
-  const columnas = useMemo(() => COLUMNAS.filter((c) => c.grupo === null || grupos.has(c.grupo)), [grupos]);
+  const columnas = useMemo(() => COLUMNAS.filter((c) => (c.grupo === null || grupos.has(c.grupo)) && !(sinCostos && c.id === "costo")), [grupos, sinCostos]);
   const finanzas = useMemo(() => resumirParaFinanzas(filas), [filas]);
 
   const contexto = useMemo<Contexto>(
@@ -473,7 +478,7 @@ export function Reporteria({
       </div>
 
       <TablaDatos
-        def={DEF}
+        def={sinCostos ? DEF_SIN_COSTOS : DEF}
         filas={visibles}
         columnas={columnas}
         contexto={contexto}
@@ -519,6 +524,7 @@ export function Reporteria({
           )}
         </section>
 
+        {!sinCostos && (
         <section aria-labelledby="t-fin" className="flex flex-col gap-2 rounded-xl border border-border bg-card p-4">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h2 id="t-fin" className="m-0 text-sm font-semibold">
@@ -559,6 +565,7 @@ export function Reporteria({
             Abrir Ventas por tienda
           </Link>
         </section>
+        )}
       </div>
 
       <Ventana abierto={importar} alCerrar={() => setImportar(false)} titulo="Actualizar desde la Matriz" ancho="md">

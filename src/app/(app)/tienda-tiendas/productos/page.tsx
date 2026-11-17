@@ -7,7 +7,8 @@ import { getPaisActual } from "@/lib/pais";
 import { prepararContexto } from "@/lib/publicaciones/vincular";
 import { createServiceClient } from "@/lib/supabase/server";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
-import { cargarTiendas, cargarVariantes, tiendaElegida } from "@/lib/tienda/datos";
+import { cargarVariantes } from "@/lib/tienda/datos";
+import { tiendasDeLaPersona } from "@/lib/tienda/acceso";
 import { nombreVariante, sugerirParaVariante } from "@/lib/tienda/vincular-variante";
 import { obtenerOpcionesSkuMaestro } from "@/lib/wms/skus-maestros";
 import { TraerProductos } from "./traer-productos";
@@ -29,8 +30,8 @@ export default async function ProductosTiendaPage({ searchParams }: { searchPara
   const sp = await searchParams;
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
-  const { tiendas, faltaMigracion } = await cargarTiendas(supabase, pais.id);
-  const tienda = tiendaElegida(tiendas, sp.tienda);
+  // Solo las tiendas de la persona (17 nov 2026: quien tiene tiendas limitadas, como la gente de Nuvo, ve solo las suyas y nunca «Todas»).
+  const { tiendas, tienda, limitado, faltaMigracion } = await tiendasDeLaPersona(supabase, pais.id, sp.tienda);
   const miradas = tienda ? [tienda] : tiendas;
   const variantes = await cargarVariantes(
     supabase,
@@ -96,7 +97,7 @@ export default async function ProductosTiendaPage({ searchParams }: { searchPara
         <SinTiendas pais={pais.nombre} />
       ) : (
         <>
-          <BarraTienda ruta="/tienda-tiendas/productos" tiendas={tiendas} tiendaId={tienda?.id ?? null} />
+          <BarraTienda ruta="/tienda-tiendas/productos" tiendas={tiendas} tiendaId={tienda?.id ?? null} sinTodas={limitado} />
           <AvisoConexion tiendas={miradas} />
           {puedeEscribir && conectadas.length > 0 && (
             <TraerProductos tiendas={conectadas.map((t) => ({ id: t.id, nombre: t.nombre }))} ultima={(ultimaFila?.actualizado_en as string | undefined) ?? null} />

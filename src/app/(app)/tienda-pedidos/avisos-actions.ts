@@ -1,5 +1,7 @@
 "use server";
 
+import { cargarTiendasPermitidas } from "@/lib/finanzas/cargar-tiendas-permitidas";
+import { puedeVerUnidad } from "@/lib/finanzas/tiendas-permitidas";
 import { getUsuarioActual } from "@/lib/auth";
 import { puedeVerPais } from "@/lib/paises-permitidos";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -37,7 +39,9 @@ export async function pedidosNuevos(desde: string): Promise<{ pedidos: PedidoNue
   if (!visibles.length) return { pedidos: [], hasta: ahora };
   const { data: unidades } = await supabase.from("fin_unidades").select("id, nombre, pais").eq("clase", "tienda").in("pais", [...new Set(visibles.map((v) => v.pais))]);
   const nombreDe = new Map<string, string>();
-  for (const u of unidades ?? []) {
+  // Con tiendas limitadas (17 nov 2026), solo los pedidos de sus tiendas.
+  const permitidas = await cargarTiendasPermitidas();
+  for (const u of (unidades ?? []).filter((x) => puedeVerUnidad(permitidas, x.id as string))) {
     const t = visibles.find((v) => v.pais === u.pais && mismaTiendaUnidad(v.nombre, u.nombre as string));
     if (t) nombreDe.set(u.id as string, t.nombre);
   }

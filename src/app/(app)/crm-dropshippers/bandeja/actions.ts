@@ -344,7 +344,7 @@ export async function pasarConversacionDeArea(id: string, area: string): Promise
 }
 
 /**
- * Archiva un chat o lo saca del archivo (17 nov 2026, pedido de Hernán para Comercial; migración 0311). Archivado no sale en las listas ni en el
+ * Archiva un chat o lo saca del archivo (17 nov 2026, pedido de Hernán para Comercial; migración 0314). Archivado no sale en las listas ni en el
  * tablero, solo en «Archivadas», y queda resuelto; cuando el cliente vuelve a escribir, sale solo del archivo (`whatsapp_registrar_entrante`).
  * Lo puede hacer quien puede marcar resuelto (lo afinado: «resolver»).
  */
@@ -359,7 +359,7 @@ export async function archivarConversacion(id: string, archivar: boolean): Promi
     ? { archivada_en: new Date().toISOString(), archivada_por: u.id, estado: "resuelta", no_leidos: 0 }
     : { archivada_en: null, archivada_por: null };
   const { error } = await supabase.from("whatsapp_conversaciones").update(cambios).eq("id", id);
-  if (error) return { error: /archivada/i.test(error.message) ? "Falta correr la migración 0311 (archivar chats) en la base." : "No se pudo cambiar." };
+  if (error) return { error: /archivada/i.test(error.message) ? "Falta correr la migración 0314 (archivar chats) en la base." : "No se pudo cambiar." };
   await registrarAuditoria({ accion: archivar ? "archivar_chat_whatsapp" : "desarchivar_chat_whatsapp", entidad: "whatsapp_conversaciones", entidadId: id });
   await avisarBandeja();
   return { ok: true };

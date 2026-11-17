@@ -39,6 +39,7 @@ export function BarraTienda({
   tiendaId,
   periodo,
   extra = {},
+  sinTodas = false,
 }: {
   ruta: string;
   tiendas: Tienda[];
@@ -47,14 +48,18 @@ export function BarraTienda({
   periodo?: Periodo & { hoy: string };
   /** Otros parámetros que se conservan al cambiar de tienda o periodo. */
   extra?: Record<string, string | null | undefined>;
+  /** Sin el botón «Todas las tiendas»: quien tiene tiendas limitadas (17 nov 2026) mira de a una de las suyas. */
+  sinTodas?: boolean;
 }) {
   const deFechas = periodo ? parametrosPeriodo(periodo.id === "rango" ? { tipo: "rango", desde: periodo.desde, hasta: periodo.hasta } : { tipo: "atajo", id: periodo.id }) : {};
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
       <nav aria-label="Tienda" className="flex flex-wrap gap-2">
-        <Chip href={rutaCon(ruta, { ...extra, ...deFechas })} activo={!tiendaId}>
-          Todas las tiendas
-        </Chip>
+        {!sinTodas && (
+          <Chip href={rutaCon(ruta, { ...extra, ...deFechas })} activo={!tiendaId}>
+            Todas las tiendas
+          </Chip>
+        )}
         {tiendas.map((t) => (
           <Chip key={t.id} href={rutaCon(ruta, { ...extra, ...deFechas, tienda: t.id })} activo={tiendaId === t.id}>
             {t.nombre}

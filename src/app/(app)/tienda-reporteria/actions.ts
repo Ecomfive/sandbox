@@ -1,5 +1,6 @@
 "use server";
 
+import { sinAccesoAOrdenes, soloSinLimite } from "@/lib/tienda/acceso";
 import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModuloEscritura } from "@/lib/auth";
@@ -35,6 +36,9 @@ export async function editarCampoReporteria(ordenId: string, columna: string, va
   if (error) return { error: /column|schema/i.test(error.message) ? "Falta correr la migración 0310 (Reportería de pedidos) en Supabase." : "No se pudo leer el pedido." };
   const unidad = (Array.isArray(o?.fin_unidades) ? o?.fin_unidades[0] : o?.fin_unidades) as { pais_id: string; nombre: string } | undefined;
   if (!o || unidad?.pais_id !== pais.id) return { error: "No se encontró el pedido." };
+  // Solo pedidos de las tiendas de la persona (17 nov 2026).
+  const sinAcceso = await sinAccesoAOrdenes(supabase, [ordenId]);
+  if (sinAcceso) return { error: sinAcceso };
   const antes = o[campo.columna];
   if (comoTexto(antes) === comoTexto(v.valor)) return { valor: v.valor };
 
@@ -63,6 +67,9 @@ export async function editarCampoReporteria(ordenId: string, columna: string, va
 export async function importarLoteMatriz(ordenes: unknown[]): Promise<{ error: string } | (ResultadoMatriz & { rechazadas: number })> {
   try {
     await requireModuloEscritura(MODULO);
+    // La Matriz trae todas las tiendas: la carga solo la hace quien ve todas (17 nov 2026).
+    const limite = await soloSinLimite();
+    if (limite) return { error: limite };
     if (!Array.isArray(ordenes) || ordenes.length === 0 || ordenes.length > TAMANO_LOTE_VENTAS) return { error: "Lote inválido." };
     const buenas: OrdenVenta[] = [];
     for (const o of ordenes) {

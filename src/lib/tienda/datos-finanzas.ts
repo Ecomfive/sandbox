@@ -2,6 +2,8 @@
 // Ver src/lib/tienda/ordenes-finanzas.ts. Solo lectura: nada de aquí escribe. Si las tablas de Finanzas no existen, no hay datos y las pantallas
 // siguen como antes (vacías hasta conectar la tienda).
 
+import { cargarTiendasPermitidas } from "@/lib/finanzas/cargar-tiendas-permitidas";
+import { puedeVerUnidad } from "@/lib/finanzas/tiendas-permitidas";
 import { fechaProgramada } from "./programado";
 import { colaTelefono } from "./chat-tienda";
 import { transportistaDe } from "./logistica";
@@ -116,13 +118,16 @@ async function historialDeClientes(supabase: SupabaseClient, claves: string[]): 
   const mapa = new Map<string, { total: number; entregadas: number; devueltas: number; canceladas: number }>();
   const tandas: string[][] = [];
   for (let i = 0; i < unicas.length; i += 150) tandas.push(unicas.slice(i, i + 150));
+  // Con tiendas limitadas (17 nov 2026), el historial cuenta solo los pedidos de sus tiendas.
+  const permitidas = await cargarTiendasPermitidas();
   for (let i = 0; i < tandas.length; i += 6) {
     const respuestas = await Promise.all(
-      tandas.slice(i, i + 6).map((t) => supabase.from("ven_ordenes_clientes").select("telefono_clave, ven_ordenes(estado_entrega)").in("telefono_clave", t).limit(5000)),
+      tandas.slice(i, i + 6).map((t) => supabase.from("ven_ordenes_clientes").select("telefono_clave, ven_ordenes(estado_entrega, unidad_id)").in("telefono_clave", t).limit(5000)),
     );
     for (const { data } of respuestas)
-      for (const r of (data ?? []) as { telefono_clave: string; ven_ordenes: { estado_entrega: string | null } | { estado_entrega: string | null }[] | null }[]) {
+      for (const r of (data ?? []) as { telefono_clave: string; ven_ordenes: { estado_entrega: string | null; unidad_id: string | null } | { estado_entrega: string | null; unidad_id: string | null }[] | null }[]) {
         const o = Array.isArray(r.ven_ordenes) ? r.ven_ordenes[0] : r.ven_ordenes;
+        if (!puedeVerUnidad(permitidas, o?.unidad_id ?? null)) continue;
         const h = mapa.get(r.telefono_clave) ?? { total: 0, entregadas: 0, devueltas: 0, canceladas: 0 };
         h.total++;
         if (o?.estado_entrega === "entregada") h.entregadas++;

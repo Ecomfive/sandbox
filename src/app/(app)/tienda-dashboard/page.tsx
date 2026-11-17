@@ -8,12 +8,13 @@ import { requireModulo } from "@/lib/auth";
 import { formatearMoneda } from "@/lib/formato";
 import { getPaisActual } from "@/lib/pais";
 import { createServiceClient } from "@/lib/supabase/server";
-import { cargarTiendas, cargarVariantes, periodoElegido, sinConfirmarDesde, tiendaElegida } from "@/lib/tienda/datos";
+import { cargarVariantes, periodoElegido, sinConfirmarDesde } from "@/lib/tienda/datos";
+import { tiendasDeLaPersona } from "@/lib/tienda/acceso";
 import { after } from "next/server";
 import { pedidosDeTiendas } from "@/lib/tienda/datos-finanzas";
 import { revisarSiHaceFalta } from "@/lib/tienda/conectar-shopify";
 import { vendidosDeFinanzas } from "@/lib/tienda/ordenes-finanzas";
-import { NOMBRE_FUENTE_COSTO, costosDeProductos } from "@/lib/tienda/costos";
+import { NOMBRE_FUENTE_COSTO, costosDeProductos, type CostoProducto } from "@/lib/tienda/costos";
 import { diaPanama, pedidosPorDia, productosVendidos, resumirPedidos, type LineaVendida } from "@/lib/tienda/resumen";
 import { TableroDashboard, type Tarjeta } from "./tablero-dashboard";
 
@@ -39,8 +40,8 @@ export default async function DashboardTiendaPage({ searchParams }: { searchPara
   const sp = await searchParams;
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
-  const { tiendas, faltaMigracion } = await cargarTiendas(supabase, pais.id);
-  const tienda = tiendaElegida(tiendas, sp.tienda);
+  // Solo las tiendas de la persona (17 nov 2026: quien tiene tiendas limitadas, como la gente de Nuvo, ve solo las suyas y nunca «Todas»).
+  const { tiendas, tienda, limitado, faltaMigracion } = await tiendasDeLaPersona(supabase, pais.id, sp.tienda);
   const eleccion = periodoElegido(sp);
   const miradas = tienda ? [tienda] : tiendas;
   // La revisión de Shopify (por si se perdió algún aviso), después de mostrar la página y como mucho cada 10 minutos.
@@ -83,7 +84,8 @@ export default async function DashboardTiendaPage({ searchParams }: { searchPara
   const [{ data: skus }, costos] = await Promise.all([
     skuIds.length ? supabase.from("skus_maestros").select("id, codigo, nombre").in("id", skuIds) : Promise.resolve({ data: [] as { id: string; codigo: string; nombre: string }[] }),
     // El costo de cada producto en el país (el costo promedio de compra del producto: del país o, si no hay, de todos), para el margen (12 nov 2026).
-    costosDeProductos(supabase, skuIds, pais.id),
+    // La gente de una tienda cliente (tiendas limitadas) no ve el costo ni el margen (17 nov 2026).
+    limitado ? Promise.resolve(new Map<string, CostoProducto>()) : costosDeProductos(supabase, skuIds, pais.id),
   ]);
   const skuDe = new Map((skus ?? []).map((s) => [s.id as string, s as { codigo: string; nombre: string }]));
 
@@ -131,7 +133,7 @@ export default async function DashboardTiendaPage({ searchParams }: { searchPara
         <SinTiendas pais={pais.nombre} />
       ) : (
         <>
-          <BarraTienda ruta="/tienda-dashboard" tiendas={tiendas} tiendaId={tienda?.id ?? null} periodo={periodo} />
+          <BarraTienda ruta="/tienda-dashboard" tiendas={tiendas} tiendaId={tienda?.id ?? null} periodo={periodo} sinTodas={limitado} />
           <AvisoConexion tiendas={miradas} finanzas={fuente} />
           <TableroDashboard etiqueta="Operación" titulo="Operación" tarjetas={operacion} />
           <TableroDashboard etiqueta="Dinero" titulo="Dinero (contra entrega)" tarjetas={plata} />
@@ -177,8 +179,8 @@ export default async function DashboardTiendaPage({ searchParams }: { searchPara
                       <th scope="col" className={`${claseThLista} text-right`}>Pedidos</th>
                       <th scope="col" className={`${claseThLista} text-right`}>Ingreso</th>
                       <th scope="col" className={`${claseThLista} text-right`}>% del total</th>
-                      <th scope="col" className={`${claseThLista} text-right`}>Costo</th>
-                      <th scope="col" className={`${claseThLista} text-right`}>Margen</th>
+                      {!limitado && <th scope="col" className={`${claseThLista} text-right`}>Costo</th>}
+                      {!limitado && <th scope="col" className={`${claseThLista} text-right`}>Margen</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -205,7 +207,7 @@ export default async function DashboardTiendaPage({ searchParams }: { searchPara
                           <td className={`${claseTdLista} text-right tabular-nums`}>{v.pedidos.toLocaleString("es-PA")}</td>
                           <td className={`${claseTdLista} text-right tabular-nums`}>{dinero(v.ingreso)}</td>
                           <td className={`${claseTdLista} text-right tabular-nums`}>{pct(v.porcentaje)}</td>
-                          {(() => {
+                          {!limitado && (() => {
                             const c = v.skuId ? costos.get(v.skuId) : undefined;
                             const costo = c ? c.costo * v.unidades : null;
                             return (

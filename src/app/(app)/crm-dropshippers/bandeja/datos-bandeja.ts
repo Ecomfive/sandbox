@@ -59,7 +59,7 @@ export interface ConversacionVista {
   /** Alguien marcó que este chat se borró en la app de WhatsApp Business (migración 0171). El historial se conserva aquí igual. */
   /** Borrado: `sistema` = se borró desde el sistema (por `por`); si no, lo marcó una persona porque se borró en la app de WhatsApp Business. */
   borradaEnApp: { por: string | null; en: string; sistema: boolean } | null;
-  /** Archivado (migración 0311): no sale en las listas ni en el tablero, solo en «Archivadas»; vuelve solo cuando el cliente escribe. */
+  /** Archivado (migración 0314): no sale en las listas ni en el tablero, solo en «Archivadas»; vuelve solo cuando el cliente escribe. */
   archivada: boolean;
   /** Hay una petición de borrar este chat esperando autorización (migración 0172). */
   /** Dónde vende (códigos ISO): los países de su dropshipper en el CRM y de sus cuentas. No sale del prefijo del número (alguien de Colombia vende en Costa Rica). */
@@ -323,7 +323,7 @@ export async function cargarBandeja(supabase: SupabaseClient, usuario: PermisosC
   }
   // Lo que se ocultó con la autorización de la 0172 (desde la 0219 nada nuevo se oculta: se borra y Atención deja de verlo). Sin la migración, nada.
   const ocultas = await conversacionesOcultas(supabase);
-  // Los archivados (migración 0311): aparte, para que sin la migración la bandeja siga igual (la consulta falla y no se marca ninguno).
+  // Los archivados (migración 0314): aparte, para que sin la migración la bandeja siga igual (la consulta falla y no se marca ninguno).
   const archivadas = await supabase.from("whatsapp_conversaciones").select("id").not("archivada_en", "is", null).in("area", areas).limit(5000);
   if (!archivadas.error) {
     const ids = new Set((archivadas.data ?? []).map((x) => x.id as string));

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { sinAccesoATiendas } from "@/lib/tienda/acceso";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import { claseThLista, claseTdLista, Pastilla } from "@/components/panel/piezas-panel";
@@ -64,6 +65,8 @@ export default async function PedidoTiendaPage({ params }: { params: Promise<{ i
   }
   // Solo los pedidos de las tiendas del país elegido arriba.
   if (!tienda || tienda.pais_id !== pais.id) notFound();
+  // Y de las tiendas de la persona (17 nov 2026).
+  if (await sinAccesoATiendas(supabase, [p.tienda_id as string])) notFound();
 
   const [{ data: lineas }, { data: notas }] = await Promise.all([
     supabase.from("tienda_pedido_lineas").select("id, shopify_variante_id, titulo, variante_titulo, sku, cantidad, precio").eq("pedido_id", id).order("shopify_linea_id"),

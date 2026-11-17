@@ -1,15 +1,4 @@
--- Archivar chats de la Bandeja de WhatsApp (17 nov 2026, pedido de Hernán para Comercial: «que pueda archivar los chats, pero si
--- escriben vuelva a aparecer»).
---
--- `archivada_en` / `archivada_por`: el chat archivado no sale en las listas ni en el tablero (solo en el filtro «Archivadas»);
--- al archivarlo también queda «resuelta», así no cuenta como sin responder. Cuando el cliente escribe, `whatsapp_registrar_entrante`
--- lo saca del archivo y lo reabre; una reacción (un 👍) no lo saca, igual que no reabre un resuelto (migración 0199).
---
--- Redefine `whatsapp_registrar_entrante` (0199) con la misma firma: solo agrega las dos líneas del archivo.
--- Se puede correr dos veces. Reversa: supabase/rollbacks/0311_rollback.sql.
-
-alter table whatsapp_conversaciones add column if not exists archivada_en timestamptz;
-alter table whatsapp_conversaciones add column if not exists archivada_por uuid references perfiles(id) on delete set null;
+-- Reversa de 0314_whatsapp_archivar.sql: vuelve `whatsapp_registrar_entrante` a como la dejó la 0199 y quita las columnas del archivo.
 
 create or replace function whatsapp_registrar_entrante(
   p_phone_number_id text,
@@ -56,9 +45,6 @@ begin
       -- Una reacción a un chat resuelto no lo reabre ni suma un no leído; todo lo demás, sí.
       set no_leidos = case when p_tipo = 'reaccion' and estado = 'resuelta' then no_leidos else no_leidos + 1 end,
           estado = case when p_tipo = 'reaccion' and estado = 'resuelta' then estado else 'abierta' end,
-          -- Un chat archivado vuelve a la bandeja cuando el cliente escribe (una reacción no lo saca del archivo).
-          archivada_en = case when p_tipo = 'reaccion' then archivada_en else null end,
-          archivada_por = case when p_tipo = 'reaccion' then archivada_por else null end,
           ultimo_entrante_en = greatest(coalesce(ultimo_entrante_en, p_momento), p_momento),
           ultimo_mensaje_en = greatest(coalesce(ultimo_mensaje_en, p_momento), p_momento),
           ultimo_texto = case when ultimo_mensaje_en is null or p_momento >= ultimo_mensaje_en then p_resumen else ultimo_texto end,
@@ -69,3 +55,6 @@ begin
 end;
 $$;
 revoke all on function whatsapp_registrar_entrante(text, text, text, text, uuid, text, text, text, text, text, text, timestamptz, text) from public, anon, authenticated;
+
+alter table whatsapp_conversaciones drop column if exists archivada_por;
+alter table whatsapp_conversaciones drop column if exists archivada_en;

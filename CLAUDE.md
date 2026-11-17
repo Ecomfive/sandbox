@@ -1315,7 +1315,7 @@ convenciones técnicas del código.
   **Pendiente:** Claude (textos), con `BotonPendiente`. Las reseñas son de clientes reales: la IA no las inventa.
 - **Bandeja: Mi vista, archivar y aviso al pasar un chat** (17 nov 2026, pedido de Hernán para el líder comercial). (1) «Mi vista» en el selector «Ver
   como» (`bandeja.tsx`, `todasMisAreas`) muestra solo el panel propio (`miArea`); «Todas mis áreas» los pone lado a lado; Dirección arranca con todas.
-  (2) Archivar (migración 0311, `archivada_en`/`archivada_por`, reversa `supabase/rollbacks/0311_rollback.sql`, probada con PGlite): `archivarConversacion`
+  (2) Archivar (migración 0314, `archivada_en`/`archivada_por`, reversa `supabase/rollbacks/0314_rollback.sql`, probada con PGlite): `archivarConversacion`
   (`bandeja/actions.ts`, pide «resolver» de lo afinado) deja el chat resuelto y fuera de listas y tablero; solo sale en «Archivadas». `whatsapp_registrar_entrante`
   lo saca del archivo cuando el cliente escribe (una reacción no). `cargarBandeja` marca `archivada` con una consulta aparte (sin la migración, ninguno).
   (3) `pasarConversacionDeArea` avisa «Para ti» (tipo `whatsapp`) a quienes tienen esa área como propia y escriben en ella, menos quien lo pasó

@@ -5,8 +5,9 @@ import { useToast } from "@/components/ui/toast";
 import { guardarTiendasUsuario, listarTiendasParaPermisos } from "./actions";
 
 /**
- * «Tiendas» en la ficha de una persona (Finanzas): todas o solo las marcadas. Con tiendas limitadas, el Estado de
- * resultados, el Panel, Rentabilidad, Ventas por tienda y el Libro solo muestran esas tiendas. Se guarda al instante.
+ * «Tiendas» en la ficha de una persona: todas o solo las marcadas. Con tiendas limitadas, el Estado de resultados, el Panel, Rentabilidad,
+ * Ventas por tienda y el Libro solo muestran esas tiendas; desde el 17 nov 2026 también Gestión de tienda (Pedidos, Dashboard, Confirmación,
+ * Logística, Productos), Despacho ciudad, Devoluciones y Cambios y reembolsos (la gente de una tienda cliente, como Nuvo). Se guarda al instante.
  */
 export function TiendasPersona({ id, nombre, inicial }: { id: string; nombre: string; inicial: string[] | null | undefined }) {
   const { mostrarToast } = useToast();
@@ -45,6 +46,10 @@ export function TiendasPersona({ id, nombre, inicial }: { id: string; nombre: st
       <h3 id={`tiendas-${id}`} className="mb-3 text-sm font-semibold">
         Tiendas
       </h3>
+      <p className="mt-0 mb-3 text-xs text-muted-foreground">
+        Con «Solo estas», en Gestión de tienda, Despacho y Finanzas ve únicamente los pedidos y datos de esas tiendas. Úsalo para la gente de una tienda
+        cliente (por ejemplo, Nuvo). Las pantallas que abre las da su rol.
+      </p>
       {inicial === undefined ? (
         <p role="alert" className="text-sm text-destructive">
           Falta correr la migración 0937 en Supabase para limitar las tiendas.
