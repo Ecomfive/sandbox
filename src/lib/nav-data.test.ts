@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { FRENTES, agruparPaginas, colapsarGestionDeIds, construirAreas, encontrarSeccionActiva, paginaInicialDe } from "./nav-data";
+import { FRENTES, agruparPaginas, colapsarGestionDeIds, construirAreas, encontrarSeccionActiva, paginaInicialDe, pestanasSinModulo, primeraPestanaPermitida, puedeAbrirPagina } from "./nav-data";
 import { ICONOS_PAGINA } from "./nav-icons";
 
 // Se corre con: npm run test:seguridad (incluye estas pruebas del menú)
@@ -189,4 +189,19 @@ test("Gestión de IDs es una sola entrada del menú que sigue a la plataforma el
   // El menú original no cambia: las migas y el buscador siguen viendo las cuatro páginas (Dropi, Drop, Effi y Dunamixfy).
   assert.equal(areas.flatMap((a) => a.items).filter((i) => i.href?.startsWith("/publicaciones-")).length, 4);
   assert.equal(encontrarSeccionActiva("/publicaciones-dunamixfy", menu), "Operación");
+});
+
+test("Gestión de tienda: tres entradas con pestañas, cada pestaña con su permiso", () => {
+  const tienda = areas.flatMap((a) => a.items).filter((i) => i.frente === "tienda" && i.href !== "/tienda-dashboard").map((i) => i.href);
+  assert.deepEqual(tienda, ["/tienda-pedidos", "/despacho-ciudad", "/tienda-tiendas"]);
+  // Solo Devoluciones: ve «Despacho ciudad», entra directo a su pestaña y no ve las otras.
+  const solo = ["despacho-devoluciones"];
+  assert.equal(puedeAbrirPagina(solo, "/despacho-ciudad"), true);
+  assert.equal(puedeAbrirPagina(solo, "/tienda-pedidos"), false);
+  assert.equal(primeraPestanaPermitida(solo, "/despacho-ciudad"), "/despacho-ciudad/devoluciones");
+  assert.equal(paginaInicialDe(solo), "/despacho-ciudad/devoluciones");
+  const ocultas = pestanasSinModulo(solo);
+  assert.ok(ocultas.includes("/despacho-ciudad") && ocultas.includes("/despacho-ciudad/cambios"));
+  assert.ok(!ocultas.includes("/despacho-ciudad/devoluciones"));
+  assert.equal(encontrarSeccionActiva("/despacho-ciudad/cambios/nueva", areas), "Operación");
 });
