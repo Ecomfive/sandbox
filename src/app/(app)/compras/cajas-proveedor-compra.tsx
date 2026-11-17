@@ -1,14 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { Seccion } from "@/components/ui/seccion-ficha";
 import { InventarioIcon } from "@/lib/nav-icons";
 import { obtenerCajasProveedorCompra, type CajasProveedorCompra } from "./cajas-proveedor-compra-actions";
+import { EditorCajasCompra } from "./editor-cajas-compra";
 
-/** «Cajas de Shen Zhen» en la ficha de una compra: cuántas cajas lleva el envío y la imagen de su etiqueta, como las anotó el proveedor al marcar el envío. Solo lectura. */
+/**
+ * «Cajas de Shen Zhen» en la ficha de una compra: cuántas cajas lleva el envío y la imagen de su etiqueta, como las anotó el proveedor al marcar el envío. Quien puede modificar Compras las anota o las
+ * corrige a mano con «Anotar» / «Editar» (los envíos viejos no las traen); lo que se guarda aquí lo ve el proveedor en su portal.
+ */
 export function CajasProveedorCompraBloque({ compraId }: { compraId: string }) {
   const [datos, setDatos] = useState<CajasProveedorCompra | null>(null);
+  const [editando, setEditando] = useState(false);
+  const cargar = useCallback(() => obtenerCajasProveedorCompra(compraId).then(setDatos).catch(() => {}), [compraId]);
   useEffect(() => {
     let vigente = true;
     obtenerCajasProveedorCompra(compraId)
@@ -19,6 +25,7 @@ export function CajasProveedorCompraBloque({ compraId }: { compraId: string }) {
     };
   }, [compraId]);
   if (!datos) return null;
+  const vacio = datos.cajas == null && datos.etiquetas.length === 0;
   return (
     <div className="px-5">
       <Seccion icono={InventarioIcon} titulo={`Cajas de ${datos.proveedor}`}>
@@ -45,7 +52,15 @@ export function CajasProveedorCompraBloque({ compraId }: { compraId: string }) {
             </div>
           )}
         </dl>
+        {datos.puedeEditar && (
+          <div>
+            <button type="button" onClick={() => setEditando(true)} className={`min-h-9 rounded-md border border-border-control bg-card px-3 text-[13px] font-medium hover:bg-muted ${anilloFoco}`}>
+              {vacio ? "Anotar cajas y etiqueta" : "Editar cajas y etiqueta"}
+            </button>
+          </div>
+        )}
       </Seccion>
+      {editando && <EditorCajasCompra compraId={compraId} titulo={datos.proveedor} alCerrar={() => setEditando(false)} alGuardar={() => void cargar()} />}
     </div>
   );
 }

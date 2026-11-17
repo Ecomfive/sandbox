@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { BotonBarra, Punto } from "@/components/panel/piezas-panel";
 import { Badge } from "@/components/ui/badge";
+import { anilloFoco } from "@/components/ui/field";
 import { Bandera } from "@/components/paises/bandera";
 import { TarjetaEmergente } from "@/components/ui/tarjeta-emergente";
 import { TableroCompras, TARJETAS_COMPRAS } from "./tablero-compras";
@@ -45,6 +46,7 @@ import {
   type FilaCompra,
 } from "./def-compras";
 import { FichaCompra } from "./ficha-compra";
+import { EditorCajasCompra } from "./editor-cajas-compra";
 import { diasEntre, enGrupo, estaAbierta, estaAtrasada, hoy, umbralesTransito, type Grupo } from "./calculos-compras";
 import { BarraPlazo, MarcaPrioridad } from "@/components/compras/plazo-prioridad";
 import { etiquetaPrioridad, ordenPrioridad, plazoDeCompra, plazoTransitoDe, textoPlazoEtapa, type EstadoPlazo } from "@/lib/compras/plazos";
@@ -180,6 +182,24 @@ function col(id: string, nombre: string, resto: Omit<ColumnaTabla<FilaCompra>, "
  * de los campos de ClickUp; todas a la vista, y cada persona oculta o mueve las que quiera (arrastrando el título o desde
  * «Columnas»). La compra lleva un punto rojo si está atrasada (más días en tránsito de lo normal para su vía).
  */
+/** El contenido de una celda de cajas o etiqueta: con permiso y portal, un botón que abre «Cajas y etiqueta» para anotarlas o corregirlas a mano; si no, solo el dato. */
+function CeldaCajas({ c, etiqueta, puede, abrir, contenido }: { c: FilaCompra; etiqueta: string; puede: boolean; abrir: (c: FilaCompra) => void; contenido: ReactNode }) {
+  if (!puede) return <>{contenido}</>;
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        abrir(c);
+      }}
+      aria-label={`Anotar o corregir ${etiqueta} de ${c.codigo ?? "la compra"}`}
+      className={`-mx-1.5 -my-1 min-h-8 min-w-10 cursor-pointer rounded-md px-1.5 py-1 text-left hover:bg-muted ${anilloFoco}`}
+    >
+      {contenido}
+    </button>
+  );
+}
+
 function columnas(
   umbral: Record<string, number>,
   dia: string,
@@ -194,6 +214,8 @@ function columnas(
     cambiarColor: (nombre: string, color: string) => void;
     /** Abre la ficha de la compra («Decidir» de una cotizada). */
     abrir: (c: FilaCompra) => void;
+    /** Abre «Cajas y etiqueta» de una compra (anotarlas a mano). */
+    editarCajas: (c: FilaCompra) => void;
   },
 ): ColumnaTabla<FilaCompra>[] {
   const resto = { ocultable: true } as const;
@@ -313,10 +335,23 @@ function columnas(
         ),
     }),
     col("qtyTotal", "Cantidad total", { ocultable: true, clase: "tabular-nums", total: (f) => sumar(f, (c) => c.qtyTotal, (n) => n.toLocaleString("es-PA")), render: (c) => ed(c, "qtyTotal", c.qtyTotal ?? "—") }),
-    col("cajasProveedor", "Cajas (Cartons)", { ocultable: true, clase: "tabular-nums", total: (f) => sumar(f, (c) => c.cajasProveedor, (n) => n.toLocaleString("es-PA")), render: (c) => c.cajasProveedor ?? <span className="text-muted-foreground">—</span> }),
+    col("cajasProveedor", "Cajas (Cartons)", {
+      ocultable: true,
+      clase: "tabular-nums",
+      total: (f) => sumar(f, (c) => c.cajasProveedor, (n) => n.toLocaleString("es-PA")),
+      render: (c) => <CeldaCajas c={c} etiqueta="las cajas" puede={edicion.puedeEscribir && c.conPortal} abrir={edicion.editarCajas} contenido={c.cajasProveedor ?? <span className="text-muted-foreground">—</span>} />,
+    }),
     col("etiquetaCajas", "Etiqueta de las cajas", {
       ocultable: true,
-      render: (c) => (c.etiquetasCajas > 0 ? <Badge tone="info">{c.etiquetasCajas === 1 ? "1 imagen" : `${c.etiquetasCajas} imágenes`}</Badge> : <span className="text-muted-foreground">—</span>),
+      render: (c) => (
+        <CeldaCajas
+          c={c}
+          etiqueta="la etiqueta de las cajas"
+          puede={edicion.puedeEscribir && c.conPortal}
+          abrir={edicion.editarCajas}
+          contenido={c.etiquetasCajas > 0 ? <Badge tone="info">{c.etiquetasCajas === 1 ? "1 imagen" : `${c.etiquetasCajas} imágenes`}</Badge> : <span className="text-muted-foreground">—</span>}
+        />
+      ),
     }),
     col("pagadoAProveedor", "Pagado a Proveedor", { ocultable: true, clase: "tabular-nums", total: (f) => sumar(f, (c) => c.pagadoAProveedor, usd), render: (c) => ed(c, "pagadoAProveedor", usd(c.pagadoAProveedor)) }),
     col("dias", "Días", { ocultable: true, clase: "tabular-nums", render: (c) => diasDeCompra(c) }),
@@ -448,6 +483,8 @@ export function TablaCompras({
   // Lo editado en una celda se ve al instante, sin esperar a rearmar la página: son cambios sobre las filas que llegaron del
   // servidor. Cuando llegan filas nuevas (otra edición, la ficha, recargar) se descarta lo que ya coincide con el servidor.
   const [cambios, setCambios] = useState<Record<string, Partial<FilaCompra>>>({});
+  // «Cajas y etiqueta»: la compra cuyas cajas se anotan a mano.
+  const [cajasDe, setCajasDe] = useState<FilaCompra | null>(null);
   const [comprasPrevias, setComprasPrevias] = useState(comprasServidor);
   if (comprasServidor !== comprasPrevias) {
     setComprasPrevias(comprasServidor);
@@ -626,6 +663,7 @@ export function TablaCompras({
       colores,
       cambiarColor,
       abrir: (c: FilaCompra) => setAbierta({ id: c.id, orden: [c.id] }),
+      editarCajas: (c: FilaCompra) => setCajasDe(c),
     }),
     [puedeEscribir, restricciones, guardarCelda, todasEtiquetas, todasTiendas, colores, cambiarColor],
   );
@@ -789,6 +827,15 @@ export function TablaCompras({
         alCerrar={() => setAbierta(null)}
         comentarioResaltado={abierta?.id === abrirInicial ? comentarioInicial : null}
       />
+      {cajasDe && (
+        <EditorCajasCompra
+          key={cajasDe.id}
+          compraId={cajasDe.id}
+          titulo={cajasDe.codigo ?? numeroOC(cajasDe.numero)}
+          alCerrar={() => setCajasDe(null)}
+          alGuardar={(r) => setCambios((o) => ({ ...o, [cajasDe.id]: { ...o[cajasDe.id], cajasProveedor: r.cajas, etiquetasCajas: r.etiquetas } }))}
+        />
+      )}
     </div>
     </ProveedorTiendas>
     </ProveedorRestricciones>

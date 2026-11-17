@@ -141,7 +141,7 @@ export async function cargarCompras(ver: string | string[] | undefined): Promise
     error ? new Map<string, string>() : inconvenientesP,
     error ? new Map<string, string>() : categoriasP,
     fotosP,
-    error ? new Map<string, { cajas: number; etiquetas: number }>() : cargarCajasDeProveedor(supabase),
+    error ? new Map<string, { cajas: number | null; etiquetas: number }>() : cargarCajasDeProveedor(supabase),
   ]);
 
   // Qué compras alcanza: todas, o solo las asignadas o creadas por la persona (lo decide su rol en Usuarios y roles › Afinar).
@@ -176,6 +176,7 @@ export async function cargarCompras(ver: string | string[] | undefined): Promise
       qtyTotal: num(c.qty_total),
       cajasProveedor: cajasDeProveedor.get(String(c.id))?.cajas ?? null,
       etiquetasCajas: cajasDeProveedor.get(String(c.id))?.etiquetas ?? 0,
+      conPortal: cajasDeProveedor.has(String(c.id)),
       montoTotal: num(c.monto_total),
       primerPago: num(c.primer_pago),
       segundoPago: num(c.segundo_pago),
@@ -209,16 +210,16 @@ export async function cargarCompras(ver: string | string[] | undefined): Promise
 }
 
 /**
- * Las cajas («Cartons») y las imágenes de etiqueta que el proveedor anotó en el portal, por compra (16 nov 2026, pedido de Hernán para Francis). Solo trae lo que ya se anotó (que son los envíos);
- * sin la migración 0299 (o si falla) la lista se ve igual, sin esas columnas.
+ * Las cajas («Cartons») y las imágenes de etiqueta de cada compra que está en el portal de un proveedor (16 nov 2026, pedido de Hernán para Francis): las que anotó el proveedor o el equipo, que es lo
+ * mismo. Una compra que está en el portal sale aunque todavía no tenga cajas (`cajas` null): es la que se puede anotar. Sin la migración 0299 (o si falla) la lista se ve igual, sin esas columnas.
  */
-async function cargarCajasDeProveedor(supabase: ReturnType<typeof createServiceClient>): Promise<Map<string, { cajas: number; etiquetas: number }>> {
-  const mapa = new Map<string, { cajas: number; etiquetas: number }>();
+async function cargarCajasDeProveedor(supabase: ReturnType<typeof createServiceClient>): Promise<Map<string, { cajas: number | null; etiquetas: number }>> {
+  const mapa = new Map<string, { cajas: number | null; etiquetas: number }>();
   try {
     const filas = await traerTodasLasFilas<{ compra_id: string; cajas: number | null; etiquetas_rutas: string[] | null; visible: boolean }>((desde, hasta) =>
-      supabase.from("proveedor_pedidos").select("compra_id, cajas, etiquetas_rutas, visible").not("cajas", "is", null).order("compra_id").range(desde, hasta),
+      supabase.from("proveedor_pedidos").select("compra_id, cajas, etiquetas_rutas, visible").eq("visible", true).order("compra_id").range(desde, hasta),
     );
-    for (const f of filas) if (f.visible && f.cajas != null) mapa.set(f.compra_id, { cajas: Number(f.cajas), etiquetas: (f.etiquetas_rutas ?? []).length });
+    for (const f of filas) if (f.visible) mapa.set(f.compra_id, { cajas: f.cajas == null ? null : Number(f.cajas), etiquetas: (f.etiquetas_rutas ?? []).length });
   } catch {
     // Sin la migración: la lista sigue igual.
   }
