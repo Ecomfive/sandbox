@@ -6,6 +6,8 @@ import { BarraMigas } from "@/components/barra-migas";
 import { LatidoPresencia } from "@/components/latido-presencia";
 import { AvisoPedidosNuevos } from "@/components/tienda/aviso-pedidos-nuevos";
 import { AvisoInactividad } from "@/components/aviso-inactividad";
+import { AvisoPersonal } from "@/components/aviso-personal";
+import { ProveedorPendientesVivos } from "@/components/pendientes-vivos";
 import { ProveedorModulos } from "@/components/modulos-contexto";
 import { ProveedorPais } from "@/components/pais-contexto";
 import { ProveedorDescargaPdf } from "@/components/tabla/descarga-pdf-contexto";
@@ -107,6 +109,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   return (
     <ProveedorModulos modulos={usuario?.modulos ?? null}>
     <ProveedorPais codigo={paisActual.codigo}>
+    <ProveedorPendientesVivos>
     <ProveedorDescargaPdf puede={!!usuario && PUEDEN_DESCARGAR_PDF.has(usuario.id)}>
     <ToastProvider>
       {usuario && <LatidoPresencia />}
@@ -114,6 +117,8 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       {usuario?.modulos.includes("despacho-ciudad") && (
         <AvisoPedidosNuevos codigoPais={paisActual.codigo} sonidoPorDefecto={!["admin", "ceo"].includes((usuario.rolNombre ?? "").trim().toLowerCase())} />
       )}
+      {/* Avisos personales que alguien tiene que atender (Llegada a Puerto, En Bodega, remisiones), en cualquier página (17 nov 2026). */}
+      {usuario && <AvisoPersonal />}
       {usuario && avisoInactividad && <AvisoInactividad />}
       {usuario?.vistaPrevia && <BannerVistaPrevia rolNombre={usuario.vistaPrevia.rolNombre} />}
       <div className="flex min-h-full">
@@ -128,6 +133,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       </div>
     </ToastProvider>
     </ProveedorDescargaPdf>
+    </ProveedorPendientesVivos>
     </ProveedorPais>
     </ProveedorModulos>
   );

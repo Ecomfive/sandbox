@@ -8,7 +8,7 @@ import { registrarAuditoria } from "@/lib/auditoria";
 import { formatearMoneda } from "@/lib/formato";
 import { getUsuarioActual, requireModuloEscritura } from "@/lib/auth";
 import { insertarConCorrelativo, leerCorrelativo } from "@/lib/retiros/correlativo";
-import { ESTADO_ETIQUETA as ETIQUETA_ESTADO } from "@/lib/retiros/estados";
+import { ESTADO_ETIQUETA as ETIQUETA_ESTADO, quitaLoRecibidoAlReabrir } from "@/lib/retiros/estados";
 import { revisarConciliacion } from "@/lib/retiros/comision";
 
 const TOLERANCIA_DISCREPANCIA = 3;
@@ -562,7 +562,7 @@ export async function actualizarRetiro(formData: FormData) {
   const supabase = createServiceClient();
   const { data: antes, error: errorAntes } = await supabase
     .from("retiros")
-    .select("monto, comision, estado, pais_id")
+    .select("monto, comision, estado, pais_id, monto_recibido")
     .eq("id", id)
     .single();
   if (errorAntes) throw new Error(errorAntes.message);
@@ -590,10 +590,16 @@ export async function actualizarRetiro(formData: FormData) {
     if (estadoTexto !== antes.estado) {
       cambios.consolidado = estadoTexto === "cerrado";
       if (estadoTexto !== "cerrado") cambios.novedad_resuelta = false;
+      // Reabrir uno conciliado (por error, o porque el dinero se reversó): lo recibido ya no vale y se quita, con sus fechas. Se vuelve a anotar al volver a conciliarlo.
+      if (quitaLoRecibidoAlReabrir(antes.estado as string, estadoTexto)) {
+        cambios.monto_recibido = null;
+        cambios.fecha_recibido = null;
+        cambios.fecha_cierre = null;
+      }
     }
   }
 
-  const { error } = (await actualizarTolerante(supabase, id, cambios, ["novedad_resuelta"])) as {
+  const { error } = (await actualizarTolerante(supabase, id, cambios, ["novedad_resuelta", "fecha_recibido"])) as {
     error: { message: string } | null;
   };
   if (error) throw new Error(error.message);
@@ -605,7 +611,8 @@ export async function actualizarRetiro(formData: FormData) {
     `Retiro modificado: monto ${m(Number(antes.monto))} → ${m(monto)}` +
       (cambioEstado
         ? `, estado ${ETIQUETA_ESTADO[antes.estado] ?? antes.estado} → ${ETIQUETA_ESTADO[estadoTexto!] ?? estadoTexto}`
-        : "")
+        : "") +
+      (cambioEstado && quitaLoRecibidoAlReabrir(antes.estado as string, estadoTexto!) && antes.monto_recibido !== null ? ` · se quitó lo recibido (${m(Number(antes.monto_recibido))})` : "")
   );
   await registrarAuditoria({
     accion: "editar_retiro",
