@@ -115,6 +115,15 @@ export function totalesDeLlegada(filas: readonly FilaLlegada[]): TotalesLlegada 
   return t;
 }
 
+/** La lista de lo que llegó a puerto en los últimos días: a donde lleva «Ver lista» del aviso de Llegada a Puerto (el de bodega sigue abriendo su llegada para pagar). */
+export const RUTA_LISTA_PUERTO = "/llegadas?tipo=puerto";
+
+/** ¿Es el aviso de una llegada a puerto? Se reconoce por su título (`armarAviso`): así los avisos que ya estaban guardados también ofrecen la lista. */
+export const esAvisoDePuerto = (titulo: string): boolean => titulo.startsWith("Llega a puerto");
+
+/** A dónde lleva un aviso: el de puerto va a la lista de llegadas (no hay nada que gestionar, solo prepararse); los demás conservan su dirección. */
+export const hrefDeAviso = (titulo: string, href: string): string => (esAvisoDePuerto(titulo) && href.startsWith("/llegadas") ? RUTA_LISTA_PUERTO : href);
+
 export interface AvisoArmado {
   titulo: string;
   texto: string;

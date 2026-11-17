@@ -2,7 +2,7 @@
 // Nunca lanza: pasar una compra de etapa ya se guardó y un aviso que falla no debe deshacerlo.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { armarAviso, llegadaDeEtapa, unaPorCompra, type EventoAviso, type FilaLlegada, type TipoLlegada } from "./llegadas-avisos";
+import { armarAviso, llegadaDeEtapa, RUTA_LISTA_PUERTO, unaPorCompra, type EventoAviso, type FilaLlegada, type TipoLlegada } from "./llegadas-avisos";
 
 const num = (v: unknown): number | null => (v === null || v === undefined || v === "" ? null : Number.isFinite(Number(v)) ? Number(v) : null);
 export const numeroOrden = (n: unknown) => (num(n) == null ? "OC" : `OC-${String(num(n)).padStart(4, "0")}`);
@@ -136,7 +136,7 @@ export async function avisarLlegada(
           tipo: "llegada",
           titulo: aviso.titulo.slice(0, 200),
           texto: aviso.texto.slice(0, 500),
-          href: `${RUTA_LLEGADA}/${llegadaId}`,
+          href: regla.tipo === "puerto" ? RUTA_LISTA_PUERTO : `${RUTA_LLEGADA}/${llegadaId}`,
           autor_id: d.autor.id,
           autor_nombre: d.autor.nombre ?? "Sistema",
         })),
