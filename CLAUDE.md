@@ -97,6 +97,8 @@ convenciones técnicas del código.
   `group by`) en vez de traer todo y calcularlo en JavaScript — ver
   [RENDIMIENTO-PENDIENTE.md](RENDIMIENTO-PENDIENTE.md) para el diagnóstico
   detallado de dónde falta esto todavía.
+- **Retiros: reabrir uno conciliado** (17 nov 2026, pedido de Hernán: el #0133 se concilió por error y su dinero se reversó; «Recibido» era de solo lectura y no se podía poner en 0). Cambiar a mano el Estado de la ficha de un retiro **Cerrado** o con la **novedad resuelta** a **Abierto** o **Novedad**
+  (`actualizarRetiro`, `quitaLoRecibidoAlReabrir` en `src/lib/retiros/estados.ts`, con prueba) le quita `monto_recibido`, `fecha_recibido` y `fecha_cierre` (queda «sin recibir»; la Consolidación ya seguía al Estado) y lo anota en el historial («se quitó lo recibido»). Se vuelve a anotar al volver a conciliar.
 - **Retiros: diferencia de cambio por mes** (13 nov 2026, pedido de Hernán: la columna «Diferencia por cambio» de su Excel, para cargar ese gasto global a los
   gastos de Ecomfive): bloque `DiferenciaCambioMes` (`retiros/diferencia-cambio-mes.tsx`) bajo el «Dashboard»; cálculo puro `diferenciaPorMes`
   (`src/lib/retiros/diferencia-cambio.ts`, con prueba): lo pedido (`monto`) menos lo recibido (`monto_recibido`) de los retiros **cerrados**, por el mes de
