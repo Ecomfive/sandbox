@@ -5,7 +5,7 @@ import { createSessionClient, createServiceClient } from "@/lib/supabase/server"
 import { aAccesoPlano, nivelesEfectivos, type PermisoPropio } from "@/lib/permisos/acceso";
 import { accionPermitida, contarAjustes, pestanaVisible, resolverAfinado, type Afinado, type FilaAfinada } from "@/lib/permisos/afinado";
 import { MODULOS_AFINABLES, catalogoDe } from "@/lib/permisos/catalogo";
-import { paginaInicialDe } from "@/lib/nav-data";
+import { paginaInicialDe, primeraPestanaPermitida } from "@/lib/nav-data";
 import { RUTA_PORTAL_PROVEEDOR, cuentaDeProveedor } from "@/lib/proveedor/cuenta";
 
 /** Cookie de "Ver así": el id del rol que Usuarios y roles está probando, o nada. Vive solo en el
@@ -233,6 +233,19 @@ export async function requireModulo(clave: string): Promise<UsuarioActual> {
   if (!usuario) return irSinPerfil();
   if (!usuario.modulos.includes(clave)) irAlInicio(usuario, clave);
   return usuario;
+}
+
+/**
+ * La primera pestaña de un panel con pestañas (Pedidos de tienda, Despacho ciudad, Tiendas Shopify; 17 nov 2026): si la persona tiene el
+ * módulo de la pestaña principal, se queda; si solo tiene el de otra pestaña (por ejemplo, solo Devoluciones), la lleva a esa en vez de sacarla.
+ */
+export async function requirePanel(href: string, clave: string): Promise<UsuarioActual> {
+  const usuario = await getUsuarioActual();
+  if (!usuario) return irSinPerfil();
+  if (usuario.modulos.includes(clave)) return usuario;
+  const otra = primeraPestanaPermitida(usuario.modulos, href);
+  if (otra && otra !== href) redirect(otra);
+  return irAlInicio(usuario, clave);
 }
 
 /** Exige acceso de escritura al módulo dado — para usar dentro de cada server action que

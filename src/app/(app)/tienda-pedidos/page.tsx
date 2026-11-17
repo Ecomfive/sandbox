@@ -1,7 +1,7 @@
 import { AvisoConexion, BarraTienda, FaltaMigracionTienda, SinTiendas, rutaCon } from "@/components/tienda/barra-tienda";
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
-import { requireModulo } from "@/lib/auth";
+import { requirePanel } from "@/lib/auth";
 import { getPaisActual } from "@/lib/pais";
 import { createServiceClient } from "@/lib/supabase/server";
 import { periodoElegido, type Tienda } from "@/lib/tienda/datos";
@@ -26,7 +26,7 @@ export const dynamic = "force-dynamic";
  * Con «Todas las tiendas» (13 nov 2026, pedido de Hernán; prototipo aprobado) no sale la lista: sale el tablero que compara las tiendas (`TableroTiendas`).
  */
 export default async function PedidosTiendaPage({ searchParams }: { searchParams: Promise<{ [k: string]: string | string[] | undefined }> }) {
-  await requireModulo("tienda-pedidos");
+  await requirePanel("/tienda-pedidos", "tienda-pedidos");
   const sp = await searchParams;
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);

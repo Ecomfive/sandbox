@@ -56,7 +56,7 @@ export default async function ConfirmacionIAPage({ searchParams }: { searchParam
         <SinTiendas pais={pais.nombre} />
       ) : (
         <>
-          {tiendas.length > 1 && <BarraTienda ruta="/tienda-confirmacion/ia" tiendas={tiendas} tiendaId={tienda?.id ?? null} />}
+          {tiendas.length > 1 && <BarraTienda ruta="/tienda-pedidos/confirmacion/ia" tiendas={tiendas} tiendaId={tienda?.id ?? null} />}
           <ConfirmacionIA
             config={config}
             paisNombre={pais.nombre}

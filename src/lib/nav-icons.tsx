@@ -1332,16 +1332,8 @@ export const ICONOS_PAGINA: Record<string, (props: SVGProps<SVGSVGElement>) => R
   "/tienda-dashboard": GestionTiendasIcon,
   "/tienda-pedidos": PedidoIcon,
   "/tienda-reporteria": ListaIcon,
-  "/tienda-confirmacion": CheckIcon,
-  "/tienda-logistica": EnvioIcon,
-  "/despacho-ciudad": PedidoIcon,
-  "/despacho-devoluciones": DeshacerIcon,
-  "/despacho-cambios": TransferirIcon,
-  "/tienda-cuanto-hay": InventarioIcon,
-  "/despacho-cuanto-hay": ChatIcon,
-  "/despacho-pedir-inventario": PedidoIcon,
+  "/despacho-ciudad": EnvioIcon,
   "/inventario-pedidos-despacho": EnvioIcon,
-  "/tienda-productos": EnlaceIcon,
   "/tienda-tiendas": TiendaIcon,
 };
 

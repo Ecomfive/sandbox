@@ -38,7 +38,7 @@ export default async function ResponderCuantoHayPage({ searchParams }: { searchP
     if (tienda) q.set("tienda", tienda);
     if (ver) q.set("ver", "respondidas");
     const s = q.toString();
-    return `/despacho-cuanto-hay${s ? `?${s}` : ""}`;
+    return `/despacho-ciudad/cuanto-hay${s ? `?${s}` : ""}`;
   };
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-4">

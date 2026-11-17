@@ -36,7 +36,7 @@ export async function vincularVariante(varianteId: string, skuId: string | null)
     if (!skuId && antes.sku_maestro_id && antes.sku) await quitarVinculoDeLineas(supabase, antes.tienda_id as string, antes.sku as string, antes.sku_maestro_id as string);
     await aplicarVinculosDeTienda(supabase, antes.tienda_id as string);
   }
-  revalidatePath("/tienda-productos");
+  revalidatePath("/tienda-tiendas/productos");
   revalidatePath("/tienda-pedidos");
   return {};
 }
@@ -71,7 +71,7 @@ export async function vincularVariantesEnBloque(pares: { varianteId: string; sku
     hechas++;
   }
   for (const t of tiendas) await aplicarVinculosDeTienda(supabase, t);
-  revalidatePath("/tienda-productos");
+  revalidatePath("/tienda-tiendas/productos");
   revalidatePath("/tienda-pedidos");
   return { hechas };
 }
@@ -92,7 +92,7 @@ export async function traerProductosShopify(tiendaId: string): Promise<{ error?:
   try {
     const r = await traerProductosTienda(supabase, { id: t.id as string, nombre: t.nombre as string });
     const lineas = await aplicarVinculosDeTienda(supabase, t.id as string);
-    revalidatePath("/tienda-productos");
+    revalidatePath("/tienda-tiendas/productos");
     revalidatePath("/tienda-pedidos");
     return {
       resumen: `${t.nombre}: ${r.productos} productos con ${r.variantes} variantes (${r.nuevas} nuevas${r.yaNoEstan ? `, ${r.yaNoEstan} ya no están en Shopify` : ""})${lineas ? ` · ${lineas} líneas de pedidos con su producto` : ""}.`,
@@ -117,6 +117,6 @@ export async function marcarNoFisico(varianteId: string, noFisico: boolean): Pro
     .update({ no_fisico: noFisico, sku_maestro_id: null, vinculado_por: noFisico ? usuario.id : null, vinculado_en: noFisico ? new Date().toISOString() : null })
     .eq("id", varianteId);
   if (error) return { error: "No se pudo guardar." };
-  revalidatePath("/tienda-productos");
+  revalidatePath("/tienda-tiendas/productos");
   return {};
 }

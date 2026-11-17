@@ -18,7 +18,7 @@ type Resultado = { error?: string };
 type Supabase = ReturnType<typeof createServiceClient>;
 
 const BUCKET = "despacho-comprobantes";
-const RUTAS = ["/despacho-ciudad", "/despacho-devoluciones"];
+const RUTAS = ["/despacho-ciudad", "/despacho-ciudad/devoluciones"];
 const esItem = (v: unknown): v is string => typeof v === "string" && /^([0-9]{1,20}|S[0-9a-f]{32})$/.test(v);
 const esDia = (v: unknown): v is string => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
 const modulo = (clase: string) => (clase === "devolucion" ? "despacho-devoluciones" : "despacho-ciudad");

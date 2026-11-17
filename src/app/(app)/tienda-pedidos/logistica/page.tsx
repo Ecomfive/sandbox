@@ -89,7 +89,7 @@ export default async function LogisticaTiendaPage({ searchParams }: { searchPara
       ) : (
         <>
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <BarraTienda ruta="/tienda-logistica" tiendas={tiendas} tiendaId={tienda?.id ?? null} sinTodas={limitado} />
+            <BarraTienda ruta="/tienda-pedidos/logistica" tiendas={tiendas} tiendaId={tienda?.id ?? null} sinTodas={limitado} />
             {puedeLeer && <LeerSiscore key={tienda?.id ?? "todas"} ultima={ultimaSiscore ? formatearFechaHora(ultimaSiscore) : null} tiendaId={tienda?.id ?? null} tiendaNombre={tienda?.nombre ?? null} />}
           </div>
           <AvisoConexion tiendas={miradas} finanzas={fuente} />

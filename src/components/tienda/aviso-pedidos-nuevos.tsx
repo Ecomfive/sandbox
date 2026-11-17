@@ -13,10 +13,14 @@ import { CerrarIcon, PedidoIcon, SilencioIcon, SonidoIcon } from "@/lib/nav-icon
  * Dónde sale el aviso (16 nov 2026, pedido de Hernán): solo en Pedidos de tienda y en las páginas de despacho, para que no distraiga a quien trabaja en
  * Compras, Producto u otro panel. Fuera de estas páginas no se pregunta ni se muestra nada.
  */
-const PAGINAS_DEL_AVISO = ["/tienda-pedidos", "/tienda-logistica", "/despacho-ciudad", "/despacho-devoluciones"];
+const PAGINAS_DEL_AVISO = ["/tienda-pedidos", "/tienda-pedidos/logistica", "/despacho-ciudad", "/despacho-ciudad/devoluciones"];
+/** Las pestañas de esos paneles que no son de pedidos por despachar (17 nov 2026: ahora cuelgan de Pedidos y de Despacho ciudad). */
+const PESTANAS_SIN_AVISO = ["/tienda-pedidos/confirmacion", "/tienda-pedidos/cuanto-hay", "/despacho-ciudad/cambios", "/despacho-ciudad/cuanto-hay", "/despacho-ciudad/pedir-inventario"];
+
+const enRuta = (ruta: string, p: string) => ruta === p || ruta.startsWith(`${p}/`);
 
 export function paginaConAvisoDePedidos(ruta: string | null): boolean {
-  return !!ruta && PAGINAS_DEL_AVISO.some((p) => ruta === p || ruta.startsWith(`${p}/`));
+  return !!ruta && PAGINAS_DEL_AVISO.some((p) => enRuta(ruta, p)) && !PESTANAS_SIN_AVISO.some((p) => enRuta(ruta, p));
 }
 
 /** Cada cuánto se pregunta por pedidos nuevos (solo con la pestaña a la vista). */

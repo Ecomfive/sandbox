@@ -2,7 +2,7 @@ import { FaltaMigracionTienda, SinTiendas } from "@/components/tienda/barra-tien
 import { claseThLista, claseTdLista, MarcoTabla, Pastilla } from "@/components/panel/piezas-panel";
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
-import { requireModulo } from "@/lib/auth";
+import { requirePanel } from "@/lib/auth";
 import { formatearTiempoRelativo } from "@/lib/formato";
 import { getPaisActual } from "@/lib/pais";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -44,7 +44,7 @@ const AVISO_ICOMFLY: Record<string, { texto: string; error: boolean }> = {
 };
 
 export default async function TiendasPage({ searchParams }: { searchParams: Promise<{ icomfly?: string; motivo?: string }> }) {
-  const usuario = await requireModulo("tienda-tiendas");
+  const usuario = await requirePanel("/tienda-tiendas", "tienda-tiendas");
   const { icomfly, motivo } = await searchParams;
   const aviso = icomfly ? AVISO_ICOMFLY[icomfly] : undefined;
   const admin = esAdministrador(usuario) && !usuario.modulosSoloLectura.includes("tienda-tiendas");

@@ -15,7 +15,7 @@ import { LeyendaPedidos, NuevoPedido, TablaPedidos } from "./pedidos";
  */
 export async function PaginaPedidos({ modo, usuario, estado }: { modo: "despacho" | "inventario"; usuario: UsuarioActual; estado: string | undefined }) {
   const modulo = modo === "despacho" ? "despacho-pedir-inventario" : "inventario-pedidos-despacho";
-  const ruta = modo === "despacho" ? "/despacho-pedir-inventario" : "/inventario-pedidos-despacho";
+  const ruta = modo === "despacho" ? "/despacho-ciudad/pedir-inventario" : "/inventario-pedidos-despacho";
   const puedeEscribir = !usuario.modulosSoloLectura.includes(modulo);
   const supabase = createServiceClient();
   const [{ pedidos, faltaMigracion }, bodegas] = await Promise.all([cargarPedidos(supabase), cargarBodegasPedido(supabase)]);

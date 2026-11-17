@@ -116,7 +116,7 @@ export default async function DashboardTiendaPage({ searchParams }: { searchPara
     { titulo: "Ticket promedio", valor: dinero(r.ticketPromedio), detalle: "por pedido no cancelado", icono: "pedido", color: "azul" },
   ];
   const avisos: Tarjeta[] = [
-    { titulo: "SKU sin vincular", valor: String(sinVincular), detalle: "variantes de Shopify sin producto nuestro", icono: "alerta", color: "ambar", punto: sinVincular ? "aviso" : undefined, href: "/tienda-productos" },
+    { titulo: "SKU sin vincular", valor: String(sinVincular), detalle: "variantes de Shopify sin producto nuestro", icono: "alerta", color: "ambar", punto: sinVincular ? "aviso" : undefined, href: "/tienda-tiendas/productos" },
     { titulo: "Sin confirmar +24 h", valor: String(viejosSinConfirmar), detalle: "pedidos que esperan desde ayer", icono: "alerta", color: "rojo", punto: viejosSinConfirmar ? "peligro" : undefined, href: "/tienda-pedidos" },
     { titulo: "Tiendas conectadas", valor: `${conectadas} de ${miradas.length}`, detalle: "solo lectura", icono: "check", color: "verde", href: "/tienda-tiendas" },
   ];
@@ -196,7 +196,7 @@ export default async function DashboardTiendaPage({ searchParams }: { searchPara
                                 <span className="shrink-0 text-xs text-muted-foreground">· sin vincular</span>
                               </span>
                             ) : (
-                              <Link href="/tienda-productos" className="text-warning underline underline-offset-2">
+                              <Link href="/tienda-tiendas/productos" className="text-warning underline underline-offset-2">
                                 Sin vincular
                               </Link>
                             )}

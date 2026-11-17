@@ -58,7 +58,7 @@ export async function cambiarInterruptor(campo: InterruptorConfirmacion, valor: 
     entidadId: pais.id,
     detalle: `${pais.nombre}: ${valor ? "encendió" : "apagó"} ${NOMBRE_INTERRUPTOR[campo]}${esAdministrador(usuario) ? "" : " (con la contraseña)"}`,
   });
-  revalidatePath("/tienda-confirmacion/ia");
+  revalidatePath("/tienda-pedidos/confirmacion/ia");
   return {};
 }
 
@@ -77,7 +77,7 @@ export async function guardarInstrucciones(texto: string): Promise<Resultado> {
   const { error } = await supabase.from("confirmacion_ia_config").upsert({ pais_id: pais.id, instrucciones: limpio || null, actualizado_en: new Date().toISOString(), actualizado_por: nombreDe(usuario) }, { onConflict: "pais_id" });
   if (error) return { error: "No se pudo guardar." };
   await registrarAuditoria({ accion: "cambiar_instrucciones_confirmacion_ia", entidad: "paises", entidadId: pais.id, detalle: `${pais.nombre}: cambió las instrucciones de la IA (${limpio.length} letras)` });
-  revalidatePath("/tienda-confirmacion/ia");
+  revalidatePath("/tienda-pedidos/confirmacion/ia");
   return {};
 }
 
@@ -180,7 +180,7 @@ export async function agregarEjemplo(d: DatosEjemplo): Promise<Resultado> {
   const { error } = await supabase.from("confirmacion_ia_ejemplos").insert({ ...l.fila, pais_id: pais.id, creado_por: usuario.id, creado_por_nombre: nombreDe(usuario) });
   if (error) return { error: /ciudad|schema cache/i.test(error.message) ? "Falta correr la migración 0301 (ciudad o corregimiento de los ejemplos) en Supabase." : "No se pudo guardar la dirección." };
   await registrarAuditoria({ accion: "agregar_ejemplo_confirmacion_ia", entidad: "paises", entidadId: pais.id, detalle: `${pais.nombre}: dirección ${l.fila.completa ? "completa" : "incompleta"} de ejemplo` });
-  revalidatePath("/tienda-confirmacion/ejemplos");
+  revalidatePath("/tienda-pedidos/confirmacion/ejemplos");
   return {};
 }
 
@@ -206,7 +206,7 @@ export async function editarEjemplo(id: string, d: DatosEjemplo): Promise<Result
   const { error } = await ctx.supabase.from("confirmacion_ia_ejemplos").update(l.fila).eq("id", id);
   if (error) return { error: /ciudad|schema cache/i.test(error.message) ? "Falta correr la migración 0301 (ciudad o corregimiento de los ejemplos) en Supabase." : "No se pudo guardar." };
   await registrarAuditoria({ accion: "editar_ejemplo_confirmacion_ia", entidad: "paises", entidadId: ctx.pais.id, detalle: `${ctx.pais.nombre}: cambió una dirección de ejemplo` });
-  revalidatePath("/tienda-confirmacion/ejemplos");
+  revalidatePath("/tienda-pedidos/confirmacion/ejemplos");
   return {};
 }
 
@@ -218,7 +218,7 @@ export async function eliminarEjemplo(id: string): Promise<Resultado> {
   const { error } = await ctx.supabase.from("confirmacion_ia_ejemplos").delete().eq("id", id);
   if (error) return { error: "No se pudo borrar." };
   await registrarAuditoria({ accion: "eliminar_ejemplo_confirmacion_ia", entidad: "paises", entidadId: ctx.pais.id, detalle: `${ctx.pais.nombre}: borró una dirección de ejemplo` });
-  revalidatePath("/tienda-confirmacion/ejemplos");
+  revalidatePath("/tienda-pedidos/confirmacion/ejemplos");
   return {};
 }
 
@@ -269,7 +269,7 @@ export async function agregarPalabraZona(texto: string, resultado: Zona): Promis
   const { error } = await supabase.from("confirmacion_ia_zonas").insert({ pais_id: pais.id, texto: limpio, clave: normalizarTexto(limpio), resultado, creado_por: usuario.id, creado_por_nombre: nombreDe(usuario) });
   if (error) return { error: error.code === "23505" ? "Esa palabra ya está en la lista." : "No se pudo guardar." };
   await registrarAuditoria({ accion: "agregar_palabra_zona_confirmacion_ia", entidad: "paises", entidadId: pais.id, detalle: `${pais.nombre}: «${limpio}» → ${resultado}` });
-  revalidatePath("/tienda-confirmacion/zonas");
+  revalidatePath("/tienda-pedidos/confirmacion/zonas");
   return {};
 }
 
@@ -286,7 +286,7 @@ export async function eliminarPalabraZona(id: string): Promise<Resultado> {
   const { error } = await supabase.from("confirmacion_ia_zonas").delete().eq("id", id);
   if (error) return { error: "No se pudo borrar." };
   await registrarAuditoria({ accion: "eliminar_palabra_zona_confirmacion_ia", entidad: "paises", entidadId: pais.id, detalle: `${pais.nombre}: quitó «${data.texto}»` });
-  revalidatePath("/tienda-confirmacion/zonas");
+  revalidatePath("/tienda-pedidos/confirmacion/zonas");
   return {};
 }
 
@@ -315,7 +315,7 @@ export async function analizarPedidoAhora(ordenId: string): Promise<Resultado & 
   const r = await analizarOrden(ctx.supabase, ordenId, { origen: "pantalla", forzar: true, por: nombreDe(usuario) });
   if (r.resultado === "omitida") return { error: r.motivo };
   await registrarAuditoria({ accion: "analizar_direccion_confirmacion_ia", entidad: "ven_ordenes", entidadId: ordenId, detalle: `Analizó la dirección del pedido: ${r.estado}` });
-  revalidatePath("/tienda-confirmacion/ia");
+  revalidatePath("/tienda-pedidos/confirmacion/ia");
   return { estado: r.estado };
 }
 
@@ -330,7 +330,7 @@ export async function analizarPendientesAhora(): Promise<Resultado & { analizada
   const { config } = await cargarConfig(supabase, pais.id);
   if (!config.activa) return { error: "La confirmación automática está apagada: enciéndela para que analice los pedidos confirmados." };
   const r = await analizarPendientes(supabase, pais.id, 5, nombreDe(usuario));
-  revalidatePath("/tienda-confirmacion/ia");
+  revalidatePath("/tienda-pedidos/confirmacion/ia");
   return r;
 }
 
@@ -438,8 +438,8 @@ export async function revisarAnalisis(
     entidadId: pais.id,
     detalle: `${pais.nombre}: ${"acierto" in d ? "dio el visto bueno a" : "marcó como correcto"} un pedido (${veredicto.completa ? `completa${veredicto.zona ? ` · ${veredicto.zona}` : ""}` : `falta ${veredicto.falta}`})`,
   });
-  revalidatePath("/tienda-confirmacion/ia");
-  revalidatePath("/tienda-confirmacion/ejemplos");
+  revalidatePath("/tienda-pedidos/confirmacion/ia");
+  revalidatePath("/tienda-pedidos/confirmacion/ejemplos");
   // Falta un dato: la pantalla le pregunta a la persona si le manda el mensaje al cliente o si ya se lo mandó a mano (no se manda solo).
   if (!veredicto.completa && veredicto.falta) {
     const p = await prepararPedirDato(supabase, analisisId);
@@ -516,7 +516,7 @@ export async function enviarMensajeDato(analisisId: string): Promise<{ error?: s
   if (error) return { error: "El mensaje salió, pero no se pudo anotar. Revisa el pedido." };
   const pais = await getPaisActual(supabase);
   await registrarAuditoria({ accion: "enviar_mensaje_dato_confirmacion_ia", entidad: "paises", entidadId: pais.id, detalle: `${pais.nombre}: pidió el dato que falta al cliente de un pedido (${r.estado}) por ${nombreDe(usuario)}` });
-  revalidatePath("/tienda-confirmacion/ia");
+  revalidatePath("/tienda-pedidos/confirmacion/ia");
   return r.estado === "error" ? { error: r.error ?? "No se pudo enviar el mensaje.", estado: r.estado } : { estado: r.estado };
 }
 
@@ -534,6 +534,6 @@ export async function marcarMensajeManual(analisisId: string): Promise<Resultado
   if (error) return { error: /mensaje_estado|check|constraint/i.test(error.message) ? "Falta correr la migración 0308 (mensaje enviado a mano) en Supabase." : "No se pudo guardar." };
   const pais = await getPaisActual(supabase);
   await registrarAuditoria({ accion: "marcar_mensaje_manual_confirmacion_ia", entidad: "paises", entidadId: pais.id, detalle: `${pais.nombre}: ${nombreDe(usuario)} marcó que ya le pidió el dato al cliente de un pedido` });
-  revalidatePath("/tienda-confirmacion/ia");
+  revalidatePath("/tienda-pedidos/confirmacion/ia");
   return {};
 }

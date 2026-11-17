@@ -9,9 +9,9 @@ import { AlertaIcon, CalendarioIcon, CerrarIcon, CheckIcon, EnvioIcon, Inventari
 import type { PedidoFila } from "@/lib/tienda/datos";
 import { DIAS_DEMORA, anuladoPorEtiqueta, diasDesde, etapaConEntrega, etapaLogistica, listoParaPreparar } from "@/lib/tienda/logistica";
 import { diaPanama } from "@/lib/tienda/resumen";
-import { columnaProgramado } from "../tienda-pedidos/columnas-extra";
-import { FichaPedido } from "../tienda-pedidos/ficha-pedido";
-import { COLUMNAS, ICONOS, NOMBRE, defPedidos, type Contexto } from "../tienda-pedidos/pedidos-tienda";
+import { columnaProgramado } from "../columnas-extra";
+import { FichaPedido } from "../ficha-pedido";
+import { COLUMNAS, ICONOS, NOMBRE, defPedidos, type Contexto } from "../pedidos-tienda";
 
 type Vista = "preparar_hoy" | "preparar_despues" | "en_ruta" | "novedad" | "demorados" | "entregados" | "devueltos" | "anulados" | "sin_zona" | "verificar";
 
