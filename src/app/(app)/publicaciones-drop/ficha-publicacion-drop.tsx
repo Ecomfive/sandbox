@@ -26,7 +26,7 @@ import { AvisoEnCamino } from "../publicaciones-dropi/ventas-publicacion";
 import { ComprasProducto } from "../producto/compras-producto";
 import { EnCaminoProducto } from "../producto/en-camino-producto";
 import { FichaProductoEmbebida } from "../producto/ficha-producto-embebida";
-import { guardarCostoManualDrop, vincularPublicacionDrop } from "./actions";
+import { guardarCostoManualDrop, guardarIdDrop, vincularPublicacionDrop } from "./actions";
 import { DialogoAccesoPrivado, DialogoSolicitudInventario } from "./dialogos-fila-drop";
 import { stockDrop, type FilaPublicacionDrop, type ProductoDrop } from "./def-publicaciones-drop";
 import { InsigniaConectadoDrop } from "./insignia-conectado-drop";
@@ -36,6 +36,74 @@ import { VentasPlataformasProducto } from "../producto/ventas-plataformas-produc
 const AVISO_SIN_CONEXION = "Todavía no se escribe en Drop desde el sistema: por ahora solo se leen sus publicaciones. Hazlo en Drop.";
 const urlDrop = (p: FilaPublicacionDrop) => `https://app.soydrop.com/vendor/products/details/${p.dropInterno}/inventory`;
 const fecha = (iso: string | null) => (iso ? formatearFechaHora(iso) : "—");
+
+/**
+ * El «ID en Drop» de la ficha (17 nov 2026): lo que Drop muestra o, si la lista no trae un ID general (los productos con variantes solo lo traen por variante), el que se anota a mano con el lápiz. Vacío lo quita.
+ */
+function IdEnDrop({ p, puedeEscribir }: { p: FilaPublicacionDrop; puedeEscribir: boolean }) {
+  const { mostrarToast } = useToast();
+  const [editando, setEditando] = useState(false);
+  const [valor, setValor] = useState(p.idDrop);
+  const [error, setError] = useState<string | null>(null);
+  const [pendiente, empezar] = useTransition();
+  function guardar() {
+    setError(null);
+    empezar(async () => {
+      const r = await guardarIdDrop(p.id, valor).catch(() => ({ error: "No se pudo guardar. Inténtalo de nuevo." }));
+      if ("error" in r) return setError(r.error);
+      setValor(r.codigo ?? "");
+      setEditando(false);
+      mostrarToast(r.codigo ? "ID guardado." : "Se quitó el ID.");
+    });
+  }
+  return (
+    <div className="flex min-w-0 flex-col gap-1">
+      <span className={labelClassSm}>ID en Drop</span>
+      {editando ? (
+        <span className="flex flex-wrap items-center gap-1.5">
+          <input
+            aria-label="ID del producto en Drop"
+            value={valor}
+            maxLength={16}
+            disabled={pendiente}
+            autoFocus
+            onChange={(e) => setValor(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") guardar();
+              if (e.key === "Escape") {
+                setValor(p.idDrop);
+                setEditando(false);
+              }
+            }}
+            placeholder="Ej: ID-ABCDE"
+            className="h-8 w-36 rounded-md border border-border bg-card px-2 text-sm uppercase tabular-nums"
+          />
+          <Button type="button" variant="secondary" disabled={pendiente} onClick={guardar} className="h-8 px-3 text-xs">
+            Guardar
+          </Button>
+          <Button type="button" variant="secondary" disabled={pendiente} onClick={() => { setValor(p.idDrop); setEditando(false); setError(null); }} className="h-8 px-3 text-xs">
+            Cancelar
+          </Button>
+        </span>
+      ) : (
+        <span className="flex items-center gap-2">
+          <span className="text-sm tabular-nums">{valor || "Drop no le muestra ID"}</span>
+          {puedeEscribir && (
+            <button type="button" onClick={() => setEditando(true)} className="rounded-md border border-border-control bg-card px-2 py-0.5 text-xs font-medium hover:bg-muted">
+              {valor ? "Cambiar" : "Anotar el ID"}
+            </button>
+          )}
+        </span>
+      )}
+      {error && (
+        <span role="alert" className="text-xs text-destructive">
+          {error}
+        </span>
+      )}
+      {!valor && !editando && puedeEscribir && <span className="text-xs text-muted-foreground">Un producto con variantes no trae ID en la lista de Drop: anótalo desde su página en Drop.</span>}
+    </div>
+  );
+}
 
 /** Un producto de Producto: su foto, el SKU (se copia con un clic) y el nombre, como en la ficha de Dropi. */
 function Producto({ sku, pequeño = false }: { sku: ProductoDrop; pequeño?: boolean }) {
@@ -378,10 +446,7 @@ export function FichaPublicacionDrop({
                 <InsigniaConectadoDrop conectado={p.conectado} />
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
-                <div className="flex min-w-0 flex-col gap-1">
-                  <span className={labelClassSm}>ID en Drop</span>
-                  <span className="text-sm tabular-nums">{p.idDrop || "Drop no le muestra ID"}</span>
-                </div>
+                <IdEnDrop key={`${p.id}-${p.idDrop}`} p={p} puedeEscribir={puedeEscribir} />
                 <div className="flex min-w-0 flex-col gap-1">
                   <span className={labelClassSm}>SKU de Drop</span>
                   <span className="text-sm [overflow-wrap:anywhere]">{p.skuDrop || "—"}</span>

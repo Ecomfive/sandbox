@@ -5,6 +5,7 @@ import { requireModuloEscritura } from "@/lib/auth";
 import { getPaisActual } from "@/lib/pais";
 import { PAIS_DE_DROP, plataformaDisponible } from "@/lib/plataformas";
 import { faltantesCrearDrop, MAX_IMAGENES } from "@/lib/publicaciones-drop/crear";
+import { normalizarIdDrop } from "@/lib/publicaciones-drop/id-drop";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { createServiceClient } from "@/lib/supabase/server";
 
@@ -43,6 +44,38 @@ export async function vincularPublicacionDrop(
   });
   revalidatePath("/publicaciones-drop");
   return { ok: true, producto: sku };
+}
+
+/**
+ * Anota (o corrige, o quita con vacío) el ID corto de una publicación de Drop («ID-BRIAH», 17 nov 2026, pedido de Hernán): en un producto con variantes la lista de Drop no trae un ID general, solo uno por variante, y la
+ * lectura lo deja vacío. Lo que se anota a mano se conserva en las próximas lecturas (la lectura solo lo reemplaza si Drop trae uno). No se repite entre dos publicaciones del país. Queda en la auditoría.
+ */
+export async function guardarIdDrop(id: string, texto: string): Promise<{ ok: true; codigo: string | null } | { error: string }> {
+  await requireModuloEscritura("publicaciones-drop");
+  if (typeof id !== "string" || !UUID.test(id)) return { error: "Datos no válidos." };
+  const n = normalizarIdDrop(texto);
+  if ("error" in n) return n;
+  const supabase = createServiceClient();
+  const { data: antes, error: errorAntes } = await supabase.from("drop_publicaciones").select("nombre, codigo, pais_id").eq("id", id).maybeSingle();
+  if (errorAntes) return { error: /drop_publicaciones|schema cache|does not exist/i.test(errorAntes.message) ? FALTA : "No se pudo leer la publicación." };
+  if (!antes) return { error: "Esa publicación ya no existe. Recarga la página." };
+  if ((antes.codigo ?? null) === n.id) return { ok: true, codigo: n.id };
+  if (n.id) {
+    const { data: otra } = await supabase.from("drop_publicaciones").select("nombre").eq("pais_id", antes.pais_id as string).eq("codigo", n.id).neq("id", id).limit(1).maybeSingle();
+    if (otra) return { error: `Ese ID ya lo tiene «${otra.nombre as string}».` };
+  }
+  const { error } = await supabase.from("drop_publicaciones").update({ codigo: n.id, actualizado_en: new Date().toISOString() }).eq("id", id);
+  if (error) return { error: "No se pudo guardar el ID." };
+  await registrarAuditoria({
+    accion: "editar_id_publicacion_drop",
+    entidad: "drop_publicaciones",
+    entidadId: id,
+    detalle: antes.nombre as string,
+    antes: { "ID en Drop": (antes.codigo as string | null) ?? "—" },
+    despues: { "ID en Drop": n.id ?? "—" },
+  });
+  revalidatePath("/publicaciones-drop");
+  return { ok: true, codigo: n.id };
 }
 
 /**
