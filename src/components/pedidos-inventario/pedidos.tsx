@@ -9,10 +9,12 @@ import {
   ponerEnProcesoPedido,
   recibirPedidoInventario,
 } from "@/app/(app)/despacho-ciudad/pedir-inventario/actions";
+import { Indicador, TableroIndicadores } from "@/components/panel/piezas-panel";
 import { Badge } from "@/components/ui/badge";
 import { fieldClass } from "@/components/ui/field";
 import { CampoSkuMaestro, ProveedorSkusMaestros, type OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import { useToast } from "@/components/ui/toast";
+import { CalendarioIcon, CheckIcon, EnvioIcon, InventarioIcon, PedidoIcon } from "@/lib/nav-icons";
 import {
   ESTADOS,
   estadoDe,
@@ -23,6 +25,7 @@ import {
   puedeEnProceso,
   puedeEnviar,
   puedeRecibir,
+  type EstadoPedido,
   type PedidoInventario,
 } from "@/lib/pedidos-inventario/reglas";
 
@@ -290,6 +293,53 @@ function FilasPedido({
 }
 
 /** La tabla de pedidos, igual para los dos lados: despacho ve «Recibido» y «Cancelar»; inventario, lo que hay y «Enviar». */
+/** Cómo se ve la tarjeta de cada estado en el tablero (como el de Compras: ícono de color, número grande y la tarjeta filtra la tabla). */
+const TARJETA_ESTADO = {
+  solicitud: { icono: PedidoIcon, color: "violeta", detalle: "pedidos que inventario no ha tomado" },
+  en_proceso: { icono: CalendarioIcon, color: "ambar", detalle: "inventario los está preparando" },
+  enviado: { icono: EnvioIcon, color: "azul", detalle: "en camino a despacho" },
+  recibido: { icono: CheckIcon, color: "verde", detalle: "despacho ya los recibió" },
+} as const;
+
+/** El tablero de arriba: el total y un contador por estado; cada tarjeta pone (o quita) el filtro `?estado=` de la dirección. */
+export function TableroPedidos({
+  modo,
+  ruta,
+  cuenta,
+  total,
+  elegido,
+}: {
+  modo: "despacho" | "inventario";
+  ruta: string;
+  cuenta: Record<EstadoPedido, number>;
+  total: number;
+  elegido: EstadoPedido | null;
+}) {
+  const num = (n: number) => n.toLocaleString("es-PA");
+  return (
+    <TableroIndicadores etiqueta="Pedidos por estado">
+      <Indicador titulo="Total pedidos" icono={InventarioIcon} color="violeta" valor={num(total)} detalle="abiertos y cerrados de 30 días" href={ruta} activo={elegido === null} />
+      {ESTADOS.filter((e) => e.clave !== "cancelado").map((e) => {
+        const t = TARJETA_ESTADO[e.clave as keyof typeof TARJETA_ESTADO];
+        const n = cuenta[e.clave];
+        return (
+          <Indicador
+            key={e.clave}
+            titulo={modo === "inventario" && e.clave === "solicitud" ? "Por atender (Solicitud)" : e.etiqueta}
+            icono={t.icono}
+            color={t.color}
+            punto={modo === "inventario" && e.clave === "solicitud" && n ? "aviso" : undefined}
+            valor={num(n)}
+            detalle={t.detalle}
+            href={elegido === e.clave ? ruta : `${ruta}?estado=${e.clave}`}
+            activo={elegido === e.clave}
+          />
+        );
+      })}
+    </TableroIndicadores>
+  );
+}
+
 export function TablaPedidos({
   pedidos,
   modo,

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { Indicador } from "@/components/panel/piezas-panel";
+import { Indicador, TableroIndicadores } from "@/components/panel/piezas-panel";
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { TablaDatos, type ColumnaTabla } from "@/components/tabla/tabla-datos";
 import { anilloFoco } from "@/components/ui/field";
@@ -430,27 +430,24 @@ export function Reporteria({
         </div>
       </div>
 
-      <section aria-label="Resumen del mes" className="overflow-hidden rounded-[10px] border border-border bg-card">
-        <div className="flex flex-wrap">
-          {RAPIDOS.map((k) => {
-            const n = r[CLAVE_RESUMEN[k.id]];
-            return (
-              <Indicador
-                key={k.id}
-                angosto
-                titulo={k.titulo}
-                icono={k.icono}
-                color={k.color}
-                punto={k.id === "difieren" && n ? "aviso" : undefined}
-                valor={num(n)}
-                detalle={k.detalle}
-                alPulsar={() => setRapido((x) => (x === k.id || k.id === "todos" ? "todos" : k.id))}
-                activo={rapido === k.id}
-              />
-            );
-          })}
-        </div>
-      </section>
+      <TableroIndicadores etiqueta="Resumen del mes">
+        {RAPIDOS.map((k) => {
+          const n = r[CLAVE_RESUMEN[k.id]];
+          return (
+            <Indicador
+              key={k.id}
+              titulo={k.titulo}
+              icono={k.icono}
+              color={k.color}
+              punto={k.id === "difieren" && n ? "aviso" : undefined}
+              valor={num(n)}
+              detalle={k.detalle}
+              alPulsar={() => setRapido((x) => (x === k.id || k.id === "todos" ? "todos" : k.id))}
+              activo={rapido === k.id}
+            />
+          );
+        })}
+      </TableroIndicadores>
 
       <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Grupos de columnas">
         <span className="mr-1 text-xs text-muted-foreground">Columnas:</span>

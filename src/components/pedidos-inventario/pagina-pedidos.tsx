@@ -1,12 +1,11 @@
-import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import type { UsuarioActual } from "@/lib/auth";
 import { cargarBodegasPedido, cargarPedidos, cargarStock } from "@/lib/pedidos-inventario/datos";
-import { contarPorEstado, esEstado, ESTADOS } from "@/lib/pedidos-inventario/reglas";
+import { contarPorEstado, esEstado } from "@/lib/pedidos-inventario/reglas";
 import { createServiceClient } from "@/lib/supabase/server";
 import { obtenerOpcionesSkuMaestro } from "@/lib/wms/skus-maestros";
-import { LeyendaPedidos, NuevoPedido, TablaPedidos } from "./pedidos";
+import { LeyendaPedidos, NuevoPedido, TablaPedidos, TableroPedidos } from "./pedidos";
 
 /**
  * Las dos páginas de «Pedir a inventario» (16 nov 2026, migración 0305; prototipo aprobado https://claude.ai/artifact/ReVGwYZrBG11rmKFUT7V5T):
@@ -42,16 +41,6 @@ export async function PaginaPedidos({ modo, usuario, estado }: { modo: "despacho
         )
       : {};
 
-  const tarjetas = [
-    { clave: null, titulo: "Total pedidos", valor: pedidos.length, tono: "neutral" as const },
-    ...ESTADOS.filter((e) => e.clave !== "cancelado").map((e) => ({
-      clave: e.clave,
-      titulo: modo === "inventario" && e.clave === "solicitud" ? "Por atender (Solicitud)" : e.etiqueta,
-      valor: cuenta[e.clave],
-      tono: (e.clave === "solicitud" ? "neutral" : e.clave === "en_proceso" ? "warning" : e.clave === "enviado" ? "info" : "success") as "neutral" | "warning" | "info" | "success",
-    })),
-  ];
-
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-4">
       <EncabezadoPagina titulo={modo === "despacho" ? "Pedir a inventario" : "Pedidos de despacho"} oculto>
@@ -75,19 +64,7 @@ export async function PaginaPedidos({ modo, usuario, estado }: { modo: "despacho
               No encontré la bodega de despacho de Panamá: hace falta una bodega propia activa cuyo nombre empiece con «Despacho».
             </p>
           )}
-          <KpiGrid compacta>
-            {tarjetas.map((t) => (
-              <KpiCard
-                key={t.clave ?? "total"}
-                compacta
-                titulo={t.titulo}
-                valor={t.valor.toLocaleString("es-PA")}
-                tono={t.tono}
-                href={t.clave && elegido !== t.clave ? `${ruta}?estado=${t.clave}` : ruta}
-                activa={t.clave === elegido}
-              />
-            ))}
-          </KpiGrid>
+          <TableroPedidos modo={modo} ruta={ruta} cuenta={cuenta} total={pedidos.length} elegido={elegido} />
           <TablaPedidos pedidos={visibles} modo={modo} puedeEscribir={puedeEscribir} origenes={bodegas.origenes} stock={stock} />
           <p className="m-0 text-xs text-muted-foreground">
             Se ven todos los pedidos abiertos y los cerrados de los últimos 30 días. {bodegas.destino ? `Lo enviado llega a ${bodegas.destino.nombre}.` : ""}

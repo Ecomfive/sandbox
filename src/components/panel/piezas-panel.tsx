@@ -242,8 +242,9 @@ export function Indicador({
           {tarjeta}
         </button>
       );
+    // Con `href` y `activo`: la tarjeta es el filtro que está puesto en la dirección (`?estado=…`), con el mismo anillo que la de botón.
     return href ? (
-      <Link href={href} className={`${base} ${movil} border-border`}>
+      <Link href={href} scroll={false} aria-current={activo ? "true" : undefined} className={`${base} ${movil} ${activo ? `ring-2 ${c.activa}` : "border-border"}`}>
         {tarjeta}
       </Link>
     ) : (

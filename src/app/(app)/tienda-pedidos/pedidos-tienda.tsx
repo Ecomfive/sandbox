@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { TablaDatos, type ColumnaTabla } from "@/components/tabla/tabla-datos";
-import { Indicador, Pastilla } from "@/components/panel/piezas-panel";
+import { Indicador, Pastilla, TableroIndicadores } from "@/components/panel/piezas-panel";
 import { formatearMoneda } from "@/lib/formato";
 import { Tooltip } from "@/components/ui/tooltip";
 import { AlertaIcon, CalendarioIcon, CerrarIcon, ChatIcon, CheckIcon, ShopifyLogo, WhatsAppLogo, DeshacerIcon, EnvioIcon, EtiquetaIcon, InventarioIcon, MargenIcon, PedidoIcon, ProductoIcon, TiendaIcon } from "@/lib/nav-icons";
@@ -389,19 +389,17 @@ export function PedidosTienda({
 
   return (
     <div className="flex flex-col gap-5">
-      {/* Una franja, como Mi Reto Digital (13 nov 2026, pedido de Hernán): los 8 indicadores en una fila, con su punto de color. */}
-      <section aria-label="Tablero de pedidos" className="overflow-hidden rounded-[10px] border border-border bg-card">
-        <div className="flex flex-wrap">
-          <Indicador angosto titulo="Pedidos" icono={PedidoIcon} color="violeta" valor={num(r.pedidos)} detalle="todos los del periodo" alPulsar={() => setEstado(null)} activo={!estado} />
-          <Indicador angosto titulo="Por confirmar" icono={AlertaIcon} color="ambar" punto={r.porEstado.nuevo ? "aviso" : undefined} valor={num(r.porEstado.nuevo)} detalle="esperan llamada o mensaje" alPulsar={() => alternar("nuevo")} activo={estado === "nuevo"} />
-          <Indicador angosto titulo="Confirmados" icono={CheckIcon} color="azul" valor={num(r.porEstado.confirmado)} detalle={`${pct(r.confirmacion)} pasó la confirmación`} alPulsar={() => alternar("confirmado")} activo={estado === "confirmado"} />
-          <Indicador angosto titulo="En camino" icono={EnvioIcon} color="violeta" punto={r.porEstado.en_camino ? "aviso" : undefined} valor={num(r.porEstado.en_camino)} detalle="con guía, sin entregar" alPulsar={() => alternar("en_camino")} activo={estado === "en_camino"} />
-          <Indicador angosto titulo="Entregados" icono={InventarioIcon} color="verde" punto={r.porEstado.entregado ? "exito" : undefined} valor={num(r.porEstado.entregado)} detalle={`${pct(r.entrega)} de lo que salió`} alPulsar={() => alternar("entregado")} activo={estado === "entregado"} />
-          <Indicador angosto titulo="Cancelados" icono={CerrarIcon} color="rojo" punto={r.porEstado.cancelado ? "peligro" : undefined} valor={num(r.porEstado.cancelado)} detalle={pct(r.cancelacion)} alPulsar={() => alternar("cancelado")} activo={estado === "cancelado"} />
-          <Indicador angosto titulo="Devoluciones" icono={DeshacerIcon} color="rojo" punto={r.porEstado.devuelto ? "peligro" : undefined} valor={num(r.porEstado.devuelto)} detalle={pct(r.devolucion)} alPulsar={() => alternar("devuelto")} activo={estado === "devuelto"} />
-          <Indicador angosto titulo="SKU sin vincular" icono={AlertaIcon} color="ambar" punto={sinVincular ? "aviso" : undefined} valor={num(sinVincular)} detalle="variantes de Shopify sin producto nuestro" href="/tienda-tiendas/productos" />
-        </div>
-      </section>
+      {/* El tablero de tarjetas de Compras (17 nov 2026, pedido de Hernán: igual que las demás pantallas); cada tarjeta filtra la lista. */}
+      <TableroIndicadores etiqueta="Tablero de pedidos">
+        <Indicador titulo="Pedidos" icono={PedidoIcon} color="violeta" valor={num(r.pedidos)} detalle="todos los del periodo" alPulsar={() => setEstado(null)} activo={!estado} />
+        <Indicador titulo="Por confirmar" icono={AlertaIcon} color="ambar" punto={r.porEstado.nuevo ? "aviso" : undefined} valor={num(r.porEstado.nuevo)} detalle="esperan llamada o mensaje" alPulsar={() => alternar("nuevo")} activo={estado === "nuevo"} />
+        <Indicador titulo="Confirmados" icono={CheckIcon} color="azul" valor={num(r.porEstado.confirmado)} detalle={`${pct(r.confirmacion)} pasó la confirmación`} alPulsar={() => alternar("confirmado")} activo={estado === "confirmado"} />
+        <Indicador titulo="En camino" icono={EnvioIcon} color="violeta" punto={r.porEstado.en_camino ? "aviso" : undefined} valor={num(r.porEstado.en_camino)} detalle="con guía, sin entregar" alPulsar={() => alternar("en_camino")} activo={estado === "en_camino"} />
+        <Indicador titulo="Entregados" icono={InventarioIcon} color="verde" punto={r.porEstado.entregado ? "exito" : undefined} valor={num(r.porEstado.entregado)} detalle={`${pct(r.entrega)} de lo que salió`} alPulsar={() => alternar("entregado")} activo={estado === "entregado"} />
+        <Indicador titulo="Cancelados" icono={CerrarIcon} color="rojo" punto={r.porEstado.cancelado ? "peligro" : undefined} valor={num(r.porEstado.cancelado)} detalle={pct(r.cancelacion)} alPulsar={() => alternar("cancelado")} activo={estado === "cancelado"} />
+        <Indicador titulo="Devoluciones" icono={DeshacerIcon} color="rojo" punto={r.porEstado.devuelto ? "peligro" : undefined} valor={num(r.porEstado.devuelto)} detalle={pct(r.devolucion)} alPulsar={() => alternar("devuelto")} activo={estado === "devuelto"} />
+        <Indicador titulo="SKU sin vincular" icono={AlertaIcon} color="ambar" punto={sinVincular ? "aviso" : undefined} valor={num(sinVincular)} detalle="variantes de Shopify sin producto nuestro" href="/tienda-tiendas/productos" />
+      </TableroIndicadores>
 
       <TablaDatos
         def={def}
