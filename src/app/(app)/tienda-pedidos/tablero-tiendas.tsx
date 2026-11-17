@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
+import { Indicador, TableroIndicadores } from "@/components/panel/piezas-panel";
 import { anilloFoco } from "@/components/ui/field";
+import { AlertaIcon, CerrarIcon, CheckIcon, EnvioIcon, MargenIcon, PedidoIcon, WalletIcon } from "@/lib/nav-icons";
 import { formatearMoneda } from "@/lib/formato";
 import type { Resumen } from "@/lib/tienda/resumen";
 import { variacion, type AlertaTienda, type ResumenTienda, type TonoAlerta } from "@/lib/tienda/tablero-tiendas";
@@ -25,16 +27,6 @@ function Cambio({ actual, antes, sufijo }: { actual: number; antes: number; sufi
       </span>
       {sufijo && <span className="text-muted-foreground"> {sufijo}</span>}
     </span>
-  );
-}
-
-function Indicador({ titulo, valor, detalle }: { titulo: string; valor: string; detalle: ReactNode }) {
-  return (
-    <div className="flex min-w-0 flex-col gap-0.5 rounded-xl border border-border bg-card px-3 py-2.5">
-      <span className="text-[11.5px] font-medium tracking-wide text-muted-foreground uppercase">{titulo}</span>
-      <span className="text-[22px] leading-tight font-bold tabular-nums">{valor}</span>
-      <span className="text-xs text-muted-foreground tabular-nums">{detalle}</span>
-    </div>
   );
 }
 
@@ -417,15 +409,25 @@ export function TableroTiendas({
   const antes = `vs ${dias} días antes`;
   return (
     <div className="flex flex-col gap-4">
-      <section aria-label="Todas las tiendas" className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-2">
-        <Indicador titulo="Pedidos" valor={entero(a.pedidos)} detalle={<Cambio actual={a.pedidos} antes={todas.anterior.pedidos} sufijo={antes} />} />
-        <Indicador titulo="Facturado" valor={formatearMoneda(a.facturado, moneda)} detalle={<Cambio actual={a.facturado} antes={todas.anterior.facturado} sufijo={antes} />} />
-        <Indicador titulo="Ticket promedio" valor={a.ticketPromedio === null ? "—" : formatearMoneda(a.ticketPromedio, moneda)} detalle="por pedido no cancelado" />
-        <Indicador titulo="Confirmación" valor={pctTxt(a.confirmacion)} detalle="de los pedidos" />
-        <Indicador titulo="Entrega" valor={pctTxt(a.entrega)} detalle="de lo que salió" />
-        <Indicador titulo="Cancelación" valor={pctTxt(a.cancelacion)} detalle="de los pedidos" />
-        <Indicador titulo="Por confirmar" valor={entero(todas.porConfirmar)} detalle="esperan llamada o mensaje" />
-      </section>
+      {/* El tablero de tarjetas de Compras (17 nov 2026, pedido de Hernán: igual que las demás pantallas). El cambio contra el periodo anterior
+          sigue en verde si sube y en rojo si baja; «Confirmación» y «Por confirmar» llevan a la pestaña Confirmación, «Entrega» a Logística. */}
+      <TableroIndicadores etiqueta="Todas las tiendas">
+        <Indicador titulo="Pedidos" icono={PedidoIcon} color="violeta" valor={entero(a.pedidos)} detalle={<Cambio actual={a.pedidos} antes={todas.anterior.pedidos} sufijo={antes} />} />
+        <Indicador titulo="Facturado" icono={WalletIcon} color="verde" valor={formatearMoneda(a.facturado, moneda)} detalle={<Cambio actual={a.facturado} antes={todas.anterior.facturado} sufijo={antes} />} />
+        <Indicador titulo="Ticket promedio" icono={MargenIcon} color="azul" valor={a.ticketPromedio === null ? "—" : formatearMoneda(a.ticketPromedio, moneda)} detalle="por pedido no cancelado" />
+        <Indicador titulo="Confirmación" icono={CheckIcon} color="azul" valor={pctTxt(a.confirmacion)} detalle="de los pedidos" href="/tienda-pedidos/confirmacion" />
+        <Indicador titulo="Entrega" icono={EnvioIcon} color="verde" valor={pctTxt(a.entrega)} detalle="de lo que salió" href="/tienda-pedidos/logistica" />
+        <Indicador titulo="Cancelación" icono={CerrarIcon} color="rojo" valor={pctTxt(a.cancelacion)} detalle="de los pedidos" />
+        <Indicador
+          titulo="Por confirmar"
+          icono={AlertaIcon}
+          color="ambar"
+          punto={todas.porConfirmar ? "aviso" : undefined}
+          valor={entero(todas.porConfirmar)}
+          detalle="esperan llamada o mensaje"
+          href="/tienda-pedidos/confirmacion"
+        />
+      </TableroIndicadores>
 
       <Alertas alertas={alertas} nombres={nombres} hrefs={hrefs} />
 
