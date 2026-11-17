@@ -3,6 +3,7 @@ import { Pagina } from "@/components/ui/pagina";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getUsuarioActual } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import { hrefDeAviso } from "@/lib/compras/llegadas-avisos";
 import { ParaTi, type AvisoParaTi } from "./para-ti";
 import { ActualizacionesAvisos, type ActualizacionAviso } from "./actualizaciones-avisos";
 import { claveNovedad, DIAS_AVISO, recientes } from "@/lib/ayuda/actualizaciones";
@@ -34,7 +35,7 @@ export default async function NotificacionesPage() {
     .eq("usuario_id", usuario.id)
     .order("creado_en", { ascending: false })
     .limit(50);
-  const avisos: AvisoParaTi[] = (propios ?? []).map((a) => ({ id: a.id, titulo: a.titulo, texto: a.texto, href: a.href, leida: !!a.leida_en, creadoEn: a.creado_en }));
+  const avisos: AvisoParaTi[] = (propios ?? []).map((a) => ({ id: a.id, titulo: a.titulo, texto: a.texto, href: hrefDeAviso(a.titulo, a.href), leida: !!a.leida_en, creadoEn: a.creado_en }));
   // Las actualizaciones del sistema de sus módulos de los últimos días, con las que ya vio (migración 0218).
   const vistas = await vistasDe(supabase, usuario.id);
   const actualizaciones: ActualizacionAviso[] = recientes(novedadesPara(usuario.modulos), hoyPanama()).map((n) => ({

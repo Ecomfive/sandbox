@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
@@ -58,6 +59,11 @@ export default async function LlegadaPage({ params }: { params: Promise<{ id: st
   return (
     <Pagina ancho="media" className="flex flex-col gap-6">
       <EncabezadoPagina titulo={tipo === "puerto" ? "Llegada a Puerto" : "En Bodega"} oculto />
+      {tipo === "puerto" && (
+        <Link href="/llegadas?tipo=puerto" className="w-fit text-sm font-medium text-primario underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+          Ver lista de lo que llegó a puerto
+        </Link>
+      )}
       <VistaLlegada
         llegadaId={id}
         tipo={tipo}
