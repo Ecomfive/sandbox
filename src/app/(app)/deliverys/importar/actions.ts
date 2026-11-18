@@ -21,6 +21,7 @@ import { claveEtiqueta } from "@/lib/deliverys/excel";
 import { sugerirDueno } from "@/lib/deliverys/repartidor";
 import { origenDeArchivo } from "@/lib/finanzas/guardar-libro";
 import { createServiceClient } from "@/lib/supabase/server";
+import { sinAccesoTodaLaEmpresa } from "@/lib/finanzas/acceso-tienda";
 
 const MODULO = "deliverys";
 const MAX_HUELLAS = 50_000;
@@ -43,6 +44,8 @@ export interface ResumenImportacion {
 export async function resumirImportacionDeliverys(archivo: string, huellas: string[], etiquetas: string[]): Promise<{ error: string } | ResumenImportacion> {
   try {
     await requireModuloEscritura(MODULO);
+    const accesoEmpresa = await sinAccesoTodaLaEmpresa();
+    if (accesoEmpresa) return { error: accesoEmpresa };
     const delArchivo = huellasValidas(huellas);
     if (!delArchivo) return { error: "El archivo trae demasiadas filas." };
     if (!Array.isArray(etiquetas) || etiquetas.length > 500) return { error: "El archivo trae demasiados nombres." };
@@ -77,6 +80,8 @@ export async function resumirImportacionDeliverys(archivo: string, huellas: stri
 export async function asignarNombresDeliverys(asignaciones: unknown): Promise<{ error: string } | { creados: number; alias: number }> {
   try {
     await requireModuloEscritura(MODULO);
+    const accesoEmpresa = await sinAccesoTodaLaEmpresa();
+    if (accesoEmpresa) return { error: accesoEmpresa };
     const a = validarAsignaciones(asignaciones);
     if (!a) return { error: "Asignaciones inválidas." };
     const r = await aplicarAsignaciones(createServiceClient(), a);
@@ -93,6 +98,8 @@ export async function asignarNombresDeliverys(asignaciones: unknown): Promise<{ 
 export async function importarLoteDeliverys(archivo: string, filas: unknown[]): Promise<{ error: string } | (ResultadoLote & { rechazadas: number })> {
   try {
     await requireModuloEscritura(MODULO);
+    const accesoEmpresa = await sinAccesoTodaLaEmpresa();
+    if (accesoEmpresa) return { error: accesoEmpresa };
     if (!Array.isArray(filas) || filas.length === 0 || filas.length > TAMANO_LOTE) return { error: "Lote inválido." };
     const buenas: EntregaExcel[] = [];
     let rechazadas = 0;
@@ -113,6 +120,8 @@ export async function importarLoteDeliverys(archivo: string, filas: unknown[]): 
 export async function terminarImportacionDeliverys(archivo: string, huellas: string[], desde: unknown, hasta: unknown): Promise<{ error: string } | { borradas: number }> {
   try {
     await requireModuloEscritura(MODULO);
+    const accesoEmpresa = await sinAccesoTodaLaEmpresa();
+    if (accesoEmpresa) return { error: accesoEmpresa };
     const delArchivo = huellasValidas(huellas);
     if (!delArchivo) return { error: "El archivo trae demasiadas filas." };
     // Sin huellas válidas no se borra nada: evita vaciar lo cargado por un envío roto.

@@ -15,6 +15,7 @@ import { traerTodasConError } from "@/lib/supabase/paginar";
 import { ORDEN_CARGA, type ModuloImportable } from "./reconocer";
 import { TABLAS_IMPORTADAS, columnasDeshacer, decidirDeshacer, esModuloDeshacer, filaCreada, nuevasYActualizadas, sumarDecisiones, textoConservadas, type Decision } from "./deshacer";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { sinAccesoTodaLaEmpresa } from "@/lib/finanzas/acceso-tienda";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const esModulo = (m: unknown): m is ModuloImportable => typeof m === "string" && (ORDEN_CARGA as string[]).includes(m);
@@ -167,6 +168,8 @@ export async function deshacerImportacion(id: string): Promise<{ error: string }
     if (!esModuloDeshacer(imp.modulo)) return { error: "Esa importación no se puede deshacer." };
     const modulo = imp.modulo as ModuloImportable;
     const usuario = await requireModuloEscritura(modulo);
+    const accesoEmpresa = await sinAccesoTodaLaEmpresa();
+    if (accesoEmpresa) return { error: accesoEmpresa };
     if (imp.estado === "deshecha") return { error: "Esa importación ya se deshizo." };
     if (imp.estado === "en_curso") return { error: "Esa importación todavía está en curso." };
     const cerrados = await mesesCerrados(supabase);

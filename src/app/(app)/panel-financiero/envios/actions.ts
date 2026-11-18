@@ -9,10 +9,15 @@ import { requireModuloEscritura } from "@/lib/auth";
 import { leerPeriodo } from "@/lib/af4/fecha";
 import { enviarInformeCorreo, enviarResumenSemanal } from "@/lib/finanzas/cargar-informe-envio";
 import { createServiceClient } from "@/lib/supabase/server";
+import { sinAccesoTodaLaEmpresa } from "@/lib/finanzas/acceso-tienda";
 
 async function permiso() {
   try {
-    return { usuario: await requireModuloEscritura("estado-resultados") };
+    const usuario = await requireModuloEscritura("estado-resultados");
+    // El informe y los envíos son de toda la empresa: con tiendas limitadas no se tocan (auditoría de seguridad, 18 nov 2026).
+    const acceso = await sinAccesoTodaLaEmpresa();
+    if (acceso) return { error: acceso };
+    return { usuario };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Sin permiso." };
   }

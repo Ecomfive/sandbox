@@ -8,6 +8,7 @@ import { origenDeArchivo } from "@/lib/finanzas/guardar-libro";
 import { TAMANO_LOTE_VENTAS, guardarMapeoProductos, validarMapeoProducto, validarOrden, type MapeoProducto, type ResultadoLoteVentas } from "@/lib/ventas/guardar";
 import type { OrdenVenta } from "@/lib/ventas/matriz";
 import { guardarLoteMatriz } from "@/lib/ventas/reporteria-importar";
+import { sinAccesoTodaLaEmpresa } from "@/lib/finanzas/acceso-tienda";
 
 const MODULO = "ventas-tiendas";
 
@@ -18,6 +19,8 @@ export async function importarLoteVentas(
 ): Promise<{ error: string } | (ResultadoLoteVentas & { rechazadas: number })> {
   try {
     await requireModuloEscritura(MODULO);
+    const accesoEmpresa = await sinAccesoTodaLaEmpresa();
+    if (accesoEmpresa) return { error: accesoEmpresa };
     if (!Array.isArray(ordenes) || ordenes.length === 0 || ordenes.length > TAMANO_LOTE_VENTAS) return { error: "Lote inválido." };
     const buenas: OrdenVenta[] = [];
     for (const o of ordenes) {
@@ -40,6 +43,8 @@ export async function terminarImportacionVentas(
 ): Promise<{ error: string } | { mapeos: number }> {
   try {
     await requireModuloEscritura(MODULO);
+    const accesoEmpresa = await sinAccesoTodaLaEmpresa();
+    if (accesoEmpresa) return { error: accesoEmpresa };
     const origen = origenDeArchivo(String(archivo ?? ""));
     const filas = (Array.isArray(mapeo) ? mapeo : []).slice(0, 10_000).map(validarMapeoProducto).filter((m): m is MapeoProducto => m !== null);
     const mapeos = await guardarMapeoProductos(createServiceClient(), origen, filas);

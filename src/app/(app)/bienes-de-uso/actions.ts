@@ -6,7 +6,7 @@ import { formatearEventoAuditoria } from "@/lib/auditoria-cambios";
 import { dinero } from "@/lib/af4/formato";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/server";
-import { sinAccesoARegistros, sinAccesoAUnidades } from "@/lib/finanzas/acceso-tienda";
+import { sinAccesoARegistros, sinAccesoAUnidades, sinAccesoTodaLaEmpresa } from "@/lib/finanzas/acceso-tienda";
 import { VIDA_UTIL, tipoDeBien, validarBienExcel, type TipoBien } from "@/lib/finanzas/bienes-uso";
 import { guardarBienes, type BienValidado } from "@/lib/finanzas/guardar-bienes";
 import { origenDeArchivo } from "@/lib/finanzas/guardar-libro";
@@ -205,6 +205,8 @@ export async function importarBienes(
 ): Promise<{ error: string } | { guardados: number; conservados: number; borrados: number; rechazados: number }> {
   try {
     await requireModuloEscritura(MODULO);
+    const accesoEmpresa = await sinAccesoTodaLaEmpresa();
+    if (accesoEmpresa) return { error: accesoEmpresa };
     if (!Array.isArray(filas) || !filas.length || filas.length > MAX_BIENES) return { error: "El archivo no trae bienes válidos." };
     const buenos = filas.map(validarBienExcel).filter((b): b is BienValidado => b !== null);
     if (!buenos.length) return { error: "El archivo no trae bienes válidos." };

@@ -47,7 +47,7 @@ export const GLOSARIO: TerminoGlosario[] = [
   { termino: "Versión de un informe", definicion: "La foto de un informe tal como se generó o se envió ese día (cifras, causas, acciones y explicación), con quién y cuándo. Se ve en Panel › Versiones aunque después cambien los datos.", modulos: ["panel-financiero"] },
   { termino: "ITBMS", definicion: "El impuesto de Panamá a la venta de bienes y servicios (7 %). En el libro del contador, Base = Total − ITBMS; en una venta facturada el ITBMS va incluido en el total.", modulos: ["libro-movimientos"] },
   { termino: "Efectivo en repartidores", definicion: "Lo que los repartidores cobraron en efectivo en semanas que todavía no se cerraron ni pagaron en Deliverys.", modulos: ["panel-financiero", "deliverys"] },
-  { termino: "Tiendas permitidas", definicion: "Las tiendas que una persona puede ver (se eligen en Usuarios y roles, en su ficha). Con tiendas limitadas ve solo los pedidos y datos de esas tiendas en Gestión de tienda, Despacho ciudad, Devoluciones, Cambios y reembolsos y Finanzas; en Finanzas, «Todas» suma solo las suyas y no ve caja, cartera ni nómina.", modulos: ["usuarios", "estado-resultados", "tienda-pedidos"] },
+  { termino: "Tiendas permitidas", definicion: "Las tiendas que una persona puede ver (se eligen en Usuarios y roles, en su ficha). Con tiendas limitadas ve solo los pedidos y datos de esas tiendas en Gestión de tienda, Despacho ciudad, Devoluciones, Cambios y reembolsos y Finanzas; en Finanzas, «Todas» suma solo las suyas y no ve caja, cartera, nómina ni los módulos de toda la empresa (el sistema los rechaza, no solo el menú).", modulos: ["usuarios", "estado-resultados", "tienda-pedidos"] },
   { termino: "Confianza de una sugerencia", definicion: "Qué tan seguro está el portal de la tienda y el tipo que propone para un movimiento: 99 % si sale de una regla; si sale de lo ya clasificado, según cuántos movimientos parecidos coinciden y cuánto se parecen (descripción y monto). Alta es 80 % o más.", modulos: ["libro-movimientos"] },
   { termino: "Monto atípico", definicion: "Un movimiento que pasa de 3 veces la mediana de su tipo en los 6 meses anteriores (y se aleja de lo normal con un z robusto mayor a 3,5).", modulos: ["libro-movimientos"] },
   { termino: "Posible duplicado", definicion: "Dos movimientos con el mismo monto al centavo, a 3 días o menos y con descripción o proveedor parecido. Se revisan en Libro de movimientos › Revisar.", modulos: ["libro-movimientos"] },
@@ -656,7 +656,7 @@ export const GUIAS: GuiaModulo[] = [
         titulo: "Accesos y segundo administrador",
         pasos: [
           "Debe haber siempre al menos dos personas que puedan modificar Usuarios y roles: si una no está, la otra corre tareas, reabre meses y da accesos.",
-          "Los accesos se dan por rol en Usuarios y roles; las tiendas que ve cada persona, en su ficha. Quien ve solo algunas tiendas no ve Balance, Tesorería, Cierre, el Paquete bancario ni Salud de datos.",
+          "Los accesos se dan por rol en Usuarios y roles; las tiendas que ve cada persona, en su ficha. Quien ve solo algunas tiendas no ve Balance, Tesorería, Cierre, Nómina, Flujo de caja, Proyección de caja, Utilidades, el Paquete bancario ni Salud de datos; tampoco puede importar archivos de Finanzas, cambiar los ajustes del Estado de resultados ni generar o enviar el informe. No es solo el menú: el sistema lo rechaza aunque se llegue por un enlace.",
           "Al salir una persona del equipo, desactiva su cuenta el mismo día.",
         ],
       },

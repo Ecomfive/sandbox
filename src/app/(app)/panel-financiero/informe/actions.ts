@@ -10,12 +10,17 @@ import { leerPeriodo } from "@/lib/af4/fecha";
 import { armarSnapshotInforme, guardarVersion, SIN_MIGRACION_ENVIOS } from "@/lib/finanzas/cargar-informe-envio";
 import { configAnthropic, pedirExplicacion } from "@/lib/finanzas/explicacion-ia";
 import { createServiceClient } from "@/lib/supabase/server";
+import { sinAccesoTodaLaEmpresa } from "@/lib/finanzas/acceso-tienda";
 
 const MODULO = "estado-resultados";
 
 async function permiso() {
   try {
-    return { usuario: await requireModuloEscritura(MODULO) };
+    const usuario = await requireModuloEscritura(MODULO);
+    // El informe y los envíos son de toda la empresa: con tiendas limitadas no se tocan (auditoría de seguridad, 18 nov 2026).
+    const acceso = await sinAccesoTodaLaEmpresa();
+    if (acceso) return { error: acceso };
+    return { usuario };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Sin permiso." };
   }
