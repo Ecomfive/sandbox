@@ -64,6 +64,19 @@ test("el mensaje que pide el dato y la etiqueta de cada zona", () => {
   assert.equal(etiquetaDeZona(null, cfg), null);
 });
 
+test("pago por adelantado manda sobre dirección incompleta: solo se cobra, lo que falta queda anotado", () => {
+  const porPalabra = combinar({ distingueZona: true, zonaReglas: "adelantado", modelos: [ok("openai", "no_se", false, "la calle"), ok("anthropic", "no_se", false, "la calle")] });
+  assert.deepEqual([porPalabra.estado, porPalabra.zona, porPalabra.falta], ["adelantado", null, "la calle"]);
+  const porIA = combinar({ distingueZona: true, zonaReglas: null, modelos: [ok("openai", "adelantado", false, "el número de casa"), ok("anthropic", "adelantado", false, "el número de casa")] });
+  assert.deepEqual([porIA.estado, porIA.falta], ["adelantado", "el número de casa"]);
+  const unaNoSabe = combinar({ distingueZona: true, zonaReglas: null, modelos: [ok("openai", "adelantado", false, "la calle"), ok("anthropic", "no_se", false, "la calle")] });
+  assert.equal(unaNoSabe.estado, "adelantado", "con la dirección incompleta, una IA que no sabe la zona no impide el cobro");
+  const otraZona = combinar({ distingueZona: true, zonaReglas: null, modelos: [ok("openai", "adelantado", false, "la calle"), ok("anthropic", "ciudad", false, "la calle")] });
+  assert.equal(otraZona.estado, "falta_dato", "si una IA dice ciudad, no es pago por adelantado");
+  const completa = combinar({ distingueZona: true, zonaReglas: null, modelos: [ok("openai", "adelantado", true), ok("anthropic", "no_se", true)] });
+  assert.equal(completa.estado, "revisar", "con la dirección completa se conserva la regla de que las dos IA coincidan");
+});
+
 test("pago por adelantado: si las dos IA lo ven así, queda en espera de pago y sin etiqueta", () => {
   const r = combinar({ distingueZona: true, zonaReglas: null, modelos: [ok("openai", "adelantado", true), ok("anthropic", "adelantado", true)] });
   assert.deepEqual([r.estado, r.zona, r.falta], ["adelantado", null, null]);

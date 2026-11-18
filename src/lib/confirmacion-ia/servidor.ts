@@ -463,7 +463,7 @@ export async function cargarAnalisis(
       analizadoPor: (a.analizado_por as string | null) ?? null,
       actualizadoEn: a.actualizado_en as string,
       revision,
-      final: resultadoFinal({ estado, zona, etiqueta, falta, revision }, config),
+      final: resultadoFinal({ estado, zona, etiqueta, falta, revision }, config, !!actual),
     } satisfies FilaAnalisis;
   });
   return { filas, faltaMigracion: false };

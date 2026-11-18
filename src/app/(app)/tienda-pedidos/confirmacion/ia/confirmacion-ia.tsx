@@ -460,7 +460,7 @@ function FichaAnalisis({ f, distingueZona, puedeEscribir, abrirCorregir, alElegi
             </p>
           </div>
         )}
-        {f.estado === "adelantado" && !f.revision && (
+        {f.final.estado === "adelantado" && f.estado === "adelantado" && (
           <div className="flex flex-col gap-2 rounded-lg border border-border px-3 py-2.5">
             <p className="m-0 text-sm">
               {f.etiquetaActual ? (
@@ -473,6 +473,12 @@ function FichaAnalisis({ f, distingueZona, puedeEscribir, abrirCorregir, alElegi
                 </>
               )}
             </p>
+            {f.final.falta && (
+              <p className="m-0 text-sm text-muted-foreground">
+                A la dirección le falta <b>{f.final.falta}</b>
+                {f.etiquetaActual ? ": como el pago ya llegó, ya se puede pedir (con «Falta un dato»)." : ": primero el pago, la dirección se le pide después."}
+              </p>
+            )}
             {puedeEscribir && !f.etiquetaActual && (
               <div>
                 <button type="button" disabled={pendiente} onClick={() => empezar(() => alPreguntar(f))} className={`rounded-md border border-border-control bg-card px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50 ${anilloFoco}`}>
