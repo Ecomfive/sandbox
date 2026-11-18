@@ -17,3 +17,13 @@ grant execute on all functions in schema public to service_role;
 
 alter default privileges for role postgres in schema public revoke execute on functions from public, anon, authenticated;
 alter default privileges for role postgres in schema public grant execute on functions to service_role;
+
+-- Revisión (solo lee): lo esperado es «anon_ejecuta = 0», «con_sesion_ejecuta = 0» y «servicio_no_ejecuta = 0».
+select
+  count(*) filter (where has_function_privilege('anon', p.oid, 'EXECUTE')) as anon_ejecuta,
+  count(*) filter (where has_function_privilege('authenticated', p.oid, 'EXECUTE')) as con_sesion_ejecuta,
+  count(*) filter (where not has_function_privilege('service_role', p.oid, 'EXECUTE')) as servicio_no_ejecuta,
+  count(*) as funciones_en_public
+from pg_proc p
+join pg_namespace n on n.oid = p.pronamespace
+where n.nspname = 'public';

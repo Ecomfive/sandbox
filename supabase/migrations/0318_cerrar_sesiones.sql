@@ -51,3 +51,11 @@ exception when others then
   -- suspender desde la app (Reactivar y Suspender) para cerrarles las sesiones.
   raise warning 'No se pudieron cerrar las sesiones de las cuentas ya suspendidas: %', sqlerrm;
 end $$;
+
+-- Revisión (solo lee): lo esperado es «funcion_creada = true», «anon_la_ejecuta = false» y «servicio_la_ejecuta = true»;
+-- «suspendidas_con_sesion» debería dar 0 (las cuentas suspendidas ya no tienen sesiones abiertas).
+select
+  to_regprocedure('public.cerrar_sesiones_usuario(uuid)') is not null as funcion_creada,
+  has_function_privilege('anon', 'public.cerrar_sesiones_usuario(uuid)', 'EXECUTE') as anon_la_ejecuta,
+  has_function_privilege('service_role', 'public.cerrar_sesiones_usuario(uuid)', 'EXECUTE') as servicio_la_ejecuta,
+  (select count(*) from auth.sessions s join public.perfiles p on p.id = s.user_id where not p.activo) as suspendidas_con_sesion;
