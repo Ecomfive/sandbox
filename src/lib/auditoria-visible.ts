@@ -120,6 +120,11 @@ export const MODULO_DE_ENTIDAD: Record<string, string> = {
   pais_plataformas: "configuracion",
   tareas_equipo: "tareas",
   crm_tipo_cliente_umbrales: "configuracion",
+  // Anuncios Meta (migración 0320): cuentas, campañas corregidas a mano, topes de CPA y decisiones sobre sugerencias.
+  meta_cuentas: "anuncios-meta",
+  meta_campanas: "anuncios-meta",
+  meta_topes: "anuncios-meta",
+  meta_decisiones: "anuncios-meta",
 };
 
 const COMERCIALES = new Set<string>(ACCIONES_COMERCIALES);

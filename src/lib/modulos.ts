@@ -69,6 +69,7 @@ export const MODULOS: Modulo[] = [
   { clave: "tienda-tiendas", etiqueta: "Tiendas Shopify (Gestión de tienda)" },
   { clave: "filtro-productos", etiqueta: "Filtro de productos" },
   { clave: "productos-test", etiqueta: "Test productos (WMS)" },
+  { clave: "anuncios-meta", etiqueta: "Anuncios Meta (Marketing)" },
   { clave: "drop-killer", etiqueta: "Drop Killer (Testing Lab)" },
   { clave: "tu-winner", etiqueta: "Tu Winner (Testing Lab)" },
   { clave: "scraping-proveedores", etiqueta: "Scraping de proveedores (Testing Lab)" },

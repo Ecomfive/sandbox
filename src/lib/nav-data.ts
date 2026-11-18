@@ -83,13 +83,13 @@ const AREAS: NavSection[] = [
       { label: "Filtro de productos", href: "/filtro-productos", frente: "proveeduria", grupo: "Resultados" },
     ],
   },
-  // Marketing se queda para lo que sea de marketing; por ahora sin páginas.
+  // Marketing se queda para lo que sea de marketing: por ahora, lo que se hace en las cuentas publicitarias de Meta (las de las tiendas).
   {
     title: "Marketing",
     panel: "Marketing y ventas",
     frentes: true,
     mostrarVacia: true,
-    items: [],
+    items: [{ label: "Anuncios Meta", href: "/anuncios-meta", frente: "tienda" }],
   },
   {
     title: "Clientes",

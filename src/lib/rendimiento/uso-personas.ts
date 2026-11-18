@@ -16,7 +16,7 @@ export const FRENTES_USO = [
   {
     id: "investigacion",
     etiqueta: "Investigación y testing",
-    rutas: ["/analisis-competencia", "/scraping-proveedores", "/tu-winner", "/drop-killer", "/inteligencia-competitiva", "/seleccion-productos", "/creacion-ofertas", "/generador-landings", "/filtro-productos", "/instagram", "/sugerencias-clientes"],
+    rutas: ["/analisis-competencia", "/scraping-proveedores", "/tu-winner", "/drop-killer", "/inteligencia-competitiva", "/seleccion-productos", "/creacion-ofertas", "/generador-landings", "/filtro-productos", "/instagram", "/sugerencias-clientes", "/anuncios-meta"],
   },
   { id: "general", etiqueta: "General", rutas: [] },
 ] as const;

@@ -22,6 +22,10 @@ export interface GuiaModulo {
 }
 
 export const GLOSARIO: TerminoGlosario[] = [
+  { termino: "CPA tope (Anuncios Meta)", definicion: "Lo máximo que se puede pagar por una compra de un producto sin perder dinero. El resultado estimado de una campaña es compras × CPA tope − gasto; se define por producto en Anuncios Meta › Cuentas (hasta entonces, $3).", modulos: ["anuncios-meta"] },
+  { termino: "CBO y ABO", definicion: "CBO: el presupuesto está en la campaña y Meta lo reparte entre los conjuntos. ABO: cada conjunto de anuncios tiene su propio presupuesto.", modulos: ["anuncios-meta"] },
+  { termino: "Bid cap y cost cap", definicion: "Tipos de puja de Meta con límite: bid cap fija lo máximo que se puja en cada subasta; cost cap busca que el costo promedio por resultado no pase de un monto. «Sin tope» deja a Meta pujar libre.", modulos: ["anuncios-meta"] },
+  { termino: "Hook rate", definicion: "De cada 100 veces que se mostró un video, cuántas lo vieron al menos 3 segundos. Dice si el comienzo del video engancha; sobre 40 % es bueno y bajo 30 % es malo.", modulos: ["anuncios-meta"] },
   { termino: "Motores de una tienda", definicion: "Las cifras que mueven su resultado: pedidos por mes, crecimiento, ticket promedio, tasa de entrega, costo de mercancía, envío por pedido, comisión de cobro, pauta sobre ventas, gastos fijos y otros del libro. Salen de los últimos 3 meses reales y se pueden editar en Planificación › Motores.", modulos: ["planificacion"] },
   { termino: "MAPE (backtest)", definicion: "Error porcentual medio del pronóstico: para cada uno de los últimos meses se pronostica solo con los meses anteriores y se compara con lo real. 10 % o menos es bueno.", modulos: ["planificacion"] },
   { termino: "Pronóstico continuo (18 meses)", definicion: "Real hasta el último mes cerrado más la proyección de los motores para los 18 meses siguientes. Cada cierre deja una foto para comparar contra el pronóstico anterior y contra el plan aprobado.", modulos: ["planificacion"] },
@@ -1791,6 +1795,28 @@ export const GUIAS: GuiaModulo[] = [
     ],
   },
   {
+    modulo: "anuncios-meta",
+    titulo: "Anuncios Meta",
+    ruta: "/anuncios-meta",
+    resumen: "Lo que pasa en las cuentas publicitarias de Facebook e Instagram: qué campañas se montaron, quién, y qué video, ángulo, copy, landing y tipo de campaña funcionan mejor. Solo lee Meta: nunca crea, pausa ni cambia nada allá.",
+    secciones: [
+      {
+        titulo: "Uso",
+        pasos: [
+          "Está en Marketing. Arriba eliges el periodo (Hoy, 7 o 30 días) y la cuenta publicitaria (o todas las del país). «Leer ahora» trae lo último de Meta; además se lee solo tres veces al día.",
+          "Resumen: gasto, compras, CPA y resultado estimado del periodo, lo que conviene decidir hoy, las campañas montadas por día, el embudo (impresiones hasta compra) y las campañas que más dejan y más pierden.",
+          "Resultado estimado = compras × CPA tope − gasto. Con menos de $100 gastados una campaña dice «poca data» y no cuenta entre las mejores ni las peores.",
+          "Para decidir hoy: el sistema sugiere pausar lo que gasta sin comprar, bajar o cambiar lo que tiene el CPA alto, escalar lo que va bien, cerrar un testing que no se decide, usar un video ganador o revisar una landing floja. Cada una se acepta («Ya lo hice»), se deja para después (7 días) o se rechaza con un porqué (90 días). No cambia nada en Meta.",
+          "Campañas: la lista completa con su etapa, CBO o ABO, puja, quién la montó y cómo le va. Se agrupa y se filtra como Compras. Al tocar una se abre su ficha: cifras, cómo está montada, anuncios con su video y texto, y los cambios que hizo el equipo en Meta.",
+          "Qué funciona: las campañas juntas por ángulo, CBO o ABO, puja, copy, landing, producto o etapa, de mejor a peor CPA. Videos: cada video una sola vez, con su hook y su CPA. Equipo: cuántas campañas montó cada persona y cuántos tests terminaron ganando.",
+          "Meta no guarda el producto, el ángulo ni la etapa: salen del nombre de la campaña (PAÍS | Producto | ÁNGULO | CBO o ABO | Puja | T, E o R). Si alguna no se lee bien, se corrige en la ficha de la campaña y la lectura ya no la pisa.",
+          "Cuentas: la conexión con Meta (un administrador del negocio crea un usuario del sistema con permiso de lectura y su token se guarda en el servidor), las cuentas publicitarias (una tienda puede tener varias), y el CPA tope de cada producto.",
+          "Las compras que cuenta Meta son las que atribuye a sus anuncios: pueden diferir de las órdenes reales de la tienda.",
+        ],
+      },
+    ],
+  },
+  {
     modulo: "tienda-reporteria",
     titulo: "Reportería de pedidos",
     ruta: "/tienda-reporteria",
@@ -2208,6 +2234,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-11-18", titulo: "Nuevo: Anuncios Meta", texto: "En Marketing hay un módulo nuevo, «Anuncios Meta», que lee las cuentas publicitarias de Facebook e Instagram (solo lectura): campañas montadas por día y por persona, CBO o ABO, tipo de puja, y qué ángulo, video, copy y landing dan mejor CPA. Sugiere qué pausar, escalar o revisar, y tú aceptas, rechazas o dejas para después. Primero se conectan las cuentas de Oferfy en «Cuentas».", modulo: "anuncios-meta", href: "/anuncios-meta" },
   { fecha: "2026-11-18", titulo: "Traslado a HL Express: ahora es un documento", texto: "Al republicar un producto de la bodega de Dropi (B280) en Panamá, la tarea «Pedir a Dropi el traslado» ya no trae un mensaje para copiar sino el botón «Descargar formato para HL Express»: baja el manifiesto de entrega de HL Express con el ID viejo, el ID nuevo, el producto y las unidades ya puestos (una línea por variación si las tiene). Solo falta completar el número de remisión y tu contacto y mandárselo a la encargada de HL Express.", modulo: "publicaciones-dropi", href: "/publicaciones-dropi/tareas" },
   { fecha: "2026-11-18", titulo: "Compras: foto del producto y PDF en la lista de llegadas a puerto", texto: "La lista de lo que llegó a puerto ahora muestra la foto de cada producto y trae el botón «Descargar PDF»: baja la lista con las fotos, las unidades, las cajas y las etiquetas de las cajas, para imprimirla o mandarla.", modulo: "compras", href: "/llegadas?tipo=puerto" },
   { fecha: "2026-11-18", titulo: "Actualizar Costa Rica: Drop vuelve a leerse", texto: "Drop cambió su página de pedidos y la lectura fallaba con «Se perdió la pestaña». La extensión «Ecomfive · Dropi» 0.8.1 ya la entiende y lee los pedidos por meses (Drop se cortaba pasados unos 5.500): vuelven a llegar todos, unos 6.800. Hay que recargar la extensión en Chrome (chrome://extensions › Recargar) y la página de Actualizar. Además, si algo falla, el aviso ahora dice qué pasó y con qué sitio (Drop, Dropi, Dunamixfy…)." },

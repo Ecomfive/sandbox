@@ -34,6 +34,7 @@ export const AREAS_ACCESO: AreaAcceso[] = [
     nombre: "Marketing y ventas · Testing Lab",
     color: "#c22f6a",
     modulos: [
+      { clave: "anuncios-meta", etiqueta: "Anuncios Meta" },
       { clave: "drop-killer", etiqueta: "Drop Killer" },
       { clave: "tu-winner", etiqueta: "Tu Winner" },
       { clave: "scraping-proveedores", etiqueta: "Scraping de proveedores" },
