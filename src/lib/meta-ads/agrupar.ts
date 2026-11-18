@@ -11,20 +11,23 @@ export interface Elemento {
   tope: number;
   /** Para contar campañas distintas. */
   campana?: string;
+  /** Para contar videos distintos (el ángulo se mide por video). */
+  video?: string | null;
 }
 
 /** Los grupos ordenados: primero los que ya tienen suficiente gasto para compararse (menor CPA primero; sin compras al final) y después los de poca data. */
 export function agrupar(elementos: Elemento[]): Grupo[] {
-  const mapa = new Map<string, { r: Resultados; resultado: number; campanas: Set<string> }>();
+  const mapa = new Map<string, { r: Resultados; resultado: number; campanas: Set<string>; videos: Set<string> }>();
   elementos.forEach((e, i) => {
     if (!e.clave) return;
-    const g = mapa.get(e.clave) ?? { r: sinResultados(), resultado: 0, campanas: new Set<string>() };
+    const g = mapa.get(e.clave) ?? { r: sinResultados(), resultado: 0, campanas: new Set<string>(), videos: new Set<string>() };
     g.r = sumar(g.r, e.r);
     g.resultado += resultado(e.r, e.tope);
     g.campanas.add(e.campana ?? `#${i}`);
+    if (e.video) g.videos.add(e.video);
     mapa.set(e.clave, g);
   });
-  const grupos: Grupo[] = [...mapa].map(([nombre, g]) => ({ nombre, campanas: g.campanas.size, r: g.r, resultado: g.resultado, confiable: confiable(g.r) }));
+  const grupos: Grupo[] = [...mapa].map(([nombre, g]) => ({ nombre, campanas: g.campanas.size, videos: g.videos.size, r: g.r, resultado: g.resultado, confiable: confiable(g.r) }));
   const peso = (g: Grupo) => (g.confiable ? 0 : 1000) + (cpa(g.r) ?? 99);
   return grupos.sort((a, b) => peso(a) - peso(b) || b.r.gasto - a.r.gasto);
 }

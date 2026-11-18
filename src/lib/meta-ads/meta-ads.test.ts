@@ -4,7 +4,7 @@ import { agrupar, copyLimpio, landingLimpia } from "./agrupar";
 import { conversion, cpa, hookRate, holdRate, resultado, sinResultados, type Resultados } from "./metricas";
 import { claveDeProducto, embellecer, etiquetasDeNombre, numeroDeVideo } from "./nombre";
 import { accion, actividadDe, anuncioDe, campanaDe, estructuraDe, mensajeDeErrorMeta, normalizarActId, presupuestoDe, pujaDe, resultadoDiaDe } from "./normalizar";
-import { pendientes, sugerir } from "./sugerencias";
+import { faltanEtiquetas, pendientes, sugerir } from "./sugerencias";
 import type { CampanaVista, VideoVista } from "./vistas";
 
 const r = (o: Partial<Resultados>): Resultados => ({ ...sinResultados(), ...o });
@@ -171,6 +171,13 @@ test("sugerencias de videos y de landing", () => {
 test("las campañas activas sin etiquetas se avisan juntas; lo decidido no vuelve a salir hasta que venza", () => {
   const sin = sugerir({ hoy: "2026-11-18", serie: new Map(), videos: [], campanas: [campana({ id: "q", etapa: null, angulo: null })] });
   assert.equal(sin[0].tipo, "etiquetas_faltan");
+  assert.match(sin[0].titulo, /producto o etapa/);
+  // Sin ángulo en el nombre no es una falta (sale de los videos); sin producto sí.
+  const soloAngulo = sugerir({ hoy: "2026-11-18", serie: new Map(), videos: [], campanas: [campana({ id: "q", angulo: null })] });
+  assert.equal(soloAngulo.length, 0);
+  assert.deepEqual(faltanEtiquetas({ producto: null, etapa: "testing" }), ["producto"]);
+  assert.deepEqual(faltanEtiquetas({ producto: "Corrector", etapa: null }), ["etapa"]);
+  assert.deepEqual(faltanEtiquetas({ producto: "Corrector", etapa: "escala" }), []);
   assert.deepEqual(pendientes(sin, [{ clave: "etiquetas_faltan:cuenta", estado: "pospuesta", vigenteHasta: "2026-11-25" }], "2026-11-18"), []);
   assert.equal(pendientes(sin, [{ clave: "etiquetas_faltan:cuenta", estado: "pospuesta", vigenteHasta: "2026-11-17" }], "2026-11-18").length, 1);
 });

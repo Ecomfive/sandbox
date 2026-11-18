@@ -1,4 +1,4 @@
-import { confiable, resultado } from "@/lib/meta-ads/metricas";
+import { confiable, resultado, type Resultados } from "@/lib/meta-ads/metricas";
 import { NOMBRE_ETAPA, NOMBRE_PUJA } from "@/lib/meta-ads/nombre";
 import type { CampanaVista } from "@/lib/meta-ads/vistas";
 import type { DefTabla } from "@/lib/tabla/motor";
@@ -6,7 +6,8 @@ import { nombreEstado } from "./piezas";
 
 /** Cómo le va a una campaña en el periodo: deja, pierde, o todavía no hay datos para decirlo. */
 export type Veredicto = "deja" | "pierde" | "poca_data" | "sin_gasto";
-export const veredictoDe = (c: CampanaVista): Veredicto => (c.r.gasto === 0 ? "sin_gasto" : !confiable(c.r) ? "poca_data" : resultado(c.r, c.tope) >= 0 ? "deja" : "pierde");
+export const veredictoDeResultados = (r: Resultados, tope: number): Veredicto => (r.gasto === 0 ? "sin_gasto" : !confiable(r) ? "poca_data" : resultado(r, tope) >= 0 ? "deja" : "pierde");
+export const veredictoDe = (c: CampanaVista): Veredicto => veredictoDeResultados(c.r, c.tope);
 export const NOMBRE_VEREDICTO: Record<Veredicto, string> = { deja: "Deja ganancia", pierde: "Está perdiendo", poca_data: "Poca data", sin_gasto: "Sin gasto en el periodo" };
 
 const SIN = "__sin_valor__";

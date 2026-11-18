@@ -47,6 +47,14 @@ export const UMBRALES = {
   landingClicsMinimos: 200,
 } as const;
 
+/** Qué etiquetas le faltan a una campaña: el producto y la etapa. El ángulo no se pide aquí: se lee de cada video. */
+export function faltanEtiquetas(c: Pick<CampanaVista, "producto" | "etapa">): ("producto" | "etapa")[] {
+  const f: ("producto" | "etapa")[] = [];
+  if (!c.producto) f.push("producto");
+  if (!c.etapa) f.push("etapa");
+  return f;
+}
+
 const DIA = 86_400_000;
 /** Días enteros de `desde` a `hasta` (AAAA-MM-DD). */
 export const diasEntre = (desde: string, hasta: string) => Math.floor((new Date(`${hasta}T00:00:00Z`).getTime() - new Date(`${desde}T00:00:00Z`).getTime()) / DIA);
@@ -115,9 +123,10 @@ export function sugerir(e: EntradaSugerencias): Sugerencia[] {
     }
   }
 
-  const sinEtiqueta = e.campanas.filter((c) => c.activa && (!c.etapa || !c.angulo || !c.producto));
+  // El ángulo no cuenta: se lee de cada video (18 nov 2026), no del nombre de la campaña.
+  const sinEtiqueta = e.campanas.filter((c) => c.activa && faltanEtiquetas(c).length > 0);
   if (sinEtiqueta.length)
-    s.push({ clave: "etiquetas_faltan:cuenta", tipo: "etiquetas_faltan", severidad: "info", positiva: false, titulo: `${sinEtiqueta.length} ${sinEtiqueta.length === 1 ? "campaña activa sin" : "campañas activas sin"} producto, ángulo o etapa`, detalle: "Sin esas etiquetas no entran al análisis de «Qué funciona». Salen solas si el nombre sigue la regla (PAÍS | Producto | ÁNGULO | CBO | Puja | T).", accion: "Completarlas en la ficha de cada campaña.", objeto: { tipo: "cuenta", id: "todas" }, gasto: sinEtiqueta.reduce((t, c) => t + c.r.gasto, 0) });
+    s.push({ clave: "etiquetas_faltan:cuenta", tipo: "etiquetas_faltan", severidad: "info", positiva: false, titulo: `${sinEtiqueta.length} ${sinEtiqueta.length === 1 ? "campaña activa sin" : "campañas activas sin"} producto o etapa`, detalle: "Sin el producto no se sabe contra qué CPA tope se mide, y sin la etapa no entra al análisis de «Qué funciona». Salen solas si el nombre sigue la regla (PAÍS | Producto | CBO | Puja | T).", accion: "Completarlas en la ficha de cada campaña (se abren al pulsar).", objeto: { tipo: "cuenta", id: "todas" }, gasto: sinEtiqueta.reduce((t, c) => t + c.r.gasto, 0) });
 
   return s.sort((a, b) => ORDEN[a.severidad] - ORDEN[b.severidad] || b.gasto - a.gasto);
 }

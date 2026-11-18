@@ -1,17 +1,30 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { DIMENSIONES, type Dimension } from "@/lib/meta-ads/datos";
 import { ctr, dolares, hookRate, nivelDeCtr, nivelDeHook } from "@/lib/meta-ads/metricas";
 import type { Grupo } from "@/lib/meta-ads/vistas";
 import { AVISO_POCA_DATA, entero, Nivel, porcentaje, Resultado, valorCpa } from "./piezas";
 
-/** «Qué funciona»: las campañas (o los anuncios, para copy y landing) juntas por ángulo, estructura, puja, copy, landing, producto o etapa, de mejor a peor CPA. Lo que tiene poco gasto va al final y atenuado. */
-export function QueFunciona({ grupos }: { grupos: Record<Dimension, Grupo[]> }) {
+/**
+ * «Qué funciona»: las campañas (o los anuncios, para ángulo, copy y landing) juntas por ángulo, estructura, puja, copy, landing, producto o etapa, de mejor a peor CPA. Lo que tiene poco gasto va al final y atenuado.
+ * El ángulo se mide por video (el de cada video, según la IA o lo que se corrigió a mano), no por el nombre de la campaña.
+ */
+export function QueFunciona({ grupos, videosSinAngulo }: { grupos: Record<Dimension, Grupo[]>; videosSinAngulo: number }) {
   const [dim, setDim] = useState<Dimension>("Ángulo");
   const lista = grupos[dim];
   const primera = lista.find((g) => g.confiable && g.r.compras > 0);
   const conSinConfiar = lista.some((g) => !g.confiable);
+  const porVideo = dim === "Ángulo";
+  const faltanAngulos = porVideo && videosSinAngulo > 0 ? (
+    <p className="m-0 rounded-xl border border-border bg-card px-4 py-2.5 text-sm text-muted-foreground">
+      {videosSinAngulo} {videosSinAngulo === 1 ? "video con gasto en el periodo todavía no tiene" : "videos con gasto en el periodo todavía no tienen"} ángulo, así que no cuentan aquí.{" "}
+      <Link href="/anuncios-meta/videos" className="font-medium text-foreground underline underline-offset-2">
+        Analizarlos en Videos
+      </Link>
+    </p>
+  ) : null;
   return (
     <div className="flex flex-col gap-4">
       <div role="group" aria-label="Ver por" className="flex flex-wrap gap-1.5">
@@ -27,9 +40,10 @@ export function QueFunciona({ grupos }: { grupos: Record<Dimension, Grupo[]> }) 
           </button>
         ))}
       </div>
+      {faltanAngulos}
       {lista.length === 0 ? (
         <p className="m-0 rounded-xl border border-border bg-card px-4 py-6 text-sm text-muted-foreground">
-          {dim === "Ángulo" || dim === "Producto" || dim === "Etapa" ? `Ninguna campaña con gasto en el periodo trae ${dim === "Etapa" ? "etapa" : dim.toLowerCase()} en el nombre. Ponla en el nombre de la campaña o corrígela en su ficha.` : "No hay datos con gasto en el periodo."}
+          {porVideo ? "Ningún video con gasto en el periodo tiene ángulo todavía. El ángulo se lee de cada video: analízalos en la pestaña Videos." : dim === "Producto" || dim === "Etapa" ? `Ninguna campaña con gasto en el periodo trae ${dim === "Etapa" ? "etapa" : dim.toLowerCase()} en el nombre. Ponla en el nombre de la campaña o corrígela en su ficha.` : "No hay datos con gasto en el periodo."}
         </p>
       ) : (
         <div className="min-w-0 overflow-hidden rounded-xl border border-border bg-card">
@@ -44,6 +58,7 @@ export function QueFunciona({ grupos }: { grupos: Record<Dimension, Grupo[]> }) 
               <thead>
                 <tr className="border-b border-border text-left text-xs text-muted-foreground">
                   <th scope="col" className="px-4 py-2 font-medium">{dim}</th>
+                  {porVideo && <th scope="col" className="px-3 py-2 text-right font-medium">Videos</th>}
                   <th scope="col" className="px-3 py-2 text-right font-medium">Campañas</th>
                   <th scope="col" className="px-3 py-2 text-right font-medium">Gasto</th>
                   <th scope="col" className="px-3 py-2 text-right font-medium">Compras</th>
@@ -62,6 +77,7 @@ export function QueFunciona({ grupos }: { grupos: Record<Dimension, Grupo[]> }) 
                       </span>
                       {!g.confiable && <span className="text-xs font-normal">poca data</span>}
                     </th>
+                    {porVideo && <td className="px-3 py-2.5 text-right tabular-nums">{g.videos}</td>}
                     <td className="px-3 py-2.5 text-right tabular-nums">{g.campanas}</td>
                     <td className="px-3 py-2.5 text-right tabular-nums">{dolares(g.r.gasto)}</td>
                     <td className="px-3 py-2.5 text-right tabular-nums">{entero(g.r.compras)}</td>

@@ -3,36 +3,144 @@
 /* eslint-disable @next/next/no-img-element -- miniaturas de los videos, directo de Meta */
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useSyncExternalStore, useTransition } from "react";
+import { ListaDatos } from "@/components/tabla/lista-datos";
+import type { IconoComp } from "@/components/tabla/botones-vista";
+import type { NombreFilas } from "@/lib/tabla/pie";
 import { useToast } from "@/components/ui/toast";
 import { fieldClassSm, labelClassSm } from "@/components/ui/field";
 import { formatearFechaHora } from "@/lib/formato";
 import { Ventana } from "@/components/ui/ventana";
 import { Seccion } from "@/components/ui/seccion-ficha";
-import { AnunciosIcon, EtiquetaIcon, MargenIcon, RobotIcon } from "@/lib/nav-icons";
+import { AnunciosIcon, ChevronRightIcon, EstadoIcon, EtiquetaIcon, FiltroIcon, MargenIcon, ProductoIcon, RobotIcon } from "@/lib/nav-icons";
 import { confiable, cpa, ctr, dolares, holdRate, hookRate, nivelDeCpa, nivelDeCtr, nivelDeHook } from "@/lib/meta-ads/metricas";
+import { CRITERIOS_VIDEO, ordenarVideos, sentidoNatural, type CriterioVideo, type Sentido } from "@/lib/meta-ads/orden-videos";
 import type { VideoVista } from "@/lib/meta-ads/vistas";
 import { analizarPendientesMeta, analizarVideoAhoraMeta, corregirAnguloVideoMeta } from "./actions";
+import { anguloDeVideo, DEF_VIDEOS } from "./def-videos";
 import { AVISO_POCA_DATA, Cifra, entero, InsigniaEtapa, MetricasEnLinea, Nivel, porcentaje, Resultado, valorCpa } from "./piezas";
 
 const urlSegura = (u: string | null) => (u && /^https:\/\//i.test(u) ? u : null);
 
-function Dato({ t, children }: { t: string; children: React.ReactNode }) {
+const NOMBRE: NombreFilas = { singular: "video", plural: "videos" };
+const ICONOS: Record<string, IconoComp> = { nombre: AnunciosIcon, campanaTexto: AnunciosIcon, angulo: EtiquetaIcon, producto: ProductoIcon, campana: AnunciosIcon, etapa: EtiquetaIcon, veredicto: MargenIcon, datos: FiltroIcon, analisis: RobotIcon, formato: FiltroIcon, activo: EstadoIcon, gasto: MargenIcon, compras: MargenIcon, cpa: MargenIcon, hook: MargenIcon, hold: MargenIcon, ctr: MargenIcon, campanas: AnunciosIcon, anuncios: AnunciosIcon };
+
+const COLUMNAS = "lg:grid-cols-[minmax(0,3fr)_minmax(0,0.8fr)_minmax(0,0.7fr)_minmax(0,0.8fr)_minmax(0,0.7fr)_minmax(0,0.8fr)_minmax(0,0.7fr)_minmax(0,1fr)_1rem]";
+
+function EncabezadoFilas() {
   return (
-    <div className="flex min-w-0 flex-col gap-0.5">
-      <dt className="text-muted-foreground">{t}</dt>
-      <dd className="m-0 font-medium tabular-nums">{children}</dd>
+    <div aria-hidden="true" className={`hidden gap-3 px-4 py-2 text-xs font-medium text-muted-foreground lg:grid ${COLUMNAS}`}>
+      <span>Video</span>
+      <span className="text-right">Gasto</span>
+      <span className="text-right">Compras</span>
+      <span className="text-right">CPA</span>
+      <span className="text-right">Hook (3 s)</span>
+      <span className="text-right">Pasan 15 s</span>
+      <span className="text-right">CTR</span>
+      <span className="text-right">Resultado estimado</span>
+      <span />
     </div>
   );
 }
 
-/** Los videos con gasto en los últimos 30 días, cada uno una sola vez. Tocar uno abre su ficha: en qué anuncios y campañas se usa y cómo le fue en cada una. */
-export function ListaVideos({ videos, escribe, iaConectada, sinAnalizar }: { videos: VideoVista[]; escribe: boolean; iaConectada: boolean; sinAnalizar: number }) {
+/** Una cifra de la fila: con su nombre a la vista en pantalla angosta (ahí no hay encabezado) y solo para lectores de pantalla en la ancha. */
+function Celda({ t, children }: { t: string; children: React.ReactNode }) {
+  return (
+    <span className="flex items-baseline justify-between gap-2 text-sm tabular-nums lg:block lg:text-right">
+      <span className="text-xs text-muted-foreground lg:sr-only">{t}</span>
+      <span>{children}</span>
+    </span>
+  );
+}
+
+function FilaVideo({ x, alAbrir }: { x: VideoVista; alAbrir: () => void }) {
+  const m = urlSegura(x.miniatura);
+  const ok = confiable(x.r);
+  const angulo = anguloDeVideo(x);
+  return (
+    <button type="button" onClick={alAbrir} className={`grid w-full cursor-pointer grid-cols-1 items-center gap-x-3 gap-y-1.5 px-4 py-3 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-foreground ${COLUMNAS} ${ok ? "" : "text-muted-foreground"}`}>
+      <span className="flex min-w-0 items-center gap-3">
+        {m ? <img src={m} alt="" loading="lazy" className="h-14 w-14 shrink-0 rounded-md bg-muted object-cover" /> : <span aria-hidden="true" className="h-14 w-14 shrink-0 rounded-md bg-muted" />}
+        <span className="flex min-w-0 flex-col gap-0.5">
+          <span className="line-clamp-1 text-sm font-medium text-foreground">
+            {x.numero && <span className="mr-1.5 rounded bg-muted px-1.5 py-0.5 text-xs font-semibold">{x.numero}</span>}
+            {x.nombre}
+          </span>
+          <span className="truncate text-xs text-muted-foreground">
+            {x.producto ?? "Sin producto"} · {angulo ? `Ángulo: ${angulo}${x.analisis?.estado === "sin_archivo" ? " (provisional)" : ""}` : "Ángulo sin analizar"}
+          </span>
+          <span className="truncate text-xs text-muted-foreground">
+            En {x.anuncios} {x.anuncios === 1 ? "anuncio" : "anuncios"} de {x.campanas} {x.campanas === 1 ? "campaña" : "campañas"}
+            {ok ? "" : " · poca data"}
+          </span>
+        </span>
+      </span>
+      <Celda t="Gasto">{dolares(x.r.gasto)}</Celda>
+      <Celda t="Compras">{entero(x.r.compras)}</Celda>
+      <Celda t="CPA">{ok && x.r.compras > 0 ? <Nivel nivel={nivelDeCpa(cpa(x.r), x.tope)}>{valorCpa(x.r)}</Nivel> : valorCpa(x.r)}</Celda>
+      <Celda t="Hook (3 s)">{hookRate(x.r) === null ? "—" : ok ? <Nivel nivel={nivelDeHook(hookRate(x.r))}>{porcentaje(hookRate(x.r), 0)}</Nivel> : porcentaje(hookRate(x.r), 0)}</Celda>
+      <Celda t="Pasan 15 s">{porcentaje(holdRate(x.r), 0)}</Celda>
+      <Celda t="CTR">{ok ? <Nivel nivel={nivelDeCtr(ctr(x.r))}>{porcentaje(ctr(x.r))}</Nivel> : porcentaje(ctr(x.r))}</Celda>
+      <span className="lg:text-right">
+        <span className="sr-only">Resultado estimado: </span>
+        <Resultado r={x.r} tope={x.tope} />
+      </span>
+      <ChevronRightIcon aria-hidden="true" className="hidden h-4 w-4 text-muted-foreground lg:block" />
+    </button>
+  );
+}
+
+/** «Ordenar por» y el sentido (de mayor a menor o al revés): la barra común filtra y agrupa, pero no ordena filas. */
+function OrdenDeVideos({ criterio, sentido, alCambiar }: { criterio: CriterioVideo; sentido: Sentido; alCambiar: (c: CriterioVideo, s: Sentido) => void }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5">
+      <label className="flex items-center gap-2 text-sm">
+        <span className="text-xs font-medium text-muted-foreground">Ordenar por</span>
+        <select value={criterio} onChange={(e) => alCambiar(e.target.value as CriterioVideo, sentidoNatural(e.target.value as CriterioVideo))} className={`${fieldClassSm} w-auto min-w-[14rem]`}>
+          {CRITERIOS_VIDEO.map((c) => (
+            <option key={c.valor} value={c.valor}>
+              {c.etiqueta}
+            </option>
+          ))}
+        </select>
+      </label>
+      <button
+        type="button"
+        onClick={() => alCambiar(criterio, sentido === "asc" ? "desc" : "asc")}
+        aria-label={`Cambiar el orden: ahora va de ${sentido === "asc" ? "menor a mayor" : "mayor a menor"}`}
+        className="min-h-8 rounded-md border border-border-control bg-card px-3 py-1 text-xs font-medium hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground"
+      >
+        {criterio === "nombre" ? (sentido === "asc" ? "A → Z" : "Z → A") : sentido === "asc" ? "De menor a mayor ↑" : "De mayor a menor ↓"}
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Los videos con gasto en los últimos 30 días, cada uno una sola vez, con la barra común (buscar, filtrar y agrupar por ángulo, producto, campaña, etapa…) y un orden a elegir (gasto, CPA, hook…, ascendente o
+ * descendente). Tocar uno abre su ficha: en qué anuncios y campañas se usa y cómo le fue en cada una; queda en la dirección (`?abrir=<id>`).
+ */
+export function ListaVideos({ videos, escribe, iaConectada, sinAnalizar, abrirInicial }: { videos: VideoVista[]; escribe: boolean; iaConectada: boolean; sinAnalizar: number; abrirInicial: string | null }) {
   const router = useRouter();
   const { mostrarToast } = useToast();
   const [trabajando, empezar] = useTransition();
-  const [abierto, setAbierto] = useState<string | null>(null);
-  const v = videos.find((x) => x.id === abierto);
+  const [abierto, setAbierto] = useState<string | null>(() => (abrirInicial && videos.some((x) => x.id === abrirInicial) ? abrirInicial : null));
+  const [criterio, setCriterio] = useState<CriterioVideo>("mejor");
+  const [sentido, setSentido] = useState<Sentido>("asc");
+  const ordenados = ordenarVideos(videos, criterio, sentido);
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (abierto) url.searchParams.set("abrir", abierto);
+    else url.searchParams.delete("abrir");
+    if (url.href !== window.location.href) window.history.replaceState(window.history.state, "", url);
+  }, [abierto]);
+  // La ficha se dibuja en `<body>` (portal): con `?abrir=` arranca abierta, así que solo se monta ya en el navegador.
+  const enNavegador = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
+  const v = enNavegador ? videos.find((x) => x.id === abierto) : undefined;
   const hayPocaData = videos.some((x) => !confiable(x.r));
   const mini = urlSegura(v?.miniatura ?? null);
   const analizarPendientes = () =>
@@ -60,54 +168,25 @@ export function ListaVideos({ videos, escribe, iaConectada, sinAnalizar }: { vid
           )}
         </div>
       )}
-      <ul role="list" className="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(17rem,1fr))] gap-4 p-0">
-        {videos.map((x) => {
-          const m = urlSegura(x.miniatura);
-          const ok = confiable(x.r);
-          return (
-            <li key={x.id} className="min-w-0">
-              <button type="button" onClick={() => setAbierto(x.id)} className={`flex h-full w-full cursor-pointer flex-col overflow-hidden rounded-xl border border-border bg-card text-left transition-colors hover:border-border-control hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground ${ok ? "" : "opacity-80"}`}>
-                <span className="flex gap-3 p-3">
-                  {m ? <img src={m} alt="" loading="lazy" className="h-24 w-24 shrink-0 rounded-md bg-muted object-cover" /> : <span aria-hidden="true" className="h-24 w-24 shrink-0 rounded-md bg-muted" />}
-                  <span className="flex min-w-0 flex-1 flex-col gap-1">
-                    <span className="line-clamp-2 text-sm font-medium">
-                      {x.numero && <span className="mr-1.5 rounded bg-muted px-1.5 py-0.5 text-xs font-semibold">{x.numero}</span>}
-                      {x.nombre}
-                    </span>
-                    <span className="truncate text-xs text-muted-foreground">{x.producto ?? "Sin producto"}</span>
-                    <span className="truncate text-xs">
-                      {x.analisis?.angulo ? (
-                        <span className="font-medium">
-                          Ángulo: {x.analisis.angulo}
-                          {x.analisis.estado === "sin_archivo" && <span className="font-normal text-muted-foreground"> (provisional)</span>}
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground">Ángulo sin analizar</span>
-                      )}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      En {x.anuncios} {x.anuncios === 1 ? "anuncio" : "anuncios"} de {x.campanas} {x.campanas === 1 ? "campaña" : "campañas"}
-                    </span>
-                    {!ok && <span className="text-xs text-muted-foreground">poca data</span>}
-                  </span>
-                </span>
-                <dl className="m-0 grid grid-cols-3 gap-x-2 gap-y-2 border-t border-border px-3 py-2.5 text-xs">
-                  <Dato t="Gasto">{dolares(x.r.gasto)}</Dato>
-                  <Dato t="Compras">{entero(x.r.compras)}</Dato>
-                  <Dato t="CPA">{ok && x.r.compras > 0 ? <Nivel nivel={nivelDeCpa(cpa(x.r), x.tope)}>{valorCpa(x.r)}</Nivel> : valorCpa(x.r)}</Dato>
-                  <Dato t="Hook (3 s)">{hookRate(x.r) === null ? "—" : ok ? <Nivel nivel={nivelDeHook(hookRate(x.r))}>{porcentaje(hookRate(x.r), 0)}</Nivel> : porcentaje(hookRate(x.r), 0)}</Dato>
-                  <Dato t="Pasan 15 s">{porcentaje(holdRate(x.r), 0)}</Dato>
-                  <Dato t="CTR">{ok ? <Nivel nivel={nivelDeCtr(ctr(x.r))}>{porcentaje(ctr(x.r))}</Nivel> : porcentaje(ctr(x.r))}</Dato>
-                </dl>
-                <span className="flex items-center justify-between border-t border-border px-3 py-2 text-xs text-muted-foreground">
-                  <span>Resultado estimado</span>
-                  <Resultado r={x.r} tope={x.tope} />
-                </span>
-              </button>
-            </li>
-          );
-        })}
-      </ul>
+      <OrdenDeVideos
+        criterio={criterio}
+        sentido={sentido}
+        alCambiar={(c, s) => {
+          setCriterio(c);
+          setSentido(s);
+        }}
+      />
+      <ListaDatos
+        def={DEF_VIDEOS}
+        filas={ordenados}
+        iconos={ICONOS}
+        nombre={NOMBRE}
+        claveFila={(x) => x.id}
+        variante="filas"
+        encabezado={<EncabezadoFilas />}
+        renderFila={(x) => <FilaVideo x={x} alAbrir={() => setAbierto(x.id)} />}
+        vacio="Todavía no hay videos con gasto en los últimos 30 días."
+      />
       {hayPocaData && <p className="m-0 text-xs text-muted-foreground">{AVISO_POCA_DATA}</p>}
 
       <Ventana

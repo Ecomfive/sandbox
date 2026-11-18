@@ -11,9 +11,10 @@ export default async function CampanasMetaPage({ searchParams }: { searchParams:
   const { datos, escribe, pais, hayToken } = await cargarPaginaMeta(searchParams);
   const sp = await searchParams;
   const abrir = Array.isArray(sp.abrir) ? sp.abrir[0] : sp.abrir;
+  const faltan = Array.isArray(sp.faltan) ? sp.faltan[0] : sp.faltan;
   return (
     <MarcoMeta titulo="Campañas" datos={datos} escribe={escribe} hayToken={hayToken} pais={pais}>
-      <CampanasLista campanas={datos.campanas} anuncios={datos.anuncios} cuentas={datos.cuentas} productos={datos.productos} escribe={escribe} abrirInicial={abrir ?? null} />
+      <CampanasLista campanas={datos.campanas} anuncios={datos.anuncios} cuentas={datos.cuentas} productos={datos.productos} escribe={escribe} abrirInicial={abrir ?? null} soloFaltanInicial={faltan === "1"} />
     </MarcoMeta>
   );
 }
