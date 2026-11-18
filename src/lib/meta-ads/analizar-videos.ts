@@ -136,10 +136,27 @@ export async function analizarVideoDeMeta(supabase: SupabaseClient, v: VideoPend
 
   // 1. El archivo del video: Meta lo entrega como una dirección temporal en el campo `source` (solo si el acceso lo permite).
   const ficha = await pedirMeta(`/${v.videoId}`, { fields: "source,length" }, token);
-  const datos = ficha.ok ? (ficha.datos as { source?: unknown; length?: unknown }) : null;
+  let datos = ficha.ok ? (ficha.datos as { source?: unknown; length?: unknown }) : null;
+  // Si el video suelto no trae el archivo, se prueba por la cuenta publicitaria: los videos subidos con ella salen en su lista de videos con el permiso de anuncios.
+  if (typeof datos?.source !== "string") {
+    const { data: cuenta } = await supabase.from("meta_cuentas").select("act_id").eq("id", v.cuentaId).maybeSingle();
+    if (cuenta?.act_id && /^[0-9]{5,25}$/.test(v.videoId)) {
+      const lista = await pedirMeta(`/${cuenta.act_id as string}/advideos`, { fields: "id,source,length", filtering: JSON.stringify([{ field: "id", operator: "IN", value: [v.videoId] }]), limit: "5" }, token);
+      const fila = lista.ok ? ((lista.datos as { data?: Array<{ id?: string; source?: unknown; length?: unknown }> }).data ?? []).find((x) => x.id === v.videoId) : null;
+      if (fila && typeof fila.source === "string") datos = fila;
+    }
+  }
   const fuente = typeof datos?.source === "string" ? datos.source : null;
   const duracion = typeof datos?.length === "number" ? Math.round(datos.length) : null;
-  const motivoSinArchivo = !ficha.ok ? ficha.error : !fuente ? "Meta no entregó el archivo del video (falta el permiso de la API para bajarlo)." : null;
+  let motivoSinArchivo: string | null = null;
+  if (!fuente) {
+    // Qué permisos tiene de verdad el acceso, para saber qué falta.
+    const permisos = await pedirMeta("/me/permissions", {}, token);
+    const dados = permisos.ok ? ((permisos.datos as { data?: Array<{ permission?: string; status?: string }> }).data ?? []).filter((p) => p.status === "granted").map((p) => p.permission).filter(Boolean).join(", ") : "";
+    motivoSinArchivo = !ficha.ok
+      ? ficha.error
+      : `Meta contestó sin el archivo del video (no dio error). Permisos del acceso: ${dados || "no se pudieron leer"}. Suele ser porque el video está en una página de Facebook a la que este acceso no llega.`;
+  }
 
   let origen: "video" | "texto" = "video";
   let motivo = motivoSinArchivo;
