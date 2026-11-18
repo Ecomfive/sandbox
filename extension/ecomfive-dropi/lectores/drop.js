@@ -136,15 +136,21 @@ async function leerDropProveedor(subida) {
     const lecturaProductos = { tipo: "drop", pais: "cr", inicio: estado.inicio, duracionMs: Math.round(performance.now() - t0), paginas, productos: [...productos.values()] };
 
     // 2) Los pedidos: los datos de cada página de /vendor/orders, de a 500, del más nuevo al más viejo. Sin periodo, Drop solo da los últimos 30 días (9 nov 2026: las
-    // ventas empezaban el 8 de octubre), así que se pide desde antes de que existiera la cuenta hasta hoy: unos 6.000 pedidos desde mayo de 2026, 2 a 3 minutos.
+    // ventas empezaban el 8 de octubre), así que se pide desde antes de que existiera la cuenta hasta hoy.
+    // 18 nov 2026 (0.8.1): Drop cambió la página — la lista ya no se llama «initialOrders» sino «orders» (dentro de «initialQuery») y su paginación se corta
+    // pasados ~5.500 pedidos (la página 12 traía 3 de 1.258). Por eso se pide por tramos: hasta junio de 2026 de una vez y después mes por mes.
     estado.fase = "pedidos";
     const POR_PAGINA = 500;
-    const DESDE = "2025-01-01";
-    const HASTA = new Date().toLocaleDateString("en-CA", { timeZone: "America/Costa_Rica" });
-    async function datosDePagina(n) {
+    const hoy = new Date().toLocaleDateString("en-CA", { timeZone: "America/Costa_Rica" });
+    const tramos = [["2025-01-01", "2026-06-30"]];
+    for (let d = new Date("2026-07-01T12:00:00Z"); d.toISOString().slice(0, 10) <= hoy; d.setUTCMonth(d.getUTCMonth() + 1)) {
+      const fin = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).toISOString().slice(0, 10);
+      tramos.push([d.toISOString().slice(0, 10), fin < hoy ? fin : hoy]);
+    }
+    async function datosDePagina(n, desde, hasta) {
       let html = null;
       for (let intento = 0; intento < 3 && html === null; intento++) {
-        const r = await fetch(`/vendor/orders?tab=all&limit=${POR_PAGINA}&all.page=${n}&all.from=${DESDE}&all.to=${HASTA}`, { credentials: "include" }).catch(() => null);
+        const r = await fetch(`/vendor/orders?tab=all&limit=${POR_PAGINA}&all.page=${n}&all.from=${desde}&all.to=${hasta}`, { credentials: "include" }).catch(() => null);
         if (r && r.ok && new URL(r.url).pathname.startsWith("/vendor")) html = await r.text();
         else if (r && !new URL(r.url).pathname.startsWith("/vendor")) throw new Error("La sesión de Drop venció mientras se leían los pedidos.");
         else await pausa(3000);
@@ -154,7 +160,12 @@ async function leerDropProveedor(subida) {
       const re = /self\.__next_f\.push\(\[1,("(?:[^"\\]|\\.)*")\]\)/g;
       let m;
       while ((m = re.exec(html))) flujo += JSON.parse(m[1]);
-      const i = flujo.indexOf('"initialOrders":');
+      // La lista: «initialOrders» (hasta el 17 nov 2026) o «orders» dentro de «initialQuery» (desde el 18 nov 2026).
+      let i = flujo.indexOf('"initialOrders":');
+      if (i < 0) {
+        const q = flujo.indexOf('"initialQuery":');
+        i = q >= 0 ? flujo.indexOf('"orders":', q) : -1;
+      }
       if (i < 0) throw new Error("Drop cambió la página de pedidos: no se encontraron los datos.");
       const j = flujo.indexOf("[", i);
       let d = 0;
@@ -178,27 +189,29 @@ async function leerDropProveedor(subida) {
       throw new Error("Drop cambió la página de pedidos: los datos vinieron cortados.");
     }
     const pedidos = new Map();
-    for (let n = 1; n <= 200; n++) {
-      const lista = await datosDePagina(n);
-      let nuevos = 0;
-      for (const o of lista) {
-        if (!o || !o.id || pedidos.has(o.id)) continue;
-        const info = o.orderInfo || {};
-        const linea = (info.statusTimeline || []).map((s) => ({ estado: String(s.status ?? ""), en: s.occurredAt || null }));
-        pedidos.set(o.id, {
-          id: String(o.id),
-          numero: info.orderNumber ? String(info.orderNumber) : null,
-          estado: info.status != null ? String(info.status) : null,
-          creado: info.createdAt || null,
-          despachado: info.dispatchedAt || linea.find((s) => s.estado === "fulfilled")?.en || null,
-          linea,
-          productos: (o.productSnapshots || []).map((p) => ({ id: String(p.productId || ""), variante: p.productVariantId ? String(p.productVariantId) : null, nombre: String(p.productName || ""), cantidad: Number(p.quantity) || 0 })),
-        });
-        nuevos++;
+    for (const [desde, hasta] of tramos) {
+      for (let n = 1; n <= 200; n++) {
+        const lista = await datosDePagina(n, desde, hasta);
+        let nuevos = 0;
+        for (const o of lista) {
+          if (!o || !o.id || pedidos.has(o.id)) continue;
+          const info = o.orderInfo || {};
+          const linea = (info.statusTimeline || []).map((s) => ({ estado: String(s.status ?? ""), en: s.occurredAt || null }));
+          pedidos.set(o.id, {
+            id: String(o.id),
+            numero: info.orderNumber ? String(info.orderNumber) : null,
+            estado: info.status != null ? String(info.status) : null,
+            creado: info.createdAt || null,
+            despachado: info.dispatchedAt || linea.find((s) => s.estado === "fulfilled")?.en || null,
+            linea,
+            productos: (o.productSnapshots || []).map((p) => ({ id: String(p.productId || ""), variante: p.productVariantId ? String(p.productVariantId) : null, nombre: String(p.productName || ""), cantidad: Number(p.quantity) || 0 })),
+          });
+          nuevos++;
+        }
+        estado.pedidos = pedidos.size;
+        if (lista.length < POR_PAGINA || !nuevos) break;
+        await pausa(500);
       }
-      estado.pedidos = pedidos.size;
-      if (lista.length < POR_PAGINA || !nuevos) break;
-      await pausa(500);
     }
     const lecturaPedidos = { tipo: "drop-pedidos", pais: "cr", inicio: estado.inicio, pedidos: [...pedidos.values()] };
 

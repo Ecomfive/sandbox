@@ -35,8 +35,9 @@ const PAISES: PaisProveedor[] = ["pa", "cr", "mx"];
 const SITIOS: Sitio[] = ["pa", "cr", "mx", "drop", "duna"];
 
 /** Costa Rica llegó a la extensión en la 0.3.0 (28 oct 2026), México en la 0.4.0 (30 oct 2026) y Drop en la 0.6.0 (7 nov 2026): una anterior no sabe de ese sitio. Drop pide la
- * 0.6.2 (9 nov 2026): las anteriores solo traían los pedidos de los últimos 30 días. */
-const VERSION_PARA: Record<Sitio, string> = { pa: "0.0.0", cr: "0.3.0", mx: "0.4.0", drop: "0.6.2", duna: "0.7.1" };
+ * 0.6.2 (9 nov 2026): las anteriores solo traían los pedidos de los últimos 30 días. 0.8.1 (18 nov 2026): Drop cambió su página de pedidos y las
+ * anteriores se quedaban sin leerlos. */
+const VERSION_PARA: Record<Sitio, string> = { pa: "0.0.0", cr: "0.3.0", mx: "0.4.0", drop: "0.8.1", duna: "0.7.1" };
 /** «0.2.3» es anterior a «0.3.0». */
 const versionAnterior = (tiene: string | null, pide: string) => {
   if (!tiene) return false;
@@ -272,16 +273,23 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
     router.refresh();
   }
 
-  /** Espera a que el lector termine en la pestaña de Dropi, mostrando lo que va leyendo. Devuelve el error o null. */
+  /** Espera a que el lector termine en la pestaña del sitio, mostrando lo que va leyendo. Devuelve el error o null. */
   async function esperarLector(lector: ClaveLector): Promise<string | null> {
     let perdido = 0;
+    // Lo último que dijo la extensión cuando no pudo leer el avance (18 nov 2026: antes se tragaba y salía siempre «se perdió la pestaña de Dropi»,
+    // también con Drop): si dice por qué, eso es lo que se muestra.
+    let motivo: string | null = null;
+    const nombre = plataformaDeSitio(sitioDe(lector));
     for (;;) {
       await esperar(3000);
       if (detener.current) return "Detenida.";
-      const a = await pedirExtension<AvanceLector | null>({ tipo: "avance", lector }).catch(() => null);
-      // Sin respuesta de la pestaña durante un minuto (se cerró o se recargó Dropi): se corta en vez de esperar para siempre.
+      const a = await pedirExtension<AvanceLector | null>({ tipo: "avance", lector }).catch((e: unknown) => {
+        motivo = e instanceof Error ? e.message : null;
+        return null;
+      });
+      // Sin respuesta de la pestaña durante un minuto (se cerró o se recargó): se corta en vez de esperar para siempre.
       perdido = a ? 0 : perdido + 1;
-      if (perdido >= 20) return "Se perdió la pestaña de Dropi mientras se leía: vuelve a pulsar «Actualizar».";
+      if (perdido >= 20) return motivo && !/no respondió/.test(motivo) ? motivo : `Se perdió la pestaña de ${nombre} mientras se leía (se cerró o se recargó): vuelve a pulsar «Actualizar» y deja esa pestaña abierta.`;
       if (a) ponerAvance(textoAvance(lector, a));
       if (a?.fin) return a.error ?? null;
     }
