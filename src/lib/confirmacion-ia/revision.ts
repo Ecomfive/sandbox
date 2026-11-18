@@ -77,9 +77,13 @@ export interface ResultadoPedido {
 export function resultadoFinal(
   f: { estado: EstadoAnalisis; zona: Zona | null; etiqueta: string | null; falta: string | null; revision: RevisionPedido | null },
   config: { etiquetaCiudad: string | null; etiquetaInterior: string | null },
+  /** El pedido ya trae la etiqueta de zona en Shopify: el pago llegó y ya toca pedir la dirección. */
+  pagado = false,
 ): ResultadoPedido {
   const r = f.revision;
   if (!r) return { estado: f.estado, zona: f.zona, etiqueta: f.etiqueta, falta: f.falta };
+  // El pago por adelantado manda sobre «falta un dato» (18 nov 2026): mientras no llegue el pago solo se cobra; lo que falta de la dirección queda anotado para pedirlo después.
+  if (!r.completa && f.estado === "adelantado" && !pagado) return { estado: "adelantado", zona: null, etiqueta: null, falta: r.falta };
   if (!r.completa) return { estado: "falta_dato", zona: null, etiqueta: null, falta: r.falta };
   // Marcado como pago por adelantado: queda en espera de pago, sin etiqueta.
   if (r.zona === "adelantado") return { estado: "adelantado", zona: null, etiqueta: null, falta: null };

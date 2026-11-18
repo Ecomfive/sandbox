@@ -8,8 +8,7 @@ import { anilloFoco, fieldClass } from "@/components/ui/field";
 import { CampoSkuMaestro, useOpcionesSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import { useToast } from "@/components/ui/toast";
 import { AlertaIcon, CheckIcon, EnlaceIcon, InventarioIcon, TiendaIcon } from "@/lib/nav-icons";
-import { MAX_UNIDADES_VENTA } from "@/lib/tienda/vincular-variante";
-import { cambiarUnidadesVenta, marcarNoFisico, vincularVariante, vincularVariantesEnBloque } from "./actions";
+import { marcarNoFisico, vincularVariante, vincularVariantesEnBloque } from "./actions";
 
 export interface FilaVinculo {
   id: string;
@@ -20,9 +19,7 @@ export interface FilaVinculo {
   enShopify: boolean;
   noFisico: boolean;
   skuMaestroId: string | null;
-  /** Cuántas unidades del producto lleva cada venta (18 nov 2026: «Lleva 3 kit» = 3). */
-  unidades: number;
-  sugerencia: { id: string; codigo: string; nombre: string; exacta: boolean; metodo: string | null; unidades: number } | null;
+  sugerencia: { id: string; codigo: string; nombre: string; exacta: boolean; metodo: string | null } | null;
 }
 
 type Filtro = "todas" | "vinculadas" | "sugeridas" | "sin" | "no_fisico";
@@ -51,56 +48,6 @@ function ProductoNuestro({ nombre, codigo, pastilla }: { nombre: string; codigo:
   );
 }
 
-const leerUnidades = (t: string) => {
-  const n = Number(t);
-  return t.trim() !== "" && Number.isInteger(n) && n >= 1 && n <= MAX_UNIDADES_VENTA ? n : null;
-};
-
-/**
- * Cuántas unidades del producto lleva cada venta de la variante (18 nov 2026, pedido de Hernán: un «Paga 1 y lleva 2» descuenta 2). Con `guardar`
- * (una variante ya vinculada) se guarda al salir del campo o con Enter; sin él, solo avisa el número para «Confirmar» o al elegir el producto.
- */
-function CampoUnidades({ valor, nombre, deshabilitado, guardar = false, alCambiar }: { valor: number; nombre: string; deshabilitado: boolean; guardar?: boolean; alCambiar: (n: number) => void }) {
-  const [texto, setTexto] = useState(String(valor));
-  const n = leerUnidades(texto);
-  const confirmar = () => {
-    if (n === null) setTexto(String(valor));
-    else if (n !== valor) alCambiar(n);
-  };
-  return (
-    <span className="inline-flex items-center gap-1">
-      <span aria-hidden="true" className="text-xs text-muted-foreground">
-        ×
-      </span>
-      <input
-        type="number"
-        inputMode="numeric"
-        min={1}
-        max={MAX_UNIDADES_VENTA}
-        step={1}
-        value={texto}
-        disabled={deshabilitado}
-        aria-label={`Unidades del producto por cada venta de ${nombre}`}
-        aria-invalid={n === null || undefined}
-        title="Cuántas unidades del producto recibe el cliente en cada venta de esta variante (Paga 1 y lleva 2 = 2)"
-        onChange={(e) => {
-          setTexto(e.target.value);
-          const m = leerUnidades(e.target.value);
-          if (!guardar && m !== null) alCambiar(m);
-        }}
-        onBlur={guardar ? confirmar : undefined}
-        onKeyDown={(e) => {
-          if (guardar && e.key === "Enter") {
-            e.preventDefault();
-            e.currentTarget.blur();
-          }
-        }}
-        className={`${fieldClass} h-8 w-16 !px-2 !py-1 text-right tabular-nums ${n !== null && n > 1 ? "font-semibold text-primario" : ""}`}
-      />
-    </span>
-  );
-}
-
 const grupo = (f: FilaVinculo): Exclude<Filtro, "todas"> => (f.noFisico ? "no_fisico" : f.skuMaestroId ? "vinculadas" : f.sugerencia ? "sugeridas" : "sin");
 
 /**
@@ -111,9 +58,6 @@ export function VinculosTienda({ filas, varias, puedeEscribir }: { filas: FilaVi
   const [filtro, setFiltro] = useState<Filtro>(() => (filas.some((f) => grupo(f) === "sugeridas") ? "sugeridas" : "todas"));
   const [q, setQ] = useState("");
   const [eligiendo, setEligiendo] = useState<string | null>(null);
-  // Las unidades por venta que la persona escribió en una fila que todavía no está vinculada (si no, la sugerida o 1).
-  const [unidadesFila, setUnidadesFila] = useState<Record<string, number>>({});
-  const unidadesDe = (f: FilaVinculo) => unidadesFila[f.id] ?? (f.skuMaestroId ? f.unidades : (f.sugerencia?.unidades ?? 1));
   const [pendiente, empezar] = useTransition();
   const { mostrarToast } = useToast();
   const opciones = useOpcionesSkuMaestro();
@@ -162,10 +106,7 @@ export function VinculosTienda({ filas, varias, puedeEscribir }: { filas: FilaVi
             disabled={pendiente}
             onClick={() =>
               // Todas juntas: los pedidos de la tienda se actualizan una sola vez.
-              correr(
-                () => vincularVariantesEnBloque(sugeridasExactas.map((f) => ({ varianteId: f.id, skuId: f.sugerencia!.id, unidades: unidadesDe(f) }))),
-                `${sugeridasExactas.length} variantes vinculadas.`,
-              )
+              correr(() => vincularVariantesEnBloque(sugeridasExactas.map((f) => ({ varianteId: f.id, skuId: f.sugerencia!.id }))), `${sugeridasExactas.length} variantes vinculadas.`)
             }
           >
             Confirmar las {sugeridasExactas.length} con SKU o nombre igual
@@ -180,13 +121,12 @@ export function VinculosTienda({ filas, varias, puedeEscribir }: { filas: FilaVi
       ) : (
         <MarcoTabla ariaLabel="Variantes de Shopify">
           {/* Anchos fijos (12 nov 2026): los nombres y los SKU largos de Shopify ya no se montan sobre la columna de al lado. */}
-          <table className="w-full min-w-[62rem] table-fixed border-collapse">
+          <table className="w-full min-w-[56rem] table-fixed border-collapse">
             <colgroup>
               <col className="w-14" />
               <col />
               {varias && <col className="w-28" />}
               <col />
-              <col className="w-28" />
               <col className="w-[17rem]" />
             </colgroup>
             <thead>
@@ -197,9 +137,6 @@ export function VinculosTienda({ filas, varias, puedeEscribir }: { filas: FilaVi
                 <th scope="col" className={claseThLista}>En Shopify</th>
                 {varias && <th scope="col" className={claseThLista}>Tienda</th>}
                 <th scope="col" className={claseThLista}>Producto nuestro</th>
-                <th scope="col" className={claseThLista} title="Cuántas unidades del producto recibe el cliente en cada venta: «Paga 1 y lleva 2» = 2">
-                  Unid. por venta
-                </th>
                 <th scope="col" className={claseThLista}>Acción</th>
               </tr>
             </thead>
@@ -235,7 +172,7 @@ export function VinculosTienda({ filas, varias, puedeEscribir }: { filas: FilaVi
                           placeholder="SKU o nombre del producto"
                           claseContenedor="w-full"
                           deshabilitado={pendiente}
-                          alCambiar={(s) => s && correr(() => vincularVariante(f.id, s.id, unidadesDe(f)), `Vinculada a ${s.codigo}${unidadesDe(f) > 1 ? ` × ${unidadesDe(f)}` : ""}.`)}
+                          alCambiar={(s) => s && correr(() => vincularVariante(f.id, s.id), `Vinculada a ${s.codigo}.`)}
                         />
                       ) : g === "no_fisico" ? (
                         <Pastilla>No sale de bodega</Pastilla>
@@ -252,24 +189,6 @@ export function VinculosTienda({ filas, varias, puedeEscribir }: { filas: FilaVi
                       )}
                     </td>
                     <td className={claseTdLista}>
-                      {g === "no_fisico" ? (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      ) : !puedeEscribir ? (
-                        <span className={`tabular-nums ${unidadesDe(f) > 1 ? "font-semibold text-primario" : "text-muted-foreground"}`}>× {unidadesDe(f)}</span>
-                      ) : g === "vinculadas" && eligiendo !== f.id ? (
-                        <CampoUnidades
-                          key={`${f.id}:${f.unidades}`}
-                          valor={f.unidades}
-                          nombre={f.nombre}
-                          deshabilitado={pendiente}
-                          guardar
-                          alCambiar={(n) => correr(() => cambiarUnidadesVenta(f.id, n), `Ahora cada venta descuenta ${n} ${n === 1 ? "unidad" : "unidades"}.`)}
-                        />
-                      ) : (
-                        <CampoUnidades key={f.id} valor={unidadesDe(f)} nombre={f.nombre} deshabilitado={pendiente} alCambiar={(n) => setUnidadesFila((u) => ({ ...u, [f.id]: n }))} />
-                      )}
-                    </td>
-                    <td className={claseTdLista}>
                       {!puedeEscribir ? (
                         <span className="text-xs text-muted-foreground">Solo lectura</span>
                       ) : eligiendo === f.id ? (
@@ -279,7 +198,7 @@ export function VinculosTienda({ filas, varias, puedeEscribir }: { filas: FilaVi
                       ) : (
                         <div className="flex items-center gap-1.5">
                           {g === "sugeridas" && (
-                            <button type="button" className={BOTON_PRINCIPAL} disabled={pendiente} onClick={() => correr(() => vincularVariante(f.id, f.sugerencia!.id, unidadesDe(f)), `Vinculada a ${f.sugerencia!.codigo}${unidadesDe(f) > 1 ? ` × ${unidadesDe(f)}` : ""}.`)}>
+                            <button type="button" className={BOTON_PRINCIPAL} disabled={pendiente} onClick={() => correr(() => vincularVariante(f.id, f.sugerencia!.id), `Vinculada a ${f.sugerencia!.codigo}.`)}>
                               Confirmar
                             </button>
                           )}
@@ -320,9 +239,8 @@ export function VinculosTienda({ filas, varias, puedeEscribir }: { filas: FilaVi
         </MarcoTabla>
       )}
       <p className="m-0 text-xs text-muted-foreground">
-        Si una variante es un paquete del mismo producto («Paga 1 y lleva 2», «Lleva 3 kit», SKU que termina en /X2), se une al producto y en «Unid. por venta»
-        va cuántas recibe el cliente: así cada venta descuenta y cuesta esas unidades (el sistema lo sugiere). Un combo de productos distintos se une a su
-        producto compuesto. Lo que no es un producto físico (garantía extendida, envío prioritario) se marca «No sale de bodega» y no cuenta como vendido.
+        Un pack o combo de Shopify se une a su producto compuesto: así la bodega sabe qué componentes salen. Lo que no es un producto físico (garantía extendida,
+        envío prioritario) se marca «No sale de bodega» y no cuenta como vendido.
       </p>
     </div>
   );

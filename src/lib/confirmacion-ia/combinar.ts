@@ -91,6 +91,10 @@ export function combinar({ distingueZona, zonaReglas, modelos }: { distingueZona
       if (zonas.every((z) => z === "ciudad" || z === "interior" || z === "adelantado") && new Set(zonas).size === 1) {
         zona = zonas[0] as Zona;
         zonaPor = "ia";
+      } else if (!completa && zonas.includes("adelantado") && zonas.every((z) => z === "adelantado" || z === "no_se")) {
+        // Con la dirección incompleta una IA puede no saber la zona; si la otra ve pago por adelantado y ninguna dice ciudad o interior, el pago por adelantado manda (18 nov 2026).
+        zona = "adelantado";
+        zonaPor = "ia";
       }
     }
   }
@@ -100,8 +104,9 @@ export function combinar({ distingueZona, zonaReglas, modelos }: { distingueZona
   const acuerdo = buenos.length < 2 ? null : mismaCompleta && mismaZona;
   const motivo = buenos.map((m) => m.respuesta.motivo).filter(Boolean)[0] ?? "";
 
-  // Pago por adelantado (por una palabra de zona o porque las dos IA lo ven así): queda «en espera de pago», sin etiqueta, aunque la dirección falte algo (el asesor se pone en contacto de todos modos).
-  if (zona === "adelantado") return { estado: "adelantado", zona: null, zonaPor, completa, falta: null, acuerdo, motivo };
+  // Pago por adelantado (por una palabra de zona o porque las IA lo ven así): queda «en espera de pago», sin etiqueta, y manda sobre «dirección incompleta» (18 nov 2026): primero se cobra y la dirección se
+  // pide después. Lo que falta se guarda igual (`falta`) para pedirlo cuando llegue el pago, pero no cambia el estado ni genera el mensaje de «falta un dato».
+  if (zona === "adelantado") return { estado: "adelantado", zona: null, zonaPor, completa, falta, acuerdo, motivo };
   if (!completa) return { estado: "falta_dato", zona, zonaPor, completa, falta, acuerdo, motivo };
   if (distingueZona && !zona) return { estado: "revisar", zona: null, zonaPor: null, completa, falta: null, acuerdo, motivo };
   return { estado: "listo", zona, zonaPor, completa, falta: null, acuerdo, motivo };

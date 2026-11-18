@@ -191,8 +191,7 @@ export async function cargarPedidosFinanzas(
   const productosDe = new Map<string, string[]>();
   for (const l of lineas) {
     if (l.esServicio) continue;
-    // Las unidades que salen: un «Lleva 3» son 3 (18 nov 2026).
-    unidadesDe.set(l.pedidoId, (unidadesDe.get(l.pedidoId) ?? 0) + l.cantidad * (l.unidadesPorVenta ?? 1));
+    unidadesDe.set(l.pedidoId, (unidadesDe.get(l.pedidoId) ?? 0) + l.cantidad);
     productosDe.set(l.pedidoId, [...(productosDe.get(l.pedidoId) ?? []), l.titulo]);
   }
   const clienteDe = (o: (typeof ordenes)[number]) => (Array.isArray(o.ven_ordenes_clientes) ? (o.ven_ordenes_clientes[0] ?? null) : o.ven_ordenes_clientes);
@@ -235,20 +234,10 @@ export async function cargarPedidosFinanzas(
 /** Las líneas de las órdenes de esas unidades entre esos días (por la fecha de su orden). */
 export async function cargarLineasFinanzas(supabase: SupabaseClient, unidades: string[], desde: string, hasta: string): Promise<LineaFinanzas[]> {
   if (!unidades.length) return [];
-  const filas = await traerTodasLasFilas<{
-    orden_id: string;
-    linea: number;
-    producto: string | null;
-    cantidad: number | null;
-    precio: number | null;
-    sku: string | null;
-    sku_maestro_id: string | null;
-    unidades_por_venta: number | null;
-    es_servicio: boolean | null;
-  }>((d, h) =>
+  const filas = await traerTodasLasFilas<{ orden_id: string; linea: number; producto: string | null; cantidad: number | null; precio: number | null; sku: string | null; sku_maestro_id: string | null; es_servicio: boolean | null }>((d, h) =>
     supabase
       .from("ven_orden_lineas")
-      .select("orden_id, linea, producto, cantidad, precio, sku, sku_maestro_id, unidades_por_venta, es_servicio, ven_ordenes!inner(unidad_id, fecha)")
+      .select("orden_id, linea, producto, cantidad, precio, sku, sku_maestro_id, es_servicio, ven_ordenes!inner(unidad_id, fecha)")
       .in("ven_ordenes.unidad_id", unidades)
       .gte("ven_ordenes.fecha", desde)
       .lte("ven_ordenes.fecha", hasta)
@@ -263,7 +252,6 @@ export async function cargarLineasFinanzas(supabase: SupabaseClient, unidades: s
     cantidad: Number(l.cantidad) || 0,
     precio: l.precio === null ? null : Number(l.precio),
     sku: l.sku,
-    unidadesPorVenta: Math.max(1, Number(l.unidades_por_venta) || 1),
     esServicio: l.es_servicio === true,
   }));
 }
