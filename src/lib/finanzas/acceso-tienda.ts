@@ -19,6 +19,7 @@ export const COLUMNA_TIENDA = {
   fin_bienes_uso: "unidad_id",
   del_entregas: "unidad_id",
   fin_reglas: "unidad_id",
+  fin_recurrentes: "unidad_id",
   mkt_meta_reglas: "unidad_id",
   mkt_meta_campanas: "unidad_id",
 } as const;

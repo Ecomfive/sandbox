@@ -11,6 +11,9 @@ export const metadata = { title: "Importar" };
 
 export const dynamic = "force-dynamic";
 
+// Leer un extracto en PDF con la IA puede tardar más de un minuto.
+export const maxDuration = 120;
+
 export default async function ImportarConciliacionPage() {
   const usuario = await requireModulo("conciliacion-bancaria");
   // Importar escribe: con solo lectura no se ofrece (las acciones también lo comprueban).

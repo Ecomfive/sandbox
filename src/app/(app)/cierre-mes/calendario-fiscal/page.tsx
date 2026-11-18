@@ -5,7 +5,11 @@ import { MarcoAF4 } from "@/components/af4/marco-af4";
 import { TablaComparacionAF4 } from "@/components/af4/tabla-comparacion-af4";
 import { KpiCard, KpiGrid, KpiGroup } from "@/components/ui/kpi-card";
 import { Pagina } from "@/components/ui/pagina";
-import { fechaCorta, hoyPanama } from "@/lib/af4/fecha";
+import { fechaCorta, hoyPanama, mesLargo } from "@/lib/af4/fecha";
+import { anilloFoco } from "@/components/ui/field";
+import { cargarLibroContador } from "@/lib/finanzas/cargar-libro-contador";
+import { mesAnterior } from "@/lib/finanzas/cierre";
+import { liquidacionItbms } from "@/lib/finanzas/libro-contador";
 import { dinero, entero } from "@/lib/af4/formato";
 import { requireModulo } from "@/lib/auth";
 import { cargarCalendario } from "@/lib/finanzas/avisos-cierre";
@@ -35,7 +39,10 @@ export default async function CalendarioFiscalPage() {
   if (await limitadoATiendas()) return <SoloTodaLaEmpresa titulo="Cierre de mes" />;
   const supabase = createServiceClient();
   const hoy = hoyPanama();
-  const cal = await cargarCalendario(supabase);
+  // El ITBMS que vence este mes es el del mes anterior (Formulario 430, el día 15).
+  const mesItbms = mesAnterior(`${hoy.slice(0, 7)}-01`);
+  const [cal, libro] = await Promise.all([cargarCalendario(supabase), cargarLibroContador(supabase, mesItbms, null)]);
+  const itbms = "error" in libro ? null : liquidacionItbms(libro.movimientos, libro.ventas);
   const titulo = "Calendario fiscal";
   if ("error" in cal) {
     return (
@@ -61,6 +68,34 @@ export default async function CalendarioFiscalPage() {
           <KpiCard compacta titulo="Presentadas" tono="success" valor={entero(cuenta("presentada"))} />
         </KpiGrid>
       </KpiGroup>
+
+      {itbms && (
+        <KpiGroup
+          titulo={`ITBMS de ${mesLargo(mesItbms)} · estimado`}
+          accion={
+            <a href={`/api/exportar-libro-contador?periodo=${mesItbms.slice(0, 7)}`} className={`rounded text-xs font-medium underline-offset-2 hover:underline ${anilloFoco}`}>
+              Libro para el contador
+            </a>
+          }
+        >
+          <KpiGrid compacta>
+            <KpiCard compacta titulo="Débito (ventas facturadas)" valor={dinero(itbms.debito, "USD", { decimales: 2 })} subtexto={`${entero(itbms.ventas)} ventas con ITBMS`} />
+            <KpiCard compacta titulo="Crédito (compras)" valor={dinero(itbms.credito, "USD", { decimales: 2 })} subtexto={`${entero(itbms.comprasConItbms)} documentos con ITBMS cargado`} />
+            {itbms.aFavor > 0 ? (
+              <KpiCard compacta titulo="Saldo a favor" tono="success" valor={dinero(itbms.aFavor, "USD", { decimales: 2 })} subtexto="Pasa al mes siguiente" />
+            ) : (
+              <KpiCard compacta titulo="A pagar" valor={dinero(itbms.aPagar, "USD", { decimales: 2 })} subtexto="Débito − crédito" />
+            )}
+            <KpiCard
+              compacta
+              titulo="Compras sin ITBMS cargado"
+              tono={itbms.comprasSinItbms ? "warning" : "neutral"}
+              valor={entero(itbms.comprasSinItbms)}
+              subtexto={itbms.comprasSinItbms ? `${dinero(itbms.montoSinItbms)} que no suman crédito` : "Todo con su ITBMS"}
+            />
+          </KpiGrid>
+        </KpiGroup>
+      )}
 
       <TablaComparacionAF4
         id="titulo-calendario"
