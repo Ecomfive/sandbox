@@ -4,7 +4,7 @@
 -- 1) Índice de pedidos por tienda y fecha (así se buscan; solo había por mes: `ven_ordenes_periodo`).
 -- 2) `ven_pedidos_periodo` y `ven_lineas_periodo`: los pedidos (con su cliente) y las líneas de esas tiendas entre dos días, cada uno en UNA respuesta (un
 --    jsonb; sin el tope de 1.000 filas). Las usa `cargarPedidosFinanzas` (src/lib/tienda/datos-finanzas.ts); sin esta migración sigue la forma anterior.
--- Solo el servidor (service role) puede llamarlas. Se puede correr más de una vez. Reversa: supabase/rollbacks/0318_rollback.sql
+-- Solo el servidor (service role) puede llamarlas. Se puede correr más de una vez. Reversa: supabase/rollbacks/0321_rollback.sql
 
 create index if not exists ven_ordenes_unidad_fecha on ven_ordenes (unidad_id, fecha desc, id);
 

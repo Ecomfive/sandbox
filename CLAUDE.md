@@ -2719,7 +2719,7 @@ convenciones técnicas del código.
 - **Velocidad de Gestión de tienda** (18 nov 2026, pedido de Hernán; medido en producción: Dashboard de tienda 8,6 s, «Todas las tiendas» 7,4 s, Logística
   7,2 s, Confirmación 6,8 s; el resto del sistema casi todo bajo 1,5 s; la base de 484 MB cabe entera en memoria —100 % de aciertos de caché, 39 de 90
   conexiones—, así que no era capacidad de Supabase). `cargarPedidosFinanzas` (`src/lib/tienda/datos-finanzas.ts`) pide los pedidos (con su cliente) y las
-  líneas de un periodo con **una sola respuesta cada uno** (`ven_pedidos_periodo` / `ven_lineas_periodo`, jsonb, migración 0318, solo service role; sin ella,
+  líneas de un periodo con **una sola respuesta cada uno** (`ven_pedidos_periodo` / `ven_lineas_periodo`, jsonb, migración 0321, solo service role; sin ella,
   la forma anterior: pedidos de a 1.000 y líneas por número de pedido —`lineasDeOrdenes`—, ya no cruzando líneas con pedidos página por página). Índice
   `ven_ordenes_unidad_fecha` (unidad_id, fecha desc, id). `liviano` (tablero «Todas» y Dashboard) se salta fotos e historial de clientes, que no muestran.
   Comprobado: misma salida que la forma anterior (14 272 pedidos y 17 069 líneas, mismo orden). Medido local: Dashboard 7,0 → 2,0 s, «Todas» 5,6 → 2,6 s,
@@ -2775,6 +2775,22 @@ convenciones técnicas del código.
   la migración). «Probar conexión» (Tiendas Shopify) ahora lista también las funciones de pausa y flujos que ve (`· pausa: …`). **Pendiente de probar con iComfly real**: qué función pausa los flujos.
   **Silenciar el aviso «Nuevo pedido»**: `AvisoPedidosNuevos` trae una cornetita en cada tarjeta (`SonidoIcon`/`SilencioIcon`); silencia el «ding» sin quitar los avisos y se vuelve a activar desde otro
   aviso (suena una vez al activar). Se recuerda en el navegador de cada persona (`aviso-pedidos-silenciado-v1`, `useSyncExternalStore`, vale en todas sus pestañas).
+
+- **Marketing › Anuncios Meta** (`/anuncios-meta`, módulo `anuncios-meta`, migración 0320, 18 nov 2026, pedido de Alcides; boceto aprobado https://claude.ai/artifact/WebDAX2JDydNkzNhpSk4LC; frente Gestión de tienda).
+  Lee las cuentas publicitarias de Meta (Facebook e Instagram) **solo en lectura** —el sistema nunca crea, pausa ni cambia una campaña— para ver qué campañas se montaron, quién, y qué ángulo, video, copy, landing,
+  estructura (CBO/ABO) y puja (sin tope, bid cap, cost cap) funcionan. Una tienda puede tener **varias cuentas** (`meta_cuentas`, Oferfy usa 3 o 4). Acceso: token de un usuario del sistema con `ads_read`
+  (`META_ADS_ACCESS_TOKEN`, solo en Vercel, nunca `NEXT_PUBLIC_` ni a la pantalla; `META_ADS_API_VERSION` opcional, v23.0 por defecto). Cliente `src/lib/meta-ads/api.ts` (solo habla con `graph.facebook.com`);
+  lectura `sincronizar.ts` (insights por anuncio y día, luego campañas, conjuntos y anuncios con video, texto y landing, y el registro de actividad para saber quién montó cada campaña; si el registro no se deja leer
+  con ese acceso solo se avisa y Equipo queda sin datos) y `leer-cuentas.ts`, que usan el cron `/api/cron/meta-ads` (3 veces al día, `vercel.json`) y «Leer ahora». «Probar conexión» y las cuentas viven en
+  Cuentas. **Producto, ángulo y etapa no existen en Meta**: salen del nombre de la campaña (`PAÍS | Producto | ÁNGULO | CBO o ABO | Puja | T, E o R`, `etiquetasDeNombre`, `nombre.ts`, tolerante al orden) y se
+  corrigen a mano en la ficha de la campaña (`meta_campanas.manual` dice cuáles: la lectura no las pisa). **Resultado estimado = compras × CPA tope − gasto** (`metricas.ts`); el CPA tope se define por producto
+  (`meta_topes`, $3 por defecto hasta definirlo) y con menos de `GASTO_MINIMO_CONFIABLE` ($100) una campaña es «poca data» y no entra entre las mejores ni las peores. Las compras son las que Meta atribuye: pueden diferir
+  de las órdenes reales de la tienda (cruzarlo con los pedidos reales y la IA que clasifica el ángulo por el texto o el video quedan para una segunda etapa). **Sugerencias** (`sugerencias.ts`, con prueba y umbrales
+  `UMBRALES` a la vista): sin compras, CPA alto, escalar, CPA subiendo, testing sin cierre, video ganador, video con hook bajo, landing floja, etiquetas que faltan; se aceptan, se rechazan con porqué o se posponen
+  (`meta_decisiones`, vigentes 30, 90 y 7 días) y nunca tocan Meta. Pantallas: Resumen, Campañas (`ListaDatos` + ficha lateral), Qué funciona (por ángulo, estructura, puja, copy, landing, producto y etapa), Videos, Equipo
+  y Cuentas; el periodo y la cuenta viajan en la dirección (`?periodo=`, `?cuenta=`) y todo se arma en el servidor (`cargarAnunciosMeta`, `datos.ts`). Acciones (`anuncios-meta/actions.ts`) con `requireModuloEscritura`,
+  país comprobado con `puedeVerPaisId` y auditoría. La migración da el módulo a los roles que ya abren Rentabilidad o Test productos. Distinto de la carga por Excel de Meta de Rentabilidad (`mkt_meta_campanas`).
+  Pendiente de probar con una cuenta real: los permisos del registro de actividad y que `omni_purchase` sea la acción de compra de cada pixel.
 
 ## Dónde vive cada cosa
 

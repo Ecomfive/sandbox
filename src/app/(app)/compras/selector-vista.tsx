@@ -6,9 +6,14 @@ import { Bandera } from "@/components/paises/bandera";
 
 const COOKIE = "compras-vista";
 
-/** Recuerda la vista elegida para las otras pestañas de Compras. */
+/**
+ * Recuerda la vista elegida para las otras pestañas de Compras. La escribe el navegador, así que no puede ser httpOnly: es
+ * solo un filtro («todos» o un país) que el servidor valida contra la lista de países. Por https va con `secure`
+ * (auditoría de seguridad, 18 nov 2026).
+ */
 function recordar(valor: string) {
-  document.cookie = `${COOKIE}=${encodeURIComponent(valor)}; path=/; max-age=31536000; samesite=lax`;
+  const segura = location.protocol === "https:" ? "; secure" : "";
+  document.cookie = `${COOKIE}=${encodeURIComponent(valor)}; path=/; max-age=31536000; samesite=lax${segura}`;
 }
 
 /** El ícono de cada opción: la bandera del país, o un emoji para «Todos». */

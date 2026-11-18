@@ -3,10 +3,12 @@
 // cifrados en `tienda_icomfly` (migración 0284) y nunca salen del servidor. Las piezas sin red, con prueba, están en `icomfly-oauth.ts`.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { cifrar, descifrar } from "@/lib/seguridad/cifrado-tokens";
+import { cifrar } from "@/lib/seguridad/cifrado-tokens";
 import {
   claveIcomfly,
+  clavesIcomfly,
   contenidoHerramienta,
+  descifrarIcomfly,
   ICOMFLY_API,
   leerTokensIcomfly,
   nuevoPkce,
@@ -92,7 +94,7 @@ async function registrarCliente(redirectUri: string): Promise<string> {
 /** Empieza la autorización: registra el cliente si hace falta, guarda el verificador PKCE (cifrado) y devuelve a dónde mandar a la persona. */
 export async function empezarAutorizacion(supabase: SupabaseClient, tiendaId: string, redirectUri: string, state: string): Promise<{ url: string } | { error: string }> {
   const clave = claveIcomfly();
-  if (!clave) return { error: "Falta la clave para cifrar los tokens (SUPABASE_SERVICE_ROLE_KEY o ICOMFLY_TOKEN_KEY)." };
+  if (!clave) return { error: "Falta la clave para cifrar los tokens (ICOMFLY_TOKEN_KEY o, mientras no esté, SUPABASE_SERVICE_ROLE_KEY)." };
   const { data: f, error } = await supabase.from("tienda_icomfly").select("mcp_url, client_id, redirect_uri").eq("tienda_id", tiendaId).maybeSingle();
   if (error) return { error: falta(error.message) ? SIN_MIGRACION_ICOMFLY : "No se pudo leer la conexión." };
   if (!f) return { error: "Primero pega la dirección del conector de la tienda." };
@@ -126,10 +128,11 @@ async function pedirTokens(cuerpo: Record<string, string>): Promise<TokensIcomfl
 
 /** Termina la autorización: cambia el código por los tokens y los guarda cifrados. */
 export async function terminarAutorizacion(supabase: SupabaseClient, tiendaId: string, codigo: string, usuarioId: string): Promise<{ error?: string }> {
-  const clave = claveIcomfly();
+  const claves = clavesIcomfly();
+  const clave = claves[0];
   if (!clave) return { error: "Falta la clave para cifrar los tokens." };
   const { data: f } = await supabase.from("tienda_icomfly").select("mcp_url, client_id, redirect_uri, pkce_cifrado").eq("tienda_id", tiendaId).maybeSingle();
-  const verificador = f?.pkce_cifrado ? descifrar(f.pkce_cifrado as string, clave) : null;
+  const verificador = f?.pkce_cifrado ? (descifrarIcomfly(f.pkce_cifrado as string, claves)?.texto ?? null) : null;
   if (!f || !f.client_id || !f.redirect_uri || !verificador) return { error: "La autorización no se empezó desde el sistema: vuelve a pulsar «Conectar iComfly»." };
   try {
     const t = await pedirTokens({ grant_type: "authorization_code", code: codigo, redirect_uri: f.redirect_uri as string, client_id: f.client_id as string, code_verifier: verificador, resource: f.mcp_url as string });
@@ -159,15 +162,30 @@ async function guardarTokens(supabase: SupabaseClient, tiendaId: string, t: Toke
 
 /** El token vigente de la tienda (lo renueva si vence en menos de 2 minutos). */
 async function tokenVigente(supabase: SupabaseClient, tiendaId: string): Promise<{ token: string; mcpUrl: string } | { error: string }> {
-  const clave = claveIcomfly();
+  const claves = clavesIcomfly();
+  const clave = claves[0];
   if (!clave) return { error: "Falta la clave para descifrar los tokens." };
   const { data: f, error } = await supabase.from("tienda_icomfly").select("mcp_url, client_id, access_cifrado, refresh_cifrado, expira_en").eq("tienda_id", tiendaId).maybeSingle();
   if (error) return { error: falta(error.message) ? SIN_MIGRACION_ICOMFLY : "No se pudo leer la conexión con iComfly." };
   if (!f?.access_cifrado) return { error: "La tienda no está conectada a iComfly." };
-  const acceso = descifrar(f.access_cifrado as string, clave);
-  if (!acceso) return { error: "No se pudo leer el token de iComfly: vuelve a conectar la tienda." };
+  const a = descifrarIcomfly(f.access_cifrado as string, claves);
+  if (!a) return { error: "No se pudo leer el token de iComfly: vuelve a conectar la tienda." };
+  const acceso = a.texto;
+  const r = f.refresh_cifrado ? descifrarIcomfly(f.refresh_cifrado as string, claves) : null;
+  const refresh = r?.texto ?? null;
+  // Tokens guardados con la clave anterior (derivada de la clave de servicio): se vuelven a cifrar con `ICOMFLY_TOKEN_KEY` (auditoría de seguridad, 18 nov 2026).
+  // Solo si nadie los cambió mientras tanto (otra petición pudo renovarlos): si no, no se pisan los nuevos.
+  if (a.anterior || r?.anterior) {
+    let cambio = supabase
+      .from("tienda_icomfly")
+      .update({ access_cifrado: cifrar(acceso, clave), ...(refresh ? { refresh_cifrado: cifrar(refresh, clave) } : {}) })
+      .eq("tienda_id", tiendaId)
+      .eq("access_cifrado", f.access_cifrado as string);
+    if (f.refresh_cifrado) cambio = cambio.eq("refresh_cifrado", f.refresh_cifrado as string);
+    const { error: e } = await cambio;
+    if (e) console.error("iComfly: no se pudieron volver a cifrar los tokens con la clave nueva", e.message);
+  }
   if (!venceProntoIcomfly((f.expira_en as string | null) ?? null, Date.now())) return { token: acceso, mcpUrl: f.mcp_url as string };
-  const refresh = f.refresh_cifrado ? descifrar(f.refresh_cifrado as string, clave) : null;
   if (!refresh || !f.client_id) return { token: acceso, mcpUrl: f.mcp_url as string };
   try {
     const t = await pedirTokens({ grant_type: "refresh_token", refresh_token: refresh, client_id: f.client_id as string, resource: f.mcp_url as string });

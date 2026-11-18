@@ -5,17 +5,17 @@
 //
 // Uso: node scripts/preview/capturar.mjs [ruta…] [--salida=<carpeta>] [--variantes=claro,oscuro,celular]
 //   Sin rutas captura todo el Portal AF4 (scripts/preview/rutas.mjs). Variables: PREVIEW_URL (http://127.0.0.1:3100),
-//   NEXT_PUBLIC_SUPABASE_URL (http://localhost:54321), PLAYWRIGHT_BROWSERS_PATH (/opt/pw-browsers).
+//   NEXT_PUBLIC_SUPABASE_URL (http://127.0.0.1:54321), PLAYWRIGHT_BROWSERS_PATH (/opt/pw-browsers).
 import { mkdirSync, writeFileSync, existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { cookieSesion } from "./sesion.mjs";
+import { URL_SUPA_PREVIEW, clavePreview, cookieSesion } from "./sesion.mjs";
 import { RUTAS_PORTAL } from "./rutas.mjs";
 
 process.env.PLAYWRIGHT_BROWSERS_PATH ??= "/opt/pw-browsers";
 const { chromium } = await import("playwright");
 
 const BASE = process.env.PREVIEW_URL ?? "http://127.0.0.1:3100";
-const SUPA = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://localhost:54321";
+const SUPA = URL_SUPA_PREVIEW;
 const args = process.argv.slice(2);
 const opcion = (n, d) => args.find((a) => a.startsWith(`--${n}=`))?.slice(n.length + 3) ?? d;
 const SALIDA = opcion("salida", join(process.env.PREVIEW_DIR ?? ".preview", "capturas"));
@@ -31,7 +31,7 @@ const VARIANTE = {
 };
 
 async function rest(ruta) {
-  const r = await fetch(`${SUPA}/rest/v1/${ruta}`, { headers: { apikey: "preview", Authorization: "Bearer preview" } });
+  const r = await fetch(`${SUPA}/rest/v1/${ruta}`, { headers: { apikey: clavePreview(), Authorization: "Bearer preview" } });
   return r.ok ? r.json() : [];
 }
 

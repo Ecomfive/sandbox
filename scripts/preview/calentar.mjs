@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 // Pide cada página una vez (sin navegador) para que `next dev` las compile antes de capturar, y dice el estado HTTP
 // de cada una. Uso: node scripts/preview/calentar.mjs [ruta…]
-import { cookieSesion } from "./sesion.mjs";
+import { URL_SUPA_PREVIEW, cookieSesion } from "./sesion.mjs";
 import { RUTAS_PORTAL } from "./rutas.mjs";
 
 const BASE = process.env.PREVIEW_URL ?? "http://127.0.0.1:3100";
-const SUPA = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://localhost:54321";
+const SUPA = URL_SUPA_PREVIEW;
 const c = cookieSesion(SUPA);
 const rutas = process.argv.slice(2).length ? process.argv.slice(2) : RUTAS_PORTAL.filter((r) => !r.includes(":"));
 let mal = 0;

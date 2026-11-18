@@ -161,7 +161,7 @@ export async function cargarPedidosFinanzas(
   const unidades = [...tiendaDeUnidad.keys()];
   // Con la migración 0276, también la hora de Shopify (un texto armado: por eso se declara como `string`).
   const columnas: string = `id, unidad_id, numero, fecha, estado_entrega, etiquetas, total, moneda, transportista, guia, origen, ${(await hayHoraDeShopify(supabase)) ? "creado_origen, " : ""}${(await hayFormaPagoEntrega(supabase)) ? "forma_pago_entrega, despachada_en, " : ""}ven_ordenes_clientes(nombre, corregimiento, direccion, telefono, telefono_clave, notas)`;
-  // Los pedidos y sus líneas (18 nov 2026, velocidad de Gestión de tienda): con la migración 0318, cada uno en una sola respuesta de la base
+  // Los pedidos y sus líneas (18 nov 2026, velocidad de Gestión de tienda): con la migración 0321, cada uno en una sola respuesta de la base
   // (`ven_pedidos_periodo` / `ven_lineas_periodo`); sin ella, los pedidos de a 1.000 y las líneas por número de pedido (antes se cruzaban con los pedidos
   // página por página y cada página tardaba ~1,6 s). Las fotos de las variantes, a la vez.
   const fotos = liviano
@@ -259,10 +259,10 @@ const comoLinea = (l: FilaLinea): LineaFinanzas => ({
   esServicio: l.es_servicio === true,
 });
 
-/** Si la base tiene las funciones de la migración 0318 (se pregunta hasta que respondan bien una vez o digan que no existen). */
+/** Si la base tiene las funciones de la migración 0321 (se pregunta hasta que respondan bien una vez o digan que no existen). */
 let enUnaDisponible: boolean | null = null;
 
-/** Los pedidos (con su cliente) y las líneas de esas unidades entre esos días, en dos respuestas de la base (migración 0318); null si no están. */
+/** Los pedidos (con su cliente) y las líneas de esas unidades entre esos días, en dos respuestas de la base (migración 0321); null si no están. */
 async function pedidosYLineasEnUna(supabase: SupabaseClient, unidades: string[], desde: string, hasta: string): Promise<{ ordenes: FilaOrden[]; lineas: LineaFinanzas[] } | null> {
   if (enUnaDisponible === false) return null;
   const args = { unidades, desde, hasta };

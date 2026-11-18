@@ -9,11 +9,15 @@
 // Cada consulta que no supo responder queda en el registro (PREVIEW_LOG) con «FALSO» si es una limitación de este
 // servidor y «SQL» si Postgres la rechazó (eso suele ser un error real del código o una migración que falta).
 //
-// Uso: npx tsx scripts/preview/postgrest.mts <carpeta-de-la-base> [puerto]
+// Uso: PREVIEW_CLAVE=<clave> npx tsx scripts/preview/postgrest.mts <carpeta-de-la-base> [puerto]
+// Solo escucha en 127.0.0.1, solo atiende con Host localhost/127.0.0.1 y cada petición trae la clave en `apikey`
+// (auditoría de seguridad, 18 nov 2026: ver acceso.mts). levantar.sh genera la clave y la pasa a la app.
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import http from "node:http";
+import type { AddressInfo } from "node:net";
 import { appendFileSync } from "node:fs";
 import { cargarPGlite } from "./pglite.mjs";
+import { HOST_ESCUCHA, LARGO_MINIMO_CLAVE, rechazo } from "./acceso.mjs";
 
 export const USUARIO_PREVIEW = {
   id: "00000000-0000-4000-8000-0000000000a1",
@@ -123,7 +127,8 @@ function exprRuta(alias: string, col: string, flechas: string[], ruta: string[])
 }
 
 // ---------- servidor ----------
-export async function crearServidor(db: DB, opciones: { log?: string } = {}) {
+export async function crearServidor(db: DB, opciones: { log?: string; clave: string }) {
+  if (opciones.clave.length < LARGO_MINIMO_CLAVE) throw new Error(`La clave de la vista previa debe tener al menos ${LARGO_MINIMO_CLAVE} caracteres.`);
   const registrar = (linea: string) => {
     if (opciones.log) appendFileSync(opciones.log, `${new Date().toISOString()} ${linea}\n`);
   };
@@ -620,6 +625,15 @@ export async function crearServidor(db: DB, opciones: { log?: string } = {}) {
   }
 
   const servidor = http.createServer(async (req, res) => {
+    // Antes de leer el cuerpo o tocar la base (auditoría de seguridad, 18 nov 2026).
+    const puerto = (servidor.address() as AddressInfo | null)?.port ?? 0;
+    const motivo = rechazo({ host: req.headers.host, apikey: req.headers.apikey }, puerto, opciones.clave);
+    if (motivo) {
+      res.writeHead(motivo.status, { "content-type": "application/json" });
+      res.end(JSON.stringify({ code: String(motivo.status), message: motivo.mensaje }));
+      req.resume();
+      return;
+    }
     const url = new URL(req.url!, "http://x");
     const metodo = req.method ?? "GET";
     let cuerpo = "";
@@ -700,10 +714,17 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     console.error("Uso: postgrest.mts <carpeta-de-la-base> [puerto]");
     process.exit(1);
   }
+  // La clave de esta corrida (la genera levantar.sh y la deja en .env.preview). Sin ella no arranca.
+  const clave = process.env.PREVIEW_CLAVE ?? "";
+  if (clave.length < LARGO_MINIMO_CLAVE) {
+    console.error(`Falta PREVIEW_CLAVE (al menos ${LARGO_MINIMO_CLAVE} caracteres): levanta la vista previa con scripts/preview/levantar.sh`);
+    process.exit(1);
+  }
   const PGlite = await cargarPGlite();
   const db = new PGlite(dir);
   await db.exec("set timezone = 'UTC'");
   // PGlite atiende una consulta a la vez; las de Next llegan en paralelo y PGlite las encola solo.
-  const { servidor } = await crearServidor(db as DB, { log: process.env.PREVIEW_LOG });
-  servidor.listen(puerto, process.env.PREVIEW_HOST ?? "localhost", () => console.log(`PostgREST falso en http://localhost:${puerto} (base ${dir})`));
+  const { servidor } = await crearServidor(db as DB, { log: process.env.PREVIEW_LOG, clave });
+  // Solo en este equipo: ya no se puede abrir a la red con PREVIEW_HOST (auditoría de seguridad, 18 nov 2026).
+  servidor.listen(puerto, HOST_ESCUCHA, () => console.log(`PostgREST falso en http://${HOST_ESCUCHA}:${puerto} (base ${dir})`));
 }

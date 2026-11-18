@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
-import { describirPrueba, diasDesde, enlaceManual, estadoTarea, estadoVariables, horasEsperadas, MIGRACIONES_CLAVE, pruebasParaSql, ultimaPor, VARIABLES_ENTORNO } from "./estado-sistema";
+import { describirPrueba, diasDesde, enlaceManual, estadoSecretosPropios, estadoTarea, estadoVariables, horasEsperadas, MIGRACIONES_CLAVE, pruebasParaSql, ultimaPor, VARIABLES_ENTORNO } from "./estado-sistema";
 
 const ahora = new Date("2026-10-26T12:00:00Z");
 
@@ -64,4 +64,16 @@ test("cada sección que enlaza la página existe en la guía y en el manual borr
   for (const t of Object.values(SECCION_MANUAL)) assert.ok(guia.secciones.some((s) => s.titulo === t), t);
   const manual = MANUALES_BORRADOR.find((m) => m.titulo.startsWith("Operación"))!;
   for (const t of Object.values(SECCION_MANUAL)) assert.ok(manual.contenido.includes(`## ${t}`), t);
+});
+
+test("secretos propios: pendientes sin la variable o corta, nunca el valor (auditoría de seguridad, 18 nov 2026)", () => {
+  const largo = "s".repeat(64);
+  const r = estadoSecretosPropios({ USO_EXTERNO_LLAVE_SECRETO: largo, ICOMFLY_TOKEN_KEY: "cortita", SUPABASE_SERVICE_ROLE_KEY: "servicio-secreto" });
+  assert.equal(r.find((s) => s.nombre === "USO_EXTERNO_LLAVE_SECRETO")!.estado, "propio");
+  assert.equal(r.find((s) => s.nombre === "ICOMFLY_TOKEN_KEY")!.estado, "corto");
+  assert.match(r.find((s) => s.nombre === "ICOMFLY_TOKEN_KEY")!.detalle, /no se usa/);
+  assert.equal(r.find((s) => s.nombre === "CLIENTES_LLAVE_SECRETO")!.estado, "falta");
+  assert.match(estadoSecretosPropios({ CLIENTES_LLAVE_SECRETO: "corta" }).find((s) => s.nombre === "CLIENTES_LLAVE_SECRETO")!.detalle, /se usa igual/);
+  const texto = JSON.stringify(r);
+  for (const v of [largo, "cortita", "servicio-secreto"]) assert.ok(!texto.includes(v));
 });

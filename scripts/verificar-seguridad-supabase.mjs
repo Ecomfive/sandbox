@@ -52,6 +52,19 @@ async function filasLegibles(token, etiqueta) {
 console.log("2) Sin iniciar sesión (solo la clave pública)");
 await filasLegibles(anon, "una persona sin sesión");
 
+console.log("2b) Funciones de la base con la clave pública (migración 0319)");
+{
+  // Solo lee: fin_estado_migraciones revisa qué migraciones están corridas y no cambia nada.
+  const r = await fetch(`${url}/rest/v1/rpc/fin_estado_migraciones`, {
+    method: "POST",
+    headers: { apikey: anon, Authorization: `Bearer ${anon}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ p_pruebas: [] }),
+  });
+  if (r.status === 401 || r.status === 403) bien("la clave pública no puede ejecutar funciones de la base");
+  else if (r.status === 404) bien("la función de prueba no existe (nada que ejecutar)");
+  else falla(`la clave pública todavía ejecuta funciones de la base (respondió ${r.status}): corre la migración 0319`);
+}
+
 console.log("3) Con una cuenta de prueba");
 if (process.env.PRUEBA_EMAIL && process.env.PRUEBA_PASSWORD) {
   const r = await fetch(`${url}/auth/v1/token?grant_type=password`, {

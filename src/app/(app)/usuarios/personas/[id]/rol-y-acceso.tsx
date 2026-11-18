@@ -58,13 +58,13 @@ export function RolYAcceso({
     formData.set("rol_id", nuevo);
     setError(null);
     empezar(async () => {
-      try {
-        await cambiarRolUsuario(formData);
-        mostrarToast("Rol cambiado");
-        router.refresh();
-      } catch (e) {
-        mostrarToast(e instanceof Error ? e.message : "No se pudo cambiar el rol.", "destructive");
+      const r = await cambiarRolUsuario(formData).catch(() => ({ error: "No se pudo cambiar el rol." }));
+      if (r.error) {
+        mostrarToast(r.error, "destructive");
+        return;
       }
+      mostrarToast("Rol cambiado");
+      router.refresh();
     });
   }
 

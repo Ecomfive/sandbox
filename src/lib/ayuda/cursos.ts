@@ -37,7 +37,7 @@ export const CURSOS: Curso[] = [
         titulo: "Moverte por el sistema",
         parrafos: [
           "La barra negra de la izquierda tiene las áreas (Desempeño, Marketing, Operación, Finanzas…). Al pulsar una, el panel de al lado muestra sus páginas, repartidas en tres frentes: Proveeduría, Gestión de tienda y Fulfillment.",
-          "Arriba tienes el buscador (Ctrl K o /): escribe el nombre de una página, un retiro, un producto o un dropshipper y ve directo. A la derecha está el país en que trabajas: Inventario, Retiros y Pedidos muestran los datos de ese país.",
+          "El buscador se abre con Ctrl K o / desde cualquier página: escribe el nombre de una página, un retiro, un producto o un dropshipper y ve directo. A la derecha está el país en que trabajas: Inventario, Retiros y Pedidos muestran los datos de ese país.",
           "Con la estrella de las migas de pan guardas una página en Favoritos.",
         ],
       },

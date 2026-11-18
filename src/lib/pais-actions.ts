@@ -5,6 +5,7 @@ import { refresh } from "next/cache";
 import { PAIS_COOKIE, PAISES_NAV } from "@/lib/nav-data";
 import { getUsuarioActual, getUsuarioIdSesion } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/server";
+import { UN_ANO_SEGUNDOS, opcionesCookiePreferencia } from "@/lib/seguridad/opciones-cookie";
 
 export async function setPaisActual(codigo: string) {
   // Solo países que existen y ya están abiertos (los «Pronto» no).
@@ -14,7 +15,8 @@ export async function setPaisActual(codigo: string) {
   if (permitidos !== null && !permitidos.includes(codigo)) return;
 
   const cookieStore = await cookies();
-  cookieStore.set(PAIS_COOKIE, codigo, { path: "/", maxAge: 60 * 60 * 24 * 365 });
+  // httpOnly, secure en producción y SameSite=Lax (auditoría de seguridad, 18 nov 2026): solo la lee el servidor.
+  cookieStore.set(PAIS_COOKIE, codigo, opcionesCookiePreferencia(UN_ANO_SEGUNDOS));
 
   // Además se recuerda en la cuenta de la persona, para que otro navegador u otro equipo arranque en el mismo
   // país. Es un extra: si falla (o la migración 0038 aún no se corrió), la cookie ya bastó.

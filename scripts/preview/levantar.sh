@@ -25,7 +25,7 @@ parar() {
   command -v fuser >/dev/null && { fuser -k -n tcp "$PORT" >/dev/null 2>&1 || true; fuser -k -n tcp "$SUPA_PORT" >/dev/null 2>&1 || true; }
   rm -f "$PREVIEW_DIR"/*.pid
   for _ in $(seq 1 20); do
-    curl -s -o /dev/null "http://127.0.0.1:$PORT" || curl -s -o /dev/null "http://localhost:$SUPA_PORT" || break
+    curl -s -o /dev/null "http://127.0.0.1:$PORT" || curl -s -o /dev/null "http://127.0.0.1:$SUPA_PORT" || break
     sleep 0.5
   done
 }
@@ -42,13 +42,33 @@ if [ -z "${PGLITE_DIR:-}" ] && [ ! -d node_modules/@electric-sql/pglite ] && [ !
   npm i --silent --prefix "$HOME/.cache/preview-pglite" @electric-sql/pglite@0.5.10
 fi
 
-cat > "$PREVIEW_DIR/.env.preview" <<EOF
-NEXT_PUBLIC_SUPABASE_URL=http://localhost:$SUPA_PORT
-NEXT_PUBLIC_SUPABASE_ANON_KEY=preview
-SUPABASE_SERVICE_ROLE_KEY=preview
+# Clave de la corrida para el PostgREST falso (auditoría de seguridad, 18 nov 2026; ver scripts/preview/acceso.mts):
+# la reciben el falso (PREVIEW_CLAVE), la app y los importadores (las claves de Supabase) por este mismo .env.preview.
+# La app compilada la lleva dentro (NEXT_PUBLIC_* se fija al compilar), así que solo se genera una nueva cuando Next se
+# vuelve a compilar; con --sin-build (o --sin-next) se reusa la de la última vez y, si no hay, se compila de nuevo.
+CLAVE_ARCHIVO="$PREVIEW_DIR/clave"
+REUSAR_CLAVE=0
+if [ -s "$CLAVE_ARCHIVO" ]; then
+  if [[ " $* " == *" --sin-next "* ]]; then REUSAR_CLAVE=1; fi
+  if [[ " $* " == *" --sin-build "* ]] && [ "${PREVIEW_MODO:-start}" != dev ] && [ -f .next/BUILD_ID ]; then REUSAR_CLAVE=1; fi
+fi
+if [ "$REUSAR_CLAVE" = 1 ]; then
+  CLAVE="$(cat "$CLAVE_ARCHIVO")"
+else
+  CLAVE="$(node -e 'process.stdout.write(require("crypto").randomBytes(32).toString("hex"))')"
+  (umask 077; printf '%s' "$CLAVE" > "$CLAVE_ARCHIVO")
+fi
+
+# El falso escucha solo en 127.0.0.1.
+(umask 077; cat > "$PREVIEW_DIR/.env.preview" <<EOF
+NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:$SUPA_PORT
+NEXT_PUBLIC_SUPABASE_ANON_KEY=$CLAVE
+SUPABASE_SERVICE_ROLE_KEY=$CLAVE
+PREVIEW_CLAVE=$CLAVE
 NEXT_FONT_GOOGLE_MOCKED_RESPONSES=$RAIZ/scripts/preview/fuentes-mock.cjs
 NEXT_TELEMETRY_DISABLED=1
 EOF
+)
 set -a; . "$PREVIEW_DIR/.env.preview"; set +a
 
 if [[ " $* " == *" --rehacer "* ]] || [ ! -f "$DB/.listo" ]; then
@@ -60,7 +80,7 @@ fi
 echo "== PostgREST falso en :$SUPA_PORT"
 PREVIEW_LOG="$PREVIEW_DIR/postgrest.log" nohup npx tsx scripts/preview/postgrest.mts "$DB" "$SUPA_PORT" >"$PREVIEW_DIR/postgrest.out" 2>&1 &
 echo $! > "$PREVIEW_DIR/postgrest.pid"
-esperar "http://localhost:$SUPA_PORT/rest/v1/paises?select=id&limit=1" 60
+esperar "http://127.0.0.1:$SUPA_PORT/rest/v1/paises?select=id&limit=1" 60
 
 if [ "${REHACER_DATOS:-0}" = 1 ]; then
   echo "== Datos de $DATOS_PRIVADOS"
@@ -75,7 +95,8 @@ if [ "${PREVIEW_MODO:-start}" = dev ]; then
   echo "== next dev en :$PORT"
   nohup npx next dev --webpack -p "$PORT" -H 127.0.0.1 >"$PREVIEW_DIR/next.out" 2>&1 &
 else
-  if [[ " $* " != *" --sin-build "* ]] || [ ! -f .next/BUILD_ID ]; then
+  # Con una clave nueva hay que compilar: la de antes va dentro de la compilación anterior.
+  if [ "$REUSAR_CLAVE" = 0 ] || [ ! -f .next/BUILD_ID ]; then
     echo "== next build (unos minutos)"
     npx next build --webpack >"$PREVIEW_DIR/build.out" 2>&1 || { echo "falló el build: ver $PREVIEW_DIR/build.out" >&2; exit 1; }
   fi

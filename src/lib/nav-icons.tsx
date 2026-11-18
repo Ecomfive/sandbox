@@ -1332,6 +1332,7 @@ export const ICONOS_PAGINA: Record<string, (props: SVGProps<SVGSVGElement>) => R
   "/tienda-dashboard": GestionTiendasIcon,
   "/tienda-pedidos": PedidoIcon,
   "/tienda-reporteria": ListaIcon,
+  "/anuncios-meta": AnunciosIcon,
   "/despacho-ciudad": EnvioIcon,
   "/inventario-pedidos-despacho": EnvioIcon,
   "/tienda-tiendas": TiendaIcon,
@@ -1423,6 +1424,16 @@ export function ListaIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <Icon {...props}>
       <path d="M4 6h16M4 12h16M4 18h10" />
+    </Icon>
+  );
+}
+
+/** Un megáfono: los anuncios de Meta. */
+export function AnunciosIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M3 10v4a1 1 0 0 0 1 1h3l9 5V4L7 9H4a1 1 0 0 0-1 1z" />
+      <path d="M19 9a4 4 0 0 1 0 6" />
     </Icon>
   );
 }
