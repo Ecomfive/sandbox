@@ -44,8 +44,49 @@ export function costoPromedioDeCompras(compras: CompraParaCosto[], paisId: strin
   return todos === null ? null : { costo: todos, fuente: "promedio_todos" };
 }
 
-/** El costo por unidad de esos productos para un pedido del país `paisId` (por su id de `skus_maestros`). Los que no tienen ninguno no salen. */
+/**
+ * El costo de un producto compuesto (combo): la suma del costo de cada componente por su cantidad (18 nov 2026). Si a algún componente le falta el costo,
+ * null (un costo a medias haría ver un margen falso). La fuente es «del país» solo si todos lo son. Sin base: con prueba.
+ */
+export function costoDeCombo(componentes: { skuId: string; cantidad: number }[], costos: Map<string, CostoProducto>): CostoProducto | null {
+  if (!componentes.length) return null;
+  let costo = 0;
+  let todosDelPais = true;
+  for (const c of componentes) {
+    const k = costos.get(c.skuId);
+    if (!k) return null;
+    costo += k.costo * c.cantidad;
+    if (k.fuente !== "promedio_pais") todosDelPais = false;
+  }
+  return { costo: Math.round(costo * 10000) / 10000, fuente: todosDelPais ? "promedio_pais" : "promedio_todos" };
+}
+
+/**
+ * El costo por unidad de esos productos para un pedido del país `paisId` (por su id de `skus_maestros`). Un compuesto (combo) cuesta lo que sus componentes
+ * (18 nov 2026: antes quedaba sin costo, porque los combos no se compran). Los que no tienen ninguno no salen.
+ */
 export async function costosDeProductos(supabase: SupabaseClient, skuIds: string[], paisId: string): Promise<Map<string, CostoProducto>> {
+  const ids = [...new Set(skuIds.filter(Boolean))];
+  if (!ids.length) return new Map();
+  const componentesDe = new Map<string, { skuId: string; cantidad: number }[]>();
+  for (let i = 0; i < ids.length; i += 200) {
+    const { data } = await supabase.from("sku_maestro_componentes").select("combo_id, componente_id, cantidad").in("combo_id", ids.slice(i, i + 200));
+    for (const c of (data ?? []) as { combo_id: string; componente_id: string; cantidad: number }[])
+      componentesDe.set(c.combo_id, [...(componentesDe.get(c.combo_id) ?? []), { skuId: c.componente_id, cantidad: Number(c.cantidad) || 1 }]);
+  }
+  const simples = [...new Set([...ids.filter((id) => !componentesDe.has(id)), ...[...componentesDe.values()].flat().map((c) => c.skuId)])];
+  const deSimples = await costosDeSimples(supabase, simples, paisId);
+  const mapa = new Map<string, CostoProducto>();
+  for (const id of ids) {
+    const comps = componentesDe.get(id);
+    const costo = comps ? costoDeCombo(comps, deSimples) : deSimples.get(id);
+    if (costo) mapa.set(id, costo);
+  }
+  return mapa;
+}
+
+/** El costo promedio de compra de productos simples (o con variantes), por su id. */
+async function costosDeSimples(supabase: SupabaseClient, skuIds: string[], paisId: string): Promise<Map<string, CostoProducto>> {
   const ids = [...new Set(skuIds.filter(Boolean))];
   const mapa = new Map<string, CostoProducto>();
   if (!ids.length) return mapa;

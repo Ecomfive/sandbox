@@ -124,7 +124,7 @@ export interface Vendido {
  * Lo vendido por producto nuestro, cruzando las líneas de los pedidos con la vinculación de cada variante (`vinculos`: variante de Shopify → producto,
  * o `no_fisico` para lo que no sale de bodega, que no se cuenta). Lo que no tiene vínculo va junto, con `skuId` null. De más a menos ingreso.
  */
-export function productosVendidos(lineas: LineaVendida[], vinculos: Map<number, string | "no_fisico">): Vendido[] {
+export function productosVendidos(lineas: LineaVendida[], vinculos: Map<number, string | "no_fisico">, unidadesPorVenta?: Map<number, number>): Vendido[] {
   const grupos = new Map<string, { skuId: string | null; unidades: number; pedidos: Set<string>; ingreso: number }>();
   let total = 0;
   for (const l of lineas) {
@@ -133,7 +133,8 @@ export function productosVendidos(lineas: LineaVendida[], vinculos: Map<number, 
     if (v === "no_fisico") continue;
     const clave = v ?? "";
     const g = grupos.get(clave) ?? { skuId: v ?? null, unidades: 0, pedidos: new Set<string>(), ingreso: 0 };
-    g.unidades += l.cantidad;
+    // Un paquete del mismo producto (18 nov 2026): cada venta de un «Lleva 3» son 3 unidades del producto.
+    g.unidades += l.cantidad * (v && l.shopifyVarianteId !== null ? (unidadesPorVenta?.get(l.shopifyVarianteId) ?? 1) : 1);
     g.pedidos.add(l.pedidoId);
     g.ingreso += l.cantidad * l.precio;
     total += l.cantidad * l.precio;
