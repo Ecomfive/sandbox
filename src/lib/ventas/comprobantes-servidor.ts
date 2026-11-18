@@ -30,6 +30,11 @@ export async function guardarComprobante(ordenId: string, ruta: string, tipo: st
   if (!rutaEsDeOrden(ruta, ordenId)) return { error: "El archivo no es de esta orden: vuelve a subirlo." };
   if (!tipoValido(tipo)) return { error: "Tipo de comprobante inválido." };
   const supabase = createServiceClient();
+  // Una foto ya guardada no se vuelve a registrar: antes el segundo intento fallaba y, al «limpiar», borraba la foto del primero
+  // (una prueba de entrega o de cobro desaparecía y el registro seguía diciendo que estaba).
+  const { data: yaEsta, error: errorYa } = await supabase.from("ven_orden_comprobantes").select("id").eq("ruta", ruta).maybeSingle();
+  if (errorYa) return { error: sinTabla(errorYa.message) };
+  if (yaEsta) return { error: "Esa foto ya está guardada." };
   const descartar = () => supabase.storage.from(BUCKET_COMPROBANTES).remove([ruta]);
   const { data: archivo, error } = await supabase.storage.from(BUCKET_COMPROBANTES).download(ruta);
   if (error || !archivo) return { error: "No se encontró el archivo: vuelve a subirlo." };
@@ -38,7 +43,11 @@ export async function guardarComprobante(ordenId: string, ruta: string, tipo: st
   if (!tipoArchivo || tipoArchivo.tipo === "image/gif") { await descartar(); return { error: "El comprobante debe ser una foto JPG, PNG o WebP." }; }
   const limpia = typeof nota === "string" && nota.trim() ? nota.trim().slice(0, 200) : null;
   const { error: ei } = await supabase.from("ven_orden_comprobantes").insert({ orden_id: ordenId, tipo, ruta, nota: limpia, subido_por: quien });
-  if (ei) { await descartar(); return { error: sinTabla(ei.message) }; }
+  // Si otra petición la registró al mismo tiempo (ruta repetida), la foto es de ese registro: no se borra.
+  if (ei) {
+    if ((ei as { code?: string }).code !== "23505") await descartar();
+    return { error: sinTabla(ei.message) };
+  }
   await supabase.from("ven_orden_eventos").insert({ orden_id: ordenId, tipo: "nota", detalle: `Comprobante de ${ETIQUETA_COMPROBANTE[tipo].toLowerCase()} subido${limpia ? `: ${limpia}` : ""}`, usuario: quien });
   await registrarAuditoria({ accion: "comprobante_orden_venta", entidad: "ven_ordenes", entidadId: ordenId, detalle: `Comprobante de ${tipo} (${quien})` });
   return { ok: true };

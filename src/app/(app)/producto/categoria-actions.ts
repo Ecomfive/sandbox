@@ -1,5 +1,6 @@
 "use server";
 
+import { rutaEnCarpeta } from "@/lib/seguridad/ruta-almacen";
 import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireAlgunModulo, requireModuloEscritura } from "@/lib/auth";
@@ -106,8 +107,7 @@ export async function sugerirCategoria(nombre: string, foto: string | null): Pro
   const supabase = createServiceClient();
 
   let huella: string | null = null;
-  const prefijoNuevos = `${PREFIJO_FOTOS}productos/nuevos/`;
-  if (typeof foto === "string" && foto.startsWith(prefijoNuevos) && !foto.includes("..") && !foto.includes("?")) {
+  if (typeof foto === "string" && foto.startsWith(PREFIJO_FOTOS) && rutaEnCarpeta(foto.slice(PREFIJO_FOTOS.length), "productos/nuevos/")) {
     const { data: archivo } = await supabase.storage.from(BUCKET_FOTOS).download(foto.slice(PREFIJO_FOTOS.length));
     if (archivo) huella = await huellaFoto(new Uint8Array(await archivo.arrayBuffer())).catch(() => null);
   }

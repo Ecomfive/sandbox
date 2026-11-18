@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { accionesDelMensajero, cambioDeMensajero, hashToken, nuevoToken, tokenPlausible } from "./mensajero";
+import { accionesDelMensajero, cambioDeMensajero, DIAS_ENLACE, enlaceVencido, hashToken, nuevoToken, tokenPlausible } from "./mensajero";
 import { MOTIVOS_FALLO } from "./operacion";
 
 test("el código es largo, único y solo se guarda su hash", () => {
@@ -32,4 +32,12 @@ test("el fallo solo acepta motivos de la lista", () => {
   assert.equal(cambioDeMensajero("fallida", { motivoCodigo: ok }).motivoCodigo, ok);
   assert.equal(cambioDeMensajero("fallida", { motivoCodigo: "inventado" }).motivoCodigo, null);
   assert.equal(cambioDeMensajero("fallida", { reprogramadaPara: "no es fecha" }).reprogramadaPara, null);
+});
+
+test("el enlace del mensajero vence a los DIAS_ENLACE días", () => {
+  const ahora = Date.parse("2026-11-18T12:00:00Z");
+  assert.equal(enlaceVencido("2026-11-10T12:00:00Z", ahora), false);
+  assert.equal(enlaceVencido(new Date(ahora - DIAS_ENLACE * 86_400_000 - 1000).toISOString(), ahora), true);
+  assert.equal(enlaceVencido(null, ahora), true);
+  assert.equal(enlaceVencido("no es fecha", ahora), true);
 });

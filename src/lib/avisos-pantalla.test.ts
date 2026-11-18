@@ -16,6 +16,7 @@ test("el botón de la tarjeta nunca lleva fuera del sistema", () => {
   assert.equal(rutaInterna("/compras/lista?abrir=1"), "/compras/lista?abrir=1");
   assert.equal(rutaInterna("https://otro.sitio/x"), "/notificaciones");
   assert.equal(rutaInterna("//otro.sitio/x"), "/notificaciones");
+  assert.equal(rutaInterna("/\\otro.sitio/x"), "/notificaciones");
   assert.equal(rutaInterna("javascript:alert(1)"), "/notificaciones");
 });
 

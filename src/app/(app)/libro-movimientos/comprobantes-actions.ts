@@ -10,7 +10,7 @@ import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { BUCKET_COMPROBANTES, registrarArchivo } from "@/lib/finanzas/comprobantes-servidor";
-import { nombreArchivoSeguro } from "@/lib/seguridad/ruta-almacen";
+import { nombreArchivoSeguro, rutaEnCarpeta } from "@/lib/seguridad/ruta-almacen";
 import { createServiceClient } from "@/lib/supabase/server";
 
 const MODULO = "libro-movimientos";
@@ -123,7 +123,7 @@ export async function eliminarComprobante(id: string): Promise<{ error?: string 
     if (!c) return { error: "El comprobante ya no existe." };
     const { error } = await supabase.from("fin_movimiento_adjuntos").delete().eq("id", id);
     if (error) return { error: error.message };
-    if (String(c.ruta).startsWith("movimientos/") && !String(c.ruta).includes("..")) await supabase.storage.from(BUCKET_COMPROBANTES).remove([c.ruta as string]);
+    if (rutaEnCarpeta(c.ruta, "movimientos/")) await supabase.storage.from(BUCKET_COMPROBANTES).remove([c.ruta as string]);
     await registrarAuditoria({ accion: "quitar_comprobante", entidad: "fin_movimientos", entidadId: c.movimiento_id as string, detalle: `Comprobante «${c.nombre}»` });
     revalidatePath("/libro-movimientos");
     return {};

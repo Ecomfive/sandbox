@@ -14,6 +14,18 @@ export function rutaPropia(url: string | null | undefined, prefijoPublico: strin
 }
 
 /**
+ * Si una ruta del almacenamiento que manda el navegador (o que viene de un dato guardado) se queda dentro de su carpeta. La librería de
+ * Supabase pone la ruta tal cual dentro de la dirección del pedido, y al armar esa dirección los puntos codificados y la barra invertida
+ * cuentan como «subir un nivel»: con la clave de servicio, una ruta así podría salir del bucket. Por eso no alcanza con revisar que empiece
+ * con la carpeta y no tenga «..»: también se rechaza lo codificado que pueda ser punto o barra, «?», «#» y los tramos vacíos.
+ */
+export function rutaEnCarpeta(ruta: unknown, carpeta: string, max = 300): ruta is string {
+  if (typeof ruta !== "string" || ruta.length > max || !ruta.startsWith(carpeta) || ruta.length === carpeta.length) return false;
+  if (/[\\?#\u0000-\u001f]/.test(ruta) || /%(2e|2f|5c)/i.test(ruta) || ruta.includes("//") || ruta.startsWith("/")) return false;
+  return ruta.split("/").every((tramo) => tramo !== "." && tramo !== "..");
+}
+
+/**
  * El nombre de un archivo subido, listo para ir dentro de una ruta del almacenamiento: sin acentos, sin «/», «\» ni «..», y
  * solo letras, números, «.», «_» y «-» (el nombre lo manda el navegador).
  */

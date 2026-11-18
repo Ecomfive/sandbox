@@ -75,12 +75,28 @@ export async function guardarEstados(estados: EstadoEntrante[]): Promise<void> {
  * Aplica las ediciones: el mensaje original se queda con el texto nuevo y se guarda el primero que tuvo (`texto_antes`) y cuándo se editó (`editado_en`, migración 0191). Nada se pierde: una
  * segunda edición no pisa el `texto_antes`. Sin la migración no se cambia nada (el texto de antes se perdería); un original que el sistema no tiene se ignora.
  */
+/**
+ * El mensaje original al que apunta un aviso de edición o de borrado, solo si es del mismo chat (el teléfono del contacto que manda el aviso) y
+ * de la misma dirección (lo suyo si lo manda el contacto, lo del equipo si es un eco). Así un aviso no cambia ni oculta mensajes de otro chat
+ * ni de otra persona (auditoría de seguridad, 18 nov 2026).
+ */
+async function originalDelAutor(supabase: ReturnType<typeof createServiceClient>, aviso: { waIdOriginal: string; telefono: string; direccion: "entrante" | "saliente" }) {
+  const { data, error } = await supabase
+    .from("whatsapp_mensajes")
+    .select("id, texto, texto_antes, direccion, eliminado_en_whatsapp_en, whatsapp_conversaciones!inner(telefono)")
+    .eq("wa_id", aviso.waIdOriginal)
+    .eq("direccion", aviso.direccion)
+    .eq("whatsapp_conversaciones.telefono", aviso.telefono)
+    .maybeSingle();
+  return { data: data as { id: string; texto: string | null; texto_antes: string | null; eliminado_en_whatsapp_en: string | null } | null, error };
+}
+
 export async function guardarEditados(editados: EditadoEntrante[]): Promise<void> {
   if (!editados.length) return;
   const supabase = createServiceClient();
   // En el orden en que se hicieron: dos ediciones seguidas dejan la última.
   for (const e of [...editados].sort((a, b) => (a.momento < b.momento ? -1 : 1))) {
-    const { data, error } = await supabase.from("whatsapp_mensajes").select("id, texto, texto_antes").eq("wa_id", e.waIdOriginal).maybeSingle();
+    const { data, error } = await originalDelAutor(supabase, e);
     if (error) {
       console.error("WhatsApp: no se pudo leer un mensaje editado (¿falta la migración 0191?)", e.waIdOriginal, error.message);
       continue;
@@ -88,8 +104,8 @@ export async function guardarEditados(editados: EditadoEntrante[]): Promise<void
     if (!data || data.texto === e.texto) continue;
     const { error: falla } = await supabase
       .from("whatsapp_mensajes")
-      .update({ texto: e.texto, texto_antes: (data.texto_antes as string | null) ?? (data.texto as string | null), editado_en: e.momento })
-      .eq("id", data.id as string);
+      .update({ texto: e.texto, texto_antes: data.texto_antes ?? data.texto, editado_en: e.momento })
+      .eq("id", data.id);
     if (falla) console.error("WhatsApp: no se pudo guardar la edición de un mensaje", e.waIdOriginal, falla.message);
   }
   await avisarBandeja();
@@ -103,7 +119,10 @@ export async function guardarRevocados(revocados: RevocadoEntrante[]): Promise<v
   if (!revocados.length) return;
   const supabase = createServiceClient();
   for (const r of revocados) {
-    const { error } = await supabase.from("whatsapp_mensajes").update({ eliminado_en_whatsapp_en: r.momento }).eq("wa_id", r.waIdOriginal).is("eliminado_en_whatsapp_en", null);
+    const { data, error: errorLeer } = await originalDelAutor(supabase, r);
+    if (errorLeer) console.error("WhatsApp: no se pudo leer un mensaje eliminado en WhatsApp", r.waIdOriginal, errorLeer.message);
+    if (!data || data.eliminado_en_whatsapp_en) continue;
+    const { error } = await supabase.from("whatsapp_mensajes").update({ eliminado_en_whatsapp_en: r.momento }).eq("id", data.id).is("eliminado_en_whatsapp_en", null);
     if (error) console.error("WhatsApp: no se pudo marcar un mensaje eliminado en WhatsApp", r.waIdOriginal, error.message);
   }
   await avisarBandeja();

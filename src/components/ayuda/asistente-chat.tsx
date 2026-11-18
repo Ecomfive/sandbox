@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { anilloFoco, fieldClass } from "@/components/ui/field";
 import { Ventana } from "@/components/ui/ventana";
 import { InteligenciaIcon } from "@/lib/nav-icons";
+import { rutaInterna } from "@/lib/avisos-pantalla";
 
 // «Pregúntale al sistema» (14 nov 2026, pedido de Hernán): el chat con el asistente del sistema (`/api/asistente`). La conversación vive aquí, en el
 // navegador (no se guarda); la respuesta llega a medida que se escribe. El asistente solo consulta, con los permisos de quien pregunta.
@@ -17,7 +18,8 @@ interface Mensaje {
 
 const EJEMPLOS = ["¿Cómo hago una remisión a una bodega externa?", "¿Cuánto stock hay del Aceite Corporal Magic?", "¿En qué va el pedido 1257?", "¿Qué significa B81?"];
 
-/** Negrita y enlaces de una línea. Un enlace solo se vuelve enlace si va a una pantalla del sistema («/…»): nada de afuera. */
+/** Negrita y enlaces de una línea. Un enlace solo se vuelve enlace si va a una pantalla del sistema («/…»): nada de afuera. «//sitio» o
+ * «/\sitio» también empiezan con «/» pero el navegador los lleva a otro sitio, así que quedan como texto (mismo criterio que los avisos). */
 function enLinea(t: string): ReactNode[] {
   const partes: ReactNode[] = [];
   const re = /\[([^\]]+)\]\((\/[^)\s]*)\)|\*\*([^*]+)\*\*/g;
@@ -25,7 +27,8 @@ function enLinea(t: string): ReactNode[] {
   let m: RegExpExecArray | null;
   while ((m = re.exec(t))) {
     if (m.index > ultimo) partes.push(t.slice(ultimo, m.index));
-    if (m[1])
+    if (m[1] && rutaInterna(m[2]) !== m[2]) partes.push(m[1]);
+    else if (m[1])
       partes.push(
         <Link key={m.index} href={m[2]} className="font-medium text-primario underline-offset-2 hover:underline">
           {m[1]}

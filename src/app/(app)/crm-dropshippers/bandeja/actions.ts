@@ -7,7 +7,7 @@ import { accesoCrm, supervisaArea, pierdeLoBorrado, type AccesoCrm, type AreaCrm
 import { conPredeterminadaPrimero, esNumeroDeLaEmpresa, esPlantillaPredeterminada, sugeridoParaVariable } from "@/lib/whatsapp/interno";
 import { getPaisActual } from "@/lib/pais";
 import { esAdministrador } from "@/lib/permisos/acceso";
-import { nombreArchivoSeguro } from "@/lib/seguridad/ruta-almacen";
+import { nombreArchivoSeguro, rutaEnCarpeta } from "@/lib/seguridad/ruta-almacen";
 import { createServiceClient } from "@/lib/supabase/server";
 import { enviarPlantillaWhatsapp, enviarTextoWhatsapp } from "@/lib/whatsapp/api";
 import { enlacesPeligrosos } from "@/lib/whatsapp/enlaces";
@@ -226,7 +226,7 @@ export async function enviarArchivoPorWhatsapp(id: string, ruta: string, nombre:
   const e = await chatParaEnviar(id, "archivos");
   if ("error" in e) return e;
   const { supabase } = e;
-  if (typeof ruta !== "string" || !ruta.startsWith(`${id}/enviados/`) || ruta.includes("..")) return { error: "Archivo no válido." };
+  if (!rutaEnCarpeta(ruta, `${id}/enviados/`)) return { error: "Archivo no válido." };
   const quitar = () => supabase.storage.from(BUCKET_ARCHIVOS).remove([ruta]);
 
   const { data: archivo, error: errorBajada } = await supabase.storage.from(BUCKET_ARCHIVOS).download(ruta);

@@ -2,6 +2,7 @@
 // de WhatsApp (Meta o 360dialog), que lo guarda unos 30 días. Lo usan la ruta que lo sirve a la pantalla (`/api/whatsapp/media/[id]`) y la transcripción de audios.
 // Solo servidor. No revisa permisos: quien lo llama comprueba antes que la persona pueda ver ese chat.
 
+import { rutaEnCarpeta } from "@/lib/seguridad/ruta-almacen";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { detectarImagen } from "@/lib/seguridad/imagen";
 import { config360, urlDescarga360, urlMedia360 } from "./proveedor";
@@ -20,7 +21,7 @@ export async function archivoDeMensaje(supabase: SupabaseClient, m: MensajeConAr
   // Un archivo de un chat importado del celular (bandeja › «Importar chat», migración 0169) o mandado desde aquí: vive en el bucket, en la carpeta del chat.
   if (mediaId.startsWith("storage:")) {
     const ruta = mediaId.slice(8);
-    if (!ruta.startsWith(`${m.conversacion_id}/`) || ruta.includes("..")) return { estado: 404, mensaje: "Not Found" };
+    if (!rutaEnCarpeta(ruta, `${m.conversacion_id}/`)) return { estado: 404, mensaje: "Not Found" };
     const { data: archivo } = await supabase.storage.from("whatsapp-importados").download(ruta);
     if (!archivo || archivo.size > maxBytes) return { estado: 410, mensaje: "Archivo no disponible." };
     const bytes = new Uint8Array(await archivo.arrayBuffer());
