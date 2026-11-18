@@ -13,13 +13,16 @@ import type { ActividadVista, AnalisisVideoVista, AnuncioVista, CampanaVista, Gr
 
 export const SIN_MIGRACION_META = "Falta correr la migración 0320 (Anuncios Meta) en Supabase.";
 
-export type Periodo = "hoy" | "7" | "30";
+export type Periodo = "hoy" | "7" | "30" | "90" | "180" | "365";
 export const PERIODOS: { valor: Periodo; etiqueta: string; dias: number }[] = [
   { valor: "hoy", etiqueta: "Hoy", dias: 1 },
   { valor: "7", etiqueta: "7 días", dias: 7 },
   { valor: "30", etiqueta: "30 días", dias: 30 },
+  { valor: "90", etiqueta: "3 meses", dias: 90 },
+  { valor: "180", etiqueta: "6 meses", dias: 180 },
+  { valor: "365", etiqueta: "1 año", dias: 365 },
 ];
-export const periodoValido = (v: unknown): Periodo => (v === "hoy" || v === "30" ? v : "7");
+export const periodoValido = (v: unknown): Periodo => (v === "hoy" || v === "30" || v === "90" || v === "180" || v === "365" ? v : "7");
 
 export interface CuentaVista {
   id: string;
@@ -132,7 +135,8 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
   const decisiones: DecisionGuardada[] = (decisionesF ?? []).map((d) => ({ clave: d.clave as string, estado: d.estado as DecisionGuardada["estado"], vigenteHasta: d.vigente_hasta as string }));
   if (!ids.length) return { ...base, cuentas, cuentaId, desde, hasta: o.hoy, topes };
 
-  const desdeDatos = restar(o.hoy, Math.max(dias * 2, 30) - 1);
+  // El periodo anterior (para comparar) solo se carga hasta 3 meses; con 6 meses o 1 año se muestra solo el periodo.
+  const desdeDatos = restar(o.hoy, (dias > 90 ? dias : Math.max(dias * 2, 30)) - 1);
   const [camp, anun, dia, act, hechos] = await Promise.all([
     traerTodasLasFilas<Record<string, unknown>>((a, b) => supabase.from("meta_campanas").select("id, cuenta_id, meta_id, nombre, estado, estructura, puja, presupuesto_diario, creada_meta_en, producto, angulo, etapa, manual, creada_por, mercado, videos, persona_nombre").in("cuenta_id", ids).range(a, b)),
     traerTodasLasFilas<Record<string, unknown>>((a, b) => supabase.from("meta_anuncios").select("id, campana_id, nombre, estado, video_id, miniatura, copy, titulo, landing").in("cuenta_id", ids).range(a, b)),
@@ -154,6 +158,7 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
   const porAnuncio = new Map<string, Resultados>();
   const serie = new Map<string, { fecha: string; r: Resultados }[]>();
   const porVideo30 = new Map<string, Resultados>();
+  const porVideoPeriodo = new Map<string, Resultados>();
   const porAnuncio30 = new Map<string, Resultados>();
   let totales = sinResultados();
   let anteriores = sinResultados();
@@ -165,6 +170,8 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
     if (f.fecha >= desde) {
       porCampana.set(f.campana_id, sumar(porCampana.get(f.campana_id) ?? sinResultados(), r));
       porAnuncio.set(f.anuncio_id, sumar(porAnuncio.get(f.anuncio_id) ?? sinResultados(), r));
+      const vp = anuncioDe.get(f.anuncio_id)?.video_id as string | undefined;
+      if (vp) porVideoPeriodo.set(vp, sumar(porVideoPeriodo.get(vp) ?? sinResultados(), r));
       totales = sumar(totales, r);
     } else if (f.fecha >= anteriorDesde) anteriores = sumar(anteriores, r);
     if (f.fecha >= desde7) porCampana7.set(f.campana_id, sumar(porCampana7.get(f.campana_id) ?? sinResultados(), r));
@@ -238,17 +245,22 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
     if (!g.miniatura && a.miniatura) g.miniatura = a.miniatura as string;
     // El número del video («V3») sale del nombre del anuncio: así se sabe cuál de la tanda es.
     g.numero ??= numeroDeVideo(`${a.nombre as string} ${(a.titulo as string | null) ?? ""}`);
-    g.detalle.push({ id: a.id as string, nombre: a.nombre as string, activo: a.estado === "ACTIVE", campanaId: a.campana_id as string, campanaNombre: c?.nombre ?? "", etapa: c?.etapa ?? null, r: porAnuncio30.get(a.id as string) ?? sinResultados() });
+    g.detalle.push({ id: a.id as string, nombre: a.nombre as string, activo: a.estado === "ACTIVE", campanaId: a.campana_id as string, campanaNombre: c?.nombre ?? "", etapa: c?.etapa ?? null, r: sinResultados() });
     videosMapa.set(v, g);
   }
   const masFrecuente = (m: Map<string, number>) => [...m].sort((x, y) => y[1] - x[1])[0]?.[0] ?? null;
-  const videos: VideoVista[] = [...videosMapa]
-    .map(([id, g]) => {
-      const producto = masFrecuente(g.productos);
-      return { id, nombre: g.nombre, miniatura: g.miniatura, producto, angulo: analisisDe.get(id)?.angulo ?? masFrecuente(g.angulos), analisis: analisisDe.get(id) ?? null, campanas: g.campanas.size, anuncios: g.anuncios, numero: g.numero, anunciosDetalle: g.detalle.sort((x, y) => y.r.gasto - x.r.gasto), r: porVideo30.get(id) ?? sinResultados(), tope: topePorClave.get(claveDeProducto(producto)) ?? CPA_TOPE_PREDETERMINADO };
-    })
-    .filter((v) => v.r.gasto > 0)
-    .sort((a, b) => b.r.gasto - a.r.gasto);
+  // La lista de Videos sigue el periodo elegido; las sugerencias y el aviso de «faltan por analizar» usan siempre los últimos 30 días.
+  const armarVideos = (porVideo: Map<string, Resultados>, porAnuncioMapa: Map<string, Resultados>): VideoVista[] =>
+    [...videosMapa]
+      .map(([id, g]) => {
+        const producto = masFrecuente(g.productos);
+        const detalle = g.detalle.map((d) => ({ ...d, r: porAnuncioMapa.get(d.id) ?? sinResultados() })).sort((x, y) => y.r.gasto - x.r.gasto);
+        return { id, nombre: g.nombre, miniatura: g.miniatura, producto, angulo: analisisDe.get(id)?.angulo ?? masFrecuente(g.angulos), analisis: analisisDe.get(id) ?? null, campanas: g.campanas.size, anuncios: g.anuncios, numero: g.numero, anunciosDetalle: detalle, r: porVideo.get(id) ?? sinResultados(), tope: topePorClave.get(claveDeProducto(producto)) ?? CPA_TOPE_PREDETERMINADO };
+      })
+      .filter((v) => v.r.gasto > 0)
+      .sort((a, b) => b.r.gasto - a.r.gasto);
+  const videos = armarVideos(porVideoPeriodo, porAnuncio);
+  const videos30 = armarVideos(porVideo30, porAnuncio30);
 
   // Qué funciona: cada dimensión con las campañas (o anuncios) del periodo con gasto.
   const conGasto = campanas.filter((c) => c.r.gasto > 0);
@@ -275,7 +287,7 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
 
   // Sugerencias: siempre con los últimos 7 días de las campañas y 30 de los videos, sin importar el periodo que se mira.
   const campanas7 = camp.map((c) => armar(c, porCampana7.get(c.id as string) ?? sinResultados()));
-  const todas = sugerir({ campanas: campanas7, serie, videos, hoy: o.hoy });
+  const todas = sugerir({ campanas: campanas7, serie, videos: videos30, hoy: o.hoy });
   const sugerencias = pendientes(todas, decisiones, o.hoy);
 
   // Campañas montadas por día (14 días) y por persona.
@@ -323,7 +335,7 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
   const productos = [...new Set(camp.map((c) => (c.producto as string | null)?.trim()).filter((p): p is string => !!p))].sort((a, b) => a.localeCompare(b, "es"));
   return {
     ...base, cuentas, cuentaId, desde, hasta: o.hoy, campanas: campanasConActividad, videos, anuncios, totales, anteriores, topes, productos, sugerencias, decididas: todas.length - sugerencias.length, grupos,
-    creadasPorDia, creadasHoy: creadasPorDia[13]?.testing + creadasPorDia[13]?.escala + creadasPorDia[13]?.retargeting + creadasPorDia[13]?.otras || 0, equipo, actividadDisponible: eventos.length > 0, videosSinAnalizar: videos.filter((v) => !v.analisis || v.analisis.estado !== "analizado" || v.analisis.version < VERSION_ANALISIS).length, videosSinAngulo, iaConectada: false,
+    creadasPorDia, creadasHoy: creadasPorDia[13]?.testing + creadasPorDia[13]?.escala + creadasPorDia[13]?.retargeting + creadasPorDia[13]?.otras || 0, equipo, actividadDisponible: eventos.length > 0, videosSinAnalizar: videos30.filter((v) => !v.analisis || v.analisis.estado !== "analizado" || v.analisis.version < VERSION_ANALISIS).length, videosSinAngulo, iaConectada: false,
   };
 }
 

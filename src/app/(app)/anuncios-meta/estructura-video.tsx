@@ -83,7 +83,7 @@ export function EstructuraYLlamado({ v }: { v: VideoVista }) {
         )}
       </dl>
       <div className="flex flex-col gap-2">
-        <p className="m-0 text-xs font-medium text-muted-foreground">Qué tanto funcionó (30 días)</p>
+        <p className="m-0 text-xs font-medium text-muted-foreground">Qué tanto funcionó en el periodo</p>
         <div className="grid grid-cols-[repeat(auto-fill,minmax(9.5rem,1fr))] gap-2">
           <Cifra titulo="Llegan al llamado" valor={porcentaje(llega, 0)} apoyo={llega === null ? (q ? "Falta el segundo del llamado" : "Meta aún no da la retención") : "de los que vieron 3 s (estimado)"} />
           <Cifra titulo="CTR del enlace" valor={porcentaje(ctr(v.r), 2)} nivel={nivelDeCtr(ctr(v.r))} apoyo="clics ÷ impresiones" />

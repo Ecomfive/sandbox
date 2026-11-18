@@ -19,10 +19,10 @@ export default async function VideosMetaPage({ searchParams }: { searchParams: P
   return (
     <MarcoMeta titulo="Videos" datos={datos} escribe={escribe} hayToken={hayToken} pais={pais}>
       {datos.videos.length === 0 ? (
-        <p className="m-0 rounded-xl border border-border bg-card px-4 py-6 text-sm text-muted-foreground">Todavía no hay videos con gasto en los últimos 30 días.</p>
+        <p className="m-0 rounded-xl border border-border bg-card px-4 py-6 text-sm text-muted-foreground">Todavía no hay videos con gasto en este periodo.</p>
       ) : (
         <>
-          <p className="-mb-2 text-xs text-muted-foreground">Últimos 30 días. Un video repetido en varios anuncios cuenta una sola vez. Ordénalos, fíltralos o agrúpalos por campaña, ángulo o producto.</p>
+          <p className="-mb-2 text-xs text-muted-foreground">Del periodo elegido arriba. Un video repetido en varios anuncios cuenta una sola vez. Ordénalos, fíltralos o agrúpalos por campaña, ángulo o producto.</p>
           <ListaVideos videos={datos.videos} escribe={escribe} iaConectada={datos.iaConectada} sinAnalizar={datos.videosSinAnalizar} abrirInicial={abrir ?? null} />
         </>
       )}

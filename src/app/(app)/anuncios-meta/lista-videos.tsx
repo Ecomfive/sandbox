@@ -3,12 +3,14 @@
 /* eslint-disable @next/next/no-img-element -- miniaturas de los videos, directo de Meta */
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useSyncExternalStore, useTransition } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { ListaDatos } from "@/components/tabla/lista-datos";
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import type { NombreFilas } from "@/lib/tabla/pie";
 import { useToast } from "@/components/ui/toast";
+import { BarraAvance } from "@/components/ui/barra-avance";
 import { fieldClassSm, labelClassSm } from "@/components/ui/field";
+import { ProgresoEstimado } from "@/components/ui/progreso-estimado";
 import { formatearFechaHora } from "@/lib/formato";
 import { Ventana } from "@/components/ui/ventana";
 import { Seccion } from "@/components/ui/seccion-ficha";
@@ -16,7 +18,7 @@ import { AnunciosIcon, ChevronRightIcon, EstadoIcon, EtiquetaIcon, FiltroIcon, M
 import { confiable, cpa, ctr, dolares, holdRate, hookRate, nivelDeCpa, nivelDeCtr, nivelDeHook } from "@/lib/meta-ads/metricas";
 import { CRITERIOS_VIDEO, ordenarVideos, sentidoNatural, type CriterioVideo, type Sentido } from "@/lib/meta-ads/orden-videos";
 import type { VideoVista } from "@/lib/meta-ads/vistas";
-import { analizarPendientesMeta, analizarVideoAhoraMeta, corregirAnguloVideoMeta } from "./actions";
+import { analizarSiguienteMeta, analizarVideoAhoraMeta, corregirAnguloVideoMeta } from "./actions";
 import { anguloDeVideo, DEF_VIDEOS } from "./def-videos";
 import { EstructuraYLlamado } from "./estructura-video";
 import { AVISO_POCA_DATA, Cifra, entero, InsigniaEtapa, MetricasEnLinea, Nivel, porcentaje, Resultado, valorCpa } from "./piezas";
@@ -118,13 +120,12 @@ function OrdenDeVideos({ criterio, sentido, alCambiar }: { criterio: CriterioVid
 }
 
 /**
- * Los videos con gasto en los últimos 30 días, cada uno una sola vez, con la barra común (buscar, filtrar y agrupar por ángulo, producto, campaña, etapa…) y un orden a elegir (gasto, CPA, hook…, ascendente o
+ * Los videos con gasto en el periodo elegido, cada uno una sola vez, con la barra común (buscar, filtrar y agrupar por ángulo, producto, campaña, etapa…) y un orden a elegir (gasto, CPA, hook…, ascendente o
  * descendente). Tocar uno abre su ficha: en qué anuncios y campañas se usa y cómo le fue en cada una; queda en la dirección (`?abrir=<id>`).
  */
 export function ListaVideos({ videos, escribe, iaConectada, sinAnalizar, abrirInicial }: { videos: VideoVista[]; escribe: boolean; iaConectada: boolean; sinAnalizar: number; abrirInicial: string | null }) {
   const router = useRouter();
   const { mostrarToast } = useToast();
-  const [trabajando, empezar] = useTransition();
   const [abierto, setAbierto] = useState<string | null>(() => (abrirInicial && videos.some((x) => x.id === abrirInicial) ? abrirInicial : null));
   const [criterio, setCriterio] = useState<CriterioVideo>("mejor");
   const [sentido, setSentido] = useState<Sentido>("asc");
@@ -144,16 +145,47 @@ export function ListaVideos({ videos, escribe, iaConectada, sinAnalizar, abrirIn
   const v = enNavegador ? videos.find((x) => x.id === abierto) : undefined;
   const hayPocaData = videos.some((x) => !confiable(x.r));
   const mini = urlSegura(v?.miniatura ?? null);
-  const analizarPendientes = () =>
-    empezar(async () => {
-      const r = await analizarPendientesMeta();
-      if (r.error) mostrarToast(r.error, "destructive");
-      else {
-        const hechos = (r.analizados ?? 0) + (r.sinArchivo ?? 0);
-        mostrarToast(`${hechos} ${hechos === 1 ? "video analizado" : "videos analizados"}${r.sinArchivo ? ` (${r.sinArchivo} solo con el texto porque Meta no dio el archivo)` : ""}${r.errores ? `, ${r.errores} con error: ${r.mensajes?.[0] ?? ""}` : ""}${r.faltan ? `. Faltan ${r.faltan}: pulsa otra vez.` : "."}`, r.errores ? "destructive" : "success");
-        router.refresh();
+  // «Analizar los pendientes»: de a un video por llamada, para mostrar el avance real y poder detenerlo. Lo ya analizado queda guardado.
+  const [avance, setAvance] = useState<{ hecho: number; total: number; texto: string; terminado: boolean } | null>(null);
+  const parar = useRef(false);
+  const [deteniendo, setDeteniendo] = useState(false);
+  const analizando = !!avance && !avance.terminado;
+  const analizarPendientes = async () => {
+    parar.current = false;
+    setDeteniendo(false);
+    const cuenta = { completo: 0, provisional: 0, error: 0 };
+    let total = 0;
+    let hecho = 0;
+    let ultimoError = "";
+    const vistos = new Set<string>();
+    setAvance({ hecho: 0, total: Math.max(1, sinAnalizar), texto: "Buscando el siguiente video…", terminado: false });
+    while (!parar.current) {
+      const r = await analizarSiguienteMeta();
+      if (r.error) {
+        mostrarToast(r.error, "destructive");
+        break;
       }
-    });
+      if (r.ninguno || !r.videoId || vistos.has(r.videoId)) break;
+      vistos.add(r.videoId);
+      if (total === 0) total = Math.max(sinAnalizar, r.faltan ?? 1);
+      hecho++;
+      if (r.estado === "analizado") cuenta.completo++;
+      else if (r.estado === "sin_archivo") cuenta.provisional++;
+      else {
+        cuenta.error++;
+        ultimoError = r.mensaje ?? "";
+      }
+      const faltan = Math.max(0, (r.faltan ?? 1) - 1);
+      total = Math.max(total, hecho + faltan);
+      setAvance({ hecho, total, texto: faltan > 0 ? "Viendo el siguiente video con la IA…" : "Terminando…", terminado: false });
+      if (faltan === 0) break;
+    }
+    setAvance(hecho > 0 ? { hecho, total: Math.max(total, hecho), texto: "", terminado: true } : null);
+    if (hecho > 0) {
+      mostrarToast(`${hecho} ${hecho === 1 ? "video" : "videos"}: ${cuenta.completo} con el video completo${cuenta.provisional ? `, ${cuenta.provisional} solo con el texto (Meta no dio el archivo)` : ""}${cuenta.error ? `, ${cuenta.error} con error: ${ultimoError}` : ""}${parar.current ? ". Detenido: lo hecho queda guardado." : "."}`, cuenta.error ? "destructive" : "success");
+      router.refresh();
+    } else if (!parar.current) mostrarToast("No hay videos pendientes.");
+  };
   return (
     <>
       {escribe && (
@@ -163,11 +195,26 @@ export function ListaVideos({ videos, escribe, iaConectada, sinAnalizar, abrirIn
             {!iaConectada ? "Falta conectar Gemini (GEMINI_API_KEY) para que la IA vea los videos." : sinAnalizar === 0 ? "La IA ya vio todos los videos con gasto." : `${sinAnalizar} ${sinAnalizar === 1 ? "video falta" : "videos faltan"} por analizar con IA (de más a menos gasto).`}
           </p>
           {iaConectada && sinAnalizar > 0 && (
-            <button type="button" onClick={analizarPendientes} disabled={trabajando} className="min-h-9 rounded-md bg-foreground px-3 py-1.5 text-xs font-medium text-background hover:opacity-90 disabled:opacity-50">
-              {trabajando ? "Viendo los videos… puede tardar unos minutos" : "Analizar los pendientes"}
+            <button type="button" onClick={analizarPendientes} disabled={analizando} className="min-h-9 rounded-md bg-foreground px-3 py-1.5 text-xs font-medium text-background hover:opacity-90 disabled:opacity-50">
+              {analizando ? "Analizando…" : "Analizar los pendientes"}
             </button>
           )}
         </div>
+      )}
+      {avance && (
+        <BarraAvance
+          hecho={avance.hecho}
+          total={avance.total}
+          texto={avance.texto}
+          unidad="videos"
+          etiqueta="Avance del análisis de videos"
+          terminado={avance.terminado}
+          deteniendo={deteniendo}
+          alDetener={() => {
+            parar.current = true;
+            setDeteniendo(true);
+          }}
+        />
       )}
       <OrdenDeVideos
         criterio={criterio}
@@ -186,7 +233,7 @@ export function ListaVideos({ videos, escribe, iaConectada, sinAnalizar, abrirIn
         variante="filas"
         encabezado={<EncabezadoFilas />}
         renderFila={(x) => <FilaVideo x={x} alAbrir={() => setAbierto(x.id)} />}
-        vacio="Todavía no hay videos con gasto en los últimos 30 días."
+        vacio="Todavía no hay videos con gasto en este periodo."
       />
       {hayPocaData && <p className="m-0 text-xs text-muted-foreground">{AVISO_POCA_DATA}</p>}
 
@@ -206,7 +253,7 @@ export function ListaVideos({ videos, escribe, iaConectada, sinAnalizar, abrirIn
       >
         {v && (
           <div className="flex flex-col divide-y divide-border px-5 py-5">
-            <Seccion icono={MargenIcon} titulo="Cómo le fue (30 días)">
+            <Seccion icono={MargenIcon} titulo="Cómo le fue en el periodo">
               <div className="flex gap-3">
                 {mini ? <img src={mini} alt="" className="h-28 w-28 shrink-0 rounded-md bg-muted object-cover" /> : null}
                 <p className="m-0 text-sm text-muted-foreground">
@@ -276,9 +323,12 @@ function AnalisisIA({ v, escribe, iaConectada }: { v: VideoVista; escribe: boole
   const [trabajando, empezar] = useTransition();
   const a = v.analisis;
   const [angulo, setAngulo] = useState(a?.angulo ?? "");
+  const [viendo, setViendo] = useState(false);
   const analizar = () =>
     empezar(async () => {
+      setViendo(true);
       const r = await analizarVideoAhoraMeta(v.id);
+      setViendo(false);
       if (r.error) mostrarToast(r.error, "destructive");
       else {
         mostrarToast(r.mensaje ?? "Listo.");
@@ -324,6 +374,7 @@ function AnalisisIA({ v, escribe, iaConectada }: { v: VideoVista; escribe: boole
       ) : (
         <p className="m-0 text-sm text-muted-foreground">{a?.estado === "error" ? `El último intento falló: ${a.error ?? "sin detalle"}.` : "La IA todavía no vio este video."}</p>
       )}
+      {viendo && <ProgresoEstimado compacta etiqueta="Analizando el video con la IA" estimadoMs={60_000} pasos={["Bajando el video de Meta", "La IA está viendo y escuchando el video", "Guardando el análisis"]} />}
       {escribe && (
         <>
           <div className="flex flex-wrap items-end gap-2">
