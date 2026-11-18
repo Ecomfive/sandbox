@@ -8,6 +8,7 @@ import { canalDe, esCanal, ETIQUETA_CANAL } from "@/lib/finanzas/canales";
 import { esBaseReparto, etiquetaBase, leerBaseReparto } from "@/lib/finanzas/reparto";
 import { createServiceClient } from "@/lib/supabase/server";
 import { leerCorreos, leerTelefonos } from "@/lib/finanzas/informe-envio";
+import { sinAccesoTodaLaEmpresa } from "@/lib/finanzas/acceso-tienda";
 
 const estado = (v: boolean) => (v ? "Encendido" : "Apagado");
 
@@ -15,6 +16,8 @@ const estado = (v: boolean) => (v ? "Encendido" : "Apagado");
 export async function cambiarAjusteFinanzas(clave: string, activo: boolean): Promise<{ error?: string }> {
   try {
     const usuario = await requireModuloEscritura("estado-resultados");
+    const accesoEmpresa = await sinAccesoTodaLaEmpresa();
+    if (accesoEmpresa) return { error: accesoEmpresa };
     if (!esClaveAjuste(clave) || typeof activo !== "boolean") return { error: "Ajuste inválido." };
     const supabase = createServiceClient();
     const { data: antes, error: errorLeer } = await supabase.from("fin_config").select("valor").eq("clave", clave).maybeSingle();
@@ -51,6 +54,8 @@ const RUTAS_EERR = ["/estado-resultados", "/estado-resultados/ajustes", "/panel-
 export async function cambiarBaseReparto(base: string): Promise<{ error?: string }> {
   try {
     const usuario = await requireModuloEscritura("estado-resultados");
+    const accesoEmpresa = await sinAccesoTodaLaEmpresa();
+    if (accesoEmpresa) return { error: accesoEmpresa };
     if (!esBaseReparto(base)) return { error: "Base inválida." };
     const supabase = createServiceClient();
     const previa = await supabase.from("fin_config").select("valor").eq("clave", "base_reparto").maybeSingle();
@@ -80,6 +85,8 @@ export async function cambiarBaseReparto(base: string): Promise<{ error?: string
 export async function cambiarCanalUnidad(unidadId: string, canal: string): Promise<{ error?: string }> {
   try {
     await requireModuloEscritura("estado-resultados");
+    const accesoEmpresa = await sinAccesoTodaLaEmpresa();
+    if (accesoEmpresa) return { error: accesoEmpresa };
     if (typeof unidadId !== "string" || !UUID.test(unidadId)) return { error: "Tienda inválida." };
     const nuevo = canal === "" ? null : canal;
     if (nuevo !== null && !esCanal(nuevo)) return { error: "Canal inválido." };
@@ -110,6 +117,8 @@ export async function cambiarCanalUnidad(unidadId: string, canal: string): Promi
 export async function cambiarFulfillmentUnidad(unidadId: string, cliente: boolean, tarifaCruda: unknown): Promise<{ error?: string }> {
   try {
     await requireModuloEscritura("estado-resultados");
+    const accesoEmpresa = await sinAccesoTodaLaEmpresa();
+    if (accesoEmpresa) return { error: accesoEmpresa };
     if (typeof unidadId !== "string" || !UUID.test(unidadId)) return { error: "Tienda inválida." };
     if (typeof cliente !== "boolean") return { error: "Dato inválido." };
     const texto = tarifaCruda === null || tarifaCruda === undefined ? "" : String(tarifaCruda).trim().replace(",", ".");
@@ -144,6 +153,8 @@ export async function cambiarFulfillmentUnidad(unidadId: string, cliente: boolea
 export async function cambiarTipoIntercompania(tipoId: string, valor: boolean): Promise<{ error?: string }> {
   try {
     await requireModuloEscritura("estado-resultados");
+    const accesoEmpresa = await sinAccesoTodaLaEmpresa();
+    if (accesoEmpresa) return { error: accesoEmpresa };
     if (typeof tipoId !== "string" || !UUID.test(tipoId) || typeof valor !== "boolean") return { error: "Tipo inválido." };
     const supabase = createServiceClient();
     const previa = await supabase.from("fin_tipos").select("nombre, intercompania").eq("id", tipoId).maybeSingle();
@@ -176,6 +187,8 @@ export async function cambiarTipoIntercompania(tipoId: string, valor: boolean): 
 export async function guardarDestinatarios(correosCrudos: unknown, telefonosCrudos: unknown): Promise<{ error?: string; correos?: number; telefonos?: number }> {
   try {
     const usuario = await requireModuloEscritura("estado-resultados");
+    const accesoEmpresa = await sinAccesoTodaLaEmpresa();
+    if (accesoEmpresa) return { error: accesoEmpresa };
     const correos = leerCorreos(correosCrudos);
     const telefonos = leerTelefonos(telefonosCrudos);
     const ahora = new Date().toISOString();

@@ -22,6 +22,7 @@ import {
 } from "@/lib/finanzas/inventario-decisiones";
 import { PAIS_FINANZAS } from "@/lib/finanzas/cargar-inventario";
 import { paisDeOperacionActual } from "@/lib/finanzas/pais-servidor";
+import { sinAccesoTodaLaEmpresa } from "@/lib/finanzas/acceso-tienda";
 
 const MODULO = "rentabilidad";
 /** Un conteo mueve el stock del WMS: hace falta poder modificar Inventario. */
@@ -34,6 +35,8 @@ const fallo = (e: unknown, porDefecto: string) => ({ error: e instanceof Error ?
 export async function guardarTasaMantener(porcentaje: unknown): Promise<{ error?: string }> {
   try {
     const usuario = await requireModuloEscritura(MODULO);
+    const accesoEmpresa = await sinAccesoTodaLaEmpresa();
+    if (accesoEmpresa) return { error: accesoEmpresa };
     const n = typeof porcentaje === "number" ? porcentaje : typeof porcentaje === "string" ? Number(porcentaje.replace(",", ".")) : NaN;
     if (!Number.isFinite(n) || n < 0 || n > 100) return { error: "La tasa va de 0 a 100 %." };
     const valor = Math.round(n * 100) / 10_000;
@@ -74,6 +77,8 @@ export interface ResultadoConteo {
 export async function importarConteo(archivo: unknown, filas: unknown[]): Promise<{ error: string } | ResultadoConteo> {
   try {
     const usuario = await requireModuloEscritura(MODULO_INVENTARIO);
+    const accesoEmpresa = await sinAccesoTodaLaEmpresa();
+    if (accesoEmpresa) return { error: accesoEmpresa };
     if (!Array.isArray(filas) || !filas.length || filas.length > MAX_FILAS) return { error: "Lote inválido." };
     const nombreArchivo = typeof archivo === "string" ? archivo.replace(/[^\w .\-()]/g, "").slice(0, 120) || "conteo.xlsx" : "conteo.xlsx";
     const supabase = createServiceClient();
@@ -198,6 +203,8 @@ export async function importarConteo(archivo: unknown, filas: unknown[]): Promis
 export async function guardarAjusteInventario(clave: unknown, valor: unknown): Promise<{ error?: string }> {
   try {
     const usuario = await requireModuloEscritura(MODULO);
+    const accesoEmpresa = await sinAccesoTodaLaEmpresa();
+    if (accesoEmpresa) return { error: accesoEmpresa };
     if (!esAjusteEditable(clave)) return { error: "Ajuste inválido." };
     const v = validarAjuste(clave, valor);
     if ("error" in v) return v;
@@ -254,6 +261,8 @@ const UNIDAD_MERMA = "A DISTRIBUIR";
 export async function llevarMermaAlLibro(mes: unknown, modo: unknown): Promise<{ error?: string; monto?: number }> {
   try {
     await requireModuloEscritura(MODULO);
+    const accesoEmpresa = await sinAccesoTodaLaEmpresa();
+    if (accesoEmpresa) return { error: accesoEmpresa };
     const usuario = await requireModuloEscritura("libro-movimientos");
     if (typeof mes !== "string" || !/^\d{4}-\d{2}-01$/.test(mes)) return { error: "Mes inválido." };
     if (!esModoMerma(modo)) return { error: "Modo inválido." };

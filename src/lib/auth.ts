@@ -6,6 +6,7 @@ import { aAccesoPlano, nivelesEfectivos, type PermisoPropio } from "@/lib/permis
 import { accionPermitida, contarAjustes, pestanaVisible, resolverAfinado, type Afinado, type FilaAfinada } from "@/lib/permisos/afinado";
 import { MODULOS_AFINABLES, catalogoDe } from "@/lib/permisos/catalogo";
 import { paginaInicialDe, primeraPestanaPermitida } from "@/lib/nav-data";
+import { leerTiendasPermitidas, modulosSegunTiendas } from "@/lib/finanzas/tiendas-permitidas";
 import { RUTA_PORTAL_PROVEEDOR, cuentaDeProveedor } from "@/lib/proveedor/cuenta";
 
 /** Cookie de "Ver así": el id del rol que Usuarios y roles está probando, o nada. Vive solo en el
@@ -38,6 +39,8 @@ export interface UsuarioActual {
    * Los países que puede ver (códigos, y «importacion» para Compras Importadora); `null` = todos. Limita Compras, el
    * histórico de compras de Producto e Inventario y el país de la barra (ver `src/lib/paises-permitidos.ts`).
    */
+  /** Las tiendas (`fin_unidades`) que puede ver; `null` = todas (migración 0937). Ver `src/lib/finanzas/tiendas-permitidas.ts`. */
+  tiendasPermitidas: string[] | null;
   paisesPermitidos: string[] | null;
 }
 
@@ -124,7 +127,7 @@ export const getUsuarioActual = cache(async (): Promise<UsuarioActual | null> =>
   // `paises_permitidos` (migración 0087) va en la misma consulta; sin la migración se pide como antes y la persona ve todos
   // los países, que es lo que veía.
   const columnas = "id, email, nombre, avatar_url, activo, rol_id, primer_ingreso_en, roles(id, nombre, permisos_rol(modulo, solo_lectura))";
-  let completo = await supabase.from("perfiles").select(`${columnas}, paises_permitidos`).eq("id", userId).maybeSingle();
+  let completo = await supabase.from("perfiles").select(`${columnas}, paises_permitidos, tiendas_permitidas`).eq("id", userId).maybeSingle();
   // Solo se vuelve a pedir sin `paises_permitidos` si la columna no existe; con cualquier otro error no se sigue (no se abre a todos los países).
   if (completo.error && !esFaltaDeMigracion(completo.error)) throw new Error("No se pudo leer el perfil de la persona.");
   if (completo.error) completo = (await supabase.from("perfiles").select(columnas).eq("id", userId).maybeSingle()) as typeof completo;
@@ -200,6 +203,13 @@ export const getUsuarioActual = cache(async (): Promise<UsuarioActual | null> =>
     }
   }
 
+  // Con tiendas limitadas (gente de una tienda cliente), los módulos de toda la empresa no se tienen: no solo salen del menú,
+  // el servidor tampoco los da, así que sus acciones y páginas los rechazan (auditoría de seguridad, 18 nov 2026). La lista de
+  // tiendas es la de la persona real, también en «Ver así».
+  const tiendasPermitidas = leerTiendasPermitidas((perfil as { tiendas_permitidas?: unknown }).tiendas_permitidas);
+  modulos = modulosSegunTiendas(modulos, tiendasPermitidas);
+  modulosSoloLectura = modulosSegunTiendas(modulosSoloLectura, tiendasPermitidas);
+
   return {
     id: perfil.id,
     email: perfil.email,
@@ -213,6 +223,7 @@ export const getUsuarioActual = cache(async (): Promise<UsuarioActual | null> =>
     modulosSoloLectura,
     afinado,
     paisesPermitidos: listaPaises((perfil as { paises_permitidos?: unknown }).paises_permitidos),
+    tiendasPermitidas,
   };
 });
 

@@ -19,6 +19,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { MovimientoExcel } from "@/lib/finanzas/libro-excel";
 import type { FilaComparable } from "@/lib/finanzas/comparar-libro";
 import { traerTodasConError } from "@/lib/supabase/paginar";
+import { sinAccesoTodaLaEmpresa } from "@/lib/finanzas/acceso-tienda";
 
 const MODULO = "libro-movimientos";
 const CLAVE = /^[0-9a-f]{24}#\d{1,5}$/;
@@ -45,6 +46,8 @@ export async function resumirImportacion(
 ): Promise<{ error: string } | { nuevos: number; actualizan: number; borran: number; origen: string }> {
   try {
     await requireModuloEscritura(MODULO);
+    const accesoEmpresa = await sinAccesoTodaLaEmpresa();
+    if (accesoEmpresa) return { error: accesoEmpresa };
     if (!Array.isArray(huellas) || huellas.length > MAX_HUELLAS) return { error: "El archivo trae demasiadas filas." };
     const origen = origenDeArchivo(String(archivo ?? ""));
     const enBase = await huellasDeOrigen(createServiceClient(), origen);
@@ -68,6 +71,8 @@ export async function importarLote(
 ): Promise<{ error: string } | (ResultadoLote & { rechazados: number })> {
   try {
     await requireModuloEscritura(MODULO);
+    const accesoEmpresa = await sinAccesoTodaLaEmpresa();
+    if (accesoEmpresa) return { error: accesoEmpresa };
     if (!Array.isArray(filas) || filas.length === 0 || filas.length > TAMANO_LOTE) return { error: "Lote inválido." };
     const supabase = createServiceClient();
     const entidad = await entidadDelLibro(supabase, codigoEntidad);
@@ -98,6 +103,8 @@ export async function terminarImportacion(
 ): Promise<{ error: string } | { borrados: number; base: number; enMesCerrado: number }> {
   try {
     await requireModuloEscritura(MODULO);
+    const accesoEmpresa = await sinAccesoTodaLaEmpresa();
+    if (accesoEmpresa) return { error: accesoEmpresa };
     const supabase = createServiceClient();
     const entidad = await entidadDelLibro(supabase, codigoEntidad);
     if (entidad && "error" in entidad) return entidad;
@@ -149,6 +156,8 @@ interface FilaCargada {
 export async function leerCargadoDelArchivo(archivo: string): Promise<{ error: string } | { filas: FilaComparable[] }> {
   try {
     await requireModuloEscritura(MODULO);
+    const accesoEmpresa = await sinAccesoTodaLaEmpresa();
+    if (accesoEmpresa) return { error: accesoEmpresa };
     const supabase = createServiceClient();
     const origen = origenDeArchivo(String(archivo ?? ""));
     const r = await traerTodasConError<FilaCargada>((d, h) =>

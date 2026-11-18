@@ -52,10 +52,12 @@ export function textoTiendasPermitidas(permitidas: string[] | null, nombres: Rec
 export const veTodaLaEmpresa = (permitidas: string[] | null) => permitidas === null;
 
 /**
- * Los módulos que son de toda la empresa y no se pueden partir por tienda: con tiendas limitadas no salen en el menú y
- * sus páginas no muestran datos (`SoloTodaLaEmpresa`).
+ * Los módulos que son de toda la empresa y no se pueden partir por tienda: con tiendas limitadas la persona no los tiene
+ * (ni en el menú ni en el servidor) y sus páginas no muestran datos (`SoloTodaLaEmpresa`).
  */
-export const MODULOS_TODA_LA_EMPRESA = ["balance-general", "tesoreria", "cierre-mes"] as const;
+// Nómina, flujo y proyección de caja y utilidades no se parten por tienda (auditoría de seguridad, 18 nov 2026): con límite
+// tampoco se dan. Desde ese día el servidor los quita en `getUsuarioActual`, no solo el menú.
+export const MODULOS_TODA_LA_EMPRESA = ["balance-general", "tesoreria", "cierre-mes", "nomina", "flujo-caja", "proyeccion-caja", "utilidades"] as const;
 
 /** Los módulos del menú según las tiendas permitidas (sin límite, todos). */
 export function modulosSegunTiendas(modulos: string[], permitidas: string[] | null): string[] {

@@ -10,6 +10,7 @@ import { origenDeArchivo } from "@/lib/finanzas/guardar-libro";
 import { traerTodasConError } from "@/lib/supabase/paginar";
 import { createServiceClient } from "@/lib/supabase/server";
 import { MAX_CLAVES_COMPARAR, TABLAS_COMPARAR, esModuloComparable } from "./comparar";
+import { sinAccesoTodaLaEmpresa } from "@/lib/finanzas/acceso-tienda";
 const MAX_FILAS = 20_000;
 
 const hojasValidas = (v: unknown): string[] =>
@@ -25,6 +26,8 @@ export async function leerCargadoParaComparar(
   try {
     if (!esModuloComparable(modulo)) return { error: "Ese importador no se puede comparar." };
     await requireModuloEscritura(modulo);
+    const accesoEmpresa = await sinAccesoTodaLaEmpresa();
+    if (accesoEmpresa) return { error: accesoEmpresa };
     const supabase = createServiceClient();
     const origen = origenDeArchivo(String(archivo ?? ""));
     const hojas = hojasValidas(opciones?.hojas);

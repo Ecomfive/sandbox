@@ -10,6 +10,7 @@ import { ETIQUETA_GASTO, validarGasto, validarPresupuesto } from "@/lib/finanzas
 import { puedeVerPais } from "@/lib/paises-permitidos";
 import { esUuid } from "@/lib/seguridad/ruta-almacen";
 import { createServiceClient } from "@/lib/supabase/server";
+import { sinAccesoTodaLaEmpresa } from "@/lib/finanzas/acceso-tienda";
 
 const MODULO = "rentabilidad";
 const fallo = (e: unknown, porDefecto: string) => ({ error: e instanceof Error ? e.message : porDefecto });
@@ -36,6 +37,8 @@ async function compraDePanama(paisesPermitidos: string[] | null, compraId: unkno
 export async function agregarGastoImportacion(compraId: unknown, datos: unknown): Promise<{ error?: string }> {
   try {
     const usuario = await requireModuloEscritura(MODULO);
+    const accesoEmpresa = await sinAccesoTodaLaEmpresa();
+    if (accesoEmpresa) return { error: accesoEmpresa };
     const compra = await compraDePanama(usuario.paisesPermitidos, compraId);
     if ("error" in compra) return compra;
     const g = validarGasto(datos);
@@ -69,6 +72,8 @@ async function leerGasto(id: unknown) {
 export async function cambiarGastoPagado(id: unknown, pagado: unknown): Promise<{ error?: string }> {
   try {
     const usuario = await requireModuloEscritura(MODULO);
+    const accesoEmpresa = await sinAccesoTodaLaEmpresa();
+    if (accesoEmpresa) return { error: accesoEmpresa };
     const g = await leerGasto(id);
     if (!g) return { error: "El gasto no existe." };
     const compra = await compraDePanama(usuario.paisesPermitidos, g.compra_id);
@@ -94,6 +99,8 @@ export async function cambiarGastoPagado(id: unknown, pagado: unknown): Promise<
 export async function eliminarGastoImportacion(id: unknown): Promise<{ error?: string }> {
   try {
     const usuario = await requireModuloEscritura(MODULO);
+    const accesoEmpresa = await sinAccesoTodaLaEmpresa();
+    if (accesoEmpresa) return { error: accesoEmpresa };
     const g = await leerGasto(id);
     if (!g) return { error: "El gasto no existe." };
     const compra = await compraDePanama(usuario.paisesPermitidos, g.compra_id);
@@ -117,6 +124,8 @@ export async function eliminarGastoImportacion(id: unknown): Promise<{ error?: s
 export async function guardarPresupuestoCompras(filas: unknown): Promise<{ error?: string }> {
   try {
     const usuario = await requireModuloEscritura(MODULO);
+    const accesoEmpresa = await sinAccesoTodaLaEmpresa();
+    if (accesoEmpresa) return { error: accesoEmpresa };
     if (!Array.isArray(filas) || !filas.length || filas.length > 24) return { error: "Datos inválidos." };
     const validas: { mes: string; monto: number | null }[] = [];
     for (const f of filas) {
