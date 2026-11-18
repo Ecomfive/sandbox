@@ -6,6 +6,8 @@ import { MarcoMeta } from "../marco-meta";
 export const metadata = { title: "Videos · Anuncios Meta" };
 
 export const dynamic = "force-dynamic";
+// «Analizar los pendientes» corre aquí: baja y analiza varios videos (Gemini tarda de 20 a 90 segundos en cada uno).
+export const maxDuration = 300;
 
 /** Anuncios Meta › Videos: cada video una sola vez (aunque esté en varios anuncios), con el hook, cuántos pasan los 3 y los 15 segundos y lo que cuesta cada compra. Tocar uno muestra en qué campañas se usa. Los últimos 30 días. */
 export default async function VideosMetaPage({ searchParams }: { searchParams: ParametrosMeta }) {
@@ -18,7 +20,7 @@ export default async function VideosMetaPage({ searchParams }: { searchParams: P
       ) : (
         <>
           <p className="-mb-2 text-xs text-muted-foreground">Últimos 30 días, de mejor a peor CPA. Un video repetido en varios anuncios cuenta una sola vez.</p>
-          <ListaVideos videos={videos} />
+          <ListaVideos videos={videos} escribe={escribe} iaConectada={datos.iaConectada} sinAnalizar={datos.videosSinAnalizar} />
         </>
       )}
     </MarcoMeta>

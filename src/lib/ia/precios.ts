@@ -22,6 +22,10 @@ const PRECIOS_TEXTO: { patron: RegExp; entrada: number; salida: number }[] = [
   { patron: /haiku/i, entrada: 1, salida: 5 },
   { patron: /opus/i, entrada: 15, salida: 75 },
   { patron: /sonnet/i, entrada: 3, salida: 15 },
+  // Gemini de texto y video (el video entra como tokens de entrada, unos 260 por segundo).
+  { patron: /^gemini.*flash-lite/i, entrada: 0.1, salida: 0.4 },
+  { patron: /^gemini.*flash/i, entrada: 0.3, salida: 2.5 },
+  { patron: /^gemini.*pro/i, entrada: 1.25, salida: 10 },
 ];
 /** Un modelo que no se conoce se cobra como uno caro (más vale pasarse que avisar tarde). */
 const PRECIO_DESCONOCIDO = { entrada: 2.5, salida: 10 };

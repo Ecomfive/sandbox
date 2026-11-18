@@ -120,7 +120,7 @@ test("landings y copys se juntan sin rastreo ni espacios", () => {
 
 const campana = (o: Partial<CampanaVista>): CampanaVista => ({
   id: "c1", cuentaId: "a", cuentaNombre: "Oferfy", metaId: "1", nombre: "PA | X", estado: "ACTIVE", activa: true, etapa: "testing", estructura: "CBO", puja: "sin_tope", producto: "Corrector", angulo: "Dolor",
-  presupuestoDiario: 20, creadaEn: "2026-11-01T00:00:00Z", persona: null, personaMeta: null, mercado: null, videos: null, r: sinResultados(), tope: 3, topeDefinido: true, manual: [], ...o,
+  presupuestoDiario: 20, creadaEn: "2026-11-01T00:00:00Z", persona: null, personaMeta: null, mercado: null, anguloOrigen: null, videos: null, r: sinResultados(), tope: 3, topeDefinido: true, manual: [], ...o,
 });
 
 test("sugerencias de campañas: gasta sin comprar, CPA alto, lista para escalar", () => {
@@ -154,7 +154,7 @@ test("sugerencias: el CPA de una campaña en escala está subiendo", () => {
 });
 
 test("sugerencias de videos y de landing", () => {
-  const video = (o: Partial<VideoVista>): VideoVista => ({ id: "v", nombre: "V-014", miniatura: null, producto: "Corrector", angulo: "Dolor", campanas: 1, anuncios: 1, numero: null, anunciosDetalle: [], r: sinResultados(), tope: 3, ...o });
+  const video = (o: Partial<VideoVista>): VideoVista => ({ id: "v", nombre: "V-014", miniatura: null, producto: "Corrector", angulo: "Dolor", campanas: 1, anuncios: 1, numero: null, analisis: null, anunciosDetalle: [], r: sinResultados(), tope: 3, ...o });
   const s = sugerir({
     hoy: "2026-11-18",
     serie: new Map(),

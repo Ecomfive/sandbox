@@ -1,0 +1,105 @@
+// Anuncios Meta › ángulo de cada video (18 nov 2026, pedido de Alcides): el ángulo no va en el nombre de la campaña, así que sale de lo que dice y muestra el video. Una IA (Gemini) ve el video completo y devuelve, en un JSON,
+// el ángulo (el motivo de compra que usa), la promesa, el gancho de los primeros segundos, lo que dice y a quién le habla. Aquí está lo puro, con prueba: el pedido, la validación de lo que contesta la IA (nunca se confía en ella:
+// largos, tipos y texto limpio) y cómo se reutiliza un ángulo que ya existe para que «Dolor de espalda» y «dolor de espalda.» no sean dos ángulos.
+
+import { claveDeTexto, embellecer } from "./nombre";
+
+export interface AnalisisVideo {
+  angulo: string;
+  promesa: string;
+  gancho: string;
+  resumen: string;
+  transcripcion: string;
+  publico: string;
+  formato: string;
+}
+
+export const FORMATOS_VIDEO = ["testimonio", "demostración", "antes y después", "UGC", "animación", "oferta", "otro"] as const;
+
+export interface ContextoPedido {
+  producto: string | null;
+  copy: string | null;
+  titulo: string | null;
+  /** Los ángulos que ya existen (de otros videos), para reutilizarlos si encajan. */
+  angulosExistentes: string[];
+  /** El video no se pudo bajar: se analiza solo con el texto del anuncio (y la miniatura, si la hay). */
+  soloTexto: boolean;
+}
+
+const recorte = (t: string | null | undefined, max: number) => String(t ?? "").replace(/\s+/g, " ").trim().slice(0, max);
+
+/** El pedido a la IA: qué mirar y el JSON exacto que debe devolver. */
+export function pedidoAnalisisVideo(c: ContextoPedido): string {
+  const existentes = c.angulosExistentes.slice(0, 40);
+  return [
+    c.soloTexto ? "Eres analista de publicidad de una tienda en línea (dropshipping, Latinoamérica). No hay video: analiza el anuncio por su texto y su imagen." : "Eres analista de publicidad de una tienda en línea (dropshipping, Latinoamérica). Mira el video completo del anuncio y escucha lo que dice.",
+    "Dime el ÁNGULO: el motivo principal de compra que usa el anuncio para convencer (por ejemplo «Dolor de espalda», «Antes y después», «Oferta 2x1», «Testimonio de cliente», «Ahorro», «Regalo», «Piel más firme»). Son de 2 a 5 palabras, en español, sin signos.",
+    existentes.length ? `Si el ángulo encaja con uno de estos que ya existen, usa EXACTAMENTE ese nombre: ${existentes.map((a) => `«${a}»`).join(", ")}. Si no encaja con ninguno, propón uno nuevo.` : "",
+    c.producto ? `Producto de la campaña: ${recorte(c.producto, 80)}.` : "",
+    c.copy ? `Texto principal del anuncio: «${recorte(c.copy, 500)}».` : "",
+    c.titulo ? `Título del anuncio: «${recorte(c.titulo, 120)}».` : "",
+    "Contesta SOLO un JSON, sin texto antes ni después, con estas llaves:",
+    '{"angulo": "…", "promesa": "lo que promete el anuncio, en una frase", "gancho": "lo que se ve y se dice en los primeros 3 segundos", "resumen": "de qué trata, en 2 o 3 frases", "transcripcion": "lo que se dice, hasta 1200 caracteres; vacío si no habla nadie", "publico": "a quién le habla", "formato": "uno de: ' + FORMATOS_VIDEO.join(", ") + '"}',
+    "No inventes: si algo no se ve o no se oye, déjalo vacío.",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+/** La llave con la que se compara un ángulo: sin acentos, mayúsculas ni signos. */
+export const claveDeAngulo = (a: string): string => claveDeTexto(a);
+
+/** Si el ángulo nuevo es el mismo de uno que ya existe (aunque cambien mayúsculas, acentos o signos), devuelve el que ya existe. */
+export function reutilizarAngulo(nuevo: string, existentes: string[]): string {
+  const k = claveDeAngulo(nuevo);
+  return existentes.find((e) => claveDeAngulo(e) === k) ?? nuevo;
+}
+
+/** Lo que contestó la IA, validado: el ángulo es obligatorio; todo se recorta y se limpia. Null si no se puede usar. */
+export function normalizarAnalisisVideo(texto: string | null | undefined, existentes: string[] = []): AnalisisVideo | null {
+  if (!texto) return null;
+  const limpio = texto.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
+  const inicio = limpio.indexOf("{");
+  const fin = limpio.lastIndexOf("}");
+  if (inicio < 0 || fin <= inicio) return null;
+  let o: Record<string, unknown>;
+  try {
+    const v: unknown = JSON.parse(limpio.slice(inicio, fin + 1));
+    if (!v || typeof v !== "object" || Array.isArray(v)) return null;
+    o = v as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+  const s = (k: string, max: number) => recorte(typeof o[k] === "string" ? (o[k] as string) : "", max);
+  const bruto = s("angulo", 80).replace(/[«»"“”.,;:!?¿¡]/g, "").trim();
+  const palabras = bruto.split(/\s+/).filter(Boolean);
+  if (palabras.length === 0 || palabras.length > 8) return null;
+  const angulo = reutilizarAngulo(embellecer(bruto), existentes);
+  const formato = s("formato", 30).toLowerCase();
+  return {
+    angulo,
+    promesa: s("promesa", 240),
+    gancho: s("gancho", 300),
+    resumen: s("resumen", 500),
+    transcripcion: s("transcripcion", 1200),
+    publico: s("publico", 160),
+    formato: (FORMATOS_VIDEO as readonly string[]).find((f) => f.toLowerCase() === formato) ?? "otro",
+  };
+}
+
+/** El ángulo de una campaña según sus videos: el que más gasto lleva (gasto de los anuncios con video analizado). */
+export function anguloDeCampana(videos: { angulo: string; gasto: number }[]): string | null {
+  const suma = new Map<string, number>();
+  for (const v of videos) suma.set(v.angulo, (suma.get(v.angulo) ?? 0) + Math.max(v.gasto, 0.01));
+  return [...suma].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+}
+
+/** Los hosts de los que se baja un video de Meta (su red de archivos): nada más, para que una dirección ajena nunca se descargue. */
+export function esHostDeVideoMeta(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return u.protocol === "https:" && (u.hostname.endsWith(".fbcdn.net") || u.hostname.endsWith(".facebook.com") || u.hostname.endsWith(".fbsbx.com"));
+  } catch {
+    return false;
+  }
+}
