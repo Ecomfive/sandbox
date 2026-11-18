@@ -43,16 +43,18 @@ export default async function LogisticaTiendaPage({ searchParams }: { searchPara
   const miradas = tienda ? [tienda] : tiendas;
   // Solo la tienda que se mira (14 nov 2026: «si abro Kenku, que se actualice Kenku»); con «Todas», todas.
   after(() => revisarSiHaceFalta(createServiceClient(), miradas));
-  const { pedidos, fuente } = await pedidosDeTiendas(supabase, miradas, pais.codigo, { tipo: "atajo", id: "hoy" }, { minDias: DIAS_LOGISTICA });
+  // Solo los que pueden estar en Logística (18 nov 2026, velocidad): de Shopify, confirmados, en ruta o cerrados por la entrega (no los cancelados ni el Excel).
+  const { pedidos, fuente } = await pedidosDeTiendas(supabase, miradas, pais.codigo, { tipo: "atajo", id: "hoy" }, { minDias: DIAS_LOGISTICA, abiertos: ["confirmado", "en_camino", "entregado", "devuelto"] });
   // Lo que se gestiona: los que llegaron de Shopify (los del Excel de Finanzas son una foto vieja), por preparar o en ruta, lo más viejo arriba.
   // Desde el 12 nov 2026 lo que Monday o Servientrega dan por entregado o devuelto pasa a esa fase en la orden: para que las tarjetas Entregados y
   // Rechazados sigan diciendo algo, también van los cerrados por ellos en los últimos días (`DIAS_CERRADOS`).
   const candidatos = pedidos.filter((p) => !p.sinHora && etapaLogistica(p.estado) !== null).sort((a, b) => a.creado.localeCompare(b.creado));
   // Las entregas: de interior, la guía de Servientrega leída de SISCORE; de ciudad, lo registrado en Monday (entregado, rechazado, el repartidor).
   const ids = candidatos.map((p) => p.id);
-  const [entregas, guias, { data: lecturas }] = await Promise.all([
+  const [entregas, guias, sinPedido, { data: lecturas }] = await Promise.all([
     entregasDeOrdenes(supabase, ids),
     guiasDeOrdenes(supabase, ids),
+    mondaySinPedido(supabase, [...new Set(miradas.map((t) => fuente.unidadDe.get(t.id)).filter((u): u is string => !!u))]),
     // La última lectura de SISCORE de la tienda que se mira (14 nov 2026: van por tienda); con «Todas», la última de cualquiera.
     (tienda ? supabase.from("tienda_guias_lecturas").select("fin").eq("estado", "listo").eq("tienda_id", tienda.id) : supabase.from("tienda_guias_lecturas").select("fin").eq("estado", "listo"))
       .order("fin", { ascending: false })
@@ -73,7 +75,6 @@ export default async function LogisticaTiendaPage({ searchParams }: { searchPara
     const e = etapaLogistica(p.estado);
     return e === "por_preparar" || e === "en_ruta" || !!p.aVerificar || (!!p.entrega?.fecha && p.entrega.fecha >= desde);
   });
-  const sinPedido = await mondaySinPedido(supabase, [...new Set(miradas.map((t) => fuente.unidadDe.get(t.id)).filter((u): u is string => !!u))]);
   const ultimaSiscore = (lecturas?.[0]?.fin as string | undefined) ?? null;
   // Leer SISCORE es del equipo de Ecomfive: quien tiene tiendas limitadas (17 nov 2026) no ve el botón.
   const puedeLeer = !usuario.modulosSoloLectura.includes("tienda-logistica") && !limitado;
