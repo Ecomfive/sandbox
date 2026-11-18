@@ -7,10 +7,10 @@ import { Pagina } from "@/components/ui/pagina";
 import { fechaCorta, fechaHora } from "@/lib/af4/fecha";
 import { entero } from "@/lib/af4/formato";
 import { requireModulo } from "@/lib/auth";
-import { TABLAS_RESPALDO, rutaArchivo } from "@/lib/finanzas/respaldo";
+import { TABLAS_RESPALDO, rutaArchivo, verificacionGuardada } from "@/lib/finanzas/respaldo";
 import { createServiceClient } from "@/lib/supabase/server";
 import { BotonCorrer } from "../tareas/botones";
-import { BotonDescargarRespaldo } from "./boton-descargar";
+import { BotonDescargarRespaldo, BotonVerificarRespaldo } from "./boton-descargar";
 
 export const metadata = { title: "Respaldos financieros" };
 
@@ -20,11 +20,38 @@ export const maxDuration = 60;
 
 const tamano = (b: number) => (b >= 1_048_576 ? `${(b / 1_048_576).toLocaleString("es-PA", { maximumFractionDigits: 1 })} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
 
+function EstadoVerificacion({ verificacion: v, en, carpeta }: { verificacion: ReturnType<typeof verificacionGuardada>; en: string | null; carpeta: string }) {
+  const malas = v?.tablas.filter((t) => t.estado !== "ok") ?? [];
+  const [punto, texto] = !v
+    ? ["bg-muted-foreground", "Sin verificar: no se comprobó que se pueda restaurar."]
+    : v.faltan.length
+      ? ["bg-warning", `Verificación a medias: faltan ${entero(v.faltan.length)} tablas.`]
+      : v.ok
+        ? ["bg-success", "Verificado: cada archivo se lee y trae sus filas. Se puede restaurar."]
+        : ["bg-destructive", `${entero(malas.length)} tablas con problemas: ${malas.map((t) => `${t.tabla} (${t.estado === "ilegible" ? "no se lee" : `${entero(t.archivo ?? 0)} de ${entero(t.anotadas)} filas`})`).join(", ")}.`];
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-2 text-sm">
+      <span className="flex items-start gap-2">
+        <span aria-hidden="true" className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${punto}`} />
+        <span>
+          {texto}
+          {en && <span className="text-muted-foreground"> · {fechaHora(en)}</span>}
+        </span>
+      </span>
+      <BotonVerificarRespaldo carpeta={carpeta} />
+    </div>
+  );
+}
+
 /** Los respaldos semanales de las tablas financieras (bucket privado), para descargar tabla por tabla. */
 export default async function RespaldosPage() {
   const usuario = await requireModulo("usuarios");
   if (usuario.modulosSoloLectura.includes("usuarios")) redirect("/sin-acceso");
-  const { data, error } = await createServiceClient().from("fin_respaldos").select("id, ruta, bytes, tablas, disparo, creado_en").order("ruta", { ascending: false }).limit(60);
+  const supabase = createServiceClient();
+  // Con la migración 0982 trae la verificación; sin ella, lo de siempre.
+  let consulta = await supabase.from("fin_respaldos").select("id, ruta, bytes, tablas, disparo, creado_en, verificacion, verificado_en").order("ruta", { ascending: false }).limit(60);
+  if (consulta.error) consulta = (await supabase.from("fin_respaldos").select("id, ruta, bytes, tablas, disparo, creado_en").order("ruta", { ascending: false }).limit(60)) as typeof consulta;
+  const { data, error } = consulta;
   if (error) {
     return (
       <Pagina ancho="media" className="flex flex-col gap-6">
@@ -33,7 +60,7 @@ export default async function RespaldosPage() {
       </Pagina>
     );
   }
-  const lista = (data ?? []) as { id: string; ruta: string; bytes: number; tablas: Record<string, number>; disparo: string; creado_en: string }[];
+  const lista = (data ?? []) as { id: string; ruta: string; bytes: number; tablas: Record<string, number>; disparo: string; creado_en: string; verificacion?: unknown; verificado_en?: string | null }[];
   return (
     <Pagina ancho="media" className="flex flex-col gap-6">
       <EncabezadoAF4 titulo="Respaldos" actualizado={lista[0]?.creado_en ?? null} imprimir={false} acciones={<BotonCorrer clave="respaldo-finanzas" titulo="Respaldo de los datos financieros" />} />
@@ -58,6 +85,7 @@ export default async function RespaldosPage() {
               detalle={`${entero(tablas.length)} tablas · ${entero(filas)} filas · ${tamano(Number(r.bytes))} · ${fechaHora(r.creado_en)}`}
               sinRelleno
             >
+              {completo && <EstadoVerificacion verificacion={verificacionGuardada(r.verificacion)} en={r.verificado_en ?? null} carpeta={r.ruta} />}
               <ul className="m-0 grid list-none grid-cols-1 p-0 sm:grid-cols-2">
                 {tablas.map((t) => (
                   <li key={t} className="flex items-center justify-between gap-2 border-b border-border px-4 py-1.5 text-sm">

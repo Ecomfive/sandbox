@@ -103,3 +103,55 @@ export function tablasPendientes(hechas: string[]): string[] {
   const listas = new Set(hechas);
   return TABLAS_RESPALDO.filter((t) => !listas.has(t));
 }
+
+// ---------------------------------------------------------------------------------------------
+// Verificación (mejora 30, migración 0982)
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * ok: el archivo se lee y trae las filas anotadas. ilegible: no se pudo descargar, descomprimir o leer. incompleto: trae
+ * otra cantidad de filas que las anotadas (el archivo está dañado o a medias).
+ */
+export type EstadoVerificacion = "ok" | "ilegible" | "incompleto";
+
+export interface TablaVerificada {
+  tabla: string;
+  estado: EstadoVerificacion;
+  anotadas: number;
+  /** Filas leídas del archivo (null si no se pudo leer). */
+  archivo: number | null;
+  /** Filas que tiene hoy la tabla (lo que cambió desde el respaldo; null si no se pudo contar). */
+  actual: number | null;
+}
+
+export interface Verificacion {
+  ok: boolean;
+  tablas: TablaVerificada[];
+  /** Tablas que no alcanzaron a verificarse (se acabó el tiempo). */
+  faltan: string[];
+}
+
+/** Junta lo anotado, lo leído de cada archivo y lo que tiene hoy cada tabla. Las tablas sin respaldo (−1) no cuentan. */
+export function compararRespaldo(anotado: Record<string, number>, leido: Record<string, number | null>, actual: Record<string, number | null>): Verificacion {
+  const tablas: TablaVerificada[] = [];
+  const faltan: string[] = [];
+  for (const t of TABLAS_RESPALDO) {
+    const n = anotado[t];
+    if (n === undefined || n < 0) continue;
+    if (!(t in leido)) {
+      faltan.push(t);
+      continue;
+    }
+    const archivo = leido[t];
+    tablas.push({ tabla: t, estado: archivo === null ? "ilegible" : archivo === n ? "ok" : "incompleto", anotadas: n, archivo, actual: actual[t] ?? null });
+  }
+  return { ok: !faltan.length && tablas.every((x) => x.estado === "ok"), tablas, faltan };
+}
+
+/** Lee lo guardado en `fin_respaldos.verificacion` (null si no hay o no tiene la forma esperada). */
+export function verificacionGuardada(v: unknown): Verificacion | null {
+  if (!v || typeof v !== "object") return null;
+  const o = v as Partial<Verificacion>;
+  if (!Array.isArray(o.tablas) || !Array.isArray(o.faltan) || typeof o.ok !== "boolean") return null;
+  return { ok: o.ok, tablas: o.tablas as TablaVerificada[], faltan: o.faltan as string[] };
+}

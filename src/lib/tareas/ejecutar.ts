@@ -19,6 +19,13 @@ import { alertasTesoreriaANuevas, DEF_ALERTA, generarAlertas, guardarAlertas, ty
 import { cargarBasePauta } from "../finanzas/cargar-comite";
 import { evaluarYGuardarRiesgos } from "../finanzas/cargar-riesgos";
 import { alertasPauta, mesPrevio } from "../finanzas/pauta";
+import { cargarPresupuestoVigente, cargarRealPorUnidad } from "../finanzas/cargar-presupuesto";
+import { serieDeLineas } from "../finanzas/presupuesto";
+import { ANOMALIA_VENTANA, desviosPresupuesto, gastosAnomalos, mesesAntes } from "../finanzas/desvios";
+import { cargarPrestamosGrupo } from "../finanzas/cargar-prestamos-grupo";
+import { pendientes } from "../finanzas/prestamos-grupo";
+import type { Seccion } from "../finanzas/eerr";
+import { generarRecurrentes, textoRecurrentes } from "../finanzas/recurrentes-servidor";
 import { alertasDePosicion, cargarPosicion } from "../finanzas/cargar-tesoreria";
 import { cargarBaseCovenants, cargarBaseDeuda, cargarCovenants, cargarOfertas } from "../finanzas/cargar-deuda-avanzada";
 import { alertaCovenant, contratosCovenant, evaluarCovenants, nombreContrato } from "../finanzas/escenarios-deuda";
@@ -99,12 +106,15 @@ async function tareaConciliacion(c: Contexto): Promise<Resultado> {
 // (b) Checklist del cierre del mes anterior y del actual
 // ---------------------------------------------------------------------------------------------
 async function tareaCierre(c: Contexto): Promise<Resultado> {
+  // Primero los movimientos recurrentes del mes (migración 0981): así el checklist ya los cuenta.
+  const g = await generarRecurrentes(c.supabase, c.hoy);
+  const rec = "error" in g ? `Recurrentes: ${g.error}` : textoRecurrentes(g);
   const actual = `${c.hoy.slice(0, 7)}-01`;
   const meses = [mesAnterior(actual), actual];
   const { data: cierres, error } = await c.supabase.from("fin_cierres").select("id, periodo, estado").in("periodo", meses);
   if (error) throw new Error("Falta correr la migración 0914 (cierre de mes) en Supabase.");
   const abiertos = meses.filter((m) => (cierres ?? []).find((x) => String(x.periodo).slice(0, 10) === m)?.estado !== "cerrado");
-  if (!abiertos.length) return { resumen: "Los dos meses están cerrados: no se tocan." };
+  if (!abiertos.length) return { resumen: `${rec} Los dos meses están cerrados: no se tocan.` };
   const [datos, { config }] = await Promise.all([cargarDatosMeses(c.supabase, abiertos), cargarConfigCierre(c.supabase)]);
   const partes: string[] = [];
   for (const m of abiertos) {
@@ -140,7 +150,7 @@ async function tareaCierre(c: Contexto): Promise<Resultado> {
     const av = await avisarTareasCierre(c.supabase, { id: cierre.id, periodo: m }, tareas, c.hoy, config);
     partes.push(`${nombreMes(m)}: ${listas} de ${tareas.length} en verde${av.atrasadas ? `, ${av.atrasadas} atrasadas` : ""}${av.avisos ? `, ${av.avisos} avisos` : ""}`);
   }
-  return { resumen: partes.join(" · ") || "Nada que evaluar." };
+  return { resumen: [rec, ...partes].join(" · ") || "Nada que evaluar." };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -197,7 +207,105 @@ async function tareaAlertas(c: Contexto): Promise<Resultado> {
   // Matriz de riesgos (migración 0948): guarda los cambios de nivel y las alertas de los que subieron.
   const rg = await evaluarYGuardarRiesgos(c.supabase, c.hoy);
   const rie = "error" in rg ? ` Riesgos: ${rg.error}` : ` Riesgos: ${rg.cambios} cambios de nivel, ${rg.alertas} alertas.`;
-  return { resumen: `${r.activas} alertas activas (${r.nuevas} nuevas), ${r.resueltas} resueltas. Evaluado: ${r.evaluados.join(", ") || "nada"}.${fiscal}${tes}${pau}${cov}${rie}` };
+  // Presupuesto contra real y gastos fuera de lo normal (migración 0980).
+  const dv = await generarAlertasDesvios(c.supabase, c.hoy);
+  const des = "error" in dv ? ` Desvíos: ${dv.error}` : ` Desvíos: ${dv.presupuesto} contra el presupuesto, ${dv.anomalias} gastos fuera de lo normal.`;
+  // Préstamos del grupo (migración 0983): lo vencido o por vencer entre países, socios y financistas.
+  const pg = await generarAlertasPrestamosGrupo(c.supabase, c.hoy);
+  const gru = "error" in pg ? ` Préstamos del grupo: ${pg.error}` : ` Préstamos del grupo: ${pg.vencidos} vencidos, ${pg.porVencer} por vencer.`;
+  return { resumen: `${r.activas} alertas activas (${r.nuevas} nuevas), ${r.resueltas} resueltas. Evaluado: ${r.evaluados.join(", ") || "nada"}.${fiscal}${tes}${pau}${cov}${rie}${des}${gru}` };
+}
+
+const usdCorto = (v: number) => `US$${Math.round(v).toLocaleString("en-US")}`;
+
+/**
+ * Lo pendiente de los préstamos del grupo (después de aplicar los abonos) vencido = crítica, que vence en 7 días = aviso.
+ * Una alerta por préstamo o costo, con clave «grupo:<id>»; lo que se paga se resuelve solo.
+ */
+export async function generarAlertasPrestamosGrupo(supabase: SupabaseClient, hoy: string): Promise<{ error: string } | { vencidos: number; porVencer: number }> {
+  const datos = await cargarPrestamosGrupo(supabase);
+  if (!datos) return { error: "falta correr la migración 0983." };
+  const nombre = new Map(datos.partes.map((p) => [p.id, p.nombre]));
+  const nuevas: AlertaNueva[] = pendientes(datos.movs, hoy)
+    .filter((p) => p.estado === "vencido" || p.estado === "por_vencer")
+    .map((p) => {
+      const cuando = p.dias! < 0 ? `venció hace ${-p.dias!} días` : p.dias === 0 ? "vence hoy" : `vence en ${p.dias} días`;
+      const ordenes = p.ordenes.length ? ` (${p.ordenes.join(", ")})` : "";
+      return {
+        clave: `grupo:${p.id}`,
+        tipo: "prestamo_grupo_vence" as const,
+        severidad: p.estado === "vencido" ? ("critica" as const) : ("aviso" as const),
+        mensaje: `${nombre.get(p.deudorId) ?? "—"} le debe a ${nombre.get(p.acreedorId) ?? "—"}: ${usdCorto(p.pendiente)} ${cuando} · ${p.concepto}${ordenes}`.slice(0, 480),
+        enlace: DEF_ALERTA.prestamo_grupo_vence.href,
+        modulo: DEF_ALERTA.prestamo_grupo_vence.modulo,
+        monto: p.pendiente,
+      };
+    });
+  const r = await guardarAlertas(supabase, nuevas, ["prestamo_grupo_vence"]);
+  if ("error" in r) return { error: /check|tipo/i.test(r.error) ? "falta correr la migración 0983." : r.error };
+  return { vencidos: nuevas.filter((n) => n.severidad === "critica").length, porVencer: nuevas.filter((n) => n.severidad === "aviso").length };
+}
+
+/**
+ * El último mes cerrado: cada sección del EERR contra el presupuesto vigente del año (escenario base) y cada tipo de gasto
+ * contra su promedio de 6 meses. Sin presupuesto del año, solo se evalúan los gastos fuera de lo normal.
+ */
+export async function generarAlertasDesvios(
+  supabase: SupabaseClient,
+  hoy: string,
+): Promise<{ error: string } | { presupuesto: number; anomalias: number }> {
+  const mes = mesPrevio(`${hoy.slice(0, 7)}-01`);
+  const meses = [...mesesAntes(mes, ANOMALIA_VENTANA).reverse(), mes];
+  const [real, vigente] = await Promise.all([cargarRealPorUnidad(supabase, meses), cargarPresupuestoVigente(supabase, Number(mes.slice(0, 4)))]);
+  if ("error" in real) return { error: real.error };
+  const evaluados: TipoAlerta[] = ["gasto_anomalo"];
+  const nuevas: AlertaNueva[] = [];
+
+  if (vigente && real.conDatos.has(mes)) {
+    evaluados.push("presupuesto_desvio");
+    const presu = serieDeLineas(vigente.lineas, "base", [mes]);
+    const porSeccion = (fuente: Record<Seccion, Record<string, number>>) =>
+      Object.fromEntries(Object.entries(fuente).map(([s, porMes]) => [s, porMes[mes] ?? 0])) as Partial<Record<Seccion, number>>;
+    const realMes: Partial<Record<Seccion, number>> = {};
+    for (const serie of real.porUnidad.values()) {
+      for (const [s, v] of Object.entries(porSeccion(serie))) realMes[s as Seccion] = (realMes[s as Seccion] ?? 0) + (v ?? 0);
+    }
+    for (const d of desviosPresupuesto(mes, realMes, porSeccion(presu))) {
+      const sentido = d.seccion === "ingresos" ? "por debajo de" : "sobre";
+      nuevas.push({
+        clave: d.clave,
+        tipo: "presupuesto_desvio",
+        severidad: d.severidad,
+        mensaje: `${nombreMes(mes)} · ${d.etiqueta}: ${usdCorto(d.real)}, ${d.desvio} % ${sentido} lo presupuestado (${usdCorto(d.presupuesto)}) en «${vigente.presupuesto.nombre}»`,
+        enlace: `/presupuesto/${vigente.presupuesto.id}`,
+        modulo: DEF_ALERTA.presupuesto_desvio.modulo,
+        monto: d.real,
+      });
+    }
+  }
+
+  const porTipo = new Map<string, { nombre: string; seccion: Seccion; meses: Record<string, number> }>();
+  for (const t of real.tipos) {
+    const x = porTipo.get(t.tipo_id) ?? { nombre: real.nombresTipo[t.tipo_id] ?? "—", seccion: t.seccion, meses: {} };
+    x.meses[t.periodo] = (x.meses[t.periodo] ?? 0) + t.valor;
+    porTipo.set(t.tipo_id, x);
+  }
+  const anomalias = real.conDatos.has(mes) ? gastosAnomalos(mes, porTipo) : [];
+  for (const a of anomalias) {
+    nuevas.push({
+      clave: a.clave,
+      tipo: "gasto_anomalo",
+      severidad: "aviso",
+      mensaje: `${nombreMes(mes)} · ${a.tipo}: ${usdCorto(a.real)}, ${a.sube} % sobre su promedio de los meses anteriores (${usdCorto(a.promedio)})`,
+      enlace: DEF_ALERTA.gasto_anomalo.href,
+      modulo: DEF_ALERTA.gasto_anomalo.modulo,
+      monto: a.real,
+    });
+  }
+
+  const r = await guardarAlertas(supabase, nuevas, evaluados);
+  if ("error" in r) return { error: /check|tipo/i.test(r.error) ? "falta correr la migración 0980." : r.error };
+  return { presupuesto: nuevas.length - anomalias.length, anomalias: anomalias.length };
 }
 
 /**

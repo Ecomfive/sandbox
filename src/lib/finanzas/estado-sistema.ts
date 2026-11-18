@@ -147,6 +147,10 @@ export const MIGRACIONES_CLAVE: { migracion: string; que: string; prueba: Prueba
   { migracion: "0970", que: "Despacho ciudad y Devoluciones: Monday dentro del sistema", prueba: { tipo: "tabla", nombre: "despacho_actividad" } },
   { migracion: "0971", que: "Despacho ciudad: archivar y restaurar una fila", prueba: { tipo: "columna", nombre: "mon_despachos", columna: "archivado_en" } },
   { migracion: "0972", que: "Cambios y reembolsos: el tablero de Monday dentro del sistema", prueba: { tipo: "tabla", nombre: "postventa_actividad" } },
+  { migracion: "0980", que: "Alertas de desvío contra el presupuesto y de gastos fuera de lo normal", prueba: { tipo: "check", nombre: "fin_alertas_tipo_check", valor: "gasto_anomalo" } },
+  { migracion: "0981", que: "Movimientos recurrentes del libro (plantillas que se registran solas cada mes)", prueba: { tipo: "tabla", nombre: "fin_recurrentes" } },
+  { migracion: "0982", que: "Verificación de los respaldos financieros (que se puedan restaurar)", prueba: { tipo: "columna", nombre: "fin_respaldos", columna: "verificacion" } },
+  { migracion: "0983", que: "Préstamos del grupo (entre países, socios y financistas)", prueba: { tipo: "tabla", nombre: "fin_grupo_movimientos" } },
 ];
 
 /** Lo que se muestra de una prueba («Falta …»). */
