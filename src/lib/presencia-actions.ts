@@ -1,7 +1,9 @@
 "use server";
 
 import { headers } from "next/headers";
-import { getUsuarioIdSesion } from "@/lib/auth";
+import { getUsuarioActual, getUsuarioIdSesion } from "@/lib/auth";
+import { veEnLinea, type PersonaEnLinea } from "@/lib/en-linea";
+import { paginaDeRuta } from "@/lib/rendimiento/datos";
 import { createServiceClient } from "@/lib/supabase/server";
 import { dispositivoDeAgente, rutaDeLatido } from "@/lib/rendimiento/jornada";
 
@@ -26,4 +28,25 @@ export async function registrarActividad(ruta?: string, trabajando?: boolean) {
   const dispositivo = dispositivoDeAgente((await headers()).get("user-agent"));
   const { error } = await supabase.from("actividad_minutos").upsert({ ...fila, dispositivo }, opciones);
   if (error) await supabase.from("actividad_minutos").upsert(fila, opciones);
+}
+
+
+/** Con un latido en los últimos 135 s (dos latidos de `LatidoPresencia`, el mismo umbral del «Activo» de Usuarios y roles). */
+const EN_LINEA_MS = 135_000;
+
+/** Quién del equipo está en línea ahora y en qué página. Solo para Admin y CEO; a cualquier otro le devuelve la lista vacía. */
+export async function quienesEnLinea(): Promise<PersonaEnLinea[]> {
+  const usuario = await getUsuarioActual();
+  if (!usuario || !veEnLinea(usuario.rolNombre)) return [];
+  const supabase = createServiceClient();
+  const desde = new Date(Date.now() - EN_LINEA_MS).toISOString();
+  const [{ data: perfiles }, { data: minutos }] = await Promise.all([
+    supabase.from("perfiles").select("id, nombre, email, avatar_url").eq("activo", true).gte("ultima_actividad_en", desde),
+    supabase.from("actividad_minutos").select("usuario_id, ruta").gte("minuto", new Date(Date.now() - 3 * 60_000).toISOString()).order("minuto", { ascending: false }),
+  ]);
+  const paginas = new Map<string, string>();
+  for (const m of minutos ?? []) if (!paginas.has(m.usuario_id as string)) paginas.set(m.usuario_id as string, paginaDeRuta(m.ruta as string));
+  return (perfiles ?? [])
+    .map((p) => ({ id: p.id as string, nombre: ((p.nombre as string | null) || (p.email as string)).trim(), avatarUrl: (p.avatar_url as string | null) ?? null, pagina: paginas.get(p.id as string) ?? null }))
+    .sort((a, b) => (a.id === usuario.id ? -1 : b.id === usuario.id ? 1 : a.nombre.localeCompare(b.nombre, "es")));
 }

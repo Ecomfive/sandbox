@@ -1,6 +1,7 @@
 import { AtajosTeclado } from "@/components/atajos-teclado";
 import { BusquedaGlobal } from "@/components/busqueda-global";
 import { CampanaPendientes } from "@/components/campana-pendientes";
+import { EnLinea } from "@/components/en-linea";
 import { MenuCrear } from "@/components/menu-crear";
 import { MenuCuenta } from "@/components/menu-cuenta";
 import { SelectorContexto } from "@/components/selector-contexto";
@@ -8,6 +9,7 @@ import { SelectorTienda } from "@/components/tienda-global/selector-tienda";
 import { getUsuarioActual } from "@/lib/auth";
 import type { PendientesMenu } from "@/lib/contadores-menu";
 import { accionesCrearPermitidas } from "@/lib/crear-global";
+import { veEnLinea } from "@/lib/en-linea";
 import { getTiendaActual, listarTiendas } from "@/lib/finanzas/tienda-actual";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
@@ -20,7 +22,7 @@ import { Suspense } from "react";
 const MODULOS_CON_TIENDA = ["estado-resultados", "rentabilidad", "ventas-tiendas", "presupuesto"];
 
 /**
- * Barra de arriba: el buscador (⌘K) a la izquierda y, a la derecha, la tienda (solo en las páginas de Finanzas que la
+ * Barra de arriba: quién está en línea a la izquierda (Admin y CEO; el buscador se abre con ⌘K o «/», sin caja) y, a la derecha, la tienda (solo en las páginas de Finanzas que la
  * usan), el contexto (país y plataforma), «Crear», la campana de pendientes y el menú de la persona. `pendientes` es la
  * misma promesa del menú lateral; la plataforma (Dropi o Drop) es la que se eligió con el selector.
  */
@@ -42,7 +44,9 @@ export async function NavBar({
   return (
     <header data-sin-imprimir className="border-b border-border bg-card">
       <div className="flex items-center justify-between gap-2 py-3 pr-4 pl-14 sm:gap-3 sm:pr-6 md:pl-6">
-        <BusquedaGlobal paginas={paginas} acciones={accionesCrear} />
+        {/* Sin la caja del buscador (18 nov 2026): se abre con Ctrl K o «/». A la izquierda, quién está en línea, solo para Admin y CEO. */}
+        <BusquedaGlobal paginas={paginas} acciones={accionesCrear} conBoton={false} />
+        {usuario && veEnLinea(usuario.rolNombre) ? <EnLinea /> : <div />}
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
           {tiendas.length > 0 && (
             <Suspense fallback={null}>
