@@ -57,9 +57,11 @@ function EditorEtiquetas({ c, productos }: { c: CampanaVista; productos: string[
   const { mostrarToast } = useToast();
   const [guardando, empezar] = useTransition();
   const [producto, setProducto] = useState(c.producto ?? "");
-  const [angulo, setAngulo] = useState(c.angulo ?? "");
+  // El ángulo que vio la IA en los videos no se guarda como corrección a mano si nadie lo toca.
+  const anguloGuardado = c.anguloOrigen === "video" ? "" : (c.angulo ?? "");
+  const [angulo, setAngulo] = useState(anguloGuardado);
   const [etapa, setEtapa] = useState<Etapa | "">(c.etapa ?? "");
-  const cambio = producto !== (c.producto ?? "") || angulo !== (c.angulo ?? "") || etapa !== (c.etapa ?? "");
+  const cambio = producto !== (c.producto ?? "") || angulo !== anguloGuardado || etapa !== (c.etapa ?? "");
   const guardar = () =>
     empezar(async () => {
       const r = await corregirCampanaMeta(c.id, { producto, angulo, etapa });
@@ -87,7 +89,7 @@ function EditorEtiquetas({ c, productos }: { c: CampanaVista; productos: string[
         </label>
         <label className="flex flex-col gap-1" htmlFor={`${id}-angulo`}>
           <span className={labelClassSm}>Ángulo</span>
-          <input id={`${id}-angulo`} className={fieldClassSm} value={angulo} onChange={(e) => setAngulo(e.target.value)} maxLength={80} placeholder="Ej: Dolor de espalda" />
+          <input id={`${id}-angulo`} className={fieldClassSm} value={angulo} onChange={(e) => setAngulo(e.target.value)} maxLength={80} placeholder={c.anguloOrigen === "video" && c.angulo ? `Por IA: ${c.angulo}` : "Ej: Dolor de espalda"} />
         </label>
         <label className="flex flex-col gap-1" htmlFor={`${id}-etapa`}>
           <span className={labelClassSm}>Etapa</span>

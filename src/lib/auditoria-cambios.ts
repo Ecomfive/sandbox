@@ -421,6 +421,8 @@ export const ETIQUETA_ACCION: Record<string, string> = {
   guardar_tope_meta: "Cambió el CPA tope de un producto (Anuncios Meta)",
   corregir_campana_meta: "Corrigió las etiquetas de una campaña de Meta",
   decidir_sugerencia_meta: "Decidió una sugerencia de Anuncios Meta",
+  analizar_video_meta: "Analizó videos de Anuncios Meta con IA",
+  corregir_angulo_video_meta: "Corrigió el ángulo de un video de Meta",
   pedir_borrado_whatsapp: "Pidió borrar un chat o un mensaje de WhatsApp",
   borrar_mensaje_whatsapp: "Borró un mensaje de WhatsApp",
   borrar_chat_whatsapp: "Borró un chat de WhatsApp",

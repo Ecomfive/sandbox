@@ -24,6 +24,8 @@ export interface CampanaVista {
   personaMeta: string | null;
   /** «ALL PA»: a quién se le muestra y dónde, según el nombre. */
   mercado: string | null;
+  /** De dónde sale el ángulo: el nombre, una corrección a mano o lo que vio la IA en sus videos. */
+  anguloOrigen: "nombre" | "manual" | "video" | null;
   /** La tanda de videos que lleva, según el nombre («RT V1 AL V5»). */
   videos: string | null;
   /** Resultados del periodo elegido. */
@@ -47,6 +49,24 @@ export interface AnuncioVista {
   r: Resultados;
 }
 
+/** Lo que la IA vio en un video. `sin_archivo`: Meta no dejó bajarlo y se analizó solo el texto y la miniatura (el ángulo es provisional). */
+export interface AnalisisVideoVista {
+  estado: "analizado" | "sin_archivo" | "error";
+  origen: "video" | "texto";
+  angulo: string | null;
+  /** Una persona corrigió el ángulo: un nuevo análisis no lo pisa. */
+  anguloManual: boolean;
+  promesa: string | null;
+  gancho: string | null;
+  resumen: string | null;
+  transcripcion: string | null;
+  publico: string | null;
+  formato: string | null;
+  duracionS: number | null;
+  error: string | null;
+  analizadoEn: string;
+}
+
 export interface VideoVista {
   /** El id del video en Meta. */
   id: string;
@@ -58,6 +78,8 @@ export interface VideoVista {
   anuncios: number;
   /** «V3»: el número del video dentro de su tanda, si el nombre del anuncio lo dice. */
   numero: string | null;
+  /** El análisis de la IA, si ya se hizo. */
+  analisis: AnalisisVideoVista | null;
   /** Los anuncios que usan este video y a qué campaña pertenece cada uno (últimos 30 días). */
   anunciosDetalle: { id: string; nombre: string; activo: boolean; campanaId: string; campanaNombre: string; etapa: Etapa | null; r: Resultados }[];
   r: Resultados;

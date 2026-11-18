@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { analizarPendientes } from "@/lib/meta-ads/analizar-videos";
 import { leerCuentasMeta } from "@/lib/meta-ads/leer-cuentas";
 import { esPeticionDeCron } from "@/lib/seguridad/cron";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -6,11 +7,23 @@ import { createServiceClient } from "@/lib/supabase/server";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
-/** La lectura de las cuentas publicitarias de Meta (18 nov 2026): solo consulta Meta y guarda en la base, nunca cambia nada en Meta. Solo lo acepta el cron de Vercel (`CRON_SECRET`). */
+/**
+ * La lectura de las cuentas publicitarias de Meta (18 nov 2026): solo consulta Meta y guarda en la base, nunca cambia nada en Meta. Después, con el tiempo que quede, la IA ve los videos
+ * con más gasto que todavía no tienen análisis (ángulo, promesa, gancho). Solo lo acepta el cron de Vercel (`CRON_SECRET`).
+ */
 export async function GET(request: Request) {
   if (!esPeticionDeCron(request)) return new NextResponse("Unauthorized", { status: 401 });
+  const inicio = Date.now();
   try {
-    return NextResponse.json(await leerCuentasMeta(createServiceClient()));
+    const supabase = createServiceClient();
+    const lectura = await leerCuentasMeta(supabase, { presupuestoMs: 120_000 });
+    let videos: Awaited<ReturnType<typeof analizarPendientes>> | { error: string } | null = null;
+    try {
+      videos = await analizarPendientes(supabase, { limiteMs: 285_000 - (Date.now() - inicio), max: 3, quien: "Lectura automática" });
+    } catch (e) {
+      videos = { error: e instanceof Error ? e.message : "No se pudieron analizar los videos." };
+    }
+    return NextResponse.json({ ...lectura, videos });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "No se pudo leer Meta." }, { status: 500 });
   }

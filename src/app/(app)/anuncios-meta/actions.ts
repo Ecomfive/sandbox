@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { registrarAuditoria } from "@/lib/auditoria";
+import { analizarPendientes, analizarVideoDeMeta, pendienteDeVideo } from "@/lib/meta-ads/analizar-videos";
 import { actividadDeCampana } from "@/lib/meta-ads/datos";
 import { leerCuentasMeta } from "@/lib/meta-ads/leer-cuentas";
 import { claveDeProducto, type Etapa } from "@/lib/meta-ads/nombre";
@@ -207,4 +208,56 @@ export async function obtenerActividadCampanaMeta(id: string): Promise<{ error?:
   } catch {
     return { eventos: [] };
   }
+}
+
+const ID_VIDEO = /^[0-9]{5,25}$/;
+
+/** Analiza (o vuelve a analizar) un video con IA: baja el video de Meta, se lo muestra a Gemini y guarda el ángulo y lo que dice. Cuesta unos centavos. */
+export async function analizarVideoAhoraMeta(videoId: string): Promise<{ error?: string; mensaje?: string }> {
+  const u = await requireModuloEscritura(MODULO);
+  if (!ID_VIDEO.test(videoId)) return { error: "Ese video no existe." };
+  const supabase = createServiceClient();
+  const v = await pendienteDeVideo(supabase, videoId);
+  if (!v) return { error: "Ese video no está en ningún anuncio leído." };
+  const { data: cuenta } = await supabase.from("meta_cuentas").select("pais_id").eq("id", v.cuentaId).maybeSingle();
+  if (!cuenta || !(await puedeVerPaisId(supabase, u.paisesPermitidos, cuenta.pais_id as string))) return { error: "No tienes acceso a las cuentas de ese país." };
+  const r = await analizarVideoDeMeta(supabase, v, u.nombre ?? u.email ?? null);
+  await registrarAuditoria({ accion: "analizar_video_meta", entidad: "meta_campanas", entidadId: videoId, detalle: `${r.estado} · ${r.mensaje}`.slice(0, 300) });
+  revalidatePath("/anuncios-meta", "layout");
+  return r.ok ? { mensaje: r.mensaje } : { error: r.mensaje };
+}
+
+/** «Analizar los pendientes»: los videos con gasto que todavía no tienen análisis, de más a menos gasto, hasta donde alcance el tiempo (se puede pulsar otra vez para seguir). */
+export async function analizarPendientesMeta(): Promise<{ error?: string; analizados?: number; sinArchivo?: number; errores?: number; faltan?: number; mensajes?: string[] }> {
+  const u = await requireModuloEscritura(MODULO);
+  const supabase = createServiceClient();
+  try {
+    const r = await analizarPendientes(supabase, { limiteMs: 270_000, max: 8, quien: u.nombre ?? u.email ?? null });
+    await registrarAuditoria({ accion: "analizar_video_meta", entidad: "meta_campanas", detalle: `${r.analizados} analizados con el video, ${r.sinArchivo} solo con el texto, ${r.errores} con error, faltan ${r.faltan}` });
+    revalidatePath("/anuncios-meta", "layout");
+    return r;
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "No se pudo analizar." };
+  }
+}
+
+/** Corrige a mano el ángulo de un video (un nuevo análisis ya no lo pisa). Vacío = volver a lo que dijo la IA en el próximo análisis. */
+export async function corregirAnguloVideoMeta(videoId: string, angulo: string): Promise<Resultado> {
+  const u = await requireModuloEscritura(MODULO);
+  if (!ID_VIDEO.test(videoId)) return { error: "Ese video no existe." };
+  const limpio = String(angulo ?? "").replace(/[«»"“”.,;:!?¿¡]/g, "").replace(/\s+/g, " ").trim().slice(0, 60);
+  const supabase = createServiceClient();
+  const v = await pendienteDeVideo(supabase, videoId);
+  if (!v) return { error: "Ese video no está en ningún anuncio leído." };
+  const { data: cuenta } = await supabase.from("meta_cuentas").select("pais_id").eq("id", v.cuentaId).maybeSingle();
+  if (!cuenta || !(await puedeVerPaisId(supabase, u.paisesPermitidos, cuenta.pais_id as string))) return { error: "No tienes acceso a las cuentas de ese país." };
+  const { data: previo } = await supabase.from("meta_video_analisis").select("angulo").eq("video_id", videoId).maybeSingle();
+  const fila: Record<string, unknown> = limpio
+    ? { video_id: videoId, cuenta_id: v.cuentaId, angulo: limpio.charAt(0).toUpperCase() + limpio.slice(1), angulo_manual: true, ...(previo ? {} : { estado: "analizado", origen: "texto" }) }
+    : { video_id: videoId, cuenta_id: v.cuentaId, angulo: null, angulo_manual: false, ...(previo ? {} : { estado: "error", origen: "texto", error: "Sin ángulo" }) };
+  const { error } = await supabase.from("meta_video_analisis").upsert(fila, { onConflict: "video_id" });
+  if (error) return { error: sinMigracion(error.message) ? "Falta correr la migración 0325 (ángulo de los videos) en Supabase." : error.message };
+  await registrarAuditoria({ accion: "corregir_angulo_video_meta", entidad: "meta_campanas", entidadId: videoId, detalle: limpio || "Sin ángulo", antes: { Ángulo: (previo?.angulo as string | null) ?? "—" }, despues: { Ángulo: limpio || "—" } });
+  revalidatePath("/anuncios-meta", "layout");
+  return {};
 }

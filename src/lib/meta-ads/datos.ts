@@ -7,8 +7,10 @@ import { agrupar, copyLimpio, landingLimpia, type Elemento } from "./agrupar";
 import { CPA_TOPE_PREDETERMINADO, resultado, sinResultados, sumar, type Resultados } from "./metricas";
 import { claveDeProducto, NOMBRE_ETAPA, NOMBRE_PUJA, numeroDeVideo, type Estructura, type Etapa, type Puja } from "./nombre";
 import { detalleLegible, esCreacionDeCampana } from "./normalizar";
+import { geminiConectado } from "./gemini-video";
+import { anguloDeCampana } from "./video-angulo";
 import { diasEntre, pendientes, sugerir, type DecisionGuardada, type Sugerencia } from "./sugerencias";
-import type { ActividadVista, AnuncioVista, CampanaVista, Grupo, VideoVista } from "./vistas";
+import type { ActividadVista, AnalisisVideoVista, AnuncioVista, CampanaVista, Grupo, VideoVista } from "./vistas";
 
 export const SIN_MIGRACION_META = "Falta correr la migración 0320 (Anuncios Meta) en Supabase.";
 
@@ -75,11 +77,14 @@ export interface DatosMeta {
   creadasHoy: number;
   equipo: FilaEquipo[];
   actividadDisponible: boolean;
+  /** Videos con gasto en 30 días que todavía no tienen análisis de IA, y si la IA (Gemini) está conectada. */
+  videosSinAnalizar: number;
+  iaConectada: boolean;
 }
 
 const vacios = (periodo: Periodo, hoy: string): DatosMeta => ({
   faltaMigracion: false, cuentas: [], cuentaId: null, periodo, desde: hoy, hasta: hoy, campanas: [], videos: [], anuncios: [], totales: sinResultados(), anteriores: sinResultados(), topes: [], productos: [], sugerencias: [], decididas: 0,
-  grupos: { "Ángulo": [], Estructura: [], Puja: [], Copy: [], Landing: [], Producto: [], Etapa: [] }, creadasPorDia: [], creadasHoy: 0, equipo: [], actividadDisponible: false,
+  grupos: { "Ángulo": [], Estructura: [], Puja: [], Copy: [], Landing: [], Producto: [], Etapa: [] }, creadasPorDia: [], creadasHoy: 0, equipo: [], videosSinAnalizar: 0, iaConectada: false, actividadDisponible: false,
 });
 
 const restar = (fecha: string, n: number) => new Date(new Date(`${fecha}T00:00:00Z`).getTime() - n * 86_400_000).toISOString().slice(0, 10);
@@ -120,11 +125,13 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
   if (!ids.length) return { ...base, cuentas, cuentaId, desde, hasta: o.hoy, topes };
 
   const desdeDatos = restar(o.hoy, Math.max(dias * 2, 30) - 1);
-  const [camp, anun, dia, act] = await Promise.all([
+  const [camp, anun, dia, act, hechos] = await Promise.all([
     traerTodasLasFilas<Record<string, unknown>>((a, b) => supabase.from("meta_campanas").select("id, cuenta_id, meta_id, nombre, estado, estructura, puja, presupuesto_diario, creada_meta_en, producto, angulo, etapa, manual, creada_por, mercado, videos, persona_nombre").in("cuenta_id", ids).range(a, b)),
     traerTodasLasFilas<Record<string, unknown>>((a, b) => supabase.from("meta_anuncios").select("id, campana_id, nombre, estado, video_id, miniatura, copy, titulo, landing").in("cuenta_id", ids).range(a, b)),
     traerTodasLasFilas<FilaDia>((a, b) => supabase.from("meta_resultados_dia").select("anuncio_id, campana_id, fecha, gasto, impresiones, clics, video_3s, video_15s, vio_landing, carrito, pago, compras, valor").in("cuenta_id", ids).gte("fecha", desdeDatos).order("fecha").range(a, b)),
     traerTodasLasFilas<Record<string, unknown>>((a, b) => supabase.from("meta_actividad").select("fecha, actor_nombre, tipo, objeto_tipo, objeto_meta_id, objeto_nombre").in("cuenta_id", ids).gte("fecha", `${restar(o.hoy, 29)}T00:00:00Z`).order("fecha", { ascending: false }).range(a, b)).catch(() => []),
+    // Sin la migración 0325 no hay análisis de videos: todo sigue funcionando sin ángulo de video.
+    traerTodasLasFilas<Record<string, unknown>>((a, b) => supabase.from("meta_video_analisis").select("video_id, estado, origen, angulo, angulo_manual, promesa, gancho, resumen, transcripcion, publico, formato, duracion_s, error, analizado_en").range(a, b)).catch(() => []),
   ]);
 
   // Resultados por campaña, por anuncio y por día de campaña.
@@ -167,12 +174,28 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
   const creaciones = new Map<string, string>();
   for (const e of eventos) if (esCreacionDeCampana({ tipo: String(e.tipo), objetoTipo: (e.objeto_tipo as string | null) ?? null }) && e.objeto_meta_id && e.actor_nombre) creaciones.set(String(e.objeto_meta_id), String(e.actor_nombre));
 
+  // Análisis de los videos (IA) y, con ellos, el ángulo de cada campaña cuando el nombre no lo trae.
+  const analisisDe = new Map<string, AnalisisVideoVista>();
+  for (const h of hechos) {
+    analisisDe.set(h.video_id as string, { estado: h.estado as AnalisisVideoVista["estado"], origen: h.origen as AnalisisVideoVista["origen"], angulo: (h.angulo as string | null) ?? null, anguloManual: !!h.angulo_manual, promesa: (h.promesa as string | null) ?? null, gancho: (h.gancho as string | null) ?? null, resumen: (h.resumen as string | null) ?? null, transcripcion: (h.transcripcion as string | null) ?? null, publico: (h.publico as string | null) ?? null, formato: (h.formato as string | null) ?? null, duracionS: h.duracion_s === null || h.duracion_s === undefined ? null : num(h.duracion_s), error: (h.error as string | null) ?? null, analizadoEn: h.analizado_en as string });
+  }
+  const angulosPorCampana = new Map<string, { angulo: string; gasto: number }[]>();
+  for (const a of anun) {
+    const an = analisisDe.get((a.video_id as string | null) ?? "");
+    if (!an?.angulo) continue;
+    const l = angulosPorCampana.get(a.campana_id as string) ?? [];
+    l.push({ angulo: an.angulo, gasto: porAnuncio30.get(a.id as string)?.gasto ?? 0 });
+    angulosPorCampana.set(a.campana_id as string, l);
+  }
+  const anguloVideoDe = (campanaId: string) => anguloDeCampana(angulosPorCampana.get(campanaId) ?? []);
+
   const armar = (c: Record<string, unknown>, r: Resultados): CampanaVista => {
     const clave = claveDeProducto(c.producto as string | null);
     const tope = topePorClave.get(clave);
     return {
       id: c.id as string, cuentaId: c.cuenta_id as string, cuentaNombre: nombreCuenta.get(c.cuenta_id as string) ?? "", metaId: c.meta_id as string, nombre: c.nombre as string, estado: c.estado as string, activa: c.estado === "ACTIVE",
-      etapa: (c.etapa as Etapa | null) ?? null, estructura: (c.estructura as Estructura | null) ?? null, puja: (c.puja as Puja | null) ?? null, producto: (c.producto as string | null) ?? null, angulo: (c.angulo as string | null) ?? null,
+      etapa: (c.etapa as Etapa | null) ?? null, estructura: (c.estructura as Estructura | null) ?? null, puja: (c.puja as Puja | null) ?? null, producto: (c.producto as string | null) ?? null, angulo: (c.angulo as string | null) ?? anguloVideoDe(c.id as string),
+      anguloOrigen: c.angulo ? ((c.manual as string[] | null) ?? []).includes("angulo") ? "manual" : "nombre" : anguloVideoDe(c.id as string) ? "video" : null,
       presupuestoDiario: c.presupuesto_diario === null || c.presupuesto_diario === undefined ? null : num(c.presupuesto_diario), creadaEn: (c.creada_meta_en as string | null) ?? null,
       persona: (c.persona_nombre as string | null) ?? (c.creada_por as string | null) ?? creaciones.get(c.meta_id as string) ?? null,
       personaMeta: (c.creada_por as string | null) ?? creaciones.get(c.meta_id as string) ?? null,
@@ -209,7 +232,7 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
   const videos: VideoVista[] = [...videosMapa]
     .map(([id, g]) => {
       const producto = masFrecuente(g.productos);
-      return { id, nombre: g.nombre, miniatura: g.miniatura, producto, angulo: masFrecuente(g.angulos), campanas: g.campanas.size, anuncios: g.anuncios, numero: g.numero, anunciosDetalle: g.detalle.sort((x, y) => y.r.gasto - x.r.gasto), r: porVideo30.get(id) ?? sinResultados(), tope: topePorClave.get(claveDeProducto(producto)) ?? CPA_TOPE_PREDETERMINADO };
+      return { id, nombre: g.nombre, miniatura: g.miniatura, producto, angulo: analisisDe.get(id)?.angulo ?? masFrecuente(g.angulos), analisis: analisisDe.get(id) ?? null, campanas: g.campanas.size, anuncios: g.anuncios, numero: g.numero, anunciosDetalle: g.detalle.sort((x, y) => y.r.gasto - x.r.gasto), r: porVideo30.get(id) ?? sinResultados(), tope: topePorClave.get(claveDeProducto(producto)) ?? CPA_TOPE_PREDETERMINADO };
     })
     .filter((v) => v.r.gasto > 0)
     .sort((a, b) => b.r.gasto - a.r.gasto);
@@ -279,7 +302,7 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
   const productos = [...new Set(camp.map((c) => (c.producto as string | null)?.trim()).filter((p): p is string => !!p))].sort((a, b) => a.localeCompare(b, "es"));
   return {
     ...base, cuentas, cuentaId, desde, hasta: o.hoy, campanas: campanasConActividad, videos, anuncios, totales, anteriores, topes, productos, sugerencias, decididas: todas.length - sugerencias.length, grupos,
-    creadasPorDia, creadasHoy: creadasPorDia[13]?.testing + creadasPorDia[13]?.escala + creadasPorDia[13]?.retargeting + creadasPorDia[13]?.otras || 0, equipo, actividadDisponible: eventos.length > 0,
+    creadasPorDia, creadasHoy: creadasPorDia[13]?.testing + creadasPorDia[13]?.escala + creadasPorDia[13]?.retargeting + creadasPorDia[13]?.otras || 0, equipo, actividadDisponible: eventos.length > 0, videosSinAnalizar: videos.filter((v) => !v.analisis || v.analisis.estado !== "analizado").length, iaConectada: geminiConectado(),
   };
 }
 
