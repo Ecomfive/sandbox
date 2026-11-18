@@ -9,7 +9,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { cargarVariantes } from "@/lib/tienda/datos";
 import { tiendasDeLaPersona } from "@/lib/tienda/acceso";
-import { nombreVariante, sugerirParaVariante } from "@/lib/tienda/vincular-variante";
+import { nombreVariante, sugerirParaVariante, unidadesDeVariante } from "@/lib/tienda/vincular-variante";
 import { obtenerOpcionesSkuMaestro } from "@/lib/wms/skus-maestros";
 import { TraerProductos } from "./traer-productos";
 import { VinculosTienda, type FilaVinculo } from "./vinculos-tienda";
@@ -43,7 +43,7 @@ export default async function ProductosTiendaPage({ searchParams }: { searchPara
   const opciones = variantes.length ? await obtenerOpcionesSkuMaestro(supabase) : [];
   const porId = new Map(opciones.map((o) => [o.id, o]));
   const sinUnir = variantes.filter((v) => !v.skuMaestroId && !v.noFisico);
-  let sugeridos = new Map<string, { skuId: string; tipo: string; metodo: string | null }>();
+  let sugeridos = new Map<string, { skuId: string; tipo: string; metodo: string | null; unidades: number }>();
   if (sinUnir.length) {
     const [skus, comps] = await Promise.all([
       traerTodasLasFilas<{ id: string; codigo: string; nombre: string; tipo: string; foto_huella: string | null }>((d, h) =>
@@ -57,10 +57,15 @@ export default async function ProductosTiendaPage({ searchParams }: { searchPara
       skus.map((s) => ({ id: s.id, codigo: s.codigo, nombre: s.nombre, tipo: s.tipo, huella: s.foto_huella })),
       comps.map((c) => ({ comboId: c.combo_id, componenteId: c.componente_id, cantidad: Number(c.cantidad) })),
     );
+    // Un paquete del mismo producto («Lleva 3», «…/X2»; 18 nov 2026) va a su producto con esas unidades por venta; si en Producto ya existe el
+    // compuesto de ese pack, va al compuesto con 1 (el compuesto ya dice cuántas trae). Sin compuesto («falta_compuesto»), al simple con las unidades.
     sugeridos = new Map(
       sinUnir.flatMap((v) => {
         const s = sugerirParaVariante({ productoTitulo: v.productoTitulo, varianteTitulo: v.varianteTitulo, sku: v.sku, huella: v.huella }, ctx);
-        return s.skuId && s.tipo !== "falta_compuesto" ? [[v.id, { skuId: s.skuId, tipo: s.tipo, metodo: s.metodo }] as const] : [];
+        if (!s.skuId) return [];
+        const deTexto = unidadesDeVariante(v);
+        const unidades = porId.get(s.skuId)?.compuesto ? 1 : (deTexto ?? (s.tipo === "falta_compuesto" ? s.pack : null) ?? 1);
+        return [[v.id, { skuId: s.skuId, tipo: s.tipo, metodo: s.metodo, unidades }] as const];
       }),
     );
   }
@@ -82,7 +87,8 @@ export default async function ProductosTiendaPage({ searchParams }: { searchPara
       enShopify: v.enShopify,
       noFisico: v.noFisico,
       skuMaestroId: v.skuMaestroId,
-      sugerencia: sugerido && s ? { id: sugerido.id, codigo: sugerido.codigo, nombre: sugerido.nombre, exacta: s.tipo === "seguro", metodo: s.metodo } : null,
+      unidades: v.unidadesPorVenta,
+      sugerencia: sugerido && s ? { id: sugerido.id, codigo: sugerido.codigo, nombre: sugerido.nombre, exacta: s.tipo === "seguro", metodo: s.metodo, unidades: s.unidades } : null,
     };
   });
 

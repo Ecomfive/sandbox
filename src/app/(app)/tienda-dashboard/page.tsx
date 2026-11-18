@@ -77,7 +77,7 @@ export default async function DashboardTiendaPage({ searchParams }: { searchPara
   const vinculos = new Map(variantes.flatMap((v) => (v.noFisico ? [[v.shopifyVarianteId, "no_fisico" as const] as const] : v.skuMaestroId ? [[v.shopifyVarianteId, v.skuMaestroId] as const] : [])));
   const pedidoFinanzas = new Map(actuales.filter((p) => fuente.unidadDe.has(p.tiendaId)).map((p) => [p.id, { estado: p.estado, total: p.total }]));
   const vendidos: (ReturnType<typeof productosVendidos>[number] & { titulo?: string })[] = [
-    ...productosVendidos(lineas, new Map(vinculos)),
+    ...productosVendidos(lineas, new Map(vinculos), new Map(variantes.map((v) => [v.shopifyVarianteId, v.unidadesPorVenta]))),
     ...vendidosDeFinanzas(lineasFinanzas, pedidoFinanzas),
   ].sort((x, y) => y.ingreso - x.ingreso);
   const skuIds = vendidos.map((v) => v.skuId).filter((x): x is string => !!x);

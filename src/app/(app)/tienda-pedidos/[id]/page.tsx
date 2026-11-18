@@ -74,7 +74,7 @@ export default async function PedidoTiendaPage({ params }: { params: Promise<{ i
   ]);
   const varianteIds = (lineas ?? []).map((l) => l.shopify_variante_id).filter((v): v is number => v !== null);
   const { data: variantes } = varianteIds.length
-    ? await supabase.from("tienda_variantes").select("shopify_variante_id, sku_maestro_id, no_fisico, skus_maestros(codigo, nombre)").eq("tienda_id", p.tienda_id).in("shopify_variante_id", varianteIds)
+    ? await supabase.from("tienda_variantes").select("shopify_variante_id, sku_maestro_id, unidades_por_venta, no_fisico, skus_maestros(codigo, nombre)").eq("tienda_id", p.tienda_id).in("shopify_variante_id", varianteIds)
     : { data: [] };
   const vinculo = new Map((variantes ?? []).map((v) => [Number(v.shopify_variante_id), v]));
   const estado = ESTADOS_PEDIDO.find((e) => e.id === (esEstadoPedido(p.estado) ? p.estado : "nuevo"))!;
@@ -134,6 +134,11 @@ export default async function PedidoTiendaPage({ params }: { params: Promise<{ i
                           ) : sku ? (
                             <span>
                               {sku.nombre} <span className="font-mono text-xs text-muted-foreground">{sku.codigo}</span>
+                              {Number(v?.unidades_por_venta) > 1 && (
+                                <span className="block text-xs font-medium text-primario">
+                                  × {v?.unidades_por_venta} por venta · salen {(Number(l.cantidad) || 0) * Number(v?.unidades_por_venta)}
+                                </span>
+                              )}
                             </span>
                           ) : (
                             <Link href="/tienda-tiendas/productos" className="no-underline">

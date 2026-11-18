@@ -1,7 +1,8 @@
 // Gestión de tienda › Productos de Shopify (12 nov 2026, punto 2 de la comparación con Mi Reto Digital): los productos y variantes de una tienda conectada
 // se traen de Shopify (solo lectura, GraphQL) a `tienda_variantes`, donde una persona los une con nuestros productos. Con la unión hecha, las líneas de los
 // pedidos de esa tienda (`ven_orden_lineas.sku_maestro_id`) saben qué producto nuestro salió: por el SKU de Shopify y, en las del Excel de Finanzas (que no
-// traen SKU), por el nombre exacto del producto. Solo servidor.
+// traen SKU), por el nombre exacto del producto. Con el producto va cuántas unidades lleva cada venta (`unidades_por_venta`, 18 nov 2026: un «Lleva 3»
+// son 3 del producto). Solo servidor.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { huellaFoto } from "@/lib/wms/huella-foto";
@@ -144,25 +145,27 @@ export async function aplicarVinculosDeTienda(supabase: SupabaseClient, tiendaId
   const unidad = await unidadDeTienda(supabase, tiendaId);
   if (!unidad) return 0;
   // Todas las vinculadas, de a 1 000 (17 nov 2026: Oferfy pasó las 1 000 y las que quedaban fuera nunca llegaban a sus pedidos).
-  const vs = await traerTodasLasFilas<{ sku: string | null; producto_titulo: string; sku_maestro_id: string }>((d, h) =>
-    supabase.from("tienda_variantes").select("sku, producto_titulo, sku_maestro_id").eq("tienda_id", tiendaId).not("sku_maestro_id", "is", null).order("id").range(d, h),
+  const vs = await traerTodasLasFilas<{ sku: string | null; producto_titulo: string; sku_maestro_id: string; unidades_por_venta: number | null }>((d, h) =>
+    supabase.from("tienda_variantes").select("sku, producto_titulo, sku_maestro_id, unidades_por_venta").eq("tienda_id", tiendaId).not("sku_maestro_id", "is", null).order("id").range(d, h),
   );
+  // El destino de una línea: el producto y cuántas unidades lleva cada venta («id:3»).
+  const destinoDe = (v: { sku_maestro_id: string; unidades_por_venta: number | null }) => `${v.sku_maestro_id}:${Math.max(1, Number(v.unidades_por_venta) || 1)}`;
   const porSku = new Map<string, string>();
   const porTitulo = new Map<string, Set<string>>();
   for (const v of vs) {
-    if (v.sku) porSku.set(skuLimpio(v.sku as string), v.sku_maestro_id as string);
+    if (v.sku) porSku.set(skuLimpio(v.sku as string), destinoDe(v));
     const t = nombreComparable(v.producto_titulo as string);
-    porTitulo.set(t, (porTitulo.get(t) ?? new Set()).add(v.sku_maestro_id as string));
+    porTitulo.set(t, (porTitulo.get(t) ?? new Set()).add(destinoDe(v)));
   }
   if (!porSku.size && !porTitulo.size) return 0;
   // Las líneas de la tienda (o solo las de esos pedidos), de a 1 000. Se agrupan por lo que las une (su SKU o el nombre del producto) y su destino.
   const grupos = new Map<string, { destino: string; campo: "sku" | "producto"; valor: string; ordenes: Set<string> }>();
   for (let desde = 0; ; desde += 1000) {
-    let q = supabase.from("ven_orden_lineas").select("orden_id, linea, producto, sku, sku_maestro_id, ven_ordenes!inner(unidad_id)").eq("ven_ordenes.unidad_id", unidad);
+    let q = supabase.from("ven_orden_lineas").select("orden_id, linea, producto, sku, sku_maestro_id, unidades_por_venta, ven_ordenes!inner(unidad_id)").eq("ven_ordenes.unidad_id", unidad);
     if (soloOrdenes) q = q.in("orden_id", soloOrdenes);
     const { data, error } = await q.order("orden_id").order("linea").range(desde, desde + 999);
     if (error || !data?.length) break;
-    for (const l of data as { orden_id: string; linea: number; producto: string | null; sku: string | null; sku_maestro_id: string | null }[]) {
+    for (const l of data as { orden_id: string; linea: number; producto: string | null; sku: string | null; sku_maestro_id: string | null; unidades_por_venta: number | null }[]) {
       let destino: string | undefined;
       let campo: "sku" | "producto" = "sku";
       let valor = "";
@@ -171,13 +174,14 @@ export async function aplicarVinculosDeTienda(supabase: SupabaseClient, tiendaId
         valor = l.sku;
       }
       // Sin SKU (el Excel) o con un SKU que ya no está en Shopify (el pedido guarda el SKU que tenía el producto ese día): por el nombre exacto.
+      // Si ese producto de Shopify tiene variantes con distintas unidades (X2 y X3 del mismo), por el nombre no se sabe cuál fue: queda como estaba.
       if (!destino && l.producto) {
         const s = porTitulo.get(nombreComparable(l.producto));
         if (s?.size === 1) destino = [...s][0];
         campo = "producto";
         valor = l.producto;
       }
-      if (!destino || destino === l.sku_maestro_id) continue;
+      if (!destino || destino === `${l.sku_maestro_id}:${Math.max(1, Number(l.unidades_por_venta) || 1)}`) continue;
       const clave = `${destino}|${campo}|${valor}`;
       const g = grupos.get(clave) ?? { destino, campo, valor, ordenes: new Set<string>() };
       g.ordenes.add(l.orden_id);
@@ -194,7 +198,14 @@ export async function aplicarVinculosDeTienda(supabase: SupabaseClient, tiendaId
   let total = 0;
   for (let i = 0; i < tareas.length; i += 8) {
     const hechas = await Promise.all(
-      tareas.slice(i, i + 8).map((t) => supabase.from("ven_orden_lineas").update({ sku_maestro_id: t.destino }, { count: "exact" }).eq(t.campo, t.valor).in("orden_id", t.ordenes)),
+      tareas.slice(i, i + 8).map((t) => {
+        const [skuId, unidades] = t.destino.split(":");
+        return supabase
+          .from("ven_orden_lineas")
+          .update({ sku_maestro_id: skuId, unidades_por_venta: Number(unidades) }, { count: "exact" })
+          .eq(t.campo, t.valor)
+          .in("orden_id", t.ordenes);
+      }),
     );
     for (const { error, count } of hechas) if (!error) total += count ?? 0;
   }
@@ -208,7 +219,7 @@ export async function quitarVinculoDeLineas(supabase: SupabaseClient, tiendaId: 
   const { data } = await supabase.from("ven_orden_lineas").select("orden_id, ven_ordenes!inner(unidad_id)").eq("ven_ordenes.unidad_id", unidad).eq("sku", sku).eq("sku_maestro_id", anterior).limit(5000);
   const ordenes = [...new Set((data ?? []).map((l) => l.orden_id as string))];
   for (let i = 0; i < ordenes.length; i += 150)
-    await supabase.from("ven_orden_lineas").update({ sku_maestro_id: null }).eq("sku", sku).eq("sku_maestro_id", anterior).in("orden_id", ordenes.slice(i, i + 150));
+    await supabase.from("ven_orden_lineas").update({ sku_maestro_id: null, unidades_por_venta: 1 }).eq("sku", sku).eq("sku_maestro_id", anterior).in("orden_id", ordenes.slice(i, i + 150));
 }
 
 /** Para los pedidos recién guardados de Shopify (por su `origen_clave`): sus líneas toman el producto de las uniones de su tienda. Nunca lanza. */
