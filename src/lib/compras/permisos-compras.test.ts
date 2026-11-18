@@ -106,3 +106,41 @@ test("sin ver el monto, las líneas de la Actividad quedan solo con sus unidades
   assert.equal(textoSinMonto("1.040 u. · $1.270,00"), "1.040 u.");
   assert.equal(textoSinMonto("900 u."), "900 u.");
 });
+
+test("sin ver el monto: la Actividad no trae el Registro de pagos ni los montos de la cotización del proveedor (auditoría, 18 nov 2026)", async () => {
+  const { comentarioSinMonto } = await import("../../app/(app)/compras/permisos-compras");
+  const r = restricciones(fila("campo", "monto", "oculto"));
+  assert.ok(!cambioVisibleEnActividad(r, "registroPagos"));
+  assert.ok(cambioVisibleEnActividad(SIN_RESTRICCIONES, "registroPagos"));
+  assert.equal(comentarioSinMonto("Cotización de Shen Zhen: 1.000 u. · $1,25 por unidad · $1.250,00"), "Cotización de Shen Zhen: 1.000 u.");
+  assert.equal(comentarioSinMonto("Cotización corregida en producción de Shen Zhen: 10 u. · $2,00 por unidad · $20,00\nPrecio $5 por caja"), "Cotización corregida en producción de Shen Zhen: 10 u.\nPrecio $5 por caja");
+  assert.equal(comentarioSinMonto("Pagamos $500 ayer"), "Pagamos $500 ayer");
+});
+
+test("el pedido del Tablero de Shen Zhen llega sin los montos y pagos que la persona no ve (auditoría, 18 nov 2026)", async () => {
+  const { pedidoSinOcultos } = await import("../../app/(app)/compras/permisos-compras");
+  const p = { id: "p1", unidades: 10, montoTotal: 100, costoUnitario: 10, primerPago: 50, fechaPago1: "2026-01-01", segundoPago: 50, fechaPago2: "2026-02-01", pagadoAProveedor: 50, anticipoMonto: 40 };
+  assert.equal(pedidoSinOcultos(p, SIN_RESTRICCIONES), p);
+  assert.deepEqual(pedidoSinOcultos(p, restricciones(fila("campo", "monto", "oculto"))), { id: "p1", unidades: 10, montoTotal: null, costoUnitario: null, primerPago: null, fechaPago1: null, segundoPago: null, fechaPago2: null, pagadoAProveedor: null, anticipoMonto: null });
+  assert.deepEqual(pedidoSinOcultos(p, restricciones(fila("campo", "pago2", "oculto"))), { ...p, segundoPago: null, fechaPago2: null });
+});
+
+test("la etiqueta de la auditoría lleva a su campo del catálogo", async () => {
+  const { campoDeEtiqueta } = await import("../../app/(app)/compras/permisos-compras");
+  assert.equal(campoDeEtiqueta("Monto Total"), "monto");
+  assert.equal(campoDeEtiqueta("Fecha de Pago (2)"), "pago2");
+  assert.equal(campoDeEtiqueta("Agente de envío"), "agente");
+  assert.equal(campoDeEtiqueta("Cantidad total"), undefined);
+  assert.equal(campoDeEtiqueta("constructor"), undefined);
+});
+
+test("los pagos a Shen Zhen solo los ve quien no tiene oculto ningún campo de dinero (auditoría, 18 nov 2026)", async () => {
+  const { vePagosProveedor } = await import("../../app/(app)/compras/permisos-compras");
+  assert.ok(vePagosProveedor(SIN_RESTRICCIONES));
+  assert.ok(vePagosProveedor(restricciones(fila("campo", "proveedor", "oculto"))));
+  for (const clave of ["monto", "pago1", "pago2", "pagado"]) {
+    const r = restricciones(fila("campo", clave, "oculto"));
+    assert.ok(!vePagosProveedor(r), clave);
+    assert.ok(!cambioVisibleEnActividad(r, "registroPagos"), clave);
+  }
+});

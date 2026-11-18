@@ -6,7 +6,7 @@ import { hoyPanama } from "@/lib/proveedor/fechas";
 import { esUuid } from "@/lib/seguridad/ruta-almacen";
 import { createServiceClient } from "@/lib/supabase/server";
 import { sinAccesoACompras } from "./acceso-compras";
-import { campoOculto, restriccionesDe } from "./permisos-compras";
+import { restriccionesDe, vePagosProveedor } from "./permisos-compras";
 
 export interface PagosProveedorCompra {
   proveedor: string;
@@ -20,8 +20,8 @@ export interface PagosProveedorCompra {
 export async function obtenerPagosProveedorCompra(compraId: string): Promise<PagosProveedorCompra | null> {
   const usuario = await requireModulo("compras");
   if (!esUuid(compraId)) return null;
-  // Quien no ve los montos de Compras tampoco ve esto.
-  if (campoOculto(restriccionesDe(usuario.afinado.compras), "monto")) return null;
+  // Quien no ve los montos o algún pago de Compras tampoco ve esto (auditoría de seguridad, 18 nov 2026).
+  if (!vePagosProveedor(restriccionesDe(usuario.afinado.compras))) return null;
   // Solo de una compra que la persona puede ver (su país y su alcance; auditoría del 27 oct 2026).
   if (await sinAccesoACompras([compraId], usuario)) return null;
   const supabase = createServiceClient();

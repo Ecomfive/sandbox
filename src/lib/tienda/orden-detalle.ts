@@ -9,6 +9,7 @@ import { hayFormaPagoEntrega, hayHoraDeShopify } from "./datos-finanzas";
 import { mismaTiendaUnidad } from "./ordenes-finanzas";
 import { cargarTiendasPermitidas } from "@/lib/finanzas/cargar-tiendas-permitidas";
 import { puedeVerUnidad } from "@/lib/finanzas/tiendas-permitidas";
+import { telefonosDeChatPosibles } from "@/lib/crm/telefono";
 
 export interface OrdenFinanzas {
   numero: string | null;
@@ -196,7 +197,7 @@ export async function cargarOrdenTienda(supabase: SupabaseClient, id: string, pa
   const datosCliente: ClienteOrdenFinanzas & { telefono_clave?: string | null } = { ...((cliente ?? {}) as ClienteOrdenFinanzas & { telefono_clave?: string | null }) };
   delete datosCliente.telefono_clave;
   // El chat del CRM es la bandeja de Ecomfive (de todas las tiendas y de los dropshippers): quien tiene tiendas limitadas no la ve.
-  const whatsapp = permitidas ? null : await whatsappDeCliente(supabase, (cliente as { telefono?: string | null } | null)?.telefono ?? null).catch(() => null);
+  const whatsapp = permitidas ? null : await whatsappDeCliente(supabase, (cliente as { telefono?: string | null } | null)?.telefono ?? null, paisId).catch(() => null);
   const unidadId = (o as { unidad_id?: string }).unidad_id ?? null;
   const ultimoDelCliente = whatsapp?.mensajes.filter((m) => m.entrante).at(-1)?.momento ?? null;
   const asistente = unidadId
@@ -255,14 +256,33 @@ async function entregaDeOrden(supabase: SupabaseClient, id: string): Promise<Ent
   return { fuente: "monday", grupo: String(d.estado_grupo), estado: d.estado, fecha: d.fecha_entrega ?? d.fecha_despacho, repartidor: d.courier, causa: d.causa_rechazo, guia: null };
 }
 
-/** El chat del cliente en el CRM: la conversación cuyo teléfono termina en los mismos 8 dígitos, con sus últimos 40 mensajes. */
-async function whatsappDeCliente(supabase: SupabaseClient, telefono: string | null): Promise<WhatsappOrden | null> {
-  const digitos = (telefono ?? "").replace(/\D/g, "");
-  if (digitos.length < 7) return null;
-  const { data: conv } = await supabase.from("whatsapp_conversaciones").select("id, nombre_perfil, nombre_personalizado").like("telefono", `%${digitos.slice(-8)}`).order("ultimo_mensaje_en", { ascending: false }).limit(1);
+/**
+ * El chat del cliente en el CRM, con sus últimos 40 mensajes. Se busca por su teléfono completo, con el país del pedido si no trae el prefijo, en las formas en que se guarda
+ * ese mismo número (`telefonosDeChatPosibles`): nunca otro número que solo comparta los últimos dígitos. Sin los chats ocultos (0172), los mensajes ocultos ni las notas
+ * privadas del equipo (auditoría de seguridad, 18 nov 2026).
+ */
+async function whatsappDeCliente(supabase: SupabaseClient, telefono: string | null, paisId: string): Promise<WhatsappOrden | null> {
+  if (!telefono) return null;
+  const { data: pais } = await supabase.from("paises").select("codigo").eq("id", paisId).maybeSingle();
+  const posibles = telefonosDeChatPosibles(telefono, (pais?.codigo as string | null | undefined) ?? null);
+  if (!posibles.length) return null;
+  const { data: conv } = await supabase
+    .from("whatsapp_conversaciones")
+    .select("id, nombre_perfil, nombre_personalizado")
+    .in("telefono", posibles)
+    .is("oculta_en", null)
+    .order("ultimo_mensaje_en", { ascending: false, nullsFirst: false })
+    .limit(1);
   const c = conv?.[0];
   if (!c) return null;
-  const { data: msgs } = await supabase.from("whatsapp_mensajes").select("id, direccion, texto, tipo, momento, creado_en, autor_nombre").eq("conversacion_id", c.id).is("oculto_en", null).order("momento", { ascending: false }).limit(40);
+  const { data: msgs } = await supabase
+    .from("whatsapp_mensajes")
+    .select("id, direccion, texto, tipo, momento, creado_en, autor_nombre")
+    .eq("conversacion_id", c.id)
+    .is("oculto_en", null)
+    .neq("direccion", "nota")
+    .order("momento", { ascending: false })
+    .limit(40);
   return {
     conversacionId: String(c.id),
     nombre: ((c.nombre_personalizado as string | null) || (c.nombre_perfil as string | null)) ?? null,

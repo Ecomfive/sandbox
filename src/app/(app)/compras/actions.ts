@@ -22,7 +22,7 @@ import { descargarPublico } from "@/lib/seguridad/url-externa";
 import { detectarImagen } from "@/lib/seguridad/imagen";
 import { agenteDeLista, ESTADOS_COMPRA, ETAPAS_COMPRA, numeroOC, proveedorDeLista, VIAS_ENVIO } from "./def-compras";
 import { CAMPOS_EDITABLES, campoEditable, normalizarValor, textoDeValor, type ValorCampo } from "./def-edicion-compras";
-import { accionPermitidaEnCompras, campoEditable as campoEditableParaRol, campoOculto, celdaEditable, cambioVisibleEnActividad, ES_ALCANCE_LIMITADO, restriccionesDe, sinColumnasBloqueadas, textoSinMonto, type RestriccionesCompras } from "./permisos-compras";
+import { accionPermitidaEnCompras, campoEditable as campoEditableParaRol, campoOculto, celdaEditable, cambioVisibleEnActividad, comentarioSinMonto, ES_ALCANCE_LIMITADO, restriccionesDe, sinColumnasBloqueadas, textoSinMonto, type RestriccionesCompras } from "./permisos-compras";
 import { fotoDeProducto, fotosPorNombre } from "@/lib/compras/foto-producto";
 import { sinAccesoACompras, sinAccesoALinea, SIN_ACCESO_PAIS } from "./acceso-compras";
 import { leerMetricasDescripcion, metricasDeTest, precioUnidad, textoLogistica, type Cotizacion, type TestParaCotizacion } from "@/lib/compras/cotizacion";
@@ -859,11 +859,13 @@ export async function obtenerActividadCompra(id: string): Promise<ActividadCompr
   const aAdjunto = (a: FilaAdjunto): AdjuntoCompra => ({ id: a.id, nombre: a.nombre, clase: a.clase, url: (a.ruta && firmadas.get(a.ruta)) || a.url_clickup || null, creadoEn: a.creado_en });
   const deComentario = new Map<string, AdjuntoCompra[]>();
   for (const a of filasAdjuntos) if (a.comentario_id) deComentario.set(a.comentario_id, [...(deComentario.get(a.comentario_id) ?? []), aAdjunto(a)]);
+  // Sin ver el monto, la cotización del proveedor llega sin sus montos (auditoría de seguridad, 18 nov 2026).
+  const sinVerMonto = campoOculto(limitesActividad, "monto");
   return {
     comentarios: filasComentarios.map((c) => ({
       id: c.id,
       autor: c.autor,
-      texto: c.texto,
+      texto: sinVerMonto ? comentarioSinMonto(c.texto) : c.texto,
       creadoEn: c.creado_en,
       adjuntos: deComentario.get(c.id) ?? [],
       respuestaA: c.respuesta_a ?? null,
@@ -878,9 +880,9 @@ export async function obtenerActividadCompra(id: string): Promise<ActividadCompr
   };
 }
 
-/** Las líneas de producto de la Actividad llevan su monto («1.040 u. · $1.270,00»): sin ver el monto, se queda solo con las unidades. */
+/** Las líneas de producto y de cotización de la Actividad llevan su monto («1.040 u. · $1.270,00»): sin ver el monto, se queda solo con las unidades. */
 function sinMonto(limites: RestriccionesCompras, campo: string, texto: string | null): string | null {
-  return campoOculto(limites, "monto") && texto && /^producto(Agregado|Cambiado|Quitado)$/.test(campo) ? textoSinMonto(texto) : texto;
+  return campoOculto(limites, "monto") && texto && /^(producto(Agregado|Cambiado|Quitado)|cotizacion)$/.test(campo) ? textoSinMonto(texto) : texto;
 }
 
 /**

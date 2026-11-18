@@ -15,3 +15,12 @@ export function mensajeVisibleParaAtencion(m: { id: string; momento: string }, e
   if (corte && new Date(m.momento).getTime() <= new Date(corte).getTime()) return false;
   return true;
 }
+
+/**
+ * Un día que la IA ya resumió (actividad del cliente) sigue a la vista de Atención si ese día no tiene mensajes borrados y es de después del día en que se borró el chat
+ * (`diaCorte`, AAAA-MM-DD de Panamá): el resumen podría contar lo borrado (auditoría de seguridad, 18 nov 2026).
+ */
+export function diaVisibleParaAtencion(dia: string, diasConBorrados: ReadonlySet<string> | undefined, diaCorte: string | null): boolean {
+  if (diasConBorrados?.has(dia)) return false;
+  return !diaCorte || dia > diaCorte;
+}

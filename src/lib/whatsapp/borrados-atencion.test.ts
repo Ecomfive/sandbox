@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { chatVisibleParaAtencion, mensajeVisibleParaAtencion } from "./borrados-atencion";
+import { chatVisibleParaAtencion, diaVisibleParaAtencion, mensajeVisibleParaAtencion } from "./borrados-atencion";
 
 const corte = "2026-10-30T12:00:00.000Z";
 
@@ -22,4 +22,16 @@ test("un mensaje eliminado en WhatsApp no se ve", () => {
 test("con el chat borrado, solo se ven los mensajes de después", () => {
   assert.equal(mensajeVisibleParaAtencion({ id: "a", momento: "2026-10-30T11:00:00.000Z" }, new Set(), corte), false);
   assert.equal(mensajeVisibleParaAtencion({ id: "b", momento: "2026-10-30T12:30:00.000Z" }, new Set(), corte), true);
+});
+
+test("un día resumido por la IA con un mensaje borrado no se ve en Atención", () => {
+  assert.equal(diaVisibleParaAtencion("2026-10-30", new Set(["2026-10-30"]), null), false);
+  assert.equal(diaVisibleParaAtencion("2026-10-29", new Set(["2026-10-30"]), null), true);
+  assert.equal(diaVisibleParaAtencion("2026-10-29", undefined, null), true);
+});
+
+test("con el chat borrado, solo se ven los días resumidos de después del día del borrado", () => {
+  assert.equal(diaVisibleParaAtencion("2026-10-29", undefined, "2026-10-30"), false);
+  assert.equal(diaVisibleParaAtencion("2026-10-30", undefined, "2026-10-30"), false);
+  assert.equal(diaVisibleParaAtencion("2026-10-31", undefined, "2026-10-30"), true);
 });

@@ -6,6 +6,9 @@ import { cargarEnCamino } from "@/lib/publicaciones/en-camino-datos";
 import { createServiceClient } from "@/lib/supabase/server";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { descontinuadosEnPais } from "@/lib/producto/descontinuado-pais";
+import { accesoCrm, pierdeLoBorrado } from "@/lib/crm/areas";
+import { diaVisibleParaAtencion, mensajeVisibleParaAtencion } from "@/lib/whatsapp/borrados-atencion";
+import { borradoPorDia, mensajesEliminadosEnWhatsapp, mensajesOcultos } from "@/lib/whatsapp/ocultos";
 import { conversacionPermitida, usuarioBandeja } from "./datos-bandeja";
 import { paisDelChat } from "./pais-chat";
 
@@ -69,13 +72,17 @@ const productosBase = (supabase: ReturnType<typeof createServiceClient>) =>
 /** Cuántos mensajes del chat se leen para saber de qué productos se habló (los más recientes): toda la conversación en la práctica. */
 const MENSAJES_A_LEER = 2000;
 
-/** Los mensajes con texto del dropshipper y del equipo, del más nuevo al más viejo, hasta `MENSAJES_A_LEER`. */
-async function textosDelChat(supabase: ReturnType<typeof createServiceClient>, conversacionId: string) {
-  const filas: { texto: string | null; momento: string; direccion: string }[] = [];
+/**
+ * Los mensajes con texto del dropshipper y del equipo, del más nuevo al más viejo, hasta `MENSAJES_A_LEER`, sin los ocultos. Con `borrado` (quien tiene solo Atención), tampoco
+ * los borrados ni los de antes del borrado del chat: la ficha cita la frase (auditoría de seguridad, 18 nov 2026).
+ */
+async function textosDelChat(supabase: ReturnType<typeof createServiceClient>, conversacionId: string, borrado: { ids: ReadonlySet<string>; corte: string | null } | null) {
+  const ocultos = await mensajesOcultos(supabase, conversacionId);
+  const filas: { id: string; texto: string | null; momento: string; direccion: string }[] = [];
   for (let desde = 0; desde < MENSAJES_A_LEER; desde += 1000) {
     const { data, error } = await supabase
       .from("whatsapp_mensajes")
-      .select("texto, momento, direccion")
+      .select("id, texto, momento, direccion")
       .eq("conversacion_id", conversacionId)
       .in("direccion", ["entrante", "saliente"])
       .not("texto", "is", null)
@@ -85,7 +92,7 @@ async function textosDelChat(supabase: ReturnType<typeof createServiceClient>, c
     filas.push(...((data ?? []) as typeof filas));
     if ((data ?? []).length < 1000) break;
   }
-  return filas;
+  return filas.filter((m) => !ocultos.has(m.id) && (!borrado || mensajeVisibleParaAtencion(m, borrado.ids, borrado.corte)));
 }
 
 /**
@@ -100,11 +107,14 @@ export async function productosDelChat(conversacionId: string): Promise<Producto
   const supabase = createServiceClient();
   const c = await conversacionPermitida(supabase, conversacionId, u);
   if (!c) return { error: "Esa conversación no existe o no es de tu área." };
+  // A quien tiene solo Atención no le llega lo borrado, ni citado ni por lo que la IA resumió ese día (auditoría de seguridad, 18 nov 2026).
+  const borrado = pierdeLoBorrado(accesoCrm(u)) ? ((await borradoPorDia(supabase, [c.id])).get(c.id) ?? null) : null;
+  const eliminados = borrado?.dias.size ? await mensajesEliminadosEnWhatsapp(supabase, c.id) : new Set<string>();
 
   const [pais, fijadosR, mensajes, analisisR, avisosR] = await Promise.all([
     paisDelChat(supabase, c.telefono, c.dropshipperId),
     supabase.from(TABLA).select("sku_id, creado_en").eq("conversacion_id", conversacionId).order("creado_en"),
-    textosDelChat(supabase, conversacionId),
+    textosDelChat(supabase, conversacionId, borrado ? { ids: eliminados, corte: borrado.corte } : null),
     // Lo que encontró «Analizar con IA» (migración 0183); sin la migración o sin análisis, nada.
     supabase.from("whatsapp_actividad").select("dia, productos").eq("conversacion_id", conversacionId).order("dia", { ascending: false }),
     // Las tareas «avisarle cuando llegue» de este chat (sin la migración 0188, ninguna).
@@ -113,7 +123,9 @@ export async function productosDelChat(conversacionId: string): Promise<Producto
   const avisos = new Map(((avisosR.error ? [] : avisosR.data) ?? []).map((a) => [a.sku_id as string, { llegadaEstimada: (a.llegada_estimada as string | null) ?? null }]));
   const sePuedeFijar = !fijadosR.error;
   const fijadosIds = (fijadosR.data ?? []).map((f) => f.sku_id as string);
-  const analisis = analisisR.error ? [] : ((analisisR.data ?? []) as { dia: string; productos: string[] | null }[]).filter((a) => a.productos?.length);
+  const analisis = analisisR.error
+    ? []
+    : ((analisisR.data ?? []) as { dia: string; productos: string[] | null }[]).filter((a) => a.productos?.length && (!borrado || diaVisibleParaAtencion(a.dia, borrado.dias, borrado.diaCorte)));
 
   let catalogo: FilaSku[] = [];
   try {
