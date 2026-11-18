@@ -11,6 +11,16 @@ export const nuevoToken = () => randomBytes(24).toString("base64url");
 export const tokenPlausible = (t: unknown): t is string => typeof t === "string" && FORMA_TOKEN.test(t);
 export const hashToken = (t: string) => createHash("sha256").update(t).digest("hex");
 
+/**
+ * Cuántos días vale un enlace desde que se generó. Vencido, el mensajero ve «Este enlace ya no vale» y hay que generarle otro desde Pipeline
+ * (auditoría de seguridad, 18 nov 2026: antes no vencía nunca y un enlace perdido seguía sirviendo).
+ */
+export const DIAS_ENLACE = 30;
+export function enlaceVencido(creadoEn: string | null | undefined, ahora = Date.now()): boolean {
+  const t = creadoEn ? Date.parse(creadoEn) : NaN;
+  return !Number.isFinite(t) || ahora - t > DIAS_ENLACE * 86_400_000;
+}
+
 export type FaseMensajero = "entregada" | "fallida";
 
 /** Qué puede hacer con una orden: solo si está en ruta y es suya. */

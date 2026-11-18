@@ -3,6 +3,7 @@
 // y acceso ANTES de llamar a estas funciones: aquí no se revisa quién es la persona, solo se hace el trabajo con las tablas. Los
 // archivos se revisan por su contenido (`detectarAdjunto`) y solo se borran los de la carpeta de esa entidad.
 
+import { rutaEnCarpeta } from "@/lib/seguridad/ruta-almacen";
 import { detectarAdjunto, MAX_ADJUNTOS_COMENTARIO, MAX_BYTES_ADJUNTO, MAX_BYTES_VIDEO, nombreSeguro } from "@/lib/compras/adjuntos";
 import { EMOJIS_REACCION } from "@/lib/compras/reacciones";
 import { mencionadosValidos, notificarMenciones } from "@/lib/menciones";
@@ -96,7 +97,7 @@ export async function comentarioDe(cfg: ConfigComentarios, comentarioId: string)
 /** Borra archivos recién subidos que no se guardaron: solo de la carpeta de ese registro y que ningún comentario use. Nunca lanza. */
 async function borrarSubidos(cfg: ConfigComentarios, entidadId: string, rutas: (string | null | undefined)[]) {
   const c = carpeta(entidadId);
-  const candidatas = [...new Set(rutas.filter((r): r is string => typeof r === "string" && r.startsWith(c) && !r.includes("..") && r.length <= 300))];
+  const candidatas = [...new Set(rutas.filter((r): r is string => typeof r === "string" && rutaEnCarpeta(r, c)))];
   if (!candidatas.length) return;
   const supabase = createServiceClient();
   const { data: usadas, error } = await supabase.from(cfg.adjuntos).select("ruta").in("ruta", candidatas);
@@ -115,7 +116,7 @@ async function revisarSubidos(cfg: ConfigComentarios, entidadId: string, archivo
   };
   if (archivos.length > MAX_ADJUNTOS_COMENTARIO) return falla(`Un comentario lleva hasta ${MAX_ADJUNTOS_COMENTARIO} archivos.`);
   const c = carpeta(entidadId);
-  if (rutas.some((r) => !r.startsWith(c) || r.includes("..") || r.length > 300)) return falla("Hay un archivo que no es de este registro.");
+  if (rutas.some((r) => !rutaEnCarpeta(r, c))) return falla("Hay un archivo que no es de este registro.");
   if (new Set(rutas).size !== rutas.length) return falla("Hay un archivo repetido.");
   const supabase = createServiceClient();
   const { data: yaUsadas, error: errorUsadas } = await supabase.from(cfg.adjuntos).select("ruta").in("ruta", rutas);
@@ -263,7 +264,7 @@ export async function editar(
   }
   if (aQuitar.length) {
     await supabase.from(cfg.adjuntos).delete().in("id", aQuitar.map((a) => a.id));
-    const rutas = aQuitar.map((a) => a.ruta).filter((r): r is string => !!r && r.startsWith(carpeta(c.entidadId)) && !r.includes(".."));
+    const rutas = aQuitar.map((a) => a.ruta).filter((r): r is string => rutaEnCarpeta(r, carpeta(c.entidadId)));
     if (rutas.length) await supabase.storage.from(cfg.bucket).remove(rutas);
   }
   const nuevos = (await mencionadosValidos(menciones, limpio, persona.id)).filter((m) => !c.texto.includes(`@${m.nombre}`));
@@ -288,7 +289,7 @@ export async function eliminar(cfg: ConfigComentarios, persona: Persona, comenta
   if (filasR.some((r) => r.autor_id !== persona.id)) return { error: "Tiene respuestas de otras personas, así que no se puede eliminar." };
   const ids = [comentarioId, ...filasR.map((r) => r.id)];
   const { data: archivos } = await supabase.from(cfg.adjuntos).select("ruta").in("comentario_id", ids);
-  const rutas = ((archivos ?? []) as { ruta: string | null }[]).map((a) => a.ruta).filter((r): r is string => !!r && r.startsWith(carpeta(c.entidadId)) && !r.includes(".."));
+  const rutas = ((archivos ?? []) as { ruta: string | null }[]).map((a) => a.ruta).filter((r): r is string => rutaEnCarpeta(r, carpeta(c.entidadId)));
   const { error } = await supabase.from(cfg.comentarios).delete().eq("id", comentarioId);
   if (error) return { error: "No se pudo eliminar el comentario." };
   if (rutas.length) await supabase.storage.from(cfg.bucket).remove(rutas);

@@ -1,8 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { BotonBarra } from "@/components/panel/piezas-panel";
+import { useToast } from "@/components/ui/toast";
 import { VisorImagen } from "@/components/ui/visor-imagen";
 import { totalesDeLlegada, type FilaLlegada } from "@/lib/compras/llegadas-avisos";
+import { fotoParaPdf } from "@/lib/tabla/foto-pdf";
 import type { EtiquetaPedido } from "@/lib/proveedor/etiquetas-datos";
 import { Dato, FilaPuerto } from "./[id]/vista-llegada";
 
@@ -15,11 +18,41 @@ const entero = (n: number) => n.toLocaleString("es-PA");
 export function ListaLlegadas({ filas, etiquetas, periodo }: { filas: FilaLlegada[]; etiquetas: Record<string, EtiquetaPedido[]>; periodo: string }) {
   const t = totalesDeLlegada(filas);
   const [foto, setFoto] = useState<{ src: string; alt: string } | null>(null);
+  const [armando, setArmando] = useState(false);
+  const { mostrarToast } = useToast();
+
+  async function descargarPdf() {
+    setArmando(true);
+    try {
+      const { llegadasAPdf, nombreArchivoLlegadas } = await import("@/lib/compras/llegadas-pdf");
+      const ahora = new Date();
+      // Más grande que en las tablas: la etiqueta lleva un código de barras.
+      const bytes = await llegadasAPdf(filas, etiquetas, periodo, ahora, (u) => fotoParaPdf(u, 320));
+      const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: "application/pdf" }));
+      const enlace = document.createElement("a");
+      enlace.href = url;
+      enlace.download = nombreArchivoLlegadas(ahora);
+      document.body.appendChild(enlace);
+      enlace.click();
+      enlace.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      mostrarToast("PDF descargado");
+    } catch {
+      mostrarToast("No se pudo armar el PDF. Inténtalo de nuevo.", "destructive");
+    } finally {
+      setArmando(false);
+    }
+  }
 
   return (
     <div className="flex flex-col gap-4">
       <header className="flex flex-col gap-2 rounded-lg border border-border bg-card p-4">
-        <h2 className="m-0 text-base font-semibold tracking-tight">Llegó a puerto</h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="m-0 text-base font-semibold tracking-tight">Llegó a puerto</h2>
+          <BotonBarra onClick={descargarPdf} disabled={armando || filas.length === 0}>
+            {armando ? "Armando el PDF…" : "Descargar PDF"}
+          </BotonBarra>
+        </div>
         <p className="m-0 text-sm text-muted-foreground">{periodo}</p>
         <dl className="m-0 flex flex-wrap gap-x-8 gap-y-2 text-sm">
           <Dato nombre="Compras" valor={entero(t.compras)} />

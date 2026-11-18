@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { rutaPropia } from "./ruta-almacen";
+import { rutaEnCarpeta, rutaPropia } from "./ruta-almacen";
 
 const P = "https://x.supabase.co/storage/v1/object/public/wms-productos/";
 const U = "0f8fad5b-d9cb-469f-a165-70867728950e";
@@ -32,4 +32,34 @@ test("nombreArchivoSeguro deja un nombre sin carpetas ni puntos dobles", async (
   assert.equal(nombreArchivoSeguro(""), "archivo");
   assert.equal(esUuid("../wms-productos/probe"), false);
   assert.equal(esUuid("0f8fad5b-d9cb-469f-a165-70867728950e"), true);
+});
+
+test("rutaEnCarpeta: acepta rutas normales de la carpeta", () => {
+  assert.equal(rutaEnCarpeta(`${U}/enviados/1-foto.jpg`, `${U}/enviados/`), true);
+  assert.equal(rutaEnCarpeta(`comentarios/${U}/1-Factura de mayo.pdf`, `comentarios/${U}/`), true);
+  assert.equal(rutaEnCarpeta("productos/nuevos/1-foto%20grande.jpg", "productos/nuevos/"), true);
+});
+
+test("rutaEnCarpeta: rechaza todo lo que puede salir de la carpeta", () => {
+  const c = `${U}/enviados/`;
+  for (const mala of [
+    `${c}../../otro/x.jpg`,
+    `${c}%2e%2e/%2e%2e/rest/v1/perfiles`,
+    `${c}%2E%2E/x`,
+    `${c}.%2e/x`,
+    `${c}%2e./x`,
+    `${c}..%2fx`,
+    `${c}a%5c..%5cx`,
+    `${c}a${"\\"}..${"\\"}x`,
+    `${c}a//x`,
+    `${c}./x`,
+    `${c}x?select=*`,
+    `${c}x#y`,
+    `${c}x\u0000`,
+    c,
+    "otra/enviados/x.jpg",
+    `${c}${"a".repeat(400)}`,
+  ]) assert.equal(rutaEnCarpeta(mala, c), false, mala);
+  assert.equal(rutaEnCarpeta(null, c), false);
+  assert.equal(rutaEnCarpeta(42, c), false);
 });

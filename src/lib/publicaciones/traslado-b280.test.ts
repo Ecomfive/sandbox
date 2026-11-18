@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mensajeTrasladoDropi, normalizarDatosRepublicar, unidadesEnBodegaDropi } from "./traslado-b280";
+import { esTareaDeTraslado, mensajeTrasladoDropi, normalizarDatosRepublicar, unidadesEnBodegaDropi } from "./traslado-b280";
 
 test("datos de una republicación de la B280: solo con b280; lo demás, revisado", () => {
   assert.equal(normalizarDatosRepublicar(null), null);
@@ -29,4 +29,10 @@ test("el mensaje para el grupo de Dropi dice cuántas, de qué bodega, de qué I
   assert.match(mensajeTrasladoDropi({ viejo: 1, nuevo: 2, nombre: "X", unidades: null, pais: "CR" }), /todas las unidades de la bodega de Dropi Costa Rica \(B15\)/);
   assert.doesNotMatch(m, /variación/);
   assert.match(mensajeTrasladoDropi({ viejo: 7000, nuevo: 9001, nombre: "Rodillera", unidades: 18, pais: "PA", variable: true }), /cada variación \(talla, color…\) a la misma variación del ID nuevo/);
+});
+
+test("la tarea del traslado se reconoce por su título", () => {
+  assert.equal(esTareaDeTraslado("Pedir a Dropi el traslado del ID 8946 al 12034"), true);
+  assert.equal(esTareaDeTraslado("Archivar en Dropi el ID 8946"), false);
+  assert.equal(esTareaDeTraslado(null), false);
 });

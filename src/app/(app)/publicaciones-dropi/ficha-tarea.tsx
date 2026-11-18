@@ -11,6 +11,8 @@ import { anilloFoco, fieldClass } from "@/components/ui/field";
 import { Ventana } from "@/components/ui/ventana";
 import { ArchivarIcon, ChevronRightIcon } from "@/lib/nav-icons";
 import { MAX_NOTA_TAREA, MAX_TITULO_TAREA, type TareaVista } from "@/lib/publicaciones/tareas";
+import { esTareaDeTraslado } from "@/lib/publicaciones/traslado-b280";
+import { BotonFormatoTraslado } from "./boton-formato-traslado";
 import type { PublicacionDeTarea } from "./tareas-datos";
 import { BuscadorPublicacion, botonClaro, ChipPublicacion, MenuEstado, MenuFecha, MenuPrioridad, MenuResponsable, useCambiarTarea } from "./tareas-piezas";
 
@@ -204,6 +206,13 @@ function ContenidoFichaTarea({
         )}
         {t.hechaNota && <p className="m-0 text-sm text-muted-foreground">Al hacerla: «{t.hechaNota}»</p>}
       </div>
+
+      {/* El manifiesto de HL Express con el traslado ya lleno: la tarea de una republicación de la bodega de Dropi (18 nov 2026). El servidor revisa que sea de Panamá. */}
+      {t.origen === "manual" && t.estado !== "hecha" && esTareaDeTraslado(t.titulo) && (
+        <div>
+          <BotonFormatoTraslado tareaId={t.id} />
+        </div>
+      )}
 
       <dl className="m-0 flex flex-col gap-1 text-xs text-muted-foreground">
         <div>

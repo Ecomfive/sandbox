@@ -1,18 +1,20 @@
 import "server-only";
 
 import { createServiceClient } from "@/lib/supabase/server";
-import { hashToken, tokenPlausible } from "@/lib/ventas/mensajero";
+import { enlaceVencido, hashToken, tokenPlausible } from "@/lib/ventas/mensajero";
 
 export interface MensajeroSesion { repartidorId: string; nombre: string }
 
-/** Quién es el dueño de un enlace. Solo compara el hash; un código inválido, desactivado o de un mensajero inactivo no entra. */
+/** Quién es el dueño de un enlace. Solo compara el hash; un código inválido, vencido, desactivado o de un mensajero inactivo no entra. */
 export async function resolverMensajero(token: unknown): Promise<MensajeroSesion | null> {
   if (!tokenPlausible(token)) return null;
   const supabase = createServiceClient();
-  const { data: enlace } = await supabase.from("ven_mensajero_enlaces").select("repartidor_id").eq("token_hash", hashToken(token)).maybeSingle();
-  if (!enlace) return null;
+  const { data: enlace } = await supabase.from("ven_mensajero_enlaces").select("repartidor_id, creado_en").eq("token_hash", hashToken(token)).maybeSingle();
+  if (!enlace || enlaceVencido(enlace.creado_en as string | null)) return null;
   const { data: rep } = await supabase.from("del_repartidores").select("id, nombre, activo").eq("id", enlace.repartidor_id).maybeSingle();
   if (!rep || !rep.activo) return null;
+  // Para saber cuándo se usó por última vez (se puede revisar quién sigue entrando con un enlace viejo).
+  await supabase.from("ven_mensajero_enlaces").update({ ultimo_uso: new Date().toISOString() }).eq("repartidor_id", enlace.repartidor_id);
   return { repartidorId: String(rep.id), nombre: String(rep.nombre) };
 }
 

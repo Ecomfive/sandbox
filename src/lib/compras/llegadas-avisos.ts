@@ -24,6 +24,8 @@ export const AVISOS_DE_COMPRAS: readonly { evento: EventoAviso; titulo: string; 
 export interface ProductoLlegada {
   codigo: string | null;
   nombre: string;
+  /** La foto comercial del producto (la de Producto), si la tiene. */
+  foto?: string | null;
 }
 
 /** Una compra dentro de una llegada. */
@@ -37,6 +39,8 @@ export interface FilaLlegada {
   productos: ProductoLlegada[];
   unidades: number | null;
   cajas: number | null;
+  /** La foto del primer producto que tenga una (18 nov 2026, pedido de Logística: reconocer el producto de un vistazo). */
+  foto?: string | null;
   /** Rutas de las imágenes de la etiqueta de las cajas (se firman al mostrarlas). */
   etiquetasRutas: string[];
   segundoPago: number | null;

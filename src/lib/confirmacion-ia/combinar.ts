@@ -107,6 +107,28 @@ export function combinar({ distingueZona, zonaReglas, modelos }: { distingueZona
   return { estado: "listo", zona, zonaPor, completa, falta: null, acuerdo, motivo };
 }
 
+/**
+ * Lo que falta, en palabras fijas, para el mensaje que sale solo al cliente (auditoría de seguridad, 18 nov 2026). La dirección la escribe el
+ * cliente y la IA la lee junto con direcciones de ejemplo de otros clientes: si la IA siguiera instrucciones escritas en la dirección, su texto
+ * libre podría llevarle al cliente la dirección de otro. Por eso el envío automático nunca usa ese texto: se traduce a las frases fijas de
+ * `FRASES_FALTA` según las palabras que nombra, y si no nombra ninguna, a una frase general. El asesor sigue viendo en pantalla lo que dijo la IA.
+ */
+export function faltaParaCliente(falta: string | null | undefined): string {
+  const t = String(falta ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  const elegidas = FRASES_FALTA.filter((f) => f.claves.some((k) => t.includes(k))).map((f) => f.frase);
+  if (!elegidas.length) return FALTA_GENERAL;
+  return elegidas.length === 1 ? elegidas[0] : `${elegidas.slice(0, -1).join(", ")} y ${elegidas[elegidas.length - 1]}`;
+}
+
+const FALTA_GENERAL = "los datos que faltan de tu dirección (la calle o el sector y el número de casa o un punto de referencia)";
+const FRASES_FALTA: { claves: string[]; frase: string }[] = [
+  { claves: ["ciudad", "corregimiento", "provincia", "distrito", "canton", "municipio"], frase: "la ciudad o el corregimiento" },
+  { claves: ["calle", "sector", "barrio", "avenida", "colonia"], frase: "la calle o el sector" },
+  { claves: ["casa", "referencia", "senas"], frase: "el número de casa o un punto de referencia" },
+  { claves: ["apartamento", "apto", "oficina", "piso", "local"], frase: "el número de apartamento u oficina" },
+  { claves: ["edificio", "urbanizacion", "residencial", "condominio", "torre"], frase: "el nombre del edificio o de la urbanización" },
+];
+
 /** El mensaje que pide solo lo que falta de la dirección. */
 export function mensajePedirDetalle({ nombre, numero, tienda, falta }: { nombre: string | null; numero: string | null; tienda: string | null; falta: string }): string {
   const primero = (nombre ?? "").trim().split(/\s+/)[0] ?? "";

@@ -26,7 +26,7 @@ interface CompraLeida {
   etapa: string;
   qty_total: number | null;
   segundo_pago: number | null;
-  wms_compra_items: { cantidad_pedida: number | null; creado_en: string; skus_maestros: { codigo: string | null; nombre: string } | { codigo: string | null; nombre: string }[] | null }[] | null;
+  wms_compra_items: { cantidad_pedida: number | null; creado_en: string; skus_maestros: { codigo: string | null; nombre: string; foto_url: string | null } | { codigo: string | null; nombre: string; foto_url: string | null }[] | null }[] | null;
 }
 
 interface ItemLeido {
@@ -43,7 +43,7 @@ async function armarFilas(supabase: SupabaseClient, lista: ItemLeido[], conLlega
   if (lista.length === 0) return [];
   const ids = [...new Set(lista.map((i) => i.compra_id))];
   const [{ data: compras }, { data: pedidos }] = await Promise.all([
-    supabase.from("wms_compras").select("id, codigo, numero, nombre, etapa, qty_total, segundo_pago, wms_compra_items(cantidad_pedida, creado_en, skus_maestros(codigo, nombre))").in("id", ids),
+    supabase.from("wms_compras").select("id, codigo, numero, nombre, etapa, qty_total, segundo_pago, wms_compra_items(cantidad_pedida, creado_en, skus_maestros(codigo, nombre, foto_url))").in("id", ids),
     supabase.from("proveedor_pedidos").select("compra_id, cajas, etiquetas_rutas").in("compra_id", ids),
   ]);
   const porCompra = new Map(((compras ?? []) as unknown as CompraLeida[]).map((c) => [c.id, c]));
@@ -54,7 +54,7 @@ async function armarFilas(supabase: SupabaseClient, lista: ItemLeido[], conLlega
     const lineas = [...(c.wms_compra_items ?? [])].sort((a, b) => a.creado_en.localeCompare(b.creado_en));
     const productos = lineas.flatMap((l) => {
       const s = Array.isArray(l.skus_maestros) ? l.skus_maestros[0] : l.skus_maestros;
-      return s ? [{ codigo: s.codigo, nombre: s.nombre }] : [];
+      return s ? [{ codigo: s.codigo, nombre: s.nombre, foto: s.foto_url }] : [];
     });
     const unidades = num(c.qty_total) ?? (lineas.length ? lineas.reduce((s, l) => s + (num(l.cantidad_pedida) ?? 0), 0) : null);
     const p = cajas.get(c.id);
@@ -64,6 +64,7 @@ async function armarFilas(supabase: SupabaseClient, lista: ItemLeido[], conLlega
         orden: numeroOrden(c.numero),
         codigo: c.codigo,
         productos: productos.length ? productos : c.nombre ? [{ codigo: null, nombre: c.nombre }] : [],
+        foto: productos.find((x) => x.foto)?.foto ?? null,
         unidades,
         cajas: p?.cajas == null ? null : Number(p.cajas),
         etiquetasRutas: (p?.etiquetas_rutas ?? []).map(String),

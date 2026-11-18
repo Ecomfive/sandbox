@@ -1,6 +1,7 @@
 // «Republicar (B280)» (12 nov 2026, proceso de Nicol; tarea de Alcides): el ID viejo tiene su stock en la bodega de Dropi (B280 en Panamá, B15 en Costa Rica),
 // que nosotros no podemos mover. «Aplicar en Dropi» crea el ID nuevo con 100 unidades temporales en nuestra bodega y lo deja en 0; después hay que pedirle a
-// Dropi, por mensaje en el grupo, que traslade a mano las unidades de su bodega del ID viejo al nuevo, y el viejo se archiva un mes después (devoluciones tardías).
+// Dropi (HL Express en Panamá), que traslade a mano las unidades de su bodega del ID viejo al nuevo, y el viejo se archiva un mes después (devoluciones tardías). En Panamá
+// ya no es un mensaje: HL Express pide un documento formal y la tarea trae «Descargar formato para HL Express» (`formato-traslado-hl.ts`); el mensaje queda para los demás países.
 // Aquí: lo que viaja en `datos` del cambio, el mensaje para Dropi y el cierre solo de la tarea «Pedir a Dropi el traslado» cuando la lectura de «Mis productos»
 // ve el stock en la bodega de Dropi del ID nuevo. Importa con rutas relativas porque también corre desde `scripts/` (la lectura diaria).
 
@@ -40,6 +41,9 @@ export function unidadesEnBodegaDropi(bodegas: unknown): number {
 
 /** El nombre de la bodega de Dropi del país, para el mensaje. */
 export const bodegaDropiDePais = (codigo: string) => (codigo.toUpperCase() === "CR" ? "la bodega de Dropi Costa Rica (B15)" : "la Bodega Dropi Panamá (B280)");
+
+/** Si el título es el de una tarea «Pedir a Dropi el traslado del ID X al Y» (de ahí cuelga el botón del formato de HL Express). */
+export const esTareaDeTraslado = (titulo: string | null | undefined) => /^Pedir a Dropi el traslado del ID \d+ al \d+/.test(titulo ?? "");
 
 /** El mensaje para el grupo de Dropi, listo para copiar. */
 export function mensajeTrasladoDropi(m: { viejo: number | string; nuevo: number | string; nombre: string; unidades: number | null; pais: string; variable?: boolean }): string {

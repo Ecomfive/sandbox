@@ -1,5 +1,6 @@
 "use server";
 
+import { rutaEnCarpeta } from "@/lib/seguridad/ruta-almacen";
 import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
 import { registrarAuditoria } from "@/lib/auditoria";
@@ -167,9 +168,8 @@ export async function crearProducto(formData: FormData): Promise<{ error?: strin
   // La foto que se subió en la ficha de crear (en `productos/nuevos/…`): se revisa que sea de verdad una imagen y pasa a la
   // carpeta del producto. Si algo falla, el producto queda creado sin foto (se pone después desde su ficha).
   const fotoSubida = texto(formData, "foto_url");
-  const prefijoNuevos = `${PREFIJO_FOTOS}productos/nuevos/`;
   let conFoto = false;
-  if (fotoSubida && fotoSubida.startsWith(prefijoNuevos) && !fotoSubida.includes("..")) {
+  if (fotoSubida && fotoSubida.startsWith(PREFIJO_FOTOS) && rutaEnCarpeta(fotoSubida.slice(PREFIJO_FOTOS.length), "productos/nuevos/")) {
     const origen = fotoSubida.slice(PREFIJO_FOTOS.length);
     const { data: archivo } = await supabase.storage.from(BUCKET_FOTOS).download(origen);
     const imagen = archivo ? detectarImagen(new Uint8Array(await archivo.slice(0, 64).arrayBuffer())) : null;
@@ -184,7 +184,7 @@ export async function crearProducto(formData: FormData): Promise<{ error?: strin
     } else {
       await supabase.storage.from(BUCKET_FOTOS).remove([origen]);
     }
-  } else if (fotoSubida && fotoSubida.startsWith(`${PREFIJO_FOTOS}publicaciones/`) && !fotoSubida.includes("..") && !fotoSubida.includes("?")) {
+  } else if (fotoSubida && fotoSubida.startsWith(PREFIJO_FOTOS) && rutaEnCarpeta(fotoSubida.slice(PREFIJO_FOTOS.length), "publicaciones/")) {
     // La foto de una publicación de Gestión de IDs Dropi (el pack o combo que se crea desde ahí usa la misma): se COPIA a la carpeta del
     // producto, revisada por su contenido; la publicación sigue con la suya.
     const origen = fotoSubida.slice(PREFIJO_FOTOS.length);
@@ -222,8 +222,9 @@ export async function crearProducto(formData: FormData): Promise<{ error?: strin
 async function copiarFotoDelSimple(supabase: SupabaseClient, destinoId: string, origenId: string): Promise<boolean> {
   const { data: simple } = await supabase.from("skus_maestros").select("foto_url").eq("id", origenId).maybeSingle();
   const url = simple?.foto_url as string | null | undefined;
-  if (!url || !url.startsWith(PREFIJO_FOTOS) || url.includes("..")) return false;
+  if (!url || !url.startsWith(PREFIJO_FOTOS)) return false;
   const origen = url.slice(PREFIJO_FOTOS.length).split("?")[0];
+  if (!rutaEnCarpeta(origen, "")) return false;
   const { data: archivo } = await supabase.storage.from(BUCKET_FOTOS).download(origen);
   if (!archivo) return false;
   const imagen = detectarImagen(new Uint8Array(await archivo.slice(0, 64).arrayBuffer()));
@@ -790,8 +791,7 @@ export async function buscarPosiblesDuplicados(nombre: string, foto: string | nu
 
   // La huella de la foto recién subida (solo una de la carpeta de fotos nuevas).
   let huella: string | null = null;
-  const prefijoNuevos = `${PREFIJO_FOTOS}productos/nuevos/`;
-  if (typeof foto === "string" && foto.startsWith(prefijoNuevos) && !foto.includes("..") && !foto.includes("?")) {
+  if (typeof foto === "string" && foto.startsWith(PREFIJO_FOTOS) && rutaEnCarpeta(foto.slice(PREFIJO_FOTOS.length), "productos/nuevos/")) {
     const { data: archivo } = await supabase.storage.from(BUCKET_FOTOS).download(foto.slice(PREFIJO_FOTOS.length));
     if (archivo) huella = await huellaFoto(new Uint8Array(await archivo.arrayBuffer()));
   }
@@ -825,7 +825,7 @@ export async function guardarFotoProducto(id: string, ruta: string | null): Prom
   let url: string | null = null;
   let huella: string | null = null;
   if (ruta !== null) {
-    if (typeof ruta !== "string" || !ruta.startsWith(`productos/${id}/`) || ruta.includes("..")) return { error: "Foto no válida." };
+    if (!rutaEnCarpeta(ruta, `productos/${id}/`)) return { error: "Foto no válida." };
     const { data: archivo } = await supabase.storage.from(BUCKET_FOTOS).download(ruta);
     const imagen = archivo ? detectarImagen(new Uint8Array(await archivo.slice(0, 64).arrayBuffer())) : null;
     if (!imagen) {

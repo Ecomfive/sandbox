@@ -1,4 +1,4 @@
--- 0315 · Unidades por venta (18 nov 2026, pedido de Hernán): una variante de Shopify que es un paquete del mismo producto
+-- 0316 · Unidades por venta (18 nov 2026, pedido de Hernán): una variante de Shopify que es un paquete del mismo producto
 -- («Paga 1 kit y lleva 2», «Lleva 3 kit», SKU «…/X3») se une a su producto con cuántas unidades lleva cada venta. Una línea de pedido con
 -- cantidad 2 de un «Lleva 3» son 6 unidades: salen 6 de bodega y cuesta 6 veces el producto. Cuenta lo que recibe el cliente, no lo que paga.
 --  · `tienda_variantes.unidades_por_venta`: lo elige quien vincula en Gestión de tienda › Tiendas Shopify › Productos (el sistema lo sugiere).

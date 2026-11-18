@@ -40,11 +40,14 @@ export async function marcarFallida(token: string, ordenId: string, datos: Recor
 export async function prepararSubidaMensajero(token: string, ordenId: string, nombreArchivo: string): Promise<{ ruta: string; token: string } | { error: string }> {
   const r = await ordenDelMensajero(token, ordenId);
   if (r.error !== undefined) return { error: r.error };
+  // Las fotos de prueba, como los cambios de fase, solo mientras la orden está en ruta (una orden ya cerrada no se toca desde el enlace).
+  if (!accionesDelMensajero(r.orden, r.sesion.repartidorId).length) return { error: "Esta orden ya no está en ruta." };
   return await permisoDeSubida(ordenId, nombreArchivo);
 }
 
 export async function guardarComprobanteMensajero(token: string, ordenId: string, ruta: string, tipo: string, nota?: string | null): Promise<Resultado> {
   const r = await ordenDelMensajero(token, ordenId);
   if (r.error !== undefined) return { error: r.error };
+  if (!accionesDelMensajero(r.orden, r.sesion.repartidorId).length) return { error: "Esta orden ya no está en ruta." };
   return await guardarComprobante(ordenId, ruta, tipo, nota, `Mensajero ${r.sesion.nombre}`);
 }

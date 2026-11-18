@@ -24,6 +24,8 @@
 // pedidos, por la API interna de la página). Su sesión también es una cookie: se ve con /api/me, que dice el rol de la cuenta (nunca sale nada más).
 // 0.7.1 (9 nov 2026): junta la 0.6.3 (que solo estaba en la carpeta de la extensión, no en el sistema) con la 0.7.0; Dunamixfy también lee con su pestaña al frente.
 // 0.7.2 (12 nov 2026): el lector de Drop también lee los exclusivos de cada producto (lo que Drop guarda aparte para un cliente), de su ficha.
+// 0.8.1 (18 nov 2026): el lector de Drop entiende la página de pedidos nueva de Drop (la lista se llama «orders») y lee por tramos de fechas (su
+// paginación se cortaba pasados ~5.500 pedidos).
 // 0.8.0 (12 nov 2026): «siscore» es la pestaña de servientrega-clientes.appsiscore.com (SISCORE, el portal de clientes de Servientrega Panamá) con la cuenta
 // de la tienda (Kenku primero), con el lector `siscore` (informe de guías y rastreo de cada una) para Logística de tienda. SOLO LECTURA: solo consultas;
 // nunca anula, crea guías, recolecciones ni confirmaciones. Su sesión es una cookie: se ve si la página es la del cliente (no la de entrar).
