@@ -11,9 +11,26 @@ export interface Pestana {
  */
 export const PESTANAS_POR_MODULO: Record<string, Pestana[]> = {
   // Gestión de tienda › Confirmación (16 nov 2026): la cola de confirmación y la confirmación con IA (analiza la dirección de lo confirmado; sus direcciones de ejemplo, palabras de zona e instrucciones son secciones de esa misma pestaña).
-  "/tienda-confirmacion": [
-    { etiqueta: "Confirmación", href: "/tienda-confirmacion" },
-    { etiqueta: "Con IA", href: "/tienda-confirmacion/ia" },
+  // Gestión de tienda (17 nov 2026, pedido de Hernán: «que no esté todo repartido»): cada entrada del menú junta en pestañas lo que antes eran
+  // módulos sueltos; cada pestaña sigue con su permiso (`PESTANAS_CON_MODULO` en nav-data) y se esconde a quien no lo tiene.
+  "/tienda-pedidos": [
+    { etiqueta: "Pedidos", href: "/tienda-pedidos" },
+    { etiqueta: "Confirmación", href: "/tienda-pedidos/confirmacion" },
+    { etiqueta: "Confirmación con IA", href: "/tienda-pedidos/confirmacion/ia" },
+    { etiqueta: "Logística", href: "/tienda-pedidos/logistica" },
+    { etiqueta: "Cuánto hay", href: "/tienda-pedidos/cuanto-hay" },
+  ],
+  // Despacho ciudad, como el panel de Monday: el día de hoy y, al lado, devoluciones, cambios y reembolsos, y lo demás de despacho.
+  "/despacho-ciudad": [
+    { etiqueta: "Hoy", href: "/despacho-ciudad" },
+    { etiqueta: "Devoluciones", href: "/despacho-ciudad/devoluciones" },
+    { etiqueta: "Cambios y reembolsos", href: "/despacho-ciudad/cambios" },
+    { etiqueta: "Cuánto hay", href: "/despacho-ciudad/cuanto-hay" },
+    { etiqueta: "Pedir a inventario", href: "/despacho-ciudad/pedir-inventario" },
+  ],
+  "/tienda-tiendas": [
+    { etiqueta: "Tiendas", href: "/tienda-tiendas" },
+    { etiqueta: "Productos", href: "/tienda-tiendas/productos" },
   ],
   "/publicaciones-drop": [
     { etiqueta: "Publicaciones", href: "/publicaciones-drop" },

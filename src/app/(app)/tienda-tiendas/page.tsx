@@ -2,12 +2,13 @@ import { FaltaMigracionTienda, SinTiendas } from "@/components/tienda/barra-tien
 import { claseThLista, claseTdLista, MarcoTabla, Pastilla } from "@/components/panel/piezas-panel";
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
-import { requireModulo } from "@/lib/auth";
+import { requirePanel } from "@/lib/auth";
 import { formatearTiempoRelativo } from "@/lib/formato";
 import { getPaisActual } from "@/lib/pais";
 import { createServiceClient } from "@/lib/supabase/server";
 import { esAdministrador } from "@/lib/permisos/acceso";
-import { cargarTiendas, type Tienda } from "@/lib/tienda/datos";
+import { type Tienda } from "@/lib/tienda/datos";
+import { tiendasVisibles } from "@/lib/confirmacion-ia/acceso";
 import { appDeTienda } from "@/lib/tienda/shopify-app";
 import { ConectarTienda } from "./conectar-tienda";
 import { ConectarIcomfly } from "./conectar-icomfly";
@@ -43,13 +44,14 @@ const AVISO_ICOMFLY: Record<string, { texto: string; error: boolean }> = {
 };
 
 export default async function TiendasPage({ searchParams }: { searchParams: Promise<{ icomfly?: string; motivo?: string }> }) {
-  const usuario = await requireModulo("tienda-tiendas");
+  const usuario = await requirePanel("/tienda-tiendas", "tienda-tiendas");
   const { icomfly, motivo } = await searchParams;
   const aviso = icomfly ? AVISO_ICOMFLY[icomfly] : undefined;
   const admin = esAdministrador(usuario) && !usuario.modulosSoloLectura.includes("tienda-tiendas");
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
-  const { tiendas, faltaMigracion } = await cargarTiendas(supabase, pais.id);
+  // Solo las tiendas de la persona (17 nov 2026).
+  const { tiendas, faltaMigracion } = await tiendasVisibles(supabase, pais.id);
   // La conexión con iComfly (el bot de WhatsApp de las tiendas, 13 nov 2026); null si falta la migración 0284.
   const icomflyDe = admin ? await conexionesIcomfly(supabase, tiendas.map((t) => t.id)) : new Map();
   return (

@@ -13,7 +13,7 @@ import { BarraPresencia, PersonasEnChat, useEquipoEnSistema, usePresenciaChats, 
 import { HORAS_VENTANA, textoVentana } from "@/lib/whatsapp/ventana";
 import type { AreaCrm } from "@/lib/crm/areas";
 import { quienesRespondieron } from "@/lib/crm/respondieron";
-import { abrirConversacion, cambiarEstadoConversacion, fichaCrmDelChat, conectarWebhook360, marcarChatLeido, enviarWhatsapp, intervenirConversacion, mensajesAnteriores, notaWhatsapp, marcarChatBorradoEnApp, pasarConversacionDeArea, tomarConversacion, vistaPreviaChat } from "./actions";
+import { abrirConversacion, archivarConversacion, cambiarEstadoConversacion, fichaCrmDelChat, conectarWebhook360, marcarChatLeido, enviarWhatsapp, intervenirConversacion, mensajesAnteriores, notaWhatsapp, marcarChatBorradoEnApp, pasarConversacionDeArea, tomarConversacion, vistaPreviaChat } from "./actions";
 import type { FichaCrmChat } from "./actions";
 import type { ConversacionVista, DatosBandeja, MensajeVista, ResumenDropshipper, VistaPreviaMensaje } from "./datos-bandeja";
 import { guardarColorEtiquetaChat, guardarEtiquetasChat } from "./etiquetas-actions";
@@ -53,7 +53,8 @@ import { Bandera } from "@/components/paises/bandera";
 import { PERMISOS_BANDEJA_COMPLETOS, type PermisosBandeja } from "@/lib/crm/permisos-bandeja";
 
 /** Qué conversaciones del panel se ven. */
-type Filtro = "sinResponder" | "mias" | "resueltas" | "todas";
+const TODAS_MIS_AREAS = "todas-mis-areas";
+type Filtro = "sinResponder" | "mias" | "resueltas" | "todas" | "archivadas";
 const REFRESCO_MS = 8000;
 /** Con el aviso en tiempo real conectado (canal-bandeja.ts), el refresco solo queda de respaldo. */
 const REFRESCO_RESPALDO_MS = 30000;
@@ -418,7 +419,10 @@ export function Bandeja({
   // panel, a todo lo ancho, con sus filtros, sus conteos y su tablero. Es para auditar desde el propio usuario: sigue siendo supervisión (lo que
   // abre no se marca leído y para contestar hay que «Intervenir»). Desde aquí, `areas` son los paneles que se muestran.
   const [verComo, setVerComo] = useState<AreaCrm | null>(null);
-  const areas = useMemo(() => (verComo ? [verComo] : misAreas), [verComo, misAreas]);
+  // «Mi vista» (17 nov 2026, pedido de Hernán para Comercial): solo el panel propio, sin los demás al lado. «Todas mis áreas» los pone lado a lado
+  // como antes. Dirección arranca con todas: su panel propio casi no tiene chats y su trabajo es mirar los de abajo.
+  const [todasMisAreas, setTodasMisAreas] = useState(miArea === "direccion");
+  const areas = useMemo(() => (verComo ? [verComo] : todasMisAreas ? misAreas : [miArea]), [verComo, todasMisAreas, misAreas, miArea]);
   // El tablero (29 oct 2026, pedido de Hernán; bosquejo https://claude.ai/artifact/1KpnHWrczXW3DtQ8Yv65na): un área a la vez; desde el 30 oct, en
   // columnas Por atender, En conversación y Cerrados. Viendo como otra área, el tablero es el de esa área.
   const [vistaBandeja, setVistaBandeja] = useState<"lista" | "tablero">("lista");
@@ -711,11 +715,15 @@ export function Bandeja({
     [datos.conversaciones, numero, areas, paisSel, numeroDe],
   );
   // Los filtros cuentan los chats de todos los paneles que se ven.
+  // Los archivados (migración 0314) no cuentan en los demás filtros: solo en «Archivadas», que aparece cuando hay alguno.
+  const vivos = delNumero.filter((c) => !c.archivada);
+  const nArchivadas = delNumero.length - vivos.length;
   const opciones: { id: Filtro; texto: string; cuenta: number }[] = [
-    { id: "sinResponder", texto: "Sin responder", cuenta: delNumero.filter(sinResponder).length },
-    { id: "mias", texto: "Mías", cuenta: delNumero.filter((c) => c.asignadaAId === miId).length },
-    { id: "resueltas", texto: "Resueltas", cuenta: delNumero.filter((c) => c.estado === "resuelta").length },
-    { id: "todas", texto: "Todas", cuenta: delNumero.length },
+    { id: "sinResponder", texto: "Sin responder", cuenta: vivos.filter(sinResponder).length },
+    { id: "mias", texto: "Mías", cuenta: vivos.filter((c) => c.asignadaAId === miId).length },
+    { id: "resueltas", texto: "Resueltas", cuenta: vivos.filter((c) => c.estado === "resuelta").length },
+    { id: "todas", texto: "Todas", cuenta: vivos.length },
+    ...(nArchivadas || filtro === "archivadas" ? [{ id: "archivadas" as const, texto: "Archivadas", cuenta: nArchivadas }] : []),
   ];
   // Una lista por panel (29 oct 2026): los paneles se ven lado a lado, cada uno con sus chats según el filtro y la búsqueda.
   const listas = useMemo(() => {
@@ -731,7 +739,9 @@ export function Bandeja({
               (c) =>
                 // El chat abierto se queda en la lista aunque ya no cumpla el filtro (al leerlo deja de estar «Sin responder»), como en WhatsApp.
                 c.id === elegido ||
-                (filtro === "sinResponder" ? sinResponder(c) : filtro === "mias" ? c.asignadaAId === miId : filtro === "resueltas" ? c.estado === "resuelta" : true),
+                (filtro === "archivadas"
+                  ? c.archivada
+                  : !c.archivada && (filtro === "sinResponder" ? sinResponder(c) : filtro === "mias" ? c.asignadaAId === miId : filtro === "resueltas" ? c.estado === "resuelta" : true)),
             )
             .filter((c) => !q || [c.nombre, c.nombrePerfil, c.codigo, ...c.tiendas].some((x) => x?.toLowerCase().includes(q))),
         ),
@@ -743,7 +753,7 @@ export function Bandeja({
   const tablero = useMemo(() => {
     const q = buscar.trim().toLowerCase();
     const chats = delNumero
-      .filter((c) => c.area === areaTablero && (!soloMios || c.asignadaAId === miId))
+      .filter((c) => c.area === areaTablero && !c.archivada && (!soloMios || c.asignadaAId === miId))
       .filter((c) => !q || [c.nombre, c.nombrePerfil, c.codigo, ...c.tiendas].some((x) => x?.toLowerCase().includes(q)))
       .map((c) => ({ c, esperandoDesde: esperandoDesde(c), grupo: c.motivo?.grupo ?? null, vip: c.vip, ultimoMensajeEn: c.ultimoMensajeEn, resuelta: c.estado === "resuelta" }));
     const r = repartirTablero(chats);
@@ -1318,6 +1328,21 @@ export function Bandeja({
               alPulsar={() => accion(() => cambiarEstadoConversacion(sel.id, "abierta"), "Conversación reabierta.")}
             />
           )}
+          {p.resolver && (
+            <BotonBarra
+              id="archivar"
+              disabled={enviando}
+              texto={sel.archivada ? "Sacar del archivo: vuelve a las listas" : "Archivar: sale de las listas hasta que el cliente vuelva a escribir"}
+              corto={sel.archivada ? "Desarchivar" : "Archivar"}
+              icono={ArchivarIcon}
+              alPulsar={() =>
+                accion(
+                  () => archivarConversacion(sel.id, !sel.archivada),
+                  sel.archivada ? "Salió del archivo." : "Archivado: si el cliente vuelve a escribir, regresa solo a la bandeja.",
+                )
+              }
+            />
+          )}
         </>
       )
     ) : null;
@@ -1407,12 +1432,17 @@ export function Bandeja({
           <label className="flex h-10 items-center gap-2 text-[13px] text-[var(--wa-sec)]">
             Ver como
             <select
-              value={verComo ?? ""}
-              onChange={(e) => cambiarVerComo((e.target.value || null) as AreaCrm | null)}
+              value={verComo ?? (todasMisAreas ? TODAS_MIS_AREAS : "")}
+              onChange={(e) => {
+                const v = e.target.value;
+                setTodasMisAreas(v === TODAS_MIS_AREAS);
+                cambiarVerComo(v && v !== TODAS_MIS_AREAS ? (v as AreaCrm) : null);
+              }}
               title="Ver la bandeja tal como la ve un área, para revisarla sin entrar con su usuario"
               className={`h-10 rounded-lg px-2 text-[13px] font-semibold text-[var(--wa-texto)] ${verComo ? "border border-[var(--wa-texto)] bg-[var(--wa-fondo)]" : "border-0 bg-[var(--wa-panel)]"} ${anilloFoco}`}
             >
-              <option value="">Mi vista (todas mis áreas)</option>
+              <option value="">Mi vista ({areaChat(miArea).etiqueta})</option>
+              <option value={TODAS_MIS_AREAS}>Todas mis áreas</option>
               {misAreas
                 .filter((a) => a !== miArea)
                 .map((a) => (
@@ -1693,7 +1723,7 @@ export function Bandeja({
               )}
               <ul className="m-0 flex-1 list-none overflow-y-auto p-0">
                 {chats.map((c) => filaChat(c, ancha))}
-                {!chats.length && <li className="px-4 py-10 text-center text-sm text-[var(--wa-sec)]">{filtro === "sinResponder" ? "Nada sin responder." : filtro === "resueltas" ? "No hay conversaciones resueltas." : "No hay conversaciones con este filtro."}</li>}
+                {!chats.length && <li className="px-4 py-10 text-center text-sm text-[var(--wa-sec)]">{filtro === "sinResponder" ? "Nada sin responder." : filtro === "resueltas" ? "No hay conversaciones resueltas." : filtro === "archivadas" ? "No hay chats archivados." : "No hay conversaciones con este filtro."}</li>}
               </ul>
               {a !== miArea && <p className="m-0 border-t border-[var(--wa-borde)] bg-[var(--wa-panel)] px-4 py-2 text-xs text-[var(--wa-sec)]">Supervisión: lo que abras aquí no se marca leído</p>}
             </section>

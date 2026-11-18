@@ -1,5 +1,6 @@
 "use server";
 
+import { sinAccesoAOrdenes, sinAccesoAPedidoShopify } from "@/lib/tienda/acceso";
 import { revalidatePath } from "next/cache";
 import { requireModuloEscritura } from "@/lib/auth";
 import { getPaisActual } from "@/lib/pais";
@@ -13,6 +14,9 @@ export async function agregarNotaPedido(pedidoId: string, texto: string): Promis
   if (!/^[0-9a-f-]{36}$/i.test(pedidoId)) return { error: "Pedido no válido." };
   if (!limpio) return { error: "Escribe la nota." };
   const supabase = createServiceClient();
+  // Solo en pedidos de las tiendas de la persona (17 nov 2026).
+  const sinAcceso = await sinAccesoAPedidoShopify(supabase, pedidoId);
+  if (sinAcceso) return { error: sinAcceso };
   const { error } = await supabase.from("tienda_pedido_notas").insert({ pedido_id: pedidoId, texto: limpio, autor_id: usuario.id, autor_nombre: usuario.nombre ?? usuario.email });
   if (error) return { error: "No se pudo guardar la nota." };
   revalidatePath(`/tienda-pedidos/${pedidoId}`);
@@ -38,6 +42,8 @@ export async function agregarNotaOrden(ordenId: string, texto: string): Promise<
   const { data: orden } = await supabase.from("ven_ordenes").select("id, fin_unidades(clase, pais_id)").eq("id", ordenId).maybeSingle();
   const unidad = (orden?.fin_unidades ?? null) as unknown as { clase: string; pais_id: string } | null;
   if (!orden || !unidad || unidad.clase !== "tienda" || unidad.pais_id !== pais.id) return { error: "No se encontró el pedido (o es de otro país)." };
+  const sinAcceso = await sinAccesoAOrdenes(supabase, [ordenId]);
+  if (sinAcceso) return { error: sinAcceso };
   const { data, error } = await supabase
     .from("ven_orden_notas")
     .insert({ orden_id: ordenId, texto: limpio, autor: usuario.nombre ?? usuario.email })

@@ -20,7 +20,8 @@ export interface ResultadoModelo {
   error?: string;
 }
 
-export type EstadoAnalisis = "listo" | "falta_dato" | "revisar" | "error";
+/** `adelantado`: la dirección es de una zona de pago por adelantado («En espera de pago»): no se propone etiqueta hasta que el asesor verifique el pago. */
+export type EstadoAnalisis = "listo" | "falta_dato" | "revisar" | "error" | "adelantado";
 
 export interface Combinado {
   estado: EstadoAnalisis;
@@ -61,7 +62,7 @@ export function leerRespuesta(texto: string): RespuestaModelo | null {
     return null;
   }
   const zona = String(j.zona ?? "").toLowerCase().trim();
-  if (zona !== "ciudad" && zona !== "interior" && zona !== "no_se" && zona !== "no_aplica") return null;
+  if (zona !== "ciudad" && zona !== "interior" && zona !== "adelantado" && zona !== "no_se" && zona !== "no_aplica") return null;
   if (typeof j.completa !== "boolean") return null;
   const falta = j.completa ? null : limpiarFalta(j.falta);
   return { zona: zona === "no_aplica" ? "no_se" : zona, completa: j.completa, falta, motivo: String(j.motivo ?? "").trim().slice(0, 400) };
@@ -87,7 +88,7 @@ export function combinar({ distingueZona, zonaReglas, modelos }: { distingueZona
       zonaPor = "regla";
     } else {
       const zonas = buenos.map((m) => m.respuesta.zona);
-      if (zonas.every((z) => z === "ciudad" || z === "interior") && new Set(zonas).size === 1) {
+      if (zonas.every((z) => z === "ciudad" || z === "interior" || z === "adelantado") && new Set(zonas).size === 1) {
         zona = zonas[0] as Zona;
         zonaPor = "ia";
       }
@@ -99,6 +100,8 @@ export function combinar({ distingueZona, zonaReglas, modelos }: { distingueZona
   const acuerdo = buenos.length < 2 ? null : mismaCompleta && mismaZona;
   const motivo = buenos.map((m) => m.respuesta.motivo).filter(Boolean)[0] ?? "";
 
+  // Pago por adelantado (por una palabra de zona o porque las dos IA lo ven así): queda «en espera de pago», sin etiqueta, aunque la dirección falte algo (el asesor se pone en contacto de todos modos).
+  if (zona === "adelantado") return { estado: "adelantado", zona: null, zonaPor, completa, falta: null, acuerdo, motivo };
   if (!completa) return { estado: "falta_dato", zona, zonaPor, completa, falta, acuerdo, motivo };
   if (distingueZona && !zona) return { estado: "revisar", zona: null, zonaPor: null, completa, falta: null, acuerdo, motivo };
   return { estado: "listo", zona, zonaPor, completa, falta: null, acuerdo, motivo };
@@ -112,8 +115,21 @@ export function mensajePedirDetalle({ nombre, numero, tienda, falta }: { nombre:
   return `${saludo} Para poder enviar ${pedido} necesitamos completar tu dirección. ¿Nos puedes escribir ${falta}? ¡Gracias! 🙏`;
 }
 
+/**
+ * El mensaje que le avisa al cliente que su pedido es de una zona de pago por adelantado y cómo pagar (17 nov 2026). Los métodos de pago son los que se registran por tienda; sin ellos, el mensaje
+ * pide el comprobante y dice que un asesor le indica cómo pagar. Lo envía el asesor con un botón (nunca solo).
+ */
+export function mensajePagoAdelantado({ nombre, numero, tienda, metodos }: { nombre: string | null; numero: string | null; tienda: string | null; metodos: string | null }): string {
+  const primero = (nombre ?? "").trim().split(/\s+/)[0] ?? "";
+  const saludo = primero ? `Hola ${primero.charAt(0).toUpperCase()}${primero.slice(1).toLowerCase()} 👋` : "Hola 👋";
+  const pedido = numero ? `tu pedido ${numero}${tienda ? ` de ${tienda}` : ""}` : "tu pedido";
+  const como = metodos?.trim() ? `\n\nPuedes pagar así:\n${metodos.trim()}\n\n` : " Un asesor te indicará cómo pagar. ";
+  return `${saludo} ${pedido[0].toUpperCase()}${pedido.slice(1)} es para una zona con pago por adelantado. Para poder enviarlo necesitamos que realices el pago y nos envíes el comprobante por este chat.${como}Apenas lo recibamos, lo confirmamos y lo despachamos. ¡Gracias! 🙏`;
+}
+
 /** La etiqueta de Shopify que corresponde a una zona, según lo configurado en el país; null si el país no la tiene definida. */
 export function etiquetaDeZona(zona: Zona | null, config: { etiquetaCiudad: string | null; etiquetaInterior: string | null }): string | null {
-  if (!zona) return null;
+  // El pago por adelantado no tiene etiqueta de envío: la pone el asesor cuando llega el pago.
+  if (!zona || zona === "adelantado") return null;
   return (zona === "ciudad" ? config.etiquetaCiudad : config.etiquetaInterior)?.trim() || null;
 }

@@ -38,7 +38,16 @@ const SUBPAGINAS_AYUDA: [string, string][] = [
 
 /** Subpáginas fijas de un módulo (no dinámicas): cuelgan de su módulo y llevan este nombre. */
 const SUBPAGINAS: Record<string, string> = {
-  "/tienda-confirmacion/ia": "Con IA",
+  // Gestión de tienda (17 nov 2026): lo que antes eran módulos sueltos ahora son pestañas de Pedidos, Despacho ciudad y Tiendas Shopify.
+  "/tienda-pedidos/confirmacion": "Confirmación",
+  "/tienda-pedidos/confirmacion/ia": "Confirmación con IA",
+  "/tienda-pedidos/logistica": "Logística",
+  "/tienda-pedidos/cuanto-hay": "Preguntar cuánto hay",
+  "/despacho-ciudad/devoluciones": "Devoluciones",
+  "/despacho-ciudad/cambios": "Cambios y reembolsos",
+  "/despacho-ciudad/cuanto-hay": "Responder cuánto hay",
+  "/despacho-ciudad/pedir-inventario": "Pedir a inventario",
+  "/tienda-tiendas/productos": "Productos de Shopify",
   "/retiros/cuentas": "Cuentas destino",
   "/compras/por-pais": "Gestión por país",
   "/usuarios/auditoria": "Historial de auditoría",
@@ -214,6 +223,7 @@ export function construirMigas(
   }
 
   // Una llegada de compras (el aviso de Llegada a Puerto o de En Bodega) no es un módulo del menú: la abre quien recibe el aviso o tiene Compras.
+  if (ruta === "/llegadas") return { migas: [{ etiqueta: "Compras" }, { etiqueta: "Llegadas a puerto" }], favoritoHref: null, moduloHref: null, moduloEtiqueta: null };
   if (ruta.startsWith("/llegadas/")) return { migas: [{ etiqueta: "Compras" }, { etiqueta: "Llegada de compras" }], favoritoHref: null, moduloHref: null, moduloEtiqueta: null };
 
   const titulo = TITULOS_APARTE[ruta];

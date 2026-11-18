@@ -5,6 +5,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { huellaFoto } from "@/lib/wms/huella-foto";
+import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { descargarPublico } from "@/lib/seguridad/url-externa";
 import { mismaTiendaUnidad, nombreComparable } from "./ordenes-finanzas";
 import { accesoDeApp, appDeTienda } from "./shopify-app";
@@ -142,10 +143,13 @@ async function unidadDeTienda(supabase: SupabaseClient, tiendaId: string): Promi
 export async function aplicarVinculosDeTienda(supabase: SupabaseClient, tiendaId: string, soloOrdenes?: string[]): Promise<number> {
   const unidad = await unidadDeTienda(supabase, tiendaId);
   if (!unidad) return 0;
-  const { data: vs } = await supabase.from("tienda_variantes").select("sku, producto_titulo, sku_maestro_id").eq("tienda_id", tiendaId).not("sku_maestro_id", "is", null);
+  // Todas las vinculadas, de a 1 000 (17 nov 2026: Oferfy pasó las 1 000 y las que quedaban fuera nunca llegaban a sus pedidos).
+  const vs = await traerTodasLasFilas<{ sku: string | null; producto_titulo: string; sku_maestro_id: string }>((d, h) =>
+    supabase.from("tienda_variantes").select("sku, producto_titulo, sku_maestro_id").eq("tienda_id", tiendaId).not("sku_maestro_id", "is", null).order("id").range(d, h),
+  );
   const porSku = new Map<string, string>();
   const porTitulo = new Map<string, Set<string>>();
-  for (const v of vs ?? []) {
+  for (const v of vs) {
     if (v.sku) porSku.set(skuLimpio(v.sku as string), v.sku_maestro_id as string);
     const t = nombreComparable(v.producto_titulo as string);
     porTitulo.set(t, (porTitulo.get(t) ?? new Set()).add(v.sku_maestro_id as string));

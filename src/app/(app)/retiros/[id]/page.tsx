@@ -53,6 +53,9 @@ export default async function RetiroDetallePage({
   const cuenta = retiro.cuentas_retiro as unknown as { nombre: string; tipo: string; detalle: string | null } | null;
   const codigoPais = (retiro.paises as unknown as { codigo: string } | null)?.codigo ?? "PA";
   const asignado = retiro.perfiles as unknown as { nombre: string | null; email: string } | null;
+  // Retiro fallido (migración 0309): sin la columna, ninguno lo es.
+  const { data: marca } = await supabase.from("retiros").select("solo_comision").eq("id", id).maybeSingle();
+  const soloComision = (marca as { solo_comision?: boolean } | null)?.solo_comision === true;
 
   let urlComprobante: string | null = null;
   if (retiro.comprobante_path) {
@@ -98,6 +101,7 @@ export default async function RetiroDetallePage({
         <div>
           <p className="text-muted-foreground">Monto del retiro</p>
           <p className="font-medium tabular-nums">{formatearMoneda(Number(retiro.monto), codigoPais)}</p>
+          {soloComision && <p className="mt-0.5 text-xs text-warning">Retiro fallido: solo se cobró la comisión (no se recibe nada)</p>}
         </div>
         <div>
           <p className="text-muted-foreground">Comisión</p>

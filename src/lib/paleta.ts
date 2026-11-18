@@ -2,7 +2,7 @@
 // recientes y cómo se mueve la selección con el teclado. Sin React, para poder probarla.
 
 import { normalizar } from "@/lib/tabla/motor";
-import { moduloDeHref, type NavSection } from "@/lib/nav-data";
+import { moduloDeHref, puedeAbrirPagina, type NavSection } from "@/lib/nav-data";
 import { PESTANAS_POR_MODULO } from "@/lib/pestanas";
 
 export interface PaginaBuscable {
@@ -24,7 +24,7 @@ const PAGINAS_FIJAS: PaginaBuscable[] = [
  * «Cuentas destino»), solo las de los módulos a los que tiene acceso. `permitidos` null = todas.
  */
 export function paginasBuscables(areas: NavSection[], permitidos: string[] | null, pestanasOcultas: string[] = []): PaginaBuscable[] {
-  const puede = (href: string) => !permitidos || permitidos.includes(moduloDeHref(href));
+  const puede = (href: string) => !permitidos || puedeAbrirPagina(permitidos, href);
   const paginas: PaginaBuscable[] = [];
   const vistos = new Set<string>();
   const agregar = (pagina: PaginaBuscable, revisarPermiso = true) => {

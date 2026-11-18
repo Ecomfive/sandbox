@@ -3,7 +3,7 @@ import { TableroDespacho } from "@/components/despacho/tablero-despacho";
 import { anilloFoco } from "@/components/ui/field";
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
-import { requireModulo } from "@/lib/auth";
+import { requirePanel } from "@/lib/auth";
 import { cargarCiudad, rangoDespacho } from "@/lib/despacho/datos";
 import { createServiceClient } from "@/lib/supabase/server";
 
@@ -23,7 +23,7 @@ const RANGOS = [
  * que antes lo hacía Monday. Muestra los días elegidos (y los dos siguientes, para lo programado).
  */
 export default async function DespachoCiudadPage({ searchParams }: { searchParams: Promise<{ [k: string]: string | string[] | undefined }> }) {
-  const usuario = await requireModulo("despacho-ciudad");
+  const usuario = await requirePanel("/despacho-ciudad", "despacho-ciudad");
   const sp = await searchParams;
   const rango = RANGOS.find((r) => r.id === sp.dias) ?? RANGOS[1];
   const { desde, hasta, hoy } = rangoDespacho(rango.dias);

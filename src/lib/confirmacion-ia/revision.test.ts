@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { acierto, coincideConPropuesta, resultadoFinal, revisarVeredicto, seleccionarEjemplos } from "./revision";
+import { acierto, coincideConPropuesta, faltaVigente, resultadoFinal, revisarVeredicto, seleccionarEjemplos } from "./revision";
 
 const etiquetas = { etiquetaCiudad: "CIUDAD", etiquetaInterior: "INTERIOR/SERVIENTREGA" };
 
@@ -47,4 +47,23 @@ test("seleccionarEjemplos reparte las completas entre ciudad e interior y deja l
   assert.deepEqual(r.filter((x) => x.completa).map((x) => x.id), [1, 5, 2], "ciudad, interior y otra vez ciudad: no solo ciudad");
   assert.deepEqual(r.filter((x) => !x.completa).map((x) => x.id), [6, 7, 8]);
   assert.equal(seleccionarEjemplos([e(1, true, "ciudad"), e(2, true, "ciudad")], 5).length, 2, "si no hay más, no inventa");
+});
+
+test("faltaVigente: lo que marcó el equipo manda; sin revisión, lo que dijo la IA", () => {
+  assert.equal(faltaVigente({ estado: "falta_dato", falta: "la calle" }), "la calle");
+  assert.equal(faltaVigente({ estado: "listo", falta: null }), null);
+  assert.equal(faltaVigente({ estado: "revisar", rev_en: "2026-11-16", rev_completa: false, rev_falta: "el número de casa" }), "el número de casa", "marcado a mano como falta un dato");
+  assert.equal(faltaVigente({ estado: "falta_dato", falta: "la calle", rev_en: "2026-11-16", rev_completa: true }), null, "el equipo dijo que estaba completa");
+  assert.equal(faltaVigente({ estado: "falta_dato", falta: "la calle", rev_en: null }), "la calle");
+});
+
+test("pago por adelantado marcado por el equipo: queda en espera de pago, sin etiqueta, y es un ejemplo propio", () => {
+  assert.deepEqual(revisarVeredicto({ completa: true, zona: "adelantado" }, true), { veredicto: { completa: true, zona: "adelantado", falta: null } });
+  const base = { estado: "revisar" as const, zona: null, etiqueta: null, falta: null };
+  const revision = { completa: true, zona: "adelantado" as const, falta: null, ok: null, por: "Ana", en: "2026-11-17T10:00:00Z" };
+  assert.deepEqual(resultadoFinal({ ...base, revision }, etiquetas), { estado: "adelantado", zona: null, etiqueta: null, falta: null });
+  assert.equal(coincideConPropuesta({ estado: "listo", zona: "interior" }, { completa: true, zona: "adelantado", falta: null }, true), false);
+  const ej = (zona: "ciudad" | "interior" | "adelantado", n: number) => ({ id: `${zona}${n}`, completa: true, zona });
+  const elegidos = seleccionarEjemplos([ej("ciudad", 1), ej("ciudad", 2), ej("interior", 1), ej("adelantado", 1), ej("adelantado", 2)], 4);
+  assert.ok(elegidos.some((e) => e.zona === "adelantado"), "el pago por adelantado entra entre los ejemplos aunque haya de las otras");
 });

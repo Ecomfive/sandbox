@@ -105,8 +105,10 @@ async function guardarCajas(
   cuenta: CuentaProveedor,
   p: Pedido,
   entrada: { cajas: unknown; nuevas?: unknown; quitar?: unknown },
-  opciones: { avisar: boolean },
+  opciones: { avisar: boolean; /** Lo anotó Ecomfive (no el proveedor): su nombre y el origen «sistema». */ ecomfive?: string },
 ): Promise<{ cajas: number; etiquetas: string[] } | { error: string }> {
+  const autor = opciones.ecomfive ?? autorDe(cuenta);
+  const origen = opciones.ecomfive ? "sistema" : "proveedor";
   const valida = validarCajas(entrada.cajas);
   if ("error" in valida) return valida;
   const nuevas = Array.isArray(entrada.nuevas) ? entrada.nuevas.map(String) : [];
@@ -142,15 +144,15 @@ async function guardarCajas(
   if (cambioCajas) {
     await supabase
       .from("wms_compra_eventos")
-      .insert({ compra_id: p.compra_id, campo: "cajas", valor_antes: cajasAntes == null ? null : String(cajasAntes), valor_despues: String(valida.cajas), autor: autorDe(cuenta), origen: "proveedor" });
+      .insert({ compra_id: p.compra_id, campo: "cajas", valor_antes: cajasAntes == null ? null : String(cajasAntes), valor_despues: String(valida.cajas), autor, origen });
   }
   if (cambioCajas || revisadas.length) {
-    const texto = `Cajas de ${cuenta.proveedor.nombre}: ${entero(valida.cajas)} ${valida.cajas === 1 ? "caja" : "cajas"}${revisadas.length ? ` · etiqueta de las cajas adjunta (${revisadas.length})` : ""}`;
-    const { data: nota } = await supabase.from("wms_compra_comentarios").insert({ compra_id: p.compra_id, autor: autorDe(cuenta), texto }).select("id").single();
+    const texto = `${opciones.ecomfive ? `Cajas de ${cuenta.proveedor.nombre} (anotadas por Ecomfive)` : `Cajas de ${cuenta.proveedor.nombre}`}: ${entero(valida.cajas)} ${valida.cajas === 1 ? "caja" : "cajas"}${revisadas.length ? ` · etiqueta de las cajas adjunta (${revisadas.length})` : ""}`;
+    const { data: nota } = await supabase.from("wms_compra_comentarios").insert({ compra_id: p.compra_id, autor, texto }).select("id").single();
     if (nota && revisadas.length) {
       await supabase
         .from("wms_compra_adjuntos")
-        .insert(revisadas.map((f) => ({ compra_id: p.compra_id, comentario_id: nota.id, nombre: f.nombre, extension: f.extension, tamano: f.tamano, clase: "foto", origen: "proveedor", ruta: f.rutaCompra, subido_por: autorDe(cuenta) })));
+        .insert(revisadas.map((f) => ({ compra_id: p.compra_id, comentario_id: nota.id, nombre: f.nombre, extension: f.extension, tamano: f.tamano, clase: "foto", origen, ruta: f.rutaCompra, subido_por: autor })));
     }
     if (opciones.avisar) {
       await avisarAEcomfive(
@@ -177,6 +179,46 @@ export async function aplicarCajas(
   if ("error" in p) return p;
   if (p.etapa !== "produccion" && p.etapa !== "enviado") return { error: "Las cajas se anotan cuando el pedido está en producción o ya salió." };
   return guardarCajas(supabase, cuenta, p, entrada, { avisar: true });
+}
+
+/**
+ * Ecomfive anota o corrige a mano las cajas y la etiqueta de las cajas de una compra (16 nov 2026, pedido de Hernán: los envíos viejos no las traen y las pone el equipo). Se escribe en el
+ * mismo espejo (`proveedor_pedidos`) que lee el portal del proveedor, así que él lo ve igual que lo que anota él; vale en cualquier etapa. `cajas` vacío deja las que ya tenía (para subir solo
+ * la etiqueta); sin cajas anotadas todavía, hay que escribirlas. El proveedor recibe una novedad en «Lo nuevo de Ecomfive».
+ */
+export async function aplicarCajasEcomfive(
+  compraId: string,
+  persona: { id: string; nombre: string },
+  entrada: { cajas?: unknown; nuevas?: unknown; quitar?: unknown },
+): Promise<{ error: string } | { cajas: number; etiquetas: string[]; pedidoId: string }> {
+  const supabase = createServiceClient();
+  const { data, error: errorLectura } = await supabase
+    .from("proveedor_pedidos")
+    .select("id, compra_id, proveedor_id, producto, etapa, visible, foto_real_ruta, cajas, proveedores(id, nombre, notificar_a)")
+    .eq("compra_id", compraId)
+    .maybeSingle();
+  if (errorLectura) return { error: /cajas|schema cache/i.test(errorLectura.message) ? SIN_MIGRACION_CAJAS : "No se pudo leer el pedido del proveedor." };
+  if (!data || !data.visible) return { error: "Esta compra no está en el portal de un proveedor: no lleva cajas ni etiqueta." };
+  const prov = (Array.isArray(data.proveedores) ? data.proveedores[0] : data.proveedores) as { id: string; nombre: string; notificar_a: string | null } | null;
+  if (!prov) return { error: "No se encontró el proveedor de esta compra." };
+  const vacio = entrada.cajas === undefined || entrada.cajas === null || String(entrada.cajas).trim() === "";
+  if (vacio && data.cajas == null) return { error: "Escribe cuántas cajas lleva el envío." };
+  const pedido: Pedido = { id: data.id as string, compra_id: data.compra_id as string, proveedor_id: data.proveedor_id as string, producto: data.producto as string, etapa: data.etapa as EtapaPortal, visible: true, foto_real_ruta: (data.foto_real_ruta as string | null) ?? null };
+  // La «cuenta» solo sirve para saber de qué proveedor es la carpeta de las imágenes; lo que queda escrito lleva el nombre de la persona.
+  const cuenta: CuentaProveedor = { cuentaId: persona.id, usuarioId: persona.id, nombre: persona.nombre, proveedor: { id: prov.id, nombre: prov.nombre, notificarA: prov.notificar_a, diasAnticipo: 0, porcentajeAnticipo: 0 } };
+  const r = await guardarCajas(supabase, cuenta, pedido, { cajas: vacio ? data.cajas : entrada.cajas, nuevas: entrada.nuevas, quitar: entrada.quitar }, { avisar: false, ecomfive: persona.nombre });
+  if ("error" in r) return r;
+  // Para el proveedor: lo que Ecomfive anotó, en «Lo nuevo de Ecomfive» de su portal.
+  await supabase.from("proveedor_novedades").insert({
+    proveedor_id: prov.id,
+    pedido_id: pedido.id,
+    lado: "ecomfive",
+    tipo: "envio",
+    texto: `Ecomfive anotó las cajas y la etiqueta de ${pedido.producto}`,
+    detalle: `${entero(r.cajas)} ${r.cajas === 1 ? "caja" : "cajas"} · ${r.etiquetas.length} ${r.etiquetas.length === 1 ? "imagen de etiqueta" : "imágenes de etiqueta"}`,
+    autor_nombre: persona.nombre,
+  });
+  return { ...r, pedidoId: pedido.id };
 }
 
 /**

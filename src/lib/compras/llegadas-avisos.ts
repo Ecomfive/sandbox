@@ -4,7 +4,7 @@
 // Lógica pura, con prueba: qué etapa avisa a quién, cómo se arma la lista de una llegada y el texto del aviso. Lo que toca la base vive en `llegadas-servidor.ts`.
 
 export type TipoLlegada = "puerto" | "bodega";
-export type EventoAviso = "llegada_puerto" | "llegada_bodega";
+export type EventoAviso = "llegada_puerto" | "llegada_bodega" | "pago_adelantado";
 
 /** Qué etapa de la compra dispara el aviso de una llegada. */
 export const LLEGADA_DE_ETAPA: Readonly<Record<string, { tipo: TipoLlegada; evento: EventoAviso }>> = {
@@ -17,12 +17,15 @@ export const EVENTO_DE_TIPO: Readonly<Record<TipoLlegada, EventoAviso>> = { puer
 /** A quién le toca cada aviso, como se dice en pantalla. */
 export const AVISOS_DE_COMPRAS: readonly { evento: EventoAviso; titulo: string; detalle: string }[] = [
   { evento: "llegada_puerto", titulo: "Logística · Llegada a Puerto", detalle: "Reciben la lista de lo que viene (producto, unidades, cajas y etiqueta de las cajas) cuando una compra pasa a «06 - Llegada a Puerto»." },
-  { evento: "llegada_bodega", titulo: "Pagos · En Bodega", detalle: "Reciben lo que hay que pagar del segundo pago (por compra y en total) cuando una compra pasa a «07 - En Bodega»." },
+  { evento: "llegada_bodega", titulo: "Pagos (solo aviso) · En Bodega", detalle: "Se enteran de lo que hay que pagar del segundo pago (por compra y en total) cuando una compra pasa a «07 - En Bodega». El pago lo registra quien gestiona Compras." },
+  { evento: "pago_adelantado", titulo: "Pago por adelantado · Confirmación con IA", detalle: "Se enteran cuando un pedido confirmado es de una zona de pago por adelantado, para avisarle al cliente y esperar el pago. Sin nadie marcado, no se avisa a nadie." },
 ];
 
 export interface ProductoLlegada {
   codigo: string | null;
   nombre: string;
+  /** La foto comercial del producto (la de Producto), si la tiene. */
+  foto?: string | null;
 }
 
 /** Una compra dentro de una llegada. */
@@ -36,6 +39,8 @@ export interface FilaLlegada {
   productos: ProductoLlegada[];
   unidades: number | null;
   cajas: number | null;
+  /** La foto del primer producto que tenga una (18 nov 2026, pedido de Logística: reconocer el producto de un vistazo). */
+  foto?: string | null;
   /** Rutas de las imágenes de la etiqueta de las cajas (se firman al mostrarlas). */
   etiquetasRutas: string[];
   segundoPago: number | null;
@@ -44,6 +49,30 @@ export interface FilaLlegada {
   montoPagado: number | null;
   pagadoPor: string | null;
   etapa: string;
+  /** La llegada de la que sale esta fila y cuándo se avisó (solo en la lista de todas las llegadas). */
+  llegadaId?: string;
+  llegadaEn?: string;
+}
+
+/** Los periodos de «Todas las llegadas» (días contando hoy) y el de entrada. */
+export const DIAS_LISTA_LLEGADAS = [1, 7, 30, 90] as const;
+export const DIAS_LISTA_PREDETERMINADO = 7;
+export const diasDeLista = (v: unknown): number => {
+  const n = Number(Array.isArray(v) ? v[0] : v);
+  return (DIAS_LISTA_LLEGADAS as readonly number[]).includes(n) ? n : DIAS_LISTA_PREDETERMINADO;
+};
+
+/** El instante desde el que cuenta un periodo: las 00:00 de Panamá (UTC−5, sin horario de verano) de `dias − 1` días antes de `hoy` (AAAA-MM-DD). */
+export function desdeDeLista(hoy: string, dias: number): string {
+  const d = new Date(`${hoy}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - (Math.max(1, dias) - 1));
+  return `${d.toISOString().slice(0, 10)}T00:00:00-05:00`;
+}
+
+/** Una compra puede estar en dos llegadas (si se movió de etapa y volvió): en la lista de todas cuenta una vez, con su llegada más reciente (las filas vienen de la más nueva a la más vieja). */
+export function unaPorCompra<T extends { compraId: string }>(filas: readonly T[]): T[] {
+  const vistas = new Set<string>();
+  return filas.filter((f) => (vistas.has(f.compraId) ? false : (vistas.add(f.compraId), true)));
 }
 
 /** Solo las etapas de aviso tienen llegada. */
@@ -90,6 +119,15 @@ export function totalesDeLlegada(filas: readonly FilaLlegada[]): TotalesLlegada 
   }
   return t;
 }
+
+/** La lista de lo que llegó a puerto en los últimos días: a donde lleva «Ver lista» del aviso de Llegada a Puerto (el de bodega sigue abriendo su llegada para pagar). */
+export const RUTA_LISTA_PUERTO = "/llegadas?tipo=puerto";
+
+/** ¿Es el aviso de una llegada a puerto? Se reconoce por su título (`armarAviso`): así los avisos que ya estaban guardados también ofrecen la lista. */
+export const esAvisoDePuerto = (titulo: string): boolean => titulo.startsWith("Llega a puerto");
+
+/** A dónde lleva un aviso: el de puerto va a la lista de llegadas (no hay nada que gestionar, solo prepararse); los demás conservan su dirección. */
+export const hrefDeAviso = (titulo: string, href: string): string => (esAvisoDePuerto(titulo) && href.startsWith("/llegadas") ? RUTA_LISTA_PUERTO : href);
 
 export interface AvisoArmado {
   titulo: string;

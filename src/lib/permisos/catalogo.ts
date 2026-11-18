@@ -89,6 +89,7 @@ export const AREAS_ACCESO: AreaAcceso[] = [
       { clave: "publicaciones-dunamixfy", etiqueta: "Gestión de IDs Dunamixfy" },
       { clave: "uso-sistema", etiqueta: "Uso del sistema (IDs Dropi)" },
       { clave: "tienda-pedidos", etiqueta: "Pedidos de tienda" },
+      { clave: "tienda-reporteria", etiqueta: "Reportería de pedidos" },
       { clave: "tienda-confirmacion", etiqueta: "Confirmación de tienda" },
       { clave: "tienda-logistica", etiqueta: "Logística de tienda" },
       { clave: "despacho-ciudad", etiqueta: "Despacho ciudad" },
@@ -304,7 +305,7 @@ export const CATALOGO_CRM: CatalogoModulo = {
     { clave: "notas", etiqueta: "Dejar notas privadas en el chat", requiereEdicion: true },
     { clave: "pasar-area", etiqueta: "Pasar un chat a otra área", requiereEdicion: true },
     { clave: "tomar", etiqueta: "Tomar, soltar e intervenir chats", requiereEdicion: true },
-    { clave: "resolver", etiqueta: "Marcar resuelto y reabrir", requiereEdicion: true },
+    { clave: "resolver", etiqueta: "Marcar resuelto, archivar y reabrir", requiereEdicion: true },
   ],
   grupos: [],
   alcance: {

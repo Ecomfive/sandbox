@@ -6,6 +6,8 @@ import { BarraMigas } from "@/components/barra-migas";
 import { LatidoPresencia } from "@/components/latido-presencia";
 import { AvisoPedidosNuevos } from "@/components/tienda/aviso-pedidos-nuevos";
 import { AvisoInactividad } from "@/components/aviso-inactividad";
+import { AvisoPersonal } from "@/components/aviso-personal";
+import { ProveedorPendientesVivos } from "@/components/pendientes-vivos";
 import { ProveedorModulos } from "@/components/modulos-contexto";
 import { ProveedorPais } from "@/components/pais-contexto";
 import { ProveedorDescargaPdf } from "@/components/tabla/descarga-pdf-contexto";
@@ -19,7 +21,7 @@ import { tieneContrasenaTemporal } from "@/lib/cuenta/contrasena";
 import { getPaisActual } from "@/lib/pais";
 import { PAISES_CON_RECEPCION } from "@/lib/wms/recepcion";
 import { obtenerPlataformasPais } from "@/lib/pais-plataformas";
-import { colapsarGestionDeIds, construirAreas } from "@/lib/nav-data";
+import { colapsarGestionDeIds, construirAreas, pestanasSinModulo } from "@/lib/nav-data";
 import { getPlataformaActual } from "@/lib/plataforma-actual";
 import { paginasBuscables } from "@/lib/paleta";
 import { esAdministrador } from "@/lib/permisos/acceso";
@@ -93,6 +95,8 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   const pestanasOcultas = usuario
     ? [
         ...pestanasOcultasDe(usuario.afinado),
+        // Las pestañas de Gestión de tienda cuyo módulo no tiene (17 nov 2026).
+        ...pestanasSinModulo(usuario.modulos),
         ...(esAdministrador(usuario) ? [] : PESTANAS_SOLO_ADMIN),
         ...(usuario.modulos.includes("uso-sistema") ? [] : PESTANAS_USO_SISTEMA),
         ...(usuario.modulos.includes("compras-por-pais") ? [] : PESTANAS_POR_PAIS),
@@ -107,6 +111,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   return (
     <ProveedorModulos modulos={usuario?.modulos ?? null}>
     <ProveedorPais codigo={paisActual.codigo}>
+    <ProveedorPendientesVivos>
     <ProveedorDescargaPdf puede={!!usuario && PUEDEN_DESCARGAR_PDF.has(usuario.id)}>
     <ToastProvider>
       {usuario && <LatidoPresencia />}
@@ -114,6 +119,8 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       {usuario?.modulos.includes("despacho-ciudad") && (
         <AvisoPedidosNuevos codigoPais={paisActual.codigo} sonidoPorDefecto={!["admin", "ceo"].includes((usuario.rolNombre ?? "").trim().toLowerCase())} />
       )}
+      {/* Avisos personales que alguien tiene que atender (Llegada a Puerto, En Bodega, remisiones), en cualquier página (17 nov 2026). */}
+      {usuario && <AvisoPersonal />}
       {usuario && avisoInactividad && <AvisoInactividad />}
       {usuario?.vistaPrevia && <BannerVistaPrevia rolNombre={usuario.vistaPrevia.rolNombre} />}
       <div className="flex min-h-full">
@@ -128,6 +135,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       </div>
     </ToastProvider>
     </ProveedorDescargaPdf>
+    </ProveedorPendientesVivos>
     </ProveedorPais>
     </ProveedorModulos>
   );

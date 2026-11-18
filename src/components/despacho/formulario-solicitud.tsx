@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { anilloFoco, fieldClass } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
-import { buscarPedido, crearSolicitud, type PedidoEncontrado } from "@/app/(app)/despacho-cambios/actions";
+import { buscarPedido, crearSolicitud, type PedidoEncontrado } from "@/app/(app)/despacho-ciudad/cambios/actions";
 import type { Persona } from "@/lib/postventa/datos";
 import { formaPagoDespacho, nombreSolicitud, TIENDAS, TIPOS, textoSolicitud, type Linea } from "@/lib/postventa/reglas";
 import type { TipoPostventa } from "@/lib/monday/postventa";
@@ -100,7 +100,7 @@ export function FormularioSolicitud({ personas, hoy, puedeCuentas, usuarioId }: 
       if (r.error) mostrarToast(r.error, "destructive");
       if (r.itemId) {
         mostrarToast("Solicitud creada.", "success");
-        router.push(`/despacho-cambios?caso=${r.itemId}`);
+        router.push(`/despacho-ciudad/cambios?caso=${r.itemId}`);
       }
     });
 
@@ -325,7 +325,7 @@ export function FormularioSolicitud({ personas, hoy, puedeCuentas, usuarioId }: 
           <button type="submit" disabled={ocupado} className={`boton-neon min-h-10 rounded-md px-4 text-sm font-medium text-white ${anilloFoco}`}>
             Crear solicitud
           </button>
-          <Link href="/despacho-cambios" className={`inline-flex min-h-10 items-center rounded-md border border-border px-4 text-sm ${anilloFoco}`}>
+          <Link href="/despacho-ciudad/cambios" className={`inline-flex min-h-10 items-center rounded-md border border-border px-4 text-sm ${anilloFoco}`}>
             Cancelar
           </Link>
         </div>

@@ -1,5 +1,8 @@
 "use server";
 
+import { cargarTiendasPermitidas } from "@/lib/finanzas/cargar-tiendas-permitidas";
+import { puedeVerUnidad } from "@/lib/finanzas/tiendas-permitidas";
+import { SIN_ACCESO_TIENDA } from "@/lib/finanzas/acceso-tienda";
 import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { requireModulo, requireModuloEscritura, type UsuarioActual } from "@/lib/auth";
@@ -15,7 +18,7 @@ type Resultado = { error?: string };
 type Supabase = ReturnType<typeof createServiceClient>;
 
 const BUCKET = "despacho-comprobantes";
-const RUTAS = ["/despacho-ciudad", "/despacho-devoluciones"];
+const RUTAS = ["/despacho-ciudad", "/despacho-ciudad/devoluciones"];
 const esItem = (v: unknown): v is string => typeof v === "string" && /^([0-9]{1,20}|S[0-9a-f]{32})$/.test(v);
 const esDia = (v: unknown): v is string => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
 const modulo = (clase: string) => (clase === "devolucion" ? "despacho-devoluciones" : "despacho-ciudad");
@@ -48,6 +51,8 @@ async function filaConPermiso(itemId: string, esArchivo = false): Promise<{ supa
   const { data: fila, error } = await supabase.from("mon_despachos").select("*").eq("item_id", itemId).maybeSingle();
   if (error || !fila) return { error: "Esa fila ya no existe." };
   const usuario = await requireModuloEscritura(modulo(String(fila.clase)));
+  // Solo filas de las tiendas de la persona (17 nov 2026: la gente de Nuvo, solo lo de Nuvo).
+  if (!puedeVerUnidad(await cargarTiendasPermitidas(), (fila.unidad_id as string | null) ?? null)) return { error: SIN_ACCESO_TIENDA };
   if (fila.archivado_en && !esArchivo) return { error: "Esa fila está archivada: restáurala para cambiarla." };
   return { supabase, usuario, fila };
 }
@@ -129,6 +134,8 @@ export async function cambiarCelda(itemId: string, campo: string, valor: string)
   const igual = antes === null || antes === undefined ? nuevo === null : nuevo !== null && (typeof nuevo === "number" ? Number(antes) === nuevo : String(antes) === nuevo);
   if (igual) return {};
   if (campo === "numero" || campo === "tienda") Object.assign(set, await enlazar(supabase, (set.numero_pedido ?? fila.numero_pedido) as string | null, (set.tienda_texto ?? fila.tienda_texto) as string | null));
+  // Con tiendas limitadas no se puede pasar la fila a otra tienda (ni dejarla sin tienda).
+  if (campo === "tienda" && !puedeVerUnidad(await cargarTiendasPermitidas(), (set.unidad_id as string | null) ?? null)) return { error: SIN_ACCESO_TIENDA };
   const { error } = await supabase.from("mon_despachos").update(set).eq("item_id", itemId);
   if (error) return { error: "No se pudo guardar." };
   await registrar(supabase, itemId, usuario, `${titulo}: ${antes ?? "vacío"} → ${nuevo ?? "vacío"}${set.grupo ? ` (pasa a ${set.grupo})` : ""}`);
@@ -172,6 +179,10 @@ export async function crearFila(clase: "ciudad" | "devolucion", destino: string,
   const courier = datos.courier && ETIQUETAS.courier.opciones.some((o) => o.nombre === datos.courier) ? datos.courier : null;
   const tienda = datos.tienda && ETIQUETAS.tienda.opciones.some((o) => o.nombre === datos.tienda) ? datos.tienda : null;
   const supabase = createServiceClient();
+  // Con tiendas limitadas (17 nov 2026), la fila nueva tiene que ser de una de sus tiendas: se le pone su tienda para que la siga viendo.
+  const permitidas = await cargarTiendasPermitidas();
+  const unidadNueva = permitidas ? (await enlazar(supabase, null, tienda)).unidad_id : null;
+  if (permitidas && !puedeVerUnidad(permitidas, unidadNueva)) return { error: "Elige primero una de tus tiendas arriba para agregar la fila." };
   const itemId = `S${crypto.randomUUID().replace(/-/g, "")}`;
   const ahora = new Date().toISOString();
   const hoy = ahora.slice(0, 10);
@@ -183,6 +194,7 @@ export async function crearFila(clase: "ciudad" | "devolucion", destino: string,
     nombre: null,
     courier,
     tienda_texto: tienda,
+    ...(unidadNueva ? { unidad_id: unidadNueva } : {}),
     estado_grupo: "sin_estado",
     edo_pago: clase === "ciudad" ? "PENDIENTE" : null,
     estado_asesores: clase === "devolucion" ? "PENDIENTE" : null,
@@ -278,9 +290,10 @@ export interface DetalleFila {
 export async function detalleFila(itemId: string): Promise<DetalleFila | { error: string }> {
   if (!esItem(itemId)) return { error: "Fila no válida." };
   const supabase = createServiceClient();
-  const { data: fila } = await supabase.from("mon_despachos").select("clase, comprobantes").eq("item_id", itemId).maybeSingle();
+  const { data: fila } = await supabase.from("mon_despachos").select("clase, comprobantes, unidad_id").eq("item_id", itemId).maybeSingle();
   if (!fila) return { error: "Esa fila ya no existe." };
   await requireModulo(modulo(String(fila.clase)));
+  if (!puedeVerUnidad(await cargarTiendasPermitidas(), (fila.unidad_id as string | null) ?? null)) return { error: SIN_ACCESO_TIENDA };
   const [{ data: notas }, { data: actividad }] = await Promise.all([
     supabase.from("despacho_notas").select("id, texto, autor_nombre, creado_en").eq("item_id", itemId).order("creado_en", { ascending: false }).limit(100),
     supabase.from("despacho_actividad").select("id, texto, autor_nombre, creado_en").eq("item_id", itemId).order("creado_en", { ascending: false }).limit(100),
