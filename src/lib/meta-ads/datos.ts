@@ -6,7 +6,7 @@ import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { agrupar, copyLimpio, landingLimpia, type Elemento } from "./agrupar";
 import { CPA_TOPE_PREDETERMINADO, resultado, sinResultados, sumar, type Resultados } from "./metricas";
 import { claveDeProducto, NOMBRE_ETAPA, NOMBRE_PUJA, type Estructura, type Etapa, type Puja } from "./nombre";
-import { esCreacionDeCampana } from "./normalizar";
+import { detalleLegible, esCreacionDeCampana } from "./normalizar";
 import { diasEntre, pendientes, sugerir, type DecisionGuardada, type Sugerencia } from "./sugerencias";
 import type { ActividadVista, AnuncioVista, CampanaVista, Grupo, VideoVista } from "./vistas";
 
@@ -279,5 +279,5 @@ export async function actividadDeCampana(supabase: SupabaseClient, campanaId: st
   const { data: c } = await supabase.from("meta_campanas").select("meta_id, cuenta_id").eq("id", campanaId).maybeSingle();
   if (!c) return [];
   const { data } = await supabase.from("meta_actividad").select("fecha, actor_nombre, tipo, objeto_nombre, detalle").eq("cuenta_id", c.cuenta_id).eq("objeto_meta_id", c.meta_id).order("fecha", { ascending: false }).limit(40);
-  return (data ?? []).map((e) => ({ fecha: e.fecha as string, actor: (e.actor_nombre as string | null) ?? null, tipo: e.tipo as string, objeto: (e.objeto_nombre as string | null) ?? null, detalle: (e.detalle as string | null) ?? null }));
+  return (data ?? []).map((e) => ({ fecha: e.fecha as string, actor: (e.actor_nombre as string | null) ?? null, tipo: e.tipo as string, objeto: (e.objeto_nombre as string | null) ?? null, detalle: detalleLegible(e.detalle as string | null) }));
 }

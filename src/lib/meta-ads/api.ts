@@ -57,13 +57,38 @@ export async function pedirTodo(ruta: string, parametros: Parametros, token: str
   }
 }
 
-/** Varios objetos por su id en una sola consulta (hasta 50): devuelve un objeto por id. Lo que Meta no deja leer simplemente no viene. */
+/**
+ * Varios objetos por su id, con el lote oficial de Meta (`POST /` con `batch`, hasta 50 consultas a la vez): el parámetro `ids` de la API quedó obsoleto desde la v26. Devuelve un objeto por id; lo que Meta
+ * no deja leer (o falla) simplemente no viene, y el error de la primera consulta fallida se cuenta aparte.
+ */
 export async function pedirPorIds(ids: string[], campos: string, token: string): Promise<{ objetos: Map<string, unknown>; error: string | null }> {
   const objetos = new Map<string, unknown>();
-  for (let i = 0; i < ids.length; i += 50) {
-    const r = await pedirMeta("/", { ids: ids.slice(i, i + 50).join(","), fields: campos }, token);
-    if (!r.ok) return { objetos, error: r.error };
-    for (const [id, v] of Object.entries(r.datos as Record<string, unknown>)) if (typeof v === "object" && v !== null) objetos.set(id, v);
+  let error: string | null = null;
+  const validos = ids.filter((i) => /^[0-9]{5,25}$/.test(i));
+  for (let i = 0; i < validos.length; i += 50) {
+    const trozo = validos.slice(i, i + 50);
+    const cuerpo = new URLSearchParams({ access_token: token, include_headers: "false", batch: JSON.stringify(trozo.map((id) => ({ method: "GET", relative_url: `${id}?fields=${encodeURIComponent(campos)}` }))) });
+    try {
+      const r = await fetch(BASE, { method: "POST", body: cuerpo, cache: "no-store", signal: AbortSignal.timeout(ESPERA_MS) });
+      const datos: unknown = await r.json().catch(() => null);
+      if (!r.ok || !Array.isArray(datos)) {
+        error ??= mensajeDeErrorMeta(r.status, datos);
+        continue;
+      }
+      datos.forEach((respuesta, k) => {
+        const o = respuesta as { code?: unknown; body?: unknown } | null;
+        let cuerpoRespuesta: unknown = null;
+        try {
+          cuerpoRespuesta = typeof o?.body === "string" ? JSON.parse(o.body) : null;
+        } catch {
+          cuerpoRespuesta = null;
+        }
+        if (o?.code === 200 && cuerpoRespuesta && typeof cuerpoRespuesta === "object") objetos.set(trozo[k], cuerpoRespuesta);
+        else error ??= mensajeDeErrorMeta(typeof o?.code === "number" ? o.code : 400, cuerpoRespuesta);
+      });
+    } catch (e) {
+      error ??= e instanceof Error && e.name === "TimeoutError" ? "Meta tardó demasiado en contestar." : "No se pudo hablar con Meta.";
+    }
   }
-  return { objetos, error: null };
+  return { objetos, error };
 }

@@ -162,3 +162,12 @@ test("las campañas activas sin etiquetas se avisan juntas; lo decidido no vuelv
   assert.deepEqual(pendientes(sin, [{ clave: "etiquetas_faltan:cuenta", estado: "pospuesta", vigenteHasta: "2026-11-25" }], "2026-11-18"), []);
   assert.equal(pendientes(sin, [{ clave: "etiquetas_faltan:cuenta", estado: "pospuesta", vigenteHasta: "2026-11-17" }], "2026-11-18").length, 1);
 });
+
+test("detalleLegible: el presupuesto y el estado en palabras, y nunca JSON suelto", async () => {
+  const { detalleLegible } = await import("./normalizar");
+  assert.equal(detalleLegible('{"new_value":{"type":"payment_amount","currency":"USD","new_value":5000,"additional_type":"status_string","additional_value":"Diario"},"type":"composite_data"}'), "Presupuesto $50.00 (diario)");
+  assert.equal(detalleLegible('{"new_value":"PAUSED","old_value":"ACTIVE"}'), "Estado: Pausada, antes Activa");
+  assert.equal(detalleLegible('{"new_value":{"type":"payment_amount","currency":"USD","new_val'), null);
+  assert.equal(detalleLegible('{"cosa":1}'), null);
+  assert.equal(detalleLegible(null), null);
+});

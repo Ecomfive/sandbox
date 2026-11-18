@@ -176,6 +176,46 @@ export interface ActividadMeta {
   detalle: string | null;
 }
 
+const ESTADOS_EVENTO: Record<string, string> = { ACTIVE: "Activa", PAUSED: "Pausada", ARCHIVED: "Archivada", DELETED: "Eliminada", CAMPAIGN_PAUSED: "Pausada", ADSET_PAUSED: "Pausada" };
+
+const dineroDeEvento = (v: unknown): string | null => {
+  const o = obj(v);
+  if (o.type !== "payment_amount") return null;
+  const n = Number(o.new_value);
+  if (!Number.isFinite(n)) return null;
+  // Meta da los montos en la unidad menor de la moneda (centavos).
+  const moneda = typeof o.currency === "string" && /^[A-Z]{3}$/.test(o.currency) ? o.currency : "USD";
+  const monto = `${moneda === "USD" ? "$" : `${moneda} `}${(n / 100).toFixed(2)}`;
+  const tipo = typeof o.additional_value === "string" ? o.additional_value.slice(0, 20) : "";
+  return tipo ? `${monto} (${tipo.toLowerCase()})` : monto;
+};
+
+/**
+ * El detalle de un evento de la actividad en palabras (`extra_data` de Meta llega como JSON): «Presupuesto $50.00 (diario)» o «Estado: Pausada». Lo que no se reconoce (o llegó cortado) devuelve null,
+ * para no mostrar JSON en la pantalla.
+ */
+export function detalleLegible(extra: string | null | undefined): string | null {
+  if (!extra) return null;
+  const t = extra.trim();
+  if (!t.startsWith("{")) return t.slice(0, 200);
+  let o: Record<string, unknown>;
+  try {
+    o = obj(JSON.parse(t));
+  } catch {
+    return null;
+  }
+  const nuevo = o.new_value;
+  const antes = o.old_value;
+  const dinero = dineroDeEvento(nuevo);
+  if (dinero) {
+    const d0 = dineroDeEvento(antes);
+    return `Presupuesto ${dinero}${d0 ? `, antes ${d0}` : ""}`;
+  }
+  if (typeof nuevo === "string" && ESTADOS_EVENTO[nuevo]) return `Estado: ${ESTADOS_EVENTO[nuevo]}${typeof antes === "string" && ESTADOS_EVENTO[antes] ? `, antes ${ESTADOS_EVENTO[antes]}` : ""}`;
+  if (typeof nuevo === "string" && nuevo.length > 0 && nuevo.length <= 120 && !nuevo.startsWith("{")) return `Ahora: ${nuevo}`;
+  return null;
+}
+
 /** Un evento del registro de actividad de la cuenta (quién creó o cambió qué). La clave no se repite: la misma fila leída dos veces no se duplica. */
 export function actividadDe(a: unknown): ActividadMeta | null {
   const o = obj(a);
@@ -185,7 +225,7 @@ export function actividadDe(a: unknown): ActividadMeta | null {
   const objetoMetaId = texto(o.object_id, 40);
   const actorId = texto(o.actor_id, 40);
   const extra = texto(o.extra_data, 400);
-  return { clave: `${fecha}|${tipo}|${objetoMetaId ?? ""}|${actorId ?? ""}|${(extra ?? "").slice(0, 60)}`, fecha, actorId, actorNombre: texto(o.actor_name, 120), tipo, objetoTipo: texto(o.object_type, 40), objetoMetaId, objetoNombre: texto(o.object_name, 300), detalle: extra };
+  return { clave: `${fecha}|${tipo}|${objetoMetaId ?? ""}|${actorId ?? ""}|${(extra ?? "").slice(0, 60)}`, fecha, actorId, actorNombre: texto(o.actor_name, 120), tipo, objetoTipo: texto(o.object_type, 40), objetoMetaId, objetoNombre: texto(o.object_name, 300), detalle: detalleLegible(extra) };
 }
 
 /** Si la actividad es la creación de una campaña (de ahí sale «quién la montó»). */
