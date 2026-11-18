@@ -258,6 +258,15 @@ export const PESTANAS_POR_MODULO: Record<string, Pestana[]> = {
     { etiqueta: "Seguimiento", href: "/tu-winner/seguimiento" },
     { etiqueta: "Cómo se actualiza", href: "/tu-winner/como" },
   ],
+  // Anuncios Meta (18 nov 2026, pedido de Alcides): el resumen, las campañas, qué funciona, los videos, el equipo y las cuentas.
+  "/anuncios-meta": [
+    { etiqueta: "Resumen", href: "/anuncios-meta" },
+    { etiqueta: "Campañas", href: "/anuncios-meta/campanas" },
+    { etiqueta: "Qué funciona", href: "/anuncios-meta/que-funciona" },
+    { etiqueta: "Videos", href: "/anuncios-meta/videos" },
+    { etiqueta: "Equipo", href: "/anuncios-meta/equipo" },
+    { etiqueta: "Cuentas", href: "/anuncios-meta/cuentas" },
+  ],
   // Compras primero y luego el Tablero de Shen Zhen (pedido de Hernán, 22 oct 2026).
   "/compras": [
     { etiqueta: "Compras", href: "/compras/lista" },
