@@ -38,7 +38,8 @@ export default async function ConfirmacionTiendaPage({ searchParams }: { searchP
   const miradas = tienda ? [tienda] : tiendas;
   // Solo la tienda que se mira (14 nov 2026: «si abro Kenku, que se actualice Kenku»); con «Todas», todas.
   after(() => revisarSiHaceFalta(createServiceClient(), miradas));
-  const { pedidos, fuente, periodo } = await pedidosDeTiendas(supabase, miradas, pais.codigo, eleccion, { minDias: DIAS_COLA });
+  // De los 60 días, solo los de Shopify sin confirmar o confirmados (18 nov 2026, velocidad: eran ~140 de 9.146); el periodo elegido va completo.
+  const { pedidos, fuente, periodo } = await pedidosDeTiendas(supabase, miradas, pais.codigo, eleccion, { minDias: DIAS_COLA, abiertos: ["nuevo", "confirmado"] });
   const delPeriodo = pedidos.filter((p) => diaPanama(p.creado) >= periodo.desde && diaPanama(p.creado) <= periodo.hasta);
   // La cola: los sin confirmar que llegaron de Shopify (los del Excel de Finanzas son una foto vieja: ya no se gestionan), lo más viejo arriba.
   const sinConfirmar = pedidos.filter((p) => p.estado === "nuevo" && !p.sinHora).sort((a, b) => a.creado.localeCompare(b.creado));

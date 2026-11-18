@@ -2743,7 +2743,11 @@ convenciones técnicas del código.
   Logística/Confirmación 9,0 → 3,9 s. Segunda tanda (migración 0322): el historial de cada cliente (`historialDeClientes`: riesgo y pedidos del
   cliente) sale de `ven_historial_clientes(claves, unidades)` en una consulta (antes ~50, de a 150 teléfonos); `unidades` = las tiendas permitidas de la
   persona (null = todas). Comprobado igual a la forma anterior. Sin caché compartida a propósito: las páginas modifican los pedidos leídos (entrega,
-  transportista) y un pedido nuevo tardaría en verse.
+  transportista) y un pedido nuevo tardaría en verse. Tercera tanda (migración 0323): Logística y Confirmación pedían 60 días de todo (9.146 pedidos)
+  para usar ~3.900 y ~140; `pedidosDeTiendas` con `abiertos` trae el periodo completo y, de los `minDias`, solo los de Shopify en esos estados
+  (`ven_pedidos_periodo`/`ven_lineas_periodo` con `solo_shopify` y `excluir`; sin la migración trae todo y filtra en el servidor, flag `filtroDisponible`).
+  `entregasDeOrdenes`/`guiasDeOrdenes` piden de a 200 y 8 a la vez (`enTandas`; antes una tras otra, ~5 s con 3.800 pedidos). Comprobado: los mismos
+  pedidos en Logística y en Confirmación (hoy, 7 y 90 días, todas o una tienda).
 - **Reportería de pedidos (la Matriz dentro del sistema)** (17 nov 2026, pedido de Hernán para María José; prototipo https://claude.ai/artifact/TNhc38acs7JZzNcsLSgUze):
   `/tienda-reporteria` (Operación › Gestión de tienda, módulo `tienda-reporteria`, migración 0310). Meta: dejar los Excel; la primera carga sale de la Matriz
   «NUEVA GESTION OCEANS PANAMA» (Google Sheet de administración, hoja «Excel Matriz») y después se trabaja aquí. Una fila por línea de producto

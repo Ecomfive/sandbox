@@ -37,36 +37,49 @@ export function etiquetaEntrega(e: EntregaMonday | null | undefined): string | n
   return e.fuente === "siscore" ? `Servientrega: ${estado}` : estado.toUpperCase();
 }
 
+/**
+ * Las filas de esas órdenes, de a 200 por consulta y 8 consultas a la vez (18 nov 2026, velocidad de Logística: de a una tardaba ~5 s con 3.800 pedidos);
+ * null si alguna falla (sin la migración de la tabla).
+ */
+async function enTandas(ids: string[], consulta: (tanda: string[]) => PromiseLike<{ data: unknown[] | null; error: unknown }>): Promise<unknown[] | null> {
+  const tandas: string[][] = [];
+  for (let i = 0; i < ids.length; i += 200) tandas.push(ids.slice(i, i + 200));
+  const filas: unknown[] = [];
+  for (let i = 0; i < tandas.length; i += 8) {
+    const rs = await Promise.all(tandas.slice(i, i + 8).map(consulta));
+    for (const r of rs) {
+      if (r.error) return null;
+      filas.push(...(r.data ?? []));
+    }
+  }
+  return filas;
+}
+
 /** La entrega más reciente de cada orden (por el día del reparto y la última actualización en Monday). */
 export async function entregasDeOrdenes(supabase: SupabaseClient, ordenIds: string[]): Promise<Map<string, EntregaMonday>> {
   const mapa = new Map<string, EntregaMonday & { clave: string }>();
   const ids = [...new Set(ordenIds.filter(Boolean))];
-  for (let i = 0; i < ids.length; i += 200) {
-    const { data, error } = await supabase
-      .from("mon_despachos")
-      .select("orden_id, estado, estado_grupo, courier, fecha_despacho, fecha_entrega, causa_rechazo, actualizado_monday, estado_asesores, observaciones_asesores")
-      .in("orden_id", ids.slice(i, i + 200));
-    if (error) return new Map();
-    for (const d of (data ?? []) as {
-      orden_id: string;
-      estado: string | null;
-      estado_grupo: GrupoEstado;
-      courier: string | null;
-      fecha_despacho: string | null;
-      fecha_entrega: string | null;
-      causa_rechazo: string | null;
-      actualizado_monday: string | null;
-      estado_asesores?: string | null;
-      observaciones_asesores?: string | null;
-    }[]) {
-      const fecha = d.fecha_entrega ?? d.fecha_despacho;
-      // Manda un ENTREGADO, luego un DESINTEGRADO de los asesores y, entre lo demás, lo más reciente (`prioridadDespacho`).
-      const clave = `${prioridadDespacho(d.estado_grupo, d.estado_asesores)}|${fecha ?? ""}|${d.actualizado_monday ?? ""}`;
-      const previa = mapa.get(d.orden_id);
-      if (previa && previa.clave >= clave) continue;
-      const causa = causaDespacho(d.causa_rechazo, d.estado_asesores, d.observaciones_asesores);
-      mapa.set(d.orden_id, { clave, grupo: d.estado_grupo, estado: d.estado, repartidor: d.courier, fecha, causa, asesores: d.estado_asesores ?? null });
-    }
+  const filas = await enTandas(ids, (t) => supabase.from("mon_despachos").select("orden_id, estado, estado_grupo, courier, fecha_despacho, fecha_entrega, causa_rechazo, actualizado_monday, estado_asesores, observaciones_asesores").in("orden_id", t));
+  if (!filas) return new Map();
+  for (const d of filas as {
+    orden_id: string;
+    estado: string | null;
+    estado_grupo: GrupoEstado;
+    courier: string | null;
+    fecha_despacho: string | null;
+    fecha_entrega: string | null;
+    causa_rechazo: string | null;
+    actualizado_monday: string | null;
+    estado_asesores?: string | null;
+    observaciones_asesores?: string | null;
+  }[]) {
+    const fecha = d.fecha_entrega ?? d.fecha_despacho;
+    // Manda un ENTREGADO, luego un DESINTEGRADO de los asesores y, entre lo demás, lo más reciente (`prioridadDespacho`).
+    const clave = `${prioridadDespacho(d.estado_grupo, d.estado_asesores)}|${fecha ?? ""}|${d.actualizado_monday ?? ""}`;
+    const previa = mapa.get(d.orden_id);
+    if (previa && previa.clave >= clave) continue;
+    const causa = causaDespacho(d.causa_rechazo, d.estado_asesores, d.observaciones_asesores);
+    mapa.set(d.orden_id, { clave, grupo: d.estado_grupo, estado: d.estado, repartidor: d.courier, fecha, causa, asesores: d.estado_asesores ?? null });
   }
   return new Map(
     [...mapa].map(([k, v]) => {
@@ -84,38 +97,33 @@ export async function entregasDeOrdenes(supabase: SupabaseClient, ordenIds: stri
 export async function guiasDeOrdenes(supabase: SupabaseClient, ordenIds: string[]): Promise<Map<string, EntregaMonday>> {
   const mapa = new Map<string, EntregaMonday & { clave: string }>();
   const ids = [...new Set(ordenIds.filter(Boolean))];
-  for (let i = 0; i < ids.length; i += 200) {
-    const { data, error } = await supabase
-      .from("tienda_guias")
-      .select("guia, orden_id, estado, estado_grupo, fecha_estado, fecha_emision, ultimo_motivo, visitas_sin_entregar")
-      .in("orden_id", ids.slice(i, i + 200));
-    if (error) return new Map();
-    for (const g of (data ?? []) as {
-      guia: string;
-      orden_id: string;
-      estado: string | null;
-      estado_grupo: "entregado" | "devuelto" | "novedad" | "en_ruta";
-      fecha_estado: string | null;
-      fecha_emision: string | null;
-      ultimo_motivo: string | null;
-      visitas_sin_entregar: number;
-    }[]) {
-      const clave = `${g.fecha_emision ?? ""}|${g.fecha_estado ?? ""}`;
-      const previa = mapa.get(g.orden_id);
-      if (previa && previa.clave >= clave) continue;
-      mapa.set(g.orden_id, {
-        clave,
-        fuente: "siscore",
-        grupo: g.estado_grupo === "entregado" ? "entregado" : g.estado_grupo === "devuelto" ? "rechazado" : "en_ruta",
-        estado: g.estado,
-        repartidor: "Servientrega",
-        fecha: g.fecha_estado,
-        causa: g.ultimo_motivo,
-        guia: g.guia,
-        visitas: g.visitas_sin_entregar,
-        novedad: g.estado_grupo === "novedad",
-      });
-    }
+  const filas = await enTandas(ids, (t) => supabase.from("tienda_guias").select("guia, orden_id, estado, estado_grupo, fecha_estado, fecha_emision, ultimo_motivo, visitas_sin_entregar").in("orden_id", t));
+  if (!filas) return new Map();
+  for (const g of filas as {
+    guia: string;
+    orden_id: string;
+    estado: string | null;
+    estado_grupo: "entregado" | "devuelto" | "novedad" | "en_ruta";
+    fecha_estado: string | null;
+    fecha_emision: string | null;
+    ultimo_motivo: string | null;
+    visitas_sin_entregar: number;
+  }[]) {
+    const clave = `${g.fecha_emision ?? ""}|${g.fecha_estado ?? ""}`;
+    const previa = mapa.get(g.orden_id);
+    if (previa && previa.clave >= clave) continue;
+    mapa.set(g.orden_id, {
+      clave,
+      fuente: "siscore",
+      grupo: g.estado_grupo === "entregado" ? "entregado" : g.estado_grupo === "devuelto" ? "rechazado" : "en_ruta",
+      estado: g.estado,
+      repartidor: "Servientrega",
+      fecha: g.fecha_estado,
+      causa: g.ultimo_motivo,
+      guia: g.guia,
+      visitas: g.visitas_sin_entregar,
+      novedad: g.estado_grupo === "novedad",
+    });
   }
   return new Map(
     [...mapa].map(([k, v]) => {

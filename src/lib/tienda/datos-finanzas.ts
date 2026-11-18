@@ -13,6 +13,17 @@ import { cargarPedidos, inicioPeriodo, type PedidoFila, type Tienda } from "./da
 import { riesgoCliente } from "@/lib/ventas/operacion";
 import { entradaDeOrden, estadoDesdeFinanzas, etiquetasDe, mismaTiendaUnidad, momentoDeFecha, nombreComparable, textoProductos, zonaDeEtiquetas, type LineaFinanzas } from "./ordenes-finanzas";
 import { periodoDe, sumarDias, type EleccionPeriodo, type Periodo } from "./rango";
+import type { EstadoPedido } from "./resumen";
+
+/** Cómo queda cada `estado_entrega` de Finanzas en la pantalla (los demás, como «pendiente» o vacío, son nuevos o confirmados por la etiqueta). */
+const ESTADO_DE_ENTREGA: Record<string, EstadoPedido> = { entregada: "entregado", en_transito: "en_camino", devuelta: "devuelto", cancelada: "cancelado", no_gestionada: "cancelado" };
+
+/** Los `estado_entrega` que la base puede dejar afuera cuando solo se quieren esos estados (los pendientes siempre vienen: se separan después por la etiqueta). */
+function excluirEstados(abiertos: EstadoPedido[]): string[] {
+  return Object.entries(ESTADO_DE_ENTREGA)
+    .filter(([, e]) => !abiertos.includes(e))
+    .map(([k]) => k);
+}
 
 /**
  * Cuántos pedidos tiene el cliente y su riesgo: «medio» o «alto» por su historial, y «bajo» si no tiene nada en contra (12 nov 2026, pedido de Hernán: un cliente sin
@@ -164,7 +175,7 @@ export async function cargarPedidosFinanzas(
   tiendaIds: string[],
   desde: string,
   hasta: string,
-  { liviano = false }: { liviano?: boolean } = {},
+  { liviano = false, abiertos }: { liviano?: boolean; abiertos?: EstadoPedido[] } = {},
 ): Promise<{ pedidos: PedidoFila[]; lineas: LineaFinanzas[] }> {
   const tiendaDeUnidad = new Map<string, string>();
   for (const id of tiendaIds) {
@@ -186,8 +197,8 @@ export async function cargarPedidosFinanzas(
         .in("tienda_id", [...tiendaDeUnidad.values()])
         .not("foto_url", "is", null)
         .then((r) => (r.data ?? []) as { sku: string | null; producto_titulo: string | null; foto_url: string }[]);
-  const enUna = await pedidosYLineasEnUna(supabase, unidades, desde, hasta);
-  const [ordenes, variantesFoto] = await Promise.all([
+  const enUna = await pedidosYLineasEnUna(supabase, unidades, desde, hasta, abiertos);
+  const [todas, variantesFoto] = await Promise.all([
     enUna ? Promise.resolve(enUna.ordenes) : traerTodasLasFilas<FilaOrden>(
       (d, h) =>
         supabase
@@ -203,7 +214,11 @@ export async function cargarPedidosFinanzas(
     ).catch(() => [] as FilaOrden[]),
     fotos,
   ]);
-  const lineas = enUna ? enUna.lineas : await lineasDeOrdenes(supabase, ordenes.map((o) => o.id));
+  // `abiertos` (18 nov 2026, la cola de Logística y Confirmación): solo los de Shopify en esos estados. La base ya los filtra (migración 0323); esto deja
+  // afuera lo que la base no separa (nuevo o confirmado salen de la etiqueta) y todo lo demás si la migración no está.
+  const ordenes = abiertos ? todas.filter((o) => !!o.creado_origen && abiertos.includes(estadoDesdeFinanzas(o.estado_entrega, o.etiquetas))) : todas;
+  const quedan = abiertos && ordenes.length !== todas.length ? new Set(ordenes.map((o) => o.id)) : null;
+  const lineas = enUna ? (quedan ? enUna.lineas.filter((l) => quedan.has(l.pedidoId)) : enUna.lineas) : await lineasDeOrdenes(supabase, ordenes.map((o) => o.id));
   // La foto de cada pedido (12 nov 2026, como Mi Reto Digital): la de la variante de Shopify con el SKU de su primera línea.
   // Si no la encuentra por el SKU (Shopify le cambió el SKU a la variante y los pedidos viejos traen el de antes: «CAPS.MULTI.COLLAGEN.COMPLEX»), por el nombre
   // del producto en Shopify (12 nov 2026: el Multi Collagen salía con y sin foto siendo el mismo).
@@ -276,9 +291,31 @@ const comoLinea = (l: FilaLinea): LineaFinanzas => ({
 /** Si la base tiene las funciones de la migración 0321 (se pregunta hasta que respondan bien una vez o digan que no existen). */
 let enUnaDisponible: boolean | null = null;
 
-/** Los pedidos (con su cliente) y las líneas de esas unidades entre esos días, en dos respuestas de la base (migración 0321); null si no están. */
-async function pedidosYLineasEnUna(supabase: SupabaseClient, unidades: string[], desde: string, hasta: string): Promise<{ ordenes: FilaOrden[]; lineas: LineaFinanzas[] } | null> {
+/** Si esas funciones ya reciben los filtros de la migración 0323 (`solo_shopify`, `excluir`). */
+let filtroDisponible: boolean | null = null;
+
+/**
+ * Los pedidos (con su cliente) y las líneas de esas unidades entre esos días, en dos respuestas de la base (migración 0321); null si no están. Con
+ * `abiertos`, la base ya deja afuera los del Excel y los estados cerrados que no se piden (migración 0323); sin ella, trae todo (se filtra después).
+ */
+async function pedidosYLineasEnUna(
+  supabase: SupabaseClient,
+  unidades: string[],
+  desde: string,
+  hasta: string,
+  abiertos?: EstadoPedido[],
+): Promise<{ ordenes: FilaOrden[]; lineas: LineaFinanzas[] } | null> {
   if (enUnaDisponible === false) return null;
+  if (abiertos && filtroDisponible !== false) {
+    const args = { unidades, desde, hasta, solo_shopify: true, excluir: excluirEstados(abiertos) };
+    const [o, l] = await Promise.all([supabase.rpc("ven_pedidos_periodo", args), supabase.rpc("ven_lineas_periodo", args)]);
+    if (!o.error && !l.error) {
+      filtroDisponible = enUnaDisponible = true;
+      return { ordenes: (o.data ?? []) as FilaOrden[], lineas: ((l.data ?? []) as FilaLinea[]).map(comoLinea) };
+    }
+    // Sin la migración 0323 la base no conoce los filtros: se sigue con la forma de 3 datos (y no se vuelve a probar hasta que se reinicie el servidor).
+    filtroDisponible = false;
+  }
   const args = { unidades, desde, hasta };
   const [o, l] = await Promise.all([supabase.rpc("ven_pedidos_periodo", args), supabase.rpc("ven_lineas_periodo", args)]);
   if (o.error || l.error) {
@@ -312,8 +349,11 @@ export async function pedidosDeTiendas(
   miradas: Tienda[],
   codigoPais: string,
   eleccion: EleccionPeriodo,
-  /** `comparar`: también el periodo anterior del mismo largo (Dashboard); `minDias`: traer al menos esos días hasta hoy (la cola de Confirmación). */
-  opciones: { comparar?: boolean; minDias?: number; liviano?: boolean } = {},
+  /**
+   * `comparar`: también el periodo anterior del mismo largo (Dashboard); `minDias`: traer al menos esos días hasta hoy (la cola de Confirmación y
+   * Logística). `abiertos` (18 nov 2026, velocidad): de esos días fuera del periodo, solo los de Shopify en esos estados; el periodo va completo.
+   */
+  opciones: { comparar?: boolean; minDias?: number; liviano?: boolean; abiertos?: EstadoPedido[] } = {},
 ): Promise<{ pedidos: PedidoFila[]; lineasFinanzas: LineaFinanzas[]; fuente: FuenteFinanzas; referencia: Date; periodo: Periodo & { hoy: string } }> {
   const fuente = await fuenteFinanzas(supabase, miradas, codigoPais);
   // Una foto (todo sale del Excel y ninguna tienda está conectada): los periodos terminan en su último día. Con una conectada, en hoy.
@@ -323,19 +363,32 @@ export async function pedidosDeTiendas(
   const periodo = periodoDe(eleccion, hoy);
   let desde = opciones.comparar ? sumarDias(periodo.desde, -periodo.dias) : periodo.desde;
   let hasta = periodo.hasta;
+  const ids = miradas.map((t) => t.id);
+  const soloShopify = ids.filter((id) => !fuente.unidadDe.has(id));
+  // La cola con `abiertos`: el periodo completo y, aparte, los abiertos de los `minDias` (antes, todo lo de esos días: 9.146 pedidos el 18 nov para usar ~3.900).
+  if (opciones.minDias && opciones.abiertos) {
+    const abiertos = opciones.abiertos;
+    const minimo = sumarDias(hoy, -(opciones.minDias - 1));
+    const [deShopify, deFinanzas, colaShopify, colaFinanzas] = await Promise.all([
+      cargarPedidos(supabase, soloShopify, desde, hasta),
+      cargarPedidosFinanzas(supabase, fuente, ids, desde, hasta, { liviano: opciones.liviano }),
+      cargarPedidos(supabase, soloShopify, minimo, hoy),
+      cargarPedidosFinanzas(supabase, fuente, ids, minimo, hoy, { liviano: opciones.liviano, abiertos }),
+    ]);
+    const vistos = new Set([...deShopify, ...deFinanzas.pedidos].map((p) => p.id));
+    const extra = [...colaShopify.filter((p) => !p.sinHora && abiertos.includes(p.estado)), ...colaFinanzas.pedidos].filter((p) => !vistos.has(p.id));
+    const extraIds = new Set(extra.map((p) => p.id));
+    const pedidos = [...deShopify, ...deFinanzas.pedidos, ...extra].sort((x, y) => y.creado.localeCompare(x.creado));
+    const lineasFinanzas = [...deFinanzas.lineas, ...colaFinanzas.lineas.filter((l) => extraIds.has(l.pedidoId))];
+    return { pedidos, lineasFinanzas, fuente, referencia, periodo: { ...periodo, hoy } };
+  }
   if (opciones.minDias) {
     const minimo = sumarDias(hoy, -(opciones.minDias - 1));
     if (minimo < desde) desde = minimo;
     hasta = hoy;
   }
-  const ids = miradas.map((t) => t.id);
   const [deShopify, deFinanzas] = await Promise.all([
-    cargarPedidos(
-      supabase,
-      ids.filter((id) => !fuente.unidadDe.has(id)),
-      desde,
-      hasta,
-    ),
+    cargarPedidos(supabase, soloShopify, desde, hasta),
     cargarPedidosFinanzas(supabase, fuente, ids, desde, hasta, { liviano: opciones.liviano }),
   ]);
   const pedidos = [...deShopify, ...deFinanzas.pedidos].sort((x, y) => y.creado.localeCompare(x.creado));
