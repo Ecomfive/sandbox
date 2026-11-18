@@ -37,7 +37,7 @@ export const DIAS_LECTURA = 7;
 const CAMPOS_CAMPANA = "id,name,objective,status,effective_status,daily_budget,lifetime_budget,bid_strategy,created_time";
 const CAMPOS_CONJUNTO = "id,name,campaign_id,status,effective_status,daily_budget,bid_strategy";
 const CAMPOS_ANUNCIO = "id,name,campaign_id,adset_id,status,effective_status,creative{video_id,thumbnail_url,body,title,link_url,object_story_spec}";
-const CAMPOS_RESULTADOS = "ad_id,adset_id,campaign_id,spend,impressions,inline_link_clicks,actions,action_values,video_thruplay_watched_actions";
+const CAMPOS_RESULTADOS = "ad_id,adset_id,campaign_id,spend,impressions,inline_link_clicks,actions,action_values,video_thruplay_watched_actions,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p95_watched_actions";
 
 const TROZO = 200;
 async function guardarPorTrozos<T>(filas: T[], guardar: (trozo: T[]) => PromiseLike<{ error: { message: string } | null }>): Promise<string | null> {
@@ -168,10 +168,16 @@ export async function sincronizarCuenta(supabase: SupabaseClient, cuenta: Cuenta
   const filasDia = dias
     .map((d) => {
       const a = anuncioPorMeta.get(d.anuncioMetaId);
-      return a ? { anuncio_id: a.id, cuenta_id: cuenta.id, campana_id: a.campana, fecha: d.fecha, gasto: d.gasto, impresiones: d.impresiones, clics: d.clics, video_3s: d.video3s, video_15s: d.video15s, vio_landing: d.vioLanding, carrito: d.carrito, pago: d.pago, compras: d.compras, valor: d.valor } : null;
+      return a ? { anuncio_id: a.id, cuenta_id: cuenta.id, campana_id: a.campana, fecha: d.fecha, gasto: d.gasto, impresiones: d.impresiones, clics: d.clics, video_3s: d.video3s, video_15s: d.video15s, video_25: d.video25, video_50: d.video50, video_75: d.video75, video_95: d.video95, vio_landing: d.vioLanding, carrito: d.carrito, pago: d.pago, compras: d.compras, valor: d.valor } : null;
     })
     .filter((f): f is NonNullable<typeof f> => f !== null);
   falla = await guardarPorTrozos(filasDia, (t) => supabase.from("meta_resultados_dia").upsert(t, { onConflict: "anuncio_id,fecha" }));
+  // Sin la migración 0326 no existen las columnas de retención: se guarda lo demás igual.
+  if (falla && /video_25|video_50|video_75|video_95|schema cache/i.test(falla)) {
+    const sinRetencion = filasDia.map(({ video_25: _a, video_50: _b, video_75: _c, video_95: _d, ...resto }) => (void [_a, _b, _c, _d], resto));
+    falla = await guardarPorTrozos(sinRetencion, (t) => supabase.from("meta_resultados_dia").upsert(t, { onConflict: "anuncio_id,fecha" }));
+    if (!falla) r.avisos.push("Falta correr la migración 0326 para guardar la retención del video (25, 50, 75 y 95 %).");
+  }
   if (falla) return terminar(`No se pudieron guardar los resultados: ${falla}`);
   r.filas = filasDia.length;
   if (filasDia.length < dias.length) r.avisos.push(`${dias.length - filasDia.length} filas de resultados quedaron sin anuncio (se completan en la próxima lectura).`);

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { anguloDeCampana, esHostDeVideoMeta, normalizarAnalisisVideo, pedidoAnalisisVideo, reutilizarAngulo } from "./video-angulo";
+import { anguloDeCampana, esHostDeVideoMeta, estructuraValida, normalizarAnalisisVideo, pedidoAnalisisVideo, recursosValidos, reutilizarAngulo } from "./video-angulo";
 
 test("el pedido trae el producto, el texto y los ángulos que ya existen", () => {
   const p = pedidoAnalisisVideo({ producto: "Shampoo anticaspa", copy: "Adiós a la caspa en 7 días", titulo: null, angulosExistentes: ["Dolor de espalda", "Oferta 2x1"], soloTexto: false });
@@ -38,4 +38,46 @@ test("solo se baja video de la red de archivos de Meta, por https", () => {
   assert.equal(esHostDeVideoMeta("http://video.xx.fbcdn.net/v.mp4"), false);
   assert.equal(esHostDeVideoMeta("https://fbcdn.net.malo.com/v.mp4"), false);
   assert.equal(esHostDeVideoMeta("https://169.254.169.254/latest"), false);
+});
+
+test("el pedido también pide el llamado a la acción, la oferta, los recursos y la estructura; sin video, sin segundos", () => {
+  const con = pedidoAnalisisVideo({ producto: null, copy: null, titulo: null, angulosExistentes: [], soloTexto: false });
+  for (const k of ["cta_segundo", "cta_tipo", "oferta", "recursos", "estructura"]) assert.match(con, new RegExp(k));
+  assert.match(con, /segundos reales/);
+  assert.match(pedidoAnalisisVideo({ producto: null, copy: null, titulo: null, angulosExistentes: [], soloTexto: true }), /cta_segundo en null/);
+});
+
+test("el llamado, la oferta, los recursos y la estructura que contesta la IA se validan", () => {
+  const a = normalizarAnalisisVideo(
+    JSON.stringify({
+      angulo: "Vitaminas para neuropatía",
+      cta: "Pide el tuyo con pago contra entrega",
+      cta_segundo: "25",
+      cta_tipo: "Compra directa",
+      oferta: "2x1 y envío gratis",
+      recursos: ["testimonio", "Música", "inventado", "testimonio"],
+      estructura: [
+        { parte: "Gancho", desde: 0, hasta: 3, resumen: "Una mujer cuenta que compró las vitaminas" },
+        { parte: "cosa rara", desde: 10, hasta: 4, resumen: "Muestra el frasco" },
+        { parte: "oferta", desde: 3, hasta: 5, resumen: "" },
+      ],
+    }),
+  );
+  assert.equal(a?.cta, "Pide el tuyo con pago contra entrega");
+  assert.equal(a?.ctaSegundo, 25);
+  assert.equal(a?.ctaTipo, "compra directa");
+  assert.deepEqual(a?.recursos, ["testimonio", "música"]);
+  assert.equal(a?.estructura.length, 2, "una parte sin resumen no vale");
+  assert.deepEqual(a?.estructura[1], { parte: "otro", desde: 10, hasta: 10, resumen: "Muestra el frasco" }, "el fin no va antes del inicio");
+});
+
+test("sin llamado a la acción, el tipo es «ninguno»; un segundo absurdo es «no se sabe»", () => {
+  const a = normalizarAnalisisVideo(JSON.stringify({ angulo: "Ahorro", cta_segundo: 99999, estructura: "no es lista" }));
+  assert.equal(a?.cta, "");
+  assert.equal(a?.ctaTipo, "ninguno");
+  assert.equal(a?.ctaSegundo, null);
+  assert.deepEqual(a?.estructura, []);
+  assert.equal(normalizarAnalisisVideo(JSON.stringify({ angulo: "Ahorro", cta: "Compra ya", cta_tipo: "xyz" }))?.ctaTipo, "otro");
+  assert.deepEqual(recursosValidos("texto"), []);
+  assert.deepEqual(estructuraValida(null), []);
 });

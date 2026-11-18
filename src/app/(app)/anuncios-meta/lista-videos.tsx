@@ -18,12 +18,13 @@ import { CRITERIOS_VIDEO, ordenarVideos, sentidoNatural, type CriterioVideo, typ
 import type { VideoVista } from "@/lib/meta-ads/vistas";
 import { analizarPendientesMeta, analizarVideoAhoraMeta, corregirAnguloVideoMeta } from "./actions";
 import { anguloDeVideo, DEF_VIDEOS } from "./def-videos";
+import { EstructuraYLlamado } from "./estructura-video";
 import { AVISO_POCA_DATA, Cifra, entero, InsigniaEtapa, MetricasEnLinea, Nivel, porcentaje, Resultado, valorCpa } from "./piezas";
 
 const urlSegura = (u: string | null) => (u && /^https:\/\//i.test(u) ? u : null);
 
 const NOMBRE: NombreFilas = { singular: "video", plural: "videos" };
-const ICONOS: Record<string, IconoComp> = { nombre: AnunciosIcon, campanaTexto: AnunciosIcon, angulo: EtiquetaIcon, producto: ProductoIcon, campana: AnunciosIcon, etapa: EtiquetaIcon, veredicto: MargenIcon, datos: FiltroIcon, analisis: RobotIcon, formato: FiltroIcon, activo: EstadoIcon, gasto: MargenIcon, compras: MargenIcon, cpa: MargenIcon, hook: MargenIcon, hold: MargenIcon, ctr: MargenIcon, campanas: AnunciosIcon, anuncios: AnunciosIcon };
+const ICONOS: Record<string, IconoComp> = { nombre: AnunciosIcon, campanaTexto: AnunciosIcon, angulo: EtiquetaIcon, producto: ProductoIcon, campana: AnunciosIcon, etapa: EtiquetaIcon, veredicto: MargenIcon, datos: FiltroIcon, analisis: RobotIcon, formato: FiltroIcon, ctaTipo: FiltroIcon, recurso: FiltroIcon, llegaCta: MargenIcon, activo: EstadoIcon, gasto: MargenIcon, compras: MargenIcon, cpa: MargenIcon, hook: MargenIcon, hold: MargenIcon, ctr: MargenIcon, campanas: AnunciosIcon, anuncios: AnunciosIcon };
 
 const COLUMNAS = "lg:grid-cols-[minmax(0,3fr)_minmax(0,0.8fr)_minmax(0,0.7fr)_minmax(0,0.8fr)_minmax(0,0.7fr)_minmax(0,0.8fr)_minmax(0,0.7fr)_minmax(0,1fr)_1rem]";
 
@@ -224,6 +225,11 @@ export function ListaVideos({ videos, escribe, iaConectada, sinAnalizar, abrirIn
             <Seccion icono={RobotIcon} titulo="Lo que vio la IA">
               <AnalisisIA v={v} escribe={escribe} iaConectada={iaConectada} />
             </Seccion>
+            {v.analisis?.estado === "analizado" && (
+              <Seccion icono={FiltroIcon} titulo="Estructura y llamado a la acción">
+                <EstructuraYLlamado v={v} />
+              </Seccion>
+            )}
             <Seccion icono={AnunciosIcon} titulo={`Dónde se usa (${v.anunciosDetalle.length} ${v.anunciosDetalle.length === 1 ? "anuncio" : "anuncios"})`}>
               <ul role="list" className="m-0 flex list-none flex-col gap-3 p-0">
                 {v.anunciosDetalle.map((a) => (

@@ -232,7 +232,7 @@ export async function analizarPendientesMeta(): Promise<{ error?: string; analiz
   const u = await requireModuloEscritura(MODULO);
   const supabase = createServiceClient();
   try {
-    const r = await analizarPendientes(supabase, { limiteMs: 270_000, max: 8, quien: u.nombre ?? u.email ?? null });
+    const r = await analizarPendientes(supabase, { limiteMs: 270_000, max: 8, quien: u.nombre ?? u.email ?? null, ahora: true });
     await registrarAuditoria({ accion: "analizar_video_meta", entidad: "meta_campanas", detalle: `${r.analizados} analizados con el video, ${r.sinArchivo} solo con el texto, ${r.errores} con error, faltan ${r.faltan}` });
     revalidatePath("/anuncios-meta", "layout");
     return r;

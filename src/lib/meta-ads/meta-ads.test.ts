@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { agrupar, copyLimpio, landingLimpia } from "./agrupar";
-import { conversion, cpa, hookRate, holdRate, resultado, sinResultados, type Resultados } from "./metricas";
+import { clicAVisita, conversion, cpa, hookRate, holdRate, llegaAlLlamado, resultado, retencion, sinResultados, type Resultados } from "./metricas";
 import { claveDeProducto, embellecer, etiquetasDeNombre, numeroDeVideo } from "./nombre";
 import { accion, actividadDe, anuncioDe, campanaDe, estructuraDe, mensajeDeErrorMeta, normalizarActId, presupuestoDe, pujaDe, resultadoDiaDe } from "./normalizar";
 import { faltanEtiquetas, pendientes, sugerir } from "./sugerencias";
@@ -196,4 +196,20 @@ test("numeroDeVideo: el V# del nombre del anuncio", () => {
   assert.equal(numeroDeVideo("v12"), "V12");
   assert.equal(numeroDeVideo("VIDEO nuevo"), null);
   assert.equal(numeroDeVideo("ACEITE V10 | copia"), "V10");
+});
+
+test("la retención del video y cuántos llegan al llamado a la acción", () => {
+  const x = r({ video3s: 1000, video25: 600, video50: 400, video75: 250, video95: 100, clics: 50, vioLanding: 40 });
+  assert.deepEqual(retencion(x), { p25: 60, p50: 40, p75: 25, p95: 10 });
+  assert.equal(retencion(r({ video3s: 1000 })), null, "sin retención de Meta no hay dato");
+  assert.equal(llegaAlLlamado(x, 15, 30), 40, "a la mitad del video, el 50 %");
+  assert.equal(llegaAlLlamado(x, 7.5, 30), 60, "en el 25 %, el punto del 25");
+  assert.equal(llegaAlLlamado(x, 0, 30), 100, "al inicio, todos");
+  assert.equal(llegaAlLlamado(x, 29, 30), 10, "al final, el punto del 95 %");
+  assert.equal(llegaAlLlamado(x, null, 30), null);
+  assert.equal(llegaAlLlamado(x, 10, null), null);
+  assert.equal(Math.round(llegaAlLlamado(x, 11.25, 30) ?? 0), 50, "entre el 25 y el 50 %, en línea recta");
+  assert.equal(clicAVisita(x), 80);
+  assert.equal(clicAVisita(r({ clics: 10, vioLanding: 30 })), 100, "no pasa de 100");
+  assert.equal(clicAVisita(r({})), null);
 });
