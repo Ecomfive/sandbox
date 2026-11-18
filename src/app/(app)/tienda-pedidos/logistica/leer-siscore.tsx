@@ -71,7 +71,8 @@ export function LeerSiscore({ ultima, tiendaId, tiendaNombre }: { ultima: string
       propia.current = r.id;
       const nombre = r.tienda ?? s.tienda ?? "la tienda";
       setEstado({ texto: textoAvance(nombre, 0, 0), tipo: "info" });
-      await pedirExtension({ tipo: "lanzar", lector: "siscore", subida: r.subida, dias: { pedidos: 75, cartera: 75 } }, 45000);
+      // `saltar`: las guías ya cerradas con su rastreo; la extensión 0.8.3 no las vuelve a rastrear (una anterior lo ignora y rastrea todas).
+      await pedirExtension({ tipo: "lanzar", lector: "siscore", subida: r.subida, dias: { pedidos: 75, cartera: 75 }, saltar: r.saltar }, 45000);
       let a: (AvanceLector & { hechos?: number }) | null = null;
       // Hasta 30 minutos: una tienda con muchas guías (Oferfy, unas 1.400 en 75 días) tarda más que Kenku. Cada 6 segundos se guarda el avance.
       for (let i = 0; i < 900; i++) {
@@ -96,7 +97,11 @@ export function LeerSiscore({ ultima, tiendaId, tiendaNombre }: { ultima: string
       } catch {
         /* sin almacenamiento: no pasa nada */
       }
-      setEstado({ texto: `Listo: ${g.guias} guías de ${g.cliente}, ${g.conPedido} unidas a su pedido.`, tipo: "bien" });
+      const saltadas = g.guias - (g.rastreadas ?? g.guias);
+      setEstado({
+        texto: `Listo: ${g.guias} guías de ${g.cliente}, ${g.conPedido} unidas a su pedido.${saltadas > 0 ? ` Se rastrearon ${g.rastreadas}; las otras ${saltadas} ya estaban cerradas.` : ""}`,
+        tipo: "bien",
+      });
       router.refresh();
     } catch (e) {
       const msg = e instanceof Error ? e.message : "No se pudo leer SISCORE.";

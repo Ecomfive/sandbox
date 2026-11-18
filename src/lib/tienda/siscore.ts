@@ -29,6 +29,11 @@ export interface GuiaLeida {
   /** Lo que se cobra contra entrega. */
   recaudo: number | null;
   historial: PasoGuia[];
+  /**
+   * El lector no abrió su rastreo (18 nov 2026): ya estaba cerrada (entregada o devuelta) en el sistema con este mismo estado. Su historial viene vacío
+   * y no se guarda encima del que ya hay.
+   */
+  saltada: boolean;
 }
 
 export interface LecturaSiscore {
@@ -73,9 +78,20 @@ export function leerLecturaSiscore(v: unknown): LecturaSiscore | null {
       fecha_emision: dia(g.fecha_emision),
       recaudo: Number.isFinite(recaudo) && recaudo >= 0 ? recaudo : null,
       historial,
+      saltada: g.saltada === true,
     });
   }
   return { leido_en: texto(o.leido_en, 40) ?? new Date().toISOString(), cliente, desde: dia(o.desde) ?? "", hasta: dia(o.hasta) ?? "", guias };
+}
+
+/** Lo que sale del rastreo de cada guía: en una guía saltada no se escribe, para no borrar lo que ya está guardado. */
+export const COLUMNAS_DEL_RASTREO = ["recaudo", "historial", "visitas_sin_entregar", "ultimo_motivo", "entregada_en"] as const;
+
+/** Una fila para `tienda_guias` sin lo que sale del rastreo (la de una guía saltada). */
+export function sinLoDelRastreo<T extends Record<string, unknown>>(fila: T): Partial<T> {
+  const copia: Record<string, unknown> = { ...fila };
+  for (const c of COLUMNAS_DEL_RASTREO) delete copia[c];
+  return copia as Partial<T>;
 }
 
 const sinTildes = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase();

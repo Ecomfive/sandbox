@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { grupoDeEstadoGuia, leerLecturaSiscore, momentoEntrega, pedidoDeFactura, tiendaDeClienteSiscore, visitasSinEntregar } from "./siscore";
+import { grupoDeEstadoGuia, leerLecturaSiscore, momentoEntrega, pedidoDeFactura, sinLoDelRastreo, tiendaDeClienteSiscore, visitasSinEntregar } from "./siscore";
 
 test("estados de SISCORE (los que se vieron en la cuenta de Kenku)", () => {
   assert.equal(grupoDeEstadoGuia("Entrega App"), "entregado");
@@ -50,6 +50,9 @@ test("la lectura que sube el lector se valida", () => {
   assert.equal(l.guias[0].cliente, "KENKU");
   assert.equal(l.guias[0].recaudo, 32.9);
   assert.equal(l.guias[0].historial.length, 1);
+  assert.equal(l.guias[0].saltada, false);
+  const s = leerLecturaSiscore({ cliente: "OFERFY", guias: [{ guia: "7224121117", estado: "Entrega App", saltada: true, historial: [] }] })!;
+  assert.equal(s.guias[0].saltada, true);
 });
 
 test("SISCORE: la cuenta se une a su tienda por el nombre, la unidad o el comienzo", () => {
@@ -64,4 +67,9 @@ test("SISCORE: la cuenta se une a su tienda por el nombre, la unidad o el comien
   assert.equal(tiendaDeClienteSiscore("NUVO", conNuvo)?.nombre, "Nuvo");
   assert.equal(tiendaDeClienteSiscore("NUVO PAN", conNuvo)?.nombre, "Nuvo");
   assert.equal(tiendaDeClienteSiscore("OFERFY", conNuvo)?.nombre, "Oferfy");
+});
+
+test("una guía saltada se guarda sin lo del rastreo (no borra su historial)", () => {
+  const fila = { guia: "7224121117", estado: "Entrega App", orden_id: "x", recaudo: null, historial: [], visitas_sin_entregar: 0, ultimo_motivo: null, entregada_en: null, leida_en: "2026-11-18" };
+  assert.deepEqual(sinLoDelRastreo(fila), { guia: "7224121117", estado: "Entrega App", orden_id: "x", leida_en: "2026-11-18" });
 });

@@ -8,7 +8,7 @@
 //   { tipo: "hola" }                              → { version }
 //   { tipo: "sesion", pais: "pa"|"cr"|"mx", abrir } → { pestana, hay, tipoUsuario, tienda, vence }  (abrir: crea la pestaña si falta)
 //   { tipo: "mostrar", pais }                     → pone la pestaña de Dropi de ese país al frente (la crea si falta)
-//   { tipo: "lanzar", lector, subida, dias }      → arranca el lector en la pestaña (sin esperarlo); `dias` solo en la primera lectura
+//   { tipo: "lanzar", lector, subida, dias, saltar } → arranca el lector en la pestaña (sin esperarlo); `dias` solo en la primera lectura
 //                                                   de un país ({ pedidos, cartera }: Costa Rica trae desde el 1 de septiembre)
 //   { tipo: "avance", lector }                    → lo que lleva el lector (window.__dropiDiario / __ventasDropi, sin el detalle)
 //
@@ -28,6 +28,8 @@
 // paginación se cortaba pasados ~5.500 pedidos).
 // 0.8.2 (18 nov 2026): Drop volvió a cambiar la página de pedidos esa misma tarde (la lista llega en «data.orders», en un bloque aparte): el lector ya no busca
 // el nombre del contenedor, sino la lista que trae pedidos, para que el próximo cambio de nombre no lo rompa.
+// 0.8.3 (18 nov 2026): el lector de SISCORE recibe `saltar` (guía → estado de las que el sistema ya tiene cerradas, con su rastreo) y no vuelve a abrir el
+// rastreo de las que siguen con ese estado: Oferfy pasa de ~2.500 rastreos por lectura a las nuevas y las abiertas.
 // 0.8.0 (12 nov 2026): «siscore» es la pestaña de servientrega-clientes.appsiscore.com (SISCORE, el portal de clientes de Servientrega Panamá) con la cuenta
 // de la tienda (Kenku primero), con el lector `siscore` (informe de guías y rastreo de cada una) para Logística de tienda. SOLO LECTURA: solo consultas;
 // nunca anula, crea guías, recolecciones ni confirmaciones. Su sesión es una cookie: se ve si la página es la del cliente (no la de entrar).
@@ -208,15 +210,21 @@ async function atender(m, remitente) {
       // Hasta 1.000 días (MAX_DIAS_LECTURA del sistema): la primera lectura de México trae desde julio de 2024.
       const entero = (x) => Number.isInteger(x) && x > 0 && x <= 1000;
       const dias = d && entero(d.pedidos) && entero(d.cartera) ? { pedidos: d.pedidos, cartera: d.cartera } : null;
+      // Las guías que el lector de SISCORE no vuelve a rastrear (0.8.3): solo números de guía y su estado, con tope.
+      const ss = m.saltar;
+      const saltar =
+        ss && typeof ss === "object" && !Array.isArray(ss)
+          ? Object.fromEntries(Object.entries(ss).filter(([k, v]) => /^[0-9A-Za-z-]{4,40}$/.test(k) && typeof v === "string" && v.length <= 200).slice(0, 20000))
+          : null;
       const t = await pestana(l.pais, true, !!l.frente);
       await chrome.scripting.executeScript({ target: { tabId: t.id }, world: "MAIN", files: [l.archivo] });
       await enPagina(
         t.id,
-        (funcion, s, dd) => {
-          window[funcion](s, dd || undefined);
+        (funcion, s, dd, sa) => {
+          window[funcion](s, dd || undefined, sa || undefined);
           return "iniciado";
         },
-        [l.funcion, subida, dias],
+        [l.funcion, subida, dias, saltar],
       );
       await chrome.storage.session.set({ [`pestana-${m.lector}`]: t.id });
       // La pestaña del sistema que lo pidió, para devolverla al frente cuando termine.
