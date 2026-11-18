@@ -7,7 +7,7 @@ import { agrupar, copyLimpio, landingLimpia, type Elemento } from "./agrupar";
 import { CPA_TOPE_PREDETERMINADO, resultado, sinResultados, sumar, type Resultados } from "./metricas";
 import { claveDeProducto, NOMBRE_ETAPA, NOMBRE_PUJA, numeroDeVideo, type Estructura, type Etapa, type Puja } from "./nombre";
 import { detalleLegible, esCreacionDeCampana } from "./normalizar";
-import { anguloDeCampana } from "./video-angulo";
+import { anguloDeCampana, estructuraValida, VERSION_ANALISIS } from "./video-angulo";
 import { diasEntre, pendientes, sugerir, type DecisionGuardada, type Sugerencia } from "./sugerencias";
 import type { ActividadVista, AnalisisVideoVista, AnuncioVista, CampanaVista, Grupo, VideoVista } from "./vistas";
 
@@ -91,6 +91,8 @@ const vacios = (periodo: Periodo, hoy: string): DatosMeta => ({
 
 const restar = (fecha: string, n: number) => new Date(new Date(`${fecha}T00:00:00Z`).getTime() - n * 86_400_000).toISOString().slice(0, 10);
 const num = (v: unknown) => Number(v ?? 0) || 0;
+/** La estructura guardada del video (jsonb), con la misma validación con que se guardó. */
+const estructuraDeBase = (v: unknown) => estructuraValida(v);
 
 interface FilaDia {
   anuncio_id: string;
@@ -101,13 +103,17 @@ interface FilaDia {
   clics: unknown;
   video_3s: unknown;
   video_15s: unknown;
+  video_25?: unknown;
+  video_50?: unknown;
+  video_75?: unknown;
+  video_95?: unknown;
   vio_landing: unknown;
   carrito: unknown;
   pago: unknown;
   compras: unknown;
   valor: unknown;
 }
-const resultadosDe = (f: FilaDia): Resultados => ({ gasto: num(f.gasto), impresiones: num(f.impresiones), clics: num(f.clics), video3s: num(f.video_3s), video15s: num(f.video_15s), vioLanding: num(f.vio_landing), carrito: num(f.carrito), pago: num(f.pago), compras: num(f.compras), valor: num(f.valor) });
+const resultadosDe = (f: FilaDia): Resultados => ({ gasto: num(f.gasto), impresiones: num(f.impresiones), clics: num(f.clics), video3s: num(f.video_3s), video15s: num(f.video_15s), video25: num(f.video_25), video50: num(f.video_50), video75: num(f.video_75), video95: num(f.video_95), vioLanding: num(f.vio_landing), carrito: num(f.carrito), pago: num(f.pago), compras: num(f.compras), valor: num(f.valor) });
 
 export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: string; cuentaId: string | null; periodo: Periodo; hoy: string }): Promise<DatosMeta> {
   const base = vacios(o.periodo, o.hoy);
@@ -130,10 +136,15 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
   const [camp, anun, dia, act, hechos] = await Promise.all([
     traerTodasLasFilas<Record<string, unknown>>((a, b) => supabase.from("meta_campanas").select("id, cuenta_id, meta_id, nombre, estado, estructura, puja, presupuesto_diario, creada_meta_en, producto, angulo, etapa, manual, creada_por, mercado, videos, persona_nombre").in("cuenta_id", ids).range(a, b)),
     traerTodasLasFilas<Record<string, unknown>>((a, b) => supabase.from("meta_anuncios").select("id, campana_id, nombre, estado, video_id, miniatura, copy, titulo, landing").in("cuenta_id", ids).range(a, b)),
-    traerTodasLasFilas<FilaDia>((a, b) => supabase.from("meta_resultados_dia").select("anuncio_id, campana_id, fecha, gasto, impresiones, clics, video_3s, video_15s, vio_landing, carrito, pago, compras, valor").in("cuenta_id", ids).gte("fecha", desdeDatos).order("fecha").range(a, b)),
+    // Sin la migración 0326 no hay retención del video: se leen las columnas de antes.
+    traerTodasLasFilas<FilaDia>((a, b) => supabase.from("meta_resultados_dia").select("anuncio_id, campana_id, fecha, gasto, impresiones, clics, video_3s, video_15s, video_25, video_50, video_75, video_95, vio_landing, carrito, pago, compras, valor").in("cuenta_id", ids).gte("fecha", desdeDatos).order("fecha").range(a, b)).catch(() =>
+      traerTodasLasFilas<FilaDia>((a, b) => supabase.from("meta_resultados_dia").select("anuncio_id, campana_id, fecha, gasto, impresiones, clics, video_3s, video_15s, vio_landing, carrito, pago, compras, valor").in("cuenta_id", ids).gte("fecha", desdeDatos).order("fecha").range(a, b)),
+    ),
     traerTodasLasFilas<Record<string, unknown>>((a, b) => supabase.from("meta_actividad").select("fecha, actor_nombre, tipo, objeto_tipo, objeto_meta_id, objeto_nombre").in("cuenta_id", ids).gte("fecha", `${restar(o.hoy, 29)}T00:00:00Z`).order("fecha", { ascending: false }).range(a, b)).catch(() => []),
     // Sin la migración 0325 no hay análisis de videos: todo sigue funcionando sin ángulo de video.
-    traerTodasLasFilas<Record<string, unknown>>((a, b) => supabase.from("meta_video_analisis").select("video_id, estado, origen, angulo, angulo_manual, promesa, gancho, resumen, transcripcion, publico, formato, duracion_s, error, analizado_en").range(a, b)).catch(() => []),
+    traerTodasLasFilas<Record<string, unknown>>((a, b) => supabase.from("meta_video_analisis").select("video_id, estado, origen, angulo, angulo_manual, promesa, gancho, resumen, transcripcion, publico, formato, duracion_s, error, analizado_en, version, cta, cta_segundo, cta_tipo, oferta, recursos, estructura").range(a, b)).catch(() =>
+      traerTodasLasFilas<Record<string, unknown>>((a, b) => supabase.from("meta_video_analisis").select("video_id, estado, origen, angulo, angulo_manual, promesa, gancho, resumen, transcripcion, publico, formato, duracion_s, error, analizado_en").range(a, b)).catch(() => []),
+    ),
   ]);
 
   // Resultados por campaña, por anuncio y por día de campaña.
@@ -179,7 +190,7 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
   // Análisis de los videos (IA) y, con ellos, el ángulo de cada campaña cuando el nombre no lo trae.
   const analisisDe = new Map<string, AnalisisVideoVista>();
   for (const h of hechos) {
-    analisisDe.set(h.video_id as string, { estado: h.estado as AnalisisVideoVista["estado"], origen: h.origen as AnalisisVideoVista["origen"], angulo: (h.angulo as string | null) ?? null, anguloManual: !!h.angulo_manual, promesa: (h.promesa as string | null) ?? null, gancho: (h.gancho as string | null) ?? null, resumen: (h.resumen as string | null) ?? null, transcripcion: (h.transcripcion as string | null) ?? null, publico: (h.publico as string | null) ?? null, formato: (h.formato as string | null) ?? null, duracionS: h.duracion_s === null || h.duracion_s === undefined ? null : num(h.duracion_s), error: (h.error as string | null) ?? null, analizadoEn: h.analizado_en as string });
+    analisisDe.set(h.video_id as string, { estado: h.estado as AnalisisVideoVista["estado"], origen: h.origen as AnalisisVideoVista["origen"], angulo: (h.angulo as string | null) ?? null, anguloManual: !!h.angulo_manual, promesa: (h.promesa as string | null) ?? null, gancho: (h.gancho as string | null) ?? null, resumen: (h.resumen as string | null) ?? null, transcripcion: (h.transcripcion as string | null) ?? null, publico: (h.publico as string | null) ?? null, formato: (h.formato as string | null) ?? null, duracionS: h.duracion_s === null || h.duracion_s === undefined ? null : num(h.duracion_s), error: (h.error as string | null) ?? null, analizadoEn: h.analizado_en as string, version: h.version === undefined || h.version === null ? 1 : num(h.version), cta: (h.cta as string | null) ?? null, ctaSegundo: h.cta_segundo === null || h.cta_segundo === undefined ? null : num(h.cta_segundo), ctaTipo: (h.cta_tipo as string | null) ?? null, oferta: (h.oferta as string | null) ?? null, recursos: Array.isArray(h.recursos) ? (h.recursos as unknown[]).filter((x): x is string => typeof x === "string") : [], estructura: estructuraDeBase(h.estructura) });
   }
   const angulosPorCampana = new Map<string, { angulo: string; gasto: number }[]>();
   for (const a of anun) {
@@ -312,7 +323,7 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
   const productos = [...new Set(camp.map((c) => (c.producto as string | null)?.trim()).filter((p): p is string => !!p))].sort((a, b) => a.localeCompare(b, "es"));
   return {
     ...base, cuentas, cuentaId, desde, hasta: o.hoy, campanas: campanasConActividad, videos, anuncios, totales, anteriores, topes, productos, sugerencias, decididas: todas.length - sugerencias.length, grupos,
-    creadasPorDia, creadasHoy: creadasPorDia[13]?.testing + creadasPorDia[13]?.escala + creadasPorDia[13]?.retargeting + creadasPorDia[13]?.otras || 0, equipo, actividadDisponible: eventos.length > 0, videosSinAnalizar: videos.filter((v) => !v.analisis || v.analisis.estado !== "analizado").length, videosSinAngulo, iaConectada: false,
+    creadasPorDia, creadasHoy: creadasPorDia[13]?.testing + creadasPorDia[13]?.escala + creadasPorDia[13]?.retargeting + creadasPorDia[13]?.otras || 0, equipo, actividadDisponible: eventos.length > 0, videosSinAnalizar: videos.filter((v) => !v.analisis || v.analisis.estado !== "analizado" || v.analisis.version < VERSION_ANALISIS).length, videosSinAngulo, iaConectada: false,
   };
 }
 

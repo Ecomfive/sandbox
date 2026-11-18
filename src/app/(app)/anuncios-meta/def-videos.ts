@@ -1,5 +1,6 @@
-import { confiable, cpa, ctr, holdRate, hookRate } from "@/lib/meta-ads/metricas";
+import { confiable, cpa, ctr, holdRate, hookRate, llegaAlLlamado } from "@/lib/meta-ads/metricas";
 import { NOMBRE_ETAPA } from "@/lib/meta-ads/nombre";
+import { VERSION_ANALISIS } from "@/lib/meta-ads/video-angulo";
 import type { VideoVista } from "@/lib/meta-ads/vistas";
 import type { DefTabla } from "@/lib/tabla/motor";
 import { NOMBRE_VEREDICTO, veredictoDeResultados, type Veredicto } from "./def-campanas";
@@ -33,12 +34,15 @@ export const DEF_VIDEOS: DefTabla<VideoVista> = {
     { id: "datos", etiqueta: "Cantidad de datos", tipo: "seleccion", valores: (v) => [confiable(v.r) ? "suficiente" : "poca"], opciones: () => [{ valor: "suficiente", etiqueta: "Data suficiente" }, { valor: "poca", etiqueta: "Poca data" }], agrupable: true },
     { id: "analisis", etiqueta: "Análisis de la IA", tipo: "seleccion", valores: (v) => [estadoAnalisis(v)], opciones: () => (Object.keys(NOMBRE_ANALISIS) as EstadoAnalisis[]).map((x) => ({ valor: x, etiqueta: NOMBRE_ANALISIS[x] })), agrupable: true },
     { id: "formato", etiqueta: "Formato del video", tipo: "seleccion", valores: (v) => [v.analisis?.formato ?? SIN], etiquetaSinValor: "Sin dato", agrupable: true },
+    { id: "ctaTipo", etiqueta: "Tipo de llamado a la acción", tipo: "seleccion", valores: (v) => [v.analisis?.estado === "analizado" && v.analisis.version >= VERSION_ANALISIS ? (v.analisis.ctaTipo ?? SIN) : SIN], etiquetaSinValor: "Sin dato", agrupable: true },
+    { id: "recurso", etiqueta: "Recursos que usa", tipo: "seleccion", valores: (v) => (v.analisis?.recursos.length ? v.analisis.recursos : [SIN]), etiquetaSinValor: "Sin dato", agrupable: true },
     { id: "activo", etiqueta: "En anuncios activos", tipo: "seleccion", valores: (v) => [v.anunciosDetalle.some((a) => a.activo) ? "si" : "no"], opciones: () => [{ valor: "si", etiqueta: "Sí, hay anuncios activos" }, { valor: "no", etiqueta: "No, todos apagados" }], agrupable: true },
     { id: "gasto", etiqueta: "Gasto", tipo: "numero", sinCsv: true, valor: (v) => v.r.gasto },
     { id: "compras", etiqueta: "Compras", tipo: "numero", sinCsv: true, valor: (v) => v.r.compras },
     { id: "cpa", etiqueta: "CPA", tipo: "numero", sinCsv: true, valor: (v) => cpa(v.r) },
     { id: "hook", etiqueta: "Hook (3 s) en %", tipo: "numero", sinCsv: true, valor: (v) => hookRate(v.r) },
     { id: "hold", etiqueta: "Pasan 15 s en %", tipo: "numero", sinCsv: true, valor: (v) => holdRate(v.r) },
+    { id: "llegaCta", etiqueta: "Llegan al llamado en %", tipo: "numero", sinCsv: true, valor: (v) => llegaAlLlamado(v.r, v.analisis?.ctaSegundo ?? null, v.analisis?.duracionS ?? null) },
     { id: "ctr", etiqueta: "CTR del enlace en %", tipo: "numero", sinCsv: true, valor: (v) => ctr(v.r) },
     { id: "campanas", etiqueta: "Campañas donde se usa", tipo: "numero", sinCsv: true, valor: (v) => v.campanas },
     { id: "anuncios", etiqueta: "Anuncios donde se usa", tipo: "numero", sinCsv: true, valor: (v) => v.anuncios },

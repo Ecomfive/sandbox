@@ -6,11 +6,13 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { pedirMeta, tokenDeMeta } from "./api";
 import { analizarSoloTextoConGemini, analizarVideoConGemini, geminiConectado } from "./gemini-video";
-import { esHostDeVideoMeta, normalizarAnalisisVideo, pedidoAnalisisVideo, type AnalisisVideo } from "./video-angulo";
+import { esHostDeVideoMeta, normalizarAnalisisVideo, pedidoAnalisisVideo, VERSION_ANALISIS, type AnalisisVideo } from "./video-angulo";
 
 const MAX_BYTES_VIDEO = 80 * 1024 * 1024;
 const MAX_BYTES_IMAGEN = 3 * 1024 * 1024;
 const REINTENTO_MS = 24 * 3600 * 1000;
+/** Cuando una persona pulsa «Analizar los pendientes» no se repite lo que se acaba de intentar (así una tanda que falla no tapa a los que siguen). */
+const ESPERA_MANUAL_MS = 3 * 60 * 1000;
 const DIA = 86_400_000;
 
 export interface VideoPendiente {
@@ -31,15 +33,20 @@ export interface ResultadoVideo {
 
 const hoyMenos = (dias: number) => new Date(Date.now() - dias * DIA).toLocaleDateString("en-CA", { timeZone: "America/Panama" });
 
-/** Los videos con gasto en los últimos 30 días que todavía no tienen análisis (o cuyo intento falló o quedó sin archivo hace más de un día), de más a menos gasto. */
-export async function videosPorAnalizar(supabase: SupabaseClient, opciones: { max: number }): Promise<{ pendientes: VideoPendiente[]; total: number }> {
+/**
+ * Los videos con gasto en los últimos 30 días que todavía no tienen análisis, o cuyo análisis falló, quedó sin archivo o es de una versión anterior (sin estructura ni llamado a la acción), de más a menos gasto.
+ * El cron espera un día antes de repetir un intento fallido; cuando una persona pulsa «Analizar los pendientes» (`ahora: true`) se repiten al momento, salvo lo intentado hace menos de 3 minutos.
+ */
+export async function videosPorAnalizar(supabase: SupabaseClient, opciones: { max: number; ahora?: boolean }): Promise<{ pendientes: VideoPendiente[]; total: number }> {
   const { data: cuentas } = await supabase.from("meta_cuentas").select("id").eq("activa", true);
   const ids = (cuentas ?? []).map((c) => c.id as string);
   if (!ids.length) return { pendientes: [], total: 0 };
   const [anuncios, filas, hechos, campanas] = await Promise.all([
     traerTodasLasFilas<Record<string, unknown>>((a, b) => supabase.from("meta_anuncios").select("id, cuenta_id, campana_id, video_id, miniatura, copy, titulo").in("cuenta_id", ids).not("video_id", "is", null).range(a, b)),
     traerTodasLasFilas<{ anuncio_id: string; gasto: unknown }>((a, b) => supabase.from("meta_resultados_dia").select("anuncio_id, gasto").in("cuenta_id", ids).gte("fecha", hoyMenos(29)).range(a, b)),
-    traerTodasLasFilas<{ video_id: string; estado: string; analizado_en: string }>((a, b) => supabase.from("meta_video_analisis").select("video_id, estado, analizado_en").range(a, b)),
+    traerTodasLasFilas<{ video_id: string; estado: string; analizado_en: string; version?: number }>((a, b) => supabase.from("meta_video_analisis").select("video_id, estado, analizado_en, version").range(a, b)).catch(() =>
+      traerTodasLasFilas<{ video_id: string; estado: string; analizado_en: string; version?: number }>((a, b) => supabase.from("meta_video_analisis").select("video_id, estado, analizado_en").range(a, b)),
+    ),
     traerTodasLasFilas<{ id: string; producto: string | null }>((a, b) => supabase.from("meta_campanas").select("id, producto").in("cuenta_id", ids).range(a, b)),
   ]);
   const gastoDe = new Map<string, number>();
@@ -63,7 +70,9 @@ export async function videosPorAnalizar(supabase: SupabaseClient, opciones: { ma
     .filter((v) => v.gasto > 0)
     .filter((v) => {
       const h = analisis.get(v.videoId);
-      return !h || (h.estado !== "analizado" && ahora - new Date(h.analizado_en).getTime() > REINTENTO_MS);
+      if (!h) return true;
+      const viejo = h.estado !== "analizado" || (h.version ?? 1) < VERSION_ANALISIS;
+      return viejo && ahora - new Date(h.analizado_en).getTime() > (opciones.ahora ? ESPERA_MANUAL_MS : REINTENTO_MS);
     })
     .sort((a, b) => b.gasto - a.gasto);
   return { pendientes: todos.slice(0, opciones.max).map(({ mejor: _mejor, ...v }) => (void _mejor, v)), total: todos.length };
@@ -207,19 +216,21 @@ export async function analizarVideoDeMeta(supabase: SupabaseClient, v: VideoPend
   }
   const manual = !!previo?.angulo_manual;
   const estado = origen === "video" ? "analizado" : "sin_archivo";
-  const { error } = await supabase.from("meta_video_analisis").upsert(
-    { video_id: v.videoId, cuenta_id: v.cuentaId, estado, origen, angulo: manual ? ((previo?.angulo as string | null) ?? analisis.angulo) : analisis.angulo, angulo_manual: manual, promesa: analisis.promesa || null, gancho: analisis.gancho || null, resumen: analisis.resumen || null, transcripcion: analisis.transcripcion || null, publico: analisis.publico || null, formato: analisis.formato, duracion_s: duracion, modelo, error: estado === "sin_archivo" ? (motivo ?? "").slice(0, 300) || null : null, analizado_por: quien, analizado_en: new Date().toISOString() },
-    { onConflict: "video_id" },
-  );
+  const base = { video_id: v.videoId, cuenta_id: v.cuentaId, estado, origen, angulo: manual ? ((previo?.angulo as string | null) ?? analisis.angulo) : analisis.angulo, angulo_manual: manual, promesa: analisis.promesa || null, gancho: analisis.gancho || null, resumen: analisis.resumen || null, transcripcion: analisis.transcripcion || null, publico: analisis.publico || null, formato: analisis.formato, duracion_s: duracion, modelo, error: estado === "sin_archivo" ? (motivo ?? "").slice(0, 300) || null : null, analizado_por: quien, analizado_en: new Date().toISOString() };
+  // Un análisis sin video (solo texto) no trae estructura ni segundos: queda en la versión 1 para volver a verlo cuando Meta dé el archivo.
+  const completo = { ...base, version: origen === "video" ? VERSION_ANALISIS : 1, cta: analisis.cta || null, cta_segundo: analisis.ctaSegundo, cta_tipo: analisis.ctaTipo || null, oferta: analisis.oferta || null, recursos: analisis.recursos, estructura: analisis.estructura };
+  let { error } = await supabase.from("meta_video_analisis").upsert(completo, { onConflict: "video_id" });
+  // Sin la migración 0326 se guarda lo de antes.
+  if (error && /cta|oferta|recursos|estructura|version|schema cache/i.test(error.message)) ({ error } = await supabase.from("meta_video_analisis").upsert(base, { onConflict: "video_id" }));
   if (error) return { ok: false, estado: "error", mensaje: /meta_video_analisis|schema cache|does not exist/i.test(error.message) ? "Falta correr la migración 0325 (ángulo de los videos) en Supabase." : error.message };
   return { ok: true, estado, mensaje: estado === "analizado" ? `Ángulo: ${analisis.angulo}.` : `Ángulo provisional «${analisis.angulo}» (solo con el texto: ${motivo ?? "Meta no entregó el video"}).` };
 }
 
 /** Analiza los pendientes más gastadores uno tras otro mientras quede tiempo. La usan el cron y «Analizar los pendientes». */
-export async function analizarPendientes(supabase: SupabaseClient, opciones: { limiteMs: number; max?: number; quien?: string | null }): Promise<{ analizados: number; sinArchivo: number; errores: number; faltan: number; mensajes: string[] }> {
+export async function analizarPendientes(supabase: SupabaseClient, opciones: { limiteMs: number; max?: number; quien?: string | null; ahora?: boolean }): Promise<{ analizados: number; sinArchivo: number; errores: number; faltan: number; mensajes: string[] }> {
   const inicio = Date.now();
   const r = { analizados: 0, sinArchivo: 0, errores: 0, faltan: 0, mensajes: [] as string[] };
-  const { pendientes, total } = await videosPorAnalizar(supabase, { max: opciones.max ?? 12 });
+  const { pendientes, total } = await videosPorAnalizar(supabase, { max: opciones.max ?? 12, ahora: opciones.ahora });
   r.faltan = total;
   for (const v of pendientes) {
     // Un video tarda de 20 a 90 segundos: no se empieza otro si ya no cabe.

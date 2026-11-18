@@ -65,6 +65,16 @@ export interface AnalisisVideoVista {
   duracionS: number | null;
   error: string | null;
   analizadoEn: string;
+  /** 1 = análisis anterior, sin estructura ni llamado a la acción; 2 = con ellos. */
+  version: number;
+  /** El llamado a la acción tal como lo dice el video, el segundo en que aparece y de qué tipo es. */
+  cta: string | null;
+  ctaSegundo: number | null;
+  ctaTipo: string | null;
+  oferta: string | null;
+  recursos: string[];
+  /** Cómo se arma el video, parte por parte y con sus segundos. */
+  estructura: { parte: string; desde: number | null; hasta: number | null; resumen: string }[];
 }
 
 export interface VideoVista {
