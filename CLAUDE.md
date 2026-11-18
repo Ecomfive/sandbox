@@ -29,6 +29,23 @@ convenciones técnicas del código.
 - Las cabeceras de seguridad están en `next.config.ts` y las cookies de sesión son `httpOnly`
   (`src/lib/supabase/cookies.ts`). Los secretos nunca llevan `NEXT_PUBLIC_`.
 - Pruebas: `npm run test:seguridad`. Comprobar la base desde fuera: `node scripts/verificar-seguridad-supabase.mjs`.
+- **Toda acción del servidor o ruta nueva revisa el acceso en una sola llamada con `exigirAcceso`**
+  (`src/lib/seguridad/exigir-acceso.ts`): módulo, escritura, país (`paisId`, `filaDePais`, `bodegaId`) y tienda (`unidades`,
+  `registros`, `todaLaEmpresa`). Todo id, país, tienda o ruta de archivo que llega del navegador se comprueba contra lo guardado
+  en la base. Los límites de tienda y país se aplican en el servidor, nunca solo en el menú o en la página. Lo oculto por rol
+  (campos de Compras, áreas y alcance del CRM, notas privadas) se quita antes de mandar datos al navegador, también en la
+  Bitácora, los avisos y las exportaciones.
+- La prueba de cierre (`src/lib/seguridad/cierre-acciones.test.ts`) falla si una acción exportada de un archivo `"use server"` o
+  un handler de `route.ts` no llama a una guardia reconocida. Una excepción nueva va en `cierre-acciones-permitidas.ts` con su
+  motivo, y solo si es pública por diseño.
+- Un PR que toque permisos, archivos/Storage, webhooks, IA o datos de clientes pasa por `/security-review` antes de
+  publicarse; la plantilla de PR (`.github/pull_request_template.md`) trae la lista. El CI (`.github/workflows/seguridad.yml`)
+  corre `npm run test:seguridad` y `tsc` en cada PR.
+- Secretos: cada uno con su variable propia (`USO_EXTERNO_LLAVE_SECRETO`, `ICOMFLY_TOKEN_KEY`, `CLIENTES_LLAVE_SECRETO`), nunca
+  derivados de `SUPABASE_SERVICE_ROLE_KEY`. Las funciones de la base solo las ejecuta `service_role` (migración 0319): una función
+  nueva no necesita `grant`. Suspender una cuenta cierra sus sesiones (`sacarDelSistema`, `src/lib/seguridad/sesiones-cuenta.ts`).
+- Auditorías y plan: `seguridad/` en la carpeta de trabajo (fuera del repo) y `~/security-audit-skill/sandbox/run-N/`; las lleva
+  el chat «VIERNES».
 - **Auditoría del 13 oct 2026 (skill security-audit de Cloudflare, 14 hallazgos corregidos).** Reglas que dejó:
   - Descargar de una URL externa solo con `descargarPublico` (`src/lib/seguridad/url-externa.ts`): IPv6 revisada por bytes
     (mapeadas, NAT64, 6to4…), puertos 80/443 y la IP se revisa en la misma búsqueda DNS de la conexión (`lookupPublico`).

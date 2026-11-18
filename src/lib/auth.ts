@@ -276,12 +276,20 @@ export async function requirePanel(href: string, clave: string): Promise<Usuario
  * pero un server action se puede invocar directo, así que esta es la barrera real. */
 export async function requireModuloEscritura(clave: string): Promise<UsuarioActual> {
   const usuario = await getUsuarioActual();
-  if (!usuario) throw new Error("No hay sesión activa.");
-  if (!usuario.modulos.includes(clave)) throw new Error("No tienes acceso a este módulo.");
-  if (usuario.modulosSoloLectura.includes(clave)) {
-    throw new Error("Tu rol solo tiene acceso de lectura a este módulo.");
-  }
+  const motivo = motivoSinModulo(usuario, clave, true);
+  if (motivo || !usuario) throw new Error(motivo ?? "No hay sesión activa.");
   return usuario;
+}
+
+/**
+ * Por qué la persona no puede abrir el módulo (con `escritura`, modificarlo), o null si puede. La regla de
+ * `requireModuloEscritura`, sin lanzar: la usa también `exigirAcceso` (plan de seguridad, fase 4 · 18 nov 2026).
+ */
+export function motivoSinModulo(usuario: Pick<UsuarioActual, "modulos" | "modulosSoloLectura"> | null, clave: string, escritura: boolean): string | null {
+  if (!usuario) return "No hay sesión activa.";
+  if (!usuario.modulos.includes(clave)) return "No tienes acceso a este módulo.";
+  if (escritura && usuario.modulosSoloLectura.includes(clave)) return "Tu rol solo tiene acceso de lectura a este módulo.";
+  return null;
 }
 
 /**

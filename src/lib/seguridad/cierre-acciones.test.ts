@@ -33,6 +33,9 @@ const GUARDIAS: { modulo: string; nombres: string[]; clase: Clase }[] = [
     nombres: ["requireModulo", "requireModuloEscritura", "requireAlgunModulo", "requirePestana", "requirePanel", "getUsuarioActual", "getUsuarioIdSesion", "getUsuarioSesion"],
     clase: "sesion",
   },
+  // Sesión + módulo + país + tienda en una llamada: la guardia para lo nuevo (plan de seguridad, fase 4 · 18 nov 2026). Llama a
+  // getUsuarioActual; `revisarAcceso` no cuenta (recibe el usuario de quien llama).
+  { modulo: "src/lib/seguridad/exigir-acceso", nombres: ["exigirAcceso"], clase: "derivada" },
   // El CRM (Atención y Comercial): getUsuarioActual + el módulo de alguna de las dos áreas; devuelve null si no.
   { modulo: "src/app/(app)/crm-dropshippers/bandeja/datos-bandeja", nombres: ["usuarioBandeja"], clase: "derivada" },
   // Mandar algo por WhatsApp desde el CRM: usuarioBandeja(true) + lo afinado + la conversación del área de la persona.
@@ -431,6 +434,20 @@ test("el mismo código sin \"use server\" no es una puerta (salvo una acción en
     abiertasDe("src/app/(app)/x/page.tsx", `export default function Pagina() { async function guardar() { "use server"; } return null; }`),
     ["guardar"],
   );
+});
+
+test("exigirAcceso cuenta como guardia; revisarAcceso o uno de otro módulo, no", () => {
+  const ejemplo = `"use server";
+import { exigirAcceso, revisarAcceso } from "@/lib/seguridad/exigir-acceso";
+import { exigirAcceso as falsa } from "./exigir-acceso";
+export async function conExigir(id: string) {
+  const acceso = await exigirAcceso({ modulo: "bienes-de-uso", escritura: true, registros: { tabla: "fin_bienes_uso", ids: [id] } });
+  if (acceso.error) return { error: acceso.error };
+}
+export async function soloRevisar(id: string) { await revisarAcceso(null, { modulo: "x" }); }
+export async function deOtroModulo() { await falsa({ modulo: "x" }); }
+`;
+  assert.deepEqual(abiertasDe("src/app/(app)/bienes-de-uso/ejemplo/actions.ts", ejemplo), ["soloRevisar", "deOtroModulo"]);
 });
 
 test("en un route.ts revisa solo los métodos HTTP y reconoce cron y firmas", () => {
