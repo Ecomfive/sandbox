@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import * as XLSX from "xlsx";
 import { getUsuarioActual } from "@/lib/auth";
+import { SOLO_TODA_LA_EMPRESA } from "@/lib/finanzas/acceso-tienda";
+import { cargarTiendasPermitidas } from "@/lib/finanzas/cargar-tiendas-permitidas";
 import { ETIQUETA_CALIDAD, CALIDADES } from "@/lib/clientes/identidad";
 import { DIAS_LTV, DIAS_RECOMPRA, ETIQUETA_PLATAFORMA, TODAS, ltv, recompra } from "@/lib/clientes/metricas";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -33,6 +35,8 @@ const ENTERO = "#,##0";
 export async function GET(req: NextRequest) {
   const usuario = await getUsuarioActual();
   if (!usuario || !usuario.modulos.includes("clientes-marketing")) return new NextResponse("No autorizado", { status: 403 });
+  // Trae «Todas» y cada tienda: con tiendas limitadas no se descarga (auditoría de seguridad, 18 nov 2026).
+  if (await cargarTiendasPermitidas()) return new NextResponse(SOLO_TODA_LA_EMPRESA, { status: 403 });
   const datos = await cargarDatosPagina(createServiceClient(), Object.fromEntries(req.nextUrl.searchParams));
   if ("error" in datos) return new NextResponse("Falta la migración 0920.", { status: 500 });
   const nombre = (id: string) => (id === TODAS ? "Todas" : (datos.nombresUnidades[id] ?? "—"));

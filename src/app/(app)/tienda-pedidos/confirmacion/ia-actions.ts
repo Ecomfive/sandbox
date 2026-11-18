@@ -192,7 +192,7 @@ async function ejemploPermitido(id: string) {
   if (!data) return null;
   const { tiendas, limitado } = await tiendasVisibles(supabase, pais.id);
   if (limitado && !(data.tienda_id && tiendas.some((t) => t.id === data.tienda_id))) return null;
-  return { supabase, pais, tiendas };
+  return { supabase, pais, tiendas, limitado };
 }
 
 export async function editarEjemplo(id: string, d: DatosEjemplo): Promise<Resultado> {
@@ -200,6 +200,9 @@ export async function editarEjemplo(id: string, d: DatosEjemplo): Promise<Result
   if (!UUID.test(String(id))) return { error: "Ejemplo no válido." };
   const ctx = await ejemploPermitido(id);
   if (!ctx) return { error: "Ese ejemplo ya no está o no tienes acceso." };
+  // Igual que al agregar: con límite no se puede pasar a «para todas» (un ejemplo general entra en las demás tiendas del país;
+  // auditoría de seguridad, 18 nov 2026).
+  if (ctx.limitado && !d?.tiendaId) return { error: "Elige la tienda de la dirección." };
   const { config } = await cargarConfig(ctx.supabase, ctx.pais.id);
   const l = await leerEjemplo(d, config.distingueZona, ctx.tiendas.map((t) => t.id));
   if ("error" in l) return l;

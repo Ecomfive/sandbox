@@ -1,3 +1,4 @@
+import { limitadoATiendas, SoloTodaLaEmpresa } from "@/components/finanzas/solo-toda-la-empresa";
 import { EncabezadoAF4 } from "@/components/af4/encabezado-af4";
 import { EstadoVacioAF4 } from "@/components/af4/estado-af4";
 import { Pagina } from "@/components/ui/pagina";
@@ -65,6 +66,8 @@ function Firma({ titulo, nombre, detalle }: { titulo: string; nombre?: string; d
 /** El recibo de un cierre pagado, listo para imprimir y firmar (el mismo texto que la hoja «RECIBOS DE PAGOS»). */
 export default async function ReciboDeliveryPage({ params }: { params: Promise<{ id: string }> }) {
   await requireModulo("deliverys");
+  // Los cierres y los repartidores juntan todas las tiendas: con tiendas limitadas no se ven (auditoría de seguridad, 18 nov 2026).
+  if (await limitadoATiendas()) return <SoloTodaLaEmpresa titulo="Recibo de delivery" />;
   const { id } = await params;
   const vacio = (titulo: string, detalle?: string) => (
     <Pagina ancho="ficha" className="flex flex-col gap-6">

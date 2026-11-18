@@ -1,3 +1,4 @@
+import { limitadoATiendas, SoloTodaLaEmpresa } from "@/components/finanzas/solo-toda-la-empresa";
 import { EncabezadoAF4 } from "@/components/af4/encabezado-af4";
 import { EstadoVacioAF4 } from "@/components/af4/estado-af4";
 import { FilaKpiAF4, KpiAF4 } from "@/components/af4/kpi-af4";
@@ -21,6 +22,8 @@ const tasaTexto = (v: number | null) => fraccion(v, { decimales: 0 });
 
 export default async function DeliverysPage({ searchParams }: { searchParams: Promise<{ [k: string]: string | string[] | undefined }> }) {
   const usuario = await requireModulo(MODULO);
+  // Los cierres y los repartidores juntan todas las tiendas: con tiendas limitadas no se ven (auditoría de seguridad, 18 nov 2026).
+  if (await limitadoATiendas()) return <SoloTodaLaEmpresa titulo="Deliverys" />;
   const puedeEscribir = !usuario.modulosSoloLectura.includes(MODULO);
   const supabase = createServiceClient();
   const { semana: pedida } = await searchParams;

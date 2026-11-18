@@ -96,6 +96,22 @@ export async function dejarRepartoPendiente(padreId: string): Promise<{ error?: 
   const supabase = createServiceClient();
   const { data: padre } = await supabase.from("skus_maestros").select("codigo").eq("id", padreId).maybeSingle();
   if (!padre) return { error: "El producto ya no existe." };
+  // La base mueve el stock de las variantes en todas las bodegas propias: con países limitados, solo si todas son de un país de
+  // la persona (auditoría de seguridad, 18 nov 2026).
+  if (usuario.paisesPermitidos !== null) {
+    const NO_SE_PUDO = { error: "No se pudo revisar el stock de las variantes. Inténtalo de nuevo." };
+    const hijas = await supabase.from("skus_maestros").select("id").eq("padre_id", padreId);
+    if (hijas.error) return NO_SE_PUDO;
+    const idsHijas = (hijas.data ?? []).map((h) => h.id as string);
+    const stock = idsHijas.length ? await supabase.from("wms_stock").select("bodega_id").in("sku_maestro_id", idsHijas).neq("fisico", 0) : { data: [] as { bodega_id: string }[], error: null };
+    if (stock.error) return NO_SE_PUDO;
+    const idsBodegas = [...new Set((stock.data ?? []).map((s) => s.bodega_id as string))];
+    const propias = idsBodegas.length ? await supabase.from("wms_bodegas").select("id").in("id", idsBodegas).eq("tipo", "propia") : { data: [] as { id: string }[], error: null };
+    if (propias.error) return NO_SE_PUDO;
+    for (const { id: bodegaId } of propias.data ?? []) {
+      if (!(await puedeVerBodega(supabase, usuario.paisesPermitidos, bodegaId as string))) return { error: "Una variante tiene stock en una bodega de un país que no tienes: no puedes dejarlo sin repartir." };
+    }
+  }
   const { data, error } = await supabase.rpc("wms_dejar_reparto_pendiente", { p_padre: padreId, p_usuario: usuario.id });
   if (error) {
     if (/wms_dejar_reparto_pendiente|schema cache|Could not find the function/i.test(error.message)) return { error: FALTA_MIGRACION };

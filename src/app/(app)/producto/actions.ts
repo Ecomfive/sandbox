@@ -17,6 +17,8 @@ import { crearCompraDesdeProducto } from "@/lib/compras/compra-desde-producto";
 import { pasarTestsAFiltro } from "@/lib/productos-test/pasar-a-filtro";
 import { getPaisActual } from "@/lib/pais";
 import { puedeVerPais } from "@/lib/paises-permitidos";
+import { filaDePaisPermitida } from "@/lib/seguridad/fila-pais";
+import { SIN_ACCESO_PAIS } from "@/lib/seguridad/pais-acceso";
 import { DIAS_AVISO_PREDETERMINADO, VENCIMIENTO_ACTIVABLE } from "@/lib/wms/vencimiento";
 import { huellaFoto } from "@/lib/wms/huella-foto";
 import { posiblesDuplicados, type CandidatoDuplicado, type PosibleDuplicado } from "@/lib/wms/duplicados";
@@ -362,11 +364,13 @@ export async function obtenerHistorialProducto(id: string): Promise<{ eventos: {
 
 /** Vincula un producto que llega en los pedidos de Dropi (tabla `productos`) con un producto del sistema (o lo desvincula). */
 export async function vincularProductoASku(formData: FormData) {
-  await requireModuloEscritura(MODULO);
+  const usuario = await requireModuloEscritura(MODULO);
   const productoId = formData.get("producto_id") as string;
   const skuMaestroId = (formData.get("sku_maestro_id") as string) || null;
 
   const supabase = createServiceClient();
+  // Solo un producto (de Productos y márgenes) de un país de la persona (auditoría de seguridad, 18 nov 2026).
+  if (!(await filaDePaisPermitida(supabase, usuario.paisesPermitidos, "productos", productoId))) throw new Error(SIN_ACCESO_PAIS);
   const { error } = await supabase.from("productos").update({ sku_maestro_id: skuMaestroId }).eq("id", productoId);
   if (error) throw new Error(error.message);
   revalidatePath("/productos");

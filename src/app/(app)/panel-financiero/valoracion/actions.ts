@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModuloEscritura } from "@/lib/auth";
+import { sinAccesoTodaLaEmpresa } from "@/lib/finanzas/acceso-tienda";
 import { CAMPOS_VALORACION, CLAVE_VALORACION, leerValoracion, validarValoracion, valoracionAGuardar, type SupuestosValoracion } from "@/lib/finanzas/valoracion";
 import { createServiceClient } from "@/lib/supabase/server";
 
@@ -12,6 +13,9 @@ const texto = (s: SupuestosValoracion) => Object.fromEntries(CAMPOS_VALORACION.m
 export async function guardarValoracion(formData: FormData): Promise<{ error?: string }> {
   try {
     const usuario = await requireModuloEscritura("estado-resultados");
+    // La valoración es de toda la empresa: con tiendas limitadas no se cambia (auditoría de seguridad, 18 nov 2026).
+    const acceso = await sinAccesoTodaLaEmpresa();
+    if (acceso) return { error: acceso };
     const leido = validarValoracion((c) => formData.get(c));
     if ("error" in leido) return { error: leido.error };
     const supabase = createServiceClient();

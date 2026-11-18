@@ -28,7 +28,7 @@ export default async function PipelinePage() {
     puedeLibro: usuario.modulos.includes("libro-movimientos") && !usuario.modulosSoloLectura.includes("libro-movimientos") && !usuario.modulosSoloLectura.includes("ventas-tiendas"),
     envTiendas: leerTiendasShopify(process.env.SHOPIFY_TIENDAS).map((t) => t.tienda),
   });
-  const op = "error" in datos ? null : await cargarOperacion(supabase, datos.ordenes, datos.saldos, datos.mensajeros, unidades, hoyPanama());
+  const op = "error" in datos ? null : await cargarOperacion(supabase, datos.ordenes, datos.saldos, datos.mensajeros, unidades, hoyPanama(), permitidas);
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
       <EncabezadoAF4 titulo="Pipeline de órdenes" imprimir={false} />

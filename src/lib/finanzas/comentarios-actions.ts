@@ -8,7 +8,10 @@ import { registrarAuditoria } from "@/lib/auditoria";
 import { getUsuarioActual } from "@/lib/auth";
 import { mencionadosValidos, notificarMenciones } from "@/lib/menciones";
 import { createServiceClient } from "@/lib/supabase/server";
+import { SIN_ACCESO_TIENDA } from "./acceso-tienda";
+import { cargarTiendasPermitidas } from "./cargar-tiendas-permitidas";
 import { PAGINAS_COMENTARIOS, enlaceAncla, limpiarTexto, nombreCifra, validarAncla } from "./comentarios";
+import { puedeVerHilo } from "./comentarios-tienda";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SIN_MIGRACION = "Falta correr la migración 0937 (comentarios) en Supabase.";
@@ -29,6 +32,9 @@ async function conAcceso(anclaCruda: unknown) {
   const ancla = validarAncla(anclaCruda);
   if (!ancla) return { error: "Cifra inválida." } as const;
   if (!usuario.modulos.includes(PAGINAS_COMENTARIOS[ancla.pagina].modulo)) return { error: "No tienes acceso a esta página." } as const;
+  // Con tiendas limitadas, solo los hilos de sus tiendas o de su «Todas»: ni los de toda la empresa ni los de otra tienda
+  // (auditoría de seguridad, 18 nov 2026).
+  if (!puedeVerHilo(ancla.pagina, ancla.clave, await cargarTiendasPermitidas())) return { error: SIN_ACCESO_TIENDA } as const;
   return { usuario, ancla } as const;
 }
 

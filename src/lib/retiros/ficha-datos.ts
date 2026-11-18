@@ -1,9 +1,11 @@
+import { getUsuarioActual } from "@/lib/auth";
+import { puedeVerPais } from "@/lib/paises-permitidos";
 import { createServiceClient } from "@/lib/supabase/server";
 import { ETIQUETA_ESTADO_DROPI, type EstadoDropi } from "@/lib/dropi/emparejar-retiros";
 import { ESTADO_ETIQUETA } from "./estados";
 import type { FichaRetiro } from "./ficha";
 
-/** Trae un retiro con todo lo que lleva su ficha. Devuelve null si no existe. */
+/** Trae un retiro con todo lo que lleva su ficha. Devuelve null si no existe o si es de un país que la persona no tiene. */
 export async function cargarFicha(id: string, generadoPor: string): Promise<FichaRetiro | null> {
   const supabase = createServiceClient();
   const { data: retiro } = await supabase
@@ -18,6 +20,9 @@ export async function cargarFicha(id: string, generadoPor: string): Promise<Fich
   const plataforma = retiro.plataformas as unknown as { nombre: string } | null;
   const cuenta = retiro.cuentas_retiro as unknown as { nombre: string; detalle: string | null } | null;
   const pais = retiro.paises as unknown as { codigo: string; nombre: string } | null;
+  // Con países limitados, solo un retiro de un país de la persona, como en su ficha (auditoría de seguridad, 18 nov 2026).
+  const usuario = await getUsuarioActual();
+  if (!usuario || (usuario.paisesPermitidos !== null && (!pais || !puedeVerPais(usuario.paisesPermitidos, pais.codigo)))) return null;
   const asignado = retiro.perfiles as unknown as { nombre: string | null; email: string } | null;
 
   return {

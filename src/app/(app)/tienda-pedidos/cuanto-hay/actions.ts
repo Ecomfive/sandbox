@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireModuloEscritura, type UsuarioActual } from "@/lib/auth";
 import { cargarTiendasCuantoHay } from "@/lib/cuanto-hay/datos";
 import { avisoPregunta, avisoRespuesta, leerCantidad, limpiarNota, tiendasDePersona } from "@/lib/cuanto-hay/reglas";
+import { SIN_ACCESO_TIENDA } from "@/lib/finanzas/acceso-tienda";
 import { cargarTiendasPermitidas } from "@/lib/finanzas/cargar-tiendas-permitidas";
 import { createServiceClient } from "@/lib/supabase/server";
 
@@ -65,6 +66,12 @@ export async function responderCuantoHay(id: string, cantidadCruda: string): Pro
     const { data: p, error: e0 } = await supabase.from("tienda_cuanto_hay").select("id, tienda_id, producto, pedido_por").eq("id", id).maybeSingle();
     if (e0) return { error: SIN_MIGRACION };
     if (!p) return { error: "Esa pregunta ya no existe." };
+    // Con tiendas limitadas, solo responde las de sus tiendas (auditoría de seguridad, 18 nov 2026).
+    const permitidas = await cargarTiendasPermitidas();
+    if (permitidas) {
+      const suyas = tiendasDePersona(await cargarTiendasCuantoHay(supabase), permitidas, (t) => t.unidadId);
+      if (!suyas.some((t) => t.id === p.tienda_id)) return { error: SIN_ACCESO_TIENDA };
+    }
     const { error } = await supabase
       .from("tienda_cuanto_hay")
       .update({ cantidad, respondido_por: u.id, respondido_por_nombre: nombreDe(u), respondido_en: new Date().toISOString() })

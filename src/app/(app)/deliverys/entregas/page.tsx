@@ -4,6 +4,8 @@ import { hoyPanama } from "@/lib/af4/fecha";
 import { Pagina } from "@/components/ui/pagina";
 import { requireModulo } from "@/lib/auth";
 import { cargarEntregas, semanasDisponibles } from "@/lib/deliverys/cargar";
+import { cargarTiendasPermitidas } from "@/lib/finanzas/cargar-tiendas-permitidas";
+import { filtrarUnidades, puedeVerUnidad } from "@/lib/finanzas/tiendas-permitidas";
 import { inicioSemana } from "@/lib/deliverys/liquidacion";
 import { createServiceClient } from "@/lib/supabase/server";
 import { SelectorSemana, semanaElegida } from "../selector-semana";
@@ -23,10 +25,11 @@ export default async function EntregasDeliverysPage({ searchParams }: { searchPa
   const { semana: pedida } = await searchParams;
   const hoy = hoyPanama();
 
-  const [disponibles, repartidores, tiendas] = await Promise.all([
+  const [disponibles, repartidores, tiendas, permitidas] = await Promise.all([
     semanasDisponibles(supabase),
     supabase.from("del_repartidores").select("id, nombre").eq("activo", true).order("nombre"),
     supabase.from("del_tiendas").select("unidad_id, fin_unidades(nombre)"),
+    cargarTiendasPermitidas(),
   ]);
   if ("error" in disponibles || repartidores.error || tiendas.error) {
     return (
@@ -39,11 +42,15 @@ export default async function EntregasDeliverysPage({ searchParams }: { searchPa
   // La semana en curso siempre se puede elegir (para cargar entregas aunque todavía no haya ninguna).
   const semanas = [...new Set([...disponibles.semanas, inicioSemana(hoy)])].sort();
   const semana = semanaElegida(semanas, pedida)!;
-  const entregas = await cargarEntregas(supabase, semana);
-  const opcionesTienda = (tiendas.data ?? [])
-    .map((t) => ({ id: t.unidad_id as string, nombre: ((Array.isArray(t.fin_unidades) ? t.fin_unidades[0] : t.fin_unidades) as { nombre: string } | null)?.nombre ?? "" }))
-    .filter((t) => t.nombre)
-    .sort((a, b) => a.nombre.localeCompare(b.nombre));
+  // Con tiendas limitadas, solo las entregas y las tiendas suyas (auditoría de seguridad, 18 nov 2026).
+  const todas = await cargarEntregas(supabase, semana);
+  const entregas = "error" in todas ? todas : { filas: todas.filas.filter((f) => puedeVerUnidad(permitidas, f.unidadId)) };
+  const opcionesTienda = filtrarUnidades(
+    permitidas,
+    (tiendas.data ?? [])
+      .map((t) => ({ id: t.unidad_id as string, nombre: ((Array.isArray(t.fin_unidades) ? t.fin_unidades[0] : t.fin_unidades) as { nombre: string } | null)?.nombre ?? "" }))
+      .filter((t) => t.nombre),
+  ).sort((a, b) => a.nombre.localeCompare(b.nombre));
 
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">

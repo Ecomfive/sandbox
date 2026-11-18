@@ -32,7 +32,7 @@ test("filtra unidades y decide la tienda que se ve", () => {
 test("con tiendas limitadas no se ven balance, tesorería ni cierre", () => {
   assert.deepEqual(modulosSegunTiendas(["estado-resultados", "tesoreria", "balance-general", "cierre-mes"], ["x"]), ["estado-resultados"]);
   assert.deepEqual(modulosSegunTiendas(["tesoreria"], null), ["tesoreria"]);
-  assert.deepEqual(modulosSegunTiendas(["nomina", "flujo-caja", "proyeccion-caja", "utilidades", "tienda-pedidos"], ["x"]), ["tienda-pedidos"]);
+  assert.deepEqual(modulosSegunTiendas(["nomina", "flujo-caja", "proyeccion-caja", "utilidades", "clientes-marketing", "tienda-pedidos"], ["x"]), ["tienda-pedidos"]);
   assert.deepEqual(modulosSegunTiendas(["nomina"], []), []);
 });
 

@@ -1,6 +1,7 @@
 import { EncabezadoAF4 } from "@/components/af4/encabezado-af4";
 import { EstadoVacioAF4 } from "@/components/af4/estado-af4";
 import { MarcoAF4 } from "@/components/af4/marco-af4";
+import { limitadoATiendas, SoloTodaLaEmpresa } from "@/components/finanzas/solo-toda-la-empresa";
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { requireModulo } from "@/lib/auth";
@@ -27,6 +28,9 @@ const uno = <T,>(v: Uno<T>): T | null => (Array.isArray(v) ? (v[0] ?? null) : v)
 
 export default async function AjustesEstadoResultadosPage() {
   const usuario = await requireModulo("estado-resultados");
+  // Los ajustes son de toda la empresa (y sus acciones ya lo piden): con tiendas limitadas no se muestran (auditoría de
+  // seguridad, 18 nov 2026).
+  if (await limitadoATiendas()) return <SoloTodaLaEmpresa titulo="Ajustes del estado de resultados" />;
   const puedeEscribir = !usuario.modulosSoloLectura.includes("estado-resultados");
   const supabase = createServiceClient();
   const anio = Number(hoyPanama().slice(0, 4));

@@ -5,6 +5,7 @@ import { requireModuloEscritura } from "@/lib/auth";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { secretoLlaves } from "@/lib/clientes/identidad";
 import { recalcularClientes } from "@/lib/clientes/recalcular";
+import { sinAccesoTodaLaEmpresa } from "@/lib/finanzas/acceso-tienda";
 import { createServiceClient } from "@/lib/supabase/server";
 
 const MODULO = "clientes-marketing";
@@ -21,6 +22,9 @@ export interface ResultadoRecalcular {
 export async function recalcularClientesAccion(): Promise<{ error: string } | ResultadoRecalcular> {
   try {
     await requireModuloEscritura(MODULO);
+    // Rearma los clientes de todas las tiendas: con tiendas limitadas, no (auditoría de seguridad, 18 nov 2026).
+    const acceso = await sinAccesoTodaLaEmpresa();
+    if (acceso) return { error: acceso };
     const r = await recalcularClientes(createServiceClient(), secretoLlaves());
     const q = r.resumen.porCalidad;
     const sinTelefonoValido = q.invalido + q.sospechoso + q.sin_dato;

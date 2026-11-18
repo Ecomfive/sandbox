@@ -7,10 +7,12 @@ import { PAIS_DE_DROP, plataformaDisponible } from "@/lib/plataformas";
 import { faltantesCrearDrop, MAX_IMAGENES } from "@/lib/publicaciones-drop/crear";
 import { normalizarIdDrop } from "@/lib/publicaciones-drop/id-drop";
 import { registrarAuditoria } from "@/lib/auditoria";
+import { puedeVerPaisId, SIN_ACCESO_PAIS } from "@/lib/seguridad/pais-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const FALTA = "Falta correr la migración 0221 (Gestión de IDs Drop) en la base.";
+// Cada acción que recibe el id de una publicación comprueba que su país sea de la persona (auditoría de seguridad, 18 nov 2026).
 
 /**
  * Vincula una publicación de Drop con su producto de Producto, la cambia a otro o le quita el vínculo (`skuId` null), desde la lista o la ficha (3 nov 2026).
@@ -20,12 +22,13 @@ export async function vincularPublicacionDrop(
   id: string,
   skuId: string | null,
 ): Promise<{ ok: true; producto: { id: string; codigo: string; nombre: string } | null } | { error: string }> {
-  await requireModuloEscritura("publicaciones-drop");
+  const usuario = await requireModuloEscritura("publicaciones-drop");
   if (typeof id !== "string" || !UUID.test(id) || (skuId !== null && (typeof skuId !== "string" || !UUID.test(skuId)))) return { error: "Datos no válidos." };
   const supabase = createServiceClient();
-  const { data: antes, error: errorAntes } = await supabase.from("drop_publicaciones").select("nombre, codigo, sku_maestro_id").eq("id", id).maybeSingle();
+  const { data: antes, error: errorAntes } = await supabase.from("drop_publicaciones").select("nombre, codigo, sku_maestro_id, pais_id").eq("id", id).maybeSingle();
   if (errorAntes) return { error: /drop_publicaciones|schema cache|does not exist/i.test(errorAntes.message) ? FALTA : "No se pudo leer la publicación." };
   if (!antes) return { error: "Esa publicación ya no existe. Recarga la página." };
+  if (!(await puedeVerPaisId(supabase, usuario.paisesPermitidos, antes.pais_id as string))) return { error: SIN_ACCESO_PAIS };
   let sku: { id: string; codigo: string; nombre: string } | null = null;
   if (skuId) {
     const { data } = await supabase.from("skus_maestros").select("id, codigo, nombre").eq("id", skuId).maybeSingle();
@@ -51,7 +54,7 @@ export async function vincularPublicacionDrop(
  * lectura lo deja vacío. Lo que se anota a mano se conserva en las próximas lecturas (la lectura solo lo reemplaza si Drop trae uno). No se repite entre dos publicaciones del país. Queda en la auditoría.
  */
 export async function guardarIdDrop(id: string, texto: string): Promise<{ ok: true; codigo: string | null } | { error: string }> {
-  await requireModuloEscritura("publicaciones-drop");
+  const usuario = await requireModuloEscritura("publicaciones-drop");
   if (typeof id !== "string" || !UUID.test(id)) return { error: "Datos no válidos." };
   const n = normalizarIdDrop(texto);
   if ("error" in n) return n;
@@ -59,6 +62,7 @@ export async function guardarIdDrop(id: string, texto: string): Promise<{ ok: tr
   const { data: antes, error: errorAntes } = await supabase.from("drop_publicaciones").select("nombre, codigo, pais_id").eq("id", id).maybeSingle();
   if (errorAntes) return { error: /drop_publicaciones|schema cache|does not exist/i.test(errorAntes.message) ? FALTA : "No se pudo leer la publicación." };
   if (!antes) return { error: "Esa publicación ya no existe. Recarga la página." };
+  if (!(await puedeVerPaisId(supabase, usuario.paisesPermitidos, antes.pais_id as string))) return { error: SIN_ACCESO_PAIS };
   if ((antes.codigo ?? null) === n.id) return { ok: true, codigo: n.id };
   if (n.id) {
     const { data: otra } = await supabase.from("drop_publicaciones").select("nombre").eq("pais_id", antes.pais_id as string).eq("codigo", n.id).neq("id", id).limit(1).maybeSingle();
@@ -83,13 +87,14 @@ export async function guardarIdDrop(id: string, texto: string): Promise<{ ok: tr
  * otra variante del mismo producto. `valor` null lo quita. En la moneda de Drop. Queda en la auditoría.
  */
 export async function guardarCostoManualDrop(id: string, valor: number | null): Promise<{ ok: true } | { error: string }> {
-  await requireModuloEscritura("publicaciones-drop");
+  const usuario = await requireModuloEscritura("publicaciones-drop");
   if (typeof id !== "string" || !UUID.test(id)) return { error: "Datos no válidos." };
   if (valor !== null && (typeof valor !== "number" || !Number.isFinite(valor) || valor < 0 || valor > 100_000_000)) return { error: "Escribe un costo válido." };
   const supabase = createServiceClient();
-  const { data: antes, error: e } = await supabase.from("drop_publicaciones").select("nombre, codigo, costo_manual").eq("id", id).maybeSingle();
+  const { data: antes, error: e } = await supabase.from("drop_publicaciones").select("nombre, codigo, costo_manual, pais_id").eq("id", id).maybeSingle();
   if (e) return { error: /costo_manual|schema cache|does not exist/i.test(e.message) ? "Falta correr la migración 0267 en la base." : "No se pudo leer la publicación." };
   if (!antes) return { error: "Esa publicación ya no existe. Recarga la página." };
+  if (!(await puedeVerPaisId(supabase, usuario.paisesPermitidos, antes.pais_id as string))) return { error: SIN_ACCESO_PAIS };
   const nuevo = valor === null ? null : Math.round(valor * 100) / 100;
   const { error } = await supabase.from("drop_publicaciones").update({ costo_manual: nuevo }).eq("id", id);
   if (error) return { error: "No se pudo guardar el costo." };
