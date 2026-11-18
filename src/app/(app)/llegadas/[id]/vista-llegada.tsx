@@ -185,6 +185,19 @@ export function Producto({ fila }: { fila: FilaLlegada }) {
 export function FilaPuerto({ fila, etiquetas, abrir }: { fila: FilaLlegada; etiquetas: EtiquetaPedido[]; abrir: (e: EtiquetaPedido, alt: string) => void }) {
   return (
     <li className="flex flex-wrap items-center gap-x-6 gap-y-3 p-4">
+      {fila.foto ? (
+        <button
+          type="button"
+          onClick={() => abrir({ ruta: fila.foto!, url: fila.foto! }, `Foto de ${textoProductos(fila)}`)}
+          className="h-14 w-14 shrink-0 cursor-pointer overflow-hidden rounded-md border border-border bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          aria-label={`Ver la foto de ${textoProductos(fila)}`}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={fila.foto} alt="" className="h-full w-full object-cover" />
+        </button>
+      ) : (
+        <span aria-hidden="true" className="h-14 w-14 shrink-0 rounded-md border border-dashed border-border" />
+      )}
       <Producto fila={fila} />
       <div className="flex gap-6 text-sm tabular-nums">
         <span>
