@@ -55,9 +55,12 @@ export function CabeceraPersona({ persona, propios, esYo, puedeEscribir }: { per
     const formData = new FormData();
     formData.set("id", persona.id);
     empezar(async () => {
-      const r = await generarContrasenaTemporal(formData).catch(() => ({ error: "Inténtalo de nuevo." }) as { error: string; contrasena?: undefined });
+      const r = await generarContrasenaTemporal(formData).catch(() => ({ error: "Inténtalo de nuevo." }) as { error: string; contrasena?: undefined; aviso?: undefined });
       if (r.error) mostrarToast(r.error, "destructive");
-      else setContrasena(r.contrasena ?? null);
+      else {
+        setContrasena(r.contrasena ?? null);
+        if (r.aviso) mostrarToast(r.aviso, "destructive");
+      }
     });
   }
 
@@ -66,12 +69,15 @@ export function CabeceraPersona({ persona, propios, esYo, puedeEscribir }: { per
     formData.set("id", persona.id);
     formData.set("activo", String(!persona.activo));
     empezar(async () => {
-      try {
-        await cambiarActivoUsuario(formData);
-        router.refresh();
-      } catch (e) {
-        mostrarToast(e instanceof Error ? e.message : "No se pudo cambiar el estado.", "destructive");
+      const r = await cambiarActivoUsuario(formData).catch(() => ({ error: "No se pudo cambiar el estado.", aviso: undefined }));
+      if (r.error) {
+        mostrarToast(r.error, "destructive");
+        return;
       }
+      // Suspendida, pero algo de la salida falló (bloquear el ingreso o cerrar sus sesiones): se avisa, no se calla.
+      if (r.aviso) mostrarToast(r.aviso, "destructive");
+      else mostrarToast(persona.activo ? "Suspendida: se cerraron sus sesiones" : "Reactivada");
+      router.refresh();
     });
   }
 

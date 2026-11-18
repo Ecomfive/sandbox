@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { cifrar } from "@/lib/seguridad/cifrado-tokens";
 import {
   claveIcomfly,
+  clavesIcomfly,
   contenidoHerramienta,
+  descifrarIcomfly,
   desafioPkce,
   firmarStateIcomfly,
   leerTokensIcomfly,
@@ -71,4 +74,42 @@ test("el contenido de una herramienta: estructurado, JSON en texto o texto", () 
   assert.deepEqual(contenidoHerramienta({ structuredContent: { a: 1 } }), { datos: { a: 1 }, esError: false });
   assert.deepEqual(contenidoHerramienta({ content: [{ type: "text", text: '{"mensajes":[1,2]}' }] }), { datos: { mensajes: [1, 2] }, esError: false });
   assert.deepEqual(contenidoHerramienta({ content: [{ type: "text", text: "No encontrado" }], isError: true }), { datos: "No encontrado", esError: true });
+});
+
+// ICOMFLY_TOKEN_KEY propia con la derivada de la clave de servicio detrás, para lo ya guardado (auditoría de seguridad, 18 nov 2026).
+const PROPIA = "k".repeat(40);
+
+test("claves: la propia primero, la derivada detrás; sin la propia (o corta), solo la derivada", () => {
+  const solo = clavesIcomfly({ SUPABASE_SERVICE_ROLE_KEY: "servicio" });
+  assert.equal(solo.length, 1);
+  assert.deepEqual(clavesIcomfly({ SUPABASE_SERVICE_ROLE_KEY: "servicio", ICOMFLY_TOKEN_KEY: "corta" }), solo);
+  const dos = clavesIcomfly({ SUPABASE_SERVICE_ROLE_KEY: "servicio", ICOMFLY_TOKEN_KEY: PROPIA });
+  assert.equal(dos.length, 2);
+  assert.deepEqual(dos[1], solo[0]);
+  assert.notDeepEqual(dos[0], solo[0]);
+  assert.deepEqual(claveIcomfly({ SUPABASE_SERVICE_ROLE_KEY: "servicio", ICOMFLY_TOKEN_KEY: PROPIA }), dos[0]);
+  assert.equal(clavesIcomfly({ ICOMFLY_TOKEN_KEY: PROPIA }).length, 1);
+  assert.deepEqual(clavesIcomfly({}), []);
+});
+
+test("tokens guardados con la clave vieja se leen y avisan que hay que volver a cifrarlos", () => {
+  const [nueva, vieja] = clavesIcomfly({ SUPABASE_SERVICE_ROLE_KEY: "servicio", ICOMFLY_TOKEN_KEY: PROPIA });
+  assert.deepEqual(descifrarIcomfly(cifrar("tok", nueva), [nueva, vieja]), { texto: "tok", anterior: false });
+  assert.deepEqual(descifrarIcomfly(cifrar("tok", vieja), [nueva, vieja]), { texto: "tok", anterior: true });
+  assert.equal(descifrarIcomfly(cifrar("tok", vieja), [nueva]), null);
+  assert.equal(descifrarIcomfly("basura", [nueva, vieja]), null);
+});
+
+test("el state firmado con la clave vieja sigue valiendo en la transición; con otra clave, no", () => {
+  const [nueva, vieja] = clavesIcomfly({ SUPABASE_SERVICE_ROLE_KEY: "servicio", ICOMFLY_TOKEN_KEY: PROPIA });
+  const tienda = "01a0e7d2-1111-7222-8333-444455556666";
+  const esperado = { usuarioId: "u1", nonceCookie: "n1", ahora: 1000 };
+  const conVieja = firmarStateIcomfly({ tiendaId: tienda, usuarioId: "u1", nonce: "n1", vence: 2000 }, vieja);
+  const conNueva = firmarStateIcomfly({ tiendaId: tienda, usuarioId: "u1", nonce: "n1", vence: 2000 }, nueva);
+  assert.equal(verificarStateIcomfly(conVieja, esperado, [nueva, vieja]).ok, true);
+  assert.equal(verificarStateIcomfly(conNueva, esperado, [nueva, vieja]).ok, true);
+  assert.equal(verificarStateIcomfly(conVieja, esperado, [nueva]).ok, false);
+  const otra = clavesIcomfly({ ICOMFLY_TOKEN_KEY: "o".repeat(40) });
+  assert.equal(verificarStateIcomfly(conNueva, esperado, otra).ok, false);
+  assert.equal(verificarStateIcomfly(conNueva, esperado, []).ok, false);
 });

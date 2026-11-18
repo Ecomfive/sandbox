@@ -1,7 +1,7 @@
 "use server";
 
 import { registrarAuditoria } from "@/lib/auditoria";
-import { getUsuarioSesion } from "@/lib/auth";
+import { getUsuarioActual, getUsuarioSesion } from "@/lib/auth";
 import { cuentaDeProveedor } from "@/lib/proveedor/cuenta";
 import { createAnonClient, createServiceClient, createSessionClient } from "@/lib/supabase/server";
 import { errorContrasenaNueva } from "./contrasena";
@@ -18,6 +18,8 @@ export async function cambiarMiContrasena(actual: string, nueva: string, repetid
   if (!usuario?.email) return { error: "Tu sesión terminó. Vuelve a iniciar sesión." };
   // Una cuenta del portal de Shen Zhen cambia su clave en su portal.
   if (await cuentaDeProveedor(usuario.id)) return { error: "Cambia tu clave desde tu portal." };
+  // Una cuenta suspendida no cambia su contraseña aunque su sesión siga viva (auditoría de seguridad, 18 nov 2026).
+  if (!(await getUsuarioActual())) return { error: "Tu cuenta no está activa. Habla con quien administra el sistema." };
   const claveActual = String(actual ?? "");
   const claveNueva = String(nueva ?? "");
   const falla = errorContrasenaNueva(claveActual, claveNueva, String(repetida ?? ""));

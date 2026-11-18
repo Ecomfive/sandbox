@@ -2,6 +2,7 @@
 // informa solo si están, nunca su valor), qué tabla prueba que cada migración se corrió, cuándo una tarea programada está
 // atrasada y a qué sección del manual de operación lleva cada problema. Prueba en `estado-sistema.test.ts`.
 
+import { estadoSecretoPropio, LARGO_MINIMO_SECRETO, type EstadoSecretoPropio } from "@/lib/seguridad/secretos-propios";
 import type { DefTareaProgramada } from "@/lib/tareas/definiciones";
 
 /** La clave de la guía «Operación y contingencia» del Centro de ayuda (`/ayuda/guias/<clave>`). */
@@ -62,6 +63,46 @@ export const VARIABLES_ENTORNO: VariableEntorno[] = [
 /** Si cada variable está configurada (no vacía). Nunca devuelve el valor. */
 export function estadoVariables(env: Record<string, string | undefined>, lista = VARIABLES_ENTORNO): (VariableEntorno & { configurada: boolean })[] {
   return lista.map((v) => ({ ...v, configurada: typeof env[v.nombre] === "string" && env[v.nombre]!.trim().length > 0 }));
+}
+
+/**
+ * Los secretos que antes salían de la clave de servicio de Supabase (auditoría de seguridad, 18 nov 2026). Mientras falten, cada función sigue con la
+ * clave de servicio y aquí quedan como pendientes: rotarla rompería todas a la vez. `alPonerla` dice qué pasa con lo ya guardado o entregado;
+ * `cortaSeUsa`, si una ya puesta pero corta se usa igual (la de clientes, para no cambiar sus llaves) o se ignora.
+ */
+export const SECRETOS_PROPIOS: { nombre: string; para: string; alPonerla: string; cortaSeUsa: boolean }[] = [
+  {
+    nombre: "USO_EXTERNO_LLAVE_SECRETO",
+    para: "Llaves de la extensión «Ecomfive · Uso»",
+    alPonerla: "Las llaves que ya tienen las extensiones siguen valiendo hasta que vencen (7 días); cada vez que alguien abre el sistema recibe una nueva.",
+    cortaSeUsa: false,
+  },
+  {
+    nombre: "ICOMFLY_TOKEN_KEY",
+    para: "Cifrado de los tokens de iComfly y de su autorización",
+    alPonerla: "Los tokens guardados se siguen leyendo y se vuelven a cifrar con la clave nueva la próxima vez que se usan.",
+    cortaSeUsa: false,
+  },
+  {
+    nombre: "CLIENTES_LLAVE_SECRETO",
+    para: "Llaves de clientes (Clientes y marketing)",
+    alPonerla: "El siguiente «Recalcular clientes» rehace todos los clientes con llaves nuevas (cambia su id; los totales salen iguales). Ponla una vez y no la cambies.",
+    cortaSeUsa: true,
+  },
+];
+
+/** Cómo está cada secreto propio (nunca su valor) y el texto para Estado del sistema. */
+export function estadoSecretosPropios(env: Record<string, string | undefined>, lista = SECRETOS_PROPIOS): ((typeof SECRETOS_PROPIOS)[number] & { estado: EstadoSecretoPropio; detalle: string })[] {
+  return lista.map((s) => {
+    const estado = estadoSecretoPropio(env[s.nombre]);
+    const detalle =
+      estado === "propio"
+        ? `${s.para} · con su propio secreto`
+        : estado === "corto"
+          ? `${s.para} · pendiente: tiene menos de ${LARGO_MINIMO_SECRETO} caracteres (${s.cortaSeUsa ? "se usa igual" : "no se usa: sigue la clave de servicio de Supabase"}); cámbiala por una larga al azar. ${s.alPonerla}`
+          : `${s.para} · pendiente: sin ella se usa la clave de servicio de Supabase. ${s.alPonerla}`;
+    return { ...s, estado, detalle };
+  });
 }
 
 /**

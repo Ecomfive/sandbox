@@ -26,9 +26,17 @@ scripts/preview/levantar.sh --parar                                # detiene los
 
 Por defecto compila y sirve la versión de producción (`next build --webpack && next start`): `next dev` llega a unos 5 GB
 al compilar todas las páginas y el sistema lo mata por memoria. Con `PREVIEW_MODO=dev` sirve para revisar pocas páginas
-(los avisos de hidratación y de `key` solo salen en desarrollo). Queda en `http://127.0.0.1:3100` (`PREVIEW_PORT`) con el PostgREST falso en `http://localhost:54321`
+(los avisos de hidratación y de `key` solo salen en desarrollo). Queda en `http://127.0.0.1:3100` (`PREVIEW_PORT`) con el PostgREST falso en `http://127.0.0.1:54321`
 (`PREVIEW_SUPA_PORT`). Todo lo generado va a `.preview/` (`PREVIEW_DIR`, ignorada por git): la base, `.env.preview`,
-`next.out`, `postgrest.log` y `carga.log`.
+`clave`, `next.out`, `postgrest.log` y `carga.log`.
+
+El PostgREST falso tiene los datos privados, así que (auditoría de seguridad, 18 nov 2026) escucha solo en `127.0.0.1`,
+contesta 403 si la dirección pedida no es `localhost`/`127.0.0.1` con su puerto (DNS rebinding) y 401 si la petición no
+trae en `apikey` la clave de la corrida. `levantar.sh` la genera al azar, la guarda en `.preview/clave` y la pasa por
+`.env.preview` (`PREVIEW_CLAVE` y las dos claves de Supabase). Como la compilación de Next la lleva dentro, solo cambia
+cuando se vuelve a compilar: `--sin-build` y `--sin-next` reusan la última (sin clave guardada, compila). A mano:
+`PREVIEW_CLAVE=<64 caracteres hex> npx tsx scripts/preview/postgrest.mts <base> [puerto]`; `capturar.mjs` la lee de
+`PREVIEW_CLAVE` o de `.preview/clave`. Pruebas: `npx tsx --test scripts/preview/acceso.test.mts`.
 
 ## Capturar
 
@@ -55,6 +63,7 @@ La sesión es una cookie de `@supabase/ssr` para la persona «Vista previa» (ro
 | `base.mts` | Stubs de `auth` y `storage` de Supabase + todas las migraciones de `supabase/migrations/` en orden. |
 | `preparar.mts` | Crea la base en una carpeta, la persona de la vista previa y carga `datos-privados/semilla-socios.sql` si existe. |
 | `postgrest.mts` | PostgREST + Auth + Storage falsos (ver el comentario de arriba del archivo para lo que entiende). |
+| `acceso.mts` | Quién puede hablarle al falso: dirección (Host) de este equipo y clave de la corrida en `apikey`. |
 | `cargar-datos.sh` | Corre `scripts/finanzas/importar-*.ts --aplicar` y `recalcular-clientes.ts` contra el falso. |
 | `fuentes-mock.cjs` | Respuesta simulada de Google Fonts (`NEXT_FONT_GOOGLE_MOCKED_RESPONSES`, mecanismo oficial de Next). |
 | `levantar.sh` | Junta todo lo anterior y arranca Next con webpack (Turbopack no acepta un `node_modules` enlazado fuera del proyecto, como el de un worktree). |

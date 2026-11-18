@@ -17,7 +17,9 @@ export async function registrarActividad(ruta?: string, trabajando?: boolean) {
   if (!id) return;
   const supabase = createServiceClient();
   const ahora = new Date();
-  await supabase.from("perfiles").update({ ultima_actividad_en: ahora.toISOString() }).eq("id", id);
+  // Solo cuentas activas: una suspendida con la sesión todavía viva no aparece «en línea» ni suma minutos (auditoría de seguridad, 18 nov 2026).
+  const { data: activa } = await supabase.from("perfiles").update({ ultima_actividad_en: ahora.toISOString() }).eq("id", id).eq("activo", true).select("id");
+  if (!activa?.length) return;
   const limpia = rutaDeLatido(ruta);
   if (trabajando !== true || !limpia) return;
   ahora.setUTCSeconds(0, 0);

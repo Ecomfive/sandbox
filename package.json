@@ -18,14 +18,14 @@
     "@supabase/supabase-js": "^2.116.0",
     "exceljs": "4.4.0",
     "libphonenumber-js": "1.13.14",
-    "next": "16.3.8",
+    "next": "16.4.6",
     "pdf-lib": "^1.17.1",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "recharts": "^3.10.1",
-    "sanitize-html": "2.17.0",
-    "sharp": "^0.35.4",
-    "xlsx": "https://cdn.sheetjs.com/xlsx-latest/xlsx-latest.tgz"
+    "sanitize-html": "2.18.2",
+    "sharp": "^0.35.5",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -34,7 +34,7 @@
     "@types/react-dom": "^19",
     "@types/sanitize-html": "2.16.2",
     "eslint": "^9",
-    "eslint-config-next": "16.3.8",
+    "eslint-config-next": "16.4.6",
     "playwright": "^1.63.0",
     "tailwindcss": "^4",
     "tsx": "^4.23.13",
