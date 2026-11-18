@@ -1,5 +1,5 @@
 // Gestión de tienda › Pedidos › «Todas las tiendas» (13 nov 2026, pedido de Hernán; prototipo aprobado): en vez de la lista de pedidos, un tablero que compara
-// las tiendas del país para decidir rápido: indicadores de todas juntas, «Para decidir hoy» (lo que se salió de lo normal en cada tienda), una tarjeta por
+// las tiendas del país para decidir rápido: indicadores de todas juntas, una tarjeta por
 // tienda (aparece sola al conectar otra) y gráficas. Aquí las cuentas, sin base ni React, con prueba (`tablero-tiendas.test.ts`).
 
 import { diaPanama, pedidosPorDia, resumirPedidos, type PedidoResumen, type Resumen } from "./resumen";

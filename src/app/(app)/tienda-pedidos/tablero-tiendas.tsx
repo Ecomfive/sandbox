@@ -7,7 +7,8 @@ import { anilloFoco } from "@/components/ui/field";
 import { AlertaIcon, CerrarIcon, CheckIcon, EnvioIcon, MargenIcon, PedidoIcon, WalletIcon } from "@/lib/nav-icons";
 import { formatearMoneda } from "@/lib/formato";
 import type { Resumen } from "@/lib/tienda/resumen";
-import { variacion, type AlertaTienda, type ResumenTienda, type TonoAlerta } from "@/lib/tienda/tablero-tiendas";
+import { variacion, type ResumenTienda } from "@/lib/tienda/tablero-tiendas";
+import { DetalleTiendaPanel } from "./detalle-tienda";
 
 // «Todas las tiendas» en Pedidos de tienda (13 nov 2026, pedido de Hernán; prototipo aprobado): el tablero que compara las tiendas del país. Las cuentas están en
 // `src/lib/tienda/tablero-tiendas.ts`; aquí solo se dibuja (gráficas en SVG, con su cuadro al pasar el cursor y la tabla para leerlo todo).
@@ -27,58 +28,6 @@ function Cambio({ actual, antes, sufijo }: { actual: number; antes: number; sufi
       </span>
       {sufijo && <span className="text-muted-foreground"> {sufijo}</span>}
     </span>
-  );
-}
-
-const TONO_ALERTA: Record<TonoAlerta, { clase: string; icono: string; nombre: string }> = {
-  critico: { clase: "bg-destructive", icono: "!", nombre: "Grave" },
-  serio: { clase: "bg-warning", icono: "!", nombre: "Revisar" },
-  aviso: { clase: "bg-warning", icono: "!", nombre: "Atención" },
-  info: { clase: "bg-primario", icono: "i", nombre: "Pendiente" },
-  bien: { clase: "bg-success", icono: "✓", nombre: "Bien" },
-};
-
-function Alertas({ alertas, nombres, hrefs }: { alertas: AlertaTienda[]; nombres: Record<string, string>; hrefs: Record<string, string> }) {
-  const [todas, setTodas] = useState(false);
-  const vistas = todas ? alertas : alertas.slice(0, 5);
-  return (
-    <section aria-labelledby="titulo-decidir" className="rounded-xl border border-border bg-card p-3.5">
-      <div className="mb-2.5 flex flex-wrap items-baseline justify-between gap-1.5">
-        <h2 id="titulo-decidir" className="m-0 text-sm font-semibold">
-          Para decidir hoy
-        </h2>
-        <span className="text-xs text-muted-foreground">Lo que se salió de lo normal en cada tienda, de lo más grave a lo menos</span>
-      </div>
-      {alertas.length === 0 ? (
-        <p className="m-0 text-sm text-muted-foreground">Nada fuera de lo normal en el periodo.</p>
-      ) : (
-        <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
-          {vistas.map((a, i) => {
-            const t = TONO_ALERTA[a.tono];
-            return (
-              <li key={i} className="grid grid-cols-[22px_1fr_auto] items-start gap-2 rounded-lg bg-muted px-2.5 py-2 text-[13px]">
-                <span aria-hidden="true" className={`mt-px grid h-5 w-5 place-items-center rounded-full text-[11px] font-bold text-white ${t.clase}`}>
-                  {t.icono}
-                </span>
-                <span className="min-w-0">
-                  <span className="sr-only">{t.nombre}: </span>
-                  <span className="block font-semibold">{a.titulo}</span>
-                  <span className="block text-xs text-muted-foreground">{a.detalle}</span>
-                </span>
-                <Link href={hrefs[a.tiendaId] ?? "#"} className={`rounded text-xs font-semibold whitespace-nowrap text-primario hover:underline ${anilloFoco}`}>
-                  Ver {nombres[a.tiendaId]} →
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-      {alertas.length > 5 && (
-        <button type="button" onClick={() => setTodas((v) => !v)} className={`mt-1.5 rounded px-0 py-1 text-[13px] font-semibold text-primario ${anilloFoco}`}>
-          {todas ? "Ver menos" : `Ver ${alertas.length - 5} más`}
-        </button>
-      )}
-    </section>
   );
 }
 
@@ -107,16 +56,28 @@ function Tasa({ nombre, valor, mala }: { nombre: string; valor: number | null; m
   );
 }
 
-function TarjetaTienda({ t, href, moneda }: { t: ResumenTienda; href: string; moneda: string }) {
+function TarjetaTienda({ t, href, moneda, abierta, alternar }: { t: ResumenTienda; href: string; moneda: string; abierta: boolean; alternar: () => void }) {
   const a = t.actual;
+  // Toda la tarjeta despliega el detalle de la tienda (18 nov 2026); «Ver pedidos» sigue llevando a la lista, por encima del botón.
   return (
-    <article className="flex min-w-0 flex-col gap-2 rounded-xl border border-border bg-card p-3" style={{ borderTop: `3px solid ${t.color}` }}>
+    <article
+      className={`relative flex min-w-0 flex-col gap-2 rounded-xl border bg-card p-3 transition-shadow hover:shadow-md ${abierta ? "border-primario ring-2 ring-primario/30" : "border-border"}`}
+      style={{ borderTop: `3px solid ${t.color}` }}
+    >
+      <button type="button" onClick={alternar} aria-expanded={abierta} aria-controls="detalle-tienda" className={`absolute inset-0 rounded-xl ${anilloFoco}`}>
+        <span className="sr-only">{abierta ? `Ocultar el detalle de ${t.nombre}` : `Ver el detalle de ${t.nombre}`}</span>
+      </button>
       <div className="flex items-center justify-between gap-1.5">
         <h3 className="m-0 inline-flex items-center gap-1.5 text-sm font-semibold">
           <span aria-hidden="true" className="h-2.5 w-2.5 rounded-[2px]" style={{ background: t.color }} />
           {t.nombre}
         </h3>
-        <span className="text-[11px] text-muted-foreground">{t.fuente}</span>
+        <span className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
+          {t.fuente}
+          <span aria-hidden="true" className={`text-primario transition-transform ${abierta ? "rotate-180" : ""}`}>
+            ▼
+          </span>
+        </span>
       </div>
       <dl className="m-0 grid grid-cols-2 gap-x-2.5 gap-y-1">
         <div className="flex flex-col">
@@ -147,7 +108,7 @@ function TarjetaTienda({ t, href, moneda }: { t: ResumenTienda; href: string; mo
         <span className="truncate tabular-nums">
           Ticket {a.ticketPromedio === null ? "—" : formatearMoneda(a.ticketPromedio, moneda)} · {entero(t.porConfirmar)} por confirmar
         </span>
-        <Link href={href} className={`shrink-0 rounded font-semibold whitespace-nowrap text-primario hover:underline ${anilloFoco}`}>
+        <Link href={href} className={`relative z-10 shrink-0 rounded font-semibold whitespace-nowrap text-primario hover:underline ${anilloFoco}`}>
           Ver pedidos →
         </Link>
       </div>
@@ -389,14 +350,12 @@ function Marco({ titulo, nota, children }: { titulo: string; nota?: string; chil
 export function TableroTiendas({
   tiendas,
   todas,
-  alertas,
   hrefs,
   moneda,
   dias,
 }: {
   tiendas: ResumenTienda[];
   todas: { actual: Resumen; anterior: Resumen; porConfirmar: number };
-  alertas: AlertaTienda[];
   /** La lista de pedidos de cada tienda, con el periodo elegido. */
   hrefs: Record<string, string>;
   moneda: string;
@@ -404,7 +363,8 @@ export function TableroTiendas({
   dias: number;
 }) {
   const a = todas.actual;
-  const nombres = Object.fromEntries(tiendas.map((t) => [t.id, t.nombre]));
+  const [abierta, setAbierta] = useState<string | null>(null);
+  const elegida = tiendas.find((t) => t.id === abierta) ?? null;
   const conPedidos = tiendas.filter((t) => t.actual.pedidos > 0 || t.anterior.pedidos > 0);
   const antes = `vs ${dias} días antes`;
   return (
@@ -429,22 +389,21 @@ export function TableroTiendas({
         />
       </TableroIndicadores>
 
-      <Alertas alertas={alertas} nombres={nombres} hrefs={hrefs} />
-
       <section aria-labelledby="titulo-cada-tienda">
         <div className="mb-2 flex flex-wrap items-baseline justify-between gap-1.5">
           <h2 id="titulo-cada-tienda" className="m-0 text-sm font-semibold">
             Cada tienda
           </h2>
-          <span className="text-xs text-muted-foreground">Una tarjeta por tienda; al agregar otra, aparece sola aquí</span>
+          <span className="text-xs text-muted-foreground">Haz clic en una tienda para ver sus entregas, confirmaciones y cada producto</span>
         </div>
         <div className="grid grid-cols-[repeat(auto-fill,minmax(270px,1fr))] gap-2.5">
           {[...tiendas]
             .sort((x, y) => y.actual.facturado - x.actual.facturado)
             .map((t) => (
-              <TarjetaTienda key={t.id} t={t} href={hrefs[t.id] ?? "#"} moneda={moneda} />
+              <TarjetaTienda key={t.id} t={t} href={hrefs[t.id] ?? "#"} moneda={moneda} abierta={abierta === t.id} alternar={() => setAbierta((x) => (x === t.id ? null : t.id))} />
             ))}
         </div>
+        {elegida && <DetalleTiendaPanel key={elegida.id} tienda={elegida} href={hrefs[elegida.id] ?? "#"} cerrar={() => setAbierta(null)} />}
       </section>
 
       {conPedidos.length > 0 && (
