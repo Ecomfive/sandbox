@@ -4,7 +4,7 @@ import { getUsuarioActual } from "@/lib/auth";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 import { probarIcomfly, terminarAutorizacion } from "@/lib/tienda/icomfly";
-import { claveIcomfly, COOKIE_ICOMFLY, verificarStateIcomfly } from "@/lib/tienda/icomfly-oauth";
+import { clavesIcomfly, COOKIE_ICOMFLY, verificarStateIcomfly } from "@/lib/tienda/icomfly-oauth";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -22,11 +22,12 @@ export async function GET(req: NextRequest) {
   const usuario = await getUsuarioActual();
   if (!usuario) return NextResponse.redirect(new URL("/login", req.url));
   if (!esAdministrador(usuario)) return new NextResponse("No autorizado", { status: 403 });
-  const clave = claveIcomfly();
-  if (!clave) return volver("sin-clave");
+  // La actual y la anterior: un `state` firmado justo antes de configurar `ICOMFLY_TOKEN_KEY` sigue valiendo (auditoría de seguridad, 18 nov 2026).
+  const claves = clavesIcomfly();
+  if (!claves.length) return volver("sin-clave");
   const p = req.nextUrl.searchParams;
   if (p.get("error")) return volver("cancelado");
-  const v = verificarStateIcomfly(p.get("state"), { usuarioId: usuario.id, nonceCookie: req.cookies.get(COOKIE_ICOMFLY)?.value, ahora: Date.now() }, clave);
+  const v = verificarStateIcomfly(p.get("state"), { usuarioId: usuario.id, nonceCookie: req.cookies.get(COOKIE_ICOMFLY)?.value, ahora: Date.now() }, claves);
   if (!v.ok) return volver("error", v.motivo);
   const codigo = p.get("code");
   if (!codigo || codigo.length > 2000) return volver("error", "iComfly no devolvió el código.");

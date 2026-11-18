@@ -19,6 +19,7 @@ import {
   pruebasParaSql,
   diasDesde,
   enlaceManual,
+  estadoSecretosPropios,
   estadoTarea,
   estadoVariables,
   ultimaPor,
@@ -106,6 +107,8 @@ export default async function EstadoSistemaPage() {
   type Imp = { modulo: string; archivo: string; estado: string; creado_en: string; usuario_nombre: string | null };
   const imps = [...ultimaPor((importaciones.data ?? []) as Imp[], (i) => i.modulo).values()];
   const variables = estadoVariables(process.env);
+  // Secretos propios en vez de derivados de la clave de servicio (auditoría de seguridad, 18 nov 2026): solo sí, no o corta; nunca el valor.
+  const secretos = estadoSecretosPropios(process.env);
   const faltanMigraciones = MIGRACIONES_CLAVE.filter((_, i) => migraciones.ok[i] === false);
   const ultimoRespaldo = (respaldo.data?.[0] as { ruta: string; tablas: Record<string, number>; creado_en: string } | undefined) ?? null;
   const diasRespaldo = diasDesde(ultimoRespaldo?.creado_en, ahora);
@@ -270,6 +273,24 @@ export default async function EstadoSistemaPage() {
               }
               detalle={`${v.para}${v.obligatoria ? " · obligatoria" : ""}`}
               accion={v.configurada ? undefined : queHacer(v.seccion)}
+            />
+          ))}
+        </ul>
+      </MarcoAF4>
+
+      <MarcoAF4 id="estado-secretos" titulo="Secretos propios" detalle={`${entero(secretos.filter((s) => s.estado !== "propio").length)} pendientes`} sinRelleno>
+        <ul className="m-0 list-none p-0">
+          {secretos.map((s) => (
+            <Fila
+              key={s.nombre}
+              tono={s.estado === "propio" ? "ok" : "aviso"}
+              titulo={
+                <>
+                  <code className="text-[13px]">{s.nombre}</code> · {s.estado === "propio" ? "Sí" : s.estado === "corto" ? "Corta" : "No"}
+                </>
+              }
+              detalle={s.detalle}
+              accion={s.estado === "propio" ? undefined : queHacer("conexiones")}
             />
           ))}
         </ul>

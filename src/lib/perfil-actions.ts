@@ -1,14 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createSessionClient, createServiceClient } from "@/lib/supabase/server";
+import { getUsuarioActual } from "@/lib/auth";
+import { createServiceClient } from "@/lib/supabase/server";
 import { detectarImagen } from "@/lib/seguridad/imagen";
 
 export async function subirAvatar(formData: FormData) {
-  const session = await createSessionClient();
-  const {
-    data: { user },
-  } = await session.auth.getUser();
+  // Una persona del equipo con la cuenta activa: antes bastaba con tener sesión, y una cuenta suspendida (o del portal del proveedor) podía
+  // seguir subiendo su foto (auditoría de seguridad, 18 nov 2026). En «Ver así», `id` sigue siendo el de quien mira.
+  const user = await getUsuarioActual();
   if (!user) throw new Error("No autenticado.");
 
   const archivo = formData.get("avatar") as File | null;

@@ -1,0 +1,6 @@
+{
+  "_nota": "Huellas SHA-256 de lo que corre el hook de impeccable (auditoría de seguridad, 18 nov 2026). Los archivos de texto se miden con saltos de línea LF. Al actualizar impeccable, revisar la versión nueva y actualizar estas huellas en el mismo PR.",
+  ".claude/skills/impeccable/scripts/bin/windows-x64/impeccable.exe": "477e544fc8880a5e82e427490cb9a5f5adab480c0e02966d33fd50772b531c71",
+  ".claude/skills/impeccable/scripts/impeccable.cmd": "759bab1d8adc071fdde2efcf6e2157aa4026f3c2b4f3c342a8070bf328011616",
+  ".claude/skills/impeccable/scripts/impeccable": "39d9600489073e227e4f4d55c451ce4252a6632ed7ae37923efbbcbc91f16d07"
+}

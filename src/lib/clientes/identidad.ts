@@ -185,7 +185,13 @@ export function armarIdentidades(
   };
 }
 
-/** El secreto de las llaves: `CLIENTES_LLAVE_SECRETO` o, si no está, la clave de servicio de Supabase. */
+/**
+ * El secreto de las llaves: `CLIENTES_LLAVE_SECRETO` o, si no está, la clave de servicio de Supabase (lo de antes; Estado del sistema lo muestra como
+ * pendiente: auditoría de seguridad, 18 nov 2026). Si la variable ya está, se usa aunque sea corta (Estado del sistema avisa): ignorarla cambiaría
+ * todas las llaves. Al ponerla (o cambiarla), el siguiente «Recalcular clientes» arma llaves nuevas: los clientes se vuelven a crear con otro id y
+ * sus órdenes y totales se rehacen desde las órdenes, sin perder nada (solo `cli_cliente_ordenes` apunta a `cli_clientes`, y se rehace). No hace
+ * falta verificar con los dos secretos: la llave no se compara con nada que traiga alguien, solo identifica.
+ */
 export function secretoLlaves(env: Record<string, string | undefined> = process.env): string {
   const s = env.CLIENTES_LLAVE_SECRETO || env.SUPABASE_SERVICE_ROLE_KEY || "";
   if (!s) throw new Error("Falta CLIENTES_LLAVE_SECRETO (o SUPABASE_SERVICE_ROLE_KEY) para armar las llaves de cliente.");

@@ -82,7 +82,20 @@ function ejecutar() {
     return;
   }
 
-  const opciones = { input: entrada, encoding: "utf8", cwd: carpetaProyecto, env: process.env, timeout: TIEMPO_MAXIMO_MS };
+  // Solo corre lo que coincide con las huellas guardadas en el repositorio (auditoría de seguridad, 18 nov 2026): si alguien
+  // cambia el lanzador o el ejecutable (una actualización de la skill, un archivo cambiado), el hook no lo ejecuta y lo anota.
+  const ejecutable = path.join(carpetaProyecto, ".claude", "skills", "impeccable", "scripts", "bin", "windows-x64", "impeccable.exe");
+  const distinto = huellaDistinta(carpetaProyecto, EN_WINDOWS ? [lanzador, ejecutable] : [lanzador]);
+  if (distinto) {
+    anotar(carpetaProyecto, { ...base, resultado: "huella_distinta", detalle: distinto, ms: Date.now() - inicio });
+    process.stderr.write(`impeccable: no se ejecutó porque ${distinto} no coincide con .claude/hooks/impeccable-huellas.json\n`);
+    process.exitCode = 0;
+    return;
+  }
+
+  // En Windows, el lanzador usa justo el ejecutable revisado (y no otro que encuentre en el sistema).
+  const env = EN_WINDOWS ? { ...process.env, IMPECCABLE_BIN: ejecutable } : process.env;
+  const opciones = { input: entrada, encoding: "utf8", cwd: carpetaProyecto, env, timeout: TIEMPO_MAXIMO_MS };
   const resultado = EN_WINDOWS
     ? spawnSync("cmd.exe", ["/d", "/s", "/c", `""${lanzador}" hook"`], { ...opciones, windowsVerbatimArguments: true })
     : spawnSync("sh", [lanzador, "hook"], opciones);
@@ -102,4 +115,29 @@ function ejecutar() {
     ms: Date.now() - inicio,
   });
   process.exitCode = resultado.status === null ? 0 : resultado.status;
+}
+
+/** El primer archivo (ruta relativa) cuya huella SHA-256 no es la guardada; null si todos coinciden. Texto medido con LF. */
+function huellaDistinta(carpetaProyecto, archivos) {
+  let huellas;
+  try {
+    huellas = JSON.parse(fs.readFileSync(path.join(carpetaProyecto, ".claude", "hooks", "impeccable-huellas.json"), "utf8"));
+  } catch {
+    return "la lista de huellas";
+  }
+  const crypto = require("node:crypto");
+  for (const archivo of archivos) {
+    const relativo = path.relative(carpetaProyecto, archivo).split(path.sep).join("/");
+    const esperada = huellas[relativo];
+    let contenido;
+    try {
+      contenido = fs.readFileSync(archivo);
+    } catch {
+      return relativo;
+    }
+    if (!archivo.endsWith(".exe")) contenido = Buffer.from(contenido.toString("latin1").replace(/\r\n/g, "\n"), "latin1");
+    const real = crypto.createHash("sha256").update(contenido).digest("hex");
+    if (typeof esperada !== "string" || esperada.length !== 64 || esperada !== real) return relativo;
+  }
+  return null;
 }
