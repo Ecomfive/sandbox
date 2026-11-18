@@ -15,6 +15,7 @@ import {
   pedidosDeLectura,
   productosDeLectura,
   vendedoresDePedidos,
+  soloNuestros,
   ventasPorDiaDunamixfy,
   type LecturaPedidosDunamixfy,
   type LecturaProductosDunamixfy,
@@ -171,8 +172,13 @@ export async function guardarPedidosDunamixfy(supabase: SupabaseClient, l: Lectu
   const pais = await paisDunamixfy(supabase);
   const pedidos = pedidosDeLectura(l?.pedidos ?? []);
   if (!pedidos.length) throw new Error("La lectura de Dunamixfy no trajo ningún pedido: no se tocó nada.");
-  const filas = ventasPorDiaDunamixfy(pedidos);
-  if (!filas.length) throw new Error("Ningún pedido de Dunamixfy está despachado: no se tocó nada.");
+  // Lo de otros proveedores que viene en pedidos mixtos no se cuenta (18 nov 2026): solo nuestros productos, los que leyó «Dunamixfy: productos».
+  const { data: pubs } = await supabase.from("dunamixfy_publicaciones").select("dunamixfy_id, sku_maestro_id").eq("pais_id", pais.id).limit(5000);
+  const todas = ventasPorDiaDunamixfy(pedidos);
+  if (!todas.length) throw new Error("Ningún pedido de Dunamixfy está despachado: no se tocó nada.");
+  const { filas, ajenos, unidadesAjenas } = soloNuestros(todas, new Set((pubs ?? []).map((p) => String(p.dunamixfy_id))));
+  if (!filas.length) throw new Error("Ninguna venta de Dunamixfy es de un producto nuestro: no se tocó nada.");
+  if (ajenos) log(`${ajenos} productos de otros proveedores venían en pedidos mixtos (${unidadesAjenas} unidades): no se cuentan.`);
   const desde = filas[0].dia;
   const hasta = filas.reduce((a, f) => (f.dia > a ? f.dia : a), desde);
 
@@ -196,7 +202,6 @@ export async function guardarPedidosDunamixfy(supabase: SupabaseClient, l: Lectu
   for (let i = 0; i < vendedores.length; i += 200) revisar(await supabase.from("dunamixfy_vendedores").upsert(vendedores.slice(i, i + 200), { onConflict: "pais_id,vendedor_id" }), "Guardar los dropshippers de Dunamixfy");
 
   // Los productos con ventas que no están vinculados en Gestión de IDs Dunamixfy no se pueden pasar a un producto en el cuadro: se avisa.
-  const { data: pubs } = await supabase.from("dunamixfy_publicaciones").select("dunamixfy_id, sku_maestro_id").eq("pais_id", pais.id).limit(5000);
   const conProducto = new Set((pubs ?? []).filter((p) => p.sku_maestro_id).map((p) => p.dunamixfy_id as string));
   const sinProducto = new Set(filas.filter((f) => !conProducto.has(f.producto_id)).map((f) => f.producto_id));
   if (sinProducto.size) log(`${sinProducto.size} productos de Dunamixfy con ventas no están vinculados a un producto en Gestión de IDs Dunamixfy: el cuadro no los cuenta.`);

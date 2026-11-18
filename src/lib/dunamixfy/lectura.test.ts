@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { diaCostaRica, pedidosDeLectura, productosDeLectura, vendedoresDePedidos, ventasPorDiaDunamixfy } from "./lectura";
+import { diaCostaRica, pedidosDeLectura, productosDeLectura, soloNuestros, vendedoresDePedidos, ventasPorDiaDunamixfy } from "./lectura";
 
 const inv = (o: Record<string, unknown>) => ({ stock: 0, reserved: 0, price: 5499, suggestedPrice: 18000, isActive: true, deletedAt: null, privateUserId: null, warehouse: { isPrincipal: true }, ...o });
 
@@ -58,4 +58,17 @@ test("los vendedores cuentan sus pedidos, entregados y devueltos (sin los cancel
 
 test("un pedido con datos raros no se toma", () => {
   assert.equal(pedidosDeLectura([{ id: "../x", productos: [] }, { id: "cmw9n358r0ykm3dqma2l7jc4g", productos: [{ id: "837", cantidad: 5000 }] }])[0].productos.length, 0);
+});
+
+test("soloNuestros: lo de otros proveedores en pedidos mixtos no cuenta; sin productos conocidos no se filtra", () => {
+  const filas = [
+    { producto_id: "837", dia: "2026-11-01", salidas: 3, devueltas: 1 },
+    { producto_id: "650", dia: "2026-11-01", salidas: 2, devueltas: 1 },
+    { producto_id: "650", dia: "2026-11-02", salidas: 1, devueltas: 0 },
+  ];
+  const r = soloNuestros(filas, new Set(["837"]));
+  assert.deepEqual(r.filas.map((f) => f.producto_id), ["837"]);
+  assert.equal(r.ajenos, 1);
+  assert.equal(r.unidadesAjenas, 3);
+  assert.equal(soloNuestros(filas, new Set()).filas.length, 3);
 });

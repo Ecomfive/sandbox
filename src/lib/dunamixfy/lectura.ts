@@ -168,6 +168,18 @@ export function ventasPorDiaDunamixfy(pedidos: readonly PedidoLeidoDunamixfy[]):
   return [...filas.values()].sort((a, b) => a.dia.localeCompare(b.dia) || a.producto_id.localeCompare(b.producto_id));
 }
 
+/**
+ * Solo nuestros productos (18 nov 2026, pedido de Hernán). Un pedido de Dunamixfy puede ser mixto: el dropshipper vende un producto nuestro y otro de otro proveedor
+ * (p. ej. «AUDIFONOS M41» de Tech Home). La lectura trae el pedido entero, así que lo ajeno se deja fuera: `nuestros` son los ids de nuestros productos en
+ * Dunamixfy (`dunamixfy_publicaciones`, vinculados o no). Sin ninguno conocido no se filtra nada (mejor avisar de más que borrar las ventas).
+ */
+export function soloNuestros(filas: readonly VentaDiaDunamixfy[], nuestros: ReadonlySet<string>): { filas: VentaDiaDunamixfy[]; ajenos: number; unidadesAjenas: number } {
+  if (!nuestros.size) return { filas: [...filas], ajenos: 0, unidadesAjenas: 0 };
+  const propias = filas.filter((f) => nuestros.has(f.producto_id));
+  const fuera = filas.filter((f) => !nuestros.has(f.producto_id));
+  return { filas: propias, ajenos: new Set(fuera.map((f) => f.producto_id)).size, unidadesAjenas: fuera.reduce((s, f) => s + f.salidas, 0) };
+}
+
 export interface VendedorDunamixfy {
   vendedorId: string;
   nombre: string;
