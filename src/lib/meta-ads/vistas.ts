@@ -18,8 +18,14 @@ export interface CampanaVista {
   angulo: string | null;
   presupuestoDiario: number | null;
   creadaEn: string | null;
-  /** Quién la creó según el registro de actividad de Meta; null si no se pudo saber. */
+  /** Quién la montó: la persona que dice el nombre («ARIANNY») y, si el nombre no la trae, quien la creó según el registro de actividad de Meta. */
   persona: string | null;
+  /** Quién tenía la sesión de Meta cuando se creó (el registro de actividad); puede ser distinta de la persona del nombre. */
+  personaMeta: string | null;
+  /** «ALL PA»: a quién se le muestra y dónde, según el nombre. */
+  mercado: string | null;
+  /** La tanda de videos que lleva, según el nombre («RT V1 AL V5»). */
+  videos: string | null;
   /** Resultados del periodo elegido. */
   r: Resultados;
   tope: number;
@@ -50,6 +56,10 @@ export interface VideoVista {
   angulo: string | null;
   campanas: number;
   anuncios: number;
+  /** «V3»: el número del video dentro de su tanda, si el nombre del anuncio lo dice. */
+  numero: string | null;
+  /** Los anuncios que usan este video y a qué campaña pertenece cada uno (últimos 30 días). */
+  anunciosDetalle: { id: string; nombre: string; activo: boolean; campanaId: string; campanaNombre: string; etapa: Etapa | null; r: Resultados }[];
   r: Resultados;
   tope: number;
 }

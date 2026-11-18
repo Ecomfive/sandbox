@@ -3,7 +3,7 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { ListaDatos } from "@/components/tabla/lista-datos";
-import { ChevronRightIcon, EtiquetaIcon, EstadoIcon, MargenIcon, PersonaIcon, ProductoIcon, TiendaIcon, CalendarioIcon, FiltroIcon } from "@/lib/nav-icons";
+import { AnunciosIcon, ChevronRightIcon, EtiquetaIcon, EstadoIcon, MargenIcon, PersonaIcon, ProductoIcon, TiendaIcon, CalendarioIcon, FiltroIcon } from "@/lib/nav-icons";
 import { cpa, ctr, dolares, nivelDeCpa, nivelDeCtr } from "@/lib/meta-ads/metricas";
 import type { CuentaVista } from "@/lib/meta-ads/datos";
 import type { AnuncioVista, CampanaVista } from "@/lib/meta-ads/vistas";
@@ -13,7 +13,7 @@ import { FichaCampana } from "./ficha-campana";
 import { InsigniaEstructura, InsigniaEtapa, Nivel, nombreEstado, porcentaje, Resultado, valorCpa } from "./piezas";
 
 const NOMBRE: NombreFilas = { singular: "campaña", plural: "campañas" };
-const ICONOS: Record<string, IconoComp> = { nombre: ProductoIcon, veredicto: MargenIcon, etapa: EtiquetaIcon, estado: EstadoIcon, estructura: FiltroIcon, puja: FiltroIcon, producto: ProductoIcon, angulo: EtiquetaIcon, cuenta: TiendaIcon, persona: PersonaIcon, meta: EstadoIcon, gasto: MargenIcon, compras: MargenIcon, creada: CalendarioIcon };
+const ICONOS: Record<string, IconoComp> = { nombre: ProductoIcon, veredicto: MargenIcon, etapa: EtiquetaIcon, estado: EstadoIcon, estructura: FiltroIcon, puja: FiltroIcon, mercado: TiendaIcon, videos: AnunciosIcon, producto: ProductoIcon, angulo: EtiquetaIcon, cuenta: TiendaIcon, persona: PersonaIcon, meta: EstadoIcon, gasto: MargenIcon, compras: MargenIcon, creada: CalendarioIcon };
 
 const COLUMNAS = "lg:grid-cols-[minmax(0,2.6fr)_minmax(0,1.3fr)_minmax(0,0.9fr)_minmax(0,0.8fr)_minmax(0,0.9fr)_minmax(0,1fr)_1rem]";
 
@@ -42,7 +42,8 @@ function FilaCampana({ c, alAbrir }: { c: CampanaVista; alAbrir: () => void }) {
           <span className="truncate text-sm font-medium">{c.nombre}</span>
         </span>
         <span className="truncate text-xs text-muted-foreground">
-          {c.cuentaNombre}
+          {c.mercado ?? c.cuentaNombre}
+          {c.videos ? ` · ${c.videos}` : ""}
           {c.persona ? ` · la montó ${c.persona}` : ""}
           {c.creadaEn ? ` · ${c.creadaEn.slice(0, 10)}` : ""}
           {c.activa ? "" : ` · ${nombreEstado(c.estado)}`}

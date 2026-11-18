@@ -204,6 +204,8 @@ export function FichaCampana({ campana: c, anuncios, actId, productos, escribe, 
               <Dato etiqueta="Presupuesto diario">{c.presupuestoDiario !== null ? dolares(c.presupuestoDiario) : c.estructura === "ABO" ? "En cada conjunto" : "—"}</Dato>
               <Dato etiqueta="Estado en Meta">{nombreEstado(c.estado)}</Dato>
               <Dato etiqueta="Cuenta publicitaria">{c.cuentaNombre}</Dato>
+              <Dato etiqueta="Audiencia y país">{c.mercado ?? "—"}</Dato>
+              <Dato etiqueta="Tanda de videos">{c.videos ?? "—"}</Dato>
               <Dato etiqueta="Creada">
                 <span className="inline-flex items-center gap-1.5">
                   <CalendarioIcon aria-hidden="true" className="h-3.5 w-3.5 text-muted-foreground" />
@@ -213,8 +215,9 @@ export function FichaCampana({ campana: c, anuncios, actId, productos, escribe, 
               <Dato etiqueta="La montó">
                 <span className="inline-flex items-center gap-1.5">
                   <PersonaIcon aria-hidden="true" className="h-3.5 w-3.5 text-muted-foreground" />
-                  {c.persona ?? "No se sabe (Meta no dio el registro de actividad)"}
+                  {c.persona ?? "No se sabe (ni el nombre ni Meta lo dicen)"}
                 </span>
+                {c.personaMeta && c.personaMeta !== c.persona && <span className="block text-xs text-muted-foreground">Creada en Meta con la sesión de {c.personaMeta}</span>}
               </Dato>
             </dl>
             {actId && (

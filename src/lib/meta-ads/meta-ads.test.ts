@@ -2,22 +2,33 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { agrupar, copyLimpio, landingLimpia } from "./agrupar";
 import { conversion, cpa, hookRate, holdRate, resultado, sinResultados, type Resultados } from "./metricas";
-import { claveDeProducto, embellecer, etiquetasDeNombre } from "./nombre";
+import { claveDeProducto, embellecer, etiquetasDeNombre, numeroDeVideo } from "./nombre";
 import { accion, actividadDe, anuncioDe, campanaDe, estructuraDe, mensajeDeErrorMeta, normalizarActId, presupuestoDe, pujaDe, resultadoDiaDe } from "./normalizar";
 import { pendientes, sugerir } from "./sugerencias";
 import type { CampanaVista, VideoVista } from "./vistas";
 
 const r = (o: Partial<Resultados>): Resultados => ({ ...sinResultados(), ...o });
 
-test("el nombre de la campaña dice producto, ángulo, estructura, puja y etapa", () => {
-  assert.deepEqual(etiquetasDeNombre("PA | Corrector | DOLOR-espalda | CBO | SINTOPE | T"), { pais: "PA", producto: "Corrector", angulo: "Dolor espalda", estructura: "CBO", puja: "sin_tope", etapa: "testing" });
-  assert.deepEqual(etiquetasDeNombre("PA | Nida | OFERTA-2x1 | ABO | Bid cap | E"), { pais: "PA", producto: "Nida", angulo: "Oferta 2x1", estructura: "ABO", puja: "bid_cap", etapa: "escala" });
+test("el nombre de la campaña dice producto, ángulo, estructura, puja y etapa (forma general)", () => {
+  assert.deepEqual(etiquetasDeNombre("PA | Corrector | DOLOR-espalda | CBO | SINTOPE | T"), { pais: "PA", mercado: "PA", videos: null, persona: null, producto: "Corrector", angulo: "Dolor espalda", estructura: "CBO", puja: "sin_tope", etapa: "testing" });
+  assert.deepEqual(etiquetasDeNombre("PA | Nida | OFERTA-2x1 | ABO | Bid cap | E"), { pais: "PA", mercado: "PA", videos: null, persona: null, producto: "Nida", angulo: "Oferta 2x1", estructura: "ABO", puja: "bid_cap", etapa: "escala" });
   const libre = etiquetasDeNombre("Corrector | Antes y después | retargeting | cost-cap");
   assert.equal(libre.pais, null);
   assert.equal(libre.producto, "Corrector");
   assert.equal(libre.angulo, "Antes y después");
   assert.deepEqual([libre.etapa, libre.puja], ["retargeting", "cost_cap"]);
-  assert.deepEqual(etiquetasDeNombre("Campaña nueva sin barras"), { pais: null, producto: null, angulo: null, estructura: null, puja: null, etapa: null });
+  assert.deepEqual(etiquetasDeNombre("Campaña nueva sin barras"), { pais: null, mercado: null, videos: null, persona: null, producto: null, angulo: null, estructura: null, puja: null, etapa: null });
+});
+
+test("el nombre como lo escriben ustedes: producto | audiencia y país | estructura y etapa | videos | persona", () => {
+  assert.deepEqual(etiquetasDeNombre("ACEITE COLAGENO | ALL PA | CBO TEST | RT V1 AL V5 | ARIANNY"), { pais: "PA", mercado: "ALL PA", videos: "RT V1 AL V5", persona: "Arianny", producto: "ACEITE COLAGENO", angulo: null, estructura: "CBO", puja: null, etapa: "testing" });
+  assert.deepEqual(etiquetasDeNombre("SHAMPOO ANTICASPA HOEGOA | ALL PA | CBO TEST | V6 AL V10 | ARIANNY"), { pais: "PA", mercado: "ALL PA", videos: "V6 AL V10", persona: "Arianny", producto: "SHAMPOO ANTICASPA HOEGOA", angulo: null, estructura: "CBO", puja: null, etapa: "testing" });
+  // «RT» pegado a los videos es el retesteo de esa tanda, no retargeting; «RT» solo sí es retargeting.
+  assert.equal(etiquetasDeNombre("COMPLEJO B | ALL PA | CBO TEST | RT V1 AL V5 | ARIANNY").etapa, "testing");
+  assert.equal(etiquetasDeNombre("COMPLEJO B | ALL PA | ABO RT | V1 | ARIANNY").etapa, "retargeting");
+  // Sin persona ni videos también se lee.
+  const corto = etiquetasDeNombre("NIDA | ALL PA | CBO ESCALA");
+  assert.deepEqual([corto.producto, corto.persona, corto.videos, corto.estructura, corto.etapa], ["NIDA", null, null, "CBO", "escala"]);
 });
 
 test("el texto y la llave de un producto", () => {
@@ -108,7 +119,7 @@ test("landings y copys se juntan sin rastreo ni espacios", () => {
 
 const campana = (o: Partial<CampanaVista>): CampanaVista => ({
   id: "c1", cuentaId: "a", cuentaNombre: "Oferfy", metaId: "1", nombre: "PA | X", estado: "ACTIVE", activa: true, etapa: "testing", estructura: "CBO", puja: "sin_tope", producto: "Corrector", angulo: "Dolor",
-  presupuestoDiario: 20, creadaEn: "2026-11-01T00:00:00Z", persona: null, r: sinResultados(), tope: 3, topeDefinido: true, manual: [], ...o,
+  presupuestoDiario: 20, creadaEn: "2026-11-01T00:00:00Z", persona: null, personaMeta: null, mercado: null, videos: null, r: sinResultados(), tope: 3, topeDefinido: true, manual: [], ...o,
 });
 
 test("sugerencias de campañas: gasta sin comprar, CPA alto, lista para escalar", () => {
@@ -142,7 +153,7 @@ test("sugerencias: el CPA de una campaña en escala está subiendo", () => {
 });
 
 test("sugerencias de videos y de landing", () => {
-  const video = (o: Partial<VideoVista>): VideoVista => ({ id: "v", nombre: "V-014", miniatura: null, producto: "Corrector", angulo: "Dolor", campanas: 1, anuncios: 1, r: sinResultados(), tope: 3, ...o });
+  const video = (o: Partial<VideoVista>): VideoVista => ({ id: "v", nombre: "V-014", miniatura: null, producto: "Corrector", angulo: "Dolor", campanas: 1, anuncios: 1, numero: null, anunciosDetalle: [], r: sinResultados(), tope: 3, ...o });
   const s = sugerir({
     hoy: "2026-11-18",
     serie: new Map(),
@@ -170,4 +181,11 @@ test("detalleLegible: el presupuesto y el estado en palabras, y nunca JSON suelt
   assert.equal(detalleLegible('{"new_value":{"type":"payment_amount","currency":"USD","new_val'), null);
   assert.equal(detalleLegible('{"cosa":1}'), null);
   assert.equal(detalleLegible(null), null);
+});
+
+test("numeroDeVideo: el V# del nombre del anuncio", () => {
+  assert.equal(numeroDeVideo("Anuncio V3 - oferta"), "V3");
+  assert.equal(numeroDeVideo("v12"), "V12");
+  assert.equal(numeroDeVideo("VIDEO nuevo"), null);
+  assert.equal(numeroDeVideo("ACEITE V10 | copia"), "V10");
 });

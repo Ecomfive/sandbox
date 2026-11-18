@@ -296,10 +296,13 @@ function Topes({ topes, productos, escribe }: { topes: TopeVista[]; productos: s
 }
 
 function ProbadorDeNombres() {
-  const [nombre, setNombre] = useState("PA | Faja moldeadora | DOLOR DE ESPALDA | CBO | Sin tope | T");
+  const [nombre, setNombre] = useState("SHAMPOO ANTICASPA HOEGOA | ALL PA | CBO TEST | V6 AL V10 | ARIANNY");
   const e = etiquetasDeNombre(nombre);
   const filas: [string, string][] = [
     ["Producto", e.producto ?? "—"],
+    ["Audiencia y país", e.mercado ?? "—"],
+    ["Tanda de videos", e.videos ?? "—"],
+    ["La montó", e.persona ?? "—"],
     ["Ángulo", e.angulo ?? "—"],
     ["Etapa", e.etapa ? NOMBRE_ETAPA[e.etapa] : "—"],
     ["CBO o ABO", e.estructura ?? "—"],
@@ -308,7 +311,7 @@ function ProbadorDeNombres() {
   return (
     <Bloque id="nombres" titulo="Cómo se leen los nombres de las campañas">
       <p className="m-0 text-sm text-muted-foreground">
-        Meta no guarda el producto, el ángulo ni la etapa: salen del nombre. Lo mejor es siempre <span className="font-medium text-foreground">PAÍS | Producto | ÁNGULO | CBO o ABO | Puja | T, E o R</span> (T = testing, E = escala, R = retargeting). Si alguna no se lee bien, se corrige en la ficha de la campaña.
+        Meta no guarda el producto, la etapa ni quién montó la campaña: salen del nombre. El formato del equipo es <span className="font-medium text-foreground">PRODUCTO | ALL PA | CBO TEST | RT V1 AL V5 | PERSONA</span> (producto, audiencia y país, estructura y etapa, tanda de videos y quién la montó). El ángulo no va en el nombre. Si algo no se lee bien, se corrige en la ficha de la campaña.
       </p>
       <label className="flex flex-col gap-1">
         <span className={labelClassSm}>Prueba un nombre</span>
