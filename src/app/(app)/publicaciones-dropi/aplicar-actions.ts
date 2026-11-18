@@ -206,8 +206,8 @@ async function tareaDelSistema(
 }
 
 /**
- * «Republicar (B280)» (12 nov 2026, proceso de Nicol): al terminar en Dropi, la tarea de pedirle a Dropi el traslado (en la publicación nueva, para mañana, con el mensaje
- * listo para copiar; se cierra sola cuando la lectura ve el stock en la bodega de Dropi del ID nuevo) y la de archivar el ID viejo en un mes (no antes: devoluciones tardías).
+ * «Republicar (B280)» (12 nov 2026, proceso de Nicol): al terminar en Dropi, la tarea de pedirle a Dropi el traslado (en la publicación nueva, para mañana; en Panamá con el
+ * botón que baja el manifiesto de HL Express y, en los demás países, con el mensaje listo para copiar; se cierra sola cuando la lectura ve el stock en la bodega de Dropi del ID nuevo) y la de archivar el ID viejo en un mes (no antes: devoluciones tardías).
  */
 async function tareasRepublicacionB280(
   supabase: ReturnType<typeof createServiceClient>,
@@ -229,7 +229,10 @@ async function tareasRepublicacionB280(
     nuevaId,
     {
       titulo: `Pedir a Dropi el traslado del ID ${viejo} al ${nuevo}`,
-      nota: `Republicado desde la bodega de Dropi: el ID nuevo ${nuevo} quedó en 0. Copia este mensaje en el grupo de Dropi: «${mensaje}» La tarea se cierra sola cuando el sistema lea el stock en la bodega de Dropi del ID ${nuevo}.`,
+      nota:
+        codigoPais.toUpperCase() === "PA"
+          ? `Republicado desde la bodega de Dropi: el ID nuevo ${nuevo} quedó en 0. Pulsa «Descargar formato para HL Express» en esta tarea: baja el manifiesto con el ID ${viejo}, el ${nuevo} y las unidades ya puestos; agrégale tu contacto y envíaselo a HL Express para que hagan el traslado. La tarea se cierra sola cuando el sistema lea el stock en la bodega de Dropi del ID ${nuevo}.`
+          : `Republicado desde la bodega de Dropi: el ID nuevo ${nuevo} quedó en 0. Copia este mensaje en el grupo de Dropi: «${mensaje}» La tarea se cierra sola cuando el sistema lea el stock en la bodega de Dropi del ID ${nuevo}.`,
       dias: 1,
       prioridad: "alta",
     },
