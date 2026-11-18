@@ -21,11 +21,12 @@ test("el nombre de la campaña dice producto, ángulo, estructura, puja y etapa 
 });
 
 test("el nombre como lo escriben ustedes: producto | audiencia y país | estructura y etapa | videos | persona", () => {
-  assert.deepEqual(etiquetasDeNombre("ACEITE COLAGENO | ALL PA | CBO TEST | RT V1 AL V5 | ARIANNY"), { pais: "PA", mercado: "ALL PA", videos: "RT V1 AL V5", persona: "Arianny", producto: "ACEITE COLAGENO", angulo: null, estructura: "CBO", puja: null, etapa: "retargeting" });
+  assert.deepEqual(etiquetasDeNombre("ACEITE COLAGENO | ALL PA | CBO TEST | RT V1 AL V5 | ARIANNY"), { pais: "PA", mercado: "ALL PA", videos: "RT V1 AL V5", persona: "Arianny", producto: "ACEITE COLAGENO", angulo: null, estructura: "CBO", puja: null, etapa: "testing" });
   assert.deepEqual(etiquetasDeNombre("SHAMPOO ANTICASPA HOEGOA | ALL PA | CBO TEST | V6 AL V10 | ARIANNY"), { pais: "PA", mercado: "ALL PA", videos: "V6 AL V10", persona: "Arianny", producto: "SHAMPOO ANTICASPA HOEGOA", angulo: null, estructura: "CBO", puja: null, etapa: "testing" });
-  // «RT» es retargeting: en «RT V1 AL V5» manda sobre el TEST de «CBO TEST»; sin RT, el TEST es testing.
-  assert.equal(etiquetasDeNombre("COMPLEJO B | ALL PA | CBO TEST | RT V1 AL V5 | ARIANNY").etapa, "retargeting");
-  assert.equal(etiquetasDeNombre("COMPLEJO B | ALL PA | ABO RT | V1 | ARIANNY").etapa, "retargeting");
+  // «RT» es retest (un segundo intento de test): la campaña sigue siendo testing, con o sin RT en los videos.
+  assert.equal(etiquetasDeNombre("COMPLEJO B | ALL PA | CBO TEST | RT V1 AL V5 | ARIANNY").etapa, "testing");
+  assert.equal(etiquetasDeNombre("COMPLEJO B | ALL PA | CBO RT | V1 | ARIANNY").etapa, "testing");
+  assert.equal(etiquetasDeNombre("COMPLEJO B | ALL PA | CBO RETARGETING | V1 | ARIANNY").etapa, "retargeting");
   // Sin persona ni videos también se lee.
   const corto = etiquetasDeNombre("NIDA | ALL PA | CBO ESCALA");
   assert.deepEqual([corto.producto, corto.persona, corto.videos, corto.estructura, corto.etapa], ["NIDA", null, null, "CBO", "escala"]);

@@ -1,6 +1,6 @@
 // Anuncios Meta (18 nov 2026, pedido de Alcides): Meta no sabe de «etapas», «productos» ni «personas»: eso vive en el nombre que el equipo le pone a la campaña. Se leen dos formas, la primera que encaje:
 //   1. La de ustedes (la que usa el equipo hoy):  PRODUCTO | ALL PA | CBO TEST | RT V1 AL V5 | ARIANNY
-//      producto · audiencia y país · estructura y etapa juntas · la tanda de videos (RT = retargeting: manda sobre el TEST) · la persona que la montó.
+//      producto · audiencia y país · estructura y etapa juntas · la tanda de videos (RT = retest, un segundo intento de test: sigue siendo testing) · la persona que la montó.
 //   2. La general:  PAÍS | Producto | ÁNGULO | CBO o ABO | Puja | T, E o R   (las palabras reservadas se reconocen donde estén).
 // El ángulo no va en el nombre de ustedes: sale del video y del texto del anuncio (o se corrige a mano). Lo que no se reconoce queda en null y una persona lo corrige en la campaña. Lógica pura, con prueba.
 
@@ -29,7 +29,7 @@ export const NOMBRE_PUJA: Record<Puja, string> = { sin_tope: "Sin tope", bid_cap
 /** Mayúsculas, sin acentos ni signos: «Dolor-espalda» → «DOLORESPALDA». */
 export const claveDeTexto = (t: string): string => t.normalize("NFD").replace(/\p{M}/gu, "").toUpperCase().replace(/[^A-Z0-9]/g, "");
 
-const ETAPAS: Record<string, Etapa> = { T: "testing", TEST: "testing", TESTING: "testing", E: "escala", ESC: "escala", ESCALA: "escala", SCALE: "escala", R: "retargeting", RT: "retargeting", RETARGET: "retargeting", RETARGETING: "retargeting", RETARGETEO: "retargeting" };
+const ETAPAS: Record<string, Etapa> = { T: "testing", TEST: "testing", TESTING: "testing", E: "escala", ESC: "escala", ESCALA: "escala", SCALE: "escala", R: "retargeting", RT: "testing", RETARGET: "retargeting", RETARGETING: "retargeting", RETARGETEO: "retargeting" };
 const PUJAS: Record<string, Puja> = { SINTOPE: "sin_tope", LOWESTCOST: "sin_tope", BIDCAP: "bid_cap", COSTCAP: "cost_cap", ROASMIN: "roas_min", MINROAS: "roas_min" };
 
 /** «DOLOR-espalda» → «Dolor espalda»; «dolor_de_espalda» → «Dolor de espalda». */
@@ -74,12 +74,9 @@ export function etiquetasDeNombre(nombre: string): EtiquetasDeNombre {
   if (partes.length < 2) return r;
   const libres: string[] = [];
   let hayFormatoPropio = false;
-  let viaRetargeting = false;
   for (const p of partes) {
     if (RE_VIDEOS.test(p)) {
       r.videos = p.toUpperCase().replace(/\s+/g, " ");
-      // «RT V1 AL V5»: RT es retargeting (así lo confirmó el equipo) y manda sobre el TEST de «CBO TEST»: es la prueba de esos videos con público que ya visitó.
-      if (/^RT\s/i.test(p)) viaRetargeting = true;
       hayFormatoPropio = true;
     } else if (/^ALL\s+[A-Za-z]{2}$/i.test(p)) {
       r.mercado = p.toUpperCase().replace(/\s+/g, " ");
@@ -98,7 +95,6 @@ export function etiquetasDeNombre(nombre: string): EtiquetasDeNombre {
       r.puja = t.puja ?? r.puja;
     }
   }
-  if (viaRetargeting) r.etapa = "retargeting";
   if (hayFormatoPropio) {
     // Producto primero; la persona es el último trozo libre, si hay más de uno. El ángulo no va en el nombre.
     if (libres[0]) r.producto = mayuscula(libres[0]);
