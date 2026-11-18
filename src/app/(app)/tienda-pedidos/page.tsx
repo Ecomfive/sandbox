@@ -13,7 +13,7 @@ import { etiquetaPostventa, postventaDePedidos } from "@/lib/tienda/postventa-ti
 import { revisarSiHaceFalta } from "@/lib/tienda/conectar-shopify";
 import { PedidosTienda } from "./pedidos-tienda";
 import { parametrosPeriodo } from "@/lib/tienda/rango";
-import { alertasTiendas, juntarTiendas, resumirTienda } from "@/lib/tienda/tablero-tiendas";
+import { juntarTiendas, resumirTienda } from "@/lib/tienda/tablero-tiendas";
 import { TableroTiendas } from "./tablero-tiendas";
 
 export const metadata = { title: "Pedidos de tienda" };
@@ -139,7 +139,7 @@ async function TodasLasTiendas({
         Cómo van las tiendas de {pais.nombre}: elige una tienda para ver sus pedidos.
       </EncabezadoPagina>
       <BarraTienda ruta="/tienda-pedidos" tiendas={tiendas} tiendaId={null} periodo={periodo} />
-      <TableroTiendas tiendas={resumenes} todas={juntarTiendas(resumenes)} alertas={alertasTiendas(resumenes)} hrefs={hrefs} moneda={pais.codigo} dias={periodo.dias} />
+      <TableroTiendas tiendas={resumenes} todas={juntarTiendas(resumenes)} hrefs={hrefs} moneda={pais.codigo} dias={periodo.dias} />
     </Pagina>
   );
 }
