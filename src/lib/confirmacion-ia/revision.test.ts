@@ -57,6 +57,14 @@ test("faltaVigente: lo que marcó el equipo manda; sin revisión, lo que dijo la
   assert.equal(faltaVigente({ estado: "falta_dato", falta: "la calle", rev_en: null }), "la calle");
 });
 
+test("«Falta un dato» sobre un pedido en espera de pago: primero el cobro, y la dirección se pide cuando el pago llegó", () => {
+  const revision = { completa: false, zona: null, falta: "la calle", ok: null, por: "Ana", en: "2026-11-18T10:00:00Z" };
+  const f = { estado: "adelantado" as const, zona: null, etiqueta: null, falta: null, revision };
+  assert.deepEqual(resultadoFinal(f, etiquetas), { estado: "adelantado", zona: null, etiqueta: null, falta: "la calle" });
+  assert.deepEqual(resultadoFinal(f, etiquetas, true), { estado: "falta_dato", zona: null, etiqueta: null, falta: "la calle" }, "con el pago ya hecho se le puede pedir la dirección");
+  assert.equal(resultadoFinal({ ...f, estado: "listo" }, etiquetas).estado, "falta_dato", "fuera del pago por adelantado nada cambia");
+});
+
 test("pago por adelantado marcado por el equipo: queda en espera de pago, sin etiqueta, y es un ejemplo propio", () => {
   assert.deepEqual(revisarVeredicto({ completa: true, zona: "adelantado" }, true), { veredicto: { completa: true, zona: "adelantado", falta: null } });
   const base = { estado: "revisar" as const, zona: null, etiqueta: null, falta: null };

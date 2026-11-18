@@ -170,6 +170,7 @@ function FichaCuenta({ cuenta, entrada, alCambiar }: { cuenta: CuentaPortal; ent
             setOcupado(false);
             if (r.error || !r.clave) return mostrarToast(r.error ?? "No se pudo cambiar la clave.", "destructive");
             setClave(r.clave);
+            if (r.aviso) mostrarToast(r.aviso, "destructive");
           }}
         >
           Generar clave nueva
@@ -197,7 +198,9 @@ function FichaCuenta({ cuenta, entrada, alCambiar }: { cuenta: CuentaPortal; ent
                 setConfirmarDesactivar(false);
                 if (r.error) return mostrarToast(r.error, "destructive");
                 alCambiar({ ...cuenta, activo: !cuenta.activo });
-                mostrarToast(cuenta.activo ? "Cuenta desactivada: ya no puede entrar." : "Cuenta activada.");
+                // Desactivada, pero si no se pudo bloquear su ingreso o cerrar sus sesiones, se avisa (auditoría de seguridad, 18 nov 2026).
+                if (r.aviso) mostrarToast(r.aviso, "destructive");
+                else mostrarToast(cuenta.activo ? "Cuenta desactivada: ya no puede entrar y se cerraron sus sesiones." : "Cuenta activada.");
               }}
             >
               {cuenta.activo ? "Sí, desactivar" : "Activar cuenta"}

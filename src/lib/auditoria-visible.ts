@@ -1,5 +1,9 @@
-import { ACCIONES_COMERCIALES } from "@/lib/crm/areas";
+import { campoDeEtiqueta, campoOculto, vePagosProveedor, type RestriccionesCompras } from "@/app/(app)/compras/permisos-compras";
+import { ACCIONES_COMERCIALES, accesoCrm, areasVisibles, type AreaCrm, type PermisosCrm } from "@/lib/crm/areas";
+import { chatEnAlcance, permisosBandeja } from "@/lib/crm/permisos-bandeja";
+import { puedeVerUnidad } from "@/lib/finanzas/tiendas-permitidas";
 import { puedeVerPais } from "@/lib/paises-permitidos";
+import type { Afinado } from "@/lib/permisos/afinado";
 
 /**
  * De qué módulo es cada `entidad` de `historial_auditoria`: un evento solo se muestra en la bitácora del Centro de
@@ -167,6 +171,83 @@ export function eventoSinMontos<T extends { detalle?: string | null; antes?: unk
   if (cuantos(evento.antes) + cuantos(evento.despues) > 0 && cuantos(antes) + cuantos(despues) === 0) return null;
   const detalle = evento.detalle ? evento.detalle.replace(/ · [^·→]*\$\s?[\d.,]+/g, "").replace(/\$\s?[\d.,]+/g, "$…") : evento.detalle;
   return { ...evento, detalle, antes, despues };
+}
+
+const cuantosDatos = (o: unknown) => (o && typeof o === "object" ? Object.keys(o as object).length : 0);
+
+/**
+ * Una línea de la auditoría de una compra como la puede ver la persona según lo afinado en Compras (auditoría de seguridad, 18 nov 2026).
+ * La auditoría guarda los montos sin «$» («Monto Total: 1270 → 1100»), así que de antes/después se quita cada dato de un campo que no ve,
+ * por su etiqueta (como hace la Actividad de la compra). Sin ver los pagos a Shen Zhen (`vePagosProveedor`), el pago de una llegada no dice
+ * cuánto y no se ven los cambios del Registro de pagos. Sin el monto, del detalle se quita todo «$…» (`eventoSinMontos`). Null si no queda nada.
+ */
+export function eventoCompraParaRol<T extends { accion: string; detalle?: string | null; antes?: unknown; despues?: unknown }>(evento: T, r: RestriccionesCompras): T | null {
+  if (r.ocultos.length === 0) return evento;
+  const sinMonto = campoOculto(r, "monto");
+  const vePagos = vePagosProveedor(r);
+  if (!vePagos && (evento.detalle ?? "").includes("cambió en el Registro de pagos")) return null;
+  if (evento.accion === "renombrar_tienda" && campoOculto(r, "tienda")) return null;
+  const pagoSinVer = evento.accion === "registrar_pago_llegada" && !vePagos;
+  const quitar = (etiqueta: string) => {
+    const campo = campoDeEtiqueta(etiqueta);
+    return (!!campo && campoOculto(r, campo)) || (pagoSinVer && etiqueta === "Pagado a Proveedor");
+  };
+  const limpiar = (o: unknown) =>
+    o && typeof o === "object" && !Array.isArray(o) ? Object.fromEntries(Object.entries(o as Record<string, unknown>).filter(([k]) => !quitar(k))) : o;
+  const antes = limpiar(evento.antes);
+  const despues = limpiar(evento.despues);
+  if (cuantosDatos(evento.antes) + cuantosDatos(evento.despues) > 0 && cuantosDatos(antes) + cuantosDatos(despues) === 0) return null;
+  const detalle = pagoSinVer ? "Segundo pago registrado; la compra pasó a Completado" : evento.detalle;
+  const limpio = { ...evento, detalle, antes, despues };
+  return sinMonto ? eventoSinMontos(limpio) : limpio;
+}
+
+/** Las entidades de finanzas y tiendas: con tiendas limitadas se parten por tienda (`eventoDeTiendaVisible`). */
+const PREFIJOS_POR_TIENDA = ["fin_", "ven_", "del_", "mkt_", "conc_", "nom_", "qbo_", "mon_", "cli_"];
+
+/**
+ * Con tiendas limitadas (`perfiles.tiendas_permitidas`), una línea de finanzas o de una tienda solo se ve si es de una tienda suya
+ * (`unidadDe` da la tienda del registro: null si es de toda la empresa, undefined si no se sabe). Lo de toda la empresa o de tienda
+ * desconocida no se ve, como en sus módulos (auditoría de seguridad, 18 nov 2026). Sin límite, todo.
+ */
+export function eventoDeTiendaVisible(
+  evento: { entidad: string; entidad_id: string | null },
+  permitidas: string[] | null,
+  unidadDe: (entidad: string, id: string | null) => string | null | undefined,
+): boolean {
+  if (permitidas === null) return true;
+  if (!PREFIJOS_POR_TIENDA.some((p) => evento.entidad.startsWith(p))) return true;
+  const unidad = unidadDe(evento.entidad, evento.entidad_id);
+  return unidad !== undefined && puedeVerUnidad(permitidas, unidad);
+}
+
+/** Lo que hace Dirección del CRM sobre un dropshipper (atender una alerta, una tarea desde su panel): solo lo ve Dirección. */
+const ACCIONES_DIRECCION = new Set(["crm_alerta_atendida", "crear_tarea_crm"]);
+
+/** Si la persona ve todos los chats del CRM (las tres áreas y sin «los suyos y los libres»): entonces no hace falta mirar cada chat. */
+export function veTodosLosChats(usuario: PermisosCrm & { afinado?: Record<string, Afinado> }): boolean {
+  return areasVisibles(accesoCrm(usuario)).length === 3 && permisosBandeja(usuario).alcance === "todas";
+}
+
+/**
+ * Si una línea del CRM se puede mostrar a esta persona como en el propio CRM (auditoría de seguridad, 18 nov 2026): la de un chat, solo si
+ * el chat es de un área suya y entra en su alcance («los suyos y los libres»); `chatDe` da su área y a quién está asignado (undefined si no
+ * se sabe: no se muestra). Una línea de varios chats (sin id) solo la ve quien ve todas las áreas y todos los chats. Lo de Dirección sobre un
+ * dropshipper, solo Dirección. El resto, igual que antes.
+ */
+export function eventoCrmVisible(
+  evento: { accion: string; entidad: string; entidad_id: string | null },
+  usuario: PermisosCrm & { id: string; afinado?: Record<string, Afinado> },
+  chatDe: (id: string) => { area: AreaCrm; asignadaA: string | null } | undefined,
+): boolean {
+  const acceso = accesoCrm(usuario);
+  if (evento.entidad === "dropshippers" && ACCIONES_DIRECCION.has(evento.accion)) return acceso.direccion;
+  if (evento.entidad !== "whatsapp_conversaciones" || veTodosLosChats(usuario)) return true;
+  if (!evento.entidad_id) return false;
+  const areas = areasVisibles(acceso);
+  const alcance = permisosBandeja(usuario).alcance;
+  const chat = chatDe(evento.entidad_id);
+  return !!chat && areas.includes(chat.area) && chatEnAlcance(alcance, chat.asignadaA, usuario.id);
 }
 
 /**

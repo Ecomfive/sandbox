@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { leerLlaveUso, llaveDeCabecera } from "@/lib/rendimiento/llave-uso";
+import { leerLlaveUso, llaveDeCabecera, secretosLlaveUso } from "@/lib/rendimiento/llave-uso";
 import { revisarLatidoExterno } from "@/lib/rendimiento/uso-externo";
 import { createServiceClient } from "@/lib/supabase/server";
 
@@ -11,12 +11,17 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(request: Request) {
   if (!request.headers.get("origin")?.startsWith("chrome-extension://")) return NextResponse.json({ error: "No permitido." }, { status: 403 });
-  const usuarioId = leerLlaveUso(llaveDeCabecera(request.headers.get("authorization")), process.env.SUPABASE_SERVICE_ROLE_KEY ?? "");
+  // Secreto propio con las llaves viejas aceptadas en la transición (auditoría de seguridad, 18 nov 2026): `secretosLlaveUso`.
+  const usuarioId = leerLlaveUso(llaveDeCabecera(request.headers.get("authorization")), secretosLlaveUso().aceptar);
   if (!usuarioId) return NextResponse.json({ error: "Sin llave." }, { status: 401 });
   const latido = revisarLatidoExterno(await request.json().catch(() => null));
   if (!latido) return NextResponse.json({ error: "Datos no válidos." }, { status: 400 });
 
   const supabase = createServiceClient();
+  // Una llave sigue valiendo hasta 7 días: si la cuenta se suspendió en ese tiempo, ya no suma minutos (auditoría de seguridad, 18 nov 2026).
+  const { data: perfil, error: errorPerfil } = await supabase.from("perfiles").select("activo").eq("id", usuarioId).maybeSingle();
+  if (errorPerfil) return NextResponse.json({ error: "No se pudo guardar." }, { status: 503 });
+  if (!perfil?.activo) return NextResponse.json({ error: "Sin llave." }, { status: 401 });
   const ahora = new Date();
   const { error } = await supabase.from("uso_externo_extensiones").upsert({ usuario_id: usuarioId, version: latido.version, visto_en: ahora.toISOString() }, { onConflict: "usuario_id" });
   if (error) return NextResponse.json({ error: "No se pudo guardar." }, { status: 503 });

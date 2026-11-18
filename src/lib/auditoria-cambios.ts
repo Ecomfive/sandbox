@@ -364,6 +364,7 @@ export const ETIQUETA_ACCION: Record<string, string> = {
   crear_usuario: "Creó un usuario",
   editar_usuario: "Modificó un usuario",
   suspender_usuario: "Cambió el estado de un usuario",
+  cambiar_rol_usuario: "Cambió el rol de una persona",
   eliminar_usuario: "Eliminó un usuario",
   generar_contrasena_temporal: "Generó una contraseña temporal",
   cambiar_contrasena: "Cambió su contraseña",

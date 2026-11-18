@@ -63,3 +63,29 @@ export function listaDePaises(texto: string | null | undefined): { codigos: stri
   }
   return { codigos, noReconocidos };
 }
+
+/**
+ * Cómo puede estar guardado en los chats de WhatsApp el teléfono de un pedido (auditoría de seguridad, 18 nov 2026): el formato internacional y las formas en que WhatsApp
+ * escribe ese mismo número. México: los celulares llegan con un 1 después del 52 (+521…, que libphonenumber ya no da por válido). Argentina: con el 9 de celular (+549…) o sin
+ * él (+54…), el mismo abonado. Escrito con el prefijo («+…» o «00…»), también tal cual, como lo guarda el webhook si no lo pudo normalizar. Nunca por los últimos dígitos.
+ */
+export function telefonosDeChatPosibles(texto: string | null | undefined, paisPorDefecto?: string | null): string[] {
+  const limpio = String(texto ?? "").trim().replace(/^00/, "+").replace(/[^\d+]/g, "");
+  const digitos = limpio.replace(/\D/g, "");
+  const internacional = limpio.startsWith("+");
+  const salida = new Set<string>();
+  // México con el 1 de WhatsApp: escrito con el prefijo, o sin él si el pedido es de México.
+  const mx = /^521(\d{10})$/.exec(digitos);
+  const base = mx && (internacional || paisPorDefecto === "MX") ? normalizarTelefono(`+52${mx[1]}`) : normalizarTelefono(texto, paisPorDefecto);
+  if (base) {
+    salida.add(base.e164);
+    if (/^\+52\d{10}$/.test(base.e164)) salida.add(`+521${base.e164.slice(3)}`);
+    const ar = /^\+54(9?)(\d{10})$/.exec(base.e164);
+    if (ar) {
+      salida.add(`+54${ar[2]}`);
+      salida.add(`+549${ar[2]}`);
+    }
+  }
+  if (internacional && digitos.length >= 8 && digitos.length <= 15) salida.add(`+${digitos}`);
+  return [...salida];
+}

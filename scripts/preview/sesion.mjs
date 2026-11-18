@@ -1,6 +1,23 @@
 // Cookie de sesión de Supabase (formato de @supabase/ssr) para la persona de la vista previa. El PostgREST falso
-// acepta cualquier token y responde /auth/v1/user con esa persona (ver postgrest.mts).
+// acepta cualquier token y responde /auth/v1/user con esa persona (ver postgrest.mts), pero exige en `apikey` la clave
+// de la corrida (auditoría de seguridad, 18 nov 2026).
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 export const USUARIO_ID = "00000000-0000-4000-8000-0000000000a1";
+
+/** Dirección del PostgREST falso: la de .env.preview si está en el entorno; si no, la de levantar.sh. */
+export const URL_SUPA_PREVIEW = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://127.0.0.1:54321";
+
+/** La clave de la corrida: PREVIEW_CLAVE del entorno o la que levantar.sh dejó en `<PREVIEW_DIR>/clave`. */
+export function clavePreview() {
+  if (process.env.PREVIEW_CLAVE) return process.env.PREVIEW_CLAVE;
+  try {
+    return readFileSync(join(process.env.PREVIEW_DIR ?? ".preview", "clave"), "utf8").trim();
+  } catch {
+    return "";
+  }
+}
 
 export function cookieSesion(urlSupabase) {
   const ref = new URL(urlSupabase).hostname.split(".")[0];

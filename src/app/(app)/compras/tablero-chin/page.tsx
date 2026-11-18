@@ -15,7 +15,7 @@ import { cargarTareasChin } from "@/lib/proveedor/tareas-datos";
 import { cargarCambiosRegistro, cargarRegistro } from "@/lib/proveedor/registro-datos";
 import { createServiceClient } from "@/lib/supabase/server";
 import { sinAccesoAlTablero } from "../acceso-compras";
-import { campoOculto, restriccionesDe } from "../permisos-compras";
+import { pedidoSinOcultos, restriccionesDe, vePagosProveedor } from "../permisos-compras";
 import type { CuentaPortal } from "./cuenta-proveedor";
 import { etiquetasDePedidos } from "@/lib/proveedor/etiquetas-datos";
 import { QueHacerChin } from "./que-hacer-chin";
@@ -70,13 +70,14 @@ export default async function TableroChinPage({ searchParams }: { searchParams: 
   for (const p of activos) if (realDeCompra[p.id]) fotosReales[p.id] = realDeCompra[p.id];
   const rutas = activos.map((p) => p.fotoRealRuta).filter((r): r is string => !!r);
 
-  // Pagos: quien no ve los montos de Compras tampoco ve los pagos a Shen Zhen.
-  const veMontos = !campoOculto(restriccionesDe(usuario.afinado.compras), "monto");
+  // Pagos: quien no ve los montos o algún pago de Compras tampoco ve los pagos a Shen Zhen (auditoría de seguridad, 18 nov 2026).
+  const restricciones = restriccionesDe(usuario.afinado.compras);
+  const veMontos = vePagosProveedor(restricciones);
   const admin = esAdministrador(usuario);
   const [firmadas, estado, { data: nuevasParaChin }, { data: filasCuentas }, chin, desempeno] = await Promise.all([
     rutas.length ? supabase.storage.from(BUCKET_PROVEEDOR).createSignedUrls(rutas, 3600).then((r) => r.data ?? []) : Promise.resolve([]),
     veMontos ? estadoPagos(supabase, { ...espejo, pedidos }) : Promise.resolve(null),
-    supabase.from("proveedor_novedades").select("id, texto, creado_en").eq("proveedor_id", espejo.proveedor.id).eq("lado", "ecomfive").is("leida_en", null).order("creado_en", { ascending: false }).limit(20),
+    supabase.from("proveedor_novedades").select("id, texto, creado_en, tipo").eq("proveedor_id", espejo.proveedor.id).eq("lado", "ecomfive").is("leida_en", null).order("creado_en", { ascending: false }).limit(20),
     supabase.from("proveedor_usuarios").select("id, nombre, email, activo, ultimo_ingreso_en").eq("proveedor_id", espejo.proveedor.id).order("creado_en"),
     cargarTareasChin(supabase, { paisesPermitidos: usuario.paisesPermitidos, veMontos }),
     // El mismo panel que ve Shen Zhen arriba de su portal (de los países que la persona ve).
@@ -120,11 +121,13 @@ export default async function TableroChinPage({ searchParams }: { searchParams: 
 
   const tablero = {
     cuenta: { nombre: (filaCuenta?.nombre as string | undefined) ?? espejo.proveedor.nombre, proveedor: espejo.proveedor.nombre, diasAnticipo: espejo.proveedor.diasAnticipo },
-    pedidos: activos,
+    // El Tablero se ve igual para todos, pero lo que la persona no ve de Compras (montos y pagos) no llega: sale «—» (auditoría de seguridad, 18 nov 2026).
+    pedidos: activos.map((p) => pedidoSinOcultos(p, restricciones)),
     plazos: espejo.plazos,
     fotosReales,
     etiquetas: await etiquetasDePedidos(supabase, activos).catch(() => ({})),
-    avisos: (nuevasParaChin ?? []).map((a) => ({ id: a.id as string, texto: a.texto as string, creadoEn: a.creado_en as string })),
+    // Los avisos del Registro de pagos llevan montos: no llegan a quien no ve los montos.
+    avisos: (nuevasParaChin ?? []).filter((a) => veMontos || a.tipo !== "pago").map((a) => ({ id: a.id as string, texto: a.texto as string, creadoEn: a.creado_en as string })),
     pagos: pagos ? { resumen: pagos.resumen, filas: pagos.filas, cambios: pagos.cambios } : null,
     traducciones,
     desempeno,

@@ -14,7 +14,7 @@ import { errorDeRegla, normalizarTexto, ZONAS, type Zona } from "@/lib/confirmac
 import { getPaisActual } from "@/lib/pais";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { createServiceClient } from "@/lib/supabase/server";
-import { mismaTiendaUnidad } from "@/lib/tienda/ordenes-finanzas";
+import { etiquetasDe, mismaTiendaUnidad } from "@/lib/tienda/ordenes-finanzas";
 
 // Gestión de tienda › Confirmación › Con IA, Direcciones de ejemplo y Palabras de zona (16 nov 2026, pedido de Hernán). Todo es del país elegido arriba y de las tiendas que la persona puede ver.
 // Ver pide el módulo Confirmación; agregar, cambiar y analizar, poder modificarlo; encender o apagar la confirmación automática, ser administrador o saber la contraseña.
@@ -522,10 +522,12 @@ async function prepararPedirDato(supabase: ReturnType<typeof createServiceClient
   if (r.error || !a) return { error: "Ese análisis ya no existe." };
   const { tiendas, limitado } = await tiendasVisibles(supabase, pais.id);
   if (limitado && !tiendas.some((t) => t.id === a.tienda_id)) return { error: "Ese pedido no es de las tiendas que ves." };
-  const { data: o } = await supabase.from("ven_ordenes").select("numero").eq("id", a.orden_id as string).maybeSingle();
+  const { data: o } = await supabase.from("ven_ordenes").select("numero, etiquetas").eq("id", a.orden_id as string).maybeSingle();
   const base = { analisisId, numero: (o?.numero as string | null) ?? null, estado: (a.mensaje_estado as EstadoMensaje) ?? "no_aplica", enviados: Number(a.mensajes_enviados ?? 0) };
-  // Pedido de una zona de pago por adelantado (por las palabras de zona o porque el equipo lo marcó así): se le avisa del pago, no se le pide un dato.
-  if ((a.estado === "adelantado" && !a.rev_en) || (a.rev_en && a.rev_completa && a.rev_zona === "adelantado")) {
+  // Pedido de una zona de pago por adelantado (por las palabras de zona o porque el equipo lo marcó así): se le avisa del pago, no se le pide un dato. Manda sobre «falta un dato» (18 nov 2026):
+  // mientras el pago no llegue (el pedido no trae todavía la etiqueta de zona) solo se cobra; la dirección se pide después.
+  const pagado = etiquetasDe((o?.etiquetas as string | null) ?? null).some((e) => /^(ciudad|interior)\b/i.test(e));
+  if ((a.estado === "adelantado" && (!a.rev_en || (a.rev_completa === false && !pagado))) || (a.rev_en && a.rev_completa && a.rev_zona === "adelantado")) {
     const adelanto = await armarMensajeAdelanto(supabase, a.orden_id as string);
     if ("error" in adelanto) return adelanto;
     return { ...base, tipo: "adelanto", falta: "pago por adelantado", mensaje: adelanto.mensaje, sinMetodos: adelanto.sinMetodos };

@@ -9,7 +9,7 @@ import { esAdministrador } from "@/lib/permisos/acceso";
 import { esUuid } from "@/lib/seguridad/ruta-almacen";
 import { createServiceClient } from "@/lib/supabase/server";
 import { sinAccesoACompras } from "../compras/acceso-compras";
-import { campoOculto, restriccionesDe } from "../compras/permisos-compras";
+import { restriccionesDe, vePagosProveedor } from "../compras/permisos-compras";
 
 type Supabase = ReturnType<typeof createServiceClient>;
 type Usuario = NonNullable<Awaited<ReturnType<typeof getUsuarioActual>>>;
@@ -22,7 +22,7 @@ async function autorizarPagos(supabase: Supabase, usuario: Usuario, llegadaId: s
   const { data: llegada } = await supabase.from("compras_llegadas").select("id, tipo").eq("id", llegadaId).maybeSingle();
   if (!llegada) return "Esa llegada ya no existe.";
   if (llegada.tipo !== "bodega") return "Solo se paga en una llegada «En Bodega».";
-  const comprasEscribe = usuario.modulos.includes("compras") && !usuario.modulosSoloLectura.includes("compras") && !campoOculto(restriccionesDe(usuario.afinado.compras), "pago2");
+  const comprasEscribe = usuario.modulos.includes("compras") && !usuario.modulosSoloLectura.includes("compras") && vePagosProveedor(restriccionesDe(usuario.afinado.compras));
   if (!esAdministrador(usuario) && !comprasEscribe) return "Los pagos los registra quien gestiona Compras: tu usuario solo ve esta llegada.";
   if (!esAdministrador(usuario)) {
     const sinAcceso = await sinAccesoACompras(compraIds, usuario);

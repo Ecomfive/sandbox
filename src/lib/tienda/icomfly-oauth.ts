@@ -3,7 +3,7 @@
 // (`icomfly-oauth.test.ts`). La parte con red está en `icomfly.ts`.
 
 import { createHash, randomBytes } from "node:crypto";
-import { claveDesdeTexto, firmarHmac, firmasIguales } from "@/lib/seguridad/cifrado-tokens";
+import { claveDesdeTexto, descifrar, firmarHmac, firmasIguales } from "@/lib/seguridad/cifrado-tokens";
 
 export const ICOMFLY_API = "https://api.icomfly.com";
 export const COOKIE_ICOMFLY = "icomfly_oauth_nonce";
@@ -18,14 +18,29 @@ export function leerUrlConector(v: unknown): string | null {
 }
 
 /**
- * La clave con que se cifran los tokens: `ICOMFLY_TOKEN_KEY` si está; si no, una derivada de la clave de servicio de Supabase (ya es un secreto del servidor y
- * quien la tiene ya lee la base), así no hace falta otra variable en Vercel para empezar.
+ * Las claves de iComfly, la que vale primero (auditoría de seguridad, 18 nov 2026). Con `ICOMFLY_TOKEN_KEY` (32 bytes en hex o base64, o un texto de 32
+ * caracteres o más) se cifra y se firma con ella; la derivada de la clave de servicio de Supabase queda detrás solo para leer lo que ya estaba guardado
+ * (los tokens se vuelven a cifrar con la nueva al leerlos: `icomfly.ts`) y el `state` de una autorización en curso. Sin la variable, la derivada, como antes.
  */
-export function claveIcomfly(env: Record<string, string | undefined> = process.env): Buffer | null {
+export function clavesIcomfly(env: Record<string, string | undefined> = process.env): Buffer[] {
   const propia = claveDesdeTexto(env.ICOMFLY_TOKEN_KEY);
-  if (propia) return propia;
   const servicio = (env.SUPABASE_SERVICE_ROLE_KEY ?? "").trim();
-  return servicio ? createHash("sha256").update(`icomfly-tokens:${servicio}`, "utf8").digest() : null;
+  const derivada = servicio ? createHash("sha256").update(`icomfly-tokens:${servicio}`, "utf8").digest() : null;
+  return [propia, derivada].filter((c): c is Buffer => !!c);
+}
+
+/** La clave con que se cifra y se firma ahora: la primera de `clavesIcomfly`; null si no hay ninguna. */
+export function claveIcomfly(env: Record<string, string | undefined> = process.env): Buffer | null {
+  return clavesIcomfly(env)[0] ?? null;
+}
+
+/** Descifra con la primera clave que sirva; `anterior` si no fue la actual (hay que volver a cifrarlo con la actual). */
+export function descifrarIcomfly(cifrado: string, claves: Buffer[]): { texto: string; anterior: boolean } | null {
+  for (let i = 0; i < claves.length; i++) {
+    const texto = descifrar(cifrado, claves[i]);
+    if (texto !== null) return { texto, anterior: i > 0 };
+  }
+  return null;
 }
 
 /** El verificador PKCE (43 caracteres) y su desafío S256. */
@@ -47,12 +62,16 @@ export function firmarStateIcomfly(d: { tiendaId: string; usuarioId: string; non
 export function verificarStateIcomfly(
   state: string | null,
   esperado: { usuarioId: string; nonceCookie: string | null | undefined; ahora: number },
-  clave: Buffer,
+  clave: Buffer | Buffer[],
 ): { ok: true; tiendaId: string } | { ok: false; motivo: string } {
   if (!state || state.length > 800) return { ok: false, motivo: "Falta el state." };
   const [cuerpo, firma, ...resto] = state.split(".");
   if (!cuerpo || !firma || resto.length) return { ok: false, motivo: "State mal formado." };
-  if (!firmasIguales(firma, firmarHmac(cuerpo, clave, "icomfly-state"))) return { ok: false, motivo: "La firma del state no coincide." };
+  // Con varias claves (transición a `ICOMFLY_TOKEN_KEY`) vale la firma de cualquiera; se prueban todas, en tiempo constante.
+  const claves = Array.isArray(clave) ? clave : [clave];
+  let firmaOk = false;
+  for (const c of claves) if (firmasIguales(firma, firmarHmac(cuerpo, c, "icomfly-state"))) firmaOk = true;
+  if (!firmaOk) return { ok: false, motivo: "La firma del state no coincide." };
   let d: { t?: unknown; u?: unknown; n?: unknown; v?: unknown };
   try {
     d = JSON.parse(Buffer.from(cuerpo, "base64url").toString("utf8"));
