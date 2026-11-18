@@ -7,7 +7,6 @@ import { agrupar, copyLimpio, landingLimpia, type Elemento } from "./agrupar";
 import { CPA_TOPE_PREDETERMINADO, resultado, sinResultados, sumar, type Resultados } from "./metricas";
 import { claveDeProducto, NOMBRE_ETAPA, NOMBRE_PUJA, numeroDeVideo, type Estructura, type Etapa, type Puja } from "./nombre";
 import { detalleLegible, esCreacionDeCampana } from "./normalizar";
-import { geminiConectado } from "./gemini-video";
 import { anguloDeCampana } from "./video-angulo";
 import { diasEntre, pendientes, sugerir, type DecisionGuardada, type Sugerencia } from "./sugerencias";
 import type { ActividadVista, AnalisisVideoVista, AnuncioVista, CampanaVista, Grupo, VideoVista } from "./vistas";
@@ -79,6 +78,7 @@ export interface DatosMeta {
   actividadDisponible: boolean;
   /** Videos con gasto en 30 días que todavía no tienen análisis de IA, y si la IA (Gemini) está conectada. */
   videosSinAnalizar: number;
+  /** Lo pone la página (servidor): si Gemini está conectado. No se calcula aquí porque este archivo también lo importan componentes del navegador. */
   iaConectada: boolean;
 }
 
@@ -302,7 +302,7 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
   const productos = [...new Set(camp.map((c) => (c.producto as string | null)?.trim()).filter((p): p is string => !!p))].sort((a, b) => a.localeCompare(b, "es"));
   return {
     ...base, cuentas, cuentaId, desde, hasta: o.hoy, campanas: campanasConActividad, videos, anuncios, totales, anteriores, topes, productos, sugerencias, decididas: todas.length - sugerencias.length, grupos,
-    creadasPorDia, creadasHoy: creadasPorDia[13]?.testing + creadasPorDia[13]?.escala + creadasPorDia[13]?.retargeting + creadasPorDia[13]?.otras || 0, equipo, actividadDisponible: eventos.length > 0, videosSinAnalizar: videos.filter((v) => !v.analisis || v.analisis.estado !== "analizado").length, iaConectada: geminiConectado(),
+    creadasPorDia, creadasHoy: creadasPorDia[13]?.testing + creadasPorDia[13]?.escala + creadasPorDia[13]?.retargeting + creadasPorDia[13]?.otras || 0, equipo, actividadDisponible: eventos.length > 0, videosSinAnalizar: videos.filter((v) => !v.analisis || v.analisis.estado !== "analizado").length, iaConectada: false,
   };
 }
 
