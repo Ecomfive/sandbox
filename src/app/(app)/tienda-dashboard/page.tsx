@@ -50,7 +50,8 @@ export default async function DashboardTiendaPage({ searchParams }: { searchPara
   const ids = miradas.map((t) => t.id);
   // Las tiendas sin conectar se ven con las órdenes de Finanzas (11 nov 2026); si todo sale de ahí, los periodos terminan en su último día.
   const [{ pedidos: todos, lineasFinanzas, fuente, referencia, periodo }, variantes] = await Promise.all([
-    pedidosDeTiendas(supabase, miradas, pais.codigo, eleccion, { comparar: true }),
+    // Liviano (18 nov 2026): el Dashboard no muestra la foto ni el historial de cada cliente.
+    pedidosDeTiendas(supabase, miradas, pais.codigo, eleccion, { comparar: true, liviano: true }),
     cargarVariantes(supabase, ids),
   ]);
   const { desde, hasta } = periodo;

@@ -106,7 +106,8 @@ async function TodasLasTiendas({
   const leidas = await Promise.all(
     tiendas.map(async (t) => {
       const [r, sinVincular] = await Promise.all([
-        pedidosDeTiendas(supabase, [t], pais.codigo, eleccion, { comparar: true }),
+        // Liviano (18 nov 2026): el tablero no muestra la foto ni el historial de cada cliente.
+        pedidosDeTiendas(supabase, [t], pais.codigo, eleccion, { comparar: true, liviano: true }),
         supabase
           .from("tienda_variantes")
           .select("id", { count: "exact", head: true })

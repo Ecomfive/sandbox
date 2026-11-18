@@ -139,13 +139,18 @@ async function historialDeClientes(supabase: SupabaseClient, claves: string[]): 
   return mapa;
 }
 
-/** Las órdenes de Finanzas de esas tiendas entre `desde` y `hasta` (días AAAA-MM-DD), con sus unidades, como pedidos de la pantalla; y sus líneas. */
+/**
+ * Las órdenes de Finanzas de esas tiendas entre `desde` y `hasta` (días AAAA-MM-DD), con sus unidades, como pedidos de la pantalla; y sus líneas.
+ * `liviano` (18 nov 2026, velocidad de Gestión de tienda): sin la foto de cada pedido ni el historial de cada cliente (riesgo y pedidos del cliente), que
+ * el tablero «Todas las tiendas» y el Dashboard no muestran: eran la mitad de las consultas.
+ */
 export async function cargarPedidosFinanzas(
   supabase: SupabaseClient,
   fuente: FuenteFinanzas,
   tiendaIds: string[],
   desde: string,
   hasta: string,
+  { liviano = false }: { liviano?: boolean } = {},
 ): Promise<{ pedidos: PedidoFila[]; lineas: LineaFinanzas[] }> {
   const tiendaDeUnidad = new Map<string, string>();
   for (const id of tiendaIds) {
@@ -156,8 +161,20 @@ export async function cargarPedidosFinanzas(
   const unidades = [...tiendaDeUnidad.keys()];
   // Con la migración 0276, también la hora de Shopify (un texto armado: por eso se declara como `string`).
   const columnas: string = `id, unidad_id, numero, fecha, estado_entrega, etiquetas, total, moneda, transportista, guia, origen, ${(await hayHoraDeShopify(supabase)) ? "creado_origen, " : ""}${(await hayFormaPagoEntrega(supabase)) ? "forma_pago_entrega, despachada_en, " : ""}ven_ordenes_clientes(nombre, corregimiento, direccion, telefono, telefono_clave, notas)`;
-  const [ordenes, lineas] = await Promise.all([
-    traerTodasLasFilas<FilaOrden>(
+  // Los pedidos y sus líneas (18 nov 2026, velocidad de Gestión de tienda): con la migración 0321, cada uno en una sola respuesta de la base
+  // (`ven_pedidos_periodo` / `ven_lineas_periodo`); sin ella, los pedidos de a 1.000 y las líneas por número de pedido (antes se cruzaban con los pedidos
+  // página por página y cada página tardaba ~1,6 s). Las fotos de las variantes, a la vez.
+  const fotos = liviano
+    ? Promise.resolve([] as { sku: string | null; producto_titulo: string | null; foto_url: string }[])
+    : supabase
+        .from("tienda_variantes")
+        .select("sku, producto_titulo, foto_url")
+        .in("tienda_id", [...tiendaDeUnidad.values()])
+        .not("foto_url", "is", null)
+        .then((r) => (r.data ?? []) as { sku: string | null; producto_titulo: string | null; foto_url: string }[]);
+  const enUna = await pedidosYLineasEnUna(supabase, unidades, desde, hasta);
+  const [ordenes, variantesFoto] = await Promise.all([
+    enUna ? Promise.resolve(enUna.ordenes) : traerTodasLasFilas<FilaOrden>(
       (d, h) =>
         supabase
           .from("ven_ordenes")
@@ -170,12 +187,12 @@ export async function cargarPedidosFinanzas(
           .order("id")
           .range(d, h) as unknown as PromiseLike<{ data: FilaOrden[] | null; error: unknown }>,
     ).catch(() => [] as FilaOrden[]),
-    cargarLineasFinanzas(supabase, unidades, desde, hasta),
+    fotos,
   ]);
+  const lineas = enUna ? enUna.lineas : await lineasDeOrdenes(supabase, ordenes.map((o) => o.id));
   // La foto de cada pedido (12 nov 2026, como Mi Reto Digital): la de la variante de Shopify con el SKU de su primera línea.
   // Si no la encuentra por el SKU (Shopify le cambió el SKU a la variante y los pedidos viejos traen el de antes: «CAPS.MULTI.COLLAGEN.COMPLEX»), por el nombre
   // del producto en Shopify (12 nov 2026: el Multi Collagen salía con y sin foto siendo el mismo).
-  const { data: variantesFoto } = await supabase.from("tienda_variantes").select("sku, producto_titulo, foto_url").in("tienda_id", [...tiendaDeUnidad.values()]).not("foto_url", "is", null);
   const fotoDeSku = new Map((variantesFoto ?? []).filter((v) => v.sku).map((v) => [String(v.sku).trim().toLowerCase(), v.foto_url as string]));
   const fotoDeNombre = new Map<string, string>();
   for (const v of variantesFoto ?? []) {
@@ -196,7 +213,7 @@ export async function cargarPedidosFinanzas(
   }
   const clienteDe = (o: (typeof ordenes)[number]) => (Array.isArray(o.ven_ordenes_clientes) ? (o.ven_ordenes_clientes[0] ?? null) : o.ven_ordenes_clientes);
   // El historial de cada cliente: cuántos pedidos tiene y su riesgo (la regla de Finanzas, `riesgoCliente`).
-  const historial = await historialDeClientes(supabase, ordenes.map((o) => clienteDe(o)?.telefono_clave ?? ""));
+  const historial = liviano ? new Map<string, { total: number; entregadas: number; devueltas: number; canceladas: number }>() : await historialDeClientes(supabase, ordenes.map((o) => clienteDe(o)?.telefono_clave ?? ""));
   const pedidos = ordenes.map((o) => ({
     id: o.id,
     tiendaId: tiendaDeUnidad.get(o.unidad_id) ?? "",
@@ -231,29 +248,45 @@ export async function cargarPedidosFinanzas(
   return { pedidos, lineas };
 }
 
-/** Las líneas de las órdenes de esas unidades entre esos días (por la fecha de su orden). */
-export async function cargarLineasFinanzas(supabase: SupabaseClient, unidades: string[], desde: string, hasta: string): Promise<LineaFinanzas[]> {
-  if (!unidades.length) return [];
-  const filas = await traerTodasLasFilas<{ orden_id: string; linea: number; producto: string | null; cantidad: number | null; precio: number | null; sku: string | null; sku_maestro_id: string | null; es_servicio: boolean | null }>((d, h) =>
-    supabase
-      .from("ven_orden_lineas")
-      .select("orden_id, linea, producto, cantidad, precio, sku, sku_maestro_id, es_servicio, ven_ordenes!inner(unidad_id, fecha)")
-      .in("ven_ordenes.unidad_id", unidades)
-      .gte("ven_ordenes.fecha", desde)
-      .lte("ven_ordenes.fecha", hasta)
-      .order("orden_id")
-      .order("linea")
-      .range(d, h),
-  ).catch(() => []);
-  return filas.map((l) => ({
-    pedidoId: l.orden_id,
-    titulo: l.producto ?? "(sin nombre)",
-    skuId: l.sku_maestro_id,
-    cantidad: Number(l.cantidad) || 0,
-    precio: l.precio === null ? null : Number(l.precio),
-    sku: l.sku,
-    esServicio: l.es_servicio === true,
-  }));
+type FilaLinea = { orden_id: string; linea: number; producto: string | null; cantidad: number | null; precio: number | null; sku: string | null; sku_maestro_id: string | null; es_servicio: boolean | null };
+const comoLinea = (l: FilaLinea): LineaFinanzas => ({
+  pedidoId: l.orden_id,
+  titulo: l.producto ?? "(sin nombre)",
+  skuId: l.sku_maestro_id,
+  cantidad: Number(l.cantidad) || 0,
+  precio: l.precio === null ? null : Number(l.precio),
+  sku: l.sku,
+  esServicio: l.es_servicio === true,
+});
+
+/** Si la base tiene las funciones de la migración 0321 (se pregunta hasta que respondan bien una vez o digan que no existen). */
+let enUnaDisponible: boolean | null = null;
+
+/** Los pedidos (con su cliente) y las líneas de esas unidades entre esos días, en dos respuestas de la base (migración 0321); null si no están. */
+async function pedidosYLineasEnUna(supabase: SupabaseClient, unidades: string[], desde: string, hasta: string): Promise<{ ordenes: FilaOrden[]; lineas: LineaFinanzas[] } | null> {
+  if (enUnaDisponible === false) return null;
+  const args = { unidades, desde, hasta };
+  const [o, l] = await Promise.all([supabase.rpc("ven_pedidos_periodo", args), supabase.rpc("ven_lineas_periodo", args)]);
+  if (o.error || l.error) {
+    if (/ven_pedidos_periodo|ven_lineas_periodo|function|schema cache/i.test(`${o.error?.message ?? ""} ${l.error?.message ?? ""}`)) enUnaDisponible = false;
+    return null;
+  }
+  enUnaDisponible = true;
+  return { ordenes: (o.data ?? []) as FilaOrden[], lineas: ((l.data ?? []) as FilaLinea[]).map(comoLinea) };
+}
+
+/** Las líneas de esos pedidos, por su número (la llave de la tabla): de a 300 pedidos por consulta, 6 a la vez, en el orden de los pedidos. */
+export async function lineasDeOrdenes(supabase: SupabaseClient, ordenIds: string[]): Promise<LineaFinanzas[]> {
+  const tandas: string[][] = [];
+  for (let i = 0; i < ordenIds.length; i += 300) tandas.push(ordenIds.slice(i, i + 300));
+  const filas: FilaLinea[] = [];
+  for (let i = 0; i < tandas.length; i += 6) {
+    const rs = await Promise.all(
+      tandas.slice(i, i + 6).map((t) => supabase.from("ven_orden_lineas").select("orden_id, linea, producto, cantidad, precio, sku, sku_maestro_id, es_servicio").in("orden_id", t).order("orden_id").order("linea").limit(10000)),
+    );
+    for (const r of rs) filas.push(...((r.data ?? []) as FilaLinea[]));
+  }
+  return filas.map(comoLinea);
 }
 
 /**
@@ -266,7 +299,7 @@ export async function pedidosDeTiendas(
   codigoPais: string,
   eleccion: EleccionPeriodo,
   /** `comparar`: también el periodo anterior del mismo largo (Dashboard); `minDias`: traer al menos esos días hasta hoy (la cola de Confirmación). */
-  opciones: { comparar?: boolean; minDias?: number } = {},
+  opciones: { comparar?: boolean; minDias?: number; liviano?: boolean } = {},
 ): Promise<{ pedidos: PedidoFila[]; lineasFinanzas: LineaFinanzas[]; fuente: FuenteFinanzas; referencia: Date; periodo: Periodo & { hoy: string } }> {
   const fuente = await fuenteFinanzas(supabase, miradas, codigoPais);
   // Una foto (todo sale del Excel y ninguna tienda está conectada): los periodos terminan en su último día. Con una conectada, en hoy.
@@ -289,7 +322,7 @@ export async function pedidosDeTiendas(
       desde,
       hasta,
     ),
-    cargarPedidosFinanzas(supabase, fuente, ids, desde, hasta),
+    cargarPedidosFinanzas(supabase, fuente, ids, desde, hasta, { liviano: opciones.liviano }),
   ]);
   const pedidos = [...deShopify, ...deFinanzas.pedidos].sort((x, y) => y.creado.localeCompare(x.creado));
   return { pedidos, lineasFinanzas: deFinanzas.lineas, fuente, referencia, periodo: { ...periodo, hoy } };
