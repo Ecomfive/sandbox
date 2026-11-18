@@ -42,6 +42,7 @@ import { cargarValoracion } from "@/lib/finanzas/valoracion";
 import { createServiceClient } from "@/lib/supabase/server";
 import { BotonComentarioCifra } from "@/components/finanzas/comentarios/boton-comentario";
 import { cargarHilos } from "@/lib/finanzas/cargar-comentarios";
+import { clavePanel } from "@/lib/finanzas/comentarios-tienda";
 import { cargarTiendasPermitidas } from "@/lib/finanzas/cargar-tiendas-permitidas";
 import { veTodaLaEmpresa } from "@/lib/finanzas/tiendas-permitidas";
 
@@ -255,9 +256,12 @@ export default async function PanelFinancieroPage({
   const cola = colaCierre(pendientes, modulosVisibles);
   // Comentarios del Panel: un hilo por bloque de indicadores, del mes en curso.
   const periodoComentarios = mesEnCurso.slice(0, 7);
-  const comentar = (clave: string, etiqueta: string) => (
-    <BotonComentarioCifra pagina="panel-financiero" periodo={periodoComentarios} clave={clave} etiqueta={etiqueta} cantidad={hilos[clave] ?? 0} />
-  );
+  // Con tiendas limitadas, lo que ve es la suma de sus tiendas: sus hilos llevan su tramo y no son los de toda la empresa
+  // (auditoría de seguridad, 18 nov 2026).
+  const comentar = (bloque: string, etiqueta: string) => {
+    const clave = clavePanel(bloque, permitidas);
+    return <BotonComentarioCifra pagina="panel-financiero" periodo={periodoComentarios} clave={clave} etiqueta={etiqueta} cantidad={hilos[clave] ?? 0} />;
+  };
 
   const nada = !res && !caja && !cartera && costoNomina === null && !activo;
 
@@ -330,7 +334,7 @@ export default async function PanelFinancieroPage({
               titulo="Valor de empresa"
               valor={dineroKpi(res.valorEmpresa, vista.moneda)}
               subtexto={`EBITDA anual ${dinero(res.ebitdaAnual, vista.moneda)} × ${multiplo}`}
-              href={puede("estado-resultados") ? "/panel-financiero/valoracion" : undefined}
+              href={puede("estado-resultados") && todaLaEmpresa ? "/panel-financiero/valoracion" : undefined}
               moneda={vista.moneda}
             />
           </FilaKpiAF4>

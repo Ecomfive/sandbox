@@ -1,6 +1,8 @@
 "use server";
 
 import { sinAccesoARegistros, sinAccesoAUnidades } from "@/lib/finanzas/acceso-tienda";
+import { cargarTiendasPermitidas } from "@/lib/finanzas/cargar-tiendas-permitidas";
+import { puedeVerUnidad } from "@/lib/finanzas/tiendas-permitidas";
 
 // Acciones de «Datos y calidad» del libro: marcar un par como «no es duplicado», un atípico como revisado, anular o
 // restaurar un movimiento y la vista previa de una regla antes de crearla. Todas devuelven `{ error }` como valor.
@@ -174,16 +176,19 @@ export async function vistaPreviaRegla(patronTexto: string, unidadId: string | n
     const tipo = typeof tipoId === "string" && UUID.test(tipoId) ? tipoId : null;
     const supabase = createServiceClient();
     // El calce (palabras completas, sin acentos) se revisa aquí: en la base no se puede comparar sin acentos.
-    const [movs, sin, reglas] = await Promise.all([
+    const [movs, sin, reglas, permitidas] = await Promise.all([
       traerTodasConError<{ descripcion: string; monto: number | string; unidad_id: string; tipo_id: string | null }>((d, h) =>
         supabase.from("fin_movimientos").select("descripcion, monto, unidad_id, tipo_id").order("id").range(d, h),
       ),
       supabase.from("fin_unidades").select("id").eq("nombre", UNIDAD_SIN_ASIGNAR).maybeSingle(),
       supabase.from("fin_reglas").select("id, patron, unidad_id, tipo_id, activo").eq("activo", true),
+      cargarTiendasPermitidas(),
     ]);
     if (movs.error) return { error: "No se pudo leer el libro." };
     const sinAsignar = (sin.data?.id as string | undefined) ?? null;
-    const calza = (movs.data ?? []).filter((m) => ` ${normalizar(m.descripcion)} `.includes(` ${patron} `));
+    // Con tiendas limitadas, solo sus movimientos (ni otras tiendas ni los sin tienda) y solo el texto de sus reglas
+    // (auditoría de seguridad, 18 nov 2026).
+    const calza = (movs.data ?? []).filter((m) => puedeVerUnidad(permitidas, m.unidad_id) && ` ${normalizar(m.descripcion)} `.includes(` ${patron} `));
     const nueva = { id: "nueva", patron, unidad_id: unidad, tipo_id: tipo, activo: true };
     const existentes = (reglas.data ?? []) as typeof nueva[];
     let completaria = 0;
@@ -191,7 +196,7 @@ export async function vistaPreviaRegla(patronTexto: string, unidadId: string | n
     let ganaOtra: string | null = null;
     for (const m of calza) {
       const r = reglaPara(m.descripcion, [...existentes, nueva]);
-      if (r && r.id !== "nueva") ganaOtra ??= r.patron;
+      if (r && r.id !== "nueva" && puedeVerUnidad(permitidas, r.unidad_id)) ganaOtra ??= r.patron;
       if (r?.id === "nueva" && ((m.unidad_id === sinAsignar && unidad) || (!m.tipo_id && tipo))) completaria++;
       if ((tipo && m.tipo_id && m.tipo_id !== tipo) || (unidad && m.unidad_id !== sinAsignar && m.unidad_id !== unidad)) distintos++;
     }

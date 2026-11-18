@@ -9,6 +9,8 @@ import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModuloEscritura, type UsuarioActual } from "@/lib/auth";
 import { precioValido } from "@/lib/effi/precios";
+import { idsPaisesPermitidos } from "@/lib/seguridad/fila-pais";
+import { puedeVerPaisId, SIN_ACCESO_PAIS } from "@/lib/seguridad/pais-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 import type { PlataformaPrecios } from "./marcador-aplicar-precios";
 
@@ -20,6 +22,9 @@ const CONFIG = {
   drop: { modulo: "publicaciones-drop", tabla: "drop_publicaciones", externo: "drop_id", activo: "en_drop", precio: "precio_proveedor", ruta: "/publicaciones-drop", nombre: "Drop" },
   dunamixfy: { modulo: "publicaciones-dunamixfy", tabla: "dunamixfy_publicaciones", externo: "interno", activo: "en_dunamixfy", precio: "precio", ruta: "/publicaciones-dunamixfy", nombre: "Dunamixfy" },
 } as const;
+
+// Drop y Dunamixfy son de Costa Rica: con países limitados, solo se lee o cambia lo de un país de la persona (auditoría de
+// seguridad, 18 nov 2026). Las consultas de varias filas se filtran con `idsPaisesPermitidos` (null = todos).
 
 const esPlataforma = (v: unknown): v is PlataformaPrecios => v === "drop" || v === "dunamixfy";
 const num = (v: unknown) => (v === null || v === undefined ? null : Number(v));
@@ -88,6 +93,7 @@ export async function cambiarPrecioPlataforma(
   if (error) return { error: esFalta(error.message) ? FALTA : "No se pudo leer la publicación." };
   if (!pub) return { error: "Esa publicación ya no existe. Recarga la página." };
   const fila = pub as unknown as Record<string, unknown>;
+  if (!(await puedeVerPaisId(supabase, usuario.paisesPermitidos, fila.pais_id as string))) return { error: SIN_ACCESO_PAIS };
   if (!fila[cfg.activo]) return { error: `Ya no aparece en ${cfg.nombre}: no se puede cambiar su precio.` };
   if (fila.con_variantes) return { error: "Tiene variantes en Drop: cambia su precio allá." };
   const externo = String(fila[cfg.externo] ?? "");
@@ -159,14 +165,12 @@ export async function cambiarPrecioPlataforma(
 export async function descartarCambioPrecio(plataforma: unknown, cambioId: unknown): Promise<{ error?: string }> {
   if (!esPlataforma(plataforma) || typeof cambioId !== "string" || !UUID.test(cambioId)) return { error: "Datos no válidos." };
   const cfg = CONFIG[plataforma];
-  await requireModuloEscritura(cfg.modulo);
-  const { data, error } = await createServiceClient()
-    .from("plataforma_cambios_precio")
-    .update({ estado: "descartado" })
-    .eq("id", cambioId)
-    .eq("plataforma", plataforma)
-    .in("estado", ["pendiente", "error"])
-    .select("id");
+  const usuario = await requireModuloEscritura(cfg.modulo);
+  const supabase = createServiceClient();
+  const visibles = await idsPaisesPermitidos(supabase, usuario.paisesPermitidos);
+  let consulta = supabase.from("plataforma_cambios_precio").update({ estado: "descartado" }).eq("id", cambioId).eq("plataforma", plataforma).in("estado", ["pendiente", "error"]);
+  if (visibles !== null) consulta = consulta.in("pais_id", visibles);
+  const { data, error } = await consulta.select("id");
   if (error) return { error: esFalta(error.message) ? FALTA : "No se pudo quitar el cambio." };
   if (!data?.length) return { error: "Ese cambio ya se aplicó o ya no está." };
   revalidatePath(cfg.ruta);
@@ -190,15 +194,16 @@ export interface CambioParaAplicar {
 export async function cambiosParaAplicar(plataforma: unknown): Promise<{ cambios?: CambioParaAplicar[]; error?: string }> {
   if (!esPlataforma(plataforma)) return { error: "Plataforma no válida." };
   const cfg = CONFIG[plataforma];
-  await requireModuloEscritura(cfg.modulo);
+  const usuario = await requireModuloEscritura(cfg.modulo);
   const supabase = createServiceClient();
-  const { data, error } = await supabase
+  const visibles = await idsPaisesPermitidos(supabase, usuario.paisesPermitidos);
+  let consulta = supabase
     .from("plataforma_cambios_precio")
     .select("id, publicacion_id, externo, precio, precio_sugerido, precio_antes, precio_sugerido_antes, estado, error, creado_por_nombre, creado_en")
     .eq("plataforma", plataforma)
-    .in("estado", ["pendiente", "error"])
-    .order("creado_en")
-    .limit(100);
+    .in("estado", ["pendiente", "error"]);
+  if (visibles !== null) consulta = consulta.in("pais_id", visibles);
+  const { data, error } = await consulta.order("creado_en").limit(100);
   if (error) return { error: esFalta(error.message) ? FALTA : "No se pudieron leer los cambios pendientes." };
   const filas = (data ?? []) as unknown as FilaCola[];
   const ids = [...new Set(filas.map((f) => f.publicacion_id))];
@@ -230,7 +235,7 @@ const texto = (v: unknown, max: number) => (typeof v === "string" && v.trim() ? 
  * Solo actualiza las publicaciones que ya existen (por su id de Drop); no crea ninguna.
  */
 export async function guardarPreciosLeidosDrop(productos: unknown): Promise<{ guardados?: number; error?: string }> {
-  await requireModuloEscritura(CONFIG.drop.modulo);
+  const usuario = await requireModuloEscritura(CONFIG.drop.modulo);
   if (!Array.isArray(productos)) return { error: "Datos no válidos." };
   const limpios = productos
     .slice(0, 2000)
@@ -244,12 +249,14 @@ export async function guardarPreciosLeidosDrop(productos: unknown): Promise<{ gu
     .filter((p): p is { id: string; precio: number | null; precioProveedor: number | null; sugerido: number | null; variantes: boolean } => !!p.id);
   if (!limpios.length) return { guardados: 0 };
   const supabase = createServiceClient();
+  const visibles = await idsPaisesPermitidos(supabase, usuario.paisesPermitidos);
+  if (visibles !== null && !visibles.length) return { error: SIN_ACCESO_PAIS };
   const ahora = new Date().toISOString();
   let guardados = 0;
   for (let i = 0; i < limpios.length; i += 10) {
     const lote = await Promise.all(
-      limpios.slice(i, i + 10).map((p) =>
-        supabase
+      limpios.slice(i, i + 10).map((p) => {
+        const consulta = supabase
           .from("drop_publicaciones")
           .update({
             ...(p.precio !== null ? { precio: p.precio } : {}),
@@ -258,9 +265,9 @@ export async function guardarPreciosLeidosDrop(productos: unknown): Promise<{ gu
             con_variantes: p.variantes,
             precios_leidos_en: ahora,
           })
-          .eq("drop_id", p.id)
-          .select("id"),
-      ),
+          .eq("drop_id", p.id);
+        return (visibles !== null ? consulta.in("pais_id", visibles) : consulta).select("id");
+      }),
     );
     for (const r of lote) {
       if (r.error) return { error: esFalta(r.error.message) ? FALTA : "No se pudieron guardar los precios leídos de Drop." };
@@ -290,7 +297,8 @@ export async function guardarResultadosPrecios(plataforma: unknown, resultados: 
     .filter((r) => r.id !== null);
   if (!limpios.length) return {};
   const supabase = createServiceClient();
-  const { data, error } = await supabase
+  const visibles = await idsPaisesPermitidos(supabase, usuario.paisesPermitidos);
+  let consulta = supabase
     .from("plataforma_cambios_precio")
     .select("id, publicacion_id, precio, precio_sugerido, precio_antes, precio_sugerido_antes, intentos")
     .eq("plataforma", plataforma)
@@ -299,6 +307,9 @@ export async function guardarResultadosPrecios(plataforma: unknown, resultados: 
       limpios.map((r) => r.id!),
     )
     .in("estado", ["pendiente", "error"]);
+  // Un cambio de otro país no se lee, así que se salta como uno que ya no está.
+  if (visibles !== null) consulta = consulta.in("pais_id", visibles);
+  const { data, error } = await consulta;
   if (error) return { error: esFalta(error.message) ? FALTA : "No se pudieron guardar los resultados." };
   const porId = new Map((data ?? []).map((f) => [f.id as string, f]));
   const ahora = new Date().toISOString();

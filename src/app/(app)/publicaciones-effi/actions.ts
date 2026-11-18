@@ -6,23 +6,27 @@ import { requireModuloEscritura } from "@/lib/auth";
 import { consultarEffi, modificarEffi } from "@/lib/effi/api";
 import { montoEffi, tarifasEffi } from "@/lib/effi/articulos";
 import { armarPreciosEffi, precioValido, type CambioPreciosEffi } from "@/lib/effi/precios";
-import { sincronizarEffi, type ResumenLecturaEffi } from "@/lib/effi/sincronizar";
+import { PAIS_DE_EFFI, sincronizarEffi, type ResumenLecturaEffi } from "@/lib/effi/sincronizar";
+import { puedeVerPais } from "@/lib/paises-permitidos";
+import { puedeVerPaisId, SIN_ACCESO_PAIS } from "@/lib/seguridad/pais-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const FALTA = "Falta correr la migración 0230 (Gestión de IDs Effi) en la base.";
+// Cada acción que recibe el id de un artículo comprueba que su país sea de la persona (auditoría de seguridad, 18 nov 2026).
 
 /** Vincula un artículo de Effi con su producto, lo cambia o le quita el vínculo (`skuId` null). Siempre lo decide una persona, como en Dropi y Drop. */
 export async function vincularPublicacionEffi(
   id: string,
   skuId: string | null,
 ): Promise<{ ok: true; producto: { id: string; codigo: string; nombre: string } | null } | { error: string }> {
-  await requireModuloEscritura("publicaciones-effi");
+  const usuario = await requireModuloEscritura("publicaciones-effi");
   if (typeof id !== "string" || !UUID.test(id) || (skuId !== null && (typeof skuId !== "string" || !UUID.test(skuId)))) return { error: "Datos no válidos." };
   const supabase = createServiceClient();
-  const { data: antes, error: errorAntes } = await supabase.from("effi_publicaciones").select("nombre, effi_id, sku_maestro_id").eq("id", id).maybeSingle();
+  const { data: antes, error: errorAntes } = await supabase.from("effi_publicaciones").select("nombre, effi_id, sku_maestro_id, pais_id").eq("id", id).maybeSingle();
   if (errorAntes) return { error: /effi_publicaciones|schema cache|does not exist/i.test(errorAntes.message) ? FALTA : "No se pudo leer el artículo." };
   if (!antes) return { error: "Ese artículo ya no existe. Recarga la página." };
+  if (!(await puedeVerPaisId(supabase, usuario.paisesPermitidos, antes.pais_id as string))) return { error: SIN_ACCESO_PAIS };
   let sku: { id: string; codigo: string; nombre: string } | null = null;
   if (skuId) {
     const { data } = await supabase.from("skus_maestros").select("id, codigo, nombre").eq("id", skuId).maybeSingle();
@@ -45,7 +49,9 @@ export async function vincularPublicacionEffi(
 
 /** «Actualizar desde Effi»: la misma lectura del cron. Solo consulta Effi y guarda aquí. */
 export async function actualizarDesdeEffi(): Promise<{ resumen?: ResumenLecturaEffi; error?: string }> {
-  await requireModuloEscritura("publicaciones-effi");
+  const usuario = await requireModuloEscritura("publicaciones-effi");
+  // Effi es de Costa Rica: solo quien tiene ese país.
+  if (!puedeVerPais(usuario.paisesPermitidos, PAIS_DE_EFFI)) return { error: SIN_ACCESO_PAIS };
   try {
     const resumen = await sincronizarEffi(createServiceClient());
     revalidatePath("/publicaciones-effi");
@@ -67,12 +73,14 @@ export async function cambiarPreciosEffi(
   id: string,
   nuevos: { precio?: unknown; precioSugerido?: unknown; precioMinimo?: unknown },
 ): Promise<{ ok: true; precio: number | null; precioSugerido: number | null; precioMinimo: number | null } | { error: string }> {
-  await requireModuloEscritura("publicaciones-effi");
+  const usuario = await requireModuloEscritura("publicaciones-effi");
   if (typeof id !== "string" || !UUID.test(id) || !nuevos || typeof nuevos !== "object") return { error: "Datos no válidos." };
   const supabase = createServiceClient();
-  const { data: pub, error: errorPub } = await supabase.from("effi_publicaciones").select("nombre, effi_id, precio_dropshipping, precio_sugerido, precio_minimo, en_effi").eq("id", id).maybeSingle();
+  const { data: pub, error: errorPub } = await supabase.from("effi_publicaciones").select("nombre, effi_id, precio_dropshipping, precio_sugerido, precio_minimo, en_effi, pais_id").eq("id", id).maybeSingle();
   if (errorPub) return { error: /effi_publicaciones|schema cache|does not exist/i.test(errorPub.message) ? FALTA : "No se pudo leer el artículo." };
   if (!pub) return { error: "Ese artículo ya no existe. Recarga la página." };
+  // Antes de mandar nada a Effi.
+  if (!(await puedeVerPaisId(supabase, usuario.paisesPermitidos, pub.pais_id as string))) return { error: SIN_ACCESO_PAIS };
   if (!pub.en_effi) return { error: "Este artículo ya no aparece en Effi: no se puede cambiar su precio." };
   const effiId = Number(pub.effi_id);
   if (!Number.isInteger(effiId) || effiId <= 0) return { error: "El artículo no tiene un ID de Effi válido." };

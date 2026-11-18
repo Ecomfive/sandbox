@@ -1,6 +1,7 @@
 "use server";
 
 import { requireModulo } from "@/lib/auth";
+import { puedeVerPais } from "@/lib/paises-permitidos";
 import { createServiceClient } from "@/lib/supabase/server";
 
 const ES_ID = (v: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
@@ -26,10 +27,10 @@ export interface VentasDropiDropshipper {
 /**
  * Las ventas en Dropi del dropshipper (Desempeño › Ventas Proveeduría, migraciones 0120 y 0122), por sus cuentas de Dropi vinculadas:
  * unidades pedidas y netas, lo no efectivo (cancelado, rechazado o devuelto), por mes y por producto. Es una lectura: basta
- * poder abrir el CRM. Devuelve el error como valor.
+ * poder abrir el CRM, pero solo de los países de la persona. Devuelve el error como valor.
  */
 export async function obtenerVentasDropi(dropshipperId: string): Promise<VentasDropiDropshipper | { error: string }> {
-  await requireModulo("crm-dropshippers");
+  const usuario = await requireModulo("crm-dropshippers");
   if (!ES_ID(dropshipperId)) return { error: "Dropshipper no válido." };
   const supabase = createServiceClient();
   const { data: dropi } = await supabase.from("plataformas").select("id").eq("nombre", "Dropi").maybeSingle();
@@ -47,6 +48,9 @@ export async function obtenerVentasDropi(dropshipperId: string): Promise<VentasD
   const { data: paises } = await supabase.from("paises").select("id, codigo").in("id", [...porPais.keys()]);
   const codigo = new Map((paises ?? []).map((p) => [p.id as string, p.codigo as string]));
   for (const [paisId, usuarios] of porPais) {
+    // Con países limitados, solo las ventas de un país de la persona, como en la ficha de Producto (auditoría de seguridad, 18 nov 2026).
+    const codigoPais = codigo.get(paisId);
+    if (usuario.paisesPermitidos !== null && (!codigoPais || !puedeVerPais(usuario.paisesPermitidos, codigoPais))) continue;
     const [carga, totales, meses] = await Promise.all([
       supabase.from("dropi_ventas_cargas").select("corte").eq("pais_id", paisId).order("corte", { ascending: false }).limit(1).maybeSingle(),
       supabase.from("dropi_ventas_dropshippers").select("pedidas, ordenes, no_efectivas, netas_30d, ultima_orden").eq("pais_id", paisId).in("dropi_usuario_id", usuarios),

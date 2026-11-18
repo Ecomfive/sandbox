@@ -3,7 +3,10 @@
 // El teléfono del cliente nunca sale de aquí: solo su validez y si hay historial.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { puedeVerUnidad, SIN_TIENDA } from "@/lib/finanzas/tiendas-permitidas";
+import { traerTodasConError } from "@/lib/supabase/paginar";
 import type { OrdenPipeline } from "./cargar-pipeline";
+import { aprobacionDeSusTiendas, remesasDeSusTiendas } from "./operacion-tiendas";
 import {
   antiguedadSaldos, detectarDuplicadas, estancadas, falloPorZona, leerUmbrales, normalizarTelefono, puntajeRiesgo, riesgoCliente, sugerirEnvio,
   type Cobertura, type CargaMensajero, type Edad, type HistorialCliente, type PaisOp, type PuntajeRiesgo, type ResultadoContacto, type Riesgo, type Sugerencia, type Umbrales,
@@ -70,6 +73,45 @@ const trozos = <T,>(xs: T[], n: number) => Array.from({ length: Math.ceil(xs.len
 const vacioHist = (): HistorialCliente => ({ entregadas: 0, devueltas: 0, canceladas: 0, fallidas: 0 });
 const fila = (clave: string): FilaKpi => ({ clave, creadas: 0, confirmadas: 0, despachadas: 0, entregadas: 0, devueltas: 0, canceladas: 0, fallidas: 0, cicloHoras: null, ventas: 0, margen: 0 });
 
+type Consulta<T> = { data: T[] | null; error: unknown };
+type FilaAprobacion = { id: string; accion: string; referencia: string; detalle: string | null; monto: number | string | null; solicitada_por: string; creado_en: string };
+type FilaRemesa = { id: string; fecha: string; total: number | string; usuario: string | null; referencia: string | null; anulada_en: string | null; anulada_motivo: string | null };
+
+/**
+ * Con tiendas limitadas, las aprobaciones pendientes y las remesas que son de sus tiendas (auditoría de seguridad, 18 nov 2026): una
+ * remesa, solo si todas sus órdenes son de sus tiendas. Si no se puede leer de qué tienda son, no se muestran. Sin límite, todo igual.
+ */
+async function aprobacionesYRemesasDeSusTiendas(
+  supabase: SupabaseClient,
+  permitidas: string[] | null,
+  apro: Consulta<unknown>,
+  rem: Consulta<unknown>,
+): Promise<{ apro: Consulta<FilaAprobacion>; rem: Consulta<FilaRemesa> }> {
+  const aprobaciones = (apro.data ?? []) as FilaAprobacion[];
+  const remesas = (rem.data ?? []) as FilaRemesa[];
+  if (permitidas === null) return { apro: { data: aprobaciones, error: apro.error }, rem: { data: remesas, error: rem.error } };
+  const remesaIds = [...new Set([...remesas.map((r) => r.id), ...aprobaciones.filter((a) => a.accion === "anular_remesa").map((a) => a.referencia)])];
+  const ordenIds = [...new Set(aprobaciones.filter((a) => a.accion === "cancelar_orden").map((a) => a.referencia))];
+  const unidadDeOrden = new Map<string, string | null>();
+  let remesasSuyas = new Set<string>();
+  for (const parte of trozos(remesaIds, 100)) {
+    const { data, error } = await traerTodasConError<{ remesa_id: string; ven_ordenes: { unidad_id: string | null } | null }>((d, h) =>
+      supabase.from("ven_cod_remesa_ordenes").select("remesa_id, ven_ordenes(unidad_id)").in("remesa_id", parte).order("remesa_id").order("orden_id").range(d, h) as unknown as PromiseLike<Consulta<{ remesa_id: string; ven_ordenes: { unidad_id: string | null } | null }>>,
+    );
+    if (error) continue;
+    const suyas = remesasDeSusTiendas(permitidas, (data ?? []).map((x) => ({ remesaId: x.remesa_id, unidadId: x.ven_ordenes?.unidad_id ?? null })));
+    remesasSuyas = new Set([...remesasSuyas, ...suyas]);
+  }
+  for (const parte of trozos(ordenIds, 200)) {
+    const { data } = await supabase.from("ven_ordenes").select("id, unidad_id").in("id", parte);
+    for (const o of (data ?? []) as { id: string; unidad_id: string | null }[]) unidadDeOrden.set(o.id, o.unidad_id);
+  }
+  return {
+    apro: { data: aprobaciones.filter((a) => aprobacionDeSusTiendas(permitidas, a, unidadDeOrden, remesasSuyas)), error: apro.error },
+    rem: { data: remesas.filter((r) => remesasSuyas.has(r.id)), error: rem.error },
+  };
+}
+
 export async function cargarOperacion(
   supabase: SupabaseClient,
   ordenes: OrdenPipeline[],
@@ -77,23 +119,35 @@ export async function cargarOperacion(
   mensajeros: { id: string; nombre: string }[],
   unidades: { id: string; nombre: string; pais?: string }[],
   hoy: string,
+  /** Las tiendas que ve la persona (`null` = todas): con límite, incidencias, aprobaciones y remesas solo de las suyas. */
+  permitidas: string[] | null = null,
 ): Promise<DatosOperacion | { error: string }> {
   const ids = ordenes.map((o) => o.id);
   const unidadIds = unidades.map((u) => u.id);
   const nombreMensajero = new Map(mensajeros.map((m) => [m.id, m.nombre]));
   const paisDe = new Map(ordenes.map((o) => [o.id, (o.pais as PaisOp) || "PA"]));
 
-  const [cfgU, cob, cfgM, cierres, apro, inc, rem] = await Promise.all([
+  const [cfgU, cob, cfgM, cierres, aproTodas, inc, remTodas] = await Promise.all([
     supabase.from("ven_config").select("valor").eq("clave", "umbrales").maybeSingle(),
     supabase.from("ven_cobertura").select("id, pais, zona, repartidor_id, transportista, tarifa, prioridad").order("pais").order("zona"),
     supabase.from("ven_mensajero_config").select("repartidor_id, capacidad_diaria, limite_efectivo, comision_entrega"),
     supabase.from("ven_cierres").select("periodo"),
     supabase.from("ven_aprobaciones").select("id, accion, referencia, detalle, monto, solicitada_por, creado_en").eq("estado", "pendiente").order("creado_en"),
-    supabase.from("ven_incidencias").select("id, orden_id, tipo, descripcion, costo, creado_en, ven_ordenes(numero, unidad_id)").eq("estado", "abierta").order("creado_en", { ascending: false }).limit(200),
+    // Con tiendas limitadas, solo las incidencias de órdenes de sus tiendas (auditoría de seguridad, 18 nov 2026).
+    permitidas === null
+      ? supabase.from("ven_incidencias").select("id, orden_id, tipo, descripcion, costo, creado_en, ven_ordenes(numero, unidad_id)").eq("estado", "abierta").order("creado_en", { ascending: false }).limit(200)
+      : supabase
+          .from("ven_incidencias")
+          .select("id, orden_id, tipo, descripcion, costo, creado_en, ven_ordenes!inner(numero, unidad_id)")
+          .in("ven_ordenes.unidad_id", permitidas.length ? permitidas : [SIN_TIENDA])
+          .eq("estado", "abierta")
+          .order("creado_en", { ascending: false })
+          .limit(200),
     supabase.from("ven_cod_remesas").select("id, fecha, total, usuario, referencia, anulada_en, anulada_motivo").order("creado_en", { ascending: false }).limit(60),
   ]);
   if (cfgU.error && /ven_config/.test(cfgU.error.message)) return { error: "Falta correr la migración 0957 en Supabase." };
   const umbrales = leerUmbrales(cfgU.data?.valor);
+  const { apro, rem } = await aprobacionesYRemesasDeSusTiendas(supabase, permitidas, aproTodas, remTodas);
 
   // Teléfonos de las órdenes abiertas: se normalizan aquí y solo viaja la validez.
   const cli = new Map<string, { telefono: string | null; corregimiento: string | null; clave: string | null }>();
@@ -347,7 +401,9 @@ export async function cargarOperacion(
     config,
     carga,
     edades,
-    incidencias: ((inc.data ?? []) as unknown as { id: string; orden_id: string; tipo: string; descripcion: string | null; costo: number | string; creado_en: string; ven_ordenes: { numero: string } | null }[]).map((i) => ({ id: i.id, ordenId: i.orden_id, numero: i.ven_ordenes?.numero ?? numeroDe.get(i.orden_id) ?? "—", tipo: i.tipo, descripcion: i.descripcion, costo: num(i.costo), creada: i.creado_en })),
+    incidencias: ((inc.data ?? []) as unknown as { id: string; orden_id: string; tipo: string; descripcion: string | null; costo: number | string; creado_en: string; ven_ordenes: { numero: string; unidad_id: string | null } | null }[])
+      .filter((i) => permitidas === null || puedeVerUnidad(permitidas, i.ven_ordenes?.unidad_id))
+      .map((i) => ({ id: i.id, ordenId: i.orden_id, numero: i.ven_ordenes?.numero ?? numeroDe.get(i.orden_id) ?? "—", tipo: i.tipo, descripcion: i.descripcion, costo: num(i.costo), creada: i.creado_en })),
     aprobaciones: ((apro.data ?? []) as { id: string; accion: string; referencia: string; detalle: string | null; monto: number | string | null; solicitada_por: string; creado_en: string }[]).map((a) => ({ id: a.id, accion: a.accion, detalle: a.detalle, monto: a.monto === null ? null : num(a.monto), por: a.solicitada_por, numero: numeroDe.get(a.referencia) ?? null, en: a.creado_en })),
     remesas: ((rem.data ?? []) as { id: string; fecha: string; total: number | string; usuario: string | null; referencia: string | null; anulada_en: string | null; anulada_motivo: string | null }[]).map((r) => ({ id: r.id, fecha: r.fecha, total: num(r.total), quien: r.usuario ?? "—", referencia: r.referencia, anulada: !!r.anulada_en, motivo: r.anulada_motivo })),
     devueltasPorRecibir,

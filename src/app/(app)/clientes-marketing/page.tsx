@@ -1,5 +1,6 @@
 import { EncabezadoAF4 } from "@/components/af4/encabezado-af4";
 import { EstadoVacioAF4 } from "@/components/af4/estado-af4";
+import { limitadoATiendas, SoloTodaLaEmpresa } from "@/components/finanzas/solo-toda-la-empresa";
 import { FilaKpiAF4, KpiAF4 } from "@/components/af4/kpi-af4";
 import { KpiCard, KpiGrid, KpiGroup } from "@/components/ui/kpi-card";
 import { Pagina } from "@/components/ui/pagina";
@@ -27,6 +28,9 @@ export default async function ClientesMarketingPage({
   searchParams: Promise<{ [k: string]: string | string[] | undefined }>;
 }) {
   const usuario = await requireModulo(MODULO);
+  // «Todas», las cohortes y la calidad son de toda la empresa: con tiendas limitadas no se muestran (auditoría de seguridad,
+  // 18 nov 2026).
+  if (await limitadoATiendas()) return <SoloTodaLaEmpresa titulo={TITULO} />;
   const puedeEscribir = !usuario.modulosSoloLectura.includes(MODULO);
   const datos = await cargarDatosPagina(createServiceClient(), await searchParams);
 

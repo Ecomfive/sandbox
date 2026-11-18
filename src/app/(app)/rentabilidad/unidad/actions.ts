@@ -1,6 +1,6 @@
 "use server";
 
-import { sinAccesoARegistros, sinAccesoAUnidades } from "@/lib/finanzas/acceso-tienda";
+import { sinAccesoARegistros, sinAccesoTodaLaEmpresa } from "@/lib/finanzas/acceso-tienda";
 
 import { createHash, randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
@@ -28,6 +28,10 @@ async function tiendasActivas(): Promise<string[]> {
 export async function guardarSupuestosUE(entrada: unknown): Promise<{ error?: string }> {
   try {
     const usuario = await requireModuloEscritura(MODULO);
+    // Los supuestos son una sola fila de toda la empresa (con los fijos de cada tienda): con tiendas limitadas no se guardan
+    // (auditoría de seguridad, 18 nov 2026).
+    const acceso = await sinAccesoTodaLaEmpresa();
+    if (acceso) return { error: acceso };
     const v = validarSupuestosUE(entrada, await tiendasActivas());
     if ("error" in v) return v;
     const supabase = createServiceClient();
@@ -71,6 +75,10 @@ export interface ResultadoImportacionMeta {
 export async function importarMetaCsv(formulario: FormData): Promise<{ error: string } | ResultadoImportacionMeta> {
   try {
     const usuario = await requireModuloEscritura(MODULO);
+    // El CSV es de toda la cuenta de Meta: pisa filas de cualquier tienda y aplica las reglas a todas. Con tiendas limitadas
+    // no se importa (auditoría de seguridad, 18 nov 2026).
+    const accesoEmpresa = await sinAccesoTodaLaEmpresa();
+    if (accesoEmpresa) return { error: accesoEmpresa };
     const archivo = formulario.get("archivo");
     if (!(archivo instanceof File)) return { error: "Elige el CSV exportado de Meta Ads Manager." };
     if (archivo.size <= 0 || archivo.size > MAX_BYTES_META) return { error: `El archivo debe pesar menos de ${TEXTO_MAX_META}.` };
@@ -133,7 +141,9 @@ export async function crearReglaMeta(entrada: { patron?: unknown; unidadId?: unk
     if (patron.length < 2 || patron.length > 120) return { error: "El texto a buscar va de 2 a 120 caracteres." };
     const unidadId = typeof entrada.unidadId === "string" && UUID.test(entrada.unidadId) ? entrada.unidadId : null;
     if (!unidadId || !(await tiendasActivas()).includes(unidadId)) return { error: "Elige la tienda." };
-    const acceso = await sinAccesoAUnidades([unidadId]);
+    // Al crearla se vuelven a aplicar todas las reglas a todas las campañas: con prioridad alta, una regla de su tienda se
+    // llevaría campañas de otras. Con tiendas limitadas no se crea (auditoría de seguridad, 18 nov 2026).
+    const acceso = await sinAccesoTodaLaEmpresa();
     if (acceso) return { error: acceso };
     const producto = typeof entrada.productoClave === "string" ? entrada.productoClave.trim().slice(0, 200) : "";
     const prioridad = Number(entrada.prioridad ?? 100);

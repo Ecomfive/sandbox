@@ -45,6 +45,7 @@ import { cargarValoracion } from "@/lib/finanzas/valoracion";
 import { cargarTiendasPermitidas } from "@/lib/finanzas/cargar-tiendas-permitidas";
 import { filtrarUnidades, veTodaLaEmpresa } from "@/lib/finanzas/tiendas-permitidas";
 import { cargarHilos } from "@/lib/finanzas/cargar-comentarios";
+import { filtrarHilos, tramoTiendaEerr } from "@/lib/finanzas/comentarios-tienda";
 import { createServiceClient } from "@/lib/supabase/server";
 import { cargarPrecioTransferencia } from "@/lib/finanzas/cargar-precio-transferencia";
 import { UNIDAD_ELIMINACIONES, ajustesTP, totalesTP } from "@/lib/finanzas/precio-transferencia";
@@ -147,8 +148,10 @@ export default async function EstadoResultadosPage({
   const unidadElegida = elegibles.find((u) => u.id === verTexto) ?? null;
 
   const idsElegibles = new Set(elegibles.map((u) => u.id));
-  const hilos = await cargarHilos(supabase, "estado-resultados", "");
-  const ambitoComentarios = [vista.entidad?.codigo ?? "todo", vista.local ? vista.moneda : "usd", unidadElegida?.id ?? "todas"].join("-");
+  // Con tiendas limitadas, su «Todas» (la suma de sus tiendas) tiene hilos propios y solo se mandan los que puede ver
+  // (auditoría de seguridad, 18 nov 2026).
+  const hilos = filtrarHilos(await cargarHilos(supabase, "estado-resultados", ""), "estado-resultados", permitidas);
+  const ambitoComentarios = [vista.entidad?.codigo ?? "todo", vista.local ? vista.moneda : "usd", tramoTiendaEerr(unidadElegida?.id ?? null, permitidas)].join("-");
   // Partes del EERR (migración 0929): repartir A DISTRIBUIR con otra base y el consolidado sin intercompañía.
   const hayPartes = !("error" in partesR);
   const basePredeterminada = hayPartes ? partesR.basePredeterminada : "envios";

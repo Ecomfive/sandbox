@@ -1,3 +1,4 @@
+import { limitadoATiendas, SoloTodaLaEmpresa } from "@/components/finanzas/solo-toda-la-empresa";
 import { EncabezadoAF4 } from "@/components/af4/encabezado-af4";
 import { EstadoVacioAF4 } from "@/components/af4/estado-af4";
 import { Pagina } from "@/components/ui/pagina";
@@ -16,6 +17,8 @@ const MODULO = "deliverys";
 
 export default async function RepartidoresPage() {
   const usuario = await requireModulo(MODULO);
+  // Los cierres y los repartidores juntan todas las tiendas: con tiendas limitadas no se ven (auditoría de seguridad, 18 nov 2026).
+  if (await limitadoATiendas()) return <SoloTodaLaEmpresa titulo="Repartidores" />;
   const puedeEscribir = !usuario.modulosSoloLectura.includes(MODULO);
   const { data, error } = await createServiceClient().from("del_repartidores").select("id, nombre, documento, telefono, alias, medio_pago, activo").order("nombre");
   // Documento y teléfono salen del servidor ya enmascarados: el completo solo lo pide la ficha.

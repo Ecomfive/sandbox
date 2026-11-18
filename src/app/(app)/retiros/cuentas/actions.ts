@@ -5,6 +5,10 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModuloEscritura } from "@/lib/auth";
 import { leerDatosBinance, type DatosBinance } from "@/lib/retiros/datos-binance";
+import { filaDePaisPermitida } from "@/lib/seguridad/fila-pais";
+import { puedeVerPaisId, SIN_ACCESO_PAIS } from "@/lib/seguridad/pais-acceso";
+
+// Con países limitados, solo se crea o cambia una cuenta de un país de la persona (auditoría de seguridad, 18 nov 2026).
 
 /** Arma el bloque de comisión sugerida a partir del formulario: según el tipo elegido, se
  * queda solo con el/los valor(es) que aplican y anula el resto, para que nunca quede un
@@ -38,7 +42,7 @@ const AVISO_MIGRACION =
 
 /** Devuelve el error como valor, no lo lanza: en producción Next.js oculta el mensaje de una excepción de una acción. */
 export async function crearCuentaRetiro(formData: FormData): Promise<{ error?: string }> {
-  await requireModuloEscritura("retiros");
+  const usuario = await requireModuloEscritura("retiros");
   const pais_id = formData.get("pais_id") as string;
   const tipo = formData.get("tipo") as string;
   const nombre = formData.get("nombre") as string;
@@ -49,6 +53,7 @@ export async function crearCuentaRetiro(formData: FormData): Promise<{ error?: s
   if (binance) detalle = binance.datos.numero_cuenta;
 
   const supabase = createServiceClient();
+  if (!(await puedeVerPaisId(supabase, usuario.paisesPermitidos, pais_id))) return { error: SIN_ACCESO_PAIS };
 
   // Numeración simple por país (Cuenta 1, Cuenta 2...) — estas cuentas se crean muy de vez
   // en cuando, así que no hace falta una función de correlativo a prueba de carreras.
@@ -81,7 +86,7 @@ export async function crearCuentaRetiro(formData: FormData): Promise<{ error?: s
  * comisión sugerida — todo junto, desde la ficha de "Modificar". Cambiar esto no toca los
  * retiros ya creados: cada uno guarda su propia comisión en su propia fila. */
 export async function actualizarCuentaRetiro(formData: FormData): Promise<{ error?: string }> {
-  await requireModuloEscritura("retiros");
+  const usuario = await requireModuloEscritura("retiros");
   const id = formData.get("id") as string;
 
   const cambios: Record<string, string | number | DatosBinance | null> = {};
@@ -103,6 +108,7 @@ export async function actualizarCuentaRetiro(formData: FormData): Promise<{ erro
   if (Object.keys(cambios).length === 0) return {};
 
   const supabase = createServiceClient();
+  if (!(await filaDePaisPermitida(supabase, usuario.paisesPermitidos, "cuentas_retiro", id))) return { error: SIN_ACCESO_PAIS };
   const { error } = await supabase.from("cuentas_retiro").update(cambios).eq("id", id);
   if (error) return { error: error.message.includes("datos_binance") ? AVISO_MIGRACION : error.message };
 
@@ -118,10 +124,11 @@ export async function actualizarCuentaRetiro(formData: FormData): Promise<{ erro
  * confirmación) para quien piensa en "eliminar" en vez de "desactivar", pero el resultado es el
  * mismo: la cuenta cae en el balde de «Eliminadas» de la barra de herramientas. */
 export async function eliminarCuentaRetiro(formData: FormData): Promise<{ error?: string }> {
-  await requireModuloEscritura("retiros");
+  const usuario = await requireModuloEscritura("retiros");
   const id = formData.get("id") as string;
 
   const supabase = createServiceClient();
+  if (!(await filaDePaisPermitida(supabase, usuario.paisesPermitidos, "cuentas_retiro", id))) return { error: SIN_ACCESO_PAIS };
   const { error } = await supabase.from("cuentas_retiro").update({ activa: false }).eq("id", id);
   if (error) return { error: error.message };
 
@@ -139,11 +146,12 @@ export async function eliminarCuentaRetiro(formData: FormData): Promise<{ error?
 }
 
 export async function alternarActivaCuenta(formData: FormData) {
-  await requireModuloEscritura("retiros");
+  const usuario = await requireModuloEscritura("retiros");
   const id = formData.get("id") as string;
   const activa = formData.get("activa") === "true";
 
   const supabase = createServiceClient();
+  if (!(await filaDePaisPermitida(supabase, usuario.paisesPermitidos, "cuentas_retiro", id))) throw new Error(SIN_ACCESO_PAIS);
   const { error } = await supabase.from("cuentas_retiro").update({ activa }).eq("id", id);
   if (error) throw new Error(error.message);
 

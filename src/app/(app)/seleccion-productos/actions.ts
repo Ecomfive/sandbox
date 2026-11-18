@@ -7,6 +7,8 @@ import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { motivoYaVisto, yaVisto } from "@/lib/scraping/cruces";
 import { cargarReferencias } from "@/lib/scraping/referencias";
 import { getPaisActual } from "@/lib/pais";
+import { filasDePaisesVisibles, filaDePaisPermitida, idsPaisesPermitidos } from "@/lib/seguridad/fila-pais";
+import { SIN_ACCESO_PAIS } from "@/lib/seguridad/pais-acceso";
 import { rutaPropia } from "@/lib/seguridad/ruta-almacen";
 import { createServiceClient } from "@/lib/supabase/server";
 import { ESTADOS_SELECCION, etiquetaEstadoSeleccion } from "./def-seleccion";
@@ -160,13 +162,15 @@ export async function crearSeleccion(formData: FormData): Promise<{ error?: stri
 
 /** Guarda la ficha de una fila (todo menos el estado, la fuente y su código). */
 export async function actualizarSeleccion(formData: FormData): Promise<{ error?: string }> {
-  await requireModuloEscritura(MODULO);
+  const usuario = await requireModuloEscritura(MODULO);
   const id = String(formData.get("id") ?? "");
   if (!UUID.test(id)) return { error: "Fila no válida." };
   const leido = await leerDatos(formData);
   if ("error" in leido) return { error: leido.error };
 
   const supabase = createServiceClient();
+  // Solo filas de un país de la persona (auditoría de seguridad, 18 nov 2026).
+  if (!(await filaDePaisPermitida(supabase, usuario.paisesPermitidos, ENTIDAD, id))) return { error: SIN_ACCESO_PAIS };
   const { data: antes } = await supabase.from(ENTIDAD).select("nombre, foto_url, categoria, costo_proveedor, precio_venta").eq("id", id).maybeSingle();
   if (!antes) return { error: "La fila ya no existe." };
   const { error } = await supabase.from(ENTIDAD).update({ ...leido.datos, actualizado_en: new Date().toISOString() }).eq("id", id);
@@ -189,13 +193,16 @@ export async function actualizarSeleccion(formData: FormData): Promise<{ error?:
  * línea de actividad por fila que cambió. Hasta 300 filas por vez.
  */
 export async function cambiarEstadoSeleccion(ids: string[], estado: string): Promise<{ error?: string; cambiadas?: number }> {
-  await requireModuloEscritura(MODULO);
+  const usuario = await requireModuloEscritura(MODULO);
   if (!ESTADOS.has(estado)) return { error: "Estado no válido." };
   if (!Array.isArray(ids) || ids.length === 0 || ids.length > 300 || !ids.every((i) => typeof i === "string" && UUID.test(i))) return { error: "Selección no válida." };
 
   const supabase = createServiceClient();
-  const { data: actuales, error: errorLeer } = await supabase.from(ENTIDAD).select("id, estado").in("id", ids);
+  const { data: actuales, error: errorLeer } = await supabase.from(ENTIDAD).select("id, estado, pais_id").in("id", ids);
   if (errorLeer) return { error: "No se pudo leer la selección." };
+  // Con países limitados, una fila de otro país rechaza todo el lote (auditoría de seguridad, 18 nov 2026).
+  const visibles = await idsPaisesPermitidos(supabase, usuario.paisesPermitidos);
+  if (filasDePaisesVisibles(actuales ?? [], visibles).length !== (actuales ?? []).length) return { error: SIN_ACCESO_PAIS };
   const cambian = (actuales ?? []).filter((f) => f.estado !== estado);
   if (cambian.length === 0) return { cambiadas: 0 };
 
@@ -223,9 +230,11 @@ export async function cambiarEstadoSeleccion(ids: string[], estado: string): Pro
 
 /** La actividad de una fila (de la auditoría), de la más nueva a la más vieja. Basta poder abrir el módulo. */
 export async function obtenerHistorialSeleccion(id: string): Promise<{ eventos: { id: string; evento: string; creadoEn: string }[] } | { error: string }> {
-  await requireModulo(MODULO);
+  const usuario = await requireModulo(MODULO);
   if (typeof id !== "string" || !UUID.test(id)) return { error: "Fila no válida." };
-  const { data, error } = await createServiceClient()
+  const supabase = createServiceClient();
+  if (!(await filaDePaisPermitida(supabase, usuario.paisesPermitidos, ENTIDAD, id))) return { error: SIN_ACCESO_PAIS };
+  const { data, error } = await supabase
     .from("historial_auditoria")
     .select("id, accion, usuario_nombre, detalle, antes, despues, creado_en")
     .eq("entidad", ENTIDAD)

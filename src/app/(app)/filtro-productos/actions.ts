@@ -1,6 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { filaDePaisPermitida } from "@/lib/seguridad/fila-pais";
+import { puedeVerPaisId, SIN_ACCESO_PAIS } from "@/lib/seguridad/pais-acceso";
 import { rutaPropia } from "@/lib/seguridad/ruta-almacen";
 import { createServiceClient } from "@/lib/supabase/server";
 import { registrarAuditoria } from "@/lib/auditoria";
@@ -8,6 +10,7 @@ import { requireModuloEscritura } from "@/lib/auth";
 import { ESTADOS, ESTADOS_REGISTRO, PRIORIDADES, TIENDAS, TIPOS_ENVIO } from "./def-filtros";
 
 const MODULO = "filtro-productos";
+const TABLA = "wms_filtro_productos";
 
 const REGISTROS_VALIDOS: Set<string> = new Set(ESTADOS_REGISTRO.map((e) => e.valor));
 const ESTADOS_VALIDOS: Set<string> = new Set(ESTADOS.map((e) => e.valor));
@@ -95,6 +98,8 @@ export async function crearFiltro(formData: FormData): Promise<{ error?: string 
   if (!PRIORIDADES_VALIDAS.has(prioridad)) return { error: "Elige una prioridad válida." };
 
   const supabase = createServiceClient();
+  // El país viene del formulario: con países limitados, solo uno de la persona (auditoría de seguridad, 18 nov 2026).
+  if (!(await puedeVerPaisId(supabase, usuario.paisesPermitidos, pais_id))) return { error: SIN_ACCESO_PAIS };
   const { data, error } = await supabase
     .from("wms_filtro_productos")
     .insert({ pais_id, nombre, estado_registro, estado, prioridad, creado_por: usuario.id, ...leerCambios(formData) })
@@ -109,7 +114,7 @@ export async function crearFiltro(formData: FormData): Promise<{ error?: string 
 
 /** Edita cualquier dato de un producto candidato ya creado — todo junto, desde su ficha. */
 export async function actualizarFiltro(formData: FormData): Promise<{ error?: string }> {
-  await requireModuloEscritura(MODULO);
+  const usuario = await requireModuloEscritura(MODULO);
   const id = formData.get("id") as string;
   const nombre = (formData.get("nombre") as string).trim();
   const estado_registro = formData.get("estado_registro") as string;
@@ -122,6 +127,7 @@ export async function actualizarFiltro(formData: FormData): Promise<{ error?: st
   if (!PRIORIDADES_VALIDAS.has(prioridad)) return { error: "Elige una prioridad válida." };
 
   const supabase = createServiceClient();
+  if (!(await filaDePaisPermitida(supabase, usuario.paisesPermitidos, TABLA, id))) return { error: SIN_ACCESO_PAIS };
   const { data: actual } = await supabase.from("wms_filtro_productos").select("foto_url").eq("id", id).single();
   const cambios = leerCambios(formData);
   const { error } = await supabase
@@ -137,11 +143,12 @@ export async function actualizarFiltro(formData: FormData): Promise<{ error?: st
 }
 
 export async function eliminarFiltro(formData: FormData) {
-  await requireModuloEscritura(MODULO);
+  const usuario = await requireModuloEscritura(MODULO);
   const id = formData.get("id") as string;
   const nombre = formData.get("nombre") as string;
 
   const supabase = createServiceClient();
+  if (!(await filaDePaisPermitida(supabase, usuario.paisesPermitidos, TABLA, id))) throw new Error(SIN_ACCESO_PAIS);
   const { data: actual } = await supabase.from("wms_filtro_productos").select("foto_url").eq("id", id).single();
   const { error } = await supabase.from("wms_filtro_productos").delete().eq("id", id);
   if (error) throw new Error(error.message);

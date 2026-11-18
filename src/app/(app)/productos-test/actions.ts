@@ -8,6 +8,8 @@ import { ESTADOS, TEST_NUMEROS } from "./def-productos-test";
 import { crearProducto } from "../producto/actions";
 import type { OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import { pasarTestsAFiltro } from "@/lib/productos-test/pasar-a-filtro";
+import { filaDePaisPermitida } from "@/lib/seguridad/fila-pais";
+import { puedeVerPaisId, SIN_ACCESO_PAIS } from "@/lib/seguridad/pais-acceso";
 
 const ESTADOS_VALIDOS: Set<string> = new Set(ESTADOS.map((e) => e.valor));
 const TEST_NUMEROS_VALIDOS: Set<string> = new Set(TEST_NUMEROS.map((t) => t.valor));
@@ -24,6 +26,16 @@ const textoOptativo = (formData: FormData, campo: string): string | null => {
 
 const fechaOptativa = (formData: FormData, campo: string): string | null => textoOptativo(formData, campo);
 
+/**
+ * Con países limitados, la fila de Selección que viene del formulario tiene que ser de un país de la persona (auditoría de
+ * seguridad, 18 nov 2026). Sin fila de Selección, true.
+ */
+async function seleccionPermitida(supabase: ReturnType<typeof createServiceClient>, permitidos: string[] | null, formData: FormData): Promise<boolean> {
+  const seleccion = String(formData.get("seleccion_id") ?? "").trim();
+  if (!/^[0-9a-fA-F-]{36}$/.test(seleccion)) return true;
+  return filaDePaisPermitida(supabase, permitidos, "wms_seleccion_productos", seleccion);
+}
+
 /** Al vincular un test con su fila de Selección, esa fila pasa a «En test» (si todavía estaba antes). Nunca lanza. */
 async function marcarSeleccionEnTest(supabase: ReturnType<typeof createServiceClient>, formData: FormData) {
   const seleccion = String(formData.get("seleccion_id") ?? "").trim();
@@ -37,9 +49,11 @@ async function marcarSeleccionEnTest(supabase: ReturnType<typeof createServiceCl
  * Selección» del formulario. Basta poder abrir Test productos. Devuelve el error como valor.
  */
 export async function opcionesSeleccionParaTest(paisId: string, actual: string | null): Promise<{ opciones: { id: string; etiqueta: string }[] } | { error: string }> {
-  await requireModulo("productos-test");
+  const usuario = await requireModulo("productos-test");
   if (!/^[0-9a-fA-F-]{36}$/.test(paisId)) return { error: "País no válido." };
   const supabase = createServiceClient();
+  // El país viene del navegador: con países limitados, solo uno de la persona (auditoría de seguridad, 18 nov 2026).
+  if (!(await puedeVerPaisId(supabase, usuario.paisesPermitidos, paisId))) return { error: SIN_ACCESO_PAIS };
   const [{ data: filas, error }, { data: conTest }] = await Promise.all([
     supabase.from("wms_seleccion_productos").select("id, numero, nombre, codigo_fuente").eq("pais_id", paisId).neq("estado", "descartado").order("numero", { ascending: false }).limit(500),
     supabase.from("wms_productos_test").select("seleccion_id").not("seleccion_id", "is", null),
@@ -99,6 +113,8 @@ export async function crearProductoTest(formData: FormData): Promise<{ error?: s
   if (!ESTADOS_VALIDOS.has(estado)) return { error: "Elige un estado válido." };
 
   const supabase = createServiceClient();
+  if (!(await puedeVerPaisId(supabase, usuario.paisesPermitidos, pais_id))) return { error: SIN_ACCESO_PAIS };
+  if (!(await seleccionPermitida(supabase, usuario.paisesPermitidos, formData))) return { error: SIN_ACCESO_PAIS };
   const { data, error } = await supabase
     .from("wms_productos_test")
     .insert({ pais_id, nombre, estado, creado_por: usuario.id, ...leerCambios(formData) })
@@ -116,7 +132,7 @@ export async function crearProductoTest(formData: FormData): Promise<{ error?: s
 
 /** Edita cualquier dato de un producto en test ya creado — todo junto, desde su ficha. */
 export async function actualizarProductoTest(formData: FormData): Promise<{ error?: string }> {
-  await requireModuloEscritura("productos-test");
+  const usuario = await requireModuloEscritura("productos-test");
   const id = formData.get("id") as string;
   const nombre = (formData.get("nombre") as string).trim();
   const estado = formData.get("estado") as string;
@@ -125,6 +141,8 @@ export async function actualizarProductoTest(formData: FormData): Promise<{ erro
   if (!ESTADOS_VALIDOS.has(estado)) return { error: "Elige un estado válido." };
 
   const supabase = createServiceClient();
+  if (!(await filaDePaisPermitida(supabase, usuario.paisesPermitidos, "wms_productos_test", id))) return { error: SIN_ACCESO_PAIS };
+  if (!(await seleccionPermitida(supabase, usuario.paisesPermitidos, formData))) return { error: SIN_ACCESO_PAIS };
   const { error } = await supabase
     .from("wms_productos_test")
     .update({ nombre, estado, actualizado_en: new Date().toISOString(), ...leerCambios(formData) })
@@ -139,11 +157,12 @@ export async function actualizarProductoTest(formData: FormData): Promise<{ erro
 }
 
 export async function eliminarProductoTest(formData: FormData) {
-  await requireModuloEscritura("productos-test");
+  const usuario = await requireModuloEscritura("productos-test");
   const id = formData.get("id") as string;
   const nombre = formData.get("nombre") as string;
 
   const supabase = createServiceClient();
+  if (!(await filaDePaisPermitida(supabase, usuario.paisesPermitidos, "wms_productos_test", id))) throw new Error(SIN_ACCESO_PAIS);
   const { error } = await supabase.from("wms_productos_test").delete().eq("id", id);
   if (error) throw new Error(error.message);
 

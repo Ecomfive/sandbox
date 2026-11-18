@@ -227,13 +227,31 @@ export async function guardarPegado(filas: unknown[]): Promise<{ error: string }
       if (r.ok && existen.has(claveCatalogo(r.mov.unidad))) buenos.push(r.mov);
       else rechazados++;
     }
-    if (!buenos.length) return { guardados: 0, rechazados, conservados: 0, sinTipo: 0 };
-    const r = await guardarLoteMovimientos(supabase, ORIGEN_PEGADO, buenos);
+    // La huella puede ser la de un movimiento que ya está: con tiendas limitadas, si ese es de otra tienda (o sin tienda), la
+    // fila se rechaza para no pisarlo ni pasarlo a la suya (auditoría de seguridad, 18 nov 2026).
+    const ajenas = permitidas ? await huellasDeOtrasTiendas(supabase, permitidas, buenos.map((m) => m.origen_clave)) : null;
+    if (ajenas === "error") return { error: "No se pudo comprobar la tienda de los movimientos." };
+    const propios = ajenas ? buenos.filter((m) => !ajenas.has(m.origen_clave)) : buenos;
+    rechazados += buenos.length - propios.length;
+    if (!propios.length) return { guardados: 0, rechazados, conservados: 0, sinTipo: 0 };
+    const r = await guardarLoteMovimientos(supabase, ORIGEN_PEGADO, propios);
     // Lo de un mes cerrado no se guarda: cuenta como rechazado.
     return { guardados: r.guardados, rechazados: rechazados + r.enMesCerrado, conservados: r.conservados, sinTipo: r.sinTipo };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "No se pudo guardar." };
   }
+}
+
+/** De estas huellas, las que ya existen en una tienda que la persona no puede ver (de a 100 para no alargar la dirección). */
+async function huellasDeOtrasTiendas(supabase: ReturnType<typeof createServiceClient>, permitidas: string[], claves: string[]): Promise<Set<string> | "error"> {
+  const ajenas = new Set<string>();
+  const lista = [...new Set(claves)];
+  for (let i = 0; i < lista.length; i += 100) {
+    const { data, error } = await supabase.from("fin_movimientos").select("origen_clave, unidad_id").in("origen_clave", lista.slice(i, i + 100));
+    if (error) return "error";
+    for (const f of data ?? []) if (!puedeVerUnidad(permitidas, f.unidad_id as string | null)) ajenas.add(f.origen_clave as string);
+  }
+  return ajenas;
 }
 
 /** Cierra un pegado: deja una línea en la auditoría y vuelve a pedir las páginas. */

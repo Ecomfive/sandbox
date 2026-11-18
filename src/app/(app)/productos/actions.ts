@@ -4,9 +4,13 @@ import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModuloEscritura } from "@/lib/auth";
+import { filasDePaisesVisibles, filaDePaisPermitida, idsPaisesPermitidos } from "@/lib/seguridad/fila-pais";
+import { SIN_ACCESO_PAIS } from "@/lib/seguridad/pais-acceso";
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function actualizarProducto(formData: FormData) {
-  await requireModuloEscritura("productos");
+  const usuario = await requireModuloEscritura("productos");
   const id = formData.get("id") as string;
   const costoRaw = formData.get("costo") as string;
   const precioRaw = formData.get("precio_actual") as string;
@@ -28,6 +32,8 @@ export async function actualizarProducto(formData: FormData) {
   }
 
   const supabase = createServiceClient();
+  // Solo un producto de un país de la persona (auditoría de seguridad, 18 nov 2026).
+  if (!(await filaDePaisPermitida(supabase, usuario.paisesPermitidos, "productos", id))) throw new Error(SIN_ACCESO_PAIS);
   const { error } = await supabase
     .from("productos")
     .update({
@@ -53,10 +59,21 @@ export async function actualizarProducto(formData: FormData) {
 }
 
 export async function actualizarMargenMasivo(ids: string[], margenMinimo: number) {
-  await requireModuloEscritura("productos");
+  const usuario = await requireModuloEscritura("productos");
+  if (!Array.isArray(ids) || ids.length > 2000 || !ids.every((i) => typeof i === "string" && UUID.test(i))) throw new Error("Selección no válida.");
+  if (typeof margenMinimo !== "number" || !Number.isFinite(margenMinimo) || margenMinimo < 0 || margenMinimo > 100) {
+    throw new Error("El margen mínimo debe estar entre 0 y 100.");
+  }
   if (ids.length === 0) return;
 
   const supabase = createServiceClient();
+  // Con países limitados, un producto de otro país rechaza todo el lote (auditoría de seguridad, 18 nov 2026).
+  const visibles = await idsPaisesPermitidos(supabase, usuario.paisesPermitidos);
+  if (visibles !== null) {
+    const { data: filas, error: errorLeer } = await supabase.from("productos").select("id, pais_id").in("id", ids);
+    if (errorLeer) throw new Error("No se pudo leer la selección.");
+    if (filasDePaisesVisibles(filas ?? [], visibles).length !== new Set(ids).size) throw new Error(SIN_ACCESO_PAIS);
+  }
   const { error } = await supabase
     .from("productos")
     .update({ margen_minimo: margenMinimo })

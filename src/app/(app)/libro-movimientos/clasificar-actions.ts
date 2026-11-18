@@ -106,8 +106,9 @@ export async function crearRegla(formData: FormData): Promise<{ error?: string }
     const unidadId = UUID.test(unidad) ? unidad : null;
     const tipoId = UUID.test(tipo) ? tipo : null;
     if (!unidadId && !tipoId) return { error: "Elige una tienda o un tipo." };
-    // Con tiendas limitadas, la regla tiene que llevar a una de sus tiendas (una sin tienda cambia el libro de todos).
-    const acceso = await sinAccesoAUnidades([unidadId]);
+    // Una regla se aplica a todo el libro (el tipo a lo pendiente de cualquier tienda y la tienda a lo SIN ASIGNAR), así que
+    // con tiendas limitadas no se crea, aunque lleve a una de las suyas (auditoría de seguridad, 18 nov 2026).
+    const acceso = await sinAccesoTodaLaEmpresa();
     if (acceso) return { error: acceso };
     const validos = await catalogosValidos(unidadId ? [unidadId] : [], tipoId ? [tipoId] : []);
     if ((unidadId && !validos.unidades.has(unidadId)) || (tipoId && !validos.tipos.has(tipoId))) return { error: "Tienda o tipo inválido." };
@@ -128,7 +129,9 @@ export async function cambiarEstadoRegla(id: string, activo: boolean): Promise<{
   try {
     await requireModuloEscritura(MODULO);
     if (typeof id !== "string" || !UUID.test(id)) return { error: "Regla inválida." };
-    const acceso = await sinAccesoARegistros(createServiceClient(), "fin_reglas", [id]);
+    // Activar o apagar una regla cambia lo que hace en todo el libro: con tiendas limitadas, tampoco (auditoría de seguridad,
+    // 18 nov 2026).
+    const acceso = await sinAccesoTodaLaEmpresa();
     if (acceso) return { error: acceso };
     const { error } = await createServiceClient().from("fin_reglas").update({ activo: activo === true }).eq("id", id);
     if (error) return { error: error.message };

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { EtiquetaMiga } from "@/components/migas/etiqueta-miga";
 import { createServiceClient } from "@/lib/supabase/server";
 import { requireModulo } from "@/lib/auth";
+import { puedeVerPais } from "@/lib/paises-permitidos";
 import { AvisoCorrelativo } from "./aviso-correlativo";
 import { CancelarRetiroForm } from "./cancelar-retiro-form";
 import { CerrarRetiroForm } from "./cerrar-retiro-form";
@@ -26,7 +27,7 @@ export default async function RetiroDetallePage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ correlativo_cambio?: string }>;
 }) {
-  await requireModulo("retiros");
+  const usuario = await requireModulo("retiros");
   const { id } = await params;
   const { correlativo_cambio } = await searchParams;
   const supabase = createServiceClient();
@@ -48,6 +49,9 @@ export default async function RetiroDetallePage({
   ]);
 
   if (!retiro) notFound();
+  // Con países limitados, un retiro de otro país no existe para la persona (auditoría de seguridad, 18 nov 2026).
+  const paisRetiro = (retiro.paises as unknown as { codigo: string } | null)?.codigo ?? null;
+  if (usuario.paisesPermitidos !== null && (!paisRetiro || !puedeVerPais(usuario.paisesPermitidos, paisRetiro))) notFound();
 
   const plataforma = retiro.plataformas as unknown as { nombre: string } | null;
   const cuenta = retiro.cuentas_retiro as unknown as { nombre: string; tipo: string; detalle: string | null } | null;

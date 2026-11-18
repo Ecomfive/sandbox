@@ -4,6 +4,7 @@ import { CLASE_FILA_AF4, claseCeldaAF4, claseNumeroAF4, claseSigno } from "@/com
 import { FilaKpiAF4, KpiAF4 } from "@/components/af4/kpi-af4";
 import { MarcoAF4 } from "@/components/af4/marco-af4";
 import { TablaFinanciera } from "@/components/af4/tabla-financiera";
+import { limitadoATiendas, SoloTodaLaEmpresa } from "@/components/finanzas/solo-toda-la-empresa";
 import { claseEncabezadoColumna, claseFilaEncabezado } from "@/components/tabla/estilos-tabla";
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { KpiGroup } from "@/components/ui/kpi-card";
@@ -57,6 +58,9 @@ function SinValoracion({ mensaje, accion }: { mensaje: string; accion?: { href: 
 
 export default async function ValoracionPage() {
   const usuario = await requireModulo("panel-financiero");
+  // La valoración usa el EERR, el capital y los bienes de toda la empresa: con tiendas limitadas no se muestra (auditoría
+  // de seguridad, 18 nov 2026).
+  if (await limitadoATiendas()) return <SoloTodaLaEmpresa titulo="Valoración" />;
   if (!usuario.modulos.includes("estado-resultados")) {
     return <SinValoracion mensaje="La valoración se arma con el Estado de resultados: pide acceso a ese módulo." />;
   }
