@@ -146,6 +146,29 @@ export async function analizarVideoDeMeta(supabase: SupabaseClient, v: VideoPend
       if (fila && typeof fila.source === "string") datos = fila;
     }
   }
+  // Tercera vía: los videos de una página de Facebook se bajan con el token de esa página (sale de /me/accounts con el acceso del sistema).
+  let paginasVistas = "";
+  let duenoDelVideo = "";
+  if (typeof datos?.source !== "string") {
+    const paginas = await pedirMeta("/me/accounts", { fields: "id,name,access_token", limit: "50" }, token);
+    const lista = paginas.ok ? ((paginas.datos as { data?: Array<{ id?: string; name?: string; access_token?: string }> }).data ?? []) : [];
+    paginasVistas = lista.map((p) => p.name ?? p.id).filter(Boolean).join(", ");
+    for (const p of lista) {
+      if (!p.access_token) continue;
+      const r = await pedirMeta(`/${v.videoId}`, { fields: "source,length,from" }, p.access_token);
+      if (!r.ok) continue;
+      const d = r.datos as { source?: unknown; length?: unknown; from?: { name?: string } };
+      if (d.from?.name) duenoDelVideo = d.from.name;
+      if (typeof d.source === "string") {
+        datos = d;
+        break;
+      }
+    }
+    if (!duenoDelVideo && ficha.ok) {
+      const d = await pedirMeta(`/${v.videoId}`, { fields: "from" }, token);
+      if (d.ok) duenoDelVideo = ((d.datos as { from?: { name?: string } }).from?.name) ?? "";
+    }
+  }
   const fuente = typeof datos?.source === "string" ? datos.source : null;
   const duracion = typeof datos?.length === "number" ? Math.round(datos.length) : null;
   let motivoSinArchivo: string | null = null;
@@ -155,7 +178,7 @@ export async function analizarVideoDeMeta(supabase: SupabaseClient, v: VideoPend
     const dados = permisos.ok ? ((permisos.datos as { data?: Array<{ permission?: string; status?: string }> }).data ?? []).filter((p) => p.status === "granted").map((p) => p.permission).filter(Boolean).join(", ") : "";
     motivoSinArchivo = !ficha.ok
       ? ficha.error
-      : `Meta contestó sin el archivo del video (no dio error). Permisos del acceso: ${dados || "no se pudieron leer"}. Suele ser porque el video está en una página de Facebook a la que este acceso no llega.`;
+      : `Meta contestó sin el archivo del video (no dio error). Permisos: ${dados || "no se pudieron leer"}. Páginas que ve el acceso: ${paginasVistas || "ninguna"}. Dueño del video: ${duenoDelVideo || "no se pudo saber"}.`;
   }
 
   let origen: "video" | "texto" = "video";
