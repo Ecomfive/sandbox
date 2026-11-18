@@ -2716,6 +2716,14 @@ convenciones técnicas del código.
   resume con `resumirTienda`; `juntarTiendas` da los indicadores de arriba y `alertasTiendas` «Para decidir hoy» (umbrales en `UMBRALES`: caída ≥ 30 % en la última semana,
   entrega < 60 %, cancelación ≥ 25 %, ≥ 100 por confirmar, SKU sin vincular, crecimiento ≥ 50 %; tiendas con < 20 pedidos no se miden). Todo en
   `src/lib/tienda/tablero-tiendas.ts`, con prueba. Colores por tienda en `COLORES_TIENDA` (validados con la skill dataviz en claro y oscuro; por orden de la lista).
+- **Velocidad de Gestión de tienda** (18 nov 2026, pedido de Hernán; medido en producción: Dashboard de tienda 8,6 s, «Todas las tiendas» 7,4 s, Logística
+  7,2 s, Confirmación 6,8 s; el resto del sistema casi todo bajo 1,5 s; la base de 484 MB cabe entera en memoria —100 % de aciertos de caché, 39 de 90
+  conexiones—, así que no era capacidad de Supabase). `cargarPedidosFinanzas` (`src/lib/tienda/datos-finanzas.ts`) pide los pedidos (con su cliente) y las
+  líneas de un periodo con **una sola respuesta cada uno** (`ven_pedidos_periodo` / `ven_lineas_periodo`, jsonb, migración 0318, solo service role; sin ella,
+  la forma anterior: pedidos de a 1.000 y líneas por número de pedido —`lineasDeOrdenes`—, ya no cruzando líneas con pedidos página por página). Índice
+  `ven_ordenes_unidad_fecha` (unidad_id, fecha desc, id). `liviano` (tablero «Todas» y Dashboard) se salta fotos e historial de clientes, que no muestran.
+  Comprobado: misma salida que la forma anterior (14 272 pedidos y 17 069 líneas, mismo orden). Medido local: Dashboard 7,0 → 2,0 s, «Todas» 5,6 → 2,6 s,
+  Logística/Confirmación 9,0 → 3,9 s (lo que queda ahí es el historial de clientes, ~50 consultas).
 - **Reportería de pedidos (la Matriz dentro del sistema)** (17 nov 2026, pedido de Hernán para María José; prototipo https://claude.ai/artifact/TNhc38acs7JZzNcsLSgUze):
   `/tienda-reporteria` (Operación › Gestión de tienda, módulo `tienda-reporteria`, migración 0310). Meta: dejar los Excel; la primera carga sale de la Matriz
   «NUEVA GESTION OCEANS PANAMA» (Google Sheet de administración, hoja «Excel Matriz») y después se trabaja aquí. Una fila por línea de producto
