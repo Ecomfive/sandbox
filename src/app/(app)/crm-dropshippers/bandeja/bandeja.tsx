@@ -908,15 +908,15 @@ export function Bandeja({
     setEtiquetando(id);
   }
 
-  /** Marca un chat como leído o no leído. Un chat abierto se cierra al marcarlo no leído (si no, seguiría contando como leído al refrescar). */
+  /** Marca un chat como leído o no leído (sin cambiar si está resuelto). Un chat abierto se cierra al marcarlo no leído (si no, seguiría contando como leído al refrescar). */
   function marcarLeido(c: ConversacionVista, leido: boolean) {
     setMenuChat(null);
     if (!leido && c.id === elegido) setElegido(null);
-    setDatos((d) => ({ ...d, conversaciones: d.conversaciones.map((x) => (x.id === c.id ? (leido ? { ...x, noLeidos: 0 } : { ...x, noLeidos: Math.max(1, x.noLeidos), estado: "abierta" as const }) : x)) }));
+    setDatos((d) => ({ ...d, conversaciones: d.conversaciones.map((x) => (x.id === c.id ? (leido ? { ...x, noLeidos: 0 } : { ...x, noLeidos: Math.max(1, x.noLeidos) }) : x)) }));
     void marcarChatLeido(c.id, leido)
       .then((r) => {
         if ("error" in r) mostrarToast(r.error, "destructive");
-        else mostrarToast(leido ? "Marcado como leído." : "Marcado como no leído: vuelve a estar pendiente de respuesta.");
+        else mostrarToast(leido ? "Marcado como leído." : "Marcado como no leído.");
         return refrescar(null);
       })
       .catch(() => mostrarToast("No se pudo marcar.", "destructive"));
@@ -1056,6 +1056,8 @@ export function Bandeja({
 
   /** El clic derecho en un chat de la lista o del tablero: abre su menú (leído, nombre, etiquetas, motivo). */
   function abrirMenuChat(e: EventoRaton<HTMLElement>, c: ConversacionVista) {
+    // Todo lo del menú pide poder escribir en el CRM (también marcar leído o no leído: la marca es del chat, la ve todo el equipo).
+    if (!escribe) return;
     e.preventDefault();
     ocultarVistaPrevia();
     origenMenu.current = e.currentTarget.querySelector("button");
@@ -1351,7 +1353,7 @@ export function Bandeja({
   const accionesExtra: AccionExtra[] = !sel
     ? []
     : [
-        { id: "no_leido", texto: "Marcar como no leído", corto: "No leído", icono: NoLeidoIcon, alPulsar: () => marcarLeido(sel, false) },
+        ...(escribe ? [{ id: "no_leido" as const, texto: "Marcar como no leído", corto: "No leído", icono: NoLeidoIcon, alPulsar: () => marcarLeido(sel, false) }] : []),
         ...(escribe && !mirando
           ? [
               ...AREAS_CHAT.filter((a) => p.pasarArea && a.valor !== sel.area).map((a) => ({ id: `pasar_${a.valor}` as AccionExtra["id"], texto: `Pasar el chat a ${a.etiqueta}`, corto: `A ${a.etiqueta}`, icono: ActualizarIcon, alPulsar: () => pasarA(a.valor) })),

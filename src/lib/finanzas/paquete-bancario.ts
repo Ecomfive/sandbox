@@ -6,6 +6,7 @@
 
 import { ESTADOS_ABIERTOS, estadoDe, resumirCartera, saldoDe, type DocumentoBase, type ResumenCartera } from "./cxc-cxp";
 import type { InsumosBalance } from "./balance";
+import type { SnapshotPaquete } from "./cargar-paquete-bancario";
 
 const r2 = (v: number) => Math.round(v * 100) / 100;
 const finito = (v: number | null | undefined): v is number => typeof v === "number" && Number.isFinite(v);
@@ -49,6 +50,23 @@ export function leerSecciones(v: unknown, permitidas: SeccionPaquete[] = SECCION
   const elegidas = pedidas.size ? permitidas.filter((s) => pedidas.has(s)) : [...permitidas];
   if (!elegidas.includes("limitaciones")) elegidas.push("limitaciones");
   return SECCIONES_PAQUETE.map((s) => s.clave).filter((s) => elegidas.includes(s));
+}
+
+/** El dato de la foto que lleva cada sección con módulo (las demás no traen cifras de un módulo). */
+const DATO_DE_SECCION = { indicadores: "indicadores", eerr: "eerr", balance: "balance", flujo: "flujo", cartera: "cartera", deuda: "deuda", proyeccion: "proyeccion", concentracion: "concentracion" } as const;
+
+/**
+ * Una versión guardada como la puede ver quien la abre o la baja: la guardó otra persona con sus módulos, así que solo quedan las
+ * secciones que esta persona puede incluir (`seccionesPermitidas`), y las cifras de las demás no llegan (auditoría de seguridad, 18 nov 2026).
+ */
+export function snapshotParaModulos(s: SnapshotPaquete, modulos: string[]): SnapshotPaquete {
+  const permitidas = seccionesPermitidas(modulos);
+  const secciones = s.secciones.filter((x) => permitidas.includes(x));
+  const copia: SnapshotPaquete = { ...s, secciones, limitaciones: limitacionesDeSecciones(s.limitaciones ?? [], secciones) };
+  for (const [seccion, dato] of Object.entries(DATO_DE_SECCION) as [SeccionPaquete, keyof typeof DATO_DE_SECCION][]) {
+    if (!permitidas.includes(seccion)) (copia as unknown as Record<string, unknown>)[dato] = null;
+  }
+  return copia;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -337,6 +355,33 @@ export interface Limitacion {
   texto: string;
   /** alta: cambia una cifra que mira el banco; media: un dato que conviene completar. */
   severidad: "alta" | "media";
+}
+
+/** De qué secciones habla cada limitación (por el comienzo de su clave). Las que no están aquí son de todo el paquete. */
+const SECCIONES_DE_LIMITACION: [string, SeccionPaquete[]][] = [
+  ["balance-", ["balance"]],
+  ["sin-inventario", ["balance", "indicadores"]],
+  ["sin-saldos", ["flujo", "balance"]],
+  ["cuentas-sin-saldo", ["flujo", "balance"]],
+  ["meses-sin-datos", ["eerr", "indicadores", "concentracion"]],
+  ["sin-tipo", ["eerr", "indicadores", "concentracion"]],
+  ["sin-tienda", ["concentracion"]],
+  ["intereses", ["indicadores"]],
+  ["deuda-ebitda", ["indicadores"]],
+  ["giros", ["deuda"]],
+  ["proyeccion", ["proyeccion"]],
+];
+
+/**
+ * Las limitaciones que van con estas secciones: la de una sección que no va (por ejemplo, la diferencia del balance con su monto) no
+ * se muestra; «… no se pudo armar», solo la de una sección que va. Las de todo el paquete, siempre (auditoría de seguridad, 18 nov 2026).
+ */
+export function limitacionesDeSecciones(l: Limitacion[], secciones: readonly SeccionPaquete[]): Limitacion[] {
+  return l.filter((x) => {
+    if (x.clave.startsWith("seccion-")) return SECCIONES_PAQUETE.some((s) => secciones.includes(s.clave) && x.texto.startsWith(`«${s.etiqueta}`));
+    const de = SECCIONES_DE_LIMITACION.find(([prefijo]) => x.clave.startsWith(prefijo))?.[1];
+    return !de || de.some((s) => secciones.includes(s));
+  });
 }
 
 export interface DatosLimitaciones {

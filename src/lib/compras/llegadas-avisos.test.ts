@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import { ETAPAS_COMPRA } from "../../app/(app)/compras/def-compras";
-import { armarAviso, desdeDeLista, diasDeLista, llegadaDeEtapa, unaPorCompra, pagadoTrasSegundoPago, revisarPago, textoProductos, totalesDeLlegada, type FilaLlegada } from "./llegadas-avisos";
+import { armarAviso, desdeDeLista, diasDeLista, llegadaDeEtapa, unaPorCompra, pagadoTrasSegundoPago, revisarPago, textoProductos, totalesDeLlegada, filaSinMontos, type FilaLlegada } from "./llegadas-avisos";
 
 const fila = (o: Partial<FilaLlegada> = {}): FilaLlegada => ({
   compraId: "c1",
@@ -110,4 +110,14 @@ test("el aviso de llegada a puerto lleva a la lista; el de bodega conserva su ll
   assert.equal(hrefDeAviso("Llega a puerto: 1 compra · 10 unidades", "/llegadas/abc"), RUTA_LISTA_PUERTO);
   assert.equal(hrefDeAviso("En bodega: $120.00 por pagar de 1 compra", "/llegadas/abc"), "/llegadas/abc");
   assert.equal(hrefDeAviso("Llega a puerto: x", "/compras/lista"), "/compras/lista");
+});
+
+test("sin ver el segundo pago, la fila llega sin montos ni día del pago, pero dice si se pagó (auditoría, 18 nov 2026)", () => {
+  const pagada = filaSinMontos(fila({ pagadoEn: "2026-11-10", montoPagado: 1200, pagadoPor: "Francis" }));
+  assert.equal(pagada.segundoPago, null);
+  assert.equal(pagada.montoPagado, null);
+  assert.equal(pagada.pagadoEn, null);
+  assert.equal(pagada.pagada, true);
+  assert.equal(filaSinMontos(fila()).pagada, false);
+  assert.equal(totalesDeLlegada([pagada, filaSinMontos(fila())]).pendientes, 1);
 });

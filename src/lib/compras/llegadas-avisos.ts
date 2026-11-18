@@ -48,6 +48,8 @@ export interface FilaLlegada {
   pagadoEn: string | null;
   montoPagado: number | null;
   pagadoPor: string | null;
+  /** Si ya se pagó, cuando la fila llega sin el día ni el monto (`filaSinMontos`). */
+  pagada?: boolean;
   etapa: string;
   /** La llegada de la que sale esta fila y cuándo se avisó (solo en la lista de todas las llegadas). */
   llegadaId?: string;
@@ -110,7 +112,7 @@ export function totalesDeLlegada(filas: readonly FilaLlegada[]): TotalesLlegada 
     t.unidades += f.unidades ?? 0;
     if (f.cajas == null) t.sinCajas += 1;
     else t.cajas += f.cajas;
-    if (f.pagadoEn) t.pagado += f.montoPagado ?? 0;
+    if (f.pagadoEn || f.pagada) t.pagado += f.montoPagado ?? 0;
     else {
       t.pendientes += 1;
       if (f.segundoPago == null) t.sinMonto += 1;
@@ -118,6 +120,14 @@ export function totalesDeLlegada(filas: readonly FilaLlegada[]): TotalesLlegada 
     }
   }
   return t;
+}
+
+/**
+ * La fila para quien no ve el segundo pago: sin el monto, lo pagado ni su día (no llegan a la pantalla); solo queda que ya se pagó
+ * (auditoría de seguridad, 18 nov 2026).
+ */
+export function filaSinMontos(f: FilaLlegada): FilaLlegada {
+  return { ...f, segundoPago: null, montoPagado: null, pagadoEn: null, pagada: f.pagada ?? !!f.pagadoEn };
 }
 
 /** La lista de lo que llegó a puerto en los últimos días: a donde lleva «Ver lista» del aviso de Llegada a Puerto (el de bodega sigue abriendo su llegada para pagar). */

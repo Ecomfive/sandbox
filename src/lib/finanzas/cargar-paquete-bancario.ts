@@ -29,6 +29,7 @@ import {
   etiquetaSeccion,
   indicadoresBancarios,
   interesesDeFinanzas,
+  limitacionesDeSecciones,
   limitacionesPaquete,
   mesesHasta,
   moverMes,
@@ -336,7 +337,8 @@ export async function armarPaqueteBancario(supabase: SupabaseClient, o: Opciones
 
   const notas = notasR.error ? [] : ((notasR.data ?? []) as { periodo: string; texto: string }[]).filter((n) => n.texto?.trim()).map((n) => ({ periodo: String(n.periodo).slice(0, 10), texto: n.texto }));
 
-  const limitaciones = limitacionesPaquete(
+  // Solo las de las secciones que lleva el paquete (auditoría de seguridad, 18 nov 2026).
+  const limitaciones = limitacionesDeSecciones(limitacionesPaquete(
     {
       balanceSinCuadrar: sinCuadrar,
       sinInventario,
@@ -355,7 +357,7 @@ export async function armarPaqueteBancario(supabase: SupabaseClient, o: Opciones
     },
     (v) => dinero(v),
     mesLargo,
-  );
+  ), secciones);
 
   return {
     version: 1,

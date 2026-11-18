@@ -13,7 +13,8 @@ import { rellenar, resolverVariables, type CampoVariable } from "@/lib/whatsapp/
 import { COLUMNAS_PLANTILLA, type PlantillaGuardada } from "@/lib/whatsapp/plantillas-servidor";
 import { dropshipperPorTelefonos } from "@/lib/whatsapp/vinculo";
 import { minutosVentana } from "@/lib/whatsapp/ventana";
-import { usuarioBandeja } from "./datos-bandeja";
+import { conversacionPermitida, usuarioBandeja } from "./datos-bandeja";
+import { avisoSupervision } from "./enviar-medio";
 import { accionBandejaBloqueada } from "@/lib/crm/permisos-bandeja";
 
 /** Una plantilla que se puede usar para un primer contacto, con lo que la ventana necesita para pedir y mostrar sus datos. */
@@ -99,7 +100,14 @@ export async function iniciarChatConPlantilla(p: PedidoNuevoContacto): Promise<{
 
   // Si ya hay un chat con ese número: con la ventana abierta se le escribe directo (no hace falta una plantilla).
   const { data: existe } = await supabase.from("whatsapp_conversaciones").select("id, ultimo_entrante_en, asignada_a").eq("numero_id", numero.id).eq("telefono", tel.e164).maybeSingle();
+  // El chat que ya existe se revisa por su propia área (puede haber pasado a Comercial o a Dirección en el mismo número) y por lo afinado («los suyos y los libres»),
+  // como al escribir en él desde la bandeja (auditoría de seguridad, 18 nov 2026).
+  const permitido = existe ? await conversacionPermitida(supabase, existe.id as string, u, true) : null;
+  if (existe && !permitido) return { error: "Ya hay un chat con ese número, pero es de un área donde no puedes escribir o lo lleva otra persona." };
   if (existe && minutosVentana((existe.ultimo_entrante_en as string | null) ?? null) > 0) return { id: existe.id as string, yaExistia: true, escribirDirecto: true };
+  // Quien supervisa ese chat no le escribe hasta «Intervenir», igual que con una plantilla desde el chat.
+  const supervisando = permitido ? avisoSupervision(u, permitido) : null;
+  if (supervisando) return { error: supervisando };
 
   if (contactosRestantes(await contactosIniciadosHoy(supabase)) <= 0) return { error: "Ya llegaste al máximo de contactos nuevos de hoy. Mañana puedes seguir: así el número no se quema." };
 

@@ -5,6 +5,7 @@
 import { alcanceDe, nivelDeCampo, type Afinado } from "@/lib/permisos/afinado";
 import { CATALOGO_COMPRAS } from "@/lib/permisos/catalogo";
 import type { FilaCompra } from "./def-compras";
+import { CAMPOS_EDITABLES } from "./def-edicion-compras";
 
 /** Las claves del catálogo de Compras que son campos. */
 const CAMPOS_DEL_CATALOGO = new Map(CATALOGO_COMPRAS.grupos.flatMap((g) => g.campos).map((c) => [c.clave, c]));
@@ -76,6 +77,13 @@ const CAMPO_DE_COLUMNA: Record<string, string> = {
 /** El campo del catálogo al que pertenece un cambio anotado en la Actividad (por el nombre con que se anota). */
 const CAMPO_DE_ACTIVIDAD: Record<string, string> = { ...CAMPO_DE_CELDA };
 
+/**
+ * El campo del catálogo de un dato por la etiqueta con que lo anota la auditoría («Monto Total» → `monto`, «Proveedor» → `proveedor`): lo usa
+ * la bitácora del Centro de notificaciones para no mostrar lo que la persona no ve (auditoría de seguridad, 18 nov 2026).
+ */
+const CAMPO_DE_ETIQUETA = new Map(Object.entries(CAMPOS_EDITABLES).flatMap(([id, def]) => (CAMPO_DE_CELDA[id] ? [[def.etiqueta, CAMPO_DE_CELDA[id]] as const] : [])));
+export const campoDeEtiqueta = (etiqueta: string): string | undefined => CAMPO_DE_ETIQUETA.get(etiqueta);
+
 export const ES_ALCANCE_LIMITADO = (alcance: string) => alcance === "asignadas" || alcance === "creadas";
 
 export interface RestriccionesCompras {
@@ -108,6 +116,15 @@ export function restriccionesDe(afinado: Afinado | undefined): RestriccionesComp
 
 export const accionPermitidaEnCompras = (r: RestriccionesCompras, accion: string): boolean => !r.bloqueadas.includes(accion);
 export const campoOculto = (r: RestriccionesCompras, clave: string): boolean => r.ocultos.includes(clave);
+/** Los campos de dinero de una compra: sin ver alguno, no se ven los pagos a Shen Zhen. */
+const CAMPOS_DE_PAGO = ["monto", "pago1", "pago2", "pagado"];
+
+/**
+ * ¿Ve los pagos a Shen Zhen (Registro de pagos, Pagos del Tablero, pago de una llegada)? Solo si no tiene oculto ninguno de los
+ * campos de dinero: esos datos mezclan el monto con los pagos (auditoría de seguridad, 18 nov 2026).
+ */
+export const vePagosProveedor = (r: RestriccionesCompras): boolean => !CAMPOS_DE_PAGO.some((c) => campoOculto(r, c));
+
 export const campoEditable = (r: RestriccionesCompras, clave: string): boolean => !r.ocultos.includes(clave) && !r.soloVer.includes(clave);
 
 /** Las columnas de la tabla que no se dibujan. */
@@ -131,6 +148,8 @@ export function sinColumnasBloqueadas<T extends Record<string, unknown>>(cambios
 
 /** ¿La persona puede ver este cambio anotado en la Actividad de una compra? (no si es de un dato que no ve). */
 export function cambioVisibleEnActividad(r: RestriccionesCompras, campo: string): boolean {
+  // El Registro de pagos del proveedor son montos y pagos (auditoría de seguridad, 18 nov 2026).
+  if (campo === "registroPagos") return vePagosProveedor(r);
   const clave = CAMPO_DE_ACTIVIDAD[campo];
   return !clave || !campoOculto(r, clave);
 }
@@ -145,9 +164,40 @@ export function enmascarar(c: FilaCompra, r: RestriccionesCompras): FilaCompra {
   return copia as unknown as FilaCompra;
 }
 
+/**
+ * Qué datos de un pedido del Tablero de Shen Zhen (`PedidoPortal`) son de cada campo del catálogo. Sin el monto no se ve ningún pago
+ * a Shen Zhen (como en la pestaña Pagos del Tablero).
+ */
+const PROPIEDADES_PEDIDO: Record<string, string[]> = {
+  monto: ["montoTotal", "costoUnitario", "primerPago", "fechaPago1", "segundoPago", "fechaPago2", "pagadoAProveedor", "anticipoMonto"],
+  unitario: ["costoUnitario"],
+  pago1: ["primerPago", "fechaPago1", "anticipoMonto"],
+  pago2: ["segundoPago", "fechaPago2"],
+  pagado: ["pagadoAProveedor"],
+};
+
+/**
+ * El pedido del Tablero de Shen Zhen como lo ve la persona: el Tablero se ve igual (es el reflejo del portal), pero el valor de lo que
+ * no ve llega vacío y la pantalla muestra «—» (auditoría de seguridad, 18 nov 2026).
+ */
+export function pedidoSinOcultos<T extends object>(p: T, r: RestriccionesCompras): T {
+  if (r.ocultos.length === 0) return p;
+  const copia = { ...p } as Record<string, unknown>;
+  for (const clave of r.ocultos) for (const propiedad of PROPIEDADES_PEDIDO[clave] ?? []) if (propiedad in copia) copia[propiedad] = null;
+  return copia as T;
+}
+
 /** Quita el monto de una línea de la Actividad («1.040 u. · $1.270,00 → 900 u. · $1.100,00» queda «1.040 u. → 900 u.»). */
 export function textoSinMonto(texto: string): string {
   return texto.replace(/ · [^·→]*\$\s?[\d.,]+/g, "");
+}
+
+/**
+ * El comentario que deja el proveedor al cotizar («Cotización de X: 10 u. · $1,20 por unidad · $12,00») sin sus montos, para quien
+ * no ve el monto: queda «Cotización de X: 10 u.». Los demás comentarios no se tocan (auditoría de seguridad, 18 nov 2026).
+ */
+export function comentarioSinMonto(texto: string): string {
+  return texto.replace(/^((?:Cotización|Cotización corregida en producción) de [^:\n]*:)([^\n]*)/, (_, inicio: string, resto: string) => inicio + resto.replace(/ · [^·→\n]*\$\s?[\d.,]+(?:[^·→\n]*[^·→\s])?/g, ""));
 }
 
 /** ¿Esta compra entra en lo que la persona alcanza? `usuario` trae su id y su nombre (las compras de ClickUp guardan el nombre como texto). */

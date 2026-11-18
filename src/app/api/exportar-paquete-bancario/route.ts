@@ -4,7 +4,7 @@ import { getUsuarioActual } from "@/lib/auth";
 import { hoyPanama, mesLargo } from "@/lib/af4/fecha";
 import { armarPaqueteBancario, empresaDelPaquete, leerSnapshot, type SnapshotPaquete } from "@/lib/finanzas/cargar-paquete-bancario";
 import { libroPaqueteBancario } from "@/lib/finanzas/excel-paquete-bancario";
-import { cartaPredeterminada } from "@/lib/finanzas/paquete-bancario";
+import { cartaPredeterminada, snapshotParaModulos } from "@/lib/finanzas/paquete-bancario";
 import { createServiceClient } from "@/lib/supabase/server";
 import { leerParametrosPaquete, puedeVerPaquete } from "@/app/(app)/panel-financiero/paquete-bancario/parametros";
 
@@ -33,6 +33,8 @@ export async function GET(req: NextRequest) {
     if (error) return new NextResponse("Falta correr la migración 0940.", { status: 500 });
     snap = data ? leerSnapshot(data.contenido) : null;
     if (!snap) return new NextResponse("No existe esa versión", { status: 404 });
+    // Solo las secciones de los módulos de quien la baja, no las de quien la guardó (auditoría de seguridad, 18 nov 2026).
+    snap = snapshotParaModulos(snap, usuario.modulos);
   } else {
     const p = await leerParametrosPaquete(supabase, usuario, { corte: q.get("corte") ?? undefined, entidad: q.get("entidad") ?? undefined, secciones: q.get("secciones") ?? undefined });
     const empresa = await empresaDelPaquete(supabase);
