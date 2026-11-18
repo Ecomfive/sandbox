@@ -1,3 +1,4 @@
+import { limitadoATiendas, SoloTodaLaEmpresa } from "@/components/finanzas/solo-toda-la-empresa";
 import { EncabezadoAF4 } from "@/components/af4/encabezado-af4";
 import { EstadoVacioAF4 } from "@/components/af4/estado-af4";
 import { FilaKpiAF4, KpiAF4 } from "@/components/af4/kpi-af4";
@@ -17,6 +18,8 @@ const MODULO = "deliverys";
 /** Todos los cierres semanales: los pendientes de cerrar o de pagar primero (los pagados, con el botón «Pagados»). */
 export default async function CierresDeliverysPage() {
   const usuario = await requireModulo(MODULO);
+  // Los cierres y los repartidores juntan todas las tiendas: con tiendas limitadas no se ven (auditoría de seguridad, 18 nov 2026).
+  if (await limitadoATiendas()) return <SoloTodaLaEmpresa titulo="Cierres de deliverys" />;
   const puedeEscribir = !usuario.modulosSoloLectura.includes(MODULO);
   const r = await cargarCierres(createServiceClient());
   if ("error" in r) {

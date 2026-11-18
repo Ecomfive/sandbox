@@ -176,12 +176,13 @@ export default async function MarketingUEPage({ searchParams }: { searchParams: 
       </section>
 
       <div className="grid gap-6 xl:grid-cols-2">
-        {puedeEditar && <ImportarMeta />}
+        {/* Importar el CSV y crear reglas tocan las campañas de todas las tiendas: con tiendas limitadas no se ofrecen. */}
+        {puedeEditar && !ctx.datos.limitado && <ImportarMeta />}
         <ReglasMeta
           reglas={mkt.reglas.map((r) => ({ id: r.id, patron: r.patron, tienda: nombre(r.unidadId), producto: r.productoClave ? nombreProducto(r.productoClave) : null, prioridad: r.prioridad }))}
           tiendas={tiendasOpc}
           productos={productosOpc}
-          puedeEditar={puedeEditar}
+          puedeEditar={puedeEditar && !ctx.datos.limitado}
         />
       </div>
     </PaginaUE>

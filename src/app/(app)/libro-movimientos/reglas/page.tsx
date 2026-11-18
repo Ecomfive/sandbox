@@ -56,7 +56,8 @@ export default async function ReglasPage() {
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
       <EncabezadoAF4 titulo="Reglas" imprimir={false} />
-      <TablaReglas filas={filas} tiendas={datos.tiendas} tipos={datos.tipos} puedeEscribir={!usuario.modulosSoloLectura.includes("libro-movimientos")} />
+      {/* Crear, activar o aplicar reglas cambia todo el libro: con tiendas limitadas solo se ven (auditoría de seguridad, 18 nov 2026). */}
+      <TablaReglas filas={filas} tiendas={datos.tiendas} tipos={datos.tipos} puedeEscribir={!permitidas && !usuario.modulosSoloLectura.includes("libro-movimientos")} />
     </Pagina>
   );
 }

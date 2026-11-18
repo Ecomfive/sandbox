@@ -9,6 +9,8 @@ import { calcularVariacion } from "@/lib/af4/variacion";
 import { requireModulo } from "@/lib/auth";
 import { depreciacionPorMes, mesDe, situacion, type Bien } from "@/lib/finanzas/bienes-uso";
 import { UNIDAD_SIN_ASIGNAR } from "@/lib/finanzas/libro-excel";
+import { cargarTiendasPermitidas } from "@/lib/finanzas/cargar-tiendas-permitidas";
+import { filtrarUnidades, puedeVerUnidad } from "@/lib/finanzas/tiendas-permitidas";
 import { createServiceClient } from "@/lib/supabase/server";
 import type { FilaBien } from "./def-bienes";
 import { TablaBienes } from "./tabla-bienes";
@@ -43,14 +45,18 @@ export default async function BienesDeUsoPage() {
   const supabase = createServiceClient();
   const periodo = mesDe(hoyPanama());
 
-  const [bienes, unidades] = await Promise.all([
+  const [bienes, unidadesTodas, permitidas] = await Promise.all([
     supabase
       .from("fin_bienes_uso")
       .select("id, descripcion, tipo, unidad_id, fecha_alta, importe, meses_vida, valor_residual, fecha_baja, motivo_baja, notas, origen, editado_a_mano, fin_unidades(nombre)")
       .order("fecha_alta", { ascending: false })
       .limit(5000),
     supabase.from("fin_unidades").select("id, nombre").eq("activo", true).neq("nombre", UNIDAD_SIN_ASIGNAR).order("orden"),
+    cargarTiendasPermitidas(),
   ]);
+  // Con tiendas limitadas, solo los bienes de sus tiendas (los «A DISTRIBUIR» son de toda la empresa) y solo sus tiendas
+  // para cargar uno (auditoría de seguridad, 18 nov 2026).
+  const unidades = filtrarUnidades(permitidas, (unidadesTodas.data ?? []) as { id: string; nombre: string }[]);
   if (bienes.error) {
     return (
       <Pagina ancho="ancha" className="flex flex-col gap-6">
@@ -61,7 +67,7 @@ export default async function BienesDeUsoPage() {
   }
 
   const base: Bien[] = [];
-  const filas: FilaBien[] = ((bienes.data ?? []) as unknown as FilaBase[]).map((b) => {
+  const filas: FilaBien[] = ((bienes.data ?? []) as unknown as FilaBase[]).filter((b) => puedeVerUnidad(permitidas, b.unidad_id)).map((b) => {
     const unidad = Array.isArray(b.fin_unidades) ? b.fin_unidades[0] : b.fin_unidades;
     const bien = {
       fecha_alta: b.fecha_alta,
@@ -143,7 +149,7 @@ export default async function BienesDeUsoPage() {
 
           <TablaBienes
             filas={filas}
-            tiendas={(unidades.data ?? []) as { id: string; nombre: string }[]}
+            tiendas={unidades}
             puedeEscribir={!usuario.modulosSoloLectura.includes("bienes-de-uso")}
           />
         </>

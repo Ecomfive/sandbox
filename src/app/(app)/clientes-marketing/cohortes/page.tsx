@@ -1,5 +1,6 @@
 import { EncabezadoAF4 } from "@/components/af4/encabezado-af4";
 import { EstadoVacioAF4 } from "@/components/af4/estado-af4";
+import { limitadoATiendas, SoloTodaLaEmpresa } from "@/components/finanzas/solo-toda-la-empresa";
 import { FilaKpiAF4, KpiAF4 } from "@/components/af4/kpi-af4";
 import { MarcoAF4 } from "@/components/af4/marco-af4";
 import { ContenedorTabla } from "@/components/tabla/contenedor-tabla";
@@ -49,6 +50,8 @@ export default async function CohortesPage({
   searchParams: Promise<{ [k: string]: string | string[] | undefined }>;
 }) {
   await requireModulo("clientes-marketing");
+  // De toda la empresa: con tiendas limitadas no se muestra (auditoría de seguridad, 18 nov 2026).
+  if (await limitadoATiendas()) return <SoloTodaLaEmpresa titulo="Clientes y marketing" />;
   const datos = await cargarDatosPagina(createServiceClient(), await searchParams);
   if ("error" in datos) {
     return (

@@ -134,8 +134,12 @@ export async function cambiarCelda(itemId: string, campo: string, valor: string)
   const igual = antes === null || antes === undefined ? nuevo === null : nuevo !== null && (typeof nuevo === "number" ? Number(antes) === nuevo : String(antes) === nuevo);
   if (igual) return {};
   if (campo === "numero" || campo === "tienda") Object.assign(set, await enlazar(supabase, (set.numero_pedido ?? fila.numero_pedido) as string | null, (set.tienda_texto ?? fila.tienda_texto) as string | null));
-  // Con tiendas limitadas no se puede pasar la fila a otra tienda (ni dejarla sin tienda).
-  if (campo === "tienda" && !puedeVerUnidad(await cargarTiendasPermitidas(), (set.unidad_id as string | null) ?? null)) return { error: SIN_ACCESO_TIENDA };
+  // Con tiendas limitadas no se puede pasar la fila a otra tienda (ni dejarla sin tienda). También al cambiar el número: sin tienda
+  // reconocida, el número enlaza la orden de cualquier tienda y la fila pasaría a esa (auditoría de seguridad, 18 nov 2026).
+  const permitidas = await cargarTiendasPermitidas();
+  // Un número que no enlaza ninguna orden (aún sin sincronizar, con un error) no cambia la tienda de la fila.
+  if (campo === "numero" && permitidas && !set.unidad_id) set.unidad_id = (fila.unidad_id as string | null) ?? null;
+  if ((campo === "tienda" || campo === "numero") && !puedeVerUnidad(permitidas, (set.unidad_id as string | null) ?? null)) return { error: SIN_ACCESO_TIENDA };
   const { error } = await supabase.from("mon_despachos").update(set).eq("item_id", itemId);
   if (error) return { error: "No se pudo guardar." };
   await registrar(supabase, itemId, usuario, `${titulo}: ${antes ?? "vacío"} → ${nuevo ?? "vacío"}${set.grupo ? ` (pasa a ${set.grupo})` : ""}`);
@@ -238,6 +242,11 @@ export async function restaurarFila(itemId: string): Promise<Resultado> {
   const { supabase, usuario, fila } = r;
   if (!fila.archivado_en) return {};
   const enlace = await enlazar(supabase, fila.numero_pedido as string | null, fila.tienda_texto as string | null);
+  // Lo mismo al restaurar: el enlace nuevo no puede llevar la fila a otra tienda (auditoría de seguridad, 18 nov 2026). Sin orden
+  // enlazada, la fila se queda en su tienda.
+  const permitidas = await cargarTiendasPermitidas();
+  if (permitidas && !enlace.unidad_id) enlace.unidad_id = (fila.unidad_id as string | null) ?? null;
+  if (!puedeVerUnidad(permitidas, enlace.unidad_id)) return { error: SIN_ACCESO_TIENDA };
   const { error } = await supabase.from("mon_despachos").update({ ...sello(usuario), archivado_en: null, archivado_por: null, ...enlace }).eq("item_id", itemId);
   if (error) return { error: "No se pudo restaurar." };
   await registrar(supabase, itemId, usuario, "Restaurada desde Archivados");

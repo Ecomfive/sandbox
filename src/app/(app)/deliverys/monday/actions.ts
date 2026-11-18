@@ -7,6 +7,7 @@
 import { revalidatePath } from "next/cache";
 import { getUsuarioActual, requireModuloEscritura } from "@/lib/auth";
 import { registrarAuditoria } from "@/lib/auditoria";
+import { sinAccesoTodaLaEmpresa } from "@/lib/finanzas/acceso-tienda";
 import { normalizar } from "@/lib/finanzas/clasificacion";
 import { codigoDeNombre, esCodigoCausa, leerPalabras, normalizarTexto } from "@/lib/monday/causas";
 import { esGrupoEstado, esIdTablero, ETIQUETA_GRUPO, leerReglasEstado, validarMapeo, type ColumnaTablero, type MapeoColumnas } from "@/lib/monday/columnas";
@@ -23,8 +24,12 @@ const revalidar = () => {
   revalidatePath("/panel-financiero/estado-sistema");
 };
 
+// Monday es de toda la empresa (la página ya no se muestra con tiendas limitadas): las acciones tampoco se aceptan
+// (auditoría de seguridad, 18 nov 2026).
 async function exigirAdministrador() {
   await requireModuloEscritura(MODULO);
+  const acceso = await sinAccesoTodaLaEmpresa();
+  if (acceso) throw new Error(acceso);
   const u = await getUsuarioActual();
   if (!administraIntegraciones(u)) throw new Error("Solo quien puede modificar Usuarios y roles configura la conexión con Monday.");
   return u!;
@@ -96,6 +101,8 @@ export async function leerMondayAhora(): Promise<{ error?: string; resumen?: str
 export async function guardarReglaEstado(etiqueta: string, grupo: string): Promise<{ error?: string }> {
   try {
     await requireModuloEscritura(MODULO);
+    const acceso = await sinAccesoTodaLaEmpresa();
+    if (acceso) return { error: acceso };
     const n = normalizar(String(etiqueta ?? "")).slice(0, 120);
     if (!n || !esGrupoEstado(grupo)) return { error: "Estado o grupo inválido." };
     const supabase = createServiceClient();
@@ -123,6 +130,8 @@ export async function guardarReglaEstado(etiqueta: string, grupo: string): Promi
 export async function guardarCausa(datos: FormData): Promise<{ error?: string }> {
   try {
     await requireModuloEscritura(MODULO);
+    const acceso = await sinAccesoTodaLaEmpresa();
+    if (acceso) return { error: acceso };
     const nombre = String(datos.get("nombre") ?? "").replace(/\s+/g, " ").trim().slice(0, 80);
     if (!nombre) return { error: "Escribe el nombre de la causa." };
     const palabras = leerPalabras(String(datos.get("palabras") ?? ""));
@@ -150,6 +159,8 @@ export async function guardarCausa(datos: FormData): Promise<{ error?: string }>
 export async function asignarTextoCausa(texto: string, codigo: string): Promise<{ error?: string }> {
   try {
     const u = await requireModuloEscritura(MODULO);
+    const acceso = await sinAccesoTodaLaEmpresa();
+    if (acceso) return { error: acceso };
     const n = normalizarTexto(texto);
     if (!n || !esCodigoCausa(codigo)) return { error: "Texto o causa inválida." };
     const supabase = createServiceClient();

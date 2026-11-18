@@ -1,6 +1,6 @@
 "use server";
 
-import { sinAccesoAUnidades } from "@/lib/finanzas/acceso-tienda";
+import { sinAccesoAUnidades, sinAccesoTodaLaEmpresa } from "@/lib/finanzas/acceso-tienda";
 
 import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
@@ -54,6 +54,9 @@ function revalidar() {
   revalidatePath("/deliverys", "layout");
 }
 
+// Un cierre junta las entregas de todas las tiendas de un repartidor, y un repartidor reparte para todas: con tiendas
+// limitadas no se ven ni se cambian (auditoría de seguridad, 18 nov 2026). Solo «Agregar» de Entregas es por tienda.
+
 const texto = (v: unknown, max: number): string | null => {
   if (typeof v !== "string") return null;
   const s = v.replace(/\s+/g, " ").trim().slice(0, max);
@@ -102,6 +105,8 @@ async function efectivoAbierto(supabase: ReturnType<typeof createServiceClient>,
 /** Todo lo de un repartidor en una semana. Basta poder abrir Deliverys. */
 export async function obtenerCierre(repartidorId: string, semana: string): Promise<{ error: string } | DetalleCierre> {
   const usuario = await requireModulo(MODULO);
+  const acceso = await sinAccesoTodaLaEmpresa();
+  if (acceso) return { error: acceso };
   if (typeof repartidorId !== "string" || !UUID.test(repartidorId) || typeof semana !== "string" || !esInicioSemana(semana)) return { error: "Cierre inválido." };
   const supabase = createServiceClient();
   const [rep, cierre, entregas, cuentas] = await Promise.all([
@@ -163,6 +168,8 @@ export async function obtenerCierre(repartidorId: string, semana: string): Promi
 export async function guardarAjustesCierre(repartidorId: string, semana: string, datos: unknown): Promise<{ error?: string }> {
   try {
     await requireModuloEscritura(MODULO);
+    const acceso = await sinAccesoTodaLaEmpresa();
+    if (acceso) return { error: acceso };
     if (typeof repartidorId !== "string" || !UUID.test(repartidorId) || typeof semana !== "string" || !esInicioSemana(semana)) return { error: "Cierre inválido." };
     const d = (datos ?? {}) as Record<string, unknown>;
     const adelantos = monto(d.adelantos ?? 0);
@@ -199,6 +206,8 @@ export async function guardarAjustesCierre(repartidorId: string, semana: string,
 export async function cerrarSemanaDelivery(repartidorId: string, semana: string): Promise<{ error?: string }> {
   try {
     const usuario = await requireModuloEscritura(MODULO);
+    const acceso = await sinAccesoTodaLaEmpresa();
+    if (acceso) return { error: acceso };
     if (typeof repartidorId !== "string" || !UUID.test(repartidorId) || typeof semana !== "string" || !esInicioSemana(semana)) return { error: "Cierre inválido." };
     const supabase = createServiceClient();
     const nombre = await nombreRepartidor(repartidorId);
@@ -270,6 +279,8 @@ export async function cerrarSemanaDelivery(repartidorId: string, semana: string)
 export async function reabrirSemanaDelivery(cierreId: string): Promise<{ error?: string }> {
   try {
     await requireModuloEscritura(MODULO);
+    const acceso = await sinAccesoTodaLaEmpresa();
+    if (acceso) return { error: acceso };
     if (typeof cierreId !== "string" || !UUID.test(cierreId)) return { error: "Cierre inválido." };
     const supabase = createServiceClient();
     const { data: c } = await supabase.from("del_cierres").select("estado, semana, repartidor_id, del_repartidores(nombre)").eq("id", cierreId).maybeSingle();
@@ -306,6 +317,8 @@ export async function reabrirSemanaDelivery(cierreId: string): Promise<{ error?:
 export async function registrarPagoDelivery(cierreId: string, datos: unknown): Promise<{ error?: string; reciboId?: string }> {
   try {
     const usuario = await requireModuloEscritura(MODULO);
+    const acceso = await sinAccesoTodaLaEmpresa();
+    if (acceso) return { error: acceso };
     if (typeof cierreId !== "string" || !UUID.test(cierreId)) return { error: "Cierre inválido." };
     const d = (datos ?? {}) as Record<string, unknown>;
     const fecha = typeof d.fecha === "string" && FECHA.test(d.fecha) && !Number.isNaN(Date.parse(d.fecha)) ? d.fecha : null;
@@ -520,6 +533,8 @@ export interface RepartidorFicha {
 /** Ficha de un repartidor (con el documento y el teléfono completos). */
 export async function obtenerRepartidor(id: string): Promise<{ error: string } | { repartidor: RepartidorFicha; cierres: FilaCierre[] }> {
   await requireModulo(MODULO);
+  const acceso = await sinAccesoTodaLaEmpresa();
+  if (acceso) return { error: acceso };
   if (typeof id !== "string" || !UUID.test(id)) return { error: "Repartidor inválido." };
   const supabase = createServiceClient();
   const [r, cierres] = await Promise.all([
@@ -567,6 +582,8 @@ function leerDatosRepartidor(d: Record<string, unknown>) {
 export async function crearRepartidor(formData: FormData): Promise<{ error?: string }> {
   try {
     await requireModuloEscritura(MODULO);
+    const acceso = await sinAccesoTodaLaEmpresa();
+    if (acceso) return { error: acceso };
     const g = (k: string) => formData.get(k);
     const d = leerDatosRepartidor({
       nombre: g("nombre"),
@@ -594,6 +611,8 @@ export async function crearRepartidor(formData: FormData): Promise<{ error?: str
 export async function actualizarRepartidor(id: string, datos: unknown): Promise<{ error?: string }> {
   try {
     await requireModuloEscritura(MODULO);
+    const acceso = await sinAccesoTodaLaEmpresa();
+    if (acceso) return { error: acceso };
     if (typeof id !== "string" || !UUID.test(id)) return { error: "Repartidor inválido." };
     const d = leerDatosRepartidor((datos ?? {}) as Record<string, unknown>);
     if ("error" in d) return { error: d.error };

@@ -149,7 +149,13 @@ export async function cambiarCaso(itemId: string, campo: string, valor: string):
     despues = t || null;
     if (campo === "nombre" && !t) return { error: "La solicitud necesita un nombre." };
     set[TEXTOS[campo].columna] = despues;
-    if (campo === "numero") Object.assign(set, await enlazar(supabase, despues, fila.tienda_texto as string | null));
+    if (campo === "numero") {
+      Object.assign(set, await enlazar(supabase, despues, fila.tienda_texto as string | null));
+      // Sin tienda reconocida, el número enlaza la orden de cualquier tienda: con límite, solo una de las suyas (auditoría de seguridad, 18 nov 2026).
+      // Sin orden enlazada (número aún sin sincronizar), el caso se queda en su tienda.
+      if (!set.unidad_id && (await cargarTiendasPermitidas())) set.unidad_id = (fila.unidad_id as string | null) ?? null;
+      if (!(await puedeVerLa((set.unidad_id as string | null) ?? null))) return { error: SIN_ACCESO_TIENDA };
+    }
   } else if (NUMEROS[campo]) {
     const t = v.replace(/[$\s]/g, "").replace(",", ".");
     const n = t ? Number(t) : null;

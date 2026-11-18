@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModuloEscritura } from "@/lib/auth";
+import { puedeVerPaisId, SIN_ACCESO_PAIS } from "@/lib/seguridad/pais-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -13,12 +14,14 @@ export async function vincularPublicacionDunamixfy(
   id: string,
   skuId: string | null,
 ): Promise<{ ok: true; producto: { id: string; codigo: string; nombre: string } | null } | { error: string }> {
-  await requireModuloEscritura("publicaciones-dunamixfy");
+  const usuario = await requireModuloEscritura("publicaciones-dunamixfy");
   if (typeof id !== "string" || !UUID.test(id) || (skuId !== null && (typeof skuId !== "string" || !UUID.test(skuId)))) return { error: "Datos no válidos." };
   const supabase = createServiceClient();
-  const { data: antes, error: errorAntes } = await supabase.from("dunamixfy_publicaciones").select("nombre, dunamixfy_id, sku_maestro_id").eq("id", id).maybeSingle();
+  const { data: antes, error: errorAntes } = await supabase.from("dunamixfy_publicaciones").select("nombre, dunamixfy_id, sku_maestro_id, pais_id").eq("id", id).maybeSingle();
   if (errorAntes) return { error: /dunamixfy_publicaciones|schema cache|does not exist/i.test(errorAntes.message) ? FALTA : "No se pudo leer el producto." };
   if (!antes) return { error: "Ese producto ya no existe. Recarga la página." };
+  // Solo un producto de un país de la persona (auditoría de seguridad, 18 nov 2026).
+  if (!(await puedeVerPaisId(supabase, usuario.paisesPermitidos, antes.pais_id as string))) return { error: SIN_ACCESO_PAIS };
   let sku: { id: string; codigo: string; nombre: string } | null = null;
   if (skuId) {
     const { data } = await supabase.from("skus_maestros").select("id, codigo, nombre").eq("id", skuId).maybeSingle();

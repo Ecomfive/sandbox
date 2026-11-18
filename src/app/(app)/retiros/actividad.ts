@@ -2,6 +2,8 @@
 
 import { createServiceClient } from "@/lib/supabase/server";
 import { requireModulo } from "@/lib/auth";
+import { filaDePaisPermitida } from "@/lib/seguridad/fila-pais";
+import { SIN_ACCESO_PAIS } from "@/lib/seguridad/pais-acceso";
 
 export interface EventoRetiro {
   id: string;
@@ -18,11 +20,14 @@ const MAX_EVENTOS = 30;
  * muestra en su sitio sin romper la tabla.
  */
 export async function obtenerActividadRetiro(id: string): Promise<{ eventos: EventoRetiro[] } | { error: string }> {
-  await requireModulo("retiros");
+  const usuario = await requireModulo("retiros");
   // Un id que no parece un id no llega a la base.
   if (typeof id !== "string" || !/^[0-9a-fA-F-]{8,64}$/.test(id)) return { error: "Retiro no válido." };
 
-  const { data, error } = await createServiceClient()
+  const supabase = createServiceClient();
+  // Solo de un retiro de un país de la persona (auditoría de seguridad, 18 nov 2026).
+  if (!(await filaDePaisPermitida(supabase, usuario.paisesPermitidos, "retiros", id))) return { error: SIN_ACCESO_PAIS };
+  const { data, error } = await supabase
     .from("retiro_eventos")
     .select("id, evento, creado_en")
     .eq("retiro_id", id)

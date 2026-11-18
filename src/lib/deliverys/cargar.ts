@@ -201,6 +201,8 @@ export interface FilaEntrega {
   repartidor: string;
   zona: string | null;
   tienda: string;
+  /** La unidad (`fin_unidades.id`) de la entrega: con ella se filtra por las tiendas permitidas. */
+  unidadId: string | null;
   pagoAparte: boolean;
   orden: string | null;
   categoria: Categoria | null;
@@ -247,6 +249,7 @@ export async function cargarEntregas(
       repartidor: uno(x.del_repartidores as Uno<{ nombre: string }>)?.nombre ?? "—",
       zona: (x.zona as string | null) ?? null,
       tienda: uno(x.fin_unidades as Uno<{ nombre: string }>)?.nombre ?? "—",
+      unidadId: (x.unidad_id as string | null) ?? null,
       pagoAparte: aparte.has(x.unidad_id as string),
       orden: (x.orden as string | null) ?? null,
       categoria: (x.categoria as Categoria | null) ?? null,

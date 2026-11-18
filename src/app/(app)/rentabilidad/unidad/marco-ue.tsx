@@ -31,12 +31,17 @@ export function PaginaUE({
   children: ReactNode;
 }) {
   const tiendas = ctx.datos.unidades.map((u) => ({ id: u.id, nombre: u.nombre }));
+  // Con tiendas limitadas, al navegador solo van los fijos de sus tiendas.
+  const supuestos = ctx.datos.limitado
+    ? { ...ctx.supuestos, fijosPorTienda: Object.fromEntries(Object.entries(ctx.supuestos.fijosPorTienda).filter(([id]) => tiendas.some((t) => t.id === id))) }
+    : ctx.supuestos;
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
       <RecordarTienda {...ctx.recordar} />
       <EncabezadoAF4 titulo={titulo} filtros={<Selectores datos={ctx.datos} ruta={ruta} />} datosHasta={ctx.datosHasta} actualizado={actualizado} />
       {children}
-      <SupuestosUE supuestos={ctx.supuestos} tiendas={tiendas} puedeEditar={puedeEditar} enviosSupuestos={envioSupuesto} ordenes={ordenes} />
+      {/* Los supuestos son de toda la empresa: con tiendas limitadas se ven, no se editan (auditoría de seguridad, 18 nov 2026). */}
+      <SupuestosUE supuestos={supuestos} tiendas={tiendas} puedeEditar={puedeEditar && !ctx.datos.limitado} enviosSupuestos={envioSupuesto} ordenes={ordenes} />
     </Pagina>
   );
 }

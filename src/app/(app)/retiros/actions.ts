@@ -10,6 +10,8 @@ import { getUsuarioActual, requireModuloEscritura } from "@/lib/auth";
 import { insertarConCorrelativo, leerCorrelativo } from "@/lib/retiros/correlativo";
 import { ESTADO_ETIQUETA as ETIQUETA_ESTADO, quitaLoRecibidoAlReabrir } from "@/lib/retiros/estados";
 import { revisarConciliacion } from "@/lib/retiros/comision";
+import { filaDePaisPermitida } from "@/lib/seguridad/fila-pais";
+import { puedeVerPaisId, SIN_ACCESO_PAIS } from "@/lib/seguridad/pais-acceso";
 
 const TOLERANCIA_DISCREPANCIA = 3;
 
@@ -30,6 +32,15 @@ async function formatoDelPais(supabase: ReturnType<typeof createServiceClient>, 
 async function registrarEvento(supabase: ReturnType<typeof createServiceClient>, retiroId: string, evento: string) {
   await supabase.from("retiro_eventos").insert({ retiro_id: retiroId, evento });
 }
+
+/**
+ * Con países limitados, solo se toca un retiro (o una cuenta destino) de un país de la persona (auditoría de seguridad,
+ * 18 nov 2026). Sin países limitados no lee nada.
+ */
+const retiroPermitido = (supabase: ReturnType<typeof createServiceClient>, permitidos: string[] | null, id: string) =>
+  filaDePaisPermitida(supabase, permitidos, "retiros", id);
+const cuentaPermitida = (supabase: ReturnType<typeof createServiceClient>, permitidos: string[] | null, id: string | null) =>
+  id ? filaDePaisPermitida(supabase, permitidos, "cuentas_retiro", id) : Promise.resolve(true);
 
 const hoyISO = () => new Date().toISOString().slice(0, 10);
 const esFechaISO = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v);
@@ -54,11 +65,12 @@ async function actualizarTolerante(
 }
 
 export async function alternarConsolidado(formData: FormData) {
-  await requireModuloEscritura("retiros");
+  const usuario = await requireModuloEscritura("retiros");
   const id = formData.get("id") as string;
   const consolidado = formData.get("consolidado") === "true";
 
   const supabase = createServiceClient();
+  if (!(await retiroPermitido(supabase, usuario.paisesPermitidos, id))) throw new Error(SIN_ACCESO_PAIS);
   const { error } = await supabase.from("retiros").update({ consolidado }).eq("id", id);
   if (error) throw new Error(error.message);
 
@@ -74,13 +86,14 @@ export async function alternarConsolidado(formData: FormData) {
 }
 
 export async function registrarSaldo(formData: FormData) {
-  await requireModuloEscritura("retiros");
+  const usuario = await requireModuloEscritura("retiros");
   const pais_id = formData.get("pais_id") as string;
   const plataforma_id = formData.get("plataforma_id") as string;
   const monto = Number(formData.get("monto"));
   const fecha = formData.get("fecha") as string;
 
   const supabase = createServiceClient();
+  if (!(await puedeVerPaisId(supabase, usuario.paisesPermitidos, pais_id))) throw new Error(SIN_ACCESO_PAIS);
   const { error } = await supabase
     .from("saldos_wallet")
     .upsert({ pais_id, plataforma_id, monto, fecha }, { onConflict: "pais_id,plataforma_id,fecha" });
@@ -112,7 +125,7 @@ export async function verSiguienteCorrelativo(): Promise<number | null> {
 }
 
 export async function crearRetiro(formData: FormData) {
-  await requireModuloEscritura("retiros");
+  const autor = await requireModuloEscritura("retiros");
   const pais_id = formData.get("pais_id") as string;
   const plataforma_id = formData.get("plataforma_id") as string;
   const cuenta_retiro_id = (formData.get("cuenta_retiro_id") as string) || null;
@@ -144,6 +157,8 @@ export async function crearRetiro(formData: FormData) {
   const correlativoPedido = leerCorrelativo(formData.get("numero_correlativo") as string | null);
 
   const supabase = createServiceClient();
+  if (!(await puedeVerPaisId(supabase, autor.paisesPermitidos, pais_id))) throw new Error(SIN_ACCESO_PAIS);
+  if (!(await cuentaPermitida(supabase, autor.paisesPermitidos, cuenta_retiro_id))) throw new Error(SIN_ACCESO_PAIS);
   const { data, error } = await insertarConCorrelativo<{ id: string; numero_correlativo: number }>(
     async (numero_correlativo) =>
       await supabase
@@ -188,7 +203,7 @@ export async function crearRetiro(formData: FormData) {
 }
 
 export async function cerrarRetiro(formData: FormData) {
-  await requireModuloEscritura("retiros");
+  const usuario = await requireModuloEscritura("retiros");
   const id = formData.get("id") as string;
   if (!esUuid(id)) throw new Error("Retiro no válido.");
   const soporte_numero = (formData.get("soporte_numero") as string) || null;
@@ -203,6 +218,7 @@ export async function cerrarRetiro(formData: FormData) {
     .eq("id", id)
     .single();
   if (errorRetiro) throw new Error(errorRetiro.message);
+  if (!(await puedeVerPaisId(supabase, usuario.paisesPermitidos, retiro.pais_id as string))) throw new Error(SIN_ACCESO_PAIS);
   const m = await formatoDelPais(supabase, retiro.pais_id as string);
 
   let comprobante_path = retiro.comprobante_path as string | null;
@@ -269,7 +285,7 @@ export async function cerrarRetiro(formData: FormData) {
  * hizo la conciliación en el sistema, no cuándo llegó el dinero).
  */
 export async function conciliarRetiro(formData: FormData): Promise<{ error?: string }> {
-  await requireModuloEscritura("retiros");
+  const usuario = await requireModuloEscritura("retiros");
   const id = formData.get("id") as string;
   if (!esUuid(id)) return { error: "Retiro no válido." };
   const soporte_numero = (formData.get("soporte_numero") as string) || null;
@@ -285,6 +301,7 @@ export async function conciliarRetiro(formData: FormData): Promise<{ error?: str
   // `*` y no una lista: `novedad_resuelta` (migración 0048) puede no existir todavía.
   const { data: retiro, error: errorRetiro } = await supabase.from("retiros").select("*").eq("id", id).single();
   if (errorRetiro) return { error: errorRetiro.message };
+  if (!(await puedeVerPaisId(supabase, usuario.paisesPermitidos, retiro.pais_id as string))) return { error: SIN_ACCESO_PAIS };
 
   // Un cancelado o una novedad resuelta ya terminaron su ciclo: no siguen a Conciliado (se vuelve a comprobar
   // aquí porque un server action se puede invocar sin pasar por la ficha, que ya oculta el botón).
@@ -366,10 +383,11 @@ export async function conciliarRetiro(formData: FormData): Promise<{ error?: str
 }
 
 export async function cancelarRetiro(formData: FormData) {
-  await requireModuloEscritura("retiros");
+  const usuario = await requireModuloEscritura("retiros");
   const id = formData.get("id") as string;
 
   const supabase = createServiceClient();
+  if (!(await retiroPermitido(supabase, usuario.paisesPermitidos, id))) throw new Error(SIN_ACCESO_PAIS);
   const { data: retiro } = await supabase.from("retiros").select("estado, estado_dropi").eq("id", id).single();
   // Solo un retiro en curso se cancela; uno cerrado o ya cancelado no cambia.
   if (retiro && retiro.estado !== "abierto" && retiro.estado !== "novedad") return;
@@ -419,13 +437,14 @@ const MAX_NOVEDAD = 500;
  * excepción.
  */
 export async function agregarNovedadRetiro(formData: FormData): Promise<{ error?: string }> {
-  await requireModuloEscritura("retiros");
+  const usuario = await requireModuloEscritura("retiros");
   const id = formData.get("id") as string;
   // La nota es opcional: se puede marcar la novedad sin explicarla todavía.
   const texto = String(formData.get("novedad") ?? "").trim();
   if (texto.length > MAX_NOVEDAD) return { error: `La novedad es muy larga (máximo ${MAX_NOVEDAD} caracteres).` };
 
   const supabase = createServiceClient();
+  if (!(await retiroPermitido(supabase, usuario.paisesPermitidos, id))) return { error: SIN_ACCESO_PAIS };
   const { data: retiro, error: errorRetiro } = await supabase.from("retiros").select("estado").eq("id", id).single();
   if (errorRetiro) return { error: errorRetiro.message };
   if (retiro.estado !== "abierto") return { error: "Solo se puede agregar una novedad a un retiro abierto." };
@@ -462,12 +481,13 @@ export async function agregarNovedadRetiro(formData: FormData): Promise<{ error?
  * la nueva nota reemplaza a la anterior sin borrar el rastro de la edición. Solo actúa mientras el retiro sigue en
  * «novedad» (no pisa una resolución que haya pasado mientras la ficha estaba abierta). Devuelve el error como valor. */
 export async function actualizarNovedadRetiro(formData: FormData): Promise<{ error?: string }> {
-  await requireModuloEscritura("retiros");
+  const usuario = await requireModuloEscritura("retiros");
   const id = formData.get("id") as string;
   const texto = String(formData.get("novedad") ?? "").trim();
   if (texto.length > MAX_NOVEDAD) return { error: `La novedad es muy larga (máximo ${MAX_NOVEDAD} caracteres).` };
 
   const supabase = createServiceClient();
+  if (!(await retiroPermitido(supabase, usuario.paisesPermitidos, id))) return { error: SIN_ACCESO_PAIS };
   const { data: retiro, error: errorRetiro } = await supabase.from("retiros").select("estado").eq("id", id).single();
   if (errorRetiro) return { error: errorRetiro.message };
   if (retiro.estado !== "novedad") return { error: "Esta novedad ya no está activa." };
@@ -493,7 +513,7 @@ export async function actualizarNovedadRetiro(formData: FormData): Promise<{ err
  * actúa si de verdad está en novedad (evita pisar un cierre o una cancelación que haya pasado mientras la ficha
  * estaba abierta). Devuelve el error como valor, porque en producción Next.js oculta el mensaje de una excepción. */
 export async function resolverNovedadRetiro(formData: FormData): Promise<{ error?: string }> {
-  await requireModuloEscritura("retiros");
+  const usuario = await requireModuloEscritura("retiros");
   const id = formData.get("id") as string;
   // Cuándo llegó el dinero (obligatoria) y cuándo se consolida (arranca en hoy, editable): las dos fechas de la etapa.
   const fecha_recibido = String(formData.get("fecha_recibido") ?? "").trim();
@@ -502,6 +522,7 @@ export async function resolverNovedadRetiro(formData: FormData): Promise<{ error
   if (!esFechaISO(fecha_cierre)) return { error: "La fecha de consolidación no es válida." };
 
   const supabase = createServiceClient();
+  if (!(await retiroPermitido(supabase, usuario.paisesPermitidos, id))) return { error: SIN_ACCESO_PAIS };
   const { data: retiro, error: errorRetiro } = await supabase.from("retiros").select("estado").eq("id", id).single();
   if (errorRetiro) return { error: errorRetiro.message };
   if (retiro.estado !== "novedad") return {};
@@ -544,7 +565,7 @@ export async function resolverNovedadRetiro(formData: FormData): Promise<{ error
  * tabla ni en lote: solo cambia desde acá (o al conciliar, al cancelar, o con «Resolver» para
  * resolver una novedad). No toca el correlativo. */
 export async function actualizarRetiro(formData: FormData) {
-  await requireModuloEscritura("retiros");
+  const usuario = await requireModuloEscritura("retiros");
   const id = formData.get("id") as string;
   const plataforma_id = formData.get("plataforma_id") as string;
   const cuenta_retiro_id = (formData.get("cuenta_retiro_id") as string) || null;
@@ -566,6 +587,8 @@ export async function actualizarRetiro(formData: FormData) {
     .eq("id", id)
     .single();
   if (errorAntes) throw new Error(errorAntes.message);
+  if (!(await puedeVerPaisId(supabase, usuario.paisesPermitidos, antes.pais_id as string))) throw new Error(SIN_ACCESO_PAIS);
+  if (!(await cuentaPermitida(supabase, usuario.paisesPermitidos, cuenta_retiro_id))) throw new Error(SIN_ACCESO_PAIS);
   const m = await formatoDelPais(supabase, antes.pais_id as string);
 
   // El estado solo se toca si viene en el formulario y es uno editable a mano (abierto, novedad o
@@ -639,10 +662,11 @@ export async function actualizarRetiro(formData: FormData) {
  * eliminarCuentaRetiro. Devuelve el error como valor en vez de lanzarlo, porque en producción
  * Next.js oculta el mensaje de cualquier excepción de un server action. */
 export async function eliminarRetiro(formData: FormData): Promise<{ error?: string }> {
-  await requireModuloEscritura("retiros");
+  const usuario = await requireModuloEscritura("retiros");
   const id = formData.get("id") as string;
 
   const supabase = createServiceClient();
+  if (!(await retiroPermitido(supabase, usuario.paisesPermitidos, id))) return { error: SIN_ACCESO_PAIS };
   const { error } = await supabase.from("retiros").delete().eq("id", id);
   if (error) return { error: error.message };
 

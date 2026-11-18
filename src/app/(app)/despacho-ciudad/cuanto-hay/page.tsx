@@ -5,7 +5,8 @@ import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { requireModulo } from "@/lib/auth";
 import { cargarPreguntasDespacho, cargarTiendasCuantoHay, contarAbiertas } from "@/lib/cuanto-hay/datos";
-import { agruparPorTienda } from "@/lib/cuanto-hay/reglas";
+import { agruparPorTienda, tiendasDePersona } from "@/lib/cuanto-hay/reglas";
+import { cargarTiendasPermitidas } from "@/lib/finanzas/cargar-tiendas-permitidas";
 import { createServiceClient } from "@/lib/supabase/server";
 
 export const metadata = { title: "Responder cuánto hay" };
@@ -22,9 +23,15 @@ export default async function ResponderCuantoHayPage({ searchParams }: { searchP
   const sp = await searchParams;
   const respondidas = sp.ver === "respondidas";
   const supabase = createServiceClient();
-  const tiendas = await cargarTiendasCuantoHay(supabase);
+  // Con tiendas limitadas, solo las preguntas de sus tiendas (auditoría de seguridad, 18 nov 2026).
+  const permitidas = await cargarTiendasPermitidas();
+  const tiendas = tiendasDePersona(await cargarTiendasCuantoHay(supabase), permitidas, (t) => t.unidadId);
+  const suyas = new Set(tiendas.map((t) => t.id));
   const tiendaElegida = typeof sp.tienda === "string" && tiendas.some((t) => t.id === sp.tienda) ? sp.tienda : null;
-  const [{ preguntas, faltaMigracion }, abiertas] = await Promise.all([cargarPreguntasDespacho(supabase, respondidas, tiendas), contarAbiertas(supabase)]);
+  const [todas, todasAbiertas] = await Promise.all([cargarPreguntasDespacho(supabase, respondidas, tiendas), contarAbiertas(supabase)]);
+  const { faltaMigracion } = todas;
+  const preguntas = permitidas ? todas.preguntas.filter((p) => suyas.has(p.tiendaId)) : todas.preguntas;
+  const abiertas = permitidas ? Object.fromEntries(Object.entries(todasAbiertas).filter(([id]) => suyas.has(id))) : todasAbiertas;
   const grupos = agruparPorTienda(
     preguntas.filter((p) => !tiendaElegida || p.tiendaId === tiendaElegida),
     tiendas.map((t) => ({ id: t.id, nombre: t.nombre })),
