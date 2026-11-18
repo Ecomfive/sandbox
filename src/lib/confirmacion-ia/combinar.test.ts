@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { combinar, etiquetaDeZona, leerRespuesta, limpiarFalta, mensajePedirDetalle, type ResultadoModelo } from "./combinar";
+import { combinar, etiquetaDeZona, faltaParaCliente, leerRespuesta, limpiarFalta, mensajePedirDetalle, type ResultadoModelo } from "./combinar";
 
 const ok = (proveedor: "openai" | "anthropic", zona: "ciudad" | "interior" | "adelantado" | "no_se", completa: boolean, falta: string | null = null): ResultadoModelo => ({
   proveedor,
@@ -71,4 +71,15 @@ test("pago por adelantado: si las dos IA lo ven así, queda en espera de pago y 
   assert.equal(dudan.estado, "revisar", "si una IA no coincide, se revisa");
   assert.equal(etiquetaDeZona("adelantado", { etiquetaCiudad: "CIUDAD", etiquetaInterior: "INTERIOR/SERVIENTREGA" }), null);
   assert.equal(leerRespuesta('{"zona":"adelantado","completa":true,"falta":null,"motivo":"x"}')?.zona, "adelantado");
+});
+
+test("faltaParaCliente: el mensaje automático solo lleva frases fijas, nunca el texto libre de la IA", () => {
+  assert.equal(faltaParaCliente("el número de casa o una referencia"), "el número de casa o un punto de referencia");
+  assert.equal(faltaParaCliente("la calle y el número de casa"), "la calle o el sector y el número de casa o un punto de referencia");
+  assert.equal(faltaParaCliente("el corregimiento"), "la ciudad o el corregimiento");
+  // Una dirección de otro cliente copiada por la IA no pasa: queda solo la frase fija.
+  const copiada = faltaParaCliente("Calle Ficticia 1, Casa 9, Barrio Prueba");
+  assert.ok(!/ficticia|prueba|9/i.test(copiada), copiada);
+  assert.equal(faltaParaCliente("algo raro"), "los datos que faltan de tu dirección (la calle o el sector y el número de casa o un punto de referencia)");
+  assert.equal(faltaParaCliente(null), "los datos que faltan de tu dirección (la calle o el sector y el número de casa o un punto de referencia)");
 });

@@ -198,7 +198,7 @@ test("un mensaje borrado «para todos» no es un mensaje nuevo: apunta al origin
       ],
     }),
   );
-  assert.deepEqual(revocados, [{ waIdOriginal: "wamid.ORIGINAL", momento: new Date(1700000100 * 1000).toISOString() }]);
+  assert.deepEqual(revocados, [{ waIdOriginal: "wamid.ORIGINAL", momento: new Date(1700000100 * 1000).toISOString(), telefono: "+50761112233", direccion: "entrante" }]);
   assert.deepEqual(mensajes.map((m) => m.waId), ["wamid.NUEVO"]);
 });
 
@@ -229,7 +229,7 @@ test("un mensaje que el equipo borra «para todos» desde la app (eco revoke) no
       },
     ],
   });
-  assert.deepEqual(revocados, [{ waIdOriginal: "wamid.MIO", momento: new Date(1793040100 * 1000).toISOString() }]);
+  assert.deepEqual(revocados, [{ waIdOriginal: "wamid.MIO", momento: new Date(1793040100 * 1000).toISOString(), telefono: "+50761112233", direccion: "saliente" }]);
   assert.deepEqual(ecos.map((e) => e.waId), ["wamid.T"]);
 });
 
@@ -249,8 +249,8 @@ test("un mensaje editado (de un cliente o desde la app) no es un mensaje nuevo: 
   );
   assert.equal(cliente.mensajes.length, 0);
   assert.deepEqual(cliente.editados, [
-    { waIdOriginal: "wamid.ORIG", texto: "Hola Michael, un gusto", momento: new Date(1793040300 * 1000).toISOString() },
-    { waIdOriginal: "wamid.FOTO", texto: "Pie nuevo", momento: new Date(1793040300 * 1000).toISOString() },
+    { waIdOriginal: "wamid.ORIG", texto: "Hola Michael, un gusto", momento: new Date(1793040300 * 1000).toISOString(), telefono: "+50761112233", direccion: "entrante" },
+    { waIdOriginal: "wamid.FOTO", texto: "Pie nuevo", momento: new Date(1793040300 * 1000).toISOString(), telefono: "+50761112233", direccion: "entrante" },
   ]);
   const eco = extraerAviso({
     object: "whatsapp_business_account",

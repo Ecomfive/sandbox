@@ -32,6 +32,12 @@ export interface MensajeEntrante {
 export interface RevocadoEntrante {
   waIdOriginal: string;
   momento: string;
+  /**
+   * Quién lo borró: el teléfono (o id de usuario) del contacto del chat, y si el original era suyo («entrante») o del equipo («saliente», un eco del
+   * celular). Solo se marca un original de ese chat y de esa dirección: un aviso no puede tocar mensajes de otro chat ni de otro autor.
+   */
+  telefono: string;
+  direccion: "entrante" | "saliente";
 }
 
 /**
@@ -43,6 +49,9 @@ export interface EditadoEntrante {
   /** El texto nuevo (o el pie de la foto o del documento). */
   texto: string;
   momento: string;
+  /** Igual que en RevocadoEntrante: el chat (teléfono del contacto) y la dirección del original que se puede editar. */
+  telefono: string;
+  direccion: "entrante" | "saliente";
 }
 
 export type EstadoMensaje = "enviado" | "entregado" | "leido" | "fallido";
@@ -185,13 +194,13 @@ export function extraerAviso(
           // Lo que el equipo borra «para todos» en la app tampoco se borra aquí: se marca el original (guardar.ts).
           if (String(m.type ?? "") === "revoke") {
             const original = texto(obj(m.revoke).original_message_id);
-            if (original) revocados.push({ waIdOriginal: original, momento: momentoDe(m.timestamp) });
+            if (original) revocados.push({ waIdOriginal: original, momento: momentoDe(m.timestamp), telefono: conMas(para)!, direccion: "saliente" });
             continue;
           }
           // Una edición no es un mensaje nuevo: cambia el texto del original (guardar.ts). Una que no trae texto se ignora.
           if (String(m.type ?? "") === "edit") {
             const ed = edicionDe(m);
-            if (ed) editados.push({ ...ed, momento: momentoDe(m.timestamp) });
+            if (ed) editados.push({ ...ed, momento: momentoDe(m.timestamp), telefono: conMas(para)!, direccion: "saliente" });
             continue;
           }
           ecos.push({ phoneNumberId, numeroEmpresa, telefono: conMas(para)!, nombre: null, waId, ...contenidoDe(m), momento: momentoDe(m.timestamp) });
@@ -200,20 +209,20 @@ export function extraerAviso(
       }
       const nombres = new Map(lista(valor.contacts).map((c) => [String(obj(c).wa_id ?? obj(c).user_id ?? ""), texto(obj(obj(c).profile).name)]));
       for (const m of lista(valor.messages).map(obj)) {
-        // Lo que alguien borra «para todos» en WhatsApp no borra nada aquí: se marca el original (guardar.ts).
+        const de = texto(m.from);
+        // Sin teléfono compartido (BSUID): se guarda el id tal cual y se le responde con `recipient` (ver api.ts).
+        const usuario = de ? null : texto(m.from_user_id);
+        // Lo que alguien borra «para todos» en WhatsApp no borra nada aquí: se marca el original (guardar.ts), solo si es suyo.
         if (String(m.type ?? "") === "revoke") {
           const original = texto(obj(m.revoke).original_message_id);
-          if (original) revocados.push({ waIdOriginal: original, momento: momentoDe(m.timestamp) });
+          if (original && (de || usuario)) revocados.push({ waIdOriginal: original, momento: momentoDe(m.timestamp), telefono: de ? conMas(de)! : usuario!, direccion: "entrante" });
           continue;
         }
         if (String(m.type ?? "") === "edit") {
           const ed = edicionDe(m);
-          if (ed) editados.push({ ...ed, momento: momentoDe(m.timestamp) });
+          if (ed && (de || usuario)) editados.push({ ...ed, momento: momentoDe(m.timestamp), telefono: de ? conMas(de)! : usuario!, direccion: "entrante" });
           continue;
         }
-        const de = texto(m.from);
-        // Sin teléfono compartido (BSUID): se guarda el id tal cual y se le responde con `recipient` (ver api.ts).
-        const usuario = de ? null : texto(m.from_user_id);
         const waId = texto(m.id);
         if ((!de && !usuario) || !waId) continue;
         const telefono = de ? conMas(de)! : usuario!;

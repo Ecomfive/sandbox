@@ -46,7 +46,17 @@ interface Permiso {
   solo_lectura: boolean;
 }
 
-/** Lo afinado y lo propio de una persona (migración 0118). Cada consulta falla en silencio: sin la migración todos ven lo de siempre. */
+/**
+ * Si un error de la base es solo «esa tabla o columna todavía no existe» (una migración sin correr). Ese caso, y solo ese, se trata como «sin
+ * restricciones nuevas». Cualquier otro error (tiempo de espera, conexión) corta la petición: un límite que no se pudo leer no puede valer como
+ * «sin límite» (auditoría de seguridad, 18 nov 2026).
+ */
+export function esFaltaDeMigracion(error: unknown): boolean {
+  const codigo = String((error as { code?: unknown } | null)?.code ?? "");
+  return codigo === "42P01" || codigo === "42703" || codigo === "PGRST204" || codigo === "PGRST205";
+}
+
+/** Lo afinado y lo propio de una persona (migración 0118). Sin la migración todos ven lo de siempre; con otro error, la petición falla (no se abre). */
 interface PermisosFinos {
   propios: PermisoPropio[];
   afinadosPersona: FilaAfinada[];
@@ -55,12 +65,12 @@ interface PermisosFinos {
 
 async function cargarPermisosFinos(supabase: ReturnType<typeof createServiceClient>, perfilId: string): Promise<PermisosFinos> {
   const seguro = async <T,>(consulta: PromiseLike<{ data: T[] | null; error: unknown }>): Promise<T[]> => {
-    try {
-      const r = await consulta;
-      return r.error ? [] : (r.data ?? []);
-    } catch {
-      return [];
+    const r = await consulta;
+    if (r.error) {
+      if (esFaltaDeMigracion(r.error)) return [];
+      throw new Error("No se pudieron leer los permisos de la persona.");
     }
+    return r.data ?? [];
   };
   const [propios, afinadosPersona, afinadosRoles] = await Promise.all([
     seguro<PermisoPropio>(supabase.from("permisos_persona").select("modulo, nivel").eq("perfil_id", perfilId)),
@@ -115,6 +125,8 @@ export const getUsuarioActual = cache(async (): Promise<UsuarioActual | null> =>
   // los países, que es lo que veía.
   const columnas = "id, email, nombre, avatar_url, activo, rol_id, primer_ingreso_en, roles(id, nombre, permisos_rol(modulo, solo_lectura))";
   let completo = await supabase.from("perfiles").select(`${columnas}, paises_permitidos`).eq("id", userId).maybeSingle();
+  // Solo se vuelve a pedir sin `paises_permitidos` si la columna no existe; con cualquier otro error no se sigue (no se abre a todos los países).
+  if (completo.error && !esFaltaDeMigracion(completo.error)) throw new Error("No se pudo leer el perfil de la persona.");
   if (completo.error) completo = (await supabase.from("perfiles").select(columnas).eq("id", userId).maybeSingle()) as typeof completo;
   const perfil = completo.error
     ? (

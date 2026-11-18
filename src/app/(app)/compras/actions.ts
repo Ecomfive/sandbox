@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { activarTareasDeLlegada } from "@/lib/crm/tareas-servidor";
-import { rutaPropia } from "@/lib/seguridad/ruta-almacen";
+import { rutaPropia, rutaEnCarpeta } from "@/lib/seguridad/ruta-almacen";
 import { createServiceClient } from "@/lib/supabase/server";
 import { descontinuadoEn } from "@/lib/producto/descontinuado-pais";
 import { registrarAuditoria, registrarAuditoriaLote } from "@/lib/auditoria";
@@ -1070,7 +1070,7 @@ export async function prepararSubidaAdjuntoComentario(compraId: string, nombreAr
  */
 async function borrarSubidos(compraId: string, rutas: (string | null | undefined)[]) {
   const carpeta = `comentarios/${compraId}/`;
-  const candidatas = [...new Set(rutas.filter((r): r is string => typeof r === "string" && r.startsWith(carpeta) && !r.includes("..") && r.length <= 300))];
+  const candidatas = [...new Set(rutas.filter((r): r is string => typeof r === "string" && rutaEnCarpeta(r, carpeta)))];
   if (!candidatas.length) return;
   const supabase = createServiceClient();
   const { data: usadas, error } = await supabase.from("wms_compra_adjuntos").select("ruta").in("ruta", candidatas);
@@ -1082,14 +1082,14 @@ async function borrarSubidos(compraId: string, rutas: (string | null | undefined
 
 /** Borra del almacenamiento los archivos de un comentario cuyas rutas salieron de la base (no del navegador). */
 async function borrarArchivosGuardados(rutas: string[]) {
-  const propias = rutas.filter((r) => r.startsWith("comentarios/") && !r.includes(".."));
+  const propias = rutas.filter((r) => rutaEnCarpeta(r, "comentarios/"));
   if (propias.length) await createServiceClient().storage.from(BUCKET_COMPRAS).remove(propias);
 }
 
 /** Descarta un archivo que se subió pero se quitó antes de comentar. Solo borra de la carpeta de esa compra. */
 export async function descartarAdjuntoSubido(compraId: string, ruta: string): Promise<void> {
   await requireModuloEscritura("compras");
-  if (typeof compraId !== "string" || !ES_ID(compraId) || typeof ruta !== "string" || !ruta.startsWith(`comentarios/${compraId}/`) || ruta.includes("..")) return;
+  if (typeof compraId !== "string" || !ES_ID(compraId) || !rutaEnCarpeta(ruta, `comentarios/${compraId}/`)) return;
   if (await sinAccesoACompras([compraId])) return;
   await borrarSubidos(compraId, [ruta]);
 }
@@ -1110,7 +1110,7 @@ async function revisarAdjuntosSubidos(
   };
   if (archivos.length > MAX_ADJUNTOS_COMENTARIO) return falla(`Un comentario lleva hasta ${MAX_ADJUNTOS_COMENTARIO} archivos.`);
   const carpeta = `comentarios/${compraId}/`;
-  if (rutas.some((r) => !r.startsWith(carpeta) || r.includes("..") || r.length > 300)) return falla("Hay un archivo que no es de esta compra.");
+  if (rutas.some((r) => !rutaEnCarpeta(r, carpeta))) return falla("Hay un archivo que no es de esta compra.");
   if (new Set(rutas).size !== rutas.length) return falla("Hay un archivo repetido.");
   // Un archivo que ya es de otro comentario no se puede volver a adjuntar (luego, al quitarlo, se borraría el ajeno).
   const { data: yaUsadas, error: errorUsadas } = await createServiceClient().from("wms_compra_adjuntos").select("ruta").in("ruta", rutas);

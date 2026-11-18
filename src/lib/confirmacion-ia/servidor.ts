@@ -15,7 +15,7 @@ import { etiquetasDe, mismaTiendaUnidad, zonaDeEtiquetas } from "@/lib/tienda/or
 import { destinatariosDe } from "@/lib/compras/llegadas-servidor";
 import { geografiaDe } from "./geografia";
 import { motivoDeAdelanto, zonasDeAdelanto } from "./adelanto";
-import { combinar, etiquetaDeZona, leerRespuesta, mensajePagoAdelantado, mensajePedirDetalle, type Combinado, type EstadoAnalisis, type ResultadoModelo } from "./combinar";
+import { combinar, etiquetaDeZona, faltaParaCliente, leerRespuesta, mensajePagoAdelantado, mensajePedirDetalle, type Combinado, type EstadoAnalisis, type ResultadoModelo } from "./combinar";
 import { armarEntrada, type EjemploPrompt } from "./prompt";
 import { resultadoFinal, seleccionarEjemplos, type RevisionPedido, type ResultadoPedido } from "./revision";
 import { coincidencias, normalizarTexto, zonaPorReglas, type ReglaZona, type Zona } from "./zonas";
@@ -276,7 +276,8 @@ export async function analizarOrden(supabase: SupabaseClient, ordenId: string, o
   let enviados = Number(previo?.mensajes_enviados ?? 0);
   let enviadoEn: string | null = null;
   if (c.estado === "falta_dato" && c.falta) {
-    mensaje = mensajePedirDetalle({ nombre: o.cliente.nombre, numero: o.numero, tienda: o.tiendaNombre, falta: c.falta });
+    // Lo que sale solo al cliente va en frases fijas, nunca con el texto libre de la IA (ver faltaParaCliente).
+    mensaje = mensajePedirDetalle({ nombre: o.cliente.nombre, numero: o.numero, tienda: o.tiendaNombre, falta: faltaParaCliente(c.falta) });
     if (!config.enviarMensajes) mensajeEstado = "apagado";
     else if (enviados >= MAX_MENSAJES) mensajeEstado = (previo?.mensaje_estado as EstadoMensaje | undefined) ?? "enviado";
     else {
