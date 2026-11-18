@@ -5,7 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { agrupar, copyLimpio, landingLimpia, type Elemento } from "./agrupar";
 import { CPA_TOPE_PREDETERMINADO, resultado, sinResultados, sumar, type Resultados } from "./metricas";
-import { claveDeProducto, NOMBRE_ETAPA, NOMBRE_PUJA, type Estructura, type Etapa, type Puja } from "./nombre";
+import { claveDeProducto, NOMBRE_ETAPA, NOMBRE_PUJA, numeroDeVideo, type Estructura, type Etapa, type Puja } from "./nombre";
 import { detalleLegible, esCreacionDeCampana } from "./normalizar";
 import { diasEntre, pendientes, sugerir, type DecisionGuardada, type Sugerencia } from "./sugerencias";
 import type { ActividadVista, AnuncioVista, CampanaVista, Grupo, VideoVista } from "./vistas";
@@ -121,7 +121,7 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
 
   const desdeDatos = restar(o.hoy, Math.max(dias * 2, 30) - 1);
   const [camp, anun, dia, act] = await Promise.all([
-    traerTodasLasFilas<Record<string, unknown>>((a, b) => supabase.from("meta_campanas").select("id, cuenta_id, meta_id, nombre, estado, estructura, puja, presupuesto_diario, creada_meta_en, producto, angulo, etapa, manual, creada_por").in("cuenta_id", ids).range(a, b)),
+    traerTodasLasFilas<Record<string, unknown>>((a, b) => supabase.from("meta_campanas").select("id, cuenta_id, meta_id, nombre, estado, estructura, puja, presupuesto_diario, creada_meta_en, producto, angulo, etapa, manual, creada_por, mercado, videos, persona_nombre").in("cuenta_id", ids).range(a, b)),
     traerTodasLasFilas<Record<string, unknown>>((a, b) => supabase.from("meta_anuncios").select("id, campana_id, nombre, estado, video_id, miniatura, copy, titulo, landing").in("cuenta_id", ids).range(a, b)),
     traerTodasLasFilas<FilaDia>((a, b) => supabase.from("meta_resultados_dia").select("anuncio_id, campana_id, fecha, gasto, impresiones, clics, video_3s, video_15s, vio_landing, carrito, pago, compras, valor").in("cuenta_id", ids).gte("fecha", desdeDatos).order("fecha").range(a, b)),
     traerTodasLasFilas<Record<string, unknown>>((a, b) => supabase.from("meta_actividad").select("fecha, actor_nombre, tipo, objeto_tipo, objeto_meta_id, objeto_nombre").in("cuenta_id", ids).gte("fecha", `${restar(o.hoy, 29)}T00:00:00Z`).order("fecha", { ascending: false }).range(a, b)).catch(() => []),
@@ -134,6 +134,7 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
   const porAnuncio = new Map<string, Resultados>();
   const serie = new Map<string, { fecha: string; r: Resultados }[]>();
   const porVideo30 = new Map<string, Resultados>();
+  const porAnuncio30 = new Map<string, Resultados>();
   let totales = sinResultados();
   let anteriores = sinResultados();
   const desde7 = restar(o.hoy, 6);
@@ -151,6 +152,7 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
       porCampana30.set(f.campana_id, sumar(porCampana30.get(f.campana_id) ?? sinResultados(), r));
       const v = anuncioDe.get(f.anuncio_id)?.video_id as string | undefined;
       if (v) porVideo30.set(v, sumar(porVideo30.get(v) ?? sinResultados(), r));
+      porAnuncio30.set(f.anuncio_id, sumar(porAnuncio30.get(f.anuncio_id) ?? sinResultados(), r));
     }
     if (f.fecha >= desde14) {
       const l = serie.get(f.campana_id) ?? [];
@@ -172,7 +174,11 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
       id: c.id as string, cuentaId: c.cuenta_id as string, cuentaNombre: nombreCuenta.get(c.cuenta_id as string) ?? "", metaId: c.meta_id as string, nombre: c.nombre as string, estado: c.estado as string, activa: c.estado === "ACTIVE",
       etapa: (c.etapa as Etapa | null) ?? null, estructura: (c.estructura as Estructura | null) ?? null, puja: (c.puja as Puja | null) ?? null, producto: (c.producto as string | null) ?? null, angulo: (c.angulo as string | null) ?? null,
       presupuestoDiario: c.presupuesto_diario === null || c.presupuesto_diario === undefined ? null : num(c.presupuesto_diario), creadaEn: (c.creada_meta_en as string | null) ?? null,
-      persona: (c.creada_por as string | null) ?? creaciones.get(c.meta_id as string) ?? null, r, tope: tope ?? CPA_TOPE_PREDETERMINADO, topeDefinido: tope !== undefined, manual: (c.manual as string[] | null) ?? [],
+      persona: (c.persona_nombre as string | null) ?? (c.creada_por as string | null) ?? creaciones.get(c.meta_id as string) ?? null,
+      personaMeta: (c.creada_por as string | null) ?? creaciones.get(c.meta_id as string) ?? null,
+      mercado: (c.mercado as string | null) ?? null,
+      videos: (c.videos as string | null) ?? null,
+      r, tope: tope ?? CPA_TOPE_PREDETERMINADO, topeDefinido: tope !== undefined, manual: (c.manual as string[] | null) ?? [],
     };
   };
   const campanas = camp.map((c) => armar(c, porCampana.get(c.id as string) ?? sinResultados()));
@@ -183,24 +189,27 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
   const anuncios: AnuncioVista[] = anun.map((a) => ({ id: a.id as string, campanaId: a.campana_id as string, nombre: a.nombre as string, activo: a.estado === "ACTIVE", videoId: (a.video_id as string | null) ?? null, miniatura: (a.miniatura as string | null) ?? null, copy: (a.copy as string | null) ?? null, titulo: (a.titulo as string | null) ?? null, landing: (a.landing as string | null) ?? null, r: porAnuncio.get(a.id as string) ?? sinResultados() }));
 
   // Videos (30 días): el mismo video en varios anuncios es uno solo.
-  const videosMapa = new Map<string, { nombre: string; miniatura: string | null; anuncios: number; campanas: Set<string>; angulos: Map<string, number>; productos: Map<string, number> }>();
+  const videosMapa = new Map<string, { nombre: string; miniatura: string | null; anuncios: number; campanas: Set<string>; angulos: Map<string, number>; productos: Map<string, number>; detalle: VideoVista["anunciosDetalle"]; numero: string | null }>();
   for (const a of anun) {
     const v = a.video_id as string | null;
     if (!v) continue;
-    const g = videosMapa.get(v) ?? { nombre: (a.titulo as string | null) || (a.nombre as string), miniatura: (a.miniatura as string | null) ?? null, anuncios: 0, campanas: new Set<string>(), angulos: new Map(), productos: new Map() };
+    const g = videosMapa.get(v) ?? { nombre: (a.titulo as string | null) || (a.nombre as string), miniatura: (a.miniatura as string | null) ?? null, anuncios: 0, campanas: new Set<string>(), angulos: new Map(), productos: new Map(), detalle: [] as VideoVista["anunciosDetalle"], numero: null };
     g.anuncios++;
     g.campanas.add(a.campana_id as string);
     const c = campanasDe.get(a.campana_id as string);
     if (c?.angulo) g.angulos.set(c.angulo, (g.angulos.get(c.angulo) ?? 0) + 1);
     if (c?.producto) g.productos.set(c.producto, (g.productos.get(c.producto) ?? 1) + 1);
     if (!g.miniatura && a.miniatura) g.miniatura = a.miniatura as string;
+    // El número del video («V3») sale del nombre del anuncio: así se sabe cuál de la tanda es.
+    g.numero ??= numeroDeVideo(`${a.nombre as string} ${(a.titulo as string | null) ?? ""}`);
+    g.detalle.push({ id: a.id as string, nombre: a.nombre as string, activo: a.estado === "ACTIVE", campanaId: a.campana_id as string, campanaNombre: c?.nombre ?? "", etapa: c?.etapa ?? null, r: porAnuncio30.get(a.id as string) ?? sinResultados() });
     videosMapa.set(v, g);
   }
   const masFrecuente = (m: Map<string, number>) => [...m].sort((x, y) => y[1] - x[1])[0]?.[0] ?? null;
   const videos: VideoVista[] = [...videosMapa]
     .map(([id, g]) => {
       const producto = masFrecuente(g.productos);
-      return { id, nombre: g.nombre, miniatura: g.miniatura, producto, angulo: masFrecuente(g.angulos), campanas: g.campanas.size, anuncios: g.anuncios, r: porVideo30.get(id) ?? sinResultados(), tope: topePorClave.get(claveDeProducto(producto)) ?? CPA_TOPE_PREDETERMINADO };
+      return { id, nombre: g.nombre, miniatura: g.miniatura, producto, angulo: masFrecuente(g.angulos), campanas: g.campanas.size, anuncios: g.anuncios, numero: g.numero, anunciosDetalle: g.detalle.sort((x, y) => y.r.gasto - x.r.gasto), r: porVideo30.get(id) ?? sinResultados(), tope: topePorClave.get(claveDeProducto(producto)) ?? CPA_TOPE_PREDETERMINADO };
     })
     .filter((v) => v.r.gasto > 0)
     .sort((a, b) => b.r.gasto - a.r.gasto);
