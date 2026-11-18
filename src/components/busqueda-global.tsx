@@ -39,7 +39,8 @@ const ICONO: Record<TipoOpcion, typeof MasIcon> = { accion: MasIcon, pagina: Che
  * páginas al instante y busca retiros (por correlativo), pedidos, productos, productos en test y dropshippers. Se usa con
  * flechas, Enter y Escape (patrón combobox con `aria-activedescendant`).
  */
-export function BusquedaGlobal({ paginas, acciones }: { paginas: PaginaBuscable[]; acciones: AccionCrear[] }) {
+/** `conBoton` false (18 nov 2026: la barra de arriba ya no muestra la caja): el buscador sigue abriéndose con Ctrl K o «/». */
+export function BusquedaGlobal({ paginas, acciones, conBoton = true }: { paginas: PaginaBuscable[]; acciones: AccionCrear[]; conBoton?: boolean }) {
   const [abierto, setAbierto] = useState(false);
   const [consulta, setConsulta] = useState("");
   const [remotos, setRemotos] = useState<ResultadoBusqueda[]>([]);
@@ -226,6 +227,7 @@ export function BusquedaGlobal({ paginas, acciones }: { paginas: PaginaBuscable[
 
   return (
     <>
+      {conBoton && (
       <button
         ref={disparadorRef}
         type="button"
@@ -240,6 +242,7 @@ export function BusquedaGlobal({ paginas, acciones }: { paginas: PaginaBuscable[
           {esMac ? "⌘ K" : "Ctrl K"}
         </kbd>
       </button>
+      )}
 
       {abierto &&
         createPortal(
