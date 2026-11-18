@@ -87,8 +87,6 @@ export interface LineaFinanzas {
   precio: number | null;
   /** El SKU de Shopify de la línea (el Excel no lo trae). */
   sku?: string | null;
-  /** Cuántas unidades del producto lleva cada venta de la línea (un «Lleva 3» son 3; 18 nov 2026). Sin dato, 1. */
-  unidadesPorVenta?: number;
   esServicio: boolean;
 }
 
@@ -108,7 +106,7 @@ export function vendidosDeFinanzas(lineas: LineaFinanzas[], pedidos: Map<string,
     const clave = l.skuId ?? `t:${nombreComparable(l.titulo)}`;
     const g = grupos.get(clave) ?? { skuId: l.skuId, titulo: l.titulo, unidades: 0, pedidos: new Set<string>(), ingreso: 0 };
     const ingreso = l.precio !== null ? l.precio * l.cantidad : (p.total * l.cantidad) / Math.max(1, unidadesDe.get(l.pedidoId) ?? 1);
-    g.unidades += l.cantidad * (l.unidadesPorVenta ?? 1);
+    g.unidades += l.cantidad;
     g.pedidos.add(l.pedidoId);
     g.ingreso += ingreso;
     total += ingreso;

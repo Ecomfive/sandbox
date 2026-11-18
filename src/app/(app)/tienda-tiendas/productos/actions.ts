@@ -5,19 +5,16 @@ import { revalidatePath } from "next/cache";
 import { requireModuloEscritura } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/server";
 import { aplicarVinculosDeTienda, quitarVinculoDeLineas, traerProductosTienda } from "@/lib/tienda/productos-shopify";
-import { MAX_UNIDADES_VENTA } from "@/lib/tienda/vincular-variante";
 
 const uuid = (v: unknown): v is string => typeof v === "string" && /^[0-9a-f-]{36}$/i.test(v);
-/** Las unidades por venta: un entero de 1 a 100 (18 nov 2026: un «Lleva 3» son 3 del producto). */
-const unidadesValidas = (v: unknown): v is number => typeof v === "number" && Number.isInteger(v) && v >= 1 && v <= MAX_UNIDADES_VENTA;
 
 /**
- * Une una variante de Shopify con un producto nuestro (o la deja sin unir con `skuId` null), con cuántas unidades del producto lleva cada venta
- * (`unidades`: 2 en un «Paga 1 y lleva 2»). La unión vive en el sistema: en Shopify no se cambia nada. Al unirla deja de estar marcada como «no sale de bodega».
+ * Une una variante de Shopify con un producto nuestro (o la deja sin unir con `skuId` null). La unión vive en el sistema: en Shopify no se cambia nada.
+ * Al unirla deja de estar marcada como «no sale de bodega».
  */
-export async function vincularVariante(varianteId: string, skuId: string | null, unidades = 1): Promise<{ error?: string }> {
+export async function vincularVariante(varianteId: string, skuId: string | null): Promise<{ error?: string }> {
   const usuario = await requireModuloEscritura("tienda-productos");
-  if (!uuid(varianteId) || (skuId !== null && !uuid(skuId)) || !unidadesValidas(unidades)) return { error: "Datos no válidos." };
+  if (!uuid(varianteId) || (skuId !== null && !uuid(skuId))) return { error: "Datos no válidos." };
   const supabase = createServiceClient();
   if (skuId) {
     const { data } = await supabase.from("skus_maestros").select("id").eq("id", skuId).maybeSingle();
@@ -31,13 +28,7 @@ export async function vincularVariante(varianteId: string, skuId: string | null,
   }
   const { error } = await supabase
     .from("tienda_variantes")
-    .update({
-      sku_maestro_id: skuId,
-      unidades_por_venta: skuId ? unidades : 1,
-      no_fisico: false,
-      vinculado_por: skuId ? usuario.id : null,
-      vinculado_en: skuId ? new Date().toISOString() : null,
-    })
+    .update({ sku_maestro_id: skuId, no_fisico: false, vinculado_por: skuId ? usuario.id : null, vinculado_en: skuId ? new Date().toISOString() : null })
     .eq("id", varianteId);
   if (error) return { error: "No se pudo guardar." };
   // Los pedidos de la tienda (12 nov 2026): sus líneas toman el producto unido, o lo pierden si se deshizo la unión.
@@ -54,10 +45,9 @@ export async function vincularVariante(varianteId: string, skuId: string | null,
  * Confirma varias uniones de una vez (el botón «Confirmar las N con SKU o nombre igual»): las guarda todas y después pasa las uniones a los pedidos de
  * cada tienda una sola vez (12 nov 2026: confirmarlas de a una recorría todos los pedidos por cada una). Hasta 500 por vez.
  */
-export async function vincularVariantesEnBloque(pares: { varianteId: string; skuId: string; unidades?: number }[]): Promise<{ error?: string; hechas?: number }> {
+export async function vincularVariantesEnBloque(pares: { varianteId: string; skuId: string }[]): Promise<{ error?: string; hechas?: number }> {
   const usuario = await requireModuloEscritura("tienda-productos");
-  if (!Array.isArray(pares) || pares.length > 500 || pares.some((p) => !uuid(p?.varianteId) || !uuid(p?.skuId) || !unidadesValidas(p?.unidades ?? 1)))
-    return { error: "Datos no válidos." };
+  if (!Array.isArray(pares) || pares.length > 500 || pares.some((p) => !uuid(p?.varianteId) || !uuid(p?.skuId))) return { error: "Datos no válidos." };
   const supabase = createServiceClient();
   const skuIds = [...new Set(pares.map((p) => p.skuId))];
   const { data: existen } = await supabase.from("skus_maestros").select("id").in("id", skuIds);
@@ -73,7 +63,7 @@ export async function vincularVariantesEnBloque(pares: { varianteId: string; sku
     if (!validos.has(p.skuId)) continue;
     const { data, error } = await supabase
       .from("tienda_variantes")
-      .update({ sku_maestro_id: p.skuId, unidades_por_venta: p.unidades ?? 1, no_fisico: false, vinculado_por: usuario.id, vinculado_en: ahora })
+      .update({ sku_maestro_id: p.skuId, no_fisico: false, vinculado_por: usuario.id, vinculado_en: ahora })
       .eq("id", p.varianteId)
       .select("tienda_id");
     if (error) return { error: `Se guardaron ${hechas}; la siguiente falló.` };
@@ -84,30 +74,6 @@ export async function vincularVariantesEnBloque(pares: { varianteId: string; sku
   revalidatePath("/tienda-tiendas/productos");
   revalidatePath("/tienda-pedidos");
   return { hechas };
-}
-
-/**
- * Cambia cuántas unidades lleva cada venta de una variante ya vinculada (18 nov 2026) y lo pasa a las líneas de los pedidos de su tienda: un pedido de un
- * «Lleva 3» descuenta y cuesta 3 del producto.
- */
-export async function cambiarUnidadesVenta(varianteId: string, unidades: number): Promise<{ error?: string }> {
-  const usuario = await requireModuloEscritura("tienda-productos");
-  if (!uuid(varianteId) || !unidadesValidas(unidades)) return { error: `Escribe un número entero de 1 a ${MAX_UNIDADES_VENTA}.` };
-  const supabase = createServiceClient();
-  const { data: v } = await supabase.from("tienda_variantes").select("tienda_id, sku_maestro_id").eq("id", varianteId).maybeSingle();
-  if (!v) return { error: "Esa variante ya no existe." };
-  if (!v.sku_maestro_id) return { error: "Primero vincula la variante a un producto." };
-  const sinAcceso = await sinAccesoATiendas(supabase, [v.tienda_id as string]);
-  if (sinAcceso) return { error: sinAcceso };
-  const { error } = await supabase
-    .from("tienda_variantes")
-    .update({ unidades_por_venta: unidades, vinculado_por: usuario.id, vinculado_en: new Date().toISOString() })
-    .eq("id", varianteId);
-  if (error) return { error: "No se pudo guardar." };
-  await aplicarVinculosDeTienda(supabase, v.tienda_id as string);
-  revalidatePath("/tienda-tiendas/productos");
-  revalidatePath("/tienda-pedidos");
-  return {};
 }
 
 /**
@@ -148,7 +114,7 @@ export async function marcarNoFisico(varianteId: string, noFisico: boolean): Pro
   }
   const { error } = await supabase
     .from("tienda_variantes")
-    .update({ no_fisico: noFisico, sku_maestro_id: null, unidades_por_venta: 1, vinculado_por: noFisico ? usuario.id : null, vinculado_en: noFisico ? new Date().toISOString() : null })
+    .update({ no_fisico: noFisico, sku_maestro_id: null, vinculado_por: noFisico ? usuario.id : null, vinculado_en: noFisico ? new Date().toISOString() : null })
     .eq("id", varianteId);
   if (error) return { error: "No se pudo guardar." };
   revalidatePath("/tienda-tiendas/productos");

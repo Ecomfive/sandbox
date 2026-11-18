@@ -171,8 +171,6 @@ export interface VarianteFila {
   foto: string | null;
   huella: string | null;
   skuMaestroId: string | null;
-  /** Cuántas unidades del producto lleva cada venta de la variante (un «Lleva 3» son 3; 18 nov 2026). */
-  unidadesPorVenta: number;
   noFisico: boolean;
   enShopify: boolean;
 }
@@ -191,13 +189,12 @@ export async function cargarVariantes(supabase: SupabaseClient, tiendaIds: strin
     foto_url: string | null;
     foto_huella: string | null;
     sku_maestro_id: string | null;
-    unidades_por_venta: number | null;
     no_fisico: boolean;
     en_shopify: boolean;
   }>((d, h) =>
     supabase
       .from("tienda_variantes")
-      .select("id, tienda_id, shopify_variante_id, producto_titulo, variante_titulo, sku, precio, foto_url, foto_huella, sku_maestro_id, unidades_por_venta, no_fisico, en_shopify")
+      .select("id, tienda_id, shopify_variante_id, producto_titulo, variante_titulo, sku, precio, foto_url, foto_huella, sku_maestro_id, no_fisico, en_shopify")
       .in("tienda_id", tiendaIds)
       .order("producto_titulo")
       .order("id")
@@ -214,7 +211,6 @@ export async function cargarVariantes(supabase: SupabaseClient, tiendaIds: strin
     foto: f.foto_url,
     huella: f.foto_huella,
     skuMaestroId: f.sku_maestro_id,
-    unidadesPorVenta: Math.max(1, Number(f.unidades_por_venta) || 1),
     noFisico: f.no_fisico,
     enShopify: f.en_shopify,
   }));

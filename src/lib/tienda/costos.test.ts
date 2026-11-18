@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { costoDeCombo, costoPromedioDeCompras, cuentasDelPedido, type CostoProducto } from "./costos";
+import { costoPromedioDeCompras, cuentasDelPedido, type CostoProducto } from "./costos";
 
 const costos = new Map<string, CostoProducto>([
   ["a", { costo: 3.73, fuente: "promedio_pais" }],
@@ -46,15 +46,4 @@ test("costo promedio de compra: del país, si no de todos; sin descartadas ni an
   // Sin compras con costo en Panamá: el de todos los países.
   assert.deepEqual(costoPromedioDeCompras([c(10, 1, "cr"), c(30, 2, "mx"), c(5, null, PA)], PA), { costo: 1.75, fuente: "promedio_todos" });
   assert.equal(costoPromedioDeCompras([c(5, null, PA)], PA), null);
-});
-
-test("costo de un combo: suma de sus componentes por su cantidad; sin costo si falta uno", () => {
-  const c = new Map<string, CostoProducto>([
-    ["a", { costo: 3.73, fuente: "promedio_pais" }],
-    ["b", { costo: 2, fuente: "promedio_todos" }],
-  ]);
-  assert.deepEqual(costoDeCombo([{ skuId: "a", cantidad: 2 }], c), { costo: 7.46, fuente: "promedio_pais" });
-  assert.deepEqual(costoDeCombo([{ skuId: "a", cantidad: 1 }, { skuId: "b", cantidad: 1 }], c), { costo: 5.73, fuente: "promedio_todos" });
-  assert.equal(costoDeCombo([{ skuId: "a", cantidad: 1 }, { skuId: "z", cantidad: 1 }], c), null);
-  assert.equal(costoDeCombo([], c), null);
 });

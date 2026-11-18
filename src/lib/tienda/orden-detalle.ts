@@ -92,8 +92,6 @@ export interface LineaOrdenFinanzas {
   precio: number | null;
   es_servicio: boolean | null;
   sku_maestro_id?: string | null;
-  /** Cuántas unidades del producto lleva cada venta de la línea (un «Lleva 3» son 3; 18 nov 2026). */
-  unidades_por_venta?: number | null;
   skus_maestros: { codigo: string; nombre: string } | null;
   /** El costo por unidad del producto nuestro en el país (y de dónde salió), si se sabe. */
   costo?: CostoProducto | null;
@@ -147,7 +145,7 @@ export async function cargarOrdenTienda(supabase: SupabaseClient, id: string, pa
   const permitidas = await cargarTiendasPermitidas();
   if (!puedeVerUnidad(permitidas, (o as { unidad_id?: string | null }).unidad_id ?? null)) return null;
   const [{ data: lineas }, { data: tiendasPais }, { data: cliente }, { data: notas }, eventos, entrega, postventa] = await Promise.all([
-    supabase.from("ven_orden_lineas").select("linea, producto, cantidad, precio, es_servicio, sku_maestro_id, unidades_por_venta, skus_maestros(codigo, nombre)").eq("orden_id", id).order("linea"),
+    supabase.from("ven_orden_lineas").select("linea, producto, cantidad, precio, es_servicio, sku_maestro_id, skus_maestros(codigo, nombre)").eq("orden_id", id).order("linea"),
     supabase.from("tiendas").select("nombre, dominio").eq("pais_id", paisId),
     supabase.from("ven_ordenes_clientes").select("nombre, telefono, direccion, corregimiento, notas, telefono_clave").eq("orden_id", id).maybeSingle(),
     supabase.from("ven_orden_notas").select("id, texto, autor, creado_en").eq("orden_id", id).order("creado_en").limit(200),
@@ -182,8 +180,7 @@ export async function cargarOrdenTienda(supabase: SupabaseClient, id: string, pa
   const flete = Number(o.costo_envio_real) > 0 ? Number(o.costo_envio_real) : Number(o.costo_envio) > 0 ? Number(o.costo_envio) : null;
   const cuentas = permitidas ? null : cuentasDelPedido(
     Number(o.total) || 0,
-    // Las unidades que salen: la cantidad de la línea por las unidades de cada venta (2 de un «Lleva 3» son 6).
-    lineasT.map((l) => ({ skuId: l.sku_maestro_id ?? null, cantidad: (Number(l.cantidad) || 0) * Math.max(1, Number(l.unidades_por_venta) || 1), esServicio: l.es_servicio === true })),
+    lineasT.map((l) => ({ skuId: l.sku_maestro_id ?? null, cantidad: Number(l.cantidad) || 0, esServicio: l.es_servicio === true })),
     costos,
     unidad.tarifa_fulfillment === null || unidad.tarifa_fulfillment === undefined ? null : Number(unidad.tarifa_fulfillment),
     flete,

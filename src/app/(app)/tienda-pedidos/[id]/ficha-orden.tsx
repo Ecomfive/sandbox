@@ -315,7 +315,7 @@ export function FichaOrdenTienda({ orden, codigoPais, puedeEscribir }: { orden: 
             </p>
           </Seccion>
 
-          <Seccion id={sid("productos")} titulo={S("productos").titulo} icono={S("productos").icono} extra={<span className="text-xs text-muted-foreground">{lineas.reduce((t, l) => t + (l.es_servicio ? 0 : (Number(l.cantidad) || 0) * Math.max(1, Number(l.unidades_por_venta) || 1)), 0)} unidades</span>}>
+          <Seccion id={sid("productos")} titulo={S("productos").titulo} icono={S("productos").icono} extra={<span className="text-xs text-muted-foreground">{lineas.reduce((t, l) => t + (Number(l.cantidad) || 0), 0)} unidades</span>}>
             <div className="overflow-x-auto">
               <table className="w-full table-fixed border-collapse">
                 <thead>
@@ -345,12 +345,6 @@ export function FichaOrdenTienda({ orden, codigoPais, puedeEscribir }: { orden: 
                         {l.skus_maestros ? (
                           <span>
                             {l.skus_maestros.nombre} <span className="font-mono text-xs text-muted-foreground">{l.skus_maestros.codigo}</span>
-                            {/* Un paquete del mismo producto (18 nov 2026): cuántas lleva cada venta y cuántas salen. */}
-                            {Number(l.unidades_por_venta) > 1 && (
-                              <span className="block text-xs font-medium text-primario">
-                                × {l.unidades_por_venta} por venta · salen {(Number(l.cantidad) || 0) * Number(l.unidades_por_venta)}
-                              </span>
-                            )}
                           </span>
                         ) : (
                           <span className="text-muted-foreground">Sin vincular</span>

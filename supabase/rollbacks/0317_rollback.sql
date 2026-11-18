@@ -1,0 +1,1 @@
+-- Deshace 0317: correr de nuevo 0316 (vuelve a crear las columnas, la vista y la función con las unidades por venta).
