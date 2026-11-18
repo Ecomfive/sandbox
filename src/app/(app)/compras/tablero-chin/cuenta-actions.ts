@@ -5,6 +5,8 @@ import { getUsuarioActual } from "@/lib/auth";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { esUuid } from "@/lib/seguridad/ruta-almacen";
+import { avisoTrasClaveNueva, avisoTrasSuspender, detalleSalida } from "@/lib/seguridad/sesiones";
+import { bloquearIngreso, cerrarSesionesDe, sacarDelSistema } from "@/lib/seguridad/sesiones-cuenta";
 import { createServiceClient } from "@/lib/supabase/server";
 import type { CuentaPortal } from "./cuenta-proveedor";
 
@@ -52,8 +54,8 @@ export async function crearCuentaProveedor(proveedorId: string, nombre: string, 
   return { clave, cuenta: { id: fila.id as string, nombre: nombreLimpio, email: correo, activo: true, ultimoIngreso: null } };
 }
 
-/** Clave temporal nueva para la cuenta del proveedor (la olvidó o nunca llegó a entrar). */
-export async function nuevaClaveProveedor(cuentaId: string): Promise<{ error?: string; clave?: string }> {
+/** Clave temporal nueva para la cuenta del proveedor (la olvidó o nunca llegó a entrar). Cierra sus sesiones abiertas (auditoría de seguridad, 18 nov 2026). */
+export async function nuevaClaveProveedor(cuentaId: string): Promise<{ error?: string; clave?: string; aviso?: string }> {
   if (!(await exigirAdministrador())) return { error: "Solo un administrador puede hacer esto." };
   if (!esUuid(cuentaId)) return { error: "Cuenta no válida." };
   const supabase = createServiceClient();
@@ -62,17 +64,43 @@ export async function nuevaClaveProveedor(cuentaId: string): Promise<{ error?: s
   const clave = claveTemporal();
   const { error } = await supabase.auth.admin.updateUserById(data.usuario_id as string, { password: clave, app_metadata: { clave_temporal: true } });
   if (error) return { error: "No se pudo cambiar la clave." };
-  await registrarAuditoria({ accion: "generar_contrasena_temporal", entidad: "proveedor_usuarios", entidadId: data.usuario_id as string, detalle: `Clave temporal nueva para ${data.nombre}` });
-  return { clave };
+  const fallaSesiones = (await cerrarSesionesDe(data.usuario_id as string)).error ?? null;
+  await registrarAuditoria({
+    accion: "generar_contrasena_temporal",
+    entidad: "proveedor_usuarios",
+    entidadId: data.usuario_id as string,
+    detalle: `Clave temporal nueva para ${data.nombre}; ${fallaSesiones ? `no se pudieron cerrar sus sesiones (${fallaSesiones})` : "se cerraron sus sesiones abiertas"}`,
+  });
+  const aviso = avisoTrasClaveNueva(fallaSesiones);
+  return aviso ? { clave, aviso } : { clave };
 }
 
-/** Desactiva o reactiva la cuenta: desactivada, el portal la deja fuera en la siguiente página que abra. */
-export async function cambiarCuentaProveedorActiva(cuentaId: string, activo: boolean): Promise<{ error?: string }> {
+/**
+ * Desactiva o reactiva la cuenta: desactivada, el portal la deja fuera en la siguiente página que abra, se le bloquea el ingreso y se cierran
+ * sus sesiones (auditoría de seguridad, 18 nov 2026; si eso falla, la desactivación queda y vuelve un `aviso`). Al reactivar, primero se le
+ * quita el bloqueo.
+ */
+export async function cambiarCuentaProveedorActiva(cuentaId: string, activo: boolean): Promise<{ error?: string; aviso?: string }> {
   if (!(await exigirAdministrador())) return { error: "Solo un administrador puede hacer esto." };
   if (!esUuid(cuentaId) || typeof activo !== "boolean") return { error: "Cuenta no válida." };
   const supabase = createServiceClient();
+  if (activo) {
+    const { data: cuenta } = await supabase.from("proveedor_usuarios").select("usuario_id").eq("id", cuentaId).maybeSingle();
+    if (!cuenta) return { error: "La cuenta ya no existe." };
+    const desbloqueo = await bloquearIngreso(cuenta.usuario_id as string, false);
+    if (desbloqueo.error) return { error: `No se pudo reactivar: ${desbloqueo.error}. Inténtalo de nuevo.` };
+  }
   const { data, error } = await supabase.from("proveedor_usuarios").update({ activo }).eq("id", cuentaId).select("usuario_id, nombre").maybeSingle();
   if (error || !data) return { error: "No se pudo cambiar la cuenta." };
-  await registrarAuditoria({ accion: activo ? "editar_usuario" : "suspender_usuario", entidad: "proveedor_usuarios", entidadId: data.usuario_id as string, detalle: `Cuenta del portal del proveedor: ${data.nombre}` });
-  return {};
+  const salida = activo ? null : await sacarDelSistema(data.usuario_id as string);
+  await registrarAuditoria({
+    accion: activo ? "editar_usuario" : "suspender_usuario",
+    entidad: "proveedor_usuarios",
+    entidadId: data.usuario_id as string,
+    detalle: `Cuenta del portal del proveedor: ${data.nombre}${salida ? ` (${detalleSalida(salida)})` : ""}`,
+    antes: { Estado: activo ? "Desactivada" : "Activa" },
+    despues: { Estado: activo ? "Activa" : "Desactivada" },
+  });
+  const aviso = salida ? avisoTrasSuspender(salida) : null;
+  return aviso ? { aviso } : {};
 }

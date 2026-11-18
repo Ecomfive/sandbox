@@ -1,16 +1,19 @@
 import type { NextConfig } from "next";
+import { HSTS, POLITICA_BASE } from "./src/lib/seguridad/cabeceras";
 
 /**
- * Cabeceras de seguridad en todas las respuestas. La política de contenido es parcial a propósito: restringe lo que no
- * necesita scripts con nonce (quién puede incrustar la app, el `<base>`, los formularios y los plugins) y deja libre
- * `script-src`, que requeriría un nonce por petición. Evita el clickjacking y varios tipos de inyección.
+ * Cabeceras de seguridad en todas las respuestas. Aquí va la parte fija de la política de contenido (quién puede incrustar
+ * la app, el `<base>`, los formularios y los plugins); `script-src` con un nonce por petición lo agrega `middleware.ts` a
+ * cada página (auditoría de seguridad, 18 nov 2026). Evita el clickjacking y varios tipos de inyección. HSTS solo en
+ * producción (auditoría de seguridad, 18 nov 2026).
  */
 const CABECERAS = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "X-Frame-Options", value: "DENY" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   { key: "Permissions-Policy", value: "camera=(), microphone=(self), geolocation=(), payment=(), usb=()" },
-  { key: "Content-Security-Policy", value: "frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'" },
+  { key: "Content-Security-Policy", value: POLITICA_BASE },
+  ...(process.env.NODE_ENV === "production" ? [{ key: "Strict-Transport-Security", value: HSTS }] : []),
 ];
 
 const nextConfig: NextConfig = {

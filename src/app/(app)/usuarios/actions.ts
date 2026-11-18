@@ -8,6 +8,8 @@ import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModuloEscritura } from "@/lib/auth";
 import { detectarImagen } from "@/lib/seguridad/imagen";
 import { esUuid } from "@/lib/seguridad/ruta-almacen";
+import { avisoTrasClaveNueva, avisoTrasSuspender, detalleSalida, textoRol } from "@/lib/seguridad/sesiones";
+import { bloquearIngreso, cerrarSesionesDe, sacarDelSistema } from "@/lib/seguridad/sesiones-cuenta";
 
 const ALFABETO_CLAVE = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
 
@@ -79,9 +81,13 @@ export async function crearUsuario(formData: FormData): Promise<{ error?: string
   return { contrasena };
 }
 
-/** Nueva clave temporal para alguien que ya tenía cuenta (la olvidó, o nunca llegó a entrar). */
-export async function generarContrasenaTemporal(formData: FormData): Promise<{ error?: string; contrasena?: string }> {
-  await requireModuloEscritura("usuarios");
+/**
+ * Nueva clave temporal para alguien que ya tenía cuenta (la olvidó, o nunca llegó a entrar). Además se cierran sus sesiones abiertas: si
+ * alguien más tenía su sesión, deja de valer (auditoría de seguridad, 18 nov 2026). La propia no se cierra desde aquí. Si cerrarlas falla,
+ * la clave queda igual y vuelve un `aviso`.
+ */
+export async function generarContrasenaTemporal(formData: FormData): Promise<{ error?: string; contrasena?: string; aviso?: string }> {
+  const usuario = await requireModuloEscritura("usuarios");
   const id = formData.get("id") as string;
   if (!esUuid(id)) return { error: "Persona no válida." };
 
@@ -90,14 +96,19 @@ export async function generarContrasenaTemporal(formData: FormData): Promise<{ e
   const { error } = await supabase.auth.admin.updateUserById(id, { password: contrasena, app_metadata: { clave_temporal: true } });
   if (error) return { error: error.message };
 
+  const fallaSesiones = id === usuario.id ? null : ((await cerrarSesionesDe(id)).error ?? null);
   await registrarAuditoria({
     accion: "generar_contrasena_temporal",
     entidad: "perfiles",
     entidadId: id,
-    detalle: "Se generó una contraseña temporal nueva",
+    detalle:
+      id === usuario.id
+        ? "Se generó una contraseña temporal nueva"
+        : `Se generó una contraseña temporal nueva; ${fallaSesiones ? `no se pudieron cerrar sus sesiones (${fallaSesiones})` : "se cerraron sus sesiones abiertas"}`,
   });
 
-  return { contrasena };
+  const aviso = avisoTrasClaveNueva(fallaSesiones);
+  return aviso ? { contrasena, aviso } : { contrasena };
 }
 
 /** Nombre y correo con el que entra — todo lo demás de "Datos" en la ficha. */
@@ -132,34 +143,86 @@ export async function actualizarDatosUsuario(formData: FormData): Promise<{ erro
   return {};
 }
 
-export async function cambiarRolUsuario(formData: FormData) {
-  await requireModuloEscritura("usuarios");
+/**
+ * El rol base de una persona. Queda en el historial con el rol de antes y el de después (auditoría de seguridad, 18 nov 2026). Devuelve
+ * el error como valor: en producción, Next.js oculta el mensaje de una excepción de un server action.
+ */
+export async function cambiarRolUsuario(formData: FormData): Promise<{ error?: string }> {
+  try {
+    await requireModuloEscritura("usuarios");
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Sin permiso." };
+  }
   const id = formData.get("id") as string;
   const rolId = (formData.get("rol_id") as string) || null;
+  if (!esUuid(id)) return { error: "Persona no válida." };
+  if (rolId !== null && !esUuid(rolId)) return { error: "Rol no válido." };
   const supabase = createServiceClient();
+  const { data: antes, error: errorAntes } = await supabase.from("perfiles").select("email, rol_id").eq("id", id).maybeSingle();
+  if (errorAntes || !antes) return { error: "No se encontró a la persona." };
+  if ((antes.rol_id ?? null) === rolId) return {};
+
   const { error } = await supabase.from("perfiles").update({ rol_id: rolId }).eq("id", id);
-  if (error) throw new Error(error.message);
+  if (error) return { error: "No se pudo cambiar el rol." };
+
+  const ids = [antes.rol_id, rolId].filter((r): r is string => !!r);
+  const { data: roles } = ids.length ? await supabase.from("roles").select("id, nombre").in("id", ids) : { data: [] };
+  const nombres = Object.fromEntries((roles ?? []).map((r) => [String(r.id), String(r.nombre)]));
+  await registrarAuditoria({
+    accion: "cambiar_rol_usuario",
+    entidad: "perfiles",
+    entidadId: id,
+    detalle: antes.email ?? undefined,
+    antes: { Rol: textoRol(antes.rol_id ?? null, nombres) },
+    despues: { Rol: textoRol(rolId, nombres) },
+  });
   revalidatePath("/usuarios");
+  return {};
 }
 
-/** "Suspender"/"Reactivar" en la ficha: no borra nada, solo le quita (o le devuelve) el paso al sistema. */
-export async function cambiarActivoUsuario(formData: FormData) {
-  await requireModuloEscritura("usuarios");
+/**
+ * "Suspender"/"Reactivar" en la ficha: no borra nada, solo le quita (o le devuelve) el paso al sistema. Al suspender, además de marcarla
+ * inactiva se le bloquea el ingreso y se cierran sus sesiones abiertas (auditoría de seguridad, 18 nov 2026): la suspensión se guarda
+ * primero, y si lo demás falla vuelve un `aviso` para quien suspendió en vez de callarlo. Al reactivar, primero se quita el bloqueo: si
+ * eso falla no se reactiva (seguiría sin poder entrar) y vuelve el error.
+ */
+export async function cambiarActivoUsuario(formData: FormData): Promise<{ error?: string; aviso?: string }> {
+  let usuario;
+  try {
+    usuario = await requireModuloEscritura("usuarios");
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Sin permiso." };
+  }
   const id = formData.get("id") as string;
   const activo = formData.get("activo") === "true";
+  if (!esUuid(id)) return { error: "Persona no válida." };
+  if (!activo && id === usuario.id) return { error: "No puedes suspender tu propia cuenta." };
   const supabase = createServiceClient();
-  const { error } = await supabase.from("perfiles").update({ activo }).eq("id", id);
-  if (error) throw new Error(error.message);
+  const { data: antes } = await supabase.from("perfiles").select("email, activo").eq("id", id).maybeSingle();
+  if (!antes) return { error: "No se encontró a la persona." };
 
+  if (activo) {
+    const desbloqueo = await bloquearIngreso(id, false);
+    if (desbloqueo.error) return { error: `No se pudo reactivar: ${desbloqueo.error}. Inténtalo de nuevo.` };
+  }
+
+  const { error } = await supabase.from("perfiles").update({ activo }).eq("id", id);
+  if (error) return { error: "No se pudo cambiar el estado." };
+
+  const salida = activo ? null : await sacarDelSistema(id);
+  const estado = (a: boolean) => (a ? "Activo" : "Suspendido");
   await registrarAuditoria({
     accion: "suspender_usuario",
     entidad: "perfiles",
     entidadId: id,
-    antes: { Estado: activo ? "Suspendido" : "Activo" },
-    despues: { Estado: activo ? "Activo" : "Suspendido" },
+    detalle: `${antes.email ?? id}${salida ? `: ${detalleSalida(salida)}` : ""}`,
+    antes: { Estado: estado(antes.activo !== false) },
+    despues: { Estado: estado(activo) },
   });
 
   revalidatePath("/usuarios");
+  const aviso = salida ? avisoTrasSuspender(salida) : null;
+  return aviso ? { aviso } : {};
 }
 
 /** Borra la cuenta de verdad (auth y perfil, en cascada). No se puede borrar la propia cuenta desde acá. */
