@@ -6,7 +6,8 @@ import { requireModulo } from "@/lib/auth";
 import { getPaisActual } from "@/lib/pais";
 import { createServiceClient } from "@/lib/supabase/server";
 import { revisarSiHaceFalta } from "@/lib/tienda/conectar-shopify";
-import { periodoElegido } from "@/lib/tienda/datos";
+import { resumirConfirmacion } from "@/lib/tienda/confirmacion";
+import { periodoElegido, type PedidoFila } from "@/lib/tienda/datos";
 import { tiendasDeLaPersona } from "@/lib/tienda/acceso";
 import { pedidosDeTiendas } from "@/lib/tienda/datos-finanzas";
 import { diaPanama } from "@/lib/tienda/resumen";
@@ -38,9 +39,20 @@ export default async function ConfirmacionTiendaPage({ searchParams }: { searchP
   const miradas = tienda ? [tienda] : tiendas;
   // Solo la tienda que se mira (14 nov 2026: «si abro Kenku, que se actualice Kenku»); con «Todas», todas.
   after(() => revisarSiHaceFalta(createServiceClient(), miradas));
-  // De los 60 días, solo los de Shopify sin confirmar o confirmados (18 nov 2026, velocidad: eran ~140 de 9.146); el periodo elegido va completo.
-  const { pedidos, fuente, periodo } = await pedidosDeTiendas(supabase, miradas, pais.codigo, eleccion, { minDias: DIAS_COLA, abiertos: ["nuevo", "confirmado"] });
+  // De los 60 días, solo los de Shopify sin confirmar o confirmados (18 nov 2026, velocidad: eran ~140 de 9.146); el periodo elegido va completo pero
+  // liviano: de él solo se cuentan confirmados y cancelados (sus listas se piden al pulsar la tarjeta, `pedidosDeEtapa`).
+  const { pedidos, fuente, periodo } = await pedidosDeTiendas(supabase, miradas, pais.codigo, eleccion, { minDias: DIAS_COLA, abiertos: ["nuevo", "confirmado"], periodoLiviano: true });
   const delPeriodo = pedidos.filter((p) => diaPanama(p.creado) >= periodo.desde && diaPanama(p.creado) <= periodo.hasta);
+  // La tasa del periodo y, si se miran varias tiendas, la de cada una (como Mi Reto Digital la da por país).
+  const grupos = new Map<string, PedidoFila[]>();
+  for (const p of delPeriodo) grupos.set(p.tiendaId, [...(grupos.get(p.tiendaId) ?? []), p]);
+  const nombreDe = new Map(tiendas.map((t) => [t.id, t.nombre]));
+  const porTienda =
+    miradas.length > 1
+      ? [...grupos].map(([id, ps]) => ({ id, nombre: nombreDe.get(id) ?? "—", pedidos: ps.length, ...resumirConfirmacion(ps) })).sort((a, b) => b.pedidos - a.pedidos)
+      : [];
+  const texto = (x: string | string[] | undefined) => (typeof x === "string" && x ? x : null);
+  const consulta = { tienda: tienda?.id ?? null, periodo: texto(sp.periodo), desde: texto(sp.desde), hasta: texto(sp.hasta) };
   // La cola: los sin confirmar que llegaron de Shopify (los del Excel de Finanzas son una foto vieja: ya no se gestionan), lo más viejo arriba.
   const sinConfirmar = pedidos.filter((p) => p.estado === "nuevo" && !p.sinHora).sort((a, b) => a.creado.localeCompare(b.creado));
   // Programados: los que todavía no salen (sin confirmar o confirmados) y tienen fecha en la nota, por fecha (12 nov 2026).
@@ -61,9 +73,13 @@ export default async function ConfirmacionTiendaPage({ searchParams }: { searchP
           <BarraTienda ruta="/tienda-pedidos/confirmacion" tiendas={tiendas} tiendaId={tienda?.id ?? null} periodo={periodo} sinTodas={limitado} />
           <AvisoConexion tiendas={miradas} finanzas={fuente} />
           <ConfirmacionTienda
+            key={JSON.stringify(consulta)}
             sinConfirmar={sinConfirmar}
             programados={programados}
-            delPeriodo={delPeriodo}
+            resumen={resumirConfirmacion(delPeriodo)}
+            totalPeriodo={delPeriodo.length}
+            porTienda={porTienda}
+            consulta={consulta}
             periodo={periodo.etiqueta.toLowerCase()}
             codigoPais={pais.codigo}
             tiendas={Object.fromEntries(tiendas.map((t) => [t.id, t.nombre]))}

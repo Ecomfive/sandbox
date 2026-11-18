@@ -352,8 +352,9 @@ export async function pedidosDeTiendas(
   /**
    * `comparar`: también el periodo anterior del mismo largo (Dashboard); `minDias`: traer al menos esos días hasta hoy (la cola de Confirmación y
    * Logística). `abiertos` (18 nov 2026, velocidad): de esos días fuera del periodo, solo los de Shopify en esos estados; el periodo va completo.
+   * `periodoLiviano` (con `abiertos`): el periodo sin fotos ni historial de clientes (solo se cuenta); los abiertos, que se listan, van completos.
    */
-  opciones: { comparar?: boolean; minDias?: number; liviano?: boolean; abiertos?: EstadoPedido[] } = {},
+  opciones: { comparar?: boolean; minDias?: number; liviano?: boolean; abiertos?: EstadoPedido[]; periodoLiviano?: boolean } = {},
 ): Promise<{ pedidos: PedidoFila[]; lineasFinanzas: LineaFinanzas[]; fuente: FuenteFinanzas; referencia: Date; periodo: Periodo & { hoy: string } }> {
   const fuente = await fuenteFinanzas(supabase, miradas, codigoPais);
   // Una foto (todo sale del Excel y ninguna tienda está conectada): los periodos terminan en su último día. Con una conectada, en hoy.
@@ -369,17 +370,19 @@ export async function pedidosDeTiendas(
   if (opciones.minDias && opciones.abiertos) {
     const abiertos = opciones.abiertos;
     const minimo = sumarDias(hoy, -(opciones.minDias - 1));
+    // El periodo liviano solo si cabe entero en los días de la cola: así todo abierto del periodo viene también completo en la cola.
+    const periodoLiviano = !!opciones.liviano || (!!opciones.periodoLiviano && desde >= minimo);
     const [deShopify, deFinanzas, colaShopify, colaFinanzas] = await Promise.all([
       cargarPedidos(supabase, soloShopify, desde, hasta),
-      cargarPedidosFinanzas(supabase, fuente, ids, desde, hasta, { liviano: opciones.liviano }),
+      cargarPedidosFinanzas(supabase, fuente, ids, desde, hasta, { liviano: periodoLiviano }),
       cargarPedidos(supabase, soloShopify, minimo, hoy),
       cargarPedidosFinanzas(supabase, fuente, ids, minimo, hoy, { liviano: opciones.liviano, abiertos }),
     ]);
-    const vistos = new Set([...deShopify, ...deFinanzas.pedidos].map((p) => p.id));
-    const extra = [...colaShopify.filter((p) => !p.sinHora && abiertos.includes(p.estado)), ...colaFinanzas.pedidos].filter((p) => !vistos.has(p.id));
-    const extraIds = new Set(extra.map((p) => p.id));
-    const pedidos = [...deShopify, ...deFinanzas.pedidos, ...extra].sort((x, y) => y.creado.localeCompare(x.creado));
-    const lineasFinanzas = [...deFinanzas.lineas, ...colaFinanzas.lineas.filter((l) => extraIds.has(l.pedidoId))];
+    // Si un pedido está en los dos, vale el de la cola (va completo aunque el periodo sea liviano).
+    const cola = [...colaShopify.filter((p) => !p.sinHora && abiertos.includes(p.estado)), ...colaFinanzas.pedidos];
+    const enCola = new Set(cola.map((p) => p.id));
+    const pedidos = [...[...deShopify, ...deFinanzas.pedidos].filter((p) => !enCola.has(p.id)), ...cola].sort((x, y) => y.creado.localeCompare(x.creado));
+    const lineasFinanzas = [...deFinanzas.lineas.filter((l) => !enCola.has(l.pedidoId)), ...colaFinanzas.lineas];
     return { pedidos, lineasFinanzas, fuente, referencia, periodo: { ...periodo, hoy } };
   }
   if (opciones.minDias) {

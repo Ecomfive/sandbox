@@ -2747,7 +2747,11 @@ convenciones técnicas del código.
   para usar ~3.900 y ~140; `pedidosDeTiendas` con `abiertos` trae el periodo completo y, de los `minDias`, solo los de Shopify en esos estados
   (`ven_pedidos_periodo`/`ven_lineas_periodo` con `solo_shopify` y `excluir`; sin la migración trae todo y filtra en el servidor, flag `filtroDisponible`).
   `entregasDeOrdenes`/`guiasDeOrdenes` piden de a 200 y 8 a la vez (`enTandas`; antes una tras otra, ~5 s con 3.800 pedidos). Comprobado: los mismos
-  pedidos en Logística y en Confirmación (hoy, 7 y 90 días, todas o una tienda).
+  pedidos en Logística y en Confirmación (hoy, 7 y 90 días, todas o una tienda). Cuarta tanda: pantallas de carga propias (`CargandoTienda`,
+  `src/components/tienda/cargando-tienda.tsx`, un `loading.tsx` en cada página de Gestión de tienda; antes salía la general). Confirmación ya no manda
+  todos los pedidos del periodo (4,35 MB en 30 días): la tasa y la tasa por tienda se calculan en el servidor (`periodoLiviano`: el periodo sin fotos ni
+  historial; lo abierto sale de la cola, completo) y las listas de confirmados y cancelados se piden al pulsar su tarjeta (`pedidosDeEtapa`,
+  `confirmacion/actions.ts`). Logística no se recortó: todo lo que manda sale en alguna tarjeta.
 - **Reportería de pedidos (la Matriz dentro del sistema)** (17 nov 2026, pedido de Hernán para María José; prototipo https://claude.ai/artifact/TNhc38acs7JZzNcsLSgUze):
   `/tienda-reporteria` (Operación › Gestión de tienda, módulo `tienda-reporteria`, migración 0310). Meta: dejar los Excel; la primera carga sale de la Matriz
   «NUEVA GESTION OCEANS PANAMA» (Google Sheet de administración, hoja «Excel Matriz») y después se trabaja aquí. Una fila por línea de producto

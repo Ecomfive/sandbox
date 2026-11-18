@@ -1,22 +1,26 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Indicador, Pastilla, TableroIndicadores } from "@/components/panel/piezas-panel";
 import { TablaDatos, type ColumnaTabla } from "@/components/tabla/tabla-datos";
 import { formatearMoneda } from "@/lib/formato";
 import { AlertaIcon, CalendarioIcon, CerrarIcon, CheckIcon, ChatIcon } from "@/lib/nav-icons";
-import { ETAPAS_CONFIRMACION, META_CONFIRMACION, etapaConfirmacion, resumirConfirmacion, tiempoEsperando, type EtapaConfirmacion } from "@/lib/tienda/confirmacion";
+import { ETAPAS_CONFIRMACION, META_CONFIRMACION, etapaConfirmacion, tiempoEsperando, type EtapaConfirmacion, type ResumenConfirmacion } from "@/lib/tienda/confirmacion";
 import type { PedidoFila } from "@/lib/tienda/datos";
 import { diasHasta } from "@/lib/tienda/programado";
 import { columnaProgramado } from "../columnas-extra";
 import { FichaPedido } from "../ficha-pedido";
 import { COLUMNAS, ICONOS, NOMBRE, defPedidos, type Contexto } from "../pedidos-tienda";
+import { pedidosDeEtapa, type ConsultaConfirmacion } from "./actions";
 
 const ETAPA = new Map(ETAPAS_CONFIRMACION.map((e) => [e.id, e]));
 const TONO: Record<EtapaConfirmacion, "aviso" | "neutro" | "exito" | "peligro"> = { por_confirmar: "aviso", esperando: "neutro", confirmado: "exito", cancelado: "peligro" };
 
 type Vista = "sin_confirmar" | "por_confirmar" | "esperando" | "programado" | "confirmado" | "cancelado";
+
+/** Una lista del periodo que se pide al pulsar su tarjeta: mientras llega, cargando; si falla, el motivo. */
+type ListaPeriodo = PedidoFila[] | "cargando" | { error: string };
 
 
 /** Las columnas de Pedidos, con «Espera» (cuánto lleva sin confirmar) y «Confirmación» en lugar de «Estado». */
@@ -52,7 +56,10 @@ function columnasConfirmacion(ahora: number, hoy: string, multiTienda: boolean):
 export function ConfirmacionTienda({
   sinConfirmar,
   programados,
-  delPeriodo,
+  resumen: r,
+  totalPeriodo,
+  porTienda,
+  consulta,
   periodo,
   codigoPais,
   tiendas,
@@ -63,8 +70,14 @@ export function ConfirmacionTienda({
   sinConfirmar: PedidoFila[];
   /** Los que todavía no salen y tienen fecha en la nota, por fecha. */
   programados: PedidoFila[];
-  /** Todos los pedidos del periodo elegido (para confirmados, cancelados y la tasa). */
-  delPeriodo: PedidoFila[];
+  /** Confirmados, cancelados y la tasa del periodo elegido (calculados en el servidor: la página ya no manda todos los pedidos del periodo). */
+  resumen: ResumenConfirmacion;
+  /** Cuántos pedidos tiene el periodo. */
+  totalPeriodo: number;
+  /** La tasa de cada tienda, si se miran varias. */
+  porTienda: ({ id: string; nombre: string; pedidos: number } & ResumenConfirmacion)[];
+  /** La tienda y el periodo de la dirección, para pedir las listas de confirmados y cancelados al pulsar su tarjeta. */
+  consulta: ConsultaConfirmacion;
   periodo: string;
   codigoPais: string;
   tiendas: Record<string, string>;
@@ -77,7 +90,18 @@ export function ConfirmacionTienda({
   const [abierto, setAbierto] = useState<string | null>(null);
   const [orden, setOrden] = useState<string[]>([]);
   const multiTienda = Object.keys(tiendas).length > 1;
-  const r = useMemo(() => resumirConfirmacion(delPeriodo), [delPeriodo]);
+  const [listas, setListas] = useState<Partial<Record<"confirmado" | "cancelado", ListaPeriodo>>>({});
+  // Los confirmados y cancelados del periodo se piden la primera vez que se abre su lista (18 nov 2026, velocidad).
+  useEffect(() => {
+    if ((vista !== "confirmado" && vista !== "cancelado") || listas[vista]) return;
+    const etapa = vista;
+    setListas((x) => ({ ...x, [etapa]: "cargando" }));
+    pedidosDeEtapa(consulta, etapa).then(
+      (res) => setListas((x) => ({ ...x, [etapa]: "error" in res ? { error: res.error } : res.pedidos })),
+      () => setListas((x) => ({ ...x, [etapa]: { error: "No se pudo cargar la lista. Vuelve a pulsar la tarjeta." } })),
+    );
+  }, [vista, listas, consulta]);
+  const listaPeriodo = vista === "confirmado" || vista === "cancelado" ? listas[vista] : undefined;
   const porConfirmar = useMemo(() => sinConfirmar.filter((p) => etapaConfirmacion(p) === "por_confirmar"), [sinConfirmar]);
   const esperando = useMemo(() => sinConfirmar.filter((p) => etapaConfirmacion(p) === "esperando"), [sinConfirmar]);
   const filas = useMemo(() => {
@@ -85,8 +109,8 @@ export function ConfirmacionTienda({
     if (vista === "por_confirmar") return porConfirmar;
     if (vista === "esperando") return esperando;
     if (vista === "programado") return programados;
-    return delPeriodo.filter((p) => etapaConfirmacion(p) === vista);
-  }, [vista, sinConfirmar, porConfirmar, esperando, programados, delPeriodo]);
+    return Array.isArray(listaPeriodo) ? listaPeriodo : [];
+  }, [vista, sinConfirmar, porConfirmar, esperando, programados, listaPeriodo]);
   const columnas = useMemo(() => columnasConfirmacion(ahora, hoy, multiTienda), [ahora, hoy, multiTienda]);
   const sePasaron = programados.filter((p) => diasHasta(p.programado!.fecha, hoy) < 0).length;
   const paraHoy = programados.filter((p) => diasHasta(p.programado!.fecha, hoy) === 0).length;
@@ -94,16 +118,16 @@ export function ConfirmacionTienda({
   const contexto = useMemo(() => ({ codigoPais, tiendas }), [codigoPais, tiendas]);
   const num = (n: number) => n.toLocaleString("es-PA");
   const pct = (n: number | null) => (n === null ? "—" : `${n.toLocaleString("es-PA")} %`);
-  const alternar = (v: Vista) => setVista((x) => (x === v ? "sin_confirmar" : v));
+  const alternar = (v: Vista) => {
+    // Si la lista del periodo falló, pulsar de nuevo la vuelve a pedir.
+    if ((v === "confirmado" || v === "cancelado") && listas[v] && typeof listas[v] === "object" && !Array.isArray(listas[v])) {
+      setListas((x) => ({ ...x, [v]: undefined }));
+      setVista(v);
+      return;
+    }
+    setVista((x) => (x === v ? "sin_confirmar" : v));
+  };
   const masViejo = sinConfirmar[0] ? tiempoEsperando(sinConfirmar[0].creado, ahora) : null;
-
-  // La tasa por tienda (como Mi Reto Digital la da por país), solo si se miran varias.
-  const porTienda = useMemo(() => {
-    if (!multiTienda) return [];
-    const grupos = new Map<string, PedidoFila[]>();
-    for (const p of delPeriodo) grupos.set(p.tiendaId, [...(grupos.get(p.tiendaId) ?? []), p]);
-    return [...grupos].map(([id, ps]) => ({ id, nombre: tiendas[id] ?? "—", pedidos: ps.length, ...resumirConfirmacion(ps) })).sort((a, b) => b.pedidos - a.pedidos);
-  }, [multiTienda, delPeriodo, tiendas]);
 
   const marcarEnDireccion = useCallback((id: string | null) => {
     const u = new URL(window.location.href);
@@ -121,11 +145,15 @@ export function ConfirmacionTienda({
 
   const barra = r.tasa === null ? 0 : Math.min(100, r.tasa);
   const vacio =
-    vista === "programado"
+    listaPeriodo === "cargando"
+      ? "Cargando los pedidos…"
+      : listaPeriodo && !Array.isArray(listaPeriodo)
+        ? listaPeriodo.error
+        : vista === "programado"
       ? "No hay pedidos programados: salen cuando la nota del pedido dice para qué día los quiere el cliente."
       : vista === "sin_confirmar" || vista === "por_confirmar" || vista === "esperando"
         ? "No hay pedidos sin confirmar. ¡Al día!"
-        : `No hay pedidos así en ${periodo}.`;
+          : `No hay pedidos así en ${periodo}.`;
 
   return (
     <div className="flex flex-col gap-5">
@@ -167,7 +195,7 @@ export function ConfirmacionTienda({
       <section aria-label="Meta de confirmación" className="flex flex-col gap-2 rounded-lg border border-border bg-card px-4 py-3">
         <div className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
           <span>
-            <b className="text-base tabular-nums text-primario">{pct(r.tasa)}</b> confirmado de {num(delPeriodo.length)} pedidos · meta {META_CONFIRMACION} %
+            <b className="text-base tabular-nums text-primario">{pct(r.tasa)}</b> confirmado de {num(totalPeriodo)} pedidos · meta {META_CONFIRMACION} %
           </span>
           <span className="text-xs text-muted-foreground">
             Pendiente {pct(r.pendiente)} · Cancelado {pct(r.cancelacion)} · {periodo}
