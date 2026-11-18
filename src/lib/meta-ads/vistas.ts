@@ -89,6 +89,8 @@ export interface VideoVista {
 export interface Grupo {
   nombre: string;
   campanas: number;
+  /** Videos distintos del grupo (solo cuenta cuando el elemento trae su video: el ángulo). */
+  videos: number;
   r: Resultados;
   resultado: number;
   confiable: boolean;

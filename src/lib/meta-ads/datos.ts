@@ -78,13 +78,15 @@ export interface DatosMeta {
   actividadDisponible: boolean;
   /** Videos con gasto en 30 días que todavía no tienen análisis de IA, y si la IA (Gemini) está conectada. */
   videosSinAnalizar: number;
+  /** Videos con gasto en el periodo elegido a los que todavía no se les conoce el ángulo (no hay análisis ni lo trae la campaña). */
+  videosSinAngulo: number;
   /** Lo pone la página (servidor): si Gemini está conectado. No se calcula aquí porque este archivo también lo importan componentes del navegador. */
   iaConectada: boolean;
 }
 
 const vacios = (periodo: Periodo, hoy: string): DatosMeta => ({
   faltaMigracion: false, cuentas: [], cuentaId: null, periodo, desde: hoy, hasta: hoy, campanas: [], videos: [], anuncios: [], totales: sinResultados(), anteriores: sinResultados(), topes: [], productos: [], sugerencias: [], decididas: 0,
-  grupos: { "Ángulo": [], Estructura: [], Puja: [], Copy: [], Landing: [], Producto: [], Etapa: [] }, creadasPorDia: [], creadasHoy: 0, equipo: [], videosSinAnalizar: 0, iaConectada: false, actividadDisponible: false,
+  grupos: { "Ángulo": [], Estructura: [], Puja: [], Copy: [], Landing: [], Producto: [], Etapa: [] }, creadasPorDia: [], creadasHoy: 0, equipo: [], videosSinAnalizar: 0, videosSinAngulo: 0, iaConectada: false, actividadDisponible: false,
 });
 
 const restar = (fecha: string, n: number) => new Date(new Date(`${fecha}T00:00:00Z`).getTime() - n * 86_400_000).toISOString().slice(0, 10);
@@ -241,9 +243,17 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
   const conGasto = campanas.filter((c) => c.r.gasto > 0);
   const deCampana = (clave: (c: CampanaVista) => string | null): Elemento[] => conGasto.map((c) => ({ clave: clave(c), r: c.r, tope: c.tope, campana: c.id }));
   const deAnuncio = (clave: (a: AnuncioVista) => string | null): Elemento[] =>
-    anuncios.filter((a) => a.r.gasto > 0).map((a) => ({ clave: clave(a), r: a.r, tope: campanasDe.get(a.campanaId)?.tope ?? CPA_TOPE_PREDETERMINADO, campana: a.campanaId }));
+    anuncios.filter((a) => a.r.gasto > 0).map((a) => ({ clave: clave(a), r: a.r, tope: campanasDe.get(a.campanaId)?.tope ?? CPA_TOPE_PREDETERMINADO, campana: a.campanaId, video: a.videoId }));
+  // El ángulo se mide por video (18 nov 2026): el de su análisis (o el que se corrigió a mano) y, sin análisis, solo el que la campaña trae en su nombre o a mano. Nunca el que la campaña heredó de otros videos.
+  const anguloDeAnuncio = (a: AnuncioVista): string | null => {
+    const deVideo = a.videoId ? analisisDe.get(a.videoId)?.angulo : null;
+    if (deVideo) return deVideo;
+    const c = campanasDe.get(a.campanaId);
+    return c && (c.anguloOrigen === "nombre" || c.anguloOrigen === "manual") ? c.angulo : null;
+  };
+  const videosSinAngulo = new Set(anuncios.filter((a) => a.r.gasto > 0 && a.videoId && !anguloDeAnuncio(a)).map((a) => a.videoId as string)).size;
   const grupos: Record<Dimension, Grupo[]> = {
-    "Ángulo": agrupar(deCampana((c) => c.angulo)),
+    "Ángulo": agrupar(deAnuncio(anguloDeAnuncio)),
     Estructura: agrupar(deCampana((c) => c.estructura)),
     Puja: agrupar(deCampana((c) => (c.puja ? NOMBRE_PUJA[c.puja] : null))),
     Copy: agrupar(deAnuncio((a) => copyLimpio(a.copy))),
@@ -302,7 +312,7 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
   const productos = [...new Set(camp.map((c) => (c.producto as string | null)?.trim()).filter((p): p is string => !!p))].sort((a, b) => a.localeCompare(b, "es"));
   return {
     ...base, cuentas, cuentaId, desde, hasta: o.hoy, campanas: campanasConActividad, videos, anuncios, totales, anteriores, topes, productos, sugerencias, decididas: todas.length - sugerencias.length, grupos,
-    creadasPorDia, creadasHoy: creadasPorDia[13]?.testing + creadasPorDia[13]?.escala + creadasPorDia[13]?.retargeting + creadasPorDia[13]?.otras || 0, equipo, actividadDisponible: eventos.length > 0, videosSinAnalizar: videos.filter((v) => !v.analisis || v.analisis.estado !== "analizado").length, iaConectada: false,
+    creadasPorDia, creadasHoy: creadasPorDia[13]?.testing + creadasPorDia[13]?.escala + creadasPorDia[13]?.retargeting + creadasPorDia[13]?.otras || 0, equipo, actividadDisponible: eventos.length > 0, videosSinAnalizar: videos.filter((v) => !v.analisis || v.analisis.estado !== "analizado").length, videosSinAngulo, iaConectada: false,
   };
 }
 

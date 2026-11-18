@@ -14,7 +14,8 @@ function Tarjeta({ s, escribe, ocupada, alDecidir }: { s: Sugerencia; escribe: b
   const [rechazando, setRechazando] = useState(false);
   const [porque, setPorque] = useState("");
   const punto = s.positiva ? "bg-success" : s.severidad === "alta" ? "bg-destructive" : s.severidad === "media" ? "bg-warning" : "bg-muted-foreground";
-  const enlace = s.objeto.tipo === "campana" ? `/anuncios-meta/campanas?abrir=${s.objeto.id}` : s.objeto.tipo === "video" ? "/anuncios-meta/videos" : null;
+  // «Campañas sin etiquetas» abre la lista de campañas ya recortada a las que faltan; una campaña o un video abre su ficha.
+  const enlace = s.tipo === "etiquetas_faltan" ? "/anuncios-meta/campanas?faltan=1" : s.objeto.tipo === "campana" ? `/anuncios-meta/campanas?abrir=${s.objeto.id}` : s.objeto.tipo === "video" ? `/anuncios-meta/videos?abrir=${encodeURIComponent(s.objeto.id)}` : null;
   return (
     <li className="flex flex-col gap-2 px-4 py-3">
       <div className="flex items-start gap-2">

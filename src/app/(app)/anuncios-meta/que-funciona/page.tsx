@@ -11,7 +11,7 @@ export default async function QueFuncionaPage({ searchParams }: { searchParams: 
   const { datos, escribe, pais, hayToken } = await cargarPaginaMeta(searchParams);
   return (
     <MarcoMeta titulo="Qué funciona" datos={datos} escribe={escribe} hayToken={hayToken} pais={pais}>
-      <QueFunciona grupos={datos.grupos} />
+      <QueFunciona grupos={datos.grupos} videosSinAngulo={datos.videosSinAngulo} />
     </MarcoMeta>
   );
 }
