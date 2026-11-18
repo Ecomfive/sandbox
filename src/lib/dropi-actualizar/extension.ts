@@ -12,7 +12,7 @@ export type MensajeExtension =
   | { tipo: "hola" }
   | { tipo: "sesion"; pais: Sitio | "tw" | "siscore"; abrir: boolean }
   | { tipo: "mostrar"; pais: Sitio | "tw" | "siscore" }
-  | { tipo: "lanzar"; lector: ClaveLector | "tuwinner" | "siscore"; subida: Record<string, string>; dias?: { pedidos: number; cartera: number } | null }
+  | { tipo: "lanzar"; lector: ClaveLector | "tuwinner" | "siscore"; subida: Record<string, string>; dias?: { pedidos: number; cartera: number } | null; /** SISCORE (0.8.3): guía → estado de las ya cerradas, que no se vuelven a rastrear. */ saltar?: Record<string, string> }
   | { tipo: "avance"; lector: ClaveLector | "tuwinner" | "siscore" };
 
 export interface SesionDropi {
