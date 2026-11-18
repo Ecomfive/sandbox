@@ -5,6 +5,7 @@ import { registrarAuditoria } from "@/lib/auditoria";
 import { formatearEventoAuditoria } from "@/lib/auditoria-cambios";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { puedeVerBodega, puedeVerPaisId, SIN_ACCESO_PAIS } from "@/lib/seguridad/pais-acceso";
+import { exigirAcceso } from "@/lib/seguridad/exigir-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 import { ETIQUETA_TIPO_BODEGA, TIPOS_BODEGA, type TipoBodega } from "./def-bodegas";
 
@@ -80,10 +81,11 @@ export async function actualizarBodega(formData: FormData): Promise<{ error?: st
 
 /** Desactiva o reactiva una bodega. No se borra: el stock y los movimientos futuros dependen de ella. */
 export async function cambiarEstadoBodega(id: string, activa: boolean): Promise<{ error?: string }> {
-  const usuario = await requireModuloEscritura(MODULO);
+  // Módulo y país de la bodega en una llamada (plan de seguridad, fase 4 · 18 nov 2026).
+  const acceso = await exigirAcceso({ modulo: MODULO, escritura: true, bodegaId: id });
+  if (acceso.error) return { error: acceso.error };
   if (typeof id !== "string" || !UUID.test(id)) return { error: "Bodega no válida." };
   const supabase = createServiceClient();
-  if (!(await puedeVerBodega(supabase, usuario.paisesPermitidos, id))) return { error: SIN_ACCESO_PAIS };
   const { data: actual } = await supabase.from("wms_bodegas").select("nombre, activa").eq("id", id).single();
   if (!actual) return { error: "La bodega ya no existe." };
   if (actual.activa === activa) return {};

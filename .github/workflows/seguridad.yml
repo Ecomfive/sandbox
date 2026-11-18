@@ -1,0 +1,37 @@
+# Revisión automática de cada PR (plan de seguridad, fase 4 · 18 nov 2026): pruebas de seguridad (incluida la prueba de
+# cierre, que falla si una acción del servidor o una ruta no revisa permisos) y tipos. No usa secretos ni toca la base.
+name: Seguridad
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: seguridad-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pruebas:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TZ: America/Panama
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Pruebas de seguridad
+        run: npm run test:seguridad
+      - name: Tipos
+        run: |
+          npx next typegen
+          npx tsc --noEmit

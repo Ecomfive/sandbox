@@ -6,7 +6,8 @@ import { formatearEventoAuditoria } from "@/lib/auditoria-cambios";
 import { dinero } from "@/lib/af4/formato";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/server";
-import { sinAccesoARegistros, sinAccesoAUnidades, sinAccesoTodaLaEmpresa } from "@/lib/finanzas/acceso-tienda";
+import { sinAccesoARegistros, sinAccesoAUnidades } from "@/lib/finanzas/acceso-tienda";
+import { exigirAcceso } from "@/lib/seguridad/exigir-acceso";
 import { VIDA_UTIL, tipoDeBien, validarBienExcel, type TipoBien } from "@/lib/finanzas/bienes-uso";
 import { guardarBienes, type BienValidado } from "@/lib/finanzas/guardar-bienes";
 import { origenDeArchivo } from "@/lib/finanzas/guardar-libro";
@@ -149,12 +150,12 @@ export async function actualizarBien(formData: FormData): Promise<{ error?: stri
 /** «Dar de baja»: el bien deja de depreciar desde el mes de la baja y sale del valor neto. Con fecha vacía, anula la baja. */
 export async function cambiarBaja(id: string, fecha: string | null, motivo: string): Promise<{ error?: string }> {
   try {
-    await requireModuloEscritura(MODULO);
+    // Módulo y tienda del bien en una llamada (plan de seguridad, fase 4 · 18 nov 2026).
+    const acceso = await exigirAcceso({ modulo: MODULO, escritura: true, registros: { tabla: "fin_bienes_uso", ids: [id] } });
+    if (acceso.error) return { error: acceso.error };
     if (typeof id !== "string" || !UUID.test(id)) return { error: "Bien inválido." };
     if (fecha !== null && (typeof fecha !== "string" || !FECHA.test(fecha))) return { error: "Elige la fecha de baja." };
     const supabase = createServiceClient();
-    const acceso = await sinAccesoARegistros(supabase, "fin_bienes_uso", [id]);
-    if (acceso) return { error: acceso };
     const { data: b } = await supabase.from("fin_bienes_uso").select("fecha_alta, fecha_baja").eq("id", id).maybeSingle();
     if (!b) return { error: "El bien ya no existe." };
     if (fecha && fecha < (b.fecha_alta as string)) return { error: "La baja no puede ser anterior al alta." };
@@ -204,9 +205,9 @@ export async function importarBienes(
   filas: unknown[],
 ): Promise<{ error: string } | { guardados: number; conservados: number; borrados: number; rechazados: number }> {
   try {
-    await requireModuloEscritura(MODULO);
-    const accesoEmpresa = await sinAccesoTodaLaEmpresa();
-    if (accesoEmpresa) return { error: accesoEmpresa };
+    // Módulo y «solo quien ve todas las tiendas» en una llamada (plan de seguridad, fase 4 · 18 nov 2026).
+    const acceso = await exigirAcceso({ modulo: MODULO, escritura: true, todaLaEmpresa: true });
+    if (acceso.error) return { error: acceso.error };
     if (!Array.isArray(filas) || !filas.length || filas.length > MAX_BIENES) return { error: "El archivo no trae bienes válidos." };
     const buenos = filas.map(validarBienExcel).filter((b): b is BienValidado => b !== null);
     if (!buenos.length) return { error: "El archivo no trae bienes válidos." };
