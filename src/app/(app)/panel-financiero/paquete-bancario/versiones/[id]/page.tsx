@@ -6,6 +6,7 @@ import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { fechaHora, mesLargo, mesMedio } from "@/lib/af4/fecha";
 import { requireModulo } from "@/lib/auth";
+import { snapshotParaModulos } from "@/lib/finanzas/paquete-bancario";
 import { leerSnapshot } from "@/lib/finanzas/cargar-paquete-bancario";
 import { createServiceClient } from "@/lib/supabase/server";
 import { TextoManual } from "../../../../ayuda/manuales/texto-manual";
@@ -21,7 +22,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Una versión guardada del paquete bancario, tal como era el día que se guardó. */
 export default async function VersionPaquetePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ papel?: string }> }) {
-  await requireModulo("panel-financiero");
+  const usuario = await requireModulo("panel-financiero");
   const { id } = await params;
   if (!UUID.test(id) || !(await puedeVerPaquete())) notFound();
   const { data, error } = await createServiceClient().from("fin_paquetes_bancarios").select("id, contenido, creado_por_nombre, creado_en").eq("id", id).maybeSingle();
@@ -34,8 +35,10 @@ export default async function VersionPaquetePage({ params, searchParams }: { par
     );
   }
   if (!data) notFound();
-  const s = leerSnapshot(data.contenido);
-  if (!s) notFound();
+  const guardada = leerSnapshot(data.contenido);
+  if (!guardada) notFound();
+  // Solo las secciones de los módulos de quien la abre, no las de quien la guardó (auditoría de seguridad, 18 nov 2026).
+  const s = snapshotParaModulos(guardada, usuario.modulos);
   const papel = leerPapel((await searchParams).papel);
   const etiqueta = `Cierre de ${mesMedio(s.corte)} · ${s.entidad === "consolidado" ? "Consolidado" : s.entidad}`;
   return (

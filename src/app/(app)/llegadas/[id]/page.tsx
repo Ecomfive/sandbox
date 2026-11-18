@@ -4,7 +4,7 @@ import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { irAlInicio } from "@/lib/auth";
 import { hoyPanama } from "@/lib/af4/fecha";
-import { EVENTO_DE_TIPO, type TipoLlegada } from "@/lib/compras/llegadas-avisos";
+import { EVENTO_DE_TIPO, filaSinMontos, type TipoLlegada } from "@/lib/compras/llegadas-avisos";
 import { cargarFilasLlegada, destinatariosDe } from "@/lib/compras/llegadas-servidor";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { direccionesDeEtiquetas, type EtiquetaPedido } from "@/lib/proveedor/etiquetas-datos";
@@ -12,7 +12,7 @@ import { esUuid } from "@/lib/seguridad/ruta-almacen";
 import { createServiceClient } from "@/lib/supabase/server";
 import { requireSesion } from "../../ayuda/datos-ayuda";
 import { sinAccesoACompras } from "../../compras/acceso-compras";
-import { campoOculto, restriccionesDe } from "../../compras/permisos-compras";
+import { restriccionesDe, vePagosProveedor } from "../../compras/permisos-compras";
 import { VistaLlegada } from "./vista-llegada";
 
 export const metadata = { title: "Llegada de compras" };
@@ -39,14 +39,17 @@ export default async function LlegadaPage({ params }: { params: Promise<{ id: st
   const conCompras = usuario.modulos.includes("compras");
   if (!esDestino && !admin && !conCompras) irAlInicio(usuario);
 
-  const filas = await cargarFilasLlegada(supabase, id);
+  const leidas = await cargarFilasLlegada(supabase, id);
   if (!esDestino && !admin) {
-    const sinAcceso = await sinAccesoACompras(filas.map((f) => f.compraId), usuario);
+    const sinAcceso = await sinAccesoACompras(leidas.map((f) => f.compraId), usuario);
     if (sinAcceso) irAlInicio(usuario);
   }
 
   const restricciones = restriccionesDe(usuario.afinado.compras);
-  const verMontos = esDestino || admin || (conCompras && !campoOculto(restricciones, "pago2"));
+  // Lo pagado y el segundo pago: sin ver algún campo de dinero de Compras, no (auditoría de seguridad, 18 nov 2026).
+  const verMontos = esDestino || admin || (conCompras && vePagosProveedor(restricciones));
+  // Quien no ve el segundo pago no recibe sus montos ni el día del pago: esconderlos en la pantalla no basta (auditoría de seguridad, 18 nov 2026).
+  const filas = verMontos ? leidas : leidas.map(filaSinMontos);
   // Registrar pagos: un administrador o quien modifica Compras (Francis). Quien recibe el aviso (María José) lo ve para enterarse, no para pagar.
   const puedePagar = tipo === "bodega" && verMontos && (admin || (conCompras && !usuario.modulosSoloLectura.includes("compras")));
 

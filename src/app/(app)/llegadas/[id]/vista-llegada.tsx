@@ -239,7 +239,7 @@ function FilaBodega({ llegadaId, fila, verMontos, puedePagar, hoy }: { llegadaId
   const [diaPago, setDiaPago] = useState(hoy);
   const [error, setError] = useState<string | null>(null);
   const [pendiente, startTransition] = useTransition();
-  const pagada = !!fila.pagadoEn;
+  const pagada = fila.pagada ?? !!fila.pagadoEn;
 
   const registrar = () => {
     setError(null);
@@ -272,7 +272,8 @@ function FilaBodega({ llegadaId, fila, verMontos, puedePagar, hoy }: { llegadaId
         <div className="flex min-w-32 items-center justify-end">
           {pagada ? (
             <Badge tone="success">
-              Pagado {fila.montoPagado != null && verMontos ? dinero(fila.montoPagado) : ""} · {dia(fila.pagadoEn!)}
+              Pagado {fila.montoPagado != null && verMontos ? dinero(fila.montoPagado) : ""}
+              {fila.pagadoEn ? ` · ${dia(fila.pagadoEn)}` : ""}
             </Badge>
           ) : puedePagar && !abierto ? (
             <button

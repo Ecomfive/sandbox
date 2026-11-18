@@ -14,8 +14,11 @@ import { getPaisActual } from "@/lib/pais";
 import { obtenerPendientesHoy } from "@/lib/pendientes-hoy";
 import { pendientesVisibles } from "@/lib/hoy";
 import { CentroNotificaciones } from "./centro-notificaciones";
-import { ENTIDADES_CON_PAIS, eventoSinMontos, eventoVisible } from "@/lib/auditoria-visible";
-import { campoOculto, dentroDelAlcance, ES_ALCANCE_LIMITADO, restriccionesDe } from "../compras/permisos-compras";
+import { ENTIDADES_CON_PAIS, eventoCompraParaRol, eventoCrmVisible, eventoDeTiendaVisible, eventoVisible, veTodosLosChats } from "@/lib/auditoria-visible";
+import type { AreaCrm } from "@/lib/crm/areas";
+import { COLUMNA_TIENDA, type TablaConTienda } from "@/lib/finanzas/acceso-tienda";
+import { cargarTiendasPermitidas } from "@/lib/finanzas/cargar-tiendas-permitidas";
+import { dentroDelAlcance, ES_ALCANCE_LIMITADO, restriccionesDe } from "../compras/permisos-compras";
 
 export const metadata = { title: "Centro de notificaciones" };
 
@@ -72,10 +75,9 @@ export default async function NotificacionesPage() {
   ]);
 
   // El país de cada compra, ruta, landing, publicación y ficha WMS que aparece, para no mostrar la de un país no permitido; y, si el rol
-  // solo ve sus compras o tiene «Monto» oculto en Compras, las compras ajenas y los montos tampoco (auditoría del 27 oct 2026).
+  // solo ve sus compras o tiene campos ocultos en Compras, las compras ajenas y esos datos tampoco (auditorías del 27 oct y 18 nov 2026).
   const restricciones = restriccionesDe(usuario.afinado.compras);
   const alcanceLimitado = ES_ALCANCE_LIMITADO(restricciones.alcance);
-  const sinMontos = campoOculto(restricciones, "monto");
   const ids = (entidad: string) => [...new Set((todos ?? []).filter((e) => e.entidad === entidad && e.entidad_id).map((e) => e.entidad_id as string))];
   const paisPor = new Map<string, string | null>();
   const compraDentro = new Map<string, boolean>();
@@ -107,10 +109,32 @@ export default async function NotificacionesPage() {
       }
     });
   }
+  // Auditoría de seguridad, 18 nov 2026: con tiendas limitadas, solo lo de finanzas de sus tiendas; y del CRM, solo los chats de sus áreas
+  // y de su alcance (como en la Bandeja).
+  const permitidas = await cargarTiendasPermitidas();
+  const unidadPor = new Map<string, string | null>();
+  if (permitidas !== null) {
+    const tablas = (Object.keys(COLUMNA_TIENDA) as TablaConTienda[]).filter((t) => ids(t).length);
+    const leidas = await Promise.all(tablas.map((t) => supabase.from(t).select(`id, ${COLUMNA_TIENDA[t]}`).in("id", ids(t))));
+    tablas.forEach((t, i) => {
+      for (const f of (leidas[i].data ?? []) as unknown as Record<string, string | null>[]) unidadPor.set(`${t}:${f.id}`, f[COLUMNA_TIENDA[t]] ?? null);
+    });
+  }
+  const chatPor = new Map<string, { area: AreaCrm; asignadaA: string | null }>();
+  const idsChats = ids("whatsapp_conversaciones");
+  // Quien ve todos los chats no necesita la consulta; para los demás, por tandas, y si una falla sus chats no se muestran.
+  if (idsChats.length && usuario.modulos.includes("crm-dropshippers") && !veTodosLosChats(usuario)) {
+    const tandas = Array.from({ length: Math.ceil(idsChats.length / 150) }, (_, i) => idsChats.slice(i * 150, i * 150 + 150));
+    const leidas = await Promise.all(tandas.map((t) => supabase.from("whatsapp_conversaciones").select("id, area, asignada_a").in("id", t)));
+    for (const { data: chats } of leidas)
+      for (const c of (chats ?? []) as { id: string; area: AreaCrm | null; asignada_a: string | null }[]) if (c.area) chatPor.set(c.id, { area: c.area, asignadaA: c.asignada_a });
+  }
   const eventos = (todos ?? [])
     .filter((e) => eventoVisible(e, usuario, (entidad, id) => paisPor.get(`${entidad}:${id}`), listaPaises))
     .filter((e) => !(alcanceLimitado && e.entidad === "wms_compras" && !compraDentro.get(e.entidad_id ?? "")))
-    .map((e) => (sinMontos && e.entidad === "wms_compras" ? eventoSinMontos(e) : e))
+    .filter((e) => eventoDeTiendaVisible(e, permitidas, (entidad, id) => unidadPor.get(`${entidad}:${id}`)))
+    .filter((e) => eventoCrmVisible(e, usuario, (id) => chatPor.get(id)))
+    .map((e) => (e.entidad === "wms_compras" ? eventoCompraParaRol(e, restricciones) : e))
     .filter((e): e is NonNullable<typeof e> => e !== null)
     .slice(0, 200);
 

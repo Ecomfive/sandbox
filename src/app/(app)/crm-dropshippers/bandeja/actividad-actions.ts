@@ -35,7 +35,10 @@ import {
   type PerfilCliente,
   type SituacionCliente,
 } from "@/lib/whatsapp/actividad";
-import { mensajesOcultos } from "@/lib/whatsapp/ocultos";
+import { accesoCrm, pierdeLoBorrado } from "@/lib/crm/areas";
+import { chatEnAlcance, permisosBandeja } from "@/lib/crm/permisos-bandeja";
+import { chatVisibleParaAtencion, diaVisibleParaAtencion } from "@/lib/whatsapp/borrados-atencion";
+import { borradoPorDia, mensajesOcultos, type BorradoPorDia } from "@/lib/whatsapp/ocultos";
 import { areasDe, conversacionPermitida, usuarioBandeja } from "./datos-bandeja";
 
 // Actividad del cliente (29 oct 2026): por qué escribió un dropshipper cada día y por qué productos preguntó, entendido por la IA a partir de sus mensajes y guardado en
@@ -191,12 +194,16 @@ export async function actividadDelCliente(conversacionId: string): Promise<Activ
   ]);
   const etiquetas = comoEtiquetas(propios.lista);
   const dias = diasPorAnalizar(agruparPorDia(msgs), mapaDeGuardados(g.filas));
-  const ultimo = g.filas[0] ?? null;
-  const interes = interesPorProducto(g.filas.map((f) => ({ cliente: c.id, productos: f.productos })));
+  // A quien tiene solo Atención no le llega lo que la IA resumió de mensajes borrados ni de antes del borrado del chat; con algo borrado, tampoco el
+  // análisis completo, que mira todo el historial (auditoría de seguridad, 18 nov 2026).
+  const borrado = pierdeLoBorrado(accesoCrm(u)) ? (await borradoPorDia(supabase, [c.id])).get(c.id) : undefined;
+  const filas = borrado ? g.filas.filter((f) => diaVisibleParaAtencion(f.dia, borrado.dias, borrado.diaCorte)) : g.filas;
+  const ultimo = filas[0] ?? null;
+  const interes = interesPorProducto(filas.map((f) => ({ cliente: c.id, productos: f.productos })));
   return {
-    perfil: pf.perfil,
-    dias: g.filas.slice(0, DIAS_EN_FICHA).map((f) => ({ dia: f.dia, motivos: f.motivos, productos: f.productos, resumen: f.resumen, estado: f.estado })),
-    frecuentes: frecuenciaDeMotivos(g.filas, etiquetas),
+    perfil: borrado ? null : pf.perfil,
+    dias: filas.slice(0, DIAS_EN_FICHA).map((f) => ({ dia: f.dia, motivos: f.motivos, productos: f.productos, resumen: f.resumen, estado: f.estado })),
+    frecuentes: frecuenciaDeMotivos(filas, etiquetas),
     etiquetas,
     productos: interes.map((p) => ({ nombre: p.nombre, dias: p.dias })).slice(0, 8),
     situacion: situacionDelCliente((conv.data?.ultimo_de as string | null) ?? null, (conv.data?.ultimo_mensaje_en as string | null) ?? null, ultimo ? { dia: ultimo.dia, estado: ultimo.estado, resumen: ultimo.resumen } : null),
@@ -370,15 +377,24 @@ export interface MotivosRecurrentes {
 
 const porTandas = <T,>(lista: T[], n: number): T[][] => Array.from({ length: Math.ceil(lista.length / n) }, (_, i) => lista.slice(i * n, i * n + n));
 
-/** Los ids de los chats de las áreas de la persona que no están ocultos, entre los pedidos. */
-async function chatsVisibles(supabase: Supabase, u: UsuarioActual, ids: string[]): Promise<Set<string>> {
-  const visibles = new Set<string>();
+/**
+ * Los ids de los chats que la persona ve en la bandeja, entre los pedidos: de sus áreas, no ocultos y dentro de su alcance («los suyos y los libres»). A quien tiene solo
+ * Atención, además, sin los chats borrados y con `borrado` para quitar los días que tocan algo borrado (auditoría de seguridad, 18 nov 2026).
+ */
+async function chatsVisibles(supabase: Supabase, u: UsuarioActual, ids: string[]): Promise<{ visibles: Set<string>; borrado: Map<string, BorradoPorDia> | null }> {
+  const visibles = new Map<string, string | null>();
   const areas = areasDe(u);
+  const alcance = permisosBandeja(u).alcance;
   for (const tanda of porTandas(ids, 150)) {
-    const { data } = await supabase.from("whatsapp_conversaciones").select("id, area, oculta_en").in("id", tanda);
-    for (const c of data ?? []) if (areas.includes(c.area as never) && !c.oculta_en) visibles.add(c.id as string);
+    const { data } = await supabase.from("whatsapp_conversaciones").select("id, area, oculta_en, asignada_a, ultimo_mensaje_en").in("id", tanda);
+    for (const c of data ?? [])
+      if (areas.includes(c.area as never) && !c.oculta_en && chatEnAlcance(alcance, (c.asignada_a as string | null) ?? null, u.id))
+        visibles.set(c.id as string, (c.ultimo_mensaje_en as string | null) ?? null);
   }
-  return visibles;
+  if (!pierdeLoBorrado(accesoCrm(u))) return { visibles: new Set(visibles.keys()), borrado: null };
+  const borrado = await borradoPorDia(supabase, [...visibles.keys()]);
+  for (const [id, ultimo] of visibles) if (!chatVisibleParaAtencion(ultimo, borrado.get(id)?.corte ?? null)) visibles.delete(id);
+  return { visibles: new Set(visibles.keys()), borrado };
 }
 
 /** Los motivos y los productos por los que más escriben los dropshippers en los últimos `dias` días, solo de los chats que la persona puede ver y que ya se analizaron. */
@@ -400,8 +416,12 @@ export async function motivosRecurrentes(dias: number): Promise<MotivosRecurrent
     filas.push(...((data ?? []) as typeof filas));
     if ((data ?? []).length < 1000 || filas.length >= 20_000) break;
   }
-  const visibles = await chatsVisibles(supabase, u, [...new Set(filas.map((f) => f.conversacion_id))]);
-  const mias = filas.filter((f) => visibles.has(f.conversacion_id));
+  const { visibles, borrado } = await chatsVisibles(supabase, u, [...new Set(filas.map((f) => f.conversacion_id))]);
+  const mias = filas.filter((f) => {
+    if (!visibles.has(f.conversacion_id)) return false;
+    const b = borrado?.get(f.conversacion_id);
+    return !b || diaVisibleParaAtencion(f.dia, b.dias, b.diaCorte);
+  });
   const propios = await cargarMotivosPropios(supabase);
   const motivos: MotivoRecurrente[] = frecuenciaDeMotivos(mias, comoEtiquetas(propios.lista)).map((f) => {
     const con = mias.filter((x) => x.estado !== "sin_consulta" && x.motivos.includes(f.id));

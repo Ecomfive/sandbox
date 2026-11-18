@@ -16,10 +16,13 @@ import {
   mesesHasta,
   posicionCorriente,
   seccionesPermitidas,
+  limitacionesDeSecciones,
+  snapshotParaModulos,
   totalesAnuales,
   type InsumosIndicadores,
 } from "./paquete-bancario";
 import type { InsumosBalance } from "./balance";
+import type { SnapshotPaquete } from "./cargar-paquete-bancario";
 
 const base: InsumosIndicadores = {
   ventas: 1200,
@@ -210,4 +213,40 @@ test("limitaciones: siempre «no auditadas», y los huecos sin repetir", () => {
   assert.ok(!l.some((x) => x.clave === "cuentas-sin-saldo"));
   assert.equal(l.filter((x) => x.texto === "Falta X").length, 1);
   assert.ok(l.some((x) => x.clave === "corte-abierto" && x.severidad === "alta"));
+});
+
+test("una versión guardada solo trae las secciones de los módulos de quien la abre (auditoría, 18 nov 2026)", () => {
+  const guardada = {
+    version: 1,
+    corte: "2026-10-31",
+    entidad: "consolidado",
+    secciones: ["resumen", "eerr", "balance", "deuda", "proyeccion", "limitaciones"],
+    eerr: { meses: [], filas: [], anual: [] },
+    balance: { cortes: [], filas: [], diferencia: [] },
+    deuda: { prestamos: [] },
+    proyeccion: { desde: "", semanas: [], filas: [], escenarios: [], supuestos: [] },
+    limitaciones: [],
+  } as unknown as SnapshotPaquete;
+  const vista = snapshotParaModulos(guardada, ["panel-financiero", "estado-resultados"]);
+  assert.deepEqual(vista.secciones, ["resumen", "eerr", "limitaciones"]);
+  assert.equal(vista.balance, null);
+  assert.equal(vista.deuda, null);
+  assert.equal(vista.proyeccion, null);
+  assert.deepEqual(vista.eerr, guardada.eerr);
+  assert.deepEqual(snapshotParaModulos(guardada, ["estado-resultados", "balance-general", "tesoreria", "proyeccion-caja"]).secciones, guardada.secciones);
+});
+
+test("las limitaciones van solo con sus secciones (auditoría, 18 nov 2026)", () => {
+  const l = [
+    { clave: "no-auditadas", severidad: "alta" as const, texto: "Cifras de gestión" },
+    { clave: "balance-2026-10-31", severidad: "alta" as const, texto: "El balance de octubre tiene una diferencia por cuadrar de $1.234,00." },
+    { clave: "giros", severidad: "media" as const, texto: "No hay giros" },
+    { clave: "seccion-Deuda vigente", severidad: "media" as const, texto: "«Deuda vigente» no se pudo armar con los datos disponibles." },
+    { clave: "seccion-Estado de resultados", severidad: "media" as const, texto: "«Estado de resultados» no se pudo armar con los datos disponibles." },
+    { clave: "aviso-Falta correr", severidad: "media" as const, texto: "Falta correr la migración 0935." },
+  ];
+  assert.deepEqual(limitacionesDeSecciones(l, ["resumen", "eerr", "limitaciones"]).map((x) => x.clave), ["no-auditadas", "seccion-Estado de resultados", "aviso-Falta correr"]);
+  assert.equal(limitacionesDeSecciones(l, ["balance", "deuda", "eerr"]).length, l.length);
+  const guardada = { version: 1, corte: "2026-10-31", entidad: "consolidado", secciones: ["resumen", "balance", "limitaciones"], balance: null, limitaciones: l } as unknown as SnapshotPaquete;
+  assert.ok(!snapshotParaModulos(guardada, ["panel-financiero"]).limitaciones.some((x) => x.clave.startsWith("balance-")));
 });

@@ -3,7 +3,7 @@ import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { irAlInicio } from "@/lib/auth";
 import { hoyPanama } from "@/lib/af4/fecha";
-import { DIAS_LISTA_LLEGADAS, EVENTO_DE_TIPO, desdeDeLista, diasDeLista } from "@/lib/compras/llegadas-avisos";
+import { DIAS_LISTA_LLEGADAS, EVENTO_DE_TIPO, desdeDeLista, diasDeLista, filaSinMontos } from "@/lib/compras/llegadas-avisos";
 import { cargarFilasDeLlegadas, destinatariosDe } from "@/lib/compras/llegadas-servidor";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { direccionesDeEtiquetas, type EtiquetaPedido } from "@/lib/proveedor/etiquetas-datos";
@@ -58,7 +58,8 @@ export default async function LlegadasPage({ searchParams }: { searchParams: Pro
           </Link>
         ))}
       </nav>
-      <ListaLlegadas filas={filas} etiquetas={etiquetas} periodo={textoPeriodo(dias)} />
+      {/* La lista no muestra montos: no se mandan a la pantalla (auditoría de seguridad, 18 nov 2026). */}
+      <ListaLlegadas filas={filas.map(filaSinMontos)} etiquetas={etiquetas} periodo={textoPeriodo(dias)} />
     </Pagina>
   );
 }
