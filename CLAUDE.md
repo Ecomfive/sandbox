@@ -2740,7 +2740,10 @@ convenciones técnicas del código.
   la forma anterior: pedidos de a 1.000 y líneas por número de pedido —`lineasDeOrdenes`—, ya no cruzando líneas con pedidos página por página). Índice
   `ven_ordenes_unidad_fecha` (unidad_id, fecha desc, id). `liviano` (tablero «Todas» y Dashboard) se salta fotos e historial de clientes, que no muestran.
   Comprobado: misma salida que la forma anterior (14 272 pedidos y 17 069 líneas, mismo orden). Medido local: Dashboard 7,0 → 2,0 s, «Todas» 5,6 → 2,6 s,
-  Logística/Confirmación 9,0 → 3,9 s (lo que queda ahí es el historial de clientes, ~50 consultas).
+  Logística/Confirmación 9,0 → 3,9 s. Segunda tanda (migración 0322): el historial de cada cliente (`historialDeClientes`: riesgo y pedidos del
+  cliente) sale de `ven_historial_clientes(claves, unidades)` en una consulta (antes ~50, de a 150 teléfonos); `unidades` = las tiendas permitidas de la
+  persona (null = todas). Comprobado igual a la forma anterior. Sin caché compartida a propósito: las páginas modifican los pedidos leídos (entrega,
+  transportista) y un pedido nuevo tardaría en verse.
 - **Reportería de pedidos (la Matriz dentro del sistema)** (17 nov 2026, pedido de Hernán para María José; prototipo https://claude.ai/artifact/TNhc38acs7JZzNcsLSgUze):
   `/tienda-reporteria` (Operación › Gestión de tienda, módulo `tienda-reporteria`, migración 0310). Meta: dejar los Excel; la primera carga sale de la Matriz
   «NUEVA GESTION OCEANS PANAMA» (Google Sheet de administración, hoja «Excel Matriz») y después se trabaja aquí. Una fila por línea de producto

@@ -109,6 +109,9 @@ interface ClienteFila {
   notas: string | null;
 }
 
+/** Si la base tiene `ven_historial_clientes` (migración 0322). */
+let historialEnUna: boolean | null = null;
+
 /**
  * El historial de cada cliente por su teléfono normalizado (`telefono_clave`), con todas sus órdenes (de cualquier fecha y tienda): cuántas tiene y cuántas
  * terminaron entregadas, devueltas o canceladas. De a 150 teléfonos por consulta, 6 a la vez.
@@ -116,10 +119,21 @@ interface ClienteFila {
 async function historialDeClientes(supabase: SupabaseClient, claves: string[]): Promise<Map<string, { total: number; entregadas: number; devueltas: number; canceladas: number }>> {
   const unicas = [...new Set(claves.filter(Boolean))];
   const mapa = new Map<string, { total: number; entregadas: number; devueltas: number; canceladas: number }>();
-  const tandas: string[][] = [];
-  for (let i = 0; i < unicas.length; i += 150) tandas.push(unicas.slice(i, i + 150));
+  if (!unicas.length) return mapa;
   // Con tiendas limitadas (17 nov 2026), el historial cuenta solo los pedidos de sus tiendas.
   const permitidas = await cargarTiendasPermitidas();
+  // Con la migración 0322 (18 nov 2026), en una sola consulta (antes ~50 en Confirmación y Logística); sin ella, la forma de antes.
+  if (historialEnUna !== false) {
+    const { data, error } = await supabase.rpc("ven_historial_clientes", { claves: unicas, unidades: permitidas });
+    if (!error) {
+      historialEnUna = true;
+      for (const [k, v] of Object.entries((data ?? {}) as Record<string, { total: number; entregadas: number; devueltas: number; canceladas: number }>)) mapa.set(k, v);
+      return mapa;
+    }
+    if (/ven_historial_clientes|function|schema cache/i.test(error.message)) historialEnUna = false;
+  }
+  const tandas: string[][] = [];
+  for (let i = 0; i < unicas.length; i += 150) tandas.push(unicas.slice(i, i + 150));
   for (let i = 0; i < tandas.length; i += 6) {
     const respuestas = await Promise.all(
       tandas.slice(i, i + 6).map((t) => supabase.from("ven_ordenes_clientes").select("telefono_clave, ven_ordenes(estado_entrega, unidad_id)").in("telefono_clave", t).limit(5000)),
