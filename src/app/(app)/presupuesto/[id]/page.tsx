@@ -176,7 +176,7 @@ export default async function PresupuestoDetallePage({
         }
         datosHasta={mesesReales.at(-1) ?? null}
         actualizado={actualizado}
-        descarga={{ href: `/presupuesto/${p.id}/descargar${unidad ? `?ver=${unidad}` : ""}` }}
+        descarga={usuario.tiendasPermitidas ? undefined : { href: `/presupuesto/${p.id}/descargar${unidad ? `?ver=${unidad}` : ""}` }}
       />
 
       <div className="flex flex-wrap items-start justify-between gap-3">
