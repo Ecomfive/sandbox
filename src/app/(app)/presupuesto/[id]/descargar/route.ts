@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import * as XLSX from "xlsx";
 import { hoyPanama } from "@/lib/af4/fecha";
 import { getUsuarioActual } from "@/lib/auth";
+import { SOLO_TODA_LA_EMPRESA } from "@/lib/finanzas/acceso-tienda";
 import { createServiceClient } from "@/lib/supabase/server";
 import { SECCIONES, mesCorto } from "@/lib/finanzas/eerr";
 import { cargarPresupuesto, cargarRealPorUnidad, unidadesPresupuesto } from "@/lib/finanzas/cargar-presupuesto";
@@ -51,6 +52,9 @@ function hoja(filas: Celda[][], anchos: number[], columnasPct: Set<number> = new
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const usuario = await getUsuarioActual();
   if (!usuario || !usuario.modulos.includes("presupuesto")) return new NextResponse("No autorizado", { status: 403 });
+  // El Excel trae las cifras reales de todas las tiendas y deja bajar cualquiera: con tiendas limitadas no se descarga
+  // (auditoría de seguridad, 18 nov 2026).
+  if (usuario.tiendasPermitidas) return new NextResponse(SOLO_TODA_LA_EMPRESA, { status: 403 });
   const { id } = await params;
   const supabase = createServiceClient();
   const cargado = await cargarPresupuesto(supabase, id);
