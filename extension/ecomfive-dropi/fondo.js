@@ -26,6 +26,8 @@
 // 0.7.2 (12 nov 2026): el lector de Drop también lee los exclusivos de cada producto (lo que Drop guarda aparte para un cliente), de su ficha.
 // 0.8.1 (18 nov 2026): el lector de Drop entiende la página de pedidos nueva de Drop (la lista se llama «orders») y lee por tramos de fechas (su
 // paginación se cortaba pasados ~5.500 pedidos).
+// 0.8.2 (18 nov 2026): Drop volvió a cambiar la página de pedidos esa misma tarde (la lista llega en «data.orders», en un bloque aparte): el lector ya no busca
+// el nombre del contenedor, sino la lista que trae pedidos, para que el próximo cambio de nombre no lo rompa.
 // 0.8.0 (12 nov 2026): «siscore» es la pestaña de servientrega-clientes.appsiscore.com (SISCORE, el portal de clientes de Servientrega Panamá) con la cuenta
 // de la tienda (Kenku primero), con el lector `siscore` (informe de guías y rastreo de cada una) para Logística de tienda. SOLO LECTURA: solo consultas;
 // nunca anula, crea guías, recolecciones ni confirmaciones. Su sesión es una cookie: se ve si la página es la del cliente (no la de entrar).

@@ -160,14 +160,13 @@ async function leerDropProveedor(subida) {
       const re = /self\.__next_f\.push\(\[1,("(?:[^"\\]|\\.)*")\]\)/g;
       let m;
       while ((m = re.exec(html))) flujo += JSON.parse(m[1]);
-      // La lista: «initialOrders» (hasta el 17 nov 2026) o «orders» dentro de «initialQuery» (desde el 18 nov 2026).
-      let i = flujo.indexOf('"initialOrders":');
-      if (i < 0) {
-        const q = flujo.indexOf('"initialQuery":');
-        i = q >= 0 ? flujo.indexOf('"orders":', q) : -1;
-      }
-      if (i < 0) throw new Error("Drop cambió la página de pedidos: no se encontraron los datos.");
-      const j = flujo.indexOf("[", i);
+      return listaDePedidos(flujo);
+    }
+    // La lista de pedidos dentro de los datos de la página. Drop le cambia el nombre seguido: «initialOrders» (hasta el 17 nov 2026), «orders» dentro de
+    // «initialQuery» (mañana del 18 nov) y «data.orders» en un bloque aparte que apunta «initialQueryPromise» (tarde del 18 nov; a veces las dos en el mismo
+    // día). Por eso no se busca por el nombre del contenedor (0.8.2): se prueba cada lista «orders»/«initialOrders» y vale la que trae pedidos
+    // (con «orderInfo»), o una vacía si el tramo no tiene pedidos.
+    function arregloDesde(flujo, j) {
       let d = 0;
       let enTexto = false;
       let escape = false;
@@ -183,10 +182,35 @@ async function leerDropProveedor(subida) {
         else if (c === "[" || c === "{") d++;
         else if (c === "]" || c === "}") {
           d--;
-          if (d === 0) return JSON.parse(flujo.slice(j, k + 1));
+          if (d === 0) return flujo.slice(j, k + 1);
         }
       }
-      throw new Error("Drop cambió la página de pedidos: los datos vinieron cortados.");
+      return null;
+    }
+    function listaDePedidos(flujo) {
+      const re = /"(?:initialOrders|orders)":\[/g;
+      let vacia = false;
+      let cortada = false;
+      let m;
+      while ((m = re.exec(flujo))) {
+        const texto = arregloDesde(flujo, m.index + m[0].length - 1);
+        if (texto === null) {
+          cortada = true;
+          continue;
+        }
+        let lista;
+        try {
+          lista = JSON.parse(texto);
+        } catch {
+          continue;
+        }
+        if (!Array.isArray(lista)) continue;
+        if (!lista.length) vacia = true;
+        else if (lista.some((o) => o && typeof o === "object" && o.id && o.orderInfo)) return lista;
+      }
+      // Vacía solo si la página no trae ningún pedido en ninguna parte: si hay pedidos que no se supo leer, mejor fallar que guardar menos.
+      if (vacia && !flujo.includes('"orderInfo"')) return [];
+      throw new Error(cortada ? "Drop cambió la página de pedidos: los datos vinieron cortados." : "Drop cambió la página de pedidos: no se encontraron los datos.");
     }
     const pedidos = new Map();
     for (const [desde, hasta] of tramos) {
