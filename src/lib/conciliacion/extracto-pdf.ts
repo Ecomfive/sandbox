@@ -6,7 +6,7 @@
 import { huella } from "@/lib/finanzas/libro-excel";
 import type { HojaLeida, LineaLeida } from "./leer-excel";
 
-export const MODELO_EXTRACTO = "claude-sonnet-4-5";
+export const MODELO_EXTRACTO = "claude-sonnet-5-5";
 /** Más líneas que esto no caben en una respuesta: el extracto se parte por meses. */
 export const MAX_LINEAS_PDF = 400;
 

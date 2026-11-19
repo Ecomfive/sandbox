@@ -8,7 +8,7 @@ import { mesLargo } from "@/lib/af4/fecha";
 import { variacion } from "./eerr";
 import type { SnapshotInforme } from "./informe-envio";
 
-export const MODELO_PREDETERMINADO = "claude-sonnet-4-5";
+export const MODELO_PREDETERMINADO = "claude-sonnet-5-5";
 const URL_API = "https://api.anthropic.com/v1/messages";
 
 export interface ConfigAnthropic {
