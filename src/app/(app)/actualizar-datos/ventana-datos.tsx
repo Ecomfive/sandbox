@@ -33,7 +33,15 @@ const lectoresDeSitio = (sitio: string): ClaveLector[] => TODOS.filter((l) => LE
  * El contenido de la ventana de «Actualizar datos» (19 nov 2026, pedido de Hernán: actualizar desde el panel, sin ir a otra página): el mismo componente de
  * la pantalla de siempre, con sus mismos permisos en el servidor. Dropi, Drop y Dunamixfy arrancan solos con la cuenta elegida.
  */
-export function ContenidoVentana({ ventana, extras, alCambiarEnMarcha }: { ventana: VentanaFuente; extras: ExtrasVentanas; alCambiarEnMarcha: (enMarcha: boolean) => void }) {
+export function ContenidoVentana(props: { ventana: VentanaFuente; extras: ExtrasVentanas; alCambiarEnMarcha: (enMarcha: boolean) => void }) {
+  return (
+    <div className="p-4">
+      <Contenido {...props} />
+    </div>
+  );
+}
+
+function Contenido({ ventana, extras, alCambiarEnMarcha }: { ventana: VentanaFuente; extras: ExtrasVentanas; alCambiarEnMarcha: (enMarcha: boolean) => void }) {
   switch (ventana.tipo) {
     case "dropi":
       if (!extras.dropi) return <p className="m-0 text-sm text-muted-foreground">No se pudo cargar la actualización de Dropi.</p>;
@@ -41,12 +49,12 @@ export function ContenidoVentana({ ventana, extras, alCambiarEnMarcha }: { venta
     case "siscore":
       return (
         <div className="flex flex-col gap-2">
-          <p className="m-0 text-sm text-muted-foreground">Lee las guías de Servientrega de la cuenta de tienda que esté abierta en SISCORE en este Chrome.</p>
-          <LeerSiscore ultima={null} tiendaId={null} tiendaNombre={null} />
+          <p className="m-0 text-sm text-muted-foreground">Lee las guías de Servientrega de la cuenta de tienda que esté abierta en SISCORE en este Chrome. Si no hay sesión, abre la pestaña y espera a que entres.</p>
+          <LeerSiscore ultima={null} tiendaId={null} tiendaNombre={null} iniciar />
         </div>
       );
     case "tuwinner":
-      return <LeerTuWinner leidoHoy={false} auto={false} />;
+      return <LeerTuWinner leidoHoy={false} auto={false} iniciar />;
     case "conteo":
       return <ImportarConteo />;
     case "excel":

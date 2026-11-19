@@ -31,7 +31,18 @@ const textoAvance = (tienda: string, hechos: number, total: number) =>
  * si la última lectura de esa tienda en este navegador tiene más de 30 minutos (si la extensión y la sesión de esa tienda están). Solo para quien puede
  * modificar Logística.
  */
-export function LeerSiscore({ ultima, tiendaId, tiendaNombre }: { ultima: string | null; tiendaId: string | null; tiendaNombre: string | null }) {
+export function LeerSiscore({
+  ultima,
+  tiendaId,
+  tiendaNombre,
+  iniciar = false,
+}: {
+  ultima: string | null;
+  tiendaId: string | null;
+  tiendaNombre: string | null;
+  /** Desde el panel «Datos» (19 nov 2026): se pulsó «Actualizar», así que lee de una vez (abre SISCORE y espera la sesión si falta). */
+  iniciar?: boolean;
+}) {
   const router = useRouter();
   const [estado, setEstado] = useState<{ texto: string; tipo: "info" | "mal" | "bien" } | null>(null);
   const [leyendo, setLeyendo] = useState(false);
@@ -116,6 +127,10 @@ export function LeerSiscore({ ultima, tiendaId, tiendaNombre }: { ultima: string
 
   // Sola al abrir, si en este navegador no se leyó esa tienda en los últimos 30 minutos (sin abrir pestañas ni pedir sesión: si no están, se avisa).
   useEffect(() => {
+    if (iniciar) {
+      const t = setTimeout(() => void leer(false), 300);
+      return () => clearTimeout(t);
+    }
     let antes = 0;
     try {
       antes = Number(localStorage.getItem(claveAuto) || 0);

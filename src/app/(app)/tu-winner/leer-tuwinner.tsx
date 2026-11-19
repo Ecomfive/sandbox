@@ -20,7 +20,7 @@ const CLAVE_AUTO = "tuwinner-lectura-auto";
  * sesión de Ecomfive si falta, corre el lector `tuwinner` ahí y guarda lo leído. **La lectura diaria**: si la última lectura no es de hoy, se lee sola al
  * abrir el panel (una vez por día y por navegador). Solo lo ve quien puede modificar Tu Winner.
  */
-export function LeerTuWinner({ leidoHoy, auto }: { leidoHoy: boolean; auto: boolean }) {
+export function LeerTuWinner({ leidoHoy, auto, iniciar = false }: { leidoHoy: boolean; auto: boolean; /** Desde el panel «Datos»: se pulsó «Actualizar», lee de una vez. */ iniciar?: boolean }) {
   const router = useRouter();
   const [estado, setEstado] = useState<{ texto: string; tipo: "info" | "mal" | "bien" } | null>(null);
   const [leyendo, setLeyendo] = useState(false);
@@ -81,6 +81,14 @@ export function LeerTuWinner({ leidoHoy, auto }: { leidoHoy: boolean; auto: bool
   }
 
   // La lectura del día: si todavía no se leyó hoy, una vez al abrir (por navegador, para no repetirla en cada visita si falla).
+  useEffect(() => {
+    if (!iniciar) return;
+    const t = setTimeout(() => void leer(), 300);
+    return () => clearTimeout(t);
+    // Solo al abrir la ventana.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [iniciar]);
+
   useEffect(() => {
     if (!auto || leidoHoy) return;
     const hoy = new Date().toISOString().slice(0, 10);
