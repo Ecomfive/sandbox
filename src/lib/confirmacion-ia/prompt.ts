@@ -35,6 +35,7 @@ export function armarEntrada({
   coincidencias,
   instruccionesExtra,
   geografia,
+  tendencia,
 }: {
   paisNombre: string;
   distingueZona: boolean;
@@ -48,6 +49,8 @@ export function armarEntrada({
   instruccionesExtra?: string | null;
   /** La geografía del país como texto (referencia; las palabras de zona mandan). */
   geografia?: string | null;
+  /** La tendencia histórica de la tienda en las zonas dudosas (texto ya armado). */
+  tendencia?: string | null;
 }): EntradaTexto {
   const instrucciones = [
     `Eres el asistente de confirmación de pedidos de una tienda en línea de ${paisNombre}. Analizas la dirección de entrega que dejó un cliente.`,
@@ -66,6 +69,7 @@ export function armarEntrada({
 
   const partes: string[] = [];
   if (distingueZona && geografia) partes.push(geografia);
+  if (distingueZona && tendencia) partes.push(tendencia);
   if (distingueZona && reglas.length) {
     const lista = reglas.slice(0, MAX_REGLAS);
     const sueltas = lista.filter((r) => !esCompuesta(r.clave));

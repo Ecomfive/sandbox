@@ -14,6 +14,7 @@ import { herramientaIcomfly, conexionesIcomfly } from "@/lib/tienda/icomfly";
 import { etiquetasDe, mismaTiendaUnidad, zonaDeEtiquetas } from "@/lib/tienda/ordenes-finanzas";
 import { destinatariosDe } from "@/lib/compras/llegadas-servidor";
 import { geografiaDe } from "./geografia";
+import { tendenciaDeTienda, textoTendencia } from "./tendencias";
 import { motivoDeAdelanto, zonasDeAdelanto } from "./adelanto";
 import { combinar, etiquetaDeZona, faltaParaCliente, leerRespuesta, mensajePagoAdelantado, mensajePedirDetalle, type Combinado, type EstadoAnalisis, type ResultadoModelo } from "./combinar";
 import { armarEntrada, type EjemploPrompt } from "./prompt";
@@ -227,7 +228,14 @@ export async function evaluarDireccion(
     if (!proveedores.length) modelos = [{ proveedor: "openai", ok: false, error: "Falta conectar ChatGPT o Claude (las claves OPENAI_API_KEY o ANTHROPIC_API_KEY)." }];
     else {
       const ejemplos = await cargarEjemplos(supabase, d.paisId, d.tiendaId);
-      const entrada = armarEntrada({ paisNombre: d.paisNombre, distingueZona: config.distingueZona, reglas, ejemplos, direccion, ciudad, coincidencias: coinc, instruccionesExtra: config.instrucciones, geografia: config.distingueZona ? geografiaDe(d.paisCodigo) : null });
+      // La tendencia histórica de la tienda (solo Panamá, por ahora): en las zonas dudosas la IA etiqueta como lo viene haciendo esa tienda.
+      let tendencia: string | null = null;
+      if (config.distingueZona && d.paisCodigo.toUpperCase() === "PA" && d.tiendaId) {
+        const { data: tienda } = await supabase.from("tiendas").select("nombre").eq("id", d.tiendaId).maybeSingle();
+        const t = tendenciaDeTienda((tienda?.nombre as string | undefined) ?? null);
+        tendencia = t ? textoTendencia(t) : null;
+      }
+      const entrada = armarEntrada({ paisNombre: d.paisNombre, distingueZona: config.distingueZona, reglas, ejemplos, direccion, ciudad, coincidencias: coinc, instruccionesExtra: config.instrucciones, geografia: config.distingueZona ? geografiaDe(d.paisCodigo) : null, tendencia });
       modelos = await Promise.all(proveedores.map((p) => pedirAlModelo(p, entrada, d.numero)));
     }
   }
