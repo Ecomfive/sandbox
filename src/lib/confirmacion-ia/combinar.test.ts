@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { combinar, etiquetaDeZona, faltaParaCliente, leerRespuesta, limpiarFalta, mensajePedirDetalle, type ResultadoModelo } from "./combinar";
+import { ACEPTAR_ZONA_DE_UNA_IA, combinar, etiquetaDeZona, faltaParaCliente, leerRespuesta, limpiarFalta, mensajePedirDetalle, type ResultadoModelo } from "./combinar";
 
 const ok = (proveedor: "openai" | "anthropic", zona: "ciudad" | "interior" | "adelantado" | "no_se", completa: boolean, falta: string | null = null): ResultadoModelo => ({
   proveedor,
@@ -31,6 +31,20 @@ test("las dos IA coinciden: lista con zona; si una duda, a revisar", () => {
   assert.deepEqual([b.estado, b.zona, b.acuerdo], ["revisar", null, false]);
   const c = combinar({ distingueZona: true, zonaReglas: null, modelos: [ok("openai", "no_se", true), ok("anthropic", "no_se", true)] });
   assert.equal(c.estado, "revisar");
+});
+
+test("si una sola IA decide la zona y la otra no sabe, se acepta (por confirmar con una prueba de pedidos nuevos)", () => {
+  const a = combinar({ distingueZona: true, zonaReglas: null, modelos: [ok("openai", "no_se", true), ok("anthropic", "interior", true)] });
+  assert.deepEqual([a.estado, a.zona, a.zonaPor, a.acuerdo], ["listo", "interior", "ia", false]);
+  const b = combinar({ distingueZona: true, zonaReglas: null, modelos: [ok("openai", "ciudad", true), ok("anthropic", "no_se", true)] });
+  assert.deepEqual([b.estado, b.zona], ["listo", "ciudad"]);
+  const incompleta = combinar({ distingueZona: true, zonaReglas: null, modelos: [ok("openai", "no_se", false, "la calle"), ok("anthropic", "interior", true)] });
+  assert.deepEqual([incompleta.estado, incompleta.zona, incompleta.falta], ["falta_dato", "interior", "la calle"]);
+  const chocan = combinar({ distingueZona: true, zonaReglas: null, modelos: [ok("openai", "ciudad", true), ok("anthropic", "interior", true)] });
+  assert.equal(chocan.estado, "revisar", "dos zonas distintas siguen a revisar");
+  const adelanto = combinar({ distingueZona: true, zonaReglas: null, modelos: [ok("openai", "no_se", true), ok("anthropic", "adelantado", true)] });
+  assert.equal(adelanto.estado, "revisar", "el pago por adelantado no se acepta de una sola IA con la dirección completa");
+  assert.equal(ACEPTAR_ZONA_DE_UNA_IA, true);
 });
 
 test("una palabra de zona del equipo manda sobre las IA", () => {
