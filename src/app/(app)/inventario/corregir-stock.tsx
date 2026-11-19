@@ -26,6 +26,8 @@ export function CorregirStock({
   lotes,
   manejaVencimiento,
   alGuardar,
+  enLinea = false,
+  nombre,
 }: {
   skuId: string;
   bodegas: BodegaCorregible[];
@@ -33,6 +35,10 @@ export function CorregirStock({
   lotes: LoteStock[];
   manejaVencimiento: boolean;
   alGuardar: () => void;
+  /** Un botón pequeño de texto para ponerlo en una fila (la variante dentro de «Stock por bodega» del producto principal), en vez del botón grande de la fila de acciones. */
+  enLinea?: boolean;
+  /** A qué se le corrige el valor (el nombre de la variante), cuando no es el producto de la ficha. */
+  nombre?: string;
 }) {
   const { mostrarToast } = useToast();
   const [abierto, setAbierto] = useState(false);
@@ -79,10 +85,24 @@ export function CorregirStock({
 
   return (
     <>
-      <BotonAccion icono={LapizIcon} onClick={abrir} aria-haspopup="dialog" disabled={!bodegas.length} title={bodegas.length ? undefined : "No hay bodegas propias para corregir"}>
-        Corregir
-      </BotonAccion>
-      <Ventana abierto={abierto} alCerrar={() => !pendiente && setAbierto(false)} ancho="sm" titulo="Corregir el inventario">
+      {enLinea ? (
+        <button
+          type="button"
+          onClick={abrir}
+          aria-haspopup="dialog"
+          disabled={!bodegas.length}
+          aria-label={`Corregir ${nombre ?? "el valor"}${bodegas.length === 1 ? ` en ${bodegas[0].nombre}` : ""}`}
+          className="ml-2 inline-flex min-h-6 cursor-pointer items-center gap-1 rounded-md border border-border-control bg-card px-2 py-0.5 text-[11px] font-medium text-foreground hover:bg-muted disabled:opacity-50"
+        >
+          <LapizIcon aria-hidden="true" className="h-3 w-3" />
+          Corregir
+        </button>
+      ) : (
+        <BotonAccion icono={LapizIcon} onClick={abrir} aria-haspopup="dialog" disabled={!bodegas.length} title={bodegas.length ? undefined : "No hay bodegas propias para corregir"}>
+          Corregir
+        </BotonAccion>
+      )}
+      <Ventana abierto={abierto} alCerrar={() => !pendiente && setAbierto(false)} ancho="sm" titulo={nombre ? `Corregir ${nombre}` : "Corregir el inventario"}>
         <form
           className="flex flex-col gap-4 p-5"
           onSubmit={(e) => {
@@ -103,7 +123,11 @@ export function CorregirStock({
               </select>
             </label>
           )}
-          {bodegas.length === 1 && <p className="m-0 text-[13px] text-muted-foreground">Bodega: {bodegas[0].nombre}</p>}
+          {bodegas.length === 1 && (
+            <p className="m-0 text-[13px] text-muted-foreground">
+              {nombre ? `${nombre} · ` : ""}Bodega: {bodegas[0].nombre}
+            </p>
+          )}
           {manejaVencimiento && bodega && (
             <label className="flex flex-col gap-1">
               <span className={labelClassSm}>Lote</span>
