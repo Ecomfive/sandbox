@@ -12,6 +12,7 @@ import { tiendasVisibles } from "@/lib/confirmacion-ia/acceso";
 import { appDeTienda } from "@/lib/tienda/shopify-app";
 import { ConectarTienda } from "./conectar-tienda";
 import { ConectarIcomfly } from "./conectar-icomfly";
+import { EscrituraTienda } from "./escritura-tienda";
 import { conexionesIcomfly } from "@/lib/tienda/icomfly";
 
 export const metadata = { title: "Tiendas Shopify" };
@@ -54,6 +55,9 @@ export default async function TiendasPage({ searchParams }: { searchParams: Prom
   const { tiendas, faltaMigracion } = await tiendasVisibles(supabase, pais.id);
   // La conexión con iComfly (el bot de WhatsApp de las tiendas, 13 nov 2026); null si falta la migración 0284.
   const icomflyDe = admin ? await conexionesIcomfly(supabase, tiendas.map((t) => t.id)) : new Map();
+  // Escribir en Shopify (19 nov 2026): qué tiendas lo tienen encendido. Sin la migración 0337, ninguna.
+  const { data: escrituras } = tiendas.length ? await supabase.from("tiendas").select("id, escribe_shopify, quitar_nota_bot").in("id", tiendas.map((t) => t.id)) : { data: [] };
+  const escrituraDe = new Map((escrituras ?? []).map((e) => [e.id as string, { escribe: e.escribe_shopify === true, quitaNotaBot: e.quitar_nota_bot === true }]));
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
       <EncabezadoPagina titulo="Tiendas Shopify" oculto>
@@ -112,7 +116,12 @@ export default async function TiendasPage({ searchParams }: { searchParams: Prom
                     )}
                   </td>
                   <td className={claseTdLista}>
-                    <Pastilla>Solo lectura</Pastilla>
+                    <div className="flex flex-col items-start gap-1.5">
+                      {escrituraDe.get(t.id)?.escribe ? <Pastilla tono="exito">Escribe etiquetas</Pastilla> : <Pastilla>Solo lectura</Pastilla>}
+                      {admin && t.estado === "conectada" && appDeTienda(t.nombre) && (
+                        <EscrituraTienda tiendaId={t.id} escribe={escrituraDe.get(t.id)?.escribe ?? false} quitaNotaBot={escrituraDe.get(t.id)?.quitaNotaBot ?? false} />
+                      )}
+                    </div>
                   </td>
                   {admin && (
                     <td className={claseTdLista}>
@@ -160,8 +169,8 @@ export default async function TiendasPage({ searchParams }: { searchParams: Prom
               su nombre en lugar de KENKU). Luego, «Redeploy».
             </li>
             <li>
-              <b>Un administrador pulsa «Conectar»</b>: se prueba el acceso (si la app puede escribir en Shopify, no se conecta) y se piden a Shopify los avisos de
-              pedidos.
+              <b>Un administrador pulsa «Conectar»</b>: se prueba el acceso (si la app tiene un permiso de escritura distinto de write_orders, no se conecta) y se
+              piden a Shopify los avisos de pedidos.
             </li>
             <li>
               <b>Se traen los pedidos y productos de antes</b>, sin tocar nada en Shopify.
@@ -173,6 +182,11 @@ export default async function TiendasPage({ searchParams }: { searchParams: Prom
             <li>
               <b>Unos días de prueba</b>: la conciliación compara los pedidos del sistema con los de Shopify hasta que coincidan siempre. Recién ahí se pasa a la
               siguiente tienda.
+            </li>
+            <li>
+              <b>Escribir en Shopify</b> (cuando se quiera gestionar desde el sistema): en el Dev Dashboard se agrega write_orders en una versión nueva de la app
+              (Versions → Create version → Scopes → Release) y se aprueba en el admin de la tienda. Luego un administrador pulsa aquí «Encender escritura»: se
+              revisa con Shopify que el permiso esté y, desde ahí, atención al cliente cambia las etiquetas y confirma pedidos desde la ficha.
             </li>
           </ol>
           <p className="m-0 text-xs text-muted-foreground">Primero Kenku (Panamá). Al caer un pedido nuevo, a quien tenga Pedidos de tienda le sale un aviso.</p>
@@ -194,12 +208,15 @@ export default async function TiendasPage({ searchParams }: { searchParams: Prom
               Lo que nunca hace
             </h2>
             <ul className="m-0 flex list-disc flex-col gap-1 pl-5 text-sm">
-              <li>Crear, editar ni cancelar pedidos</li>
+              <li>Crear ni cancelar pedidos, ni cambiar sus productos</li>
               <li>Cambiar productos, precios ni inventario</li>
               <li>Marcar envíos ni tocar el despacho</li>
               <li>Escribirle al cliente</li>
             </ul>
-            <p className="m-0 text-xs text-muted-foreground">Shopify no se lo permite: la app no tiene permisos de escritura.</p>
+            <p className="m-0 text-xs text-muted-foreground">
+              Lo único que puede escribir, si un administrador lo enciende en la tienda: las etiquetas del pedido (y «Confirmar pedido», que es la etiqueta
+              «Confirmada») y quitar la nota del bot. La app solo puede tener el permiso write_orders: con cualquier otro, no se conecta.
+            </p>
           </section>
         </div>
       </div>

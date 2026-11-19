@@ -1,7 +1,8 @@
 // Conexión en vivo de una tienda de Shopify (12 nov 2026, pedido de Hernán: «si cae un pedido, nos cae a nosotros en el sistema y nos da un aviso»).
 // Desde el 1 ene 2026 Shopify ya no deja crear apps propias en el admin de la tienda: se crean en el Dev Dashboard y dan un Client ID y un Client secret,
 // no un token fijo. El token se pide con el «client credentials grant» (POST /admin/oauth/access_token), dura 24 horas y aquí se guarda en memoria hasta
-// un rato antes de vencer. La app tiene solo permisos de lectura: el sistema nunca cambia nada en Shopify.
+// un rato antes de vencer. Hasta el 19 nov 2026 la app era solo de lectura; desde entonces puede tener `write_orders` (etiquetas del pedido, que un
+// administrador enciende por tienda en Tiendas Shopify: `tiendas.escribe_shopify`). Cualquier otro permiso de escritura sigue sin aceptarse.
 //
 // Cada tienda va en Vercel con tres variables (nunca en el código ni en un chat):
 //   SHOPIFY_<TIENDA>_CLIENT_ID, SHOPIFY_<TIENDA>_CLIENT_SECRET, SHOPIFY_<TIENDA>_DOMINIO (xxx.myshopify.com)
@@ -80,7 +81,25 @@ export async function accesoDeApp(app: AppTienda, ahora = Date.now()): Promise<{
   return acceso;
 }
 
-/** Los permisos de escritura que una app de solo lectura no debe tener (`write_…`). */
+/** Lo único que el sistema escribe en Shopify (19 nov 2026, etapa 1: etiquetas del pedido). Otro `write_…` hace que la tienda no se conecte. */
+export const ESCRITURA_PERMITIDA: readonly string[] = ["write_orders"];
+
+/** Los permisos de escritura que la app tiene y el sistema no usa (no deben estar: una clave filtrada podría hacer más daño). */
+export function permisosNoPermitidos(scope: string | null | undefined): string[] {
+  return permisosDeEscritura(scope).filter((p) => !ESCRITURA_PERMITIDA.includes(p));
+}
+
+/** ¿La tienda le dio a la app permiso para cambiar pedidos (etiquetas)? */
+export function puedeEscribirPedidos(scope: string | null | undefined): boolean {
+  return permisosDeEscritura(scope).includes("write_orders");
+}
+
+/** Olvida el token guardado: el próximo se pide de nuevo (después de aprobar un permiso nuevo en la tienda, el guardado no lo trae). */
+export function olvidarAcceso(app: AppTienda): void {
+  tokens.delete(app.dominio);
+}
+
+/** Los permisos de escritura de la app (`write_…`). */
 export function permisosDeEscritura(scope: string | null | undefined): string[] {
   return (scope ?? "")
     .split(",")

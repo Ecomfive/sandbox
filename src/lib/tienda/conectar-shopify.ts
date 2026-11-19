@@ -4,7 +4,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { sincronizarTienda } from "@/lib/finanzas/sincronizar-shopify";
-import { accesoDeApp, appDeTienda, permisosDeEscritura, type AppTienda } from "./shopify-app";
+import { accesoDeApp, appDeTienda, permisosNoPermitidos, type AppTienda } from "./shopify-app";
 import { completarTelefonosDeTienda } from "./telefono-cliente";
 import { aplicarVinculosDeTienda, traerProductosTienda } from "./productos-shopify";
 import { unidadDeTienda } from "@/lib/ventas/matriz";
@@ -99,8 +99,9 @@ export async function conectarTienda(supabase: SupabaseClient, tiendaId: string,
   const urlBase = urlDelSistema();
   if (!urlBase) throw new Error("No se sabe la dirección pública del sistema (PORTAL_URL) para recibir los avisos de Shopify.");
   const { token, scope } = await accesoDeApp(app);
-  const escritura = permisosDeEscritura(scope);
-  if (escritura.length) throw new Error(`La app de ${t.nombre} tiene permisos de escritura (${escritura.join(", ")}). Debe ser solo de lectura: quítaselos en el Dev Dashboard y vuelve a conectar.`);
+  // Solo se acepta `write_orders` (etiquetas del pedido, 19 nov 2026); cualquier otro permiso de escritura no se usa y no debe estar.
+  const escritura = permisosNoPermitidos(scope);
+  if (escritura.length) throw new Error(`La app de ${t.nombre} tiene permisos de escritura que el sistema no usa (${escritura.join(", ")}). Quítaselos en el Dev Dashboard (solo puede quedar write_orders) y vuelve a conectar.`);
   const faltan = PERMISOS_NECESARIOS.filter((p) => !scope.split(",").map((s) => s.trim()).includes(p));
   if (faltan.length) throw new Error(`La app de ${t.nombre} no tiene permiso para ${faltan.join(", ")}.`);
   const avisos = await registrarAvisos(app, token, urlBase);

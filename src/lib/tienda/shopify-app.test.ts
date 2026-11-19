@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { urlDelSistema } from "./conectar-shopify";
-import { appDeDominio, appDeTienda, appsDeEntorno, permisosDeEscritura } from "./shopify-app";
+import { appDeDominio, appDeTienda, appsDeEntorno, permisosDeEscritura, permisosNoPermitidos, puedeEscribirPedidos } from "./shopify-app";
 
 const ENV = {
   SHOPIFY_KENKU_CLIENT_ID: "id-k",
@@ -42,6 +42,13 @@ test("una app con permisos de escritura no se conecta", () => {
   assert.deepEqual(permisosDeEscritura("read_orders,read_customers,read_products"), []);
   assert.deepEqual(permisosDeEscritura("read_orders, write_orders,write_products"), ["write_orders", "write_products"]);
   assert.deepEqual(permisosDeEscritura(null), []);
+});
+
+test("solo write_orders se acepta (etiquetas del pedido, 19 nov 2026)", () => {
+  assert.deepEqual(permisosNoPermitidos("read_orders,write_orders"), []);
+  assert.deepEqual(permisosNoPermitidos("read_orders, write_orders,write_products"), ["write_products"]);
+  assert.equal(puedeEscribirPedidos("read_orders, write_orders"), true);
+  assert.equal(puedeEscribirPedidos("read_orders"), false);
 });
 
 test("la dirección pública del sistema para los avisos", () => {

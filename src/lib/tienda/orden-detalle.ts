@@ -6,7 +6,9 @@ import { postventaDeOrdenes, type CasoPedido } from "./postventa-tienda";
 import { datosAsistente, evaluarAsistente, type Asistente } from "./asistente";
 import { costosDeProductos, cuentasDelPedido, type CostoProducto, type IngresosYCostos } from "./costos";
 import { hayFormaPagoEntrega, hayHoraDeShopify } from "./datos-finanzas";
-import { mismaTiendaUnidad } from "./ordenes-finanzas";
+import { etiquetasDe, mismaTiendaUnidad } from "./ordenes-finanzas";
+import { etiquetasSugeridas } from "./etiquetas-shopify";
+import { appDeTienda } from "./shopify-app";
 import { cargarTiendasPermitidas } from "@/lib/finanzas/cargar-tiendas-permitidas";
 import { puedeVerUnidad } from "@/lib/finanzas/tiendas-permitidas";
 import { telefonosDeChatPosibles } from "@/lib/crm/telefono";
@@ -106,6 +108,12 @@ export interface NotaOrden {
   creado_en: string;
 }
 
+export interface EscrituraOrden {
+  activa: boolean;
+  motivo: string | null;
+  sugeridas: string[];
+}
+
 export interface OrdenTienda {
   id: string;
   o: OrdenFinanzas;
@@ -132,6 +140,11 @@ export interface OrdenTienda {
   whatsapp: WhatsappOrden | null;
   /** El asistente de confirmación (13 nov 2026): riesgo, dirección, transportadora y conversación, con lo registrado. */
   asistente: Asistente | null;
+  /**
+   * Cambiar las etiquetas en Shopify desde la ficha (19 nov 2026, etapa 1 de escribir en Shopify): `activa` si la tienda está conectada y tiene encendido
+   * «Escribir en Shopify»; si no, `motivo` en palabras. `sugeridas`: las etiquetas que más usa la tienda (para agregar sin escribir).
+   */
+  escritura: EscrituraOrden;
 }
 
 export async function cargarOrdenTienda(supabase: SupabaseClient, id: string, paisId: string): Promise<OrdenTienda | null> {
@@ -147,7 +160,7 @@ export async function cargarOrdenTienda(supabase: SupabaseClient, id: string, pa
   if (!puedeVerUnidad(permitidas, (o as { unidad_id?: string | null }).unidad_id ?? null)) return null;
   const [{ data: lineas }, { data: tiendasPais }, { data: cliente }, { data: notas }, eventos, entrega, postventa] = await Promise.all([
     supabase.from("ven_orden_lineas").select("linea, producto, cantidad, precio, es_servicio, sku_maestro_id, skus_maestros(codigo, nombre)").eq("orden_id", id).order("linea"),
-    supabase.from("tiendas").select("nombre, dominio").eq("pais_id", paisId),
+    supabase.from("tiendas").select("id, nombre, dominio, estado").eq("pais_id", paisId),
     supabase.from("ven_ordenes_clientes").select("nombre, telefono, direccion, corregimiento, notas, telefono_clave").eq("orden_id", id).maybeSingle(),
     supabase.from("ven_orden_notas").select("id, texto, autor, creado_en").eq("orden_id", id).order("creado_en").limit(200),
     supabase
@@ -223,7 +236,37 @@ export async function cargarOrdenTienda(supabase: SupabaseClient, id: string, pa
     postventa,
     whatsapp,
     asistente,
+    escritura: await escrituraDeOrden(supabase, tiendaSistema ? { id: tiendaSistema.id as string, nombre: tiendaSistema.nombre as string, estado: tiendaSistema.estado as string } : null, unidadId, o.numero, o.etiquetas),
   };
+}
+
+/** Quienes editan Pedidos o Confirmación de tienda cambian etiquetas (19 nov 2026); a los demás la ficha se las muestra sin poder tocarlas. */
+export function escrituraParaPersona(orden: OrdenTienda, u: { modulos: string[]; modulosSoloLectura: string[] }): OrdenTienda {
+  const puede = ["tienda-pedidos", "tienda-confirmacion"].some((m) => u.modulos.includes(m) && !u.modulosSoloLectura.includes(m));
+  return puede || !orden.escritura.activa ? orden : { ...orden, escritura: { activa: false, motivo: "Tu rol solo puede leer los pedidos.", sugeridas: [] } };
+}
+
+/**
+ * Si se pueden cambiar las etiquetas de este pedido en Shopify (19 nov 2026) y cuáles sugerir. Sin la migración 0337, apagado. Las sugeridas salen de
+ * los últimos 500 pedidos de la tienda (solo si está encendido: es una consulta más).
+ */
+async function escrituraDeOrden(
+  supabase: SupabaseClient,
+  tienda: { id: string; nombre: string; estado: string } | null,
+  unidadId: string | null,
+  numero: string | null,
+  etiquetas: string | null,
+): Promise<EscrituraOrden> {
+  const no = (motivo: string): EscrituraOrden => ({ activa: false, motivo, sugeridas: [] });
+  if (!tienda || tienda.estado !== "conectada") return no("La tienda no está conectada a Shopify.");
+  if (!numero) return no("El pedido no tiene número de Shopify.");
+  const { data, error } = await supabase.from("tiendas").select("escribe_shopify").eq("id", tienda.id).maybeSingle();
+  if (error || !data?.escribe_shopify) return no(`${tienda.nombre} todavía no escribe en Shopify: lo enciende un administrador en Tiendas Shopify.`);
+  if (!appDeTienda(tienda.nombre)) return no(`Faltan las claves de ${tienda.nombre} en Vercel.`);
+  const { data: usadas } = unidadId
+    ? await supabase.from("ven_ordenes").select("etiquetas").eq("unidad_id", unidadId).not("etiquetas", "is", null).order("fecha", { ascending: false }).limit(500)
+    : { data: [] };
+  return { activa: true, motivo: null, sugeridas: etiquetasSugeridas((usadas ?? []).map((u) => etiquetasDe(u.etiquetas as string | null)), etiquetasDe(etiquetas), 15) };
 }
 
 /** Lo último que tienen Monday o Servientrega del pedido (la guía manda: es de interior). Sin sus tablas, null. */
