@@ -51,7 +51,7 @@ export default async function ResponderCuantoHayPage({ searchParams }: { searchP
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-4">
       <EncabezadoPagina titulo="Responder cuánto hay" oculto>
-        Lo que preguntan las tiendas y Proveeduría: manda a contar a despacho, escribe la cantidad y responde. La respuesta le llega a quien preguntó.
+        Lo que preguntan las tiendas y Proveeduría: manda a contar a despacho, escribe la cantidad y responde. La respuesta le llega a quien preguntó y el inventario de Despacho queda en esa cantidad; si te equivocas, vuelve a responder con «Corregir».
       </EncabezadoPagina>
       {faltaMigracion ? (
         <p role="alert" className="m-0 rounded-lg border border-border bg-card px-4 py-3 text-sm text-destructive">

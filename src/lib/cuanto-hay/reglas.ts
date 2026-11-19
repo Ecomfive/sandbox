@@ -89,3 +89,23 @@ export function cuandoCorto(iso: string, ahora = new Date()): string {
   if (dia === ayer) return `ayer ${horaPanama(d)}`;
   return `${d.toLocaleDateString("es-PA", { timeZone: "America/Panama", day: "numeric", month: "short" }).replace(".", "")} ${horaPanama(d)}`;
 }
+
+/**
+ * Al responder «¿Cuánto hay?» el inventario de la bodega Despacho queda en esa cantidad (19 nov 2026, pedido de Hernán: «para no hacerlo doble»). Esto decide qué se puede hacer con el producto y
+ * arma el motivo que queda en el historial; si se equivocó, se corrige respondiendo otra vez o con «Corregir» del inventario.
+ */
+export type DecisionConteo = { tipo: "ajustar"; diferencia: number } | { tipo: "igual" } | { tipo: "no"; motivo: string };
+
+export function decidirConteoDespacho(p: { actual: number; cantidad: number; tipo: string; clase: string; manejaVencimiento: boolean; conVariantes: boolean }): DecisionConteo {
+  if (p.tipo === "combo") return { tipo: "no", motivo: "es un pack o combo y no guarda stock propio" };
+  if (p.clase === "test") return { tipo: "no", motivo: "es un producto de prueba, sin stock hasta pasarlo a Activo" };
+  if (p.manejaVencimiento) return { tipo: "no", motivo: "maneja vencimiento: se corrige por lote en el inventario" };
+  if (p.conVariantes) return { tipo: "no", motivo: "tiene variantes: se corrige en cada variante" };
+  if (p.actual === p.cantidad) return { tipo: "igual" };
+  return { tipo: "ajustar", diferencia: p.cantidad - p.actual };
+}
+
+/** El motivo del ajuste en el historial del producto: «Conteo de despacho (¿Cuánto hay?) de Yiletsi, pedido por Nicol: 120 → 98». */
+export function motivoConteoDespacho(p: { quien: string; pidio: string | null; antes: number; despues: number }): string {
+  return `Conteo de despacho (¿Cuánto hay?) de ${p.quien}${p.pidio ? `, pedido por ${p.pidio}` : ""}: ${p.antes.toLocaleString("es-PA")} → ${p.despues.toLocaleString("es-PA")}`.slice(0, 500);
+}

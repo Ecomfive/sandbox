@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { requireModuloEscritura, type UsuarioActual } from "@/lib/auth";
 import { cargarTiendasCuantoHay } from "@/lib/cuanto-hay/datos";
-import { PROVEEDURIA, avisoPregunta, avisoRespuesta, leerCantidad, limpiarNota, tiendasDePersona } from "@/lib/cuanto-hay/reglas";
+import { registrarAuditoria } from "@/lib/auditoria";
+import { PROVEEDURIA, avisoPregunta, avisoRespuesta, decidirConteoDespacho, leerCantidad, limpiarNota, motivoConteoDespacho, tiendasDePersona } from "@/lib/cuanto-hay/reglas";
 import { SIN_ACCESO_TIENDA } from "@/lib/finanzas/acceso-tienda";
 import { cargarTiendasPermitidas } from "@/lib/finanzas/cargar-tiendas-permitidas";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -17,7 +18,9 @@ const ES_UUID = (v: unknown): v is string => typeof v === "string" && /^[0-9a-f]
 const SIN_MIGRACION = "Falta correr en Supabase la migración 0302 («¿Cuánto hay?»).";
 const nombreDe = (u: UsuarioActual) => (u.nombre || u.email || "Alguien").trim();
 
-type Resultado = { ok: true } | { error: string };
+/** Lo que pasó con el inventario de Despacho al responder: `ok` si quedó en la cantidad contada (o ya estaba), y el texto para mostrarlo. */
+export type EstadoInventario = { ok: boolean; texto: string };
+type Resultado = { ok: true; inventario?: EstadoInventario } | { error: string };
 
 async function conPermiso<T>(modulo: string, hacer: (u: UsuarioActual) => Promise<T>): Promise<T | { error: string }> {
   let u: UsuarioActual;
@@ -72,7 +75,7 @@ export async function responderCuantoHay(id: string, cantidadCruda: string): Pro
     const cantidad = leerCantidad(cantidadCruda);
     if (cantidad === null) return { error: "Escribe la cantidad (un número entero, 0 si no hay)." };
     const supabase = createServiceClient();
-    const { data: p, error: e0 } = await supabase.from("tienda_cuanto_hay").select("id, tienda_id, producto, pedido_por").eq("id", id).maybeSingle();
+    const { data: p, error: e0 } = await supabase.from("tienda_cuanto_hay").select("id, tienda_id, sku_id, producto, pedido_por, pedido_por_nombre").eq("id", id).maybeSingle();
     // Las de Proveeduría no tienen tienda (migración 0336).
     if (e0) return { error: SIN_MIGRACION };
     if (!p) return { error: "Esa pregunta ya no existe." };
@@ -94,7 +97,56 @@ export async function responderCuantoHay(id: string, cantidadCruda: string): Pro
         .from("notificaciones_usuario")
         .insert({ usuario_id: p.pedido_por, tipo: "tarea", titulo: aviso.titulo, texto: aviso.texto, href: "/inventario-pedidos-despacho/cuanto-hay", autor_id: u.id, autor_nombre: nombreDe(u) });
     }
+    // Al responder, el inventario de la bodega Despacho queda en lo contado (19 nov 2026, pedido de Hernán: no hacerlo doble). Si no se puede, la respuesta ya quedó guardada y se dice por qué.
+    const inventario = await ajustarInventarioDeDespacho(supabase, { skuId: (p.sku_id as string | null) ?? null, cantidad, u, pidio: (p.pedido_por_nombre as string | null) ?? null });
     for (const r of RUTAS) revalidatePath(r);
-    return { ok: true as const };
+    revalidatePath("/inventario");
+    return { ok: true as const, inventario };
   });
+}
+
+/**
+ * Deja el stock físico del producto en la bodega «Despacho» de Panamá (código `despacho`, la propia y activa) en la cantidad que contó Yiletsi, con un ajuste que lleva el motivo en el historial.
+ * Nunca lanza ni deshace la respuesta: devuelve el resultado en palabras. Los productos con vencimiento, con variantes, compuestos o de prueba no se ajustan (ver `decidirConteoDespacho`).
+ */
+async function ajustarInventarioDeDespacho(
+  supabase: ReturnType<typeof createServiceClient>,
+  d: { skuId: string | null; cantidad: number; u: UsuarioActual; pidio: string | null },
+): Promise<EstadoInventario> {
+  const NO = (texto: string): EstadoInventario => ({ ok: false, texto: `La respuesta quedó guardada, pero el inventario no se actualizó: ${texto}.` });
+  try {
+    if (!d.skuId) return NO("la pregunta no tiene un producto del catálogo");
+    const { data: bodega } = await supabase.from("wms_bodegas").select("id, nombre, paises!inner(codigo)").eq("codigo", "despacho").eq("tipo", "propia").eq("activa", true).eq("paises.codigo", "PA").maybeSingle();
+    if (!bodega) return NO("no se encontró la bodega Despacho de Panamá");
+    const [{ data: sku }, { data: hijas }, { data: fila }] = await Promise.all([
+      supabase.from("skus_maestros").select("codigo, tipo, clase, maneja_vencimiento").eq("id", d.skuId).maybeSingle(),
+      supabase.from("skus_maestros").select("id").eq("padre_id", d.skuId).limit(1),
+      supabase.from("wms_stock").select("fisico").eq("sku_maestro_id", d.skuId).eq("bodega_id", bodega.id as string).maybeSingle(),
+    ]);
+    if (!sku) return NO("el producto ya no existe");
+    const actual = Number(fila?.fisico ?? 0);
+    const decision = decidirConteoDespacho({ actual, cantidad: d.cantidad, tipo: String(sku.tipo), clase: String(sku.clase ?? "fisico"), manejaVencimiento: sku.maneja_vencimiento === true, conVariantes: (hijas ?? []).length > 0 });
+    if (decision.tipo === "no") return NO(decision.motivo);
+    if (decision.tipo === "igual") return { ok: true, texto: `El inventario de ${bodega.nombre} ya decía ${d.cantidad.toLocaleString("es-PA")}.` };
+    const { error } = await supabase.rpc("wms_registrar_movimiento", {
+      p_sku: d.skuId,
+      p_bodega: bodega.id,
+      p_tipo: "ajuste",
+      p_cantidad: decision.diferencia,
+      p_origen: "manual",
+      p_referencia: "¿Cuánto hay?",
+      p_motivo: motivoConteoDespacho({ quien: nombreDe(d.u), pidio: d.pidio, antes: actual, despues: d.cantidad }),
+      p_usuario: d.u.id,
+    });
+    if (error) return NO(error.message.length < 160 ? error.message.replace(/\.$/, "") : "la base no lo dejó");
+    await registrarAuditoria({
+      accion: "conteo_despacho_inventario",
+      entidad: "skus_maestros",
+      entidadId: d.skuId,
+      detalle: `¿Cuánto hay? ${sku.codigo}: ${actual} → ${d.cantidad} en ${bodega.nombre} · Panamá`,
+    });
+    return { ok: true, texto: `El inventario de ${bodega.nombre} pasó de ${actual.toLocaleString("es-PA")} a ${d.cantidad.toLocaleString("es-PA")}.` };
+  } catch {
+    return NO("no se pudo guardar el ajuste");
+  }
 }
