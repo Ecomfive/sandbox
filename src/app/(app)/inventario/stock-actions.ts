@@ -11,6 +11,7 @@ import { getPaisActual } from "@/lib/pais";
 import { puedeVerBodega } from "@/lib/seguridad/pais-acceso";
 import type { CajaGuardada } from "@/lib/wms/cajas";
 import { codigoLote } from "@/lib/wms/vencimiento";
+import { ETIQUETA_ACCION_DEFECTUOSO, revisarDefectuoso } from "@/lib/wms/defectuoso";
 import { compararOpciones, etiquetaTalla } from "@/lib/wms/talla";
 import type { VarianteConStock } from "@/lib/wms/stock-con-variantes";
 
@@ -285,6 +286,51 @@ export async function registrarMovimientoStock(formData: FormData): Promise<{ er
     entidad: "skus_maestros",
     entidadId: sku,
     detalle: `${tipo} ${cantidad} de ${maestro.codigo}${loteCodigo ? ` lote ${loteCodigo}` : ""}${referencia ? ` (${referencia})` : ""}${nombrePais ? ` · ${nombrePais}` : ""}`,
+  });
+  revalidatePath("/inventario");
+  return {};
+}
+
+/**
+ * Marca unidades como defectuosas, las devuelve a disponible o las da de baja (19 nov 2026, pedido de Dinora): ver `src/lib/wms/defectuoso.ts`. Basta poder modificar Inventario; dar de baja es
+ * una salida, así que donde la salida a mano está restringida (Costa Rica) pide el mismo permiso que ella. La cuenta la hace la base en una transacción (`wms_marcar_danado`). Devuelve el error
+ * como valor, porque en producción Next.js oculta el mensaje de una excepción.
+ */
+export async function marcarDefectuoso(d: { skuId: string; bodegaId: string; accion: string; cantidad: unknown; motivo: unknown }): Promise<{ error?: string }> {
+  const usuario = await requireModuloEscritura(MODULO);
+  if (!ES_ID(String(d?.skuId ?? ""))) return { error: "SKU no válido." };
+  if (!ES_ID(String(d?.bodegaId ?? ""))) return { error: "Elige la bodega." };
+  const supabase = createServiceClient();
+  if (!(await puedeVerBodega(supabase, usuario.paisesPermitidos, d.bodegaId))) return { error: "No tienes acceso al país de esa bodega." };
+  const { data: bodega } = await supabase.from("wms_bodegas").select("nombre, tipo, paises(nombre, codigo)").eq("id", d.bodegaId).maybeSingle();
+  if (!bodega) return { error: "La bodega no existe." };
+  if (bodega.tipo !== "propia") return { error: "Esta bodega es externa: su stock solo lo cambia la sincronización." };
+  const paisBodega = bodega.paises as { nombre: string; codigo: string } | { nombre: string; codigo: string }[] | null;
+  const pais = Array.isArray(paisBodega) ? paisBodega[0] : paisBodega;
+  // Dar de baja saca unidades del inventario: donde toda salida va con remisión, es de quien puede hacer salidas a mano.
+  if (d.accion === "baja" && !puedeMoverAMano("salida", pais?.codigo, autorizadaParaSalidaManual(usuario))) return { error: SOLO_ADMIN_MOVIMIENTO };
+
+  const { data: maestro } = await supabase.from("skus_maestros").select("codigo, tipo, clase, maneja_vencimiento").eq("id", d.skuId).maybeSingle();
+  if (!maestro) return { error: "El SKU no existe." };
+  if (maestro.tipo === "combo") return { error: "Un producto compuesto no guarda stock: se calcula de sus componentes." };
+  if (maestro.clase === "test") return { error: "Es un producto de prueba: no tiene stock hasta que se pase a Activo." };
+  if (maestro.maneja_vencimiento) return { error: "Este producto maneja vencimiento: márcalo con una salida o un ajuste por lote." };
+
+  // Lo que hay ahora en esa bodega, para revisar la cantidad con los mismos números que la base.
+  const { data: fila } = await supabase.from("wms_stock").select("disponible, danado").eq("sku_maestro_id", d.skuId).eq("bodega_id", d.bodegaId).maybeSingle();
+  const r = revisarDefectuoso({ accion: d.accion, cantidad: d.cantidad, motivo: d.motivo, disponible: Number(fila?.disponible ?? 0), danado: Number(fila?.danado ?? 0) });
+  if ("error" in r) return r;
+
+  const { error } = await supabase.rpc("wms_marcar_danado", { p_sku: d.skuId, p_bodega: d.bodegaId, p_accion: r.accion, p_cantidad: r.cantidad, p_motivo: r.motivo, p_usuario: usuario.id });
+  if (error) {
+    if (/wms_marcar_danado|schema cache|Could not find the function/i.test(error.message)) return { error: "Falta correr la migración 0334 (productos defectuosos) en Supabase." };
+    return { error: errorDeBase(error.message, "No se pudo guardar.") };
+  }
+  await registrarAuditoria({
+    accion: "marcar_defectuoso_inventario",
+    entidad: "skus_maestros",
+    entidadId: d.skuId,
+    detalle: `${ETIQUETA_ACCION_DEFECTUOSO[r.accion]}: ${r.cantidad} de ${maestro.codigo} en ${bodega.nombre} (${r.motivo})${pais?.nombre ? ` · ${pais.nombre}` : ""}`,
   });
   revalidatePath("/inventario");
   return {};

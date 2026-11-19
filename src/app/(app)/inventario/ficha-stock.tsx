@@ -19,6 +19,7 @@ import { usePuedeAbrir } from "@/components/modulos-contexto";
 import { ComprasProducto } from "../producto/compras-producto";
 import { FichaProductoEmbebida } from "../producto/ficha-producto-embebida";
 import { CorregirStock } from "./corregir-stock";
+import { PanelDefectuoso } from "./defectuoso";
 import { NotasProducto } from "./notas-producto";
 import { ETIQUETA_TIPO_SKU, type FilaStock } from "./def-stock";
 import { DESCRIPCION_CUBETA } from "./descripciones-stock";
@@ -198,6 +199,19 @@ export function FichaStock({
                   bodegas={datos && datos !== "error" ? datos.bodegas.filter((b) => b.tipo !== "externa").map((b) => ({ bodegaId: b.bodegaId, nombre: b.nombre, fisico: b.fisico })) : []}
                   lotes={datos && datos !== "error" ? datos.lotes : []}
                   manejaVencimiento={sku.manejaVencimiento}
+                  alGuardar={() => {
+                    setVersion((v) => v + 1);
+                    alCambiar();
+                  }}
+                />
+              )}
+              {/* Defectuoso: marcar unidades que no se pueden vender, devolverlas a disponible o darlas de baja. No aplica a un producto con vencimiento ni al principal de variantes ya repartidas. */}
+              {puedeCorregir && !sku.manejaVencimiento && (!sku.conVariantes || sku.repartoPendiente) && (
+                <PanelDefectuoso
+                  key={`${sku.id}-defectuoso-${version}`}
+                  skuId={sku.id}
+                  bodegas={datos && datos !== "error" ? datos.bodegas.filter((b) => b.tipo !== "externa").map((b) => ({ bodegaId: b.bodegaId, nombre: b.nombre, disponible: b.disponible, danado: b.danado })) : []}
+                  puedeBaja={puedeMoverAMano("salida", codigoPais, esAdmin)}
                   alGuardar={() => {
                     setVersion((v) => v + 1);
                     alCambiar();

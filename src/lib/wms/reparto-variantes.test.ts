@@ -72,3 +72,12 @@ test("la migración 0332 deja repartir todo: el libro acepta los movimientos de 
   const cuenta = sql.indexOf("select coalesce(sum(abs(fisico)), 0) into suma");
   assert.ok(prende > 0 && prende < apaga && apaga < cuenta);
 });
+
+test("las funciones de reparto no usan un DELETE sin WHERE: la protección de Supabase (pg_safeupdate) lo rechaza con 21000", async () => {
+  const { readFileSync } = await import("node:fs");
+  for (const archivo of ["0332_reparto_completo.sql", "0335_reparto_sin_delete_abierto.sql"]) {
+    const sql = readFileSync(new URL(`../../../supabase/migrations/${archivo}`, import.meta.url), "utf8");
+    assert.doesNotMatch(sql, /^\s*delete\s+from\s+\w+\s*;/im, archivo);
+    assert.match(sql, /truncate _reparto/, archivo);
+  }
+});
