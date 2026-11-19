@@ -33,8 +33,21 @@ export function conSusVariantes(principal: FilaStock, variantes: FilaStock[]): F
     manejaVencimiento: todos.some((f) => f.manejaVencimiento),
     plataformas: todos.reduce<StockPlataformas | null>((t, f) => sumaPlataformas(t, f.plataformas), null),
     porBodega: [...porBodega].map(([bodegaId, fisico]) => ({ bodegaId, fisico })),
-    variantes: dentro,
+    generalPorBodega: principal.porBodega,
+    // Cada variante sabe cuánto stock general queda en su producto, para decir «sale del general» solo donde es cierto.
+    variantes: dentro.map((v) => ({ ...v, generalPorBodega: principal.porBodega })),
   };
+}
+
+/**
+ * Si, mirando lo que se ve, queda stock general sin repartir entre las variantes (19 nov 2026, pedido de Jhokser: con el filtro de la bodega Despacho Plaza 100, donde ya estaba repartido, la fila
+ * seguía diciendo «Stock sin repartir» porque en otras bodegas sí quedaba). Con una bodega elegida (el selector de arriba o el filtro «Bodega»), cuenta solo el stock general de esa bodega; sin
+ * bodega, el de cualquiera. Sin el dato por bodega (una variante suelta), vale la marca del producto.
+ */
+export function sinRepartirEn(f: Pick<FilaStock, "repartoPendiente" | "generalPorBodega">, bodegaId: string | null | undefined): boolean {
+  if (!f.repartoPendiente) return false;
+  if (!f.generalPorBodega) return true;
+  return bodegaId ? f.generalPorBodega.some((b) => b.bodegaId === bodegaId && b.fisico !== 0) : f.generalPorBodega.some((b) => b.fisico !== 0);
 }
 
 /**
