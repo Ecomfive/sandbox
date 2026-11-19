@@ -8,6 +8,10 @@ import { avanceLecturaSiscore, empezarLecturaSiscore, fallarLecturaSiscore, lect
 
 /** La versión de «Ecomfive · Dropi» que trae el lector de SISCORE. */
 export const VERSION_EXTENSION_SISCORE = "0.8.0";
+/** Desde la 0.8.3 se saltan las guías ya cerradas (Oferfy: de ~2.500 a ~170 rastreos). Con una anterior lee igual, pero todas: se avisa (19 nov 2026). */
+export const VERSION_SISCORE_RAPIDA = "0.8.3";
+const avisoLenta = (version: string) =>
+  `La extensión de este Chrome es la ${version}: lee todas las guías otra vez y tarda mucho. Recárgala en chrome://extensions (debe decir ${VERSION_SISCORE_RAPIDA} o más) y vuelve a cargar esta página: así salta las guías ya cerradas.`;
 /** Cada cuánto se vuelve a leer sola al abrir Logística (por navegador y por tienda). */
 const CADA_MS = 30 * 60_000;
 const CLAVE_AUTO = "siscore-lectura-auto";
@@ -47,6 +51,8 @@ export function LeerSiscore({
   const [estado, setEstado] = useState<{ texto: string; tipo: "info" | "mal" | "bien" } | null>(null);
   const [leyendo, setLeyendo] = useState(false);
   const [otras, setOtras] = useState<LecturaEnCurso[]>([]);
+  /** La extensión es anterior a la que salta las guías cerradas: lee igual, pero lento (19 nov 2026). */
+  const [lenta, setLenta] = useState<string | null>(null);
   const corriendo = useRef(false);
   const propia = useRef<string | null>(null);
   const claveAuto = `${CLAVE_AUTO}:${tiendaId ?? "todas"}`;
@@ -62,6 +68,7 @@ export function LeerSiscore({
       if (!hola) throw new Error("Falta la extensión «Ecomfive · Dropi» en este Chrome (o hay que recargar la página).");
       if (anterior(hola.version, VERSION_EXTENSION_SISCORE))
         throw new Error(`La extensión es la ${hola.version}: SISCORE necesita la ${VERSION_EXTENSION_SISCORE}. Recárgala en chrome://extensions y vuelve a cargar esta página.`);
+      setLenta(anterior(hola.version, VERSION_SISCORE_RAPIDA) ? hola.version : null);
       setEstado({ texto: "Abriendo SISCORE…", tipo: "info" });
       let s = await pedirExtension<SesionDropi>({ tipo: "sesion", pais: "siscore", abrir: !sola }, 45000);
       if (!s.pestana && sola) throw new Error("SISCORE no está abierto en este Chrome: pulsa «Actualizar Servientrega» para abrirlo.");
@@ -144,6 +151,17 @@ export function LeerSiscore({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [claveAuto]);
 
+  // Al abrir: si la extensión es anterior a la que salta las guías cerradas, se avisa antes de leer (la lectura tardaría mucho).
+  useEffect(() => {
+    let vivo = true;
+    pedirExtension<{ version: string }>({ tipo: "hola" }, 2500)
+      .then((h) => vivo && h?.version && setLenta(anterior(h.version, VERSION_SISCORE_RAPIDA) ? h.version : null))
+      .catch(() => null);
+    return () => {
+      vivo = false;
+    };
+  }, []);
+
   // Las lecturas en curso de otras tiendas o de otras personas, con su porcentaje: se consultan cada 5 segundos mientras haya alguna.
   useEffect(() => {
     let vivo = true;
@@ -177,6 +195,11 @@ export function LeerSiscore({
           {leyendo ? "Leyendo…" : mismaTienda ? `Leyendo… ${pct(mismaTienda.hechos, mismaTienda.total)} %` : "Actualizar Servientrega"}
         </Button>
       </div>
+      {lenta && (
+        <span role="alert" className="max-w-md text-right font-semibold text-warning">
+          {avisoLenta(lenta)}
+        </span>
+      )}
       {otras.map((o) => (
         <span key={o.id} className="text-muted-foreground">
           {textoAvance(o.tienda, o.hechos, o.total)}
