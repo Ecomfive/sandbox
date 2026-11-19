@@ -1,4 +1,5 @@
 import type { DefTabla } from "@/lib/tabla/motor";
+import { textoParaBuscarMonto } from "@/lib/tabla/buscar-monto";
 
 export interface FilaMovimiento {
   id: string;
@@ -30,6 +31,8 @@ export interface FilaMovimiento {
   anulado: boolean;
   anuladoMotivo: string | null;
   atipico: { veces: number; mediana: number } | null;
+  /** Compra de un bien de uso (marcada así o del tipo «Alta Bien de Uso»): la ficha ofrece su bien. */
+  esBien: boolean;
 }
 
 const seleccion = <K extends keyof FilaMovimiento>(id: K, etiqueta: string, agrupable = true) => ({
@@ -55,6 +58,8 @@ export const DEF_MOVIMIENTOS: DefTabla<FilaMovimiento> = {
     seleccion("flujo", "Entra al flujo"),
     { id: "descripcion", etiqueta: "Descripción", tipo: "texto", valor: (m) => m.descripcion },
     { id: "monto", etiqueta: "Monto", tipo: "numero", valor: (m) => m.monto },
+    // La lupa busca texto: el monto escrito de varias formas («150.25», «150,25», «1,500.25») para encontrarlo por monto.
+    { id: "montoBuscar", etiqueta: "Monto (búsqueda)", tipo: "texto", sinCsv: true, soloBusqueda: true, valor: (m) => textoParaBuscarMonto(m.monto) },
     { id: "fecha", etiqueta: "Fecha de pago", tipo: "fecha", valor: (m) => m.fecha ?? "" },
     seleccion("origen", "Archivo", false),
   ],

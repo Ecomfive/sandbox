@@ -52,6 +52,8 @@ export interface CampoNumero<F> extends CampoComun {
 export interface CampoTexto<F> extends CampoComun {
   tipo: "texto";
   valor: (fila: F) => string;
+  /** Solo lo usa la lupa: no sale en «Filtros» (otra forma de buscar un dato que ya tiene su filtro, como el monto). */
+  soloBusqueda?: boolean;
 }
 
 export type CampoDef<F> = CampoSeleccion<F> | CampoFecha<F> | CampoNumero<F> | CampoTexto<F>;

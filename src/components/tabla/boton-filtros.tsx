@@ -216,7 +216,7 @@ export function BotonFiltros<F>({
   const activos = filtros.filter(filtroActivo).length;
   const usados = useMemo(() => new Set(filtros.map((f) => f.campo)), [filtros]);
   const camposDisponibles = def.campos.filter(
-    (campo) => !usados.has(campo.id) && normalizar(campo.etiqueta).includes(normalizar(busqueda.trim()))
+    (campo) => !usados.has(campo.id) && !(campo.tipo === "texto" && campo.soloBusqueda) && normalizar(campo.etiqueta).includes(normalizar(busqueda.trim()))
   );
 
   useEffect(() => {

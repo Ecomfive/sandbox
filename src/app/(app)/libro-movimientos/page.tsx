@@ -42,6 +42,7 @@ interface FilaBase {
   editado_a_mano: boolean | null;
   factura_numero: string | null;
   ruc_proveedor: string | null;
+  es_bien_de_uso?: boolean | null;
   anulado_en?: string | null;
   anulado_motivo?: string | null;
   fin_unidades: Uno<{ nombre: string }>;
@@ -88,7 +89,7 @@ export default async function LibroMovimientosPage({
     permitidas ? ((q as unknown as { in: (c: string, v: string[]) => unknown }).in("unidad_id", permitidas.length ? permitidas : [SIN_TIENDA]) as Q) : q;
 
   const columnas =
-    "id, periodo, fecha_pago, fecha_registro, fecha_servicio, descripcion, monto, en_eerr, en_flujo, tipo_texto, origen, unidad_id, tipo_id, cuenta_id, editado_a_mano, factura_numero, ruc_proveedor, fin_unidades(nombre), fin_tipos(nombre, seccion), fin_cuentas(nombre)";
+    "id, periodo, fecha_pago, fecha_registro, fecha_servicio, descripcion, monto, en_eerr, en_flujo, tipo_texto, origen, unidad_id, tipo_id, cuenta_id, editado_a_mano, factura_numero, ruc_proveedor, es_bien_de_uso, fin_unidades(nombre), fin_tipos(nombre, seccion), fin_cuentas(nombre)";
   const leerMes = (cols: string) =>
     traerTodasConError<FilaBase>((desde, hasta) =>
       soloSuyas(
@@ -165,6 +166,7 @@ export default async function LibroMovimientosPage({
       anulado: !!m.anulado_en,
       anuladoMotivo: m.anulado_motivo ?? null,
       atipico: at ? { veces: at.veces, mediana: at.mediana } : null,
+      esBien: m.es_bien_de_uso === true || tipo?.nombre === "Alta Bien de Uso",
     };
   });
 

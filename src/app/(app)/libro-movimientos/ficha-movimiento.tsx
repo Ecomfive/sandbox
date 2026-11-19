@@ -19,6 +19,7 @@ import type { FilaMovimiento } from "./def-movimientos";
 import { actualizarMovimiento, eliminarMovimiento, obtenerHistorialMovimiento } from "./movimiento-actions";
 import { anularMovimiento, restaurarMovimiento } from "./calidad-actions";
 import { ComprobantesMovimiento } from "./comprobantes-movimiento";
+import { VinculosMovimiento } from "./vinculos-movimiento";
 import { OfrecerRegla } from "./ofrecer-regla";
 import { firma } from "@/lib/finanzas/clasificacion";
 import { validarRucDv } from "@/lib/finanzas/ruc-panama";
@@ -460,6 +461,10 @@ function Contenido({
             </label>
           </Seccion>
         </fieldset>
+
+        <div className="border-t border-border px-5">
+          <VinculosMovimiento movimientoId={m.id} monto={m.monto} esBien={m.esBien} puedeEscribir={puedeEscribir && !m.anulado} alCambiar={() => setVersion((v) => v + 1)} />
+        </div>
 
         <div className="border-t border-border px-5">
           <ComprobantesMovimiento movimientoId={m.id} puedeEscribir={puedeEscribir} />
