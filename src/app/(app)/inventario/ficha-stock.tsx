@@ -320,6 +320,22 @@ export function FichaStock({
                               <span className="sr-only">Incluido en el total de {b.nombre}: </span>
                               {p.nombre}
                               {p.general && <span className="ml-1.5 text-[11px]">sin repartir</span>}
+                              {/* Corregir el número de esa variante en esa bodega, sin salir de la ficha del principal (19 nov 2026, pedido de Jhokser). El stock general sin repartir es del propio principal. */}
+                              {puedeCorregir && !sku.manejaVencimiento && b.tipo !== "externa" && (
+                                <CorregirStock
+                                  key={`${p.clave}-${b.bodegaId}-corregir-${version}`}
+                                  skuId={p.general ? sku.id : p.clave}
+                                  nombre={p.general ? "el stock general" : p.nombre}
+                                  enLinea
+                                  bodegas={[{ bodegaId: b.bodegaId, nombre: b.nombre, fisico: p.cubetas.fisico }]}
+                                  lotes={[]}
+                                  manejaVencimiento={false}
+                                  alGuardar={() => {
+                                    setVersion((v) => v + 1);
+                                    alCambiar();
+                                  }}
+                                />
+                              )}
                             </th>
                             {valoresDe(p.cubetas).map((n, i) => (
                               <td key={i} className="px-1.5 py-1 text-right text-xs">
