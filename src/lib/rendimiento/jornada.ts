@@ -271,7 +271,7 @@ export function agruparHechas(cosas: CosaHecha[]): { titulo: string | null; cosa
 }
 
 /** Las páginas que no están en el menú, para no mostrar una ruta. */
-const RUTAS_SIN_MENU: Record<string, string> = { "/ayuda": "Centro de ayuda", "/notificaciones": "Notificaciones", "/actualizaciones": "Actualizaciones" };
+const RUTAS_SIN_MENU: Record<string, string> = { "/ayuda": "Centro de ayuda", "/notificaciones": "Notificaciones", "/actualizaciones": "Actualizaciones", "/actualizar-datos": "Actualizar datos" };
 
 /** El nombre de una ruta que no está en el menú: «/ventas-tiendas/pipeline» es «Ventas tiendas › Pipeline». Sin códigos: un número o un ID no dicen nada. */
 export function nombreDeRuta(ruta: string): string {

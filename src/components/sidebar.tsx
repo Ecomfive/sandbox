@@ -14,7 +14,7 @@ import { usePendientesVivos } from "@/components/pendientes-vivos";
 import { SIN_PENDIENTES, type PendientesMenu } from "@/lib/contadores-menu";
 import { conPendientesVivos } from "@/lib/pendientes-vivos";
 import { FRENTES, PRONTO_NAV, agruparPaginas, encontrarSeccionActiva, moduloDeHref, puedeAbrirPagina, type NavItem, type NavSection } from "@/lib/nav-data";
-import { AjustesIcon, AvisosIcon, AyudaIcon, BabyYodaIcon, ConfiguracionIcon, DashboardIcon, HistorialIcon, ICONOS_PAGINA, SECTION_ICONS } from "@/lib/nav-icons";
+import { ActualizarIcon, AjustesIcon, AvisosIcon, AyudaIcon, BabyYodaIcon, ConfiguracionIcon, DashboardIcon, HistorialIcon, ICONOS_PAGINA, SECTION_ICONS } from "@/lib/nav-icons";
 
 /** Si el panel de páginas está oculto («cerrado»); se guarda en el navegador de cada persona. */
 const CLAVE_PANEL = "sidebar-panel-v1";
@@ -277,6 +277,7 @@ function RielYPanel({
   favoritos,
   pendientes,
   verActualizaciones,
+  verDatos,
 }: {
   areas: NavSection[];
   modulosPermitidos?: string[] | null;
@@ -285,6 +286,8 @@ function RielYPanel({
   /** Solo para `REVISAN_CAMBIOS`: la fecha del último cambio del sistema (botón «Cambios»); null = no se dibuja. */
   /** Solo para `REVISAN_CAMBIOS`: el botón «Cambios» (Actualizaciones del sistema). */
   verActualizaciones: boolean;
+  /** «Actualizar datos» (19 nov 2026): para quien ve alguna de sus fuentes. */
+  verDatos: boolean;
 }) {
   const pathname = usePathname();
   const visibles = areasVisibles(areas, modulosPermitidos);
@@ -364,6 +367,17 @@ function RielYPanel({
         })}
         <div className="mt-auto flex w-full flex-col gap-0.5">
           {botonRiel("Ayuda", verAyuda, AyudaIcon)}
+          {verDatos && (
+            <Link
+              href="/actualizar-datos"
+              aria-current={pathname === "/actualizar-datos" ? "page" : undefined}
+              aria-label="Actualizar datos"
+              className={claseRiel(pathname === "/actualizar-datos")}
+            >
+              <IconoRiel Icono={ActualizarIcon} seleccionada={pathname === "/actualizar-datos"} />
+              <span>Datos</span>
+            </Link>
+          )}
           {puedeVerAvisos && (
             <Link
               href="/notificaciones"
@@ -444,6 +458,7 @@ function ListaMovil({
   pendientes,
   alNavegar,
   verActualizaciones,
+  verDatos,
 }: {
   areas: NavSection[];
   modulosPermitidos?: string[] | null;
@@ -452,6 +467,8 @@ function ListaMovil({
   alNavegar: () => void;
   /** Solo para `REVISAN_CAMBIOS`: el botón «Cambios» (Actualizaciones del sistema). */
   verActualizaciones: boolean;
+  /** «Actualizar datos» (19 nov 2026): para quien ve alguna de sus fuentes. */
+  verDatos: boolean;
 }) {
   const pathname = usePathname();
   const visibles = areasVisibles(areas, modulosPermitidos);
@@ -468,6 +485,20 @@ function ListaMovil({
             <PaginasDeArea area={v.area} items={v.items} limitado={limitado} pathname={pathname} favoritos={favoritos} pendientes={pendientes} alNavegar={alNavegar} />
           </section>
         ))}
+      {verDatos && (
+        <section aria-label="Actualizar datos">
+          <Titulo>Datos</Titulo>
+          <Link
+            href="/actualizar-datos"
+            onClick={alNavegar}
+            aria-current={pathname === "/actualizar-datos" ? "page" : undefined}
+            className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-[13px] ${anilloFoco} ${pathname === "/actualizar-datos" ? "bg-accent font-medium text-accent-foreground" : "hover:bg-muted"}`}
+          >
+            <ActualizarIcon className="h-4 w-4 text-muted-foreground" />
+            Actualizar datos
+          </Link>
+        </section>
+      )}
       {(
         <section aria-label="Avisos">
           <Titulo>Avisos</Titulo>
@@ -558,6 +589,7 @@ export function Sidebar({
   favoritos,
   pendientes,
   verActualizaciones = false,
+  verDatos = false,
 }: {
   modulosPermitidos?: string[] | null;
   areas: NavSection[];
@@ -565,6 +597,8 @@ export function Sidebar({
   pendientes: Promise<PendientesMenu>;
   /** Solo para `REVISAN_CAMBIOS`: la fecha del último cambio del sistema (botón «Cambios»). */
   verActualizaciones?: boolean;
+  /** «Actualizar datos» (19 nov 2026): para quien ve alguna de sus fuentes. */
+  verDatos?: boolean;
 }) {
   const [movilAbierto, setMovilAbierto] = useState(false);
 
@@ -573,7 +607,7 @@ export function Sidebar({
       {/* Riel y panel — escritorio */}
       <aside data-sin-imprimir className="sticky top-0 hidden h-screen shrink-0 md:flex">
         <ConPendientes pendientes={pendientes}>
-          {(p) => <RielYPanel areas={areas} modulosPermitidos={modulosPermitidos} favoritos={favoritos} pendientes={p} verActualizaciones={verActualizaciones} />}
+          {(p) => <RielYPanel areas={areas} modulosPermitidos={modulosPermitidos} favoritos={favoritos} pendientes={p} verActualizaciones={verActualizaciones} verDatos={verDatos} />}
         </ConPendientes>
       </aside>
 
@@ -609,7 +643,7 @@ export function Sidebar({
             </div>
             <ConPendientes pendientes={pendientes}>
               {(p) => (
-                <ListaMovil areas={areas} modulosPermitidos={modulosPermitidos} favoritos={favoritos} pendientes={p} alNavegar={() => setMovilAbierto(false)} verActualizaciones={verActualizaciones} />
+                <ListaMovil areas={areas} modulosPermitidos={modulosPermitidos} favoritos={favoritos} pendientes={p} alNavegar={() => setMovilAbierto(false)} verActualizaciones={verActualizaciones} verDatos={verDatos} />
               )}
             </ConPendientes>
           </div>

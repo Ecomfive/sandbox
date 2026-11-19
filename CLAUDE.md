@@ -2858,6 +2858,36 @@ convenciones técnicas del código.
   **Videos como tarjetas y reproducir** (19 nov 2026, pedido de Alcides): `ListaVideos` tiene «Tarjetas» (por defecto) y «Lista» (`CLAVE_VISTA` `anuncios-meta-videos-vista-v1`, por navegador). La tarjeta (`tarjeta-video.tsx`, `ListaDatos variante="rejilla"`) trae la miniatura vertical con su puesto en el orden, la duración (`formatoDuracion`, `duracion.ts`, con prueba; de `analisis.duracionS`) y Hook, Hold, CTR y CPA; pulsar la miniatura abre la ficha **y arranca el video**, pulsar el cuerpo solo abre la ficha. `ReproductorVideo` (`reproductor-video.tsx`, arriba de la ficha) pide `reproducirVideoMeta` (`actions.ts`, basta ver el módulo y el país de la cuenta): usa la misma búsqueda del archivo que el análisis con IA (`buscarArchivoDeVideo`, `archivo-video.ts`: video suelto → `advideos` de la cuenta → token de cada página de `/me/accounts`) y devuelve la dirección temporal `source` (solo hosts de Meta, `esHostDeVideoMeta`; **no se guarda**: vence a las pocas horas, así que se pide al pulsar y se vuelve a pedir si el `<video>` falla). Si Meta no la da, ofrece `preview_shareable_link` del anuncio (solo https de facebook.com o fb.me) o el motivo. **«Meta no deja leer esa cuenta…» en un video** (`motivoSinArchivoDeVideo`): el acceso ve el anuncio pero **no la página de Facebook que lo publica** (Oferfy Ofertas, Oferfy PTY…): hay que darle al usuario del sistema acceso a esa página en el Business Manager (Usuarios del sistema › Agregar activos › Páginas; si la página es de otro Business Manager, su dueño la comparte primero con nosotros en Páginas › Asignar socios), y si sigue sin dejar, generar el token con `pages_show_list` y `pages_read_engagement` además de `ads_read` y cambiar `META_ADS_ACCESS_TOKEN` en Vercel. Después, «Analizar los pendientes» vuelve a intentar esos videos.
   **Barras de avance, historial y periodos largos** (18 nov 2026, pedido de Alcides): **todo proceso lento del módulo muestra su avance, y lo que se agregue después también.** Dos piezas: `BarraAvance` (`src/components/ui/barra-avance.tsx`, avance real «hecho de total», texto de lo que hace y botón Detener) para lo que se hace por partes, y `ProgresoEstimado` (la del módulo Instagram, con `compacta`) para una sola llamada de duración incierta. Lo por partes se encadena **desde el navegador, una llamada de servidor por parte** (así hay avance real, se puede detener y lo hecho queda guardado): «Analizar los pendientes» llama a `analizarSiguienteMeta` (un video por llamada; el que acaba de intentarse no se repite en 3 minutos) y «Traer historial» (`traer-historial.tsx`, Cuentas › Historial) a `leerTramoMeta(cuenta, desde, hasta)` por cada tramo de 30 días (`tramosDeHistorial`, `tramos.ts`, con prueba; Meta guarda 37 meses), que corre `sincronizarCuenta(…, { rango })`. «Leer ahora», «Volver a analizar» y «Probar conexión» usan `ProgresoEstimado`. Periodos: Hoy, 7, 30, 90 (3 meses), 180 y 365 días (`PERIODOS`); con más de 90 no se carga el periodo anterior (`anteriores` queda en 0). La lista de Videos sigue el periodo elegido (`armarVideos`); las sugerencias y el aviso de videos por analizar siguen usando siempre los últimos 30 días (`videos30`). Una campaña solo se guarda si gastó en las fechas leídas o se tocó en ellas: la primera lectura de una cuenta trae 30 días, así que lo anterior (campañas viejas, apagadas) aparece al traer el historial.
 
+- **Actualizar datos** (`/actualizar-datos`, 19 nov 2026, pedido de Hernán; prototipo aprobado https://claude.ai/artifact/1ZUNXf8dTbszZpskenPs6X): una sola
+  entrada con todo lo que el sistema trae de otras plataformas. En el riel va como «Datos», arriba de Avisos, y en el celular, como su propia sección. **No es un
+  módulo propio:** cada fuente sale si la persona tiene el módulo de su pantalla de siempre (`cargarFuentes`, `src/lib/actualizar-datos/fuentes.ts`). La entrada sale
+  con alguno de esos módulos (`veAlgunaFuente`, `modulos.ts`). Las reglas, sin base, están en `estado.ts` (con prueba):
+  - Estados: al día, atrasada (pasado su plazo: 26 h lo diario y 35 días los Excel; el conteo de inventario no se atrasa), falló, sin registro (no cuenta como
+    atrasada, porque los Excel cargados con script no dejaron `fin_importaciones`) y actualizándose.
+  - Las tarjetas son filtros.
+
+  **Cada botón llama a la acción de su pantalla de siempre**, así que la barrera de permisos sigue allí, y la página tiene `maxDuration` 300.
+  - **Se corren desde aquí:** Effi (`actualizarDesdeEffi`), productos de Shopify (`traerProductosShopify` por tienda), pedidos de Shopify (`sincronizarTiendaAhora`
+    por unidad conectada), Monday (`leerMondayAhora`), QuickBooks (`leerQuickbooksAhora`), Dropi al portal financiero (`correrTareaAhora`) y Meta
+    (`leerAhoraMeta`, cuentas del país elegido).
+  - **La Matriz** se sube aquí mismo (`ImportarMatriz` en una ventana).
+  - **Lo que pasa por la extensión** (Dropi PA/CR/MX, Drop, Dunamixfy, retiros, SISCORE, Tu Winner) **y los Excel** llevan a su pantalla.
+
+  **De dónde sale la última vez:**
+  - Dropi, Drop y Dunamixfy: `cargarPanel` (`dropi_actualizaciones`).
+  - Monday, QuickBooks, Dropi finanzas y pedidos de Shopify: `fin_tareas_ejecuciones`. Para los pedidos de Shopify, además, `ven_tiendas_conexion`.
+  - Effi: `effi_publicaciones.ultima_vez`.
+  - Productos de Shopify: `tienda_variantes.actualizado_en`.
+  - La Matriz: la auditoría `importar_matriz_reporteria` o, sin ella, el último pedido nuevo `origen` «Excel Matriz».
+  - SISCORE: `tienda_guias_lecturas`.
+  - Retiros: `saldos_wallet`.
+  - Meta: `meta_cuentas` y la auditoría `leer_cuentas_meta`.
+  - Tu Winner: `tuwinner_lecturas`.
+  - Excel: `fin_importaciones`.
+  - Conteo de inventario: la auditoría `conteo_inventario`.
+
+  **Una fuente nueva que se actualice a mano va también aquí**, con su fila en `cargarFuentes` y su módulo en `modulos.ts`.
+
 ## Dónde vive cada cosa
 
 - `supabase/migrations/` — cambios de esquema, en orden numerado. Correr

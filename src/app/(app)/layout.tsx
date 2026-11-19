@@ -25,6 +25,7 @@ import { colapsarGestionDeIds, construirAreas, pestanasSinModulo } from "@/lib/n
 import { getPlataformaActual } from "@/lib/plataforma-actual";
 import { paginasBuscables } from "@/lib/paleta";
 import { esAdministrador } from "@/lib/permisos/acceso";
+import { veAlgunaFuente } from "@/lib/actualizar-datos/modulos";
 import { REVISAN_CAMBIOS } from "@/lib/ayuda/actualizaciones";
 import { contarNovedadesSinVer } from "@/lib/ayuda/novedades-vistas";
 import { PESTANAS_POR_PAIS, PESTANAS_SOLO_ADMIN, PESTANAS_USO_SISTEMA, pestanasOcultasDe } from "@/lib/permisos/ocultas";
@@ -124,7 +125,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       {usuario && avisoInactividad && <AvisoInactividad />}
       {usuario?.vistaPrevia && <BannerVistaPrevia rolNombre={usuario.vistaPrevia.rolNombre} />}
       <div className="flex min-h-full">
-        <Sidebar modulosPermitidos={modulosMenu} areas={areasMenu} favoritos={favoritos} pendientes={pendientes} verActualizaciones={!!usuario && REVISAN_CAMBIOS.has(usuario.id)} />
+        <Sidebar modulosPermitidos={modulosMenu} areas={areasMenu} favoritos={favoritos} pendientes={pendientes} verActualizaciones={!!usuario && REVISAN_CAMBIOS.has(usuario.id)} verDatos={!!usuario && veAlgunaFuente(usuario.modulos)} />
         <div className="flex min-h-full min-w-0 flex-1 flex-col">
           <NavBar paginas={paginas} pendientes={pendientes} />
           <BarraMigas areas={areas} favoritos={favoritos} pestanasOcultas={pestanasOcultas} verAccesos={!!usuario && esAdministrador(usuario)}

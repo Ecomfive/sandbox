@@ -26,6 +26,7 @@ const TITULOS_APARTE: Record<string, string> = {
   "/sin-acceso": "Sin acceso",
   "/mi-puesto": "Mi puesto",
   "/actualizaciones": "Actualizaciones del sistema",
+  "/actualizar-datos": "Actualizar datos",
 };
 
 /** Las secciones del Centro de ayuda (`/ayuda`), en el orden en que se buscan. */
@@ -243,7 +244,7 @@ export function construirMigas(
   if (titulo) {
     // "Sin acceso" no es un módulo: no hay permisos que mostrar.
     // "Mi puesto" lo abre cualquiera con sesión: tampoco es un módulo.
-    const esModulo = ruta !== "/sin-acceso" && ruta !== "/mi-puesto" && ruta !== "/actualizaciones";
+    const esModulo = ruta !== "/sin-acceso" && ruta !== "/mi-puesto" && ruta !== "/actualizaciones" && ruta !== "/actualizar-datos";
     return {
       migas: [{ etiqueta: titulo }],
       favoritoHref: null,
