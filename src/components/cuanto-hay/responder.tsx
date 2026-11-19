@@ -20,7 +20,9 @@ function Fila({ p, puedeResponder, ahora }: { p: PreguntaCuantoHay; puedeRespond
     iniciar(async () => {
       const r = await responderCuantoHay(p.id, cantidad).catch(() => ({ error: "No se pudo guardar la respuesta." }));
       if ("error" in r) return mostrarToast(r.error, "destructive");
-      mostrarToast(`Listo: le llegó a ${p.pedidoPorNombre ?? "quien preguntó"}.`);
+      mostrarToast(`Listo: le llegó a ${p.pedidoPorNombre ?? "quien preguntó"}.${r.inventario?.ok ? ` ${r.inventario.texto}` : ""}`);
+      // Si el inventario no se pudo ajustar, se avisa aparte: la respuesta ya se guardó.
+      if (r.inventario && !r.inventario.ok) mostrarToast(r.inventario.texto, "destructive");
       router.refresh();
     });
   const cambio = p.cantidad === null ? cantidad.trim() !== "" : cantidad.trim() !== String(p.cantidad);

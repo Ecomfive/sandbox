@@ -71,3 +71,19 @@ test("cuándo, en hora de Panamá", () => {
   assert.equal(cuandoCorto("2026-11-15T21:10:00Z", ahora), "ayer 16:10");
   assert.match(cuandoCorto("2026-11-14T21:10:00Z", ahora), /^14 nov 16:10$/);
 });
+
+test("al responder, el inventario de Despacho se ajusta a lo contado, salvo lo que no se puede ajustar sin lote o variante", async () => {
+  const { decidirConteoDespacho } = await import("./reglas");
+  const base = { actual: 120, cantidad: 98, tipo: "simple", clase: "fisico", manejaVencimiento: false, conVariantes: false };
+  assert.deepEqual(decidirConteoDespacho(base), { tipo: "ajustar", diferencia: -22 });
+  assert.deepEqual(decidirConteoDespacho({ ...base, cantidad: 130 }), { tipo: "ajustar", diferencia: 10 });
+  assert.deepEqual(decidirConteoDespacho({ ...base, cantidad: 120 }), { tipo: "igual" });
+  assert.deepEqual(decidirConteoDespacho({ ...base, actual: -3, cantidad: 0 }), { tipo: "ajustar", diferencia: 3 });
+  for (const caso of [{ tipo: "combo" }, { clase: "test" }, { manejaVencimiento: true }, { conVariantes: true }]) assert.equal(decidirConteoDespacho({ ...base, ...caso }).tipo, "no");
+});
+
+test("el motivo del ajuste dice quién contó, quién pidió y de cuánto a cuánto", async () => {
+  const { motivoConteoDespacho } = await import("./reglas");
+  assert.equal(motivoConteoDespacho({ quien: "Yiletsi", pidio: "Nicol", antes: 120, despues: 98 }), "Conteo de despacho (¿Cuánto hay?) de Yiletsi, pedido por Nicol: 120 → 98");
+  assert.equal(motivoConteoDespacho({ quien: "Yiletsi", pidio: null, antes: 0, despues: 5 }), "Conteo de despacho (¿Cuánto hay?) de Yiletsi: 0 → 5");
+});
