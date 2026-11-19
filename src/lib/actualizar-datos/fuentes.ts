@@ -8,7 +8,7 @@ import { cargarPanel } from "@/app/(app)/publicaciones-dropi/actualizar/datos";
 import type { UsuarioActual } from "@/lib/auth";
 import { PARTES, sitioDe, puedeActualizarDropi, type ClaveParte, type Sitio } from "@/lib/dropi-actualizar/partes";
 import { cargarTiendasPermitidas } from "@/lib/finanzas/cargar-tiendas-permitidas";
-import { NOMBRE_MODULO, ORDEN_CARGA, RUTA_IMPORTADOR, type ModuloImportable } from "@/lib/importar/reconocer";
+import { NOMBRE_MODULO, ORDEN_CARGA, type ModuloImportable } from "@/lib/importar/reconocer";
 import { getPaisActual } from "@/lib/pais";
 import { puedeVerPais } from "@/lib/paises-permitidos";
 import { administraIntegraciones } from "@/lib/quickbooks/permiso";
@@ -131,7 +131,7 @@ export async function cargarFuentes(supabase: SupabaseClient, u: UsuarioActual):
           automatica: null,
           requisito: `Con la extensión y la sesión de ${s.sesion}`,
           donde: { texto: "Gestión de IDs", href: puede ? "/publicaciones-dropi/actualizar" : "/publicaciones-dropi" },
-          accion: puede ? { tipo: "enlace", href: "/publicaciones-dropi/actualizar", texto: "Actualizar" } : null,
+          accion: puede ? { tipo: "ventana", ventana: { tipo: "dropi", sitio: s.sitio }, titulo: `Actualizar ${s.nombre}`, texto: "Actualizar" } : null,
           corriendo: Boolean(enCurso),
           conError,
         },
@@ -266,7 +266,7 @@ export async function cargarFuentes(supabase: SupabaseClient, u: UsuarioActual):
         automatica: null,
         requisito: "Con la extensión y la sesión de SISCORE de cada tienda",
         donde: { texto: "Gestión de tienda › Logística", href: "/tienda-pedidos/logistica" },
-        accion: todaLaEmpresa && escribe(u, "tienda-logistica") ? { tipo: "enlace", href: "/tienda-pedidos/logistica", texto: "Actualizar" } : null,
+        accion: todaLaEmpresa && escribe(u, "tienda-logistica") ? { tipo: "ventana", ventana: { tipo: "siscore" }, titulo: "Actualizar Servientrega (SISCORE)", texto: "Actualizar" } : null,
         corriendo: ultima?.estado === "corriendo" && reciente(ultima.inicio, VIGENCIA_CORRIENDO_MS),
         conError,
       },
@@ -332,7 +332,7 @@ export async function cargarFuentes(supabase: SupabaseClient, u: UsuarioActual):
         automatica: null,
         requisito: "Se trae con «Actualizar» de Dropi de cada país",
         donde: { texto: "Retiros", href: "/retiros" },
-        accion: puede ? { tipo: "enlace", href: "/publicaciones-dropi/actualizar", texto: "Actualizar" } : null,
+        accion: puede ? { tipo: "ventana", ventana: { tipo: "dropi", sitio: null }, titulo: "Actualizar Dropi (retiros y saldo de cada país)", texto: "Actualizar" } : null,
       },
       DIARIA,
     );
@@ -401,7 +401,7 @@ export async function cargarFuentes(supabase: SupabaseClient, u: UsuarioActual):
         automatica: null,
         requisito: "Con la extensión y la sesión de Tu Winner",
         donde: { texto: "Tu Winner", href: "/tu-winner" },
-        accion: escribe(u, "tu-winner") ? { tipo: "enlace", href: "/tu-winner", texto: "Actualizar" } : null,
+        accion: escribe(u, "tu-winner") ? { tipo: "ventana", ventana: { tipo: "tuwinner" }, titulo: "Actualizar Tu Winner", texto: "Actualizar" } : null,
         corriendo: ultima?.estado === "corriendo" && reciente(ultima.inicio, VIGENCIA_CORRIENDO_MS),
         conError,
       },
@@ -429,7 +429,7 @@ export async function cargarFuentes(supabase: SupabaseClient, u: UsuarioActual):
         automatica: null,
         requisito: null,
         donde: { texto: NOMBRE_MODULO[m], href: `/${m}` },
-        accion: escribe(u, m) ? { tipo: "enlace", href: RUTA_IMPORTADOR[m], texto: "Subir Excel" } : null,
+        accion: escribe(u, m) ? { tipo: "ventana", ventana: { tipo: "excel", modulo: m }, titulo: `Subir Excel: ${NOMBRE_MODULO[m]}`, texto: "Subir Excel" } : null,
         corriendo,
         conError,
       },
@@ -450,7 +450,7 @@ export async function cargarFuentes(supabase: SupabaseClient, u: UsuarioActual):
         automatica: null,
         requisito: null,
         donde: { texto: "Rentabilidad › Inventario", href: "/rentabilidad/inventario" },
-        accion: escribe(u, "inventario") ? { tipo: "enlace", href: "/rentabilidad/inventario/conteo", texto: "Subir Excel" } : null,
+        accion: escribe(u, "inventario") ? { tipo: "ventana", ventana: { tipo: "conteo" }, titulo: "Subir el conteo de inventario", texto: "Subir Excel" } : null,
       },
       null,
     );

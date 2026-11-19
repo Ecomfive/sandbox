@@ -111,7 +111,21 @@ function textoAvance(lector: ClaveLector, a: AvanceLector | null): string {
  * pestaña y la sesión de su país. Cada país se
  * actualiza por separado (Hernán: los dos juntos es mucha carga y tarda mucho más), con su botón; no hay «Actualizar todo».
  */
-export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponible: boolean; corridas: Corrida[]; ultima: Partial<Record<ClaveParte, UltimaParte>> }) {
+export function PanelActualizarDropi({
+  disponible,
+  corridas,
+  ultima,
+  iniciar = null,
+  alCambiarEnMarcha,
+}: {
+  disponible: boolean;
+  corridas: Corrida[];
+  ultima: Partial<Record<ClaveParte, UltimaParte>>;
+  /** Desde el panel «Datos» (19 nov 2026): los lectores de la cuenta elegida, que arrancan solos en cuanto la extensión responde. */
+  iniciar?: ClaveLector[] | null;
+  /** Avisa a quien lo muestra en una ventana si hay una actualización en marcha (cerrarla la cortaría). */
+  alCambiarEnMarcha?: (enMarcha: boolean) => void;
+}) {
   const router = useRouter();
   const [extension, setExtension] = useState<EstadoExtension>("buscando");
   const [version, setVersion] = useState<string | null>(null);
@@ -320,8 +334,22 @@ export function PanelActualizarDropi({ disponible, corridas, ultima }: { disponi
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [extension, corridas]);
 
+  // Desde «Datos»: arranca sola la cuenta elegida, una vez, si no hay otra actualización en marcha (si la hay, se retoma esa).
+  const iniciada = useRef(false);
+  useEffect(() => {
+    if (!iniciar?.length || iniciada.current || extension !== "lista") return;
+    iniciada.current = true;
+    if (arrancando.current || corridas.some((x) => x.estado === "corriendo" && Date.now() - new Date(x.inicio).getTime() < VIGENCIA_MS)) return;
+    void Promise.resolve().then(() => actualizar(iniciar));
+    // `actualizar` usa el estado más reciente por sus propios setters; solo importa que la extensión ya respondió.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [extension, iniciar]);
+
   // Mientras corre, cerrar o recargar la página la interrumpe: el navegador pregunta antes.
   const enMarcha = !!corriendo && !corriendo.terminado;
+  useEffect(() => {
+    alCambiarEnMarcha?.(enMarcha || empezando);
+  }, [enMarcha, empezando, alCambiarEnMarcha]);
   useEffect(() => {
     if (!enMarcha) return;
     const avisar = (e: BeforeUnloadEvent) => e.preventDefault();

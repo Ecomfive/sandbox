@@ -15,10 +15,22 @@ export const GRUPOS_FUENTE: { id: GrupoFuente; titulo: string; subtitulo: string
   { id: "archivos", titulo: "Archivos", subtitulo: "Los Excel que se suben a mano" },
 ];
 
-/** Lo que se hace con el botón de la fila: correr la lectura desde aquí, abrir la pantalla donde se hace, o subir la Matriz aquí mismo. */
+/**
+ * Lo que se abre en una ventana encima del panel (19 nov 2026, pedido de Hernán: «la idea era actualizarlos desde ahí, no que me mande a la página»): la
+ * actualización de Dropi, Drop o Dunamixfy de esa cuenta (`sitio`; null = elegir), la lectura de Servientrega o de Tu Winner, o el cargador de un Excel.
+ */
+export type VentanaFuente =
+  | { tipo: "dropi"; sitio: "pa" | "cr" | "mx" | "drop" | "duna" | null }
+  | { tipo: "siscore" }
+  | { tipo: "tuwinner" }
+  | { tipo: "excel"; modulo: string }
+  | { tipo: "conteo" };
+
+/** Lo que se hace con el botón de la fila: correr la lectura desde aquí, abrirla en una ventana aquí mismo, o subir la Matriz aquí mismo. */
 export type AccionFuente =
   | { tipo: "correr"; clave: "effi" | "shopify-productos" | "shopify-pedidos" | "shopify-ventas" | "monday" | "quickbooks" | "dropi-finanzas" | "meta"; texto: string; tiendas?: { id: string; nombre: string }[] }
   | { tipo: "matriz"; texto: string }
+  | { tipo: "ventana"; ventana: VentanaFuente; titulo: string; texto: string }
   | { tipo: "enlace"; href: string; texto: string };
 
 export interface Fuente {

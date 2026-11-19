@@ -19,6 +19,7 @@ import { actualizarDesdeEffi } from "../publicaciones-effi/actions";
 import { ImportarMatriz } from "../tienda-reporteria/importar-matriz";
 import { traerProductosShopify } from "../tienda-tiendas/productos/actions";
 import { sincronizarTiendaAhora } from "../ventas-tiendas/pipeline/actions";
+import { ContenidoVentana, type ExtrasVentanas } from "./ventana-datos";
 
 const ESTADO: Record<EstadoFuente, { texto: string; punto: string; color: string }> = {
   aldia: { texto: "Al día", punto: "bg-success", color: "text-success" },
@@ -32,6 +33,7 @@ const COLUMNAS = "md:grid-cols-[minmax(0,2.3fr)_minmax(0,1.25fr)_minmax(0,1.35fr
 const boton = `inline-flex min-h-9 w-full items-center justify-center rounded-lg border border-border-control bg-card px-3 text-[13px] font-semibold hover:bg-accent disabled:opacity-55 ${anilloFoco}`;
 
 type Correr = Extract<AccionFuente, { tipo: "correr" }>;
+type ConVentana = Extract<AccionFuente, { tipo: "ventana" }>;
 
 /** Corre una lectura del servidor con la acción de su pantalla de siempre (la barrera de permisos sigue allí). Devuelve el texto para el aviso. */
 async function correrAccion(a: Correr): Promise<{ ok: boolean; texto: string }> {
@@ -83,12 +85,21 @@ async function correrAccion(a: Correr): Promise<{ ok: boolean; texto: string }> 
  * «Actualizar datos» (19 nov 2026; prototipo aprobado https://claude.ai/artifact/1ZUNXf8dTbszZpskenPs6X): las tarjetas de arriba son filtros; abajo, las
  * fuentes por tema con su estado, la última vez y quién, cómo se actualiza, su pantalla de siempre y el botón.
  */
-export function PanelDatos({ fuentes, usaExtension }: { fuentes: Fuente[]; usaExtension: boolean }) {
+export function PanelDatos({ fuentes, usaExtension, extras }: { fuentes: Fuente[]; usaExtension: boolean; extras: ExtrasVentanas }) {
   const router = useRouter();
   const { mostrarToast } = useToast();
   const [filtro, setFiltro] = useState<FiltroFuentes>("todas");
   const [corriendo, setCorriendo] = useState<string | null>(null);
   const [matriz, setMatriz] = useState(false);
+  // La actualización que se hace aquí mismo, en una ventana (19 nov 2026: Dropi, Drop, Dunamixfy, Servientrega, Tu Winner y los Excel), y si va en marcha.
+  const [abierta, setAbierta] = useState<ConVentana | null>(null);
+  const [ventanaEnMarcha, setVentanaEnMarcha] = useState(false);
+  const cerrarVentana = () => {
+    if (ventanaEnMarcha && !window.confirm("La actualización sigue en marcha: si cierras la ventana se corta (al volver a abrirla se retoma). ¿Cerrar igual?")) return;
+    setAbierta(null);
+    setVentanaEnMarcha(false);
+    router.refresh();
+  };
   const [extension, setExtension] = useState<"buscando" | "lista" | "falta">("buscando");
   const cuentas = useMemo(() => contarFuentes(fuentes), [fuentes]);
 
@@ -212,6 +223,11 @@ export function PanelDatos({ fuentes, usaExtension }: { fuentes: Fuente[]; usaEx
                           {f.accion.texto}
                         </button>
                       )}
+                      {f.accion?.tipo === "ventana" && (
+                        <button type="button" className={boton} disabled={corriendo !== null} onClick={() => setAbierta(f.accion as ConVentana)}>
+                          {f.accion.texto}
+                        </button>
+                      )}
                       {f.accion?.tipo === "enlace" && (
                         <Link href={f.accion.href} className={boton}>
                           {f.accion.texto}
@@ -229,9 +245,13 @@ export function PanelDatos({ fuentes, usaExtension }: { fuentes: Fuente[]; usaEx
       {fuentes.length === 0 && <p className="m-0 rounded-xl border border-border bg-card px-4 py-6 text-center text-sm text-muted-foreground">No tienes fuentes que actualizar.</p>}
 
       <p className="m-0 text-xs text-muted-foreground">
-        Las que pasan por la extensión de Chrome (Dropi, Drop, Dunamixfy, Servientrega y Tu Winner) se actualizan en su pantalla: el botón te lleva allí.
-        Una fuente diaria sale «Atrasada» pasado un día; un Excel, pasado un mes.
+        Todo se actualiza desde aquí: las que pasan por la extensión de Chrome (Dropi, Drop, Dunamixfy, Servientrega y Tu Winner) y los Excel se abren en una
+        ventana encima de este panel. Una fuente diaria sale «Atrasada» pasado un día; un Excel, pasado un mes.
       </p>
+
+      <Ventana abierto={abierta !== null} alCerrar={cerrarVentana} titulo={abierta?.titulo ?? ""} ancho={abierta?.ventana.tipo === "dropi" || abierta?.ventana.tipo === "excel" ? "xl" : "lg"}>
+        {abierta && <ContenidoVentana key={JSON.stringify(abierta.ventana)} ventana={abierta.ventana} extras={extras} alCambiarEnMarcha={setVentanaEnMarcha} />}
+      </Ventana>
 
       <Ventana
         abierto={matriz}
