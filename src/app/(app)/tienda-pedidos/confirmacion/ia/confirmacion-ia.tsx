@@ -21,6 +21,7 @@ import { PalabrasZona } from "./palabras-zona";
 import { PreguntaMensaje } from "./pedir-dato";
 import { BotonesVeredicto, ColaRevision, type AlElegir } from "./revision-pedidos";
 import { SeccionCard } from "./seccion";
+import { ProbarHistorico } from "./probar-historico";
 import { ProveedorZonasPais, useZonasPais } from "./zonas-pais";
 import {
   analizarPedidoAhora,
@@ -183,6 +184,7 @@ export function ConfirmacionIA({
   const sinTiendas = tiendas.length === 0;
   const indice = [
     ...(sinTiendas ? [] : [{ id: "pedidos", texto: "Pedidos analizados" }]),
+    ...(esAdmin && !sinTiendas && config.distingueZona ? [{ id: "historico", texto: "Probar con pedidos reales" }] : []),
     { id: "ejemplos", texto: "Direcciones de ejemplo" },
     { id: "zonas", texto: "Palabras de zona" },
     ...(sinTiendas ? [] : [{ id: "adelanto", texto: "Cómo paga el cliente" }]),
@@ -380,6 +382,12 @@ export function ConfirmacionIA({
           </div>
         )}
       </SeccionCard>
+      )}
+
+      {esAdmin && !sinTiendas && config.distingueZona && (
+        <SeccionCard id="historico" icono={RobotIcon} titulo="Probar con pedidos reales" ayuda="Toma pedidos de los últimos días que ya tienen su etiqueta de zona, les pasa la dirección al análisis del sistema y compara lo que dijo con la etiqueta real. Sirve para medir y mejorar. Solo administradores; gasta crédito de las IA.">
+          <ProbarHistorico tiendas={tiendas} tiendaElegida={tiendaElegida} />
+        </SeccionCard>
       )}
 
       <ProbarDireccion paisCodigo={paisCodigo} tiendas={tiendas} puedeEscribir={puedeEscribir} tiendaElegida={tiendaElegida} />

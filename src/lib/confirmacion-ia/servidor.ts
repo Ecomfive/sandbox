@@ -13,11 +13,14 @@ import { leerChat } from "@/lib/tienda/chat-tienda-datos";
 import { herramientaIcomfly, conexionesIcomfly } from "@/lib/tienda/icomfly";
 import { etiquetasDe, mismaTiendaUnidad, zonaDeEtiquetas } from "@/lib/tienda/ordenes-finanzas";
 import { destinatariosDe } from "@/lib/compras/llegadas-servidor";
+import { traerTodasLasFilas } from "@/lib/supabase/paginar";
+import { cargarTiendas } from "@/lib/tienda/datos";
 import { geografiaDe } from "./geografia";
 import { tendenciaDeTienda, textoTendencia } from "./tendencias";
 import { motivoDeAdelanto, zonasDeAdelanto } from "./adelanto";
 import { combinar, etiquetaDeZona, faltaParaCliente, leerRespuesta, mensajePagoAdelantado, mensajePedirDetalle, type Combinado, type EstadoAnalisis, type ResultadoModelo } from "./combinar";
 import { armarEntrada, type EjemploPrompt } from "./prompt";
+import { muestraBalanceada, type PedidoMuestra, type ResultadoPrueba } from "./prueba-historica";
 import { resultadoFinal, seleccionarEjemplos, type RevisionPedido, type ResultadoPedido } from "./revision";
 import { coincidencias, normalizarTexto, permiteAdelanto, zonaPorReglas, type ReglaZona, type Zona } from "./zonas";
 
@@ -214,7 +217,7 @@ async function pedirAlModelo(proveedor: ProveedorIA, entrada: ReturnType<typeof 
  */
 export async function evaluarDireccion(
   supabase: SupabaseClient,
-  d: { paisId: string; paisNombre: string; paisCodigo: string; tiendaId: string | null; numero: string | null; direccion: string; ciudad: string | null; config: ConfigConfirmacion },
+  d: { paisId: string; paisNombre: string; paisCodigo: string; tiendaId: string | null; numero: string | null; direccion: string; ciudad: string | null; config: ConfigConfirmacion; /** Sin la tendencia histórica de la tienda: mide el prompt y los ejemplos solos (la tendencia sale de los mismos pedidos con que se compara). */ sinTendencia?: boolean },
 ): Promise<{ combinado: Combinado; modelos: ResultadoModelo[]; coinc: ReglaZona[] }> {
   const { direccion, ciudad, config } = d;
   const reglas = await cargarReglas(supabase, d.paisId);
@@ -232,7 +235,7 @@ export async function evaluarDireccion(
       const ejemplos = await cargarEjemplos(supabase, d.paisId, d.tiendaId);
       // La tendencia histórica de la tienda (solo Panamá, por ahora): en las zonas dudosas la IA etiqueta como lo viene haciendo esa tienda.
       let tendencia: string | null = null;
-      if (config.distingueZona && d.paisCodigo.toUpperCase() === "PA" && d.tiendaId) {
+      if (config.distingueZona && d.paisCodigo.toUpperCase() === "PA" && d.tiendaId && !d.sinTendencia) {
         const { data: tienda } = await supabase.from("tiendas").select("nombre").eq("id", d.tiendaId).maybeSingle();
         const t = tendenciaDeTienda((tienda?.nombre as string | undefined) ?? null);
         tendencia = t ? textoTendencia(t) : null;
@@ -477,4 +480,65 @@ export async function cargarAnalisis(
     } satisfies FilaAnalisis;
   });
   return { filas, faltaMigracion: false };
+}
+
+
+// --- Probar con pedidos reales (19 nov 2026, pedido de Jhokser): ver `prueba-historica.ts`. --------------------------------------------------------------------------------------------------------
+
+/**
+ * La muestra de pedidos de Shopify de los últimos `dias` que ya tienen etiqueta de zona (CIUDAD o INTERIOR), repartida entre tiendas y zonas. Solo lee. Devuelve cuántos había en total para
+ * que se vea qué parte se está probando.
+ */
+export async function listarMuestraHistorica(supabase: SupabaseClient, d: { paisId: string; tiendaId: string | null; dias: number; max: number }): Promise<{ pedidos: PedidoMuestra[]; disponibles: number }> {
+  const [{ tiendas }, { data: unidades }] = await Promise.all([cargarTiendas(supabase, d.paisId), supabase.from("fin_unidades").select("id, nombre").eq("pais_id", d.paisId).eq("clase", "tienda")]);
+  const tiendaDeUnidad = new Map<string, string>();
+  for (const u of unidades ?? []) {
+    const t = tiendas.find((x) => mismaTiendaUnidad(x.nombre, u.nombre as string));
+    if (t && (!d.tiendaId || t.id === d.tiendaId)) tiendaDeUnidad.set(u.id as string, t.id);
+  }
+  if (!tiendaDeUnidad.size) return { pedidos: [], disponibles: 0 };
+  const desde = new Date(Date.now() - d.dias * 86_400_000).toISOString().slice(0, 10);
+  const ids = [...tiendaDeUnidad.keys()];
+  const filas = await traerTodasLasFilas<{ id: string; etiquetas: string | null; unidad_id: string }>((a, b) =>
+    supabase.from("ven_ordenes").select("id, etiquetas, unidad_id").eq("origen", "shopify").in("unidad_id", ids).gte("fecha", desde).order("id").range(a, b),
+  );
+  const candidatos: PedidoMuestra[] = [];
+  for (const f of filas) {
+    const zona = zonaDeEtiquetas(f.etiquetas);
+    if (zona !== "Ciudad" && zona !== "Interior") continue;
+    candidatos.push({ id: f.id, tiendaId: tiendaDeUnidad.get(f.unidad_id) ?? null, real: zona === "Ciudad" ? "ciudad" : "interior" });
+  }
+  return { pedidos: muestraBalanceada(candidatos, d.max), disponibles: candidatos.length };
+}
+
+/** Analiza un pedido ya etiquetado con el mismo análisis del sistema y lo deja junto a su zona real. Null si el pedido no sirve (sin dirección, sin etiqueta de zona o de otro país). No guarda nada. */
+export async function probarPedidoHistorico(supabase: SupabaseClient, ordenId: string, paisId: string, config: ConfigConfirmacion, opciones: { sinTendencia: boolean }): Promise<ResultadoPrueba | null> {
+  const o = await cargarOrden(supabase, ordenId);
+  if (!o || o.paisId !== paisId) return null;
+  const zona = zonaDeEtiquetas(o.etiquetas);
+  if (zona !== "Ciudad" && zona !== "Interior") return null;
+  const direccion = (o.cliente.direccion ?? "").trim();
+  const ciudad = (o.cliente.corregimiento ?? "").trim() || null;
+  if (direccion.length < 5) return null;
+  // Misma regla que el análisis real: una zona de pago por adelantado no pasa por las IA.
+  const adelanto = zonasDeAdelanto(direccion, ciudad, await cargarReglas(supabase, o.paisId));
+  const { combinado: c, modelos, coinc } = adelanto.length
+    ? { combinado: { estado: "adelantado", zona: null, zonaPor: null, completa: null, falta: null, acuerdo: null, motivo: motivoDeAdelanto(adelanto) } as Combinado, modelos: [] as ResultadoModelo[], coinc: [] as ReglaZona[] }
+    : await evaluarDireccion(supabase, { paisId: o.paisId, paisNombre: o.paisNombre, paisCodigo: o.paisCodigo, tiendaId: o.tiendaId, numero: o.numero, direccion, ciudad, config, sinTendencia: opciones.sinTendencia });
+  return {
+    id: o.id,
+    numero: o.numero,
+    tienda: o.tiendaNombre ?? "—",
+    tiendaId: o.tiendaId,
+    ciudad,
+    direccion,
+    real: zona === "Ciudad" ? "ciudad" : "interior",
+    estado: c.estado,
+    zona: c.zona,
+    zonaPor: c.zonaPor,
+    falta: c.falta,
+    motivo: c.motivo,
+    modelos: modelos.map((m) => ({ proveedor: m.proveedor, ok: m.ok, zona: m.respuesta?.zona ?? null, completa: m.respuesta?.completa ?? null, motivo: m.respuesta?.motivo ?? m.error ?? null })),
+    reglas: coinc.map((r) => `${r.texto} (${r.resultado})`),
+  };
 }

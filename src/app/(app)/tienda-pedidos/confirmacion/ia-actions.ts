@@ -9,7 +9,8 @@ import { tiendasVisibles } from "@/lib/confirmacion-ia/acceso";
 import { etiquetaDeZona, type Combinado, type EstadoAnalisis, type ResultadoModelo } from "@/lib/confirmacion-ia/combinar";
 import { coincideConPropuesta, faltaVigente, revisarVeredicto, type DecisionRevision, type Veredicto } from "@/lib/confirmacion-ia/revision";
 import { MAX_INSTRUCCIONES } from "@/lib/confirmacion-ia/prompt";
-import { analizarOrden, analizarPendientes, armarMensajeAdelanto, armarMensajeDato, cargarConfig, enviarMensajeDato as mandarMensajeDato, evaluarDireccion, MAX_MENSAJES, SIN_MIGRACION_CONFIRMACION, type EstadoMensaje } from "@/lib/confirmacion-ia/servidor";
+import type { PedidoMuestra, ResultadoPrueba } from "@/lib/confirmacion-ia/prueba-historica";
+import { listarMuestraHistorica, probarPedidoHistorico, analizarOrden, analizarPendientes, armarMensajeAdelanto, armarMensajeDato, cargarConfig, enviarMensajeDato as mandarMensajeDato, evaluarDireccion, MAX_MENSAJES, SIN_MIGRACION_CONFIRMACION, type EstadoMensaje } from "@/lib/confirmacion-ia/servidor";
 import { errorDeRegla, normalizarTexto, permiteAdelanto, ZONAS, type Zona } from "@/lib/confirmacion-ia/zonas";
 import { getPaisActual } from "@/lib/pais";
 import { esAdministrador } from "@/lib/permisos/acceso";
@@ -596,4 +597,39 @@ export async function marcarMensajeManual(analisisId: string): Promise<Resultado
   await registrarAuditoria({ accion: "marcar_mensaje_manual_confirmacion_ia", entidad: "paises", entidadId: pais.id, detalle: `${pais.nombre}: ${nombreDe(usuario)} marcó que ya le pidió el dato al cliente de un pedido` });
   revalidatePath("/tienda-pedidos/confirmacion/ia");
   return {};
+}
+
+
+// --- Probar con pedidos reales (19 nov 2026, pedido de Jhokser): ver `src/lib/confirmacion-ia/prueba-historica.ts`. Solo un administrador. Gasta crédito de las IA (dos llamadas por pedido) y no guarda nada. ---
+
+const SOLO_ADMIN_PRUEBA = "Solo un administrador puede probar con pedidos reales (gasta crédito de las IA).";
+
+/** La muestra de pedidos con zona real de los últimos `dias` (hasta `max`), de una tienda o de todas las del país. */
+export async function listarPedidosParaProbar(d: { tiendaId: string | null; dias: number; max: number }): Promise<{ error: string } | { pedidos: PedidoMuestra[]; disponibles: number }> {
+  const usuario = await requireModuloEscritura(MODULO);
+  if (!esAdministrador(usuario)) return { error: SOLO_ADMIN_PRUEBA };
+  const dias = Math.min(Math.max(Math.trunc(Number(d?.dias)) || 30, 1), 120);
+  const max = Math.min(Math.max(Math.trunc(Number(d?.max)) || 40, 1), 400);
+  const tiendaId = d?.tiendaId && UUID.test(String(d.tiendaId)) ? String(d.tiendaId) : null;
+  const supabase = createServiceClient();
+  const pais = await getPaisActual(supabase);
+  const { config, faltaMigracion } = await cargarConfig(supabase, pais.id);
+  if (faltaMigracion) return { error: SIN_MIGRACION_CONFIRMACION };
+  if (!config.distingueZona) return { error: `En ${pais.nombre} no se distingue ciudad e interior: no hay zona real con qué comparar.` };
+  return listarMuestraHistorica(supabase, { paisId: pais.id, tiendaId, dias, max });
+}
+
+/** Analiza hasta 6 pedidos de la muestra con el mismo análisis del sistema y devuelve cada uno junto a su zona real. */
+export async function probarPedidosReales(ids: string[], opciones: { sinTendencia: boolean }): Promise<{ error: string } | { resultados: ResultadoPrueba[]; omitidos: number }> {
+  const usuario = await requireModuloEscritura(MODULO);
+  if (!esAdministrador(usuario)) return { error: SOLO_ADMIN_PRUEBA };
+  const lista = (Array.isArray(ids) ? ids : []).filter((x) => UUID.test(String(x))).slice(0, 6);
+  if (!lista.length) return { resultados: [], omitidos: 0 };
+  const supabase = createServiceClient();
+  const pais = await getPaisActual(supabase);
+  const { config, faltaMigracion } = await cargarConfig(supabase, pais.id);
+  if (faltaMigracion) return { error: SIN_MIGRACION_CONFIRMACION };
+  const hechos = await Promise.all(lista.map((id) => probarPedidoHistorico(supabase, id, pais.id, config, { sinTendencia: !!opciones?.sinTendencia }).catch(() => null)));
+  const resultados = hechos.filter((r): r is ResultadoPrueba => r !== null);
+  return { resultados, omitidos: lista.length - resultados.length };
 }
