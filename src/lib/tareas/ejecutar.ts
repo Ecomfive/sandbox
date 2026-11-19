@@ -27,7 +27,7 @@ import { cargarPresupuestoVigente, cargarRealPorUnidad } from "../finanzas/carga
 import { serieDeLineas } from "../finanzas/presupuesto";
 import { ANOMALIA_VENTANA, desviosPresupuesto, gastosAnomalos, mesesAntes } from "../finanzas/desvios";
 import { cargarPrestamosGrupo } from "../finanzas/cargar-prestamos-grupo";
-import { pendientes } from "../finanzas/prestamos-grupo";
+import { DIAS_AVISO_URGENTE, pendientes } from "../finanzas/prestamos-grupo";
 import type { Seccion } from "../finanzas/eerr";
 import { generarRecurrentes, textoRecurrentes } from "../finanzas/recurrentes-servidor";
 import { alertasDePosicion, cargarPosicion } from "../finanzas/cargar-tesoreria";
@@ -319,7 +319,8 @@ export async function generarAlertasPrestamosGrupo(supabase: SupabaseClient, hoy
       return {
         clave: `grupo:${p.id}`,
         tipo: "prestamo_grupo_vence" as const,
-        severidad: p.estado === "vencido" ? ("critica" as const) : ("aviso" as const),
+        // Mejora 64: aviso a 7 días y, a 2 días o menos, crítica.
+        severidad: p.estado === "vencido" || (p.dias !== null && p.dias <= DIAS_AVISO_URGENTE) ? ("critica" as const) : ("aviso" as const),
         mensaje: `${nombre.get(p.deudorId) ?? "—"} le debe a ${nombre.get(p.acreedorId) ?? "—"}: ${usdCorto(p.pendiente)} ${cuando} · ${p.concepto}${ordenes}`.slice(0, 480),
         enlace: DEF_ALERTA.prestamo_grupo_vence.href,
         modulo: DEF_ALERTA.prestamo_grupo_vence.modulo,
@@ -449,7 +450,21 @@ export async function generarAlertasTesoreria(supabase: SupabaseClient, hoy: str
   if (v.deuda) evaluados.push("tesoreria_linea_vencida", "tesoreria_linea_renovar", "tesoreria_linea_uso");
   const r = await guardarAlertas(supabase, alertasTesoreriaANuevas(alertasDePosicion(v)), evaluados);
   if ("error" in r) return { error: /check|tipo/i.test(r.error) ? "falta correr la migración 0939." : r.error };
-  return { activas: r.activas, resueltas: r.resueltas };
+  // Caja mínima por empresa (mejora 52, migración 0989): aviso a 20 % del mínimo, crítica bajo el mínimo.
+  const caja: AlertaNueva[] = v.cajaEmpresas
+    .filter((c) => c.estado === "bajo" || c.estado === "cerca")
+    .map((c) => ({
+      clave: `caja-emp:${c.entidadId}`,
+      tipo: "caja_minima_empresa" as const,
+      severidad: c.estado === "bajo" ? ("critica" as const) : ("aviso" as const),
+      mensaje: `${c.nombre}: caja de ${usdCorto(c.saldo)} ${c.estado === "bajo" ? "bajo" : "cerca de"} su mínimo de ${usdCorto(c.minimo ?? 0)}${c.fecha ? ` (saldos al ${c.fecha})` : ""}`.slice(0, 480),
+      enlace: DEF_ALERTA.caja_minima_empresa.href,
+      modulo: DEF_ALERTA.caja_minima_empresa.modulo,
+      monto: c.saldo,
+    }));
+  const rc = await guardarAlertas(supabase, caja, ["caja_minima_empresa"]);
+  if ("error" in rc) return { activas: r.activas, resueltas: r.resueltas };
+  return { activas: r.activas + rc.activas, resueltas: r.resueltas + rc.resueltas };
 }
 
 // ---------------------------------------------------------------------------------------------

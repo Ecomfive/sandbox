@@ -20,7 +20,20 @@ function cuando(fecha: string | null, hoy: string, antiguedad: number | null): s
  * La posición de caja del día (Tesorería y Panel financiero): bancos, Yappy, efectivo en repartidores y Dropi, cada uno con
  * la fecha de su dato. Un punto ámbar marca el dato que pasó de `diasViejo` días.
  */
-export function PosicionCajaAF4({ posicion, hoy, diasViejo, compacta = false }: { posicion: Posicion; hoy: string; diasViejo: number; compacta?: boolean }) {
+export function PosicionCajaAF4({
+  posicion,
+  hoy,
+  diasViejo,
+  compacta = false,
+  tasaFecha = null,
+}: {
+  posicion: Posicion;
+  hoy: string;
+  diasViejo: number;
+  compacta?: boolean;
+  /** Fecha del tipo de cambio con que se pasaron a dólares las cuentas en otra moneda. */
+  tasaFecha?: string | null;
+}) {
   return (
     <MarcoAF4
       id={compacta ? "posicion-caja-panel" : "posicion-caja"}
@@ -49,7 +62,7 @@ export function PosicionCajaAF4({ posicion, hoy, diasViejo, compacta = false }: 
                     </Link>
                     <span className={`shrink-0 ${claseCifra}`}>{dinero(p.monto)}</span>
                   </div>
-                  {!compacta && p.detalle.length > 1 && (
+                  {!compacta && (p.detalle.length > 1 || p.detalle.some((x) => / [A-Z]{3}\)$/.test(x.etiqueta))) && (
                     <ul className="mt-1 flex flex-col gap-0.5 pl-3.5 text-xs text-muted-foreground">
                       {p.detalle.map((x) => (
                         <li key={x.etiqueta} className="flex justify-between gap-3">
@@ -65,6 +78,12 @@ export function PosicionCajaAF4({ posicion, hoy, diasViejo, compacta = false }: 
               );
             })}
           </ul>
+          {!compacta && (tasaFecha || posicion.sinTasa?.length) && (
+            <p className="text-xs text-muted-foreground">
+              {tasaFecha ? `Las cuentas en otra moneda van en dólares al tipo de cambio del ${diaMes(tasaFecha)}.` : ""}
+              {posicion.sinTasa?.length ? ` Sin tipo de cambio, no suman: ${posicion.sinTasa.join(", ")}.` : ""}
+            </p>
+          )}
         </div>
       )}
     </MarcoAF4>

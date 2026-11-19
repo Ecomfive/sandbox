@@ -85,6 +85,8 @@ export interface CuentaTesoreria {
   nombre: string;
   clase: string;
   moneda: string;
+  /** La empresa a la que pertenece (migración 0923); null si no se dijo. */
+  entidadId?: string | null;
 }
 
 /** El último saldo de cada cuenta (con su fecha y su origen). */
@@ -129,13 +131,15 @@ export function serieDiaria(puntos: PuntoSaldo[], desde: string, hasta: string):
 
 /** Las cuentas que entran a la posición de caja: bancos y billeteras (las tarjetas son deuda, no caja). */
 export const esCuentaDeCaja = (c: Pick<CuentaTesoreria, "clase">) => c.clase === "banco" || c.clase === "billetera";
-const esYappy = (c: Pick<CuentaTesoreria, "nombre" | "clase">) => c.clase === "billetera" || /yappy/i.test(c.nombre);
+const esYappy = (c: Pick<CuentaTesoreria, "nombre" | "clase">) => /yappy/i.test(c.nombre);
+/** Una billetera que no es Yappy: la wallet de una plataforma (Drop, Effi, Dunamixfy…) que se carga a mano (mejora 56). */
+const esWallet = (c: Pick<CuentaTesoreria, "nombre" | "clase">) => c.clase === "billetera" && !esYappy(c);
 
 // ---------------------------------------------------------------------------------------------
 // Posición de caja del día
 // ---------------------------------------------------------------------------------------------
 
-export type ClavePosicion = "bancos" | "yappy" | "repartidores" | "dropi_wallet" | "dropi_retiros";
+export type ClavePosicion = "bancos" | "yappy" | "wallets" | "repartidores" | "dropi_wallet" | "dropi_retiros";
 
 export interface PartidaPosicion {
   clave: ClavePosicion;
@@ -159,6 +163,8 @@ export interface DatosPosicion {
   efectivoRepartidores: { monto: number; fecha: string | null } | null;
   dropiWallet: { monto: number; fecha: string } | null;
   dropiRetiros: { monto: number; fecha: string | null; cantidad: number } | null;
+  /** Unidades por 1 dólar de cada moneda (mejora 55). Sin ella, todo se toma como dólares. */
+  tasas?: Record<string, number>;
 }
 
 export interface Posicion {
@@ -166,16 +172,41 @@ export interface Posicion {
   total: number;
   /** El dato más viejo de los que suman. */
   fechaMasVieja: string | null;
+  /** Cuentas en otra moneda sin tipo de cambio: no suman (mejora 55). */
+  sinTasa: string[];
+}
+
+/** El saldo de una cuenta en dólares; null si su moneda no tiene tipo de cambio. */
+export function saldoEnUsd(saldo: number, moneda: string, tasas?: Record<string, number>): number | null {
+  const m = (moneda || "USD").toUpperCase();
+  if (m === "USD") return saldo;
+  const t = tasas?.[m];
+  return t && t > 0 ? r2(saldo / t) : null;
 }
 
 export function posicionCaja(d: DatosPosicion): Posicion {
   const ant = (f: string | null) => (f ? Math.max(diasEntre(f, d.hoy), 0) : null);
   const masVieja = (fs: (string | null)[]) => fs.filter((f): f is string => !!f).sort()[0] ?? null;
   const partidas: PartidaPosicion[] = [];
-  const conSaldo = d.cuentas.filter((c) => esCuentaDeCaja(c) && d.saldos.has(c.id));
-  const bancos = conSaldo.filter((c) => !esYappy(c));
+  const sinTasa: string[] = [];
+  const conSaldo = d.cuentas.filter((c) => {
+    if (!esCuentaDeCaja(c) || !d.saldos.has(c.id)) return false;
+    if (saldoEnUsd(d.saldos.get(c.id)!.saldo, c.moneda, d.tasas ?? { USD: 1 }) === null && d.tasas) {
+      sinTasa.push(c.nombre);
+      return false;
+    }
+    return true;
+  });
+  const bancos = conSaldo.filter((c) => !esYappy(c) && !esWallet(c));
   const billeteras = conSaldo.filter(esYappy);
-  const det = (cs: CuentaTesoreria[]): PartidaPosicion["detalle"] => cs.map((c) => ({ etiqueta: c.nombre, monto: d.saldos.get(c.id)!.saldo, fecha: d.saldos.get(c.id)!.fecha }));
+  const wallets = conSaldo.filter(esWallet);
+  const det = (cs: CuentaTesoreria[]): PartidaPosicion["detalle"] =>
+    cs.map((c) => {
+      const p = d.saldos.get(c.id)!;
+      const moneda = (c.moneda || "USD").toUpperCase();
+      const usd = d.tasas ? (saldoEnUsd(p.saldo, moneda, d.tasas) ?? p.saldo) : p.saldo;
+      return { etiqueta: moneda === "USD" || !d.tasas ? c.nombre : `${c.nombre} (${p.saldo.toLocaleString("en-US", { maximumFractionDigits: 0 })} ${moneda})`, monto: usd, fecha: p.fecha };
+    });
   if (bancos.length) {
     const detalle = det(bancos);
     const fecha = masVieja(detalle.map((x) => x.fecha));
@@ -186,6 +217,11 @@ export function posicionCaja(d: DatosPosicion): Posicion {
     if (d.yappyPorLiquidar && d.yappyPorLiquidar.monto > 0) detalle.push({ etiqueta: "Yappy por liquidar", monto: d.yappyPorLiquidar.monto, fecha: d.yappyPorLiquidar.fecha });
     const fecha = masVieja(detalle.map((x) => x.fecha));
     partidas.push({ clave: "yappy", etiqueta: "Yappy", monto: r2(suma(detalle.map((x) => x.monto))), fecha, antiguedad: ant(fecha), detalle, href: "/conciliacion-bancaria/cobros" });
+  }
+  if (wallets.length) {
+    const detalle = det(wallets);
+    const fecha = masVieja(detalle.map((x) => x.fecha));
+    partidas.push({ clave: "wallets", etiqueta: "Wallets de plataformas", monto: r2(suma(detalle.map((x) => x.monto))), fecha, antiguedad: ant(fecha), detalle, href: "/tesoreria/saldos" });
   }
   if (d.efectivoRepartidores) {
     const { monto, fecha } = d.efectivoRepartidores;
@@ -205,7 +241,66 @@ export function posicionCaja(d: DatosPosicion): Posicion {
       href: "/retiros",
     });
   }
-  return { partidas, total: r2(suma(partidas.map((p) => p.monto))), fechaMasVieja: masVieja(partidas.map((p) => p.fecha)) };
+  return { partidas, total: r2(suma(partidas.map((p) => p.monto))), fechaMasVieja: masVieja(partidas.map((p) => p.fecha)), sinTasa };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Caja mínima por empresa (mejora 52)
+// ---------------------------------------------------------------------------------------------
+
+/** Margen sobre el mínimo desde el que se avisa: a 20 % del mínimo, aviso; bajo el mínimo, crítica. */
+export const MARGEN_AVISO_CAJA = 0.2;
+
+export interface CajaEmpresa {
+  entidadId: string;
+  nombre: string;
+  saldo: number;
+  minimo: number | null;
+  /** El saldo más viejo de los que suman. */
+  fecha: string | null;
+  cuentas: number;
+  estado: "bajo" | "cerca" | "bien" | "sin_minimo";
+}
+
+/** La caja de cada empresa en dólares (bancos y billeteras con saldo) contra su mínimo. */
+export function cajaPorEmpresa(
+  entidades: { id: string; nombre: string }[],
+  cuentas: CuentaTesoreria[],
+  saldos: Map<string, PuntoSaldo>,
+  minimos: Record<string, number>,
+  tasas?: Record<string, number>,
+): CajaEmpresa[] {
+  return entidades
+    .map((e) => {
+      const propias = cuentas.filter((c) => c.entidadId === e.id && esCuentaDeCaja(c) && saldos.has(c.id));
+      let saldo = 0;
+      let fecha: string | null = null;
+      let n = 0;
+      for (const c of propias) {
+        const p = saldos.get(c.id)!;
+        const usd = saldoEnUsd(p.saldo, c.moneda, tasas);
+        if (usd === null) continue;
+        saldo += usd;
+        n++;
+        if (!fecha || p.fecha < fecha) fecha = p.fecha;
+      }
+      const minimo = minimos[e.id] ?? null;
+      const estado: CajaEmpresa["estado"] =
+        minimo === null || minimo <= 0 ? "sin_minimo" : saldo < minimo ? "bajo" : saldo < minimo * (1 + MARGEN_AVISO_CAJA) ? "cerca" : "bien";
+      return { entidadId: e.id, nombre: e.nombre, saldo: r2(saldo), minimo: minimo && minimo > 0 ? minimo : null, fecha, cuentas: n, estado };
+    })
+    .filter((c) => c.cuentas > 0 || c.minimo !== null);
+}
+
+/** Lee `fin_config.caja_minima_empresas` ({ entidad_id: monto }); lo inválido se ignora. */
+export function leerMinimosEmpresas(v: unknown): Record<string, number> {
+  const o = (v && typeof v === "object" ? v : {}) as Record<string, unknown>;
+  const salida: Record<string, number> = {};
+  for (const [k, x] of Object.entries(o)) {
+    const n = numero(x);
+    if (/^[0-9a-f-]{36}$/i.test(k) && n !== null && n > 0 && n <= 100_000_000) salida[k] = r2(n);
+  }
+  return salida;
 }
 
 // ---------------------------------------------------------------------------------------------

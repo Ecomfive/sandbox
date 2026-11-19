@@ -22,6 +22,8 @@ export const etiquetaTipoGrupo = (t: TipoMovGrupo) => TIPOS_MOVIMIENTO_GRUPO.fin
 
 /** Días antes del vencimiento en que se avisa. */
 export const DIAS_AVISO_VENCE = 7;
+/** Días antes del vencimiento en que el aviso pasa a crítico (mejora 64). */
+export const DIAS_AVISO_URGENTE = 2;
 
 export interface ParteGrupo {
   id: string;
@@ -39,7 +41,12 @@ export interface MovGrupo {
   monto: number;
   concepto: string;
   ordenes: string[];
+  /** Un préstamo de un socio puede ser aporte de capital (migración 0989): no es deuda ni vence. */
+  naturaleza?: "deuda" | "aporte";
 }
+
+/** Lo que cuenta como deuda: todo menos los aportes de capital. */
+export const esDeuda = (m: Pick<MovGrupo, "naturaleza">) => m.naturaleza !== "aporte";
 
 export const clavePar = (acreedorId: string, deudorId: string) => `${acreedorId}|${deudorId}`;
 
@@ -57,7 +64,7 @@ export interface SaldoPar {
 /** El saldo de cada par acreedor → deudor. */
 export function saldosPorPar(movs: MovGrupo[]): SaldoPar[] {
   const m = new Map<string, SaldoPar>();
-  for (const x of movs) {
+  for (const x of movs.filter(esDeuda)) {
     const k = clavePar(x.acreedorId, x.deudorId);
     const s = m.get(k) ?? { acreedorId: x.acreedorId, deudorId: x.deudorId, prestado: 0, costo: 0, abonado: 0, saldo: 0, ultimo: x.fecha };
     if (x.tipo === "prestamo") s.prestado += x.monto;
@@ -146,7 +153,7 @@ const dias = (desde: string, hasta: string) => Math.round((Date.parse(`${hasta}T
  */
 export function pendientes(movs: MovGrupo[], hoy: string): CargoPendiente[] {
   const porPar = new Map<string, MovGrupo[]>();
-  for (const x of movs) {
+  for (const x of movs.filter(esDeuda)) {
     const k = clavePar(x.acreedorId, x.deudorId);
     porPar.set(k, [...(porPar.get(k) ?? []), x]);
   }
@@ -220,6 +227,8 @@ export function leerOrdenes(texto: unknown): string[] {
 }
 
 export interface DatosMovGrupo {
+  naturaleza: "deuda" | "aporte";
+  soporte: string | null;
   acreedor_id: string;
   deudor_id: string;
   tipo: TipoMovGrupo;
@@ -255,16 +264,225 @@ export function leerDatosMovGrupo(get: (campo: string) => unknown): DatosMovGrup
   if (!Number.isFinite(monto) || monto <= 0 || monto > 100_000_000) return { error: "El monto debe ser mayor a cero." };
   const concepto = s("concepto").replace(/\s+/g, " ").slice(0, 300);
   if (!concepto) return { error: "Falta el concepto." };
+  const naturaleza = s("naturaleza") === "aporte" && tipo === "prestamo" ? "aporte" : "deuda";
   return {
+    naturaleza,
+    soporte: s("soporte").slice(0, 300) || null,
     acreedor_id: acreedor,
     deudor_id: deudor,
     tipo: tipo as TipoMovGrupo,
     fecha,
-    vence: tipo === "abono" ? null : vence,
+    vence: tipo === "abono" || naturaleza === "aporte" ? null : vence,
     monto: r2(monto),
     concepto,
     ordenes: leerOrdenes(s("ordenes")),
     medio: s("medio").slice(0, 60) || null,
     nota: s("nota").slice(0, 1000) || null,
   };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Mejoras 61 a 70 (19 nov 2026)
+// ---------------------------------------------------------------------------------------------
+
+export interface LineaEstadoCuenta {
+  id: string;
+  fecha: string;
+  tipo: TipoMovGrupo;
+  /** Quién le presta a quién en esta línea. */
+  acreedorId: string;
+  deudorId: string;
+  concepto: string;
+  ordenes: string[];
+  /** Positivo: sube lo que `b` le debe a `a`; negativo, lo baja. */
+  efecto: number;
+  /** Lo que `b` le debe a `a` después de esta línea (negativo = `a` le debe a `b`). */
+  saldo: number;
+}
+
+/**
+ * Estado de cuenta de un par de partes (mejora 61), en neto: las líneas de las dos direcciones en orden, con el saldo que
+ * `b` le debe a `a` después de cada una. Los aportes de capital no entran.
+ */
+export function estadoDeCuenta(movs: MovGrupo[], a: string, b: string): LineaEstadoCuenta[] {
+  const del = movs
+    .filter(esDeuda)
+    .filter((m) => (m.acreedorId === a && m.deudorId === b) || (m.acreedorId === b && m.deudorId === a))
+    .sort((x, y) => x.fecha.localeCompare(y.fecha) || x.id.localeCompare(y.id));
+  let saldo = 0;
+  return del.map((m) => {
+    const sube = m.tipo === "abono" ? -m.monto : m.monto;
+    const efecto = r2(m.acreedorId === a ? sube : -sube);
+    saldo = r2(saldo + efecto);
+    return { id: m.id, fecha: m.fecha, tipo: m.tipo, acreedorId: m.acreedorId, deudorId: m.deudorId, concepto: m.concepto, ordenes: m.ordenes, efecto, saldo };
+  });
+}
+
+/** Lo que `b` le debe a `a` (neto) al final de `fecha`. */
+export function saldoNetoAl(movs: MovGrupo[], a: string, b: string, fecha: string): number {
+  return estadoDeCuenta(movs, a, b).filter((l) => l.fecha <= fecha).at(-1)?.saldo ?? 0;
+}
+
+/** Los días de un mes «AAAA-MM-01». */
+const diasMes = (mes: string) => new Date(Date.UTC(Number(mes.slice(0, 4)), Number(mes.slice(5, 7)), 0)).getUTCDate();
+
+/**
+ * Interés de un mes entre dos empresas (mejora 62): tasa anual simple sobre el saldo de cada día de lo que `deudor` le
+ * debe a `acreedor` en esa dirección (sin netear, sin contar el interés ya cobrado de ese mismo mes). 365 días.
+ */
+export function interesDelMes(movs: MovGrupo[], acreedorId: string, deudorId: string, tasaAnual: number, mes: string, claveInteres?: (m: MovGrupo) => boolean): number {
+  if (!(tasaAnual > 0)) return 0;
+  const del = movs
+    .filter(esDeuda)
+    .filter((m) => m.acreedorId === acreedorId && m.deudorId === deudorId && !(claveInteres?.(m) ?? false))
+    .sort((x, y) => x.fecha.localeCompare(y.fecha));
+  const inicio = mes.slice(0, 7);
+  let saldo = 0;
+  let i = 0;
+  let acumulado = 0;
+  const n = diasMes(mes);
+  for (let d = 1; d <= n; d++) {
+    const dia = `${inicio}-${String(d).padStart(2, "0")}`;
+    while (i < del.length && del[i].fecha <= dia) {
+      saldo += del[i].tipo === "abono" ? -del[i].monto : del[i].monto;
+      i++;
+    }
+    if (saldo > 0) acumulado += saldo;
+  }
+  return r2((acumulado * tasaAnual) / 365);
+}
+
+/** La clave para no registrar dos veces el interés de un mes. */
+export const claveInteres = (acreedorId: string, deudorId: string, mes: string) => `interes:${acreedorId}:${deudorId}:${mes.slice(0, 7)}`;
+
+export interface Neteo {
+  a: string;
+  b: string;
+  /** Lo que se cancela en las dos direcciones. */
+  monto: number;
+}
+
+/** Los pares que se deben en las dos direcciones (mejora 63): lo que se puede netear es el menor de los dos saldos. */
+export function neteosPosibles(saldos: SaldoPar[]): Neteo[] {
+  const m = new Map(saldos.map((s) => [clavePar(s.acreedorId, s.deudorId), s.saldo]));
+  const salida: Neteo[] = [];
+  for (const s of saldos) {
+    if (s.acreedorId > s.deudorId) continue;
+    const ida = s.saldo;
+    const vuelta = m.get(clavePar(s.deudorId, s.acreedorId)) ?? 0;
+    const monto = r2(Math.min(ida, vuelta));
+    if (monto >= 0.01) salida.push({ a: s.acreedorId, b: s.deudorId, monto });
+  }
+  return salida.sort((x, y) => y.monto - x.monto);
+}
+
+export interface AbonoAplicado {
+  abonoId: string;
+  fecha: string;
+  monto: number;
+}
+
+/**
+ * A qué cargo pagó cada abono (mejora 70): por par, los abonos van primero a lo que vence antes (como `pendientes`).
+ * Devuelve, por cargo, los abonos que lo pagaron.
+ */
+export function abonosPorCargo(movs: MovGrupo[]): Map<string, AbonoAplicado[]> {
+  const porPar = new Map<string, MovGrupo[]>();
+  for (const x of movs.filter(esDeuda)) {
+    const k = clavePar(x.acreedorId, x.deudorId);
+    porPar.set(k, [...(porPar.get(k) ?? []), x]);
+  }
+  const salida = new Map<string, AbonoAplicado[]>();
+  for (const lista of porPar.values()) {
+    const abonos = lista.filter((x) => x.tipo === "abono").sort((a, b) => a.fecha.localeCompare(b.fecha) || a.id.localeCompare(b.id)).map((x) => ({ ...x, resto: x.monto }));
+    const cargos = lista
+      .filter((x) => x.tipo !== "abono")
+      .sort((a, b) => (a.vence ?? a.fecha).localeCompare(b.vence ?? b.fecha) || a.fecha.localeCompare(b.fecha) || a.id.localeCompare(b.id));
+    let j = 0;
+    for (const c of cargos) {
+      let falta = c.monto;
+      const aplicados: AbonoAplicado[] = [];
+      while (falta > 0.005 && j < abonos.length) {
+        const ab = abonos[j];
+        const usa = Math.min(ab.resto, falta);
+        aplicados.push({ abonoId: ab.id, fecha: ab.fecha, monto: r2(usa) });
+        ab.resto -= usa;
+        falta -= usa;
+        if (ab.resto <= 0.005) j++;
+      }
+      salida.set(c.id, aplicados);
+    }
+  }
+  return salida;
+}
+
+export interface HistorialPrestamo {
+  prestamo: MovGrupo;
+  /** Costos del mismo par y las mismas órdenes (comisión, interés, retorno del financista). */
+  costos: MovGrupo[];
+  abonos: AbonoAplicado[];
+  pagado: number;
+  pendiente: number;
+  costoTotal: number;
+  /** Costo sobre el capital (0–1). */
+  costoPct: number | null;
+}
+
+/** El historial de un préstamo (mejora 70): su costo con las mismas órdenes, los abonos que lo pagaron y lo pendiente. */
+export function historialPrestamo(movs: MovGrupo[], id: string, aplicados = abonosPorCargo(movs)): HistorialPrestamo | null {
+  const p = movs.find((m) => m.id === id && m.tipo === "prestamo");
+  if (!p) return null;
+  const costos = p.ordenes.length
+    ? movs.filter((m) => m.tipo === "costo" && m.acreedorId === p.acreedorId && m.deudorId === p.deudorId && m.ordenes.join() === p.ordenes.join())
+    : [];
+  const abonos = aplicados.get(p.id) ?? [];
+  const pagado = r2(abonos.reduce((a, x) => a + x.monto, 0));
+  const costoTotal = r2(costos.reduce((a, x) => a + x.monto, 0));
+  return { prestamo: p, costos, abonos, pagado, pendiente: r2(Math.max(0, p.monto - pagado)), costoTotal, costoPct: p.monto > 0 ? costoTotal / p.monto : null };
+}
+
+/**
+ * Cuánto se ahorra al prepagar hoy un préstamo de un financista (mejora 66), si su costo corre por días: el costo del ciclo
+ * (monto × tasa) por la parte del plazo que todavía no corrió. Null sin tasa, sin vencimiento o ya vencido.
+ */
+export function ahorroPrepago(c: Pick<CargoPendiente, "fecha" | "vence" | "pendiente" | "tipo">, tasaCiclo: number | null, hoy: string): number | null {
+  if (c.tipo !== "prestamo" || !c.vence || !tasaCiclo || tasaCiclo <= 0) return null;
+  const plazo = dias(c.fecha, c.vence);
+  const faltan = dias(hoy, c.vence);
+  if (plazo <= 0 || faltan <= 0) return null;
+  return r2(c.pendiente * tasaCiclo * Math.min(1, faltan / plazo));
+}
+
+export interface Confirmacion {
+  id: string;
+  acreedorId: string;
+  deudorId: string;
+  fechaCorte: string;
+  saldoAcreedor: number | null;
+  saldoDeudor: number | null;
+  nota: string | null;
+}
+
+export interface ConciliacionPar extends Confirmacion {
+  /** Lo que dice el portal que `deudor` le debe a `acreedor` (neto) a la fecha de corte. */
+  sistema: number;
+  difAcreedor: number | null;
+  difDeudor: number | null;
+  cuadra: boolean;
+}
+
+/** Tolerancia para dar por cuadrado un saldo confirmado (mejora 68). */
+export const TOLERANCIA_CONFIRMACION = 1;
+
+/** Cada confirmación contra el saldo del portal a su fecha de corte. */
+export function conciliarConfirmaciones(movs: MovGrupo[], confs: Confirmacion[]): ConciliacionPar[] {
+  return confs
+    .map((c) => {
+      const sistema = saldoNetoAl(movs, c.acreedorId, c.deudorId, c.fechaCorte);
+      const difAcreedor = c.saldoAcreedor === null ? null : r2(c.saldoAcreedor - sistema);
+      const difDeudor = c.saldoDeudor === null ? null : r2(c.saldoDeudor - sistema);
+      const cuadra = [difAcreedor, difDeudor].every((d) => d === null || Math.abs(d) <= TOLERANCIA_CONFIRMACION);
+      return { ...c, sistema, difAcreedor, difDeudor, cuadra };
+    })
+    .sort((a, b) => b.fechaCorte.localeCompare(a.fechaCorte));
 }

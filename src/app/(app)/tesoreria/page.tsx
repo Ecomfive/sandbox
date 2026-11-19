@@ -17,6 +17,8 @@ import { dias, serieDiaria, sumarDias } from "@/lib/finanzas/tesoreria";
 import { createServiceClient } from "@/lib/supabase/server";
 import { AvisoTesoreria } from "./aviso";
 
+import { CajaEmpresas } from "./caja-empresas";
+
 export const metadata = { title: "Tesorería" };
 
 export const dynamic = "force-dynamic";
@@ -76,8 +78,12 @@ export default async function TesoreriaPage() {
       </FilaKpiAF4>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:items-start">
-        <PosicionCajaAF4 posicion={v.posicion} hoy={hoy} diasViejo={v.config.saldoDias} />
+        <PosicionCajaAF4 posicion={v.posicion} hoy={hoy} diasViejo={v.config.saldoDias} tasaFecha={v.tasaFecha} />
         <AlertasTesoreriaAF4 alertas={alertas} />
+      </div>
+
+      <div id="caja-empresas" className="scroll-mt-24">
+        <CajaEmpresas filas={v.cajaEmpresas} puedeEscribir={!usuario.modulosSoloLectura.includes("tesoreria")} />
       </div>
 
       <div id="dropi" className="scroll-mt-24">

@@ -185,3 +185,33 @@ test("alertas ordenadas por gravedad", () => {
   );
   assert.deepEqual(a.map((x) => x.severidad), ["critica", "info", "info"]);
 });
+
+import { cajaPorEmpresa, leerMinimosEmpresas, posicionCaja as posicion2, saldoEnUsd } from "./tesoreria";
+
+test("saldoEnUsd y la posición en dólares con wallets aparte", () => {
+  assert.equal(saldoEnUsd(1000, "CRC", { USD: 1, CRC: 500 }), 2);
+  assert.equal(saldoEnUsd(1000, "MXN", { USD: 1 }), null);
+  const cuentas = [
+    { id: "b", nombre: "BAC CR", clase: "banco", moneda: "CRC" },
+    { id: "y", nombre: "Yappy", clase: "billetera", moneda: "USD" },
+    { id: "w", nombre: "Wallet Drop", clase: "billetera", moneda: "USD" },
+    { id: "m", nombre: "BBVA MX", clase: "banco", moneda: "MXN" },
+  ];
+  const saldos = new Map(cuentas.map((c) => [c.id, { cuentaId: c.id, fecha: "2026-11-18", saldo: 1000, origen: "manual" as const }]));
+  const p = posicion2({ hoy: "2026-11-19", cuentas, saldos, yappyPorLiquidar: null, efectivoRepartidores: null, dropiWallet: null, dropiRetiros: null, tasas: { USD: 1, CRC: 500 } });
+  assert.equal(p.partidas.find((x) => x.clave === "bancos")!.monto, 2);
+  assert.equal(p.partidas.find((x) => x.clave === "wallets")!.monto, 1000);
+  assert.equal(p.partidas.find((x) => x.clave === "yappy")!.monto, 1000);
+  assert.deepEqual(p.sinTasa, ["BBVA MX"]);
+  assert.equal(p.total, 2002);
+});
+
+test("cajaPorEmpresa contra su mínimo", () => {
+  const E = "00000000-0000-0000-0000-0000000000e1";
+  const cuentas = [{ id: "b", nombre: "BG", clase: "banco", moneda: "USD", entidadId: E }];
+  const saldos = new Map([["b", { cuentaId: "b", fecha: "2026-11-18", saldo: 1100, origen: "manual" as const }]]);
+  assert.equal(cajaPorEmpresa([{ id: E, nombre: "PA" }], cuentas, saldos, { [E]: 1000 })[0].estado, "cerca");
+  assert.equal(cajaPorEmpresa([{ id: E, nombre: "PA" }], cuentas, saldos, { [E]: 2000 })[0].estado, "bajo");
+  assert.equal(cajaPorEmpresa([{ id: E, nombre: "PA" }], cuentas, saldos, {})[0].estado, "sin_minimo");
+  assert.deepEqual(leerMinimosEmpresas({ [E]: "500", x: 3 }), { [E]: 500 });
+});

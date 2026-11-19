@@ -197,6 +197,7 @@ export const MIGRACIONES_CLAVE: { migracion: string; que: string; prueba: Prueba
   { migracion: "0986", que: "Nota interna, plantillas de reparto, reglas que concilian solas, redondeo bancario y aviso de cuentas sin conciliar", prueba: { tipo: "columna", nombre: "fin_movimientos", columna: "nota_interna" } },
   { migracion: "0987", que: "Costo vigente por último lote o promedio de 12 meses, costos desde Compras y alerta de costo que sube", prueba: { tipo: "columna", nombre: "fin_costo_vigente", columna: "costo_promedio_12m" } },
   { migracion: "0988", que: "Ventas por tienda: ventas por día, por día de la semana y hora, y unidades por pedido", prueba: { tipo: "funcion", nombre: "ven_ventas_diarias" } },
+  { migracion: "0989", que: "Préstamos del grupo: aportes, interés entre empresas, conciliación, y caja mínima por empresa", prueba: { tipo: "tabla", nombre: "fin_grupo_confirmaciones" } },
 ];
 
 /** Lo que se muestra de una prueba («Falta …»). */

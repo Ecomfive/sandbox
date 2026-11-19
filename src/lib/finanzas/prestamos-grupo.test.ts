@@ -59,3 +59,64 @@ test("lee órdenes y valida la ficha", () => {
   const abono = leerDatosMovGrupo((k) => ({ ...ok, tipo: "abono" } as Record<string, string>)[k]);
   assert.ok(!("error" in abono) && abono.vence === null);
 });
+
+import { abonosPorCargo, ahorroPrepago, conciliarConfirmaciones, estadoDeCuenta, historialPrestamo, interesDelMes, neteosPosibles, saldoNetoAl, saldosPorPar as saldos2 } from "./prestamos-grupo";
+
+const mv = (id: string, a: string, d: string, tipo: "prestamo" | "costo" | "abono", fecha: string, monto: number, extra: Record<string, unknown> = {}) => ({
+  id, acreedorId: a, deudorId: d, tipo, fecha, vence: null as string | null, monto, concepto: id, ordenes: [] as string[], ...extra,
+});
+
+test("estadoDeCuenta neto y saldoNetoAl", () => {
+  const movs = [mv("1", "PA", "CR", "prestamo", "2026-01-01", 100), mv("2", "CR", "PA", "prestamo", "2026-01-05", 30), mv("3", "PA", "CR", "abono", "2026-01-10", 20)];
+  const e = estadoDeCuenta(movs, "PA", "CR");
+  assert.deepEqual(e.map((l) => l.saldo), [100, 70, 50]);
+  assert.equal(saldoNetoAl(movs, "PA", "CR", "2026-01-06"), 70);
+  assert.equal(saldoNetoAl(movs, "CR", "PA", "2026-01-06"), -70);
+});
+
+test("los aportes no son deuda", () => {
+  const movs = [mv("1", "AL", "PA", "prestamo", "2026-01-01", 500, { naturaleza: "aporte" }), mv("2", "AL", "PA", "prestamo", "2026-01-01", 100)];
+  assert.equal(saldos2(movs)[0].saldo, 100);
+});
+
+test("interesDelMes: saldo diario × tasa / 365", () => {
+  const movs = [mv("1", "PA", "CR", "prestamo", "2026-11-01", 3650), mv("2", "PA", "CR", "abono", "2026-11-16", 3650)];
+  // 15 días con 3650 a 10 % anual = 15.
+  assert.equal(interesDelMes(movs, "PA", "CR", 0.1, "2026-11-01"), 15);
+  assert.equal(interesDelMes(movs, "PA", "CR", 0, "2026-11-01"), 0);
+});
+
+test("neteosPosibles", () => {
+  const n = neteosPosibles(saldos2([mv("1", "PA", "CR", "prestamo", "2026-01-01", 100), mv("2", "CR", "PA", "prestamo", "2026-01-02", 40)]));
+  assert.equal(n.length, 1);
+  assert.equal(n[0].monto, 40);
+});
+
+test("historialPrestamo y abonosPorCargo", () => {
+  const movs = [
+    mv("p", "OR", "PA", "prestamo", "2026-01-01", 1000, { ordenes: ["ECOM-0001"], vence: "2026-03-01" }),
+    mv("c", "OR", "PA", "costo", "2026-03-01", 200, { ordenes: ["ECOM-0001"], vence: "2026-03-01" }),
+    mv("a", "OR", "PA", "abono", "2026-03-02", 1100),
+  ];
+  const h = historialPrestamo(movs, "p", abonosPorCargo(movs))!;
+  assert.equal(h.costoTotal, 200);
+  assert.equal(h.pagado, 1000);
+  assert.equal(h.pendiente, 0);
+  assert.equal(h.costoPct, 0.2);
+});
+
+test("ahorroPrepago", () => {
+  const c = { tipo: "prestamo" as const, fecha: "2026-01-01", vence: "2026-03-12", pendiente: 1000 };
+  // 70 días de plazo; faltan 35 → la mitad de 200.
+  assert.equal(ahorroPrepago(c, 0.2, "2026-02-05"), 100);
+  assert.equal(ahorroPrepago(c, null, "2026-02-05"), null);
+  assert.equal(ahorroPrepago(c, 0.2, "2026-04-01"), null);
+});
+
+test("conciliarConfirmaciones", () => {
+  const movs = [mv("1", "PA", "CR", "prestamo", "2026-01-01", 100)];
+  const r = conciliarConfirmaciones(movs, [{ id: "x", acreedorId: "PA", deudorId: "CR", fechaCorte: "2026-01-31", saldoAcreedor: 100, saldoDeudor: 80, nota: null }]);
+  assert.equal(r[0].sistema, 100);
+  assert.equal(r[0].difDeudor, -20);
+  assert.equal(r[0].cuadra, false);
+});

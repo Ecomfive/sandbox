@@ -1228,6 +1228,8 @@ export const GUIAS: GuiaModulo[] = [
         titulo: "Saldos bancarios",
         pasos: [
           "No hay conexión con los bancos: el saldo de cada día sale de la última línea de los extractos cargados en Conciliación bancaria o de la carga a mano («Agregar»). Si hay los dos el mismo día, manda el cargado a mano.",
+          "La posición de caja va en dólares: las cuentas en colones o pesos se pasan al tipo de cambio del día (si una moneda no tiene tipo de cambio, esa cuenta no suma y se dice). Las billeteras que no son Yappy (la wallet de Drop, Effi o Dunamixfy, cargadas como cuenta billetera con su saldo a mano) suman en «Wallets de plataformas».",
+          "«Caja por empresa» suma los bancos y billeteras de cada empresa en dólares y los compara con su mínimo, que se escribe ahí mismo. A 20 % del mínimo sale un aviso en Tesorería y en el Panel; debajo del mínimo, crítico.",
           "La gráfica muestra el saldo diario de las cuentas con más saldo; un día sin dato repite el anterior.",
         ],
       },
@@ -1256,6 +1258,13 @@ export const GUIAS: GuiaModulo[] = [
           "El costo financiero del año se mide con su tasa efectiva anual: un 20 % cada 70 días equivale a cerca de 159 % al año.",
           "«Tasa de los financistas»: lo que cobra cada uno por ciclo (Ortoped&Co, 20 %) y, si es fijo, cuántos días dura el ciclo (vacío = el plazo de cada préstamo). Con ella Compras y costos estima el costo de financiamiento de las OC fondeadas que todavía no tienen su cargo.",
           "Lo importado de ClickUp no se elimina: si algo está mal se corrige con otro movimiento. Para una empresa o persona nueva, «Agregar parte».",
+          "Un préstamo de un socio puede ser «Aporte de capital» (Naturaleza): no se devuelve, así que no suma a la deuda ni vence. Cada movimiento puede llevar su soporte (acta, contrato, transferencia).",
+          "Pulsa un préstamo en Movimientos para ver su historial: el costo con las mismas órdenes de compra, los abonos que lo pagaron, lo pendiente y su costo sobre el capital.",
+          "«Estado de cuenta», en cada fila de «Quién le debe a quién», descarga en CSV todos los movimientos entre las dos partes con el saldo después de cada uno.",
+          "«Se pueden netear» aparece cuando dos partes se deben en las dos direcciones: «Netear» registra un abono en cada lado por el menor de los dos saldos.",
+          "«Interés entre empresas»: si se decide cobrar interés, se pone la tasa anual de cada par. El portal calcula el interés del mes anterior sobre el saldo de cada día y «Registrar» lo deja como un costo (una sola vez por mes).",
+          "«Conciliación entre empresas»: «Registrar saldos» guarda lo que dice cada empresa que le debe la otra a una fecha de corte; se compara con el saldo del portal a esa fecha (punto verde si cuadra, ámbar si hay diferencia).",
+          "En «Próximos vencimientos», un préstamo de un financista con tasa muestra cuánto se ahorraría prepagándolo hoy, si cobra por días. El aviso sale 7 días antes y pasa a crítico 2 días antes.",
         ],
       },
       {
@@ -2272,6 +2281,8 @@ export interface Novedad {
 export const NOVEDADES: Novedad[] = [
   { fecha: "2026-11-19", titulo: "Compras y costos: el costo de financiar cada OC", texto: "Compras y costos suma la columna «Financiamiento» (lo que cobró el financista por la OC o, si no lo cobró aún, un estimado con su tasa) y «Por unidad con financiamiento», como línea aparte del costo puesto. La tasa de cada financista se pone en Tesorería › Préstamos del grupo. Hace falta correr la migración 0985.", modulo: "rentabilidad", href: "/rentabilidad/compras" },
   { fecha: "2026-11-19", titulo: "Costos: Compras como costo oficial y promedio ponderado", texto: "Las compras que llegaron dejan su costo puesto (con el financiamiento) en Costos de mercancía y pasan a ser el costo vigente. En Costos de mercancía se elige si el costo vigente es el último lote o el promedio ponderado de 12 meses, y si un costo sube más de la alerta queda un aviso en el Panel. Hace falta correr la migración 0987.", modulo: "costos-mercancia", href: "/costos-mercancia" },
+  { fecha: "2026-11-19", titulo: "Préstamos del grupo: estado de cuenta, neteo, interés y conciliación", texto: "En Préstamos del grupo: estado de cuenta descargable por par, «Netear» lo que se deben dos partes, interés entre empresas con su tasa anual, conciliación con lo que dice cada empresa, aportes de capital de los socios aparte de la deuda, historial de cada préstamo y cuánto se ahorra al prepagar a un financista. Hace falta correr la migración 0989.", modulo: "tesoreria", href: "/tesoreria/grupo" },
+  { fecha: "2026-11-19", titulo: "Tesorería: caja por empresa, posición en dólares y wallets", texto: "Tesorería suma «Caja por empresa» con un mínimo por empresa y su alerta, pasa a dólares las cuentas en otra moneda con el tipo de cambio del día y junta las wallets de Drop, Effi y otras plataformas en su propia línea de la posición de caja. El mínimo por empresa necesita la migración 0989.", modulo: "tesoreria", href: "/tesoreria" },
   { fecha: "2026-11-19", titulo: "Ventas por tienda: proyección, patrón de la semana y del vendido al banco", texto: "Ventas por tienda compara cada tarjeta también con el mismo mes del año anterior, muestra las unidades por pedido, proyecta el mes en curso al ritmo de los días completos, sigue el efectivo contra entrega desde lo vendido hasta lo remesado y muestra qué días y horas venden más. Quien ve toda la empresa ve además la proveeduría (Dropi) del mes. La proyección, el patrón y las unidades necesitan la migración 0988.", modulo: "ventas-tiendas", href: "/ventas-tiendas" },
   { fecha: "2026-11-19", titulo: "Rentabilidad: por qué un producto no llega al margen", texto: "En Rentabilidad › Productos, cada producto que no llega al margen objetivo dice la causa (flete, devoluciones, marketing, comisión, mercancía o precio bajo) y la lista completa queda como ranking por utilidad.", modulo: "rentabilidad", href: "/rentabilidad/productos" },
   { fecha: "2026-11-19", titulo: "El cierre de mes en «Hoy»", texto: "«Hoy» y Avisos suman el cierre pendiente: mes sin cerrar, tareas del cierre atrasadas y cuentas del banco sin conciliar, para quien abre Cierre de mes.", modulo: "cierre-mes", href: "/cierre-mes" },
