@@ -1,7 +1,7 @@
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import type { UsuarioActual } from "@/lib/auth";
-import { cargarBodegasPedido, cargarPedidos, cargarStock } from "@/lib/pedidos-inventario/datos";
+import { cargarBodegasPedido, cargarPedidos, cargarStock, stockInventario } from "@/lib/pedidos-inventario/datos";
 import { contarPorEstado, esEstado } from "@/lib/pedidos-inventario/reglas";
 import { createServiceClient } from "@/lib/supabase/server";
 import { obtenerOpcionesSkuMaestro } from "@/lib/wms/skus-maestros";
@@ -30,6 +30,8 @@ export async function PaginaPedidos({ modo, usuario, estado }: { modo: "despacho
           return os.filter((o) => !o.compuesto && !padres.has(o.id));
         })
       : [];
+  // Despacho ve cuánto hay en inventario de cada producto al elegirlo, y no puede pedir lo que no hay (19 nov 2026).
+  const hayEnInventario = modo === "despacho" && puedeEscribir ? await stockInventario(supabase, bodegas.origenes) : {};
   // Inventario ve cuánto hay en cada bodega de origen de lo que está por enviar.
   const porEnviar = pedidos.filter((p) => p.estado === "solicitud" || p.estado === "en_proceso");
   const stock =
@@ -56,7 +58,7 @@ export async function PaginaPedidos({ modo, usuario, estado }: { modo: "despacho
         <>
           {modo === "despacho" && puedeEscribir && (
             <div className="flex justify-end">
-              <NuevoPedido opciones={opciones} />
+              <NuevoPedido opciones={opciones} stock={hayEnInventario} />
             </div>
           )}
           {modo === "inventario" && !bodegas.destino && (

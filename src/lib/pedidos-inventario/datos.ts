@@ -4,7 +4,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { traerTodasConError } from "@/lib/supabase/paginar";
 import { numeroTraslado } from "@/lib/wms/traslado";
-import { esEstado, type EstadoPedido, type PedidoInventario } from "./reglas";
+import { esEstado, type EstadoPedido, type PedidoInventario, type StockInventario } from "./reglas";
 
 export interface BodegaPedido {
   id: string;
@@ -32,6 +32,32 @@ export async function cargarStock(supabase: SupabaseClient, bodegas: string[], s
     for (const s of data ?? []) (stock[s.bodega_id] ??= {})[s.sku_maestro_id] = Number(s.disponible);
   }
   return stock;
+}
+
+/**
+ * Lo disponible en inventario de cada producto (19 nov 2026), sumando las bodegas de donde inventario envía, con el detalle por bodega. Solo lo que tiene algo;
+ * `skus` limita a esos productos (sin él, todos: lo que ve despacho al elegir el producto).
+ */
+export async function stockInventario(supabase: SupabaseClient, origenes: BodegaPedido[], skus?: string[]): Promise<Record<string, StockInventario>> {
+  const fuera: Record<string, StockInventario> = {};
+  if (!origenes.length || (skus && !skus.length)) return fuera;
+  const nombreDe = new Map(origenes.map((b) => [b.id, b.nombre]));
+  const tandas = skus ? Array.from({ length: Math.ceil(skus.length / 200) }, (_, i) => skus.slice(i * 200, i * 200 + 200)) : [null];
+  for (const tanda of tandas) {
+    const { data } = await traerTodasConError<{ bodega_id: string; sku_maestro_id: string; disponible: number }>((d, h) => {
+      const q = supabase.from("wms_stock").select("bodega_id, sku_maestro_id, disponible").in("bodega_id", [...nombreDe.keys()]).gt("disponible", 0);
+      return (tanda ? q.in("sku_maestro_id", tanda) : q).order("sku_maestro_id").order("bodega_id").range(d, h);
+    });
+    for (const s of data ?? []) {
+      const n = Number(s.disponible) || 0;
+      if (n <= 0) continue;
+      const x = (fuera[s.sku_maestro_id] ??= { total: 0, bodegas: [] });
+      x.total += n;
+      x.bodegas.push({ nombre: nombreDe.get(s.bodega_id) ?? "Bodega", disponible: n });
+    }
+  }
+  for (const x of Object.values(fuera)) x.bodegas.sort((a, b) => b.disponible - a.disponible);
+  return fuera;
 }
 
 const uno = <T,>(r: T | T[] | null): T | null => (Array.isArray(r) ? (r[0] ?? null) : r);

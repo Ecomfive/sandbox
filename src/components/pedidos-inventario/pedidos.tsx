@@ -27,6 +27,7 @@ import {
   puedeRecibir,
   type EstadoPedido,
   type PedidoInventario,
+  type StockInventario,
 } from "@/lib/pedidos-inventario/reglas";
 
 // Pedir a inventario (16 nov 2026, migración 0305; prototipo aprobado https://claude.ai/artifact/ReVGwYZrBG11rmKFUT7V5T): la tabla
@@ -61,7 +62,7 @@ interface Linea {
 }
 
 /** Despacho: «+ Nuevo pedido» abre las líneas (producto de la lista, cantidad y nota) y «Pedir a inventario» lo manda. */
-export function NuevoPedido({ opciones }: { opciones: OpcionSkuMaestro[] }) {
+export function NuevoPedido({ opciones, stock }: { opciones: OpcionSkuMaestro[]; stock: Record<string, StockInventario> }) {
   const [abierto, setAbierto] = useState(false);
   const [siguiente, setSiguiente] = useState(1);
   const [lineas, setLineas] = useState<Linea[]>([{ clave: 0, sku: null, cantidad: "", nota: "" }]);
@@ -75,7 +76,9 @@ export function NuevoPedido({ opciones }: { opciones: OpcionSkuMaestro[] }) {
     setLineas([{ clave: 0, sku: null, cantidad: "", nota: "" }]);
     setAbierto(false);
   };
-  const listo = lineas.every((l) => l.sku && Number(l.cantidad) > 0);
+  // No se pide lo que inventario no tiene (19 nov 2026): un producto sin stock o más unidades de las que hay no dejan enviar.
+  const hayDe = (l: Linea) => (l.sku ? (stock[l.sku.id]?.total ?? 0) : 0);
+  const listo = lineas.every((l) => l.sku && Number(l.cantidad) > 0 && hayDe(l) > 0 && Number(l.cantidad) <= hayDe(l));
 
   if (!abierto)
     return (
@@ -102,7 +105,7 @@ export function NuevoPedido({ opciones }: { opciones: OpcionSkuMaestro[] }) {
               </div>
               <label className="flex w-28 flex-col gap-1 text-sm">
                 <span className={i === 0 ? "font-medium" : "sr-only"}>Cantidad</span>
-                <input type="number" inputMode="numeric" min={1} step={1} value={l.cantidad} onChange={(e) => cambiar(l.clave, { cantidad: e.target.value })} className={fieldClass} />
+                <input type="number" inputMode="numeric" min={1} max={l.sku ? Math.max(1, hayDe(l)) : undefined} step={1} disabled={!!l.sku && hayDe(l) <= 0} value={l.cantidad} onChange={(e) => cambiar(l.clave, { cantidad: e.target.value })} className={fieldClass} />
               </label>
               <label className="flex min-w-[200px] flex-[2_1_240px] flex-col gap-1 text-sm">
                 <span className={i === 0 ? "font-medium" : "sr-only"}>
@@ -119,6 +122,11 @@ export function NuevoPedido({ opciones }: { opciones: OpcionSkuMaestro[] }) {
               >
                 ×
               </button>
+              {l.sku && (
+                <div className="basis-full">
+                  <HayEnInventario hay={stock[l.sku.id]} pedido={Number(l.cantidad) || 0} />
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -137,6 +145,25 @@ export function NuevoPedido({ opciones }: { opciones: OpcionSkuMaestro[] }) {
         </div>
       </div>
     </form>
+  );
+}
+
+/** Cuánto hay en inventario del producto elegido, con el detalle por bodega; en rojo si no hay o si se pide más de lo que hay. */
+function HayEnInventario({ hay, pedido }: { hay: StockInventario | undefined; pedido: number }) {
+  const total = hay?.total ?? 0;
+  if (total <= 0)
+    return (
+      <span role="alert" className="text-xs font-semibold text-destructive">
+        Sin stock en inventario: no se puede pedir.
+      </span>
+    );
+  const detalle = (hay?.bodegas ?? []).map((b) => `${b.nombre} ${b.disponible.toLocaleString("es-PA")}`).join(" · ");
+  return (
+    <span className="text-xs text-muted-foreground" aria-live="polite">
+      Hay en inventario: <span className="font-semibold text-foreground tabular-nums">{total.toLocaleString("es-PA")}</span>
+      {detalle && <span> ({detalle})</span>}
+      {pedido > total && <span className="block font-semibold text-destructive">Pides más de lo que hay: pide {total.toLocaleString("es-PA")} o menos.</span>}
+    </span>
   );
 }
 

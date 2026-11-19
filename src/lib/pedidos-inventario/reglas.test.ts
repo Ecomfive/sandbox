@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { avisoPedido, contarPorEstado, fechaCorta, leerCantidad, numeroPedido, puedeEnviar, puedeRecibir, revisarEntregas, revisarLineas } from "./reglas";
+import { avisoPedido, contarPorEstado, fechaCorta, leerCantidad, numeroPedido, puedeEnviar, puedeRecibir, revisarEntregas, revisarLineas, revisarStockPedido } from "./reglas";
 
 const A = "11111111-1111-4111-8111-111111111111";
 const B = "22222222-2222-4222-8222-222222222222";
@@ -51,4 +51,12 @@ test("contadores, fecha y avisos", () => {
   assert.equal(fechaCorta("2026-11-16T03:00:00Z"), "15/11/2026");
   assert.equal(avisoPedido({ numero: 3, items: 2 }, "Yiletsi", "nuevo").titulo, "Despacho pide a inventario: PED-0003");
   assert.match(avisoPedido({ numero: 3, items: 1 }, "Dinora", "enviado", "TRA-0065").texto, /TRA-0065/);
+});
+
+test("no se pide lo que inventario no tiene, ni más de lo que hay", () => {
+  const stock = { [A]: { total: 5, bodegas: [{ nombre: "Bodega Central", disponible: 5 }] } };
+  const nombres = { [A]: "Ventilador", [B]: "Abanico" };
+  assert.equal(revisarStockPedido([{ skuId: A, cantidad: 5 }], stock, nombres), null);
+  assert.match(revisarStockPedido([{ skuId: A, cantidad: 6 }], stock, nombres) ?? "", /solo hay 5/);
+  assert.match(revisarStockPedido([{ skuId: A, cantidad: 1 }, { skuId: B, cantidad: 1 }], stock, nombres) ?? "", /«Abanico» no tiene stock/);
 });

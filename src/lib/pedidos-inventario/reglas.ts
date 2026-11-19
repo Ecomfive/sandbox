@@ -83,6 +83,26 @@ export function revisarLineas(lineas: unknown): { lineas: { skuId: string; canti
   return { lineas: limpias };
 }
 
+/** Lo que hay en inventario de un producto (19 nov 2026): lo disponible en las bodegas de donde inventario envía (todas las de Panamá menos la de despacho). */
+export interface StockInventario {
+  total: number;
+  bodegas: { nombre: string; disponible: number }[];
+}
+
+/**
+ * No se pide lo que inventario no tiene (19 nov 2026, pedido de Hernán): un producto sin nada disponible no se puede pedir, y no se piden más unidades de las
+ * que hay. `stock` dice lo disponible de cada producto (sin entrada = 0) y `nombres`, cómo se llama, para el aviso.
+ */
+export function revisarStockPedido(lineas: { skuId: string; cantidad: number }[], stock: Record<string, StockInventario | undefined>, nombres: Record<string, string>): string | null {
+  for (const l of lineas) {
+    const hay = stock[l.skuId]?.total ?? 0;
+    const nombre = nombres[l.skuId] ?? "Un producto";
+    if (hay <= 0) return `«${nombre}» no tiene stock en inventario: no se puede pedir.`;
+    if (l.cantidad > hay) return `De «${nombre}» solo hay ${hay} en inventario: pide ${hay} o menos.`;
+  }
+  return null;
+}
+
 /** Revisa lo que inventario envía de cada producto: una cantidad de 0 en adelante por línea del pedido, y algo más que cero en total. */
 export function revisarEntregas(
   itemsDelPedido: { id: string }[],
