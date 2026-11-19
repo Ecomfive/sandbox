@@ -198,6 +198,7 @@ export const MIGRACIONES_CLAVE: { migracion: string; que: string; prueba: Prueba
   { migracion: "0987", que: "Costo vigente por último lote o promedio de 12 meses, costos desde Compras y alerta de costo que sube", prueba: { tipo: "columna", nombre: "fin_costo_vigente", columna: "costo_promedio_12m" } },
   { migracion: "0988", que: "Ventas por tienda: ventas por día, por día de la semana y hora, y unidades por pedido", prueba: { tipo: "funcion", nombre: "ven_ventas_diarias" } },
   { migracion: "0989", que: "Préstamos del grupo: aportes, interés entre empresas, conciliación, y caja mínima por empresa", prueba: { tipo: "tabla", nombre: "fin_grupo_confirmaciones" } },
+  { migracion: "0990", que: "Inventario contable: provisión por obsoleto, consignación y ajustes de conteo con aprobación", prueba: { tipo: "tabla", nombre: "fin_ajustes_inventario" } },
 ];
 
 /** Lo que se muestra de una prueba («Falta …»). */

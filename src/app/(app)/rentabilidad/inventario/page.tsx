@@ -22,6 +22,11 @@ import { AjusteInventario } from "./ajuste-inventario";
 import { TablaBodegas, TablaProductos, TablaVencimientos } from "./tablas-inventario";
 import { TablaMerma, TablaMuerto, TablaSobrestock } from "./tablas-decisiones";
 import { TasaMantener } from "./tasa-mantener";
+import { MarcoAF4 } from "@/components/af4/marco-af4";
+import { mesCorto } from "@/lib/af4/fecha";
+import { cargarInventarioContable } from "@/lib/finanzas/cargar-inventario-contable";
+import { ajusteProvision, provisionObsoleto, separarConsignacion } from "@/lib/finanzas/inventario-contable";
+import { BodegasConsignacion, BotonProvision } from "./contable-inventario";
 
 export const metadata = { title: "Inventario valorizado" };
 
@@ -62,7 +67,19 @@ export default async function InventarioValorizadoPage({ searchParams }: { searc
   }
 
   const hoy = hoyCarga;
-  const r = resumirInventario(datos.filas, datos.vendido, hoy, datos.tasa);
+  const mesHoy = `${hoy.slice(0, 7)}-01`;
+  const costosWms = new Map<string, number>();
+  for (const f of datos.filas) if (f.costoUnitario !== null) costosWms.set(f.skuId, f.costoUnitario);
+  const contable = await cargarInventarioContable(supabase, pais, mesHoy, costosWms);
+  // Mejora 78: lo de las bodegas en consignación no es nuestro y no suma al inventario contable.
+  const { propias, consignacion } = separarConsignacion(datos.filas, contable.consignacion);
+  const valorConsignacion = consignacion.reduce((a, f) => a + f.valor, 0);
+  const r = resumirInventario(propias, datos.vendido, hoy, datos.tasa);
+  const provision = provisionObsoleto(r.porProducto, hoy);
+  const ajusteProv = ajusteProvision(provision.total, contable.provisionAnterior);
+  const bodegasPais = [...new Map(datos.filas.map((f) => [f.bodegaId, { id: f.bodegaId, nombre: f.bodega, valor: 0 }])).values()]
+    .map((b) => ({ ...b, valor: Math.round(datos.filas.filter((f) => f.bodegaId === b.id).reduce((a, f) => a + f.valor, 0) * 100) / 100 }))
+    .sort((a, b) => b.valor - a.valor);
   const venc = vencimientosValorizados(datos.lotes, datos.filas);
   const ajustes = decisiones.ajustes;
   const sobre = sobrestock(r.porProducto, ajustes.sobrestockDias);
@@ -104,6 +121,36 @@ export default async function InventarioValorizadoPage({ searchParams }: { searc
           subtexto={`${dinero(r.costoMantenerMensual)} al mes · ${porcentaje(r.tasaMantener * 100)} anual`}
         />
       </FilaKpiAF4>
+
+      <KpiGroup titulo="Inventario contable · USD">
+        <KpiGrid compacta>
+          <KpiCard compacta titulo="Propio" valor={dinero(r.valor)} subtexto={valorConsignacion > 0 ? "Sin lo que está en consignación" : "Todo lo de las bodegas"} />
+          <KpiCard compacta titulo="En consignación" valor={dinero(valorConsignacion)} subtexto="No es nuestro: no suma" href="#titulo-consignacion" />
+          <KpiCard
+            compacta
+            titulo="En plataformas"
+            valor={contable.plataformas ? dinero(contable.plataformas.valor) : "—"}
+            subtexto={
+              contable.plataformas
+                ? `${entero(contable.plataformas.unidades)} unidades en ${contable.plataformas.porPlataforma.map((p) => p.plataforma[0].toUpperCase() + p.plataforma.slice(1)).join(", ")}${contable.plataformas.sinCosto ? ` · ${entero(contable.plataformas.sinCosto)} sin costo` : ""}`
+                : "Sin lecturas de plataformas"
+            }
+          />
+          <KpiCard
+            compacta
+            titulo="Provisión por obsoleto"
+            tono={provision.total > 0 ? "warning" : "neutral"}
+            valor={dinero(provision.total)}
+            subtexto={`${dinero(provision.valorObsoleto)} con más de 120 días sin salidas`}
+            href="#titulo-provision"
+          />
+          {contable.porPais.length > 1 &&
+            contable.porPais.map((p) => <KpiCard key={p.pais} compacta titulo={nombreDePais(p.pais)} valor={dinero(p.valor)} subtexto="Inventario de hoy" />)}
+          {pais === "PA" && contable.fotoCierre && (
+            <KpiCard compacta titulo={`Balance al cierre de ${mesCorto(contable.fotoCierre.periodo)}`} valor={dinero(contable.fotoCierre.valor)} subtexto="La foto del inventario que usa el balance" href="/balance-general" />
+          )}
+        </KpiGrid>
+      </KpiGroup>
 
       <KpiGroup titulo="Pendientes de datos">
         <KpiGrid compacta>
@@ -221,6 +268,50 @@ export default async function InventarioValorizadoPage({ searchParams }: { searc
         </div>
         <TablaMerma filas={merma} modo={modoMerma} puedeLlevar={puedeLlevarMerma} />
       </section>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <MarcoAF4
+          id="titulo-provision"
+          titulo="Provisión por inventario obsoleto"
+          detalle="120 a 179 días sin salidas: 50 % · 180 o más o sin salidas: 100 %"
+          accion={pais === "PA" && escribe("rentabilidad") && escribe("libro-movimientos") && Math.abs(ajusteProv) >= 0.005 ? <BotonProvision ajuste={ajusteProv} /> : undefined}
+        >
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
+            {provision.porTramo.map((t) => (
+              <div key={t.etiqueta}>
+                <dt className="text-xs text-muted-foreground">{t.etiqueta}</dt>
+                <dd className="tabular-nums">
+                  {dinero(t.provision)} <span className="text-xs text-muted-foreground">de {dinero(t.valor)}</span>
+                </dd>
+              </div>
+            ))}
+            <div>
+              <dt className="text-xs text-muted-foreground">Ya en el libro</dt>
+              <dd className="tabular-nums">{dinero(contable.provisionAnterior + (contable.provisionMes ?? 0))}</dd>
+            </div>
+          </dl>
+          {provision.lineas.length > 0 && (
+            <ul className="mt-3 flex flex-col gap-0.5 text-xs text-muted-foreground">
+              {provision.lineas.slice(0, 8).map((l) => (
+                <li key={l.skuId} className="flex justify-between gap-3">
+                  <span className="truncate">
+                    {l.codigo} · {l.diasSinSalida === null ? "sin salidas" : `${entero(l.diasSinSalida)} días`}
+                  </span>
+                  <span className="tabular-nums">{dinero(l.provision)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {pais !== "PA" && <p className="mt-2 text-xs text-muted-foreground">Llevarla al libro es solo de Panamá.</p>}
+        </MarcoAF4>
+        <MarcoAF4 id="titulo-consignacion" titulo="Bodegas en consignación" detalle="Mercancía de un cliente o un proveedor: no es activo nuestro">
+          {bodegasPais.length ? (
+            <BodegasConsignacion bodegas={bodegasPais} marcadas={contable.consignacion} puedeEscribir={escribe("rentabilidad")} />
+          ) : (
+            <p className="text-sm text-muted-foreground">Sin bodegas con stock.</p>
+          )}
+        </MarcoAF4>
+      </div>
 
       <section aria-labelledby="titulo-bodegas" className="flex flex-col gap-2">
         <h2 id="titulo-bodegas" className="text-sm font-semibold">
