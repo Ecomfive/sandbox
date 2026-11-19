@@ -200,6 +200,7 @@ export function ProbarHistorico({ tiendas, tiendaElegida }: { tiendas: { id: str
                   </th>
                   <td colSpan={3} className="px-3 py-2 text-right tabular-nums">
                     palabra de zona {resumen.porQuien.regla.acerto}/{resumen.porQuien.regla.total} · las IA {resumen.porQuien.ia.acerto}/{resumen.porQuien.ia.total}
+                    {resumen.unaSolaIA.total > 0 && ` (una sola IA: ${resumen.unaSolaIA.acerto}/${resumen.unaSolaIA.total})`}
                   </td>
                 </tr>
               </tbody>

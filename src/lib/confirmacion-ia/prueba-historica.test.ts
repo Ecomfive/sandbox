@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { huellaDeId, lugaresConDesacuerdo, muestraBalanceada, resumirPrueba, veredictoDe, zonaDominante, type PedidoMuestra, type ResultadoPrueba } from "./prueba-historica";
+import { decidioUnaSolaIA, huellaDeId, lugaresConDesacuerdo, muestraBalanceada, resumirPrueba, veredictoDe, zonaDominante, type PedidoMuestra, type ResultadoPrueba } from "./prueba-historica";
 
 const pedido = (id: string, tiendaId: string, real: "ciudad" | "interior"): PedidoMuestra => ({ id, tiendaId, real });
 
@@ -45,6 +45,18 @@ test("el resumen cuenta aciertos, fallos, lo no decidido, la matriz y quién dec
   assert.deepEqual(s.porQuien, { regla: { total: 1, acerto: 0 }, ia: { total: 2, acerto: 2 } });
   assert.deepEqual(s.porTienda.map((t) => [t.tienda, t.total, t.acerto]), [["Kenku", 2, 1], ["Nuvo", 2, 1]]);
   assert.equal(resumirPrueba([]).precision, null);
+});
+
+test("cuenta aparte lo que decidió una sola IA", () => {
+  const m = (proveedor: string, zona: string | null) => ({ proveedor, ok: true, zona, completa: true, motivo: null });
+  const una = r({ id: "u1", modelos: [m("openai", "no_se"), m("anthropic", "ciudad")] });
+  const dos = r({ id: "u2", modelos: [m("openai", "ciudad"), m("anthropic", "ciudad")] });
+  const fallo = r({ id: "u3", zona: "interior", modelos: [m("openai", "no_se"), m("anthropic", "interior")] });
+  assert.equal(decidioUnaSolaIA(una), true);
+  assert.equal(decidioUnaSolaIA(dos), false);
+  assert.equal(decidioUnaSolaIA(r({ zonaPor: "regla", modelos: [m("openai", "no_se"), m("anthropic", "ciudad")] })), false);
+  assert.equal(decidioUnaSolaIA(r({ modelos: [m("anthropic", "ciudad")] })), false, "con una sola IA conectada no cuenta");
+  assert.deepEqual(resumirPrueba([una, dos, fallo]).unaSolaIA, { total: 2, acerto: 1 });
 });
 
 test("los lugares con más desacuerdo y su zona dominante", () => {

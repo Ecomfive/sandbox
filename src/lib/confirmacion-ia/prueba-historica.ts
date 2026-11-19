@@ -76,6 +76,14 @@ export function veredictoDe(r: Pick<ResultadoPrueba, "estado" | "zona" | "real">
   return "sin_decision";
 }
 
+/** La zona la decidió una sola IA (la otra dijo «no sé» o no contestó una zona): los casos de `ACEPTAR_ZONA_DE_UNA_IA` que hay que vigilar. */
+export function decidioUnaSolaIA(r: Pick<ResultadoPrueba, "zonaPor" | "modelos" | "zona">): boolean {
+  if (r.zonaPor !== "ia") return false;
+  const dadas = r.modelos.filter((m) => m.ok && m.zona && m.zona !== "no_se");
+  const contestaron = r.modelos.filter((m) => m.ok).length;
+  return contestaron >= 2 && dadas.length === 1;
+}
+
 export interface ResumenPrueba {
   total: number;
   acerto: number;
@@ -90,12 +98,15 @@ export interface ResumenPrueba {
   matriz: Record<ZonaReal, { ciudad: number; interior: number; sinDecision: number }>;
   /** Cuántos decidió una palabra de zona y cuántos las IA, y cuánto acertó cada una. */
   porQuien: { regla: { total: number; acerto: number }; ia: { total: number; acerto: number } };
+  /** De los que decidieron las IA, los que decidió una sola (la otra no supo): cuántos y cuántos acertó. */
+  unaSolaIA: { total: number; acerto: number };
 }
 
 export function resumirPrueba(resultados: readonly ResultadoPrueba[]): ResumenPrueba {
   const porTienda = new Map<string, { tienda: string; total: number; acerto: number; fallo: number; sinDecision: number }>();
   const matriz: ResumenPrueba["matriz"] = { ciudad: { ciudad: 0, interior: 0, sinDecision: 0 }, interior: { ciudad: 0, interior: 0, sinDecision: 0 } };
   const porQuien: ResumenPrueba["porQuien"] = { regla: { total: 0, acerto: 0 }, ia: { total: 0, acerto: 0 } };
+  const unaSolaIA = { total: 0, acerto: 0 };
   let acerto = 0;
   let fallo = 0;
   let sinDecision = 0;
@@ -119,6 +130,10 @@ export function resumirPrueba(resultados: readonly ResultadoPrueba[]): ResumenPr
     if (v !== "sin_decision" && r.zonaPor) {
       porQuien[r.zonaPor].total++;
       if (v === "acerto") porQuien[r.zonaPor].acerto++;
+      if (decidioUnaSolaIA(r)) {
+        unaSolaIA.total++;
+        if (v === "acerto") unaSolaIA.acerto++;
+      }
     }
   }
   const decididos = acerto + fallo;
@@ -132,6 +147,7 @@ export function resumirPrueba(resultados: readonly ResultadoPrueba[]): ResumenPr
     porTienda: [...porTienda.values()].sort((a, b) => a.tienda.localeCompare(b.tienda, "es")),
     matriz,
     porQuien,
+    unaSolaIA,
   };
 }
 
