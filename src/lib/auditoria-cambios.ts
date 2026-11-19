@@ -365,9 +365,13 @@ export const ETIQUETA_ACCION: Record<string, string> = {
   editar_usuario: "Modificó un usuario",
   suspender_usuario: "Cambió el estado de un usuario",
   cambiar_rol_usuario: "Cambió el rol de una persona",
+  alerta_seguridad: "Alerta de seguridad",
   eliminar_usuario: "Eliminó un usuario",
   generar_contrasena_temporal: "Generó una contraseña temporal",
   cambiar_contrasena: "Cambió su contraseña",
+  // Verificación en dos pasos (seguridad · 19 nov 2026).
+  activar_dos_pasos: "Activó la verificación en dos pasos",
+  quitar_dos_pasos: "Quitó la verificación en dos pasos de una persona",
   crear_dropshipper: "Agregó el dropshipper",
   cambiar_estado_dropshipper: "Cambió el estado",
   editar_dropshipper: "Editó los datos",

@@ -3,6 +3,8 @@
 import { registrarAuditoria } from "@/lib/auditoria";
 import { getUsuarioActual, getUsuarioSesion } from "@/lib/auth";
 import { cuentaDeProveedor } from "@/lib/proveedor/cuenta";
+import { cerrarIntento, revisarIngreso } from "@/lib/seguridad/limite-ingreso";
+import { DEMASIADOS_INTENTOS } from "@/lib/seguridad/limite-reglas";
 import { createAnonClient, createServiceClient, createSessionClient } from "@/lib/supabase/server";
 import { errorContrasenaNueva } from "./contrasena";
 
@@ -25,8 +27,12 @@ export async function cambiarMiContrasena(actual: string, nueva: string, repetid
   const falla = errorContrasenaNueva(claveActual, claveNueva, String(repetida ?? ""));
   if (falla) return { error: falla };
 
+  // La contraseña actual cuenta como un ingreso: mismo tope de claves equivocadas que el login (seguridad · 19 nov 2026).
+  const { intento, frenado } = await revisarIngreso(usuario.email);
+  if (frenado) return { error: DEMASIADOS_INTENTOS };
   const comprobar = createAnonClient();
   const { error: errorActual } = await comprobar.auth.signInWithPassword({ email: usuario.email, password: claveActual });
+  await cerrarIntento(intento, errorActual);
   if (errorActual) return { error: "La contraseña actual no es correcta." };
   await comprobar.auth.signOut({ scope: "local" });
 
