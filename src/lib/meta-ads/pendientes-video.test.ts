@@ -37,8 +37,9 @@ test("lo analizado con la versión actual no vuelve; la versión vieja y los fal
   // hace 10 minutos: a mano se repiten los tres no completos; en automático todavía no
   assert.deepEqual(base({ anuncios, gastoPorAnuncio, analisis: hechos(10 * 60_000), manual: true }).pendientes.map((p) => p.videoId).sort(), ["error", "texto", "viejo"]);
   assert.equal(base({ anuncios, gastoPorAnuncio, analisis: hechos(10 * 60_000) }).total, 0);
-  // un día y medio: en automático vuelven el error y la versión vieja, no el «solo texto» (tres días)
-  assert.deepEqual(base({ anuncios, gastoPorAnuncio, analisis: hechos(ESPERA_AUTOMATICA.error + 3_600_000) }).pendientes.map((p) => p.videoId).sort(), ["error", "viejo"]);
-  assert.deepEqual(base({ anuncios, gastoPorAnuncio, analisis: hechos(ESPERA_AUTOMATICA.sin_archivo + 3_600_000) }).pendientes.map((p) => p.videoId).sort(), ["error", "texto", "viejo"]);
-  assert.ok(ESPERA_MANUAL_MS < ESPERA_AUTOMATICA.error);
+  // siete horas: en automático vuelve solo el «solo texto» (seis horas: solo mira si Meta ya da el archivo); el error y la versión vieja esperan un día
+  assert.deepEqual(base({ anuncios, gastoPorAnuncio, analisis: hechos(ESPERA_AUTOMATICA.sin_archivo + 3_600_000) }).pendientes.map((p) => p.videoId), ["texto"]);
+  // más de un día: vuelven los tres
+  assert.deepEqual(base({ anuncios, gastoPorAnuncio, analisis: hechos(ESPERA_AUTOMATICA.error + 3_600_000) }).pendientes.map((p) => p.videoId).sort(), ["error", "texto", "viejo"]);
+  assert.ok(ESPERA_MANUAL_MS < ESPERA_AUTOMATICA.sin_archivo && ESPERA_AUTOMATICA.sin_archivo < ESPERA_AUTOMATICA.error);
 });

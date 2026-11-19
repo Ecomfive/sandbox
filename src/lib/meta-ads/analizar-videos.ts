@@ -119,7 +119,7 @@ export async function analizarVideoDeMeta(supabase: SupabaseClient, v: VideoPend
   if (!geminiConectado()) return { ok: false, estado: "error", mensaje: "Falta conectar Gemini (la clave GEMINI_API_KEY) para analizar videos." };
   const existentes = await angulosExistentes(supabase);
   const contexto = { operacion: "meta_video_angulo", modulo: "anuncios-meta", referencia: v.videoId };
-  const { data: previo } = await supabase.from("meta_video_analisis").select("angulo, angulo_manual").eq("video_id", v.videoId).maybeSingle();
+  const { data: previo } = await supabase.from("meta_video_analisis").select("angulo, angulo_manual, estado").eq("video_id", v.videoId).maybeSingle();
 
   // 1. El archivo del video: Meta lo entrega como una dirección temporal en el campo `source` (solo si el acceso lo permite).
   const archivoDeVideo = await buscarArchivoDeVideo(supabase, token, v.videoId, v.cuentaId);
@@ -132,6 +132,11 @@ export async function analizarVideoDeMeta(supabase: SupabaseClient, v: VideoPend
     const dados = permisos?.ok ? ((permisos.datos as { data?: Array<{ permission?: string; status?: string }> }).data ?? []).filter((p) => p.status === "granted").map((p) => p.permission).filter(Boolean).join(", ") : "";
     const { data: cuentaDelVideo } = await supabase.from("meta_cuentas").select("nombre").eq("id", v.cuentaId).maybeSingle();
     motivoSinArchivo = motivoSinArchivoDeVideo(archivoDeVideo, (cuentaDelVideo?.nombre as string | undefined) ?? null, dados);
+  }
+  // Ya estaba analizado solo con el texto y Meta sigue sin dar el archivo: no se vuelve a pagar a la IA para repetir el mismo análisis; solo se anota el intento (y el motivo) para volver a mirar más tarde.
+  if (!fuente && previo?.estado === "sin_archivo") {
+    await supabase.from("meta_video_analisis").update({ analizado_en: new Date().toISOString(), error: (motivoSinArchivo ?? "Meta no entregó el archivo del video.").slice(0, 300) }).eq("video_id", v.videoId);
+    return { ok: true, estado: "sin_archivo", mensaje: `Sigue sin el archivo de Meta: ${motivoSinArchivo ?? "no lo entregó"}` };
   }
 
   let origen: "video" | "texto" = "video";
