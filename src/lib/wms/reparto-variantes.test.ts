@@ -56,3 +56,19 @@ test("el motivo de la base se muestra solo si es de los que escribió para el eq
   assert.equal(mensajeErrorReparto("En Despacho hay que repartir exactamente 30 unidades y se repartieron 20."), "En Despacho hay que repartir exactamente 30 unidades y se repartieron 20.");
   assert.equal(mensajeErrorReparto('relation "x" does not exist'), "No se pudo hacer el reparto.");
 });
+
+test("mensajeErrorReparto muestra que el producto tiene variantes (error de un movimiento rechazado por el libro)", () => {
+  assert.match(mensajeErrorReparto("Este producto tiene variantes: el inventario se mueve en cada variante."), /tiene variantes/);
+});
+
+test("la migración 0332 deja repartir todo: el libro acepta los movimientos de reparto y la marca no se quita a mitad del reparto", async () => {
+  const { readFileSync } = await import("node:fs");
+  const sql = readFileSync(new URL("../../../supabase/migrations/0332_reparto_completo.sql", import.meta.url), "utf8");
+  assert.match(sql, /new\.origen <> 'reparto'/);
+  assert.match(sql, /current_setting\('wms\.repartiendo', true\)/);
+  // La señal se activa al empezar el reparto y se apaga antes de la cuenta final, que es la que quita la marca.
+  const prende = sql.indexOf("set_config('wms.repartiendo', 'on', true)");
+  const apaga = sql.indexOf("set_config('wms.repartiendo', 'off', true)");
+  const cuenta = sql.indexOf("select coalesce(sum(abs(fisico)), 0) into suma");
+  assert.ok(prende > 0 && prende < apaga && apaga < cuenta);
+});

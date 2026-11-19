@@ -174,8 +174,9 @@ function PanelReparto({ id, alTerminar }: { id: string; alTerminar: (cambio: boo
             <ul className="m-0 grid list-none grid-cols-1 gap-2 p-0 sm:grid-cols-2">
               {datos.variantes.map((v) => (
                 <li key={v.id}>
-                  <label className="flex items-center justify-between gap-2 text-sm">
-                    <span className="min-w-0 truncate">{v.opciones || v.nombre}</span>
+                  {/* Cada variante es una tarjeta con su nombre pegado a su casilla: así no se confunde cuál casilla es de cuál. */}
+                  <label className="grid grid-cols-[minmax(0,1fr)_6rem] items-center gap-3 rounded-lg border border-border bg-card px-3 py-2 text-sm focus-within:border-foreground">
+                    <span className="min-w-0 truncate font-medium">{v.opciones || v.nombre}</span>
                     <input
                       type="number"
                       inputMode="numeric"
@@ -188,7 +189,7 @@ function PanelReparto({ id, alTerminar }: { id: string; alTerminar: (cambio: boo
                         setError(null);
                         setValores((x) => ({ ...x, [clave(v.id, g.bodegaId)]: e.target.value }));
                       }}
-                      className={`${fieldClassSm} w-24 text-right tabular-nums`}
+                      className={`${fieldClassSm} w-full text-right tabular-nums`}
                     />
                   </label>
                 </li>
