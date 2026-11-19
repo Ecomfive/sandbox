@@ -18,7 +18,8 @@ test("el distrito de Panamá tiene sus 26 corregimientos, con los dos creados en
 
 test("solo hay geografía de los países que se tienen", () => {
   assert.equal(geografiaDe("pa"), geografiaDePanama());
-  assert.equal(geografiaDe("CR"), null);
+  assert.ok(geografiaDe("CR")?.includes("COSTA RICA"));
+  assert.equal(geografiaDe("MX"), null);
 });
 
 test("las 6 zonas de delivery, la lista de Servientrega y el pago por adelantado salen en la geografía", () => {
