@@ -101,15 +101,7 @@
     },
     {
       "path": "/api/cron/meta-ads?solo=videos",
-      "schedule": "10 13 * * *"
-    },
-    {
-      "path": "/api/cron/meta-ads?solo=videos",
-      "schedule": "10 19 * * *"
-    },
-    {
-      "path": "/api/cron/meta-ads?solo=videos",
-      "schedule": "40 0 * * *"
+      "schedule": "*/10 * * * *"
     }
   ]
 }

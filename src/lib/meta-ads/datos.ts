@@ -79,7 +79,7 @@ export interface DatosMeta {
   creadasHoy: number;
   equipo: FilaEquipo[];
   actividadDisponible: boolean;
-  /** Videos con gasto en 30 días que todavía no tienen análisis de IA, y si la IA (Gemini) está conectada. */
+  /** Videos del periodo elegido que todavía no tienen análisis de IA (o lo tienen incompleto), y si la IA (Gemini) está conectada. */
   videosSinAnalizar: number;
   /** Videos con gasto en el periodo elegido a los que todavía no se les conoce el ángulo (no hay análisis ni lo trae la campaña). */
   videosSinAngulo: number;
@@ -249,7 +249,7 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
     videosMapa.set(v, g);
   }
   const masFrecuente = (m: Map<string, number>) => [...m].sort((x, y) => y[1] - x[1])[0]?.[0] ?? null;
-  // La lista de Videos sigue el periodo elegido; las sugerencias y el aviso de «faltan por analizar» usan siempre los últimos 30 días.
+  // La lista de Videos sigue el periodo elegido; las sugerencias usan siempre los últimos 30 días.
   const armarVideos = (porVideo: Map<string, Resultados>, porAnuncioMapa: Map<string, Resultados>): VideoVista[] =>
     [...videosMapa]
       .map(([id, g]) => {
@@ -335,7 +335,7 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
   const productos = [...new Set(camp.map((c) => (c.producto as string | null)?.trim()).filter((p): p is string => !!p))].sort((a, b) => a.localeCompare(b, "es"));
   return {
     ...base, cuentas, cuentaId, desde, hasta: o.hoy, campanas: campanasConActividad, videos, anuncios, totales, anteriores, topes, productos, sugerencias, decididas: todas.length - sugerencias.length, grupos,
-    creadasPorDia, creadasHoy: creadasPorDia[13]?.testing + creadasPorDia[13]?.escala + creadasPorDia[13]?.retargeting + creadasPorDia[13]?.otras || 0, equipo, actividadDisponible: eventos.length > 0, videosSinAnalizar: videos30.filter((v) => !v.analisis || v.analisis.estado !== "analizado" || v.analisis.version < VERSION_ANALISIS).length, videosSinAngulo, iaConectada: false,
+    creadasPorDia, creadasHoy: creadasPorDia[13]?.testing + creadasPorDia[13]?.escala + creadasPorDia[13]?.retargeting + creadasPorDia[13]?.otras || 0, equipo, actividadDisponible: eventos.length > 0, videosSinAnalizar: videos.filter((v) => !v.analisis || v.analisis.estado !== "analizado" || v.analisis.version < VERSION_ANALISIS).length, videosSinAngulo, iaConectada: false,
   };
 }
 

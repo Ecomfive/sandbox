@@ -192,12 +192,15 @@ export function ListaVideos({ videos, escribe, iaConectada, sinAnalizar, abrirIn
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3">
           <p className="m-0 flex items-center gap-2 text-sm">
             <RobotIcon aria-hidden="true" className="h-4 w-4 text-muted-foreground" />
-            {!iaConectada ? "Falta conectar Gemini (GEMINI_API_KEY) para que la IA vea los videos." : sinAnalizar === 0 ? "La IA ya vio todos los videos con gasto." : `${sinAnalizar} ${sinAnalizar === 1 ? "video falta" : "videos faltan"} por analizar con IA (de más a menos gasto).`}
+            {!iaConectada ? "Falta conectar Gemini (GEMINI_API_KEY) para que la IA vea los videos." : sinAnalizar === 0 ? "La IA ya vio todos los videos de este periodo." : `${sinAnalizar} ${sinAnalizar === 1 ? "video de este periodo falta" : "videos de este periodo faltan"} por analizar con IA (de más a menos gasto).`}
           </p>
-          {iaConectada && sinAnalizar > 0 && (
-            <button type="button" onClick={analizarPendientes} disabled={analizando} className="min-h-9 rounded-md bg-foreground px-3 py-1.5 text-xs font-medium text-background hover:opacity-90 disabled:opacity-50">
-              {analizando ? "Analizando…" : "Analizar los pendientes"}
-            </button>
+          {iaConectada && (
+            <div className="flex flex-col items-end gap-1">
+              <button type="button" onClick={analizarPendientes} disabled={analizando} className="min-h-9 rounded-md bg-foreground px-3 py-1.5 text-xs font-medium text-background hover:opacity-90 disabled:opacity-50">
+                {analizando ? "Analizando…" : "Analizar los pendientes"}
+              </button>
+              <span className="text-xs text-muted-foreground">Revisa todo el historial leído. El sistema también los va analizando solo, cada 10 minutos.</span>
+            </div>
           )}
         </div>
       )}
@@ -324,17 +327,20 @@ function AnalisisIA({ v, escribe, iaConectada }: { v: VideoVista; escribe: boole
   const a = v.analisis;
   const [angulo, setAngulo] = useState(a?.angulo ?? "");
   const [viendo, setViendo] = useState(false);
-  const analizar = () =>
-    empezar(async () => {
-      setViendo(true);
+  // Sin `useTransition`: en una transición asíncrona los cambios de estado de antes del `await` no se ven hasta que termina, y la barra de avance nunca salía.
+  const analizar = async () => {
+    setViendo(true);
+    try {
       const r = await analizarVideoAhoraMeta(v.id);
-      setViendo(false);
       if (r.error) mostrarToast(r.error, "destructive");
       else {
         mostrarToast(r.mensaje ?? "Listo.");
         router.refresh();
       }
-    });
+    } finally {
+      setViendo(false);
+    }
+  };
   const guardarAngulo = () =>
     empezar(async () => {
       const r = await corregirAnguloVideoMeta(v.id, angulo);
@@ -385,13 +391,13 @@ function AnalisisIA({ v, escribe, iaConectada }: { v: VideoVista; escribe: boole
               </span>
               <input className={fieldClassSm} value={angulo} onChange={(e) => setAngulo(e.target.value)} maxLength={60} placeholder="Ej: Dolor de espalda" />
             </label>
-            <button type="button" disabled={trabajando || angulo.trim() === (a?.angulo ?? "")} onClick={guardarAngulo} className="min-h-8 rounded-md border border-border-control bg-card px-3 py-1 text-xs font-medium hover:bg-muted disabled:opacity-50">
+            <button type="button" disabled={trabajando || viendo || angulo.trim() === (a?.angulo ?? "")} onClick={guardarAngulo} className="min-h-8 rounded-md border border-border-control bg-card px-3 py-1 text-xs font-medium hover:bg-muted disabled:opacity-50">
               Guardar
             </button>
           </div>
           {iaConectada && (
-            <button type="button" disabled={trabajando} onClick={analizar} className="min-h-9 w-fit rounded-md bg-foreground px-3 py-1.5 text-xs font-medium text-background hover:opacity-90 disabled:opacity-50">
-              {trabajando ? "Viendo el video… puede tardar un minuto" : a && a.estado === "analizado" ? "Volver a analizar con IA" : "Analizar con IA"}
+            <button type="button" disabled={trabajando || viendo} onClick={analizar} className="min-h-9 w-fit rounded-md bg-foreground px-3 py-1.5 text-xs font-medium text-background hover:opacity-90 disabled:opacity-50">
+              {viendo ? "Viendo el video…" : a && a.estado === "analizado" ? "Volver a analizar con IA" : "Analizar con IA"}
             </button>
           )}
         </>
