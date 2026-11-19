@@ -82,7 +82,7 @@ export function RepartoStock({ id, codigo, pendiente, puedeEscribir, alCambiar }
   );
 }
 
-/** Por cada bodega con stock general, una casilla por variante; solo se guarda cuando en todas lo repartido es exactamente lo que hay. */
+/** Por cada bodega con stock general, una casilla por variante. Se puede repartir solo una bodega, varias o solo una parte de cada una: en ninguna se reparte más de lo que hay. */
 function PanelReparto({ id, alTerminar }: { id: string; alTerminar: (cambio: boolean) => void }) {
   const { mostrarToast } = useToast();
   const [datos, setDatos] = useState<DatosReparto | null>(null);
@@ -184,7 +184,10 @@ function PanelReparto({ id, alTerminar }: { id: string; alTerminar: (cambio: boo
                       placeholder="0"
                       aria-label={`${v.opciones || v.nombre} en ${g.nombre}`}
                       value={valores[clave(v.id, g.bodegaId)] ?? ""}
-                      onChange={(e) => setValores((x) => ({ ...x, [clave(v.id, g.bodegaId)]: e.target.value }))}
+                      onChange={(e) => {
+                        setError(null);
+                        setValores((x) => ({ ...x, [clave(v.id, g.bodegaId)]: e.target.value }));
+                      }}
                       className={`${fieldClassSm} w-24 text-right tabular-nums`}
                     />
                   </label>
