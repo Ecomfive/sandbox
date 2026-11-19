@@ -1,8 +1,20 @@
 import { cache } from "react";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
+import type { User } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
 import { createSessionClient, createServiceClient } from "@/lib/supabase/server";
-import { aAccesoPlano, nivelesEfectivos, type PermisoPropio } from "@/lib/permisos/acceso";
+import { aAccesoPlano, esAdministrador, nivelesEfectivos, type PermisoPropio } from "@/lib/permisos/acceso";
+import {
+  bloqueaPorDosPasos,
+  dosPasosObligatorio,
+  estadoDosPasos,
+  nivelDelToken,
+  rutaDosPasosDesde,
+  tieneFactorVerificado,
+  type EstadoDosPasos,
+  type FactorAuth,
+  type NivelSesion,
+} from "@/lib/seguridad/dos-pasos";
 import { accionPermitida, contarAjustes, pestanaVisible, resolverAfinado, type Afinado, type FilaAfinada } from "@/lib/permisos/afinado";
 import { MODULOS_AFINABLES, catalogoDe } from "@/lib/permisos/catalogo";
 import { paginaInicialDe, primeraPestanaPermitida } from "@/lib/nav-data";
@@ -106,16 +118,85 @@ function juntarAfinado(rolId: string | null, finos: Pick<PermisosFinos, "afinado
 export const getUsuarioIdSesion = cache(async (): Promise<string | null> => (await getUsuarioSesion())?.id ?? null);
 
 /** El usuario de autenticación con sesión (con su `app_metadata`), de la misma consulta que `getUsuarioIdSesion`. */
-export const getUsuarioSesion = cache(async () => {
-  const session = await createSessionClient();
+export const getUsuarioSesion = cache(async () => (await getSesionComprobada())?.user ?? null);
+
+/**
+ * La sesión de esta petición comprobada por Supabase, con su nivel (seguridad · 19 nov 2026): `aal1` = entró solo con la contraseña,
+ * `aal2` = además escribió el código de la verificación en dos pasos. El nivel se lee del MISMO token que Supabase acaba de comprobar
+ * (`getUser(token)`, que le pregunta al servidor de Auth): un token inventado o alterado no pasa esa comprobación, así que el `aal` no
+ * se puede falsificar desde el navegador. Los factores (`user.factors`) también vienen de esa respuesta, no de la cookie.
+ */
+const getSesionComprobada = cache(async (): Promise<{ user: User; nivel: NivelSesion | null } | null> => {
+  const cliente = await createSessionClient();
+  // `getSession` lee la cookie (y la renueva si venció, como hacía `getUser()`); el token se comprueba enseguida con el servidor.
+  const {
+    data: { session },
+  } = await cliente.auth.getSession();
+  if (!session?.access_token) return null;
   const {
     data: { user },
-  } = await session.auth.getUser();
-  return user ?? null;
+  } = await cliente.auth.getUser(session.access_token);
+  if (!user) return null;
+  return { user, nivel: nivelDelToken(session.access_token) };
 });
 
-/** Usuario con sesión activa, su rol y los módulos a los que ese rol tiene acceso (una vez por petición). */
+/**
+ * Usuario con sesión activa, su rol y los módulos a los que ese rol tiene acceso (una vez por petición). Es la puerta de todo:
+ * `requireModulo*`, `exigirAcceso`, las rutas de API y el layout pasan por aquí.
+ *
+ * Verificación en dos pasos (seguridad · 19 nov 2026): si a la persona le falta escribir el código (o activarla, cuando es
+ * obligatoria), devuelve null igual que sin sesión. Así ninguna página, acción del servidor ni ruta le da nada aunque se llame directo:
+ * la regla está aquí, no en el menú ni en el layout. Las páginas la llevan a `/dos-pasos` (`irSinPerfil` y el layout de `(app)`).
+ *
+ * Si quien administra perdió el celular y no hay otra persona que pueda quitarle la verificación desde Usuarios y roles: en el panel de
+ * Supabase, Authentication › Users › esa persona › «MFA factors», borrar el factor (apagar `DOS_PASOS_ADMIN` en Vercel no alcanza:
+ * solo deja de exigirla a quien no la activó). Al volver a entrar, la activa de nuevo con el celular nuevo.
+ */
 export const getUsuarioActual = cache(async (): Promise<UsuarioActual | null> => {
+  const base = await cargarUsuario();
+  if (!base) return null;
+  // Sin poder leer el estado (no debería pasar: sale de la misma sesión) no se abre: null, como sin sesión.
+  const dos = await getDosPasos();
+  if (!dos || bloqueaPorDosPasos(dos.estado)) return null;
+  return base.usuario;
+});
+
+/** Lo de la verificación en dos pasos de la persona con sesión (ver `getDosPasos`). */
+export interface DosPasosSesion {
+  estado: EstadoDosPasos;
+  perfilId: string;
+  email: string;
+  nombre: string | null;
+  /** Los factores de la cuenta, de la respuesta de Supabase (no de la cookie). */
+  factores: FactorAuth[];
+}
+
+/**
+ * Lo de la verificación en dos pasos de la persona con sesión (seguridad · 19 nov 2026), o null sin sesión o sin perfil activo (las
+ * cuentas del portal del proveedor no tienen perfil: no les afecta). Quién la debe tener sale de sus permisos REALES, no de «Ver así».
+ * No da módulos: lo usan la pantalla `/dos-pasos` y sus acciones (que no pueden pedir un módulo, porque la persona todavía no los
+ * tiene) y el layout para la invitación.
+ */
+export const getDosPasos = cache(async (): Promise<DosPasosSesion | null> => {
+  const base = await cargarUsuario();
+  if (!base) return null;
+  const sesion = await getSesionComprobada();
+  if (!sesion || sesion.user.id !== base.usuario.id) return null;
+  const factores = (sesion.user.factors ?? []) as FactorAuth[];
+  const estado = estadoDosPasos({
+    administra: base.administraUsuarios,
+    nivel: sesion.nivel,
+    tieneFactor: tieneFactorVerificado(factores),
+    obligatorio: dosPasosObligatorio(process.env),
+  });
+  return { estado, perfilId: base.usuario.id, email: base.usuario.email, nombre: base.usuario.nombre, factores };
+});
+
+/**
+ * La persona y sus permisos, SIN mirar la verificación en dos pasos. No se exporta a propósito: todo lo de afuera pasa por
+ * `getUsuarioActual`, que sí la mira. `administraUsuarios` son sus permisos reales (antes de «Ver así» y de las tiendas).
+ */
+const cargarUsuario = cache(async (): Promise<{ usuario: UsuarioActual; administraUsuarios: boolean } | null> => {
   const userId = await getUsuarioIdSesion();
   if (!userId) return null;
 
@@ -162,6 +243,8 @@ export const getUsuarioActual = cache(async (): Promise<UsuarioActual | null> =>
   let modulosSoloLectura = efectivo.modulosSoloLectura;
   let afinado = juntarAfinado(rol?.id ?? null, finos);
   let vistaPrevia: { rolId: string; rolNombre: string } | null = null;
+  // Quién debe tener la verificación en dos pasos: lo que la persona puede de verdad, antes de «Ver así» y de las tiendas (seguridad · 19 nov 2026).
+  const administraUsuarios = esAdministrador(efectivo);
 
   // "Ver así": solo quien de verdad administra Usuarios y roles puede probar la app con los
   // permisos de otro rol (o de otra persona) — así que el cambio se aplica DESPUÉS de calcular los permisos reales,
@@ -210,7 +293,7 @@ export const getUsuarioActual = cache(async (): Promise<UsuarioActual | null> =>
   modulos = modulosSegunTiendas(modulos, tiendasPermitidas);
   modulosSoloLectura = modulosSegunTiendas(modulosSoloLectura, tiendasPermitidas);
 
-  return {
+  const usuario: UsuarioActual = {
     id: perfil.id,
     email: perfil.email,
     nombre: perfil.nombre,
@@ -225,6 +308,7 @@ export const getUsuarioActual = cache(async (): Promise<UsuarioActual | null> =>
     paisesPermitidos: listaPaises((perfil as { paises_permitidos?: unknown }).paises_permitidos),
     tiendasPermitidas,
   };
+  return { usuario, administraUsuarios };
 });
 
 /** `null` = todos los países; si no, los códigos que la persona puede ver (y «importacion»). */
@@ -241,10 +325,21 @@ export function irAlInicio(usuario: Pick<UsuarioActual, "modulos">, excluirModul
 }
 
 /**
+ * Si a la persona con sesión le falta la verificación en dos pasos, la lleva a `/dos-pasos` con la página que pedía (la cabecera
+ * `x-ruta` la pone el middleware y la pisa siempre: no se puede mandar desde el navegador). Si no le falta, no hace nada.
+ */
+export async function irADosPasosSiFalta(): Promise<void> {
+  if (!bloqueaPorDosPasos((await getDosPasos())?.estado)) return;
+  redirect(rutaDosPasosDesde((await headers()).get("x-ruta")));
+}
+
+/**
  * Sin perfil del equipo: una cuenta del portal del proveedor (Shen Zhen) vuelve a su portal, que es lo único que puede abrir; sin
  * sesión, a entrar.
  */
 async function irSinPerfil(): Promise<never> {
+  // Le falta la verificación en dos pasos: a escribir el código (o activarla), y después vuelve a la página que pidió.
+  await irADosPasosSiFalta();
   const usuarioId = await getUsuarioIdSesion();
   if (usuarioId && (await cuentaDeProveedor(usuarioId))) redirect(RUTA_PORTAL_PROVEEDOR);
   redirect("/login");

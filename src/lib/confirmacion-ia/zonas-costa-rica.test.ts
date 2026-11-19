@@ -37,9 +37,9 @@ test("la geografía de Costa Rica trae las dos etiquetas, la lista de ciudad y d
   assert.match(g, /nunca respondas «adelantado»/);
 });
 
-test("las palabras de zona que siembra la migración 0331 coinciden con la regla del Excel", async () => {
+test("las palabras de zona que siembra la migración 0333 coinciden con la regla del Excel", async () => {
   const { readFileSync } = await import("node:fs");
-  const sql = readFileSync(new URL("../../../supabase/migrations/0331_confirmacion_ia_palabras_costa_rica.sql", import.meta.url), "utf8");
+  const sql = readFileSync(new URL("../../../supabase/migrations/0333_confirmacion_ia_palabras_costa_rica.sql", import.meta.url), "utf8");
   const filas = [...sql.matchAll(/^\s+\('([^']+)', '([^']+)', '(ciudad|interior)'\)/gm)].map((m) => ({ texto: m[1], resultado: m[3] }));
   assert.ok(filas.length > 40);
   for (const f of filas) {

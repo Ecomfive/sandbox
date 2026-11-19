@@ -2,6 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { RUTA_PORTAL_PROVEEDOR, cuentaDeProveedor } from "@/lib/proveedor/cuenta";
+import { cerrarIntento, revisarIngreso } from "@/lib/seguridad/limite-ingreso";
+import { DEMASIADOS_INTENTOS } from "@/lib/seguridad/limite-reglas";
 import { createServiceClient, createSessionClient } from "@/lib/supabase/server";
 
 export interface LoginState {
@@ -12,8 +14,15 @@ export async function iniciarSesion(_prevState: LoginState, formData: FormData):
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
 
+  // Tope de claves equivocadas por correo + IP, por IP y por correo (seguridad · 19 nov 2026): el intento se suma antes de probar la
+  // clave y, frenado, ni se prueba. El mensaje no dice si el correo existe.
+  const { intento, frenado } = await revisarIngreso(email);
+  if (frenado) return { error: DEMASIADOS_INTENTOS };
+
   const supabase = await createSessionClient();
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  // Correcta (o Supabase no respondió): el intento se devuelve. Equivocada: queda contada.
+  await cerrarIntento(intento, error);
   if (error) {
     return { error: "Correo o contraseña incorrectos." };
   }

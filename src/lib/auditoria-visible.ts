@@ -102,6 +102,8 @@ export const MODULO_DE_ENTIDAD: Record<string, string> = {
   cuentas_retiro: "retiros",
   saldos_wallet: "retiros",
   perfiles: "usuarios",
+  // Las alertas de seguridad (login frenado, cuenta nueva, edición de Usuarios y roles): solo quien ve Usuarios y roles (19 nov 2026).
+  seguridad: "usuarios",
   manuales_proceso: "usuarios",
   wms_productos: "wms-productos",
   wms_dropi_productos: "wms-productos-dropi",

@@ -1,7 +1,7 @@
 -- Confirmación con IA › Costa Rica: palabras de zona de arranque (19 nov 2026, pedido de Jhokser: dejar el módulo armado aunque todavía no haya ninguna tienda). Salen del Excel «Codificación - Cantón - Provincia - Distrito - Barrio» del equipo
 -- (lo verde es ciudad; lo azul y lo blanco, interior; ver `src/lib/confirmacion-ia/zonas-costa-rica.ts`). Solo van los nombres que NO se repiten en otro cantón con otra zona: los cantones del centro de San José son ciudad; las provincias de
 -- Cartago, Heredia, Guanacaste, Puntarenas y Limón, y los cantones lejanos de San José y de Alajuela, son interior. «San José», «Alajuela», «San Rafael», «San Antonio», «San Isidro», «Desamparados», «Santa Ana»… no van: dependen del cantón
--- y del distrito, así que los decide la IA con la geografía y los ejemplos (el equipo puede agregar más desde «Palabras de zona»). Se puede correr de nuevo sin efecto. Reversa: supabase/rollbacks/0331_rollback.sql.
+-- y del distrito, así que los decide la IA con la geografía y los ejemplos (el equipo puede agregar más desde «Palabras de zona»). Se puede correr de nuevo sin efecto. Reversa: supabase/rollbacks/0333_rollback.sql.
 
 insert into confirmacion_ia_zonas (pais_id, texto, clave, resultado, creado_por_nombre)
 select p.id, v.texto, v.clave, v.resultado, 'Sistema'

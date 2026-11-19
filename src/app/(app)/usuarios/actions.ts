@@ -10,6 +10,7 @@ import { detectarImagen } from "@/lib/seguridad/imagen";
 import { esUuid } from "@/lib/seguridad/ruta-almacen";
 import { avisoTrasClaveNueva, avisoTrasSuspender, detalleSalida, textoRol } from "@/lib/seguridad/sesiones";
 import { bloquearIngreso, cerrarSesionesDe, sacarDelSistema } from "@/lib/seguridad/sesiones-cuenta";
+import { avisarCuentaNueva, avisarDosPasosQuitada, avisarSiPuedeModificarUsuarios } from "@/lib/seguridad/avisos-seguridad";
 
 const ALFABETO_CLAVE = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
 
@@ -76,6 +77,8 @@ export async function crearUsuario(formData: FormData): Promise<{ error?: string
     entidadId: creado.user.id,
     detalle: `${nombre} <${email}>`,
   });
+  // Aviso inmediato a quienes administran (seguridad · 19 nov 2026).
+  await avisarCuentaNueva(creado.user.id);
 
   revalidatePath("/usuarios");
   return { contrasena };
@@ -109,6 +112,47 @@ export async function generarContrasenaTemporal(formData: FormData): Promise<{ e
 
   const aviso = avisoTrasClaveNueva(fallaSesiones);
   return aviso ? { contrasena, aviso } : { contrasena };
+}
+
+/**
+ * «Quitar verificación en dos pasos» de otra persona (perdió o cambió el celular; seguridad · 19 nov 2026): borra sus factores de
+ * Supabase Auth con la API de administración. Supabase cierra además sus sesiones abiertas si el factor estaba confirmado. Al volver a
+ * entrar con su contraseña, si administra Usuarios y roles y la verificación es obligatoria, la activa de nuevo con el celular nuevo.
+ * La propia no se quita desde aquí (para eso hace falta otra persona que administre, o el panel de Supabase). Devuelve el error como valor.
+ */
+export async function quitarDosPasos(formData: FormData): Promise<{ error?: string }> {
+  let usuario;
+  try {
+    usuario = await requireModuloEscritura("usuarios");
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Sin permiso." };
+  }
+  const id = formData.get("id") as string;
+  if (!esUuid(id)) return { error: "Persona no válida." };
+  if (id === usuario.id) return { error: "No puedes quitar tu propia verificación en dos pasos." };
+
+  const supabase = createServiceClient();
+  const { data: perfil } = await supabase.from("perfiles").select("email").eq("id", id).maybeSingle();
+  if (!perfil) return { error: "No se encontró a la persona." };
+
+  const { data: lista, error: errorLista } = await supabase.auth.admin.mfa.listFactors({ userId: id });
+  if (errorLista) return { error: "No se pudo leer su verificación en dos pasos." };
+  const factores = lista?.factors ?? [];
+  if (factores.length === 0) return { error: "Esta persona no tiene la verificación en dos pasos activa." };
+  for (const f of factores) {
+    const { error } = await supabase.auth.admin.mfa.deleteFactor({ id: f.id, userId: id });
+    if (error) return { error: "No se pudo quitar la verificación en dos pasos. Inténtalo de nuevo." };
+  }
+
+  await registrarAuditoria({
+    accion: "quitar_dos_pasos",
+    entidad: "perfiles",
+    entidadId: id,
+    detalle: `${perfil.email ?? id}: se le quitó la verificación en dos pasos (deberá activarla de nuevo)`,
+  });
+  await avisarDosPasosQuitada(id, usuario.id);
+  revalidatePath(`/usuarios/personas/${id}`);
+  return {};
 }
 
 /** Nombre y correo con el que entra — todo lo demás de "Datos" en la ficha. */
@@ -176,6 +220,7 @@ export async function cambiarRolUsuario(formData: FormData): Promise<{ error?: s
     antes: { Rol: textoRol(antes.rol_id ?? null, nombres) },
     despues: { Rol: textoRol(rolId, nombres) },
   });
+  await avisarSiPuedeModificarUsuarios(id);
   revalidatePath("/usuarios");
   return {};
 }
