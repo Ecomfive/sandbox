@@ -1,5 +1,6 @@
 "use client";
 
+import { textosCiudad, type TextosCiudad } from "@/lib/confirmacion-ia/textos-pais";
 import { useState, useTransition } from "react";
 import { Pastilla } from "@/components/panel/piezas-panel";
 import { ListaIcon } from "@/lib/nav-icons";
@@ -21,10 +22,12 @@ function FormularioEjemplo({
   tiendas,
   tiendaObligatoria,
   etiquetaBoton,
+  textos,
   alGuardar,
   alCancelar,
 }: {
   inicial?: EjemploDireccion;
+  textos: TextosCiudad;
   distingueZona: boolean;
   tiendas: { id: string; nombre: string }[];
   /** La persona ve solo algunas tiendas: tiene que elegir una (no hay «todas»). */
@@ -64,8 +67,8 @@ function FormularioEjemplo({
       }}
     >
       <label className="flex flex-col gap-1 sm:max-w-sm">
-        <span className={labelClass}>Ciudad o corregimiento *</span>
-        <input value={ciudad} required maxLength={120} onChange={(e) => setCiudad(e.target.value)} placeholder="Ej: Bella Vista, Colón, Arraiján" className={fieldClass} />
+        <span className={labelClass}>{textos.campo} *</span>
+        <input value={ciudad} required maxLength={120} onChange={(e) => setCiudad(e.target.value)} placeholder={textos.ejemploCiudad} className={fieldClass} />
         <span className="text-xs text-muted-foreground">Lo que el cliente puso en ese campo: es lo primero que mira la IA.</span>
       </label>
       <label className="flex flex-col gap-1">
@@ -76,7 +79,7 @@ function FormularioEjemplo({
           required
           value={direccion}
           onChange={(e) => setDireccion(e.target.value)}
-          placeholder="Ej: Urb. Los Pinos, calle 5, casa 12, frente a la tienda de la esquina"
+          placeholder={textos.ejemploDireccion}
           className={fieldClass}
         />
       </label>
@@ -142,6 +145,7 @@ function FormularioEjemplo({
 
 export function EjemplosDirecciones({
   paisNombre,
+  paisCodigo,
   distingueZona,
   tiendas,
   tiendaObligatoria,
@@ -149,12 +153,14 @@ export function EjemplosDirecciones({
   total: totalInicial,
 }: {
   paisNombre: string;
+  paisCodigo?: string;
   distingueZona: boolean;
   tiendas: { id: string; nombre: string }[];
   tiendaObligatoria: boolean;
   puedeEscribir: boolean;
   total: number;
 }) {
+  const textos = textosCiudad(paisCodigo);
   const { mostrarToast } = useToast();
   const [total, setTotal] = useState(totalInicial);
   const [abierto, setAbierto] = useState(false);
@@ -193,6 +199,7 @@ export function EjemplosDirecciones({
             distingueZona={distingueZona}
             tiendas={tiendas}
             tiendaObligatoria={tiendaObligatoria}
+            textos={textos}
             etiquetaBoton="Guardar dirección"
             alGuardar={async (d) => {
               const r = await agregarEjemplo(d);
@@ -249,6 +256,7 @@ export function EjemplosDirecciones({
                       distingueZona={distingueZona}
                       tiendas={tiendas}
                       tiendaObligatoria={tiendaObligatoria}
+                      textos={textos}
                       etiquetaBoton="Guardar cambios"
                       alCancelar={() => setEditando(null)}
                       alGuardar={async (d) => {

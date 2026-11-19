@@ -1,5 +1,6 @@
 "use client";
 
+import { textosCiudad } from "@/lib/confirmacion-ia/textos-pais";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Indicador, Pastilla, TableroIndicadores, claseTdLista, claseThLista } from "@/components/panel/piezas-panel";
@@ -75,6 +76,7 @@ type Filtro = "todos" | "listo" | "falta_dato" | "revisar" | "revisados" | "adel
 export function ConfirmacionIA({
   config,
   paisNombre,
+  paisCodigo,
   etiquetasTexto,
   esAdmin,
   puedeEscribir,
@@ -90,6 +92,8 @@ export function ConfirmacionIA({
 }: {
   config: ConfigConfirmacion;
   paisNombre: string;
+  /** El código del país (PA, CR): decide cómo se llama el campo de ciudad y sus ejemplos. */
+  paisCodigo?: string;
   /** Las etiquetas del país, como se leen («CIUDAD · INTERIOR/SERVIENTREGA») o que faltan definirse. */
   etiquetasTexto: string | null;
   esAdmin: boolean;
@@ -174,11 +178,13 @@ export function ConfirmacionIA({
     });
   }
 
+  // País sin tiendas todavía (Costa Rica): se deja todo armado —ejemplos, palabras de zona, pruebas— y los pedidos y el pago por adelantado esperan a la primera tienda.
+  const sinTiendas = tiendas.length === 0;
   const indice = [
-    { id: "pedidos", texto: "Pedidos analizados" },
+    ...(sinTiendas ? [] : [{ id: "pedidos", texto: "Pedidos analizados" }]),
     { id: "ejemplos", texto: "Direcciones de ejemplo" },
     { id: "zonas", texto: "Palabras de zona" },
-    { id: "adelanto", texto: "Cómo paga el cliente" },
+    ...(sinTiendas ? [] : [{ id: "adelanto", texto: "Cómo paga el cliente" }]),
     ...(esAdmin ? [{ id: "instrucciones", texto: "Instrucciones de la IA" }] : []),
   ];
 
@@ -208,6 +214,14 @@ export function ConfirmacionIA({
           <span aria-hidden="true">·</span>
           <span>{etiquetasTexto ? `Etiquetas de ${paisNombre}: ${etiquetasTexto}` : `Etiquetas de ${paisNombre}: sin definir (solo revisa que la dirección esté completa)`}</span>
         </p>
+        {sinTiendas && (
+          <p role="status" className="m-0 flex items-start gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm">
+            <span aria-hidden="true" className="mt-1.5 h-2 w-2 flex-none rounded-full bg-warning" />
+            <span>
+              {paisNombre} todavía no tiene tiendas conectadas. Ya puedes cargar ejemplos y palabras de zona y probar direcciones; los pedidos aparecerán aquí cuando se conecte la primera tienda.
+            </span>
+          </p>
+        )}
         {apagadaPorFaltaDeIA && (
           <p role="alert" className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm text-destructive">
             Falta conectar ChatGPT o Claude: sin sus claves no se puede analizar ninguna dirección.
@@ -224,6 +238,7 @@ export function ConfirmacionIA({
         ))}
       </nav>
 
+      {!sinTiendas && (
       <SeccionCard
         id="pedidos"
         icono={PedidoIcon}
@@ -363,16 +378,17 @@ export function ConfirmacionIA({
           </div>
         )}
       </SeccionCard>
+      )}
 
-      <ProbarDireccion tiendas={tiendas} puedeEscribir={puedeEscribir} tiendaElegida={tiendaElegida} />
+      <ProbarDireccion paisCodigo={paisCodigo} tiendas={tiendas} puedeEscribir={puedeEscribir} tiendaElegida={tiendaElegida} />
 
       {/* Lo que el equipo le enseña a la IA, lado a lado en pantalla ancha. */}
       <div className="grid gap-6 xl:grid-cols-2 xl:items-start">
-        <EjemplosDirecciones paisNombre={paisNombre} distingueZona={config.distingueZona} tiendas={tiendas} tiendaObligatoria={ejemplos.tiendaObligatoria} puedeEscribir={puedeEscribir} total={ejemplos.total} />
+        <EjemplosDirecciones paisNombre={paisNombre} paisCodigo={paisCodigo} distingueZona={config.distingueZona} tiendas={tiendas} tiendaObligatoria={ejemplos.tiendaObligatoria} puedeEscribir={puedeEscribir} total={ejemplos.total} />
         <PalabrasZona paisNombre={paisNombre} distingueZona={config.distingueZona} puedeEscribir={puedeEscribir} inicial={palabras} />
       </div>
 
-      <PagoPorAdelantado paisNombre={paisNombre} puedeEscribir={puedeEscribir} metodos={metodosPago} />
+      {!sinTiendas && <PagoPorAdelantado paisNombre={paisNombre} puedeEscribir={puedeEscribir} metodos={metodosPago} />}
 
       {esAdmin && <InstruccionesIA paisNombre={paisNombre} inicial={instrucciones ?? ""} />}
 
@@ -533,11 +549,12 @@ function FichaAnalisis({ f, distingueZona, puedeEscribir, abrirCorregir, alElegi
 }
 
 /** «Probar una dirección»: escribe una dirección y ve qué diría el sistema, sin guardar ni mandar nada. */
-function ProbarDireccion({ tiendas, puedeEscribir, tiendaElegida }: { tiendas: { id: string; nombre: string }[]; puedeEscribir: boolean; tiendaElegida: string | null }) {
+function ProbarDireccion({ paisCodigo, tiendas, puedeEscribir, tiendaElegida }: { paisCodigo?: string; tiendas: { id: string; nombre: string }[]; puedeEscribir: boolean; tiendaElegida: string | null }) {
   const { mostrarToast } = useToast();
   const [pendiente, empezar] = useTransition();
   const [direccion, setDireccion] = useState("");
   const [ciudad, setCiudad] = useState("");
+  const textos = textosCiudad(paisCodigo);
   const [resultado, setResultado] = useState<{ combinado: Combinado; modelos: ResultadoModelo[]; palabras: { texto: string; resultado: Zona }[]; etiqueta: string | null } | null>(null);
   if (!puedeEscribir) return null;
   return (
@@ -549,13 +566,13 @@ function ProbarDireccion({ tiendas, puedeEscribir, tiendaElegida }: { tiendas: {
       <div className="flex flex-col gap-3 border-t border-border p-4">
         <p className="m-0 text-sm text-muted-foreground">Escribe una dirección y mira qué diría el sistema. No se guarda ni se le escribe a nadie.</p>
         <label className="flex flex-col gap-1 sm:max-w-sm">
-          <span className={labelClass}>Ciudad o corregimiento *</span>
-          <input value={ciudad} required maxLength={120} onChange={(e) => setCiudad(e.target.value)} placeholder="Ej: Bella Vista, Colón, Arraiján" className={fieldClass} />
+          <span className={labelClass}>{textos.campo} *</span>
+          <input value={ciudad} required maxLength={120} onChange={(e) => setCiudad(e.target.value)} placeholder={textos.ejemploCiudad} className={fieldClass} />
           <span className="text-xs text-muted-foreground">Lo primero que mira la IA: dice de dónde es el pedido.</span>
         </label>
         <label className="flex flex-col gap-1">
           <span className={labelClass}>Dirección *</span>
-          <textarea rows={2} maxLength={600} required value={direccion} onChange={(e) => setDireccion(e.target.value)} placeholder="Ej: Urb. Los Pinos, calle 5, casa 12, frente a la tienda" className={fieldClass} />
+          <textarea rows={2} maxLength={600} required value={direccion} onChange={(e) => setDireccion(e.target.value)} placeholder={textos.ejemploDireccion} className={fieldClass} />
         </label>
         <div className="flex items-center gap-3">
           <button

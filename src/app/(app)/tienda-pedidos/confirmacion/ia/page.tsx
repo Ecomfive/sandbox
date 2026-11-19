@@ -25,6 +25,7 @@ const ahoraMismo = () => Date.now();
 /**
  * Gestión de tienda › Confirmación › Con IA (16 nov 2026, pedido de Hernán): cuando iComfly deja un pedido «Confirmada», el sistema analiza su dirección con ChatGPT y Claude, propone la
  * etiqueta de zona (CIUDAD o INTERIOR/SERVIENTREGA en Panamá) y, si falta un dato, se lo pide al cliente por WhatsApp. Por ahora solo propone: no cambia etiquetas en Shopify.
+ * Un país sin tiendas todavía (Costa Rica, 19 nov 2026, pedido de Jhokser) también abre: se dejan listos los ejemplos, las palabras de zona y las pruebas de direcciones para cuando se conecte la primera tienda.
  */
 export default async function ConfirmacionIAPage({ searchParams }: { searchParams: Promise<{ [k: string]: string | string[] | undefined }> }) {
   const usuario = await requireModulo("tienda-confirmacion");
@@ -52,7 +53,7 @@ export default async function ConfirmacionIAPage({ searchParams }: { searchParam
         <p role="alert" className="rounded-lg border border-border bg-card px-4 py-3 text-sm text-destructive">
           {SIN_MIGRACION_CONFIRMACION}
         </p>
-      ) : !tiendas.length ? (
+      ) : !tiendas.length && limitado ? (
         <SinTiendas pais={pais.nombre} />
       ) : (
         <>
@@ -60,6 +61,7 @@ export default async function ConfirmacionIAPage({ searchParams }: { searchParam
           <ConfirmacionIA
             config={config}
             paisNombre={pais.nombre}
+            paisCodigo={pais.codigo}
             etiquetasTexto={config.etiquetaCiudad || config.etiquetaInterior ? [config.etiquetaCiudad, config.etiquetaInterior].filter(Boolean).join(" · ") : null}
             esAdmin={esAdministrador(usuario)}
             puedeEscribir={!usuario.modulosSoloLectura.includes("tienda-confirmacion")}
