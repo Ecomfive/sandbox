@@ -1,5 +1,5 @@
 // Pedir a inventario (16 nov 2026, migración 0305): lo que leen las dos pantallas. Despacho (Pedir a inventario) e inventario
-// (Comunicación con despacho › Solicitudes de despacho) ven la misma lista; cambian los botones. Por ahora solo Panamá: el destino es su bodega «Despacho…».
+// (Comunicación despacho › Solicitudes de despacho) ven la misma lista; cambian los botones. Por ahora solo Panamá: el destino es su bodega «Despacho…».
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { traerTodasConError } from "@/lib/supabase/paginar";

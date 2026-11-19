@@ -204,8 +204,8 @@ function modulosDeNav(areas: NavSection[]): ModuloDeNav[] {
 }
 
 /**
- * El nombre de la página principal de un módulo cuando no es el mismo del menú (19 nov 2026, pedido de Hernán): el menú dice «Comunicación con despacho» y
- * arriba se lee «Comunicación con despacho › Solicitudes de despacho».
+ * El nombre de la página principal de un módulo cuando no es el mismo del menú (19 nov 2026, pedido de Hernán): el menú dice «Comunicación despacho» y
+ * arriba se lee «Comunicación despacho › Solicitudes de despacho».
  */
 const PAGINA_PRINCIPAL: Record<string, string> = {
   "/inventario-pedidos-despacho": "Solicitudes de despacho",

@@ -100,7 +100,7 @@ export const AREAS_ACCESO: AreaAcceso[] = [
       { clave: "tienda-cuanto-hay", etiqueta: "Preguntar cuánto hay" },
       { clave: "despacho-cuanto-hay", etiqueta: "Responder cuánto hay" },
       { clave: "despacho-pedir-inventario", etiqueta: "Pedir a inventario" },
-      { clave: "inventario-pedidos-despacho", etiqueta: "Comunicación con despacho (inventario)" },
+      { clave: "inventario-pedidos-despacho", etiqueta: "Comunicación despacho (inventario)" },
       { clave: "tienda-productos", etiqueta: "Productos de Shopify" },
       { clave: "tienda-tiendas", etiqueta: "Tiendas Shopify" },
     ],
