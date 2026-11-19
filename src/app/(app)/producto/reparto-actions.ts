@@ -2,12 +2,25 @@
 
 import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
-import { requireModulo, requireModuloEscritura } from "@/lib/auth";
+import { requireAlgunModulo, type UsuarioActual } from "@/lib/auth";
 import { puedeVerBodega } from "@/lib/seguridad/pais-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 import { mensajeErrorReparto, revisarReparto, type LineaReparto, type StockGeneral } from "@/lib/wms/reparto-variantes";
 
-// Repartir el stock general de un producto entre sus variantes (11 nov 2026, pedido de Jhokser; migración 0273). Mueven inventario, así que piden poder modificar Inventario.
+// Repartir el stock general de un producto entre sus variantes (11 nov 2026, pedido de Jhokser; migración 0273). Mueven inventario; desde el 19 nov 2026 las puede hacer quien modifique Inventario
+// **o Producto**: el botón sale en la ficha de Producto (donde se crean las variantes) y quien las crea tiene que poder repartirlas. Antes pedían solo Inventario y a quien editaba Producto sin
+// poder escribir en Inventario (Dinora) el servidor le fallaba con un error genérico aunque la pantalla le dejaba intentarlo.
+const MODULOS_REPARTO = ["inventario", "producto"];
+const SIN_PERMISO = "Para repartir el stock hace falta poder modificar Producto o Inventario. Pídelo a quien administra los permisos.";
+
+/** Quien puede repartir (modificar Inventario o Producto), o el error dicho en palabras: en producción Next.js oculta el mensaje de una excepción. */
+async function quienReparte(): Promise<{ usuario: UsuarioActual } | { error: string }> {
+  try {
+    return { usuario: await requireAlgunModulo(MODULOS_REPARTO, true) };
+  } catch {
+    return { error: SIN_PERMISO };
+  }
+}
 
 const ES_ID = (v: unknown): v is string => typeof v === "string" && /^[0-9a-fA-F-]{8,64}$/.test(v);
 const FALTA_MIGRACION = "Falta correr la migración 0273 (reparto del stock entre variantes) en la base.";
@@ -23,7 +36,12 @@ export interface DatosReparto {
 
 /** Lo que hace falta para repartir el stock general de un producto: sus bodegas con stock y sus variantes. Basta poder abrir Producto. */
 export async function obtenerRepartoVariantes(padreId: string): Promise<DatosReparto | { error: string }> {
-  const usuario = await requireModulo("producto");
+  let usuario: UsuarioActual;
+  try {
+    usuario = await requireAlgunModulo(MODULOS_REPARTO);
+  } catch {
+    return { error: "No tienes acceso a Producto ni a Inventario." };
+  }
   if (!ES_ID(padreId)) return { error: "Producto no válido." };
   const supabase = createServiceClient();
   const { data: padre, error } = await supabase.from("skus_maestros").select("id, codigo, reparto_pendiente").eq("id", padreId).maybeSingle();
@@ -56,7 +74,9 @@ export async function obtenerRepartoVariantes(padreId: string): Promise<DatosRep
  * stock general en ninguna bodega. Devuelve el error como valor.
  */
 export async function repartirStockVariantes(padreId: string, lineas: LineaReparto[]): Promise<{ error?: string; repartidas?: number; queda?: number }> {
-  const usuario = await requireModuloEscritura("inventario");
+  const quien = await quienReparte();
+  if ("error" in quien) return quien;
+  const usuario = quien.usuario;
   if (!ES_ID(padreId) || !Array.isArray(lineas) || lineas.length > 2000 || lineas.some((l) => !ES_ID(l?.varianteId) || !ES_ID(l?.bodegaId))) return { error: "El reparto no es válido." };
   const datos = await obtenerRepartoVariantes(padreId);
   if ("error" in datos) return datos;
@@ -71,7 +91,10 @@ export async function repartirStockVariantes(padreId: string, lineas: LineaRepar
     p_reparto: lineas.filter((l) => l.cantidad > 0).map((l) => ({ variante: l.varianteId, bodega: l.bodegaId, cantidad: l.cantidad })),
     p_usuario: usuario.id,
   });
-  if (error) return { error: mensajeErrorReparto(error.message) };
+  if (error) {
+    console.error("[repartir_stock_variantes]", padreId, error.message);
+    return { error: mensajeErrorReparto(error.message) };
+  }
   const repartidas = Number((data as { repartidas?: number } | null)?.repartidas ?? 0);
   // Sin la migración 0296 la base no devuelve `queda`: reparte todo o nada, así que no queda nada.
   const queda = Number((data as { queda?: number } | null)?.queda ?? 0);
@@ -91,7 +114,9 @@ export async function repartirStockVariantes(padreId: string, lineas: LineaRepar
  * variantes). Mientras tanto, lo que sale de una variante se descuenta del stock general. Devuelve el error como valor.
  */
 export async function dejarRepartoPendiente(padreId: string): Promise<{ error?: string; unidades?: number }> {
-  const usuario = await requireModuloEscritura("inventario");
+  const quien = await quienReparte();
+  if ("error" in quien) return quien;
+  const usuario = quien.usuario;
   if (!ES_ID(padreId)) return { error: "Producto no válido." };
   const supabase = createServiceClient();
   const { data: padre } = await supabase.from("skus_maestros").select("codigo").eq("id", padreId).maybeSingle();

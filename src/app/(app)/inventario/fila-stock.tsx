@@ -78,13 +78,17 @@ export function EncabezadoFilasStock({ conPlataformas = false, plataforma = null
 export function FilaStockLista({
   f,
   alAbrir,
+  alAlternar,
   conPlataformas = false,
   plataforma = null,
   hijo = false,
   abierto,
 }: {
   f: FilaStock;
+  /** Abre la ficha del SKU. En un producto con variantes, la abre su nombre (la ficha del principal: su stock general y el de sus variantes bodega por bodega). */
   alAbrir: () => void;
+  /** Solo en un producto con variantes: despliega o pliega sus variantes (la flecha de la derecha o cualquier otra parte de la fila). */
+  alAlternar?: () => void;
   conPlataformas?: boolean;
   plataforma?: Plataforma | null;
   hijo?: boolean;
@@ -95,56 +99,90 @@ export function FilaStockLista({
   const compuesto = f.tipo === "combo";
   const armables = compuesto && f.fisico !== 0 ? "armables" : undefined;
   const fuera = fueraDeVenta(f);
-  return (
-    <button
-      type="button"
-      onClick={alAbrir}
-      aria-label={conVariantes ? `${abierto ? "Cerrar" : "Abrir"} las ${f.variantes.length} variantes de ${f.nombre}` : `Abrir el inventario del SKU ${f.codigo}`}
-      aria-expanded={conVariantes ? abierto : undefined}
-      className={`group grid w-full cursor-pointer grid-cols-[minmax(0,1fr)_1rem] items-center gap-x-4 gap-y-3 py-3 pr-4 text-left transition-colors hover:bg-muted/50 ${hijo ? "bg-muted/30 pl-10" : "pl-4"} ${conPlataformas ? COLUMNAS_PLATAFORMAS : COLUMNAS} ${anilloFoco}`}
-    >
-      <span className="flex min-w-0 items-center gap-3">
-        <span className="shrink-0">
-          <MiniaturaFoto url={f.foto} nombre={f.nombre} />
-        </span>
-        <span className="flex min-w-0 flex-col gap-0.5">
+  const clasesFila = `group grid w-full grid-cols-[minmax(0,1fr)_1rem] items-center gap-x-4 gap-y-3 py-3 pr-4 text-left transition-colors hover:bg-muted/50 ${hijo ? "bg-muted/30 pl-10" : "pl-4"} ${conPlataformas ? COLUMNAS_PLATAFORMAS : COLUMNAS}`;
+  const identidad = (
+    <>
+      <span className="shrink-0">
+        <MiniaturaFoto url={f.foto} nombre={f.nombre} />
+      </span>
+      <span className="flex min-w-0 flex-col gap-0.5">
+        {conVariantes ? (
+          // El nombre del principal es un botón aparte: abre su ficha sin desplegar las variantes (el clic en el resto de la fila las despliega).
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              alAbrir();
+            }}
+            aria-label={`Abrir la ficha de ${f.nombre}`}
+            className={`w-fit max-w-full cursor-pointer truncate rounded-sm text-left text-sm font-medium underline-offset-2 hover:underline ${anilloFoco}`}
+          >
+            {f.nombre}
+          </button>
+        ) : (
           <span className="truncate text-sm font-medium">{hijo && f.opciones ? f.opciones : f.nombre}</span>
-          <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground [overflow-wrap:anywhere]">
-            <span className="font-mono font-semibold text-foreground">{f.codigo}</span>
-            <CodigosProducto numero={f.numero} barras={f.barras} />
-            {conVariantes && <Badge tone="neutral">{f.variantes.length} variantes</Badge>}
-            {f.repartoPendiente && <Badge tone="neutral">{hijo ? "Sin repartir: sale del general" : "Stock sin repartir"}</Badge>}
-            {compuesto && <Badge tone="neutral">{ETIQUETA_TIPO_SKU.combo}</Badge>}
-            {f.clase === "test" && <Badge tone="azul">{ETIQUETA_CLASE_SKU.test}</Badge>}
-            {f.clase === "inactivo" && <Badge tone="destructive">{ETIQUETA_CLASE_SKU.inactivo}</Badge>}
-            {f.clase === "descontinuado" && <Badge tone="neutral">{ETIQUETA_CLASE_SKU.descontinuado}</Badge>}
-          </span>
+        )}
+        <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground [overflow-wrap:anywhere]">
+          <span className="font-mono font-semibold text-foreground">{f.codigo}</span>
+          <CodigosProducto numero={f.numero} barras={f.barras} />
+          {conVariantes && <Badge tone="neutral">{f.variantes.length} variantes</Badge>}
+          {f.repartoPendiente && <Badge tone="neutral">{hijo ? "Sin repartir: sale del general" : "Stock sin repartir"}</Badge>}
+          {compuesto && <Badge tone="neutral">{ETIQUETA_TIPO_SKU.combo}</Badge>}
+          {f.clase === "test" && <Badge tone="azul">{ETIQUETA_CLASE_SKU.test}</Badge>}
+          {f.clase === "inactivo" && <Badge tone="destructive">{ETIQUETA_CLASE_SKU.inactivo}</Badge>}
+          {f.clase === "descontinuado" && <Badge tone="neutral">{ETIQUETA_CLASE_SKU.descontinuado}</Badge>}
         </span>
       </span>
-
-      <span className="order-last col-span-2 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-6 lg:order-none lg:contents">
-        <Cifra nombre="Disponible" n={f.disponible} fuerte apoyo={armables} />
-        <Cifra nombre="Físico" n={f.fisico} apoyo={armables} />
-        <Cifra nombre="Cajas" n={f.cajas} apoyo={f.cajas > 0 && f.unidadesEnCajas !== f.fisico ? <span className="text-warning">No cuadra</span> : undefined} />
-        {conPlataformas &&
-          (plataforma ? (
-            <Cifra nombre={`En ${ETIQUETA_PLATAFORMA[plataforma]}`} n={f.plataformas?.[plataforma] ?? 0} />
-          ) : (
-            <Cifra nombre="En plataformas" n={f.plataformas?.total ?? 0} apoyo={textoPlataformas(f.plataformas) || undefined} />
-          ))}
-        <Cifra nombre="Reservado" n={f.reservado} />
-        <Cifra nombre="En camino" n={f.enCamino} />
-        <Cifra
-          nombre="Fuera de venta"
-          n={f.danado + f.inspeccion + f.retenido + f.vencido}
-          apoyo={fuera.length > 0 ? fuera.map((c) => `${c.nombre} ${entero(c.n)}`).join(" · ") : undefined}
-        />
-      </span>
-
-      <ChevronRightIcon
-        aria-hidden="true"
-        className={`h-4 w-4 text-muted-foreground transition-transform lg:order-last ${conVariantes ? (abierto ? "rotate-90" : "") : "group-hover:translate-x-0.5"}`}
+    </>
+  );
+  const cifras = (
+    <span className="order-last col-span-2 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-6 lg:order-none lg:contents">
+      <Cifra nombre="Disponible" n={f.disponible} fuerte apoyo={armables} />
+      <Cifra nombre="Físico" n={f.fisico} apoyo={armables} />
+      <Cifra nombre="Cajas" n={f.cajas} apoyo={f.cajas > 0 && f.unidadesEnCajas !== f.fisico ? <span className="text-warning">No cuadra</span> : undefined} />
+      {conPlataformas &&
+        (plataforma ? (
+          <Cifra nombre={`En ${ETIQUETA_PLATAFORMA[plataforma]}`} n={f.plataformas?.[plataforma] ?? 0} />
+        ) : (
+          <Cifra nombre="En plataformas" n={f.plataformas?.total ?? 0} apoyo={textoPlataformas(f.plataformas) || undefined} />
+        ))}
+      <Cifra nombre="Reservado" n={f.reservado} />
+      <Cifra nombre="En camino" n={f.enCamino} />
+      <Cifra
+        nombre="Fuera de venta"
+        n={f.danado + f.inspeccion + f.retenido + f.vencido}
+        apoyo={fuera.length > 0 ? fuera.map((c) => `${c.nombre} ${entero(c.n)}`).join(" · ") : undefined}
       />
+    </span>
+  );
+
+  // Un producto con variantes: la fila despliega sus variantes (flecha o clic en la fila) y su nombre abre su ficha. No es un botón entero porque no puede llevar otro botón dentro.
+  if (conVariantes) {
+    return (
+      <div className={`cursor-pointer ${clasesFila}`} onClick={alAlternar}>
+        <span className="flex min-w-0 items-center gap-3">{identidad}</span>
+        {cifras}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            alAlternar?.();
+          }}
+          aria-label={`${abierto ? "Cerrar" : "Abrir"} las ${f.variantes.length} variantes de ${f.nombre}`}
+          aria-expanded={abierto}
+          className={`relative -m-3 cursor-pointer rounded-md p-3 text-muted-foreground lg:order-last ${anilloFoco}`}
+        >
+          <ChevronRightIcon aria-hidden="true" className={`h-4 w-4 transition-transform ${abierto ? "rotate-90" : ""}`} />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <button type="button" onClick={alAbrir} aria-label={`Abrir el inventario del SKU ${f.codigo}`} className={`cursor-pointer ${clasesFila} ${anilloFoco}`}>
+      <span className="flex min-w-0 items-center gap-3">{identidad}</span>
+      {cifras}
+      <ChevronRightIcon aria-hidden="true" className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 lg:order-last" />
     </button>
   );
 }
