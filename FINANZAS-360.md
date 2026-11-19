@@ -131,7 +131,7 @@ junto con los Excel originales.
   Meta) lee su tienda de la base y la rechaza si no es de las permitidas; también la tienda nueva que se le pone. Por
   clasificar trae solo los movimientos sin tipo de las tiendas de la persona y Reglas solo las que llevan a ellas; aplicar
   reglas a todo el libro y actualizar la base de reparto son de toda la empresa.
-- **Leer facturas.** `ANTHROPIC_API_KEY` (y opcional `ANTHROPIC_MODEL`, por defecto `claude-sonnet-4-5`) en el servidor. Solo
+- **Leer facturas.** `ANTHROPIC_API_KEY` (y opcional `ANTHROPIC_MODEL`, por defecto `claude-sonnet-5-5`) en el servidor. Solo
   se manda el archivo de la factura; la respuesta se valida (fecha, montos, RUC/DV) y siempre se revisa antes de guardar.
 
 - **Planificación (0157–0158).** Pronóstico mensual por tienda (`src/lib/finanzas/pronostico.ts`): Holt-Winters aditivo con
@@ -248,7 +248,7 @@ Todas opcionales; sin ellas la función se ve apagada y nada falla. Ver `.env.ex
   está vacía; `PORTAL_URL` para el enlace). Tarea «informe-mensual», el día 5 a las 7:00 de Panamá; una sola vez por mes desde el cron.
 - **WhatsApp** (`WHATSAPP_API_URL`, `WHATSAPP_API_TOKEN`, `WHATSAPP_INSTANCIA`; API compatible con Evolution API:
   `POST {URL}/message/sendText/{instancia}` con `{number, text}` y cabecera `apikey`). Sin ellas, «Abrir en WhatsApp» (wa.me).
-- **Anthropic** (`ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, por defecto `claude-sonnet-4-5`): solo cifras agregadas del informe.
+- **Anthropic** (`ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, por defecto `claude-sonnet-5-5`): solo cifras agregadas del informe.
 - **Shopify** (`SHOPIFY_TIENDAS`, JSON con tienda, dominio y token Admin API por tienda). La tarea lee desde el último `updated_at`
   leído (la primera vez, 60 días) y guarda con la misma huella del importador de Excel (`ventas|<unidad>|<número>`): una orden que ya vino
   del Excel solo actualiza su estado de pago y, si se canceló o reembolsó entera, su estado de entrega.

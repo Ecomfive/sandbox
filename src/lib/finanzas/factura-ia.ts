@@ -3,7 +3,7 @@
 
 import { validarRucDv } from "./ruc-panama";
 
-export const MODELO_PREDETERMINADO = "claude-sonnet-4-5";
+export const MODELO_PREDETERMINADO = "claude-sonnet-5-5";
 
 /** Lo que se le pide al modelo: solo los datos de la factura, en JSON, sin inventar. */
 export const INSTRUCCIONES_FACTURA = `Eres un asistente contable en Panamá. Lee la factura o recibo adjunto y responde SOLO un objeto JSON, sin texto antes ni después, con estas claves:
