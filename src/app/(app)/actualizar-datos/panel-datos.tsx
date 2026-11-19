@@ -66,10 +66,11 @@ async function correrAccion(a: Correr): Promise<{ ok: boolean; texto: string }> 
       const r = await leerQuickbooksAhora();
       return r.error ? mal(r.error) : { ok: true, texto: r.resumen ?? "QuickBooks leído." };
     }
-    case "dropi-finanzas": {
-      const r = await correrTareaAhora("dropi-finanzas");
+    case "dropi-finanzas":
+    case "shopify-ventas": {
+      const r = await correrTareaAhora(a.clave);
       if (r.error) return mal(r.error);
-      return { ok: true, texto: r.omitida ? "Ya estaba corriendo: espera unos minutos." : (r.resumen ?? "Dropi al portal financiero, listo.") };
+      return { ok: true, texto: r.omitida ? "Ya estaba corriendo: espera unos minutos." : (r.resumen ?? "Listo.") };
     }
     case "meta": {
       const r = await leerAhoraMeta();
@@ -147,7 +148,9 @@ export function PanelDatos({ fuentes, usaExtension }: { fuentes: Fuente[]; usaEx
         const todas = fuentes.filter((f) => f.grupo === g.id);
         const filas = todas.filter((f) => pasaFiltro(f, filtro));
         if (!filas.length) return null;
-        const porRevisar = todas.filter((f) => f.estado !== "aldia" && f.estado !== "corriendo").length;
+        // Por revisar = atrasadas o con error; las que no tienen registro no cuentan (como en la tarjeta «Atrasadas»).
+        const porRevisar = todas.filter((f) => f.estado === "atrasada" || f.estado === "error").length;
+        const sinRegistro = todas.filter((f) => f.estado === "nunca").length;
         return (
           <section key={g.id} aria-labelledby={`grupo-${g.id}`} className="overflow-hidden rounded-xl border border-border bg-card">
             <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
@@ -157,7 +160,7 @@ export function PanelDatos({ fuentes, usaExtension }: { fuentes: Fuente[]; usaEx
                 </h2>
                 <span className="text-xs text-muted-foreground">{g.subtitulo}</span>
               </div>
-              <span className="rounded-full bg-accent px-2.5 py-1 text-xs text-accent-foreground">{porRevisar ? `${porRevisar} por revisar de ${todas.length}` : "Todo al día"}</span>
+              <span className="rounded-full bg-accent px-2.5 py-1 text-xs text-accent-foreground">{porRevisar ? `${porRevisar} por revisar de ${todas.length}` : sinRegistro ? `${sinRegistro} sin registro de ${todas.length}` : "Todo al día"}</span>
             </div>
             <div className={`hidden gap-4 bg-muted px-4 py-2 text-[11px] font-semibold tracking-[0.04em] text-muted-foreground uppercase md:grid ${COLUMNAS}`} aria-hidden="true">
               <span>Fuente</span>

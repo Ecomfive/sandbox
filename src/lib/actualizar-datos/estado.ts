@@ -17,7 +17,7 @@ export const GRUPOS_FUENTE: { id: GrupoFuente; titulo: string; subtitulo: string
 
 /** Lo que se hace con el botón de la fila: correr la lectura desde aquí, abrir la pantalla donde se hace, o subir la Matriz aquí mismo. */
 export type AccionFuente =
-  | { tipo: "correr"; clave: "effi" | "shopify-productos" | "shopify-pedidos" | "monday" | "quickbooks" | "dropi-finanzas" | "meta"; texto: string; tiendas?: { id: string; nombre: string }[] }
+  | { tipo: "correr"; clave: "effi" | "shopify-productos" | "shopify-pedidos" | "shopify-ventas" | "monday" | "quickbooks" | "dropi-finanzas" | "meta"; texto: string; tiendas?: { id: string; nombre: string }[] }
   | { tipo: "matriz"; texto: string }
   | { tipo: "enlace"; href: string; texto: string };
 

@@ -209,7 +209,14 @@ export async function cargarFuentes(supabase: SupabaseClient, u: UsuarioActual):
         automatica: "Sola, todos los días 4:40 a. m.",
         requisito: "Y a mano cuando haga falta",
         donde: { texto: "Ventas › Pipeline", href: "/ventas-tiendas/pipeline" },
-        accion: todaLaEmpresa && escribe(u, "ventas-tiendas") && tiendas.length ? { tipo: "correr", clave: "shopify-pedidos", texto: "Sincronizar", tiendas } : null,
+        // Por tienda conectada en Pipeline; si las tiendas vienen de las apps de Shopify (sin conexión en Pipeline), la tarea programada para quien la
+        // puede correr (Tareas programadas).
+        accion:
+          todaLaEmpresa && escribe(u, "ventas-tiendas") && tiendas.length
+            ? { tipo: "correr", clave: "shopify-pedidos", texto: "Sincronizar", tiendas }
+            : escribe(u, "usuarios")
+              ? { tipo: "correr", clave: "shopify-ventas", texto: "Correr ahora" }
+              : null,
         corriendo: t.corriendo,
         conError,
       },
