@@ -9,6 +9,8 @@ import { getPaisActual } from "@/lib/pais";
 import { createServiceClient } from "@/lib/supabase/server";
 import { etiquetaDeModulo } from "@/lib/permisos/catalogo";
 import { AVISO_HERRAMIENTA, HERRAMIENTAS, correrHerramienta } from "@/lib/asistente/herramientas";
+import { limitar } from "@/lib/seguridad/limite";
+import { claveLimite, LIMITES, textoTopeAsistente } from "@/lib/seguridad/limite-reglas";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -53,6 +55,12 @@ export async function POST(request: Request) {
   const cuerpo = await request.json().catch(() => null);
   const entrada = leerMensajes((cuerpo as { mensajes?: unknown } | null)?.mensajes);
   if (!entrada) return Response.json({ error: "Conversación no válida." }, { status: 400 });
+  // Tope de preguntas por persona (seguridad · 19 nov 2026): cada pregunta cuesta. Primero la hora; la del día solo suma si pasó la hora.
+  for (const [regla, porDia] of [[LIMITES.asistenteHora, false], [LIMITES.asistenteDia, true]] as const) {
+    if (!(await limitar(claveLimite(porDia ? "asistente-dia" : "asistente-hora", usuario.id), regla))) {
+      return Response.json({ error: textoTopeAsistente(regla, porDia, Date.now()) }, { status: 429 });
+    }
+  }
 
   const pais = await getPaisActual(createServiceClient());
   // Lo de esta persona va después de lo fijo (no rompe la caché de la parte fija).

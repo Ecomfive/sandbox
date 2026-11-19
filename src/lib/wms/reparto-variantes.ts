@@ -64,5 +64,5 @@ export function revisarReparto(general: readonly StockGeneral[], lineas: readonl
  */
 export function mensajeErrorReparto(mensaje: string | null | undefined): string {
   const m = (mensaje ?? "").trim();
-  return /^(El reparto|En .+ hay que repartir|En .+ se pueden repartir|El stock general|Este producto no tiene|Una de las|Una variante|El producto no|Un producto con vencimiento|Después de repartir|La cantidad)/.test(m) ? m : "No se pudo hacer el reparto.";
+  return /^(El reparto|En .+ hay que repartir|En .+ se pueden repartir|El stock general|Este producto (no tiene|tiene variantes)|Una de las|Una variante|El producto no|Un producto con vencimiento|Después de repartir|La cantidad)/.test(m) ? m : "No se pudo hacer el reparto.";
 }

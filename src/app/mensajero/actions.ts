@@ -2,9 +2,11 @@
 
 import { resolverMensajero } from "@/lib/ventas/cargar-mensajero";
 import { guardarComprobante, permisoDeSubida } from "@/lib/ventas/comprobantes-servidor";
-import { accionesDelMensajero, cambioDeMensajero, type FaseMensajero } from "@/lib/ventas/mensajero";
+import { accionesDelMensajero, cambioDeMensajero, tokenPlausible, type FaseMensajero } from "@/lib/ventas/mensajero";
 import { moverFase } from "@/lib/ventas/mover-fase";
 import { createServiceClient } from "@/lib/supabase/server";
+import { ipDeLaPeticion, limitar } from "@/lib/seguridad/limite";
+import { claveLimite, DEMASIADAS_ACCIONES, LIMITES } from "@/lib/seguridad/limite-reglas";
 
 // Acciones de la web app del mensajero. No hay sesión: la puerta es su código secreto, y cada acción vuelve a comprobar que la orden
 // es suya y está en ruta (no se confía en lo que mande el navegador).
@@ -14,6 +16,10 @@ type Resultado = { error: string } | { ok: true; aviso?: string };
 const NO_VALE = "Este enlace ya no vale. Pide uno nuevo.";
 
 async function ordenDelMensajero(token: string, ordenId: string) {
+  // Tope de acciones por enlace e IP (seguridad · 19 nov 2026). Un código sin forma de código no llega a la base ni se cuenta.
+  if (tokenPlausible(token) && !(await limitar(claveLimite("mensajero", token, (await ipDeLaPeticion()) ?? "sin-ip"), LIMITES.mensajero))) {
+    return { error: DEMASIADAS_ACCIONES } as const;
+  }
   const sesion = await resolverMensajero(token);
   if (!sesion) return { error: NO_VALE } as const;
   if (!UUID.test(ordenId)) return { error: "Orden inválida." } as const;

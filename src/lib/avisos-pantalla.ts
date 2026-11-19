@@ -7,8 +7,10 @@
  *  - `llegada`: Llegada a Puerto (para Logística) y En Bodega (para quien paga) de Compras.
  *  - `remision`: remisiones, novedades de plataforma y correcciones de Inventario.
  *  - `adelanto`: un pedido confirmado de una zona de pago por adelantado (Confirmación con IA).
+ *  - `seguridad`: login frenado por muchas claves equivocadas, cuenta nueva o alguien más con la edición de Usuarios y roles (para quien
+ *    administra Usuarios y roles; seguridad · 19 nov 2026).
  */
-export const TIPOS_CON_AVISO_EN_PANTALLA: readonly string[] = ["llegada", "remision", "adelanto"];
+export const TIPOS_CON_AVISO_EN_PANTALLA: readonly string[] = ["llegada", "remision", "adelanto", "seguridad"];
 
 export const esAvisoDePantalla = (tipo: string): boolean => TIPOS_CON_AVISO_EN_PANTALLA.includes(tipo);
 

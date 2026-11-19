@@ -13,6 +13,9 @@ export async function middleware(request: NextRequest) {
   const cabeceras = new Headers(request.headers);
   cabeceras.set("x-nonce", nonce);
   cabeceras.set("content-security-policy", politica);
+  // La página que se pidió, para volver a ella tras la verificación en dos pasos (`irADosPasosSiFalta`, seguridad · 19 nov 2026).
+  // Se pisa siempre: una `x-ruta` que mande el navegador no llega a la página.
+  cabeceras.set("x-ruta", `${request.nextUrl.pathname}${request.nextUrl.search}`);
 
   const respuesta = await updateSession(request, cabeceras);
   // Mientras no se prenda `CSP_SCRIPTS_ESTRICTA`, el límite de scripts solo avisa (en la consola del navegador) y no bloquea:
