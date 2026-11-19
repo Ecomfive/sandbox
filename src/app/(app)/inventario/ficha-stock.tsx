@@ -19,7 +19,7 @@ import { usePuedeAbrir } from "@/components/modulos-contexto";
 import { ComprasProducto } from "../producto/compras-producto";
 import { FichaProductoEmbebida } from "../producto/ficha-producto-embebida";
 import { CorregirStock } from "./corregir-stock";
-import { PanelDefectuoso } from "./defectuoso";
+import { PanelDefectuoso, type BodegaDefectuosos, type OpcionDefectuoso } from "./defectuoso";
 import { NotasProducto } from "./notas-producto";
 import { ETIQUETA_TIPO_SKU, type FilaStock } from "./def-stock";
 import { DESCRIPCION_CUBETA } from "./descripciones-stock";
@@ -71,6 +71,24 @@ const valoresDe = (c: Cubetas): number[] => [c.fisico, c.reservado, c.disponible
 /** Lo de todo el producto (stock general más variantes) en las bodegas propias del país: es el número que ve la lista de Stock. */
 const totalPropias = (bodegas: StockBodega[], variantes: VarianteConStock[]): Cubetas =>
   sumarCubetas(...juntarConVariantes(bodegas.filter((b) => b.tipo !== "externa"), variantes).map((x) => x.total));
+
+/**
+ * A qué se le puede marcar defectuoso desde el botón de arriba: un producto simple, todas sus bodegas propias; un producto con variantes, cada variante con las bodegas donde tiene unidades (disponibles o ya
+ * marcadas) y, mientras su stock esté sin repartir, el stock general del principal.
+ */
+function opcionesDefectuoso(sku: SkuFicha, datos: { bodegas: StockBodega[]; variantes: VarianteConStock[] } | null): OpcionDefectuoso[] {
+  if (!datos) return [];
+  // El nombre y el tipo de cada bodega salen de las del producto principal (las variantes traen solo las cifras).
+  const propias = new Map(datos.bodegas.filter((b) => b.tipo !== "externa").map((b) => [b.bodegaId, b.nombre]));
+  const bodegasDe = (cifras: { bodegaId: string; disponible: number; danado: number }[], soloConUnidades: boolean): BodegaDefectuosos[] =>
+    cifras
+      .filter((b) => propias.has(b.bodegaId) && (!soloConUnidades || b.disponible > 0 || b.danado > 0))
+      .map((b) => ({ bodegaId: b.bodegaId, nombre: propias.get(b.bodegaId)!, disponible: b.disponible, danado: b.danado }));
+  if (!sku.conVariantes) return [{ skuId: sku.id, nombre: sku.nombre, bodegas: bodegasDe(datos.bodegas, false) }];
+  const deVariantes: OpcionDefectuoso[] = datos.variantes.map((v) => ({ skuId: v.id, nombre: v.etiqueta, bodegas: bodegasDe(v.bodegas, true) })).filter((o) => o.bodegas.length > 0);
+  const general: OpcionDefectuoso[] = sku.repartoPendiente ? [{ skuId: sku.id, nombre: "Stock general (sin repartir)", bodegas: bodegasDe(datos.bodegas, true) }].filter((o) => o.bodegas.length > 0) : [];
+  return [...deVariantes, ...general];
+}
 
 function cambiosATexto(cambios: Record<string, number>): string {
   return Object.entries(cambios)
@@ -205,12 +223,11 @@ export function FichaStock({
                   }}
                 />
               )}
-              {/* Defectuoso: marcar unidades que no se pueden vender, devolverlas a disponible o darlas de baja. No aplica a un producto con vencimiento ni al principal de variantes ya repartidas. */}
-              {puedeCorregir && !sku.manejaVencimiento && (!sku.conVariantes || sku.repartoPendiente) && (
+              {/* Defectuoso: marcar unidades que no se pueden vender, devolverlas a disponible o darlas de baja. En un producto con variantes se elige primero la variante (y el stock general mientras esté sin repartir). No aplica a un producto con vencimiento. */}
+              {puedeCorregir && !sku.manejaVencimiento && (
                 <PanelDefectuoso
                   key={`${sku.id}-defectuoso-${version}`}
-                  skuId={sku.id}
-                  bodegas={datos && datos !== "error" ? datos.bodegas.filter((b) => b.tipo !== "externa").map((b) => ({ bodegaId: b.bodegaId, nombre: b.nombre, disponible: b.disponible, danado: b.danado })) : []}
+                  opciones={opcionesDefectuoso(sku, datos && datos !== "error" ? datos : null)}
                   puedeBaja={puedeMoverAMano("salida", codigoPais, esAdmin)}
                   alGuardar={() => {
                     setVersion((v) => v + 1);
@@ -320,21 +337,34 @@ export function FichaStock({
                               <span className="sr-only">Incluido en el total de {b.nombre}: </span>
                               {p.nombre}
                               {p.general && <span className="ml-1.5 text-[11px]">sin repartir</span>}
-                              {/* Corregir el número de esa variante en esa bodega, sin salir de la ficha del principal (19 nov 2026, pedido de Jhokser). El stock general sin repartir es del propio principal. */}
+                              {/* Corregir el número de esa variante en esa bodega y marcar unidades defectuosas, sin salir de la ficha del principal (19 nov 2026, pedido de Jhokser). El stock general sin repartir es del propio principal. */}
                               {puedeCorregir && !sku.manejaVencimiento && b.tipo !== "externa" && (
-                                <CorregirStock
-                                  key={`${p.clave}-${b.bodegaId}-corregir-${version}`}
-                                  skuId={p.general ? sku.id : p.clave}
-                                  nombre={p.general ? "el stock general" : p.nombre}
-                                  enLinea
-                                  bodegas={[{ bodegaId: b.bodegaId, nombre: b.nombre, fisico: p.cubetas.fisico }]}
-                                  lotes={[]}
-                                  manejaVencimiento={false}
-                                  alGuardar={() => {
-                                    setVersion((v) => v + 1);
-                                    alCambiar();
-                                  }}
-                                />
+                                <span className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                                  <CorregirStock
+                                    key={`${p.clave}-${b.bodegaId}-corregir-${version}`}
+                                    skuId={p.general ? sku.id : p.clave}
+                                    nombre={p.general ? "el stock general" : p.nombre}
+                                    enLinea
+                                    bodegas={[{ bodegaId: b.bodegaId, nombre: b.nombre, fisico: p.cubetas.fisico }]}
+                                    lotes={[]}
+                                    manejaVencimiento={false}
+                                    alGuardar={() => {
+                                      setVersion((v) => v + 1);
+                                      alCambiar();
+                                    }}
+                                  />
+                                  <PanelDefectuoso
+                                    key={`${p.clave}-${b.bodegaId}-defectuoso-${version}`}
+                                    nombre={p.general ? "el stock general" : p.nombre}
+                                    enLinea
+                                    opciones={[{ skuId: p.general ? sku.id : p.clave, nombre: p.general ? "Stock general" : p.nombre, bodegas: [{ bodegaId: b.bodegaId, nombre: b.nombre, disponible: p.cubetas.disponible, danado: p.cubetas.danado }] }]}
+                                    puedeBaja={puedeMoverAMano("salida", codigoPais, esAdmin)}
+                                    alGuardar={() => {
+                                      setVersion((v) => v + 1);
+                                      alCambiar();
+                                    }}
+                                  />
+                                </span>
                               )}
                             </th>
                             {valoresDe(p.cubetas).map((n, i) => (
