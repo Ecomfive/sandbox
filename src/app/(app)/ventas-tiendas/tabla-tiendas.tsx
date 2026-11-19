@@ -13,7 +13,11 @@ import { COBERTURA_MINIMA } from "./formato";
 export interface FilaTienda extends Totales {
   id: string;
   tienda: string;
+  /** Unidades de producto entregadas en el mes; null sin la migración 0988. */
+  unidades: number | null;
 }
+
+const upp = (u: number | null, e: number) => (u === null || !e ? "—" : (u / e).toFixed(2));
 
 const DEF: DefTabla<FilaTienda> = {
   clave: "ventas-tiendas-por-tienda",
@@ -23,13 +27,14 @@ const DEF: DefTabla<FilaTienda> = {
     { id: "entregadas", etiqueta: "Entregadas", tipo: "numero", valor: (f) => f.entregadas },
     { id: "ventas", etiqueta: "Ventas entregadas", tipo: "numero", valor: (f) => f.ventas_entregadas },
     { id: "margen", etiqueta: "Margen bruto", tipo: "numero", valor: (f) => f.margen_bruto },
+    { id: "upp", etiqueta: "Unidades por pedido", tipo: "numero", valor: (f) => (f.unidades === null || !f.entregadas ? null : f.unidades / f.entregadas) },
   ],
 };
 const NOMBRE: NombreFilas = { singular: "tienda", plural: "tiendas" };
-const ICONOS: Record<string, IconoComp> = { tienda: TiendaIcon, ordenes: PedidoIcon, entregadas: EnvioIcon, ventas: GastoIcon, margen: GastoIcon };
+const ICONOS: Record<string, IconoComp> = { upp: PedidoIcon, tienda: TiendaIcon, ordenes: PedidoIcon, entregadas: EnvioIcon, ventas: GastoIcon, margen: GastoIcon };
 
 /** El total de una columna recalculado sobre las filas que se ven (las tasas no se suman ni se promedian). */
-const tot = (f: (t: Totales) => string) => (filas: FilaTienda[]) => f(sumar(filas.map((x) => ({ ...x, periodo: "", unidad_id: x.id }))));
+const tot = (f: (t: Totales) => string) => (filas: FilaTienda[]) => f(sumar(filas.map(({ unidades: _u, ...x }) => ({ ...x, periodo: "", unidad_id: x.id }))));
 
 const COLUMNAS: ColumnaTabla<FilaTienda, null>[] = [
   { id: "tienda", label: "Tienda", ocultable: false, clase: "whitespace-nowrap font-medium", render: (f) => f.tienda },
@@ -47,6 +52,14 @@ const COLUMNAS: ColumnaTabla<FilaTienda, null>[] = [
   },
   { id: "tasa", label: "Tasa de entrega", ocultable: true, clase: "text-right tabular-nums", render: (f) => fraccion(f.tasa_entrega), total: tot((t) => fraccion(t.tasa_entrega)) },
   { id: "ventas", label: "Ventas entregadas", ocultable: false, clase: "text-right tabular-nums whitespace-nowrap", render: (f) => dinero(f.ventas_entregadas), total: tot((t) => dinero(t.ventas_entregadas)) },
+  {
+    id: "upp",
+    label: "Unidades por pedido",
+    ocultable: true,
+    clase: "text-right tabular-nums",
+    render: (f) => upp(f.unidades, f.entregadas),
+    total: (filas) => upp(filas.some((f) => f.unidades !== null) ? filas.reduce((a, f) => a + (f.unidades ?? 0), 0) : null, filas.reduce((a, f) => a + f.entregadas, 0)),
+  },
   { id: "ticket", label: "Ticket", ocultable: true, clase: "text-right tabular-nums whitespace-nowrap", render: (f) => dinero2(f.ticket_promedio), total: tot((t) => dinero2(t.ticket_promedio)) },
   { id: "costo", label: "Costo mercancía", ocultable: true, clase: "text-right tabular-nums whitespace-nowrap text-muted-foreground", render: (f) => dinero(f.costo_mercancia), total: tot((t) => dinero(t.costo_mercancia)) },
   { id: "envio", label: "Envío", ocultable: true, clase: "text-right tabular-nums whitespace-nowrap text-muted-foreground", render: (f) => dinero(f.costo_envio), total: tot((t) => dinero(t.costo_envio)) },

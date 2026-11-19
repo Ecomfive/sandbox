@@ -196,6 +196,7 @@ export const MIGRACIONES_CLAVE: { migracion: string; que: string; prueba: Prueba
   { migracion: "0985", que: "Costo de financiamiento por OC (tasa de los financistas) y paquetes extraviados en el libro", prueba: { tipo: "columna", nombre: "fin_grupo_partes", columna: "tasa_ciclo" } },
   { migracion: "0986", que: "Nota interna, plantillas de reparto, reglas que concilian solas, redondeo bancario y aviso de cuentas sin conciliar", prueba: { tipo: "columna", nombre: "fin_movimientos", columna: "nota_interna" } },
   { migracion: "0987", que: "Costo vigente por último lote o promedio de 12 meses, costos desde Compras y alerta de costo que sube", prueba: { tipo: "columna", nombre: "fin_costo_vigente", columna: "costo_promedio_12m" } },
+  { migracion: "0988", que: "Ventas por tienda: ventas por día, por día de la semana y hora, y unidades por pedido", prueba: { tipo: "funcion", nombre: "ven_ventas_diarias" } },
 ];
 
 /** Lo que se muestra de una prueba («Falta …»). */

@@ -4,15 +4,17 @@ import { GraficaBarrasAF4 } from "@/components/af4/graficas-af4";
 import { FilaKpiAF4, KpiAF4, type ComparacionKpi } from "@/components/af4/kpi-af4";
 import { RecordarTienda } from "@/components/tienda-global/recordar-tienda";
 import { Pagina } from "@/components/ui/pagina";
-import { mesCorto } from "@/lib/af4/fecha";
+import { hoyPanama, mesCorto, sumarMeses } from "@/lib/af4/fecha";
 import { dinero, dineroKpi, entero, fraccion } from "@/lib/af4/formato";
 import { calcularVariacion } from "@/lib/af4/variacion";
 import { requireModulo } from "@/lib/auth";
 import { paramsConTienda } from "@/lib/finanzas/tienda-actual";
 import { conTiendaExplicita, TODAS_TIENDAS } from "@/lib/finanzas/tienda-elegida";
 import { createServiceClient } from "@/lib/supabase/server";
+import { delVendidoAlBanco, parteEntregadaDe, patronSemana, proyectarMes, resumenDropi, unidadesPorPedido } from "@/lib/ventas/patrones";
 import { agrupar, sumar, type Totales } from "@/lib/ventas/resumen";
-import { cargarDatosPagina } from "./datos";
+import { cargarDatosPagina, cargarExtras } from "./datos";
+import { BloqueDeposito, BloqueDropi, BloquePatron, BloqueProyeccion } from "./extras-ventas";
 import { COBERTURA_MINIMA } from "./formato";
 import { FiltrosVentas, conFiltros } from "./selector";
 import { TablaTiendas, type FilaTienda } from "./tabla-tiendas";
@@ -58,12 +60,15 @@ export default async function VentasTiendasPage({
   }
 
   const deTienda = tienda ? resumen.filter((r) => r.unidad_id === tienda.id) : resumen;
+  const ids = tienda ? [tienda.id] : datos.veTodo ? null : datos.unidades.map((u) => u.id);
+  const extras = await cargarExtras(supabase, { mes, ids, unidades: datos.unidades, veTodo: datos.veTodo });
   const t = sumar(deTienda.filter((r) => r.periodo === mes));
   const porMes = agrupar(deTienda, (r) => r.periodo);
   const filasTienda: FilaTienda[] = [...agrupar(resumen.filter((r) => r.periodo === mes), (r) => r.unidad_id)].map(([id, x]) => ({
     id,
     tienda: datos.unidades.find((u) => u.id === id)?.nombre ?? "—",
     ...x,
+    unidades: extras.unidades ? (extras.unidades.get(id) ?? 0) : null,
   }));
   // La tienda va siempre explícita (también «todas»): sin ella la página arranca con la global.
   const elegida = tienda?.id ?? TODAS_TIENDAS;
@@ -75,14 +80,42 @@ export default async function VentasTiendasPage({
   const mesAnterior = [...porMes.keys()].filter((m) => m < mes).sort().at(-1);
   const previo: Totales | undefined = mesAnterior ? porMes.get(mesAnterior) : undefined;
   const contra = mesAnterior ? mesCorto(mesAnterior) : "";
-  const vs = (actual: number, antes: number | undefined): ComparacionKpi[] =>
-    previo && antes !== undefined ? [{ v: calcularVariacion(actual, antes), contra }] : [];
-  const vsTasa = (actual: number | null, antes: number | null | undefined): ComparacionKpi[] =>
-    previo && actual !== null && antes !== null && antes !== undefined ? [{ v: calcularVariacion(actual * 100, antes * 100), contra, modo: "puntos" }] : [];
+  // El mismo mes del año anterior (mejora 49), si tuvo órdenes.
+  const pasado = extras.anioAnterior.length ? sumar(extras.anioAnterior) : undefined;
+  const contraPasado = mesCorto(sumarMeses(mes, -12));
+  const vs = (f: (x: Totales) => number): ComparacionKpi[] => [
+    ...(previo ? [{ v: calcularVariacion(f(t), f(previo)), contra }] : []),
+    ...(pasado ? [{ v: calcularVariacion(f(t), f(pasado)), contra: contraPasado }] : []),
+  ];
+  const vsTasa = (f: (x: Totales) => number | null): ComparacionKpi[] => {
+    const a = f(t);
+    if (a === null) return [];
+    const p = previo ? f(previo) : null;
+    const q = pasado ? f(pasado) : null;
+    return [
+      ...(p !== null ? [{ v: calcularVariacion(a * 100, p * 100), contra, modo: "puntos" as const }] : []),
+      ...(q !== null ? [{ v: calcularVariacion(a * 100, q * 100), contra: contraPasado, modo: "puntos" as const }] : []),
+    ];
+  };
   const serie = (f: (x: Totales) => number) => {
     const ordenados = [...porMes].sort(([a], [b]) => a.localeCompare(b)).filter(([m]) => m <= mes);
     return ordenados.length > 1 ? ordenados.map(([, x]) => f(x)) : undefined;
   };
+  // Unidades por pedido entregado (mejora 46).
+  const unidadesMes = extras.unidades ? [...extras.unidades.entries()].filter(([id]) => !tienda || id === tienda.id).reduce((a, [, v]) => a + v, 0) : null;
+  const upp = unidadesMes === null ? null : unidadesPorPedido(unidadesMes, t.entregadas);
+  // Proyección del mes en curso (mejora 48): la parte entregada sale de los tres meses cerrados anteriores.
+  const hoy = hoyPanama();
+  let proyeccion = null;
+  if (extras.diarios) {
+    const cerrados = [1, 2, 3].map((k) => sumarMeses(mes, -k));
+    const vendido = extras.diarios.filter((d) => cerrados.includes(`${d.fecha.slice(0, 7)}-01`)).reduce((a, d) => a + d.ventas, 0);
+    const entregado = cerrados.reduce((a, m) => a + (porMes.get(m)?.ventas_entregadas ?? 0), 0);
+    proyeccion = proyectarMes(extras.diarios, mes, hoy, parteEntregadaDe(vendido, entregado));
+  }
+  const patron = extras.semana ? patronSemana(extras.semana.filas, extras.semana.desde, extras.semana.hasta) : null;
+  const deposito = extras.cod ? delVendidoAlBanco(extras.cod) : null;
+  const dropi = extras.dropi ? resumenDropi(extras.dropi) : null;
   const costoIncompleto = t.cobertura_costo !== null && t.cobertura_costo < COBERTURA_MINIMA;
   const contexto = `${tienda?.nombre ?? "Todas las tiendas"} · USD`;
 
@@ -109,7 +142,7 @@ export default async function VentasTiendasPage({
           titulo="Ventas entregadas"
           destacado
           valor={dineroKpi(t.ventas_entregadas)}
-          comparaciones={vs(t.ventas_entregadas, previo?.ventas_entregadas)}
+          comparaciones={vs((x) => x.ventas_entregadas)}
           serie={serie((x) => x.ventas_entregadas)}
           subtexto={`Ticket ${dinero(t.ticket_promedio, "USD", { decimales: 2 })}`}
         />
@@ -117,31 +150,33 @@ export default async function VentasTiendasPage({
           titulo="Margen bruto"
           tono={costoIncompleto ? "warning" : t.margen_bruto < 0 ? "destructive" : "neutral"}
           valor={dineroKpi(t.margen_bruto)}
-          comparaciones={vs(t.margen_bruto, previo?.margen_bruto)}
+          comparaciones={vs((x) => x.margen_bruto)}
           subtexto={`${fraccion(t.margen_pct)} de las ventas · costo en ${fraccion(t.cobertura_costo)} de las líneas`}
           href="/ventas-tiendas/cuadre"
         />
         <KpiAF4
           titulo="Tasa de entrega"
           valor={fraccion(t.tasa_entrega)}
-          comparaciones={vsTasa(t.tasa_entrega, previo?.tasa_entrega)}
+          comparaciones={vsTasa((x) => x.tasa_entrega)}
           subtexto={`${fraccion(t.tasa_sobre_ordenes)} sobre todas las órdenes`}
         />
         <KpiAF4
           titulo="Órdenes"
           valor={entero(t.ordenes)}
-          comparaciones={vs(t.ordenes, previo?.ordenes)}
+          comparaciones={vs((x) => x.ordenes)}
           subtexto={`${entero(t.canceladas + t.no_gestionadas)} canceladas o sin gestionar`}
           href={ordenes()}
         />
         <KpiAF4
           titulo="Entregadas"
           valor={entero(t.entregadas)}
-          comparaciones={vs(t.entregadas, previo?.entregadas)}
-          subtexto={`${entero(t.devueltas)} devueltas · ${entero(t.en_transito + t.pendientes)} sin cerrar`}
+          comparaciones={vs((x) => x.entregadas)}
+          subtexto={`${entero(t.devueltas)} devueltas · ${entero(t.en_transito + t.pendientes)} sin cerrar${upp !== null ? ` · ${upp.toFixed(2)} unidades por pedido` : ""}`}
           href={ordenes("entregada")}
         />
       </FilaKpiAF4>
+
+      {proyeccion && <BloqueProyeccion p={proyeccion} mes={mes} anioAnterior={pasado ? pasado.ventas_entregadas : null} />}
 
       <GraficaBarrasAF4
         id="grafica-ventas"
@@ -163,6 +198,10 @@ export default async function VentasTiendasPage({
         </h2>
         <TablaTiendas filas={filasTienda} mes={mes} />
       </section>
+
+      {deposito && <BloqueDeposito d={deposito} mes={mes} />}
+      {dropi && <BloqueDropi r={dropi} mes={mes} ventasTiendas={t.ventas_entregadas} />}
+      {patron && extras.semana && <BloquePatron patron={patron} desde={extras.semana.desde} hasta={extras.semana.hasta} contexto={contexto} />}
     </Pagina>
   );
 }
