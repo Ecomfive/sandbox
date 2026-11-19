@@ -1966,12 +1966,13 @@ export const GUIAS: GuiaModulo[] = [
   {
     modulo: "tienda-cuanto-hay",
     titulo: "Preguntar cuánto hay",
-    ruta: "/tienda-pedidos/cuanto-hay",
+    ruta: "/inventario-pedidos-despacho/cuanto-hay",
     resumen: "Para saber cuánto hay de un producto sin mandar mensajes: la tienda pregunta y Yiletsi responde con lo que contó despacho.",
     secciones: [
       {
         titulo: "Uso",
         pasos: [
+          "Está en Fulfillment › Comunicación despacho, pestaña «Cuánto hay» (antes estaba en Pedidos de tienda). La ve quien tiene el permiso «Preguntar cuánto hay», aunque no tenga Solicitudes de despacho.",
           "En «Producto» escribe parte del nombre, el SKU o el N.º y elige el producto (o la variante: color, talla) de la lista. Solo salen los productos del catálogo; los combos no, porque se cuenta cada producto.",
           "Si quieres, escribe una nota para despacho (por ejemplo, «es para un cambio, cliente esperando») y pulsa «Preguntar». Si manejas más de una tienda, primero eliges la tienda.",
           "Abajo están tus preguntas. La columna «Hay» dice «Esperando a Yiletsi» hasta que responde; después sale la cantidad, quién respondió y cuándo. También te llega el aviso en «Para ti».",
@@ -2241,6 +2242,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-11-19", titulo: "«Cuánto hay» pasó a Comunicación despacho", texto: "Preguntar cuánto hay ya no está en Pedidos de tienda: ahora es la pestaña «Cuánto hay» de Fulfillment › Comunicación despacho, al lado de «Solicitudes de despacho». Funciona igual y la ve quien tenía el permiso, aunque no tenga Solicitudes de despacho. Los avisos y favoritos viejos llevan a la página nueva.", modulo: "tienda-cuanto-hay", href: "/inventario-pedidos-despacho/cuanto-hay" },
   { fecha: "2026-11-19", titulo: "«Pedidos de despacho» ahora es «Comunicación despacho»", texto: "En Fulfillment, la entrada «Pedidos de despacho» se llama ahora «Comunicación despacho», y su página, «Solicitudes de despacho»: arriba se lee «Comunicación despacho › Solicitudes de despacho». Es lo mismo de antes, lo que despacho le pide a inventario; solo cambió el nombre. Los enlaces y favoritos siguen funcionando.", modulo: "inventario-pedidos-despacho", href: "/inventario-pedidos-despacho" },
   { fecha: "2026-11-18", titulo: "Anuncios Meta: los videos nuevos se analizan solos", texto: "Después de cada lectura automática de Meta (tres al día) el sistema hace una pasada solo de videos: la IA ve hasta 6 videos nuevos o por completar y saca ángulo, gancho, estructura y llamado a la acción, sin que nadie pulse nada. «Analizar los pendientes» queda para adelantarse o para ponerse al día de una vez.", modulo: "anuncios-meta", href: "/anuncios-meta/videos" },
   { fecha: "2026-11-18", titulo: "Anuncios Meta: la IA analiza todos los videos del historial", texto: "Los videos que quedaban sin analizar eran los de hace más de 30 días: el análisis automático y «Analizar los pendientes» solo miraban el último mes. Ahora cuentan todo el historial leído (de más a menos gasto) y el sistema los va analizando solo, cada 10 minutos, hasta ponerse al día. «Analizar los pendientes» queda siempre a la vista para adelantarse, y «Volver a analizar con IA» en la ficha de un video ahora muestra su barra de avance.", modulo: "anuncios-meta", href: "/anuncios-meta/videos" },

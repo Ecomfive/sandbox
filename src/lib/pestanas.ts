@@ -18,7 +18,11 @@ export const PESTANAS_POR_MODULO: Record<string, Pestana[]> = {
     { etiqueta: "Confirmación", href: "/tienda-pedidos/confirmacion" },
     { etiqueta: "Confirmación con IA", href: "/tienda-pedidos/confirmacion/ia" },
     { etiqueta: "Logística", href: "/tienda-pedidos/logistica" },
-    { etiqueta: "Cuánto hay", href: "/tienda-pedidos/cuanto-hay" },
+  ],
+  // Comunicación despacho (19 nov 2026, pedido de Hernán): lo que se le pide a despacho; «Preguntar cuánto hay» vino de Pedidos de tienda.
+  "/inventario-pedidos-despacho": [
+    { etiqueta: "Solicitudes de despacho", href: "/inventario-pedidos-despacho" },
+    { etiqueta: "Cuánto hay", href: "/inventario-pedidos-despacho/cuanto-hay" },
   ],
   // Despacho ciudad, como el panel de Monday: el día de hoy y, al lado, devoluciones, cambios y reembolsos, y lo demás de despacho.
   "/despacho-ciudad": [

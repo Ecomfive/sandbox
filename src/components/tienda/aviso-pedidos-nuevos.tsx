@@ -15,7 +15,7 @@ import { CerrarIcon, PedidoIcon, SilencioIcon, SonidoIcon } from "@/lib/nav-icon
  */
 const PAGINAS_DEL_AVISO = ["/tienda-pedidos", "/tienda-pedidos/logistica", "/despacho-ciudad", "/despacho-ciudad/devoluciones"];
 /** Las pestañas de esos paneles que no son de pedidos por despachar (17 nov 2026: ahora cuelgan de Pedidos y de Despacho ciudad). */
-const PESTANAS_SIN_AVISO = ["/tienda-pedidos/confirmacion", "/tienda-pedidos/cuanto-hay", "/despacho-ciudad/cambios", "/despacho-ciudad/cuanto-hay", "/despacho-ciudad/pedir-inventario"];
+const PESTANAS_SIN_AVISO = ["/tienda-pedidos/confirmacion", "/despacho-ciudad/cambios", "/despacho-ciudad/cuanto-hay", "/despacho-ciudad/pedir-inventario"];
 
 const enRuta = (ruta: string, p: string) => ruta === p || ruta.startsWith(`${p}/`);
 

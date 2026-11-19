@@ -276,7 +276,10 @@ export const PESTANAS_CON_MODULO: Record<string, { href: string; modulo: string 
     { href: "/tienda-pedidos/confirmacion", modulo: "tienda-confirmacion" },
     { href: "/tienda-pedidos/confirmacion/ia", modulo: "tienda-confirmacion" },
     { href: "/tienda-pedidos/logistica", modulo: "tienda-logistica" },
-    { href: "/tienda-pedidos/cuanto-hay", modulo: "tienda-cuanto-hay" },
+  ],
+  "/inventario-pedidos-despacho": [
+    { href: "/inventario-pedidos-despacho", modulo: "inventario-pedidos-despacho" },
+    { href: "/inventario-pedidos-despacho/cuanto-hay", modulo: "tienda-cuanto-hay" },
   ],
   "/despacho-ciudad": [
     { href: "/despacho-ciudad", modulo: "despacho-ciudad" },

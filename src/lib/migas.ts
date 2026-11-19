@@ -42,7 +42,7 @@ const SUBPAGINAS: Record<string, string> = {
   "/tienda-pedidos/confirmacion": "Confirmación",
   "/tienda-pedidos/confirmacion/ia": "Confirmación con IA",
   "/tienda-pedidos/logistica": "Logística",
-  "/tienda-pedidos/cuanto-hay": "Preguntar cuánto hay",
+  "/inventario-pedidos-despacho/cuanto-hay": "Preguntar cuánto hay",
   "/despacho-ciudad/devoluciones": "Devoluciones",
   "/despacho-ciudad/cambios": "Cambios y reembolsos",
   "/despacho-ciudad/cuanto-hay": "Responder cuánto hay",
