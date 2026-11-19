@@ -127,7 +127,7 @@ const AREAS: NavSection[] = [
       { label: "Tiendas Shopify", href: "/tienda-tiendas", frente: "tienda" },
       { label: "Alertas de inventario", href: "/alertas", dropi: true, frente: "fulfillment" },
       { label: "Inventario", href: "/inventario", dropi: true, frente: "fulfillment" },
-      { label: "Pedidos de despacho", href: "/inventario-pedidos-despacho", frente: "fulfillment" },
+      { label: "Comunicación con despacho", href: "/inventario-pedidos-despacho", frente: "fulfillment" },
       { label: "Bodegas", href: "/wms-bodegas", frente: "fulfillment" },
       { label: "Ubicaciones", href: "/wms-ubicaciones", frente: "fulfillment" },
       { label: "Compras", href: "/compras", frente: "fulfillment" },

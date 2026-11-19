@@ -203,6 +203,14 @@ function modulosDeNav(areas: NavSection[]): ModuloDeNav[] {
   return lista;
 }
 
+/**
+ * El nombre de la página principal de un módulo cuando no es el mismo del menú (19 nov 2026, pedido de Hernán): el menú dice «Comunicación con despacho» y
+ * arriba se lee «Comunicación con despacho › Solicitudes de despacho».
+ */
+const PAGINA_PRINCIPAL: Record<string, string> = {
+  "/inventario-pedidos-despacho": "Solicitudes de despacho",
+};
+
 function rutaDeModulo(modulo: ModuloDeNav, conEnlace: boolean): Miga[] {
   return [{ etiqueta: modulo.seccion }, { etiqueta: modulo.label, ...(conEnlace ? { href: modulo.href } : {}) }];
 }
@@ -248,8 +256,9 @@ export function construirMigas(
 
   const exacto = modulos.find((m) => m.href === ruta);
   if (exacto) {
+    const pagina = PAGINA_PRINCIPAL[exacto.href];
     return {
-      migas: rutaDeModulo(exacto, false),
+      migas: pagina ? [...rutaDeModulo(exacto, true), { etiqueta: pagina }] : rutaDeModulo(exacto, false),
       favoritoHref: exacto.href,
       moduloHref: exacto.href,
       moduloEtiqueta: exacto.label,

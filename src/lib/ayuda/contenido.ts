@@ -2017,9 +2017,9 @@ export const GUIAS: GuiaModulo[] = [
   },
   {
     modulo: "inventario-pedidos-despacho",
-    titulo: "Pedidos de despacho",
+    titulo: "Comunicación con despacho",
     ruta: "/inventario-pedidos-despacho",
-    resumen: "Lo que despacho le pide a inventario: se pone en proceso, se escribe cuánto se envía y «Enviar» hace el traslado a la bodega de despacho.",
+    resumen: "Solicitudes de despacho: lo que despacho le pide a inventario. Se pone en proceso, se escribe cuánto se envía y «Enviar» hace el traslado a la bodega de despacho.",
     secciones: [
       {
         titulo: "Uso",
@@ -2241,6 +2241,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-11-19", titulo: "«Pedidos de despacho» ahora es «Comunicación con despacho»", texto: "En Fulfillment, la entrada «Pedidos de despacho» se llama ahora «Comunicación con despacho», y su página, «Solicitudes de despacho»: arriba se lee «Comunicación con despacho › Solicitudes de despacho». Es lo mismo de antes, lo que despacho le pide a inventario; solo cambió el nombre. Los enlaces y favoritos siguen funcionando.", modulo: "inventario-pedidos-despacho", href: "/inventario-pedidos-despacho" },
   { fecha: "2026-11-18", titulo: "Anuncios Meta: los videos nuevos se analizan solos", texto: "Después de cada lectura automática de Meta (tres al día) el sistema hace una pasada solo de videos: la IA ve hasta 6 videos nuevos o por completar y saca ángulo, gancho, estructura y llamado a la acción, sin que nadie pulse nada. «Analizar los pendientes» queda para adelantarse o para ponerse al día de una vez.", modulo: "anuncios-meta", href: "/anuncios-meta/videos" },
   { fecha: "2026-11-18", titulo: "Anuncios Meta: la IA analiza todos los videos del historial", texto: "Los videos que quedaban sin analizar eran los de hace más de 30 días: el análisis automático y «Analizar los pendientes» solo miraban el último mes. Ahora cuentan todo el historial leído (de más a menos gasto) y el sistema los va analizando solo, cada 10 minutos, hasta ponerse al día. «Analizar los pendientes» queda siempre a la vista para adelantarse, y «Volver a analizar con IA» en la ficha de un video ahora muestra su barra de avance.", modulo: "anuncios-meta", href: "/anuncios-meta/videos" },
   { fecha: "2026-11-18", titulo: "Anuncios Meta: el CPA tope por producto se puede plegar", texto: "En Anuncios Meta › Cuentas, la lista de CPA tope por producto ahora aparece cerrada y se abre o se cierra pulsando su título, que dice cuántos productos ya tienen tope definido. Así la pantalla de Cuentas no se hace tan larga.", modulo: "anuncios-meta", href: "/anuncios-meta/cuentas" },

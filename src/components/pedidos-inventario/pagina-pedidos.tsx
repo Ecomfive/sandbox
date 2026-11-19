@@ -43,7 +43,7 @@ export async function PaginaPedidos({ modo, usuario, estado }: { modo: "despacho
 
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-4">
-      <EncabezadoPagina titulo={modo === "despacho" ? "Pedir a inventario" : "Pedidos de despacho"} oculto>
+      <EncabezadoPagina titulo={modo === "despacho" ? "Pedir a inventario" : "Solicitudes de despacho"} oculto>
         {modo === "despacho"
           ? "Pide a inventario lo que se agotó en despacho. Te avisa en «Para ti» cuando lo prepara y cuando lo envía; al llegar, márcalo «Recibido»."
           : "Lo que despacho le pide a inventario: ponlo en proceso, escribe cuánto envías, elige de qué bodega sale y «Enviar» hace el traslado a despacho."}

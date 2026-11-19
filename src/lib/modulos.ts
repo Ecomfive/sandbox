@@ -64,7 +64,7 @@ export const MODULOS: Modulo[] = [
   { clave: "tienda-cuanto-hay", etiqueta: "Preguntar cuánto hay (Gestión de tienda)" },
   { clave: "despacho-cuanto-hay", etiqueta: "Responder cuánto hay (Gestión de tienda)" },
   { clave: "despacho-pedir-inventario", etiqueta: "Pedir a inventario (Gestión de tienda)" },
-  { clave: "inventario-pedidos-despacho", etiqueta: "Pedidos de despacho (Inventario)" },
+  { clave: "inventario-pedidos-despacho", etiqueta: "Comunicación con despacho (Inventario)" },
   { clave: "tienda-productos", etiqueta: "Productos de Shopify (Gestión de tienda)" },
   { clave: "tienda-tiendas", etiqueta: "Tiendas Shopify (Gestión de tienda)" },
   { clave: "filtro-productos", etiqueta: "Filtro de productos" },
