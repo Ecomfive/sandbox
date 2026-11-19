@@ -19,7 +19,7 @@ import { motivoDeAdelanto, zonasDeAdelanto } from "./adelanto";
 import { combinar, etiquetaDeZona, faltaParaCliente, leerRespuesta, mensajePagoAdelantado, mensajePedirDetalle, type Combinado, type EstadoAnalisis, type ResultadoModelo } from "./combinar";
 import { armarEntrada, type EjemploPrompt } from "./prompt";
 import { resultadoFinal, seleccionarEjemplos, type RevisionPedido, type ResultadoPedido } from "./revision";
-import { coincidencias, normalizarTexto, zonaPorReglas, type ReglaZona, type Zona } from "./zonas";
+import { coincidencias, normalizarTexto, permiteAdelanto, zonaPorReglas, type ReglaZona, type Zona } from "./zonas";
 
 export const SIN_MIGRACION_CONFIRMACION = "Falta correr la migración 0300 (confirmación con IA) en Supabase.";
 /** Cuántos mensajes se le piden a un mismo pedido (el primero y, si contesta pero sigue incompleta, uno más). */
@@ -199,11 +199,13 @@ export async function enviarMensajeDato(supabase: SupabaseClient, ordenId: strin
   return pedirDatoPorWhatsapp(supabase, o, texto);
 }
 
-async function pedirAlModelo(proveedor: ProveedorIA, entrada: ReturnType<typeof armarEntrada>, numero: string | null): Promise<ResultadoModelo> {
+async function pedirAlModelo(proveedor: ProveedorIA, entrada: ReturnType<typeof armarEntrada>, numero: string | null, conAdelanto = true): Promise<ResultadoModelo> {
   const r = await pedirIAEn(proveedor, entrada, { operacion: "confirmacion_direccion", modulo: "tienda-confirmacion", referencia: numero });
   if ("error" in r) return { proveedor, ok: false, error: r.error };
   const respuesta = leerRespuesta(r.texto);
-  return respuesta ? { proveedor, ok: true, respuesta } : { proveedor, ok: false, error: "La respuesta no se pudo leer." };
+  if (!respuesta) return { proveedor, ok: false, error: "La respuesta no se pudo leer." };
+  // En un país sin pago por adelantado (Costa Rica) esa respuesta no existe: se toma como «no sé» y el pedido queda para que lo decida el equipo.
+  return { proveedor, ok: true, respuesta: respuesta.zona === "adelantado" && !conAdelanto ? { ...respuesta, zona: "no_se" } : respuesta };
 }
 
 /**
@@ -236,7 +238,7 @@ export async function evaluarDireccion(
         tendencia = t ? textoTendencia(t) : null;
       }
       const entrada = armarEntrada({ paisNombre: d.paisNombre, distingueZona: config.distingueZona, reglas, ejemplos, direccion, ciudad, coincidencias: coinc, instruccionesExtra: config.instrucciones, geografia: config.distingueZona ? geografiaDe(d.paisCodigo) : null, tendencia });
-      modelos = await Promise.all(proveedores.map((p) => pedirAlModelo(p, entrada, d.numero)));
+      modelos = await Promise.all(proveedores.map((p) => pedirAlModelo(p, entrada, d.numero, permiteAdelanto(d.paisCodigo))));
     }
   }
   return { combinado: combinar({ distingueZona: config.distingueZona, zonaReglas: porReglas.zona, modelos }), modelos, coinc };

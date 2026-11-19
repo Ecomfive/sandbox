@@ -1,13 +1,14 @@
 "use client";
 
+import { textosCiudad } from "@/lib/confirmacion-ia/textos-pais";
 import { useState } from "react";
 import { Pastilla } from "@/components/panel/piezas-panel";
 import { anilloFoco, fieldClass, labelClass } from "@/components/ui/field";
 import { FALTAS_RAPIDAS, type DecisionRevision } from "@/lib/confirmacion-ia/revision";
 import type { FilaAnalisis } from "@/lib/confirmacion-ia/servidor";
-import { NOMBRE_ZONA } from "@/lib/confirmacion-ia/zonas";
 import { tiempoEsperando } from "@/lib/tienda/confirmacion";
 import { LineaModelo } from "./lineas-modelo";
+import { useZonasPais } from "./zonas-pais";
 
 /** Guarda lo que marcó la persona; devuelve el error en palabras (o null si quedó). */
 export type AlElegir = (f: FilaAnalisis, d: DecisionRevision) => Promise<string | null>;
@@ -20,6 +21,8 @@ const CHIP = `inline-flex min-h-9 items-center rounded-full border border-border
  * sistema ya había propuesto algo, «Está bien». Un toque guarda; lo marcado manda sobre lo que dijo la IA y le enseña para la próxima vez.
  */
 export function BotonesVeredicto({ f, distingueZona, puedeConfirmar, alElegir }: { f: FilaAnalisis; distingueZona: boolean; puedeConfirmar: boolean; alElegir: AlElegir }) {
+  const { nombres, conAdelanto, codigo } = useZonasPais();
+  const textos = textosCiudad(codigo);
   const [faltando, setFaltando] = useState(false);
   const [otro, setOtro] = useState("");
   const [ciudad, setCiudad] = useState(f.ciudad ?? "");
@@ -45,8 +48,8 @@ export function BotonesVeredicto({ f, distingueZona, puedeConfirmar, alElegir }:
     <div className="flex flex-col gap-3">
       {pedirCiudad && (
         <label className="flex flex-col gap-1 sm:max-w-xs">
-          <span className={labelClass}>Ciudad o corregimiento *</span>
-          <input value={ciudad} maxLength={120} onChange={(e) => setCiudad(e.target.value)} placeholder="Ej: Bella Vista" className={fieldClass} />
+          <span className={labelClass}>{textos.campo} *</span>
+          <input value={ciudad} maxLength={120} onChange={(e) => setCiudad(e.target.value)} placeholder={textos.ejemploCiudad} className={fieldClass} />
           <span className="text-xs text-muted-foreground">El pedido no la trae: escríbela para marcarlo completo.</span>
         </label>
       )}
@@ -54,14 +57,16 @@ export function BotonesVeredicto({ f, distingueZona, puedeConfirmar, alElegir }:
         {distingueZona ? (
           <>
             <button type="button" disabled={enviando || (pedirCiudad && sinCiudad)} onClick={() => completa("ciudad")} className={BOTON}>
-              Completa · {NOMBRE_ZONA.ciudad}
+              Completa · {nombres.ciudad}
             </button>
             <button type="button" disabled={enviando || (pedirCiudad && sinCiudad)} onClick={() => completa("interior")} className={BOTON}>
-              Completa · {NOMBRE_ZONA.interior}
+              Completa · {nombres.interior}
             </button>
-            <button type="button" disabled={enviando || (pedirCiudad && sinCiudad)} onClick={() => completa("adelantado")} className={BOTON}>
-              Completa · {NOMBRE_ZONA.adelantado}
-            </button>
+            {conAdelanto && (
+              <button type="button" disabled={enviando || (pedirCiudad && sinCiudad)} onClick={() => completa("adelantado")} className={BOTON}>
+                Completa · {nombres.adelantado}
+              </button>
+            )}
           </>
         ) : (
           <button type="button" disabled={enviando || (pedirCiudad && sinCiudad)} onClick={() => completa(null)} className={BOTON}>

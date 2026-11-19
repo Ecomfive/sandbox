@@ -1,0 +1,5 @@
+-- Reversa de la 0333: quita las palabras de zona de Costa Rica que sembró el sistema (las que agregó una persona se conservan).
+delete from confirmacion_ia_zonas
+where creado_por_nombre = 'Sistema'
+  and pais_id = (select id from paises where codigo = 'CR')
+  and clave in ('escazu', 'goicoechea', 'tibas', 'moravia', 'curridabat', 'alajuelita', 'montes de oca', 'vasquez de coronado', 'coronado', 'cartago', 'limon', 'puntarenas', 'guanacaste', 'heredia', 'liberia', 'nicoya', 'turrialba', 'perez zeledon', 'puriscal', 'tarrazu', 'aserri', 'acosta', 'turrubares', 'dota', 'grecia', 'naranjo', 'palmares', 'atenas', 'orotina', 'zarcero', 'upala', 'san ramon', 'ciudad quesada', 'pococi', 'guapiles', 'siquirres', 'guacimo', 'talamanca', 'matina', 'la union', 'tres rios', 'oreamuno', 'el guarco', 'barva', 'belen', 'esparza', 'quepos', 'golfito', 'jaco', 'canas', 'tilaran', 'bagaces', 'abangares', 'monteverde', 'sarapiqui', 'los chiles', 'guatuso', 'rio cuarto', 'corredores', 'parrita', 'coto brus', 'hojancha', 'nandayure');

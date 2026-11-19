@@ -1,5 +1,6 @@
 "use client";
 
+import { textosCiudad } from "@/lib/confirmacion-ia/textos-pais";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Indicador, Pastilla, TableroIndicadores, claseTdLista, claseThLista } from "@/components/panel/piezas-panel";
@@ -10,7 +11,7 @@ import { AlertaIcon, CheckIcon, ChatIcon, GastoIcon, PedidoIcon, RobotIcon, Suge
 import type { Combinado, ResultadoModelo } from "@/lib/confirmacion-ia/combinar";
 import { acierto, type DecisionRevision } from "@/lib/confirmacion-ia/revision";
 import type { ConfigConfirmacion, FilaAnalisis } from "@/lib/confirmacion-ia/servidor";
-import { NOMBRE_ZONA, type Zona } from "@/lib/confirmacion-ia/zonas";
+import { type Zona } from "@/lib/confirmacion-ia/zonas";
 import { tiempoEsperando } from "@/lib/tienda/confirmacion";
 import { EjemplosDirecciones } from "./ejemplos-direcciones";
 import { InstruccionesIA } from "./instrucciones-ia";
@@ -20,6 +21,7 @@ import { PalabrasZona } from "./palabras-zona";
 import { PreguntaMensaje } from "./pedir-dato";
 import { BotonesVeredicto, ColaRevision, type AlElegir } from "./revision-pedidos";
 import { SeccionCard } from "./seccion";
+import { ProveedorZonasPais, useZonasPais } from "./zonas-pais";
 import {
   analizarPedidoAhora,
   analizarPendientesAhora,
@@ -33,7 +35,6 @@ import {
   type PalabraZona,
 } from "../ia-actions";
 
-const ZONA_TEXTO = NOMBRE_ZONA;
 const MENSAJE: Record<FilaAnalisis["mensajeEstado"], { texto: string; tono: "neutro" | "exito" | "aviso" | "peligro" }> = {
   no_aplica: { texto: "No hace falta", tono: "neutro" },
   apagado: { texto: "Sin enviar (apagado)", tono: "neutro" },
@@ -62,12 +63,13 @@ function Interruptor({ activo, etiqueta, deshabilitado, alCambiar }: { activo: b
 
 /** El resultado de un análisis como lo ve la persona: la zona (con la etiqueta que se pondría) y si la dirección está completa. */
 function Resultado({ f, etiquetaActual }: { f: Pick<FilaAnalisis, "estado" | "zona" | "etiqueta" | "falta">; etiquetaActual?: string | null }) {
+  const { nombres } = useZonasPais();
   // Pago por adelantado: en espera hasta que el asesor le pone la etiqueta real en Shopify (cuando llega el pago).
   if (f.estado === "adelantado") return etiquetaActual ? <Pastilla tono="exito">Pagó · etiquetado</Pastilla> : <Pastilla tono="aviso">En espera de pago</Pastilla>;
   if (f.estado === "error") return <Pastilla tono="peligro">No se pudo analizar</Pastilla>;
   if (f.estado === "falta_dato") return <Pastilla tono="aviso">Falta un dato</Pastilla>;
   if (f.estado === "revisar") return <Pastilla tono="neutro">Revisar</Pastilla>;
-  return <Pastilla tono="exito">{f.etiqueta ?? (f.zona ? ZONA_TEXTO[f.zona] : "Completa")}</Pastilla>;
+  return <Pastilla tono="exito">{f.etiqueta ?? (f.zona ? nombres[f.zona] : "Completa")}</Pastilla>;
 }
 
 type Filtro = "todos" | "listo" | "falta_dato" | "revisar" | "revisados" | "adelantado";
@@ -75,6 +77,7 @@ type Filtro = "todos" | "listo" | "falta_dato" | "revisar" | "revisados" | "adel
 export function ConfirmacionIA({
   config,
   paisNombre,
+  paisCodigo,
   etiquetasTexto,
   esAdmin,
   puedeEscribir,
@@ -90,6 +93,8 @@ export function ConfirmacionIA({
 }: {
   config: ConfigConfirmacion;
   paisNombre: string;
+  /** El código del país (PA, CR): decide cómo se llama el campo de ciudad y sus ejemplos. */
+  paisCodigo?: string;
   /** Las etiquetas del país, como se leen («CIUDAD · INTERIOR/SERVIENTREGA») o que faltan definirse. */
   etiquetasTexto: string | null;
   esAdmin: boolean;
@@ -174,15 +179,18 @@ export function ConfirmacionIA({
     });
   }
 
+  // País sin tiendas todavía (Costa Rica): se deja todo armado —ejemplos, palabras de zona, pruebas— y los pedidos y el pago por adelantado esperan a la primera tienda.
+  const sinTiendas = tiendas.length === 0;
   const indice = [
-    { id: "pedidos", texto: "Pedidos analizados" },
+    ...(sinTiendas ? [] : [{ id: "pedidos", texto: "Pedidos analizados" }]),
     { id: "ejemplos", texto: "Direcciones de ejemplo" },
     { id: "zonas", texto: "Palabras de zona" },
-    { id: "adelanto", texto: "Cómo paga el cliente" },
+    ...(sinTiendas ? [] : [{ id: "adelanto", texto: "Cómo paga el cliente" }]),
     ...(esAdmin ? [{ id: "instrucciones", texto: "Instrucciones de la IA" }] : []),
   ];
 
   return (
+    <ProveedorZonasPais codigoPais={paisCodigo}>
     <div className="flex flex-col gap-6">
       <SeccionCard
         id="estado"
@@ -208,6 +216,14 @@ export function ConfirmacionIA({
           <span aria-hidden="true">·</span>
           <span>{etiquetasTexto ? `Etiquetas de ${paisNombre}: ${etiquetasTexto}` : `Etiquetas de ${paisNombre}: sin definir (solo revisa que la dirección esté completa)`}</span>
         </p>
+        {sinTiendas && (
+          <p role="status" className="m-0 flex items-start gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm">
+            <span aria-hidden="true" className="mt-1.5 h-2 w-2 flex-none rounded-full bg-warning" />
+            <span>
+              {paisNombre} todavía no tiene tiendas conectadas. Ya puedes cargar ejemplos y palabras de zona y probar direcciones; los pedidos aparecerán aquí cuando se conecte la primera tienda.
+            </span>
+          </p>
+        )}
         {apagadaPorFaltaDeIA && (
           <p role="alert" className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm text-destructive">
             Falta conectar ChatGPT o Claude: sin sus claves no se puede analizar ninguna dirección.
@@ -224,6 +240,7 @@ export function ConfirmacionIA({
         ))}
       </nav>
 
+      {!sinTiendas && (
       <SeccionCard
         id="pedidos"
         icono={PedidoIcon}
@@ -363,16 +380,17 @@ export function ConfirmacionIA({
           </div>
         )}
       </SeccionCard>
+      )}
 
-      <ProbarDireccion tiendas={tiendas} puedeEscribir={puedeEscribir} tiendaElegida={tiendaElegida} />
+      <ProbarDireccion paisCodigo={paisCodigo} tiendas={tiendas} puedeEscribir={puedeEscribir} tiendaElegida={tiendaElegida} />
 
       {/* Lo que el equipo le enseña a la IA, lado a lado en pantalla ancha. */}
       <div className="grid gap-6 xl:grid-cols-2 xl:items-start">
-        <EjemplosDirecciones paisNombre={paisNombre} distingueZona={config.distingueZona} tiendas={tiendas} tiendaObligatoria={ejemplos.tiendaObligatoria} puedeEscribir={puedeEscribir} total={ejemplos.total} />
+        <EjemplosDirecciones paisNombre={paisNombre} paisCodigo={paisCodigo} distingueZona={config.distingueZona} tiendas={tiendas} tiendaObligatoria={ejemplos.tiendaObligatoria} puedeEscribir={puedeEscribir} total={ejemplos.total} />
         <PalabrasZona paisNombre={paisNombre} distingueZona={config.distingueZona} puedeEscribir={puedeEscribir} inicial={palabras} />
       </div>
 
-      <PagoPorAdelantado paisNombre={paisNombre} puedeEscribir={puedeEscribir} metodos={metodosPago} />
+      {!sinTiendas && <PagoPorAdelantado paisNombre={paisNombre} puedeEscribir={puedeEscribir} metodos={metodosPago} />}
 
       {esAdmin && <InstruccionesIA paisNombre={paisNombre} inicial={instrucciones ?? ""} />}
 
@@ -412,10 +430,12 @@ export function ConfirmacionIA({
         </Ventana>
       )}
     </div>
+    </ProveedorZonasPais>
   );
 }
 
 function FichaAnalisis({ f, distingueZona, puedeEscribir, abrirCorregir, alElegir, alPreguntar, alCerrar }: { f: FilaAnalisis; distingueZona: boolean; puedeEscribir: boolean; abrirCorregir: boolean; alElegir: AlElegir; alPreguntar: (f: FilaAnalisis) => Promise<void>; alCerrar: () => void }) {
+  const { nombres } = useZonasPais();
   const router = useRouter();
   const { mostrarToast } = useToast();
   const [pendiente, empezar] = useTransition();
@@ -441,11 +461,11 @@ function FichaAnalisis({ f, distingueZona, puedeEscribir, abrirCorregir, alElegi
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Resultado f={f.final} etiquetaActual={f.etiquetaActual} />
-          {f.final.zona && <Pastilla>{ZONA_TEXTO[f.final.zona]}{f.revision ? " · lo marcó el equipo" : f.zonaPor === "regla" ? " · por palabra de zona" : " · por las IA"}</Pastilla>}
+          {f.final.zona && <Pastilla>{nombres[f.final.zona]}{f.revision ? " · lo marcó el equipo" : f.zonaPor === "regla" ? " · por palabra de zona" : " · por las IA"}</Pastilla>}
           {f.acuerdo === false && <Pastilla tono="aviso">Las IA no coinciden</Pastilla>}
         </div>
         {f.final.etiqueta && <p className="m-0 text-sm">Etiqueta que se pondría: <b>{f.final.etiqueta}</b>{f.etiquetaActual ? ` · en Shopify tiene ${f.etiquetaActual}` : ""}</p>}
-        {f.reglas.length > 0 && <p className="m-0 text-sm">Palabras de zona que salieron: {f.reglas.map((r) => `${r.texto} (${ZONA_TEXTO[r.resultado]})`).join(", ")}</p>}
+        {f.reglas.length > 0 && <p className="m-0 text-sm">Palabras de zona que salieron: {f.reglas.map((r) => `${r.texto} (${nombres[r.resultado]})`).join(", ")}</p>}
         <div>
           <p className={`${labelClass} m-0`}>Lo que dijo cada IA</p>
           <ul className="m-0 mt-1 flex list-none flex-col gap-1.5 p-0">{f.modelos.map((x) => <LineaModelo key={x.proveedor} m={x} />)}</ul>
@@ -502,7 +522,7 @@ function FichaAnalisis({ f, distingueZona, puedeEscribir, abrirCorregir, alElegi
         {f.revision && (
           <div className="rounded-lg border border-border bg-muted/40 px-3 py-2.5 text-sm">
             <p className="m-0">
-              <b>{f.revision.por ?? "El equipo"}</b> marcó: {f.revision.completa ? `completa${f.revision.zona ? ` · ${ZONA_TEXTO[f.revision.zona]}` : ""}` : `falta ${f.revision.falta ?? "un dato"}`}.
+              <b>{f.revision.por ?? "El equipo"}</b> marcó: {f.revision.completa ? `completa${f.revision.zona ? ` · ${nombres[f.revision.zona]}` : ""}` : `falta ${f.revision.falta ?? "un dato"}`}.
             </p>
             <p className="m-0 text-xs text-muted-foreground">
               {f.revision.ok === true ? "Coincidía con lo que propuso el sistema." : f.revision.ok === false ? "Era distinto de lo que propuso el sistema: la IA aprende de esta corrección." : "Las IA no habían decidido: la IA aprende de esta respuesta."}
@@ -533,11 +553,13 @@ function FichaAnalisis({ f, distingueZona, puedeEscribir, abrirCorregir, alElegi
 }
 
 /** «Probar una dirección»: escribe una dirección y ve qué diría el sistema, sin guardar ni mandar nada. */
-function ProbarDireccion({ tiendas, puedeEscribir, tiendaElegida }: { tiendas: { id: string; nombre: string }[]; puedeEscribir: boolean; tiendaElegida: string | null }) {
+function ProbarDireccion({ paisCodigo, tiendas, puedeEscribir, tiendaElegida }: { paisCodigo?: string; tiendas: { id: string; nombre: string }[]; puedeEscribir: boolean; tiendaElegida: string | null }) {
+  const { nombres } = useZonasPais();
   const { mostrarToast } = useToast();
   const [pendiente, empezar] = useTransition();
   const [direccion, setDireccion] = useState("");
   const [ciudad, setCiudad] = useState("");
+  const textos = textosCiudad(paisCodigo);
   const [resultado, setResultado] = useState<{ combinado: Combinado; modelos: ResultadoModelo[]; palabras: { texto: string; resultado: Zona }[]; etiqueta: string | null } | null>(null);
   if (!puedeEscribir) return null;
   return (
@@ -549,13 +571,13 @@ function ProbarDireccion({ tiendas, puedeEscribir, tiendaElegida }: { tiendas: {
       <div className="flex flex-col gap-3 border-t border-border p-4">
         <p className="m-0 text-sm text-muted-foreground">Escribe una dirección y mira qué diría el sistema. No se guarda ni se le escribe a nadie.</p>
         <label className="flex flex-col gap-1 sm:max-w-sm">
-          <span className={labelClass}>Ciudad o corregimiento *</span>
-          <input value={ciudad} required maxLength={120} onChange={(e) => setCiudad(e.target.value)} placeholder="Ej: Bella Vista, Colón, Arraiján" className={fieldClass} />
+          <span className={labelClass}>{textos.campo} *</span>
+          <input value={ciudad} required maxLength={120} onChange={(e) => setCiudad(e.target.value)} placeholder={textos.ejemploCiudad} className={fieldClass} />
           <span className="text-xs text-muted-foreground">Lo primero que mira la IA: dice de dónde es el pedido.</span>
         </label>
         <label className="flex flex-col gap-1">
           <span className={labelClass}>Dirección *</span>
-          <textarea rows={2} maxLength={600} required value={direccion} onChange={(e) => setDireccion(e.target.value)} placeholder="Ej: Urb. Los Pinos, calle 5, casa 12, frente a la tienda" className={fieldClass} />
+          <textarea rows={2} maxLength={600} required value={direccion} onChange={(e) => setDireccion(e.target.value)} placeholder={textos.ejemploDireccion} className={fieldClass} />
         </label>
         <div className="flex items-center gap-3">
           <button
@@ -577,10 +599,10 @@ function ProbarDireccion({ tiendas, puedeEscribir, tiendaElegida }: { tiendas: {
           <div className="flex flex-col gap-2 rounded-lg border border-border p-3" aria-live="polite">
             <div className="flex flex-wrap items-center gap-2">
               <Resultado f={{ estado: resultado.combinado.estado, zona: resultado.combinado.zona, etiqueta: resultado.etiqueta, falta: resultado.combinado.falta }} />
-              {resultado.combinado.zona && <Pastilla>{ZONA_TEXTO[resultado.combinado.zona]}{resultado.combinado.zonaPor === "regla" ? " · por palabra de zona" : " · por las IA"}</Pastilla>}
+              {resultado.combinado.zona && <Pastilla>{nombres[resultado.combinado.zona]}{resultado.combinado.zonaPor === "regla" ? " · por palabra de zona" : " · por las IA"}</Pastilla>}
             </div>
             {resultado.combinado.falta && <p className="m-0 text-sm">Le pediría: <b>{resultado.combinado.falta}</b></p>}
-            {resultado.palabras.length > 0 && <p className="m-0 text-sm">Palabras de zona que salieron: {resultado.palabras.map((r) => `${r.texto} (${ZONA_TEXTO[r.resultado]})`).join(", ")}</p>}
+            {resultado.palabras.length > 0 && <p className="m-0 text-sm">Palabras de zona que salieron: {resultado.palabras.map((r) => `${r.texto} (${nombres[r.resultado]})`).join(", ")}</p>}
             <ul className="m-0 flex list-none flex-col gap-1.5 p-0">{resultado.modelos.map((m) => <LineaModelo key={m.proveedor} m={m} />)}</ul>
           </div>
         )}

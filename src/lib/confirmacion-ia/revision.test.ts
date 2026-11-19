@@ -75,3 +75,10 @@ test("pago por adelantado marcado por el equipo: queda en espera de pago, sin et
   const elegidos = seleccionarEjemplos([ej("ciudad", 1), ej("ciudad", 2), ej("interior", 1), ej("adelantado", 1), ej("adelantado", 2)], 4);
   assert.ok(elegidos.some((e) => e.zona === "adelantado"), "el pago por adelantado entra entre los ejemplos aunque haya de las otras");
 });
+
+test("en un país sin pago por adelantado (Costa Rica) esa zona no se acepta al revisar", () => {
+  assert.deepEqual(revisarVeredicto({ completa: true, zona: "adelantado" }, true, false), { error: "En este país no hay pago por adelantado: elige ciudad o interior." });
+  assert.deepEqual(revisarVeredicto({ completa: true, zona: "interior" }, true, false), { veredicto: { completa: true, zona: "interior", falta: null } });
+  // Donde sí hay (Panamá) sigue igual.
+  assert.deepEqual(revisarVeredicto({ completa: true, zona: "adelantado" }, true), { veredicto: { completa: true, zona: "adelantado", falta: null } });
+});
