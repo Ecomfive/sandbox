@@ -9,7 +9,7 @@ import { Ventana } from "@/components/ui/ventana";
 import { fechaCorta } from "@/lib/af4/fecha";
 import { dinero, entero, fraccion, SIN_DATO } from "@/lib/af4/formato";
 import { CONCEPTOS_GASTO, ETIQUETA_GASTO, type ConceptoGasto, type CostoPuesto, type GastoImportacion } from "@/lib/finanzas/compras-costos";
-import { ComprasIcon, EnvioIcon, ProductoIcon } from "@/lib/nav-icons";
+import { ComprasIcon, EnvioIcon, GastoIcon, ProductoIcon } from "@/lib/nav-icons";
 import { agregarGastoImportacion, cambiarGastoPagado, eliminarGastoImportacion } from "./actions";
 
 const usd2 = (v: number | null) => dinero(v, "USD", { decimales: 2 });
@@ -167,6 +167,17 @@ export function FichaCostoPuesto({
               <Dato etiqueta="Diferencia">{fraccion(fila.diferencia, { conSigno: true })}</Dato>
             </dl>
           </Seccion>
+          {fila.financiamiento && (
+            <Seccion icono={GastoIcon} titulo="Financiamiento">
+              <dl className="flex flex-col gap-1.5">
+                <Dato etiqueta="Capital prestado para esta OC">{usd2(fila.financiamiento.capital)}</Dato>
+                {fila.financiamiento.real > 0 && <Dato etiqueta="Cobrado por el financista">{usd2(fila.financiamiento.real)}</Dato>}
+                {fila.financiamiento.estimado > 0 && <Dato etiqueta="Estimado con su tasa (aún sin cargo)">{usd2(fila.financiamiento.estimado)}</Dato>}
+                <Dato etiqueta="Costo puesto + financiamiento">{usd2(fila.total + fila.financiamiento.total)}</Dato>
+                <Dato etiqueta="Costo por unidad con financiamiento">{usd4(fila.unitarioConFinanciamiento ?? null)}</Dato>
+              </dl>
+            </Seccion>
+          )}
           <Seccion icono={EnvioIcon} titulo="Gastos de importación">
             {gastos.length ? (
               <ul className="divide-y divide-border/60">

@@ -3,6 +3,9 @@
 // decide quien llama. La lógica está en `compras-costos.ts` e `inventario-decisiones.ts`.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { cargarPrestamosGrupo, cargarTasasFinancistas } from "./cargar-prestamos-grupo";
+import type { TasaFinancista } from "./financiamiento-orden";
+import type { MovGrupo } from "./prestamos-grupo";
 import { traerTodasConError } from "@/lib/supabase/paginar";
 import { PAIS_FINANZAS } from "./cargar-inventario";
 import {
@@ -90,6 +93,9 @@ export interface DatosComprasCostos {
   presupuestos: Map<string, number>;
   anticipos: Anticipo[];
   ajustes: AjustesInventario;
+  /** Préstamos y costos del grupo con sus OC, y la tasa de cada financista (financiamiento por OC, migraciones 0983/0985). */
+  movsGrupo: MovGrupo[];
+  tasas: Map<string, TasaFinancista>;
   /** Sin la 0148: no hay gastos de importación, presupuesto ni anticipos (lo demás se ve igual). */
   sinMigracion: boolean;
 }
@@ -98,7 +104,7 @@ export interface DatosComprasCostos {
 export async function cargarComprasCostos(supabase: SupabaseClient, hoy: string, codigoPais: string = PAIS_FINANZAS): Promise<DatosComprasCostos | { error: string }> {
   const pais = await paisId(supabase, codigoPais);
   if (!pais) return { error: `No existe el país ${codigoPais}.` };
-  const [compras, gastos, lotes, presupuesto, anticipos, ajustes] = await Promise.all([
+  const [compras, gastos, lotes, presupuesto, anticipos, ajustes, grupo, tasasPartes] = await Promise.all([
     traerTodasConError<Record<string, unknown>>((d, h) =>
       supabase.from("wms_compras").select(COLUMNAS_COMPRA).eq("pais_id", pais).eq("tipo", "pais").is("anulada_en", null).order("id").range(d, h),
     ),
@@ -109,6 +115,8 @@ export async function cargarComprasCostos(supabase: SupabaseClient, hoy: string,
     supabase.from("fin_compras_presupuesto").select("mes, monto").gte("mes", `${hoy.slice(0, 4)}-01-01`),
     supabase.rpc("fin_anticipos_proveedores_al", { p_corte: hoy }),
     cargarAjustesInventario(supabase),
+    cargarPrestamosGrupo(supabase),
+    cargarTasasFinancistas(supabase),
   ]);
   if (compras.error) return { error: "No se pudieron leer las compras." };
   const listaCompras = (compras.data ?? []).map(aCompra);
@@ -172,6 +180,8 @@ export async function cargarComprasCostos(supabase: SupabaseClient, hoy: string,
     presupuestos: new Map(presupuesto.error ? [] : (presupuesto.data ?? []).map((p) => [String(p.mes).slice(0, 10), num(p.monto)])),
     anticipos: anticipos.error ? [] : ((anticipos.data ?? []) as Record<string, unknown>[]).map(leerAnticipo),
     ajustes,
+    movsGrupo: (grupo?.movs ?? []).filter((m) => m.ordenes.length > 0 && m.tipo !== "abono"),
+    tasas: new Map((tasasPartes ?? []).filter((t) => (t.tasaCiclo ?? 0) > 0).map((t) => [t.id, { tasaCiclo: t.tasaCiclo!, diasCiclo: t.diasCiclo }])),
     sinMigracion,
   };
 }

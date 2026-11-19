@@ -7,10 +7,11 @@ import { Pagina } from "@/components/ui/pagina";
 import { diaMes, hoyPanama } from "@/lib/af4/fecha";
 import { dinero, dinero2, dineroKpi, fraccion } from "@/lib/af4/formato";
 import { requireModulo } from "@/lib/auth";
-import { cargarPrestamosGrupo, SIN_MIGRACION_GRUPO } from "@/lib/finanzas/cargar-prestamos-grupo";
+import { cargarPrestamosGrupo, cargarTasasFinancistas, SIN_MIGRACION_GRUPO } from "@/lib/finanzas/cargar-prestamos-grupo";
 import { costoFinanciero, deudasNetas, etiquetaTipoGrupo, pendientes, saldosPorPar, type ClaseParte } from "@/lib/finanzas/prestamos-grupo";
 import { createServiceClient } from "@/lib/supabase/server";
 import { AvisoTesoreria } from "../aviso";
+import { TasasFinancistas } from "./tasas-financistas";
 import { CrearParteGrupo, TablaMovimientosGrupo, type FilaMovGrupo } from "./vista-grupo";
 
 export const metadata = { title: "Préstamos del grupo" };
@@ -28,7 +29,8 @@ export default async function PrestamosGrupoPage() {
   const usuario = await requireModulo("tesoreria");
   if (await limitadoATiendas()) return <SoloTodaLaEmpresa titulo="Tesorería" />;
   const hoy = hoyPanama();
-  const datos = await cargarPrestamosGrupo(createServiceClient());
+  const supabase = createServiceClient();
+  const [datos, tasas] = await Promise.all([cargarPrestamosGrupo(supabase), cargarTasasFinancistas(supabase)]);
   if (!datos) {
     return (
       <Pagina ancho="ancha" className="flex flex-col gap-6">
@@ -143,6 +145,10 @@ export default async function PrestamosGrupoPage() {
           )}
         </MarcoAF4>
       </div>
+
+      <MarcoAF4 id="titulo-tasas" titulo="Tasa de los financistas" detalle="Con ella Compras y costos estima el financiamiento de cada OC" sinRelleno>
+        {tasas ? <TasasFinancistas tasas={tasas} puedeEscribir={puedeEscribir} /> : <p className="px-4 py-6 text-sm text-muted-foreground">Falta correr la migración 0985 en Supabase.</p>}
+      </MarcoAF4>
 
       <section aria-labelledby="titulo-movimientos" className="flex flex-col gap-2">
         <div className="flex items-center justify-between gap-3">

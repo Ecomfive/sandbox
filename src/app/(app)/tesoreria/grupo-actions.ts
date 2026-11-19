@@ -78,3 +78,42 @@ export async function crearParteGrupo(formData: FormData): Promise<{ error?: str
     return { error: e instanceof Error ? e.message : "No se pudo crear." };
   }
 }
+
+/**
+ * La tasa por ciclo de un financista (migración 0985). Con ella Compras y costos estima el costo de financiamiento de
+ * las OC que fondeó y todavía no tienen su cargo. `tasa` en porcentaje («20»); `dias` vacío = el plazo de cada préstamo.
+ */
+export async function guardarTasaFinancista(id: unknown, tasa: unknown, dias: unknown): Promise<{ error?: string }> {
+  try {
+    await requireModuloEscritura(MODULO);
+    if (await limitadoATiendas()) return { error: "Solo para quien ve toda la empresa." };
+    if (typeof id !== "string" || !UUID.test(id)) return { error: "Financista inválido." };
+    const t = typeof tasa === "string" ? tasa.trim().replace(",", ".").replace("%", "") : "";
+    const tasaNum = t === "" ? null : Number(t);
+    if (tasaNum !== null && (!Number.isFinite(tasaNum) || tasaNum < 0 || tasaNum > 500)) return { error: "La tasa va en porcentaje, entre 0 y 500." };
+    const d = typeof dias === "string" ? dias.trim() : "";
+    const diasNum = d === "" ? null : Number(d);
+    if (diasNum !== null && (!Number.isInteger(diasNum) || diasNum < 1 || diasNum > 730)) return { error: "Los días del ciclo van de 1 a 730." };
+    const supabase = createServiceClient();
+    const { data: antes } = await supabase.from("fin_grupo_partes").select("nombre, clase, tasa_ciclo, dias_ciclo").eq("id", id).maybeSingle();
+    if (!antes) return { error: "Falta correr la migración 0985 en Supabase, o el financista ya no existe." };
+    if (antes.clase !== "financista") return { error: "Solo los financistas tienen tasa." };
+    const tasaCiclo = tasaNum === null ? null : Math.round(tasaNum * 100) / 10_000;
+    const { error } = await supabase.from("fin_grupo_partes").update({ tasa_ciclo: tasaCiclo, dias_ciclo: diasNum }).eq("id", id);
+    if (error) return { error: error.message };
+    const pct = (v: unknown) => (v === null || v === undefined ? "—" : `${(Number(v) * 100).toLocaleString("es-PA", { maximumFractionDigits: 2 })} %`);
+    await registrarAuditoria({
+      accion: "tasa_financista",
+      entidad: "fin_grupo_movimientos",
+      entidadId: id,
+      detalle: `Tasa de ${antes.nombre}`,
+      antes: { Tasa: pct(antes.tasa_ciclo), "Días del ciclo": antes.dias_ciclo ? String(antes.dias_ciclo) : "plazo del préstamo" },
+      despues: { Tasa: pct(tasaCiclo), "Días del ciclo": diasNum ? String(diasNum) : "plazo del préstamo" },
+    });
+    revalidar();
+    revalidatePath("/rentabilidad/compras");
+    return {};
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "No se pudo guardar la tasa." };
+  }
+}

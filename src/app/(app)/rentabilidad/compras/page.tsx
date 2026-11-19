@@ -9,6 +9,7 @@ import { dinero, dineroKpi, entero, fraccion } from "@/lib/af4/formato";
 import { requireModulo } from "@/lib/auth";
 import { cargarComprasCostos } from "@/lib/finanzas/cargar-compras-costos";
 import { costoPuestoCompras, porPagarProveedores, presupuestoCompras, variacionCostos } from "@/lib/finanzas/compras-costos";
+import { conFinanciamiento, financiamientoPorOrden } from "@/lib/finanzas/financiamiento-orden";
 import { createServiceClient } from "@/lib/supabase/server";
 import { AjusteInventario } from "../inventario/ajuste-inventario";
 import { PresupuestoCompras } from "./presupuesto-compras";
@@ -55,7 +56,10 @@ export default async function ComprasCostosPage() {
   const meses = Array.from({ length: MESES_PRESUPUESTO }, (_, i) => sumarMeses(mesHoy, i));
   const porPagar = porPagarProveedores(datos.compras, datos.gastos, hoy);
   const presupuesto = presupuestoCompras(meses, datos.presupuestos, porPagar, hoy);
-  const costos = costoPuestoCompras(datos.compras, datos.items, datos.gastos, datos.vigente, datos.nombres);
+  const costoPuesto = costoPuestoCompras(datos.compras, datos.items, datos.gastos, datos.vigente, datos.nombres);
+  // El financiamiento de cada OC va como línea aparte (no entra en el costo puesto): real si el financista ya lo cargó,
+  // estimado con su tasa si no. Préstamos del grupo dice qué OC fondeó cada préstamo.
+  const costos = conFinanciamiento(costoPuesto, financiamientoPorOrden(datos.movsGrupo, datos.tasas, new Map(costoPuesto.map((c) => [c.codigo, c.fob])), hoy));
   const variacion = variacionCostos(datos.lotes, datos.ajustes.alertaCosto);
   const totalPorPagar = porPagar.reduce((a, p) => a + p.monto, 0);
   const vencido = porPagar.filter((p) => p.vencido).reduce((a, p) => a + p.monto, 0);

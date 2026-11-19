@@ -49,3 +49,22 @@ export async function cargarPrestamosGrupo(supabase: SupabaseClient): Promise<Da
     })),
   };
 }
+
+export interface TasaParte {
+  id: string;
+  nombre: string;
+  tasaCiclo: number | null;
+  diasCiclo: number | null;
+}
+
+/** La tasa por ciclo de cada financista (migración 0985). Sin la migración, null. */
+export async function cargarTasasFinancistas(supabase: SupabaseClient): Promise<TasaParte[] | null> {
+  const { data, error } = await supabase.from("fin_grupo_partes").select("id, nombre, tasa_ciclo, dias_ciclo").eq("clase", "financista").order("orden").order("nombre");
+  if (error) return null;
+  return (data ?? []).map((p) => ({
+    id: p.id as string,
+    nombre: p.nombre as string,
+    tasaCiclo: p.tasa_ciclo === null || p.tasa_ciclo === undefined ? null : Number(p.tasa_ciclo),
+    diasCiclo: p.dias_ciclo === null || p.dias_ciclo === undefined ? null : Number(p.dias_ciclo),
+  }));
+}

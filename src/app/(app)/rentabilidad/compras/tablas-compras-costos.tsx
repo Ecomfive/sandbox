@@ -150,6 +150,14 @@ const DEF_COSTO: DefTabla<CostoPuesto> = {
     { id: "llegada", etiqueta: "Llegada", tipo: "fecha", valor: (f) => f.fechaLlegada ?? "" },
     { id: "total", etiqueta: "Costo puesto", tipo: "numero", valor: (f) => f.total },
     { id: "diferencia", etiqueta: "Diferencia", tipo: "numero", valor: (f) => (f.diferencia ?? 0) * 100 },
+    {
+      id: "financiamiento",
+      etiqueta: "Financiamiento",
+      tipo: "seleccion",
+      valores: (f) => [!f.financiamiento ? "Sin financiamiento" : f.financiamiento.estimado > 0 ? "Financiada (con estimado)" : "Financiada"],
+      agrupable: true,
+    },
+    { id: "unitarioFin", etiqueta: "Por unidad con financiamiento", tipo: "numero", valor: (f) => f.unitarioConFinanciamiento ?? 0 },
   ],
 };
 const COLUMNAS_COSTO: ColumnaTabla<CostoPuesto, CtxCosto>[] = [
@@ -176,6 +184,24 @@ const COLUMNAS_COSTO: ColumnaTabla<CostoPuesto, CtxCosto>[] = [
   { id: "total", label: "Costo puesto", ocultable: false, clase: `${num} font-medium`, render: (f) => usd(f.total), total: (fs) => usd(fs.reduce((a, f) => a + f.total, 0)) },
   { id: "unidades", label: "Unidades", ocultable: true, clase: num, render: (f) => entero(f.unidades) },
   { id: "unitario", label: "Por unidad", ocultable: false, clase: num, render: (f) => usd4(f.unitarioReal) },
+  {
+    id: "financiamiento",
+    label: "Financiamiento",
+    ocultable: true,
+    clase: num,
+    render: (f) =>
+      f.financiamiento ? (
+        <span className="inline-flex items-center gap-1.5">
+          {f.financiamiento.estimado > 0 && <Punto tono="warning" />}
+          {usd(f.financiamiento.total)}
+          {f.financiamiento.estimado > 0 && <span className="sr-only">(incluye estimado)</span>}
+        </span>
+      ) : (
+        SIN_DATO
+      ),
+    total: (fs) => usd(fs.reduce((a, f) => a + (f.financiamiento?.total ?? 0), 0)),
+  },
+  { id: "unitarioFin", label: "Por unidad con financiamiento", ocultable: true, clase: num, render: (f) => (f.financiamiento ? usd4(f.unitarioConFinanciamiento ?? null) : SIN_DATO) },
   { id: "vigente", label: "Vigente", ocultable: false, clase: num, render: (f) => usd4(f.unitarioVigente) },
   {
     id: "diferencia",
@@ -193,7 +219,7 @@ const COLUMNAS_COSTO: ColumnaTabla<CostoPuesto, CtxCosto>[] = [
       ),
   },
 ];
-const ICONOS_COSTO: Record<string, IconoComp> = { compra: ComprasIcon, estado: EstadoIcon, gastos: GastoIcon, llegada: CalendarioIcon, total: GastoIcon, diferencia: EstadoIcon };
+const ICONOS_COSTO: Record<string, IconoComp> = { compra: ComprasIcon, estado: EstadoIcon, gastos: GastoIcon, llegada: CalendarioIcon, total: GastoIcon, diferencia: EstadoIcon, financiamiento: GastoIcon, unitarioFin: GastoIcon };
 
 export function TablaCostoPuesto({ filas, gastos, umbral, puedeEditar }: { filas: CostoPuesto[]; gastos: GastoImportacion[]; umbral: number; puedeEditar: boolean }) {
   const [abierta, setAbierta] = useState<string | null>(null);

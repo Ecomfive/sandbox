@@ -43,6 +43,8 @@ export const ETIQUETA_ACCION: Record<string, string> = {
   pagado_por_otra_libro: "Marcó que lo pagó otra empresa",
   quitar_pagado_por_otra_libro: "Quitó que lo pagó otra empresa",
   vincular_bien_libro: "Vinculó el bien de uso",
+  paquete_extraviado_libro: "Registró un paquete extraviado",
+  tasa_financista: "Cambió la tasa del financista",
   crear_bien_uso: "Registró el bien de uso",
   editar_bien_uso: "Corrigió el bien de uso",
   baja_bien_uso: "Dio de baja el bien de uso",

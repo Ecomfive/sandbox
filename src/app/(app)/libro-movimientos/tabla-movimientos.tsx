@@ -11,6 +11,7 @@ import type { NombreFilas } from "@/lib/tabla/pie";
 import type { Opcion } from "@/lib/finanzas/cargar-pendientes";
 import { BarraClasificar } from "./barra-clasificar";
 import { CrearMovimientoPanel } from "./crear-movimiento-panel";
+import { PaqueteExtraviadoPanel } from "./paquete-extraviado-panel";
 import { FichaMovimiento } from "./ficha-movimiento";
 import { LeerFacturaPanel } from "./leer-factura-panel";
 import { PegarExcel } from "./pegar-excel";
@@ -119,6 +120,7 @@ export function TablaMovimientos({
             <>
               <LeerFacturaPanel disponible={iaDisponible} tiendas={tiendas} tipos={tipos} cuentas={cuentas} mes={mes} />
               <PegarExcel tiendas={tiendas} tipos={tipos} cuentas={cuentas} />
+              <PaqueteExtraviadoPanel tiendas={tiendas} cuentas={cuentas} />
               <CrearMovimientoPanel tiendas={tiendas} tipos={tipos} cuentas={cuentas} mes={mes} />
             </>
           ) : undefined
