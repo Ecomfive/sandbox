@@ -50,7 +50,9 @@ export const INSTRUCCIONES =
 export function cuerpoPedido(s: SnapshotInforme, modelo: string) {
   return {
     model: modelo,
-    max_tokens: 600,
+    // Lo que el modelo piensa cuenta dentro de max_tokens: con 600 podía gastarlo todo y responder vacío.
+    max_tokens: 4000,
+    output_config: { effort: "low" },
     system: INSTRUCCIONES,
     messages: [{ role: "user", content: datosParaExplicar(s) }],
   };

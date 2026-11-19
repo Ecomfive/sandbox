@@ -25,7 +25,9 @@ export function pedidoFactura(medio: MedioFactura, base64: string, modelo = MODE
       : { type: "image", source: { type: "base64", media_type: medio.mime, data: base64 } };
   return {
     model: modelo,
-    max_tokens: 800,
+    // Lo que el modelo piensa cuenta dentro de max_tokens: con 800 podía gastarlo todo y responder vacío.
+    max_tokens: 4000,
+    output_config: { effort: "low" },
     messages: [{ role: "user", content: [archivo, { type: "text", text: INSTRUCCIONES_FACTURA }] }],
   };
 }

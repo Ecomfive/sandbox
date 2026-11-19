@@ -24,6 +24,8 @@ export function pedidoExtracto(base64: string, modelo = MODELO_EXTRACTO) {
   return {
     model: modelo,
     max_tokens: 32000,
+    // Sonnet 5.5 piensa por defecto y lo pensado cuenta en max_tokens: esfuerzo medio para leer el estado de cuenta.
+    output_config: { effort: "medium" },
     messages: [
       {
         role: "user",

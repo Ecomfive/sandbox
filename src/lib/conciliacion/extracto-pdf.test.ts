@@ -44,3 +44,7 @@ test("respuesta ilegible o sin movimientos da error; sin saldos no se cuadra", (
   assert.equal(cuadreSaldos(100, 90, [{ monto: -5 }]), 5);
   assert.equal(pedidoExtracto("QUJD").messages[0].content[0].type, "document");
 });
+
+test("extracto: esfuerzo medio", () => {
+  assert.deepEqual((pedidoExtracto("x") as { output_config: unknown }).output_config, { effort: "medium" });
+});
