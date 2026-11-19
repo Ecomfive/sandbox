@@ -6,6 +6,7 @@ import { requireModulo } from "@/lib/auth";
 import { cobertura, diferencias, nivelesDeRol, nivelesEfectivos, type PermisoPropio, type PermisoRol } from "@/lib/permisos/acceso";
 import { contarAjustes, resolverAfinado, type FilaAfinada } from "@/lib/permisos/afinado";
 import { MODULOS_AFINABLES, MODULOS_ACCESO, catalogoDe, etiquetaDeModulo, type Nivel } from "@/lib/permisos/catalogo";
+import { tieneFactorVerificado } from "@/lib/seguridad/dos-pasos";
 import { esUuid } from "@/lib/seguridad/ruta-almacen";
 import { createServiceClient } from "@/lib/supabase/server";
 import { cargarPuestosDeUsuarios, consultarRoles, consultaSegura } from "../../datos-usuarios";
@@ -28,7 +29,7 @@ export default async function PersonaPage({ params }: { params: Promise<{ id: st
   if (!esUuid(id)) notFound();
   const supabase = createServiceClient();
 
-  const [{ data: perfil }, paisesPersona, tiendasPersona, roles, authUsuario] = await Promise.all([
+  const [{ data: perfil }, paisesPersona, tiendasPersona, roles, authUsuario, factoresPersona] = await Promise.all([
     supabase.from("perfiles").select("id, email, nombre, avatar_url, activo, rol_id, creado_en, primer_ingreso_en, foto_recordada_en, ultima_actividad_en").eq("id", id).maybeSingle(),
     // Aparte: sin la migración 0087 la columna no existe y la ficha se carga igual.
     supabase.from("perfiles").select("paises_permitidos").eq("id", id).maybeSingle(),
@@ -36,6 +37,8 @@ export default async function PersonaPage({ params }: { params: Promise<{ id: st
     supabase.from("perfiles").select("tiendas_permitidas").eq("id", id).maybeSingle(),
     consultarRoles(supabase),
     supabase.auth.admin.getUserById(id),
+    // Si tiene la verificación en dos pasos (seguridad · 19 nov 2026). Si no se puede leer, no se muestra nada.
+    supabase.auth.admin.mfa.listFactors({ userId: id }),
   ]);
   if (!perfil) notFound();
 
@@ -106,6 +109,7 @@ export default async function PersonaPage({ params }: { params: Promise<{ id: st
         propios={lista.length}
         esYo={esYo}
         puedeEscribir={puedeEscribir}
+        dosPasos={factoresPersona.error ? null : tieneFactorVerificado(factoresPersona.data?.factors)}
       />
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(300px,34%)]">

@@ -16,7 +16,8 @@ import { NavBar } from "@/components/nav";
 import { Sidebar } from "@/components/sidebar";
 import { ToastProvider } from "@/components/ui/toast";
 import { TransicionPagina } from "@/components/transicion-pagina";
-import { getUsuarioActual, getUsuarioIdSesion, getUsuarioSesion } from "@/lib/auth";
+import { getDosPasos, getUsuarioActual, getUsuarioIdSesion, getUsuarioSesion, irADosPasosSiFalta } from "@/lib/auth";
+import { AvisoDosPasos } from "@/components/cuenta/aviso-dos-pasos";
 import { tieneContrasenaTemporal } from "@/lib/cuenta/contrasena";
 import { getPaisActual } from "@/lib/pais";
 import { PAISES_CON_RECEPCION } from "@/lib/wms/recepcion";
@@ -86,9 +87,13 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   if (usuario && tieneContrasenaTemporal(await getUsuarioSesion())) redirect("/elegir-contrasena");
   // Una cuenta del portal del proveedor no tiene perfil: no ve ni el menú del sistema, vuelve a su portal.
   if (!usuario) {
+    // Le falta la verificación en dos pasos (seguridad · 19 nov 2026): sin módulos hasta escribir el código; va a /dos-pasos.
+    await irADosPasosSiFalta();
     const usuarioId = await getUsuarioIdSesion();
     if (usuarioId && (await cuentaDeProveedor(usuarioId))) redirect(RUTA_PORTAL_PROVEEDOR);
   }
+  // Quien administra sin la verificación en dos pasos, mientras no es obligatoria: una invitación a activarla.
+  const invitarDosPasos = !!usuario && !usuario.vistaPrevia && (await getDosPasos())?.estado === "invitar";
   const favoritos = usuario ? favoritosDeSesion : [];
   const areas = construirAreas(plataformasPais);
   const modulosMenu = usuario ? modulosSegunTiendas(usuario.modulos, permitidas) : null;
@@ -123,6 +128,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       {usuario && <AvisoPersonal />}
       {usuario && avisoInactividad && <AvisoInactividad />}
       {usuario?.vistaPrevia && <BannerVistaPrevia rolNombre={usuario.vistaPrevia.rolNombre} />}
+      {invitarDosPasos && <AvisoDosPasos />}
       <div className="flex min-h-full">
         <Sidebar modulosPermitidos={modulosMenu} areas={areasMenu} favoritos={favoritos} pendientes={pendientes} verActualizaciones={!!usuario && REVISAN_CAMBIOS.has(usuario.id)} />
         <div className="flex min-h-full min-w-0 flex-1 flex-col">

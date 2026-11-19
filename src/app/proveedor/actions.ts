@@ -12,6 +12,8 @@ import { registrarAuditoria } from "@/lib/auditoria";
 import { getUsuarioSesion } from "@/lib/auth";
 import { cuentaProveedorActual } from "@/lib/proveedor/sesion";
 import { BUCKET_PROVEEDOR, rutaEtiqueta, rutaFotoReal } from "@/lib/proveedor/rutas";
+import { cerrarIntento, revisarIngreso } from "@/lib/seguridad/limite-ingreso";
+import { DEMASIADOS_INTENTOS } from "@/lib/seguridad/limite-reglas";
 import { esUuid } from "@/lib/seguridad/ruta-almacen";
 import { createAnonClient, createServiceClient, createSessionClient } from "@/lib/supabase/server";
 
@@ -154,8 +156,12 @@ export async function cambiarClaveProveedor(actual: string, nueva: string, repet
   if (claveNueva !== String(repetida ?? "")) return { error: "Las claves nuevas no coinciden." };
   if (claveNueva === claveActual) return { error: "La clave nueva debe ser distinta de la actual." };
 
+  // La clave actual cuenta como un ingreso: mismo tope de claves equivocadas que el login (seguridad · 19 nov 2026).
+  const { intento, frenado } = await revisarIngreso(usuario.email);
+  if (frenado) return { error: DEMASIADOS_INTENTOS };
   const comprobar = createAnonClient();
   const { error: errorActual } = await comprobar.auth.signInWithPassword({ email: usuario.email, password: claveActual });
+  await cerrarIntento(intento, errorActual);
   if (errorActual) return { error: "La clave actual no es correcta." };
   await comprobar.auth.signOut({ scope: "local" });
 

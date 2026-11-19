@@ -9,7 +9,7 @@ import { Chip } from "@/components/permisos/piezas-permisos";
 import { AfinarIcon, OjoIcon } from "@/lib/nav-icons";
 import { colorDeRol } from "@/lib/permisos/color-rol";
 import { iniciarVistaPreviaPersona } from "@/lib/vista-previa-actions";
-import { cambiarActivoUsuario, eliminarUsuario, generarContrasenaTemporal } from "../../actions";
+import { cambiarActivoUsuario, eliminarUsuario, generarContrasenaTemporal, quitarDosPasos } from "../../actions";
 import { faltantesDePersona } from "../../def-usuarios";
 import { EstadoPresencia } from "../../estado-presencia";
 
@@ -29,8 +29,23 @@ export interface PersonaCabecera {
   fotoRecordadaEn: string | null;
 }
 
-/** La cabecera de la ficha de una persona: quién es, su rol y qué le falta, y lo que se hace con su cuenta (ver así, contraseña, suspender, eliminar). */
-export function CabeceraPersona({ persona, propios, esYo, puedeEscribir }: { persona: PersonaCabecera; propios: number; esYo: boolean; puedeEscribir: boolean }) {
+/**
+ * La cabecera de la ficha de una persona: quién es, su rol y qué le falta, y lo que se hace con su cuenta (ver así, contraseña, quitar la
+ * verificación en dos pasos, suspender, eliminar). `dosPasos`: si tiene la verificación activa (null si no se pudo leer).
+ */
+export function CabeceraPersona({
+  persona,
+  propios,
+  esYo,
+  puedeEscribir,
+  dosPasos = null,
+}: {
+  persona: PersonaCabecera;
+  propios: number;
+  esYo: boolean;
+  puedeEscribir: boolean;
+  dosPasos?: boolean | null;
+}) {
   const router = useRouter();
   const { mostrarToast } = useToast();
   const [pendiente, empezar] = useTransition();
@@ -60,6 +75,20 @@ export function CabeceraPersona({ persona, propios, esYo, puedeEscribir }: { per
       else {
         setContrasena(r.contrasena ?? null);
         if (r.aviso) mostrarToast(r.aviso, "destructive");
+      }
+    });
+  }
+
+  function quitarVerificacion() {
+    if (!confirm(`¿Quitar la verificación en dos pasos de ${nombre}? Se cerrarán sus sesiones y, al volver a entrar, tendrá que activarla de nuevo con su celular.`)) return;
+    const formData = new FormData();
+    formData.set("id", persona.id);
+    empezar(async () => {
+      const r = await quitarDosPasos(formData).catch(() => ({ error: "Inténtalo de nuevo." }));
+      if (r.error) mostrarToast(r.error, "destructive");
+      else {
+        mostrarToast("Verificación en dos pasos quitada");
+        router.refresh();
       }
     });
   }
@@ -118,6 +147,7 @@ export function CabeceraPersona({ persona, propios, esYo, puedeEscribir }: { per
                 </Chip>
               )}
               {!persona.activo && <Chip>Suspendida</Chip>}
+              {dosPasos && <Chip tono="primario">Verificación en dos pasos</Chip>}
               {persona.activo && faltan.length > 0 && <Chip tono="aviso">Falta: {faltan.join(", ")}</Chip>}
               <EstadoPresencia ultimaActividadEn={persona.ultimaActividadEn} ultimoIngresoEn={persona.ultimoIngresoEn} />
             </div>
@@ -133,6 +163,11 @@ export function CabeceraPersona({ persona, propios, esYo, puedeEscribir }: { per
               <button type="button" onClick={generar} disabled={pendiente} className={boton}>
                 Generar contraseña temporal
               </button>
+              {!esYo && dosPasos && (
+                <button type="button" onClick={quitarVerificacion} disabled={pendiente} className={boton}>
+                  Quitar verificación en dos pasos
+                </button>
+              )}
               {!esYo && (
                 <>
                   <button type="button" onClick={suspender} disabled={pendiente} className={boton}>

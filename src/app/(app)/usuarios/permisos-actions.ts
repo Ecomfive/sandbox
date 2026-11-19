@@ -9,6 +9,7 @@ import { resolverAfinado, valorDe, valorPorDefecto, valorValido, type FilaAfinad
 import { MODULOS_ACCESO, MODULOS_SENSIBLES, catalogoDe, etiquetaDeModulo, type Nivel } from "@/lib/permisos/catalogo";
 import { esColorRol } from "@/lib/permisos/color-rol";
 import { esUuid } from "@/lib/seguridad/ruta-almacen";
+import { avisarSiPuedeModificarUsuarios, avisarSiRolModificaUsuarios } from "@/lib/seguridad/avisos-seguridad";
 
 // Las acciones de Usuarios y roles que cambian lo que ve o puede cada rol y cada persona. Todas devuelven el error como valor (en
 // producción Next.js oculta el mensaje de una excepción) y todas exigen poder MODIFICAR Usuarios y roles.
@@ -78,6 +79,8 @@ export async function fijarNivelRolLote(rolId: string, modulos: string[], nivel:
     entidadId: rolId,
     detalle: `${rol.nombre}: ${unicos.length === 1 ? etiquetaDeModulo(unicos[0]) : `${unicos.length} módulos`} → ${textoNivel(nivel)}`,
   });
+  // Aviso inmediato si el rol queda con la edición de Usuarios y roles (seguridad · 19 nov 2026).
+  if (nivel === "w" && unicos.includes("usuarios")) await avisarSiRolModificaUsuarios(rolId);
   refrescar();
   return {};
 }
@@ -208,6 +211,7 @@ export async function copiarPermisosDeRol(rolId: string, desdeId: string): Promi
   const resultado = await copiarPermisos(desdeId, rolId, true);
   if (resultado.error) return resultado;
   await registrarAuditoria({ accion: "copiar_permisos_rol", entidad: "roles", entidadId: rolId, detalle: `${destino.nombre} ← ${origen.nombre}` });
+  await avisarSiRolModificaUsuarios(rolId);
   refrescar();
   return {};
 }
@@ -270,6 +274,7 @@ export async function fijarNivelPersona(perfilId: string, modulo: string, nivel:
     entidadId: perfilId,
     detalle: `${persona.nombre ?? persona.email}: ${etiquetaDeModulo(modulo)} → ${nivel === "rol" ? "lo que da su rol" : textoNivel(nivel)}`,
   });
+  if (modulo === "usuarios") await avisarSiPuedeModificarUsuarios(perfilId);
   refrescar();
   return {};
 }
@@ -313,6 +318,7 @@ export async function fijarNivelPersonaLote(perfilId: string, modulos: string[],
     entidadId: perfilId,
     detalle: `${persona.nombre ?? persona.email}: ${unicos.length === 1 ? etiquetaDeModulo(unicos[0]) : `${unicos.length} módulos`} → ${textoNivel(nivel)}${igualAlRol.length === unicos.length ? " (lo que da su rol)" : ""}`,
   });
+  if (modulos.includes("usuarios")) await avisarSiPuedeModificarUsuarios(perfilId);
   refrescar();
   return {};
 }
