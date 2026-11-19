@@ -7,11 +7,11 @@ import { ListaIcon } from "@/lib/nav-icons";
 import { SeccionCard } from "./seccion";
 import { anilloFoco, fieldClass, labelClass } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
-import { NOMBRE_ZONA, type Zona } from "@/lib/confirmacion-ia/zonas";
+import { type Zona } from "@/lib/confirmacion-ia/zonas";
 import { agregarEjemplo, editarEjemplo, eliminarEjemplo, listarEjemplos, type EjemploDireccion } from "../ia-actions";
+import { useZonasPais } from "./zonas-pais";
 
 const POR_VEZ = 20;
-const ZONA_TEXTO = NOMBRE_ZONA;
 const boton = `rounded-md border border-border-control bg-card px-3 py-1.5 text-sm font-medium hover:bg-muted disabled:opacity-50 ${anilloFoco}`;
 const botonPrincipal = `rounded-md bg-foreground px-3 py-2 text-sm font-semibold text-background disabled:opacity-50 ${anilloFoco}`;
 
@@ -36,6 +36,7 @@ function FormularioEjemplo({
   alGuardar: (d: { ciudad: string; direccion: string; completa: boolean; falta: string | null; zona: Zona | null; tiendaId: string | null }) => Promise<string | null>;
   alCancelar?: () => void;
 }) {
+  const { nombres, zonas } = useZonasPais();
   const [ciudad, setCiudad] = useState(inicial?.ciudad ?? "");
   const [direccion, setDireccion] = useState(inicial?.direccion ?? "");
   const [completa, setCompleta] = useState(inicial?.completa ?? true);
@@ -105,9 +106,11 @@ function FormularioEjemplo({
           <span className={labelClass}>Zona de envío (opcional)</span>
           <select value={zona} onChange={(e) => setZona(e.target.value as Zona | "")} className={fieldClass}>
             <option value="">No sé</option>
-            <option value="ciudad">{NOMBRE_ZONA.ciudad}</option>
-            <option value="interior">{NOMBRE_ZONA.interior}</option>
-            <option value="adelantado">{NOMBRE_ZONA.adelantado}</option>
+            {zonas.map((z) => (
+              <option key={z} value={z}>
+                {nombres[z]}
+              </option>
+            ))}
           </select>
         </label>
       )}
@@ -161,6 +164,7 @@ export function EjemplosDirecciones({
   total: number;
 }) {
   const textos = textosCiudad(paisCodigo);
+  const { nombres } = useZonasPais();
   const { mostrarToast } = useToast();
   const [total, setTotal] = useState(totalInicial);
   const [abierto, setAbierto] = useState(false);
@@ -277,7 +281,7 @@ export function EjemplosDirecciones({
                       <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                         <Pastilla tono={e.completa ? "exito" : "aviso"}>{e.completa ? "Completa" : "Incompleta"}</Pastilla>
                         {!e.completa && e.falta && <span>Falta {e.falta}</span>}
-                        {e.zona && <Pastilla>{ZONA_TEXTO[e.zona]}</Pastilla>}
+                        {e.zona && <Pastilla>{nombres[e.zona]}</Pastilla>}
                         <span>{e.tienda ?? "Todas las tiendas"}</span>
                         <span>
                           {e.mio ? "Tú" : (e.creadoPor ?? "—")} · {new Date(e.creadoEn).toLocaleDateString("es-PA", { day: "numeric", month: "short", timeZone: "America/Panama" })}

@@ -10,7 +10,7 @@ import { etiquetaDeZona, type Combinado, type EstadoAnalisis, type ResultadoMode
 import { coincideConPropuesta, faltaVigente, revisarVeredicto, type DecisionRevision, type Veredicto } from "@/lib/confirmacion-ia/revision";
 import { MAX_INSTRUCCIONES } from "@/lib/confirmacion-ia/prompt";
 import { analizarOrden, analizarPendientes, armarMensajeAdelanto, armarMensajeDato, cargarConfig, enviarMensajeDato as mandarMensajeDato, evaluarDireccion, MAX_MENSAJES, SIN_MIGRACION_CONFIRMACION, type EstadoMensaje } from "@/lib/confirmacion-ia/servidor";
-import { errorDeRegla, normalizarTexto, ZONAS, type Zona } from "@/lib/confirmacion-ia/zonas";
+import { errorDeRegla, normalizarTexto, permiteAdelanto, ZONAS, type Zona } from "@/lib/confirmacion-ia/zonas";
 import { getPaisActual } from "@/lib/pais";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -109,7 +109,7 @@ export interface DatosEjemplo {
 }
 
 /** Valida lo que manda el navegador y lo deja listo para guardar (la tienda debe ser del país y de las que la persona ve). */
-async function leerEjemplo(d: DatosEjemplo, distingueZona: boolean, tiendasOk: string[]): Promise<{ fila: { ciudad: string; direccion: string; completa: boolean; falta: string | null; zona: Zona | null; tienda_id: string | null } } | { error: string }> {
+async function leerEjemplo(d: DatosEjemplo, distingueZona: boolean, tiendasOk: string[], conAdelanto = true): Promise<{ fila: { ciudad: string; direccion: string; completa: boolean; falta: string | null; zona: Zona | null; tienda_id: string | null } } | { error: string }> {
   const ciudad = String(d?.ciudad ?? "").replace(/\s+/g, " ").trim();
   if (ciudad.length < 2) return { error: "Escribe la ciudad o el corregimiento: es lo más importante para saber de dónde es." };
   if (ciudad.length > 120) return { error: "La ciudad o el corregimiento es muy largo (hasta 120 letras)." };
@@ -119,6 +119,7 @@ async function leerEjemplo(d: DatosEjemplo, distingueZona: boolean, tiendasOk: s
   if (typeof d.completa !== "boolean") return { error: "Elige si la dirección está completa o incompleta." };
   const falta = d.completa ? null : String(d.falta ?? "").replace(/\s+/g, " ").trim().slice(0, 200) || null;
   if (!d.completa && !falta) return { error: "Escribe qué le falta a la dirección." };
+  if (d.zona === "adelantado" && !conAdelanto) return { error: "En este país no hay pago por adelantado: elige ciudad o interior." };
   const zona = distingueZona && d.zona && (ZONAS as string[]).includes(d.zona) ? d.zona : null;
   const tienda = d.tiendaId ? String(d.tiendaId) : null;
   if (tienda && (!UUID.test(tienda) || !tiendasOk.includes(tienda))) return { error: "Esa tienda no es de este país o no tienes acceso a ella." };
@@ -175,7 +176,7 @@ export async function agregarEjemplo(d: DatosEjemplo): Promise<Resultado> {
   if (faltaMigracion) return { error: SIN_MIGRACION_CONFIRMACION };
   // Quien ve solo algunas tiendas agrega solo para ellas (no «para todas»).
   if (limitado && !d?.tiendaId) return { error: "Elige la tienda de la dirección." };
-  const l = await leerEjemplo(d, config.distingueZona, tiendas.map((t) => t.id));
+  const l = await leerEjemplo(d, config.distingueZona, tiendas.map((t) => t.id), permiteAdelanto(pais.codigo));
   if ("error" in l) return l;
   const { error } = await supabase.from("confirmacion_ia_ejemplos").insert({ ...l.fila, pais_id: pais.id, creado_por: usuario.id, creado_por_nombre: nombreDe(usuario) });
   if (error) return { error: /ciudad|schema cache/i.test(error.message) ? "Falta correr la migración 0301 (ciudad o corregimiento de los ejemplos) en Supabase." : "No se pudo guardar la dirección." };
@@ -204,7 +205,7 @@ export async function editarEjemplo(id: string, d: DatosEjemplo): Promise<Result
   // auditoría de seguridad, 18 nov 2026).
   if (ctx.limitado && !d?.tiendaId) return { error: "Elige la tienda de la dirección." };
   const { config } = await cargarConfig(ctx.supabase, ctx.pais.id);
-  const l = await leerEjemplo(d, config.distingueZona, ctx.tiendas.map((t) => t.id));
+  const l = await leerEjemplo(d, config.distingueZona, ctx.tiendas.map((t) => t.id), permiteAdelanto(ctx.pais.codigo));
   if ("error" in l) return l;
   const { error } = await ctx.supabase.from("confirmacion_ia_ejemplos").update(l.fila).eq("id", id);
   if (error) return { error: /ciudad|schema cache/i.test(error.message) ? "Falta correr la migración 0301 (ciudad o corregimiento de los ejemplos) en Supabase." : "No se pudo guardar." };
@@ -265,6 +266,7 @@ export async function agregarPalabraZona(texto: string, resultado: Zona): Promis
   if (!(ZONAS as string[]).includes(resultado)) return { error: "Elige si es de ciudad, del interior o de pago por adelantado." };
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
+  if (resultado === "adelantado" && !permiteAdelanto(pais.codigo)) return { error: "En este país no hay pago por adelantado: elige ciudad o interior." };
   const { config, faltaMigracion } = await cargarConfig(supabase, pais.id);
   if (faltaMigracion) return { error: SIN_MIGRACION_CONFIRMACION };
   if (!config.distingueZona) return { error: `En ${pais.nombre} no se distingue ciudad e interior: todavía no se usan palabras de zona.` };
@@ -431,7 +433,7 @@ export async function revisarAnalisis(
     veredicto = { completa: estado === "listo", zona: estado === "listo" ? propuesta.zona : null, falta: estado === "falta_dato" ? ((a.falta as string | null) ?? null) : null };
     ok = true;
   } else {
-    const v = revisarVeredicto(d, config.distingueZona);
+    const v = revisarVeredicto(d, config.distingueZona, permiteAdelanto(pais.codigo));
     if ("error" in v) return v;
     veredicto = v.veredicto;
     ok = coincideConPropuesta(propuesta, veredicto, config.distingueZona);

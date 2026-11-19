@@ -8,6 +8,23 @@ export const ZONAS: Zona[] = ["ciudad", "interior", "adelantado"];
 /** Cómo se llama cada zona en las pantallas: la etiqueta de Shopify tal cual se escribe (Panamá). */
 export const NOMBRE_ZONA: Record<Zona, string> = { ciudad: "CIUDAD", interior: "INTERIOR/SERVIENTREGA", adelantado: "PAGO POR ADELANTADO" };
 
+/** Costa Rica (19 nov 2026): sus dos etiquetas de zona son otras y no hay pago por adelantado. */
+const NOMBRE_ZONA_COSTA_RICA: Record<Zona, string> = { ciudad: "CIUDAD-GAM", interior: "INTERIOR-ZONAS-ALEJADAS", adelantado: "PAGO POR ADELANTADO" };
+
+/** Los países sin zonas de pago por adelantado: ahí solo se distingue ciudad de interior (o no se sabe). */
+const SIN_PAGO_ADELANTADO = ["CR"];
+
+const esCostaRica = (codigoPais: string | null | undefined) => String(codigoPais ?? "").toUpperCase() === "CR";
+
+/** Si el país tiene zonas de pago por adelantado (Panamá sí; Costa Rica no). Sin país, sí: como siempre. */
+export const permiteAdelanto = (codigoPais: string | null | undefined): boolean => !SIN_PAGO_ADELANTADO.includes(String(codigoPais ?? "").toUpperCase());
+
+/** Cómo se llama cada zona en las pantallas de ese país: la etiqueta de Shopify tal cual se escribe. */
+export const nombresDeZona = (codigoPais: string | null | undefined): Record<Zona, string> => (esCostaRica(codigoPais) ? NOMBRE_ZONA_COSTA_RICA : NOMBRE_ZONA);
+
+/** Las zonas que se pueden elegir en ese país (ejemplos, palabras de zona y botones de revisión). */
+export const zonasDePais = (codigoPais: string | null | undefined): Zona[] => (permiteAdelanto(codigoPais) ? ZONAS : ZONAS.filter((z) => z !== "adelantado"));
+
 export interface ReglaZona {
   id: string;
   /** Como la escribió la persona. */

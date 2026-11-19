@@ -46,7 +46,7 @@ export function coincideConPropuesta(p: Propuesta, v: Veredicto, distingueZona: 
 const limpiar = (t: unknown, max: number) => String(t ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 
 /** Revisa lo que llegó del navegador y lo deja limpio: completa con zona (si el país la distingue) o incompleta con lo que falta. */
-export function revisarVeredicto(d: { completa?: unknown; zona?: unknown; falta?: unknown }, distingueZona: boolean): { error: string } | { veredicto: Veredicto } {
+export function revisarVeredicto(d: { completa?: unknown; zona?: unknown; falta?: unknown }, distingueZona: boolean, conAdelanto = true): { error: string } | { veredicto: Veredicto } {
   if (typeof d?.completa !== "boolean") return { error: "Elige si la dirección está completa o falta un dato." };
   if (!d.completa) {
     const falta = limpiar(d.falta, 200);
@@ -54,7 +54,8 @@ export function revisarVeredicto(d: { completa?: unknown; zona?: unknown; falta?
     return { veredicto: { completa: false, zona: null, falta } };
   }
   if (!distingueZona) return { veredicto: { completa: true, zona: null, falta: null } };
-  if (d.zona !== "ciudad" && d.zona !== "interior" && d.zona !== "adelantado") return { error: "Elige si es ciudad, interior o pago por adelantado." };
+  if (d.zona !== "ciudad" && d.zona !== "interior" && d.zona !== "adelantado") return { error: conAdelanto ? "Elige si es ciudad, interior o pago por adelantado." : "Elige si es ciudad o interior." };
+  if (d.zona === "adelantado" && !conAdelanto) return { error: "En este país no hay pago por adelantado: elige ciudad o interior." };
   return { veredicto: { completa: true, zona: d.zona, falta: null } };
 }
 
