@@ -5,6 +5,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { pedirMeta, tokenDeMeta } from "./api";
+import { buscarArchivoDeVideo, motivoSinArchivoDeVideo } from "./archivo-video";
 import { analizarSoloTextoConGemini, analizarVideoConGemini, geminiConectado } from "./gemini-video";
 import { elegirPendientes, type AnalisisGuardado, type AnuncioConVideo, type VideoPendiente } from "./pendientes-video";
 import { esHostDeVideoMeta, normalizarAnalisisVideo, pedidoAnalisisVideo, VERSION_ANALISIS, type AnalisisVideo } from "./video-angulo";
@@ -121,50 +122,16 @@ export async function analizarVideoDeMeta(supabase: SupabaseClient, v: VideoPend
   const { data: previo } = await supabase.from("meta_video_analisis").select("angulo, angulo_manual").eq("video_id", v.videoId).maybeSingle();
 
   // 1. El archivo del video: Meta lo entrega como una dirección temporal en el campo `source` (solo si el acceso lo permite).
-  const ficha = await pedirMeta(`/${v.videoId}`, { fields: "source,length" }, token);
-  let datos = ficha.ok ? (ficha.datos as { source?: unknown; length?: unknown }) : null;
-  // Si el video suelto no trae el archivo, se prueba por la cuenta publicitaria: los videos subidos con ella salen en su lista de videos con el permiso de anuncios.
-  if (typeof datos?.source !== "string") {
-    const { data: cuenta } = await supabase.from("meta_cuentas").select("act_id").eq("id", v.cuentaId).maybeSingle();
-    if (cuenta?.act_id && /^[0-9]{5,25}$/.test(v.videoId)) {
-      const lista = await pedirMeta(`/${cuenta.act_id as string}/advideos`, { fields: "id,source,length", filtering: JSON.stringify([{ field: "id", operator: "IN", value: [v.videoId] }]), limit: "5" }, token);
-      const fila = lista.ok ? ((lista.datos as { data?: Array<{ id?: string; source?: unknown; length?: unknown }> }).data ?? []).find((x) => x.id === v.videoId) : null;
-      if (fila && typeof fila.source === "string") datos = fila;
-    }
-  }
-  // Tercera vía: los videos de una página de Facebook se bajan con el token de esa página (sale de /me/accounts con el acceso del sistema).
-  let paginasVistas = "";
-  let duenoDelVideo = "";
-  if (typeof datos?.source !== "string") {
-    const paginas = await pedirMeta("/me/accounts", { fields: "id,name,access_token", limit: "50" }, token);
-    const lista = paginas.ok ? ((paginas.datos as { data?: Array<{ id?: string; name?: string; access_token?: string }> }).data ?? []) : [];
-    paginasVistas = lista.map((p) => p.name ?? p.id).filter(Boolean).join(", ");
-    for (const p of lista) {
-      if (!p.access_token) continue;
-      const r = await pedirMeta(`/${v.videoId}`, { fields: "source,length,from" }, p.access_token);
-      if (!r.ok) continue;
-      const d = r.datos as { source?: unknown; length?: unknown; from?: { name?: string } };
-      if (d.from?.name) duenoDelVideo = d.from.name;
-      if (typeof d.source === "string") {
-        datos = d;
-        break;
-      }
-    }
-    if (!duenoDelVideo && ficha.ok) {
-      const d = await pedirMeta(`/${v.videoId}`, { fields: "from" }, token);
-      if (d.ok) duenoDelVideo = ((d.datos as { from?: { name?: string } }).from?.name) ?? "";
-    }
-  }
-  const fuente = typeof datos?.source === "string" ? datos.source : null;
-  const duracion = typeof datos?.length === "number" ? Math.round(datos.length) : null;
+  const archivoDeVideo = await buscarArchivoDeVideo(supabase, token, v.videoId, v.cuentaId);
+  const fuente = archivoDeVideo.fuente;
+  const duracion = archivoDeVideo.duracion;
   let motivoSinArchivo: string | null = null;
   if (!fuente) {
-    // Qué permisos tiene de verdad el acceso, para saber qué falta.
-    const permisos = await pedirMeta("/me/permissions", {}, token);
-    const dados = permisos.ok ? ((permisos.datos as { data?: Array<{ permission?: string; status?: string }> }).data ?? []).filter((p) => p.status === "granted").map((p) => p.permission).filter(Boolean).join(", ") : "";
-    motivoSinArchivo = !ficha.ok
-      ? ficha.error
-      : `Meta contestó sin el archivo del video (no dio error). Permisos: ${dados || "no se pudieron leer"}. Páginas que ve el acceso: ${paginasVistas || "ninguna"}. Dueño del video: ${duenoDelVideo || "no se pudo saber"}.`;
+    // Qué permisos tiene de verdad el acceso, para saber qué falta, y de qué cuenta es el video.
+    const permisos = archivoDeVideo.ficha.ok ? await pedirMeta("/me/permissions", {}, token) : null;
+    const dados = permisos?.ok ? ((permisos.datos as { data?: Array<{ permission?: string; status?: string }> }).data ?? []).filter((p) => p.status === "granted").map((p) => p.permission).filter(Boolean).join(", ") : "";
+    const { data: cuentaDelVideo } = await supabase.from("meta_cuentas").select("nombre").eq("id", v.cuentaId).maybeSingle();
+    motivoSinArchivo = motivoSinArchivoDeVideo(archivoDeVideo, (cuentaDelVideo?.nombre as string | undefined) ?? null, dados);
   }
 
   let origen: "video" | "texto" = "video";
