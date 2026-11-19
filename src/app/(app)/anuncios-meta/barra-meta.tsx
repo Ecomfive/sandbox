@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState, useTransition } from "react";
+import { ProgresoEstimado } from "@/components/ui/progreso-estimado";
 import { useToast } from "@/components/ui/toast";
 import { fieldClassSm, labelClassSm } from "@/components/ui/field";
 import { formatearFechaHora } from "@/lib/formato";
@@ -91,7 +92,8 @@ export function BarraMeta({ periodo, cuentas, cuentaId, escribe, hayToken, desde
           )}
         </div>
       </div>
-      {conError.length > 0 && mensajes.length === 0 && (
+      {leyendo && <ProgresoEstimado compacta etiqueta="Leyendo Meta" estimadoMs={40_000} pasos={["Conectando con Meta", "Leyendo los resultados por día", "Leyendo campañas, anuncios y videos", "Leyendo quién montó qué", "Guardando"]} />}
+      {conError.length > 0 && mensajes.length === 0 && !leyendo && (
         <ul role="alert" className="m-0 flex list-none flex-col gap-1 rounded-lg border border-border bg-card px-3 py-2 text-xs">
           {conError.map((c) => (
             <li key={c.id} className="flex items-start gap-2">

@@ -48,11 +48,11 @@ async function guardarPorTrozos<T>(filas: T[], guardar: (trozo: T[]) => PromiseL
   return null;
 }
 
-export async function sincronizarCuenta(supabase: SupabaseClient, cuenta: CuentaMeta, opciones: { limiteMs?: number } = {}): Promise<ResumenLectura> {
+export async function sincronizarCuenta(supabase: SupabaseClient, cuenta: CuentaMeta, opciones: { limiteMs?: number; /** Leer una ventana de fechas concreta (para traer el historial de a tramos) en vez de los últimos días. */ rango?: { desde: string; hasta: string } } = {}): Promise<ResumenLectura> {
   const inicio = Date.now();
   const limite = opciones.limiteMs ?? 90_000;
-  const hasta = hoyEnPanama();
-  const desde = restarDias(hasta, (cuenta.ultima_lectura_en ? DIAS_LECTURA : DIAS_PRIMERA_LECTURA) - 1);
+  const hasta = opciones.rango?.hasta ?? hoyEnPanama();
+  const desde = opciones.rango?.desde ?? restarDias(hasta, (cuenta.ultima_lectura_en ? DIAS_LECTURA : DIAS_PRIMERA_LECTURA) - 1);
   const r: ResumenLectura = { cuenta: cuenta.nombre, ok: false, campanas: 0, anuncios: 0, filas: 0, actividad: 0, desde, hasta, avisos: [], error: null };
 
   const token = tokenDeMeta();

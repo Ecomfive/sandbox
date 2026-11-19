@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
+import { ProgresoEstimado } from "@/components/ui/progreso-estimado";
 import { fieldClassSm, labelClassSm } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { formatearFechaHora } from "@/lib/formato";
@@ -10,6 +11,7 @@ import type { CuentaVista, TopeVista } from "@/lib/meta-ads/datos";
 import { CPA_TOPE_PREDETERMINADO } from "@/lib/meta-ads/metricas";
 import { claveDeProducto, etiquetasDeNombre, NOMBRE_ETAPA, NOMBRE_PUJA } from "@/lib/meta-ads/nombre";
 import { guardarCuentaMeta, guardarTopeMeta, probarConexionMeta } from "./actions";
+import { TraerHistorial } from "./traer-historial";
 
 const boton = "min-h-9 rounded-md px-3 py-1.5 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50";
 const botonOscuro = `${boton} bg-foreground text-background hover:opacity-90`;
@@ -64,7 +66,8 @@ function Conexion({ hayToken, escribe, alAgregar }: { hayToken: boolean; escribe
           </button>
         </div>
       )}
-      {r && (
+      {probando && <ProgresoEstimado compacta etiqueta="Probando la conexión con Meta" estimadoMs={6000} pasos={["Conectando con Meta", "Revisando el acceso", "Buscando las cuentas publicitarias"]} />}
+      {r && !probando && (
         <div role="status" className="flex flex-col gap-2 rounded-lg border border-border px-3 py-2 text-sm">
           <p className={`m-0 ${r.ok ? "" : "text-destructive"}`}>{r.mensaje}</p>
           {r.cuentas.length > 0 && (
@@ -330,12 +333,18 @@ function ProbadorDeNombres() {
 }
 
 /** «Cuentas»: la conexión con Meta, las cuentas publicitarias que se leen, el CPA tope de cada producto y cómo se leen los nombres de las campañas. */
-export function PanelCuentas({ cuentas, topes, productos, escribe, hayToken, pais }: { cuentas: CuentaVista[]; topes: TopeVista[]; productos: string[]; escribe: boolean; hayToken: boolean; pais: string }) {
+export function PanelCuentas({ cuentas, topes, productos, escribe, hayToken, pais, hoy }: { cuentas: CuentaVista[]; topes: TopeVista[]; productos: string[]; escribe: boolean; hayToken: boolean; pais: string; hoy: string }) {
   const [borrador, setBorrador] = useState<{ id: string; nombre: string } | null>(null);
   return (
     <div className="flex flex-col gap-6">
       <Conexion hayToken={hayToken} escribe={escribe} alAgregar={setBorrador} />
       <Cuentas cuentas={cuentas} escribe={escribe} pais={pais} borrador={borrador} />
+      {escribe && hayToken && (
+        <Bloque id="historial" titulo="Historial">
+          <p className="m-0 text-sm text-muted-foreground">Al agregar una cuenta solo se leen sus últimos 30 días. Aquí se trae lo anterior (hasta 3 años, lo que Meta guarda), un mes por vez, para ver campañas y videos de más tiempo.</p>
+          <TraerHistorial cuentas={cuentas} hoy={hoy} />
+        </Bloque>
+      )}
       <Topes topes={topes} productos={productos} escribe={escribe} />
       <ProbadorDeNombres />
     </div>

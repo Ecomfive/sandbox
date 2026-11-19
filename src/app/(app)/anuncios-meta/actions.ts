@@ -3,12 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { registrarAuditoria } from "@/lib/auditoria";
-import { analizarPendientes, analizarVideoDeMeta, pendienteDeVideo } from "@/lib/meta-ads/analizar-videos";
+import { analizarVideoDeMeta, pendienteDeVideo, videosPorAnalizar } from "@/lib/meta-ads/analizar-videos";
 import { actividadDeCampana } from "@/lib/meta-ads/datos";
 import { leerCuentasMeta } from "@/lib/meta-ads/leer-cuentas";
 import { claveDeProducto, type Etapa } from "@/lib/meta-ads/nombre";
 import { normalizarActId } from "@/lib/meta-ads/normalizar";
-import { probarAccesoMeta } from "@/lib/meta-ads/sincronizar";
+import { hoyEnPanama, probarAccesoMeta, restarDias, sincronizarCuenta } from "@/lib/meta-ads/sincronizar";
 import { DIAS_DE_DECISION } from "@/lib/meta-ads/sugerencias";
 import type { ActividadVista } from "@/lib/meta-ads/vistas";
 import { getPaisActual } from "@/lib/pais";
@@ -227,18 +227,47 @@ export async function analizarVideoAhoraMeta(videoId: string): Promise<{ error?:
   return r.ok ? { mensaje: r.mensaje } : { error: r.mensaje };
 }
 
-/** «Analizar los pendientes»: los videos con gasto que todavía no tienen análisis, de más a menos gasto, hasta donde alcance el tiempo (se puede pulsar otra vez para seguir). */
-export async function analizarPendientesMeta(): Promise<{ error?: string; analizados?: number; sinArchivo?: number; errores?: number; faltan?: number; mensajes?: string[] }> {
+/**
+ * «Analizar los pendientes», de a un video por llamada: la pantalla las encadena y así muestra el avance real («3 de 13») y se puede detener. Toma el pendiente que más gastó (los intentos de hace menos
+ * de 3 minutos no se repiten, así uno que falla no se queda dando vueltas), lo analiza y dice cuántos faltaban antes de él.
+ */
+export async function analizarSiguienteMeta(): Promise<{ error?: string; ninguno?: boolean; videoId?: string; estado?: "analizado" | "sin_archivo" | "error"; mensaje?: string; faltan?: number }> {
   const u = await requireModuloEscritura(MODULO);
   const supabase = createServiceClient();
   try {
-    const r = await analizarPendientes(supabase, { limiteMs: 270_000, max: 8, quien: u.nombre ?? u.email ?? null, ahora: true });
-    await registrarAuditoria({ accion: "analizar_video_meta", entidad: "meta_campanas", detalle: `${r.analizados} analizados con el video, ${r.sinArchivo} solo con el texto, ${r.errores} con error, faltan ${r.faltan}` });
-    revalidatePath("/anuncios-meta", "layout");
-    return r;
+    const { pendientes, total } = await videosPorAnalizar(supabase, { max: 1, ahora: true });
+    const v = pendientes[0];
+    if (!v) return { ninguno: true, faltan: 0 };
+    const r = await analizarVideoDeMeta(supabase, v, u.nombre ?? u.email ?? null);
+    await registrarAuditoria({ accion: "analizar_video_meta", entidad: "meta_campanas", entidadId: v.videoId, detalle: `${r.estado} · ${r.mensaje}`.slice(0, 300) });
+    if (!r.ok && /Falta (el acceso|conectar)/.test(r.mensaje)) return { error: r.mensaje };
+    return { videoId: v.videoId, estado: r.estado, mensaje: r.mensaje, faltan: total };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "No se pudo analizar." };
   }
+}
+
+const FECHA = /^\d{4}-\d{2}-\d{2}$/;
+const DIA_MS = 86_400_000;
+
+/**
+ * Trae el historial de una cuenta de a un tramo de fechas por llamada (la pantalla las encadena, de lo más nuevo a lo más viejo, y muestra el avance). Meta guarda hasta 37 meses. Cada tramo es de 31 días como mucho
+ * y guarda lo mismo que una lectura normal: resultados por día, campañas, anuncios y registro de actividad de esas fechas.
+ */
+export async function leerTramoMeta(cuentaId: string, desde: string, hasta: string): Promise<{ error?: string; texto?: string; filas?: number }> {
+  const u = await requireModuloEscritura(MODULO);
+  if (!UUID.test(cuentaId)) return { error: "Esa cuenta no existe." };
+  if (!FECHA.test(desde) || !FECHA.test(hasta) || desde > hasta) return { error: "Las fechas no son válidas." };
+  const dias = (new Date(`${hasta}T00:00:00Z`).getTime() - new Date(`${desde}T00:00:00Z`).getTime()) / DIA_MS + 1;
+  if (dias > 31) return { error: "Un tramo es de 31 días como máximo." };
+  if (hasta > hoyEnPanama() || desde < restarDias(hoyEnPanama(), 37 * 31)) return { error: "Meta solo guarda los últimos 37 meses." };
+  const supabase = createServiceClient();
+  const { data: cuenta } = await supabase.from("meta_cuentas").select("id, nombre, act_id, ultima_lectura_en, pais_id").eq("id", cuentaId).maybeSingle();
+  if (!cuenta || !(await puedeVerPaisId(supabase, u.paisesPermitidos, cuenta.pais_id as string))) return { error: "No tienes acceso a las cuentas de ese país." };
+  const r = await sincronizarCuenta(supabase, cuenta as { id: string; nombre: string; act_id: string; ultima_lectura_en: string | null }, { limiteMs: 100_000, rango: { desde, hasta } });
+  await registrarAuditoria({ accion: "leer_cuentas_meta", entidad: "meta_cuentas", entidadId: cuentaId, detalle: `Historial ${desde} a ${hasta}: ${r.ok ? `${r.campanas} campañas, ${r.filas} filas` : "con error"}` });
+  revalidatePath("/anuncios-meta", "layout");
+  return r.ok ? { texto: `${r.filas} filas de resultados${r.avisos.length ? ` (${r.avisos[0]})` : ""}`, filas: r.filas } : { error: r.error ?? "No se pudo leer ese tramo." };
 }
 
 /** Corrige a mano el ángulo de un video (un nuevo análisis ya no lo pisa). Vacío = volver a lo que dijo la IA en el próximo análisis. */

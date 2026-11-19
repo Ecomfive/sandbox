@@ -50,7 +50,7 @@ export const DEF_VIDEOS: DefTabla<VideoVista> = {
   csvAntes: [
     { etiqueta: "Video", valor: (v) => v.nombre },
     { etiqueta: "Número", valor: (v) => v.numero },
-    { etiqueta: "Gasto (30 días)", valor: (v) => Number(v.r.gasto.toFixed(2)) },
+    { etiqueta: "Gasto del periodo", valor: (v) => Number(v.r.gasto.toFixed(2)) },
     { etiqueta: "Compras", valor: (v) => v.r.compras },
     { etiqueta: "CPA", valor: (v) => { const c = cpa(v.r); return c === null ? null : Number(c.toFixed(2)); } },
     { etiqueta: "CPA tope", valor: (v) => v.tope },
@@ -59,5 +59,5 @@ export const DEF_VIDEOS: DefTabla<VideoVista> = {
     { etiqueta: "CTR del enlace %", valor: (v) => { const c = ctr(v.r); return c === null ? null : Number(c.toFixed(2)); } },
     { etiqueta: "Campañas", valor: (v) => campanasDeVideo(v).join(" | ") },
   ],
-  pdf: ["Video", "Producto", "Ángulo", "Gasto (30 días)", "Compras", "CPA", "Hook (3 s) %", "Campañas"],
+  pdf: ["Video", "Producto", "Ángulo", "Gasto del periodo", "Compras", "CPA", "Hook (3 s) %", "Campañas"],
 };
