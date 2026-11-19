@@ -8,8 +8,8 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { leerReglas } from "@/lib/finanzas/guardar-libro";
 import { reglaPara } from "@/lib/finanzas/clasificacion";
 import { UNIDAD_SIN_ASIGNAR } from "@/lib/finanzas/libro-excel";
-import { estadoDeLinea, type EstadoLinea } from "@/lib/conciliacion/emparejar";
-import { ORIGEN_CONCILIACION, enTrozos, planIngresos, recalcularCuentaMes, SIN_MIGRACION_V2 } from "@/lib/conciliacion/guardar";
+import { estadoDeLinea, redondeoPendiente, type EstadoLinea } from "@/lib/conciliacion/emparejar";
+import { ORIGEN_CONCILIACION, enTrozos, leerToleranciaCent, planIngresos, recalcularCuentaMes, SIN_MIGRACION_V2 } from "@/lib/conciliacion/guardar";
 import { PREFIJO_INGRESO, movimientosIngreso } from "@/lib/conciliacion/ingreso";
 import { etiquetaFuente } from "@/lib/conciliacion/cargar";
 import { hoyPanama } from "@/lib/af4/fecha";
@@ -84,14 +84,122 @@ async function actualizarEstados(ids: string[], quien: string | null): Promise<v
   }
 }
 
+const TIPO_REDONDEO = { a_favor: "Redondeo bancario a favor", en_contra: "Redondeo bancario en contra" } as const;
+
+/**
+ * Diferencia de centavos que se ajusta sola (mejora 13, migración 0986): una línea confirmada contra movimientos del libro
+ * que difieren en más de un centavo y no más del tope queda conciliada con un movimiento de redondeo en la tienda del
+ * primero. Solo cuando lo confirmado son movimientos del libro. Devuelve cuántas se ajustaron (0 sin la migración).
+ */
+async function asentarRedondeos(ids: string[], quien: string): Promise<number> {
+  if (!ids.length) return 0;
+  const supabase = createServiceClient();
+  const tope = await leerToleranciaCent(supabase);
+  if (tope <= 1) return 0;
+  const [lineas, pares, tipos] = await Promise.all([
+    leerLineas(ids),
+    enTrozos<{ linea_id: string; clase: string; movimiento_id: string | null; monto: number | string; grupo: string }>(ids, (t) =>
+      supabase.from("conc_pares").select("linea_id, clase, movimiento_id, monto, grupo").in("linea_id", t).eq("estado", "confirmado"),
+    ),
+    supabase.from("fin_tipos").select("id, nombre").in("nombre", Object.values(TIPO_REDONDEO)),
+  ]);
+  const idTipo = new Map((tipos.data ?? []).map((t) => [t.nombre as string, t.id as string]));
+  if (idTipo.size < 2) return 0;
+  let hechos = 0;
+  for (const l of lineas) {
+    const propios = pares.filter((p) => p.linea_id === l.id);
+    if (!propios.length || propios.some((p) => p.clase !== "movimiento" || !p.movimiento_id)) continue;
+    const r = redondeoPendiente(Number(l.monto), propios.map((p) => ({ monto: Number(p.monto) })), tope);
+    if (!r) continue;
+    const { data: base } = await supabase.from("fin_movimientos").select("unidad_id").eq("id", propios[0].movimiento_id!).maybeSingle();
+    if (!base) continue;
+    const clave = `conc-redondeo:${l.huella}`;
+    const { data: mov, error } = await supabase
+      .from("fin_movimientos")
+      .upsert(
+        {
+          periodo: `${String(l.fecha).slice(0, 7)}-01`,
+          fecha_registro: hoyPanama(),
+          fecha_pago: String(l.fecha).slice(0, 10),
+          unidad_id: base.unidad_id,
+          tipo_id: idTipo.get(TIPO_REDONDEO[r.tipo])!,
+          descripcion: `Redondeo bancario · ${l.descripcion.slice(0, 120)}`,
+          monto: r.importe,
+          en_eerr: true,
+          en_flujo: true,
+          cuenta_id: l.cuenta_id,
+          origen: ORIGEN_CONCILIACION,
+          origen_clave: clave,
+          creado_por: quien,
+        },
+        { onConflict: "origen_clave" },
+      )
+      .select("id")
+      .single();
+    if (error || !mov) continue;
+    const p = await supabase.from("conc_pares").insert({
+      linea_id: l.id,
+      clase: "movimiento",
+      movimiento_id: mov.id,
+      monto: r.monto,
+      puntaje: 100,
+      metodo: "exacto",
+      grupo: `${l.id}|redondeo`,
+      detalle: `Redondeo de ${usd(r.importe)}`,
+      estado: "confirmado",
+      confirmado_en: ahora(),
+      confirmado_por: quien,
+    });
+    if (!p.error) hechos++;
+  }
+  return hechos;
+}
+
+/**
+ * Las líneas sin pareja de una cuenta y mes que cumplen una regla «crear sola desde el banco» (con tienda y tipo) se crean
+ * en el libro y quedan conciliadas (mejora 12, migración 0986). Solo si la persona puede modificar el libro.
+ */
+async function crearPorReglas(
+  supabase: ReturnType<typeof createServiceClient>,
+  cuentaId: string,
+  mes: string,
+  usuario: { id: string; modulos: string[]; modulosSoloLectura: string[] },
+): Promise<number> {
+  if (!usuario.modulos.includes("libro-movimientos") || usuario.modulosSoloLectura.includes("libro-movimientos")) return 0;
+  const { data: auto, error } = await supabase
+    .from("fin_reglas")
+    .select("id, patron, unidad_id, tipo_id, activo")
+    .eq("activo", true)
+    .eq("conciliar_auto", true)
+    .not("unidad_id", "is", null)
+    .not("tipo_id", "is", null);
+  if (error || !auto?.length) return 0;
+  const fin = `${new Date(Date.UTC(Number(mes.slice(0, 4)), Number(mes.slice(5, 7)), 0)).toISOString().slice(0, 10)}`;
+  const { data: pendientes } = await supabase
+    .from("conc_lineas")
+    .select("id, cuenta_id, fecha, descripcion, monto, estado, huella")
+    .eq("cuenta_id", cuentaId)
+    .eq("estado", "pendiente")
+    .gte("fecha", mes)
+    .lte("fecha", fin)
+    .limit(MAX_LOTE);
+  const lineas = ((pendientes ?? []) as LineaBase[]).filter((l) => reglaPara(l.descripcion, auto as Parameters<typeof reglaPara>[1]));
+  if (!lineas.length) return 0;
+  const r = await crearDesdeLineas(supabase, lineas, usuario.id);
+  return "error" in r ? 0 : r.creados.length;
+}
+
 /** «Buscar coincidencias»: vuelve a proponer para las líneas sin conciliar de una cuenta en un mes. */
-export async function buscarCoincidencias(cuentaId: string, mes: string): Promise<Resultado<{ auto: number; sugeridas: number; pendientes: number }>> {
+export async function buscarCoincidencias(cuentaId: string, mes: string): Promise<Resultado<{ auto: number; sugeridas: number; pendientes: number; creadasPorRegla: number }>> {
   try {
-    await requireModuloEscritura(MODULO);
+    const usuario = await requireModuloEscritura(MODULO);
     if (typeof cuentaId !== "string" || !UUID.test(cuentaId) || typeof mes !== "string" || !MES.test(mes)) return { error: "Cuenta o mes inválidos." };
-    const r = await recalcularCuentaMes(createServiceClient(), cuentaId, mes);
+    const supabase = createServiceClient();
+    const r = await recalcularCuentaMes(supabase, cuentaId, mes);
+    const creadasPorRegla = await crearPorReglas(supabase, cuentaId, mes, usuario);
     revalidar();
-    return { ok: true, auto: r.auto, sugeridas: r.sugeridas, pendientes: r.pendientes };
+    if (creadasPorRegla) revalidatePath("/libro-movimientos", "layout");
+    return { ok: true, auto: r.auto, sugeridas: r.sugeridas, pendientes: Math.max(0, r.pendientes - creadasPorRegla), creadasPorRegla };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "No se pudo buscar coincidencias." };
   }
@@ -131,7 +239,11 @@ export async function confirmarPropuestas(seleccion: { lineaId: string; grupo?: 
     }
     await cambiarEnTrozos(descartar, (t) => supabase.from("conc_pares").update({ estado: "descartado" }).in("id", t));
     const conciliadas = [...elegido.keys()];
+    // El redondeo escribe en el libro: solo si además se puede modificar el Libro de movimientos.
+    const escribeLibro = usuario.modulos.includes("libro-movimientos") && !usuario.modulosSoloLectura.includes("libro-movimientos");
+    const redondeos = escribeLibro ? await asentarRedondeos(conciliadas, usuario.id) : 0;
     if (conciliadas.length) await actualizarEstados(conciliadas, usuario.id);
+    if (redondeos) revalidatePath("/libro-movimientos", "layout");
     const lineas = await leerLineas(conciliadas);
     await registrarAuditoriaLote(
       lineas.map((l) => ({
@@ -250,6 +362,86 @@ export async function reabrirLineas(ids: unknown): Promise<Resultado<{ reabierta
 }
 
 /**
+ * Crea en el libro un movimiento por línea del banco (con la regla que la describa) y deja la línea conciliada con él.
+ * Lo usan «Crear en el libro» y las reglas que crean solas desde el banco (mejora 12).
+ */
+async function crearDesdeLineas(
+  supabase: ReturnType<typeof createServiceClient>,
+  lineas: LineaBase[],
+  quien: string,
+): Promise<{ error: string } | { creados: { id: string }[] }> {
+  const [sinAsignar, reglas] = await Promise.all([
+    supabase.from("fin_unidades").select("id").eq("nombre", UNIDAD_SIN_ASIGNAR).maybeSingle(),
+    leerReglas(supabase),
+  ]);
+  if (!sinAsignar.data) return { error: `Falta la unidad «${UNIDAD_SIN_ASIGNAR}» del libro (migración 0901).` };
+  const huellaDe = new Map(lineas.map((l) => [l.id, l.huella]));
+  const hoy = hoyPanama();
+  const filas = lineas.map((l) => {
+    const monto = Number(l.monto);
+    const regla = reglaPara(l.descripcion, reglas);
+    return {
+      periodo: `${String(l.fecha).slice(0, 7)}-01`,
+      fecha_registro: hoy,
+      fecha_pago: String(l.fecha).slice(0, 10),
+      unidad_id: regla?.unidad_id ?? (sinAsignar.data!.id as string),
+      tipo_id: regla?.tipo_id ?? null,
+      regla_id: regla?.id ?? null,
+      descripcion: l.descripcion.slice(0, 500) || "Movimiento del banco",
+      monto: Math.abs(monto),
+      en_eerr: monto < 0,
+      en_flujo: true,
+      cuenta_id: l.cuenta_id,
+      origen: ORIGEN_CONCILIACION,
+      origen_clave: `conc:${huellaDe.get(l.id) ?? l.id}`,
+      editado_a_mano: true,
+      editado_por: quien,
+      editado_en: ahora(),
+      creado_por: quien,
+    };
+  });
+  const { data: creados, error } = await supabase.from("fin_movimientos").upsert(filas, { onConflict: "origen_clave" }).select("id, origen_clave");
+  if (error || !creados) return { error: `No se pudo crear en el libro: ${error?.message ?? "sin respuesta"}` };
+  const movDe = new Map(creados.map((c) => [c.origen_clave as string, c.id as string]));
+  // Las sugerencias de esas líneas sobran: quedan conciliadas con el movimiento nuevo.
+  await cambiarEnTrozos(
+    lineas.map((l) => l.id),
+    (t) => supabase.from("conc_pares").update({ estado: "descartado" }).in("linea_id", t).eq("estado", "sugerido"),
+  );
+  const pares = lineas.map((l) => ({
+    linea_id: l.id,
+    clase: "movimiento",
+    movimiento_id: movDe.get(`conc:${huellaDe.get(l.id) ?? l.id}`)!,
+    monto: Number(l.monto),
+    puntaje: 100,
+    metodo: "exacto",
+    grupo: `${l.id}|creado`,
+    detalle: "Creado en el libro",
+    estado: "confirmado",
+    confirmado_en: ahora(),
+    confirmado_por: quien,
+  }));
+  const p = await supabase.from("conc_pares").insert(pares.filter((x) => x.movimiento_id));
+  if (p.error) return { error: "El movimiento se creó, pero no se pudo conciliar la línea. Búscalo en el libro." };
+  await actualizarEstados(lineas.map((l) => l.id), quien);
+  await registrarAuditoriaLote([
+    ...lineas.map((l) => ({
+      accion: "crear_movimiento_desde_banco",
+      entidad: "conc_lineas",
+      entidadId: l.id,
+      detalle: `${l.fecha} · ${usd(Number(l.monto))} · ${l.descripcion.slice(0, 80)}`,
+    })),
+    ...creados.map((c) => ({
+      accion: "crear_movimiento_libro",
+      entidad: "fin_movimientos",
+      entidadId: c.id as string,
+      detalle: "Creado desde la conciliación bancaria",
+    })),
+  ]);
+  return { creados: creados.map((c) => ({ id: c.id as string })) };
+}
+
+/**
  * «Crear en el libro»: lo que el banco tiene y el libro no. Cada línea pendiente o sugerida se carga como movimiento
  * del libro (origen «conciliacion», corregido a mano: reimportar el Excel no lo pisa), sin tienda ni tipo salvo que una
  * regla de clasificación los dé (queda en «Por clasificar» del libro), y la línea queda conciliada con él.
@@ -267,74 +459,9 @@ export async function crearEnLibro(ids: unknown): Promise<Resultado<{ creados: n
     const supabase = createServiceClient();
     const lineas = (await leerLineas(lista)).filter((l) => l.estado === "pendiente" || l.estado === "sugerida");
     if (!lineas.length) return { error: "Solo se crean en el libro las líneas pendientes o sugeridas." };
-    const [sinAsignar, reglas] = await Promise.all([
-      supabase.from("fin_unidades").select("id").eq("nombre", UNIDAD_SIN_ASIGNAR).maybeSingle(),
-      leerReglas(supabase),
-    ]);
-    if (!sinAsignar.data) return { error: `Falta la unidad «${UNIDAD_SIN_ASIGNAR}» del libro (migración 0901).` };
-    const huellaDe = new Map(lineas.map((l) => [l.id, l.huella]));
-    const hoy = hoyPanama();
-    const filas = lineas.map((l) => {
-      const monto = Number(l.monto);
-      const regla = reglaPara(l.descripcion, reglas);
-      return {
-        periodo: `${String(l.fecha).slice(0, 7)}-01`,
-        fecha_registro: hoy,
-        fecha_pago: String(l.fecha).slice(0, 10),
-        unidad_id: regla?.unidad_id ?? (sinAsignar.data!.id as string),
-        tipo_id: regla?.tipo_id ?? null,
-        regla_id: regla?.id ?? null,
-        descripcion: l.descripcion.slice(0, 500) || "Movimiento del banco",
-        monto: Math.abs(monto),
-        en_eerr: monto < 0,
-        en_flujo: true,
-        cuenta_id: l.cuenta_id,
-        origen: ORIGEN_CONCILIACION,
-        origen_clave: `conc:${huellaDe.get(l.id) ?? l.id}`,
-        editado_a_mano: true,
-        editado_por: usuario.id,
-        editado_en: ahora(),
-        creado_por: usuario.id,
-      };
-    });
-    const { data: creados, error } = await supabase.from("fin_movimientos").upsert(filas, { onConflict: "origen_clave" }).select("id, origen_clave");
-    if (error || !creados) return { error: `No se pudo crear en el libro: ${error?.message ?? "sin respuesta"}` };
-    const movDe = new Map(creados.map((c) => [c.origen_clave as string, c.id as string]));
-    // Las sugerencias de esas líneas sobran: quedan conciliadas con el movimiento nuevo.
-    await cambiarEnTrozos(
-      lineas.map((l) => l.id),
-      (t) => supabase.from("conc_pares").update({ estado: "descartado" }).in("linea_id", t).eq("estado", "sugerido"),
-    );
-    const pares = lineas.map((l) => ({
-      linea_id: l.id,
-      clase: "movimiento",
-      movimiento_id: movDe.get(`conc:${huellaDe.get(l.id) ?? l.id}`)!,
-      monto: Number(l.monto),
-      puntaje: 100,
-      metodo: "exacto",
-      grupo: `${l.id}|creado`,
-      detalle: "Creado en el libro",
-      estado: "confirmado",
-      confirmado_en: ahora(),
-      confirmado_por: usuario.id,
-    }));
-    const p = await supabase.from("conc_pares").insert(pares.filter((x) => x.movimiento_id));
-    if (p.error) return { error: "El movimiento se creó, pero no se pudo conciliar la línea. Búscalo en el libro." };
-    await actualizarEstados(lineas.map((l) => l.id), usuario.id);
-    await registrarAuditoriaLote([
-      ...lineas.map((l) => ({
-        accion: "crear_movimiento_desde_banco",
-        entidad: "conc_lineas",
-        entidadId: l.id,
-        detalle: `${l.fecha} · ${usd(Number(l.monto))} · ${l.descripcion.slice(0, 80)}`,
-      })),
-      ...creados.map((c) => ({
-        accion: "crear_movimiento_libro",
-        entidad: "fin_movimientos",
-        entidadId: c.id as string,
-        detalle: "Creado desde la conciliación bancaria",
-      })),
-    ]);
+    const r = await crearDesdeLineas(supabase, lineas, usuario.id);
+    if ("error" in r) return r;
+    const creados = r.creados;
     revalidar();
     revalidatePath("/libro-movimientos", "layout");
     return { ok: true, creados: creados.length };
@@ -520,4 +647,40 @@ export async function obtenerHistorialLinea(id: string): Promise<{ eventos: { id
     .limit(30);
   if (error) return { error: "No se pudo cargar la actividad." };
   return { eventos: (data ?? []).map((e) => ({ id: e.id, evento: formatearEventoAuditoria(e), creadoEn: e.creado_en })) };
+}
+
+/**
+ * Ajustes de la conciliación (migración 0986): el tope de la diferencia de centavos que se ajusta sola al confirmar
+ * (hasta US$5.00) y los días sin conciliar para avisar (1 a 90).
+ */
+export async function guardarAjustesConciliacion(tope: string, dias: string): Promise<{ error: string } | { ok: true }> {
+  try {
+    const usuario = await requireModuloEscritura(MODULO);
+    const t = Number(String(tope ?? "").trim().replace(",", "."));
+    const d = Number(String(dias ?? "").trim());
+    if (!Number.isFinite(t) || t < 0.01 || t > 5) return { error: "La diferencia que se ajusta sola va de 0.01 a 5.00." };
+    if (!Number.isInteger(d) || d < 1 || d > 90) return { error: "Los días del aviso van de 1 a 90." };
+    const supabase = createServiceClient();
+    const centavos = Math.round(t * 100);
+    const { data: antes, error: ea } = await supabase.from("fin_config").select("clave, valor").in("clave", ["conc_tolerancia_centavos", "conc_dias_alerta"]);
+    if (ea) return { error: "No se pudieron leer los ajustes." };
+    const { error } = await supabase.from("fin_config").upsert([
+      { clave: "conc_tolerancia_centavos", valor: centavos, actualizado_por: usuario.id, actualizado_en: ahora() },
+      { clave: "conc_dias_alerta", valor: d, actualizado_por: usuario.id, actualizado_en: ahora() },
+    ]);
+    if (error) return { error: `No se pudo guardar: ${error.message}` };
+    const previo = (clave: string) => (antes ?? []).find((a) => a.clave === clave)?.valor;
+    await registrarAuditoriaLote([
+      {
+        accion: "ajustes_conciliacion",
+        entidad: "fin_config",
+        antes: { "Diferencia que se ajusta sola": usd(Number(previo("conc_tolerancia_centavos") ?? 1) / 100), "Aviso a los días": String(previo("conc_dias_alerta") ?? 7) },
+        despues: { "Diferencia que se ajusta sola": usd(centavos / 100), "Aviso a los días": String(d) },
+      },
+    ]);
+    revalidar();
+    return { ok: true };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "No se pudieron guardar los ajustes." };
+  }
 }

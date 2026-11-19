@@ -33,6 +33,14 @@ export interface FilaMovimiento {
   atipico: { veces: number; mediana: number } | null;
   /** Compra de un bien de uso (marcada así o del tipo «Alta Bien de Uso»): la ficha ofrece su bien. */
   esBien: boolean;
+  /** ITBMS del documento (vacío = no cargado). */
+  itbms: number | null;
+  /** Nota de Finanzas (migración 0986; no sale en el libro del contador). */
+  notaInterna: string | null;
+  /** «Repetida» si otro movimiento vivo tiene la misma factura del mismo proveedor. */
+  factura: "Repetida" | "Única" | "Sin factura";
+  /** Los otros movimientos con la misma factura. */
+  facturaRepetida: { id: string; periodo: string; monto: number }[];
 }
 
 const seleccion = <K extends keyof FilaMovimiento>(id: K, etiqueta: string, agrupable = true) => ({
@@ -51,6 +59,7 @@ export const DEF_MOVIMIENTOS: DefTabla<FilaMovimiento> = {
     seleccion("tienda", "Tienda"),
     seleccion("proveedor", "Proveedor"),
     seleccion("revision", "Monto"),
+    seleccion("factura", "Factura"),
     seleccion("seccion", "Sección del EERR"),
     seleccion("tipo", "Tipo"),
     seleccion("cuenta", "Forma de pago"),

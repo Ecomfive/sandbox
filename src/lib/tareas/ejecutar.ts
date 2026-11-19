@@ -8,6 +8,7 @@ import { cargarProyeccion, guardarFotoSiFalta, minimoProyectado } from "@/lib/fi
 import { armarProyeccion } from "@/lib/finanzas/proyeccion-caja";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { recalcularCuentaMes } from "../conciliacion/guardar";
+import { cargarAjustesConciliacion, cargarAntiguedad } from "../conciliacion/cargar";
 import { efectivoPorRepartidor, sincronizarTransportistas } from "../deliverys/efectivo";
 import { inicioSemana, sumarDias } from "../deliverys/liquidacion";
 import { cargarDatosMeses } from "../finanzas/cargar-cierre";
@@ -213,10 +214,44 @@ async function tareaAlertas(c: Contexto): Promise<Resultado> {
   // Préstamos del grupo (migración 0983): lo vencido o por vencer entre países, socios y financistas.
   const pg = await generarAlertasPrestamosGrupo(c.supabase, c.hoy);
   const gru = "error" in pg ? ` Préstamos del grupo: ${pg.error}` : ` Préstamos del grupo: ${pg.vencidos} vencidos, ${pg.porVencer} por vencer.`;
-  return { resumen: `${r.activas} alertas activas (${r.nuevas} nuevas), ${r.resueltas} resueltas. Evaluado: ${r.evaluados.join(", ") || "nada"}.${fiscal}${tes}${pau}${cov}${rie}${des}${gru}` };
+  // Conciliación (migración 0986): cuentas con algo abierto y sin conciliar hace más de los días del aviso.
+  const cb = await generarAlertasConciliacion(c.supabase, c.hoy);
+  const con = "error" in cb ? ` Conciliación: ${cb.error}` : ` Conciliación: ${cb.atrasadas} cuentas atrasadas.`;
+  return { resumen: `${r.activas} alertas activas (${r.nuevas} nuevas), ${r.resueltas} resueltas. Evaluado: ${r.evaluados.join(", ") || "nada"}.${fiscal}${tes}${pau}${cov}${rie}${des}${gru}${con}` };
 }
 
 const usdCorto = (v: number) => `US$${Math.round(v).toLocaleString("en-US")}`;
+
+/**
+ * Una alerta por cuenta del banco con líneas abiertas y sin conciliar hace más de `conc_dias_alerta` días (mejora 17).
+ * Crítica si además tiene algo abierto de más de 30 días. Lo que se pone al día se resuelve solo.
+ */
+export async function generarAlertasConciliacion(supabase: SupabaseClient, hoy: string): Promise<{ error: string } | { atrasadas: number }> {
+  const cuentas = await supabase.from("fin_cuentas").select("id, nombre");
+  if (cuentas.error) return { error: cuentas.error.message };
+  const ajustes = await cargarAjustesConciliacion(supabase);
+  const filas = await cargarAntiguedad(supabase, cuentas.data ?? [], hoy, ajustes.diasAlerta);
+  if (!filas) return { error: "falta correr la migración 0910." };
+  const nombre = new Map((cuentas.data ?? []).map((c) => [c.id as string, c.nombre as string]));
+  const nuevas: AlertaNueva[] = filas
+    .filter((f) => f.atrasada)
+    .map((f) => {
+      const abiertas = f.tramos.hasta7 + f.tramos.hasta30 + f.tramos.mas30;
+      const monto = f.montos.hasta7 + f.montos.hasta30 + f.montos.mas30;
+      return {
+        clave: `conc:${f.cuentaId}`,
+        tipo: "conciliacion_atrasada" as const,
+        severidad: f.tramos.mas30 > 0 ? ("critica" as const) : ("aviso" as const),
+        mensaje: `${nombre.get(f.cuentaId) ?? "Cuenta"}: ${abiertas} líneas sin conciliar (${usdCorto(monto)}), ${f.diasSinConciliar} días sin conciliar${f.tramos.mas30 ? ` · ${f.tramos.mas30} de más de 30 días` : ""}`.slice(0, 480),
+        enlace: `/conciliacion-bancaria?cuenta=${f.cuentaId}`,
+        modulo: DEF_ALERTA.conciliacion_atrasada.modulo,
+        monto,
+      };
+    });
+  const r = await guardarAlertas(supabase, nuevas, ["conciliacion_atrasada"]);
+  if ("error" in r) return { error: /check|tipo/i.test(r.error) ? "falta correr la migración 0986." : r.error };
+  return { atrasadas: nuevas.length };
+}
 
 /**
  * Lo pendiente de los préstamos del grupo (después de aplicar los abonos) vencido = crítica, que vence en 7 días = aviso.

@@ -8,11 +8,11 @@ import { claseCifra } from "@/components/af4/estilos-af4";
 import { anilloFoco } from "@/components/ui/field";
 import { entero } from "@/lib/af4/formato";
 import { useToast } from "@/components/ui/toast";
-import { ExtractoIcon, GastoIcon, PedidoIcon, TiendaIcon } from "@/lib/nav-icons";
+import { ConciliacionIcon, ExtractoIcon, GastoIcon, PedidoIcon, TiendaIcon } from "@/lib/nav-icons";
 import type { DefTabla } from "@/lib/tabla/motor";
 import type { NombreFilas } from "@/lib/tabla/pie";
 import type { Opcion } from "@/lib/finanzas/cargar-pendientes";
-import { aplicarReglasPendientes, cambiarEstadoRegla } from "../clasificar-actions";
+import { aplicarReglasPendientes, cambiarConciliarAuto, cambiarEstadoRegla } from "../clasificar-actions";
 import { CrearReglaPanel } from "./crear-regla-panel";
 
 export interface FilaRegla {
@@ -21,6 +21,10 @@ export interface FilaRegla {
   tienda: string;
   tipo: string;
   activo: boolean;
+  /** Crea sola el movimiento desde la conciliación bancaria (migración 0986). */
+  auto: boolean;
+  /** Pone tienda y tipo (solo así puede crear sola desde el banco). */
+  completa: boolean;
   pendientes: number;
   completados: number;
 }
@@ -32,11 +36,12 @@ const DEF: DefTabla<FilaRegla> = {
     { id: "tienda", etiqueta: "Tienda", tipo: "seleccion", valores: (r) => [r.tienda], agrupable: true },
     { id: "tipo", etiqueta: "Tipo", tipo: "seleccion", valores: (r) => [r.tipo], agrupable: true },
     { id: "estado", etiqueta: "Estado", tipo: "seleccion", valores: (r) => [r.activo ? "Activa" : "Inactiva"], agrupable: true },
+    { id: "banco", etiqueta: "Desde el banco", tipo: "seleccion", valores: (r) => [r.auto ? "Crea sola" : "No"], agrupable: true },
   ],
   cerrados: { etiqueta: "Inactivas", esCerrado: (r) => !r.activo, campoEstado: "estado", valoresCerrados: ["Inactiva"], ocultosPorDefecto: true, exclusivo: true },
 };
 const NOMBRE: NombreFilas = { singular: "regla", plural: "reglas" };
-const ICONOS: Record<string, IconoComp> = { patron: ExtractoIcon, tienda: TiendaIcon, tipo: GastoIcon, estado: PedidoIcon };
+const ICONOS: Record<string, IconoComp> = { patron: ExtractoIcon, tienda: TiendaIcon, tipo: GastoIcon, estado: PedidoIcon, banco: ConciliacionIcon };
 
 function Interruptor({ regla }: { regla: FilaRegla }) {
   const router = useRouter();
@@ -61,6 +66,33 @@ function Interruptor({ regla }: { regla: FilaRegla }) {
   );
 }
 
+/** «Crear sola desde el banco»: una casilla por regla con tienda y tipo. */
+function DesdeBanco({ regla, puedeEscribir }: { regla: FilaRegla; puedeEscribir: boolean }) {
+  const router = useRouter();
+  const { mostrarToast } = useToast();
+  const [pendiente, iniciar] = useTransition();
+  if (!regla.completa) return <span className="text-muted-foreground">—</span>;
+  return (
+    <label className="inline-flex items-center gap-1.5 text-xs">
+      <input
+        type="checkbox"
+        className="h-4 w-4"
+        checked={regla.auto}
+        disabled={!puedeEscribir || pendiente}
+        onChange={(e) =>
+          iniciar(async () => {
+            const r = await cambiarConciliarAuto(regla.id, e.target.checked);
+            if (r.error) mostrarToast(r.error, "destructive");
+            router.refresh();
+          })
+        }
+      />
+      <span>{regla.auto ? "Crea sola" : "No"}</span>
+      <span className="sr-only"> · crear sola desde el banco con la regla «{regla.patron}»</span>
+    </label>
+  );
+}
+
 const COLUMNAS: ColumnaTabla<FilaRegla, null>[] = [
   { id: "patron", label: "Cuando la descripción contiene", ocultable: false, render: (r) => <span className="font-mono text-xs">{r.patron}</span> },
   { id: "tienda", label: "Tienda", ocultable: true, render: (r) => r.tienda },
@@ -68,6 +100,15 @@ const COLUMNAS: ColumnaTabla<FilaRegla, null>[] = [
   { id: "pendientes", label: "Pendientes que completa", ocultable: true, clase: `text-right ${claseCifra}`, render: (r) => entero(r.pendientes) },
   { id: "completados", label: "Ya completados", ocultable: true, clase: `text-right text-muted-foreground ${claseCifra}`, render: (r) => entero(r.completados) },
 ];
+
+const columnaBanco = (puedeEscribir: boolean): ColumnaTabla<FilaRegla, null> => ({
+  id: "banco",
+  label: "Crear sola desde el banco",
+  ocultable: true,
+  render: (r) => <DesdeBanco regla={r} puedeEscribir={puedeEscribir} />,
+});
+const COLUMNAS_ESCRIBE = [...COLUMNAS, columnaBanco(true)];
+const COLUMNAS_LEE = [...COLUMNAS, columnaBanco(false)];
 
 export function TablaReglas({ filas, tiendas, tipos, puedeEscribir }: { filas: FilaRegla[]; tiendas: Opcion[]; tipos: Opcion[]; puedeEscribir: boolean }) {
   const router = useRouter();
@@ -100,7 +141,7 @@ export function TablaReglas({ filas, tiendas, tipos, puedeEscribir }: { filas: F
       <TablaDatos
         def={DEF}
         filas={filas}
-        columnas={COLUMNAS}
+        columnas={puedeEscribir ? COLUMNAS_ESCRIBE : COLUMNAS_LEE}
         contexto={null}
         iconos={ICONOS}
         nombre={NOMBRE}

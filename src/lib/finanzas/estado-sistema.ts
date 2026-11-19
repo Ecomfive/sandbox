@@ -194,6 +194,7 @@ export const MIGRACIONES_CLAVE: { migracion: string; que: string; prueba: Prueba
   { migracion: "0983", que: "Préstamos del grupo (entre países, socios y financistas)", prueba: { tipo: "tabla", nombre: "fin_grupo_movimientos" } },
   { migracion: "0984", que: "Libro: tiendas que asumen un gasto, lo pagó otra empresa y bien de uso desde el movimiento", prueba: { tipo: "tabla", nombre: "fin_movimiento_reparto" } },
   { migracion: "0985", que: "Costo de financiamiento por OC (tasa de los financistas) y paquetes extraviados en el libro", prueba: { tipo: "columna", nombre: "fin_grupo_partes", columna: "tasa_ciclo" } },
+  { migracion: "0986", que: "Nota interna, plantillas de reparto, reglas que concilian solas, redondeo bancario y aviso de cuentas sin conciliar", prueba: { tipo: "columna", nombre: "fin_movimientos", columna: "nota_interna" } },
 ];
 
 /** Lo que se muestra de una prueba («Falta …»). */

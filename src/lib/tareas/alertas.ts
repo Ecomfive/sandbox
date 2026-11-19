@@ -40,6 +40,8 @@ export const TIPOS_ALERTA = [
   "gasto_anomalo",
   // Migración 0983: un préstamo del grupo (entre países, socios o financistas) vencido o por vencer (`generarAlertasPrestamosGrupo`).
   "prestamo_grupo_vence",
+  // Migración 0986: una cuenta con líneas del banco abiertas y sin conciliar hace más de N días (`generarAlertasConciliacion`).
+  "conciliacion_atrasada",
 ] as const;
 export type TipoAlerta = (typeof TIPOS_ALERTA)[number];
 export type Severidad = "info" | "aviso" | "critica";
@@ -68,6 +70,7 @@ export const DEF_ALERTA: Record<TipoAlerta, { modulo: string; titulo: string; ac
   presupuesto_desvio: { modulo: "presupuesto", titulo: "Desvío contra el presupuesto", accion: "Ver presupuesto", href: "/presupuesto" },
   gasto_anomalo: { modulo: "libro-movimientos", titulo: "Gasto fuera de lo normal", accion: "Revisar gastos", href: "/libro-movimientos" },
   prestamo_grupo_vence: { modulo: "tesoreria", titulo: "Préstamo del grupo por vencer", accion: "Ver préstamos", href: "/tesoreria/grupo" },
+  conciliacion_atrasada: { modulo: "conciliacion-bancaria", titulo: "Cuenta sin conciliar", accion: "Conciliar", href: "/conciliacion-bancaria" },
 };
 
 /** Los tipos de Tesorería y de qué alerta de la página sale cada uno (por el comienzo de su clave). */

@@ -4,11 +4,14 @@ import { EstadoVacioAF4 } from "@/components/af4/estado-af4";
 import { FilaKpiAF4, KpiAF4, type ComparacionKpi } from "@/components/af4/kpi-af4";
 import { KpiCard, KpiGrid, KpiGroup } from "@/components/ui/kpi-card";
 import { Pagina } from "@/components/ui/pagina";
-import { mesCorto, mesEnCursoPanama } from "@/lib/af4/fecha";
+import { hoyPanama, mesCorto, mesEnCursoPanama } from "@/lib/af4/fecha";
 import { dinero, dineroKpi, entero, porcentaje } from "@/lib/af4/formato";
 import { calcularVariacion } from "@/lib/af4/variacion";
 import { requireModulo } from "@/lib/auth";
-import { cargarLineas, cargarResumen, cargarSaldo, type ResumenMes } from "@/lib/conciliacion/cargar";
+import { cargarAjustesConciliacion, cargarAntiguedad, cargarLineas, cargarResumen, cargarSaldo, type ResumenMes } from "@/lib/conciliacion/cargar";
+import { MarcoAF4 } from "@/components/af4/marco-af4";
+import { AjustesConciliacion } from "./ajustes-conciliacion";
+import { EstadoCuentas } from "./estado-cuentas";
 import { createServiceClient } from "@/lib/supabase/server";
 import { TablaLineas } from "./tabla-lineas";
 
@@ -65,7 +68,12 @@ export default async function ConciliacionBancariaPage({
   const mesPrevio = meses[meses.indexOf(mesElegido) - 1];
   const previo = mesPrevio ? datos.resumen.find((r) => r.cuentaId === cuentaId && r.mes === mesPrevio) : undefined;
 
-  const [lineas, saldo] = await Promise.all([cargarLineas(supabase, cuentaId, mesElegido), cargarSaldo(supabase, cuentaId, mesElegido, resumen)]);
+  const ajustes = await cargarAjustesConciliacion(supabase);
+  const [lineas, saldo, antiguedad] = await Promise.all([
+    cargarLineas(supabase, cuentaId, mesElegido),
+    cargarSaldo(supabase, cuentaId, mesElegido, resumen),
+    cargarAntiguedad(supabase, datos.cuentas, hoyPanama(), ajustes.diasAlerta),
+  ]);
   const filas = "error" in lineas ? [] : lineas;
   const conciliables = (resumen?.lineas ?? 0) - (resumen?.ignoradas ?? 0);
   // Con saldo inicial cargado (Flujo de caja › Saldos iniciales) se comparan saldos; sin él, lo que se movió en el mes.
@@ -153,10 +161,18 @@ export default async function ConciliacionBancariaPage({
         </KpiGrid>
       </KpiGroup>
 
+      {antiguedad && <EstadoCuentas filas={antiguedad} nombres={new Map(datos.cuentas.map((c) => [c.id, c.nombre]))} diasAlerta={ajustes.diasAlerta} href={(c) => href(c)} />}
+
       {"error" in lineas ? (
         <EstadoVacioAF4 titulo="No se pudieron leer las líneas del extracto">{lineas.error}</EstadoVacioAF4>
       ) : (
         <TablaLineas filas={filas} cuentaId={cuentaId} mes={mesElegido} puedeEscribir={puedeEscribir} puedeCrear={puedeCrear} />
+      )}
+
+      {puedeEscribir && (
+        <MarcoAF4 id="ajustes-conciliacion" titulo="Ajustes">
+          <AjustesConciliacion toleranciaCent={ajustes.toleranciaCent} diasAlerta={ajustes.diasAlerta} />
+        </MarcoAF4>
       )}
     </Pagina>
   );

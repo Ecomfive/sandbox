@@ -13,6 +13,8 @@ import type { Afinado } from "@/lib/permisos/afinado";
  */
 export const MODULO_DE_ENTIDAD: Record<string, string> = {
   fin_movimientos: "libro-movimientos",
+  fin_reparto_plantillas: "libro-movimientos",
+  fin_reglas: "libro-movimientos",
   fin_costos_lotes: "costos-mercancia",
   fin_bienes_uso: "bienes-de-uso",
   fin_config: "estado-resultados",

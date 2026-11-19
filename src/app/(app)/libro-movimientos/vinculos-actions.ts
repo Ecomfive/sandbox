@@ -44,6 +44,8 @@ export interface VinculosMovimiento {
   puedeBienes: boolean;
   /** Sin la migración 0984: el bloque avisa y no ofrece nada. */
   faltaMigracion: boolean;
+  /** Repartos guardados con nombre cuyas tiendas son todas de esta entidad (migración 0986; vacío sin ella). */
+  plantillas: { id: string; nombre: string; partes: ParteReparto[] }[];
 }
 
 interface Movimiento {
@@ -102,16 +104,17 @@ export async function obtenerVinculosMovimiento(id: string): Promise<{ error: st
     if ("error" in m) return m;
     const escribe = (modulo: string) => usuario.modulos.includes(modulo) && !usuario.modulosSoloLectura.includes(modulo);
     const todaLaEmpresa = veTodaLaEmpresa(await cargarTiendasPermitidas());
-    const [tiendas, reparto, partes, grupo, bien, sueltos] = await Promise.all([
+    const [tiendas, reparto, partes, grupo, bien, sueltos, plantillas] = await Promise.all([
       tiendasDeEntidad(supabase, m.entidad_id),
       supabase.from("fin_movimiento_reparto").select("unidad_id, porcentaje").eq("movimiento_id", m.id),
       supabase.from("fin_grupo_partes").select("id, nombre, clase, entidad_id").eq("activo", true).order("orden"),
       supabase.from("fin_grupo_movimientos").select("id, acreedor_id").eq("movimiento_id", m.id).maybeSingle(),
       supabase.from("fin_bienes_uso").select("id, descripcion").eq("movimiento_id", m.id).maybeSingle(),
       supabase.from("fin_bienes_uso").select("id, descripcion, fecha_alta").is("movimiento_id", null).order("fecha_alta", { ascending: false }).limit(200),
+      supabase.from("fin_reparto_plantillas").select("id, nombre, partes").order("nombre"),
     ]);
     if (reparto.error || grupo.error || bien.error) {
-      return { tiendas, reparto: [], duena: null, pagador: null, pagadores: [], puedeEmpresas: false, bien: null, bienesSueltos: [], puedeBienes: false, faltaMigracion: true };
+      return { tiendas, reparto: [], duena: null, pagador: null, pagadores: [], puedeEmpresas: false, bien: null, bienesSueltos: [], puedeBienes: false, faltaMigracion: true, plantillas: [] };
     }
     const listaPartes = (partes.data ?? []).filter((p) => p.clase === "empresa" || p.clase === "socio");
     const duenaFila = m.entidad_id ? listaPartes.find((p) => p.entidad_id === m.entidad_id) : undefined;
@@ -127,9 +130,71 @@ export async function obtenerVinculosMovimiento(id: string): Promise<{ error: st
       bienesSueltos: (sueltos.data ?? []).map((b) => ({ id: b.id as string, nombre: `${b.descripcion} · ${String(b.fecha_alta).slice(0, 7)}` })),
       puedeBienes: escribe(MODULO) && escribe("bienes-de-uso"),
       faltaMigracion: false,
+      plantillas: plantillasDe(plantillas.data, new Set(tiendas.map((t) => t.id))),
     };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "No se pudo leer el movimiento." };
+  }
+}
+
+/** Las plantillas que se pueden usar con estas tiendas (todas sus tiendas están en la lista y son válidas). */
+function plantillasDe(filas: { id: unknown; nombre: unknown; partes: unknown }[] | null, tiendas: Set<string>) {
+  const salida: VinculosMovimiento["plantillas"] = [];
+  for (const f of filas ?? []) {
+    const v = validarReparto(f.partes, tiendas);
+    if ("error" in v || !v.partes.length) continue;
+    salida.push({ id: String(f.id), nombre: String(f.nombre), partes: v.partes });
+  }
+  return salida;
+}
+
+/** Guarda el reparto con un nombre para usarlo en otros movimientos (mismo nombre = lo reemplaza). */
+export async function guardarPlantillaReparto(movimientoId: string, nombre: string, partes: unknown): Promise<{ error: string } | { id: string; nombre: string }> {
+  try {
+    const usuario = await requireModuloEscritura(MODULO);
+    const supabase = createServiceClient();
+    const m = await leerMovimiento(supabase, movimientoId);
+    if ("error" in m) return m;
+    const limpio = String(nombre ?? "").replace(/\s+/g, " ").trim().slice(0, 80);
+    if (limpio.length < 2) return { error: "Ponle un nombre a la plantilla." };
+    const tiendas = await tiendasDeEntidad(supabase, m.entidad_id);
+    const v = validarReparto(partes, new Set(tiendas.map((t) => t.id)));
+    if ("error" in v) return v;
+    if (!v.partes.length) return { error: "Elige las tiendas antes de guardar la plantilla." };
+    const { data: existe, error: ee } = await supabase.from("fin_reparto_plantillas").select("id").ilike("nombre", limpio.replace(/[%_]/g, "\\$&")).maybeSingle();
+    if (ee) return { error: "Falta correr la migración 0986 en Supabase." };
+    const fila = { nombre: limpio, partes: v.partes, actualizado_en: new Date().toISOString() };
+    const { data: guardada, error } = existe
+      ? await supabase.from("fin_reparto_plantillas").update(fila).eq("id", existe.id).select("id").single()
+      : await supabase.from("fin_reparto_plantillas").insert({ ...fila, creado_por: usuario.id }).select("id").single();
+    if (error || !guardada) return { error: `No se pudo guardar la plantilla: ${error?.message ?? "sin respuesta"}` };
+    const nombreTienda = (u: string) => tiendas.find((t) => t.id === u)?.nombre ?? "tienda";
+    await registrarAuditoria({
+      accion: "plantilla_reparto_libro",
+      entidad: "fin_reparto_plantillas",
+      detalle: `${limpio}: ${v.partes.map((p) => `${nombreTienda(p.unidadId)} ${p.porcentaje} %`).join(", ")}`,
+    });
+    return { id: guardada.id as string, nombre: limpio };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "No se pudo guardar la plantilla." };
+  }
+}
+
+/** Borra una plantilla de reparto (no toca los movimientos que ya la usaron: su reparto quedó guardado en cada uno). */
+export async function eliminarPlantillaReparto(id: string): Promise<{ error?: string }> {
+  try {
+    await requireModuloEscritura(MODULO);
+    if (typeof id !== "string" || !UUID.test(id)) return { error: "Plantilla inválida." };
+    const supabase = createServiceClient();
+    const { data, error: el } = await supabase.from("fin_reparto_plantillas").select("nombre").eq("id", id).maybeSingle();
+    if (el) return { error: "Falta correr la migración 0986 en Supabase." };
+    if (!data) return {};
+    const { error } = await supabase.from("fin_reparto_plantillas").delete().eq("id", id);
+    if (error) return { error: error.message };
+    await registrarAuditoria({ accion: "eliminar_plantilla_reparto", entidad: "fin_reparto_plantillas", entidadId: id, detalle: String(data.nombre) });
+    return {};
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "No se pudo borrar la plantilla." };
   }
 }
 

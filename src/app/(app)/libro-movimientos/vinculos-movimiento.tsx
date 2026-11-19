@@ -15,6 +15,8 @@ import { TIPOS_BIEN, VIDA_UTIL, type TipoBien } from "@/lib/finanzas/bienes-uso"
 import { montosDelReparto, partesIguales, type ParteReparto } from "@/lib/finanzas/reparto-elegido";
 import {
   crearBienDesdeMovimiento,
+  eliminarPlantillaReparto,
+  guardarPlantillaReparto,
   guardarRepartoMovimiento,
   marcarPagadoPorOtra,
   obtenerVinculosMovimiento,
@@ -90,8 +92,45 @@ function BloqueReparto({ id, monto, datos, puedeEscribir, alGuardar }: { id: str
   const [partes, setPartes] = useState<ParteReparto[]>(datos.reparto);
   const [error, setError] = useState<string | null>(null);
   const [pendiente, empezar] = useTransition();
+  const [plantilla, setPlantilla] = useState("");
+  const [plantillas, setPlantillas] = useState(datos.plantillas);
+  const [nombrePlantilla, setNombrePlantilla] = useState<string | null>(null);
   const nombre = (u: string) => datos.tiendas.find((t) => t.id === u)?.nombre ?? "Tienda";
   const elegidas = new Set(partes.map((p) => p.unidadId));
+
+  function usarPlantilla(id: string) {
+    setPlantilla(id);
+    const p = plantillas.find((x) => x.id === id);
+    if (p) setPartes(p.partes);
+  }
+
+  function guardarPlantilla() {
+    setError(null);
+    empezar(async () => {
+      const r = await guardarPlantillaReparto(id, nombrePlantilla ?? "", partes).catch(() => ({ error: "No se pudo guardar." }));
+      if ("error" in r && r.error) setError(r.error);
+      else if ("id" in r) {
+        mostrarToast("Plantilla guardada");
+        const nueva = { id: r.id, nombre: r.nombre, partes };
+        setPlantillas((a) => [...a.filter((x) => x.id !== r.id), nueva].sort((x, y) => x.nombre.localeCompare(y.nombre)));
+        setPlantilla(r.id);
+        setNombrePlantilla(null);
+      }
+    });
+  }
+
+  function borrarPlantilla() {
+    if (!plantilla || !confirm("¿Borrar esta plantilla? Los movimientos que ya la usaron no cambian.")) return;
+    empezar(async () => {
+      const r = await eliminarPlantillaReparto(plantilla).catch(() => ({ error: "No se pudo borrar." }));
+      if (r.error) setError(r.error);
+      else {
+        mostrarToast("Plantilla borrada");
+        setPlantillas((a) => a.filter((x) => x.id !== plantilla));
+        setPlantilla("");
+      }
+    });
+  }
   const suma = partes.reduce((s, p) => s + p.porcentaje, 0);
   const montos = montosDelReparto(monto, partes);
 
@@ -142,6 +181,26 @@ function BloqueReparto({ id, monto, datos, puedeEscribir, alGuardar }: { id: str
       )}
       {abierto && (
         <div role="group" aria-label="Tiendas que asumen el movimiento" className="flex flex-col gap-3">
+          {plantillas.length > 0 && (
+            <div className="flex flex-wrap items-end gap-2">
+              <label className="flex flex-col gap-1">
+                <span className={labelClassSm}>Usar una plantilla</span>
+                <select value={plantilla} onChange={(e) => usarPlantilla(e.target.value)} className={`${fieldClass} w-60`}>
+                  <option value="">Elegir plantilla</option>
+                  {plantillas.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.nombre}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {plantilla && (
+                <button type="button" className={boton} disabled={pendiente} onClick={borrarPlantilla}>
+                  Borrar plantilla
+                </button>
+              )}
+            </div>
+          )}
           <ul className="grid gap-1.5 sm:grid-cols-2">
             {datos.tiendas.map((t) => {
               const parte = partes.find((p) => p.unidadId === t.id);
@@ -193,10 +252,37 @@ function BloqueReparto({ id, monto, datos, puedeEscribir, alGuardar }: { id: str
                 Quitar reparto
               </button>
             )}
-            <button type="button" className={boton} disabled={pendiente} onClick={() => { setPartes(datos.reparto); setAbierto(false); setError(null); }}>
+            {partes.length > 1 && Math.abs(suma - 100) <= 0.01 && nombrePlantilla === null && (
+              <button type="button" className={boton} disabled={pendiente} onClick={() => setNombrePlantilla("")}>
+                Guardar como plantilla
+              </button>
+            )}
+            <button type="button" className={boton} disabled={pendiente} onClick={() => { setPartes(datos.reparto); setAbierto(false); setError(null); setNombrePlantilla(null); }}>
               Cancelar
             </button>
           </div>
+          {nombrePlantilla !== null && (
+            <div className="flex flex-wrap items-end gap-2">
+              <label className="flex flex-col gap-1">
+                <span className={labelClassSm}>Nombre de la plantilla</span>
+                <input
+                  value={nombrePlantilla}
+                  onChange={(e) => setNombrePlantilla(e.target.value)}
+                  onKeyDown={sinEnter}
+                  maxLength={80}
+                  data-enfocar
+                  placeholder="Ej: Alquiler Plaza 100"
+                  className={`${fieldClass} w-60`}
+                />
+              </label>
+              <button type="button" className={botonFuerte} disabled={pendiente || nombrePlantilla.trim().length < 2} onClick={guardarPlantilla}>
+                {pendiente ? "Guardando…" : "Guardar plantilla"}
+              </button>
+              <button type="button" className={boton} disabled={pendiente} onClick={() => setNombrePlantilla(null)}>
+                No
+              </button>
+            </div>
+          )}
         </div>
       )}
     </Seccion>
