@@ -119,6 +119,9 @@ export function ListaStock({
   // Con una plataforma elegida (su tarjeta o el filtro «Plataforma»), la columna muestra solo lo de esa plataforma.
   const [filtros] = useFiltros(def);
   const filtroPlataforma = filtros.find((x) => x.campo === "plataforma")?.valor;
+  // La bodega que se está viendo: la del selector de arriba o, si no hay, la única del filtro «Bodega».
+  const filtroBodega = filtros.find((x) => x.campo === "bodega")?.valor;
+  const bodegaVista = bodegaElegida || (filtroBodega?.tipo === "seleccion" && filtroBodega.valores.length === 1 ? filtroBodega.valores[0] : null);
   const plataforma = conPlataformas && filtroPlataforma?.tipo === "seleccion" && filtroPlataforma.valores.length === 1 && PLATAFORMAS_STOCK.includes(filtroPlataforma.valores[0] as Plataforma) ? (filtroPlataforma.valores[0] as Plataforma) : null;
 
   return (
@@ -134,11 +137,11 @@ export function ListaStock({
         renderFila={(f) =>
           f.variantes.length > 0 ? (
             <>
-              <FilaStockLista f={f} conPlataformas={conPlataformas} plataforma={plataforma} abierto={desplegados.has(f.id)} alAbrir={() => setAbierto(f.id)} alAlternar={() => alternar(f.id)} />
+              <FilaStockLista f={f} conPlataformas={conPlataformas} plataforma={plataforma} bodegaId={bodegaVista} abierto={desplegados.has(f.id)} alAbrir={() => setAbierto(f.id)} alAlternar={() => alternar(f.id)} />
               {desplegados.has(f.id) && (
                 <div className="divide-y divide-border border-t border-border">
                   {ordenarVariantes(f.variantes, descendente).map((v) => (
-                    <FilaStockLista key={v.id} f={v} hijo conPlataformas={conPlataformas} plataforma={plataforma} alAbrir={() => setAbierto(v.id)} />
+                    <FilaStockLista key={v.id} f={v} hijo bodegaId={bodegaVista} conPlataformas={conPlataformas} plataforma={plataforma} alAbrir={() => setAbierto(v.id)} />
                   ))}
                   <div className="flex items-center justify-end bg-muted/30 py-1.5 pr-4 pl-10">
                     <BotonOrdenVariantes />
@@ -147,7 +150,7 @@ export function ListaStock({
               )}
             </>
           ) : (
-            <FilaStockLista f={f} conPlataformas={conPlataformas} plataforma={plataforma} alAbrir={() => setAbierto(f.id)} />
+            <FilaStockLista f={f} conPlataformas={conPlataformas} plataforma={plataforma} bodegaId={bodegaVista} alAbrir={() => setAbierto(f.id)} />
           )
         }
         formatearTotal={(n) => `${n.toLocaleString("es-PA")} u.`}
