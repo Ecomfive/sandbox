@@ -9,8 +9,9 @@ import { useToast } from "@/components/ui/toast";
 import { cuandoCorto, type PreguntaCuantoHay } from "@/lib/cuanto-hay/reglas";
 
 /**
- * Gestión de tienda › Preguntar cuánto hay (16 nov 2026): una línea para preguntar (tienda si maneja varias, producto del catálogo y una nota) y
- * debajo sus preguntas con la columna «Hay»: «Esperando a Yiletsi» hasta que responde, y después la cantidad, quién y cuándo.
+ * Comunicación despacho › Cuánto hay (16 nov 2026): una línea para preguntar («Para»: Proveeduría o la tienda, si hay más de una; producto del
+ * catálogo y una nota) y debajo **solo las preguntas de la persona** (19 nov 2026). «Cantidad» lleva solo el número (o «Esperando a Yiletsi») y
+ * «Respondió», quién y cuándo, en su propia columna.
  */
 export function PreguntarCuantoHay({
   tiendas,
@@ -62,7 +63,7 @@ export function PreguntarCuantoHay({
           >
             {verTienda ? (
               <label className="flex min-w-[140px] flex-col gap-1 text-sm">
-                <span className="font-medium">Tienda</span>
+                <span className="font-medium">Para</span>
                 <select value={tiendaId} onChange={(e) => setTiendaId(e.target.value)} className={fieldClass}>
                   {tiendas.map((t) => (
                     <option key={t.id} value={t.id}>
@@ -104,17 +105,18 @@ export function PreguntarCuantoHay({
           <thead>
             <tr className="text-left text-muted-foreground">
               <th className="border-b border-border px-4 py-2 font-medium">Producto</th>
-              {verTienda && <th className="border-b border-border px-2 py-2 font-medium">Tienda</th>}
+              {verTienda && <th className="border-b border-border px-2 py-2 font-medium">Para</th>}
               <th className="border-b border-border px-2 py-2 font-medium">Nota</th>
-              <th className="border-b border-border px-2 py-2 font-medium">Preguntó</th>
-              <th className="border-b border-border px-4 py-2 text-right font-medium">Hay</th>
+              <th className="border-b border-border px-2 py-2 font-medium">Preguntaste</th>
+              <th className="border-b border-border px-2 py-2 text-right font-medium">Cantidad</th>
+              <th className="border-b border-border px-4 py-2 font-medium">Respondió</th>
             </tr>
           </thead>
           <tbody>
             {preguntas.length === 0 ? (
               <tr>
-                <td colSpan={verTienda ? 5 : 4} className="px-4 py-6 text-center text-muted-foreground">
-                  Todavía no hay preguntas.
+                <td colSpan={verTienda ? 6 : 5} className="px-4 py-6 text-center text-muted-foreground">
+                  Todavía no has preguntado nada.
                 </td>
               </tr>
             ) : (
@@ -123,19 +125,22 @@ export function PreguntarCuantoHay({
                   <td className="px-4 py-2.5 font-medium">{p.producto}</td>
                   {verTienda && <td className="px-2 py-2.5">{p.tienda}</td>}
                   <td className="px-2 py-2.5 text-muted-foreground">{p.nota ?? "—"}</td>
-                  <td className="px-2 py-2.5 text-muted-foreground">
-                    {p.pedidoPorNombre ?? "—"} · {cuandoCorto(p.creadoEn, ahora)}
-                  </td>
-                  <td className="px-4 py-2.5 text-right">
+                  <td className="px-2 py-2.5 whitespace-nowrap text-muted-foreground">{cuandoCorto(p.creadoEn, ahora)}</td>
+                  <td className="px-2 py-2.5 text-right">
                     {p.cantidad === null ? (
-                      <span className="text-muted-foreground">Esperando a Yiletsi</span>
+                      <span className="text-xs whitespace-nowrap text-muted-foreground">Esperando a Yiletsi</span>
                     ) : (
-                      <>
-                        <span className="text-base font-bold text-primario">{p.cantidad.toLocaleString("es-PA")}</span>{" "}
-                        <span className="text-muted-foreground">
-                          · {p.respondidoPorNombre ?? "Despacho"}, {p.respondidoEn ? cuandoCorto(p.respondidoEn, ahora) : ""}
-                        </span>
-                      </>
+                      <span className="text-base font-bold text-primario tabular-nums">{p.cantidad.toLocaleString("es-PA")}</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-2.5">
+                    {p.respondidoEn ? (
+                      <span className="flex flex-col leading-tight">
+                        <span>{p.respondidoPorNombre ?? "Despacho"}</span>
+                        <span className="text-xs text-muted-foreground">{cuandoCorto(p.respondidoEn, ahora)}</span>
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
                     )}
                   </td>
                 </tr>
@@ -144,7 +149,7 @@ export function PreguntarCuantoHay({
           </tbody>
         </table>
       </div>
-      <p className="m-0 text-xs text-muted-foreground">Cuando Yiletsi responde, te llega el aviso en «Para ti». Se ven las preguntas de los últimos 60 días.</p>
+      <p className="m-0 text-xs text-muted-foreground">Aquí ves solo lo que tú preguntaste, de los últimos 60 días. Cuando Yiletsi responde, te llega el aviso en «Para ti».</p>
     </div>
   );
 }

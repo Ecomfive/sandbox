@@ -2,10 +2,17 @@
 // Yiletsi responde con la cantidad que contó despacho. Prueba en `reglas.test.ts`.
 
 export const MAX_NOTA = 300;
+
+/**
+ * Una pregunta sin tienda es de Proveeduría (19 nov 2026, migración 0336: Nicol, de Gestión de IDs Dropi, también pregunta). En la base es
+ * `tienda_id` null; en las pantallas va con este id, para elegirla y agruparla como una tienda más.
+ */
+export const PROVEEDURIA = { id: "proveeduria", nombre: "Proveeduría" } as const;
 export const MAX_CANTIDAD = 1_000_000;
 
 export interface PreguntaCuantoHay {
   id: string;
+  /** La tienda, o `PROVEEDURIA.id` si la pregunta es de Proveeduría. */
   tiendaId: string;
   tienda: string;
   producto: string;

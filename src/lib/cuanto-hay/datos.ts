@@ -3,7 +3,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { mismaTiendaUnidad } from "@/lib/tienda/ordenes-finanzas";
-import type { PreguntaCuantoHay } from "./reglas";
+import { PROVEEDURIA, type PreguntaCuantoHay } from "./reglas";
 
 export interface TiendaCuantoHay {
   id: string;
@@ -26,7 +26,7 @@ const COLUMNAS = "id, tienda_id, producto, nota, pedido_por, pedido_por_nombre, 
 
 type Fila = {
   id: string;
-  tienda_id: string;
+  tienda_id: string | null;
   producto: string;
   nota: string | null;
   pedido_por: string;
@@ -39,8 +39,8 @@ type Fila = {
 
 const aPregunta = (f: Fila, tiendas: TiendaCuantoHay[]): PreguntaCuantoHay => ({
   id: f.id,
-  tiendaId: f.tienda_id,
-  tienda: tiendas.find((t) => t.id === f.tienda_id)?.nombre ?? "Tienda",
+  tiendaId: f.tienda_id ?? PROVEEDURIA.id,
+  tienda: f.tienda_id ? (tiendas.find((t) => t.id === f.tienda_id)?.nombre ?? "Tienda") : PROVEEDURIA.nombre,
   producto: f.producto,
   nota: f.nota,
   pedidoPor: f.pedido_por,
@@ -55,14 +55,18 @@ const aPregunta = (f: Fila, tiendas: TiendaCuantoHay[]): PreguntaCuantoHay => ({
 type Resultado = { preguntas: PreguntaCuantoHay[]; faltaMigracion: boolean };
 
 /**
- * Las preguntas que ve una tienda (los últimos 60 días): con tiendas asignadas, todas las de sus tiendas (también las de un compañero);
- * sin tiendas asignadas, las que hizo la persona.
+ * Las preguntas que ve quien pregunta (los últimos 60 días): **solo las suyas** (19 nov 2026, pedido de Hernán: «salir solo lo que pregunta al que
+ * pregunta»; antes, con tiendas asignadas, veía también las de sus compañeros).
  */
-export async function cargarPreguntasDeTienda(supabase: SupabaseClient, usuarioId: string, susTiendas: string[] | null, tiendas: TiendaCuantoHay[]): Promise<Resultado> {
+export async function cargarPreguntasDeTienda(supabase: SupabaseClient, usuarioId: string, tiendas: TiendaCuantoHay[]): Promise<Resultado> {
   const desde = new Date(Date.now() - 60 * 86_400_000).toISOString();
-  let q = supabase.from("tienda_cuanto_hay").select(COLUMNAS).gte("creado_en", desde);
-  q = susTiendas === null ? q.eq("pedido_por", usuarioId) : q.in("tienda_id", susTiendas.length ? susTiendas : ["00000000-0000-0000-0000-000000000000"]);
-  const { data, error } = await q.order("creado_en", { ascending: false }).limit(300);
+  const { data, error } = await supabase
+    .from("tienda_cuanto_hay")
+    .select(COLUMNAS)
+    .gte("creado_en", desde)
+    .eq("pedido_por", usuarioId)
+    .order("creado_en", { ascending: false })
+    .limit(300);
   if (error) return { preguntas: [], faltaMigracion: true };
   return { preguntas: ((data ?? []) as Fila[]).map((f) => aPregunta(f, tiendas)), faltaMigracion: false };
 }
@@ -82,6 +86,9 @@ export async function contarAbiertas(supabase: SupabaseClient): Promise<Record<s
   const { data, error } = await supabase.from("tienda_cuanto_hay").select("tienda_id").is("respondido_en", null).limit(2000);
   if (error) return {};
   const c: Record<string, number> = {};
-  for (const f of (data ?? []) as { tienda_id: string }[]) c[f.tienda_id] = (c[f.tienda_id] ?? 0) + 1;
+  for (const f of (data ?? []) as { tienda_id: string | null }[]) {
+    const k = f.tienda_id ?? PROVEEDURIA.id;
+    c[k] = (c[k] ?? 0) + 1;
+  }
   return c;
 }

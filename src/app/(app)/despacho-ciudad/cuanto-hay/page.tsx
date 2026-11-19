@@ -5,7 +5,7 @@ import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { requireModulo } from "@/lib/auth";
 import { cargarPreguntasDespacho, cargarTiendasCuantoHay, contarAbiertas } from "@/lib/cuanto-hay/datos";
-import { agruparPorTienda, tiendasDePersona } from "@/lib/cuanto-hay/reglas";
+import { PROVEEDURIA, agruparPorTienda, tiendasDePersona } from "@/lib/cuanto-hay/reglas";
 import { cargarTiendasPermitidas } from "@/lib/finanzas/cargar-tiendas-permitidas";
 import { createServiceClient } from "@/lib/supabase/server";
 
@@ -25,7 +25,8 @@ export default async function ResponderCuantoHayPage({ searchParams }: { searchP
   const supabase = createServiceClient();
   // Con tiendas limitadas, solo las preguntas de sus tiendas (auditoría de seguridad, 18 nov 2026).
   const permitidas = await cargarTiendasPermitidas();
-  const tiendas = tiendasDePersona(await cargarTiendasCuantoHay(supabase), permitidas, (t) => t.unidadId);
+  // Las de Proveeduría (sin tienda, migración 0336) van al final, como una tienda más; con tiendas limitadas no se ven.
+  const tiendas = [...tiendasDePersona(await cargarTiendasCuantoHay(supabase), permitidas, (t) => t.unidadId), ...(permitidas === null ? [{ ...PROVEEDURIA, unidadId: null }] : [])];
   const suyas = new Set(tiendas.map((t) => t.id));
   const tiendaElegida = typeof sp.tienda === "string" && tiendas.some((t) => t.id === sp.tienda) ? sp.tienda : null;
   const [todas, todasAbiertas] = await Promise.all([cargarPreguntasDespacho(supabase, respondidas, tiendas), contarAbiertas(supabase)]);
@@ -50,7 +51,7 @@ export default async function ResponderCuantoHayPage({ searchParams }: { searchP
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-4">
       <EncabezadoPagina titulo="Responder cuánto hay" oculto>
-        Lo que preguntan las tiendas: manda a contar a despacho, escribe la cantidad y responde. La respuesta le llega a quien preguntó.
+        Lo que preguntan las tiendas y Proveeduría: manda a contar a despacho, escribe la cantidad y responde. La respuesta le llega a quien preguntó.
       </EncabezadoPagina>
       {faltaMigracion ? (
         <p role="alert" className="m-0 rounded-lg border border-border bg-card px-4 py-3 text-sm text-destructive">

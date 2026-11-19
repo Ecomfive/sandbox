@@ -3,7 +3,7 @@ import { Pagina } from "@/components/ui/pagina";
 import { PreguntarCuantoHay } from "@/components/cuanto-hay/preguntar";
 import { requireModulo } from "@/lib/auth";
 import { cargarPreguntasDeTienda, cargarTiendasCuantoHay } from "@/lib/cuanto-hay/datos";
-import { tiendasDePersona } from "@/lib/cuanto-hay/reglas";
+import { PROVEEDURIA, tiendasDePersona } from "@/lib/cuanto-hay/reglas";
 import { cargarTiendasPermitidas } from "@/lib/finanzas/cargar-tiendas-permitidas";
 import { createServiceClient } from "@/lib/supabase/server";
 import { obtenerOpcionesSkuMaestro } from "@/lib/wms/skus-maestros";
@@ -20,8 +20,9 @@ export default async function PreguntarCuantoHayPage() {
   const usuario = await requireModulo("tienda-cuanto-hay");
   const supabase = createServiceClient();
   const [todas, permitidas, opciones] = await Promise.all([cargarTiendasCuantoHay(supabase), cargarTiendasPermitidas(), obtenerOpcionesSkuMaestro(supabase)]);
-  const tiendas = tiendasDePersona(todas, permitidas, (t) => t.unidadId);
-  const { preguntas, faltaMigracion } = await cargarPreguntasDeTienda(supabase, usuario.id, permitidas === null ? null : tiendas.map((t) => t.id), todas);
+  // Quien ve toda la empresa también pregunta para Proveeduría (sin tienda; 19 nov 2026, migración 0336), y va primero.
+  const tiendas = [...(permitidas === null ? [PROVEEDURIA] : []), ...tiendasDePersona(todas, permitidas, (t) => t.unidadId)];
+  const { preguntas, faltaMigracion } = await cargarPreguntasDeTienda(supabase, usuario.id, todas);
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-4">
       <EncabezadoPagina titulo="Preguntar cuánto hay" oculto>

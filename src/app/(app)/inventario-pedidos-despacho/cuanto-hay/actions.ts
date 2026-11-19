@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireModuloEscritura, type UsuarioActual } from "@/lib/auth";
 import { cargarTiendasCuantoHay } from "@/lib/cuanto-hay/datos";
-import { avisoPregunta, avisoRespuesta, leerCantidad, limpiarNota, tiendasDePersona } from "@/lib/cuanto-hay/reglas";
+import { PROVEEDURIA, avisoPregunta, avisoRespuesta, leerCantidad, limpiarNota, tiendasDePersona } from "@/lib/cuanto-hay/reglas";
 import { SIN_ACCESO_TIENDA } from "@/lib/finanzas/acceso-tienda";
 import { cargarTiendasPermitidas } from "@/lib/finanzas/cargar-tiendas-permitidas";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -29,19 +29,28 @@ async function conPermiso<T>(modulo: string, hacer: (u: UsuarioActual) => Promis
   return hacer(u);
 }
 
-/** La tienda pregunta cuánto hay de un producto del catálogo, con una nota opcional. Le llega el aviso a quien responde. */
+/**
+ * Una tienda (o Proveeduría, `PROVEEDURIA.id`: solo quien ve toda la empresa) pregunta cuánto hay de un producto del catálogo, con una nota
+ * opcional. Le llega el aviso a quien responde.
+ */
 export async function preguntarCuantoHay(tiendaId: string, skuId: string, nota: string): Promise<Resultado> {
   return conPermiso(MODULO_TIENDA, async (u) => {
-    if (!ES_UUID(tiendaId)) return { error: "Elige la tienda." };
+    const deProveeduria = tiendaId === PROVEEDURIA.id;
+    if (!deProveeduria && !ES_UUID(tiendaId)) return { error: "Elige para quién es." };
     if (!ES_UUID(skuId)) return { error: "Elige el producto de la lista." };
     const supabase = createServiceClient();
-    const tiendas = tiendasDePersona(await cargarTiendasCuantoHay(supabase), await cargarTiendasPermitidas(), (t) => t.unidadId);
-    const tienda = tiendas.find((t) => t.id === tiendaId);
+    const permitidas = await cargarTiendasPermitidas();
+    let tienda: { id: string | null; nombre: string } | undefined;
+    if (deProveeduria) {
+      if (permitidas !== null) return { error: "No puedes preguntar para Proveeduría." };
+      tienda = { id: null, nombre: PROVEEDURIA.nombre };
+    } else tienda = tiendasDePersona(await cargarTiendasCuantoHay(supabase), permitidas, (t) => t.unidadId).find((t) => t.id === tiendaId);
     if (!tienda) return { error: "No puedes preguntar por esa tienda." };
     const { data: sku } = await supabase.from("skus_maestros").select("id, nombre, tipo").eq("id", skuId).maybeSingle();
     if (!sku || sku.tipo !== "simple") return { error: "Elige un producto de la lista (los combos no se cuentan: pregunta por cada producto)." };
     const fila = { tienda_id: tienda.id, sku_id: sku.id as string, producto: String(sku.nombre).slice(0, 300), nota: limpiarNota(nota), pedido_por: u.id, pedido_por_nombre: nombreDe(u) };
     const { error } = await supabase.from("tienda_cuanto_hay").insert(fila);
+    if (error && deProveeduria && /tienda_id/.test(error.message)) return { error: "Falta correr en Supabase la migración 0336 (Cuánto hay para Proveeduría)." };
     if (error) return { error: /tienda_cuanto_hay/.test(error.message) ? SIN_MIGRACION : "No se pudo guardar la pregunta." };
     // El aviso «Para ti» a quien tiene el panel para ella sola (Yiletsi, migración 0302); a los administradores no, para no llenarles la campana.
     const { data: responden } = await supabase.from("permisos_persona").select("perfil_id").eq("modulo", MODULO_DESPACHO).eq("nivel", "edicion");
@@ -64,6 +73,7 @@ export async function responderCuantoHay(id: string, cantidadCruda: string): Pro
     if (cantidad === null) return { error: "Escribe la cantidad (un número entero, 0 si no hay)." };
     const supabase = createServiceClient();
     const { data: p, error: e0 } = await supabase.from("tienda_cuanto_hay").select("id, tienda_id, producto, pedido_por").eq("id", id).maybeSingle();
+    // Las de Proveeduría no tienen tienda (migración 0336).
     if (e0) return { error: SIN_MIGRACION };
     if (!p) return { error: "Esa pregunta ya no existe." };
     // Con tiendas limitadas, solo responde las de sus tiendas (auditoría de seguridad, 18 nov 2026).
@@ -78,7 +88,7 @@ export async function responderCuantoHay(id: string, cantidadCruda: string): Pro
       .eq("id", id);
     if (error) return { error: "No se pudo guardar la respuesta." };
     if (p.pedido_por !== u.id) {
-      const { data: t } = await supabase.from("tiendas").select("nombre").eq("id", p.tienda_id).maybeSingle();
+      const { data: t } = p.tienda_id ? await supabase.from("tiendas").select("nombre").eq("id", p.tienda_id).maybeSingle() : { data: { nombre: PROVEEDURIA.nombre } };
       const aviso = avisoRespuesta({ producto: p.producto as string, tienda: (t?.nombre as string | undefined) ?? "tu tienda" }, cantidad, nombreDe(u));
       await supabase
         .from("notificaciones_usuario")

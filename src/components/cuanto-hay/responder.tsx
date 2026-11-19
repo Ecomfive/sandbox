@@ -7,7 +7,10 @@ import { fieldClass } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { cuandoCorto, type PreguntaCuantoHay } from "@/lib/cuanto-hay/reglas";
 
-/** Una fila: la cantidad y «Responder» (en Respondidas, la cantidad dada y se puede corregir). */
+/**
+ * Una fila: quién pidió (su nombre y, debajo, cuándo), la cantidad en su propia columna con «Responder» al lado (en Respondidas, la cantidad dada
+ * y se puede corregir) y quién respondió en otra columna (19 nov 2026, pedido de Hernán: que se vea claro quién pidió y el número solo).
+ */
 function Fila({ p, puedeResponder, ahora }: { p: PreguntaCuantoHay; puedeResponder: boolean; ahora: Date }) {
   const router = useRouter();
   const { mostrarToast } = useToast();
@@ -25,13 +28,16 @@ function Fila({ p, puedeResponder, ahora }: { p: PreguntaCuantoHay; puedeRespond
     <tr className="border-b border-border last:border-b-0">
       <td className="px-4 py-2 font-medium">{p.producto}</td>
       <td className="px-2 py-2 text-muted-foreground">{p.nota ?? "—"}</td>
-      <td className="px-2 py-2 text-muted-foreground">
-        {p.pedidoPorNombre ?? "—"} · {cuandoCorto(p.creadoEn, ahora)}
+      <td className="px-2 py-2">
+        <span className="flex flex-col leading-tight">
+          <span className="font-semibold">{p.pedidoPorNombre ?? "—"}</span>
+          <span className="text-xs text-muted-foreground">{cuandoCorto(p.creadoEn, ahora)}</span>
+        </span>
       </td>
-      <td className="px-4 py-2">
+      <td className="px-2 py-2">
         {puedeResponder ? (
           <form
-            className="flex items-center gap-1.5"
+            className="flex items-center gap-2"
             onSubmit={(e) => {
               e.preventDefault();
               if (cambio) responder();
@@ -39,19 +45,33 @@ function Fila({ p, puedeResponder, ahora }: { p: PreguntaCuantoHay; puedeRespond
           >
             <label>
               <span className="sr-only">Cantidad de {p.producto}</span>
-              <input type="number" inputMode="numeric" min={0} step={1} value={cantidad} onChange={(e) => setCantidad(e.target.value)} placeholder="0" className={`${fieldClass} w-20`} />
+              <input
+                type="number"
+                inputMode="numeric"
+                min={0}
+                step={1}
+                value={cantidad}
+                onChange={(e) => setCantidad(e.target.value)}
+                placeholder="0"
+                className={`${fieldClass} w-24 text-right tabular-nums`}
+              />
             </label>
             <button type="submit" disabled={enviando || !cambio} className="inline-flex min-h-9 items-center rounded-md bg-primario px-3 text-sm font-semibold text-white disabled:opacity-50">
               {enviando ? "…" : p.cantidad === null ? "Responder" : "Corregir"}
             </button>
-            {p.respondidoEn && (
-              <span className="ml-1 whitespace-nowrap text-xs text-muted-foreground">
-                {p.respondidoPorNombre ?? ""} · {cuandoCorto(p.respondidoEn, ahora)}
-              </span>
-            )}
           </form>
         ) : (
-          <span className="font-semibold">{p.cantidad ?? "—"}</span>
+          <span className="text-base font-bold tabular-nums">{p.cantidad ?? "—"}</span>
+        )}
+      </td>
+      <td className="px-4 py-2">
+        {p.respondidoEn ? (
+          <span className="flex flex-col leading-tight">
+            <span>{p.respondidoPorNombre ?? "—"}</span>
+            <span className="text-xs text-muted-foreground">{cuandoCorto(p.respondidoEn, ahora)}</span>
+          </span>
+        ) : (
+          <span className="text-muted-foreground">—</span>
         )}
       </td>
     </tr>
@@ -77,21 +97,22 @@ export function ResponderCuantoHay({
             <tr className="text-left text-muted-foreground">
               <th className="border-b border-border px-4 py-2 font-medium">Producto</th>
               <th className="border-b border-border px-2 py-2 font-medium">Nota</th>
-              <th className="border-b border-border px-2 py-2 font-medium">Preguntó</th>
-              <th className="border-b border-border px-4 py-2 font-medium">Hay</th>
+              <th className="border-b border-border px-2 py-2 font-medium">Pidió</th>
+              <th className="border-b border-border px-2 py-2 font-medium">Cantidad</th>
+              <th className="border-b border-border px-4 py-2 font-medium">Respondió</th>
             </tr>
           </thead>
           <tbody>
             {grupos.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-4 py-6 text-center text-muted-foreground">
+                <td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">
                   {respondidas ? "No hay respuestas en los últimos 7 días." : "No hay preguntas pendientes."}
                 </td>
               </tr>
             ) : (
               grupos.flatMap((g) => [
                 <tr key={`t-${g.tienda.id}`} className="bg-primario-suave">
-                  <th colSpan={4} scope="colgroup" className="px-4 py-1.5 text-left font-bold text-primario">
+                  <th colSpan={5} scope="colgroup" className="px-4 py-1.5 text-left font-bold text-primario">
                     {g.tienda.nombre} · {g.preguntas.length}
                   </th>
                 </tr>,

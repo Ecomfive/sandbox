@@ -1977,9 +1977,9 @@ export const GUIAS: GuiaModulo[] = [
         pasos: [
           "Está en Fulfillment › Comunicación despacho, pestaña «Cuánto hay» (antes estaba en Pedidos de tienda). La ve quien tiene el permiso «Preguntar cuánto hay», aunque no tenga Solicitudes de despacho.",
           "En «Producto» escribe parte del nombre, el SKU o el N.º y elige el producto (o la variante: color, talla) de la lista. Solo salen los productos del catálogo; los combos no, porque se cuenta cada producto.",
-          "Si quieres, escribe una nota para despacho (por ejemplo, «es para un cambio, cliente esperando») y pulsa «Preguntar». Si manejas más de una tienda, primero eliges la tienda.",
-          "Abajo están tus preguntas. La columna «Hay» dice «Esperando a Yiletsi» hasta que responde; después sale la cantidad, quién respondió y cuándo. También te llega el aviso en «Para ti».",
-          "Quien tiene tiendas asignadas ve las preguntas de sus tiendas (también las de un compañero); quien no, las suyas. Se ven las de los últimos 60 días.",
+          "Si quieres, escribe una nota para despacho (por ejemplo, «es para un cambio, cliente esperando») y pulsa «Preguntar». En «Para» eliges de quién es la pregunta: Proveeduría (Gestión de IDs Dropi) o la tienda, si manejas más de una.",
+          "Abajo están solo tus preguntas. «Cantidad» dice «Esperando a Yiletsi» hasta que responde; después sale el número, y en «Respondió», quién y cuándo. También te llega el aviso en «Para ti».",
+          "Cada persona ve solo lo que ella preguntó, de los últimos 60 días.",
         ],
       },
     ],
@@ -1993,8 +1993,8 @@ export const GUIAS: GuiaModulo[] = [
       {
         titulo: "Uso",
         pasos: [
-          "Cada tienda es un renglón y debajo van sus preguntas, la que lleva más esperando primero. Arriba, los botones muestran una sola tienda y cuántas tiene pendientes.",
-          "Manda a contar a despacho, escribe la cantidad en «Hay» (0 si no hay) y pulsa «Responder». La respuesta le llega a quien preguntó en «Para ti» y la pregunta pasa a «Respondidas».",
+          "Cada tienda (y Proveeduría, al final) es un renglón y debajo van sus preguntas, la que lleva más esperando primero. Arriba, los botones muestran una sola y cuántas tiene pendientes.",
+          "«Pidió» dice quién preguntó y cuándo. Manda a contar a despacho, escribe el número en «Cantidad» (0 si no hay) y pulsa «Responder». La respuesta le llega a quien preguntó en «Para ti» y la pregunta pasa a «Respondidas»; ahí, «Respondió» dice quién y cuándo.",
           "«Ver respondidas» muestra lo respondido en los últimos 7 días. Ahí se puede corregir una cantidad: cambia el número y pulsa «Corregir» (a la tienda le llega otra vez el aviso).",
           "Cuando una tienda pregunta, a Yiletsi le llega el aviso en «Para ti».",
         ],
@@ -2246,6 +2246,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-11-19", titulo: "Cuánto hay: cada uno ve lo suyo, se ve quién pidió y Proveeduría también pregunta", texto: "En Comunicación despacho › Cuánto hay cada persona ve ahora solo lo que ella preguntó. La cantidad va sola en su columna «Cantidad» y quién respondió, en «Respondió». En el panel de Yiletsi, «Pidió» dice claro quién preguntó y cuándo, y la cantidad se escribe en su propia columna. Además, Proveeduría puede preguntar: en «Para» se elige Proveeduría (Nicol, de Gestión de IDs Dropi, ya tiene el permiso) y sus preguntas salen en el panel de Yiletsi como un grupo más.", modulo: "tienda-cuanto-hay", href: "/inventario-pedidos-despacho/cuanto-hay" },
   { fecha: "2026-11-19", titulo: "Pedir a inventario: se ve cuánto hay y no se pide lo que no hay", texto: "En Despacho ciudad › Pedir a inventario, al elegir un producto sale cuánto hay en inventario (lo disponible en las bodegas de donde inventario envía, con el detalle por bodega). Si el producto no tiene stock no se puede pedir, y tampoco se pueden pedir más unidades de las que hay: así despacho no pide algo que inventario no tiene.", modulo: "despacho-pedir-inventario", href: "/despacho-ciudad/pedir-inventario" },
   { fecha: "2026-11-19", titulo: "Actualizar datos: todo lo que se actualiza a mano, en un solo lugar", texto: "En el menú hay una entrada nueva, «Datos» (arriba de Avisos), con todo lo que el sistema trae de otras plataformas: Dropi de cada país, Drop, Dunamixfy, Effi, Shopify (productos y pedidos), la Matriz, Servientrega, Monday, Dropi al portal financiero, retiros, QuickBooks, Meta, Tu Winner y los Excel que se suben a mano. Cada fila dice si está al día, atrasada o si falló la última vez, cuándo se actualizó y quién lo hizo, si se actualiza sola y qué hace falta para actualizarla, y trae su botón. Las tarjetas de arriba filtran. Effi, Shopify, Monday, QuickBooks, Dropi finanzas y Meta se actualizan desde ahí mismo; la Matriz se sube ahí; lo que usa la extensión de Chrome y los Excel te llevan a su pantalla. Cada botón sigue también en su pantalla de siempre, y cada persona ve solo las fuentes de los módulos que tiene.", href: "/actualizar-datos" },
   { fecha: "2026-11-19", titulo: "Confirmación con IA: Costa Rica ya se puede preparar sin tiendas", texto: "Con Costa Rica elegido, Confirmación › Con IA ya no dice que falta una tienda: se pueden cargar direcciones de ejemplo, palabras de zona (una o varias palabras, como en Panamá), ver las instrucciones de la IA y probar direcciones. Quedaron cargadas 63 palabras de zona de arranque —cantones del centro de San José como ciudad; provincias y cantones lejanos como interior—; los nombres que se repiten (San José, Alajuela, San Rafael, San Antonio…) los decide la IA por cantón y distrito. El campo se llama «Cantón o ciudad». Los pedidos y «Cómo paga el cliente» aparecerán cuando se conecte la primera tienda. Hace falta correr la migración 0333.", modulo: "tienda-confirmacion", href: "/tienda-pedidos/confirmacion/ia" },
