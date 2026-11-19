@@ -376,6 +376,7 @@ export const ETIQUETA_ACCION: Record<string, string> = {
   cambiar_estado_dropshipper: "Cambió el estado",
   editar_dropshipper: "Editó los datos",
   movimiento_inventario: "Registró un movimiento de inventario",
+  marcar_defectuoso_inventario: "Marcó, devolvió o dio de baja unidades defectuosas",
   envio_dropi_inventario: "Hizo una remisión a una bodega externa",
   agregar_a_remision: "Agregó productos a una remisión",
   envio_dropi_recibido: "Anotó lo que recibió la bodega externa",

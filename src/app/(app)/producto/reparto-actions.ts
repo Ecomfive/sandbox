@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireAlgunModulo, type UsuarioActual } from "@/lib/auth";
+import { esAdministrador } from "@/lib/permisos/acceso";
 import { puedeVerBodega } from "@/lib/seguridad/pais-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 import { mensajeErrorReparto, revisarReparto, type LineaReparto, type StockGeneral } from "@/lib/wms/reparto-variantes";
@@ -11,6 +12,11 @@ import { mensajeErrorReparto, revisarReparto, type LineaReparto, type StockGener
 // **o Producto**: el botón sale en la ficha de Producto (donde se crean las variantes) y quien las crea tiene que poder repartirlas. Antes pedían solo Inventario y a quien editaba Producto sin
 // poder escribir en Inventario (Dinora) el servidor le fallaba con un error genérico aunque la pantalla le dejaba intentarlo.
 const MODULOS_REPARTO = ["inventario", "producto"];
+/**
+ * El error que la base devolvió, para quien administra el sistema o está en «Ver así» (19 nov 2026: Dinora no podía repartir y el aviso genérico no decía por qué). A los demás no se les
+ * enseña: es texto de la base. Va entre paréntesis, con el código de Postgres, al final del mensaje.
+ */
+const detalleTecnico = (usuario: UsuarioActual, error: { code?: string; message: string }): string => (esAdministrador(usuario) || usuario.vistaPrevia ? ` (${error.code ? `${error.code}: ` : ""}${error.message.slice(0, 220)})` : "");
 const SIN_PERMISO = "Para repartir el stock hace falta poder modificar Producto o Inventario. Pídelo a quien administra los permisos.";
 
 /** Quien puede repartir (modificar Inventario o Producto), o el error dicho en palabras: en producción Next.js oculta el mensaje de una excepción. */
@@ -92,8 +98,8 @@ export async function repartirStockVariantes(padreId: string, lineas: LineaRepar
     p_usuario: usuario.id,
   });
   if (error) {
-    console.error("[repartir_stock_variantes]", padreId, error.message);
-    return { error: mensajeErrorReparto(error.message) };
+    console.error("[repartir_stock_variantes]", padreId, error.code, error.message);
+    return { error: mensajeErrorReparto(error.message) + (mensajeErrorReparto(error.message) === error.message ? "" : detalleTecnico(usuario, error)) };
   }
   const repartidas = Number((data as { repartidas?: number } | null)?.repartidas ?? 0);
   // Sin la migración 0296 la base no devuelve `queda`: reparte todo o nada, así que no queda nada.
@@ -140,7 +146,8 @@ export async function dejarRepartoPendiente(padreId: string): Promise<{ error?: 
   const { data, error } = await supabase.rpc("wms_dejar_reparto_pendiente", { p_padre: padreId, p_usuario: usuario.id });
   if (error) {
     if (/wms_dejar_reparto_pendiente|schema cache|Could not find the function/i.test(error.message)) return { error: FALTA_MIGRACION };
-    return { error: mensajeErrorReparto(error.message) };
+    console.error("[dejar_reparto_pendiente]", padreId, error.code, error.message);
+    return { error: mensajeErrorReparto(error.message) + (mensajeErrorReparto(error.message) === error.message ? "" : detalleTecnico(usuario, error)) };
   }
   const unidades = Number((data as { unidades?: number } | null)?.unidades ?? 0);
   await registrarAuditoria({
