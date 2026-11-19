@@ -1,6 +1,8 @@
 // Confirmación con IA: lo que la IA sabe de la geografía de cada país antes de leer una dirección (16 nov 2026, pedido de Hernán: «que tengas más o menos la geografía para saber cuál es ciudad y
 // cuál es lo demás»). Es solo referencia: las palabras de zona que agrega el equipo mandan sobre esto, y lo que de verdad es dudoso se deja como «no sé» para que el equipo lo defina. Lógica pura, con su prueba.
 
+import { geografiaDeCostaRica } from "./zonas-costa-rica";
+
 /**
  * Los 26 corregimientos del distrito de Panamá, verificados el 16 nov 2026 contra Wikipedia (distrito de Panamá: «veintiséis corregimientos») y las leyes que crearon los últimos: Las Garzas (Ley 40 de 2017,
  * segregado de Pacora) y Don Bosco (Ley 42 de 2017, segregado de Juan Díaz). La lista en inglés que se consultó primero tenía 24 porque no incluía esos dos.
@@ -139,5 +141,8 @@ export function geografiaDePanama(): string {
 
 /** La geografía del país para el pedido a la IA; null si todavía no se tiene la de ese país. */
 export function geografiaDe(codigoPais: string): string | null {
-  return codigoPais.toUpperCase() === "PA" ? geografiaDePanama() : null;
+  const c = codigoPais.toUpperCase();
+  if (c === "PA") return geografiaDePanama();
+  if (c === "CR") return geografiaDeCostaRica();
+  return null;
 }
