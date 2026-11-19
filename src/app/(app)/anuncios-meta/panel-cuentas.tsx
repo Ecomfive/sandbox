@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
 import { ProgresoEstimado } from "@/components/ui/progreso-estimado";
+import { ChevronRightIcon } from "@/lib/nav-icons";
 import { fieldClassSm, labelClassSm } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { formatearFechaHora } from "@/lib/formato";
@@ -17,16 +18,30 @@ const boton = "min-h-9 rounded-md px-3 py-1.5 text-xs font-medium focus-visible:
 const botonOscuro = `${boton} bg-foreground text-background hover:opacity-90`;
 const botonClaro = `${boton} border border-border-control bg-card hover:bg-muted`;
 
-function Bloque({ id, titulo, derecha, children }: { id: string; titulo: string; derecha?: React.ReactNode; children: React.ReactNode }) {
+/** Una tarjeta del panel. Con `plegado` definido es desplegable: el título pasa a ser un botón que la abre o la cierra y, cerrada, deja a la vista solo `resumen`. */
+function Bloque({ id, titulo, derecha, children, plegado, alAlternar, resumen }: { id: string; titulo: string; derecha?: React.ReactNode; children: React.ReactNode; plegado?: boolean; alAlternar?: () => void; resumen?: string }) {
+  const plegable = plegado !== undefined && !!alAlternar;
   return (
     <section aria-labelledby={id} className="min-w-0 overflow-hidden rounded-xl border border-border bg-card">
-      <div className="flex min-h-8 flex-wrap items-center justify-between gap-x-3 border-b border-border bg-muted px-4 py-1 text-xs font-medium text-muted-foreground">
+      <div className="flex min-h-8 flex-wrap items-center justify-between gap-x-3 border-b border-border bg-muted px-4 py-1 text-xs font-medium text-muted-foreground" style={plegable && plegado ? { borderBottomWidth: 0 } : undefined}>
         <h2 id={id} className="m-0 text-xs font-medium">
-          {titulo}
+          {plegable ? (
+            <button type="button" onClick={alAlternar} aria-expanded={!plegado} aria-controls={`${id}-contenido`} className="-mx-1 flex min-h-8 items-center gap-1.5 rounded px-1 text-xs font-medium hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground">
+              <ChevronRightIcon aria-hidden="true" className={`h-3.5 w-3.5 transition-transform motion-reduce:transition-none ${plegado ? "" : "rotate-90"}`} />
+              {titulo}
+              {plegado && resumen && <span className="font-normal">· {resumen}</span>}
+            </button>
+          ) : (
+            titulo
+          )}
         </h2>
         {derecha}
       </div>
-      <div className="flex flex-col gap-4 p-4">{children}</div>
+      {(!plegable || !plegado) && (
+        <div id={`${id}-contenido`} className="flex flex-col gap-4 p-4">
+          {children}
+        </div>
+      )}
     </section>
   );
 }
@@ -217,6 +232,8 @@ function Topes({ topes, productos, escribe }: { topes: TopeVista[]; productos: s
   const [valores, setValores] = useState<Record<string, string>>({});
   const [nuevo, setNuevo] = useState("");
   const [nuevoValor, setNuevoValor] = useState("");
+  // Cerrada de entrada: la lista de productos es larga y casi nunca se toca.
+  const [plegado, setPlegado] = useState(true);
   const filas = (() => {
     const mapa = new Map<string, { producto: string; tope: number | null }>();
     for (const t of topes) mapa.set(t.clave, { producto: t.producto, tope: t.tope });
@@ -238,7 +255,7 @@ function Topes({ topes, productos, escribe }: { topes: TopeVista[]; productos: s
       }
     });
   return (
-    <Bloque id="topes" titulo="CPA tope por producto">
+    <Bloque id="topes" titulo="CPA tope por producto" plegado={plegado} alAlternar={() => setPlegado((x) => !x)} resumen={`${filas.filter((f) => f.tope !== null).length} de ${filas.length} definidos`}>
       <p className="m-0 text-sm text-muted-foreground">Lo máximo que se puede pagar por una compra sin perder. Con él se calcula el resultado estimado de cada campaña. Hasta que se defina, se usa ${CPA_TOPE_PREDETERMINADO}.</p>
       {filas.length === 0 && !escribe ? (
         <p className="m-0 text-sm text-muted-foreground">Todavía no hay productos en las campañas.</p>
