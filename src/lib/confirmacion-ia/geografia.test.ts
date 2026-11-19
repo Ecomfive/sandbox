@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { CORREGIMIENTOS_DISTRITO_PANAMA, geografiaDe, geografiaDePanama } from "./geografia";
+import { CORREGIMIENTOS_DISTRITO_PANAMA, geografiaDe, geografiaDePanama, LUGARES_SERVIENTREGA_PANAMA, ZONAS_DELIVERY_PANAMA, ZONAS_EN_DISCUSION, ZONAS_PAGO_ADELANTADO_PANAMA } from "./geografia";
+import { normalizarTexto } from "./zonas";
 
 test("la geografía de Panamá trae las provincias, el distrito de Panamá y lo que se deja como dudoso", () => {
   const g = geografiaDePanama();
@@ -18,4 +19,24 @@ test("el distrito de Panamá tiene sus 26 corregimientos, con los dos creados en
 test("solo hay geografía de los países que se tienen", () => {
   assert.equal(geografiaDe("pa"), geografiaDePanama());
   assert.equal(geografiaDe("CR"), null);
+});
+
+test("las 6 zonas de delivery, la lista de Servientrega y el pago por adelantado salen en la geografía", () => {
+  const g = geografiaDePanama();
+  assert.equal(ZONAS_DELIVERY_PANAMA.length, 6);
+  assert.deepEqual(ZONAS_DELIVERY_PANAMA.map((z) => z.zona), [1, 2, 3, 4, 5, 6]);
+  for (const z of ZONAS_DELIVERY_PANAMA) assert.ok(g.includes(`Zona ${z.zona} (`));
+  for (const lugar of ["Costa del Este", "Villa Lucre", "Condado del Rey", "Punta Pacífica", "Tocumen", "Pacora"]) assert.ok(g.includes(lugar), lugar);
+  for (const lugar of LUGARES_SERVIENTREGA_PANAMA) assert.ok(g.includes(lugar), lugar);
+  for (const lugar of ZONAS_PAGO_ADELANTADO_PANAMA) assert.ok(g.includes(lugar), lugar);
+  assert.match(g, /responde «adelantado»/);
+  assert.match(g, /homónimos/);
+});
+
+test("lo que está en Servientrega no se repite en el delivery, y lo que está en discusión sale en el delivery o es de los corregimientos que las tiendas etiquetan CIUDAD", () => {
+  const delivery = new Set(ZONAS_DELIVERY_PANAMA.flatMap((z) => z.lugares.map(normalizarTexto)));
+  for (const lugar of LUGARES_SERVIENTREGA_PANAMA) assert.ok(!delivery.has(normalizarTexto(lugar)), `${lugar} sale en el delivery y en Servientrega sin estar en discusión`);
+  const extras = new Set(["Ernesto Córdoba Campos", "Caimitillo", "Cabra", "Panamá Norte"].map(normalizarTexto));
+  for (const lugar of ZONAS_EN_DISCUSION) assert.ok(delivery.has(normalizarTexto(lugar)) || extras.has(normalizarTexto(lugar)), `${lugar} no está en ninguna zona de delivery`);
+  assert.equal(new Set(ZONAS_EN_DISCUSION.map(normalizarTexto)).size, ZONAS_EN_DISCUSION.length);
 });

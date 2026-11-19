@@ -62,8 +62,58 @@ const NUCLEO_URBANO = [
   "Vía España",
 ];
 
-/** Lo que depende de cómo lo clasifique el equipo: la IA no lo decide sola. */
-const DUDOSAS = ["San Miguelito y sus corregimientos", "Don Bosco (segregado de Juan Díaz)", "Tocumen", "24 de Diciembre", "Las Mañanitas", "Pacora", "Las Garzas (segregado de Pacora)", "San Martín", "Chilibre", "Alcalde Díaz", "Caimitillo", "Las Cumbres", "Ernesto Córdoba Campos"];
+/**
+ * Las 6 zonas con reparto propio («delivery») de la ciudad de Panamá, tal cual las pasó el equipo en el documento «Zonas de envío con Delivery» (18 nov 2026). Todo lo que sale aquí es CIUDAD, salvo lo que
+ * está en `ZONAS_EN_DISCUSION`. Es referencia para la IA: las palabras de zona del equipo mandan sobre esto.
+ */
+export const ZONAS_DELIVERY_PANAMA: { zona: number; nombre: string; lugares: string[] }[] = [
+  {
+    zona: 1,
+    nombre: "Juan Díaz",
+    lugares: ["Chanis", "Campo Lindbergh", "Anayansi", "San Fernando", "Ciudad Radial", "Plaza Costa Sur", "Costa del Este", "Anasa", "Don Bosco", "Versalles", "Reparto Nuevo Panamá", "Casa Blanca", "Altos del Romeral", "Santa Clara", "Marcasa", "El Sitio", "Llano Bonito", "Balán", "Las Acacias", "Los Caobos"],
+  },
+  {
+    zona: 2,
+    nombre: "Lucre / Brisas / San Antonio",
+    lugares: ["Villa Lucre", "Paseo del Valle", "Altos de la Pulida", "Tierra Alta", "Florencia", "Las Trancas", "Quintas de Monticello", "Lomas del Golf", "Brisas del Pacífico", "Brisas del Golf", "Altamira", "Terrazas de Brisas del Golf", "Camino Real", "San Antonio", "Colinas de Cerro Viento", "La Riviera", "Villalobos", "Altos de Villalobos", "Montería", "Los Nogales", "Parque Real", "Las Américas", "Villas del Bosque", "Brisas Norte", "P.H. Alpes"],
+  },
+  {
+    zona: 3,
+    nombre: "San Miguelito / Altos de Panamá / Dorado / Betania / Edison",
+    lugares: ["San Miguelito", "Calle Ojo de Agua", "Samaria", "Cerro la Cruz", "Cerro Batea", "9 de Enero", "Residencial El Bosque", "El Doral", "Linda Vista", "Limajo", "Barrio Alto", "Altos de Panamá", "Altos de Santa María", "Condado del Rey", "Dorado Springs", "Dorado Lakes", "Paseo Dorado", "Las Huacas", "Altamira Gardens", "Villa Cáceres", "Miraflores", "Club X", "El Ingenio", "AltaPlaza Mall", "Universidad Tecnológica", "Torres de Milán", "Bethania", "El Dorado", "La Locería", "La Alameda", "Dos Mares", "Edison Park", "Las Mercedes", "Camino de Cruces"],
+  },
+  {
+    zona: 4,
+    nombre: "Centro de la ciudad y Ancón",
+    lugares: ["Los Yoses", "Victoriano Lorenzo", "Carmen Cecilia", "Puente del Rey", "Panamá Viejo", "12 de Octubre", "Hato Pintado", "Río Abajo", "Altos del Golf", "Coco del Mar", "Parque Lefevre", "Avenida Santa Elena", "La Loma", "Carrasquilla", "El Carmen", "San Francisco", "Punta Paitilla", "Punta Pacífica", "El Cangrejo", "Obarrio", "Estación Fernández de Córdoba", "La Cresta", "Calidonia", "Bella Vista", "La Exposición", "Altos de Curundú", "Curundú", "Perejil", "San Miguel", "Ancón", "Albrook", "Diablo", "Balboa", "Ciudad del Saber", "Corozal", "Cárdenas", "Clayton", "Casco Antiguo", "El Chorrillo", "Isla Flamenco", "Isla Naos", "Isla Perico", "Amador", "La Boca"],
+  },
+  {
+    zona: 5,
+    nombre: "Norte: Veranillo, Las Cumbres, Alcalde Díaz",
+    lugares: ["San Miguelito", "Paraíso", "Veranillo", "Villa Zaita", "Nuevo Veranillo", "Cerro Batea", "San Isidro", "Pan de Azúcar", "Las Cumbres", "Ojo de Agua", "Milla 7 y 8", "Chivo Chivo", "San Librada", "Gonzalillo", "La Cabima", "El Lago", "Alcalde Díaz"],
+  },
+  {
+    zona: 6,
+    nombre: "Este: Pedregal, Tocumen, 24 de Diciembre, Pacora",
+    lugares: ["Pedregal", "Villalobos", "San Joaquín", "Rana de Oro", "Nogales", "Montería", "Mañanitas", "Tocumen Belén", "Las Américas", "La Siesta", "24 de Diciembre", "Tocumen", "Nuevo Tocumen", "La Doña", "Pacora"],
+  },
+];
+
+/** Lugares de la provincia de Panamá que el equipo dice que van por Servientrega (INTERIOR) aunque estén cerca de la ciudad, y que no están en las zonas de delivery (lista que pasó el 18 nov 2026). */
+export const LUGARES_SERVIENTREGA_PANAMA = ["Ciudad de la Salud", "Esclusas de Miraflores", "Chilibre", "Chepo", "Panamá Pacífico", "Vacamonte", "La Peña", "Monte Madero"];
+
+/**
+ * Lugares que salen a la vez como zona de delivery (CIUDAD) y en la lista de Servientrega (INTERIOR), más cuatro corregimientos que la lista de Servientrega nombra pero que las tiendas etiquetan casi siempre CIUDAD
+ * (Ernesto Córdoba Campos, Caimitillo, Cabra, Panamá Norte). Las listas no coinciden y el equipo todavía no dijo cuál manda: la IA no los decide sola y responde «no_se» salvo que la dirección traiga otra pista (una
+ * palabra de zona, otro lugar que sí defina la zona). Con los pedidos de octubre y noviembre de 2026 de Nuvo y Oferfy salen CIUDAD casi siempre y en Kenku casi siempre INTERIOR.
+ */
+export const ZONAS_EN_DISCUSION = ["Ernesto Córdoba Campos", "Caimitillo", "Cabra", "Panamá Norte", "Las Cumbres", "Alcalde Díaz", "Ciudad del Saber", "Pan de Azúcar", "Cerro Batea", "Altos de la Pulida", "Samaria", "Tierra Alta", "Paraíso", "Cerro la Cruz", "La Cabima", "Gonzalillo", "Veranillo"];
+
+/** Zonas de difícil acceso o cerca de la frontera: se pagan por adelantado y el pedido no se etiqueta hasta que llegue el pago (lo gestiona el asesor). */
+export const ZONAS_PAGO_ADELANTADO_PANAMA = ["Changuinola", "Bocas del Toro", "Isla Colón", "Puerto Armuelles", "Paso Ancho (el de Chiriquí)", "Bajo Boquete", "El Empalme", "Portobelo", "María Chiquita", "Darién"];
+
+/** Lo que depende de cómo lo clasifique el equipo y no está en ninguna de las listas de arriba: la IA no lo decide sola. */
+const DUDOSAS = ["Las Garzas (segregado de Pacora)", "San Martín"];
 
 /** La geografía de Panamá como texto para el pedido a la IA. */
 export function geografiaDePanama(): string {
@@ -74,7 +124,15 @@ export function geografiaDePanama(): string {
     "- Provincia de Colón (distritos Colón, Chagres, Donoso, Portobelo, Santa Isabel y Omar Torrijos Herrera; por ejemplo Cativá, Sabanitas, Puerto Pilón, Escobal) es INTERIOR.",
     `- La ciudad de Panamá es el distrito de Panamá (provincia de Panamá), con los corregimientos: ${CORREGIMIENTOS_DISTRITO_PANAMA.join(", ")}.`,
     `- El corazón de la ciudad, casi seguro CIUDAD: ${NUCLEO_URBANO.join(", ")}.`,
+    "ZONAS CON REPARTO PROPIO (delivery) = CIUDAD. Son las 6 zonas que definió el equipo: todo lo que sale aquí es CIUDAD, aunque la dirección diga solo «Panamá» o el nombre del barrio. Excepción: las zonas 5 y 6 y los lugares en discusión (más abajo) se etiquetan según la TENDENCIA HISTÓRICA de la tienda, que Kenku manda a INTERIOR y Nuvo y Oferfy a CIUDAD:",
+    ...ZONAS_DELIVERY_PANAMA.map((z) => `  · Zona ${z.zona} (${z.nombre}): ${z.lugares.join(", ")}.`),
+    `- Va por SERVIENTREGA (INTERIOR) aunque esté en la provincia de Panamá y cerca de la ciudad: ${LUGARES_SERVIENTREGA_PANAMA.join(", ")}; y todo Panamá Oeste, Colón, Chepo y las provincias del interior.`,
+    `- Estos lugares están a la vez en las zonas de delivery y en la lista de Servientrega, y el equipo todavía no decidió cuál manda: ${ZONAS_EN_DISCUSION.join(", ")}. Para esos y los de las zonas 5 y 6 sigue la tendencia histórica de la tienda (si te la dan abajo); si no hay una palabra de zona ni tendencia ni otra pista (otro lugar de la dirección que sí defina la zona), responde «no_se» en la zona (no adivines).`,
+    `- PAGO POR ADELANTADO (zonas de difícil acceso o cerca de la frontera; responde «adelantado» solo si el lugar es uno de estos): ${ZONAS_PAGO_ADELANTADO_PANAMA.join(", ")}. Un barrio llamado Paso Ancho dentro de la ciudad es CIUDAD.`,
     `- Zonas dudosas, que dependen de cómo las clasifique el equipo: ${DUDOSAS.join(", ")}. Si no hay una palabra de zona que las defina, responde «no_se» en la zona (no adivines).`,
+    "- Ojo con los nombres repetidos (homónimos): muchos barrios de la ciudad se llaman igual que lugares del interior. Casa Blanca, La Loma, Balboa, Don Bosco, San Antonio, Las Américas, La Alameda, Miraflores, Amador, Llano Bonito o Pedregal (el de David, Chiriquí) también existen en La Chorrera, Arraiján, Colón, David, Santiago o Chitré, y «casa blanca» muchas veces es solo el color de la casa. Para decidir, lee la ciudad o el corregimiento que puso el cliente junto con el resto de la dirección (distrito, provincia, calles, referencias): si todo lo demás es del interior, es INTERIOR aunque el barrio se llame como uno de la ciudad.",
+    "- Si el cliente puso «Panamá» como ciudad pero la dirección habla de Chepo, La Chorrera, Arraiján, Colón, Chilibre, Panamá Pacífico (Howard), Chitré, Santiago, David u otro lugar del interior, es INTERIOR: «Panamá» es la provincia y manda lo que dice la dirección.",
+    "- Si el cliente pide recoger el pedido en una oficina o centro de Servientrega (por ejemplo «CDS Mañanitas»), es INTERIOR/Servientrega aunque esa oficina esté en la ciudad.",
     "- Ojo: «Colón» también es un barrio, una calle o un corregimiento (Barrio Colón en La Chorrera); la que manda es la ciudad o el corregimiento que puso el cliente, leída junto con el resto de la dirección.",
   ].join("\n");
 }
