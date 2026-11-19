@@ -1,12 +1,14 @@
 // SISCORE (portal de clientes de Servientrega Panamá) al sistema (pedido de Hernán, 12 nov 2026): en servientrega-clientes.appsiscore.com, con la
 // sesión que la persona abrió (cuenta de la tienda, Kenku primero), lee el informe de guías de los últimos `dias` días (infgen.php) y el rastreo de cada
 // guía (guiaa.php: cada paso con fecha y hora, y lo que se cobra), y lo sube a la dirección firmada que da el sistema.
+// Desde la 0.8.3 (18 nov 2026, pedido de Hernán: Oferfy releía cada día ~2.500 guías, 11 a 16 minutos) `saltar` trae las guías que el sistema ya tiene
+// cerradas (entregadas o devueltas, con su rastreo) y su estado: si el informe dice el mismo estado, no se abre su rastreo (va con `saltada: true`).
 // **SOLO LECTURA**: solo consultas (informe y rastreo). Nunca anula, crea guías, recolecciones ni confirmaciones. La sesión (cookie) no sale de la página.
 // Lo corre la extensión «Ecomfive · Dropi» (lector `siscore`) o, a mano, la consola de la pestaña de SISCORE:
-//   leerSiscore({ siscore: "<dirección firmada>" }, { pedidos: 45 }); "iniciado"
+//   leerSiscore({ siscore: "<dirección firmada>" }, { pedidos: 45 }, { "7224121117": "Entrega App" }); "iniciado"
 //   JSON.stringify(window.__siscore)
 
-async function leerSiscore(subida, dias) {
+async function leerSiscore(subida, dias, saltar) {
   const estado = (window.__siscore = { fase: "inicio", productos: 0, hechos: 0, inicio: new Date().toISOString(), fin: null, resultado: null, error: null });
   const espera = (ms) => new Promise((ok) => setTimeout(ok, ms));
   const BASE = "/app/app-cliente/";
@@ -79,14 +81,22 @@ async function leerSiscore(subida, dias) {
         historial: [],
       });
     }
-    estado.productos = guias.length;
+    // Las guías ya cerradas en el sistema con el mismo estado no se vuelven a rastrear: su rastreo ya no cambia. Si cambió el estado, sí.
+    const yaCerrada = (g) => !!(saltar && g.estado && Object.prototype.hasOwnProperty.call(saltar, g.guia) && limpio(saltar[g.guia]) === g.estado);
+    const porRastrear = [];
+    for (const g of guias) {
+      if (yaCerrada(g)) g.saltada = true;
+      else porRastrear.push(g);
+    }
+    estado.guias = guias.length;
+    estado.productos = porRastrear.length;
 
     // 2. El rastreo de cada guía (de a 3 a la vez): los pasos con fecha y hora, y lo que se cobra.
     estado.fase = "rastreo";
     let siguiente = 0;
     const trabajar = async () => {
-      while (siguiente < guias.length) {
-        const g = guias[siguiente++];
+      while (siguiente < porRastrear.length) {
+        const g = porRastrear[siguiente++];
         try {
           const r = await traer(`${BASE}guiaa.php`, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ guia: g.guia }) });
           const p = await html(r);
@@ -115,7 +125,7 @@ async function leerSiscore(subida, dias) {
     const salida = { leido_en: new Date().toISOString(), cliente, desde, hasta, guias };
     const r = await fetch(subida.siscore, { method: "PUT", headers: { "x-upsert": "true", "content-type": "application/json" }, body: new Blob([JSON.stringify(salida)], { type: "application/json" }) });
     if (!r.ok) throw new Error(`No se pudo pasar la lectura al sistema (${r.status}).`);
-    estado.resultado = { cliente, guias: guias.length, conRastreo: guias.filter((g) => g.historial.length).length };
+    estado.resultado = { cliente, guias: guias.length, saltadas: guias.length - porRastrear.length, conRastreo: guias.filter((g) => g.historial.length).length };
   } catch (e) {
     estado.error = String((e && e.message) || e);
   } finally {

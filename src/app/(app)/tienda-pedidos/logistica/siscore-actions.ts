@@ -8,7 +8,8 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { cargarTiendas } from "@/lib/tienda/datos";
 import { fuenteFinanzas } from "@/lib/tienda/datos-finanzas";
 import { tiendaDeClienteSiscore } from "@/lib/tienda/siscore";
-import { grupoDeEstadoGuia, leerLecturaSiscore, momentoEntrega, pedidoDeFactura, visitasSinEntregar } from "@/lib/tienda/siscore";
+import { grupoDeEstadoGuia, leerLecturaSiscore, momentoEntrega, pedidoDeFactura, sinLoDelRastreo, visitasSinEntregar } from "@/lib/tienda/siscore";
+import { traerTodasConError } from "@/lib/supabase/paginar";
 import { actualizarEntregas, completarDatosEntrega } from "@/lib/tienda/actualizar-entregas";
 
 const RUTA = "/tienda-pedidos/logistica";
@@ -75,9 +76,14 @@ export async function lecturasSiscoreEnCurso(): Promise<LecturaEnCurso[]> {
 /**
  * Empieza una lectura de SISCORE (14 nov 2026: por tienda). `clienteSesion` es la cuenta abierta en SISCORE («KENKU»); `tiendaElegida`, la tienda
  * que se mira en Logística. Si no coinciden, no lee (avisa con qué cuenta entrar). Solo frena una lectura de la **misma** tienda que siga avanzando.
- * Da la dirección firmada donde la extensión sube lo leído. Solo quien puede modificar Logística de tienda.
+ * Da la dirección firmada donde la extensión sube lo leído y `saltar` (18 nov 2026): las guías de esa tienda que ya están cerradas (entregadas o devueltas)
+ * con su rastreo guardado, con su estado; la extensión (0.8.3) no vuelve a abrir el rastreo de las que siguen con ese estado. Solo quien puede modificar
+ * Logística de tienda.
  */
-export async function empezarLecturaSiscore(clienteSesion: string | null, tiendaElegida: string | null): Promise<{ id: string; tienda: string | null; subida: { siscore: string } } | { error: string }> {
+export async function empezarLecturaSiscore(
+  clienteSesion: string | null,
+  tiendaElegida: string | null,
+): Promise<{ id: string; tienda: string | null; subida: { siscore: string }; saltar: Record<string, string> } | { error: string }> {
   const limite = await soloSinLimite();
   if (limite) return { error: limite };
   let u;
@@ -110,7 +116,26 @@ export async function empezarLecturaSiscore(clienteSesion: string | null, tienda
     await supabase.from("tienda_guias_lecturas").update({ estado: "error", fin: new Date().toISOString(), error: "No se pudo preparar la subida." }).eq("id", id);
     return { error: "No se pudo preparar la subida." };
   }
-  return { id, tienda: tienda?.nombre ?? null, subida: { siscore: s.signedUrl } };
+  return { id, tienda: tienda?.nombre ?? null, subida: { siscore: s.signedUrl }, saltar: tienda ? await guiasCerradas(supabase, tienda.id) : {} };
+}
+
+/** Las guías cerradas de una tienda con su rastreo ya guardado (de los últimos 90 días: la lectura trae 75), con su estado. Si falla, ninguna: se rastrea todo. */
+async function guiasCerradas(supabase: ReturnType<typeof createServiceClient>, tiendaId: string): Promise<Record<string, string>> {
+  const desde = new Date(Date.now() - 90 * 86_400_000).toLocaleDateString("en-CA", { timeZone: "America/Panama" });
+  const r = await traerTodasConError<{ guia: string; estado: string | null }>((d, h) =>
+    supabase
+      .from("tienda_guias")
+      .select("guia, estado")
+      .eq("tienda_id", tiendaId)
+      .in("estado_grupo", ["entregado", "devuelto"])
+      .neq("historial", "[]")
+      .gte("fecha_emision", desde)
+      .order("guia")
+      .range(d, h),
+  );
+  const saltar: Record<string, string> = {};
+  for (const g of r.data ?? []) if (g.estado) saltar[g.guia] = g.estado;
+  return saltar;
 }
 
 /** El avance de una lectura (guías con su rastreo leídas de cuántas): lo manda la pantalla que lee, para que cualquiera vea el porcentaje. */
@@ -132,7 +157,7 @@ export async function avanceLecturaSiscore(id: string, hechos: number, total: nu
  * Guarda lo que subió la extensión: cada guía con su tienda (el cliente de SISCORE, «KENKU» = Kenku) y su pedido (la «Factura» es el número de Shopify),
  * el grupo de su estado, las visitas sin entregar, cuándo se entregó y el rastreo. Borra el archivo temporal.
  */
-export async function procesarLecturaSiscore(id: string): Promise<{ guias: number; conPedido: number; cliente: string } | { error: string }> {
+export async function procesarLecturaSiscore(id: string): Promise<{ guias: number; conPedido: number; rastreadas: number; cliente: string } | { error: string }> {
   const limite = await soloSinLimite();
   if (limite) return { error: limite };
   try {
@@ -194,11 +219,15 @@ export async function procesarLecturaSiscore(id: string): Promise<{ guias: numbe
         leida_en: lectura.leido_en,
       };
     });
-    for (let i = 0; i < filas.length; i += 200) {
-      const { error: e } = await supabase.from("tienda_guias").upsert(filas.slice(i, i + 200), { onConflict: "guia" });
-      if (e) return fallar(`No se pudieron guardar las guías: ${e.message}`);
-    }
-    const resumen = { cliente: lectura.cliente, guias: filas.length, conPedido: filas.filter((f) => f.orden_id).length, desde: lectura.desde, hasta: lectura.hasta };
+    // Las guías saltadas (ya cerradas, sin abrir su rastreo) se guardan sin lo del rastreo: su historial, visitas y recaudo quedan como estaban.
+    const rastreadas = filas.filter((_, i) => !lectura.guias[i].saltada);
+    const saltadas = filas.filter((_, i) => lectura.guias[i].saltada).map(sinLoDelRastreo);
+    for (const grupo of [rastreadas, saltadas])
+      for (let i = 0; i < grupo.length; i += 200) {
+        const { error: e } = await supabase.from("tienda_guias").upsert(grupo.slice(i, i + 200), { onConflict: "guia" });
+        if (e) return fallar(`No se pudieron guardar las guías: ${e.message}`);
+      }
+    const resumen = { cliente: lectura.cliente, guias: filas.length, conPedido: filas.filter((f) => f.orden_id).length, rastreadas: rastreadas.length, desde: lectura.desde, hasta: lectura.hasta };
     await supabase.from("tienda_guias_lecturas").update({ estado: "listo", fin: new Date().toISOString(), cliente: lectura.cliente, resumen, error: null, ...(tienda ? { tienda_id: tienda.id, hechos: resumen.guias, total: resumen.guias } : {}) }).eq("id", id);
     await supabase.storage.from(BUCKET).remove([ruta]);
     // Las órdenes despachadas que Servientrega (o Monday) ya dan por entregadas o devueltas pasan a esa fase (12 nov 2026, pedido de Hernán).
@@ -207,7 +236,7 @@ export async function procesarLecturaSiscore(id: string): Promise<{ guias: numbe
     // La fecha de despacho de los que salieron por Servientrega sin la fecha de Shopify (la emisión de la guía), 14 nov 2026.
     await completarDatosEntrega(supabase, Date.now() + 10_000).catch(() => 0);
     revalidatePath(RUTA);
-    return { guias: resumen.guias, conPedido: resumen.conPedido, cliente: lectura.cliente };
+    return { guias: resumen.guias, conPedido: resumen.conPedido, rastreadas: resumen.rastreadas, cliente: lectura.cliente };
   } catch (e) {
     return fallar(e instanceof Error ? e.message : "No se pudo guardar la lectura de SISCORE.");
   }
