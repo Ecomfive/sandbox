@@ -6,24 +6,14 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { pedirMeta, tokenDeMeta } from "./api";
 import { analizarSoloTextoConGemini, analizarVideoConGemini, geminiConectado } from "./gemini-video";
+import { elegirPendientes, type AnalisisGuardado, type AnuncioConVideo, type VideoPendiente } from "./pendientes-video";
 import { esHostDeVideoMeta, normalizarAnalisisVideo, pedidoAnalisisVideo, VERSION_ANALISIS, type AnalisisVideo } from "./video-angulo";
 
 const MAX_BYTES_VIDEO = 80 * 1024 * 1024;
 const MAX_BYTES_IMAGEN = 3 * 1024 * 1024;
-const REINTENTO_MS = 24 * 3600 * 1000;
-/** Cuando una persona pulsa «Analizar los pendientes» no se repite lo que se acaba de intentar (así una tanda que falla no tapa a los que siguen). */
-const ESPERA_MANUAL_MS = 3 * 60 * 1000;
 const DIA = 86_400_000;
 
-export interface VideoPendiente {
-  videoId: string;
-  cuentaId: string;
-  gasto: number;
-  producto: string | null;
-  copy: string | null;
-  titulo: string | null;
-  miniatura: string | null;
-}
+export type { VideoPendiente };
 
 export interface ResultadoVideo {
   ok: boolean;
@@ -34,55 +24,42 @@ export interface ResultadoVideo {
 const hoyMenos = (dias: number) => new Date(Date.now() - dias * DIA).toLocaleDateString("en-CA", { timeZone: "America/Panama" });
 
 /**
- * Los videos con gasto en los últimos 30 días que todavía no tienen análisis, o cuyo análisis falló, quedó sin archivo o es de una versión anterior (sin estructura ni llamado a la acción), de más a menos gasto.
- * El cron espera un día antes de repetir un intento fallido; cuando una persona pulsa «Analizar los pendientes» (`ahora: true`) se repiten al momento, salvo lo intentado hace menos de 3 minutos.
+ * Los videos que le tocan a la IA (de más a menos gasto): con gasto en **todo el historial leído** (no solo los últimos 30 días) y sin análisis, con el intento fallido, analizados solo con el texto o con un análisis de una
+ * versión anterior (reglas en `elegirPendientes`). El gasto sale de `meta_gasto_por_anuncio` (migración 0327); sin ella se cuentan los últimos 30 días, como antes. El cron espera de uno a tres días antes de repetir
+ * un intento; cuando una persona pulsa «Analizar los pendientes» (`ahora: true`) se repiten al momento, salvo lo intentado hace menos de 3 minutos.
  */
 export async function videosPorAnalizar(supabase: SupabaseClient, opciones: { max: number; ahora?: boolean }): Promise<{ pendientes: VideoPendiente[]; total: number }> {
   const { data: cuentas } = await supabase.from("meta_cuentas").select("id").eq("activa", true);
   const ids = (cuentas ?? []).map((c) => c.id as string);
   if (!ids.length) return { pendientes: [], total: 0 };
-  const [anuncios, filas, hechos, campanas] = await Promise.all([
-    traerTodasLasFilas<Record<string, unknown>>((a, b) => supabase.from("meta_anuncios").select("id, cuenta_id, campana_id, video_id, miniatura, copy, titulo").in("cuenta_id", ids).not("video_id", "is", null).range(a, b)),
-    traerTodasLasFilas<{ anuncio_id: string; gasto: unknown }>((a, b) => supabase.from("meta_resultados_dia").select("anuncio_id, gasto").in("cuenta_id", ids).gte("fecha", hoyMenos(29)).range(a, b)),
-    traerTodasLasFilas<{ video_id: string; estado: string; analizado_en: string; version?: number }>((a, b) => supabase.from("meta_video_analisis").select("video_id, estado, analizado_en, version").range(a, b)).catch(() =>
-      traerTodasLasFilas<{ video_id: string; estado: string; analizado_en: string; version?: number }>((a, b) => supabase.from("meta_video_analisis").select("video_id, estado, analizado_en").range(a, b)),
+  const gastoTotal = async (): Promise<Map<string, number>> => {
+    const m = new Map<string, number>();
+    try {
+      const filas = await traerTodasLasFilas<{ anuncio_id: string; gasto: unknown }>((a, b) => supabase.rpc("meta_gasto_por_anuncio", { p_cuentas: ids }).range(a, b));
+      for (const f of filas) m.set(f.anuncio_id, Number(f.gasto) || 0);
+      return m;
+    } catch {
+      const filas = await traerTodasLasFilas<{ anuncio_id: string; gasto: unknown }>((a, b) => supabase.from("meta_resultados_dia").select("anuncio_id, gasto").in("cuenta_id", ids).gte("fecha", hoyMenos(29)).range(a, b));
+      for (const f of filas) m.set(f.anuncio_id, (m.get(f.anuncio_id) ?? 0) + (Number(f.gasto) || 0));
+      return m;
+    }
+  };
+  const [anuncios, gastoPorAnuncio, hechos, campanas] = await Promise.all([
+    traerTodasLasFilas<AnuncioConVideo>((a, b) => supabase.from("meta_anuncios").select("id, cuenta_id, campana_id, video_id, miniatura, copy, titulo").in("cuenta_id", ids).not("video_id", "is", null).range(a, b)),
+    gastoTotal(),
+    traerTodasLasFilas<AnalisisGuardado>((a, b) => supabase.from("meta_video_analisis").select("video_id, estado, analizado_en, version").range(a, b)).catch(() =>
+      traerTodasLasFilas<AnalisisGuardado>((a, b) => supabase.from("meta_video_analisis").select("video_id, estado, analizado_en").range(a, b)),
     ),
     traerTodasLasFilas<{ id: string; producto: string | null }>((a, b) => supabase.from("meta_campanas").select("id, producto").in("cuenta_id", ids).range(a, b)),
   ]);
-  const gastoDe = new Map<string, number>();
-  for (const f of filas) gastoDe.set(f.anuncio_id, (gastoDe.get(f.anuncio_id) ?? 0) + (Number(f.gasto) || 0));
-  const productoDe = new Map(campanas.map((c) => [c.id, c.producto]));
-  const analisis = new Map(hechos.map((h) => [h.video_id, h]));
-  const porVideo = new Map<string, VideoPendiente & { mejor: number }>();
-  for (const a of anuncios) {
-    const v = a.video_id as string;
-    const g = gastoDe.get(a.id as string) ?? 0;
-    const previo = porVideo.get(v);
-    if (!previo) porVideo.set(v, { videoId: v, cuentaId: a.cuenta_id as string, gasto: g, producto: productoDe.get(a.campana_id as string) ?? null, copy: (a.copy as string | null) ?? null, titulo: (a.titulo as string | null) ?? null, miniatura: (a.miniatura as string | null) ?? null, mejor: g });
-    else {
-      previo.gasto += g;
-      if (g > previo.mejor) Object.assign(previo, { mejor: g, copy: (a.copy as string | null) ?? previo.copy, titulo: (a.titulo as string | null) ?? previo.titulo, producto: productoDe.get(a.campana_id as string) ?? previo.producto });
-      if (!previo.miniatura && a.miniatura) previo.miniatura = a.miniatura as string;
-    }
-  }
-  const ahora = Date.now();
-  const todos = [...porVideo.values()]
-    .filter((v) => v.gasto > 0)
-    .filter((v) => {
-      const h = analisis.get(v.videoId);
-      if (!h) return true;
-      const viejo = h.estado !== "analizado" || (h.version ?? 1) < VERSION_ANALISIS;
-      return viejo && ahora - new Date(h.analizado_en).getTime() > (opciones.ahora ? ESPERA_MANUAL_MS : REINTENTO_MS);
-    })
-    .sort((a, b) => b.gasto - a.gasto);
-  return { pendientes: todos.slice(0, opciones.max).map(({ mejor: _mejor, ...v }) => (void _mejor, v)), total: todos.length };
+  return elegirPendientes({ anuncios, gastoPorAnuncio, analisis: new Map(hechos.map((h) => [h.video_id, h])), productoDe: new Map(campanas.map((c) => [c.id, c.producto])), ahora: Date.now(), manual: !!opciones.ahora, version: VERSION_ANALISIS, max: opciones.max });
 }
 
 /** El contexto de un video concreto (para «Analizar con IA» o «Volver a analizar» en su ficha): el anuncio que más lo usa, su texto y el producto de su campaña. */
 export async function pendienteDeVideo(supabase: SupabaseClient, videoId: string): Promise<VideoPendiente | null> {
   const { data: anuncios } = await supabase.from("meta_anuncios").select("id, cuenta_id, campana_id, miniatura, copy, titulo").eq("video_id", videoId);
   if (!anuncios?.length) return null;
-  const { data: filas } = await supabase.from("meta_resultados_dia").select("anuncio_id, gasto").in("anuncio_id", anuncios.map((a) => a.id as string)).gte("fecha", hoyMenos(29));
+  const { data: filas } = await supabase.from("meta_resultados_dia").select("anuncio_id, gasto").in("anuncio_id", anuncios.map((a) => a.id as string));
   const gastoDe = new Map<string, number>();
   for (const f of filas ?? []) gastoDe.set(f.anuncio_id as string, (gastoDe.get(f.anuncio_id as string) ?? 0) + (Number(f.gasto) || 0));
   const mejor = [...anuncios].sort((a, b) => (gastoDe.get(b.id as string) ?? 0) - (gastoDe.get(a.id as string) ?? 0))[0];
