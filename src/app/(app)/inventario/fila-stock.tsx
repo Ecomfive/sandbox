@@ -9,6 +9,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { ChevronRightIcon } from "@/lib/nav-icons";
 import { ETIQUETA_PLATAFORMA, textoPlataformas, type Plataforma } from "@/lib/wms/stock-plataformas";
 import { ETIQUETA_CLASE_SKU, ETIQUETA_TIPO_SKU, type FilaStock } from "./def-stock";
+import { sinRepartirEn } from "./variantes-stock";
 import { DESCRIPCION_CUBETA } from "./descripciones-stock";
 
 /** Las columnas de la fila en pantalla ancha; las usa también el encabezado, así que van juntas. */
@@ -83,6 +84,7 @@ export function FilaStockLista({
   plataforma = null,
   hijo = false,
   abierto,
+  bodegaId = null,
 }: {
   f: FilaStock;
   /** Abre la ficha del SKU. En un producto con variantes, la abre su nombre (la ficha del principal: su stock general y el de sus variantes bodega por bodega). */
@@ -94,6 +96,8 @@ export function FilaStockLista({
   hijo?: boolean;
   /** Solo en un producto con variantes: si está desplegado. */
   abierto?: boolean;
+  /** La bodega que se está viendo (el selector o el filtro): «sin repartir» se dice según el stock general de esa bodega. */
+  bodegaId?: string | null;
 }) {
   const conVariantes = f.variantes.length > 0;
   const compuesto = f.tipo === "combo";
@@ -126,7 +130,7 @@ export function FilaStockLista({
           <span className="font-mono font-semibold text-foreground">{f.codigo}</span>
           <CodigosProducto numero={f.numero} barras={f.barras} />
           {conVariantes && <Badge tone="neutral">{f.variantes.length} variantes</Badge>}
-          {f.repartoPendiente && <Badge tone="neutral">{hijo ? "Sin repartir: sale del general" : "Stock sin repartir"}</Badge>}
+          {sinRepartirEn(f, bodegaId) && <Badge tone="neutral">{hijo ? "Sin repartir: sale del general" : "Stock sin repartir"}</Badge>}
           {compuesto && <Badge tone="neutral">{ETIQUETA_TIPO_SKU.combo}</Badge>}
           {f.clase === "test" && <Badge tone="azul">{ETIQUETA_CLASE_SKU.test}</Badge>}
           {f.clase === "inactivo" && <Badge tone="destructive">{ETIQUETA_CLASE_SKU.inactivo}</Badge>}

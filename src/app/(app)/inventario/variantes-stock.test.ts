@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { DEF_STOCK, type FilaStock } from "./def-stock";
-import { agruparVariantes, aplanarVariantes } from "./variantes-stock";
+import { agruparVariantes, aplanarVariantes, sinRepartirEn } from "./variantes-stock";
 
 const fila = (id: string, codigo: string, extra: Partial<FilaStock> = {}): FilaStock => ({
   id,
@@ -73,4 +73,20 @@ test("buscar una variante encuentra a su producto, y se descarga una línea por 
   assert.ok(buscador.valor(p).includes("BANDA/PEDALES/ROSA"));
   assert.deepEqual(DEF_STOCK.expandirDescarga?.(p).map((f) => f.id), ["a", "r"]);
   assert.deepEqual(DEF_STOCK.expandirDescarga?.(fila("z", "SIN/VARIANTES")).map((f) => f.id), ["z"]);
+});
+
+test("«sin repartir» se dice según la bodega que se ve: solo donde queda stock general", () => {
+  // El Ventilador MF019 Mini: 146 ya repartidos al Blanco en Despacho; 125 siguen como stock general en otras dos bodegas.
+  const padre = fila("p", "VENTILADOR", { repartoPendiente: true, porBodega: [{ bodegaId: "despacho", fisico: 0 }, { bodegaId: "externo", fisico: 25 }, { bodegaId: "istorage", fisico: 100 }] });
+  const blanco = fila("b", "VENTILADOR/BLANCO", { padreId: "p", repartoPendiente: true, opciones: "Blanco", fisico: 146, porBodega: [{ bodegaId: "despacho", fisico: 146 }] });
+  const [agrupado] = agruparVariantes([padre, blanco]);
+  assert.equal(sinRepartirEn(agrupado, null), true, "sin filtro, en alguna bodega queda general");
+  assert.equal(sinRepartirEn(agrupado, "despacho"), false, "en Despacho ya está repartido");
+  assert.equal(sinRepartirEn(agrupado, "externo"), true);
+  // La variante dice «sale del general» solo donde el general todavía tiene stock.
+  assert.equal(sinRepartirEn(agrupado.variantes[0], "despacho"), false);
+  assert.equal(sinRepartirEn(agrupado.variantes[0], "istorage"), true);
+  // Sin la marca del producto nunca; sin el dato por bodega (una variante suelta), vale la marca.
+  assert.equal(sinRepartirEn({ repartoPendiente: false, generalPorBodega: [{ bodegaId: "x", fisico: 5 }] }, "x"), false);
+  assert.equal(sinRepartirEn({ repartoPendiente: true }, "x"), true);
 });
