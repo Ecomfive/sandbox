@@ -54,7 +54,7 @@ begin
   perform set_config('wms.repartiendo', 'on', true);
 
   create temporary table if not exists _reparto (variante uuid, bodega uuid, cantidad integer) on commit drop;
-  delete from _reparto;
+  truncate _reparto;
   for fila in select * from jsonb_to_recordset(p_reparto) as x(variante uuid, bodega uuid, cantidad integer) loop
     if fila.variante is null or fila.bodega is null or fila.cantidad is null or fila.cantidad < 0 then
       raise exception 'El reparto no es válido: cada línea lleva variante, bodega y una cantidad de 0 o más.';
