@@ -3,8 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModuloEscritura, type UsuarioActual } from "@/lib/auth";
-import { cargarBodegasPedido } from "@/lib/pedidos-inventario/datos";
-import { avisoPedido, numeroPedido, revisarEntregas, revisarLineas } from "@/lib/pedidos-inventario/reglas";
+import { cargarBodegasPedido, stockInventario } from "@/lib/pedidos-inventario/datos";
+import { avisoPedido, numeroPedido, revisarEntregas, revisarLineas, revisarStockPedido } from "@/lib/pedidos-inventario/reglas";
 import { puedeVerBodega } from "@/lib/seguridad/pais-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 import { numeroTraslado } from "@/lib/wms/traslado";
@@ -56,7 +56,7 @@ export async function crearPedidoInventario(lineas: unknown): Promise<Resultado>
     const revisadas = revisarLineas(lineas);
     if ("error" in revisadas) return revisadas;
     const supabase = createServiceClient();
-    const { destino } = await cargarBodegasPedido(supabase);
+    const { destino, origenes } = await cargarBodegasPedido(supabase);
     if (!destino) return { error: "No encontré la bodega de despacho de Panamá (una bodega propia activa que empiece con «Despacho»)." };
     const ids = revisadas.lineas.map((l) => l.skuId);
     const { data: skus } = await supabase.from("skus_maestros").select("id, codigo, nombre, tipo, opciones_variantes").in("id", ids);
@@ -66,6 +66,9 @@ export async function crearPedidoInventario(lineas: unknown): Promise<Resultado>
       if (!s) return { error: "Un producto ya no existe: elígelo otra vez de la lista." };
       if (s.tipo !== "simple" || s.opciones_variantes) return { error: `«${s.nombre}» no se puede pedir así: elige el producto suelto (sin combo) o la variante exacta.` };
     }
+    // No se pide lo que inventario no tiene (19 nov 2026): se revisa aquí también, no solo en la pantalla.
+    const sinStock = revisarStockPedido(revisadas.lineas, await stockInventario(supabase, origenes, ids), Object.fromEntries([...porId].map(([id, s]) => [id, s.nombre])));
+    if (sinStock) return { error: sinStock };
     const { data: pedido, error } = await supabase
       .from("despacho_pedidos_inventario")
       .insert({ bodega_destino_id: destino.id, pedido_por: u.id, pedido_por_nombre: nombreDe(u) })
