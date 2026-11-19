@@ -31,8 +31,8 @@ export interface AnalisisGuardado {
 
 const MIN = 60_000;
 const DIA = 24 * 60 * MIN;
-/** Cuánto se espera para repetir un intento según cómo quedó. En automático: un fallo o una versión vieja, un día; «solo con el texto», tres (Meta suele no dar nunca el archivo de un video borrado). */
-export const ESPERA_AUTOMATICA = { error: DIA, sin_archivo: 3 * DIA, version_vieja: DIA };
+/** Cuánto se espera para repetir un intento según cómo quedó. En automático: un fallo o una versión vieja, un día; «solo con el texto», seis horas (ese reintento solo mira si Meta ya entrega el archivo —unas consultas a Meta—: la IA solo se vuelve a pagar si lo entrega). */
+export const ESPERA_AUTOMATICA = { error: DIA, sin_archivo: 6 * 60 * MIN, version_vieja: DIA };
 /** Cuando una persona pulsa el botón no se repite lo que se acaba de intentar (así una tanda que falla no tapa a los que siguen). */
 export const ESPERA_MANUAL_MS = 3 * MIN;
 

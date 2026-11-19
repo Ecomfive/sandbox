@@ -308,7 +308,7 @@ export function ListaVideos({ videos, escribe, iaConectada, sinAnalizar, abrirIn
         variante={vista === "tarjetas" ? "rejilla" : "filas"}
         encabezado={vista === "lista" ? <EncabezadoFilas /> : undefined}
         renderFila={(x, enOrden) =>
-          vista === "tarjetas" ? <TarjetaVideo x={x} posicion={enOrden.indexOf(x) + 1} alAbrir={() => abrirVideo(x.id, false)} alReproducir={() => abrirVideo(x.id, true)} /> : <FilaVideo x={x} alAbrir={() => abrirVideo(x.id, false)} />
+          vista === "tarjetas" ? <TarjetaVideo x={x} posicion={enOrden.indexOf(x) + 1} alAbrir={() => abrirVideo(x.id, false)} alReproducir={() => abrirVideo(x.id, true)} /> : <FilaVideo x={x} alAbrir={() => abrirVideo(x.id, true)} />
         }
         vacio="Todavía no hay videos con gasto en este periodo."
       />
