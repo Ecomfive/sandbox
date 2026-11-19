@@ -11,7 +11,7 @@ import { AlertaIcon, CheckIcon, ChatIcon, GastoIcon, PedidoIcon, RobotIcon, Suge
 import type { Combinado, ResultadoModelo } from "@/lib/confirmacion-ia/combinar";
 import { acierto, type DecisionRevision } from "@/lib/confirmacion-ia/revision";
 import type { ConfigConfirmacion, FilaAnalisis } from "@/lib/confirmacion-ia/servidor";
-import { NOMBRE_ZONA, type Zona } from "@/lib/confirmacion-ia/zonas";
+import { type Zona } from "@/lib/confirmacion-ia/zonas";
 import { tiempoEsperando } from "@/lib/tienda/confirmacion";
 import { EjemplosDirecciones } from "./ejemplos-direcciones";
 import { InstruccionesIA } from "./instrucciones-ia";
@@ -21,6 +21,7 @@ import { PalabrasZona } from "./palabras-zona";
 import { PreguntaMensaje } from "./pedir-dato";
 import { BotonesVeredicto, ColaRevision, type AlElegir } from "./revision-pedidos";
 import { SeccionCard } from "./seccion";
+import { ProveedorZonasPais, useZonasPais } from "./zonas-pais";
 import {
   analizarPedidoAhora,
   analizarPendientesAhora,
@@ -34,7 +35,6 @@ import {
   type PalabraZona,
 } from "../ia-actions";
 
-const ZONA_TEXTO = NOMBRE_ZONA;
 const MENSAJE: Record<FilaAnalisis["mensajeEstado"], { texto: string; tono: "neutro" | "exito" | "aviso" | "peligro" }> = {
   no_aplica: { texto: "No hace falta", tono: "neutro" },
   apagado: { texto: "Sin enviar (apagado)", tono: "neutro" },
@@ -63,12 +63,13 @@ function Interruptor({ activo, etiqueta, deshabilitado, alCambiar }: { activo: b
 
 /** El resultado de un análisis como lo ve la persona: la zona (con la etiqueta que se pondría) y si la dirección está completa. */
 function Resultado({ f, etiquetaActual }: { f: Pick<FilaAnalisis, "estado" | "zona" | "etiqueta" | "falta">; etiquetaActual?: string | null }) {
+  const { nombres } = useZonasPais();
   // Pago por adelantado: en espera hasta que el asesor le pone la etiqueta real en Shopify (cuando llega el pago).
   if (f.estado === "adelantado") return etiquetaActual ? <Pastilla tono="exito">Pagó · etiquetado</Pastilla> : <Pastilla tono="aviso">En espera de pago</Pastilla>;
   if (f.estado === "error") return <Pastilla tono="peligro">No se pudo analizar</Pastilla>;
   if (f.estado === "falta_dato") return <Pastilla tono="aviso">Falta un dato</Pastilla>;
   if (f.estado === "revisar") return <Pastilla tono="neutro">Revisar</Pastilla>;
-  return <Pastilla tono="exito">{f.etiqueta ?? (f.zona ? ZONA_TEXTO[f.zona] : "Completa")}</Pastilla>;
+  return <Pastilla tono="exito">{f.etiqueta ?? (f.zona ? nombres[f.zona] : "Completa")}</Pastilla>;
 }
 
 type Filtro = "todos" | "listo" | "falta_dato" | "revisar" | "revisados" | "adelantado";
@@ -189,6 +190,7 @@ export function ConfirmacionIA({
   ];
 
   return (
+    <ProveedorZonasPais codigoPais={paisCodigo}>
     <div className="flex flex-col gap-6">
       <SeccionCard
         id="estado"
@@ -428,10 +430,12 @@ export function ConfirmacionIA({
         </Ventana>
       )}
     </div>
+    </ProveedorZonasPais>
   );
 }
 
 function FichaAnalisis({ f, distingueZona, puedeEscribir, abrirCorregir, alElegir, alPreguntar, alCerrar }: { f: FilaAnalisis; distingueZona: boolean; puedeEscribir: boolean; abrirCorregir: boolean; alElegir: AlElegir; alPreguntar: (f: FilaAnalisis) => Promise<void>; alCerrar: () => void }) {
+  const { nombres } = useZonasPais();
   const router = useRouter();
   const { mostrarToast } = useToast();
   const [pendiente, empezar] = useTransition();
@@ -457,11 +461,11 @@ function FichaAnalisis({ f, distingueZona, puedeEscribir, abrirCorregir, alElegi
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Resultado f={f.final} etiquetaActual={f.etiquetaActual} />
-          {f.final.zona && <Pastilla>{ZONA_TEXTO[f.final.zona]}{f.revision ? " · lo marcó el equipo" : f.zonaPor === "regla" ? " · por palabra de zona" : " · por las IA"}</Pastilla>}
+          {f.final.zona && <Pastilla>{nombres[f.final.zona]}{f.revision ? " · lo marcó el equipo" : f.zonaPor === "regla" ? " · por palabra de zona" : " · por las IA"}</Pastilla>}
           {f.acuerdo === false && <Pastilla tono="aviso">Las IA no coinciden</Pastilla>}
         </div>
         {f.final.etiqueta && <p className="m-0 text-sm">Etiqueta que se pondría: <b>{f.final.etiqueta}</b>{f.etiquetaActual ? ` · en Shopify tiene ${f.etiquetaActual}` : ""}</p>}
-        {f.reglas.length > 0 && <p className="m-0 text-sm">Palabras de zona que salieron: {f.reglas.map((r) => `${r.texto} (${ZONA_TEXTO[r.resultado]})`).join(", ")}</p>}
+        {f.reglas.length > 0 && <p className="m-0 text-sm">Palabras de zona que salieron: {f.reglas.map((r) => `${r.texto} (${nombres[r.resultado]})`).join(", ")}</p>}
         <div>
           <p className={`${labelClass} m-0`}>Lo que dijo cada IA</p>
           <ul className="m-0 mt-1 flex list-none flex-col gap-1.5 p-0">{f.modelos.map((x) => <LineaModelo key={x.proveedor} m={x} />)}</ul>
@@ -518,7 +522,7 @@ function FichaAnalisis({ f, distingueZona, puedeEscribir, abrirCorregir, alElegi
         {f.revision && (
           <div className="rounded-lg border border-border bg-muted/40 px-3 py-2.5 text-sm">
             <p className="m-0">
-              <b>{f.revision.por ?? "El equipo"}</b> marcó: {f.revision.completa ? `completa${f.revision.zona ? ` · ${ZONA_TEXTO[f.revision.zona]}` : ""}` : `falta ${f.revision.falta ?? "un dato"}`}.
+              <b>{f.revision.por ?? "El equipo"}</b> marcó: {f.revision.completa ? `completa${f.revision.zona ? ` · ${nombres[f.revision.zona]}` : ""}` : `falta ${f.revision.falta ?? "un dato"}`}.
             </p>
             <p className="m-0 text-xs text-muted-foreground">
               {f.revision.ok === true ? "Coincidía con lo que propuso el sistema." : f.revision.ok === false ? "Era distinto de lo que propuso el sistema: la IA aprende de esta corrección." : "Las IA no habían decidido: la IA aprende de esta respuesta."}
@@ -550,6 +554,7 @@ function FichaAnalisis({ f, distingueZona, puedeEscribir, abrirCorregir, alElegi
 
 /** «Probar una dirección»: escribe una dirección y ve qué diría el sistema, sin guardar ni mandar nada. */
 function ProbarDireccion({ paisCodigo, tiendas, puedeEscribir, tiendaElegida }: { paisCodigo?: string; tiendas: { id: string; nombre: string }[]; puedeEscribir: boolean; tiendaElegida: string | null }) {
+  const { nombres } = useZonasPais();
   const { mostrarToast } = useToast();
   const [pendiente, empezar] = useTransition();
   const [direccion, setDireccion] = useState("");
@@ -594,10 +599,10 @@ function ProbarDireccion({ paisCodigo, tiendas, puedeEscribir, tiendaElegida }: 
           <div className="flex flex-col gap-2 rounded-lg border border-border p-3" aria-live="polite">
             <div className="flex flex-wrap items-center gap-2">
               <Resultado f={{ estado: resultado.combinado.estado, zona: resultado.combinado.zona, etiqueta: resultado.etiqueta, falta: resultado.combinado.falta }} />
-              {resultado.combinado.zona && <Pastilla>{ZONA_TEXTO[resultado.combinado.zona]}{resultado.combinado.zonaPor === "regla" ? " · por palabra de zona" : " · por las IA"}</Pastilla>}
+              {resultado.combinado.zona && <Pastilla>{nombres[resultado.combinado.zona]}{resultado.combinado.zonaPor === "regla" ? " · por palabra de zona" : " · por las IA"}</Pastilla>}
             </div>
             {resultado.combinado.falta && <p className="m-0 text-sm">Le pediría: <b>{resultado.combinado.falta}</b></p>}
-            {resultado.palabras.length > 0 && <p className="m-0 text-sm">Palabras de zona que salieron: {resultado.palabras.map((r) => `${r.texto} (${ZONA_TEXTO[r.resultado]})`).join(", ")}</p>}
+            {resultado.palabras.length > 0 && <p className="m-0 text-sm">Palabras de zona que salieron: {resultado.palabras.map((r) => `${r.texto} (${nombres[r.resultado]})`).join(", ")}</p>}
             <ul className="m-0 flex list-none flex-col gap-1.5 p-0">{resultado.modelos.map((m) => <LineaModelo key={m.proveedor} m={m} />)}</ul>
           </div>
         )}

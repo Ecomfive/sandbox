@@ -5,12 +5,13 @@ import { anilloFoco, fieldClass, labelClass } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { CerrarIcon, UbicacionIcon } from "@/lib/nav-icons";
 import { SeccionCard } from "./seccion";
-import { NOMBRE_ZONA, type Zona } from "@/lib/confirmacion-ia/zonas";
+import { type Zona } from "@/lib/confirmacion-ia/zonas";
 import { agregarPalabraZona, eliminarPalabraZona, listarPalabrasZona, type PalabraZona } from "../ia-actions";
+import { useZonasPais } from "./zonas-pais";
 
-const ZONA_TEXTO = NOMBRE_ZONA;
 
 function Grupo({ titulo, ayuda, palabras, puedeEscribir, alQuitar }: { titulo: string; ayuda: string; palabras: PalabraZona[]; puedeEscribir: boolean; alQuitar: (p: PalabraZona) => void }) {
+  const { nombres } = useZonasPais();
   return (
     <details className="rounded-lg border border-border">
       <summary className={`flex cursor-pointer flex-wrap items-baseline justify-between gap-2 rounded-lg px-3 py-2.5 text-sm font-medium ${anilloFoco}`}>
@@ -27,7 +28,7 @@ function Grupo({ titulo, ayuda, palabras, puedeEscribir, alQuitar }: { titulo: s
             {palabras.map((p) => (
               <li key={p.id} className={`inline-flex items-center gap-1.5 rounded-full border py-1 pr-1.5 pl-3 text-sm ${p.resultado === "ciudad" ? "border-success/40 bg-success-soft" : p.resultado === "adelantado" ? "border-primario/40 bg-primario-suave" : "border-warning/40 bg-warning-soft"}`}>
                 <span>
-                  {p.texto} <span className="text-xs text-muted-foreground">· {ZONA_TEXTO[p.resultado]}</span>
+                  {p.texto} <span className="text-xs text-muted-foreground">· {nombres[p.resultado]}</span>
                 </span>
                 {puedeEscribir && (
                   <button type="button" aria-label={`Quitar ${p.texto}`} onClick={() => alQuitar(p)} className={`grid h-6 w-6 place-items-center rounded-full text-muted-foreground hover:bg-card ${anilloFoco}`}>
@@ -45,6 +46,8 @@ function Grupo({ titulo, ayuda, palabras, puedeEscribir, alQuitar }: { titulo: s
 
 export function PalabrasZona({ paisNombre, distingueZona, puedeEscribir, inicial }: { paisNombre: string; distingueZona: boolean; puedeEscribir: boolean; inicial: PalabraZona[] }) {
   const { mostrarToast } = useToast();
+  const { nombres, zonas, codigo } = useZonasPais();
+  const costaRica = String(codigo ?? "").toUpperCase() === "CR";
   const [palabras, setPalabras] = useState(inicial);
   const [texto, setTexto] = useState("");
   const [resultado, setResultado] = useState<Zona>("interior");
@@ -71,7 +74,7 @@ export function PalabrasZona({ paisNombre, distingueZona, puedeEscribir, inicial
           {paisNombre} · {palabras.length} {palabras.length === 1 ? "guardada" : "guardadas"}
         </span>
       }
-      ayuda="Si una de estas palabras sale en la dirección, la IA toma esa zona. Una palabra sola (Colón) o varias juntas (Panamá Este); las juntas pesan más. «Pago por adelantado» (Bocas del Toro, Puerto Armuelles…) gana siempre: el pedido queda en espera de pago, sin etiqueta."
+      ayuda={costaRica ? "Si una de estas palabras sale en la dirección, la IA toma esa zona. Una palabra sola (Heredia) o varias juntas (Pérez Zeledón); las juntas pesan más." : "Si una de estas palabras sale en la dirección, la IA toma esa zona. Una palabra sola (Colón) o varias juntas (Panamá Este); las juntas pesan más. «Pago por adelantado» (Bocas del Toro, Puerto Armuelles…) gana siempre: el pedido queda en espera de pago, sin etiqueta."}
     >
       <div className="flex flex-col gap-4">
         {puedeEscribir ? (
@@ -92,14 +95,17 @@ export function PalabrasZona({ paisNombre, distingueZona, puedeEscribir, inicial
           >
             <label className="flex min-w-[14rem] flex-1 flex-col gap-1">
               <span className={labelClass}>Palabra o palabras</span>
-              <input value={texto} maxLength={80} required onChange={(e) => setTexto(e.target.value)} placeholder="Ej: Colón, o Panamá Este" className={fieldClass} />
+              <input value={texto} maxLength={80} required onChange={(e) => setTexto(e.target.value)} placeholder={costaRica ? "Ej: Heredia, o Pérez Zeledón" : "Ej: Colón, o Panamá Este"} className={fieldClass} />
             </label>
             <label className="flex flex-col gap-1">
               <span className={labelClass}>Entonces es de</span>
               <select value={resultado} onChange={(e) => setResultado(e.target.value as Zona)} className={fieldClass}>
-                <option value="interior">{NOMBRE_ZONA.interior}</option>
-                <option value="ciudad">{NOMBRE_ZONA.ciudad}</option>
-                <option value="adelantado">{NOMBRE_ZONA.adelantado}</option>
+                {/* Primero interior (lo más común), luego ciudad y, donde existe, pago por adelantado. */}
+                {(["interior", "ciudad", "adelantado"] as Zona[]).filter((z) => zonas.includes(z)).map((z) => (
+                  <option key={z} value={z}>
+                    {nombres[z]}
+                  </option>
+                ))}
               </select>
             </label>
             <button type="submit" disabled={pendiente || texto.trim().length < 2} className={`rounded-md bg-foreground px-3 py-2 text-sm font-semibold text-background disabled:opacity-50 ${anilloFoco}`}>
@@ -116,8 +122,8 @@ export function PalabrasZona({ paisNombre, distingueZona, puedeEscribir, inicial
         )}
       </div>
 
-      <Grupo titulo="Una palabra" ayuda="Ej: Colón" palabras={sueltas} puedeEscribir={puedeEscribir} alQuitar={setQuitando} />
-      <Grupo titulo="Varias palabras juntas" ayuda="Ej: Panamá Este" palabras={juntas} puedeEscribir={puedeEscribir} alQuitar={setQuitando} />
+      <Grupo titulo="Una palabra" ayuda={costaRica ? "Ej: Heredia" : "Ej: Colón"} palabras={sueltas} puedeEscribir={puedeEscribir} alQuitar={setQuitando} />
+      <Grupo titulo="Varias palabras juntas" ayuda={costaRica ? "Ej: Pérez Zeledón" : "Ej: Panamá Este"} palabras={juntas} puedeEscribir={puedeEscribir} alQuitar={setQuitando} />
 
       {quitando && (
         <div role="alertdialog" aria-label="Quitar palabra" className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-muted px-3 py-2.5">

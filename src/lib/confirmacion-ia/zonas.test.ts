@@ -44,3 +44,15 @@ test("una palabra de pago por adelantado gana sobre las demás, aunque la direcc
   assert.equal(r.zona, "adelantado");
   assert.equal(r.conflicto, false);
 });
+
+test("Costa Rica: etiquetas propias y sin pago por adelantado; Panamá queda igual", async () => {
+  const { nombresDeZona, permiteAdelanto, zonasDePais, NOMBRE_ZONA } = await import("./zonas");
+  assert.deepEqual(zonasDePais("CR"), ["ciudad", "interior"]);
+  assert.equal(permiteAdelanto("cr"), false);
+  assert.equal(nombresDeZona("CR").ciudad, "CIUDAD-GAM");
+  assert.equal(nombresDeZona("CR").interior, "INTERIOR-ZONAS-ALEJADAS");
+  assert.deepEqual(zonasDePais("PA"), ["ciudad", "interior", "adelantado"]);
+  assert.equal(permiteAdelanto("PA"), true);
+  assert.equal(nombresDeZona("PA"), NOMBRE_ZONA);
+  assert.equal(permiteAdelanto(undefined), true);
+});
