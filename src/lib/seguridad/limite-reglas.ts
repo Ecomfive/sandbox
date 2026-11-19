@@ -1,5 +1,5 @@
 // Límite de peticiones: lo puro (seguridad · 19 nov 2026). Cuántas veces se puede hacer algo en una ventana de tiempo, de qué IP viene
-// la petición y cómo se arma la clave que se cuenta. La parte que habla con la base está en `limite.ts` (migración 0330). Prueba en
+// la petición y cómo se arma la clave que se cuenta. La parte que habla con la base está en `limite.ts` (migración 0331). Prueba en
 // `limite-reglas.test.ts`.
 
 import { createHash } from "node:crypto";

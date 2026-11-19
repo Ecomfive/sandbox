@@ -41,12 +41,12 @@ export function entradaDeOrden(origen: string | null | undefined, etiquetas: str
   return etiquetasDe(etiquetas).some((e) => e.toLowerCase() === "chatbot") ? "bot" : "shopify";
 }
 
-/** La zona que dicen las etiquetas: «CIUDAD» o «INTERIOR» (también «INTERIOR/SERVIENTREGA»). Null si no dicen. */
+/** La zona que dicen las etiquetas: «CIUDAD» o «INTERIOR» (también «INTERIOR/SERVIENTREGA» de Panamá y «CIUDAD-GAM» e «INTERIOR-ZONAS-ALEJADAS» de Costa Rica). Null si no dicen. */
 export function zonaDeEtiquetas(etiquetas: string | null): string | null {
   for (const e of etiquetasDe(etiquetas)) {
     const n = e.toUpperCase();
-    if (n === "CIUDAD" || n.startsWith("CIUDAD/")) return "Ciudad";
-    if (n === "INTERIOR" || n.startsWith("INTERIOR/")) return "Interior";
+    if (n === "CIUDAD" || n.startsWith("CIUDAD/") || n.startsWith("CIUDAD-")) return "Ciudad";
+    if (n === "INTERIOR" || n.startsWith("INTERIOR/") || n.startsWith("INTERIOR-")) return "Interior";
   }
   return null;
 }

@@ -11,6 +11,7 @@ import { formatearTiempoRelativo } from "@/lib/formato";
 import { CalendarioIcon, ComprasIcon, EnvioIcon, HistorialIcon, InventarioIcon } from "@/lib/nav-icons";
 import { pideMotivo, puedeMoverAMano } from "@/lib/wms/recepcion";
 import { ETIQUETA_PLATAFORMA, type Plataforma } from "@/lib/wms/stock-plataformas";
+import { juntarConVariantes, sumarCubetas, type Cubetas } from "@/lib/wms/stock-con-variantes";
 
 /** De qué plataforma lee cada bodega externa su stock (por su código): la fila de la bodega muestra lo que dice la plataforma (11 nov 2026, Hernán). */
 const PLATAFORMA_DE_BODEGA: Record<string, Plataforma> = { dropi: "dropi", effi: "effi", boxfull: "drop", dunamixfy: "dunamixfy" };
@@ -24,6 +25,7 @@ import { DESCRIPCION_CUBETA } from "./descripciones-stock";
 import { PanelMovimiento, type BodegaOpcion, type UbicacionOpcion } from "./panel-movimiento";
 import { PanelRemision, PanelTransferencia } from "./panel-transferencia";
 import { obtenerStockDeSku, type EnvioDropi, type CajaDeBodega, type LoteStock, type MovimientoStock, type StockBodega } from "./stock-actions";
+import type { VarianteConStock } from "@/lib/wms/stock-con-variantes";
 
 /** Lo que la ficha necesita del producto (el Levantamiento la abre con sus propios datos). */
 export type SkuFicha = Pick<FilaStock, "id" | "codigo" | "nombre" | "numero" | "barras" | "tipo" | "clase" | "manejaVencimiento"> & { /** Su stock está como general en el producto principal, pendiente de repartir entre las variantes (migración 0273). */ repartoPendiente?: boolean; plataformas?: FilaStock["plataformas"]; /** Un producto principal con variantes: la etiqueta dice «Con variantes». */ conVariantes?: boolean };
@@ -61,6 +63,13 @@ function textoDias(d: number): string {
 function Cifra({ n }: { n: number }) {
   return <span className={`tabular-nums ${n < 0 ? "font-medium text-destructive" : ""}`}>{n}</span>;
 }
+
+/** Las cifras de una fila de la tabla de bodegas, en el orden de sus columnas. */
+const valoresDe = (c: Cubetas): number[] => [c.fisico, c.reservado, c.disponible, c.danado, c.inspeccion, c.retenido, c.vencido, c.enCamino];
+
+/** Lo de todo el producto (stock general más variantes) en las bodegas propias del país: es el número que ve la lista de Stock. */
+const totalPropias = (bodegas: StockBodega[], variantes: VarianteConStock[]): Cubetas =>
+  sumarCubetas(...juntarConVariantes(bodegas.filter((b) => b.tipo !== "externa"), variantes).map((x) => x.total));
 
 function cambiosATexto(cambios: Record<string, number>): string {
   return Object.entries(cambios)
@@ -105,7 +114,7 @@ export function FichaStock({
   /** Se llama tras guardar un movimiento, para que la tabla vuelva a pedir sus totales. */
   alCambiar: () => void;
 }) {
-  const [datos, setDatos] = useState<{ bodegas: StockBodega[]; movimientos: MovimientoStock[]; lotes: LoteStock[]; envios: EnvioDropi[]; cajas: CajaDeBodega[] } | "error" | null>(null);
+  const [datos, setDatos] = useState<{ bodegas: StockBodega[]; movimientos: MovimientoStock[]; lotes: LoteStock[]; envios: EnvioDropi[]; cajas: CajaDeBodega[]; variantes: VarianteConStock[] } | "error" | null>(null);
   // Sube cuando se guarda un movimiento, para volver a pedir el stock y el libro.
   const [version, setVersion] = useState(0);
   const id = sku?.id;
@@ -266,27 +275,45 @@ export function FichaStock({
                       </tr>
                     </thead>
                     <tbody>
-                      {datos.bodegas.map((b) => {
+                      {juntarConVariantes(datos.bodegas, datos.variantes).map(({ bodega: b, total, partes }) => {
                         // Una bodega de plataforma (Dropi B280, Effi, Drop, Dunamixfy) muestra lo de la última lectura de la plataforma: el sistema no la mueve.
                         const plataforma = conPlataformas && b.tipo === "externa" ? PLATAFORMA_DE_BODEGA[b.codigo] : undefined;
                         const enPlataforma = plataforma ? (sku.plataformas?.[plataforma] ?? 0) : null;
-                        const fisico = enPlataforma ?? b.fisico;
-                        const disponible = enPlataforma ?? b.disponible;
+                        const fisico = enPlataforma ?? total.fisico;
+                        const disponible = enPlataforma ?? total.disponible;
                         // Junto a la de Dropi, nuestra bodega de proveedor en Dropi (B81 en Panamá): sus unidades son referenciales (11 nov 2026, Hernán).
                         const enProveedor = plataforma === "dropi" ? (sku.plataformas?.lineas ?? []).filter((l) => l.plataforma === "dropi").reduce((t, l) => t + l.aparte, 0) : null;
+                        // Con variantes, el stock general sin repartir se nombra en la bodega donde está (aún sin ninguna variante ahí), para que se entienda que ese número no es de una variante.
+                        const sinRepartir = sku.repartoPendiente && datos.variantes.length > 0 && partes.length === 0 && total.fisico !== 0;
                         return (
                         <Fragment key={b.bodegaId}>
                         <tr className="border-t border-border">
                           <th scope="row" className="py-1.5 pr-2 text-left font-medium">
                             {b.nombre}
                             {b.tipo === "externa" && <span className="ml-1.5 text-[11px] font-normal text-muted-foreground">{plataforma ? `según ${ETIQUETA_PLATAFORMA[plataforma]}` : "externa"}</span>}
+                            {sinRepartir && <span className="ml-1.5 text-[11px] font-normal text-muted-foreground">stock general, sin repartir</span>}
                           </th>
-                          {[fisico, b.reservado, disponible, b.danado, b.inspeccion, b.retenido, b.vencido, b.enCamino].map((n, i) => (
+                          {[fisico, total.reservado, disponible, total.danado, total.inspeccion, total.retenido, total.vencido, total.enCamino].map((n, i) => (
                             <td key={i} className="px-1.5 py-1.5 text-right">
                               <Cifra n={n} />
                             </td>
                           ))}
                         </tr>
+                        {partes.map((p) => (
+                          <tr key={p.clave} className="text-muted-foreground">
+                            <th scope="row" className="py-1 pr-2 pl-5 text-left text-xs font-normal">
+                              <span aria-hidden="true">↳ </span>
+                              <span className="sr-only">Incluido en el total de {b.nombre}: </span>
+                              {p.nombre}
+                              {p.general && <span className="ml-1.5 text-[11px]">sin repartir</span>}
+                            </th>
+                            {valoresDe(p.cubetas).map((n, i) => (
+                              <td key={i} className="px-1.5 py-1 text-right text-xs">
+                                <Cifra n={n} />
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
                         {enProveedor !== null && (
                           <tr className="border-t border-border">
                             <th scope="row" className="py-1.5 pr-2 text-left font-medium">
@@ -303,6 +330,18 @@ export function FichaStock({
                         </Fragment>
                         );
                       })}
+                      {datos.variantes.length > 0 && datos.bodegas.length > 1 && (
+                        <tr className="border-t-2 border-border font-semibold">
+                          <th scope="row" className="py-1.5 pr-2 text-left">
+                            Total en bodegas propias
+                          </th>
+                          {valoresDe(totalPropias(datos.bodegas, datos.variantes)).map((n, i) => (
+                            <td key={i} className="px-1.5 py-1.5 text-right">
+                              <Cifra n={n} />
+                            </td>
+                          ))}
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>

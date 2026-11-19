@@ -75,7 +75,7 @@ export async function avisarSeguridad(aviso: AvisoSeguridad): Promise<void> {
           autor_nombre: autor.nombre,
         }));
       let { error } = await supabase.from("notificaciones_usuario").insert(filas("seguridad"));
-      // Sin la migración 0330 la regla de la tabla no conoce «seguridad»: sale como un aviso común, pero sale.
+      // Sin la migración 0331 la regla de la tabla no conoce «seguridad»: sale como un aviso común, pero sale.
       if (error?.code === "23514") ({ error } = await supabase.from("notificaciones_usuario").insert(filas("mencion")));
       if (error) console.error("[avisos-seguridad] no se pudo avisar", aviso.motivo, error);
     } else {

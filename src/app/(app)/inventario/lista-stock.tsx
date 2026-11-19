@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { anilloFoco, fieldClassSm } from "@/components/ui/field";
+import { fieldClassSm } from "@/components/ui/field";
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { SelectorTipoProducto } from "@/components/tabla/selector-tipo-producto";
 import { useFiltros } from "@/components/tabla/ganchos";
@@ -134,21 +134,13 @@ export function ListaStock({
         renderFila={(f) =>
           f.variantes.length > 0 ? (
             <>
-              <FilaStockLista f={f} conPlataformas={conPlataformas} plataforma={plataforma} abierto={desplegados.has(f.id)} alAbrir={() => alternar(f.id)} />
+              <FilaStockLista f={f} conPlataformas={conPlataformas} plataforma={plataforma} abierto={desplegados.has(f.id)} alAbrir={() => setAbierto(f.id)} alAlternar={() => alternar(f.id)} />
               {desplegados.has(f.id) && (
                 <div className="divide-y divide-border border-t border-border">
                   {ordenarVariantes(f.variantes, descendente).map((v) => (
                     <FilaStockLista key={v.id} f={v} hijo conPlataformas={conPlataformas} plataforma={plataforma} alAbrir={() => setAbierto(v.id)} />
                   ))}
-                  {/* El principal también tiene su ficha (su stock general, sus movimientos y Corregir), por si quedó con un saldo propio, como un negativo (13 nov 2026). */}
-                  <div className="flex items-center justify-between gap-3 bg-muted/30 py-2 pr-4 pl-10">
-                    <button
-                      type="button"
-                      onClick={() => setAbierto(f.id)}
-                      className={`min-h-9 rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium hover:bg-muted ${anilloFoco}`}
-                    >
-                      Abrir la ficha de {f.nombre} (stock general)
-                    </button>
+                  <div className="flex items-center justify-end bg-muted/30 py-1.5 pr-4 pl-10">
                     <BotonOrdenVariantes />
                   </div>
                 </div>

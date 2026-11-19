@@ -1,4 +1,4 @@
-// Límite de peticiones contra la base (seguridad · 19 nov 2026, migración 0330). Solo servidor: NO es un archivo "use server".
+// Límite de peticiones contra la base (seguridad · 19 nov 2026, migración 0331). Solo servidor: NO es un archivo "use server".
 //
 // Si la migración falta o la base falla, se DEJA PASAR (y se anota una vez en los registros del servidor): una falla de la base nunca
 // deja a nadie afuera del login. Lo puro (reglas, IP, claves) está en `limite-reglas.ts`.
@@ -21,7 +21,7 @@ function anotarFalla(donde: string, error: unknown) {
   if (anotados.has(motivo)) return;
   anotados.add(motivo);
   console.warn(
-    sinMigrar ? `[limite] falta correr la migración 0330 (${donde}): se deja pasar todo` : `[limite] la base no respondió (${donde}): se deja pasar`,
+    sinMigrar ? `[limite] falta correr la migración 0331 (${donde}): se deja pasar todo` : `[limite] la base no respondió (${donde}): se deja pasar`,
     sinMigrar ? "" : error,
   );
 }

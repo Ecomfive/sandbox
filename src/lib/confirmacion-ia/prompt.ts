@@ -21,7 +21,7 @@ export const MAX_INSTRUCCIONES = 2000;
 /** Cuántas palabras de zona entran al pedido. */
 export const MAX_REGLAS = 200;
 
-const ETIQUETA_ZONA: Record<Zona, string> = { ciudad: "CIUDAD", interior: "INTERIOR (se envía con Servientrega)", adelantado: "PAGO POR ADELANTADO (zona de difícil acceso o fronteriza: el cliente paga antes de que se envíe)" };
+const ETIQUETA_ZONA: Record<Zona, string> = { ciudad: "CIUDAD", interior: "INTERIOR (todo lo que no es ciudad: las zonas más lejanas)", adelantado: "PAGO POR ADELANTADO (zona de difícil acceso o fronteriza: el cliente paga antes de que se envíe)" };
 
 const comillas = (t: string) => JSON.stringify(String(t).replace(/\s+/g, " ").trim().slice(0, 400));
 
@@ -57,7 +57,7 @@ export function armarEntrada({
     "Haces dos cosas:",
     "1) Decides si la dirección está COMPLETA: alcanza para despachar el pedido. Se sabe el lugar (barrio, urbanización, corregimiento o sector) y el punto exacto (calle, casa, edificio, apartamento o una referencia clara). Está INCOMPLETA si solo trae la ciudad o el sector, o un nombre suelto sin número ni referencia. Así funcionan los envíos: el repartidor casi siempre llama al cliente para avisar que llega y coordinar, así que no pidas lo que se resuelve en esa llamada; pero un pedido con la dirección incompleta no se despacha y sigue sin confirmarse hasta que el cliente la complete, por eso hay que pedir lo que falta. Guíate sobre todo por los ejemplos que te damos.",
     distingueZona
-      ? "2) Decides la ZONA de envío: «ciudad» (se entrega con repartidor propio), «interior» (todo lo que no es ciudad; se envía con Servientrega) o «adelantado» (zonas de difícil acceso o fronterizas que se pagan por adelantado; responde «adelantado» SOLO si las palabras de zona o los ejemplos de abajo dicen que ese lugar es de pago por adelantado, nunca por tu cuenta). Si no alcanza para decidirla, responde «no_se»."
+      ? "2) Decides la ZONA de envío: «ciudad» (la zona de ciudad, con reparto cercano), «interior» (todo lo que no es ciudad: las zonas más lejanas) o «adelantado» (zonas de difícil acceso o fronterizas que se pagan por adelantado; responde «adelantado» SOLO si las palabras de zona o los ejemplos de abajo dicen que ese lugar es de pago por adelantado, nunca por tu cuenta). Si no alcanza para decidirla, responde «no_se»."
       : `2) En ${paisNombre} no se distingue ciudad e interior: responde siempre «no_aplica» en la zona.`,
     "LO MÁS IMPORTANTE de una dirección es de dónde es: la ciudad o el corregimiento. Te llega aparte («Ciudad o corregimiento que puso»), y a veces el cliente lo repite dentro de la dirección o lo escribe solo ahí. Léelo primero: con una sola palabra (por ejemplo Colón) ya sabes que no es de ciudad. Si dice Panamá, casi seguro es ciudad, pero lee el resto de la dirección para confirmarlo (puede ser Panamá Este, Panamá Oeste u otro lugar). Si ni ese dato ni la dirección dicen de dónde es, la dirección está INCOMPLETA y lo que falta es «la ciudad o el corregimiento».",
     "Si la dirección está incompleta, escribe en «falta» SOLO lo que hay que pedirle al cliente, en pocas palabras y como complemento de «¿Nos puedes escribir …?» (por ejemplo: «el número de casa o un punto de referencia»). No inventes datos ni pidas nada que ya esté en la dirección.",

@@ -1,4 +1,4 @@
--- 0330 · Límite de peticiones y avisos de seguridad (seguridad · 19 nov 2026).
+-- 0331 · Límite de peticiones y avisos de seguridad (seguridad · 19 nov 2026).
 --
 -- Antes nada frenaba a quien probara claves en el login, ni a quien llamara sin parar al asistente con IA (cada pregunta cuesta) o al
 -- enlace del mensajero. Ahora el servidor cuenta las peticiones por clave (un correo, una IP, una persona, un enlace) en ventanas fijas
@@ -17,7 +17,7 @@
 -- RLS activado y sin políticas; las funciones solo las ejecuta `service_role`. Sin esta migración la app deja pasar todo, como antes
 -- (nunca deja a nadie afuera por una falla de la base), y los avisos salen como tipo «mención».
 --
--- Se puede correr dos veces. Reversa: supabase/rollbacks/0330_rollback.sql
+-- Se puede correr dos veces. Reversa: supabase/rollbacks/0331_rollback.sql
 
 create table if not exists public.limite_contadores (
   clave text not null check (char_length(clave) between 1 and 200),
@@ -30,7 +30,7 @@ create table if not exists public.limite_contadores (
 create index if not exists limite_contadores_inicio on public.limite_contadores (inicio);
 alter table public.limite_contadores enable row level security;
 revoke all on table public.limite_contadores from public, anon, authenticated;
-comment on table public.limite_contadores is 'Cuántas peticiones lleva cada clave (resumida) en su ventana de tiempo. Solo servidor (0330).';
+comment on table public.limite_contadores is 'Cuántas peticiones lleva cada clave (resumida) en su ventana de tiempo. Solo servidor (0331).';
 
 create or replace function public.limite_sumar(p_clave text, p_ventana_segundos integer, p_sumar integer default 1) returns integer
 language plpgsql security definer set search_path = '' as $$

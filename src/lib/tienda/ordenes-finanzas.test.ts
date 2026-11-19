@@ -16,6 +16,9 @@ test("el estado del Excel de Finanzas pasa al de la pantalla, igual que el ciclo
 
 test("la zona sale de las etiquetas", () => {
   assert.equal(zonaDeEtiquetas("CIUDAD, Confirmada"), "Ciudad");
+  // Costa Rica
+  assert.equal(zonaDeEtiquetas("CONFIRMADO, CIUDAD-GAM, DROP"), "Ciudad");
+  assert.equal(zonaDeEtiquetas("CONFIRMADO, INTERIOR-ZONAS-ALEJADAS"), "Interior");
   assert.equal(zonaDeEtiquetas("Carrito recuperado, Confirmada, INTERIOR/SERVIENTREGA"), "Interior");
   assert.equal(zonaDeEtiquetas("Confirmada"), null);
   assert.equal(zonaDeEtiquetas(null), null);

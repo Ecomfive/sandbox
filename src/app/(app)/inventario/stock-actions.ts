@@ -11,6 +11,8 @@ import { getPaisActual } from "@/lib/pais";
 import { puedeVerBodega } from "@/lib/seguridad/pais-acceso";
 import type { CajaGuardada } from "@/lib/wms/cajas";
 import { codigoLote } from "@/lib/wms/vencimiento";
+import { compararOpciones, etiquetaTalla } from "@/lib/wms/talla";
+import type { VarianteConStock } from "@/lib/wms/stock-con-variantes";
 
 const MODULO = "inventario";
 const ES_ID = (v: string) => /^[0-9a-fA-F-]{8,64}$/.test(v);
@@ -77,14 +79,29 @@ export interface MovimientoStock {
   usuario: string | null;
 }
 
+const aStockBodega = (b: Record<string, unknown>): StockBodega => ({
+  bodegaId: String(b.bodega_id),
+  codigo: String(b.codigo),
+  nombre: String(b.nombre),
+  tipo: String(b.tipo),
+  fisico: Number(b.fisico),
+  reservado: Number(b.reservado),
+  disponible: Number(b.disponible),
+  danado: Number(b.danado),
+  inspeccion: Number(b.inspeccion),
+  retenido: Number(b.retenido),
+  enCamino: Number(b.en_camino),
+  vencido: Number(b.vencido ?? 0),
+});
+
 /** El stock de un SKU en cada bodega del país y sus últimos movimientos, para su ficha. Basta poder abrir Inventario. */
-export async function obtenerStockDeSku(skuId: string): Promise<{ bodegas: StockBodega[]; movimientos: MovimientoStock[]; lotes: LoteStock[]; envios: EnvioDropi[]; cajas: CajaDeBodega[] } | { error: string }> {
+export async function obtenerStockDeSku(skuId: string): Promise<{ bodegas: StockBodega[]; movimientos: MovimientoStock[]; lotes: LoteStock[]; envios: EnvioDropi[]; cajas: CajaDeBodega[]; variantes: VarianteConStock[] } | { error: string }> {
   await requireModulo(MODULO);
   if (!ES_ID(skuId)) return { error: "SKU no válido." };
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
 
-  const [porBodega, libro, lotesRpc, enviosRes, cajasRes] = await Promise.all([
+  const [porBodega, libro, lotesRpc, enviosRes, cajasRes, hijasRes] = await Promise.all([
     supabase.rpc("wms_stock_por_bodega", { p_sku: skuId, p_pais: pais.id }),
     supabase
       .from("wms_movimientos")
@@ -109,8 +126,22 @@ export async function obtenerStockDeSku(skuId: string): Promise<{ bodegas: Stock
       .select("id, bodega_id, cajas, unidades_por_caja, observacion, wms_ubicaciones(codigo, notas), wms_bodegas!inner(nombre, pais_id)")
       .eq("sku_maestro_id", skuId)
       .eq("wms_bodegas.pais_id", pais.id),
+    // Las variantes del producto (si es un principal): su stock se junta con el general en la ficha.
+    supabase.from("skus_maestros").select("id, codigo, opciones").eq("padre_id", skuId).order("codigo").limit(60),
   ]);
   if (porBodega.error) return { error: "No se pudo cargar el stock." };
+
+  // Lo que hay de cada variante en cada bodega del país (la misma función de la ficha de una variante). Una variante que no se puede leer no rompe la ficha: sale sin su stock.
+  const hijas = hijasRes.error ? [] : (hijasRes.data ?? []);
+  const variantes: VarianteConStock[] = (
+    await Promise.all(
+      hijas.map(async (h) => {
+        const r = await supabase.rpc("wms_stock_por_bodega", { p_sku: h.id as string, p_pais: pais.id });
+        const etiqueta = etiquetaTalla(Object.values((h.opciones ?? {}) as Record<string, string>).join(" / ")) || (h.codigo as string);
+        return { id: h.id as string, etiqueta, bodegas: r.error ? [] : (r.data ?? []).map(aStockBodega) };
+      }),
+    )
+  ).sort((a, b) => compararOpciones(a.etiqueta, b.etiqueta));
 
   const uno = <T,>(r: T | T[] | null): T | null => (Array.isArray(r) ? (r[0] ?? null) : r);
   // Quién hizo cada movimiento: el libro guarda el id de la cuenta; el nombre se busca aparte.
@@ -118,20 +149,8 @@ export async function obtenerStockDeSku(skuId: string): Promise<{ bodegas: Stock
   const { data: perfiles } = idsUsuario.length > 0 ? await supabase.from("perfiles").select("id, nombre, email").in("id", idsUsuario) : { data: [] };
   const nombreDe = new Map((perfiles ?? []).map((p) => [p.id as string, (p.nombre as string | null) || (p.email as string)]));
   return {
-    bodegas: (porBodega.data ?? []).map((b: Record<string, unknown>) => ({
-      bodegaId: String(b.bodega_id),
-      codigo: String(b.codigo),
-      nombre: String(b.nombre),
-      tipo: String(b.tipo),
-      fisico: Number(b.fisico),
-      reservado: Number(b.reservado),
-      disponible: Number(b.disponible),
-      danado: Number(b.danado),
-      inspeccion: Number(b.inspeccion),
-      retenido: Number(b.retenido),
-      enCamino: Number(b.en_camino),
-      vencido: Number(b.vencido ?? 0),
-    })),
+    bodegas: (porBodega.data ?? []).map(aStockBodega),
+    variantes,
     // Los lotes pueden fallar sin romper la ficha (producto sin vencimiento o migración sin correr).
     lotes: lotesRpc.error
       ? []
