@@ -17,29 +17,62 @@ export interface BodegaDefectuosos {
   danado: number;
 }
 
+/** Algo a lo que se le puede marcar defectuoso: el producto, o cada una de sus variantes (y el stock general sin repartir), con sus bodegas. */
+export interface OpcionDefectuoso {
+  skuId: string;
+  nombre: string;
+  bodegas: BodegaDefectuosos[];
+}
+
 const unidades = (n: number) => `${n.toLocaleString("es-PA")} ${n === 1 ? "unidad" : "unidades"}`;
 
 /**
  * «Defectuoso» en la fila de acciones de la ficha, junto a Entrada, Salida y Corregir (pedido de Dinora, 19 nov 2026): en vez de solo restar, se marcan unidades como defectuosas (siguen en
  * la bodega pero no se venden), se devuelven a disponible o se dan de baja. Siempre con el motivo, que queda en el historial del producto.
  */
-export function PanelDefectuoso({ skuId, bodegas, puedeBaja, alGuardar }: { skuId: string; bodegas: BodegaDefectuosos[]; puedeBaja: boolean; alGuardar: () => void }) {
+export function PanelDefectuoso({
+  opciones,
+  puedeBaja,
+  alGuardar,
+  enLinea = false,
+  nombre,
+}: {
+  /** Un producto simple trae una sola opción; un producto con variantes trae una por variante (y el stock general mientras esté sin repartir): se elige primero cuál. */
+  opciones: OpcionDefectuoso[];
+  puedeBaja: boolean;
+  alGuardar: () => void;
+  /** Un botón pequeño de texto para una fila (cada variante dentro de «Stock por bodega» del producto principal), en vez del botón grande de la fila de acciones. */
+  enLinea?: boolean;
+  /** A qué se le marca (el nombre de la variante), cuando no es el producto de la ficha. */
+  nombre?: string;
+}) {
   const { mostrarToast } = useToast();
   const [abierto, setAbierto] = useState(false);
   const [accion, setAccion] = useState<AccionDefectuoso>("marcar");
+  const [opcionId, setOpcionId] = useState("");
   const [bodegaId, setBodegaId] = useState("");
   const [cantidad, setCantidad] = useState("");
   const [motivo, setMotivo] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pendiente, empezar] = useTransition();
   const acciones = ACCIONES_DEFECTUOSO.filter((a) => a !== "baja" || puedeBaja);
+  const opcion = opciones.find((o) => o.skuId === opcionId) ?? null;
+  const bodegas = opcion?.bodegas ?? [];
   const bodega = bodegas.find((b) => b.bodegaId === bodegaId) ?? null;
   // Cuántas unidades se pueden mover en la bodega elegida según la acción.
   const tope = !bodega ? null : accion === "marcar" ? Math.max(bodega.disponible, 0) : Math.max(bodega.danado, 0);
 
+  function elegirOpcion(id: string) {
+    setOpcionId(id);
+    const o = opciones.find((x) => x.skuId === id);
+    setBodegaId(o && o.bodegas.length === 1 ? o.bodegas[0].bodegaId : "");
+    setCantidad("");
+    setError(null);
+  }
+
   function abrir() {
     setAccion("marcar");
-    setBodegaId(bodegas.length === 1 ? bodegas[0].bodegaId : "");
+    elegirOpcion(opciones.length === 1 ? opciones[0].skuId : "");
     setCantidad("");
     setMotivo("");
     setError(null);
@@ -47,11 +80,12 @@ export function PanelDefectuoso({ skuId, bodegas, puedeBaja, alGuardar }: { skuI
   }
 
   function guardar() {
+    if (!opcion) return setError("Elige la variante.");
     if (!bodega) return setError("Elige la bodega.");
     const r = revisarDefectuoso({ accion, cantidad, motivo, disponible: bodega.disponible, danado: bodega.danado });
     if ("error" in r) return setError(r.error);
     empezar(async () => {
-      const res = await marcarDefectuoso({ skuId, bodegaId: bodega.bodegaId, accion: r.accion, cantidad: r.cantidad, motivo: r.motivo }).catch(() => ({ error: "No se pudo guardar." }));
+      const res = await marcarDefectuoso({ skuId: opcion.skuId, bodegaId: bodega.bodegaId, accion: r.accion, cantidad: r.cantidad, motivo: r.motivo }).catch(() => ({ error: "No se pudo guardar." }));
       if (res.error) return setError(res.error);
       mostrarToast(r.accion === "marcar" ? `${unidades(r.cantidad)} marcadas como defectuosas` : r.accion === "devolver" ? `${unidades(r.cantidad)} vuelven a disponible` : `${unidades(r.cantidad)} dadas de baja`);
       setAbierto(false);
@@ -61,10 +95,24 @@ export function PanelDefectuoso({ skuId, bodegas, puedeBaja, alGuardar }: { skuI
 
   return (
     <>
-      <BotonAccion icono={AlertaIcon} onClick={abrir} aria-haspopup="dialog" disabled={!bodegas.length} title={bodegas.length ? undefined : "No hay bodegas propias"}>
-        Defectuoso
-      </BotonAccion>
-      <Ventana abierto={abierto} alCerrar={() => !pendiente && setAbierto(false)} ancho="sm" titulo="Productos defectuosos">
+      {enLinea ? (
+        <button
+          type="button"
+          onClick={abrir}
+          aria-haspopup="dialog"
+          disabled={!opciones.length}
+          aria-label={`Defectuoso: ${nombre ?? "marcar unidades"}${opciones.length === 1 && opciones[0].bodegas.length === 1 ? ` en ${opciones[0].bodegas[0].nombre}` : ""}`}
+          className="inline-flex min-h-6 cursor-pointer items-center gap-1 rounded-md border border-border-control bg-card px-2 py-0.5 text-[11px] font-medium text-foreground hover:bg-muted disabled:opacity-50"
+        >
+          <AlertaIcon aria-hidden="true" className="h-3 w-3" />
+          Defectuoso
+        </button>
+      ) : (
+        <BotonAccion icono={AlertaIcon} onClick={abrir} aria-haspopup="dialog" disabled={!opciones.length} title={opciones.length ? undefined : "No hay unidades para marcar ni bodegas propias"}>
+          Defectuoso
+        </BotonAccion>
+      )}
+      <Ventana abierto={abierto} alCerrar={() => !pendiente && setAbierto(false)} ancho="sm" titulo={nombre ? `Defectuoso: ${nombre}` : "Productos defectuosos"}>
         <form
           className="flex flex-col gap-4 p-5"
           onSubmit={(e) => {
@@ -94,7 +142,20 @@ export function PanelDefectuoso({ skuId, bodegas, puedeBaja, alGuardar }: { skuI
               </label>
             ))}
           </fieldset>
-          {bodegas.length > 1 ? (
+          {opciones.length > 1 && (
+            <label className="flex flex-col gap-1">
+              <span className={labelClassSm}>Variante</span>
+              <select value={opcionId} onChange={(e) => elegirOpcion(e.target.value)} required className={fieldClassSm}>
+                <option value="">Elige la variante</option>
+                {opciones.map((o) => (
+                  <option key={o.skuId} value={o.skuId}>
+                    {o.nombre} · {o.bodegas.reduce((t, b) => t + b.disponible, 0).toLocaleString("es-PA")} disp. · {o.bodegas.reduce((t, b) => t + b.danado, 0).toLocaleString("es-PA")} defectuosas
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {!opcion ? null : bodegas.length > 1 ? (
             <label className="flex flex-col gap-1">
               <span className={labelClassSm}>Bodega</span>
               <select
@@ -116,7 +177,7 @@ export function PanelDefectuoso({ skuId, bodegas, puedeBaja, alGuardar }: { skuI
             </label>
           ) : (
             <p className="m-0 text-[13px] text-muted-foreground">
-              Bodega: {bodegas[0]?.nombre} · {bodegas[0]?.disponible.toLocaleString("es-PA")} disponibles · {bodegas[0]?.danado.toLocaleString("es-PA")} defectuosas
+              {nombre ? `${nombre} · ` : ""}{bodegas.length === 0 ? "Sin bodegas con unidades" : "Bodega"}: {bodegas[0]?.nombre} · {bodegas[0]?.disponible.toLocaleString("es-PA")} disponibles · {bodegas[0]?.danado.toLocaleString("es-PA")} defectuosas
             </p>
           )}
           <label className="flex flex-col gap-1">

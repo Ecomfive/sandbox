@@ -92,7 +92,7 @@ export function CorregirStock({
           aria-haspopup="dialog"
           disabled={!bodegas.length}
           aria-label={`Corregir ${nombre ?? "el valor"}${bodegas.length === 1 ? ` en ${bodegas[0].nombre}` : ""}`}
-          className="ml-2 inline-flex min-h-6 cursor-pointer items-center gap-1 rounded-md border border-border-control bg-card px-2 py-0.5 text-[11px] font-medium text-foreground hover:bg-muted disabled:opacity-50"
+          className="inline-flex min-h-6 cursor-pointer items-center gap-1 rounded-md border border-border-control bg-card px-2 py-0.5 text-[11px] font-medium text-foreground hover:bg-muted disabled:opacity-50"
         >
           <LapizIcon aria-hidden="true" className="h-3 w-3" />
           Corregir
