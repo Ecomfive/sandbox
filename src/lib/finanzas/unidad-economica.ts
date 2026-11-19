@@ -464,6 +464,40 @@ export interface FilaVistaUE extends FilaUE, DerivadosUE {
   accion: AccionProducto;
   /** Subir el precio $X, ganaría $X con la tasa de referencia, bajar el marketing $X, pierde $X. */
   montoAccion: number | null;
+  /** Por qué no llega al margen (mejora 40): el costo que más pesa por encima del promedio, o el precio. Solo en los que pierden. */
+  causa?: string | null;
+}
+
+/** Puntos de las ventas que un costo tiene que pasar al promedio para ser «la causa» (si ninguno, es el precio). */
+export const EXCESO_CAUSA = 0.02;
+
+/**
+ * Por qué un producto queda bajo el margen objetivo (mejora 40): cada costo como parte de sus ventas contra lo mismo en
+ * `referencia` (el total de la selección). El que más se pasa es la causa; si ninguno se pasa más de 2 puntos, el precio
+ * es bajo para lo que cuesta. Sin entregas, lo dice. Lógica pura, con prueba en `unidad-economica.test.ts`.
+ */
+export function causaMargen(f: FilaUE, referencia: FilaUE): string {
+  if (f.ventas <= 0) return "Sin entregas: solo envío y devolución";
+  const partes = (x: FilaUE) => ({
+    mercancia: x.ventas ? x.mercancia / x.ventas : 0,
+    flete: x.ventas ? (x.envio - x.envioDevueltas) / x.ventas : 0,
+    devoluciones: x.ventas ? (x.devolucion + x.envioDevueltas) / x.ventas : 0,
+    comision: x.ventas ? x.comision / x.ventas : 0,
+    marketing: x.ventas ? x.marketing / x.ventas : 0,
+  });
+  const p = partes(f);
+  const r = partes(referencia);
+  const NOMBRE = { mercancia: "Costo de la mercancía", flete: "Flete", devoluciones: "Devoluciones", comision: "Comisión de cobro", marketing: "Marketing" } as const;
+  let mayor: keyof typeof NOMBRE | null = null;
+  let exceso = EXCESO_CAUSA;
+  for (const k of Object.keys(NOMBRE) as (keyof typeof NOMBRE)[]) {
+    const e = p[k] - r[k];
+    if (e > exceso) {
+      exceso = e;
+      mayor = k;
+    }
+  }
+  return mayor ? `${NOMBRE[mayor]} (+${Math.round(exceso * 100)} pts sobre el promedio)` : "Precio bajo para lo que cuesta";
 }
 
 export function filaVista(f: FilaUE, s: Pick<SupuestosUE, "margenObjetivoPct">, tasaReferencia: number | null, etiqueta?: string): FilaVistaUE {

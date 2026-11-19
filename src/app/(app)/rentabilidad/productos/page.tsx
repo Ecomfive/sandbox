@@ -4,7 +4,7 @@ import { dinero, dineroKpi, entero, fraccion, porcentaje } from "@/lib/af4/forma
 import { rangoPeriodo } from "@/lib/af4/periodo";
 import { requireModulo } from "@/lib/auth";
 import { cargarAgrupado } from "@/lib/finanzas/cargar-unidad-economica";
-import { baseSimulador, derivados, filaVista, separarDestruyen, sumarFilasUE } from "@/lib/finanzas/unidad-economica";
+import { baseSimulador, derivados, filaVista, separarDestruyen, sumarFilasUE, causaMargen } from "@/lib/finanzas/unidad-economica";
 import { createServiceClient } from "@/lib/supabase/server";
 import { cargarContextoUE } from "../unidad/datos-ue";
 import { PaginaUE, PaginaUEError, puedeEditarUE } from "../unidad/marco-ue";
@@ -31,10 +31,16 @@ export default async function ProductosUEPage({ searchParams }: { searchParams: 
   const t = sumarFilasUE(tiendas);
   const dt = derivados(t);
   const s = ctx.supuestos;
-  const filas = productos.map((p) => filaVista(p, s, dt.tasaEntrega)).sort((a, b) => b.ventas - a.ventas || a.etiqueta.localeCompare(b.etiqueta));
+  // La causa (mejora 40) solo en los que no llegan al margen objetivo: el costo que más se pasa del promedio de la selección.
+  const vista = (p: (typeof productos)[number]) => {
+    const v = filaVista(p, s, dt.tasaEntrega);
+    return { ...v, causa: v.margenPct === null || v.margenPct < s.margenObjetivoPct ? causaMargen(p, t) : null };
+  };
+  // Ranking por utilidad total (mejora 39): el que más deja arriba.
+  const filas = productos.map(vista).sort((a, b) => b.margen - a.margen || b.ventas - a.ventas || a.etiqueta.localeCompare(b.etiqueta));
   const grupos = separarDestruyen(productos, s.margenObjetivoPct);
-  const sinEntregas = grupos.sinEntregas.map((p) => filaVista(p, s, dt.tasaEntrega));
-  const conEntregas = grupos.conEntregas.map((p) => filaVista(p, s, dt.tasaEntrega));
+  const sinEntregas = grupos.sinEntregas.map(vista);
+  const conEntregas = grupos.conEntregas.map(vista);
   const destruyen = [...conEntregas, ...sinEntregas];
   const conDevoluciones = filas.filter((f) => f.devueltas > 0).sort((a, b) => b.costoDevoluciones - a.costoDevoluciones);
   const perdida = destruyen.filter((f) => f.margen < 0).reduce((a, f) => a + f.margen, 0);
@@ -83,8 +89,8 @@ export default async function ProductosUEPage({ searchParams }: { searchParams: 
 
           <section aria-labelledby="titulo-productos" className="flex flex-col gap-2">
             <h2 id="titulo-productos" className="flex flex-wrap items-baseline gap-x-2 text-sm font-semibold">
-              Margen real por producto
-              <span className="text-xs font-normal text-muted-foreground">{detalle}</span>
+              Ranking por utilidad
+              <span className="text-xs font-normal text-muted-foreground">Del que más deja al que más pierde · {detalle}</span>
             </h2>
             <TablaProductosUE filas={filas} />
           </section>

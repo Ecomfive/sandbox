@@ -24,7 +24,7 @@ export function conParaTi(p: PendientesMenu, paraTi: number, novedades = 0, tare
 }
 
 /** Páginas del menú que muestran un contador; el resto no cuenta nada. */
-const PAGINAS_CON_CONTADOR = ["/alertas", "/pedidos-dropi", "/retiros", "/inventario", "/analisis-competencia"];
+const PAGINAS_CON_CONTADOR = ["/alertas", "/pedidos-dropi", "/retiros", "/inventario", "/analisis-competencia", "/cierre-mes"];
 
 /** ¿Hay algo que consultar para esta persona? Sin ninguno de estos módulos no se gasta ni una consulta. */
 export function necesitaPendientes(modulos: string[]): boolean {
@@ -48,6 +48,7 @@ export function calcularPendientesMenu(pendientes: PendientesHoy, modulos: strin
     "/analisis-competencia": pendientes.competidoresNuevos,
     "/publicaciones-dropi": pendientes.tareasAtrasadas + pendientes.creditosIA,
     "/compras": pendientes.sinStockPorRevisar,
+    "/cierre-mes": pendientes.cierreAtrasado,
   };
   const contadores: ContadoresMenu = {};
   for (const [href, cantidad] of Object.entries(porPagina)) {
@@ -63,7 +64,8 @@ export function calcularPendientesMenu(pendientes: PendientesHoy, modulos: strin
       pendientes.competidoresNuevos +
       pendientes.tareasAtrasadas +
       pendientes.creditosIA +
-      pendientes.sinStockPorRevisar
+      pendientes.sinStockPorRevisar +
+      pendientes.cierreAtrasado
     : 0;
   return { contadores, total, paraTi: 0, novedades: 0, tareasMias: 0 };
 }
@@ -80,6 +82,7 @@ const DE_DONDE: Record<string, string> = {
   "/analisis-competencia": "competidores nuevos",
   "/publicaciones-dropi": "tareas atrasadas o crédito de IA por acabarse",
   "/compras": "productos sin stock por revisar, en la pestaña «Sin stock»",
+  "/cierre-mes": "mes sin cerrar, tareas del cierre atrasadas y cuentas del banco sin conciliar",
 };
 
 /** El texto del globito: «12 pendientes: productos sin stock por revisar, en la pestaña «Sin stock»». */

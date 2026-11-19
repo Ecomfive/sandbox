@@ -9,6 +9,7 @@ import { dinero, dineroKpi, entero, fraccion } from "@/lib/af4/formato";
 import { requireModulo } from "@/lib/auth";
 import { cargarComprasCostos } from "@/lib/finanzas/cargar-compras-costos";
 import { costoPuestoCompras, porPagarProveedores, presupuestoCompras, variacionCostos } from "@/lib/finanzas/compras-costos";
+import { UsarComoCosto } from "./usar-como-costo";
 import { conFinanciamiento, financiamientoPorOrden } from "@/lib/finanzas/financiamiento-orden";
 import { createServiceClient } from "@/lib/supabase/server";
 import { AjusteInventario } from "../inventario/ajuste-inventario";
@@ -107,7 +108,11 @@ export default async function ComprasCostosPage() {
         <TablaAnticipos filas={datos.anticipos} />
       </Bloque>
 
-      <Bloque id="titulo-costo-puesto" titulo="Costo puesto en bodega">
+      <Bloque
+        id="titulo-costo-puesto"
+        titulo="Costo puesto en bodega"
+        accion={escribe && usuario.modulos.includes("costos-mercancia") && !usuario.modulosSoloLectura.includes("costos-mercancia") ? <UsarComoCosto /> : undefined}
+      >
         <TablaCostoPuesto filas={costos} gastos={datos.gastos} umbral={datos.ajustes.alertaCosto} puedeEditar={escribe && !datos.sinMigracion} />
       </Bloque>
 

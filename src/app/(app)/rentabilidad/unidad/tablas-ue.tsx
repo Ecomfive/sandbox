@@ -97,6 +97,7 @@ const DEF_PRODUCTOS: DefTabla<FilaVistaUE> = {
     { id: "ventas", etiqueta: "Ventas", tipo: "numero", valor: (f) => f.ventas },
     { id: "margen", etiqueta: "Margen real", tipo: "numero", valor: (f) => f.margen },
     { id: "margenPct", etiqueta: "Margen %", tipo: "numero", valor: (f) => f.margenPct },
+    { id: "causa", etiqueta: "Por qué no llega", tipo: "seleccion", valores: (f) => [f.causa ? f.causa.replace(/ \(.*$/, "") : "Llega al objetivo"], agrupable: true },
   ],
 };
 
@@ -166,6 +167,14 @@ const COLUMNAS_PRODUCTOS: ColumnaTabla<FilaVistaUE, null>[] = [
     render: (f) => d2(f.precioMinimo),
   },
   { id: "accion", label: "Recomendación", ocultable: false, render: (f) => <Accion accion={f.accion} texto={textoAccion(f)} /> },
+  {
+    id: "causa",
+    label: "Por qué no llega",
+    descripcion: "El costo que más pesa sobre sus ventas por encima del promedio de la selección; si ninguno, el precio es bajo.",
+    ocultable: true,
+    clase: "text-muted-foreground",
+    render: (f) => f.causa ?? "—",
+  },
 ];
 
 const ICONOS_PRODUCTOS: Record<string, IconoComp> = {

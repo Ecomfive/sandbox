@@ -9,6 +9,9 @@ import { armarProyeccion } from "@/lib/finanzas/proyeccion-caja";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { recalcularCuentaMes } from "../conciliacion/guardar";
 import { cargarAjustesConciliacion, cargarAntiguedad } from "../conciliacion/cargar";
+import { sincronizarCostosCompras } from "../finanzas/sincronizar-costos-compras";
+import { variacionCostos } from "../finanzas/compras-costos";
+import { cargarAjustesInventario } from "../finanzas/cargar-compras-costos";
 import { efectivoPorRepartidor, sincronizarTransportistas } from "../deliverys/efectivo";
 import { inicioSemana, sumarDias } from "../deliverys/liquidacion";
 import { cargarDatosMeses } from "../finanzas/cargar-cierre";
@@ -217,10 +220,57 @@ async function tareaAlertas(c: Contexto): Promise<Resultado> {
   // Conciliación (migración 0986): cuentas con algo abierto y sin conciliar hace más de los días del aviso.
   const cb = await generarAlertasConciliacion(c.supabase, c.hoy);
   const con = "error" in cb ? ` Conciliación: ${cb.error}` : ` Conciliación: ${cb.atrasadas} cuentas atrasadas.`;
-  return { resumen: `${r.activas} alertas activas (${r.nuevas} nuevas), ${r.resueltas} resueltas. Evaluado: ${r.evaluados.join(", ") || "nada"}.${fiscal}${tes}${pau}${cov}${rie}${des}${gru}${con}` };
+  // Costos (migración 0987): el costo puesto de las compras que llegaron pasa a Costos de mercancía y se avisa si sube.
+  const sc = await sincronizarCostosCompras(c.supabase, c.hoy).catch((e: unknown) => ({ error: e instanceof Error ? e.message : "falló" }));
+  const ac = await generarAlertasCostos(c.supabase, c.hoy);
+  const cos = `${"error" in sc ? ` Costos desde Compras: ${sc.error}` : ` Costos desde Compras: ${sc.lotes} lotes.`}${"error" in ac ? ` Costos: ${ac.error}` : ` Costos que subieron: ${ac.suben}.`}`;
+  return { resumen: `${r.activas} alertas activas (${r.nuevas} nuevas), ${r.resueltas} resueltas. Evaluado: ${r.evaluados.join(", ") || "nada"}.${fiscal}${tes}${pau}${cov}${rie}${des}${gru}${con}${cos}` };
 }
 
 const usdCorto = (v: number) => `US$${Math.round(v).toLocaleString("en-US")}`;
+
+/** Días hacia atrás en que un lote nuevo con el costo más alto todavía avisa. */
+const DIAS_AVISO_COSTO = 60;
+
+/**
+ * Una alerta por producto cuyo último lote (por fecha de llegada, de los últimos 60 días) costó más que el anterior por
+ * encima del umbral de «Variación del costo entre lotes» (mejora 35). Crítica si sube más del doble del umbral.
+ */
+export async function generarAlertasCostos(supabase: SupabaseClient, hoy: string): Promise<{ error: string } | { suben: number }> {
+  const [lotes, ajustes] = await Promise.all([
+    traerTodasConError<{ producto_clave: string; producto: string; codigo: string | null; sku_maestro_id: string | null; fecha_llegada: string | null; costo_total: number | string }>((d, h) =>
+      supabase.from("fin_costos_lotes").select("producto_clave, producto, codigo, sku_maestro_id, fecha_llegada, costo_total").order("id").range(d, h),
+    ),
+    cargarAjustesInventario(supabase),
+  ]);
+  if (lotes.error) return { error: "falta correr la migración 0908." };
+  const desde = sumarDias(hoy, -DIAS_AVISO_COSTO);
+  const variacion = variacionCostos(
+    (lotes.data ?? []).map((l) => ({
+      productoClave: l.producto_clave,
+      producto: l.producto,
+      codigo: l.codigo,
+      skuId: l.sku_maestro_id,
+      fecha: l.fecha_llegada ? String(l.fecha_llegada).slice(0, 10) : null,
+      costo: Number(l.costo_total),
+    })),
+    ajustes.alertaCosto,
+  );
+  const nuevas: AlertaNueva[] = variacion
+    .filter((v) => v.alerta && v.fechaUltimo && v.fechaUltimo >= desde && v.anterior)
+    .map((v) => ({
+      clave: `costo:${v.productoClave}`,
+      tipo: "costo_sube" as const,
+      severidad: (v.variacion ?? 0) > 2 * ajustes.alertaCosto ? ("critica" as const) : ("aviso" as const),
+      mensaje: `${v.producto}: el costo subió ${Math.round((v.variacion ?? 0) * 100)} % (US$${v.anterior!.toFixed(2)} → US$${v.ultimo.toFixed(2)}) en el lote del ${v.fechaUltimo}`.slice(0, 480),
+      enlace: DEF_ALERTA.costo_sube.href,
+      modulo: DEF_ALERTA.costo_sube.modulo,
+      monto: Math.round((v.ultimo - v.anterior!) * 100) / 100,
+    }));
+  const r = await guardarAlertas(supabase, nuevas, ["costo_sube"]);
+  if ("error" in r) return { error: /check|tipo/i.test(r.error) ? "falta correr la migración 0987." : r.error };
+  return { suben: nuevas.length };
+}
 
 /**
  * Una alerta por cuenta del banco con líneas abiertas y sin conciliar hace más de `conc_dias_alerta` días (mejora 17).

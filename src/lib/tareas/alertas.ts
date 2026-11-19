@@ -42,6 +42,8 @@ export const TIPOS_ALERTA = [
   "prestamo_grupo_vence",
   // Migración 0986: una cuenta con líneas del banco abiertas y sin conciliar hace más de N días (`generarAlertasConciliacion`).
   "conciliacion_atrasada",
+  // Migración 0987: el último lote de un producto costó más que el anterior por encima del umbral (`generarAlertasCostos`).
+  "costo_sube",
 ] as const;
 export type TipoAlerta = (typeof TIPOS_ALERTA)[number];
 export type Severidad = "info" | "aviso" | "critica";
@@ -71,6 +73,7 @@ export const DEF_ALERTA: Record<TipoAlerta, { modulo: string; titulo: string; ac
   gasto_anomalo: { modulo: "libro-movimientos", titulo: "Gasto fuera de lo normal", accion: "Revisar gastos", href: "/libro-movimientos" },
   prestamo_grupo_vence: { modulo: "tesoreria", titulo: "Préstamo del grupo por vencer", accion: "Ver préstamos", href: "/tesoreria/grupo" },
   conciliacion_atrasada: { modulo: "conciliacion-bancaria", titulo: "Cuenta sin conciliar", accion: "Conciliar", href: "/conciliacion-bancaria" },
+  costo_sube: { modulo: "rentabilidad", titulo: "Costo de un producto que subió", accion: "Ver costos", href: "/rentabilidad/compras" },
 };
 
 /** Los tipos de Tesorería y de qué alerta de la página sale cada uno (por el comienzo de su clave). */

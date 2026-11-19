@@ -160,3 +160,13 @@ test("fila para la tabla: derivados y recomendación juntos", () => {
   assert.equal(v.tasaEntrega, 0.8);
   assert.ok(v.efectoTasa! > 0);
 });
+
+test("causaMargen: el costo que más se pasa del promedio, o el precio", async () => {
+  const { causaMargen, filaUE } = await import("./unidad-economica");
+  const ref = { ...filaUE({}), ventas: 1000, mercancia: 300, envio: 100, envioDevueltas: 20, devolucion: 30, comision: 30, marketing: 200 };
+  const devuelve = { ...filaUE({}), ventas: 100, mercancia: 30, envio: 10, envioDevueltas: 8, devolucion: 12, comision: 3, marketing: 20 };
+  assert.match(causaMargen(devuelve, ref), /^Devoluciones \(\+15 pts/);
+  const barato = { ...filaUE({}), ventas: 100, mercancia: 31, envio: 10, envioDevueltas: 2, devolucion: 3, comision: 3, marketing: 21 };
+  assert.equal(causaMargen(barato, ref), "Precio bajo para lo que cuesta");
+  assert.equal(causaMargen({ ...filaUE({}), ventas: 0 }, ref), "Sin entregas: solo envío y devolución");
+});

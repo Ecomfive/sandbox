@@ -49,6 +49,8 @@ export const ETIQUETA_ACCION: Record<string, string> = {
   eliminar_plantilla_reparto: "Borró una plantilla de reparto",
   regla_conciliar_auto: "Cambió si la regla crea sola desde el banco",
   ajustes_conciliacion: "Cambió los ajustes de la conciliación",
+  costos_desde_compras: "Llevó los costos de Compras a Costos de mercancía",
+  metodo_costo: "Cambió cómo se calcula el costo vigente",
   crear_bien_uso: "Registró el bien de uso",
   editar_bien_uso: "Corrigió el bien de uso",
   baja_bien_uso: "Dio de baja el bien de uso",

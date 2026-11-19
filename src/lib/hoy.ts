@@ -105,6 +105,15 @@ const PENDIENTES: {
     accion: "Revisar",
   },
   {
+    clave: "cierre",
+    modulo: "cierre-mes",
+    campo: "cierreAtrasado",
+    titulo: "Cierre de mes pendiente",
+    descripcion: "Mes sin cerrar, tareas del cierre atrasadas o cuentas del banco sin conciliar",
+    href: "/cierre-mes",
+    accion: "Cerrar",
+  },
+  {
     clave: "creditos-ia",
     modulo: "publicaciones-dropi",
     campo: "creditosIA",

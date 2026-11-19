@@ -187,6 +187,13 @@ function PorCorregir({ pendientes }: { pendientes: PendientesHoy }) {
       Icono: ComprasIcon,
     },
     {
+      clave: "cierre",
+      cantidad: pendientes.cierreAtrasado,
+      titulo: "Cierre de mes pendiente",
+      href: "/cierre-mes",
+      Icono: CalendarioIcon,
+    },
+    {
       clave: "creditos-ia",
       cantidad: pendientes.creditosIA,
       titulo: "Crédito de IA por acabarse",
