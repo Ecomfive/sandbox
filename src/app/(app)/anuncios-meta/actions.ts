@@ -4,18 +4,30 @@ import { revalidatePath } from "next/cache";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { analizarVideoDeMeta, pendienteDeVideo, videosPorAnalizar } from "@/lib/meta-ads/analizar-videos";
+import { pedirMeta, tokenDeMeta } from "@/lib/meta-ads/api";
+import { buscarArchivoDeVideo, motivoSinArchivoDeVideo } from "@/lib/meta-ads/archivo-video";
 import { actividadDeCampana } from "@/lib/meta-ads/datos";
 import { leerCuentasMeta } from "@/lib/meta-ads/leer-cuentas";
 import { claveDeProducto, type Etapa } from "@/lib/meta-ads/nombre";
 import { normalizarActId } from "@/lib/meta-ads/normalizar";
 import { hoyEnPanama, probarAccesoMeta, restarDias, sincronizarCuenta } from "@/lib/meta-ads/sincronizar";
 import { DIAS_DE_DECISION } from "@/lib/meta-ads/sugerencias";
+import { esHostDeVideoMeta } from "@/lib/meta-ads/video-angulo";
 import type { ActividadVista } from "@/lib/meta-ads/vistas";
 import { getPaisActual } from "@/lib/pais";
 import { puedeVerPaisId } from "@/lib/seguridad/pais-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 
 const MODULO = "anuncios-meta";
+/** Un enlace https de Facebook (o su acortador fb.me): lo único que se le entrega a la pantalla como vista previa. */
+const esEnlaceDeMeta = (u: string): boolean => {
+  try {
+    const x = new URL(u);
+    return x.protocol === "https:" && (x.hostname === "fb.me" || x.hostname === "facebook.com" || x.hostname.endsWith(".facebook.com"));
+  } catch {
+    return false;
+  }
+};
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const sinMigracion = (m: string) => /meta_[a-z_]+|schema cache|does not exist/i.test(m);
 const MIGRACION = "Falta correr la migración 0320 (Anuncios Meta) en Supabase.";
@@ -225,6 +237,32 @@ export async function analizarVideoAhoraMeta(videoId: string): Promise<{ error?:
   await registrarAuditoria({ accion: "analizar_video_meta", entidad: "meta_campanas", entidadId: videoId, detalle: `${r.estado} · ${r.mensaje}`.slice(0, 300) });
   revalidatePath("/anuncios-meta", "layout");
   return r.ok ? { mensaje: r.mensaje } : { error: r.mensaje };
+}
+
+/**
+ * Reproducir un video en su ficha: pide a Meta la dirección temporal del archivo (la misma búsqueda del análisis con IA) y se la da a la pantalla, que la pone en un `<video>`. No se guarda: vence a las pocas
+ * horas, así que se pide al pulsar «Reproducir». Si Meta no la da (el acceso del sistema no llega a ese video), devuelve el enlace de vista previa del anuncio, que se abre en Meta, o el motivo.
+ */
+export async function reproducirVideoMeta(videoId: string): Promise<{ error?: string; url?: string; duracion?: number | null; enlace?: string }> {
+  const u = await requireModulo(MODULO);
+  if (!ID_VIDEO.test(videoId)) return { error: "Ese video no existe." };
+  const token = tokenDeMeta();
+  if (!token) return { error: "Falta el acceso a Meta (META_ADS_ACCESS_TOKEN)." };
+  const supabase = createServiceClient();
+  const v = await pendienteDeVideo(supabase, videoId);
+  if (!v) return { error: "Ese video no está en ningún anuncio leído." };
+  const { data: cuenta } = await supabase.from("meta_cuentas").select("pais_id, nombre").eq("id", v.cuentaId).maybeSingle();
+  if (!cuenta || !(await puedeVerPaisId(supabase, u.paisesPermitidos, cuenta.pais_id as string))) return { error: "No tienes acceso a las cuentas de ese país." };
+  const archivo = await buscarArchivoDeVideo(supabase, token, videoId, v.cuentaId);
+  if (archivo.fuente && esHostDeVideoMeta(archivo.fuente)) return { url: archivo.fuente, duracion: archivo.duracion };
+  // Sin el archivo: la vista previa del anuncio en Meta (se abre en otra pestaña) si el acceso la da.
+  const { data: anuncio } = await supabase.from("meta_anuncios").select("meta_id").eq("video_id", videoId).limit(1).maybeSingle();
+  if (anuncio?.meta_id) {
+    const vista = await pedirMeta(`/${anuncio.meta_id as string}`, { fields: "preview_shareable_link" }, token);
+    const enlace = vista.ok ? (vista.datos as { preview_shareable_link?: unknown }).preview_shareable_link : null;
+    if (typeof enlace === "string" && esEnlaceDeMeta(enlace)) return { enlace, error: "Meta no entregó el archivo para verlo aquí; se abre la vista previa del anuncio en Meta." };
+  }
+  return { error: motivoSinArchivoDeVideo(archivo, (cuenta.nombre as string | undefined) ?? null, "") };
 }
 
 /**

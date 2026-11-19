@@ -53,9 +53,10 @@ export function ListaDatos<F>({
   accionPrincipal?: ReactNode;
   /**
    * `tarjetas` (por defecto): cada fila es su propia tarjeta. `filas`: las filas van juntas en una sola tarjeta, separadas por una
-   * línea fina, como una lista (una fila la dibuja `renderFila` sin borde propio).
+   * línea fina, como una lista (una fila la dibuja `renderFila` sin borde propio). `rejilla`: las filas son tarjetas en una cuadrícula que se acomoda al ancho (para cosas con imagen, como los videos);
+   * cada tarjeta la dibuja `renderFila` con su propio borde.
    */
-  variante?: "tarjetas" | "filas";
+  variante?: "tarjetas" | "filas" | "rejilla";
   /**
    * Solo con `variante="filas"`: la franja con el nombre de cada columna, encima de las filas (de cada grupo, si se agrupa). Queda
    * fija arriba al bajar la página mientras se vean filas de esa lista. Quien la pasa la dibuja con las mismas columnas que sus filas.
@@ -82,6 +83,14 @@ export function ListaDatos<F>({
           ))}
         </ul>
       </div>
+    ) : variante === "rejilla" ? (
+      <ul role="list" className="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(13.5rem,1fr))] gap-3 p-0">
+        {filasDelGrupo.map((f) => (
+          <li key={claveFila(f)} className="min-w-0">
+            {renderFila(f, enOrden)}
+          </li>
+        ))}
+      </ul>
     ) : (
       filasDelGrupo.map(dibujar)
     );

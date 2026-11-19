@@ -21,6 +21,8 @@ import type { VideoVista } from "@/lib/meta-ads/vistas";
 import { analizarSiguienteMeta, analizarVideoAhoraMeta, corregirAnguloVideoMeta } from "./actions";
 import { anguloDeVideo, DEF_VIDEOS } from "./def-videos";
 import { EstructuraYLlamado } from "./estructura-video";
+import { ReproductorVideo } from "./reproductor-video";
+import { TarjetaVideo } from "./tarjeta-video";
 import { AVISO_POCA_DATA, Cifra, entero, InsigniaEtapa, MetricasEnLinea, Nivel, porcentaje, Resultado, valorCpa } from "./piezas";
 
 const urlSegura = (u: string | null) => (u && /^https:\/\//i.test(u) ? u : null);
@@ -63,7 +65,14 @@ function FilaVideo({ x, alAbrir }: { x: VideoVista; alAbrir: () => void }) {
   return (
     <button type="button" onClick={alAbrir} className={`grid w-full cursor-pointer grid-cols-1 items-center gap-x-3 gap-y-1.5 px-4 py-3 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-foreground ${COLUMNAS} ${ok ? "" : "text-muted-foreground"}`}>
       <span className="flex min-w-0 items-center gap-3">
-        {m ? <img src={m} alt="" loading="lazy" className="h-14 w-14 shrink-0 rounded-md bg-muted object-cover" /> : <span aria-hidden="true" className="h-14 w-14 shrink-0 rounded-md bg-muted" />}
+        <span aria-hidden="true" className="relative h-16 w-12 shrink-0 overflow-hidden rounded-md bg-gradient-to-br from-zinc-600 to-zinc-800">
+          {m && <img src={m} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />}
+          <span className="absolute inset-0 flex items-center justify-center bg-black/25">
+            <svg viewBox="0 0 24 24" className="h-4 w-4 text-white" fill="currentColor">
+              <path d="M8 5.14v13.72a1 1 0 0 0 1.52.85l11.1-6.86a1 1 0 0 0 0-1.7L9.52 4.29A1 1 0 0 0 8 5.14Z" />
+            </svg>
+          </span>
+        </span>
         <span className="flex min-w-0 flex-col gap-0.5">
           <span className="line-clamp-1 text-sm font-medium text-foreground">
             {x.numero && <span className="mr-1.5 rounded bg-muted px-1.5 py-0.5 text-xs font-semibold">{x.numero}</span>}
@@ -94,7 +103,48 @@ function FilaVideo({ x, alAbrir }: { x: VideoVista; alAbrir: () => void }) {
 }
 
 /** «Ordenar por» y el sentido (de mayor a menor o al revés): la barra común filtra y agrupa, pero no ordena filas. */
-function OrdenDeVideos({ criterio, sentido, alCambiar }: { criterio: CriterioVideo; sentido: Sentido; alCambiar: (c: CriterioVideo, s: Sentido) => void }) {
+type VistaVideos = "tarjetas" | "lista";
+const CLAVE_VISTA = "anuncios-meta-videos-vista-v1";
+
+const oyentesDeVista = new Set<() => void>();
+/** Lo elegido en esta pestaña, por si el navegador no deja guardar. */
+let vistaEnMemoria: VistaVideos | null = null;
+function leerVista(): VistaVideos {
+  try {
+    const guardada = window.localStorage.getItem(CLAVE_VISTA);
+    if (guardada === "lista" || guardada === "tarjetas") return guardada;
+  } catch {
+    /* sin almacenamiento */
+  }
+  return vistaEnMemoria ?? "tarjetas";
+}
+/** La vista elegida, guardada en el navegador (sin almacenamiento queda en tarjetas); vale en todas las pestañas abiertas. */
+function useVistaVideos(): [VistaVideos, (v: VistaVideos) => void] {
+  const vista = useSyncExternalStore(
+    (avisar) => {
+      oyentesDeVista.add(avisar);
+      window.addEventListener("storage", avisar);
+      return () => {
+        oyentesDeVista.delete(avisar);
+        window.removeEventListener("storage", avisar);
+      };
+    },
+    leerVista,
+    () => "tarjetas" as VistaVideos,
+  );
+  const elegir = (v: VistaVideos) => {
+    vistaEnMemoria = v;
+    try {
+      window.localStorage.setItem(CLAVE_VISTA, v);
+    } catch {
+      /* no pasa nada: solo no se recuerda */
+    }
+    oyentesDeVista.forEach((f) => f());
+  };
+  return [vista, elegir];
+}
+
+function OrdenDeVideos({ criterio, sentido, alCambiar, vista, alElegirVista }: { criterio: CriterioVideo; sentido: Sentido; alCambiar: (c: CriterioVideo, s: Sentido) => void; vista: VistaVideos; alElegirVista: (v: VistaVideos) => void }) {
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5">
       <label className="flex items-center gap-2 text-sm">
@@ -115,6 +165,19 @@ function OrdenDeVideos({ criterio, sentido, alCambiar }: { criterio: CriterioVid
       >
         {criterio === "nombre" ? (sentido === "asc" ? "A → Z" : "Z → A") : sentido === "asc" ? "De menor a mayor ↑" : "De mayor a menor ↓"}
       </button>
+      <div role="group" aria-label="Cómo ver los videos" className="ml-auto flex overflow-hidden rounded-md border border-border-control">
+        {(["tarjetas", "lista"] as const).map((o) => (
+          <button
+            key={o}
+            type="button"
+            aria-pressed={vista === o}
+            onClick={() => alElegirVista(o)}
+            className={`min-h-8 px-3 py-1 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-foreground ${vista === o ? "bg-foreground text-background" : "bg-card hover:bg-muted"}`}
+          >
+            {o === "tarjetas" ? "Tarjetas" : "Lista"}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -129,6 +192,14 @@ export function ListaVideos({ videos, escribe, iaConectada, sinAnalizar, abrirIn
   const [abierto, setAbierto] = useState<string | null>(() => (abrirInicial && videos.some((x) => x.id === abrirInicial) ? abrirInicial : null));
   const [criterio, setCriterio] = useState<CriterioVideo>("mejor");
   const [sentido, setSentido] = useState<Sentido>("asc");
+  // Cómo se ven los videos (tarjetas o lista): lo elige cada persona y se recuerda en su navegador.
+  const [vista, elegirVista] = useVistaVideos();
+  // «Reproducir» desde una tarjeta abre la ficha y arranca el video; abrir la ficha con un clic en el cuerpo no lo arranca.
+  const [reproducirAlAbrir, setReproducirAlAbrir] = useState(false);
+  const abrirVideo = (id: string, reproducir: boolean) => {
+    setReproducirAlAbrir(reproducir);
+    setAbierto(id);
+  };
   const ordenados = ordenarVideos(videos, criterio, sentido);
   useEffect(() => {
     const url = new URL(window.location.href);
@@ -144,7 +215,6 @@ export function ListaVideos({ videos, escribe, iaConectada, sinAnalizar, abrirIn
   );
   const v = enNavegador ? videos.find((x) => x.id === abierto) : undefined;
   const hayPocaData = videos.some((x) => !confiable(x.r));
-  const mini = urlSegura(v?.miniatura ?? null);
   // «Analizar los pendientes»: de a un video por llamada, para mostrar el avance real y poder detenerlo. Lo ya analizado queda guardado.
   const [avance, setAvance] = useState<{ hecho: number; total: number; texto: string; terminado: boolean } | null>(null);
   const parar = useRef(false);
@@ -226,6 +296,8 @@ export function ListaVideos({ videos, escribe, iaConectada, sinAnalizar, abrirIn
           setCriterio(c);
           setSentido(s);
         }}
+        vista={vista}
+        alElegirVista={elegirVista}
       />
       <ListaDatos
         def={DEF_VIDEOS}
@@ -233,9 +305,11 @@ export function ListaVideos({ videos, escribe, iaConectada, sinAnalizar, abrirIn
         iconos={ICONOS}
         nombre={NOMBRE}
         claveFila={(x) => x.id}
-        variante="filas"
-        encabezado={<EncabezadoFilas />}
-        renderFila={(x) => <FilaVideo x={x} alAbrir={() => setAbierto(x.id)} />}
+        variante={vista === "tarjetas" ? "rejilla" : "filas"}
+        encabezado={vista === "lista" ? <EncabezadoFilas /> : undefined}
+        renderFila={(x, enOrden) =>
+          vista === "tarjetas" ? <TarjetaVideo x={x} posicion={enOrden.indexOf(x) + 1} alAbrir={() => abrirVideo(x.id, false)} alReproducir={() => abrirVideo(x.id, true)} /> : <FilaVideo x={x} alAbrir={() => abrirVideo(x.id, false)} />
+        }
         vacio="Todavía no hay videos con gasto en este periodo."
       />
       {hayPocaData && <p className="m-0 text-xs text-muted-foreground">{AVISO_POCA_DATA}</p>}
@@ -256,14 +330,14 @@ export function ListaVideos({ videos, escribe, iaConectada, sinAnalizar, abrirIn
       >
         {v && (
           <div className="flex flex-col divide-y divide-border px-5 py-5">
+            <div className="pb-5">
+              <ReproductorVideo key={v.id} videoId={v.id} miniatura={v.miniatura} duracion={v.analisis?.duracionS ?? null} titulo={v.nombre} autoReproducir={reproducirAlAbrir} />
+            </div>
             <Seccion icono={MargenIcon} titulo="Cómo le fue en el periodo">
-              <div className="flex gap-3">
-                {mini ? <img src={mini} alt="" className="h-28 w-28 shrink-0 rounded-md bg-muted object-cover" /> : null}
-                <p className="m-0 text-sm text-muted-foreground">
-                  {v.producto ?? "Sin producto"}
-                  {v.angulo ? ` · ángulo ${v.angulo}` : ""}
-                </p>
-              </div>
+              <p className="m-0 text-sm text-muted-foreground">
+                {v.producto ?? "Sin producto"}
+                {v.angulo ? ` · ángulo ${v.angulo}` : ""}
+              </p>
               <div className="grid grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-2">
                 <Cifra titulo="Gasto" valor={dolares(v.r.gasto)} />
                 <Cifra titulo="Compras" valor={entero(v.r.compras)} />
