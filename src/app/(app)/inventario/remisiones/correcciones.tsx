@@ -32,7 +32,9 @@ export interface CorreccionVista {
 const claseBoton = `inline-flex min-h-8 items-center rounded-md border border-border-control bg-card px-2.5 text-xs font-medium hover:bg-muted ${anilloFoco}`;
 
 /** «Corregir» en una línea recibida y «Anular» en una que sigue en camino: abren la petición, que queda esperando autorización. */
-export function PedirCorreccion({ envioId, tipo, codigo, enviada, recibida }: { envioId: string; tipo: TipoCorreccion; codigo: string; enviada: number; recibida: number | null }) {
+export function PedirCorreccion({ envioId, tipo, codigo, enviada, recibida, anularDirecto = false }: { envioId: string; tipo: TipoCorreccion; codigo: string; enviada: number; recibida: number | null; anularDirecto?: boolean }) {
+  // Quien lleva las remisiones anula sin esperar autorización (migración 0344); corregir lo recibido sigue pidiéndola.
+  const directa = tipo === "anular" && anularDirecto;
   const router = useRouter();
   const { mostrarToast } = useToast();
   const [abierta, setAbierta] = useState(false);
@@ -44,10 +46,10 @@ export function PedirCorreccion({ envioId, tipo, codigo, enviada, recibida }: { 
   function enviar() {
     setError(null);
     empezar(async () => {
-      const r = await pedirCorreccion(envioId, tipo, nueva, motivo).catch(() => ({ error: "No se pudo. Inténtalo de nuevo." }));
+      const r = await pedirCorreccion(envioId, tipo, nueva, motivo).catch((): { error?: string; anulada?: boolean } => ({ error: "No se pudo. Inténtalo de nuevo." }));
       if (r.error) return void setError(r.error);
       setAbierta(false);
-      mostrarToast("Petición enviada: espera autorización");
+      mostrarToast(r.anulada ? "Línea anulada: las unidades volvieron a la bodega" : "Petición enviada: espera autorización");
       router.refresh();
     });
   }
@@ -68,7 +70,9 @@ export function PedirCorreccion({ envioId, tipo, codigo, enviada, recibida }: { 
           >
             <p className="m-0 text-muted-foreground">
               {tipo === "anular"
-                ? `Si lo autorizan, las ${enviada.toLocaleString("es-PA")} unidades vuelven a la bodega de donde salieron.`
+                ? directa
+                  ? `Las ${enviada.toLocaleString("es-PA")} unidades vuelven a la bodega de donde salieron y la línea queda anulada.`
+                  : `Si lo autorizan, las ${enviada.toLocaleString("es-PA")} unidades vuelven a la bodega de donde salieron.`
                 : `Se enviaron ${enviada.toLocaleString("es-PA")} y está anotado que llegaron ${(recibida ?? 0).toLocaleString("es-PA")}. No cambia hasta que lo autoricen.`}
             </p>
             {tipo === "recibida" && (
@@ -88,7 +92,7 @@ export function PedirCorreccion({ envioId, tipo, codigo, enviada, recibida }: { 
             )}
             <div className="flex flex-wrap gap-2">
               <button type="submit" disabled={pendiente} className={`inline-flex min-h-10 items-center rounded-md bg-foreground px-4 py-2 font-medium text-background disabled:opacity-40 ${anilloFoco}`}>
-                {pendiente ? "Un momento..." : "Pedir autorización"}
+                {pendiente ? "Un momento..." : directa ? "Anular la línea" : "Pedir autorización"}
               </button>
               <button type="button" onClick={() => setAbierta(false)} className={`inline-flex min-h-10 items-center rounded-md border border-border bg-card px-4 py-2 font-medium hover:bg-muted ${anilloFoco}`}>
                 Cancelar
