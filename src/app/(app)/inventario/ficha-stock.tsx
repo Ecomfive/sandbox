@@ -7,7 +7,7 @@ import { Seccion } from "@/components/ui/seccion-ficha";
 import { cuantasCajas, textoCaja, unidadesDeCajas } from "@/lib/wms/cajas";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
-import { formatearTiempoRelativo } from "@/lib/formato";
+import { FechaHora } from "@/components/ui/fecha-hora";
 import { CalendarioIcon, ComprasIcon, EnvioIcon, HistorialIcon, InventarioIcon } from "@/lib/nav-icons";
 import { pideMotivo, puedeMoverAMano } from "@/lib/wms/recepcion";
 import { ETIQUETA_PLATAFORMA, type Plataforma } from "@/lib/wms/stock-plataformas";
@@ -515,7 +515,7 @@ export function FichaStock({
                         )}
                       </span>
                       <span className="text-xs text-muted-foreground">
-                        Desde {e.desde} · {formatearTiempoRelativo(e.enviadoEn)}
+                        Desde {e.desde} · <FechaHora iso={e.enviadoEn} />
                         {e.referencia ? ` · ${e.referencia}` : ""}
                         {e.motivo ? ` · ${e.motivo}` : ""}
                       </span>
@@ -539,7 +539,7 @@ export function FichaStock({
                         <span className="text-xs text-muted-foreground">
                           {m.bodega}
                           {m.ubicacion ? ` · ${m.ubicacion}` : ""} · {ETIQUETA_ORIGEN[m.origen] ?? m.origen}
-                          {m.usuario ? ` · ${m.usuario}` : ""} · {formatearTiempoRelativo(m.creadoEn)}
+                          {m.usuario ? ` · ${m.usuario}` : ""} · <FechaHora iso={m.creadoEn} />
                           {m.referencia ? ` · ${m.referencia}` : ""}
                           {m.motivo ? ` · ${m.motivo}` : ""}
                         </span>
