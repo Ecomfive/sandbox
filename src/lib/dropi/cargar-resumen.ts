@@ -17,7 +17,8 @@ export async function cargarResumenDropi(supabase: SupabaseClient, paisId: strin
   const { data, error } = await supabase.rpc("dropi_resumen_mensual", { p_pais: paisId, p_desde: desde, p_hasta: enCurso });
   if (error) return { error: /dropi_resumen_mensual|function/i.test(error.message) ? SIN_MIGRACION_RESUMEN_DROPI : error.message };
   const meses = leerMeses((data ?? []) as Record<string, unknown>[]);
-  // Los meses del principio sin nada (antes de que se leyera Dropi) no se muestran.
-  const primero = meses.findIndex((m) => m.filas > 0 || m.pagos_ganancia > 0 || m.retiros > 0);
+  // Empieza en el primer mes con pedidos guardados (Panamá: marzo 2026). Antes solo hay billetera, y una columna con 0 pedidos
+  // parecería un mes sin ventas.
+  const primero = meses.findIndex((m) => m.filas > 0);
   return { meses: primero === -1 ? [] : meses.slice(primero), enCurso };
 }
