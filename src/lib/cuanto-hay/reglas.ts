@@ -10,6 +10,28 @@ export const MAX_NOTA = 300;
 export const PROVEEDURIA = { id: "proveeduria", nombre: "Proveeduría" } as const;
 export const MAX_CANTIDAD = 1_000_000;
 
+/** Lo que se le pide a despacho: contar cuánto hay (lo de siempre) o tomar fotos reales del producto (20 nov 2026, migración 0342, pedido de Nicole). */
+export type TipoPregunta = "cantidad" | "fotos";
+export const TIPOS_PREGUNTA: { valor: TipoPregunta; etiqueta: string }[] = [
+  { valor: "cantidad", etiqueta: "Cuánto hay" },
+  { valor: "fotos", etiqueta: "Fotos reales" },
+];
+export const leerTipo = (v: unknown): TipoPregunta => (v === "fotos" ? "fotos" : "cantidad");
+
+/** El almacén privado de las fotos reales (migración 0342). */
+export const BUCKET_FOTOS_CUANTO_HAY = "cuanto-hay-fotos";
+
+/** Cuántas fotos se suben a la vez y de cuánto pesa cada una (el almacén admite hasta 15 MB). */
+export const MAX_FOTOS_POR_SUBIDA = 8;
+export const MAX_FOTOS_POR_PEDIDO = 20;
+export const MAX_BYTES_FOTO = 15 * 1024 * 1024;
+
+/** Una foto subida por despacho, lista para mostrar (con su enlace firmado de una hora). */
+export interface FotoCuantoHay {
+  id: string;
+  url: string;
+}
+
 export interface PreguntaCuantoHay {
   id: string;
   /** La tienda, o `PROVEEDURIA.id` si la pregunta es de Proveeduría. */
@@ -23,6 +45,12 @@ export interface PreguntaCuantoHay {
   cantidad: number | null;
   respondidoPorNombre: string | null;
   respondidoEn: string | null;
+  /** Qué se pidió: contar o tomar fotos. */
+  tipo: TipoPregunta;
+  /** El país de quien pidió (solo en las de fotos), para que despacho sepa de cuál es. */
+  pais: string | null;
+  /** Las fotos que subió despacho (solo en las de fotos). */
+  fotos: FotoCuantoHay[];
 }
 
 /** La nota, limpia: sin espacios de más y hasta 300 caracteres; vacía = null. */
@@ -65,12 +93,35 @@ export function avisoRespuesta(p: { producto: string; tienda: string }, cantidad
   };
 }
 
-/** El aviso «Para ti» de quien responde: «Kenku pregunta cuánto hay de Extracto de ajo». */
-export function avisoPregunta(p: { producto: string; tienda: string; nota: string | null }, quien: string): { titulo: string; texto: string } {
+/** El aviso «Para ti» de quien responde: «Kenku pregunta cuánto hay de Extracto de ajo» o «Proveeduría pide fotos reales de Extracto de ajo». */
+export function avisoPregunta(p: { producto: string; tienda: string; nota: string | null; tipo?: TipoPregunta }, quien: string): { titulo: string; texto: string } {
+  const fotos = p.tipo === "fotos";
   return {
-    titulo: `${p.tienda} pregunta cuánto hay de ${p.producto}`.slice(0, 300),
-    texto: `${quien}${p.nota ? `: «${p.nota}»` : " pregunta cuánto hay."}`.slice(0, 600),
+    titulo: (fotos ? `${p.tienda} pide fotos reales de ${p.producto}` : `${p.tienda} pregunta cuánto hay de ${p.producto}`).slice(0, 300),
+    texto: `${quien}${p.nota ? `: «${p.nota}»` : fotos ? " pide fotos reales." : " pregunta cuánto hay."}`.slice(0, 600),
   };
+}
+
+/** El aviso «Para ti» de quien pidió las fotos: «Fotos reales · Extracto de ajo (3)». */
+export function avisoFotos(p: { producto: string; tienda: string }, fotos: number, quien: string): { titulo: string; texto: string } {
+  return {
+    titulo: `Fotos reales · ${p.producto} (${fotos})`.slice(0, 300),
+    texto: `${quien} subió ${fotos === 1 ? "1 foto" : `${fotos} fotos`} de ${p.producto} para ${p.tienda}.`.slice(0, 600),
+  };
+}
+
+/** Las rutas de fotos que se pueden registrar: de la carpeta de ese pedido, sin repetir y hasta el máximo por subida. */
+export function rutasDeFotosValidas(rutas: unknown, preguntaId: string): string[] {
+  if (!Array.isArray(rutas)) return [];
+  const carpeta = `fotos/${preguntaId}/`;
+  const ok = new Set<string>();
+  for (const r of rutas) {
+    if (typeof r !== "string" || r.length > 300 || !r.startsWith(carpeta) || r.length === carpeta.length) continue;
+    if (/[\\?#\u0000-\u001f]/.test(r) || /%(2e|2f|5c)/i.test(r) || r.includes("//") || r.slice(carpeta.length).includes("/") || r.includes("..")) continue;
+    ok.add(r);
+    if (ok.size >= MAX_FOTOS_POR_SUBIDA) break;
+  }
+  return [...ok];
 }
 
 const diaPanama = (d: Date) => d.toLocaleDateString("en-CA", { timeZone: "America/Panama" });

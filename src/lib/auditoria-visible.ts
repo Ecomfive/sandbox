@@ -89,6 +89,7 @@ export const MODULO_DE_ENTIDAD: Record<string, string> = {
   puestos: "puestos",
   compras_alertas_sin_stock: "compras",
   skus_maestros: "producto",
+  tienda_cuanto_hay: "despacho-cuanto-hay",
   competencia_productos: "analisis-competencia",
   drop_competencia_productos: "analisis-competencia",
   effi_competencia_productos: "analisis-competencia",
