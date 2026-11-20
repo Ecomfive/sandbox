@@ -9,6 +9,7 @@ export const MODULOS: Modulo[] = [
   { clave: "inventario", etiqueta: "Inventario" },
   { clave: "alertas", etiqueta: "Alertas de inventario" },
   { clave: "pedidos-dropi", etiqueta: "Pedidos Dropi" },
+  { clave: "pedidos-dropi-resumen", etiqueta: "Resumen mensual de Dropi (Pedidos Dropi)" },
   { clave: "extractos", etiqueta: "Extractos bancarios" },
   { clave: "conciliaciones", etiqueta: "Conciliación" },
   { clave: "productos", etiqueta: "Productos y márgenes" },

@@ -32,6 +32,11 @@ export const PESTANAS_POR_MODULO: Record<string, Pestana[]> = {
     { etiqueta: "Cuánto hay", href: "/despacho-ciudad/cuanto-hay" },
     { etiqueta: "Pedir a inventario", href: "/despacho-ciudad/pedir-inventario" },
   ],
+  // Pedidos Dropi › Resumen (20 nov 2026, pedido de María José): la pestaña RESUMEN de su sheet «ECOMFIVE DROPI 2026», un mes por columna.
+  "/pedidos-dropi": [
+    { etiqueta: "Pedidos", href: "/pedidos-dropi" },
+    { etiqueta: "Resumen", href: "/pedidos-dropi/resumen" },
+  ],
   "/tienda-tiendas": [
     { etiqueta: "Tiendas", href: "/tienda-tiendas" },
     { etiqueta: "Productos", href: "/tienda-tiendas/productos" },
