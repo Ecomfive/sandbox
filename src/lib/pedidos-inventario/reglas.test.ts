@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { avisoPedido, contarPorEstado, fechaCorta, leerCantidad, numeroPedido, puedeEnviar, puedeRecibir, revisarEntregas, revisarLineas, revisarStockPedido } from "./reglas";
+import { avisoPedido, contarPorEstado, fechaCorta, leerCantidad, numeroPedido, puedeEnviar, puedeRecibir, revisarEntregas, revisarLineas, revisarStockPedido, faltantesEn, mejorOrigen } from "./reglas";
 
 const A = "11111111-1111-4111-8111-111111111111";
 const B = "22222222-2222-4222-8222-222222222222";
@@ -59,4 +59,14 @@ test("no se pide lo que inventario no tiene, ni más de lo que hay", () => {
   assert.equal(revisarStockPedido([{ skuId: A, cantidad: 5 }], stock, nombres), null);
   assert.match(revisarStockPedido([{ skuId: A, cantidad: 6 }], stock, nombres) ?? "", /solo hay 5/);
   assert.match(revisarStockPedido([{ skuId: A, cantidad: 1 }, { skuId: B, cantidad: 1 }], stock, nombres) ?? "", /«Abanico» no tiene stock/);
+});
+
+test("de qué bodega sale el pedido: la primera que alcanza; si ninguna, la que deja menos sin cubrir", () => {
+  const stock = { dep: { [A]: 100, [B]: 0 }, ist: { [A]: 10, [B]: 50 }, ofi: { [A]: 100, [B]: 50 } };
+  const lineas = [{ skuId: A, cantidad: 20 }, { skuId: B, cantidad: 5 }];
+  assert.deepEqual(faltantesEn(lineas, "dep", stock), [{ skuId: B, falta: 5 }]);
+  assert.equal(mejorOrigen(lineas, ["dep", "ist", "ofi"], stock), "ofi");
+  assert.equal(mejorOrigen(lineas, ["dep", "ist"], stock), "dep", "empatadas en faltantes, la que más cubre");
+  assert.equal(mejorOrigen([{ skuId: A, cantidad: 0 }], ["ist"], stock), "ist");
+  assert.equal(mejorOrigen(lineas, [], stock), null);
 });
