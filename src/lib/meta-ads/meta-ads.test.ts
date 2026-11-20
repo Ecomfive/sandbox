@@ -70,6 +70,10 @@ test("una campaña, un anuncio con su video y una fila de resultados se leen de 
   });
   assert.deepEqual([f?.gasto, f?.impresiones, f?.clics, f?.video3s, f?.video15s, f?.vioLanding, f?.carrito, f?.compras, f?.valor], [12.5, 3000, 90, 1200, 400, 70, 11, 4, 116], "una compra no se cuenta dos veces");
   assert.equal(resultadoDiaDe({ ad_id: "9", date_start: "ayer" }), null);
+  // El reporte trae el nombre de su anuncio, conjunto y campaña: con eso se guarda un anuncio que Meta no deja leer.
+  const n = resultadoDiaDe({ ad_id: "9", ad_name: "V1 | Antes y después", adset_id: "5", adset_name: "Conjunto 1", campaign_id: "1", campaign_name: "FAJA | ALL PA", date_start: "2026-11-17", spend: "1" });
+  assert.deepEqual([n?.anuncioNombre, n?.conjuntoMetaId, n?.conjuntoNombre, n?.campanaMetaId, n?.campanaNombre], ["V1 | Antes y después", "5", "Conjunto 1", "1", "FAJA | ALL PA"]);
+  assert.deepEqual([resultadoDiaDe({ ad_id: "9", date_start: "2026-11-17" })?.anuncioNombre, resultadoDiaDe({ ad_id: "9", date_start: "2026-11-17" })?.campanaNombre], [null, null]);
   assert.equal(accion([{ action_type: "purchase", value: "2" }], ["omni_purchase", "purchase"]), 2);
   assert.equal(accion(undefined, ["purchase"]), 0);
 });
