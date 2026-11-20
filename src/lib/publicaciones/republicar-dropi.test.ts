@@ -1,7 +1,18 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { ARMAR_JS, marcadorAplicarDropi } from "./marcador-aplicar-dropi";
-import { armarMovimientoStock, armarProductoNuevo, armarProductoNuevoB280, bodegaTemporalB280, CDN_FOTOS_DROPI, fotosParaCopiar, REPUBLICAR_JS, republicacionSinTocarDropi, stockPorBodega, UNIDADES_TEMPORALES_B280 } from "./republicar-dropi";
+import { armarMovimientoStock, armarProductoNuevo, armarProductoNuevoB280, bodegaTemporalB280, CDN_FOTOS_DROPI, fotosParaCopiar, normalizarSumar, REPUBLICAR_JS, republicacionSinTocarDropi, stockPorBodega, UNIDADES_TEMPORALES_B280 } from "./republicar-dropi";
+
+test("normalizarSumar: solo enteros positivos con una bodega; lo demás no suma", () => {
+  assert.deepEqual(normalizarSumar({ sumar: 20, bodega: 81, nombreBodega: "Proveedor Ecomfive" }), { sumar: 20, bodega: 81, nombreBodega: "Proveedor Ecomfive" });
+  assert.deepEqual(normalizarSumar({ sumar: 3, bodega: 81 }), { sumar: 3, bodega: 81, nombreBodega: "B81" });
+  for (const d of [null, {}, { sumar: 0, bodega: 81 }, { sumar: -2, bodega: 81 }, { sumar: 1.5, bodega: 81 }, { sumar: 5 }, { sumar: 200_000, bodega: 81 }, { b280: true, temporal: 100 }]) assert.equal(normalizarSumar(d), null);
+});
+
+test("una republicación que se detuvo por la bodega para sumar no tocó Dropi", () => {
+  assert.equal(republicacionSinTocarDropi("La bodega para sumar las unidades no es de ECOMFIVE en Dropi.", null), true);
+  assert.equal(republicacionSinTocarDropi("La bodega para sumar las unidades no es de ECOMFIVE en Dropi.", 9001), false);
+});
 
 type Obj = Record<string, unknown>;
 const delFavorito = new Function(`${ARMAR_JS};${REPUBLICAR_JS}; return { nuevo, mover, stockDe, fotosDe };`)() as {

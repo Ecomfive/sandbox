@@ -515,6 +515,33 @@ test("republicar: crea el nuevo con sus fotos, le copia las garantías del viejo
   assert.equal(d.llamadas.filter((l) => l === "POST /productwarranty/create").length, llamadasAntes);
 });
 
+test("republicar sumando las unidades que llegaron: el nuevo queda con las del viejo más esas y un reintento no las vuelve a sumar", async () => {
+  for (const stockAlCrear of [false, true]) {
+    const d = crearDropi({ stockAlCrear });
+    d.productos.set(8751, productoBase(8751));
+    const datos = { sumar: 20, bodega: 81, nombreBodega: "Proveedor Ecomfive" };
+    const [r] = await aplicar(d, [{ ...base, id: "r1", tipo: "republicar", producto: 8751, datos }]);
+    assert.equal(r.ok, true, String(r.error));
+    assert.equal(r.stock, 244);
+    assert.deepEqual(d.stockDe(d.productos.get(9001)!), { 81: 244 }, "224 del viejo + 20 que llegaron");
+    assert.deepEqual(d.stockDe(d.productos.get(8751)!), { 81: 0 });
+    assert.equal(d.productos.get(8751)!.archived, true);
+    const [r2] = await aplicar(d, [{ ...base, id: "r1", tipo: "republicar", producto: 8751, nuevo: 9001, datos }]);
+    assert.equal(r2.ok, true, String(r2.error));
+    assert.deepEqual(d.stockDe(d.productos.get(9001)!), { 81: 244 }, "el reintento no suma otra vez");
+  }
+});
+
+test("republicar sumando en una bodega que no es de ECOMFIVE: no crea nada en Dropi", async () => {
+  const d = crearDropi();
+  d.productos.set(8751, productoBase(8751));
+  const [r] = await aplicar(d, [{ ...base, id: "r1", tipo: "republicar", producto: 8751, datos: { sumar: 5, bodega: 280, nombreBodega: "Bodega Dropi" } }]);
+  assert.equal(r.ok, false);
+  assert.match(String(r.error), /^La bodega para sumar las unidades/);
+  assert.equal(d.productos.has(9001), false);
+  assert.deepEqual(d.stockDe(d.productos.get(8751)!), { 81: 224 });
+});
+
 test("republicar (B280): crea el nuevo con 100 temporales en la B81 y lo deja en 0; el viejo sigue igual, con su stock en la B280", async () => {
   const d = crearDropi();
   const B280 = { id: 280, name: "Bodega Dropi Panama", address: "Panamá", warehouse_white_brand: false };

@@ -137,9 +137,9 @@ function BotonRepublicarFila({ f }: { f: FilaPublicacion }) {
   const [confirmando, setConfirmando] = useState(false);
   const yaPendiente = puedeRepublicar(f) && republicacionPendiente(f);
   // Pide el precio del producto nuevo antes de dejarlo pendiente (27 oct 2026).
-  function republicar(precio: number) {
+  function republicar(precio: number, sumar: { unidades: number; bodega: number } | null) {
     empezar(async () => {
-      const r = await republicarPublicacion(f.id, precio).catch(() => ({ error: "No se pudo. Inténtalo de nuevo.", detalle: undefined }));
+      const r = await republicarPublicacion(f.id, precio, sumar).catch(() => ({ error: "No se pudo. Inténtalo de nuevo.", detalle: undefined }));
       mostrarToast(r.error ?? r.detalle ?? "Republicación pendiente", r.error ? "destructive" : undefined);
       if (!r.error) setConfirmando(false);
     });
