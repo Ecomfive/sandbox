@@ -16,7 +16,17 @@ type Respuesta = { candidates?: { content?: { parts?: { text?: string }[] } }[];
 
 export type ResultadoGemini = { texto: string; modelo: string } | { error: string };
 
+/** Un fallo de Gemini que suele pasar solo (servidor ocupado, tiempo agotado, sin conexión): se repite una vez. */
+const esPasajero = (r: ResultadoGemini) => "error" in r && /tardó demasiado|No se pudo conectar|no pudo analizarlo|no devolvió nada/i.test(r.error);
+
 async function generar(partes: unknown[], contexto: ContextoConsumo, esperaMs: number): Promise<ResultadoGemini> {
+  const primero = await generarUnaVez(partes, contexto, esperaMs);
+  if (!esPasajero(primero)) return primero;
+  await new Promise((ok) => setTimeout(ok, 3_000));
+  return generarUnaVez(partes, contexto, esperaMs);
+}
+
+async function generarUnaVez(partes: unknown[], contexto: ContextoConsumo, esperaMs: number): Promise<ResultadoGemini> {
   const clave = claveGemini();
   const modelo = modeloDeVideo();
   try {

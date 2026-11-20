@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { dolaresEnteros } from "@/lib/meta-ads/metricas";
 import type { VideoVista } from "@/lib/meta-ads/vistas";
 import { Anillo, BarraApilada, Leyenda, partesConColor, TarjetaMeta } from "./graficas";
@@ -25,6 +26,8 @@ export function ResumenVideos({ videos }: { videos: VideoVista[] }) {
   const ganchos = porGasto((v) => v.analisis?.ganchoTipo);
   const formatos = porGasto((v) => (v.analisis && v.analisis.estado !== "error" ? v.analisis.formato : null));
   const tipos = Object.keys(estados) as EstadoAnalisis[];
+  // Los videos que la IA no pudo ver completos (solo texto o con error), con el motivo, para abrirlos y decidir qué hacer.
+  const aRevisar = videos.filter((v) => v.analisis && estado(v) !== "analizado").sort((a, b) => b.r.gasto - a.r.gasto);
   return (
     <section aria-label="Resumen de los videos" className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)]">
       <TarjetaMeta titulo="Lo que ya vio la IA" derecha={`${videos.length} videos`} id="resumen-analisis">
@@ -53,6 +56,23 @@ export function ResumenVideos({ videos }: { videos: VideoVista[] }) {
             ))}
           </ul>
         </div>
+        {aRevisar.length > 0 && (
+          <div className="mt-4 flex flex-col gap-1.5 border-t border-border pt-3">
+            <p className="m-0 text-xs font-medium text-muted-foreground">Para revisar ({aRevisar.length})</p>
+            <ul role="list" className="m-0 flex list-none flex-col gap-1.5 p-0 text-xs">
+              {aRevisar.slice(0, 6).map((v) => (
+                <li key={v.id} className="flex min-w-0 flex-col gap-0.5">
+                  <Link href={`/anuncios-meta/videos?abrir=${v.id}`} className="inline-flex min-w-0 items-center gap-2 rounded font-medium underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2">
+                    <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full" style={{ background: COLOR[estado(v)] }} />
+                    <span className="truncate">{v.nombre}</span>
+                    <span className="shrink-0 font-normal text-muted-foreground">· {NOMBRE[estado(v)]}</span>
+                  </Link>
+                  <span className="pl-4 text-muted-foreground">{v.analisis?.error ?? "Sin detalle del motivo."}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </TarjetaMeta>
 
       <TarjetaMeta titulo="Dónde se gasta" derecha={`${dolaresEnteros(gasto)} en videos del periodo`} id="resumen-gasto">
