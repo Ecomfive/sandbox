@@ -38,7 +38,7 @@ export const DIAS_LECTURA = 7;
 const CAMPOS_CAMPANA = "id,name,objective,status,effective_status,daily_budget,lifetime_budget,bid_strategy,created_time";
 const CAMPOS_CONJUNTO = "id,name,campaign_id,status,effective_status,daily_budget,bid_strategy";
 const CAMPOS_ANUNCIO = "id,name,campaign_id,adset_id,status,effective_status,creative{video_id,thumbnail_url,body,title,link_url,object_story_spec}";
-const CAMPOS_RESULTADOS = "ad_id,adset_id,campaign_id,spend,impressions,inline_link_clicks,actions,action_values,video_thruplay_watched_actions,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p95_watched_actions";
+const CAMPOS_RESULTADOS = "ad_id,ad_name,adset_id,adset_name,campaign_id,campaign_name,spend,impressions,inline_link_clicks,actions,action_values,video_thruplay_watched_actions,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p95_watched_actions";
 
 const TROZO = 200;
 async function guardarPorTrozos<T>(filas: T[], guardar: (trozo: T[]) => PromiseLike<{ error: { message: string } | null }>): Promise<string | null> {
@@ -121,7 +121,7 @@ export async function sincronizarCuenta(supabase: SupabaseClient, cuenta: Cuenta
   const existentes = await traerTodasLasFilas<{ meta_id: string; producto: string | null; angulo: string | null; etapa: string | null; manual: string[] | null }>((a, b) => supabase.from("meta_campanas").select("meta_id, producto, angulo, etapa, manual").eq("cuenta_id", cuenta.id).order("id").range(a, b));
   const previas = new Map(existentes.map((e) => [e.meta_id as string, e as { producto: string | null; angulo: string | null; etapa: string | null; manual: string[] | null }]));
   const pujaDeConjuntos = (idCampana: string) => [...conjuntos.values()].find((c) => c.campanaMetaId === idCampana && c.puja)?.puja ?? null;
-  const filasCampana = [...campanas.values()].map((c) => {
+  const aFilaCampana = (c: CampanaMeta) => {
     const e = etiquetasDeNombre(c.nombre);
     const p = previas.get(c.metaId);
     const manual = p?.manual ?? [];
@@ -143,10 +143,22 @@ export async function sincronizarCuenta(supabase: SupabaseClient, cuenta: Cuenta
       etapa: manual.includes("etapa") ? (p?.etapa ?? null) : e.etapa,
       actualizado_en: new Date().toISOString(),
     };
-  });
+  };
+  const filasCampana = [...campanas.values()].map(aFilaCampana);
   let falla = await guardarPorTrozos(filasCampana, (t) => supabase.from("meta_campanas").upsert(t, { onConflict: "cuenta_id,meta_id" }));
   if (falla) return terminar(`No se pudieron guardar las campañas: ${falla}`);
-  r.campanas = filasCampana.length;
+  // Las campañas que Meta no dejó leer (borradas o sin permiso) se guardan con lo que dice el reporte de resultados, para que ningún resultado quede sin dónde colgarse. Solo si no existen: nunca pisan una campaña ya leída bien.
+  const provisionalesC: CampanaMeta[] = [];
+  for (const d of dias) {
+    if (d.campanaMetaId && d.campanaNombre && !campanas.has(d.campanaMetaId) && !provisionalesC.some((c) => c.metaId === d.campanaMetaId)) {
+      provisionalesC.push({ metaId: d.campanaMetaId, nombre: d.campanaNombre, objetivo: null, estado: "DESCONOCIDO", estructura: null, puja: null, presupuestoDiario: null, creadaEn: null });
+    }
+  }
+  if (provisionalesC.length) {
+    const e = await guardarPorTrozos(provisionalesC.map(aFilaCampana), (t) => supabase.from("meta_campanas").upsert(t, { onConflict: "cuenta_id,meta_id", ignoreDuplicates: true }));
+    if (e) r.avisos.push(`No se pudieron guardar ${provisionalesC.length} campañas que Meta no dejó leer: ${e}`);
+  }
+  r.campanas = filasCampana.length + provisionalesC.length;
   const idsC = await traerTodasLasFilas<{ id: string; meta_id: string }>((a, b) => supabase.from("meta_campanas").select("id, meta_id").eq("cuenta_id", cuenta.id).order("id").range(a, b));
   const idDeCampana = new Map(idsC.map((c) => [c.meta_id as string, c.id as string]));
 
@@ -154,6 +166,17 @@ export async function sincronizarCuenta(supabase: SupabaseClient, cuenta: Cuenta
   const filasConjunto = [...conjuntos.values()].filter((c) => idDeCampana.has(c.campanaMetaId)).map((c) => ({ cuenta_id: cuenta.id, campana_id: idDeCampana.get(c.campanaMetaId)!, meta_id: c.metaId, nombre: c.nombre, estado: c.estado, presupuesto_diario: c.presupuestoDiario, puja: c.puja }));
   falla = await guardarPorTrozos(filasConjunto, (t) => supabase.from("meta_conjuntos").upsert(t, { onConflict: "cuenta_id,meta_id" }));
   if (falla) r.avisos.push(`No se pudieron guardar los conjuntos: ${falla}`);
+  // Los conjuntos y anuncios que Meta no entregó se guardan, solo si no existen, con lo que dice el reporte de resultados.
+  const provisionalesJ = new Map<string, (typeof filasConjunto)[number]>();
+  for (const d of dias) {
+    if (d.conjuntoMetaId && d.conjuntoNombre && d.campanaMetaId && !conjuntos.has(d.conjuntoMetaId) && idDeCampana.has(d.campanaMetaId) && !provisionalesJ.has(d.conjuntoMetaId)) {
+      provisionalesJ.set(d.conjuntoMetaId, { cuenta_id: cuenta.id, campana_id: idDeCampana.get(d.campanaMetaId)!, meta_id: d.conjuntoMetaId, nombre: d.conjuntoNombre, estado: "DESCONOCIDO", presupuesto_diario: null, puja: null });
+    }
+  }
+  if (provisionalesJ.size) {
+    const e = await guardarPorTrozos([...provisionalesJ.values()], (t) => supabase.from("meta_conjuntos").upsert(t, { onConflict: "cuenta_id,meta_id", ignoreDuplicates: true }));
+    if (e) r.avisos.push(`No se pudieron guardar ${provisionalesJ.size} conjuntos que Meta no dejó leer: ${e}`);
+  }
   const idsJ = await traerTodasLasFilas<{ id: string; meta_id: string }>((a, b) => supabase.from("meta_conjuntos").select("id, meta_id").eq("cuenta_id", cuenta.id).order("id").range(a, b));
   const idDeConjunto = new Map(idsJ.map((c) => [c.meta_id as string, c.id as string]));
 
@@ -162,7 +185,17 @@ export async function sincronizarCuenta(supabase: SupabaseClient, cuenta: Cuenta
     .map((a) => ({ cuenta_id: cuenta.id, campana_id: idDeCampana.get(a.campanaMetaId)!, conjunto_id: a.conjuntoMetaId ? (idDeConjunto.get(a.conjuntoMetaId) ?? null) : null, meta_id: a.metaId, nombre: a.nombre, estado: a.estado, video_id: a.videoId, miniatura: a.miniatura, copy: a.copy, titulo: a.titulo, landing: a.landing }));
   falla = await guardarPorTrozos(filasAnuncio, (t) => supabase.from("meta_anuncios").upsert(t, { onConflict: "cuenta_id,meta_id" }));
   if (falla) return terminar(`No se pudieron guardar los anuncios: ${falla}`);
-  r.anuncios = filasAnuncio.length;
+  const provisionalesA = new Map<string, (typeof filasAnuncio)[number]>();
+  for (const d of dias) {
+    if (d.anuncioNombre && d.campanaMetaId && !anuncios.has(d.anuncioMetaId) && idDeCampana.has(d.campanaMetaId) && !provisionalesA.has(d.anuncioMetaId)) {
+      provisionalesA.set(d.anuncioMetaId, { cuenta_id: cuenta.id, campana_id: idDeCampana.get(d.campanaMetaId)!, conjunto_id: d.conjuntoMetaId ? (idDeConjunto.get(d.conjuntoMetaId) ?? null) : null, meta_id: d.anuncioMetaId, nombre: d.anuncioNombre, estado: "DESCONOCIDO", video_id: null, miniatura: null, copy: null, titulo: null, landing: null });
+    }
+  }
+  if (provisionalesA.size) {
+    const e = await guardarPorTrozos([...provisionalesA.values()], (t) => supabase.from("meta_anuncios").upsert(t, { onConflict: "cuenta_id,meta_id", ignoreDuplicates: true }));
+    if (e) r.avisos.push(`No se pudieron guardar ${provisionalesA.size} anuncios que Meta no dejó leer: ${e}`);
+  }
+  r.anuncios = filasAnuncio.length + provisionalesA.size;
   const idsA = await traerTodasLasFilas<{ id: string; meta_id: string; campana_id: string }>((a, b) => supabase.from("meta_anuncios").select("id, meta_id, campana_id").eq("cuenta_id", cuenta.id).order("id").range(a, b));
   const anuncioPorMeta = new Map(idsA.map((a) => [a.meta_id as string, { id: a.id as string, campana: a.campana_id as string }]));
 
