@@ -10,6 +10,7 @@ import { BODEGA_DE_PLATAFORMA } from "@/lib/wms/cuadro-plataformas";
 import { PAISES_SALIDA_CON_REMISION } from "@/lib/wms/recepcion";
 import type { Plataforma } from "@/lib/wms/stock-plataformas";
 import { leerStockPlataformas } from "../datos-plataformas";
+import { puedeAnularSinAutorizacion } from "@/lib/permisos/anular-remision";
 import { CorreccionesPendientes, type CorreccionVista } from "./correcciones";
 import { ListaEnvios, type FilaEnvio } from "./lista-envios";
 import { NuevaRemision, type BodegaRemision, type CajasPorBodega, type StockPorBodega } from "./nueva-remision";
@@ -164,7 +165,7 @@ export default async function RemisionesPage() {
           {/remision_id/.test(error.message) ? "Falta correr la migración 0233 en la base." : "No se pudieron cargar las remisiones."}
         </p>
       ) : (
-        <ListaEnvios filas={filas} productos={opciones} stock={stock} puedeEscribir={puedeEscribir} codigoPais={pais.codigo} conPendiente={[...conPendiente]} resueltas={Object.fromEntries(ultimas)} />
+        <ListaEnvios filas={filas} productos={opciones} stock={stock} puedeEscribir={puedeEscribir} anularDirecto={puedeEscribir && puedeAnularSinAutorizacion(usuario)} codigoPais={pais.codigo} conPendiente={[...conPendiente]} resueltas={Object.fromEntries(ultimas)} />
       )}
     </Pagina>
   );

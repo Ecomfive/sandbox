@@ -76,6 +76,7 @@ export const AREAS_ACCESO: AreaAcceso[] = [
       { clave: "alertas", etiqueta: "Alertas de inventario" },
       { clave: "inventario", etiqueta: "Inventario" },
       { clave: "salida-manual", etiqueta: "Salida a mano donde va con remisión" },
+      { clave: "anular-remision", etiqueta: "Anular una remisión en camino sin autorización" },
       { clave: "wms-bodegas", etiqueta: "Bodegas" },
       { clave: "wms-ubicaciones", etiqueta: "Ubicaciones" },
       { clave: "compras", etiqueta: "Compras" },
@@ -160,7 +161,7 @@ export const MODULOS_ACCESO: ModuloAcceso[] = AREAS_ACCESO.flatMap((a) => a.modu
 export const etiquetaDeModulo = (clave: string): string => MODULOS_ACCESO.find((m) => m.clave === clave)?.etiqueta ?? clave;
 
 /** Los módulos con datos sensibles (nómina, bancos, retiros, márgenes) y los que dan poder de administración: llevan su marca en la matriz. */
-export const MODULOS_SENSIBLES: ReadonlySet<string> = new Set(["retiros", "conciliaciones", "extractos", "productos", "usuarios", "configuracion", "rendimiento", "unir-productos", "salida-manual", "nomina", "utilidades", "tesoreria", "conciliacion-bancaria", "libro-movimientos"]);
+export const MODULOS_SENSIBLES: ReadonlySet<string> = new Set(["retiros", "conciliaciones", "extractos", "productos", "usuarios", "configuracion", "rendimiento", "unir-productos", "salida-manual", "anular-remision", "nomina", "utilidades", "tesoreria", "conciliacion-bancaria", "libro-movimientos"]);
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Lo que se puede afinar dentro de un módulo
