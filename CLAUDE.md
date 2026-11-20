@@ -92,6 +92,8 @@ convenciones técnicas del código.
 
 ## Convenciones importantes
 
+- **La rueda del mouse no cambia un número** (20 nov 2026, Nueva remisión: un 40 quedó en 38 al bajar la lista con el cursor sobre la cantidad): `SinRuedaEnNumeros` (`src/components/sin-rueda-en-numeros.tsx`, en el layout raíz) le quita el foco a un `input type="number"` cuando la rueda gira sobre él, así el navegador no le sube ni le baja el valor y la página se desplaza normal. No hace falta un `onWheel` en cada campo numérico.
+
 - Todas las páginas llevan `export const dynamic = "force-dynamic"` — no
   hay caché de página, cada carga consulta datos frescos.
 - **Server Components no pueden pasar funciones como props a Client
