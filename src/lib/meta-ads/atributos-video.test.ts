@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { anguloDominante, composicionDeAngulos, gruposDeVideos, MEZCLA_DE_ANGULOS, mejorGrupo, patronDeEstructura, rangoDeDuracion, rangoDelLlamado, textoDeMezcla, valoresDeVideo, ventajaDeCpa } from "./atributos-video";
-import { certezaDe, sinResultados, type Resultados } from "./metricas";
+import { certezaDe, motivoDeCerteza, sinResultados, type Resultados } from "./metricas";
 import type { AnalisisVideoVista, VideoVista } from "./vistas";
 
 const r = (gasto: number, compras: number): Resultados => ({ ...sinResultados(), gasto, compras, impresiones: 1000 });
@@ -118,4 +118,11 @@ test("la certeza: poca data, probable o firme", () => {
   assert.equal(certezaDe(r(400, 12), 3), "firme");
   assert.equal(certezaDe(r(400, 5), 4), "probable");
   assert.equal(certezaDe(r(400, 0), 4), "firme");
+});
+
+test("cada nivel explica qué significa y, si es probable, qué le falta para ser firme", () => {
+  assert.match(motivoDeCerteza(r(50, 5), 5, "videos"), /^Poca data: menos de \$100/);
+  assert.match(motivoDeCerteza(r(400, 12), 3, "videos"), /^Firme: hay datos de sobra/);
+  assert.equal(motivoDeCerteza(r(109, 3), 4, "videos"), "Probable: va bien encaminado, pero todavía no es seguro. Para ser firme falta $191 más de gasto, 7 compras más.");
+  assert.equal(motivoDeCerteza(r(400, 20), 2, "campañas"), "Probable: va bien encaminado, pero todavía no es seguro. Para ser firme falta 1 campaña más.");
 });

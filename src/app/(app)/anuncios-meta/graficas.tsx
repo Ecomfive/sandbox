@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Tooltip } from "@/components/ui/tooltip";
 import type { Certeza } from "@/lib/meta-ads/metricas";
 import { NOMBRE_CERTEZA } from "@/lib/meta-ads/metricas";
 
@@ -219,12 +220,12 @@ export function Variacion({ actual, anterior, sentido = "neutral" }: { actual: n
   );
 }
 
-/** Tres puntos que dicen qué tan seguro es un resultado, con el nombre al lado (nunca solo color). */
-export function InsigniaCerteza({ certeza }: { certeza: Certeza }) {
+/** Tres puntos que dicen qué tan seguro es un resultado, con el nombre al lado (nunca solo color). `motivo` explica el nivel y qué le falta (aparece al pasar el cursor o con el teclado). */
+export function InsigniaCerteza({ certeza, motivo }: { certeza: Certeza; motivo?: string }) {
   const llenos = certeza === "firme" ? 3 : certeza === "probable" ? 2 : 1;
   const clase = certeza === "firme" ? "text-success" : certeza === "probable" ? "text-warning" : "text-muted-foreground";
-  return (
-    <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${clase}`}>
+  const insignia = (
+    <span tabIndex={motivo ? 0 : undefined} aria-label={motivo ?? undefined} className={`inline-flex items-center gap-1.5 rounded text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground ${clase} ${motivo ? "cursor-help" : ""}`}>
       <span aria-hidden="true" className="inline-flex gap-0.5">
         {[0, 1, 2].map((i) => (
           <span key={i} className="h-1.5 w-1.5 rounded-full" style={{ background: i < llenos ? "currentColor" : "var(--border-control)" }} />
@@ -233,6 +234,7 @@ export function InsigniaCerteza({ certeza }: { certeza: Certeza }) {
       {NOMBRE_CERTEZA[certeza]}
     </span>
   );
+  return motivo ? <Tooltip texto={motivo}>{insignia}</Tooltip> : insignia;
 }
 
 /** Un círculo con las iniciales de la persona y el color de su puesto en la lista. */
