@@ -19,8 +19,10 @@ import { CalendarioIcon, CheckIcon, EnvioIcon, InventarioIcon, PedidoIcon } from
 import {
   ESTADOS,
   estadoDe,
+  faltantesEn,
   fechaCorta,
   MAX_LINEAS,
+  mejorOrigen,
   numeroPedido,
   puedeCancelar,
   puedeEnProceso,
@@ -170,6 +172,30 @@ function HayEnInventario({ hay, pedido }: { hay: StockInventario | undefined; pe
 
 const TD = "border-b border-border px-2 py-2 align-top";
 
+/**
+ * Cuánto hay del producto en cada bodega de donde inventario envía (20 nov 2026, pedido de Hernán: «si sale general no sabré de dónde sale»): la elegida
+ * en «Sale de» en negrita (aunque tenga 0) y las demás que tienen algo; en rojo cuánto falta si en la elegida no alcanza.
+ */
+function StockPorBodega({ skuId, origen, origenes, stock, falta }: { skuId: string; origen: string; origenes: { id: string; nombre: string }[]; stock: Record<string, Record<string, number>>; falta: number }) {
+  const filas = origenes.map((b) => ({ ...b, hay: stock[b.id]?.[skuId] ?? 0 })).filter((b) => b.id === origen || b.hay > 0);
+  if (!filas.some((b) => b.hay > 0)) return <span className="font-semibold text-destructive">Sin stock en ninguna bodega</span>;
+  return (
+    <ul className="m-0 flex list-none flex-col gap-0.5 p-0 whitespace-nowrap">
+      {filas.map((b) => (
+        <li key={b.id} className={b.id === origen ? "font-semibold text-foreground" : "text-muted-foreground"}>
+          {b.nombre} <span className="tabular-nums">{b.hay.toLocaleString("es-PA")}</span>
+          {b.id === origen && <span className="sr-only"> (de aquí sale)</span>}
+        </li>
+      ))}
+      {falta > 0 && (
+        <li className="font-semibold whitespace-normal text-destructive">
+          Faltan {falta.toLocaleString("es-PA")} en {origenes.find((b) => b.id === origen)?.nombre ?? "esa bodega"}
+        </li>
+      )}
+    </ul>
+  );
+}
+
 /** Las filas de un pedido (una por producto, el N.º y los botones a la izquierda y a la derecha, como en el Excel). */
 function FilasPedido({
   p,
@@ -190,10 +216,19 @@ function FilasPedido({
   const { ocupado, correr } = useAccion();
   const enInventario = modo === "inventario";
   const editable = enInventario && puedeEscribir && puedeEnviar(p.estado);
-  const [origen, setOrigen] = useState(origenes[0]?.id ?? "");
+  // «Sale de» arranca en la bodega que alcanza para todo el pedido (20 nov 2026); si ninguna, en la que deja menos sin cubrir.
+  const [origen, setOrigen] = useState(
+    () => mejorOrigen(p.items.map((it) => ({ skuId: it.skuId, cantidad: it.cantidadPedida })), origenes.map((b) => b.id), stock) ?? origenes[0]?.id ?? "",
+  );
   const [entregas, setEntregas] = useState<Record<string, { cantidad: string; observacion: string }>>(() =>
     Object.fromEntries(p.items.map((it) => [it.id, { cantidad: String(it.cantidadPedida), observacion: "" }])),
   );
+  // Lo que se va a enviar (lo escrito en «Cantidad entregada») y lo que no alcanza en cada bodega.
+  const aEnviar = p.items.map((it) => ({ skuId: it.skuId, cantidad: Math.max(0, Math.floor(Number(entregas[it.id]?.cantidad) || 0)) }));
+  const faltanEn = (bodegaId: string) => faltantesEn(aEnviar, bodegaId, stock);
+  const faltan = editable ? faltanEn(origen) : [];
+  const faltaDe = new Map(faltan.map((f) => [f.skuId, f.falta]));
+  const nombreOrigen = origenes.find((b) => b.id === origen)?.nombre ?? "esa bodega";
   const estado = estadoDe(p.estado);
   const n = p.items.length;
 
@@ -211,16 +246,24 @@ function FilasPedido({
               <label className="flex flex-col gap-1 text-xs text-muted-foreground">
                 Sale de
                 <select value={origen} onChange={(e) => setOrigen(e.target.value)} className={`${fieldClass} text-sm`}>
-                  {origenes.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.nombre}
-                    </option>
-                  ))}
+                  {origenes.map((b) => {
+                    const f = faltanEn(b.id).length;
+                    return (
+                      <option key={b.id} value={b.id}>
+                        {b.nombre} · {f === 0 ? "alcanza para todo" : f === 1 ? "falta 1 producto" : `faltan ${f} productos`}
+                      </option>
+                    );
+                  })}
                 </select>
               </label>
+              {faltan.length > 0 && (
+                <span role="alert" className="max-w-[12rem] text-xs font-semibold text-destructive">
+                  En {nombreOrigen} no alcanza: elige otra bodega o baja la cantidad entregada.
+                </span>
+              )}
               <button
                 type="button"
-                disabled={ocupado || !origen}
+                disabled={ocupado || !origen || faltan.length > 0}
                 onClick={() => correr(() => enviarPedidoInventario(p.id, origen, p.items.map((it) => ({ id: it.id, ...entregas[it.id] }))))}
                 className={PRINCIPAL}
               >
@@ -252,7 +295,6 @@ function FilasPedido({
       {p.items.map((it, i) => {
         const ultima = i === n - 1;
         const borde = TD;
-        const hay = stock[origen]?.[it.skuId];
         const obs = [it.nota, it.observacion, ultima && p.traslado ? p.traslado : null].filter(Boolean).join(" · ");
         return (
           <tr key={it.id}>
@@ -281,7 +323,11 @@ function FilasPedido({
             {/* En Comunicación despacho no van «Pedido por» ni «Responsable bodega» (20 nov 2026): siempre son las mismas personas. */}
             {!enInventario && <td className={borde}>{p.pedidoPorNombre ?? "—"}</td>}
             {!enInventario && <td className={`${borde} text-muted-foreground`}>{p.responsableNombre ?? "—"}</td>}
-            {enInventario && <td className={`${borde} text-right tabular-nums text-muted-foreground`}>{editable ? (hay ?? 0).toLocaleString("es-PA") : "—"}</td>}
+            {enInventario && (
+              <td className={`${borde} text-xs`}>
+                {editable ? <StockPorBodega skuId={it.skuId} origen={origen} origenes={origenes} stock={stock} falta={faltaDe.get(it.skuId) ?? 0} /> : <span className="text-muted-foreground">—</span>}
+              </td>
+            )}
             <td className={`${borde} text-right tabular-nums`}>
               {editable ? (
                 <label>
@@ -417,7 +463,7 @@ export function TablaPedidos({
             <th className={th}>Fecha</th>
             {modo !== "inventario" && <th className={th}>Pedido por</th>}
             {modo !== "inventario" && <th className={th}>Responsable bodega</th>}
-            {modo === "inventario" && <th className={`${th} text-right`}>Hay en bodega</th>}
+            {modo === "inventario" && <th className={th}>Stock por bodega</th>}
             <th className={`${th} text-right`}>Cantidad entregada</th>
             <th className={th}>Estado</th>
             <th className={th}>Observaciones</th>

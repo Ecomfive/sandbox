@@ -83,6 +83,32 @@ export function revisarLineas(lineas: unknown): { lineas: { skuId: string; canti
   return { lineas: limpias };
 }
 
+/**
+ * Lo que no alcanza en una bodega (20 nov 2026, pedido de Hernán: saber de dónde sale la mercancía): cada línea que pide más de lo disponible allí, con
+ * cuánto falta. `stock[bodega][sku]` = disponible (sin entrada = 0). Las líneas en 0 no cuentan.
+ */
+export function faltantesEn(lineas: { skuId: string; cantidad: number }[], bodegaId: string, stock: Record<string, Record<string, number>>): { skuId: string; falta: number }[] {
+  return lineas.filter((l) => l.cantidad > 0).flatMap((l) => {
+    const hay = stock[bodegaId]?.[l.skuId] ?? 0;
+    return l.cantidad > hay ? [{ skuId: l.skuId, falta: l.cantidad - hay }] : [];
+  });
+}
+
+/**
+ * De qué bodega conviene que salga un pedido entero (un pedido sale de una sola: es un traslado): la primera, en el orden de las bodegas, donde alcanza
+ * para todo; si ninguna, la que deja menos productos sin cubrir y, empatadas, la que más unidades cubre. null sin bodegas.
+ */
+export function mejorOrigen(lineas: { skuId: string; cantidad: number }[], origenes: string[], stock: Record<string, Record<string, number>>): string | null {
+  let mejor: { id: string; faltan: number; cubre: number } | null = null;
+  for (const id of origenes) {
+    const faltan = faltantesEn(lineas, id, stock).length;
+    if (faltan === 0) return id;
+    const cubre = lineas.reduce((s, l) => s + Math.min(l.cantidad, stock[id]?.[l.skuId] ?? 0), 0);
+    if (!mejor || faltan < mejor.faltan || (faltan === mejor.faltan && cubre > mejor.cubre)) mejor = { id, faltan, cubre };
+  }
+  return mejor?.id ?? null;
+}
+
 /** Lo que hay en inventario de un producto (19 nov 2026): lo disponible en las bodegas de donde inventario envía (todas las de Panamá menos la de despacho). */
 export interface StockInventario {
   total: number;
