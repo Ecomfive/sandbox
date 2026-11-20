@@ -17,6 +17,15 @@ type Parametros = Record<string, string | number | undefined>;
 
 /** Los códigos con que Meta pide esperar («demasiadas consultas»). */
 const CODIGOS_DE_ESPERA = new Set([4, 17, 32, 613, 80000, 80004]);
+/**
+ * Si Meta contestó con un error pasajero y conviene repetir la consulta: pide esperar (códigos de límite), o dice «An unexpected error has occurred. Please retry your request later» (códigos 1 y 2, o
+ * `is_transient`). 20 nov 2026: el registro de actividad de Oferfy Panamá II fallaba con ese mensaje y no se reintentaba.
+ */
+export function esErrorPasajeroDeMeta(cuerpo: unknown): boolean {
+  const e = (cuerpo as { error?: { code?: unknown; is_transient?: unknown } } | null)?.error;
+  if (!e) return false;
+  return (typeof e.code === "number" && (CODIGOS_DE_ESPERA.has(e.code) || e.code === 1 || e.code === 2)) || e.is_transient === true;
+}
 const esperar = (ms: number) => new Promise<void>((ok) => setTimeout(ok, ms));
 
 async function pedirUrl(url: string, token: string, hasta?: number): Promise<RespuestaMeta> {
@@ -40,8 +49,7 @@ async function pedirUrl(url: string, token: string, hasta?: number): Promise<Res
       const cuerpo: unknown = await r.json().catch(() => null);
       if (r.ok) return { ok: true, datos: cuerpo };
       ultimo = { ok: false, error: mensajeDeErrorMeta(r.status, cuerpo) };
-      const codigo = (cuerpo as { error?: { code?: unknown } } | null)?.error?.code;
-      reintentar = typeof codigo === "number" && CODIGOS_DE_ESPERA.has(codigo);
+      reintentar = esErrorPasajeroDeMeta(cuerpo);
     } catch (e) {
       ultimo = { ok: false, error: e instanceof Error && e.name === "TimeoutError" ? "Meta tardó demasiado en contestar." : "No se pudo hablar con Meta." };
       reintentar = true;

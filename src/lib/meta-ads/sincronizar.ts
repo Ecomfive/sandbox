@@ -4,6 +4,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { pedirMeta, pedirPorIds, pedirTodo, tokenDeMeta } from "./api";
+import { partirTramo } from "./cobertura";
 import { etiquetasDeNombre } from "./nombre";
 import { actividadDe, anuncioDe, campanaDe, conjuntoDe, esCreacionDeCampana, resultadoDiaDe, type ActividadMeta, type AnuncioMeta, type CampanaMeta, type ConjuntoMeta, type ResultadoDia } from "./normalizar";
 
@@ -239,7 +240,16 @@ export async function sincronizarCuenta(supabase: SupabaseClient, cuenta: Cuenta
   }
 
   // 6. Registro de actividad: quién creó o cambió qué. Si Meta no lo deja con este acceso, se avisa y todo lo demás sigue.
-  const actividad = Date.now() > finEstructura ? { filas: [] as unknown[], error: "Se acabó el tiempo de esta lectura.", incompleta: false } : await pedirTodo(`/${cuenta.act_id}/activities`, { fields: "event_type,event_time,actor_id,actor_name,object_id,object_name,object_type,extra_data", since: `${desde}`, until: `${hasta}`, limit: 200 }, token, 10, inicio + limite);
+  // Si Meta falla con todo el rango (suele pasar con muchos días y muchos cambios), se vuelve a pedir partido en mitades hasta 3 veces (8 pedazos); solo es error lo que ningún pedazo pudo traer.
+  const leerActividad = async (t: { desde: string; hasta: string }, nivel = 0): Promise<{ filas: unknown[]; error: string | null; incompleta: boolean }> => {
+    const r = await pedirTodo(`/${cuenta.act_id}/activities`, { fields: "event_type,event_time,actor_id,actor_name,object_id,object_name,object_type,extra_data", since: t.desde, until: t.hasta, limit: 200 }, token, 10, inicio + limite);
+    const mitades = r.error && nivel < 3 && Date.now() < finEstructura ? partirTramo(t) : null;
+    if (!mitades) return r;
+    const partes = [await leerActividad(mitades[0], nivel + 1), await leerActividad(mitades[1], nivel + 1)];
+    const falla = partes.find((x) => x.error);
+    return { filas: partes.flatMap((x) => x.filas), error: falla ? falla.error : null, incompleta: partes.some((x) => x.incompleta) };
+  };
+  const actividad = Date.now() > finEstructura ? { filas: [] as unknown[], error: "Se acabó el tiempo de esta lectura.", incompleta: false } : await leerActividad({ desde, hasta });
   if (actividad.error) r.avisos.push(`No se pudo leer el registro de actividad (Equipo queda sin datos de quién montó qué): ${actividad.error}`);
   const eventos = actividad.filas.map(actividadDe).filter((a): a is ActividadMeta => a !== null);
   if (eventos.length) {
