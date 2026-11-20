@@ -1,7 +1,7 @@
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import type { UsuarioActual } from "@/lib/auth";
-import { cargarBodegasPedido, cargarPedidos, cargarStock, stockInventario } from "@/lib/pedidos-inventario/datos";
+import { cargarBodegasPedido, cargarPedidos, cargarStock, fichasDeProductos, stockInventario } from "@/lib/pedidos-inventario/datos";
 import { contarPorEstado, esEstado } from "@/lib/pedidos-inventario/reglas";
 import { createServiceClient } from "@/lib/supabase/server";
 import { obtenerOpcionesSkuMaestro } from "@/lib/wms/skus-maestros";
@@ -32,6 +32,9 @@ export async function PaginaPedidos({ modo, usuario, estado }: { modo: "despacho
       : [];
   // Despacho ve cuánto hay en inventario de cada producto al elegirlo, y no puede pedir lo que no hay (19 nov 2026).
   const hayEnInventario = modo === "despacho" && puedeEscribir ? await stockInventario(supabase, bodegas.origenes) : {};
+  // Comunicación despacho (20 nov 2026): al tocar el producto se abre su ficha de stock, para ver cómo está repartido. Solo con el permiso de Inventario
+  // (la ficha lo pide para leer el stock).
+  const fichas = modo === "inventario" && usuario.modulos.includes("inventario") ? await fichasDeProductos(supabase, [...new Set(pedidos.flatMap((p) => p.items.map((it) => it.skuId)).filter(Boolean))]) : null;
   // Inventario ve cuánto hay en cada bodega de origen de lo que está por enviar.
   const porEnviar = pedidos.filter((p) => p.estado === "solicitud" || p.estado === "en_proceso");
   const stock =
@@ -67,7 +70,7 @@ export async function PaginaPedidos({ modo, usuario, estado }: { modo: "despacho
             </p>
           )}
           <TableroPedidos modo={modo} ruta={ruta} cuenta={cuenta} total={pedidos.length} elegido={elegido} />
-          <TablaPedidos pedidos={visibles} modo={modo} puedeEscribir={puedeEscribir} origenes={bodegas.origenes} stock={stock} />
+          <TablaPedidos pedidos={visibles} modo={modo} puedeEscribir={puedeEscribir} origenes={bodegas.origenes} stock={stock} fichas={fichas} />
           <p className="m-0 text-xs text-muted-foreground">
             Se ven todos los pedidos abiertos y los cerrados de los últimos 30 días. {bodegas.destino ? `Lo enviado llega a ${bodegas.destino.nombre}.` : ""}
           </p>
