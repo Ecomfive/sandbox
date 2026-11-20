@@ -15,6 +15,7 @@ import { normalizarDatosStock, textoVariacion, type DatosStock } from "@/lib/pub
 import { normalizarDatosReserva, reservasDeDropi, type DatosReserva } from "@/lib/publicaciones/reservas-dropi";
 import { codigoBodega } from "@/lib/publicaciones/sincronizar-dropi";
 import { mensajeTrasladoDropi, normalizarDatosRepublicar, type DatosRepublicar } from "@/lib/publicaciones/traslado-b280";
+import { normalizarSumar, type SumarAlRepublicar } from "@/lib/publicaciones/republicar-dropi";
 import { puedeVerPaisId } from "@/lib/seguridad/pais-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 
@@ -63,6 +64,8 @@ export interface CambioParaDropi {
   nuevo: number | null;
   /** «republicar» de la B280 (12 nov 2026): nace con unidades temporales y Dropi traslada las suyas (al favorito viaja como `datos`); null = la de siempre. */
   republicar: DatosRepublicar | null;
+  /** «Sumar unidades al republicar» (20 nov 2026): las que llegaron y en qué bodega; null = ninguna (o una republicación de la B280). */
+  sumar: SumarAlRepublicar | null;
   producto: number;
   /** null = no se cambia el nombre. */
   nombre: string | null;
@@ -456,6 +459,7 @@ export async function pendientesParaDropi(codigoPais: string): Promise<{ error?:
       quitarPrivados: f.quitar_privados === true,
       devolver: f.tipo === "apagar" ? normalizarDatosDevolver(f.datos) : null,
       republicar: f.tipo === "republicar" ? normalizarDatosRepublicar(f.datos) : null,
+      sumar: f.tipo === "republicar" && !normalizarDatosRepublicar(f.datos) ? normalizarSumar(f.datos) : null,
       nuevo: num(f.nuevo_dropi_id),
       producto: f.dropi_producto_id == null ? 0 : Number(f.dropi_producto_id),
       nombre: (f.nombre as string | null) ?? null,

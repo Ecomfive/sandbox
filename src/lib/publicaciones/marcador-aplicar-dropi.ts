@@ -463,16 +463,23 @@ const CODIGO = [
   "if(c.guia!==null&&n.name_in_guide!==c.guia)return{ok:false,error:'Dropi sigue mostrando en la guía «'+n.name_in_guide+'».'};",
   "if(Array.isArray(c.fotos)&&c.fotos.length){var mal=await subirFotos(c.producto,n,c.fotos,false);if(mal)return{ok:false,error:'No se pudieron subir '+mal+' foto(s) a Dropi'+porque()+'.'}}",
   "return{ok:true}}",
-  "var W=window.open(O+'/publicaciones-dropi/aplicar-dropi?p='+P+'&v='+__VERSION__,'aplicar-dropi','width=560,height=760');",
+  // Un código por pulsación (20 nov 2026: el Shilajit y 7 productos nuevos se crearon dos y tres veces). Un favorito pulsado antes (uno viejo que la ventana
+  // rechazó por desactualizado, o una pulsación repetida) se quedaba escuchando en la pestaña y, al pulsar «Aplicar» en la ventana, aplicaba también: la ventana
+  // ahora manda los cambios solo a la última pulsación (`k`), con otro nombre de mensaje («aplicar») que los favoritos viejos no escuchan.
+  "if(window.__ecfAplicando){alert('«Aplicar en Dropi» ya está trabajando en esta pestaña: espera a que termine.');return}",
+  "var K=Math.random().toString(36).slice(2)+Date.now().toString(36);",
+  "var W=window.open(O+'/publicaciones-dropi/aplicar-dropi?p='+P+'&v='+__VERSION__+'&k='+K,'aplicar-dropi','width=560,height=760');",
   "if(!W){alert('El navegador bloqueó la ventana: permite las ventanas emergentes de Dropi y vuelve a pulsar.');return}",
   "window.addEventListener('message',async function f(e){",
-  "if(e.origin!==O||e.source!==W||!e.data||e.data.tipo!=='pendientes')return;window.removeEventListener('message',f);",
+  "if(e.origin!==O||e.source!==W||!e.data||e.data.tipo!=='aplicar'||e.data.k!==K)return;window.removeEventListener('message',f);",
+  // Si otra pulsación ya está aplicando en esta pestaña, esta no hace nada (le avisa a la ventana).
+  "if(window.__ecfAplicando){W.postMessage({tipo:'resultados',resultados:[],ocupado:true},O);return}window.__ecfAplicando=true;",
   "var C=(Array.isArray(e.data.cambios)?e.data.cambios:[]).slice(0,100),R=[];",
   "var u=await pedir('/users/'+L.id),bp=u.ok&&u.j&&u.j.objects&&Array.isArray(u.j.objects.warehouses)?u.j.objects.warehouses:null;",
   "for(var i=0;i<C.length;i++){var c=C[i],x;",
   "try{x=bp?await aplicar(c,bp):{ok:false,error:motivo(u)}}catch(z){x={ok:false,error:String(z&&z.message||z)}}",
   "x.id=c.id;R.push(x);W.postMessage({tipo:'progreso',hechos:i+1,total:C.length},O)}",
-  "W.postMessage({tipo:'resultados',resultados:R},O)});",
+  "window.__ecfAplicando=false;W.postMessage({tipo:'resultados',resultados:R},O)});",
   "})();",
 ].join("");
 

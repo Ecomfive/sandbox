@@ -59,7 +59,8 @@ export function AplicarDropi({ puedeEscribir }: { puedeEscribir: boolean }) {
     if (!origen || !dropi) return void setEstado({ tipo: "sin_dropi", mensaje: "Esta ventana se abre con el favorito «Aplicar en Dropi», pulsado con Dropi abierto." });
     // Un favorito viejo (otra versión, o de antes de las versiones) no aplica nada: puede llevar un error ya corregido.
     const version = new URLSearchParams(window.location.search).get("v");
-    if (version !== VERSION_FAVORITO)
+    // Sin el código de la pulsación (`k`) tampoco: es un favorito de antes del 20 nov 2026.
+    if (version !== VERSION_FAVORITO || !new URLSearchParams(window.location.search).get("k"))
       return void setEstado({
         tipo: "sin_dropi",
         mensaje: `Tu favorito «Aplicar en Dropi» está desactualizado (${version ? `versión ${version}` : "sin versión"}; la actual es la ${VERSION_FAVORITO}). Abre Gestión de IDs Dropi › «Cómo aplicar en Dropi», arrastra el favorito nuevo a la barra (reemplaza el viejo) y vuelve a pulsarlo con Dropi abierto. No se aplicó nada.`,
@@ -71,6 +72,8 @@ export function AplicarDropi({ puedeEscribir }: { puedeEscribir: boolean }) {
       if (e.data.tipo === "progreso") setEstado((s) => (s.tipo === "aplicando" ? { ...s, hechos: Number(e.data.hechos) || 0 } : s));
       if (e.data.tipo !== "resultados") return;
       window.removeEventListener("message", alRecibir);
+      // Otra pulsación ya estaba aplicando en esa pestaña de Dropi: esta no hizo nada.
+      if (e.data.ocupado) return void setEstado({ tipo: "sin_dropi", mensaje: "«Aplicar en Dropi» ya estaba trabajando en la pestaña de Dropi: espera a que termine y vuelve a pulsar el favorito. No se aplicó nada desde esta ventana." });
       const resultados = (Array.isArray(e.data.resultados) ? e.data.resultados : []) as Resultado[];
       const { cambios, pospuestos } = enviados.current;
       setEstado({ tipo: "listo", cambios, resultados, guardado: "Guardando…", pospuestos });
@@ -101,10 +104,13 @@ export function AplicarDropi({ puedeEscribir }: { puedeEscribir: boolean }) {
     if (!dropi || !origen || dropi.closed) return void setEstado({ tipo: "sin_dropi", mensaje: "La pestaña de Dropi se cerró: vuelve a pulsar «Aplicar en Dropi» con Dropi abierto." });
     enviados.current = { cambios, pospuestos };
     setEstado({ tipo: "aplicando", cambios, hechos: 0 });
+    // Solo a la pulsación que abrió esta ventana (`k`, 20 nov 2026): otro favorito que siga escuchando en la pestaña no aplica nada.
+    const k = new URLSearchParams(window.location.search).get("k") ?? "";
     dropi.postMessage(
       {
-        tipo: "pendientes",
-        cambios: cambios.map(({ id, tipo, quitarPrivados, restaurar, nuevo, producto, nombre, guia, precio, sugerido, descripcion, fotos, datos, privatizar, stock, devolver, reserva, republicar }) => ({
+        tipo: "aplicar",
+        k,
+        cambios: cambios.map(({ id, tipo, quitarPrivados, restaurar, nuevo, producto, nombre, guia, precio, sugerido, descripcion, fotos, datos, privatizar, stock, devolver, reserva, republicar, sumar }) => ({
           id,
           tipo,
           quitarPrivados,
@@ -117,7 +123,7 @@ export function AplicarDropi({ puedeEscribir }: { puedeEscribir: boolean }) {
           sugerido,
           descripcion,
           fotos,
-          datos: tipo === "privatizar" ? privatizar : tipo === "stock" ? stock : tipo === "reserva" ? reserva : tipo === "apagar" ? devolver : tipo === "republicar" ? republicar : datos,
+          datos: tipo === "privatizar" ? privatizar : tipo === "stock" ? stock : tipo === "reserva" ? reserva : tipo === "apagar" ? devolver : tipo === "republicar" ? (republicar ?? sumar) : datos,
         })),
       },
       origen,
@@ -313,7 +319,7 @@ function DetalleCambio({ c }: { c: CambioParaDropi }) {
         <span className="text-xs">
           {c.republicar
             ? `Un producto nuevo en Dropi con los mismos datos y fotos, creado con ${c.republicar.temporal} unidades temporales en nuestra bodega que enseguida se sacan (queda en 0). El ID ${c.producto} no se toca: Dropi traslada su stock al nuevo.`
-            : `Un producto nuevo en Dropi con los mismos datos, fotos y stock; el ID ${c.producto} queda archivado y sin stock.`}
+            : `Un producto nuevo en Dropi con los mismos datos, fotos y stock${c.sumar ? `, más ${c.sumar.sumar.toLocaleString("es-PA")} u. que llegaron en ${c.sumar.nombreBodega}` : ""}; el ID ${c.producto} queda archivado y sin stock.`}
         </span>
         <span className="text-xs text-muted-foreground">
           ID {c.producto}

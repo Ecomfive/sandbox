@@ -232,8 +232,12 @@ async function aplicar(dropi: ReturnType<typeof crearDropi>, cambios: Obj[]): Pr
     },
   };
   let oyente: ((e: Obj) => Promise<void>) | null = null;
+  let abierta = "";
   const ventanaGlobal = {
-    open: () => ventana,
+    open: (url: string) => {
+      abierta = url;
+      return ventana;
+    },
     addEventListener: (_t: string, f: (e: Obj) => Promise<void>) => {
       oyentes.add(f);
       if (!oyente) oyente = f;
@@ -243,13 +247,60 @@ async function aplicar(dropi: ReturnType<typeof crearDropi>, cambios: Obj[]): Pr
   const localStorageFalso = { getItem: (k: string) => (k === "DROPI_token" ? JSON.stringify("tok") : k === "DROPI_LoginResult" ? JSON.stringify({ objects: { id: 2094, type_user: "SUPPLIER" } }) : null) };
   new Function("location", "localStorage", "window", "alert", "fetch", codigo)({ hostname: "app.dropi.pa" }, localStorageFalso, ventanaGlobal, (m: string) => assert.fail(`alert: ${m}`), dropi.fetchFalso);
   assert.ok(oyente, "el favorito debe quedar escuchando a la ventana");
-  await (oyente as (e: Obj) => Promise<void>)({ origin: ORIGEN, source: ventana, data: { tipo: "pendientes", cambios } });
+  const k = new URL(abierta).searchParams.get("k");
+  assert.ok(k, "la ventana se abre con el código de la pulsación");
+  await (oyente as (e: Obj) => Promise<void>)({ origin: ORIGEN, source: ventana, data: { tipo: "aplicar", k, cambios } });
   const final = mensajes.find((m) => m.tipo === "resultados");
   assert.ok(final, "el favorito debe devolver los resultados");
   return final.resultados as Obj[];
 }
 
 const base = { quitarPrivados: false, restaurar: false, nuevo: null, nombre: null, guia: null, precio: null, sugerido: null, descripcion: null, fotos: [], datos: null };
+
+test("pulsar el favorito varias veces en la misma pestaña: solo aplica la última pulsación, una vez (20 nov 2026, el Shilajit creado tres veces)", async () => {
+  const d = crearDropi();
+  d.productos.set(8751, productoBase(8751));
+  const codigo = decodeURIComponent(marcadorAplicarDropi(ORIGEN).slice("javascript:".length));
+  const mensajes: Obj[] = [];
+  const ventana = { postMessage: (m: Obj) => void mensajes.push(m) };
+  const oyentes: ((e: Obj) => Promise<void>)[] = [];
+  const urls: string[] = [];
+  const ventanaGlobal: Obj = {
+    open: (url: string) => {
+      urls.push(url);
+      return ventana;
+    },
+    addEventListener: (_t: string, f: (e: Obj) => Promise<void>) => void oyentes.push(f),
+    removeEventListener: () => {},
+  };
+  const localStorageFalso = { getItem: (k: string) => (k === "DROPI_token" ? JSON.stringify("tok") : k === "DROPI_LoginResult" ? JSON.stringify({ objects: { id: 2094, type_user: "SUPPLIER" } }) : null) };
+  const pulsar = () => new Function("location", "localStorage", "window", "alert", "fetch", codigo)({ hostname: "app.dropi.pa" }, localStorageFalso, ventanaGlobal, (m: string) => assert.fail(`alert: ${m}`), d.fetchFalso);
+  pulsar();
+  pulsar();
+  pulsar();
+  assert.equal(oyentes.length, 3);
+  const k = new URL(urls[2]).searchParams.get("k");
+  assert.notEqual(k, new URL(urls[0]).searchParams.get("k"), "cada pulsación lleva su propio código");
+  const cambios = [{ ...base, id: "r1", tipo: "republicar", producto: 8751 }];
+  // Un favorito de antes (mensaje «pendientes») y la ventana mandando a la última pulsación: todos los oyentes reciben el mensaje, como en el navegador.
+  for (const data of [{ tipo: "pendientes", cambios }, { tipo: "aplicar", k, cambios }]) await Promise.all(oyentes.map((f) => f({ origin: ORIGEN, source: ventana, data })));
+  const creados = d.llamadas.filter((l) => l === "POST /products").length;
+  assert.equal(creados, 1, "un solo producto nuevo en Dropi");
+  assert.equal(mensajes.filter((m) => m.tipo === "resultados").length, 1);
+});
+
+test("la ventana con un código que no es el de la pulsación no aplica nada", async () => {
+  const d = crearDropi();
+  d.productos.set(8751, productoBase(8751));
+  const codigo = decodeURIComponent(marcadorAplicarDropi(ORIGEN).slice("javascript:".length));
+  const ventana = { postMessage: () => {} };
+  let oyente: ((e: Obj) => Promise<void>) | null = null;
+  const ventanaGlobal: Obj = { open: () => ventana, addEventListener: (_t: string, f: (e: Obj) => Promise<void>) => void (oyente = f), removeEventListener: () => {} };
+  const localStorageFalso = { getItem: (k: string) => (k === "DROPI_token" ? JSON.stringify("tok") : k === "DROPI_LoginResult" ? JSON.stringify({ objects: { id: 2094, type_user: "SUPPLIER" } }) : null) };
+  new Function("location", "localStorage", "window", "alert", "fetch", codigo)({ hostname: "app.dropi.pa" }, localStorageFalso, ventanaGlobal, () => {}, d.fetchFalso);
+  await (oyente as unknown as (e: Obj) => Promise<void>)({ origin: ORIGEN, source: ventana, data: { tipo: "aplicar", k: "otro", cambios: [{ ...base, id: "r1", tipo: "republicar", producto: 8751 }] } });
+  assert.equal(d.llamadas.filter((l) => l === "POST /products").length, 0);
+});
 const foto = (n: string) => ({ url: `https://x.supabase.co/storage/v1/object/public/wms-productos/publicaciones/p/ia/${n}`, nombre: n });
 
 test("archivar: lo archiva en Dropi y lo comprueba; sacar de Archivados lo devuelve; si ya estaba, no hace nada", async () => {
