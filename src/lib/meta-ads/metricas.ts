@@ -83,6 +83,22 @@ export const conversion = (r: Resultados): number | null => (r.vioLanding > 0 ? 
 export const resultado = (r: Resultados, tope: number): number => r.compras * tope - r.gasto;
 export const confiable = (r: Resultados): boolean => r.gasto >= GASTO_MINIMO_CONFIABLE;
 
+/** Qué tan firme es lo que dice un grupo de campañas o videos. */
+export type Certeza = "firme" | "probable" | "poca";
+export const GASTO_FIRME = 300;
+export const COMPRAS_FIRME = 10;
+export const UNIDADES_FIRME = 3;
+/**
+ * Poca data: menos de $100 gastados. Firme: al menos $300, de 3 campañas o videos distintos, y o bien 10 compras o más (funciona de verdad) o ninguna (no funciona de verdad). Probable: lo demás.
+ * Una sola campaña o un solo video con muchas compras todavía no es «firme»: puede ser suerte de ese anuncio y no del ángulo.
+ */
+export function certezaDe(r: Resultados, unidades: number): Certeza {
+  if (!confiable(r)) return "poca";
+  if (r.gasto >= GASTO_FIRME && unidades >= UNIDADES_FIRME && (r.compras >= COMPRAS_FIRME || r.compras === 0)) return "firme";
+  return "probable";
+}
+export const NOMBRE_CERTEZA: Record<Certeza, string> = { firme: "Firme", probable: "Probable", poca: "Poca data" };
+
 export const nivelDeResultado = (v: number): NivelMetrica => (v > 15 ? "bueno" : v < -15 ? "malo" : "medio");
 /** El CPA frente a su tope: dentro del tope, bien; hasta 30 % por encima, regular; más, mal. */
 export const nivelDeCpa = (valor: number | null, tope: number): NivelMetrica => (valor === null ? "neutral" : valor <= tope ? "bueno" : valor > tope * 1.3 ? "malo" : "medio");

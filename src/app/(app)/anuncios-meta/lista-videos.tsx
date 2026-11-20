@@ -28,7 +28,7 @@ import { AVISO_POCA_DATA, Cifra, entero, InsigniaEtapa, MetricasEnLinea, Nivel, 
 const urlSegura = (u: string | null) => (u && /^https:\/\//i.test(u) ? u : null);
 
 const NOMBRE: NombreFilas = { singular: "video", plural: "videos" };
-const ICONOS: Record<string, IconoComp> = { nombre: AnunciosIcon, campanaTexto: AnunciosIcon, angulo: EtiquetaIcon, producto: ProductoIcon, campana: AnunciosIcon, etapa: EtiquetaIcon, veredicto: MargenIcon, datos: FiltroIcon, analisis: RobotIcon, formato: FiltroIcon, ctaTipo: FiltroIcon, recurso: FiltroIcon, llegaCta: MargenIcon, activo: EstadoIcon, gasto: MargenIcon, compras: MargenIcon, cpa: MargenIcon, hook: MargenIcon, hold: MargenIcon, ctr: MargenIcon, campanas: AnunciosIcon, anuncios: AnunciosIcon };
+const ICONOS: Record<string, IconoComp> = { nombre: AnunciosIcon, campanaTexto: AnunciosIcon, angulo: EtiquetaIcon, producto: ProductoIcon, campana: AnunciosIcon, etapa: EtiquetaIcon, veredicto: MargenIcon, datos: FiltroIcon, analisis: RobotIcon, gancho: FiltroIcon, formato: FiltroIcon, ctaTipo: FiltroIcon, recurso: FiltroIcon, llegaCta: MargenIcon, activo: EstadoIcon, gasto: MargenIcon, compras: MargenIcon, cpa: MargenIcon, hook: MargenIcon, hold: MargenIcon, ctr: MargenIcon, campanas: AnunciosIcon, anuncios: AnunciosIcon };
 
 const COLUMNAS = "lg:grid-cols-[minmax(0,3fr)_minmax(0,0.8fr)_minmax(0,0.7fr)_minmax(0,0.8fr)_minmax(0,0.7fr)_minmax(0,0.8fr)_minmax(0,0.7fr)_minmax(0,1fr)_1rem]";
 
@@ -435,7 +435,12 @@ function AnalisisIA({ v, escribe, iaConectada }: { v: VideoVista; escribe: boole
               {a.anguloManual && <span className="ml-2 text-xs text-muted-foreground">corregido a mano</span>}
             </Fila>
             {a.promesa && <Fila t="Promesa">{a.promesa}</Fila>}
-            {a.gancho && <Fila t="Gancho (primeros 3 segundos)">{a.gancho}</Fila>}
+            {a.gancho && (
+              <Fila t="Gancho (primeros 3 segundos)">
+                {a.gancho}
+                {a.ganchoTipo && <span className="ml-2 rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-medium">{a.ganchoTipo}</span>}
+              </Fila>
+            )}
             {a.resumen && <Fila t="De qué trata">{a.resumen}</Fila>}
             {a.publico && <Fila t="A quién le habla">{a.publico}</Fila>}
             {a.formato && <Fila t="Formato">{a.formato}</Fila>}

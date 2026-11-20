@@ -3,12 +3,14 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
+import { resumirEquipo, type CreacionDeCampana, type DatosActividad, type EventoDeActividad } from "./actividad-equipo";
 import { agrupar, copyLimpio, landingLimpia, type Elemento } from "./agrupar";
-import { CPA_TOPE_PREDETERMINADO, resultado, sinResultados, sumar, type Resultados } from "./metricas";
+import { anguloDominante, composicionDeAngulos, gruposDeVideos, type GruposDeVideo } from "./atributos-video";
+import { CPA_TOPE_PREDETERMINADO, sinResultados, sumar, type Resultados } from "./metricas";
 import { claveDeProducto, NOMBRE_ETAPA, NOMBRE_PUJA, numeroDeVideo, type Estructura, type Etapa, type Puja } from "./nombre";
 import { detalleLegible, esCreacionDeCampana } from "./normalizar";
-import { anguloDeCampana, estructuraValida, VERSION_ANALISIS } from "./video-angulo";
-import { diasEntre, pendientes, sugerir, type DecisionGuardada, type Sugerencia } from "./sugerencias";
+import { estructuraValida, VERSION_ANALISIS } from "./video-angulo";
+import { pendientes, sugerir, type DecisionGuardada, type Sugerencia } from "./sugerencias";
 import type { ActividadVista, AnalisisVideoVista, AnuncioVista, CampanaVista, Grupo, VideoVista } from "./vistas";
 
 export const SIN_MIGRACION_META = "Falta correr la migración 0320 (Anuncios Meta) en Supabase.";
@@ -34,23 +36,24 @@ export interface CuentaVista {
   ultimoError: string | null;
 }
 
-export interface FilaEquipo {
-  persona: string;
-  hoy: number;
-  periodo: number;
-  pctTesting: number | null;
-  anunciosNuevos: number;
-  testsGanadores: number;
-  tests: number;
-  gastoSinCompras: number;
-  cambios: number;
-  ultimo: string | null;
-  /** Campañas creadas por día en los últimos 14 días, de la más vieja a la de hoy. */
-  tira: number[];
+/** Las formas de medir campañas y anuncios en «Qué funciona». El ángulo de una campaña sale de la mezcla de los ángulos de sus videos; los ángulos y demás datos de los videos se miden en `gruposVideo`. */
+export const DIMENSIONES_CAMPANA = ["Ángulo", "Estructura", "Puja", "Producto", "Etapa"] as const;
+export type DimensionCampana = (typeof DIMENSIONES_CAMPANA)[number];
+export const DIMENSIONES_ANUNCIO = ["Copy", "Landing"] as const;
+export type DimensionAnuncio = (typeof DIMENSIONES_ANUNCIO)[number];
+
+export interface GruposMeta {
+  campana: Record<DimensionCampana, Grupo[]>;
+  anuncio: Record<DimensionAnuncio, Grupo[]>;
 }
 
-export const DIMENSIONES = ["Ángulo", "Estructura", "Puja", "Copy", "Landing", "Producto", "Etapa"] as const;
-export type Dimension = (typeof DIMENSIONES)[number];
+/** Un punto de la serie de gasto y compras: un día (hasta 90 días) o una semana (más de 90 días). */
+export interface PuntoSerie {
+  fecha: string;
+  etiqueta: string;
+  gasto: number;
+  compras: number;
+}
 
 export interface TopeVista {
   clave: string;
@@ -74,11 +77,18 @@ export interface DatosMeta {
   productos: string[];
   sugerencias: Sugerencia[];
   decididas: number;
-  grupos: Record<Dimension, Grupo[]>;
+  grupos: GruposMeta;
+  /** Gasto y compras del periodo, día por día (o semana por semana con más de 90 días), con todos los días del periodo aunque no hayan gastado. */
+  serie: PuntoSerie[];
+  /** Todo lo que la IA sacó de los videos del periodo (ángulo, gancho, formato, llamado, recursos, estructura…), medido con lo que costó y vendió cada video. */
+  gruposVideo: GruposDeVideo;
   creadasPorDia: { fecha: string; testing: number; escala: number; retargeting: number; otras: number }[];
   creadasHoy: number;
-  equipo: FilaEquipo[];
+  /** La actividad del equipo con todas las cuentas del país juntas (o solo la elegida): campañas por persona, promedios, rangos y lo más reciente. */
+  actividad: DatosActividad;
   actividadDisponible: boolean;
+  /** Videos analizados cuyo gancho todavía no tiene tipo (se clasifica con el texto del gancho, sin volver a ver el video). */
+  ganchosSinTipo: number;
   /** Videos del periodo elegido que todavía no tienen análisis de IA (o lo tienen incompleto), y si la IA (Gemini) está conectada. */
   videosSinAnalizar: number;
   /** Videos con gasto en el periodo elegido a los que todavía no se les conoce el ángulo (no hay análisis ni lo trae la campaña). */
@@ -89,10 +99,14 @@ export interface DatosMeta {
 
 const vacios = (periodo: Periodo, hoy: string): DatosMeta => ({
   faltaMigracion: false, cuentas: [], cuentaId: null, periodo, desde: hoy, hasta: hoy, campanas: [], videos: [], anuncios: [], totales: sinResultados(), anteriores: sinResultados(), topes: [], productos: [], sugerencias: [], decididas: 0,
-  grupos: { "Ángulo": [], Estructura: [], Puja: [], Copy: [], Landing: [], Producto: [], Etapa: [] }, creadasPorDia: [], creadasHoy: 0, equipo: [], videosSinAnalizar: 0, videosSinAngulo: 0, iaConectada: false, actividadDisponible: false,
+  grupos: { campana: { "Ángulo": [], Estructura: [], Puja: [], Producto: [], Etapa: [] }, anuncio: { Copy: [], Landing: [] } }, serie: [], gruposVideo: gruposDeVideos([]), creadasPorDia: [], creadasHoy: 0, actividad: resumirEquipo([], [], hoy), ganchosSinTipo: 0, videosSinAnalizar: 0, videosSinAngulo: 0, iaConectada: false, actividadDisponible: false,
 });
 
 const restar = (fecha: string, n: number) => new Date(new Date(`${fecha}T00:00:00Z`).getTime() - n * 86_400_000).toISOString().slice(0, 10);
+const COLUMNAS_ANALISIS_BASE = "video_id, estado, origen, angulo, angulo_manual, promesa, gancho, resumen, transcripcion, publico, formato, duracion_s, error, analizado_en";
+const COLUMNAS_ANALISIS_V2 = "version, cta, cta_segundo, cta_tipo, oferta, recursos, estructura";
+/** Cuántos días hacia atrás se lee el registro de actividad de Meta (lo que cada persona montó y cambió). */
+export const DIAS_DE_ACTIVIDAD = 180;
 const num = (v: unknown) => Number(v ?? 0) || 0;
 /** La estructura guardada del video (jsonb), con la misma validación con que se guardó. */
 const estructuraDeBase = (v: unknown) => estructuraValida(v);
@@ -144,10 +158,12 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
     traerTodasLasFilas<FilaDia>((a, b) => supabase.from("meta_resultados_dia").select("anuncio_id, campana_id, fecha, gasto, impresiones, clics, video_3s, video_15s, video_25, video_50, video_75, video_95, vio_landing, carrito, pago, compras, valor").in("cuenta_id", ids).gte("fecha", desdeDatos).order("fecha").range(a, b)).catch(() =>
       traerTodasLasFilas<FilaDia>((a, b) => supabase.from("meta_resultados_dia").select("anuncio_id, campana_id, fecha, gasto, impresiones, clics, video_3s, video_15s, vio_landing, carrito, pago, compras, valor").in("cuenta_id", ids).gte("fecha", desdeDatos).order("fecha").range(a, b)),
     ),
-    traerTodasLasFilas<Record<string, unknown>>((a, b) => supabase.from("meta_actividad").select("fecha, actor_nombre, tipo, objeto_tipo, objeto_meta_id, objeto_nombre").in("cuenta_id", ids).gte("fecha", `${restar(o.hoy, 29)}T00:00:00Z`).order("fecha", { ascending: false }).range(a, b)).catch(() => []),
-    // Sin la migración 0325 no hay análisis de videos: todo sigue funcionando sin ángulo de video.
-    traerTodasLasFilas<Record<string, unknown>>((a, b) => supabase.from("meta_video_analisis").select("video_id, estado, origen, angulo, angulo_manual, promesa, gancho, resumen, transcripcion, publico, formato, duracion_s, error, analizado_en, version, cta, cta_segundo, cta_tipo, oferta, recursos, estructura").range(a, b)).catch(() =>
-      traerTodasLasFilas<Record<string, unknown>>((a, b) => supabase.from("meta_video_analisis").select("video_id, estado, origen, angulo, angulo_manual, promesa, gancho, resumen, transcripcion, publico, formato, duracion_s, error, analizado_en").range(a, b)).catch(() => []),
+    traerTodasLasFilas<Record<string, unknown>>((a, b) => supabase.from("meta_actividad").select("fecha, cuenta_id, actor_nombre, tipo, objeto_tipo, objeto_meta_id, objeto_nombre, detalle").in("cuenta_id", ids).gte("fecha", `${restar(o.hoy, DIAS_DE_ACTIVIDAD - 1)}T00:00:00Z`).order("fecha", { ascending: false }).range(a, b)).catch(() => []),
+    // Sin la migración 0338 no hay tipo de gancho, sin la 0326 no hay estructura ni llamado y sin la 0325 no hay análisis de videos: cada una cae a lo de antes.
+    traerTodasLasFilas<Record<string, unknown>>((a, b) => supabase.from("meta_video_analisis").select(`${COLUMNAS_ANALISIS_BASE}, ${COLUMNAS_ANALISIS_V2}, gancho_tipo`).range(a, b)).catch(() =>
+      traerTodasLasFilas<Record<string, unknown>>((a, b) => supabase.from("meta_video_analisis").select(`${COLUMNAS_ANALISIS_BASE}, ${COLUMNAS_ANALISIS_V2}`).range(a, b)).catch(() =>
+        traerTodasLasFilas<Record<string, unknown>>((a, b) => supabase.from("meta_video_analisis").select(COLUMNAS_ANALISIS_BASE).range(a, b)).catch(() => []),
+      ),
     ),
   ]);
 
@@ -162,6 +178,7 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
   const porAnuncio30 = new Map<string, Resultados>();
   let totales = sinResultados();
   let anteriores = sinResultados();
+  const porDiaPeriodo = new Map<string, { gasto: number; compras: number }>();
   const desde7 = restar(o.hoy, 6);
   const desde14 = restar(o.hoy, 13);
   const anuncioDe = new Map(anun.map((a) => [a.id as string, a]));
@@ -173,6 +190,10 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
       const vp = anuncioDe.get(f.anuncio_id)?.video_id as string | undefined;
       if (vp) porVideoPeriodo.set(vp, sumar(porVideoPeriodo.get(vp) ?? sinResultados(), r));
       totales = sumar(totales, r);
+      const d = porDiaPeriodo.get(f.fecha) ?? { gasto: 0, compras: 0 };
+      d.gasto += r.gasto;
+      d.compras += r.compras;
+      porDiaPeriodo.set(f.fecha, d);
     } else if (f.fecha >= anteriorDesde) anteriores = sumar(anteriores, r);
     if (f.fecha >= desde7) porCampana7.set(f.campana_id, sumar(porCampana7.get(f.campana_id) ?? sinResultados(), r));
     if (f.fecha >= restar(o.hoy, 29)) {
@@ -197,25 +218,32 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
   // Análisis de los videos (IA) y, con ellos, el ángulo de cada campaña cuando el nombre no lo trae.
   const analisisDe = new Map<string, AnalisisVideoVista>();
   for (const h of hechos) {
-    analisisDe.set(h.video_id as string, { estado: h.estado as AnalisisVideoVista["estado"], origen: h.origen as AnalisisVideoVista["origen"], angulo: (h.angulo as string | null) ?? null, anguloManual: !!h.angulo_manual, promesa: (h.promesa as string | null) ?? null, gancho: (h.gancho as string | null) ?? null, resumen: (h.resumen as string | null) ?? null, transcripcion: (h.transcripcion as string | null) ?? null, publico: (h.publico as string | null) ?? null, formato: (h.formato as string | null) ?? null, duracionS: h.duracion_s === null || h.duracion_s === undefined ? null : num(h.duracion_s), error: (h.error as string | null) ?? null, analizadoEn: h.analizado_en as string, version: h.version === undefined || h.version === null ? 1 : num(h.version), cta: (h.cta as string | null) ?? null, ctaSegundo: h.cta_segundo === null || h.cta_segundo === undefined ? null : num(h.cta_segundo), ctaTipo: (h.cta_tipo as string | null) ?? null, oferta: (h.oferta as string | null) ?? null, recursos: Array.isArray(h.recursos) ? (h.recursos as unknown[]).filter((x): x is string => typeof x === "string") : [], estructura: estructuraDeBase(h.estructura) });
+    analisisDe.set(h.video_id as string, { estado: h.estado as AnalisisVideoVista["estado"], origen: h.origen as AnalisisVideoVista["origen"], angulo: (h.angulo as string | null) ?? null, anguloManual: !!h.angulo_manual, promesa: (h.promesa as string | null) ?? null, gancho: (h.gancho as string | null) ?? null, ganchoTipo: (h.gancho_tipo as string | null) ?? null, resumen: (h.resumen as string | null) ?? null, transcripcion: (h.transcripcion as string | null) ?? null, publico: (h.publico as string | null) ?? null, formato: (h.formato as string | null) ?? null, duracionS: h.duracion_s === null || h.duracion_s === undefined ? null : num(h.duracion_s), error: (h.error as string | null) ?? null, analizadoEn: h.analizado_en as string, version: h.version === undefined || h.version === null ? 1 : num(h.version), cta: (h.cta as string | null) ?? null, ctaSegundo: h.cta_segundo === null || h.cta_segundo === undefined ? null : num(h.cta_segundo), ctaTipo: (h.cta_tipo as string | null) ?? null, oferta: (h.oferta as string | null) ?? null, recursos: Array.isArray(h.recursos) ? (h.recursos as unknown[]).filter((x): x is string => typeof x === "string") : [], estructura: estructuraDeBase(h.estructura) });
   }
-  const angulosPorCampana = new Map<string, { angulo: string; gasto: number }[]>();
+  // De qué ángulos está hecha cada campaña: los de sus videos (cada video distinto, una vez), con lo que gastó cada anuncio en el periodo.
+  const videosPorCampana = new Map<string, { videoId: string; angulo: string | null; gasto: number }[]>();
   for (const a of anun) {
-    const an = analisisDe.get((a.video_id as string | null) ?? "");
-    if (!an?.angulo) continue;
-    const l = angulosPorCampana.get(a.campana_id as string) ?? [];
-    l.push({ angulo: an.angulo, gasto: porAnuncio30.get(a.id as string)?.gasto ?? 0 });
-    angulosPorCampana.set(a.campana_id as string, l);
+    const vid = (a.video_id as string | null) ?? "";
+    if (!vid) continue;
+    const l = videosPorCampana.get(a.campana_id as string) ?? [];
+    l.push({ videoId: vid, angulo: analisisDe.get(vid)?.angulo ?? null, gasto: porAnuncio.get(a.id as string)?.gasto ?? 0 });
+    videosPorCampana.set(a.campana_id as string, l);
   }
-  const anguloVideoDe = (campanaId: string) => anguloDeCampana(angulosPorCampana.get(campanaId) ?? []);
+  const mezclaDe = (campanaId: string) => composicionDeAngulos(videosPorCampana.get(campanaId) ?? []);
 
   const armar = (c: Record<string, unknown>, r: Resultados): CampanaVista => {
     const clave = claveDeProducto(c.producto as string | null);
     const tope = topePorClave.get(clave);
+    const mezcla = mezclaDe(c.id as string);
+    const delVideo = anguloDominante(mezcla.angulos);
+    const manual = ((c.manual as string[] | null) ?? []).includes("angulo");
+    const delNombre = (c.angulo as string | null) ?? null;
+    // El ángulo de la campaña: el que se corrigió a mano; si no, el que domina entre sus videos (o «Mezcla de ángulos»); si los videos no tienen ángulo, el que traía el nombre.
+    const angulo = manual && delNombre ? delNombre : (delVideo ?? delNombre);
     return {
       id: c.id as string, cuentaId: c.cuenta_id as string, cuentaNombre: nombreCuenta.get(c.cuenta_id as string) ?? "", metaId: c.meta_id as string, nombre: c.nombre as string, estado: c.estado as string, activa: c.estado === "ACTIVE",
-      etapa: (c.etapa as Etapa | null) ?? null, estructura: (c.estructura as Estructura | null) ?? null, puja: (c.puja as Puja | null) ?? null, producto: (c.producto as string | null) ?? null, angulo: (c.angulo as string | null) ?? anguloVideoDe(c.id as string),
-      anguloOrigen: c.angulo ? ((c.manual as string[] | null) ?? []).includes("angulo") ? "manual" : "nombre" : anguloVideoDe(c.id as string) ? "video" : null,
+      etapa: (c.etapa as Etapa | null) ?? null, estructura: (c.estructura as Estructura | null) ?? null, puja: (c.puja as Puja | null) ?? null, producto: (c.producto as string | null) ?? null, angulo, angulos: mezcla.angulos, videosTotal: mezcla.videosTotal, videosConAngulo: mezcla.videosConAngulo,
+      anguloOrigen: manual && delNombre ? "manual" : delVideo ? "video" : delNombre ? "nombre" : null,
       presupuestoDiario: c.presupuesto_diario === null || c.presupuesto_diario === undefined ? null : num(c.presupuesto_diario), creadaEn: (c.creada_meta_en as string | null) ?? null,
       persona: (c.persona_nombre as string | null) ?? (c.creada_por as string | null) ?? creaciones.get(c.meta_id as string) ?? null,
       personaMeta: (c.creada_por as string | null) ?? creaciones.get(c.meta_id as string) ?? null,
@@ -240,7 +268,8 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
     g.anuncios++;
     g.campanas.add(a.campana_id as string);
     const c = campanasDe.get(a.campana_id as string);
-    if (c?.angulo) g.angulos.set(c.angulo, (g.angulos.get(c.angulo) ?? 0) + 1);
+    // El ángulo de un video no se hereda de lo que dicen sus campañas (eso viene de otros videos): solo cuenta el que una campaña trae en su nombre o se corrigió a mano.
+    if (c?.angulo && (c.anguloOrigen === "nombre" || c.anguloOrigen === "manual")) g.angulos.set(c.angulo, (g.angulos.get(c.angulo) ?? 0) + 1);
     if (c?.producto) g.productos.set(c.producto, (g.productos.get(c.producto) ?? 1) + 1);
     if (!g.miniatura && a.miniatura) g.miniatura = a.miniatura as string;
     // El número del video («V3») sale del nombre del anuncio: así se sabe cuál de la tanda es.
@@ -267,22 +296,18 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
   const deCampana = (clave: (c: CampanaVista) => string | null): Elemento[] => conGasto.map((c) => ({ clave: clave(c), r: c.r, tope: c.tope, campana: c.id }));
   const deAnuncio = (clave: (a: AnuncioVista) => string | null): Elemento[] =>
     anuncios.filter((a) => a.r.gasto > 0).map((a) => ({ clave: clave(a), r: a.r, tope: campanasDe.get(a.campanaId)?.tope ?? CPA_TOPE_PREDETERMINADO, campana: a.campanaId, video: a.videoId }));
-  // El ángulo se mide por video (18 nov 2026): el de su análisis (o el que se corrigió a mano) y, sin análisis, solo el que la campaña trae en su nombre o a mano. Nunca el que la campaña heredó de otros videos.
-  const anguloDeAnuncio = (a: AnuncioVista): string | null => {
-    const deVideo = a.videoId ? analisisDe.get(a.videoId)?.angulo : null;
-    if (deVideo) return deVideo;
-    const c = campanasDe.get(a.campanaId);
-    return c && (c.anguloOrigen === "nombre" || c.anguloOrigen === "manual") ? c.angulo : null;
-  };
-  const videosSinAngulo = new Set(anuncios.filter((a) => a.r.gasto > 0 && a.videoId && !anguloDeAnuncio(a)).map((a) => a.videoId as string)).size;
-  const grupos: Record<Dimension, Grupo[]> = {
-    "Ángulo": agrupar(deAnuncio(anguloDeAnuncio)),
-    Estructura: agrupar(deCampana((c) => c.estructura)),
-    Puja: agrupar(deCampana((c) => (c.puja ? NOMBRE_PUJA[c.puja] : null))),
-    Copy: agrupar(deAnuncio((a) => copyLimpio(a.copy))),
-    Landing: agrupar(deAnuncio((a) => landingLimpia(a.landing))),
-    Producto: agrupar(deCampana((c) => c.producto)),
-    Etapa: agrupar(deCampana((c) => (c.etapa ? NOMBRE_ETAPA[c.etapa] : null))),
+  // Todo lo que la IA sacó de los videos se mide por video (lo que costó y vendió cada uno). El ángulo de una campaña es la mezcla de los de sus videos.
+  const gruposVideo = gruposDeVideos(videos);
+  const videosSinAngulo = gruposVideo.sinDato["Ángulo"];
+  const grupos: GruposMeta = {
+    campana: {
+      "Ángulo": agrupar(deCampana((c) => c.angulo)),
+      Estructura: agrupar(deCampana((c) => c.estructura)),
+      Puja: agrupar(deCampana((c) => (c.puja ? NOMBRE_PUJA[c.puja] : null))),
+      Producto: agrupar(deCampana((c) => c.producto)),
+      Etapa: agrupar(deCampana((c) => (c.etapa ? NOMBRE_ETAPA[c.etapa] : null))),
+    },
+    anuncio: { Copy: agrupar(deAnuncio((a) => copyLimpio(a.copy))), Landing: agrupar(deAnuncio((a) => landingLimpia(a.landing))) },
   };
 
   // Sugerencias: siempre con los últimos 7 días de las campañas y 30 de los videos, sin importar el periodo que se mira.
@@ -297,45 +322,33 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
     const d = creadasPorDia.find((x) => x.fecha === f);
     if (d) d[c.etapa ?? "otras"]++;
   }
-  const personas = new Map<string, FilaEquipo>();
-  const fila = (p: string): FilaEquipo => {
-    const f = personas.get(p) ?? { persona: p, hoy: 0, periodo: 0, pctTesting: null, anunciosNuevos: 0, testsGanadores: 0, tests: 0, gastoSinCompras: 0, cambios: 0, ultimo: null, tira: Array(14).fill(0) };
-    personas.set(p, f);
-    return f;
-  };
-  for (const c of campanas) {
-    if (!c.persona || !c.creadaEn) continue;
-    const dia = c.creadaEn.slice(0, 10);
-    const i = diasEntre(dia, o.hoy);
-    const f = fila(c.persona);
-    if (i >= 0 && i < 14) f.tira[13 - i]++;
-    if (dia === o.hoy) f.hoy++;
-    if (dia >= desde) {
-      f.periodo++;
-      if (c.etapa === "testing") f.tests++;
-    }
-    if (c.etapa === "testing" && c.r.gasto > 0 && dia >= restar(o.hoy, 29)) {
-      if (resultado(c.r, c.tope) > 0) f.testsGanadores++;
-      if (c.r.compras === 0) f.gastoSinCompras += c.r.gasto;
-    }
-  }
-  for (const e of eventos) {
-    const p = e.actor_nombre as string | null;
-    if (!p) continue;
-    const f = fila(p);
-    const fecha = String(e.fecha);
-    if (!f.ultimo || fecha > f.ultimo) f.ultimo = fecha;
-    if (String(e.fecha).slice(0, 10) >= desde) {
-      if (String(e.tipo) === "create_ad") f.anunciosNuevos++;
-      else if (!esCreacionDeCampana({ tipo: String(e.tipo), objetoTipo: null })) f.cambios++;
-    }
-  }
-  const equipo = [...personas.values()].map((f) => ({ ...f, pctTesting: f.periodo ? Math.round((f.tests / f.periodo) * 100) : null })).sort((a, b) => b.periodo - a.periodo);
+  // La actividad del equipo cuenta todas las cuentas juntas (las del país, o la que se haya elegido): 3 campañas en una cuenta y 3 el mismo día en otra son 6 ese día.
+  const campanaDeMeta = new Map(camp.map((c) => [c.meta_id as string, c.id as string]));
+  const creacionesEquipo: CreacionDeCampana[] = campanas.map((c) => ({ persona: c.persona, creadaEn: c.creadaEn, etapa: c.etapa ? NOMBRE_ETAPA[c.etapa] : null, estructura: c.estructura, puja: c.puja ? NOMBRE_PUJA[c.puja] : null, producto: c.producto, cuenta: c.cuentaNombre }));
+  const eventosEquipo: EventoDeActividad[] = eventos.map((e) => ({ fecha: String(e.fecha), actor: (e.actor_nombre as string | null) ?? null, tipo: String(e.tipo), objetoTipo: (e.objeto_tipo as string | null) ?? null, objeto: (e.objeto_nombre as string | null) ?? null, detalle: (e.detalle as string | null) ?? null, cuenta: nombreCuenta.get(e.cuenta_id as string) ?? "", campanaId: campanaDeMeta.get(String(e.objeto_meta_id ?? "")) ?? null }));
+  const actividad = resumirEquipo(creacionesEquipo, eventosEquipo, o.hoy, { maxReciente: 200 });
+  const ganchosSinTipo = [...videosMapa.keys()].filter((id) => {
+    const a = analisisDe.get(id);
+    return !!a?.gancho && !a.ganchoTipo && a.estado !== "error";
+  }).length;
 
+  const serieGlobal: PuntoSerie[] = [];
+  const paso = dias > 90 ? 7 : 1;
+  for (let i = 0; i < dias; i += paso) {
+    let gasto = 0;
+    let compras = 0;
+    for (let k = i; k < Math.min(dias, i + paso); k++) {
+      const d = porDiaPeriodo.get(restar(desde, -k));
+      gasto += d?.gasto ?? 0;
+      compras += d?.compras ?? 0;
+    }
+    const fecha = restar(desde, -i);
+    serieGlobal.push({ fecha, etiqueta: `${fecha.slice(8)}/${fecha.slice(5, 7)}`, gasto, compras });
+  }
   const productos = [...new Set(camp.map((c) => (c.producto as string | null)?.trim()).filter((p): p is string => !!p))].sort((a, b) => a.localeCompare(b, "es"));
   return {
     ...base, cuentas, cuentaId, desde, hasta: o.hoy, campanas: campanasConActividad, videos, anuncios, totales, anteriores, topes, productos, sugerencias, decididas: todas.length - sugerencias.length, grupos,
-    creadasPorDia, creadasHoy: creadasPorDia[13]?.testing + creadasPorDia[13]?.escala + creadasPorDia[13]?.retargeting + creadasPorDia[13]?.otras || 0, equipo, actividadDisponible: eventos.length > 0, videosSinAnalizar: videos.filter((v) => !v.analisis || v.analisis.estado !== "analizado" || v.analisis.version < VERSION_ANALISIS).length, videosSinAngulo, iaConectada: false,
+    serie: serieGlobal, gruposVideo, creadasPorDia, creadasHoy: creadasPorDia[13]?.testing + creadasPorDia[13]?.escala + creadasPorDia[13]?.retargeting + creadasPorDia[13]?.otras || 0, actividad, ganchosSinTipo, actividadDisponible: eventos.length > 0, videosSinAnalizar: videos.filter((v) => !v.analisis || v.analisis.estado !== "analizado" || v.analisis.version < VERSION_ANALISIS).length, videosSinAngulo, iaConectada: false,
   };
 }
 

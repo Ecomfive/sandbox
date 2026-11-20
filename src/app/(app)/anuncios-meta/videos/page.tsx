@@ -1,6 +1,7 @@
 import { cargarPaginaMeta, type ParametrosMeta } from "../datos-pagina";
 import { ListaVideos } from "../lista-videos";
 import { MarcoMeta } from "../marco-meta";
+import { ResumenVideos } from "../resumen-videos";
 
 export const metadata = { title: "Videos · Anuncios Meta" };
 
@@ -22,7 +23,8 @@ export default async function VideosMetaPage({ searchParams }: { searchParams: P
         <p className="m-0 rounded-xl border border-border bg-card px-4 py-6 text-sm text-muted-foreground">Todavía no hay videos con gasto en este periodo.</p>
       ) : (
         <>
-          <p className="-mb-2 text-xs text-muted-foreground">Del periodo elegido arriba. Un video repetido en varios anuncios cuenta una sola vez. Ordénalos, fíltralos o agrúpalos por campaña, ángulo o producto.</p>
+          <ResumenVideos videos={datos.videos} />
+          <p className="-mb-2 text-xs text-muted-foreground">Del periodo elegido arriba. Un video repetido en varios anuncios cuenta una sola vez. Ordénalos, fíltralos o agrúpalos por campaña, ángulo, gancho o producto.</p>
           <ListaVideos videos={datos.videos} escribe={escribe} iaConectada={datos.iaConectada} sinAnalizar={datos.videosSinAnalizar} abrirInicial={abrir ?? null} />
         </>
       )}

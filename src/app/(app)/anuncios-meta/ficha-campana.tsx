@@ -10,27 +10,13 @@ import { Ventana } from "@/components/ui/ventana";
 import { formatearFechaHora } from "@/lib/formato";
 import { AnunciosIcon, CalendarioIcon, EnlaceIcon, EtiquetaIcon, FlechaAbajoIcon, FlechaArribaIcon, HistorialIcon, MargenIcon, PersonaIcon } from "@/lib/nav-icons";
 import { conversion, cpa, ctr, dolares, hookRate, holdRate, nivelDeCpa, nivelDeCtr, nivelDeHook, resultado } from "@/lib/meta-ads/metricas";
+import { nombreEvento } from "@/lib/meta-ads/actividad-equipo";
 import { NOMBRE_ETAPA, type Etapa } from "@/lib/meta-ads/nombre";
 import type { ActividadVista, AnuncioVista, CampanaVista } from "@/lib/meta-ads/vistas";
 import { corregirCampanaMeta, obtenerActividadCampanaMeta, soltarCorreccionMeta } from "./actions";
 import { NOMBRE_VEREDICTO, veredictoDe } from "./def-campanas";
+import { BarraApilada } from "./graficas";
 import { Cifra, entero, InsigniaEstructura, InsigniaEtapa, MetricasEnLinea, nombreEstado, porcentaje, Resultado, valorCpa } from "./piezas";
-
-const NOMBRE_EVENTO: Record<string, string> = {
-  create_campaign_group: "Creó la campaña",
-  create_campaign: "Creó la campaña",
-  update_campaign_budget: "Cambió el presupuesto",
-  update_campaign_run_status: "Cambió el estado (encendida o pausada)",
-  update_campaign_name: "Le cambió el nombre",
-  update_campaign_bid_strategy: "Cambió la estrategia de puja",
-  create_ad_set: "Creó un conjunto de anuncios",
-  update_ad_set_budget: "Cambió el presupuesto de un conjunto",
-  update_ad_set_run_status: "Cambió el estado de un conjunto",
-  create_ad: "Creó un anuncio",
-  update_ad_run_status: "Cambió el estado de un anuncio",
-  update_ad_creative: "Cambió el creativo de un anuncio",
-};
-const nombreEvento = (tipo: string) => NOMBRE_EVENTO[tipo] ?? "Hizo un cambio";
 
 function BotonNavegar({ texto, icono: Icono, activo, alHacerClic }: { texto: string; icono: typeof FlechaArribaIcon; activo: boolean; alHacerClic: () => void }) {
   return (
@@ -88,8 +74,8 @@ function EditorEtiquetas({ c, productos }: { c: CampanaVista; productos: string[
           </datalist>
         </label>
         <label className="flex flex-col gap-1" htmlFor={`${id}-angulo`}>
-          <span className={labelClassSm}>Ángulo</span>
-          <input id={`${id}-angulo`} className={fieldClassSm} value={angulo} onChange={(e) => setAngulo(e.target.value)} maxLength={80} placeholder={c.anguloOrigen === "video" && c.angulo ? `Por IA: ${c.angulo}` : "Ej: Dolor de espalda"} />
+          <span className={labelClassSm}>Ángulo a mano</span>
+          <input id={`${id}-angulo`} className={fieldClassSm} value={angulo} onChange={(e) => setAngulo(e.target.value)} maxLength={80} placeholder={c.anguloOrigen === "video" && c.angulo ? `Por sus videos: ${c.angulo}` : "Ej: Dolor de espalda"} />
         </label>
         <label className="flex flex-col gap-1" htmlFor={`${id}-etapa`}>
           <span className={labelClassSm}>Etapa</span>
@@ -114,6 +100,48 @@ function EditorEtiquetas({ c, productos }: { c: CampanaVista; productos: string[
         )}
         {c.manual.length > 0 && <span className="text-xs text-muted-foreground">Corregido a mano: {c.manual.map((m) => (m === "angulo" ? "ángulo" : m)).join(", ")}</span>}
       </div>
+    </div>
+  );
+}
+
+/** La mezcla de ángulos de la campaña: cada video cuenta con el ángulo que tiene, y los porcentajes suman 100. */
+function MezclaDeAngulos({ c, colores }: { c: CampanaVista; colores: Map<string, string> }) {
+  const sin = c.videosTotal - c.videosConAngulo;
+  if (c.angulos.length === 0) {
+    return (
+      <p className="m-0 text-sm text-muted-foreground">
+        {c.videosTotal === 0 ? "Esta campaña no tiene anuncios con video." : `Ninguno de sus ${c.videosTotal} ${c.videosTotal === 1 ? "video tiene" : "videos tienen"} ángulo todavía.`}{" "}
+        {c.videosTotal > 0 && (
+          <a href="/anuncios-meta/videos" className="font-medium text-foreground underline underline-offset-2">
+            Analizarlos en Videos
+          </a>
+        )}
+      </p>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-3">
+      <BarraApilada partes={c.angulos.map((a) => ({ nombre: a.angulo, valor: a.videos, color: colores.get(a.angulo) ?? "var(--grafica-5)" }))} alto={18} conPorcentaje etiqueta={`Ángulos de la campaña: ${c.angulos.map((a) => `${a.angulo} ${a.pct} %`).join(", ")}`} />
+      <ul role="list" className="m-0 flex list-none flex-col gap-1.5 p-0 text-sm">
+        {c.angulos.map((a) => (
+          <li key={a.angulo} className="flex items-center justify-between gap-3">
+            <span className="inline-flex min-w-0 items-center gap-2">
+              <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: colores.get(a.angulo) ?? "var(--grafica-5)" }} />
+              <span className="truncate">{a.angulo}</span>
+            </span>
+            <span className="shrink-0 tabular-nums">
+              <span className="font-semibold">{a.pct} %</span>{" "}
+              <span className="text-xs text-muted-foreground">
+                {a.videos} {a.videos === 1 ? "video" : "videos"} · {dolares(a.gasto)}
+              </span>
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className="m-0 text-xs text-muted-foreground">
+        {c.videosConAngulo} de {c.videosTotal} {c.videosTotal === 1 ? "video con ángulo" : "videos con ángulo"}
+        {sin > 0 ? `; ${sin} sin analizar no cuentan.` : "."} Se clasifica como «{c.angulo}»{c.anguloOrigen === "manual" ? " (corregido a mano)" : ""}.
+      </p>
     </div>
   );
 }
@@ -154,7 +182,7 @@ function Actividad({ id }: { id: string }) {
 }
 
 /** La ficha de una campaña: cómo le va, cómo está montada, sus etiquetas (producto, ángulo y etapa, que se pueden corregir), sus anuncios con el video y el texto, y los cambios que hizo el equipo en Meta. */
-export function FichaCampana({ campana: c, anuncios, actId, productos, escribe, alCerrar, anterior, siguiente }: { campana: CampanaVista | undefined; anuncios: AnuncioVista[]; actId: string | null; productos: string[]; escribe: boolean; alCerrar: () => void; anterior?: () => void; siguiente?: () => void }) {
+export function FichaCampana({ campana: c, colores, anuncios, actId, productos, escribe, alCerrar, anterior, siguiente }: { campana: CampanaVista | undefined; colores: Map<string, string>; anuncios: AnuncioVista[]; actId: string | null; productos: string[]; escribe: boolean; alCerrar: () => void; anterior?: () => void; siguiente?: () => void }) {
   const r = c?.r;
   const veredicto = c ? veredictoDe(c) : null;
   return (
@@ -229,6 +257,10 @@ export function FichaCampana({ campana: c, anuncios, actId, productos, escribe, 
                 <span className="sr-only"> (se abre en una pestaña nueva)</span>
               </a>
             )}
+          </Seccion>
+
+          <Seccion icono={EtiquetaIcon} titulo="De qué ángulos está hecha">
+            <MezclaDeAngulos c={c} colores={colores} />
           </Seccion>
 
           <Seccion icono={EtiquetaIcon} titulo="Producto, ángulo y etapa">

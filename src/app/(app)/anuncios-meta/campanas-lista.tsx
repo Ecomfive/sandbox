@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { ListaDatos } from "@/components/tabla/lista-datos";
 import { AnunciosIcon, ChevronRightIcon, EtiquetaIcon, EstadoIcon, MargenIcon, PersonaIcon, ProductoIcon, TiendaIcon, CalendarioIcon, FiltroIcon } from "@/lib/nav-icons";
@@ -10,6 +10,7 @@ import { faltanEtiquetas } from "@/lib/meta-ads/sugerencias";
 import type { AnuncioVista, CampanaVista } from "@/lib/meta-ads/vistas";
 import type { NombreFilas } from "@/lib/tabla/pie";
 import { DEF_CAMPANAS, NOMBRE_VEREDICTO, veredictoDe } from "./def-campanas";
+import { BarraApilada, coloresDeAngulos } from "./graficas";
 import { FichaCampana } from "./ficha-campana";
 import { InsigniaEstructura, InsigniaEtapa, Nivel, nombreEstado, porcentaje, Resultado, valorCpa } from "./piezas";
 
@@ -32,7 +33,7 @@ function EncabezadoFilas() {
   );
 }
 
-function FilaCampana({ c, alAbrir }: { c: CampanaVista; alAbrir: () => void }) {
+function FilaCampana({ c, alAbrir, colores }: { c: CampanaVista; alAbrir: () => void; colores: Map<string, string> }) {
   const v = veredictoDe(c);
   const punto = v === "pierde" ? "bg-destructive" : v === "deja" ? "bg-success" : "bg-muted-foreground";
   return (
@@ -50,6 +51,12 @@ function FilaCampana({ c, alAbrir }: { c: CampanaVista; alAbrir: () => void }) {
           {c.activa ? "" : ` · ${nombreEstado(c.estado)}`}
           {c.activa && faltanEtiquetas(c).length > 0 ? ` · falta ${faltanEtiquetas(c).join(" y ")}` : ""}
         </span>
+        {c.angulos.length > 0 && (
+          <span className="mt-0.5 flex min-w-0 flex-col gap-0.5">
+            <BarraApilada partes={c.angulos.map((a) => ({ nombre: a.angulo, valor: a.videos, color: colores.get(a.angulo) ?? "var(--grafica-5)" }))} alto={6} etiqueta={`Ángulos de sus videos: ${c.angulos.map((a) => `${a.angulo} ${a.pct} %`).join(", ")}`} />
+            <span className="truncate text-xs text-muted-foreground">{c.angulos.map((a) => `${a.angulo} ${a.pct} %`).join(" · ")}</span>
+          </span>
+        )}
       </span>
       <span className="flex flex-wrap items-center gap-1">
         <InsigniaEtapa etapa={c.etapa} />
@@ -93,6 +100,7 @@ export function CampanasLista({ campanas: todas, anuncios, cuentas, productos, e
     if (url.href !== window.location.href) window.history.replaceState(window.history.state, "", url);
   }, [abierta, soloFaltan]);
   const [orden, setOrden] = useState<string[]>([]);
+  const colores = useMemo(() => coloresDeAngulos(todas), [todas]);
   // La ficha se dibuja en `<body>` (portal): con `?abrir=` arranca abierta, así que solo se monta ya en el navegador.
   const enNavegador = useSyncExternalStore(
     () => () => {},
@@ -126,6 +134,7 @@ export function CampanasLista({ campanas: todas, anuncios, cuentas, productos, e
         renderFila={(c, enOrden) => (
           <FilaCampana
             c={c}
+            colores={colores}
             alAbrir={() => {
               setOrden(enOrden.map((x) => x.id));
               setAbierta(c.id);
@@ -137,6 +146,7 @@ export function CampanasLista({ campanas: todas, anuncios, cuentas, productos, e
       <FichaCampana
         key={abierta ?? "cerrada"}
         campana={campana}
+        colores={colores}
         anuncios={anuncios.filter((a) => a.campanaId === campana?.id)}
         actId={cuentas.find((x) => x.id === campana?.cuentaId)?.actId ?? null}
         productos={productos}
