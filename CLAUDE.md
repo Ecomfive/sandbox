@@ -92,6 +92,8 @@ convenciones técnicas del código.
 
 ## Convenciones importantes
 
+- **Un registro lleva su fecha y hora, no «hace 2 d»** (20 nov 2026, pedido de Jhokser: los movimientos de la ficha del producto decían «hace 2 d»): `FechaHora` (`src/components/ui/fecha-hora.tsx`, usa `formatearFechaHoraCompleta` con el país de la barra: «20 nov 2026, 01:50 p. m.») va en el historial de una ficha, las novedades, la actividad y las ediciones. `formatearTiempoRelativo` queda solo para lo que mide **qué tan fresco** es un dato (la última lectura de una plataforma, la última conexión, «Última vez que se trajeron los productos»). Un historial nuevo usa `FechaHora`.
+
 - **La rueda del mouse no cambia un número** (20 nov 2026, Nueva remisión: un 40 quedó en 38 al bajar la lista con el cursor sobre la cantidad): `SinRuedaEnNumeros` (`src/components/sin-rueda-en-numeros.tsx`, en el layout raíz) le quita el foco a un `input type="number"` cuando la rueda gira sobre él, así el navegador no le sube ni le baja el valor y la página se desplaza normal. No hace falta un `onWheel` en cada campo numérico.
 
 - Todas las páginas llevan `export const dynamic = "force-dynamic"` — no

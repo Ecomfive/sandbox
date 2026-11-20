@@ -13,7 +13,7 @@ import { coincideCodigo } from "@/lib/wms/codigos-producto";
 import { MiniaturaFoto } from "@/components/ui/miniatura-foto";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
-import { formatearTiempoRelativo } from "@/lib/formato";
+import { FechaHora } from "@/components/ui/fecha-hora";
 import type { Ambito } from "@/lib/imagen/buscar";
 import { BuscarIcon, CamaraIcon, ChevronRightIcon, MasIcon, PapeleraIcon } from "@/lib/nav-icons";
 import { FichaStock } from "../ficha-stock";
@@ -687,7 +687,7 @@ export function Levantamiento({
         </button>
         {ultimo && (
           <p className="text-xs text-muted-foreground">
-            Último levantamiento: {formatearTiempoRelativo(ultimo.fecha)}
+            Último levantamiento: <FechaHora iso={ultimo.fecha} />
             {ultimo.referencia ? ` · ${ultimo.referencia}` : ""} · {ultimo.productos} productos
           </p>
         )}

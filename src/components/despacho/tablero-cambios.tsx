@@ -20,7 +20,7 @@ import {
 import type { FilaCaso, Persona } from "@/lib/postventa/datos";
 import { colorDe, ESTADOS, grupoPorEstado, GRUPOS, NOTIFICAR, TIENDAS, TIPOS, type Etiqueta } from "@/lib/postventa/reglas";
 import { textoSobre } from "@/lib/despacho/etiquetas";
-import { formatearTiempoRelativo } from "@/lib/formato";
+import { FechaHora } from "@/components/ui/fecha-hora";
 import { VisorArchivos } from "./visor-archivos";
 
 type Pill = "tienda" | "tipo" | "responsable" | "estado" | "notificar";
@@ -509,7 +509,7 @@ function PanelCaso({ fila, puedeEscribir, puedeArchivar, archivada, alCerrar }: 
         {detalle?.notas.map((n) => (
           <div key={n.id} className="rounded-lg border border-border/70 p-2.5 text-[13px]">
             <div className="text-xs font-semibold">
-              {n.autor} <span className="font-normal text-muted-foreground">· {formatearTiempoRelativo(n.cuando)}</span>
+              {n.autor} <span className="font-normal text-muted-foreground">· <FechaHora iso={n.cuando} /></span>
             </div>
             <p className="m-0 mt-1 whitespace-pre-line">{n.texto}</p>
           </div>
@@ -523,7 +523,7 @@ function PanelCaso({ fila, puedeEscribir, puedeArchivar, archivada, alCerrar }: 
         {detalle?.actividad.length ? (
           detalle.actividad.map((a) => (
             <p key={a.id} className="m-0 border-b border-border/50 py-1 text-xs">
-              {a.texto} <span className="text-muted-foreground">· {a.autor}, {formatearTiempoRelativo(a.cuando)}</span>
+              {a.texto} <span className="text-muted-foreground">· {a.autor}, <FechaHora iso={a.cuando} /></span>
             </p>
           ))
         ) : (

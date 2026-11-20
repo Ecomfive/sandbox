@@ -4,7 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import { TextoConMenciones } from "@/components/ui/campo-menciones";
 import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
-import { formatearTiempoRelativo } from "@/lib/formato";
+import { FechaHora } from "@/components/ui/fecha-hora";
 import type { AccesoCrm } from "@/lib/crm/areas";
 import { escalarCaso, obtenerLineaDeTiempo, type ItemLinea } from "./actions";
 
@@ -83,7 +83,7 @@ export function LineaDeTiempo({ dropshipperId, acceso, version }: { dropshipperI
               <span className="min-w-0">
                 <TextoConMenciones texto={i.texto} />
                 <span className="block text-xs text-muted-foreground">
-                  {formatearTiempoRelativo(i.creadoEn)}
+                  <FechaHora iso={i.creadoEn} />
                   {acceso.comercial && i.area !== "general" ? ` · ${i.area === "comercial" ? "Comercial" : "Atención"}` : ""}
                 </span>
               </span>
