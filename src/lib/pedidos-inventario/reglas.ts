@@ -13,7 +13,7 @@ export const ESTADOS: { clave: EstadoPedido; etiqueta: string; tono: Tone; expli
   { clave: "solicitud", etiqueta: "Solicitud", tono: "neutral", explica: "Pedido registrado: inventario todavía no lo toma." },
   { clave: "en_proceso", etiqueta: "En proceso", tono: "warning", explica: "Inventario está preparando el pedido." },
   { clave: "enviado", etiqueta: "Enviado", tono: "azul", explica: "Va en camino a despacho (el traslado ya está hecho)." },
-  { clave: "recibido", etiqueta: "Recibido", tono: "success", explica: "Despacho lo recibió: el pedido queda cerrado." },
+  { clave: "recibido", etiqueta: "Entregado", tono: "success", explica: "Llegó a despacho (lo marca despacho con «Recibido» o inventario con «Marcar entregado»): el pedido queda cerrado." },
   { clave: "cancelado", etiqueta: "Cancelado", tono: "destructive", explica: "Despacho lo canceló antes de que inventario lo tomara." },
 ];
 
@@ -234,7 +234,7 @@ export function fechaCorta(iso: string): string {
 }
 
 /** Los avisos «Para ti» de cada paso. */
-export function avisoPedido(p: { numero: number; items: number }, quien: string, paso: "nuevo" | "en_proceso" | "enviado" | "recibido" | "cancelado", extra?: string): { titulo: string; texto: string } {
+export function avisoPedido(p: { numero: number; items: number }, quien: string, paso: "nuevo" | "en_proceso" | "enviado" | "recibido" | "entregado" | "cancelado", extra?: string): { titulo: string; texto: string } {
   const n = numeroPedido(p.numero);
   const prods = `${p.items} ${p.items === 1 ? "producto" : "productos"}`;
   const t = {
@@ -242,6 +242,7 @@ export function avisoPedido(p: { numero: number; items: number }, quien: string,
     en_proceso: [`${n} está en proceso`, `${quien} está preparando tu pedido.`],
     enviado: [`${n} fue enviado`, `${quien} lo envió${extra ? ` (${extra})` : ""}. Márcalo «Recibido» cuando llegue.`],
     recibido: [`${n} fue recibido`, `${quien} lo recibió en despacho.`],
+    entregado: [`${n} fue entregado`, `${quien} lo marcó entregado en despacho: el pedido quedó cerrado.`],
     cancelado: [`${n} fue cancelado`, `${quien} canceló el pedido.`],
   }[paso];
   return { titulo: t[0].slice(0, 300), texto: t[1].slice(0, 600) };

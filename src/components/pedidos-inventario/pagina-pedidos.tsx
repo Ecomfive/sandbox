@@ -51,7 +51,7 @@ export async function PaginaPedidos({ modo, usuario, estado }: { modo: "despacho
       <EncabezadoPagina titulo={modo === "despacho" ? "Pedir a inventario" : "Solicitudes de despacho"} oculto>
         {modo === "despacho"
           ? "Pide a inventario lo que se agotó en despacho. Te avisa en «Para ti» cuando lo prepara y cuando lo envía; al llegar, márcalo «Recibido»."
-          : "Lo que despacho le pide a inventario: ponlo en proceso, escribe cuánto envías, elige de qué bodega sale y «Enviar» hace el traslado a despacho."}
+          : "Lo que despacho le pide a inventario: ponlo en proceso, escribe cuánto envías, elige de qué bodega sale y «Enviar» hace el traslado a despacho. Cuando llega, «Marcar entregado» cierra el pedido."}
       </EncabezadoPagina>
       {faltaMigracion ? (
         <p role="alert" className="m-0 rounded-lg border border-border bg-card px-4 py-3 text-sm text-destructive">

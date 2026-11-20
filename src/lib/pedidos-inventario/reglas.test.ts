@@ -51,6 +51,7 @@ test("contadores, fecha y avisos", () => {
   assert.equal(fechaCorta("2026-11-16T03:00:00Z"), "15/11/2026");
   assert.equal(avisoPedido({ numero: 3, items: 2 }, "Yiletsi", "nuevo").titulo, "Despacho pide a inventario: PED-0003");
   assert.match(avisoPedido({ numero: 3, items: 1 }, "Dinora", "enviado", "TRA-0065").texto, /TRA-0065/);
+  assert.equal(avisoPedido({ numero: 3, items: 1 }, "Dinora", "entregado").titulo, "PED-0003 fue entregado");
 });
 
 test("no se pide lo que inventario no tiene, ni más de lo que hay", () => {

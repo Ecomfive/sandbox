@@ -261,6 +261,29 @@ export async function enviarPedidoInventario(id: string, origenId: string, entre
   });
 }
 
+/**
+ * Inventario marca el pedido como entregado (20 nov 2026, pedido de Jhokser: para que la orden finalice sin esperar a que despacho pulse «Recibido»): queda cerrado igual que si despacho lo recibe y
+ * le llega el aviso a quien lo pidió. Solo un pedido enviado; el cambio es un `update … eq(estado previo)`, así que dos clics (o despacho y inventario a la vez) no lo cierran dos veces.
+ */
+export async function marcarEntregadoPedidoInventario(id: string): Promise<Resultado> {
+  return conPermiso(MODULO_INVENTARIO, async (u) => {
+    if (!ES_UUID(id)) return { error: "Pedido no válido." };
+    const supabase = createServiceClient();
+    const { data } = await supabase
+      .from("despacho_pedidos_inventario")
+      .update({ estado: "recibido", recibido_en: new Date().toISOString(), recibido_por: u.id, recibido_por_nombre: nombreDe(u) })
+      .eq("id", id)
+      .eq("estado", "enviado")
+      .select("numero, pedido_por, despacho_pedidos_inventario_items(id)");
+    const p = data?.[0];
+    if (!p) return { error: "Ese pedido no está enviado: recarga la página." };
+    const items = (p.despacho_pedidos_inventario_items as unknown[] | null)?.length ?? 0;
+    await registrarAuditoria({ accion: "entregar_pedido_inventario", entidad: "despacho_pedidos_inventario", entidadId: id, detalle: `${numeroPedido(p.numero as number)} marcado entregado desde inventario` });
+    await avisar(supabase, [p.pedido_por as string | null], u, avisoPedido({ numero: p.numero as number, items }, nombreDe(u), "entregado"), "/despacho-ciudad/pedir-inventario");
+    return { ok: true, mensaje: `${numeroPedido(p.numero as number)} entregado.` };
+  });
+}
+
 /** Despacho marca que le llegó: el pedido queda cerrado y le llega el aviso a quien lo envió. */
 export async function recibirPedidoInventario(id: string): Promise<Resultado> {
   return conPermiso(MODULO_DESPACHO, async (u) => {
