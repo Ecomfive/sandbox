@@ -112,8 +112,8 @@ export default async function RemisionesPage() {
         traerTodasConError<{ bodega_id: string; sku_maestro_id: string; disponible: number }>((d, h) =>
           supabase.from("wms_stock").select("bodega_id, sku_maestro_id, disponible").in("bodega_id", propias.map((b) => b.id)).gt("disponible", 0).order("sku_maestro_id").range(d, h),
         ),
-        traerTodasConError<{ id: string; codigo: string; nombre: string; estado: string; numero: number | null; foto_url: string | null; codigo_barras: string | null }>((d, h) =>
-          supabase.from("skus_maestros").select("id, codigo, nombre, estado, numero, foto_url, codigo_barras").neq("tipo", "combo").is("opciones_variantes", null).order("codigo").range(d, h),
+        traerTodasConError<{ id: string; codigo: string; nombre: string; estado: string; numero: number | null; foto_url: string | null; codigo_barras: string | null; padre_id: string | null }>((d, h) =>
+          supabase.from("skus_maestros").select("id, codigo, nombre, estado, numero, foto_url, codigo_barras, padre_id").neq("tipo", "combo").is("opciones_variantes", null).order("codigo").range(d, h),
         ),
       ])
     : [{ data: [] }, { data: [] }];
@@ -148,7 +148,7 @@ export default async function RemisionesPage() {
     ((cajas[c.bodega_id] ??= {})[c.sku_maestro_id] ??= []).push(caja);
   }
   for (const porSku of Object.values(cajas)) for (const lista of Object.values(porSku)) lista.sort((a, b) => a.ubicacion.localeCompare(b.ubicacion) || b.porCaja - a.porCaja);
-  const opciones = (productos.data ?? []).filter((p) => hay.has(p.id)).map((p) => ({ id: p.id, codigo: p.codigo, nombre: p.nombre, estado: p.estado, numero: p.numero, barras: p.codigo_barras, foto: p.foto_url }));
+  const opciones = (productos.data ?? []).filter((p) => hay.has(p.id)).map((p) => ({ id: p.id, codigo: p.codigo, nombre: p.nombre, estado: p.estado, numero: p.numero, barras: p.codigo_barras, foto: p.foto_url, padreId: p.padre_id ?? null }));
 
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
