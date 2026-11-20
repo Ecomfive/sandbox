@@ -15,7 +15,7 @@ import { anilloFoco, fieldClass } from "@/components/ui/field";
 import { FichaStock, type SkuFicha } from "@/app/(app)/inventario/ficha-stock";
 import { CampoSkuMaestro, ProveedorSkusMaestros, type OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import { useToast } from "@/components/ui/toast";
-import { CalendarioIcon, CheckIcon, EnvioIcon, InventarioIcon, PedidoIcon } from "@/lib/nav-icons";
+import { CalendarioIcon, CheckIcon, DescargarIcon, EnvioIcon, InventarioIcon, PedidoIcon } from "@/lib/nav-icons";
 import {
   ESTADOS,
   estadoDe,
@@ -196,6 +196,38 @@ function StockPorBodega({ skuId, origen, origenes, stock, falta }: { skuId: stri
   );
 }
 
+/** «Descargar PDF» de un pedido: lo arma en el navegador (pdf-lib, cargado al pulsar) y lo baja; lo puede usar quien abra el módulo, aunque solo lea. */
+function BotonPdfPedido({ p }: { p: PedidoInventario }) {
+  const { mostrarToast } = useToast();
+  const [armando, setArmando] = useState(false);
+  const descargar = async () => {
+    if (armando) return;
+    setArmando(true);
+    try {
+      const { pedidoAPdf, nombreArchivoPedido } = await import("@/lib/pedidos-inventario/pdf");
+      const bytes = await pedidoAPdf(p);
+      const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: "application/pdf" }));
+      const enlace = document.createElement("a");
+      enlace.href = url;
+      enlace.download = nombreArchivoPedido(p);
+      document.body.appendChild(enlace);
+      enlace.click();
+      enlace.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch {
+      mostrarToast("No se pudo armar el PDF. Inténtalo de nuevo.", "destructive");
+    } finally {
+      setArmando(false);
+    }
+  };
+  return (
+    <button type="button" onClick={descargar} disabled={armando} aria-label={`Descargar el pedido ${numeroPedido(p.numero)} en PDF`} className={`${SECUNDARIO} gap-1.5`}>
+      <DescargarIcon className="h-4 w-4" aria-hidden="true" />
+      {armando ? "Armando…" : "Descargar PDF"}
+    </button>
+  );
+}
+
 /** Las filas de un pedido (una por producto, el N.º y los botones a la izquierda y a la derecha, como en el Excel). */
 function FilasPedido({
   p,
@@ -237,6 +269,7 @@ function FilasPedido({
       <span className="mb-0.5">
         <Badge tone={estado.tono}>{estado.etiqueta}</Badge>
       </span>
+      <BotonPdfPedido p={p} />
       {!puedeEscribir ? null : enInventario ? (
         <>
           {puedeEnProceso(p.estado) && (
