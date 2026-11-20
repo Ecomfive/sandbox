@@ -79,6 +79,7 @@ export const AREAS_ACCESO: AreaAcceso[] = [
       { clave: "wms-bodegas", etiqueta: "Bodegas" },
       { clave: "wms-ubicaciones", etiqueta: "Ubicaciones" },
       { clave: "compras", etiqueta: "Compras" },
+      { clave: "llegadas", etiqueta: "Llegadas a puerto" },
       { clave: "compras-por-pais", etiqueta: "Gestión por país (Compras)" },
       { clave: "producto", etiqueta: "Producto" },
       { clave: "unir-productos", etiqueta: "Unir productos duplicados" },

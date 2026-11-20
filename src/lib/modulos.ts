@@ -47,6 +47,7 @@ export const MODULOS: Modulo[] = [
   { clave: "wms-productos", etiqueta: "Ficha producto Shopify (WMS)" },
   { clave: "wms-productos-dropi", etiqueta: "Ficha producto Dropi (WMS)" },
   { clave: "compras", etiqueta: "Compras (WMS)" },
+  { clave: "llegadas", etiqueta: "Llegadas a puerto (Fulfillment)" },
   { clave: "compras-por-pais", etiqueta: "Gestión por país (Compras)" },
   { clave: "publicaciones-dropi", etiqueta: "Gestión de IDs Dropi (WMS)" },
   { clave: "publicaciones-drop", etiqueta: "Gestión de IDs Drop (WMS)" },

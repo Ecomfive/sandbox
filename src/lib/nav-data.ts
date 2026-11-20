@@ -128,6 +128,8 @@ const AREAS: NavSection[] = [
       { label: "Alertas de inventario", href: "/alertas", dropi: true, frente: "fulfillment" },
       { label: "Inventario", href: "/inventario", dropi: true, frente: "fulfillment" },
       { label: "Comunicación despacho", href: "/inventario-pedidos-despacho", frente: "fulfillment" },
+      // Llegadas a puerto (20 nov 2026, pedido de Logística: «solo me aparecen en avisos y las perdería de vista»): la lista que abre «Ver lista» del aviso.
+      { label: "Llegadas a puerto", href: "/llegadas", frente: "fulfillment" },
       { label: "Bodegas", href: "/wms-bodegas", frente: "fulfillment" },
       { label: "Ubicaciones", href: "/wms-ubicaciones", frente: "fulfillment" },
       { label: "Compras", href: "/compras", frente: "fulfillment" },
