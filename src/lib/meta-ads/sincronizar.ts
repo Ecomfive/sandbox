@@ -2,6 +2,7 @@
 // deja, el registro de actividad. Solo consulta Meta y guarda aquí; no escribe nada en Meta. Los problemas no tumban la lectura: lo que sí se pudo leer se guarda y lo demás queda dicho en `ultimo_error`.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { pedirMeta, pedirPorIds, pedirTodo, tokenDeMeta } from "./api";
 import { etiquetasDeNombre } from "./nombre";
 import { actividadDe, anuncioDe, campanaDe, conjuntoDe, esCreacionDeCampana, resultadoDiaDe, type ActividadMeta, type AnuncioMeta, type CampanaMeta, type ConjuntoMeta, type ResultadoDia } from "./normalizar";
@@ -116,8 +117,9 @@ export async function sincronizarCuenta(supabase: SupabaseClient, cuenta: Cuenta
   }
 
   // 3. Campañas: lo corregido a mano no se pisa; la puja de una ABO sale de sus conjuntos.
-  const { data: existentes } = await supabase.from("meta_campanas").select("meta_id, producto, angulo, etapa, manual").eq("cuenta_id", cuenta.id);
-  const previas = new Map((existentes ?? []).map((e) => [e.meta_id as string, e as { producto: string | null; angulo: string | null; etapa: string | null; manual: string[] | null }]));
+  // Supabase entrega como mucho 1000 filas por consulta: una cuenta con historial largo tiene más campañas, conjuntos y anuncios que eso, así que se leen por páginas (20 nov 2026: «24 filas sin anuncio» que nunca se completaban).
+  const existentes = await traerTodasLasFilas<{ meta_id: string; producto: string | null; angulo: string | null; etapa: string | null; manual: string[] | null }>((a, b) => supabase.from("meta_campanas").select("meta_id, producto, angulo, etapa, manual").eq("cuenta_id", cuenta.id).order("id").range(a, b));
+  const previas = new Map(existentes.map((e) => [e.meta_id as string, e as { producto: string | null; angulo: string | null; etapa: string | null; manual: string[] | null }]));
   const pujaDeConjuntos = (idCampana: string) => [...conjuntos.values()].find((c) => c.campanaMetaId === idCampana && c.puja)?.puja ?? null;
   const filasCampana = [...campanas.values()].map((c) => {
     const e = etiquetasDeNombre(c.nombre);
@@ -145,15 +147,15 @@ export async function sincronizarCuenta(supabase: SupabaseClient, cuenta: Cuenta
   let falla = await guardarPorTrozos(filasCampana, (t) => supabase.from("meta_campanas").upsert(t, { onConflict: "cuenta_id,meta_id" }));
   if (falla) return terminar(`No se pudieron guardar las campañas: ${falla}`);
   r.campanas = filasCampana.length;
-  const { data: idsC } = await supabase.from("meta_campanas").select("id, meta_id").eq("cuenta_id", cuenta.id);
-  const idDeCampana = new Map((idsC ?? []).map((c) => [c.meta_id as string, c.id as string]));
+  const idsC = await traerTodasLasFilas<{ id: string; meta_id: string }>((a, b) => supabase.from("meta_campanas").select("id, meta_id").eq("cuenta_id", cuenta.id).order("id").range(a, b));
+  const idDeCampana = new Map(idsC.map((c) => [c.meta_id as string, c.id as string]));
 
   // 4. Conjuntos y anuncios (solo los que tienen campaña guardada).
   const filasConjunto = [...conjuntos.values()].filter((c) => idDeCampana.has(c.campanaMetaId)).map((c) => ({ cuenta_id: cuenta.id, campana_id: idDeCampana.get(c.campanaMetaId)!, meta_id: c.metaId, nombre: c.nombre, estado: c.estado, presupuesto_diario: c.presupuestoDiario, puja: c.puja }));
   falla = await guardarPorTrozos(filasConjunto, (t) => supabase.from("meta_conjuntos").upsert(t, { onConflict: "cuenta_id,meta_id" }));
   if (falla) r.avisos.push(`No se pudieron guardar los conjuntos: ${falla}`);
-  const { data: idsJ } = await supabase.from("meta_conjuntos").select("id, meta_id").eq("cuenta_id", cuenta.id);
-  const idDeConjunto = new Map((idsJ ?? []).map((c) => [c.meta_id as string, c.id as string]));
+  const idsJ = await traerTodasLasFilas<{ id: string; meta_id: string }>((a, b) => supabase.from("meta_conjuntos").select("id, meta_id").eq("cuenta_id", cuenta.id).order("id").range(a, b));
+  const idDeConjunto = new Map(idsJ.map((c) => [c.meta_id as string, c.id as string]));
 
   const filasAnuncio = [...anuncios.values()]
     .filter((a) => idDeCampana.has(a.campanaMetaId))
@@ -161,8 +163,8 @@ export async function sincronizarCuenta(supabase: SupabaseClient, cuenta: Cuenta
   falla = await guardarPorTrozos(filasAnuncio, (t) => supabase.from("meta_anuncios").upsert(t, { onConflict: "cuenta_id,meta_id" }));
   if (falla) return terminar(`No se pudieron guardar los anuncios: ${falla}`);
   r.anuncios = filasAnuncio.length;
-  const { data: idsA } = await supabase.from("meta_anuncios").select("id, meta_id, campana_id").eq("cuenta_id", cuenta.id);
-  const anuncioPorMeta = new Map((idsA ?? []).map((a) => [a.meta_id as string, { id: a.id as string, campana: a.campana_id as string }]));
+  const idsA = await traerTodasLasFilas<{ id: string; meta_id: string; campana_id: string }>((a, b) => supabase.from("meta_anuncios").select("id, meta_id, campana_id").eq("cuenta_id", cuenta.id).order("id").range(a, b));
+  const anuncioPorMeta = new Map(idsA.map((a) => [a.meta_id as string, { id: a.id as string, campana: a.campana_id as string }]));
 
   // 5. Resultados por día.
   const filasDia = dias
@@ -180,7 +182,14 @@ export async function sincronizarCuenta(supabase: SupabaseClient, cuenta: Cuenta
   }
   if (falla) return terminar(`No se pudieron guardar los resultados: ${falla}`);
   r.filas = filasDia.length;
-  if (filasDia.length < dias.length) r.avisos.push(`${dias.length - filasDia.length} filas de resultados quedaron sin anuncio (se completan en la próxima lectura).`);
+  if (filasDia.length < dias.length) {
+    const sinAnuncio = [...new Set(dias.filter((d) => !anuncioPorMeta.has(d.anuncioMetaId)).map((d) => d.anuncioMetaId))];
+    // Por qué no se pudo guardar cada anuncio: Meta no lo entregó, no trajo su campaña o su campaña no se guardó.
+    const sinLeer = sinAnuncio.filter((id) => !porAnuncio.objetos.has(id)).length;
+    const sinCampana = sinAnuncio.filter((id) => { const a = anuncios.get(id); return !!a && !idDeCampana.has(a.campanaMetaId); }).length;
+    const motivo = [sinLeer ? `Meta no entregó ${sinLeer} ${sinLeer === 1 ? "anuncio" : "anuncios"} (borrados o sin permiso)` : "", sinCampana ? `${sinCampana} ${sinCampana === 1 ? "anuncio" : "anuncios"} de campañas que no se pudieron guardar` : ""].filter(Boolean).join("; ");
+    r.avisos.push(`${dias.length - filasDia.length} filas de resultados de ${sinAnuncio.length} ${sinAnuncio.length === 1 ? "anuncio" : "anuncios"} no se guardaron${motivo ? ` (${motivo})` : ""}. Ids: ${sinAnuncio.slice(0, 5).join(", ")}${sinAnuncio.length > 5 ? "…" : ""}.`);
+  }
 
   // 6. Registro de actividad: quién creó o cambió qué. Si Meta no lo deja con este acceso, se avisa y todo lo demás sigue.
   const actividad = await pedirTodo(`/${cuenta.act_id}/activities`, { fields: "event_type,event_time,actor_id,actor_name,object_id,object_name,object_type,extra_data", since: `${desde}`, until: `${hasta}`, limit: 200 }, token, 10);
