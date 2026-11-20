@@ -42,6 +42,7 @@ export const MODULOS: Modulo[] = [
   { clave: "producto", etiqueta: "Producto" },
   { clave: "unir-productos", etiqueta: "Unir productos duplicados (Producto)" },
   { clave: "salida-manual", etiqueta: "Salida a mano donde va con remisión (Inventario)" },
+  { clave: "anular-remision", etiqueta: "Anular una remisión en camino sin autorización (Inventario)" },
   { clave: "wms-bodegas", etiqueta: "Bodegas (WMS)" },
   { clave: "wms-ubicaciones", etiqueta: "Ubicaciones (WMS)" },
   { clave: "wms-productos", etiqueta: "Ficha producto Shopify (WMS)" },

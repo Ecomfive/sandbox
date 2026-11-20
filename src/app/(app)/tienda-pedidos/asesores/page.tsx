@@ -69,7 +69,7 @@ export default async function AsesoresTiendaPage({ searchParams }: { searchParam
     traerTodasLasFilas<FilaEvento>((d, h) =>
       supabase.from("ven_orden_eventos").select(columnas).eq("tipo", "etiqueta").gte("creado_en", desde).lt("creado_en", hasta).order("creado_en").range(d, h) as unknown as PromiseLike<{ data: FilaEvento[] | null; error: unknown }>,
     );
-  // Sin la migración 0344 no están el perfil ni las etiquetas: se leen del texto del historial.
+  // Sin la migración 0345 no están el perfil ni las etiquetas: se leen del texto del historial.
   const filas = await leer("orden_id, usuario, usuario_id, creado_en, agregadas, quitadas, detalle").catch(() => leer("orden_id, usuario, creado_en, detalle").catch(() => [] as FilaEvento[]));
 
   // De qué tienda es cada pedido y cuándo entró (solo los de las tiendas que se miran).

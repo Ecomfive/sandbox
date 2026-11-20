@@ -56,7 +56,7 @@ export function efectoEtiquetas(agregadas: string[]): { confirma: boolean; cance
 }
 
 /**
- * Las etiquetas de un evento viejo (antes de la migración 0344 solo quedaba el texto): «Etiquetas en Shopify: agregó «A», «B» y quitó «C»».
+ * Las etiquetas de un evento viejo (antes de la migración 0345 solo quedaba el texto): «Etiquetas en Shopify: agregó «A», «B» y quitó «C»».
  */
 export function cambioDeTexto(detalle: string | null | undefined): { agregadas: string[]; quitadas: string[] } {
   const t = String(detalle ?? "");

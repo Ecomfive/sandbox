@@ -69,9 +69,9 @@ export async function cambiarEtiquetasPedido(ordenId: string, agregarCrudo: unkn
   const quitadas = antes.filter((h) => !final.some((e) => e.toLowerCase() === h.toLowerCase()));
   const detalle = textoCambio(agregadas, quitadas);
   const evento = { orden_id: o.id, tipo: "etiqueta", detalle, usuario: quien };
-  // Quién fue y qué etiquetas (20 nov 2026, migración 0344): de aquí sale el rendimiento de cada asesor (Pedidos de tienda › Asesores).
+  // Quién fue y qué etiquetas (20 nov 2026, migración 0345): de aquí sale el rendimiento de cada asesor (Pedidos de tienda › Asesores).
   const { error: eE } = await supabase.from("ven_orden_eventos").insert({ ...evento, usuario_id: usuario.id, agregadas, quitadas });
-  // Sin la migración 0344, sin esas columnas; sin la 0337, el tipo «etiqueta» no existe y queda como nota del historial.
+  // Sin la migración 0345, sin esas columnas; sin la 0337, el tipo «etiqueta» no existe y queda como nota del historial.
   if (eE) {
     const { error: e2 } = await supabase.from("ven_orden_eventos").insert(evento);
     if (e2) await supabase.from("ven_orden_eventos").insert({ ...evento, tipo: "nota" });

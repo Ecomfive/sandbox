@@ -4,7 +4,7 @@
 --    `ven_orden_eventos` guarda además el perfil (`usuario_id`) y las etiquetas que agregó y quitó (antes solo el nombre y un texto).
 -- 2) Los módulos «tienda-asesores» (Asesores, en Pedidos de tienda) y «tienda-tablero» (Tablero de tiendas, en Desempeño), para Admin y CEO.
 --    A la encargada de atención se le da «tienda-asesores» como permiso propio en Usuarios.
--- Se puede correr más de una vez. Reversa: supabase/rollbacks/0344_rollback.sql
+-- Se puede correr más de una vez. Reversa: supabase/rollbacks/0345_rollback.sql
 
 alter table ven_orden_eventos add column if not exists usuario_id uuid references perfiles(id) on delete set null;
 alter table ven_orden_eventos add column if not exists agregadas text[];

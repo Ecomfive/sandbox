@@ -1,6 +1,3 @@
--- Reversa de 0344_asesores_tienda.sql. Las columnas nuevas de `ven_orden_eventos` se dejan (borrarlas perdería quién hizo cada cambio); solo se quitan
--- el índice y los permisos.
-drop index if exists ven_orden_eventos_etiquetas_fecha;
-delete from permisos_rol where modulo in ('tienda-asesores', 'tienda-tablero');
-delete from permisos_persona where modulo in ('tienda-asesores', 'tienda-tablero');
-notify pgrst, 'reload schema';
+-- Reversa de 0344_anular_remision_directo.sql: quita el módulo «Anular remisión sin autorización» a quien lo tenga. La columna `directa` y la función se dejan:
+-- sin el módulo nadie crea una petición directa, y las ya anuladas conservan su historia.
+delete from permisos_persona where modulo = 'anular-remision';

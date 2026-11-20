@@ -133,6 +133,7 @@ function FichaRemision({
   productos,
   stock,
   puedeEscribir,
+  anularDirecto,
   codigoPais,
   conPendiente,
   resueltas,
@@ -141,6 +142,8 @@ function FichaRemision({
   productos: OpcionSkuMaestro[];
   stock: StockPorBodega;
   puedeEscribir: boolean;
+  /** Puede anular lo que sigue en camino sin pedir autorización (módulo «Anular remisión», migración 0344). */
+  anularDirecto: boolean;
   codigoPais: string;
   conPendiente: Set<string>;
   resueltas: Record<string, string>;
@@ -231,7 +234,7 @@ function FichaRemision({
                     f.remisionId &&
                     f.estado !== "anulado" && (
                       <span className="mt-1 block">
-                        <PedirCorreccion envioId={f.id} tipo={f.estado === "en_camino" ? "anular" : "recibida"} codigo={f.codigo} enviada={f.enviada} recibida={f.recibida} />
+                        <PedirCorreccion envioId={f.id} tipo={f.estado === "en_camino" ? "anular" : "recibida"} codigo={f.codigo} enviada={f.enviada} recibida={f.recibida} anularDirecto={anularDirecto} />
                       </span>
                     )
                   )}
@@ -265,6 +268,7 @@ export function ListaEnvios({
   productos,
   stock,
   puedeEscribir,
+  anularDirecto,
   codigoPais,
   conPendiente,
   resueltas,
@@ -274,6 +278,7 @@ export function ListaEnvios({
   productos: OpcionSkuMaestro[];
   stock: StockPorBodega;
   puedeEscribir: boolean;
+  anularDirecto: boolean;
   codigoPais: string;
   /** Las líneas con una corrección esperando autorización. */
   conPendiente: string[];
@@ -347,7 +352,7 @@ export function ListaEnvios({
         </table>
       </ContenedorTabla>
       <Ventana abierto={!!elegida} alCerrar={() => setAbierta(null)} titulo={elegida?.numero ?? ""} lado="derecha" ancho="lg">
-        {elegida && <FichaRemision r={elegida} productos={productos} stock={stock} puedeEscribir={puedeEscribir} codigoPais={codigoPais} conPendiente={pendientes} resueltas={resueltas} />}
+        {elegida && <FichaRemision r={elegida} productos={productos} stock={stock} puedeEscribir={puedeEscribir} anularDirecto={anularDirecto} codigoPais={codigoPais} conPendiente={pendientes} resueltas={resueltas} />}
       </Ventana>
     </div>
   );
