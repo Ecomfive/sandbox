@@ -7,6 +7,7 @@ import {
   crearPedidoInventario,
   editarPedidoInventario,
   enviarPedidoInventario,
+  marcarEntregadoPedidoInventario,
   ponerEnProcesoPedido,
   recibirPedidoInventario,
 } from "@/app/(app)/despacho-ciudad/pedir-inventario/actions";
@@ -299,6 +300,8 @@ function EditarPedido({ p, opciones, stock }: { p: PedidoInventario; opciones: O
 }
 
 const TD = "border-b border-border px-2 py-2 align-top";
+/** La última fila de cada pedido cierra con una línea más gruesa para que se lea dónde termina uno y empieza el siguiente. */
+const TD_FIN = "border-b-2 border-border-control px-2 py-2 align-top";
 
 /**
  * Cuánto hay del producto en cada bodega de donde inventario envía (20 nov 2026, pedido de Hernán: «si sale general no sabré de dónde sale»): la de donde
@@ -427,7 +430,14 @@ function FilasPedido({
               </button>
             </>
           )}
-          {p.estado === "enviado" && <span className="text-xs text-muted-foreground">Esperando que despacho lo reciba</span>}
+          {puedeRecibir(p.estado) && (
+            <>
+              <span className="text-xs text-muted-foreground">Esperando que despacho lo reciba</span>
+              <button type="button" disabled={ocupado} onClick={() => correr(() => marcarEntregadoPedidoInventario(p.id))} className={PRINCIPAL}>
+                {ocupado ? "Cerrando…" : "Marcar entregado"}
+              </button>
+            </>
+          )}
         </>
       ) : (
         <>
@@ -451,12 +461,12 @@ function FilasPedido({
     <>
       {p.items.map((it, i) => {
         const ultima = i === n - 1;
-        const borde = TD;
+        const borde = ultima ? TD_FIN : TD;
         const obs = [it.nota, it.observacion, ultima && p.traslado ? p.traslado : null].filter(Boolean).join(" · ");
         return (
           <tr key={it.id}>
             {i === 0 && (
-              <td rowSpan={n} className={`${TD} bg-primario-suave px-3 whitespace-nowrap`}>
+              <td rowSpan={n} className={`${TD_FIN} bg-primario-suave px-3 whitespace-nowrap`}>
                 <span className="block font-semibold text-primario">{numeroPedido(p.numero)}</span>
                 <span className="block text-xs font-normal text-muted-foreground">{fechaCorta(p.creadoEn)}</span>
               </td>
@@ -526,7 +536,7 @@ function FilasPedido({
               )}
             </td>
             {i === 0 && (
-              <td rowSpan={n} className={`${TD} px-3`}>
+              <td rowSpan={n} className={`${TD_FIN} px-3`}>
                 {acciones}
               </td>
             )}
@@ -543,7 +553,7 @@ const TARJETA_ESTADO = {
   solicitud: { icono: PedidoIcon, color: "violeta", detalle: "pedidos que inventario no ha tomado" },
   en_proceso: { icono: CalendarioIcon, color: "ambar", detalle: "inventario los está preparando" },
   enviado: { icono: EnvioIcon, color: "azul", detalle: "en camino a despacho" },
-  recibido: { icono: CheckIcon, color: "verde", detalle: "despacho ya los recibió" },
+  recibido: { icono: CheckIcon, color: "verde", detalle: "ya llegaron a despacho" },
 } as const;
 
 /** El tablero de arriba: el total y un contador por estado; cada tarjeta pone (o quita) el filtro `?estado=` de la dirección. */
@@ -682,7 +692,7 @@ export function LeyendaPedidos() {
         <h2 className="m-0 text-sm font-semibold text-foreground">Avisos automáticos («Para ti»)</h2>
         <p className="m-0">A inventario, cuando despacho hace un pedido (o lo cancela).</p>
         <p className="m-0">A quien pidió, cuando inventario lo pone en proceso y cuando lo envía.</p>
-        <p className="m-0">A quien envió, cuando despacho marca «Recibido».</p>
+        <p className="m-0">A quien envió, cuando despacho marca «Recibido». A quien pidió, cuando inventario marca «Marcar entregado».</p>
         <p className="m-0">«Enviar» hace el traslado a la bodega de despacho: no hay que hacerlo aparte en Inventario › Traslados.</p>
       </section>
     </div>

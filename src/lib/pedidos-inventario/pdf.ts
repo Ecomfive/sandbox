@@ -45,7 +45,7 @@ export function datosDelPedido(p: PedidoInventario): [string, string][] {
     ["Pedido por", p.pedidoPorNombre],
     ["Responsable de bodega", p.responsableNombre],
     ["Enviado", p.enviadoEn ? fechaCorta(p.enviadoEn) : null],
-    ["Recibido", p.recibidoEn ? `${fechaCorta(p.recibidoEn)}${p.recibidoPorNombre ? ` · ${p.recibidoPorNombre}` : ""}` : null],
+    ["Entregado", p.recibidoEn ? `${fechaCorta(p.recibidoEn)}${p.recibidoPorNombre ? ` · ${p.recibidoPorNombre}` : ""}` : null],
   ];
   return datos.filter((d): d is [string, string] => !!d[1]);
 }
