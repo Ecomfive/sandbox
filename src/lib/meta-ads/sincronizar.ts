@@ -25,6 +25,8 @@ export interface ResumenLectura {
   hasta: string;
   avisos: string[];
   error: string | null;
+  /** Con `rango`: el tramo trae más datos de los que caben en una lectura o Meta tardó demasiado; no se guardó nada y conviene leerlo en partes más chicas. */
+  partir?: boolean;
 }
 
 const DIA = 86_400_000;
@@ -55,6 +57,10 @@ export async function sincronizarCuenta(supabase: SupabaseClient, cuenta: Cuenta
   const hasta = opciones.rango?.hasta ?? hoyEnPanama();
   const desde = opciones.rango?.desde ?? restarDias(hasta, (cuenta.ultima_lectura_en ? DIAS_LECTURA : DIAS_PRIMERA_LECTURA) - 1);
   const r: ResumenLectura = { cuenta: cuenta.nombre, ok: false, campanas: 0, anuncios: 0, filas: 0, actividad: 0, desde, hasta, avisos: [], error: null };
+  // El reloj de la lectura (20 nov 2026: un mes de una cuenta grande pedía más páginas de las que caben en una llamada y quedaba colgado hasta que Vercel la cortaba, sin decir nada):
+  // los resultados se piden hasta el 55 % del tiempo y la estructura hasta el 90 %; lo que no cabe se avisa en vez de seguir.
+  const finResultados = inicio + Math.round(limite * 0.55);
+  const finEstructura = inicio + Math.round(limite * 0.9);
 
   const token = tokenDeMeta();
   const terminar = async (error: string | null) => {
@@ -66,8 +72,16 @@ export async function sincronizarCuenta(supabase: SupabaseClient, cuenta: Cuenta
   if (!token) return terminar("Falta el acceso a Meta (META_ADS_ACCESS_TOKEN) en el servidor: ver «Cuentas».");
 
   // 1. Resultados por anuncio y día.
-  const resultados = await pedirTodo(`/${cuenta.act_id}/insights`, { level: "ad", time_increment: 1, time_range: JSON.stringify({ since: desde, until: hasta }), fields: CAMPOS_RESULTADOS, limit: 500 }, token, 60);
-  if (resultados.error && !resultados.filas.length) return terminar(resultados.error);
+  const resultados = await pedirTodo(`/${cuenta.act_id}/insights`, { level: "ad", time_increment: 1, time_range: JSON.stringify({ since: desde, until: hasta }), fields: CAMPOS_RESULTADOS, limit: 500 }, token, 60, finResultados);
+  if (resultados.error && !resultados.filas.length) {
+    if (opciones.rango && /tardó demasiado|esperar/i.test(resultados.error)) r.partir = true;
+    return terminar(resultados.error);
+  }
+  // Un tramo del historial se guarda entero o no se guarda: si no cupo, no se guarda y se lee en partes más chicas.
+  if (opciones.rango && (resultados.incompleta || resultados.error)) {
+    r.partir = true;
+    return terminar(resultados.error ? `Meta no terminó de entregar los resultados de ${desde} a ${hasta}: ${resultados.error}` : `Los resultados de ${desde} a ${hasta} son demasiados para una sola lectura.`);
+  }
   if (resultados.error) r.avisos.push(`La lectura de resultados quedó a medias: ${resultados.error}`);
   const dias: ResultadoDia[] = [];
   const campanaDeAnuncio = new Map<string, string>();
@@ -86,7 +100,7 @@ export async function sincronizarCuenta(supabase: SupabaseClient, cuenta: Cuenta
   const idsAnuncios = [...new Set(dias.map((d) => d.anuncioMetaId))];
   const idsCampanas = new Set(campanaDeAnuncio.values());
   const idsConjuntos = new Set(conjuntoDeAnuncio.values());
-  const recientes = await pedirTodo(`/${cuenta.act_id}/campaigns`, { fields: CAMPOS_CAMPANA, filtering: JSON.stringify([{ field: "updated_time", operator: "GREATER_THAN", value: Math.floor(new Date(`${desde}T00:00:00Z`).getTime() / 1000) }]), limit: 200 }, token, 10);
+  const recientes = await pedirTodo(`/${cuenta.act_id}/campaigns`, { fields: CAMPOS_CAMPANA, filtering: JSON.stringify([{ field: "updated_time", operator: "GREATER_THAN", value: Math.floor(new Date(`${desde}T00:00:00Z`).getTime() / 1000) }]), limit: 200 }, token, 10, finEstructura);
   if (recientes.error) r.avisos.push(`No se leyeron las campañas nuevas: ${recientes.error}`);
   const campanasRaw = new Map<string, unknown>();
   for (const c of recientes.filas) {
@@ -95,7 +109,7 @@ export async function sincronizarCuenta(supabase: SupabaseClient, cuenta: Cuenta
     if (typeof id === "string") idsCampanas.add(id);
   }
   const faltanCampanas = [...idsCampanas].filter((id) => !campanasRaw.has(id));
-  const [porCampana, porConjunto, porAnuncio] = await Promise.all([pedirPorIds(faltanCampanas, CAMPOS_CAMPANA, token), pedirPorIds([...idsConjuntos], CAMPOS_CONJUNTO, token), pedirPorIds(idsAnuncios, CAMPOS_ANUNCIO, token)]);
+  const [porCampana, porConjunto, porAnuncio] = await Promise.all([pedirPorIds(faltanCampanas, CAMPOS_CAMPANA, token, finEstructura), pedirPorIds([...idsConjuntos], CAMPOS_CONJUNTO, token, finEstructura), pedirPorIds(idsAnuncios, CAMPOS_ANUNCIO, token, finEstructura)]);
   for (const e of [porCampana.error, porConjunto.error, porAnuncio.error]) if (e) r.avisos.push(`No se pudo leer parte de la estructura: ${e}`);
   for (const [id, v] of porCampana.objetos) campanasRaw.set(id, v);
   if (Date.now() - inicio > limite) r.avisos.push("Se acabó el tiempo de esta lectura: el resto sigue en la próxima.");
@@ -225,7 +239,7 @@ export async function sincronizarCuenta(supabase: SupabaseClient, cuenta: Cuenta
   }
 
   // 6. Registro de actividad: quién creó o cambió qué. Si Meta no lo deja con este acceso, se avisa y todo lo demás sigue.
-  const actividad = await pedirTodo(`/${cuenta.act_id}/activities`, { fields: "event_type,event_time,actor_id,actor_name,object_id,object_name,object_type,extra_data", since: `${desde}`, until: `${hasta}`, limit: 200 }, token, 10);
+  const actividad = Date.now() > finEstructura ? { filas: [] as unknown[], error: "Se acabó el tiempo de esta lectura.", incompleta: false } : await pedirTodo(`/${cuenta.act_id}/activities`, { fields: "event_type,event_time,actor_id,actor_name,object_id,object_name,object_type,extra_data", since: `${desde}`, until: `${hasta}`, limit: 200 }, token, 10, inicio + limite);
   if (actividad.error) r.avisos.push(`No se pudo leer el registro de actividad (Equipo queda sin datos de quién montó qué): ${actividad.error}`);
   const eventos = actividad.filas.map(actividadDe).filter((a): a is ActividadMeta => a !== null);
   if (eventos.length) {
@@ -238,6 +252,12 @@ export async function sincronizarCuenta(supabase: SupabaseClient, cuenta: Cuenta
       const id = idDeCampana.get(a.objetoMetaId!);
       if (id) await supabase.from("meta_campanas").update({ creada_por: a.actorNombre }).eq("id", id).is("creada_por", null);
     }
+  }
+
+  // El registro de lo leído (migración 0346): dice con certeza qué fechas de esta cuenta ya se trajeron de Meta. Solo cuando los resultados llegaron completos; sin la migración se ignora.
+  if (!resultados.incompleta && !resultados.error) {
+    await supabase.from("meta_lecturas_tramos").delete().eq("cuenta_id", cuenta.id).gte("desde", desde).lte("hasta", hasta);
+    await supabase.from("meta_lecturas_tramos").insert({ cuenta_id: cuenta.id, desde, hasta, filas: r.filas });
   }
 
   return terminar(null);
