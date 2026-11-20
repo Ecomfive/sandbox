@@ -12,6 +12,7 @@ import {
   publicacionSinCrearEnDropi,
   resolverCategorias,
   textoPlanoDropi,
+  unirSubidas,
   type DatosCrearDropi,
 } from "./crear-dropi";
 
@@ -159,4 +160,14 @@ test("el favorito arma exactamente lo mismo que el sistema", () => {
     igual(delFavorito.nuevoProducto(d, 2094, bp, categorias), sistema);
   }
   igual(delFavorito.GARANTIAS, GARANTIAS_DROPI);
+});
+
+test("las fotos ya subidas a Dropi: se guardan solo las que son del cambio, sin repetir, y un reintento las suma", () => {
+  const fotos = [{ url: "https://x.co/a.jpg", nombre: "a.jpg" }, { url: "https://x.co/b.png", nombre: "b.png" }];
+  assert.deepEqual(unirSubidas(undefined, ["https://x.co/a.jpg", "https://x.co/a.jpg", "https://otro.co/z.jpg", 5, null], fotos), ["https://x.co/a.jpg"]);
+  assert.deepEqual(unirSubidas(["https://x.co/a.jpg"], ["https://x.co/b.png"], fotos), ["https://x.co/a.jpg", "https://x.co/b.png"]);
+  assert.deepEqual(unirSubidas(undefined, "no es lista", fotos), []);
+  const d = normalizarDatosCrear({ fotos, subidas: ["https://x.co/b.png", "https://ajena.co/q.png"] });
+  assert.deepEqual(d.subidas, ["https://x.co/b.png"]);
+  assert.equal("subidas" in normalizarDatosCrear({ fotos }), false, "sin fotos subidas, el campo no aparece");
 });

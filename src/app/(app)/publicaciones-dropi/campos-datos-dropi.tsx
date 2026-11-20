@@ -21,6 +21,13 @@ const PREFIJO_PUBLICO = "/storage/v1/object/public/wms-productos/";
 interface FotoSubida {
   ruta: string;
   url: string;
+  /** Nombre, tamaño y fecha del archivo elegido: la misma foto elegida dos veces no se sube otra vez (20 nov 2026, la Turmeric Curcumin traía el JPG dos veces). */
+  huella?: string;
+}
+
+/** Una marca del archivo elegido (nombre, tamaño y fecha de modificación) para no subir la misma foto dos veces. */
+function huellaDeArchivo(f: File): string {
+  return `${f.name}|${f.size}|${f.lastModified}`;
 }
 
 /** La ruta de Storage de una foto a partir de su dirección pública (las guardadas en los datos para Dropi son direcciones). */
@@ -129,10 +136,16 @@ export function CamposDatosDropi({
     if (!archivos?.length) return;
     setSubiendo(true);
     try {
+      const elegidas = new Set(fotos.map((x) => x.huella).filter(Boolean));
       for (const f of [...archivos]) {
         if (fotos.length + 1 > MAX_FOTOS_CREAR) {
           mostrarToast(`Hasta ${MAX_FOTOS_CREAR} fotos.`, "destructive");
           break;
+        }
+        const huella = huellaDeArchivo(f);
+        if (elegidas.has(huella)) {
+          mostrarToast(`«${f.name}» ya está en la lista.`, "destructive");
+          continue;
         }
         if (!TIPOS_FOTO.includes(f.type)) {
           mostrarToast(`«${f.name}» no es una imagen JPG, PNG o WebP.`, "destructive");
@@ -152,7 +165,8 @@ export function CamposDatosDropi({
           mostrarToast(`No se pudo subir «${f.name}».`, "destructive");
           continue;
         }
-        setFotos((a) => [...a, { ruta: permiso.ruta, url: permiso.url }]);
+        elegidas.add(huella);
+        setFotos((a) => [...a, { ruta: permiso.ruta, url: permiso.url, huella }]);
       }
     } finally {
       setSubiendo(false);

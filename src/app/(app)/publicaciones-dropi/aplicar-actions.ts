@@ -7,7 +7,7 @@ import { revalidatePath } from "next/cache";
 import { registrarAuditoria, registrarAuditoriaLote } from "@/lib/auditoria";
 import { requireModuloEscritura } from "@/lib/auth";
 import { normalizarDatosDevolver, normalizarUnidades, type DatosDevolver } from "@/lib/publicaciones/apagar-dropi";
-import { normalizarDatosCrear, type DatosCrearDropi, type FotoCrear } from "@/lib/publicaciones/crear-dropi";
+import { normalizarDatosCrear, unirSubidas, type DatosCrearDropi, type FotoCrear } from "@/lib/publicaciones/crear-dropi";
 import { unaPorFoto } from "@/lib/publicaciones/fotos-dropi";
 import { destinosDe, normalizarDatosPrivatizar, quienesDe, type DatosPrivatizar } from "@/lib/publicaciones/privatizar-dropi";
 import type { VariacionLeida } from "@/lib/publicaciones/privatizar-variable";
@@ -479,7 +479,7 @@ export async function guardarResultadosDropi(codigoPais: string, resultados: unk
   if (!pais) return { error: "País no válido." };
   if (!Array.isArray(resultados) || resultados.length > MAX) return { error: "Resultados no válidos." };
   const limpios = resultados
-    .map((r) => r as { id?: unknown; ok?: unknown; error?: unknown; nuevo?: unknown; archivado?: unknown; aviso?: unknown; salida?: unknown; antes?: unknown; stock?: unknown; bodegas?: unknown; variacion?: unknown; unidades?: unknown; devuelto?: unknown; reservas?: unknown; privado?: unknown; fotosFaltan?: unknown; archivoPendiente?: unknown; b280?: unknown })
+    .map((r) => r as { subidas?: unknown; id?: unknown; ok?: unknown; error?: unknown; nuevo?: unknown; archivado?: unknown; aviso?: unknown; salida?: unknown; antes?: unknown; stock?: unknown; bodegas?: unknown; variacion?: unknown; unidades?: unknown; devuelto?: unknown; reservas?: unknown; privado?: unknown; fotosFaltan?: unknown; archivoPendiente?: unknown; b280?: unknown })
     .filter((r) => typeof r.id === "string" && UUID.test(r.id))
     .map((r) => ({
       id: r.id as string,
@@ -515,6 +515,8 @@ export async function guardarResultadosDropi(codigoPais: string, resultados: unk
       // «republicar» de la B280: las unidades que el ID viejo tenía en la bodega de Dropi (las que Dropi debe trasladar).
       b280: Number.isInteger(r.b280) && (r.b280 as number) >= 0 && (r.b280 as number) < 10_000_000 ? (r.b280 as number) : null,
       fotosFaltan: Array.isArray(r.fotosFaltan) ? (r.fotosFaltan as unknown[]).filter((x): x is string => typeof x === "string").slice(0, 20).map((x) => x.slice(0, 120)) : [],
+      // «crear»: las direcciones de las fotos que Dropi ya recibió (se vuelven a revisar contra las del cambio al guardarlas).
+      subidas: Array.isArray(r.subidas) ? (r.subidas as unknown[]).filter((x): x is string => typeof x === "string").slice(0, 20).map((x) => x.slice(0, 600)) : [],
       // El ID del producto que creó una republicación (aunque haya fallado un paso después).
       nuevo: Number.isInteger(r.nuevo) && (r.nuevo as number) > 0 && (r.nuevo as number) < 100_000_000 ? (r.nuevo as number) : null,
     }));
@@ -654,6 +656,9 @@ export async function guardarResultadosDropi(codigoPais: string, resultados: unk
     if (f.tipo === "crear") {
       const nuevo = r.nuevo ?? (f.nuevo_dropi_id == null ? null : Number(f.nuevo_dropi_id));
       await publicadaEnDropi(supabase, f, r.ok, nuevo, ahora);
+      // Las fotos que Dropi ya recibió quedan anotadas en el cambio: un reintento solo sube las que faltan (20 nov 2026, la Turmeric Curcumin llegó a 19 repetidas).
+      const dc = normalizarDatosCrear(f.datos);
+      const subidas = unirSubidas(dc.subidas, r.subidas, dc.fotos);
       await supabase
         .from("dropi_cambios_pendientes")
         .update({
@@ -661,6 +666,7 @@ export async function guardarResultadosDropi(codigoPais: string, resultados: unk
           intentos: Number(f.intentos) + 1,
           nuevo_dropi_id: nuevo,
           dropi_producto_id: nuevo,
+          ...(subidas.length ? { datos: { ...(typeof f.datos === "object" && f.datos !== null ? (f.datos as Record<string, unknown>) : {}), subidas } } : {}),
         })
         .eq("id", r.id);
       const hecho = r.ok && !!nuevo;

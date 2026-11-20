@@ -25,11 +25,14 @@ function productoBase(id: number, extra: Obj = {}): Obj {
 }
 
 /** Un Dropi de mentira con las rutas que usa el favorito. */
-function crearDropi(opciones: { noTomaEntradas?: boolean; usuarios?: Record<string, Obj>; fallaAsignar?: boolean; stockAlCrear?: boolean; noArchiva?: boolean; categorias?: Obj[]; fallaCrear?: boolean; respuestaCrear?: "sinId" | "anidado"; fotos?: "rechaza" | "soloXAuth" | "fallaLaPrincipal"; cdnSinCache?: boolean; cdnBloqueado?: boolean; fallaPutDe?: number; quitarReservaSaca?: boolean; reservaLibre?: boolean } = {}) {
+function crearDropi(opciones: { noTomaEntradas?: boolean; usuarios?: Record<string, Obj>; fallaAsignar?: boolean; stockAlCrear?: boolean; noArchiva?: boolean; categorias?: Obj[]; fallaCrear?: boolean; respuestaCrear?: "sinId" | "anidado"; fotos?: "rechaza" | "soloXAuth" | "fallaLaPrincipal"; grandes?: boolean; maxSubida?: number; fallaNombre?: string; renombra?: boolean; cdnSinCache?: boolean; cdnBloqueado?: boolean; fallaPutDe?: number; quitarReservaSaca?: boolean; reservaLibre?: boolean } = {}) {
   const productos = new Map<number, Obj>();
   const llamadas: string[] = [];
   const garantias = new Map<number, Obj[]>();
   const fallo = { veces: 0, hecho: false };
+  // Las fotos que el favorito intentó subir (por su nombre) y la que falla siempre mientras no se «arregle».
+  const subidas: string[] = [];
+  const estado = { arreglado: false };
   let siguiente = 9001;
   const stockDe = (p: Obj) => Object.fromEntries((p.warehouse_product as Obj[]).map((w) => [w.warehouse_id, Number(w.stock)]));
   const responder = (objeto: unknown, status = 200) => new Response(JSON.stringify(typeof objeto === "object" && objeto !== null && "isSuccess" in objeto ? objeto : { isSuccess: status < 400, objects: objeto }), { status });
@@ -41,6 +44,7 @@ function crearDropi(opciones: { noTomaEntradas?: boolean; usuarios?: Record<stri
     // Como el navegador con una copia guardada que no deja leer: la dirección tal cual falla; con «?r=…» sale bien.
     // El CDN de Dropi sin la cabecera CORS (lo que pasa de verdad desde la pestaña de Dropi): el navegador no deja leer la foto.
     if (opciones.cdnBloqueado && url.startsWith("https://d39ru7awumhhs2.cloudfront.net/")) throw new TypeError("Failed to fetch");
+    if (opciones.grandes && url.startsWith("https://x.supabase.co/")) return new Response(new Blob([new Uint8Array(1_200_000)], { type: "image/png" }));
     if (url.startsWith("https://x.supabase.co/") || url.startsWith("https://d39ru7awumhhs2.cloudfront.net/")) return new Response(new Blob([new Uint8Array([0xff, 0xd8, 0xff, 1, 2, 3])], { type: "image/jpeg" }));
     const ruta = url.replace("https://api.dropi.pa/api", "");
     llamadas.push(`${metodo} ${ruta}`);
@@ -179,7 +183,13 @@ function crearDropi(opciones: { noTomaEntradas?: boolean; usuarios?: Record<stri
       const f = init.body as FormData;
       const p = productos.get(Number(f.get("id")))!;
       const archivo = f.get("files") as File;
-      p.gallery.push({ id: p.gallery.length + 100, main: f.get("main") === "true", urlS3: `panama/products/${p.id}/1779999999${archivo.name}`, url: null, variation_id: null });
+      subidas.push(archivo.name);
+      // Dropi corta la subida sin dar respuesta (el navegador lo ve como «Failed to fetch»): una foto demasiado pesada o una que falla siempre.
+      if (opciones.maxSubida && archivo.size > opciones.maxSubida) throw new TypeError("Failed to fetch");
+      if (opciones.fallaNombre && !estado.arreglado && archivo.name.includes(opciones.fallaNombre)) throw new TypeError("Failed to fetch");
+      // Dropi real: a veces la foto queda en la galería con otro nombre (sin el que se le dio al subirla).
+      const nombreEnDropi = opciones.renombra ? `${1780000000 + p.gallery.length}${["a1b2", "c3d4", "e5f6", "0789"][p.gallery.length % 4]}.jpg` : `1779999999${archivo.name}`;
+      p.gallery.push({ id: p.gallery.length + 100, main: f.get("main") === "true", urlS3: `panama/products/${p.id}/${nombreEnDropi}`, url: null, variation_id: null });
       return responder(true);
     }
     if (metodo === "POST" && ruta === "/productwarranty/create") {
@@ -202,7 +212,7 @@ function crearDropi(opciones: { noTomaEntradas?: boolean; usuarios?: Record<stri
     if (metodo === "POST" && m && m[2] === "/unarchive") return responder(true);
     return responder({ isSuccess: false, message: `Ruta no simulada: ${metodo} ${ruta}` }, 404);
   };
-  return { productos, llamadas, fetchFalso, stockDe, garantias, fotoPorPlataforma: true };
+  return { productos, llamadas, fetchFalso, stockDe, garantias, fotoPorPlataforma: true, subidas, estado };
 }
 
 /** Pulsa el favorito con esos cambios y devuelve lo que la ventana recibió. */
@@ -433,6 +443,55 @@ test("fotos: si la subida solo acepta X-Authorization (como la pantalla de Dropi
   const [r] = await aplicar(d, [{ ...base, id: "p1", tipo: "crear", producto: 0, datos: completo }]);
   assert.equal(r.ok, true, String(r.error));
   assert.equal(d.productos.get(9001)!.gallery.length, 3);
+});
+
+test("publicar: si una foto falla, el reintento solo sube la que faltó aunque Dropi les haya cambiado el nombre (20 nov 2026, la Turmeric Curcumin: 19 fotos repetidas)", async () => {
+  const d = crearDropi({ fallaNombre: "2.jpg", renombra: true });
+  const [r1] = await aplicar(d, [{ ...base, id: "p1", tipo: "crear", producto: 0, datos: completo }]);
+  assert.equal(r1.ok, false);
+  assert.equal(r1.nuevo, 9001);
+  assert.deepEqual(r1.subidas, [completo.fotos[0].url, completo.fotos[2].url], "el favorito devuelve cuáles fotos ya recibió Dropi");
+  assert.equal(d.productos.get(9001)!.gallery.length, 2);
+  // El sistema las guarda en el cambio y el reintento las trae en `datos.subidas`.
+  d.estado.arreglado = true;
+  const [r2] = await aplicar(d, [{ ...base, id: "p1", tipo: "crear", producto: 9001, nuevo: 9001, datos: { ...completo, subidas: r1.subidas } }]);
+  assert.equal(r2.ok, true, String(r2.error));
+  assert.equal(d.productos.get(9001)!.gallery.length, 3, "la galería queda con las 3, sin repetidas");
+  assert.equal(d.subidas.filter((n) => n === "1.jpg").length, 1, "la 1 se subió una sola vez");
+  assert.equal(d.subidas.filter((n) => n === "3.jpg").length, 1, "la 3 se subió una sola vez");
+  assert.equal(d.llamadas.filter((l) => l === "POST /products").length, 1);
+  assert.deepEqual([...(r2.subidas as string[])].sort(), completo.fotos.map((f) => f.url).sort());
+});
+
+test("fotos: una foto de más de 1 MB se reduce a JPG antes de subirla (Dropi corta la subida pesada sin responder: «Failed to fetch»)", async () => {
+  const g = globalThis as Obj;
+  g.createImageBitmap = async () => ({ width: 3000, height: 2000, close() {} });
+  g.OffscreenCanvas = class {
+    getContext() {
+      return { fillStyle: "", fillRect() {}, drawImage() {} };
+    }
+    async convertToBlob(o: Obj) {
+      return new Blob([new Uint8Array(Math.round(500_000 * o.quality))], { type: o.type });
+    }
+  };
+  try {
+    const d = crearDropi({ grandes: true, maxSubida: 1_000_000 });
+    const [r] = await aplicar(d, [{ ...base, id: "p1", tipo: "crear", producto: 0, datos: { ...completo, fotos: ["a.png", "b.png", "c.png"].map(foto) } }]);
+    assert.equal(r.ok, true, String(r.error));
+    assert.deepEqual(d.subidas, ["a.jpg", "b.jpg", "c.jpg"], "se suben como JPG");
+    assert.equal(d.productos.get(9001)!.gallery.length, 3);
+  } finally {
+    delete g.createImageBitmap;
+    delete g.OffscreenCanvas;
+  }
+});
+
+test("fotos: si el navegador no puede reducir una foto pesada y Dropi la corta, el error dice cuánto pesa", async () => {
+  const d = crearDropi({ grandes: true, maxSubida: 1_000_000 });
+  const [r] = await aplicar(d, [{ ...base, id: "p1", tipo: "crear", producto: 0, datos: { ...completo, fotos: ["a.png", "b.png", "c.png"].map(foto) } }]);
+  assert.equal(r.ok, false);
+  assert.match(String(r.error), /Failed to fetch; pesa 1,1 MB/);
+  assert.deepEqual(r.subidas, []);
 });
 
 test("republicar: crea el nuevo con sus fotos, le copia las garantías del viejo y archiva el viejo sin stock", async () => {

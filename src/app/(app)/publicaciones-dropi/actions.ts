@@ -1,5 +1,6 @@
 "use server";
 
+import { createHash } from "node:crypto";
 import { montoDePais } from "@/lib/moneda/simbolo";
 import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
@@ -166,14 +167,20 @@ function medida(f: FormData, k: string): number | null {
 async function fotosValidas(supabase: ReturnType<typeof createServiceClient>, rutas: unknown, publicacionId: string | null): Promise<{ fotos: FotoCrear[] } | { error: string }> {
   if (!Array.isArray(rutas) || rutas.length > MAX_FOTOS_CREAR) return { error: `Sube hasta ${MAX_FOTOS_CREAR} fotos.` };
   const fotos: FotoCrear[] = [];
+  // La misma imagen subida dos veces (con otro nombre) cuenta una sola: así no llega repetida a Dropi (20 nov 2026, la Turmeric Curcumin traía el JPG dos veces).
+  const contenidos = new Set<string>();
   for (const ruta of [...new Set(rutas)]) {
     const propia = typeof ruta === "string" && publicacionId !== null && new RegExp(`^publicaciones/${publicacionId}/ia/[A-Za-z0-9._-]+$`).test(ruta);
     if (typeof ruta !== "string" || !(RUTA_FOTO_BORRADOR.test(ruta) || propia)) return { error: "Una de las fotos no es válida: vuelve a subirla." };
     const { data, error } = await supabase.storage.from(BUCKET).download(ruta);
     if (error || !data) return { error: "No se encontró una de las fotos: vuelve a subirla." };
     if (data.size > MAX_BYTES_FOTO_DROPI) return { error: "Una foto pesa más de 10 MB, que es lo que admite Dropi." };
-    const tipo = detectarImagen(new Uint8Array(await data.slice(0, 64).arrayBuffer()));
+    const bytes = new Uint8Array(await data.arrayBuffer());
+    const tipo = detectarImagen(bytes.subarray(0, 64));
     if (!tipo || tipo.tipo === "image/gif") return { error: "Una de las fotos no es una imagen JPG, PNG o WebP." };
+    const contenido = createHash("sha256").update(bytes).digest("hex");
+    if (contenidos.has(contenido)) continue;
+    contenidos.add(contenido);
     fotos.push({ url: urlPublica(ruta), nombre: ruta.split("/").pop() ?? "foto.jpg" });
   }
   return { fotos };
