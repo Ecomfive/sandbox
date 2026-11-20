@@ -99,6 +99,21 @@ export function certezaDe(r: Resultados, unidades: number): Certeza {
 }
 export const NOMBRE_CERTEZA: Record<Certeza, string> = { firme: "Firme", probable: "Probable", poca: "Poca data" };
 
+/**
+ * Qué quiere decir el nivel de un grupo, en una frase y con lo que le falta: «Probable» no es un error, es que ya hay algo de data pero todavía no la suficiente para darlo por cierto.
+ * `unidad` es lo que se cuenta («videos», «campañas»).
+ */
+export function motivoDeCerteza(r: Resultados, unidades: number, unidad: string): string {
+  const nivel = certezaDe(r, unidades);
+  if (nivel === "firme") return `Firme: hay datos de sobra (más de $${GASTO_FIRME} gastados, ${UNIDADES_FIRME} o más ${unidad} y ${r.compras === 0 ? "ninguna compra" : "10 compras o más"}). Se puede dar por cierto.`;
+  if (nivel === "poca") return `Poca data: menos de $${GASTO_MINIMO_CONFIABLE} gastados. Todavía no se puede decir si funciona.`;
+  const falta: string[] = [];
+  if (r.gasto < GASTO_FIRME) falta.push(`$${Math.ceil(GASTO_FIRME - r.gasto)} más de gasto`);
+  if (unidades < UNIDADES_FIRME) falta.push(`${UNIDADES_FIRME - unidades} ${UNIDADES_FIRME - unidades === 1 ? unidad.replace(/s$/, "") : unidad} más`);
+  if (r.compras > 0 && r.compras < COMPRAS_FIRME) falta.push(`${COMPRAS_FIRME - r.compras} compras más`);
+  return `Probable: va bien encaminado, pero todavía no es seguro. Para ser firme falta ${falta.join(", ")}.`;
+}
+
 export const nivelDeResultado = (v: number): NivelMetrica => (v > 15 ? "bueno" : v < -15 ? "malo" : "medio");
 /** El CPA frente a su tope: dentro del tope, bien; hasta 30 % por encima, regular; más, mal. */
 export const nivelDeCpa = (valor: number | null, tope: number): NivelMetrica => (valor === null ? "neutral" : valor <= tope ? "bueno" : valor > tope * 1.3 ? "malo" : "medio");

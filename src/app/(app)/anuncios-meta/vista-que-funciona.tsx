@@ -5,7 +5,7 @@ import { useState } from "react";
 import { Tooltip } from "@/components/ui/tooltip";
 import { DIMENSIONES_ANUNCIO, DIMENSIONES_CAMPANA, type DimensionAnuncio, type DimensionCampana, type GruposMeta } from "@/lib/meta-ads/datos";
 import { DIMENSIONES_VIDEO, EXPLICACION_DIMENSION_VIDEO, esGanador, esPerdedor, mejorGrupo, MEZCLA_DE_ANGULOS, sumaDeGrupos, UMBRAL_DOMINANTE, ventajaDeCpa, type DimensionVideo, type GruposDeVideo } from "@/lib/meta-ads/atributos-video";
-import { ctr, dolares, dolaresEnteros, hookRate, nivelDeCtr, nivelDeHook, type Resultados } from "@/lib/meta-ads/metricas";
+import { ctr, dolares, dolaresEnteros, hookRate, motivoDeCerteza, nivelDeCtr, nivelDeHook, type Resultados } from "@/lib/meta-ads/metricas";
 import type { Grupo } from "@/lib/meta-ads/vistas";
 import { ClasificarGanchos } from "./clasificar-ganchos";
 import { BarraProgreso, InsigniaCerteza, TarjetaMeta } from "./graficas";
@@ -78,7 +78,7 @@ export function QueFunciona({ grupos, gruposVideo, videosSinAngulo, ganchosSinTi
 
   return (
     <div className="flex flex-col gap-6">
-      <TarjetaMeta titulo="Lo que ya sabemos" derecha="Lo que mejor funciona en cada cosa, entre lo que ya tiene datos suficientes" id="conclusiones">
+      <TarjetaMeta titulo="Lo que ya sabemos" derecha="Firme: datos de sobra · Probable: va bien, falta data · Poca data: menos de $100" id="conclusiones">
         {!hayAlgo ? (
           <p className="m-0 text-sm text-muted-foreground">Todavía no hay nada con datos suficientes ($100 gastados y alguna compra). A medida que se gaste, aquí va saliendo lo que funciona.</p>
         ) : (
@@ -162,14 +162,17 @@ function TarjetaConclusion({ c }: { c: Conclusion }) {
             {ventaja !== null && Math.abs(ventaja) >= 1 && <span className={ventaja < 0 ? "font-medium text-success" : "font-medium text-destructive"}>{ventaja < 0 ? `${Math.abs(ventaja).toFixed(0)} % más barato que el promedio` : `${ventaja.toFixed(0)} % más caro que el promedio`}</span>}
           </p>
           <div className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-1">
-            <InsigniaCerteza certeza={g.certeza} />
+            <InsigniaCerteza certeza={g.certeza} motivo={motivoDeCerteza(g.r, g.videos > 0 ? g.videos : g.campanas, g.videos > 0 ? "videos" : "campañas")} />
             <span className="text-xs tabular-nums text-muted-foreground">
               {g.videos > 0 && c.unidad === "videos" ? `${g.videos} ${g.videos === 1 ? "video" : "videos"}` : `${g.campanas} ${g.campanas === 1 ? "campaña" : "campañas"}`} · {dolaresEnteros(g.r.gasto)}
             </span>
           </div>
         </>
       ) : (
-        <p className="m-0 text-sm text-muted-foreground">Sin datos suficientes todavía</p>
+        <>
+          <p className="m-0 text-sm text-muted-foreground">Sin datos suficientes todavía</p>
+          <p className="m-0 text-xs text-muted-foreground">Ninguno llega aún a $100 gastados con alguna compra en este periodo{c.etiqueta === "Estructura del video" ? "; cada orden de partes se reparte entre pocos videos" : ""}.</p>
+        </>
       )}
     </li>
   );
@@ -277,7 +280,7 @@ function TablaDeGrupos({ grupos, dimension, unidad, sinDato, porVideo }: { grupo
                       <Resultado r={g.r} tope={1} valor={g.resultado} />
                     </td>
                     <td className="px-4 py-2.5">
-                      <InsigniaCerteza certeza={g.certeza} />
+                      <InsigniaCerteza certeza={g.certeza} motivo={motivoDeCerteza(g.r, porVideo ? g.videos : g.campanas, porVideo ? "videos" : "campañas")} />
                     </td>
                   </tr>
                 );
