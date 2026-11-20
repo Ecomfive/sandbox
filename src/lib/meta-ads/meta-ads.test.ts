@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { esErrorPasajeroDeMeta } from "./api";
 import { agrupar, copyLimpio, landingLimpia } from "./agrupar";
 import { clicAVisita, conversion, cpa, hookRate, holdRate, llegaAlLlamado, resultado, retencion, sinResultados, type Resultados } from "./metricas";
 import { claveDeProducto, embellecer, etiquetasDeNombre, numeroDeVideo } from "./nombre";
@@ -216,4 +217,14 @@ test("la retención del video y cuántos llegan al llamado a la acción", () => 
   assert.equal(clicAVisita(x), 80);
   assert.equal(clicAVisita(r({ clics: 10, vioLanding: 30 })), 100, "no pasa de 100");
   assert.equal(clicAVisita(r({})), null);
+});
+
+test("un error pasajero de Meta se reintenta; uno de permisos no", () => {
+  assert.equal(esErrorPasajeroDeMeta({ error: { code: 2, message: "An unexpected error has occurred. Please retry your request later." } }), true);
+  assert.equal(esErrorPasajeroDeMeta({ error: { code: 1 } }), true);
+  assert.equal(esErrorPasajeroDeMeta({ error: { code: 17 } }), true);
+  assert.equal(esErrorPasajeroDeMeta({ error: { code: 100, is_transient: true } }), true);
+  assert.equal(esErrorPasajeroDeMeta({ error: { code: 190 } }), false);
+  assert.equal(esErrorPasajeroDeMeta({ error: { code: 200 } }), false);
+  assert.equal(esErrorPasajeroDeMeta(null), false);
 });
