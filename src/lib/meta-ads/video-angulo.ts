@@ -51,6 +51,11 @@ export interface ContextoPedido {
   angulosExistentes: string[];
   /** El video no se pudo bajar: se analiza solo con el texto del anuncio (y la miniatura, si la hay). */
   soloTexto: boolean;
+  /**
+   * Segundo intento tras un bloqueo por «recitation» (Gemini corta la respuesta cuando va a repetir palabra por palabra un texto que reconoce, como una canción o un discurso famoso): no se transcribe nada y todo
+   * se cuenta con palabras propias.
+   */
+  sinTranscribir?: boolean;
 }
 
 const recorte = (t: string | null | undefined, max: number) => String(t ?? "").replace(/\s+/g, " ").trim().slice(0, max);
@@ -66,8 +71,9 @@ export function pedidoAnalisisVideo(c: ContextoPedido): string {
     c.copy ? `Texto principal del anuncio: «${recorte(c.copy, 500)}».` : "",
     c.titulo ? `Título del anuncio: «${recorte(c.titulo, 120)}».` : "",
     "Contesta SOLO un JSON, sin texto antes ni después, con estas llaves:",
-    '{"angulo": "…", "promesa": "lo que promete el anuncio, en una frase", "gancho": "lo que se ve y se dice en los primeros 3 segundos", "gancho_tipo": "uno de: ' + TIPOS_GANCHO.join(", ") + '", "resumen": "de qué trata, en 2 o 3 frases", "transcripcion": "lo que se dice, hasta 1200 caracteres; vacío si no habla nadie", "publico": "a quién le habla", "formato": "uno de: ' + FORMATOS_VIDEO.join(", ") + '", "cta": "el llamado a la acción tal como se dice o se escribe; vacío si no hay", "cta_segundo": segundo aproximado en que aparece por primera vez (un número entero) o null, "cta_tipo": "uno de: ' + TIPOS_CTA.join(", ") + '", "oferta": "la oferta concreta (descuento, 2x1, envío gratis, garantía, precio); vacío si no hay", "recursos": ["los que use el video, de esta lista: ' + RECURSOS_VIDEO.join(", ") + '"], "estructura": [{"parte": "una de: ' + PARTES_VIDEO.join(", ") + '", "desde": segundo de inicio, "hasta": segundo de fin, "resumen": "qué pasa en esa parte, en una frase"}]}',
+    '{"angulo": "…", "promesa": "lo que promete el anuncio, en una frase", "gancho": "lo que se ve y se dice en los primeros 3 segundos", "gancho_tipo": "uno de: ' + TIPOS_GANCHO.join(", ") + '", "resumen": "de qué trata, en 2 o 3 frases", "transcripcion": ' + (c.sinTranscribir ? '"" (déjala vacía)' : '"lo que se dice, hasta 1200 caracteres; vacío si no habla nadie"') + ', "publico": "a quién le habla", "formato": "uno de: ' + FORMATOS_VIDEO.join(", ") + '", "cta": "el llamado a la acción tal como se dice o se escribe; vacío si no hay", "cta_segundo": segundo aproximado en que aparece por primera vez (un número entero) o null, "cta_tipo": "uno de: ' + TIPOS_CTA.join(", ") + '", "oferta": "la oferta concreta (descuento, 2x1, envío gratis, garantía, precio); vacío si no hay", "recursos": ["los que use el video, de esta lista: ' + RECURSOS_VIDEO.join(", ") + '"], "estructura": [{"parte": "una de: ' + PARTES_VIDEO.join(", ") + '", "desde": segundo de inicio, "hasta": segundo de fin, "resumen": "qué pasa en esa parte, en una frase"}]}',
     c.soloTexto ? "Como no hay video, deja cta_segundo en null, recursos y estructura vacíos." : "En estructura pon de 3 a 8 partes en orden, con los segundos reales del video; la primera es el gancho.",
+    c.sinTranscribir ? "No copies ni transcribas literalmente lo que se dice, la letra de una canción ni el texto del anuncio: cuéntalo todo con tus propias palabras." : "",
     "No inventes: si algo no se ve o no se oye, déjalo vacío.",
   ]
     .filter(Boolean)

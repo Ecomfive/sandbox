@@ -19,21 +19,21 @@ export type ResultadoGemini = { texto: string; modelo: string } | { error: strin
 /** Un fallo de Gemini que suele pasar solo (servidor ocupado, tiempo agotado, sin conexión): se repite una vez. */
 const esPasajero = (r: ResultadoGemini) => "error" in r && /tardó demasiado|No se pudo conectar|no pudo analizarlo|no devolvió nada \(/i.test(r.error);
 
-async function generar(partes: unknown[], contexto: ContextoConsumo, esperaMs: number): Promise<ResultadoGemini> {
-  const primero = await generarUnaVez(partes, contexto, esperaMs);
+async function generar(partes: unknown[], contexto: ContextoConsumo, esperaMs: number, temperatura = 0.2): Promise<ResultadoGemini> {
+  const primero = await generarUnaVez(partes, contexto, esperaMs, temperatura);
   if (!esPasajero(primero)) return primero;
   await new Promise((ok) => setTimeout(ok, 3_000));
-  return generarUnaVez(partes, contexto, esperaMs);
+  return generarUnaVez(partes, contexto, esperaMs, temperatura);
 }
 
-async function generarUnaVez(partes: unknown[], contexto: ContextoConsumo, esperaMs: number): Promise<ResultadoGemini> {
+async function generarUnaVez(partes: unknown[], contexto: ContextoConsumo, esperaMs: number, temperatura: number): Promise<ResultadoGemini> {
   const clave = claveGemini();
   const modelo = modeloDeVideo();
   try {
     const r = await fetch(`${BASE}/v1beta/models/${encodeURIComponent(modelo)}:generateContent`, {
       method: "POST",
       headers: { "content-type": "application/json", "x-goog-api-key": clave },
-      body: JSON.stringify({ contents: [{ role: "user", parts: partes }], generationConfig: { temperature: 0.2, responseMimeType: "application/json" } }),
+      body: JSON.stringify({ contents: [{ role: "user", parts: partes }], generationConfig: { temperature: temperatura, responseMimeType: "application/json" } }),
       signal: AbortSignal.timeout(esperaMs),
       cache: "no-store",
     });
@@ -58,7 +58,7 @@ async function generarUnaVez(partes: unknown[], contexto: ContextoConsumo, esper
 }
 
 /** Sube el video a Gemini, espera a que lo procese, pide el análisis y lo borra. */
-export async function analizarVideoConGemini(bytes: Uint8Array, mime: string, pedido: string, contexto: ContextoConsumo): Promise<ResultadoGemini> {
+export async function analizarVideoConGemini(bytes: Uint8Array, mime: string, pedido: string, contexto: ContextoConsumo, temperatura = 0.2): Promise<ResultadoGemini> {
   const clave = claveGemini();
   if (!clave) return { error: "Falta conectar Gemini (la clave GEMINI_API_KEY)." };
   let nombre: string | null = null;
@@ -85,7 +85,7 @@ export async function analizarVideoConGemini(bytes: Uint8Array, mime: string, pe
       estado = j?.state ?? estado;
     }
     if (estado !== "ACTIVE") return { error: estado === "FAILED" ? "Gemini no pudo procesar el video." : "Gemini tardó demasiado en procesar el video." };
-    return await generar([{ file_data: { mime_type: archivo.file.mimeType ?? mime, file_uri: archivo.file.uri } }, { text: pedido }], contexto, 120_000);
+    return await generar([{ file_data: { mime_type: archivo.file.mimeType ?? mime, file_uri: archivo.file.uri } }, { text: pedido }], contexto, 120_000, temperatura);
   } catch (e) {
     return { error: (e as Error)?.name === "TimeoutError" ? "Gemini tardó demasiado con el video." : "No se pudo conectar con Gemini." };
   } finally {
