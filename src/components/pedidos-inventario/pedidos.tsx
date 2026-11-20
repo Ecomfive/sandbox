@@ -250,7 +250,7 @@ function FilasPedido({
                     const f = faltanEn(b.id).length;
                     return (
                       <option key={b.id} value={b.id}>
-                        {b.nombre} · {f === 0 ? "alcanza para todo" : `faltan ${f} ${f === 1 ? "producto" : "productos"}`}
+                        {b.nombre} · {f === 0 ? "alcanza para todo" : f === 1 ? "falta 1 producto" : `faltan ${f} productos`}
                       </option>
                     );
                   })}
