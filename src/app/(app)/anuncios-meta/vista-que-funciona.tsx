@@ -2,104 +2,300 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { DIMENSIONES, type Dimension } from "@/lib/meta-ads/datos";
-import { ctr, dolares, hookRate, nivelDeCtr, nivelDeHook } from "@/lib/meta-ads/metricas";
+import { Tooltip } from "@/components/ui/tooltip";
+import { DIMENSIONES_ANUNCIO, DIMENSIONES_CAMPANA, type DimensionAnuncio, type DimensionCampana, type GruposMeta } from "@/lib/meta-ads/datos";
+import { DIMENSIONES_VIDEO, EXPLICACION_DIMENSION_VIDEO, esGanador, esPerdedor, mejorGrupo, MEZCLA_DE_ANGULOS, sumaDeGrupos, UMBRAL_DOMINANTE, ventajaDeCpa, type DimensionVideo, type GruposDeVideo } from "@/lib/meta-ads/atributos-video";
+import { ctr, dolares, dolaresEnteros, hookRate, nivelDeCtr, nivelDeHook, type Resultados } from "@/lib/meta-ads/metricas";
 import type { Grupo } from "@/lib/meta-ads/vistas";
+import { ClasificarGanchos } from "./clasificar-ganchos";
+import { BarraProgreso, InsigniaCerteza, TarjetaMeta } from "./graficas";
 import { AVISO_POCA_DATA, entero, Nivel, porcentaje, Resultado, valorCpa } from "./piezas";
 
+type Seccion = "videos" | "campanas" | "anuncios";
+const SECCIONES: { id: Seccion; nombre: string; detalle: string }[] = [
+  { id: "videos", nombre: "Videos", detalle: "Lo que la IA saca de cada video" },
+  { id: "campanas", nombre: "Campañas", detalle: "Cómo está montada cada campaña" },
+  { id: "anuncios", nombre: "Anuncios", detalle: "El texto y la página de destino" },
+];
+
+const EXPLICACION_CAMPANA: Record<DimensionCampana, string> = {
+  Ángulo: "El ángulo con que se clasifica cada campaña: el que usa la mayoría de sus videos.",
+  Estructura: "CBO (el presupuesto está en la campaña) o ABO (en cada conjunto de anuncios).",
+  Puja: "La estrategia de puja de la campaña: sin tope, bid cap, cost cap…",
+  Producto: "Qué producto vende la campaña, según su nombre.",
+  Etapa: "Testing, escala o retargeting, según el nombre.",
+};
+const EXPLICACION_ANUNCIO: Record<DimensionAnuncio, string> = {
+  Copy: "El texto principal del anuncio: los anuncios que dicen lo mismo se juntan.",
+  Landing: "La página a la que lleva el anuncio, sin parámetros ni rastreo.",
+};
+
+interface Conclusion {
+  etiqueta: string;
+  dimension: string;
+  grupo: Grupo | null;
+  total: Resultados;
+  unidad: string;
+}
+
+function conclusion(etiqueta: string, dimension: string, grupos: Grupo[], unidad: string): Conclusion {
+  return { etiqueta, dimension, grupo: mejorGrupo(grupos), total: sumaDeGrupos(grupos).r, unidad };
+}
+
 /**
- * «Qué funciona»: las campañas (o los anuncios, para ángulo, copy y landing) juntas por ángulo, estructura, puja, copy, landing, producto o etapa, de mejor a peor CPA. Lo que tiene poco gasto va al final y atenuado.
- * El ángulo se mide por video (el de cada video, según la IA o lo que se corrigió a mano), no por el nombre de la campaña.
+ * «Qué funciona»: lo que ya se puede dar por cierto, arriba, y debajo cada forma de medir (los datos de los videos, cómo está montada la campaña, el texto y la landing) de mejor a peor CPA, con qué tan seguro es cada
+ * resultado. El ángulo de una campaña es la mezcla de los ángulos de sus videos; el de un video lo saca la IA al verlo (o se corrige a mano en su ficha).
  */
-export function QueFunciona({ grupos, videosSinAngulo }: { grupos: Record<Dimension, Grupo[]>; videosSinAngulo: number }) {
-  const [dim, setDim] = useState<Dimension>("Ángulo");
-  const lista = grupos[dim];
-  const primera = lista.find((g) => g.confiable && g.r.compras > 0);
-  const conSinConfiar = lista.some((g) => !g.confiable);
-  const porVideo = dim === "Ángulo";
-  const faltanAngulos = porVideo && videosSinAngulo > 0 ? (
-    <p className="m-0 rounded-xl border border-border bg-card px-4 py-2.5 text-sm text-muted-foreground">
-      {videosSinAngulo} {videosSinAngulo === 1 ? "video con gasto en el periodo todavía no tiene" : "videos con gasto en el periodo todavía no tienen"} ángulo, así que no cuentan aquí.{" "}
-      <Link href="/anuncios-meta/videos" className="font-medium text-foreground underline underline-offset-2">
-        Analizarlos en Videos
-      </Link>
-    </p>
-  ) : null;
+export function QueFunciona({ grupos, gruposVideo, videosSinAngulo, ganchosSinTipo, iaConectada, escribe }: { grupos: GruposMeta; gruposVideo: GruposDeVideo; videosSinAngulo: number; ganchosSinTipo: number; iaConectada: boolean; escribe: boolean }) {
+  const [seccion, setSeccion] = useState<Seccion>("videos");
+  const [dimVideo, setDimVideo] = useState<DimensionVideo>("Ángulo");
+  const [dimCampana, setDimCampana] = useState<DimensionCampana>("Ángulo");
+  const [dimAnuncio, setDimAnuncio] = useState<DimensionAnuncio>("Copy");
+
+  const conclusiones: Conclusion[] = [
+    conclusion("Ángulo del video", "Ángulo", gruposVideo.grupos["Ángulo"], "videos"),
+    conclusion("Gancho", "Gancho", gruposVideo.grupos.Gancho, "videos"),
+    conclusion("Formato del video", "Formato", gruposVideo.grupos.Formato, "videos"),
+    conclusion("Llamado a la acción", "Llamado a la acción", gruposVideo.grupos["Llamado a la acción"], "videos"),
+    conclusion("Estructura del video", "Estructura", gruposVideo.grupos.Estructura, "videos"),
+    conclusion("Duración", "Duración", gruposVideo.grupos.Duración, "videos"),
+    conclusion("Ángulo de la campaña", "Ángulo", grupos.campana["Ángulo"].filter((g) => g.nombre !== MEZCLA_DE_ANGULOS), "campañas"),
+    conclusion("CBO o ABO", "Estructura", grupos.campana.Estructura, "campañas"),
+    conclusion("Puja", "Puja", grupos.campana.Puja, "campañas"),
+  ];
+  const hayAlgo = conclusiones.some((c) => c.grupo);
+
+  const lista = seccion === "videos" ? gruposVideo.grupos[dimVideo] : seccion === "campanas" ? grupos.campana[dimCampana] : grupos.anuncio[dimAnuncio];
+  const dimActual = seccion === "videos" ? dimVideo : seccion === "campanas" ? dimCampana : dimAnuncio;
+  const unidad = seccion === "videos" ? "Videos" : "Campañas";
+  const sinDato = seccion === "videos" ? gruposVideo.sinDato[dimVideo] : 0;
+  const vacio =
+    seccion === "videos"
+      ? "Ningún video con gasto en el periodo tiene este dato todavía. Los datos se leen de cada video: analízalos en la pestaña Videos."
+      : seccion === "campanas"
+        ? `Ninguna campaña con gasto en el periodo ${dimCampana === "Ángulo" ? "tiene videos con ángulo todavía" : dimCampana === "Producto" || dimCampana === "Etapa" ? `trae ${dimCampana === "Etapa" ? "etapa" : "producto"} en el nombre. Ponlo en el nombre de la campaña o corrígelo en su ficha` : "trae este dato"}.`
+        : "No hay anuncios con gasto en el periodo.";
+
   return (
-    <div className="flex flex-col gap-4">
-      <div role="group" aria-label="Ver por" className="flex flex-wrap gap-1.5">
-        {DIMENSIONES.map((d) => (
-          <button
-            key={d}
-            type="button"
-            aria-pressed={d === dim}
-            onClick={() => setDim(d)}
-            className={`min-h-9 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground ${d === dim ? "border-foreground bg-foreground text-background" : "border-border-control bg-card text-muted-foreground hover:bg-muted"}`}
-          >
-            {d}
-          </button>
-        ))}
-      </div>
-      {faltanAngulos}
-      {lista.length === 0 ? (
-        <p className="m-0 rounded-xl border border-border bg-card px-4 py-6 text-sm text-muted-foreground">
-          {porVideo ? "Ningún video con gasto en el periodo tiene ángulo todavía. El ángulo se lee de cada video: analízalos en la pestaña Videos." : dim === "Producto" || dim === "Etapa" ? `Ninguna campaña con gasto en el periodo trae ${dim === "Etapa" ? "etapa" : dim.toLowerCase()} en el nombre. Ponla en el nombre de la campaña o corrígela en su ficha.` : "No hay datos con gasto en el periodo."}
-        </p>
-      ) : (
-        <div className="min-w-0 overflow-hidden rounded-xl border border-border bg-card">
-          {primera && (
-            <p className="m-0 border-b border-border bg-muted px-4 py-2 text-xs text-muted-foreground">
-              Lo que mejor funciona en {dim.toLowerCase()}: <span className="font-medium text-foreground">{primera.nombre}</span> con CPA {valorCpa(primera.r)} y {entero(primera.r.compras)} compras.
-            </p>
-          )}
-          <div className="overflow-x-auto">
-            <table className="tabla-datos w-full min-w-[44rem] border-collapse text-sm">
-              <caption className="sr-only">Resultados por {dim.toLowerCase()}</caption>
-              <thead>
-                <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                  <th scope="col" className="px-4 py-2 font-medium">{dim}</th>
-                  {porVideo && <th scope="col" className="px-3 py-2 text-right font-medium">Videos</th>}
-                  <th scope="col" className="px-3 py-2 text-right font-medium">Campañas</th>
-                  <th scope="col" className="px-3 py-2 text-right font-medium">Gasto</th>
-                  <th scope="col" className="px-3 py-2 text-right font-medium">Compras</th>
-                  <th scope="col" className="px-3 py-2 text-right font-medium">CPA</th>
-                  <th scope="col" className="px-3 py-2 text-right font-medium">CTR</th>
-                  <th scope="col" className="px-3 py-2 text-right font-medium">Hook</th>
-                  <th scope="col" className="px-4 py-2 text-right font-medium">Resultado estimado</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {lista.map((g) => (
-                  <tr key={g.nombre} className={g.confiable ? "" : "text-muted-foreground"}>
-                    <th scope="row" className="max-w-[26rem] px-4 py-2.5 text-left font-medium">
-                      <span className="block truncate" title={g.nombre}>
-                        {g.nombre}
-                      </span>
-                      {!g.confiable && <span className="text-xs font-normal">poca data</span>}
-                    </th>
-                    {porVideo && <td className="px-3 py-2.5 text-right tabular-nums">{g.videos}</td>}
-                    <td className="px-3 py-2.5 text-right tabular-nums">{g.campanas}</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums">{dolares(g.r.gasto)}</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums">{entero(g.r.compras)}</td>
-                    <td className="px-3 py-2.5 text-right">{g.r.compras > 0 ? valorCpa(g.r) : "—"}</td>
-                    <td className="px-3 py-2.5 text-right">{g.confiable ? <Nivel nivel={nivelDeCtr(ctr(g.r))}>{porcentaje(ctr(g.r))}</Nivel> : porcentaje(ctr(g.r))}</td>
-                    <td className="px-3 py-2.5 text-right">{hookRate(g.r) === null ? "—" : g.confiable ? <Nivel nivel={nivelDeHook(hookRate(g.r))}>{porcentaje(hookRate(g.r), 0)}</Nivel> : porcentaje(hookRate(g.r), 0)}</td>
-                    <td className="px-4 py-2.5 text-right">
-                      <ResultadoDeGrupo g={g} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {conSinConfiar && <p className="m-0 border-t border-border px-4 py-2 text-xs text-muted-foreground">{AVISO_POCA_DATA}</p>}
+    <div className="flex flex-col gap-6">
+      <TarjetaMeta titulo="Lo que ya sabemos" derecha="Lo que mejor funciona en cada cosa, entre lo que ya tiene datos suficientes" id="conclusiones">
+        {!hayAlgo ? (
+          <p className="m-0 text-sm text-muted-foreground">Todavía no hay nada con datos suficientes ($100 gastados y alguna compra). A medida que se gaste, aquí va saliendo lo que funciona.</p>
+        ) : (
+          <ul role="list" className="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(15.5rem,1fr))] gap-3 p-0">
+            {conclusiones.map((c) => (
+              <TarjetaConclusion key={c.etiqueta} c={c} />
+            ))}
+          </ul>
+        )}
+      </TarjetaMeta>
+
+      <div className="flex flex-col gap-3">
+        <div role="group" aria-label="Qué medir" className="flex w-fit max-w-full flex-wrap overflow-hidden rounded-lg border border-border-control bg-card">
+          {SECCIONES.map((s) => (
+            <button key={s.id} type="button" aria-pressed={seccion === s.id} onClick={() => setSeccion(s.id)} className={`min-h-10 px-4 py-2 text-sm font-medium transition-colors focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-foreground ${seccion === s.id ? "bg-foreground text-background" : "text-muted-foreground hover:bg-muted"}`}>
+              {s.nombre}
+            </button>
+          ))}
         </div>
+        <div role="group" aria-label="Ver por" className="flex flex-wrap gap-1.5">
+          {seccion === "videos" &&
+            DIMENSIONES_VIDEO.map((d) => (
+              <Chip key={d} activo={d === dimVideo} texto={d} ayuda={EXPLICACION_DIMENSION_VIDEO[d]} alPulsar={() => setDimVideo(d)} />
+            ))}
+          {seccion === "campanas" &&
+            DIMENSIONES_CAMPANA.map((d) => (
+              <Chip key={d} activo={d === dimCampana} texto={d} ayuda={EXPLICACION_CAMPANA[d]} alPulsar={() => setDimCampana(d)} />
+            ))}
+          {seccion === "anuncios" &&
+            DIMENSIONES_ANUNCIO.map((d) => (
+              <Chip key={d} activo={d === dimAnuncio} texto={d} ayuda={EXPLICACION_ANUNCIO[d]} alPulsar={() => setDimAnuncio(d)} />
+            ))}
+        </div>
+      </div>
+
+      {seccion === "videos" && dimVideo === "Gancho" && escribe && <ClasificarGanchos pendientes={ganchosSinTipo} iaConectada={iaConectada} />}
+      {seccion === "videos" && dimVideo === "Ángulo" && videosSinAngulo > 0 && (
+        <p className="m-0 rounded-xl border border-border bg-card px-4 py-2.5 text-sm text-muted-foreground">
+          {videosSinAngulo} {videosSinAngulo === 1 ? "video con gasto en el periodo todavía no tiene" : "videos con gasto en el periodo todavía no tienen"} ángulo, así que no cuentan aquí.{" "}
+          <Link href="/anuncios-meta/videos" className="font-medium text-foreground underline underline-offset-2">
+            Analizarlos en Videos
+          </Link>
+        </p>
+      )}
+      {seccion === "campanas" && dimCampana === "Ángulo" && (
+        <p className="m-0 rounded-xl border border-border bg-card px-4 py-2.5 text-sm text-muted-foreground">
+          Una campaña cuenta en el ángulo que usan {UMBRAL_DOMINANTE} % o más de sus videos; si ninguno llega, va en «{MEZCLA_DE_ANGULOS}». Cada una muestra su mezcla en Campañas.
+        </p>
+      )}
+
+      {lista.length === 0 ? (
+        <p className="m-0 rounded-xl border border-border bg-card px-4 py-6 text-sm text-muted-foreground">{vacio}</p>
+      ) : (
+        <TablaDeGrupos grupos={lista} dimension={dimActual} unidad={unidad} sinDato={sinDato} porVideo={seccion === "videos"} />
       )}
     </div>
   );
 }
 
-/** El resultado de un grupo ya viene sumado campaña por campaña con el tope de cada producto: se muestra tal cual. */
-function ResultadoDeGrupo({ g }: { g: Grupo }) {
-  return <Resultado r={g.r} tope={1} valor={g.resultado} />;
+function Chip({ activo, texto, ayuda, alPulsar }: { activo: boolean; texto: string; ayuda: string; alPulsar: () => void }) {
+  return (
+    <Tooltip texto={ayuda}>
+      <button type="button" aria-pressed={activo} onClick={alPulsar} className={`min-h-9 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground ${activo ? "border-foreground bg-foreground text-background" : "border-border-control bg-card text-muted-foreground hover:bg-muted"}`}>
+        {texto}
+      </button>
+    </Tooltip>
+  );
+}
+
+function TarjetaConclusion({ c }: { c: Conclusion }) {
+  const g = c.grupo;
+  const ventaja = g ? ventajaDeCpa(g, c.total) : null;
+  return (
+    <li className="flex min-w-0 flex-col gap-1.5 rounded-xl border border-border bg-background px-3.5 py-3">
+      <p className="m-0 text-xs font-medium text-muted-foreground">{c.etiqueta}</p>
+      {g ? (
+        <>
+          <p className="m-0 line-clamp-2 text-base font-semibold leading-snug">{g.nombre}</p>
+          <p className="m-0 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs tabular-nums text-muted-foreground">
+            <span className="text-sm font-semibold text-foreground">CPA {valorCpa(g.r)}</span>
+            {ventaja !== null && Math.abs(ventaja) >= 1 && <span className={ventaja < 0 ? "font-medium text-success" : "font-medium text-destructive"}>{ventaja < 0 ? `${Math.abs(ventaja).toFixed(0)} % más barato que el promedio` : `${ventaja.toFixed(0)} % más caro que el promedio`}</span>}
+          </p>
+          <div className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-1">
+            <InsigniaCerteza certeza={g.certeza} />
+            <span className="text-xs tabular-nums text-muted-foreground">
+              {g.videos > 0 && c.unidad === "videos" ? `${g.videos} ${g.videos === 1 ? "video" : "videos"}` : `${g.campanas} ${g.campanas === 1 ? "campaña" : "campañas"}`} · {dolaresEnteros(g.r.gasto)}
+            </span>
+          </div>
+        </>
+      ) : (
+        <p className="m-0 text-sm text-muted-foreground">Sin datos suficientes todavía</p>
+      )}
+    </li>
+  );
+}
+
+/** Los grupos de una dimensión: la comparación de CPA con su promedio y la tabla completa. */
+function TablaDeGrupos({ grupos, dimension, unidad, sinDato, porVideo }: { grupos: Grupo[]; dimension: string; unidad: string; sinDato: number; porVideo: boolean }) {
+  const total = sumaDeGrupos(grupos);
+  const promedio = total.r.compras > 0 ? total.r.gasto / total.r.compras : null;
+  const conCompras = grupos.filter((g) => g.r.compras > 0).slice(0, 10);
+  const maxCpa = Math.max(0.01, promedio ?? 0, ...conCompras.map((g) => g.r.gasto / g.r.compras));
+  const maxGasto = Math.max(1, ...grupos.map((g) => g.r.gasto));
+  const primera = mejorGrupo(grupos);
+  const conSinConfiar = grupos.some((g) => !g.confiable);
+  return (
+    <div className="flex flex-col gap-6">
+      {conCompras.length > 1 && promedio !== null && (
+        <TarjetaMeta titulo={`CPA por ${dimension.toLowerCase()}`} derecha={`Promedio de la lista: ${dolares(promedio)}`} id="cpa-dim">
+          <ul role="list" className="m-0 flex list-none flex-col gap-2.5 p-0">
+            {conCompras.map((g) => {
+              const c = g.r.gasto / g.r.compras;
+              const color = !g.confiable ? "var(--grafica-5)" : c <= promedio ? "var(--success)" : c > promedio * 1.3 ? "var(--destructive)" : "var(--warning)";
+              return (
+                <li key={g.nombre} className="grid grid-cols-[minmax(0,11rem)_1fr_auto] items-center gap-3 text-xs">
+                  <span className="truncate" title={g.nombre}>
+                    {g.nombre}
+                  </span>
+                  <span className="relative block h-3 overflow-hidden rounded-full bg-muted" aria-hidden="true">
+                    <span className="block h-full rounded-full" style={{ width: `${Math.max(2, (c / maxCpa) * 100)}%`, background: color }} />
+                    <span className="absolute inset-y-0 w-0.5 bg-foreground/70" style={{ left: `${(promedio / maxCpa) * 100}%` }} />
+                  </span>
+                  <span className="min-w-[4.5rem] text-right font-semibold tabular-nums">
+                    {dolares(c)}
+                    {!g.confiable && <span className="ml-1 font-normal text-muted-foreground">·</span>}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+          <p className="m-0 mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5">
+              <span aria-hidden="true" className="h-3 w-0.5 bg-foreground/70" />
+              Promedio
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span aria-hidden="true" className="h-2.5 w-2.5 rounded-[3px] bg-success" /> Mejor que el promedio
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span aria-hidden="true" className="h-2.5 w-2.5 rounded-[3px] bg-warning" /> Hasta 30 % más caro
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span aria-hidden="true" className="h-2.5 w-2.5 rounded-[3px] bg-destructive" /> Más caro
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span aria-hidden="true" className="h-2.5 w-2.5 rounded-[3px]" style={{ background: "var(--grafica-5)" }} /> Poca data
+            </span>
+          </p>
+        </TarjetaMeta>
+      )}
+
+      <div className="min-w-0 overflow-hidden rounded-xl border border-border bg-card">
+        {primera && (
+          <p className="m-0 border-b border-border bg-muted px-4 py-2 text-xs text-muted-foreground">
+            Lo que mejor funciona en {dimension.toLowerCase()}: <span className="font-medium text-foreground">{primera.nombre}</span> con CPA {valorCpa(primera.r)} y {entero(primera.r.compras)} compras.
+          </p>
+        )}
+        <div className="overflow-x-auto">
+          <table className="tabla-datos w-full min-w-[56rem] border-collapse text-sm">
+            <caption className="sr-only">Resultados por {dimension.toLowerCase()}</caption>
+            <thead>
+              <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                <th scope="col" className="px-4 py-2 font-medium">{dimension}</th>
+                <th scope="col" className="px-3 py-2 text-right font-medium">{unidad}</th>
+                <th scope="col" className="px-3 py-2 text-right font-medium">Gasto</th>
+                <th scope="col" className="px-3 py-2 text-right font-medium">Compras</th>
+                <th scope="col" className="px-3 py-2 text-right font-medium">CPA</th>
+                <th scope="col" className="px-3 py-2 text-right font-medium">Frente al promedio</th>
+                <th scope="col" className="px-3 py-2 text-right font-medium">CTR</th>
+                <th scope="col" className="px-3 py-2 text-right font-medium">Hook</th>
+                <th scope="col" className="px-3 py-2 text-right font-medium">Resultado estimado</th>
+                <th scope="col" className="px-4 py-2 font-medium">Qué tan seguro</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {grupos.map((g) => {
+                const ventaja = ventajaDeCpa(g, total.r);
+                return (
+                  <tr key={g.nombre} className={g.confiable ? "" : "text-muted-foreground"}>
+                    <th scope="row" className="max-w-[26rem] px-4 py-2.5 text-left font-medium">
+                      <span className="block truncate" title={g.nombre}>
+                        {g.nombre}
+                      </span>
+                      <span className="mt-1.5 block w-40 max-w-full">
+                        <BarraProgreso valor={g.r.gasto} maximo={maxGasto} color={esGanador(g) ? "var(--success)" : esPerdedor(g) ? "var(--destructive)" : "var(--grafica-5)"} alto={4} />
+                      </span>
+                    </th>
+                    <td className="px-3 py-2.5 text-right tabular-nums">{porVideo ? g.videos : g.campanas}</td>
+                    <td className="px-3 py-2.5 text-right tabular-nums">{dolares(g.r.gasto)}</td>
+                    <td className="px-3 py-2.5 text-right tabular-nums">{entero(g.r.compras)}</td>
+                    <td className="px-3 py-2.5 text-right font-medium tabular-nums">{g.r.compras > 0 ? valorCpa(g.r) : "—"}</td>
+                    <td className="px-3 py-2.5 text-right tabular-nums">{ventaja === null ? "—" : <span className={!g.confiable ? "" : ventaja < 0 ? "font-medium text-success" : "font-medium text-destructive"}>{ventaja < 0 ? "−" : "+"}{Math.abs(ventaja).toFixed(0)} %</span>}</td>
+                    <td className="px-3 py-2.5 text-right">{g.confiable ? <Nivel nivel={nivelDeCtr(ctr(g.r))}>{porcentaje(ctr(g.r))}</Nivel> : porcentaje(ctr(g.r))}</td>
+                    <td className="px-3 py-2.5 text-right">{hookRate(g.r) === null ? "—" : g.confiable ? <Nivel nivel={nivelDeHook(hookRate(g.r))}>{porcentaje(hookRate(g.r), 0)}</Nivel> : porcentaje(hookRate(g.r), 0)}</td>
+                    <td className="px-3 py-2.5 text-right">
+                      <Resultado r={g.r} tope={1} valor={g.resultado} />
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <InsigniaCerteza certeza={g.certeza} />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        {(conSinConfiar || sinDato > 0) && (
+          <p className="m-0 flex flex-col gap-1 border-t border-border px-4 py-2 text-xs text-muted-foreground">
+            {conSinConfiar && <span>{AVISO_POCA_DATA}</span>}
+            {sinDato > 0 && (
+              <span>
+                {sinDato} {sinDato === 1 ? "video con gasto no tiene" : "videos con gasto no tienen"} este dato y no cuentan aquí.
+              </span>
+            )}
+          </p>
+        )}
+      </div>
+    </div>
+  );
 }

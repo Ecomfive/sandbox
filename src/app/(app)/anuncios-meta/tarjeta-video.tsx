@@ -54,6 +54,7 @@ export function TarjetaVideo({ x, posicion, alAbrir, alReproducir }: { x: VideoV
         <span className="flex flex-wrap gap-1.5">
           {x.numero && <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-medium">{x.numero}</span>}
           <span className="rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground">{angulo ? `${angulo}${x.analisis?.estado === "sin_archivo" ? " (provisional)" : ""}` : "Sin analizar"}</span>
+          {x.analisis?.ganchoTipo && <span className="rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground">Gancho: {x.analisis.ganchoTipo}</span>}
           {x.producto && <span className="max-w-full truncate rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground">{x.producto}</span>}
         </span>
         <span className="grid grid-cols-4 gap-2">

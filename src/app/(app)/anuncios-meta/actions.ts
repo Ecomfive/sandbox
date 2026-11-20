@@ -6,6 +6,7 @@ import { registrarAuditoria } from "@/lib/auditoria";
 import { analizarVideoDeMeta, pendienteDeVideo, videosPorAnalizar } from "@/lib/meta-ads/analizar-videos";
 import { pedirMeta, tokenDeMeta } from "@/lib/meta-ads/api";
 import { buscarArchivoDeVideo, motivoSinArchivoDeVideo } from "@/lib/meta-ads/archivo-video";
+import { clasificarGanchosPendientes } from "@/lib/meta-ads/clasificar-ganchos";
 import { actividadDeCampana } from "@/lib/meta-ads/datos";
 import { leerCuentasMeta } from "@/lib/meta-ads/leer-cuentas";
 import { claveDeProducto, type Etapa } from "@/lib/meta-ads/nombre";
@@ -327,4 +328,23 @@ export async function corregirAnguloVideoMeta(videoId: string, angulo: string): 
   await registrarAuditoria({ accion: "corregir_angulo_video_meta", entidad: "meta_campanas", entidadId: videoId, detalle: limpio || "Sin ángulo", antes: { Ángulo: (previo?.angulo as string | null) ?? "—" }, despues: { Ángulo: limpio || "—" } });
   revalidatePath("/anuncios-meta", "layout");
   return {};
+}
+
+/**
+ * «Clasificar los ganchos»: pone tipo (pregunta, problema o dolor, resultado…) al gancho de los videos que ya estaban analizados, de a 30 por llamada con el texto del gancho (no vuelve a ver el video). La pantalla encadena
+ * las llamadas y muestra el avance. Solo las cuentas activas del país de la barra.
+ */
+export async function clasificarGanchosMeta(): Promise<{ error?: string; clasificados?: number; faltan?: number }> {
+  const u = await requireModuloEscritura(MODULO);
+  const supabase = createServiceClient();
+  const pais = await getPaisActual(supabase);
+  if (!(await puedeVerPaisId(supabase, u.paisesPermitidos, pais.id))) return { error: "No tienes acceso a las cuentas de ese país." };
+  const { data, error } = await supabase.from("meta_cuentas").select("id").eq("pais_id", pais.id).eq("activa", true);
+  if (error) return { error: sinMigracion(error.message) ? MIGRACION : error.message };
+  const r = await clasificarGanchosPendientes(supabase, (data ?? []).map((c) => c.id as string));
+  if (r.clasificados > 0) {
+    await registrarAuditoria({ accion: "clasificar_ganchos_meta", entidad: "meta_video_analisis", detalle: `${r.clasificados} ganchos clasificados · ${pais.nombre}` });
+    revalidatePath("/anuncios-meta", "layout");
+  }
+  return r.error ? { error: r.error, clasificados: r.clasificados, faltan: r.faltan } : { clasificados: r.clasificados, faltan: r.faltan };
 }

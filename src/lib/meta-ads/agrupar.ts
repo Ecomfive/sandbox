@@ -1,6 +1,6 @@
 // Anuncios Meta › Qué funciona: juntar campañas, anuncios o videos por una dimensión (ángulo, estructura, puja, copy, landing…) y ordenarlos de mejor a peor CPA. Lógica pura, con prueba.
 
-import { confiable, cpa, resultado, sinResultados, sumar, type Resultados } from "./metricas";
+import { certezaDe, confiable, cpa, resultado, sinResultados, sumar, type Resultados } from "./metricas";
 import type { Grupo } from "./vistas";
 
 export interface Elemento {
@@ -27,7 +27,7 @@ export function agrupar(elementos: Elemento[]): Grupo[] {
     if (e.video) g.videos.add(e.video);
     mapa.set(e.clave, g);
   });
-  const grupos: Grupo[] = [...mapa].map(([nombre, g]) => ({ nombre, campanas: g.campanas.size, videos: g.videos.size, r: g.r, resultado: g.resultado, confiable: confiable(g.r) }));
+  const grupos: Grupo[] = [...mapa].map(([nombre, g]) => ({ nombre, campanas: g.campanas.size, videos: g.videos.size, r: g.r, resultado: g.resultado, confiable: confiable(g.r), certeza: certezaDe(g.r, g.videos.size > 0 ? g.videos.size : g.campanas.size) }));
   const peso = (g: Grupo) => (g.confiable ? 0 : 1000) + (cpa(g.r) ?? 99);
   return grupos.sort((a, b) => peso(a) - peso(b) || b.r.gasto - a.r.gasto);
 }

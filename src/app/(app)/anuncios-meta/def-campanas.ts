@@ -18,7 +18,7 @@ export const DEF_CAMPANAS: DefTabla<CampanaVista> = {
   campos: [
     { id: "nombre", etiqueta: "Nombre", tipo: "texto", valor: (c) => c.nombre },
     { id: "veredicto", etiqueta: "Cómo le va", tipo: "seleccion", valores: (c) => [veredictoDe(c)], opciones: () => (Object.keys(NOMBRE_VEREDICTO) as Veredicto[]).map((v) => ({ valor: v, etiqueta: NOMBRE_VEREDICTO[v] })), agrupable: true, ordenGrupos: ["pierde", "deja", "poca_data", "sin_gasto"] },
-    { id: "etapa", etiqueta: "Etapa", tipo: "seleccion", valores: (c) => [c.etapa ?? SIN], opciones: () => [...(Object.keys(NOMBRE_ETAPA) as (keyof typeof NOMBRE_ETAPA)[]).map((e) => ({ valor: e, etiqueta: NOMBRE_ETAPA[e] })), { valor: SIN, etiqueta: "Sin etapa" }], agrupable: true, ordenGrupos: ["testing", "escala", "retargeting"] },
+    { id: "etapa", etiqueta: "Etapa", tipo: "seleccion", valores: (c) => [c.etapa ?? SIN], opciones: () => [...(Object.keys(NOMBRE_ETAPA) as (keyof typeof NOMBRE_ETAPA)[]).map((e) => ({ valor: e, etiqueta: NOMBRE_ETAPA[e] })), { valor: SIN, etiqueta: "Sin etapa" }], etiquetaSinValor: "Sin etapa", agrupable: true, ordenGrupos: ["testing", "escala", "retargeting"] },
     { id: "estado", etiqueta: "Estado en Meta", tipo: "seleccion", valores: (c) => [c.activa ? "activa" : "apagada"], opciones: () => [{ valor: "activa", etiqueta: "Activa" }, { valor: "apagada", etiqueta: "Pausada o archivada" }], agrupable: true },
     { id: "estructura", etiqueta: "CBO o ABO", tipo: "seleccion", valores: (c) => [c.estructura ?? SIN], etiquetaSinValor: "Sin dato", agrupable: true },
     { id: "puja", etiqueta: "Puja", tipo: "seleccion", valores: (c) => [c.puja ? NOMBRE_PUJA[c.puja] : SIN], etiquetaSinValor: "Sin dato", agrupable: true },

@@ -14,7 +14,7 @@ import { leerAhoraMeta } from "./actions";
  * Arriba de cada pestaña de Anuncios Meta: el periodo (Hoy, 7 o 30 días), la cuenta publicitaria (o todas las del país) y «Leer ahora». El periodo y la cuenta viajan en la dirección
  * (`?periodo=` y `?cuenta=`), así que se pueden copiar y mandar.
  */
-export function BarraMeta({ periodo, cuentas, cuentaId, escribe, hayToken, desde, hasta }: { periodo: Periodo; cuentas: CuentaVista[]; cuentaId: string | null; escribe: boolean; hayToken: boolean; desde: string; hasta: string }) {
+export function BarraMeta({ periodo, cuentas, cuentaId, escribe, hayToken, desde, hasta, sinPeriodo = false }: { periodo: Periodo; cuentas: CuentaVista[]; cuentaId: string | null; escribe: boolean; hayToken: boolean; desde: string; hasta: string; sinPeriodo?: boolean }) {
   const ruta = usePathname();
   const router = useRouter();
   const params = useSearchParams();
@@ -46,6 +46,7 @@ export function BarraMeta({ periodo, cuentas, cuentaId, escribe, hayToken, desde
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
         <div className="flex flex-wrap items-end gap-x-4 gap-y-2">
+          {!sinPeriodo && (
           <div role="group" aria-label="Periodo" className="flex overflow-hidden rounded-md border border-border-control">
             {PERIODOS.map((p) => (
               <Link
@@ -59,6 +60,7 @@ export function BarraMeta({ periodo, cuentas, cuentaId, escribe, hayToken, desde
               </Link>
             ))}
           </div>
+          )}
           {cuentas.length > 1 && (
             <label className="flex flex-col gap-1">
               <span className={labelClassSm}>Cuenta publicitaria</span>
@@ -74,7 +76,7 @@ export function BarraMeta({ periodo, cuentas, cuentaId, escribe, hayToken, desde
             </label>
           )}
           <p className="m-0 pb-1.5 text-xs text-muted-foreground">
-            {desde === hasta ? `Hoy, ${hasta}` : `Del ${desde} al ${hasta}`} · hora de Panamá
+            {sinPeriodo ? `Hasta hoy, ${hasta}` : desde === hasta ? `Hoy, ${hasta}` : `Del ${desde} al ${hasta}`} · hora de Panamá
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">

@@ -1,6 +1,7 @@
 import { CampanasLista } from "../campanas-lista";
 import { cargarPaginaMeta, type ParametrosMeta } from "../datos-pagina";
 import { MarcoMeta } from "../marco-meta";
+import { ResumenCampanas } from "../resumen-campanas";
 
 export const metadata = { title: "Campañas · Anuncios Meta" };
 
@@ -14,6 +15,7 @@ export default async function CampanasMetaPage({ searchParams }: { searchParams:
   const faltan = Array.isArray(sp.faltan) ? sp.faltan[0] : sp.faltan;
   return (
     <MarcoMeta titulo="Campañas" datos={datos} escribe={escribe} hayToken={hayToken} pais={pais}>
+      <ResumenCampanas campanas={datos.campanas} />
       <CampanasLista campanas={datos.campanas} anuncios={datos.anuncios} cuentas={datos.cuentas} productos={datos.productos} escribe={escribe} abrirInicial={abrir ?? null} soloFaltanInicial={faltan === "1"} />
     </MarcoMeta>
   );

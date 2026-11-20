@@ -61,6 +61,13 @@
   --grafica-5: #7c7c85;
   --grafica-positivo: #15803d;
   --grafica-negativo: #be123c;
+  /* Anuncios Meta: seis series categóricas para ángulos, ganchos, formatos y personas. Validadas (daltonismo, luz y contraste ≥ 3:1) en claro y en oscuro; el color sigue a la entidad, no a su puesto. */
+  --meta-1: #8a35c9;
+  --meta-2: #d97706;
+  --meta-3: #0891b2;
+  --meta-4: #e11d48;
+  --meta-5: #1d4ed8;
+  --meta-6: #4d7c0f;
 }
 
 @theme inline {
@@ -92,6 +99,12 @@
   --color-nivel-lectura: var(--nivel-lectura);
   --color-nivel-edicion: var(--nivel-edicion);
   --color-privado: var(--privado);
+  --color-meta-1: var(--meta-1);
+  --color-meta-2: var(--meta-2);
+  --color-meta-3: var(--meta-3);
+  --color-meta-4: var(--meta-4);
+  --color-meta-5: var(--meta-5);
+  --color-meta-6: var(--meta-6);
   --color-sin-acceso: var(--sin-acceso);
   --font-sans: var(--font-inter);
 }
@@ -139,6 +152,12 @@
   --grafica-5: #80808a;
   --grafica-positivo: #4ade80;
   --grafica-negativo: #fb7185;
+  --meta-1: #a066e6;
+  --meta-2: #cf8100;
+  --meta-3: #14a0c0;
+  --meta-4: #e8566f;
+  --meta-5: #5a8fe8;
+  --meta-6: #689f10;
 }
 
 body {

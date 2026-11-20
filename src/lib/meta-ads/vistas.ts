@@ -15,7 +15,13 @@ export interface CampanaVista {
   estructura: Estructura | null;
   puja: Puja | null;
   producto: string | null;
+  /** El ángulo con que se clasifica la campaña: el que domina entre sus videos (60 % o más), «Mezcla de ángulos» si ninguno domina, o el corregido a mano. */
   angulo: string | null;
+  /** De qué ángulos está hecha, por el ángulo de cada uno de sus videos (los videos distintos de sus anuncios). */
+  angulos: ComposicionAngulo[];
+  /** Videos distintos que usa la campaña y cuántos de ellos ya tienen ángulo. */
+  videosTotal: number;
+  videosConAngulo: number;
   presupuestoDiario: number | null;
   creadaEn: string | null;
   /** Quién la montó: la persona que dice el nombre («ARIANNY») y, si el nombre no la trae, quien la creó según el registro de actividad de Meta. */
@@ -34,6 +40,14 @@ export interface CampanaVista {
   topeDefinido: boolean;
   /** Qué etiquetas se corrigieron a mano (la lectura de Meta no las pisa): `producto`, `angulo`, `etapa`. */
   manual: string[];
+}
+
+/** Un ángulo dentro de una campaña: cuántos de sus videos lo usan y qué parte de los videos con ángulo es. Los porcentajes de una campaña suman 100. */
+export interface ComposicionAngulo {
+  angulo: string;
+  videos: number;
+  pct: number;
+  gasto: number;
 }
 
 export interface AnuncioVista {
@@ -58,6 +72,8 @@ export interface AnalisisVideoVista {
   anguloManual: boolean;
   promesa: string | null;
   gancho: string | null;
+  /** Qué tipo de gancho es (pregunta, problema o dolor, resultado…), de una lista fija; null si todavía no se clasificó. */
+  ganchoTipo: string | null;
   resumen: string | null;
   transcripcion: string | null;
   publico: string | null;
@@ -104,6 +120,8 @@ export interface Grupo {
   r: Resultados;
   resultado: number;
   confiable: boolean;
+  /** Qué tan seguro es lo que dice el grupo: firme (mucho gasto, varias unidades y compras suficientes), probable o poca data. */
+  certeza: "firme" | "probable" | "poca";
 }
 
 export interface ActividadVista {

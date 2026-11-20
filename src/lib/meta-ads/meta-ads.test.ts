@@ -119,7 +119,7 @@ test("landings y copys se juntan sin rastreo ni espacios", () => {
 });
 
 const campana = (o: Partial<CampanaVista>): CampanaVista => ({
-  id: "c1", cuentaId: "a", cuentaNombre: "Oferfy", metaId: "1", nombre: "PA | X", estado: "ACTIVE", activa: true, etapa: "testing", estructura: "CBO", puja: "sin_tope", producto: "Corrector", angulo: "Dolor",
+  id: "c1", cuentaId: "a", cuentaNombre: "Oferfy", metaId: "1", nombre: "PA | X", estado: "ACTIVE", activa: true, etapa: "testing", estructura: "CBO", puja: "sin_tope", producto: "Corrector", angulo: "Dolor", angulos: [], videosTotal: 0, videosConAngulo: 0,
   presupuestoDiario: 20, creadaEn: "2026-11-01T00:00:00Z", persona: null, personaMeta: null, mercado: null, anguloOrigen: null, videos: null, r: sinResultados(), tope: 3, topeDefinido: true, manual: [], ...o,
 });
 

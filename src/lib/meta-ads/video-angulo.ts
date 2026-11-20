@@ -2,6 +2,7 @@
 // el ángulo (el motivo de compra que usa), la promesa, el gancho de los primeros segundos, lo que dice y a quién le habla. Aquí está lo puro, con prueba: el pedido, la validación de lo que contesta la IA (nunca se confía en ella:
 // largos, tipos y texto limpio) y cómo se reutiliza un ángulo que ya existe para que «Dolor de espalda» y «dolor de espalda.» no sean dos ángulos.
 
+import { ganchoTipoValido, TIPOS_GANCHO } from "./ganchos";
 import { claveDeTexto, embellecer } from "./nombre";
 
 /** Sube cuando el análisis pide más cosas al video: «Analizar los pendientes» vuelve a ver los de una versión menor. 1 = ángulo, promesa, gancho…; 2 = estructura, llamado a la acción, oferta y recursos. */
@@ -11,6 +12,8 @@ export interface AnalisisVideo {
   angulo: string;
   promesa: string;
   gancho: string;
+  /** El tipo de gancho, de la lista fija de `ganchos.ts`; null si la IA no contestó uno válido (se clasifica después con el texto del gancho). */
+  ganchoTipo: string | null;
   resumen: string;
   transcripcion: string;
   publico: string;
@@ -63,7 +66,7 @@ export function pedidoAnalisisVideo(c: ContextoPedido): string {
     c.copy ? `Texto principal del anuncio: «${recorte(c.copy, 500)}».` : "",
     c.titulo ? `Título del anuncio: «${recorte(c.titulo, 120)}».` : "",
     "Contesta SOLO un JSON, sin texto antes ni después, con estas llaves:",
-    '{"angulo": "…", "promesa": "lo que promete el anuncio, en una frase", "gancho": "lo que se ve y se dice en los primeros 3 segundos", "resumen": "de qué trata, en 2 o 3 frases", "transcripcion": "lo que se dice, hasta 1200 caracteres; vacío si no habla nadie", "publico": "a quién le habla", "formato": "uno de: ' + FORMATOS_VIDEO.join(", ") + '", "cta": "el llamado a la acción tal como se dice o se escribe; vacío si no hay", "cta_segundo": segundo aproximado en que aparece por primera vez (un número entero) o null, "cta_tipo": "uno de: ' + TIPOS_CTA.join(", ") + '", "oferta": "la oferta concreta (descuento, 2x1, envío gratis, garantía, precio); vacío si no hay", "recursos": ["los que use el video, de esta lista: ' + RECURSOS_VIDEO.join(", ") + '"], "estructura": [{"parte": "una de: ' + PARTES_VIDEO.join(", ") + '", "desde": segundo de inicio, "hasta": segundo de fin, "resumen": "qué pasa en esa parte, en una frase"}]}',
+    '{"angulo": "…", "promesa": "lo que promete el anuncio, en una frase", "gancho": "lo que se ve y se dice en los primeros 3 segundos", "gancho_tipo": "uno de: ' + TIPOS_GANCHO.join(", ") + '", "resumen": "de qué trata, en 2 o 3 frases", "transcripcion": "lo que se dice, hasta 1200 caracteres; vacío si no habla nadie", "publico": "a quién le habla", "formato": "uno de: ' + FORMATOS_VIDEO.join(", ") + '", "cta": "el llamado a la acción tal como se dice o se escribe; vacío si no hay", "cta_segundo": segundo aproximado en que aparece por primera vez (un número entero) o null, "cta_tipo": "uno de: ' + TIPOS_CTA.join(", ") + '", "oferta": "la oferta concreta (descuento, 2x1, envío gratis, garantía, precio); vacío si no hay", "recursos": ["los que use el video, de esta lista: ' + RECURSOS_VIDEO.join(", ") + '"], "estructura": [{"parte": "una de: ' + PARTES_VIDEO.join(", ") + '", "desde": segundo de inicio, "hasta": segundo de fin, "resumen": "qué pasa en esa parte, en una frase"}]}',
     c.soloTexto ? "Como no hay video, deja cta_segundo en null, recursos y estructura vacíos." : "En estructura pon de 3 a 8 partes en orden, con los segundos reales del video; la primera es el gancho.",
     "No inventes: si algo no se ve o no se oye, déjalo vacío.",
   ]
@@ -105,6 +108,7 @@ export function normalizarAnalisisVideo(texto: string | null | undefined, existe
     angulo,
     promesa: s("promesa", 240),
     gancho: s("gancho", 300),
+    ganchoTipo: ganchoTipoValido(o.gancho_tipo),
     resumen: s("resumen", 500),
     transcripcion: s("transcripcion", 1200),
     publico: s("publico", 160),
