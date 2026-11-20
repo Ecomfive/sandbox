@@ -70,3 +70,73 @@ test("de qué bodega sale el pedido: la primera que alcanza; si ninguna, la que 
   assert.equal(mejorOrigen([{ skuId: A, cantidad: 0 }], ["ist"], stock), "ist");
   assert.equal(mejorOrigen(lineas, [], stock), null);
 });
+
+// Editar un pedido (20 nov 2026).
+import { avisoEdicion, cambiosDeEdicion, puedeEditar, revisarEdicion } from "./reglas";
+
+const L1 = "aaaaaaaa-1111-4111-8111-111111111111";
+const L2 = "bbbbbbbb-2222-4222-8222-222222222222";
+const existentes = [
+  { id: "linea-1", skuId: A },
+  { id: "linea-2", skuId: B },
+];
+
+test("despacho edita mientras inventario no haya enviado", () => {
+  assert.equal(puedeEditar("solicitud"), true);
+  assert.equal(puedeEditar("en_proceso"), true);
+  assert.equal(puedeEditar("enviado"), false);
+  assert.equal(puedeEditar("recibido"), false);
+  assert.equal(puedeEditar("cancelado"), false);
+});
+
+test("una edición conserva la línea que ya existía y trata como nueva la que no corresponde", () => {
+  const r = revisarEdicion(
+    [
+      { id: "linea-1", skuId: A, cantidad: "3", nota: " se acabó " },
+      { id: "linea-1", skuId: B, cantidad: 2 }, // dice ser de otra línea y de otro producto: es nueva
+      { skuId: L1, cantidad: 1 },
+    ],
+    existentes,
+  );
+  assert.ok("lineas" in r);
+  if ("lineas" in r) assert.deepEqual(r.lineas, [
+    { id: "linea-1", skuId: A, cantidad: 3, nota: "se acabó" },
+    { id: null, skuId: B, cantidad: 2, nota: null },
+    { id: null, skuId: L1, cantidad: 1, nota: null },
+  ]);
+});
+
+test("un pedido editado no puede quedar vacío ni con un producto repetido o una cantidad inválida", () => {
+  const vacio = revisarEdicion([], existentes);
+  assert.ok("error" in vacio && /cancela/i.test(vacio.error));
+  assert.ok("error" in revisarEdicion([{ id: "linea-1", skuId: A, cantidad: 1 }, { skuId: A, cantidad: 2 }], existentes));
+  assert.ok("error" in revisarEdicion([{ id: "linea-1", skuId: A, cantidad: 0 }], existentes));
+});
+
+test("qué cambió: lo que se quita, lo que cambia de cantidad o nota y lo que se agrega", () => {
+  const antes = [
+    { id: "linea-1", skuId: A, producto: "Faja Negro / S", cantidad: 40, nota: null },
+    { id: "linea-2", skuId: B, producto: "Faja Negro / XL", cantidad: 10, nota: "urgente" },
+    { id: "linea-3", skuId: L2, producto: "Crema", cantidad: 5, nota: null },
+  ];
+  const despues = [
+    { id: "linea-1", skuId: A, cantidad: 38, nota: null },
+    { id: "linea-2", skuId: B, cantidad: 10, nota: "urgente" },
+    { id: null, skuId: L1, cantidad: 7, nota: null },
+  ];
+  const c = cambiosDeEdicion(antes, despues, { [L1]: "Aceite" });
+  assert.deepEqual(c.quitar, ["linea-3"]);
+  assert.deepEqual(c.cambiar.map((l) => l.id), ["linea-1"]);
+  assert.deepEqual(c.agregar.map((l) => l.skuId), [L1]);
+  assert.deepEqual(c.resumen, ["quitó Crema", "Faja Negro / S: 40 → 38", "agregó Aceite (7)"]);
+  // Sin tocar nada no hay cambios.
+  assert.deepEqual(cambiosDeEdicion(antes, antes.map((a) => ({ id: a.id, skuId: a.skuId, cantidad: a.cantidad, nota: a.nota })), {}).resumen, []);
+  // Solo la nota.
+  assert.deepEqual(cambiosDeEdicion(antes.slice(0, 1), [{ id: "linea-1", skuId: A, cantidad: 40, nota: "ojo" }], {}).resumen, ["Faja Negro / S: cambió la nota"]);
+});
+
+test("el aviso de una edición dice quién y qué", () => {
+  const a = avisoEdicion(12, "Yiletsi", ["quitó Crema", "Faja: 40 → 38"]);
+  assert.equal(a.titulo, "PED-0012 fue editado");
+  assert.match(a.texto, /Yiletsi editó el pedido: quitó Crema; Faja: 40 → 38\./);
+});

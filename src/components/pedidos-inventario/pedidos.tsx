@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   cancelarPedidoInventario,
   crearPedidoInventario,
+  editarPedidoInventario,
   enviarPedidoInventario,
   ponerEnProcesoPedido,
   recibirPedidoInventario,
@@ -15,8 +16,10 @@ import { anilloFoco, fieldClass } from "@/components/ui/field";
 import { FichaStock, type SkuFicha } from "@/app/(app)/inventario/ficha-stock";
 import { CampoSkuMaestro, ProveedorSkusMaestros, type OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import { useToast } from "@/components/ui/toast";
+import { Ventana } from "@/components/ui/ventana";
 import { CalendarioIcon, CheckIcon, DescargarIcon, EnvioIcon, InventarioIcon, PedidoIcon } from "@/lib/nav-icons";
 import {
+  cambiosDeEdicion,
   ESTADOS,
   estadoDe,
   faltantesEn,
@@ -25,6 +28,7 @@ import {
   mejorOrigen,
   numeroPedido,
   puedeCancelar,
+  puedeEditar,
   puedeEnProceso,
   puedeEnviar,
   puedeRecibir,
@@ -170,6 +174,130 @@ function HayEnInventario({ hay, pedido }: { hay: StockInventario | undefined; pe
   );
 }
 
+interface LineaEdicion {
+  clave: number;
+  /** La línea que ya existía en el pedido (null = producto nuevo). */
+  id: string | null;
+  sku: OpcionSkuMaestro | null;
+  skuId: string | null;
+  nombre: string;
+  cantidad: string;
+  nota: string;
+}
+
+/**
+ * Despacho edita su pedido (20 nov 2026, pedido de Jhokser): quita productos, cambia cantidades o notas y agrega productos mientras inventario no lo haya enviado. Lo que se sube de cantidad o se agrega se compara con
+ * lo que hay en inventario, como al hacer un pedido; lo que no cambia no. Un pedido no puede quedar vacío: para quitarlo todo se cancela.
+ */
+function EditarPedido({ p, opciones, stock }: { p: PedidoInventario; opciones: OpcionSkuMaestro[]; stock: Record<string, StockInventario> }) {
+  const desdeElPedido = (): LineaEdicion[] => p.items.map((it, i) => ({ clave: i, id: it.id, sku: null, skuId: it.skuId, nombre: it.producto, cantidad: String(it.cantidadPedida), nota: it.nota ?? "" }));
+  const [abierto, setAbierto] = useState(false);
+  const [lineas, setLineas] = useState<LineaEdicion[]>(desdeElPedido);
+  const [siguiente, setSiguiente] = useState(p.items.length);
+  const { ocupado, correr } = useAccion();
+  const abrir = () => {
+    setLineas(desdeElPedido());
+    setSiguiente(p.items.length);
+    setAbierto(true);
+  };
+  const cambiar = (clave: number, c: Partial<LineaEdicion>) => setLineas((ls) => ls.map((l) => (l.clave === clave ? { ...l, ...c } : l)));
+  const agregar = () => {
+    setLineas((ls) => [...ls, { clave: siguiente, id: null, sku: null, skuId: null, nombre: "", cantidad: "", nota: "" }]);
+    setSiguiente((n) => n + 1);
+  };
+
+  const editadas = lineas.map((l) => ({ id: l.id, skuId: l.skuId ?? "", cantidad: Number(l.cantidad), nota: l.nota.trim() || null }));
+  const antes = p.items.map((it) => ({ id: it.id, skuId: it.skuId, producto: it.producto, cantidad: it.cantidadPedida, nota: it.nota }));
+  const nombres = Object.fromEntries([...p.items.map((it) => [it.skuId, it.producto]), ...lineas.flatMap((l) => (l.sku && l.skuId ? [[l.skuId, l.sku.nombre]] : []))]);
+  const cambios = cambiosDeEdicion(antes, editadas.filter((l) => l.skuId), nombres);
+  const previas = new Map(p.items.map((it) => [it.id, it.cantidadPedida]));
+  const hayDe = (skuId: string | null) => (skuId ? (stock[skuId]?.total ?? 0) : 0);
+  // Solo lo nuevo o lo que sube de cantidad se compara con lo que hay en inventario.
+  const sinStock = (l: LineaEdicion) => {
+    const cant = Number(l.cantidad);
+    const sube = !l.id || cant > (previas.get(l.id) ?? 0);
+    return sube && (hayDe(l.skuId) <= 0 || cant > hayDe(l.skuId));
+  };
+  const repetido = new Set(lineas.map((l) => l.skuId).filter(Boolean)).size < lineas.filter((l) => l.skuId).length;
+  const listo = lineas.length > 0 && !repetido && lineas.every((l) => l.skuId && Number.isInteger(Number(l.cantidad)) && Number(l.cantidad) >= 1 && !sinStock(l)) && cambios.resumen.length > 0;
+
+  return (
+    <>
+      <button type="button" onClick={abrir} aria-haspopup="dialog" className={SECUNDARIO}>
+        Editar
+      </button>
+      <Ventana abierto={abierto} alCerrar={() => setAbierto(false)} titulo={`Editar ${numeroPedido(p.numero)}`} ancho="lg">
+        <form
+          className="flex flex-col gap-4 p-5 text-sm"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!ocupado && listo) correr(() => editarPedidoInventario(p.id, editadas), () => setAbierto(false));
+          }}
+        >
+          <ProveedorSkusMaestros opciones={opciones}>
+            <div className="flex flex-col gap-2">
+              {lineas.map((l, i) => (
+                <div key={l.clave} className="flex flex-wrap items-end gap-2">
+                  <div className="flex min-w-[220px] flex-[3_1_280px] flex-col gap-1">
+                    {i === 0 && <span className="font-medium">Producto</span>}
+                    {l.id ? (
+                      <span className="flex min-h-9 items-center font-medium">{l.nombre}</span>
+                    ) : (
+                      <CampoSkuMaestro valor={l.skuId} alCambiar={(o) => cambiar(l.clave, { sku: o, skuId: o?.id ?? null, nombre: o?.nombre ?? "" })} etiquetaAria={`Producto nuevo ${i + 1}`} placeholder="Escribe parte del nombre, el SKU o el N.º" claseContenedor="w-full" />
+                    )}
+                  </div>
+                  <label className="flex w-28 flex-col gap-1">
+                    <span className={i === 0 ? "font-medium" : "sr-only"}>Cantidad</span>
+                    <input type="number" inputMode="numeric" min={1} step={1} value={l.cantidad} onChange={(e) => cambiar(l.clave, { cantidad: e.target.value })} className={fieldClass} />
+                  </label>
+                  <label className="flex min-w-[180px] flex-[2_1_220px] flex-col gap-1">
+                    <span className={i === 0 ? "font-medium" : "sr-only"}>
+                      Nota <span className="font-normal text-muted-foreground">(opcional)</span>
+                    </span>
+                    <input type="text" maxLength={300} value={l.nota} onChange={(e) => cambiar(l.clave, { nota: e.target.value })} className={fieldClass} />
+                  </label>
+                  <button type="button" aria-label={`Quitar ${l.nombre || `el producto ${i + 1}`} del pedido`} onClick={() => setLineas((ls) => ls.filter((x) => x.clave !== l.clave))} className={`${SECUNDARIO} min-w-9 px-0 text-muted-foreground`}>
+                    ×
+                  </button>
+                  {l.skuId && sinStock(l) && (
+                    <span role="alert" className="basis-full text-xs font-semibold text-destructive">
+                      {hayDe(l.skuId) <= 0 ? "Sin stock en inventario: no se puede pedir." : `Solo hay ${hayDe(l.skuId).toLocaleString("es-PA")} en inventario: pide ${hayDe(l.skuId).toLocaleString("es-PA")} o menos.`}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </ProveedorSkusMaestros>
+          {lineas.length === 0 && (
+            <p role="alert" className="m-0 text-xs font-semibold text-destructive">
+              El pedido no puede quedar vacío: para quitarlo todo, cancélalo.
+            </p>
+          )}
+          {repetido && (
+            <p role="alert" className="m-0 text-xs font-semibold text-destructive">
+              Un producto está dos veces en el pedido.
+            </p>
+          )}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <button type="button" onClick={agregar} disabled={lineas.length >= MAX_LINEAS} className={SECUNDARIO}>
+              + Agregar producto
+            </button>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setAbierto(false)} className={SECUNDARIO}>
+                Cerrar
+              </button>
+              <button type="submit" disabled={ocupado || !listo} className={PRINCIPAL}>
+                {ocupado ? "Guardando…" : "Guardar cambios"}
+              </button>
+            </div>
+          </div>
+          {cambios.resumen.length > 0 && <p className="m-0 text-xs text-muted-foreground">Cambios: {cambios.resumen.join("; ")}.</p>}
+        </form>
+      </Ventana>
+    </>
+  );
+}
+
 const TD = "border-b border-border px-2 py-2 align-top";
 
 /**
@@ -236,12 +364,17 @@ function FilasPedido({
   origenes,
   stock,
   abrirFicha,
+  opciones,
+  hayEnInventario,
 }: {
   p: PedidoInventario;
   modo: "despacho" | "inventario";
   puedeEscribir: boolean;
   origenes: { id: string; nombre: string }[];
   stock: Record<string, Record<string, number>>;
+  /** Los productos que despacho puede pedir y lo que hay de cada uno en inventario (para editar un pedido). */
+  opciones: OpcionSkuMaestro[];
+  hayEnInventario: Record<string, StockInventario>;
   /** Abre la ficha de stock del producto (null = no se puede: falta el permiso de Inventario). */
   abrirFicha: ((skuId: string) => void) | null;
 }) {
@@ -298,6 +431,7 @@ function FilasPedido({
         </>
       ) : (
         <>
+          {puedeEditar(p.estado) && <EditarPedido p={p} opciones={opciones} stock={hayEnInventario} />}
           {puedeRecibir(p.estado) && (
             <button type="button" disabled={ocupado} onClick={() => correr(() => recibirPedidoInventario(p.id))} className={PRINCIPAL}>
               Recibido
@@ -458,6 +592,8 @@ export function TablaPedidos({
   origenes = [],
   stock = {},
   fichas = null,
+  opciones = [],
+  hayEnInventario = {},
 }: {
   pedidos: PedidoInventario[];
   modo: "despacho" | "inventario";
@@ -466,6 +602,9 @@ export function TablaPedidos({
   stock?: Record<string, Record<string, number>>;
   /** Los productos de los pedidos, para abrir su ficha de stock (20 nov 2026); null = sin permiso de Inventario. */
   fichas?: Record<string, SkuFicha> | null;
+  /** Para que despacho edite un pedido: los productos que puede pedir y lo que hay de cada uno en inventario. */
+  opciones?: OpcionSkuMaestro[];
+  hayEnInventario?: Record<string, StockInventario>;
 }) {
   const [ficha, setFicha] = useState<string | null>(null);
   const columnas = modo === "inventario" ? 8 : 9;
@@ -498,7 +637,7 @@ export function TablaPedidos({
           ) : (
             pedidos.map((p) => (
               <Fragment key={p.id}>
-                <FilasPedido p={p} modo={modo} puedeEscribir={puedeEscribir} origenes={origenes} stock={stock} abrirFicha={fichas ? (id) => fichas[id] && setFicha(id) : null} />
+                <FilasPedido p={p} modo={modo} puedeEscribir={puedeEscribir} origenes={origenes} stock={stock} abrirFicha={fichas ? (id) => fichas[id] && setFicha(id) : null} opciones={opciones} hayEnInventario={hayEnInventario} />
               </Fragment>
             ))
           )}

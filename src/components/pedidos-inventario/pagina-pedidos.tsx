@@ -70,7 +70,7 @@ export async function PaginaPedidos({ modo, usuario, estado }: { modo: "despacho
             </p>
           )}
           <TableroPedidos modo={modo} ruta={ruta} cuenta={cuenta} total={pedidos.length} elegido={elegido} />
-          <TablaPedidos pedidos={visibles} modo={modo} puedeEscribir={puedeEscribir} origenes={bodegas.origenes} stock={stock} fichas={fichas} />
+          <TablaPedidos pedidos={visibles} modo={modo} puedeEscribir={puedeEscribir} origenes={bodegas.origenes} stock={stock} fichas={fichas} opciones={opciones} hayEnInventario={hayEnInventario} />
           <p className="m-0 text-xs text-muted-foreground">
             Se ven todos los pedidos abiertos y los cerrados de los últimos 30 días. {bodegas.destino ? `Lo enviado llega a ${bodegas.destino.nombre}.` : ""}
           </p>
