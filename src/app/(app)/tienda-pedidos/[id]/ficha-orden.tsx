@@ -1,6 +1,7 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, useTransition, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { claseThLista, claseTdLista, Pastilla } from "@/components/panel/piezas-panel";
 import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
@@ -14,11 +15,15 @@ import type { OrdenTienda } from "@/lib/tienda/orden-detalle";
 import { casoAbierto, tipoPrincipal, type CasoPedido } from "@/lib/tienda/postventa-tienda";
 import { etiquetasDe, zonaDeEtiquetas } from "@/lib/tienda/ordenes-finanzas";
 import { NotasOrden } from "./notas-orden";
+import { EtiquetasPedido } from "./etiquetas-pedido";
+import { cambiarEtiquetasPedido } from "../etiquetas-actions";
+import { ETIQUETA_CONFIRMADA, esConfirmada } from "@/lib/tienda/etiquetas-shopify";
 import { ChatTienda } from "@/components/tienda/chat-tienda";
 
 // La ficha de un pedido de tienda (13 nov 2026, pedido de Hernán: «como la ficha de pedido de la app de Jorge»): la línea de tiempo del pedido, las
 // pestañas que llevan a cada parte, el chat de WhatsApp del cliente al lado y los botones de acción abajo. Todo sale de lo registrado (la orden, Monday,
-// Servientrega, el CRM); los botones están apagados mientras Shopify sea de solo lectura. Lo único que se escribe son las notas del equipo.
+// Servientrega, el CRM). Se escriben las notas del equipo y, desde el 19 nov 2026, con «Escribir en Shopify» encendido en la tienda, las etiquetas del
+// pedido y «Confirmar pedido» (la etiqueta «Confirmada»), que van primero a Shopify. Los demás botones siguen apagados.
 
 const SECCIONES = [
   { id: "asistente", titulo: "Asistente", icono: InteligenciaIcon },
@@ -242,8 +247,25 @@ export function FichaOrdenTienda({ orden, codigoPais, puedeEscribir }: { orden: 
   const entregados = anteriores.filter((e) => e === "entregada").length;
   const devueltos = anteriores.filter((e) => e === "devuelta").length;
   const dinero = (n: number | null | undefined) => (n === null || n === undefined ? "—" : formatearMoneda(Number(n), codigoPais));
-  const etiquetas = etiquetasDe(o.etiquetas);
-  const zona = zonaDeEtiquetas(o.etiquetas);
+  const router = useRouter();
+  // Las etiquetas se cambian en Shopify desde aquí (19 nov 2026): lo que vuelve de Shopify es lo que se muestra.
+  const [etiquetas, setEtiquetas] = useState(() => etiquetasDe(o.etiquetas));
+  const [cambiando, startCambio] = useTransition();
+  const zona = zonaDeEtiquetas(etiquetas.join(", "));
+  const esc = orden.escritura;
+  const confirmada = esConfirmada(etiquetas);
+  function cambiarEtiquetas(agregar: string[], quitar: string[], hecho: string) {
+    startCambio(async () => {
+      const r = await cambiarEtiquetasPedido(orden.id, agregar, quitar);
+      if ("error" in r) {
+        mostrarToast(r.error, "destructive");
+        return;
+      }
+      setEtiquetas(r.etiquetas);
+      mostrarToast(r.aviso ?? hecho, r.aviso ? "destructive" : undefined);
+      router.refresh();
+    });
+  }
   const pasos = pasosDelPedido(o, entrega ? { fuente: entrega.fuente, grupo: entrega.grupo, fecha: entrega.fecha, repartidor: entrega.repartidor, causa: entrega.causa } : null);
   const c = orden.cuentas;
   const telefono = cliente?.telefono ?? null;
@@ -277,6 +299,10 @@ export function FichaOrdenTienda({ orden, codigoPais, puedeEscribir }: { orden: 
               </button>
             ))}
           </nav>
+
+          {(etiquetas.length > 0 || esc.activa) && (
+            <EtiquetasPedido ordenId={orden.id} etiquetas={etiquetas} sugeridas={esc.sugeridas} activa={esc.activa} motivo={esc.motivo} pendiente={cambiando} onCambiar={cambiarEtiquetas} />
+          )}
 
           {orden.asistente && (
             <Seccion id={sid("asistente")} titulo="Asistente de confirmación" icono={S("asistente").icono}>
@@ -430,14 +456,6 @@ export function FichaOrdenTienda({ orden, codigoPais, puedeEscribir }: { orden: 
               {o.fecha_devolucion && <Dato etiqueta="Devuelto">{formatearFecha(o.fecha_devolucion)}</Dato>}
               {o.motivo_cancelacion && <Dato etiqueta="Motivo">{o.motivo_cancelacion}</Dato>}
             </dl>
-            {etiquetas.length > 0 && (
-              <div className="flex flex-wrap items-center gap-1.5">
-                <span className="text-xs text-muted-foreground">Etiquetas de Shopify:</span>
-                {etiquetas.map((e) => (
-                  <Pastilla key={e}>{e}</Pastilla>
-                ))}
-              </div>
-            )}
           </Seccion>
 
           <Seccion id={sid("postventa")} titulo={S("postventa").titulo} icono={S("postventa").icono} extra={<span className="text-xs text-muted-foreground">del tablero de Monday</span>}>
@@ -464,10 +482,12 @@ export function FichaOrdenTienda({ orden, codigoPais, puedeEscribir }: { orden: 
                           <b>{ETIQUETA_FASE[e.fase_despues] ?? e.fase_despues}</b>
                           {e.fase_antes ? <span className="text-muted-foreground"> (antes {ETIQUETA_FASE[e.fase_antes]?.toLowerCase() ?? e.fase_antes})</span> : null}
                         </>
+                      ) : e.tipo === "etiqueta" ? (
+                        <b>Etiquetas en Shopify</b>
                       ) : (
                         <b>{e.tipo}</b>
                       )}
-                      {e.detalle ? <span className="text-muted-foreground"> · {e.detalle}</span> : null}
+                      {e.detalle ? <span className="text-muted-foreground"> · {e.tipo === "etiqueta" ? e.detalle.replace(/^Etiquetas en Shopify: /, "") : e.detalle}</span> : null}
                     </span>
                     <span className="text-xs text-muted-foreground">
                       {e.usuario ?? "Sistema"} · {formatearFechaHora(e.creado_en)}
@@ -498,8 +518,26 @@ export function FichaOrdenTienda({ orden, codigoPais, puedeEscribir }: { orden: 
 
           {/* Los botones de acción, como en la app de Jorge: apagados mientras Shopify sea de solo lectura (nada cambia de estado sin registro). */}
           <div className="sticky bottom-0 z-[5] mt-auto flex flex-wrap items-center gap-2 border-t border-border bg-card px-4 py-3">
-            {ACCIONES.map((a) => (
-              <Tooltip key={a} texto="Todavía no: por ahora Shopify es de solo lectura y el estado sale de lo registrado (Shopify, Monday, Servientrega).">
+            {/* «Confirmar pedido» (19 nov 2026): pone la etiqueta «Confirmada» en Shopify, que es lo que el sistema lee como confirmado. */}
+            {esc.activa &&
+              (confirmada ? (
+                <span className="inline-flex items-center gap-1.5 rounded-md bg-success-soft px-3 py-1.5 text-[13px] font-semibold text-success">
+                  <CheckIcon className="h-3.5 w-3.5" aria-hidden="true" />
+                  Confirmado
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  disabled={cambiando}
+                  onClick={() => cambiarEtiquetas([ETIQUETA_CONFIRMADA], [], "Pedido confirmado: la etiqueta «Confirmada» quedó en Shopify.")}
+                  className={`inline-flex items-center gap-1.5 rounded-md bg-primario px-3 py-1.5 text-[13px] font-semibold text-white disabled:opacity-50 ${anilloFoco}`}
+                >
+                  <CheckIcon className="h-3.5 w-3.5" aria-hidden="true" />
+                  {cambiando ? "Guardando…" : "Confirmar pedido"}
+                </button>
+              ))}
+            {ACCIONES.filter((a) => !esc.activa || a !== "Confirmar pedido").map((a) => (
+              <Tooltip key={a} texto="Todavía no: por ahora desde el sistema solo se cambian las etiquetas del pedido en Shopify (y «Confirmar pedido», si la tienda lo tiene encendido).">
                 <button type="button" aria-disabled="true" className="cursor-not-allowed rounded-md border border-border bg-muted/50 px-3 py-1.5 text-[13px] font-medium text-muted-foreground">
                   {a}
                 </button>

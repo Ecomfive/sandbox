@@ -35,6 +35,13 @@ export interface Combinado {
   motivo: string;
 }
 
+/**
+ * Aceptar la zona cuando una sola IA decide y la otra dice «no sé» (19 nov 2026, pedido de Jhokser). En la prueba con pedidos reales esa IA acertó en ~14 de 15 casos, así que se aplica,
+ * pero queda **por confirmar con una prueba de pedidos nuevos**: si el acierto de esos casos baja, se pone en `false` y vuelve a «Para revisar». Si las dos dicen zonas distintas, sigue a revisar.
+ * Cómo comprobarlo: «Probar con pedidos reales», casos donde una IA da la zona y la otra «no_se».
+ */
+export const ACEPTAR_ZONA_DE_UNA_IA = true;
+
 /** Lo que falta, limpio para ponerlo en un mensaje: sin enlaces ni teléfonos, sin punto final y de hasta 160 letras. */
 export function limpiarFalta(v: unknown): string | null {
   if (typeof v !== "string") return null;
@@ -68,8 +75,16 @@ export function leerRespuesta(texto: string): RespuestaModelo | null {
   return { zona: zona === "no_aplica" ? "no_se" : zona, completa: j.completa, falta, motivo: String(j.motivo ?? "").trim().slice(0, 400) };
 }
 
+/** Si al menos dos IA contestaron, una da ciudad o interior y todas las demás dicen «no sé» (sin ninguna zona distinta), esa zona; si no, null. */
+function zonaDeUnaIA(zonas: (Zona | "no_se")[]): Zona | null {
+  if (zonas.length < 2) return null;
+  const dadas = zonas.filter((z) => z !== "no_se");
+  if (dadas.length !== 1) return null;
+  return dadas[0] === "ciudad" || dadas[0] === "interior" ? dadas[0] : null;
+}
+
 /**
- * La decisión final. La zona la deciden primero las palabras de zona del equipo (`zonaPorReglas`) y, si no hay, las dos IA si coinciden; si una dice otra cosa o no sabe, queda para revisar.
+ * La decisión final. La zona la deciden primero las palabras de zona del equipo (`zonaPorReglas`) y, si no hay, las dos IA si coinciden (o una decide y la otra no sabe, `ACEPTAR_ZONA_DE_UNA_IA`); si dicen zonas distintas, queda para revisar.
  * Una dirección está completa solo si todas las IA que contestaron la ven completa; si no, se pide lo que falta (antes que decidir la zona).
  */
 export function combinar({ distingueZona, zonaReglas, modelos }: { distingueZona: boolean; zonaReglas: Zona | null; modelos: ResultadoModelo[] }): Combinado {
@@ -90,6 +105,9 @@ export function combinar({ distingueZona, zonaReglas, modelos }: { distingueZona
       const zonas = buenos.map((m) => m.respuesta.zona);
       if (zonas.every((z) => z === "ciudad" || z === "interior" || z === "adelantado") && new Set(zonas).size === 1) {
         zona = zonas[0] as Zona;
+        zonaPor = "ia";
+      } else if (ACEPTAR_ZONA_DE_UNA_IA && zonaDeUnaIA(zonas)) {
+        zona = zonaDeUnaIA(zonas);
         zonaPor = "ia";
       } else if (!completa && zonas.includes("adelantado") && zonas.every((z) => z === "adelantado" || z === "no_se")) {
         // Con la dirección incompleta una IA puede no saber la zona; si la otra ve pago por adelantado y ninguna dice ciudad o interior, el pago por adelantado manda (18 nov 2026).

@@ -8,7 +8,7 @@ import { requireModulo } from "@/lib/auth";
 import { formatearFechaHora, formatearMoneda } from "@/lib/formato";
 import { getPaisActual } from "@/lib/pais";
 import { createServiceClient } from "@/lib/supabase/server";
-import { cargarOrdenTienda } from "@/lib/tienda/orden-detalle";
+import { cargarOrdenTienda, escrituraParaPersona } from "@/lib/tienda/orden-detalle";
 import { ESTADOS_PEDIDO, esEstadoPedido } from "@/lib/tienda/resumen";
 import { tituloVariante } from "@/lib/tienda/vincular-variante";
 import { DetalleOrdenFinanzas } from "./detalle-finanzas";
@@ -61,7 +61,7 @@ export default async function PedidoTiendaPage({ params }: { params: Promise<{ i
     // Una tienda sin conectar (o conectada en vivo) muestra sus órdenes de `ven_ordenes` (11 y 12 nov 2026): la misma ficha que se abre al lado en Pedidos.
     const orden = await cargarOrdenTienda(supabase, id, pais.id);
     if (!orden) notFound();
-    return <DetalleOrdenFinanzas orden={orden} codigoPais={pais.codigo} puedeEscribir={!usuario.modulosSoloLectura.includes("tienda-pedidos")} />;
+    return <DetalleOrdenFinanzas orden={escrituraParaPersona(orden, usuario)} codigoPais={pais.codigo} puedeEscribir={!usuario.modulosSoloLectura.includes("tienda-pedidos")} />;
   }
   // Solo los pedidos de las tiendas del país elegido arriba.
   if (!tienda || tienda.pais_id !== pais.id) notFound();

@@ -8,9 +8,11 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { conectarTienda, revisarTienda } from "@/lib/tienda/conectar-shopify";
 import { desconectarIcomfly, guardarUrlConector, probarIcomfly } from "@/lib/tienda/icomfly";
 import { leerUrlConector } from "@/lib/tienda/icomfly-oauth";
+import { accesoDeApp, appDeTienda, olvidarAcceso, permisosNoPermitidos, puedeEscribirPedidos } from "@/lib/tienda/shopify-app";
 
 // Gestión de tienda › Tiendas (12 nov 2026): conectar una tienda de Shopify en vivo y revisarla a mano. Solo un administrador: conectar pide a Shopify
-// los avisos de pedidos de la tienda. Nada cambia en Shopify (la app es de solo lectura; si tuviera permisos de escritura, no se conecta).
+// los avisos de pedidos de la tienda. Desde el 19 nov 2026 un administrador también enciende «Escribir en Shopify» por tienda (las etiquetas del pedido
+// desde la ficha) y «Quitar la nota del bot»; los dos piden que la tienda haya aprobado `write_orders` en la app.
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -86,4 +88,62 @@ export async function desconectarIcomflyTienda(tiendaId: string): Promise<{ erro
   if (!r.error) await registrarAuditoria({ accion: "desconectar_icomfly", entidad: "tiendas", entidadId: tiendaId, detalle: "Se borraron los tokens de iComfly" });
   revalidatePath("/tienda-tiendas");
   return r;
+}
+
+// Escribir en Shopify (19 nov 2026, etapa 1: etiquetas del pedido). Encender revisa con Shopify, con un token nuevo, que la tienda haya aprobado
+// write_orders y que la app no tenga otros permisos de escritura. Apagar siempre se puede. Queda en la Actividad.
+
+async function revisarPermisoDeEscritura(nombre: string): Promise<string | null> {
+  const app = appDeTienda(nombre);
+  if (!app) return `Faltan las claves de ${nombre} en Vercel.`;
+  olvidarAcceso(app);
+  let scope: string;
+  try {
+    scope = (await accesoDeApp(app)).scope;
+  } catch (e) {
+    return e instanceof Error ? e.message : "Shopify no dio acceso.";
+  }
+  const otros = permisosNoPermitidos(scope);
+  if (otros.length) return `La app de ${nombre} tiene permisos de escritura que el sistema no usa (${otros.join(", ")}): quítaselos en el Dev Dashboard (solo debe quedar write_orders).`;
+  if (!puedeEscribirPedidos(scope)) return `La tienda ${nombre} todavía no aprobó el permiso write_orders: agrégalo en una versión nueva de la app (Dev Dashboard → Versions → Scopes → Release) y apruébalo en el admin de la tienda.`;
+  return null;
+}
+
+export async function cambiarEscrituraShopify(tiendaId: string, encender: boolean): Promise<{ error?: string; resumen?: string }> {
+  const usuario = await soloAdmin();
+  if (!usuario) return { error: "Solo un administrador enciende la escritura en Shopify." };
+  if (!UUID.test(tiendaId)) return { error: "Tienda no válida." };
+  const supabase = createServiceClient();
+  const { data: t, error: e0 } = await supabase.from("tiendas").select("id, nombre, estado, escribe_shopify").eq("id", tiendaId).maybeSingle();
+  if (e0) return { error: /escribe_shopify/.test(e0.message) ? "Falta correr en Supabase la migración 0337 (escribir etiquetas en Shopify)." : "No se pudo leer la tienda." };
+  if (!t) return { error: "La tienda ya no existe." };
+  if (encender) {
+    if (t.estado !== "conectada") return { error: "Primero hay que conectar la tienda." };
+    const problema = await revisarPermisoDeEscritura(t.nombre as string);
+    if (problema) return { error: problema };
+  }
+  const cambio = encender
+    ? { escribe_shopify: true, escribe_shopify_por: usuario.id, escribe_shopify_en: new Date().toISOString() }
+    : { escribe_shopify: false, escribe_shopify_por: usuario.id, escribe_shopify_en: new Date().toISOString(), quitar_nota_bot: false };
+  const { error } = await supabase.from("tiendas").update(cambio).eq("id", tiendaId);
+  if (error) return { error: "No se pudo guardar." };
+  await registrarAuditoria({ accion: encender ? "encender_escritura_shopify" : "apagar_escritura_shopify", entidad: "tiendas", entidadId: tiendaId, detalle: `${t.nombre}: ${encender ? "escribe las etiquetas del pedido en Shopify" : "vuelve a solo lectura"}` });
+  revalidatePath("/tienda-tiendas");
+  revalidatePath("/tienda-pedidos");
+  return { resumen: encender ? `${t.nombre}: ya se pueden cambiar las etiquetas de los pedidos desde el sistema.` : `${t.nombre} vuelve a solo lectura.` };
+}
+
+/** La nota que el bot de iComfly deja en los pedidos (automatización de jhokserg, 16 nov 2026, #678): con la escritura encendida, se quita de Shopify. */
+export async function cambiarQuitarNotaBot(tiendaId: string, encender: boolean): Promise<{ error?: string; resumen?: string }> {
+  if (!(await soloAdmin())) return { error: "Solo un administrador cambia esto." };
+  if (!UUID.test(tiendaId)) return { error: "Tienda no válida." };
+  const supabase = createServiceClient();
+  const { data: t, error: e0 } = await supabase.from("tiendas").select("id, nombre, escribe_shopify").eq("id", tiendaId).maybeSingle();
+  if (e0 || !t) return { error: "No se pudo leer la tienda." };
+  if (encender && !t.escribe_shopify) return { error: "Primero enciende «Escribir en Shopify» en esta tienda." };
+  const { error } = await supabase.from("tiendas").update({ quitar_nota_bot: encender }).eq("id", tiendaId);
+  if (error) return { error: "No se pudo guardar (¿falta la migración 0303?)." };
+  await registrarAuditoria({ accion: encender ? "encender_quitar_nota_bot" : "apagar_quitar_nota_bot", entidad: "tiendas", entidadId: tiendaId, detalle: `${t.nombre}: ${encender ? "se quita de Shopify la nota del bot" : "la nota del bot se deja en Shopify"}` });
+  revalidatePath("/tienda-tiendas");
+  return { resumen: encender ? `${t.nombre}: la nota del bot se quitará de los pedidos nuevos.` : `${t.nombre}: la nota del bot ya no se quita.` };
 }
