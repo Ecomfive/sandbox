@@ -199,6 +199,7 @@ export const MIGRACIONES_CLAVE: { migracion: string; que: string; prueba: Prueba
   { migracion: "0988", que: "Ventas por tienda: ventas por día, por día de la semana y hora, y unidades por pedido", prueba: { tipo: "funcion", nombre: "ven_ventas_diarias" } },
   { migracion: "0989", que: "Préstamos del grupo: aportes, interés entre empresas, conciliación, y caja mínima por empresa", prueba: { tipo: "tabla", nombre: "fin_grupo_confirmaciones" } },
   { migracion: "0990", que: "Inventario contable: provisión por obsoleto, consignación y ajustes de conteo con aprobación", prueba: { tipo: "tabla", nombre: "fin_ajustes_inventario" } },
+  { migracion: "0991", que: "Dropi: la ganancia acreditada se lee de la descripción de la billetera (salía en $0)", prueba: { tipo: "funcion", nombre: "fin_sincronizar_dropi" } },
 ];
 
 /** Lo que se muestra de una prueba («Falta …»). */
