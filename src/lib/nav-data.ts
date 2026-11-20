@@ -271,6 +271,10 @@ export function moduloDeHref(href: string): string {
  * La entrada sale en el menú si la persona tiene cualquiera de ellos, y la lleva a la primera pestaña que puede abrir.
  */
 export const PESTANAS_CON_MODULO: Record<string, { href: string; modulo: string }[]> = {
+  "/pedidos-dropi": [
+    { href: "/pedidos-dropi", modulo: "pedidos-dropi" },
+    { href: "/pedidos-dropi/resumen", modulo: "pedidos-dropi-resumen" },
+  ],
   "/tienda-pedidos": [
     { href: "/tienda-pedidos", modulo: "tienda-pedidos" },
     { href: "/tienda-pedidos/confirmacion", modulo: "tienda-confirmacion" },

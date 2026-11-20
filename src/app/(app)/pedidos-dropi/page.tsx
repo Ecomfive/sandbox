@@ -3,7 +3,7 @@ import { Pagina } from "@/components/ui/pagina";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getPaisActual } from "@/lib/pais";
 import { obtenerPlataformaDropiId } from "@/lib/plataforma-dropi";
-import { requireModulo } from "@/lib/auth";
+import { requirePanel } from "@/lib/auth";
 import { KpiCard, KpiGrid, KpiGroup } from "@/components/ui/kpi-card";
 import { contarFiltrado, obtenerResumenPedidos, totalesPedidos } from "@/lib/pedidos/resumen";
 import { formatearMoneda } from "@/lib/formato";
@@ -33,7 +33,8 @@ export default async function PedidosDropiPage({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  await requireModulo("pedidos-dropi");
+  // Con solo la pestaña Resumen (Finanzas), la lleva ahí en vez de sacarla.
+  await requirePanel("/pedidos-dropi", "pedidos-dropi");
   const sp = await searchParams;
   const { desde, hasta } = resolverPeriodo({
     preset: typeof sp.preset === "string" ? sp.preset : undefined,

@@ -72,6 +72,7 @@ export const AREAS_ACCESO: AreaAcceso[] = [
     color: "#b45309",
     modulos: [
       { clave: "pedidos-dropi", etiqueta: "Pedidos Dropi" },
+      { clave: "pedidos-dropi-resumen", etiqueta: "Resumen mensual de Dropi" },
       { clave: "alertas", etiqueta: "Alertas de inventario" },
       { clave: "inventario", etiqueta: "Inventario" },
       { clave: "salida-manual", etiqueta: "Salida a mano donde va con remisión" },
