@@ -173,8 +173,8 @@ function HayEnInventario({ hay, pedido }: { hay: StockInventario | undefined; pe
 const TD = "border-b border-border px-2 py-2 align-top";
 
 /**
- * Cuánto hay del producto en cada bodega de donde inventario envía (20 nov 2026, pedido de Hernán: «si sale general no sabré de dónde sale»): la elegida
- * en «Sale de» en negrita (aunque tenga 0) y las demás que tienen algo; en rojo cuánto falta si en la elegida no alcanza.
+ * Cuánto hay del producto en cada bodega de donde inventario envía (20 nov 2026, pedido de Hernán: «si sale general no sabré de dónde sale»): la de donde
+ * sale el pedido en negrita (aunque tenga 0) y las demás que tienen algo; en rojo cuánto falta si en la elegida no alcanza.
  */
 function StockPorBodega({ skuId, origen, origenes, stock, falta }: { skuId: string; origen: string; origenes: { id: string; nombre: string }[]; stock: Record<string, Record<string, number>>; falta: number }) {
   const filas = origenes.map((b) => ({ ...b, hay: stock[b.id]?.[skuId] ?? 0 })).filter((b) => b.id === origen || b.hay > 0);
@@ -216,8 +216,8 @@ function FilasPedido({
   const { ocupado, correr } = useAccion();
   const enInventario = modo === "inventario";
   const editable = enInventario && puedeEscribir && puedeEnviar(p.estado);
-  // «Sale de» arranca en la bodega que alcanza para todo el pedido (20 nov 2026); si ninguna, en la que deja menos sin cubrir.
-  const [origen, setOrigen] = useState(
+  // Ya no se elige de dónde sale (20 nov 2026: por ahora no aplica): sale de la bodega que alcanza para todo el pedido y, si ninguna, de la que deja menos sin cubrir.
+  const [origen] = useState(
     () => mejorOrigen(p.items.map((it) => ({ skuId: it.skuId, cantidad: it.cantidadPedida })), origenes.map((b) => b.id), stock) ?? origenes[0]?.id ?? "",
   );
   const [entregas, setEntregas] = useState<Record<string, { cantidad: string; observacion: string }>>(() =>
@@ -234,6 +234,9 @@ function FilasPedido({
 
   const acciones = (
     <div className="flex flex-col items-stretch gap-1.5">
+      <span className="mb-0.5">
+        <Badge tone={estado.tono}>{estado.etiqueta}</Badge>
+      </span>
       {!puedeEscribir ? null : enInventario ? (
         <>
           {puedeEnProceso(p.estado) && (
@@ -243,22 +246,9 @@ function FilasPedido({
           )}
           {puedeEnviar(p.estado) && (
             <>
-              <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                Sale de
-                <select value={origen} onChange={(e) => setOrigen(e.target.value)} className={`${fieldClass} text-sm`}>
-                  {origenes.map((b) => {
-                    const f = faltanEn(b.id).length;
-                    return (
-                      <option key={b.id} value={b.id}>
-                        {b.nombre} · {f === 0 ? "alcanza para todo" : f === 1 ? "falta 1 producto" : `faltan ${f} productos`}
-                      </option>
-                    );
-                  })}
-                </select>
-              </label>
               {faltan.length > 0 && (
                 <span role="alert" className="max-w-[12rem] text-xs font-semibold text-destructive">
-                  En {nombreOrigen} no alcanza: elige otra bodega o baja la cantidad entregada.
+                  En {nombreOrigen} no alcanza: baja la cantidad entregada.
                 </span>
               )}
               <button
@@ -299,8 +289,9 @@ function FilasPedido({
         return (
           <tr key={it.id}>
             {i === 0 && (
-              <td rowSpan={n} className={`${TD} bg-primario-suave px-3 font-semibold whitespace-nowrap text-primario`}>
-                {numeroPedido(p.numero)}
+              <td rowSpan={n} className={`${TD} bg-primario-suave px-3 whitespace-nowrap`}>
+                <span className="block font-semibold text-primario">{numeroPedido(p.numero)}</span>
+                <span className="block text-xs font-normal text-muted-foreground">{fechaCorta(p.creadoEn)}</span>
               </td>
             )}
             <td className={`${borde} font-mono text-xs text-muted-foreground`}>{it.codigo ?? "—"}</td>
@@ -319,7 +310,6 @@ function FilasPedido({
               )}
             </td>
             <td className={`${borde} text-right tabular-nums`}>{it.cantidadPedida.toLocaleString("es-PA")}</td>
-            <td className={`${borde} whitespace-nowrap`}>{fechaCorta(p.creadoEn)}</td>
             {/* En Comunicación despacho no van «Pedido por» ni «Responsable bodega» (20 nov 2026): siempre son las mismas personas. */}
             {!enInventario && <td className={borde}>{p.pedidoPorNombre ?? "—"}</td>}
             {!enInventario && <td className={`${borde} text-muted-foreground`}>{p.responsableNombre ?? "—"}</td>}
@@ -347,9 +337,6 @@ function FilasPedido({
               ) : (
                 <span className="font-semibold">{it.cantidadEntregada.toLocaleString("es-PA")}</span>
               )}
-            </td>
-            <td className={borde}>
-              <Badge tone={estado.tono}>{estado.etiqueta}</Badge>
             </td>
             <td className={`${borde} min-w-[160px] text-muted-foreground`}>
               {editable ? (
@@ -448,7 +435,7 @@ export function TablaPedidos({
   fichas?: Record<string, SkuFicha> | null;
 }) {
   const [ficha, setFicha] = useState<string | null>(null);
-  const columnas = modo === "inventario" ? 10 : 11;
+  const columnas = modo === "inventario" ? 8 : 9;
   const th = "px-2 py-2.5 font-semibold";
   const vacios = pedidos.length === 0;
   return (
@@ -456,20 +443,16 @@ export function TablaPedidos({
       <table className="w-full min-w-[1100px] border-collapse text-sm">
         <thead>
           <tr className="bg-muted text-left text-foreground">
-            <th className={`${th} px-3`}>N.º pedido</th>
+            <th className={`${th} px-3`}>N.º pedido y fecha</th>
             <th className={th}>Código</th>
             <th className={th}>Producto</th>
             <th className={`${th} text-right`}>Cantidad pedida</th>
-            <th className={th}>Fecha</th>
             {modo !== "inventario" && <th className={th}>Pedido por</th>}
             {modo !== "inventario" && <th className={th}>Responsable bodega</th>}
             {modo === "inventario" && <th className={th}>Stock por bodega</th>}
             <th className={`${th} text-right`}>Cantidad entregada</th>
-            <th className={th}>Estado</th>
             <th className={th}>Observaciones</th>
-            <th className={`${th} px-3`}>
-              <span className="sr-only">Acciones</span>
-            </th>
+            <th className={`${th} px-3`}>Estado</th>
           </tr>
         </thead>
         <tbody>
