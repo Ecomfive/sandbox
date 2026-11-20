@@ -12,12 +12,12 @@ const modeloDeVideo = () => process.env.GEMINI_VIDEO_MODEL?.trim() || process.en
 export const geminiConectado = () => !!claveGemini();
 
 type Uso = { promptTokenCount?: number; candidatesTokenCount?: number };
-type Respuesta = { candidates?: { content?: { parts?: { text?: string }[] } }[]; usageMetadata?: Uso; error?: { message?: string } };
+type Respuesta = { candidates?: { content?: { parts?: { text?: string }[] }; finishReason?: string }[]; promptFeedback?: { blockReason?: string }; usageMetadata?: Uso; error?: { message?: string } };
 
 export type ResultadoGemini = { texto: string; modelo: string } | { error: string };
 
 /** Un fallo de Gemini que suele pasar solo (servidor ocupado, tiempo agotado, sin conexión): se repite una vez. */
-const esPasajero = (r: ResultadoGemini) => "error" in r && /tardó demasiado|No se pudo conectar|no pudo analizarlo|no devolvió nada/i.test(r.error);
+const esPasajero = (r: ResultadoGemini) => "error" in r && /tardó demasiado|No se pudo conectar|no pudo analizarlo|no devolvió nada \(/i.test(r.error);
 
 async function generar(partes: unknown[], contexto: ContextoConsumo, esperaMs: number): Promise<ResultadoGemini> {
   const primero = await generarUnaVez(partes, contexto, esperaMs);
@@ -46,7 +46,10 @@ async function generarUnaVez(partes: unknown[], contexto: ContextoConsumo, esper
     const salida = json?.usageMetadata?.candidatesTokenCount ?? 0;
     await registrarConsumo(contexto, { proveedor: "gemini", modelo, tokensEntrada: entrada, tokensSalida: salida, costoUsd: costoTexto(modelo, { tokensEntrada: entrada, tokensSalida: salida, busquedas: 0 }), ok: true });
     const texto = (json?.candidates?.[0]?.content?.parts ?? []).map((p) => p.text ?? "").join("");
-    return texto.trim() ? { texto, modelo } : { error: "Gemini no devolvió nada." };
+    if (texto.trim()) return { texto, modelo };
+    // Sin texto: Gemini bloqueó la respuesta (política de contenido: no sirve repetir igual) o terminó sin escribir nada (pasajero).
+    const bloqueo = json?.promptFeedback?.blockReason ?? ((json?.candidates?.[0]?.finishReason ?? "") && !["STOP", "MAX_TOKENS"].includes(json?.candidates?.[0]?.finishReason ?? "") ? json?.candidates?.[0]?.finishReason : undefined);
+    return { error: bloqueo ? `Gemini bloqueó la respuesta (${bloqueo}).` : `Gemini no devolvió nada (terminó con «${json?.candidates?.[0]?.finishReason ?? "sin motivo"}»).` };
   } catch (e) {
     const error = (e as Error)?.name === "TimeoutError" ? "Gemini tardó demasiado." : "No se pudo conectar con Gemini.";
     await registrarConsumo(contexto, { proveedor: "gemini", modelo, costoUsd: 0, ok: false, error });
@@ -96,5 +99,8 @@ export async function analizarSoloTextoConGemini(pedido: string, imagen: { bytes
   const partes: unknown[] = [];
   if (imagen) partes.push({ inline_data: { mime_type: imagen.mime, data: Buffer.from(imagen.bytes).toString("base64") } });
   partes.push({ text: pedido });
-  return generar(partes, contexto, 60_000);
+  const r = await generar(partes, contexto, 60_000);
+  // Si no devolvió nada con la miniatura (a veces la imagen es lo que bloquea la respuesta), se repite solo con el texto del anuncio.
+  if (imagen && "error" in r && /bloque|no devolvió nada/i.test(r.error)) return generar([{ text: pedido }], contexto, 60_000);
+  return r;
 }

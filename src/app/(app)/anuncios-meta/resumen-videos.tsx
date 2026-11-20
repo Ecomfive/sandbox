@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { dolaresEnteros } from "@/lib/meta-ads/metricas";
 import type { VideoVista } from "@/lib/meta-ads/vistas";
+import { ParaRevisar } from "./para-revisar";
 import { Anillo, BarraApilada, Leyenda, partesConColor, TarjetaMeta } from "./graficas";
 
 type EstadoAnalisis = "analizado" | "provisional" | "error" | "sin_analizar";
@@ -9,7 +9,7 @@ const COLOR: Record<EstadoAnalisis, string> = { analizado: "var(--success)", pro
 const estado = (v: VideoVista): EstadoAnalisis => (!v.analisis ? "sin_analizar" : v.analisis.estado === "analizado" ? "analizado" : v.analisis.estado === "sin_archivo" ? "provisional" : "error");
 
 /** Arriba de Videos: cuántos ya vio la IA y cómo se reparte lo que se gastó por ángulo, por gancho y por formato de video. */
-export function ResumenVideos({ videos }: { videos: VideoVista[] }) {
+export function ResumenVideos({ videos, escribe = false, iaConectada = false }: { videos: VideoVista[]; escribe?: boolean; iaConectada?: boolean }) {
   if (videos.length === 0) return null;
   const estados: Record<EstadoAnalisis, number> = { analizado: 0, provisional: 0, error: 0, sin_analizar: 0 };
   for (const v of videos) estados[estado(v)]++;
@@ -57,21 +57,11 @@ export function ResumenVideos({ videos }: { videos: VideoVista[] }) {
           </ul>
         </div>
         {aRevisar.length > 0 && (
-          <div className="mt-4 flex flex-col gap-1.5 border-t border-border pt-3">
-            <p className="m-0 text-xs font-medium text-muted-foreground">Para revisar ({aRevisar.length})</p>
-            <ul role="list" className="m-0 flex list-none flex-col gap-1.5 p-0 text-xs">
-              {aRevisar.slice(0, 6).map((v) => (
-                <li key={v.id} className="flex min-w-0 flex-col gap-0.5">
-                  <Link href={`/anuncios-meta/videos?abrir=${v.id}`} className="inline-flex min-w-0 items-center gap-2 rounded font-medium underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2">
-                    <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full" style={{ background: COLOR[estado(v)] }} />
-                    <span className="truncate">{v.nombre}</span>
-                    <span className="shrink-0 font-normal text-muted-foreground">· {NOMBRE[estado(v)]}</span>
-                  </Link>
-                  <span className="pl-4 text-muted-foreground">{v.analisis?.error ?? "Sin detalle del motivo."}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
+          <ParaRevisar
+            total={aRevisar.length}
+            puedeReintentar={escribe && iaConectada}
+            videos={aRevisar.slice(0, 6).map((v) => ({ id: v.id, nombre: v.nombre, estado: NOMBRE[estado(v)], color: COLOR[estado(v)], motivo: v.analisis?.error ?? null }))}
+          />
         )}
       </TarjetaMeta>
 
