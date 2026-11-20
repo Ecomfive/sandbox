@@ -67,12 +67,21 @@ export function mesesCubiertos(c: CoberturaCuenta, hoy: string, meses = 13): Mes
   return salida;
 }
 
-/** Un tramo ya está traído si todos sus días están en una lectura registrada o si casi todos (70 %) tienen resultados (lo leído antes del registro). */
+/**
+ * Un tramo ya está traído solo si todos sus días están dentro de una lectura registrada (20 nov 2026: saltarse también lo que «parece» leído por tener resultados lo dejaba sin registro para siempre y el cuadro nunca
+ * pasaba a «completo»). Lo leído antes del registro se vuelve a leer una vez —es idempotente— y desde ahí queda registrado.
+ */
 export function tramoYaTraido(t: { desde: string; hasta: string }, c: CoberturaCuenta): boolean {
   const dias = diasEntre(t.desde, t.hasta);
-  if (!dias.length) return true;
-  if (dias.every((d) => c.registrados.has(d))) return true;
-  return dias.filter((d) => c.conDatos.has(d)).length / dias.length >= 0.7;
+  return dias.length > 0 && dias.every((d) => c.registrados.has(d));
+}
+
+/** Cuántos días hay desde el día 1 del mes de hace `mesesAtras` meses hasta `hoy` (ambos incluidos): lo que hay que pedir para que ese mes quede completo. */
+export function diasDesdeInicioDeMes(hoy: string, mesesAtras: number): number {
+  const [anio, mes] = hoy.split("-").map(Number);
+  const total = anio * 12 + (mes - 1) - mesesAtras;
+  const inicio = Date.UTC(Math.floor(total / 12), total % 12, 1);
+  return Math.round((aMs(hoy) - inicio) / DIA) + 1;
 }
 
 /** Parte un tramo en dos mitades, la más nueva primero. Null si ya es de un solo día. */
