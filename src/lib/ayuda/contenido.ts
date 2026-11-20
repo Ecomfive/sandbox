@@ -2067,6 +2067,24 @@ export const GUIAS: GuiaModulo[] = [
     ],
   },
   {
+    modulo: "llegadas",
+    titulo: "Llegadas a puerto",
+    ruta: "/llegadas",
+    resumen: "Todo lo que llegó a puerto en una sola lista: producto, unidades, cajas y etiqueta de cada compra, con los totales. Es la misma lista que abre «Ver lista» del aviso de Llegada a Puerto, ahora fija en el menú.",
+    secciones: [
+      {
+        titulo: "Uso",
+        pasos: [
+          "Entra por Operaciones › Fulfillment › «Llegadas a puerto». Arriba eliges el periodo: hoy o los últimos 7, 30 o 90 días (se abre en 7).",
+          "Cada compra que pasó a «06 - Llegada a Puerto» sale con la foto y el nombre del producto, las unidades, las cajas (y cuántas faltan por anotar) y la etiqueta de las cajas. Arriba van los totales del periodo.",
+          "«Descargar PDF» baja la lista con las fotos, para imprimirla o mandarla.",
+          "Los avisos de cada llegada siguen llegando a «Para ti»; desde aquí no se pierden de vista aunque marques los avisos como leídos.",
+          "No muestra montos ni pagos: eso sigue en Compras.",
+        ],
+      },
+    ],
+  },
+  {
     modulo: "inventario-pedidos-despacho",
     titulo: "Comunicación despacho",
     ruta: "/inventario-pedidos-despacho",
@@ -2294,6 +2312,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-11-20", titulo: "Llegadas a puerto, en el menú de Fulfillment", texto: "Las llegadas a puerto ya no viven solo en los avisos: en Operaciones › Fulfillment está la entrada «Llegadas a puerto» con todo lo que llegó (producto, unidades, cajas y etiquetas, con los totales) de hoy o de los últimos 7, 30 o 90 días, y el botón «Descargar PDF». Es la misma lista de «Ver lista» del aviso. La ven quienes tienen Compras y quienes reciben el aviso de Llegada a Puerto; a otra persona se le da con el permiso «Llegadas a puerto».", modulo: "llegadas", href: "/llegadas" },
   { fecha: "2026-11-20", titulo: "Comunicación despacho: de qué bodega sale cada producto", texto: "En Solicitudes de despacho, la columna «Hay en bodega» pasó a «Stock por bodega»: muestra cuánto hay de cada producto en cada bodega, con la elegida en «Sale de» en negrita. «Sale de» ya viene con la bodega que alcanza para todo el pedido, y en la lista cada bodega dice «alcanza para todo» o cuántos productos faltan. Si en la elegida no alcanza, la línea dice en rojo cuánto falta y «Enviar» no deja enviar hasta elegir otra bodega o bajar la cantidad.", modulo: "inventario-pedidos-despacho", href: "/inventario-pedidos-despacho" },
   { fecha: "2026-11-20", titulo: "Republicar y sumar las unidades que llegaron", texto: "Al pulsar «Republicar en Dropi» (en la ficha o en la fila) ahora, debajo del precio, está «Unidades que llegaron»: si volvió a llegar el producto, escribe cuántas y se suman en el mismo paso al stock que pasa al ID nuevo, en la bodega de ECOMFIVE (si tiene varias, eliges cuál). El botón dice cuántas se suman, por ejemplo «Republicar a $6.99 · +20 u.». En productos con variaciones o con el stock en la bodega de Dropi se republica igual que antes y las unidades se suman después con el lápiz de stock del ID nuevo. Para que funcione, vuelve a arrastrar el favorito «Aplicar en Dropi» (Gestión de IDs Dropi › «Cómo aplicar en Dropi»): el viejo avisa que está desactualizado y no aplica nada.", modulo: "publicaciones-dropi", href: "/publicaciones-dropi" },
   { fecha: "2026-11-20", titulo: "Comunicación despacho: tabla más corta y ficha del producto", texto: "En Comunicación despacho › Solicitudes de despacho se quitaron las columnas «Pedido por» y «Responsable bodega», que siempre eran las mismas personas. Al tocar el nombre de un producto se abre su ficha de stock con cómo está repartido en cada bodega (solo para consultar; hace falta el permiso de Inventario). En «Pedir a inventario» (Despacho ciudad) la tabla sigue igual.", modulo: "inventario-pedidos-despacho", href: "/inventario-pedidos-despacho" },

@@ -24,7 +24,8 @@ const claseOpcion = (activa: boolean) =>
 
 /**
  * Lo que llegó a puerto, en una sola lista (17 nov 2026, pedido de Logística: ver de una vez los productos, unidades, cajas y etiquetas, no un aviso por compra). Es lo que abre «Ver lista» del aviso
- * de Llegada a Puerto. La abre quien recibe ese aviso, un administrador o quien tiene Compras (con el país y el alcance de sus compras). `?dias=1|7|30|90`. El pago de En Bodega sigue en su propia llegada.
+ * de Llegada a Puerto y, desde el 20 nov 2026, la entrada «Llegadas a puerto» de Fulfillment (módulo `llegadas`). La abre quien tiene ese módulo o recibe el aviso, un administrador o quien
+ * tiene Compras (con el país y el alcance de sus compras). `?dias=1|7|30|90`. El pago de En Bodega sigue en su propia llegada.
  */
 export default async function LlegadasPage({ searchParams }: { searchParams: Promise<{ dias?: string }> }) {
   const sp = await searchParams;
@@ -32,7 +33,7 @@ export default async function LlegadasPage({ searchParams }: { searchParams: Pro
   const supabase = createServiceClient();
   const admin = esAdministrador(usuario);
   const conCompras = usuario.modulos.includes("compras");
-  const esDestino = (await destinatariosDe(supabase, EVENTO_DE_TIPO.puerto)).includes(usuario.id);
+  const esDestino = usuario.modulos.includes("llegadas") || (await destinatariosDe(supabase, EVENTO_DE_TIPO.puerto)).includes(usuario.id);
   if (!esDestino && !admin && !conCompras) irAlInicio(usuario);
 
   const dias = diasDeLista(sp.dias);
