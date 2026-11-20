@@ -129,6 +129,67 @@ export function revisarStockPedido(lineas: { skuId: string; cantidad: number }[]
   return null;
 }
 
+/** Una línea de un pedido en edición: `id` es la línea que ya existía (sin `id` = producto nuevo). */
+export interface LineaEditada {
+  id: string | null;
+  skuId: string;
+  cantidad: number;
+  nota: string | null;
+}
+
+/**
+ * Revisa las líneas de un pedido que se edita (20 nov 2026, pedido de Jhokser: despacho quita o cambia productos de su pedido): lo mismo que un pedido nuevo (al menos un producto, cantidad entera desde 1, sin repetir) y,
+ * de cada línea, a cuál de las que ya tenía corresponde. Una línea que dice ser de otra línea del pedido, o de otro producto, se trata como producto nuevo.
+ */
+export function revisarEdicion(lineas: unknown, existentes: { id: string; skuId: string }[]): { lineas: LineaEditada[] } | { error: string } {
+  const r = revisarLineas(lineas);
+  if ("error" in r) return r.error === "Agrega al menos un producto." ? { error: "El pedido necesita al menos un producto: para quitarlo todo, cancela el pedido." } : r;
+  const propias = new Map(existentes.map((e) => [e.id, e.skuId]));
+  const usados = new Set<string>();
+  const entrada = lineas as Record<string, unknown>[];
+  return {
+    lineas: r.lineas.map((l, i) => {
+      const id = entrada[i]?.id;
+      const valido = typeof id === "string" && propias.get(id) === l.skuId && !usados.has(id);
+      if (valido) usados.add(id);
+      return { id: valido ? (id as string) : null, skuId: l.skuId, cantidad: l.cantidad, nota: l.nota };
+    }),
+  };
+}
+
+/**
+ * Qué cambió entre lo que tenía el pedido y lo que quedó: las líneas que se quitan (las que existían y ya no están), las que se cambian (otra cantidad u otra nota) y las nuevas. Los productos que se quitan se identifican
+ * por la línea, no por el producto, para que dos líneas del mismo producto no se confundan.
+ */
+export function cambiosDeEdicion(
+  antes: { id: string; skuId: string; producto: string; cantidad: number; nota: string | null }[],
+  despues: LineaEditada[],
+  nombres: Record<string, string>,
+): { quitar: string[]; cambiar: LineaEditada[]; agregar: LineaEditada[]; resumen: string[] } {
+  const quedan = new Set(despues.map((l) => l.id).filter((id): id is string => !!id));
+  const previas = new Map(antes.map((a) => [a.id, a]));
+  const quitar = antes.filter((a) => !quedan.has(a.id));
+  const cambiar = despues.filter((l) => {
+    const a = l.id ? previas.get(l.id) : undefined;
+    return !!a && (a.cantidad !== l.cantidad || (a.nota ?? null) !== (l.nota ?? null));
+  });
+  const agregar = despues.filter((l) => !l.id);
+  const resumen = [
+    ...quitar.map((a) => `quitó ${a.producto}`),
+    ...cambiar.map((l) => {
+      const a = previas.get(l.id!)!;
+      return a.cantidad !== l.cantidad ? `${a.producto}: ${a.cantidad} → ${l.cantidad}` : `${a.producto}: cambió la nota`;
+    }),
+    ...agregar.map((l) => `agregó ${nombres[l.skuId] ?? "un producto"} (${l.cantidad})`),
+  ];
+  return { quitar: quitar.map((a) => a.id), cambiar, agregar, resumen };
+}
+
+/** El aviso a inventario cuando despacho edita un pedido que ya tenía delante. */
+export function avisoEdicion(numero: number, quien: string, resumen: string[]): { titulo: string; texto: string } {
+  return { titulo: `${numeroPedido(numero)} fue editado`.slice(0, 300), texto: `${quien} editó el pedido: ${resumen.join("; ") || "sin cambios"}.`.slice(0, 600) };
+}
+
 /** Revisa lo que inventario envía de cada producto: una cantidad de 0 en adelante por línea del pedido, y algo más que cero en total. */
 export function revisarEntregas(
   itemsDelPedido: { id: string }[],
@@ -154,6 +215,8 @@ export function revisarEntregas(
 /** Qué puede hacer cada lado con un pedido en su estado. */
 export const puedeCancelar = (estado: EstadoPedido) => estado === "solicitud";
 export const puedeEnProceso = (estado: EstadoPedido) => estado === "solicitud";
+/** Despacho edita un pedido (quitar productos, cambiar cantidades o notas, agregar) mientras inventario no lo haya enviado (20 nov 2026, pedido de Jhokser). */
+export const puedeEditar = (estado: EstadoPedido) => estado === "solicitud" || estado === "en_proceso";
 export const puedeEnviar = (estado: EstadoPedido) => estado === "solicitud" || estado === "en_proceso";
 export const puedeRecibir = (estado: EstadoPedido) => estado === "enviado";
 
