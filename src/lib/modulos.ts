@@ -55,6 +55,8 @@ export const MODULOS: Modulo[] = [
   { clave: "publicaciones-dunamixfy", etiqueta: "Gestión de IDs Dunamixfy (WMS)" },
   { clave: "uso-sistema", etiqueta: "Uso del sistema (Gestión de IDs Dropi)" },
   { clave: "tienda-dashboard", etiqueta: "Dashboard de tienda (Gestión de tienda)" },
+  { clave: "tienda-tablero", etiqueta: "Tablero de tiendas (Desempeño)" },
+  { clave: "tienda-asesores", etiqueta: "Asesores de tienda (Pedidos de tienda)" },
   { clave: "tienda-pedidos", etiqueta: "Pedidos de tienda (Gestión de tienda)" },
   { clave: "tienda-reporteria", etiqueta: "Reportería de pedidos (Gestión de tienda)" },
   { clave: "tienda-confirmacion", etiqueta: "Confirmación (Gestión de tienda)" },

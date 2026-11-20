@@ -62,6 +62,8 @@ const AREAS: NavSection[] = [
       { label: "Hoy", href: "/", frente: "proveeduria" },
       { label: "Ventas Proveeduría", href: "/ventas-dropi", dropi: true, frente: "proveeduria" },
       { label: "Dashboard de tienda", href: "/tienda-dashboard", frente: "tienda" },
+      // El tablero que compara las tiendas (20 nov 2026): antes era «Todas las tiendas» en Pedidos de tienda; ahora es de Admin y CEO.
+      { label: "Tablero de tiendas", href: "/tienda-tablero", frente: "tienda" },
     ],
   },
   // El recorrido de un producto antes de comprarse, en orden: de dónde sale (Fuentes), qué se elige (Selección), cómo se

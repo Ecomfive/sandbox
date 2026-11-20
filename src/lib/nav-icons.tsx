@@ -1343,6 +1343,7 @@ export const ICONOS_PAGINA: Record<string, (props: SVGProps<SVGSVGElement>) => R
   "/wms-productos-dropi": CatalogoIcon,
   "/notificaciones": NotificacionesIcon,
   "/tienda-dashboard": GestionTiendasIcon,
+  "/tienda-tablero": GestionTiendasIcon,
   "/tienda-pedidos": PedidoIcon,
   "/tienda-reporteria": ListaIcon,
   "/anuncios-meta": AnunciosIcon,

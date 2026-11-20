@@ -193,7 +193,7 @@ test("Gestión de IDs es una sola entrada del menú que sigue a la plataforma el
 });
 
 test("Gestión de tienda: tres entradas con pestañas, cada pestaña con su permiso", () => {
-  const tienda = areas.flatMap((a) => a.items).filter((i) => i.frente === "tienda" && i.href !== "/tienda-dashboard").map((i) => i.href);
+  const tienda = areas.flatMap((a) => a.items).filter((i) => i.frente === "tienda" && i.href !== "/tienda-dashboard" && i.href !== "/tienda-tablero").map((i) => i.href);
   assert.deepEqual(tienda.filter((h) => h !== "/tienda-reporteria" && h !== "/anuncios-meta"), ["/tienda-pedidos", "/despacho-ciudad", "/tienda-tiendas"]);
   // Solo Devoluciones: ve «Despacho ciudad», entra directo a su pestaña y no ve las otras.
   const solo = ["despacho-devoluciones"];
@@ -205,4 +205,10 @@ test("Gestión de tienda: tres entradas con pestañas, cada pestaña con su perm
   assert.ok(ocultas.includes("/despacho-ciudad") && ocultas.includes("/despacho-ciudad/cambios"));
   assert.ok(!ocultas.includes("/despacho-ciudad/devoluciones"));
   assert.equal(encontrarSeccionActiva("/despacho-ciudad/cambios/nueva", areas), "Operación");
+});
+
+test("Tablero de tiendas (Desempeño) pide su propio permiso", () => {
+  assert.equal(puedeAbrirPagina(["tienda-pedidos"], "/tienda-tablero"), false);
+  assert.equal(puedeAbrirPagina(["tienda-tablero"], "/tienda-tablero"), true);
+  assert.equal(encontrarSeccionActiva("/tienda-tablero", areas), "Desempeño");
 });

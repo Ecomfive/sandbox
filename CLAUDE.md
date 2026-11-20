@@ -2806,6 +2806,12 @@ convenciones técnicas del código.
   todos los pedidos del periodo (4,35 MB en 30 días): la tasa y la tasa por tienda se calculan en el servidor (`periodoLiviano`: el periodo sin fotos ni
   historial; lo abierto sale de la cola, completo) y las listas de confirmados y cancelados se piden al pulsar su tarjeta (`pedidosDeEtapa`,
   `confirmacion/actions.ts`). Logística no se recortó: todo lo que manda sale en alguna tarjeta.
+- **Asesores de tienda y Tablero de tiendas** (20 nov 2026, pedido de Hernán para Beatriz, encargada de atención): `/tienda-pedidos/asesores` (módulo
+  `tienda-asesores`, botón «Asesores» al lado de las tiendas en Pedidos) mide a cada asesor por sus cambios de etiquetas desde el sistema (`ven_orden_eventos`
+  tipo «etiqueta», con `usuario_id`, `agregadas`, `quitadas` desde la migración 0344; antes solo texto: `cambioDeTexto`). `resumirAsesores` (`src/lib/tienda/
+  asesores.ts`, con prueba): atendidos, confirmados («Confirmada»), cancelados («ANULADO…»/«Cancelado»), en gestión, % y mediana de minutos para confirmar.
+  Lo confirmado directo en Shopify sale como «sin asesor». «Todas las tiendas» salió de Pedidos de tienda: es `/tienda-tablero` en Desempeño (módulo
+  `tienda-tablero`, Admin y CEO); Pedidos abre en la primera tienda. Cada asesor ve solo sus tiendas con `tiendas_permitidas`.
 - **Reportería de pedidos (la Matriz dentro del sistema)** (17 nov 2026, pedido de Hernán para María José; prototipo https://claude.ai/artifact/TNhc38acs7JZzNcsLSgUze):
   `/tienda-reporteria` (Operación › Gestión de tienda, módulo `tienda-reporteria`, migración 0310). Meta: dejar los Excel; la primera carga sale de la Matriz
   «NUEVA GESTION OCEANS PANAMA» (Google Sheet de administración, hoja «Excel Matriz») y después se trabaja aquí. Una fila por línea de producto
