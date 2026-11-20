@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { coberturaDe, diasEntre, mesesCubiertos, nombreCortoDeMes, partirTramo, tramoYaTraido } from "./cobertura";
+import { coberturaDe, diasDesdeInicioDeMes, diasEntre, mesesCubiertos, nombreCortoDeMes, partirTramo, tramoYaTraido } from "./cobertura";
 
 test("los días entre dos fechas, ambas incluidas", () => {
   assert.deepEqual(diasEntre("2026-02-27", "2026-03-02"), ["2026-02-27", "2026-02-28", "2026-03-01", "2026-03-02"]);
@@ -32,14 +32,19 @@ test("trece meses seguidos, del más nuevo al más viejo, también al cruzar el 
   assert.equal(meses[12], "2025-02");
 });
 
-test("un tramo ya está traído si está registrado entero o casi todos sus días tienen resultados", () => {
+test("un tramo ya está traído solo si todos sus días están dentro de una lectura registrada", () => {
   const registrado = coberturaDe({ tramos: [["2026-03-01", "2026-03-31"]], dias: [] });
   assert.equal(tramoYaTraido({ desde: "2026-03-05", hasta: "2026-03-20" }, registrado), true);
   assert.equal(tramoYaTraido({ desde: "2026-02-20", hasta: "2026-03-10" }, registrado), false);
-  const dias = diasEntre("2026-02-01", "2026-02-28").slice(0, 22);
-  const porDatos = coberturaDe({ tramos: [], dias });
-  assert.equal(tramoYaTraido({ desde: "2026-02-01", hasta: "2026-02-28" }, porDatos), true);
-  assert.equal(tramoYaTraido({ desde: "2026-02-01", hasta: "2026-03-10" }, porDatos), false);
+  // Tener resultados no basta: lo leído antes del registro se vuelve a leer una vez.
+  const porDatos = coberturaDe({ tramos: [], dias: diasEntre("2026-02-01", "2026-02-28") });
+  assert.equal(tramoYaTraido({ desde: "2026-02-01", hasta: "2026-02-28" }, porDatos), false);
+});
+
+test("los días desde el primero del mes de hace N meses", () => {
+  assert.equal(diasDesdeInicioDeMes("2026-11-20", 0), 20);
+  assert.equal(diasDesdeInicioDeMes("2026-11-20", 12), 385);
+  assert.equal(diasDesdeInicioDeMes("2026-02-10", 1), 41);
 });
 
 test("un tramo se parte en dos mitades sin huecos ni solapes, la más nueva primero", () => {
