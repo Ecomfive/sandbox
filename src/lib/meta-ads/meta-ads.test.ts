@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { esErrorPasajeroDeMeta } from "./api";
 import { agrupar, copyLimpio, landingLimpia } from "./agrupar";
-import { clicAVisita, conversion, cpa, hookRate, holdRate, llegaAlLlamado, resultado, retencion, sinResultados, type Resultados } from "./metricas";
+import { clicAVisita, conSignoCompacto, conversion, cpa, hookRate, holdRate, llegaAlLlamado, resultado, retencion, sinResultados, type Resultados } from "./metricas";
 import { claveDeProducto, embellecer, etiquetasDeNombre, numeroDeVideo } from "./nombre";
 import { accion, actividadDe, anuncioDe, campanaDe, estructuraDe, mensajeDeErrorMeta, normalizarActId, presupuestoDe, pujaDe, resultadoDiaDe } from "./normalizar";
 import { faltanEtiquetas, pendientes, sugerir } from "./sugerencias";
@@ -227,4 +227,11 @@ test("un error pasajero de Meta se reintenta; uno de permisos no", () => {
   assert.equal(esErrorPasajeroDeMeta({ error: { code: 190 } }), false);
   assert.equal(esErrorPasajeroDeMeta({ error: { code: 200 } }), false);
   assert.equal(esErrorPasajeroDeMeta(null), false);
+});
+
+test("el resultado estimado se abrevia para que quepa en el anillo", () => {
+  assert.equal(conSignoCompacto(-148949), "−$149 mil");
+  assert.equal(conSignoCompacto(12_500), "+$12.5 mil");
+  assert.equal(conSignoCompacto(-950), "−$950");
+  assert.equal(conSignoCompacto(2_300_000), "+$2.3 M");
 });
