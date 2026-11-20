@@ -122,11 +122,20 @@ const CODIGO = [
   "function bajar(f){var us=[f.url].concat(Array.isArray(f.alternas)?f.alternas:[]),i=0;var otra=function(){if(i>=us.length)return Promise.resolve(null);var u=us[i++];",
   "var cdn=u.indexOf(CDN+'/')===0,porV=function(){return cdn?porVentana(u).then(function(b){return b||otra()}):otra()};",
   "return fetch(u,{cache:'no-store',credentials:'omit'}).then(function(x){if(!x.ok){FE='no se pudo bajar la foto '+f.nombre+' de '+u.split('/')[2]+' (respondió '+x.status+')';return porV()}return x.blob()},function(e){FE='no se pudo bajar la foto '+f.nombre+' de '+u.split('/')[2]+' ('+String(e&&e.message||e)+')';return porV()})};return otra()}",
-  "function subir(id,f){return bajar(f).then(function(b){if(!b)return false;",
-  "var mandar=function(h){var d=new FormData();d.append('files',new File([b],nl(f.nombre),{type:b.type||'image/jpeg'}));d.append('id',String(id));d.append('main',f.main?'true':'false');",
+  // Una foto de más de ~1 MB se reduce antes de subirla (20 nov 2026, la Turmeric Curcumin: dos PNG de 1,1 y 1,4 MB daban «Failed to fetch» en cada intento —Dropi corta
+  // la subida sin dar respuesta— mientras el JPG chico sí subía): se dibuja en un lienzo sobre fondo blanco y se guarda como JPG, bajando la calidad y el tamaño hasta
+  // que quepa. Si el navegador no puede (sin lienzo o sin decodificar), se sube la original.
+  "var LIM=950000;",
+  "async function reducir(b){if(!b||b.size<=LIM)return b;try{var ib=await createImageBitmap(b),w=ib.width,h=ib.height,esc=Math.min(1,2000/Math.max(w,h)),q=0.9,r=null;",
+  "for(var i=0;i<6;i++){var cw=Math.max(1,Math.round(w*esc)),ch=Math.max(1,Math.round(h*esc)),cv=typeof OffscreenCanvas==='function'?new OffscreenCanvas(cw,ch):Object.assign(document.createElement('canvas'),{width:cw,height:ch}),cx=cv.getContext('2d');",
+  "cx.fillStyle='#fff';cx.fillRect(0,0,cw,ch);cx.drawImage(ib,0,0,cw,ch);r=cv.convertToBlob?await cv.convertToBlob({type:'image/jpeg',quality:q}):await new Promise(function(ok){cv.toBlob(ok,'image/jpeg',q)});",
+  "if(r&&r.size<=LIM)break;q=Math.max(0.5,q-0.1);esc=esc*0.85}if(ib.close)ib.close();return r&&r.size<b.size?r:b}catch(e){return b}}",
+  "function mb(n){return (n/1048576).toFixed(1).replace('.',',')+' MB'}",
+  "function subir(id,f){return bajar(f).then(function(b0){if(!b0)return false;return reducir(b0).then(function(b){var nom=b===b0?nl(f.nombre):nl(f.nombre).replace(/\\.[a-z0-9]{2,5}$/i,'')+'.jpg';",
+  "var mandar=function(h){var d=new FormData();d.append('files',new File([b],nom,{type:b.type||'image/jpeg'}));d.append('id',String(id));d.append('main',f.main?'true':'false');",
   "return fetch(A+'/products/photos/upload',{method:'POST',headers:h,body:d}).then(function(x){return x.text().then(function(t){var j=null;try{j=JSON.parse(t)}catch(z){}var ok=x.ok&&!(j&&j.isSuccess===false);",
-  "ST=x.status;if(!ok)FE='Dropi no aceptó la foto '+f.nombre+' (respondió '+x.status+(j&&(j.message||j.error)?': '+String(j.message||j.error).slice(0,120):t?': '+t.replace(/\\s+/g,' ').slice(0,120):'')+')';return ok})},function(e){ST=0;FE='no se pudo subir la foto '+f.nombre+' ('+String(e&&e.message||e)+')';return false})};",
-  "return mandar({Accept:'application/json',Authorization:'Bearer '+T,'x-authorization':'Bearer '+T}).then(function(ok){return ok||(ST>=500?false:mandar({Accept:'application/json','X-Authorization':'Bearer '+T}))})})}",
+  "ST=x.status;if(!ok)FE='Dropi no aceptó la foto '+f.nombre+' (respondió '+x.status+(j&&(j.message||j.error)?': '+String(j.message||j.error).slice(0,120):t?': '+t.replace(/\\s+/g,' ').slice(0,120):'')+')';return ok})},function(e){ST=0;FE='no se pudo subir la foto '+f.nombre+' ('+String(e&&e.message||e)+'; pesa '+mb(b.size)+')';return false})};",
+  "return mandar({Accept:'application/json',Authorization:'Bearer '+T,'x-authorization':'Bearer '+T}).then(function(ok){return ok||(ST>=500?false:mandar({Accept:'application/json','X-Authorization':'Bearer '+T}))})})})}",
   "function porque(){return FE?': '+FE:''}",
   // «Republicar (B280)» (12 nov 2026, proceso de Nicol): el ID viejo tiene su stock en la bodega de Dropi (B280), que no podemos mover. Se crea el ID nuevo con
   // `temporal` unidades (100) en una bodega de ECOMFIVE, porque Dropi no deja publicar con 0; se le copian fotos y garantías; se le sacan esas unidades y queda en 0.
@@ -240,7 +249,9 @@ const CODIGO = [
   // ¿La galería del producto ya tiene una foto con ese nombre? (Dropi antepone un número al nombre del archivo: se compara el final.)
   "function tiene(n,nom){var k=ck(nom);return fotosDe(n).some(function(g){return ck(g.nombre)===k})}",
   // Sube a un producto las fotos que le falten; devuelve cuántas no se pudieron subir.
-  "async function subirFotos(id,n,fs,principal){var mal=0;fs=unicas(fs);for(var i=0;i<fs.length;i++){if(tiene(n,fs[i].nombre))continue;if(!(await subir(id,{url:fs[i].url,nombre:fs[i].nombre,main:principal&&i===0})))mal++}return mal}",
+  // `reg` (opcional) es la lista de direcciones que Dropi ya recibió de un intento anterior: esas no se vuelven a subir y las que sí suben se anotan ahí. Dropi cambia el nombre
+  // de cada archivo, así que `tiene` (por nombre) no basta para saber cuáles ya están (20 nov 2026, la Turmeric Curcumin llegó a 19 fotos repetidas).
+  "async function subirFotos(id,n,fs,principal,reg){var mal=0;fs=unicas(fs);for(var i=0;i<fs.length;i++){if(reg&&reg.indexOf(fs[i].url)>=0)continue;if(tiene(n,fs[i].nombre)){if(reg)reg.push(fs[i].url);continue}if(await subir(id,{url:fs[i].url,nombre:fs[i].nombre,main:principal&&i===0})){if(reg)reg.push(fs[i].url)}else mal++}return mal}",
   // Archivar (o sacar de Archivados) un producto en Dropi: `archiveProduct` / `activateProduct` (las que llama el botón de «Mis productos»; se vuelve a leer para
   // comprobar). **No `unarchive`**: Dropi responde bien a esa ruta pero no desarchiva (28 oct 2026, el 8537 «Truly Jelly Booster» quedó archivado).
   "async function archivar(c){",
@@ -257,15 +268,15 @@ const CODIGO = [
   // Publicar un producto nuevo: crearlo, subirle las fotos, ponerle las garantías y el stock inicial, y comprobar.
   "async function crear(c,bp){",
   "var d=c.datos;if(!d||!Array.isArray(d.fotos)||!Array.isArray(d.bodegas))return{ok:false,error:'El cambio no trae los datos del producto.'};",
-  "var id=Number(c.nuevo)||0,recien=false,k;",
+  "var id=Number(c.nuevo)||0,recien=false,k,SUB=Array.isArray(d.subidas)?d.subidas.slice():[];",
   "if(!id){var cs=await pedir('/categories');if(!cs.ok)return{ok:false,error:motivo(cs)};",
   "var ls=cs.j&&(cs.j.objects!==undefined?cs.j.objects:cs.j);if(!Array.isArray(ls))return{ok:false,error:'Dropi no devolvió las categorías.'};",
   "var r=nuevoProducto(d,L.id,bp,ls);if(r.error)return{ok:false,error:r.error};",
   "var g=await pedir('/products','POST',r.cuerpo);if(!g.ok)return{ok:false,error:motivo(g)};",
   "id=idCreado(g.j);if(!id)return{ok:false,error:sinId(g)};recien=true}",
-  "var f=function(e){return{ok:false,nuevo:id,error:e}};",
+  "var f=function(e){return{ok:false,nuevo:id,error:e,subidas:SUB}};",
   "var b=await pedir('/products/'+id),n=b.j&&b.j.objects;if(!b.ok||!n)return f('Se creó el '+id+', pero no se pudo leer: '+motivo(b));",
-  "var mal=await subirFotos(id,n,d.fotos,true);if(mal)return f('Se creó el '+id+', pero no se pudieron subir '+mal+' foto(s)'+porque()+'.');",
+  "var mal=await subirFotos(id,n,d.fotos,true,SUB);if(mal)return f('Se creó el '+id+', pero no se pudieron subir '+mal+' foto(s)'+porque()+'.');",
   "var aviso=null;if(recien){var gw=await pedir('/productwarranty/create','POST',{id:id,warranties:GARANTIAS});if(!gw.ok)aviso='Las garantías no se pudieron poner: '+motivo(gw)+' Revísalas en Dropi.'}",
   "var sn=stockDe(n),en={},hay=false;d.bodegas.forEach(function(x){var t=sn[String(x.id)]||0;if(t<x.unidades){en[String(x.id)]=x.unidades-t;hay=true}});",
   "if(hay){var me=mover(n,bp,en,'Stock inicial');if(me.error)return f(me.error);",
@@ -273,8 +284,8 @@ const CODIGO = [
   "var v=await pedir('/products/'+id),w=v.j&&v.j.objects;if(!v.ok||!w)return f('Se creó el '+id+', pero no se pudo comprobar en Dropi.');",
   "var tn=0,sw=stockDe(w);for(k in sw)tn+=sw[k];var nf=fotosDe(w).length;",
   "if(w.name!==d.nombre)return f('Dropi muestra el nombre «'+w.name+'» en el '+id+'.');",
-  "if(nf<d.fotos.length)return f('El '+id+' tiene '+nf+' foto(s) en Dropi y se esperaban '+d.fotos.length+'.');",
-  "return{ok:true,nuevo:id,stock:tn,fotos:nf,aviso:aviso}}",
+  "var esp=unicas(d.fotos).length;if(nf<esp)return f('El '+id+' tiene '+nf+' foto(s) en Dropi y se esperaban '+esp+'.');",
+  "return{ok:true,nuevo:id,stock:tn,fotos:nf,aviso:aviso,subidas:SUB}}",
   // Privatizar (26 oct 2026): comprobar el correo, crear el producto privado, ponerle fotos, garantías y stock, asignárselo al dropshipper en
   // «Productos privados» y sacarle esas unidades al público. Cada paso que ya está hecho se salta, así un reintento sigue desde donde quedó:
   // el ID del privado vuelve en `nuevo` aunque falle un paso después, y `salida` avisa que al público ya se le sacó el stock (no se saca dos veces).

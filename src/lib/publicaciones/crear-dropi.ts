@@ -68,6 +68,19 @@ export interface DatosCrearDropi {
   codigoBarras: string | null;
   bodegas: BodegaCrear[];
   fotos: FotoCrear[];
+  /**
+   * Las direcciones de las fotos que Dropi ya recibió (solo en el cambio pendiente, no en el formulario). Dropi cambia el nombre de cada archivo, así que al reintentar
+   * no se puede saber por el nombre cuáles ya están; se anotan aquí al subirlas y un reintento solo sube las que faltan (20 nov 2026, la Turmeric Curcumin llegó a
+   * 19 fotos repetidas porque cada reintento volvía a subir las que sí funcionaban).
+   */
+  subidas?: string[];
+}
+
+/** Las fotos ya subidas a Dropi: las que había más las que dice el favorito, solo direcciones que de verdad son de `fotos` y sin repetir. */
+export function unirSubidas(previas: readonly string[] | undefined, nuevas: unknown, fotos: readonly FotoCrear[]): string[] {
+  const validas = new Set(fotos.map((f) => f.url));
+  const lista = [...(previas ?? []), ...(Array.isArray(nuevas) ? nuevas : [])];
+  return [...new Set(lista.filter((u): u is string => typeof u === "string" && validas.has(u)))];
 }
 
 /** Lo que el formulario de «Publicar en Dropi» ofrece para elegir: las categorías y las bodegas del proveedor que ya se conocen de Dropi. */
@@ -138,6 +151,7 @@ export function normalizarDatosCrear(crudo: unknown): DatosCrearDropi {
     if (!/^https:\/\/[^\s]+$/i.test(url) || fotos.some((x) => x.url === url)) continue;
     fotos.push({ url, nombre: cadena((f as Obj)?.nombre, 160) || url.split("/").pop() || "foto.jpg" });
   }
+  const subidas = unirSubidas(undefined, r.subidas, fotos);
   const categorias = [...new Set((Array.isArray(r.categorias) ? r.categorias : []).map((c) => cadena(c, 80)).filter(Boolean))].slice(0, 10);
   const dinero = (v: unknown) => {
     const n = num(v);
@@ -163,6 +177,7 @@ export function normalizarDatosCrear(crudo: unknown): DatosCrearDropi {
     codigoBarras: cadena(r.codigoBarras, 60) || null,
     bodegas,
     fotos,
+    ...(subidas.length ? { subidas } : {}),
   };
 }
 
