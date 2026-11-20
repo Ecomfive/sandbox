@@ -59,7 +59,13 @@ export async function cargarLibro(
   base: BaseExcel[],
   avance: Avance,
   codigoEntidad?: string,
+  /** «2026-08»: carga solo ese mes y reemplaza lo importado de ese mes (de cualquier archivo o pegado). */
+  mesCompleto?: string | null,
 ): Promise<{ error: string } | ResultadoCargaLibro> {
+  if (mesCompleto) {
+    movimientos = movimientos.filter((m) => m.periodo.slice(0, 7) === mesCompleto);
+    base = base.filter((b) => b.periodo.slice(0, 7) === mesCompleto);
+  }
   const tiendasNuevas = new Set<string>();
   let sinTipo = 0;
   let rechazados = 0;
@@ -91,7 +97,7 @@ export async function cargarLibro(
     avance(Math.min(i + LOTE, movimientos.length), movimientos.length);
   }
   const meses = [...new Set(movimientos.map((m) => m.periodo.slice(0, 7)))].sort();
-  const fin = await terminarImportacion(archivo, movimientos.map((m) => m.origen_clave), base, { movimientos: movimientos.length, meses }, codigoEntidad).catch(cortada);
+  const fin = await terminarImportacion(archivo, movimientos.map((m) => m.origen_clave), base, { movimientos: movimientos.length, meses }, codigoEntidad, mesCompleto ?? null).catch(cortada);
   if ("error" in fin) return fallar(fin.error);
   await terminarBitacora(bitacora, "libro-movimientos", "terminada", {
     nuevas: nuevos,

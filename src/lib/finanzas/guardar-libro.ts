@@ -6,6 +6,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { claseDeCuenta, claveCatalogo, UNIDAD_SIN_ASIGNAR, type BaseExcel, type MovimientoExcel } from "./libro-excel";
 import { reglaPara, type Regla } from "./clasificacion";
 import { mesesDeMovimiento, separarPorCierre } from "./cierre";
+import { planMesCompleto, type MovimientoDelMes, type PlanMesCompleto } from "./mes-completo";
 import { ENTIDAD_BASE, MONEDA_BASE, tasaDelMes, unidadEnEntidad, type TasaMes, type UnidadCatalogo } from "./entidades";
 
 /** Tamaño de cada lote que manda la pantalla (cabe holgado en el límite de 1 MB de una Server Action). */
@@ -358,15 +359,12 @@ async function clavesExistentes(supabase: SupabaseClient, claves: string[]): Pro
 }
 
 /** Las huellas de lo que ya está cargado de ese archivo (para el resumen previo y para borrar lo que ya no está). */
-export async function huellasDeOrigen(supabase: SupabaseClient, origen: string): Promise<Map<string, string>> {
+export async function huellasDeOrigen(supabase: SupabaseClient, origen: string, soloPeriodo: string | null = null): Promise<Map<string, string>> {
   const huellas = new Map<string, string>();
   for (let desde = 0; ; desde += 1000) {
-    const { data, error } = await supabase
-      .from("fin_movimientos")
-      .select("id, origen_clave")
-      .eq("origen", origen)
-      .order("id")
-      .range(desde, desde + 999);
+    let consulta = supabase.from("fin_movimientos").select("id, origen_clave").eq("origen", origen);
+    if (soloPeriodo) consulta = consulta.eq("periodo", soloPeriodo);
+    const { data, error } = await consulta.order("id").range(desde, desde + 999);
     if (error) throw new Error(error.message);
     for (const r of data ?? []) huellas.set(r.origen_clave as string, r.id as string);
     if (!data || data.length < 1000) break;
@@ -384,8 +382,10 @@ export async function cerrarImportacion(
   huellasDelArchivo: Set<string>,
   todaLaBase: BaseExcel[],
   entidad: EntidadLibro | null = null,
+  /** Mes completo: solo se mira ese mes (lo de otros meses del mismo archivo no se toca). */
+  soloPeriodo: string | null = null,
 ): Promise<{ borrados: number; base: number; enMesCerrado: number }> {
-  const [enBase, cerrados] = await Promise.all([huellasDeOrigen(supabase, origen), mesesCerrados(supabase)]);
+  const [enBase, cerrados] = await Promise.all([huellasDeOrigen(supabase, origen, soloPeriodo), mesesCerrados(supabase)]);
   const candidatos = [...enBase].filter(([clave]) => !huellasDelArchivo.has(clave));
   const protegidos = await guardadosEnMesCerrado(supabase, candidatos.map(([clave]) => clave), cerrados);
   const sobran = candidatos.filter(([clave]) => !protegidos.has(clave)).map(([, id]) => id);
@@ -430,4 +430,77 @@ export function validarBase(v: unknown): BaseExcel | null {
   if (!unidad || !Number.isInteger(envios) || envios < 0 || envios > 10_000_000) return null;
   if (!Number.isInteger(entregados) || entregados < 0) return null;
   return { periodo: b.periodo, unidad, envios, entregados };
+}
+
+/** Las unidades (tiendas) de una entidad. La de Panamá también cuenta las que todavía no tienen entidad. */
+async function unidadesDeEntidad(supabase: SupabaseClient, entidad: EntidadLibro | null): Promise<{ ids: Set<string>; base: boolean }> {
+  const base = !entidad || entidad.codigo === ENTIDAD_BASE;
+  let entidadId = entidad?.id ?? null;
+  if (!entidadId) {
+    const { data } = await supabase.from("fin_entidades").select("id").eq("codigo", ENTIDAD_BASE).maybeSingle();
+    entidadId = (data?.id as string | undefined) ?? null;
+  }
+  const { data, error } = await supabase.from("fin_unidades").select("id, entidad_id");
+  if (error) throw new Error(`fin_unidades: ${error.message}`);
+  const ids = new Set<string>();
+  for (const u of data ?? []) {
+    const suya = u.entidad_id ? u.entidad_id === entidadId : base;
+    if (suya) ids.add(u.id as string);
+  }
+  return { ids, base };
+}
+
+/**
+ * Qué pasaría con el mes si se carga como «mes completo»: lo importado (de cualquier archivo o pegado) de ese mes y esa
+ * entidad que no vino en el archivo se borra; lo cargado a mano, lo del sistema, lo conciliado con el banco y lo de un
+ * mes cerrado se queda. Ver `mes-completo.ts`.
+ */
+export async function revisarMesCompleto(
+  supabase: SupabaseClient,
+  periodo: string,
+  huellasDelArchivo: Set<string>,
+  entidad: EntidadLibro | null,
+): Promise<PlanMesCompleto> {
+  const [{ ids, base }, cerrados] = await Promise.all([unidadesDeEntidad(supabase, entidad), mesesCerrados(supabase)]);
+  const movimientos: (MovimientoDelMes & { unidad_id: string | null })[] = [];
+  for (let desde = 0; ; desde += 1000) {
+    const { data, error } = await supabase
+      .from("fin_movimientos")
+      .select("id, origen, origen_clave, periodo, fecha_pago, unidad_id")
+      .eq("periodo", periodo)
+      .order("id")
+      .range(desde, desde + 999);
+    if (error) throw new Error(`fin_movimientos: ${error.message}`);
+    for (const r of data ?? []) {
+      const unidad = (r.unidad_id as string | null) ?? null;
+      if (unidad ? !ids.has(unidad) : !base) continue;
+      movimientos.push({
+        id: r.id as string,
+        origen: String(r.origen ?? ""),
+        origen_clave: (r.origen_clave as string | null) ?? null,
+        periodo: String(r.periodo),
+        fecha_pago: (r.fecha_pago as string | null) ?? null,
+        unidad_id: unidad,
+      });
+    }
+    if (!data || data.length < 1000) break;
+  }
+  // Lo emparejado con una línea del banco (migración 0910; sin ella no hay nada conciliado).
+  const conciliados = new Set<string>();
+  const posibles = movimientos.map((m) => m.id);
+  for (let i = 0; i < posibles.length; i += 200) {
+    const { data, error } = await supabase.from("conc_pares").select("movimiento_id").in("movimiento_id", posibles.slice(i, i + 200));
+    if (error) break;
+    for (const r of data ?? []) if (r.movimiento_id) conciliados.add(r.movimiento_id as string);
+  }
+  return planMesCompleto(movimientos, { huellas: huellasDelArchivo, conciliados, cerrados });
+}
+
+/** Borra lo que el plan del mes completo dice (de a 200). Devuelve cuántos borró. */
+export async function aplicarMesCompleto(supabase: SupabaseClient, plan: PlanMesCompleto): Promise<number> {
+  for (let i = 0; i < plan.borrar.length; i += 200) {
+    const { error } = await supabase.from("fin_movimientos").delete().in("id", plan.borrar.slice(i, i + 200));
+    if (error) throw new Error(error.message);
+  }
+  return plan.borrar.length;
 }

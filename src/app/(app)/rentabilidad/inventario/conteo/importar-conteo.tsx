@@ -24,9 +24,13 @@ type Paso =
   | { tipo: "listo"; resultado: ResultadoConteo }
   | { tipo: "error"; mensaje: string };
 
-/** Importa un conteo físico: se lee en el navegador y cada fila entra como un ajuste del WMS por la diferencia. */
+/**
+ * Importa un conteo físico: se lee en el navegador y las diferencias con el WMS quedan como una solicitud de ajuste con su
+ * soporte, que aprueba otra persona (mejora 79).
+ */
 export function ImportarConteo() {
   const [paso, setPaso] = useState<Paso>({ tipo: "elegir" });
+  const [soporte, setSoporte] = useState("");
   const [lectura, setLectura] = useState<{ archivo: string; filas: FilaConteo[]; descartadas: number } | null>(null);
 
   async function alElegir(e: React.ChangeEvent<HTMLInputElement>) {
@@ -49,12 +53,13 @@ export function ImportarConteo() {
 
   async function cargar() {
     if (!lectura) return;
-    const total: ResultadoConteo = { ajustados: 0, sinCambio: 0, rechazados: [] };
+    const total: ResultadoConteo = { ajustados: 0, sinCambio: 0, enAprobacion: 0, rechazados: [] };
     setPaso({ tipo: "cargando", hechos: 0, total: lectura.filas.length });
     for (let i = 0; i < lectura.filas.length; i += LOTE) {
-      const r = await importarConteo(lectura.archivo, lectura.filas.slice(i, i + LOTE)).catch(() => ({ error: "Se cortó la conexión." }));
-      if ("error" in r) return setPaso({ tipo: "error", mensaje: `Se cargaron ${i} de ${lectura.filas.length} y falló un lote: ${r.error} Puedes volver a cargarlo: lo ya ajustado no se mueve otra vez.` });
+      const r = await importarConteo(lectura.archivo, lectura.filas.slice(i, i + LOTE), soporte).catch(() => ({ error: "Se cortó la conexión." }));
+      if ("error" in r) return setPaso({ tipo: "error", mensaje: `Se revisaron ${i} de ${lectura.filas.length} y falló un lote: ${r.error}` });
       total.ajustados += r.ajustados;
+      total.enAprobacion += r.enAprobacion;
       total.sinCambio += r.sinCambio;
       total.rechazados.push(...r.rechazados);
       setPaso({ tipo: "cargando", hechos: Math.min(i + LOTE, lectura.filas.length), total: lectura.filas.length });
@@ -88,12 +93,24 @@ export function ImportarConteo() {
               {lectura.descartadas > 0 && <Dato titulo="Filas descartadas" valor={entero(lectura.descartadas)} />}
             </dl>
           </MarcoAF4>
+          <label className="flex flex-col gap-1">
+            <span className={labelClass}>Soporte del conteo</span>
+            <textarea
+              value={soporte}
+              onChange={(e) => setSoporte(e.target.value)}
+              rows={2}
+              maxLength={500}
+              disabled={paso.tipo === "cargando"}
+              placeholder="Ej: Conteo del 18 nov en Plaza 100 por Dinora y Yiletsi, acta firmada en Drive"
+              className={fieldClass}
+            />
+          </label>
           {paso.tipo === "cargando" ? (
-            <ProgresoCarga mensaje={`Ajustando ${entero(paso.hechos)} de ${entero(paso.total)}…`} />
+            <ProgresoCarga mensaje={`Revisando ${entero(paso.hechos)} de ${entero(paso.total)}…`} />
           ) : (
             <div className="flex gap-3">
-              <Button type="button" onClick={cargar}>
-                Ajustar el inventario
+              <Button type="button" onClick={cargar} disabled={soporte.trim().length < 5}>
+                Pedir el ajuste
               </Button>
               <Button
                 type="button"
@@ -113,7 +130,7 @@ export function ImportarConteo() {
         <section aria-live="polite" className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4 text-sm">
           <p className="flex items-center gap-2 font-medium">
             <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${paso.resultado.rechazados.length ? "bg-warning" : "bg-success"}`} />
-            {entero(paso.resultado.ajustados)} ajustes · {entero(paso.resultado.sinCambio)} sin cambio
+            {entero(paso.resultado.enAprobacion)} ajustes pendientes de aprobación · {entero(paso.resultado.sinCambio)} sin cambio
             {paso.resultado.rechazados.length ? ` · ${entero(paso.resultado.rechazados.length)} rechazadas` : ""}
           </p>
           {paso.resultado.rechazados.length > 0 && (
@@ -126,6 +143,7 @@ export function ImportarConteo() {
               ))}
             </ul>
           )}
+          {paso.resultado.enAprobacion > 0 && <p className="text-muted-foreground">El stock no cambia hasta que otra persona apruebe la solicitud, abajo en esta página.</p>}
           <div className="flex flex-wrap gap-3">
             <Link href="/rentabilidad/inventario" className={`rounded-md bg-foreground px-3 py-1.5 font-medium text-background ${anilloFoco}`}>
               Ver inventario valorizado

@@ -12,13 +12,14 @@ import { Seccion } from "@/components/ui/seccion-ficha";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
-import { ActualizarIcon, CalendarioIcon, CerrarIcon, CheckIcon, ExtractoIcon, FlechaAbajoIcon, FlechaArribaIcon, GastoIcon, PapeleraIcon, TiendaIcon } from "@/lib/nav-icons";
+import { ActualizarIcon, CalendarioIcon, CerrarIcon, CheckIcon, ExtractoIcon, FlechaAbajoIcon, FlechaArribaIcon, GastoIcon, LapizIcon as NotaIcon, PapeleraIcon, TiendaIcon } from "@/lib/nav-icons";
 import type { Opcion } from "@/lib/finanzas/cargar-pendientes";
 import { ORIGEN_MANUAL, ORIGEN_PEGADO, ORIGEN_RECURRENTE, ORIGENES_ELIMINABLES } from "@/lib/finanzas/movimiento-manual";
 import type { FilaMovimiento } from "./def-movimientos";
 import { actualizarMovimiento, eliminarMovimiento, obtenerHistorialMovimiento } from "./movimiento-actions";
 import { anularMovimiento, restaurarMovimiento } from "./calidad-actions";
 import { ComprobantesMovimiento } from "./comprobantes-movimiento";
+import { VinculosMovimiento } from "./vinculos-movimiento";
 import { OfrecerRegla } from "./ofrecer-regla";
 import { firma } from "@/lib/finanzas/clasificacion";
 import { validarRucDv } from "@/lib/finanzas/ruc-panama";
@@ -37,6 +38,8 @@ interface Formulario {
   en_flujo: boolean;
   factura_numero: string;
   ruc: string;
+  itbms: string;
+  nota_interna: string;
 }
 
 const desde = (m: FilaMovimiento): Formulario => ({
@@ -52,6 +55,8 @@ const desde = (m: FilaMovimiento): Formulario => ({
   en_flujo: m.flujo === "Sí",
   factura_numero: m.facturaNumero ?? "",
   ruc: m.ruc ?? "",
+  itbms: m.itbms === null ? "" : m.itbms.toFixed(2),
+  nota_interna: m.notaInterna ?? "",
 });
 
 const etiquetaOrigen = (origen: string) => (origen === ORIGEN_MANUAL ? "Cargado a mano" : origen === ORIGEN_PEGADO ? "Pegado desde Excel" : origen === ORIGEN_RECURRENTE ? "Recurrente (lo creó su plantilla)" : origen);
@@ -424,7 +429,24 @@ function Contenido({
             </label>
           </Seccion>
           <Seccion icono={ExtractoIcon} titulo="Factura">
-            <div className="grid gap-3 sm:grid-cols-2">
+            {m.facturaRepetida.length > 0 && (
+              <div className="flex flex-col gap-1 text-sm">
+                <p className="flex items-center gap-1.5">
+                  <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-warning" />
+                  Esta factura también está en {m.facturaRepetida.length === 1 ? "otro movimiento" : `${m.facturaRepetida.length} movimientos`}:
+                </p>
+                <ul className="flex flex-col gap-0.5 pl-3">
+                  {m.facturaRepetida.map((r) => (
+                    <li key={r.id}>
+                      <a href={`/libro-movimientos?mov=${r.id}`} className={`underline underline-offset-2 hover:text-foreground ${anilloFoco} rounded-sm`}>
+                        {mesMedio(r.periodo)} · {dineroAF4(r.monto, "USD", { decimales: 2 })}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            <div className="grid gap-3 sm:grid-cols-3">
               <label className="flex flex-col gap-1">
                 <span className={labelClassSm}>N° de factura</span>
                 <input value={d.factura_numero} onChange={(e) => cambiar({ factura_numero: e.target.value })} maxLength={80} placeholder="Ej: 001-0001234" className={`${fieldClass} w-full`} />
@@ -447,7 +469,33 @@ function Contenido({
                   </span>
                 )}
               </label>
+              <label className="flex flex-col gap-1">
+                <span className={labelClassSm}>ITBMS (USD)</span>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  min="0"
+                  value={d.itbms}
+                  onChange={(e) => cambiar({ itbms: e.target.value })}
+                  placeholder="Ej: 7.00"
+                  className={`${fieldClass} w-full tabular-nums`}
+                />
+              </label>
             </div>
+          </Seccion>
+          <Seccion icono={NotaIcon} titulo="Nota interna">
+            <label className="flex flex-col gap-1">
+              <span className="sr-only">Nota interna de Finanzas</span>
+              <textarea
+                value={d.nota_interna}
+                onChange={(e) => cambiar({ nota_interna: e.target.value })}
+                rows={2}
+                maxLength={1000}
+                placeholder="Ej: confirmar con el proveedor el descuento de octubre"
+                className={`${fieldClass} w-full resize-y`}
+              />
+            </label>
           </Seccion>
           <Seccion icono={GastoIcon} titulo="Dónde entra">
             <label className="flex items-center gap-2 text-sm">
@@ -460,6 +508,10 @@ function Contenido({
             </label>
           </Seccion>
         </fieldset>
+
+        <div className="border-t border-border px-5">
+          <VinculosMovimiento movimientoId={m.id} monto={m.monto} esBien={m.esBien} puedeEscribir={puedeEscribir && !m.anulado} alCambiar={() => setVersion((v) => v + 1)} />
+        </div>
 
         <div className="border-t border-border px-5">
           <ComprobantesMovimiento movimientoId={m.id} puedeEscribir={puedeEscribir} />

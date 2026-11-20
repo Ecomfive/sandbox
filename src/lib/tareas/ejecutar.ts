@@ -8,6 +8,10 @@ import { cargarProyeccion, guardarFotoSiFalta, minimoProyectado } from "@/lib/fi
 import { armarProyeccion } from "@/lib/finanzas/proyeccion-caja";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { recalcularCuentaMes } from "../conciliacion/guardar";
+import { cargarAjustesConciliacion, cargarAntiguedad } from "../conciliacion/cargar";
+import { sincronizarCostosCompras } from "../finanzas/sincronizar-costos-compras";
+import { variacionCostos } from "../finanzas/compras-costos";
+import { cargarAjustesInventario } from "../finanzas/cargar-compras-costos";
 import { efectivoPorRepartidor, sincronizarTransportistas } from "../deliverys/efectivo";
 import { inicioSemana, sumarDias } from "../deliverys/liquidacion";
 import { cargarDatosMeses } from "../finanzas/cargar-cierre";
@@ -23,7 +27,7 @@ import { cargarPresupuestoVigente, cargarRealPorUnidad } from "../finanzas/carga
 import { serieDeLineas } from "../finanzas/presupuesto";
 import { ANOMALIA_VENTANA, desviosPresupuesto, gastosAnomalos, mesesAntes } from "../finanzas/desvios";
 import { cargarPrestamosGrupo } from "../finanzas/cargar-prestamos-grupo";
-import { pendientes } from "../finanzas/prestamos-grupo";
+import { DIAS_AVISO_URGENTE, pendientes } from "../finanzas/prestamos-grupo";
 import type { Seccion } from "../finanzas/eerr";
 import { generarRecurrentes, textoRecurrentes } from "../finanzas/recurrentes-servidor";
 import { alertasDePosicion, cargarPosicion } from "../finanzas/cargar-tesoreria";
@@ -213,10 +217,91 @@ async function tareaAlertas(c: Contexto): Promise<Resultado> {
   // Préstamos del grupo (migración 0983): lo vencido o por vencer entre países, socios y financistas.
   const pg = await generarAlertasPrestamosGrupo(c.supabase, c.hoy);
   const gru = "error" in pg ? ` Préstamos del grupo: ${pg.error}` : ` Préstamos del grupo: ${pg.vencidos} vencidos, ${pg.porVencer} por vencer.`;
-  return { resumen: `${r.activas} alertas activas (${r.nuevas} nuevas), ${r.resueltas} resueltas. Evaluado: ${r.evaluados.join(", ") || "nada"}.${fiscal}${tes}${pau}${cov}${rie}${des}${gru}` };
+  // Conciliación (migración 0986): cuentas con algo abierto y sin conciliar hace más de los días del aviso.
+  const cb = await generarAlertasConciliacion(c.supabase, c.hoy);
+  const con = "error" in cb ? ` Conciliación: ${cb.error}` : ` Conciliación: ${cb.atrasadas} cuentas atrasadas.`;
+  // Costos (migración 0987): el costo puesto de las compras que llegaron pasa a Costos de mercancía y se avisa si sube.
+  const sc = await sincronizarCostosCompras(c.supabase, c.hoy).catch((e: unknown) => ({ error: e instanceof Error ? e.message : "falló" }));
+  const ac = await generarAlertasCostos(c.supabase, c.hoy);
+  const cos = `${"error" in sc ? ` Costos desde Compras: ${sc.error}` : ` Costos desde Compras: ${sc.lotes} lotes.`}${"error" in ac ? ` Costos: ${ac.error}` : ` Costos que subieron: ${ac.suben}.`}`;
+  return { resumen: `${r.activas} alertas activas (${r.nuevas} nuevas), ${r.resueltas} resueltas. Evaluado: ${r.evaluados.join(", ") || "nada"}.${fiscal}${tes}${pau}${cov}${rie}${des}${gru}${con}${cos}` };
 }
 
 const usdCorto = (v: number) => `US$${Math.round(v).toLocaleString("en-US")}`;
+
+/** Días hacia atrás en que un lote nuevo con el costo más alto todavía avisa. */
+const DIAS_AVISO_COSTO = 60;
+
+/**
+ * Una alerta por producto cuyo último lote (por fecha de llegada, de los últimos 60 días) costó más que el anterior por
+ * encima del umbral de «Variación del costo entre lotes» (mejora 35). Crítica si sube más del doble del umbral.
+ */
+export async function generarAlertasCostos(supabase: SupabaseClient, hoy: string): Promise<{ error: string } | { suben: number }> {
+  const [lotes, ajustes] = await Promise.all([
+    traerTodasConError<{ producto_clave: string; producto: string; codigo: string | null; sku_maestro_id: string | null; fecha_llegada: string | null; costo_total: number | string }>((d, h) =>
+      supabase.from("fin_costos_lotes").select("producto_clave, producto, codigo, sku_maestro_id, fecha_llegada, costo_total").order("id").range(d, h),
+    ),
+    cargarAjustesInventario(supabase),
+  ]);
+  if (lotes.error) return { error: "falta correr la migración 0908." };
+  const desde = sumarDias(hoy, -DIAS_AVISO_COSTO);
+  const variacion = variacionCostos(
+    (lotes.data ?? []).map((l) => ({
+      productoClave: l.producto_clave,
+      producto: l.producto,
+      codigo: l.codigo,
+      skuId: l.sku_maestro_id,
+      fecha: l.fecha_llegada ? String(l.fecha_llegada).slice(0, 10) : null,
+      costo: Number(l.costo_total),
+    })),
+    ajustes.alertaCosto,
+  );
+  const nuevas: AlertaNueva[] = variacion
+    .filter((v) => v.alerta && v.fechaUltimo && v.fechaUltimo >= desde && v.anterior)
+    .map((v) => ({
+      clave: `costo:${v.productoClave}`,
+      tipo: "costo_sube" as const,
+      severidad: (v.variacion ?? 0) > 2 * ajustes.alertaCosto ? ("critica" as const) : ("aviso" as const),
+      mensaje: `${v.producto}: el costo subió ${Math.round((v.variacion ?? 0) * 100)} % (US$${v.anterior!.toFixed(2)} → US$${v.ultimo.toFixed(2)}) en el lote del ${v.fechaUltimo}`.slice(0, 480),
+      enlace: DEF_ALERTA.costo_sube.href,
+      modulo: DEF_ALERTA.costo_sube.modulo,
+      monto: Math.round((v.ultimo - v.anterior!) * 100) / 100,
+    }));
+  const r = await guardarAlertas(supabase, nuevas, ["costo_sube"]);
+  if ("error" in r) return { error: /check|tipo/i.test(r.error) ? "falta correr la migración 0987." : r.error };
+  return { suben: nuevas.length };
+}
+
+/**
+ * Una alerta por cuenta del banco con líneas abiertas y sin conciliar hace más de `conc_dias_alerta` días (mejora 17).
+ * Crítica si además tiene algo abierto de más de 30 días. Lo que se pone al día se resuelve solo.
+ */
+export async function generarAlertasConciliacion(supabase: SupabaseClient, hoy: string): Promise<{ error: string } | { atrasadas: number }> {
+  const cuentas = await supabase.from("fin_cuentas").select("id, nombre");
+  if (cuentas.error) return { error: cuentas.error.message };
+  const ajustes = await cargarAjustesConciliacion(supabase);
+  const filas = await cargarAntiguedad(supabase, cuentas.data ?? [], hoy, ajustes.diasAlerta);
+  if (!filas) return { error: "falta correr la migración 0910." };
+  const nombre = new Map((cuentas.data ?? []).map((c) => [c.id as string, c.nombre as string]));
+  const nuevas: AlertaNueva[] = filas
+    .filter((f) => f.atrasada)
+    .map((f) => {
+      const abiertas = f.tramos.hasta7 + f.tramos.hasta30 + f.tramos.mas30;
+      const monto = f.montos.hasta7 + f.montos.hasta30 + f.montos.mas30;
+      return {
+        clave: `conc:${f.cuentaId}`,
+        tipo: "conciliacion_atrasada" as const,
+        severidad: f.tramos.mas30 > 0 ? ("critica" as const) : ("aviso" as const),
+        mensaje: `${nombre.get(f.cuentaId) ?? "Cuenta"}: ${abiertas} líneas sin conciliar (${usdCorto(monto)}), ${f.diasSinConciliar} días sin conciliar${f.tramos.mas30 ? ` · ${f.tramos.mas30} de más de 30 días` : ""}`.slice(0, 480),
+        enlace: `/conciliacion-bancaria?cuenta=${f.cuentaId}`,
+        modulo: DEF_ALERTA.conciliacion_atrasada.modulo,
+        monto,
+      };
+    });
+  const r = await guardarAlertas(supabase, nuevas, ["conciliacion_atrasada"]);
+  if ("error" in r) return { error: /check|tipo/i.test(r.error) ? "falta correr la migración 0986." : r.error };
+  return { atrasadas: nuevas.length };
+}
 
 /**
  * Lo pendiente de los préstamos del grupo (después de aplicar los abonos) vencido = crítica, que vence en 7 días = aviso.
@@ -234,7 +319,8 @@ export async function generarAlertasPrestamosGrupo(supabase: SupabaseClient, hoy
       return {
         clave: `grupo:${p.id}`,
         tipo: "prestamo_grupo_vence" as const,
-        severidad: p.estado === "vencido" ? ("critica" as const) : ("aviso" as const),
+        // Mejora 64: aviso a 7 días y, a 2 días o menos, crítica.
+        severidad: p.estado === "vencido" || (p.dias !== null && p.dias <= DIAS_AVISO_URGENTE) ? ("critica" as const) : ("aviso" as const),
         mensaje: `${nombre.get(p.deudorId) ?? "—"} le debe a ${nombre.get(p.acreedorId) ?? "—"}: ${usdCorto(p.pendiente)} ${cuando} · ${p.concepto}${ordenes}`.slice(0, 480),
         enlace: DEF_ALERTA.prestamo_grupo_vence.href,
         modulo: DEF_ALERTA.prestamo_grupo_vence.modulo,
@@ -364,7 +450,21 @@ export async function generarAlertasTesoreria(supabase: SupabaseClient, hoy: str
   if (v.deuda) evaluados.push("tesoreria_linea_vencida", "tesoreria_linea_renovar", "tesoreria_linea_uso");
   const r = await guardarAlertas(supabase, alertasTesoreriaANuevas(alertasDePosicion(v)), evaluados);
   if ("error" in r) return { error: /check|tipo/i.test(r.error) ? "falta correr la migración 0939." : r.error };
-  return { activas: r.activas, resueltas: r.resueltas };
+  // Caja mínima por empresa (mejora 52, migración 0989): aviso a 20 % del mínimo, crítica bajo el mínimo.
+  const caja: AlertaNueva[] = v.cajaEmpresas
+    .filter((c) => c.estado === "bajo" || c.estado === "cerca")
+    .map((c) => ({
+      clave: `caja-emp:${c.entidadId}`,
+      tipo: "caja_minima_empresa" as const,
+      severidad: c.estado === "bajo" ? ("critica" as const) : ("aviso" as const),
+      mensaje: `${c.nombre}: caja de ${usdCorto(c.saldo)} ${c.estado === "bajo" ? "bajo" : "cerca de"} su mínimo de ${usdCorto(c.minimo ?? 0)}${c.fecha ? ` (saldos al ${c.fecha})` : ""}`.slice(0, 480),
+      enlace: DEF_ALERTA.caja_minima_empresa.href,
+      modulo: DEF_ALERTA.caja_minima_empresa.modulo,
+      monto: c.saldo,
+    }));
+  const rc = await guardarAlertas(supabase, caja, ["caja_minima_empresa"]);
+  if ("error" in rc) return { activas: r.activas, resueltas: r.resueltas };
+  return { activas: r.activas + rc.activas, resueltas: r.resueltas + rc.resueltas };
 }
 
 // ---------------------------------------------------------------------------------------------

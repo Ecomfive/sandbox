@@ -182,6 +182,11 @@ export interface Opciones {
   maxCandidatos: number;
   /** Cuántas propuestas alternativas se guardan por línea, además de la elegida. */
   alternativas: number;
+  /**
+   * Diferencia en centavos que se acepta entre la línea y un movimiento del libro (1 = un centavo). Más de un centavo se
+   * propone con menos puntaje y, al confirmarla, la diferencia se asienta sola como redondeo (migración 0986).
+   */
+  toleranciaCent: number;
 }
 
 export const OPCIONES: Opciones = {
@@ -194,6 +199,7 @@ export const OPCIONES: Opciones = {
   maxSuma: 5,
   maxCandidatos: 18,
   alternativas: 2,
+  toleranciaCent: 1,
 };
 
 // ---------------------------------------------------------------------------------------------
@@ -669,16 +675,19 @@ function propuestasLibro(l: LineaEmp, movs: MovEmp[], o: Opciones): Propuesta[] 
   const mismoSigno = movs.filter((m) => m.fecha && Math.sign(m.efecto) === Math.sign(l.monto) && Math.abs(diasEntre(m.fecha, l.fecha)) <= o.diasLibro);
   const bonoFecha = (m: MovEmp) => [20, 15, 10, 5][Math.abs(diasEntre(m.fecha!, l.fecha))] ?? 0;
   const salida: Propuesta[] = [];
+  const tope = Math.max(1, Math.round(o.toleranciaCent));
   for (const m of mismoSigno) {
-    if (!iguales(m.efecto, l.monto)) continue;
+    const diferencia = Math.abs(cent(m.efecto) - cent(l.monto));
+    if (diferencia > tope) continue;
+    const exacto = diferencia <= 1;
     salida.push({
       lineaId: l.id,
       grupo: "",
       metodo: "exacto",
-      puntaje: Math.min(100, 60 + bonoFecha(m) + Math.round(20 * parecido(l.descripcion, m.descripcion))),
+      puntaje: Math.min(100, (exacto ? 60 : 45) + bonoFecha(m) + Math.round(20 * parecido(l.descripcion, m.descripcion))),
       auto: false,
       partes: [{ clase: "movimiento", id: m.id, monto: m.efecto }],
-      detalle: "Libro · 1 movimiento",
+      detalle: exacto ? "Libro · 1 movimiento" : `Libro · 1 movimiento · diferencia de ${(diferencia / 100).toFixed(2)} (se ajusta sola)`,
     });
   }
   if (!salida.length) {
@@ -809,13 +818,41 @@ export function estadoDeLinea(
 ): EstadoLinea {
   if (actual === "ignorada") return actual;
   const confirmados = pares.filter((p) => p.estado === "confirmado");
-  const cubierto = confirmados.reduce((a, p) => a + Math.abs(p.monto), 0);
+  const cubierto = cubiertoPor(confirmados);
   if (confirmados.length && Math.abs(cent(cubierto) - cent(Math.abs(monto))) <= 1) return "conciliada";
   // Solo la propuesta elegida la hace «sugerida»; las alternativas se ven en la ficha pero la línea sigue pendiente.
   return pares.some((p) => p.estado === "sugerido" && p.principal !== false) ? "sugerida" : "pendiente";
 }
 
-/** Cuánto falta cubrir de una línea con lo confirmado (0 si está cubierta). */
+/**
+ * Lo que cubren las partes confirmadas de una línea. Las partes van todas con el mismo signo; un ajuste de redondeo por
+ * algo que el libro cubrió de más va con el signo contrario y resta (migración 0986).
+ */
+export function cubiertoPor(confirmados: { monto: number }[]): number {
+  const signo = Math.sign(confirmados.find((p) => p.monto !== 0)?.monto ?? 1) || 1;
+  return Math.abs(confirmados.reduce((a, p) => a + (Math.sign(p.monto) === signo ? Math.abs(p.monto) : -Math.abs(p.monto)), 0));
+}
+
+/** Cuánto falta cubrir de una línea con lo confirmado (0 si está cubierta; negativo si se cubrió de más). */
 export function faltaCubrir(monto: number, confirmados: { monto: number }[]): number {
-  return Math.round((Math.abs(monto) - confirmados.reduce((a, p) => a + Math.abs(p.monto), 0)) * 100) / 100;
+  return Math.round((Math.abs(monto) - cubiertoPor(confirmados)) * 100) / 100;
+}
+
+/**
+ * El redondeo que deja conciliada una línea cuyo libro difiere en pocos centavos, o null si no hace falta o pasa el tope.
+ * `monto` va con el signo de las partes (para el par) y `tipo` dice si el banco tiene de más («a favor») o de menos.
+ */
+export function redondeoPendiente(
+  montoLinea: number,
+  confirmados: { monto: number }[],
+  toleranciaCent: number,
+): { monto: number; importe: number; tipo: "a_favor" | "en_contra" } | null {
+  if (!confirmados.length) return null;
+  const falta = faltaCubrir(montoLinea, confirmados);
+  const centavos = Math.round(Math.abs(falta) * 100);
+  if (centavos <= 1 || centavos > Math.max(1, Math.round(toleranciaCent))) return null;
+  const signoPartes = Math.sign(confirmados.find((p) => p.monto !== 0)?.monto ?? montoLinea) || 1;
+  // Lo que el banco movió de más respecto del libro, en el sentido del banco: + = entró más o salió menos.
+  const banco = montoLinea > 0 ? falta : -falta;
+  return { monto: Math.round(signoPartes * falta * 100) / 100, importe: Math.abs(falta), tipo: banco > 0 ? "a_favor" : "en_contra" };
 }

@@ -106,12 +106,26 @@ export async function actualizarMovimiento(formData: FormData): Promise<{ error?
     // La tienda de antes (en la base) y la nueva tienen que ser de las que la persona puede ver.
     const acceso = (await sinAccesoARegistros(supabase, "fin_movimientos", [id])) ?? (await sinAccesoAUnidades([d.unidad_id]));
     if (acceso) return { error: acceso };
-    const { data: a } = await supabase
-      .from("fin_movimientos")
-      .select("periodo, fecha_pago, fecha_servicio, descripcion, monto, en_eerr, en_flujo, tipo_texto, factura_numero, ruc_proveedor, fin_unidades(nombre), fin_tipos(nombre), fin_cuentas(nombre)")
-      .eq("id", id)
-      .maybeSingle();
+    const base = "periodo, fecha_pago, fecha_servicio, descripcion, monto, en_eerr, en_flujo, tipo_texto, factura_numero, ruc_proveedor, itbms, fin_unidades(nombre), fin_tipos(nombre), fin_cuentas(nombre)";
+    // Con la migración 0986 trae también la nota interna; sin ella, la nota no se guarda.
+    const conNota = await supabase.from("fin_movimientos").select(`${base}, nota_interna`).eq("id", id).maybeSingle();
+    const hayNota = !conNota.error;
+    const { data: a } = hayNota ? conNota : await supabase.from("fin_movimientos").select(base).eq("id", id).maybeSingle();
     if (!a) return { error: "El movimiento ya no existe." };
+    const fila = a as unknown as Record<string, unknown>;
+    // ITBMS (mejora 9) y nota interna (mejora 10): solo si vienen en el formulario.
+    const extra2: { itbms?: number | null; nota_interna?: string | null } = {};
+    if (formData.has("itbms")) {
+      const t = String(formData.get("itbms") ?? "").trim().replace(",", ".");
+      const v = t ? Number(t) : null;
+      if (v !== null && (!Number.isFinite(v) || v < 0 || v > d.monto)) return { error: "El ITBMS tiene que ser un monto entre 0 y el monto del movimiento." };
+      const antesItbms = fila.itbms === null || fila.itbms === undefined ? null : Number(fila.itbms);
+      if ((v === null ? null : Math.round(v * 100) / 100) !== antesItbms) extra2.itbms = v === null ? null : Math.round(v * 100) / 100;
+    }
+    if (hayNota && formData.has("nota_interna")) {
+      const nota = String(formData.get("nota_interna") ?? "").trim().slice(0, 1000) || null;
+      if (nota !== ((fila.nota_interna as string | null) ?? null)) extra2.nota_interna = nota;
+    }
     // El RUC se valida solo si cambió: uno importado del Excel con otro formato no impide corregir lo demás.
     if (formData.has("ruc")) {
       const escrito = String(formData.get("ruc") ?? "").trim();
@@ -147,11 +161,19 @@ export async function actualizarMovimiento(formData: FormData): Promise<{ error?
       (cambios.antes as Record<string, unknown>).RUC = ruc.antes;
       (cambios.despues as Record<string, unknown>).RUC = ruc.despues;
     }
+    if ("itbms" in extra2) {
+      (cambios.antes as Record<string, unknown>).ITBMS = fila.itbms === null || fila.itbms === undefined ? "" : usd(Number(fila.itbms));
+      (cambios.despues as Record<string, unknown>).ITBMS = extra2.itbms === null || extra2.itbms === undefined ? "" : usd(extra2.itbms);
+    }
+    if ("nota_interna" in extra2) {
+      (cambios.antes as Record<string, unknown>)["Nota interna"] = (fila.nota_interna as string | null) ?? "";
+      (cambios.despues as Record<string, unknown>)["Nota interna"] = extra2.nota_interna ?? "";
+    }
     if (!Object.keys(cambios.antes).length) return {};
     const ahora = new Date().toISOString();
     const { error } = await supabase
       .from("fin_movimientos")
-      .update({ ...d, ...extras, editado_a_mano: true, editado_por: usuario.id, editado_en: ahora, actualizado_en: ahora })
+      .update({ ...d, ...extras, ...extra2, editado_a_mano: true, editado_por: usuario.id, editado_en: ahora, actualizado_en: ahora })
       .eq("id", id);
     if (error) return { error: `No se pudo guardar: ${error.message}` };
     await registrarAuditoria({ accion: "editar_movimiento_libro", entidad: "fin_movimientos", entidadId: id, ...cambios });

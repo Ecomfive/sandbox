@@ -11,6 +11,9 @@ import { puedeVerPais } from "@/lib/paises-permitidos";
 import { esUuid } from "@/lib/seguridad/ruta-almacen";
 import { createServiceClient } from "@/lib/supabase/server";
 import { sinAccesoTodaLaEmpresa } from "@/lib/finanzas/acceso-tienda";
+import { paisDeOperacionActual } from "@/lib/finanzas/pais-servidor";
+import { sincronizarCostosCompras } from "@/lib/finanzas/sincronizar-costos-compras";
+import { hoyPanama } from "@/lib/af4/fecha";
 
 const MODULO = "rentabilidad";
 const fallo = (e: unknown, porDefecto: string) => ({ error: e instanceof Error ? e.message : porDefecto });
@@ -164,5 +167,36 @@ export async function guardarPresupuestoCompras(filas: unknown): Promise<{ error
     return {};
   } catch (e) {
     return fallo(e, "No se pudo guardar el presupuesto.");
+  }
+}
+
+/**
+ * «Usar como costo oficial» (mejoras 31 y 37): lleva el costo puesto (más el financiamiento) de las compras que ya llegaron
+ * a Costos de mercancía, un lote por compra y producto. El costo vigente pasa a ser el de la compra más reciente. La tarea
+ * diaria de alertas hace lo mismo; este botón no espera a mañana. Escribe en Costos de mercancía: pide poder modificarlo.
+ */
+export async function usarComprasComoCosto(): Promise<{ error: string } | { lotes: number; quitados: number }> {
+  try {
+    const usuario = await requireModuloEscritura(MODULO);
+    if (!usuario.modulos.includes("costos-mercancia") || usuario.modulosSoloLectura.includes("costos-mercancia")) {
+      return { error: "Hace falta poder modificar Costos de mercancía." };
+    }
+    const accesoEmpresa = await sinAccesoTodaLaEmpresa();
+    if (accesoEmpresa) return { error: accesoEmpresa };
+    const pais = await paisDeOperacionActual(usuario.paisesPermitidos);
+    if (!pais) return { error: "No tienes acceso a un país con operación." };
+    const r = await sincronizarCostosCompras(createServiceClient(), hoyPanama(), pais);
+    if ("error" in r) return r;
+    await registrarAuditoria({
+      accion: "costos_desde_compras",
+      entidad: "fin_costos_lotes",
+      detalle: `${nombreDePais(pais)}: ${r.lotes} lotes desde Compras${r.quitados ? `, ${r.quitados} quitados` : ""}`,
+    });
+    revalidar();
+    revalidatePath("/costos-mercancia", "layout");
+    revalidatePath("/rentabilidad", "layout");
+    return r;
+  } catch (e) {
+    return fallo(e, "No se pudieron llevar los costos.");
   }
 }

@@ -192,6 +192,13 @@ export const MIGRACIONES_CLAVE: { migracion: string; que: string; prueba: Prueba
   { migracion: "0981", que: "Movimientos recurrentes del libro (plantillas que se registran solas cada mes)", prueba: { tipo: "tabla", nombre: "fin_recurrentes" } },
   { migracion: "0982", que: "Verificación de los respaldos financieros (que se puedan restaurar)", prueba: { tipo: "columna", nombre: "fin_respaldos", columna: "verificacion" } },
   { migracion: "0983", que: "Préstamos del grupo (entre países, socios y financistas)", prueba: { tipo: "tabla", nombre: "fin_grupo_movimientos" } },
+  { migracion: "0984", que: "Libro: tiendas que asumen un gasto, lo pagó otra empresa y bien de uso desde el movimiento", prueba: { tipo: "tabla", nombre: "fin_movimiento_reparto" } },
+  { migracion: "0985", que: "Costo de financiamiento por OC (tasa de los financistas) y paquetes extraviados en el libro", prueba: { tipo: "columna", nombre: "fin_grupo_partes", columna: "tasa_ciclo" } },
+  { migracion: "0986", que: "Nota interna, plantillas de reparto, reglas que concilian solas, redondeo bancario y aviso de cuentas sin conciliar", prueba: { tipo: "columna", nombre: "fin_movimientos", columna: "nota_interna" } },
+  { migracion: "0987", que: "Costo vigente por último lote o promedio de 12 meses, costos desde Compras y alerta de costo que sube", prueba: { tipo: "columna", nombre: "fin_costo_vigente", columna: "costo_promedio_12m" } },
+  { migracion: "0988", que: "Ventas por tienda: ventas por día, por día de la semana y hora, y unidades por pedido", prueba: { tipo: "funcion", nombre: "ven_ventas_diarias" } },
+  { migracion: "0989", que: "Préstamos del grupo: aportes, interés entre empresas, conciliación, y caja mínima por empresa", prueba: { tipo: "tabla", nombre: "fin_grupo_confirmaciones" } },
+  { migracion: "0990", que: "Inventario contable: provisión por obsoleto, consignación y ajustes de conteo con aprobación", prueba: { tipo: "tabla", nombre: "fin_ajustes_inventario" } },
 ];
 
 /** Lo que se muestra de una prueba («Falta …»). */

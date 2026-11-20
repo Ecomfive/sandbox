@@ -314,6 +314,13 @@ const uno = <T>(v: Uno<T>): T | null => (Array.isArray(v) ? (v[0] ?? null) : v);
  * `emparejar` contra lo que todavía no está conciliado y guarda lo nuevo. Lo que tiene prueba se confirma solo; lo
  * descartado por una persona no se vuelve a proponer.
  */
+/** Tope de la diferencia de centavos que se ajusta sola (`fin_config.conc_tolerancia_centavos`, migración 0986; 1 sin ella). */
+export async function leerToleranciaCent(supabase: SupabaseClient): Promise<number> {
+  const { data, error } = await supabase.from("fin_config").select("valor").eq("clave", "conc_tolerancia_centavos").maybeSingle();
+  const n = Number(error ? 1 : (data?.valor ?? 1));
+  return Number.isFinite(n) ? Math.min(Math.max(Math.round(n), 1), 500) : 1;
+}
+
 export async function recalcularCuentaMes(supabase: SupabaseClient, cuentaId: string, mes: string): Promise<ResultadoRecalculo> {
   const inicio = `${mes.slice(0, 7)}-01`;
   const fin = sumarDias(`${new Date(Date.UTC(Number(mes.slice(0, 4)), Number(mes.slice(5, 7)), 1)).toISOString().slice(0, 10)}`, -1);
@@ -430,7 +437,8 @@ export async function recalcularCuentaMes(supabase: SupabaseClient, cuentaId: st
     cliente: clienteDe.get(o.id) ?? null,
   }));
 
-  const r = emparejar(lineas, { movimientos, cobros, ordenes, semanas }, {}, new Set(descartadosDb.map((d) => d.grupo)));
+  const toleranciaCent = await leerToleranciaCent(supabase);
+  const r = emparejar(lineas, { movimientos, cobros, ordenes, semanas }, { toleranciaCent }, new Set(descartadosDb.map((d) => d.grupo)));
 
   // Se borran las sugerencias anteriores de estas líneas y se guardan las nuevas.
   for (let i = 0; i < ids.length; i += TROZO) {

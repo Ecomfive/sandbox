@@ -40,6 +40,12 @@ export const TIPOS_ALERTA = [
   "gasto_anomalo",
   // Migración 0983: un préstamo del grupo (entre países, socios o financistas) vencido o por vencer (`generarAlertasPrestamosGrupo`).
   "prestamo_grupo_vence",
+  // Migración 0986: una cuenta con líneas del banco abiertas y sin conciliar hace más de N días (`generarAlertasConciliacion`).
+  "conciliacion_atrasada",
+  // Migración 0987: el último lote de un producto costó más que el anterior por encima del umbral (`generarAlertasCostos`).
+  "costo_sube",
+  // Migración 0989: la caja de una empresa (bancos y billeteras en USD) bajo o cerca de su mínimo (`generarAlertasCajaEmpresas`).
+  "caja_minima_empresa",
 ] as const;
 export type TipoAlerta = (typeof TIPOS_ALERTA)[number];
 export type Severidad = "info" | "aviso" | "critica";
@@ -68,6 +74,9 @@ export const DEF_ALERTA: Record<TipoAlerta, { modulo: string; titulo: string; ac
   presupuesto_desvio: { modulo: "presupuesto", titulo: "Desvío contra el presupuesto", accion: "Ver presupuesto", href: "/presupuesto" },
   gasto_anomalo: { modulo: "libro-movimientos", titulo: "Gasto fuera de lo normal", accion: "Revisar gastos", href: "/libro-movimientos" },
   prestamo_grupo_vence: { modulo: "tesoreria", titulo: "Préstamo del grupo por vencer", accion: "Ver préstamos", href: "/tesoreria/grupo" },
+  conciliacion_atrasada: { modulo: "conciliacion-bancaria", titulo: "Cuenta sin conciliar", accion: "Conciliar", href: "/conciliacion-bancaria" },
+  costo_sube: { modulo: "rentabilidad", titulo: "Costo de un producto que subió", accion: "Ver costos", href: "/rentabilidad/compras" },
+  caja_minima_empresa: { modulo: "tesoreria", titulo: "Caja de una empresa cerca del mínimo", accion: "Ver tesorería", href: "/tesoreria#caja-empresas" },
 };
 
 /** Los tipos de Tesorería y de qué alerta de la página sale cada uno (por el comienzo de su clave). */
@@ -85,6 +94,8 @@ export const TIPOS_TESORERIA: { tipo: TipoAlerta; prefijo: string }[] = [
   { tipo: "tesoreria_covenant", prefijo: "cov:" },
   // Tampoco sale de `alertasTesoreria`: la deja `generarAlertasPrestamosGrupo` con su clave «grupo:<id>».
   { tipo: "prestamo_grupo_vence", prefijo: "grupo:" },
+  // La deja `generarAlertasCajaEmpresas` con su clave «caja-emp:<entidad>».
+  { tipo: "caja_minima_empresa", prefijo: "caja-emp:" },
 ];
 export const esTipoTesoreria = (t: string) => TIPOS_TESORERIA.some((x) => x.tipo === t);
 

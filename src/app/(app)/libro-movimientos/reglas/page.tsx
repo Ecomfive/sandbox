@@ -19,7 +19,12 @@ export default async function ReglasPage() {
   const permitidas = await cargarTiendasPermitidas();
   const [datos, todas, usos] = await Promise.all([
     cargarPendientes(supabase, permitidas),
-    supabase.from("fin_reglas").select("id, patron, unidad_id, tipo_id, activo").order("patron"),
+    // Con la migración 0986 trae «crear sola desde el banco»; sin ella, sin esa columna.
+    supabase
+      .from("fin_reglas")
+      .select("id, patron, unidad_id, tipo_id, activo, conciliar_auto")
+      .order("patron")
+      .then((r) => (r.error ? supabase.from("fin_reglas").select("id, patron, unidad_id, tipo_id, activo").order("patron") : r)),
     supabase.from("fin_movimientos").select("regla_id").not("regla_id", "is", null).limit(20000),
   ]);
   if ("error" in datos || todas.error) {
@@ -50,6 +55,8 @@ export default async function ReglasPage() {
     tienda: r.unidad_id ? (nombreTienda.get(r.unidad_id) ?? "—") : "(no cambia)",
     tipo: r.tipo_id ? (nombreTipo.get(r.tipo_id) ?? "—") : "(no cambia)",
     activo: r.activo,
+    auto: (r as { conciliar_auto?: boolean }).conciliar_auto === true,
+    completa: !!r.unidad_id && !!r.tipo_id,
     pendientes: porRegla.get(r.id) ?? 0,
     completados: completados.get(r.id) ?? 0,
   }));

@@ -13,6 +13,8 @@ import {
   type Linea,
 } from "./proyeccion-caja";
 
+import type { FinanciamientoOrden } from "./financiamiento-orden";
+
 const r2 = (v: number) => Math.round((v + Number.EPSILON) * 100) / 100;
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -149,6 +151,10 @@ export interface CostoPuesto {
   /** Gastos ÷ FOB: lo que pesa la importación sobre la mercancía. */
   pesoGastos: number | null;
   lineas: LineaCostoPuesto[];
+  /** Lo que costó (o se estima que cuesta) financiar la compra: línea aparte, no entra en `total`. */
+  financiamiento?: FinanciamientoOrden | null;
+  /** (Costo puesto + financiamiento) ÷ unidades. */
+  unitarioConFinanciamiento?: number | null;
 }
 
 /**

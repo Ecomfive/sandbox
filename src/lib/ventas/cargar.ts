@@ -21,11 +21,12 @@ export async function cargarUnidades(supabase: SupabaseClient): Promise<Unidad[]
 
 const num = (v: unknown) => Number(v ?? 0) || 0;
 
-/** El resumen mensual desde un mes (incluido). `{ error }` si falta la migración 0909. */
-export async function cargarResumen(supabase: SupabaseClient, desde: string, unidades: Unidad[]): Promise<FilaResumen[] | { error: string }> {
-  const r = await traerTodasConError<Record<string, unknown>>((d, h) =>
-    supabase.from("ven_resumen_mensual").select("*").gte("periodo", desde).order("periodo").order("unidad_id").range(d, h),
-  );
+/** El resumen mensual desde un mes (incluido) y, si se pasa, hasta otro (incluido). `{ error }` si falta la migración 0909. */
+export async function cargarResumen(supabase: SupabaseClient, desde: string, unidades: Unidad[], hasta?: string): Promise<FilaResumen[] | { error: string }> {
+  const r = await traerTodasConError<Record<string, unknown>>((d, h) => {
+    const q = supabase.from("ven_resumen_mensual").select("*").gte("periodo", desde);
+    return (hasta ? q.lte("periodo", hasta) : q).order("periodo").order("unidad_id").range(d, h);
+  });
   if (r.error) return { error: r.error instanceof Error ? r.error.message : String((r.error as { message?: string }).message ?? r.error) };
   const nombre = new Map(unidades.map((u) => [u.id, u.nombre]));
   return (r.data ?? []).map((f) => ({

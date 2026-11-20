@@ -15,7 +15,7 @@ import { dinero, entero, SIN_DATO } from "@/lib/af4/formato";
 import { abrirLibro, cargarLibro, compararConCargado, hojasDelLibro, leerHojaLibro } from "@/lib/importar/cargas/libro";
 import { ComparacionImportacion } from "@/components/importar/comparacion-importacion";
 import { ENTIDAD_BASE, entidadDeArchivo } from "@/lib/finanzas/entidades";
-import { resumirImportacion } from "./actions";
+import { resumirImportacion, resumirMesCompleto, type ResumenMesCompleto } from "./actions";
 
 const MAX_BYTES = 30 * 1024 * 1024;
 
@@ -52,6 +52,9 @@ export function ImportarExcel({ entidades = [] }: { entidades?: EntidadImportar[
   const [codigo, setCodigo] = useState(ENTIDAD_BASE);
   const entidad = entidades.find((e) => e.codigo === codigo) ?? null;
   const monedaLibro = entidad?.moneda ?? "USD";
+  // «Reemplazar un mes completo»: "" = como siempre (agrega y actualiza); «2026-08» = solo ese mes, que reemplaza lo importado.
+  const [mesCompleto, setMesCompleto] = useState("");
+  const [planMes, setPlanMes] = useState<ResumenMesCompleto | { error: string } | "cargando" | null>(null);
 
   async function leerHoja(wb: XLSX.WorkBook, archivo: string, hoja: string, hojas: string[], cod = codigo) {
     const moneda = entidades.find((e) => e.codigo === cod)?.moneda;
@@ -62,6 +65,8 @@ export function ImportarExcel({ entidades = [] }: { entidades?: EntidadImportar[
       return;
     }
     setLectura({ archivo, hojas, hoja, movimientos, descartadas, base, resumen: r });
+    setMesCompleto("");
+    setPlanMes(null);
     setPaso({ tipo: "revisar" });
   }
 
@@ -93,7 +98,7 @@ export function ImportarExcel({ entidades = [] }: { entidades?: EntidadImportar[
     if (!lectura) return;
     const { archivo, movimientos, base } = lectura;
     setPaso({ tipo: "cargando", hechos: 0 });
-    const r = await cargarLibro(archivo, movimientos, base, (hechos) => setPaso({ tipo: "cargando", hechos }), codigo);
+    const r = await cargarLibro(archivo, movimientos, base, (hechos) => setPaso({ tipo: "cargando", hechos }), codigo, mesCompleto || null);
     if ("error" in r) {
       setPaso({ tipo: "error", mensaje: r.error });
       return;
@@ -115,6 +120,23 @@ export function ImportarExcel({ entidades = [] }: { entidades?: EntidadImportar[
     }
     return [...mapa].sort(([a], [b]) => a.localeCompare(b));
   }, [lectura]);
+
+  /** Lo que se carga: el archivo entero o, con mes completo, solo ese mes. */
+  const aCargar = useMemo(
+    () => (mesCompleto ? (lectura?.movimientos ?? []).filter((m) => m.periodo.slice(0, 7) === mesCompleto) : (lectura?.movimientos ?? [])),
+    [lectura, mesCompleto],
+  );
+
+  async function elegirMes(mes: string) {
+    setMesCompleto(mes);
+    if (!mes || !lectura) {
+      setPlanMes(null);
+      return;
+    }
+    setPlanMes("cargando");
+    const huellas = lectura.movimientos.filter((m) => m.periodo.slice(0, 7) === mes).map((m) => m.origen_clave);
+    setPlanMes(await resumirMesCompleto(mes, huellas, codigo));
+  }
 
   const motivos = useMemo(() => {
     const c = new Map<string, number>();
@@ -155,6 +177,8 @@ export function ImportarExcel({ entidades = [] }: { entidades?: EntidadImportar[
                 disabled={paso.tipo === "cargando"}
                 onChange={(e) => {
                   setCodigo(e.target.value);
+                  setMesCompleto("");
+                  setPlanMes(null);
                   if (libro) leerHoja(libro, lectura.archivo, lectura.hoja, lectura.hojas, e.target.value);
                 }}
               >
@@ -235,21 +259,30 @@ export function ImportarExcel({ entidades = [] }: { entidades?: EntidadImportar[
             </div>
           </MarcoAF4>
 
-          {paso.tipo === "revisar" && (
+          <MesCompleto
+            meses={porMes.map(([mes]) => mes.slice(0, 7))}
+            valor={mesCompleto}
+            plan={planMes}
+            filas={aCargar.length}
+            deshabilitado={paso.tipo === "cargando"}
+            alElegir={elegirMes}
+          />
+
+          {paso.tipo === "revisar" && !mesCompleto && (
             <ComparacionImportacion key={`${lectura.archivo}-${lectura.hoja}-${codigo}`} comparar={() => compararConCargado(lectura.archivo, lectura.movimientos)} moneda={monedaLibro} />
           )}
 
           {paso.tipo === "cargando" ? (
             <div className="flex flex-col gap-2" aria-live="polite">
-              <ProgresoCarga mensaje={`Cargando ${entero(paso.hechos)} de ${entero(lectura.movimientos.length)}…`} />
+              <ProgresoCarga mensaje={`Cargando ${entero(paso.hechos)} de ${entero(aCargar.length)}…`} />
               <div className="h-1.5 overflow-hidden rounded-full bg-muted" aria-hidden="true">
-                <div className="h-full bg-foreground transition-[width]" style={{ width: `${(100 * paso.hechos) / Math.max(lectura.movimientos.length, 1)}%` }} />
+                <div className="h-full bg-foreground transition-[width]" style={{ width: `${(100 * paso.hechos) / Math.max(aCargar.length, 1)}%` }} />
               </div>
             </div>
           ) : (
             <div className="flex flex-wrap items-center gap-3">
-              <Button type="button" onClick={cargar} disabled={!lectura.movimientos.length}>
-                Cargar al portal
+              <Button type="button" onClick={cargar} disabled={!aCargar.length || (!!mesCompleto && (planMes === "cargando" || planMes === null || "error" in planMes))}>
+                {mesCompleto ? `Reemplazar ${mesCorto(`${mesCompleto}-01`)}` : "Cargar al portal"}
               </Button>
               <Button type="button" variant="secondary" onClick={() => { setLectura(null); setPaso({ tipo: "elegir" }); }}>
                 Cancelar
@@ -263,7 +296,7 @@ export function ImportarExcel({ entidades = [] }: { entidades?: EntidadImportar[
         <section aria-live="polite" className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4 text-sm">
           <p className="flex items-center gap-2 font-medium">
             <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-success" />
-            Libro cargado: {entero(lectura.movimientos.length)} movimientos
+            {mesCompleto ? `${mesCorto(`${mesCompleto}-01`)} reemplazado` : "Libro cargado"}: {entero(aCargar.length)} movimientos
             {paso.borrados ? `, ${entero(paso.borrados)} borrados` : ""}
             {paso.base ? `, base de reparto de ${paso.base} filas` : ""}.
           </p>
@@ -317,5 +350,83 @@ function Dato({ titulo, valor, detalle, alerta = false }: { titulo: string; valo
       <dd className={`text-lg font-semibold ${claseCifra}`}>{entero(valor)}</dd>
       {detalle && <dd className="text-xs text-muted-foreground">{detalle}</dd>}
     </div>
+  );
+}
+
+/** Elegir si el archivo se carga como siempre o reemplaza un mes completo, y qué pasaría con ese mes. */
+function MesCompleto({
+  meses,
+  valor,
+  plan,
+  filas,
+  deshabilitado,
+  alElegir,
+}: {
+  meses: string[];
+  valor: string;
+  plan: ResumenMesCompleto | { error: string } | "cargando" | null;
+  filas: number;
+  deshabilitado: boolean;
+  alElegir: (mes: string) => void;
+}) {
+  return (
+    <fieldset className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4 text-sm">
+      <legend className="px-1 font-medium">Cómo cargarlo</legend>
+      <label className="flex items-start gap-2">
+        <input type="radio" name="modo-carga" className="mt-1" checked={!valor} disabled={deshabilitado} onChange={() => alElegir("")} />
+        <span>
+          Agregar y actualizar
+          <span className="block text-muted-foreground">Lo que ya estaba de otros archivos se queda.</span>
+        </span>
+      </label>
+      <label className="flex items-start gap-2">
+        <input type="radio" name="modo-carga" className="mt-1" checked={!!valor} disabled={deshabilitado || !meses.length} onChange={() => alElegir(meses[meses.length - 1] ?? "")} />
+        <span>
+          Reemplazar un mes completo
+          <span className="block text-muted-foreground">Ese mes queda igual al Excel: se borra lo importado o pegado de ese mes que no viene en el archivo.</span>
+        </span>
+      </label>
+      {valor && (
+        <div className="flex flex-col gap-3 pl-6">
+          <label className="flex flex-col gap-1 sm:max-w-xs">
+            <span className={labelClass}>Mes</span>
+            <select className={fieldClass} value={valor} disabled={deshabilitado} onChange={(e) => alElegir(e.target.value)}>
+              {meses.map((m) => (
+                <option key={m} value={m}>
+                  {mesCorto(`${m}-01`)}
+                </option>
+              ))}
+            </select>
+          </label>
+          {plan === "cargando" && <ProgresoCarga mensaje="Revisando el mes…" />}
+          {plan && plan !== "cargando" && "error" in plan && (
+            <p role="alert" className="flex items-start gap-2">
+              <span aria-hidden="true" className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-destructive" />
+              {plan.error}
+            </p>
+          )}
+          {plan && plan !== "cargando" && !("error" in plan) && (
+            <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4" aria-live="polite">
+              <Dato titulo="Se cargan" valor={filas} />
+              <Dato titulo="Se borran" valor={plan.borran} alerta={plan.borran > 0} detalle={plan.porOrigen.map((o) => `${entero(o.cantidad)} de ${o.origen}`).join(" · ")} />
+              <Dato titulo="Se quedan" valor={plan.conservados.delSistema} detalle="cargados a mano o del sistema" />
+              {(plan.conservados.conciliados > 0 || plan.conservados.enMesCerrado > 0) && (
+                <Dato
+                  titulo="No se pueden borrar"
+                  valor={plan.conservados.conciliados + plan.conservados.enMesCerrado}
+                  alerta
+                  detalle={[
+                    plan.conservados.conciliados ? `${entero(plan.conservados.conciliados)} conciliados con el banco` : "",
+                    plan.conservados.enMesCerrado ? `${entero(plan.conservados.enMesCerrado)} en un mes cerrado` : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                />
+              )}
+            </dl>
+          )}
+        </div>
+      )}
+    </fieldset>
   );
 }

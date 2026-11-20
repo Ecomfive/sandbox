@@ -143,6 +143,38 @@ export async function cambiarEstadoRegla(id: string, activo: boolean): Promise<{
 }
 
 /**
+ * «Crear sola desde el banco» (mejora 12, migración 0986): una regla con tienda y tipo que, al buscar coincidencias en la
+ * conciliación, crea el movimiento del libro de las líneas del banco sin pareja que la cumplen.
+ */
+export async function cambiarConciliarAuto(id: string, auto: boolean): Promise<{ error?: string }> {
+  try {
+    await requireModuloEscritura(MODULO);
+    if (typeof id !== "string" || !UUID.test(id)) return { error: "Regla inválida." };
+    const acceso = await sinAccesoTodaLaEmpresa();
+    if (acceso) return { error: acceso };
+    const supabase = createServiceClient();
+    const { data: r, error: el } = await supabase.from("fin_reglas").select("patron, unidad_id, tipo_id, conciliar_auto").eq("id", id).maybeSingle();
+    if (el) return { error: "Falta correr la migración 0986 en Supabase." };
+    if (!r) return { error: "La regla ya no existe." };
+    if (auto && (!r.unidad_id || !r.tipo_id)) return { error: "Para crear sola desde el banco, la regla tiene que poner tienda y tipo." };
+    const { error } = await supabase.from("fin_reglas").update({ conciliar_auto: auto === true }).eq("id", id);
+    if (error) return { error: error.message };
+    await registrarAuditoria({
+      accion: "regla_conciliar_auto",
+      entidad: "fin_reglas",
+      entidadId: id,
+      antes: { "Crear sola desde el banco": r.conciliar_auto ? "Sí" : "No" },
+      despues: { "Crear sola desde el banco": auto ? "Sí" : "No" },
+      detalle: String(r.patron),
+    });
+    revalidatePath("/libro-movimientos", "layout");
+    return {};
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "No se pudo cambiar la regla." };
+  }
+}
+
+/**
  * Aplica las reglas activas a todo lo pendiente (sin tienda o sin tipo). Solo completa lo que falta. No marca «editado a
  * mano»: al reimportar el Excel, la misma regla vuelve a completar esas filas.
  */

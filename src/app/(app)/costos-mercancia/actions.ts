@@ -8,6 +8,7 @@ import { cerrarLotes, guardarLotes, guardarMapeo, validarLote, validarMapeo } fr
 import { origenDeArchivo } from "@/lib/finanzas/guardar-libro";
 import type { LoteCosto, MapeoDropi } from "@/lib/finanzas/costos-excel";
 import { normalizar } from "@/lib/finanzas/clasificacion";
+import { sinAccesoTodaLaEmpresa } from "@/lib/finanzas/acceso-tienda";
 
 const MODULO = "costos-mercancia";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -118,5 +119,33 @@ export async function aplicarCostosAProductos(cambios: { id: string; costo: numb
     return { aplicados };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "No se pudieron aplicar los costos." };
+  }
+}
+
+/**
+ * Cómo se calcula el costo vigente (mejora 32, migración 0987): «ultimo» = el lote más reciente; «promedio» = promedio
+ * ponderado por unidades de los lotes de los 12 meses anteriores al más reciente. Cambia el costo de todo lo que lo usa
+ * (margen por producto, ventas, inventario), así que pide ver toda la empresa.
+ */
+export async function cambiarMetodoCosto(metodo: string): Promise<{ error?: string }> {
+  try {
+    const usuario = await requireModuloEscritura(MODULO);
+    if (metodo !== "ultimo" && metodo !== "promedio") return { error: "Método inválido." };
+    const acceso = await sinAccesoTodaLaEmpresa();
+    if (acceso) return { error: acceso };
+    const supabase = createServiceClient();
+    const { data: antes, error: ea } = await supabase.from("fin_config").select("valor").eq("clave", "costo_metodo").maybeSingle();
+    if (ea) return { error: "No se pudo leer el ajuste." };
+    if (!antes) return { error: "Falta correr la migración 0987 en Supabase." };
+    const { error } = await supabase.from("fin_config").update({ valor: metodo, actualizado_por: usuario.id, actualizado_en: new Date().toISOString() }).eq("clave", "costo_metodo");
+    if (error) return { error: error.message };
+    const nombre = (m: unknown) => (m === "promedio" ? "Promedio ponderado (12 meses)" : "Último lote");
+    await registrarAuditoria({ accion: "metodo_costo", entidad: "fin_config", antes: { "Costo vigente": nombre(antes.valor) }, despues: { "Costo vigente": nombre(metodo) } });
+    revalidatePath("/costos-mercancia", "layout");
+    revalidatePath("/rentabilidad", "layout");
+    revalidatePath("/estado-resultados");
+    return {};
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "No se pudo cambiar el método." };
   }
 }

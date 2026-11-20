@@ -8,14 +8,19 @@ import { requireModulo } from "@/lib/auth";
 import { cargarCostosVigentes } from "@/lib/finanzas/cargar-costos";
 import { createServiceClient } from "@/lib/supabase/server";
 import { TablaCostos } from "./tabla-costos";
+import { MetodoCosto } from "./metodo-costo";
 
 export const metadata = { title: "Costos de mercancía" };
 
 export const dynamic = "force-dynamic";
 
 export default async function CostosMercanciaPage() {
-  await requireModulo("costos-mercancia");
-  const r = await cargarCostosVigentes(createServiceClient());
+  const usuario = await requireModulo("costos-mercancia");
+  const supabase = createServiceClient();
+  const [r, metodoFila] = await Promise.all([cargarCostosVigentes(supabase), supabase.from("fin_config").select("valor").eq("clave", "costo_metodo").maybeSingle()]);
+  // Sin la migración 0987 no hay método guardado: el costo vigente es el último lote (lo de siempre).
+  const metodo = metodoFila.data?.valor === "promedio" ? "promedio" : "ultimo";
+  const conMetodo = !metodoFila.error && !!metodoFila.data;
   if ("error" in r) {
     return (
       <Pagina ancho="ancha" className="flex flex-col gap-6">
@@ -35,7 +40,11 @@ export default async function CostosMercanciaPage() {
 
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
-      <EncabezadoAF4 titulo="Costos de mercancía" datosHasta={ultima ? inicioDeMes(ultima) : null} />
+      <EncabezadoAF4
+        titulo="Costos de mercancía"
+        datosHasta={ultima ? inicioDeMes(ultima) : null}
+        filtros={conMetodo ? <MetodoCosto metodo={metodo} puedeEscribir={!usuario.modulosSoloLectura.includes("costos-mercancia")} /> : undefined}
+      />
       {!filas.length ? (
         <EstadoVacioAF4 titulo="Todavía no hay costos de mercancía" accion={{ href: "/costos-mercancia/importar", etiqueta: "Importar Excel" }} />
       ) : (

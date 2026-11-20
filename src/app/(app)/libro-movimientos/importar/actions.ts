@@ -6,10 +6,12 @@ import { registrarAuditoria } from "@/lib/auditoria";
 import { createServiceClient } from "@/lib/supabase/server";
 import {
   TAMANO_LOTE,
+  aplicarMesCompleto,
   cerrarImportacion,
   guardarLoteMovimientos,
   huellasDeOrigen,
   origenDeArchivo,
+  revisarMesCompleto,
   validarBase,
   validarMovimiento,
   type EntidadLibro,
@@ -20,6 +22,7 @@ import type { MovimientoExcel } from "@/lib/finanzas/libro-excel";
 import type { FilaComparable } from "@/lib/finanzas/comparar-libro";
 import { traerTodasConError } from "@/lib/supabase/paginar";
 import { sinAccesoTodaLaEmpresa } from "@/lib/finanzas/acceso-tienda";
+import { periodoDeMes, type PlanMesCompleto } from "@/lib/finanzas/mes-completo";
 
 const MODULO = "libro-movimientos";
 const CLAVE = /^[0-9a-f]{24}#\d{1,5}$/;
@@ -62,6 +65,36 @@ export async function resumirImportacion(
   }
 }
 
+/** Lo que el plan del mes completo le muestra a la pantalla (sin los ids). */
+export type ResumenMesCompleto = Omit<PlanMesCompleto, "borrar"> & { borran: number };
+
+/**
+ * «Importar el mes completo»: qué se borraría del mes al cargarlo así (lo importado de ese mes que no viene en el
+ * archivo, de cualquier archivo o pegado). No borra nada.
+ */
+export async function resumirMesCompleto(
+  mes: string,
+  huellas: string[],
+  codigoEntidad?: string,
+): Promise<{ error: string } | ResumenMesCompleto> {
+  try {
+    await requireModuloEscritura(MODULO);
+    const accesoEmpresa = await sinAccesoTodaLaEmpresa();
+    if (accesoEmpresa) return { error: accesoEmpresa };
+    const periodo = periodoDeMes(mes);
+    if (!periodo) return { error: "Mes inválido." };
+    if (!Array.isArray(huellas) || huellas.length > MAX_HUELLAS) return { error: "El archivo trae demasiadas filas." };
+    const supabase = createServiceClient();
+    const entidad = await entidadDelLibro(supabase, codigoEntidad);
+    if (entidad && "error" in entidad) return entidad;
+    const delArchivo = new Set(huellas.filter((h) => typeof h === "string" && CLAVE.test(h)));
+    const { borrar, ...resto } = await revisarMesCompleto(supabase, periodo, delArchivo, entidad);
+    return { ...resto, borran: borrar.length };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "No se pudo revisar el mes." };
+  }
+}
+
 /** Guarda un lote de movimientos (se llama varias veces, una por lote). */
 export async function importarLote(
   archivo: string,
@@ -100,7 +133,9 @@ export async function terminarImportacion(
   base: unknown[],
   resumen: { movimientos: number; meses: string[] },
   codigoEntidad?: string,
-): Promise<{ error: string } | { borrados: number; base: number; enMesCerrado: number }> {
+  /** «2026-08»: el archivo trae ese mes entero y reemplaza lo importado de ese mes (ver `resumirMesCompleto`). */
+  mesCompleto?: string | null,
+): Promise<{ error: string } | { borrados: number; base: number; enMesCerrado: number; delMes?: number }> {
   try {
     await requireModuloEscritura(MODULO);
     const accesoEmpresa = await sinAccesoTodaLaEmpresa();
@@ -114,16 +149,20 @@ export async function terminarImportacion(
     // Sin huellas válidas no se borra nada: evita vaciar lo cargado por un envío roto.
     if (delArchivo.size === 0) return { error: "El archivo no trae movimientos válidos." };
     const filasBase = (Array.isArray(base) ? base : []).slice(0, 5_000).map(validarBase).filter((b) => b !== null);
-    const r = await cerrarImportacion(supabase, origen, delArchivo, filasBase, entidad);
+    const periodo = mesCompleto ? periodoDeMes(mesCompleto) : null;
+    if (mesCompleto && !periodo) return { error: "Mes inválido." };
+    const r = await cerrarImportacion(supabase, origen, delArchivo, periodo ? filasBase.filter((b) => b.periodo === periodo) : filasBase, entidad, periodo);
+    // Mes completo: además, lo importado de ese mes desde otro archivo (o pegado) que no vino en este.
+    const delMes = periodo ? await aplicarMesCompleto(supabase, await revisarMesCompleto(supabase, periodo, delArchivo, entidad)) : 0;
     const meses = Array.isArray(resumen?.meses) ? resumen.meses.filter((m) => /^\d{4}-\d{2}$/.test(m)).slice(0, 24) : [];
     await registrarAuditoria({
       accion: "importar_libro",
       entidad: "fin_movimientos",
-      detalle: `${origen}${entidad ? ` (${entidad.codigo}, ${entidad.moneda})` : ""}: ${delArchivo.size} movimientos (${meses.join(", ")}), ${r.borrados} borrados, ${r.base} filas de base de reparto${r.enMesCerrado ? `, ${r.enMesCerrado} de meses cerrados sin tocar` : ""}`,
+      detalle: `${origen}${entidad ? ` (${entidad.codigo}, ${entidad.moneda})` : ""}${periodo ? ` · mes completo ${periodo.slice(0, 7)}` : ""}: ${delArchivo.size} movimientos (${meses.join(", ")}), ${r.borrados + delMes} borrados, ${r.base} filas de base de reparto${r.enMesCerrado ? `, ${r.enMesCerrado} de meses cerrados sin tocar` : ""}`,
     });
     revalidatePath("/libro-movimientos");
     revalidatePath("/estado-resultados");
-    return r;
+    return { ...r, borrados: r.borrados + delMes, delMes };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "No se pudo terminar la importación." };
   }

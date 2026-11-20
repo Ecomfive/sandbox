@@ -16,6 +16,10 @@ import { cargarCalendario } from "@/lib/finanzas/avisos-cierre";
 import { ETIQUETA_ESTADO_OBLIGACION, filasCalendario, nombrePeriodoFiscal, type EstadoObligacion } from "@/lib/finanzas/calendario-fiscal";
 import { createServiceClient } from "@/lib/supabase/server";
 import { EditarObligacion, MarcaPresentada } from "./controles-fiscales";
+import { cargarEerr } from "@/lib/finanzas/cargar-eerr";
+import { total as totalMeses } from "@/lib/finanzas/eerr";
+import { estimarRenta, TARIFA_RENTA, UMBRAL_CAIR } from "@/lib/finanzas/inventario-contable";
+import { fraccion } from "@/lib/af4/formato";
 
 export const metadata = { title: "Calendario fiscal" };
 
@@ -41,7 +45,27 @@ export default async function CalendarioFiscalPage() {
   const hoy = hoyPanama();
   // El ITBMS que vence este mes es el del mes anterior (Formulario 430, el día 15).
   const mesItbms = mesAnterior(`${hoy.slice(0, 7)}-01`);
-  const [cal, libro] = await Promise.all([cargarCalendario(supabase), cargarLibroContador(supabase, mesItbms, null)]);
+  // Renta del año (mejora 86): los meses cerrados del año en curso de la entidad de Panamá.
+  const anio = hoy.slice(0, 4);
+  const mesesRenta = Array.from({ length: Number(hoy.slice(5, 7)) - 1 }, (_, i) => `${anio}-${String(i + 1).padStart(2, "0")}-01`);
+  const entidadPa = mesesRenta.length ? await supabase.from("fin_entidades").select("id").eq("codigo", "PA").maybeSingle() : null;
+  const [cal, libro, eerrRenta] = await Promise.all([
+    cargarCalendario(supabase),
+    cargarLibroContador(supabase, mesItbms, null),
+    mesesRenta.length ? cargarEerr(supabase, null, mesesRenta, { entidadId: (entidadPa?.data?.id as string | undefined) ?? null }) : Promise.resolve(null),
+  ]);
+  const renta = (() => {
+    if (!eerrRenta || "error" in eerrRenta || !eerrRenta.eerr.meses.length) return null;
+    const e = eerrRenta.eerr;
+    const impuesto = e.secciones.find((x) => x.seccion === "impuesto_ganancias")?.efectoTotal ?? 0;
+    const r = estimarRenta({
+      meses: e.meses.length,
+      ingresos: totalMeses(e.ingresosNetos),
+      utilidadAntesImpuesto: totalMeses(e.resultadoNeto) + totalMeses(e.dividendos) - impuesto,
+      registrado: -impuesto,
+    });
+    return r ? { ...r, meses: e.meses.length, registrado: -impuesto } : null;
+  })();
   const itbms = "error" in libro ? null : liquidacionItbms(libro.movimientos, libro.ventas);
   const titulo = "Calendario fiscal";
   if ("error" in cal) {
@@ -94,6 +118,32 @@ export default async function CalendarioFiscalPage() {
               subtexto={itbms.comprasSinItbms ? `${dinero(itbms.montoSinItbms)} que no suman crédito` : "Todo con su ITBMS"}
             />
           </KpiGrid>
+        </KpiGroup>
+      )}
+
+      {renta && (
+        <KpiGroup titulo={`Impuesto sobre la renta ${anio} · estimado con ${entero(renta.meses)} ${renta.meses === 1 ? "mes" : "meses"} cerrados · Panamá`}>
+          <KpiGrid compacta>
+            <KpiCard compacta titulo="Utilidad anualizada" valor={dinero(renta.utilidadAnual)} subtexto={`Ingresos anualizados ${dinero(renta.ingresosAnual)}`} />
+            <KpiCard compacta titulo={`Tradicional (${fraccion(TARIFA_RENTA, { decimales: 0 })})`} valor={dinero(renta.tradicional)} subtexto="Sobre la utilidad antes del impuesto" />
+            <KpiCard
+              compacta
+              titulo="CAIR"
+              valor={renta.cair === null ? "No aplica" : dinero(renta.cair)}
+              subtexto={renta.cair === null ? `Ingresos bajo ${dinero(UMBRAL_CAIR)}` : "4.67 % de los ingresos × 25 %"}
+            />
+            <KpiCard
+              compacta
+              titulo="Renta estimada del año"
+              tono={renta.porRegistrar > 0 ? "warning" : "neutral"}
+              valor={dinero(renta.estimado)}
+              subtexto={`${renta.metodo === "cair" ? "Por el CAIR (el mayor)" : "Por el método tradicional"}${renta.tasaEfectiva !== null ? ` · ${fraccion(renta.tasaEfectiva, { decimales: 1 })} de la utilidad` : ""}`}
+            />
+            <KpiCard compacta titulo="Ya en el libro" valor={dinero(renta.registrado)} subtexto={renta.porRegistrar > 0 ? `Faltan ${dinero(renta.porRegistrar)}` : "Cubre el estimado"} />
+          </KpiGrid>
+          <p className="px-1 pt-2 text-xs text-muted-foreground">
+            Lo que va del año anualizado; no es una declaración. Con ingresos sobre {dinero(UMBRAL_CAIR)} se paga el mayor entre el tradicional y el CAIR, salvo que la DGI autorice no aplicarlo. Confírmalo con el contador.
+          </p>
         </KpiGroup>
       )}
 

@@ -11,6 +11,8 @@ import type { NombreFilas } from "@/lib/tabla/pie";
 import type { Opcion } from "@/lib/finanzas/cargar-pendientes";
 import { BarraClasificar } from "./barra-clasificar";
 import { CrearMovimientoPanel } from "./crear-movimiento-panel";
+import { PaqueteExtraviadoPanel } from "./paquete-extraviado-panel";
+import { ComprobantesLote } from "./comprobantes-lote";
 import { FichaMovimiento } from "./ficha-movimiento";
 import { LeerFacturaPanel } from "./leer-factura-panel";
 import { PegarExcel } from "./pegar-excel";
@@ -22,6 +24,7 @@ const ICONOS: Record<string, IconoComp> = {
   tienda: TiendaIcon,
   proveedor: TiendaIcon,
   revision: GastoIcon,
+  factura: ExtractoIcon,
   seccion: GastoIcon,
   tipo: GastoIcon,
   cuenta: ExtractoIcon,
@@ -119,6 +122,8 @@ export function TablaMovimientos({
             <>
               <LeerFacturaPanel disponible={iaDisponible} tiendas={tiendas} tipos={tipos} cuentas={cuentas} mes={mes} />
               <PegarExcel tiendas={tiendas} tipos={tipos} cuentas={cuentas} />
+              <PaqueteExtraviadoPanel tiendas={tiendas} cuentas={cuentas} />
+              <ComprobantesLote movimientos={filas.filter((f) => !f.anulado).map((f) => ({ id: f.id, monto: f.monto, fecha: f.fecha, descripcion: f.descripcion }))} />
               <CrearMovimientoPanel tiendas={tiendas} tipos={tipos} cuentas={cuentas} mes={mes} />
             </>
           ) : undefined

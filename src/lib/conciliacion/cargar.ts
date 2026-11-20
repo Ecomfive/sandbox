@@ -7,6 +7,7 @@ import { traerTodasConError } from "@/lib/supabase/paginar";
 import { saldosPorCuenta, type FilaFlujo } from "@/lib/finanzas/flujo";
 import { ETIQUETA_CLASE, FUENTE_VENTAS, type ClaseLinea, type EstadoLinea } from "./emparejar";
 import { CLASES_INGRESO } from "./ingreso";
+import { antiguedadPorCuenta, type AntiguedadCuenta } from "./antiguedad";
 
 export interface ResumenMes {
   cuentaId: string;
@@ -431,4 +432,49 @@ export async function cargarCobros(
       };
     }),
   };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Antigüedad y cuentas atrasadas (mejoras 14 y 17, migración 0986)
+// ---------------------------------------------------------------------------------------------
+
+export interface AjustesConciliacion {
+  /** Tope en centavos de la diferencia que se ajusta sola (1 = solo un centavo, lo de siempre). */
+  toleranciaCent: number;
+  /** Días sin conciliar a partir de los que una cuenta con algo abierto sale como atrasada. */
+  diasAlerta: number;
+}
+
+export async function cargarAjustesConciliacion(supabase: SupabaseClient): Promise<AjustesConciliacion> {
+  const { data, error } = await supabase.from("fin_config").select("clave, valor").in("clave", ["conc_tolerancia_centavos", "conc_dias_alerta"]);
+  const valor = (clave: string, defecto: number) => {
+    const n = Number(error ? defecto : ((data ?? []).find((d) => d.clave === clave)?.valor ?? defecto));
+    return Number.isFinite(n) ? n : defecto;
+  };
+  return { toleranciaCent: Math.min(Math.max(Math.round(valor("conc_tolerancia_centavos", 1)), 1), 500), diasAlerta: Math.min(Math.max(Math.round(valor("conc_dias_alerta", 7)), 1), 90) };
+}
+
+/** Lo abierto de cada cuenta por antigüedad y la última vez que se concilió algo en ella. */
+export async function cargarAntiguedad(supabase: SupabaseClient, cuentas: { id: string }[], hoy: string, diasAlerta: number): Promise<AntiguedadCuenta[] | null> {
+  const desde = new Date(Date.parse(`${hoy}T00:00:00Z`) - 400 * 86_400_000).toISOString().slice(0, 10);
+  const [abiertas, ...ultimas] = await Promise.all([
+    traerTodasConError<{ cuenta_id: string; fecha: string; monto: number | string }>((d, h) =>
+      supabase.from("conc_lineas").select("cuenta_id, fecha, monto").in("estado", ["pendiente", "sugerida"]).gte("fecha", desde).order("id").range(d, h),
+    ),
+    ...cuentas.map((c) =>
+      supabase.from("conc_lineas").select("conciliada_en").eq("cuenta_id", c.id).not("conciliada_en", "is", null).order("conciliada_en", { ascending: false }).limit(1),
+    ),
+  ]);
+  if (abiertas.error) return null;
+  const ult = new Map<string, string>();
+  cuentas.forEach((c, i) => {
+    const f = ultimas[i]?.data?.[0]?.conciliada_en as string | undefined;
+    if (f) ult.set(c.id, f);
+  });
+  return antiguedadPorCuenta(
+    (abiertas.data ?? []).map((l) => ({ cuentaId: l.cuenta_id, fecha: String(l.fecha).slice(0, 10), monto: Number(l.monto) })),
+    ult,
+    hoy,
+    diasAlerta,
+  );
 }

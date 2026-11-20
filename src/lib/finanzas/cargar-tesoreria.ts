@@ -12,7 +12,9 @@ import { partirMensajeTesoreria, TIPOS_TESORERIA, type TipoAlerta } from "@/lib/
 import {
   alertasTesoreria,
   antiguedadEfectivo,
+  cajaPorEmpresa,
   depositosRepartidores,
+  leerMinimosEmpresas,
   leerConfigTesoreria,
   posicionCaja,
   seguimientoDropi,
@@ -29,7 +31,9 @@ import {
   type SeguimientoDropi,
   type AntiguedadRepartidor,
   type AlertaTesoreria,
+  type CajaEmpresa,
 } from "./tesoreria";
+import { tasasUsd } from "@/lib/moneda/tipo-cambio";
 
 export const SIN_MIGRACION_TESORERIA = "Falta correr la migración 0931 (tesorería) en Supabase.";
 export const SIN_MIGRACION_DEUDA = "Falta correr la migración 0932 (deuda) en Supabase.";
@@ -46,11 +50,11 @@ export async function cargarConfigTesoreria(supabase: SupabaseClient): Promise<C
 }
 
 export async function cargarCuentas(supabase: SupabaseClient): Promise<CuentaTesoreria[]> {
-  const conMoneda = await supabase.from("fin_cuentas").select("id, nombre, clase, moneda, activo").order("nombre");
+  const conMoneda = await supabase.from("fin_cuentas").select("id, nombre, clase, moneda, entidad_id, activo").order("nombre");
   const r = conMoneda.error ? await supabase.from("fin_cuentas").select("id, nombre, clase, activo").order("nombre") : conMoneda;
   return ((r.data ?? []) as Record<string, unknown>[])
     .filter((c) => c.activo !== false)
-    .map((c) => ({ id: String(c.id), nombre: String(c.nombre), clase: String(c.clase ?? "otro"), moneda: String(c.moneda ?? "USD") }));
+    .map((c) => ({ id: String(c.id), nombre: String(c.nombre), clase: String(c.clase ?? "otro"), moneda: String(c.moneda ?? "USD"), entidadId: (c.entidad_id as string | null) ?? null }));
 }
 
 /**
@@ -246,11 +250,15 @@ export interface VistaPosicion {
   deuda: DeudaTesoreria | null;
   porAprobar: number;
   saldosViejos: { cuenta: string; fecha: string }[];
+  /** La caja de cada empresa contra su mínimo (mejora 52). */
+  cajaEmpresas: CajaEmpresa[];
+  /** Fecha del tipo de cambio usado (mejora 55); null si solo hay dólares. */
+  tasaFecha: string | null;
 }
 
 /** Todo lo de la posición del día (la usan la portada de Tesorería y la tarjeta del Panel). */
 export async function cargarPosicion(supabase: SupabaseClient, hoy: string, desdeSerie = sumarDias(hoy, -60)): Promise<VistaPosicion> {
-  const [config, cuentas, saldos, semanas, dropiDatos, porLiquidar, deuda, porAprobar] = await Promise.all([
+  const [config, cuentas, saldos, semanas, dropiDatos, porLiquidar, deuda, porAprobar, tasas, entidades, minimos] = await Promise.all([
     cargarConfigTesoreria(supabase),
     cargarCuentas(supabase),
     cargarPuntosSaldo(supabase, desdeSerie),
@@ -259,6 +267,9 @@ export async function cargarPosicion(supabase: SupabaseClient, hoy: string, desd
     cargarPorLiquidar(supabase),
     cargarDeuda(supabase),
     supabase.from("fin_pagos_programados").select("id", { count: "exact", head: true }).eq("estado", "solicitado"),
+    tasasUsd(supabase),
+    supabase.from("fin_entidades").select("id, razon_social, codigo").eq("activo", true).order("orden"),
+    supabase.from("fin_config").select("valor").eq("clave", "caja_minima_empresas").maybeSingle(),
   ]);
   const ultimos = ultimosSaldos(saldos.puntos);
   const depositos = semanas ? depositosRepartidores(semanas, hoy, config.toleranciaDeposito) : null;
@@ -274,7 +285,15 @@ export async function cargarPosicion(supabase: SupabaseClient, hoy: string, desd
     efectivoRepartidores: efectivo === null ? null : { monto: efectivo, fecha: hoy },
     dropiWallet: dropi && dropi.saldo !== null && dropi.fechaSaldo ? { monto: dropi.saldo, fecha: dropi.fechaSaldo } : null,
     dropiRetiros: dropi && dropi.abiertos ? { monto: dropi.enCamino, fecha: dropi.ultimoRetiro, cantidad: dropi.abiertos } : null,
+    tasas: tasas.porUsd,
   });
+  const cajaEmpresas = cajaPorEmpresa(
+    ((entidades.error ? [] : entidades.data) ?? []).map((e) => ({ id: String(e.id), nombre: String(e.razon_social || e.codigo) })),
+    cuentas,
+    ultimos,
+    leerMinimosEmpresas(minimos.error ? null : minimos.data?.valor),
+    tasas.porUsd,
+  );
   const saldosViejos = cuentas
     .filter((c) => (c.clase === "banco" || c.clase === "billetera") && ultimos.has(c.id))
     .map((c) => ({ cuenta: c.nombre, fecha: ultimos.get(c.id)!.fecha }))
@@ -293,6 +312,8 @@ export async function cargarPosicion(supabase: SupabaseClient, hoy: string, desd
     deuda,
     porAprobar: porAprobar.error ? 0 : (porAprobar.count ?? 0),
     saldosViejos,
+    cajaEmpresas,
+    tasaFecha: cuentas.some((c) => c.moneda && c.moneda !== "USD") ? tasas.fecha : null,
   };
 }
 

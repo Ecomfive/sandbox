@@ -95,7 +95,8 @@ function BotonBuscar({ cuentaId, mes }: { cuentaId: string; mes: string }) {
           const r = await buscarCoincidencias(cuentaId, mes).catch(() => ({ error: "No se pudo buscar coincidencias." }));
           if ("error" in r) mostrarToast(r.error, "destructive");
           else {
-            mostrarToast(`${r.auto} conciliadas solas · ${r.sugeridas} sugeridas · ${r.pendientes} sin coincidencia`);
+            const porRegla = r.creadasPorRegla ? ` · ${r.creadasPorRegla} creadas en el libro por regla` : "";
+            mostrarToast(`${r.auto} conciliadas solas · ${r.sugeridas} sugeridas${porRegla} · ${r.pendientes} sin coincidencia`);
             router.refresh();
           }
         })

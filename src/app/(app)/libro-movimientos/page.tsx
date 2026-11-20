@@ -17,8 +17,10 @@ import { detectarAtipicos } from "@/lib/finanzas/duplicados";
 import { proveedorDe } from "@/lib/finanzas/proveedores";
 import { createServiceClient } from "@/lib/supabase/server";
 import { traerTodasConError } from "@/lib/supabase/paginar";
+import { facturasRepetidas, numeroFactura } from "@/lib/finanzas/factura-repetida";
 import { ETIQUETA_SECCION, type FilaMovimiento } from "./def-movimientos";
 import { TablaMovimientos } from "./tabla-movimientos";
+import { TarjetaRepetidas } from "./tarjeta-repetidas";
 
 export const metadata = { title: "Libro de movimientos" };
 
@@ -42,8 +44,11 @@ interface FilaBase {
   editado_a_mano: boolean | null;
   factura_numero: string | null;
   ruc_proveedor: string | null;
+  es_bien_de_uso?: boolean | null;
   anulado_en?: string | null;
   anulado_motivo?: string | null;
+  itbms?: number | string | null;
+  nota_interna?: string | null;
   fin_unidades: Uno<{ nombre: string }>;
   fin_tipos: Uno<{ nombre: string; seccion: string }>;
   fin_cuentas: Uno<{ nombre: string }>;
@@ -52,6 +57,37 @@ interface FilaBase {
 /** PostgREST devuelve la fila relacionada como objeto o como arreglo según cómo infiera la relación. */
 type Uno<T> = T | T[] | null;
 const uno = <T,>(v: Uno<T>): T | null => (Array.isArray(v) ? (v[0] ?? null) : v);
+
+/**
+ * Las facturas del mes que también están en otro movimiento vivo (en cualquier mes). Lee del libro solo los movimientos
+ * con alguno de esos números tal como están escritos y los compara normalizados; ante un error, no marca ninguna.
+ */
+async function leerFacturasRepetidas(supabase: ReturnType<typeof createServiceClient>, mes: FilaBase[]) {
+  const numeros = [...new Set(mes.map((m) => m.factura_numero?.trim()).filter((n): n is string => !!n && numeroFactura(n).length >= 3))];
+  if (!numeros.length) return new Map<string, { id: string; periodo: string; monto: number }[]>();
+  const otros: { id: string; periodo: string; monto: number | string; factura_numero: string | null; ruc_proveedor: string | null; anulado_en?: string | null }[] = [];
+  for (let i = 0; i < numeros.length; i += 150) {
+    const r = await supabase
+      .from("fin_movimientos")
+      .select("id, periodo, monto, factura_numero, ruc_proveedor, anulado_en")
+      .in("factura_numero", numeros.slice(i, i + 150))
+      .limit(2000);
+    if (r.error) return new Map();
+    otros.push(...((r.data ?? []) as typeof otros));
+  }
+  const vivos = new Map<string, (typeof otros)[number]>();
+  for (const m of [...mes, ...otros]) vivos.set(m.id, m as (typeof otros)[number]);
+  return facturasRepetidas(
+    [...vivos.values()].map((m) => ({
+      id: m.id,
+      periodo: String(m.periodo).slice(0, 10),
+      monto: Number(m.monto),
+      facturaNumero: m.factura_numero,
+      ruc: m.ruc_proveedor,
+      anulado: !!m.anulado_en,
+    })),
+  );
+}
 
 export default async function LibroMovimientosPage({
   searchParams,
@@ -88,7 +124,7 @@ export default async function LibroMovimientosPage({
     permitidas ? ((q as unknown as { in: (c: string, v: string[]) => unknown }).in("unidad_id", permitidas.length ? permitidas : [SIN_TIENDA]) as Q) : q;
 
   const columnas =
-    "id, periodo, fecha_pago, fecha_registro, fecha_servicio, descripcion, monto, en_eerr, en_flujo, tipo_texto, origen, unidad_id, tipo_id, cuenta_id, editado_a_mano, factura_numero, ruc_proveedor, fin_unidades(nombre), fin_tipos(nombre, seccion), fin_cuentas(nombre)";
+    "id, periodo, fecha_pago, fecha_registro, fecha_servicio, descripcion, monto, en_eerr, en_flujo, tipo_texto, origen, unidad_id, tipo_id, cuenta_id, editado_a_mano, factura_numero, ruc_proveedor, es_bien_de_uso, itbms, fin_unidades(nombre), fin_tipos(nombre, seccion), fin_cuentas(nombre)";
   const leerMes = (cols: string) =>
     traerTodasConError<FilaBase>((desde, hasta) =>
       soloSuyas(
@@ -104,8 +140,10 @@ export default async function LibroMovimientosPage({
         .range(desde, hasta) as unknown as PromiseLike<{ data: FilaBase[] | null; error: unknown }>,
     );
   const [movs, sinTipo, sinTienda, catalogoTiendas, catalogoTipos, catalogoCuentas, previos, actualizado, prov, revisados] = await Promise.all([
-    // Con la migración 0925 trae si está anulado; sin ella, sin esas columnas.
-    leerMes(`${columnas}, anulado_en, anulado_motivo`).then((r) => (r.error ? leerMes(columnas) : r)),
+    // Con las migraciones 0925 y 0986 trae si está anulado y la nota interna; sin ellas, sin esas columnas.
+    leerMes(`${columnas}, anulado_en, anulado_motivo, nota_interna`)
+      .then((r) => (r.error ? leerMes(`${columnas}, anulado_en, anulado_motivo`) : r))
+      .then((r) => (r.error ? leerMes(columnas) : r)),
     soloSuyas(supabase.from("fin_movimientos").select("id", { count: "exact", head: true }).is("tipo_id", null)),
     supabase
       .from("fin_movimientos")
@@ -123,6 +161,8 @@ export default async function LibroMovimientosPage({
   const ventana = await leerMovimientosCalidad(supabase, sumarMeses(elegido, -6), prov.catalogo);
   const atipicos = "error" in ventana ? new Map() : detectarAtipicos(ventana.filter((x) => !x.anulado && x.periodo <= elegido));
   const nombreProveedor = new Map(prov.proveedores.map((p) => [p.id, p.nombre]));
+  // Facturas repetidas (mejora 8): las del mes contra todo el libro con ese número.
+  const repetidas = await leerFacturasRepetidas(supabase, movs.data ?? []);
 
   const filas: FilaMovimiento[] = (movs.data ?? []).map((m) => {
     const unidad = uno(m.fin_unidades);
@@ -165,12 +205,18 @@ export default async function LibroMovimientosPage({
       anulado: !!m.anulado_en,
       anuladoMotivo: m.anulado_motivo ?? null,
       atipico: at ? { veces: at.veces, mediana: at.mediana } : null,
+      esBien: m.es_bien_de_uso === true || tipo?.nombre === "Alta Bien de Uso",
+      itbms: m.itbms === null || m.itbms === undefined ? null : Number(m.itbms),
+      notaInterna: m.nota_interna ?? null,
+      factura: !numeroFactura(m.factura_numero) ? "Sin factura" : repetidas.has(m.id) ? "Repetida" : "Única",
+      facturaRepetida: repetidas.get(m.id) ?? [],
     };
   });
 
   const alEerr = filas.filter((f) => f.eerr === "Sí");
   const pendientesMes = filas.filter((f) => f.estado === "Sin tienda" || f.estado === "Sin tipo").length;
   const atipicosMes = filas.filter((f) => f.atipico).length;
+  const facturasRepetidasMes = filas.filter((f) => f.factura === "Repetida").length;
   const nSinTienda = sinTienda.count ?? 0;
   const nSinTipo = sinTipo.count ?? 0;
   const movimientosAntes = previos.error ? 0 : (previos.count ?? 0);
@@ -226,6 +272,7 @@ export default async function LibroMovimientosPage({
               href="/libro-movimientos/pendientes"
             />
             <KpiCard compacta tono={atipicosMes ? "warning" : "neutral"} titulo="Montos atípicos (este mes)" valor={entero(atipicosMes)} href="/libro-movimientos/revisar" />
+            <TarjetaRepetidas cantidad={facturasRepetidasMes} />
           </KpiGrid>
         </KpiGroup>
       </div>
