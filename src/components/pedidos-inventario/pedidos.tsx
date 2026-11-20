@@ -11,7 +11,8 @@ import {
 } from "@/app/(app)/despacho-ciudad/pedir-inventario/actions";
 import { Indicador, TableroIndicadores } from "@/components/panel/piezas-panel";
 import { Badge } from "@/components/ui/badge";
-import { fieldClass } from "@/components/ui/field";
+import { anilloFoco, fieldClass } from "@/components/ui/field";
+import { FichaStock, type SkuFicha } from "@/app/(app)/inventario/ficha-stock";
 import { CampoSkuMaestro, ProveedorSkusMaestros, type OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import { useToast } from "@/components/ui/toast";
 import { CalendarioIcon, CheckIcon, EnvioIcon, InventarioIcon, PedidoIcon } from "@/lib/nav-icons";
@@ -176,12 +177,15 @@ function FilasPedido({
   puedeEscribir,
   origenes,
   stock,
+  abrirFicha,
 }: {
   p: PedidoInventario;
   modo: "despacho" | "inventario";
   puedeEscribir: boolean;
   origenes: { id: string; nombre: string }[];
   stock: Record<string, Record<string, number>>;
+  /** Abre la ficha de stock del producto (null = no se puede: falta el permiso de Inventario). */
+  abrirFicha: ((skuId: string) => void) | null;
 }) {
   const { ocupado, correr } = useAccion();
   const enInventario = modo === "inventario";
@@ -258,11 +262,25 @@ function FilasPedido({
               </td>
             )}
             <td className={`${borde} font-mono text-xs text-muted-foreground`}>{it.codigo ?? "—"}</td>
-            <td className={`${borde} font-medium`}>{it.producto}</td>
+            <td className={`${borde} font-medium`}>
+              {abrirFicha && it.skuId ? (
+                <button
+                  type="button"
+                  onClick={() => abrirFicha(it.skuId)}
+                  title="Ver cómo está repartido su stock"
+                  className={`rounded text-left font-medium text-primario underline-offset-2 hover:underline ${anilloFoco}`}
+                >
+                  {it.producto}
+                </button>
+              ) : (
+                it.producto
+              )}
+            </td>
             <td className={`${borde} text-right tabular-nums`}>{it.cantidadPedida.toLocaleString("es-PA")}</td>
             <td className={`${borde} whitespace-nowrap`}>{fechaCorta(p.creadoEn)}</td>
-            <td className={borde}>{p.pedidoPorNombre ?? "—"}</td>
-            <td className={`${borde} text-muted-foreground`}>{p.responsableNombre ?? "—"}</td>
+            {/* En Comunicación despacho no van «Pedido por» ni «Responsable bodega» (20 nov 2026): siempre son las mismas personas. */}
+            {!enInventario && <td className={borde}>{p.pedidoPorNombre ?? "—"}</td>}
+            {!enInventario && <td className={`${borde} text-muted-foreground`}>{p.responsableNombre ?? "—"}</td>}
             {enInventario && <td className={`${borde} text-right tabular-nums text-muted-foreground`}>{editable ? (hay ?? 0).toLocaleString("es-PA") : "—"}</td>}
             <td className={`${borde} text-right tabular-nums`}>
               {editable ? (
@@ -373,14 +391,18 @@ export function TablaPedidos({
   puedeEscribir,
   origenes = [],
   stock = {},
+  fichas = null,
 }: {
   pedidos: PedidoInventario[];
   modo: "despacho" | "inventario";
   puedeEscribir: boolean;
   origenes?: { id: string; nombre: string }[];
   stock?: Record<string, Record<string, number>>;
+  /** Los productos de los pedidos, para abrir su ficha de stock (20 nov 2026); null = sin permiso de Inventario. */
+  fichas?: Record<string, SkuFicha> | null;
 }) {
-  const columnas = modo === "inventario" ? 12 : 11;
+  const [ficha, setFicha] = useState<string | null>(null);
+  const columnas = modo === "inventario" ? 10 : 11;
   const th = "px-2 py-2.5 font-semibold";
   const vacios = pedidos.length === 0;
   return (
@@ -393,8 +415,8 @@ export function TablaPedidos({
             <th className={th}>Producto</th>
             <th className={`${th} text-right`}>Cantidad pedida</th>
             <th className={th}>Fecha</th>
-            <th className={th}>Pedido por</th>
-            <th className={th}>Responsable bodega</th>
+            {modo !== "inventario" && <th className={th}>Pedido por</th>}
+            {modo !== "inventario" && <th className={th}>Responsable bodega</th>}
             {modo === "inventario" && <th className={`${th} text-right`}>Hay en bodega</th>}
             <th className={`${th} text-right`}>Cantidad entregada</th>
             <th className={th}>Estado</th>
@@ -414,12 +436,26 @@ export function TablaPedidos({
           ) : (
             pedidos.map((p) => (
               <Fragment key={p.id}>
-                <FilasPedido p={p} modo={modo} puedeEscribir={puedeEscribir} origenes={origenes} stock={stock} />
+                <FilasPedido p={p} modo={modo} puedeEscribir={puedeEscribir} origenes={origenes} stock={stock} abrirFicha={fichas ? (id) => fichas[id] && setFicha(id) : null} />
               </Fragment>
             ))
           )}
         </tbody>
       </table>
+      {fichas && (
+        // Solo para consultar cómo está repartido el stock: los movimientos se hacen en Inventario.
+        <FichaStock
+          sku={ficha ? fichas[ficha] : undefined}
+          bodegasPropias={[]}
+          bodegasExternas={[]}
+          ubicaciones={[]}
+          puedeEscribir={false}
+          puedeComentar={false}
+          codigoPais="PA"
+          alCerrar={() => setFicha(null)}
+          alCambiar={() => undefined}
+        />
+      )}
     </div>
   );
 }

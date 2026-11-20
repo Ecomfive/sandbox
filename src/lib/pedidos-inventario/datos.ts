@@ -60,6 +60,29 @@ export async function stockInventario(supabase: SupabaseClient, origenes: Bodega
   return fuera;
 }
 
+/** Lo que la ficha de stock usa de cada producto de los pedidos (20 nov 2026: en Comunicación despacho se abre al tocar el producto). */
+export async function fichasDeProductos(
+  supabase: SupabaseClient,
+  ids: string[],
+): Promise<Record<string, { id: string; codigo: string; nombre: string; numero: number | null; barras: string | null; tipo: string; clase: string; manejaVencimiento: boolean }>> {
+  const fuera: Awaited<ReturnType<typeof fichasDeProductos>> = {};
+  for (let i = 0; i < ids.length; i += 200) {
+    const { data } = await supabase.from("skus_maestros").select("id, codigo, nombre, numero, codigo_barras, tipo, clase, maneja_vencimiento").in("id", ids.slice(i, i + 200));
+    for (const s of data ?? [])
+      fuera[s.id as string] = {
+        id: s.id as string,
+        codigo: s.codigo as string,
+        nombre: s.nombre as string,
+        numero: (s.numero as number | null) ?? null,
+        barras: (s.codigo_barras as string | null) || null,
+        tipo: (s.tipo as string) ?? "simple",
+        clase: (s.clase as string) ?? "fisico",
+        manejaVencimiento: s.maneja_vencimiento === true,
+      };
+  }
+  return fuera;
+}
+
 const uno = <T,>(r: T | T[] | null): T | null => (Array.isArray(r) ? (r[0] ?? null) : r);
 
 /**
