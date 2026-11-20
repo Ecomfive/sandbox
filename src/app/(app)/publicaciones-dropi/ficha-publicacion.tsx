@@ -407,10 +407,10 @@ function ContenidoFicha({
     setError(null);
     setConfirmandoRepublicar(true);
   }
-  function confirmarRepublicar(precio: number) {
+  function confirmarRepublicar(precio: number, sumar: { unidades: number; bodega: number } | null) {
     setRepublicando(true);
     empezar(async () => {
-      const r = await republicarPublicacion(p.id, precio).catch(() => ({ error: "No se pudo. Inténtalo de nuevo.", detalle: undefined }));
+      const r = await republicarPublicacion(p.id, precio, sumar).catch(() => ({ error: "No se pudo. Inténtalo de nuevo.", detalle: undefined }));
       setRepublicando(false);
       setConfirmandoRepublicar(false);
       if (r.error) setError(r.error);

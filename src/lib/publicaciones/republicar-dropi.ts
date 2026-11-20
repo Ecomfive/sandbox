@@ -47,6 +47,29 @@ export function armarProductoNuevo(
   return { cuerpo };
 }
 
+/**
+ * «Sumar unidades al republicar» (20 nov 2026, pedido del equipo: muchas veces se republica porque volvió a llegar el producto). Lo que va en `datos` de la
+ * republicación: `sumar` unidades más en la bodega `bodega` (de ECOMFIVE) del ID nuevo, además del stock que pasa del viejo. Solo productos simples y que no
+ * sean de la B280 (ahí el ID nuevo nace en 0 y Dropi traslada lo suyo).
+ */
+export interface SumarAlRepublicar {
+  sumar: number;
+  bodega: number;
+  nombreBodega: string;
+}
+
+/** Hasta cuántas unidades se pueden sumar de una vez al republicar. */
+export const MAX_SUMAR_REPUBLICAR = 100_000;
+
+/** `datos` de una republicación con unidades para sumar, o null si no trae (o vienen mal). */
+export function normalizarSumar(datos: unknown): SumarAlRepublicar | null {
+  const d = datos && typeof datos === "object" ? (datos as Obj) : null;
+  const sumar = Number(d?.sumar);
+  const bodega = Number(d?.bodega);
+  if (!d || !Number.isInteger(sumar) || sumar <= 0 || sumar > MAX_SUMAR_REPUBLICAR || !Number.isInteger(bodega) || bodega <= 0) return null;
+  return { sumar, bodega, nombreBodega: typeof d.nombreBodega === "string" ? d.nombreBodega : `B${bodega}` };
+}
+
 /** Unidades temporales con que se crea en Dropi el producto nuevo de una republicación de la B280 (Dropi no deja publicar con 0; reunión con Nicol, 12 nov 2026). */
 export const UNIDADES_TEMPORALES_B280 = 100;
 
@@ -92,6 +115,7 @@ export function armarProductoNuevoB280(
 export const ERRORES_ANTES_DE_DROPI = [
   "Tiene variaciones",
   "La bodega para las unidades temporales",
+  "La bodega para sumar las unidades",
   "No hay una bodega de ECOMFIVE",
   "Dropi no devolvió los atributos",
   "Tiene stock en una bodega que no es de ECOMFIVE",

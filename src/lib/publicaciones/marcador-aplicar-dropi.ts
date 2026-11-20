@@ -167,6 +167,12 @@ const CODIGO = [
   "if(c.datos&&c.datos.b280)return republicar280(c,bp,o);",
   // Con variaciones (1 nov 2026) las unidades se cuentan por bodega y variación y el producto nuevo se arma con sus atributos y variaciones (el precio de cada una se copia igual).
   "var vr=esV(o),id=Number(c.nuevo)||0,st=vr?unidadesV(o):stockDe(o),k;",
+  // «Sumar unidades al republicar» (20 nov 2026): las que llegaron van al ID nuevo, además de las que pasan del viejo, en una sola entrada. La meta (`mt`) es
+  // lo del viejo más esas: un reintento con el viejo ya vacío no las vuelve a sumar (el nuevo ya tiene más que la meta).
+  "var su=c.datos&&!c.datos.b280&&Number(c.datos.sumar)>0?c.datos:null,mt=Object.assign({},st);",
+  "if(su){if(vr)return{ok:false,nuevo:id||undefined,error:'Tiene variaciones: las unidades que llegaron súmalas con el lápiz de stock del ID nuevo.'};var bs=Number(su.bodega);",
+  "if(!bp.some(function(x){return Number(x.id)===bs}))return{ok:false,nuevo:id||undefined,error:'La bodega para sumar las unidades no es de ECOMFIVE en Dropi.'};mt[String(bs)]=(mt[String(bs)]||0)+Number(su.sumar)}",
+  "var cr='Republicado desde el ID '+c.producto+(su?' + '+Number(su.sumar)+' u. que llegaron':'');",
   // El precio elegido al republicar (27 oct 2026) va al producto nuevo; sin él, queda el del viejo.
   "if(!id){var r=vr?nuevoV(o,bp,{precio:c.precio,precioSugerido:c.sugerido}):nuevo(o,bp,{precio:c.precio,precioSugerido:c.sugerido});if(r.error)return{ok:false,error:r.error};",
   "var g=await pedir('/products','POST',r.cuerpo);if(!g.ok)return{ok:false,error:motivo(g)};",
@@ -179,8 +185,8 @@ const CODIGO = [
   // Una foto que no se pudo copiar ya no detiene la republicación (8 nov 2026, pedido de Alcides): se termina el trabajo y vuelve en `fotosFaltan`, y el
   // sistema le deja una tarea a quien la pidió para subirla a mano en el ID nuevo (sacándola del viejo).
   ...FOTOS_GARANTIAS_JS,
-  "var sn=vr?unidadesV(n):stockDe(n),en={},hay=false;for(k in st)if((sn[k]||0)<st[k]){en[k]=st[k]-(sn[k]||0);hay=true}",
-  "if(hay){var me;if(vr){var em=emparejarV(n,en);if(em.error)return f('Se creó el '+id+', pero no se le pudo poner el stock: '+em.error);var e1=await entradasV(n);if(e1.error)return f('Se creó el '+id+', pero no se le pudo poner el stock: '+e1.error);me=entradaV(n,bp,em.porVariacion,e1.ent,'Republicado desde el ID '+c.producto)}else me=mover(n,bp,en,'Republicado desde el ID '+c.producto);if(me.error)return f(me.error);",
+  "var sn=vr?unidadesV(n):stockDe(n),en={},hay=false;for(k in mt)if((sn[k]||0)<mt[k]){en[k]=mt[k]-(sn[k]||0);hay=true}",
+  "if(hay){var me;if(vr){var em=emparejarV(n,en);if(em.error)return f('Se creó el '+id+', pero no se le pudo poner el stock: '+em.error);var e1=await entradasV(n);if(e1.error)return f('Se creó el '+id+', pero no se le pudo poner el stock: '+e1.error);me=entradaV(n,bp,em.porVariacion,e1.ent,cr)}else me=mover(n,bp,en,cr);if(me.error)return f(me.error);",
   "var pe=await pedir('/products/'+id,'PUT',me.cuerpo);if(!pe.ok)return f('Se creó el '+id+', pero no se le pudo poner el stock: '+motivo(pe))}",
   // Con variaciones, antes de sacarle algo al viejo se comprueba que el nuevo quedó con el stock de cada variación: si no, no se toca el viejo.
   "if(vr){var vz=await pedir('/products/'+id),nz=vz.j&&vz.j.objects;if(!vz.ok||!nz)return f('Se creó el '+id+', pero no se pudo comprobar su stock: '+motivo(vz));var s2=unidadesV(nz),m2=[];for(k in st)if((s2[k]||0)<st[k])m2.push(k.slice(k.indexOf('|')+1)||k);if(m2.length)return f('Se creó el '+id+', pero su stock no coincide con el del '+c.producto+' (falta en: '+m2.join(', ')+'): no se le sacó nada al '+c.producto+'.')}",
