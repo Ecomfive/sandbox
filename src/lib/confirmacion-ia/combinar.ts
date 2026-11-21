@@ -36,11 +36,11 @@ export interface Combinado {
 }
 
 /**
- * Aceptar la zona cuando una sola IA decide y la otra dice «no sé» (19 nov 2026, pedido de Jhokser). En la prueba con pedidos reales esa IA acertó en ~14 de 15 casos, así que se aplica,
- * pero queda **por confirmar con una prueba de pedidos nuevos**: si el acierto de esos casos baja, se pone en `false` y vuelve a «Para revisar». Si las dos dicen zonas distintas, sigue a revisar.
- * Cómo comprobarlo: «Probar con pedidos reales», casos donde una IA da la zona y la otra «no_se».
+ * Aceptar la zona cuando una sola IA decide y la otra dice «no sé» (19 nov 2026, pedido de Jhokser). **Apagado el 21 nov 2026**: la prueba con 150 pedidos nuevos de las tres tiendas (últimos 2 días) mostró que cuando las dos IA
+ * coinciden aciertan 44 de 44, pero cuando decide una sola acierta 16 de 20 (80 %). Sin esos casos el acierto de lo que el sistema decide sube de 95 % a 98 % (108 de 110) y esos pedidos vuelven a «Para revisar»
+ * (la cobertura baja de ~87 % a ~73 %). Para ponerlo en `true` otra vez: repetir «Probar con pedidos reales» y mirar «una sola IA» en «Quién decidió».
  */
-export const ACEPTAR_ZONA_DE_UNA_IA = true;
+export const ACEPTAR_ZONA_DE_UNA_IA = false;
 
 /** Lo que falta, limpio para ponerlo en un mensaje: sin enlaces ni teléfonos, sin punto final y de hasta 160 letras. */
 export function limpiarFalta(v: unknown): string | null {
