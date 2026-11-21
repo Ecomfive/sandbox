@@ -74,7 +74,10 @@ export async function accesoDeApp(app: AppTienda, ahora = Date.now()): Promise<{
   const cuerpo = (await r.json().catch(() => ({}))) as { access_token?: string; scope?: string; expires_in?: number; error?: string; error_description?: string };
   if (!r.ok || !cuerpo.access_token) {
     const motivo = cuerpo.error_description || cuerpo.error || `HTTP ${r.status}`;
-    throw new Error(`Shopify no dio acceso a ${app.tienda} (${motivo}). Revisa que la app esté instalada en la tienda y que el Client ID y el secret sean los de esa app.`);
+    // Qué tienda y qué app se usaron (20 nov 2026: Nuvo con una app nueva daba «not installed» y no se sabía si fallaba el dominio o el Client ID). El Client ID
+    // no es secreto (va en las direcciones de instalación de Shopify); igual solo se muestran sus primeros y últimos 4 caracteres. El secret nunca.
+    const id = app.clientId.length > 10 ? `${app.clientId.slice(0, 4)}…${app.clientId.slice(-4)}` : "(muy corto)";
+    throw new Error(`Shopify no dio acceso a ${app.tienda} (${motivo}). Se usó la tienda ${app.dominio} con el Client ID ${id}: revisa que esa app esté instalada en esa tienda y que el secret sea de la misma app.`);
   }
   const acceso = { token: cuerpo.access_token, scope: cuerpo.scope ?? "", vence: ahora + (Number(cuerpo.expires_in) || 86_399) * 1000 };
   tokens.set(app.dominio, acceso);
