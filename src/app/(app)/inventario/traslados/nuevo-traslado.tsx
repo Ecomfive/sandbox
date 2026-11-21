@@ -7,6 +7,7 @@ import { CodigosProducto } from "@/components/ui/codigos-producto";
 import { MiniaturaFoto } from "@/components/ui/miniatura-foto";
 import { CampoSkuMaestro, ProveedorSkusMaestros, type OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import { useToast } from "@/components/ui/toast";
+import { useLineasArriba } from "@/components/ui/usar-lineas-arriba";
 import { Ventana } from "@/components/ui/ventana";
 import { textoCaja, type CajaGuardada } from "@/lib/wms/cajas";
 import { crearTraslado } from "./actions";
@@ -43,6 +44,7 @@ export function NuevoTraslado({
   const [desde, setDesde] = useState(bodegas[0]?.id ?? "");
   const [hacia, setHacia] = useState("");
   const [lineas, setLineas] = useState<Linea[]>([]);
+  const { buscador, enfocarCantidadDe, volverAlBuscador } = useLineasArriba(lineas);
   const [notas, setNotas] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pendiente, empezar] = useTransition();
@@ -83,7 +85,10 @@ export function NuevoTraslado({
     setError(null);
   }
   function agregar(sku: OpcionSkuMaestro | null) {
-    if (sku && !lineas.some((l) => l.sku.id === sku.id)) setLineas((l) => [...l, { sku, cantidad: "", elegidas: {}, ubicacion: "" }]);
+    if (sku && !lineas.some((l) => l.sku.id === sku.id)) {
+      enfocarCantidadDe(sku.id);
+      setLineas((l) => [{ sku, cantidad: "", elegidas: {}, ubicacion: "" }, ...l]);
+    }
   }
   function crear() {
     setError(null);
@@ -92,7 +97,7 @@ export function NuevoTraslado({
         desde,
         hacia,
         notas,
-        lineas: lineas.map((l) => ({ sku: l.sku.id, cantidad: cantidadDe(l), cajas: elegidasDe(l).map(({ c, n }) => ({ id: c.id, cajas: n })), ubicacion_destino: l.ubicacion || undefined })),
+        lineas: [...lineas].reverse().map((l) => ({ sku: l.sku.id, cantidad: cantidadDe(l), cajas: elegidasDe(l).map(({ c, n }) => ({ id: c.id, cajas: n })), ubicacion_destino: l.ubicacion || undefined })),
       }).catch(() => ({ error: "No se pudo. Inténtalo de nuevo." }));
       if ("error" in r) return void setError(r.error);
       mostrarToast(`Traslado ${r.numero} hecho`);
@@ -143,7 +148,7 @@ export function NuevoTraslado({
                 </select>
               </label>
             </div>
-            <div className="flex flex-col gap-1">
+            <div ref={buscador} className="flex flex-col gap-1">
               <span className={labelClassSm}>Agregar producto</span>
               <ProveedorSkusMaestros opciones={productos.filter((p) => hay(p.id) > 0)}>
                 <CampoSkuMaestro key={`${desde}-${lineas.length}`} valor={null} alCambiar={agregar} etiquetaAria="Agregar producto al traslado" placeholder="Busca por SKU o nombre" claseContenedor="w-full" />
@@ -155,7 +160,7 @@ export function NuevoTraslado({
                   const pasa = cantidadDe(l) > hay(l.sku.id);
                   const guardadas = cajasDe(l.sku.id);
                   return (
-                    <li key={l.sku.id} className="flex flex-col gap-2 px-3 py-2">
+                    <li key={l.sku.id} data-linea={l.sku.id} className="flex flex-col gap-2 px-3 py-2">
                       <div className="flex items-center gap-3">
                         <MiniaturaFoto url={l.sku.foto ?? null} nombre={l.sku.nombre} />
                         <span className="min-w-0 flex-1">
@@ -173,6 +178,7 @@ export function NuevoTraslado({
                             min={1}
                             step={1}
                             aria-label={`Unidades de ${l.sku.codigo}`}
+                            onKeyDown={volverAlBuscador}
                             value={l.cantidad}
                             onChange={(e) => setLineas((ls) => ls.map((x) => (x.sku.id === l.sku.id ? { ...x, cantidad: e.target.value } : x)))}
                             placeholder="0"
