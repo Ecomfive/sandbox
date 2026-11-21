@@ -6,6 +6,7 @@ import { CodigosProducto } from "@/components/ui/codigos-producto";
 import { MiniaturaFoto } from "@/components/ui/miniatura-foto";
 import { anilloFoco, fieldClass, fieldClassSm, labelClassSm } from "@/components/ui/field";
 import { CampoSkuMaestro, ProveedorSkusMaestros, type OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
+import { useLineasArriba } from "@/components/ui/usar-lineas-arriba";
 import { Ventana } from "@/components/ui/ventana";
 import { textoCaja, type CajaGuardada } from "@/lib/wms/cajas";
 import { crearRemision } from "./actions";
@@ -43,6 +44,7 @@ export function NuevaRemision({ propias, externas, plataformas = [], productos, 
   const [notas, setNotas] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [creada, setCreada] = useState<{ id: string; numero: string } | null>(null);
+  const { buscador, enfocarCantidadDe, volverAlBuscador } = useLineasArriba(lineas);
   const [pendiente, empezar] = useTransition();
 
   const dePlataforma = plataformas.some((b) => b.id === desde);
@@ -77,12 +79,16 @@ export function NuevaRemision({ propias, externas, plataformas = [], productos, 
     setError(null);
   }
   function agregar(sku: OpcionSkuMaestro | null) {
-    if (sku && !lineas.some((l) => l.sku.id === sku.id)) setLineas((l) => [...l, { sku, cantidad: "", elegidas: {}, sueltas: {} }]);
+    // El producto nuevo entra arriba, pegado al buscador, con el cursor en su cantidad.
+    if (sku && !lineas.some((l) => l.sku.id === sku.id)) {
+      enfocarCantidadDe(sku.id);
+      setLineas((l) => [{ sku, cantidad: "", elegidas: {}, sueltas: {} }, ...l]);
+    }
   }
   function crear() {
     setError(null);
     empezar(async () => {
-      const r = await crearRemision({ desde, hacia, notas, lineas: lineas.map((l) => ({ sku: l.sku.id, cantidad: cantidadDe(l), cajas: elegidasDe(l).map(({ c, n, s }) => (s > 0 ? { id: c.id, cajas: n, sueltas: s } : { id: c.id, cajas: n })) })) }).catch(() => ({ error: "No se pudo. Inténtalo de nuevo." }));
+      const r = await crearRemision({ desde, hacia, notas, lineas: [...lineas].reverse().map((l) => ({ sku: l.sku.id, cantidad: cantidadDe(l), cajas: elegidasDe(l).map(({ c, n, s }) => (s > 0 ? { id: c.id, cajas: n, sueltas: s } : { id: c.id, cajas: n })) })) }).catch(() => ({ error: "No se pudo. Inténtalo de nuevo." }));
       if ("error" in r) return void setError(r.error);
       setCreada(r);
       router.refresh();
@@ -169,7 +175,7 @@ export function NuevaRemision({ propias, externas, plataformas = [], productos, 
                 </label>
               </div>
               {dePlataforma && <p className="m-0 text-xs text-muted-foreground">Las unidades disponibles son las de la última lectura de la plataforma. El sistema deja el documento: el movimiento se hace en cada plataforma.</p>}
-              <div className="flex flex-col gap-1">
+              <div ref={buscador} className="flex flex-col gap-1">
                 <span className={labelClassSm}>Agregar producto</span>
                 <ProveedorSkusMaestros opciones={productos}>
                   <CampoSkuMaestro key={lineas.length} valor={null} alCambiar={agregar} etiquetaAria="Agregar producto a la remisión" placeholder="Busca por SKU o nombre" claseContenedor="w-full" />
@@ -181,7 +187,7 @@ export function NuevaRemision({ propias, externas, plataformas = [], productos, 
                     const pasa = cantidadDe(l) > hay(l.sku.id);
                     const guardadas = cajasDe(l.sku.id);
                     return (
-                      <li key={l.sku.id} className="flex flex-col gap-2 px-3 py-2">
+                      <li key={l.sku.id} data-linea={l.sku.id} className="flex flex-col gap-2 px-3 py-2">
                         <div className="flex items-center gap-3">
                         <MiniaturaFoto url={l.sku.foto ?? null} nombre={l.sku.nombre} />
                         <span className="min-w-0 flex-1">
@@ -199,6 +205,7 @@ export function NuevaRemision({ propias, externas, plataformas = [], productos, 
                             min={1}
                             step={1}
                             aria-label={`Unidades de ${l.sku.codigo}`}
+                            onKeyDown={volverAlBuscador}
                             value={l.cantidad}
                             onChange={(e) => setLineas((ls) => ls.map((x) => (x.sku.id === l.sku.id ? { ...x, cantidad: e.target.value } : x)))}
                             placeholder="0"
