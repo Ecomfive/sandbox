@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModuloEscritura } from "@/lib/auth";
 import { esAdministrador } from "@/lib/permisos/acceso";
+import { quitarNotasDeSinPreparar } from "@/lib/tienda/nota-bot-servidor";
 import { createServiceClient } from "@/lib/supabase/server";
 import { conectarTienda, registrarAvisos, revisarTienda, urlDelSistema } from "@/lib/tienda/conectar-shopify";
 import { desconectarIcomfly, guardarUrlConector, probarIcomfly } from "@/lib/tienda/icomfly";
@@ -184,4 +185,32 @@ export async function cambiarIaPoneEtiqueta(tiendaId: string, encender: boolean)
     if (cfg?.activa !== true) aviso = " Ojo: la «Confirmación automática» del país está apagada; enciéndela en Confirmación con IA para que analice los pedidos que se confirmen.";
   }
   return { resumen: encender ? `${t.nombre}: la IA pondrá la etiqueta de zona en los pedidos que se confirmen desde ahora.${aviso}` : `${t.nombre}: la IA ya no pone etiquetas, solo las propone.` };
+}
+
+/**
+ * Quita la nota del bot de los pedidos que ya estaban en Shopify y **todavía no se han preparado** (21 nov 2026, pedido de Hernán: comprobar que de verdad se quita). Solo un administrador y solo con
+ * «Escribir en Shopify» y «Quitar la nota del bot» encendidos en la tienda. De a 25 pedidos por pulsación; la nota original queda guardada en `tienda_notas_bot`.
+ */
+export async function quitarNotasSinPreparar(tiendaId: string): Promise<{ error?: string; resumen?: string }> {
+  const usuario = await soloAdmin();
+  if (!usuario) return { error: "Solo un administrador cambia esto." };
+  if (!UUID.test(tiendaId)) return { error: "Tienda no válida." };
+  const supabase = createServiceClient();
+  const { data: t, error: e0 } = await supabase.from("tiendas").select("id, nombre, dominio, escribe_shopify, quitar_nota_bot").eq("id", tiendaId).maybeSingle();
+  if (e0 || !t || !t.dominio) return { error: "No se pudo leer la tienda." };
+  if (!t.escribe_shopify || !t.quitar_nota_bot) return { error: "Primero enciende «Escribir en Shopify» y «Quitar la nota del bot» en esta tienda." };
+  const r = await quitarNotasDeSinPreparar(supabase, String(t.dominio));
+  if (r.error) return { error: r.error };
+  await registrarAuditoria({
+    accion: "quitar_notas_bot_sin_preparar",
+    entidad: "tiendas",
+    entidadId: tiendaId,
+    detalle: `${t.nombre}: ${r.encontrados} sin preparar con la nota del bot; se quitó en ${r.quitadas}, ${r.conError} con error, ${r.sinTocar} sin tocar`,
+  });
+  revalidatePath("/tienda-tiendas");
+  if (!r.encontrados) return { resumen: `${t.nombre}: no hay pedidos sin preparar con la nota del bot.` };
+  const partes = [`se quitó la nota en ${r.quitadas}`];
+  if (r.conError) partes.push(`${r.conError} con error`);
+  if (r.sinTocar) partes.push(`${r.sinTocar} sin tocar`);
+  return { resumen: `${t.nombre}: ${r.encontrados} pedidos sin preparar tenían la nota del bot; ${partes.join(", ")}.${r.hayMas ? " Quedan más: vuelve a pulsar." : ""}` };
 }

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
-import { cambiarEscrituraShopify, cambiarIaPoneEtiqueta, cambiarQuitarNotaBot } from "./actions";
+import { cambiarEscrituraShopify, cambiarIaPoneEtiqueta, cambiarQuitarNotaBot, quitarNotasSinPreparar } from "./actions";
 
 /**
  * «Escribir en Shopify» de una tienda (19 nov 2026), solo para un administrador: encender revisa con Shopify que la tienda aprobó write_orders. Con la
@@ -42,6 +42,11 @@ export function EscrituraTienda({ tiendaId, escribe, quitaNotaBot, notasBot, iaP
           <input type="checkbox" checked={quitaNotaBot} disabled={pendiente} onChange={(e) => hacer(() => cambiarQuitarNotaBot(tiendaId, e.target.checked))} />
           Quitar la nota del bot
         </label>
+      )}
+      {escribe && quitaNotaBot && (
+        <button type="button" disabled={pendiente} aria-busy={pendiente} onClick={() => hacer(() => quitarNotasSinPreparar(tiendaId))} className={`${boton} border-border bg-card hover:bg-muted`}>
+          {pendiente ? "Trabajando…" : "Quitar la nota de los pedidos sin preparar"}
+        </button>
       )}
       {escribe && (
         <label className="flex items-center gap-1.5 text-xs">

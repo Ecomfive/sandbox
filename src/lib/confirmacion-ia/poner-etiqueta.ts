@@ -13,10 +13,10 @@ import { appDeTienda } from "@/lib/tienda/shopify-app";
 export const AUTOR_IA = "Confirmación con IA";
 
 /**
- * Si al poner la etiqueta de zona se quita la de «Confirmada». En la primera prueba **no**: solo se agrega la zona (lo que lee `estadoDesdeFinanzas` y lo que hace el equipo con «Confirmada»
- * no cambia). Si se decide quitarla, es un cambio aquí.
+ * Si al poner la etiqueta de zona se quita la de «Confirmada», por país (21 nov 2026, aclarado por Jhokser): en Panamá sí; en Costa Rica se deja cuando se active allá. Un país que no está aquí la deja.
  */
-export const QUITAR_CONFIRMADA = false;
+const QUITAR_CONFIRMADA_POR_PAIS: Record<string, boolean> = { PA: true, CR: false };
+export const quitarConfirmadaEn = (paisCodigo: string | null | undefined): boolean => QUITAR_CONFIRMADA_POR_PAIS[String(paisCodigo ?? "").toUpperCase()] === true;
 
 export type ResultadoPonerEtiqueta =
   | { estado: "puesta"; etiqueta: string }
@@ -35,7 +35,7 @@ export function motivoParaNoEscribir(t: { estado: unknown; escribe_shopify: unkn
 
 export async function ponerEtiquetaDeZona(
   supabase: SupabaseClient,
-  d: { ordenId: string; numero: string | null; tiendaId: string | null; etiqueta: string; zonaYaPuesta: (etiquetas: string | null) => boolean },
+  d: { ordenId: string; numero: string | null; tiendaId: string | null; paisCodigo: string | null; etiqueta: string; zonaYaPuesta: (etiquetas: string | null) => boolean },
 ): Promise<ResultadoPonerEtiqueta> {
   try {
     if (!d.tiendaId) return { estado: "omitida", motivo: "No se encontró la tienda." };
@@ -50,7 +50,7 @@ export async function ponerEtiquetaDeZona(
     const app = appDeTienda(String(t!.nombre));
     if (!app) return { estado: "error", motivo: `Faltan las claves de ${t!.nombre} en Vercel.` };
 
-    const plan = planCambio(actuales, [d.etiqueta], QUITAR_CONFIRMADA ? actuales.filter((e) => /^confirmad[ao]$/i.test(e)) : []);
+    const plan = planCambio(actuales, [d.etiqueta], quitarConfirmadaEn(d.paisCodigo) ? actuales.filter((e) => /^confirmad[ao]$/i.test(e)) : []);
     if (!plan.agregar.length && !plan.quitar.length) return { estado: "puesta", etiqueta: d.etiqueta };
     const r = await cambiarEtiquetasEnShopify(app, d.numero, plan.agregar, plan.quitar);
 

@@ -342,7 +342,7 @@ export async function analizarOrden(supabase: SupabaseClient, ordenId: string, o
   // La etiqueta de zona en Shopify (21 nov 2026, prueba controlada): solo cuando el pedido acaba de confirmarse (aviso de Shopify), nunca desde la pantalla ni desde los pendientes viejos, y solo
   // en una tienda con «La IA pone la etiqueta de zona» encendido (`ponerEtiquetaDeZona` lo comprueba y nunca lanza).
   if (opciones.origen === "webhook" && !opciones.forzar && c.estado === "listo" && etiqueta) {
-    const r = await ponerEtiquetaDeZona(supabase, { ordenId, numero: o.numero, tiendaId: o.tiendaId, etiqueta, zonaYaPuesta: tieneEtiquetaDeZona });
+    const r = await ponerEtiquetaDeZona(supabase, { ordenId, numero: o.numero, tiendaId: o.tiendaId, paisCodigo: o.paisCodigo, etiqueta, zonaYaPuesta: tieneEtiquetaDeZona });
     if (r.estado === "puesta") await supabase.from("confirmacion_ia_analisis").update({ etiqueta_puesta: r.etiqueta, etiqueta_puesta_en: new Date().toISOString(), etiqueta_error: null }).eq("orden_id", ordenId);
     else if (r.estado === "error") await supabase.from("confirmacion_ia_analisis").update({ etiqueta_error: r.motivo }).eq("orden_id", ordenId);
   }
