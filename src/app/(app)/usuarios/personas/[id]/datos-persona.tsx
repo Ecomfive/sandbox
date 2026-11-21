@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { anilloFoco, fieldClass, labelClassSm } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { SeccionTarjeta } from "@/components/permisos/seccion-tarjeta";
-import { formatearTiempoRelativo } from "@/lib/formato";
+import { FechaHora } from "@/components/ui/fecha-hora";
 import { CheckIcon, PersonaIcon } from "@/lib/nav-icons";
 import { actualizarDatosUsuario, recordarFoto, subirFotoDeUsuario } from "../../actions";
 
@@ -101,7 +101,7 @@ export function DatosPersona({ persona, puedeEscribir }: { persona: PersonaDatos
                 <button type="button" onClick={recordar} disabled={pendiente} className="text-xs font-medium text-accent-foreground underline disabled:opacity-50">
                   Recordar otra vez
                 </button>
-                {persona.fotoRecordadaEn && <span className="block text-[11px] text-muted-foreground">Recordado {formatearTiempoRelativo(persona.fotoRecordadaEn)}</span>}
+                {persona.fotoRecordadaEn && <span className="block text-[11px] text-muted-foreground">Recordado <FechaHora iso={persona.fotoRecordadaEn} /></span>}
               </span>
             )}
           </FilaAlta>

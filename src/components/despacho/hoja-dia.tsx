@@ -7,7 +7,7 @@ import { anilloFoco, fieldClass } from "@/components/ui/field";
 import type { FilaTablero } from "@/lib/despacho/datos";
 import { colorDe, textoSobre, type Columna } from "@/lib/despacho/etiquetas";
 import { COLUMNAS_HOJA, diaLargo, gruposHoja } from "@/lib/despacho/hoja";
-import { formatearTiempoRelativo } from "@/lib/formato";
+import { FechaHora } from "@/components/ui/fecha-hora";
 import type { ArchivoVisible } from "@/lib/monday/comprobantes";
 import { VisorArchivos } from "./visor-archivos";
 
@@ -104,7 +104,7 @@ export function HojaDia({ dia, hoy, filas }: { dia: string; hoy: string; filas: 
                         {f.numero ?? ""}
                       </td>
                       {pill("tienda", f.tienda)}
-                      <td className={`${td} text-xs text-muted-foreground`}>{f.editadoEn || f.actualizado ? formatearTiempoRelativo((f.editadoEn ?? f.actualizado)!) : ""}</td>
+                      <td className={`${td} text-xs text-muted-foreground`}>{f.editadoEn || f.actualizado ? <FechaHora iso={(f.editadoEn ?? f.actualizado)!} /> : ""}</td>
                       {pill("courier", f.courier)}
                       {pill("estado", f.estado)}
                       {pill("edo_pago", f.edoPago)}

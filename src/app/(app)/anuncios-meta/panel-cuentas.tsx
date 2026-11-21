@@ -10,8 +10,10 @@ import { useToast } from "@/components/ui/toast";
 import { formatearFechaHora } from "@/lib/formato";
 import type { CuentaVista, TopeVista } from "@/lib/meta-ads/datos";
 import { CPA_TOPE_PREDETERMINADO } from "@/lib/meta-ads/metricas";
+import { filtrarProductos } from "@/lib/meta-ads/topes";
 import { claveDeProducto, etiquetasDeNombre, NOMBRE_ETAPA, NOMBRE_PUJA } from "@/lib/meta-ads/nombre";
 import { guardarCuentaMeta, guardarTopeMeta, probarConexionMeta } from "./actions";
+import { CoberturaHistorial } from "./cobertura-historial";
 import { TraerHistorial } from "./traer-historial";
 
 const boton = "min-h-9 rounded-md px-3 py-1.5 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50";
@@ -234,12 +236,15 @@ function Topes({ topes, productos, escribe }: { topes: TopeVista[]; productos: s
   const [nuevoValor, setNuevoValor] = useState("");
   // Cerrada de entrada: la lista de productos es larga y casi nunca se toca.
   const [plegado, setPlegado] = useState(true);
-  const filas = (() => {
+  const [buscar, setBuscar] = useState("");
+  const [soloSinDefinir, setSoloSinDefinir] = useState(false);
+  const todas = (() => {
     const mapa = new Map<string, { producto: string; tope: number | null }>();
     for (const t of topes) mapa.set(t.clave, { producto: t.producto, tope: t.tope });
     for (const p of productos) if (!mapa.has(claveDeProducto(p))) mapa.set(claveDeProducto(p), { producto: p, tope: null });
     return [...mapa.values()].sort((a, b) => a.producto.localeCompare(b.producto, "es"));
   })();
+  const filas = filtrarProductos(soloSinDefinir ? todas.filter((f) => f.tope === null) : todas, buscar);
   const guardar = (producto: string, texto: string) =>
     empezar(async () => {
       const r = await guardarTopeMeta(producto, Number(texto.replace(",", ".")));
@@ -255,10 +260,25 @@ function Topes({ topes, productos, escribe }: { topes: TopeVista[]; productos: s
       }
     });
   return (
-    <Bloque id="topes" titulo="CPA tope por producto" plegado={plegado} alAlternar={() => setPlegado((x) => !x)} resumen={`${filas.filter((f) => f.tope !== null).length} de ${filas.length} definidos`}>
+    <Bloque id="topes" titulo="CPA tope por producto" plegado={plegado} alAlternar={() => setPlegado((x) => !x)} resumen={`${todas.filter((f) => f.tope !== null).length} de ${todas.length} definidos`}>
       <p className="m-0 text-sm text-muted-foreground">Lo máximo que se puede pagar por una compra sin perder. Con él se calcula el resultado estimado de cada campaña. Hasta que se defina, se usa ${CPA_TOPE_PREDETERMINADO}.</p>
-      {filas.length === 0 && !escribe ? (
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="flex min-w-[14rem] flex-1 flex-col gap-1">
+          <span className="text-xs font-medium text-muted-foreground">Buscar producto</span>
+          <input type="search" className={fieldClassSm} value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Ej: colageno, aceite calabaza" autoComplete="off" />
+        </label>
+        <label className="flex min-h-9 items-center gap-2 text-xs">
+          <input type="checkbox" checked={soloSinDefinir} onChange={(e) => setSoloSinDefinir(e.target.checked)} className="h-4 w-4" />
+          <span>Solo los sin definir</span>
+        </label>
+        <p role="status" className="m-0 min-h-9 content-center text-xs tabular-nums text-muted-foreground">
+          {filas.length === todas.length ? `${todas.length} productos` : `${filas.length} de ${todas.length} productos`}
+        </p>
+      </div>
+      {todas.length === 0 && !escribe ? (
         <p className="m-0 text-sm text-muted-foreground">Todavía no hay productos en las campañas.</p>
+      ) : filas.length === 0 ? (
+        <p className="m-0 text-sm text-muted-foreground">Ningún producto coincide con lo que escribiste.</p>
       ) : (
         <ul role="list" className="m-0 flex list-none flex-col divide-y divide-border p-0">
           {filas.map((f) => {
@@ -352,6 +372,7 @@ function ProbadorDeNombres() {
 /** «Cuentas»: la conexión con Meta, las cuentas publicitarias que se leen, el CPA tope de cada producto y cómo se leen los nombres de las campañas. */
 export function PanelCuentas({ cuentas, topes, productos, escribe, hayToken, pais, hoy }: { cuentas: CuentaVista[]; topes: TopeVista[]; productos: string[]; escribe: boolean; hayToken: boolean; pais: string; hoy: string }) {
   const [borrador, setBorrador] = useState<{ id: string; nombre: string } | null>(null);
+  const [versionCobertura, setVersionCobertura] = useState(0);
   return (
     <div className="flex flex-col gap-6">
       <Conexion hayToken={hayToken} escribe={escribe} alAgregar={setBorrador} />
@@ -359,7 +380,8 @@ export function PanelCuentas({ cuentas, topes, productos, escribe, hayToken, pai
       {escribe && hayToken && (
         <Bloque id="historial" titulo="Historial">
           <p className="m-0 text-sm text-muted-foreground">Al agregar una cuenta solo se leen sus últimos 30 días. Aquí se trae lo anterior (hasta 3 años, lo que Meta guarda), un mes por vez, para ver campañas y videos de más tiempo.</p>
-          <TraerHistorial cuentas={cuentas} hoy={hoy} />
+          <TraerHistorial cuentas={cuentas} hoy={hoy} alTerminar={() => setVersionCobertura((v) => v + 1)} />
+          <CoberturaHistorial hoy={hoy} version={versionCobertura} />
         </Bloque>
       )}
       <Topes topes={topes} productos={productos} escribe={escribe} />

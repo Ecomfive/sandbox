@@ -81,3 +81,12 @@ test("sin llamado a la acción, el tipo es «ninguno»; un segundo absurdo es «
   assert.deepEqual(recursosValidos("texto"), []);
   assert.deepEqual(estructuraValida(null), []);
 });
+
+test("el segundo intento tras un bloqueo por recitation no pide transcripción", () => {
+  const normal = pedidoAnalisisVideo({ producto: null, copy: null, titulo: null, angulosExistentes: [], soloTexto: false });
+  const sin = pedidoAnalisisVideo({ producto: null, copy: null, titulo: null, angulosExistentes: [], soloTexto: false, sinTranscribir: true });
+  assert.match(normal, /"transcripcion": "lo que se dice/);
+  assert.match(sin, /"transcripcion": "" \(déjala vacía\)/);
+  assert.match(sin, /No copies ni transcribas literalmente/);
+  assert.doesNotMatch(normal, /No copies ni transcribas/);
+});

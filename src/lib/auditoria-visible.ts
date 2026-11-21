@@ -12,6 +12,7 @@ import type { Afinado } from "@/lib/permisos/afinado";
  * historial completo en /usuarios/auditoria.
  */
 export const MODULO_DE_ENTIDAD: Record<string, string> = {
+  despacho_pedidos_inventario: "despacho-pedir-inventario",
   fin_movimientos: "libro-movimientos",
   fin_reparto_plantillas: "libro-movimientos",
   fin_reglas: "libro-movimientos",

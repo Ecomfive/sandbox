@@ -1,11 +1,19 @@
 import { MEZCLA_DE_ANGULOS } from "@/lib/meta-ads/atributos-video";
-import { conSigno, dolaresEnteros, resultado } from "@/lib/meta-ads/metricas";
+import Link from "next/link";
+import { Tooltip } from "@/components/ui/tooltip";
+import { conSigno, conSignoCompacto, CPA_TOPE_PREDETERMINADO, dolaresEnteros, GASTO_MINIMO_CONFIABLE, resultado } from "@/lib/meta-ads/metricas";
 import { NOMBRE_ETAPA, type Etapa } from "@/lib/meta-ads/nombre";
 import type { CampanaVista } from "@/lib/meta-ads/vistas";
 import { NOMBRE_VEREDICTO, veredictoDe, type Veredicto } from "./def-campanas";
 import { Anillo, BarraApilada, coloresDeAngulos, Leyenda, TarjetaMeta } from "./graficas";
 
 const COLOR_VEREDICTO: Record<Veredicto, string> = { deja: "var(--success)", pierde: "var(--destructive)", poca_data: "var(--warning)", sin_gasto: "var(--grafica-5)" };
+const EXPLICA_VEREDICTO: Record<Veredicto, string> = {
+  deja: `Gastó $${GASTO_MINIMO_CONFIABLE} o más y, con el CPA tope de su producto, las compras que trajo valen más de lo que se gastó.`,
+  pierde: `Gastó $${GASTO_MINIMO_CONFIABLE} o más y, con el CPA tope de su producto, las compras que trajo valen menos de lo que se gastó.`,
+  poca_data: `Gastó menos de $${GASTO_MINIMO_CONFIABLE} en estas fechas: todavía no alcanza para decir si funciona. Elige un periodo más largo (30 días, 3 meses…) para que sumen más datos.`,
+  sin_gasto: "Existe en la cuenta pero no gastó nada en estas fechas (pausada, archivada o sin entregas).",
+};
 const COLOR_ETAPA: Record<Etapa | "sin", string> = { testing: "var(--azul)", escala: "var(--success)", retargeting: "var(--warning)", sin: "var(--grafica-5)" };
 
 /**
@@ -16,6 +24,7 @@ export function ResumenCampanas({ campanas }: { campanas: CampanaVista[] }) {
   const veredictos: Record<Veredicto, number> = { deja: 0, pierde: 0, poca_data: 0, sin_gasto: 0 };
   for (const c of campanas) veredictos[veredictoDe(c)]++;
   const gasto = campanas.reduce((s, c) => s + c.r.gasto, 0);
+  const sinTope = campanas.filter((c) => !c.topeDefinido && c.r.gasto > 0).length;
   const compras = campanas.reduce((s, c) => s + c.r.compras, 0);
   const total = campanas.reduce((s, c) => s + resultado(c.r, c.tope), 0);
   const etapas: Record<Etapa | "sin", number> = { testing: 0, escala: 0, retargeting: 0, sin: 0 };
@@ -44,7 +53,9 @@ export function ResumenCampanas({ campanas }: { campanas: CampanaVista[] }) {
             partes={tipos.map((v) => ({ nombre: NOMBRE_VEREDICTO[v], valor: veredictos[v], color: COLOR_VEREDICTO[v] }))}
             centro={
               <>
-                <span className={`text-lg font-semibold tabular-nums ${total >= 0 ? "text-success" : "text-destructive"}`}>{conSigno(total)}</span>
+                <span title={conSigno(total)} className={`text-lg font-semibold tabular-nums ${total >= 0 ? "text-success" : "text-destructive"}`}>
+                  {conSignoCompacto(total)}
+                </span>
                 <span className="text-[11px] text-muted-foreground">estimado</span>
               </>
             }
@@ -55,7 +66,11 @@ export function ResumenCampanas({ campanas }: { campanas: CampanaVista[] }) {
                 <li key={v} className="flex items-center justify-between gap-3">
                   <span className="inline-flex items-center gap-2">
                     <span aria-hidden="true" className="h-2.5 w-2.5 rounded-[3px]" style={{ background: COLOR_VEREDICTO[v] }} />
-                    {NOMBRE_VEREDICTO[v]}
+                    <Tooltip texto={EXPLICA_VEREDICTO[v]}>
+                      <span tabIndex={0} className="cursor-help rounded underline decoration-dotted decoration-muted-foreground underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2">
+                        {NOMBRE_VEREDICTO[v]}
+                      </span>
+                    </Tooltip>
                   </span>
                   <span className="font-semibold tabular-nums">{veredictos[v]}</span>
                 </li>
@@ -64,6 +79,17 @@ export function ResumenCampanas({ campanas }: { campanas: CampanaVista[] }) {
             <p className="m-0 text-xs text-muted-foreground tabular-nums">
               {dolaresEnteros(gasto)} gastados · {compras} compras
             </p>
+            {sinTope > 0 && (
+              <p className="m-0 flex items-start gap-2 text-xs text-muted-foreground">
+                <span aria-hidden="true" className="mt-1 h-2 w-2 shrink-0 rounded-full" style={{ background: "var(--warning)" }} />
+                <span>
+                  {sinTope} {sinTope === 1 ? "campaña usa" : "campañas usan"} el CPA tope de ${CPA_TOPE_PREDETERMINADO} porque su producto no tiene uno:{" "}
+                  <Link href="/anuncios-meta/cuentas" className="font-medium text-foreground underline underline-offset-2">
+                    definir los CPA tope
+                  </Link>
+                </span>
+              </p>
+            )}
           </div>
         </div>
       </TarjetaMeta>

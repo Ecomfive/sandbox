@@ -145,7 +145,18 @@ export async function analizarVideoDeMeta(supabase: SupabaseClient, v: VideoPend
   if (fuente) {
     const archivo = await bajarDeMeta(fuente, MAX_BYTES_VIDEO, 60_000);
     if (!archivo) motivo = "No se pudo bajar el video de Meta (o pesa más de 80 MB).";
-    else respuesta = await analizarVideoConGemini(archivo.bytes, archivo.tipo.startsWith("video/") ? archivo.tipo : "video/mp4", pedidoAnalisisVideo({ producto: v.producto, copy: v.copy, titulo: v.titulo, angulosExistentes: existentes, soloTexto: false }), contexto);
+    else {
+      respuesta = await analizarVideoConGemini(archivo.bytes, archivo.tipo.startsWith("video/") ? archivo.tipo : "video/mp4", pedidoAnalisisVideo({ producto: v.producto, copy: v.copy, titulo: v.titulo, angulosExistentes: existentes, soloTexto: false }), contexto);
+      // «Recitation»: Gemini cortó la respuesta porque iba a repetir de memoria algo que reconoce (la letra de una canción, un texto famoso, la transcripción). Se repite el mismo video sin pedir transcripción y con más temperatura.
+      if ("error" in respuesta && /RECITATION/.test(respuesta.error)) {
+        respuesta = await analizarVideoConGemini(archivo.bytes, archivo.tipo.startsWith("video/") ? archivo.tipo : "video/mp4", pedidoAnalisisVideo({ producto: v.producto, copy: v.copy, titulo: v.titulo, angulosExistentes: existentes, soloTexto: false, sinTranscribir: true }), contexto, 0.7);
+      }
+      // Si Gemini no pudo con el video, no se deja el video en error: se analiza con el texto y la miniatura (provisional) y el motivo queda dicho en la ficha.
+      if ("error" in respuesta) {
+        motivo = `${respuesta.error}`;
+        respuesta = null;
+      }
+    }
   }
 
   // 2. Sin video: el texto del anuncio y su miniatura, con el ángulo provisional.

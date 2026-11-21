@@ -10,6 +10,7 @@ import type { NombreFilas } from "@/lib/tabla/pie";
 import { useToast } from "@/components/ui/toast";
 import { BarraAvance } from "@/components/ui/barra-avance";
 import { fieldClassSm, labelClassSm } from "@/components/ui/field";
+import { EVENTO_ABRIR_VIDEO } from "./para-revisar";
 import { ProgresoEstimado } from "@/components/ui/progreso-estimado";
 import { formatearFechaHora } from "@/lib/formato";
 import { Ventana } from "@/components/ui/ventana";
@@ -201,6 +202,15 @@ export function ListaVideos({ videos, escribe, iaConectada, sinAnalizar, abrirIn
     setAbierto(id);
   };
   const ordenados = ordenarVideos(videos, criterio, sentido);
+  // «Abrir este video» de «Para revisar» (arriba, en el resumen) pide abrir la ficha de ese video sin recargar la página.
+  useEffect(() => {
+    const abrirDesdeResumen = (e: Event) => {
+      const id = (e as CustomEvent<string>).detail;
+      if (typeof id === "string") abrirVideo(id, false);
+    };
+    window.addEventListener(EVENTO_ABRIR_VIDEO, abrirDesdeResumen);
+    return () => window.removeEventListener(EVENTO_ABRIR_VIDEO, abrirDesdeResumen);
+  }, []);
   useEffect(() => {
     const url = new URL(window.location.href);
     if (abierto) url.searchParams.set("abrir", abierto);

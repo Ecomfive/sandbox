@@ -7,6 +7,7 @@ import { analizarVideoDeMeta, pendienteDeVideo, videosPorAnalizar } from "@/lib/
 import { pedirMeta, tokenDeMeta } from "@/lib/meta-ads/api";
 import { buscarArchivoDeVideo, motivoSinArchivoDeVideo } from "@/lib/meta-ads/archivo-video";
 import { clasificarGanchosPendientes } from "@/lib/meta-ads/clasificar-ganchos";
+import type { CoberturaBruta } from "@/lib/meta-ads/cobertura";
 import { actividadDeCampana } from "@/lib/meta-ads/datos";
 import { leerCuentasMeta } from "@/lib/meta-ads/leer-cuentas";
 import { claveDeProducto, type Etapa } from "@/lib/meta-ads/nombre";
@@ -293,7 +294,7 @@ const DIA_MS = 86_400_000;
  * Trae el historial de una cuenta de a un tramo de fechas por llamada (la pantalla las encadena, de lo más nuevo a lo más viejo, y muestra el avance). Meta guarda hasta 37 meses. Cada tramo es de 31 días como mucho
  * y guarda lo mismo que una lectura normal: resultados por día, campañas, anuncios y registro de actividad de esas fechas.
  */
-export async function leerTramoMeta(cuentaId: string, desde: string, hasta: string): Promise<{ error?: string; texto?: string; filas?: number }> {
+export async function leerTramoMeta(cuentaId: string, desde: string, hasta: string): Promise<{ error?: string; texto?: string; filas?: number; /** El tramo no cupo en una lectura (o Meta tardó): no se guardó nada y conviene leerlo en partes más chicas. */ partir?: boolean }> {
   const u = await requireModuloEscritura(MODULO);
   if (!UUID.test(cuentaId)) return { error: "Esa cuenta no existe." };
   if (!FECHA.test(desde) || !FECHA.test(hasta) || desde > hasta) return { error: "Las fechas no son válidas." };
@@ -303,10 +304,40 @@ export async function leerTramoMeta(cuentaId: string, desde: string, hasta: stri
   const supabase = createServiceClient();
   const { data: cuenta } = await supabase.from("meta_cuentas").select("id, nombre, act_id, ultima_lectura_en, pais_id").eq("id", cuentaId).maybeSingle();
   if (!cuenta || !(await puedeVerPaisId(supabase, u.paisesPermitidos, cuenta.pais_id as string))) return { error: "No tienes acceso a las cuentas de ese país." };
-  const r = await sincronizarCuenta(supabase, cuenta as { id: string; nombre: string; act_id: string; ultima_lectura_en: string | null }, { limiteMs: 100_000, rango: { desde, hasta } });
+  const r = await sincronizarCuenta(supabase, cuenta as { id: string; nombre: string; act_id: string; ultima_lectura_en: string | null }, { limiteMs: 250_000, rango: { desde, hasta } });
   await registrarAuditoria({ accion: "leer_cuentas_meta", entidad: "meta_cuentas", entidadId: cuentaId, detalle: `Historial ${desde} a ${hasta}: ${r.ok ? `${r.campanas} campañas, ${r.filas} filas` : "con error"}` });
   revalidatePath("/anuncios-meta", "layout");
-  return r.ok ? { texto: `${r.filas} filas de resultados${r.avisos.length ? ` (${r.avisos[0]})` : ""}`, filas: r.filas } : { error: r.error ?? "No se pudo leer ese tramo." };
+  return r.ok ? { texto: `${r.filas} filas de resultados${r.avisos.length ? ` (${r.avisos[0]})` : ""}`, filas: r.filas } : { error: r.error ?? "No se pudo leer ese tramo.", partir: r.partir };
+}
+
+/**
+ * Qué fechas de cada cuenta activa del país ya se trajeron de Meta (migración 0346): los rangos leídos completos y los días con resultados, de los últimos 37 meses. La pantalla arma de ahí el cuadro por mes y
+ * decide qué tramos del historial ya no hace falta volver a leer. Solo mira.
+ */
+export async function coberturaMeta(): Promise<{ error?: string; cuentas?: { id: string; nombre: string; bruta: CoberturaBruta }[] }> {
+  const u = await requireModuloEscritura(MODULO);
+  const supabase = createServiceClient();
+  const pais = await getPaisActual(supabase);
+  if (!(await puedeVerPaisId(supabase, u.paisesPermitidos, pais.id))) return { error: "No tienes acceso a las cuentas de ese país." };
+  const { data, error } = await supabase.from("meta_cuentas").select("id, nombre").eq("pais_id", pais.id).eq("activa", true).order("nombre");
+  if (error) return { error: sinMigracion(error.message) ? MIGRACION : error.message };
+  const hoy = hoyEnPanama();
+  const desde = restarDias(hoy, 37 * 31);
+  const cuentas: { id: string; nombre: string; bruta: CoberturaBruta }[] = [];
+  for (const c of data ?? []) {
+    const { data: bruta, error: e } = await supabase.rpc("meta_cobertura", { p_cuenta: c.id, p_desde: desde, p_hasta: hoy });
+    if (e) return { error: /meta_cobertura|schema cache|does not exist/i.test(e.message) ? "Falta correr la migración 0346 (registro de lo leído de Meta) en Supabase." : e.message };
+    const b = (bruta ?? {}) as { tramos?: unknown; dias?: unknown };
+    cuentas.push({
+      id: c.id as string,
+      nombre: c.nombre as string,
+      bruta: {
+        tramos: Array.isArray(b.tramos) ? (b.tramos as unknown[]).filter((t): t is [string, string] => Array.isArray(t) && typeof t[0] === "string" && typeof t[1] === "string") : [],
+        dias: Array.isArray(b.dias) ? (b.dias as unknown[]).filter((d): d is string => typeof d === "string") : [],
+      },
+    });
+  }
+  return { cuentas };
 }
 
 /** Corrige a mano el ángulo de un video (un nuevo análisis ya no lo pisa). Vacío = volver a lo que dijo la IA en el próximo análisis. */

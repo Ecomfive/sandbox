@@ -408,6 +408,8 @@ export const ETIQUETA_ACCION: Record<string, string> = {
   remision_correccion_autorizada: "Autorizó la corrección de una remisión",
   remision_correccion_rechazada: "Rechazó la corrección de una remisión",
   traslado_inventario: "Hizo un traslado entre bodegas",
+  editar_pedido_inventario: "Editó un pedido a inventario",
+  entregar_pedido_inventario: "Marcó un pedido a inventario como entregado",
   traslado_nota: "Cambió la nota de un traslado",
   levantamiento_inventario: "Registró un levantamiento de inventario",
   crear_producto: "Creó el producto",

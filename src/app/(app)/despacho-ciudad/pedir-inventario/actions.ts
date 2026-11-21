@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModuloEscritura, type UsuarioActual } from "@/lib/auth";
 import { cargarBodegasPedido, stockInventario } from "@/lib/pedidos-inventario/datos";
-import { avisoPedido, numeroPedido, revisarEntregas, revisarLineas, revisarStockPedido } from "@/lib/pedidos-inventario/reglas";
+import { avisoEdicion, avisoPedido, cambiosDeEdicion, numeroPedido, puedeEditar, revisarEdicion, revisarEntregas, revisarLineas, revisarStockPedido, type EstadoPedido } from "@/lib/pedidos-inventario/reglas";
 import { puedeVerBodega } from "@/lib/seguridad/pais-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 import { numeroTraslado } from "@/lib/wms/traslado";
@@ -87,6 +87,75 @@ export async function crearPedidoInventario(lineas: unknown): Promise<Resultado>
     }
     await avisar(supabase, await quienesAtienden(supabase), u, avisoPedido({ numero: pedido.numero, items: revisadas.lineas.length }, nombreDe(u), "nuevo"), "/inventario-pedidos-despacho");
     return { ok: true, mensaje: `${numeroPedido(pedido.numero)} enviado a inventario.` };
+  });
+}
+
+/**
+ * Despacho edita su pedido (20 nov 2026, pedido de Jhokser): quita productos, cambia cantidades o notas y agrega productos, mientras inventario no lo haya enviado (solicitud o en proceso). Recibe todas las líneas
+ * que deben quedar: las que ya existían llevan su `id` y las que no vienen se quitan. Un pedido no puede quedar vacío (para eso se cancela). Lo que se agrega o se sube de cantidad se revisa contra lo que hay en inventario,
+ * como al hacer un pedido; lo que no cambia no se vuelve a revisar. Si inventario ya lo tenía, le llega un aviso con lo que cambió.
+ */
+export async function editarPedidoInventario(id: string, lineas: unknown): Promise<Resultado> {
+  return conPermiso(MODULO_DESPACHO, async (u) => {
+    if (!ES_UUID(id)) return { error: "Pedido no válido." };
+    const supabase = createServiceClient();
+    const { data: p } = await supabase
+      .from("despacho_pedidos_inventario")
+      .select("id, numero, estado, despacho_pedidos_inventario_items(id, sku_id, producto, cantidad_pedida, nota)")
+      .eq("id", id)
+      .maybeSingle();
+    if (!p) return { error: "Ese pedido ya no existe." };
+    const estado = p.estado as EstadoPedido;
+    if (!puedeEditar(estado)) return { error: "Ya no se puede editar: inventario ya lo envió o se cerró. Recarga la página." };
+    const items = ((p.despacho_pedidos_inventario_items as { id: string; sku_id: string; producto: string; cantidad_pedida: number; nota: string | null }[] | null) ?? []).map((it) => ({ id: it.id, skuId: it.sku_id, producto: it.producto, cantidad: it.cantidad_pedida, nota: it.nota }));
+    const revisadas = revisarEdicion(lineas, items);
+    if ("error" in revisadas) return revisadas;
+
+    // Los productos nuevos: del catálogo, simples o la variante exacta (como al hacer el pedido).
+    const nuevosIds = revisadas.lineas.filter((l) => !l.id).map((l) => l.skuId);
+    const { data: skus } = nuevosIds.length ? await supabase.from("skus_maestros").select("id, codigo, nombre, tipo, opciones_variantes").in("id", nuevosIds) : { data: [] };
+    const porId = new Map(((skus ?? []) as { id: string; codigo: string; nombre: string; tipo: string; opciones_variantes: unknown }[]).map((s) => [s.id, s]));
+    for (const l of revisadas.lineas.filter((x) => !x.id)) {
+      const s = porId.get(l.skuId);
+      if (!s) return { error: "Un producto ya no existe: elígelo otra vez de la lista." };
+      if (s.tipo !== "simple" || s.opciones_variantes) return { error: `«${s.nombre}» no se puede pedir así: elige el producto suelto (sin combo) o la variante exacta.` };
+    }
+    const nombres: Record<string, string> = { ...Object.fromEntries(items.map((it) => [it.skuId, it.producto])), ...Object.fromEntries([...porId].map(([k, s]) => [k, s.nombre])) };
+    const cambios = cambiosDeEdicion(items, revisadas.lineas, nombres);
+    if (!cambios.resumen.length) return { ok: true, mensaje: "No cambiaste nada." };
+
+    // Solo lo nuevo o lo que sube de cantidad se compara con lo que hay en inventario.
+    const previas = new Map(items.map((it) => [it.id, it]));
+    const aRevisar = [...cambios.agregar, ...cambios.cambiar.filter((l) => l.cantidad > (previas.get(l.id!)?.cantidad ?? 0))];
+    if (aRevisar.length) {
+      const { origenes } = await cargarBodegasPedido(supabase);
+      const sinStock = revisarStockPedido(aRevisar, await stockInventario(supabase, origenes, aRevisar.map((l) => l.skuId)), nombres);
+      if (sinStock) return { error: sinStock };
+    }
+
+    if (cambios.quitar.length) {
+      const { error } = await supabase.from("despacho_pedidos_inventario_items").delete().eq("pedido_id", id).in("id", cambios.quitar);
+      if (error) return { error: "No se pudo quitar el producto del pedido." };
+    }
+    for (const l of cambios.cambiar) {
+      const { error } = await supabase.from("despacho_pedidos_inventario_items").update({ cantidad_pedida: l.cantidad, nota: l.nota }).eq("id", l.id!).eq("pedido_id", id);
+      if (error) return { error: "No se pudo guardar un cambio del pedido. Revisa cómo quedó y vuelve a intentarlo." };
+    }
+    if (cambios.agregar.length) {
+      const orden = revisadas.lineas.length;
+      const { error } = await supabase.from("despacho_pedidos_inventario_items").insert(
+        cambios.agregar.map((l, i) => {
+          const s = porId.get(l.skuId)!;
+          return { pedido_id: id, orden: orden + i, sku_id: s.id, producto: String(s.nombre).slice(0, 300), codigo: s.codigo, cantidad_pedida: l.cantidad, nota: l.nota };
+        }),
+      );
+      if (error) return { error: "No se pudo agregar el producto al pedido. Revisa cómo quedó y vuelve a intentarlo." };
+    }
+    const n = numeroPedido(p.numero as number);
+    await registrarAuditoria({ accion: "editar_pedido_inventario", entidad: "despacho_pedidos_inventario", entidadId: id, detalle: `${n}: ${cambios.resumen.join("; ")}` });
+    // Inventario se entera de lo que cambió (ya lo haya tomado o no).
+    await avisar(supabase, await quienesAtienden(supabase), u, avisoEdicion(p.numero as number, nombreDe(u), cambios.resumen), "/inventario-pedidos-despacho");
+    return { ok: true, mensaje: `${n} editado.` };
   });
 }
 
@@ -189,6 +258,29 @@ export async function enviarPedidoInventario(id: string, origenId: string, entre
     revalidatePath("/inventario");
     revalidatePath("/inventario/traslados");
     return { ok: true, mensaje: `Enviado: se hizo el traslado ${numTr} a ${destino.nombre}.` };
+  });
+}
+
+/**
+ * Inventario marca el pedido como entregado (20 nov 2026, pedido de Jhokser: para que la orden finalice sin esperar a que despacho pulse «Recibido»): queda cerrado igual que si despacho lo recibe y
+ * le llega el aviso a quien lo pidió. Solo un pedido enviado; el cambio es un `update … eq(estado previo)`, así que dos clics (o despacho y inventario a la vez) no lo cierran dos veces.
+ */
+export async function marcarEntregadoPedidoInventario(id: string): Promise<Resultado> {
+  return conPermiso(MODULO_INVENTARIO, async (u) => {
+    if (!ES_UUID(id)) return { error: "Pedido no válido." };
+    const supabase = createServiceClient();
+    const { data } = await supabase
+      .from("despacho_pedidos_inventario")
+      .update({ estado: "recibido", recibido_en: new Date().toISOString(), recibido_por: u.id, recibido_por_nombre: nombreDe(u) })
+      .eq("id", id)
+      .eq("estado", "enviado")
+      .select("numero, pedido_por, despacho_pedidos_inventario_items(id)");
+    const p = data?.[0];
+    if (!p) return { error: "Ese pedido no está enviado: recarga la página." };
+    const items = (p.despacho_pedidos_inventario_items as unknown[] | null)?.length ?? 0;
+    await registrarAuditoria({ accion: "entregar_pedido_inventario", entidad: "despacho_pedidos_inventario", entidadId: id, detalle: `${numeroPedido(p.numero as number)} marcado entregado desde inventario` });
+    await avisar(supabase, [p.pedido_por as string | null], u, avisoPedido({ numero: p.numero as number, items }, nombreDe(u), "entregado"), "/despacho-ciudad/pedir-inventario");
+    return { ok: true, mensaje: `${numeroPedido(p.numero as number)} entregado.` };
   });
 }
 

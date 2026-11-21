@@ -7,7 +7,7 @@ import { useToast } from "@/components/ui/toast";
 import { archivarFila, cambiarCelda, comentarFila, crearFila, detalleFila, moverFila, restaurarFila, subirComprobante, type DetalleFila } from "@/app/(app)/despacho-ciudad/actions";
 import { colorDe, diaTexto, ETIQUETAS, GRUPOS_DEVOLUCION, grupoPorAsesores, sumasGrupo, textoSobre, type Columna } from "@/lib/despacho/etiquetas";
 import type { Clase, FilaTablero } from "@/lib/despacho/datos";
-import { formatearTiempoRelativo } from "@/lib/formato";
+import { FechaHora } from "@/components/ui/fecha-hora";
 import { VisorArchivos } from "./visor-archivos";
 
 type Agrupar = "dia" | "courier" | "tienda";
@@ -357,7 +357,7 @@ export function TableroDespacho({
                                 {pill(f, "tienda")}
                               </td>
                             )}
-                            <td className={`${td} px-2 text-xs text-muted-foreground`}>{f.editadoEn || f.actualizado ? formatearTiempoRelativo((f.editadoEn ?? f.actualizado)!) : "—"}</td>
+                            <td className={`${td} px-2 text-xs text-muted-foreground`}>{f.editadoEn || f.actualizado ? <FechaHora iso={(f.editadoEn ?? f.actualizado)!} /> : "—"}</td>
                             <td className={td}>
                               {pill(f, "courier")}
                             </td>
@@ -562,7 +562,7 @@ function PanelFila({
         {detalle?.notas.map((n) => (
           <div key={n.id} className="rounded-lg border border-border/70 p-2.5 text-[13px]">
             <div className="text-xs font-semibold">
-              {n.autor} <span className="font-normal text-muted-foreground">· {formatearTiempoRelativo(n.cuando)}</span>
+              {n.autor} <span className="font-normal text-muted-foreground">· <FechaHora iso={n.cuando} /></span>
             </div>
             <p className="m-0 mt-1 whitespace-pre-line">{n.texto}</p>
           </div>
@@ -576,7 +576,7 @@ function PanelFila({
         {detalle?.actividad.length ? (
           detalle.actividad.map((a) => (
             <p key={a.id} className="m-0 border-b border-border/50 py-1 text-xs">
-              {a.texto} <span className="text-muted-foreground">· {a.autor}, {formatearTiempoRelativo(a.cuando)}</span>
+              {a.texto} <span className="text-muted-foreground">· {a.autor}, <FechaHora iso={a.cuando} /></span>
             </p>
           ))
         ) : (

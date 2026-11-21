@@ -12,18 +12,28 @@ const modeloDeVideo = () => process.env.GEMINI_VIDEO_MODEL?.trim() || process.en
 export const geminiConectado = () => !!claveGemini();
 
 type Uso = { promptTokenCount?: number; candidatesTokenCount?: number };
-type Respuesta = { candidates?: { content?: { parts?: { text?: string }[] } }[]; usageMetadata?: Uso; error?: { message?: string } };
+type Respuesta = { candidates?: { content?: { parts?: { text?: string }[] }; finishReason?: string }[]; promptFeedback?: { blockReason?: string }; usageMetadata?: Uso; error?: { message?: string } };
 
 export type ResultadoGemini = { texto: string; modelo: string } | { error: string };
 
-async function generar(partes: unknown[], contexto: ContextoConsumo, esperaMs: number): Promise<ResultadoGemini> {
+/** Un fallo de Gemini que suele pasar solo (servidor ocupado, tiempo agotado, sin conexión): se repite una vez. */
+const esPasajero = (r: ResultadoGemini) => "error" in r && /tardó demasiado|No se pudo conectar|no pudo analizarlo|no devolvió nada \(/i.test(r.error);
+
+async function generar(partes: unknown[], contexto: ContextoConsumo, esperaMs: number, temperatura = 0.2): Promise<ResultadoGemini> {
+  const primero = await generarUnaVez(partes, contexto, esperaMs, temperatura);
+  if (!esPasajero(primero)) return primero;
+  await new Promise((ok) => setTimeout(ok, 3_000));
+  return generarUnaVez(partes, contexto, esperaMs, temperatura);
+}
+
+async function generarUnaVez(partes: unknown[], contexto: ContextoConsumo, esperaMs: number, temperatura: number): Promise<ResultadoGemini> {
   const clave = claveGemini();
   const modelo = modeloDeVideo();
   try {
     const r = await fetch(`${BASE}/v1beta/models/${encodeURIComponent(modelo)}:generateContent`, {
       method: "POST",
       headers: { "content-type": "application/json", "x-goog-api-key": clave },
-      body: JSON.stringify({ contents: [{ role: "user", parts: partes }], generationConfig: { temperature: 0.2, responseMimeType: "application/json" } }),
+      body: JSON.stringify({ contents: [{ role: "user", parts: partes }], generationConfig: { temperature: temperatura, responseMimeType: "application/json" } }),
       signal: AbortSignal.timeout(esperaMs),
       cache: "no-store",
     });
@@ -36,7 +46,10 @@ async function generar(partes: unknown[], contexto: ContextoConsumo, esperaMs: n
     const salida = json?.usageMetadata?.candidatesTokenCount ?? 0;
     await registrarConsumo(contexto, { proveedor: "gemini", modelo, tokensEntrada: entrada, tokensSalida: salida, costoUsd: costoTexto(modelo, { tokensEntrada: entrada, tokensSalida: salida, busquedas: 0 }), ok: true });
     const texto = (json?.candidates?.[0]?.content?.parts ?? []).map((p) => p.text ?? "").join("");
-    return texto.trim() ? { texto, modelo } : { error: "Gemini no devolvió nada." };
+    if (texto.trim()) return { texto, modelo };
+    // Sin texto: Gemini bloqueó la respuesta (política de contenido: no sirve repetir igual) o terminó sin escribir nada (pasajero).
+    const bloqueo = json?.promptFeedback?.blockReason ?? ((json?.candidates?.[0]?.finishReason ?? "") && !["STOP", "MAX_TOKENS"].includes(json?.candidates?.[0]?.finishReason ?? "") ? json?.candidates?.[0]?.finishReason : undefined);
+    return { error: bloqueo ? `Gemini bloqueó la respuesta (${bloqueo}).` : `Gemini no devolvió nada (terminó con «${json?.candidates?.[0]?.finishReason ?? "sin motivo"}»).` };
   } catch (e) {
     const error = (e as Error)?.name === "TimeoutError" ? "Gemini tardó demasiado." : "No se pudo conectar con Gemini.";
     await registrarConsumo(contexto, { proveedor: "gemini", modelo, costoUsd: 0, ok: false, error });
@@ -45,7 +58,7 @@ async function generar(partes: unknown[], contexto: ContextoConsumo, esperaMs: n
 }
 
 /** Sube el video a Gemini, espera a que lo procese, pide el análisis y lo borra. */
-export async function analizarVideoConGemini(bytes: Uint8Array, mime: string, pedido: string, contexto: ContextoConsumo): Promise<ResultadoGemini> {
+export async function analizarVideoConGemini(bytes: Uint8Array, mime: string, pedido: string, contexto: ContextoConsumo, temperatura = 0.2): Promise<ResultadoGemini> {
   const clave = claveGemini();
   if (!clave) return { error: "Falta conectar Gemini (la clave GEMINI_API_KEY)." };
   let nombre: string | null = null;
@@ -72,7 +85,7 @@ export async function analizarVideoConGemini(bytes: Uint8Array, mime: string, pe
       estado = j?.state ?? estado;
     }
     if (estado !== "ACTIVE") return { error: estado === "FAILED" ? "Gemini no pudo procesar el video." : "Gemini tardó demasiado en procesar el video." };
-    return await generar([{ file_data: { mime_type: archivo.file.mimeType ?? mime, file_uri: archivo.file.uri } }, { text: pedido }], contexto, 120_000);
+    return await generar([{ file_data: { mime_type: archivo.file.mimeType ?? mime, file_uri: archivo.file.uri } }, { text: pedido }], contexto, 120_000, temperatura);
   } catch (e) {
     return { error: (e as Error)?.name === "TimeoutError" ? "Gemini tardó demasiado con el video." : "No se pudo conectar con Gemini." };
   } finally {
@@ -86,5 +99,8 @@ export async function analizarSoloTextoConGemini(pedido: string, imagen: { bytes
   const partes: unknown[] = [];
   if (imagen) partes.push({ inline_data: { mime_type: imagen.mime, data: Buffer.from(imagen.bytes).toString("base64") } });
   partes.push({ text: pedido });
-  return generar(partes, contexto, 60_000);
+  const r = await generar(partes, contexto, 60_000);
+  // Si no devolvió nada con la miniatura (a veces la imagen es lo que bloquea la respuesta), se repite solo con el texto del anuncio.
+  if (imagen && "error" in r && /bloque|no devolvió nada/i.test(r.error)) return generar([{ text: pedido }], contexto, 60_000);
+  return r;
 }

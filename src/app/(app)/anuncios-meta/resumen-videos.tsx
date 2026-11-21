@@ -1,5 +1,6 @@
 import { dolaresEnteros } from "@/lib/meta-ads/metricas";
 import type { VideoVista } from "@/lib/meta-ads/vistas";
+import { ParaRevisar } from "./para-revisar";
 import { Anillo, BarraApilada, Leyenda, partesConColor, TarjetaMeta } from "./graficas";
 
 type EstadoAnalisis = "analizado" | "provisional" | "error" | "sin_analizar";
@@ -8,7 +9,7 @@ const COLOR: Record<EstadoAnalisis, string> = { analizado: "var(--success)", pro
 const estado = (v: VideoVista): EstadoAnalisis => (!v.analisis ? "sin_analizar" : v.analisis.estado === "analizado" ? "analizado" : v.analisis.estado === "sin_archivo" ? "provisional" : "error");
 
 /** Arriba de Videos: cuántos ya vio la IA y cómo se reparte lo que se gastó por ángulo, por gancho y por formato de video. */
-export function ResumenVideos({ videos }: { videos: VideoVista[] }) {
+export function ResumenVideos({ videos, escribe = false, iaConectada = false }: { videos: VideoVista[]; escribe?: boolean; iaConectada?: boolean }) {
   if (videos.length === 0) return null;
   const estados: Record<EstadoAnalisis, number> = { analizado: 0, provisional: 0, error: 0, sin_analizar: 0 };
   for (const v of videos) estados[estado(v)]++;
@@ -25,6 +26,8 @@ export function ResumenVideos({ videos }: { videos: VideoVista[] }) {
   const ganchos = porGasto((v) => v.analisis?.ganchoTipo);
   const formatos = porGasto((v) => (v.analisis && v.analisis.estado !== "error" ? v.analisis.formato : null));
   const tipos = Object.keys(estados) as EstadoAnalisis[];
+  // Los videos que la IA no pudo ver completos (solo texto o con error), con el motivo, para abrirlos y decidir qué hacer.
+  const aRevisar = videos.filter((v) => v.analisis && estado(v) !== "analizado").sort((a, b) => b.r.gasto - a.r.gasto);
   return (
     <section aria-label="Resumen de los videos" className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)]">
       <TarjetaMeta titulo="Lo que ya vio la IA" derecha={`${videos.length} videos`} id="resumen-analisis">
@@ -53,6 +56,13 @@ export function ResumenVideos({ videos }: { videos: VideoVista[] }) {
             ))}
           </ul>
         </div>
+        {aRevisar.length > 0 && (
+          <ParaRevisar
+            total={aRevisar.length}
+            puedeReintentar={escribe && iaConectada}
+            videos={aRevisar.slice(0, 6).map((v) => ({ id: v.id, nombre: v.nombre, estado: NOMBRE[estado(v)], color: COLOR[estado(v)], motivo: v.analisis?.error ?? null }))}
+          />
+        )}
       </TarjetaMeta>
 
       <TarjetaMeta titulo="Dónde se gasta" derecha={`${dolaresEnteros(gasto)} en videos del periodo`} id="resumen-gasto">

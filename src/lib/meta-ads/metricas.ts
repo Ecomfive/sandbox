@@ -123,3 +123,12 @@ export const nivelDeHook = (v: number | null): NivelMetrica => (v === null ? "ne
 export const dolares = (n: number): string => `$${n.toFixed(2)}`;
 export const dolaresEnteros = (n: number): string => `${n < 0 ? "−" : ""}$${Math.abs(n).toFixed(0)}`;
 export const conSigno = (n: number): string => `${n < 0 ? "−" : "+"}$${Math.abs(n).toFixed(0)}`;
+/** Como `conSigno`, pero con miles abreviados para que quepa en un espacio chico: «−$149 mil», «+$12.5 mil»; de menos de $10 000 va entero. */
+export const conSignoCompacto = (n: number): string => {
+  const a = Math.abs(n);
+  const signo = n < 0 ? "−" : "+";
+  const sinCero = (x: number) => x.toFixed(1).replace(/[.]0$/, "");
+  if (a < 10_000) return `${signo}$${a.toFixed(0)}`;
+  if (a < 1_000_000) return `${signo}$${a >= 100_000 ? (a / 1000).toFixed(0) : sinCero(a / 1000)} mil`;
+  return `${signo}$${sinCero(a / 1_000_000)} M`;
+};
