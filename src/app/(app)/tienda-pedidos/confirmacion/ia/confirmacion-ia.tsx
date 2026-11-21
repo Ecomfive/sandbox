@@ -44,6 +44,8 @@ const MENSAJE: Record<FilaAnalisis["mensajeEstado"], { texto: string; tono: "neu
   pendiente_plantilla: { texto: "Falta plantilla", tono: "aviso" },
   sin_chat: { texto: "Sin chat", tono: "aviso" },
   error: { texto: "No se pudo enviar", tono: "peligro" },
+  ya_pedido: { texto: "Ya se lo habían pedido", tono: "neutro" },
+  sin_comprobar: { texto: "Sin comprobar el chat", tono: "aviso" },
 };
 
 function Interruptor({ activo, etiqueta, deshabilitado, alCambiar }: { activo: boolean; etiqueta: string; deshabilitado?: boolean; alCambiar: () => void }) {
@@ -209,12 +211,12 @@ export function ConfirmacionIA({
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border px-3 py-2.5">
           <div className="min-w-0">
             <p className="m-0 text-sm font-medium">Pedir por WhatsApp el dato que falta</p>
-            <p className="m-0 text-xs text-muted-foreground">Si la dirección está incompleta, le escribe al cliente solo lo que falta. Solo con el chat abierto (24 h).</p>
+            <p className="m-0 text-xs text-muted-foreground">Si la dirección está incompleta o el pedido es de pago por adelantado, le escribe al cliente, pero solo si en el chat de iComfly todavía no se lo habían pedido. Solo con el chat abierto (24 h).</p>
           </div>
           <Interruptor activo={config.enviarMensajes} etiqueta="Pedir por WhatsApp el dato que falta" deshabilitado={pendiente} alCambiar={() => pulsar("enviar_mensajes", !config.enviarMensajes)} />
         </div>
         <p className="m-0 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-          <span>Por ahora solo propone: no cambia etiquetas en Shopify.</span>
+          <span>Solo pone etiquetas en las tiendas con «La IA pone la etiqueta de zona» (Tiendas Shopify); en las demás solo propone.</span>
           <span aria-hidden="true">·</span>
           <span>{etiquetasTexto ? `Etiquetas de ${paisNombre}: ${etiquetasTexto}` : `Etiquetas de ${paisNombre}: sin definir (solo revisa que la dirección esté completa)`}</span>
         </p>
@@ -484,7 +486,7 @@ function FichaAnalisis({ f, distingueZona, puedeEscribir, abrirCorregir, alElegi
             <p className="m-0 mt-1 rounded-md bg-muted px-3 py-2 text-sm">{f.mensaje}</p>
             <p className="m-0 mt-1 text-xs text-muted-foreground">
               {m.texto}
-              {f.mensajeEstado === "pendiente_plantilla" ? ": pasaron más de 24 horas del último mensaje del cliente; hay que usar una plantilla de iComfly." : f.mensajeEstado === "sin_chat" ? ": el cliente no tiene chat con la tienda." : f.mensajeError ? `: ${f.mensajeError}` : ""}
+              {f.mensajeEstado === "pendiente_plantilla" ? ": pasaron más de 24 horas del último mensaje del cliente; hay que usar una plantilla de iComfly." : f.mensajeEstado === "sin_chat" ? ": el cliente no tiene chat con la tienda." : f.mensajeEstado === "ya_pedido" ? `: en el chat de iComfly ya se lo habían pedido, no se repite${f.mensajeError ? ` (${f.mensajeError})` : ""}.` : f.mensajeEstado === "sin_comprobar" ? `: no se pudo saber si ya se lo habían pedido en el chat, así que no se le escribió${f.mensajeError ? ` (${f.mensajeError})` : ""}. Decide una persona.` : f.mensajeError ? `: ${f.mensajeError}` : ""}
             </p>
           </div>
         )}

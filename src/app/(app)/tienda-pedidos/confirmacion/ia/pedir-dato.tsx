@@ -74,6 +74,13 @@ export function PreguntaMensaje({ p, alCerrar }: { p: PedirDato; alCerrar: () =>
         {p.tipo === "adelanto" && p.sinMetodos && (
           <p className="m-0 rounded-md bg-muted px-3 py-2 text-sm">Esta tienda todavía no tiene métodos de pago registrados: el mensaje sale sin ellos. Regístralos en la sección «Pago por adelantado» de esta pantalla.</p>
         )}
+        {p.chat?.ya === true && (
+          <p className="m-0 rounded-md bg-muted px-3 py-2 text-sm">
+            <b>En el chat de iComfly ya se lo habían pedido</b>
+            {p.chat.motivo ? `: ${p.chat.motivo}` : "."} {p.tipo === "adelanto" ? "Envíalo solo si hace falta." : "Envíalo solo si es otro dato."}
+          </p>
+        )}
+        {p.chat?.ya === false && <p className="m-0 rounded-md bg-muted px-3 py-2 text-sm">En el chat de iComfly todavía no se le ha pedido.</p>}
         {yaPedido && (
           <p className="m-0 rounded-md bg-muted px-3 py-2 text-sm">
             {p.estado === "manual" ? "Ya se le había enviado un mensaje a mano." : p.tipo === "adelanto" ? "Ya se le había avisado por WhatsApp." : "Ya se le había pedido un dato por WhatsApp."} {p.tipo === "adelanto" ? "Envíalo de nuevo solo si hace falta." : "Envíalo de nuevo solo si es otro dato."}
