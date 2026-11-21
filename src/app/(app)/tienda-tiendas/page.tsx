@@ -13,6 +13,8 @@ import { appDeTienda } from "@/lib/tienda/shopify-app";
 import { ConectarTienda } from "./conectar-tienda";
 import { ConectarIcomfly } from "./conectar-icomfly";
 import { EscrituraTienda } from "./escritura-tienda";
+import { ahoraMismo, haceDias, resumirNotasBot, type FilaNotaBot } from "@/lib/tienda/notas-bot-resumen";
+import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { conexionesIcomfly } from "@/lib/tienda/icomfly";
 
 export const metadata = { title: "Tiendas Shopify" };
@@ -57,6 +59,9 @@ export default async function TiendasPage({ searchParams }: { searchParams: Prom
   const icomflyDe = admin ? await conexionesIcomfly(supabase, tiendas.map((t) => t.id)) : new Map();
   // Escribir en Shopify (19 nov 2026): qué tiendas lo tienen encendido. Sin la migración 0337, ninguna.
   const { data: escrituras } = tiendas.length ? await supabase.from("tiendas").select("id, escribe_shopify, quitar_nota_bot").in("id", tiendas.map((t) => t.id)) : { data: [] };
+  // Pedidos del bot de iComfly vistos en cada tienda y qué pasó con su nota (21 nov 2026: para elegir dónde probar «Quitar la nota del bot»). Sin la migración 0303, vacío.
+  const notasBot = await traerTodasLasFilas<FilaNotaBot>((a, b) => supabase.from("tienda_notas_bot").select("tienda_id, dominio, estado, creado_en").gte("creado_en", haceDias(8)).order("creado_en").range(a, b)).catch(() => [] as FilaNotaBot[]);
+  const resumenNotas = resumirNotasBot(notasBot, ahoraMismo(), tiendas.map((t) => ({ id: t.id, dominio: t.dominio })));
   const escrituraDe = new Map((escrituras ?? []).map((e) => [e.id as string, { escribe: e.escribe_shopify === true, quitaNotaBot: e.quitar_nota_bot === true }]));
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
@@ -119,7 +124,7 @@ export default async function TiendasPage({ searchParams }: { searchParams: Prom
                     <div className="flex flex-col items-start gap-1.5">
                       {escrituraDe.get(t.id)?.escribe ? <Pastilla tono="exito">Escribe etiquetas</Pastilla> : <Pastilla>Solo lectura</Pastilla>}
                       {admin && t.estado === "conectada" && appDeTienda(t.nombre) && (
-                        <EscrituraTienda tiendaId={t.id} escribe={escrituraDe.get(t.id)?.escribe ?? false} quitaNotaBot={escrituraDe.get(t.id)?.quitaNotaBot ?? false} />
+                        <EscrituraTienda tiendaId={t.id} escribe={escrituraDe.get(t.id)?.escribe ?? false} quitaNotaBot={escrituraDe.get(t.id)?.quitaNotaBot ?? false} notasBot={resumenNotas.get(t.id) ?? null} />
                       )}
                     </div>
                   </td>
