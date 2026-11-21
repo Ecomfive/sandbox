@@ -3,7 +3,7 @@
 //
 // El camino: iComfly deja el pedido «Confirmada» en Shopify → el webhook (`orders/updated`) lo guarda y llama a `dispararDesdeWebhook` → `analizarOrden` mira la dirección con ChatGPT y
 // Claude y las palabras de zona del país → guarda el análisis (la etiqueta que correspondería: CIUDAD o INTERIOR/SERVIENTREGA) y, si falta un dato de la dirección y el envío del
-// WhatsApp está encendido, se lo pide al cliente por iComfly. Por ahora no cambia etiquetas en Shopify: el sistema solo lee.
+// WhatsApp está encendido, se lo pide al cliente por iComfly. Solo en una tienda con «La IA pone la etiqueta de zona» encendido (`poner-etiqueta.ts`) la pone en Shopify; en las demás solo propone.
 
 import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -19,6 +19,7 @@ import { geografiaDe } from "./geografia";
 import { tendenciaDeTienda, textoTendencia } from "./tendencias";
 import { motivoDeAdelanto, zonasDeAdelanto } from "./adelanto";
 import { combinar, etiquetaDeZona, faltaParaCliente, leerRespuesta, mensajePagoAdelantado, mensajePedirDetalle, type Combinado, type EstadoAnalisis, type ResultadoModelo } from "./combinar";
+import { ponerEtiquetaDeZona } from "./poner-etiqueta";
 import { armarEntrada, type EjemploPrompt } from "./prompt";
 import { muestraBalanceada, type PedidoMuestra, type ResultadoPrueba } from "./prueba-historica";
 import { resultadoFinal, seleccionarEjemplos, type RevisionPedido, type ResultadoPedido } from "./revision";
@@ -338,6 +339,13 @@ export async function analizarOrden(supabase: SupabaseClient, ordenId: string, o
   if (error) return { resultado: "omitida", motivo: /confirmacion_ia|schema cache/i.test(error.message) ? SIN_MIGRACION_CONFIRMACION : "No se pudo guardar el análisis." };
   // Un pedido que entra a «en espera de pago» (no uno que ya lo estaba) se le avisa a quienes estén marcados en Configuración › Avisos a personas (nadie de entrada).
   if (c.estado === "adelantado" && previo?.estado !== "adelantado") await avisarPagoAdelantado(supabase, { numero: o.numero, tienda: o.tiendaNombre, ciudad, direccion });
+  // La etiqueta de zona en Shopify (21 nov 2026, prueba controlada): solo cuando el pedido acaba de confirmarse (aviso de Shopify), nunca desde la pantalla ni desde los pendientes viejos, y solo
+  // en una tienda con «La IA pone la etiqueta de zona» encendido (`ponerEtiquetaDeZona` lo comprueba y nunca lanza).
+  if (opciones.origen === "webhook" && !opciones.forzar && c.estado === "listo" && etiqueta) {
+    const r = await ponerEtiquetaDeZona(supabase, { ordenId, numero: o.numero, tiendaId: o.tiendaId, etiqueta, zonaYaPuesta: tieneEtiquetaDeZona });
+    if (r.estado === "puesta") await supabase.from("confirmacion_ia_analisis").update({ etiqueta_puesta: r.etiqueta, etiqueta_puesta_en: new Date().toISOString(), etiqueta_error: null }).eq("orden_id", ordenId);
+    else if (r.estado === "error") await supabase.from("confirmacion_ia_analisis").update({ etiqueta_error: r.motivo }).eq("orden_id", ordenId);
+  }
   return { resultado: "analizada", estado: c.estado };
 }
 
