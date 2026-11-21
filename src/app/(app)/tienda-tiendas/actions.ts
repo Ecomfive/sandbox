@@ -5,7 +5,7 @@ import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModuloEscritura } from "@/lib/auth";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { createServiceClient } from "@/lib/supabase/server";
-import { conectarTienda, revisarTienda } from "@/lib/tienda/conectar-shopify";
+import { conectarTienda, registrarAvisos, revisarTienda, urlDelSistema } from "@/lib/tienda/conectar-shopify";
 import { desconectarIcomfly, guardarUrlConector, probarIcomfly } from "@/lib/tienda/icomfly";
 import { leerUrlConector } from "@/lib/tienda/icomfly-oauth";
 import { accesoDeApp, appDeTienda, olvidarAcceso, permisosNoPermitidos, puedeEscribirPedidos } from "@/lib/tienda/shopify-app";
@@ -49,11 +49,22 @@ export async function revisarTiendaShopify(tiendaId: string): Promise<{ error?: 
   const { data: t } = await supabase.from("tiendas").select("id, nombre, estado").eq("id", tiendaId).maybeSingle();
   if (!t || t.estado !== "conectada") return { error: "La tienda no está conectada." };
   try {
+    // Los avisos de pedidos son de cada app (20 nov 2026: Nuvo pasó a una app nueva para escribir etiquetas): a mano, la revisión vuelve a pedirle a Shopify
+    // los de la app que está en Vercel. Los que ya estaban no se repiten. Sin esto, con otra app los avisos seguían siendo los de la vieja y se rechazaban.
+    let avisos = "";
+    const app = appDeTienda(t.nombre as string);
+    const urlBase = urlDelSistema();
+    if (app && urlBase) {
+      const a = await registrarAvisos(app, (await accesoDeApp(app)).token, urlBase);
+      if (a.creados) avisos = ` Se pidieron ${a.creados} avisos de pedidos a Shopify con la app actual.`;
+      await supabase.from("tiendas").update({ dominio: app.dominio }).eq("id", t.id);
+    }
     // 50 segundos (la página tiene 60): con una tienda recién conectada, cada pulsación trae el doble de historial (14 nov 2026).
     const r = await revisarTienda(supabase, { id: t.id as string, nombre: t.nombre as string }, 50_000);
+    if (avisos) await registrarAuditoria({ accion: "conectar_tienda_shopify", entidad: "tiendas", entidadId: t.id as string, detalle: `${t.nombre}:${avisos} · ${r.texto}` });
     revalidatePath("/tienda-tiendas");
     revalidatePath("/tienda-pedidos");
-    return { resumen: `${r.texto}.${r.completa ? "" : " Falta una parte: vuelve a pulsar «Revisar ahora»."}` };
+    return { resumen: `${r.texto}.${avisos}${r.completa ? "" : " Falta una parte: vuelve a pulsar «Revisar ahora»."}` };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "No se pudo revisar la tienda." };
   }
