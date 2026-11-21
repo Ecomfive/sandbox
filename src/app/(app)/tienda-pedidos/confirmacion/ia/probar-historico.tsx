@@ -110,6 +110,9 @@ export function ProbarHistorico({ tiendas, tiendaElegida }: { tiendas: { id: str
         <label className="flex flex-col gap-1">
           <span className={labelClassSm}>Pedidos de los últimos</span>
           <select value={dias} onChange={(e) => setDias(Number(e.target.value))} disabled={corriendo} className={fieldClassSm}>
+            <option value={2}>2 días (solo los nuevos)</option>
+            <option value={3}>3 días</option>
+            <option value={7}>7 días</option>
             <option value={30}>30 días</option>
             <option value={60}>60 días</option>
             <option value={90}>90 días</option>
