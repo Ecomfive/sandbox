@@ -10,7 +10,9 @@ import type { NombreFilas } from "@/lib/tabla/pie";
 import { useToast } from "@/components/ui/toast";
 import { BarraAvance } from "@/components/ui/barra-avance";
 import { fieldClassSm, labelClassSm } from "@/components/ui/field";
+import { ControlAnalisisAutomatico } from "./control-automatico";
 import { EVENTO_ABRIR_VIDEO } from "./para-revisar";
+import type { EstadoAnalisisAutomatico } from "@/lib/meta-ads/ajustes";
 import { ProgresoEstimado } from "@/components/ui/progreso-estimado";
 import { formatearFechaHora } from "@/lib/formato";
 import { Ventana } from "@/components/ui/ventana";
@@ -187,7 +189,7 @@ function OrdenDeVideos({ criterio, sentido, alCambiar, vista, alElegirVista }: {
  * Los videos con gasto en el periodo elegido, cada uno una sola vez, con la barra común (buscar, filtrar y agrupar por ángulo, producto, campaña, etapa…) y un orden a elegir (gasto, CPA, hook…, ascendente o
  * descendente). Tocar uno abre su ficha: en qué anuncios y campañas se usa y cómo le fue en cada una; queda en la dirección (`?abrir=<id>`).
  */
-export function ListaVideos({ videos, escribe, iaConectada, sinAnalizar, abrirInicial }: { videos: VideoVista[]; escribe: boolean; iaConectada: boolean; sinAnalizar: number; abrirInicial: string | null }) {
+export function ListaVideos({ videos, escribe, iaConectada, sinAnalizar, abrirInicial, automatico }: { videos: VideoVista[]; escribe: boolean; iaConectada: boolean; sinAnalizar: number; abrirInicial: string | null; automatico: EstadoAnalisisAutomatico }) {
   const router = useRouter();
   const { mostrarToast } = useToast();
   const [abierto, setAbierto] = useState<string | null>(() => (abrirInicial && videos.some((x) => x.id === abrirInicial) ? abrirInicial : null));
@@ -279,9 +281,12 @@ export function ListaVideos({ videos, escribe, iaConectada, sinAnalizar, abrirIn
               <button type="button" onClick={analizarPendientes} disabled={analizando} className="min-h-9 rounded-md bg-foreground px-3 py-1.5 text-xs font-medium text-background hover:opacity-90 disabled:opacity-50">
                 {analizando ? "Analizando…" : "Analizar los pendientes"}
               </button>
-              <span className="text-xs text-muted-foreground">Revisa todo el historial leído. El sistema también los va analizando solo, cada 10 minutos.</span>
+              <span className="text-xs text-muted-foreground">Revisa todo el historial leído.</span>
             </div>
           )}
+          <div className="basis-full border-t border-border pt-3">
+            <ControlAnalisisAutomatico estado={automatico} />
+          </div>
         </div>
       )}
       {avance && (

@@ -1,3 +1,5 @@
+import { estadoAnalisisAutomatico } from "@/lib/meta-ads/ajustes";
+import { createServiceClient } from "@/lib/supabase/server";
 import { cargarPaginaMeta, type ParametrosMeta } from "../datos-pagina";
 import { ListaVideos } from "../lista-videos";
 import { MarcoMeta } from "../marco-meta";
@@ -17,6 +19,7 @@ export default async function VideosMetaPage({ searchParams }: { searchParams: P
   const { datos, escribe, pais, hayToken } = await cargarPaginaMeta(searchParams);
   const sp = await searchParams;
   const abrir = Array.isArray(sp.abrir) ? sp.abrir[0] : sp.abrir;
+  const automatico = await estadoAnalisisAutomatico(createServiceClient());
   return (
     <MarcoMeta titulo="Videos" datos={datos} escribe={escribe} hayToken={hayToken} pais={pais}>
       {datos.videos.length === 0 ? (
@@ -25,7 +28,7 @@ export default async function VideosMetaPage({ searchParams }: { searchParams: P
         <>
           <ResumenVideos videos={datos.videos} escribe={escribe} iaConectada={datos.iaConectada} />
           <p className="-mb-2 text-xs text-muted-foreground">Del periodo elegido arriba. Un video repetido en varios anuncios cuenta una sola vez. Ordénalos, fíltralos o agrúpalos por campaña, ángulo, gancho o producto.</p>
-          <ListaVideos videos={datos.videos} escribe={escribe} iaConectada={datos.iaConectada} sinAnalizar={datos.videosSinAnalizar} abrirInicial={abrir ?? null} />
+          <ListaVideos videos={datos.videos} escribe={escribe} iaConectada={datos.iaConectada} sinAnalizar={datos.videosSinAnalizar} abrirInicial={abrir ?? null} automatico={automatico} />
         </>
       )}
     </MarcoMeta>

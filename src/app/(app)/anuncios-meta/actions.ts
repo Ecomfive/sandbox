@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { registrarAuditoria } from "@/lib/auditoria";
+import { AJUSTE_ANALISIS_AUTOMATICO } from "@/lib/meta-ads/ajustes";
 import { analizarVideoDeMeta, pendienteDeVideo, videosPorAnalizar } from "@/lib/meta-ads/analizar-videos";
 import { pedirMeta, tokenDeMeta } from "@/lib/meta-ads/api";
 import { buscarArchivoDeVideo, motivoSinArchivoDeVideo } from "@/lib/meta-ads/archivo-video";
@@ -378,4 +379,19 @@ export async function clasificarGanchosMeta(): Promise<{ error?: string; clasifi
     revalidatePath("/anuncios-meta", "layout");
   }
   return r.error ? { error: r.error, clasificados: r.clasificados, faltan: r.faltan } : { clasificados: r.clasificados, faltan: r.faltan };
+}
+
+/**
+ * Pausa o reanuda el análisis automático de videos (el cron que corre cada 10 minutos). No toca lo manual («Analizar los pendientes», «Reintentar este video»). Queda en la auditoría con quién y cuándo.
+ */
+export async function cambiarAnalisisAutomaticoMeta(activo: boolean): Promise<Resultado> {
+  const u = await requireModuloEscritura(MODULO);
+  const supabase = createServiceClient();
+  const { error } = await supabase
+    .from("meta_ajustes")
+    .upsert({ clave: AJUSTE_ANALISIS_AUTOMATICO, valor: { activo: !!activo }, actualizado_por: u.id, actualizado_por_nombre: u.nombre ?? u.email ?? null, actualizado_en: new Date().toISOString() }, { onConflict: "clave" });
+  if (error) return { error: /meta_ajustes|schema cache|does not exist/i.test(error.message) ? "Falta correr la migración 0347 (ajustes de Anuncios Meta) en Supabase." : error.message };
+  await registrarAuditoria({ accion: "analisis_automatico_meta", entidad: "meta_ajustes", detalle: activo ? "Reanudó el análisis automático de videos" : "Pausó el análisis automático de videos" });
+  revalidatePath("/anuncios-meta", "layout");
+  return {};
 }
