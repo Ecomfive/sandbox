@@ -136,7 +136,9 @@ export async function cambiarEscrituraShopify(tiendaId: string, encender: boolea
   const cambio = encender
     ? { escribe_shopify: true, escribe_shopify_por: usuario.id, escribe_shopify_en: new Date().toISOString() }
     : { escribe_shopify: false, escribe_shopify_por: usuario.id, escribe_shopify_en: new Date().toISOString(), quitar_nota_bot: false };
-  const { error } = await supabase.from("tiendas").update(cambio).eq("id", tiendaId);
+  let { error } = await supabase.from("tiendas").update(encender ? cambio : { ...cambio, ia_pone_etiqueta: false }).eq("id", tiendaId);
+  // Sin la migración 0348 no existe `ia_pone_etiqueta`: se apaga igual lo demás.
+  if (error && !encender && /ia_pone_etiqueta|schema cache/i.test(error.message)) ({ error } = await supabase.from("tiendas").update(cambio).eq("id", tiendaId));
   if (error) return { error: "No se pudo guardar." };
   await registrarAuditoria({ accion: encender ? "encender_escritura_shopify" : "apagar_escritura_shopify", entidad: "tiendas", entidadId: tiendaId, detalle: `${t.nombre}: ${encender ? "escribe las etiquetas del pedido en Shopify" : "vuelve a solo lectura"}` });
   revalidatePath("/tienda-tiendas");
@@ -157,4 +159,29 @@ export async function cambiarQuitarNotaBot(tiendaId: string, encender: boolean):
   await registrarAuditoria({ accion: encender ? "encender_quitar_nota_bot" : "apagar_quitar_nota_bot", entidad: "tiendas", entidadId: tiendaId, detalle: `${t.nombre}: ${encender ? "se quita de Shopify la nota del bot" : "la nota del bot se deja en Shopify"}` });
   revalidatePath("/tienda-tiendas");
   return { resumen: encender ? `${t.nombre}: la nota del bot se quitará de los pedidos nuevos.` : `${t.nombre}: la nota del bot ya no se quita.` };
+}
+
+/**
+ * «La IA pone la etiqueta de zona» (21 nov 2026, pedido de Jhokser: prueba controlada, una tienda a la vez): con esto encendido, la confirmación con IA pone en Shopify la etiqueta CIUDAD o
+ * INTERIOR/SERVIENTREGA de un pedido que acaba de confirmarse y quedó «Listo». Solo un administrador, y solo con «Escribir en Shopify» encendido (migración 0348).
+ */
+export async function cambiarIaPoneEtiqueta(tiendaId: string, encender: boolean): Promise<{ error?: string; resumen?: string }> {
+  const usuario = await soloAdmin();
+  if (!usuario) return { error: "Solo un administrador cambia esto." };
+  if (!UUID.test(tiendaId)) return { error: "Tienda no válida." };
+  const supabase = createServiceClient();
+  const { data: t, error: e0 } = await supabase.from("tiendas").select("id, nombre, escribe_shopify, pais_id").eq("id", tiendaId).maybeSingle();
+  if (e0 || !t) return { error: "No se pudo leer la tienda." };
+  if (encender && !t.escribe_shopify) return { error: "Primero enciende «Escribir en Shopify» en esta tienda." };
+  const { error } = await supabase.from("tiendas").update({ ia_pone_etiqueta: encender, ia_pone_etiqueta_por: usuario.id, ia_pone_etiqueta_en: new Date().toISOString() }).eq("id", tiendaId);
+  if (error) return { error: "No se pudo guardar (¿falta la migración 0348?)." };
+  await registrarAuditoria({ accion: encender ? "encender_ia_pone_etiqueta" : "apagar_ia_pone_etiqueta", entidad: "tiendas", entidadId: tiendaId, detalle: `${t.nombre}: ${encender ? "la IA pone la etiqueta de zona en Shopify" : "la IA solo propone la etiqueta de zona"}` });
+  revalidatePath("/tienda-tiendas");
+  // Aviso útil: la IA solo analiza sola si la confirmación automática del país está encendida.
+  let aviso = "";
+  if (encender) {
+    const { data: cfg } = await supabase.from("confirmacion_ia_config").select("activa").eq("pais_id", t.pais_id as string).maybeSingle();
+    if (cfg?.activa !== true) aviso = " Ojo: la «Confirmación automática» del país está apagada; enciéndela en Confirmación con IA para que analice los pedidos que se confirmen.";
+  }
+  return { resumen: encender ? `${t.nombre}: la IA pondrá la etiqueta de zona en los pedidos que se confirmen desde ahora.${aviso}` : `${t.nombre}: la IA ya no pone etiquetas, solo las propone.` };
 }

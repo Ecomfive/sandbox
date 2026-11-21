@@ -5,13 +5,13 @@ import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
-import { cambiarEscrituraShopify, cambiarQuitarNotaBot } from "./actions";
+import { cambiarEscrituraShopify, cambiarIaPoneEtiqueta, cambiarQuitarNotaBot } from "./actions";
 
 /**
  * «Escribir en Shopify» de una tienda (19 nov 2026), solo para un administrador: encender revisa con Shopify que la tienda aprobó write_orders. Con la
  * escritura encendida, también «Quitar la nota del bot» de los pedidos nuevos.
  */
-export function EscrituraTienda({ tiendaId, escribe, quitaNotaBot, notasBot }: { tiendaId: string; escribe: boolean; quitaNotaBot: boolean; notasBot: ResumenNotasBot | null }) {
+export function EscrituraTienda({ tiendaId, escribe, quitaNotaBot, notasBot, iaPoneEtiqueta, etiquetasIa }: { tiendaId: string; escribe: boolean; quitaNotaBot: boolean; notasBot: ResumenNotasBot | null; iaPoneEtiqueta: boolean; etiquetasIa: { hoy: number; conError: number } | null }) {
   const router = useRouter();
   const { mostrarToast } = useToast();
   const [pendiente, start] = useTransition();
@@ -42,6 +42,18 @@ export function EscrituraTienda({ tiendaId, escribe, quitaNotaBot, notasBot }: {
           <input type="checkbox" checked={quitaNotaBot} disabled={pendiente} onChange={(e) => hacer(() => cambiarQuitarNotaBot(tiendaId, e.target.checked))} />
           Quitar la nota del bot
         </label>
+      )}
+      {escribe && (
+        <label className="flex items-center gap-1.5 text-xs">
+          <input type="checkbox" checked={iaPoneEtiqueta} disabled={pendiente} onChange={(e) => hacer(() => cambiarIaPoneEtiqueta(tiendaId, e.target.checked))} />
+          La IA pone la etiqueta de zona
+        </label>
+      )}
+      {etiquetasIa && (iaPoneEtiqueta || etiquetasIa.hoy > 0 || etiquetasIa.conError > 0) && (
+        <p className="m-0 text-xs text-muted-foreground tabular-nums">
+          Etiquetas de la IA hoy: {etiquetasIa.hoy}
+          {etiquetasIa.conError > 0 ? ` · ${etiquetasIa.conError} con error` : ""}
+        </p>
       )}
       {notasBot && (
         <p className="m-0 text-xs text-muted-foreground tabular-nums">
