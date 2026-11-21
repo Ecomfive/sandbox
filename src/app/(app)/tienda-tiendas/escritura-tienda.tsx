@@ -1,5 +1,6 @@
 "use client";
 
+import type { ResumenNotasBot } from "@/lib/tienda/notas-bot-resumen";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { anilloFoco } from "@/components/ui/field";
@@ -10,7 +11,7 @@ import { cambiarEscrituraShopify, cambiarQuitarNotaBot } from "./actions";
  * «Escribir en Shopify» de una tienda (19 nov 2026), solo para un administrador: encender revisa con Shopify que la tienda aprobó write_orders. Con la
  * escritura encendida, también «Quitar la nota del bot» de los pedidos nuevos.
  */
-export function EscrituraTienda({ tiendaId, escribe, quitaNotaBot }: { tiendaId: string; escribe: boolean; quitaNotaBot: boolean }) {
+export function EscrituraTienda({ tiendaId, escribe, quitaNotaBot, notasBot }: { tiendaId: string; escribe: boolean; quitaNotaBot: boolean; notasBot: ResumenNotasBot | null }) {
   const router = useRouter();
   const { mostrarToast } = useToast();
   const [pendiente, start] = useTransition();
@@ -41,6 +42,13 @@ export function EscrituraTienda({ tiendaId, escribe, quitaNotaBot }: { tiendaId:
           <input type="checkbox" checked={quitaNotaBot} disabled={pendiente} onChange={(e) => hacer(() => cambiarQuitarNotaBot(tiendaId, e.target.checked))} />
           Quitar la nota del bot
         </label>
+      )}
+      {notasBot && (
+        <p className="m-0 text-xs text-muted-foreground tabular-nums">
+          Pedidos del bot: hoy {notasBot.hoy} · 7 días {notasBot.sieteDias}
+          {notasBot.quitadas > 0 ? ` · ${notasBot.quitadas} sin nota` : ""}
+          {notasBot.conError > 0 ? ` · ${notasBot.conError} con error` : ""}
+        </p>
       )}
     </div>
   );
