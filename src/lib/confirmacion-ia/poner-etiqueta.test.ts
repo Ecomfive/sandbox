@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { motivoParaNoEscribir, QUITAR_CONFIRMADA } from "./poner-etiqueta";
+import { motivoParaNoEscribir, quitarConfirmadaEn } from "./poner-etiqueta";
 
 const tienda = { estado: "conectada", escribe_shopify: true, ia_pone_etiqueta: true };
 
@@ -16,6 +16,10 @@ test("un pedido que ya trae etiqueta de zona no se vuelve a etiquetar", () => {
   assert.match(motivoParaNoEscribir(tienda, true) ?? "", /ya tiene etiqueta de zona/);
 });
 
-test("en la primera prueba no se quita la etiqueta «Confirmada»", () => {
-  assert.equal(QUITAR_CONFIRMADA, false);
+test("«Confirmada» se quita en Panamá y se deja en Costa Rica", () => {
+  assert.equal(quitarConfirmadaEn("PA"), true);
+  assert.equal(quitarConfirmadaEn("pa"), true);
+  assert.equal(quitarConfirmadaEn("CR"), false);
+  assert.equal(quitarConfirmadaEn("MX"), false);
+  assert.equal(quitarConfirmadaEn(null), false);
 });
