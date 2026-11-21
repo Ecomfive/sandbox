@@ -135,6 +135,7 @@ export const MODULO_DE_ENTIDAD: Record<string, string> = {
   meta_campanas: "anuncios-meta",
   meta_topes: "anuncios-meta",
   meta_decisiones: "anuncios-meta",
+  meta_ajustes: "anuncios-meta",
 };
 
 const COMERCIALES = new Set<string>(ACCIONES_COMERCIALES);
