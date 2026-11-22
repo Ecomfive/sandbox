@@ -72,3 +72,18 @@ export async function procesarNotaDelBot(supabase: SupabaseClient, d: { dominio:
     return "error";
   }
 }
+
+/**
+ * Una tienda que se conecta a iComfly por primera vez ya tiene el bot que deja la nota en los pedidos: se le enciende «Quitar la nota del bot» sola (21 nov 2026, pedido de Hernán, después de que en Oferfy y
+ * Nuvo se quitó a 8 de 8 pedidos). Solo la primera vez: si un administrador la apaga a propósito y después se vuelve a autorizar iComfly, no se vuelve a encender. Mientras la app de Shopify no tenga el
+ * permiso `write_orders`, el pedido solo se detecta y se registra (`procesarNotaDelBot`). Nunca lanza.
+ */
+export async function encenderQuitarNotaAlConectarIcomfly(supabase: SupabaseClient, tiendaId: string, yaEstabaConectada: boolean): Promise<boolean> {
+  if (yaEstabaConectada) return false;
+  try {
+    const { error } = await supabase.from("tiendas").update({ quitar_nota_bot: true }).eq("id", tiendaId);
+    return !error;
+  } catch {
+    return false;
+  }
+}

@@ -4,6 +4,7 @@ import { getUsuarioActual } from "@/lib/auth";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 import { probarIcomfly, terminarAutorizacion } from "@/lib/tienda/icomfly";
+import { encenderQuitarNotaAlConectarIcomfly } from "@/lib/tienda/nota-bot-servidor";
 import { clavesIcomfly, COOKIE_ICOMFLY, verificarStateIcomfly } from "@/lib/tienda/icomfly-oauth";
 
 export const dynamic = "force-dynamic";
@@ -32,8 +33,12 @@ export async function GET(req: NextRequest) {
   const codigo = p.get("code");
   if (!codigo || codigo.length > 2000) return volver("error", "iComfly no devolvió el código.");
   const supabase = createServiceClient();
+  // ¿Ya había estado conectada? (la primera vez se le enciende «Quitar la nota del bot»).
+  const { data: previa } = await supabase.from("tienda_icomfly").select("conectado_en").eq("tienda_id", v.tiendaId).maybeSingle();
   const t = await terminarAutorizacion(supabase, v.tiendaId, codigo, usuario.id);
   if (t.error) return volver("error", t.error);
+  const nota = await encenderQuitarNotaAlConectarIcomfly(supabase, v.tiendaId, !!previa?.conectado_en);
+  if (nota) await registrarAuditoria({ accion: "encender_quitar_nota_bot", entidad: "tiendas", entidadId: v.tiendaId, detalle: "Se encendió sola «Quitar la nota del bot» al conectar la tienda a iComfly" });
   const prueba = await probarIcomfly(supabase, v.tiendaId);
   await registrarAuditoria({ accion: "conectar_icomfly", entidad: "tiendas", entidadId: v.tiendaId, detalle: "error" in prueba ? `Conectada; la prueba falló: ${prueba.error}` : `Conectada: ${prueba.resumen}` });
   return volver("conectado");
