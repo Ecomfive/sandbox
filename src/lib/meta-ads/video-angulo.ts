@@ -11,7 +11,15 @@ export const VERSION_ANALISIS = 2;
  * Con qué regla de ángulo se analizó un video (23 nov 2026, pedido de Alcides): la 3 pide un ángulo específico y sacado solo de lo que se ve y se dice en el video, no del texto del anuncio. Es aparte de `VERSION_ANALISIS`
  * (que dice si el análisis trae estructura y llamado a la acción) para que subirla vuelva a analizar todos los videos sin dejar sin datos de estructura a los que aún no se reanalizaron.
  */
-export const VERSION_ANGULO = 3;
+export const VERSION_ANGULO = 4;
+
+/**
+ * Nombres que no dicen nada del motivo de compra (24 nov 2026: «Beneficios clave» llegó a 806 de 2.579 videos y seguía saliendo en el reanálisis, porque estaba en la lista de ángulos existentes). La IA no los
+ * debe usar ni se le ofrecen para reutilizar: tiene que decir cuál es el beneficio.
+ */
+export const ANGULOS_VAGOS = ["Beneficios clave", "Beneficios", "Beneficios del producto", "Resultados", "Calidad", "Producto", "Características"];
+const clavesVagas = new Set(ANGULOS_VAGOS.map((a) => claveDeTexto(a)));
+export const esAnguloVago = (a: string): boolean => clavesVagas.has(claveDeTexto(a));
 
 export interface AnalisisVideo {
   angulo: string;
@@ -67,9 +75,12 @@ const recorte = (t: string | null | undefined, max: number) => String(t ?? "").r
 
 /** Cómo se pide el ángulo (lo mismo en el análisis completo y en el reanálisis solo del ángulo): específico, con ejemplos y sin forzar uno amplio que ya existe. */
 export function lineasDeAngulo(existentes: string[]): string[] {
+  // Los ángulos vagos ya existentes no se ofrecen para reutilizar: es lo que hacía que «Beneficios clave» se repitiera.
+  existentes = existentes.filter((a) => !esAnguloVago(a));
   return [
     "Dime el ÁNGULO: el motivo concreto de compra que usa ESTE anuncio para convencer (por ejemplo «Dolor de espalda», «Antes y después», «Oferta 2x1», «Testimonio de cliente», «Ahorro», «Regalo», «Piel más firme»). Son de 2 a 5 palabras, en español, sin signos.",
     "Sé ESPECÍFICO: nombra el beneficio o la situación que cambia la vida de quien compra, no la categoría general del producto. Un producto tiene varios ángulos distintos y cada anuncio usa uno: para un suplemento masculino, «Energía y vitalidad», «Rendimiento en el gimnasio», «Salud de la próstata» y «Aumento de la libido» son ángulos diferentes, y «Vitalidad masculina» es demasiado amplio y NO sirve. Para una crema, «Manchas en la cara», «Arrugas y firmeza» y «Piel seca» son distintos; para un aceite, «Caída del cabello» y «Crecimiento de la barba» también. Si el anuncio toca varios beneficios, elige el que más tiempo ocupa o el del gancho.",
+    `Nombres vagos como ${ANGULOS_VAGOS.slice(0, 4).map((a) => `«${a}»`).join(", ")} NO sirven: no dicen nada. Di cuál es el beneficio o el problema concreto del que habla el video (por ejemplo «Alivio de varices», «Piel sin manchas», «Dientes más blancos», «Más energía en el gimnasio»).`,
     existentes.length ? `Estos ángulos ya existen en otros videos: ${existentes.map((a) => `«${a}»`).join(", ")}. Usa EXACTAMENTE uno de ellos solo si describe igual de específico el motivo de compra de este anuncio; si el de aquí es más específico o distinto, propón uno nuevo. No fuerces un ángulo amplio para que coincida.` : "",
   ];
 }
