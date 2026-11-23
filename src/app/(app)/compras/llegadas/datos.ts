@@ -1,5 +1,5 @@
-// Compras › Llegadas: lo que hay que mirar y pagar al llegar la mercancía (23 nov 2026, pedido de María José: que no se pierda entre los avisos). Solo servidor.
-// Las llegadas ya existen (`compras_llegadas`, una por cambio de etapa a Llegada a Puerto o En Bodega); aquí se juntan las que siguen pendientes según la etapa ACTUAL de cada compra:
+// Compras › Llegadas: lo que hay que pagar al llegar la mercancía a bodega (23 nov 2026, pedido de María José: que no se pierda entre los avisos). Solo servidor.
+// Las llegadas ya existen (`compras_llegadas`, una por cambio de etapa); aquí se juntan las de En Bodega que siguen pendientes según la etapa ACTUAL de cada compra (lo de puerto es el módulo «Llegadas a puerto», `/llegadas`):
 // una compra que ya pasó de En Bodega a Completado sale de la lista sola.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -13,7 +13,6 @@ import { restriccionesDe, vePagosProveedor } from "../permisos-compras";
 
 /** Cuántos días hacia atrás se buscan llegadas: una compra pendiente de pago lleva semanas, no meses. */
 export const DIAS_BUSQUEDA_LLEGADAS = 120;
-export const ETAPA_PUERTO = "arribo_mercancia";
 export const ETAPA_BODEGA = "en_bodega";
 
 export interface GrupoBodega {
@@ -25,7 +24,6 @@ export interface GrupoBodega {
 
 export interface PanelLlegadas {
   bodega: GrupoBodega[];
-  puerto: FilaLlegada[];
   verMontos: boolean;
   puedePagar: boolean;
   hoy: string;
@@ -43,24 +41,13 @@ export async function cargarPanelLlegadas(supabase: SupabaseClient, usuario: Usu
   const desde = desdeDeLista(hoy, DIAS_BUSQUEDA_LLEGADAS);
   const admin = esAdministrador(usuario);
   const conCompras = usuario.modulos.includes("compras");
-  const [avisaBodega, avisaPuerto, bodegaTodas, puertoTodas] = await Promise.all([
-    destinatariosDe(supabase, EVENTO_DE_TIPO.bodega),
-    destinatariosDe(supabase, EVENTO_DE_TIPO.puerto),
-    cargarFilasDeLlegadas(supabase, "bodega", desde),
-    cargarFilasDeLlegadas(supabase, "puerto", desde),
-  ]);
+  const [avisaBodega, bodegaTodas] = await Promise.all([destinatariosDe(supabase, EVENTO_DE_TIPO.bodega), cargarFilasDeLlegadas(supabase, "bodega", desde)]);
   const destinoBodega = avisaBodega.includes(usuario.id);
-  const destinoPuerto = avisaPuerto.includes(usuario.id) || usuario.modulos.includes("llegadas");
 
   const pendientesBodega = await visibles(
     bodegaTodas.filter((f) => f.etapa === ETAPA_BODEGA),
     usuario,
     admin || destinoBodega,
-  );
-  const pendientesPuerto = await visibles(
-    puertoTodas.filter((f) => f.etapa === ETAPA_PUERTO),
-    usuario,
-    admin || destinoPuerto,
   );
 
   // Lo mismo que la página de una llegada: sin ver el segundo pago, no se manda el dinero a la pantalla.
@@ -79,6 +66,5 @@ export async function cargarPanelLlegadas(supabase: SupabaseClient, usuario: Usu
     grupos.set(f.llegadaId, g);
   }
   const bodega = [...grupos.values()].sort((a, b) => b.avisadaEn.localeCompare(a.avisadaEn));
-  // La lista de puerto no lleva montos (igual que `/llegadas`).
-  return { bodega, puerto: pendientesPuerto.map(filaSinMontos), verMontos, puedePagar, hoy };
+  return { bodega, verMontos, puedePagar, hoy };
 }

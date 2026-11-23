@@ -1,12 +1,11 @@
+import Link from "next/link";
 import { ContadorPestana } from "@/components/migas/contador-pestana";
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { requirePestana } from "@/lib/auth";
 import { totalesDeLlegada } from "@/lib/compras/llegadas-avisos";
-import { direccionesDeEtiquetas, type EtiquetaPedido } from "@/lib/proveedor/etiquetas-datos";
 import { createServiceClient } from "@/lib/supabase/server";
 import { VistaLlegada } from "../../llegadas/[id]/vista-llegada";
-import { ListaLlegadas } from "../../llegadas/lista-llegadas";
 import { cargarPanelLlegadas } from "./datos";
 
 export const metadata = { title: "Llegadas · Compras" };
@@ -16,20 +15,14 @@ export const dynamic = "force-dynamic";
 const dinero = (n: number) => `$${n.toLocaleString("es-PA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 /**
- * Compras › Llegadas (23 nov 2026, pedido de María José: los avisos de lo que llega se le pierden, quiere un lugar fijo en Compras). Dos listas que se arman solas con la etapa actual de cada
- * compra: **En bodega · por pagar** (cada llegada con su total y «Registrar pago», como en el aviso) y **En puerto · por llegar a bodega** (productos, unidades, cajas y etiqueta). Cuando una
- * compra se paga o cambia de etapa, sale de la lista sin hacer nada. Los avisos «Para ti» siguen existiendo.
+ * Compras › Llegadas (23 nov 2026, pedido de María José: los avisos de lo que llega se le pierden, quiere un lugar fijo en Compras). Lo que llegó a bodega y falta pagar, armado con la etapa actual de cada compra:
+ * cada llegada con su total y «Registrar pago», como en el aviso. Cuando una compra se paga o cambia de etapa, sale de la lista sin hacer nada. Lo que llegó a puerto es el módulo «Llegadas a puerto»
+ * (`/llegadas`), que se enlaza desde aquí. Los avisos «Para ti» siguen existiendo.
  */
 export default async function LlegadasComprasPage() {
   const usuario = await requirePestana("compras", "llegadas");
   const supabase = createServiceClient();
   const panel = await cargarPanelLlegadas(supabase, usuario);
-
-  const rutas = [...new Set(panel.puerto.flatMap((f) => f.etiquetasRutas))];
-  const firmadas = rutas.length ? await direccionesDeEtiquetas(supabase, rutas) : [];
-  const porRuta = new Map(firmadas.map((e) => [e.ruta, e]));
-  const etiquetas: Record<string, EtiquetaPedido[]> = {};
-  for (const f of panel.puerto) etiquetas[f.compraId] = f.etiquetasRutas.flatMap((r) => (porRuta.get(r) ? [porRuta.get(r)!] : []));
 
   const filasBodega = panel.bodega.flatMap((g) => g.filas);
   const t = totalesDeLlegada(filasBodega);
@@ -50,6 +43,9 @@ export default async function LlegadasComprasPage() {
               ? "No hay compras en bodega esperando el pago."
               : `${plural(filasBodega.length)} en bodega${panel.verMontos && t.porPagar > 0 ? ` · ${dinero(t.porPagar)} por pagar` : ""}.`}
           </p>
+          <Link href="/llegadas" className="w-fit text-sm font-medium text-primario underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+            Ver lo que llegó a puerto
+          </Link>
         </div>
         {panel.bodega.map((g) => (
           <VistaLlegada
@@ -67,17 +63,6 @@ export default async function LlegadasComprasPage() {
         ))}
       </section>
 
-      <section aria-labelledby="llegadas-puerto" className="flex flex-col gap-4">
-        <div className="flex flex-col gap-1">
-          <h2 id="llegadas-puerto" className="m-0 text-lg font-semibold tracking-tight">
-            En puerto · por llegar a bodega
-          </h2>
-          <p className="m-0 text-sm text-muted-foreground">
-            {panel.puerto.length === 0 ? "No hay compras en puerto." : `${plural(panel.puerto.length)} que ya llegaron a puerto y todavía no están en bodega.`}
-          </p>
-        </div>
-        {panel.puerto.length > 0 && <ListaLlegadas filas={panel.puerto} etiquetas={etiquetas} periodo="Pendientes de llegar a bodega" />}
-      </section>
     </Pagina>
   );
 }
