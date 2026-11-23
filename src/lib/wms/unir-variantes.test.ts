@@ -27,3 +27,10 @@ test("emparejarVariantes: dos del que se va no van a la misma del que queda", ()
   assert.equal(p.x, "q");
   assert.equal(p.y, null);
 });
+
+test("lineasDeInforme: suma lo del producto y de sus variantes, en palabras", async () => {
+  const { lineasDeInforme } = await import("./unir-productos");
+  const l = lineasDeInforme({ movido: { "dropi_publicaciones.sku_maestro_id": 1 }, variantes: [{ variante: "A/100", movido: { "ven_orden_lineas.sku_maestro_id": 3 } }, { variante: "A/450", pasa: true }] });
+  assert.deepEqual(l.slice(0, 2), ["1 variante se une con su pareja", "1 variante pasa como variante nueva"]);
+  assert.ok(l.includes("3 líneas de pedidos de tienda"));
+});
