@@ -4,7 +4,8 @@
 //   2. La general:  PAÍS | Producto | ÁNGULO | CBO o ABO | Puja | T, E o R   (las palabras reservadas se reconocen donde estén).
 // El ángulo no va en el nombre de ustedes: sale del video y del texto del anuncio (o se corrige a mano). Lo que no se reconoce queda en null y una persona lo corrige en la campaña. Lógica pura, con prueba.
 
-export type Etapa = "testing" | "escala" | "retargeting";
+/** «venta» (23 nov 2026): una campaña de un producto que ya salió de Test; en estas cuentas todo lo que se sube es para vender. No viene del nombre: la calcula `etapa-venta.ts`. */
+export type Etapa = "testing" | "venta" | "escala" | "retargeting";
 export type Puja = "sin_tope" | "bid_cap" | "cost_cap" | "roas_min";
 export type Estructura = "CBO" | "ABO";
 
@@ -23,7 +24,7 @@ export interface EtiquetasDeNombre {
   etapa: Etapa | null;
 }
 
-export const NOMBRE_ETAPA: Record<Etapa, string> = { testing: "Testing", escala: "Escala", retargeting: "Retargeting" };
+export const NOMBRE_ETAPA: Record<Etapa, string> = { testing: "Testing", venta: "Ventas", escala: "Escala", retargeting: "Retargeting" };
 export const NOMBRE_PUJA: Record<Puja, string> = { sin_tope: "Sin tope", bid_cap: "Bid cap", cost_cap: "Cost cap", roas_min: "ROAS mínimo" };
 
 /** Mayúsculas, sin acentos ni signos: «Dolor-espalda» → «DOLORESPALDA». */

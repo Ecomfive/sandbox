@@ -12,6 +12,8 @@ export interface CampanaVista {
   estado: string;
   activa: boolean;
   etapa: Etapa | null;
+  /** Por qué tiene esa etapa (lo que dice el nombre, el producto en Producto o lo corregido a mano). */
+  etapaMotivo: string | null;
   estructura: Estructura | null;
   puja: Puja | null;
   producto: string | null;

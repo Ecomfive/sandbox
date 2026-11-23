@@ -35,6 +35,7 @@ export function ContenidoResumen({ datos, escribe }: { datos: DatosMeta; escribe
   const totalVeredictos = Object.values(veredictos).reduce((s, n) => s + n, 0);
   const etapaDia = [
     { nombre: NOMBRE_ETAPA.testing, color: "var(--azul)" },
+    { nombre: NOMBRE_ETAPA.venta, color: "var(--primario)" },
     { nombre: NOMBRE_ETAPA.escala, color: "var(--success)" },
     { nombre: NOMBRE_ETAPA.retargeting, color: "var(--warning)" },
     { nombre: "Sin etapa en el nombre", color: "var(--grafica-5)" },
@@ -143,7 +144,7 @@ export function ContenidoResumen({ datos, escribe }: { datos: DatosMeta; escribe
           <ColumnasApiladas
             etiquetaGrafica="Campañas montadas por día"
             series={etapaDia}
-            datos={datos.creadasPorDia.map((d) => ({ etiqueta: d.fecha.slice(8), valores: [d.testing, d.escala, d.retargeting, d.otras] }))}
+            datos={datos.creadasPorDia.map((d) => ({ etiqueta: d.fecha.slice(8), valores: [d.testing, d.venta, d.escala, d.retargeting, d.otras] }))}
           />
           <div className="mt-3">
             <Leyenda partes={etapaDia} />

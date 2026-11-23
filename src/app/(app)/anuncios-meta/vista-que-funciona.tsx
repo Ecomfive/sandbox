@@ -23,7 +23,7 @@ const EXPLICACION_CAMPANA: Record<DimensionCampana, string> = {
   Estructura: "CBO (el presupuesto está en la campaña) o ABO (en cada conjunto de anuncios).",
   Puja: "La estrategia de puja de la campaña: sin tope, bid cap, cost cap…",
   Producto: "Qué producto vende la campaña, según su nombre.",
-  Etapa: "Testing, escala o retargeting, según el nombre.",
+  Etapa: "Testing, ventas, escala o retargeting: ventas es lo que ya salió de Test.",
 };
 const EXPLICACION_ANUNCIO: Record<DimensionAnuncio, string> = {
   Copy: "El texto principal del anuncio: los anuncios que dicen lo mismo se juntan.",

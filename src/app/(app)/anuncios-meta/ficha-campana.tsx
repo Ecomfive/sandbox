@@ -278,6 +278,7 @@ export function FichaCampana({ campana: c, colores, anuncios, actId, productos, 
                 <Dato etiqueta="Etapa">{c.etapa ? NOMBRE_ETAPA[c.etapa] : "—"}</Dato>
               </dl>
             )}
+            {c.etapa && c.etapaMotivo && <p className="m-0 mt-2 text-xs text-muted-foreground">Etapa {NOMBRE_ETAPA[c.etapa]}: {c.etapaMotivo}</p>}
           </Seccion>
 
           <Seccion icono={AnunciosIcon} titulo={`Anuncios (${anuncios.length})`}>
