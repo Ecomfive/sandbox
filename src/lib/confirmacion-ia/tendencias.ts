@@ -133,9 +133,9 @@ const ETIQUETA: Record<DireccionTendencia, string> = { ciudad: "CIUDAD", interio
 export function textoTendencia(t: TendenciaTienda): string {
   const lugares = t.lugares.filter((l) => l.ciudad + l.interior >= MIN_CASOS_TENDENCIA).map((l) => `${l.lugar} → ${ETIQUETA[direccionDeLugar(l)]} (${l.ciudad} ciudad / ${l.interior} interior)`);
   return [
-    `TENDENCIA HISTÓRICA DE ${t.nombre.toUpperCase()} (${t.periodo}). Para los lugares de las zonas 5 y 6 y los que están en discusión, así los etiquetó esta tienda:`,
+    `TENDENCIA HISTÓRICA DE ${t.nombre.toUpperCase()} (${t.periodo}). Para los lugares de las zonas 5 y 6 y los que están en discusión, así los etiquetó esta tienda (una tendencia clara manda sobre el reglamento):`,
     lugares.join("; ") + ".",
     ...(t.nota ? [t.nota] : []),
-    "Para esos lugares sigue la tendencia de esta tienda, salvo que otro dato de la dirección diga lo contrario (otro lugar del interior, el distrito o la provincia, un barrio con el mismo nombre de otra ciudad, recoger en Servientrega). Si el lugar sale «mixto», no está en la lista o la dirección no aclara más, responde «no_se» para que los asesores lo revisen.",
+    "Para esos lugares sigue la tendencia de esta tienda, salvo que otro dato de la dirección diga lo contrario (otro lugar del interior, el distrito o la provincia, un barrio con el mismo nombre de otra ciudad, recoger en Servientrega). Si el lugar sale «mixto» o no está en la lista, manda el reglamento: las zonas de delivery y lo de dentro del mapa son CIUDAD y lo de fuera es INTERIOR; responde «no_se» solo si no se puede ubicar el lugar.",
   ].join("\n");
 }

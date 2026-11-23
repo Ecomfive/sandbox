@@ -30,3 +30,9 @@ test("Kenku manda a interior lo que Nuvo y Oferfy mandan a ciudad, y el texto lo
 test("cada tienda tiene sus lugares sin repetir", () => {
   for (const t of TENDENCIAS_PANAMA) assert.equal(new Set(t.lugares.map((l) => l.lugar)).size, t.lugares.length, t.nombre);
 });
+
+test("el texto de la tendencia manda al reglamento cuando el lugar es mixto o no está", () => {
+  const t = textoTendencia(tendenciaDeTienda("Kenku")!);
+  assert.match(t, /manda el reglamento/);
+  assert.match(t, /dentro del mapa son CIUDAD/);
+});
