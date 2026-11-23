@@ -153,7 +153,20 @@ export const METRICAS_CAMPANA: { clave: ClaveMetrica; titulo: string }[] = [
 ];
 
 /**
- * El color de cada cifra. **En testing** (campañas de etapa «Test») valen las escalas de la hoja de Control de Testing —las mismas de Productos Test, `@/lib/metricas-meta-ads`—: CPM menor que 3 bien y mayor
+ * Las escalas de **ventas** (documento «Métrica» de Oferfy, 23 nov 2026): CPA bien hasta $9.50 y mal desde $11; CTR del enlace bien desde 3 % y mal bajo 2 %; CPM bien hasta $5.50 y mal desde $7.50; Hook Rate bien desde
+ * 40 %, regular desde 25 % y mal bajo 25 %; efectividad de la visita a la landing bien desde 85 % y mal bajo 75 %; conversión de la landing bien desde 1.5 % y mal bajo 1 %. Gasto y compras no llevan color.
+ */
+const escalaVenta = {
+  cpm: (v: number): NivelMetrica => (v <= 5.5 ? "bueno" : v <= 7.5 ? "medio" : "malo"),
+  ctr: (v: number): NivelMetrica => (v >= 3 ? "bueno" : v >= 2 ? "medio" : "malo"),
+  hook: (v: number): NivelMetrica => (v >= 40 ? "bueno" : v >= 25 ? "medio" : "malo"),
+  efectividad: (v: number): NivelMetrica => (v >= 85 ? "bueno" : v >= 75 ? "medio" : "malo"),
+  cvr: (v: number): NivelMetrica => (v >= 1.5 ? "bueno" : v >= 1 ? "medio" : "malo"),
+  cpa: (v: number): NivelMetrica => (v <= 9.5 ? "bueno" : v <= 11 ? "medio" : "malo"),
+};
+
+/**
+ * El color de cada cifra. **En ventas** valen las escalas del documento «Métrica» (`escalaVenta`). **En testing** (campañas de etapa «Test») valen las escalas de la hoja de Control de Testing —las mismas de Productos Test, `@/lib/metricas-meta-ads`—: CPM menor que 3 bien y mayor
  * que 5 mal; % Efectividad mayor que 80 bien y menor que 70 mal; Hook mayor que 40 bien y menor que 30 mal; CTR mayor que 3 bien y menor que 2 mal; CPA menor que 2 bien y mayor que 4 mal; CVR mayor que 9
  * bien y menor que 4 mal; Gasto mayor que 24 mal; lo de en medio, regular (los dos extremos incluidos). Una campaña de testing que gastó y no compró lleva el CPA en rojo si ya pasó de $4, como la hoja
  * (que pone el gasto como CPA). **Escala y retargeting** todavía no tienen sus rangos (los dará el equipo): conservan lo que había (CPA frente a su tope, CTR y Hook) y el resto sin color.
@@ -161,6 +174,19 @@ export const METRICAS_CAMPANA: { clave: ClaveMetrica; titulo: string }[] = [
 export function nivelesDeMetricas(r: Resultados, etapa: string | null, tope: number): Record<ClaveMetrica, NivelMetrica> {
   const sinColor: Record<ClaveMetrica, NivelMetrica> = { cpm: "neutral", efectividad: "neutral", hook: "neutral", ctr: "neutral", cpa: "neutral", gasto: "neutral", compras: "neutral", cvr: "neutral" };
   const valor = <T extends number | null>(v: T, f: (n: number) => NivelMetrica): NivelMetrica => (v === null ? "neutral" : f(v));
+  if (etapa === "venta") {
+    return {
+      cpm: valor(cpm(r), escalaVenta.cpm),
+      efectividad: valor(efectividad(r), escalaVenta.efectividad),
+      hook: valor(hookRate(r), escalaVenta.hook),
+      ctr: valor(ctr(r), escalaVenta.ctr),
+      // Gastó más del CPA en rojo sin comprar: malo (el documento corta el anuncio a los $12).
+      cpa: r.compras === 0 && r.gasto > 0 ? (r.gasto >= 12 ? "malo" : "neutral") : valor(cpa(r), escalaVenta.cpa),
+      gasto: "neutral",
+      compras: "neutral",
+      cvr: valor(cvr(r), escalaVenta.cvr),
+    };
+  }
   if (etapa !== "testing") return { ...sinColor, cpa: nivelDeCpa(cpa(r), tope), ctr: nivelDeCtr(ctr(r)), hook: nivelDeHook(hookRate(r)) };
   const sinCompras = r.compras === 0 && r.gasto > 0;
   return {

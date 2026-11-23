@@ -249,7 +249,7 @@ test("un CPA arriba del tope que ya se recuperó en los últimos 4 días no se a
 });
 
 test("un anuncio activo que pasa de $12 sin ventas se apaga y se propone sustituirlo con el ángulo del que sí vende", () => {
-  const anuncio = (id: string, numero: string, gasto: number, compras: number, angulo: string | null, activo = true) => ({ id, campanaId: "c1", nombre: `ARIANNY ${numero}`, numero, activo, angulo, r: r({ gasto, compras }) });
+  const anuncio = (id: string, numero: string, gasto: number, compras: number, angulo: string | null, activo = true) => ({ id, campanaId: "c1", nombre: `ARIANNY ${numero}`, numero, activo, angulo, r: r({ gasto, compras }), ultimos2: sinResultados(), ultimoDia: sinResultados() });
   const s = sugerir({
     hoy: "2026-11-23", serie: new Map(), videos: [],
     campanas: [campana({ id: "c1", tope: 10, r: r({ gasto: 120, compras: 20 }) })],
@@ -259,5 +259,5 @@ test("un anuncio activo que pasa de $12 sin ventas se apaga y se propone sustitu
   assert.deepEqual(apagar.map((x) => x.clave), ["anuncio_apagar:a3"]);
   assert.equal(apagar[0].severidad, "alta");
   assert.match(apagar[0].accion, /Apagar V3 y sustituirlo con anuncios del ángulo «Salud de la próstata» como V5 \(CPA \$4\.44\)/);
-  assert.match(apagar[0].detalle, /sin importar su CTR/);
+  assert.match(apagar[0].detalle, /pasó de \$12/);
 });

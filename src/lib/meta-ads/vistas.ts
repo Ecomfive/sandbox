@@ -1,5 +1,6 @@
 // Anuncios Meta: lo que las pantallas reciben ya armado (serializable: cruza de servidor a cliente).
 
+import type { Decision } from "./decision-anuncio";
 import type { Resultados } from "./metricas";
 import type { Estructura, Etapa, Puja } from "./nombre";
 
@@ -66,6 +67,9 @@ export interface AnuncioVista {
   numero: string | null;
   /** El ángulo de su video, según el análisis de la IA. */
   angulo: string | null;
+  /** Qué toca hacer con este anuncio según la escalera del documento «Métrica» (solo anuncios activos de campañas activas) y por qué. */
+  decision: Decision | null;
+  decisionMotivo: string | null;
   r: Resultados;
 }
 
