@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { cantidadEnNombre, distintivosDeNombre, prefijoDePack, primeroLibre, sugerirSku, sugerirSkuCompuesto, sugerirSkuVariante } from "./sugerir-sku";
+import { cantidadEnNombre, distintivosDeNombre, primeroLibre, sugerirSku, sugerirSkuCompuesto, sugerirSkuVariante } from "./sugerir-sku";
 
 test("un pack que choca lleva la palabra de su cantidad, no un número", () => {
   const usados = new Set(["PACKS/CREMA/NIDA"]);
@@ -86,17 +86,21 @@ test("el SKU de un compuesto (pack o combo) siempre empieza por COMBO, sin repet
   assert.equal(sugerirSku("Crema Nida"), "CREMA/NIDA");
 });
 
-test("PACK si son 2 unidades del mismo producto, PACKS si son 3 o más, COMBO si no se sabe", () => {
-  assert.equal(prefijoDePack(2), "PACK");
-  assert.equal(prefijoDePack(3), "PACKS");
-  assert.equal(prefijoDePack(6), "PACKS");
-  assert.equal(prefijoDePack(1), "COMBO");
-  assert.equal(prefijoDePack(null), "COMBO");
+test("la primera promoción por cantidad es PACK y la segunda del mismo producto es PACKS", () => {
+  const usados = new Set<string>();
+  assert.equal(primeroLibre("PACK/CREMA/NIDA", (c) => usados.has(c), 2), "PACK/CREMA/NIDA");
+  usados.add("PACK/CREMA/NIDA");
+  assert.equal(primeroLibre("PACK/CREMA/NIDA", (c) => usados.has(c), 3), "PACKS/CREMA/NIDA");
+  // Una tercera lleva la palabra de su cantidad, nunca un número.
+  usados.add("PACKS/CREMA/NIDA");
+  assert.equal(primeroLibre("PACK/CREMA/NIDA", (c) => usados.has(c), 4), "PACKS/CREMA/NIDA/CUARTETO");
+  // Otro producto no se afecta.
+  assert.equal(primeroLibre("PACK/CREMA/OTRA", (c) => usados.has(c), 3), "PACK/CREMA/OTRA");
 });
 
-test("un compuesto de un solo producto lleva PACK o PACKS y el SKU de ese producto", () => {
+test("un compuesto de un solo producto lleva PACK y el SKU de ese producto, sin importar cuántas unidades", () => {
   assert.equal(sugerirSkuCompuesto({ nombre: "Crema Nida Pack 2", componentes: [{ codigo: "CREMA/NIDA", cantidad: 2 }] }), "PACK/CREMA/NIDA");
-  assert.equal(sugerirSkuCompuesto({ nombre: "", componentes: [{ codigo: "crema/nida", cantidad: 3 }] }), "PACKS/CREMA/NIDA");
+  assert.equal(sugerirSkuCompuesto({ nombre: "", componentes: [{ codigo: "crema/nida", cantidad: 3 }] }), "PACK/CREMA/NIDA");
   assert.equal(sugerirSkuCompuesto({ nombre: "", componentes: [{ codigo: "MAGNESIUM/COMPLEX/TOPLUX/60", cantidad: 2 }] }), "PACK/MAGNESIUM/COMPLEX/TOPLUX/60");
 });
 
@@ -112,10 +116,10 @@ test("un combo de productos distintos une el SKU de cada uno con «+»", () => {
 });
 
 test("sin productos elegidos, el prefijo sale de la cantidad que diga el nombre", () => {
-  assert.equal(sugerirSkuCompuesto({ nombre: "Crema Nida Pack 3" }), "PACKS/CREMA/NIDA");
+  assert.equal(sugerirSkuCompuesto({ nombre: "Crema Nida Pack 3" }), "PACK/CREMA/NIDA");
   assert.equal(sugerirSkuCompuesto({ nombre: "Crema Nida 2x1" }), "PACK/CREMA/NIDA");
   assert.equal(sugerirSkuCompuesto({ nombre: "Crema Nida" }), "COMBO/CREMA/NIDA");
   assert.equal(sugerirSkuCompuesto({ nombre: "" }), "");
   // «packs» tampoco se repite desde el nombre.
-  assert.equal(sugerirSku("Packs Crema Nida", 3, { compuesto: true, prefijo: "PACKS" }), "PACKS/CREMA/NIDA");
+  assert.equal(sugerirSku("Packs Crema Nida", 3, { compuesto: true, prefijo: "PACK" }), "PACK/CREMA/NIDA");
 });

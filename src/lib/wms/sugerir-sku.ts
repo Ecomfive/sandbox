@@ -4,9 +4,9 @@
 // cápsulas, tabletas o gomitas, el color y la talla que diga el nombre («ACEITE/OREGANO/CAPSULAS/300/VERDE», «BOLSO/NAYLA/GRAN/PURPURA»), para
 // que no haga falta un /2 y /3 que no dicen nada. Una variante agrega sus valores («/ROJO/M»). Es solo una sugerencia: la persona puede
 // borrarla y escribir otro; el sistema no deja repetir un SKU. **Un producto compuesto empieza por PACK, PACKS o COMBO** (23 nov 2026, pedido
-// de Jhokser; antes todo empezaba por COMBO): varias unidades del MISMO producto = «PACK/…» si son 2 y «PACKS/…» si son 3 o más; dos o más
-// productos DISTINTOS = «COMBO/…» con el SKU de cada uno unido por «+» («COMBO/TRULY/GLAZED+ESPUMA/EELHOE»). Las palabras «combo», «pack» y
-// «packs» del nombre no se repiten.
+// de Jhokser; antes todo empezaba por COMBO): la **primera** promoción por cantidad de un producto = «PACK/…»; una **segunda** promoción de otra cantidad del
+// mismo producto = «PACKS/…» (no importa si son 2, 3 o más unidades); dos o más productos DISTINTOS = «COMBO/…» con el SKU de cada uno unido por «+»
+// («COMBO/TRULY/GLAZED+ESPUMA/EELHOE»). Las palabras «combo», «pack» y «packs» del nombre no se repiten.
 // **Un pack del mismo producto por cantidad (2x1, pack de 2, x3…) NO lleva la cantidad en el SKU** (11 nov 2026, pedido de Jhokser):
 // «PACK/ACEITE/NATURAL/VEGANIC», nunca «…/X2», «…/PACK/2» ni «…/2»; el SKU del compuesto es el del producto con PACK (o PACKS) delante. Dos
 // packs de productos distintos se separan por lo que de verdad los distingue (el color: «PACK/BASE/MAQUILLAJE/ZEPHOCO/DARK»), no por
@@ -67,15 +67,9 @@ export const palabraSku = (t: string) =>
 
 /** La palabra con que empieza el SKU de un combo de productos distintos. */
 export const PREFIJO_COMPUESTO = "COMBO";
-/** Varias unidades de un mismo producto: «PACK» si son 2 y «PACKS» si son 3 o más. */
+/** La primera promoción por cantidad de un producto: «PACK». La segunda, de otra cantidad del mismo producto: «PACKS». */
 export const PREFIJO_PACK = "PACK";
 export const PREFIJO_PACKS = "PACKS";
-
-/** El prefijo del SKU de un compuesto de un solo producto según sus unidades (2 = PACK, 3 o más = PACKS); sin cantidad clara, COMBO. */
-export function prefijoDePack(cantidad: number | null | undefined): string {
-  if (!cantidad || cantidad < 2) return PREFIJO_COMPUESTO;
-  return cantidad === 2 ? PREFIJO_PACK : PREFIJO_PACKS;
-}
 
 /** El SKU sugerido para un nombre de producto (vacío si el nombre no tiene palabras útiles). Con `compuesto`, empieza por COMBO o por el `prefijo` que se dé (PACK, PACKS). */
 export function sugerirSku(nombre: string, maxPalabras = 3, opciones: { compuesto?: boolean; prefijo?: string } = {}): string {
@@ -108,10 +102,11 @@ const tramos = (codigo: string, n: number) => codigo.split("/").slice(0, n).join
 
 /**
  * El SKU sugerido de un compuesto (23 nov 2026, pedido de Jhokser), según lo que lleva:
- * - **Un solo producto, varias unidades** (un pack): «PACK/» si son 2 y «PACKS/» si son 3 o más, y el SKU de ese producto («PACK/CREMA/NIDA»).
+ * - **Un solo producto, varias unidades** (un pack): «PACK/» y el SKU de ese producto («PACK/CREMA/NIDA»); si ese SKU ya es de otra promoción del mismo producto
+ *   (otra cantidad), `primeroLibre` lo pasa a «PACKS/».
  * - **Dos o más productos distintos** (un combo): «COMBO/» y el SKU de cada producto unido por «+» («COMBO/TRULY/GLAZED+ESPUMA/EELHOE»). Si pasa de
  *   80 letras se acorta cada SKU a sus primeros tramos.
- * - **Sin productos elegidos todavía**: sale del nombre, y el prefijo de la cantidad que diga («Pack 3» → PACKS; si no dice nada, COMBO).
+ * - **Sin productos elegidos todavía**: sale del nombre; si el nombre dice una cantidad («Pack 3», «2x1») empieza por PACK y si no dice nada, por COMBO.
  */
 export function sugerirSkuCompuesto(d: { nombre: string; componentes?: { codigo: string; cantidad: number }[] }): string {
   const comps = (d.componentes ?? []).map((c) => ({ codigo: String(c.codigo ?? "").trim().toUpperCase(), cantidad: c.cantidad })).filter((c) => c.codigo);
@@ -124,8 +119,8 @@ export function sugerirSkuCompuesto(d: { nombre: string; componentes?: { codigo:
     }
     return `${PREFIJO_COMPUESTO}/${comps.map((c) => tramos(c.codigo, 1)).join("+")}`.slice(0, MAX_COMBO);
   }
-  if (comps.length === 1) return `${prefijoDePack(comps[0].cantidad)}/${comps[0].codigo}`;
-  return sugerirSku(d.nombre, 3, { compuesto: true, prefijo: prefijoDePack(cantidadEnNombre(d.nombre)) });
+  if (comps.length === 1) return `${comps[0].cantidad >= 2 ? PREFIJO_PACK : PREFIJO_COMPUESTO}/${comps[0].codigo}`;
+  return sugerirSku(d.nombre, 3, { compuesto: true, prefijo: cantidadEnNombre(d.nombre) ? PREFIJO_PACK : PREFIJO_COMPUESTO });
 }
 
 /** El SKU de una variante: el del producto más los valores de sus opciones («BALSAMO/PURPURA/MELAXIN/ROJO/M»). */
@@ -146,13 +141,18 @@ export function cantidadEnNombre(nombre: string): number | null {
 }
 
 /**
- * El primero libre: el sugerido o, si ya existe, el siguiente. Con la cantidad de un pack (11 nov 2026, pedido de Jhokser) el primer pack
- * de un producto —el más vendido— se queda con «PACKS/CREMA/NIDA» y el que llega después lleva la palabra de su cantidad
- * («PACKS/CREMA/NIDA/CUARTETO»), nunca un número; solo si esa palabra tampoco está libre o no se sabe la cantidad, va /2, /3…
- * (Desde el 23 nov 2026 los de 2 unidades son «PACK» y los de 3 o más «PACKS», así que 2 y 3 ya no chocan entre sí.)
+ * El primero libre: el sugerido o, si ya existe, el siguiente. Una **segunda promoción** del mismo producto (23 nov 2026, pedido de Jhokser) pasa de «PACK/…» a
+ * «PACKS/…»; una tercera lleva además la palabra de su cantidad («PACKS/CREMA/NIDA/CUARTETO», 11 nov 2026), nunca un número; solo si esa palabra tampoco
+ * está libre o no se sabe la cantidad, va /2, /3…
  */
 export function primeroLibre(sugerido: string, existe: (codigo: string) => boolean, cantidad?: number | null): string {
   if (!existe(sugerido)) return sugerido;
+  // La segunda promoción por cantidad del mismo producto: PACK → PACKS.
+  if (sugerido.startsWith(`${PREFIJO_PACK}/`)) {
+    const plural = `${PREFIJO_PACKS}/${sugerido.slice(PREFIJO_PACK.length + 1)}`;
+    if (!existe(plural)) return plural;
+    sugerido = plural;
+  }
   const palabra = cantidad ? PALABRA_DE_CANTIDAD[cantidad] : undefined;
   if (palabra && !existe(`${sugerido}/${palabra}`)) return `${sugerido}/${palabra}`;
   for (let n = 2; n < 1000; n++) {
