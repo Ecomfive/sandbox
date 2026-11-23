@@ -7,7 +7,7 @@ import { ProgresoEstimado } from "@/components/ui/progreso-estimado";
 import { ChevronRightIcon } from "@/lib/nav-icons";
 import { fieldClassSm, labelClassSm } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
-import { formatearFechaHora } from "@/lib/formato";
+import { horaDeMeta } from "@/lib/meta-ads/hora";
 import type { CuentaVista, TopeVista } from "@/lib/meta-ads/datos";
 import { CPA_TOPE_PREDETERMINADO } from "@/lib/meta-ads/metricas";
 import { filtrarProductos } from "@/lib/meta-ads/topes";
@@ -173,7 +173,7 @@ function Cuentas({ cuentas, escribe, pais, borrador }: { cuentas: CuentaVista[];
                 <span className="text-xs text-muted-foreground">
                   <span className="font-mono">{c.actId}</span>
                   {c.tienda ? ` · ${c.tienda}` : ""}
-                  {c.ultimaLectura ? ` · última lectura ${formatearFechaHora(c.ultimaLectura)}` : " · todavía sin leer"}
+                  {c.ultimaLectura ? ` · última lectura ${horaDeMeta(c.ultimaLectura)}` : " · todavía sin leer"}
                 </span>
                 {c.ultimoError && <span className="text-xs text-destructive">{c.ultimoError}</span>}
               </span>

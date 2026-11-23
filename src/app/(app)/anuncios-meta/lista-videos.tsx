@@ -14,7 +14,7 @@ import { ControlAnalisisAutomatico } from "./control-automatico";
 import { EVENTO_ABRIR_VIDEO } from "./para-revisar";
 import type { EstadoAnalisisAutomatico } from "@/lib/meta-ads/ajustes";
 import { ProgresoEstimado } from "@/components/ui/progreso-estimado";
-import { formatearFechaHora } from "@/lib/formato";
+import { horaDeMeta } from "@/lib/meta-ads/hora";
 import { Ventana } from "@/components/ui/ventana";
 import { Seccion } from "@/components/ui/seccion-ficha";
 import { AnunciosIcon, ChevronRightIcon, EstadoIcon, EtiquetaIcon, FiltroIcon, MargenIcon, ProductoIcon, RobotIcon } from "@/lib/nav-icons";
@@ -467,7 +467,7 @@ function AnalisisIA({ v, escribe, iaConectada }: { v: VideoVista; escribe: boole
             </details>
           )}
           <p className="m-0 text-xs text-muted-foreground">
-            Analizado el {formatearFechaHora(a.analizadoEn)}
+            Analizado el {horaDeMeta(a.analizadoEn)}
             {a.duracionS ? ` · ${a.duracionS} s` : ""}
           </p>
         </>

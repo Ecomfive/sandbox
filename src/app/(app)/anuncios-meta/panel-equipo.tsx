@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { formatearFechaHora } from "@/lib/formato";
+import { horaDeMeta } from "@/lib/meta-ads/hora";
 import { CATEGORIAS_EVENTO, NOMBRES_DIA_SEMANA, RANGOS_ACTIVIDAD, textoDeCambios, textoDias, VENTANA_PROMEDIO_DIAS, type ConteoDe, type FilaPersona, type ResumenActividad } from "@/lib/meta-ads/actividad-equipo";
 import type { CuentaVista } from "@/lib/meta-ads/datos";
 import { BarraApilada, BarraProgreso, Columnas, colorDeSerie, Iniciales, Leyenda, partesConColor, TarjetaMeta } from "./graficas";
@@ -140,7 +140,7 @@ export function TarjetaPersona({ p, indice }: { p: FilaPersona; indice: number }
         <div className="min-w-0 flex-1">
           <h3 className="m-0 truncate text-base font-semibold">{p.persona}</h3>
           <p className="m-0 text-xs text-muted-foreground">
-            {p.ultimaActividad ? `Última actividad: ${formatearFechaHora(p.ultimaActividad)}` : "Sin actividad leída"}
+            {p.ultimaActividad ? `Última actividad: ${horaDeMeta(p.ultimaActividad)}` : "Sin actividad leída"}
           </p>
         </div>
         <div className="text-right">

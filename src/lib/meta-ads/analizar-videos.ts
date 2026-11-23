@@ -142,6 +142,7 @@ export async function analizarVideoDeMeta(supabase: SupabaseClient, v: VideoPend
   let origen: "video" | "texto" = "video";
   let motivo = motivoSinArchivo;
   let respuesta: Awaited<ReturnType<typeof analizarVideoConGemini>> | null = null;
+  let analisisDelVideo: AnalisisVideo | null = null;
   if (fuente) {
     const archivo = await bajarDeMeta(fuente, MAX_BYTES_VIDEO, 60_000);
     if (!archivo) motivo = "No se pudo bajar el video de Meta (o pesa más de 80 MB).";
@@ -151,8 +152,24 @@ export async function analizarVideoDeMeta(supabase: SupabaseClient, v: VideoPend
       if ("error" in respuesta && /RECITATION/.test(respuesta.error)) {
         respuesta = await analizarVideoConGemini(archivo.bytes, archivo.tipo.startsWith("video/") ? archivo.tipo : "video/mp4", pedidoAnalisisVideo({ producto: v.producto, copy: v.copy, titulo: v.titulo, angulosExistentes: existentes, soloTexto: false, sinTranscribir: true }), contexto, 0.7);
       }
+      // Gemini contestó pero no se puede usar (cortada, sin ángulo): se pide de nuevo sin transcripción, que es lo que más largo se hace, y con otra temperatura.
+      if ("texto" in respuesta) {
+        analisisDelVideo = normalizarAnalisisVideo(respuesta.texto, existentes);
+        if (!analisisDelVideo) {
+          const primera = respuesta.texto;
+          const otra = await analizarVideoConGemini(archivo.bytes, archivo.tipo.startsWith("video/") ? archivo.tipo : "video/mp4", pedidoAnalisisVideo({ producto: v.producto, copy: v.copy, titulo: v.titulo, angulosExistentes: existentes, soloTexto: false, sinTranscribir: true }), contexto, 0.5);
+          if ("texto" in otra) {
+            analisisDelVideo = normalizarAnalisisVideo(otra.texto, existentes);
+            if (analisisDelVideo) respuesta = otra;
+          }
+          if (!analisisDelVideo) {
+            motivo = `La IA contestó, pero no se pudo leer (${primera.length} letras: «${primera.replace(/\s+/g, " ").slice(0, 70)}»).`;
+            respuesta = null;
+          }
+        }
+      }
       // Si Gemini no pudo con el video, no se deja el video en error: se analiza con el texto y la miniatura (provisional) y el motivo queda dicho en la ficha.
-      if ("error" in respuesta) {
+      if (respuesta && "error" in respuesta) {
         motivo = `${respuesta.error}`;
         respuesta = null;
       }
@@ -167,10 +184,10 @@ export async function analizarVideoDeMeta(supabase: SupabaseClient, v: VideoPend
     respuesta = await analizarSoloTextoConGemini(pedidoAnalisisVideo({ producto: v.producto, copy: v.copy, titulo: v.titulo, angulosExistentes: existentes, soloTexto: true }), mini ? { bytes: mini.bytes, mime: tipo } : null, contexto);
   }
 
-  const analisis: AnalisisVideo | null = "texto" in respuesta ? normalizarAnalisisVideo(respuesta.texto, existentes) : null;
+  const analisis: AnalisisVideo | null = analisisDelVideo ?? ("texto" in respuesta ? normalizarAnalisisVideo(respuesta.texto, existentes) : null);
   const modelo = "modelo" in respuesta ? respuesta.modelo : null;
   if (!analisis) {
-    const error = "error" in respuesta ? respuesta.error : "La IA no devolvió un análisis que se pueda usar.";
+    const error = "error" in respuesta ? respuesta.error : `La IA no devolvió un análisis que se pueda usar (${respuesta.texto.length} letras: «${respuesta.texto.replace(/\s+/g, " ").slice(0, 70)}»).`;
     await supabase.from("meta_video_analisis").upsert({ video_id: v.videoId, cuenta_id: v.cuentaId, estado: "error", origen, error: `${motivo ? `${motivo} ` : ""}${error}`.slice(0, 300), modelo, analizado_por: quien, analizado_en: new Date().toISOString(), duracion_s: duracion }, { onConflict: "video_id" });
     return { ok: false, estado: "error", mensaje: error };
   }
