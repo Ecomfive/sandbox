@@ -4,6 +4,7 @@
 // aparte como «fuera del sistema». Sin base ni red, con prueba (`asesores.test.ts`).
 
 import { enGestion } from "./confirmacion";
+import { diaPanama } from "./resumen";
 
 /** Un cambio de etiquetas hecho desde el sistema (`ven_orden_eventos`, tipo «etiqueta»). */
 export interface EventoEtiqueta {
@@ -40,6 +41,10 @@ export interface FilaAsesor {
   minutosPromedio: number | null;
   /** El último cambio que hizo (ISO). */
   ultimo: string;
+  /** Confirmados + cancelados (para la corona hace falta un mínimo). */
+  resueltos: number;
+  /** Cuántos confirmó en cada rango de atención (`RANGOS_ATENCION`). */
+  rangos: number[];
 }
 
 const CONFIRMADA = /^confirmad[ao]$/i;
@@ -121,6 +126,8 @@ export function resumirAsesores(eventos: EventoEtiqueta[], pedidos: Map<string, 
       minutosMediana: mediana(a.minutos),
       minutosPromedio: a.minutos.length ? Math.round(a.minutos.reduce((s, x) => s + x, 0) / a.minutos.length) : null,
       ultimo: a.ultimo,
+      resueltos,
+      rangos: contarRangos(a.minutos),
     };
   }).sort((x, y) => y.confirmados - x.confirmados || y.atendidos - x.atendidos || x.nombre.localeCompare(y.nombre));
 }
@@ -132,4 +139,119 @@ export function textoMinutos(min: number | null): string {
   const h = Math.floor(min / 60);
   if (h < 24) return `${h} h${min % 60 ? ` ${Math.round(min % 60)} min` : ""}`;
   return `${Math.floor(h / 24)} d${h % 24 ? ` ${h % 24} h` : ""}`;
+}
+
+// ---------- Panel de asesores (23 nov 2026, prototipo aprobado por Hernán: donas, rangos de atención, corona a los 3 mejores y paso a paso) ----------
+
+/** Los rangos de atención: cuánto tardó en confirmarse un pedido desde que entró en Shopify. */
+export const RANGOS_ATENCION = [
+  { etiqueta: "< 15 min", hasta: 15 },
+  { etiqueta: "15–30 min", hasta: 30 },
+  { etiqueta: "30–60 min", hasta: 60 },
+  { etiqueta: "1–4 h", hasta: 240 },
+  { etiqueta: "4–24 h", hasta: 1440 },
+  { etiqueta: "> 24 h", hasta: Number.POSITIVE_INFINITY },
+] as const;
+
+/** Cuántos minutos caen en cada rango de atención. */
+export function contarRangos(minutos: number[]): number[] {
+  const c = RANGOS_ATENCION.map(() => 0);
+  for (const m of minutos) {
+    const i = RANGOS_ATENCION.findIndex((r) => m < r.hasta);
+    if (i >= 0) c[i]++;
+  }
+  return c;
+}
+
+/** Pedidos resueltos (confirmados + cancelados) que hacen falta para llevar corona: que no gane alguien con tres pedidos. */
+export const MIN_RESUELTOS_CORONA = 20;
+
+export type AsesorConPuntaje = FilaAsesor & { puntos: number; corona: 0 | 1 | 2 | null };
+
+/**
+ * El puntaje de atención (0 a 100) y la corona de los 3 mejores: 50 % su confirmación, 30 % su rapidez (la mediana: 0 min = todo, 2 h o más = nada) y 20 % su
+ * volumen (sus confirmados frente al que más confirmó). La corona (oro, plata, bronce) va a los 3 de mayor puntaje con al menos `MIN_RESUELTOS_CORONA` resueltos.
+ */
+export function puntuarAsesores(filas: FilaAsesor[]): AsesorConPuntaje[] {
+  const maxC = Math.max(1, ...filas.map((f) => f.confirmados));
+  const conPuntos = filas.map((f) => ({
+    ...f,
+    puntos: Math.round(50 * ((f.tasa ?? 0) / 100) + 30 * (f.minutosMediana === null ? 0 : Math.max(0, 1 - f.minutosMediana / 120)) + 20 * (f.confirmados / maxC)),
+    corona: null as 0 | 1 | 2 | null,
+  }));
+  conPuntos.sort((a, b) => b.puntos - a.puntos || b.confirmados - a.confirmados || a.nombre.localeCompare(b.nombre));
+  let k = 0;
+  for (const f of conPuntos) if (k < 3 && f.resueltos >= MIN_RESUELTOS_CORONA) f.corona = k++ as 0 | 1 | 2;
+  return conPuntos;
+}
+
+export type ResultadoAtencion = "confirma" | "cancela" | "gestion" | "otro";
+
+/** Lo que un asesor hizo con un pedido: sus pasos en orden, cómo terminó y, si lo confirmó, en cuántos minutos desde que entró. */
+export interface AtencionPedido {
+  clave: string;
+  ordenId: string;
+  resultado: ResultadoAtencion;
+  minutos: number | null;
+  pasos: { t: string; agregadas: string[]; quitadas: string[]; tipo: ResultadoAtencion }[];
+  ultimo: string;
+}
+
+const claveDe = (e: EventoEtiqueta) => e.usuarioId ?? `n:${(e.usuario ?? "").trim().toLowerCase() || "sin nombre"}`;
+
+/** El paso a paso de cada asesor con cada pedido (solo pedidos de las tiendas que se miran), lo más reciente primero. */
+export function atencionesDe(eventos: EventoEtiqueta[], pedidos: Map<string, PedidoAsesor>): AtencionPedido[] {
+  const mapa = new Map<string, AtencionPedido>();
+  for (const e of [...eventos].sort((a, b) => a.creadoEn.localeCompare(b.creadoEn))) {
+    const p = pedidos.get(e.ordenId);
+    if (!p) continue;
+    const clave = claveDe(e);
+    const k = `${clave}|${e.ordenId}`;
+    const a = mapa.get(k) ?? { clave, ordenId: e.ordenId, resultado: "otro" as ResultadoAtencion, minutos: null, pasos: [], ultimo: e.creadoEn };
+    const ef = efectoEtiquetas(e.agregadas);
+    const tipo: ResultadoAtencion = ef.cancela ? "cancela" : ef.confirma ? "confirma" : ef.gestion ? "gestion" : "otro";
+    a.pasos.push({ t: e.creadoEn, agregadas: e.agregadas, quitadas: e.quitadas, tipo });
+    if (tipo !== "otro") a.resultado = tipo;
+    if (ef.confirma && a.minutos === null && p.creado) {
+      const min = (Date.parse(e.creadoEn) - Date.parse(p.creado)) / 60_000;
+      if (Number.isFinite(min) && min >= 0) a.minutos = Math.round(min);
+    }
+    a.ultimo = e.creadoEn;
+    mapa.set(k, a);
+  }
+  return [...mapa.values()].sort((a, b) => b.ultimo.localeCompare(a.ultimo));
+}
+
+/**
+ * Confirmados por día (o por semana si el periodo pasa de 62 días): los confirmados desde el sistema (el día en que se confirmó, una vez por pedido) y los que
+ * se confirmaron directo en Shopify (el día en que entró el pedido). `desde` y `hasta` son días de Panamá (AAAA-MM-DD).
+ */
+export function confirmadosPorDia(
+  confirmadosSistema: { t: string }[],
+  confirmadosShopify: { creado: string }[],
+  desde: string,
+  hasta: string,
+): { desde: string; sistema: number; shopify: number }[] {
+  const dias: string[] = [];
+  for (let d = Date.parse(`${desde}T12:00:00Z`); d <= Date.parse(`${hasta}T12:00:00Z`); d += 86_400_000) dias.push(new Date(d).toISOString().slice(0, 10));
+  const porSemana = dias.length > 62;
+  const cubeta = (dia: string) => {
+    if (!porSemana) return dia;
+    const i = dias.indexOf(dia);
+    return i < 0 ? dia : dias[i - (i % 7)];
+  };
+  const grupos = new Map<string, { desde: string; sistema: number; shopify: number }>();
+  for (const d of dias) {
+    const c = cubeta(d);
+    if (!grupos.has(c)) grupos.set(c, { desde: c, sistema: 0, shopify: 0 });
+  }
+  for (const x of confirmadosSistema) {
+    const g = grupos.get(cubeta(diaPanama(x.t)));
+    if (g) g.sistema++;
+  }
+  for (const x of confirmadosShopify) {
+    const g = grupos.get(cubeta(diaPanama(x.creado)));
+    if (g) g.shopify++;
+  }
+  return [...grupos.values()];
 }

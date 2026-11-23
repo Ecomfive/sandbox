@@ -4,17 +4,27 @@ import { anilloFoco } from "@/components/ui/field";
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { requireModulo } from "@/lib/auth";
-import { formatearFechaHora } from "@/lib/formato";
 import { getPaisActual } from "@/lib/pais";
 import { createServiceClient } from "@/lib/supabase/server";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { tiendasDeLaPersona } from "@/lib/tienda/acceso";
-import { cambioDeTexto, efectoEtiquetas, resumirAsesores, textoMinutos, type EventoEtiqueta, type PedidoAsesor } from "@/lib/tienda/asesores";
+import {
+  atencionesDe,
+  cambioDeTexto,
+  confirmadosPorDia,
+  contarRangos,
+  efectoEtiquetas,
+  puntuarAsesores,
+  resumirAsesores,
+  type EventoEtiqueta,
+  type PedidoAsesor,
+} from "@/lib/tienda/asesores";
 import { etapaConfirmacion, tiempoEsperando } from "@/lib/tienda/confirmacion";
 import { periodoElegido } from "@/lib/tienda/datos";
 import { pedidosDeTiendas } from "@/lib/tienda/datos-finanzas";
 import { diaPanama } from "@/lib/tienda/resumen";
 import { sumarDias } from "@/lib/tienda/rango";
+import { PanelAsesores, type DatosPanelAsesores } from "./panel-asesores";
 
 export const metadata = { title: "Asesores de tienda" };
 
@@ -23,14 +33,14 @@ export const dynamic = "force-dynamic";
 type FilaEvento = { orden_id: string; usuario: string | null; usuario_id?: string | null; creado_en: string; agregadas?: string[] | null; quitadas?: string[] | null; detalle: string | null };
 
 const texto = (x: string | string[] | undefined) => (typeof x === "string" && x ? x : null);
-const num = (n: number) => n.toLocaleString("es-PA");
 const ahoraMismo = () => Date.now();
+/** Cuántos pedidos de cada asesor salen en su paso a paso (los más recientes). */
+const PASOS_POR_ASESOR = 40;
 
 /**
- * Pedidos de tienda › Asesores (20 nov 2026, pedido de Hernán: que Beatriz, la encargada de atención, vea el rendimiento de los asesores). Cada asesor queda
- * registrado cuando confirma o cambia etiquetas de un pedido desde el sistema (`etiquetas-actions.ts`); lo que se hace directo en Shopify no tiene asesor y
- * sale aparte («fuera del sistema»). Por asesor: confirmación (atendidos, confirmados, cancelados, en gestión, % de confirmación) y rapidez (cuánto tarda en
- * confirmar desde que entra el pedido). Arriba, la cola de cada tienda. Cada persona ve solo sus tiendas (`tiendas_permitidas`). Módulo «tienda-asesores».
+ * Pedidos de tienda › Asesores (20 nov 2026; panel del 23 nov 2026 con el prototipo aprobado por Hernán: donas, rangos de atención, corona a los 3 mejores y
+ * paso a paso). Cada asesor queda registrado cuando confirma o cambia etiquetas de un pedido desde el sistema (`etiquetas-actions.ts`); lo que se hace directo
+ * en Shopify no tiene asesor y sale aparte. Cada persona ve solo sus tiendas (`tiendas_permitidas`). Módulo «tienda-asesores».
  */
 export default async function AsesoresTiendaPage({ searchParams }: { searchParams: Promise<{ [k: string]: string | string[] | undefined }> }) {
   await requireModulo("tienda-asesores");
@@ -62,68 +72,118 @@ export default async function AsesoresTiendaPage({ searchParams }: { searchParam
   }
   const nombreTienda = (id: string) => tiendas.find((t) => t.id === id)?.nombre ?? "—";
 
-  // Los cambios de etiquetas hechos desde el sistema en el periodo (días de Panamá).
-  const desde = `${periodo.desde}T00:00:00-05:00`;
-  const hasta = `${sumarDias(periodo.hasta, 1)}T00:00:00-05:00`;
-  const leer = (columnas: string) =>
+  // Los cambios de etiquetas hechos desde el sistema: los del periodo y, para comparar, los del periodo anterior del mismo largo (días de Panamá).
+  const leer = (de: string, a: string, columnas: string) =>
     traerTodasLasFilas<FilaEvento>((d, h) =>
-      supabase.from("ven_orden_eventos").select(columnas).eq("tipo", "etiqueta").gte("creado_en", desde).lt("creado_en", hasta).order("creado_en").range(d, h) as unknown as PromiseLike<{ data: FilaEvento[] | null; error: unknown }>,
+      supabase.from("ven_orden_eventos").select(columnas).eq("tipo", "etiqueta").gte("creado_en", `${de}T00:00:00-05:00`).lt("creado_en", `${a}T00:00:00-05:00`).order("creado_en").range(d, h) as unknown as PromiseLike<{ data: FilaEvento[] | null; error: unknown }>,
     );
   // Sin la migración 0345 no están el perfil ni las etiquetas: se leen del texto del historial.
-  const filas = await leer("orden_id, usuario, usuario_id, creado_en, agregadas, quitadas, detalle").catch(() => leer("orden_id, usuario, creado_en, detalle").catch(() => [] as FilaEvento[]));
+  const leerConViejo = (de: string, a: string) => leer(de, a, "orden_id, usuario, usuario_id, creado_en, agregadas, quitadas, detalle").catch(() => leer(de, a, "orden_id, usuario, creado_en, detalle").catch(() => [] as FilaEvento[]));
+  const [filas, filasAntes] = await Promise.all([leerConViejo(periodo.desde, sumarDias(periodo.hasta, 1)), leerConViejo(sumarDias(periodo.desde, -periodo.dias), periodo.desde)]);
 
-  // De qué tienda es cada pedido y cuándo entró (solo los de las tiendas que se miran).
-  const ids = [...new Set(filas.map((f) => f.orden_id))];
+  // De qué tienda es cada pedido, cuándo entró, su número, su cliente y su primer producto (solo los de las tiendas que se miran).
+  const ids = [...new Set([...filas, ...filasAntes].map((f) => f.orden_id))];
   const pedidosAsesor = new Map<string, PedidoAsesor>();
+  const detalle = new Map<string, { numero: string; cliente: string | null; producto: string | null }>();
   for (let i = 0; i < ids.length; i += 300) {
-    const { data } = await supabase.from("ven_ordenes").select("id, unidad_id, creado_origen").in("id", ids.slice(i, i + 300));
+    const tanda = ids.slice(i, i + 300);
+    const [{ data }, { data: lineas }] = await Promise.all([
+      supabase.from("ven_ordenes").select("id, numero, unidad_id, creado_origen, ven_ordenes_clientes(nombre)").in("id", tanda),
+      supabase.from("ven_orden_lineas").select("orden_id, linea, producto, es_servicio").in("orden_id", tanda).order("linea"),
+    ]);
+    const primero = new Map<string, string>();
+    for (const l of lineas ?? []) if (!l.es_servicio && !primero.has(l.orden_id as string)) primero.set(l.orden_id as string, String(l.producto ?? ""));
     for (const o of data ?? []) {
       const t = tiendaDeUnidad.get(o.unidad_id as string);
-      if (t) pedidosAsesor.set(o.id as string, { tiendaId: t, creado: (o.creado_origen as string | null) ?? null });
+      if (!t) continue;
+      pedidosAsesor.set(o.id as string, { tiendaId: t, creado: (o.creado_origen as string | null) ?? null });
+      const cli = o.ven_ordenes_clientes as { nombre?: string | null } | { nombre?: string | null }[] | null;
+      detalle.set(o.id as string, { numero: String(o.numero ?? "—"), cliente: (Array.isArray(cli) ? cli[0]?.nombre : cli?.nombre) ?? null, producto: primero.get(o.id as string) ?? null });
     }
   }
-  const eventos: EventoEtiqueta[] = filas.map((f) => {
-    const viejo = Array.isArray(f.agregadas) ? null : cambioDeTexto(f.detalle);
-    return {
-      ordenId: f.orden_id,
-      usuarioId: f.usuario_id ?? null,
-      usuario: f.usuario,
-      creadoEn: f.creado_en,
-      agregadas: viejo ? viejo.agregadas : (f.agregadas ?? []),
-      quitadas: viejo ? viejo.quitadas : (f.quitadas ?? []),
-    };
-  });
-  const asesores = resumirAsesores(eventos, pedidosAsesor, nombreTienda);
+  const aEventos = (xs: FilaEvento[]): EventoEtiqueta[] =>
+    xs.map((f) => {
+      const viejo = Array.isArray(f.agregadas) ? null : cambioDeTexto(f.detalle);
+      return { ordenId: f.orden_id, usuarioId: f.usuario_id ?? null, usuario: f.usuario, creadoEn: f.creado_en, agregadas: viejo ? viejo.agregadas : (f.agregadas ?? []), quitadas: viejo ? viejo.quitadas : (f.quitadas ?? []) };
+    });
+  const eventos = aEventos(filas);
+  const asesores = puntuarAsesores(resumirAsesores(eventos, pedidosAsesor, nombreTienda));
+  const atenciones = atencionesDe(eventos, pedidosAsesor);
 
+  // Confirmados desde el sistema (una vez por pedido, el día del primero) y los del periodo anterior, para comparar.
+  const primerConfirmado = (xs: EventoEtiqueta[]) => {
+    const m = new Map<string, string>();
+    for (const e of xs) if (pedidosAsesor.has(e.ordenId) && efectoEtiquetas(e.agregadas).confirma && !m.has(e.ordenId)) m.set(e.ordenId, e.creadoEn);
+    return m;
+  };
+  const confirmadosSistema = primerConfirmado(eventos);
+  const confirmadosAntes = primerConfirmado(aEventos(filasAntes)).size;
   // Confirmados del periodo (de Shopify) que nadie confirmó desde el sistema: se hicieron directo en Shopify.
-  const confirmadosEnSistema = new Set(eventos.filter((e) => pedidosAsesor.has(e.ordenId) && efectoEtiquetas(e.agregadas).confirma).map((e) => e.ordenId));
   const delPeriodo = pedidos.filter((p) => !p.sinHora && diaPanama(p.creado) >= periodo.desde && diaPanama(p.creado) <= periodo.hasta);
-  const confirmadosPeriodo = delPeriodo.filter((p) => etapaConfirmacion(p) === "confirmado");
-  const fueraDelSistema = confirmadosPeriodo.filter((p) => !confirmadosEnSistema.has(p.id)).length;
+  const enShopify = delPeriodo.filter((p) => etapaConfirmacion(p) === "confirmado" && !confirmadosSistema.has(p.id));
 
   // La cola de cada tienda ahora: por confirmar, esperando respuesta y el más viejo.
   const ahora = ahoraMismo();
   const cola = miradas.map((t) => {
     const sinConfirmar = pedidos.filter((p) => p.tiendaId === t.id && p.estado === "nuevo" && !p.sinHora).sort((a, b) => a.creado.localeCompare(b.creado));
     return {
-      tienda: t,
+      tiendaId: t.id,
+      tienda: t.nombre,
       porConfirmar: sinConfirmar.filter((p) => etapaConfirmacion(p) === "por_confirmar").length,
       esperando: sinConfirmar.filter((p) => etapaConfirmacion(p) === "esperando").length,
       masViejo: sinConfirmar[0] ? tiempoEsperando(sinConfirmar[0].creado, ahora) : null,
       escribe: (escritura ?? []).find((x) => x.id === t.id)?.escribe_shopify === true,
     };
   });
-  const sinEscribir = cola.filter((c) => !c.escribe).map((c) => c.tienda.nombre);
+
+  // El paso a paso: los más recientes de cada asesor, con el número, la tienda, el cliente y el producto del pedido.
+  const porAsesor = new Map<string, number>();
+  const pasos = atenciones
+    .filter((a) => {
+      const n = porAsesor.get(a.clave) ?? 0;
+      porAsesor.set(a.clave, n + 1);
+      return n < PASOS_POR_ASESOR;
+    })
+    .map((a) => {
+      const p = pedidosAsesor.get(a.ordenId)!;
+      const d = detalle.get(a.ordenId);
+      return { clave: a.clave, ordenId: a.ordenId, numero: d?.numero ?? "—", tiendaId: p.tiendaId, tienda: nombreTienda(p.tiendaId), cliente: d?.cliente ?? null, producto: d?.producto ?? null, entra: p.creado, resultado: a.resultado, minutos: a.minutos, pasos: a.pasos };
+    });
+  const minutosConfirmados = atenciones.filter((a) => a.resultado === "confirma" && a.minutos !== null).map((a) => a.minutos as number);
+  const resueltos = atenciones.filter((a) => a.resultado === "confirma" || a.resultado === "cancela");
+  const mediana = (() => {
+    const s = [...minutosConfirmados].sort((a, b) => a - b);
+    if (!s.length) return null;
+    const m = Math.floor(s.length / 2);
+    return Math.round(s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2);
+  })();
+
+  const datos: DatosPanelAsesores = {
+    periodo: periodo.etiqueta.toLowerCase(),
+    totales: {
+      confirmadosSistema: confirmadosSistema.size,
+      confirmadosAntes,
+      enShopify: enShopify.length,
+      atendidos: atenciones.length,
+      confirmados: atenciones.filter((a) => a.resultado === "confirma").length,
+      cancelados: atenciones.filter((a) => a.resultado === "cancela").length,
+      enGestion: atenciones.filter((a) => a.resultado === "gestion" || a.resultado === "otro").length,
+      tasa: resueltos.length ? Math.round((resueltos.filter((a) => a.resultado === "confirma").length / resueltos.length) * 1000) / 10 : null,
+      mediana,
+    },
+    asesores,
+    rangos: contarRangos(minutosConfirmados),
+    porDia: confirmadosPorDia([...confirmadosSistema.values()].map((t) => ({ t })), enShopify, periodo.desde, periodo.hasta),
+    pasos,
+    cola,
+    multiTienda: miradas.length > 1,
+  };
 
   const fechas = { periodo: texto(sp.periodo), desde: texto(sp.desde), hasta: texto(sp.hasta) };
-  const th = "px-3 py-2 text-left text-xs font-semibold tracking-wide text-muted-foreground uppercase whitespace-nowrap";
-  const thN = `${th} text-right`;
-  const td = "px-3 py-2 text-sm";
-  const tdN = `${td} text-right tabular-nums`;
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-5">
       <EncabezadoPagina titulo="Asesores" oculto>
-        El rendimiento de los asesores de las tiendas de {pais.nombre}: cuánto confirman y qué tan rápido.
+        El rendimiento de los asesores de las tiendas de {pais.nombre}: cuánto confirman, qué tan rápido y qué hacen con cada pedido.
       </EncabezadoPagina>
       <BarraTienda
         ruta="/tienda-pedidos/asesores"
@@ -157,98 +217,7 @@ export default async function AsesoresTiendaPage({ searchParams }: { searchParam
         ))}
       </nav>
 
-      <section aria-label="Resumen" className="flex flex-wrap gap-x-6 gap-y-1 rounded-lg border border-border bg-card px-4 py-3 text-sm">
-        <span>
-          <b className="tabular-nums text-primario">{num(confirmadosEnSistema.size)}</b> confirmados desde el sistema
-        </span>
-        <span>
-          <b className="tabular-nums">{num(fueraDelSistema)}</b> confirmados directo en Shopify (sin asesor)
-        </span>
-        <span>
-          <b className="tabular-nums">{num(asesores.length)}</b> {asesores.length === 1 ? "asesor" : "asesores"} con movimiento · {periodo.etiqueta.toLowerCase()}
-        </span>
-      </section>
-
-      <section aria-label="Rendimiento por asesor" className="flex flex-col gap-2">
-        <h2 className="m-0 text-sm font-semibold">Por asesor</h2>
-        {asesores.length ? (
-          <div className="overflow-x-auto rounded-lg border border-border bg-card">
-            <table className="w-full min-w-[56rem] border-collapse">
-              <thead className="bg-muted">
-                <tr>
-                  <th className={th}>Asesor</th>
-                  <th className={th}>Tiendas</th>
-                  <th className={thN}>Atendidos</th>
-                  <th className={thN}>Confirmados</th>
-                  <th className={thN}>Cancelados</th>
-                  <th className={thN}>En gestión</th>
-                  <th className={thN}>% confirmación</th>
-                  <th className={thN}>Tarda en confirmar</th>
-                  <th className={th}>Último movimiento</th>
-                </tr>
-              </thead>
-              <tbody>
-                {asesores.map((a) => (
-                  <tr key={a.clave} className="border-t border-border/60">
-                    <td className={`${td} font-medium`}>{a.nombre}</td>
-                    <td className={`${td} text-muted-foreground`}>{a.tiendas.join(", ")}</td>
-                    <td className={tdN}>{num(a.atendidos)}</td>
-                    <td className={`${tdN} font-semibold text-primario`}>{num(a.confirmados)}</td>
-                    <td className={tdN}>{num(a.cancelados)}</td>
-                    <td className={tdN}>{num(a.enGestion)}</td>
-                    <td className={tdN}>{a.tasa === null ? "—" : `${a.tasa.toLocaleString("es-PA")} %`}</td>
-                    <td className={tdN} title={a.minutosPromedio === null ? undefined : `Promedio: ${textoMinutos(a.minutosPromedio)}`}>
-                      {textoMinutos(a.minutosMediana)}
-                    </td>
-                    <td className={`${td} whitespace-nowrap text-muted-foreground`}>{formatearFechaHora(a.ultimo)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <p className="m-0 rounded-lg border border-dashed border-border bg-card px-4 py-6 text-center text-sm text-muted-foreground">
-            Nadie confirmó ni cambió etiquetas desde el sistema en {periodo.etiqueta.toLowerCase()}. Cada asesor aparece aquí cuando usa «Confirmar pedido» o cambia las
-            etiquetas en la ficha del pedido.
-          </p>
-        )}
-        <p className="m-0 text-xs text-muted-foreground">
-          Cuenta lo que cada asesor hace desde el sistema: confirmar (etiqueta «Confirmada»), cancelar («ANULADO…» o «Cancelado») o dejar en gestión («Pendiente»,
-          «Modificar…»). Un pedido cuenta una vez por asesor, con lo último que hizo. «Tarda en confirmar» es la mediana desde que entró el pedido en Shopify hasta que lo
-          confirmó (pasa el cursor para ver el promedio).
-          {sinEscribir.length ? ` ${sinEscribir.join(", ")} todavía no tiene encendido «Escribir en Shopify»: ahí no se puede confirmar desde el sistema.` : ""}
-        </p>
-      </section>
-
-      <section aria-label="Cola de cada tienda" className="flex flex-col gap-2">
-        <h2 className="m-0 text-sm font-semibold">Cola ahora</h2>
-        <div className="overflow-x-auto rounded-lg border border-border bg-card">
-          <table className="w-full min-w-[32rem] border-collapse">
-            <thead className="bg-muted">
-              <tr>
-                <th className={th}>Tienda</th>
-                <th className={thN}>Por confirmar</th>
-                <th className={thN}>Esperando respuesta</th>
-                <th className={thN}>El más viejo lleva</th>
-              </tr>
-            </thead>
-            <tbody>
-              {cola.map((c) => (
-                <tr key={c.tienda.id} className="border-t border-border/60">
-                  <td className={`${td} font-medium`}>
-                    <Link href={rutaCon("/tienda-pedidos/confirmacion", { tienda: c.tienda.id })} className={`underline-offset-2 hover:underline ${anilloFoco}`}>
-                      {c.tienda.nombre}
-                    </Link>
-                  </td>
-                  <td className={tdN}>{num(c.porConfirmar)}</td>
-                  <td className={tdN}>{num(c.esperando)}</td>
-                  <td className={tdN}>{c.masViejo ?? "—"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
+      <PanelAsesores datos={datos} />
     </Pagina>
   );
 }
