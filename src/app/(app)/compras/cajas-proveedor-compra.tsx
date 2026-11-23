@@ -1,5 +1,6 @@
 "use client";
 
+import { FotoAmpliable } from "@/components/ui/foto-ampliable";
 import { useCallback, useEffect, useState } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { Seccion } from "@/components/ui/seccion-ficha";
@@ -42,8 +43,7 @@ export function CajasProveedorCompraBloque({ compraId }: { compraId: string }) {
                   {datos.etiquetas.map((e, i) => (
                     <li key={e.ruta}>
                       <a href={e.url} target="_blank" rel="noopener noreferrer" aria-label={`Ver etiqueta ${i + 1}`} className={`block overflow-hidden rounded-md border border-border bg-card ${anilloFoco}`}>
-                        {/* eslint-disable-next-line @next/next/no-img-element -- la etiqueta es una dirección firmada del almacenamiento privado */}
-                        <img src={e.url} alt={`Etiqueta de las cajas ${i + 1}`} className="h-28 w-28 object-contain" />
+                        <FotoAmpliable src={e.url} alt={`Etiqueta de las cajas ${i + 1}`} className="h-28 w-28 object-contain" />
                       </a>
                     </li>
                   ))}

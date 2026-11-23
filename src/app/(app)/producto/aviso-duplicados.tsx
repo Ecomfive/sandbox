@@ -1,5 +1,6 @@
 "use client";
 
+import { FotoAmpliable } from "@/components/ui/foto-ampliable";
 import { useEffect, useState } from "react";
 import type { PosibleDuplicado } from "@/lib/wms/duplicados";
 import { buscarPosiblesDuplicados } from "./actions";
@@ -40,8 +41,7 @@ export function AvisoDuplicados({ nombre, foto }: { nombre: string; foto: string
         {duplicados.map((d) => (
           <li key={d.id} className="flex items-center gap-3">
             {d.foto ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={d.foto} alt="" loading="lazy" className="h-10 w-10 shrink-0 rounded-md border border-border object-cover" />
+              <FotoAmpliable src={d.foto} alt="" className="h-10 w-10 shrink-0 rounded-md border border-border object-cover" />
             ) : (
               <span aria-hidden="true" className="h-10 w-10 shrink-0 rounded-md border border-dashed border-border" />
             )}

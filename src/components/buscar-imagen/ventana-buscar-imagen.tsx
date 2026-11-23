@@ -1,5 +1,6 @@
 "use client";
 
+import { FotoAmpliable } from "@/components/ui/foto-ampliable";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Badge, type Tone } from "@/components/ui/badge";
@@ -187,8 +188,7 @@ export function VentanaBuscarImagen({
                     <li key={`${c.ambito}:${c.id}`}>
                       <Link href={c.href} className={`flex items-start gap-3 px-3 py-2.5 hover:bg-muted ${anilloFoco} ${c.veredicto === "distinto" ? "opacity-60" : ""}`}>
                         {c.foto ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={c.foto} alt="" loading="lazy" className="h-12 w-12 shrink-0 rounded-md border border-border bg-white object-contain" />
+                          <FotoAmpliable toque={false} src={c.foto} alt="" className="h-12 w-12 shrink-0 rounded-md border border-border bg-white object-contain" />
                         ) : (
                           <span aria-hidden="true" className="h-12 w-12 shrink-0 rounded-md bg-muted" />
                         )}

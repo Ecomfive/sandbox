@@ -1,6 +1,6 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element -- fotos de Storage */
+import { FotoAmpliable } from "@/components/ui/foto-ampliable";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -31,7 +31,7 @@ function TarjetaTarea({ t, alAbrir }: { t: Tarea; alAbrir: () => void }) {
       className={`flex min-w-0 gap-3 border-b border-border px-4 py-3 transition-colors hover:bg-muted/50 sm:border-r ${anilloFoco}`}
     >
       {t.foto ? (
-        <img src={t.foto} alt="" loading="lazy" className="h-10 w-10 shrink-0 rounded-md border border-border object-cover" />
+        <FotoAmpliable src={t.foto} alt="" className="h-10 w-10 shrink-0 rounded-md border border-border object-cover" />
       ) : (
         <span aria-hidden="true" className="h-10 w-10 shrink-0 rounded-md border border-dashed border-border-control" />
       )}

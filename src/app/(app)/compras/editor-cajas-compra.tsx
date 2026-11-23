@@ -1,5 +1,6 @@
 "use client";
 
+import { FotoAmpliable } from "@/components/ui/foto-ampliable";
 import { useEffect, useRef, useState } from "react";
 import { anilloFoco, fieldClass, labelClass } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
@@ -116,8 +117,7 @@ export function EditorCajasCompra({ compraId, titulo, alCerrar, alGuardar }: { c
                 <ul className="m-0 flex list-none flex-wrap gap-2 p-0">
                   {existentes.map((e, i) => (
                     <li key={e.ruta} className="relative">
-                      {/* eslint-disable-next-line @next/next/no-img-element -- dirección firmada del almacenamiento privado */}
-                      <img src={e.url} alt={`Etiqueta de las cajas ${i + 1}`} className="h-24 w-24 rounded-md border border-border bg-card object-contain" />
+                      <FotoAmpliable src={e.url} alt={`Etiqueta de las cajas ${i + 1}`} className="h-24 w-24 rounded-md border border-border bg-card object-contain" />
                       <button type="button" aria-label={`Quitar la etiqueta ${i + 1}`} onClick={() => setQuitar((xs) => [...xs, e.ruta])} className={`absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full border border-border bg-card shadow-sm ${anilloFoco}`}>
                         <CerrarIcon className="h-3 w-3" />
                       </button>

@@ -1,6 +1,6 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element -- fotos de Storage */
+import { FotoAmpliable } from "@/components/ui/foto-ampliable";
 import { CodigosProducto } from "@/components/ui/codigos-producto";
 import Link from "next/link";
 import { useState, useTransition } from "react";
@@ -101,7 +101,7 @@ function FilaAlerta({ a, puedeEscribir }: { a: AlertaSinStock; puedeEscribir: bo
     <li className="flex flex-col gap-3 px-5 py-4">
       <div className="flex flex-wrap items-start gap-4">
         {a.foto ? (
-          <img src={a.foto} alt="" loading="lazy" className="h-14 w-14 shrink-0 rounded-lg border border-border object-cover" />
+          <FotoAmpliable src={a.foto} alt="" className="h-14 w-14 shrink-0 rounded-lg border border-border object-cover" />
         ) : (
           <span aria-hidden="true" className="h-14 w-14 shrink-0 rounded-lg border border-dashed border-border" />
         )}

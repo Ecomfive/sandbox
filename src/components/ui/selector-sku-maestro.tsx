@@ -1,5 +1,6 @@
 "use client";
 
+import { FotoAmpliable } from "@/components/ui/foto-ampliable";
 import { createContext, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { fieldClass } from "@/components/ui/field";
@@ -40,8 +41,7 @@ const buscar = buscarProductos;
 /** Miniatura de 32 × 32 (o un cuadro vacío del mismo tamaño). */
 function Miniatura({ foto }: { foto?: string | null }) {
   return foto ? (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img src={foto} alt="" loading="lazy" className="h-8 w-8 shrink-0 rounded-md border border-border object-cover" />
+    <FotoAmpliable toque={false} src={foto} alt="" className="h-8 w-8 shrink-0 rounded-md border border-border object-cover" />
   ) : (
     <span aria-hidden="true" className="h-8 w-8 shrink-0 rounded-md border border-dashed border-border" />
   );

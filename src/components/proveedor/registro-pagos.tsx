@@ -1,6 +1,6 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element -- fotos de Storage */
+import { FotoAmpliable } from "@/components/ui/foto-ampliable";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { anilloFoco } from "@/components/ui/field";
@@ -157,7 +157,7 @@ export function RegistroPagos({ filas, guardar, pista, cambios = [] }: { filas: 
                     <td className="min-w-[17rem] px-3 py-2">
                       <span className="flex items-center gap-2.5">
                         {f.foto ? (
-                          <img src={f.foto} alt="" loading="lazy" className="h-11 w-11 shrink-0 rounded-lg border border-border object-cover" />
+                          <FotoAmpliable src={f.foto} alt="" className="h-11 w-11 shrink-0 rounded-lg border border-border object-cover" />
                         ) : (
                           <span aria-hidden="true" className="h-11 w-11 shrink-0 rounded-lg border border-dashed border-border-control" />
                         )}

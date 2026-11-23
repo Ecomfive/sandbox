@@ -1,5 +1,6 @@
 "use client";
 
+import { FotoAmpliable } from "@/components/ui/foto-ampliable";
 import { useMemo, useState, useTransition, type ReactNode } from "react";
 import { claseThLista, claseTdLista, Indicador, MarcoTabla, Pastilla, TableroIndicadores } from "@/components/panel/piezas-panel";
 import { Button } from "@/components/ui/button";
@@ -148,8 +149,7 @@ export function VinculosTienda({ filas, varias, puedeEscribir }: { filas: FilaVi
                   <tr key={f.id} className="align-middle hover:bg-muted/40">
                     <td className={claseTdLista}>
                       {f.foto ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={f.foto} alt="" loading="lazy" className="h-10 w-10 rounded-md border border-border object-cover" />
+                        <FotoAmpliable src={f.foto} alt="" className="h-10 w-10 rounded-md border border-border object-cover" />
                       ) : (
                         <span aria-hidden="true" className="block h-10 w-10 rounded-md border border-dashed border-border" />
                       )}

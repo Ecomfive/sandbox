@@ -60,6 +60,16 @@ export async function stockInventario(supabase: SupabaseClient, origenes: Bodega
   return fuera;
 }
 
+/** La foto de cada producto de los pedidos (23 nov 2026: se ve en la tabla y se agranda al pasar el cursor). */
+export async function fotosDeProductos(supabase: SupabaseClient, ids: string[]): Promise<Record<string, string>> {
+  const fuera: Record<string, string> = {};
+  for (let i = 0; i < ids.length; i += 200) {
+    const { data } = await supabase.from("skus_maestros").select("id, foto_url").in("id", ids.slice(i, i + 200)).not("foto_url", "is", null);
+    for (const s of data ?? []) if (s.foto_url) fuera[s.id as string] = s.foto_url as string;
+  }
+  return fuera;
+}
+
 /** Lo que la ficha de stock usa de cada producto de los pedidos (20 nov 2026: en Comunicación despacho se abre al tocar el producto). */
 export async function fichasDeProductos(
   supabase: SupabaseClient,

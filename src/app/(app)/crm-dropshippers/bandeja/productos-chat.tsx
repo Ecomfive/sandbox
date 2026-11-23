@@ -1,5 +1,6 @@
 "use client";
 
+import { FotoAmpliable } from "@/components/ui/foto-ampliable";
 import { useEffect, useRef, useState } from "react";
 import { anilloFoco } from "@/components/ui/field";
 import { cuantoFalta, type MencionEnChat } from "@/lib/crm/productos-chat";
@@ -124,8 +125,7 @@ export function ProductosDelChatFicha({
           {datos.productos.map((p) => (
             <div key={p.id} className="flex gap-2.5 rounded-lg border border-[var(--wa-borde)] bg-[var(--wa-fondo)] px-2.5 py-2">
               {p.foto ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={p.foto} alt="" className="h-10 w-10 flex-none rounded-md object-cover" />
+                <FotoAmpliable src={p.foto} alt="" className="h-10 w-10 flex-none rounded-md object-cover" />
               ) : (
                 <span aria-hidden="true" className="h-10 w-10 flex-none rounded-md bg-[var(--wa-panel)]" />
               )}

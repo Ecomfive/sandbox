@@ -1,6 +1,6 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element -- fotos de Storage */
+import { FotoAmpliable } from "@/components/ui/foto-ampliable";
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { BotonBarra } from "@/components/panel/piezas-panel";
@@ -13,7 +13,7 @@ const MAX_BYTES = 5 * 1024 * 1024;
 /** La miniatura de una variante: su foto o, si no tiene, la del producto principal (un cuadro vacío solo si ninguno la tiene). */
 export function MiniaturaVariante({ foto, nombre, tam = "h-9 w-9" }: { foto: string | null | undefined; nombre: string; tam?: string }) {
   return foto ? (
-    <img src={foto} alt={`Foto de ${nombre}`} loading="lazy" className={`${tam} shrink-0 rounded-md border border-border object-cover`} />
+    <FotoAmpliable src={foto} alt={`Foto de ${nombre}`} className={`${tam} shrink-0 rounded-md border border-border object-cover`} />
   ) : (
     <span aria-hidden="true" className={`${tam} shrink-0 rounded-md border border-dashed border-border bg-muted`} />
   );

@@ -1,5 +1,6 @@
 "use client";
 
+import { FotoAmpliable } from "@/components/ui/foto-ampliable";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { ContenedorTabla } from "@/components/tabla/contenedor-tabla";
@@ -272,8 +273,7 @@ export function DescubrirProveedores({ lectura, proveedores, puedeLeer, puedeSeg
                         <span className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                           {p.destacados.map((d) => (
                             <span key={d.nombre} className="inline-flex max-w-[16rem] items-center gap-1.5">
-                              {/* eslint-disable-next-line @next/next/no-img-element -- fotos de Dropi (CloudFront), sin optimizar */}
-                              {foto(d.foto) ? <img src={foto(d.foto)!} alt="" loading="lazy" className="h-7 w-7 shrink-0 rounded border border-border object-cover" /> : null}
+                              {foto(d.foto) ? <FotoAmpliable src={foto(d.foto)!} alt="" className="h-7 w-7 shrink-0 rounded border border-border object-cover" /> : null}
                               <span className="truncate">
                                 {d.nombre}
                                 {d.ventas ? ` · ${formatoNumero(d.ventas)} u.` : ""}

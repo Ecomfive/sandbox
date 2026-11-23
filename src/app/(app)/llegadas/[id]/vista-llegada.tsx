@@ -1,5 +1,6 @@
 "use client";
 
+import { FotoAmpliable } from "@/components/ui/foto-ampliable";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -191,8 +192,7 @@ export function FotoProducto({ fila, abrir }: { fila: FilaLlegada; abrir: (e: Et
       className="h-14 w-14 shrink-0 cursor-pointer overflow-hidden rounded-md border border-border bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
       aria-label={`Ver la foto de ${textoProductos(fila)}`}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={fila.foto} alt="" className="h-full w-full object-cover" />
+      <FotoAmpliable src={fila.foto} alt="" className="h-full w-full object-cover" />
     </button>
   ) : (
     <span aria-hidden="true" className="h-14 w-14 shrink-0 rounded-md border border-dashed border-border" />
@@ -226,8 +226,7 @@ export function FilaPuerto({ fila, etiquetas, abrir }: { fila: FilaLlegada; etiq
               className="h-14 w-14 cursor-pointer overflow-hidden rounded-md border border-border bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
               aria-label={`Ver la etiqueta ${i + 1} de las cajas de ${textoProductos(fila)}`}
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={e.url} alt="" className="h-full w-full object-cover" />
+              <FotoAmpliable src={e.url} alt="" className="h-full w-full object-cover" />
             </button>
           ))
         )}

@@ -1,5 +1,6 @@
 "use client";
 
+import { FotoAmpliable } from "@/components/ui/foto-ampliable";
 import { useEffect, useState, useTransition } from "react";
 import { anilloFoco, fieldClassSm } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
@@ -152,8 +153,7 @@ export function RecomendacionesDropshipper({ dropshipperId, version, puedeEscrib
                 className={`flex w-full items-center gap-2.5 rounded text-left ${anilloFoco}`}
               >
                 {r.fotoUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={r.fotoUrl} alt="" className="h-8 w-8 shrink-0 rounded-md border border-border object-cover" />
+                  <FotoAmpliable src={r.fotoUrl} alt="" className="h-8 w-8 shrink-0 rounded-md border border-border object-cover" />
                 ) : (
                   <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-dashed border-border text-muted-foreground">
                     <AdjuntoIcon className="h-3.5 w-3.5" />

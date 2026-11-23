@@ -1,5 +1,6 @@
 "use client";
 
+import { FotoAmpliable } from "@/components/ui/foto-ampliable";
 import { useEffect, useId, useRef, useState, useTransition, type KeyboardEvent, type ReactNode, type RefObject } from "react";
 import { anilloFoco, fieldClass, labelClassSm } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
@@ -506,8 +507,7 @@ export function ChipPublicacion({ p, chico = false }: { p: PublicacionDeTarea | 
   return (
     <span className="flex min-w-0 items-center gap-2">
       {p.fotoUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={p.fotoUrl} alt="" className={`${foto} shrink-0 rounded-md border border-border object-cover`} loading="lazy" />
+        <FotoAmpliable src={p.fotoUrl} alt="" className={`${foto} shrink-0 rounded-md border border-border object-cover`} />
       ) : (
         <span className={`flex ${foto} shrink-0 items-center justify-center rounded-md border border-border bg-muted text-muted-foreground`}>
           <SinFotoIcon className="h-3.5 w-3.5" />

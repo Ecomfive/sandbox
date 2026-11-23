@@ -20,6 +20,7 @@ import { Indicador, TableroIndicadores } from "@/components/panel/piezas-panel";
 import { Badge } from "@/components/ui/badge";
 import { anilloFoco, fieldClass } from "@/components/ui/field";
 import { FichaStock, type SkuFicha } from "@/app/(app)/inventario/ficha-stock";
+import { MiniaturaFoto } from "@/components/ui/miniatura-foto";
 import { CampoSkuMaestro, ProveedorSkusMaestros, type OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import { useToast } from "@/components/ui/toast";
 import { Ventana } from "@/components/ui/ventana";
@@ -387,6 +388,7 @@ function FilasPedido({
   opciones,
   hayEnInventario,
   columnas,
+  fotos,
 }: {
   p: PedidoInventario;
   columnas: number;
@@ -399,6 +401,8 @@ function FilasPedido({
   hayEnInventario: Record<string, StockInventario>;
   /** Abre la ficha de stock del producto (null = no se puede: falta el permiso de Inventario). */
   abrirFicha: ((skuId: string) => void) | null;
+  /** La foto de cada producto (23 nov 2026: se agranda al pasar el cursor o con un toque). */
+  fotos: Record<string, string>;
 }) {
   const { ocupado, correr } = useAccion();
   const enInventario = modo === "inventario";
@@ -628,18 +632,21 @@ function FilasPedido({
             )}
             <td className={`${borde} font-mono text-xs text-muted-foreground`}>{it.codigo ?? "—"}</td>
             <td className={`${borde} font-medium`}>
-              {abrirFicha && it.skuId ? (
-                <button
-                  type="button"
-                  onClick={() => abrirFicha(it.skuId)}
-                  title="Ver cómo está repartido su stock"
-                  className={`rounded text-left font-medium text-primario underline-offset-2 hover:underline ${anilloFoco}`}
-                >
-                  {it.producto}
-                </button>
-              ) : (
-                it.producto
-              )}
+              <span className="flex items-start gap-2">
+                <MiniaturaFoto url={fotos[it.skuId] ?? null} nombre={it.producto} />
+                {abrirFicha && it.skuId ? (
+                  <button
+                    type="button"
+                    onClick={() => abrirFicha(it.skuId)}
+                    title="Ver cómo está repartido su stock"
+                    className={`rounded text-left font-medium text-primario underline-offset-2 hover:underline ${anilloFoco}`}
+                  >
+                    {it.producto}
+                  </button>
+                ) : (
+                  <span>{it.producto}</span>
+                )}
+              </span>
             </td>
             <td className={`${borde} text-right tabular-nums`}>{it.cantidadPedida.toLocaleString("es-PA")}</td>
             {/* En Comunicación despacho no van «Pedido por» ni «Responsable bodega» (20 nov 2026): siempre son las mismas personas. */}
@@ -759,6 +766,7 @@ export function TablaPedidos({
   fichas = null,
   opciones = [],
   hayEnInventario = {},
+  fotos = {},
 }: {
   pedidos: PedidoInventario[];
   modo: "despacho" | "inventario";
@@ -770,6 +778,8 @@ export function TablaPedidos({
   /** Para que despacho edite un pedido: los productos que puede pedir y lo que hay de cada uno en inventario. */
   opciones?: OpcionSkuMaestro[];
   hayEnInventario?: Record<string, StockInventario>;
+  /** La foto de cada producto de los pedidos (23 nov 2026). */
+  fotos?: Record<string, string>;
 }) {
   const [ficha, setFicha] = useState<string | null>(null);
   const columnas = modo === "inventario" ? 8 : 9;
@@ -802,7 +812,7 @@ export function TablaPedidos({
           ) : (
             pedidos.map((p) => (
               <Fragment key={p.id}>
-                <FilasPedido p={p} modo={modo} puedeEscribir={puedeEscribir} origenes={origenes} stock={stock} abrirFicha={fichas ? (id) => fichas[id] && setFicha(id) : null} opciones={opciones} hayEnInventario={hayEnInventario} columnas={columnas} />
+                <FilasPedido p={p} modo={modo} puedeEscribir={puedeEscribir} origenes={origenes} stock={stock} abrirFicha={fichas ? (id) => fichas[id] && setFicha(id) : null} opciones={opciones} hayEnInventario={hayEnInventario} columnas={columnas} fotos={fotos} />
               </Fragment>
             ))
           )}

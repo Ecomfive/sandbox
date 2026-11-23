@@ -1,5 +1,6 @@
 "use client";
 
+import { FotoAmpliable } from "@/components/ui/foto-ampliable";
 import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
 import { anilloFoco, fieldClass, labelClass } from "@/components/ui/field";
@@ -12,8 +13,7 @@ import { buscarParaUnir, simularUnion, unirProductos, type OpcionesUnion } from 
 
 function Miniatura({ foto }: { foto: string | null }) {
   return foto ? (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img src={foto} alt="" loading="lazy" className="h-10 w-10 shrink-0 rounded-md border border-border object-cover" />
+    <FotoAmpliable src={foto} alt="" className="h-10 w-10 shrink-0 rounded-md border border-border object-cover" />
   ) : (
     <span aria-hidden="true" className="h-10 w-10 shrink-0 rounded-md border border-dashed border-border" />
   );

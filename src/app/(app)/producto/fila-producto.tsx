@@ -1,6 +1,6 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element -- fotos de Storage */
+import { FotoAmpliable } from "@/components/ui/foto-ampliable";
 import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { anilloFoco } from "@/components/ui/field";
@@ -145,7 +145,7 @@ export function FilaProductoLista({ p, alAbrir }: { p: FilaProducto; alAbrir: ()
       {/* Producto */}
       <span className="flex min-w-0 items-center gap-3">
         {p.foto ? (
-          <img src={p.foto} alt="" loading="lazy" className="h-12 w-12 shrink-0 rounded-lg border border-border object-cover" />
+          <FotoAmpliable src={p.foto} alt="" className="h-12 w-12 shrink-0 rounded-lg border border-border object-cover" />
         ) : (
           <span role="img" aria-label="Sin foto" className="h-12 w-12 shrink-0 rounded-lg border border-dashed border-border-control" />
         )}
