@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { fieldClassSm } from "@/components/ui/field";
+import { filtrarProductos } from "@/lib/meta-ads/topes";
+import { claveDeProducto } from "@/lib/meta-ads/nombre";
 import { Tooltip } from "@/components/ui/tooltip";
 import { DIMENSIONES_ANUNCIO, DIMENSIONES_CAMPANA, type DimensionAnuncio, type DimensionCampana, type GruposMeta } from "@/lib/meta-ads/datos";
 import { DIMENSIONES_VIDEO, EXPLICACION_DIMENSION_VIDEO, esGanador, esPerdedor, mejorGrupo, MEZCLA_DE_ANGULOS, sumaDeGrupos, UMBRAL_DOMINANTE, ventajaDeCpa, type DimensionVideo, type GruposDeVideo } from "@/lib/meta-ads/atributos-video";
@@ -55,6 +57,9 @@ export function QueFunciona({ productos, productoActual, grupos, gruposVideo, vi
   const [dimVideo, setDimVideo] = useState<DimensionVideo>("Ángulo");
   const [dimCampana, setDimCampana] = useState<DimensionCampana>("Ángulo");
   const [dimAnuncio, setDimAnuncio] = useState<DimensionAnuncio>("Copy");
+  // Lo que se escribe para encontrar un producto en la lista de Productos.
+  const [buscarProducto, setBuscarProducto] = useState("");
+  const [escrito, setEscrito] = useState<string | null>(null);
 
   const conclusiones: Conclusion[] = [
     conclusion("Ángulo del video", "Ángulo", gruposVideo.grupos["Ángulo"], "videos"),
@@ -94,16 +99,35 @@ export function QueFunciona({ productos, productoActual, grupos, gruposVideo, vi
       <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card px-4 py-2.5">
         <label className="flex items-center gap-2 text-sm">
           <span className="text-xs font-medium text-muted-foreground">Ver por producto</span>
-          <select value={productoActual ?? ""} onChange={(e) => elegirProducto(e.target.value)} className={`${fieldClassSm} w-auto min-w-[16rem] max-w-full`}>
-            <option value="">Todos los productos</option>
-            {productos.map((p) => (
-              <option key={p.clave} value={p.clave}>
-                {p.nombre}
-              </option>
+          <input
+            type="search"
+            list="productos-que-funciona"
+            value={escrito ?? nombreProducto ?? ""}
+            onChange={(e) => {
+              setEscrito(e.target.value);
+              // Al escribir el nombre completo (o elegirlo de la lista) se abre ese producto.
+              const exacto = productos.find((p) => p.nombre.toLocaleLowerCase("es") === e.target.value.trim().toLocaleLowerCase("es"));
+              if (exacto) {
+                setEscrito(null);
+                elegirProducto(exacto.clave);
+              }
+            }}
+            placeholder="Escribe el nombre de un producto"
+            autoComplete="off"
+            className={`${fieldClassSm} w-[min(22rem,80vw)]`}
+          />
+          <datalist id="productos-que-funciona">
+            {filtrarProductos(productos.map((p) => ({ producto: p.nombre })), escrito ?? "").slice(0, 60).map((p) => (
+              <option key={p.producto} value={p.producto} />
             ))}
-          </select>
+          </datalist>
         </label>
-        <p className="m-0 text-xs text-muted-foreground">{nombreProducto ? `Todo lo de abajo sale solo de «${nombreProducto}».` : "Elige un producto para ver qué ángulos, ganchos y formatos funcionan con él."}</p>
+        {productoActual && (
+          <button type="button" onClick={() => { setEscrito(null); elegirProducto(""); }} className="min-h-8 rounded-md border border-border-control bg-card px-3 py-1 text-xs font-medium hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground">
+            Ver todos los productos
+          </button>
+        )}
+        <p className="m-0 text-xs text-muted-foreground">{nombreProducto ? `Todo lo de abajo sale solo de «${nombreProducto}».` : "Escribe o elige un producto para ver qué ángulos, ganchos y formatos funcionan con él."}</p>
       </div>
       <TarjetaMeta titulo="Lo que ya sabemos" derecha="Firme: datos de sobra · Probable: va bien, falta data · Poca data: menos de $100" id="conclusiones">
         {!hayAlgo ? (
@@ -141,15 +165,6 @@ export function QueFunciona({ productos, productoActual, grupos, gruposVideo, vi
         </div>
       </div>
 
-      {seccion === "productos" && (
-        <p className="m-0 rounded-xl border border-border bg-card px-4 py-2.5 text-sm text-muted-foreground">
-          Cada producto suma todas sus campañas del periodo. Para ver qué ángulos, ganchos y formatos funcionan con uno solo, elígelo arriba en «Ver por producto» o ábrelo en{" "}
-          <Link href="/anuncios-meta/productos" className="font-medium text-foreground underline underline-offset-2">
-            Productos
-          </Link>
-          .
-        </p>
-      )}
       {seccion === "videos" && dimVideo === "Gancho" && escribe && <ClasificarGanchos pendientes={ganchosSinTipo} iaConectada={iaConectada} />}
       {seccion === "videos" && dimVideo === "Ángulo" && videosSinAngulo > 0 && (
         <p className="m-0 rounded-xl border border-border bg-card px-4 py-2.5 text-sm text-muted-foreground">
@@ -165,8 +180,39 @@ export function QueFunciona({ productos, productoActual, grupos, gruposVideo, vi
         </p>
       )}
 
-      {lista.length === 0 ? (
+      {seccion === "productos" && productoActual ? (
+        <DetalleDeProducto
+          nombre={nombreProducto ?? lista[0]?.nombre ?? "Producto"}
+          grupo={lista[0] ?? null}
+          gruposVideo={gruposVideo}
+          dimVideo={dimVideo}
+          alElegirDimension={setDimVideo}
+        />
+      ) : lista.length === 0 ? (
         <p className="m-0 rounded-xl border border-border bg-card px-4 py-6 text-sm text-muted-foreground">{vacio}</p>
+      ) : seccion === "productos" ? (
+        <>
+          <label className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="text-xs font-medium text-muted-foreground">Buscar un producto</span>
+            <input type="search" value={buscarProducto} onChange={(e) => setBuscarProducto(e.target.value)} placeholder="Parte del nombre, sin importar acentos" autoComplete="off" className={`${fieldClassSm} w-[min(22rem,80vw)]`} />
+            <span className="text-xs text-muted-foreground" aria-live="polite">
+              {buscarProducto.trim() ? `${filtrarProductos(lista.map((g) => ({ ...g, producto: g.nombre })), buscarProducto).length} de ${lista.length} productos` : `${lista.length} productos`}
+            </span>
+          </label>
+          <p className="m-0 text-xs text-muted-foreground">Toca un producto para ver sus ángulos, ganchos, formatos, llamados a la acción y lo demás que se mide en sus videos.</p>
+          <TablaDeGrupos
+            grupos={lista}
+            filas={filtrarProductos(lista.map((g) => ({ ...g, producto: g.nombre })), buscarProducto)}
+            dimension="Producto"
+            unidad="Campañas"
+            sinDato={0}
+            porVideo={false}
+            alElegir={(g) => {
+              const p = productos.find((x) => x.clave === claveDeProducto(g.nombre));
+              if (p) elegirProducto(p.clave);
+            }}
+          />
+        </>
       ) : (
         <TablaDeGrupos grupos={lista} dimension={dimActual} unidad={unidad} sinDato={sinDato} porVideo={seccion === "videos"} />
       )}
@@ -214,8 +260,48 @@ function TarjetaConclusion({ c }: { c: Conclusion }) {
   );
 }
 
+/**
+ * Lo que se sabe de un producto (23 nov 2026, pedido de Alcides: «ver los ángulos de ese producto y lo demás que se ve en los videos»): su resumen y, con las mismas dimensiones de la pestaña Videos
+ * (ángulo, gancho, formato, llamado a la acción, recursos, estructura, duración, momento del llamado y oferta), cómo funciona cada cosa solo en sus videos. La pantalla ya está calculada con ese producto.
+ */
+function DetalleDeProducto({ nombre, grupo, gruposVideo, dimVideo, alElegirDimension }: { nombre: string; grupo: Grupo | null; gruposVideo: GruposDeVideo; dimVideo: DimensionVideo; alElegirDimension: (d: DimensionVideo) => void }) {
+  const lista = gruposVideo.grupos[dimVideo];
+  return (
+    <div className="flex flex-col gap-4">
+      <TarjetaMeta titulo={nombre} derecha={grupo ? `${grupo.campanas} ${grupo.campanas === 1 ? "campaña" : "campañas"} · ${dolaresEnteros(grupo.r.gasto)} gastados` : "Sin campañas con gasto en el periodo"} id="detalle-producto">
+        {grupo ? (
+          <p className="m-0 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm tabular-nums">
+            <span className="font-semibold">CPA {valorCpa(grupo.r)}</span>
+            <span>{entero(grupo.r.compras)} compras</span>
+            <span>
+              CTR <Nivel nivel={nivelDeCtr(ctr(grupo.r))}>{porcentaje(ctr(grupo.r))}</Nivel>
+            </span>
+            <span>
+              Hook <Nivel nivel={nivelDeHook(hookRate(grupo.r))}>{porcentaje(hookRate(grupo.r), 0)}</Nivel>
+            </span>
+            <InsigniaCerteza certeza={grupo.certeza} motivo={motivoDeCerteza(grupo.r, grupo.campanas, "campañas")} />
+          </p>
+        ) : (
+          <p className="m-0 text-sm text-muted-foreground">Este producto no gastó nada en el periodo elegido.</p>
+        )}
+      </TarjetaMeta>
+      <div role="group" aria-label={`Ver de ${nombre} por`} className="flex flex-wrap gap-1.5">
+        {DIMENSIONES_VIDEO.map((d) => (
+          <Chip key={d} activo={d === dimVideo} texto={d} ayuda={EXPLICACION_DIMENSION_VIDEO[d]} alPulsar={() => alElegirDimension(d)} />
+        ))}
+      </div>
+      {lista.length === 0 ? (
+        <p className="m-0 rounded-xl border border-border bg-card px-4 py-6 text-sm text-muted-foreground">Ningún video de este producto con gasto en el periodo tiene este dato todavía. Los datos se leen de cada video: analízalos en la pestaña Videos.</p>
+      ) : (
+        <TablaDeGrupos grupos={lista} dimension={dimVideo} unidad="Videos" sinDato={gruposVideo.sinDato[dimVideo]} porVideo />
+      )}
+      <p className="m-0 text-xs text-muted-foreground">Cambia a Campañas o Anuncios arriba para ver lo mismo de este producto desde esas miradas.</p>
+    </div>
+  );
+}
+
 /** Los grupos de una dimensión: la comparación de CPA con su promedio y la tabla completa. */
-function TablaDeGrupos({ grupos, dimension, unidad, sinDato, porVideo }: { grupos: Grupo[]; dimension: string; unidad: string; sinDato: number; porVideo: boolean }) {
+function TablaDeGrupos({ grupos, filas, alElegir, dimension, unidad, sinDato, porVideo }: { grupos: Grupo[]; /** Las filas de la tabla si son menos que los grupos (una búsqueda): los promedios y las barras siguen midiendo todos. */ filas?: Grupo[]; /** Si viene, el nombre de cada fila se puede tocar (abre ese producto). */ alElegir?: (g: Grupo) => void; dimension: string; unidad: string; sinDato: number; porVideo: boolean }) {
   const total = sumaDeGrupos(grupos);
   const promedio = total.r.compras > 0 ? total.r.gasto / total.r.compras : null;
   const conCompras = grupos.filter((g) => g.r.compras > 0).slice(0, 10);
@@ -293,14 +379,20 @@ function TablaDeGrupos({ grupos, dimension, unidad, sinDato, porVideo }: { grupo
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {grupos.map((g) => {
+              {(filas ?? grupos).map((g) => {
                 const ventaja = ventajaDeCpa(g, total.r);
                 return (
                   <tr key={g.nombre} className={g.confiable ? "" : "text-muted-foreground"}>
                     <th scope="row" className="max-w-[26rem] px-4 py-2.5 text-left font-medium">
-                      <span className="block truncate" title={g.nombre}>
-                        {g.nombre}
-                      </span>
+                      {alElegir ? (
+                        <button type="button" onClick={() => alElegir(g)} title={`Ver qué funciona de ${g.nombre}`} className="block max-w-full cursor-pointer truncate text-left font-medium underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground">
+                          {g.nombre}
+                        </button>
+                      ) : (
+                        <span className="block truncate" title={g.nombre}>
+                          {g.nombre}
+                        </span>
+                      )}
                       <span className="mt-1.5 block w-40 max-w-full">
                         <BarraProgreso valor={g.r.gasto} maximo={maxGasto} color={esGanador(g) ? "var(--success)" : esPerdedor(g) ? "var(--destructive)" : "var(--grafica-5)"} alto={4} />
                       </span>
@@ -323,6 +415,7 @@ function TablaDeGrupos({ grupos, dimension, unidad, sinDato, porVideo }: { grupo
               })}
             </tbody>
           </table>
+          {(filas ?? grupos).length === 0 && <p className="m-0 px-4 py-4 text-sm text-muted-foreground">Ningún producto tiene esas palabras en su nombre.</p>}
         </div>
         {(conSinConfiar || sinDato > 0) && (
           <p className="m-0 flex flex-col gap-1 border-t border-border px-4 py-2 text-xs text-muted-foreground">
