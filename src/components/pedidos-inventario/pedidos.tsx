@@ -56,6 +56,10 @@ import {
 const BOTON = "inline-flex min-h-9 items-center justify-center rounded-md px-3 text-sm font-semibold whitespace-nowrap disabled:opacity-50";
 const PRINCIPAL = `${BOTON} bg-primario text-white`;
 const SECUNDARIO = `${BOTON} border border-border bg-card text-foreground hover:bg-muted`;
+// Los botones de los pedidos que se confunden entre sí llevan su propio color (23 nov 2026, pedido de Jhokser): descargar = azul, archivar = violeta, deshacer o volver atrás = ámbar.
+const DESCARGA = `${BOTON} border border-azul/30 bg-azul-soft text-azul hover:brightness-95`;
+const ARCHIVO = `${BOTON} border border-primario/30 bg-primario-suave text-primario hover:brightness-95`;
+const DESHACER = `${BOTON} border border-warning/30 bg-warning-soft text-warning hover:brightness-95`;
 
 type Resultado = { ok: true; mensaje?: string } | { error: string };
 
@@ -365,7 +369,7 @@ function BotonPdfPedido({ p }: { p: PedidoInventario }) {
     }
   };
   return (
-    <button type="button" onClick={descargar} disabled={armando} aria-label={`Descargar el pedido ${numeroPedido(p.numero)} en PDF`} className={`${SECUNDARIO} gap-1.5`}>
+    <button type="button" onClick={descargar} disabled={armando} aria-label={`Descargar el pedido ${numeroPedido(p.numero)} en PDF`} className={`${DESCARGA} gap-1.5`}>
       <DescargarIcon className="h-4 w-4" aria-hidden="true" />
       {armando ? "Armando…" : "Descargar PDF"}
     </button>
@@ -452,7 +456,7 @@ function FilasPedido({
             </>
           )}
           {puedeVolverASolicitud(p.estado) && (
-            <button type="button" disabled={ocupado} onClick={() => correr(() => volverASolicitudPedido(p.id))} className={SECUNDARIO}>
+            <button type="button" disabled={ocupado} onClick={() => correr(() => volverASolicitudPedido(p.id))} className={DESHACER}>
               Volver a «Solicitud»
             </button>
           )}
@@ -484,7 +488,7 @@ function FilasPedido({
                     </button>
                   </div>
                 ) : (
-                  <button type="button" onClick={() => setDeshaciendoEnvio(true)} className={SECUNDARIO}>
+                  <button type="button" onClick={() => setDeshaciendoEnvio(true)} className={DESHACER}>
                     Deshacer envío
                   </button>
                 ))}
@@ -505,14 +509,14 @@ function FilasPedido({
             </button>
           )}
           {puedeReabrir(p.estado) && !p.archivadoEn && (
-            <button type="button" disabled={ocupado} onClick={() => correr(() => reabrirPedidoInventario(p.id))} className={SECUNDARIO}>
+            <button type="button" disabled={ocupado} onClick={() => correr(() => reabrirPedidoInventario(p.id))} className={DESHACER}>
               Reabrir pedido
             </button>
           )}
         </>
       )}
       {puedeEscribir && puedeArchivar(p.estado) && (
-        <button type="button" disabled={ocupado} onClick={() => correr(() => archivarPedidoInventario(p.id, !p.archivadoEn))} className={SECUNDARIO}>
+        <button type="button" disabled={ocupado} onClick={() => correr(() => archivarPedidoInventario(p.id, !p.archivadoEn))} className={ARCHIVO}>
           {p.archivadoEn ? "Sacar del archivo" : "Archivar pedido"}
         </button>
       )}
@@ -533,7 +537,7 @@ function FilasPedido({
             </button>
           </div>
         ) : (
-          <button type="button" onClick={() => setDeshaciendo(true)} className={SECUNDARIO}>
+          <button type="button" onClick={() => setDeshaciendo(true)} className={DESHACER}>
             Deshacer entrega
           </button>
         ))}
