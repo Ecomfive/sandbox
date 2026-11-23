@@ -2,6 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { anguloDeCampana, esHostDeVideoMeta, estructuraValida, normalizarAnalisisVideo, pedidoAnalisisVideo, recursosValidos, reutilizarAngulo } from "./video-angulo";
 
+test("el pedido de ángulo pide ser específico y no forzar un ángulo amplio que ya existe", () => {
+  const p = pedidoAnalisisVideo({ producto: null, copy: null, titulo: null, angulosExistentes: ["Vitalidad masculina"], soloTexto: false });
+  assert.match(p, /ESPECÍFICO/);
+  assert.match(p, /Salud de la próstata/);
+  assert.match(p, /No fuerces un ángulo amplio/);
+});
+
 test("el pedido trae el producto, el texto y los ángulos que ya existen", () => {
   const p = pedidoAnalisisVideo({ producto: "Shampoo anticaspa", copy: "Adiós a la caspa en 7 días", titulo: null, angulosExistentes: ["Dolor de espalda", "Oferta 2x1"], soloTexto: false });
   assert.match(p, /Mira el video completo/);

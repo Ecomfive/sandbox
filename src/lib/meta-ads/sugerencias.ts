@@ -93,7 +93,8 @@ export function sugerir(e: EntradaSugerencias): Sugerencia[] {
     if (c.etapa === "testing" && costo !== null && c.r.compras >= U.escalarCompras && confiable(c.r) && costo <= c.tope * U.escalarFactor) {
       s.push({ clave: `escalar:${c.id}`, tipo: "escalar", severidad: "media", positiva: true, titulo: `${c.nombre}: lista para escalar`, detalle: `${c.r.compras} compras con CPA ${dolares(costo)} (tope ${dolares(c.tope)}) y ${dolares(gasto)} gastados en 7 días.`, accion: "Subir el presupuesto un 20 a 30 % o duplicarla en una campaña de escala.", objeto: { tipo: "campana", id: c.id }, gasto });
     }
-    if (c.etapa === "escala") {
+    // Una campaña de ventas se vigila como una de escala: si su CPA empieza a subir, se avisa.
+    if (c.etapa === "escala" || c.etapa === "venta") {
       const ultimos = serie.filter((d) => diasEntre(d.fecha, e.hoy) < 3).reduce((a, d) => sumar(a, d.r), sinResultados());
       const antes = serie.filter((d) => diasEntre(d.fecha, e.hoy) >= 3 && diasEntre(d.fecha, e.hoy) < 10).reduce((a, d) => sumar(a, d.r), sinResultados());
       const cu = cpa(ultimos);

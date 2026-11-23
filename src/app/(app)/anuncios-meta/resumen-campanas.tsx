@@ -14,7 +14,7 @@ const EXPLICA_VEREDICTO: Record<Veredicto, string> = {
   poca_data: `Gastó menos de $${GASTO_MINIMO_CONFIABLE} en estas fechas: todavía no alcanza para decir si funciona. Elige un periodo más largo (30 días, 3 meses…) para que sumen más datos.`,
   sin_gasto: "Existe en la cuenta pero no gastó nada en estas fechas (pausada, archivada o sin entregas).",
 };
-const COLOR_ETAPA: Record<Etapa | "sin", string> = { testing: "var(--azul)", escala: "var(--success)", retargeting: "var(--warning)", sin: "var(--grafica-5)" };
+const COLOR_ETAPA: Record<Etapa | "sin", string> = { testing: "var(--azul)", venta: "var(--primario)", escala: "var(--success)", retargeting: "var(--warning)", sin: "var(--grafica-5)" };
 
 /**
  * Arriba de Campañas: cómo van todas las campañas del periodo de un vistazo — cuántas dejan ganancia o pierden, cuánto se gastó y qué dejó, en qué etapa están y de qué ángulos están hechas
@@ -27,7 +27,7 @@ export function ResumenCampanas({ campanas }: { campanas: CampanaVista[] }) {
   const sinTope = campanas.filter((c) => !c.topeDefinido && c.r.gasto > 0).length;
   const compras = campanas.reduce((s, c) => s + c.r.compras, 0);
   const total = campanas.reduce((s, c) => s + resultado(c.r, c.tope), 0);
-  const etapas: Record<Etapa | "sin", number> = { testing: 0, escala: 0, retargeting: 0, sin: 0 };
+  const etapas: Record<Etapa | "sin", number> = { testing: 0, venta: 0, escala: 0, retargeting: 0, sin: 0 };
   for (const c of campanas) etapas[c.etapa ?? "sin"]++;
   const partesEtapa = (Object.keys(etapas) as (Etapa | "sin")[]).filter((k) => etapas[k] > 0).map((k) => ({ nombre: k === "sin" ? "Sin etapa" : NOMBRE_ETAPA[k], valor: etapas[k], color: COLOR_ETAPA[k] }));
   const angulos = new Map<string, number>();

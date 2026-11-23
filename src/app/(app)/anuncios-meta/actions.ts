@@ -129,7 +129,7 @@ export async function guardarTopeMeta(producto: string, tope: number): Promise<R
   return {};
 }
 
-const ETAPAS = new Set(["testing", "escala", "retargeting"]);
+const ETAPAS = new Set(["testing", "venta", "escala", "retargeting"]);
 
 /** Corrige a mano el producto, el ángulo o la etapa de una campaña (la lectura de Meta ya no los pisa). Vacío = volver a lo que dice el nombre. */
 export async function corregirCampanaMeta(id: string, cambio: { producto?: string | null; angulo?: string | null; etapa?: Etapa | "" | null }): Promise<Resultado> {
@@ -158,7 +158,7 @@ export async function corregirCampanaMeta(id: string, cambio: { producto?: strin
   poner("angulo", cambio.angulo, "Ángulo");
   if (cambio.etapa !== undefined) {
     const e = cambio.etapa ?? "";
-    if (e && !ETAPAS.has(e)) return { error: "La etapa debe ser Testing, Escala o Retargeting." };
+    if (e && !ETAPAS.has(e)) return { error: "La etapa debe ser Testing, Ventas, Escala o Retargeting." };
     if ((e || null) !== ((c.etapa as string | null) ?? null)) {
       antes.Etapa = (c.etapa as string | null) ?? "—";
       despues.Etapa = e || "—";

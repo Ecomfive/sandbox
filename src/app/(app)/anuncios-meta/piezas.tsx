@@ -13,7 +13,7 @@ export const valorCpa = (r: Resultados) => {
   return v === null ? (r.gasto > 0 ? "Sin compras" : "—") : dolares(v);
 };
 
-const TONO_ETAPA: Record<Etapa, Tone> = { testing: "azul", escala: "success", retargeting: "warning" };
+const TONO_ETAPA: Record<Etapa, Tone> = { testing: "azul", venta: "info", escala: "success", retargeting: "warning" };
 
 /** La etapa de una campaña; sin etapa en el nombre ni corregida a mano, «Sin etapa». */
 export function InsigniaEtapa({ etapa }: { etapa: Etapa | null }) {
