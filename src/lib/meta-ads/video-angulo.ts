@@ -95,20 +95,23 @@ export function normalizarAnalisisVideo(texto: string | null | undefined, existe
   const limpio = texto.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
   const inicio = limpio.indexOf("{");
   const fin = limpio.lastIndexOf("}");
-  if (inicio < 0 || fin <= inicio) return null;
-  let o: Record<string, unknown>;
+  if (inicio < 0) return null;
+  let o: Record<string, unknown> | null = null;
   try {
-    const v: unknown = JSON.parse(limpio.slice(inicio, fin + 1));
-    if (!v || typeof v !== "object" || Array.isArray(v)) return null;
-    o = v as Record<string, unknown>;
+    const v: unknown = fin > inicio ? JSON.parse(limpio.slice(inicio, fin + 1)) : null;
+    if (v && typeof v === "object" && !Array.isArray(v)) o = v as Record<string, unknown>;
   } catch {
-    return null;
+    o = null;
   }
+  // Una respuesta cortada a la mitad (terminó por el largo) o con una coma de más no se tira: se rescata lo que alcanzó a escribir, que casi siempre incluye el ángulo.
+  o ??= camposSueltos(limpio.slice(inicio));
+  if (!o) return null;
   const s = (k: string, max: number) => recorte(typeof o[k] === "string" ? (o[k] as string) : "", max);
-  const bruto = s("angulo", 80).replace(/[«»"“”.,;:!?¿¡]/g, "").trim();
+  const bruto = s("angulo", 120).replace(/[«»"“”.,;:!?¿¡]/g, "").trim();
   const palabras = bruto.split(/\s+/).filter(Boolean);
-  if (palabras.length === 0 || palabras.length > 8) return null;
-  const angulo = reutilizarAngulo(embellecer(bruto), existentes);
+  if (palabras.length === 0) return null;
+  // Un ángulo largo se acorta a sus primeras palabras en vez de descartar todo el análisis.
+  const angulo = reutilizarAngulo(embellecer(palabras.slice(0, 8).join(" ")), existentes);
   const formato = s("formato", 30).toLowerCase();
   return {
     angulo,
@@ -126,6 +129,22 @@ export function normalizarAnalisisVideo(texto: string | null | undefined, existe
     recursos: recursosValidos(o.recursos),
     estructura: estructuraValida(o.estructura),
   };
+}
+
+/** De un JSON que no se pudo leer entero (cortado o mal cerrado), saca los textos y números simples que sí se alcanzan a leer. Null si no hay ninguno. */
+export function camposSueltos(texto: string): Record<string, unknown> | null {
+  const o: Record<string, unknown> = {};
+  for (const m of texto.matchAll(/"([a-z_]+)"\s*:\s*"((?:[^"\\]|\\.)*)"/g)) {
+    if (m[1] in o) continue;
+    try {
+      o[m[1]] = JSON.parse(`"${m[2]}"`);
+    } catch {
+      o[m[1]] = m[2];
+    }
+  }
+  const n = /"cta_segundo"\s*:\s*(\d+)/.exec(texto);
+  if (n) o.cta_segundo = Number(n[1]);
+  return Object.keys(o).length > 0 ? o : null;
 }
 
 /** Un segundo del video: entero de 0 a 3 600; lo demás es «no se sabe». */

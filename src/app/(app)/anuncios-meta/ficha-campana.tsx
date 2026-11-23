@@ -7,7 +7,7 @@ import { anilloFoco, fieldClassSm, labelClassSm } from "@/components/ui/field";
 import { Seccion } from "@/components/ui/seccion-ficha";
 import { useToast } from "@/components/ui/toast";
 import { Ventana } from "@/components/ui/ventana";
-import { formatearFechaHora } from "@/lib/formato";
+import { horaDeMeta } from "@/lib/meta-ads/hora";
 import { AnunciosIcon, CalendarioIcon, EnlaceIcon, EtiquetaIcon, FlechaAbajoIcon, FlechaArribaIcon, HistorialIcon, MargenIcon, PersonaIcon } from "@/lib/nav-icons";
 import { conversion, cpa, ctr, dolares, hookRate, holdRate, nivelDeCpa, nivelDeCtr, nivelDeHook, resultado } from "@/lib/meta-ads/metricas";
 import { nombreEvento } from "@/lib/meta-ads/actividad-equipo";
@@ -172,7 +172,7 @@ function Actividad({ id }: { id: string }) {
             {e.objeto && e.tipo !== "create_campaign_group" ? ` · ${e.objeto}` : ""}
           </span>
           <span className="text-xs text-muted-foreground">
-            {formatearFechaHora(e.fecha)}
+            {horaDeMeta(e.fecha)}
             {e.detalle ? ` · ${e.detalle}` : ""}
           </span>
         </li>
@@ -239,7 +239,7 @@ export function FichaCampana({ campana: c, colores, anuncios, actId, productos, 
               <Dato etiqueta="Creada">
                 <span className="inline-flex items-center gap-1.5">
                   <CalendarioIcon aria-hidden="true" className="h-3.5 w-3.5 text-muted-foreground" />
-                  {c.creadaEn ? formatearFechaHora(c.creadaEn) : "—"}
+                  {c.creadaEn ? horaDeMeta(c.creadaEn) : "—"}
                 </span>
               </Dato>
               <Dato etiqueta="La montó">

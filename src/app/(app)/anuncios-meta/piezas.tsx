@@ -9,7 +9,8 @@ export const entero = (n: number) => n.toLocaleString("es-PA", { maximumFraction
 export const porcentaje = (n: number | null, decimales = 1) => (n === null ? "—" : `${n.toFixed(decimales)} %`);
 export const valorCpa = (r: Resultados) => {
   const v = cpa(r);
-  return v === null ? "—" : dolares(v);
+  // Sin compras no hay CPA (gasto ÷ compras): si ya gastó, se dice «Sin compras» y no un guion que parece un dato que falta.
+  return v === null ? (r.gasto > 0 ? "Sin compras" : "—") : dolares(v);
 };
 
 const TONO_ETAPA: Record<Etapa, Tone> = { testing: "azul", escala: "success", retargeting: "warning" };

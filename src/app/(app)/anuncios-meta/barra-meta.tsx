@@ -6,7 +6,7 @@ import { useState, useTransition } from "react";
 import { ProgresoEstimado } from "@/components/ui/progreso-estimado";
 import { useToast } from "@/components/ui/toast";
 import { fieldClassSm, labelClassSm } from "@/components/ui/field";
-import { formatearFechaHora } from "@/lib/formato";
+import { horaDeMeta } from "@/lib/meta-ads/hora";
 import { PERIODOS, type CuentaVista, type Periodo } from "@/lib/meta-ads/datos";
 import { leerAhoraMeta } from "./actions";
 
@@ -80,7 +80,7 @@ export function BarraMeta({ periodo, cuentas, cuentaId, escribe, hayToken, desde
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <p className="m-0 text-xs text-muted-foreground">{ultima ? `Última lectura: ${formatearFechaHora(ultima)}` : "Todavía no se ha leído Meta"}</p>
+          <p className="m-0 text-xs text-muted-foreground">{ultima ? `Última lectura: ${horaDeMeta(ultima)}` : "Todavía no se ha leído Meta"}</p>
           {escribe && cuentas.some((c) => c.activa) && (
             <button
               type="button"

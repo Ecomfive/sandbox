@@ -17,7 +17,8 @@ test("lo que contesta la IA se valida: ángulo obligatorio, textos recortados, f
   assert.equal(a?.formato, "testimonio");
   assert.equal(normalizarAnalisisVideo('{"angulo":"","promesa":"x"}'), null);
   assert.equal(normalizarAnalisisVideo("no es json"), null);
-  assert.equal(normalizarAnalisisVideo('{"angulo":"uno dos tres cuatro cinco seis siete ocho nueve"}'), null);
+  // Un ángulo largo se acorta a sus primeras 8 palabras, no se descarta el análisis.
+  assert.equal(normalizarAnalisisVideo('{"angulo":"uno dos tres cuatro cinco seis siete ocho nueve"}')?.angulo, "Uno dos tres cuatro cinco seis siete ocho");
   assert.equal(normalizarAnalisisVideo('{"angulo":"Ahorro","formato":"raro"}')?.formato, "otro");
   assert.equal(normalizarAnalisisVideo(`{"angulo":"Ahorro","transcripcion":"${"a".repeat(3000)}"}`)?.transcripcion.length, 1200);
 });
@@ -89,4 +90,18 @@ test("el segundo intento tras un bloqueo por recitation no pide transcripción",
   assert.match(sin, /"transcripcion": "" \(déjala vacía\)/);
   assert.match(sin, /No copies ni transcribas literalmente/);
   assert.doesNotMatch(normal, /No copies ni transcribas/);
+});
+
+test("una respuesta cortada a la mitad se rescata en vez de dar error", () => {
+  const cortada = '{"angulo": "Detox en pocas semanas", "promesa": "Limpia el cuerpo", "gancho": "Un hombre muestra el frasco", "gancho_tipo": "curiosidad", "resumen": "Testimonio", "transcripcion": "hola a todos hoy les voy a contar que';
+  const a = normalizarAnalisisVideo(cortada);
+  assert.equal(a?.angulo, "Detox en pocas semanas");
+  assert.equal(a?.promesa, "Limpia el cuerpo");
+  assert.deepEqual(a?.estructura, []);
+  assert.equal(normalizarAnalisisVideo('{"promesa": "x", "resumen": "y"'), null);
+  assert.equal(normalizarAnalisisVideo("no hay json"), null);
+});
+
+test("una coma de más tampoco tira el análisis", () => {
+  assert.equal(normalizarAnalisisVideo('{"angulo": "Ahorro", "promesa": "x",}')?.angulo, "Ahorro");
 });

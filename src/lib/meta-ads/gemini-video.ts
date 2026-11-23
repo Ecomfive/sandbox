@@ -33,7 +33,7 @@ async function generarUnaVez(partes: unknown[], contexto: ContextoConsumo, esper
     const r = await fetch(`${BASE}/v1beta/models/${encodeURIComponent(modelo)}:generateContent`, {
       method: "POST",
       headers: { "content-type": "application/json", "x-goog-api-key": clave },
-      body: JSON.stringify({ contents: [{ role: "user", parts: partes }], generationConfig: { temperature: temperatura, responseMimeType: "application/json" } }),
+      body: JSON.stringify({ contents: [{ role: "user", parts: partes }], generationConfig: { temperature: temperatura, responseMimeType: "application/json", maxOutputTokens: 8192 } }),
       signal: AbortSignal.timeout(esperaMs),
       cache: "no-store",
     });
