@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { avisoPedido, contarPorEstado, fechaCorta, leerCantidad, numeroPedido, puedeEnviar, puedeRecibir, revisarEntregas, revisarLineas, revisarStockPedido, faltantesEn, mejorOrigen } from "./reglas";
+import { avisoPedido, contarPorEstado, fechaCorta, leerCantidad, numeroPedido, puedeDeshacerEntrega, puedeEnviar, puedeRecibir, revisarEntregas, revisarLineas, revisarStockPedido, faltantesEn, mejorOrigen } from "./reglas";
 
 const A = "11111111-1111-4111-8111-111111111111";
 const B = "22222222-2222-4222-8222-222222222222";
@@ -140,4 +140,10 @@ test("el aviso de una edición dice quién y qué", () => {
   const a = avisoEdicion(12, "Yiletsi", ["quitó Crema", "Faja: 40 → 38"]);
   assert.equal(a.titulo, "PED-0012 fue editado");
   assert.match(a.texto, /Yiletsi editó el pedido: quitó Crema; Faja: 40 → 38\./);
+});
+
+test("un pedido entregado se puede devolver a enviado, y solo ese", () => {
+  assert.equal(puedeDeshacerEntrega("recibido"), true);
+  for (const e of ["solicitud", "en_proceso", "enviado", "cancelado"] as const) assert.equal(puedeDeshacerEntrega(e), false);
+  assert.match(avisoPedido({ numero: 3, items: 1 }, "Dinora", "entrega_deshecha").titulo, /PED-0003 volvió a «Enviado»/);
 });

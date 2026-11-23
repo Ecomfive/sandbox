@@ -18,6 +18,7 @@ export function calcularCambios(
 
 export const ETIQUETA_ACCION: Record<string, string> = {
   aviso_inactividad: "Cambió el aviso de inactividad",
+  deshacer_entrega_pedido_inventario: "Deshizo la entrega de un pedido a inventario",
   subir_fotos_cuanto_hay: "Subió fotos reales",
   quitar_foto_cuanto_hay: "Quitó una foto real",
   lider_tareas: "Cambió quién asigna tareas (líderes)",

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   cancelarPedidoInventario,
   crearPedidoInventario,
+  deshacerEntregaPedidoInventario,
   editarPedidoInventario,
   enviarPedidoInventario,
   marcarEntregadoPedidoInventario,
@@ -32,6 +33,7 @@ import {
   puedeEditar,
   puedeEnProceso,
   puedeEnviar,
+  puedeDeshacerEntrega,
   puedeRecibir,
   type EstadoPedido,
   type PedidoInventario,
@@ -399,6 +401,8 @@ function FilasPedido({
   const nombreOrigen = origenes.find((b) => b.id === origen)?.nombre ?? "esa bodega";
   const estado = estadoDe(p.estado);
   const n = p.items.length;
+  // «Deshacer entrega»: dos pasos (pulsar y confirmar) para que no se repita el error de marcarlo sin querer.
+  const [deshaciendo, setDeshaciendo] = useState(false);
 
   const acciones = (
     <div className="flex flex-col items-stretch gap-1.5">
@@ -454,6 +458,27 @@ function FilasPedido({
           )}
         </>
       )}
+      {puedeEscribir && puedeDeshacerEntrega(p.estado) &&
+        (deshaciendo ? (
+          <div className="flex flex-col gap-1.5 rounded-md bg-muted p-2">
+            <span className="text-xs">¿Volver este pedido a «Enviado»? No cambia el inventario.</span>
+            <button type="button" disabled={ocupado} onClick={() => {
+                setDeshaciendo(false);
+                correr(() => deshacerEntregaPedidoInventario(p.id));
+              }}
+              className={PRINCIPAL}
+            >
+              {ocupado ? "Deshaciendo…" : "Sí, deshacer"}
+            </button>
+            <button type="button" disabled={ocupado} onClick={() => setDeshaciendo(false)} className={SECUNDARIO}>
+              No
+            </button>
+          </div>
+        ) : (
+          <button type="button" onClick={() => setDeshaciendo(true)} className={SECUNDARIO}>
+            Deshacer entrega
+          </button>
+        ))}
     </div>
   );
 

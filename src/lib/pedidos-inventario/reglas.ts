@@ -219,6 +219,8 @@ export const puedeEnProceso = (estado: EstadoPedido) => estado === "solicitud";
 export const puedeEditar = (estado: EstadoPedido) => estado === "solicitud" || estado === "en_proceso";
 export const puedeEnviar = (estado: EstadoPedido) => estado === "solicitud" || estado === "en_proceso";
 export const puedeRecibir = (estado: EstadoPedido) => estado === "enviado";
+/** Un pedido cerrado («Entregado») se puede devolver a «Enviado» si se marcó por error (23 nov 2026): el traslado ya estaba hecho al enviarlo, así que no mueve inventario. */
+export const puedeDeshacerEntrega = (estado: EstadoPedido) => estado === "recibido";
 
 /** Cuántos pedidos hay en cada estado (los contadores de arriba). */
 export function contarPorEstado(pedidos: { estado: EstadoPedido }[]): Record<EstadoPedido, number> {
@@ -234,7 +236,7 @@ export function fechaCorta(iso: string): string {
 }
 
 /** Los avisos «Para ti» de cada paso. */
-export function avisoPedido(p: { numero: number; items: number }, quien: string, paso: "nuevo" | "en_proceso" | "enviado" | "recibido" | "entregado" | "cancelado", extra?: string): { titulo: string; texto: string } {
+export function avisoPedido(p: { numero: number; items: number }, quien: string, paso: "nuevo" | "en_proceso" | "enviado" | "recibido" | "entregado" | "cancelado" | "entrega_deshecha", extra?: string): { titulo: string; texto: string } {
   const n = numeroPedido(p.numero);
   const prods = `${p.items} ${p.items === 1 ? "producto" : "productos"}`;
   const t = {
@@ -244,6 +246,7 @@ export function avisoPedido(p: { numero: number; items: number }, quien: string,
     recibido: [`${n} fue recibido`, `${quien} lo recibió en despacho.`],
     entregado: [`${n} fue entregado`, `${quien} lo marcó entregado en despacho: el pedido quedó cerrado.`],
     cancelado: [`${n} fue cancelado`, `${quien} canceló el pedido.`],
+    entrega_deshecha: [`${n} volvió a «Enviado»`, `${quien} deshizo la entrega (se había marcado por error). Márcalo «Recibido» cuando llegue.`],
   }[paso];
   return { titulo: t[0].slice(0, 300), texto: t[1].slice(0, 600) };
 }
