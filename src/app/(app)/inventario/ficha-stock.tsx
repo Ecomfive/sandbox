@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Fragment, useEffect, useState } from "react";
 import { CodigosProducto } from "@/components/ui/codigos-producto";
 import { Badge } from "@/components/ui/badge";
@@ -139,6 +140,8 @@ export function FichaStock({
   const id = sku?.id;
   // La ficha de Producto encima de esta (11 nov 2026, pedido de Hernán: que Dinora cree variantes, una productos, etc. sin salir del Levantamiento).
   const puedeVerProducto = usePuedeAbrir("producto");
+  // El Levantamiento es del módulo Inventario: quien abre la ficha desde otro lado (Producto, Gestión de IDs) y no lo tiene, no ve el enlace.
+  const puedeVerInventario = usePuedeAbrir("inventario");
   const [productoAbierto, setProductoAbierto] = useState<string | null>(null);
 
   useEffect(() => {
@@ -320,7 +323,18 @@ export function FichaStock({
                         <Fragment key={b.bodegaId}>
                         <tr className="border-t border-border">
                           <th scope="row" className="py-1.5 pr-2 text-left font-medium">
-                            {b.nombre}
+                            {/* Una bodega propia abre su levantamiento con este producto (23 nov 2026, pedido de Dinora). Las de plataforma no se cuentan ahí. */}
+                            {b.tipo !== "externa" && puedeVerInventario ? (
+                              <Link
+                                href={`/inventario/levantamiento?bodega=${b.bodegaId}&producto=${sku.id}`}
+                                title={`Abrir el levantamiento de ${b.nombre} con este producto`}
+                                className="underline-offset-2 hover:text-primario hover:underline focus-visible:outline-2 focus-visible:outline-offset-2"
+                              >
+                                {b.nombre}
+                              </Link>
+                            ) : (
+                              b.nombre
+                            )}
                             {b.tipo === "externa" && <span className="ml-1.5 text-[11px] font-normal text-muted-foreground">{plataforma ? `según ${ETIQUETA_PLATAFORMA[plataforma]}` : "externa"}</span>}
                             {sinRepartir && <span className="ml-1.5 text-[11px] font-normal text-muted-foreground">stock general, sin repartir</span>}
                           </th>
@@ -335,7 +349,17 @@ export function FichaStock({
                             <th scope="row" className="py-1 pr-2 pl-5 text-left text-xs font-normal">
                               <span aria-hidden="true">↳ </span>
                               <span className="sr-only">Incluido en el total de {b.nombre}: </span>
-                              {p.nombre}
+                              {b.tipo !== "externa" && !p.general && puedeVerInventario ? (
+                                <Link
+                                  href={`/inventario/levantamiento?bodega=${b.bodegaId}&producto=${p.clave}`}
+                                  title={`Abrir el levantamiento de ${b.nombre} con esta variante`}
+                                  className="underline-offset-2 hover:text-primario hover:underline focus-visible:outline-2 focus-visible:outline-offset-2"
+                                >
+                                  {p.nombre}
+                                </Link>
+                              ) : (
+                                p.nombre
+                              )}
                               {p.general && <span className="ml-1.5 text-[11px]">sin repartir</span>}
                               {/* Corregir el número de esa variante en esa bodega y marcar unidades defectuosas, sin salir de la ficha del principal (19 nov 2026, pedido de Jhokser). El stock general sin repartir es del propio principal. */}
                               {puedeCorregir && !sku.manejaVencimiento && b.tipo !== "externa" && (

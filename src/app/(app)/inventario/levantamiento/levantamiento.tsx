@@ -108,6 +108,7 @@ export function Levantamiento({
   puedeRestar,
   restarPideMotivo,
   codigoPais,
+  productoInicial = null,
 }: {
   bodegas: { id: string; nombre: string }[];
   bodegaElegida: string;
@@ -121,6 +122,11 @@ export function Levantamiento({
   restarPideMotivo: boolean;
   /** El país que se está viendo: la ficha muestra sus compras. */
   codigoPais: string;
+  /**
+   * El producto con que se abre (23 nov 2026, pedido de Dinora: desde la ficha de stock, un clic en la bodega trae su levantamiento con ese producto): sale ya
+   * buscado y, si es una variante (o un producto con variantes), desplegado.
+   */
+  productoInicial?: string | null;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -130,7 +136,9 @@ export function Levantamiento({
   const [lotes, setLotes] = useState<Record<string, LineaLote[]>>({});
   // Las cajas que se tocaron; un producto sin tocar conserva las suyas.
   const [cajas, setCajas] = useState<Record<string, LineaCajasForm[]>>({});
-  const [buscar, setBuscar] = useState("");
+  // El producto pedido en la dirección: una fila suya (la variante o, si es un principal, una de sus variantes).
+  const inicial = productoInicial ? (productos.find((p) => p.id === productoInicial) ?? productos.find((p) => p.padre?.id === productoInicial) ?? null) : null;
+  const [buscar, setBuscar] = useState(() => (!inicial ? "" : inicial.padre && inicial.padre.id === productoInicial ? inicial.padre.codigo : inicial.codigo));
   const [verTodos, setVerTodos] = useState(false);
   // Los productos que encontró la foto, de más a menos parecido (null = sin filtro por imagen).
   const [porImagen, setPorImagen] = useState<string[] | null>(null);
@@ -144,10 +152,10 @@ export function Levantamiento({
   // La ficha del producto (7 nov 2026, pedido de Hernán): al tocar su nombre, para ver lo último que pasó y dejar notas.
   const [ficha, setFicha] = useState<string | null>(null);
   // Los productos con variantes que están desplegados (se cuentan las variantes, no el principal).
-  const [abiertos, setAbiertos] = useState<Set<string>>(new Set());
+  const [abiertos, setAbiertos] = useState<Set<string>>(() => new Set(inicial?.padre ? [inicial.padre.id] : []));
   const { descendente } = useOrdenVariantes();
   // Los colores desplegados dentro de un producto («idPrincipal|Azul»): nacen plegados (11 nov 2026, pedido de Hernán).
-  const [coloresAbiertos, setColoresAbiertos] = useState<Set<string>>(new Set());
+  const [coloresAbiertos, setColoresAbiertos] = useState<Set<string>>(() => new Set(inicial?.padre && inicial.color && inicial.id === productoInicial ? [`${inicial.padre.id}|${inicial.color}`] : []));
 
   // Borrador (23 nov 2026): lo escrito sin guardar se queda en este navegador, por país y bodega, y vuelve al abrir el levantamiento de esa bodega.
   // `cargada` es la bodega cuyo borrador ya se leyó: hasta entonces no se escribe nada (si no, lo vacío del arranque pisaría el borrador).

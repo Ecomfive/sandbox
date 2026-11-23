@@ -36,7 +36,7 @@ export default async function LevantamientoPage({ searchParams }: { searchParams
   const usuario = await requireModulo("inventario");
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
-  const { bodega } = await searchParams;
+  const { bodega, producto } = await searchParams;
 
   const { data: bodegasPais } = await supabase
     .from("wms_bodegas")
@@ -140,6 +140,7 @@ export default async function LevantamientoPage({ searchParams }: { searchParams
           puedeRestar={puedeMoverAMano("salida", pais.codigo, autorizadaParaSalidaManual(usuario))}
           restarPideMotivo={pideMotivo("salida", pais.codigo)}
           codigoPais={pais.codigo}
+          productoInicial={typeof producto === "string" && ES_ID(producto) ? producto : null}
         />
       )}
     </Pagina>
