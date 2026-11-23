@@ -43,7 +43,7 @@ function FilaVideo({ x, alAbrir, columnas }: { x: VideoVista; alAbrir: () => voi
   const ok = confiable(x.r);
   const angulo = anguloDeVideo(x);
   return (
-    <button type="button" onClick={alAbrir} style={estiloRejilla(columnas.length)} className={`grid w-full cursor-pointer grid-cols-1 items-center gap-x-3 gap-y-1.5 px-4 py-3 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-foreground lg:[grid-template-columns:var(--columnas-meta)] ${ok ? "" : "text-muted-foreground"}`}>
+    <button type="button" onClick={alAbrir} style={estiloRejilla(columnas.length)} className={`grid w-full cursor-pointer grid-cols-1 items-center gap-x-3 gap-y-1.5 px-4 py-3 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-foreground xl:[grid-template-columns:var(--columnas-meta)] ${ok ? "" : "text-muted-foreground"}`}>
       <span className="flex min-w-0 items-center gap-3">
         <span aria-hidden="true" className="relative h-16 w-12 shrink-0 overflow-hidden rounded-md bg-gradient-to-br from-zinc-600 to-zinc-800">
           {m && <img src={m} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />}
@@ -68,7 +68,7 @@ function FilaVideo({ x, alAbrir, columnas }: { x: VideoVista; alAbrir: () => voi
         </span>
       </span>
       <CeldasColumnas columnas={columnas} r={x.r} ctx={{ tope: x.tope, etapa: "venta", confiable: ok }} />
-      <ChevronRightIcon aria-hidden="true" className="hidden h-4 w-4 text-muted-foreground lg:block" />
+      <ChevronRightIcon aria-hidden="true" className="hidden h-4 w-4 text-muted-foreground xl:block" />
     </button>
   );
 }

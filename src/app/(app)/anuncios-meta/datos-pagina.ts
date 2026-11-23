@@ -16,6 +16,6 @@ export async function cargarPaginaMeta(searchParams: ParametrosMeta): Promise<{ 
   const sp = await searchParams;
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
-  const datos = await cargarAnunciosMeta(supabase, { paisId: pais.id, cuentaId: uno(sp.cuenta) ?? null, periodo: periodoValido(uno(sp.periodo)), hoy: hoyEnPanama() });
+  const datos = await cargarAnunciosMeta(supabase, { paisId: pais.id, cuentaId: uno(sp.cuenta) ?? null, periodo: periodoValido(uno(sp.periodo)), hoy: hoyEnPanama(), producto: uno(sp.producto) ?? null });
   return { datos: { ...datos, iaConectada: geminiConectado() }, escribe: !usuario.modulosSoloLectura.includes("anuncios-meta"), pais: pais.nombre, hayToken: tokenDeMeta() !== null };
 }

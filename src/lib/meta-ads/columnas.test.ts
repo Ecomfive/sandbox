@@ -55,6 +55,6 @@ test("con poca data los colores se apagan", () => {
 });
 
 test("la rejilla de una lista: el nombre, una columna por métrica y la flecha (con una columna extra para el tipo)", () => {
-  assert.equal(rejillaDeColumnas(3), "minmax(0,3fr) repeat(3, minmax(4.5rem,1fr)) 1rem");
-  assert.equal(rejillaDeColumnas(2, true), "minmax(0,2.4fr) minmax(0,1.2fr) repeat(2, minmax(4.5rem,1fr)) 1rem");
+  assert.equal(rejillaDeColumnas(3), "minmax(10rem,3fr) repeat(3, minmax(3.5rem,1fr)) 1rem");
+  assert.equal(rejillaDeColumnas(2, true), "minmax(9rem,2.4fr) minmax(5.5rem,1.2fr) repeat(2, minmax(3.5rem,1fr)) 1rem");
 });

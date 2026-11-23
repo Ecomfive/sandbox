@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { fieldClassSm } from "@/components/ui/field";
 import { Tooltip } from "@/components/ui/tooltip";
 import { DIMENSIONES_ANUNCIO, DIMENSIONES_CAMPANA, type DimensionAnuncio, type DimensionCampana, type GruposMeta } from "@/lib/meta-ads/datos";
 import { DIMENSIONES_VIDEO, EXPLICACION_DIMENSION_VIDEO, esGanador, esPerdedor, mejorGrupo, MEZCLA_DE_ANGULOS, sumaDeGrupos, UMBRAL_DOMINANTE, ventajaDeCpa, type DimensionVideo, type GruposDeVideo } from "@/lib/meta-ads/atributos-video";
@@ -11,11 +13,12 @@ import { ClasificarGanchos } from "./clasificar-ganchos";
 import { BarraProgreso, InsigniaCerteza, TarjetaMeta } from "./graficas";
 import { AVISO_POCA_DATA, entero, Nivel, porcentaje, Resultado, valorCpa } from "./piezas";
 
-type Seccion = "videos" | "campanas" | "anuncios";
+type Seccion = "videos" | "campanas" | "anuncios" | "productos";
 const SECCIONES: { id: Seccion; nombre: string; detalle: string }[] = [
   { id: "videos", nombre: "Videos", detalle: "Lo que la IA saca de cada video" },
   { id: "campanas", nombre: "Campañas", detalle: "Cómo está montada cada campaña" },
   { id: "anuncios", nombre: "Anuncios", detalle: "El texto y la página de destino" },
+  { id: "productos", nombre: "Productos", detalle: "Qué producto rinde mejor" },
 ];
 
 const EXPLICACION_CAMPANA: Record<DimensionCampana, string> = {
@@ -46,7 +49,8 @@ function conclusion(etiqueta: string, dimension: string, grupos: Grupo[], unidad
  * «Qué funciona»: lo que ya se puede dar por cierto, arriba, y debajo cada forma de medir (los datos de los videos, cómo está montada la campaña, el texto y la landing) de mejor a peor CPA, con qué tan seguro es cada
  * resultado. El ángulo de una campaña es la mezcla de los ángulos de sus videos; el de un video lo saca la IA al verlo (o se corrige a mano en su ficha).
  */
-export function QueFunciona({ grupos, gruposVideo, videosSinAngulo, ganchosSinTipo, iaConectada, escribe }: { grupos: GruposMeta; gruposVideo: GruposDeVideo; videosSinAngulo: number; ganchosSinTipo: number; iaConectada: boolean; escribe: boolean }) {
+export function QueFunciona({ productos, productoActual, grupos, gruposVideo, videosSinAngulo, ganchosSinTipo, iaConectada, escribe }: { grupos: GruposMeta; gruposVideo: GruposDeVideo; videosSinAngulo: number; ganchosSinTipo: number; iaConectada: boolean; escribe: boolean; /** Los productos con campañas, para ver qué funciona de uno solo. */ productos: { clave: string; nombre: string }[]; productoActual: string | null }) {
+  const router = useRouter();
   const [seccion, setSeccion] = useState<Seccion>("videos");
   const [dimVideo, setDimVideo] = useState<DimensionVideo>("Ángulo");
   const [dimCampana, setDimCampana] = useState<DimensionCampana>("Ángulo");
@@ -65,8 +69,8 @@ export function QueFunciona({ grupos, gruposVideo, videosSinAngulo, ganchosSinTi
   ];
   const hayAlgo = conclusiones.some((c) => c.grupo);
 
-  const lista = seccion === "videos" ? gruposVideo.grupos[dimVideo] : seccion === "campanas" ? grupos.campana[dimCampana] : grupos.anuncio[dimAnuncio];
-  const dimActual = seccion === "videos" ? dimVideo : seccion === "campanas" ? dimCampana : dimAnuncio;
+  const lista = seccion === "videos" ? gruposVideo.grupos[dimVideo] : seccion === "campanas" ? grupos.campana[dimCampana] : seccion === "productos" ? grupos.campana.Producto : grupos.anuncio[dimAnuncio];
+  const dimActual = seccion === "videos" ? dimVideo : seccion === "campanas" ? dimCampana : seccion === "productos" ? "Producto" : dimAnuncio;
   const unidad = seccion === "videos" ? "Videos" : "Campañas";
   const sinDato = seccion === "videos" ? gruposVideo.sinDato[dimVideo] : 0;
   const vacio =
@@ -74,10 +78,33 @@ export function QueFunciona({ grupos, gruposVideo, videosSinAngulo, ganchosSinTi
       ? "Ningún video con gasto en el periodo tiene este dato todavía. Los datos se leen de cada video: analízalos en la pestaña Videos."
       : seccion === "campanas"
         ? `Ninguna campaña con gasto en el periodo ${dimCampana === "Ángulo" ? "tiene videos con ángulo todavía" : dimCampana === "Producto" || dimCampana === "Etapa" ? `trae ${dimCampana === "Etapa" ? "etapa" : "producto"} en el nombre. Ponlo en el nombre de la campaña o corrígelo en su ficha` : "trae este dato"}.`
-        : "No hay anuncios con gasto en el periodo.";
+        : seccion === "productos"
+          ? "Ninguna campaña con producto y gasto en el periodo."
+          : "No hay anuncios con gasto en el periodo.";
 
+  const elegirProducto = (clave: string) => {
+    const url = new URL(window.location.href);
+    if (clave) url.searchParams.set("producto", clave);
+    else url.searchParams.delete("producto");
+    router.push(`${url.pathname}${url.search}`);
+  };
+  const nombreProducto = productos.find((p) => p.clave === productoActual)?.nombre ?? null;
   return (
     <div className="flex flex-col gap-6">
+      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card px-4 py-2.5">
+        <label className="flex items-center gap-2 text-sm">
+          <span className="text-xs font-medium text-muted-foreground">Ver por producto</span>
+          <select value={productoActual ?? ""} onChange={(e) => elegirProducto(e.target.value)} className={`${fieldClassSm} w-auto min-w-[16rem] max-w-full`}>
+            <option value="">Todos los productos</option>
+            {productos.map((p) => (
+              <option key={p.clave} value={p.clave}>
+                {p.nombre}
+              </option>
+            ))}
+          </select>
+        </label>
+        <p className="m-0 text-xs text-muted-foreground">{nombreProducto ? `Todo lo de abajo sale solo de «${nombreProducto}».` : "Elige un producto para ver qué ángulos, ganchos y formatos funcionan con él."}</p>
+      </div>
       <TarjetaMeta titulo="Lo que ya sabemos" derecha="Firme: datos de sobra · Probable: va bien, falta data · Poca data: menos de $100" id="conclusiones">
         {!hayAlgo ? (
           <p className="m-0 text-sm text-muted-foreground">Todavía no hay nada con datos suficientes ($100 gastados y alguna compra). A medida que se gaste, aquí va saliendo lo que funciona.</p>
@@ -114,6 +141,15 @@ export function QueFunciona({ grupos, gruposVideo, videosSinAngulo, ganchosSinTi
         </div>
       </div>
 
+      {seccion === "productos" && (
+        <p className="m-0 rounded-xl border border-border bg-card px-4 py-2.5 text-sm text-muted-foreground">
+          Cada producto suma todas sus campañas del periodo. Para ver qué ángulos, ganchos y formatos funcionan con uno solo, elígelo arriba en «Ver por producto» o ábrelo en{" "}
+          <Link href="/anuncios-meta/productos" className="font-medium text-foreground underline underline-offset-2">
+            Productos
+          </Link>
+          .
+        </p>
+      )}
       {seccion === "videos" && dimVideo === "Gancho" && escribe && <ClasificarGanchos pendientes={ganchosSinTipo} iaConectada={iaConectada} />}
       {seccion === "videos" && dimVideo === "Ángulo" && videosSinAngulo > 0 && (
         <p className="m-0 rounded-xl border border-border bg-card px-4 py-2.5 text-sm text-muted-foreground">
