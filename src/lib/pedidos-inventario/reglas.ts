@@ -224,6 +224,9 @@ export const puedeRecibir = (estado: EstadoPedido) => estado === "enviado";
 /** Un pedido cerrado («Entregado») se puede devolver a «Enviado» si se marcó por error (23 nov 2026): el traslado ya estaba hecho al enviarlo, así que no mueve inventario. */
 export const puedeDeshacerEntrega = (estado: EstadoPedido) => estado === "recibido";
 
+/** Inventario puede deshacer un envío hecho por error (23 nov 2026, pedido de Jhokser: Dinora envió un pedido sin querer): el pedido vuelve a «En proceso» y un traslado de reversa devuelve lo enviado a la bodega de origen. */
+export const puedeDeshacerEnvio = (estado: EstadoPedido) => estado === "enviado";
+
 /** Un pedido ya realizado (entregado) o cancelado se puede archivar para sacarlo de la lista (23 nov 2026, pedido de Jhokser). */
 export const puedeArchivar = (estado: EstadoPedido) => estado === "recibido" || estado === "cancelado";
 
@@ -241,7 +244,7 @@ export function fechaCorta(iso: string): string {
 }
 
 /** Los avisos «Para ti» de cada paso. */
-export function avisoPedido(p: { numero: number; items: number }, quien: string, paso: "nuevo" | "en_proceso" | "enviado" | "recibido" | "entregado" | "cancelado" | "entrega_deshecha", extra?: string): { titulo: string; texto: string } {
+export function avisoPedido(p: { numero: number; items: number }, quien: string, paso: "nuevo" | "en_proceso" | "enviado" | "recibido" | "entregado" | "cancelado" | "entrega_deshecha" | "envio_deshecho", extra?: string): { titulo: string; texto: string } {
   const n = numeroPedido(p.numero);
   const prods = `${p.items} ${p.items === 1 ? "producto" : "productos"}`;
   const t = {
@@ -251,6 +254,7 @@ export function avisoPedido(p: { numero: number; items: number }, quien: string,
     recibido: [`${n} fue recibido`, `${quien} lo recibió en despacho.`],
     entregado: [`${n} fue entregado`, `${quien} lo marcó entregado en despacho: el pedido quedó cerrado.`],
     cancelado: [`${n} fue cancelado`, `${quien} canceló el pedido.`],
+    envio_deshecho: [`${n} volvió a «En proceso»`, `${quien} deshizo el envío (se había enviado por error). Te avisará cuando lo envíe de nuevo.`],
     entrega_deshecha: [`${n} volvió a «Enviado»`, `${quien} deshizo la entrega (se había marcado por error). Márcalo «Recibido» cuando llegue.`],
   }[paso];
   return { titulo: t[0].slice(0, 300), texto: t[1].slice(0, 600) };
