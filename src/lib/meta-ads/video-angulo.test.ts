@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { anguloDeCampana, esHostDeVideoMeta, estructuraValida, normalizarAnalisisVideo, pedidoAnalisisVideo, recursosValidos, reutilizarAngulo } from "./video-angulo";
+import { anguloDeCampana, esHostDeVideoMeta, estructuraValida, normalizarAnalisisVideo, pedidoAnalisisVideo, pedidoSoloAngulo, recursosValidos, reutilizarAngulo } from "./video-angulo";
 
 test("el pedido de ángulo pide ser específico y no forzar un ángulo amplio que ya existe", () => {
   const p = pedidoAnalisisVideo({ producto: null, copy: null, titulo: null, angulosExistentes: ["Vitalidad masculina"], soloTexto: false });
@@ -119,4 +119,13 @@ test("con el video a la vista el ángulo sale del video: el texto del anuncio no
   assert.match(conVideo, /ÚNICAMENTE de lo que se ve y se dice en el video/);
   const soloTexto = pedidoAnalisisVideo({ producto: "Shilajit", copy: "Energía para todos", titulo: null, angulosExistentes: [], soloTexto: true });
   assert.match(soloTexto, /Energía para todos/);
+});
+
+test("el reanálisis pide solo el ángulo, con la misma regla específica y sin texto del anuncio", () => {
+  const p = pedidoSoloAngulo({ producto: "Shilajit", angulosExistentes: ["Vitalidad masculina"] });
+  assert.match(p, /ESPECÍFICO/);
+  assert.match(p, /ÚNICAMENTE de lo que se ve y se dice en el video/);
+  assert.match(p, /\{"angulo": "…"\}/);
+  assert.doesNotMatch(p, /transcripcion|estructura|cta_tipo/);
+  assert.match(p, /Vitalidad masculina/);
 });
