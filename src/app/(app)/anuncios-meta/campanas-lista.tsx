@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { ListaDatos } from "@/components/tabla/lista-datos";
 import { AnunciosIcon, ChevronRightIcon, EtiquetaIcon, EstadoIcon, MargenIcon, PersonaIcon, ProductoIcon, TiendaIcon, CalendarioIcon, FiltroIcon } from "@/lib/nav-icons";
-import { cpa, ctr, dolares, nivelDeCpa, nivelDeCtr } from "@/lib/meta-ads/metricas";
+import { METRICAS_CAMPANA, dolares } from "@/lib/meta-ads/metricas";
 import type { CuentaVista } from "@/lib/meta-ads/datos";
 import { faltanEtiquetas } from "@/lib/meta-ads/sugerencias";
 import type { AnuncioVista, CampanaVista } from "@/lib/meta-ads/vistas";
@@ -12,21 +12,24 @@ import type { NombreFilas } from "@/lib/tabla/pie";
 import { DEF_CAMPANAS, NOMBRE_VEREDICTO, veredictoDe } from "./def-campanas";
 import { BarraApilada, coloresDeAngulos } from "./graficas";
 import { FichaCampana } from "./ficha-campana";
-import { InsigniaEstructura, InsigniaEtapa, Nivel, nombreEstado, porcentaje, Resultado, valorCpa } from "./piezas";
+import { CeldasMetricas, InsigniaEstructura, InsigniaEtapa, nombreEstado, Resultado } from "./piezas";
 
 const NOMBRE: NombreFilas = { singular: "campaña", plural: "campañas" };
 const ICONOS: Record<string, IconoComp> = { nombre: ProductoIcon, veredicto: MargenIcon, etapa: EtiquetaIcon, estado: EstadoIcon, estructura: FiltroIcon, puja: FiltroIcon, mercado: TiendaIcon, videos: AnunciosIcon, producto: ProductoIcon, angulo: EtiquetaIcon, cuenta: TiendaIcon, persona: PersonaIcon, meta: EstadoIcon, gasto: MargenIcon, compras: MargenIcon, creada: CalendarioIcon };
 
-const COLUMNAS = "lg:grid-cols-[minmax(0,2.6fr)_minmax(0,1.3fr)_minmax(0,0.9fr)_minmax(0,0.8fr)_minmax(0,0.9fr)_minmax(0,1fr)_1rem]";
+// Pantalla ancha: nombre, tipo, las ocho cifras de la hoja de Testing, el resultado y la flecha. Más angosta, las cifras van en una línea debajo del nombre.
+const COLUMNAS = "xl:grid-cols-[minmax(0,2.4fr)_minmax(0,1.2fr)_repeat(8,minmax(0,0.85fr))_minmax(0,1.1fr)_1rem]";
 
 function EncabezadoFilas() {
   return (
-    <div aria-hidden="true" className={`hidden gap-3 px-4 py-2 text-xs font-medium text-muted-foreground lg:grid ${COLUMNAS}`}>
+    <div aria-hidden="true" className={`hidden gap-3 px-4 py-2 text-xs font-medium text-muted-foreground xl:grid ${COLUMNAS}`}>
       <span>Campaña</span>
       <span>Tipo</span>
-      <span className="text-right">Gasto</span>
-      <span className="text-right">Compras</span>
-      <span className="text-right">CPA</span>
+      {METRICAS_CAMPANA.map((m) => (
+        <span key={m.clave} className="text-right">
+          {m.titulo}
+        </span>
+      ))}
       <span className="text-right">Resultado estimado</span>
       <span />
     </div>
@@ -62,25 +65,13 @@ function FilaCampana({ c, alAbrir, colores }: { c: CampanaVista; alAbrir: () => 
         <InsigniaEtapa etapa={c.etapa} />
         <InsigniaEstructura estructura={c.estructura} puja={c.puja} />
       </span>
-      <span className="text-sm tabular-nums lg:text-right">
-        <span className="sr-only">Gasto: </span>
-        {c.r.gasto > 0 ? dolares(c.r.gasto) : "—"}
-      </span>
-      <span className="text-sm tabular-nums lg:text-right">
-        <span className="sr-only">Compras: </span>
-        {c.r.gasto > 0 ? c.r.compras : "—"}
-      </span>
-      <span className="text-sm lg:text-right">
-        <span className="sr-only">CPA: </span>
-        {c.r.compras > 0 ? <Nivel nivel={nivelDeCpa(cpa(c.r), c.tope)}>{valorCpa(c.r)}</Nivel> : "—"}
-        {c.r.impresiones > 0 && <span className="block text-xs text-muted-foreground">CTR <Nivel nivel={nivelDeCtr(ctr(c.r))}>{porcentaje(ctr(c.r))}</Nivel></span>}
-      </span>
-      <span className="lg:text-right">
+      <CeldasMetricas r={c.r} etapa={c.etapa} tope={c.tope} />
+      <span className="xl:text-right">
         <span className="sr-only">Resultado estimado: </span>
         <Resultado r={c.r} tope={c.tope} />
         {!c.topeDefinido && c.r.gasto > 0 && <span className="block text-xs text-muted-foreground">con tope {dolares(c.tope)}</span>}
       </span>
-      <ChevronRightIcon aria-hidden="true" className="hidden h-4 w-4 text-muted-foreground lg:block" />
+      <ChevronRightIcon aria-hidden="true" className="hidden h-4 w-4 text-muted-foreground xl:block" />
     </button>
   );
 }
