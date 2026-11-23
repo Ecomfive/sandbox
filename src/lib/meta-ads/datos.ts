@@ -13,7 +13,8 @@ import { estructuraValida, VERSION_ANALISIS } from "./video-angulo";
 import { decisionesDeAnuncios } from "./decision-anuncio";
 import { etapaEfectiva, indexarCatalogo, productoDeCampana, type IndiceCatalogo } from "./etapa-venta";
 import { pendientes, sugerir, type DecisionGuardada, type Sugerencia } from "./sugerencias";
-import type { ActividadVista, AnalisisVideoVista, AnuncioVista, CampanaVista, Grupo, VideoVista } from "./vistas";
+import { agruparProductos } from "./productos";
+import type { ActividadVista, AnalisisVideoVista, AnuncioVista, CampanaVista, Grupo, ProductoVista, VideoVista } from "./vistas";
 
 export const SIN_MIGRACION_META = "Falta correr la migración 0320 (Anuncios Meta) en Supabase.";
 
@@ -85,6 +86,8 @@ export interface DatosMeta {
   serie: PuntoSerie[];
   /** Todo lo que la IA sacó de los videos del periodo (ángulo, gancho, formato, llamado, recursos, estructura…), medido con lo que costó y vendió cada video. */
   gruposVideo: GruposDeVideo;
+  /** Los productos con lo que sumaron sus campañas en el periodo. */
+  productosVista: ProductoVista[];
   creadasPorDia: { fecha: string; testing: number; venta: number; escala: number; retargeting: number; otras: number }[];
   creadasHoy: number;
   /** La actividad del equipo con todas las cuentas del país juntas (o solo la elegida): campañas por persona, promedios, rangos y lo más reciente. */
@@ -102,7 +105,7 @@ export interface DatosMeta {
 
 const vacios = (periodo: Periodo, hoy: string): DatosMeta => ({
   faltaMigracion: false, cuentas: [], cuentaId: null, periodo, desde: hoy, hasta: hoy, campanas: [], videos: [], anuncios: [], totales: sinResultados(), anteriores: sinResultados(), topes: [], productos: [], sugerencias: [], decididas: 0,
-  grupos: { campana: { "Ángulo": [], Estructura: [], Puja: [], Producto: [], Etapa: [] }, anuncio: { Copy: [], Landing: [] } }, serie: [], gruposVideo: gruposDeVideos([]), creadasPorDia: [], creadasHoy: 0, actividad: resumirEquipo([], [], hoy), ganchosSinTipo: 0, videosSinAnalizar: 0, videosSinAngulo: 0, iaConectada: false, actividadDisponible: false,
+  grupos: { campana: { "Ángulo": [], Estructura: [], Puja: [], Producto: [], Etapa: [] }, anuncio: { Copy: [], Landing: [] } }, serie: [], gruposVideo: gruposDeVideos([]), productosVista: [], creadasPorDia: [], creadasHoy: 0, actividad: resumirEquipo([], [], hoy), ganchosSinTipo: 0, videosSinAnalizar: 0, videosSinAngulo: 0, iaConectada: false, actividadDisponible: false,
 });
 
 const restar = (fecha: string, n: number) => new Date(new Date(`${fecha}T00:00:00Z`).getTime() - n * 86_400_000).toISOString().slice(0, 10);
@@ -388,7 +391,7 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
   const productos = [...new Set(camp.map((c) => (c.producto as string | null)?.trim()).filter((p): p is string => !!p))].sort((a, b) => a.localeCompare(b, "es"));
   return {
     ...base, cuentas, cuentaId, desde, hasta: o.hoy, campanas: campanasConActividad, videos, anuncios, totales, anteriores, topes, productos, sugerencias, decididas: todas.length - sugerencias.length, grupos,
-    serie: serieGlobal, gruposVideo, creadasPorDia, creadasHoy: creadasPorDia[13]?.testing + creadasPorDia[13]?.venta + creadasPorDia[13]?.escala + creadasPorDia[13]?.retargeting + creadasPorDia[13]?.otras || 0, actividad, ganchosSinTipo, actividadDisponible: eventos.length > 0, videosSinAnalizar: videos.filter((v) => !v.analisis || v.analisis.estado !== "analizado" || v.analisis.version < VERSION_ANALISIS).length, videosSinAngulo, iaConectada: false,
+    serie: serieGlobal, gruposVideo, productosVista: agruparProductos(campanasConActividad, videos), creadasPorDia, creadasHoy: creadasPorDia[13]?.testing + creadasPorDia[13]?.venta + creadasPorDia[13]?.escala + creadasPorDia[13]?.retargeting + creadasPorDia[13]?.otras || 0, actividad, ganchosSinTipo, actividadDisponible: eventos.length > 0, videosSinAnalizar: videos.filter((v) => !v.analisis || v.analisis.estado !== "analizado" || v.analisis.version < VERSION_ANALISIS).length, videosSinAngulo, iaConectada: false,
   };
 }
 

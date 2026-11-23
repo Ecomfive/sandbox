@@ -47,6 +47,21 @@ export interface CampanaVista {
   manual: string[];
 }
 
+/** Un producto con lo que sumaron sus campañas en el periodo (vista por producto). */
+export interface ProductoVista {
+  /** La llave del producto (sin acentos, mayúsculas ni signos): vacía para «Sin producto». */
+  clave: string;
+  nombre: string;
+  tope: number;
+  topeDefinido: boolean;
+  r: Resultados;
+  campanas: number;
+  activas: number;
+  /** Videos distintos de sus campañas (los últimos 30 días). */
+  videos: number;
+  anuncios: number;
+}
+
 /** Un ángulo dentro de una campaña: cuántos de sus videos lo usan y qué parte de los videos con ángulo es. Los porcentajes de una campaña suman 100. */
 export interface ComposicionAngulo {
   angulo: string;

@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { ListaDatos } from "@/components/tabla/lista-datos";
 import { AnunciosIcon, ChevronRightIcon, EtiquetaIcon, EstadoIcon, MargenIcon, PersonaIcon, ProductoIcon, TiendaIcon, CalendarioIcon, FiltroIcon } from "@/lib/nav-icons";
-import { METRICAS_CAMPANA, dolares } from "@/lib/meta-ads/metricas";
+import { PRESETS_COLUMNAS, type ClaveColumna } from "@/lib/meta-ads/columnas";
+import { confiable, dolares } from "@/lib/meta-ads/metricas";
 import type { CuentaVista } from "@/lib/meta-ads/datos";
 import { faltanEtiquetas } from "@/lib/meta-ads/sugerencias";
 import type { AnuncioVista, CampanaVista } from "@/lib/meta-ads/vistas";
@@ -12,35 +13,20 @@ import type { NombreFilas } from "@/lib/tabla/pie";
 import { DEF_CAMPANAS, NOMBRE_VEREDICTO, veredictoDe } from "./def-campanas";
 import { BarraApilada, coloresDeAngulos } from "./graficas";
 import { FichaCampana } from "./ficha-campana";
-import { CeldasMetricas, InsigniaEstructura, InsigniaEtapa, nombreEstado, Resultado } from "./piezas";
+import { CeldasColumnas, EncabezadoColumnas, estiloRejilla, SelectorColumnasMeta, useColumnasMeta } from "./columnas-meta";
+import { InsigniaEstructura, InsigniaEtapa, nombreEstado } from "./piezas";
 
 const NOMBRE: NombreFilas = { singular: "campaña", plural: "campañas" };
 const ICONOS: Record<string, IconoComp> = { nombre: ProductoIcon, veredicto: MargenIcon, etapa: EtiquetaIcon, estado: EstadoIcon, estructura: FiltroIcon, puja: FiltroIcon, mercado: TiendaIcon, videos: AnunciosIcon, producto: ProductoIcon, angulo: EtiquetaIcon, cuenta: TiendaIcon, persona: PersonaIcon, meta: EstadoIcon, gasto: MargenIcon, compras: MargenIcon, creada: CalendarioIcon };
 
-// Pantalla ancha: nombre, tipo, las ocho cifras de la hoja de Testing, el resultado y la flecha. Más angosta, las cifras van en una línea debajo del nombre.
-const COLUMNAS = "xl:grid-cols-[minmax(0,2.4fr)_minmax(0,1.2fr)_repeat(8,minmax(0,0.85fr))_minmax(0,1.1fr)_1rem]";
+// Pantalla ancha: nombre, tipo, las columnas que cada persona elige con «Columnas» (por defecto las de la hoja de Testing y el resultado) y la flecha. Más angosta, las cifras van en una línea debajo del nombre.
+const COLUMNAS_CAMPANAS: ClaveColumna[] = PRESETS_COLUMNAS.find((p) => p.id === "testing")!.columnas;
 
-function EncabezadoFilas() {
-  return (
-    <div aria-hidden="true" className={`hidden gap-3 px-4 py-2 text-xs font-medium text-muted-foreground xl:grid ${COLUMNAS}`}>
-      <span>Campaña</span>
-      <span>Tipo</span>
-      {METRICAS_CAMPANA.map((m) => (
-        <span key={m.clave} className="text-right">
-          {m.titulo}
-        </span>
-      ))}
-      <span className="text-right">Resultado estimado</span>
-      <span />
-    </div>
-  );
-}
-
-function FilaCampana({ c, alAbrir, colores }: { c: CampanaVista; alAbrir: () => void; colores: Map<string, string> }) {
+function FilaCampana({ c, alAbrir, colores, columnas }: { c: CampanaVista; alAbrir: () => void; colores: Map<string, string>; columnas: ClaveColumna[] }) {
   const v = veredictoDe(c);
   const punto = v === "pierde" ? "bg-destructive" : v === "deja" ? "bg-success" : "bg-muted-foreground";
   return (
-    <button type="button" onClick={alAbrir} className={`grid w-full cursor-pointer grid-cols-1 gap-x-3 gap-y-1.5 px-4 py-3 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-foreground ${COLUMNAS}`}>
+    <button type="button" onClick={alAbrir} style={estiloRejilla(columnas.length, true)} className={`grid w-full cursor-pointer grid-cols-1 gap-x-3 gap-y-1.5 px-4 py-3 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-foreground xl:[grid-template-columns:var(--columnas-meta)]`}>
       <span className="flex min-w-0 flex-col gap-0.5">
         <span className="flex min-w-0 items-center gap-2">
           <span role="img" aria-label={NOMBRE_VEREDICTO[v]} className={`h-2 w-2 shrink-0 rounded-full ${punto}`} />
@@ -65,12 +51,7 @@ function FilaCampana({ c, alAbrir, colores }: { c: CampanaVista; alAbrir: () => 
         <InsigniaEtapa etapa={c.etapa} />
         <InsigniaEstructura estructura={c.estructura} puja={c.puja} />
       </span>
-      <CeldasMetricas r={c.r} etapa={c.etapa} tope={c.tope} />
-      <span className="xl:text-right">
-        <span className="sr-only">Resultado estimado: </span>
-        <Resultado r={c.r} tope={c.tope} />
-        {!c.topeDefinido && c.r.gasto > 0 && <span className="block text-xs text-muted-foreground">con tope {dolares(c.tope)}</span>}
-      </span>
+      <CeldasColumnas columnas={columnas} r={c.r} ctx={{ tope: c.tope, etapa: c.etapa, frecuencia: c.frecuencia, confiable: confiable(c.r) }} minimo="xl" />
       <ChevronRightIcon aria-hidden="true" className="hidden h-4 w-4 text-muted-foreground xl:block" />
     </button>
   );
@@ -91,6 +72,7 @@ export function CampanasLista({ campanas: todas, anuncios, cuentas, productos, e
     if (url.href !== window.location.href) window.history.replaceState(window.history.state, "", url);
   }, [abierta, soloFaltan]);
   const [orden, setOrden] = useState<string[]>([]);
+  const [columnas, guardarColumnas, restablecerColumnas] = useColumnasMeta("campanas", COLUMNAS_CAMPANAS);
   const colores = useMemo(() => coloresDeAngulos(todas), [todas]);
   // La ficha se dibuja en `<body>` (portal): con `?abrir=` arranca abierta, así que solo se monta ya en el navegador.
   const enNavegador = useSyncExternalStore(
@@ -113,6 +95,9 @@ export function CampanasLista({ campanas: todas, anuncios, cuentas, productos, e
           </button>
         </div>
       )}
+      <div className="flex justify-end">
+        <SelectorColumnasMeta titulo="Campañas" columnas={columnas} alCambiar={guardarColumnas} alRestablecer={restablecerColumnas} />
+      </div>
       <ListaDatos
         def={DEF_CAMPANAS}
         filas={campanas}
@@ -120,12 +105,13 @@ export function CampanasLista({ campanas: todas, anuncios, cuentas, productos, e
         nombre={NOMBRE}
         claveFila={(c) => c.id}
         variante="filas"
-        encabezado={<EncabezadoFilas />}
+        encabezado={<EncabezadoColumnas nombre="Campaña" extra="Tipo" columnas={columnas} minimo="xl" />}
         formatearTotal={dolares}
         renderFila={(c, enOrden) => (
           <FilaCampana
             c={c}
             colores={colores}
+            columnas={columnas}
             alAbrir={() => {
               setOrden(enOrden.map((x) => x.id));
               setAbierta(c.id);

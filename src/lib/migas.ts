@@ -160,6 +160,7 @@ const SUBPAGINAS: Record<string, string> = {
   "/compras/reponer": "Reponer",
   "/anuncios-meta/campanas": "Campañas",
   "/anuncios-meta/que-funciona": "Qué funciona",
+  "/anuncios-meta/productos": "Productos",
   "/anuncios-meta/videos": "Videos",
   "/anuncios-meta/equipo": "Equipo",
   "/anuncios-meta/cuentas": "Cuentas",
