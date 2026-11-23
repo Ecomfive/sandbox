@@ -59,7 +59,7 @@ function FilaVideo({ x, alAbrir, columnas }: { x: VideoVista; alAbrir: () => voi
             {x.nombre}
           </span>
           <span className="truncate text-xs text-muted-foreground">
-            {x.producto ?? "Sin producto"} · {angulo ? `Ángulo: ${angulo}${x.analisis?.estado === "sin_archivo" ? " (provisional)" : ""}` : "Ángulo sin analizar"}
+            {x.producto ?? "Sin producto"} · {angulo ? `Ángulo: ${angulo}${x.analisis?.anguloDetalle ? ` (${x.analisis.anguloDetalle})` : ""}${x.analisis?.estado === "sin_archivo" ? " (provisional)" : ""}` : "Ángulo sin analizar"}
           </span>
           <span className="truncate text-xs text-muted-foreground">
             En {x.anuncios} {x.anuncios === 1 ? "anuncio" : "anuncios"} de {x.campanas} {x.campanas === 1 ? "campaña" : "campañas"}
@@ -419,6 +419,7 @@ function AnalisisIA({ v, escribe, iaConectada }: { v: VideoVista; escribe: boole
               <span className="font-medium">{a.angulo ?? "—"}</span>
               {a.anguloManual && <span className="ml-2 text-xs text-muted-foreground">corregido a mano</span>}
             </Fila>
+            {a.anguloDetalle && <Fila t="Detalle del ángulo">{a.anguloDetalle}</Fila>}
             {a.promesa && <Fila t="Promesa">{a.promesa}</Fila>}
             {a.gancho && (
               <Fila t="Gancho (primeros 3 segundos)">

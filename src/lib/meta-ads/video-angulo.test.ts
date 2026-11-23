@@ -125,7 +125,7 @@ test("el reanálisis pide solo el ángulo, con la misma regla específica y sin 
   const p = pedidoSoloAngulo({ producto: "Shilajit", angulosExistentes: ["Vitalidad masculina"] });
   assert.match(p, /ESPECÍFICO/);
   assert.match(p, /ÚNICAMENTE de lo que se ve y se dice en el video/);
-  assert.match(p, /\{"angulo": "…"\}/);
+  assert.match(p, /\{"angulo": "…", "angulo_detalle": "…"\}/);
   assert.doesNotMatch(p, /transcripcion|estructura|cta_tipo/);
   assert.match(p, /Vitalidad masculina/);
 });
@@ -141,4 +141,17 @@ test("un ángulo vago como «Beneficios clave» no se ofrece para reutilizar y s
   assert.doesNotMatch(linea, /Beneficios clave/);
   assert.match(p, /NO sirven: no dicen nada/);
   assert.doesNotMatch(pedidoSoloAngulo({ producto: null, angulosExistentes: ["Beneficios clave"] }), /Estos ángulos ya existen/);
+});
+
+test("las tácticas generales llevan su detalle aparte y los demás ángulos no", async () => {
+  const { esAnguloTactico } = await import("./video-angulo");
+  assert.equal(esAnguloTactico("Antes y después"), true);
+  assert.equal(esAnguloTactico("testimonio de cliente."), true);
+  assert.equal(esAnguloTactico("Salud de la próstata"), false);
+  const t = normalizarAnalisisVideo('{"angulo": "Antes y después", "angulo_detalle": "«Manchas en la cara»."}');
+  assert.equal(t?.anguloDetalle, "Manchas en la cara");
+  const o = normalizarAnalisisVideo('{"angulo": "Salud de la próstata", "angulo_detalle": "algo que se debe ignorar"}');
+  assert.equal(o?.anguloDetalle, "");
+  assert.match(pedidoAnalisisVideo({ producto: null, copy: null, titulo: null, angulosExistentes: [], soloTexto: false }), /angulo_detalle/);
+  assert.match(pedidoSoloAngulo({ producto: null, angulosExistentes: [], vagoAnterior: "Beneficios clave" }), /Tu respuesta anterior fue «Beneficios clave»/);
 });
