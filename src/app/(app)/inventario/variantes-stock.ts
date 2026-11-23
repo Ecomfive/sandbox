@@ -14,12 +14,21 @@ const sumaPlataformas = (a: StockPlataformas | null, b: StockPlataformas | null)
  */
 export function conSusVariantes(principal: FilaStock, variantes: FilaStock[]): FilaStock {
   const dentro = [...variantes].sort((a, b) => compararOpciones(a.opciones, b.opciones) || a.codigo.localeCompare(b.codigo, "es", { numeric: true }));
-  const todos = [principal, ...dentro];
+  return {
+    ...principal,
+    ...sumarFilas([principal, ...dentro]),
+    generalPorBodega: principal.porBodega,
+    // Cada variante sabe cuánto stock general queda en su producto, para decir «sale del general» solo donde es cierto.
+    variantes: dentro.map((v) => ({ ...v, generalPorBodega: principal.porBodega })),
+  };
+}
+
+/** Las cifras de varias filas sumadas (cada cubeta, las cajas, las plataformas y el stock por bodega). */
+function sumarFilas(todos: FilaStock[]) {
   const suma = (valor: (f: FilaStock) => number) => todos.reduce((t, f) => t + valor(f), 0);
   const porBodega = new Map<string, number>();
   for (const f of todos) for (const b of f.porBodega) porBodega.set(b.bodegaId, (porBodega.get(b.bodegaId) ?? 0) + b.fisico);
   return {
-    ...principal,
     fisico: suma((f) => f.fisico),
     reservado: suma((f) => f.reservado),
     disponible: suma((f) => f.disponible),
@@ -33,9 +42,27 @@ export function conSusVariantes(principal: FilaStock, variantes: FilaStock[]): F
     manejaVencimiento: todos.some((f) => f.manejaVencimiento),
     plataformas: todos.reduce<StockPlataformas | null>((t, f) => sumaPlataformas(t, f.plataformas), null),
     porBodega: [...porBodega].map(([bodegaId, fisico]) => ({ bodegaId, fisico })),
-    generalPorBodega: principal.porBodega,
-    // Cada variante sabe cuánto stock general queda en su producto, para decir «sale del general» solo donde es cierto.
-    variantes: dentro.map((v) => ({ ...v, generalPorBodega: principal.porBodega })),
+  };
+}
+
+/**
+ * Las variantes de un mismo color como una fila (23 nov 2026, pedido de Jhokser: en Levantamiento se ven agrupadas por color y en Stock no): lleva la suma de sus tallas
+ * (o lo que las distinga) y las variantes dentro. Es solo para mostrar; no es un producto.
+ */
+export function grupoDeColor(principal: FilaStock, color: string, hijos: FilaStock[]): FilaStock {
+  return {
+    ...principal,
+    ...sumarFilas(hijos),
+    id: `${principal.id}|${color}`,
+    nombre: color,
+    codigo: principal.codigo,
+    color,
+    resto: "",
+    opciones: color,
+    foto: hijos.find((h) => h.foto)?.foto ?? principal.foto,
+    repartoPendiente: false,
+    generalPorBodega: undefined,
+    variantes: hijos,
   };
 }
 
