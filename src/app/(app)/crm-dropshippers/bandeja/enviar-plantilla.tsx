@@ -68,7 +68,7 @@ export function EnviarPlantilla({
   }, [conversacionId]);
 
   const faltaEscribir = !!elegida && elegida.manual.some((m, i) => m && !manuales[i]?.trim());
-  const sePuede = !!elegida && !elegida.faltante && !elegida.yaEnviada && !faltaEscribir && !enviando;
+  const sePuede = !!elegida && !elegida.yaEnviada && !faltaEscribir && !enviando;
 
   function enviar() {
     if (!elegida || !sePuede) return;
@@ -155,7 +155,6 @@ export function EnviarPlantilla({
               {previa(elegida, manuales)}
             </p>
             {elegida.botones.length > 0 && <p className="m-0 text-xs text-muted-foreground">Botones: {elegida.botones.join(" · ")}</p>}
-            {elegida.faltante && <p className="m-0 rounded-md bg-warning-soft px-3 py-2 text-sm text-warning">{elegida.faltante}</p>}
             {elegida.yaEnviada && <p className="m-0 rounded-md bg-warning-soft px-3 py-2 text-sm text-warning">Ya le mandaste esta plantilla hoy. Espera su respuesta antes de repetirla.</p>}
             {elegida.categoria === "marketing" && !elegida.yaEnviada && <p className="m-0 text-xs text-muted-foreground">Es de Marketing: cada mensaje cuesta más.</p>}
             {error && (
@@ -235,8 +234,8 @@ export function PlantillasEnLinea({ conversacionId, interno = false, alElegir, a
       {plantillas && plantillas.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
           {plantillas.map((p) => {
-            const apagada = p.yaEnviada || !!p.faltante;
-            const motivo = p.yaEnviada ? "Ya se le mandó hoy: espera su respuesta antes de repetirla." : (p.faltante ?? previa(p, []));
+            const apagada = p.yaEnviada;
+            const motivo = p.yaEnviada ? "Ya se le mandó hoy: espera su respuesta antes de repetirla." : previa(p, []);
             return (
               <button
                 key={p.id}
