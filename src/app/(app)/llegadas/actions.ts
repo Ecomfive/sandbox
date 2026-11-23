@@ -98,6 +98,7 @@ export async function registrarPagoLlegada(llegadaId: string, compraId: string, 
   if (r.error) return r;
   revalidatePath(`/llegadas/${llegadaId}`);
   revalidatePath("/compras/lista");
+  revalidatePath("/compras/llegadas");
   return {};
 }
 
@@ -127,11 +128,14 @@ export async function registrarPagoTotalLlegada(llegadaId: string, dia: unknown)
     if (r.error) {
       revalidatePath(`/llegadas/${llegadaId}`);
       revalidatePath("/compras/lista");
+      revalidatePath("/compras/llegadas");
+  revalidatePath("/compras/llegadas");
       return { error: `Se pagaron ${pagadas} de ${lista.length}. ${r.error}`, pagadas, total: lista.length };
     }
     pagadas += 1;
   }
   revalidatePath(`/llegadas/${llegadaId}`);
   revalidatePath("/compras/lista");
+  revalidatePath("/compras/llegadas");
   return { pagadas, total: lista.length };
 }
