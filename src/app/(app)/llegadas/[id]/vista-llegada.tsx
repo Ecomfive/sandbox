@@ -76,7 +76,7 @@ export function VistaLlegada({
             puerto ? (
               <FilaPuerto key={f.compraId} fila={f} etiquetas={etiquetas[f.compraId] ?? []} abrir={(e, alt) => setFoto({ src: e.url, alt })} />
             ) : (
-              <FilaBodega key={f.compraId} llegadaId={llegadaId} fila={f} verMontos={verMontos} puedePagar={puedePagar} hoy={hoy} />
+              <FilaBodega key={f.compraId} llegadaId={llegadaId} fila={f} verMontos={verMontos} puedePagar={puedePagar} hoy={hoy} abrir={(e, alt) => setFoto({ src: e.url, alt })} />
             ),
           )}
         </ul>
@@ -182,22 +182,27 @@ export function Producto({ fila }: { fila: FilaLlegada }) {
   );
 }
 
+/** La foto del producto (se amplía al pulsarla) o un cuadro punteado si no tiene: en Puerto y en Bodega se reconoce el producto de un vistazo (23 nov 2026, pedido de María José y Logística). */
+export function FotoProducto({ fila, abrir }: { fila: FilaLlegada; abrir: (e: EtiquetaPedido, alt: string) => void }) {
+  return fila.foto ? (
+    <button
+      type="button"
+      onClick={() => abrir({ ruta: fila.foto!, url: fila.foto! }, `Foto de ${textoProductos(fila)}`)}
+      className="h-14 w-14 shrink-0 cursor-pointer overflow-hidden rounded-md border border-border bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+      aria-label={`Ver la foto de ${textoProductos(fila)}`}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={fila.foto} alt="" className="h-full w-full object-cover" />
+    </button>
+  ) : (
+    <span aria-hidden="true" className="h-14 w-14 shrink-0 rounded-md border border-dashed border-border" />
+  );
+}
+
 export function FilaPuerto({ fila, etiquetas, abrir }: { fila: FilaLlegada; etiquetas: EtiquetaPedido[]; abrir: (e: EtiquetaPedido, alt: string) => void }) {
   return (
     <li className="flex flex-wrap items-center gap-x-6 gap-y-3 p-4">
-      {fila.foto ? (
-        <button
-          type="button"
-          onClick={() => abrir({ ruta: fila.foto!, url: fila.foto! }, `Foto de ${textoProductos(fila)}`)}
-          className="h-14 w-14 shrink-0 cursor-pointer overflow-hidden rounded-md border border-border bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-          aria-label={`Ver la foto de ${textoProductos(fila)}`}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={fila.foto} alt="" className="h-full w-full object-cover" />
-        </button>
-      ) : (
-        <span aria-hidden="true" className="h-14 w-14 shrink-0 rounded-md border border-dashed border-border" />
-      )}
+      <FotoProducto fila={fila} abrir={abrir} />
       <Producto fila={fila} />
       <div className="flex gap-6 text-sm tabular-nums">
         <span>
@@ -231,7 +236,7 @@ export function FilaPuerto({ fila, etiquetas, abrir }: { fila: FilaLlegada; etiq
   );
 }
 
-function FilaBodega({ llegadaId, fila, verMontos, puedePagar, hoy }: { llegadaId: string; fila: FilaLlegada; verMontos: boolean; puedePagar: boolean; hoy: string }) {
+function FilaBodega({ llegadaId, fila, verMontos, puedePagar, hoy, abrir }: { llegadaId: string; fila: FilaLlegada; verMontos: boolean; puedePagar: boolean; hoy: string; abrir: (e: EtiquetaPedido, alt: string) => void }) {
   const router = useRouter();
   const { mostrarToast } = useToast();
   const [abierto, setAbierto] = useState(false);
@@ -258,6 +263,7 @@ function FilaBodega({ llegadaId, fila, verMontos, puedePagar, hoy }: { llegadaId
   return (
     <li className="flex flex-col gap-3 p-4">
       <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+        <FotoProducto fila={fila} abrir={abrir} />
         <Producto fila={fila} />
         <div className="flex gap-6 text-sm tabular-nums">
           <span>
