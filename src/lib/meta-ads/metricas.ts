@@ -15,6 +15,9 @@ export interface Resultados {
   video50: number;
   video75: number;
   video95: number;
+  /** Reproducciones del video y tiempo total visto en segundos (promedio de Meta × reproducciones): sumables; el promedio es `tiempoPromedio`. 0 = sin dato. */
+  reproducciones: number;
+  segundosVistos: number;
   vioLanding: number;
   carrito: number;
   pago: number;
@@ -22,7 +25,7 @@ export interface Resultados {
   valor: number;
 }
 
-export const sinResultados = (): Resultados => ({ gasto: 0, impresiones: 0, clics: 0, video3s: 0, video15s: 0, video25: 0, video50: 0, video75: 0, video95: 0, vioLanding: 0, carrito: 0, pago: 0, compras: 0, valor: 0 });
+export const sinResultados = (): Resultados => ({ gasto: 0, impresiones: 0, clics: 0, video3s: 0, video15s: 0, video25: 0, video50: 0, video75: 0, video95: 0, reproducciones: 0, segundosVistos: 0, vioLanding: 0, carrito: 0, pago: 0, compras: 0, valor: 0 });
 
 export function sumar(a: Resultados, b: Partial<Resultados>): Resultados {
   return {
@@ -35,6 +38,8 @@ export function sumar(a: Resultados, b: Partial<Resultados>): Resultados {
     video50: a.video50 + (b.video50 ?? 0),
     video75: a.video75 + (b.video75 ?? 0),
     video95: a.video95 + (b.video95 ?? 0),
+    reproducciones: a.reproducciones + (b.reproducciones ?? 0),
+    segundosVistos: a.segundosVistos + (b.segundosVistos ?? 0),
     vioLanding: a.vioLanding + (b.vioLanding ?? 0),
     carrito: a.carrito + (b.carrito ?? 0),
     pago: a.pago + (b.pago ?? 0),
@@ -47,6 +52,13 @@ export function sumar(a: Resultados, b: Partial<Resultados>): Resultados {
 export const GASTO_MINIMO_CONFIABLE = 100;
 /** El CPA tope mientras nadie lo defina para el producto: $10 (23 nov 2026, indicado por Alcides; antes $3). El equipo lo cambia por producto en «Cuentas». */
 export const CPA_TOPE_PREDETERMINADO = 10;
+
+/** Segundos que se ve en promedio cada reproducción del video (null si Meta todavía no dio el dato). */
+export const tiempoPromedio = (r: Resultados): number | null => (r.reproducciones > 0 && r.segundosVistos > 0 ? r.segundosVistos / r.reproducciones : null);
+/** Tiempo promedio de reproducción (documento «Métrica»): bien desde 8 s, mal hasta 5 s. */
+export const nivelTiempo = (s: number | null): NivelMetrica => (s === null ? "neutral" : s >= 8 ? "bueno" : s > 5 ? "medio" : "malo");
+/** Frecuencia (documento «Métrica»): bien hasta 2.20 veces, mal pasadas 2.80 (saturación). */
+export const nivelFrecuencia = (f: number | null): NivelMetrica => (f === null ? "neutral" : f <= 2.2 ? "bueno" : f <= 2.8 ? "medio" : "malo");
 
 export const cpa = (r: Resultados): number | null => (r.compras > 0 ? r.gasto / r.compras : null);
 export const ctr = (r: Resultados): number | null => (r.impresiones > 0 ? (r.clics / r.impresiones) * 100 : null);

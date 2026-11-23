@@ -172,6 +172,9 @@ export function resultadoDiaDe(f: unknown): ResultadoDia | null {
     video50: Math.round(accion(o.video_p50_watched_actions, ["video_view"])),
     video75: Math.round(accion(o.video_p75_watched_actions, ["video_view"])),
     video95: Math.round(accion(o.video_p95_watched_actions, ["video_view"])),
+    // Meta da el tiempo promedio de cada reproducción: se guarda el total (promedio × reproducciones) para poder sumar días y volver a sacar el promedio.
+    reproducciones: Math.round(accion(o.video_play_actions, ["video_view"])),
+    segundosVistos: accion(o.video_avg_time_watched_actions, ["video_view"]) * Math.round(accion(o.video_play_actions, ["video_view"])),
     vioLanding: Math.round(accion(o.actions, LANDING)),
     carrito: Math.round(accion(o.actions, CARRITO)),
     pago: Math.round(accion(o.actions, PAGO)),

@@ -127,13 +127,15 @@ interface FilaDia {
   video_50?: unknown;
   video_75?: unknown;
   video_95?: unknown;
+  video_reproducciones?: unknown;
+  video_segundos?: unknown;
   vio_landing: unknown;
   carrito: unknown;
   pago: unknown;
   compras: unknown;
   valor: unknown;
 }
-const resultadosDe = (f: FilaDia): Resultados => ({ gasto: num(f.gasto), impresiones: num(f.impresiones), clics: num(f.clics), video3s: num(f.video_3s), video15s: num(f.video_15s), video25: num(f.video_25), video50: num(f.video_50), video75: num(f.video_75), video95: num(f.video_95), vioLanding: num(f.vio_landing), carrito: num(f.carrito), pago: num(f.pago), compras: num(f.compras), valor: num(f.valor) });
+const resultadosDe = (f: FilaDia): Resultados => ({ gasto: num(f.gasto), impresiones: num(f.impresiones), clics: num(f.clics), video3s: num(f.video_3s), video15s: num(f.video_15s), video25: num(f.video_25), video50: num(f.video_50), video75: num(f.video_75), video95: num(f.video_95), reproducciones: num(f.video_reproducciones), segundosVistos: num(f.video_segundos), vioLanding: num(f.vio_landing), carrito: num(f.carrito), pago: num(f.pago), compras: num(f.compras), valor: num(f.valor) });
 
 export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: string; cuentaId: string | null; periodo: Periodo; hoy: string }): Promise<DatosMeta> {
   const base = vacios(o.periodo, o.hoy);
@@ -154,11 +156,12 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
 
   // El periodo anterior (para comparar) solo se carga hasta 3 meses; con 6 meses o 1 año se muestra solo el periodo.
   const desdeDatos = restar(o.hoy, (dias > 90 ? dias : Math.max(dias * 2, 30)) - 1);
-  const [camp, anun, dia, act, hechos, catalogo] = await Promise.all([
+  const [camp, anun, dia, act, hechos, catalogo, frecuencias] = await Promise.all([
     traerTodasLasFilas<Record<string, unknown>>((a, b) => supabase.from("meta_campanas").select("id, cuenta_id, meta_id, nombre, estado, estructura, puja, presupuesto_diario, creada_meta_en, producto, angulo, etapa, manual, creada_por, mercado, videos, persona_nombre").in("cuenta_id", ids).range(a, b)),
-    traerTodasLasFilas<Record<string, unknown>>((a, b) => supabase.from("meta_anuncios").select("id, campana_id, nombre, estado, video_id, miniatura, copy, titulo, landing").in("cuenta_id", ids).range(a, b)),
+    traerTodasLasFilas<Record<string, unknown>>((a, b) => supabase.from("meta_anuncios").select("id, meta_id, cuenta_id, campana_id, nombre, estado, video_id, miniatura, copy, titulo, landing").in("cuenta_id", ids).range(a, b)),
     // Sin la migración 0326 no hay retención del video: se leen las columnas de antes.
-    traerTodasLasFilas<FilaDia>((a, b) => supabase.from("meta_resultados_dia").select("anuncio_id, campana_id, fecha, gasto, impresiones, clics, video_3s, video_15s, video_25, video_50, video_75, video_95, vio_landing, carrito, pago, compras, valor").in("cuenta_id", ids).gte("fecha", desdeDatos).order("fecha").range(a, b)).catch(() =>
+    traerTodasLasFilas<FilaDia>((a, b) => supabase.from("meta_resultados_dia").select("anuncio_id, campana_id, fecha, gasto, impresiones, clics, video_3s, video_15s, video_25, video_50, video_75, video_95, video_reproducciones, video_segundos, vio_landing, carrito, pago, compras, valor").in("cuenta_id", ids).gte("fecha", desdeDatos).order("fecha").range(a, b)).catch(() =>
+    traerTodasLasFilas<FilaDia>((a, b) => supabase.from("meta_resultados_dia").select("anuncio_id, campana_id, fecha, gasto, impresiones, clics, video_3s, video_15s, video_25, video_50, video_75, video_95, vio_landing, carrito, pago, compras, valor").in("cuenta_id", ids).gte("fecha", desdeDatos).order("fecha").range(a, b))).catch(() =>
       traerTodasLasFilas<FilaDia>((a, b) => supabase.from("meta_resultados_dia").select("anuncio_id, campana_id, fecha, gasto, impresiones, clics, video_3s, video_15s, vio_landing, carrito, pago, compras, valor").in("cuenta_id", ids).gte("fecha", desdeDatos).order("fecha").range(a, b)),
     ),
     traerTodasLasFilas<Record<string, unknown>>((a, b) => supabase.from("meta_actividad").select("fecha, cuenta_id, actor_nombre, tipo, objeto_tipo, objeto_meta_id, objeto_nombre, detalle").in("cuenta_id", ids).gte("fecha", `${restar(o.hoy, DIAS_DE_ACTIVIDAD - 1)}T00:00:00Z`).order("fecha", { ascending: false }).range(a, b)).catch(() => []),
@@ -170,7 +173,11 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
     ),
     // Los productos de Producto (nombre y clase) para saber si el de una campaña ya salió de Test. Si no se pueden leer, las campañas quedan con la etapa que dice su nombre.
     traerTodasLasFilas<Record<string, unknown>>((a, b) => supabase.from("skus_maestros").select("nombre, clase").range(a, b)).then((f) => indexarCatalogo(f.map((x) => ({ nombre: String(x.nombre ?? ""), clase: String(x.clase ?? "") })))).catch((): IndiceCatalogo | null => null),
+    // La frecuencia de los últimos 7 días de cada anuncio y campaña (migración 0356); sin ella, no se muestra.
+    traerTodasLasFilas<Record<string, unknown>>((a, b) => supabase.from("meta_frecuencia").select("cuenta_id, tipo, meta_id, frecuencia, alcance").in("cuenta_id", ids).range(a, b)).catch((): Record<string, unknown>[] => []),
   ]);
+  const frecuenciaDe = new Map<string, number>();
+  for (const f of frecuencias) frecuenciaDe.set(`${f.tipo}|${f.cuenta_id}|${f.meta_id}`, num(f.frecuencia));
 
   // Resultados por campaña, por anuncio y por día de campaña.
   const porCampana = new Map<string, Resultados>();
@@ -258,6 +265,7 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
     const angulo = manual && delNombre ? delNombre : (delVideo ?? delNombre);
     return {
       id: c.id as string, cuentaId: c.cuenta_id as string, cuentaNombre: nombreCuenta.get(c.cuenta_id as string) ?? "", metaId: c.meta_id as string, nombre: c.nombre as string, estado: c.estado as string, activa: c.estado === "ACTIVE",
+      frecuencia: frecuenciaDe.get(`campana|${c.cuenta_id as string}|${c.meta_id as string}`) ?? null,
       etapa: efectiva ? efectiva.etapa : delNombreEtapa, etapaMotivo: efectiva ? efectiva.motivo : null, estructura: (c.estructura as Estructura | null) ?? null, puja: (c.puja as Puja | null) ?? null, producto: (c.producto as string | null) ?? null, angulo, angulos: mezcla.angulos, videosTotal: mezcla.videosTotal, videosConAngulo: mezcla.videosConAngulo,
       anguloOrigen: manual && delNombre ? "manual" : delVideo ? "video" : delNombre ? "nombre" : null,
       presupuestoDiario: c.presupuesto_diario === null || c.presupuesto_diario === undefined ? null : num(c.presupuesto_diario), creadaEn: (c.creada_meta_en as string | null) ?? null,
@@ -273,7 +281,7 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
   const campanasConActividad = campanas.filter((c) => c.r.gasto > 0 || c.activa || (c.creadaEn ?? "") >= desde);
   const campanasDe = new Map(campanas.map((c) => [c.id, c]));
 
-  const anuncios: AnuncioVista[] = anun.map((a) => ({ id: a.id as string, campanaId: a.campana_id as string, nombre: a.nombre as string, activo: a.estado === "ACTIVE", videoId: (a.video_id as string | null) ?? null, miniatura: (a.miniatura as string | null) ?? null, copy: (a.copy as string | null) ?? null, titulo: (a.titulo as string | null) ?? null, landing: (a.landing as string | null) ?? null, numero: numeroDeVideo(String(a.nombre ?? "")), angulo: analisisDe.get(String(a.video_id ?? ""))?.angulo ?? null, decision: null, decisionMotivo: null, r: porAnuncio.get(a.id as string) ?? sinResultados() }));
+  const anuncios: AnuncioVista[] = anun.map((a) => ({ id: a.id as string, campanaId: a.campana_id as string, nombre: a.nombre as string, activo: a.estado === "ACTIVE", videoId: (a.video_id as string | null) ?? null, miniatura: (a.miniatura as string | null) ?? null, copy: (a.copy as string | null) ?? null, titulo: (a.titulo as string | null) ?? null, landing: (a.landing as string | null) ?? null, numero: numeroDeVideo(String(a.nombre ?? "")), angulo: analisisDe.get(String(a.video_id ?? ""))?.angulo ?? null, decision: null, decisionMotivo: null, frecuencia: frecuenciaDe.get(`anuncio|${a.cuenta_id as string}|${a.meta_id as string}`) ?? null, r: porAnuncio.get(a.id as string) ?? sinResultados() }));
 
   // Videos (30 días): el mismo video en varios anuncios es uno solo.
   const videosMapa = new Map<string, { nombre: string; miniatura: string | null; anuncios: number; campanas: Set<string>; angulos: Map<string, number>; productos: Map<string, number>; detalle: VideoVista["anunciosDetalle"]; numero: string | null }>();
@@ -335,7 +343,7 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
     const fecha = [...dias.keys()].sort().pop();
     return fecha ? (dias.get(fecha) ?? sinResultados()) : sinResultados();
   };
-  const anunciosSugerencia = anuncios.map((a) => ({ id: a.id, campanaId: a.campanaId, nombre: a.nombre, numero: a.numero, activo: a.activo, angulo: a.angulo, r: porAnuncio30.get(a.id) ?? sinResultados(), ultimos2: porAnuncio2.get(a.id) ?? sinResultados(), ultimoDia: ultimoDiaDe(a.id) }));
+  const anunciosSugerencia = anuncios.map((a) => ({ id: a.id, campanaId: a.campanaId, nombre: a.nombre, numero: a.numero, activo: a.activo, angulo: a.angulo, r: porAnuncio30.get(a.id) ?? sinResultados(), ultimos2: porAnuncio2.get(a.id) ?? sinResultados(), ultimoDia: ultimoDiaDe(a.id), frecuencia: a.frecuencia }));
   const decisionesAnuncio = decisionesDeAnuncios(anunciosSugerencia, campanas);
   for (const a of anuncios) {
     const d = decisionesAnuncio.get(a.id);
