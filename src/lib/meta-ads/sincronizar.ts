@@ -41,7 +41,7 @@ export const DIAS_LECTURA = 7;
 const CAMPOS_CAMPANA = "id,name,objective,status,effective_status,daily_budget,lifetime_budget,bid_strategy,created_time";
 const CAMPOS_CONJUNTO = "id,name,campaign_id,status,effective_status,daily_budget,bid_strategy";
 const CAMPOS_ANUNCIO = "id,name,campaign_id,adset_id,status,effective_status,creative{video_id,thumbnail_url,body,title,link_url,object_story_spec}";
-const CAMPOS_RESULTADOS = "ad_id,ad_name,adset_id,adset_name,campaign_id,campaign_name,spend,impressions,inline_link_clicks,actions,action_values,video_thruplay_watched_actions,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p95_watched_actions";
+const CAMPOS_RESULTADOS = "ad_id,ad_name,adset_id,adset_name,campaign_id,campaign_name,spend,impressions,inline_link_clicks,actions,action_values,video_thruplay_watched_actions,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p95_watched_actions,video_play_actions,video_avg_time_watched_actions";
 
 const TROZO = 200;
 async function guardarPorTrozos<T>(filas: T[], guardar: (trozo: T[]) => PromiseLike<{ error: { message: string } | null }>): Promise<string | null> {
@@ -218,13 +218,20 @@ export async function sincronizarCuenta(supabase: SupabaseClient, cuenta: Cuenta
   const filasDia = dias
     .map((d) => {
       const a = anuncioPorMeta.get(d.anuncioMetaId);
-      return a ? { anuncio_id: a.id, cuenta_id: cuenta.id, campana_id: a.campana, fecha: d.fecha, gasto: d.gasto, impresiones: d.impresiones, clics: d.clics, video_3s: d.video3s, video_15s: d.video15s, video_25: d.video25, video_50: d.video50, video_75: d.video75, video_95: d.video95, vio_landing: d.vioLanding, carrito: d.carrito, pago: d.pago, compras: d.compras, valor: d.valor } : null;
+      return a ? { anuncio_id: a.id, cuenta_id: cuenta.id, campana_id: a.campana, fecha: d.fecha, gasto: d.gasto, impresiones: d.impresiones, clics: d.clics, video_3s: d.video3s, video_15s: d.video15s, video_25: d.video25, video_50: d.video50, video_75: d.video75, video_95: d.video95, video_reproducciones: d.reproducciones, video_segundos: Math.round(d.segundosVistos * 100) / 100, vio_landing: d.vioLanding, carrito: d.carrito, pago: d.pago, compras: d.compras, valor: d.valor } : null;
     })
     .filter((f): f is NonNullable<typeof f> => f !== null);
   falla = await guardarPorTrozos(filasDia, (t) => supabase.from("meta_resultados_dia").upsert(t, { onConflict: "anuncio_id,fecha" }));
+  // Sin la migración 0356 no existen las columnas del tiempo de reproducción: se guarda lo demás igual.
+  let filasGuardar: Record<string, unknown>[] = filasDia;
+  if (falla && /video_reproducciones|video_segundos|schema cache/i.test(falla)) {
+    filasGuardar = filasDia.map(({ video_reproducciones: _a, video_segundos: _b, ...resto }) => (void [_a, _b], resto));
+    falla = await guardarPorTrozos(filasGuardar, (t) => supabase.from("meta_resultados_dia").upsert(t, { onConflict: "anuncio_id,fecha" }));
+    if (!falla) r.avisos.push("Falta correr la migración 0356 para guardar el tiempo promedio de reproducción y la frecuencia.");
+  }
   // Sin la migración 0326 no existen las columnas de retención: se guarda lo demás igual.
   if (falla && /video_25|video_50|video_75|video_95|schema cache/i.test(falla)) {
-    const sinRetencion = filasDia.map(({ video_25: _a, video_50: _b, video_75: _c, video_95: _d, ...resto }) => (void [_a, _b, _c, _d], resto));
+    const sinRetencion = filasGuardar.map(({ video_25: _a, video_50: _b, video_75: _c, video_95: _d, ...resto }) => (void [_a, _b, _c, _d], resto));
     falla = await guardarPorTrozos(sinRetencion, (t) => supabase.from("meta_resultados_dia").upsert(t, { onConflict: "anuncio_id,fecha" }));
     if (!falla) r.avisos.push("Falta correr la migración 0326 para guardar la retención del video (25, 50, 75 y 95 %).");
   }
@@ -237,6 +244,33 @@ export async function sincronizarCuenta(supabase: SupabaseClient, cuenta: Cuenta
     const sinCampana = sinAnuncio.filter((id) => { const a = anuncios.get(id); return !!a && !idDeCampana.has(a.campanaMetaId); }).length;
     const motivo = [sinLeer ? `Meta no entregó ${sinLeer} ${sinLeer === 1 ? "anuncio" : "anuncios"} (borrados o sin permiso)` : "", sinCampana ? `${sinCampana} ${sinCampana === 1 ? "anuncio" : "anuncios"} de campañas que no se pudieron guardar` : ""].filter(Boolean).join("; ");
     r.avisos.push(`${dias.length - filasDia.length} filas de resultados de ${sinAnuncio.length} ${sinAnuncio.length === 1 ? "anuncio" : "anuncios"} no se guardaron${motivo ? ` (${motivo})` : ""}. Ids: ${sinAnuncio.slice(0, 5).join(", ")}${sinAnuncio.length > 5 ? "…" : ""}.`);
+  }
+
+  // 5b. Frecuencia: personas distintas alcanzadas y veces que vieron en promedio el anuncio o la campaña en los últimos 7 días. No se puede sumar día por día, así que se pide aparte y se guarda la última lectura.
+  // Solo en la lectura de siempre (no al traer historial) y si todavía queda tiempo.
+  if (!opciones.rango && Date.now() < finEstructura) {
+    const desde7 = restarDias(hasta, 6);
+    const hoyIso = new Date().toISOString();
+    for (const [nivel, tipo, campoId] of [["ad", "anuncio", "ad_id"], ["campaign", "campana", "campaign_id"]] as const) {
+      const f = await pedirTodo(`/${cuenta.act_id}/insights`, { level: nivel, time_range: JSON.stringify({ since: desde7, until: hasta }), fields: `${campoId},reach,frequency`, limit: 500 }, token, 30, finEstructura);
+      const filas = f.filas
+        .map((x) => {
+          const o = x as Record<string, unknown>;
+          const id = typeof o[campoId] === "string" ? (o[campoId] as string) : null;
+          const frecuencia = Number(o.frequency);
+          return id && Number.isFinite(frecuencia) ? { cuenta_id: cuenta.id, tipo, meta_id: id, alcance: Math.round(Number(o.reach) || 0), frecuencia: Math.round(frecuencia * 100) / 100, desde: desde7, hasta, leida_en: hoyIso } : null;
+        })
+        .filter((x): x is NonNullable<typeof x> => x !== null);
+      if (f.error && !filas.length) {
+        r.avisos.push(`No se pudo leer la frecuencia: ${f.error}`);
+        break;
+      }
+      const e = await guardarPorTrozos(filas, (t) => supabase.from("meta_frecuencia").upsert(t, { onConflict: "cuenta_id,tipo,meta_id" }));
+      if (e) {
+        if (!/meta_frecuencia|schema cache|does not exist/i.test(e)) r.avisos.push(`No se pudo guardar la frecuencia: ${e}`);
+        break;
+      }
+    }
   }
 
   // 6. Registro de actividad: quién creó o cambió qué. Si Meta no lo deja con este acceso, se avisa y todo lo demás sigue.

@@ -15,6 +15,9 @@ export interface Resultados {
   video50: number;
   video75: number;
   video95: number;
+  /** Reproducciones del video y tiempo total visto en segundos (promedio de Meta × reproducciones): sumables; el promedio es `tiempoPromedio`. 0 = sin dato. */
+  reproducciones: number;
+  segundosVistos: number;
   vioLanding: number;
   carrito: number;
   pago: number;
@@ -22,7 +25,7 @@ export interface Resultados {
   valor: number;
 }
 
-export const sinResultados = (): Resultados => ({ gasto: 0, impresiones: 0, clics: 0, video3s: 0, video15s: 0, video25: 0, video50: 0, video75: 0, video95: 0, vioLanding: 0, carrito: 0, pago: 0, compras: 0, valor: 0 });
+export const sinResultados = (): Resultados => ({ gasto: 0, impresiones: 0, clics: 0, video3s: 0, video15s: 0, video25: 0, video50: 0, video75: 0, video95: 0, reproducciones: 0, segundosVistos: 0, vioLanding: 0, carrito: 0, pago: 0, compras: 0, valor: 0 });
 
 export function sumar(a: Resultados, b: Partial<Resultados>): Resultados {
   return {
@@ -35,6 +38,8 @@ export function sumar(a: Resultados, b: Partial<Resultados>): Resultados {
     video50: a.video50 + (b.video50 ?? 0),
     video75: a.video75 + (b.video75 ?? 0),
     video95: a.video95 + (b.video95 ?? 0),
+    reproducciones: a.reproducciones + (b.reproducciones ?? 0),
+    segundosVistos: a.segundosVistos + (b.segundosVistos ?? 0),
     vioLanding: a.vioLanding + (b.vioLanding ?? 0),
     carrito: a.carrito + (b.carrito ?? 0),
     pago: a.pago + (b.pago ?? 0),
@@ -47,6 +52,13 @@ export function sumar(a: Resultados, b: Partial<Resultados>): Resultados {
 export const GASTO_MINIMO_CONFIABLE = 100;
 /** El CPA tope mientras nadie lo defina para el producto: $10 (23 nov 2026, indicado por Alcides; antes $3). El equipo lo cambia por producto en «Cuentas». */
 export const CPA_TOPE_PREDETERMINADO = 10;
+
+/** Segundos que se ve en promedio cada reproducción del video (null si Meta todavía no dio el dato). */
+export const tiempoPromedio = (r: Resultados): number | null => (r.reproducciones > 0 && r.segundosVistos > 0 ? r.segundosVistos / r.reproducciones : null);
+/** Tiempo promedio de reproducción (documento «Métrica»): bien desde 8 s, mal hasta 5 s. */
+export const nivelTiempo = (s: number | null): NivelMetrica => (s === null ? "neutral" : s >= 8 ? "bueno" : s > 5 ? "medio" : "malo");
+/** Frecuencia (documento «Métrica»): bien hasta 2.20 veces, mal pasadas 2.80 (saturación). */
+export const nivelFrecuencia = (f: number | null): NivelMetrica => (f === null ? "neutral" : f <= 2.2 ? "bueno" : f <= 2.8 ? "medio" : "malo");
 
 export const cpa = (r: Resultados): number | null => (r.compras > 0 ? r.gasto / r.compras : null);
 export const ctr = (r: Resultados): number | null => (r.impresiones > 0 ? (r.clics / r.impresiones) * 100 : null);
@@ -153,7 +165,20 @@ export const METRICAS_CAMPANA: { clave: ClaveMetrica; titulo: string }[] = [
 ];
 
 /**
- * El color de cada cifra. **En testing** (campañas de etapa «Test») valen las escalas de la hoja de Control de Testing —las mismas de Productos Test, `@/lib/metricas-meta-ads`—: CPM menor que 3 bien y mayor
+ * Las escalas de **ventas** (documento «Métrica» de Oferfy, 23 nov 2026): CPA bien hasta $9.50 y mal desde $11; CTR del enlace bien desde 3 % y mal bajo 2 %; CPM bien hasta $5.50 y mal desde $7.50; Hook Rate bien desde
+ * 40 %, regular desde 25 % y mal bajo 25 %; efectividad de la visita a la landing bien desde 85 % y mal bajo 75 %; conversión de la landing bien desde 1.5 % y mal bajo 1 %. Gasto y compras no llevan color.
+ */
+const escalaVenta = {
+  cpm: (v: number): NivelMetrica => (v <= 5.5 ? "bueno" : v <= 7.5 ? "medio" : "malo"),
+  ctr: (v: number): NivelMetrica => (v >= 3 ? "bueno" : v >= 2 ? "medio" : "malo"),
+  hook: (v: number): NivelMetrica => (v >= 40 ? "bueno" : v >= 25 ? "medio" : "malo"),
+  efectividad: (v: number): NivelMetrica => (v >= 85 ? "bueno" : v >= 75 ? "medio" : "malo"),
+  cvr: (v: number): NivelMetrica => (v >= 1.5 ? "bueno" : v >= 1 ? "medio" : "malo"),
+  cpa: (v: number): NivelMetrica => (v <= 9.5 ? "bueno" : v <= 11 ? "medio" : "malo"),
+};
+
+/**
+ * El color de cada cifra. **En ventas** valen las escalas del documento «Métrica» (`escalaVenta`). **En testing** (campañas de etapa «Test») valen las escalas de la hoja de Control de Testing —las mismas de Productos Test, `@/lib/metricas-meta-ads`—: CPM menor que 3 bien y mayor
  * que 5 mal; % Efectividad mayor que 80 bien y menor que 70 mal; Hook mayor que 40 bien y menor que 30 mal; CTR mayor que 3 bien y menor que 2 mal; CPA menor que 2 bien y mayor que 4 mal; CVR mayor que 9
  * bien y menor que 4 mal; Gasto mayor que 24 mal; lo de en medio, regular (los dos extremos incluidos). Una campaña de testing que gastó y no compró lleva el CPA en rojo si ya pasó de $4, como la hoja
  * (que pone el gasto como CPA). **Escala y retargeting** todavía no tienen sus rangos (los dará el equipo): conservan lo que había (CPA frente a su tope, CTR y Hook) y el resto sin color.
@@ -161,6 +186,19 @@ export const METRICAS_CAMPANA: { clave: ClaveMetrica; titulo: string }[] = [
 export function nivelesDeMetricas(r: Resultados, etapa: string | null, tope: number): Record<ClaveMetrica, NivelMetrica> {
   const sinColor: Record<ClaveMetrica, NivelMetrica> = { cpm: "neutral", efectividad: "neutral", hook: "neutral", ctr: "neutral", cpa: "neutral", gasto: "neutral", compras: "neutral", cvr: "neutral" };
   const valor = <T extends number | null>(v: T, f: (n: number) => NivelMetrica): NivelMetrica => (v === null ? "neutral" : f(v));
+  if (etapa === "venta") {
+    return {
+      cpm: valor(cpm(r), escalaVenta.cpm),
+      efectividad: valor(efectividad(r), escalaVenta.efectividad),
+      hook: valor(hookRate(r), escalaVenta.hook),
+      ctr: valor(ctr(r), escalaVenta.ctr),
+      // Gastó más del CPA en rojo sin comprar: malo (el documento corta el anuncio a los $12).
+      cpa: r.compras === 0 && r.gasto > 0 ? (r.gasto >= 12 ? "malo" : "neutral") : valor(cpa(r), escalaVenta.cpa),
+      gasto: "neutral",
+      compras: "neutral",
+      cvr: valor(cvr(r), escalaVenta.cvr),
+    };
+  }
   if (etapa !== "testing") return { ...sinColor, cpa: nivelDeCpa(cpa(r), tope), ctr: nivelDeCtr(ctr(r)), hook: nivelDeHook(hookRate(r)) };
   const sinCompras = r.compras === 0 && r.gasto > 0;
   return {

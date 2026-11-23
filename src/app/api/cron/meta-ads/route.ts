@@ -10,7 +10,7 @@ export const maxDuration = 300;
 
 /**
  * La lectura de las cuentas publicitarias de Meta (18 nov 2026): solo consulta Meta y guarda en la base, nunca cambia nada en Meta. Después, con el tiempo que quede, la IA ve los videos
- * con más gasto que todavía no tienen análisis (ángulo, promesa, gancho, estructura, llamado a la acción). Con `?solo=videos` no lee Meta y dedica todo el tiempo a los videos: Vercel lo corre cada 10 minutos (un video tarda de 20 a
+ * con más gasto que todavía no tienen análisis (y, cuando ya no queda ninguno, vuelve a pedir solo el ángulo de los ya analizados con la regla nueva) (ángulo, promesa, gancho, estructura, llamado a la acción). Con `?solo=videos` no lee Meta y dedica todo el tiempo a los videos: Vercel lo corre cada 10 minutos (un video tarda de 20 a
  * 90 segundos, así que cada pasada hace de 3 a 8; si no hay pendientes, termina en un segundo y no cuesta nada). Si el análisis automático está en pausa (interruptor de Videos, `meta_ajustes`) no analiza nada. Ve todo el historial leído, de más a menos gasto, hasta ponerse al día. Solo lo acepta el cron de Vercel (`CRON_SECRET`).
  */
 export async function GET(request: Request) {

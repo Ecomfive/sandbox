@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { Badge, type Tone } from "@/components/ui/badge";
 import { claseMetrica, type NivelMetrica } from "@/lib/metricas-meta-ads";
-import { GASTO_MINIMO_CONFIABLE, METRICAS_CAMPANA, conSigno, confiable, cpa, cpm, ctr, cvr, dolares, efectividad, hookRate, nivelDeCpa, nivelDeCtr, nivelDeHook, nivelDeResultado, nivelesDeMetricas, resultado, type ClaveMetrica, type Resultados } from "@/lib/meta-ads/metricas";
+import { GASTO_MINIMO_CONFIABLE, METRICAS_CAMPANA, conSigno, confiable, cpa, cpm, ctr, cvr, dolares, efectividad, hookRate, nivelDeCpa, nivelDeCtr, nivelDeHook, nivelDeResultado, nivelesDeMetricas, nivelFrecuencia, nivelTiempo, resultado, tiempoPromedio, type ClaveMetrica, type Resultados } from "@/lib/meta-ads/metricas";
 import { NOMBRE_ETAPA, NOMBRE_PUJA, type Estructura, type Etapa, type Puja } from "@/lib/meta-ads/nombre";
 
 export const entero = (n: number) => n.toLocaleString("es-PA", { maximumFractionDigits: 0 });
@@ -76,6 +76,10 @@ export function Cifra({ titulo, valor, apoyo, nivel }: { titulo: string; valor: 
   );
 }
 
+/** Tiempo promedio de reproducción («7.4 s») y frecuencia de los últimos 7 días («1.85»); «—» si todavía no se leen de Meta. */
+export const textoTiempo = (r: Resultados): string => (tiempoPromedio(r) === null ? "—" : `${tiempoPromedio(r)!.toFixed(1)} s`);
+export const textoFrecuencia = (f: number | null): string => (f === null ? "—" : f.toFixed(2));
+
 /** El texto de cada una de las ocho cifras de una campaña («$4.20», «49.12 %», «Sin compras»). */
 export function textoMetrica(clave: ClaveMetrica, r: Resultados): string {
   const pct = (n: number | null) => porcentaje(n, 2);
@@ -118,7 +122,7 @@ export function CeldasMetricas({ r, etapa, tope }: { r: Resultados; etapa: strin
 }
 
 /** Las métricas de un resultado en una línea: para filas y fichas. Con `completa`, las ocho de la hoja de Testing (con sus colores según la etapa); sin ella, solo CPA, CTR y Hook. */
-export function MetricasEnLinea({ r, tope, etapa = null, completa = false }: { r: Resultados; tope: number; etapa?: string | null; completa?: boolean }) {
+export function MetricasEnLinea({ r, tope, etapa = null, completa = false, frecuencia = null }: { r: Resultados; tope: number; etapa?: string | null; completa?: boolean; frecuencia?: number | null }) {
   if (completa) {
     const niveles = nivelesDeMetricas(r, etapa, tope);
     return (
@@ -128,6 +132,16 @@ export function MetricasEnLinea({ r, tope, etapa = null, completa = false }: { r
             {m.titulo} <Nivel nivel={niveles[m.clave]}>{textoMetrica(m.clave, r)}</Nivel>
           </span>
         ))}
+        {tiempoPromedio(r) !== null && (
+          <span>
+            Tiempo prom. <Nivel nivel={nivelTiempo(tiempoPromedio(r))}>{textoTiempo(r)}</Nivel>
+          </span>
+        )}
+        {frecuencia !== null && (
+          <span>
+            Frecuencia <Nivel nivel={nivelFrecuencia(frecuencia)}>{textoFrecuencia(frecuencia)}</Nivel>
+          </span>
+        )}
       </span>
     );
   }
