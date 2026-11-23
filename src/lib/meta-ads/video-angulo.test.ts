@@ -129,3 +129,16 @@ test("el reanálisis pide solo el ángulo, con la misma regla específica y sin 
   assert.doesNotMatch(p, /transcripcion|estructura|cta_tipo/);
   assert.match(p, /Vitalidad masculina/);
 });
+
+test("un ángulo vago como «Beneficios clave» no se ofrece para reutilizar y se le dice a la IA que no sirve", async () => {
+  const { esAnguloVago } = await import("./video-angulo");
+  assert.equal(esAnguloVago("Beneficios clave"), true);
+  assert.equal(esAnguloVago(" beneficios  CLAVE. "), true);
+  assert.equal(esAnguloVago("Salud de la próstata"), false);
+  const p = pedidoAnalisisVideo({ producto: null, copy: null, titulo: null, angulosExistentes: ["Beneficios clave", "Antes y después"], soloTexto: false });
+  const linea = p.split("\n").find((l) => l.startsWith("Estos ángulos ya existen")) ?? "";
+  assert.match(linea, /«Antes y después»/);
+  assert.doesNotMatch(linea, /Beneficios clave/);
+  assert.match(p, /NO sirven: no dicen nada/);
+  assert.doesNotMatch(pedidoSoloAngulo({ producto: null, angulosExistentes: ["Beneficios clave"] }), /Estos ángulos ya existen/);
+});
