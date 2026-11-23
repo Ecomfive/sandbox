@@ -164,7 +164,8 @@ export function FichaProducto({
   }
 
   // Una variante o un producto con variantes no se une con otro: la base se negaría.
-  const sePuedeUnir = !!producto && puedeUnir && !producto.padre && producto.variantes.length === 0;
+  // Desde el 23 nov 2026 (migración 0355) también los productos con variantes: sus variantes se unen con las del otro o pasan como nuevas.
+  const sePuedeUnir = !!producto && puedeUnir && !producto.padre;
   const esTest = clase === "test";
   return (
     <Ventana
