@@ -14,7 +14,9 @@ import {
   confirmadosPorDia,
   contarRangos,
   efectoEtiquetas,
+  notaDelBot,
   puntuarAsesores,
+  resumirBot,
   resumirAsesores,
   type EventoEtiqueta,
   type PedidoAsesor,
@@ -122,6 +124,34 @@ export default async function AsesoresTiendaPage({ searchParams }: { searchParam
   const delPeriodo = pedidos.filter((p) => !p.sinHora && diaPanama(p.creado) >= periodo.desde && diaPanama(p.creado) <= periodo.hasta);
   const enShopify = delPeriodo.filter((p) => etapaConfirmacion(p) === "confirmado" && !confirmadosSistema.has(p.id));
 
+  // Las ventas del bot de iComfly (23 nov 2026): los pedidos del periodo con la etiqueta «chatbot» o con la nota que deja el bot («… Venta por bot …»).
+  // La nota no viene en la lista de pedidos: se buscan aparte los del periodo que la tienen.
+  const unidades = [...tiendaDeUnidad.keys()];
+  const conNotaBot = new Set(
+    unidades.length
+      ? (
+          await traerTodasLasFilas<{ orden_id: string; notas: string | null }>((d, h) =>
+            supabase
+              .from("ven_ordenes_clientes")
+              .select("orden_id, notas, ven_ordenes!inner(unidad_id, fecha)")
+              .ilike("notas", "%venta por bot%")
+              .in("ven_ordenes.unidad_id", unidades)
+              .gte("ven_ordenes.fecha", periodo.desde)
+              .lte("ven_ordenes.fecha", periodo.hasta)
+              .order("orden_id")
+              .range(d, h) as unknown as PromiseLike<{ data: { orden_id: string; notas: string | null }[] | null; error: unknown }>,
+          ).catch(() => [] as { orden_id: string; notas: string | null }[])
+        )
+          .filter((f) => notaDelBot(f.notas))
+          .map((f) => f.orden_id)
+      : [],
+  );
+  const bot = resumirBot(
+    delPeriodo.map((p) => ({ tienda: nombreTienda(p.tiendaId), estado: p.estado, creado: p.creado, esBot: p.entrada === "bot" || conNotaBot.has(p.id) })),
+    periodo.desde,
+    periodo.hasta,
+  );
+
   // La cola de cada tienda ahora: por confirmar, esperando respuesta y el más viejo.
   const ahora = ahoraMismo();
   const cola = miradas.map((t) => {
@@ -177,6 +207,7 @@ export default async function AsesoresTiendaPage({ searchParams }: { searchParam
     pasos,
     cola,
     multiTienda: miradas.length > 1,
+    bot,
   };
 
   const fechas = { periodo: texto(sp.periodo), desde: texto(sp.desde), hasta: texto(sp.hasta) };

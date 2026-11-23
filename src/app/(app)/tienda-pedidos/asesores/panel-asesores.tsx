@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { anilloFoco } from "@/components/ui/field";
-import { RANGOS_ATENCION, textoMinutos, type AsesorConPuntaje, type ResultadoAtencion } from "@/lib/tienda/asesores";
+import { ETIQUETA_FIN, RANGOS_ATENCION, textoMinutos, type AsesorConPuntaje, type CuentaPedidos, type FinPedido, type ResultadoAtencion, type ResumenBot } from "@/lib/tienda/asesores";
 
 /** Lo que la página le pasa al panel (todo ya calculado en el servidor). */
 export interface DatosPanelAsesores {
@@ -37,6 +37,8 @@ export interface DatosPanelAsesores {
   }[];
   cola: { tiendaId: string; tienda: string; porConfirmar: number; esperando: number; masViejo: string | null; escribe: boolean }[];
   multiTienda: boolean;
+  /** Las ventas del bot de iComfly frente a los demás pedidos (23 nov 2026). */
+  bot: ResumenBot;
 }
 
 // Un solo tono (el morado del sistema) en distintas fuerzas; gris para lo que no tiene asesor.
@@ -133,7 +135,7 @@ function Corona({ i }: { i: 0 | 1 | 2 }) {
 }
 
 /** Confirmados por día (o semana): desde el sistema abajo y directo en Shopify arriba, en barras apiladas. */
-function PorDia({ datos }: { datos: DatosPanelAsesores["porDia"] }) {
+function PorDia({ datos, nombres = ["desde el sistema", "directo en Shopify"] }: { datos: DatosPanelAsesores["porDia"]; nombres?: [string, string] }) {
   const caja = useRef<HTMLDivElement>(null);
   const [ancho, setAncho] = useState(640);
   useEffect(() => {
@@ -150,7 +152,7 @@ function PorDia({ datos }: { datos: DatosPanelAsesores["porDia"] }) {
   const cada = Math.max(1, Math.ceil(datos.length / (ancho > 520 ? 7 : 4)));
   return (
     <div ref={caja} className="relative h-[200px] w-full">
-      <svg width={ancho} height={H} role="img" aria-label="Confirmados por día, desde el sistema y directo en Shopify" className="absolute inset-0">
+      <svg width={ancho} height={H} role="img" aria-label={`Por día: ${nombres.filter(Boolean).join(" y ")}`} className="absolute inset-0">
         {[0, Math.round(max / 2), max].map((t) => (
           <g key={t}>
             <line x1={m.l} x2={ancho - m.r} y1={y(t)} y2={y(t)} stroke="var(--border)" />
@@ -166,7 +168,7 @@ function PorDia({ datos }: { datos: DatosPanelAsesores["porDia"] }) {
               {d.sistema > 0 && <rect x={X} y={y1} width={w} height={H - m.b - y1} rx={2} fill="var(--primario)" />}
               {d.shopify > 0 && <rect x={X} y={y2} width={w} height={Math.max(0, y1 - y2 - (d.sistema > 0 ? 2 : 0))} rx={2} fill={GRIS} />}
               <rect x={m.l + i * bw} y={m.t} width={bw} height={H - m.t - m.b} fill="transparent">
-                <title>{`${diaCorto(d.desde)}: ${d.sistema} desde el sistema · ${d.shopify} directo en Shopify`}</title>
+                <title>{`${diaCorto(d.desde)}: ${d.sistema} ${nombres[0]}${d.shopify ? ` · ${d.shopify} ${nombres[1]}` : ""}`}</title>
               </rect>
               {i % cada === 0 && (
                 <text x={X + w / 2} y={H - 6} textAnchor="middle" fontSize="11" fill="var(--muted-foreground)">
@@ -351,6 +353,8 @@ export function PanelAsesores({ datos }: { datos: DatosPanelAsesores }) {
         </ul>
       </Tarjeta>
 
+      <SeccionBot bot={datos.bot} multiTienda={datos.multiTienda} />
+
       <section ref={paso} aria-labelledby="pa-paso" className="flex scroll-mt-20 flex-col gap-2 rounded-lg border border-border bg-card px-4 py-3">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 id="pa-paso" className="m-0 text-sm font-semibold">
@@ -479,5 +483,106 @@ export function PanelAsesores({ datos }: { datos: DatosPanelAsesores }) {
         </div>
       </Tarjeta>
     </div>
+  );
+}
+
+const TONO_FIN: Record<FinPedido, string> = {
+  entregado: tono(100),
+  en_camino: tono(72),
+  confirmado: tono(48),
+  pendiente: tono(28),
+  cancelado: GRIS,
+  devuelto: "color-mix(in oklab, var(--muted-foreground) 65%, var(--card))",
+};
+const ORDEN_FIN: FinPedido[] = ["entregado", "en_camino", "confirmado", "pendiente", "cancelado", "devuelto"];
+const porc = (n: number | null) => (n === null ? "—" : `${n.toLocaleString("es-PA")} %`);
+
+/** Una cifra del bot con la de los demás pedidos al lado, para comparar. */
+function Comparada({ titulo, bot, resto, detalle }: { titulo: string; bot: string; resto: string; detalle: string }) {
+  return (
+    <div className="bg-card px-4 py-2.5">
+      <div className="text-xs text-muted-foreground">{titulo}</div>
+      <div className="flex items-baseline gap-2">
+        <span className="text-2xl leading-tight font-bold text-primario tabular-nums">{bot}</span>
+        <span className="text-xs text-muted-foreground">el resto: {resto}</span>
+      </div>
+      <div className="text-xs text-muted-foreground">{detalle}</div>
+    </div>
+  );
+}
+
+/**
+ * Las ventas del bot de iComfly (23 nov 2026, pedido de Hernán): cuántos pedidos toma el bot por WhatsApp (etiqueta «chatbot» o nota «Venta por bot»), cómo
+ * terminan y su confirmación y entrega frente a los demás pedidos, por tienda y por día. Quién los confirma después no se sabe todavía (queda en Shopify).
+ */
+function SeccionBot({ bot, multiTienda }: { bot: ResumenBot; multiTienda: boolean }) {
+  const total = bot.bot.total + bot.resto.total;
+  const cancelados = (c: CuentaPedidos) => c.fin.cancelado;
+  return (
+    <section aria-labelledby="pa-bot" className="flex flex-col gap-3 rounded-lg border border-border bg-card px-4 py-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 id="pa-bot" className="m-0 text-sm font-semibold">
+          Bot de iComfly
+        </h2>
+        <span className="text-xs text-muted-foreground">lo que vende el bot por WhatsApp (etiqueta «chatbot» o nota «Venta por bot»)</span>
+      </div>
+      {bot.bot.total === 0 ? (
+        <p className="m-0 rounded-lg border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">El bot no tomó pedidos en este periodo.</p>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-4">
+            <Comparada titulo="Pedidos del bot" bot={num(bot.bot.total)} resto={num(bot.resto.total)} detalle={`${pct(bot.bot.total, total)} % de todos los pedidos`} />
+            <Comparada titulo="Pasan la confirmación" bot={porc(bot.bot.confirmacion)} resto={porc(bot.resto.confirmacion)} detalle="de los ya resueltos (sin los por confirmar)" />
+            <Comparada titulo="Se entregan" bot={porc(bot.bot.entrega)} resto={porc(bot.resto.entrega)} detalle="de los que ya terminaron" />
+            <Comparada titulo="Cancelados" bot={num(cancelados(bot.bot))} resto={num(cancelados(bot.resto))} detalle={`${pct(cancelados(bot.bot), bot.bot.total)} % de los del bot`} />
+          </div>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <div className="flex flex-col gap-2">
+              <h3 className="m-0 text-xs font-medium text-muted-foreground">Cómo terminan los pedidos del bot</h3>
+              <Dona partes={ORDEN_FIN.map((f) => ({ nombre: ETIQUETA_FIN[f], n: bot.bot.fin[f], color: TONO_FIN[f] }))} centro={num(bot.bot.total)} sub="del bot" />
+            </div>
+            {multiTienda && (
+              <div className="flex flex-col gap-2">
+                <h3 className="m-0 text-xs font-medium text-muted-foreground">Por tienda</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[26rem] border-collapse text-sm">
+                    <thead>
+                      <tr className="text-left text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+                        <th className="px-2 py-1.5">Tienda</th>
+                        <th className="px-2 py-1.5 text-right">Del bot</th>
+                        <th className="px-2 py-1.5 text-right">% del total</th>
+                        <th className="px-2 py-1.5 text-right">Confirmación</th>
+                        <th className="px-2 py-1.5 text-right">Entrega</th>
+                        <th className="px-2 py-1.5 text-right">Cancelados</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {bot.porTienda.map((t) => (
+                        <tr key={t.tienda} className="border-t border-border">
+                          <td className="px-2 py-1.5 font-medium">{t.tienda}</td>
+                          <td className="px-2 py-1.5 text-right font-semibold text-primario tabular-nums">{num(t.bot.total)}</td>
+                          <td className="px-2 py-1.5 text-right tabular-nums">{pct(t.bot.total, t.total)} %</td>
+                          <td className="px-2 py-1.5 text-right tabular-nums">{porc(t.bot.confirmacion)}</td>
+                          <td className="px-2 py-1.5 text-right tabular-nums">{porc(t.bot.entrega)}</td>
+                          <td className="px-2 py-1.5 text-right tabular-nums">{num(t.bot.fin.cancelado)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="flex flex-col gap-1">
+            <h3 className="m-0 text-xs font-medium text-muted-foreground">{bot.porDia.length > 62 ? "Pedidos del bot por semana" : "Pedidos del bot por día"}</h3>
+            <PorDia datos={bot.porDia.map((d) => ({ desde: d.desde, sistema: d.bot, shopify: 0 }))} nombres={["del bot", ""]} />
+          </div>
+          <p className="m-0 text-xs text-muted-foreground">
+            Quién confirma después los pedidos del bot (el propio bot, una persona en Shopify o un asesor desde el sistema) todavía no se mide: cuando los asesores
+            confirmen desde el sistema, sus confirmaciones de pedidos del bot salen en su fila.
+          </p>
+        </>
+      )}
+    </section>
   );
 }

@@ -110,3 +110,22 @@ test("confirmadosPorDia: por día de Panamá, y por semana si el periodo es larg
   assert.deepEqual(d, [{ desde: "2026-11-19", sistema: 1, shopify: 0 }, { desde: "2026-11-20", sistema: 1, shopify: 0 }, { desde: "2026-11-21", sistema: 0, shopify: 1 }]);
   assert.equal(confirmadosPorDia([], [], "2026-01-01", "2026-06-30").length, 26);
 });
+
+test("resumirBot: ventas del bot frente a los demás, por tienda y por día", async () => {
+  const { resumirBot, notaDelBot } = await import("./asesores");
+  const p = (tienda: string, estado: string, esBot: boolean, creado = "2026-11-20T15:00:00Z") => ({ tienda, estado, esBot, creado });
+  const r = resumirBot(
+    [p("Nuvo", "entregado", true), p("Nuvo", "cancelado", true), p("Nuvo", "nuevo", true), p("Nuvo", "en_camino", true, "2026-11-21T15:00:00Z"), p("Kenku", "entregado", false), p("Kenku", "devuelto", false)],
+    "2026-11-20",
+    "2026-11-21",
+  );
+  assert.equal(r.bot.total, 4);
+  assert.equal(r.bot.fin.pendiente, 1);
+  assert.equal(r.bot.confirmacion, Math.round((2 / 3) * 1000) / 10);
+  assert.equal(r.bot.entrega, 50);
+  assert.equal(r.resto.entrega, 50);
+  assert.deepEqual(r.porTienda.map((t) => [t.tienda, t.bot.total, t.total]), [["Kenku", 0, 2], ["Nuvo", 4, 4]]);
+  assert.deepEqual(r.porDia, [{ desde: "2026-11-20", bot: 3 }, { desde: "2026-11-21", bot: 1 }]);
+  assert.equal(notaDelBot("Pedido #56960 - Venta por bot - WhatsApp +50769345035"), true);
+  assert.equal(notaDelBot("Entregar el sábado"), false);
+});

@@ -255,3 +255,67 @@ export function confirmadosPorDia(
   }
   return [...grupos.values()];
 }
+
+// ---------- Ventas del bot de iComfly (23 nov 2026, pedido de Hernán: «agregar las métricas de lo que confirma el bot») ----------
+// El bot deja en el pedido que toma por WhatsApp la etiqueta «chatbot» o la nota «Pedido #… - Venta por bot - WhatsApp …». No se sabe quién lo confirma
+// después (eso queda en el historial de Shopify): aquí se mide lo que vende el bot y cómo terminan sus pedidos, frente a los demás.
+
+/** Cómo terminó un pedido, para comparar los del bot con los demás. */
+export type FinPedido = "entregado" | "en_camino" | "confirmado" | "pendiente" | "cancelado" | "devuelto";
+
+export const ETIQUETA_FIN: Record<FinPedido, string> = {
+  entregado: "Entregados",
+  en_camino: "En camino",
+  confirmado: "Confirmados, por despachar",
+  pendiente: "Por confirmar",
+  cancelado: "Cancelados",
+  devuelto: "Devueltos",
+};
+
+/** El fin de un pedido según su estado en el sistema. */
+export function finDePedido(estado: string): FinPedido {
+  if (estado === "entregado" || estado === "en_camino" || estado === "confirmado" || estado === "cancelado" || estado === "devuelto") return estado;
+  return "pendiente";
+}
+
+/** Lo que se cuenta de un grupo de pedidos (los del bot o los demás). */
+export interface CuentaPedidos {
+  total: number;
+  fin: Record<FinPedido, number>;
+  /** Los que pasaron la confirmación (todo menos por confirmar y cancelados) ÷ los que ya se resolvieron (todo menos por confirmar), en %. */
+  confirmacion: number | null;
+  /** Entregados ÷ los que ya terminaron (entregados + devueltos + cancelados), en %. */
+  entrega: number | null;
+}
+
+function contarPedidos(estados: string[]): CuentaPedidos {
+  const fin = { entregado: 0, en_camino: 0, confirmado: 0, pendiente: 0, cancelado: 0, devuelto: 0 } as Record<FinPedido, number>;
+  for (const e of estados) fin[finDePedido(e)]++;
+  const resueltos = estados.length - fin.pendiente;
+  const terminados = fin.entregado + fin.devuelto + fin.cancelado;
+  const r1 = (a: number, b: number) => (b ? Math.round((a / b) * 1000) / 10 : null);
+  return { total: estados.length, fin, confirmacion: r1(resueltos - fin.cancelado, resueltos), entrega: r1(fin.entregado, terminados) };
+}
+
+export interface ResumenBot {
+  bot: CuentaPedidos;
+  resto: CuentaPedidos;
+  porTienda: { tienda: string; bot: CuentaPedidos; total: number }[];
+  porDia: { desde: string; bot: number }[];
+}
+
+/** Las ventas del bot del periodo frente a los demás pedidos de Shopify, por tienda y por día (o semana si el periodo pasa de 62 días). */
+export function resumirBot(pedidos: { tienda: string; estado: string; creado: string; esBot: boolean }[], desde: string, hasta: string): ResumenBot {
+  const bot = pedidos.filter((p) => p.esBot);
+  const tiendas = [...new Set(pedidos.map((p) => p.tienda))].sort();
+  const dias = confirmadosPorDia(bot.map((p) => ({ t: p.creado })), [], desde, hasta);
+  return {
+    bot: contarPedidos(bot.map((p) => p.estado)),
+    resto: contarPedidos(pedidos.filter((p) => !p.esBot).map((p) => p.estado)),
+    porTienda: tiendas.map((t) => ({ tienda: t, bot: contarPedidos(bot.filter((p) => p.tienda === t).map((p) => p.estado)), total: pedidos.filter((p) => p.tienda === t).length })),
+    porDia: dias.map((d) => ({ desde: d.desde, bot: d.sistema })),
+  };
+}
+
+/** Si la nota del pedido es la que deja el bot al crearlo («… Venta por bot …»). */
+export const notaDelBot = (nota: string | null | undefined) => /venta por bot/i.test(nota ?? "");
