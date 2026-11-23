@@ -235,3 +235,29 @@ test("el resultado estimado se abrevia para que quepa en el anillo", () => {
   assert.equal(conSignoCompacto(-950), "−$950");
   assert.equal(conSignoCompacto(2_300_000), "+$2.3 M");
 });
+
+test("un CPA arriba del tope que ya se recuperó en los últimos 4 días no se avisa; si sigue arriba, sí, sin decir «pausarla»", () => {
+  const dia = (fecha: string, gasto: number, compras: number) => ({ fecha, r: r({ gasto, compras }) });
+  const c = campana({ id: "k", tope: 10, r: r({ gasto: 400, compras: 30 }) });
+  const recuperada = sugerir({ hoy: "2026-11-23", videos: [], campanas: [c], serie: new Map([["k", [dia("2026-11-19", 100, 4), dia("2026-11-21", 50, 8), dia("2026-11-22", 50, 8), dia("2026-11-23", 50, 8)]]]) });
+  assert.equal(recuperada.some((x) => x.tipo === "cpa_alto"), false);
+  const sigueAlto = sugerir({ hoy: "2026-11-23", videos: [], campanas: [c], serie: new Map([["k", [dia("2026-11-21", 60, 3), dia("2026-11-22", 60, 3), dia("2026-11-23", 60, 3)]]]) });
+  const alto = sigueAlto.find((x) => x.tipo === "cpa_alto");
+  assert.ok(alto);
+  assert.match(alto.titulo, /en los últimos 4/);
+  assert.doesNotMatch(alto.accion, /^Pausarla/);
+});
+
+test("un anuncio activo que pasa de $12 sin ventas se apaga y se propone sustituirlo con el ángulo del que sí vende", () => {
+  const anuncio = (id: string, numero: string, gasto: number, compras: number, angulo: string | null, activo = true) => ({ id, campanaId: "c1", nombre: `ARIANNY ${numero}`, numero, activo, angulo, r: r({ gasto, compras }) });
+  const s = sugerir({
+    hoy: "2026-11-23", serie: new Map(), videos: [],
+    campanas: [campana({ id: "c1", tope: 10, r: r({ gasto: 120, compras: 20 }) })],
+    anuncios: [anuncio("a3", "V3", 14.2, 0, "Caída del cabello"), anuncio("a5", "V5", 80, 18, "Salud de la próstata"), anuncio("a6", "V6", 11, 0, null), anuncio("a7", "V7", 30, 0, null, false)],
+  });
+  const apagar = s.filter((x) => x.tipo === "anuncio_apagar");
+  assert.deepEqual(apagar.map((x) => x.clave), ["anuncio_apagar:a3"]);
+  assert.equal(apagar[0].severidad, "alta");
+  assert.match(apagar[0].accion, /Apagar V3 y sustituirlo con anuncios del ángulo «Salud de la próstata» como V5 \(CPA \$4\.44\)/);
+  assert.match(apagar[0].detalle, /sin importar su CTR/);
+});

@@ -8,7 +8,7 @@ import { pedirMeta, tokenDeMeta } from "./api";
 import { buscarArchivoDeVideo, motivoSinArchivoDeVideo } from "./archivo-video";
 import { analizarSoloTextoConGemini, analizarVideoConGemini, geminiConectado } from "./gemini-video";
 import { elegirPendientes, type AnalisisGuardado, type AnuncioConVideo, type VideoPendiente } from "./pendientes-video";
-import { esHostDeVideoMeta, normalizarAnalisisVideo, pedidoAnalisisVideo, VERSION_ANALISIS, type AnalisisVideo } from "./video-angulo";
+import { esHostDeVideoMeta, normalizarAnalisisVideo, pedidoAnalisisVideo, VERSION_ANGULO, type AnalisisVideo } from "./video-angulo";
 
 const MAX_BYTES_VIDEO = 80 * 1024 * 1024;
 const MAX_BYTES_IMAGEN = 3 * 1024 * 1024;
@@ -53,7 +53,7 @@ export async function videosPorAnalizar(supabase: SupabaseClient, opciones: { ma
     ),
     traerTodasLasFilas<{ id: string; producto: string | null }>((a, b) => supabase.from("meta_campanas").select("id, producto").in("cuenta_id", ids).range(a, b)),
   ]);
-  return elegirPendientes({ anuncios, gastoPorAnuncio, analisis: new Map(hechos.map((h) => [h.video_id, h])), productoDe: new Map(campanas.map((c) => [c.id, c.producto])), ahora: Date.now(), manual: !!opciones.ahora, version: VERSION_ANALISIS, max: opciones.max });
+  return elegirPendientes({ anuncios, gastoPorAnuncio, analisis: new Map(hechos.map((h) => [h.video_id, h])), productoDe: new Map(campanas.map((c) => [c.id, c.producto])), ahora: Date.now(), manual: !!opciones.ahora, version: VERSION_ANGULO, max: opciones.max });
 }
 
 /** El contexto de un video concreto (para «Analizar con IA» o «Volver a analizar» en su ficha): el anuncio que más lo usa, su texto y el producto de su campaña. */
@@ -191,11 +191,16 @@ export async function analizarVideoDeMeta(supabase: SupabaseClient, v: VideoPend
     await supabase.from("meta_video_analisis").upsert({ video_id: v.videoId, cuenta_id: v.cuentaId, estado: "error", origen, error: `${motivo ? `${motivo} ` : ""}${error}`.slice(0, 300), modelo, analizado_por: quien, analizado_en: new Date().toISOString(), duracion_s: duracion }, { onConflict: "video_id" });
     return { ok: false, estado: "error", mensaje: error };
   }
+  // Un video que ya se analizó viéndolo no se pisa con un análisis solo con el texto (si Meta hoy no entrega el archivo): se conserva el ángulo bueno y se anota el intento (así el reanálisis no empeora lo que ya había).
+  if (origen === "texto" && previo?.estado === "analizado") {
+    await supabase.from("meta_video_analisis").update({ analizado_en: new Date().toISOString() }).eq("video_id", v.videoId);
+    return { ok: false, estado: "error", mensaje: `No se pudo volver a ver el video (${motivo ?? "Meta no entregó el archivo"}): se conserva el ángulo de antes.` };
+  }
   const manual = !!previo?.angulo_manual;
   const estado = origen === "video" ? "analizado" : "sin_archivo";
   const base = { video_id: v.videoId, cuenta_id: v.cuentaId, estado, origen, angulo: manual ? ((previo?.angulo as string | null) ?? analisis.angulo) : analisis.angulo, angulo_manual: manual, promesa: analisis.promesa || null, gancho: analisis.gancho || null, resumen: analisis.resumen || null, transcripcion: analisis.transcripcion || null, publico: analisis.publico || null, formato: analisis.formato, duracion_s: duracion, modelo, error: estado === "sin_archivo" ? (motivo ?? "").slice(0, 300) || null : null, analizado_por: quien, analizado_en: new Date().toISOString() };
   // Un análisis sin video (solo texto) no trae estructura ni segundos: queda en la versión 1 para volver a verlo cuando Meta dé el archivo.
-  const completo = { ...base, gancho_tipo: analisis.ganchoTipo, version: origen === "video" ? VERSION_ANALISIS : 1, cta: analisis.cta || null, cta_segundo: analisis.ctaSegundo, cta_tipo: analisis.ctaTipo || null, oferta: analisis.oferta || null, recursos: analisis.recursos, estructura: analisis.estructura };
+  const completo = { ...base, gancho_tipo: analisis.ganchoTipo, version: origen === "video" ? VERSION_ANGULO : 1, cta: analisis.cta || null, cta_segundo: analisis.ctaSegundo, cta_tipo: analisis.ctaTipo || null, oferta: analisis.oferta || null, recursos: analisis.recursos, estructura: analisis.estructura };
   let { error } = await supabase.from("meta_video_analisis").upsert(completo, { onConflict: "video_id" });
   // Sin la migración 0326 se guarda lo de antes.
   if (error && /cta|oferta|recursos|estructura|version|gancho_tipo|schema cache/i.test(error.message)) ({ error } = await supabase.from("meta_video_analisis").upsert(base, { onConflict: "video_id" }));

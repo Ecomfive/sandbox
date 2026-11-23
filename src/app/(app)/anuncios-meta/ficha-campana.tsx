@@ -293,9 +293,11 @@ export function FichaCampana({ campana: c, colores, anuncios, actId, productos, 
                       {mini ? <img src={mini} alt="" loading="lazy" className="h-16 w-16 shrink-0 rounded-md bg-muted object-cover" /> : <span aria-hidden="true" className="h-16 w-16 shrink-0 rounded-md bg-muted" />}
                       <div className="flex min-w-0 flex-1 flex-col gap-1">
                         <p className="m-0 truncate text-sm font-medium">
+                          {a.numero && <span className="mr-2 rounded bg-muted px-1.5 py-0.5 text-xs font-semibold tabular-nums">{a.numero}</span>}
                           {a.nombre}
                           {!a.activo && <span className="ml-2 text-xs font-normal text-muted-foreground">apagado</span>}
                         </p>
+                        {a.angulo && <p className="m-0 text-xs text-foreground">Ángulo: {a.angulo}</p>}
                         {a.copy && <p className="m-0 line-clamp-2 text-xs text-muted-foreground">{a.copy}</p>}
                         {a.landing && <p className="m-0 truncate text-xs text-muted-foreground">Landing: {a.landing}</p>}
                         <p className="m-0 flex flex-wrap gap-x-3 text-xs text-muted-foreground">

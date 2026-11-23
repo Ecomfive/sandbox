@@ -112,3 +112,11 @@ test("una respuesta cortada a la mitad se rescata en vez de dar error", () => {
 test("una coma de más tampoco tira el análisis", () => {
   assert.equal(normalizarAnalisisVideo('{"angulo": "Ahorro", "promesa": "x",}')?.angulo, "Ahorro");
 });
+
+test("con el video a la vista el ángulo sale del video: el texto del anuncio no se le muestra a la IA", () => {
+  const conVideo = pedidoAnalisisVideo({ producto: "Shilajit", copy: "Energía para todos", titulo: "Oferta", angulosExistentes: [], soloTexto: false });
+  assert.doesNotMatch(conVideo, /Energía para todos/);
+  assert.match(conVideo, /ÚNICAMENTE de lo que se ve y se dice en el video/);
+  const soloTexto = pedidoAnalisisVideo({ producto: "Shilajit", copy: "Energía para todos", titulo: null, angulosExistentes: [], soloTexto: true });
+  assert.match(soloTexto, /Energía para todos/);
+});

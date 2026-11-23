@@ -36,13 +36,17 @@ test("si dos productos calzan gana el de nombre más corto, y a igual parecido e
   assert.equal(productoDeCampana("CANDIDA CLEANSE", catalogo)?.nombre, "Candida Cleanse");
 });
 
-test("la etapa efectiva: a mano manda, Escala y Retargeting se respetan, Test sigue Testing y lo demás es Ventas", () => {
+test("la etapa efectiva: a mano manda, Escala y Retargeting se respetan, Testing solo para campañas nuevas de un producto en Test y lo demás es Ventas", () => {
   const activo = { nombre: "Aceite Veganic Oil", test: false };
   const enTest = { nombre: "Astaxantina 12mg", test: true };
   assert.equal(etapaEfectiva({ delNombre: "testing", manual: true, producto: activo }).etapa, "testing");
   assert.equal(etapaEfectiva({ delNombre: "escala", manual: false, producto: enTest }).etapa, "escala");
   assert.equal(etapaEfectiva({ delNombre: "retargeting", manual: false, producto: activo }).etapa, "retargeting");
-  assert.equal(etapaEfectiva({ delNombre: "testing", manual: false, producto: enTest }).etapa, "testing");
+  // Lo montado antes del 24 nov 2026 es todo de venta (aunque su producto siga en Test); lo nuevo de un producto en Test sí es testing.
+  assert.equal(etapaEfectiva({ delNombre: "testing", manual: false, producto: enTest, creadaEn: "2026-11-10T00:00:00Z" }).etapa, "venta");
+  assert.equal(etapaEfectiva({ delNombre: "testing", manual: false, producto: enTest }).etapa, "venta");
+  assert.equal(etapaEfectiva({ delNombre: "testing", manual: false, producto: enTest, creadaEn: "2026-11-25T08:00:00Z" }).etapa, "testing");
+  assert.equal(etapaEfectiva({ delNombre: "testing", manual: false, producto: activo, creadaEn: "2026-11-25T08:00:00Z" }).etapa, "venta");
   assert.equal(etapaEfectiva({ delNombre: "testing", manual: false, producto: activo }).etapa, "venta");
   assert.equal(etapaEfectiva({ delNombre: "testing", manual: false, producto: null }).etapa, "venta");
   assert.equal(etapaEfectiva({ delNombre: null, manual: false, producto: null }).etapa, "venta");

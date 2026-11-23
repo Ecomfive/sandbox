@@ -7,7 +7,11 @@ import { claveDeTexto, embellecer } from "./nombre";
 
 /** Sube cuando el análisis pide más cosas al video: «Analizar los pendientes» vuelve a ver los de una versión menor. 1 = ángulo, promesa, gancho…; 2 = estructura, llamado a la acción, oferta y recursos. */
 export const VERSION_ANALISIS = 2;
-// Nota (23 nov 2026): el pedido de ángulo se hizo más específico (pedido de Alcides). Los videos ya analizados conservan su ángulo; para afinarlos se usa «Volver a analizar» en el video. No sube `VERSION_ANALISIS` para no gastar crédito de IA en todos a la vez.
+/**
+ * Con qué regla de ángulo se analizó un video (23 nov 2026, pedido de Alcides): la 3 pide un ángulo específico y sacado solo de lo que se ve y se dice en el video, no del texto del anuncio. Es aparte de `VERSION_ANALISIS`
+ * (que dice si el análisis trae estructura y llamado a la acción) para que subirla vuelva a analizar todos los videos sin dejar sin datos de estructura a los que aún no se reanalizaron.
+ */
+export const VERSION_ANGULO = 3;
 
 export interface AnalisisVideo {
   angulo: string;
@@ -70,8 +74,10 @@ export function pedidoAnalisisVideo(c: ContextoPedido): string {
     "Sé ESPECÍFICO: nombra el beneficio o la situación que cambia la vida de quien compra, no la categoría general del producto. Un producto tiene varios ángulos distintos y cada anuncio usa uno: para un suplemento masculino, «Energía y vitalidad», «Rendimiento en el gimnasio», «Salud de la próstata» y «Aumento de la libido» son ángulos diferentes, y «Vitalidad masculina» es demasiado amplio y NO sirve. Para una crema, «Manchas en la cara», «Arrugas y firmeza» y «Piel seca» son distintos; para un aceite, «Caída del cabello» y «Crecimiento de la barba» también. Si el anuncio toca varios beneficios, elige el que más tiempo ocupa o el del gancho.",
     existentes.length ? `Estos ángulos ya existen en otros videos: ${existentes.map((a) => `«${a}»`).join(", ")}. Usa EXACTAMENTE uno de ellos solo si describe igual de específico el motivo de compra de este anuncio; si el de aquí es más específico o distinto, propón uno nuevo. No fuerces un ángulo amplio para que coincida.` : "",
     c.producto ? `Producto de la campaña: ${recorte(c.producto, 80)}.` : "",
-    c.copy ? `Texto principal del anuncio: «${recorte(c.copy, 500)}».` : "",
-    c.titulo ? `Título del anuncio: «${recorte(c.titulo, 120)}».` : "",
+    // Con el video a la vista, el ángulo sale del video: el texto del anuncio suele ser general y poco detallado, así que no se le muestra a la IA (solo sirve cuando no hay video).
+    c.soloTexto && c.copy ? `Texto principal del anuncio: «${recorte(c.copy, 500)}».` : "",
+    c.soloTexto && c.titulo ? `Título del anuncio: «${recorte(c.titulo, 120)}».` : "",
+    c.soloTexto ? "" : "El ángulo sale ÚNICAMENTE de lo que se ve y se dice en el video (el guion, la historia, el problema que muestra, el beneficio que destaca), no del texto escrito del anuncio, que suele ser general.",
     "Contesta SOLO un JSON, sin texto antes ni después, con estas llaves:",
     '{"angulo": "…", "promesa": "lo que promete el anuncio, en una frase", "gancho": "lo que se ve y se dice en los primeros 3 segundos", "gancho_tipo": "uno de: ' + TIPOS_GANCHO.join(", ") + '", "resumen": "de qué trata, en 2 o 3 frases", "transcripcion": ' + (c.sinTranscribir ? '"" (déjala vacía)' : '"lo que se dice, hasta 1200 caracteres; vacío si no habla nadie"') + ', "publico": "a quién le habla", "formato": "uno de: ' + FORMATOS_VIDEO.join(", ") + '", "cta": "el llamado a la acción tal como se dice o se escribe; vacío si no hay", "cta_segundo": segundo aproximado en que aparece por primera vez (un número entero) o null, "cta_tipo": "uno de: ' + TIPOS_CTA.join(", ") + '", "oferta": "la oferta concreta (descuento, 2x1, envío gratis, garantía, precio); vacío si no hay", "recursos": ["los que use el video, de esta lista: ' + RECURSOS_VIDEO.join(", ") + '"], "estructura": [{"parte": "una de: ' + PARTES_VIDEO.join(", ") + '", "desde": segundo de inicio, "hasta": segundo de fin, "resumen": "qué pasa en esa parte, en una frase"}]}',
     c.soloTexto ? "Como no hay video, deja cta_segundo en null, recursos y estructura vacíos." : "En estructura pon de 3 a 8 partes en orden, con los segundos reales del video; la primera es el gancho.",

@@ -45,8 +45,8 @@ export function sumar(a: Resultados, b: Partial<Resultados>): Resultados {
 
 /** Con menos gasto que esto, un número no alcanza para comparar (una campaña con $20 y 2 compras no «gana» a una con $600). */
 export const GASTO_MINIMO_CONFIABLE = 100;
-/** El CPA tope mientras nadie lo defina para el producto (el equipo lo cambia en «Cuentas»; los umbrales de Productos Test ya consideran malo todo lo que pasa de $4). */
-export const CPA_TOPE_PREDETERMINADO = 3;
+/** El CPA tope mientras nadie lo defina para el producto: $10 (23 nov 2026, indicado por Alcides; antes $3). El equipo lo cambia por producto en «Cuentas». */
+export const CPA_TOPE_PREDETERMINADO = 10;
 
 export const cpa = (r: Resultados): number | null => (r.compras > 0 ? r.gasto / r.compras : null);
 export const ctr = (r: Resultados): number | null => (r.impresiones > 0 ? (r.clics / r.impresiones) * 100 : null);

@@ -4,7 +4,7 @@
 import { conversion, confiable, cpa, ctr, dolares, GASTO_MINIMO_CONFIABLE, hookRate, sinResultados, sumar, type Resultados } from "./metricas";
 import type { CampanaVista, VideoVista } from "./vistas";
 
-export type TipoSugerencia = "sin_compras" | "cpa_alto" | "escalar" | "cpa_subiendo" | "testing_sin_cierre" | "video_ganador" | "video_hook_bajo" | "landing_floja" | "etiquetas_faltan";
+export type TipoSugerencia = "sin_compras" | "cpa_alto" | "escalar" | "cpa_subiendo" | "testing_sin_cierre" | "anuncio_apagar" | "video_ganador" | "video_hook_bajo" | "landing_floja" | "etiquetas_faltan";
 export type Severidad = "alta" | "media" | "info";
 
 export interface Sugerencia {
@@ -35,6 +35,10 @@ export const UMBRALES = {
   /** El CPA de los últimos 3 días contra el de los 7 anteriores. */
   subiendoFactor: 1.3,
   subiendoGastoMinimo: 40,
+  /** Un anuncio con tiempo que gastó esto (en 7 días) sin una sola compra se apaga, sin mirar su CTR ni su conversión. */
+  anuncioSinVentas: 12,
+  /** Para saber si una campaña con el CPA alto se está recuperando se mira el CPA de estos últimos días. */
+  recuperandoDias: 4,
   /** Testing que lleva días y gasta sin decidirse. */
   testingDias: 7,
   testingGastoVeces: 2,
@@ -59,7 +63,22 @@ const DIA = 86_400_000;
 /** Días enteros de `desde` a `hasta` (AAAA-MM-DD). */
 export const diasEntre = (desde: string, hasta: string) => Math.floor((new Date(`${hasta}T00:00:00Z`).getTime() - new Date(`${desde}T00:00:00Z`).getTime()) / DIA);
 
+/** Un anuncio con lo que hizo en los últimos 7 días. */
+export interface AnuncioSugerencia {
+  id: string;
+  campanaId: string;
+  nombre: string;
+  /** «V3»: el número del video dentro de su tanda, según el nombre del anuncio. */
+  numero: string | null;
+  activo: boolean;
+  /** El ángulo de su video, según el análisis. */
+  angulo: string | null;
+  r: Resultados;
+}
+
 export interface EntradaSugerencias {
+  /** Anuncios con los resultados de los últimos 7 días (para decidir cuál apagar). */
+  anuncios?: AnuncioSugerencia[];
   /** Campañas con los resultados de los últimos 7 días (`r`). */
   campanas: CampanaVista[];
   /** Resultados por día de cada campaña, de los últimos 14 días. */
@@ -87,8 +106,14 @@ export function sugerir(e: EntradaSugerencias): Sugerencia[] {
       continue;
     }
     if (costo !== null && gasto >= U.cpaAltoGastoMinimo && costo > c.tope * U.cpaAltoFactor) {
-      s.push({ clave: `cpa_alto:${c.id}`, tipo: "cpa_alto", severidad: gasto >= 150 ? "alta" : "media", positiva: false, titulo: `${c.nombre}: CPA ${dolares(costo)} con tope ${dolares(c.tope)}`, detalle: `${c.r.compras} compras por ${dolares(gasto)} en 7 días: cada compra cuesta ${dolares(costo - c.tope)} más de lo que deja.`, accion: "Pausarla, bajar el presupuesto o cambiar el anuncio.", objeto: { tipo: "campana", id: c.id }, gasto });
-      continue;
+      // Un CPA por encima del tope en la semana no siempre es para apagarla (23 nov 2026, indicado por Alcides): puede ser un mal día. Si en los últimos días el CPA ya está dentro del tope, se está recuperando y no se avisa.
+      const ultimos = serie.filter((d) => diasEntre(d.fecha, e.hoy) < U.recuperandoDias).reduce((a, d) => sumar(a, d.r), sinResultados());
+      const costoReciente = cpa(ultimos);
+      if (!(costoReciente !== null && costoReciente <= c.tope)) {
+        const reciente = costoReciente !== null ? ` y ${dolares(costoReciente)} en los últimos ${U.recuperandoDias}` : ultimos.gasto > 0 ? ` y sin compras en los últimos ${U.recuperandoDias} (gastó ${dolares(ultimos.gasto)})` : "";
+        s.push({ clave: `cpa_alto:${c.id}`, tipo: "cpa_alto", severidad: gasto >= 150 ? "alta" : "media", positiva: false, titulo: `${c.nombre}: CPA ${dolares(costo)} en 7 días${reciente}, con tope ${dolares(c.tope)}`, detalle: `${c.r.compras} compras por ${dolares(gasto)} en 7 días: cada compra cuesta ${dolares(costo - c.tope)} más de lo que deja. Pasarse del tope una semana no obliga a apagarla: puede ser un mal día.`, accion: `No la apagues todavía: mira sus anuncios y apaga los que gastan más de ${dolares(U.anuncioSinVentas)} sin vender (salen aparte). Pausarla solo si ninguno rinde o el CPA de los últimos ${U.recuperandoDias} días sigue arriba del tope.`, objeto: { tipo: "campana", id: c.id }, gasto });
+        continue;
+      }
     }
     if (c.etapa === "testing" && costo !== null && c.r.compras >= U.escalarCompras && confiable(c.r) && costo <= c.tope * U.escalarFactor) {
       s.push({ clave: `escalar:${c.id}`, tipo: "escalar", severidad: "media", positiva: true, titulo: `${c.nombre}: lista para escalar`, detalle: `${c.r.compras} compras con CPA ${dolares(costo)} (tope ${dolares(c.tope)}) y ${dolares(gasto)} gastados en 7 días.`, accion: "Subir el presupuesto un 20 a 30 % o duplicarla en una campaña de escala.", objeto: { tipo: "campana", id: c.id }, gasto });
@@ -112,6 +137,31 @@ export function sugerir(e: EntradaSugerencias): Sugerencia[] {
     if (porClic !== null && conv !== null && c.r.clics >= U.landingClicsMinimos && porClic >= U.landingCtr && conv < U.landingConversion) {
       s.push({ clave: `landing_floja:${c.id}`, tipo: "landing_floja", severidad: "media", positiva: false, titulo: `${c.nombre}: el anuncio atrae pero la landing no convierte`, detalle: `CTR ${porClic.toFixed(1)} % (bueno) y solo ${conv.toFixed(1)} % de las visitas compran.`, accion: "Revisar la landing: oferta, velocidad, precio o confianza.", objeto: { tipo: "campana", id: c.id }, gasto });
     }
+  }
+
+  // A nivel de anuncio (23 nov 2026, indicado por Alcides): un anuncio con tiempo que pasa de $12 en 7 días sin una venta se apaga, sin importar su CTR ni su conversión; con más razón si su campaña va por debajo del tope
+  // (el anuncio le está quitando presupuesto). La propuesta dice cuál apagar y con cuál ángulo sustituirlo: el del anuncio de la misma campaña que sí vende dentro del tope.
+  const activas = new Map(e.campanas.filter((x) => x.activa).map((x) => [x.id, x]));
+  const todosAnuncios = e.anuncios ?? [];
+  for (const a of todosAnuncios) {
+    const c = activas.get(a.campanaId);
+    if (!c || !a.activo || a.r.compras > 0 || a.r.gasto < U.anuncioSinVentas) continue;
+    const costoCampana = cpa(c.r);
+    const campanaVaBien = costoCampana !== null && costoCampana <= c.tope;
+    const ganador = todosAnuncios
+      .filter((x) => x.campanaId === a.campanaId && x.id !== a.id && x.r.compras > 0 && (cpa(x.r) ?? Infinity) <= c.tope)
+      .sort((x, y) => (cpa(x.r) ?? Infinity) - (cpa(y.r) ?? Infinity))[0];
+    const etiqueta = a.numero ?? a.nombre;
+    const sustituir = ganador
+      ? ` y sustituirlo con anuncios ${ganador.angulo ? `del ángulo «${ganador.angulo}» ` : ""}como ${ganador.numero ?? ganador.nombre} (CPA ${dolares(cpa(ganador.r) ?? 0)})`
+      : " y probar otro ángulo";
+    s.push({
+      clave: `anuncio_apagar:${a.id}`, tipo: "anuncio_apagar", severidad: campanaVaBien ? "alta" : "media", positiva: false,
+      titulo: `${c.nombre}: apagar ${etiqueta} (${dolares(a.r.gasto)} sin ventas)`,
+      detalle: `Gastó ${dolares(a.r.gasto)} en 7 días sin una compra: pasa del límite de ${dolares(U.anuncioSinVentas)} por anuncio, sin importar su CTR ni su conversión.${campanaVaBien ? ` La campaña va bien (CPA ${dolares(costoCampana ?? 0)}, tope ${dolares(c.tope)}): este anuncio le está quitando presupuesto.` : ""}`,
+      accion: `Apagar ${etiqueta}${sustituir}.`,
+      objeto: { tipo: "campana", id: c.id }, gasto: a.r.gasto,
+    });
   }
 
   for (const v of e.videos) {
