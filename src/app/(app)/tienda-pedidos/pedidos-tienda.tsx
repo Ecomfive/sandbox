@@ -7,6 +7,7 @@ import { TablaDatos, type ColumnaTabla } from "@/components/tabla/tabla-datos";
 import { Indicador, Pastilla, TableroIndicadores } from "@/components/panel/piezas-panel";
 import { formatearMoneda } from "@/lib/formato";
 import { Tooltip } from "@/components/ui/tooltip";
+import { TarjetaEmergente } from "@/components/ui/tarjeta-emergente";
 import { AlertaIcon, CalendarioIcon, CerrarIcon, ChatIcon, CheckIcon, ShopifyLogo, WhatsAppLogo, DeshacerIcon, EnvioIcon, EtiquetaIcon, InventarioIcon, MargenIcon, PedidoIcon, ProductoIcon, TiendaIcon } from "@/lib/nav-icons";
 import { SIN_VALOR, type DefTabla } from "@/lib/tabla/motor";
 import type { NombreFilas } from "@/lib/tabla/pie";
@@ -135,14 +136,26 @@ export const COLUMNAS: ColumnaTabla<PedidoFila, Contexto>[] = [
     id: "productos",
     label: "Productos",
     ocultable: true,
-    // Con la foto del producto (la de Shopify), como en Mi Reto Digital.
+    // Con la foto del producto (la de Shopify), como en Mi Reto Digital. Al pasar el cursor por la foto se ve grande, como en
+    // Inventario o Compras (23 nov 2026, pedido de Hernán).
     render: (p) => (
-      <span className="flex max-w-[9rem] items-center gap-1.5" title={p.productos ?? undefined}>
+      <span className="flex max-w-[9rem] items-center gap-1.5">
         {p.foto && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={p.foto} alt="" loading="lazy" className="h-6 w-6 shrink-0 rounded border border-border object-cover" />
+          <TarjetaEmergente
+            clase="rounded-lg border border-border bg-card p-1.5 shadow-lg"
+            claseEnvoltura="shrink-0"
+            contenido={
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={p.foto} alt={p.productos ?? ""} className="max-h-72 max-w-72 rounded-md object-contain" />
+            }
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={p.foto} alt="" loading="lazy" className="h-6 w-6 rounded border border-border object-cover" />
+          </TarjetaEmergente>
         )}
-        <span className="truncate">{p.productos ?? "—"}</span>
+        <span className="truncate" title={p.productos ?? undefined}>
+          {p.productos ?? "—"}
+        </span>
       </span>
     ),
   },
