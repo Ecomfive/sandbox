@@ -13,6 +13,7 @@ import {
   ranurasUnicas,
   rellenar,
   resolverVariables,
+  etiquetaDeVariable,
   segundosDeEspera,
   siguienteRanura,
   textoEspera,
@@ -155,9 +156,18 @@ describe("resolverVariables", () => {
     assert.deepEqual(r, { valores: ["Ana", "Mi Tienda", "Crema reparadora"] });
   });
   it("dice qué falta", () => {
-    assert.deepEqual(resolverVariables(vars, { nombre: "Ana", tienda: null }, ["", "", "x"]), { error: "Este dropshipper no tiene nombre de su tienda en el CRM." });
-    assert.deepEqual(resolverVariables(vars, { nombre: null, tienda: "T" }, ["", "", "x"]), { error: "Este dropshipper no tiene primer nombre en el CRM." });
-    assert.deepEqual(resolverVariables(vars, { nombre: "Ana", tienda: "T" }, []), { error: "Escribe Producto." });
+    assert.deepEqual(resolverVariables(vars, { nombre: "Ana", tienda: null }, ["", "", "x"]), { error: "Escribe nombre de su tienda del cliente." });
+    assert.deepEqual(resolverVariables(vars, { nombre: null, tienda: "T" }, ["", "", "x"]), { error: "Escribe primer nombre del cliente." });
+    assert.deepEqual(resolverVariables(vars, { nombre: "Ana", tienda: "T" }, []), { error: "Escribe producto." });
+  });
+  it("lo que el CRM no sabe se puede escribir al enviar, y lo que sabe no se cambia", () => {
+    assert.deepEqual(resolverVariables(vars, { nombre: null, tienda: null }, ["María", "Bella Moda", "Crema"]), { valores: ["María", "Bella Moda", "Crema"] });
+    assert.deepEqual(resolverVariables(vars, { nombre: "Ana López", tienda: "Mi Tienda" }, ["Otro", "Otra", "Crema"]), { valores: ["Ana", "Mi Tienda", "Crema"] });
+  });
+  it("nombra cada variable para pedirla", () => {
+    assert.equal(etiquetaDeVariable(vars[0], 0), "Primer nombre del cliente");
+    assert.equal(etiquetaDeVariable(vars[2], 2), "Producto");
+    assert.equal(etiquetaDeVariable({ campo: "manual", ejemplo: "" }, 3), "La variable {{4}}");
   });
 });
 

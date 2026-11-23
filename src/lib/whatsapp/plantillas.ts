@@ -248,16 +248,19 @@ export function resolverVariables(
   const valores: string[] = [];
   for (let i = 0; i < variables.length; i++) {
     const v = variables[i];
-    const dato =
-      v.campo === "primer_nombre" ? primerNombre(persona.nombre) : v.campo === "nombre_completo" ? (persona.nombre ?? "") : v.campo === "tienda" ? (persona.tienda ?? "") : (manuales[i] ?? "");
-    const limpio = limpiarValor(dato);
-    if (!limpio) {
-      const que = v.campo === "manual" ? (v.etiqueta?.trim() || `la variable {{${i + 1}}}`) : (CAMPOS_VARIABLE.find((c) => c.campo === v.campo)?.etiqueta ?? v.campo).toLowerCase();
-      return { error: v.campo === "manual" ? `Escribe ${que}.` : `Este dropshipper no tiene ${que} en el CRM.` };
-    }
+    const delCrm = v.campo === "primer_nombre" ? primerNombre(persona.nombre) : v.campo === "nombre_completo" ? (persona.nombre ?? "") : v.campo === "tienda" ? (persona.tienda ?? "") : "";
+    // Lo que el CRM no sabe (el chat no tiene nombre ni ficha) se escribe al enviar: antes la plantilla quedaba bloqueada (23 nov 2026, el chat de un contacto sin nombre).
+    const limpio = limpiarValor(delCrm) || limpiarValor(manuales[i] ?? "");
+    if (!limpio) return { error: `Escribe ${etiquetaDeVariable(v, i).toLowerCase()}.` };
     valores.push(limpio);
   }
   return { valores };
+}
+
+/** Cómo se llama una variable cuando hay que escribirla al enviar: la etiqueta que le puso quien hizo la plantilla o, si se llena sola, el dato de la persona. */
+export function etiquetaDeVariable(v: VariablePlantilla, i: number): string {
+  if (v.campo === "manual") return v.etiqueta?.trim() || `La variable {{${i + 1}}}`;
+  return `${CAMPOS_VARIABLE.find((c) => c.campo === v.campo)?.etiqueta ?? v.campo} del cliente`;
 }
 
 /** El estado de Meta, en el nuestro. `null` si el evento no cambia el estado (una marca de riesgo, un borrado). */
