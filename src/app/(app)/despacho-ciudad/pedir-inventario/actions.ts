@@ -284,6 +284,38 @@ export async function marcarEntregadoPedidoInventario(id: string): Promise<Resul
   });
 }
 
+/**
+ * Deshace «Entregado» (23 nov 2026, pedido de Jhokser: se marcó entregado un pedido por error): el pedido vuelve a «Enviado» y a «Esperando que despacho lo reciba». Lo puede hacer quien atiende los pedidos
+ * (inventario) o despacho. No toca el inventario: el traslado se hizo al enviar y sigue igual. Solo un pedido «Entregado» (`update … eq(estado previo)`), queda en la auditoría y le llega el aviso a la otra parte.
+ */
+export async function deshacerEntregaPedidoInventario(id: string): Promise<Resultado> {
+  const hacer = async (u: UsuarioActual, lado: "inventario" | "despacho"): Promise<Resultado> => {
+    if (!ES_UUID(id)) return { error: "Pedido no válido." };
+    const supabase = createServiceClient();
+    const { data } = await supabase
+      .from("despacho_pedidos_inventario")
+      .update({ estado: "enviado", recibido_en: null, recibido_por: null, recibido_por_nombre: null })
+      .eq("id", id)
+      .eq("estado", "recibido")
+      .select("numero, pedido_por, responsable_id, despacho_pedidos_inventario_items(id)");
+    const p = data?.[0];
+    if (!p) return { error: "Ese pedido ya no está entregado: recarga la página." };
+    const items = (p.despacho_pedidos_inventario_items as unknown[] | null)?.length ?? 0;
+    await registrarAuditoria({ accion: "deshacer_entrega_pedido_inventario", entidad: "despacho_pedidos_inventario", entidadId: id, detalle: `${numeroPedido(p.numero as number)} volvió a Enviado (se había marcado entregado por error)` });
+    const aviso = avisoPedido({ numero: p.numero as number, items }, nombreDe(u), "entrega_deshecha");
+    if (lado === "inventario") await avisar(supabase, [p.pedido_por as string | null], u, aviso, "/despacho-ciudad/pedir-inventario");
+    else await avisar(supabase, [p.responsable_id as string | null], u, aviso, "/inventario-pedidos-despacho");
+    return { ok: true, mensaje: `${numeroPedido(p.numero as number)} volvió a «Enviado».` };
+  };
+  // Quien tiene edición en inventario o en despacho.
+  const deInventario = await conPermiso(MODULO_INVENTARIO, (u) => hacer(u, "inventario"));
+  if ("ok" in deInventario) return deInventario;
+  const deDespacho = await conPermiso(MODULO_DESPACHO, (u) => hacer(u, "despacho"));
+  if ("ok" in deDespacho) return deDespacho;
+  // Si la persona sí podía y el pedido ya cambió, ese es el error útil; si no podía con ninguno, el de permiso.
+  return /ya no está entregado|no válido/.test(deInventario.error) ? deInventario : /ya no está entregado|no válido/.test(deDespacho.error) ? deDespacho : deInventario;
+}
+
 /** Despacho marca que le llegó: el pedido queda cerrado y le llega el aviso a quien lo envió. */
 export async function recibirPedidoInventario(id: string): Promise<Resultado> {
   return conPermiso(MODULO_DESPACHO, async (u) => {
