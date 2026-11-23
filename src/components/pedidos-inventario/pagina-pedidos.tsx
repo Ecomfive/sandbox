@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import type { UsuarioActual } from "@/lib/auth";
@@ -12,12 +13,12 @@ import { LeyendaPedidos, NuevoPedido, TablaPedidos, TableroPedidos } from "./ped
  * los contadores por estado (filtran la tabla con `?estado=`), la tabla del Excel y la leyenda. Despacho además hace pedidos nuevos;
  * inventario ve lo que hay en la bodega de donde sale y envía.
  */
-export async function PaginaPedidos({ modo, usuario, estado }: { modo: "despacho" | "inventario"; usuario: UsuarioActual; estado: string | undefined }) {
+export async function PaginaPedidos({ modo, usuario, estado, archivados = false }: { modo: "despacho" | "inventario"; usuario: UsuarioActual; estado: string | undefined; archivados?: boolean }) {
   const modulo = modo === "despacho" ? "despacho-pedir-inventario" : "inventario-pedidos-despacho";
   const ruta = modo === "despacho" ? "/despacho-ciudad/pedir-inventario" : "/inventario-pedidos-despacho";
   const puedeEscribir = !usuario.modulosSoloLectura.includes(modulo);
   const supabase = createServiceClient();
-  const [{ pedidos, faltaMigracion }, bodegas] = await Promise.all([cargarPedidos(supabase), cargarBodegasPedido(supabase)]);
+  const [{ pedidos, faltaMigracion, totalArchivados, sinArchivo }, bodegas] = await Promise.all([cargarPedidos(supabase, { archivados }), cargarBodegasPedido(supabase)]);
   const elegido = esEstado(estado) ? estado : null;
   const visibles = elegido ? pedidos.filter((p) => p.estado === elegido) : pedidos;
   const cuenta = contarPorEstado(pedidos);
@@ -69,10 +70,28 @@ export async function PaginaPedidos({ modo, usuario, estado }: { modo: "despacho
               No encontré la bodega de despacho de Panamá: hace falta una bodega propia activa cuyo nombre empiece con «Despacho».
             </p>
           )}
-          <TableroPedidos modo={modo} ruta={ruta} cuenta={cuenta} total={pedidos.length} elegido={elegido} />
-          <TablaPedidos pedidos={visibles} modo={modo} puedeEscribir={puedeEscribir} origenes={bodegas.origenes} stock={stock} fichas={fichas} opciones={opciones} hayEnInventario={hayEnInventario} />
+          {archivados ? (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-card px-4 py-3 text-sm">
+              <span>
+                <span className="font-semibold">Pedidos archivados</span> · {pedidos.length.toLocaleString("es-PA")}. Ya no salen en la lista de siempre.
+              </span>
+              <Link href={ruta} className="font-medium text-primario underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+                Volver a los pedidos
+              </Link>
+            </div>
+          ) : (
+            <TableroPedidos modo={modo} ruta={ruta} cuenta={cuenta} total={pedidos.length} elegido={elegido} />
+          )}
+          <TablaPedidos pedidos={archivados ? pedidos : visibles} modo={modo} puedeEscribir={puedeEscribir} origenes={bodegas.origenes} stock={stock} fichas={fichas} opciones={opciones} hayEnInventario={hayEnInventario} />
+          {!archivados && !sinArchivo && (
+            <p className="m-0 text-sm">
+              <Link href={`${ruta}?archivados=1`} className="font-medium text-primario underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+                Ver archivados ({totalArchivados.toLocaleString("es-PA")})
+              </Link>
+            </p>
+          )}
           <p className="m-0 text-xs text-muted-foreground">
-            Se ven todos los pedidos abiertos y los cerrados de los últimos 30 días. {bodegas.destino ? `Lo enviado llega a ${bodegas.destino.nombre}.` : ""}
+            Se ven todos los pedidos abiertos y los cerrados de los últimos 30 días que no estén archivados. {bodegas.destino ? `Lo enviado llega a ${bodegas.destino.nombre}.` : ""}
           </p>
           <LeyendaPedidos />
         </>

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModuloEscritura, type UsuarioActual } from "@/lib/auth";
 import { cargarBodegasPedido, stockInventario } from "@/lib/pedidos-inventario/datos";
-import { avisoEdicion, avisoPedido, cambiosDeEdicion, numeroPedido, puedeEditar, revisarEdicion, revisarEntregas, revisarLineas, revisarStockPedido, type EstadoPedido } from "@/lib/pedidos-inventario/reglas";
+import { avisoEdicion, avisoPedido, cambiosDeEdicion, numeroPedido, puedeArchivar, puedeEditar, revisarEdicion, revisarEntregas, revisarLineas, revisarStockPedido, type EstadoPedido } from "@/lib/pedidos-inventario/reglas";
 import { puedeVerBodega } from "@/lib/seguridad/pais-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 import { numeroTraslado } from "@/lib/wms/traslado";
@@ -314,6 +314,32 @@ export async function deshacerEntregaPedidoInventario(id: string): Promise<Resul
   if ("ok" in deDespacho) return deDespacho;
   // Si la persona sí podía y el pedido ya cambió, ese es el error útil; si no podía con ninguno, el de permiso.
   return /ya no está entregado|no válido/.test(deInventario.error) ? deInventario : /ya no está entregado|no válido/.test(deDespacho.error) ? deDespacho : deInventario;
+}
+
+/**
+ * Archiva un pedido ya realizado (entregado) o cancelado, o lo saca del archivo (23 nov 2026, pedido de Jhokser; migración 0354): sale de la lista de siempre y queda en «Ver archivados». Lo puede hacer
+ * quien tenga edición en inventario o en despacho; no toca inventario ni cambia el estado. Un solo `update … eq(estado)` (solo recibido o cancelado).
+ */
+export async function archivarPedidoInventario(id: string, archivar = true): Promise<Resultado> {
+  const hacer = async (u: UsuarioActual): Promise<Resultado> => {
+    if (!ES_UUID(id)) return { error: "Pedido no válido." };
+    const supabase = createServiceClient();
+    const cambio = archivar ? { archivado_en: new Date().toISOString(), archivado_por: u.id, archivado_por_nombre: nombreDe(u) } : { archivado_en: null, archivado_por: null, archivado_por_nombre: null };
+    const base = supabase.from("despacho_pedidos_inventario").update(cambio).eq("id", id);
+    const { data, error } = await (archivar ? base.in("estado", ["recibido", "cancelado"]).is("archivado_en", null) : base.not("archivado_en", "is", null)).select("numero, estado");
+    if (error) return { error: /archivado_/.test(error.message) ? "Falta correr en Supabase la migración 0354 (archivar pedidos)." : "No se pudo guardar. Intenta otra vez." };
+    const p = data?.[0];
+    if (!p) return { error: archivar ? "Solo se archiva un pedido entregado o cancelado que no esté ya archivado: recarga la página." : "Ese pedido ya no está archivado: recarga la página." };
+    if (archivar && !puedeArchivar(p.estado as EstadoPedido)) return { error: "Solo se archiva un pedido entregado o cancelado." };
+    await registrarAuditoria({ accion: archivar ? "archivar_pedido_inventario" : "desarchivar_pedido_inventario", entidad: "despacho_pedidos_inventario", entidadId: id, detalle: `${numeroPedido(p.numero as number)} ${archivar ? "archivado" : "sacado del archivo"}` });
+    return { ok: true, mensaje: `${numeroPedido(p.numero as number)} ${archivar ? "archivado" : "sacado del archivo"}.` };
+  };
+  const deInventario = await conPermiso(MODULO_INVENTARIO, hacer);
+  if ("ok" in deInventario) return deInventario;
+  const deDespacho = await conPermiso(MODULO_DESPACHO, hacer);
+  if ("ok" in deDespacho) return deDespacho;
+  const util = (e: string) => /migración|Solo se archiva|ya no está archivado|no válido/.test(e);
+  return util(deInventario.error) ? deInventario : util(deDespacho.error) ? deDespacho : deInventario;
 }
 
 /** Despacho marca que le llegó: el pedido queda cerrado y le llega el aviso a quien lo envió. */
