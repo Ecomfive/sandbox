@@ -65,14 +65,37 @@ export interface ContextoPedido {
 
 const recorte = (t: string | null | undefined, max: number) => String(t ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 
+/** Cómo se pide el ángulo (lo mismo en el análisis completo y en el reanálisis solo del ángulo): específico, con ejemplos y sin forzar uno amplio que ya existe. */
+export function lineasDeAngulo(existentes: string[]): string[] {
+  return [
+    "Dime el ÁNGULO: el motivo concreto de compra que usa ESTE anuncio para convencer (por ejemplo «Dolor de espalda», «Antes y después», «Oferta 2x1», «Testimonio de cliente», «Ahorro», «Regalo», «Piel más firme»). Son de 2 a 5 palabras, en español, sin signos.",
+    "Sé ESPECÍFICO: nombra el beneficio o la situación que cambia la vida de quien compra, no la categoría general del producto. Un producto tiene varios ángulos distintos y cada anuncio usa uno: para un suplemento masculino, «Energía y vitalidad», «Rendimiento en el gimnasio», «Salud de la próstata» y «Aumento de la libido» son ángulos diferentes, y «Vitalidad masculina» es demasiado amplio y NO sirve. Para una crema, «Manchas en la cara», «Arrugas y firmeza» y «Piel seca» son distintos; para un aceite, «Caída del cabello» y «Crecimiento de la barba» también. Si el anuncio toca varios beneficios, elige el que más tiempo ocupa o el del gancho.",
+    existentes.length ? `Estos ángulos ya existen en otros videos: ${existentes.map((a) => `«${a}»`).join(", ")}. Usa EXACTAMENTE uno de ellos solo si describe igual de específico el motivo de compra de este anuncio; si el de aquí es más específico o distinto, propón uno nuevo. No fuerces un ángulo amplio para que coincida.` : "",
+  ];
+}
+
+/**
+ * Reanálisis solo del ángulo (23 nov 2026, pedido de Alcides): con la regla nueva (específico y sacado únicamente del video) se vuelve a pedir **solo el ángulo** de los videos que ya estaban analizados, sin repetir
+ * la estructura, el llamado a la acción ni la transcripción: es un pedido corto y más barato.
+ */
+export function pedidoSoloAngulo(c: { producto: string | null; angulosExistentes: string[] }): string {
+  return [
+    "Eres analista de publicidad de una tienda en línea (dropshipping, Latinoamérica). Mira el video completo del anuncio y escucha lo que dice.",
+    ...lineasDeAngulo(c.angulosExistentes.slice(0, 40)),
+    "El ángulo sale ÚNICAMENTE de lo que se ve y se dice en el video (el guion, la historia, el problema que muestra, el beneficio que destaca), no de ningún texto escrito del anuncio.",
+    c.producto ? `Producto de la campaña: ${recorte(c.producto, 80)}.` : "",
+    'Contesta SOLO un JSON, sin texto antes ni después: {"angulo": "…"}',
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
 /** El pedido a la IA: qué mirar y el JSON exacto que debe devolver. */
 export function pedidoAnalisisVideo(c: ContextoPedido): string {
   const existentes = c.angulosExistentes.slice(0, 40);
   return [
     c.soloTexto ? "Eres analista de publicidad de una tienda en línea (dropshipping, Latinoamérica). No hay video: analiza el anuncio por su texto y su imagen." : "Eres analista de publicidad de una tienda en línea (dropshipping, Latinoamérica). Mira el video completo del anuncio y escucha lo que dice.",
-    "Dime el ÁNGULO: el motivo concreto de compra que usa ESTE anuncio para convencer (por ejemplo «Dolor de espalda», «Antes y después», «Oferta 2x1», «Testimonio de cliente», «Ahorro», «Regalo», «Piel más firme»). Son de 2 a 5 palabras, en español, sin signos.",
-    "Sé ESPECÍFICO: nombra el beneficio o la situación que cambia la vida de quien compra, no la categoría general del producto. Un producto tiene varios ángulos distintos y cada anuncio usa uno: para un suplemento masculino, «Energía y vitalidad», «Rendimiento en el gimnasio», «Salud de la próstata» y «Aumento de la libido» son ángulos diferentes, y «Vitalidad masculina» es demasiado amplio y NO sirve. Para una crema, «Manchas en la cara», «Arrugas y firmeza» y «Piel seca» son distintos; para un aceite, «Caída del cabello» y «Crecimiento de la barba» también. Si el anuncio toca varios beneficios, elige el que más tiempo ocupa o el del gancho.",
-    existentes.length ? `Estos ángulos ya existen en otros videos: ${existentes.map((a) => `«${a}»`).join(", ")}. Usa EXACTAMENTE uno de ellos solo si describe igual de específico el motivo de compra de este anuncio; si el de aquí es más específico o distinto, propón uno nuevo. No fuerces un ángulo amplio para que coincida.` : "",
+    ...lineasDeAngulo(existentes),
     c.producto ? `Producto de la campaña: ${recorte(c.producto, 80)}.` : "",
     // Con el video a la vista, el ángulo sale del video: el texto del anuncio suele ser general y poco detallado, así que no se le muestra a la IA (solo sirve cuando no hay video).
     c.soloTexto && c.copy ? `Texto principal del anuncio: «${recorte(c.copy, 500)}».` : "",

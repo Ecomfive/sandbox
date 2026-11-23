@@ -460,6 +460,7 @@ export const ETIQUETA_ACCION: Record<string, string> = {
   corregir_campana_meta: "Corrigió las etiquetas de una campaña de Meta",
   decidir_sugerencia_meta: "Decidió una sugerencia de Anuncios Meta",
   analizar_video_meta: "Analizó videos de Anuncios Meta con IA",
+  afinar_angulo_video_meta: "Volvió a analizar el ángulo de un video de Anuncios Meta",
   corregir_angulo_video_meta: "Corrigió el ángulo de un video de Meta",
   pedir_borrado_whatsapp: "Pidió borrar un chat o un mensaje de WhatsApp",
   borrar_mensaje_whatsapp: "Borró un mensaje de WhatsApp",

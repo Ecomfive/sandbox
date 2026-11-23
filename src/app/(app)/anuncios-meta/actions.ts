@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { AJUSTE_ANALISIS_AUTOMATICO } from "@/lib/meta-ads/ajustes";
-import { analizarVideoDeMeta, pendienteDeVideo, videosPorAnalizar } from "@/lib/meta-ads/analizar-videos";
+import { afinarAnguloDeVideo, analizarVideoDeMeta, pendienteDeVideo, videosPorAnalizar } from "@/lib/meta-ads/analizar-videos";
 import { pedirMeta, tokenDeMeta } from "@/lib/meta-ads/api";
 import { buscarArchivoDeVideo, motivoSinArchivoDeVideo } from "@/lib/meta-ads/archivo-video";
 import { clasificarGanchosPendientes } from "@/lib/meta-ads/clasificar-ganchos";
@@ -276,13 +276,15 @@ export async function analizarSiguienteMeta(): Promise<{ error?: string; ninguno
   const u = await requireModuloEscritura(MODULO);
   const supabase = createServiceClient();
   try {
-    const { pendientes, total } = await videosPorAnalizar(supabase, { max: 1, ahora: true });
-    const v = pendientes[0];
+    const { pendientes, total, afinar } = await videosPorAnalizar(supabase, { max: 1, ahora: true });
+    // Primero lo que falta analizar por completo; cuando no queda nada, sigue con el reanálisis solo del ángulo de lo ya analizado.
+    const v = pendientes[0] ?? afinar.pendientes[0];
     if (!v) return { ninguno: true, faltan: 0 };
-    const r = await analizarVideoDeMeta(supabase, v, u.nombre ?? u.email ?? null);
-    await registrarAuditoria({ accion: "analizar_video_meta", entidad: "meta_campanas", entidadId: v.videoId, detalle: `${r.estado} · ${r.mensaje}`.slice(0, 300) });
+    const afinando = !pendientes[0];
+    const r = afinando ? await afinarAnguloDeVideo(supabase, v, u.nombre ?? u.email ?? null) : await analizarVideoDeMeta(supabase, v, u.nombre ?? u.email ?? null);
+    await registrarAuditoria({ accion: afinando ? "afinar_angulo_video_meta" : "analizar_video_meta", entidad: "meta_campanas", entidadId: v.videoId, detalle: `${r.estado} · ${r.mensaje}`.slice(0, 300) });
     if (!r.ok && /Falta (el acceso|conectar)/.test(r.mensaje)) return { error: r.mensaje };
-    return { videoId: v.videoId, estado: r.estado, mensaje: r.mensaje, faltan: total };
+    return { videoId: v.videoId, estado: r.estado, mensaje: r.mensaje, faltan: total + afinar.total };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "No se pudo analizar." };
   }

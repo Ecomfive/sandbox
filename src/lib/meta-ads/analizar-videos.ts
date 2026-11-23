@@ -7,8 +7,8 @@ import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { pedirMeta, tokenDeMeta } from "./api";
 import { buscarArchivoDeVideo, motivoSinArchivoDeVideo } from "./archivo-video";
 import { analizarSoloTextoConGemini, analizarVideoConGemini, geminiConectado } from "./gemini-video";
-import { elegirPendientes, type AnalisisGuardado, type AnuncioConVideo, type VideoPendiente } from "./pendientes-video";
-import { esHostDeVideoMeta, normalizarAnalisisVideo, pedidoAnalisisVideo, VERSION_ANGULO, type AnalisisVideo } from "./video-angulo";
+import { elegirParaAfinar, elegirPendientes, type AnalisisGuardado, type AnuncioConVideo, type VideoPendiente } from "./pendientes-video";
+import { esHostDeVideoMeta, normalizarAnalisisVideo, pedidoAnalisisVideo, pedidoSoloAngulo, VERSION_ANALISIS, VERSION_ANGULO, type AnalisisVideo } from "./video-angulo";
 
 const MAX_BYTES_VIDEO = 80 * 1024 * 1024;
 const MAX_BYTES_IMAGEN = 3 * 1024 * 1024;
@@ -29,10 +29,10 @@ const hoyMenos = (dias: number) => new Date(Date.now() - dias * DIA).toLocaleDat
  * versión anterior (reglas en `elegirPendientes`). El gasto sale de `meta_gasto_por_anuncio` (migración 0327); sin ella se cuentan los últimos 30 días, como antes. El cron espera de uno a tres días antes de repetir
  * un intento; cuando una persona pulsa «Analizar los pendientes» (`ahora: true`) se repiten al momento, salvo lo intentado hace menos de 3 minutos.
  */
-export async function videosPorAnalizar(supabase: SupabaseClient, opciones: { max: number; ahora?: boolean }): Promise<{ pendientes: VideoPendiente[]; total: number }> {
+export async function videosPorAnalizar(supabase: SupabaseClient, opciones: { max: number; ahora?: boolean }): Promise<{ pendientes: VideoPendiente[]; total: number; afinar: { pendientes: VideoPendiente[]; total: number } }> {
   const { data: cuentas } = await supabase.from("meta_cuentas").select("id").eq("activa", true);
   const ids = (cuentas ?? []).map((c) => c.id as string);
-  if (!ids.length) return { pendientes: [], total: 0 };
+  if (!ids.length) return { pendientes: [], total: 0, afinar: { pendientes: [], total: 0 } };
   const gastoTotal = async (): Promise<Map<string, number>> => {
     const m = new Map<string, number>();
     try {
@@ -48,12 +48,14 @@ export async function videosPorAnalizar(supabase: SupabaseClient, opciones: { ma
   const [anuncios, gastoPorAnuncio, hechos, campanas] = await Promise.all([
     traerTodasLasFilas<AnuncioConVideo>((a, b) => supabase.from("meta_anuncios").select("id, cuenta_id, campana_id, video_id, miniatura, copy, titulo").in("cuenta_id", ids).not("video_id", "is", null).range(a, b)),
     gastoTotal(),
-    traerTodasLasFilas<AnalisisGuardado>((a, b) => supabase.from("meta_video_analisis").select("video_id, estado, analizado_en, version").range(a, b)).catch(() =>
+    traerTodasLasFilas<AnalisisGuardado>((a, b) => supabase.from("meta_video_analisis").select("video_id, estado, analizado_en, version, error, angulo_manual").range(a, b)).catch(() =>
       traerTodasLasFilas<AnalisisGuardado>((a, b) => supabase.from("meta_video_analisis").select("video_id, estado, analizado_en").range(a, b)),
     ),
     traerTodasLasFilas<{ id: string; producto: string | null }>((a, b) => supabase.from("meta_campanas").select("id, producto").in("cuenta_id", ids).range(a, b)),
   ]);
-  return elegirPendientes({ anuncios, gastoPorAnuncio, analisis: new Map(hechos.map((h) => [h.video_id, h])), productoDe: new Map(campanas.map((c) => [c.id, c.producto])), ahora: Date.now(), manual: !!opciones.ahora, version: VERSION_ANGULO, max: opciones.max });
+  const entrada = { anuncios, gastoPorAnuncio, analisis: new Map(hechos.map((h) => [h.video_id, h])), productoDe: new Map(campanas.map((c) => [c.id, c.producto])), ahora: Date.now(), manual: !!opciones.ahora, max: opciones.max };
+  // Primero lo que falta analizar por completo (sin análisis, con fallo, solo con el texto o de una versión sin estructura); después, el reanálisis solo del ángulo de lo ya analizado.
+  return { ...elegirPendientes({ ...entrada, version: VERSION_ANALISIS }), afinar: elegirParaAfinar({ ...entrada, version: VERSION_ANGULO, versionMinima: VERSION_ANALISIS }) };
 }
 
 /** El contexto de un video concreto (para «Analizar con IA» o «Volver a analizar» en su ficha): el anuncio que más lo usa, su texto y el producto de su campaña. */
@@ -208,16 +210,60 @@ export async function analizarVideoDeMeta(supabase: SupabaseClient, v: VideoPend
   return { ok: true, estado, mensaje: estado === "analizado" ? `Ángulo: ${analisis.angulo}.` : `Ángulo provisional «${analisis.angulo}» (solo con el texto: ${motivo ?? "Meta no entregó el video"}).` };
 }
 
-/** Analiza los pendientes más gastadores uno tras otro mientras quede tiempo. La usan el cron y «Analizar los pendientes». */
-export async function analizarPendientes(supabase: SupabaseClient, opciones: { limiteMs: number; max?: number; quien?: string | null; ahora?: boolean }): Promise<{ analizados: number; sinArchivo: number; errores: number; faltan: number; mensajes: string[] }> {
+/**
+ * Vuelve a pedir **solo el ángulo** de un video que ya estaba analizado (23 nov 2026, pedido de Alcides): con la regla nueva —específico y sacado únicamente de lo que se ve y se dice en el video— y sin tocar nada más del
+ * análisis (estructura, llamado a la acción, transcripción). Si Meta hoy no entrega el archivo o la IA no contesta, se conserva el ángulo de antes y se anota el intento. Un ángulo corregido a mano no se reanaliza.
+ */
+export async function afinarAnguloDeVideo(supabase: SupabaseClient, v: VideoPendiente, quien: string | null): Promise<ResultadoVideo> {
+  const token = tokenDeMeta();
+  if (!token) return { ok: false, estado: "error", mensaje: "Falta el acceso a Meta (META_ADS_ACCESS_TOKEN)." };
+  if (!geminiConectado()) return { ok: false, estado: "error", mensaje: "Falta conectar Gemini (la clave GEMINI_API_KEY) para analizar videos." };
+  const { data: previo } = await supabase.from("meta_video_analisis").select("angulo, angulo_manual, estado").eq("video_id", v.videoId).maybeSingle();
+  if (!previo || previo.estado !== "analizado") return { ok: false, estado: "error", mensaje: "Ese video no tiene un análisis completo que afinar." };
+  const ahora = new Date().toISOString();
+  if (previo.angulo_manual) {
+    await supabase.from("meta_video_analisis").update({ version: VERSION_ANGULO }).eq("video_id", v.videoId);
+    return { ok: true, estado: "analizado", mensaje: "El ángulo está corregido a mano: no se reanaliza." };
+  }
+  const falla = async (mensaje: string): Promise<ResultadoVideo> => {
+    await supabase.from("meta_video_analisis").update({ analizado_en: ahora, error: `Reanálisis del ángulo: ${mensaje}`.slice(0, 300) }).eq("video_id", v.videoId);
+    return { ok: false, estado: "error", mensaje: `${mensaje} Se conserva el ángulo de antes.` };
+  };
+  const archivoDeVideo = await buscarArchivoDeVideo(supabase, token, v.videoId, v.cuentaId);
+  if (!archivoDeVideo.fuente) return falla("Meta no entregó el archivo del video.");
+  const archivo = await bajarDeMeta(archivoDeVideo.fuente, MAX_BYTES_VIDEO, 60_000);
+  if (!archivo) return falla("No se pudo bajar el video de Meta (o pesa más de 80 MB).");
+  const existentes = await angulosExistentes(supabase);
+  const contexto = { operacion: "meta_video_angulo", modulo: "anuncios-meta", referencia: v.videoId };
+  const mime = archivo.tipo.startsWith("video/") ? archivo.tipo : "video/mp4";
+  const respuesta = await analizarVideoConGemini(archivo.bytes, mime, pedidoSoloAngulo({ producto: v.producto, angulosExistentes: existentes }), contexto);
+  if ("error" in respuesta) return falla(respuesta.error);
+  const analisis = normalizarAnalisisVideo(respuesta.texto, existentes);
+  if (!analisis) return falla("La IA no devolvió un ángulo que se pueda usar.");
+  const { error } = await supabase.from("meta_video_analisis").update({ angulo: analisis.angulo, version: VERSION_ANGULO, error: null, analizado_en: ahora, modelo: respuesta.modelo, analizado_por: quien }).eq("video_id", v.videoId);
+  if (error) return { ok: false, estado: "error", mensaje: error.message };
+  const antes = (previo.angulo as string | null) ?? "—";
+  return { ok: true, estado: "analizado", mensaje: antes === analisis.angulo ? `Ángulo: ${analisis.angulo} (sigue igual).` : `Ángulo: ${antes} → ${analisis.angulo}.` };
+}
+
+/**
+ * Analiza los pendientes más gastadores uno tras otro mientras quede tiempo. La usan el cron y «Analizar los pendientes». Primero lo que falta analizar por completo; cuando eso se acaba, sigue **solo** con el reanálisis del
+ * ángulo de lo ya analizado (`afinados`), sin que nadie lo pida.
+ */
+export async function analizarPendientes(supabase: SupabaseClient, opciones: { limiteMs: number; max?: number; quien?: string | null; ahora?: boolean }): Promise<{ analizados: number; sinArchivo: number; errores: number; faltan: number; afinados: number; faltanAfinar: number; mensajes: string[] }> {
   const inicio = Date.now();
-  const r = { analizados: 0, sinArchivo: 0, errores: 0, faltan: 0, mensajes: [] as string[] };
-  const { pendientes, total } = await videosPorAnalizar(supabase, { max: opciones.max ?? 12, ahora: opciones.ahora });
+  const r = { analizados: 0, sinArchivo: 0, errores: 0, faltan: 0, afinados: 0, faltanAfinar: 0, mensajes: [] as string[] };
+  const max = opciones.max ?? 12;
+  const { pendientes, total, afinar } = await videosPorAnalizar(supabase, { max, ahora: opciones.ahora });
   r.faltan = total;
+  r.faltanAfinar = afinar.total;
+  // Un video tarda de 20 a 90 segundos: no se empieza otro si ya no cabe.
+  const cabe = () => Date.now() - inicio <= opciones.limiteMs - 100_000;
+  let hechos = 0;
   for (const v of pendientes) {
-    // Un video tarda de 20 a 90 segundos: no se empieza otro si ya no cabe.
-    if (Date.now() - inicio > opciones.limiteMs - 100_000) break;
+    if (!cabe()) break;
     const x = await analizarVideoDeMeta(supabase, v, opciones.quien ?? null);
+    hechos++;
     if (x.estado === "analizado") r.analizados++;
     else if (x.estado === "sin_archivo") r.sinArchivo++;
     else {
@@ -226,7 +272,21 @@ export async function analizarPendientes(supabase: SupabaseClient, opciones: { l
     }
     r.faltan = Math.max(0, r.faltan - 1);
     // Un fallo de configuración se repetiría con todos: se corta.
-    if (!x.ok && /Falta (el acceso|conectar)/.test(x.mensaje)) break;
+    if (!x.ok && /Falta (el acceso|conectar)/.test(x.mensaje)) return r;
+  }
+  // Ya no queda nada por analizar por completo: se sigue con el ángulo de los que ya estaban analizados.
+  if (r.faltan === 0 && hechos < max) {
+    for (const v of afinar.pendientes.slice(0, max - hechos)) {
+      if (!cabe()) break;
+      const x = await afinarAnguloDeVideo(supabase, v, opciones.quien ?? null);
+      if (x.ok) r.afinados++;
+      else {
+        r.errores++;
+        r.mensajes.push(x.mensaje);
+      }
+      r.faltanAfinar = Math.max(0, r.faltanAfinar - 1);
+      if (!x.ok && /Falta (el acceso|conectar)/.test(x.mensaje)) break;
+    }
   }
   return r;
 }
