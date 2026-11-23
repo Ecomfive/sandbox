@@ -36,14 +36,14 @@ export async function PaginaPedidos({ modo, usuario, estado, archivados = false 
   // Comunicación despacho (20 nov 2026): al tocar el producto se abre su ficha de stock, para ver cómo está repartido. Solo con el permiso de Inventario
   // (la ficha lo pide para leer el stock).
   const fichas = modo === "inventario" && usuario.modulos.includes("inventario") ? await fichasDeProductos(supabase, [...new Set(pedidos.flatMap((p) => p.items.map((it) => it.skuId)).filter(Boolean))]) : null;
-  // Inventario ve cuánto hay en cada bodega de origen de lo que está por enviar.
-  const porEnviar = pedidos.filter((p) => p.estado === "solicitud" || p.estado === "en_proceso");
+  // Inventario ve cuánto hay hoy en cada bodega de origen de los productos de sus pedidos (también los ya enviados o cerrados: la columna «Stock por bodega» ya no sale en blanco).
+  const deLaLista = pedidos;
   const stock =
-    modo === "inventario" && porEnviar.length
+    modo === "inventario" && deLaLista.length
       ? await cargarStock(
           supabase,
           bodegas.origenes.map((b) => b.id),
-          [...new Set(porEnviar.flatMap((p) => p.items.map((it) => it.skuId)))],
+          [...new Set(deLaLista.flatMap((p) => p.items.map((it) => it.skuId)))],
         )
       : {};
 
