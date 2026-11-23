@@ -3,9 +3,9 @@ import test from "node:test";
 import { anguloDeCampana, esHostDeVideoMeta, estructuraValida, normalizarAnalisisVideo, pedidoAnalisisVideo, pedidoSoloAngulo, recursosValidos, reutilizarAngulo } from "./video-angulo";
 
 test("el pedido de ángulo pide ser específico y no forzar un ángulo amplio que ya existe", () => {
-  const p = pedidoAnalisisVideo({ producto: null, copy: null, titulo: null, angulosExistentes: ["Vitalidad masculina"], soloTexto: false });
+  const p = pedidoAnalisisVideo({ producto: null, copy: null, titulo: null, angulosExistentes: ["Alivio de varices"], soloTexto: false });
   assert.match(p, /ESPECÍFICO/);
-  assert.match(p, /Salud de la próstata/);
+  assert.match(p, /«Energía», «Gimnasio», «Salud prostática» o «Aumento de libido»/);
   assert.match(p, /No fuerces un ángulo amplio/);
 });
 
@@ -154,4 +154,17 @@ test("las tácticas generales llevan su detalle aparte y los demás ángulos no"
   assert.equal(o?.anguloDetalle, "");
   assert.match(pedidoAnalisisVideo({ producto: null, copy: null, titulo: null, angulosExistentes: [], soloTexto: false }), /angulo_detalle/);
   assert.match(pedidoSoloAngulo({ producto: null, angulosExistentes: [], vagoAnterior: "Beneficios clave" }), /Tu respuesta anterior fue «Beneficios clave»/);
+});
+
+test("el ejemplo de quien lleva las campañas: «vitalidad masculina» y parecidos son vagos; energía, gimnasio, salud prostática y libido, no", async () => {
+  const { esAnguloVago } = await import("./video-angulo");
+  for (const v of ["Vitalidad masculina", "Energía masculina", "salud masculina", "Bienestar femenino", "Rendimiento masculino"]) assert.equal(esAnguloVago(v), true, v);
+  for (const v of ["Energía", "Gimnasio", "Salud prostática", "Aumento de libido", "Bienestar íntimo femenino", "Aclarar zonas íntimas"]) assert.equal(esAnguloVago(v), false, v);
+  const p = pedidoAnalisisVideo({ producto: "Shilajit", copy: null, titulo: null, angulosExistentes: ["Energía masculina", "Salud prostática"], soloTexto: false });
+  assert.match(p, /público masculino/);
+  assert.match(p, /NO se deben resumir en «Vitalidad masculina»/);
+  const linea = p.split("\n").find((l) => l.startsWith("Estos ángulos ya existen")) ?? "";
+  assert.match(linea, /Salud prostática/);
+  assert.doesNotMatch(linea, /Energía masculina/);
+  assert.match(p, /«urólogo, salud prostática»/);
 });
