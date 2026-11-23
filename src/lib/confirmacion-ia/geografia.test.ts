@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { CORREGIMIENTOS_DISTRITO_PANAMA, geografiaDe, geografiaDePanama, LUGARES_SERVIENTREGA_PANAMA, ZONAS_DELIVERY_PANAMA, ZONAS_EN_DISCUSION, ZONAS_PAGO_ADELANTADO_PANAMA } from "./geografia";
+import { CORREGIMIENTOS_DISTRITO_PANAMA, geografiaDe, geografiaDePanama, LUGARES_FUERA_DEL_MAPA_PANAMA, LUGARES_SERVIENTREGA_PANAMA, ZONAS_DELIVERY_PANAMA, ZONAS_EN_DISCUSION, ZONAS_PAGO_ADELANTADO_PANAMA } from "./geografia";
 import { normalizarTexto } from "./zonas";
 
 test("la geografía de Panamá trae las provincias, el distrito de Panamá y lo que se deja como dudoso", () => {
@@ -37,7 +37,19 @@ test("las 6 zonas de delivery, la lista de Servientrega y el pago por adelantado
 test("lo que está en Servientrega no se repite en el delivery, y lo que está en discusión sale en el delivery o es de los corregimientos que las tiendas etiquetan CIUDAD", () => {
   const delivery = new Set(ZONAS_DELIVERY_PANAMA.flatMap((z) => z.lugares.map(normalizarTexto)));
   for (const lugar of LUGARES_SERVIENTREGA_PANAMA) assert.ok(!delivery.has(normalizarTexto(lugar)), `${lugar} sale en el delivery y en Servientrega sin estar en discusión`);
-  const extras = new Set(["Ernesto Córdoba Campos", "Caimitillo", "Cabra", "Panamá Norte"].map(normalizarTexto));
+  const extras = new Set(["Ernesto Córdoba Campos", "Cabra"].map(normalizarTexto));
   for (const lugar of ZONAS_EN_DISCUSION) assert.ok(delivery.has(normalizarTexto(lugar)) || extras.has(normalizarTexto(lugar)), `${lugar} no está en ninguna zona de delivery`);
   assert.equal(new Set(ZONAS_EN_DISCUSION.map(normalizarTexto)).size, ZONAS_EN_DISCUSION.length);
+});
+
+test("el mapa del equipo: lo de dentro es ciudad, lo de fuera es interior, y el orden para decidir está dicho", () => {
+  const g = geografiaDePanama();
+  assert.match(g, /MAPA DEL EQUIPO/);
+  assert.match(g, /Isla Naos, Isla Flamenco/);
+  for (const lugar of LUGARES_FUERA_DEL_MAPA_PANAMA) assert.ok(g.includes(lugar), lugar);
+  assert.match(g, /ORDEN PARA DECIDIR LA ZONA/);
+  assert.match(g, /Las zonas 5 y 6 .* también son CIUDAD/);
+  // Nada de lo que el mapa deja afuera está en una zona de delivery.
+  const delivery = new Set(ZONAS_DELIVERY_PANAMA.flatMap((z) => z.lugares.map(normalizarTexto)));
+  for (const lugar of LUGARES_FUERA_DEL_MAPA_PANAMA) assert.ok(!delivery.has(normalizarTexto(lugar)), `${lugar} está en el delivery y fuera del mapa`);
 });

@@ -92,7 +92,7 @@ export const ZONAS_DELIVERY_PANAMA: { zona: number; nombre: string; lugares: str
   {
     zona: 5,
     nombre: "Norte: Veranillo, Las Cumbres, Alcalde Díaz",
-    lugares: ["San Miguelito", "Paraíso", "Veranillo", "Villa Zaita", "Nuevo Veranillo", "Cerro Batea", "San Isidro", "Pan de Azúcar", "Las Cumbres", "Ojo de Agua", "Milla 7 y 8", "Chivo Chivo", "San Librada", "Gonzalillo", "La Cabima", "El Lago", "Alcalde Díaz"],
+    lugares: ["San Miguelito", "Paraíso", "Veranillo", "Villa Zaita", "Nuevo Veranillo", "Cerro Batea", "San Isidro", "Pan de Azúcar", "Las Cumbres", "Ojo de Agua", "Milla 7 y 8", "Chivo Chivo", "San Librada", "Gonzalillo", "La Cabima", "Villa Grecia", "El Lago", "Alcalde Díaz"],
   },
   {
     zona: 6,
@@ -109,7 +109,16 @@ export const LUGARES_SERVIENTREGA_PANAMA = ["Ciudad de la Salud", "Esclusas de M
  * (Ernesto Córdoba Campos, Caimitillo, Cabra, Panamá Norte). Las listas no coinciden y el equipo todavía no dijo cuál manda: la IA no los decide sola y responde «no_se» salvo que la dirección traiga otra pista (una
  * palabra de zona, otro lugar que sí defina la zona). Con los pedidos de octubre y noviembre de 2026 de Nuvo y Oferfy salen CIUDAD casi siempre y en Kenku casi siempre INTERIOR.
  */
-export const ZONAS_EN_DISCUSION = ["Ernesto Córdoba Campos", "Caimitillo", "Cabra", "Panamá Norte", "Las Cumbres", "Alcalde Díaz", "Ciudad del Saber", "Pan de Azúcar", "Cerro Batea", "Altos de la Pulida", "Samaria", "Tierra Alta", "Paraíso", "Cerro la Cruz", "La Cabima", "Gonzalillo", "Veranillo"];
+export const ZONAS_EN_DISCUSION = ["Ernesto Córdoba Campos", "Cabra", "Las Cumbres", "Alcalde Díaz", "Ciudad del Saber", "Pan de Azúcar", "Cerro Batea", "Altos de la Pulida", "Samaria", "Tierra Alta", "Paraíso", "Cerro la Cruz", "La Cabima", "Gonzalillo", "Veranillo"];
+
+/**
+ * El mapa del equipo (23 nov 2026): una línea roja alrededor de la ciudad. Todo lo de adentro es CIUDAD (incluida la punta hacia el mar: Amador, Isla Naos, Isla Flamenco, Isla Perico) y todo lo de afuera es INTERIOR.
+ * Con él se resuelven los lugares que están a la vez en el delivery y en la lista de Servientrega: los del delivery quedan adentro. Lo que el mapa deja afuera y no estaba en otra lista va aquí.
+ */
+export const LUGARES_FUERA_DEL_MAPA_PANAMA = ["Caimitillo", "Panamá Norte", "Pradera de San Lorenzo", "El Caraño", "Utivé", "Nuevo Sitio", "Los Lotes", "Paso Blanco", "Boca de Pacora", "Cocolí"];
+
+/** Lo que el mapa deja dentro de la línea roja, para decírselo a la IA en palabras. */
+const DENTRO_DEL_MAPA = "Amador, Isla Naos, Isla Flamenco, Isla Perico, Ancón, Albrook y el Casco Antiguo por el oeste (el límite es el Canal), todo el centro y San Miguelito, y por el norte Villa Zaita, Cerro Batea, Villa Grecia, La Cabima y Alcalde Díaz; por el este Tocumen, Nuevo Tocumen, Nueva Esperanza, Felipillo y Altos de Tatare hasta Pacora";
 
 /** Zonas de difícil acceso o cerca de la frontera: se pagan por adelantado y el pedido no se etiqueta hasta que llegue el pago (lo gestiona el asesor). */
 export const ZONAS_PAGO_ADELANTADO_PANAMA = ["Changuinola", "Bocas del Toro", "Isla Colón", "Puerto Armuelles", "Paso Ancho (el de Chiriquí)", "Bajo Boquete", "El Empalme", "Portobelo", "María Chiquita", "Darién"];
@@ -126,10 +135,12 @@ export function geografiaDePanama(): string {
     "- Provincia de Colón (distritos Colón, Chagres, Donoso, Portobelo, Santa Isabel y Omar Torrijos Herrera; por ejemplo Cativá, Sabanitas, Puerto Pilón, Escobal) es INTERIOR.",
     `- La ciudad de Panamá es el distrito de Panamá (provincia de Panamá), con los corregimientos: ${CORREGIMIENTOS_DISTRITO_PANAMA.join(", ")}.`,
     `- El corazón de la ciudad, casi seguro CIUDAD: ${NUCLEO_URBANO.join(", ")}.`,
-    "ZONAS CON REPARTO PROPIO (delivery) = CIUDAD. Son las 6 zonas que definió el equipo: todo lo que sale aquí es CIUDAD, aunque la dirección diga solo «Panamá» o el nombre del barrio. Excepción: las zonas 5 y 6 y los lugares en discusión (más abajo) se etiquetan según la TENDENCIA HISTÓRICA de la tienda, que Kenku manda a INTERIOR y Nuvo y Oferfy a CIUDAD:",
+    "ZONAS CON REPARTO PROPIO (delivery) = CIUDAD. Son las 6 zonas que definió el equipo: todo lo que sale aquí es CIUDAD, aunque la dirección diga solo «Panamá» o el nombre del barrio. Las zonas 5 y 6 (Las Cumbres, Alcalde Díaz, Tocumen, Pacora…) también son CIUDAD por reglamento y por el mapa. La única excepción es una TENDENCIA HISTÓRICA clara de la tienda (se te da abajo, si existe): Kenku suele mandar esas zonas a INTERIOR y Nuvo y Oferfy a CIUDAD.",
     ...ZONAS_DELIVERY_PANAMA.map((z) => `  · Zona ${z.zona} (${z.nombre}): ${z.lugares.join(", ")}.`),
+    `- MAPA DEL EQUIPO (una línea roja alrededor de la ciudad): todo lo que queda DENTRO es CIUDAD, incluida la punta hacia el mar; abarca ${DENTRO_DEL_MAPA}. Todo lo que queda FUERA de la línea es INTERIOR: ${LUGARES_FUERA_DEL_MAPA_PANAMA.join(", ")}, el otro lado del Canal (todo Panamá Oeste), Chepo, Colón y las provincias.`,
+    "- ORDEN PARA DECIDIR LA ZONA: (1) una palabra de zona del equipo; (2) la tendencia clara de la tienda, si te la dan; (3) el reglamento: las zonas de delivery y lo de dentro del mapa son CIUDAD, lo de fuera es INTERIOR. Responde «no_se» solo si con eso no se puede ubicar el lugar.",
     `- Va por SERVIENTREGA (INTERIOR) aunque esté en la provincia de Panamá y cerca de la ciudad: ${LUGARES_SERVIENTREGA_PANAMA.join(", ")}; y todo Panamá Oeste, Colón, Chepo y las provincias del interior.`,
-    `- Estos lugares están a la vez en las zonas de delivery y en la lista de Servientrega, y el equipo todavía no decidió cuál manda: ${ZONAS_EN_DISCUSION.join(", ")}. Para esos y los de las zonas 5 y 6 sigue la tendencia histórica de la tienda (si te la dan abajo); si no hay una palabra de zona ni tendencia ni otra pista (otro lugar de la dirección que sí defina la zona), responde «no_se» en la zona (no adivines).`,
+    `- Lugares donde las tiendas etiquetan distinto (estaban en el delivery y en la lista de Servientrega): ${ZONAS_EN_DISCUSION.join(", ")}. Los que son de las zonas de delivery y quedan dentro del mapa son CIUDAD por reglamento; si la tienda tiene una tendencia clara en ellos, sigue la tendencia. Ernesto Córdoba Campos y Cabra no se ven en el mapa: sin palabra de zona, tendencia ni otra pista en la dirección, responde «no_se» (no adivines).`,
     `- PAGO POR ADELANTADO (zonas de difícil acceso o cerca de la frontera; responde «adelantado» solo si el lugar es uno de estos): ${ZONAS_PAGO_ADELANTADO_PANAMA.join(", ")}. Un barrio llamado Paso Ancho dentro de la ciudad es CIUDAD.`,
     `- Zonas dudosas, que dependen de cómo las clasifique el equipo: ${DUDOSAS.join(", ")}. Si no hay una palabra de zona que las defina, responde «no_se» en la zona (no adivines).`,
     "- Ojo con los nombres repetidos (homónimos): muchos barrios de la ciudad se llaman igual que lugares del interior. Casa Blanca, La Loma, Balboa, Don Bosco, San Antonio, Las Américas, La Alameda, Miraflores, Amador, Llano Bonito o Pedregal (el de David, Chiriquí) también existen en La Chorrera, Arraiján, Colón, David, Santiago o Chitré, y «casa blanca» muchas veces es solo el color de la casa. Para decidir, lee la ciudad o el corregimiento que puso el cliente junto con el resto de la dirección (distrito, provincia, calles, referencias): si todo lo demás es del interior, es INTERIOR aunque el barrio se llame como uno de la ciudad.",
