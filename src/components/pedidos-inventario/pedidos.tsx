@@ -314,9 +314,10 @@ const TD_FIN = "border-b-2 border-border-control px-2 py-2 align-top";
  * Cuánto hay del producto en cada bodega de donde inventario envía (20 nov 2026, pedido de Hernán: «si sale general no sabré de dónde sale»): la de donde
  * sale el pedido en negrita (aunque tenga 0) y las demás que tienen algo; en rojo cuánto falta si en la elegida no alcanza.
  */
-function StockPorBodega({ skuId, origen, origenes, stock, falta }: { skuId: string; origen: string; origenes: { id: string; nombre: string }[]; stock: Record<string, Record<string, number>>; falta: number }) {
+/** Lo que hay hoy de ese producto en cada bodega de origen (23 nov 2026: también en los pedidos ya enviados o cerrados, no solo en los que faltan por enviar). `soloLectura` = el pedido ya no se envía: sin alarmas. */
+function StockPorBodega({ skuId, origen, origenes, stock, falta, soloLectura = false }: { skuId: string; origen: string; origenes: { id: string; nombre: string }[]; stock: Record<string, Record<string, number>>; falta: number; soloLectura?: boolean }) {
   const filas = origenes.map((b) => ({ ...b, hay: stock[b.id]?.[skuId] ?? 0 })).filter((b) => b.id === origen || b.hay > 0);
-  if (!filas.some((b) => b.hay > 0)) return <span className="font-semibold text-destructive">Sin stock en ninguna bodega</span>;
+  if (!filas.some((b) => b.hay > 0)) return soloLectura ? <span className="text-muted-foreground">Sin stock hoy</span> : <span className="font-semibold text-destructive">Sin stock en ninguna bodega</span>;
   return (
     <ul className="m-0 flex list-none flex-col gap-0.5 p-0 whitespace-nowrap">
       {filas.map((b) => (
@@ -599,7 +600,7 @@ function FilasPedido({
             {!enInventario && <td className={`${borde} text-muted-foreground`}>{p.responsableNombre ?? "—"}</td>}
             {enInventario && (
               <td className={`${borde} text-xs`}>
-                {editable ? <StockPorBodega skuId={it.skuId} origen={origen} origenes={origenes} stock={stock} falta={faltaDe.get(it.skuId) ?? 0} /> : <span className="text-muted-foreground">—</span>}
+                <StockPorBodega skuId={it.skuId} origen={origen} origenes={origenes} stock={stock} falta={faltaDe.get(it.skuId) ?? 0} soloLectura={!editable} />
               </td>
             )}
             <td className={`${borde} text-right tabular-nums`}>
