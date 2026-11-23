@@ -211,7 +211,7 @@ export async function analizarVideoDeMeta(supabase: SupabaseClient, v: VideoPend
     const { angulo_detalle: _d, ...sinDetalle } = completo;
     void _d;
     // Sin subir la versión del ángulo (queda una menos): se vuelve a pedir, con su detalle, cuando la migración esté.
-    ({ error } = await supabase.from("meta_video_analisis").upsert({ ...sinDetalle, version: origen === "video" ? VERSION_ANGULO - 1 : 1 }, { onConflict: "video_id" }));
+    ({ error } = await supabase.from("meta_video_analisis").upsert({ ...sinDetalle, error: "Reanálisis del ángulo: falta correr la migración 0357 (detalle del ángulo).", version: origen === "video" ? VERSION_ANGULO - 1 : 1 }, { onConflict: "video_id" }));
   }
   // Sin la migración 0326 se guarda lo de antes.
   if (error && /cta|oferta|recursos|estructura|version|gancho_tipo|schema cache/i.test(error.message)) ({ error } = await supabase.from("meta_video_analisis").upsert(base, { onConflict: "video_id" }));
@@ -262,7 +262,8 @@ export async function afinarAnguloDeVideo(supabase: SupabaseClient, v: VideoPend
   let { error } = await supabase.from("meta_video_analisis").update(cambios).eq("video_id", v.videoId);
   // Sin la migración 0357 no existe el detalle del ángulo: se guarda el ángulo, pero sin subir la versión, para que se vuelva a pedir (con su detalle) cuando la migración esté.
   if (error && /angulo_detalle|schema cache/i.test(error.message)) {
-    const { angulo_detalle: _d, version: _v, ...sinDetalle } = cambios;
+    // Y se anota el intento (hora y motivo) para que la cola espere 6 horas en vez de repetir siempre los mismos videos mientras falta la migración.
+    const { angulo_detalle: _d, version: _v, ...sinDetalle } = { ...cambios, error: "Reanálisis del ángulo: falta correr la migración 0357 (detalle del ángulo)." };
     void [_d, _v];
     ({ error } = await supabase.from("meta_video_analisis").update(sinDetalle).eq("video_id", v.videoId));
   }
