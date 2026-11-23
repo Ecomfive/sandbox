@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Campo } from "@/components/ui/campo-ficha";
 import { fieldClass } from "@/components/ui/field";
 import { FichaCrear } from "@/components/ui/ficha-crear";
@@ -107,10 +107,12 @@ export function CrearProductoPanel({
   const [skuOcupado, setSkuOcupado] = useState<string | null>(null);
   // Si la persona escribió el SKU a mano: entonces el sistema ya no lo cambia por su sugerencia.
   const [skuTocado, setSkuTocado] = useState(false);
-  // Un compuesto (pack o combo) sugiere un SKU que empieza por COMBO; `esCombo` se pasa cuando el tipo cambia en el mismo momento.
-  async function sugerir(desde: string, esCombo: boolean = combo) {
-    if (!desde.trim()) return;
-    const { codigo: sugerido } = await sugerirSkuLibre(desde, esCombo);
+  // Un compuesto sugiere PACK (2 unidades de un producto), PACKS (3 o más) o COMBO (productos distintos, con el SKU de cada uno unido por «+»); `esCombo` se pasa cuando el tipo cambia en el mismo momento.
+  // Con los productos ya elegidos (`comps`) el SKU sale de ellos; sin ellos, del nombre.
+  const [armado, setArmado] = useState<{ id: string; cantidad: number }[]>([]);
+  async function sugerir(desde: string, esCombo: boolean = combo, comps: { id: string; cantidad: number }[] = armado) {
+    if (!desde.trim() && !(esCombo && comps.length > 0)) return;
+    const { codigo: sugerido } = await sugerirSkuLibre(desde, esCombo, esCombo ? comps : []);
     if (sugerido) {
       setCodigo(sugerido);
       setSkuOcupado(null);
@@ -130,6 +132,15 @@ export function CrearProductoPanel({
   // Los productos elegidos como componentes: uno solo = un pack (toma la foto del original); varios distintos = foto nueva.
   const [elegidos, setElegidos] = useState<string[]>([]);
   const variosDistintos = combo && elegidos.length >= 2;
+  // Al elegir los productos del compuesto (o cambiar su cantidad) el SKU se sugiere de nuevo, si nadie lo escribió a mano.
+  const claveArmado = armado.map((a) => `${a.id}:${a.cantidad}`).join(",");
+  useEffect(() => {
+    if (!combo || skuTocado || armado.length === 0) return;
+    const t = setTimeout(() => void sugerir(nombre, true, armado), 350);
+    return () => clearTimeout(t);
+    // Solo cuando cambia lo elegido o su cantidad.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [claveArmado]);
   // Se vuelve a armar vacío al abrir la ficha otra vez.
   const [vueltaEnvio, setVueltaEnvio] = useState(0);
   const [conVariantes, setConVariantes] = useState(false);
@@ -382,7 +393,7 @@ export function CrearProductoPanel({
                       Sugeridos por el nombre: revisa que sean los productos y las cantidades correctos.
                     </p>
                   )}
-                  <ComboBuilder opciones={opcionesSimples} nombreProducto={nombre} inicial={componenteInicial} alCambiar={setElegidos} />
+                  <ComboBuilder opciones={opcionesSimples} nombreProducto={nombre} inicial={componenteInicial} alCambiar={setElegidos} alCambiarArmado={setArmado} />
                 </div>
               ) : (
                 <p id="campo-componentes" role="alert" className="py-1 text-xs text-destructive">

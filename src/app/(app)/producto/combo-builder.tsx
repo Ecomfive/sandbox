@@ -17,6 +17,7 @@ export function ComboBuilder({
   nombreProducto,
   inicial = null,
   alCambiar,
+  alCambiarArmado,
 }: {
   opciones: OpcionSkuMaestro[];
   nombreProducto: string;
@@ -24,6 +25,8 @@ export function ComboBuilder({
   inicial?: { componenteId: string; cantidad: number } | { componenteId: string; cantidad: number }[] | null;
   /** Cada vez que cambian los productos elegidos (para saber si es un pack de uno solo o de varios distintos). */
   alCambiar?: (ids: string[]) => void;
+  /** Cada vez que cambian los productos o sus cantidades, en el orden de las filas (para sugerir el SKU: PACK, PACKS o COMBO). */
+  alCambiarArmado?: (armado: { id: string; cantidad: number }[]) => void;
 }) {
   const [filas, setFilas] = useState<{ clave: number; id: string | null; cantidad: string }[]>(() => {
     const lista = inicial ? (Array.isArray(inicial) ? inicial : [inicial]) : [];
@@ -36,6 +39,12 @@ export function ComboBuilder({
     // Solo cuando cambian los elegidos, no cuando cambia la función.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clavesElegidas]);
+  const claveArmado = filas.flatMap((f) => (f.id ? [`${f.id}:${Math.max(1, Math.floor(Number(f.cantidad) || 1))}`] : [])).join(",");
+  useEffect(() => {
+    alCambiarArmado?.(claveArmado ? claveArmado.split(",").map((x) => ({ id: x.split(":")[0], cantidad: Number(x.split(":")[1]) })) : []);
+    // Solo cuando cambia lo elegido o su cantidad, no cuando cambia la función.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [claveArmado]);
   const cambiar = (clave: number, cambios: Partial<{ id: string | null; cantidad: string }>) => setFilas((fs) => fs.map((f) => (f.clave === clave ? { ...f, ...cambios } : f)));
   const porId = new Map(opciones.map((o) => [o.id, o]));
   const armado = filas.flatMap((f) => (f.id && porId.has(f.id) ? [{ producto: porId.get(f.id)!, cantidad: Math.max(0, Math.floor(Number(f.cantidad) || 0)) }] : []));
