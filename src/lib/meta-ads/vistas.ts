@@ -15,6 +15,8 @@ export interface CampanaVista {
   etapa: Etapa | null;
   /** Por qué tiene esa etapa (lo que dice el nombre, el producto en Producto o lo corregido a mano). */
   etapaMotivo: string | null;
+  /** Veces que, en promedio, una persona vio la campaña en los últimos 7 días (null si Meta todavía no se lo dijo al sistema). */
+  frecuencia: number | null;
   estructura: Estructura | null;
   puja: Puja | null;
   producto: string | null;
@@ -70,6 +72,8 @@ export interface AnuncioVista {
   /** Qué toca hacer con este anuncio según la escalera del documento «Métrica» (solo anuncios activos de campañas activas) y por qué. */
   decision: Decision | null;
   decisionMotivo: string | null;
+  /** Veces que, en promedio, una persona vio el anuncio en los últimos 7 días. */
+  frecuencia: number | null;
   r: Resultados;
 }
 

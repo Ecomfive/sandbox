@@ -6,7 +6,7 @@
 //   1 compra con CPA de $12.01 a $16 y CTR ≥ 2 % → Observar (hasta $24–25: una segunda compra que baje el CPA a $12 o menos). Pasados $25 con el CPA arriba de $12 → Cortar.
 //   2 o más compras con CPA ≤ $9.50 y ROAS ≥ 3.5 → Consolidar (no se edita ni se duplica dentro de la misma CBO).
 //   Opcionales (el equipo no los hace hoy, quedan por si ayudan): Rebalancear (un anuncio de una CBO se come más del 60 % del presupuesto con CPA de $11–12 mientras otro rinde mejor) y Rotar gancho (ganador que
-//   se desgasta: más de $35, el CTR cae más de 25 % y el CPA de 48 h pasa de $12). La frecuencia todavía no se lee de Meta, así que esa parte de «Rotar gancho» no se comprueba.
+//   se desgasta: más de $35, la frecuencia pasa de 2.80, el CTR cae más de 25 % y el CPA de 48 h pasa de $12).
 
 import { cpa, ctr, dolares, hookRate, type Resultados } from "./metricas";
 
@@ -42,6 +42,7 @@ export const UMBRALES_ANUNCIO = {
   /** Rotar gancho: gasto acumulado, caída del CTR y CPA de las últimas 48 horas. */
   rotarGastoMinimo: 35,
   rotarCaidaCtr: 0.25,
+  rotarFrecuencia: 2.8,
 } as const;
 
 export interface EntradaDecision {
@@ -56,6 +57,8 @@ export interface EntradaDecision {
   esCbo: boolean;
   /** Otro anuncio activo de la misma campaña rinde mucho mejor (CPA menor a $8.50). */
   hayOtroConCpaBajo: boolean;
+  /** Veces que, en promedio, una persona vio el anuncio en los últimos 7 días; null si todavía no se lee de Meta. */
+  frecuencia?: number | null;
 }
 
 export interface ResultadoDecision {
@@ -94,8 +97,8 @@ export function decisionDeAnuncio(e: EntradaDecision): ResultadoDecision | null 
   const ctrAhora = ctr(e.ultimos2);
   const costoAhora = cpa(e.ultimos2);
   const ganabaAntes = antes.compras >= 2 && (cpa(antes) ?? Infinity) <= U.cpaObjetivo;
-  if (a.gasto >= U.rotarGastoMinimo && ganabaAntes && ctrAntes !== null && ctrAhora !== null && ctrAhora < ctrAntes * (1 - U.rotarCaidaCtr) && e.ultimos2.gasto > 0 && (costoAhora === null || costoAhora > U.cpaRojo)) {
-    return { decision: "rotar", motivo: `Era ganador (CPA ${dolares(cpa(antes) ?? 0)}) pero en 48 horas su CTR cayó de ${ctrAntes.toFixed(2)} % a ${ctrAhora.toFixed(2)} % y el CPA pasó de ${dolares(U.cpaRojo)}. Sube 2 o 3 variantes cambiando solo los primeros 3 segundos y conserva el cuerpo del video.` };
+  if (a.gasto >= U.rotarGastoMinimo && ganabaAntes && ctrAntes !== null && ctrAhora !== null && ctrAhora < ctrAntes * (1 - U.rotarCaidaCtr) && e.ultimos2.gasto > 0 && (costoAhora === null || costoAhora > U.cpaRojo) && (e.frecuencia == null || e.frecuencia > U.rotarFrecuencia)) {
+    return { decision: "rotar", motivo: `Era ganador (CPA ${dolares(cpa(antes) ?? 0)})${e.frecuencia != null ? `, su frecuencia ya es ${e.frecuencia.toFixed(2)} (más de ${U.rotarFrecuencia})` : ""} y en 48 horas su CTR cayó de ${ctrAntes.toFixed(2)} % a ${ctrAhora.toFixed(2)} % y el CPA pasó de ${dolares(U.cpaRojo)}. Sube 2 o 3 variantes cambiando solo los primeros 3 segundos y conserva el cuerpo del video.` };
   }
   // Un anuncio que se come la CBO con un CPA regular mientras otro rinde mejor (opcional).
   const costoDia = cpa(e.ultimoDia);
@@ -124,6 +127,8 @@ export interface AnuncioParaDecidir {
   r: Resultados;
   ultimos2: Resultados;
   ultimoDia: Resultados;
+  /** Frecuencia de los últimos 7 días, si se conoce. */
+  frecuencia?: number | null;
 }
 
 /** La decisión de cada anuncio activo de las campañas activas (id del anuncio → decisión). */
@@ -134,7 +139,7 @@ export function decisionesDeAnuncios(anuncios: AnuncioParaDecidir[], campanas: {
     const c = activas.get(a.campanaId);
     if (!c || !a.activo) continue;
     const hayOtroConCpaBajo = anuncios.some((x) => x.id !== a.id && x.campanaId === a.campanaId && x.activo && x.r.compras > 0 && (cpa(x.r) ?? Infinity) < UMBRALES_ANUNCIO.rebalancearOtroCpa);
-    const d = decisionDeAnuncio({ acumulado: a.r, ultimos2: a.ultimos2, ultimoDia: a.ultimoDia, presupuestoCampana: c.presupuestoDiario, esCbo: c.estructura === "CBO", hayOtroConCpaBajo });
+    const d = decisionDeAnuncio({ acumulado: a.r, ultimos2: a.ultimos2, ultimoDia: a.ultimoDia, presupuestoCampana: c.presupuestoDiario, esCbo: c.estructura === "CBO", hayOtroConCpaBajo, frecuencia: a.frecuencia });
     if (d) salida.set(a.id, d);
   }
   return salida;

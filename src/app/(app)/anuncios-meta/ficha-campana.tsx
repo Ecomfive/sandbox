@@ -10,7 +10,7 @@ import { useToast } from "@/components/ui/toast";
 import { Ventana } from "@/components/ui/ventana";
 import { horaDeMeta } from "@/lib/meta-ads/hora";
 import { AnunciosIcon, CalendarioIcon, EnlaceIcon, EtiquetaIcon, FlechaAbajoIcon, FlechaArribaIcon, HistorialIcon, MargenIcon, PersonaIcon } from "@/lib/nav-icons";
-import { METRICAS_CAMPANA, dolares, holdRate, nivelesDeMetricas, resultado, type ClaveMetrica, type Resultados } from "@/lib/meta-ads/metricas";
+import { METRICAS_CAMPANA, dolares, holdRate, nivelesDeMetricas, nivelFrecuencia, nivelTiempo, resultado, tiempoPromedio, type ClaveMetrica, type Resultados } from "@/lib/meta-ads/metricas";
 import { nombreEvento } from "@/lib/meta-ads/actividad-equipo";
 import { NOMBRE_DECISION, type Decision } from "@/lib/meta-ads/decision-anuncio";
 import { NOMBRE_ETAPA, type Etapa } from "@/lib/meta-ads/nombre";
@@ -18,7 +18,7 @@ import type { ActividadVista, AnuncioVista, CampanaVista } from "@/lib/meta-ads/
 import { corregirCampanaMeta, obtenerActividadCampanaMeta, soltarCorreccionMeta } from "./actions";
 import { NOMBRE_VEREDICTO, veredictoDe } from "./def-campanas";
 import { BarraApilada } from "./graficas";
-import { Cifra, entero, InsigniaEstructura, InsigniaEtapa, MetricasEnLinea, nombreEstado, porcentaje, Resultado, textoMetrica } from "./piezas";
+import { Cifra, entero, InsigniaEstructura, InsigniaEtapa, MetricasEnLinea, nombreEstado, porcentaje, Resultado, textoFrecuencia, textoMetrica, textoTiempo } from "./piezas";
 
 /** El color de cada decisión: cortar en rojo, observar y rotar en ámbar, consolidar en verde. */
 const TONO_DECISION: Record<Decision, Tone> = { cortar: "destructive", mantener: "neutral", observar: "warning", consolidar: "success", rebalancear: "info", rotar: "warning" };
@@ -230,6 +230,8 @@ export function FichaCampana({ campana: c, colores, anuncios, actId, productos, 
               {METRICAS_CAMPANA.map((m) => (
                 <Cifra key={m.clave} titulo={m.titulo} valor={textoMetrica(m.clave, r)} nivel={nivelesDeMetricas(r, c.etapa, c.tope)[m.clave]} apoyo={apoyoDeMetrica(m.clave, r)} />
               ))}
+              <Cifra titulo="Tiempo prom." valor={textoTiempo(r)} nivel={nivelTiempo(tiempoPromedio(r))} apoyo={tiempoPromedio(r) === null ? "Meta aún no lo da" : "Por reproducción"} />
+              <Cifra titulo="Frecuencia" valor={textoFrecuencia(c.frecuencia)} nivel={nivelFrecuencia(c.frecuencia)} apoyo={c.frecuencia === null ? "Meta aún no la da" : "Últimos 7 días"} />
             </div>
             <p className="m-0 text-xs text-muted-foreground">
               Resultado = {r.compras} compras × {dolares(c.tope)} − {dolares(r.gasto)} = {dolares(resultado(r, c.tope))}
@@ -315,7 +317,7 @@ export function FichaCampana({ campana: c, colores, anuncios, actId, productos, 
                           <span>{dolares(a.r.gasto)}</span>
                           <span>{a.r.compras} compras</span>
                         </p>
-                        {a.r.gasto > 0 && <MetricasEnLinea r={a.r} tope={c.tope} etapa={c.etapa} completa />}
+                        {a.r.gasto > 0 && <MetricasEnLinea r={a.r} tope={c.tope} etapa={c.etapa} completa frecuencia={a.frecuencia} />}
                       </div>
                     </li>
                   );

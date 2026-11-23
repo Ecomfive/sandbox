@@ -67,3 +67,29 @@ test("las escalas de ventas del documento «Métrica»: CPA, CTR, CPM, Hook, efe
   assert.equal(nivelesDeMetricas(r({ gasto: 5, compras: 0 }), "venta", 10).cpa, "neutral");
   assert.equal(nivelesDeMetricas(r({ gasto: 80, compras: 8 }), "venta", 10).gasto, "neutral");
 });
+
+test("rotar gancho exige la frecuencia arriba de 2.80 cuando se conoce; sin dato, no la comprueba", () => {
+  const base = clics(3, { gasto: 60, compras: 8, valor: 300 });
+  const ult = r({ impresiones: 500, clics: 7, gasto: 20, compras: 1 });
+  assert.equal(decisionDeAnuncio(entrada(base, { ultimos2: ult, frecuencia: 3.2 }))?.decision, "rotar");
+  assert.match(decisionDeAnuncio(entrada(base, { ultimos2: ult, frecuencia: 3.2 }))?.motivo ?? "", /frecuencia ya es 3\.20/);
+  assert.notEqual(decisionDeAnuncio(entrada(base, { ultimos2: ult, frecuencia: 1.8 }))?.decision, "rotar");
+  assert.equal(decisionDeAnuncio(entrada(base, { ultimos2: ult, frecuencia: null }))?.decision, "rotar");
+});
+
+test("el tiempo promedio de reproducción se suma por total visto y se colorea con las zonas del documento", async () => {
+  const { nivelFrecuencia, nivelTiempo, sumar, tiempoPromedio } = await import("./metricas");
+  // Dos días: 100 reproducciones a 6 s y 300 a 10 s → 8.5 s en promedio (no el promedio simple de 8).
+  const dos = sumar(r({ reproducciones: 100, segundosVistos: 600 }), r({ reproducciones: 300, segundosVistos: 3000 }));
+  assert.equal(tiempoPromedio(dos), 9);
+  assert.equal(tiempoPromedio(sinResultados()), null);
+  assert.deepEqual([nivelTiempo(9), nivelTiempo(6), nivelTiempo(5), nivelTiempo(null)], ["bueno", "medio", "malo", "neutral"]);
+  assert.deepEqual([nivelFrecuencia(1.8), nivelFrecuencia(2.5), nivelFrecuencia(3), nivelFrecuencia(null)], ["bueno", "medio", "malo", "neutral"]);
+});
+
+test("Meta da el tiempo promedio por reproducción: se guarda el total (promedio × reproducciones)", async () => {
+  const { resultadoDiaDe } = await import("./normalizar");
+  const d = resultadoDiaDe({ ad_id: "1", date_start: "2026-11-20", spend: "5", impressions: "1000", video_play_actions: [{ action_type: "video_view", value: "400" }], video_avg_time_watched_actions: [{ action_type: "video_view", value: "7.5" }] });
+  assert.equal(d?.reproducciones, 400);
+  assert.equal(d?.segundosVistos, 3000);
+});
