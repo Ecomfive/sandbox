@@ -140,7 +140,7 @@ interface FilaDia {
 }
 const resultadosDe = (f: FilaDia): Resultados => ({ gasto: num(f.gasto), impresiones: num(f.impresiones), clics: num(f.clics), video3s: num(f.video_3s), video15s: num(f.video_15s), video25: num(f.video_25), video50: num(f.video_50), video75: num(f.video_75), video95: num(f.video_95), reproducciones: num(f.video_reproducciones), segundosVistos: num(f.video_segundos), vioLanding: num(f.vio_landing), carrito: num(f.carrito), pago: num(f.pago), compras: num(f.compras), valor: num(f.valor) });
 
-export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: string; cuentaId: string | null; periodo: Periodo; hoy: string }): Promise<DatosMeta> {
+export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: string; cuentaId: string | null; periodo: Periodo; hoy: string; /** La llave de un producto (`claveDeProducto`): «Qué funciona» se calcula solo con sus campañas, anuncios y videos. */ producto?: string | null }): Promise<DatosMeta> {
   const base = vacios(o.periodo, o.hoy);
   const dias = PERIODOS.find((p) => p.valor === o.periodo)!.dias;
   const desde = restar(o.hoy, dias - 1);
@@ -319,12 +319,14 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
   const videos30 = armarVideos(porVideo30, porAnuncio30);
 
   // Qué funciona: cada dimensión con las campañas (o anuncios) del periodo con gasto.
-  const conGasto = campanas.filter((c) => c.r.gasto > 0);
+  // Con un producto elegido (`?producto=`), todo lo de «Qué funciona» sale solo de ese producto (23 nov 2026: los ángulos que funcionan dependen del producto).
+  const delProducto = (producto: string | null) => !o.producto || claveDeProducto(producto) === o.producto;
+  const conGasto = campanas.filter((c) => c.r.gasto > 0 && delProducto(c.producto));
   const deCampana = (clave: (c: CampanaVista) => string | null): Elemento[] => conGasto.map((c) => ({ clave: clave(c), r: c.r, tope: c.tope, campana: c.id }));
   const deAnuncio = (clave: (a: AnuncioVista) => string | null): Elemento[] =>
-    anuncios.filter((a) => a.r.gasto > 0).map((a) => ({ clave: clave(a), r: a.r, tope: campanasDe.get(a.campanaId)?.tope ?? CPA_TOPE_PREDETERMINADO, campana: a.campanaId, video: a.videoId }));
+    anuncios.filter((a) => a.r.gasto > 0 && delProducto(campanasDe.get(a.campanaId)?.producto ?? null)).map((a) => ({ clave: clave(a), r: a.r, tope: campanasDe.get(a.campanaId)?.tope ?? CPA_TOPE_PREDETERMINADO, campana: a.campanaId, video: a.videoId }));
   // Todo lo que la IA sacó de los videos se mide por video (lo que costó y vendió cada uno). El ángulo de una campaña es la mezcla de los de sus videos.
-  const gruposVideo = gruposDeVideos(videos);
+  const gruposVideo = gruposDeVideos(o.producto ? videos.filter((v) => delProducto(v.producto)) : videos);
   const videosSinAngulo = gruposVideo.sinDato["Ángulo"];
   const grupos: GruposMeta = {
     campana: {

@@ -72,7 +72,7 @@ function ordenar(lista: ProductoVista[], c: Criterio, sentido: "asc" | "desc"): 
 function FilaProducto({ p, columnas, alAbrir }: { p: ProductoVista; columnas: ClaveColumna[]; alAbrir: () => void }) {
   const ok = confiable(p.r);
   return (
-    <button type="button" onClick={alAbrir} style={estiloRejilla(columnas.length)} className="grid w-full cursor-pointer grid-cols-1 items-center gap-x-3 gap-y-1.5 px-4 py-3 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-foreground lg:[grid-template-columns:var(--columnas-meta)]">
+    <button type="button" onClick={alAbrir} style={estiloRejilla(columnas.length)} className="grid w-full cursor-pointer grid-cols-1 items-center gap-x-3 gap-y-1.5 px-4 py-3 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-foreground xl:[grid-template-columns:var(--columnas-meta)]">
       <span className="flex min-w-0 flex-col gap-0.5">
         <span className="truncate text-sm font-medium">{p.nombre}</span>
         <span className="truncate text-xs text-muted-foreground">
@@ -81,7 +81,7 @@ function FilaProducto({ p, columnas, alAbrir }: { p: ProductoVista; columnas: Cl
         </span>
       </span>
       <CeldasColumnas columnas={columnas} r={p.r} ctx={{ tope: p.tope, etapa: "venta", confiable: ok }} />
-      <ChevronRightIcon aria-hidden="true" className="hidden h-4 w-4 text-muted-foreground lg:block" />
+      <ChevronRightIcon aria-hidden="true" className="hidden h-4 w-4 text-muted-foreground xl:block" />
     </button>
   );
 }
@@ -110,6 +110,11 @@ function FichaProducto({ p, campanas, videos, alCerrar }: { p: ProductoVista | u
           </Seccion>
 
           <Seccion icono={FiltroIcon} titulo={`Ángulos que usa (${angulos.length})`}>
+            {p.clave && (
+              <Link href={`/anuncios-meta/que-funciona?producto=${encodeURIComponent(p.clave)}`} className="w-fit text-xs font-medium text-foreground underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground">
+                Ver qué funciona de este producto
+              </Link>
+            )}
             {angulos.length === 0 ? (
               <p className="m-0 text-sm text-muted-foreground">Todavía no hay videos de este producto con ángulo (se miran los últimos 30 días).</p>
             ) : (

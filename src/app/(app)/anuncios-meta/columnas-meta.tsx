@@ -165,7 +165,7 @@ export function estiloRejilla(n: number, conExtra = false): CSSProperties {
 }
 
 /** Los títulos de las columnas elegidas, a la derecha del nombre. */
-export function EncabezadoColumnas({ nombre, columnas, minimo = "lg", extra }: { nombre: string; columnas: ClaveColumna[]; minimo?: "lg" | "xl"; /** Una columna de texto entre el nombre y las métricas (el «Tipo» de las campañas). */ extra?: string }) {
+export function EncabezadoColumnas({ nombre, columnas, minimo = "xl", extra }: { nombre: string; columnas: ClaveColumna[]; minimo?: "lg" | "xl"; /** Una columna de texto entre el nombre y las métricas (el «Tipo» de las campañas). */ extra?: string }) {
   return (
     <div aria-hidden="true" style={estiloRejilla(columnas.length, !!extra)} className={`hidden gap-3 px-4 py-2 text-xs font-medium text-muted-foreground ${minimo === "xl" ? "xl:grid xl:[grid-template-columns:var(--columnas-meta)]" : "lg:grid lg:[grid-template-columns:var(--columnas-meta)]"}`}>
       <span>{nombre}</span>
@@ -181,7 +181,7 @@ export function EncabezadoColumnas({ nombre, columnas, minimo = "lg", extra }: {
 }
 
 /** Las celdas de una fila para las columnas elegidas. En pantalla angosta cada una dice su nombre; en la ancha lo dice el encabezado. */
-export function CeldasColumnas({ columnas, r, ctx, minimo = "lg" }: { columnas: ClaveColumna[]; r: Resultados; ctx: ContextoColumna; minimo?: "lg" | "xl" }) {
+export function CeldasColumnas({ columnas, r, ctx, minimo = "xl" }: { columnas: ClaveColumna[]; r: Resultados; ctx: ContextoColumna; minimo?: "lg" | "xl" }) {
   return (
     <>
       {columnas.map((c) => {

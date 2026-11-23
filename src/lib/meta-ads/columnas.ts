@@ -144,4 +144,4 @@ export function moverColumna(lista: ClaveColumna[], clave: ClaveColumna, delta: 
 }
 
 /** Las columnas de una lista en forma de plantilla de rejilla: el nombre a lo ancho, una por métrica y la flecha. */
-export const rejillaDeColumnas = (n: number, conExtra = false) => `${conExtra ? "minmax(0,2.4fr) minmax(0,1.2fr)" : "minmax(0,3fr)"} repeat(${n}, minmax(4.5rem,1fr)) 1rem`;
+export const rejillaDeColumnas = (n: number, conExtra = false) => `${conExtra ? "minmax(9rem,2.4fr) minmax(5.5rem,1.2fr)" : "minmax(10rem,3fr)"} repeat(${n}, minmax(3.5rem,1fr)) 1rem`;
