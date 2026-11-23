@@ -1,7 +1,8 @@
 "use client";
 
 import { quedaDespues, repartirFilas, type FilaConteo } from "@/lib/wms/levantamiento";
-import { Fragment, useMemo, useState, useTransition } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { claveBorrador, hayAlgo, leerBorrador } from "@/lib/wms/borrador-levantamiento";
 import { usePathname, useRouter } from "next/navigation";
 import { ContenedorTabla } from "@/components/tabla/contenedor-tabla";
 import { claseCeldaColumna, claseEncabezadoColumna, claseFilaEncabezado } from "@/components/tabla/estilos-tabla";
@@ -147,6 +148,55 @@ export function Levantamiento({
   const { descendente } = useOrdenVariantes();
   // Los colores desplegados dentro de un producto («idPrincipal|Azul»): nacen plegados (11 nov 2026, pedido de Hernán).
   const [coloresAbiertos, setColoresAbiertos] = useState<Set<string>>(new Set());
+
+  // Borrador (23 nov 2026): lo escrito sin guardar se queda en este navegador, por país y bodega, y vuelve al abrir el levantamiento de esa bodega.
+  // `cargada` es la bodega cuyo borrador ya se leyó: hasta entonces no se escribe nada (si no, lo vacío del arranque pisaría el borrador).
+  const clave = claveBorrador(codigoPais, bodegaElegida);
+  const cargada = useRef<string | null>(null);
+  const [recuperado, setRecuperado] = useState<string | null>(null);
+  useEffect(() => {
+    let leido: ReturnType<typeof leerBorrador> = null;
+    try {
+      leido = leerBorrador(localStorage.getItem(clave));
+    } catch {
+      leido = null;
+    }
+    // Al cambiar de bodega, lo de la otra no pasa a esta: cada una tiene su borrador.
+    void Promise.resolve().then(() => {
+      setContados(leido?.contados ?? {});
+      setLotes((leido?.lotes ?? {}) as Record<string, LineaLote[]>);
+      setCajas((leido?.cajas ?? {}) as Record<string, LineaCajasForm[]>);
+      setSumas(leido?.sumas ?? {});
+      setRestas(leido?.restas ?? {});
+      setTraslados(leido?.traslados ?? {});
+      setReferencia(leido?.referencia ?? "");
+      setRecuperado(leido ? leido.guardadoEn : null);
+      cargada.current = clave;
+    });
+  }, [clave]);
+  useEffect(() => {
+    if (cargada.current !== clave) return;
+    const t = setTimeout(() => {
+      const datos = { contados, lotes, cajas, sumas, restas, traslados, referencia };
+      try {
+        if (hayAlgo(datos)) localStorage.setItem(clave, JSON.stringify({ version: 1, guardadoEn: new Date().toISOString(), ...datos }));
+        else localStorage.removeItem(clave);
+      } catch {
+        // Sin espacio o sin permiso en este navegador: se sigue sin borrador.
+      }
+    }, 400);
+    return () => clearTimeout(t);
+  }, [clave, contados, lotes, cajas, sumas, restas, traslados, referencia]);
+  const descartarBorrador = () => {
+    setContados({});
+    setLotes({});
+    setCajas({});
+    setSumas({});
+    setRestas({});
+    setTraslados({});
+    setReferencia("");
+    setRecuperado(null);
+  };
   const alternar = (set: (f: (x: Set<string>) => Set<string>) => void, clave: string) =>
     set((x) => {
       const y = new Set(x);
@@ -332,6 +382,7 @@ export function Levantamiento({
       setRestas({});
       setTraslados({});
       setReferencia("");
+      setRecuperado(null);
       router.refresh();
     });
   };
@@ -617,6 +668,16 @@ export function Levantamiento({
 
   return (
     <div className="flex flex-col gap-4">
+      {recuperado && hayQueGuardar && (
+        <div role="status" className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-primario/40 bg-primario-suave px-4 py-2.5 text-sm">
+          <span>
+            Recuperamos lo que llevabas en <strong>{nombreBodega}</strong> sin guardar (lo último, <FechaHora iso={recuperado} />). Revísalo y pulsa «Guardar levantamiento» cuando termines.
+          </span>
+          <button type="button" onClick={descartarBorrador} className={`rounded px-2 py-1 text-xs font-semibold text-muted-foreground hover:bg-card hover:text-foreground ${anilloFoco}`}>
+            Descartar
+          </button>
+        </div>
+      )}
       <div className="flex flex-wrap items-end gap-3 rounded-lg border border-border bg-card p-4">
         <label className="flex flex-col gap-1">
           <span className="text-xs font-semibold text-muted-foreground">Bodega</span>
