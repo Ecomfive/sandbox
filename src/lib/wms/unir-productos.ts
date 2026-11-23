@@ -64,6 +64,11 @@ const NOMBRE_MOVIDO: Record<string, [string, string]> = {
   unidades: ["unidad de inventario", "unidades de inventario"],
   wms_movimientos: ["movimiento de inventario", "movimientos de inventario"],
   wms_cajas: ["línea de cajas", "líneas de cajas"],
+  // Lo de las tiendas y traslados que se mueve al unir con variantes (23 nov 2026).
+  tienda_variantes: ["variante de Shopify", "variantes de Shopify"],
+  ven_orden_lineas: ["línea de pedido de tienda", "líneas de pedidos de tienda"],
+  wms_traslado_items: ["línea de traslado", "líneas de traslado"],
+  sku_comentarios: ["comentario del producto", "comentarios del producto"],
 };
 
 /**
