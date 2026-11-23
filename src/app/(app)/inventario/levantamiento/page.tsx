@@ -8,6 +8,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { traerTodasConError } from "@/lib/supabase/paginar";
 import { leerStockPlataformas } from "../datos-plataformas";
 import { etiquetaTalla } from "@/lib/wms/talla";
+import { colorDeVariante } from "@/lib/wms/color-variante";
 import { Levantamiento, type ProductoConteo } from "./levantamiento";
 
 export const metadata = { title: "Levantamiento" };
@@ -21,17 +22,6 @@ const ES_ID = (v: string) => /^[0-9a-fA-F-]{8,64}$/.test(v);
  * cada producto y, al guardar, cada uno queda en lo contado (la diferencia se anota como ajuste en el libro). Un producto con
  * variantes no sale: no lleva stock propio y la base rechazaría todo el conteo; se cuenta cada variante.
  */
-/**
- * El color de una variante que además tiene otra opción (talla…): con él se agrupan sus variantes en el Levantamiento (11 nov 2026, pedido de Hernán), y `resto`
- * es lo demás («M», «43»). Una variante solo de color, o sin color, no se agrupa.
- */
-function colorDeVariante(opciones: Record<string, string> | null): { color: string | null; resto: string } {
-  const pares = Object.entries(opciones ?? {}).filter(([, v]) => String(v ?? "").trim() !== "");
-  const color = pares.find(([k]) => /^(colou?r|tono)$/i.test(k.trim()));
-  if (!color || pares.length < 2) return { color: null, resto: "" };
-  return { color: String(color[1]).trim(), resto: etiquetaTalla(pares.filter((x) => x !== color).map(([, v]) => v).join(" / ")) };
-}
-
 export default async function LevantamientoPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
   const usuario = await requireModulo("inventario");
   const supabase = createServiceClient();

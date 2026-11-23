@@ -24,6 +24,7 @@ import { ImportarLista } from "./importar-lista";
 import { LineasCajas, unidadesFormulario, type LineaCajasForm, type UbicacionConteo } from "./lineas-cajas";
 import { CAJAS_ACTIVAS } from "@/lib/wms/cajas";
 import { codigoLote, PEDIR_CODIGO_LOTE } from "@/lib/wms/vencimiento";
+import { agruparPorColor } from "@/lib/wms/color-variante";
 import { ordenarVariantes } from "@/lib/wms/orden-variantes";
 import { compararOpciones } from "@/lib/wms/talla";
 import { BotonOrdenVariantes, useOrdenVariantes } from "@/components/ui/orden-variantes";
@@ -66,13 +67,6 @@ interface LineaLote {
 
 const AMBITOS_PRODUCTO: Ambito[] = ["producto"];
 
-/** Las variantes de un producto juntas por color, en el orden en que salen; las que no tienen color (o solo color) van sueltas, primero. */
-function porColor(hijos: ProductoConteo[]): { color: string | null; hijos: ProductoConteo[] }[] {
-  const sueltas = hijos.filter((h) => !h.color);
-  const grupos = new Map<string, ProductoConteo[]>();
-  for (const h of hijos) if (h.color) grupos.set(h.color, [...(grupos.get(h.color) ?? []), h]);
-  return [...(sueltas.length ? [{ color: null, hijos: sueltas }] : []), ...[...grupos].map(([color, lista]) => ({ color, hijos: lista }))];
-}
 const ETIQUETA_CLASE: Record<string, string> = { inactivo: "Inactivo", descontinuado: "Descontinuado" };
 const sinAcentos = (t: string) => t.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
 const numero = (t: string) => (t.trim() === "" ? null : Number(t));
@@ -845,7 +839,7 @@ export function Levantamiento({
                     </td>
                   </tr>
                   {abierto &&
-                    porColor(ordenarVariantes(g.hijos, descendente)).map((c) => {
+                    agruparPorColor(ordenarVariantes(g.hijos, descendente)).map((c) => {
                       if (!c.color) return c.hijos.map((h) => filaDe(h, true));
                       const clave = `${g.padre.id}|${c.color}`;
                       const colorAbierto = coloresAbiertos.has(clave);

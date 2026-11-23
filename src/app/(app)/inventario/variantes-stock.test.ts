@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { DEF_STOCK, type FilaStock } from "./def-stock";
-import { agruparVariantes, aplanarVariantes, sinRepartirEn } from "./variantes-stock";
+import { agruparVariantes, aplanarVariantes, grupoDeColor, sinRepartirEn } from "./variantes-stock";
 
 const fila = (id: string, codigo: string, extra: Partial<FilaStock> = {}): FilaStock => ({
   id,
@@ -89,4 +89,17 @@ test("«sin repartir» se dice según la bodega que se ve: solo donde queda stoc
   // Sin la marca del producto nunca; sin el dato por bodega (una variante suelta), vale la marca.
   assert.equal(sinRepartirEn({ repartoPendiente: false, generalPorBodega: [{ bodegaId: "x", fisico: 5 }] }, "x"), false);
   assert.equal(sinRepartirEn({ repartoPendiente: true }, "x"), true);
+});
+
+test("grupoDeColor: la fila de un color suma sus variantes y las lleva dentro", () => {
+  const m = fila("m", "CAMISA/AZUL/M", { padreId: "p", opciones: "Azul / M", color: "Azul", resto: "M", fisico: 3, disponible: 2, reservado: 1, porBodega: [{ bodegaId: "b1", fisico: 3 }] });
+  const l = fila("l", "CAMISA/AZUL/L", { padreId: "p", opciones: "Azul / L", color: "Azul", resto: "L", fisico: 4, disponible: 4, porBodega: [{ bodegaId: "b1", fisico: 1 }, { bodegaId: "b2", fisico: 3 }] });
+  const g = grupoDeColor(fila("p", "CAMISA"), "Azul", [m, l]);
+  assert.equal(g.nombre, "Azul");
+  assert.equal(g.fisico, 7);
+  assert.equal(g.disponible, 6);
+  assert.equal(g.reservado, 1);
+  assert.deepEqual(g.porBodega.sort((a, b) => a.bodegaId.localeCompare(b.bodegaId)), [{ bodegaId: "b1", fisico: 4 }, { bodegaId: "b2", fisico: 3 }]);
+  assert.deepEqual(g.variantes.map((v) => v.id), ["m", "l"]);
+  assert.equal(g.id, "p|Azul");
 });

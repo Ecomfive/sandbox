@@ -8,6 +8,7 @@ import { autorizadaParaSalidaManual } from "@/lib/permisos/salida-manual";
 import { traerTodasConError } from "@/lib/supabase/paginar";
 import { leerStockPlataformas } from "./datos-plataformas";
 import { etiquetaTalla } from "@/lib/wms/talla";
+import { colorDeVariante } from "@/lib/wms/color-variante";
 import type { FilaStock } from "./def-stock";
 import { ListaStock } from "./lista-stock";
 import { agruparVariantes } from "./variantes-stock";
@@ -115,6 +116,7 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
     padreId: hijaDe.get(String(r.sku_maestro_id))?.padre_id ?? null,
     repartoPendiente: repartoPendiente.has(String(r.sku_maestro_id)) || repartoPendiente.has(hijaDe.get(String(r.sku_maestro_id))?.padre_id ?? ""),
     opciones: etiquetaTalla(Object.values(hijaDe.get(String(r.sku_maestro_id))?.opciones ?? {}).join(" / ")),
+    ...colorDeVariante(hijaDe.get(String(r.sku_maestro_id))?.opciones),
     variantes: [],
   }));
   const filas = agruparVariantes(todasLasFilas);

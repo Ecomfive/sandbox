@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { fieldClassSm } from "@/components/ui/field";
 import type { IconoComp } from "@/components/tabla/botones-vista";
@@ -10,6 +10,7 @@ import { ListaDatos } from "@/components/tabla/lista-datos";
 import { BotonOrdenVariantes, useOrdenVariantes } from "@/components/ui/orden-variantes";
 import { InventarioIcon, ProductoIcon } from "@/lib/nav-icons";
 import type { NombreFilas } from "@/lib/tabla/pie";
+import { agruparPorColor } from "@/lib/wms/color-variante";
 import { ordenarVariantes } from "@/lib/wms/orden-variantes";
 import { conStockPrimero } from "@/lib/wms/total-stock";
 import { formatearTiempoRelativo } from "@/lib/formato";
@@ -19,7 +20,7 @@ import { FichaStock } from "./ficha-stock";
 import { EncabezadoFilasStock, FilaStockLista } from "./fila-stock";
 import type { BodegaOpcion, UbicacionOpcion } from "./panel-movimiento";
 import { TableroStock } from "./tablero-stock";
-import { aplanarVariantes } from "./variantes-stock";
+import { aplanarVariantes, grupoDeColor } from "./variantes-stock";
 
 const NOMBRE: NombreFilas = { singular: "SKU", plural: "SKUs" };
 const ICONOS: Record<string, IconoComp> = { sku: ProductoIcon, existencia: InventarioIcon, tipo: ProductoIcon, clase: ProductoIcon, fisico: InventarioIcon, plataformas: InventarioIcon, disponible: InventarioIcon, vencido: InventarioIcon, enCamino: InventarioIcon , plataforma: InventarioIcon, bodega: InventarioIcon };
@@ -111,6 +112,15 @@ export function ListaStock({
       else y.add(id);
       return y;
     });
+  // Los colores desplegados dentro de un producto (como en el Levantamiento: cada color se abre aparte; la clave es `<producto>|<color>`).
+  const [coloresAbiertos, setColoresAbiertos] = useState<Set<string>>(new Set());
+  const alternarColor = (clave: string) =>
+    setColoresAbiertos((x) => {
+      const y = new Set(x);
+      if (y.has(clave)) y.delete(clave);
+      else y.add(clave);
+      return y;
+    });
   // La ficha puede ser la de un producto o la de una de sus variantes.
   const sku = abierto ? aplanarVariantes(filas).find((f) => f.id === abierto) : undefined;
   const conPlataformas = lecturas !== null;
@@ -140,9 +150,18 @@ export function ListaStock({
               <FilaStockLista f={f} conPlataformas={conPlataformas} plataforma={plataforma} bodegaId={bodegaVista} abierto={desplegados.has(f.id)} alAbrir={() => setAbierto(f.id)} alAlternar={() => alternar(f.id)} />
               {desplegados.has(f.id) && (
                 <div className="divide-y divide-border border-t border-border">
-                  {ordenarVariantes(f.variantes, descendente).map((v) => (
-                    <FilaStockLista key={v.id} f={v} hijo bodegaId={bodegaVista} conPlataformas={conPlataformas} plataforma={plataforma} alAbrir={() => setAbierto(v.id)} />
-                  ))}
+                  {agruparPorColor(ordenarVariantes(f.variantes, descendente).map((v) => ({ ...v, color: v.color ?? null }))).map((c) => {
+                    // Sin color (o solo color): sueltas, una fila cada una.
+                    if (!c.color) return c.hijos.map((v) => <FilaStockLista key={v.id} f={v} hijo bodegaId={bodegaVista} conPlataformas={conPlataformas} plataforma={plataforma} alAbrir={() => setAbierto(v.id)} />);
+                    const g = grupoDeColor(f, c.color, c.hijos);
+                    const colorAbierto = coloresAbiertos.has(g.id);
+                    return (
+                      <Fragment key={g.id}>
+                        <FilaStockLista f={g} hijo grupoColor abierto={colorAbierto} bodegaId={bodegaVista} conPlataformas={conPlataformas} plataforma={plataforma} alAbrir={() => {}} alAlternar={() => alternarColor(g.id)} />
+                        {colorAbierto && c.hijos.map((v) => <FilaStockLista key={v.id} f={v} hijo profundo bodegaId={bodegaVista} conPlataformas={conPlataformas} plataforma={plataforma} alAbrir={() => setAbierto(v.id)} />)}
+                      </Fragment>
+                    );
+                  })}
                   <div className="flex items-center justify-end bg-muted/30 py-1.5 pr-4 pl-10">
                     <BotonOrdenVariantes />
                   </div>
