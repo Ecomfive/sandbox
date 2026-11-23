@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { ContadorPestana } from "@/components/migas/contador-pestana";
+import { contarLlegadasEnBodega } from "./llegadas/actions";
 import { contarSinStockPorRevisar } from "./sin-stock/actions";
 
 /**
@@ -11,6 +12,7 @@ export default function ComprasLayout({ children }: { children: ReactNode }) {
   return (
     <>
       <ContadorPestana href="/compras/sin-stock" cargar={contarSinStockPorRevisar} />
+      <ContadorPestana href="/compras/llegadas" cargar={contarLlegadasEnBodega} />
       {children}
     </>
   );
