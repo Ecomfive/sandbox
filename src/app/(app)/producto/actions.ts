@@ -956,7 +956,7 @@ const UUID_V = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 /**
  * El SKU sugerido para un nombre (palabras del nombre con barra), ya libre: si existe, con /2, /3… Vacío si no hay sugerencia. Un compuesto (23 nov 2026, pedido de
- * Jhokser) empieza por PACK si son 2 unidades de un mismo producto, PACKS si son 3 o más y COMBO si son productos distintos, y con los productos elegidos
+ * Jhokser) empieza por PACK la primera promoción por cantidad de un producto, por PACKS una segunda (otra cantidad del mismo producto) y por COMBO si son productos distintos, y con los productos elegidos
  * (`componentes`: id y cantidad; el servidor lee su SKU, no se confía en lo que mande el navegador) lleva el SKU de cada uno («COMBO/A+B», «PACK/A»).
  */
 export async function sugerirSkuLibre(nombre: string, compuesto = false, componentes: { id: string; cantidad: number }[] = []): Promise<{ codigo: string }> {
@@ -980,8 +980,13 @@ export async function sugerirSkuLibre(nombre: string, compuesto = false, compone
     base = sugerirSku(texto, 3, { compuesto: false });
   }
   if (!base) return { codigo: "" };
-  const { data } = await supabase.from("skus_maestros").select("codigo").ilike("codigo", `${base}%`);
-  const usados = new Set((data ?? []).map((p) => String(p.codigo).trim().toUpperCase()));
+  // Un «PACK/X» que ya existe pasa a «PACKS/X» (segunda promoción del mismo producto): también se miran los que empiezan por PACKS/X.
+  const plural = base.startsWith("PACK/") ? `PACKS/${base.slice(5)}` : null;
+  const [{ data }, { data: dePlural }] = await Promise.all([
+    supabase.from("skus_maestros").select("codigo").ilike("codigo", `${base}%`),
+    plural ? supabase.from("skus_maestros").select("codigo").ilike("codigo", `${plural}%`) : Promise.resolve({ data: [] as { codigo: string }[] }),
+  ]);
+  const usados = new Set([...(data ?? []), ...(dePlural ?? [])].map((p) => String(p.codigo).trim().toUpperCase()));
   // Un pack que choca con otro del mismo producto lleva la palabra de su cantidad (CUARTETO…), no un número.
   return { codigo: primeroLibre(base, (c) => usados.has(c), compuesto === true ? cantidad : null) };
 }
