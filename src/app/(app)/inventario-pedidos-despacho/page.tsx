@@ -10,5 +10,5 @@ export default async function PedidosDespachoPage({ searchParams }: { searchPara
   // Quien solo tiene «Cuánto hay» (Nicol, 19 nov 2026) entra a esa pestaña en vez de ir a su inicio.
   const usuario = await requirePanel("/inventario-pedidos-despacho", "inventario-pedidos-despacho");
   const sp = await searchParams;
-  return <PaginaPedidos modo="inventario" usuario={usuario} estado={typeof sp.estado === "string" ? sp.estado : undefined} />;
+  return <PaginaPedidos modo="inventario" usuario={usuario} estado={typeof sp.estado === "string" ? sp.estado : undefined} archivados={sp.archivados === "1"} />;
 }

@@ -89,18 +89,31 @@ const uno = <T,>(r: T | T[] | null): T | null => (Array.isArray(r) ? (r[0] ?? nu
  * Los pedidos: todos los abiertos (Solicitud, En proceso, Enviado) y los cerrados de los últimos 30 días, el más nuevo arriba.
  * Si falta la migración 0305, `faltaMigracion`.
  */
-export async function cargarPedidos(supabase: SupabaseClient): Promise<{ pedidos: PedidoInventario[]; faltaMigracion: boolean }> {
+export async function cargarPedidos(
+  supabase: SupabaseClient,
+  opciones: { archivados?: boolean } = {},
+): Promise<{ pedidos: PedidoInventario[]; faltaMigracion: boolean; totalArchivados: number; sinArchivo: boolean }> {
   const desde = new Date(Date.now() - 30 * 86_400_000).toISOString();
-  const { data, error } = await supabase
-    .from("despacho_pedidos_inventario")
-    .select(
-      "id, numero, estado, pedido_por, pedido_por_nombre, creado_en, responsable_nombre, enviado_en, recibido_por_nombre, recibido_en, origen:wms_bodegas!despacho_pedidos_inventario_bodega_origen_id_fkey(nombre), traslado:wms_traslados(numero), despacho_pedidos_inventario_items(id, orden, sku_id, producto, codigo, cantidad_pedida, nota, cantidad_entregada, observacion)",
-    )
-    .or(`estado.in.(solicitud,en_proceso,enviado),creado_en.gte.${desde}`)
-    .order("creado_en", { ascending: false })
-    .limit(500);
-  if (error) return { pedidos: [], faltaMigracion: true };
-  const pedidos = (data ?? []).map((p) => {
+  const campos =
+    "id, numero, estado, pedido_por, pedido_por_nombre, creado_en, responsable_nombre, enviado_en, recibido_por_nombre, recibido_en, origen:wms_bodegas!despacho_pedidos_inventario_bodega_origen_id_fkey(nombre), traslado:wms_traslados(numero), despacho_pedidos_inventario_items(id, orden, sku_id, producto, codigo, cantidad_pedida, nota, cantidad_entregada, observacion)";
+  // Los archivados (migración 0354, 23 nov 2026) salen de la lista de siempre y se ven aparte, sin el límite de 30 días.
+  const consulta = (conArchivo: boolean) => {
+    const q = supabase.from("despacho_pedidos_inventario").select(conArchivo ? `${campos}, archivado_en` : campos);
+    if (!conArchivo) return q.or(`estado.in.(solicitud,en_proceso,enviado),creado_en.gte.${desde}`).order("creado_en", { ascending: false }).limit(500);
+    return (opciones.archivados ? q.not("archivado_en", "is", null) : q.is("archivado_en", null).or(`estado.in.(solicitud,en_proceso,enviado),creado_en.gte.${desde}`))
+      .order("creado_en", { ascending: false })
+      .limit(500);
+  };
+  let sinArchivo = false;
+  let { data, error } = await consulta(true);
+  if (error && /archivado_en/.test(error.message)) {
+    // Sin la migración 0354 todo carga como antes, sin archivar.
+    sinArchivo = true;
+    ({ data, error } = await consulta(false));
+  }
+  if (error) return { pedidos: [], faltaMigracion: true, totalArchivados: 0, sinArchivo };
+  const { count } = sinArchivo ? { count: 0 } : await supabase.from("despacho_pedidos_inventario").select("id", { count: "exact", head: true }).not("archivado_en", "is", null);
+  const pedidos = ((data ?? []) as unknown as Record<string, unknown>[]).map((p) => {
     const items = ((p.despacho_pedidos_inventario_items as Record<string, unknown>[] | null) ?? []).sort((a, b) => Number(a.orden) - Number(b.orden));
     const traslado = uno(p.traslado as { numero: number } | { numero: number }[] | null);
     return {
@@ -116,6 +129,7 @@ export async function cargarPedidos(supabase: SupabaseClient): Promise<{ pedidos
       recibidoEn: (p.recibido_en as string | null) ?? null,
       origen: uno(p.origen as { nombre: string } | { nombre: string }[] | null)?.nombre ?? null,
       traslado: traslado ? numeroTraslado(traslado.numero) : null,
+      archivadoEn: (p.archivado_en as string | null | undefined) ?? null,
       items: items.map((it) => ({
         id: it.id as string,
         skuId: it.sku_id as string,
@@ -128,5 +142,5 @@ export async function cargarPedidos(supabase: SupabaseClient): Promise<{ pedidos
       })),
     } satisfies PedidoInventario;
   });
-  return { pedidos, faltaMigracion: false };
+  return { pedidos, faltaMigracion: false, totalArchivados: count ?? 0, sinArchivo };
 }

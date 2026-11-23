@@ -47,6 +47,8 @@ export interface PedidoInventario {
   recibidoEn: string | null;
   origen: string | null;
   traslado: string | null;
+  /** Cuándo se archivó (23 nov 2026, migración 0354); null = a la vista. */
+  archivadoEn?: string | null;
   items: ItemPedido[];
 }
 
@@ -221,6 +223,9 @@ export const puedeEnviar = (estado: EstadoPedido) => estado === "solicitud" || e
 export const puedeRecibir = (estado: EstadoPedido) => estado === "enviado";
 /** Un pedido cerrado («Entregado») se puede devolver a «Enviado» si se marcó por error (23 nov 2026): el traslado ya estaba hecho al enviarlo, así que no mueve inventario. */
 export const puedeDeshacerEntrega = (estado: EstadoPedido) => estado === "recibido";
+
+/** Un pedido ya realizado (entregado) o cancelado se puede archivar para sacarlo de la lista (23 nov 2026, pedido de Jhokser). */
+export const puedeArchivar = (estado: EstadoPedido) => estado === "recibido" || estado === "cancelado";
 
 /** Cuántos pedidos hay en cada estado (los contadores de arriba). */
 export function contarPorEstado(pedidos: { estado: EstadoPedido }[]): Record<EstadoPedido, number> {

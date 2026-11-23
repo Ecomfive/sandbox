@@ -3,6 +3,7 @@
 import { Fragment, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
+  archivarPedidoInventario,
   cancelarPedidoInventario,
   crearPedidoInventario,
   deshacerEntregaPedidoInventario,
@@ -19,7 +20,8 @@ import { FichaStock, type SkuFicha } from "@/app/(app)/inventario/ficha-stock";
 import { CampoSkuMaestro, ProveedorSkusMaestros, type OpcionSkuMaestro } from "@/components/ui/selector-sku-maestro";
 import { useToast } from "@/components/ui/toast";
 import { Ventana } from "@/components/ui/ventana";
-import { CalendarioIcon, CheckIcon, DescargarIcon, EnvioIcon, InventarioIcon, PedidoIcon } from "@/lib/nav-icons";
+import { usePlegado } from "@/app/(app)/crm-dropshippers/bandeja/usar-plegado";
+import { CalendarioIcon, CheckIcon, DescargarIcon, EnvioIcon, FlechaAbajoIcon, FlechaArribaIcon, InventarioIcon, PedidoIcon } from "@/lib/nav-icons";
 import {
   cambiosDeEdicion,
   ESTADOS,
@@ -33,6 +35,7 @@ import {
   puedeEditar,
   puedeEnProceso,
   puedeEnviar,
+  puedeArchivar,
   puedeDeshacerEntrega,
   puedeRecibir,
   type EstadoPedido,
@@ -371,8 +374,10 @@ function FilasPedido({
   abrirFicha,
   opciones,
   hayEnInventario,
+  columnas,
 }: {
   p: PedidoInventario;
+  columnas: number;
   modo: "despacho" | "inventario";
   puedeEscribir: boolean;
   origenes: { id: string; nombre: string }[];
@@ -403,6 +408,8 @@ function FilasPedido({
   const n = p.items.length;
   // «Deshacer entrega»: dos pasos (pulsar y confirmar) para que no se repita el error de marcarlo sin querer.
   const [deshaciendo, setDeshaciendo] = useState(false);
+  // Ocultar o desplegar la solicitud (23 nov 2026, pedido de Jhokser): se recuerda en el navegador de cada persona.
+  const [plegado, alternarPlegado] = usePlegado(`pedido-inventario:${p.id}`);
 
   const acciones = (
     <div className="flex flex-col items-stretch gap-1.5">
@@ -458,7 +465,12 @@ function FilasPedido({
           )}
         </>
       )}
-      {puedeEscribir && puedeDeshacerEntrega(p.estado) &&
+      {puedeEscribir && puedeArchivar(p.estado) && (
+        <button type="button" disabled={ocupado} onClick={() => correr(() => archivarPedidoInventario(p.id, !p.archivadoEn))} className={SECUNDARIO}>
+          {p.archivadoEn ? "Sacar del archivo" : "Archivar pedido"}
+        </button>
+      )}
+      {puedeEscribir && puedeDeshacerEntrega(p.estado) && !p.archivadoEn &&
         (deshaciendo ? (
           <div className="flex flex-col gap-1.5 rounded-md bg-muted p-2">
             <span className="text-xs">¿Volver este pedido a «Enviado»? No cambia el inventario.</span>
@@ -482,6 +494,47 @@ function FilasPedido({
     </div>
   );
 
+  const alternar = (
+    <button
+      type="button"
+      onClick={alternarPlegado}
+      aria-expanded={!plegado}
+      aria-label={`${plegado ? "Desplegar" : "Ocultar"} el pedido ${numeroPedido(p.numero)}`}
+      className={`mt-1 inline-flex items-center gap-1 rounded text-xs font-medium text-primario underline-offset-2 hover:underline ${anilloFoco}`}
+    >
+      {plegado ? <FlechaAbajoIcon className="h-3.5 w-3.5" aria-hidden="true" /> : <FlechaArribaIcon className="h-3.5 w-3.5" aria-hidden="true" />}
+      {plegado ? "Desplegar" : "Ocultar"}
+    </button>
+  );
+
+  // Plegado: una sola fila con el N.º, un resumen de lo que lleva y el estado. Si falta enviarlo (inventario escribe las cantidades), no se ofrece «Enviar» sin ver los productos.
+  if (plegado) {
+    const unidades = p.items.reduce((t, it) => t + it.cantidadPedida, 0);
+    return (
+      <tr>
+        <td className={`${TD_FIN} bg-primario-suave px-3 whitespace-nowrap`}>
+          <span className="block font-semibold text-primario">{numeroPedido(p.numero)}</span>
+          <span className="block text-xs font-normal text-muted-foreground">{fechaCorta(p.creadoEn)}</span>
+          {alternar}
+        </td>
+        <td colSpan={Math.max(1, columnas - 2)} className={`${TD_FIN} text-muted-foreground`}>
+          {n.toLocaleString("es-PA")} {n === 1 ? "producto" : "productos"} · {unidades.toLocaleString("es-PA")} unidades pedidas
+          <span className="block truncate text-xs">{p.items.map((it) => it.producto).join(" · ")}</span>
+        </td>
+        <td className={`${TD_FIN} px-3`}>
+          {editable ? (
+            <span className="flex flex-col gap-1">
+              <Badge tone={estado.tono}>{estado.etiqueta}</Badge>
+              <span className="text-xs text-muted-foreground">Despliégalo para enviarlo.</span>
+            </span>
+          ) : (
+            acciones
+          )}
+        </td>
+      </tr>
+    );
+  }
+
   return (
     <>
       {p.items.map((it, i) => {
@@ -494,6 +547,7 @@ function FilasPedido({
               <td rowSpan={n} className={`${TD_FIN} bg-primario-suave px-3 whitespace-nowrap`}>
                 <span className="block font-semibold text-primario">{numeroPedido(p.numero)}</span>
                 <span className="block text-xs font-normal text-muted-foreground">{fechaCorta(p.creadoEn)}</span>
+                {alternar}
               </td>
             )}
             <td className={`${borde} font-mono text-xs text-muted-foreground`}>{it.codigo ?? "—"}</td>
@@ -672,7 +726,7 @@ export function TablaPedidos({
           ) : (
             pedidos.map((p) => (
               <Fragment key={p.id}>
-                <FilasPedido p={p} modo={modo} puedeEscribir={puedeEscribir} origenes={origenes} stock={stock} abrirFicha={fichas ? (id) => fichas[id] && setFicha(id) : null} opciones={opciones} hayEnInventario={hayEnInventario} />
+                <FilasPedido p={p} modo={modo} puedeEscribir={puedeEscribir} origenes={origenes} stock={stock} abrirFicha={fichas ? (id) => fichas[id] && setFicha(id) : null} opciones={opciones} hayEnInventario={hayEnInventario} columnas={columnas} />
               </Fragment>
             ))
           )}
