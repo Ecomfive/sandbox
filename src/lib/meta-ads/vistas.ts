@@ -62,6 +62,10 @@ export interface AnuncioVista {
   copy: string | null;
   titulo: string | null;
   landing: string | null;
+  /** «V3»: el número del video dentro de su tanda, según el nombre del anuncio. */
+  numero: string | null;
+  /** El ángulo de su video, según el análisis de la IA. */
+  angulo: string | null;
   r: Resultados;
 }
 

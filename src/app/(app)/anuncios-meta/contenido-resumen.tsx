@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { conSigno, confiable, cpa, ctr, dolares, dolaresEnteros, hookRate, nivelDeCtr, nivelDeHook, resultado } from "@/lib/meta-ads/metricas";
+import { conSigno, confiable, CPA_TOPE_PREDETERMINADO, cpa, ctr, dolares, dolaresEnteros, hookRate, nivelDeCtr, nivelDeHook, resultado } from "@/lib/meta-ads/metricas";
 import { NOMBRE_ETAPA } from "@/lib/meta-ads/nombre";
 import type { CampanaVista } from "@/lib/meta-ads/vistas";
 import type { DatosMeta } from "@/lib/meta-ads/datos";
@@ -67,7 +67,7 @@ export function ContenidoResumen({ datos, escribe }: { datos: DatosMeta; escribe
       {sinTope.length > 0 && (
         <p className="-mt-3 text-xs text-muted-foreground">
           <span aria-hidden="true" className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-warning" />
-          {sinTope.length === 1 ? "1 producto usa" : `${sinTope.length} productos usan`} el CPA tope de $3 por defecto ({sinTope.slice(0, 4).join(", ")}
+          {sinTope.length === 1 ? "1 producto usa" : `${sinTope.length} productos usan`} el CPA tope de {dolares(CPA_TOPE_PREDETERMINADO)} por defecto ({sinTope.slice(0, 4).join(", ")}
           {sinTope.length > 4 ? "…" : ""}): defínelo en <Link href="/anuncios-meta/cuentas" className="underline underline-offset-2">Cuentas</Link> para que el resultado sea real.
         </p>
       )}

@@ -180,6 +180,7 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
   const porVideo30 = new Map<string, Resultados>();
   const porVideoPeriodo = new Map<string, Resultados>();
   const porAnuncio30 = new Map<string, Resultados>();
+  const porAnuncio7 = new Map<string, Resultados>();
   let totales = sinResultados();
   let anteriores = sinResultados();
   const porDiaPeriodo = new Map<string, { gasto: number; compras: number }>();
@@ -199,7 +200,10 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
       d.compras += r.compras;
       porDiaPeriodo.set(f.fecha, d);
     } else if (f.fecha >= anteriorDesde) anteriores = sumar(anteriores, r);
-    if (f.fecha >= desde7) porCampana7.set(f.campana_id, sumar(porCampana7.get(f.campana_id) ?? sinResultados(), r));
+    if (f.fecha >= desde7) {
+      porCampana7.set(f.campana_id, sumar(porCampana7.get(f.campana_id) ?? sinResultados(), r));
+      porAnuncio7.set(f.anuncio_id, sumar(porAnuncio7.get(f.anuncio_id) ?? sinResultados(), r));
+    }
     if (f.fecha >= restar(o.hoy, 29)) {
       porCampana30.set(f.campana_id, sumar(porCampana30.get(f.campana_id) ?? sinResultados(), r));
       const v = anuncioDe.get(f.anuncio_id)?.video_id as string | undefined;
@@ -242,7 +246,7 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
     const delVideo = anguloDominante(mezcla.angulos);
     const manual = ((c.manual as string[] | null) ?? []).includes("angulo");
     const delNombreEtapa = (c.etapa as Etapa | null) ?? null;
-    const efectiva = catalogo ? etapaEfectiva({ delNombre: delNombreEtapa, manual: ((c.manual as string[] | null) ?? []).includes("etapa"), producto: productoDeCampana(c.producto as string | null, catalogo) }) : null;
+    const efectiva = catalogo ? etapaEfectiva({ delNombre: delNombreEtapa, manual: ((c.manual as string[] | null) ?? []).includes("etapa"), producto: productoDeCampana(c.producto as string | null, catalogo), creadaEn: (c.creada_meta_en as string | null) ?? null }) : null;
     const delNombre = (c.angulo as string | null) ?? null;
     // El ángulo de la campaña: el que se corrigió a mano; si no, el que domina entre sus videos (o «Mezcla de ángulos»); si los videos no tienen ángulo, el que traía el nombre.
     const angulo = manual && delNombre ? delNombre : (delVideo ?? delNombre);
@@ -263,7 +267,7 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
   const campanasConActividad = campanas.filter((c) => c.r.gasto > 0 || c.activa || (c.creadaEn ?? "") >= desde);
   const campanasDe = new Map(campanas.map((c) => [c.id, c]));
 
-  const anuncios: AnuncioVista[] = anun.map((a) => ({ id: a.id as string, campanaId: a.campana_id as string, nombre: a.nombre as string, activo: a.estado === "ACTIVE", videoId: (a.video_id as string | null) ?? null, miniatura: (a.miniatura as string | null) ?? null, copy: (a.copy as string | null) ?? null, titulo: (a.titulo as string | null) ?? null, landing: (a.landing as string | null) ?? null, r: porAnuncio.get(a.id as string) ?? sinResultados() }));
+  const anuncios: AnuncioVista[] = anun.map((a) => ({ id: a.id as string, campanaId: a.campana_id as string, nombre: a.nombre as string, activo: a.estado === "ACTIVE", videoId: (a.video_id as string | null) ?? null, miniatura: (a.miniatura as string | null) ?? null, copy: (a.copy as string | null) ?? null, titulo: (a.titulo as string | null) ?? null, landing: (a.landing as string | null) ?? null, numero: numeroDeVideo(String(a.nombre ?? "")), angulo: analisisDe.get(String(a.video_id ?? ""))?.angulo ?? null, r: porAnuncio.get(a.id as string) ?? sinResultados() }));
 
   // Videos (30 días): el mismo video en varios anuncios es uno solo.
   const videosMapa = new Map<string, { nombre: string; miniatura: string | null; anuncios: number; campanas: Set<string>; angulos: Map<string, number>; productos: Map<string, number>; detalle: VideoVista["anunciosDetalle"]; numero: string | null }>();
@@ -318,7 +322,8 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
 
   // Sugerencias: siempre con los últimos 7 días de las campañas y 30 de los videos, sin importar el periodo que se mira.
   const campanas7 = camp.map((c) => armar(c, porCampana7.get(c.id as string) ?? sinResultados()));
-  const todas = sugerir({ campanas: campanas7, serie, videos: videos30, hoy: o.hoy });
+  const anunciosSugerencia = anuncios.map((a) => ({ id: a.id, campanaId: a.campanaId, nombre: a.nombre, numero: a.numero, activo: a.activo, angulo: a.angulo, r: porAnuncio7.get(a.id) ?? sinResultados() }));
+  const todas = sugerir({ campanas: campanas7, anuncios: anunciosSugerencia, serie, videos: videos30, hoy: o.hoy });
   const sugerencias = pendientes(todas, decisiones, o.hoy);
 
   // Campañas montadas por día (14 días) y por persona.
