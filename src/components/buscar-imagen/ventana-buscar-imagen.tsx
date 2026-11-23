@@ -186,7 +186,7 @@ export function VentanaBuscarImagen({
                 <ul className="m-0 flex list-none flex-col divide-y divide-border rounded-lg border border-border bg-card p-0">
                   {respuesta.coincidencias.map((c) => (
                     <li key={`${c.ambito}:${c.id}`}>
-                      <Link href={c.href} className={`flex items-start gap-3 px-3 py-2.5 hover:bg-muted ${anilloFoco} ${c.veredicto === "distinto" ? "opacity-60" : ""}`}>
+                      <Link href={c.href} onClick={alCerrar} className={`flex items-start gap-3 px-3 py-2.5 hover:bg-muted ${anilloFoco} ${c.veredicto === "distinto" ? "opacity-60" : ""}`}>
                         {c.foto ? (
                           <FotoAmpliable toque={false} src={c.foto} alt="" className="h-12 w-12 shrink-0 rounded-md border border-border bg-white object-contain" />
                         ) : (
