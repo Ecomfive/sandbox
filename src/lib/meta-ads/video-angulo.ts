@@ -11,7 +11,7 @@ export const VERSION_ANALISIS = 2;
  * Con qué regla de ángulo se analizó un video (23 nov 2026, pedido de Alcides): la 3 pide un ángulo específico y sacado solo de lo que se ve y se dice en el video, no del texto del anuncio. Es aparte de `VERSION_ANALISIS`
  * (que dice si el análisis trae estructura y llamado a la acción) para que subirla vuelva a analizar todos los videos sin dejar sin datos de estructura a los que aún no se reanalizaron.
  */
-export const VERSION_ANGULO = 4;
+export const VERSION_ANGULO = 5;
 
 /**
  * Nombres que no dicen nada del motivo de compra (24 nov 2026: «Beneficios clave» llegó a 806 de 2.579 videos y seguía saliendo en el reanálisis, porque estaba en la lista de ángulos existentes). La IA no los
@@ -21,8 +21,15 @@ export const ANGULOS_VAGOS = ["Beneficios clave", "Beneficios", "Beneficios del 
 const clavesVagas = new Set(ANGULOS_VAGOS.map((a) => claveDeTexto(a)));
 export const esAnguloVago = (a: string): boolean => clavesVagas.has(claveDeTexto(a));
 
+/** Las tácticas generales que se dejan como ángulo para poder compararlas entre productos, y que llevan aparte su detalle (de qué es). */
+export const ANGULOS_TACTICOS = ["Antes y después", "Testimonio de cliente", "Experto o autoridad"];
+const clavesTacticas = new Set(ANGULOS_TACTICOS.map((a) => claveDeTexto(a)));
+export const esAnguloTactico = (a: string): boolean => clavesTacticas.has(claveDeTexto(a));
+
 export interface AnalisisVideo {
   angulo: string;
+  /** Solo para las tácticas generales («Antes y después», «Testimonio de cliente», «Experto o autoridad»): de qué es. Vacío en los demás ángulos. */
+  anguloDetalle: string;
   promesa: string;
   gancho: string;
   /** El tipo de gancho, de la lista fija de `ganchos.ts`; null si la IA no contestó uno válido (se clasifica después con el texto del gancho). */
@@ -80,6 +87,7 @@ export function lineasDeAngulo(existentes: string[]): string[] {
   return [
     "Dime el ÁNGULO: el motivo concreto de compra que usa ESTE anuncio para convencer (por ejemplo «Dolor de espalda», «Antes y después», «Oferta 2x1», «Testimonio de cliente», «Ahorro», «Regalo», «Piel más firme»). Son de 2 a 5 palabras, en español, sin signos.",
     "Sé ESPECÍFICO: nombra el beneficio o la situación que cambia la vida de quien compra, no la categoría general del producto. Un producto tiene varios ángulos distintos y cada anuncio usa uno: para un suplemento masculino, «Energía y vitalidad», «Rendimiento en el gimnasio», «Salud de la próstata» y «Aumento de la libido» son ángulos diferentes, y «Vitalidad masculina» es demasiado amplio y NO sirve. Para una crema, «Manchas en la cara», «Arrugas y firmeza» y «Piel seca» son distintos; para un aceite, «Caída del cabello» y «Crecimiento de la barba» también. Si el anuncio toca varios beneficios, elige el que más tiempo ocupa o el del gancho.",
+    `Si el ángulo es una táctica general (${ANGULOS_TACTICOS.map((a) => `«${a}»`).join(", ")}), ponla tal cual en "angulo" para poder compararla entre productos, y en "angulo_detalle" di de qué es, en pocas palabras: de qué es el antes y después («manchas en la cara»), de qué habla el testimonio («caída del cabello») o quién es el experto y de qué («dermatóloga, acné»). Para cualquier otro ángulo deja "angulo_detalle" vacío.`,
     `Nombres vagos como ${ANGULOS_VAGOS.slice(0, 4).map((a) => `«${a}»`).join(", ")} NO sirven: no dicen nada. Di cuál es el beneficio o el problema concreto del que habla el video (por ejemplo «Alivio de varices», «Piel sin manchas», «Dientes más blancos», «Más energía en el gimnasio»).`,
     existentes.length ? `Estos ángulos ya existen en otros videos: ${existentes.map((a) => `«${a}»`).join(", ")}. Usa EXACTAMENTE uno de ellos solo si describe igual de específico el motivo de compra de este anuncio; si el de aquí es más específico o distinto, propón uno nuevo. No fuerces un ángulo amplio para que coincida.` : "",
   ];
@@ -89,13 +97,14 @@ export function lineasDeAngulo(existentes: string[]): string[] {
  * Reanálisis solo del ángulo (23 nov 2026, pedido de Alcides): con la regla nueva (específico y sacado únicamente del video) se vuelve a pedir **solo el ángulo** de los videos que ya estaban analizados, sin repetir
  * la estructura, el llamado a la acción ni la transcripción: es un pedido corto y más barato.
  */
-export function pedidoSoloAngulo(c: { producto: string | null; angulosExistentes: string[] }): string {
+export function pedidoSoloAngulo(c: { producto: string | null; angulosExistentes: string[]; /** La respuesta anterior de la IA, si fue demasiado vaga: se le dice para que no la repita. */ vagoAnterior?: string }): string {
   return [
     "Eres analista de publicidad de una tienda en línea (dropshipping, Latinoamérica). Mira el video completo del anuncio y escucha lo que dice.",
     ...lineasDeAngulo(c.angulosExistentes.slice(0, 40)),
     "El ángulo sale ÚNICAMENTE de lo que se ve y se dice en el video (el guion, la historia, el problema que muestra, el beneficio que destaca), no de ningún texto escrito del anuncio.",
     c.producto ? `Producto de la campaña: ${recorte(c.producto, 80)}.` : "",
-    'Contesta SOLO un JSON, sin texto antes ni después: {"angulo": "…"}',
+    c.vagoAnterior ? `Tu respuesta anterior fue «${recorte(c.vagoAnterior, 60)}», que es demasiado vaga: vuelve a ver el video y di el beneficio o problema concreto.` : "",
+    'Contesta SOLO un JSON, sin texto antes ni después: {"angulo": "…", "angulo_detalle": "…"}',
   ]
     .filter(Boolean)
     .join("\n");
@@ -113,7 +122,7 @@ export function pedidoAnalisisVideo(c: ContextoPedido): string {
     c.soloTexto && c.titulo ? `Título del anuncio: «${recorte(c.titulo, 120)}».` : "",
     c.soloTexto ? "" : "El ángulo sale ÚNICAMENTE de lo que se ve y se dice en el video (el guion, la historia, el problema que muestra, el beneficio que destaca), no del texto escrito del anuncio, que suele ser general.",
     "Contesta SOLO un JSON, sin texto antes ni después, con estas llaves:",
-    '{"angulo": "…", "promesa": "lo que promete el anuncio, en una frase", "gancho": "lo que se ve y se dice en los primeros 3 segundos", "gancho_tipo": "uno de: ' + TIPOS_GANCHO.join(", ") + '", "resumen": "de qué trata, en 2 o 3 frases", "transcripcion": ' + (c.sinTranscribir ? '"" (déjala vacía)' : '"lo que se dice, hasta 1200 caracteres; vacío si no habla nadie"') + ', "publico": "a quién le habla", "formato": "uno de: ' + FORMATOS_VIDEO.join(", ") + '", "cta": "el llamado a la acción tal como se dice o se escribe; vacío si no hay", "cta_segundo": segundo aproximado en que aparece por primera vez (un número entero) o null, "cta_tipo": "uno de: ' + TIPOS_CTA.join(", ") + '", "oferta": "la oferta concreta (descuento, 2x1, envío gratis, garantía, precio); vacío si no hay", "recursos": ["los que use el video, de esta lista: ' + RECURSOS_VIDEO.join(", ") + '"], "estructura": [{"parte": "una de: ' + PARTES_VIDEO.join(", ") + '", "desde": segundo de inicio, "hasta": segundo de fin, "resumen": "qué pasa en esa parte, en una frase"}]}',
+    '{"angulo": "…", "angulo_detalle": "…", "promesa": "lo que promete el anuncio, en una frase", "gancho": "lo que se ve y se dice en los primeros 3 segundos", "gancho_tipo": "uno de: ' + TIPOS_GANCHO.join(", ") + '", "resumen": "de qué trata, en 2 o 3 frases", "transcripcion": ' + (c.sinTranscribir ? '"" (déjala vacía)' : '"lo que se dice, hasta 1200 caracteres; vacío si no habla nadie"') + ', "publico": "a quién le habla", "formato": "uno de: ' + FORMATOS_VIDEO.join(", ") + '", "cta": "el llamado a la acción tal como se dice o se escribe; vacío si no hay", "cta_segundo": segundo aproximado en que aparece por primera vez (un número entero) o null, "cta_tipo": "uno de: ' + TIPOS_CTA.join(", ") + '", "oferta": "la oferta concreta (descuento, 2x1, envío gratis, garantía, precio); vacío si no hay", "recursos": ["los que use el video, de esta lista: ' + RECURSOS_VIDEO.join(", ") + '"], "estructura": [{"parte": "una de: ' + PARTES_VIDEO.join(", ") + '", "desde": segundo de inicio, "hasta": segundo de fin, "resumen": "qué pasa en esa parte, en una frase"}]}',
     c.soloTexto ? "Como no hay video, deja cta_segundo en null, recursos y estructura vacíos." : "En estructura pon de 3 a 8 partes en orden, con los segundos reales del video; la primera es el gancho.",
     c.sinTranscribir ? "No copies ni transcribas literalmente lo que se dice, la letra de una canción ni el texto del anuncio: cuéntalo todo con tus propias palabras." : "",
     "No inventes: si algo no se ve o no se oye, déjalo vacío.",
@@ -157,6 +166,7 @@ export function normalizarAnalisisVideo(texto: string | null | undefined, existe
   const formato = s("formato", 30).toLowerCase();
   return {
     angulo,
+    anguloDetalle: esAnguloTactico(angulo) ? s("angulo_detalle", 120).replace(/[«»"“”]/g, "").replace(/[.;:!?]+$/, "").trim() : "",
     promesa: s("promesa", 240),
     gancho: s("gancho", 300),
     ganchoTipo: ganchoTipoValido(o.gancho_tipo),

@@ -8,7 +8,7 @@ import { pedirMeta, tokenDeMeta } from "./api";
 import { buscarArchivoDeVideo, motivoSinArchivoDeVideo } from "./archivo-video";
 import { analizarSoloTextoConGemini, analizarVideoConGemini, geminiConectado } from "./gemini-video";
 import { elegirParaAfinar, elegirPendientes, type AnalisisGuardado, type AnuncioConVideo, type VideoPendiente } from "./pendientes-video";
-import { esHostDeVideoMeta, normalizarAnalisisVideo, pedidoAnalisisVideo, pedidoSoloAngulo, VERSION_ANALISIS, VERSION_ANGULO, type AnalisisVideo } from "./video-angulo";
+import { esAnguloVago, esHostDeVideoMeta, normalizarAnalisisVideo, pedidoAnalisisVideo, pedidoSoloAngulo, VERSION_ANALISIS, VERSION_ANGULO, type AnalisisVideo } from "./video-angulo";
 
 const MAX_BYTES_VIDEO = 80 * 1024 * 1024;
 const MAX_BYTES_IMAGEN = 3 * 1024 * 1024;
@@ -202,8 +202,17 @@ export async function analizarVideoDeMeta(supabase: SupabaseClient, v: VideoPend
   const estado = origen === "video" ? "analizado" : "sin_archivo";
   const base = { video_id: v.videoId, cuenta_id: v.cuentaId, estado, origen, angulo: manual ? ((previo?.angulo as string | null) ?? analisis.angulo) : analisis.angulo, angulo_manual: manual, promesa: analisis.promesa || null, gancho: analisis.gancho || null, resumen: analisis.resumen || null, transcripcion: analisis.transcripcion || null, publico: analisis.publico || null, formato: analisis.formato, duracion_s: duracion, modelo, error: estado === "sin_archivo" ? (motivo ?? "").slice(0, 300) || null : null, analizado_por: quien, analizado_en: new Date().toISOString() };
   // Un análisis sin video (solo texto) no trae estructura ni segundos: queda en la versión 1 para volver a verlo cuando Meta dé el archivo.
-  const completo = { ...base, gancho_tipo: analisis.ganchoTipo, version: origen === "video" ? VERSION_ANGULO : 1, cta: analisis.cta || null, cta_segundo: analisis.ctaSegundo, cta_tipo: analisis.ctaTipo || null, oferta: analisis.oferta || null, recursos: analisis.recursos, estructura: analisis.estructura };
+  // Si el ángulo salió vago («Beneficios clave»), se guarda un grado menos de la versión del ángulo y con el motivo: la cola de «solo el ángulo» lo vuelve a pedir más tarde.
+  const vago = origen === "video" && !manual && esAnguloVago(analisis.angulo);
+  const completo = { ...base, angulo_detalle: analisis.anguloDetalle || null, error: vago ? `Reanálisis del ángulo: salió vago («${analisis.angulo}»).` : null, gancho_tipo: analisis.ganchoTipo, version: origen === "video" ? (vago ? VERSION_ANGULO - 1 : VERSION_ANGULO) : 1, cta: analisis.cta || null, cta_segundo: analisis.ctaSegundo, cta_tipo: analisis.ctaTipo || null, oferta: analisis.oferta || null, recursos: analisis.recursos, estructura: analisis.estructura };
   let { error } = await supabase.from("meta_video_analisis").upsert(completo, { onConflict: "video_id" });
+  // Sin la migración 0357 no existe el detalle del ángulo: se guarda lo demás igual.
+  if (error && /angulo_detalle/i.test(error.message)) {
+    const { angulo_detalle: _d, ...sinDetalle } = completo;
+    void _d;
+    // Sin subir la versión del ángulo (queda una menos): se vuelve a pedir, con su detalle, cuando la migración esté.
+    ({ error } = await supabase.from("meta_video_analisis").upsert({ ...sinDetalle, version: origen === "video" ? VERSION_ANGULO - 1 : 1 }, { onConflict: "video_id" }));
+  }
   // Sin la migración 0326 se guarda lo de antes.
   if (error && /cta|oferta|recursos|estructura|version|gancho_tipo|schema cache/i.test(error.message)) ({ error } = await supabase.from("meta_video_analisis").upsert(base, { onConflict: "video_id" }));
   if (error) return { ok: false, estado: "error", mensaje: /meta_video_analisis|schema cache|does not exist/i.test(error.message) ? "Falta correr la migración 0325 (ángulo de los videos) en Supabase." : error.message };
@@ -238,9 +247,25 @@ export async function afinarAnguloDeVideo(supabase: SupabaseClient, v: VideoPend
   const mime = archivo.tipo.startsWith("video/") ? archivo.tipo : "video/mp4";
   const respuesta = await analizarVideoConGemini(archivo.bytes, mime, pedidoSoloAngulo({ producto: v.producto, angulosExistentes: existentes }), contexto);
   if ("error" in respuesta) return falla(respuesta.error);
-  const analisis = normalizarAnalisisVideo(respuesta.texto, existentes);
+  let analisis = normalizarAnalisisVideo(respuesta.texto, existentes);
   if (!analisis) return falla("La IA no devolvió un ángulo que se pueda usar.");
-  const { error } = await supabase.from("meta_video_analisis").update({ angulo: analisis.angulo, version: VERSION_ANGULO, error: null, analizado_en: ahora, modelo: respuesta.modelo, analizado_por: quien }).eq("video_id", v.videoId);
+  let modelo = respuesta.modelo;
+  // Un ángulo vago («Beneficios clave») se vuelve a pedir una vez, diciéndole a la IA que el suyo no sirve; si sigue igual, se conserva el de antes y se vuelve a intentar más tarde (las tandas siguientes).
+  if (esAnguloVago(analisis.angulo)) {
+    const otra = await analizarVideoConGemini(archivo.bytes, mime, pedidoSoloAngulo({ producto: v.producto, angulosExistentes: existentes, vagoAnterior: analisis.angulo }), contexto, 0.7);
+    const segundo = "texto" in otra ? normalizarAnalisisVideo(otra.texto, existentes) : null;
+    if (!segundo || esAnguloVago(segundo.angulo)) return falla(`El ángulo sigue siendo vago («${analisis.angulo}»).`);
+    analisis = segundo;
+    modelo = "modelo" in otra ? otra.modelo : modelo;
+  }
+  const cambios = { angulo: analisis.angulo, angulo_detalle: analisis.anguloDetalle || null, version: VERSION_ANGULO, error: null, analizado_en: ahora, modelo, analizado_por: quien };
+  let { error } = await supabase.from("meta_video_analisis").update(cambios).eq("video_id", v.videoId);
+  // Sin la migración 0357 no existe el detalle del ángulo: se guarda el ángulo, pero sin subir la versión, para que se vuelva a pedir (con su detalle) cuando la migración esté.
+  if (error && /angulo_detalle|schema cache/i.test(error.message)) {
+    const { angulo_detalle: _d, version: _v, ...sinDetalle } = cambios;
+    void [_d, _v];
+    ({ error } = await supabase.from("meta_video_analisis").update(sinDetalle).eq("video_id", v.videoId));
+  }
   if (error) return { ok: false, estado: "error", mensaje: error.message };
   const antes = (previo.angulo as string | null) ?? "—";
   return { ok: true, estado: "analizado", mensaje: antes === analisis.angulo ? `Ángulo: ${analisis.angulo} (sigue igual).` : `Ángulo: ${antes} → ${analisis.angulo}.` };

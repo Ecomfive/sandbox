@@ -56,12 +56,13 @@ export function anguloDominante(angulos: ComposicionAngulo[]): string | null {
 /** «Antes y después 50 % · Testimonio 50 %». */
 export const textoDeMezcla = (angulos: ComposicionAngulo[]): string => angulos.map((a) => `${a.angulo} ${a.pct} %`).join(" · ");
 
-export const DIMENSIONES_VIDEO = ["Ángulo", "Gancho", "Formato", "Llamado a la acción", "Recursos", "Estructura", "Duración", "Momento del llamado", "Oferta"] as const;
+export const DIMENSIONES_VIDEO = ["Ángulo", "Detalle del ángulo", "Gancho", "Formato", "Llamado a la acción", "Recursos", "Estructura", "Duración", "Momento del llamado", "Oferta"] as const;
 export type DimensionVideo = (typeof DIMENSIONES_VIDEO)[number];
 
 /** Qué mide cada dimensión de video, en una frase, para quien nunca lo vio. */
 export const EXPLICACION_DIMENSION_VIDEO: Record<DimensionVideo, string> = {
   Ángulo: "El motivo de compra que usa el video para convencer.",
+  "Detalle del ángulo": "De qué es la táctica general: de qué es el antes y después, de qué habla el testimonio, quién es el experto y de qué.",
   Gancho: "Cómo arranca el video, en sus primeros 3 segundos.",
   Formato: "El estilo del video: testimonio, demostración, UGC, animación…",
   "Llamado a la acción": "Qué le pide el video al espectador al final: comprar, aprovechar una oferta, escribir…",
@@ -108,6 +109,12 @@ export function valoresDeVideo(v: VideoVista, dim: DimensionVideo): string[] {
     case "Ángulo": {
       const x = a?.angulo ?? v.angulo;
       return x ? [x] : [];
+    }
+    case "Detalle del ángulo": {
+      // Solo las tácticas generales llevan detalle; se muestra con su ángulo para que se entienda sola («Antes y después · manchas en la cara»).
+      const d = a?.anguloDetalle?.trim();
+      const x = a?.angulo ?? v.angulo;
+      return d && x ? [`${x} · ${d.charAt(0).toLowerCase()}${d.slice(1)}`] : [];
     }
     case "Gancho":
       return a?.ganchoTipo ? [mayuscula(a.ganchoTipo)] : [];

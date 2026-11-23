@@ -103,6 +103,8 @@ export interface AnalisisVideoVista {
   gancho: string | null;
   /** Qué tipo de gancho es (pregunta, problema o dolor, resultado…), de una lista fija; null si todavía no se clasificó. */
   ganchoTipo: string | null;
+  /** Solo en las tácticas generales (Antes y después, Testimonio de cliente, Experto o autoridad): de qué es. */
+  anguloDetalle: string | null;
   resumen: string | null;
   transcripcion: string | null;
   publico: string | null;

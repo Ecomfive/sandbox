@@ -5,7 +5,7 @@ import { certezaDe, motivoDeCerteza, sinResultados, type Resultados } from "./me
 import type { AnalisisVideoVista, VideoVista } from "./vistas";
 
 const r = (gasto: number, compras: number): Resultados => ({ ...sinResultados(), gasto, compras, impresiones: 1000 });
-const analisis = (o: Partial<AnalisisVideoVista> = {}): AnalisisVideoVista => ({ estado: "analizado", origen: "video", angulo: "Antes y después", anguloManual: false, promesa: null, gancho: null, ganchoTipo: null, resumen: null, transcripcion: null, publico: null, formato: "testimonio", duracionS: 30, error: null, analizadoEn: "2026-11-20", version: 2, cta: null, ctaSegundo: null, ctaTipo: "compra directa", oferta: null, recursos: [], estructura: [], ...o });
+const analisis = (o: Partial<AnalisisVideoVista> = {}): AnalisisVideoVista => ({ estado: "analizado", origen: "video", angulo: "Antes y después", anguloDetalle: null, anguloManual: false, promesa: null, gancho: null, ganchoTipo: null, resumen: null, transcripcion: null, publico: null, formato: "testimonio", duracionS: 30, error: null, analizadoEn: "2026-11-20", version: 2, cta: null, ctaSegundo: null, ctaTipo: "compra directa", oferta: null, recursos: [], estructura: [], ...o });
 const video = (id: string, resultados: Resultados, a: AnalisisVideoVista | null): VideoVista => ({ id, nombre: id, miniatura: null, producto: "Faja", angulo: null, campanas: 1, anuncios: 1, numero: null, analisis: a, anunciosDetalle: [], r: resultados, tope: 3 });
 
 test("una campaña con 10 videos, 5 y 5, es 50 % y 50 %", () => {
@@ -125,4 +125,10 @@ test("cada nivel explica qué significa y, si es probable, qué le falta para se
   assert.match(motivoDeCerteza(r(400, 12), 3, "videos"), /^Firme: hay datos de sobra/);
   assert.equal(motivoDeCerteza(r(109, 3), 4, "videos"), "Probable: va bien encaminado, pero todavía no es seguro. Para ser firme falta $191 más de gasto, 7 compras más.");
   assert.equal(motivoDeCerteza(r(400, 20), 2, "campañas"), "Probable: va bien encaminado, pero todavía no es seguro. Para ser firme falta 1 campaña más.");
+});
+
+test("el detalle del ángulo solo existe en las tácticas generales y sale junto a su ángulo", async () => {
+  const { valoresDeVideo } = await import("./atributos-video");
+  assert.deepEqual(valoresDeVideo(video("a", r(100, 5), analisis({ angulo: "Antes y después", anguloDetalle: "Manchas en la cara" })), "Detalle del ángulo"), ["Antes y después · manchas en la cara"]);
+  assert.deepEqual(valoresDeVideo(video("b", r(100, 5), analisis({ angulo: "Salud de la próstata", anguloDetalle: null })), "Detalle del ángulo"), []);
 });
