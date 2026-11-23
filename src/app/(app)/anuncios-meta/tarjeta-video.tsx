@@ -1,11 +1,12 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element -- miniatura del video, directo de Meta */
-import { confiable, cpa, ctr, dolares, holdRate, hookRate, nivelDeCpa, nivelDeCtr, nivelDeHook } from "@/lib/meta-ads/metricas";
+import { defDeColumna, valorColumna, type ClaveColumna } from "@/lib/meta-ads/columnas";
+import { confiable, dolares } from "@/lib/meta-ads/metricas";
 import { formatoDuracion } from "@/lib/meta-ads/duracion";
 import type { VideoVista } from "@/lib/meta-ads/vistas";
 import { anguloDeVideo } from "./def-videos";
-import { Nivel, porcentaje, valorCpa } from "./piezas";
+import { Nivel } from "./piezas";
 import { BotonPlay } from "./reproductor-video";
 
 const urlSegura = (u: string | null) => (u && /^https:\/\//i.test(u) ? u : null);
@@ -20,10 +21,10 @@ function Cifra({ titulo, children }: { titulo: string; children: React.ReactNode
 }
 
 /**
- * Un video como tarjeta: la miniatura vertical con su botón de reproducir (abre la ficha y arranca el video), su puesto en el orden elegido, lo que dura, el nombre con sus insignias y las cuatro cifras que
- * más se miran (Hook, Hold, CTR y CPA). Tocar el cuerpo de la tarjeta abre la ficha sin reproducir.
+ * Un video como tarjeta: la miniatura vertical con su botón de reproducir (abre la ficha y arranca el video), su puesto en el orden elegido, lo que dura, el nombre con sus insignias y las cifras que cada
+ * persona eligió con «Columnas» (las primeras ocho). Tocar el cuerpo de la tarjeta abre la ficha sin reproducir.
  */
-export function TarjetaVideo({ x, posicion, alAbrir, alReproducir }: { x: VideoVista; posicion: number; alAbrir: () => void; alReproducir: () => void }) {
+export function TarjetaVideo({ x, columnas, posicion, alAbrir, alReproducir }: { x: VideoVista; columnas: ClaveColumna[]; posicion: number; alAbrir: () => void; alReproducir: () => void }) {
   const mini = urlSegura(x.miniatura);
   const ok = confiable(x.r);
   const angulo = anguloDeVideo(x);
@@ -58,10 +59,14 @@ export function TarjetaVideo({ x, posicion, alAbrir, alReproducir }: { x: VideoV
           {x.producto && <span className="max-w-full truncate rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground">{x.producto}</span>}
         </span>
         <span className="grid grid-cols-4 gap-2">
-          <Cifra titulo="Hook">{hookRate(x.r) === null ? "—" : ok ? <Nivel nivel={nivelDeHook(hookRate(x.r))}>{porcentaje(hookRate(x.r), 0)}</Nivel> : porcentaje(hookRate(x.r), 0)}</Cifra>
-          <Cifra titulo="Hold">{porcentaje(holdRate(x.r), 0)}</Cifra>
-          <Cifra titulo="CTR">{ok ? <Nivel nivel={nivelDeCtr(ctr(x.r))}>{porcentaje(ctr(x.r), 1)}</Nivel> : porcentaje(ctr(x.r), 1)}</Cifra>
-          <Cifra titulo="CPA">{ok && x.r.compras > 0 ? <Nivel nivel={nivelDeCpa(cpa(x.r), x.tope)}>{valorCpa(x.r)}</Nivel> : valorCpa(x.r)}</Cifra>
+          {columnas.slice(0, 8).map((c) => {
+            const v = valorColumna(c, x.r, { tope: x.tope, etapa: "venta", confiable: ok });
+            return (
+              <Cifra key={c} titulo={defDeColumna(c).titulo}>
+                <Nivel nivel={v.nivel}>{v.texto}</Nivel>
+              </Cifra>
+            );
+          })}
         </span>
         <span className="mt-auto text-xs text-muted-foreground">
           {dolares(x.r.gasto)} gastados · usado en {x.campanas} {x.campanas === 1 ? "campaña" : "campañas"}
