@@ -548,7 +548,24 @@ function FilasPedido({
         </td>
         <td colSpan={Math.max(1, columnas - 2)} className={`${TD_FIN} text-muted-foreground`}>
           {n.toLocaleString("es-PA")} {n === 1 ? "producto" : "productos"} · {unidades.toLocaleString("es-PA")} unidades pedidas
-          <span className="block truncate text-xs">{p.items.map((it) => it.producto).join(" · ")}</span>
+          {enInventario ? (
+            // Plegado también se ve el stock por bodega de cada producto (23 nov 2026, pedido de Jhokser).
+            <ul className="m-0 mt-1 flex list-none flex-col gap-0.5 p-0 text-xs">
+              {p.items.map((it) => {
+                const hay = origenes.map((b) => ({ nombre: b.nombre, hay: stock[b.id]?.[it.skuId] ?? 0 })).filter((b) => b.hay > 0);
+                return (
+                  <li key={it.id} className="flex flex-wrap gap-x-3">
+                    <span className="font-medium text-foreground">{it.producto}</span>
+                    <span>
+                      {it.cantidadPedida.toLocaleString("es-PA")} pedidas · Stock: {hay.length ? hay.map((b) => `${b.nombre} ${b.hay.toLocaleString("es-PA")}`).join(" · ") : "sin stock hoy"}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <span className="block truncate text-xs">{p.items.map((it) => it.producto).join(" · ")}</span>
+          )}
         </td>
         <td className={`${TD_FIN} px-3`}>
           {editable ? (
