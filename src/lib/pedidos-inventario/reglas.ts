@@ -45,6 +45,8 @@ export interface PedidoInventario {
   enviadoEn: string | null;
   recibidoPorNombre: string | null;
   recibidoEn: string | null;
+  /** Cuándo pasó a «En proceso»; si es el mismo instante del envío, el pedido se envió directo desde «Solicitud». */
+  enProcesoEn?: string | null;
   origen: string | null;
   traslado: string | null;
   /** Cuándo se archivó (23 nov 2026, migración 0354); null = a la vista. */
@@ -227,6 +229,18 @@ export const puedeDeshacerEntrega = (estado: EstadoPedido) => estado === "recibi
 /** Inventario puede deshacer un envío hecho por error (23 nov 2026, pedido de Jhokser: Dinora envió un pedido sin querer): el pedido vuelve a «En proceso» y un traslado de reversa devuelve lo enviado a la bodega de origen. */
 export const puedeDeshacerEnvio = (estado: EstadoPedido) => estado === "enviado";
 
+/**
+ * A qué estado vuelve un pedido cuando se deshace su envío (23 nov 2026, pedido de Jhokser: «que regrese a la acción anterior»): «Enviar» guarda `en_proceso_en` = el envío cuando el pedido venía de
+ * «Solicitud» (no lo había puesto en proceso), así que si los dos instantes son iguales vuelve a «Solicitud»; si no, a «En proceso».
+ */
+export function estadoAntesDeEnviar(enProcesoEn: string | null | undefined, enviadoEn: string | null | undefined): "solicitud" | "en_proceso" {
+  if (!enProcesoEn || !enviadoEn) return "solicitud";
+  return new Date(enProcesoEn).getTime() === new Date(enviadoEn).getTime() ? "solicitud" : "en_proceso";
+}
+/** Inventario devuelve a «Solicitud» un pedido que puso en proceso por error; despacho reabre uno que canceló por error. */
+export const puedeVolverASolicitud = (estado: EstadoPedido) => estado === "en_proceso";
+export const puedeReabrir = (estado: EstadoPedido) => estado === "cancelado";
+
 /** Un pedido ya realizado (entregado) o cancelado se puede archivar para sacarlo de la lista (23 nov 2026, pedido de Jhokser). */
 export const puedeArchivar = (estado: EstadoPedido) => estado === "recibido" || estado === "cancelado";
 
@@ -244,7 +258,7 @@ export function fechaCorta(iso: string): string {
 }
 
 /** Los avisos «Para ti» de cada paso. */
-export function avisoPedido(p: { numero: number; items: number }, quien: string, paso: "nuevo" | "en_proceso" | "enviado" | "recibido" | "entregado" | "cancelado" | "entrega_deshecha" | "envio_deshecho", extra?: string): { titulo: string; texto: string } {
+export function avisoPedido(p: { numero: number; items: number }, quien: string, paso: "nuevo" | "en_proceso" | "enviado" | "recibido" | "entregado" | "cancelado" | "entrega_deshecha" | "envio_deshecho" | "reabierto", extra?: string): { titulo: string; texto: string } {
   const n = numeroPedido(p.numero);
   const prods = `${p.items} ${p.items === 1 ? "producto" : "productos"}`;
   const t = {
@@ -254,7 +268,8 @@ export function avisoPedido(p: { numero: number; items: number }, quien: string,
     recibido: [`${n} fue recibido`, `${quien} lo recibió en despacho.`],
     entregado: [`${n} fue entregado`, `${quien} lo marcó entregado en despacho: el pedido quedó cerrado.`],
     cancelado: [`${n} fue cancelado`, `${quien} canceló el pedido.`],
-    envio_deshecho: [`${n} volvió a «En proceso»`, `${quien} deshizo el envío (se había enviado por error). Te avisará cuando lo envíe de nuevo.`],
+    envio_deshecho: [`${n} volvió a «${extra ?? "En proceso"}»`, `${quien} deshizo el envío (se había enviado por error). Te avisará cuando lo envíe de nuevo.`],
+    reabierto: [`${n} fue reabierto`, `${quien} reabrió el pedido que estaba cancelado: vuelve a estar en «Solicitud».`],
     entrega_deshecha: [`${n} volvió a «Enviado»`, `${quien} deshizo la entrega (se había marcado por error). Márcalo «Recibido» cuando llegue.`],
   }[paso];
   return { titulo: t[0].slice(0, 300), texto: t[1].slice(0, 600) };

@@ -49,7 +49,7 @@ export async function PaginaPedidos({ modo, usuario, estado, archivados = false 
 
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-4">
-      <EncabezadoPagina titulo={modo === "despacho" ? "Pedir a inventario" : "Solicitudes de despacho"} oculto>
+      <EncabezadoPagina titulo={archivados ? "Archivo de pedidos" : modo === "despacho" ? "Pedir a inventario" : "Solicitudes de despacho"} oculto>
         {modo === "despacho"
           ? "Pide a inventario lo que se agotó en despacho. Te avisa en «Para ti» cuando lo prepara y cuando lo envía; al llegar, márcalo «Recibido»."
           : "Lo que despacho le pide a inventario: ponlo en proceso, escribe cuánto envías, elige de qué bodega sale y «Enviar» hace el traslado a despacho. Cuando llega, «Marcar entregado» cierra el pedido."}
@@ -73,7 +73,7 @@ export async function PaginaPedidos({ modo, usuario, estado, archivados = false 
           {archivados ? (
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-card px-4 py-3 text-sm">
               <span>
-                <span className="font-semibold">Pedidos archivados</span> · {pedidos.length.toLocaleString("es-PA")}. Ya no salen en la lista de siempre.
+                <span className="font-semibold">Archivo de pedidos</span> · {pedidos.length.toLocaleString("es-PA")} {pedidos.length === 1 ? "pedido" : "pedidos"}. Ya no salen en la lista de siempre; «Sacar del archivo» los devuelve.
               </span>
               <Link href={ruta} className="font-medium text-primario underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
                 Volver a los pedidos
@@ -85,7 +85,7 @@ export async function PaginaPedidos({ modo, usuario, estado, archivados = false 
           <TablaPedidos pedidos={archivados ? pedidos : visibles} modo={modo} puedeEscribir={puedeEscribir} origenes={bodegas.origenes} stock={stock} fichas={fichas} opciones={opciones} hayEnInventario={hayEnInventario} />
           {!archivados && !sinArchivo && (
             <p className="m-0 text-sm">
-              <Link href={`${ruta}?archivados=1`} className="font-medium text-primario underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+              <Link href={`${ruta}/archivo`} className="font-medium text-primario underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
                 Ver archivados ({totalArchivados.toLocaleString("es-PA")})
               </Link>
             </p>

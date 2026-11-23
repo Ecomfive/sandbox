@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { PaginaPedidos } from "@/components/pedidos-inventario/pagina-pedidos";
 import { requireModulo } from "@/lib/auth";
 
@@ -9,5 +10,7 @@ export const dynamic = "force-dynamic";
 export default async function PedirInventarioPage({ searchParams }: { searchParams: Promise<{ [k: string]: string | string[] | undefined }> }) {
   const usuario = await requireModulo("despacho-pedir-inventario");
   const sp = await searchParams;
-  return <PaginaPedidos modo="despacho" usuario={usuario} estado={typeof sp.estado === "string" ? sp.estado : undefined} archivados={sp.archivados === "1"} />;
+  // El enlace viejo «?archivados=1» ahora es la sección «Archivo de pedidos».
+  if (sp.archivados === "1") redirect("/despacho-ciudad/pedir-inventario/archivo");
+  return <PaginaPedidos modo="despacho" usuario={usuario} estado={typeof sp.estado === "string" ? sp.estado : undefined} />;
 }

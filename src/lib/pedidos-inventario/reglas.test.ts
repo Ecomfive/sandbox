@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { avisoPedido, contarPorEstado, fechaCorta, leerCantidad, numeroPedido, puedeArchivar, puedeDeshacerEntrega, puedeDeshacerEnvio, puedeEnviar, puedeRecibir, revisarEntregas, revisarLineas, revisarStockPedido, faltantesEn, mejorOrigen } from "./reglas";
+import { avisoPedido, contarPorEstado, fechaCorta, leerCantidad, numeroPedido, puedeArchivar, puedeDeshacerEntrega, puedeDeshacerEnvio, estadoAntesDeEnviar, puedeReabrir, puedeVolverASolicitud, puedeEnviar, puedeRecibir, revisarEntregas, revisarLineas, revisarStockPedido, faltantesEn, mejorOrigen } from "./reglas";
 
 const A = "11111111-1111-4111-8111-111111111111";
 const B = "22222222-2222-4222-8222-222222222222";
@@ -158,4 +158,18 @@ test("solo un pedido enviado se puede devolver a en proceso", () => {
   assert.equal(puedeDeshacerEnvio("enviado"), true);
   for (const e of ["solicitud", "en_proceso", "recibido", "cancelado"] as const) assert.equal(puedeDeshacerEnvio(e), false);
   assert.match(avisoPedido({ numero: 3, items: 1 }, "Dinora", "envio_deshecho").titulo, /PED-0003 volvió a «En proceso»/);
+});
+
+test("un envío deshecho vuelve al estado de antes: Solicitud si se envió directo, En proceso si ya estaba en proceso", () => {
+  assert.equal(estadoAntesDeEnviar("2026-11-23T15:54:33.172+00:00", "2026-11-23T15:54:33.172+00:00"), "solicitud");
+  assert.equal(estadoAntesDeEnviar("2026-11-20T22:14:01.837+00:00", "2026-11-23T16:02:08.775+00:00"), "en_proceso");
+  assert.equal(estadoAntesDeEnviar(null, "2026-11-23T16:02:08.775+00:00"), "solicitud");
+  assert.match(avisoPedido({ numero: 3, items: 1 }, "Dinora", "envio_deshecho", "Solicitud").titulo, /PED-0003 volvió a «Solicitud»/);
+});
+
+test("volver atrás: en proceso vuelve a solicitud y un cancelado se reabre", () => {
+  assert.equal(puedeVolverASolicitud("en_proceso"), true);
+  for (const e of ["solicitud", "enviado", "recibido", "cancelado"] as const) assert.equal(puedeVolverASolicitud(e), false);
+  assert.equal(puedeReabrir("cancelado"), true);
+  for (const e of ["solicitud", "en_proceso", "enviado", "recibido"] as const) assert.equal(puedeReabrir(e), false);
 });

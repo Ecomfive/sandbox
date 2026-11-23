@@ -95,7 +95,7 @@ export async function cargarPedidos(
 ): Promise<{ pedidos: PedidoInventario[]; faltaMigracion: boolean; totalArchivados: number; sinArchivo: boolean }> {
   const desde = new Date(Date.now() - 30 * 86_400_000).toISOString();
   const campos =
-    "id, numero, estado, pedido_por, pedido_por_nombre, creado_en, responsable_nombre, enviado_en, recibido_por_nombre, recibido_en, origen:wms_bodegas!despacho_pedidos_inventario_bodega_origen_id_fkey(nombre), traslado:wms_traslados(numero), despacho_pedidos_inventario_items(id, orden, sku_id, producto, codigo, cantidad_pedida, nota, cantidad_entregada, observacion)";
+    "id, numero, estado, pedido_por, pedido_por_nombre, creado_en, responsable_nombre, enviado_en, en_proceso_en, recibido_por_nombre, recibido_en, origen:wms_bodegas!despacho_pedidos_inventario_bodega_origen_id_fkey(nombre), traslado:wms_traslados(numero), despacho_pedidos_inventario_items(id, orden, sku_id, producto, codigo, cantidad_pedida, nota, cantidad_entregada, observacion)";
   // Los archivados (migración 0354, 23 nov 2026) salen de la lista de siempre y se ven aparte, sin el límite de 30 días.
   const consulta = (conArchivo: boolean) => {
     const q = supabase.from("despacho_pedidos_inventario").select(conArchivo ? `${campos}, archivado_en` : campos);
@@ -125,6 +125,7 @@ export async function cargarPedidos(
       creadoEn: p.creado_en as string,
       responsableNombre: (p.responsable_nombre as string | null) ?? null,
       enviadoEn: (p.enviado_en as string | null) ?? null,
+      enProcesoEn: (p.en_proceso_en as string | null) ?? null,
       recibidoPorNombre: (p.recibido_por_nombre as string | null) ?? null,
       recibidoEn: (p.recibido_en as string | null) ?? null,
       origen: uno(p.origen as { nombre: string } | { nombre: string }[] | null)?.nombre ?? null,

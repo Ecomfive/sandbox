@@ -49,6 +49,8 @@ const SUBPAGINAS: Record<string, string> = {
   "/despacho-ciudad/cambios": "Cambios y reembolsos",
   "/despacho-ciudad/cuanto-hay": "Responder cuánto hay",
   "/despacho-ciudad/pedir-inventario": "Pedir a inventario",
+  "/despacho-ciudad/pedir-inventario/archivo": "Archivo de pedidos",
+  "/inventario-pedidos-despacho/archivo": "Archivo de pedidos",
   "/tienda-tiendas/productos": "Productos de Shopify",
   "/pedidos-dropi/resumen": "Resumen",
   "/retiros/cuentas": "Cuentas destino",

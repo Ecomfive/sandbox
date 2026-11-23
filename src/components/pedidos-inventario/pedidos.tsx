@@ -8,6 +8,8 @@ import {
   crearPedidoInventario,
   deshacerEntregaPedidoInventario,
   deshacerEnvioPedidoInventario,
+  reabrirPedidoInventario,
+  volverASolicitudPedido,
   editarPedidoInventario,
   enviarPedidoInventario,
   marcarEntregadoPedidoInventario,
@@ -39,7 +41,10 @@ import {
   puedeArchivar,
   puedeDeshacerEntrega,
   puedeDeshacerEnvio,
+  puedeReabrir,
   puedeRecibir,
+  puedeVolverASolicitud,
+  estadoAntesDeEnviar,
   type EstadoPedido,
   type PedidoInventario,
   type StockInventario,
@@ -446,6 +451,11 @@ function FilasPedido({
               </button>
             </>
           )}
+          {puedeVolverASolicitud(p.estado) && (
+            <button type="button" disabled={ocupado} onClick={() => correr(() => volverASolicitudPedido(p.id))} className={SECUNDARIO}>
+              Volver a «Solicitud»
+            </button>
+          )}
           {puedeRecibir(p.estado) && (
             <>
               <span className="text-xs text-muted-foreground">Esperando que despacho lo reciba</span>
@@ -455,7 +465,9 @@ function FilasPedido({
               {puedeDeshacerEnvio(p.estado) && p.traslado &&
                 (deshaciendoEnvio ? (
                   <div className="flex max-w-[14rem] flex-col gap-1.5 rounded-md bg-muted p-2">
-                    <span className="text-xs">¿Deshacer el envío? Lo enviado vuelve a la bodega de origen con un traslado de reversa y el pedido queda «En proceso».</span>
+                    <span className="text-xs">
+                      ¿Deshacer el envío? Lo enviado vuelve a la bodega de origen con un traslado de reversa y el pedido vuelve a «{estadoAntesDeEnviar(p.enProcesoEn, p.enviadoEn) === "solicitud" ? "Solicitud" : "En proceso"}».
+                    </span>
                     <button
                       type="button"
                       disabled={ocupado}
@@ -490,6 +502,11 @@ function FilasPedido({
           {puedeCancelar(p.estado) && (
             <button type="button" disabled={ocupado} onClick={() => correr(() => cancelarPedidoInventario(p.id))} className={SECUNDARIO}>
               Cancelar
+            </button>
+          )}
+          {puedeReabrir(p.estado) && !p.archivadoEn && (
+            <button type="button" disabled={ocupado} onClick={() => correr(() => reabrirPedidoInventario(p.id))} className={SECUNDARIO}>
+              Reabrir pedido
             </button>
           )}
         </>
@@ -547,25 +564,34 @@ function FilasPedido({
           {alternar}
         </td>
         <td colSpan={Math.max(1, columnas - 2)} className={`${TD_FIN} text-muted-foreground`}>
-          {n.toLocaleString("es-PA")} {n === 1 ? "producto" : "productos"} · {unidades.toLocaleString("es-PA")} unidades pedidas
-          {enInventario ? (
-            // Plegado también se ve el stock por bodega de cada producto (23 nov 2026, pedido de Jhokser).
-            <ul className="m-0 mt-1 flex list-none flex-col gap-0.5 p-0 text-xs">
-              {p.items.map((it) => {
+          <p className="m-0">
+            {n.toLocaleString("es-PA")} {n === 1 ? "producto" : "productos"} · {unidades.toLocaleString("es-PA")} unidades pedidas
+          </p>
+          {/* Plegado también se ven todos los datos de cada producto (23 nov 2026, pedido de Jhokser): pedida, stock por bodega (inventario), entregada y observaciones, como desplegado pero sin los campos para escribir. */}
+          <div className="mt-1.5 overflow-x-auto">
+            <div className={`grid min-w-[640px] gap-x-4 gap-y-1.5 text-xs ${enInventario ? "grid-cols-[minmax(0,2fr)_4rem_minmax(0,1.6fr)_4.5rem_minmax(0,1.6fr)]" : "grid-cols-[minmax(0,2fr)_4rem_4.5rem_minmax(0,1.6fr)]"}`}>
+              <span className="font-semibold text-foreground">Producto</span>
+              <span className="text-right font-semibold text-foreground">Pedida</span>
+              {enInventario && <span className="font-semibold text-foreground">Stock por bodega</span>}
+              <span className="text-right font-semibold text-foreground">Entregada</span>
+              <span className="font-semibold text-foreground">Observaciones</span>
+              {p.items.map((it, i) => {
                 const hay = origenes.map((b) => ({ nombre: b.nombre, hay: stock[b.id]?.[it.skuId] ?? 0 })).filter((b) => b.hay > 0);
+                const obs = [it.nota, it.observacion, i === n - 1 && p.traslado ? p.traslado : null].filter(Boolean).join(" · ");
                 return (
-                  <li key={it.id} className="flex flex-wrap gap-x-3">
+                  <Fragment key={it.id}>
                     <span className="font-medium text-foreground">{it.producto}</span>
-                    <span>
-                      {it.cantidadPedida.toLocaleString("es-PA")} pedidas · Stock: {hay.length ? hay.map((b) => `${b.nombre} ${b.hay.toLocaleString("es-PA")}`).join(" · ") : "sin stock hoy"}
+                    <span className="text-right tabular-nums">{it.cantidadPedida.toLocaleString("es-PA")}</span>
+                    {enInventario && <span>{hay.length ? hay.map((b) => `${b.nombre} ${b.hay.toLocaleString("es-PA")}`).join(" · ") : "Sin stock hoy"}</span>}
+                    <span className="text-right tabular-nums">
+                      {editable ? "—" : it.cantidadEntregada === null ? "0" : <span className="font-semibold text-foreground">{it.cantidadEntregada.toLocaleString("es-PA")}</span>}
                     </span>
-                  </li>
+                    <span>{obs || "—"}</span>
+                  </Fragment>
                 );
               })}
-            </ul>
-          ) : (
-            <span className="block truncate text-xs">{p.items.map((it) => it.producto).join(" · ")}</span>
-          )}
+            </div>
+          </div>
         </td>
         <td className={`${TD_FIN} px-3`}>
           {editable ? (
