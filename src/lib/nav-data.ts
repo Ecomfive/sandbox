@@ -288,6 +288,7 @@ export const PESTANAS_CON_MODULO: Record<string, { href: string; modulo: string 
   "/inventario-pedidos-despacho": [
     { href: "/inventario-pedidos-despacho", modulo: "inventario-pedidos-despacho" },
     { href: "/inventario-pedidos-despacho/cuanto-hay", modulo: "tienda-cuanto-hay" },
+    { href: "/inventario-pedidos-despacho/archivo", modulo: "inventario-pedidos-despacho" },
   ],
   "/despacho-ciudad": [
     { href: "/despacho-ciudad", modulo: "despacho-ciudad" },
@@ -295,6 +296,7 @@ export const PESTANAS_CON_MODULO: Record<string, { href: string; modulo: string 
     { href: "/despacho-ciudad/cambios", modulo: "despacho-cambios" },
     { href: "/despacho-ciudad/cuanto-hay", modulo: "despacho-cuanto-hay" },
     { href: "/despacho-ciudad/pedir-inventario", modulo: "despacho-pedir-inventario" },
+    { href: "/despacho-ciudad/pedir-inventario/archivo", modulo: "despacho-pedir-inventario" },
   ],
   "/tienda-tiendas": [
     { href: "/tienda-tiendas", modulo: "tienda-tiendas" },

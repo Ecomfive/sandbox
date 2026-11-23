@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { PaginaPedidos } from "@/components/pedidos-inventario/pagina-pedidos";
 import { requirePanel } from "@/lib/auth";
 
@@ -10,5 +11,7 @@ export default async function PedidosDespachoPage({ searchParams }: { searchPara
   // Quien solo tiene «Cuánto hay» (Nicol, 19 nov 2026) entra a esa pestaña en vez de ir a su inicio.
   const usuario = await requirePanel("/inventario-pedidos-despacho", "inventario-pedidos-despacho");
   const sp = await searchParams;
-  return <PaginaPedidos modo="inventario" usuario={usuario} estado={typeof sp.estado === "string" ? sp.estado : undefined} archivados={sp.archivados === "1"} />;
+  // El enlace viejo «?archivados=1» ahora es la sección «Archivo de pedidos».
+  if (sp.archivados === "1") redirect("/inventario-pedidos-despacho/archivo");
+  return <PaginaPedidos modo="inventario" usuario={usuario} estado={typeof sp.estado === "string" ? sp.estado : undefined} />;
 }
