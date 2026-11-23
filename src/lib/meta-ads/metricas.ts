@@ -1,6 +1,6 @@
 // Anuncios Meta: las cuentas del equipo. Resultados de un grupo de anuncios (suma de días) y lo que se calcula de ellos. Todo en dólares, como los reporta Meta. Lógica pura, con prueba.
 
-import { nivelCtr, nivelHookRate, type NivelMetrica } from "@/lib/metricas-meta-ads";
+import { nivelCpa, nivelCpm, nivelCtr, nivelCvr, nivelEfectividad, nivelGasto, nivelHookRate, type NivelMetrica } from "@/lib/metricas-meta-ads";
 
 export interface Resultados {
   gasto: number;
@@ -79,6 +79,12 @@ export function llegaAlLlamado(r: Resultados, ctaSegundo: number | null, duracio
 export const clicAVisita = (r: Resultados): number | null => (r.clics > 0 && r.vioLanding > 0 ? Math.min(100, (r.vioLanding / r.clics) * 100) : null);
 /** Compras ÷ visitas a la landing: lo que convierte la página. */
 export const conversion = (r: Resultados): number | null => (r.vioLanding > 0 ? (r.compras / r.vioLanding) * 100 : null);
+/** Costo por mil impresiones. */
+export const cpm = (r: Resultados): number | null => (r.impresiones > 0 ? (r.gasto / r.impresiones) * 1000 : null);
+/** «% Efectividad» de la hoja de Control de Testing: las visitas a la landing que salen de los clics (visitas ÷ clics del enlace). */
+export const efectividad = clicAVisita;
+/** «CVR» de la hoja: compras ÷ visitas a la landing. */
+export const cvr = conversion;
 /** Lo que dejó, antes de gastos del negocio: compras × lo que se puede pagar por compra, menos lo gastado. Positivo = el anuncio se pagó solo. */
 export const resultado = (r: Resultados, tope: number): number => r.compras * tope - r.gasto;
 export const confiable = (r: Resultados): boolean => r.gasto >= GASTO_MINIMO_CONFIABLE;
@@ -132,3 +138,39 @@ export const conSignoCompacto = (n: number): string => {
   if (a < 1_000_000) return `${signo}$${a >= 100_000 ? (a / 1000).toFixed(0) : sinCero(a / 1000)} mil`;
   return `${signo}$${sinCero(a / 1_000_000)} M`;
 };
+
+/** Las ocho cifras que se miran de una campaña, en el orden de la hoja «Control de Testing» (23 nov 2026, pedido de Jhokser). */
+export type ClaveMetrica = "cpm" | "efectividad" | "hook" | "ctr" | "cpa" | "gasto" | "compras" | "cvr";
+export const METRICAS_CAMPANA: { clave: ClaveMetrica; titulo: string }[] = [
+  { clave: "cpm", titulo: "CPM" },
+  { clave: "efectividad", titulo: "% Efectividad" },
+  { clave: "hook", titulo: "Hook Rate" },
+  { clave: "ctr", titulo: "CTR" },
+  { clave: "cpa", titulo: "CPA" },
+  { clave: "gasto", titulo: "Gasto" },
+  { clave: "compras", titulo: "Compras" },
+  { clave: "cvr", titulo: "CVR" },
+];
+
+/**
+ * El color de cada cifra. **En testing** (campañas de etapa «Test») valen las escalas de la hoja de Control de Testing —las mismas de Productos Test, `@/lib/metricas-meta-ads`—: CPM menor que 3 bien y mayor
+ * que 5 mal; % Efectividad mayor que 80 bien y menor que 70 mal; Hook mayor que 40 bien y menor que 30 mal; CTR mayor que 3 bien y menor que 2 mal; CPA menor que 2 bien y mayor que 4 mal; CVR mayor que 9
+ * bien y menor que 4 mal; Gasto mayor que 24 mal; lo de en medio, regular (los dos extremos incluidos). Una campaña de testing que gastó y no compró lleva el CPA en rojo si ya pasó de $4, como la hoja
+ * (que pone el gasto como CPA). **Escala y retargeting** todavía no tienen sus rangos (los dará el equipo): conservan lo que había (CPA frente a su tope, CTR y Hook) y el resto sin color.
+ */
+export function nivelesDeMetricas(r: Resultados, etapa: string | null, tope: number): Record<ClaveMetrica, NivelMetrica> {
+  const sinColor: Record<ClaveMetrica, NivelMetrica> = { cpm: "neutral", efectividad: "neutral", hook: "neutral", ctr: "neutral", cpa: "neutral", gasto: "neutral", compras: "neutral", cvr: "neutral" };
+  const valor = <T extends number | null>(v: T, f: (n: number) => NivelMetrica): NivelMetrica => (v === null ? "neutral" : f(v));
+  if (etapa !== "testing") return { ...sinColor, cpa: nivelDeCpa(cpa(r), tope), ctr: nivelDeCtr(ctr(r)), hook: nivelDeHook(hookRate(r)) };
+  const sinCompras = r.compras === 0 && r.gasto > 0;
+  return {
+    cpm: valor(cpm(r), nivelCpm),
+    efectividad: valor(efectividad(r), nivelEfectividad),
+    hook: valor(hookRate(r), nivelHookRate),
+    ctr: valor(ctr(r), nivelCtr),
+    cpa: sinCompras ? (nivelCpa(r.gasto) === "malo" ? "malo" : "neutral") : valor(cpa(r), nivelCpa),
+    gasto: r.gasto > 0 ? nivelGasto(r.gasto) : "neutral",
+    compras: "neutral",
+    cvr: valor(cvr(r), nivelCvr),
+  };
+}

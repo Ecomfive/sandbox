@@ -9,14 +9,14 @@ import { useToast } from "@/components/ui/toast";
 import { Ventana } from "@/components/ui/ventana";
 import { horaDeMeta } from "@/lib/meta-ads/hora";
 import { AnunciosIcon, CalendarioIcon, EnlaceIcon, EtiquetaIcon, FlechaAbajoIcon, FlechaArribaIcon, HistorialIcon, MargenIcon, PersonaIcon } from "@/lib/nav-icons";
-import { conversion, cpa, ctr, dolares, hookRate, holdRate, nivelDeCpa, nivelDeCtr, nivelDeHook, resultado } from "@/lib/meta-ads/metricas";
+import { METRICAS_CAMPANA, dolares, holdRate, nivelesDeMetricas, resultado, type ClaveMetrica, type Resultados } from "@/lib/meta-ads/metricas";
 import { nombreEvento } from "@/lib/meta-ads/actividad-equipo";
 import { NOMBRE_ETAPA, type Etapa } from "@/lib/meta-ads/nombre";
 import type { ActividadVista, AnuncioVista, CampanaVista } from "@/lib/meta-ads/vistas";
 import { corregirCampanaMeta, obtenerActividadCampanaMeta, soltarCorreccionMeta } from "./actions";
 import { NOMBRE_VEREDICTO, veredictoDe } from "./def-campanas";
 import { BarraApilada } from "./graficas";
-import { Cifra, entero, InsigniaEstructura, InsigniaEtapa, MetricasEnLinea, nombreEstado, porcentaje, Resultado, valorCpa } from "./piezas";
+import { Cifra, entero, InsigniaEstructura, InsigniaEtapa, MetricasEnLinea, nombreEstado, porcentaje, Resultado, textoMetrica } from "./piezas";
 
 function BotonNavegar({ texto, icono: Icono, activo, alHacerClic }: { texto: string; icono: typeof FlechaArribaIcon; activo: boolean; alHacerClic: () => void }) {
   return (
@@ -26,6 +26,14 @@ function BotonNavegar({ texto, icono: Icono, activo, alHacerClic }: { texto: str
       </button>
     </Tooltip>
   );
+}
+
+/** La línea de apoyo de algunas cifras: el valor de las compras, lo que mantiene el video 15 s y cuántos vieron la landing. */
+function apoyoDeMetrica(clave: ClaveMetrica, r: Resultados): string | undefined {
+  if (clave === "compras") return r.valor > 0 ? `Valor ${dolares(r.valor)}` : undefined;
+  if (clave === "hook") return holdRate(r) !== null ? `Mantienen 15 s: ${porcentaje(holdRate(r), 0)}` : undefined;
+  if (clave === "cvr") return r.vioLanding > 0 ? `${entero(r.vioLanding)} vieron la landing` : undefined;
+  return undefined;
 }
 
 function Dato({ etiqueta, children }: { etiqueta: string; children: React.ReactNode }) {
@@ -214,12 +222,9 @@ export function FichaCampana({ campana: c, colores, anuncios, actId, productos, 
               {c.topeDefinido ? "" : " (el de por defecto: defínelo en Cuentas)"}.
             </p>
             <div className="grid grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-2">
-              <Cifra titulo="Gasto" valor={dolares(r.gasto)} />
-              <Cifra titulo="Compras" valor={entero(r.compras)} apoyo={r.valor > 0 ? `Valor ${dolares(r.valor)}` : undefined} />
-              <Cifra titulo="CPA" valor={valorCpa(r)} nivel={nivelDeCpa(cpa(r), c.tope)} />
-              <Cifra titulo="CTR del enlace" valor={porcentaje(ctr(r), 2)} nivel={nivelDeCtr(ctr(r))} />
-              <Cifra titulo="Hook (3 s)" valor={porcentaje(hookRate(r), 0)} nivel={nivelDeHook(hookRate(r))} apoyo={holdRate(r) !== null ? `Mantienen 15 s: ${porcentaje(holdRate(r), 0)}` : undefined} />
-              <Cifra titulo="Visitas que compran" valor={porcentaje(conversion(r), 1)} apoyo={r.vioLanding > 0 ? `${entero(r.vioLanding)} vieron la landing` : undefined} />
+              {METRICAS_CAMPANA.map((m) => (
+                <Cifra key={m.clave} titulo={m.titulo} valor={textoMetrica(m.clave, r)} nivel={nivelesDeMetricas(r, c.etapa, c.tope)[m.clave]} apoyo={apoyoDeMetrica(m.clave, r)} />
+              ))}
             </div>
             <p className="m-0 text-xs text-muted-foreground">
               Resultado = {r.compras} compras × {dolares(c.tope)} − {dolares(r.gasto)} = {dolares(resultado(r, c.tope))}
@@ -296,7 +301,7 @@ export function FichaCampana({ campana: c, colores, anuncios, actId, productos, 
                           <span>{dolares(a.r.gasto)}</span>
                           <span>{a.r.compras} compras</span>
                         </p>
-                        {a.r.gasto > 0 && <MetricasEnLinea r={a.r} tope={c.tope} />}
+                        {a.r.gasto > 0 && <MetricasEnLinea r={a.r} tope={c.tope} etapa={c.etapa} completa />}
                       </div>
                     </li>
                   );
