@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { avisoPedido, contarPorEstado, fechaCorta, leerCantidad, numeroPedido, puedeArchivar, puedeDeshacerEntrega, puedeEnviar, puedeRecibir, revisarEntregas, revisarLineas, revisarStockPedido, faltantesEn, mejorOrigen } from "./reglas";
+import { avisoPedido, contarPorEstado, fechaCorta, leerCantidad, numeroPedido, puedeArchivar, puedeDeshacerEntrega, puedeDeshacerEnvio, puedeEnviar, puedeRecibir, revisarEntregas, revisarLineas, revisarStockPedido, faltantesEn, mejorOrigen } from "./reglas";
 
 const A = "11111111-1111-4111-8111-111111111111";
 const B = "22222222-2222-4222-8222-222222222222";
@@ -152,4 +152,10 @@ test("solo un pedido realizado o cancelado se puede archivar", () => {
   assert.equal(puedeArchivar("recibido"), true);
   assert.equal(puedeArchivar("cancelado"), true);
   for (const e of ["solicitud", "en_proceso", "enviado"] as const) assert.equal(puedeArchivar(e), false);
+});
+
+test("solo un pedido enviado se puede devolver a en proceso", () => {
+  assert.equal(puedeDeshacerEnvio("enviado"), true);
+  for (const e of ["solicitud", "en_proceso", "recibido", "cancelado"] as const) assert.equal(puedeDeshacerEnvio(e), false);
+  assert.match(avisoPedido({ numero: 3, items: 1 }, "Dinora", "envio_deshecho").titulo, /PED-0003 volvió a «En proceso»/);
 });

@@ -7,6 +7,7 @@ import {
   cancelarPedidoInventario,
   crearPedidoInventario,
   deshacerEntregaPedidoInventario,
+  deshacerEnvioPedidoInventario,
   editarPedidoInventario,
   enviarPedidoInventario,
   marcarEntregadoPedidoInventario,
@@ -37,6 +38,7 @@ import {
   puedeEnviar,
   puedeArchivar,
   puedeDeshacerEntrega,
+  puedeDeshacerEnvio,
   puedeRecibir,
   type EstadoPedido,
   type PedidoInventario,
@@ -408,6 +410,8 @@ function FilasPedido({
   const n = p.items.length;
   // «Deshacer entrega»: dos pasos (pulsar y confirmar) para que no se repita el error de marcarlo sin querer.
   const [deshaciendo, setDeshaciendo] = useState(false);
+  // «Deshacer envío»: también en dos pasos, porque devuelve el inventario con un traslado de reversa.
+  const [deshaciendoEnvio, setDeshaciendoEnvio] = useState(false);
   // Ocultar o desplegar la solicitud (23 nov 2026, pedido de Jhokser): se recuerda en el navegador de cada persona.
   const [plegado, alternarPlegado] = usePlegado(`pedido-inventario:${p.id}`);
 
@@ -447,6 +451,30 @@ function FilasPedido({
               <button type="button" disabled={ocupado} onClick={() => correr(() => marcarEntregadoPedidoInventario(p.id))} className={PRINCIPAL}>
                 {ocupado ? "Cerrando…" : "Marcar entregado"}
               </button>
+              {puedeDeshacerEnvio(p.estado) && p.traslado &&
+                (deshaciendoEnvio ? (
+                  <div className="flex max-w-[14rem] flex-col gap-1.5 rounded-md bg-muted p-2">
+                    <span className="text-xs">¿Deshacer el envío? Lo enviado vuelve a la bodega de origen con un traslado de reversa y el pedido queda «En proceso».</span>
+                    <button
+                      type="button"
+                      disabled={ocupado}
+                      onClick={() => {
+                        setDeshaciendoEnvio(false);
+                        correr(() => deshacerEnvioPedidoInventario(p.id));
+                      }}
+                      className={PRINCIPAL}
+                    >
+                      {ocupado ? "Deshaciendo…" : "Sí, deshacer el envío"}
+                    </button>
+                    <button type="button" disabled={ocupado} onClick={() => setDeshaciendoEnvio(false)} className={SECUNDARIO}>
+                      No
+                    </button>
+                  </div>
+                ) : (
+                  <button type="button" onClick={() => setDeshaciendoEnvio(true)} className={SECUNDARIO}>
+                    Deshacer envío
+                  </button>
+                ))}
             </>
           )}
         </>

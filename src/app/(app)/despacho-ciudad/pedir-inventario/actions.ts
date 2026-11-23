@@ -3,8 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModuloEscritura, type UsuarioActual } from "@/lib/auth";
-import { cargarBodegasPedido, stockInventario } from "@/lib/pedidos-inventario/datos";
-import { avisoEdicion, avisoPedido, cambiosDeEdicion, numeroPedido, puedeArchivar, puedeEditar, revisarEdicion, revisarEntregas, revisarLineas, revisarStockPedido, type EstadoPedido } from "@/lib/pedidos-inventario/reglas";
+import { cargarBodegasPedido, cargarStock, stockInventario } from "@/lib/pedidos-inventario/datos";
+import { avisoEdicion, avisoPedido, cambiosDeEdicion, numeroPedido, puedeArchivar, puedeDeshacerEnvio, puedeEditar, revisarEdicion, revisarEntregas, revisarLineas, revisarStockPedido, type EstadoPedido } from "@/lib/pedidos-inventario/reglas";
 import { puedeVerBodega } from "@/lib/seguridad/pais-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 import { numeroTraslado } from "@/lib/wms/traslado";
@@ -314,6 +314,74 @@ export async function deshacerEntregaPedidoInventario(id: string): Promise<Resul
   if ("ok" in deDespacho) return deDespacho;
   // Si la persona sí podía y el pedido ya cambió, ese es el error útil; si no podía con ninguno, el de permiso.
   return /ya no está entregado|no válido/.test(deInventario.error) ? deInventario : /ya no está entregado|no válido/.test(deDespacho.error) ? deDespacho : deInventario;
+}
+
+/**
+ * Deshace un envío hecho por error (23 nov 2026, pedido de Jhokser: Dinora envió un pedido sin querer): el pedido vuelve a «En proceso» y se hace un **traslado de reversa** (de la bodega de despacho a la de origen,
+ * `wms_crear_traslado`, todo o nada) con lo que se había enviado; el traslado original queda en el historial y el de reversa lo dice en su nota. Si despacho ya no tiene esas unidades (se vendieron o se movieron),
+ * la reversa no se hace y el pedido sigue «Enviado». Solo inventario (edición), solo un pedido enviado con su traslado; primero cambia el estado (así un segundo clic no hace dos reversas) y, si la reversa falla, lo devuelve.
+ */
+export async function deshacerEnvioPedidoInventario(id: string): Promise<Resultado> {
+  return conPermiso(MODULO_INVENTARIO, async (u) => {
+    if (!ES_UUID(id)) return { error: "Pedido no válido." };
+    const supabase = createServiceClient();
+    const { data: p } = await supabase
+      .from("despacho_pedidos_inventario")
+      .select("id, numero, estado, pedido_por, traslado_id, bodega_origen_id, bodega_destino_id, enviado_en, traslado:wms_traslados(numero), despacho_pedidos_inventario_items(id, sku_id, producto, cantidad_entregada)")
+      .eq("id", id)
+      .maybeSingle();
+    if (!p) return { error: "Ese pedido ya no existe." };
+    if (!puedeDeshacerEnvio(p.estado as EstadoPedido)) return { error: "Ese pedido ya no está enviado: recarga la página." };
+    const origenId = p.bodega_origen_id as string | null;
+    const destinoId = p.bodega_destino_id as string | null;
+    if (!p.traslado_id || !origenId || !destinoId) return { error: "Ese pedido no tiene un traslado que revertir." };
+    if (!(await puedeVerBodega(supabase, u.paisesPermitidos, origenId))) return { error: "No tienes acceso al país de esa bodega." };
+    const items = (p.despacho_pedidos_inventario_items as { id: string; sku_id: string; producto: string; cantidad_entregada: number | null }[] | null) ?? [];
+    const lineas = items.filter((it) => (it.cantidad_entregada ?? 0) > 0).map((it) => ({ sku: it.sku_id, cantidad: it.cantidad_entregada as number }));
+    if (!lineas.length) return { error: "Ese pedido no tiene nada enviado que devolver." };
+    // Despacho tiene que tener todavía lo que se le envió: si ya lo vendió o lo movió, no se devuelve (nunca se deja su inventario en negativo).
+    const hayEnDespacho = (await cargarStock(supabase, [destinoId], lineas.map((l) => l.sku)))[destinoId] ?? {};
+    const faltan = items.filter((it) => (it.cantidad_entregada ?? 0) > (hayEnDespacho[it.sku_id] ?? 0));
+    if (faltan.length) {
+      const detalle = faltan.slice(0, 3).map((it) => `${it.producto} (envió ${it.cantidad_entregada}, hay ${hayEnDespacho[it.sku_id] ?? 0})`).join("; ");
+      return { error: `Despacho ya no tiene lo que se le envió, así que no se puede devolver: ${detalle}${faltan.length > 3 ? " y más" : ""}.` };
+    }
+    const tr = (Array.isArray(p.traslado) ? p.traslado[0] : p.traslado) as { numero: number } | null;
+    const numOriginal = tr ? numeroTraslado(tr.numero) : "el traslado";
+
+    const { data: tomado } = await supabase
+      .from("despacho_pedidos_inventario")
+      .update({ estado: "en_proceso", enviado_en: null, bodega_origen_id: null, traslado_id: null })
+      .eq("id", id)
+      .eq("estado", "enviado")
+      .select("id");
+    if (!tomado?.length) return { error: "Ese pedido ya cambió de estado: recarga la página." };
+
+    const nota = `Reversa de ${numOriginal} · ${numeroPedido(p.numero as number)} (envío deshecho)`;
+    const { data: rev, error } = await supabase.rpc("wms_crear_traslado", { p_desde: destinoId, p_hacia: origenId, p_items: lineas, p_notas: nota, p_usuario: u.id, p_nombre: nombreDe(u) });
+    if (error || !rev) {
+      await supabase
+        .from("despacho_pedidos_inventario")
+        .update({ estado: "enviado", enviado_en: p.enviado_en, bodega_origen_id: origenId, traslado_id: p.traslado_id })
+        .eq("id", id);
+      const msg = error?.message ?? "";
+      return { error: msg && msg.length < 220 && !/wms_crear_traslado/.test(msg) ? `No se pudo devolver el inventario: ${msg}` : "No se pudo hacer el traslado de reversa." };
+    }
+    const creado = rev as { id: string; numero: number };
+    const numRev = numeroTraslado(creado.numero);
+    await supabase.from("despacho_pedidos_inventario_items").update({ cantidad_entregada: null, observacion: null }).eq("pedido_id", id);
+    const unidades = lineas.reduce((t, l) => t + l.cantidad, 0);
+    await registrarAuditoria({
+      accion: "deshacer_envio_pedido_inventario",
+      entidad: "despacho_pedidos_inventario",
+      entidadId: id,
+      detalle: `${numeroPedido(p.numero as number)}: envío deshecho con el traslado de reversa ${numRev} (${unidades.toLocaleString("es-PA")} unidades de vuelta a la bodega de origen; el original fue ${numOriginal})`,
+    });
+    await avisar(supabase, [p.pedido_por as string], u, avisoPedido({ numero: p.numero as number, items: items.length }, nombreDe(u), "envio_deshecho"), "/despacho-ciudad/pedir-inventario");
+    revalidatePath("/inventario");
+    revalidatePath("/inventario/traslados");
+    return { ok: true, mensaje: `${numeroPedido(p.numero as number)} volvió a «En proceso»: el traslado de reversa ${numRev} devolvió lo enviado.` };
+  });
 }
 
 /**
