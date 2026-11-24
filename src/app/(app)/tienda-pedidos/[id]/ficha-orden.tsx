@@ -16,6 +16,7 @@ import { casoAbierto, tipoPrincipal, type CasoPedido } from "@/lib/tienda/postve
 import { etiquetasDe, zonaDeEtiquetas } from "@/lib/tienda/ordenes-finanzas";
 import { NotasOrden } from "./notas-orden";
 import { EtiquetasPedido } from "./etiquetas-pedido";
+import { GestionPedido } from "./gestion-pedido";
 import { cambiarEtiquetasPedido } from "../etiquetas-actions";
 import { ETIQUETA_CONFIRMADA, esConfirmada } from "@/lib/tienda/etiquetas-shopify";
 import { ChatTienda } from "@/components/tienda/chat-tienda";
@@ -304,6 +305,21 @@ export function FichaOrdenTienda({ orden, codigoPais, puedeEscribir }: { orden: 
             <EtiquetasPedido ordenId={orden.id} etiquetas={etiquetas} sugeridas={esc.sugeridas} activa={esc.activa} motivo={esc.motivo} pendiente={cambiando} onCambiar={cambiarEtiquetas} />
           )}
 
+          {/* Manual ATC (24 nov 2026): Confirmar, Novedad y Anular con las reglas del manual; cada uno escribe en Shopify y deja su línea en la cronología. */}
+          {esc.activa && puedeEscribir && deShopify && (
+            <GestionPedido
+              ordenId={orden.id}
+              etiquetas={etiquetas}
+              codigoPais={codigoPais}
+              estadoEntrega={o.estado_entrega ?? null}
+              alHecho={(r) => {
+                setEtiquetas(r.etiquetas);
+                mostrarToast(r.aviso ?? r.texto, r.aviso ? "destructive" : undefined);
+                router.refresh();
+              }}
+            />
+          )}
+
           {orden.asistente && (
             <Seccion id={sid("asistente")} titulo="Asistente de confirmación" icono={S("asistente").icono}>
               <AsistenteConfirmacion a={orden.asistente} />
@@ -467,7 +483,7 @@ export function FichaOrdenTienda({ orden, codigoPais, puedeEscribir }: { orden: 
           </Seccion>
 
           <Seccion id={sid("notas")} titulo={S("notas").titulo} icono={S("notas").icono} extra={<span className="text-xs text-muted-foreground">quedan en el sistema, no en Shopify</span>}>
-            <NotasOrden key={orden.id} ordenId={orden.id} notas={orden.notas} puedeEscribir={puedeEscribir} />
+            <NotasOrden key={`${orden.id}-${orden.notas.length}`} ordenId={orden.id} notas={orden.notas} puedeEscribir={puedeEscribir} />
           </Seccion>
 
           <Seccion id={sid("historial")} titulo={S("historial").titulo} icono={S("historial").icono} extra={<span className="text-xs text-muted-foreground">del más nuevo al más viejo</span>}>

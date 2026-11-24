@@ -2,7 +2,7 @@
 // etiquetas con `tagsAdd`/`tagsRemove` (solo tocan las etiquetas nombradas: no pisa las que otra persona o una app pusieron mientras tanto) y devuelve
 // cómo quedaron en Shopify. Necesita que la tienda haya aprobado `write_orders` en su app; si no, lanza el error en palabras del equipo. Solo servidor.
 
-import { accesoDeApp, olvidarAcceso, puedeEscribirPedidos, type AppTienda } from "./shopify-app";
+import { accesoDeApp, olvidarAcceso, puedeEscribirPedidos, puedeManejarEspera, type AppTienda } from "./shopify-app";
 
 const VERSION_API = "2026-07";
 
@@ -83,4 +83,64 @@ export async function cambiarEtiquetasEnShopify(app: AppTienda, numero: string, 
     }
   }
   return { etiquetas: tags, error: null };
+}
+
+// ── Manual ATC (24 nov 2026): anular el pedido y levantar la espera al confirmar.
+
+/**
+ * Anula el pedido en Shopify (como «Cancelar pedido» en el admin): sin avisar al cliente, sin reembolso (es contra entrega) y devolviendo el stock. Si el
+ * pedido ya estaba anulado, no hace nada. El motivo va en la nota interna de la anulación y como etiqueta (la pone quien llama).
+ */
+export async function anularEnShopify(app: AppTienda, numero: string, motivo: string): Promise<void> {
+  const token = await tokenConEscritura(app);
+  const pedido = await buscarPedido(app, token, numero);
+  const estado = await graphql<{ order: { cancelledAt: string | null } | null }>(app, token, "query($id: ID!) { order(id: $id) { cancelledAt } }", { id: pedido.id });
+  if (estado.order?.cancelledAt) return;
+  type Res = { orderCancel: { orderCancelUserErrors: { message: string }[] } | null };
+  const variables = { id: pedido.id, nota: `Anulado desde el sistema: ${motivo}`.slice(0, 250) };
+  // Shopify cambió cómo se dice «sin reembolso» (`refund` → `refundMethod`): se prueba una forma y, si no la reconoce, la otra.
+  const formas = [
+    `mutation($id: ID!, $nota: String) { orderCancel(orderId: $id, reason: CUSTOMER, refund: false, restock: true, notifyCustomer: false, staffNote: $nota) { orderCancelUserErrors { message } } }`,
+    `mutation($id: ID!, $nota: String) { orderCancel(orderId: $id, reason: CUSTOMER, refundMethod: { originalPaymentMethodsRefund: false }, restock: true, notifyCustomer: false, staffNote: $nota) { orderCancelUserErrors { message } } }`,
+  ];
+  let ultimo: unknown = null;
+  for (const forma of formas) {
+    try {
+      const d = await graphql<Res>(app, token, forma, variables);
+      const errores = d.orderCancel?.orderCancelUserErrors ?? [];
+      if (errores.length) throw new Error(`Shopify no anuló el pedido: ${errores[0].message}`);
+      return;
+    } catch (e) {
+      ultimo = e;
+      if (!(e instanceof Error) || !/refund/i.test(e.message) || /no anuló/.test(e.message)) throw e;
+    }
+  }
+  throw ultimo instanceof Error ? ultimo : new Error("Shopify no anuló el pedido.");
+}
+
+/**
+ * Levanta la espera del pedido (los envíos «En espera» pasan a «No preparado» y despacho ya los puede preparar). Necesita el permiso
+ * `write_merchant_managed_fulfillment_orders`; sin él devuelve false y no hace nada (la espera se levanta en Shopify). Sin espera, true.
+ */
+export async function liberarEsperaEnShopify(app: AppTienda, numero: string): Promise<boolean> {
+  const acceso = await accesoDeApp(app);
+  if (!puedeManejarEspera(acceso.scope)) return false;
+  const pedido = await buscarPedido(app, acceso.token, numero);
+  const d = await graphql<{ order: { fulfillmentOrders: { nodes: { id: string; status: string }[] } } | null }>(
+    app,
+    acceso.token,
+    "query($id: ID!) { order(id: $id) { fulfillmentOrders(first: 10) { nodes { id status } } } }",
+    { id: pedido.id },
+  );
+  for (const fo of (d.order?.fulfillmentOrders.nodes ?? []).filter((x) => x.status === "ON_HOLD")) {
+    const r = await graphql<{ fulfillmentOrderReleaseHold: { userErrors: { message: string }[] } | null }>(
+      app,
+      acceso.token,
+      "mutation($id: ID!) { fulfillmentOrderReleaseHold(id: $id) { userErrors { message } } }",
+      { id: fo.id },
+    );
+    const errores = r.fulfillmentOrderReleaseHold?.userErrors ?? [];
+    if (errores.length) throw new Error(`Shopify no levantó la espera: ${errores[0].message}`);
+  }
+  return true;
 }
