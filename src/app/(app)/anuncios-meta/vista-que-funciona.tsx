@@ -14,6 +14,7 @@ import type { Grupo } from "@/lib/meta-ads/vistas";
 import { ClasificarGanchos } from "./clasificar-ganchos";
 import { BarraProgreso, InsigniaCerteza, TarjetaMeta } from "./graficas";
 import { AVISO_POCA_DATA, entero, Nivel, porcentaje, Resultado, valorCpa } from "./piezas";
+import { SeccionPlegable } from "./plegable";
 
 type Seccion = "videos" | "campanas" | "anuncios" | "productos";
 const SECCIONES: { id: Seccion; nombre: string; detalle: string }[] = [
@@ -129,23 +130,31 @@ export function QueFunciona({ productos, productoActual, grupos, gruposVideo, vi
         )}
         <p className="m-0 text-xs text-muted-foreground">{nombreProducto ? `Todo lo de abajo sale solo de «${nombreProducto}».` : "Escribe o elige un producto para ver qué ángulos, ganchos y formatos funcionan con él."}</p>
       </div>
-      <TarjetaMeta titulo="Lo que ya sabemos" derecha="Firme: datos de sobra · Probable: va bien, falta data · Poca data: menos de $100" id="conclusiones">
+      <SeccionPlegable titulo="Lo que ya sabemos" resumen={`${conclusiones.filter((c) => c.grupo).length} de ${conclusiones.length} con datos suficientes`} derecha={<span className="hidden sm:inline">Firme: datos de sobra · Probable: falta data · Poca data: menos de $100</span>}>
         {!hayAlgo ? (
           <p className="m-0 text-sm text-muted-foreground">Todavía no hay nada con datos suficientes ($100 gastados y alguna compra). A medida que se gaste, aquí va saliendo lo que funciona.</p>
         ) : (
-          <ul role="list" className="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(15.5rem,1fr))] gap-3 p-0">
-            {conclusiones.map((c) => (
-              <TarjetaConclusion key={c.etiqueta} c={c} />
+          <div className="flex flex-col gap-4">
+            {(["videos", "campañas"] as const).map((u) => (
+              <div key={u} className="flex flex-col gap-2">
+                <h3 className="m-0 text-xs font-semibold text-muted-foreground">{u === "videos" ? "En los videos" : "En las campañas"}</h3>
+                <ul role="list" className="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(15.5rem,1fr))] gap-3 p-0">
+                  {conclusiones.filter((c) => c.unidad === u).map((c) => (
+                    <TarjetaConclusion key={c.etiqueta} c={c} />
+                  ))}
+                </ul>
+              </div>
             ))}
-          </ul>
+          </div>
         )}
-      </TarjetaMeta>
+      </SeccionPlegable>
 
       <div className="flex flex-col gap-3">
-        <div role="group" aria-label="Qué medir" className="flex w-fit max-w-full flex-wrap overflow-hidden rounded-lg border border-border-control bg-card">
-          {SECCIONES.map((s) => (
-            <button key={s.id} type="button" aria-pressed={seccion === s.id} onClick={() => setSeccion(s.id)} className={`min-h-10 px-4 py-2 text-sm font-medium transition-colors focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-foreground ${seccion === s.id ? "bg-foreground text-background" : "text-muted-foreground hover:bg-muted"}`}>
-              {s.nombre}
+        <div role="group" aria-label="Qué medir" className="flex flex-wrap gap-1.5">
+          {SECCIONES.map((x) => (
+            <button key={x.id} type="button" aria-pressed={seccion === x.id} onClick={() => setSeccion(x.id)} className={`inline-flex min-h-9 flex-col items-start justify-center rounded-lg border px-3.5 py-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground ${seccion === x.id ? "border-foreground bg-foreground text-background" : "border-border-control bg-card hover:bg-muted"}`}>
+              <span className="text-sm font-semibold leading-tight">{x.nombre}</span>
+              <span className={`text-[11px] leading-tight ${seccion === x.id ? "opacity-80" : "text-muted-foreground"}`}>{x.detalle}</span>
             </button>
           ))}
         </div>
@@ -234,27 +243,28 @@ function TarjetaConclusion({ c }: { c: Conclusion }) {
   const g = c.grupo;
   const ventaja = g ? ventajaDeCpa(g, c.total) : null;
   return (
-    <li className="flex min-w-0 flex-col gap-1.5 rounded-xl border border-border bg-background px-3.5 py-3">
-      <p className="m-0 text-xs font-medium text-muted-foreground">{c.etiqueta}</p>
+    <li className="flex min-w-0 flex-col gap-2 rounded-xl border border-border bg-card px-3.5 py-3">
+      <div className="flex items-start justify-between gap-2">
+        <p className="m-0 text-xs font-medium text-muted-foreground">{c.etiqueta}</p>
+        {g && <InsigniaCerteza certeza={g.certeza} motivo={motivoDeCerteza(g.r, g.videos > 0 ? g.videos : g.campanas, g.videos > 0 ? "videos" : "campañas")} />}
+      </div>
       {g ? (
         <>
           <p className="m-0 line-clamp-2 text-base font-semibold leading-snug">{g.nombre}</p>
-          <p className="m-0 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs tabular-nums text-muted-foreground">
-            <span className="text-sm font-semibold text-foreground">CPA {valorCpa(g.r)}</span>
-            {ventaja !== null && Math.abs(ventaja) >= 1 && <span className={ventaja < 0 ? "font-medium text-success" : "font-medium text-destructive"}>{ventaja < 0 ? `${Math.abs(ventaja).toFixed(0)} % más barato que el promedio` : `${ventaja.toFixed(0)} % más caro que el promedio`}</span>}
-          </p>
-          <div className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-1">
-            <InsigniaCerteza certeza={g.certeza} motivo={motivoDeCerteza(g.r, g.videos > 0 ? g.videos : g.campanas, g.videos > 0 ? "videos" : "campañas")} />
-            <span className="text-xs tabular-nums text-muted-foreground">
-              {g.videos > 0 && c.unidad === "videos" ? `${g.videos} ${g.videos === 1 ? "video" : "videos"}` : `${g.campanas} ${g.campanas === 1 ? "campaña" : "campañas"}`} · {dolaresEnteros(g.r.gasto)}
-            </span>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-md bg-muted px-2 py-0.5 text-sm font-semibold tabular-nums">CPA {valorCpa(g.r)}</span>
+            {ventaja !== null && Math.abs(ventaja) >= 1 && (
+              <span className={`rounded-full px-2 py-0.5 text-xs font-medium tabular-nums ${ventaja < 0 ? "bg-success-soft text-success" : "bg-destructive-soft text-destructive"}`}>
+                {ventaja < 0 ? `${Math.abs(ventaja).toFixed(0)} % más barato` : `${ventaja.toFixed(0)} % más caro`}
+              </span>
+            )}
           </div>
+          <p className="m-0 mt-auto text-xs tabular-nums text-muted-foreground">
+            {g.videos > 0 && c.unidad === "videos" ? `${g.videos} ${g.videos === 1 ? "video" : "videos"}` : `${g.campanas} ${g.campanas === 1 ? "campaña" : "campañas"}`} · {dolaresEnteros(g.r.gasto)} gastados
+          </p>
         </>
       ) : (
-        <>
-          <p className="m-0 text-sm text-muted-foreground">Sin datos suficientes todavía</p>
-          <p className="m-0 text-xs text-muted-foreground">Ninguno llega aún a $100 gastados con alguna compra en este periodo{c.etiqueta === "Estructura del video" ? "; cada orden de partes se reparte entre pocos videos" : ""}.</p>
-        </>
+        <p className="m-0 text-sm text-muted-foreground">Sin datos suficientes todavía{c.etiqueta === "Estructura del video" ? " (cada orden de partes se reparte entre pocos videos)" : ""}.</p>
       )}
     </li>
   );
@@ -312,7 +322,7 @@ function TablaDeGrupos({ grupos, filas, alElegir, dimension, unidad, sinDato, po
   return (
     <div className="flex flex-col gap-6">
       {conCompras.length > 1 && promedio !== null && (
-        <TarjetaMeta titulo={`CPA por ${dimension.toLowerCase()}`} derecha={`Promedio de la lista: ${dolares(promedio)}`} id="cpa-dim">
+        <SeccionPlegable titulo={`CPA por ${dimension.toLowerCase()}`} resumen={`Promedio de la lista: ${dolares(promedio)}`} derecha={`Promedio de la lista: ${dolares(promedio)}`}>
           <ul role="list" className="m-0 flex list-none flex-col gap-2.5 p-0">
             {conCompras.map((g) => {
               const c = g.r.gasto / g.r.compras;
@@ -352,10 +362,10 @@ function TablaDeGrupos({ grupos, filas, alElegir, dimension, unidad, sinDato, po
               <span aria-hidden="true" className="h-2.5 w-2.5 rounded-[3px]" style={{ background: "var(--grafica-5)" }} /> Poca data
             </span>
           </p>
-        </TarjetaMeta>
+        </SeccionPlegable>
       )}
 
-      <div className="min-w-0 overflow-hidden rounded-xl border border-border bg-card">
+      <SeccionPlegable titulo="Todas las cifras" sinRelleno abierta={!(conCompras.length > 1 && promedio !== null)} resumen={`${(filas ?? grupos).length} filas`} derecha={`${(filas ?? grupos).length} ${dimension.toLowerCase()}`}>
         {primera && (
           <p className="m-0 border-b border-border bg-muted px-4 py-2 text-xs text-muted-foreground">
             Lo que mejor funciona en {dimension.toLowerCase()}: <span className="font-medium text-foreground">{primera.nombre}</span> con CPA {valorCpa(primera.r)} y {entero(primera.r.compras)} compras.
@@ -427,7 +437,7 @@ function TablaDeGrupos({ grupos, filas, alElegir, dimension, unidad, sinDato, po
             )}
           </p>
         )}
-      </div>
+      </SeccionPlegable>
     </div>
   );
 }
