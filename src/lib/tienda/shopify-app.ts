@@ -86,7 +86,7 @@ export async function accesoDeApp(app: AppTienda, ahora = Date.now()): Promise<{
 
 /**
  * Lo único que el sistema escribe en Shopify. 19 nov 2026: etiquetas del pedido (`write_orders`, también anular y marcar pagado). 24 nov 2026, manual ATC:
- * la espera de los pedidos nuevos y levantarla al confirmar (`write_merchant_managed_fulfillment_orders`) y la guía y el «Entregado» (`write_fulfillments`).
+ * la espera de los pedidos nuevos y levantarla al confirmar (`write_merchant_managed_fulfillment_orders`), la guía (también `write_merchant_managed_fulfillment_orders`, por `fulfillmentTrackingInfoUpdate`) y el «Entregado» (`write_fulfillments`).
  * Otro `write_…` hace que la tienda no se conecte.
  */
 export const ESCRITURA_PERMITIDA: readonly string[] = ["write_orders", "write_merchant_managed_fulfillment_orders", "write_fulfillments"];
