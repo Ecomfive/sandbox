@@ -84,7 +84,7 @@ export function CeldaEditable({
       </button>
       {abierto &&
         (def.tipo === "lista" ? (
-          // Una lista abierta (la tienda): se elige una o varias y, si no existe, se crea ahí mismo; cada cambio se guarda al instante.
+          // Una lista abierta (la tienda, las etiquetas): se elige una o varias y, si no existe, se crea ahí mismo; cada cambio se guarda al instante.
           <PanelLista
             ancla={boton}
             etiqueta={aria}
@@ -94,7 +94,7 @@ export function CeldaEditable({
             alAlternar={(n) => {
               const puestas = compra[def.prop] as string[];
               const ya = presenciaEnLote([puestas], n) === "todas";
-              // Una sola (la tienda): elegir otra la cambia y cierra; pulsar la que ya está la quita.
+              // Una sola: elegir otra la cambia y cierra; pulsar la que ya está la quita.
               if (def.unica) {
                 cerrar("elegido");
                 return guardar(compra, campo, ya ? [] : [n]);
