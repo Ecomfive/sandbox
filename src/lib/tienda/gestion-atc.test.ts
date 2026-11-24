@@ -114,3 +114,24 @@ test("metas del puesto: cumple si llega a la meta", () => {
   const m = cumplimientoMetas({ confirmacion: 86, entrega: 65, ticket: null, unidades: 2 });
   assert.deepEqual(m.map((x) => x.cumple), [true, false, null, true]);
 });
+
+import { INICIO_GUIAS_SOLAS, MOTIVOS_GUIA_SIN_CARGAR, VISTAS_ATC as VISTAS, desdeGuiasSolas, guiaSolaSinShopify } from "./gestion-atc";
+
+test("guías solas: desde el 24 nov 2026 y nunca más de 10 días atrás", () => {
+  assert.equal(desdeGuiasSolas("2026-11-25"), INICIO_GUIAS_SOLAS);
+  assert.equal(desdeGuiasSolas("2026-12-20"), "2026-12-10");
+});
+
+test("guías solas: anulado va a «Guía sin cargar»; la misma guía ya cargada no se toca; si no, a Shopify", () => {
+  const base = { etiquetas: ["INTERIOR/SERVIENTREGA"], estadoEntrega: "en_transito", guia: null };
+  assert.equal(guiaSolaSinShopify(base, "7224161722"), null);
+  assert.deepEqual(guiaSolaSinShopify({ ...base, guia: "7224161722" }, "7224161722"), { estado: "ya_tenia", motivo: null });
+  assert.deepEqual(guiaSolaSinShopify({ ...base, etiquetas: ["INTERIOR/SERVIENTREGA", "MOT-CLIENTE-NO-CONTESTA"] }, "7224161722"), { estado: "pendiente", motivo: MOTIVOS_GUIA_SIN_CARGAR.anuladoSistema });
+  assert.equal(guiaSolaSinShopify({ ...base, estadoEntrega: "cancelada" }, "7224161722")?.estado, "pendiente");
+});
+
+test("la vista «Guía sin cargar» trae los pedidos con motivo", () => {
+  const v = VISTAS.find((x) => x.id === "guia-sin-cargar")!;
+  assert.equal(v.incluye({ estado: "en_camino", creado: "", guiaSinCargar: "Guía 7224161722: no está preparado en Shopify" }, 0), true);
+  assert.equal(v.incluye({ estado: "en_camino", creado: "" }, 0), false);
+});

@@ -146,6 +146,8 @@ export interface PedidoAtc {
   etiquetas?: string[];
   /** ISO de cuando entró el pedido. */
   creado: string;
+  /** La guía de SISCORE que no entró sola en Shopify (o cuyo aviso al cliente no salió): el motivo. Sin el campo, nada. */
+  guiaSinCargar?: string | null;
 }
 
 export interface VistaAtc {
@@ -181,6 +183,7 @@ export const VISTAS_ATC: VistaAtc[] = [
     detalle: "falta el motivo o la zona (pedidos desde el 24 nov 2026)",
     incluye: (p) => (p.estado === "cancelado" || p.estado === "devuelto") && p.creado >= INICIO_ATC && (!motivoAtc(p.etiquetas ?? []) || !zonaAtc(p.etiquetas ?? [])),
   },
+  { id: "guia-sin-cargar", etiqueta: "Guía sin cargar", detalle: "Servientrega generó la guía y no entró sola en Shopify (o el aviso al cliente no salió): el motivo está en la ficha", incluye: (p) => !!p.guiaSinCargar },
   { id: "sin-etiqueta", etiqueta: "Sin etiqueta", detalle: "ni zona, ni control, ni motivo", incluye: (p) => !["cancelado", "entregado", "devuelto"].includes(p.estado) && sinGestion(p.etiquetas ?? []) },
 ];
 
@@ -270,4 +273,33 @@ export function cumplimientoMetas(v: { confirmacion: number | null; entrega: num
     const valor = v[m.id];
     return { ...m, valor, cumple: valor === null ? null : valor >= m.meta };
   });
+}
+
+// ── Las guías de SISCORE entran solas en Shopify (24 nov 2026, pedido de Hernán): lo que no entra va a «Guía sin cargar» para una asesora.
+
+/** Solo las guías emitidas desde este día: las de antes son de pedidos que ya salieron (o se entregaron) sin este paso. */
+export const INICIO_GUIAS_SOLAS = "2026-11-24";
+
+/** Desde qué emisión se buscan guías por cargar: los últimos 10 días (lo de antes ya no se reintenta), nunca antes del inicio. */
+export function desdeGuiasSolas(hoy: string): string {
+  const d = new Date(`${hoy}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - 10);
+  const hace10 = d.toISOString().slice(0, 10);
+  return hace10 > INICIO_GUIAS_SOLAS ? hace10 : INICIO_GUIAS_SOLAS;
+}
+
+export const MOTIVOS_GUIA_SIN_CARGAR = {
+  noPreparado: "no está preparado en Shopify: despacho lo prepara y la guía entra sola en la próxima lectura de SISCORE (o con «Cargar guía»)",
+  anuladoShopify: "el pedido está anulado en Shopify y Servientrega generó la guía: revisar con despacho",
+  anuladoSistema: "el pedido está anulado y Servientrega generó la guía: revisar con despacho",
+} as const;
+
+/**
+ * Lo que se sabe sin preguntarle a Shopify: si el pedido está anulado (a «Guía sin cargar») o si ya tiene esa misma guía (no se toca). null = hay que
+ * cargarla.
+ */
+export function guiaSolaSinShopify(o: { etiquetas: string[]; estadoEntrega: string | null; guia: string | null }, guia: string): { estado: "ya_tenia" | "pendiente"; motivo: string | null } | null {
+  if (o.estadoEntrega === "cancelada" || o.etiquetas.some((e) => /^mot-/i.test(e.trim()))) return { estado: "pendiente", motivo: MOTIVOS_GUIA_SIN_CARGAR.anuladoSistema };
+  if ((o.guia ?? "").trim() === guia) return { estado: "ya_tenia", motivo: null };
+  return null;
 }

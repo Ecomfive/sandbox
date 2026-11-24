@@ -319,6 +319,7 @@ export function FichaOrdenTienda({ orden, codigoPais, puedeEscribir }: { orden: 
               estadoEntrega={o.estado_entrega ?? null}
               estadoPago={o.estado_pago ?? null}
               guia={o.guia ?? null}
+              guiaSinCargar={orden.guiaSinCargar ?? null}
               finanzas={!!esc.finanzas}
               soloFinanzas={!!esc.soloFinanzas || !puedeEscribir}
               alHecho={(r) => {

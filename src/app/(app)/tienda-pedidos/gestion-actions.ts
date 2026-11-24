@@ -14,11 +14,9 @@ import {
   marcarEntregadoEnShopify,
   marcarPagadoEnShopify,
 } from "@/lib/tienda/escribir-shopify";
-import { esErrorDeVentana, telefonoParaIcomfly } from "@/lib/tienda/chat-tienda";
-import { enviarAviso, enviarPlantilla, plantillasAprobadas } from "@/lib/tienda/chat-tienda-datos";
+import { guiaPorWhatsapp } from "@/lib/tienda/guia-cliente";
 import { textoCambio } from "@/lib/tienda/etiquetas-shopify";
-import { ETIQUETA_ACREDITADO, leerGuia, lineaCronologia, lineaPaso, mensajeGuiaWhatsapp, planAtc, plantillaGuia, type AccionAtc, type PasoAtc } from "@/lib/tienda/gestion-atc";
-import { conexionesIcomfly } from "@/lib/tienda/icomfly";
+import { ETIQUETA_ACREDITADO, leerGuia, lineaCronologia, lineaPaso, planAtc, type AccionAtc, type PasoAtc } from "@/lib/tienda/gestion-atc";
 import { etiquetasDe, mismaTiendaUnidad } from "@/lib/tienda/ordenes-finanzas";
 import { appDeTienda, type AppTienda } from "@/lib/tienda/shopify-app";
 
@@ -145,74 +143,6 @@ export async function gestionarPedidoAtc(ordenId: string, accionCruda: unknown, 
   return { ok: true, etiquetas: final, texto: linea, ...(aviso ? { aviso } : {}) };
 }
 
-/** Manda la plantilla aprobada de la guía (sirve fuera de las 24 h). Comprueba que la plantilla exista y pida las variables que se le dan. */
-async function guiaConPlantilla(
-  supabase: ReturnType<typeof createServiceClient>,
-  ctx: Contexto,
-  g: { numero: string; url: string },
-  cliente: string | null,
-  telefono: string,
-  persona: { id: string; nombre: string },
-): Promise<{ nombre: string } | { error: string }> {
-  const [{ data: o }, { data: lineas }] = await Promise.all([
-    supabase.from("ven_ordenes").select("total, estado_pago").eq("id", ctx.orden.id).maybeSingle(),
-    supabase.from("ven_orden_lineas").select("producto, cantidad, es_servicio").eq("orden_id", ctx.orden.id).order("linea"),
-  ]);
-  const elegida = plantillaGuia({
-    pagado: /^paid$/i.test(String(o?.estado_pago ?? "")),
-    cliente,
-    guia: g.numero,
-    url: g.url,
-    productos: (lineas ?? []).filter((l) => !l.es_servicio).map((l) => ({ producto: (l.producto as string | null) ?? null, cantidad: (l.cantidad as number | null) ?? null })),
-    total: o?.total == null ? null : Number(o.total),
-  });
-  const aprobadas = await plantillasAprobadas(supabase, ctx.tiendaId);
-  if (!Array.isArray(aprobadas)) return { error: aprobadas.error };
-  const p = aprobadas.find((x) => x.nombre === elegida.nombre);
-  if (!p) return { error: `la tienda no tiene aprobada «${elegida.nombre}»` };
-  if (p.variables.length !== elegida.valores.length) return { error: `«${p.nombre}» cambió: pide ${p.variables.length} datos` };
-  const r = await enviarPlantilla(supabase, ctx.tiendaId, telefono, { nombre: p.nombre, idioma: p.idioma, valores: elegida.valores, cuerpo: p.cuerpo }, persona);
-  return r.error ? { error: r.error } : { nombre: p.nombre };
-}
-
-/**
- * La guía por WhatsApp al cliente sin correo, por iComfly. Devuelve la línea de la cronología y, si no salió, el aviso para la asesora. Nunca hace fallar
- * el paso: la guía ya quedó en Shopify.
- */
-async function guiaPorWhatsapp(ctx: Contexto, g: { numero: string; url: string }): Promise<{ linea: string; aviso?: string }> {
-  const sinEnviar = (porque: string, aviso: string) => ({ linea: `sin correo del cliente; ${porque}: mandar la guía por WhatsApp a mano`, aviso: `La guía quedó en Shopify, pero el cliente no tiene correo y ${aviso}` });
-  try {
-    const supabase = createServiceClient();
-    const [con, { data: cliente }] = await Promise.all([
-      conexionesIcomfly(supabase, [ctx.tiendaId]),
-      supabase.from("ven_ordenes_clientes").select("nombre, telefono").eq("orden_id", ctx.orden.id).maybeSingle(),
-    ]);
-    if (!con?.get(ctx.tiendaId)?.conectado) return sinEnviar(`${ctx.tienda} no está conectada a iComfly`, `${ctx.tienda} no está conectada a iComfly: mándale la guía por WhatsApp a mano.`);
-    const telefono = telefonoParaIcomfly((cliente?.telefono as string | null) ?? null, ctx.codigoPais);
-    if (!telefono) return sinEnviar("el pedido no tiene un teléfono válido", "el pedido no tiene un teléfono válido para WhatsApp.");
-    const texto = mensajeGuiaWhatsapp({ cliente: (cliente?.nombre as string | null) ?? null, pedido: ctx.orden.numero, tienda: ctx.tienda, guia: g.numero, url: g.url });
-    const quien = (ctx.usuario.nombre || ctx.usuario.email || "Alguien").trim();
-    const persona = { id: ctx.usuario.id, nombre: quien };
-    const r = await enviarAviso(supabase, ctx.tiendaId, telefono, texto, persona);
-    let como = "";
-    if (r.error) {
-      if (!esErrorDeVentana(r.error)) return sinEnviar("iComfly no lo mandó", `iComfly no mandó el WhatsApp (${r.error}). Mándale la guía a mano.`);
-      // Fuera de las 24 h: la plantilla aprobada de la guía (contra entrega o ya pagado).
-      const p = await guiaConPlantilla(supabase, ctx, g, (cliente?.nombre as string | null) ?? null, telefono, persona);
-      if ("error" in p)
-        return sinEnviar(
-          `pasaron más de 24 h desde su último mensaje y la plantilla no salió (${p.error})`,
-          `pasaron más de 24 h desde su último mensaje y la plantilla de la guía no salió (${p.error}). Mándasela desde el chat con 📋 Plantillas.`,
-        );
-      como = ` con la plantilla «${p.nombre}»`;
-    }
-    await registrarAuditoria({ accion: "chat_tienda_mensaje", entidad: "tiendas", entidadId: ctx.tiendaId, detalle: `${ctx.tienda}: guía del pedido ${ctx.orden.numero} por WhatsApp (iComfly)${como}, el cliente no tiene correo` });
-    return { linea: `el cliente no tiene correo: se le mandó la guía por WhatsApp (iComfly)${como}` };
-  } catch (e) {
-    return sinEnviar("no se pudo mandar el WhatsApp", `no se pudo mandar el WhatsApp (${e instanceof Error ? e.message : "error"}). Mándale la guía a mano.`);
-  }
-}
-
 /**
  * Los pasos después de confirmar: «guia» (la asesora, con el enlace público y el correo al cliente), «entregado» (la coordinadora o la asesora, cuando
  * Servientrega o el reparto local lo reportan) y «acreditar» (Finanzas, con el dinero en el banco: pone «acreditado» y pasa el pago a «Pagado»).
@@ -231,9 +161,21 @@ export async function pasoPedidoAtc(ordenId: string, pasoCrudo: unknown, datosCr
       if ("error" in g) return g;
       const { correo } = await cargarGuiaEnShopify(ctx.app, ctx.orden.numero, g);
       // Sin correo, Shopify no tiene a quién mandar el seguimiento: la guía va por WhatsApp (iComfly), en el número de la tienda (Hernán, 24 nov 2026).
-      const wa = correo ? null : await guiaPorWhatsapp(ctx, g);
+      const supabase = createServiceClient();
+      const persona = { id: ctx.usuario.id, nombre: (ctx.usuario.nombre || ctx.usuario.email || "Alguien").trim() };
+      const wa = correo
+        ? null
+        : await guiaPorWhatsapp(supabase, { ordenId: ctx.orden.id, numero: ctx.orden.numero, tienda: ctx.tienda, tiendaId: ctx.tiendaId, codigoPais: ctx.codigoPais, persona }, g);
       const linea = lineaPaso("guia", { guia: g.numero, nota, aviso: wa?.linea ?? null });
       await registrar(ctx, ctx.orden.etiquetas, linea, "guia", { guia: g.numero, transportista: g.empresa });
+      // La guía de SISCORE de este pedido que no había entrado sola sale de «Guía sin cargar» (24 nov 2026).
+      const avisoCliente = correo ? "correo" : wa?.enviado ? "whatsapp" : "a_mano";
+      await supabase
+        .from("tienda_guias")
+        .update({ shopify_estado: "cargada", shopify_motivo: avisoCliente === "a_mano" ? (wa?.aviso ?? null) : null, aviso_cliente: avisoCliente, shopify_en: new Date().toISOString() })
+        .eq("guia", g.numero)
+        .eq("orden_id", ctx.orden.id);
+      await supabase.from("tienda_guias").update({ shopify_estado: "resuelta", shopify_en: new Date().toISOString() }).eq("orden_id", ctx.orden.id).eq("shopify_estado", "pendiente");
       return { ok: true, etiquetas: ctx.orden.etiquetas, texto: linea, ...(wa?.aviso ? { aviso: wa.aviso } : {}) };
     }
     if (paso === "entregado") {
@@ -252,4 +194,25 @@ export async function pasoPedidoAtc(ordenId: string, pasoCrudo: unknown, datosCr
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Shopify no aceptó el cambio." };
   }
+}
+
+/**
+ * «Guía sin cargar» › «Ya está resuelto» (24 nov 2026): la asesora resolvió a mano la guía de SISCORE que no entró sola (la cargó en Shopify, le mandó
+ * la guía al cliente o despacho aclaró el pedido anulado). Sale de la vista y queda en la cronología.
+ */
+export async function resolverGuiaSinCargar(ordenId: string): Promise<ResultadoGestion> {
+  const ctx = await cargarContexto(ordenId, MODULOS_ASESORA);
+  if ("error" in ctx) return ctx;
+  const supabase = createServiceClient();
+  const ahora = new Date().toISOString();
+  const [a, b] = await Promise.all([
+    supabase.from("tienda_guias").update({ shopify_estado: "resuelta", shopify_en: ahora }).eq("orden_id", ctx.orden.id).eq("shopify_estado", "pendiente").select("guia"),
+    supabase.from("tienda_guias").update({ aviso_cliente: "a_mano_hecho", shopify_en: ahora }).eq("orden_id", ctx.orden.id).eq("aviso_cliente", "a_mano").select("guia"),
+  ]);
+  if (a.error || b.error) return { error: "No se pudo marcar la guía: " + (a.error ?? b.error)!.message };
+  const guias = [...new Set([...(a.data ?? []), ...(b.data ?? [])].map((g) => String(g.guia)))];
+  if (!guias.length) return { error: "Este pedido ya no tiene guías sin cargar." };
+  const linea = `Guía ${guias.join(", ")} de Servientrega: resuelta a mano (no había entrado sola en Shopify o el aviso al cliente no había salido)`;
+  await registrar(ctx, ctx.orden.etiquetas, linea, "guia_resuelta");
+  return { ok: true, etiquetas: ctx.orden.etiquetas, texto: linea };
 }
