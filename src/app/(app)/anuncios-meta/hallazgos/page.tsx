@@ -30,8 +30,6 @@ export default async function HallazgosMetaPage({ searchParams }: { searchParams
         analisis={(guardado?.analisis ?? vivo?.analisis)!}
         interpretacion={datos.interpretacion}
         iaConectada={datos.iaConectada}
-        tiendas={guardado?.tiendas ?? vivo?.tiendas ?? []}
-        pedidos={guardado?.pedidos ?? vivo?.pedidos ?? 0}
         preparando={datos.analisisPendiente}
       />
     </MarcoMeta>

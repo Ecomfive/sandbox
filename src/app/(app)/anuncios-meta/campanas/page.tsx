@@ -1,4 +1,6 @@
 import { CampanasLista } from "../campanas-lista";
+import { HallazgosDeSeccion } from "../hallazgos-tarjetas";
+import { QueGeneraMasVentas } from "../historial-seccion";
 import { cargarPaginaMeta, type ParametrosMeta } from "../datos-pagina";
 import { MarcoMeta } from "../marco-meta";
 import { ResumenCampanas } from "../resumen-campanas";
@@ -16,6 +18,12 @@ export default async function CampanasMetaPage({ searchParams }: { searchParams:
   return (
     <MarcoMeta titulo="Campañas" datos={datos} escribe={escribe} hayToken={hayToken} pais={pais}>
       <ResumenCampanas campanas={datos.campanas} />
+      {datos.historial && (
+        <div className="flex flex-col gap-3">
+          <HallazgosDeSeccion titulo="Lo que dicen los datos de las campañas" hallazgos={datos.historial.hallazgos.campanas} />
+          <QueGeneraMasVentas historial={datos.historial} claves={["campanas"]} />
+        </div>
+      )}
       <CampanasLista campanas={datos.campanas} // Solo los anuncios que gastaron en el periodo o siguen activos: mandar todos (miles, con su texto) pesaba ~17 MB y tardaba 6 s en cargar (medido el 23 nov 2026).
         anuncios={datos.anuncios.filter((a) => a.activo || a.r.gasto > 0)} cuentas={datos.cuentas} productos={datos.productos} escribe={escribe} abrirInicial={abrir ?? null} soloFaltanInicial={faltan === "1"} />
     </MarcoMeta>
