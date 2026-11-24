@@ -73,13 +73,13 @@ export function ContenidoResumen({ datos, escribe }: { datos: DatosMeta; escribe
         </p>
       )}
 
+      <ListaSugerencias sugerencias={datos.sugerencias} decididas={datos.decididas} escribe={escribe} />
+
+      <InterpretacionVista guardada={datos.interpretacion} preparando={datos.analisisPendiente} enlace />
+
       <div className="grid min-w-0 gap-6 lg:grid-cols-2">
-        <TarjetaMeta titulo={porSemana ? "Gasto por semana" : "Gasto por día"} derecha={rangoFechas} id="gasto-dia">
-          {t.gasto === 0 ? <p className="m-0 text-sm text-muted-foreground">No hubo gasto en este periodo.</p> : <Columnas datos={datos.serie.map((p) => ({ etiqueta: p.etiqueta, valor: Math.round(p.gasto) }))} formato={(n) => `$${n}`} color="var(--meta-1)" etiquetaGrafica="Gasto por día" alto={140} />}
-        </TarjetaMeta>
-        <TarjetaMeta titulo={porSemana ? "Compras por semana" : "Compras por día"} derecha={`${entero(t.compras)} en total`} id="compras-dia">
-          {t.compras === 0 ? <p className="m-0 text-sm text-muted-foreground">Todavía no hay compras en este periodo.</p> : <Columnas datos={datos.serie.map((p) => ({ etiqueta: p.etiqueta, valor: p.compras }))} color="var(--success)" etiquetaGrafica="Compras por día" alto={140} />}
-        </TarjetaMeta>
+        <ListaCampanas titulo="Las que más dejan" vacio="Ninguna campaña con más de $100 gastados deja ganancia todavía." campanas={mejores} color="var(--success)" />
+        <ListaCampanas titulo="Las que más pierden" vacio="Ninguna campaña con más de $100 gastados está perdiendo." campanas={peores} color="var(--destructive)" />
       </div>
 
       <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
@@ -138,7 +138,15 @@ export function ContenidoResumen({ datos, escribe }: { datos: DatosMeta; escribe
         </TarjetaMeta>
       </div>
 
-      <ListaSugerencias sugerencias={datos.sugerencias} decididas={datos.decididas} escribe={escribe} />
+
+      <div className="grid min-w-0 gap-6 lg:grid-cols-2">
+        <TarjetaMeta titulo={porSemana ? "Gasto por semana" : "Gasto por día"} derecha={rangoFechas} id="gasto-dia">
+          {t.gasto === 0 ? <p className="m-0 text-sm text-muted-foreground">No hubo gasto en este periodo.</p> : <Columnas datos={datos.serie.map((p) => ({ etiqueta: p.etiqueta, valor: Math.round(p.gasto) }))} formato={(n) => `$${n}`} color="var(--meta-1)" etiquetaGrafica="Gasto por día" alto={140} />}
+        </TarjetaMeta>
+        <TarjetaMeta titulo={porSemana ? "Compras por semana" : "Compras por día"} derecha={`${entero(t.compras)} en total`} id="compras-dia">
+          {t.compras === 0 ? <p className="m-0 text-sm text-muted-foreground">Todavía no hay compras en este periodo.</p> : <Columnas datos={datos.serie.map((p) => ({ etiqueta: p.etiqueta, valor: p.compras }))} color="var(--success)" etiquetaGrafica="Compras por día" alto={140} />}
+        </TarjetaMeta>
+      </div>
 
       <div className="grid min-w-0 gap-6 lg:grid-cols-2">
         <TarjetaMeta titulo="Campañas montadas por día" derecha="Últimos 14 días, todas las cuentas" id="por-dia">
@@ -187,12 +195,7 @@ export function ContenidoResumen({ datos, escribe }: { datos: DatosMeta; escribe
         </TarjetaMeta>
       </div>
 
-      <div className="grid min-w-0 gap-6 lg:grid-cols-2">
-        <ListaCampanas titulo="Las que más dejan" vacio="Ninguna campaña con más de $100 gastados deja ganancia todavía." campanas={mejores} color="var(--success)" />
-        <ListaCampanas titulo="Las que más pierden" vacio="Ninguna campaña con más de $100 gastados está perdiendo." campanas={peores} color="var(--destructive)" />
-      </div>
 
-      <InterpretacionVista guardada={datos.interpretacion} preparando={datos.analisisPendiente} enlace />
     </>
   );
 }

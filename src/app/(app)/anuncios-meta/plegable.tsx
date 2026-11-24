@@ -6,7 +6,7 @@ import { useId, useState, type ReactNode } from "react";
  * Una tarjeta del módulo que se pliega y se despliega (24 nov 2026, pedido de Alcides: «que se puedan desplegar y volver a replegar»). El encabezado entero es el botón (`aria-expanded`, `aria-controls`), con la misma franja gris de
  * `TarjetaMeta`; plegada deja a la vista su `resumen` (una línea con lo más importante) para no tener que abrirla para saber de qué trata. Lo de adentro no se dibuja mientras está plegada: la página pesa menos.
  */
-export function SeccionPlegable({ titulo, resumen, derecha, abierta = true, icono, children }: { titulo: string; resumen?: ReactNode; derecha?: ReactNode; abierta?: boolean; icono?: ReactNode; children: ReactNode }) {
+export function SeccionPlegable({ titulo, resumen, derecha, abierta = true, icono, sinRelleno = false, children }: { titulo: string; resumen?: ReactNode; derecha?: ReactNode; abierta?: boolean; icono?: ReactNode; /** El contenido llega hasta el borde (una tabla). */ sinRelleno?: boolean; children: ReactNode }) {
   const [visible, setVisible] = useState(abierta);
   const id = useId();
   return (
@@ -30,7 +30,7 @@ export function SeccionPlegable({ titulo, resumen, derecha, abierta = true, icon
         {derecha && <div className="text-xs text-muted-foreground">{derecha}</div>}
       </div>
       {visible && (
-        <div id={`${id}-c`} className="p-4">
+        <div id={`${id}-c`} className={sinRelleno ? "" : "p-4"}>
           {children}
         </div>
       )}

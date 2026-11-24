@@ -3,6 +3,7 @@ import { HallazgosDeSeccion } from "../hallazgos-tarjetas";
 import { EntregaDeProductos, QueGeneraMasVentas } from "../historial-seccion";
 import { ListaProductos } from "../lista-productos";
 import { MarcoMeta } from "../marco-meta";
+import { ResumenProductos } from "../resumen-productos";
 
 export const metadata = { title: "Productos · Anuncios Meta" };
 
@@ -18,6 +19,7 @@ export default async function ProductosMetaPage({ searchParams }: { searchParams
   const abrir = Array.isArray(sp.abrir) ? sp.abrir[0] : sp.abrir;
   return (
     <MarcoMeta titulo="Productos" datos={datos} escribe={escribe} hayToken={hayToken} pais={pais}>
+      <ResumenProductos productos={datos.productosVista} />
       {datos.historial && (
         <div className="flex flex-col gap-3">
           <HallazgosDeSeccion titulo="Lo que dicen los datos de los productos" hallazgos={datos.historial.hallazgos.productos} />
