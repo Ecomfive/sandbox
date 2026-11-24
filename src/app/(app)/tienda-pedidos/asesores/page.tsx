@@ -24,7 +24,8 @@ import {
 import { etapaConfirmacion, tiempoEsperando } from "@/lib/tienda/confirmacion";
 import { periodoElegido } from "@/lib/tienda/datos";
 import { pedidosDeTiendas } from "@/lib/tienda/datos-finanzas";
-import { diaPanama } from "@/lib/tienda/resumen";
+import { diaPanama, resumirPedidos } from "@/lib/tienda/resumen";
+import { cumplimientoMetas } from "@/lib/tienda/gestion-atc";
 import { sumarDias } from "@/lib/tienda/rango";
 import { PanelAsesores, type DatosPanelAsesores } from "./panel-asesores";
 
@@ -208,6 +209,11 @@ export default async function AsesoresTiendaPage({ searchParams }: { searchParam
     cola,
     multiTienda: miradas.length > 1,
     bot,
+    // Las metas del puesto del manual ATC (24 nov 2026), con los pedidos del periodo de la tienda.
+    metas: (() => {
+      const r = resumirPedidos(delPeriodo);
+      return cumplimientoMetas({ confirmacion: r.confirmacion, entrega: r.entrega, ticket: r.ticketPromedio, unidades: r.unidadesPorPedido });
+    })(),
   };
 
   const fechas = { periodo: texto(sp.periodo), desde: texto(sp.desde), hasta: texto(sp.hasta) };

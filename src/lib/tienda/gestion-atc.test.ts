@@ -70,3 +70,17 @@ test("las etiquetas de antes del manual se quitan al gestionar y no se sugieren"
   assert.deepEqual(planAtc("anular", ["CIUDAD", "ANULADO/VERIFICADO"], { ...PA, motivo: "MOT-CLIENTE-NO-CONTESTA" }), { agregar: ["MOT-CLIENTE-NO-CONTESTA"], quitar: ["ANULADO/VERIFICADO"] });
   assert.deepEqual(["Confirmada", "ANULADO/VERIFICADO", "Cancelado", "Pendiente", "CIUDAD", "MOT-CLIENTE-DUPLICA", "novedad", "Carrito recuperado", "Pedido Pagado"].filter(sugerenciaPermitida), ["Carrito recuperado", "Pedido Pagado"]);
 });
+
+import { cumplimientoMetas, leerGuia } from "./gestion-atc";
+
+test("la guía: número sin espacios y el enlace público (si no hay, la página de Servientrega)", () => {
+  assert.deepEqual(leerGuia({ numero: " 2001 1439 17 " }), { numero: "200114391 7".replace(" ", ""), url: "https://servientrega.com.pa/", empresa: "Servientrega" });
+  assert.ok("error" in leerGuia({ numero: "12" }));
+  assert.ok("error" in leerGuia({ numero: "200114391", url: "https://siscore.servientrega.com/consulta" }), "el portal interno no");
+  assert.ok("error" in leerGuia({ numero: "200114391", url: "javascript:alert(1)" }));
+});
+
+test("metas del puesto: cumple si llega a la meta", () => {
+  const m = cumplimientoMetas({ confirmacion: 86, entrega: 65, ticket: null, unidades: 2 });
+  assert.deepEqual(m.map((x) => x.cumple), [true, false, null, true]);
+});

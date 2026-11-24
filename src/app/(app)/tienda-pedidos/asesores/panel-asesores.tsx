@@ -8,6 +8,8 @@ import { ETIQUETA_FIN, RANGOS_ATENCION, textoMinutos, type AsesorConPuntaje, typ
 /** Lo que la página le pasa al panel (todo ya calculado en el servidor). */
 export interface DatosPanelAsesores {
   periodo: string;
+  /** Las metas del puesto del manual ATC (24 nov 2026): valor del periodo y si se cumple. */
+  metas?: { id: string; nombre: string; meta: number; unidad: string; valor: number | null; cumple: boolean | null }[];
   totales: {
     confirmadosSistema: number;
     confirmadosAntes: number;
@@ -229,6 +231,21 @@ export function PanelAsesores({ datos }: { datos: DatosPanelAsesores }) {
           </div>
         ))}
       </section>
+
+      {datos.metas && (
+        <section aria-label="Metas del puesto" className="flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-lg border border-border bg-card px-4 py-2.5 text-[13px]">
+          <span className="text-xs font-semibold tracking-wide text-primario uppercase">Metas del puesto</span>
+          {datos.metas.map((m) => (
+            <span key={m.id} className="inline-flex items-center gap-1.5" title={`Meta: ${m.meta} ${m.unidad} o más (manual ATC; base de la bonificación mensual)`}>
+              <span className="text-muted-foreground">{m.nombre}</span>
+              <b className="tabular-nums">{m.valor === null ? "—" : `${m.valor.toLocaleString("es-PA", { maximumFractionDigits: 2 })} ${m.unidad}`}</b>
+              <span className={`text-xs ${m.cumple === null ? "text-muted-foreground" : m.cumple ? "text-success" : "text-destructive"}`}>
+                {m.cumple === null ? "sin datos" : m.cumple ? `✓ meta ${m.meta}` : `✗ meta ${m.meta}`}
+              </span>
+            </span>
+          ))}
+        </section>
+      )}
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
         <Tarjeta id="pa-quien" titulo="Quién confirma" extra={`${conAsesor} % con asesor`}>

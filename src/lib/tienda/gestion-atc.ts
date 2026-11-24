@@ -186,3 +186,45 @@ export const VISTAS_ATC: VistaAtc[] = [
 
 /** La hora actual para las vistas («más de 48 h»): se lee una vez al abrir la lista. */
 export const ahoraMs = () => Date.now();
+
+// ── El resto del recorrido (24 nov 2026): guía y rastreo (asesora), entregado (coordinadora o asesora) y acreditado + pagado (Finanzas).
+
+export type PasoAtc = "guia" | "entregado" | "acreditar";
+
+/** Las transportadoras de la guía. El manual: Servientrega para INTERIOR; si el enlace público no trae la guía, se registra la página de Servientrega. */
+export const TRANSPORTADORAS = [{ nombre: "Servientrega", url: "https://servientrega.com.pa/" }] as const;
+
+/** La guía escrita por la asesora, lista para Shopify, o el error. El enlace tiene que ser el público (http/https), nunca el del portal interno. */
+export function leerGuia(datos: { numero?: unknown; url?: unknown; empresa?: unknown }): { numero: string; url: string; empresa: string } | { error: string } {
+  const numero = String(datos.numero ?? "").replace(/\s+/g, "").trim();
+  if (!/^[A-Za-z0-9-]{5,40}$/.test(numero)) return { error: "Escribe el número de guía (sin espacios)." };
+  const empresa = TRANSPORTADORAS.find((t) => t.nombre === datos.empresa) ?? TRANSPORTADORAS[0];
+  const url = String(datos.url ?? "").trim() || empresa.url;
+  if (!/^https?:\/\/[^\s]+$/i.test(url) || url.length > 500) return { error: "El enlace de rastreo tiene que ser una dirección web (el enlace público de Servientrega)." };
+  if (/siscore|portal/i.test(url)) return { error: "Ese parece el enlace del portal interno: el cliente no tiene acceso. Usa el enlace público de servientrega.com.pa." };
+  return { numero, url, empresa: empresa.nombre };
+}
+
+/** La línea de la cronología de cada paso. */
+export function lineaPaso(paso: PasoAtc, datos: { guia?: string; nota?: string | null }): string {
+  const por = datos.nota?.trim() ? ` — ${datos.nota.trim()}` : "";
+  if (paso === "guia") return `Guía cargada en Shopify: ${datos.guia} (Servientrega), con correo de seguimiento al cliente${por}`;
+  if (paso === "entregado") return `Marcado como entregado en Shopify${por}`;
+  return `Finanzas: dinero acreditado en el banco, pago pasado a «Pagado»${por}`;
+}
+
+/** Las metas del puesto (base de la bonificación mensual), del manual. */
+export const METAS_PUESTO = [
+  { id: "confirmacion", nombre: "Tasa de confirmación efectiva", meta: 85, unidad: "%" },
+  { id: "entrega", nombre: "Tasa de entrega efectiva", meta: 70, unidad: "%" },
+  { id: "ticket", nombre: "Ticket promedio", meta: 40, unidad: "USD" },
+  { id: "unidades", nombre: "Unidades por pedido", meta: 2, unidad: "u." },
+] as const;
+
+/** Cada meta con su valor del periodo y si se cumple (null = sin datos). */
+export function cumplimientoMetas(v: { confirmacion: number | null; entrega: number | null; ticket: number | null; unidades: number | null }) {
+  return METAS_PUESTO.map((m) => {
+    const valor = v[m.id];
+    return { ...m, valor, cumple: valor === null ? null : valor >= m.meta };
+  });
+}
