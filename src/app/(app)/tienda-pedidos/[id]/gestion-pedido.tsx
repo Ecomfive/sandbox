@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { Pastilla } from "@/components/panel/piezas-panel";
 import { anilloFoco, fieldClassSm } from "@/components/ui/field";
-import { ETIQUETA_ACREDITADO, MOTIVOS_ANULACION, TRANSPORTADORAS, ZONAS_ATC, conNovedad, motivoAtc, porConfirmar, zonaAtc, type AccionAtc, type PasoAtc } from "@/lib/tienda/gestion-atc";
+import { ETIQUETA_ACREDITADO, MOTIVOS_ANULACION, TRANSPORTADORAS, ZONAS_ATC, conNovedad, enlaceRastreo, motivoAtc, porConfirmar, zonaAtc, type AccionAtc, type PasoAtc } from "@/lib/tienda/gestion-atc";
 import { gestionarPedidoAtc, pasoPedidoAtc, type ResultadoGestion } from "../gestion-actions";
 
 type Abierto = AccionAtc | PasoAtc;
@@ -11,7 +11,7 @@ type Abierto = AccionAtc | PasoAtc;
 /**
  * Gestión del pedido con el manual ATC (24 nov 2026): el estado en palabras y los botones de cada rol, en el orden del recorrido.
  *  - Asesora: Confirmar (elige la zona), Novedad (el cliente pidió esperar), Anular (un solo motivo del árbol), Cargar guía (interior: Servientrega, con el
- *    enlace público y el correo al cliente) y Entregado (también la coordinadora).
+ *    enlace de rastreo armado con el número y el correo al cliente) y Entregado (también la coordinadora).
  *  - Finanzas: Acreditado y pagado, con el dinero en el banco.
  * Cada botón escribe en Shopify y deja su línea en la cronología (Notas del equipo). El sistema no deja anular sin motivo, borrar la zona al anular, poner
  * dos motivos ni inventar etiquetas.
@@ -44,7 +44,7 @@ export function GestionPedido({
   const [motivo, setMotivo] = useState<string>("");
   const [nota, setNota] = useState("");
   const [numeroGuia, setNumeroGuia] = useState("");
-  const [url, setUrl] = useState("");
+  const numeroLimpio = numeroGuia.replace(/\s+/g, "");
   const [error, setError] = useState<string | null>(null);
   const [pendiente, iniciar] = useTransition();
 
@@ -73,7 +73,6 @@ export function GestionPedido({
     setNota("");
     setMotivo("");
     setNumeroGuia(guia ?? "");
-    setUrl("");
     setZona(zonaActual ?? "");
     setAbierta((x) => (x === a ? null : a));
   }
@@ -86,7 +85,7 @@ export function GestionPedido({
       const r =
         abierta === "confirmar" || abierta === "novedad" || abierta === "anular"
           ? await gestionarPedidoAtc(ordenId, abierta, { zona, motivo, nota })
-          : await pasoPedidoAtc(ordenId, abierta, { guia: numeroGuia, url, nota });
+          : await pasoPedidoAtc(ordenId, abierta, { guia: numeroGuia, nota });
       if ("error" in r) {
         setError(r.error);
         return;
@@ -209,16 +208,21 @@ export function GestionPedido({
               <div className="flex flex-wrap gap-2">
                 <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
                   Número de guía ({TRANSPORTADORAS[0].nombre})
-                  <input value={numeroGuia} onChange={(e) => setNumeroGuia(e.target.value)} required maxLength={40} inputMode="text" className={`${fieldClassSm} w-48`} placeholder="Ej.: 2001143917" />
-                </label>
-                <label className="flex min-w-60 flex-1 flex-col gap-1 text-xs font-medium text-muted-foreground">
-                  Enlace público de rastreo (servientrega.com.pa → Rastrea tu envío)
-                  <input value={url} onChange={(e) => setUrl(e.target.value)} type="url" maxLength={500} className={`${fieldClassSm} w-full`} placeholder={TRANSPORTADORAS[0].url} />
+                  <input value={numeroGuia} onChange={(e) => setNumeroGuia(e.target.value)} required maxLength={40} inputMode="text" className={`${fieldClassSm} w-48`} placeholder="Ej.: 7224147076" />
                 </label>
               </div>
               <p className="m-0 text-xs text-muted-foreground">
-                Nunca el enlace del portal interno: el cliente no tiene acceso. Si el enlace público no trae la guía, déjalo vacío y va la página de Servientrega. Shopify le manda al cliente el
-                correo con el seguimiento; envíale también la guía por WhatsApp.
+                El enlace de rastreo se arma solo con el número
+                {numeroLimpio.length >= 5 && (
+                  <>
+                    {": "}
+                    <a href={enlaceRastreo(numeroLimpio)} target="_blank" rel="noopener noreferrer" className="font-medium text-primary underline">
+                      {enlaceRastreo(numeroLimpio)}
+                    </a>{" "}
+                    (ábrelo para revisar que la guía sea la correcta)
+                  </>
+                )}
+                . Shopify le manda al cliente el correo con el seguimiento; envíale también la guía por WhatsApp.
               </p>
             </>
           )}
