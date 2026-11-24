@@ -400,6 +400,8 @@ const completo: DatosCrearDropi = {
   codigoBarras: null,
   bodegas: [{ id: 81, unidades: 120 }],
   fotos: ["1.jpg", "2.jpg", "3.jpg"].map(foto),
+  // Estas pruebas miran lo que se publica; dejar el stock en 0 tiene sus propias pruebas más abajo.
+  quitarTemporal: false,
 };
 
 test("publicar: crea el producto, sube las 3 fotos (la primera principal), pone las garantías y el stock, y devuelve el ID", async () => {
@@ -424,6 +426,32 @@ test("publicar: si Dropi no toma el stock al crear, se le da con una entrada y s
   assert.equal(r.ok, true, String(r.error));
   assert.deepEqual(d.stockDe(d.productos.get(9001)!), { 81: 120 });
   assert.ok(d.llamadas.includes("PUT /products/9001"));
+});
+
+test("publicar: al terminar deja el stock en 0 (solo las unidades que se pusieron para poder crear)", async () => {
+  const d = crearDropi();
+  const [r] = await aplicar(d, [{ ...base, id: "p1", tipo: "crear", producto: 0, datos: { ...completo, quitarTemporal: true } }]);
+  assert.equal(r.ok, true, String(r.error));
+  assert.equal(r.stock, 0);
+  assert.equal(r.aviso, null);
+  assert.deepEqual(d.stockDe(d.productos.get(9001)!), { 81: 0 });
+  assert.equal(r.fotos, 3);
+});
+
+test("publicar: con «dejar en 0» apagado, el stock queda como se puso", async () => {
+  const d = crearDropi();
+  const [r] = await aplicar(d, [{ ...base, id: "p1", tipo: "crear", producto: 0, datos: { ...completo, quitarTemporal: false } }]);
+  assert.equal(r.ok, true, String(r.error));
+  assert.equal(r.stock, 120);
+});
+
+test("publicar: si Dropi no deja sacar el stock, el producto queda publicado y el aviso dice que se saque en Dropi (sin reintento que lo vuelva a poner)", async () => {
+  const d = crearDropi({ fallaPutDe: 9001 });
+  const [r] = await aplicar(d, [{ ...base, id: "p1", tipo: "crear", producto: 0, datos: { ...completo, quitarTemporal: true } }]);
+  assert.equal(r.ok, true, String(r.error));
+  assert.equal(r.nuevo, 9001);
+  assert.match(String(r.aviso), /dejar el stock en 0/);
+  assert.equal(r.stock, 120);
 });
 
 test("publicar: un reintento sigue desde el producto ya creado (no crea otro, no repite garantías ni fotos)", async () => {

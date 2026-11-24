@@ -46,6 +46,7 @@ const completo: DatosCrearDropi = {
   codigoBarras: null,
   bodegas: [{ id: 81, unidades: 120 }],
   fotos: [1, 2, 3].map((n) => ({ url: `https://x.supabase.co/storage/v1/object/public/wms-productos/publicaciones/p/${n}.jpg`, nombre: `${n}.jpg` })),
+  quitarTemporal: true,
 };
 
 test("lo que Dropi exige: nada falta cuando todo está", () => {
@@ -170,4 +171,12 @@ test("las fotos ya subidas a Dropi: se guardan solo las que son del cambio, sin 
   const d = normalizarDatosCrear({ fotos, subidas: ["https://x.co/b.png", "https://ajena.co/q.png"] });
   assert.deepEqual(d.subidas, ["https://x.co/b.png"]);
   assert.equal("subidas" in normalizarDatosCrear({ fotos }), false, "sin fotos subidas, el campo no aparece");
+});
+
+test("dejar el stock en 0 después de publicar es lo normal: solo una creación que dice false lo conserva", () => {
+  assert.equal(normalizarDatosCrear({ ...completo }).quitarTemporal, true);
+  const sinCampo: Record<string, unknown> = { ...completo };
+  delete sinCampo.quitarTemporal;
+  assert.equal(normalizarDatosCrear(sinCampo).quitarTemporal, true);
+  assert.equal(normalizarDatosCrear({ ...completo, quitarTemporal: false }).quitarTemporal, false);
 });

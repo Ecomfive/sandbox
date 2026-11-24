@@ -365,6 +365,11 @@ export function CamposDatosDropi({
         <Campo etiqueta="Unidades" id={id("unidades")} obligatorio faltante={faltante} mensaje={`Dropi pide ${MIN_STOCK_CREAR} o más`}>
           <input id={id("unidades")} name="dd_unidades" type="number" required min={MIN_STOCK_CREAR} step={1} defaultValue={bodega?.unidades ?? MIN_STOCK_CREAR} aria-invalid={invalido(id("unidades"))} className={`${fieldClass} w-full tabular-nums`} />
         </Campo>
+        <input type="hidden" name="dd_quitar_temporal_v" value="1" />
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" name="dd_quitar_temporal" defaultChecked={inicial?.quitarTemporal !== false} className="h-4 w-4 shrink-0" />
+          Dejar en 0 después de publicar
+        </label>
       </Seccion>
 
       <Seccion icono={AdjuntoIcon} titulo="Fotos">
