@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { MOTIVOS_ANULACION, VISTAS_ATC, confirmadoAtc, lineaCronologia, planAtc } from "./gestion-atc";
+import { MOTIVOS_ANULACION, VISTAS_ATC, confirmadoAtc, lineaCronologia, planAtc, sugerenciaPermitida } from "./gestion-atc";
 
 const PA = { codigoPais: "PA" };
 
@@ -52,12 +52,21 @@ test("vistas: por confirmar, 48 h, novedades, anulados sin motivo y sin etiqueta
   assert.equal(v("48h").incluye({ estado: "nuevo", etiquetas: ["por confirmar datos"], creado: "2026-11-24T10:00:00Z" }, ahora), false);
   assert.equal(v("por-confirmar").incluye({ estado: "nuevo", etiquetas: ["novedad"], creado: "" }, ahora), false);
   assert.equal(v("novedades").incluye({ estado: "nuevo", etiquetas: ["novedad"], creado: "" }, ahora), true);
-  assert.equal(v("anulados-sin-motivo").incluye({ estado: "cancelado", etiquetas: ["CIUDAD"], creado: "" }, ahora), true);
-  assert.equal(v("anulados-sin-motivo").incluye({ estado: "cancelado", etiquetas: ["CIUDAD", "MOT-CLIENTE-NO-CONTESTA"], creado: "" }, ahora), false);
+  assert.equal(v("anulados-sin-motivo").incluye({ estado: "cancelado", etiquetas: ["CIUDAD"], creado: "2026-11-24T15:00:00Z" }, ahora), true);
+  assert.equal(v("anulados-sin-motivo").incluye({ estado: "cancelado", etiquetas: ["CIUDAD", "MOT-CLIENTE-NO-CONTESTA"], creado: "2026-11-24T15:00:00Z" }, ahora), false);
+  assert.equal(v("anulados-sin-motivo").incluye({ estado: "cancelado", etiquetas: ["ANULADO/VERIFICADO"], creado: "2026-11-10T15:00:00Z" }, ahora), false, "lo de antes del manual no cuenta");
+  assert.equal(v("sin-pagar").incluye({ estado: "entregado", etiquetas: ["CIUDAD"], creado: "2026-11-10T15:00:00Z" }, ahora), false, "lo de antes del manual no cuenta");
+  assert.equal(v("sin-pagar").incluye({ estado: "entregado", etiquetas: ["CIUDAD"], creado: "2026-11-25T15:00:00Z" }, ahora), true);
   assert.equal(v("sin-etiqueta").incluye({ estado: "nuevo", etiquetas: ["easysell_cod_form"], creado: "" }, ahora), true);
   assert.equal(v("sin-pagar").incluye({ estado: "entregado", etiquetas: ["CIUDAD", "acreditado"], creado: "" }, ahora), false);
 });
 
 test("la línea de la cronología dice qué y por qué", () => {
   assert.equal(lineaCronologia("anular", { motivo: "MOT-CLIENTE-SIN-DINERO", nota: "paga el viernes" }), "Anulado · MOT-CLIENTE-SIN-DINERO — paga el viernes");
+});
+
+test("las etiquetas de antes del manual se quitan al gestionar y no se sugieren", () => {
+  assert.deepEqual(planAtc("confirmar", ["easysell_cod_form", "Pendiente", "Modificar Dirección"], { ...PA, zona: "CIUDAD" }), { agregar: ["CIUDAD"], quitar: ["Pendiente", "Modificar Dirección"] });
+  assert.deepEqual(planAtc("anular", ["CIUDAD", "ANULADO/VERIFICADO"], { ...PA, motivo: "MOT-CLIENTE-NO-CONTESTA" }), { agregar: ["MOT-CLIENTE-NO-CONTESTA"], quitar: ["ANULADO/VERIFICADO"] });
+  assert.deepEqual(["Confirmada", "ANULADO/VERIFICADO", "Cancelado", "Pendiente", "CIUDAD", "MOT-CLIENTE-DUPLICA", "novedad", "Carrito recuperado", "Pedido Pagado"].filter(sugerenciaPermitida), ["Carrito recuperado", "Pedido Pagado"]);
 });
