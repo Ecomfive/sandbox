@@ -2,7 +2,13 @@ import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { ToastProvider } from "@/components/ui/toast";
 
-export const metadata: Metadata = { title: "Mi ruta" };
+// Se instala en el celular como su propia app (24 nov 2026): «Agregar a la pantalla de inicio» deja el ícono «Mi ruta», que abre el panel directo, sin
+// Play Store. Su manifiesto (`public/repartidor.webmanifest`) reemplaza aquí al del sistema («Fuentes», que abre Instagram).
+export const metadata: Metadata = {
+  title: "Mi ruta",
+  manifest: "/repartidor.webmanifest",
+  appleWebApp: { capable: true, title: "Mi ruta", statusBarStyle: "default" },
+};
 export const viewport: Viewport = { themeColor: "#8a35c9" };
 
 /**
