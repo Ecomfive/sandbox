@@ -58,3 +58,8 @@ test("la fecha de llegada: un día, un rango o en blanco", () => {
   assert.equal(fechaDeLlegada([{ llegadaEn: "2026-11-26T15:00:00Z" }, { llegadaEn: "2026-11-24T20:00:00Z" }]), "24/11/2026 - 26/11/2026");
   assert.equal(fechaDeLlegada([{}]), "");
 });
+
+test("el nombre del archivo de un lote lleva la hora de Panamá", () => {
+  assert.equal(nombreArchivoLista(new Date("2026-11-24T20:00:00Z"), false, "2026-11-24T12:14:10Z"), "lista-llegadas-puerto-2026-11-24-0714.pdf");
+  assert.equal(nombreArchivoLista(new Date("2026-11-24T20:00:00Z"), true, "2026-11-24T12:14:10Z"), "lista-llegadas-puerto-con-fotos-2026-11-24-0714.pdf");
+});

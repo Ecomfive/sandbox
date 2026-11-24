@@ -16,7 +16,7 @@ export const BOTON_DESARCHIVAR = `${BOTON} border border-warning/30 bg-warning-s
  * «Descargar lista» y «Descargar lista con fotos»: el PDF en la hoja de recepción de Logística (nombre del producto, unidades y cajas, con las casillas para anotar al recibir).
  * Las dos versiones se arman en el navegador con las filas que recibe (las pendientes de recibir). Lo usan la lista de Llegadas a puerto y el Centro de notificaciones.
  */
-export function BotonesListaPuerto({ filas }: { filas: FilaLlegada[] }) {
+export function BotonesListaPuerto({ filas, desdeLote, todos }: { filas: FilaLlegada[]; /** El instante de la primera llegada del lote (para nombrar el archivo). */ desdeLote?: string; /** Son todas las del periodo, no un lote: los botones lo dicen. */ todos?: boolean }) {
   const [armando, setArmando] = useState<"lista" | "fotos" | null>(null);
   const { mostrarToast } = useToast();
 
@@ -29,7 +29,7 @@ export function BotonesListaPuerto({ filas }: { filas: FilaLlegada[] }) {
       const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: "application/pdf" }));
       const enlace = document.createElement("a");
       enlace.href = url;
-      enlace.download = nombreArchivoLista(ahora, conFotos);
+      enlace.download = nombreArchivoLista(ahora, conFotos, desdeLote);
       document.body.appendChild(enlace);
       enlace.click();
       enlace.remove();
@@ -45,10 +45,10 @@ export function BotonesListaPuerto({ filas }: { filas: FilaLlegada[] }) {
   return (
     <div className="flex flex-wrap gap-2">
       <button type="button" onClick={() => descargar(false)} disabled={armando !== null || filas.length === 0} className={BOTON_LISTA}>
-        {armando === "lista" ? "Armando la lista…" : "Descargar lista"}
+        {armando === "lista" ? "Armando la lista…" : todos ? "Descargar todo" : "Descargar lista"}
       </button>
       <button type="button" onClick={() => descargar(true)} disabled={armando !== null || filas.length === 0} className={BOTON_LISTA_FOTOS}>
-        {armando === "fotos" ? "Armando la lista…" : "Descargar lista con fotos"}
+        {armando === "fotos" ? "Armando la lista…" : todos ? "Descargar todo con fotos" : "Descargar lista con fotos"}
       </button>
     </div>
   );
