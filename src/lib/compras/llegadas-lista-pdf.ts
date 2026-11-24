@@ -192,7 +192,15 @@ export async function listaLlegadasAPdf(filas: FilaLlegada[], { conFotos, cargar
   return doc.save();
 }
 
-/** «lista-llegadas-puerto-2026-11-24.pdf» / «lista-llegadas-puerto-con-fotos-2026-11-24.pdf». */
-export function nombreArchivoLista(fecha: Date, conFotos: boolean): string {
-  return `lista-llegadas-puerto${conFotos ? "-con-fotos" : ""}-${fecha.toISOString().slice(0, 10)}.pdf`;
+/**
+ * «lista-llegadas-puerto-2026-11-24.pdf» / «lista-llegadas-puerto-con-fotos-2026-11-24.pdf». De un lote (`desdeLote`, el instante de su primera llegada), lleva también la hora de Panamá:
+ * «lista-llegadas-puerto-2026-11-24-0714.pdf», para no confundir dos lotes del mismo día.
+ */
+export function nombreArchivoLista(fecha: Date, conFotos: boolean, desdeLote?: string): string {
+  const base = `lista-llegadas-puerto${conFotos ? "-con-fotos" : ""}`;
+  if (desdeLote && !Number.isNaN(Date.parse(desdeLote))) {
+    const [dia, hora] = new Date(desdeLote).toLocaleString("sv-SE", { timeZone: "America/Panama", hour12: false }).split(" ");
+    return `${base}-${dia}-${hora.slice(0, 5).replace(":", "")}.pdf`;
+  }
+  return `${base}-${fecha.toISOString().slice(0, 10)}.pdf`;
 }

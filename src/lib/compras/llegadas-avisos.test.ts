@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { ETAPAS_COMPRA } from "../../app/(app)/compras/def-compras";
 import { ETAPAS_LLEGADA_PUERTO, esLlegadaPuerto } from "./etapas-puerto";
-import { armarAviso, pendientesDeRecibir, yaArchivadas, desdeDeLista, diasDeLista, llegadaDeEtapa, unaPorCompra, pagadoTrasSegundoPago, revisarPago, textoProductos, totalesDeLlegada, filaSinMontos, type FilaLlegada } from "./llegadas-avisos";
+import { agruparEnLotes, nombreDeLote, armarAviso, pendientesDeRecibir, yaArchivadas, desdeDeLista, diasDeLista, llegadaDeEtapa, unaPorCompra, pagadoTrasSegundoPago, revisarPago, textoProductos, totalesDeLlegada, filaSinMontos, type FilaLlegada } from "./llegadas-avisos";
 
 const fila = (o: Partial<FilaLlegada> = {}): FilaLlegada => ({
   compraId: "c1",
@@ -138,4 +138,36 @@ test("lo archivado sale de «por recibir» y se ve aparte, sin perder el orden",
   const lista = [fila({ compraId: "a" }), fila({ compraId: "b", archivadaEn: "2026-11-24T10:00:00Z" }), fila({ compraId: "c", archivadaEn: null }), fila({ compraId: "d", archivadaEn: "2026-11-23T10:00:00Z" })];
   assert.deepEqual(pendientesDeRecibir(lista).map((f) => f.compraId), ["a", "c"]);
   assert.deepEqual(yaArchivadas(lista).map((f) => f.compraId), ["b", "d"]);
+});
+
+test("las llegadas se separan en lotes por tandas: las que caen con poco tiempo entre una y otra van juntas", () => {
+  // De la más reciente a la más antigua, como las trae la lista.
+  const lista = [
+    fila({ compraId: "e", llegadaEn: "2026-11-24T13:24:00Z" }),
+    fila({ compraId: "d", llegadaEn: "2026-11-24T13:21:30Z" }),
+    fila({ compraId: "c", llegadaEn: "2026-11-24T12:15:40Z" }),
+    fila({ compraId: "b", llegadaEn: "2026-11-24T12:15:00Z" }),
+    fila({ compraId: "a", llegadaEn: "2026-11-24T12:14:10Z" }),
+  ];
+  const lotes = agruparEnLotes(lista);
+  assert.equal(lotes.length, 2);
+  assert.deepEqual(lotes[0].filas.map((f) => f.compraId), ["e", "d"]);
+  assert.deepEqual(lotes[1].filas.map((f) => f.compraId), ["c", "b", "a"]);
+  assert.equal(lotes[1].desde, "2026-11-24T12:14:10Z");
+  assert.equal(lotes[1].hasta, "2026-11-24T12:15:40Z");
+  assert.equal(lotes[1].clave, "a");
+  // Con una brecha muy corta, cada una es su propio lote; vacío, sin lotes.
+  assert.equal(agruparEnLotes(lista, 0.01).length, 5);
+  assert.deepEqual(agruparEnLotes([]), []);
+});
+
+test("una llegada sin fecha forma su propio lote", () => {
+  const lotes = agruparEnLotes([fila({ compraId: "a", llegadaEn: "2026-11-24T12:00:00Z" }), fila({ compraId: "b" })]);
+  assert.equal(lotes.length, 2);
+});
+
+test("el nombre del lote dice el día y la hora de Panamá", () => {
+  assert.match(nombreDeLote("2026-11-24T12:14:10Z", "2026-11-24T12:14:50Z"), /^24 nov(\.)? 2026 · 7:14\s?a\.\s?m\.$/);
+  assert.match(nombreDeLote("2026-11-24T12:14:10Z", "2026-11-24T12:15:40Z"), /7:14\s?a\.\s?m\. – 7:15\s?a\.\s?m\./);
+  assert.equal(nombreDeLote("", ""), "Sin fecha");
 });

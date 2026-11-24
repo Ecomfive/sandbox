@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { BotonesListaPuerto } from "@/components/llegadas/botones-lista-puerto";
 import { anilloFoco } from "@/components/ui/field";
-import { RUTA_LISTA_PUERTO, textoProductos, totalesDeLlegada, type FilaLlegada } from "@/lib/compras/llegadas-avisos";
+import { agruparEnLotes, nombreDeLote, RUTA_LISTA_PUERTO, textoProductos, totalesDeLlegada, type FilaLlegada } from "@/lib/compras/llegadas-avisos";
 import { marcarAvisoLeido } from "@/lib/menciones-actions";
 
 /** Las llegadas a puerto que se juntan en una sola tarjeta de «Para ti» (24 nov 2026, pedido de Logística: un aviso por producto era imposible de leer). */
@@ -32,6 +32,7 @@ export function LlegadasPuertoAviso({ datos }: { datos: LlegadasEnAvisos }) {
   const router = useRouter();
   const [pendiente, start] = useTransition();
   const t = totalesDeLlegada(datos.filas);
+  const lotes = agruparEnLotes(datos.filas);
   const sinLeer = datos.sinLeer > 0;
 
   const marcarLeidos = () =>
@@ -51,7 +52,7 @@ export function LlegadasPuertoAviso({ datos }: { datos: LlegadasEnAvisos }) {
           {sinLeer && <span className="sr-only">(sin leer)</span>}
         </h3>
         <p className="m-0 text-xs text-muted-foreground">
-          Prepárense: la lista completa, de la llegada más reciente a la más antigua · último aviso {fechaHora(datos.creadoEn)}
+          Prepárense: la lista completa, separada por llegadas (la más reciente primero) · último aviso {fechaHora(datos.creadoEn)}
           {datos.archivadas > 0 ? ` · ${entero(datos.archivadas)} ya archivadas` : ""}
         </p>
       </div>
@@ -59,32 +60,47 @@ export function LlegadasPuertoAviso({ datos }: { datos: LlegadasEnAvisos }) {
       {datos.filas.length === 0 ? (
         <p className="m-0 text-sm text-muted-foreground">Todo lo que llegó a puerto ya está recibido y archivado.</p>
       ) : (
-        <ol aria-label="Lista de llegadas a puerto por recibir" tabIndex={0} className={`m-0 flex max-h-80 list-none flex-col overflow-y-auto rounded-md border border-border bg-card p-0 ${anilloFoco}`}>
-          <li aria-hidden="true" className="sticky top-0 z-10 grid grid-cols-[2rem_1fr_4.5rem_3.5rem] gap-2 border-b border-border bg-muted px-2 py-1 text-xs font-semibold text-muted-foreground">
-            <span>#</span>
-            <span>Producto</span>
-            <span className="text-right">Unidades</span>
-            <span className="text-right">Cajas</span>
-          </li>
-          {datos.filas.map((f, i) => (
-            <li key={f.compraId} className="grid grid-cols-[2rem_1fr_4.5rem_3.5rem] items-baseline gap-2 border-b border-border px-2 py-1.5 text-sm last:border-b-0">
-              <span className="text-xs tabular-nums text-muted-foreground">{i + 1}</span>
-              <span className="min-w-0 break-words">{textoProductos(f)}</span>
-              <span className="text-right tabular-nums">
-                <span className="sr-only">Unidades: </span>
-                {f.unidades == null ? "—" : entero(f.unidades)}
-              </span>
-              <span className="text-right tabular-nums">
-                <span className="sr-only">Cajas: </span>
-                {f.cajas == null ? "—" : entero(f.cajas)}
-              </span>
-            </li>
-          ))}
-        </ol>
+        <div className="flex flex-col gap-3">
+          {lotes.map((lote) => {
+            const tl = totalesDeLlegada(lote.filas);
+            return (
+              <section key={lote.clave} aria-labelledby={`aviso-lote-${lote.clave}`} className="flex flex-col gap-1.5">
+                <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+                  <h4 id={`aviso-lote-${lote.clave}`} className="m-0 text-xs font-semibold">
+                    Llegada del {nombreDeLote(lote.desde, lote.hasta)} · {entero(tl.compras)} {tl.compras === 1 ? "compra" : "compras"} · {entero(tl.unidades)} u. · {entero(tl.cajas)} cajas
+                  </h4>
+                  <BotonesListaPuerto filas={lote.filas} desdeLote={lote.desde} />
+                </div>
+                <ol aria-label={`Compras de la llegada del ${nombreDeLote(lote.desde, lote.hasta)}`} tabIndex={0} className={`m-0 flex max-h-64 list-none flex-col overflow-y-auto rounded-md border border-border bg-card p-0 ${anilloFoco}`}>
+                  <li aria-hidden="true" className="sticky top-0 z-10 grid grid-cols-[2rem_1fr_4.5rem_3.5rem] gap-2 border-b border-border bg-muted px-2 py-1 text-xs font-semibold text-muted-foreground">
+                    <span>#</span>
+                    <span>Producto</span>
+                    <span className="text-right">Unidades</span>
+                    <span className="text-right">Cajas</span>
+                  </li>
+                  {lote.filas.map((f, i) => (
+                    <li key={f.compraId} className="grid grid-cols-[2rem_1fr_4.5rem_3.5rem] items-baseline gap-2 border-b border-border px-2 py-1.5 text-sm last:border-b-0">
+                      <span className="text-xs tabular-nums text-muted-foreground">{i + 1}</span>
+                      <span className="min-w-0 break-words">{textoProductos(f)}</span>
+                      <span className="text-right tabular-nums">
+                        <span className="sr-only">Unidades: </span>
+                        {f.unidades == null ? "—" : entero(f.unidades)}
+                      </span>
+                      <span className="text-right tabular-nums">
+                        <span className="sr-only">Cajas: </span>
+                        {f.cajas == null ? "—" : entero(f.cajas)}
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              </section>
+            );
+          })}
+        </div>
       )}
 
       <div className="flex flex-wrap items-center gap-2">
-        <BotonesListaPuerto filas={datos.filas} />
+        <BotonesListaPuerto filas={datos.filas} todos />
         <Link
           href={RUTA_LISTA_PUERTO}
           onClick={() => void Promise.all(datos.avisoIds.map((id) => marcarAvisoLeido(id)))}
