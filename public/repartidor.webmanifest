@@ -1,6 +1,6 @@
 {
-  "name": "Mi ruta · Ecomfive",
-  "short_name": "Mi ruta",
+  "name": "Ecomfive",
+  "short_name": "Ecomfive",
   "description": "El panel del repartidor: su ruta del día, las entregas y el cierre.",
   "lang": "es",
   "id": "/repartidor",
