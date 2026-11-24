@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   analizarHistorico,
+  filasMensuales,
   bandasDeMetricas,
   filasDeEntrega,
   funciono,
@@ -203,4 +204,33 @@ test("sin nada que analizar no falla", () => {
   assert.equal(a.hallazgos.length, 0);
   assert.equal(a.resumen.campanasMedibles, 0);
   assert.equal(a.rankings.campanas.length, 0);
+});
+
+test("el mes a mes sale ordenado, con las cifras calculadas", () => {
+  const filas = filasMensuales([
+    { mes: "2026-11", r: res({ gasto: 300, compras: 30, impresiones: 50_000, clics: 1_500 }) },
+    { mes: "2026-10", r: res({ gasto: 400, compras: 80, impresiones: 80_000, clics: 2_000 }) },
+  ]);
+  assert.deepEqual(filas.map((f) => f.mes), ["2026-10", "2026-11"]);
+  assert.equal(filas[0].cpa, 5);
+  assert.equal(filas[1].cpa, 10);
+  assert.equal(filas[1].ctr, 3);
+  assert.equal(filas[0].hook, null, "sin vistas de 3 s no hay hook");
+});
+
+test("el análisis trae el mes a mes de todo y de los productos con más gasto", () => {
+  const a = analizarHistorico({
+    campanas: [],
+    videos: [],
+    productos: [],
+    desde: null,
+    hasta: null,
+    mensual: [{ mes: "2026-10", r: res({ gasto: 100, compras: 10 }) }],
+    mensualPorProducto: [
+      { clave: "A", nombre: "A", meses: [{ mes: "2026-10", r: res({ gasto: 50, compras: 5 }) }] },
+      { clave: "B", nombre: "B", meses: [{ mes: "2026-10", r: res({ gasto: 500, compras: 50 }) }] },
+    ],
+  });
+  assert.equal(a.meses.length, 1);
+  assert.deepEqual(a.mesesPorProducto.map((p) => p.nombre), ["B", "A"]);
 });

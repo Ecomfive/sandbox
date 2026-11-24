@@ -3,9 +3,10 @@
 
 import { conversion, confiable, cpa, ctr, dolares, GASTO_MINIMO_CONFIABLE, hookRate, sinResultados, sumar, type Resultados } from "./metricas";
 import { decisionesDeAnuncios, NOMBRE_DECISION, UMBRALES_ANUNCIO, type AnuncioParaDecidir } from "./decision-anuncio";
+import type { Hallazgo } from "./historico";
 import type { CampanaVista, VideoVista } from "./vistas";
 
-export type TipoSugerencia = "sin_compras" | "cpa_alto" | "escalar" | "cpa_subiendo" | "testing_sin_cierre" | "anuncio_apagar" | "anuncio_rotar" | "anuncio_rebalancear" | "video_ganador" | "video_hook_bajo" | "landing_floja" | "etiquetas_faltan";
+export type TipoSugerencia = "sin_compras" | "cpa_alto" | "escalar" | "cpa_subiendo" | "testing_sin_cierre" | "anuncio_apagar" | "anuncio_rotar" | "anuncio_rebalancear" | "video_ganador" | "video_hook_bajo" | "landing_floja" | "etiquetas_faltan" | "hallazgo";
 export type Severidad = "alta" | "media" | "info";
 
 export interface Sugerencia {
@@ -199,4 +200,42 @@ export const DIAS_DE_DECISION = { aceptada: 30, rechazada: 90, pospuesta: 7 } as
 export function pendientes(sugerencias: Sugerencia[], decisiones: DecisionGuardada[], hoy: string): Sugerencia[] {
   const vigentes = new Set(decisiones.filter((d) => d.vigenteHasta >= hoy).map((d) => d.clave));
   return sugerencias.filter((x) => !vigentes.has(x.clave));
+}
+
+// — Los hallazgos del historial como sugerencias (24 nov 2026, pedido de Alcides: «que salgan también como sugerencias que se aceptan o rechazan, en el Resumen»).
+
+/** Una llave corta y estable para un hallazgo (su id lleva espacios y acentos y la de una decisión no puede): la misma sugerencia sobre lo mismo tiene siempre la misma. FNV-1a de 32 bits en hexadecimal. */
+export function claveDeHallazgo(id: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < id.length; i++) {
+    h ^= id.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return `hallazgo:${h.toString(16).padStart(8, "0")}`;
+}
+
+/** Cuántos hallazgos se convierten en sugerencia: lo que pide atención (por gasto) y unas pocas buenas noticias; el resto se ve en Hallazgos. */
+export const HALLAZGOS_COMO_SUGERENCIA = { atencion: 8, buenas: 3 } as const;
+
+/** Un hallazgo que pide atención con tanto gasto detrás es «urgente»; el resto, «importante». */
+const GASTO_URGENTE = 300;
+
+/**
+ * Los hallazgos del historial (ya ordenados: primero los que piden atención) como sugerencias que se aceptan, rechazan o posponen igual que las demás. Entrega y tendencias a la baja con gasto alto son urgentes;
+ * lo que nunca funcionó, importante; lo bueno, una buena noticia. La decisión se recuerda por su llave (`claveDeHallazgo`).
+ */
+export function sugerenciasDeHallazgos(hallazgos: readonly Hallazgo[]): Sugerencia[] {
+  const atencion = hallazgos.filter((h) => h.tono === "alerta").sort((a, b) => b.gasto - a.gasto).slice(0, HALLAZGOS_COMO_SUGERENCIA.atencion);
+  const buenas = hallazgos.filter((h) => h.tono === "bueno").sort((a, b) => b.gasto - a.gasto).slice(0, HALLAZGOS_COMO_SUGERENCIA.buenas);
+  return [...atencion, ...buenas].map((h): Sugerencia => ({
+    clave: claveDeHallazgo(h.id),
+    tipo: "hallazgo",
+    severidad: h.tono === "bueno" ? "info" : (h.categoria === "entrega" || h.categoria === "tendencia") && h.gasto >= GASTO_URGENTE ? "alta" : "media",
+    positiva: h.tono === "bueno",
+    titulo: h.titulo,
+    detalle: h.motivo ? `${h.detalle} Por qué: ${h.motivo}` : h.detalle,
+    accion: h.accion ?? "Revisar los detalles en Hallazgos.",
+    objeto: { tipo: "cuenta", id: "historial" },
+    gasto: h.gasto,
+  }));
 }

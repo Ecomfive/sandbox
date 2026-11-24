@@ -7,7 +7,7 @@ import { conTtl } from "@/lib/cache-ttl";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { anguloDominante, composicionDeAngulos } from "./atributos-video";
 import { indexarCatalogo, palabrasDeProducto, type IndiceCatalogo } from "./etapa-venta";
-import { analizarHistorico, sinVentanas, type AnalisisHistorico, type CampanaHist, type EntregaProducto, type ProductoHist, type VideoHist, type Ventanas } from "./historico";
+import { analizarHistorico, sinVentanas, type AnalisisHistorico, type CampanaHist, type EntregaProducto, type MesHist, type ProductoHist, type VideoHist, type Ventanas } from "./historico";
 import { CPA_TOPE_PREDETERMINADO, sinResultados, sumar, type Resultados } from "./metricas";
 import { claveDeProducto } from "./nombre";
 
@@ -84,7 +84,7 @@ export function entregasPorProducto(lineas: { producto: string; cantidad: number
   return mapa;
 }
 
-async function cargar(o: { paisId: string; cuentaId: string | null; hoy: string }, supabase: SupabaseClient): Promise<HistoricoCargado> {
+export async function calcularHistorico(o: { paisId: string; cuentaId: string | null; hoy: string }, supabase: SupabaseClient): Promise<HistoricoCargado> {
   const vacio: HistoricoCargado = { analisis: analizarHistorico({ campanas: [], videos: [], productos: [], desde: null, hasta: null }), tiendas: [], pedidos: 0, vacio: true };
   const { data: filasCuentas, error } = await supabase.from("meta_cuentas").select("id, tienda, activa").eq("pais_id", o.paisId);
   if (error) return vacio;
@@ -113,6 +113,8 @@ async function cargar(o: { paisId: string; cuentaId: string | null; hoy: string 
   const ventCampana = new Map<string, Ventanas>();
   const totalAnuncio = new Map<string, Resultados>();
   const totalVideo = new Map<string, Resultados>();
+  const mesDeCampana = new Map<string, Map<string, Resultados>>();
+  const mesGlobal = new Map<string, Resultados>();
   let desde: string | null = null;
   let hasta: string | null = null;
   for (const fila of dia) {
@@ -121,6 +123,11 @@ async function cargar(o: { paisId: string; cuentaId: string | null; hoy: string 
     if (!hasta || fila.fecha > hasta) hasta = fila.fecha;
     totalCampana.set(fila.campana_id, sumar(totalCampana.get(fila.campana_id) ?? sinResultados(), r));
     totalAnuncio.set(fila.anuncio_id, sumar(totalAnuncio.get(fila.anuncio_id) ?? sinResultados(), r));
+    const mes = String(fila.fecha).slice(0, 7);
+    mesGlobal.set(mes, sumar(mesGlobal.get(mes) ?? sinResultados(), r));
+    const porMes = mesDeCampana.get(fila.campana_id) ?? new Map<string, Resultados>();
+    porMes.set(mes, sumar(porMes.get(mes) ?? sinResultados(), r));
+    mesDeCampana.set(fila.campana_id, porMes);
     const vid = anuncioDe.get(fila.anuncio_id)?.video_id as string | undefined;
     if (vid) totalVideo.set(vid, sumar(totalVideo.get(vid) ?? sinResultados(), r));
     const v = ventCampana.get(fila.campana_id) ?? sinVentanas();
@@ -243,8 +250,15 @@ async function cargar(o: { paisId: string; cuentaId: string | null; hoy: string 
     };
   });
 
-  return { analisis: analizarHistorico({ campanas, videos, productos, desde, hasta }), tiendas: unidades.map((u) => u.nombre), pedidos, vacio: false };
+  // El mes a mes: de todo y de cada producto (sumando sus campañas).
+  const mensual: MesHist[] = [...mesGlobal].map(([mes, r]) => ({ mes, r }));
+  const mensualPorProducto = [...porClave].map(([clave, g]) => {
+    const meses = new Map<string, Resultados>();
+    for (const c of g.campanas) for (const [mes, r] of mesDeCampana.get(c.id) ?? []) meses.set(mes, sumar(meses.get(mes) ?? sinResultados(), r));
+    return { clave, nombre: g.nombre, meses: [...meses].map(([mes, r]) => ({ mes, r })) };
+  });
+  return { analisis: analizarHistorico({ campanas, videos, productos, desde, hasta, mensual, mensualPorProducto }), tiendas: unidades.map((u) => u.nombre), pedidos, vacio: false };
 }
 
 /** Todo el historial analizado para un país (y una cuenta, o todas), guardado 10 minutos. */
-export const cargarHistorico = conTtl(10 * 60_000, (o: { paisId: string; cuentaId: string | null; hoy: string }) => `${o.paisId}|${o.cuentaId ?? "todas"}|${o.hoy}`, cargar, { esValido: (r) => !r.vacio });
+export const cargarHistorico = conTtl(10 * 60_000, (o: { paisId: string; cuentaId: string | null; hoy: string }) => `${o.paisId}|${o.cuentaId ?? "todas"}|${o.hoy}`, calcularHistorico, { esValido: (r) => !r.vacio });
