@@ -76,6 +76,7 @@ const ICONOS: Record<string, IconoComp> = {
   pagadoAProveedor: GastoIcon,
   fechaLimite: CalendarioIcon,
   fechaLlegada: CalendarioIcon,
+  fechaLlegadaPuerto: CalendarioIcon,
   fechaPago1: CalendarioIcon,
   fechaPago2: CalendarioIcon,
   fechaEnvio: CalendarioIcon,
@@ -318,6 +319,7 @@ function columnas(
     }),
     col("viaEnvio", "Vía de envío", { ocultable: true, clase: "whitespace-nowrap text-muted-foreground", render: (c) => ed(c, "viaEnvio", lista(c.viaEnvio, etiquetaVia)) }),
     col("creado", "Creada", { ocultable: true, clase: "whitespace-nowrap", render: (c) => fecha(c.creadoEn) }),
+    col("fechaLlegadaPuerto", "Fecha llegada a puerto", { ocultable: true, clase: "whitespace-nowrap", render: (c) => ed(c, "fechaLlegadaPuerto", fecha(c.fechaLlegadaPuerto)) }),
     col("fechaLlegada", "Fecha de llegada", {
       ocultable: true,
       clase: "whitespace-nowrap",

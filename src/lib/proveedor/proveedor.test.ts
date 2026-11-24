@@ -15,8 +15,8 @@ const pedido = { montoTotal: 5000, fechaEnvio: "2026-10-21", fechaLlegada: null 
 const pago = (monto: number, fecha: string) => [{ monto, fecha }];
 
 test("el disparador de la migración usa las mismas etapas y la misma vía que el código", () => {
-  const sql = readFileSync(new URL("../../../supabase/migrations/0304_compras_llegadas.sql", import.meta.url), "utf8");
-  const pares = [...sql.matchAll(/when '([a-z_]+)' then '([a-z_]+)'/g)].map((m) => [m[1], m[2]]);
+  const sql = readFileSync(new URL("../../../supabase/migrations/0359_compras_llegada_puerto_lotes.sql", import.meta.url), "utf8");
+  const pares = [...sql.matchAll(/when '([a-z0-9_]+)' then '([a-z0-9_]+)'/g)].map((m) => [m[1], m[2]]);
   assert.deepEqual(Object.fromEntries(pares), ETAPA_PORTAL_DE_COMPRA);
   assert.match(sql, /= array\['aire'\]::text\[\] then 'aire' else 'mar'/);
   assert.equal(viaPortal(["aire"]), "aire");

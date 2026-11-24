@@ -3,6 +3,7 @@
 // Tracking o Arribo Mercancía: pedida y pagada aunque todavía no se envíe). Una orden en Cotizar, Cotizado o Backlog es solo una
 // cotización: no cuenta. Una orden anulada tampoco. Sin base ni React, para poder probarlo.
 
+import { ETAPAS_LLEGADA_PUERTO } from "./etapas-puerto";
 import { estimarPlanificacion, type TiemposTransito } from "./planificacion";
 
 /** Las etapas con que una orden ya está cerrada (las mismas de `ETAPAS_CERRADAS` en Compras). */
@@ -27,7 +28,7 @@ export interface EnCaminoPais {
 }
 
 /** Las etapas en que la mercancía ya está pedida (se produce, viaja o llegó al puerto) aunque todavía no tenga fecha de envío. */
-export const ETAPAS_EN_MARCHA = ["produccion", "tracking", "arribo_mercancia"];
+export const ETAPAS_EN_MARCHA = ["produccion", "tracking", ...ETAPAS_LLEGADA_PUERTO];
 
 /** Las etapas en que la orden todavía se está cotizando (01 - Cotizar, 02 - Enviado a cotización y 03 - Cotizado): se sabe cuánto se piensa pedir, pero aún no se pidió. */
 export const ETAPAS_COTIZANDO = ["cotizar", "enviado_cotizacion", "cotizado"];

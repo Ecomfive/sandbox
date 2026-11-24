@@ -100,6 +100,7 @@ function DatosDeLaCompra({ compra, codigoPais }: { compra: FilaCompra; codigoPai
       <Seccion icono={CalendarioIcon} titulo="Fechas">
         <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <DatoGobernado clave="limite"><Dato etiqueta="Fecha límite">{fecha(compra.fechaLimite)}</Dato></DatoGobernado>
+          <Dato etiqueta="Fecha llegada a puerto">{fecha(compra.fechaLlegadaPuerto)}</Dato>
           <Dato etiqueta="Fecha de llegada">{fecha(compra.fechaLlegada)}</Dato>
           <DatoGobernado clave="pago1"><Dato etiqueta="Fecha de Pago (1)">{fecha(compra.fechaPago1)}</Dato></DatoGobernado>
           <DatoGobernado clave="pago2"><Dato etiqueta="Fecha de Pago (2)">{fecha(compra.fechaPago2)}</Dato></DatoGobernado>

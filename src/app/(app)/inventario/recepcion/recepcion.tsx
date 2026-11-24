@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { esLlegadaPuerto } from "@/lib/compras/etapas-puerto";
 import { ContenedorTabla } from "@/components/tabla/contenedor-tabla";
 import { claseCeldaColumna, claseEncabezadoColumna, claseFilaEncabezado } from "@/components/tabla/estilos-tabla";
 import { Badge } from "@/components/ui/badge";
@@ -291,7 +292,7 @@ export function Recepcion({
                   <span className="block truncate text-sm font-medium">{c.codigo}</span>
                   <span className="block truncate text-xs text-muted-foreground">{c.lineas.map((l) => l.nombre).join(" · ")}</span>
                 </span>
-                {c.etapa === "arribo_mercancia" || c.etapa === "en_bodega" ? <Badge tone="success">Llegó</Badge> : <Badge tone="azul">En camino</Badge>}
+                {esLlegadaPuerto(c.etapa) || c.etapa === "en_bodega" ? <Badge tone="success">Llegó</Badge> : <Badge tone="azul">En camino</Badge>}
                 <span className="w-28 text-right text-xs text-muted-foreground">{c.llegada ? formatearFecha(c.llegada) : "Sin fecha"}</span>
                 <span className="w-24 text-right text-sm tabular-nums">{entero(pedidas)} u.</span>
               </button>
