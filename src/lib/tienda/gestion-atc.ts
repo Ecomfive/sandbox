@@ -192,17 +192,18 @@ export const ahoraMs = () => Date.now();
 export type PasoAtc = "guia" | "entregado" | "acreditar";
 
 /** Las transportadoras de la guía. El manual: Servientrega para INTERIOR; si el enlace público no trae la guía, se registra la página de Servientrega. */
-export const TRANSPORTADORAS = [{ nombre: "Servientrega", url: "https://servientrega.com.pa/" }] as const;
+export const TRANSPORTADORAS = [{ nombre: "Servientrega", rastreo: "https://servientrega.com.pa/Tracking/?guia=" }] as const;
 
-/** La guía escrita por la asesora, lista para Shopify, o el error. El enlace tiene que ser el público (http/https), nunca el del portal interno. */
-export function leerGuia(datos: { numero?: unknown; url?: unknown; empresa?: unknown }): { numero: string; url: string; empresa: string } | { error: string } {
+/** El enlace público de rastreo de la guía: la página que abre servientrega.com.pa al buscarla en «Rastrea tu envío». */
+export function enlaceRastreo(numero: string): string {
+  return TRANSPORTADORAS[0].rastreo + encodeURIComponent(numero);
+}
+
+/** La guía escrita por la asesora, lista para Shopify, o el error. El enlace se arma solo con el número (nadie lo copia). */
+export function leerGuia(datos: { numero?: unknown }): { numero: string; url: string; empresa: string } | { error: string } {
   const numero = String(datos.numero ?? "").replace(/\s+/g, "").trim();
   if (!/^[A-Za-z0-9-]{5,40}$/.test(numero)) return { error: "Escribe el número de guía (sin espacios)." };
-  const empresa = TRANSPORTADORAS.find((t) => t.nombre === datos.empresa) ?? TRANSPORTADORAS[0];
-  const url = String(datos.url ?? "").trim() || empresa.url;
-  if (!/^https?:\/\/[^\s]+$/i.test(url) || url.length > 500) return { error: "El enlace de rastreo tiene que ser una dirección web (el enlace público de Servientrega)." };
-  if (/siscore|portal/i.test(url)) return { error: "Ese parece el enlace del portal interno: el cliente no tiene acceso. Usa el enlace público de servientrega.com.pa." };
-  return { numero, url, empresa: empresa.nombre };
+  return { numero, url: enlaceRastreo(numero), empresa: TRANSPORTADORAS[0].nombre };
 }
 
 /** La línea de la cronología de cada paso. */

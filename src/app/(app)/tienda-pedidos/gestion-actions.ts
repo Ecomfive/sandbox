@@ -144,7 +144,7 @@ export async function gestionarPedidoAtc(ordenId: string, accionCruda: unknown, 
  * Los pasos después de confirmar: «guia» (la asesora, con el enlace público y el correo al cliente), «entregado» (la coordinadora o la asesora, cuando
  * Servientrega o el reparto local lo reportan) y «acreditar» (Finanzas, con el dinero en el banco: pone «acreditado» y pasa el pago a «Pagado»).
  */
-export async function pasoPedidoAtc(ordenId: string, pasoCrudo: unknown, datosCrudos: { guia?: unknown; url?: unknown; nota?: unknown }): Promise<ResultadoGestion> {
+export async function pasoPedidoAtc(ordenId: string, pasoCrudo: unknown, datosCrudos: { guia?: unknown; nota?: unknown }): Promise<ResultadoGestion> {
   const paso = PASOS.find((p) => p === pasoCrudo);
   if (!paso) return { error: "Paso no válido." };
   const nota = limpiarNota(datosCrudos?.nota);
@@ -154,7 +154,7 @@ export async function pasoPedidoAtc(ordenId: string, pasoCrudo: unknown, datosCr
 
   try {
     if (paso === "guia") {
-      const g = leerGuia({ numero: datosCrudos?.guia, url: datosCrudos?.url });
+      const g = leerGuia({ numero: datosCrudos?.guia });
       if ("error" in g) return g;
       await cargarGuiaEnShopify(ctx.app, ctx.orden.numero, g);
       const linea = lineaPaso("guia", { guia: g.numero, nota });

@@ -73,11 +73,10 @@ test("las etiquetas de antes del manual se quitan al gestionar y no se sugieren"
 
 import { cumplimientoMetas, leerGuia } from "./gestion-atc";
 
-test("la guía: número sin espacios y el enlace público (si no hay, la página de Servientrega)", () => {
-  assert.deepEqual(leerGuia({ numero: " 2001 1439 17 " }), { numero: "200114391 7".replace(" ", ""), url: "https://servientrega.com.pa/", empresa: "Servientrega" });
+test("la guía: número sin espacios y el enlace de rastreo de Servientrega armado con él", () => {
+  assert.deepEqual(leerGuia({ numero: " 7224 1470 76 " }), { numero: "7224147076", url: "https://servientrega.com.pa/Tracking/?guia=7224147076", empresa: "Servientrega" });
   assert.ok("error" in leerGuia({ numero: "12" }));
-  assert.ok("error" in leerGuia({ numero: "200114391", url: "https://siscore.servientrega.com/consulta" }), "el portal interno no");
-  assert.ok("error" in leerGuia({ numero: "200114391", url: "javascript:alert(1)" }));
+  assert.ok("error" in leerGuia({ numero: "7224147076&x=1" }), "solo letras, números y guiones");
 });
 
 test("metas del puesto: cumple si llega a la meta", () => {
