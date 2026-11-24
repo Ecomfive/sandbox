@@ -71,7 +71,7 @@ test("las etiquetas de antes del manual se quitan al gestionar y no se sugieren"
   assert.deepEqual(["Confirmada", "ANULADO/VERIFICADO", "Cancelado", "Pendiente", "CIUDAD", "MOT-CLIENTE-DUPLICA", "novedad", "Carrito recuperado", "Pedido Pagado"].filter(sugerenciaPermitida), ["Carrito recuperado", "Pedido Pagado"]);
 });
 
-import { cumplimientoMetas, leerGuia, lineaPaso, mensajeGuiaWhatsapp } from "./gestion-atc";
+import { cumplimientoMetas, leerGuia, lineaPaso, mensajeGuiaWhatsapp, plantillaGuia } from "./gestion-atc";
 
 test("la guía: número sin espacios y el enlace de rastreo de Servientrega armado con él", () => {
   assert.deepEqual(leerGuia({ numero: " 7224 1470 76 " }), { numero: "7224147076", url: "https://servientrega.com.pa/Tracking/?guia=7224147076", empresa: "Servientrega" });
@@ -91,6 +91,23 @@ test("el WhatsApp de la guía: primer nombre, pedido, guía y enlace; sin nombre
     lineaPaso("guia", { guia: "7224147076", aviso: "el cliente no tiene correo: se le mandó la guía por WhatsApp (iComfly)" }),
     "Guía cargada en Shopify: 7224147076 (Servientrega), el cliente no tiene correo: se le mandó la guía por WhatsApp (iComfly)",
   );
+});
+
+test("la plantilla de la guía: contra entrega con valor a pagar, pagado sin él; el enlace va con la transportadora", () => {
+  const base = { cliente: "stefanny laing", guia: "7224147076", url: "https://servientrega.com.pa/Tracking/?guia=7224147076", total: 32.9 };
+  const productos = [{ producto: "Fat‑Burn Shorts", cantidad: 2 }, { producto: "Envío", cantidad: null }];
+  assert.deepEqual(plantillaGuia({ ...base, pagado: false, productos }), {
+    nombre: "guia_transporte_utilidad_",
+    valores: ["7224147076", "Stefanny", "2x Fat‑Burn Shorts, 1x Envío", "$32.90", "Servientrega. Síguelo aquí: https://servientrega.com.pa/Tracking/?guia=7224147076"],
+  });
+  assert.deepEqual(plantillaGuia({ ...base, pagado: true, productos: [], cliente: null }).valores, [
+    "cliente",
+    "7224147076",
+    "pedido",
+    "Servientrega. Síguelo aquí: https://servientrega.com.pa/Tracking/?guia=7224147076",
+  ]);
+  const muchos = [1, 2, 3, 4, 5].map((i) => ({ producto: `P${i}`, cantidad: 1 }));
+  assert.equal(plantillaGuia({ ...base, pagado: true, productos: muchos }).valores[2], "1x P1, 1x P2, 1x P3, y 2 más");
 });
 
 test("metas del puesto: cumple si llega a la meta", () => {
