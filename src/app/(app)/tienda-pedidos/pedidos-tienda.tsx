@@ -13,6 +13,7 @@ import { SIN_VALOR, type DefTabla } from "@/lib/tabla/motor";
 import type { NombreFilas } from "@/lib/tabla/pie";
 import { ESTADOS_PEDIDO, diaPanama, resumirPedidos, type EstadoPedido } from "@/lib/tienda/resumen";
 import type { PedidoFila } from "@/lib/tienda/datos";
+import { VISTAS_ATC, ahoraMs } from "@/lib/tienda/gestion-atc";
 import { etiquetaEntrega } from "@/lib/tienda/entregas-monday";
 
 /** Cómo pagó al recibir (14 nov 2026). */
@@ -352,6 +353,9 @@ export function PedidosTienda({
 }) {
   const router = useRouter();
   const [estado, setEstado] = useState<EstadoPedido | null>(null);
+  // Las vistas del manual ATC (24 nov 2026): reemplazan las pestañas del Sheet de atención al cliente. Una vista y una tarjeta no se combinan.
+  const [vista, setVista] = useState<string | null>(null);
+  const [ahora] = useState(ahoraMs);
   const [abierto, setAbierto] = useState<string | null>(abrirInicial);
   const [orden, setOrden] = useState<string[]>([]);
   // Si ya se está en Pedidos y llega otro `?pedido=` (el «Ver» del aviso de «Nuevo pedido»), se abre esa ficha (se ajusta al dibujar, sin efecto).
@@ -361,7 +365,12 @@ export function PedidosTienda({
     if (abrirInicial) setAbierto(abrirInicial);
   }
   const r = useMemo(() => resumirPedidos(pedidos), [pedidos]);
-  const filas = useMemo(() => (estado ? pedidos.filter((p) => p.estado === estado) : pedidos), [pedidos, estado]);
+  const conteoVistas = useMemo(() => VISTAS_ATC.map((v) => ({ ...v, n: pedidos.filter((p) => v.incluye(p, ahora)).length })), [pedidos, ahora]);
+  const filas = useMemo(() => {
+    const v = VISTAS_ATC.find((x) => x.id === vista);
+    if (v) return pedidos.filter((p) => v.incluye(p, ahora));
+    return estado ? pedidos.filter((p) => p.estado === estado) : pedidos;
+  }, [pedidos, estado, vista, ahora]);
   const def = useMemo(() => defPedidos(tiendas), [tiendas]);
   // Los mensajes de WhatsApp pendientes (iComfly) de la tienda que se mira, cada 30 segundos con la página a la vista (y al abrir o cerrar una ficha).
   const tiendaUnica = pedidos.length && pedidos.every((p) => p.tiendaId === pedidos[0].tiendaId) ? pedidos[0].tiendaId : null;
@@ -383,7 +392,14 @@ export function PedidosTienda({
   const columnas = useMemo(() => (Object.keys(tiendas).length > 1 ? COLUMNAS : COLUMNAS.filter((c) => c.id !== "tienda")), [tiendas]);
   const pct = (n: number | null) => (n === null ? "—" : `${n.toLocaleString("es-PA")} %`);
   const num = (n: number) => n.toLocaleString("es-PA");
-  const alternar = (e: EstadoPedido) => setEstado((x) => (x === e ? null : e));
+  const alternar = (e: EstadoPedido) => {
+    setVista(null);
+    setEstado((x) => (x === e ? null : e));
+  };
+  const alternarVista = (id: string) => {
+    setEstado(null);
+    setVista((x) => (x === id ? null : id));
+  };
 
   // La ficha abierta queda en la dirección (`?pedido=`), así se puede copiar o recargar.
   const marcarEnDireccion = useCallback((id: string | null) => {
@@ -404,7 +420,7 @@ export function PedidosTienda({
     <div className="flex flex-col gap-5">
       {/* El tablero de tarjetas de Compras (17 nov 2026, pedido de Hernán: igual que las demás pantallas); cada tarjeta filtra la lista. */}
       <TableroIndicadores etiqueta="Tablero de pedidos">
-        <Indicador titulo="Pedidos" icono={PedidoIcon} color="violeta" valor={num(r.pedidos)} detalle="todos los del periodo" alPulsar={() => setEstado(null)} activo={!estado} />
+        <Indicador titulo="Pedidos" icono={PedidoIcon} color="violeta" valor={num(r.pedidos)} detalle="todos los del periodo" alPulsar={() => { setEstado(null); setVista(null); }} activo={!estado && !vista} />
         <Indicador titulo="Por confirmar" icono={AlertaIcon} color="ambar" punto={r.porEstado.nuevo ? "aviso" : undefined} valor={num(r.porEstado.nuevo)} detalle="esperan llamada o mensaje" alPulsar={() => alternar("nuevo")} activo={estado === "nuevo"} />
         <Indicador titulo="Confirmados" icono={CheckIcon} color="azul" valor={num(r.porEstado.confirmado)} detalle={`${pct(r.confirmacion)} pasó la confirmación`} alPulsar={() => alternar("confirmado")} activo={estado === "confirmado"} />
         <Indicador titulo="En camino" icono={EnvioIcon} color="violeta" punto={r.porEstado.en_camino ? "aviso" : undefined} valor={num(r.porEstado.en_camino)} detalle="con guía, sin entregar" alPulsar={() => alternar("en_camino")} activo={estado === "en_camino"} />
@@ -413,6 +429,25 @@ export function PedidosTienda({
         <Indicador titulo="Devoluciones" icono={DeshacerIcon} color="rojo" punto={r.porEstado.devuelto ? "peligro" : undefined} valor={num(r.porEstado.devuelto)} detalle={pct(r.devolucion)} alPulsar={() => alternar("devuelto")} activo={estado === "devuelto"} />
         <Indicador titulo="SKU sin vincular" icono={AlertaIcon} color="ambar" punto={sinVincular ? "aviso" : undefined} valor={num(sinVincular)} detalle="variantes de Shopify sin producto nuestro" href="/tienda-tiendas/productos" />
       </TableroIndicadores>
+
+      <nav aria-label="Vistas de atención al cliente" className="-mt-2 flex flex-wrap items-center gap-1.5">
+        <span className="mr-1 text-xs font-medium text-muted-foreground">Vistas</span>
+        {conteoVistas.map((v) => (
+          <button
+            key={v.id}
+            type="button"
+            onClick={() => alternarVista(v.id)}
+            aria-pressed={vista === v.id}
+            title={v.detalle}
+            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${
+              vista === v.id ? "border-primario bg-primario text-white" : "border-border bg-card text-foreground hover:bg-primario-suave"
+            }`}
+          >
+            {v.etiqueta}
+            <span className={`tabular-nums ${vista === v.id ? "text-white/80" : v.n ? "text-primario" : "text-muted-foreground"}`}>{num(v.n)}</span>
+          </button>
+        ))}
+      </nav>
 
       <TablaDatos
         def={def}

@@ -10,7 +10,11 @@ test("el estado del Excel de Finanzas pasa al de la pantalla, igual que el ciclo
   assert.equal(estadoDesdeFinanzas("cancelada", null), "cancelado");
   assert.equal(estadoDesdeFinanzas("no_gestionada", null), "cancelado");
   assert.equal(estadoDesdeFinanzas("pendiente", "CIUDAD, Confirmada, easysell_cod_form"), "confirmado");
-  assert.equal(estadoDesdeFinanzas("pendiente", "CIUDAD, easysell_cod_form"), "nuevo");
+  // Manual ATC (24 nov 2026): la zona puesta por la asesora confirma; con «por confirmar datos» o «novedad» todavía no.
+  assert.equal(estadoDesdeFinanzas("pendiente", "CIUDAD, easysell_cod_form"), "confirmado");
+  assert.equal(estadoDesdeFinanzas("pendiente", "CIUDAD, por confirmar datos"), "nuevo");
+  assert.equal(estadoDesdeFinanzas("pendiente", "novedad, easysell_cod_form"), "nuevo");
+  assert.equal(estadoDesdeFinanzas("pendiente", "easysell_cod_form"), "nuevo");
   assert.equal(estadoDesdeFinanzas(null, null), "nuevo");
 });
 

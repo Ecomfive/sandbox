@@ -21,7 +21,7 @@ export const META_CONFIRMACION = 85;
  * Las etiquetas con que el equipo deja un pedido sin confirmar «en gestión» (ya se habló con el cliente y se espera algo de él): «Pendiente»,
  * «Modificar Dirección», «Modificar Pedido», «POR CONFIRMAR DATOS», «No contesta», «Esperando…», «Llamar…».
  */
-const EN_GESTION = /^(pendiente|modificar\b.*|por confirmar datos|no contesta.*|esperando.*|llamar.*|volver a llamar.*)$/i;
+const EN_GESTION = /^(pendiente|novedad|modificar\b.*|por confirmar datos|no contesta.*|esperando.*|llamar.*|volver a llamar.*)$/i;
 
 export function enGestion(etiquetas: string[] | undefined): boolean {
   return (etiquetas ?? []).some((e) => EN_GESTION.test(e.trim()));

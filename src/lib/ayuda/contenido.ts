@@ -1816,6 +1816,18 @@ export const GUIAS: GuiaModulo[] = [
     resumen: "Los pedidos de Shopify de las tiendas del país, al instante, con su estado, su cliente y sus productos.",
     secciones: [
       {
+        titulo: "Atención al cliente con el manual ATC",
+        pasos: [
+          "Desde el 24 nov 2026 la gestión de cada pedido se hace desde la ficha y se escribe en Shopify, como pide el «Manual de gestión de pedidos en Shopify — Nueva estructura ATC». Un pedido lleva siempre su zona y, solo si se anula, un motivo.",
+          "«Confirmar»: cuando el cliente confirmó nombre, dirección, referencias y teléfono, eliges la zona (CIUDAD o INTERIOR/SERVIENTREGA en Panamá). Se quita «por confirmar datos» y, si la tienda ya aprobó el permiso de envíos, se levanta la espera para que despacho lo prepare.",
+          "«Novedad»: el cliente pidió esperar después de confirmar. Se quita la zona y se pone «novedad»: despacho no lo envía. Al confirmarse, «Confirmar» de nuevo.",
+          "«Anular»: se anula el pedido en Shopify (sin avisar al cliente), se deja la zona y se pone un solo motivo del árbol del manual (MOT-…): baja por las preguntas y detente en el primer sí. MOT-TIENDA-NO-GESTIONA solo lo pone la coordinadora.",
+          "Cada botón deja su línea en «Notas del equipo», que es la cronología del pedido: qué se hizo y por qué. La novedad y la anulación piden escribir el porqué.",
+          "El sistema no deja anular sin motivo, borrar la zona al anular, poner dos motivos ni inventar etiquetas.",
+          "Arriba de la lista están las vistas del manual: Por confirmar, Más de 48 h sin confirmar, Novedades, Listos para despacho, En ruta, Entregados sin acreditar, Anulados sin motivo y Sin etiqueta. Cada una muestra cuántos pedidos tiene; un clic filtra la lista.",
+        ],
+      },
+      {
         titulo: "Uso",
         pasos: [
           "Está en Operación, en el frente Gestión de tienda. Arriba eliges la tienda (abre en la primera) y el periodo. Al lado de las tiendas, quien tiene el permiso ve «Asesores»: el rendimiento de cada asesor (atendidos, confirmados, cancelados, en gestión, % de confirmación y cuánto tarda en confirmar) y la cola de cada tienda. Cada asesor queda registrado cuando usa «Confirmar pedido» o cambia etiquetas en la ficha; lo confirmado directo en Shopify sale aparte, sin asesor.",
@@ -2312,6 +2324,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-11-24", titulo: "Pedidos de tienda: Confirmar, Novedad y Anular con el manual ATC", texto: "La ficha de cada pedido trae la gestión del manual de atención al cliente: «Confirmar» (eliges la zona y despacho ya lo puede preparar), «Novedad» (el cliente pidió esperar) y «Anular» (se anula en Shopify con un solo motivo MOT-… y se deja la zona). Todo se escribe en Shopify y cada paso deja su línea en las notas del pedido. Arriba de la lista, las vistas del manual: Por confirmar, Más de 48 h, Novedades, Listos para despacho, En ruta, Entregados sin acreditar, Anulados sin motivo y Sin etiqueta.", modulo: "tienda-pedidos", href: "/tienda-pedidos" },
   { fecha: "2026-11-24", titulo: "Compras: varias tiendas por orden, como etiquetas", texto: "La Tienda de una orden de compra ya no es una sola: se ponen varias, como las etiquetas. En la columna, en la ficha («Añadir tienda») y al crear la compra se marcan o se quitan de la lista, y la que no existe se crea al escribirla. Con varias compras seleccionadas, la barra agrega o quita una tienda sin borrar las que ya tenían. Al agrupar o filtrar por Tienda, una orden con dos tiendas sale en las dos.", modulo: "compras", href: "/compras/lista" },
   { fecha: "2026-11-24", titulo: "Inventario › Stock: las variantes se agrupan por color", texto: "En Stock, un producto con variantes que tienen color y talla (por ejemplo una camisa en 4 colores y 6 tallas) ya no muestra todas las variantes seguidas: al desplegarlo salen los colores, cada uno con la suma de sus tallas, y pulsar un color muestra sus variantes con sus cifras. Es como ya se veía en el Levantamiento. Las variantes que son solo de color, o sin color, siguen saliendo una por una.", modulo: "inventario", href: "/inventario" },
   { fecha: "2026-11-24", titulo: "Anuncios Meta: los ángulos siguen el ejemplo de Ariadne (energía, gimnasio, próstata, libido)", texto: "A la IA se le dice textualmente el ejemplo de quien lleva las campañas: un producto para el público masculino se vende con ángulos de «Energía», «Gimnasio», «Salud prostática» o «Aumento de libido», y no se resume en «Vitalidad masculina». Esos nombres genéricos de público (vitalidad, energía, salud, bienestar, rendimiento más masculina o femenina) ya no valen: se le piden de nuevo con el motivo concreto. En «Antes y después», «Testimonio de cliente» y «Experto o autoridad», el detalle también usa ese lenguaje («antes y después · salud prostática»).", modulo: "anuncios-meta", href: "/anuncios-meta/videos" },
