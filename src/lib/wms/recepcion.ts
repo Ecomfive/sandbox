@@ -1,6 +1,7 @@
 /**
  * Recepción de compras y reglas de Costa Rica (6 nov 2026, pedido de Hernán, flujograma de Proveeduría Costa Rica). Lógica pura, con prueba.
  */
+import { ETAPAS_LLEGADA_PUERTO } from "@/lib/compras/etapas-puerto";
 import { codigoLote } from "./vencimiento";
 
 /** Los países donde se reciben compras desde Inventario. Por ahora Costa Rica: los demás siguen como estaban. */
@@ -21,7 +22,7 @@ export const puedeMoverAMano = (tipo: string, codigoPais: string | null | undefi
 export const pideMotivo = (tipo: string, codigoPais: string | null | undefined) => tipo === "ajuste" || (tipo === "salida" && PAISES_SALIDA_CON_REMISION.includes(codigoPais ?? ""));
 
 /** Las etapas en que una compra se puede recibir: en camino o ya llegó. Las completadas quedaron dentro del levantamiento y recibirlas las contaría dos veces. */
-export const ETAPAS_POR_RECIBIR = ["tracking", "arribo_mercancia", "en_bodega"];
+export const ETAPAS_POR_RECIBIR = ["tracking", ...ETAPAS_LLEGADA_PUERTO, "en_bodega"];
 
 export interface LineaRecepcion {
   item: string;

@@ -4,14 +4,15 @@ import Link from "next/link";
 import { Fragment, useMemo, useState } from "react";
 import { CabeceraTarjeta, Punto, claseTd, claseTh } from "@/components/panel/piezas-panel";
 import { anilloFoco } from "@/components/ui/field";
+import { ETAPAS_LLEGADA_PUERTO_LOTE } from "@/lib/compras/etapas-puerto";
 import { tiempoPorEtapa, type EventoEtapa } from "@/lib/compras/tiempo-etapas";
 import { etiquetaEtapa, numeroOC, type FilaCompra } from "./def-compras";
 import { entero, usd } from "./calculos-compras";
 
 /** Las etapas que se miden, en el orden del flujo (Completado y Descartado son el final: no se mide cuánto se quedan). */
-const ETAPAS = ["cotizar", "enviado_cotizacion", "cotizado", "produccion", "tracking", "arribo_mercancia", "en_bodega", "backlog"] as const;
+const ETAPAS = ["cotizar", "enviado_cotizacion", "cotizado", "produccion", "tracking", "arribo_mercancia", ...ETAPAS_LLEGADA_PUERTO_LOTE, "en_bodega", "backlog"] as const;
 /** Las del recorrido normal, para sumar el ciclo de Cotizar a Arribo. */
-const RECORRIDO = ["cotizar", "enviado_cotizacion", "cotizado", "produccion", "tracking", "arribo_mercancia", "en_bodega"];
+const RECORRIDO = ["cotizar", "enviado_cotizacion", "cotizado", "produccion", "tracking", "arribo_mercancia", ...ETAPAS_LLEGADA_PUERTO_LOTE, "en_bodega"];
 /** Con menos estancias que estas, «9 de cada 10» no dice mucho y no se marca a nadie como «más de lo normal». */
 const MIN_MUESTRA = 3;
 /** Pospuesta no tiene un tiempo «normal»: ahí no se marca a nadie. */

@@ -9,6 +9,9 @@ export type EventoAviso = "llegada_puerto" | "llegada_bodega" | "pago_adelantado
 /** Qué etapa de la compra dispara el aviso de una llegada. */
 export const LLEGADA_DE_ETAPA: Readonly<Record<string, { tipo: TipoLlegada; evento: EventoAviso }>> = {
   arribo_mercancia: { tipo: "puerto", evento: "llegada_puerto" },
+  llegada_puerto_lote_1: { tipo: "puerto", evento: "llegada_puerto" },
+  llegada_puerto_lote_2: { tipo: "puerto", evento: "llegada_puerto" },
+  llegada_puerto_lote_3: { tipo: "puerto", evento: "llegada_puerto" },
   en_bodega: { tipo: "bodega", evento: "llegada_bodega" },
 };
 

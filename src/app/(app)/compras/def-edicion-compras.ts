@@ -59,6 +59,7 @@ export const CAMPOS_EDITABLES: Record<string, CampoEditable> = {
   financiamiento: { etiqueta: "Financiamiento", prop: "financiamiento", columna: "financiamiento", tipo: "booleano" },
   fechaLimite: { etiqueta: "Fecha límite", prop: "fechaLimite", columna: "fecha_limite", tipo: "fecha" },
   fechaLlegada: { etiqueta: "Fecha de llegada", prop: "fechaLlegada", columna: "fecha_llegada", tipo: "fecha" },
+  fechaLlegadaPuerto: { etiqueta: "Fecha llegada a puerto", prop: "fechaLlegadaPuerto", columna: "fecha_llegada_puerto", tipo: "fecha" },
   fechaPago1: { etiqueta: "Fecha de Pago (1)", prop: "fechaPago1", columna: "fecha_pago_1", tipo: "fecha" },
   fechaPago2: { etiqueta: "Fecha de Pago (2)", prop: "fechaPago2", columna: "fecha_pago_2", tipo: "fecha" },
   fechaEnvio: { etiqueta: "Fecha de Envío", prop: "fechaEnvio", columna: "fecha_envio", tipo: "fecha" },
