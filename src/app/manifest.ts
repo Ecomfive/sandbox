@@ -2,14 +2,14 @@ import type { MetadataRoute } from "next";
 
 /**
  * Lo que hace que la plataforma se pueda instalar como app en el celular (Chrome › «Instalar aplicación»). Instalada, aparece como
- * «Ecomfive Fuentes» en la hoja de «Compartir en…» de Instagram, Facebook y TikTok: lo que se comparte llega a `/instagram/compartir` (el «share
+ * «Ecomfive» (antes «Ecomfive Fuentes»; 24 nov 2026, pedido de Hernán: que la app instalada se llame Ecomfive y lleve el logo de la app) en la hoja de «Compartir en…» de Instagram, Facebook y TikTok: lo que se comparte llega a `/instagram/compartir` (el «share
  * target»), que guarda el reel o la publicación como una captura, sin pasar por el mensaje directo. Solo Android (Chrome) registra el
  * destino de compartir; en iPhone se usa un atajo de la app Atajos que abre la misma página (ver `INSTAGRAM-META.md`).
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Ecomfive Fuentes",
-    short_name: "Fuentes",
+    name: "Ecomfive",
+    short_name: "Ecomfive",
     description: "Guarda en Fuentes lo que ves en Instagram, Facebook y TikTok",
     lang: "es",
     start_url: "/instagram",
@@ -18,12 +18,12 @@ export default function manifest(): MetadataRoute.Manifest {
     background_color: "#ffffff",
     theme_color: "#ffffff",
     icons: [
-      { src: "/pwa/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
-      { src: "/pwa/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
-      { src: "/pwa/icon-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+      { src: "/pwa/ecomfive-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+      { src: "/pwa/ecomfive-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+      { src: "/pwa/ecomfive-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
     ],
     // Acceso directo de la app instalada a las cifras del día de Finanzas (mantener pulsado el ícono).
-    shortcuts: [{ name: "Finanzas · Hoy", short_name: "Hoy", url: "/panel-financiero/hoy", icons: [{ src: "/pwa/icon-192.png", sizes: "192x192", type: "image/png" }] }],
+    shortcuts: [{ name: "Finanzas · Hoy", short_name: "Hoy", url: "/panel-financiero/hoy", icons: [{ src: "/pwa/ecomfive-192.png", sizes: "192x192", type: "image/png" }] }],
     share_target: {
       action: "/instagram/compartir",
       method: "GET",
