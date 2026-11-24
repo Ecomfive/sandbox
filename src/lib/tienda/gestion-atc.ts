@@ -211,10 +211,41 @@ export function leerGuia(datos: { numero?: unknown }): { numero: string; url: st
  * Solo el primer nombre del cliente; el enlace es el de rastreo de Servientrega.
  */
 export function mensajeGuiaWhatsapp(d: { cliente?: string | null; pedido: string; tienda: string; guia: string; url: string }): string {
-  const nombre = (d.cliente ?? "").trim().split(/\s+/)[0] ?? "";
-  const saludo = /^[\p{L}'-]{2,30}$/u.test(nombre) ? `Hola ${nombre[0].toLocaleUpperCase("es")}${nombre.slice(1).toLocaleLowerCase("es")}` : "Hola";
+  const nombre = primerNombre(d.cliente);
+  const saludo = nombre ? `Hola ${nombre}` : "Hola";
   const pedido = d.pedido.replace(/^#/, "").trim();
   return `${saludo} 👋 Tu pedido #${pedido} de ${d.tienda} ya va en camino con Servientrega.\nNúmero de guía: ${d.guia}\nPuedes seguirlo aquí: ${d.url}`;
+}
+
+/**
+ * Las plantillas aprobadas de la tienda para la guía (Kenku, en iComfly; validadas el 24 nov 2026). Sirven fuera de las 24 h, cuando WhatsApp no deja
+ * mandar texto libre. Contra entrega: guia_transporte_utilidad_ ({{1}} guía, {{2}} nombre, {{3}} productos, {{4}} valor a pagar, {{5}} transportadora).
+ * Ya pagado: guia_transporte_pago_directo ({{1}} nombre, {{2}} guía, {{3}} productos, {{4}} transportadora). Ninguna trae el enlace: va junto a la
+ * transportadora.
+ */
+export const PLANTILLAS_GUIA = { contraEntrega: "guia_transporte_utilidad_", pagado: "guia_transporte_pago_directo" } as const;
+
+/** La plantilla de la guía y sus valores, en orden. Sin texto vacío (WhatsApp rechaza variables vacías). */
+export function plantillaGuia(d: {
+  pagado: boolean;
+  cliente?: string | null;
+  guia: string;
+  url: string;
+  productos: { producto: string | null; cantidad: number | null }[];
+  total: number | null;
+}): { nombre: string; valores: string[] } {
+  const nombre = primerNombre(d.cliente) || "cliente";
+  const lista = d.productos.filter((p) => p.producto?.trim()).map((p) => `${Math.max(1, Math.round(Number(p.cantidad) || 1))}x ${p.producto!.trim()}`);
+  const productos = (lista.length > 3 ? [...lista.slice(0, 3), `y ${lista.length - 3} más`] : lista).join(", ").slice(0, 300) || "pedido";
+  const transportadora = `Servientrega. Síguelo aquí: ${d.url}`;
+  if (d.pagado) return { nombre: PLANTILLAS_GUIA.pagado, valores: [nombre, d.guia, productos, transportadora] };
+  const valor = d.total != null && Number.isFinite(Number(d.total)) ? `$${Number(d.total).toFixed(2)}` : "el valor de tu pedido";
+  return { nombre: PLANTILLAS_GUIA.contraEntrega, valores: [d.guia, nombre, productos, valor, transportadora] };
+}
+
+function primerNombre(cliente: string | null | undefined): string {
+  const n = (cliente ?? "").trim().split(/\s+/)[0] ?? "";
+  return /^[\p{L}'-]{2,30}$/u.test(n) ? `${n[0].toLocaleUpperCase("es")}${n.slice(1).toLocaleLowerCase("es")}` : "";
 }
 
 /** La línea de la cronología de cada paso. */

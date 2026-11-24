@@ -15,9 +15,9 @@ import {
   marcarPagadoEnShopify,
 } from "@/lib/tienda/escribir-shopify";
 import { esErrorDeVentana, telefonoParaIcomfly } from "@/lib/tienda/chat-tienda";
-import { enviarAviso } from "@/lib/tienda/chat-tienda-datos";
+import { enviarAviso, enviarPlantilla, plantillasAprobadas } from "@/lib/tienda/chat-tienda-datos";
 import { textoCambio } from "@/lib/tienda/etiquetas-shopify";
-import { ETIQUETA_ACREDITADO, leerGuia, lineaCronologia, lineaPaso, mensajeGuiaWhatsapp, planAtc, type AccionAtc, type PasoAtc } from "@/lib/tienda/gestion-atc";
+import { ETIQUETA_ACREDITADO, leerGuia, lineaCronologia, lineaPaso, mensajeGuiaWhatsapp, planAtc, plantillaGuia, type AccionAtc, type PasoAtc } from "@/lib/tienda/gestion-atc";
 import { conexionesIcomfly } from "@/lib/tienda/icomfly";
 import { etiquetasDe, mismaTiendaUnidad } from "@/lib/tienda/ordenes-finanzas";
 import { appDeTienda, type AppTienda } from "@/lib/tienda/shopify-app";
@@ -145,6 +145,36 @@ export async function gestionarPedidoAtc(ordenId: string, accionCruda: unknown, 
   return { ok: true, etiquetas: final, texto: linea, ...(aviso ? { aviso } : {}) };
 }
 
+/** Manda la plantilla aprobada de la guía (sirve fuera de las 24 h). Comprueba que la plantilla exista y pida las variables que se le dan. */
+async function guiaConPlantilla(
+  supabase: ReturnType<typeof createServiceClient>,
+  ctx: Contexto,
+  g: { numero: string; url: string },
+  cliente: string | null,
+  telefono: string,
+  persona: { id: string; nombre: string },
+): Promise<{ nombre: string } | { error: string }> {
+  const [{ data: o }, { data: lineas }] = await Promise.all([
+    supabase.from("ven_ordenes").select("total, estado_pago").eq("id", ctx.orden.id).maybeSingle(),
+    supabase.from("ven_orden_lineas").select("producto, cantidad, es_servicio").eq("orden_id", ctx.orden.id).order("linea"),
+  ]);
+  const elegida = plantillaGuia({
+    pagado: /^paid$/i.test(String(o?.estado_pago ?? "")),
+    cliente,
+    guia: g.numero,
+    url: g.url,
+    productos: (lineas ?? []).filter((l) => !l.es_servicio).map((l) => ({ producto: (l.producto as string | null) ?? null, cantidad: (l.cantidad as number | null) ?? null })),
+    total: o?.total == null ? null : Number(o.total),
+  });
+  const aprobadas = await plantillasAprobadas(supabase, ctx.tiendaId);
+  if (!Array.isArray(aprobadas)) return { error: aprobadas.error };
+  const p = aprobadas.find((x) => x.nombre === elegida.nombre);
+  if (!p) return { error: `la tienda no tiene aprobada «${elegida.nombre}»` };
+  if (p.variables.length !== elegida.valores.length) return { error: `«${p.nombre}» cambió: pide ${p.variables.length} datos` };
+  const r = await enviarPlantilla(supabase, ctx.tiendaId, telefono, { nombre: p.nombre, idioma: p.idioma, valores: elegida.valores, cuerpo: p.cuerpo }, persona);
+  return r.error ? { error: r.error } : { nombre: p.nombre };
+}
+
 /**
  * La guía por WhatsApp al cliente sin correo, por iComfly. Devuelve la línea de la cronología y, si no salió, el aviso para la asesora. Nunca hace fallar
  * el paso: la guía ya quedó en Shopify.
@@ -162,16 +192,22 @@ async function guiaPorWhatsapp(ctx: Contexto, g: { numero: string; url: string }
     if (!telefono) return sinEnviar("el pedido no tiene un teléfono válido", "el pedido no tiene un teléfono válido para WhatsApp.");
     const texto = mensajeGuiaWhatsapp({ cliente: (cliente?.nombre as string | null) ?? null, pedido: ctx.orden.numero, tienda: ctx.tienda, guia: g.numero, url: g.url });
     const quien = (ctx.usuario.nombre || ctx.usuario.email || "Alguien").trim();
-    const r = await enviarAviso(supabase, ctx.tiendaId, telefono, texto, { id: ctx.usuario.id, nombre: quien });
-    if (r.error)
-      return esErrorDeVentana(r.error)
-        ? sinEnviar(
-            "pasaron más de 24 h desde su último mensaje (WhatsApp solo deja mandar una plantilla)",
-            "pasaron más de 24 h desde su último mensaje: WhatsApp solo deja mandar una plantilla. Mándale la guía desde el chat con 📋 Plantillas.",
-          )
-        : sinEnviar("iComfly no lo mandó", `iComfly no mandó el WhatsApp (${r.error}). Mándale la guía a mano.`);
-    await registrarAuditoria({ accion: "chat_tienda_mensaje", entidad: "tiendas", entidadId: ctx.tiendaId, detalle: `${ctx.tienda}: guía del pedido ${ctx.orden.numero} por WhatsApp (iComfly), el cliente no tiene correo` });
-    return { linea: "el cliente no tiene correo: se le mandó la guía por WhatsApp (iComfly)" };
+    const persona = { id: ctx.usuario.id, nombre: quien };
+    const r = await enviarAviso(supabase, ctx.tiendaId, telefono, texto, persona);
+    let como = "";
+    if (r.error) {
+      if (!esErrorDeVentana(r.error)) return sinEnviar("iComfly no lo mandó", `iComfly no mandó el WhatsApp (${r.error}). Mándale la guía a mano.`);
+      // Fuera de las 24 h: la plantilla aprobada de la guía (contra entrega o ya pagado).
+      const p = await guiaConPlantilla(supabase, ctx, g, (cliente?.nombre as string | null) ?? null, telefono, persona);
+      if ("error" in p)
+        return sinEnviar(
+          `pasaron más de 24 h desde su último mensaje y la plantilla no salió (${p.error})`,
+          `pasaron más de 24 h desde su último mensaje y la plantilla de la guía no salió (${p.error}). Mándasela desde el chat con 📋 Plantillas.`,
+        );
+      como = ` con la plantilla «${p.nombre}»`;
+    }
+    await registrarAuditoria({ accion: "chat_tienda_mensaje", entidad: "tiendas", entidadId: ctx.tiendaId, detalle: `${ctx.tienda}: guía del pedido ${ctx.orden.numero} por WhatsApp (iComfly)${como}, el cliente no tiene correo` });
+    return { linea: `el cliente no tiene correo: se le mandó la guía por WhatsApp (iComfly)${como}` };
   } catch (e) {
     return sinEnviar("no se pudo mandar el WhatsApp", `no se pudo mandar el WhatsApp (${e instanceof Error ? e.message : "error"}). Mándale la guía a mano.`);
   }
