@@ -130,7 +130,19 @@ const palabras = (t: string | null | undefined) =>
 export interface ChatPendiente {
   cola: string;
   nombre: string;
+  /** Los mensajes sin leer en iComfly. */
   cuenta: number;
+  /**
+   * Ya leído, pero el último mensaje es del cliente y nadie le respondió (24 nov 2026: antes contaba como «1 sin leer» y atención decía que sí los había
+   * leído). Se muestra aparte, sin número.
+   */
+  espera?: boolean;
+}
+
+/** Lo que lleva cada pedido de la lista: los sin leer (el número rojo) y si, ya leído, el cliente espera respuesta (un punto, sin número). */
+export interface ChatDelPedido {
+  sinLeer: number;
+  espera: boolean;
 }
 
 /**
@@ -138,15 +150,20 @@ export interface ChatPendiente {
  * teléfono termina en esos 4 dígitos Y cuyo cliente comparte una palabra del nombre con el contacto (Hernán: que coincidan los dos). Si el nombre no coincide
  * («prd», «🙂»), ninguno: mejor sin numerito que en el cliente equivocado. Un mismo cliente con varios pedidos lo lleva en todos.
  */
-export function pendientesPorPedido(filas: { id: string; cliente: string | null; colaTel?: string | null }[], chats: ChatPendiente[]): Record<string, number> {
+export function pendientesPorPedido(filas: { id: string; cliente: string | null; colaTel?: string | null }[], chats: ChatPendiente[]): Record<string, ChatDelPedido> {
   const porCola = new Map<string, { id: string; cliente: string | null }[]>();
   for (const f of filas) if (f.colaTel) porCola.set(f.colaTel, [...(porCola.get(f.colaTel) ?? []), f]);
-  const res: Record<string, number> = {};
+  const res: Record<string, ChatDelPedido> = {};
   for (const ch of chats) {
-    if (!(ch.cuenta > 0)) continue;
+    const sinLeer = ch.cuenta > 0 ? ch.cuenta : 0;
+    if (!sinLeer && !ch.espera) continue;
     const delContacto = palabras(ch.nombre);
     if (!delContacto.size) continue;
-    for (const f of porCola.get(ch.cola) ?? []) if ([...palabras(f.cliente)].some((w) => delContacto.has(w))) res[f.id] = Math.max(res[f.id] ?? 0, ch.cuenta);
+    for (const f of porCola.get(ch.cola) ?? [])
+      if ([...palabras(f.cliente)].some((w) => delContacto.has(w))) {
+        const antes = res[f.id] ?? { sinLeer: 0, espera: false };
+        res[f.id] = { sinLeer: Math.max(antes.sinLeer, sinLeer), espera: antes.espera || !!ch.espera };
+      }
   }
   return res;
 }
