@@ -2,7 +2,7 @@
 
 import { FotoAmpliable } from "@/components/ui/foto-ampliable";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { fieldClass } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
@@ -199,9 +199,10 @@ export function FotoProducto({ fila, abrir }: { fila: FilaLlegada; abrir: (e: Et
   );
 }
 
-export function FilaPuerto({ fila, etiquetas, abrir }: { fila: FilaLlegada; etiquetas: EtiquetaPedido[]; abrir: (e: EtiquetaPedido, alt: string) => void }) {
+export function FilaPuerto({ fila, etiquetas, abrir, antes }: { fila: FilaLlegada; etiquetas: EtiquetaPedido[]; abrir: (e: EtiquetaPedido, alt: string) => void; antes?: ReactNode }) {
   return (
     <li className="flex flex-wrap items-center gap-x-6 gap-y-3 p-4">
+      {antes}
       <FotoProducto fila={fila} abrir={abrir} />
       <Producto fila={fila} />
       <div className="flex gap-6 text-sm tabular-nums">

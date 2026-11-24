@@ -7,7 +7,7 @@ import { sonar } from "@/components/tienda/aviso-pedidos-nuevos";
 import { anilloFoco } from "@/components/ui/field";
 import { avisosParaPantalla } from "@/lib/avisos-pantalla-actions";
 import { RUTA_LISTA_PUERTO } from "@/lib/compras/llegadas-avisos";
-import { MAX_TARJETAS, rutaInterna, sinMostrar, type AvisoEnPantalla } from "@/lib/avisos-pantalla";
+import { juntarAvisosDePuerto, MAX_TARJETAS, rutaInterna, sinMostrar, type AvisoEnPantalla } from "@/lib/avisos-pantalla";
 import { marcarAvisoLeido } from "@/lib/menciones-actions";
 import { CerrarIcon, NotificacionesIcon } from "@/lib/nav-icons";
 
@@ -44,7 +44,7 @@ export function AvisoPersonal() {
         const nuevos = sinMostrar(r.avisos, vistos.current);
         if (!nuevos.length) return;
         for (const a of nuevos) vistos.current.add(a.id);
-        cola.current = [...cola.current, ...nuevos];
+        cola.current = [...cola.current, ...juntarAvisosDePuerto(nuevos)];
         setTarjetas((actuales) => {
           const lugar = Math.max(0, MAX_TARJETAS - actuales.length);
           const entran = cola.current.splice(0, lugar);
@@ -107,7 +107,7 @@ export function AvisoPersonal() {
                 <Link
                   href={rutaInterna(t.href)}
                   onClick={() => {
-                    void marcarAvisoLeido(t.id);
+                    for (const id of t.ids ?? [t.id]) void marcarAvisoLeido(id);
                     quitar(t.id);
                   }}
                   className={`rounded-md bg-foreground px-3 py-2 text-sm font-semibold text-background ${anilloFoco}`}

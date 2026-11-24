@@ -57,7 +57,16 @@ export interface FilaLlegada {
   /** La llegada de la que sale esta fila y cuándo se avisó (solo en la lista de todas las llegadas). */
   llegadaId?: string;
   llegadaEn?: string;
+  /** Cuándo se archivó (ya se recibió); null = pendiente de recibir (migración 0360). */
+  archivadaEn?: string | null;
 }
+
+/** Las que siguen pendientes de recibir (sin archivar) y las ya archivadas, cada una en el orden en que llegaron. */
+export const pendientesDeRecibir = <T extends { archivadaEn?: string | null }>(filas: readonly T[]): T[] => filas.filter((f) => !f.archivadaEn);
+export const yaArchivadas = <T extends { archivadaEn?: string | null }>(filas: readonly T[]): T[] => filas.filter((f) => !!f.archivadaEn);
+
+/** Cuántas compras archivar o sacar del archivo de una vez, como mucho. */
+export const MAX_ARCHIVAR_A_LA_VEZ = 300;
 
 /** Los periodos de «Todas las llegadas» (días contando hoy) y el de entrada. */
 export const DIAS_LISTA_LLEGADAS = [1, 7, 30, 90] as const;

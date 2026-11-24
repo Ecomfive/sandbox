@@ -25,6 +25,8 @@ export const rutaInterna = (href: string): string => (href.startsWith("/") && !h
 
 export interface AvisoEnPantalla {
   id: string;
+  /** Si la tarjeta junta varios avisos, los ids de todos (para marcarlos leídos juntos). */
+  ids?: string[];
   tipo: string;
   titulo: string;
   texto: string | null;
@@ -35,4 +37,27 @@ export interface AvisoEnPantalla {
 /** De la lista que llegó, lo que todavía no se mostró en esta sesión, de los más viejos a los más nuevos. */
 export function sinMostrar(lista: AvisoEnPantalla[], vistos: ReadonlySet<string>): AvisoEnPantalla[] {
   return lista.filter((a) => !vistos.has(a.id)).sort((a, b) => a.creadoEn.localeCompare(b.creadoEn));
+}
+
+/** ¿Es el aviso «Llega a puerto» (uno por cambio de etapa de Compras)? Se reconoce por su título, como en `esAvisoDePuerto`. */
+const esDePuerto = (a: Pick<AvisoEnPantalla, "titulo">) => a.titulo.startsWith("Llega a puerto");
+
+/**
+ * Varios avisos «Llega a puerto» que caen juntos salen en **una sola tarjeta** (24 nov 2026, pedido de Logística: una tarjeta por producto llenaba la pantalla): «Llegan a puerto: N avisos nuevos», que
+ * lleva a la lista completa y se marca leída entera. Con uno solo, queda como estaba; los demás avisos no se tocan.
+ */
+export function juntarAvisosDePuerto(lista: AvisoEnPantalla[]): AvisoEnPantalla[] {
+  const puerto = lista.filter(esDePuerto);
+  if (puerto.length < 2) return lista;
+  const junta: AvisoEnPantalla = {
+    id: puerto[0].id,
+    ids: puerto.map((a) => a.id),
+    tipo: puerto[0].tipo,
+    titulo: `Llegan a puerto: ${puerto.length} avisos nuevos`,
+    texto: "Abre la lista completa, ordenada, con producto, unidades y cajas; ahí la puedes descargar en PDF.",
+    href: puerto[0].href,
+    creadoEn: puerto[puerto.length - 1].creadoEn,
+  };
+  const primero = lista.findIndex(esDePuerto);
+  return [...lista.slice(0, primero).filter((a) => !esDePuerto(a)), junta, ...lista.slice(primero).filter((a) => !esDePuerto(a))];
 }
