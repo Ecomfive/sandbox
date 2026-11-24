@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { RUTA_PORTAL_PROVEEDOR, cuentaDeProveedor } from "@/lib/proveedor/cuenta";
+import { RUTA_PANEL_REPARTIDOR, cuentaDeRepartidor } from "@/lib/despacho/cuenta-repartidor";
 import { BannerVistaPrevia } from "@/components/banner-vista-previa";
 import { BarraMigas } from "@/components/barra-migas";
 import { LatidoPresencia } from "@/components/latido-presencia";
@@ -92,6 +93,8 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     await irADosPasosSiFalta();
     const usuarioId = await getUsuarioIdSesion();
     if (usuarioId && (await cuentaDeProveedor(usuarioId))) redirect(RUTA_PORTAL_PROVEEDOR);
+    // Una cuenta de repartidor (24 nov 2026) tampoco tiene perfil: vuelve a su panel.
+    if (usuarioId && (await cuentaDeRepartidor(usuarioId))) redirect(RUTA_PANEL_REPARTIDOR);
   }
   // Quien administra sin la verificación en dos pasos, mientras no es obligatoria: una invitación a activarla.
   const invitarDosPasos = !!usuario && !usuario.vistaPrevia && (await getDosPasos())?.estado === "invitar";

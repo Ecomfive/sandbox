@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CierresRepartidores } from "@/components/despacho/cierres-repartidores";
 import { TableroDespacho } from "@/components/despacho/tablero-despacho";
 import { anilloFoco, fieldClassSm } from "@/components/ui/field";
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
@@ -6,6 +7,8 @@ import { Pagina } from "@/components/ui/pagina";
 import { requirePanel } from "@/lib/auth";
 import { cargarCiudad, rangoDespacho } from "@/lib/despacho/datos";
 import { diaTexto, rangoElegido } from "@/lib/despacho/etiquetas";
+import { cargarCierres } from "@/lib/despacho/cierres";
+import { esAdministrador } from "@/lib/permisos/acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 
 export const metadata = { title: "Despacho ciudad" };
@@ -33,7 +36,8 @@ export default async function DespachoCiudadPage({ searchParams }: { searchParam
   const { desde, hasta } = elegido ?? rangoDespacho(rango.dias);
   const supabase = createServiceClient();
   const archivados = sp.archivados === "1";
-  const { filas, faltaMigracion } = await cargarCiudad(supabase, desde, hasta, archivados);
+  const [{ filas, faltaMigracion }, cierres] = await Promise.all([cargarCiudad(supabase, desde, hasta, archivados), archivados ? Promise.resolve([]) : cargarCierres(supabase, desde, hasta)]);
+  const puedeEscribir = !usuario.modulosSoloLectura.includes("despacho-ciudad");
   const chip = (activo: boolean) =>
     `inline-flex min-h-9 items-center rounded-full border px-3.5 text-[13px] font-medium ${anilloFoco} ${activo ? "border-primario bg-primario-suave text-primario" : "border-border bg-card text-foreground-soft hover:bg-muted"}`;
   return (
@@ -81,6 +85,11 @@ export default async function DespachoCiudadPage({ searchParams }: { searchParam
             <Link href="/despacho-ciudad/hoja" className={`${chip(false)} ml-auto`}>
               Hoja del día
             </Link>
+            {esAdministrador(usuario) && (
+              <Link href="/despacho-ciudad/repartidores" className={chip(false)}>
+                Cuentas de repartidores
+              </Link>
+            )}
             <Link href="/despacho-ciudad?archivados=1" aria-current={archivados ? "page" : undefined} className={chip(archivados)}>
               Archivados
             </Link>
@@ -91,6 +100,8 @@ export default async function DespachoCiudadPage({ searchParams }: { searchParam
               estados y la tienda de abajo.
             </p>
           )}
+          {/* Los cierres que mandan los repartidores desde su panel (24 nov 2026), para validarlos. */}
+          <CierresRepartidores cierres={cierres} puedeEscribir={puedeEscribir} />
           <TableroDespacho clase="ciudad" filas={filas} hoy={hoy} archivados={archivados} mostrarHoy={!elegido || (elegido.desde <= hoy && hoy <= elegido.hasta)} puedeEscribir={!usuario.modulosSoloLectura.includes("despacho-ciudad")} />
         </>
       )}

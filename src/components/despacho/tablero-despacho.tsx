@@ -388,6 +388,12 @@ export function TableroDespacho({
                                 <div className="min-w-0 flex-1 font-semibold">
                                   {celda(f, "numero", "Número de pedido")}
                                 </div>
+                                {/* Marcado por el repartidor desde su panel (24 nov 2026): se ve aquí al instante. */}
+                                {f.desdePanel && (
+                                  <span title={f.marcadoEn ? `Marcado desde su panel el ${new Date(f.marcadoEn).toLocaleString("es-PA", { timeZone: "America/Panama", dateStyle: "short", timeStyle: "short" })}` : "Marcado desde su panel"} className="shrink-0 rounded-full bg-primario-suave px-1.5 py-0.5 text-[10px] font-semibold whitespace-nowrap text-[#5b2386]">
+                                    desde su panel
+                                  </span>
+                                )}
                                 <button type="button" onClick={() => setSel(f.itemId)} className={`rounded px-1.5 py-1 text-xs font-medium text-primario hover:bg-primario-suave ${anilloFoco}`} aria-label={`Abrir ${f.numero ?? "la fila"}`}>
                                   Abrir
                                 </button>
