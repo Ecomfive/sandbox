@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { analizarPendientes } from "@/lib/meta-ads/analizar-videos";
+import { refrescarAnalisisMeta, type ResultadoRefresco } from "@/lib/meta-ads/analisis-guardado";
 import { estadoAnalisisAutomatico } from "@/lib/meta-ads/ajustes";
 import { leerCuentasMeta } from "@/lib/meta-ads/leer-cuentas";
+import { hoyEnPanama } from "@/lib/meta-ads/sincronizar";
 import { esPeticionDeCron } from "@/lib/seguridad/cron";
 import { createServiceClient } from "@/lib/supabase/server";
 
@@ -20,6 +22,16 @@ export async function GET(request: Request) {
     const supabase = createServiceClient();
     const soloVideos = new URL(request.url).searchParams.get("solo") === "videos";
     const lectura = soloVideos ? { lecturas: [], sinCuentas: false } : await leerCuentasMeta(supabase, { presupuestoMs: 120_000 });
+    // El análisis del historial (24 nov 2026): después de leer Meta, se vuelve a calcular y, una vez al día, la IA lo interpreta. Las pantallas lo leen ya hecho. Con poco tiempo, la interpretación espera a la próxima pasada.
+    const analisis: { pais: string; resultado: ResultadoRefresco }[] = [];
+    if (!soloVideos) {
+      const { data: cuentas } = await supabase.from("meta_cuentas").select("pais_id").eq("activa", true);
+      const ids = [...new Set((cuentas ?? []).map((c) => c.pais_id as string))];
+      const { data: paises } = ids.length ? await supabase.from("paises").select("id, nombre").in("id", ids) : { data: [] };
+      for (const p of paises ?? []) {
+        analisis.push({ pais: String(p.nombre), resultado: await refrescarAnalisisMeta(supabase, { paisId: p.id as string, paisNombre: String(p.nombre), hoy: hoyEnPanama(), interpretar: Date.now() - inicio < 90_000 }) });
+      }
+    }
     let videos: Awaited<ReturnType<typeof analizarPendientes>> | { error: string } | { pausado: true } | null = null;
     try {
       // Pausado desde el botón de Videos (21 nov 2026: la cuenta de Gemini quedó suspendida): se lee Meta como siempre, pero no se llama a la IA.
@@ -28,7 +40,7 @@ export async function GET(request: Request) {
     } catch (e) {
       videos = { error: e instanceof Error ? e.message : "No se pudieron analizar los videos." };
     }
-    return NextResponse.json({ ...lectura, videos });
+    return NextResponse.json({ ...lectura, analisis, videos });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "No se pudo leer Meta." }, { status: 500 });
   }

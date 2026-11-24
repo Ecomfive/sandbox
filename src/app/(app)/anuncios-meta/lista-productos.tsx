@@ -17,6 +17,14 @@ import type { NombreFilas } from "@/lib/tabla/pie";
 import { CeldasColumnas, EncabezadoColumnas, estiloRejilla, SelectorColumnasMeta, useColumnasMeta } from "./columnas-meta";
 import { DEF_PRODUCTOS } from "./def-productos";
 import { AVISO_POCA_DATA, Cifra, InsigniaEtapa, MetricasEnLinea, Nivel } from "./piezas";
+import { entregaPorProductoMeta } from "./actions";
+
+/** Lo que se sabe de la entrega de un producto en la tienda (viene de los pedidos, aparte de Meta). */
+type EntregaMeta = { tasa: number | null; cerradas: number; entregadas: number; devueltas: number };
+type EntregasMeta = { productos: Record<string, EntregaMeta>; promedio: number | null };
+const pctEntrega = (n: number) => `${Math.round(n * 100)} %`;
+/** Entrega mala: la de la tienda baja de 55 % o queda 12 puntos por debajo del promedio de todos los productos. */
+const entregaMala = (t: number, promedio: number | null) => t <= 0.55 || (promedio !== null && t <= promedio - 0.12);
 
 const NOMBRE: NombreFilas = { singular: "producto", plural: "productos" };
 const ICONOS: Record<string, IconoComp> = { nombre: ProductoIcon, veredicto: MargenIcon, datos: FiltroIcon, activas: EstadoIcon, gasto: MargenIcon, compras: MargenIcon, cpa: MargenIcon, campanas: AnunciosIcon, videos: AnunciosIcon };
@@ -69,8 +77,9 @@ function ordenar(lista: ProductoVista[], c: Criterio, sentido: "asc" | "desc"): 
   });
 }
 
-function FilaProducto({ p, columnas, alAbrir }: { p: ProductoVista; columnas: ClaveColumna[]; alAbrir: () => void }) {
+function FilaProducto({ p, columnas, alAbrir, entrega }: { p: ProductoVista; columnas: ClaveColumna[]; alAbrir: () => void; entrega: EntregasMeta | null }) {
   const ok = confiable(p.r);
+  const e = entrega?.productos[p.clave] ?? null;
   return (
     <button type="button" onClick={alAbrir} style={estiloRejilla(columnas.length)} className="grid w-full cursor-pointer grid-cols-1 items-center gap-x-3 gap-y-1.5 px-4 py-3 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-foreground xl:[grid-template-columns:var(--columnas-meta)]">
       <span className="flex min-w-0 flex-col gap-0.5">
@@ -78,6 +87,9 @@ function FilaProducto({ p, columnas, alAbrir }: { p: ProductoVista; columnas: Cl
         <span className="truncate text-xs text-muted-foreground">
           {p.campanas} {p.campanas === 1 ? "campaña" : "campañas"} ({p.activas} {p.activas === 1 ? "activa" : "activas"}) · {p.videos} {p.videos === 1 ? "video" : "videos"}
           {ok ? "" : " · poca data"}
+          {e?.tasa != null && (
+            <span className={entregaMala(e.tasa, entrega?.promedio ?? null) ? "font-medium text-destructive" : ""}> · Entrega {pctEntrega(e.tasa)}{entregaMala(e.tasa, entrega?.promedio ?? null) ? " (baja)" : ""}</span>
+          )}
         </span>
       </span>
       <CeldasColumnas columnas={columnas} r={p.r} ctx={{ tope: p.tope, etapa: "venta", confiable: ok }} />
@@ -87,7 +99,10 @@ function FilaProducto({ p, columnas, alAbrir }: { p: ProductoVista; columnas: Cl
 }
 
 /** La ficha de un producto: lo que sumó en el periodo con todas sus cifras, los ángulos que usa, sus campañas y sus videos. */
-function FichaProducto({ p, campanas, videos, alCerrar }: { p: ProductoVista | undefined; campanas: CampanaVista[]; videos: VideoVista[]; alCerrar: () => void }) {
+function FichaProducto({ p, campanas, videos, alCerrar, entrega }: { p: ProductoVista | undefined; campanas: CampanaVista[]; videos: VideoVista[]; alCerrar: () => void; entrega: EntregasMeta | null }) {
+  const e = p ? (entrega?.productos[p.clave] ?? null) : null;
+  const cpaMeta = p ? cpa(p.r) : null;
+  const entregadas = p && e?.tasa != null ? p.r.compras * e.tasa : null;
   const delProducto = useMemo(() => (p ? campanas.filter((c) => claveDeProducto(c.producto) === p.clave).sort((a, b) => b.r.gasto - a.r.gasto) : []), [p, campanas]);
   const angulos = useMemo(() => (p ? angulosDeProducto(videos, p.clave) : []), [p, videos]);
   const susVideos = useMemo(() => (p ? videos.filter((v) => claveDeProducto(v.producto) === p.clave).sort((a, b) => b.r.gasto - a.r.gasto).slice(0, 8) : []), [p, videos]);
@@ -108,6 +123,25 @@ function FichaProducto({ p, campanas, videos, alCerrar }: { p: ProductoVista | u
             </div>
             {!confiable(p.r) && <p className="m-0 text-xs text-muted-foreground">{AVISO_POCA_DATA}</p>}
           </Seccion>
+
+          {e && (
+            <Seccion icono={EstadoIcon} titulo="Entrega en la tienda">
+              {e.tasa === null ? (
+                <p className="m-0 text-sm text-muted-foreground">Todavía hay pocos pedidos resueltos de este producto ({e.cerradas}) para tener una tasa de entrega.</p>
+              ) : (
+                <>
+                  <div className="grid grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-2">
+                    <Cifra titulo="Tasa de entrega" valor={pctEntrega(e.tasa)} apoyo={`${e.entregadas} entregados · ${e.devueltas} devueltos`} nivel={entregaMala(e.tasa, entrega?.promedio ?? null) ? "malo" : "bueno"} />
+                    <Cifra titulo="Compras entregadas (est.)" valor={entregadas === null ? "—" : Math.round(entregadas).toLocaleString("es-PA")} apoyo="compras × tasa" />
+                    <Cifra titulo="CPA por entrega" valor={entregadas && entregadas > 0 ? dolares(p!.r.gasto / entregadas) : "—"} apoyo={cpaMeta !== null ? `CPA de Meta ${dolares(cpaMeta)}` : undefined} nivel={entregadas && entregadas > 0 && p!.r.gasto / entregadas > p!.tope ? "malo" : undefined} />
+                  </div>
+                  <p className="m-0 text-xs text-muted-foreground">
+                    Con los pedidos de los últimos 180 días.{entrega?.promedio != null ? ` El promedio de todos los productos es ${pctEntrega(entrega.promedio)}.` : ""} Un producto puede vender bien en Meta y entregar mal: cada compra que no llega se paga igual.
+                  </p>
+                </>
+              )}
+            </Seccion>
+          )}
 
           <Seccion icono={FiltroIcon} titulo={`Ángulos que usa (${angulos.length})`}>
             {p.clave && (
@@ -199,6 +233,17 @@ function FichaProducto({ p, campanas, videos, alCerrar }: { p: ProductoVista | u
 /** Todos los productos con lo que sumaron sus campañas en el periodo, con la barra común, un orden a elegir y las columnas que cada persona quiera ver. Tocar uno abre su ficha (`?abrir=<producto>`). */
 export function ListaProductos({ productos, campanas, videos, abrirInicial }: { productos: ProductoVista[]; campanas: CampanaVista[]; videos: VideoVista[]; abrirInicial: string | null }) {
   const [columnas, guardarColumnas, restablecerColumnas] = useColumnasMeta("productos", COLUMNAS_PRODUCTOS);
+  // La entrega sale de los pedidos y tarda unos segundos la primera vez: se pide después de abrir la lista, sin frenarla.
+  const [entrega, setEntrega] = useState<EntregasMeta | null>(null);
+  useEffect(() => {
+    let vivo = true;
+    entregaPorProductoMeta(null)
+      .then((d) => vivo && setEntrega(d))
+      .catch(() => undefined);
+    return () => {
+      vivo = false;
+    };
+  }, []);
   const [criterio, setCriterio] = useState<Criterio>("gasto");
   const [sentido, setSentido] = useState<"asc" | "desc">("desc");
   const [abierto, setAbierto] = useState<string | null>(() => (abrirInicial && productos.some((p) => idDe(p) === abrirInicial) ? abrirInicial : null));
@@ -258,11 +303,11 @@ export function ListaProductos({ productos, campanas, videos, abrirInicial }: { 
         claveFila={idDe}
         variante="filas"
         encabezado={<EncabezadoColumnas nombre="Producto" columnas={columnas} />}
-        renderFila={(x) => <FilaProducto p={x} columnas={columnas} alAbrir={() => setAbierto(idDe(x))} />}
+        renderFila={(x) => <FilaProducto p={x} columnas={columnas} alAbrir={() => setAbierto(idDe(x))} entrega={entrega} />}
         vacio="Todavía no hay campañas con producto en este periodo."
       />
       {hayPocaData && <p className="m-0 text-xs text-muted-foreground">{AVISO_POCA_DATA}</p>}
-      <FichaProducto p={p} campanas={campanas} videos={videos} alCerrar={() => setAbierto(null)} />
+      <FichaProducto p={p} campanas={campanas} videos={videos} alCerrar={() => setAbierto(null)} entrega={entrega} />
     </>
   );
 }

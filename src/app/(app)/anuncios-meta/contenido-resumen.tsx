@@ -5,6 +5,7 @@ import type { CampanaVista } from "@/lib/meta-ads/vistas";
 import type { DatosMeta } from "@/lib/meta-ads/datos";
 import { NOMBRE_VEREDICTO, veredictoDe, type Veredicto } from "./def-campanas";
 import { Anillo, BarraProgreso, ColumnasApiladas, Columnas, Leyenda, partesConColor, TarjetaMeta, Tendencia, Variacion } from "./graficas";
+import { InterpretacionVista } from "./interpretacion-vista";
 import { ListaSugerencias } from "./lista-sugerencias";
 import { Cifra, entero, InsigniaEtapa, porcentaje, Resultado, valorCpa } from "./piezas";
 
@@ -190,6 +191,8 @@ export function ContenidoResumen({ datos, escribe }: { datos: DatosMeta; escribe
         <ListaCampanas titulo="Las que más dejan" vacio="Ninguna campaña con más de $100 gastados deja ganancia todavía." campanas={mejores} color="var(--success)" />
         <ListaCampanas titulo="Las que más pierden" vacio="Ninguna campaña con más de $100 gastados está perdiendo." campanas={peores} color="var(--destructive)" />
       </div>
+
+      <InterpretacionVista guardada={datos.interpretacion} preparando={datos.analisisPendiente} enlace />
     </>
   );
 }

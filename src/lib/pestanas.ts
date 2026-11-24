@@ -274,6 +274,7 @@ export const PESTANAS_POR_MODULO: Record<string, Pestana[]> = {
     { etiqueta: "Resumen", href: "/anuncios-meta" },
     { etiqueta: "Campañas", href: "/anuncios-meta/campanas" },
     { etiqueta: "Qué funciona", href: "/anuncios-meta/que-funciona" },
+    { etiqueta: "Hallazgos", href: "/anuncios-meta/hallazgos" },
     { etiqueta: "Productos", href: "/anuncios-meta/productos" },
     { etiqueta: "Videos", href: "/anuncios-meta/videos" },
     { etiqueta: "Equipo", href: "/anuncios-meta/equipo" },
