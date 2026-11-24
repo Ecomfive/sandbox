@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import { ETAPAS_COMPRA } from "../../app/(app)/compras/def-compras";
+import { ETAPAS_LLEGADA_PUERTO, esLlegadaPuerto } from "./etapas-puerto";
 import { armarAviso, desdeDeLista, diasDeLista, llegadaDeEtapa, unaPorCompra, pagadoTrasSegundoPago, revisarPago, textoProductos, totalesDeLlegada, filaSinMontos, type FilaLlegada } from "./llegadas-avisos";
 
 const fila = (o: Partial<FilaLlegada> = {}): FilaLlegada => ({
@@ -32,7 +33,7 @@ test("el flujo de etapas queda 04 Producción → 05 Tracking → 06 Llegada a P
 });
 
 test("la migración acepta la etapa nueva y la de las acciones es la misma que la del código", () => {
-  const sql = readFileSync(new URL("../../../supabase/migrations/0304_compras_llegadas.sql", import.meta.url), "utf8");
+  const sql = readFileSync(new URL("../../../supabase/migrations/0359_compras_llegada_puerto_lotes.sql", import.meta.url), "utf8");
   for (const e of ETAPAS_COMPRA) assert.match(sql, new RegExp(`'${e.valor}'`), e.valor);
 });
 
@@ -40,6 +41,17 @@ test("solo Llegada a Puerto y En Bodega avisan", () => {
   assert.deepEqual(llegadaDeEtapa("arribo_mercancia"), { tipo: "puerto", evento: "llegada_puerto" });
   assert.deepEqual(llegadaDeEtapa("en_bodega"), { tipo: "bodega", evento: "llegada_bodega" });
   for (const e of ["tracking", "completado", "produccion", "descartado"]) assert.equal(llegadaDeEtapa(e), null, e);
+});
+
+test("las etapas por lote avisan igual que Llegada a Puerto y están en la lista de etapas", () => {
+  for (const e of ETAPAS_LLEGADA_PUERTO) {
+    assert.deepEqual(llegadaDeEtapa(e), { tipo: "puerto", evento: "llegada_puerto" }, e);
+    assert.ok(ETAPAS_COMPRA.some((x) => x.valor === e), e);
+  }
+  const etiquetas = Object.fromEntries(ETAPAS_COMPRA.map((e) => [e.valor, e.etiqueta]));
+  assert.equal(etiquetas.llegada_puerto_lote_1, "06 - Llegada a Puerto - Lote 1");
+  assert.equal(etiquetas.llegada_puerto_lote_3, "06 - Llegada a Puerto - Lote 3");
+  assert.ok(esLlegadaPuerto("llegada_puerto_lote_2") && !esLlegadaPuerto("en_bodega") && !esLlegadaPuerto(null));
 });
 
 test("totales: unidades, cajas, por pagar y ya pagado", () => {
