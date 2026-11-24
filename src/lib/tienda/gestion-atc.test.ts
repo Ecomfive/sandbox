@@ -135,3 +135,12 @@ test("la vista «Guía sin cargar» trae los pedidos con motivo", () => {
   assert.equal(v.incluye({ estado: "en_camino", creado: "", guiaSinCargar: "Guía 7224161722: no está preparado en Shopify" }, 0), true);
   assert.equal(v.incluye({ estado: "en_camino", creado: "" }, 0), false);
 });
+
+import { esperaDeIcomfly } from "./gestion-atc";
+
+test("iComfly pide esperar: se espera lo que dice más un segundo; otro error no se reintenta", () => {
+  assert.equal(esperaDeIcomfly("Error: Vas muy rápido (límite de seguridad del conector, no es una falla ni una caída de iComfly). Espera ~7s antes del siguiente mensaje."), 8000);
+  assert.equal(esperaDeIcomfly("Vas muy rápido"), 9000);
+  assert.equal(esperaDeIcomfly("fuera de la ventana de 24 horas"), null);
+  assert.equal(esperaDeIcomfly(null), null);
+});

@@ -217,6 +217,7 @@ function textoShopify(r: ResultadoGuiasSolas | null | undefined): string {
   const partes: string[] = [];
   if (r.cargadas) partes.push(`${r.cargadas} guía${r.cargadas === 1 ? "" : "s"} cargada${r.cargadas === 1 ? "" : "s"} en Shopify con aviso al cliente`);
   if (r.pendientes) partes.push(`${r.pendientes} a «Guía sin cargar» en Pedidos de tienda`);
+  if (r.reenviados) partes.push(`${r.reenviados} WhatsApp de guía reenviado${r.reenviados === 1 ? "" : "s"}`);
   if (r.yaTenian) partes.push(`${r.yaTenian} ya tenía${r.yaTenian === 1 ? "" : "n"} guía en Shopify`);
   if (r.quedan && !r.aviso) partes.push(`${r.quedan} entra${r.quedan === 1 ? "" : "n"} en la próxima lectura`);
   return `${partes.length ? ` Shopify: ${partes.join(", ")}.` : ""}${r.aviso ? ` ${r.aviso}` : ""}`;

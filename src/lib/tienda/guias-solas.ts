@@ -9,7 +9,7 @@
 import { registrarAuditoriaLote, type EntradaAuditoria } from "@/lib/auditoria";
 import type { createServiceClient } from "@/lib/supabase/server";
 import { cargarGuiaSiFalta } from "./escribir-shopify";
-import { MOTIVOS_GUIA_SIN_CARGAR, desdeGuiasSolas, guiaSolaSinShopify, leerGuia, lineaPaso } from "./gestion-atc";
+import { MOTIVOS_GUIA_SIN_CARGAR, desdeGuiasSolas, esperaDeIcomfly, guiaSolaSinShopify, leerGuia, lineaPaso } from "./gestion-atc";
 import { guiaPorWhatsapp } from "./guia-cliente";
 import { etiquetasDe } from "./ordenes-finanzas";
 import { appDeTienda } from "./shopify-app";
@@ -24,6 +24,8 @@ export interface ResultadoGuiasSolas {
   quedan: number;
   /** Algo que frenó todo (sin permiso, sin migración, tienda sin escritura); null si corrió. */
   aviso: string | null;
+  /** Los WhatsApp de la guía que iComfly había frenado por ir muy rápido y salieron ahora. */
+  reenviados?: number;
 }
 
 const AUTOR = "Sistema (guía de SISCORE)";
@@ -38,8 +40,9 @@ export async function cargarGuiasSolas(supabase: Supabase, tiendaId: string, per
   if (!app) return vacio(`${nombre}: faltan las claves de Shopify en Vercel; las guías no se cargaron solas.`);
   const { data: pais } = await supabase.from("paises").select("codigo").eq("id", tienda.pais_id as string).maybeSingle();
   const codigoPais = String(pais?.codigo ?? "PA");
-
   const hoy = new Date().toLocaleDateString("en-CA", { timeZone: "America/Panama" });
+  const reenviados = await reintentarAvisosFrenados(supabase, { tiendaId, nombre, codigoPais, persona, desde: desdeGuiasSolas(hoy), hasta: Math.min(hasta, Date.now() + 20_000) });
+
   const { data: guias, error } = await supabase
     .from("tienda_guias")
     .select("guia, orden_id, fecha_emision, shopify_estado")
@@ -50,7 +53,7 @@ export async function cargarGuiasSolas(supabase: Supabase, tiendaId: string, per
     .or("shopify_estado.is.null,shopify_estado.eq.pendiente")
     .limit(500);
   if (error) return vacio(/shopify_estado/.test(error.message) ? "Falta correr en Supabase la migración 0361 (guías solas en Shopify)." : `No se pudieron leer las guías: ${error.message}`);
-  if (!guias?.length) return vacio(null);
+  if (!guias?.length) return { ...vacio(null), reenviados };
   // Primero las que nunca se intentaron, de la más nueva a la más vieja.
   const lista = [...guias].sort((a, b) => Number(!!a.shopify_estado) - Number(!!b.shopify_estado) || String(b.fecha_emision ?? "").localeCompare(String(a.fecha_emision ?? "")));
 
@@ -62,7 +65,7 @@ export async function cargarGuiasSolas(supabase: Supabase, tiendaId: string, per
       ordenes.set(o.id as string, { numero: String(o.numero ?? ""), etiquetas: etiquetasDe(o.etiquetas as string | null), estadoEntrega: (o.estado_entrega as string | null) ?? null, guia: (o.guia as string | null) ?? null });
   }
 
-  const r = vacio(null);
+  const r: ResultadoGuiasSolas = { ...vacio(null), reenviados };
   const auditoria: EntradaAuditoria[] = [];
   const marcar = (guia: string, cambios: Record<string, unknown>) => supabase.from("tienda_guias").update({ ...cambios, shopify_en: new Date().toISOString() }).eq("guia", guia);
   const pendiente = async (guia: string, motivo: string) => {
@@ -137,6 +140,41 @@ export async function cargarGuiasSolas(supabase: Supabase, tiendaId: string, per
   }
   await registrarAuditoriaLote(auditoria).catch(() => null);
   return r;
+}
+
+/**
+ * Los avisos de la guía que iComfly frenó por ir muy rápido (24 nov 2026: 3 de Oferfy): la guía ya está en Shopify, solo se vuelve a mandar el WhatsApp.
+ * Si sale, el pedido sale de «Guía sin cargar».
+ */
+async function reintentarAvisosFrenados(
+  supabase: Supabase,
+  t: { tiendaId: string; nombre: string; codigoPais: string; persona: { id: string; nombre: string }; desde: string; hasta: number },
+): Promise<number> {
+  const { data } = await supabase
+    .from("tienda_guias")
+    .select("guia, orden_id, shopify_motivo")
+    .eq("tienda_id", t.tiendaId)
+    .eq("aviso_cliente", "a_mano")
+    .gte("fecha_emision", t.desde)
+    .not("orden_id", "is", null)
+    .limit(50);
+  let n = 0;
+  for (const fila of (data ?? []).filter((x) => esperaDeIcomfly(x.shopify_motivo as string | null) !== null)) {
+    if (Date.now() > t.hasta) break;
+    const g = leerGuia({ numero: fila.guia });
+    if ("error" in g) continue;
+    const { data: o } = await supabase.from("ven_ordenes").select("numero").eq("id", fila.orden_id as string).maybeSingle();
+    if (!o?.numero) continue;
+    const wa = await guiaPorWhatsapp(supabase, { ordenId: fila.orden_id as string, numero: String(o.numero), tienda: t.nombre, tiendaId: t.tiendaId, codigoPais: t.codigoPais, persona: t.persona }, g);
+    if (!wa.enviado) {
+      await supabase.from("tienda_guias").update({ shopify_motivo: (wa.aviso ?? "mandarle la guía al cliente a mano").slice(0, 300), shopify_en: new Date().toISOString() }).eq("guia", g.numero);
+      continue;
+    }
+    await supabase.from("tienda_guias").update({ aviso_cliente: "whatsapp", shopify_motivo: null, shopify_en: new Date().toISOString() }).eq("guia", g.numero);
+    await supabase.from("ven_orden_notas").insert({ orden_id: fila.orden_id as string, texto: `Guía ${g.numero}: ${wa.linea} (reintento, iComfly lo había frenado por ir muy rápido)`, autor: AUTOR });
+    n++;
+  }
+  return n;
 }
 
 /** El motivo de «Guía sin cargar» de cada pedido de esas tiendas: las que no entraron y las que entraron pero el aviso al cliente no salió. */
