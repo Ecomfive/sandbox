@@ -107,7 +107,7 @@ export const LUGARES_SERVIENTREGA_PANAMA = ["Ciudad de la Salud", "Esclusas de M
 /**
  * Lugares que salen a la vez como zona de delivery (CIUDAD) y en la lista de Servientrega (INTERIOR), más cuatro corregimientos que la lista de Servientrega nombra pero que las tiendas etiquetan casi siempre CIUDAD
  * (Ernesto Córdoba Campos, Caimitillo, Cabra, Panamá Norte). Las listas no coinciden y el equipo todavía no dijo cuál manda: la IA no los decide sola y responde «no_se» salvo que la dirección traiga otra pista (una
- * palabra de zona, otro lugar que sí defina la zona). Con los pedidos de octubre y noviembre de 2026 de Nuvo y Oferfy salen CIUDAD casi siempre y en Kenku casi siempre INTERIOR.
+ * palabra de zona, otro lugar que sí defina la zona). Con los pedidos de octubre y noviembre de 2026 de Nuvo y Oferfy salen CIUDAD casi siempre (Kenku los mandaba a INTERIOR, pero eso se dejó de seguir el 24 nov 2026: sus asesores lo corrigen y la IA ya no usa su tendencia).
  */
 export const ZONAS_EN_DISCUSION = ["Ernesto Córdoba Campos", "Cabra", "Las Cumbres", "Alcalde Díaz", "Ciudad del Saber", "Pan de Azúcar", "Cerro Batea", "Altos de la Pulida", "Samaria", "Tierra Alta", "Paraíso", "Cerro la Cruz", "La Cabima", "Gonzalillo", "Veranillo"];
 
