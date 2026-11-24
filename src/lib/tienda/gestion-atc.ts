@@ -303,3 +303,14 @@ export function guiaSolaSinShopify(o: { etiquetas: string[]; estadoEntrega: stri
   if ((o.guia ?? "").trim() === guia) return { estado: "ya_tenia", motivo: null };
   return null;
 }
+
+/**
+ * iComfly frena los mensajes seguidos («Vas muy rápido… Espera ~7s antes del siguiente mensaje»): cuántos milisegundos esperar antes de reintentar, o
+ * null si el error es otro. Con las guías solas (24 nov 2026) salieron 3 avisos de Oferfy sin enviar por esto.
+ */
+export function esperaDeIcomfly(error: string | null | undefined): number | null {
+  const e = error ?? "";
+  if (!/muy r[aá]pido|l[ií]mite de seguridad/i.test(e)) return null;
+  const s = Number(e.match(/espera\s*~?\s*(\d+)\s*s/i)?.[1] ?? 8);
+  return (Math.min(Math.max(s, 1), 30) + 1) * 1000;
+}

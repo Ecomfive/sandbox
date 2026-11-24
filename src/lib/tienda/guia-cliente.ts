@@ -5,7 +5,7 @@ import { registrarAuditoria } from "@/lib/auditoria";
 import type { createServiceClient } from "@/lib/supabase/server";
 import { esErrorDeVentana, telefonoParaIcomfly } from "./chat-tienda";
 import { enviarAviso, enviarPlantilla, plantillasAprobadas } from "./chat-tienda-datos";
-import { mensajeGuiaWhatsapp, plantillaGuia } from "./gestion-atc";
+import { esperaDeIcomfly, mensajeGuiaWhatsapp, plantillaGuia } from "./gestion-atc";
 import { conexionesIcomfly } from "./icomfly";
 
 type Supabase = ReturnType<typeof createServiceClient>;
@@ -18,6 +18,18 @@ export interface PedidoDeGuia {
   codigoPais: string;
   /** Quien queda como autor del mensaje en el chat. */
   persona: { id: string; nombre: string };
+}
+
+/** Reintenta (hasta 3 veces) cuando iComfly pide esperar unos segundos entre mensajes. */
+async function conEspera<T extends { error?: string | null }>(enviar: () => Promise<T>): Promise<T> {
+  let r = await enviar();
+  for (let i = 0; i < 3; i++) {
+    const ms = esperaDeIcomfly(r.error);
+    if (ms === null) break;
+    await new Promise((ok) => setTimeout(ok, ms));
+    r = await enviar();
+  }
+  return r;
 }
 
 /** Manda la plantilla aprobada de la guía (sirve fuera de las 24 h). Comprueba que la plantilla exista y pida las variables que se le dan. */
@@ -39,7 +51,7 @@ async function guiaConPlantilla(supabase: Supabase, p: PedidoDeGuia, g: { numero
   const plantilla = aprobadas.find((x) => x.nombre === elegida.nombre);
   if (!plantilla) return { error: `la tienda no tiene aprobada «${elegida.nombre}»` };
   if (plantilla.variables.length !== elegida.valores.length) return { error: `«${plantilla.nombre}» cambió: pide ${plantilla.variables.length} datos` };
-  const r = await enviarPlantilla(supabase, p.tiendaId, telefono, { nombre: plantilla.nombre, idioma: plantilla.idioma, valores: elegida.valores, cuerpo: plantilla.cuerpo }, p.persona);
+  const r = await conEspera(() => enviarPlantilla(supabase, p.tiendaId, telefono, { nombre: plantilla.nombre, idioma: plantilla.idioma, valores: elegida.valores, cuerpo: plantilla.cuerpo }, p.persona));
   return r.error ? { error: r.error } : { nombre: plantilla.nombre };
 }
 
@@ -63,7 +75,7 @@ export async function guiaPorWhatsapp(supabase: Supabase, p: PedidoDeGuia, g: { 
     if (!telefono) return sinEnviar("el pedido no tiene un teléfono válido", "el pedido no tiene un teléfono válido para WhatsApp.");
     const nombre = (cliente?.nombre as string | null) ?? null;
     const texto = mensajeGuiaWhatsapp({ cliente: nombre, pedido: p.numero, tienda: p.tienda, guia: g.numero, url: g.url });
-    const r = await enviarAviso(supabase, p.tiendaId, telefono, texto, p.persona);
+    const r = await conEspera(() => enviarAviso(supabase, p.tiendaId, telefono, texto, p.persona));
     let como = "";
     if (r.error) {
       if (!esErrorDeVentana(r.error)) return sinEnviar("iComfly no lo mandó", `iComfly no mandó el WhatsApp (${r.error}). Mándale la guía a mano.`);
