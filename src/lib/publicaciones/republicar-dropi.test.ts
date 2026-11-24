@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { ARMAR_JS, marcadorAplicarDropi } from "./marcador-aplicar-dropi";
-import { armarMovimientoStock, armarProductoNuevo, armarProductoNuevoB280, bodegaTemporalB280, CDN_FOTOS_DROPI, fotosParaCopiar, normalizarSumar, REPUBLICAR_JS, republicacionSinTocarDropi, stockPorBodega, UNIDADES_TEMPORALES_B280 } from "./republicar-dropi";
+import { cambioSinTocarDropi, armarMovimientoStock, armarProductoNuevo, armarProductoNuevoB280, bodegaTemporalB280, CDN_FOTOS_DROPI, fotosParaCopiar, normalizarSumar, REPUBLICAR_JS, republicacionSinTocarDropi, stockPorBodega, UNIDADES_TEMPORALES_B280 } from "./republicar-dropi";
 
 test("normalizarSumar: solo enteros positivos con una bodega; lo demás no suma", () => {
   assert.deepEqual(normalizarSumar({ sumar: 20, bodega: 81, nombreBodega: "Proveedor Ecomfive" }), { sumar: 20, bodega: 81, nombreBodega: "Proveedor Ecomfive" });
@@ -182,4 +182,14 @@ test("«Republicar (B280)»: el nuevo sin la B280, con 100 u. temporales en nues
   assert.match(String((armarProductoNuevoB280(truly, bp, 280, 100) as { error: string }).error), /no es de ECOMFIVE/);
   const privatizado = { ...truly, private_product_inventories: [{ stock: 5, deleted_at: null }] };
   igual(fn.nuevo280(privatizado, bp, 81, 100), armarProductoNuevoB280(privatizado, bp, 81, 100));
+});
+
+test("un cambio que falló porque Dropi ya no devuelve el producto no tocó nada y se puede quitar de la cola", () => {
+  const error = "Dropi respondió 200: Ha ocurrido un error al obtener el producto.";
+  assert.equal(cambioSinTocarDropi(error, null), true);
+  assert.equal(republicacionSinTocarDropi(error, null), true);
+  assert.equal(cambioSinTocarDropi(error, 9001), false, "ya se creó un producto: no es seguro");
+  assert.equal(cambioSinTocarDropi("Se guardó, pero no se pudo comprobar en Dropi.", null), false);
+  assert.equal(cambioSinTocarDropi("Dropi respondió 500.", null), false);
+  assert.equal(cambioSinTocarDropi(null, null), false);
 });

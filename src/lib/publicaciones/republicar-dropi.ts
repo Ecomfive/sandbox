@@ -125,11 +125,24 @@ export const ERRORES_ANTES_DE_DROPI = [
   "Dropi no devolvió el producto.",
 ] as const;
 
+/**
+ * Lo que Dropi responde cuando el producto que se le pide ya no existe (o no se puede leer): «Ha ocurrido un error al obtener el producto». Todo cambio del favorito empieza leyendo el producto,
+ * así que con este error **no se llegó a tocar nada en Dropi** (24 nov 2026, Liver en Cápsulas, ID 9002: el producto ya no existía en Dropi y «Sacar de Archivados» y «Republicar» quedaron fallando
+ * en cada «Aplicar en Dropi», sin botón «Deshacer»). Los pasos que vienen después de esa lectura usan mensajes propios («Se guardó, pero no se pudo comprobar…»), no este.
+ */
+export const ERROR_PRODUCTO_NO_LEIDO = "al obtener el producto";
+
+/** ¿Falló el cambio porque Dropi no devolvió el producto? Sin `nuevoDropiId` (no se creó nada) quiere decir que Dropi no se tocó y el cambio se puede quitar de la cola. */
+export function cambioSinTocarDropi(error: string | null | undefined, nuevoDropiId: unknown): boolean {
+  if (nuevoDropiId !== null && nuevoDropiId !== undefined && nuevoDropiId !== "") return false;
+  return String(error ?? "").includes(ERROR_PRODUCTO_NO_LEIDO);
+}
+
 /** Si una republicación que falló no llegó a tocar Dropi (ver `ERRORES_ANTES_DE_DROPI`). */
 export function republicacionSinTocarDropi(error: string | null | undefined, nuevoDropiId: unknown): boolean {
   if (nuevoDropiId !== null && nuevoDropiId !== undefined && nuevoDropiId !== "") return false;
   const e = String(error ?? "").trim();
-  return ERRORES_ANTES_DE_DROPI.some((p) => e.startsWith(p));
+  return cambioSinTocarDropi(e, nuevoDropiId) || ERRORES_ANTES_DE_DROPI.some((p) => e.startsWith(p));
 }
 
 /**

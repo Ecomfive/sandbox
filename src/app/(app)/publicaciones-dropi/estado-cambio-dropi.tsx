@@ -1,6 +1,6 @@
 import { useMoneda } from "./moneda-contexto";
 import type { CambioDropiVista } from "@/lib/publicaciones/cambios-dropi";
-import { republicacionSinTocarDropi } from "@/lib/publicaciones/republicar-dropi";
+import { cambioSinTocarDropi, republicacionSinTocarDropi } from "@/lib/publicaciones/republicar-dropi";
 import { publicacionSinCrearEnDropi } from "@/lib/publicaciones/crear-dropi";
 import { codigoBodega } from "@/lib/publicaciones/sincronizar-dropi";
 import { textoVariacion } from "@/lib/publicaciones/stock-dropi";
@@ -126,7 +126,9 @@ function EstadoArchivar({ c }: { c: CambioDropiVista }) {
   return (
     <span className="flex items-center gap-1.5 text-xs text-destructive">
       <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-destructive" />
-      {c.estado === "error"
+      {c.estado === "error" && cambioSinTocarDropi(c.error, c.nuevoDropiId)
+        ? `No se pudo ${c.restaurar ? "sacarla de Archivados" : "archivarla"} en Dropi: ${c.error} Dropi ya no devuelve el producto y no se tocó nada. Quítalo de la cola con «Deshacer» en «Cambios pendientes para Dropi».`
+        : c.estado === "error"
         ? `No se pudo ${c.restaurar ? "sacarla de Archivados" : "archivarla"} en Dropi: ${c.error ?? "sin detalle"} Se vuelve a intentar al pulsar «Aplicar en Dropi».`
         : `${c.restaurar ? "Salir de Archivados" : "Archivar"} pendiente en Dropi: pulsa «Aplicar en Dropi» con Dropi abierto.`}
     </span>
