@@ -36,6 +36,7 @@ interface ItemLeido {
   pagado_por_nombre: string | null;
   llegada_id?: string;
   creado_en?: string;
+  archivado_en?: string | null;
 }
 
 /** Arma las filas de una lista de compras de llegadas (en ese orden): sus productos, unidades, cajas, etiqueta y lo pagado. */
@@ -73,7 +74,7 @@ async function armarFilas(supabase: SupabaseClient, lista: ItemLeido[], conLlega
         montoPagado: num(i.monto_pagado),
         pagadoPor: i.pagado_por_nombre,
         etapa: c.etapa,
-        ...(conLlegada ? { llegadaId: i.llegada_id, llegadaEn: i.creado_en } : {}),
+        ...(conLlegada ? { llegadaId: i.llegada_id, llegadaEn: i.creado_en, archivadaEn: i.archivado_en ?? null } : {}),
       },
     ];
   });
@@ -98,14 +99,19 @@ export const MAX_LLEGADAS_LISTA = 500;
  * la más reciente primero y cada compra una vez. Cada fila dice de qué llegada es, para abrirla.
  */
 export async function cargarFilasDeLlegadas(supabase: SupabaseClient, tipo: TipoLlegada, desdeIso: string): Promise<FilaLlegada[]> {
-  const { data: items } = await supabase
-    .from("compras_llegada_items")
-    .select("llegada_id, compra_id, pagado_en, monto_pagado, pagado_por_nombre, creado_en, compras_llegadas!inner(tipo)")
-    .eq("compras_llegadas.tipo", tipo)
-    .gte("creado_en", desdeIso)
-    .order("creado_en", { ascending: false })
-    .limit(MAX_LLEGADAS_LISTA);
+  const consulta = (columnas: string) =>
+    supabase.from("compras_llegada_items").select(columnas).eq("compras_llegadas.tipo", tipo).gte("creado_en", desdeIso).order("creado_en", { ascending: false }).limit(MAX_LLEGADAS_LISTA);
+  const base = "llegada_id, compra_id, pagado_en, monto_pagado, pagado_por_nombre, creado_en, compras_llegadas!inner(tipo)";
+  const conArchivo = await consulta(`${base}, archivado_en`);
+  // Sin la migración 0360 no hay archivo: todo cuenta como pendiente de recibir.
+  const items = conArchivo.error ? (await consulta(base)).data : conArchivo.data;
   return unaPorCompra(await armarFilas(supabase, (items ?? []) as unknown as ItemLeido[], true));
+}
+
+/** ¿Está la migración 0360 (archivo de llegadas)? Sin ella no hay dónde guardar lo archivado. */
+export async function hayArchivoDeLlegadas(supabase: SupabaseClient): Promise<boolean> {
+  const { error } = await supabase.from("compras_llegada_items").select("archivado_en").limit(1);
+  return !error;
 }
 
 /**

@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { ETAPAS_COMPRA } from "../../app/(app)/compras/def-compras";
 import { ETAPAS_LLEGADA_PUERTO, esLlegadaPuerto } from "./etapas-puerto";
-import { armarAviso, desdeDeLista, diasDeLista, llegadaDeEtapa, unaPorCompra, pagadoTrasSegundoPago, revisarPago, textoProductos, totalesDeLlegada, filaSinMontos, type FilaLlegada } from "./llegadas-avisos";
+import { armarAviso, pendientesDeRecibir, yaArchivadas, desdeDeLista, diasDeLista, llegadaDeEtapa, unaPorCompra, pagadoTrasSegundoPago, revisarPago, textoProductos, totalesDeLlegada, filaSinMontos, type FilaLlegada } from "./llegadas-avisos";
 
 const fila = (o: Partial<FilaLlegada> = {}): FilaLlegada => ({
   compraId: "c1",
@@ -132,4 +132,10 @@ test("sin ver el segundo pago, la fila llega sin montos ni día del pago, pero d
   assert.equal(pagada.pagada, true);
   assert.equal(filaSinMontos(fila()).pagada, false);
   assert.equal(totalesDeLlegada([pagada, filaSinMontos(fila())]).pendientes, 1);
+});
+
+test("lo archivado sale de «por recibir» y se ve aparte, sin perder el orden", () => {
+  const lista = [fila({ compraId: "a" }), fila({ compraId: "b", archivadaEn: "2026-11-24T10:00:00Z" }), fila({ compraId: "c", archivadaEn: null }), fila({ compraId: "d", archivadaEn: "2026-11-23T10:00:00Z" })];
+  assert.deepEqual(pendientesDeRecibir(lista).map((f) => f.compraId), ["a", "c"]);
+  assert.deepEqual(yaArchivadas(lista).map((f) => f.compraId), ["b", "d"]);
 });

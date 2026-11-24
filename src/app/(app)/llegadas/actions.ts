@@ -4,12 +4,13 @@ import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { getUsuarioActual } from "@/lib/auth";
 import { hoyPanama } from "@/lib/af4/fecha";
-import { pagadoTrasSegundoPago, revisarPago } from "@/lib/compras/llegadas-avisos";
+import { MAX_ARCHIVAR_A_LA_VEZ, pagadoTrasSegundoPago, revisarPago } from "@/lib/compras/llegadas-avisos";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { esUuid } from "@/lib/seguridad/ruta-almacen";
 import { createServiceClient } from "@/lib/supabase/server";
 import { sinAccesoACompras } from "../compras/acceso-compras";
 import { restriccionesDe, vePagosProveedor } from "../compras/permisos-compras";
+import { accesoAPuerto, motivoSinAccesoAPuerto } from "./acceso-llegadas";
 
 type Supabase = ReturnType<typeof createServiceClient>;
 type Usuario = NonNullable<Awaited<ReturnType<typeof getUsuarioActual>>>;
@@ -138,4 +139,36 @@ export async function registrarPagoTotalLlegada(llegadaId: string, dia: unknown)
   revalidatePath("/compras/lista");
   revalidatePath("/compras/llegadas");
   return { pagadas, total: lista.length };
+}
+
+/**
+ * Archiva lo que ya se recibió (o lo saca del archivo): las compras salen de la lista de «Llegadas a puerto» y se ven en «Archivadas». No cambia la etapa de la compra ni borra nada; solo marca quién y cuándo
+ * en todas las filas de puerto de esa compra. Si la compra vuelve a llegar a puerto (otro lote), aparece de nuevo como pendiente. Devuelve el error como valor.
+ */
+export async function archivarLlegadasPuerto(compraIds: string[], archivar: boolean): Promise<{ error?: string; cambiadas?: number }> {
+  const usuario = await getUsuarioActual();
+  if (!usuario) return { error: "Vuelve a iniciar sesión." };
+  const ids = [...new Set(Array.isArray(compraIds) ? compraIds : [])].filter((id): id is string => typeof id === "string" && esUuid(id));
+  if (ids.length === 0) return { error: "Marca al menos una compra." };
+  if (ids.length > MAX_ARCHIVAR_A_LA_VEZ) return { error: `Se pueden archivar hasta ${MAX_ARCHIVAR_A_LA_VEZ} compras a la vez.` };
+  const supabase = createServiceClient();
+  const sinAcceso = await motivoSinAccesoAPuerto(supabase, usuario, ids);
+  if (sinAcceso) return { error: sinAcceso };
+  if (!(await accesoAPuerto(supabase, usuario)).puedeArchivar) return { error: "Tu usuario solo puede ver las llegadas a puerto; archivarlas lo hace quien las gestiona." };
+  const { data: items, error: errLeer } = await supabase.from("compras_llegada_items").select("id, compras_llegadas!inner(tipo)").in("compra_id", ids).eq("compras_llegadas.tipo", "puerto");
+  if (errLeer) return { error: errLeer.message.includes("archivado") ? "Falta correr la migración 0360 (archivo de llegadas)." : "No se pudo leer las llegadas." };
+  const itemIds = ((items ?? []) as { id: string }[]).map((i) => i.id);
+  if (itemIds.length === 0) return { error: "Esas compras no están en llegadas a puerto." };
+  const marca = archivar ? { archivado_en: new Date().toISOString(), archivado_por: usuario.id, archivado_por_nombre: usuario.nombre || usuario.email } : { archivado_en: null, archivado_por: null, archivado_por_nombre: null };
+  const { error } = await supabase.from("compras_llegada_items").update(marca).in("id", itemIds);
+  if (error) return { error: error.message.includes("archivado") ? "Falta correr la migración 0360 (archivo de llegadas)." : "No se pudo guardar el cambio." };
+  await registrarAuditoria({
+    accion: archivar ? "archivar_llegada_puerto" : "desarchivar_llegada_puerto",
+    entidad: "wms_compras",
+    entidadId: ids[0],
+    detalle: `${archivar ? "Archivó" : "Sacó del archivo"} ${ids.length} ${ids.length === 1 ? "compra" : "compras"} de llegadas a puerto`,
+  });
+  revalidatePath("/llegadas");
+  revalidatePath("/notificaciones");
+  return { cambiadas: ids.length };
 }
