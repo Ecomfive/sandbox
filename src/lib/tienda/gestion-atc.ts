@@ -54,6 +54,18 @@ const ES_MOTIVO = /^mot-/i;
 const ES_CONFIRMADA = /^confirmad[ao]$/i;
 const ZONA_CUALQUIERA = /^(ciudad|interior)([-/].*)?$/i;
 
+/** Las etiquetas de gestión de antes del manual: en gestión («Pendiente», «Modificar…», «No contesta»…) y de anulación («ANULADO…», «Cancelado»). */
+const DEL_SISTEMA_ANTERIOR = /^(pendiente|modificar\b.*|no contesta.*|esperando.*|llamar.*|volver a llamar.*|anulad[oa](?![a-z]).*|cancelad[oa])$/i;
+
+/** Las que el manual reemplaza: no se sugieren como etiqueta suelta en la ficha (zona, control y motivo van por los botones de Gestión). */
+export function sugerenciaPermitida(etiqueta: string): boolean {
+  const t = etiqueta.trim();
+  return !DEL_SISTEMA_ANTERIOR.test(t) && !ES_CONFIRMADA.test(t) && !ZONA_CUALQUIERA.test(t) && !ES_MOTIVO.test(t) && clave(t) !== clave(ETIQUETA_POR_CONFIRMAR) && clave(t) !== clave(ETIQUETA_NOVEDAD);
+}
+
+/** Desde cuándo se trabaja con el manual (24 nov 2026, Kenku): lo anulado o entregado antes no tiene motivo MOT-… ni «acreditado». */
+export const INICIO_ATC = "2026-11-24T05:00:00Z";
+
 /** La zona del pedido según el manual (la etiqueta tal cual), o null. */
 export function zonaAtc(etiquetas: string[]): string | null {
   return etiquetas.find((e) => ZONA_CUALQUIERA.test(e.trim())) ?? null;
@@ -91,7 +103,8 @@ export type PlanAtc = { agregar: string[]; quitar: string[] } | { error: string 
 export function planAtc(accion: AccionAtc, actuales: string[], datos: { zona?: string | null; motivo?: string | null; codigoPais: string; supervision?: boolean }): PlanAtc {
   const zonas = (ZONAS_ATC[datos.codigoPais] ?? ZONAS_ATC.PA).map((z) => z.etiqueta);
   const zonaActual = zonaAtc(actuales);
-  const quitarSi = (pred: (e: string) => boolean) => actuales.filter(pred);
+  // Lo que usaba el equipo antes del manual («Pendiente», «Modificar…», «ANULADO/VERIFICADO», «Cancelado»…) también se quita: el manual no las usa.
+  const quitarSi = (pred: (e: string) => boolean) => actuales.filter((e) => pred(e) || DEL_SISTEMA_ANTERIOR.test(e.trim()));
   const control = (e: string) => clave(e) === clave(ETIQUETA_POR_CONFIRMAR) || clave(e) === clave(ETIQUETA_NOVEDAD);
 
   if (accion === "confirmar") {
@@ -155,8 +168,19 @@ export const VISTAS_ATC: VistaAtc[] = [
   { id: "novedades", etiqueta: "Novedades", detalle: "el cliente pidió esperar", incluye: (p) => conNovedad(p.etiquetas ?? []) && !["cancelado", "entregado", "devuelto"].includes(p.estado) },
   { id: "listos", etiqueta: "Listos para despacho", detalle: "con zona y sin preparar", incluye: (p) => p.estado === "confirmado" },
   { id: "en-ruta", etiqueta: "En ruta", detalle: "preparados y sin entregar", incluye: (p) => p.estado === "en_camino" },
-  { id: "sin-pagar", etiqueta: "Entregados sin acreditar", detalle: "Finanzas: falta «acreditado»", incluye: (p) => p.estado === "entregado" && !tiene(p.etiquetas ?? [], ETIQUETA_ACREDITADO) },
-  { id: "anulados-sin-motivo", etiqueta: "Anulados sin motivo", detalle: "falta el motivo o la zona", incluye: (p) => (p.estado === "cancelado" || p.estado === "devuelto") && (!motivoAtc(p.etiquetas ?? []) || !zonaAtc(p.etiquetas ?? [])) },
+  // Estas dos cuentan desde que se trabaja con el manual: lo de antes nunca tuvo «acreditado» ni motivo MOT-….
+  {
+    id: "sin-pagar",
+    etiqueta: "Entregados sin acreditar",
+    detalle: "Finanzas: falta «acreditado» (pedidos desde el 24 nov 2026)",
+    incluye: (p) => p.estado === "entregado" && p.creado >= INICIO_ATC && !tiene(p.etiquetas ?? [], ETIQUETA_ACREDITADO),
+  },
+  {
+    id: "anulados-sin-motivo",
+    etiqueta: "Anulados sin motivo",
+    detalle: "falta el motivo o la zona (pedidos desde el 24 nov 2026)",
+    incluye: (p) => (p.estado === "cancelado" || p.estado === "devuelto") && p.creado >= INICIO_ATC && (!motivoAtc(p.etiquetas ?? []) || !zonaAtc(p.etiquetas ?? [])),
+  },
   { id: "sin-etiqueta", etiqueta: "Sin etiqueta", detalle: "ni zona, ni control, ni motivo", incluye: (p) => !["cancelado", "entregado", "devuelto"].includes(p.estado) && sinGestion(p.etiquetas ?? []) },
 ];
 
