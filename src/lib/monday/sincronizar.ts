@@ -7,6 +7,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { unidadDeTienda } from "../ventas/matriz";
+import { REPARTIDOR_PRUEBA } from "@/lib/despacho/etiquetas";
 import {
   cambioDesde,
   completarMapeo,
@@ -87,7 +88,15 @@ const COLUMNAS_0970 = ["grupo", "edo_pago", "por_cobrar", "coste_envio", "turno"
  * Enlaza y guarda un lote de despachos. `clase`: de qué tablero son (los repartos de ciudad o las devoluciones). Lo que ya se editó en el sistema
  * (Despacho ciudad, migración 0970: `editado_en`) no se pisa: desde ahí manda el sistema.
  */
-export async function guardarDespachos(supabase: SupabaseClient, tableroId: string, todo: Despacho[], unidades: { id: string; nombre: string }[], clase: "ciudad" | "devolucion" = "ciudad"): Promise<number> {
+export async function guardarDespachos(
+  supabase: SupabaseClient,
+  tableroId: string,
+  todo: Despacho[],
+  unidades: { id: string; nombre: string }[],
+  clase: "ciudad" | "devolucion" = "ciudad",
+  /** Tablero de prueba (migración 0363): sus filas van con el repartidor de prueba, sin tienda ni pedido enlazado. */
+  prueba = false,
+): Promise<number> {
   if (!todo.length) return 0;
   const editados = new Set<string>();
   for (let i = 0; i < todo.length; i += 200) {
@@ -97,7 +106,7 @@ export async function guardarDespachos(supabase: SupabaseClient, tableroId: stri
   }
   const lote = todo.filter((d) => !editados.has(d.item_id));
   if (!lote.length) return 0;
-  const variantes = [...new Set(lote.flatMap((d) => variantesPedido(d.numero_pedido)))];
+  const variantes = prueba ? [] : [...new Set(lote.flatMap((d) => variantesPedido(d.numero_pedido)))];
   const candidatas: OrdenCandidata[] = [];
   for (let i = 0; i < variantes.length; i += 200) {
     const { data, error } = await supabase.from("ven_ordenes").select("id, unidad_id, numero, periodo").in("numero", variantes.slice(i, i + 200));
@@ -106,6 +115,7 @@ export async function guardarDespachos(supabase: SupabaseClient, tableroId: stri
   }
   const ahora = new Date().toISOString();
   const filas = lote.map((d) => {
+    if (prueba) return { ...d, courier: REPARTIDOR_PRUEBA, clase, tablero_id: tableroId, unidad_id: null, orden_id: null, periodo: d.fecha_despacho ? `${d.fecha_despacho.slice(0, 7)}-01` : null, leido_en: ahora };
     const unidad = unidadDeTexto(d.tienda_texto, unidades, unidadDeTienda);
     const orden = enlazarOrden(d.numero_pedido, unidad, candidatas);
     const periodo = orden?.periodo ?? (d.fecha_despacho ? `${d.fecha_despacho.slice(0, 7)}-01` : null);

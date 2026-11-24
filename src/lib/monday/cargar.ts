@@ -6,6 +6,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { traerTodasConError } from "@/lib/supabase/paginar";
 import { causaDeTexto, type Causa, type DespachoAnalisis } from "./causas";
 import { esGrupoEstado, leerMapeo, leerReglasEstado, type GrupoEstado, type MapeoColumnas } from "./columnas";
+import { REPARTIDOR_PRUEBA } from "@/lib/despacho/etiquetas";
 import { SIN_MIGRACION_MONDAY } from "./sincronizar";
 
 export interface ConfigMonday {
@@ -73,7 +74,8 @@ export async function cargarDespachos(supabase: SupabaseClient, desde: string, h
       .range(a, b) as unknown as PromiseLike<{ data: Fila[] | null; error: { message: string } | null }>,
   );
   if (r.error) return { error: SIN_MIGRACION_MONDAY };
-  return (r.data ?? []).map((f) => ({
+  // Las filas del tablero de prueba del panel del repartidor (migración 0363) no cuentan en las métricas.
+  return (r.data ?? []).filter((f) => f.courier !== REPARTIDOR_PRUEBA).map((f) => ({
     periodo: f.periodo ? String(f.periodo).slice(0, 10) : null,
     unidadId: f.unidad_id,
     tienda: f.fin_unidades?.nombre ?? f.tienda_texto,
