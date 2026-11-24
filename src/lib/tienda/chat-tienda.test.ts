@@ -71,7 +71,9 @@ test("el numerito de WhatsApp va con el pedido del cliente correcto", () => {
     { cola: "3333", nombre: "Nadie", cuenta: 5 },
   ]);
   // «🙂» no coincide con el nombre: aunque solo Tilsia termine en 5732, no lleva numerito.
-  assert.deepEqual(r, { c: 2 });
-  assert.deepEqual(pendientesPorPedido(filas, [{ cola: "5732", nombre: "Tilsia", cuenta: 3 }]), { a: 3, b: 3 });
+  assert.deepEqual(r, { c: { sinLeer: 2, espera: false } });
+  assert.deepEqual(pendientesPorPedido(filas, [{ cola: "5732", nombre: "Tilsia", cuenta: 3 }]), { a: { sinLeer: 3, espera: false }, b: { sinLeer: 3, espera: false } });
   assert.deepEqual(pendientesPorPedido(filas, [{ cola: "1111", nombre: "🙂", cuenta: 4 }]), {});
+  // Leído pero el cliente espera respuesta: sin número, solo el punto (24 nov 2026).
+  assert.deepEqual(pendientesPorPedido(filas, [{ cola: "2222", nombre: "Rosa", cuenta: 0, espera: true }]), { e: { sinLeer: 0, espera: true } });
 });
