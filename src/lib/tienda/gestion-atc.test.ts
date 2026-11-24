@@ -71,12 +71,26 @@ test("las etiquetas de antes del manual se quitan al gestionar y no se sugieren"
   assert.deepEqual(["Confirmada", "ANULADO/VERIFICADO", "Cancelado", "Pendiente", "CIUDAD", "MOT-CLIENTE-DUPLICA", "novedad", "Carrito recuperado", "Pedido Pagado"].filter(sugerenciaPermitida), ["Carrito recuperado", "Pedido Pagado"]);
 });
 
-import { cumplimientoMetas, leerGuia } from "./gestion-atc";
+import { cumplimientoMetas, leerGuia, lineaPaso, mensajeGuiaWhatsapp } from "./gestion-atc";
 
 test("la guía: número sin espacios y el enlace de rastreo de Servientrega armado con él", () => {
   assert.deepEqual(leerGuia({ numero: " 7224 1470 76 " }), { numero: "7224147076", url: "https://servientrega.com.pa/Tracking/?guia=7224147076", empresa: "Servientrega" });
   assert.ok("error" in leerGuia({ numero: "12" }));
   assert.ok("error" in leerGuia({ numero: "7224147076&x=1" }), "solo letras, números y guiones");
+});
+
+test("el WhatsApp de la guía: primer nombre, pedido, guía y enlace; sin nombre, «Hola»", () => {
+  const datos = { pedido: "#1937", tienda: "Kenku", guia: "7224147076", url: "https://servientrega.com.pa/Tracking/?guia=7224147076" };
+  assert.equal(
+    mensajeGuiaWhatsapp({ ...datos, cliente: "STEFANNY laing" }),
+    "Hola Stefanny 👋 Tu pedido #1937 de Kenku ya va en camino con Servientrega.\nNúmero de guía: 7224147076\nPuedes seguirlo aquí: https://servientrega.com.pa/Tracking/?guia=7224147076",
+  );
+  assert.ok(mensajeGuiaWhatsapp({ ...datos, cliente: null }).startsWith("Hola 👋 Tu pedido #1937"));
+  assert.ok(mensajeGuiaWhatsapp({ ...datos, cliente: "123" }).startsWith("Hola 👋"));
+  assert.equal(
+    lineaPaso("guia", { guia: "7224147076", aviso: "el cliente no tiene correo: se le mandó la guía por WhatsApp (iComfly)" }),
+    "Guía cargada en Shopify: 7224147076 (Servientrega), el cliente no tiene correo: se le mandó la guía por WhatsApp (iComfly)",
+  );
 });
 
 test("metas del puesto: cumple si llega a la meta", () => {

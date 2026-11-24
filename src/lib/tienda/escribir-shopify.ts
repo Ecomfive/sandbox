@@ -159,21 +159,24 @@ async function tokenCon(app: AppTienda, permiso: string, para: string): Promise<
 }
 
 /** El envío (fulfillment) del pedido: el último que no se canceló. Sin envío, despacho todavía no lo preparó. */
-async function envioDelPedido(app: AppTienda, token: string, numero: string): Promise<{ id: string; displayStatus: string | null }> {
+async function envioDelPedido(app: AppTienda, token: string, numero: string): Promise<{ id: string; displayStatus: string | null; correo: boolean }> {
   const pedido = await buscarPedido(app, token, numero);
-  const d = await graphql<{ order: { fulfillments: { id: string; status: string; displayStatus: string | null; createdAt: string }[] } | null }>(
+  const d = await graphql<{ order: { email: string | null; fulfillments: { id: string; status: string; displayStatus: string | null; createdAt: string }[] } | null }>(
     app,
     token,
-    "query($id: ID!) { order(id: $id) { fulfillments(first: 10) { id status displayStatus createdAt } } }",
+    "query($id: ID!) { order(id: $id) { email fulfillments(first: 10) { id status displayStatus createdAt } } }",
     { id: pedido.id },
   );
   const envios = (d.order?.fulfillments ?? []).filter((f) => f.status !== "CANCELLED" && f.status !== "ERROR").sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   if (!envios.length) throw new Error("El pedido todavía no está preparado en Shopify: despacho lo prepara primero y después se carga la guía.");
-  return { id: envios[0].id, displayStatus: envios[0].displayStatus };
+  return { id: envios[0].id, displayStatus: envios[0].displayStatus, correo: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(d.order?.email ?? "").trim()) };
 }
 
-/** Carga la guía y el enlace público en el envío del pedido, con el correo de seguimiento al cliente (el manual lo pide activado). */
-export async function cargarGuiaEnShopify(app: AppTienda, numero: string, guia: { numero: string; empresa: string; url: string }): Promise<void> {
+/**
+ * Carga la guía y el enlace público en el envío del pedido, con el correo de seguimiento al cliente (el manual lo pide activado). Dice si el pedido tiene
+ * correo: sin correo, Shopify no tiene a quién mandarlo y el aviso va por WhatsApp.
+ */
+export async function cargarGuiaEnShopify(app: AppTienda, numero: string, guia: { numero: string; empresa: string; url: string }): Promise<{ correo: boolean }> {
   const token = await tokenCon(app, "write_fulfillments", "cargar la guía");
   const envio = await envioDelPedido(app, token, numero);
   const d = await graphql<{ fulfillmentTrackingInfoUpdate: { userErrors: { message: string }[] } | null }>(
@@ -184,6 +187,7 @@ export async function cargarGuiaEnShopify(app: AppTienda, numero: string, guia: 
   );
   const errores = d.fulfillmentTrackingInfoUpdate?.userErrors ?? [];
   if (errores.length) throw new Error(`Shopify no aceptó la guía: ${errores[0].message}`);
+  return { correo: envio.correo };
 }
 
 /** «Marcar como entregado» en Shopify (un evento DELIVERED en el envío). Si ya está entregado, no hace nada. */

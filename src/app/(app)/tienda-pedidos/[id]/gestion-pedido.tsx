@@ -222,7 +222,7 @@ export function GestionPedido({
                     (ábrelo para revisar que la guía sea la correcta)
                   </>
                 )}
-                . Shopify le manda al cliente el correo con el seguimiento; envíale también la guía por WhatsApp.
+                . Shopify le manda al cliente el correo con el seguimiento; si el cliente no dejó correo, el sistema le manda la guía por WhatsApp (iComfly).
               </p>
             </>
           )}

@@ -206,10 +206,21 @@ export function leerGuia(datos: { numero?: unknown }): { numero: string; url: st
   return { numero, url: enlaceRastreo(numero), empresa: TRANSPORTADORAS[0].nombre };
 }
 
+/**
+ * El WhatsApp con la guía para el cliente que no dejó correo (Shopify no tiene a quién mandar el seguimiento). Va por iComfly, en el número de la tienda.
+ * Solo el primer nombre del cliente; el enlace es el de rastreo de Servientrega.
+ */
+export function mensajeGuiaWhatsapp(d: { cliente?: string | null; pedido: string; tienda: string; guia: string; url: string }): string {
+  const nombre = (d.cliente ?? "").trim().split(/\s+/)[0] ?? "";
+  const saludo = /^[\p{L}'-]{2,30}$/u.test(nombre) ? `Hola ${nombre[0].toLocaleUpperCase("es")}${nombre.slice(1).toLocaleLowerCase("es")}` : "Hola";
+  const pedido = d.pedido.replace(/^#/, "").trim();
+  return `${saludo} 👋 Tu pedido #${pedido} de ${d.tienda} ya va en camino con Servientrega.\nNúmero de guía: ${d.guia}\nPuedes seguirlo aquí: ${d.url}`;
+}
+
 /** La línea de la cronología de cada paso. */
-export function lineaPaso(paso: PasoAtc, datos: { guia?: string; nota?: string | null }): string {
+export function lineaPaso(paso: PasoAtc, datos: { guia?: string; nota?: string | null; aviso?: string | null }): string {
   const por = datos.nota?.trim() ? ` — ${datos.nota.trim()}` : "";
-  if (paso === "guia") return `Guía cargada en Shopify: ${datos.guia} (Servientrega), con correo de seguimiento al cliente${por}`;
+  if (paso === "guia") return `Guía cargada en Shopify: ${datos.guia} (Servientrega), ${datos.aviso ?? "con correo de seguimiento al cliente"}${por}`;
   if (paso === "entregado") return `Marcado como entregado en Shopify${por}`;
   return `Finanzas: dinero acreditado en el banco, pago pasado a «Pagado»${por}`;
 }
