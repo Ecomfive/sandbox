@@ -11,7 +11,7 @@ export const GRUPOS_FUENTE: { id: GrupoFuente; titulo: string; subtitulo: string
   { id: "tiendas", titulo: "Tiendas", subtitulo: "Shopify y la Matriz de administración" },
   { id: "entregas", titulo: "Entregas", subtitulo: "Servientrega y Monday" },
   { id: "finanzas", titulo: "Finanzas", subtitulo: "Dropi, retiros y QuickBooks" },
-  { id: "marketing", titulo: "Marketing e investigación", subtitulo: "Meta y Tu Winner" },
+  { id: "marketing", titulo: "Marketing e investigación", subtitulo: "Meta, Tu Winner y la competencia en Drop" },
   { id: "archivos", titulo: "Archivos", subtitulo: "Los Excel que se suben a mano" },
 ];
 
@@ -23,6 +23,7 @@ export type VentanaFuente =
   | { tipo: "dropi"; sitio: "pa" | "cr" | "mx" | "drop" | "duna" | null }
   | { tipo: "siscore" }
   | { tipo: "tuwinner" }
+  | { tipo: "competencia-drop" }
   | { tipo: "excel"; modulo: string }
   | { tipo: "conteo" };
 

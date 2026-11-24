@@ -42,7 +42,7 @@ export default async function PublicacionesDropPage({ searchParams }: { searchPa
           Falta correr en Supabase la migración 0221 (Gestión de IDs Drop) para ver las publicaciones de Drop.
         </p>
       )}
-      <TableroDrop publicaciones={datos.publicaciones} conVentas={datos.conVentas} reglas={datos.reglasVentas} />
+      <TableroDrop publicaciones={datos.publicaciones} conVentas={datos.conVentas} conCompetencia={datos.conCompetencia} competenciaDel={datos.competenciaDel} reglas={datos.reglasVentas} />
       {puedeEscribir && !datos.faltaMigracion && <BarraAplicarPrecios plataforma="drop" pendientes={datos.publicaciones.filter((x) => x.cambioPrecio).length} />}
       {datos.publicaciones.length > 0 && (
         <p className="m-0 -mt-3 text-xs text-muted-foreground">

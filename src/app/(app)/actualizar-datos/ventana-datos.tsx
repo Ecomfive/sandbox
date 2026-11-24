@@ -16,6 +16,7 @@ import { PanelActualizarDropi } from "../publicaciones-dropi/actualizar/panel-ac
 import { ImportarConteo } from "../rentabilidad/inventario/conteo/importar-conteo";
 import { LeerSiscore } from "../tienda-pedidos/logistica/leer-siscore";
 import { LeerTuWinner } from "../tu-winner/leer-tuwinner";
+import { LeerCompetenciaDrop } from "../analisis-competencia/leer-competencia-drop";
 import { ImportarVentas } from "../ventas-tiendas/importar/importar-ventas";
 
 /** Lo que la página carga para las ventanas que lo necesitan (solo si alguna fila las usa). */
@@ -57,6 +58,8 @@ function Contenido({ ventana, extras, alCambiarEnMarcha }: { ventana: VentanaFue
       return <LeerTuWinner leidoHoy={false} auto={false} iniciar />;
     case "conteo":
       return <ImportarConteo />;
+    case "competencia-drop":
+      return <LeerCompetenciaDrop iniciar />;
     case "excel":
       return (
         <div className="flex flex-col gap-4">

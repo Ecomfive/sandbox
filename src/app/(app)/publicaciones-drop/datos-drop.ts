@@ -6,6 +6,7 @@ import { tasasUsd } from "@/lib/moneda/tipo-cambio";
 import { leerExclusivosDrop, margenDrop } from "@/lib/publicaciones-drop/lectura";
 import { diaCostaRica, ventas30PorPublicacion, ventasEnCaidaDrop, verificarDropshipperDrop, type VentaDiaDrop } from "@/lib/publicaciones-drop/ventas";
 import { cargarReglas } from "@/lib/publicaciones/reglas-datos";
+import { cargarCompetenciaDrop, masBaratoDrop } from "@/lib/publicaciones-drop/competencia";
 import { monedaPublicaciones, type MonedaPublicaciones } from "@/lib/publicaciones/moneda";
 import { fulfillmentEnMoneda, fulfillmentQueCuenta, leerFulfillmentPlataforma, type QuienPagaFulfillment } from "@/lib/publicaciones/fulfillment-pais";
 import { cambiosPrecioEsperando } from "@/lib/publicaciones/cambios-precio-datos";
@@ -25,6 +26,10 @@ export interface DatosDrop {
   faltaMigracion: boolean;
   /** Si ya hay ventas de Drop leídas (sin ellas, «Ventas en caída» y «Verificar dropshipper» siguen en «—»). */
   conVentas?: boolean;
+  /** Si ya hay una lectura de la competencia de Drop (sin ella, «Bajar precio» sigue en «—»). */
+  conCompetencia?: boolean;
+  /** Cuándo se leyó la competencia de Drop (ISO). */
+  competenciaDel?: string | null;
   /** Las reglas de Gestión de IDs Dropi que usan esas tarjetas, para su texto. */
   reglasVentas?: { caida: number; diasNuevo: number };
 }
@@ -168,7 +173,7 @@ export async function cargarDatosDrop(supabase: SupabaseClient, pais: { id: stri
   // Las ventas de Drop de los últimos 60 días (24 nov 2026): para «Ventas en caída» y «Verificar dropshipper», con las reglas de Gestión de IDs Dropi.
   const hoy = diaCostaRica(new Date().toISOString());
   const desdeVentas = new Date(Date.parse(`${hoy}T12:00:00Z`) - 59 * 86_400_000).toISOString().slice(0, 10);
-  const [{ camino, cotizando, etapasCotizando }, cambiosPrecio, filasVentas, { reglas }] = await Promise.all([
+  const [{ camino, cotizando, etapasCotizando }, cambiosPrecio, filasVentas, { reglas }, competencia] = await Promise.all([
     skuIds.length ? cargarEnCamino(supabase, pais.id, usuario) : { camino: new Map(), cotizando: new Map(), etapasCotizando: new Map() },
     cambiosPrecioEsperando(supabase, "drop", pais.id),
     traerTodasLasFilas<VentaDiaDrop>((d, h) =>
@@ -183,6 +188,8 @@ export async function cargarDatosDrop(supabase: SupabaseClient, pais: { id: stri
         .range(d, h) as unknown as PromiseLike<{ data: VentaDiaDrop[] | null; error: unknown }>,
     ).catch(() => null),
     cargarReglas(supabase),
+    // La competencia del Catálogo de Drop (24 nov 2026): para «Bajar precio».
+    cargarCompetenciaDrop(supabase, pais.id),
   ]);
   // Sin ninguna venta leída no se sabe nada (las tarjetas siguen en «—»); con la lectura, una publicación sin filas vendió 0.
   const ventas = filasVentas && filasVentas.length ? ventas30PorPublicacion(filasVentas, hoy) : null;
@@ -241,11 +248,12 @@ export async function cargarDatosDrop(supabase: SupabaseClient, pais: { id: stri
           clientesExclusivos,
           // Solo las que siguen en Drop: una que se eliminó allá ya no se revisa.
           ventasEnCaida: f.en_drop && ventasEnCaidaDrop(v, reglas),
+          competidorMasBarato: f.en_drop ? masBaratoDrop(competencia.porDropId.get(f.drop_id)) : null,
           verificarDropshipper: f.en_drop && verificarDropshipperDrop({ clientesExclusivos, creadoEnDrop: f.creado_en_drop, ventas: v }, hoy, reglas),
         };
       })(),
     };
   });
   const ultimaLectura = filas.filter((f) => f.en_drop).reduce<string | null>((max, f) => (!max || f.ultima_vez > max ? f.ultima_vez : max), null);
-  return { publicaciones, moneda, ultimaLectura, fulfillment, fulfillmentPaga, faltaMigracion: false, conVentas: ventas !== null, reglasVentas: { caida: reglas.caida_ventas, diasNuevo: reglas.dias_nuevo } };
+  return { publicaciones, moneda, ultimaLectura, fulfillment, fulfillmentPaga, faltaMigracion: false, conVentas: ventas !== null, conCompetencia: competencia.hayLectura, competenciaDel: competencia.ultimaLectura, reglasVentas: { caida: reglas.caida_ventas, diasNuevo: reglas.dias_nuevo } };
 }

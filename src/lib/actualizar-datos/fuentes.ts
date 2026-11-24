@@ -18,6 +18,8 @@ import { estadoFuente, masNueva, type AccionFuente, type Fuente, type GrupoFuent
 /** Los días que se esperan entre lecturas: lo diario se atrasa pasado un día (26 h, como las tareas programadas); los Excel, pasado un mes. */
 const DIARIA = 26;
 const MENSUAL = 35 * 24;
+/** La competencia cambia poco: se lee una vez por semana (24 nov 2026); se atrasa pasados 8 días. */
+const SEMANAL = 8 * 24;
 const VIGENCIA_CORRIENDO_MS = 40 * 60_000;
 
 type FilaTarea = { tarea: string; inicio: string; fin: string | null; ok: boolean | null; error: string | null; disparo: string | null; usuario_id: string | null };
@@ -40,7 +42,7 @@ export async function cargarFuentes(supabase: SupabaseClient, u: UsuarioActual):
   const archivos = ORDEN_CARGA.filter((m) => m !== "ventas-tiendas" && tiene(u, m));
   const vacio = Promise.resolve({ data: null });
 
-  const [dropi, effi, tareas, matriz, matrizExcel, matrizPedido, siscore, saldo, meta, metaManual, tuwinner, importaciones, conteo, conexiones] = await Promise.all([
+  const [dropi, effi, tareas, matriz, matrizExcel, matrizPedido, siscore, saldo, meta, metaManual, tuwinner, importaciones, conteo, conexiones, competenciaDrop] = await Promise.all([
     verDropi ? cargarPanel(supabase) : null,
     verEffi ? supabase.from("effi_publicaciones").select("ultima_vez").eq("en_effi", true).order("ultima_vez", { ascending: false }).limit(1).maybeSingle() : vacio,
     verTareas
@@ -71,6 +73,8 @@ export async function cargarFuentes(supabase: SupabaseClient, u: UsuarioActual):
       : Promise.resolve({ data: [] }),
     tiene(u, "inventario") ? auditoria("conteo_inventario") : vacio,
     tiene(u, "ventas-tiendas") ? supabase.from("ven_tiendas_conexion").select("unidad_id, activo, ultima_lectura, ultimo_error") : Promise.resolve({ data: [] }),
+    // La competencia en Drop (24 nov 2026): cada lectura queda en drop_competencia_busquedas (lista, fallida o corriendo).
+    tiene(u, "analisis-competencia") ? supabase.from("drop_competencia_busquedas").select("estado, inicio, fin, detalle").order("inicio", { ascending: false }).limit(5) : Promise.resolve({ data: [] }),
   ]);
 
   // Los nombres de quien corrió a mano una tarea programada.
@@ -406,6 +410,30 @@ export async function cargarFuentes(supabase: SupabaseClient, u: UsuarioActual):
         conError,
       },
       DIARIA,
+    );
+  }
+  if (tiene(u, "analisis-competencia")) {
+    const filas = ((competenciaDrop.data ?? []) as { estado: string; inicio: string; fin: string | null; detalle: string | null }[]).filter(Boolean);
+    const ultima = filas[0];
+    const buena = filas.find((f) => f.estado === "lista");
+    const conError = ultima?.estado === "fallida";
+    agregar(
+      {
+        clave: "drop-competencia",
+        grupo: "marketing",
+        nombre: "Drop: competencia",
+        que: "El catálogo de Drop con los demás proveedores (para «Bajar precio»)",
+        fecha: conError ? (ultima.fin ?? ultima.inicio) : (buena?.fin ?? buena?.inicio ?? null),
+        quien: null,
+        error: conError ? (ultima.detalle ?? "Falló") : null,
+        automatica: null,
+        requisito: "En el perfil de Chrome con la sesión de dropshipper de Drop",
+        donde: { texto: "Análisis de competencia", href: "/analisis-competencia" },
+        accion: escribe(u, "analisis-competencia") ? { tipo: "ventana", ventana: { tipo: "competencia-drop" }, titulo: "Leer la competencia de Drop", texto: "Actualizar" } : null,
+        corriendo: ultima?.estado === "corriendo" && reciente(ultima.inicio, VIGENCIA_CORRIENDO_MS),
+        conError,
+      },
+      SEMANAL,
     );
   }
 
