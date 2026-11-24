@@ -46,11 +46,14 @@ export function TableroDespacho({
   puedeEscribir: puedeArchivar,
   hoy,
   archivados = false,
+  mostrarHoy = true,
 }: {
   clase: Clase;
   filas: FilaTablero[];
   puedeEscribir: boolean;
   hoy: string;
+  /** Si el grupo de hoy sale aunque esté vacío (no, cuando se mira un día o un rango del pasado para un cierre). */
+  mostrarHoy?: boolean;
   /** La vista de archivados: nada se edita, solo se restaura desde el panel. */
   archivados?: boolean;
 }) {
@@ -67,7 +70,9 @@ export function TableroDespacho({
   }
   const esCiudad = clase === "ciudad";
   const [vista, setVista] = useState<string>(esCiudad ? "TODOS" : "KENKU");
-  const [filtro, setFiltro] = useState("");
+  // Varios estados a la vez (24 nov 2026, pedido de Soporte para los cierres de pago a los mensajeros: «Entregados» y «Fallidos» juntos); vacío = todos.
+  const [estados, setEstados] = useState<string[]>([]);
+  const alternarEstado = (id: string) => setEstados((es) => (id === "" ? [] : es.includes(id) ? es.filter((x) => x !== id) : [...es, id]));
   const [tienda, setTienda] = useState("");
   const [tipo, setTipo] = useState("");
   const [busqueda, setBusqueda] = useState("");
@@ -126,19 +131,19 @@ export function TableroDespacho({
     return filas.filter(
       (f) =>
         (esCiudad ? vista === "TODOS" || f.courier === vista : f.tienda === vista) &&
-        (!filtro || (filtro === "SIN" ? !f.estado : f.estado === filtro)) &&
+        (!estados.length || estados.some((e) => (e === "SIN" ? !f.estado : f.estado === e))) &&
         (!tienda || f.tienda === tienda) &&
         (!tipo || (tipo === "TODOS" ? TIPOS_VIAJE.includes(f.formaPago ?? "") : f.formaPago === tipo)) &&
         (!q || normal(`${f.numero ?? ""} ${f.comentario ?? ""} ${f.obsAsesores ?? ""}`).includes(q)),
     );
-  }, [filas, vista, filtro, tienda, tipo, busqueda, esCiudad]);
+  }, [filas, vista, estados, tienda, tipo, busqueda, esCiudad]);
 
   const grupos = useMemo(() => {
     const modo: Agrupar | "grupo" = esCiudad ? agrupar : "grupo";
     const claveDe = (f: FilaTablero) => (modo === "grupo" ? f.grupo : modo === "dia" ? (f.dia ?? "Sin día") : ((modo === "courier" ? f.courier : f.tienda) ?? "Sin asignar"));
     let claves: string[];
     if (modo === "grupo") claves = GRUPOS_DEVOLUCION.map((g) => g.nombre);
-    else if (modo === "dia") claves = [...new Set([hoy, ...visibles.map(claveDe)])].sort().reverse();
+    else if (modo === "dia") claves = [...new Set([...(mostrarHoy ? [hoy] : []), ...visibles.map(claveDe)])].sort().reverse();
     else claves = [...new Set(visibles.map(claveDe))].sort();
     return claves.map((k, i) => {
       const lista = visibles.filter((f) => claveDe(f) === k).sort((a, b) => a.posicion - b.posicion || (a.numero ?? "").localeCompare(b.numero ?? ""));
@@ -146,7 +151,7 @@ export function TableroDespacho({
         modo === "grupo" ? (GRUPOS_DEVOLUCION.find((g) => g.nombre === k)?.color ?? "#8a35c9") : modo === "dia" ? COLOR_DIA[i % COLOR_DIA.length] : (colorDe(modo, k) ?? "#9ca3af");
       return { clave: k, titulo: modo === "dia" ? `${diaTexto(k === "Sin día" ? null : k)}${k === hoy ? " · hoy" : ""}` : k, color, filas: lista, sumas: sumasGrupo(lista) };
     });
-  }, [visibles, agrupar, esCiudad, hoy]);
+  }, [visibles, agrupar, esCiudad, hoy, mostrarHoy]);
 
   const soltar = (destino: string) => (e: DragEvent) => {
     e.preventDefault();
@@ -167,7 +172,17 @@ export function TableroDespacho({
       router.refresh();
     });
 
-  const total = visibles.reduce((t, f) => t + (f.porCobrar ?? 0), 0);
+  // El resumen de lo que se ve con todos los filtros juntos: para el cierre y el pago de cada mensajero.
+  const resumen = sumasGrupo(visibles);
+  const fallidos = visibles.filter((f) => f.estado === "FALLIDO").length;
+  const hayFiltros = estados.length > 0 || !!tienda || !!tipo || !!busqueda || (esCiudad && vista !== "TODOS");
+  const limpiar = () => {
+    setEstados([]);
+    setTienda("");
+    setTipo("");
+    setBusqueda("");
+    if (esCiudad) setVista("TODOS");
+  };
   const filaSel = filas.find((f) => f.itemId === sel) ?? null;
   const chip = (activo: boolean) =>
     `min-h-9 rounded-full border px-3.5 text-[13px] font-medium whitespace-nowrap ${anilloFoco} ${activo ? "border-primario bg-primario-suave text-primario" : "border-border bg-card text-foreground-soft hover:bg-muted"}`;
@@ -249,12 +264,15 @@ export function TableroDespacho({
           <span className="sr-only">Buscar</span>
           <input type="search" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Buscar pedido o comentario" className={`${fieldClass} w-full`} />
         </label>
-        <span className="ml-1 text-xs text-muted-foreground">Estado:</span>
-        {[["", "Todos"], ["ENTREGADO", "Entregados"], ["FALLIDO", "Fallidos"], ["POSPUESTO", "Pospuestos"], ["SIN", "Sin estado"]].map(([id, nombre]) => (
-          <button key={id} type="button" aria-pressed={filtro === id} onClick={() => setFiltro(id)} className={chip(filtro === id)}>
-            {nombre}
-          </button>
-        ))}
+        <span className="ml-1 text-xs text-muted-foreground">Estado (uno o varios):</span>
+        {[["", "Todos"], ["ENTREGADO", "Entregados"], ["FALLIDO", "Fallidos"], ["RECOLECTADO", "Recolectados"], ["POSPUESTO", "Pospuestos"], ["DESINTEGRADO", "Desintegrados"], ["SIN", "Sin estado"]].map(([id, nombre]) => {
+          const activo = id === "" ? !estados.length : estados.includes(id);
+          return (
+            <button key={id || "todos"} type="button" aria-pressed={activo} onClick={() => alternarEstado(id)} className={chip(activo)}>
+              {nombre}
+            </button>
+          );
+        })}
         {esCiudad && (
           <>
             <span className="ml-1 text-xs text-muted-foreground">Agrupar por:</span>
@@ -271,10 +289,33 @@ export function TableroDespacho({
             ))}
           </>
         )}
-        <span className="ml-auto text-[13px] text-muted-foreground" aria-live="polite">
-          {visibles.length} pedidos · {plata(total)} por cobrar · {visibles.filter((f) => f.estado === "ENTREGADO").length} entregados
-        </span>
+        {hayFiltros && (
+          <button type="button" onClick={limpiar} className={`min-h-9 rounded-md px-2.5 text-[13px] font-medium text-primario underline-offset-2 hover:underline ${anilloFoco}`}>
+            Limpiar filtros
+          </button>
+        )}
       </div>
+
+      <p className="m-0 flex flex-wrap gap-x-4 gap-y-1 rounded-lg border border-primario/30 bg-primario-suave px-3 py-2 text-[13px]" aria-live="polite">
+        <span>
+          <b>{resumen.pedidos}</b> pedidos
+        </span>
+        <span>
+          <b>{resumen.entregados}</b> entregados
+        </span>
+        <span>
+          <b>{fallidos}</b> fallidos
+        </span>
+        <span>
+          <b>{plata(resumen.cobrado)}</b> cobrado
+        </span>
+        <span>
+          <b>{plata(resumen.porCobrar)}</b> por cobrar
+        </span>
+        <span>
+          <b>{plata(resumen.costeEnvio)}</b> coste de envío
+        </span>
+      </p>
 
       {esCiudad && (
         <div className="flex flex-wrap items-center gap-2">
