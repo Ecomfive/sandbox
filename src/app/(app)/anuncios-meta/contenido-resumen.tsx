@@ -5,7 +5,7 @@ import type { CampanaVista } from "@/lib/meta-ads/vistas";
 import type { DatosMeta } from "@/lib/meta-ads/datos";
 import { NOMBRE_VEREDICTO, veredictoDe, type Veredicto } from "./def-campanas";
 import { Anillo, BarraProgreso, ColumnasApiladas, Columnas, Leyenda, partesConColor, TarjetaMeta, Tendencia, Variacion } from "./graficas";
-import { HallazgosResumen } from "./hallazgos-resumen";
+import { InterpretacionVista } from "./interpretacion-vista";
 import { ListaSugerencias } from "./lista-sugerencias";
 import { Cifra, entero, InsigniaEtapa, porcentaje, Resultado, valorCpa } from "./piezas";
 
@@ -139,7 +139,6 @@ export function ContenidoResumen({ datos, escribe }: { datos: DatosMeta; escribe
       </div>
 
       <ListaSugerencias sugerencias={datos.sugerencias} decididas={datos.decididas} escribe={escribe} />
-      <HallazgosResumen cuentaId={datos.cuentaId} />
 
       <div className="grid min-w-0 gap-6 lg:grid-cols-2">
         <TarjetaMeta titulo="Campañas montadas por día" derecha="Últimos 14 días, todas las cuentas" id="por-dia">
@@ -192,6 +191,8 @@ export function ContenidoResumen({ datos, escribe }: { datos: DatosMeta; escribe
         <ListaCampanas titulo="Las que más dejan" vacio="Ninguna campaña con más de $100 gastados deja ganancia todavía." campanas={mejores} color="var(--success)" />
         <ListaCampanas titulo="Las que más pierden" vacio="Ninguna campaña con más de $100 gastados está perdiendo." campanas={peores} color="var(--destructive)" />
       </div>
+
+      <InterpretacionVista guardada={datos.interpretacion} preparando={datos.analisisPendiente} enlace />
     </>
   );
 }

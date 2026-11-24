@@ -110,10 +110,19 @@ export interface ProductoHist {
   entrega: EntregaProducto | null;
 }
 
+/** Lo que sumó algo en un mes calendario (AAAA-MM). */
+export interface MesHist {
+  mes: string;
+  r: Resultados;
+}
+
 export interface EntradaHistorico {
   campanas: CampanaHist[];
   videos: VideoHist[];
   productos: ProductoHist[];
+  /** Mes a mes de todas las campañas y de los productos con más gasto: para comparar un mes con otro. Opcional: sin esto no hay serie mensual. */
+  mensual?: MesHist[];
+  mensualPorProducto?: { clave: string; nombre: string; meses: MesHist[] }[];
   /** Primer y último día con resultados leídos. */
   desde: string | null;
   hasta: string | null;
@@ -679,6 +688,33 @@ export function rankingsDeVentas(campanas: readonly CampanaHist[], videos: reado
   };
 }
 
+// ───────────────────────── Mes a mes ─────────────────────────
+
+/** Un mes con sus cifras ya calculadas (la IA y las tablas leen cifras, no sumas). */
+export interface FilaMes {
+  mes: string;
+  gasto: number;
+  compras: number;
+  cpa: number | null;
+  ctr: number | null;
+  hook: number | null;
+  cpm: number | null;
+  efectividad: number | null;
+  cvr: number | null;
+}
+
+const r2 = (n: number | null): number | null => (n === null ? null : Math.round(n * 100) / 100);
+
+/** Los meses con sus cifras calculadas, del más viejo al más nuevo. */
+export function filasMensuales(meses: readonly MesHist[]): FilaMes[] {
+  return [...meses]
+    .sort((a, b) => a.mes.localeCompare(b.mes))
+    .map(({ mes, r }) => ({ mes, gasto: Math.round(r.gasto * 100) / 100, compras: r.compras, cpa: r2(cpa(r)), ctr: r2(ctr(r)), hook: r2(hookRate(r)), cpm: r2(cpm(r)), efectividad: r2(efectividad(r)), cvr: r2(cvr(r)) }));
+}
+
+/** Cuántos productos llevan serie mensual propia (los de más gasto): más haría el contexto de la IA enorme sin aportar. */
+export const PRODUCTOS_CON_SERIE = 12;
+
 // ───────────────────────── Todo junto ─────────────────────────
 
 export interface ResumenHistorico {
@@ -701,6 +737,9 @@ export interface AnalisisHistorico {
   tendencias: FilaTendencia[];
   entrega: FilaEntrega[];
   rankings: Rankings;
+  /** Mes a mes de todas las campañas, y de los productos con más gasto. */
+  meses: FilaMes[];
+  mesesPorProducto: { nombre: string; filas: FilaMes[] }[];
 }
 
 const ORDEN_CATEGORIA: CategoriaHallazgo[] = ["entrega", "tendencia", "no_funciona", "funciona"];
@@ -741,6 +780,12 @@ export function analizarHistorico(e: EntradaHistorico): AnalisisHistorico {
     tendencias: filasTendencia,
     entrega,
     rankings: rankingsDeVentas(e.campanas, e.videos, e.productos),
+    meses: filasMensuales(e.mensual ?? []),
+    mesesPorProducto: (e.mensualPorProducto ?? [])
+      .map((p) => ({ nombre: p.nombre, filas: filasMensuales(p.meses), gasto: p.meses.reduce((s, m) => s + m.r.gasto, 0) }))
+      .sort((a, b) => b.gasto - a.gasto)
+      .slice(0, PRODUCTOS_CON_SERIE)
+      .map(({ nombre, filas }) => ({ nombre, filas })),
   };
 }
 

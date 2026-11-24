@@ -4,11 +4,11 @@ import { revalidatePath } from "next/cache";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { AJUSTE_ANALISIS_AUTOMATICO } from "@/lib/meta-ads/ajustes";
-import { tieneHistorialSuficiente, type Hallazgo } from "@/lib/meta-ads/historico";
+import { iasParaInterpretar, leerAnalisisGuardado } from "@/lib/meta-ads/analisis-guardado";
+import { LIMITES_CHAT, limpiarRespuesta, pedidoChat, revisarPregunta, sanitizarHistorial } from "@/lib/meta-ads/chat-ia";
+import { tieneHistorialSuficiente } from "@/lib/meta-ads/historico";
 import { cargarHistorico } from "@/lib/meta-ads/historico-datos";
-import { claveDeInterpretacion, type InterpretacionGuardada } from "@/lib/meta-ads/interpretacion-guardada";
-import { leerInterpretacion, pedidoInterpretacion } from "@/lib/meta-ads/interpretar-ia";
-import { modeloDeTexto, NOMBRE_PROVEEDOR, pedirIA, proveedorTexto } from "@/lib/publicaciones/ia/proveedor";
+import { NOMBRE_PROVEEDOR, pedirIAEn, proveedoresConectados } from "@/lib/publicaciones/ia/proveedor";
 import { afinarAnguloDeVideo, analizarVideoDeMeta, pendienteDeVideo, videosPorAnalizar } from "@/lib/meta-ads/analizar-videos";
 import { pedirMeta, tokenDeMeta } from "@/lib/meta-ads/api";
 import { buscarArchivoDeVideo, motivoSinArchivoDeVideo } from "@/lib/meta-ads/archivo-video";
@@ -403,55 +403,7 @@ export async function cambiarAnalisisAutomaticoMeta(activo: boolean): Promise<Re
   return {};
 }
 
-/**
- * «Interpretar con IA» (Hallazgos, 24 nov 2026): le pasa a la IA de texto (OpenAI o Claude, la que tenga clave) las estadísticas ya calculadas del historial y guarda lo que contesta (patrones, riesgos, qué probar y qué no
- * se puede concluir). La IA no calcula nada: interpreta cifras del sistema. Cuesta crédito de IA (queda en «Consumo de IA» como `meta_interpretacion`). Devuelve el error como valor.
- */
-export async function interpretarHallazgosMeta(): Promise<{ error?: string; guardada?: InterpretacionGuardada; aviso?: string }> {
-  const u = await requireModuloEscritura(MODULO);
-  const supabase = createServiceClient();
-  const pais = await getPaisActual(supabase);
-  if (!(await puedeVerPaisId(supabase, u.paisesPermitidos, pais.id))) return { error: "No tienes acceso a ese país." };
-  if (!proveedorTexto()) return { error: "Falta conectar una IA de texto (la clave OPENAI_API_KEY o ANTHROPIC_API_KEY en Vercel)." };
-  const historico = await cargarHistorico({ paisId: pais.id, cuentaId: null, hoy: hoyEnPanama() }, supabase);
-  if (historico.vacio) return { error: "Todavía no hay cuentas ni historial que interpretar." };
-  if (!tieneHistorialSuficiente(historico.analisis)) return { error: "Todavía hay muy poco historial (menos de 8 campañas con gasto suficiente): no alcanza para interpretar." };
-  const { instrucciones, texto } = pedidoInterpretacion(historico.analisis);
-  const respuesta = await pedirIA({ instrucciones, texto, imagenes: [] }, false, { operacion: "meta_interpretacion", modulo: "anuncios-meta", usuario: { id: u.id, nombre: u.nombre ?? null, email: u.email }, referencia: `Hallazgos · ${pais.nombre}` });
-  if ("error" in respuesta) return { error: respuesta.error };
-  const interpretacion = leerInterpretacion(respuesta.texto);
-  if (!interpretacion) return { error: "La IA no devolvió una interpretación que se pueda usar. Inténtalo de nuevo." };
-  const proveedor = proveedorTexto()!;
-  const guardada: InterpretacionGuardada = { interpretacion, modelo: modeloDeTexto(), proveedor: NOMBRE_PROVEEDOR[proveedor], generadaEn: new Date().toISOString(), por: u.nombre ?? u.email ?? null };
-  const { error } = await supabase
-    .from("meta_ajustes")
-    .upsert({ clave: claveDeInterpretacion(pais.id), valor: { interpretacion, modelo: guardada.modelo, proveedor: guardada.proveedor, generadaEn: guardada.generadaEn }, actualizado_por: u.id, actualizado_por_nombre: guardada.por, actualizado_en: guardada.generadaEn }, { onConflict: "clave" });
-  await registrarAuditoria({ accion: "interpretar_hallazgos_meta", entidad: "meta_ajustes", detalle: `Pidió la interpretación con IA de los hallazgos · ${pais.nombre} · ${guardada.proveedor}` });
-  revalidatePath("/anuncios-meta/hallazgos");
-  return { guardada, ...(error ? { aviso: "Se interpretó, pero no se pudo guardar (falta la migración 0347): se pierde al salir de la pantalla." } : {}) };
-}
-
-/**
- * Los hallazgos que más piden atención, para la tarjeta del Resumen (24 nov 2026). Se piden después de abrir la pantalla para no frenarla: leer todo el historial tarda unos segundos la primera vez (después se guarda 10 minutos).
- * Solo lectura: basta poder abrir el módulo. Nunca lanza: sin historial devuelve una lista vacía.
- */
-export async function hallazgosDestacadosMeta(cuentaId: string | null): Promise<{ hallazgos: Hallazgo[]; total: number; atender: number }> {
-  const u = await requireModulo(MODULO);
-  try {
-    const supabase = createServiceClient();
-    const pais = await getPaisActual(supabase);
-    if (!(await puedeVerPaisId(supabase, u.paisesPermitidos, pais.id))) return { hallazgos: [], total: 0, atender: 0 };
-    const h = await cargarHistorico({ paisId: pais.id, cuentaId: cuentaId && UUID.test(cuentaId) ? cuentaId : null, hoy: hoyEnPanama() }, supabase);
-    if (h.vacio || !tieneHistorialSuficiente(h.analisis)) return { hallazgos: [], total: 0, atender: 0 };
-    const lista = h.analisis.hallazgos;
-    const atender = lista.filter((x) => x.tono === "alerta");
-    return { hallazgos: [...atender.slice(0, 4), ...lista.filter((x) => x.tono === "bueno").slice(0, 2)], total: lista.length, atender: atender.length };
-  } catch {
-    return { hallazgos: [], total: 0, atender: 0 };
-  }
-}
-
-/** La entrega de cada producto de las campañas (para la lista y la ficha de Productos): tasa, pedidos resueltos y la tasa de todos. Se pide aparte porque sale del historial de pedidos. Nunca lanza. */
+/** La entrega de cada producto de las campañas (para la lista y la ficha de Productos): tasa, pedidos resueltos y la tasa de todos. Sale del análisis guardado (se prepara solo); sin él, se calcula. Nunca lanza. */
 export async function entregaPorProductoMeta(cuentaId: string | null): Promise<{ productos: Record<string, { tasa: number | null; cerradas: number; entregadas: number; devueltas: number }>; promedio: number | null }> {
   const u = await requireModulo(MODULO);
   const vacio = { productos: {}, promedio: null };
@@ -459,10 +411,41 @@ export async function entregaPorProductoMeta(cuentaId: string | null): Promise<{
     const supabase = createServiceClient();
     const pais = await getPaisActual(supabase);
     if (!(await puedeVerPaisId(supabase, u.paisesPermitidos, pais.id))) return vacio;
-    const h = await cargarHistorico({ paisId: pais.id, cuentaId: cuentaId && UUID.test(cuentaId) ? cuentaId : null, hoy: hoyEnPanama() }, supabase);
-    if (h.vacio) return vacio;
-    return { productos: Object.fromEntries(h.analisis.entrega.map((f) => [f.clave, { tasa: f.tasa, cerradas: f.cerradas, entregadas: f.entregadas, devueltas: f.devueltas }])), promedio: h.analisis.resumen.tasaEntrega };
+    const guardado = cuentaId ? null : await leerAnalisisGuardado(supabase, pais.id);
+    const analisis = guardado?.analisis ?? (await cargarHistorico({ paisId: pais.id, cuentaId: cuentaId && UUID.test(cuentaId) ? cuentaId : null, hoy: hoyEnPanama() }, supabase)).analisis;
+    return { productos: Object.fromEntries(analisis.entrega.map((f) => [f.clave, { tasa: f.tasa, cerradas: f.cerradas, entregadas: f.entregadas, devueltas: f.devueltas }])), promedio: analisis.resumen.tasaEntrega };
   } catch {
     return vacio;
   }
+}
+
+/**
+ * El chat de Hallazgos (24 nov 2026): una pregunta sobre el historial («¿qué producto funciona mejor?», «¿qué cambió más este mes?») que la IA contesta **solo con las estadísticas que el sistema ya calculó** (`chat-ia.ts`).
+ * Basta poder abrir el módulo. Cada pregunta cuesta unos centavos de crédito de IA: hay un tope por persona cada 24 horas. Usa Claude si está conectado y, si no, OpenAI. Devuelve el error como valor.
+ */
+export async function preguntarHallazgosMeta(pregunta: unknown, historial: unknown): Promise<{ respuesta?: string; proveedor?: string; error?: string; quedan?: number }> {
+  const u = await requireModulo(MODULO);
+  const revisada = revisarPregunta(pregunta);
+  if ("error" in revisada) return { error: revisada.error };
+  const conectadas = iasParaInterpretar(proveedoresConectados());
+  if (!conectadas.length) return { error: "Falta conectar una IA de texto (la clave OPENAI_API_KEY o ANTHROPIC_API_KEY en Vercel)." };
+  const supabase = createServiceClient();
+  const pais = await getPaisActual(supabase);
+  if (!(await puedeVerPaisId(supabase, u.paisesPermitidos, pais.id))) return { error: "No tienes acceso a ese país." };
+  // El tope por persona: lo que ya preguntó en las últimas 24 horas.
+  const { count } = await supabase.from("ia_consumo").select("id", { count: "exact", head: true }).eq("operacion", "meta_chat").eq("usuario_id", u.id).gte("creado_en", new Date(Date.now() - 86_400_000).toISOString());
+  const usadas = count ?? 0;
+  if (usadas >= LIMITES_CHAT.porDia) return { error: `Ya hiciste ${LIMITES_CHAT.porDia} preguntas hoy: es el tope diario (cada una cuesta crédito de IA). Mañana puedes seguir.` };
+  const hoy = hoyEnPanama();
+  const guardado = await leerAnalisisGuardado(supabase, pais.id);
+  const analisis = guardado?.analisis ?? (await cargarHistorico({ paisId: pais.id, cuentaId: null, hoy }, supabase)).analisis;
+  const tiendas = guardado?.tiendas ?? [];
+  if (!tieneHistorialSuficiente(analisis)) return { error: "Todavía hay muy poco historial (menos de 8 campañas con gasto suficiente) para contestar con datos." };
+  const { instrucciones, texto } = pedidoChat(analisis, tiendas, hoy, revisada.pregunta, sanitizarHistorial(historial));
+  const proveedor = conectadas[0];
+  const r = await pedirIAEn(proveedor, { instrucciones, texto, imagenes: [] }, { operacion: "meta_chat", modulo: "anuncios-meta", usuario: { id: u.id, nombre: u.nombre ?? null, email: u.email }, referencia: revisada.pregunta.slice(0, 120) }, "analisis");
+  if ("error" in r) return { error: r.error };
+  const respuesta = limpiarRespuesta(r.texto);
+  if (!respuesta) return { error: "La IA no devolvió una respuesta. Inténtalo de nuevo." };
+  return { respuesta, proveedor: NOMBRE_PROVEEDOR[proveedor], quedan: Math.max(0, LIMITES_CHAT.porDia - usadas - 1) };
 }

@@ -1,18 +1,15 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
-import { ProgresoEstimado } from "@/components/ui/progreso-estimado";
-import { useToast } from "@/components/ui/toast";
-import { NOMBRE_CATEGORIA, tieneHistorialSuficiente, UMBRALES_HISTORICO, type AnalisisHistorico, type CategoriaHallazgo, type FilaEntrega, type FilaTendencia, type FilaVentas, type Hallazgo } from "@/lib/meta-ads/historico";
+import { useState } from "react";
+import { NOMBRE_CATEGORIA, tieneHistorialSuficiente, UMBRALES_HISTORICO, type AnalisisHistorico, type CategoriaHallazgo, type FilaEntrega, type FilaMes, type FilaTendencia, type FilaVentas, type Hallazgo } from "@/lib/meta-ads/historico";
 import type { InterpretacionGuardada } from "@/lib/meta-ads/interpretacion-guardada";
 import { dolares } from "@/lib/meta-ads/metricas";
-import { interpretarHallazgosMeta } from "./actions";
+import { ChatHallazgos } from "./chat-hallazgos";
 import { InsigniaCerteza, TarjetaMeta } from "./graficas";
+import { InterpretacionVista } from "./interpretacion-vista";
 import { Cifra, entero } from "./piezas";
 
 const pct = (n: number | null) => (n === null ? "—" : `${Math.round(n * 100)} %`);
-const fecha = (iso: string) => new Date(iso).toLocaleString("es-PA", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/Panama" });
 
 type Filtro = "todo" | "atender" | CategoriaHallazgo;
 const FILTROS: { id: Filtro; texto: string }[] = [
@@ -54,88 +51,6 @@ function TarjetaHallazgo({ h }: { h: Hallazgo }) {
         <InsigniaCerteza certeza={h.certeza} />
       </div>
     </li>
-  );
-}
-
-function ListaPuntos({ titulo, puntos }: { titulo: string; puntos: { titulo: string; detalle: string }[] }) {
-  if (puntos.length === 0) return null;
-  return (
-    <div className="flex flex-col gap-1.5">
-      <h3 className="m-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{titulo}</h3>
-      <ul className="m-0 flex list-none flex-col gap-2 p-0">
-        {puntos.map((p) => (
-          <li key={p.titulo} className="text-sm">
-            <span className="font-medium">{p.titulo}. </span>
-            <span className="text-muted-foreground">{p.detalle}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-function Interpretacion({ guardada, escribe, iaConectada }: { guardada: InterpretacionGuardada | null; escribe: boolean; iaConectada: boolean }) {
-  const router = useRouter();
-  const { mostrarToast } = useToast();
-  const [pensando, empezar] = useTransition();
-  const [local, setLocal] = useState<InterpretacionGuardada | null>(guardada);
-  const pedir = () =>
-    empezar(async () => {
-      const r = await interpretarHallazgosMeta();
-      if (r.error) {
-        mostrarToast(r.error, "destructive");
-        return;
-      }
-      if (r.guardada) setLocal(r.guardada);
-      if (r.aviso) mostrarToast(r.aviso, "info");
-      router.refresh();
-    });
-  const i = local?.interpretacion ?? null;
-  return (
-    <TarjetaMeta
-      titulo="Interpretación con IA"
-      id="interpretacion"
-      derecha={
-        escribe && iaConectada ? (
-          <button type="button" onClick={pedir} disabled={pensando} className="min-h-9 rounded-md border border-border-control bg-card px-3 text-sm font-medium hover:bg-muted disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground">
-            {pensando ? "Interpretando…" : i ? "Volver a interpretar" : "Interpretar con IA"}
-          </button>
-        ) : null
-      }
-    >
-      {pensando && <ProgresoEstimado etiqueta="La IA está leyendo las estadísticas" pasos={["Armando el resumen de las estadísticas", "La IA está leyendo los patrones", "Escribiendo la interpretación"]} estimadoMs={40_000} compacta />}
-      {!pensando && !i && (
-        <p className="m-0 text-sm text-muted-foreground">
-          {iaConectada
-            ? "La IA lee las estadísticas de abajo (no inventa cifras) y las explica: qué patrones se ven, qué riesgos hay, qué conviene probar y qué todavía no se puede concluir. Cuesta unos centavos de crédito de IA."
-            : "Falta conectar una IA de texto (OPENAI_API_KEY o ANTHROPIC_API_KEY en Vercel) para interpretar las estadísticas."}
-        </p>
-      )}
-      {i && !pensando && (
-        <div className="flex flex-col gap-4">
-          <p className="m-0 text-sm">{i.resumen}</p>
-          <div className="grid gap-4 lg:grid-cols-2">
-            <ListaPuntos titulo="Patrones que se ven" puntos={i.patrones} />
-            <ListaPuntos titulo="Riesgos" puntos={i.riesgos} />
-            <ListaPuntos titulo="Qué conviene hacer" puntos={i.recomendaciones} />
-            {i.limites.length > 0 && (
-              <div className="flex flex-col gap-1.5">
-                <h3 className="m-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Lo que todavía no se puede concluir</h3>
-                <ul className="m-0 flex list-disc flex-col gap-1 pl-5 text-sm text-muted-foreground">
-                  {i.limites.map((l) => (
-                    <li key={l}>{l}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-          <p className="m-0 text-xs text-muted-foreground">
-            Interpretado por {local!.proveedor} el {fecha(local!.generadaEn)}
-            {local!.por ? ` · ${local!.por}` : ""}. Es una lectura de las estadísticas de abajo, no una cifra nueva: si algo no cuadra, manda lo que dicen las tablas.
-          </p>
-        </div>
-      )}
-    </TarjetaMeta>
   );
 }
 
@@ -301,6 +216,79 @@ function SeccionBandas({ a }: { a: AnalisisHistorico }) {
   );
 }
 
+const NOMBRE_MES = (mes: string) => {
+  const [a, m] = mes.split("-");
+  return new Date(Date.UTC(Number(a), Number(m) - 1, 1)).toLocaleDateString("es-PA", { month: "short", year: "numeric", timeZone: "UTC" });
+};
+
+function TablaMeses({ filas }: { filas: FilaMes[] }) {
+  const celda = (n: number | null, f: (x: number) => string) => (n === null ? "—" : f(n));
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[44rem] border-collapse text-sm">
+        <thead>
+          <tr className="border-b border-border text-left text-xs text-muted-foreground">
+            <th scope="col" className="py-1.5 pr-3 font-medium">Mes</th>
+            <th scope="col" className="px-2 py-1.5 text-right font-medium">Gasto</th>
+            <th scope="col" className="px-2 py-1.5 text-right font-medium">Compras</th>
+            <th scope="col" className="px-2 py-1.5 text-right font-medium">CPA</th>
+            <th scope="col" className="px-2 py-1.5 text-right font-medium">CTR</th>
+            <th scope="col" className="px-2 py-1.5 text-right font-medium">Hook</th>
+            <th scope="col" className="px-2 py-1.5 text-right font-medium">CPM</th>
+            <th scope="col" className="px-2 py-1.5 text-right font-medium">Clic a visita</th>
+            <th scope="col" className="py-1.5 pl-2 text-right font-medium">CVR</th>
+          </tr>
+        </thead>
+        <tbody>
+          {[...filas].reverse().map((f) => (
+            <tr key={f.mes} className="border-b border-border last:border-b-0">
+              <th scope="row" className="py-1.5 pr-3 text-left font-medium capitalize">{NOMBRE_MES(f.mes)}</th>
+              <td className="px-2 py-1.5 text-right tabular-nums">{dolares(f.gasto)}</td>
+              <td className="px-2 py-1.5 text-right tabular-nums">{entero(f.compras)}</td>
+              <td className="px-2 py-1.5 text-right tabular-nums">{celda(f.cpa, dolares)}</td>
+              <td className="px-2 py-1.5 text-right tabular-nums">{celda(f.ctr, (n) => `${n.toFixed(2)} %`)}</td>
+              <td className="px-2 py-1.5 text-right tabular-nums">{celda(f.hook, (n) => `${n.toFixed(1)} %`)}</td>
+              <td className="px-2 py-1.5 text-right tabular-nums">{celda(f.cpm, dolares)}</td>
+              <td className="px-2 py-1.5 text-right tabular-nums">{celda(f.efectividad, (n) => `${n.toFixed(1)} %`)}</td>
+              <td className="py-1.5 pl-2 text-right tabular-nums">{celda(f.cvr, (n) => `${n.toFixed(2)} %`)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function SeccionMeses({ a }: { a: AnalisisHistorico }) {
+  const [producto, setProducto] = useState("");
+  if (a.meses.length === 0) return null;
+  const filas = producto ? (a.mesesPorProducto.find((p) => p.nombre === producto)?.filas ?? []) : a.meses;
+  return (
+    <TarjetaMeta
+      titulo="Mes a mes"
+      id="meses"
+      derecha={
+        a.mesesPorProducto.length > 0 ? (
+          <label className="flex items-center gap-2 text-xs text-muted-foreground">
+            Ver
+            <select value={producto} onChange={(e) => setProducto(e.target.value)} className="min-h-8 rounded-md border border-border-control bg-card px-2 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground">
+              <option value="">Todas las campañas</option>
+              {a.mesesPorProducto.map((p) => (
+                <option key={p.nombre} value={p.nombre}>
+                  {p.nombre}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : undefined
+      }
+    >
+      <p className="m-0 mb-2 text-xs text-muted-foreground">El mes en curso está incompleto: compáralo con otro mes por CPA, CTR, hook, CPM o CVR, no por gasto ni compras totales.</p>
+      <TablaMeses filas={filas} />
+    </TarjetaMeta>
+  );
+}
+
 function SeccionTendencias({ filas }: { filas: FilaTendencia[] }) {
   const [ventana, setVentana] = useState<"mes" | "semana">("mes");
   const lista = filas.filter((f) => f.ventana === ventana && f.cambio.sentido !== "poca").sort((a, b) => (a.cambio.sentido === b.cambio.sentido ? b.gastoRec - a.gastoRec : a.cambio.sentido === "baja" ? -1 : b.cambio.sentido === "baja" ? 1 : a.cambio.sentido === "mejora" ? -1 : 1));
@@ -362,7 +350,7 @@ function SeccionTendencias({ filas }: { filas: FilaTendencia[] }) {
  * Anuncios Meta › Hallazgos (24 nov 2026): lo que dicen los datos de todo el historial, sin necesidad de la calculadora: qué nunca funcionó, qué funciona mejor, qué empieza a empeorar y por qué, la entrega por producto
  * y qué genera más ventas. Arriba, la interpretación con IA de esas mismas estadísticas.
  */
-export function HallazgosVista({ analisis, interpretacion, escribe, iaConectada, tiendas, pedidos }: { analisis: AnalisisHistorico; interpretacion: InterpretacionGuardada | null; escribe: boolean; iaConectada: boolean; tiendas: string[]; pedidos: number }) {
+export function HallazgosVista({ analisis, interpretacion, iaConectada, tiendas, pedidos, preparando }: { analisis: AnalisisHistorico; interpretacion: InterpretacionGuardada | null; iaConectada: boolean; tiendas: string[]; pedidos: number; preparando: boolean }) {
   const [filtro, setFiltro] = useState<Filtro>("atender");
   const a = analisis;
   if (!tieneHistorialSuficiente(a)) {
@@ -379,7 +367,9 @@ export function HallazgosVista({ analisis, interpretacion, escribe, iaConectada,
         <Cifra titulo="Tasa de entrega" valor={pct(a.resumen.tasaEntrega)} apoyo={a.resumen.tasaEntrega === null ? "sin pedidos suficientes" : "de lo que se resolvió"} nivel={a.resumen.tasaEntrega === null ? undefined : a.resumen.tasaEntrega >= 0.7 ? "bueno" : a.resumen.tasaEntrega >= 0.55 ? "medio" : "malo"} />
       </div>
 
-      <Interpretacion guardada={interpretacion} escribe={escribe} iaConectada={iaConectada} />
+      <ChatHallazgos iaConectada={iaConectada} />
+
+      <InterpretacionVista guardada={interpretacion} preparando={preparando} />
 
       <TarjetaMeta titulo="Lo que dicen los datos" id="hallazgos" derecha={`${entero(a.hallazgos.length)} hallazgos`}>
         <div role="group" aria-label="Filtrar hallazgos" className="mb-3 flex flex-wrap gap-1.5">
@@ -398,11 +388,12 @@ export function HallazgosVista({ analisis, interpretacion, escribe, iaConectada,
             ))}
           </ul>
         )}
-        <p className="m-0 mt-2 text-xs text-muted-foreground">«Funcionó» = tuvo al menos {dolares(100)} de gasto y su CPA quedó dentro del CPA tope de su producto (el de «Cuentas›Topes»). No usa la calculadora de costos.</p>
+        <p className="m-0 mt-2 text-xs text-muted-foreground">«Funcionó» = tuvo al menos {dolares(100)} de gasto y su CPA quedó dentro del CPA tope de su producto (el de «Cuentas›Topes»). No usa la calculadora de costos. Los hallazgos que piden atención también salen como sugerencias en el Resumen.</p>
       </TarjetaMeta>
 
       <TablaEntrega filas={a.entrega} promedio={a.resumen.tasaEntrega} tiendas={tiendas} pedidos={pedidos} />
       <SeccionVentas a={a} />
+      <SeccionMeses a={a} />
       <SeccionTendencias filas={a.tendencias} />
       <SeccionBandas a={a} />
     </div>
