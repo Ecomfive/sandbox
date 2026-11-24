@@ -258,7 +258,7 @@ export function FichaOrdenTienda({ orden, codigoPais, puedeEscribir }: { orden: 
   const confirmada = esConfirmada(etiquetas);
   // Con el manual ATC (24 nov 2026) la gestión va por los botones de «Gestión»: abajo no sale el «Confirmar pedido» de antes y no se sugieren las
   // etiquetas que el manual reemplaza (Confirmada, ANULADO/VERIFICADO, Cancelado, Pendiente, zona y motivos).
-  const conGestionAtc = esc.activa && puedeEscribir && deShopify;
+  const conGestionAtc = esc.activa && deShopify && (puedeEscribir || !!esc.finanzas);
   const sugeridas = conGestionAtc ? esc.sugeridas.filter(sugerenciaPermitida) : esc.sugeridas;
   function cambiarEtiquetas(agregar: string[], quitar: string[], hecho: string) {
     startCambio(async () => {
@@ -307,7 +307,7 @@ export function FichaOrdenTienda({ orden, codigoPais, puedeEscribir }: { orden: 
           </nav>
 
           {(etiquetas.length > 0 || esc.activa) && (
-            <EtiquetasPedido ordenId={orden.id} etiquetas={etiquetas} sugeridas={sugeridas} activa={esc.activa} motivo={esc.motivo} pendiente={cambiando} onCambiar={cambiarEtiquetas} />
+            <EtiquetasPedido ordenId={orden.id} etiquetas={etiquetas} sugeridas={sugeridas} activa={esc.activa && !esc.soloFinanzas} motivo={esc.motivo} pendiente={cambiando} onCambiar={cambiarEtiquetas} />
           )}
 
           {/* Manual ATC (24 nov 2026): Confirmar, Novedad y Anular con las reglas del manual; cada uno escribe en Shopify y deja su línea en la cronología. */}
@@ -317,6 +317,10 @@ export function FichaOrdenTienda({ orden, codigoPais, puedeEscribir }: { orden: 
               etiquetas={etiquetas}
               codigoPais={codigoPais}
               estadoEntrega={o.estado_entrega ?? null}
+              estadoPago={o.estado_pago ?? null}
+              guia={o.guia ?? null}
+              finanzas={!!esc.finanzas}
+              soloFinanzas={!!esc.soloFinanzas || !puedeEscribir}
               alHecho={(r) => {
                 setEtiquetas(r.etiquetas);
                 mostrarToast(r.aviso ?? r.texto, r.aviso ? "destructive" : undefined);

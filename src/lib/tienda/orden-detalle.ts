@@ -112,6 +112,10 @@ export interface EscrituraOrden {
   activa: boolean;
   motivo: string | null;
   sugeridas: string[];
+  /** Manual ATC (24 nov 2026): puede acreditar y pasar a «Pagado» (Finanzas: edita Ventas por tienda o la Reportería de pedidos). */
+  finanzas?: boolean;
+  /** Solo puede hacer lo de Finanzas en este pedido (no edita Pedidos ni Confirmación de tienda). */
+  soloFinanzas?: boolean;
 }
 
 export interface OrdenTienda {
@@ -242,8 +246,13 @@ export async function cargarOrdenTienda(supabase: SupabaseClient, id: string, pa
 
 /** Quienes editan Pedidos o Confirmación de tienda cambian etiquetas (19 nov 2026); a los demás la ficha se las muestra sin poder tocarlas. */
 export function escrituraParaPersona(orden: OrdenTienda, u: { modulos: string[]; modulosSoloLectura: string[] }): OrdenTienda {
-  const puede = ["tienda-pedidos", "tienda-confirmacion"].some((m) => u.modulos.includes(m) && !u.modulosSoloLectura.includes(m));
-  return puede || !orden.escritura.activa ? orden : { ...orden, escritura: { activa: false, motivo: "Tu rol solo puede leer los pedidos.", sugeridas: [] } };
+  const edita = (ms: string[]) => ms.some((m) => u.modulos.includes(m) && !u.modulosSoloLectura.includes(m));
+  const puede = edita(["tienda-pedidos", "tienda-confirmacion"]);
+  const finanzas = edita(["ventas-tiendas", "tienda-reporteria"]);
+  if (!orden.escritura.activa) return orden;
+  if (puede) return { ...orden, escritura: { ...orden.escritura, finanzas } };
+  if (finanzas) return { ...orden, escritura: { ...orden.escritura, finanzas: true, soloFinanzas: true, sugeridas: [] } };
+  return { ...orden, escritura: { activa: false, motivo: "Tu rol solo puede leer los pedidos.", sugeridas: [] } };
 }
 
 /**

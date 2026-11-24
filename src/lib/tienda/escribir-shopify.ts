@@ -144,3 +144,76 @@ export async function liberarEsperaEnShopify(app: AppTienda, numero: string): Pr
   }
   return true;
 }
+
+// ── Manual ATC, el resto del recorrido (24 nov 2026): la guía de la asesora, el «Entregado» de la coordinadora y el «Pagado» de Finanzas.
+
+/** El token con un permiso de escritura dado; si falta, el error dice cuál aprobar. */
+async function tokenCon(app: AppTienda, permiso: string, para: string): Promise<string> {
+  let acceso = await accesoDeApp(app);
+  const tiene = (scope: string) => scope.split(",").map((s) => s.trim()).includes(permiso);
+  if (tiene(acceso.scope)) return acceso.token;
+  olvidarAcceso(app);
+  acceso = await accesoDeApp(app);
+  if (tiene(acceso.scope)) return acceso.token;
+  throw new Error(`Para ${para} falta aprobar en la app de Shopify de ${app.tienda} el permiso «${permiso}» (Dev Dashboard → nueva versión → aprobar en la tienda).`);
+}
+
+/** El envío (fulfillment) del pedido: el último que no se canceló. Sin envío, despacho todavía no lo preparó. */
+async function envioDelPedido(app: AppTienda, token: string, numero: string): Promise<{ id: string; displayStatus: string | null }> {
+  const pedido = await buscarPedido(app, token, numero);
+  const d = await graphql<{ order: { fulfillments: { id: string; status: string; displayStatus: string | null; createdAt: string }[] } | null }>(
+    app,
+    token,
+    "query($id: ID!) { order(id: $id) { fulfillments(first: 10) { id status displayStatus createdAt } } }",
+    { id: pedido.id },
+  );
+  const envios = (d.order?.fulfillments ?? []).filter((f) => f.status !== "CANCELLED" && f.status !== "ERROR").sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  if (!envios.length) throw new Error("El pedido todavía no está preparado en Shopify: despacho lo prepara primero y después se carga la guía.");
+  return { id: envios[0].id, displayStatus: envios[0].displayStatus };
+}
+
+/** Carga la guía y el enlace público en el envío del pedido, con el correo de seguimiento al cliente (el manual lo pide activado). */
+export async function cargarGuiaEnShopify(app: AppTienda, numero: string, guia: { numero: string; empresa: string; url: string }): Promise<void> {
+  const token = await tokenCon(app, "write_fulfillments", "cargar la guía");
+  const envio = await envioDelPedido(app, token, numero);
+  const d = await graphql<{ fulfillmentTrackingInfoUpdate: { userErrors: { message: string }[] } | null }>(
+    app,
+    token,
+    "mutation($id: ID!, $info: FulfillmentTrackingInput!) { fulfillmentTrackingInfoUpdate(fulfillmentId: $id, trackingInfoInput: $info, notifyCustomer: true) { userErrors { message } } }",
+    { id: envio.id, info: { number: guia.numero, company: guia.empresa, url: guia.url } },
+  );
+  const errores = d.fulfillmentTrackingInfoUpdate?.userErrors ?? [];
+  if (errores.length) throw new Error(`Shopify no aceptó la guía: ${errores[0].message}`);
+}
+
+/** «Marcar como entregado» en Shopify (un evento DELIVERED en el envío). Si ya está entregado, no hace nada. */
+export async function marcarEntregadoEnShopify(app: AppTienda, numero: string): Promise<void> {
+  const token = await tokenCon(app, "write_fulfillments", "marcar el pedido como entregado");
+  const envio = await envioDelPedido(app, token, numero);
+  if (envio.displayStatus === "DELIVERED") return;
+  const d = await graphql<{ fulfillmentEventCreate: { userErrors: { message: string }[] } | null }>(
+    app,
+    token,
+    "mutation($ev: FulfillmentEventInput!) { fulfillmentEventCreate(fulfillmentEvent: $ev) { userErrors { message } } }",
+    { ev: { fulfillmentId: envio.id, status: "DELIVERED", happenedAt: new Date().toISOString() } },
+  );
+  const errores = d.fulfillmentEventCreate?.userErrors ?? [];
+  if (errores.length) throw new Error(`Shopify no lo marcó como entregado: ${errores[0].message}`);
+}
+
+/** Pasa el pago de «Pendiente» a «Pagado» (Finanzas, con el dinero en el banco). Si ya está pagado, no hace nada. */
+export async function marcarPagadoEnShopify(app: AppTienda, numero: string): Promise<void> {
+  const token = await tokenConEscritura(app);
+  const pedido = await buscarPedido(app, token, numero);
+  const e = await graphql<{ order: { displayFinancialStatus: string | null; cancelledAt: string | null } | null }>(app, token, "query($id: ID!) { order(id: $id) { displayFinancialStatus cancelledAt } }", { id: pedido.id });
+  if (e.order?.cancelledAt) throw new Error("El pedido está anulado en Shopify: no se marca como pagado.");
+  if (e.order?.displayFinancialStatus === "PAID") return;
+  const d = await graphql<{ orderMarkAsPaid: { userErrors: { message: string }[] } | null }>(
+    app,
+    token,
+    "mutation($id: ID!) { orderMarkAsPaid(input: { id: $id }) { userErrors { message } } }",
+    { id: pedido.id },
+  );
+  const errores = d.orderMarkAsPaid?.userErrors ?? [];
+  if (errores.length) throw new Error(`Shopify no lo marcó como pagado: ${errores[0].message}`);
+}
