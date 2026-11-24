@@ -1,6 +1,8 @@
 import { estadoAnalisisAutomatico } from "@/lib/meta-ads/ajustes";
 import { createServiceClient } from "@/lib/supabase/server";
 import { cargarPaginaMeta, type ParametrosMeta } from "../datos-pagina";
+import { HallazgosDeSeccion } from "../hallazgos-tarjetas";
+import { QueGeneraMasVentas } from "../historial-seccion";
 import { ListaVideos } from "../lista-videos";
 import { MarcoMeta } from "../marco-meta";
 import { ResumenVideos } from "../resumen-videos";
@@ -27,6 +29,12 @@ export default async function VideosMetaPage({ searchParams }: { searchParams: P
       ) : (
         <>
           <ResumenVideos videos={datos.videos} escribe={escribe} iaConectada={datos.iaConectada} />
+          {datos.historial && (
+            <div className="flex flex-col gap-3">
+              <HallazgosDeSeccion titulo="Lo que dicen los datos de los videos" hallazgos={datos.historial.hallazgos.videos} />
+              <QueGeneraMasVentas historial={datos.historial} claves={["videos", "angulos", "ganchos", "formatos"]} />
+            </div>
+          )}
           <p className="-mb-2 text-xs text-muted-foreground">Del periodo elegido arriba. Un video repetido en varios anuncios cuenta una sola vez. Ordénalos, fíltralos o agrúpalos por campaña, ángulo, gancho o producto.</p>
           <ListaVideos videos={datos.videos} escribe={escribe} iaConectada={datos.iaConectada} sinAnalizar={datos.videosSinAnalizar} abrirInicial={abrir ?? null} automatico={automatico} />
         </>

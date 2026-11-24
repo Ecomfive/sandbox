@@ -13,7 +13,7 @@ import { estructuraValida, VERSION_ANALISIS } from "./video-angulo";
 import { decisionesDeAnuncios } from "./decision-anuncio";
 import { etapaEfectiva, indexarCatalogo, productoDeCampana, type IndiceCatalogo } from "./etapa-venta";
 import { pendientes, sugerenciasDeHallazgos, sugerir, type DecisionGuardada, type Sugerencia } from "./sugerencias";
-import { claveDeAnalisis, analisisViejo, type AnalisisGuardado } from "./analisis-tipos";
+import { claveDeAnalisis, analisisViejo, seccionesDeAnalisis, type AnalisisGuardado, type HistorialSecciones } from "./analisis-tipos";
 import { claveDeInterpretacion, leerValorInterpretacion, type InterpretacionGuardada } from "./interpretacion-guardada";
 import { agruparProductos } from "./productos";
 import type { ActividadVista, AnalisisVideoVista, AnuncioVista, CampanaVista, Grupo, ProductoVista, VideoVista } from "./vistas";
@@ -107,13 +107,15 @@ export interface DatosMeta {
   analisisGeneradoEn: string | null;
   /** Hay que preparar el análisis del historial (no existe o es de hace más de un día): la página lo lanza en segundo plano. */
   analisisPendiente: boolean;
+  /** Los hallazgos, la entrega y lo que genera más ventas del historial, repartidos por pantalla (Productos, Campañas, Videos). null si todavía no hay análisis guardado. */
+  historial: HistorialSecciones | null;
   /** Lo pone la página (servidor): si Gemini está conectado. No se calcula aquí porque este archivo también lo importan componentes del navegador. */
   iaConectada: boolean;
 }
 
 const vacios = (periodo: Periodo, hoy: string): DatosMeta => ({
   faltaMigracion: false, cuentas: [], cuentaId: null, periodo, desde: hoy, hasta: hoy, campanas: [], videos: [], anuncios: [], totales: sinResultados(), anteriores: sinResultados(), topes: [], productos: [], sugerencias: [], decididas: 0,
-  grupos: { campana: { "Ángulo": [], Estructura: [], Puja: [], Producto: [], Etapa: [] }, anuncio: { Copy: [], Landing: [] } }, serie: [], gruposVideo: gruposDeVideos([]), interpretacion: null, analisisGeneradoEn: null, analisisPendiente: false, productosVista: [], creadasPorDia: [], creadasHoy: 0, actividad: resumirEquipo([], [], hoy), ganchosSinTipo: 0, videosSinAnalizar: 0, videosSinAngulo: 0, iaConectada: false, actividadDisponible: false,
+  grupos: { campana: { "Ángulo": [], Estructura: [], Puja: [], Producto: [], Etapa: [] }, anuncio: { Copy: [], Landing: [] } }, serie: [], gruposVideo: gruposDeVideos([]), interpretacion: null, analisisGeneradoEn: null, analisisPendiente: false, historial: null, productosVista: [], creadasPorDia: [], creadasHoy: 0, actividad: resumirEquipo([], [], hoy), ganchosSinTipo: 0, videosSinAnalizar: 0, videosSinAngulo: 0, iaConectada: false, actividadDisponible: false,
 });
 
 const restar = (fecha: string, n: number) => new Date(new Date(`${fecha}T00:00:00Z`).getTime() - n * 86_400_000).toISOString().slice(0, 10);
@@ -414,7 +416,7 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
   const productos = [...new Set(camp.map((c) => (c.producto as string | null)?.trim()).filter((p): p is string => !!p))].sort((a, b) => a.localeCompare(b, "es"));
   return {
     ...base, cuentas, cuentaId, desde, hasta: o.hoy, campanas: campanasConActividad, videos, anuncios, totales, anteriores, topes, productos, sugerencias, decididas: todas.length - sugerencias.length, grupos,
-    interpretacion, analisisGeneradoEn: hallazgosGuardados?.generadoEn ?? null, analisisPendiente: analisisViejo(hallazgosGuardados),
+    interpretacion, analisisGeneradoEn: hallazgosGuardados?.generadoEn ?? null, analisisPendiente: analisisViejo(hallazgosGuardados), historial: hallazgosGuardados ? seccionesDeAnalisis(hallazgosGuardados) : null,
     serie: serieGlobal, gruposVideo, productosVista: agruparProductos(campanasConActividad, videos), creadasPorDia, creadasHoy: creadasPorDia[13]?.testing + creadasPorDia[13]?.venta + creadasPorDia[13]?.escala + creadasPorDia[13]?.retargeting + creadasPorDia[13]?.otras || 0, actividad, ganchosSinTipo, actividadDisponible: eventos.length > 0, videosSinAnalizar: videos.filter((v) => !v.analisis || v.analisis.estado !== "analizado" || v.analisis.version < VERSION_ANALISIS).length, videosSinAngulo, iaConectada: false,
   };
 }

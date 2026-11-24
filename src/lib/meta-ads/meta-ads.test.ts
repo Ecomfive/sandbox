@@ -263,7 +263,7 @@ test("un anuncio activo que pasa de $12 sin ventas se apaga y se propone sustitu
 });
 
 import { claveDeHallazgo, sugerenciasDeHallazgos } from "./sugerencias";
-import type { Hallazgo } from "./historico";
+import { seccionDeHallazgo, type Hallazgo } from "./historico";
 
 const hallazgo = (id: string, o: Partial<Hallazgo> = {}): Hallazgo => ({ id, categoria: "entrega", tono: "alerta", titulo: `T ${id}`, detalle: "Detalle.", certeza: "firme", gasto: 500, ...o });
 
@@ -294,4 +294,33 @@ test("los hallazgos pasan a sugerencias: atención primero por gasto, entrega o 
   assert.equal(buena.severidad, "info");
   assert.match(buena.detalle, /Por qué: x/);
   assert.ok(s.every((x) => x.tipo === "hallazgo" && x.clave.startsWith("hallazgo:")));
+});
+
+test("al Resumen llegan primero los hallazgos firmes: un probable con más gasto va después y la poca data nunca llega", () => {
+  const lista = [
+    hallazgo("probable-grande", { certeza: "probable", gasto: 5000 }),
+    hallazgo("firme-chico", { certeza: "firme", gasto: 50 }),
+    hallazgo("firme-grande", { certeza: "firme", gasto: 800 }),
+    hallazgo("poca", { certeza: "poca", gasto: 9000 }),
+    hallazgo("buena-poca", { tono: "bueno", categoria: "funciona", certeza: "poca", gasto: 900 }),
+  ];
+  const s = sugerenciasDeHallazgos(lista).map((x) => x.titulo);
+  assert.deepEqual(s, ["T firme-grande", "T firme-chico", "T probable-grande"]);
+});
+
+test("cada hallazgo se reparte en la pantalla donde se explica mejor, según su llave", () => {
+  const seccion = (id: string) => seccionDeHallazgo({ id });
+  assert.equal(seccion("entrega:abc:mala"), "productos");
+  assert.equal(seccion("tendencia:Producto:Corrector:mes"), "productos");
+  assert.equal(seccion("tendencia:Campaña:OF | X:semana"), "campanas");
+  assert.equal(seccion("tendencia:Ángulo:Energía:mes"), "videos");
+  assert.equal(seccion("tendencia:Todo:Todo:mes"), "general");
+  assert.equal(seccion("banda:ctr:menos de 1 %:no"), "campanas");
+  assert.equal(seccion("angulo:Energía:si"), "videos");
+  assert.equal(seccion("angulo@suplemento:Energía:si"), "videos");
+  assert.equal(seccion("gancho:Pregunta:no"), "videos");
+  assert.equal(seccion("cta:Compra ya:si"), "videos");
+  assert.equal(seccion("estructura:CBO:no"), "campanas");
+  assert.equal(seccion("puja:Sin tope:si"), "campanas");
+  assert.equal(seccion("otra-cosa"), "general");
 });

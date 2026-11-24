@@ -232,6 +232,27 @@ export interface Hallazgo {
   gasto: number;
 }
 
+/** En qué pantalla de Anuncios Meta se explica mejor un hallazgo (24 nov 2026): cada pestaña muestra los suyos y Hallazgos queda con lo general. */
+export type SeccionHallazgo = "productos" | "campanas" | "videos" | "general";
+
+/**
+ * A qué sección pertenece un hallazgo, según de qué nace su llave: la entrega y las tendencias de producto son de Productos; las bandas, la estructura, la puja y las tendencias de campaña, de Campañas; el ángulo, el gancho, el formato
+ * y el llamado a la acción (lo que sale del video) y las tendencias de ángulo, de Videos; el resto (todo el conjunto), general. Se deduce de la llave para que valga también con un análisis guardado antes.
+ */
+export function seccionDeHallazgo(h: Pick<Hallazgo, "id">): SeccionHallazgo {
+  const id = h.id;
+  if (id.startsWith("entrega:")) return "productos";
+  if (id.startsWith("tendencia:")) {
+    const nivel = id.split(":")[1];
+    return nivel === "Producto" ? "productos" : nivel === "Campaña" ? "campanas" : nivel === "Ángulo" ? "videos" : "general";
+  }
+  if (id.startsWith("banda:")) return "campanas";
+  const dimension = id.split(":")[0].split("@")[0];
+  if (["angulo", "gancho", "formato", "cta"].includes(dimension)) return "videos";
+  if (["estructura", "puja"].includes(dimension)) return "campanas";
+  return "general";
+}
+
 export const NOMBRE_CATEGORIA: Record<CategoriaHallazgo, string> = {
   entrega: "Entrega",
   tendencia: "Tendencia",

@@ -225,8 +225,15 @@ const GASTO_URGENTE = 300;
  * lo que nunca funcionó, importante; lo bueno, una buena noticia. La decisión se recuerda por su llave (`claveDeHallazgo`).
  */
 export function sugerenciasDeHallazgos(hallazgos: readonly Hallazgo[]): Sugerencia[] {
-  const atencion = hallazgos.filter((h) => h.tono === "alerta").sort((a, b) => b.gasto - a.gasto).slice(0, HALLAZGOS_COMO_SUGERENCIA.atencion);
-  const buenas = hallazgos.filter((h) => h.tono === "bueno").sort((a, b) => b.gasto - a.gasto).slice(0, HALLAZGOS_COMO_SUGERENCIA.buenas);
+  // Solo lo que el sistema está seguro de que es real (24 nov 2026, pedido de Alcides: «las que sean firmes»): primero los firmes y, si faltan, los probables; la «poca data» nunca llega al Resumen.
+  const rango = (h: Hallazgo) => (h.certeza === "firme" ? 0 : h.certeza === "probable" ? 1 : 2);
+  const mejores = (tono: Hallazgo["tono"], cuantos: number) =>
+    hallazgos
+      .filter((h) => h.tono === tono && h.certeza !== "poca")
+      .sort((a, b) => rango(a) - rango(b) || b.gasto - a.gasto)
+      .slice(0, cuantos);
+  const atencion = mejores("alerta", HALLAZGOS_COMO_SUGERENCIA.atencion);
+  const buenas = mejores("bueno", HALLAZGOS_COMO_SUGERENCIA.buenas);
   return [...atencion, ...buenas].map((h): Sugerencia => ({
     clave: claveDeHallazgo(h.id),
     tipo: "hallazgo",
