@@ -1,7 +1,6 @@
-import Link from "next/link";
 import { CierresRepartidores } from "@/components/despacho/cierres-repartidores";
 import { TableroDespacho } from "@/components/despacho/tablero-despacho";
-import { anilloFoco, fieldClassSm } from "@/components/ui/field";
+import { BarraPeriodo } from "@/components/despacho/barra-periodo";
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { requirePanel } from "@/lib/auth";
@@ -38,8 +37,6 @@ export default async function DespachoCiudadPage({ searchParams }: { searchParam
   const archivados = sp.archivados === "1";
   const [{ filas, faltaMigracion }, cierres] = await Promise.all([cargarCiudad(supabase, desde, hasta, archivados), archivados ? Promise.resolve([]) : cargarCierres(supabase, desde, hasta)]);
   const puedeEscribir = !usuario.modulosSoloLectura.includes("despacho-ciudad");
-  const chip = (activo: boolean) =>
-    `inline-flex min-h-9 items-center rounded-full border px-3.5 text-[13px] font-medium ${anilloFoco} ${activo ? "border-primario bg-primario-suave text-primario" : "border-border bg-card text-foreground-soft hover:bg-muted"}`;
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-4">
       <EncabezadoPagina titulo="Despacho ciudad" oculto>
@@ -52,52 +49,26 @@ export default async function DespachoCiudadPage({ searchParams }: { searchParam
         </p>
       ) : (
         <>
-          <nav aria-label="Días" className="flex flex-wrap gap-1.5">
-            {RANGOS.map((r) => (
-              <Link key={r.id} href={`/despacho-ciudad?dias=${r.id}`} aria-current={!archivados && !elegido && r.id === rango.id ? "page" : undefined} className={chip(!archivados && !elegido && r.id === rango.id)}>
-                {r.etiqueta}
-              </Link>
-            ))}
-            {[
-              { dia: hoy, etiqueta: "Hoy" },
-              { dia: ayer, etiqueta: "Ayer" },
-            ].map((d) => {
-              const activo = !archivados && elegido?.desde === d.dia && elegido.hasta === d.dia;
-              return (
-                <Link key={d.etiqueta} href={`/despacho-ciudad?desde=${d.dia}&hasta=${d.dia}`} aria-current={activo ? "page" : undefined} className={chip(activo)}>
-                  {d.etiqueta}
-                </Link>
-              );
-            })}
-            <form action="/despacho-ciudad" className="flex items-center gap-1.5 text-[13px]">
-              <label className="flex items-center gap-1.5">
-                Del
-                <input type="date" name="desde" required defaultValue={elegido?.desde ?? ""} className={fieldClassSm} />
-              </label>
-              <label className="flex items-center gap-1.5">
-                al
-                <input type="date" name="hasta" defaultValue={elegido?.hasta ?? ""} className={fieldClassSm} />
-              </label>
-              <button type="submit" className={chip(!archivados && !!elegido)}>
-                Ver
-              </button>
-            </form>
-            <Link href="/despacho-ciudad/hoja" className={`${chip(false)} ml-auto`}>
-              Hoja del día
-            </Link>
-            {esAdministrador(usuario) && (
-              <Link href="/despacho-ciudad/repartidores" className={chip(false)}>
-                Cuentas de repartidores
-              </Link>
-            )}
-            <Link href="/despacho-ciudad?archivados=1" aria-current={archivados ? "page" : undefined} className={chip(archivados)}>
-              Archivados
-            </Link>
-          </nav>
+          {/* Menos botones sueltos (24 nov 2026, pedido de despacho): el período en un botón y lo demás en «Más», como Monday. */}
+          <BarraPeriodo
+            actual={archivados ? "Archivados" : elegido ? (elegido.desde === elegido.hasta ? (elegido.desde === hoy ? "Hoy" : elegido.desde === ayer ? "Ayer" : diaTexto(elegido.desde)) : `Del ${diaTexto(elegido.desde)} al ${diaTexto(elegido.hasta)}`) : rango.etiqueta}
+            opciones={[
+              { etiqueta: "Hoy", href: `/despacho-ciudad?desde=${hoy}&hasta=${hoy}`, activa: !archivados && elegido?.desde === hoy && elegido.hasta === hoy },
+              { etiqueta: "Ayer", href: `/despacho-ciudad?desde=${ayer}&hasta=${ayer}`, activa: !archivados && elegido?.desde === ayer && elegido.hasta === ayer },
+              ...RANGOS.map((r) => ({ etiqueta: r.etiqueta, href: `/despacho-ciudad?dias=${r.id}`, activa: !archivados && !elegido && r.id === rango.id })),
+            ]}
+            desde={elegido?.desde ?? ""}
+            hasta={elegido?.hasta ?? ""}
+            mas={[
+              { etiqueta: "Hoja del día", href: "/despacho-ciudad/hoja", activa: false },
+              ...(esAdministrador(usuario) ? [{ etiqueta: "Cuentas de repartidores", href: "/despacho-ciudad/repartidores", activa: false }] : []),
+              archivados ? { etiqueta: "Volver al tablero", href: "/despacho-ciudad", activa: false } : { etiqueta: "Archivados", href: "/despacho-ciudad?archivados=1", activa: false },
+            ]}
+          />
           {elegido && !archivados && (
             <p className="m-0 text-[13px] text-muted-foreground">
-              Mostrando {elegido.desde === elegido.hasta ? `el ${diaTexto(elegido.desde)}` : `del ${diaTexto(elegido.desde)} al ${diaTexto(elegido.hasta)}`}. Combínalo con el repartidor, los
-              estados y la tienda de abajo.
+              Mostrando {elegido.desde === elegido.hasta ? `el ${diaTexto(elegido.desde)}` : `del ${diaTexto(elegido.desde)} al ${diaTexto(elegido.hasta)}`}. Combínalo con el repartidor y los
+              filtros de abajo.
             </p>
           )}
           {/* Los cierres que mandan los repartidores desde su panel (24 nov 2026), para validarlos. */}
