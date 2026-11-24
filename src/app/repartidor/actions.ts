@@ -6,7 +6,7 @@ import { registrarAuditoria } from "@/lib/auditoria";
 import { getUsuarioSesion } from "@/lib/auth";
 import { cargarRuta } from "@/lib/despacho/datos-repartidor";
 import { rangoDespacho } from "@/lib/despacho/datos";
-import { FORMAS_PAGO, MOTIVOS, esFormaPago, nombreRepartidor, sumarDias } from "@/lib/despacho/panel-repartidor";
+import { FORMAS_PAGO, MOTIVOS, esFormaPago, nombreRepartidor, puedeMarcar, sumarDias } from "@/lib/despacho/panel-repartidor";
 import { cuentaRepartidorActual } from "@/lib/despacho/sesion-repartidor";
 import type { CuentaRepartidor } from "@/lib/despacho/cuenta-repartidor";
 import { grupoDeEstado, leerReglasEstado } from "@/lib/monday/columnas";
@@ -32,10 +32,9 @@ const esDia = (v: unknown): v is string => typeof v === "string" && /^\d{4}-\d{2
 const TIPOS: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/heic": "heic", "application/pdf": "pdf" };
 const quien = (c: CuentaRepartidor) => `${c.nombre} (su panel)`;
 
-/** Los días en que el repartidor puede marcar: hoy y los dos anteriores (lo que quedó sin marcar al cerrar la noche). */
-function diasPermitidos(): { desde: string; hoy: string } {
-  const { hoy } = rangoDespacho(1);
-  return { desde: sumarDias(hoy, -2), hoy };
+/** Hoy en Panamá. Se marca hoy y los dos días anteriores, sin salir de la semana en curso (`puedeMarcar`). */
+function hoyPanama(): string {
+  return rangoDespacho(1).hoy;
 }
 
 async function conCuenta(): Promise<CuentaRepartidor | null> {
@@ -58,9 +57,8 @@ async function filaDelRepartidor(itemId: string): Promise<{ supabase: Supabase; 
   const supabase = createServiceClient();
   const { data: fila } = await supabase.from("mon_despachos").select("*").eq("item_id", itemId).maybeSingle();
   if (!fila || fila.clase !== "ciudad" || fila.archivado_en || nombreRepartidor(fila.courier as string | null) !== nombreRepartidor(cuenta.courier)) return { error: "Ese pedido no está en tu ruta." };
-  const { desde, hoy } = diasPermitidos();
   const dia = (fila.fecha_despacho as string | null) ?? "";
-  if (dia < desde || dia > hoy) return { error: "Ese pedido es de otro día: pídele a Soporte que lo cambie." };
+  if (!puedeMarcar(dia, hoyPanama())) return { error: "Ese día ya no se puede marcar desde el panel: pídele a Soporte que lo cambie." };
   return { supabase, cuenta, fila };
 }
 
@@ -162,7 +160,7 @@ export async function noEntregarPedido(itemId: string, datos: FormData): Promise
   if (!(MOTIVOS as readonly string[]).includes(motivo)) return { error: "Elige el motivo." };
   const comentario = String(datos.get("comentario") ?? "").replace(/\s+/g, " ").trim().slice(0, 500);
   const fecha = tipo === "POSPUESTO" ? String(datos.get("fecha") ?? "") : "";
-  const { hoy } = diasPermitidos();
+  const hoy = hoyPanama();
   if (tipo === "POSPUESTO" && (!esDia(fecha) || fecha <= (fila.fecha_despacho as string) || fecha > sumarDias(hoy, 60))) return { error: "Elige para cuándo queda." };
   const fotos = await subirFotos(supabase, itemId, (fila.comprobantes as string[] | null) ?? [], datos);
   if ("error" in fotos) return fotos;
@@ -226,8 +224,7 @@ export async function enviarCierre(dia: string, datos: FormData): Promise<Result
   const cuenta = await conCuenta();
   if (!cuenta) return SIN_SESION;
   if (await frenado(cuenta)) return { error: DEMASIADAS_ACCIONES };
-  const { desde, hoy } = diasPermitidos();
-  if (!esDia(dia) || dia < desde || dia > hoy) return { error: "Ese día ya no se puede cerrar desde el panel." };
+  if (!esDia(dia) || !puedeMarcar(dia, hoyPanama())) return { error: "Ese día ya no se puede cerrar desde el panel." };
   const supabase = createServiceClient();
   const ruta = await cargarRuta(supabase, cuenta, dia);
   if (ruta.faltaMigracion) return { error: "Falta correr en Supabase la migración 0362 (panel del repartidor)." };

@@ -4,13 +4,32 @@ import Link from "next/link";
 import { useState } from "react";
 import type { PedidoRuta } from "@/lib/despacho/datos-repartidor";
 import { plata, type ResumenCierre, type Seccion } from "@/lib/despacho/panel-repartidor";
-import { EstadoConexion, NavRepartidor, PastillaEstado, enlaceMapa, telefonoLimpio } from "./piezas";
+import { EstadoConexion, NavRepartidor, PastillaEstado, consultaDia, enlaceMapa, telefonoLimpio } from "./piezas";
 
 /**
  * «Mi ruta de hoy» (pantalla 1 del prototipo aprobado): el avance del día, los contadores, lo cobrado (el efectivo por tienda) y los pedidos en tres
  * pestañas: en ruta, entregados y no entregados. Cada pedido abre su ficha; Llamar y Mapa van directo.
  */
-export function MiRuta({ nombre, diaTexto, pedidos, resumen }: { nombre: string; diaTexto: string; pedidos: PedidoRuta[]; resumen: ResumenCierre }) {
+export function MiRuta({
+  nombre,
+  dia,
+  hoy,
+  diaTexto,
+  dias,
+  pedidos,
+  resumen,
+}: {
+  nombre: string;
+  dia: string;
+  hoy: string;
+  diaTexto: string;
+  /** Los días de la semana en curso (de lunes a hoy), para el selector. */
+  dias: { iso: string; texto: string; marca: boolean }[];
+  pedidos: PedidoRuta[];
+  resumen: ResumenCierre;
+}) {
+  const consulta = consultaDia(dia, hoy);
+  const seMarca = dias.find((d) => d.iso === dia)?.marca ?? false;
   const [pestana, setPestana] = useState<Seccion>("ruta");
   const cerrados = resumen.pedidos - resumen.enRuta;
   const avance = resumen.pedidos ? Math.round((cerrados / resumen.pedidos) * 100) : 0;
@@ -47,6 +66,22 @@ export function MiRuta({ nombre, diaTexto, pedidos, resumen }: { nombre: string;
       </header>
 
       <div className="flex flex-col gap-3 px-3.5 pt-3.5">
+        {/* Los días de la semana en curso (24 nov 2026): cada lunes empieza de nuevo. Lo de días que ya no se marcan se ve en solo lectura. */}
+        {dias.length > 1 && (
+          <nav aria-label="Días de la semana" className="-mx-3.5 flex gap-1.5 overflow-x-auto px-3.5">
+            {dias.map((d) => (
+              <Link
+                key={d.iso}
+                href={d.iso === hoy ? "/repartidor" : `/repartidor?dia=${d.iso}`}
+                aria-current={d.iso === dia ? "page" : undefined}
+                className={`flex min-h-9 shrink-0 items-center rounded-full border px-3 text-[13px] whitespace-nowrap no-underline ${d.iso === dia ? "border-primario bg-primario-suave font-semibold text-[#5b2386]" : "border-[#e3e3e3] bg-white font-medium text-[#3f3f46]"}`}
+              >
+                {d.texto}
+              </Link>
+            ))}
+          </nav>
+        )}
+        {!seMarca && <p className="m-0 rounded-[10px] bg-[#fef3c7] px-3 py-2 text-xs text-[#8a4b08]">Este día ya no se puede marcar desde el panel: solo se ve. Si falta algo, avísale a Soporte.</p>}
         <div className="grid grid-cols-4 gap-2">
           {[
             { n: resumen.enRuta, t: "En ruta" },
@@ -104,7 +139,7 @@ export function MiRuta({ nombre, diaTexto, pedidos, resumen }: { nombre: string;
           const monto = p.seccion === "entregados" ? (p.cobrado ?? p.porCobrar) : p.porCobrar;
           return (
             <div key={p.itemId} className="flex flex-col gap-1.5 rounded-[14px] border border-[#e3e3e3] bg-white px-3 py-2.5">
-              <Link href={`/repartidor/pedido/${p.itemId}`} className="flex flex-col gap-1.5 text-[#18181b] no-underline">
+              <Link href={`/repartidor/pedido/${p.itemId}${consulta}`} className="flex flex-col gap-1.5 text-[#18181b] no-underline">
                 <span className="flex items-center justify-between gap-2">
                   <span className="flex items-center gap-2">
                     <b className="text-[15px]">#{p.numero}</b>
@@ -137,7 +172,7 @@ export function MiRuta({ nombre, diaTexto, pedidos, resumen }: { nombre: string;
         })}
       </div>
 
-      <NavRepartidor activa="ruta" />
+      <NavRepartidor activa="ruta" consulta={consulta} />
     </div>
   );
 }

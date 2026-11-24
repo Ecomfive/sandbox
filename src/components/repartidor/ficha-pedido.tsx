@@ -75,7 +75,7 @@ function Foto({ id, foto, alElegir, texto, tieneGuardadas }: { id: string; foto:
 }
 
 /** Hoja «Entregar #…» (pantalla 3 del prototipo): forma de pago, monto, comprobante y confirmar. */
-function HojaEntregado({ pedido, alCerrar }: { pedido: PedidoRuta; alCerrar: () => void }) {
+function HojaEntregado({ pedido, volver, alCerrar }: { pedido: PedidoRuta; volver: string; alCerrar: () => void }) {
   const router = useRouter();
   const { mostrarToast } = useToast();
   const [forma, setForma] = useState<FormaPago>("efectivo");
@@ -103,7 +103,7 @@ function HojaEntregado({ pedido, alCerrar }: { pedido: PedidoRuta; alCerrar: () 
     setEnviando(false);
     if (r.error) return mostrarToast(r.error, "destructive");
     mostrarToast(`#${pedido.numero} entregado.`);
-    router.push("/repartidor");
+    router.push(volver);
     router.refresh();
   }
 
@@ -174,7 +174,7 @@ function HojaEntregado({ pedido, alCerrar }: { pedido: PedidoRuta; alCerrar: () 
 }
 
 /** Hoja «No se entregó #…» (pantalla 4 del prototipo): pospuesto o fallido, motivo, fecha, comentario y evidencia. */
-function HojaNoEntregado({ pedido, inicial, fechas, alCerrar }: { pedido: PedidoRuta; inicial: "POSPUESTO" | "FALLIDO"; fechas: { iso: string; texto: string }[]; alCerrar: () => void }) {
+function HojaNoEntregado({ pedido, inicial, fechas, volver, alCerrar }: { pedido: PedidoRuta; inicial: "POSPUESTO" | "FALLIDO"; fechas: { iso: string; texto: string }[]; volver: string; alCerrar: () => void }) {
   const router = useRouter();
   const { mostrarToast } = useToast();
   const [tipo, setTipo] = useState(inicial);
@@ -203,7 +203,7 @@ function HojaNoEntregado({ pedido, inicial, fechas, alCerrar }: { pedido: Pedido
     setEnviando(false);
     if (r.error) return mostrarToast(r.error, "destructive");
     mostrarToast(tipo === "POSPUESTO" ? `#${pedido.numero} pospuesto.` : `#${pedido.numero} marcado fallido.`);
-    router.push("/repartidor");
+    router.push(volver);
     router.refresh();
   }
 
@@ -305,7 +305,7 @@ function HojaNoEntregado({ pedido, inicial, fechas, alCerrar }: { pedido: Pedido
 }
 
 /** La ficha del pedido (pantalla 2 del prototipo) con sus dos hojas. */
-export function FichaPedidoRepartidor({ pedido, fechas }: { pedido: PedidoRuta; fechas: { iso: string; texto: string }[] }) {
+export function FichaPedidoRepartidor({ pedido, fechas, volver, seMarca }: { pedido: PedidoRuta; fechas: { iso: string; texto: string }[]; volver: string; seMarca: boolean }) {
   const [hoja, setHoja] = useState<null | "entregado" | "POSPUESTO" | "FALLIDO">(null);
   const tel = telefonoLimpio(pedido.cliente?.telefono);
   const mapa = enlaceMapa(pedido.cliente?.direccion, pedido.cliente?.corregimiento);
@@ -315,7 +315,7 @@ export function FichaPedidoRepartidor({ pedido, fechas }: { pedido: PedidoRuta; 
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="flex items-center gap-2.5 border-b border-[#e3e3e3] bg-white px-4 py-3.5">
-        <Link href="/repartidor" aria-label="Volver a mi ruta" className="flex h-10 w-10 items-center justify-center rounded-[10px] text-[#18181b]">
+        <Link href={volver} aria-label="Volver a mi ruta" className="flex h-10 w-10 items-center justify-center rounded-[10px] text-[#18181b]">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M15 18l-6-6 6-6" />
           </svg>
@@ -398,7 +398,10 @@ export function FichaPedidoRepartidor({ pedido, fechas }: { pedido: PedidoRuta; 
         )}
       </div>
 
-      <div className="sticky bottom-0 grid grid-cols-2 gap-2 border-t border-[#e3e3e3] bg-white px-3.5 pt-3 pb-4">
+      {!seMarca && (
+        <p className="sticky bottom-0 m-0 border-t border-[#e3e3e3] bg-[#fef3c7] px-4 py-3 text-center text-[13px] text-[#8a4b08]">Este día ya no se puede marcar desde el panel: solo se ve. Si falta algo, avísale a Soporte.</p>
+      )}
+      <div className={`sticky bottom-0 grid grid-cols-2 gap-2 border-t border-[#e3e3e3] bg-white px-3.5 pt-3 pb-4 ${seMarca ? "" : "hidden"}`}>
         <button type="button" onClick={() => setHoja("entregado")} className="col-span-2 flex min-h-[52px] items-center justify-center gap-2 rounded-xl bg-[#15803d] text-base font-bold text-white">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M5 12l5 5L20 7" />
@@ -418,9 +421,9 @@ export function FichaPedidoRepartidor({ pedido, fechas }: { pedido: PedidoRuta; 
           <div className="mt-auto flex max-h-[92dvh] w-full max-w-[430px] flex-col gap-3.5 overflow-y-auto rounded-t-[22px] bg-white px-[18px] pt-2.5 pb-[18px]">
             <div className="h-[5px] w-11 self-center rounded-full bg-[#d4d4d8]" />
             {hoja === "entregado" ? (
-              <HojaEntregado pedido={pedido} alCerrar={() => setHoja(null)} />
+              <HojaEntregado pedido={pedido} volver={volver} alCerrar={() => setHoja(null)} />
             ) : (
-              <HojaNoEntregado key={hoja} pedido={pedido} inicial={hoja} fechas={fechas} alCerrar={() => setHoja(null)} />
+              <HojaNoEntregado key={hoja} pedido={pedido} inicial={hoja} fechas={fechas} volver={volver} alCerrar={() => setHoja(null)} />
             )}
           </div>
         </div>

@@ -8,20 +8,39 @@ import { useToast } from "@/components/ui/toast";
 import type { CierreGuardado } from "@/lib/despacho/datos-repartidor";
 import { plata, type ResumenCierre } from "@/lib/despacho/panel-repartidor";
 import { ElegirClave } from "./elegir-clave";
-import { NavRepartidor } from "./piezas";
+import { NavRepartidor, consultaDia } from "./piezas";
 
 /**
  * «Cierre del día» (pantalla 5 del prototipo aprobado): lo que hay que resolver, el efectivo a depositar por tienda (cada una con la foto de su
  * depósito), los pagos digitales por tienda, su pago de envíos (entregados + fallidos con evidencia) y «Enviar cierre a Soporte».
  */
-export function CierreDia({ nombreCompleto, nombre, dia, diaTexto, resumen, cierre }: { nombreCompleto: string; nombre: string; dia: string; diaTexto: string; resumen: ResumenCierre; cierre: CierreGuardado | null }) {
+export function CierreDia({
+  nombreCompleto,
+  nombre,
+  dia,
+  hoy,
+  seEnvia,
+  diaTexto,
+  resumen,
+  cierre,
+}: {
+  nombreCompleto: string;
+  nombre: string;
+  dia: string;
+  hoy: string;
+  /** Si el cierre de ese día todavía se puede enviar (hoy y los dos anteriores, dentro de la semana). */
+  seEnvia: boolean;
+  diaTexto: string;
+  resumen: ResumenCierre;
+  cierre: CierreGuardado | null;
+}) {
   const router = useRouter();
   const { mostrarToast } = useToast();
   const [depositos, setDepositos] = useState<Record<string, File | null>>({});
   const [enviando, setEnviando] = useState(false);
   const [cambiarClave, setCambiarClave] = useState(false);
   const validado = cierre?.estado === "validado";
-  const bloqueado = resumen.enRuta > 0 || validado || resumen.pedidos === 0;
+  const bloqueado = resumen.enRuta > 0 || validado || resumen.pedidos === 0 || !seEnvia;
   const etiqueta = "text-[11px] font-semibold tracking-[0.04em]";
 
   if (cambiarClave) return <ElegirClave temporal={false} nombre={nombre} alCancelar={() => setCambiarClave(false)} />;
@@ -113,7 +132,7 @@ export function CierreDia({ nombreCompleto, nombre, dia, diaTexto, resumen, cier
                   </span>
                 </span>
                 <b>{plata(e.monto)}</b>
-                {!validado ? (
+                {!validado && seEnvia ? (
                   <label htmlFor={id} className={`cursor-pointer rounded-lg px-1.5 py-1 text-[11px] font-semibold ${elegido || guardado ? "border border-[#15803d] text-[#15803d]" : "border border-dashed border-[#b38ad9] text-[#5b2386]"}`}>
                     {elegido ? "Foto lista ✓" : guardado ? "Depósito ✓" : "Foto depósito"}
                     <input id={id} type="file" accept="image/*,application/pdf" capture="environment" className="sr-only" onChange={(ev) => setDepositos((d) => ({ ...d, [e.tienda]: ev.target.files?.[0] ?? null }))} />
@@ -173,11 +192,11 @@ export function CierreDia({ nombreCompleto, nombre, dia, diaTexto, resumen, cier
 
       <div className="sticky bottom-14 flex flex-col gap-1.5 border-t border-[#e3e3e3] bg-white px-3.5 pt-3 pb-4">
         <button type="button" onClick={enviar} disabled={bloqueado || enviando} className="min-h-[52px] rounded-xl bg-primario text-base font-bold text-white disabled:opacity-50">
-          {enviando ? "Enviando…" : validado ? "Cierre validado" : cierre ? "Volver a enviar a Soporte" : "Enviar cierre a Soporte"}
+          {enviando ? "Enviando…" : validado ? "Cierre validado" : !seEnvia ? "Este día ya no se envía desde el panel" : cierre ? "Volver a enviar a Soporte" : "Enviar cierre a Soporte"}
         </button>
         <span className="text-center text-xs text-[#636363]">Soporte lo valida en Despacho ciudad y te llega la confirmación.</span>
       </div>
-      <NavRepartidor activa="cierre" />
+      <NavRepartidor activa="cierre" consulta={consultaDia(dia, hoy)} />
     </div>
   );
 }

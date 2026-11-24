@@ -177,3 +177,32 @@ export function fechasRapidas(hoy: string): { iso: string; texto: string }[] {
 
 /** Un monto como se lee en el panel: «$1,132.64». */
 export const plata = (n: number | null | undefined) => `$${(n ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+/** El lunes de la semana de un día (la semana del panel va de lunes a domingo; cada lunes empieza de nuevo). */
+export function inicioSemana(iso: string): string {
+  const dia = new Date(`${iso}T12:00:00Z`).getUTCDay();
+  return sumarDias(iso, -((dia + 6) % 7));
+}
+
+/**
+ * Los días que el repartidor puede ver (24 nov 2026, pedido de Hernán: «que vean lo de la semana en curso y al iniciar los lunes se les quite lo de la
+ * semana pasada»): de lunes a hoy. `marca`: si ese día todavía se puede marcar (hoy y los dos anteriores, sin salir de la semana).
+ */
+export function diasDeLaSemana(hoy: string): { iso: string; texto: string; hoy: boolean; marca: boolean }[] {
+  const dias: { iso: string; texto: string; hoy: boolean; marca: boolean }[] = [];
+  for (let d = inicioSemana(hoy); d <= hoy; d = sumarDias(d, 1)) {
+    dias.push({ iso: d, texto: d === hoy ? "Hoy" : `${diaLargo(d).slice(0, 3)} ${d.slice(8, 10)}`, hoy: d === hoy, marca: puedeMarcar(d, hoy) });
+  }
+  return dias;
+}
+
+/** Si un día se puede marcar desde el panel: hoy y los dos anteriores, sin salir de la semana en curso. */
+export function puedeMarcar(dia: string, hoy: string): boolean {
+  const desde = [inicioSemana(hoy), sumarDias(hoy, -2)].sort().at(-1)!;
+  return dia >= desde && dia <= hoy;
+}
+
+/** El día que mira el panel: el pedido si es de la semana en curso (de lunes a hoy); si no, hoy. */
+export function diaVisible(pedido: unknown, hoy: string): string {
+  return typeof pedido === "string" && /^\d{4}-\d{2}-\d{2}$/.test(pedido) && pedido <= hoy && pedido >= inicioSemana(hoy) ? pedido : hoy;
+}

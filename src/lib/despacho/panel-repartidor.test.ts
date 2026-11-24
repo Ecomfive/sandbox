@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { diaLargo, fechasRapidas, formaNormal, nombreRepartidor, resumenCierre, seccionDe, tituloTienda, type FilaPanel } from "./panel-repartidor";
+import { diaLargo, diasDeLaSemana, diaVisible, fechasRapidas, inicioSemana, puedeMarcar, formaNormal, nombreRepartidor, resumenCierre, seccionDe, tituloTienda, type FilaPanel } from "./panel-repartidor";
 
 test("pestañas de Mi ruta: recolectado y sin estado van en ruta", () => {
   assert.equal(seccionDe(null), "ruta");
@@ -56,4 +56,25 @@ test("fechas del panel", () => {
     { iso: "2026-11-25", texto: "Mañana" },
     { iso: "2026-11-26", texto: "Jue 26/11" },
   ]);
+});
+
+test("la semana en curso: de lunes a hoy, y se marca hoy y los dos días anteriores", () => {
+  assert.equal(inicioSemana("2026-11-24"), "2026-11-23");
+  assert.equal(inicioSemana("2026-11-23"), "2026-11-23");
+  assert.equal(inicioSemana("2026-11-29"), "2026-11-23");
+  assert.deepEqual(
+    diasDeLaSemana("2026-11-26").map((d) => [d.iso, d.texto, d.marca]),
+    [
+      ["2026-11-23", "Lun 23", false],
+      ["2026-11-24", "Mar 24", true],
+      ["2026-11-25", "Mié 25", true],
+      ["2026-11-26", "Hoy", true],
+    ],
+  );
+  // El lunes empieza de nuevo: lo del sábado ya no se ve ni se marca.
+  assert.deepEqual(diasDeLaSemana("2026-11-30").map((d) => d.iso), ["2026-11-30"]);
+  assert.equal(puedeMarcar("2026-11-28", "2026-11-30"), false);
+  assert.equal(diaVisible("2026-11-28", "2026-11-30"), "2026-11-30");
+  assert.equal(diaVisible("2026-11-23", "2026-11-26"), "2026-11-23");
+  assert.equal(diaVisible("basura", "2026-11-26"), "2026-11-26");
 });
