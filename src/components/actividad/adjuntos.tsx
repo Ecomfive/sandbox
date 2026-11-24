@@ -234,7 +234,8 @@ export function TiraExistentes({ adjuntos, alQuitar }: { adjuntos: AdjuntoActivi
 
 /** Los archivos de un comentario ya enviado, debajo de su texto: las imágenes como miniaturas de 40 × 40 (se amplían al pulsarlas) y los documentos (PDF, Excel, Word…) como enlace con su ícono. */
 export function GaleriaAdjuntos({ adjuntos }: { adjuntos: AdjuntoActividad[] }) {
-  const [ampliada, setAmpliada] = useState<AdjuntoActividad | null>(null);
+  // Cuál de las imágenes de este comentario está ampliada (su posición), para poder pasar a la anterior o a la siguiente.
+  const [ampliada, setAmpliada] = useState<number | null>(null);
   if (adjuntos.length === 0) return null;
   const imagenes = adjuntos.filter((a) => a.clase === "foto" && a.url);
   const videos = adjuntos.filter((a) => a.clase === "video" && a.url);
@@ -243,11 +244,11 @@ export function GaleriaAdjuntos({ adjuntos }: { adjuntos: AdjuntoActividad[] }) 
     <div className="mt-1.5 flex flex-col gap-2">
       {imagenes.length > 0 && (
         <ul className="m-0 flex list-none flex-wrap gap-1.5 p-0">
-          {imagenes.map((a) => (
+          {imagenes.map((a, i) => (
             <li key={a.id}>
               <button
                 type="button"
-                onClick={() => setAmpliada(a)}
+                onClick={() => setAmpliada(i)}
                 aria-label={`Ver ${a.nombre} más grande`}
                 className={`block overflow-hidden rounded-md border border-border ${anilloFoco}`}
               >
@@ -288,7 +289,16 @@ export function GaleriaAdjuntos({ adjuntos }: { adjuntos: AdjuntoActividad[] }) 
           ))}
         </ul>
       )}
-      {ampliada && <VisorImagen src={ampliada.url} alt={ampliada.nombre} onClose={() => setAmpliada(null)} />}
+      {ampliada !== null && imagenes[ampliada] && (
+        <VisorImagen
+          src={imagenes[ampliada].url}
+          alt={imagenes[ampliada].nombre}
+          pie={imagenes[ampliada].nombre}
+          descargar={{ href: imagenes[ampliada].url!, nombre: imagenes[ampliada].nombre }}
+          navegacion={{ posicion: ampliada + 1, total: imagenes.length, onAnterior: () => setAmpliada((ampliada - 1 + imagenes.length) % imagenes.length), onSiguiente: () => setAmpliada((ampliada + 1) % imagenes.length) }}
+          onClose={() => setAmpliada(null)}
+        />
+      )}
     </div>
   );
 }

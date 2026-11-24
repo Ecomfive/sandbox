@@ -1355,7 +1355,7 @@ convenciones técnicas del código.
 - **Actividad con comentarios, común a todos los módulos** (22 oct 2026). La Actividad de Compras se separó en una pieza común:
   `Actividad` (`src/components/actividad/actividad.tsx`: un solo bloque con comentarios, cambios y archivos, filtro, «Ver anteriores»,
   campo con @menciones, pegar o arrastrar archivos), `TarjetaComentario` (`tarjeta-comentario.tsx`: respuestas de un nivel,
-  reacciones, editar y eliminar el propio) y `adjuntos.tsx` (subida directa a Storage con URL firmada, galería). Cada módulo le pasa
+  reacciones, editar y eliminar el propio) y `adjuntos.tsx` (subida directa a Storage con URL firmada, galería). **Ver las fotos** (24 nov 2026, pedido de Dinora): al ampliar una foto de un comentario, `VisorImagen` (`src/components/ui/visor-imagen.tsx`) deja **girarla** (botones o R / Mayús + R), **descargarla** (por `fetch` + `blob`, y ya girada si se giró; si el navegador no deja leer el archivo, se abre en otra pestaña) y **pasar a la anterior o a la siguiente** de ese comentario con las flechas de la pantalla o las del teclado, dando la vuelta (`navegacion`, «2 de 6»). Girar y descargar valen para todo uso del visor; la navegación solo donde se pasa `navegacion` (hoy las notas de Actividad: Producto, Compras, CRM…). Cada módulo le pasa
   `obtener` (su lectura) y `acciones` (`AccionesActividad`, `src/lib/comentarios/tipos.ts`: comentar, editar, eliminar, reaccionar,
   prepararSubida, descartarSubida y su bucket) y, si quiere, `renderCambio` y `arriba`; `version` la vuelve a pedir. Compras la usa
   con sus acciones de siempre (`actividad-compra.tsx` es ahora un envoltorio: etapa/estado en color y subtareas). Para un módulo nuevo
