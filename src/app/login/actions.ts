@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { RUTA_PORTAL_PROVEEDOR, cuentaDeProveedor } from "@/lib/proveedor/cuenta";
+import { RUTA_PANEL_REPARTIDOR, cuentaDeRepartidor } from "@/lib/despacho/cuenta-repartidor";
 import { cerrarIntento, revisarIngreso } from "@/lib/seguridad/limite-ingreso";
 import { DEMASIADOS_INTENTOS } from "@/lib/seguridad/limite-reglas";
 import { createServiceClient, createSessionClient } from "@/lib/supabase/server";
@@ -31,6 +32,12 @@ export async function iniciarSesion(_prevState: LoginState, formData: FormData):
   if (cuenta) {
     await createServiceClient().from("proveedor_usuarios").update({ ultimo_ingreso_en: new Date().toISOString() }).eq("id", cuenta.cuentaId);
     redirect(RUTA_PORTAL_PROVEEDOR);
+  }
+  // Una cuenta de repartidor (24 nov 2026) entra a su panel, no al sistema.
+  const repartidor = data.user ? await cuentaDeRepartidor(data.user.id) : null;
+  if (repartidor) {
+    await createServiceClient().from("despacho_repartidores").update({ ultimo_ingreso_en: new Date().toISOString() }).eq("id", repartidor.id);
+    redirect(RUTA_PANEL_REPARTIDOR);
   }
   redirect("/");
 }

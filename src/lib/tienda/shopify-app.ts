@@ -84,8 +84,12 @@ export async function accesoDeApp(app: AppTienda, ahora = Date.now()): Promise<{
   return acceso;
 }
 
-/** Lo único que el sistema escribe en Shopify (19 nov 2026, etapa 1: etiquetas del pedido). Otro `write_…` hace que la tienda no se conecte. */
-export const ESCRITURA_PERMITIDA: readonly string[] = ["write_orders"];
+/**
+ * Lo único que el sistema escribe en Shopify. 19 nov 2026: etiquetas del pedido (`write_orders`, también anular y marcar pagado). 24 nov 2026, manual ATC:
+ * la espera de los pedidos nuevos y levantarla al confirmar (`write_merchant_managed_fulfillment_orders`), la guía (también `write_merchant_managed_fulfillment_orders`, por `fulfillmentTrackingInfoUpdate`) y el «Entregado» (`write_fulfillments`).
+ * Otro `write_…` hace que la tienda no se conecte.
+ */
+export const ESCRITURA_PERMITIDA: readonly string[] = ["write_orders", "write_merchant_managed_fulfillment_orders", "write_fulfillments"];
 
 /** Los permisos de escritura que la app tiene y el sistema no usa (no deben estar: una clave filtrada podría hacer más daño). */
 export function permisosNoPermitidos(scope: string | null | undefined): string[] {
@@ -95,6 +99,11 @@ export function permisosNoPermitidos(scope: string | null | undefined): string[]
 /** ¿La tienda le dio a la app permiso para cambiar pedidos (etiquetas)? */
 export function puedeEscribirPedidos(scope: string | null | undefined): boolean {
   return permisosDeEscritura(scope).includes("write_orders");
+}
+
+/** ¿La tienda le dio a la app permiso para poner y levantar la espera de los envíos (manual ATC, 24 nov 2026)? */
+export function puedeManejarEspera(scope: string | null | undefined): boolean {
+  return permisosDeEscritura(scope).includes("write_merchant_managed_fulfillment_orders");
 }
 
 /** Olvida el token guardado: el próximo se pide de nuevo (después de aprobar un permiso nuevo en la tienda, el guardado no lo trae). */

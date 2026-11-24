@@ -11,6 +11,7 @@ import { tiendaDeClienteSiscore } from "@/lib/tienda/siscore";
 import { grupoDeEstadoGuia, guiaAntesDelPedido, leerLecturaSiscore, momentoEntrega, pedidoDeFactura, sinLoDelRastreo, visitasSinEntregar } from "@/lib/tienda/siscore";
 import { traerTodasConError } from "@/lib/supabase/paginar";
 import { actualizarEntregas, completarDatosEntrega } from "@/lib/tienda/actualizar-entregas";
+import { cargarGuiasSolas, type ResultadoGuiasSolas } from "@/lib/tienda/guias-solas";
 
 const RUTA = "/tienda-pedidos/logistica";
 const BUCKET = "wms-compras";
@@ -157,11 +158,14 @@ export async function avanceLecturaSiscore(id: string, hechos: number, total: nu
  * Guarda lo que subió la extensión: cada guía con su tienda (el cliente de SISCORE, «KENKU» = Kenku) y su pedido (la «Factura» es el número de Shopify),
  * el grupo de su estado, las visitas sin entregar, cuándo se entregó y el rastreo. Borra el archivo temporal.
  */
-export async function procesarLecturaSiscore(id: string): Promise<{ guias: number; conPedido: number; rastreadas: number; cliente: string } | { error: string }> {
+export async function procesarLecturaSiscore(
+  id: string,
+): Promise<{ guias: number; conPedido: number; rastreadas: number; cliente: string; shopify: ResultadoGuiasSolas | null } | { error: string }> {
   const limite = await soloSinLimite();
   if (limite) return { error: limite };
+  let u;
   try {
-    await requireModuloEscritura("tienda-logistica");
+    u = await requireModuloEscritura("tienda-logistica");
   } catch {
     return { error: "Tu rol solo puede ver Logística." };
   }
@@ -237,8 +241,15 @@ export async function procesarLecturaSiscore(id: string): Promise<{ guias: numbe
     await actualizarEntregas(supabase, "Servientrega (lectura de SISCORE)", Date.now() + 30_000).catch(() => null);
     // La fecha de despacho de los que salieron por Servientrega sin la fecha de Shopify (la emisión de la guía), 14 nov 2026.
     await completarDatosEntrega(supabase, Date.now() + 10_000).catch(() => 0);
+    // Las guías nuevas entran solas en Shopify (24 nov 2026, pedido de Hernán): lo que no entra va a Pedidos de tienda › «Guía sin cargar».
+    // Con tope de tiempo: lo que no alcance entra en la próxima lectura.
+    const persona = { id: u.id, nombre: (u.nombre || u.email || "Alguien").trim() };
+    const shopify = tienda
+      ? await cargarGuiasSolas(supabase, tienda.id, persona, Date.now() + 60_000).catch((e: unknown) => ({ cargadas: 0, yaTenian: 0, pendientes: 0, quedan: 0, aviso: e instanceof Error ? e.message : "No se pudieron cargar las guías en Shopify." }))
+      : null;
     revalidatePath(RUTA);
-    return { guias: resumen.guias, conPedido: resumen.conPedido, rastreadas: resumen.rastreadas, cliente: lectura.cliente };
+    revalidatePath("/tienda-pedidos");
+    return { guias: resumen.guias, conPedido: resumen.conPedido, rastreadas: resumen.rastreadas, cliente: lectura.cliente, shopify };
   } catch (e) {
     return fallar(e instanceof Error ? e.message : "No se pudo guardar la lectura de SISCORE.");
   }

@@ -272,10 +272,11 @@ export const PESTANAS_POR_MODULO: Record<string, Pestana[]> = {
   // Anuncios Meta (18 nov 2026, pedido de Alcides): el resumen, las campañas, qué funciona, los videos, el equipo y las cuentas.
   "/anuncios-meta": [
     { etiqueta: "Resumen", href: "/anuncios-meta" },
+    { etiqueta: "Hallazgos", href: "/anuncios-meta/hallazgos" },
     { etiqueta: "Campañas", href: "/anuncios-meta/campanas" },
-    { etiqueta: "Qué funciona", href: "/anuncios-meta/que-funciona" },
     { etiqueta: "Productos", href: "/anuncios-meta/productos" },
     { etiqueta: "Videos", href: "/anuncios-meta/videos" },
+    { etiqueta: "Qué funciona", href: "/anuncios-meta/que-funciona" },
     { etiqueta: "Equipo", href: "/anuncios-meta/equipo" },
     { etiqueta: "Cuentas", href: "/anuncios-meta/cuentas" },
   ],

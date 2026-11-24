@@ -303,6 +303,23 @@ export async function enviarTexto(
   return { botPausado };
 }
 
+/**
+ * Un aviso automático del sistema (por ejemplo, la guía cuando el cliente no tiene correo). A diferencia de `enviarTexto`, no pausa el bot: no es una
+ * persona que toma la conversación. Queda anotado con quién lo originó.
+ */
+export async function enviarAviso(
+  supabase: SupabaseClient,
+  tiendaId: string,
+  telefono: string,
+  texto: string,
+  persona: { id: string; nombre: string },
+): Promise<{ error?: string }> {
+  const r = await herramientaIcomfly(supabase, tiendaId, "enviar_mensaje_whatsapp", { telefono, mensaje: texto });
+  if ("error" in r) return { error: r.error };
+  await anotarAutor(supabase, tiendaId, telefono, persona).catch(() => undefined);
+  return {};
+}
+
 export interface PlantillaChat {
   nombre: string;
   idioma: string;

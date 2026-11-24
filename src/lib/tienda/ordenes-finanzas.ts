@@ -5,6 +5,7 @@
 
 import type { EstadoPedido, Vendido } from "./resumen";
 import { unidadDeTienda } from "../ventas/matriz";
+import { confirmadoAtc } from "./gestion-atc";
 
 /**
  * El estado de un pedido a partir del estado de entrega del Excel de Finanzas y sus etiquetas de Shopify. Igual que el ciclo de Finanzas
@@ -23,7 +24,8 @@ export function estadoDesdeFinanzas(estadoEntrega: string | null, etiquetas: str
     case "no_gestionada":
       return "cancelado";
     default:
-      return etiquetasDe(etiquetas).some((e) => /^confirmad[ao]$/i.test(e)) ? "confirmado" : "nuevo";
+      // Desde el 24 nov 2026 (manual ATC) también confirma la zona puesta por la asesora, si no tiene «por confirmar datos» ni «novedad».
+      return confirmadoAtc(etiquetasDe(etiquetas)) ? "confirmado" : "nuevo";
   }
 }
 

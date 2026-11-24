@@ -42,7 +42,7 @@ const FALLIDOS = ["fallido", "descartado"];
 const ETAPAS_COMPRA_CLIENTE: { clave: string; etiqueta: string; etapas: string[] }[] = [
   { clave: "cotizando", etiqueta: "Cotizando con el proveedor", etapas: ["cotizar", "enviado_cotizacion", "cotizado"] },
   { clave: "produccion", etiqueta: "En producción", etapas: ["produccion"] },
-  { clave: "camino", etiqueta: "En camino", etapas: ["tracking", "arribo_mercancia"] },
+  { clave: "camino", etiqueta: "En camino", etapas: ["tracking", "arribo_mercancia", "llegada_puerto_lote_1", "llegada_puerto_lote_2", "llegada_puerto_lote_3"] },
   { clave: "llego", etiqueta: "Llegó a bodega", etapas: ["en_bodega"] },
   { clave: "completado", etiqueta: "Disponible para vender", etapas: ["completado"] },
 ];

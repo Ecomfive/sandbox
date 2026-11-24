@@ -13,7 +13,7 @@ import { SIN_RESTRICCIONES, dentroDelAlcance, enmascarar, restriccionesDe, type 
 export const COOKIE_VISTA_COMPRAS = "compras-vista";
 
 const COLUMNAS =
-  "id, tipo, codigo, nombre, foto_url, etapa, etapa_desde, prioridad, estado, proveedor, agente_envio, venta_importacion, tiendas, qty_total, monto_total, primer_pago, segundo_pago, pagado_a_proveedor, anulada_en, anulada_por, motivo_anulacion, factura, financiamiento, fecha_limite, fecha_llegada, fecha_pago_1, fecha_pago_2, fecha_envio, planificacion, via_envio, etiquetas, responsable_nombre, creador_nombre, asignado_a, creado_por, descripcion, url_producto, nota_proveedor, paises_destino, fecha_inicio, cerrado_en, creado_en, paises(codigo), perfiles(nombre, email), numero, wms_compra_items(cantidad_pedida, creado_en, sku_maestro_id, skus_maestros(codigo, nombre))";
+  "id, tipo, codigo, nombre, foto_url, etapa, etapa_desde, prioridad, estado, proveedor, agente_envio, venta_importacion, tiendas, qty_total, monto_total, primer_pago, segundo_pago, pagado_a_proveedor, anulada_en, anulada_por, motivo_anulacion, factura, financiamiento, fecha_limite, fecha_llegada, fecha_llegada_puerto, fecha_pago_1, fecha_pago_2, fecha_envio, planificacion, via_envio, etiquetas, responsable_nombre, creador_nombre, asignado_a, creado_por, descripcion, url_producto, nota_proveedor, paises_destino, fecha_inicio, cerrado_en, creado_en, paises(codigo), perfiles(nombre, email), numero, wms_compra_items(cantidad_pedida, creado_en, sku_maestro_id, skus_maestros(codigo, nombre))";
 
 const num = (v: unknown) => (v === null || v === undefined ? null : Number(v));
 const uno = <T,>(r: unknown): T | null => (Array.isArray(r) ? ((r[0] as T) ?? null) : ((r as T) ?? null));
@@ -131,7 +131,10 @@ export async function cargarCompras(ver: string | string[] | undefined): Promise
           return q.order("creado_en", { ascending: false }).range(desde, hasta) as unknown as PromiseLike<{ data: Record<string, unknown>[] | null; error: unknown }>;
         });
       // Sin la migración 0270 (`etapa_desde`) la lista se ve igual, sin el plazo de cada etapa.
-      filas = await leer(COLUMNAS).catch(() => leer(COLUMNAS.replace(" etapa_desde,", "")));
+      filas = await leer(COLUMNAS).catch(() =>
+        // Sin las migraciones recientes (la fecha de llegada a puerto o `etapa_desde`) la lista carga igual, sin esas columnas.
+        leer(COLUMNAS.replace(" fecha_llegada_puerto,", "")).catch(() => leer(COLUMNAS.replace(" fecha_llegada_puerto,", "").replace(" etapa_desde,", ""))),
+      );
     }
   } catch {
     error = true;
@@ -185,6 +188,7 @@ export async function cargarCompras(ver: string | string[] | undefined): Promise
       financiamiento: c.financiamiento === true,
       fechaLimite: txt(c.fecha_limite),
       fechaLlegada: txt(c.fecha_llegada),
+      fechaLlegadaPuerto: txt(c.fecha_llegada_puerto),
       fechaPago1: txt(c.fecha_pago_1),
       fechaPago2: txt(c.fecha_pago_2),
       fechaEnvio: txt(c.fecha_envio),

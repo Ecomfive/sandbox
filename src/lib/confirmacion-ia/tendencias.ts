@@ -1,4 +1,4 @@
-// Confirmación con IA › tendencia histórica de cada tienda (18 nov 2026, pedido de Jhokser): en las zonas donde el documento de delivery y la lista de Servientrega no coinciden (zonas 5 y 6 y los lugares en
+// Confirmación con IA › tendencia histórica de las tiendas (18 nov 2026, pedido de Jhokser; **Kenku se quitó el 24 nov 2026**: etiquetaba INTERIOR lugares que según el documento de delivery y el mapa son CIUDAD, y la IA no debe repetir eso; la IA sigue a los documentos y a lo que etiqueta la mayoría, que hoy son Nuvo y Oferfy): en las zonas donde el documento de delivery y la lista de Servientrega no coinciden (zonas 5 y 6 y los lugares en
 // discusión), la IA etiqueta como lo viene haciendo la tienda. Sale de contar, en los pedidos del 19 oct al 18 nov 2026, qué etiqueta de zona recibió cada lugar. Los números se actualizan cuando se analicen más
 // pedidos históricos. Lógica pura, con su prueba.
 
@@ -28,27 +28,6 @@ export const MIN_CASOS_TENDENCIA = 2;
 const PERIODO = "pedidos del 19 oct al 18 nov 2026";
 
 export const TENDENCIAS_PANAMA: TendenciaTienda[] = [
-  {
-    clave: "kenku",
-    nombre: "Kenku",
-    periodo: PERIODO,
-    nota: "Kenku manda por Servientrega casi todo lo que está fuera de las zonas 1 a 4.",
-    lugares: [
-      { lugar: "24 de Diciembre", ciudad: 0, interior: 5 },
-      { lugar: "Alcalde Díaz", ciudad: 2, interior: 3 },
-      { lugar: "Caimitillo", ciudad: 0, interior: 2 },
-      { lugar: "Gonzalillo", ciudad: 0, interior: 2 },
-      { lugar: "La Siesta", ciudad: 0, interior: 3 },
-      { lugar: "Las Cumbres", ciudad: 1, interior: 9 },
-      { lugar: "Mañanitas", ciudad: 1, interior: 2 },
-      { lugar: "Milla 8", ciudad: 0, interior: 2 },
-      { lugar: "Pacora", ciudad: 1, interior: 1 },
-      { lugar: "Paraíso", ciudad: 3, interior: 0 },
-      { lugar: "Pedregal", ciudad: 3, interior: 1 },
-      { lugar: "Tocumen", ciudad: 2, interior: 18 },
-      { lugar: "Villa Zaita", ciudad: 1, interior: 5 },
-    ],
-  },
   {
     clave: "oferfy",
     nombre: "Oferfy",

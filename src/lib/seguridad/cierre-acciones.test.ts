@@ -42,6 +42,8 @@ const GUARDIAS: { modulo: string; nombres: string[]; clase: Clase }[] = [
   { modulo: "src/app/(app)/crm-dropshippers/bandeja/enviar-medio", nombres: ["chatParaEnviar"], clase: "derivada" },
   // El portal del proveedor (Shen Zhen): la cuenta sale de la sesión, nunca del navegador.
   { modulo: "src/lib/proveedor/sesion", nombres: ["cuentaProveedorActual", "requireProveedor"], clase: "derivada" },
+  // El panel del repartidor (24 nov 2026): la cuenta y su nombre en Despacho ciudad salen de la sesión, nunca del navegador.
+  { modulo: "src/lib/despacho/sesion-repartidor", nombres: ["cuentaRepartidorActual", "requireRepartidor"], clase: "derivada" },
   // Los crons de Vercel: `Authorization: Bearer <CRON_SECRET>` comparado en tiempo constante.
   { modulo: "src/lib/seguridad/cron", nombres: ["esPeticionDeCron"], clase: "cron" },
   { modulo: "src/lib/tareas/ruta", nombres: ["manejarCron"], clase: "derivada" },

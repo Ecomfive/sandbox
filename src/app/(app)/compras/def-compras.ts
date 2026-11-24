@@ -51,6 +51,8 @@ export interface FilaCompra {
   financiamiento: boolean;
   fechaLimite: string | null;
   fechaLlegada: string | null;
+  /** Cuándo llegó la mercancía al puerto (24 nov 2026); distinta de «Fecha de llegada», que es la de destino. */
+  fechaLlegadaPuerto: string | null;
   fechaPago1: string | null;
   fechaPago2: string | null;
   fechaEnvio: string | null;
@@ -101,6 +103,7 @@ export const EMOJI_CAMPO: Record<string, string> = {
   financiamiento: "💰",
   fechaLimite: "⏰",
   fechaLlegada: "📦",
+  fechaLlegadaPuerto: "⚓",
   fechaPago1: "📆",
   fechaPago2: "🗓️",
   fechaEnvio: "🚚",
@@ -188,6 +191,9 @@ export const ETAPAS_COMPRA = [
   { valor: "produccion", etiqueta: "04 - En Producción" },
   { valor: "tracking", etiqueta: "05 - Tracking" },
   { valor: "arribo_mercancia", etiqueta: "06 - Llegada a Puerto" },
+  { valor: "llegada_puerto_lote_1", etiqueta: "06 - Llegada a Puerto - Lote 1" },
+  { valor: "llegada_puerto_lote_2", etiqueta: "06 - Llegada a Puerto - Lote 2" },
+  { valor: "llegada_puerto_lote_3", etiqueta: "06 - Llegada a Puerto - Lote 3" },
   { valor: "en_bodega", etiqueta: "07 - En Bodega" },
   { valor: "completado", etiqueta: "08 - Completado" },
   { valor: "descartado", etiqueta: "Descartado" },
@@ -227,6 +233,9 @@ const ETAPA_COLOR: Record<string, string> = {
   tracking: "#8ed401",
   aviso_logistica: "#FF7FAB",
   arribo_mercancia: "#EA80FC",
+  llegada_puerto_lote_1: "#E040FB",
+  llegada_puerto_lote_2: "#BA68C8",
+  llegada_puerto_lote_3: "#9C27B0",
   en_bodega: "#26C6DA",
   completado: "#1bbc9c",
   descartado: "#e50000",
@@ -454,6 +463,7 @@ export const DEF_COMPRAS: DefTabla<FilaCompra> = {
     { id: "pagadoAProveedor", etiqueta: "Pagado a Proveedor", tipo: "numero", valor: (c) => c.pagadoAProveedor },
     { id: "fechaLimite", etiqueta: "Fecha límite", tipo: "fecha", valor: (c) => c.fechaLimite },
     { id: "fechaLlegada", etiqueta: "Fecha de llegada", tipo: "fecha", valor: (c) => c.fechaLlegada },
+    { id: "fechaLlegadaPuerto", etiqueta: "Fecha llegada a puerto", tipo: "fecha", valor: (c) => c.fechaLlegadaPuerto },
     { id: "fechaPago1", etiqueta: "Fecha de Pago (1)", tipo: "fecha", valor: (c) => c.fechaPago1 },
     { id: "fechaPago2", etiqueta: "Fecha de Pago (2)", tipo: "fecha", valor: (c) => c.fechaPago2 },
     { id: "fechaEnvio", etiqueta: "Fecha de Envío", tipo: "fecha", valor: (c) => c.fechaEnvio },

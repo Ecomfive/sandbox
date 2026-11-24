@@ -261,3 +261,66 @@ test("un anuncio activo que pasa de $12 sin ventas se apaga y se propone sustitu
   assert.match(apagar[0].accion, /Apagar V3 y sustituirlo con anuncios del ángulo «Salud de la próstata» como V5 \(CPA \$4\.44\)/);
   assert.match(apagar[0].detalle, /pasó de \$12/);
 });
+
+import { claveDeHallazgo, sugerenciasDeHallazgos } from "./sugerencias";
+import { seccionDeHallazgo, type Hallazgo } from "./historico";
+
+const hallazgo = (id: string, o: Partial<Hallazgo> = {}): Hallazgo => ({ id, categoria: "entrega", tono: "alerta", titulo: `T ${id}`, detalle: "Detalle.", certeza: "firme", gasto: 500, ...o });
+
+test("la llave de un hallazgo es estable, corta y válida para guardar una decisión", () => {
+  const k = claveDeHallazgo("entrega:Corrector «especial»:mala");
+  assert.equal(k, claveDeHallazgo("entrega:Corrector «especial»:mala"));
+  assert.notEqual(k, claveDeHallazgo("entrega:Otro:mala"));
+  assert.match(k, /^[a-z_]+:[A-Za-z0-9_.:-]{1,80}$/);
+});
+
+test("los hallazgos pasan a sugerencias: atención primero por gasto, entrega o tendencia con gasto alto es urgente y lo bueno es buena noticia", () => {
+  const lista = [
+    hallazgo("a", { gasto: 900 }),
+    hallazgo("b", { categoria: "no_funciona", gasto: 700 }),
+    hallazgo("c", { categoria: "tendencia", gasto: 100 }),
+    hallazgo("d", { tono: "bueno", categoria: "funciona", gasto: 400, motivo: "x" }),
+    ...Array.from({ length: 12 }, (_, i) => hallazgo(`z${i}`, { gasto: 10 + i })),
+  ];
+  const s = sugerenciasDeHallazgos(lista);
+  // 8 de atención + 1 buena.
+  assert.equal(s.length, 9);
+  assert.equal(s[0].titulo, "T a");
+  assert.equal(s[0].severidad, "alta");
+  assert.equal(s.find((x) => x.titulo === "T b")!.severidad, "media", "lo que no funcionó es importante, no urgente");
+  assert.equal(s.find((x) => x.titulo === "T c")!.severidad, "media", "poco gasto");
+  const buena = s.find((x) => x.titulo === "T d")!;
+  assert.equal(buena.positiva, true);
+  assert.equal(buena.severidad, "info");
+  assert.match(buena.detalle, /Por qué: x/);
+  assert.ok(s.every((x) => x.tipo === "hallazgo" && x.clave.startsWith("hallazgo:")));
+});
+
+test("al Resumen llegan primero los hallazgos firmes: un probable con más gasto va después y la poca data nunca llega", () => {
+  const lista = [
+    hallazgo("probable-grande", { certeza: "probable", gasto: 5000 }),
+    hallazgo("firme-chico", { certeza: "firme", gasto: 50 }),
+    hallazgo("firme-grande", { certeza: "firme", gasto: 800 }),
+    hallazgo("poca", { certeza: "poca", gasto: 9000 }),
+    hallazgo("buena-poca", { tono: "bueno", categoria: "funciona", certeza: "poca", gasto: 900 }),
+  ];
+  const s = sugerenciasDeHallazgos(lista).map((x) => x.titulo);
+  assert.deepEqual(s, ["T firme-grande", "T firme-chico", "T probable-grande"]);
+});
+
+test("cada hallazgo se reparte en la pantalla donde se explica mejor, según su llave", () => {
+  const seccion = (id: string) => seccionDeHallazgo({ id });
+  assert.equal(seccion("entrega:abc:mala"), "productos");
+  assert.equal(seccion("tendencia:Producto:Corrector:mes"), "productos");
+  assert.equal(seccion("tendencia:Campaña:OF | X:semana"), "campanas");
+  assert.equal(seccion("tendencia:Ángulo:Energía:mes"), "videos");
+  assert.equal(seccion("tendencia:Todo:Todo:mes"), "general");
+  assert.equal(seccion("banda:ctr:menos de 1 %:no"), "campanas");
+  assert.equal(seccion("angulo:Energía:si"), "videos");
+  assert.equal(seccion("angulo@suplemento:Energía:si"), "videos");
+  assert.equal(seccion("gancho:Pregunta:no"), "videos");
+  assert.equal(seccion("cta:Compra ya:si"), "videos");
+  assert.equal(seccion("estructura:CBO:no"), "campanas");
+  assert.equal(seccion("puja:Sin tope:si"), "campanas");
+  assert.equal(seccion("otra-cosa"), "general");
+});

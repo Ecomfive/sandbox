@@ -135,3 +135,52 @@ export async function guardarVentasDrop(
   if (sinProducto.size) log(`${sinProducto.size} productos de Drop con ventas no están vinculados a un producto en Gestión de IDs Drop: el cuadro no los cuenta.`);
   return { pedidos: pedidos.length, desde, hasta, filas: filas.length, sinProducto: sinProducto.size };
 }
+
+/** Las ventas netas (salidas − devueltas) de una publicación en los últimos 30 días y en los 30 anteriores. */
+export interface Ventas30Drop {
+  netas30: number;
+  netasAntes: number;
+}
+
+const restarDias = (dia: string, n: number) => new Date(Date.parse(`${dia}T12:00:00Z`) - n * 86_400_000).toISOString().slice(0, 10);
+
+/**
+ * Las ventas de cada publicación de Drop (por su id de Drop) para las tarjetas de Gestión de IDs Drop (24 nov 2026, pedido de Hernán): los últimos 30 días
+ * hasta `hoy` (día de Costa Rica) y los 30 anteriores. Una publicación sin filas no está: quien llama la toma como 0 si la lectura de ventas existe.
+ */
+export function ventas30PorPublicacion(filas: VentaDiaDrop[], hoy: string): Map<string, Ventas30Drop> {
+  const desde = restarDias(hoy, 29);
+  const desdeAntes = restarDias(hoy, 59);
+  const fuera = new Map<string, Ventas30Drop>();
+  for (const f of filas) {
+    if (f.dia > hoy || f.dia < desdeAntes) continue;
+    const v = fuera.get(f.producto_id) ?? { netas30: 0, netasAntes: 0 };
+    const netas = (Number(f.salidas) || 0) - (Number(f.devueltas) || 0);
+    if (f.dia >= desde) v.netas30 += netas;
+    else v.netasAntes += netas;
+    fuera.set(f.producto_id, v);
+  }
+  return fuera;
+}
+
+/** «Ventas en caída» (la misma regla de Dropi): vendió al menos `min_ventas_antes` en los 30 anteriores y en estos 30 menos que `caida_ventas` de aquello. */
+export function ventasEnCaidaDrop(v: Ventas30Drop | null, reglas: { caida_ventas: number; min_ventas_antes: number }): boolean {
+  return !!v && v.netasAntes >= reglas.min_ventas_antes && v.netas30 < v.netasAntes * reglas.caida_ventas;
+}
+
+/**
+ * «Verificar dropshipper» (la misma regla de Dropi, «privatizado a un dropshipper y sin ventas en 30 días»): en Drop, un producto con exclusivo activo para
+ * algún cliente, que no es nuevo (creado hace `dias_nuevo` días o más) y sin ventas netas en 30 días. Sin lectura de ventas, no se juzga.
+ */
+export function verificarDropshipperDrop(
+  p: { clientesExclusivos: string[]; creadoEnDrop: string | null; ventas: Ventas30Drop | null },
+  hoy: string,
+  reglas: { dias_nuevo: number },
+): boolean {
+  if (!p.clientesExclusivos.length || !p.ventas) return false;
+  if (p.creadoEnDrop) {
+    const dias = (Date.parse(`${hoy}T12:00:00Z`) - Date.parse(p.creadoEnDrop)) / 86_400_000;
+    if (Number.isFinite(dias) && dias < reglas.dias_nuevo) return false;
+  }
+  return p.ventas.netas30 <= 0;
+}

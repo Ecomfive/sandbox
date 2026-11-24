@@ -16,7 +16,10 @@ test("efectoEtiquetas: confirmar, cancelar y dejar en gestión", () => {
   assert.deepEqual(efectoEtiquetas(["ANULADO VERIFICADO"]), { confirma: false, cancela: true, gestion: false });
   assert.deepEqual(efectoEtiquetas(["Cancelado"]), { confirma: false, cancela: true, gestion: false });
   assert.deepEqual(efectoEtiquetas(["Pendiente"]), { confirma: false, cancela: false, gestion: true });
-  assert.deepEqual(efectoEtiquetas(["CIUDAD"]), { confirma: false, cancela: false, gestion: false });
+  // Manual ATC (24 nov 2026): la zona confirma, el motivo MOT-… anula (aunque se ponga con la zona) y «novedad» deja en gestión.
+  assert.deepEqual(efectoEtiquetas(["CIUDAD"]), { confirma: true, cancela: false, gestion: false });
+  assert.deepEqual(efectoEtiquetas(["CIUDAD", "MOT-CLIENTE-NO-CONTESTA"]), { confirma: false, cancela: true, gestion: false });
+  assert.deepEqual(efectoEtiquetas(["novedad"]), { confirma: false, cancela: false, gestion: true });
 });
 
 test("cambioDeTexto lee los eventos viejos (solo texto)", () => {

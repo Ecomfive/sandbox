@@ -12,8 +12,8 @@ export type ProveedorIA = "openai" | "anthropic";
 
 const claudeConectado = () => !!process.env.ANTHROPIC_API_KEY?.trim();
 
-/** Para qué se pide la IA: «crm» prefiere Claude; «general», la de siempre. */
-export type UsoIA = "general" | "crm";
+/** Para qué se pide la IA: «crm» prefiere Claude (esfuerzo bajo); «analisis» (la interpretación y el chat de Anuncios Meta) razona con esfuerzo medio; «general», la de siempre. */
+export type UsoIA = "general" | "crm" | "analisis";
 
 /** Qué IA de texto se usa, o null si no hay ninguna clave. */
 export function proveedorTexto(uso: UsoIA = "general"): ProveedorIA | null {
@@ -51,7 +51,7 @@ async function pedirClaude(entrada: EntradaTexto, buscar: boolean, consumo: Cont
       method: "POST",
       headers: { "content-type": "application/json", "x-api-key": clave, "anthropic-version": "2023-06-01" },
       // El CRM clasifica y resume: con esfuerzo bajo alcanza y gasta menos.
-      body: JSON.stringify(cuerpoMensaje(modelo, entrada, buscar, uso === "crm" ? "low" : undefined)),
+      body: JSON.stringify(cuerpoMensaje(modelo, entrada, buscar, uso === "crm" ? "low" : uso === "analisis" ? "medium" : undefined)),
       signal: AbortSignal.timeout(170_000),
       cache: "no-store",
     });
@@ -88,7 +88,7 @@ export function proveedoresConectados(): ProveedorIA[] {
   return [...(openaiConectado() ? (["openai"] as const) : []), ...(claudeConectado() ? (["anthropic"] as const) : [])];
 }
 
-/** Pide un texto a una IA en particular (sin búsqueda en internet). Claude con esfuerzo bajo: es clasificar y resumir. Nunca lanza. */
-export async function pedirIAEn(proveedor: ProveedorIA, entrada: EntradaTexto, consumo?: ContextoConsumo): Promise<RespuestaTexto> {
-  return proveedor === "anthropic" ? pedirClaude(entrada, false, consumo, "crm") : pedirTexto(entrada, false, consumo);
+/** Pide un texto a una IA en particular (sin búsqueda en internet). Por defecto Claude con esfuerzo bajo (clasificar y resumir); con `uso` «analisis», esfuerzo medio. Nunca lanza. */
+export async function pedirIAEn(proveedor: ProveedorIA, entrada: EntradaTexto, consumo?: ContextoConsumo, uso: UsoIA = "crm"): Promise<RespuestaTexto> {
+  return proveedor === "anthropic" ? pedirClaude(entrada, false, consumo, uso) : pedirTexto(entrada, false, consumo);
 }

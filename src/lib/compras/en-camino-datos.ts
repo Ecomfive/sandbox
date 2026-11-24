@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { ETAPAS_LLEGADA_PUERTO } from "@/lib/compras/etapas-puerto";
 import { dentroDelAlcance, restriccionesDe } from "@/app/(app)/compras/permisos-compras";
 import type { UsuarioActual } from "@/lib/auth";
 import { puedeVerPais } from "@/lib/paises-permitidos";
@@ -77,7 +78,7 @@ export async function cargarEnCaminoDatos(supabase: SupabaseClient, usuario: Usu
     .is("fecha_llegada", null)
     .not("etapa", "in", "(completado,descartado)")
     // Ya salió, o ya está en producción, tracking o arribo (pedida aunque todavía no tenga fecha de envío); y las que se están cotizando.
-    .or(`fecha_envio.not.is.null,etapa.in.(produccion,tracking,arribo_mercancia,${ETAPAS_COTIZANDO.join(",")})`);
+    .or(`fecha_envio.not.is.null,etapa.in.(produccion,tracking,${ETAPAS_LLEGADA_PUERTO.join(",")},${ETAPAS_COTIZANDO.join(",")})`);
   if (paisId) consulta = consulta.eq("pais_id", paisId);
   const { data: compras, error } = await consulta.limit(5000);
   if (error || !compras?.length) return vacio;

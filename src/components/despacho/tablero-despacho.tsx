@@ -9,6 +9,8 @@ import { colorDe, diaTexto, ETIQUETAS, GRUPOS_DEVOLUCION, grupoPorAsesores, suma
 import type { Clase, FilaTablero } from "@/lib/despacho/datos";
 import { FechaHora } from "@/components/ui/fecha-hora";
 import { VisorArchivos } from "./visor-archivos";
+import { MenuDesplegable, TituloGrupoMenu, claseOpcionMenu } from "@/components/ui/menu-desplegable";
+import { AgruparIcon, BuscarIcon, FiltroIcon, PersonaIcon } from "@/lib/nav-icons";
 
 type Agrupar = "dia" | "courier" | "tienda";
 type CampoNumero = "por_cobrar" | "cobrado" | "coste_envio";
@@ -30,6 +32,35 @@ const plata = (n: number) => `$${n.toLocaleString("es-PA", { minimumFractionDigi
 const normal = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 /** Los viajes que se hacen después de la entrega original (en Monday van en «Forma de pago»): cada uno es otro pago al mensajero. */
 const TIPOS_VIAJE = ["CAMBIO", "RETIRO", "COMPLEMENTO"];
+// La barra como la de Monday (24 nov 2026, pedido de despacho: «tantos botones pierden a la gente nueva»): Buscar, Repartidor, Filtrar y Agrupar, cada uno
+// con su menú; lo que se está filtrando sale abajo en etiquetas que se quitan con ✕.
+const ESTADOS_FILTRO = [
+  ["ENTREGADO", "Entregados"],
+  ["FALLIDO", "Fallidos"],
+  ["RECOLECTADO", "Recolectados"],
+  ["POSPUESTO", "Pospuestos"],
+  ["DESINTEGRADO", "Desintegrados"],
+  ["SIN", "Sin estado"],
+] as const;
+const CAMBIOS_FILTRO = [
+  ["TODOS", "Cambios, retiros y complementos"],
+  ["CAMBIO", "Cambios"],
+  ["RETIRO", "Retiros"],
+  ["COMPLEMENTO", "Complementos"],
+] as const;
+const AGRUPAR_OPCIONES = [
+  ["dia", "Día"],
+  ["courier", "Repartidor"],
+  ["tienda", "Tienda"],
+] as const;
+const botonBarra = (activo: boolean) =>
+  `inline-flex min-h-9 items-center gap-1.5 rounded-md border px-3 text-[13px] font-medium whitespace-nowrap ${activo ? "border-primario bg-primario-suave text-primario" : "border-border bg-card text-foreground-soft hover:bg-muted"}`;
+const Marca = ({ activa, radio = false }: { activa: boolean; radio?: boolean }) => (
+  <span aria-hidden="true" className={`flex h-4 w-4 shrink-0 items-center justify-center border text-[10px] font-bold ${radio ? "rounded-full" : "rounded"} ${activa ? "border-primario bg-primario text-white" : "border-border-control"}`}>
+    {activa ? (radio ? "●" : "✓") : ""}
+  </span>
+);
+
 const COLOR_DIA = ["#8a35c9", "#037f4c", "#007eb5", "#ff6d3b", "#9d50dd", "#fdab3d", "#df2f4a"];
 
 const th = "sticky top-0 z-[1] border-b border-border bg-muted px-2 py-2 text-left text-[11px] font-semibold tracking-[0.04em] whitespace-nowrap text-muted-foreground uppercase";
@@ -46,11 +77,14 @@ export function TableroDespacho({
   puedeEscribir: puedeArchivar,
   hoy,
   archivados = false,
+  mostrarHoy = true,
 }: {
   clase: Clase;
   filas: FilaTablero[];
   puedeEscribir: boolean;
   hoy: string;
+  /** Si el grupo de hoy sale aunque esté vacío (no, cuando se mira un día o un rango del pasado para un cierre). */
+  mostrarHoy?: boolean;
   /** La vista de archivados: nada se edita, solo se restaura desde el panel. */
   archivados?: boolean;
 }) {
@@ -67,7 +101,9 @@ export function TableroDespacho({
   }
   const esCiudad = clase === "ciudad";
   const [vista, setVista] = useState<string>(esCiudad ? "TODOS" : "KENKU");
-  const [filtro, setFiltro] = useState("");
+  // Varios estados a la vez (24 nov 2026, pedido de Soporte para los cierres de pago a los mensajeros: «Entregados» y «Fallidos» juntos); vacío = todos.
+  const [estados, setEstados] = useState<string[]>([]);
+  const alternarEstado = (id: string) => setEstados((es) => (id === "" ? [] : es.includes(id) ? es.filter((x) => x !== id) : [...es, id]));
   const [tienda, setTienda] = useState("");
   const [tipo, setTipo] = useState("");
   const [busqueda, setBusqueda] = useState("");
@@ -126,19 +162,19 @@ export function TableroDespacho({
     return filas.filter(
       (f) =>
         (esCiudad ? vista === "TODOS" || f.courier === vista : f.tienda === vista) &&
-        (!filtro || (filtro === "SIN" ? !f.estado : f.estado === filtro)) &&
+        (!estados.length || estados.some((e) => (e === "SIN" ? !f.estado : f.estado === e))) &&
         (!tienda || f.tienda === tienda) &&
         (!tipo || (tipo === "TODOS" ? TIPOS_VIAJE.includes(f.formaPago ?? "") : f.formaPago === tipo)) &&
         (!q || normal(`${f.numero ?? ""} ${f.comentario ?? ""} ${f.obsAsesores ?? ""}`).includes(q)),
     );
-  }, [filas, vista, filtro, tienda, tipo, busqueda, esCiudad]);
+  }, [filas, vista, estados, tienda, tipo, busqueda, esCiudad]);
 
   const grupos = useMemo(() => {
     const modo: Agrupar | "grupo" = esCiudad ? agrupar : "grupo";
     const claveDe = (f: FilaTablero) => (modo === "grupo" ? f.grupo : modo === "dia" ? (f.dia ?? "Sin día") : ((modo === "courier" ? f.courier : f.tienda) ?? "Sin asignar"));
     let claves: string[];
     if (modo === "grupo") claves = GRUPOS_DEVOLUCION.map((g) => g.nombre);
-    else if (modo === "dia") claves = [...new Set([hoy, ...visibles.map(claveDe)])].sort().reverse();
+    else if (modo === "dia") claves = [...new Set([...(mostrarHoy ? [hoy] : []), ...visibles.map(claveDe)])].sort().reverse();
     else claves = [...new Set(visibles.map(claveDe))].sort();
     return claves.map((k, i) => {
       const lista = visibles.filter((f) => claveDe(f) === k).sort((a, b) => a.posicion - b.posicion || (a.numero ?? "").localeCompare(b.numero ?? ""));
@@ -146,7 +182,7 @@ export function TableroDespacho({
         modo === "grupo" ? (GRUPOS_DEVOLUCION.find((g) => g.nombre === k)?.color ?? "#8a35c9") : modo === "dia" ? COLOR_DIA[i % COLOR_DIA.length] : (colorDe(modo, k) ?? "#9ca3af");
       return { clave: k, titulo: modo === "dia" ? `${diaTexto(k === "Sin día" ? null : k)}${k === hoy ? " · hoy" : ""}` : k, color, filas: lista, sumas: sumasGrupo(lista) };
     });
-  }, [visibles, agrupar, esCiudad, hoy]);
+  }, [visibles, agrupar, esCiudad, hoy, mostrarHoy]);
 
   const soltar = (destino: string) => (e: DragEvent) => {
     e.preventDefault();
@@ -167,10 +203,29 @@ export function TableroDespacho({
       router.refresh();
     });
 
-  const total = visibles.reduce((t, f) => t + (f.porCobrar ?? 0), 0);
+  // El resumen de lo que se ve con todos los filtros juntos: para el cierre y el pago de cada mensajero.
+  const resumen = sumasGrupo(visibles);
+  const fallidos = visibles.filter((f) => f.estado === "FALLIDO").length;
+  const hayFiltros = estados.length > 0 || !!tienda || !!tipo || !!busqueda || (esCiudad && vista !== "TODOS");
+  const limpiar = () => {
+    setEstados([]);
+    setTienda("");
+    setTipo("");
+    setBusqueda("");
+    if (esCiudad) setVista("TODOS");
+  };
+  const cuantosFiltros = estados.length + (tienda ? 1 : 0) + (tipo ? 1 : 0);
+  // Lo que se está filtrando, en etiquetas que se quitan con ✕ (como los filtros de Monday).
+  const activos: { clave: string; texto: string; quitar: () => void }[] = [
+    ...(esCiudad && vista !== "TODOS" ? [{ clave: "vista", texto: `Repartidor: ${vista}`, quitar: () => setVista("TODOS") }] : []),
+    ...(busqueda.trim() ? [{ clave: "busqueda", texto: `Buscar: «${busqueda.trim()}»`, quitar: () => setBusqueda("") }] : []),
+    ...(estados.length
+      ? [{ clave: "estados", texto: `Estado: ${estados.map((e) => ESTADOS_FILTRO.find(([id]) => id === e)?.[1] ?? e).join(", ")}`, quitar: () => setEstados([]) }]
+      : []),
+    ...(tienda ? [{ clave: "tienda", texto: `Tienda: ${tienda}`, quitar: () => setTienda("") }] : []),
+    ...(tipo ? [{ clave: "tipo", texto: CAMBIOS_FILTRO.find(([id]) => id === tipo)?.[1] ?? tipo, quitar: () => setTipo("") }] : []),
+  ];
   const filaSel = filas.find((f) => f.itemId === sel) ?? null;
-  const chip = (activo: boolean) =>
-    `min-h-9 rounded-full border px-3.5 text-[13px] font-medium whitespace-nowrap ${anilloFoco} ${activo ? "border-primario bg-primario-suave text-primario" : "border-border bg-card text-foreground-soft hover:bg-muted"}`;
 
   const pill = (f: FilaTablero, col: Columna) => {
     const valor = f[VALOR_ETIQUETA[col]] as string | null;
@@ -231,67 +286,166 @@ export function TableroDespacho({
 
   return (
     <div className="flex flex-col gap-4">
-      <nav aria-label={esCiudad ? "Tableros por repartidor" : "Tienda"} className="flex flex-wrap gap-1.5">
-        {vistas.map((v) => (
-          <button key={v} type="button" aria-pressed={vista === v} onClick={() => setVista(v)} className={chip(vista === v)}>
-            {v === "TODOS" ? "Consolidado (todos)" : v}
-          </button>
-        ))}
-      </nav>
-
       <div className="flex flex-wrap items-center gap-2">
         {puedeEscribir && (
           <button type="button" onClick={agregar} className={`boton-neon min-h-9 rounded-md px-3.5 text-[13px] font-medium text-white ${anilloFoco}`}>
             + {esCiudad ? "Agregar pedido" : "Agregar devolución"}
           </button>
         )}
-        <label className="flex min-w-[14rem] items-center">
+        <label className="relative flex min-w-[12rem] flex-1 items-center sm:max-w-xs">
           <span className="sr-only">Buscar</span>
-          <input type="search" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Buscar pedido o comentario" className={`${fieldClass} w-full`} />
+          <BuscarIcon aria-hidden="true" className="pointer-events-none absolute left-2.5 h-4 w-4 text-muted-foreground" />
+          <input type="search" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Buscar pedido o comentario" className={`${fieldClass} w-full pl-8`} />
         </label>
-        <span className="ml-1 text-xs text-muted-foreground">Estado:</span>
-        {[["", "Todos"], ["ENTREGADO", "Entregados"], ["FALLIDO", "Fallidos"], ["POSPUESTO", "Pospuestos"], ["SIN", "Sin estado"]].map(([id, nombre]) => (
-          <button key={id} type="button" aria-pressed={filtro === id} onClick={() => setFiltro(id)} className={chip(filtro === id)}>
-            {nombre}
-          </button>
-        ))}
-        {esCiudad && (
-          <>
-            <span className="ml-1 text-xs text-muted-foreground">Agrupar por:</span>
-            {(
-              [
-                ["dia", "Día"],
-                ["courier", "Repartidor"],
-                ["tienda", "Tienda"],
-              ] as const
-            ).map(([id, nombre]) => (
-              <button key={id} type="button" aria-pressed={agrupar === id} onClick={() => setAgrupar(id)} className={chip(agrupar === id)}>
-                {nombre}
+        <MenuDesplegable
+          etiqueta={esCiudad ? "Repartidor" : "Tienda"}
+          alineacion="izquierda"
+          claseMenu="w-64 max-h-[60vh] overflow-y-auto"
+          claseBoton={botonBarra(esCiudad && vista !== "TODOS")}
+          contenidoBoton={
+            <>
+              <PersonaIcon aria-hidden="true" className="h-4 w-4" />
+              {esCiudad ? (vista === "TODOS" ? "Repartidor" : vista) : `Tienda: ${vista}`}
+              <span aria-hidden="true">▾</span>
+            </>
+          }
+        >
+          {(cerrar) =>
+            vistas.map((v) => (
+              <button
+                key={v}
+                type="button"
+                role="menuitemradio"
+                aria-checked={vista === v}
+                onClick={() => {
+                  setVista(v);
+                  cerrar(true);
+                }}
+                className={claseOpcionMenu}
+              >
+                <Marca activa={vista === v} radio />
+                {v === "TODOS" ? "Todos (consolidado)" : v}
               </button>
-            ))}
-          </>
+            ))
+          }
+        </MenuDesplegable>
+        <MenuDesplegable
+          etiqueta="Filtrar"
+          alineacion="izquierda"
+          claseMenu="w-80 max-h-[70vh] overflow-y-auto"
+          claseBoton={botonBarra(cuantosFiltros > 0)}
+          contenidoBoton={
+            <>
+              <FiltroIcon aria-hidden="true" className="h-4 w-4" />
+              Filtrar{cuantosFiltros ? ` · ${cuantosFiltros}` : ""}
+              <span aria-hidden="true">▾</span>
+            </>
+          }
+        >
+          {() => (
+            <>
+              <TituloGrupoMenu>Estado (uno o varios)</TituloGrupoMenu>
+              {ESTADOS_FILTRO.map(([id, nombre]) => (
+                <button key={id} type="button" role="menuitemcheckbox" aria-checked={estados.includes(id)} onClick={() => alternarEstado(id)} className={claseOpcionMenu}>
+                  <Marca activa={estados.includes(id)} />
+                  {nombre}
+                </button>
+              ))}
+              {esCiudad && (
+                <>
+                  <TituloGrupoMenu>Tienda</TituloGrupoMenu>
+                  {["", ...tiendas].map((t) => (
+                    <button key={t || "todas"} type="button" role="menuitemradio" aria-checked={tienda === t} onClick={() => setTienda(t)} className={claseOpcionMenu}>
+                      <Marca activa={tienda === t} radio />
+                      {t || "Todas"}
+                    </button>
+                  ))}
+                  <TituloGrupoMenu>Cambios, retiros y complementos</TituloGrupoMenu>
+                  {[["", "Todos los pedidos"] as const, ...CAMBIOS_FILTRO].map(([id, nombre]) => (
+                    <button key={id || "todos"} type="button" role="menuitemradio" aria-checked={tipo === id} onClick={() => setTipo(id)} className={claseOpcionMenu}>
+                      <Marca activa={tipo === id} radio />
+                      {nombre}
+                    </button>
+                  ))}
+                </>
+              )}
+            </>
+          )}
+        </MenuDesplegable>
+        {esCiudad && (
+          <MenuDesplegable
+            etiqueta="Agrupar por"
+            alineacion="izquierda"
+            claseMenu="w-52"
+            claseBoton={botonBarra(agrupar !== "dia")}
+            contenidoBoton={
+              <>
+                <AgruparIcon aria-hidden="true" className="h-4 w-4" />
+                Agrupar: {AGRUPAR_OPCIONES.find(([id]) => id === agrupar)?.[1]}
+                <span aria-hidden="true">▾</span>
+              </>
+            }
+          >
+            {(cerrar) =>
+              AGRUPAR_OPCIONES.map(([id, nombre]) => (
+                <button
+                  key={id}
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={agrupar === id}
+                  onClick={() => {
+                    setAgrupar(id);
+                    cerrar(true);
+                  }}
+                  className={claseOpcionMenu}
+                >
+                  <Marca activa={agrupar === id} radio />
+                  {nombre}
+                </button>
+              ))
+            }
+          </MenuDesplegable>
         )}
-        <span className="ml-auto text-[13px] text-muted-foreground" aria-live="polite">
-          {visibles.length} pedidos · {plata(total)} por cobrar · {visibles.filter((f) => f.estado === "ENTREGADO").length} entregados
-        </span>
+        {hayFiltros && (
+          <button type="button" onClick={limpiar} className={`min-h-9 rounded-md px-2.5 text-[13px] font-medium text-primario underline-offset-2 hover:underline ${anilloFoco}`}>
+            Limpiar filtros
+          </button>
+        )}
       </div>
 
-      {esCiudad && (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs text-muted-foreground">Tienda:</span>
-          {["", ...tiendas].map((t) => (
-            <button key={t || "todas"} type="button" aria-pressed={tienda === t} onClick={() => setTienda(t)} className={chip(tienda === t)}>
-              {t || "Todas"}
-            </button>
+      {activos.length > 0 && (
+        <ul aria-label="Filtros puestos" className="m-0 -mt-2 flex list-none flex-wrap gap-1.5 p-0">
+          {activos.map((a) => (
+            <li key={a.clave}>
+              <button type="button" onClick={a.quitar} aria-label={`Quitar el filtro ${a.texto}`} className={`inline-flex min-h-8 items-center gap-1.5 rounded-full border border-primario/40 bg-primario-suave px-3 text-xs font-medium text-primario hover:bg-primario/15 ${anilloFoco}`}>
+                {a.texto}
+                <span aria-hidden="true">✕</span>
+              </button>
+            </li>
           ))}
-          <span className="ml-1 text-xs text-muted-foreground">Cambios:</span>
-          {[["", "Todos los pedidos"], ["TODOS", "Cambios, retiros y complementos"], ["CAMBIO", "Cambios"], ["RETIRO", "Retiros"], ["COMPLEMENTO", "Complementos"]].map(([id, nombre]) => (
-            <button key={id || "todos"} type="button" aria-pressed={tipo === id} onClick={() => setTipo(id)} className={chip(tipo === id)}>
-              {nombre}
-            </button>
-          ))}
-        </div>
+        </ul>
       )}
+
+      <p className="m-0 flex flex-wrap gap-x-4 gap-y-1 rounded-lg border border-primario/30 bg-primario-suave px-3 py-2 text-[13px]" aria-live="polite">
+        <span>
+          <b>{resumen.pedidos}</b> pedidos
+        </span>
+        <span>
+          <b>{resumen.entregados}</b> entregados
+        </span>
+        <span>
+          <b>{fallidos}</b> fallidos
+        </span>
+        <span>
+          <b>{plata(resumen.cobrado)}</b> cobrado
+        </span>
+        <span>
+          <b>{plata(resumen.porCobrar)}</b> por cobrar
+        </span>
+        <span>
+          <b>{plata(resumen.costeEnvio)}</b> coste de envío
+        </span>
+      </p>
 
       <div className="grid grid-cols-1 items-start gap-4 min-[1300px]:grid-cols-[minmax(0,1fr)_auto]">
         <div className="flex min-w-0 flex-col gap-5">
@@ -347,6 +501,12 @@ export function TableroDespacho({
                                 <div className="min-w-0 flex-1 font-semibold">
                                   {celda(f, "numero", "Número de pedido")}
                                 </div>
+                                {/* Marcado por el repartidor desde su panel (24 nov 2026): se ve aquí al instante. */}
+                                {f.desdePanel && (
+                                  <span title={f.marcadoEn ? `Marcado desde su panel el ${new Date(f.marcadoEn).toLocaleString("es-PA", { timeZone: "America/Panama", dateStyle: "short", timeStyle: "short" })}` : "Marcado desde su panel"} className="shrink-0 rounded-full bg-primario-suave px-1.5 py-0.5 text-[10px] font-semibold whitespace-nowrap text-[#5b2386]">
+                                    desde su panel
+                                  </span>
+                                )}
                                 <button type="button" onClick={() => setSel(f.itemId)} className={`rounded px-1.5 py-1 text-xs font-medium text-primario hover:bg-primario-suave ${anilloFoco}`} aria-label={`Abrir ${f.numero ?? "la fila"}`}>
                                   Abrir
                                 </button>

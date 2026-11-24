@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { despachoDeItem, faltaCompletar, sugerirMapeo } from "../monday/columnas";
-import { colorDe, diaIso, diaTexto, etiquetaLimpia, grupoDevolucion, grupoPorAsesores, sinDuplicados, sumasGrupo, textoSobre, type FilaDespacho } from "./etiquetas";
+import { colorDe, diaIso, diaTexto, etiquetaLimpia, grupoDevolucion, grupoPorAsesores, rangoElegido, sinDuplicados, sumasGrupo, textoSobre, type FilaDespacho } from "./etiquetas";
 
 test("etiquetas: el nombre limpio corrige los errores de Monday y conserva lo desconocido", () => {
   assert.equal(etiquetaLimpia("courier", "DEIMIBLE CIUDAD"), "DEIMIBEL CIUDAD");
@@ -78,4 +78,13 @@ test("Monday: las columnas nuevas se reconocen por el título y se leen del íte
   assert.equal(d.turno, "1ER. TURNO");
   assert.equal(d.comentario, "Llamar antes");
   assert.equal(d.comprobantes.length, 2);
+});
+
+test("día o rango elegido para los cierres de los mensajeros", () => {
+  assert.deepEqual(rangoElegido("2026-11-20", undefined), { desde: "2026-11-20", hasta: "2026-11-20" });
+  assert.deepEqual(rangoElegido("2026-11-20", "2026-11-16"), { desde: "2026-11-16", hasta: "2026-11-20" });
+  assert.deepEqual(rangoElegido("2026-09-01", "2026-12-31"), { desde: "2026-09-01", hasta: "2026-11-01" });
+  assert.equal(rangoElegido("20/11/2026", "2026-11-21"), null);
+  assert.equal(rangoElegido(undefined, "2026-11-21"), null);
+  assert.deepEqual(rangoElegido("2026-11-20", "no"), { desde: "2026-11-20", hasta: "2026-11-20" });
 });

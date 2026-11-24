@@ -2,7 +2,7 @@
 // etiquetas con `tagsAdd`/`tagsRemove` (solo tocan las etiquetas nombradas: no pisa las que otra persona o una app pusieron mientras tanto) y devuelve
 // cómo quedaron en Shopify. Necesita que la tienda haya aprobado `write_orders` en su app; si no, lanza el error en palabras del equipo. Solo servidor.
 
-import { accesoDeApp, olvidarAcceso, puedeEscribirPedidos, type AppTienda } from "./shopify-app";
+import { accesoDeApp, olvidarAcceso, puedeEscribirPedidos, puedeManejarEspera, type AppTienda } from "./shopify-app";
 
 const VERSION_API = "2026-07";
 
@@ -83,4 +83,195 @@ export async function cambiarEtiquetasEnShopify(app: AppTienda, numero: string, 
     }
   }
   return { etiquetas: tags, error: null };
+}
+
+// ── Manual ATC (24 nov 2026): anular el pedido y levantar la espera al confirmar.
+
+/**
+ * Anula el pedido en Shopify (como «Cancelar pedido» en el admin): sin avisar al cliente, sin reembolso (es contra entrega) y devolviendo el stock. Si el
+ * pedido ya estaba anulado, no hace nada. El motivo va en la nota interna de la anulación y como etiqueta (la pone quien llama).
+ */
+export async function anularEnShopify(app: AppTienda, numero: string, motivo: string): Promise<void> {
+  const token = await tokenConEscritura(app);
+  const pedido = await buscarPedido(app, token, numero);
+  const estado = await graphql<{ order: { cancelledAt: string | null } | null }>(app, token, "query($id: ID!) { order(id: $id) { cancelledAt } }", { id: pedido.id });
+  if (estado.order?.cancelledAt) return;
+  type Res = { orderCancel: { orderCancelUserErrors: { message: string }[] } | null };
+  const variables = { id: pedido.id, nota: `Anulado desde el sistema: ${motivo}`.slice(0, 250) };
+  // Shopify cambió cómo se dice «sin reembolso» (`refund` → `refundMethod`): se prueba una forma y, si no la reconoce, la otra.
+  const formas = [
+    `mutation($id: ID!, $nota: String) { orderCancel(orderId: $id, reason: CUSTOMER, refund: false, restock: true, notifyCustomer: false, staffNote: $nota) { orderCancelUserErrors { message } } }`,
+    `mutation($id: ID!, $nota: String) { orderCancel(orderId: $id, reason: CUSTOMER, refundMethod: { originalPaymentMethodsRefund: false }, restock: true, notifyCustomer: false, staffNote: $nota) { orderCancelUserErrors { message } } }`,
+  ];
+  let ultimo: unknown = null;
+  for (const forma of formas) {
+    try {
+      const d = await graphql<Res>(app, token, forma, variables);
+      const errores = d.orderCancel?.orderCancelUserErrors ?? [];
+      if (errores.length) throw new Error(`Shopify no anuló el pedido: ${errores[0].message}`);
+      return;
+    } catch (e) {
+      ultimo = e;
+      if (!(e instanceof Error) || !/refund/i.test(e.message) || /no anuló/.test(e.message)) throw e;
+    }
+  }
+  throw ultimo instanceof Error ? ultimo : new Error("Shopify no anuló el pedido.");
+}
+
+/**
+ * Levanta la espera del pedido (los envíos «En espera» pasan a «No preparado» y despacho ya los puede preparar). Necesita el permiso
+ * `write_merchant_managed_fulfillment_orders`; sin él devuelve false y no hace nada (la espera se levanta en Shopify). Sin espera, true.
+ */
+export async function liberarEsperaEnShopify(app: AppTienda, numero: string): Promise<boolean> {
+  const acceso = await accesoDeApp(app);
+  if (!puedeManejarEspera(acceso.scope)) return false;
+  const pedido = await buscarPedido(app, acceso.token, numero);
+  const d = await graphql<{ order: { fulfillmentOrders: { nodes: { id: string; status: string }[] } } | null }>(
+    app,
+    acceso.token,
+    "query($id: ID!) { order(id: $id) { fulfillmentOrders(first: 10) { nodes { id status } } } }",
+    { id: pedido.id },
+  );
+  for (const fo of (d.order?.fulfillmentOrders.nodes ?? []).filter((x) => x.status === "ON_HOLD")) {
+    const r = await graphql<{ fulfillmentOrderReleaseHold: { userErrors: { message: string }[] } | null }>(
+      app,
+      acceso.token,
+      "mutation($id: ID!) { fulfillmentOrderReleaseHold(id: $id) { userErrors { message } } }",
+      { id: fo.id },
+    );
+    const errores = r.fulfillmentOrderReleaseHold?.userErrors ?? [];
+    if (errores.length) throw new Error(`Shopify no levantó la espera: ${errores[0].message}`);
+  }
+  return true;
+}
+
+// ── Manual ATC, el resto del recorrido (24 nov 2026): la guía de la asesora, el «Entregado» de la coordinadora y el «Pagado» de Finanzas.
+
+/**
+ * El token con un permiso de escritura dado; si falta, el error dice cuál aprobar y qué permisos tiene hoy la app (los nombres de los permisos no son
+ * secretos: sirven para ver si la versión nueva quedó activa).
+ */
+async function tokenCon(app: AppTienda, permiso: string, para: string): Promise<string> {
+  let acceso = await accesoDeApp(app);
+  const tiene = (scope: string) => scope.split(",").map((s) => s.trim()).includes(permiso);
+  if (tiene(acceso.scope)) return acceso.token;
+  olvidarAcceso(app);
+  acceso = await accesoDeApp(app);
+  if (tiene(acceso.scope)) return acceso.token;
+  const hoy = acceso.scope.split(",").map((s) => s.trim()).filter((s) => s.startsWith("write_"));
+  throw new Error(
+    `Para ${para} falta aprobar en la app de Shopify de ${app.tienda} el permiso «${permiso}» (Dev Dashboard → nueva versión → aprobar en la tienda). Hoy la app tiene: ${hoy.join(", ") || "ningún permiso de escritura"}.`,
+  );
+}
+
+/**
+ * Cargar o cambiar la guía (`fulfillmentTrackingInfoUpdate`) pide el permiso de los envíos que prepara la tienda, no `write_fulfillments` (ese es para
+ * los eventos del envío, como «Entregado»). Corregido el 24 nov 2026: Kenku y Oferfy tenían el bueno y el sistema pedía el otro.
+ */
+const PERMISO_GUIA = "write_merchant_managed_fulfillment_orders";
+
+interface EnvioPedido {
+  id: string;
+  displayStatus: string | null;
+  /** Las guías que ya tiene cargadas ese envío. */
+  guias: string[];
+}
+
+/** Los envíos (fulfillments) del pedido que no se cancelaron, del más nuevo al más viejo; si tiene correo y si está anulado. */
+async function enviosDelPedido(app: AppTienda, token: string, numero: string): Promise<{ envios: EnvioPedido[]; correo: boolean; anulado: boolean }> {
+  const pedido = await buscarPedido(app, token, numero);
+  const d = await graphql<{
+    order: {
+      email: string | null;
+      cancelledAt: string | null;
+      fulfillments: { id: string; status: string; displayStatus: string | null; createdAt: string; trackingInfo: { number: string | null }[] }[];
+    } | null;
+  }>(app, token, "query($id: ID!) { order(id: $id) { email cancelledAt fulfillments(first: 10) { id status displayStatus createdAt trackingInfo { number } } } }", { id: pedido.id });
+  const envios = (d.order?.fulfillments ?? [])
+    .filter((f) => f.status !== "CANCELLED" && f.status !== "ERROR")
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .map((f) => ({ id: f.id, displayStatus: f.displayStatus, guias: (f.trackingInfo ?? []).map((t) => String(t.number ?? "").trim()).filter(Boolean) }));
+  return { envios, correo: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(d.order?.email ?? "").trim()), anulado: !!d.order?.cancelledAt };
+}
+
+/** El envío (fulfillment) del pedido: el último que no se canceló. Sin envío, despacho todavía no lo preparó. */
+async function envioDelPedido(app: AppTienda, token: string, numero: string): Promise<EnvioPedido & { correo: boolean }> {
+  const { envios, correo } = await enviosDelPedido(app, token, numero);
+  if (!envios.length) throw new Error("El pedido todavía no está preparado en Shopify: despacho lo prepara primero y después se carga la guía.");
+  return { ...envios[0], correo };
+}
+
+export type CargaGuiaSola = { resultado: "cargada"; correo: boolean } | { resultado: "ya_tenia"; guia: string } | { resultado: "no_preparado" } | { resultado: "anulado" };
+
+/**
+ * La guía que llega de SISCORE (24 nov 2026, pedido de Hernán: «la guía trae el número de pedido, no hay forma de que el sistema se pierda»): la carga
+ * solo si el pedido no tiene ninguna guía en Shopify, con el correo de seguimiento al cliente. Si ya tenía una (la cargó una asesora), no la pisa ni le
+ * vuelve a escribir al cliente. Sin envío (no preparado) o anulado, no hace nada y lo dice. Lanza si falta el permiso o Shopify no la acepta.
+ */
+export async function cargarGuiaSiFalta(app: AppTienda, numero: string, guia: { numero: string; empresa: string; url: string }): Promise<CargaGuiaSola> {
+  const token = await tokenCon(app, PERMISO_GUIA, "cargar la guía");
+  const { envios, correo, anulado } = await enviosDelPedido(app, token, numero);
+  if (anulado) return { resultado: "anulado" };
+  const ya = envios.flatMap((e) => e.guias)[0];
+  if (ya) return { resultado: "ya_tenia", guia: ya };
+  if (!envios.length) return { resultado: "no_preparado" };
+  const d = await graphql<{ fulfillmentTrackingInfoUpdate: { userErrors: { message: string }[] } | null }>(
+    app,
+    token,
+    "mutation($id: ID!, $info: FulfillmentTrackingInput!) { fulfillmentTrackingInfoUpdate(fulfillmentId: $id, trackingInfoInput: $info, notifyCustomer: true) { userErrors { message } } }",
+    { id: envios[0].id, info: { number: guia.numero, company: guia.empresa, url: guia.url } },
+  );
+  const errores = d.fulfillmentTrackingInfoUpdate?.userErrors ?? [];
+  if (errores.length) throw new Error(`Shopify no aceptó la guía: ${errores[0].message}`);
+  return { resultado: "cargada", correo };
+}
+
+/**
+ * Carga la guía y el enlace público en el envío del pedido, con el correo de seguimiento al cliente (el manual lo pide activado). Dice si el pedido tiene
+ * correo: sin correo, Shopify no tiene a quién mandarlo y el aviso va por WhatsApp.
+ */
+export async function cargarGuiaEnShopify(app: AppTienda, numero: string, guia: { numero: string; empresa: string; url: string }): Promise<{ correo: boolean }> {
+  const token = await tokenCon(app, PERMISO_GUIA, "cargar la guía");
+  const envio = await envioDelPedido(app, token, numero);
+  const d = await graphql<{ fulfillmentTrackingInfoUpdate: { userErrors: { message: string }[] } | null }>(
+    app,
+    token,
+    "mutation($id: ID!, $info: FulfillmentTrackingInput!) { fulfillmentTrackingInfoUpdate(fulfillmentId: $id, trackingInfoInput: $info, notifyCustomer: true) { userErrors { message } } }",
+    { id: envio.id, info: { number: guia.numero, company: guia.empresa, url: guia.url } },
+  );
+  const errores = d.fulfillmentTrackingInfoUpdate?.userErrors ?? [];
+  if (errores.length) throw new Error(`Shopify no aceptó la guía: ${errores[0].message}`);
+  return { correo: envio.correo };
+}
+
+/** «Marcar como entregado» en Shopify (un evento DELIVERED en el envío). Si ya está entregado, no hace nada. */
+export async function marcarEntregadoEnShopify(app: AppTienda, numero: string): Promise<void> {
+  const token = await tokenCon(app, "write_fulfillments", "marcar el pedido como entregado");
+  const envio = await envioDelPedido(app, token, numero);
+  if (envio.displayStatus === "DELIVERED") return;
+  const d = await graphql<{ fulfillmentEventCreate: { userErrors: { message: string }[] } | null }>(
+    app,
+    token,
+    "mutation($ev: FulfillmentEventInput!) { fulfillmentEventCreate(fulfillmentEvent: $ev) { userErrors { message } } }",
+    { ev: { fulfillmentId: envio.id, status: "DELIVERED", happenedAt: new Date().toISOString() } },
+  );
+  const errores = d.fulfillmentEventCreate?.userErrors ?? [];
+  if (errores.length) throw new Error(`Shopify no lo marcó como entregado: ${errores[0].message}`);
+}
+
+/** Pasa el pago de «Pendiente» a «Pagado» (Finanzas, con el dinero en el banco). Si ya está pagado, no hace nada. */
+export async function marcarPagadoEnShopify(app: AppTienda, numero: string): Promise<void> {
+  const token = await tokenConEscritura(app);
+  const pedido = await buscarPedido(app, token, numero);
+  const e = await graphql<{ order: { displayFinancialStatus: string | null; cancelledAt: string | null } | null }>(app, token, "query($id: ID!) { order(id: $id) { displayFinancialStatus cancelledAt } }", { id: pedido.id });
+  if (e.order?.cancelledAt) throw new Error("El pedido está anulado en Shopify: no se marca como pagado.");
+  if (e.order?.displayFinancialStatus === "PAID") return;
+  const d = await graphql<{ orderMarkAsPaid: { userErrors: { message: string }[] } | null }>(
+    app,
+    token,
+    "mutation($id: ID!) { orderMarkAsPaid(input: { id: $id }) { userErrors { message } } }",
+    { id: pedido.id },
+  );
+  const errores = d.orderMarkAsPaid?.userErrors ?? [];
+  if (errores.length) throw new Error(`Shopify no lo marcó como pagado: ${errores[0].message}`);
 }

@@ -200,7 +200,13 @@ export function PanelActualizarDropi({
         await pedirExtension({ tipo: "mostrar", pais }).catch(() => null);
         mostrada = true;
       }
-      ponerAvance(`Esperando que inicies sesión en ${nombreSitio(pais)}…`, pais);
+      // Drop en el mismo Chrome (24 nov 2026): si la pestaña tiene la sesión de dropshipper (la de «Drop dropshipper» en Datos), se dice cuál cerrar.
+      ponerAvance(
+        pais === "drop" && s?.hay && s.tipoUsuario === "DROPSHIPPER"
+          ? "La pestaña de Drop tiene la sesión de dropshipper: ciérrala (abajo a la izquierda › Cerrar sesión) y entra con la cuenta de proveedor…"
+          : `Esperando que inicies sesión en ${nombreSitio(pais)}…`,
+        pais,
+      );
       await esperar(3000);
     }
     return false;
@@ -485,7 +491,9 @@ export function PanelActualizarDropi({
           <div className="flex flex-col gap-1 text-sm">
             <span className="font-semibold">Falta iniciar sesión en {nombreSitio(corriendo.esperandoSesion)}</span>
             <span>
-              {corriendo.esperandoSesion === "drop" || corriendo.esperandoSesion === "duna"
+              {corriendo.esperandoSesion === "drop" && sesiones.drop?.hay && sesiones.drop.tipoUsuario === "DROPSHIPPER"
+                ? "Te dejamos la pestaña de Drop al frente. Tiene abierta la cuenta de dropshipper: ciérrala (abajo a la izquierda › Cerrar sesión) y entra con la cuenta de proveedor de Costa Rica. La actualización sigue sola."
+                : corriendo.esperandoSesion === "drop" || corriendo.esperandoSesion === "duna"
                 ? `Te dejamos la pestaña de ${CUENTAS[corriendo.esperandoSesion].nombre} al frente. Entra con la ${CUENTAS[corriendo.esperandoSesion].cuenta} (no la de dropshipper) y la actualización sigue sola.`
                 : `Te dejamos la pestaña de Dropi al frente. Entra con la ${CUENTAS[corriendo.esperandoSesion].cuenta} (con el código de dos pasos) y la actualización sigue sola.`}
             </span>

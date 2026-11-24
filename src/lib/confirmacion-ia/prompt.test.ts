@@ -60,8 +60,8 @@ test("entran solo los ejemplos más recientes de cada tipo y la dirección va en
 });
 
 test("la tendencia de la tienda entra al pedido solo si la ciudad se distingue de interior", () => {
-  const tendencia = "TENDENCIA HISTÓRICA DE KENKU: Tocumen → INTERIOR";
-  assert.match(armarEntrada({ ...base, coincidencias: [], tendencia }).texto, /TENDENCIA HISTÓRICA DE KENKU/);
+  const tendencia = "TENDENCIA HISTÓRICA DE NUVO: Tocumen → CIUDAD";
+  assert.match(armarEntrada({ ...base, coincidencias: [], tendencia }).texto, /TENDENCIA HISTÓRICA DE NUVO/);
   assert.doesNotMatch(armarEntrada({ ...base, coincidencias: [] }).texto, /TENDENCIA HISTÓRICA/);
   assert.doesNotMatch(armarEntrada({ ...base, distingueZona: false, coincidencias: [], tendencia }).texto, /TENDENCIA HISTÓRICA/);
 });

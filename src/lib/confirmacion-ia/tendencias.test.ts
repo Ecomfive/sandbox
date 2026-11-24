@@ -10,20 +10,18 @@ test("un lugar sigue la etiqueta que lleva el 70 % de los casos; si no, es mixto
 });
 
 test("la tienda se reconoce por una palabra de su nombre", () => {
-  assert.equal(tendenciaDeTienda("Kenku Panamá")?.nombre, "Kenku");
+  assert.equal(tendenciaDeTienda("Kenku Panamá"), null, "la tendencia de Kenku ya no se sigue");
   assert.equal(tendenciaDeTienda("OFERFY")?.nombre, "Oferfy");
   assert.equal(tendenciaDeTienda("Nuvo")?.nombre, "Nuvo");
-  assert.equal(tendenciaDeTienda("Kenkuz"), null);
   assert.equal(tendenciaDeTienda("Wao Ofertas"), null);
   assert.equal(tendenciaDeTienda(null), null);
 });
 
-test("Kenku manda a interior lo que Nuvo y Oferfy mandan a ciudad, y el texto lo dice con los casos", () => {
-  const k = textoTendencia(tendenciaDeTienda("Kenku")!);
+test("Kenku ya no tiene tendencia: la IA sigue los documentos y lo que etiquetan Nuvo y Oferfy", () => {
+  assert.ok(!TENDENCIAS_PANAMA.some((t) => t.clave === "kenku"));
   const n = textoTendencia(tendenciaDeTienda("Nuvo")!);
-  assert.match(k, /Tocumen → INTERIOR \(2 ciudad \/ 18 interior\)/);
   assert.match(n, /Tocumen → CIUDAD \(14 ciudad \/ 0 interior\)/);
-  assert.match(k, /responde «no_se»/);
+  assert.match(n, /responde «no_se»/);
   assert.match(textoTendencia(tendenciaDeTienda("Oferfy")!), /Panamá Norte → mixto/);
 });
 
@@ -32,7 +30,7 @@ test("cada tienda tiene sus lugares sin repetir", () => {
 });
 
 test("el texto de la tendencia manda al reglamento cuando el lugar es mixto o no está", () => {
-  const t = textoTendencia(tendenciaDeTienda("Kenku")!);
+  const t = textoTendencia(tendenciaDeTienda("Nuvo")!);
   assert.match(t, /manda el reglamento/);
   assert.match(t, /dentro del mapa son CIUDAD/);
 });

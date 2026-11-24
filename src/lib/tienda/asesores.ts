@@ -50,12 +50,16 @@ export interface FilaAsesor {
 const CONFIRMADA = /^confirmad[ao]$/i;
 /** Cancelar: «ANULADO», «ANULADO VERIFICADO», «ANULADO/VERIFICADO» o «Cancelado» (las cuatro las usa el equipo en Shopify). */
 const CANCELA = /^(anulad[oa]|cancelad[oa])(?![a-z])/i;
+/** Manual ATC (24 nov 2026): la asesora confirma poniendo la zona y anula poniendo un motivo MOT-…; «novedad» lo deja en gestión. */
+const ZONA = /^(ciudad|interior)([-/].*)?$/i;
+const MOTIVO = /^mot-/i;
 
 /** Si esas etiquetas agregadas confirman el pedido, lo cancelan o lo dejan en gestión. */
 export function efectoEtiquetas(agregadas: string[]): { confirma: boolean; cancela: boolean; gestion: boolean } {
+  const motivo = agregadas.some((e) => MOTIVO.test(e.trim()));
   return {
-    confirma: agregadas.some((e) => CONFIRMADA.test(e.trim())),
-    cancela: agregadas.some((e) => CANCELA.test(e.trim())),
+    confirma: agregadas.some((e) => CONFIRMADA.test(e.trim())) || (!motivo && agregadas.some((e) => ZONA.test(e.trim()))),
+    cancela: motivo || agregadas.some((e) => CANCELA.test(e.trim())),
     gestion: enGestion(agregadas),
   };
 }

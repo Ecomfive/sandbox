@@ -130,6 +130,7 @@ function leerCambios(formData: FormData) {
     financiamiento: formData.get("financiamiento") === "on",
     fecha_limite: fechaOptativa(formData, "fecha_limite"),
     fecha_llegada: fechaOptativa(formData, "fecha_llegada"),
+    fecha_llegada_puerto: fechaOptativa(formData, "fecha_llegada_puerto"),
     fecha_pago_1: fechaOptativa(formData, "fecha_pago_1"),
     fecha_pago_2: fechaOptativa(formData, "fecha_pago_2"),
     fecha_envio: fechaOptativa(formData, "fecha_envio"),

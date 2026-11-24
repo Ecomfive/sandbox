@@ -1,3 +1,4 @@
+// (Antes en scripts/competencia-catalogo-guardar.ts; desde el 24 nov 2026 también lo usa el sistema: «Drop: competencia» en Datos.)
 // Análisis de competencia con Drop y Effi (6 nov 2026, migraciones 0234 y 0239): guarda una lectura del catálogo de una de las dos (la mandan
 // `scrapingCompetenciaDrop` y `scrapingCompetenciaEffi` de scripts/scraping-proveedores-navegador.js al receptor de scripts/scraping-proveedores.ts). Lo mismo que
 // competencia-guardar.ts con Dropi, en sus propias tablas: anota cada cambio, empareja cada producto de la competencia con el nuestro igual (por nombre y por
@@ -6,13 +7,13 @@
 // Dunamixfy (11 nov 2026, migración 0271): su Marketplace con una cuenta de dropshipper (`scrapingCompetenciaDunamixfy`), igual que Drop.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { certezaIgual } from "../src/lib/competencia/certeza";
-import { armarAlertas, type ProductoAlerta } from "../src/lib/competencia/analisis";
-import { catalogoDrop } from "../src/lib/competencia/drop";
-import { catalogoDunamixfy } from "../src/lib/competencia/dunamixfy";
-import { catalogoEffi } from "../src/lib/competencia/effi";
-import { comparar, type Evento, type ProductoGuardado, type ProductoVisto } from "../src/lib/scraping/comparar";
-import { indexar, yaVisto } from "../src/lib/scraping/cruces";
+import { certezaIgual } from "@/lib/competencia/certeza";
+import { armarAlertas, type ProductoAlerta } from "@/lib/competencia/analisis";
+import { catalogoDrop } from "@/lib/competencia/drop";
+import { catalogoDunamixfy } from "@/lib/competencia/dunamixfy";
+import { catalogoEffi } from "@/lib/competencia/effi";
+import { comparar, type Evento, type ProductoGuardado, type ProductoVisto } from "@/lib/scraping/comparar";
+import { indexar, yaVisto } from "@/lib/scraping/cruces";
 
 export interface LecturaCatalogo {
   tipo: "competencia-drop" | "competencia-effi" | "competencia-dunamixfy";
