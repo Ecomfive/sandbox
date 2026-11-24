@@ -375,7 +375,7 @@ function EditorListaLote({
       renderOpcion={colores ? (n) => <PastillaEtiqueta nombre={n} color={colores[n]} /> : campo === "tienda" ? (n) => <PastillaTienda nombre={n} /> : undefined}
       gestion={campo === "tienda" ? tiendas : null}
       placeholder={campo === "etiquetas" ? "Buscar o añadir etiquetas…" : `Buscar o añadir ${def.etiqueta.toLowerCase()}…`}
-      // Una sola (la tienda): elegir una la pone en todas en lugar de la que tenían (o la quita si ya la tenían todas) y cierra.
+      // Una sola: elegir una la pone en todas en lugar de la que tenían (o la quita si ya la tenían todas) y cierra.
       alAlternar={(n) => {
         if (def.unica) {
           alCerrar("elegido");

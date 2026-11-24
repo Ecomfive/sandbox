@@ -119,8 +119,8 @@ function leerCambios(formData: FormData) {
     proveedor: proveedorDeLista(textoOptativo(formData, "proveedor")),
     agente_envio: agenteDeLista(textoOptativo(formData, "agente_envio")),
     venta_importacion: formData.get("venta_importacion") === "si",
-    // Una sola tienda por orden (se guarda como lista por las de antes).
-    tiendas: listaDeTexto(textoOptativo(formData, "tiendas")).slice(0, 1),
+    // Una o varias tiendas por orden, como etiquetas (24 nov 2026).
+    tiendas: listaDeTexto(textoOptativo(formData, "tiendas")),
     qty_total: numeroOptativo(formData, "qty_total"),
     monto_total: numeroOptativo(formData, "monto_total"),
     primer_pago: numeroOptativo(formData, "primer_pago"),
