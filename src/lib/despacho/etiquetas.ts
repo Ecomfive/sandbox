@@ -6,6 +6,13 @@ import { normalizar } from "@/lib/finanzas/clasificacion";
 
 export type Columna = "tienda" | "courier" | "estado" | "edo_pago" | "forma_pago" | "turno" | "estado_asesores";
 
+/**
+ * El repartidor de prueba (24 nov 2026, pedido de Hernán: probar el panel del repartidor sin tocar pedidos reales). Las filas del tablero de prueba de
+ * Monday (`mon_tableros_extra.prueba`, migración 0363) se guardan con este repartidor, sin tienda ni pedido enlazado: lo que se marque no cambia ningún
+ * pedido, no sale en Logística ni en las métricas de Monday y no se confunde con una fila real del mismo número.
+ */
+export const REPARTIDOR_PRUEBA = "USUARIO DE PRUEBA";
+
 export interface Etiqueta {
   nombre: string;
   color: string;
@@ -38,6 +45,7 @@ export const ETIQUETAS: Record<Columna, { titulo: string; opciones: Etiqueta[] }
       { nombre: "DEIMIBEL ZONA 5", color: "#037f4c" },
       { nombre: "DEIMIBEL CHORRERA", color: "#784bd1" },
       { nombre: "DEIMIBEL ARRAIJÁN", color: "#7e3b8a" },
+      { nombre: "USUARIO DE PRUEBA", color: "#c4c4c4" },
     ],
   },
   estado: {
@@ -153,6 +161,8 @@ export interface FilaDespacho {
   numero: string | null;
   tienda: string | null;
   dia: string | null;
+  /** El repartidor: las filas de prueba (`REPARTIDOR_PRUEBA`) nunca se juntan con una real del mismo número. */
+  courier?: string | null;
 }
 
 /**
@@ -168,7 +178,7 @@ export function sinDuplicados<T extends FilaDespacho>(filas: T[], tableroConsoli
       sueltas.push(f);
       continue;
     }
-    const clave = `${normalizar(f.tienda ?? "")}|${normalizar(f.numero).replace(/\s|COPY|COPIA/g, "")}|${f.dia ?? ""}`;
+    const clave = `${f.courier === REPARTIDOR_PRUEBA ? "PRUEBA|" : ""}${normalizar(f.tienda ?? "")}|${normalizar(f.numero).replace(/\s|COPY|COPIA/g, "")}|${f.dia ?? ""}`;
     const previa = mejor.get(clave);
     if (!previa || puntos(f) > puntos(previa)) mejor.set(clave, f);
   }

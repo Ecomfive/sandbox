@@ -20,7 +20,7 @@ import { etiquetaEntrega } from "@/lib/tienda/entregas-monday";
 const PAGO_ENTREGA: Record<string, string> = { efectivo: "Efectivo", yappy: "Yappy", transferencia: "Transferencia", tarjeta: "Tarjeta", otro: "Otro" };
 import { FichaPedido } from "./ficha-pedido";
 import { pendientesWhatsapp } from "./chat-actions";
-import { pendientesPorPedido, type ChatPendiente } from "@/lib/tienda/chat-tienda";
+import { pendientesPorPedido, type ChatDelPedido, type ChatPendiente } from "@/lib/tienda/chat-tienda";
 
 const ESTADO = new Map(ESTADOS_PEDIDO.map((e) => [e.id, e]));
 export const NOMBRE: NombreFilas = { singular: "pedido", plural: "pedidos" };
@@ -81,7 +81,7 @@ export interface Contexto {
   codigoPais: string;
   tiendas: Record<string, string>;
   /** Mensajes de WhatsApp pendientes por pedido (iComfly): el numerito sobre el logo del cliente. Solo en Pedidos de tienda. */
-  whatsapp?: Record<string, number>;
+  whatsapp?: Record<string, ChatDelPedido>;
 }
 
 /** Las columnas, como en Mi Reto Digital: se ocultan y se reordenan desde «Columnas». */
@@ -94,20 +94,30 @@ export const COLUMNAS: ColumnaTabla<PedidoFila, Contexto>[] = [
     label: "Cliente",
     ocultable: true,
     // El logo de WhatsApp si el cliente tiene teléfono (13 nov 2026, pedido de Hernán): su chat se ve a la derecha de la ficha del pedido. Con mensajes
-    // pendientes en iComfly (sin leer, o el cliente espera respuesta), el numerito encima; se borra al abrir su chat en la ficha.
+    // sin leer en iComfly, el numerito rojo encima; se borra al abrir su chat en la ficha. Si ya se leyó pero el cliente espera respuesta, solo un punto
+    // (24 nov 2026: antes salía «1» y atención decía que sí lo había leído).
     render: (p, c) => {
-      const n = c.whatsapp?.[p.id] ?? 0;
-      const pendientes = `${n} ${n === 1 ? "mensaje pendiente" : "mensajes pendientes"}`;
+      const chat = c.whatsapp?.[p.id];
+      const n = chat?.sinLeer ?? 0;
+      const espera = !n && !!chat?.espera;
+      const pendientes = `${n} ${n === 1 ? "mensaje sin leer" : "mensajes sin leer"}`;
+      const texto = n ? `WhatsApp: ${pendientes}` : espera ? "WhatsApp: leído, el cliente espera respuesta" : "Tiene WhatsApp";
       return (
         <span className="flex max-w-[8.5rem] items-center gap-1.5" title={p.cliente ?? undefined}>
           {p.pedidosCliente != null && (
-            <span role="img" aria-label={n ? `WhatsApp: ${pendientes}` : "Tiene WhatsApp"} title={n ? `${pendientes} por WhatsApp: ábrelo para verlo` : "Tiene WhatsApp: su chat se ve en la ficha del pedido"} className="relative shrink-0">
+            <span
+              role="img"
+              aria-label={texto}
+              title={n ? `${pendientes} por WhatsApp: ábrelo para verlo` : espera ? "Leído: el último mensaje es del cliente y nadie le respondió" : "Tiene WhatsApp: su chat se ve en la ficha del pedido"}
+              className="relative shrink-0"
+            >
               <WhatsAppLogo className="h-3.5 w-3.5" />
               {n > 0 && (
                 <span aria-hidden="true" className="absolute -top-2 -right-2 min-w-[15px] rounded-full bg-destructive px-1 text-center text-[9px] leading-[15px] font-bold text-white tabular-nums">
                   {n > 99 ? "99+" : n}
                 </span>
               )}
+              {espera && <span aria-hidden="true" className="absolute -top-1 -right-1 h-2 w-2 rounded-full border border-card bg-primario" />}
             </span>
           )}
           <span className={`truncate ${n > 0 ? "ml-1 font-semibold" : ""}`}>{p.cliente ?? "—"}</span>
