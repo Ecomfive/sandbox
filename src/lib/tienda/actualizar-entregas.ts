@@ -8,6 +8,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { mismaTiendaUnidad } from "./ordenes-finanzas";
+import { guiaAntesDelPedido } from "./siscore";
 import { formaDePago, esDesintegrado, prioridadDespacho } from "@/lib/monday/columnas";
 
 export interface OrdenParaEntrega {
@@ -135,6 +136,7 @@ export async function actualizarEntregas(supabase: SupabaseClient, quien = "Sist
   }
   if (!ordenes.length) return { entregadas: 0, devueltas: 0, resumen: "No hay órdenes despachadas." };
   const ids = ordenes.map((o) => o.id);
+  const fechaDe = new Map(ordenes.map((o) => [o.id, o.fecha]));
   const monday = new Map<string, DatoMonday & { clave: string }>();
   const guias = new Map<string, DatoGuia & { clave: string }>();
   for (let i = 0; i < ids.length; i += 200) {
@@ -175,6 +177,8 @@ export async function actualizarEntregas(supabase: SupabaseClient, quien = "Sist
       });
     }
     for (const x of (g.error ? [] : (g.data ?? [])) as Record<string, unknown>[]) {
+      // Una guía emitida antes que el pedido es de otro pedido (factura mal escrita en SISCORE, 24 nov 2026): no lo mueve.
+      if (guiaAntesDelPedido(x.fecha_emision as string | null, fechaDe.get(String(x.orden_id)))) continue;
       const clave = `${x.fecha_emision ?? ""}|${x.fecha_estado ?? ""}`;
       const previa = guias.get(String(x.orden_id));
       if (previa && previa.clave >= clave) continue;

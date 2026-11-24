@@ -8,7 +8,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { cargarTiendas } from "@/lib/tienda/datos";
 import { fuenteFinanzas } from "@/lib/tienda/datos-finanzas";
 import { tiendaDeClienteSiscore } from "@/lib/tienda/siscore";
-import { grupoDeEstadoGuia, leerLecturaSiscore, momentoEntrega, pedidoDeFactura, sinLoDelRastreo, visitasSinEntregar } from "@/lib/tienda/siscore";
+import { grupoDeEstadoGuia, guiaAntesDelPedido, leerLecturaSiscore, momentoEntrega, pedidoDeFactura, sinLoDelRastreo, visitasSinEntregar } from "@/lib/tienda/siscore";
 import { traerTodasConError } from "@/lib/supabase/paginar";
 import { actualizarEntregas, completarDatosEntrega } from "@/lib/tienda/actualizar-entregas";
 
@@ -189,21 +189,23 @@ export async function procesarLecturaSiscore(id: string): Promise<{ guias: numbe
     const unidad = tienda ? ((await fuenteFinanzas(supabase, [tienda], pais.codigo)).unidadDe.get(tienda.id) ?? null) : null;
     // Los pedidos de esas guías, por su número en esa unidad.
     const numeros = [...new Set(lectura.guias.map((g) => pedidoDeFactura(g.factura)).filter((n): n is string => !!n))];
-    const ordenDe = new Map<string, string>();
+    const ordenDe = new Map<string, { id: string; fecha: string | null }>();
     if (unidad)
       for (let i = 0; i < numeros.length; i += 200) {
-        const { data } = await supabase.from("ven_ordenes").select("id, numero").eq("unidad_id", unidad).in("numero", numeros.slice(i, i + 200));
-        for (const o of data ?? []) ordenDe.set(String(o.numero).toUpperCase(), o.id as string);
+        const { data } = await supabase.from("ven_ordenes").select("id, numero, fecha").eq("unidad_id", unidad).in("numero", numeros.slice(i, i + 200));
+        for (const o of data ?? []) ordenDe.set(String(o.numero).toUpperCase(), { id: o.id as string, fecha: (o.fecha as string | null) ?? null });
       }
     const filas = lectura.guias.map((g) => {
       const numero = pedidoDeFactura(g.factura);
       const { visitas, motivo } = visitasSinEntregar(g.historial);
+      // Una guía emitida antes que el pedido es de otro (la factura se escribió mal): queda sin pedido, a la vista en Logística.
+      const orden = numero ? (ordenDe.get(numero) ?? null) : null;
       return {
         guia: g.guia,
         tienda_id: tienda?.id ?? null,
         cliente: g.cliente,
         numero_pedido: numero,
-        orden_id: numero ? (ordenDe.get(numero) ?? null) : null,
+        orden_id: orden && !guiaAntesDelPedido(g.fecha_emision, orden.fecha) ? orden.id : null,
         destino: g.destino,
         servicio: g.servicio,
         proceso: g.proceso,

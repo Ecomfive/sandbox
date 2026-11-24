@@ -73,3 +73,12 @@ test("una guía saltada se guarda sin lo del rastreo (no borra su historial)", (
   const fila = { guia: "7224121117", estado: "Entrega App", orden_id: "x", recaudo: null, historial: [], visitas_sin_entregar: 0, ultimo_motivo: null, entregada_en: null, leida_en: "2026-11-18" };
   assert.deepEqual(sinLoDelRastreo(fila), { guia: "7224121117", estado: "Entrega App", orden_id: "x", leida_en: "2026-11-18" });
 });
+
+test("guiaAntesDelPedido: una guía emitida antes que el pedido es de otro (factura mal escrita)", async () => {
+  const { guiaAntesDelPedido } = await import("./siscore");
+  assert.equal(guiaAntesDelPedido("2026-11-17", "2026-11-23"), true);
+  assert.equal(guiaAntesDelPedido("2026-11-23", "2026-11-23"), false);
+  assert.equal(guiaAntesDelPedido("2026-11-24", "2026-11-23"), false);
+  assert.equal(guiaAntesDelPedido(null, "2026-11-23"), false);
+  assert.equal(guiaAntesDelPedido("2026-11-17", null), false);
+});
