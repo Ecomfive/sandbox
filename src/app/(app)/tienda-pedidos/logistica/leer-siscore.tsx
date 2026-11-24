@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { pedirExtension, type AvanceLector, type SesionDropi } from "@/lib/dropi-actualizar/extension";
+import type { ResultadoGuiasSolas } from "@/lib/tienda/guias-solas";
 import { avanceLecturaSiscore, empezarLecturaSiscore, fallarLecturaSiscore, lecturasSiscoreEnCurso, procesarLecturaSiscore, type LecturaEnCurso } from "./siscore-actions";
 
 /** La versión de «Ecomfive · Dropi» que trae el lector de SISCORE. */
@@ -117,8 +118,8 @@ export function LeerSiscore({
       }
       const saltadas = g.guias - (g.rastreadas ?? g.guias);
       setEstado({
-        texto: `Listo: ${g.guias} guías de ${g.cliente}, ${g.conPedido} unidas a su pedido.${saltadas > 0 ? ` Se rastrearon ${g.rastreadas}; las otras ${saltadas} ya estaban cerradas.` : ""}`,
-        tipo: "bien",
+        texto: `Listo: ${g.guias} guías de ${g.cliente}, ${g.conPedido} unidas a su pedido.${saltadas > 0 ? ` Se rastrearon ${g.rastreadas}; las otras ${saltadas} ya estaban cerradas.` : ""}${textoShopify(g.shopify)}`,
+        tipo: g.shopify?.aviso ? "mal" : "bien",
       });
       router.refresh();
     } catch (e) {
@@ -208,4 +209,15 @@ export function LeerSiscore({
       ))}
     </div>
   );
+}
+
+/** Lo que pasó con las guías nuevas en Shopify (24 nov 2026), en una frase; vacío si no había ninguna. */
+function textoShopify(r: ResultadoGuiasSolas | null | undefined): string {
+  if (!r) return "";
+  const partes: string[] = [];
+  if (r.cargadas) partes.push(`${r.cargadas} guía${r.cargadas === 1 ? "" : "s"} cargada${r.cargadas === 1 ? "" : "s"} en Shopify con aviso al cliente`);
+  if (r.pendientes) partes.push(`${r.pendientes} a «Guía sin cargar» en Pedidos de tienda`);
+  if (r.yaTenian) partes.push(`${r.yaTenian} ya tenía${r.yaTenian === 1 ? "" : "n"} guía en Shopify`);
+  if (r.quedan && !r.aviso) partes.push(`${r.quedan} entra${r.quedan === 1 ? "" : "n"} en la próxima lectura`);
+  return `${partes.length ? ` Shopify: ${partes.join(", ")}.` : ""}${r.aviso ? ` ${r.aviso}` : ""}`;
 }

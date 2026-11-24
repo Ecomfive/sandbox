@@ -158,18 +158,60 @@ async function tokenCon(app: AppTienda, permiso: string, para: string): Promise<
   throw new Error(`Para ${para} falta aprobar en la app de Shopify de ${app.tienda} el permiso «${permiso}» (Dev Dashboard → nueva versión → aprobar en la tienda).`);
 }
 
-/** El envío (fulfillment) del pedido: el último que no se canceló. Sin envío, despacho todavía no lo preparó. */
-async function envioDelPedido(app: AppTienda, token: string, numero: string): Promise<{ id: string; displayStatus: string | null; correo: boolean }> {
+interface EnvioPedido {
+  id: string;
+  displayStatus: string | null;
+  /** Las guías que ya tiene cargadas ese envío. */
+  guias: string[];
+}
+
+/** Los envíos (fulfillments) del pedido que no se cancelaron, del más nuevo al más viejo; si tiene correo y si está anulado. */
+async function enviosDelPedido(app: AppTienda, token: string, numero: string): Promise<{ envios: EnvioPedido[]; correo: boolean; anulado: boolean }> {
   const pedido = await buscarPedido(app, token, numero);
-  const d = await graphql<{ order: { email: string | null; fulfillments: { id: string; status: string; displayStatus: string | null; createdAt: string }[] } | null }>(
+  const d = await graphql<{
+    order: {
+      email: string | null;
+      cancelledAt: string | null;
+      fulfillments: { id: string; status: string; displayStatus: string | null; createdAt: string; trackingInfo: { number: string | null }[] }[];
+    } | null;
+  }>(app, token, "query($id: ID!) { order(id: $id) { email cancelledAt fulfillments(first: 10) { id status displayStatus createdAt trackingInfo { number } } } }", { id: pedido.id });
+  const envios = (d.order?.fulfillments ?? [])
+    .filter((f) => f.status !== "CANCELLED" && f.status !== "ERROR")
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .map((f) => ({ id: f.id, displayStatus: f.displayStatus, guias: (f.trackingInfo ?? []).map((t) => String(t.number ?? "").trim()).filter(Boolean) }));
+  return { envios, correo: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(d.order?.email ?? "").trim()), anulado: !!d.order?.cancelledAt };
+}
+
+/** El envío (fulfillment) del pedido: el último que no se canceló. Sin envío, despacho todavía no lo preparó. */
+async function envioDelPedido(app: AppTienda, token: string, numero: string): Promise<EnvioPedido & { correo: boolean }> {
+  const { envios, correo } = await enviosDelPedido(app, token, numero);
+  if (!envios.length) throw new Error("El pedido todavía no está preparado en Shopify: despacho lo prepara primero y después se carga la guía.");
+  return { ...envios[0], correo };
+}
+
+export type CargaGuiaSola = { resultado: "cargada"; correo: boolean } | { resultado: "ya_tenia"; guia: string } | { resultado: "no_preparado" } | { resultado: "anulado" };
+
+/**
+ * La guía que llega de SISCORE (24 nov 2026, pedido de Hernán: «la guía trae el número de pedido, no hay forma de que el sistema se pierda»): la carga
+ * solo si el pedido no tiene ninguna guía en Shopify, con el correo de seguimiento al cliente. Si ya tenía una (la cargó una asesora), no la pisa ni le
+ * vuelve a escribir al cliente. Sin envío (no preparado) o anulado, no hace nada y lo dice. Lanza si falta el permiso o Shopify no la acepta.
+ */
+export async function cargarGuiaSiFalta(app: AppTienda, numero: string, guia: { numero: string; empresa: string; url: string }): Promise<CargaGuiaSola> {
+  const token = await tokenCon(app, "write_fulfillments", "cargar la guía");
+  const { envios, correo, anulado } = await enviosDelPedido(app, token, numero);
+  if (anulado) return { resultado: "anulado" };
+  const ya = envios.flatMap((e) => e.guias)[0];
+  if (ya) return { resultado: "ya_tenia", guia: ya };
+  if (!envios.length) return { resultado: "no_preparado" };
+  const d = await graphql<{ fulfillmentTrackingInfoUpdate: { userErrors: { message: string }[] } | null }>(
     app,
     token,
-    "query($id: ID!) { order(id: $id) { email fulfillments(first: 10) { id status displayStatus createdAt } } }",
-    { id: pedido.id },
+    "mutation($id: ID!, $info: FulfillmentTrackingInput!) { fulfillmentTrackingInfoUpdate(fulfillmentId: $id, trackingInfoInput: $info, notifyCustomer: true) { userErrors { message } } }",
+    { id: envios[0].id, info: { number: guia.numero, company: guia.empresa, url: guia.url } },
   );
-  const envios = (d.order?.fulfillments ?? []).filter((f) => f.status !== "CANCELLED" && f.status !== "ERROR").sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  if (!envios.length) throw new Error("El pedido todavía no está preparado en Shopify: despacho lo prepara primero y después se carga la guía.");
-  return { id: envios[0].id, displayStatus: envios[0].displayStatus, correo: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(d.order?.email ?? "").trim()) };
+  const errores = d.fulfillmentTrackingInfoUpdate?.userErrors ?? [];
+  if (errores.length) throw new Error(`Shopify no aceptó la guía: ${errores[0].message}`);
+  return { resultado: "cargada", correo };
 }
 
 /**

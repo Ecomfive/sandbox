@@ -138,6 +138,8 @@ export interface OrdenTienda {
   eventos: EventoOrden[];
   /** Lo que dicen Monday o Servientrega; null si ninguno lo tiene. */
   entrega: EntregaOrden | null;
+  /** La guía de SISCORE que no entró sola en Shopify, o cuyo aviso al cliente no salió (24 nov 2026): para «Guía sin cargar». */
+  guiaSinCargar?: { guia: string; motivo: string } | null;
   /** Los cambios, reembolsos, retiros y complementos del tablero «CAMBIOS Y REEMBOLSOS» de Monday, del más nuevo al más viejo (14 nov 2026). */
   postventa: CasoPedido[];
   /** El chat de WhatsApp del cliente, si escribió a algún número del sistema. */
@@ -237,6 +239,7 @@ export async function cargarOrdenTienda(supabase: SupabaseClient, id: string, pa
     notas: (notas ?? []) as NotaOrden[],
     eventos,
     entrega,
+    guiaSinCargar: await guiaSinCargarDeOrden(supabase, id),
     postventa,
     whatsapp,
     asistente,
@@ -276,6 +279,20 @@ async function escrituraDeOrden(
     ? await supabase.from("ven_ordenes").select("etiquetas").eq("unidad_id", unidadId).not("etiquetas", "is", null).order("fecha", { ascending: false }).limit(500)
     : { data: [] };
   return { activa: true, motivo: null, sugeridas: etiquetasSugeridas((usadas ?? []).map((u) => etiquetasDe(u.etiquetas as string | null)), etiquetasDe(etiquetas), 15) };
+}
+
+/** La guía de SISCORE del pedido que no entró sola en Shopify (o cuyo aviso no salió), con el motivo. Sin la migración 0361, null. */
+async function guiaSinCargarDeOrden(supabase: SupabaseClient, id: string): Promise<{ guia: string; motivo: string } | null> {
+  const { data, error } = await supabase
+    .from("tienda_guias")
+    .select("guia, shopify_estado, shopify_motivo")
+    .eq("orden_id", id)
+    .or("shopify_estado.eq.pendiente,aviso_cliente.eq.a_mano")
+    .order("fecha_emision", { ascending: false })
+    .limit(1);
+  const g = error ? null : data?.[0];
+  if (!g) return null;
+  return { guia: String(g.guia), motivo: String(g.shopify_motivo ?? (g.shopify_estado === "pendiente" ? "no entró en Shopify" : "mandarle la guía al cliente a mano")) };
 }
 
 /** Lo último que tienen Monday o Servientrega del pedido (la guía manda: es de interior). Sin sus tablas, null. */

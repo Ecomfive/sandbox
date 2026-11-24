@@ -9,6 +9,7 @@ import { tiendasDeLaPersona } from "@/lib/tienda/acceso";
 import { after } from "next/server";
 import { pedidosDeTiendas } from "@/lib/tienda/datos-finanzas";
 import { entregasDeOrdenes, guiasDeOrdenes } from "@/lib/tienda/entregas-monday";
+import { guiasSinCargar } from "@/lib/tienda/guias-solas";
 import { etiquetaPostventa, postventaDePedidos } from "@/lib/tienda/postventa-tienda";
 import { revisarSiHaceFalta } from "@/lib/tienda/conectar-shopify";
 import { PedidosTienda } from "./pedidos-tienda";
@@ -58,6 +59,9 @@ export default async function PedidosTiendaPage({ searchParams }: { searchParams
     const [entregas, guias] = await Promise.all([entregasDeOrdenes(supabase, enCamino), guiasDeOrdenes(supabase, enCamino)]);
     for (const p of pedidos) if (p.estado === "en_camino") p.entrega = guias.get(p.id) ?? entregas.get(p.id) ?? null;
   }
+  // Las guías de SISCORE que no entraron solas en Shopify (24 nov 2026): la vista «Guía sin cargar».
+  const sinCargar = await guiasSinCargar(supabase, ids);
+  for (const p of pedidos) p.guiaSinCargar = sinCargar.get(p.id) ?? null;
   // Los cambios, reembolsos, retiros y complementos de Monday (14 nov 2026): la etiqueta del caso más reciente de cada pedido.
   const casos = await postventaDePedidos(supabase, pedidos.map((p) => p.id));
   for (const p of pedidos) p.postventa = etiquetaPostventa(casos.get(p.id));

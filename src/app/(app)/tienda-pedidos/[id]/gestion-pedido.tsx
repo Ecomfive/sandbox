@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { Pastilla } from "@/components/panel/piezas-panel";
 import { anilloFoco, fieldClassSm } from "@/components/ui/field";
 import { ETIQUETA_ACREDITADO, MOTIVOS_ANULACION, TRANSPORTADORAS, ZONAS_ATC, conNovedad, enlaceRastreo, motivoAtc, porConfirmar, zonaAtc, type AccionAtc, type PasoAtc } from "@/lib/tienda/gestion-atc";
-import { gestionarPedidoAtc, pasoPedidoAtc, type ResultadoGestion } from "../gestion-actions";
+import { gestionarPedidoAtc, pasoPedidoAtc, resolverGuiaSinCargar, type ResultadoGestion } from "../gestion-actions";
 
 type Abierto = AccionAtc | PasoAtc;
 
@@ -23,6 +23,7 @@ export function GestionPedido({
   estadoEntrega,
   estadoPago,
   guia,
+  guiaSinCargar,
   finanzas,
   soloFinanzas,
   alHecho,
@@ -33,6 +34,8 @@ export function GestionPedido({
   estadoEntrega: string | null;
   estadoPago: string | null;
   guia: string | null;
+  /** La guía de SISCORE que no entró sola en Shopify (o cuyo aviso al cliente no salió), con el motivo (24 nov 2026). */
+  guiaSinCargar?: { guia: string; motivo: string } | null;
   /** Puede acreditar y pasar a «Pagado». */
   finanzas: boolean;
   /** Solo lo de Finanzas (no edita Pedidos de tienda). */
@@ -72,7 +75,7 @@ export function GestionPedido({
     setError(null);
     setNota("");
     setMotivo("");
-    setNumeroGuia(guia ?? "");
+    setNumeroGuia(guia ?? guiaSinCargar?.guia ?? "");
     setZona(zonaActual ?? "");
     setAbierta((x) => (x === a ? null : a));
   }
@@ -153,6 +156,36 @@ export function GestionPedido({
         <Pastilla tono={estado.tono}>{estado.texto}</Pastilla>
         {botones.length > 0 && <span className="ml-auto flex flex-wrap gap-1.5">{botones}</span>}
       </div>
+
+      {guiaSinCargar && (
+        <div role="status" className="flex flex-wrap items-center gap-2 rounded-md border border-primario/30 bg-card px-3 py-2 text-xs">
+          <span>
+            <b>Guía sin cargar:</b> {guiaSinCargar.guia} de Servientrega — {guiaSinCargar.motivo}
+          </span>
+          {!soloFinanzas && (
+            <button
+              type="button"
+              disabled={pendiente}
+              onClick={() =>
+                iniciar(async () => {
+                  setError(null);
+                  const r = await resolverGuiaSinCargar(ordenId);
+                  if ("error" in r) setError(r.error);
+                  else alHecho(r);
+                })
+              }
+              className={`ml-auto inline-flex min-h-7 items-center rounded-md border border-primario/40 px-2.5 font-semibold text-primario hover:bg-primario-suave disabled:opacity-40 ${anilloFoco}`}
+            >
+              Ya está resuelto
+            </button>
+          )}
+        </div>
+      )}
+      {!abierta && error && (
+        <p role="alert" className="m-0 text-xs text-destructive">
+          {error}
+        </p>
+      )}
 
       {abierta && (
         <form onSubmit={enviar} className="flex flex-col gap-2 rounded-lg border border-border bg-card p-3 text-sm">
