@@ -24,6 +24,7 @@ export const ETIQUETA_ACCION: Record<string, string> = {
   reabrir_pedido_inventario: "Reabrió un pedido cancelado",
   archivar_pedido_inventario: "Archivó un pedido a inventario",
   desarchivar_pedido_inventario: "Sacó un pedido a inventario del archivo",
+  interpretar_hallazgos_meta: "Pidió la interpretación con IA de los hallazgos de Anuncios Meta",
   archivar_llegada_puerto: "Archivó llegadas a puerto ya recibidas",
   desarchivar_llegada_puerto: "Sacó llegadas a puerto del archivo",
   subir_fotos_cuanto_hay: "Subió fotos reales",
