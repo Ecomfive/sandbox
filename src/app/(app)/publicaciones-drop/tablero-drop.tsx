@@ -25,7 +25,9 @@ interface Tarjeta {
 }
 
 /** Las tarjetas de Gestión de IDs Dropi que valen para Drop (sin «Republicar»: Drop no republica). Las que tienen datos cuentan y filtran la lista. */
-const TARJETAS: Tarjeta[] = [
+// Ventas en caída y Verificar dropshipper (24 nov 2026) ya tienen datos de Drop: las ventas por producto y día y los exclusivos de cada cliente. Usan las
+// reglas de Gestión de IDs Dropi; sin ninguna venta leída todavía, siguen en «—».
+const tarjetasDrop = (conVentas: boolean, r: { caida: number; diasNuevo: number }): Tarjeta[] => [
   {
     id: "activas",
     titulo: "Activas en Drop",
@@ -45,9 +47,29 @@ const TARJETAS: Tarjeta[] = [
     cuenta: margenBajoDrop,
     atajo: { id: "margen-bajo", etiqueta: "Margen bajo", ayuda: "Filtrar la lista: margen bajo", filtro: seleccion("margen", "bajo") },
   },
-  { id: "ventas-caida", titulo: "Ventas en caída", detalle: "Todavía sin las ventas de Drop", icono: VentasIcon, color: "ambar" },
+  conVentas
+    ? {
+        id: "ventas-caida",
+        titulo: "Ventas en caída",
+        detalle: `En 30 días vende menos del ${Math.round(r.caida * 100)} % de los 30 anteriores`,
+        icono: VentasIcon,
+        color: "ambar",
+        cuenta: (f) => f.ventasEnCaida,
+        atajo: { id: "ventas-caida", etiqueta: "Ventas en caída", ayuda: "Filtrar la lista: ventas en caída", filtro: seleccion("ventas", "caida") },
+      }
+    : { id: "ventas-caida", titulo: "Ventas en caída", detalle: "Todavía sin las ventas de Drop", icono: VentasIcon, color: "ambar" },
   { id: "bajar-precio", titulo: "Bajar precio", detalle: "Todavía sin la competencia en Drop", icono: AnalisisCompetenciaIcon, color: "rojo" },
-  { id: "verificar-dropshipper", titulo: "Verificar dropshipper", detalle: "Todavía sin los privatizados de Drop", icono: DropshipperIcon, color: "azul" },
+  conVentas
+    ? {
+        id: "verificar-dropshipper",
+        titulo: "Verificar dropshipper",
+        detalle: "Con exclusivo para un cliente y sin ventas en 30 días",
+        icono: DropshipperIcon,
+        color: "azul",
+        cuenta: (f) => f.verificarDropshipper,
+        atajo: { id: "verificar-dropshipper", etiqueta: "Verificar dropshipper", ayuda: "Filtrar la lista: exclusivo sin ventas en 30 días", filtro: seleccion("dropshipper", "verificar") },
+      }
+    : { id: "verificar-dropshipper", titulo: "Verificar dropshipper", detalle: "Todavía sin las ventas de Drop", icono: DropshipperIcon, color: "azul" },
   { id: "recomendaciones", titulo: "Recomendaciones", detalle: "Todavía sin datos de Drop", icono: SugerenciaIcon, color: "violeta" },
   { id: "por-optimizar", titulo: "Por optimizar", detalle: "Todavía sin datos de Drop", icono: EstadoIcon, color: "azul" },
   {
@@ -93,8 +115,17 @@ const TARJETAS: Tarjeta[] = [
  * publicaciones y, al pulsarlas, filtran la lista de abajo; pulsarlas otra vez quita el filtro. Las que esperan datos que Drop todavía no da (ventas,
  * competencia, privatizados) se ven con «—» y no filtran.
  */
-export function TableroDrop({ publicaciones }: { publicaciones: FilaPublicacionDrop[] }) {
+export function TableroDrop({
+  publicaciones,
+  conVentas = false,
+  reglas = { caida: 0.5, diasNuevo: 30 },
+}: {
+  publicaciones: FilaPublicacionDrop[];
+  conVentas?: boolean;
+  reglas?: { caida: number; diasNuevo: number };
+}) {
   const [filtros, cambiarFiltros] = useFiltros(DEF_PUBLICACIONES_DROP);
+  const TARJETAS = tarjetasDrop(conVentas, reglas);
   return (
     <section aria-label="Tablero de acciones" className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(12rem,1fr))]">
       {TARJETAS.map((t) => {
