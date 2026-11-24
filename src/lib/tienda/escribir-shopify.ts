@@ -147,7 +147,10 @@ export async function liberarEsperaEnShopify(app: AppTienda, numero: string): Pr
 
 // ── Manual ATC, el resto del recorrido (24 nov 2026): la guía de la asesora, el «Entregado» de la coordinadora y el «Pagado» de Finanzas.
 
-/** El token con un permiso de escritura dado; si falta, el error dice cuál aprobar. */
+/**
+ * El token con un permiso de escritura dado; si falta, el error dice cuál aprobar y qué permisos tiene hoy la app (los nombres de los permisos no son
+ * secretos: sirven para ver si la versión nueva quedó activa).
+ */
 async function tokenCon(app: AppTienda, permiso: string, para: string): Promise<string> {
   let acceso = await accesoDeApp(app);
   const tiene = (scope: string) => scope.split(",").map((s) => s.trim()).includes(permiso);
@@ -155,8 +158,17 @@ async function tokenCon(app: AppTienda, permiso: string, para: string): Promise<
   olvidarAcceso(app);
   acceso = await accesoDeApp(app);
   if (tiene(acceso.scope)) return acceso.token;
-  throw new Error(`Para ${para} falta aprobar en la app de Shopify de ${app.tienda} el permiso «${permiso}» (Dev Dashboard → nueva versión → aprobar en la tienda).`);
+  const hoy = acceso.scope.split(",").map((s) => s.trim()).filter((s) => s.startsWith("write_"));
+  throw new Error(
+    `Para ${para} falta aprobar en la app de Shopify de ${app.tienda} el permiso «${permiso}» (Dev Dashboard → nueva versión → aprobar en la tienda). Hoy la app tiene: ${hoy.join(", ") || "ningún permiso de escritura"}.`,
+  );
 }
+
+/**
+ * Cargar o cambiar la guía (`fulfillmentTrackingInfoUpdate`) pide el permiso de los envíos que prepara la tienda, no `write_fulfillments` (ese es para
+ * los eventos del envío, como «Entregado»). Corregido el 24 nov 2026: Kenku y Oferfy tenían el bueno y el sistema pedía el otro.
+ */
+const PERMISO_GUIA = "write_merchant_managed_fulfillment_orders";
 
 interface EnvioPedido {
   id: string;
@@ -197,7 +209,7 @@ export type CargaGuiaSola = { resultado: "cargada"; correo: boolean } | { result
  * vuelve a escribir al cliente. Sin envío (no preparado) o anulado, no hace nada y lo dice. Lanza si falta el permiso o Shopify no la acepta.
  */
 export async function cargarGuiaSiFalta(app: AppTienda, numero: string, guia: { numero: string; empresa: string; url: string }): Promise<CargaGuiaSola> {
-  const token = await tokenCon(app, "write_fulfillments", "cargar la guía");
+  const token = await tokenCon(app, PERMISO_GUIA, "cargar la guía");
   const { envios, correo, anulado } = await enviosDelPedido(app, token, numero);
   if (anulado) return { resultado: "anulado" };
   const ya = envios.flatMap((e) => e.guias)[0];
@@ -219,7 +231,7 @@ export async function cargarGuiaSiFalta(app: AppTienda, numero: string, guia: { 
  * correo: sin correo, Shopify no tiene a quién mandarlo y el aviso va por WhatsApp.
  */
 export async function cargarGuiaEnShopify(app: AppTienda, numero: string, guia: { numero: string; empresa: string; url: string }): Promise<{ correo: boolean }> {
-  const token = await tokenCon(app, "write_fulfillments", "cargar la guía");
+  const token = await tokenCon(app, PERMISO_GUIA, "cargar la guía");
   const envio = await envioDelPedido(app, token, numero);
   const d = await graphql<{ fulfillmentTrackingInfoUpdate: { userErrors: { message: string }[] } | null }>(
     app,
