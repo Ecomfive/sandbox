@@ -69,6 +69,11 @@ export interface DatosCrearDropi {
   bodegas: BodegaCrear[];
   fotos: FotoCrear[];
   /**
+   * Dejar el stock en 0 después de publicar (24 nov 2026, la Turmeric Curcumin de Costa Rica quedó con las 100 unidades que Dropi pide para crear): las unidades de `bodegas` son solo las que Dropi exige
+   * para crear el producto, así que el favorito las saca al terminar de publicarlo (solo esas unidades, nunca más). Por defecto sí; una creación guardada antes de esta opción también se queda en 0.
+   */
+  quitarTemporal: boolean;
+  /**
    * Las direcciones de las fotos que Dropi ya recibió (solo en el cambio pendiente, no en el formulario). Dropi cambia el nombre de cada archivo, así que al reintentar
    * no se puede saber por el nombre cuáles ya están; se anotan aquí al subirlas y un reintento solo sube las que faltan (20 nov 2026, la Turmeric Curcumin llegó a
    * 19 fotos repetidas porque cada reintento volvía a subir las que sí funcionaban).
@@ -90,7 +95,7 @@ export interface OpcionesCrear {
 }
 
 export function datosCrearVacios(): DatosCrearDropi {
-  return { nombre: "", nombreGuia: null, precio: null, precioSugerido: null, peso: null, largo: null, ancho: null, alto: null, categorias: [], descripcion: "", descripcionApp: "", sku: null, codigoBarras: null, bodegas: [], fotos: [] };
+  return { nombre: "", nombreGuia: null, precio: null, precioSugerido: null, peso: null, largo: null, ancho: null, alto: null, categorias: [], descripcion: "", descripcionApp: "", sku: null, codigoBarras: null, bodegas: [], fotos: [], quitarTemporal: true };
 }
 
 /** El texto de un HTML sin etiquetas (para contar los 200 caracteres mínimos de la descripción). */
@@ -177,6 +182,7 @@ export function normalizarDatosCrear(crudo: unknown): DatosCrearDropi {
     codigoBarras: cadena(r.codigoBarras, 60) || null,
     bodegas,
     fotos,
+    quitarTemporal: r.quitarTemporal !== false,
     ...(subidas.length ? { subidas } : {}),
   };
 }

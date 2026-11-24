@@ -233,6 +233,8 @@ async function leerDatosDropi(
     sku: sku || null,
     codigoBarras: texto(f, "dd_codigo_barras", 60) || base.producto?.codigoBarras || null,
     bodegas: Number.isInteger(bodega) && bodega > 0 && Number.isInteger(unidades) ? [{ id: bodega, unidades }] : [],
+    // La casilla «Dejar en 0 después de publicar»: una casilla sin marcar no viaja, así que se mira también su marca de que estaba en el formulario (sin ella, queda en 0).
+    quitarTemporal: texto(f, "dd_quitar_temporal_v", 2) ? texto(f, "dd_quitar_temporal", 4) === "on" : true,
     fotos: fotos.fotos,
   });
 }

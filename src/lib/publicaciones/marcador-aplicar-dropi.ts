@@ -291,6 +291,14 @@ const CODIGO = [
   "var tn=0,sw=stockDe(w);for(k in sw)tn+=sw[k];var nf=fotosDe(w).length;",
   "if(w.name!==d.nombre)return f('Dropi muestra el nombre «'+w.name+'» en el '+id+'.');",
   "var esp=unicas(d.fotos).length;if(nf<esp)return f('El '+id+' tiene '+nf+' foto(s) en Dropi y se esperaban '+esp+'.');",
+  // Dejar el stock en 0 (24 nov 2026): es lo último, con todo lo demás ya comprobado. Solo se saca lo que se puso para poder crear (`d.bodegas`), nunca más. Si Dropi no deja, no se
+  // reintenta (un reintento volvería a ponerlo): el producto queda publicado y el aviso dice que se saque a mano. Con `quitarTemporal` en false se deja el stock tal cual.
+  "if(d.quitarTemporal!==false){var sq={},hq=false;d.bodegas.forEach(function(x){var t=Number(sw[String(x.id)])||0,m=Math.min(t,Number(x.unidades)||0);if(m>0){sq[String(x.id)]=-m;hq=true}});",
+  "if(hq){var avq=function(e){aviso=(aviso?aviso+' ':'')+e},mq=mover(w,bp,sq,'Stock temporal para publicar');",
+  "if(mq.error)avq('No se pudo dejar el stock en 0: '+mq.error+' Sácalo en Dropi.');",
+  "else{var pq=await pedir('/products/'+id,'PUT',mq.cuerpo);if(!pq.ok)avq('No se pudo dejar el stock en 0: '+motivo(pq)+' Sácalo en Dropi.');",
+  "else{var vq=await pedir('/products/'+id),wq=vq.j&&vq.j.objects;if(!vq.ok||!wq)avq('Se pidió dejar el stock en 0, pero no se pudo comprobar en Dropi.');",
+  "else{tn=0;sw=stockDe(wq);for(k in sw)tn+=sw[k];if(tn>0)avq('Se pidió dejar el stock en 0, pero Dropi todavía muestra '+tn+' unidades: sácalas en Dropi.')}}}}}",
   "return{ok:true,nuevo:id,stock:tn,fotos:nf,aviso:aviso,subidas:SUB}}",
   // Privatizar (26 oct 2026): comprobar el correo, crear el producto privado, ponerle fotos, garantías y stock, asignárselo al dropshipper en
   // «Productos privados» y sacarle esas unidades al público. Cada paso que ya está hecho se salta, así un reintento sigue desde donde quedó:
