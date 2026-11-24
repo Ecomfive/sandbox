@@ -94,6 +94,8 @@ export interface FilaPublicacionDrop {
   /** «Ventas en caída» y «Verificar dropshipper», con las reglas de Gestión de IDs Dropi (`src/lib/publicaciones-drop/ventas.ts`). */
   ventasEnCaida: boolean;
   verificarDropshipper: boolean;
+  /** El competidor más barato que nosotros en el Catálogo de Drop, con stock, a precio equivalente (`src/lib/publicaciones-drop/competencia.ts`); null si nadie. */
+  competidorMasBarato: { proveedor: string; precio: number } | null;
 }
 
 export const estadoVinculoDrop = (f: FilaPublicacionDrop): "vinculado" | "sugerido" | "sin_vincular" => (f.producto ? "vinculado" : f.sugerido ? "sugerido" : "sin_vincular");
@@ -211,6 +213,16 @@ export const DEF_PUBLICACIONES_DROP: DefTabla<FilaPublicacionDrop> = {
         { valor: "verificar", etiqueta: "Verificar con el cliente (sin ventas en 30 días)" },
         { valor: "con_exclusivo", etiqueta: "Con exclusivo y vendiendo" },
         { valor: "sin_exclusivo", etiqueta: "Sin exclusivo" },
+      ],
+    },
+    {
+      id: "competencia",
+      etiqueta: "Competencia",
+      tipo: "seleccion",
+      valores: (f) => [f.competidorMasBarato ? "mas_barato" : "no"],
+      opciones: () => [
+        { valor: "mas_barato", etiqueta: "Alguien lo vende más barato" },
+        { valor: "no", etiqueta: "Nadie más barato" },
       ],
     },
     { id: "ventas30", etiqueta: "Ventas netas (30 días)", tipo: "numero", valor: (f) => f.ventas30 },

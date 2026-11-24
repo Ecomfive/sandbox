@@ -27,7 +27,14 @@ interface Tarjeta {
 /** Las tarjetas de Gestión de IDs Dropi que valen para Drop (sin «Republicar»: Drop no republica). Las que tienen datos cuentan y filtran la lista. */
 // Ventas en caída y Verificar dropshipper (24 nov 2026) ya tienen datos de Drop: las ventas por producto y día y los exclusivos de cada cliente. Usan las
 // reglas de Gestión de IDs Dropi; sin ninguna venta leída todavía, siguen en «—».
-const tarjetasDrop = (conVentas: boolean, r: { caida: number; diasNuevo: number }): Tarjeta[] => [
+/** «del 7 nov» (y «, actualízala en Datos» si tiene más de una semana). */
+const textoLecturaCompetencia = (iso: string | null) => {
+  if (!iso) return "";
+  const dia = new Date(iso).toLocaleDateString("es-PA", { day: "numeric", month: "short", timeZone: "America/Costa_Rica" }).replace(".", "");
+  return Date.now() - Date.parse(iso) > 8 * 86_400_000 ? ` (lectura del ${dia}: actualízala en Datos)` : ` (lectura del ${dia})`;
+};
+
+const tarjetasDrop = (conVentas: boolean, conCompetencia: boolean, r: { caida: number; diasNuevo: number }, competenciaDel: string | null = null): Tarjeta[] => [
   {
     id: "activas",
     titulo: "Activas en Drop",
@@ -58,7 +65,17 @@ const tarjetasDrop = (conVentas: boolean, r: { caida: number; diasNuevo: number 
         atajo: { id: "ventas-caida", etiqueta: "Ventas en caída", ayuda: "Filtrar la lista: ventas en caída", filtro: seleccion("ventas", "caida") },
       }
     : { id: "ventas-caida", titulo: "Ventas en caída", detalle: "Todavía sin las ventas de Drop", icono: VentasIcon, color: "ambar" },
-  { id: "bajar-precio", titulo: "Bajar precio", detalle: "Todavía sin la competencia en Drop", icono: AnalisisCompetenciaIcon, color: "rojo" },
+  conCompetencia
+    ? {
+        id: "bajar-precio",
+        titulo: "Bajar precio",
+        detalle: `Alguien vende lo mismo más barato y tiene stock${textoLecturaCompetencia(competenciaDel)}`,
+        icono: AnalisisCompetenciaIcon,
+        color: "rojo",
+        cuenta: (f) => !!f.competidorMasBarato,
+        atajo: { id: "bajar-precio", etiqueta: "Bajar precio", ayuda: "Filtrar la lista: alguien lo vende más barato", filtro: seleccion("competencia", "mas_barato") },
+      }
+    : { id: "bajar-precio", titulo: "Bajar precio", detalle: "Todavía sin la competencia en Drop", icono: AnalisisCompetenciaIcon, color: "rojo" },
   conVentas
     ? {
         id: "verificar-dropshipper",
@@ -118,14 +135,18 @@ const tarjetasDrop = (conVentas: boolean, r: { caida: number; diasNuevo: number 
 export function TableroDrop({
   publicaciones,
   conVentas = false,
+  conCompetencia = false,
+  competenciaDel = null,
   reglas = { caida: 0.5, diasNuevo: 30 },
 }: {
   publicaciones: FilaPublicacionDrop[];
   conVentas?: boolean;
+  conCompetencia?: boolean;
+  competenciaDel?: string | null;
   reglas?: { caida: number; diasNuevo: number };
 }) {
   const [filtros, cambiarFiltros] = useFiltros(DEF_PUBLICACIONES_DROP);
-  const TARJETAS = tarjetasDrop(conVentas, reglas);
+  const TARJETAS = tarjetasDrop(conVentas, conCompetencia, reglas, competenciaDel);
   return (
     <section aria-label="Tablero de acciones" className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(12rem,1fr))]">
       {TARJETAS.map((t) => {
