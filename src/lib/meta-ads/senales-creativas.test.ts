@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { BaseDias } from "./analisis-pedido";
 import { sinResultados } from "./metricas";
-import { leerValorSenales, senalesDeProducto, senalesParaIA } from "./senales-creativas";
+import { leerValorSenales, senalesDeProducto, senalesParaIA, tieneSenales } from "./senales-creativas";
 
 const HOY = "2026-11-24";
 const dia = (fecha: string, videoId: string, gasto: number, compras: number, ctrPct: number, hookPct = 30) => ({
@@ -57,4 +57,11 @@ test("lo que se le da a la IA y lo guardado se lee con validación", () => {
   assert.ok(Array.isArray(t.causas_encontradas));
   assert.equal(leerValorSenales({ generadoEn: "x", items: [s, { producto: 3 }] })!.items.length, 1);
   assert.equal(leerValorSenales(null), null);
+});
+
+test("un producto sin causas ni señales de otros módulos no tiene nada que mostrar", () => {
+  assert.equal(tieneSenales({ causas: [], otras: [] }), false);
+  assert.equal(tieneSenales({ causas: [], otras: undefined }), false);
+  assert.equal(tieneSenales({ causas: [{ tipo: "cansancio", titulo: "t", detalle: "d", accion: "a", fuerza: 1 }], otras: [] }), true);
+  assert.equal(tieneSenales({ causas: [], otras: [{ modulo: "inventario", tipo: "sin_stock", titulo: "t", detalle: "d", accion: "a", gravedad: "alta" }] }), true);
 });
