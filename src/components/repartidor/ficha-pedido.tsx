@@ -6,7 +6,8 @@ import { useEffect, useMemo, useState } from "react";
 import { entregarPedido, noEntregarPedido } from "@/app/repartidor/actions";
 import { useToast } from "@/components/ui/toast";
 import type { PedidoRuta } from "@/lib/despacho/datos-repartidor";
-import { FORMAS_PAGO, MOTIVOS, plata, type FormaPago } from "@/lib/despacho/panel-repartidor";
+import { FORMAS_PAGO, MOTIVOS, SIN_FECHA, plata, type FormaPago } from "@/lib/despacho/panel-repartidor";
+import { TOPE_SUBIDA, comprimirFoto } from "@/lib/imagen/comprimir-foto";
 import { PastillaEstado, enlaceMapa, telefonoLimpio } from "./piezas";
 
 /** La ubicación del celular, si la da en unos segundos (no frena la entrega si no). */
@@ -68,7 +69,8 @@ function Foto({ id, foto, alElegir, texto, tieneGuardadas }: { id: string; foto:
         <label htmlFor={id} className="flex min-h-10 cursor-pointer items-center justify-center rounded-[10px] border border-[#dcc6f3] bg-white text-[13px] font-semibold text-[#5b2386]">
           {foto ? "Tomar otra foto" : texto}
         </label>
-        <input id={id} type="file" accept="image/*,application/pdf" capture="environment" className="sr-only" onChange={(e) => alElegir(e.target.files?.[0] ?? null)} />
+        {/* Sin «capture»: el celular ofrece tomar la foto o elegirla de la galería (25 nov 2026, pedido de Hernán). */}
+        <input id={id} type="file" accept="image/*" className="sr-only" onChange={(e) => alElegir(e.target.files?.[0] ?? null)} />
       </div>
     </div>
   );
@@ -81,7 +83,7 @@ function HojaEntregado({ pedido, volver, alCerrar }: { pedido: PedidoRuta; volve
   const [forma, setForma] = useState<FormaPago>("efectivo");
   const [monto, setMonto] = useState(pedido.porCobrar !== null ? pedido.porCobrar.toFixed(2) : "");
   const [foto, setFoto] = useState<File | null>(null);
-  const [numero, setNumero] = useState("");
+  const [comentario, setComentario] = useState("");
   const [enviando, setEnviando] = useState(false);
   const nombreForma = FORMAS_PAGO.find((f) => f.id === forma)!.nombre.replace(" (tarjeta)", "");
   const montoN = Number(monto.replace(",", "."));
@@ -89,22 +91,32 @@ function HojaEntregado({ pedido, volver, alCerrar }: { pedido: PedidoRuta; volve
 
   async function confirmar() {
     setEnviando(true);
-    const d = new FormData();
-    d.set("forma", forma);
-    d.set("monto", monto);
-    if (numero.trim()) d.set("numero", numero.trim());
-    if (foto) d.append("foto", foto);
-    const u = await pedirUbicacion();
-    if (u) {
-      d.set("lat", String(u.lat));
-      d.set("lng", String(u.lng));
+    try {
+      const d = new FormData();
+      d.set("forma", forma);
+      d.set("monto", monto);
+      if (comentario.trim()) d.set("comentario", comentario.trim());
+      // La foto se achica antes de subirla: entera pesa más de lo que recibe el sistema y el envío se quedaba esperando.
+      if (foto) {
+        const chica = await comprimirFoto(foto);
+        if (chica.size > TOPE_SUBIDA) return mostrarToast("La foto pesa demasiado: toma otra o elige una más pequeña.", "destructive");
+        d.append("foto", chica);
+      }
+      const u = await pedirUbicacion();
+      if (u) {
+        d.set("lat", String(u.lat));
+        d.set("lng", String(u.lng));
+      }
+      const r = await entregarPedido(pedido.itemId, d);
+      if (r.error) return mostrarToast(r.error, "destructive");
+      mostrarToast(`#${pedido.numero} entregado.`);
+      router.push(volver);
+      router.refresh();
+    } catch {
+      mostrarToast("No se pudo guardar: revisa la señal y vuelve a probar.", "destructive");
+    } finally {
+      setEnviando(false);
     }
-    const r = await entregarPedido(pedido.itemId, d);
-    setEnviando(false);
-    if (r.error) return mostrarToast(r.error, "destructive");
-    mostrarToast(`#${pedido.numero} entregado.`);
-    router.push(volver);
-    router.refresh();
   }
 
   return (
@@ -150,13 +162,15 @@ function HojaEntregado({ pedido, volver, alCerrar }: { pedido: PedidoRuta; volve
           <span className="text-xs font-semibold text-[#3f3f46]">
             Comprobante de {nombreForma} <span className="text-[#be123c]">*</span>
           </span>
-          <Foto id={`comprobante-${pedido.itemId}`} foto={foto} alElegir={setFoto} texto="Tomar foto" tieneGuardadas={pedido.comprobantes} />
-          <label className="flex flex-col gap-1">
-            <span className="text-[11px] text-[#636363]">N.º de comprobante (opcional)</span>
-            <input value={numero} onChange={(e) => setNumero(e.target.value)} maxLength={40} placeholder="Ej. 8734521" className="min-h-9 rounded-lg border border-[#8a8a8a] px-2.5 text-sm" />
-          </label>
+          <Foto id={`comprobante-${pedido.itemId}`} foto={foto} alElegir={setFoto} texto="Tomar o elegir foto" tieneGuardadas={pedido.comprobantes} />
         </div>
       )}
+
+      {/* El comentario (25 nov 2026: en lugar del número de comprobante, y también en efectivo). */}
+      <label className="flex flex-col gap-1">
+        <span className="text-xs font-semibold text-[#3f3f46]">Comentario (opcional)</span>
+        <textarea rows={2} value={comentario} onChange={(e) => setComentario(e.target.value)} maxLength={500} placeholder="Ej. pagó con billete de 50, lo recibió el portero…" className="resize-none rounded-[10px] border border-[#8a8a8a] px-2.5 py-2 text-sm" />
+      </label>
 
       <p className="m-0 rounded-[10px] bg-[#fafafa] px-2.5 py-2 text-xs text-[#636363]">
         Se guardan solas la hora de la entrega y tu ubicación. En Envíos Delivery el pedido pasa a{" "}
@@ -181,6 +195,7 @@ function HojaNoEntregado({ pedido, inicial, fechas, volver, alCerrar }: { pedido
   const [motivo, setMotivo] = useState<string>(MOTIVOS[0]);
   const [fecha, setFecha] = useState(fechas[0]?.iso ?? "");
   const [otra, setOtra] = useState(false);
+  const [ninguna, setNinguna] = useState(false);
   const [comentario, setComentario] = useState("");
   const [foto, setFoto] = useState<File | null>(null);
   const [enviando, setEnviando] = useState(false);
@@ -188,23 +203,32 @@ function HojaNoEntregado({ pedido, inicial, fechas, volver, alCerrar }: { pedido
 
   async function guardar() {
     setEnviando(true);
-    const d = new FormData();
-    d.set("tipo", tipo);
-    d.set("motivo", motivo);
-    if (comentario.trim()) d.set("comentario", comentario.trim());
-    if (tipo === "POSPUESTO") d.set("fecha", fecha);
-    if (foto) d.append("foto", foto);
-    const u = await pedirUbicacion();
-    if (u) {
-      d.set("lat", String(u.lat));
-      d.set("lng", String(u.lng));
+    try {
+      const d = new FormData();
+      d.set("tipo", tipo);
+      d.set("motivo", motivo);
+      if (comentario.trim()) d.set("comentario", comentario.trim());
+      if (tipo === "POSPUESTO") d.set("fecha", ninguna ? SIN_FECHA : fecha);
+      if (foto) {
+        const chica = await comprimirFoto(foto);
+        if (chica.size > TOPE_SUBIDA) return mostrarToast("La foto pesa demasiado: toma otra o elige una más pequeña.", "destructive");
+        d.append("foto", chica);
+      }
+      const u = await pedirUbicacion();
+      if (u) {
+        d.set("lat", String(u.lat));
+        d.set("lng", String(u.lng));
+      }
+      const r = await noEntregarPedido(pedido.itemId, d);
+      if (r.error) return mostrarToast(r.error, "destructive");
+      mostrarToast(tipo === "POSPUESTO" ? `#${pedido.numero} pospuesto.` : `#${pedido.numero} marcado fallido.`);
+      router.push(volver);
+      router.refresh();
+    } catch {
+      mostrarToast("No se pudo guardar: revisa la señal y vuelve a probar.", "destructive");
+    } finally {
+      setEnviando(false);
     }
-    const r = await noEntregarPedido(pedido.itemId, d);
-    setEnviando(false);
-    if (r.error) return mostrarToast(r.error, "destructive");
-    mostrarToast(tipo === "POSPUESTO" ? `#${pedido.numero} pospuesto.` : `#${pedido.numero} marcado fallido.`);
-    router.push(volver);
-    router.refresh();
   }
 
   const chip = (activo: boolean) => `min-h-[38px] rounded-full px-3 text-[13px] ${activo ? "border-2 border-primario bg-primario-suave font-semibold text-[#5b2386]" : "border border-[#e3e3e3] bg-white font-medium text-[#3f3f46]"}`;
@@ -250,17 +274,18 @@ function HojaNoEntregado({ pedido, inicial, fechas, volver, alCerrar }: { pedido
       {tipo === "POSPUESTO" && (
         <div className="flex flex-col gap-1.5">
           <span className="text-xs font-semibold text-[#3f3f46]">¿Para cuándo queda?</span>
-          <span className="flex gap-1.5">
+          <span className="grid grid-cols-2 gap-1.5">
             {fechas.map((f) => (
               <button
                 key={f.iso}
                 type="button"
-                aria-pressed={!otra && fecha === f.iso}
+                aria-pressed={!otra && !ninguna && fecha === f.iso}
                 onClick={() => {
                   setOtra(false);
+                  setNinguna(false);
                   setFecha(f.iso);
                 }}
-                className={`min-h-10 flex-1 rounded-[10px] text-[13px] ${!otra && fecha === f.iso ? "border-2 border-primario bg-primario-suave font-semibold text-[#5b2386]" : "border border-[#e3e3e3] bg-white font-medium text-[#3f3f46]"}`}
+                className={`min-h-10 flex-1 rounded-[10px] text-[13px] ${!otra && !ninguna && fecha === f.iso ? "border-2 border-primario bg-primario-suave font-semibold text-[#5b2386]" : "border border-[#e3e3e3] bg-white font-medium text-[#3f3f46]"}`}
               >
                 {f.texto}
               </button>
@@ -268,10 +293,25 @@ function HojaNoEntregado({ pedido, inicial, fechas, volver, alCerrar }: { pedido
             <button
               type="button"
               aria-pressed={otra}
-              onClick={() => setOtra(true)}
+              onClick={() => {
+                setOtra(true);
+                setNinguna(false);
+              }}
               className={`min-h-10 flex-1 rounded-[10px] text-[13px] ${otra ? "border-2 border-primario bg-primario-suave font-semibold text-[#5b2386]" : "border border-[#e3e3e3] bg-white font-medium text-[#3f3f46]"}`}
             >
               Otra fecha
+            </button>
+            {/* «Ninguna» (25 nov 2026): no se reprograma; vuelve como devolución. */}
+            <button
+              type="button"
+              aria-pressed={ninguna}
+              onClick={() => {
+                setNinguna(true);
+                setOtra(false);
+              }}
+              className={`min-h-10 flex-1 rounded-[10px] text-[13px] ${ninguna ? "border-2 border-primario bg-primario-suave font-semibold text-[#5b2386]" : "border border-[#e3e3e3] bg-white font-medium text-[#3f3f46]"}`}
+            >
+              Ninguna
             </button>
           </span>
           {otra && <input type="date" aria-label="Otra fecha" value={fecha} min={fechas[0]?.iso} onChange={(e) => setFecha(e.target.value)} className="min-h-10 rounded-[10px] border border-[#8a8a8a] px-2.5 text-sm" />}
@@ -287,13 +327,15 @@ function HojaNoEntregado({ pedido, inicial, fechas, volver, alCerrar }: { pedido
         <span className="text-[13px] font-semibold">
           Evidencia <span className="font-medium text-[#636363]">(obligatoria si es fallido)</span>
         </span>
-        <Foto id={`evidencia-${pedido.itemId}`} foto={foto} alElegir={setFoto} texto="Tomar foto" tieneGuardadas={pedido.comprobantes} />
+        <Foto id={`evidencia-${pedido.itemId}`} foto={foto} alElegir={setFoto} texto="Tomar o elegir foto" tieneGuardadas={pedido.comprobantes} />
         <span className="text-xs text-[#636363]">Foto de la llamada, del chat o de la puerta. Un fallido con evidencia se te paga; un pospuesto, no.</span>
       </div>
 
       <p className="m-0 rounded-[10px] bg-[#fafafa] px-2.5 py-2 text-xs text-[#636363]">
         {tipo === "POSPUESTO"
-          ? `Queda en Envíos Delivery con tu motivo, para que Atención al cliente de ${pedido.tiendaTitulo} hable con el cliente. El pedido pasa al día que elegiste.`
+          ? ninguna
+            ? `Queda en Envíos Delivery con tu motivo, sin fecha nueva: el pedido vuelve como devolución. Atención al cliente de ${pedido.tiendaTitulo} lo ve ahí.`
+            : `Queda en Envíos Delivery con tu motivo, para que Atención al cliente de ${pedido.tiendaTitulo} hable con el cliente. El pedido pasa al día que elegiste.`
           : `Queda en Envíos Delivery con tu motivo y la evidencia, para que Atención al cliente de ${pedido.tiendaTitulo} hable con el cliente.`}
       </p>
 
@@ -366,9 +408,12 @@ export function FichaPedidoRepartidor({ pedido, fechas, volver, seMarca }: { ped
           )}
           <div className="h-px bg-[#e3e3e3]" />
           <div className="flex flex-col gap-0.5">
+            <span className={seccion}>ZONA</span>
+            <span className="text-sm">{[pedido.cliente?.corregimiento?.trim(), pedido.zona].filter(Boolean).join(" · ") || "Sin zona en el pedido"}</span>
+          </div>
+          <div className="flex flex-col gap-0.5">
             <span className={seccion}>DIRECCIÓN</span>
-            <span className="text-sm">{[pedido.cliente?.corregimiento?.trim(), pedido.cliente?.direccion?.trim()].filter(Boolean).join(" · ") || "Sin dirección en el pedido"}</span>
-            {pedido.cliente?.notas?.trim() && <span className="text-xs text-[#636363]">{pedido.cliente.notas}</span>}
+            <span className="text-sm">{pedido.cliente?.direccion?.trim() || "Sin dirección en el pedido"}</span>
           </div>
           {mapa && (
             <a href={mapa} target="_blank" rel="noreferrer" className="flex min-h-11 items-center justify-center rounded-[10px] border border-[#e3e3e3] bg-white text-sm font-semibold text-[#18181b] no-underline">
@@ -382,6 +427,14 @@ export function FichaPedidoRepartidor({ pedido, fechas, volver, seMarca }: { ped
           {pedido.productos.length ? pedido.productos.map((p, i) => <span key={i} className="text-sm">{p}</span>) : <span className="text-sm text-[#636363]">El pedido no tiene el detalle de productos en el sistema.</span>}
           <span className="text-xs text-[#636363]">Revisa que sea este producto antes de entregar.</span>
         </section>
+
+        {/* La nota del pedido en Shopify: indicaciones del cliente o lo que anotan los asesores (25 nov 2026). */}
+        {pedido.cliente?.notas?.trim() && (
+          <section className="flex flex-col gap-0.5 rounded-[14px] border border-[#dcc6f3] bg-primario-suave px-3.5 py-2.5">
+            <span className="text-[11px] font-semibold tracking-[0.04em] text-[#5b2386]">NOTAS DEL PEDIDO (SHOPIFY)</span>
+            <span className="text-[13px] whitespace-pre-line text-[#3f3f46]">{pedido.cliente.notas}</span>
+          </section>
+        )}
 
         {pedido.notaEquipo && (
           <section className="flex flex-col gap-0.5 rounded-[14px] border border-[#f4d58a] bg-[#fef3c7] px-3.5 py-2.5">

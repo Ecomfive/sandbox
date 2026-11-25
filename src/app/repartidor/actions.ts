@@ -6,7 +6,7 @@ import { registrarAuditoria } from "@/lib/auditoria";
 import { getUsuarioSesion } from "@/lib/auth";
 import { cargarRuta } from "@/lib/despacho/datos-repartidor";
 import { rangoDespacho } from "@/lib/despacho/datos";
-import { FORMAS_PAGO, MOTIVOS, esFormaPago, nombreRepartidor, puedeMarcar, sumarDias } from "@/lib/despacho/panel-repartidor";
+import { FORMAS_PAGO, MOTIVOS, SIN_FECHA, esFormaPago, nombreRepartidor, puedeMarcar, sumarDias } from "@/lib/despacho/panel-repartidor";
 import { cuentaRepartidorActual } from "@/lib/despacho/sesion-repartidor";
 import type { CuentaRepartidor } from "@/lib/despacho/cuenta-repartidor";
 import { grupoDeEstado, leerReglasEstado } from "@/lib/monday/columnas";
@@ -119,7 +119,8 @@ export async function entregarPedido(itemId: string, datos: FormData): Promise<R
   const t = String(datos.get("monto") ?? "").trim().replace(/[$\s,]/g, "");
   const monto = t ? Number(t) : NaN;
   if (!Number.isFinite(monto) || monto < 0 || monto > 100_000) return { error: "Escribe el monto cobrado." };
-  const numero = String(datos.get("numero") ?? "").replace(/\s+/g, " ").trim().slice(0, 40) || null;
+  // El comentario del repartidor (25 nov 2026: en lugar del número de comprobante, y también en efectivo).
+  const comentario = String(datos.get("comentario") ?? "").replace(/\s+/g, " ").trim().slice(0, 500) || null;
   const fotos = await subirFotos(supabase, itemId, (fila.comprobantes as string[] | null) ?? [], datos);
   if ("error" in fotos) return fotos;
   if (forma !== "efectivo" && fotos.lista.length === 0) return { error: "Toma la foto del comprobante." };
@@ -134,12 +135,12 @@ export async function entregarPedido(itemId: string, datos: FormData): Promise<R
       edo_pago: "PAGADO",
       forma_pago: etiqueta,
       monto_cobrado: Math.round(monto * 100) / 100,
-      comprobante_numero: numero,
       comprobantes: fotos.lista,
+      ...(comentario ? { comentario } : {}),
     })
     .eq("item_id", itemId);
   if (error) return { error: "No se pudo guardar. Vuelve a probar." };
-  await registrar(supabase, itemId, cuenta, `Entregado · ${etiqueta} · $${monto.toFixed(2)}${numero ? ` · comprobante ${numero}` : ""}${fotos.nuevas ? ` · ${fotos.nuevas} foto${fotos.nuevas === 1 ? "" : "s"}` : ""}`);
+  await registrar(supabase, itemId, cuenta, `Entregado · ${etiqueta} · $${monto.toFixed(2)}${comentario ? ` · ${comentario}` : ""}${fotos.nuevas ? ` · ${fotos.nuevas} foto${fotos.nuevas === 1 ? "" : "s"}` : ""}`);
   // Un reparto de Cambios y reembolsos entregado pasa su solicitud a Hecho (como en el tablero).
   await hechoDesdeDespacho(supabase, itemId, { id: null, nombre: quien(cuenta) }).catch(() => null);
   actualizarPedidosDespues(cuenta);
@@ -159,13 +160,18 @@ export async function noEntregarPedido(itemId: string, datos: FormData): Promise
   const motivo = String(datos.get("motivo") ?? "");
   if (!(MOTIVOS as readonly string[]).includes(motivo)) return { error: "Elige el motivo." };
   const comentario = String(datos.get("comentario") ?? "").replace(/\s+/g, " ").trim().slice(0, 500);
-  const fecha = tipo === "POSPUESTO" ? String(datos.get("fecha") ?? "") : "";
+  const fechaCruda = tipo === "POSPUESTO" ? String(datos.get("fecha") ?? "") : "";
+  // «Ninguna»: no se reprograma; el pedido vuelve como devolución.
+  const sinFecha = tipo === "POSPUESTO" && fechaCruda === SIN_FECHA;
+  const fecha = sinFecha ? "" : fechaCruda;
   const hoy = hoyPanama();
-  if (tipo === "POSPUESTO" && (!esDia(fecha) || fecha <= (fila.fecha_despacho as string) || fecha > sumarDias(hoy, 60))) return { error: "Elige para cuándo queda." };
+  if (tipo === "POSPUESTO" && !sinFecha && (!esDia(fecha) || fecha <= (fila.fecha_despacho as string) || fecha > sumarDias(hoy, 60))) return { error: "Elige para cuándo queda." };
   const fotos = await subirFotos(supabase, itemId, (fila.comprobantes as string[] | null) ?? [], datos);
   if ("error" in fotos) return fotos;
   if (tipo === "FALLIDO" && fotos.lista.length === 0) return { error: "Un fallido lleva evidencia: toma la foto de la llamada, del chat o de la puerta." };
-  const texto = [motivo, comentario && comentario !== motivo ? comentario : ""].filter(Boolean).join(" · ") + (tipo === "POSPUESTO" ? ` · pasa al ${fecha.slice(8, 10)}/${fecha.slice(5, 7)}` : "");
+  const texto =
+    [motivo, comentario && comentario !== motivo ? comentario : ""].filter(Boolean).join(" · ") +
+    (tipo !== "POSPUESTO" ? "" : sinFecha ? " · sin fecha nueva: vuelve como devolución" : ` · pasa al ${fecha.slice(8, 10)}/${fecha.slice(5, 7)}`);
   const { error } = await supabase
     .from("mon_despachos")
     .update({
@@ -175,12 +181,12 @@ export async function noEntregarPedido(itemId: string, datos: FormData): Promise
       estado_grupo: await estadoGrupo(supabase, tipo),
       comentario: texto.slice(0, 1000),
       comprobantes: fotos.lista,
-      reprogramado_para: tipo === "POSPUESTO" ? fecha : null,
+      reprogramado_para: tipo === "POSPUESTO" && !sinFecha ? fecha : null,
     })
     .eq("item_id", itemId);
   if (error) return { error: "No se pudo guardar. Vuelve a probar." };
   await registrar(supabase, itemId, cuenta, `${tipo === "POSPUESTO" ? "Pospuesto" : "Fallido"}: ${texto}${fotos.nuevas ? ` · ${fotos.nuevas} foto${fotos.nuevas === 1 ? "" : "s"}` : ""}`);
-  if (tipo === "POSPUESTO") {
+  if (tipo === "POSPUESTO" && !sinFecha) {
     // El pedido sigue en la ruta del día nuevo (mismo repartidor y pedido), salvo que ya esté ahí.
     const { data: ya } = await supabase.from("mon_despachos").select("item_id").eq("clase", "ciudad").is("archivado_en", null).eq("fecha_despacho", fecha).eq("numero_pedido", fila.numero_pedido as string).limit(1);
     if (!ya?.length && fila.numero_pedido) {

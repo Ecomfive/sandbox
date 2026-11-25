@@ -7,6 +7,7 @@ import { enviarCierre } from "@/app/repartidor/actions";
 import { useToast } from "@/components/ui/toast";
 import type { CierreGuardado } from "@/lib/despacho/datos-repartidor";
 import { plata, type ResumenCierre } from "@/lib/despacho/panel-repartidor";
+import { TOPE_SUBIDA, comprimirFoto } from "@/lib/imagen/comprimir-foto";
 import { ElegirClave } from "./elegir-clave";
 import { NavRepartidor, consultaDia } from "./piezas";
 
@@ -47,14 +48,27 @@ export function CierreDia({
 
   async function enviar() {
     setEnviando(true);
-    const d = new FormData();
-    for (const [tienda, archivo] of Object.entries(depositos)) if (archivo) d.set(`deposito:${tienda}`, archivo);
-    const r = await enviarCierre(dia, d);
-    setEnviando(false);
-    if (r.error) return mostrarToast(r.error, "destructive");
-    mostrarToast("Cierre enviado a Soporte.");
-    setDepositos({});
-    router.refresh();
+    try {
+      const d = new FormData();
+      // Las fotos se achican: enteras pesan más de lo que recibe el sistema (25 nov 2026). Todas juntas tienen que caber en un envío.
+      let total = 0;
+      for (const [tienda, archivo] of Object.entries(depositos)) {
+        if (!archivo) continue;
+        const chica = await comprimirFoto(archivo, 1400, 0.75);
+        total += chica.size;
+        d.set(`deposito:${tienda}`, chica);
+      }
+      if (total > TOPE_SUBIDA) return mostrarToast("Las fotos de los depósitos pesan demasiado juntas: envía el cierre con una y vuelve a enviarlo con la siguiente.", "destructive");
+      const r = await enviarCierre(dia, d);
+      if (r.error) return mostrarToast(r.error, "destructive");
+      mostrarToast("Cierre enviado a Soporte.");
+      setDepositos({});
+      router.refresh();
+    } catch {
+      mostrarToast("No se pudo enviar: revisa la señal y vuelve a probar.", "destructive");
+    } finally {
+      setEnviando(false);
+    }
   }
 
   return (
@@ -135,7 +149,7 @@ export function CierreDia({
                 {!validado && seEnvia ? (
                   <label htmlFor={id} className={`cursor-pointer rounded-lg px-1.5 py-1 text-[11px] font-semibold ${elegido || guardado ? "border border-[#15803d] text-[#15803d]" : "border border-dashed border-[#b38ad9] text-[#5b2386]"}`}>
                     {elegido ? "Foto lista ✓" : guardado ? "Depósito ✓" : "Foto depósito"}
-                    <input id={id} type="file" accept="image/*,application/pdf" capture="environment" className="sr-only" onChange={(ev) => setDepositos((d) => ({ ...d, [e.tienda]: ev.target.files?.[0] ?? null }))} />
+                    <input id={id} type="file" accept="image/*" className="sr-only" onChange={(ev) => setDepositos((d) => ({ ...d, [e.tienda]: ev.target.files?.[0] ?? null }))} />
                   </label>
                 ) : (
                   <span className="text-[11px] font-semibold text-[#15803d]">{guardado ? "Depósito ✓" : ""}</span>

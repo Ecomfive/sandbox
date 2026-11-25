@@ -7,6 +7,9 @@ import { aFila, COLUMNAS_DESPACHO, COLUMNAS_PANEL, tableroConsolidado } from "./
 import { sinDuplicados } from "./etiquetas";
 import { nombreRepartidor, resumenCierre, seccionDe, tituloTienda, type ResumenCierre, type Seccion } from "./panel-repartidor";
 import type { CuentaRepartidor } from "./cuenta-repartidor";
+import { enlazarOrden, unidadDeTexto, variantesPedido, type OrdenCandidata } from "@/lib/monday/columnas";
+import { zonaDeEtiquetas } from "@/lib/tienda/ordenes-finanzas";
+import { unidadDeTienda } from "@/lib/ventas/matriz";
 
 export interface PedidoRuta {
   itemId: string;
@@ -22,7 +25,10 @@ export interface PedidoRuta {
   comprobantes: number;
   comentario: string | null;
   productos: string[];
+  /** Del pedido de la tienda (Shopify o la Matriz): nombre, teléfono, dirección, corregimiento y la nota del pedido (indicaciones del cliente o de los asesores). */
   cliente: { nombre: string | null; telefono: string | null; direccion: string | null; corregimiento: string | null; notas: string | null } | null;
+  /** «Ciudad» o «Interior», por las etiquetas del pedido. */
+  zona: string | null;
   /** La última nota del equipo (atención al cliente) en el pedido. */
   notaEquipo: string | null;
   reprogramadoPara: string | null;
@@ -66,14 +72,34 @@ export async function cargarRuta(supabase: SupabaseClient, cuenta: CuentaReparti
     .filter((f) => (f.numero ?? "").trim().toUpperCase() !== "CIERRE")
     .sort((a, b) => a.posicion - b.posicion || (a.numero ?? "").localeCompare(b.numero ?? ""));
 
-  const ordenes = [...new Set(filas.map((f) => f.ordenId).filter(Boolean) as string[])];
-  const [clientes, lineas, notas] = ordenes.length
+  // El pedido de cada fila, para mostrar su cliente y productos. Una fila sin pedido enlazado (las del tablero de prueba, o una que aún no enlazó) se
+  // busca por su número y su tienda SOLO para mostrarlo (25 nov 2026, pedido de Hernán: «el delivery debe ver todo»): no se enlaza, así que lo que se
+  // marque en ella no cambia ese pedido.
+  const pedidoDe = new Map<string, string>();
+  for (const f of filas) if (f.ordenId) pedidoDe.set(f.itemId, f.ordenId);
+  const sinPedido = filas.filter((f) => !f.ordenId && f.numero);
+  if (sinPedido.length) {
+    const variantes = [...new Set(sinPedido.flatMap((f) => variantesPedido(f.numero)))];
+    const [{ data: unidades }, { data: cands }] = await Promise.all([
+      supabase.from("fin_unidades").select("id, nombre"),
+      supabase.from("ven_ordenes").select("id, unidad_id, numero, periodo").in("numero", variantes.slice(0, 500)),
+    ]);
+    const candidatas: OrdenCandidata[] = ((cands ?? []) as Record<string, unknown>[]).map((o) => ({ id: String(o.id), unidad_id: String(o.unidad_id), numero: String(o.numero), periodo: String(o.periodo).slice(0, 10) }));
+    for (const f of sinPedido) {
+      const unidad = unidadDeTexto(f.tienda, (unidades ?? []) as { id: string; nombre: string }[], unidadDeTienda);
+      const o = enlazarOrden(f.numero, unidad, candidatas);
+      if (o) pedidoDe.set(f.itemId, o.id);
+    }
+  }
+  const ordenes = [...new Set(pedidoDe.values())];
+  const [clientes, lineas, notas, etiquetas] = ordenes.length
     ? await Promise.all([
         supabase.from("ven_ordenes_clientes").select("orden_id, nombre, telefono, direccion, corregimiento, notas").in("orden_id", ordenes),
         supabase.from("ven_orden_lineas").select("orden_id, linea, producto, cantidad, es_servicio").in("orden_id", ordenes).order("linea"),
         supabase.from("ven_orden_notas").select("orden_id, texto, creado_en").in("orden_id", ordenes).order("creado_en", { ascending: false }),
+        supabase.from("ven_ordenes").select("id, etiquetas").in("id", ordenes),
       ])
-    : [{ data: [] }, { data: [] }, { data: [] }];
+    : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }];
   const clienteDe = new Map(((clientes.data ?? []) as Record<string, unknown>[]).map((c) => [String(c.orden_id), c]));
   const productosDe = new Map<string, string[]>();
   for (const l of (lineas.data ?? []) as Record<string, unknown>[]) {
@@ -84,8 +110,11 @@ export async function cargarRuta(supabase: SupabaseClient, cuenta: CuentaReparti
   const notaDe = new Map<string, string>();
   for (const n of (notas.data ?? []) as Record<string, unknown>[]) if (!notaDe.has(String(n.orden_id))) notaDe.set(String(n.orden_id), String(n.texto ?? ""));
 
+  const zonaDe = new Map(((etiquetas.data ?? []) as Record<string, unknown>[]).map((o) => [String(o.id), zonaDeEtiquetas((o.etiquetas as string | null) ?? null)]));
+
   const pedidos: PedidoRuta[] = filas.map((f) => {
-    const c = f.ordenId ? (clienteDe.get(f.ordenId) as Record<string, string | null> | undefined) : undefined;
+    const orden = pedidoDe.get(f.itemId) ?? null;
+    const c = orden ? (clienteDe.get(orden) as Record<string, string | null> | undefined) : undefined;
     return {
       itemId: f.itemId,
       numero: (f.numero ?? "").replace(/^#/, ""),
@@ -99,9 +128,10 @@ export async function cargarRuta(supabase: SupabaseClient, cuenta: CuentaReparti
       costeEnvio: f.costeEnvio,
       comprobantes: f.comprobantes,
       comentario: f.comentario,
-      productos: f.ordenId ? (productosDe.get(f.ordenId) ?? []) : [],
+      productos: orden ? (productosDe.get(orden) ?? []) : [],
       cliente: c ? { nombre: c.nombre ?? null, telefono: c.telefono ?? null, direccion: c.direccion ?? null, corregimiento: c.corregimiento ?? null, notas: c.notas ?? null } : null,
-      notaEquipo: f.ordenId ? (notaDe.get(f.ordenId) ?? null) : null,
+      zona: orden ? (zonaDe.get(orden) ?? null) : null,
+      notaEquipo: orden ? (notaDe.get(orden) ?? null) : null,
       reprogramadoPara: reprogramado.get(f.itemId) ?? null,
     };
   });

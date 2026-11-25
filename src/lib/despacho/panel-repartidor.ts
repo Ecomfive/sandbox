@@ -23,7 +23,10 @@ export type FormaPago = (typeof FORMAS_PAGO)[number]["id"];
 export const esFormaPago = (v: unknown): v is FormaPago => FORMAS_PAGO.some((f) => f.id === v);
 
 /** Los motivos de un pospuesto o fallido, de lo que los repartidores anotan hoy en Envíos Delivery. */
-export const MOTIVOS = ["No responde", "Me deja en visto", "No está en casa", "Pidió otra fecha", "No lo quiso", "Dirección incompleta", "Producto equivocado"] as const;
+export const MOTIVOS = ["No responde", "Me deja en visto", "No está en casa", "No tiene dinero", "Pidió otra fecha", "No lo quiso", "Dirección incompleta", "Producto equivocado"] as const;
+
+/** «Ninguna» fecha en un pospuesto (25 nov 2026, pedido de Hernán): no se reprograma, el pedido vuelve como devolución. */
+export const SIN_FECHA = "ninguna";
 
 /** El nombre del repartidor sin espacios de más ni mayúsculas distintas («YOSELYN    VIAÑA» = «Yoselyn Viaña»). */
 export const nombreRepartidor = (t: string | null | undefined) =>
