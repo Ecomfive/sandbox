@@ -9,6 +9,8 @@ import { tieneHistorialSuficiente, type AnalisisHistorico } from "./historico";
 import { calcularHistorico, type HistoricoCargado } from "./historico-datos";
 import { claveDeInterpretacion, leerInterpretacionGuardada, type OpinionIA } from "./interpretacion-guardada";
 import { leerInterpretacion, pedidoInterpretacion } from "./interpretar-ia";
+import { investigarProblemasDeEntrega } from "./investigacion-datos";
+import { textoParaIA, type InvestigacionProducto } from "./investigacion-entrega";
 import { evaluarVigilanciasGuardadas } from "./vigilancias";
 
 export { analisisViejo, claveDeAnalisis, HORAS_ANALISIS_VIGENTE, type AnalisisGuardado } from "./analisis-tipos";
@@ -52,8 +54,8 @@ export function iasParaInterpretar(conectadas: readonly ProveedorIA[]): Proveedo
 }
 
 /** Pide la interpretación a cada IA conectada, a la vez; las que fallan se saltan. */
-async function interpretarConTodas(analisis: AnalisisHistorico, paisNombre: string): Promise<OpinionIA[]> {
-  const { instrucciones, texto } = pedidoInterpretacion(analisis);
+async function interpretarConTodas(analisis: AnalisisHistorico, paisNombre: string, investigaciones: readonly InvestigacionProducto[]): Promise<OpinionIA[]> {
+  const { instrucciones, texto } = pedidoInterpretacion(analisis, investigaciones.map(textoParaIA));
   const opiniones = await Promise.all(
     iasParaInterpretar(proveedoresConectados()).map(async (proveedor): Promise<OpinionIA | null> => {
       const r = await pedirIAEn(proveedor, { instrucciones, texto, imagenes: [] }, { operacion: "meta_interpretacion", modulo: "anuncios-meta", referencia: `Análisis automático · ${paisNombre}` }, "analisis");
@@ -95,7 +97,9 @@ export async function refrescarAnalisisMeta(supabase: SupabaseClient, o: { paisI
     if (!proveedoresConectados().length) return { analizado: true, interpretado: false, motivo: "Ninguna IA de texto conectada." };
     const previa = await leerInterpretacionGuardada(supabase, o.paisId);
     if (previa && horasDesde(previa.generadaEn) < HORAS_ENTRE_INTERPRETACIONES) return { analizado: true, interpretado: false, motivo: "La interpretación de hoy ya está hecha." };
-    const opiniones = await interpretarConTodas(h.analisis, o.paisNombre);
+    // Antes de interpretar se investiga por qué no se entregan los productos con problema, para que las recomendaciones usen causas encontradas y no «revisa por qué».
+    const investigaciones = await investigarProblemasDeEntrega(supabase, { paisId: o.paisId, hoy: o.hoy, analisis: h.analisis, tiendas: h.tiendas });
+    const opiniones = await interpretarConTodas(h.analisis, o.paisNombre, investigaciones);
     if (!opiniones.length) return { analizado: true, interpretado: false, motivo: "Las IA no devolvieron una interpretación que sirva." };
     await guardar(supabase, claveDeInterpretacion(o.paisId), { generadaEn: new Date().toISOString(), opiniones }, "Sistema");
     return { analizado: true, interpretado: true };
