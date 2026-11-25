@@ -1,5 +1,6 @@
 import { dolaresEnteros } from "@/lib/meta-ads/metricas";
 import type { SenalesCreativas, VideoSenal } from "@/lib/meta-ads/senales-creativas";
+import { NOMBRE_MODULO_SENAL } from "@/lib/meta-ads/senales-modulos";
 import { BarraProgreso } from "./graficas";
 import { SeccionPlegable } from "./plegable";
 
@@ -46,13 +47,33 @@ function Producto({ s }: { s: SenalesCreativas }) {
                 {s.videosActivos} videos · {pct(s.parteVieja)} del gasto en videos viejos · {s.nuevos14.videos} nuevos
               </span>
             </span>
-            <span className="mt-1.5 block text-sm text-muted-foreground">{s.causas[0] ? s.causas[0].titulo : "Sin señales de cansancio: los creativos se ven sanos."}</span>
+            <span className="mt-1.5 block text-sm text-muted-foreground">{(s.otras ?? []).find((o) => o.gravedad === "alta")?.titulo ?? (s.causas[0] ? s.causas[0].titulo : (s.otras ?? [])[0]?.titulo ?? "Sin señales de cansancio: los creativos se ven sanos.")}</span>
           </span>
           <svg aria-hidden="true" viewBox="0 0 16 16" width="16" height="16" className="mt-1 shrink-0 text-muted-foreground transition-transform group-open:rotate-90 motion-reduce:transition-none" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             <path d="M6 3.5 10.5 8 6 12.5" />
           </svg>
         </summary>
         <div className="flex flex-col gap-3 border-t border-border px-3 py-3">
+          {(s.otras ?? []).length > 0 && (
+            <div className="flex flex-col gap-2">
+              <h4 className="m-0 text-xs font-semibold text-muted-foreground">Lo que pasó en otros módulos</h4>
+              <ul className="m-0 flex list-none flex-col gap-2 p-0">
+                {(s.otras ?? []).map((o) => (
+                  <li key={o.titulo} className="rounded-md border border-border p-2.5 text-sm">
+                    <p className="m-0 flex flex-wrap items-center gap-2 font-medium leading-snug">
+                      <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${o.gravedad === "alta" ? "bg-destructive text-white" : o.gravedad === "media" ? "bg-warning-soft text-warning" : "bg-muted text-muted-foreground"}`}>{NOMBRE_MODULO_SENAL[o.modulo]}</span>
+                      {o.titulo}
+                    </p>
+                    <p className="m-0 mt-1 text-xs text-muted-foreground">{o.detalle}</p>
+                    <p className="m-0 mt-1.5 flex gap-2 rounded-md bg-success-soft px-2.5 py-1.5 text-xs">
+                      <span className="shrink-0 font-semibold text-success">Qué hacer</span>
+                      <span>{o.accion}</span>
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {s.causas.length > 0 && (
             <ul className="m-0 flex list-none flex-col gap-2 p-0">
               {s.causas.map((c) => (
@@ -89,10 +110,10 @@ function Producto({ s }: { s: SenalesCreativas }) {
  */
 export function SenalesCreativasVista({ senales, abierta = true }: { senales: SenalesCreativas[]; abierta?: boolean }) {
   if (senales.length === 0) return null;
-  const orden = [...senales].sort((a, b) => b.causas.length - a.causas.length || b.gasto14 - a.gasto14);
-  const conCausas = orden.filter((s) => s.causas.length > 0).length;
+  const orden = [...senales].sort((a, b) => b.causas.length + (b.otras ?? []).length - (a.causas.length + (a.otras ?? []).length) || b.gasto14 - a.gasto14);
+  const conCausas = orden.filter((s) => s.causas.length > 0 || (s.otras ?? []).length > 0).length;
   return (
-    <SeccionPlegable titulo="Por qué empeora: los creativos" abierta={abierta} resumen={`${conCausas} de ${orden.length} productos con señales`} derecha="Cansancio, dependencia de un video y renovación">
+    <SeccionPlegable titulo="Por qué empeora: creativos y otros módulos" abierta={abierta} resumen={`${conCausas} de ${orden.length} productos con señales`} derecha="Videos, inventario, precio, competencia y test">
       <ul className="m-0 flex list-none flex-col gap-2 p-0">
         {orden.map((s) => (
           <Producto key={s.producto} s={s} />

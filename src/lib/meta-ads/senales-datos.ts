@@ -5,6 +5,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { cargarBaseDias } from "./base-dias";
 import type { AnalisisHistorico } from "./historico";
 import { claveDeSenales, senalesDeProducto, type SenalesCreativas } from "./senales-creativas";
+import { senalesDeModulos } from "./senales-modulos";
+import { leerDatosModulos } from "./senales-modulos-datos";
 
 /** Los productos a mirar: los que empeoran (tendencia del CPA a la baja, por gasto) y, para completar, los que más gastan. */
 export function productosParaMirar(a: AnalisisHistorico, max = 5): string[] {
@@ -18,6 +20,12 @@ export async function senalesCreativasDelDia(supabase: SupabaseClient, o: { pais
     const base = await cargarBaseDias({ paisId: o.paisId, cuentaId: null }, supabase);
     if (!base) return [];
     const items = productosParaMirar(o.analisis).map((p) => senalesDeProducto(base, p, o.hoy)).filter((s): s is SenalesCreativas => s !== null);
+    // Lo que pasó con cada producto en Inventario, Gestión de IDs Dropi, Análisis de competencia y Test productos.
+    const modulos = await leerDatosModulos(supabase, { paisId: o.paisId, productos: items.map((s) => s.producto), hoy: o.hoy });
+    for (const s of items) {
+      const d = modulos.get(s.producto);
+      if (d) s.otras = senalesDeModulos(d, { hoy: o.hoy, cpaActual: s.cpa14 ?? null, gasto14: s.gasto14 });
+    }
     await supabase.from("meta_ajustes").upsert({ clave: claveDeSenales(o.paisId), valor: { generadoEn: new Date().toISOString(), items }, actualizado_por_nombre: "Sistema", actualizado_en: new Date().toISOString() }, { onConflict: "clave" });
     return items;
   } catch {

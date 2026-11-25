@@ -3,6 +3,7 @@
 // ha funcionado con ese producto. Cada causa lleva su acción concreta y sus números. Lógica pura, con prueba; los datos son los de `base-dias.ts`. Solo lee.
 
 import type { BaseDias } from "./analisis-pedido";
+import { senalesModulosParaIA, type SenalModulo } from "./senales-modulos";
 import { cpa, ctr, hookRate, sinResultados, sumar, type Resultados } from "./metricas";
 
 export const UMBRALES_CREATIVOS = {
@@ -58,6 +59,10 @@ export interface SenalesCreativas {
   videos: VideoSenal[];
   mejorAngulo: { angulo: string; cpa: number; gasto: number; compras: number } | null;
   causas: CausaCreativa[];
+  /** El CPA de los últimos 14 días (para compararlo con el de su test). */
+  cpa14?: number | null;
+  /** Lo que pasó con el producto en otros módulos (inventario, precio, competencia, test): se llena aparte, cada día. */
+  otras?: SenalModulo[];
 }
 
 const sumarDias = (fecha: string, n: number) => new Date(Date.parse(`${fecha}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
@@ -186,6 +191,7 @@ export function senalesDeProducto(base: BaseDias, producto: string, hoy: string)
     producto,
     generadaEn: new Date().toISOString(),
     gasto14: Math.round(total14.gasto * 100) / 100,
+    cpa14: cpa(total14),
     videosActivos: videos.length,
     parteVieja,
     nuevos14: { videos: idsNuevos.size, gasto: Math.round(sumaNuevos.gasto * 100) / 100, cpa: cNuevos },
@@ -207,6 +213,7 @@ export function senalesParaIA(s: SenalesCreativas): unknown {
     videos_viejos: s.viejos14,
     mejor_angulo_60_dias: s.mejorAngulo,
     causas_encontradas: s.causas.map((c) => ({ tipo: c.tipo, titulo: c.titulo, detalle: c.detalle, accion: c.accion })),
+    ...(s.otras?.length ? { lo_que_paso_en_otros_modulos: senalesModulosParaIA(s.otras) } : {}),
   };
 }
 

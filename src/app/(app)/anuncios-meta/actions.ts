@@ -10,6 +10,7 @@ import { cargarBaseDias } from "@/lib/meta-ads/base-dias";
 import { guardarInvestigacion, investigarProducto, leerInvestigaciones, proveedorParaInvestigar } from "@/lib/meta-ads/investigacion-datos";
 import { textoParaIA } from "@/lib/meta-ads/investigacion-entrega";
 import { leerValorSenales, claveDeSenales, senalesParaIA } from "@/lib/meta-ads/senales-creativas";
+import { senalesVisibles } from "@/lib/meta-ads/senales-modulos";
 import { interpretarRespuestaChat, LIMITES_CHAT, limpiarRespuesta, pedidoChat, pedidoConResultados, revisarPregunta, sanitizarHistorial } from "@/lib/meta-ads/chat-ia";
 import { cambiarVigilancia, crearVigilancia, DIAS_DE_INSISTENCIA, leerVigilancias, VECES_PARA_VIGILAR } from "@/lib/meta-ads/vigilancias";
 import { tieneHistorialSuficiente } from "@/lib/meta-ads/historico";
@@ -449,7 +450,8 @@ export async function preguntarHallazgosMeta(pregunta: unknown, historial: unkno
   if (!tieneHistorialSuficiente(analisis)) return { error: "Todavía hay muy poco historial (menos de 8 campañas con gasto suficiente) para contestar con datos." };
   const investigadas = (await leerInvestigaciones(supabase, pais.id))?.items ?? [];
   const { data: filaSenales } = await supabase.from("meta_ajustes").select("valor").eq("clave", claveDeSenales(pais.id)).maybeSingle();
-  const senales = leerValorSenales(filaSenales?.valor)?.items ?? [];
+  // En el chat, cada persona solo recibe las señales de los módulos que puede abrir.
+  const senales = (leerValorSenales(filaSenales?.valor)?.items ?? []).map((s) => ({ ...s, otras: senalesVisibles(s.otras ?? [], u.modulos) }));
   const { instrucciones, texto } = pedidoChat(analisis, tiendas, hoy, revisada.pregunta, sanitizarHistorial(historial), investigadas.map(textoParaIA), senales.map(senalesParaIA));
   const proveedor = conectadas[0];
   const quien = { id: u.id, nombre: u.nombre ?? null, email: u.email };
