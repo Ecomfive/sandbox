@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { COSTOS_DE_LA_HOJA, costoPorVenta, tasasDe } from "./costos-operacion";
+import { tasasDe } from "./costos-operacion";
 import { decisionDeAnuncio, umbralesDeAnuncio } from "./decision-anuncio";
 import { analizarHistorico, type CampanaHist } from "./historico";
 import { estadoFrenteAGuia, guiaDeTope, textoDeGuia, topeAjustado, topeDeProducto, zonaDe, zonaDeCpa } from "./limite";
@@ -15,44 +15,46 @@ const PEDIDOS_TIENDA = { entregadas: 14822, devueltas: 2692, canceladas: 10056, 
 const TIENDA = tasasDe(PEDIDOS_TIENDA);
 const peor = { entregadas: 60, devueltas: 20, canceladas: 60, enCamino: 0, sinEnviar: 0 };
 
-test("el tope baja solo en el que envía o entrega peor, y cada venta que llega le cuesta lo mismo que a uno promedio", () => {
-  const t = topeAjustado(10, tasasDe(peor), TIENDA, COSTOS_DE_LA_HOJA)!;
-  assert.ok(t > 5 && t < 9, String(t));
-  const suyo = costoPorVenta(t, tasasDe(peor).envio, tasasDe(peor).entrega, COSTOS_DE_LA_HOJA)!.total;
-  const promedio = costoPorVenta(10, TIENDA.envio, TIENDA.entrega, COSTOS_DE_LA_HOJA)!.total;
-  assert.ok(Math.abs(suyo - promedio) < 0.2, `${suyo} frente a ${promedio}`);
+test("el tope baja solo en el que envía o entrega peor, entre $10 y $9 según cuánto menos le llega", () => {
+  const tienda = { envio: 0.8, entrega: 0.8 };
+  // A este le llega esa parte menos que a la tienda.
+  const con = (caida: number) => topeAjustado(10, { envio: 0.8, entrega: 0.8 * (1 - caida) }, tienda);
+  assert.deepEqual([con(0.03), con(0.07), con(0.1), con(0.125), con(0.2), con(0.25), con(0.6), con(1)], [null, 9.7, 9.6, 9.5, 9.2, 9, 9, 9]);
+  // Cuenta igual si lo que baja es el envío.
+  assert.equal(topeAjustado(10, { envio: 0.7, entrega: 0.8 }, tienda), 9.5);
+  assert.equal(topeAjustado(10, tasasDe(peor), TIENDA), 9.2);
   // Mejor que la tienda: no sube. Igual: no cambia. Sin pedidos suficientes: no se toca.
-  assert.equal(topeAjustado(10, { envio: 0.9, entrega: 0.95 }, TIENDA, COSTOS_DE_LA_HOJA), null);
-  assert.equal(topeAjustado(10, TIENDA, TIENDA, COSTOS_DE_LA_HOJA), null);
-  assert.equal(topeAjustado(10, { envio: null, entrega: null }, TIENDA, COSTOS_DE_LA_HOJA), null);
-  assert.equal(topeAjustado(10, tasasDe(peor), { envio: null, entrega: 0.8 }, COSTOS_DE_LA_HOJA), null);
+  assert.equal(topeAjustado(10, { envio: 0.9, entrega: 0.95 }, TIENDA), null);
+  assert.equal(topeAjustado(10, TIENDA, TIENDA), null);
+  assert.equal(topeAjustado(10, { envio: null, entrega: null }, TIENDA), null);
+  assert.equal(topeAjustado(10, tasasDe(peor), { envio: null, entrega: 0.8 }), null);
 });
 
 test("un tope escrito a mano se respeta; el ajustado dice por qué", () => {
-  const mano = topeDeProducto(12, peor, TIENDA, COSTOS_DE_LA_HOJA);
+  const mano = topeDeProducto(12, peor, TIENDA);
   assert.deepEqual([mano.tope, mano.definido, mano.ajustado, guiaDeTope(mano)], [12, true, false, null]);
-  const solo = topeDeProducto(undefined, peor, TIENDA, COSTOS_DE_LA_HOJA);
+  const solo = topeDeProducto(undefined, peor, TIENDA);
   assert.deepEqual([solo.base, solo.definido, solo.ajustado], [10, false, true]);
   const g = guiaDeTope(solo)!;
   assert.deepEqual([g.causa, g.motivo], ["Envía y entrega menos", "envía 57 % (la tienda 64 %) y entrega 75 % (la tienda 85 %)"]);
   assert.deepEqual([g.vigilar, g.apagar, g.vigilarGeneral, g.apagarGeneral], [Math.round(solo.tope * 90) / 100, Math.round(solo.tope * 120) / 100, 9, 12]);
   assert.equal(g.apagar, limiteDeApagado({ tope: solo.tope, topeAjustado: true }), "lo que se indica es lo que el sistema usa para apagar");
-  assert.match(textoDeGuia(g), /conviene empezar a vigilarlo desde un CPA de \$\d\.\d\d y apagarlo desde \$\d\.\d\d si en 4 días no baja \(con el tope general sería \$9\.00 y \$12\.00\)\.$/);
+  assert.match(textoDeGuia(g), /conviene empezar a vigilarlo desde un CPA de \$\d\.\d\d y apagarlo desde \$\d+\.\d\d si en 4 días no baja \(con el tope general sería \$9\.00 y \$12\.00\)\.$/);
   assert.deepEqual([estadoFrenteAGuia({ gasto: g.apagar * 10, compras: 10 }, g), estadoFrenteAGuia({ gasto: g.vigilar * 10, compras: 10 }, g), estadoFrenteAGuia({ gasto: 10, compras: 10 }, g), estadoFrenteAGuia({ gasto: 3, compras: 0 }, g)], ["apagar", "vigilar", "bien", "sin_compras"]);
   // Solo entrega menos: lo dice así.
-  assert.equal(guiaDeTope(topeDeProducto(undefined, { entregadas: 50, devueltas: 50, canceladas: 55, enCamino: 0, sinEnviar: 0 }, TIENDA, COSTOS_DE_LA_HOJA))!.causa, "Entrega más baja");
-  const de = calculadorDeTopes(new Map([["MANO", 8]]), { entrega: [{ clave: "PEOR", ...peor }], pedidosDeLaTienda: PEDIDOS_TIENDA }, COSTOS_DE_LA_HOJA);
+  assert.equal(guiaDeTope(topeDeProducto(undefined, { entregadas: 50, devueltas: 50, canceladas: 55, enCamino: 0, sinEnviar: 0 }, TIENDA))!.causa, "Entrega más baja");
+  const de = calculadorDeTopes(new Map([["MANO", 8]]), { entrega: [{ clave: "PEOR", ...peor }], pedidosDeLaTienda: PEDIDOS_TIENDA });
   assert.equal(de("MANO").tope, 8);
   assert.equal(de("PEOR").tope, solo.tope);
   assert.equal(de("OTRO").tope, 10);
-  assert.equal(calculadorDeTopes(new Map(), null, COSTOS_DE_LA_HOJA)("PEOR").tope, 10);
+  assert.equal(calculadorDeTopes(new Map(), null)("PEOR").tope, 10);
 });
 
 test("las zonas frente al tope, y los montos de apagar y de cada anuncio bajan con un tope ajustado", () => {
   assert.deepEqual([zonaDeCpa(7, 10), zonaDeCpa(9, 10), zonaDeCpa(10.1, 10)], ["dentro", "cerca", "sobre"]);
   assert.deepEqual([zonaDe({ gasto: 12, compras: 0 }, 10), zonaDe({ gasto: 15, compras: 0 }, 10)], ["dentro", "sobre"]);
   assert.equal(limiteDeApagado({ tope: 10 }), 12);
-  assert.equal(limiteDeApagado({ tope: 7, topeAjustado: true }), 8.4);
+  assert.equal(limiteDeApagado({ tope: 9, topeAjustado: true }), 10.8);
   assert.equal(limiteDeApagado({ tope: 15, topeDefinido: true }), 15);
   assert.equal(umbralesDeAnuncio(0.7).ventanaCorte, 8.4);
   assert.equal(umbralesDeAnuncio(0.7).ctrBueno, 2, "los porcentajes no cambian");

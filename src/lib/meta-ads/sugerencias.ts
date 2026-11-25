@@ -88,7 +88,7 @@ export const UMBRALES = {
 
 /**
  * El CPA de una campaña a partir del cual deja de ser rentable (25 nov 2026, pedido de Alcides: «que diga cuándo sí debe apagarse porque el CPA a nivel de campaña ya pasa de $12»): $12, el CPA en rojo del documento «Métrica». Si el producto
- * tiene un CPA tope propio más alto (definido en Cuentas), manda ese; si su tope se ajustó por envío y entrega, baja en la misma proporción (un tope de $7 se apaga desde $8.40).
+ * tiene un CPA tope propio más alto (definido en Cuentas), manda ese; si su tope se ajustó por envío y entrega, baja en la misma proporción (un tope de $9 se apaga desde $10.80).
  */
 export const limiteDeApagado = (c: { tope: number; topeDefinido?: boolean; topeAjustado?: boolean }): number =>
   c.topeAjustado ? Math.round(c.tope * FACTOR_DE_APAGADO * 100) / 100 : c.topeDefinido && c.tope > UMBRALES_ANUNCIO.cpaRojo ? c.tope : UMBRALES_ANUNCIO.cpaRojo;

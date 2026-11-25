@@ -97,10 +97,10 @@ export function CalculadoraCostos({ productos, entrega, costos, guardados, escri
   const filas = entrega ? filasDeCostos(productos.map((p) => ({ clave: p.clave, nombre: p.nombre, gasto: p.r.gasto, compras: p.r.compras })), entrega.productos, entrega.tienda, usados) : [];
   const ordenadas = orden ? ordenarPor(filas, CRITERIOS, [orden], (f) => f.gasto) : filas;
   const visibles = todas ? ordenadas : ordenadas.slice(0, FILAS_A_LA_VISTA);
-  // El tope de cada producto con los costos que están escritos: el de Cuentas si se escribió uno; si no, el general ajustado por su envío y entrega.
+  // El tope de cada producto: el de Cuentas si se escribió uno; si no, el general ajustado por su envío y entrega (los costos de arriba no lo mueven).
   const topeDe = (clave: string) => {
     const p = productos.find((x) => x.clave === clave);
-    return entrega ? topeDeProducto(p?.topeDefinido ? p.tope : undefined, entrega.productos[clave], entrega.tienda, usados) : null;
+    return entrega ? topeDeProducto(p?.topeDefinido ? p.tope : undefined, entrega.productos[clave], entrega.tienda) : null;
   };
   const conTienda = filas.some((f) => f.envioDeLaTienda || f.entregaDeLaTienda);
   const columna = (valor: string, texto: string, clase: string) => <ColumnaOrdenable criterio={valor} texto={texto} natural={CRITERIOS.find((c) => c.valor === valor)?.sentido} clase={clase} orden={orden} alElegir={setOrden} />;
@@ -264,7 +264,7 @@ export function CalculadoraCostos({ productos, entrega, costos, guardados, escri
               <li>CPA real = CPA de Meta ÷ (% de envío × % de entrega).</li>
               <li>Envíos = envío + comisión × % de entrega + (1 − % de entrega) × envío.</li>
               <li>Costo por venta entregada = CPA real + envíos + costo operativo.</li>
-              <li>CPA tope: el general ($10) baja en el producto que envía o entrega peor que la tienda, hasta que cada venta entregada no cueste más que la de un producto promedio al tope general. Nunca sube, y uno escrito en Cuentas se usa tal cual. Con ese tope el sistema decide qué apagar y qué no tocar.</li>
+              <li>CPA tope: el general ($10) baja como mucho a $9 en el producto al que le llegan menos ventas que a la tienda (% de envío × % de entrega): $1 si le llegan un 25 % menos o peor, y en proporción si es menos. Nunca sube, uno escrito en Cuentas se usa tal cual y los costos de arriba no lo cambian. Con ese tope el sistema decide qué apagar y qué no tocar.</li>
             </ul>
           </details>
         </>
