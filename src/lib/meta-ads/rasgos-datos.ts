@@ -9,6 +9,8 @@ import { descargarConDetalle } from "@/lib/seguridad/url-externa";
 import { landingLimpia } from "./agrupar";
 import { CPA_TOPE_PREDETERMINADO, sinResultados, sumar, type Resultados } from "./metricas";
 import { claveDeProducto } from "./nombre";
+import { claveDeOfertas, claveDePaginasMedidas, leerValorOfertas, type OfertasProducto } from "./diagnostico-concreto";
+import { cortarEnPunto } from "./interpretar-ia";
 import { claveDeRasgos, compararGanadores, rasgosDeCampana, rasgosDeCopy, rasgosDePagina, rasgosDeVideo, type Entidad, type RasgosDeGanadores } from "./rasgos-ganadores";
 
 const DIAS = 120;
@@ -17,7 +19,7 @@ const DIAS_VIGENTE_PAGINA = 14;
 const DIAS_VIGENTE_ERROR = 5;
 const restar = (fecha: string, n: number) => new Date(new Date(`${fecha}T00:00:00Z`).getTime() - n * 86_400_000).toISOString().slice(0, 10);
 const num = (v: unknown) => Number(v ?? 0) || 0;
-const claveDePaginas = (paisId: string) => `landing_rasgos:${paisId}`;
+const claveDePaginas = claveDePaginasMedidas;
 
 interface PaginaGuardada {
   rasgos: string[];
@@ -31,6 +33,16 @@ async function leerPaginas(supabase: SupabaseClient, paisId: string): Promise<Pa
     const { data } = await supabase.from("meta_ajustes").select("valor").eq("clave", claveDePaginas(paisId)).maybeSingle();
     const v = data?.valor as { paginas?: Paginas } | null;
     return v?.paginas && typeof v.paginas === "object" ? v.paginas : {};
+  } catch {
+    return {};
+  }
+}
+
+/** Lo que prometen los anuncios de cada producto y lo medido de sus páginas, guardado por el último análisis (vacío si todavía no hay). */
+export async function leerOfertasGuardadas(supabase: SupabaseClient, paisId: string): Promise<Record<string, OfertasProducto>> {
+  try {
+    const { data } = await supabase.from("meta_ajustes").select("valor").eq("clave", claveDeOfertas(paisId)).maybeSingle();
+    return leerValorOfertas(data?.valor);
   } catch {
     return {};
   }
@@ -77,6 +89,7 @@ export async function rasgosDelDia(supabase: SupabaseClient, o: { paisId: string
     }
 
     const anuncios: Entidad[] = [];
+    const ofertas = new Map<string, { producto: string; anuncios: OfertasProducto["anuncios"] }>();
     const porPagina = new Map<string, { r: Resultados; tope: number; familia: string }>();
     for (const a of anun) {
       const r = porAnuncio.get(a.id as string);
@@ -94,6 +107,14 @@ export async function rasgosDelDia(supabase: SupabaseClient, o: { paisId: string
       ];
       anuncios.push({ id: a.id as string, nombre: String((a.titulo as string | null) || (a.nombre as string | null) || "Anuncio").slice(0, 70), rasgos, r, tope: topeC });
       const pag = landingLimpia(a.landing as string | null);
+      // La promesa de cada anuncio y adónde lleva, por producto: es lo que usa el «Qué hacer» de los hallazgos de entrega.
+      const inicio = cortarEnPunto(String((a.copy as string | null) ?? (a.titulo as string | null) ?? "").replace(/\s+/g, " ").trim(), 170);
+      if (producto && inicio && r.gasto >= 30) {
+        const clave = claveDeProducto(producto);
+        const oferta = ofertas.get(clave) ?? { producto, anuncios: [] };
+        oferta.anuncios.push({ titulo: (a.titulo as string | null) ?? null, inicio, landing: pag, gasto: Math.round(r.gasto), compras: r.compras });
+        ofertas.set(clave, oferta);
+      }
       if (pag) {
         const e = porPagina.get(pag) ?? { r: sinResultados(), tope: topeC, familia };
         e.r = sumar(e.r, r);
@@ -116,6 +137,15 @@ export async function rasgosDelDia(supabase: SupabaseClient, o: { paisId: string
       });
     }
     if (pendientes.length) await supabase.from("meta_ajustes").upsert({ clave: claveDePaginas(o.paisId), valor: { paginas }, actualizado_por_nombre: "Sistema", actualizado_en: new Date().toISOString() }, { onConflict: "clave" });
+
+    const productosOfertas: Record<string, OfertasProducto> = {};
+    for (const [clave, oferta] of ofertas) {
+      const top = oferta.anuncios.sort((x, y) => y.gasto - x.gasto).slice(0, 3);
+      const medidas: Record<string, string[]> = {};
+      for (const a of top) if (a.landing && paginas[a.landing] && !paginas[a.landing].error && paginas[a.landing].rasgos.length) medidas[a.landing] = paginas[a.landing].rasgos;
+      productosOfertas[clave] = { producto: oferta.producto, anuncios: top, paginas: medidas };
+    }
+    await supabase.from("meta_ajustes").upsert({ clave: claveDeOfertas(o.paisId), valor: { generadoEn: new Date().toISOString(), productos: productosOfertas }, actualizado_por_nombre: "Sistema", actualizado_en: new Date().toISOString() }, { onConflict: "clave" });
 
     const entidadesPagina: Entidad[] = [...porPagina]
       .filter(([url]) => (paginas[url]?.rasgos.length ?? 0) > 0)
