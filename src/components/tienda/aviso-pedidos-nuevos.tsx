@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { conPausaAlVolver } from "@/lib/consulta-con-pausa";
 import { anilloFoco } from "@/components/ui/field";
 import { Tooltip } from "@/components/ui/tooltip";
 import { pedidosNuevos, type PedidoNuevo } from "@/app/(app)/tienda-pedidos/avisos-actions";
@@ -128,14 +129,16 @@ export function AvisoPedidosNuevos({ codigoPais, sonidoPorDefecto }: { codigoPai
         // Sin red: se vuelve a intentar en la próxima vuelta.
       }
     }
+    // Al volver a la pestaña solo si la última consulta fue hace 20 s o más.
+    const pausa = conPausaAlVolver(() => void revisar());
     function ciclo() {
-      temporizador = setTimeout(async () => {
-        await revisar();
+      temporizador = setTimeout(() => {
+        pausa.ahora();
         if (vivo) ciclo();
       }, CADA_MS);
     }
     ciclo();
-    const alVolver = () => void revisar();
+    const alVolver = pausa.alVolver;
     document.addEventListener("visibilitychange", alVolver);
     return () => {
       vivo = false;

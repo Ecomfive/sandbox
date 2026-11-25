@@ -6,6 +6,7 @@ import { usePendientesVivos } from "@/components/pendientes-vivos";
 import { sonar } from "@/components/tienda/aviso-pedidos-nuevos";
 import { anilloFoco } from "@/components/ui/field";
 import { avisosParaPantalla } from "@/lib/avisos-pantalla-actions";
+import { conPausaAlVolver } from "@/lib/consulta-con-pausa";
 import { RUTA_LISTA_PUERTO } from "@/lib/compras/llegadas-avisos";
 import { juntarAvisosDePuerto, MAX_TARJETAS, rutaInterna, sinMostrar, type AvisoEnPantalla } from "@/lib/avisos-pantalla";
 import { marcarAvisoLeido } from "@/lib/menciones-actions";
@@ -56,15 +57,17 @@ export function AvisoPersonal() {
         // Sin red: se vuelve a intentar en la próxima vuelta.
       }
     }
+    // Al volver a la pestaña solo si la última consulta fue hace 20 s o más.
+    const pausa = conPausaAlVolver(() => void revisar());
     function ciclo() {
-      temporizador = setTimeout(async () => {
-        await revisar();
+      temporizador = setTimeout(() => {
+        pausa.ahora();
         if (vivo) ciclo();
       }, CADA_MS);
     }
-    void revisar();
+    pausa.ahora();
     ciclo();
-    const alVolver = () => void revisar();
+    const alVolver = pausa.alVolver;
     document.addEventListener("visibilitychange", alVolver);
     return () => {
       vivo = false;

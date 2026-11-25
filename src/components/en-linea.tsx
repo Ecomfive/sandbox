@@ -5,6 +5,7 @@ import { AvatarPersona } from "@/components/ui/avatar-persona";
 import { anilloFoco } from "@/components/ui/field";
 import type { PersonaEnLinea } from "@/lib/en-linea";
 import { quienesEnLinea } from "@/lib/presencia-actions";
+import { conPausaAlVolver } from "@/lib/consulta-con-pausa";
 
 const CADA_MS = 60_000;
 const MAX_FOTOS = 4;
@@ -26,13 +27,14 @@ export function EnLinea() {
         .then((r) => vigente && setPersonas(r))
         .catch(() => {});
     };
-    traer();
-    const id = setInterval(traer, CADA_MS);
-    document.addEventListener("visibilitychange", traer);
+    const pausa = conPausaAlVolver(traer);
+    pausa.ahora();
+    const id = setInterval(pausa.ahora, CADA_MS);
+    document.addEventListener("visibilitychange", pausa.alVolver);
     return () => {
       vigente = false;
       clearInterval(id);
-      document.removeEventListener("visibilitychange", traer);
+      document.removeEventListener("visibilitychange", pausa.alVolver);
     };
   }, []);
 
