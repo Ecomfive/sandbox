@@ -58,11 +58,51 @@ export function topeDeProducto(manual: number | undefined, pedidos: PedidosParaT
 
 const pct = (n: number | null) => (n === null ? "—" : `${Math.round(n * 100)} %`);
 
-/** Por qué un producto tiene ese tope, en una frase; null si es el general o el escrito a mano. */
-export function textoDeTope(t: TopeProducto): string | null {
+/** Desde esta parte del tope algo se apaga si no baja: $12 con un tope de $10 (el CPA en rojo del documento «Métrica»). */
+export const FACTOR_DE_APAGADO = 1.2;
+const redondo = (n: number) => Math.round(n * 100) / 100;
+
+/** Lo que hay que saber de un producto con el tope ajustado: por qué, desde qué CPA vigilarlo y desde cuál apagarlo (y cuáles serían con el tope general). */
+export interface GuiaDeTope {
+  tope: number;
+  vigilar: number;
+  apagar: number;
+  vigilarGeneral: number;
+  apagarGeneral: number;
+  /** «Entrega más baja», «Envía menos» o «Envía y entrega menos». */
+  causa: string;
+  /** «entrega 70 % (la tienda 85 %)». */
+  motivo: string;
+}
+
+export function guiaDeTope(t: TopeProducto): GuiaDeTope | null {
   if (!t.ajustado) return null;
-  const suyo = [t.envio !== null ? `envía ${pct(t.envio)}` : "", t.entrega !== null ? `entrega ${pct(t.entrega)}` : ""].filter(Boolean).join(" y ");
-  return `Tope ajustado a ${dolares(t.tope)} (el general es ${dolares(t.base)}): este producto ${suyo}, y la tienda envía ${pct(t.tiendaEnvio)} y entrega ${pct(t.tiendaEntrega)}.`;
+  const menos = (propia: number | null, tienda: number | null) => propia !== null && tienda !== null && Math.round(propia * 100) < Math.round(tienda * 100);
+  const envia = menos(t.envio, t.tiendaEnvio);
+  const entrega = menos(t.entrega, t.tiendaEntrega);
+  const motivo = [envia ? `envía ${pct(t.envio)} (la tienda ${pct(t.tiendaEnvio)})` : "", entrega ? `entrega ${pct(t.entrega)} (la tienda ${pct(t.tiendaEntrega)})` : ""].filter(Boolean).join(" y ");
+  return {
+    tope: t.tope,
+    vigilar: redondo(t.tope * CERCA_DEL_TOPE),
+    apagar: redondo(t.tope * FACTOR_DE_APAGADO),
+    vigilarGeneral: redondo(t.base * CERCA_DEL_TOPE),
+    apagarGeneral: redondo(t.base * FACTOR_DE_APAGADO),
+    causa: envia && entrega ? "Envía y entrega menos" : envia ? "Envía menos" : "Entrega más baja",
+    motivo: motivo || `envía ${pct(t.envio)} y entrega ${pct(t.entrega)}`,
+  };
+}
+
+/** La indicación en una frase, para la IA y las listas de texto. */
+export const textoDeGuia = (g: GuiaDeTope): string =>
+  `${g.causa}: ${g.motivo}. Su tope es ${dolares(g.tope)}: conviene empezar a vigilarlo desde un CPA de ${dolares(g.vigilar)} y apagarlo desde ${dolares(g.apagar)} si en 4 días no baja (con el tope general sería ${dolares(g.vigilarGeneral)} y ${dolares(g.apagarGeneral)}).`;
+
+export type EstadoDeGuia = "apagar" | "vigilar" | "bien" | "sin_compras";
+
+/** Dónde está un producto frente a sus dos puntos, con unos resultados. */
+export function estadoFrenteAGuia(r: { gasto: number; compras: number }, g: GuiaDeTope): EstadoDeGuia {
+  if (r.compras <= 0) return r.gasto >= g.tope * 1.5 ? "apagar" : "sin_compras";
+  const costo = r.gasto / r.compras;
+  return costo >= g.apagar ? "apagar" : costo >= g.vigilar ? "vigilar" : "bien";
 }
 
 export type Zona = "dentro" | "cerca" | "sobre";

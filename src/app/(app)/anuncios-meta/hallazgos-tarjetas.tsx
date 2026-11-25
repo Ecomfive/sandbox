@@ -4,6 +4,7 @@ import { useState } from "react";
 import { NOMBRE_CATEGORIA, seccionDeHallazgo, type Hallazgo, type SeccionHallazgo, type TonoHallazgo } from "@/lib/meta-ads/historico";
 import { dolares } from "@/lib/meta-ads/metricas";
 import { claveDeDecision } from "@/lib/meta-ads/sugerencias";
+import { GuiaEnLinea } from "./aviso-tope";
 import { BotonesDecidir, Omitidas, useDecisiones } from "./decidir";
 import { InsigniaCerteza } from "./graficas";
 import { SeccionPlegable } from "./plegable";
@@ -76,6 +77,7 @@ export function TarjetaHallazgo({ h, conSeccion = false }: { h: Hallazgo; conSec
           {h.quienes && <Cuales quienes={h.quienes} />}
         </div>
       </details>
+      {h.guia && <GuiaEnLinea guia={h.guia} className="px-3 pb-2 sm:pl-14" />}
       <BotonesDecidir clave={claveDeDecision(h)} titulo={h.titulo} className="px-3 pb-2.5 sm:pl-14" />
     </li>
   );

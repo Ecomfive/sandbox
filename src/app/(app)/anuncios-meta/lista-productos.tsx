@@ -1,5 +1,6 @@
 "use client";
 
+import { AvisoDeTope, GuiaEnLinea } from "./aviso-tope";
 import Link from "next/link";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import type { IconoComp } from "@/components/tabla/botones-vista";
@@ -54,6 +55,7 @@ function FilaProducto({ p, columnas, alAbrir, entrega }: { p: ProductoVista; col
             <span className={entregaMala(e.tasa, entrega?.promedio ?? null) ? "font-medium text-destructive" : ""}> · Entrega {pctEntrega(e.tasa)}{entregaMala(e.tasa, entrega?.promedio ?? null) ? " (baja)" : ""}</span>
           )}
         </span>
+        {p.guiaTope && <GuiaEnLinea guia={p.guiaTope} className="mt-0.5" />}
       </span>
       <CeldasColumnas columnas={columnas} r={p.r} ctx={{ tope: p.tope, etapa: "venta", confiable: ok }} />
       <ChevronRightIcon aria-hidden="true" className="hidden h-4 w-4 text-muted-foreground xl:block" />
@@ -79,7 +81,7 @@ function FichaProducto({ p, campanas, videos, alCerrar, entrega, costos }: { p: 
               Con un CPA tope de {dolares(p.tope)}
               {p.topeDefinido || p.topeAjustado ? "" : " (el general; se puede cambiar en Cuentas)"}.
             </p>
-            {p.topeTexto && <p className="m-0 text-xs text-muted-foreground">{p.topeTexto}</p>}
+            {p.guiaTope && <AvisoDeTope guia={p.guiaTope} />}
             <div className="grid grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-2">
               {CATALOGO_COLUMNAS.filter((c) => c.clave !== "frecuencia").map((c) => {
                 const v = valorColumna(c.clave, p.r, { tope: p.tope, etapa: "venta", confiable: confiable(p.r) });

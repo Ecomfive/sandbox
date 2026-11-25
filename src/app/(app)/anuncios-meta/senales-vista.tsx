@@ -2,6 +2,8 @@
 
 import { dolaresEnteros } from "@/lib/meta-ads/metricas";
 import { claveDeHallazgo } from "@/lib/meta-ads/sugerencias";
+import { claveDeProducto } from "@/lib/meta-ads/nombre";
+import { GuiaEnLinea } from "./aviso-tope";
 import { BotonesDecidir, Omitidas, useDecisiones } from "./decidir";
 import { tieneSenales, type CausaCreativa, type SenalesCreativas, type VideoSenal } from "@/lib/meta-ads/senales-creativas";
 import { NOMBRE_MODULO_SENAL, type Gravedad, type SenalModulo } from "@/lib/meta-ads/senales-modulos";
@@ -102,8 +104,9 @@ function Icono({ d, tono }: { d: string; tono: Tono }) {
 }
 
 function Producto({ s }: { s: SenalesCreativas }) {
-  const { ocultas } = useDecisiones();
+  const { ocultas, guias } = useDecisiones();
   const filas = filasDe(s).filter((f) => !ocultas.has(f.decision));
+  const guia = guias[claveDeProducto(s.producto)];
   const peor: Tono = filas[0]?.tono ?? "azul";
   const visibles = filas.slice(0, 4);
   return (
@@ -130,6 +133,7 @@ function Producto({ s }: { s: SenalesCreativas }) {
           </svg>
         </summary>
         <div className="flex flex-col gap-3 border-t border-border px-3 py-3">
+          {guia && <GuiaEnLinea guia={guia} />}
           <ul className="m-0 flex list-none flex-col gap-2 p-0">
             {filas.map((f) => (
               <li key={f.clave} className="flex gap-3 rounded-md border border-border p-2.5 text-sm">

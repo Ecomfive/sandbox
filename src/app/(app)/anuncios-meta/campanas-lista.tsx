@@ -17,6 +17,7 @@ import { BarraApilada, coloresDeAngulos } from "./graficas";
 import { FichaCampana } from "./ficha-campana";
 import { CeldasColumnas, EncabezadoColumnas, estiloRejilla, SelectorColumnasMeta, useColumnasMeta } from "./columnas-meta";
 import { BarraOrden, useOrdenMeta } from "./orden-meta";
+import { GuiaEnLinea } from "./aviso-tope";
 import { InsigniaEstructura, InsigniaEtapa, InsigniaPrioridad, nombreEstado } from "./piezas";
 import { textoDeMezcla } from "@/lib/meta-ads/atributos-video";
 
@@ -47,6 +48,7 @@ function FilaCampana({ c, alAbrir, colores, columnas }: { c: CampanaVista; alAbr
             {c.activa && faltanEtiquetas(c).length > 0 ? ` · falta ${faltanEtiquetas(c).join(" y ")}` : ""}
           </span>
         </span>
+        {c.guiaTope && <GuiaEnLinea guia={c.guiaTope} className="mt-0.5" />}
         {c.angulos.length > 0 && (
           <span className="mt-0.5 flex min-w-0 flex-col gap-0.5">
             <BarraApilada partes={c.angulos.map((a) => ({ nombre: a.angulo, valor: a.videos, color: colores.get(a.angulo) ?? "var(--grafica-5)" }))} alto={6} etiqueta={`Ángulos de sus videos: ${textoDeMezcla(c.angulos)}`} />

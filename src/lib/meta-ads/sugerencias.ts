@@ -1,8 +1,8 @@
 // Anuncios Meta › Sugerencias (18 nov 2026, pedido de Alcides: «como en Gestión de IDs, que nos sugiera»): lo que el sistema ve en los números y propone hacer. No toca Meta: avisa, y la persona acepta,
 // rechaza (con porqué) o pospone, como las recomendaciones de Gestión de IDs Dropi. Las reglas son simples a propósito, con umbrales a la vista, para que el equipo las entienda y las discuta. Lógica pura, con prueba.
 
-import { conversion, confiable, CPA_TOPE_PREDETERMINADO, cpa, ctr, dolares, GASTO_MINIMO_CONFIABLE, hookRate, sinResultados, sumar, type Resultados } from "./metricas";
-import { CERCA_DEL_TOPE, zonaDe, zonaDeCpa } from "./limite";
+import { conversion, confiable, cpa, ctr, dolares, GASTO_MINIMO_CONFIABLE, hookRate, sinResultados, sumar, type Resultados } from "./metricas";
+import { CERCA_DEL_TOPE, FACTOR_DE_APAGADO, zonaDe, zonaDeCpa, type GuiaDeTope } from "./limite";
 import { decisionesDeAnuncios, NOMBRE_DECISION, UMBRALES_ANUNCIO, type AnuncioParaDecidir } from "./decision-anuncio";
 import { diagnosticoDeLanding } from "./diagnostico-concreto";
 import { pesoDeHallazgo, type Hallazgo } from "./historico";
@@ -37,6 +37,8 @@ export interface Sugerencia {
   accion: string;
   objeto: { tipo: "campana" | "video" | "cuenta"; id: string };
   gasto: number;
+  /** Si su producto tiene el tope más bajo (envía o entrega menos): desde cuánto vigilarlo y apagarlo. */
+  guia?: GuiaDeTope;
   /** Los anuncios de la campaña que ya pasaron del límite, con su cifra (para decir cuáles en vez de «los que pasaron»). */
   anuncios?: AnuncioEnSugerencia[];
 }
@@ -89,7 +91,7 @@ export const UMBRALES = {
  * tiene un CPA tope propio más alto (definido en Cuentas), manda ese; si su tope se ajustó por envío y entrega, baja en la misma proporción (un tope de $7 se apaga desde $8.40).
  */
 export const limiteDeApagado = (c: { tope: number; topeDefinido?: boolean; topeAjustado?: boolean }): number =>
-  c.topeAjustado ? Math.round(c.tope * (UMBRALES_ANUNCIO.cpaRojo / CPA_TOPE_PREDETERMINADO) * 100) / 100 : c.topeDefinido && c.tope > UMBRALES_ANUNCIO.cpaRojo ? c.tope : UMBRALES_ANUNCIO.cpaRojo;
+  c.topeAjustado ? Math.round(c.tope * FACTOR_DE_APAGADO * 100) / 100 : c.topeDefinido && c.tope > UMBRALES_ANUNCIO.cpaRojo ? c.tope : UMBRALES_ANUNCIO.cpaRojo;
 
 /** Los anuncios activos de una campaña que ya pasaron del límite: los que hay que apagar y los que van caros con poco gasto, de más a menos gasto. */
 export function anunciosPasados(anuncios: readonly AnuncioSugerencia[], campanaId: string, decisiones: ReadonlyMap<string, { decision: string }>, limite: number): AnuncioEnSugerencia[] {
@@ -360,6 +362,13 @@ export function sugerir(e: EntradaSugerencias): Sugerencia[] {
   if (sinEtiqueta.length)
     s.push({ clave: "etiquetas_faltan:cuenta", tipo: "etiquetas_faltan", severidad: "info", prioridad: "observar", positiva: false, titulo: `${sinEtiqueta.length} ${sinEtiqueta.length === 1 ? "campaña activa sin" : "campañas activas sin"} producto o etapa`, detalle: "Sin el producto no se sabe contra qué CPA tope se mide, y sin la etapa no entra al análisis de «Qué funciona». Salen solas si el nombre sigue la regla (PAÍS | Producto | CBO | Puja | T).", accion: "Completarlas en la ficha de cada campaña (se abren al pulsar).", objeto: { tipo: "cuenta", id: "todas" }, gasto: sinEtiqueta.reduce((t, c) => t + c.r.gasto, 0) });
 
+  // En lo de un producto con el tope más bajo se dice desde cuánto vigilarlo y apagarlo.
+  const guiaDe = new Map(e.campanas.flatMap((c) => (c.guiaTope ? [[c.id, c.guiaTope] as const] : [])));
+  for (const x of s) {
+    const guia = x.objeto.tipo === "campana" ? guiaDe.get(x.objeto.id) : undefined;
+    if (guia) x.guia = guia;
+  }
+
   return s.sort((a, b) => PRIORIDADES.indexOf(a.prioridad) - PRIORIDADES.indexOf(b.prioridad) || ORDEN[a.severidad] - ORDEN[b.severidad] || b.gasto - a.gasto);
 }
 
@@ -418,6 +427,7 @@ export function sugerenciasDeHallazgos(hallazgos: readonly Hallazgo[]): Sugerenc
   const buenas = mejores("bueno", HALLAZGOS_COMO_SUGERENCIA.buenas);
   return [...atencion, ...buenas].map((h): Sugerencia => ({
     clave: claveDeDecision(h),
+    ...(h.guia ? { guia: h.guia } : {}),
     tipo: "hallazgo",
     // Lo que la persona pidió vigilar sale con lo del día; lo demás del historial, aparte.
     prioridad: h.prioridad === "alta" ? "actuar" : h.prioridad === "media" ? "observar" : "historial",

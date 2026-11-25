@@ -19,6 +19,7 @@ import { corregirCampanaMeta, obtenerActividadCampanaMeta, soltarCorreccionMeta 
 import { NOMBRE_VEREDICTO, veredictoDe } from "./def-campanas";
 import { BarraApilada } from "./graficas";
 import { Cifra, entero, InsigniaEstructura, InsigniaEtapa, MetricasEnLinea, nombreEstado, porcentaje, QueHacer, Resultado, textoFrecuencia, textoMetrica, textoTiempo } from "./piezas";
+import { AvisoDeTope } from "./aviso-tope";
 import { anguloDeLaCampana, textoDeMezcla } from "@/lib/meta-ads/atributos-video";
 
 /** El color de cada decisión: cortar en rojo, observar y rotar en ámbar, consolidar en verde. */
@@ -235,7 +236,7 @@ export function FichaCampana({ campana: c, colores, anuncios, actId, productos, 
               <span className="font-medium">{NOMBRE_VEREDICTO[veredicto]}.</span> <Resultado r={r} tope={c.tope} /> estimado con un CPA tope de {dolares(c.tope)}
               {c.topeDefinido || c.topeAjustado ? "" : " (el general; se puede cambiar en Cuentas)"}.
             </p>
-            {c.topeTexto && <p className="m-0 text-xs text-muted-foreground">{c.topeTexto}</p>}
+            {c.guiaTope && <AvisoDeTope guia={c.guiaTope} />}
             <div className="grid grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-2">
               {METRICAS_CAMPANA.map((m) => (
                 <Cifra key={m.clave} titulo={m.titulo} valor={textoMetrica(m.clave, r)} nivel={nivelesDeMetricas(r, c.etapa, c.tope)[m.clave]} apoyo={apoyoDeMetrica(m.clave, r)} />

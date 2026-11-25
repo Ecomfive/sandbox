@@ -12,6 +12,7 @@ import { EntregaDeProductos, QueGeneraMasVentas } from "./historial-seccion";
 import { ListaProductos } from "./lista-productos";
 import { ResumenProductos } from "./resumen-productos";
 import { SelectorActividad } from "./selector-actividad";
+import { TopesMasBajos } from "./topes-mas-bajos";
 
 const estadoDe = (p: ProductoVista) => (p.enMarcha ? "activo" : "apagado");
 
@@ -59,6 +60,7 @@ export function VistaProductos({ productos, campanas, videos, historial, enMarch
         </p>
       </div>
       <ResumenProductos productos={visibles} />
+      <TopesMasBajos key={`t-${vista}`} productos={visibles} />
       <CalculadoraCostos productos={visibles} entrega={entrega} costos={calculadora.costos} guardados={calculadora.guardados} escribe={escribe} />
       {h && (
         <div className="flex flex-col gap-3">

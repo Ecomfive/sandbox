@@ -6,7 +6,7 @@ import { fieldClassSm } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { filasDeCostos, revisarCostos, type CostosGuardados, type CostosOperacion, type EntregasMeta, type FilaCosto } from "@/lib/meta-ads/costos-operacion";
 import { horaDeMeta } from "@/lib/meta-ads/hora";
-import { topeDeProducto, type TopeProducto } from "@/lib/meta-ads/limite";
+import { guiaDeTope, topeDeProducto, type TopeProducto } from "@/lib/meta-ads/limite";
 import { dolares } from "@/lib/meta-ads/metricas";
 import { ordenarPor, type CriterioOrden, type Orden } from "@/lib/meta-ads/orden";
 import type { ProductoVista } from "@/lib/meta-ads/vistas";
@@ -50,10 +50,16 @@ const etiquetaDe = (f: FilaCosto) => `De qué está hecho: ${desglose(f).map((p)
 /** El tope de un producto: el que resulta y, si se ajustó, cuál era. */
 function TopeEnTabla({ t }: { t: TopeProducto | null }) {
   if (!t) return <>—</>;
+  const guia = guiaDeTope(t);
   return (
     <span className="tabular-nums">
       <span className={t.ajustado ? "font-semibold text-warning" : "font-semibold"}>{dolares(t.tope)}</span>
       <span className="block text-xs text-muted-foreground">{t.ajustado ? `ajustado, antes ${dolares(t.base)}` : t.definido ? "escrito en Cuentas" : "el general"}</span>
+      {guia && (
+        <span className="block text-xs">
+          vigilar {dolares(guia.vigilar)} · <span className="text-destructive">apagar {dolares(guia.apagar)}</span>
+        </span>
+      )}
     </span>
   );
 }

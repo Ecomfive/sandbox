@@ -10,6 +10,7 @@ import { ListaSugerencias } from "./lista-sugerencias";
 import { Cifra, entero, InsigniaEtapa, porcentaje, Resultado, valorCpa } from "./piezas";
 import { temasPorTactica } from "@/lib/meta-ads/angulo-detalle";
 import { TemasDeTacticas } from "./cuales";
+import { TopesMasBajos } from "./topes-mas-bajos";
 
 const COLOR_VEREDICTO: Record<Veredicto, string> = { deja: "var(--success)", pierde: "var(--destructive)", poca_data: "var(--warning)", sin_gasto: "var(--grafica-5)" };
 
@@ -77,6 +78,8 @@ export function ContenidoResumen({ datos }: { datos: DatosMeta }) {
       )}
 
       <ListaSugerencias sugerencias={datos.sugerencias} decididas={datos.decididas} />
+
+      <TopesMasBajos productos={datos.productosVista.filter((p) => p.enMarcha)} />
 
       <InterpretacionVista guardada={datos.interpretacion} preparando={datos.analisisPendiente} enlace />
 
