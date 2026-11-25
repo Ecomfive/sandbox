@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { accionDeEntregaConcreta, accionDeZonas, concretarHallazgos, diagnosticoDeLanding, fallasDePagina, leerValorOfertas, leerValorPaginas, type OfertasProducto } from "./diagnostico-concreto";
-import { analizarHistorico, sinVentanas, type ProductoHist } from "./historico";
+import { analizarHistorico, detallarConCampanas, sinVentanas, type CampanaHist, type Hallazgo, type ProductoHist, type VideoHist } from "./historico";
 import { concluir, type InvestigacionProducto, type OrdenInv } from "./investigacion-entrega";
 import { sinResultados } from "./metricas";
 import type { SenalesCreativas } from "./senales-creativas";
@@ -90,4 +90,24 @@ test("lo guardado se lee sin romperse con datos raros", () => {
   assert.deepEqual(leerValorOfertas(null), {});
   assert.deepEqual(leerValorOfertas({ productos: { a: { producto: 1 }, b: { producto: "B", anuncios: [{ inicio: "hola", gasto: 1, compras: 0, landing: null, titulo: null }, 5], paginas: { "x.com": ["r"], "y.com": 5 } } } }).b.paginas, { "x.com": ["r"] });
   assert.deepEqual(leerValorPaginas({ paginas: { "a.com": { rasgos: ["x"], en: "e" }, "b.com": { rasgos: [], en: "e", error: true }, "c.com": { rasgos: ["z"], error: true } } }), { "a.com": ["x"] });
+});
+
+test("las tendencias de campañas, ángulos y del total, y lo que nunca funcionó, también traen la respuesta (no solo los productos)", () => {
+  const res = (gasto: number, compras: number, extra: Partial<ReturnType<typeof sinResultados>> = {}) => ({ ...sinResultados(), gasto, compras, impresiones: 10_000, clics: 300, video3s: 4_000, ...extra });
+  const camp = (id: string, nombre: string, angulo: string, prev: ReturnType<typeof res>, rec: ReturnType<typeof res>, extra: Partial<CampanaHist> = {}): CampanaHist => ({ id, nombre, producto: "Corrector", clave: "corrector", familia: "general", activa: true, etapa: "venta", estructura: "CBO", puja: null, angulo, tope: 10, total: res(300, 20), v: { mes: { prev, rec }, semana: { prev, rec } }, ...extra });
+  const campanas = [
+    camp("a", "CORRECTOR | CBO | A", "Dolor de espalda", res(100, 20), res(200, 10)),
+    camp("b", "CORRECTOR | CBO | B", "Dolor de espalda", res(100, 10), res(100, 20)),
+    camp("c", "CORRECTOR | CBO | C", "Postura", res(100, 10), res(100, 10, { clics: 150 }), { estructura: "ABO", total: res(500, 0) }),
+  ];
+  const videos: VideoHist[] = [{ id: "v1", nombre: "Video antes y después", producto: "Corrector", clave: "corrector", familia: "general", angulo: "Postura", ganchoTipo: "Pregunta", formato: "UGC", ctaTipo: "Compra ya", tope: 10, total: res(300, 0) }];
+  const base = (id: string, categoria: "tendencia" | "no_funciona"): Hallazgo => ({ id, categoria, tono: "alerta", titulo: "t", detalle: "Detalle.", accion: "genérico", certeza: "firme", gasto: 300 });
+  const r = detallarConCampanas([base("tendencia:Ángulo:Dolor de espalda:semana", "tendencia"), base("tendencia:Todo:Todas las campañas:mes", "tendencia"), base("tendencia:Campaña:CORRECTOR | CBO | C:semana", "tendencia"), base("angulo:Postura:no", "no_funciona"), base("estructura:ABO:no", "no_funciona")], campanas, videos);
+  assert.match(r[0].accion!, /Bajar el presupuesto o rotar el creativo de lo que más empeoró: CORRECTOR \| CBO \| A \(CPA \$5\.00 → \$20\.00, \$200 gastados\); y mover ese dinero a lo que mejoró: CORRECTOR \| CBO \| B/);
+  assert.match(r[1].accion!, /CORRECTOR \| CBO \| A/, "el total también nombra las campañas que más empeoraron");
+  assert.match(r[2].accion!, /El anuncio atrae menos clics: subir 2 o 3 anuncios nuevos con otro gancho/, "una campaña: la métrica que más cayó dice qué hacer");
+  assert.match(r[3].detalle, /Hoy lo usan 1 video \(\$300 gastados\); los de más gasto: Video antes y después \(\$300\)/);
+  assert.match(r[4].detalle, /Hoy siguen activas 1 campaña así \(\$500 gastados\)/);
+  assert.equal(detallarConCampanas([base("tendencia:Ángulo:Otro:semana", "tendencia")], campanas, videos)[0].accion, "genérico", "sin campañas que lo expliquen se deja como estaba");
+  assert.ok(![r[0], r[1], r[2]].some((x) => /llamada|WhatsApp|cobro previo|despachar/i.test(x.accion!)));
 });

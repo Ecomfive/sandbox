@@ -167,8 +167,8 @@ export function concretarHallazgos(analisis: AnalisisHistorico, d: DatosParaConc
       const accion = accionDeTendenciaConcreta(d.senales.find((s) => norm(s.producto) === nombre));
       return accion ? { ...h, accion } : h;
     }
-    if (h.categoria === "no_funciona" && h.accion?.startsWith("Antes de volver a usar") && ganadores) {
-      return { ...h, accion: `${h.accion.replace(/, revisar qué lo distingue de lo que sí funcionó\.$/, ", compararlo con lo que sí funcionó.")} ${ganadores}.` };
+    if (h.categoria === "no_funciona" && h.accion?.startsWith("Dejar de usar «") && ganadores) {
+      return { ...h, accion: `${h.accion} ${ganadores}.` };
     }
     return h;
   });

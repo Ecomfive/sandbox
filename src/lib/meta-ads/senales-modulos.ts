@@ -107,7 +107,7 @@ export function senalesDeModulos(d: DatosModulos, o: { hoy: string; cpaActual: n
       tipo: "mas_baratos",
       titulo: `${m.competidores} ${m.competidores === 1 ? "competidor vende" : "competidores venden"} el mismo producto más barato (desde ${usd(m.minimo)} frente a nuestros ${usd(m.nuestro)})`,
       detalle: "Cuando el dropshipper compara, se queda con el más barato: eso encarece cada compra en Meta aunque el anuncio sea bueno.",
-      accion: "Ver en Análisis de competencia quién es y qué ofrece; mejorar la oferta y la promesa del anuncio y la landing, o dejar de empujar este producto.",
+      accion: `Su precio más bajo es ${usd(m.minimo)} frente a nuestros ${usd(m.nuestro)}: mejorar la oferta y la promesa del anuncio y la landing, o dejar de empujar este producto.`,
       gravedad: "media",
     });
   }
@@ -118,7 +118,7 @@ export function senalesDeModulos(d: DatosModulos, o: { hoy: string; cpaActual: n
       tipo: "competencia",
       titulo: `${avisos.length} ${avisos.length === 1 ? "aviso" : "avisos"} de la competencia en los últimos ${U.diasReciente} días`,
       detalle: avisos.slice(0, 3).map((c) => `«${c.titulo}»`).join(" "),
-      accion: "Mirar en Análisis de competencia qué hizo la competencia (producto nuevo, stock) y si coincide con la fecha en que empezó a empeorar.",
+      accion: "Si lo que cambió en la competencia coincide con la fecha en que empezó a empeorar, ajustar la oferta y la promesa del anuncio frente a ese competidor.",
       gravedad: "info",
     });
   }

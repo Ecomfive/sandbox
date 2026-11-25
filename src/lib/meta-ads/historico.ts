@@ -427,7 +427,7 @@ function hallazgosDeCaracteristica(opciones: { id: string; unidad: string; plura
         tono: "alerta",
         titulo: `${opciones.nombre} «${g.clave}»${donde}: ninguno funcionó`,
         detalle: `De ${g.n} ${opciones.plural} con ${opciones.nombre.toLowerCase()} «${g.clave}»${donde} (${dol(g.gasto)} gastados) ninguno llegó a su CPA tope; en el resto funcionó ${pct(resto)}.`,
-        accion: `Antes de volver a usar «${g.clave}»${donde}, revisar qué lo distingue de lo que sí funcionó.`,
+        accion: opciones.unidad === "video" ? `Dejar de usar «${g.clave}»${donde} en videos nuevos y probar con lo que sí funcionó.` : `Dejar de montar campañas con ${opciones.nombre.toLowerCase()} «${g.clave}»${donde} y probar con lo que sí funcionó.`,
         certeza,
         gasto: g.gasto,
       });
@@ -508,7 +508,13 @@ const METRICAS_MOTIVO: MetricaMotivo[] = [
  * null si ninguna se movió lo suficiente: el cambio no se explica con esas métricas.
  */
 export function motivoDeCambio(prev: Resultados, rec: Resultados, empeora: boolean): string | null {
-  let mejor: { fuerza: number; texto: string } | null = null;
+  const x = masMovida(prev, rec, empeora);
+  return x ? (empeora ? x.m.malo : x.m.bueno)(Math.round(Math.abs(x.relativo) * 100)) : null;
+}
+
+/** La métrica del anuncio que más se movió (en contra si `empeora`, a favor si no), con cuánto; null si ninguna llegó al umbral. */
+function masMovida(prev: Resultados, rec: Resultados, empeora: boolean): { m: MetricaMotivo; relativo: number } | null {
+  let mejor: { fuerza: number; m: MetricaMotivo; relativo: number } | null = null;
   for (const m of METRICAS_MOTIVO) {
     const a = m.valor(prev);
     const b = m.valor(rec);
@@ -518,9 +524,9 @@ export function motivoDeCambio(prev: Resultados, rec: Resultados, empeora: boole
     const enContra = m.masEsMejor ? -relativo : relativo;
     const fuerza = empeora ? enContra : -enContra;
     if (fuerza < UMBRALES_HISTORICO.metricaCambio) continue;
-    if (!mejor || fuerza > mejor.fuerza) mejor = { fuerza, texto: (empeora ? m.malo : m.bueno)(Math.round(Math.abs(relativo) * 100)) };
+    if (!mejor || fuerza > mejor.fuerza) mejor = { fuerza, m, relativo };
   }
-  return mejor?.texto ?? null;
+  return mejor;
 }
 
 /** Cómo cambió algo entre el periodo anterior y el reciente: el CPA, y por qué. */
@@ -773,6 +779,61 @@ export function ordenarHallazgos(lista: readonly Hallazgo[]): Hallazgo[] {
   return [...lista].sort((a, b) => PESO_TONO[a.tono] - PESO_TONO[b.tono] || ORDEN_CATEGORIA.indexOf(a.categoria) - ORDEN_CATEGORIA.indexOf(b.categoria) || b.gasto - a.gasto || a.id.localeCompare(b.id));
 }
 
+// ───────────────────────── Del «revisa» a la respuesta: lo que se puede decir con las campañas y los videos ─────────────────────────
+
+const ACCION_POR_METRICA: Record<string, string> = {
+  cpm: "Meta cobra más por mostrar el anuncio: la audiencia se saturó. Ampliar el público o sumar anuncios con otro ángulo.",
+  ctr: "El anuncio atrae menos clics: subir 2 o 3 anuncios nuevos con otro gancho y bajar el gasto de los que ya se cansaron.",
+  hook: "El inicio del video perdió fuerza: subir 2 o 3 variantes del mismo video con otros primeros 3 segundos.",
+  efectividad: "Se pierden clics antes de ver la página: probar el enlace desde el celular y aligerar la landing para que cargue más rápido.",
+  cvr: "El clic llega pero no compra: cambiar la oferta o el precio que muestra la landing, o probar otra página.",
+};
+const ACCION_SIN_METRICA = "Las métricas del anuncio casi no se movieron: no tocar el creativo todavía; si el CPA sigue arriba la próxima semana, bajar el presupuesto.";
+const dolR = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
+const nombreCorto = (t: string) => (t.length > 46 ? `${t.slice(0, 45).trimEnd()}…` : t);
+
+/**
+ * Convierte el «Qué hacer» genérico de las tendencias que empeoraron (de una campaña, un ángulo o todo) y de lo que nunca funcionó (ángulo, gancho, formato, llamado) en uno con la respuesta: qué métrica falló y qué hacer con ella, qué campañas
+ * empeoraron y a cuáles mover el presupuesto, y qué videos usan hoy eso que no funciona. Solo con lo que ya está en el análisis; lo que no se puede resolver queda como estaba.
+ */
+export function detallarConCampanas(hallazgos: readonly Hallazgo[], campanas: readonly CampanaHist[], videos: readonly VideoHist[]): Hallazgo[] {
+  return hallazgos.map((h): Hallazgo => {
+    const t = /^tendencia:(Todo|Ángulo|Campaña):(.+):(mes|semana)$/.exec(h.id);
+    if (t && h.tono === "alerta") {
+      const [, nivel, nombre, ventana] = t as unknown as [string, string, string, "mes" | "semana"];
+      if (nivel === "Campaña") {
+        const c = campanas.find((x) => x.nombre === nombre);
+        if (!c) return h;
+        const mov = masMovida(c.v[ventana].prev, c.v[ventana].rec, true);
+        return { ...h, accion: mov ? ACCION_POR_METRICA[mov.m.id] : ACCION_SIN_METRICA };
+      }
+      const filas = campanas
+        .filter((c) => c.activa && (nivel === "Todo" || c.angulo === nombre) && c.v[ventana].rec.gasto >= 30)
+        .map((c) => ({ c, prev: cpa(c.v[ventana].prev), rec: cpa(c.v[ventana].rec), gasto: c.v[ventana].rec.gasto, comprasRec: c.v[ventana].rec.compras }));
+      const peores = filas.filter((x) => (x.rec === null ? x.comprasRec === 0 && x.prev !== null : x.prev !== null && x.rec > x.prev * 1.15)).sort((a, b) => b.gasto - a.gasto).slice(0, 3);
+      const mejores = filas.filter((x) => x.prev !== null && x.rec !== null && x.rec < x.prev * 0.85).sort((a, b) => b.gasto - a.gasto).slice(0, 2);
+      if (!peores.length) return h;
+      const de = (x: (typeof filas)[number]) => `${nombreCorto(x.c.nombre)} (CPA ${dol(x.prev!)} → ${x.rec === null ? "sin ventas" : dol(x.rec)}, ${dolR(x.gasto)} gastados)`;
+      return { ...h, accion: `Bajar el presupuesto o rotar el creativo de lo que más empeoró: ${peores.map(de).join("; ")}${mejores.length ? `; y mover ese dinero a lo que mejoró: ${mejores.map(de).join("; ")}` : ""}.` };
+    }
+    const k = /^(angulo|gancho|formato|cta|estructura|puja)(?:@(\w+))?:(.+):no$/.exec(h.id);
+    if (k) {
+      const [, dim, familia, clave] = k;
+      if (dim === "estructura" || dim === "puja") {
+        const usan = campanas.filter((c) => c[dim] === clave && c.activa && c.total.gasto > 0).sort((x, y) => y.total.gasto - x.total.gasto);
+        if (!usan.length) return h;
+        return { ...h, detalle: `${h.detalle} Hoy siguen activas ${usan.length} ${usan.length === 1 ? "campaña" : "campañas"} así (${dolR(usan.reduce((t2, c) => t2 + c.total.gasto, 0))} gastados); las de más gasto: ${usan.slice(0, 3).map((c) => `${nombreCorto(c.nombre)} (${dolR(c.total.gasto)})`).join("; ")}.` };
+      }
+      const campo = dim === "angulo" ? "angulo" : dim === "gancho" ? "ganchoTipo" : dim === "formato" ? "formato" : "ctaTipo";
+      const usan = videos.filter((v) => v[campo] === clave && (!familia || v.familia === familia) && v.total.gasto > 0).sort((x, y) => y.total.gasto - x.total.gasto);
+      if (!usan.length) return h;
+      const gasto = usan.reduce((t2, v) => t2 + v.total.gasto, 0);
+      return { ...h, detalle: `${h.detalle} Hoy lo usan ${usan.length} ${usan.length === 1 ? "video" : "videos"} (${dolR(gasto)} gastados); los de más gasto: ${usan.slice(0, 3).map((v) => `${nombreCorto(v.nombre)} (${dolR(v.total.gasto)})`).join("; ")}.` };
+    }
+    return h;
+  });
+}
+
 export function analizarHistorico(e: EntradaHistorico): AnalisisHistorico {
   const bandas = bandasDeMetricas(e.campanas);
   const filasTendencia = tendencias(e.campanas, e.productos);
@@ -780,12 +841,12 @@ export function analizarHistorico(e: EntradaHistorico): AnalisisHistorico {
   const promedio = tasaPromedio(e.productos);
   const medibles = e.campanas.filter((c) => confiable(c.total));
   const total = e.campanas.reduce((r, c) => sumar(r, c.total), sinResultados());
-  const hallazgos = ordenarHallazgos([
+  const hallazgos = ordenarHallazgos(detallarConCampanas([
     ...hallazgosDeEntrega(entrega, promedio),
     ...hallazgosDeTendencias(filasTendencia),
     ...hallazgosDeBandas(bandas),
     ...hallazgosDeCaracteristicas(e.campanas, e.videos),
-  ]);
+  ], e.campanas, e.videos));
   return {
     resumen: {
       campanas: e.campanas.length,
