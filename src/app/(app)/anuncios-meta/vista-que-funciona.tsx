@@ -6,6 +6,8 @@ import { useState } from "react";
 import { fieldClassSm } from "@/components/ui/field";
 import { filtrarProductos } from "@/lib/meta-ads/topes";
 import { claveDeProducto } from "@/lib/meta-ads/nombre";
+import { ordenarPor, type Orden } from "@/lib/meta-ads/orden";
+import { CRITERIOS_GRUPOS } from "@/lib/meta-ads/orden-listas";
 import { Tooltip } from "@/components/ui/tooltip";
 import { DIMENSIONES_ANUNCIO, DIMENSIONES_CAMPANA, type DimensionAnuncio, type DimensionCampana, type GruposMeta } from "@/lib/meta-ads/datos";
 import { DIMENSIONES_VIDEO, EXPLICACION_DIMENSION_VIDEO, esGanador, esPerdedor, mejorGrupo, MEZCLA_DE_ANGULOS, sumaDeGrupos, UMBRAL_DOMINANTE, ventajaDeCpa, type DimensionVideo, type GruposDeVideo } from "@/lib/meta-ads/atributos-video";
@@ -310,6 +312,25 @@ function DetalleDeProducto({ nombre, grupo, gruposVideo, dimVideo, alElegirDimen
   );
 }
 
+/** Un título de columna que ordena la tabla: primero con lo mejor arriba (el CPA, de menor a mayor) y, al tocarlo de nuevo, al revés. */
+function ColumnaOrdenable({ criterio, texto, clase, orden, alElegir }: { criterio: string; texto: string; clase: string; orden: Orden | null; alElegir: (o: Orden) => void }) {
+  const activa = orden?.criterio === criterio ? orden.sentido : null;
+  const natural = CRITERIOS_GRUPOS.find((c) => c.valor === criterio)?.sentido ?? "desc";
+  return (
+    <th scope="col" aria-sort={activa === null ? "none" : activa === "asc" ? "ascending" : "descending"} className={`${clase} font-medium`}>
+      <button
+        type="button"
+        onClick={() => alElegir({ criterio, sentido: activa === null ? natural : activa === "asc" ? "desc" : "asc" })}
+        title={`Ordenar por ${texto.toLowerCase()}`}
+        className={`inline-flex min-h-8 cursor-pointer items-center gap-1 rounded-md font-medium hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground ${activa ? "text-foreground" : ""}`}
+      >
+        {texto}
+        <span aria-hidden="true" className="w-3 text-center">{activa === "asc" ? "↑" : activa === "desc" ? "↓" : "↕"}</span>
+      </button>
+    </th>
+  );
+}
+
 /** Los grupos de una dimensión: la comparación de CPA con su promedio y la tabla completa. */
 function TablaDeGrupos({ grupos, filas, alElegir, dimension, unidad, sinDato, porVideo }: { grupos: Grupo[]; /** Las filas de la tabla si son menos que los grupos (una búsqueda): los promedios y las barras siguen midiendo todos. */ filas?: Grupo[]; /** Si viene, el nombre de cada fila se puede tocar (abre ese producto). */ alElegir?: (g: Grupo) => void; dimension: string; unidad: string; sinDato: number; porVideo: boolean }) {
   const total = sumaDeGrupos(grupos);
@@ -319,6 +340,10 @@ function TablaDeGrupos({ grupos, filas, alElegir, dimension, unidad, sinDato, po
   const maxGasto = Math.max(1, ...grupos.map((g) => g.r.gasto));
   const primera = mejorGrupo(grupos);
   const conSinConfiar = grupos.some((g) => !g.confiable);
+  // Tocar el título de una columna ordena por ella (otra vez, al revés); sin elegir, el orden de siempre (primero lo que ya tiene datos, de menor a mayor CPA).
+  const [orden, setOrden] = useState<Orden | null>(null);
+  const filasOrdenadas = orden ? ordenarPor(filas ?? grupos, CRITERIOS_GRUPOS, [orden], (g) => g.r.gasto) : (filas ?? grupos);
+  const columna = (criterio: string, texto: string, clase: string) => <ColumnaOrdenable criterio={criterio} texto={texto} clase={clase} orden={orden} alElegir={setOrden} />;
   return (
     <div className="flex flex-col gap-6">
       {conCompras.length > 1 && promedio !== null && (
@@ -371,25 +396,33 @@ function TablaDeGrupos({ grupos, filas, alElegir, dimension, unidad, sinDato, po
             Lo que mejor funciona en {dimension.toLowerCase()}: <span className="font-medium text-foreground">{primera.nombre}</span> con CPA {valorCpa(primera.r)} y {entero(primera.r.compras)} compras.
           </p>
         )}
+        {orden && (
+          <p className="m-0 flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border px-4 py-2 text-xs text-muted-foreground" aria-live="polite">
+            Ordenado por {CRITERIOS_GRUPOS.find((c) => c.valor === orden.criterio)?.etiqueta}, {orden.sentido === "asc" ? "de menor a mayor" : "de mayor a menor"}.
+            <button type="button" onClick={() => setOrden(null)} className="min-h-8 cursor-pointer rounded-md border border-border-control bg-card px-3 py-1 font-medium text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground">
+              Volver al orden de siempre
+            </button>
+          </p>
+        )}
         <div className="overflow-x-auto">
           <table className="tabla-datos w-full min-w-[56rem] border-collapse text-sm">
             <caption className="sr-only">Resultados por {dimension.toLowerCase()}</caption>
             <thead>
               <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                <th scope="col" className="px-4 py-2 font-medium">{dimension}</th>
-                <th scope="col" className="px-3 py-2 text-right font-medium">{unidad}</th>
-                <th scope="col" className="px-3 py-2 text-right font-medium">Gasto</th>
-                <th scope="col" className="px-3 py-2 text-right font-medium">Compras</th>
-                <th scope="col" className="px-3 py-2 text-right font-medium">CPA</th>
+                {columna("nombre", dimension, "px-4 py-2 text-left")}
+                {columna(porVideo ? "videos" : "campanas", unidad, "px-3 py-2 text-right")}
+                {columna("gasto", "Gasto", "px-3 py-2 text-right")}
+                {columna("compras", "Compras", "px-3 py-2 text-right")}
+                {columna("cpa", "CPA", "px-3 py-2 text-right")}
                 <th scope="col" className="px-3 py-2 text-right font-medium">Frente al promedio</th>
-                <th scope="col" className="px-3 py-2 text-right font-medium">CTR</th>
-                <th scope="col" className="px-3 py-2 text-right font-medium">Hook</th>
-                <th scope="col" className="px-3 py-2 text-right font-medium">Resultado estimado</th>
+                {columna("ctr", "CTR", "px-3 py-2 text-right")}
+                {columna("hook", "Hook", "px-3 py-2 text-right")}
+                {columna("resultado", "Resultado estimado", "px-3 py-2 text-right")}
                 <th scope="col" className="px-4 py-2 font-medium">Qué tan seguro</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {(filas ?? grupos).map((g) => {
+              {filasOrdenadas.map((g) => {
                 const ventaja = ventajaDeCpa(g, total.r);
                 return (
                   <tr key={g.nombre} className={g.confiable ? "" : "text-muted-foreground"}>

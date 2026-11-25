@@ -19,7 +19,7 @@ const estadoAnalisis = (v: VideoVista): EstadoAnalisis => (!v.analisis ? "sin_an
 
 /**
  * Los videos con la barra común: se filtran, buscan y agrupan por ángulo, producto, campaña, etapa, formato, cómo les va o si ya los vio la IA, y por rangos de gasto, compras, CPA, hook, CTR… (18 nov 2026,
- * pedido de Alcides). El orden de las filas no lo hace la barra: lo elige el selector «Ordenar por» de la lista (`orden-videos.ts`).
+ * pedido de Alcides). El orden de las filas no lo hace la barra: lo elige el selector «Ordenar por» de la lista (`orden-listas.ts`).
  */
 export const DEF_VIDEOS: DefTabla<VideoVista> = {
   clave: "anuncios-meta-videos",

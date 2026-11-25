@@ -21,20 +21,22 @@ export interface DefColumna {
   grupo: GrupoColumna;
   /** Una línea para quien no sabe qué mide. */
   descripcion: string;
+  /** Al ordenar, lo bajo es lo bueno (CPA, CPM, frecuencia): se ordena de menor a mayor de entrada. */
+  menorEsMejor?: boolean;
 }
 
 export const CATALOGO_COLUMNAS: DefColumna[] = [
   { clave: "gasto", titulo: "Gasto", grupo: "Resultados", descripcion: "Dinero gastado en el periodo." },
   { clave: "compras", titulo: "Compras", grupo: "Resultados", descripcion: "Compras que Meta atribuye." },
-  { clave: "cpa", titulo: "CPA", grupo: "Resultados", descripcion: "Costo por compra: gasto ÷ compras." },
+  { clave: "cpa", titulo: "CPA", grupo: "Resultados", descripcion: "Costo por compra: gasto ÷ compras.", menorEsMejor: true },
   { clave: "valor", titulo: "Valor de compras", grupo: "Resultados", descripcion: "Lo vendido según Meta." },
   { clave: "roas", titulo: "ROAS", grupo: "Resultados", descripcion: "Valor de compras ÷ gasto." },
   { clave: "resultado", titulo: "Resultado estimado", grupo: "Resultados", descripcion: "Compras × CPA tope − gasto." },
-  { clave: "cpm", titulo: "CPM", grupo: "Entrega", descripcion: "Costo por mil impresiones." },
+  { clave: "cpm", titulo: "CPM", grupo: "Entrega", descripcion: "Costo por mil impresiones.", menorEsMejor: true },
   { clave: "ctr", titulo: "CTR (enlace)", grupo: "Entrega", descripcion: "Clics en el enlace ÷ impresiones." },
   { clave: "impresiones", titulo: "Impresiones", grupo: "Entrega", descripcion: "Veces que se mostró." },
   { clave: "clics", titulo: "Clics al enlace", grupo: "Entrega", descripcion: "Clics en el enlace." },
-  { clave: "frecuencia", titulo: "Frecuencia", grupo: "Entrega", descripcion: "Veces que una persona lo vio, últimos 7 días (solo campañas y anuncios)." },
+  { clave: "frecuencia", titulo: "Frecuencia", grupo: "Entrega", descripcion: "Veces que una persona lo vio, últimos 7 días (solo campañas y anuncios).", menorEsMejor: true },
   { clave: "hook", titulo: "Hook (3 s)", grupo: "Video", descripcion: "Reproducciones de 3 s ÷ impresiones." },
   { clave: "hold", titulo: "Pasan 15 s", grupo: "Video", descripcion: "De los que vieron 3 s, cuántos pasan los 15 s." },
   { clave: "tiempo", titulo: "Tiempo prom.", grupo: "Video", descripcion: "Segundos que se mira cada reproducción." },
@@ -122,6 +124,56 @@ export function valorColumna(clave: ClaveColumna, r: Resultados, ctx: ContextoCo
       return { texto: r.vioLanding > 0 ? entero(r.vioLanding) : "—", nivel: "neutral" };
     case "cvr":
       return { texto: pct(cvr(r), 2), nivel: color(niveles.cvr) };
+  }
+}
+
+/**
+ * El número por el que se ordena una columna (`orden.ts`); null cuando no hay dato (nunca un cero que parezca real). Una columna nueva del catálogo tiene que sumar aquí su número: si falta, TypeScript no deja compilar.
+ */
+export function numeroColumna(clave: ClaveColumna, r: Resultados, ctx: ContextoColumna): number | null {
+  switch (clave) {
+    case "gasto":
+      return r.gasto > 0 ? r.gasto : null;
+    case "compras":
+      return r.gasto > 0 || r.compras > 0 ? r.compras : null;
+    case "cpa":
+      return cpa(r);
+    case "valor":
+      return r.valor > 0 ? r.valor : null;
+    case "roas":
+      return r.gasto > 0 && r.valor > 0 ? r.valor / r.gasto : null;
+    case "resultado":
+      return r.gasto > 0 ? resultado(r, ctx.tope) : null;
+    case "cpm":
+      return cpm(r);
+    case "ctr":
+      return ctr(r);
+    case "impresiones":
+      return r.impresiones > 0 ? r.impresiones : null;
+    case "clics":
+      return r.clics > 0 ? r.clics : null;
+    case "frecuencia":
+      return ctx.frecuencia ?? null;
+    case "hook":
+      return hookRate(r);
+    case "hold":
+      return holdRate(r);
+    case "tiempo":
+      return tiempoPromedio(r);
+    case "ret25":
+      return ret(r, "p25");
+    case "ret50":
+      return ret(r, "p50");
+    case "ret75":
+      return ret(r, "p75");
+    case "ret95":
+      return ret(r, "p95");
+    case "efectividad":
+      return efectividad(r);
+    case "visitas":
+      return r.vioLanding > 0 ? r.vioLanding : null;
+    case "cvr":
+      return cvr(r);
   }
 }
 

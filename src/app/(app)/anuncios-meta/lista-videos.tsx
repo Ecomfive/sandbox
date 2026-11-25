@@ -21,7 +21,9 @@ import { Ventana } from "@/components/ui/ventana";
 import { Seccion } from "@/components/ui/seccion-ficha";
 import { AnunciosIcon, ChevronRightIcon, EstadoIcon, EtiquetaIcon, FiltroIcon, MargenIcon, ProductoIcon, RobotIcon } from "@/lib/nav-icons";
 import { confiable, dolares } from "@/lib/meta-ads/metricas";
-import { CRITERIOS_VIDEO, ordenarVideos, sentidoNatural, type CriterioVideo, type Sentido } from "@/lib/meta-ads/orden-videos";
+import { ordenarPor } from "@/lib/meta-ads/orden";
+import { CRITERIOS_VIDEOS, ORDEN_VIDEOS } from "@/lib/meta-ads/orden-listas";
+import { BarraOrden, useOrdenMeta } from "./orden-meta";
 import type { VideoVista } from "@/lib/meta-ads/vistas";
 import { analizarSiguienteMeta, analizarVideoAhoraMeta, corregirAnguloVideoMeta } from "./actions";
 import { anguloDeVideo, DEF_VIDEOS } from "./def-videos";
@@ -73,7 +75,6 @@ function FilaVideo({ x, alAbrir, columnas }: { x: VideoVista; alAbrir: () => voi
   );
 }
 
-/** «Ordenar por» y el sentido (de mayor a menor o al revés): la barra común filtra y agrupa, pero no ordena filas. */
 type VistaVideos = "tarjetas" | "lista";
 const CLAVE_VISTA = "anuncios-meta-videos-vista-v1";
 
@@ -115,47 +116,27 @@ function useVistaVideos(): [VistaVideos, (v: VistaVideos) => void] {
   return [vista, elegir];
 }
 
-function OrdenDeVideos({ criterio, sentido, alCambiar, vista, alElegirVista, selectorColumnas }: { selectorColumnas: React.ReactNode; criterio: CriterioVideo; sentido: Sentido; alCambiar: (c: CriterioVideo, s: Sentido) => void; vista: VistaVideos; alElegirVista: (v: VistaVideos) => void }) {
+/** Tarjetas o lista. */
+function SelectorVista({ vista, alElegirVista }: { vista: VistaVideos; alElegirVista: (v: VistaVideos) => void }) {
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5">
-      <label className="flex items-center gap-2 text-sm">
-        <span className="text-xs font-medium text-muted-foreground">Ordenar por</span>
-        <select value={criterio} onChange={(e) => alCambiar(e.target.value as CriterioVideo, sentidoNatural(e.target.value as CriterioVideo))} className={`${fieldClassSm} w-auto min-w-[14rem]`}>
-          {CRITERIOS_VIDEO.map((c) => (
-            <option key={c.valor} value={c.valor}>
-              {c.etiqueta}
-            </option>
-          ))}
-        </select>
-      </label>
-      <button
-        type="button"
-        onClick={() => alCambiar(criterio, sentido === "asc" ? "desc" : "asc")}
-        aria-label={`Cambiar el orden: ahora va de ${sentido === "asc" ? "menor a mayor" : "mayor a menor"}`}
-        className="min-h-8 rounded-md border border-border-control bg-card px-3 py-1 text-xs font-medium hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground"
-      >
-        {criterio === "nombre" ? (sentido === "asc" ? "A → Z" : "Z → A") : sentido === "asc" ? "De menor a mayor ↑" : "De mayor a menor ↓"}
-      </button>
-      <span className="ml-auto">{selectorColumnas}</span>
-      <div role="group" aria-label="Cómo ver los videos" className="flex overflow-hidden rounded-md border border-border-control">
-        {(["tarjetas", "lista"] as const).map((o) => (
-          <button
-            key={o}
-            type="button"
-            aria-pressed={vista === o}
-            onClick={() => alElegirVista(o)}
-            className={`min-h-8 px-3 py-1 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-foreground ${vista === o ? "bg-foreground text-background" : "bg-card hover:bg-muted"}`}
-          >
-            {o === "tarjetas" ? "Tarjetas" : "Lista"}
-          </button>
-        ))}
-      </div>
+    <div role="group" aria-label="Cómo ver los videos" className="flex overflow-hidden rounded-md border border-border-control">
+      {(["tarjetas", "lista"] as const).map((o) => (
+        <button
+          key={o}
+          type="button"
+          aria-pressed={vista === o}
+          onClick={() => alElegirVista(o)}
+          className={`min-h-9 px-3 py-1 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-foreground ${vista === o ? "bg-foreground text-background" : "bg-card hover:bg-muted"}`}
+        >
+          {o === "tarjetas" ? "Tarjetas" : "Lista"}
+        </button>
+      ))}
     </div>
   );
 }
 
 /**
- * Los videos con gasto en el periodo elegido, cada uno una sola vez, con la barra común (buscar, filtrar y agrupar por ángulo, producto, campaña, etapa…) y un orden a elegir (gasto, CPA, hook…, ascendente o
+ * Los videos con gasto en el periodo elegido, cada uno una sola vez, con la barra común (buscar, filtrar y agrupar por ángulo, producto, campaña, etapa…) y el orden que cada persona elija (cualquier métrica, hasta tres encadenadas, ascendente o
  * descendente). Tocar uno abre su ficha: en qué anuncios y campañas se usa y cómo le fue en cada una; queda en la dirección (`?abrir=<id>`).
  */
 export function ListaVideos({ videos, escribe, iaConectada, sinAnalizar, abrirInicial, automatico }: { videos: VideoVista[]; escribe: boolean; iaConectada: boolean; sinAnalizar: number; abrirInicial: string | null; automatico: EstadoAnalisisAutomatico }) {
@@ -163,8 +144,7 @@ export function ListaVideos({ videos, escribe, iaConectada, sinAnalizar, abrirIn
   const { mostrarToast } = useToast();
   const [columnas, guardarColumnas, restablecerColumnas] = useColumnasMeta("videos", COLUMNAS_VIDEOS);
   const [abierto, setAbierto] = useState<string | null>(() => (abrirInicial && videos.some((x) => x.id === abrirInicial) ? abrirInicial : null));
-  const [criterio, setCriterio] = useState<CriterioVideo>("mejor");
-  const [sentido, setSentido] = useState<Sentido>("asc");
+  const [ordenes, guardarOrdenes] = useOrdenMeta("videos", CRITERIOS_VIDEOS, ORDEN_VIDEOS);
   // Cómo se ven los videos (tarjetas o lista): lo elige cada persona y se recuerda en su navegador.
   const [vista, elegirVista] = useVistaVideos();
   // «Reproducir» desde una tarjeta abre la ficha y arranca el video; abrir la ficha con un clic en el cuerpo no lo arranca.
@@ -173,7 +153,7 @@ export function ListaVideos({ videos, escribe, iaConectada, sinAnalizar, abrirIn
     setReproducirAlAbrir(reproducir);
     setAbierto(id);
   };
-  const ordenados = ordenarVideos(videos, criterio, sentido);
+  const ordenados = ordenarPor(videos, CRITERIOS_VIDEOS, ordenes, (x) => x.r.gasto);
   // «Abrir este video» de «Para revisar» (arriba, en el resumen) pide abrir la ficha de ese video sin recargar la página.
   useEffect(() => {
     const abrirDesdeResumen = (e: Event) => {
@@ -274,17 +254,10 @@ export function ListaVideos({ videos, escribe, iaConectada, sinAnalizar, abrirIn
           }}
         />
       )}
-      <OrdenDeVideos
-        selectorColumnas={<SelectorColumnasMeta titulo="Videos" columnas={columnas} alCambiar={guardarColumnas} alRestablecer={restablecerColumnas} sinFrecuencia />}
-        criterio={criterio}
-        sentido={sentido}
-        alCambiar={(c, s) => {
-          setCriterio(c);
-          setSentido(s);
-        }}
-        vista={vista}
-        alElegirVista={elegirVista}
-      />
+      <BarraOrden criterios={CRITERIOS_VIDEOS} ordenes={ordenes} alCambiar={guardarOrdenes}>
+        <SelectorColumnasMeta titulo="Videos" columnas={columnas} alCambiar={guardarColumnas} alRestablecer={restablecerColumnas} sinFrecuencia />
+        <SelectorVista vista={vista} alElegirVista={elegirVista} />
+      </BarraOrden>
       <ListaDatos
         def={DEF_VIDEOS}
         filas={ordenados}
