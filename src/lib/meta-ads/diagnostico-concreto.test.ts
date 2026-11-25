@@ -64,7 +64,7 @@ test("el «Qué hacer» de entrega junta zonas, la promesa del anuncio y lo que 
 });
 
 test("los hallazgos del análisis reemplazan el texto genérico cuando hay datos, y lo demás queda igual", () => {
-  const p: ProductoHist = { clave: "corrector", nombre: "Corrector", familia: "general", tope: 10, campanas: 2, total: { ...sinResultados(), gasto: 700, compras: 100 }, v: sinVentanas(), entrega: { nombre: "Corrector", entregadas: 48, devueltas: 52, canceladas: 3, enCamino: 1 } };
+  const p: ProductoHist = { clave: "corrector", nombre: "Corrector", familia: "general", tope: 6, topeBase: 10, campanas: 2, total: { ...sinResultados(), gasto: 700, compras: 100 }, v: sinVentanas(), entrega: { nombre: "Corrector", entregadas: 48, devueltas: 52, canceladas: 3, enCamino: 1 } };
   const a = analizarHistorico({ campanas: [], videos: [], productos: [p], desde: "2025-11-01", hasta: "2026-11-24" });
   const antes = a.hallazgos.find((h) => h.id === "entrega:corrector:mala")!;
   assert.match(antes.accion!, /mirar en qué zonas se entrega peor/, "el texto genérico de antes");

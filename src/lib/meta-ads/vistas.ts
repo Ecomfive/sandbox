@@ -48,6 +48,9 @@ export interface CampanaVista {
   r: Resultados;
   tope: number;
   topeDefinido: boolean;
+  /** El tope se bajó del general por el envío y la entrega del producto, y por qué. */
+  topeAjustado?: boolean;
+  topeTexto?: string | null;
   /** Qué etiquetas se corrigieron a mano (la lectura de Meta no las pisa): `producto`, `angulo`, `etapa`. */
   manual: string[];
 }
@@ -59,6 +62,8 @@ export interface ProductoVista {
   nombre: string;
   tope: number;
   topeDefinido: boolean;
+  topeAjustado?: boolean;
+  topeTexto?: string | null;
   r: Resultados;
   campanas: number;
   activas: number;

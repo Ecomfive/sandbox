@@ -17,7 +17,7 @@ export default async function AnunciosMetaPage({ searchParams }: { searchParams:
   prepararAnalisisSiHaceFalta(datos, paisId, pais);
   return (
     <MarcoMeta titulo="Anuncios Meta" datos={datos} escribe={escribe} hayToken={hayToken} pais={pais}>
-      <ContenidoResumen datos={datos} escribe={escribe} />
+      <ContenidoResumen datos={datos} />
     </MarcoMeta>
   );
 }

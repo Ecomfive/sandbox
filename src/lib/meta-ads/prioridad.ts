@@ -5,6 +5,8 @@ import { PRIORIDADES, type CifraSugerencia, type Prioridad, type Severidad, type
 
 /** Lo más urgente que tiene una fila de una lista. */
 export interface Pendiente {
+  /** La llave de la sugerencia, para poder decidirla («Ya lo hice», «Dejar para después», «No aplica»). */
+  clave?: string;
   prioridad: Prioridad;
   titulo: string;
   accion: string;
@@ -27,7 +29,7 @@ function agrupar(pares: readonly [string, Sugerencia][]): Map<string, Pendiente>
   const salida = new Map<string, Pendiente>();
   for (const [id, lista] of porId) {
     const s = [...lista].sort((a, b) => urgencia(a) - urgencia(b) || b.gasto - a.gasto)[0];
-    salida.set(id, { prioridad: s.prioridad, titulo: s.titulo, accion: s.accion, cifras: s.cifras, cuantas: lista.filter((x) => x.prioridad === s.prioridad).length });
+    salida.set(id, { clave: s.clave, prioridad: s.prioridad, titulo: s.titulo, accion: s.accion, cifras: s.cifras, cuantas: lista.filter((x) => x.prioridad === s.prioridad).length });
   }
   return salida;
 }
@@ -54,7 +56,8 @@ export function pendientesPorVideo(s: readonly Sugerencia[], videos: readonly { 
     // Los anuncios que una tarjeta de campaña manda apagar.
     for (const a of x.anuncios ?? []) {
       const video = a.grupo === "apagar" ? videoDe.get(a.id) : undefined;
-      if (video) pares.push([video, { ...x, prioridad: "actuar", titulo: `${a.nombre}: apagar este anuncio (${a.cifra})`, accion: `Apagar ${a.nombre}: ${a.cifra}.`, cifras: undefined }]);
+      // Sin llave: decidirla desde un video omitiría la tarjeta entera de la campaña.
+      if (video) pares.push([video, { ...x, clave: "", prioridad: "actuar", titulo: `${a.nombre}: apagar este anuncio (${a.cifra})`, accion: `Apagar ${a.nombre}: ${a.cifra}.`, cifras: undefined }]);
     }
   }
   return agrupar(pares);

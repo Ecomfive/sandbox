@@ -77,8 +77,9 @@ function FichaProducto({ p, campanas, videos, alCerrar, entrega, costos }: { p: 
           <Seccion icono={MargenIcon} titulo="Cómo le va en el periodo">
             <p className="m-0 text-sm text-muted-foreground">
               Con un CPA tope de {dolares(p.tope)}
-              {p.topeDefinido ? "" : " (el de por defecto: defínelo en Cuentas)"}.
+              {p.topeDefinido || p.topeAjustado ? "" : " (el general; se puede cambiar en Cuentas)"}.
             </p>
+            {p.topeTexto && <p className="m-0 text-xs text-muted-foreground">{p.topeTexto}</p>}
             <div className="grid grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-2">
               {CATALOGO_COLUMNAS.filter((c) => c.clave !== "frecuencia").map((c) => {
                 const v = valorColumna(c.clave, p.r, { tope: p.tope, etapa: "venta", confiable: confiable(p.r) });

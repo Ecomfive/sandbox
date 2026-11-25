@@ -6,6 +6,7 @@ import { fieldClassSm } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { filasDeCostos, revisarCostos, type CostosGuardados, type CostosOperacion, type EntregasMeta, type FilaCosto } from "@/lib/meta-ads/costos-operacion";
 import { horaDeMeta } from "@/lib/meta-ads/hora";
+import { topeDeProducto, type TopeProducto } from "@/lib/meta-ads/limite";
 import { dolares } from "@/lib/meta-ads/metricas";
 import { ordenarPor, type CriterioOrden, type Orden } from "@/lib/meta-ads/orden";
 import type { ProductoVista } from "@/lib/meta-ads/vistas";
@@ -46,6 +47,17 @@ const desglose = (f: FilaCosto) => (f.costo ? PARTES.map((p) => ({ nombre: p.nom
 
 const etiquetaDe = (f: FilaCosto) => `De qué está hecho: ${desglose(f).map((p) => `${p.nombre} ${dolares(p.valor)}`).join(", ")}`;
 
+/** El tope de un producto: el que resulta y, si se ajustó, cuál era. */
+function TopeEnTabla({ t }: { t: TopeProducto | null }) {
+  if (!t) return <>—</>;
+  return (
+    <span className="tabular-nums">
+      <span className={t.ajustado ? "font-semibold text-warning" : "font-semibold"}>{dolares(t.tope)}</span>
+      <span className="block text-xs text-muted-foreground">{t.ajustado ? `ajustado, antes ${dolares(t.base)}` : t.definido ? "escrito en Cuentas" : "el general"}</span>
+    </span>
+  );
+}
+
 /** La leyenda de los tres colores. */
 export function LeyendaDeCostos() {
   return (
@@ -79,6 +91,11 @@ export function CalculadoraCostos({ productos, entrega, costos, guardados, escri
   const filas = entrega ? filasDeCostos(productos.map((p) => ({ clave: p.clave, nombre: p.nombre, gasto: p.r.gasto, compras: p.r.compras })), entrega.productos, entrega.tienda, usados) : [];
   const ordenadas = orden ? ordenarPor(filas, CRITERIOS, [orden], (f) => f.gasto) : filas;
   const visibles = todas ? ordenadas : ordenadas.slice(0, FILAS_A_LA_VISTA);
+  // El tope de cada producto con los costos que están escritos: el de Cuentas si se escribió uno; si no, el general ajustado por su envío y entrega.
+  const topeDe = (clave: string) => {
+    const p = productos.find((x) => x.clave === clave);
+    return entrega ? topeDeProducto(p?.topeDefinido ? p.tope : undefined, entrega.productos[clave], entrega.tienda, usados) : null;
+  };
   const conTienda = filas.some((f) => f.envioDeLaTienda || f.entregaDeLaTienda);
   const columna = (valor: string, texto: string, clase: string) => <ColumnaOrdenable criterio={valor} texto={texto} natural={CRITERIOS.find((c) => c.valor === valor)?.sentido} clase={clase} orden={orden} alElegir={setOrden} />;
 
@@ -162,11 +179,15 @@ export function CalculadoraCostos({ productos, entrega, costos, guardados, escri
                       {f.envioDeLaTienda ? "*" : ""} · entrega {pct(f.entrega)}
                       {f.entregaDeLaTienda ? "*" : ""} · gastó {dolares(f.gasto)}
                     </p>
+                    <p className="m-0 flex flex-wrap items-baseline gap-1.5">
+                      <span className="text-muted-foreground">CPA tope</span>
+                      <TopeEnTabla t={topeDe(f.clave)} />
+                    </p>
                   </li>
                 ))}
               </ul>
               <div className="hidden overflow-x-auto md:block">
-                <table className="tabla-datos w-full min-w-[58rem] border-collapse text-sm">
+                <table className="tabla-datos w-full min-w-[64rem] border-collapse text-sm">
                   <caption className="sr-only">Costo de cada venta entregada por producto, en el periodo elegido</caption>
                   <thead>
                     <tr className="border-b border-border text-left text-xs text-muted-foreground">
@@ -178,7 +199,8 @@ export function CalculadoraCostos({ productos, entrega, costos, guardados, escri
                       {columna("cpaReal", "CPA real", "px-3 py-2 text-right")}
                       <th scope="col" className="px-3 py-2 text-right font-medium">Envíos</th>
                       <th scope="col" className="px-3 py-2 text-right font-medium">Operativo</th>
-                      {columna("total", "Costo por venta entregada", "px-4 py-2 text-right")}
+                      {columna("total", "Costo por venta entregada", "px-3 py-2 text-right")}
+                      <th scope="col" className="px-4 py-2 text-right font-medium">CPA tope</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
@@ -202,13 +224,16 @@ export function CalculadoraCostos({ productos, entrega, costos, guardados, escri
                         <td className="px-3 py-2.5 text-right">{plata(f.costo?.cpaReal)}</td>
                         <td className="px-3 py-2.5 text-right">{plata(f.costo?.envios)}</td>
                         <td className="px-3 py-2.5 text-right">{plata(f.costo?.operativo)}</td>
-                        <td className="px-4 py-2.5 text-right">
+                        <td className="px-3 py-2.5 text-right">
                           <span className="block font-semibold">{plata(f.costo?.total)}</span>
                           {f.costo && (
                             <span className="mt-1 ml-auto block w-36">
                               <BarraApilada partes={desglose(f)} alto={5} etiqueta={etiquetaDe(f)} />
                             </span>
                           )}
+                        </td>
+                        <td className="px-4 py-2.5 text-right">
+                          <TopeEnTabla t={topeDe(f.clave)} />
                         </td>
                       </tr>
                     ))}
@@ -232,7 +257,8 @@ export function CalculadoraCostos({ productos, entrega, costos, guardados, escri
               <li>% de envío: pedidos enviados entre los ya decididos (enviados, cancelados o sin gestionar). % de entrega: entregados entre entregados y devueltos. Pedidos de la tienda de los últimos 180 días.</li>
               <li>CPA real = CPA de Meta ÷ (% de envío × % de entrega).</li>
               <li>Envíos = envío + comisión × % de entrega + (1 − % de entrega) × envío.</li>
-              <li>Costo por venta entregada = CPA real + envíos + costo operativo. Por ahora es informativo: no cambia lo que el sistema recomienda apagar.</li>
+              <li>Costo por venta entregada = CPA real + envíos + costo operativo.</li>
+              <li>CPA tope: el general ($10) baja en el producto que envía o entrega peor que la tienda, hasta que cada venta entregada no cueste más que la de un producto promedio al tope general. Nunca sube, y uno escrito en Cuentas se usa tal cual. Con ese tope el sistema decide qué apagar y qué no tocar.</li>
             </ul>
           </details>
         </>

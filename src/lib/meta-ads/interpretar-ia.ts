@@ -59,6 +59,14 @@ export function cortarEnPunto(t: string, max: number): string {
 export const REGLA_TACTICAS =
   "«Antes y después», «Testimonio de cliente» y «Experto o autoridad» son tácticas generales: nunca las nombres solas. Cada vez que las menciones di de qué son (campos «de_que_son», «deQue» o «detalle»: por ejemplo «antes y después de manchas en la cara») y, si lo tienes, qué videos y campañas son y qué tienen en común. Si un dato dice que faltan detalles, dilo. Un mismo ángulo puede haber empeorado en la última semana y mejorado en el último mes: di siempre de qué periodo hablas.";
 
+/** La regla para las dos IA: no se toca lo que va dentro de su tope. */
+export const REGLA_APRENDIZAJE =
+  "APRENDIZAJE DE META: agregar o cambiar videos, subir el presupuesto más de un 20 % y cambiar la segmentación reinicia el aprendizaje de una campaña y puede dañarla. Nunca recomiendes eso sobre una campaña o producto cuyo CPA está por debajo del 90 % de su CPA tope, aunque haya subido (pasar de $5 a $7 con tope de $10 no es motivo): di que se deje correr. Solo se recomienda cuando pasa de su tope, o está cerca y no baja en unos 4 días; las ideas para probar mientras tanto van en una campaña nueva, sin tocar la que va bien.";
+
+/** La regla para las dos IA: qué pesa más al juzgar (decidido el 25 nov 2026). */
+export const REGLA_RELEVANCIA =
+  "QUÉ PESA MÁS, en este orden: 1) el CPA frente al CPA tope de ese producto (el «cpa_tope» que recibes ya está ajustado por su porcentaje de envío y de entrega: un producto que entrega peor tiene un tope más bajo que el general de $10) y los dólares gastados por encima; 2) cuánto se envía y se entrega; 3) si el cambio se sostiene (7 días contra los anteriores y los últimos 4); 4) cuánto dato hay (certeza); 5) CTR, hook y conversión para explicar el porqué; 6) ángulo, gancho, formato y llamado de los videos para saber qué repetir. Contrasta unas cosas con otras antes de recomendar y no repitas como problema algo que va dentro de su tope.";
+
 export function pedidoInterpretacion(completo: AnalisisHistorico, investigaciones: readonly unknown[] = [], senalesCreativas: readonly unknown[] = [], rasgos: readonly unknown[] = []): { instrucciones: string; texto: string } {
   // La IA recibe los productos y campañas que siguen en marcha: sobre lo apagado no hay nada que recomendar.
   const a = soloEnMarcha(completo);
@@ -67,17 +75,19 @@ export function pedidoInterpretacion(completo: AnalisisHistorico, investigacione
     "Recibes estadísticas ya calculadas por el sistema sobre el historial de campañas, anuncios y videos, la tasa de entrega de cada producto y las tendencias recientes.",
     "Reglas: usa SOLO las cifras que recibes; no inventes números, productos ni causas que no se vean en ellas. Si algo tiene poca data (certeza «poca» o «probable», pocos videos o poco gasto), dilo en vez de afirmarlo.",
     "Distingue lo que ya está comprobado en el historial de lo que apenas empieza a verse. Una correlación no es una causa: di «se asocia con», no «causa».",
-    "El resultado «funcionó» significa que la campaña o el video tuvo gasto suficiente y su CPA quedó dentro del CPA tope de su producto; no hay cálculo de costos reales todavía.",
+    "El resultado «funcionó» significa que la campaña o el video tuvo gasto suficiente y su CPA quedó dentro del CPA tope de su producto; el tope de cada producto ya tiene en cuenta cuánto se envía y se entrega; no se cuenta el costo del producto ni su precio.",
     "Da importancia a la tasa de entrega: un producto que vende bien en Meta pero entrega mal cuesta más por venta real.",
     "Escribe para quien monta las campañas, que no es analista: español claro, frases cortas, sin jerga. Cada punto lleva un título corto y un detalle con las cifras que lo respaldan y qué hacer.",
     REGLA_ALCANCE_DE_CAMPANAS,
     REGLA_TACTICAS,
+    REGLA_APRENDIZAJE,
+    REGLA_RELEVANCIA,
     hayAlgoEnMarcha(a.enMarcha) ? "Los productos y las campañas que recibes son solo los que tienen campañas activas hoy: recomienda sobre ellos. Los ángulos, ganchos, formatos y bandas salen de todo el historial: úsalos como aprendizaje y no propongas volver a anunciar un producto que no esté en la lista." : "",
     'Responde SOLO con un JSON válido de esta forma: {"resumen": string, "patrones": [{"titulo": string, "detalle": string}], "riesgos": [{"titulo": string, "detalle": string}], "recomendaciones": [{"titulo": string, "detalle": string}], "limites": [string]}.',
     `Máximo ${LIMITES_IA.puntos} elementos en patrones, riesgos y recomendaciones, y ${LIMITES_IA.limites} en limites. «limites» = lo que los datos todavía no permiten concluir o lo que convendría empezar a medir.`,
     "Largos: el resumen de hasta 600 caracteres y cada detalle de hasta 450; termina siempre las frases (nunca dejes una a medias): si no cabe todo, di menos y prioriza lo que más importa.",
     investigaciones.length
-      ? "Recibes además «investigaciones_de_entrega»: por qué no se entregan los productos que más devuelven, buscado por el sistema en los pedidos, la zona, la transportadora, la confirmación, lo que escribieron Servientrega, Monday y los asesores y, a veces, las conversaciones de WhatsApp. NO recomiendes «revisa por qué vuelven los pedidos»: usa las causas encontradas (con sus números) y da la acción concreta; si la investigación no encontró una causa clara, dilo y di qué dato falta. Para cada producto con investigación, el costo por entrega objetivo es el que viene en el JSON."
+      ? "Recibes además «investigaciones_de_entrega»: por qué no se entregan los productos que más devuelven, buscado por el sistema en los pedidos, la zona, la transportadora, la confirmación, lo que escribieron Servientrega, Monday y los asesores y, a veces, las conversaciones de WhatsApp. NO recomiendes «revisa por qué vuelven los pedidos»: usa las causas encontradas (con sus números) y da la acción concreta; si la investigación no encontró una causa clara, dilo y di qué dato falta. Para cada producto con investigación, el CPA objetivo («costo.cpaObjetivo») es su CPA tope ya ajustado."
       : "Si un producto vende bien pero entrega mal y no recibes la causa, no digas «revisa por qué vuelven»: di que todavía no se investigó y qué se necesita para saberlo.",
     rasgos.length
       ? "Recibes además «rasgos_de_ganadores»: por métrica (CTR, hook, clic a visita, conversión de la página), qué comparten los anuncios o las páginas que cayeron en la zona buena y funcionaron (lo que comparten) y qué casi nunca tienen, con cuántos de cuántos. Cuando recomiendes mejorar algo de esa métrica, di en concreto cómo parecerse a los que funcionaron (por ejemplo «los anuncios con CTR de 3 % o más empiezan con una pregunta: 6 de 8») y no solo «sube el CTR»; son asociaciones, no causas: dilo con «se asocia con»."
@@ -101,7 +111,7 @@ export function pedidoInterpretacion(completo: AnalisisHistorico, investigacione
     },
     hallazgos: a.hallazgos.slice(0, 30).map((h) => ({ tipo: NOMBRE_CATEGORIA[h.categoria], tono: h.tono, titulo: h.titulo, detalle: h.detalle, motivo: h.motivo ?? null, certeza: h.certeza, ...cualesParaIA(h) })),
     bandas: a.bandas.map((b) => ({ metrica: b.titulo, porcentaje_base_que_funciono: r1(b.tasaBase), bandas: b.filas.map((f) => ({ banda: f.etiqueta, campanas: f.campanas, funcionaron: f.funcionaron, cpa: r1(f.cpa) })) })),
-    entrega_por_producto: a.entrega.slice(0, 15).map((f) => ({ producto: f.nombre, gasto_usd: Math.round(f.gasto), compras: f.compras, cpa: r1(f.cpa), cpa_tope: f.tope, tasa_entrega: r1(f.tasa), pedidos_resueltos: f.cerradas, cpa_por_compra_entregada: r1(f.cpaEntregado), veredicto: f.veredicto })),
+    entrega_por_producto: a.entrega.slice(0, 15).map((f) => ({ producto: f.nombre, gasto_usd: Math.round(f.gasto), compras: f.compras, cpa: r1(f.cpa), cpa_tope: f.tope, tope_sin_ajustar: f.topeBase ?? f.tope, tasa_envio: r1(f.envio ?? null), tasa_entrega: r1(f.tasa), pedidos_resueltos: f.cerradas, cpa_por_compra_entregada: r1(f.cpaEntregado), veredicto: f.veredicto })),
     mas_ventas: {
       productos: a.rankings.productos.slice(0, 6).map((f) => ({ nombre: f.nombre, compras: f.compras, cpa: r1(f.cpa), entregadas_estimadas: r1(f.comprasEntregadas) })),
       angulos: a.rankings.angulos.slice(0, 6).map((f) => ({ nombre: f.nombre, compras: f.compras, cpa: r1(f.cpa), ...(f.deQue ? { de_que_son: f.deQue } : {}) })),

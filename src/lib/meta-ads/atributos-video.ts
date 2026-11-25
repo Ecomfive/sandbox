@@ -197,7 +197,14 @@ function ordenNatural(dim: DimensionVideo, grupos: Grupo[]): Grupo[] {
 export function mejorGrupo(grupos: Grupo[]): Grupo | null {
   const ok = grupos.filter((g) => g.confiable && g.r.compras > 0);
   if (!ok.length) return null;
-  return [...ok].sort((a, b) => a.r.gasto / a.r.compras - b.r.gasto / b.r.compras)[0];
+  // El mejor es el que más lejos queda de su tope (cada producto tiene el suyo); a igualdad, el de CPA más bajo.
+  return [...ok].sort((a, b) => (usoDelTope(a) ?? Infinity) - (usoDelTope(b) ?? Infinity) || a.r.gasto / a.r.compras - b.r.gasto / b.r.compras)[0];
+}
+
+/** Qué parte de su CPA tope cuesta cada compra de un grupo (0.8 = 80 %): lo gastado entre lo que se podía gastar con esas compras. null sin compras. El resultado de un grupo es la suma de compras × tope − gasto. */
+export function usoDelTope(g: { r: { gasto: number; compras: number }; resultado: number }): number | null {
+  const permitido = g.resultado + g.r.gasto;
+  return g.r.compras > 0 && permitido > 0 ? g.r.gasto / permitido : null;
 }
 
 /**

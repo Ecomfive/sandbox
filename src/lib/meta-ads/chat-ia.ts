@@ -6,7 +6,7 @@
 import { cualesParaIA } from "./angulo-detalle";
 import { CLAVES_FILTRO, DIMENSIONES, METRICAS } from "./analisis-pedido";
 import { NOMBRE_CATEGORIA, type AnalisisHistorico, type FilaVentas } from "./historico";
-import { cortarEnPunto, recortarTexto, REGLA_ALCANCE_DE_CAMPANAS, REGLA_TACTICAS } from "./interpretar-ia";
+import { cortarEnPunto, recortarTexto, REGLA_ALCANCE_DE_CAMPANAS, REGLA_APRENDIZAJE, REGLA_RELEVANCIA, REGLA_TACTICAS } from "./interpretar-ia";
 
 export const LIMITES_CHAT = {
   /** Largo máximo de una pregunta. */
@@ -68,7 +68,7 @@ export function contextoDeChat(a: AnalisisHistorico, tiendas: readonly string[],
       porcentaje_que_funciono: r(a.resumen.tasaFuncionaron),
       tiendas_de_las_cuentas: tiendas,
     },
-    como_se_calcula: "«funcionó» = al menos $100 gastados, alguna compra y CPA dentro del CPA tope del producto. Tasa de entrega = entregados ÷ (entregados + devueltos) de los pedidos de 180 días. cpa_por_compra_entregada = gasto ÷ (compras × tasa de entrega).",
+    como_se_calcula: "«funcionó» = al menos $100 gastados, alguna compra y CPA dentro del CPA tope del producto. Tasa de entrega = entregados ÷ (entregados + devueltos) de los pedidos de 180 días. El «cpa_tope» de cada producto es el general ($10) o uno escrito a mano; el general baja cuando el producto envía o entrega peor que la tienda. cpa_por_compra_entregada = gasto ÷ (compras × tasa de envío × tasa de entrega).",
     ...(investigaciones.length ? { investigaciones_de_entrega: investigaciones } : {}),
     ...(senales.length ? { senales_de_creativos: senales } : {}),
     ...(rasgos.length ? { rasgos_de_ganadores: rasgos } : {}),
@@ -79,7 +79,7 @@ export function contextoDeChat(a: AnalisisHistorico, tiendas: readonly string[],
       .filter((t) => t.cambio.sentido !== "poca")
       .slice(0, 120)
       .map((t) => ({ nivel: t.nivel, nombre: t.nombre, ventana: t.ventana === "mes" ? "último mes contra el anterior" : "última semana contra las tres anteriores", sentido: t.cambio.sentido, gasto_reciente_usd: Math.round(t.gastoRec), compras_antes: t.comprasPrev, compras_ahora: t.comprasRec, cpa_antes: r(t.cambio.cpaPrev), cpa_ahora: r(t.cambio.cpaRec), motivo: t.cambio.motivo, ...(t.deQue ? { de_que_son: t.deQue } : {}) })),
-    entrega_por_producto: a.entrega.slice(0, 40).map((f) => ({ producto: f.nombre, producto_en_la_tienda: f.enTienda, gasto_usd: Math.round(f.gasto), compras: f.compras, cpa: r(f.cpa), cpa_tope: f.tope, tasa_entrega: r(f.tasa), pedidos_resueltos: f.cerradas, entregadas: f.entregadas, devueltas: f.devueltas, canceladas: f.canceladas, cpa_por_compra_entregada: r(f.cpaEntregado), veredicto: f.veredicto })),
+    entrega_por_producto: a.entrega.slice(0, 40).map((f) => ({ producto: f.nombre, producto_en_la_tienda: f.enTienda, gasto_usd: Math.round(f.gasto), compras: f.compras, cpa: r(f.cpa), cpa_tope: f.tope, tope_sin_ajustar: f.topeBase ?? f.tope, tasa_envio: r(f.envio ?? null), tasa_entrega: r(f.tasa), pedidos_resueltos: f.cerradas, entregadas: f.entregadas, devueltas: f.devueltas, canceladas: f.canceladas, cpa_por_compra_entregada: r(f.cpaEntregado), veredicto: f.veredicto })),
     mas_ventas: Object.fromEntries((Object.entries(a.rankings) as [string, FilaVentas[]][]).map(([k, filas]) => [k, filas.map((f) => ({ nombre: f.nombre, ...(f.deQue ? { de_que_son: f.deQue } : {}), compras: f.compras, parte_del_total: r(f.parte), gasto_usd: Math.round(f.gasto), cpa: r(f.cpa), entregadas_estimadas: r(f.comprasEntregadas) }))])),
     bandas_de_metricas: a.bandas.map((b) => ({ metrica: b.titulo, porcentaje_base_que_funciono: r(b.tasaBase), bandas: b.filas.map((f) => ({ banda: f.etiqueta, campanas: f.campanas, funcionaron: f.funcionaron, cpa: r(f.cpa) })) })),
   };
@@ -98,6 +98,8 @@ export function pedidoChat(a: AnalisisHistorico, tiendas: readonly string[], hoy
     "Si la pregunta no tiene que ver con el rendimiento de las campañas, los productos, la entrega o el historial, di amablemente que solo puedes ayudar con eso.",
     REGLA_ALCANCE_DE_CAMPANAS,
     REGLA_TACTICAS,
+    REGLA_APRENDIZAJE,
+    REGLA_RELEVANCIA,
     `Puedes pedir un análisis nuevo: si para contestar con exactitud hace falta algo que NO está en el JSON (otro rango de fechas, otro desglose, un producto, ángulo o campaña concreto por día o por semana, comparar dos periodos, lo de «esta semana»…), no contestes todavía ni te disculpes: responde SOLO con este JSON, sin texto antes ni después: {"accion":"analizar","analisis":[{...}]} (hasta 2 análisis). Cada análisis lleva: "titulo" (corto), "agrupar" (uno de: ${DIMENSIONES.join(", ")}), "desde" y "hasta" (AAAA-MM-DD, hasta no pasa de hoy), "comparar" opcional ({"desde","hasta"} de otro periodo para ver el cambio), "filtros" opcional (texto que debe contener: ${CLAVES_FILTRO.join(", ")}), "orden" (una de: ${METRICAS.join(", ")}), "sentido" ("asc" o "desc"), "limite" (hasta 15) y "gasto_minimo" (dólares, para dejar fuera lo que casi no gastó). Si la respuesta ya está en el JSON del sistema, contesta directo en texto y no pidas análisis.`,
     `Si la pregunta es POR QUÉ un producto no se entrega o se devuelve (o qué hacer con su entrega), primero mira «investigaciones_de_entrega» del JSON: ya trae las causas que el sistema encontró cruzando pedidos, zona, transportadora, confirmación y lo que escribieron Servientrega, Monday y los asesores. Contesta con esas causas y sus números, sin decir «revisa por qué». Si el producto no está ahí o la persona pide ir más a fondo (leer las conversaciones de WhatsApp de los pedidos devueltos), responde SOLO con: {"accion":"investigar","producto":"nombre del producto como lo dice la persona"}.`,
     `Si la persona te pide que desde ahora le indiques, vigiles o le muestres algo («avísame cuando…», «a partir de ahora…», «vigila…», «quiero que me lo muestres siempre»), responde SOLO con este JSON: {"accion":"vigilar","vigilancia":{"titulo":"...","agrupar":"total|producto|campana|angulo|gancho|formato|cta|estructura|puja|etapa|familia","metrica":"una de: ${METRICAS.join(", ")}","ventana_dias":7|14|30,"umbral_pct":número entre 5 y 200,"gasto_minimo":número,"filtros":{}},"prioridad":"alta|media|baja","mensaje":"una frase que confirma qué vigilarás y con qué prioridad"}. Se compara lo de los últimos ventana_dias días con los anteriores y se marca lo que se mueva más que umbral_pct. La prioridad es la que la persona diga (urgente o muy importante = alta; normal = media; «cuando puedas» = baja); si no dice nada, media. Usa la conversación para saber a qué se refiere («eso», «lo de antes»).`,

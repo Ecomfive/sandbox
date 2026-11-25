@@ -60,7 +60,7 @@ export function ResumenProductos({ productos }: { productos: ProductoVista[] }) 
           </ul>
         </div>
         <p className="m-0 mt-3 text-xs tabular-nums text-muted-foreground">
-          {dolaresEnteros(gasto)} gastados · {entero(compras)} compras{sinTope > 0 && ` · ${sinTope} usan el CPA tope por defecto`}
+          {dolaresEnteros(gasto)} gastados · {entero(compras)} compras{sinTope > 0 && ` · ${sinTope} usan el CPA tope general o su ajuste`}
         </p>
       </TarjetaMeta>
 

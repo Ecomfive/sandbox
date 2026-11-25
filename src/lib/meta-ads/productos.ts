@@ -11,7 +11,7 @@ export function agruparProductos(campanas: CampanaVista[], videos: VideoVista[],
   const mapa = new Map<string, ProductoVista>();
   for (const c of campanas) {
     const clave = claveDeProducto(c.producto);
-    const p = mapa.get(clave) ?? { clave, nombre: c.producto?.trim() || "Sin producto", tope: c.tope, topeDefinido: c.topeDefinido, r: sinResultados(), campanas: 0, activas: 0, enMarcha: false, videos: 0, anuncios: 0 };
+    const p = mapa.get(clave) ?? { clave, nombre: c.producto?.trim() || "Sin producto", tope: c.tope, topeDefinido: c.topeDefinido, topeAjustado: c.topeAjustado, topeTexto: c.topeTexto, r: sinResultados(), campanas: 0, activas: 0, enMarcha: false, videos: 0, anuncios: 0 };
     p.r = sumar(p.r, c.r);
     p.campanas++;
     if (c.activa) p.activas++;

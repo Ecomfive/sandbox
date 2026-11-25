@@ -4,6 +4,8 @@ import { useState, type ReactNode } from "react";
 import { seccionDeHallazgo, tieneHistorialSuficiente, UMBRALES_HISTORICO, type AnalisisHistorico, type BandasMetrica, type FilaMes, type FilaTendencia, type Quienes, type SeccionHallazgo } from "@/lib/meta-ads/historico";
 import type { InterpretacionGuardada } from "@/lib/meta-ads/interpretacion-guardada";
 import { dolares } from "@/lib/meta-ads/metricas";
+import { claveDeDecision } from "@/lib/meta-ads/sugerencias";
+import { useDecisiones } from "./decidir";
 import { enLaVista, estadoDeTendencia, hallazgosEnVista, productoEnMarcha, type EnMarcha, type VistaActividad } from "@/lib/meta-ads/en-marcha";
 import { ChatHallazgos } from "./chat-hallazgos";
 import { SelectorActividad } from "./selector-actividad";
@@ -105,9 +107,10 @@ function CifrasDeArriba({ a }: { a: AnalisisHistorico }) {
 
 // ───────────────────────── Hallazgos ─────────────────────────
 
-type Filtro = "atender" | "buenas" | "todo";
+type Filtro = "atender" | "mirar" | "buenas" | "todo";
 const FILTROS: { id: Filtro; texto: string; punto: string }[] = [
   { id: "atender", texto: "Para atender", punto: "bg-destructive" },
+  { id: "mirar", texto: "En observación", punto: "bg-azul" },
   { id: "buenas", texto: "Buenas noticias", punto: "bg-success" },
   { id: "todo", texto: "Todo", punto: "bg-muted-foreground" },
 ];
@@ -125,11 +128,14 @@ function SeccionHallazgos({ a }: { a: AnalisisHistorico }) {
   const [filtro, setFiltro] = useState<Filtro>("atender");
   const [seccion, setSeccion] = useState<SeccionHallazgo | "todas">("todas");
   const [soloFirmes, setSoloFirmes] = useState(false);
-  const coincide = (h: AnalisisHistorico["hallazgos"][number], f: Filtro) => (f === "todo" ? true : f === "atender" ? h.tono === "alerta" : h.tono === "bueno");
+  const { ocultas } = useDecisiones();
+  const coincide = (h: AnalisisHistorico["hallazgos"][number], f: Filtro) => (f === "todo" ? true : f === "atender" ? h.tono === "alerta" : f === "mirar" ? h.tono === "info" : h.tono === "bueno");
   const base = a.hallazgos.filter((h) => (seccion === "todas" || seccionDeHallazgo(h) === seccion) && (!soloFirmes || h.certeza === "firme"));
   const visibles = base.filter((h) => coincide(h, filtro));
-  const porSeccion = (s: SeccionHallazgo) => a.hallazgos.filter((h) => seccionDeHallazgo(h) === s).length;
-  const atender = a.hallazgos.filter((h) => h.tono === "alerta").length;
+  // Las cifras cuentan lo que sigue pendiente; lo omitido queda plegado al final de la lista.
+  const pendiente = (h: AnalisisHistorico["hallazgos"][number]) => !ocultas.has(claveDeDecision(h));
+  const porSeccion = (s: SeccionHallazgo) => a.hallazgos.filter((h) => seccionDeHallazgo(h) === s && pendiente(h)).length;
+  const atender = a.hallazgos.filter((h) => h.tono === "alerta" && pendiente(h)).length;
   return (
     <SeccionPlegable titulo="Lo que dicen los datos" resumen={`${atender} para atender de ${a.hallazgos.length} hallazgos`} derecha={`${entero(a.hallazgos.length)} hallazgos`}>
       <div className="flex flex-col gap-3">
@@ -139,7 +145,7 @@ function SeccionHallazgos({ a }: { a: AnalisisHistorico }) {
               <Chip key={f.id} activo={filtro === f.id} onClick={() => setFiltro(f.id)}>
                 <span aria-hidden="true" className={`h-2 w-2 rounded-full ${f.punto}`} />
                 {f.texto}
-                <span className="tabular-nums opacity-80">{base.filter((h) => coincide(h, f.id)).length}</span>
+                <span className="tabular-nums opacity-80">{base.filter((h) => coincide(h, f.id) && pendiente(h)).length}</span>
               </Chip>
             ))}
           </div>
@@ -161,7 +167,7 @@ function SeccionHallazgos({ a }: { a: AnalisisHistorico }) {
         </div>
         <ListaHallazgos hallazgos={visibles} vistos={6} conSeccion vacio={filtro === "atender" ? "Nada que atender con estos filtros." : "No hay hallazgos con estos filtros."} />
         <p className="m-0 text-xs text-muted-foreground">
-          «Funcionó» = al menos {dolares(100)} gastados y un CPA dentro del tope de su producto. Cada pantalla (Productos, Campañas, Videos) muestra además los suyos.
+          «Funcionó» = al menos {dolares(100)} gastados y un CPA dentro del tope de su producto (ajustado por su envío y entrega). Lo que va dentro del tope queda en observación. Cada pantalla (Productos, Campañas, Videos) muestra además los suyos.
         </p>
       </div>
     </SeccionPlegable>

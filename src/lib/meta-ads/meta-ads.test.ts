@@ -260,9 +260,18 @@ test("un anuncio activo que pasa de $12 sin ventas se apaga y se propone sustitu
   });
   const apagar = s.filter((x) => x.tipo === "anuncio_apagar");
   assert.deepEqual(apagar.map((x) => x.clave), ["anuncio_apagar:a3"]);
-  assert.equal(apagar[0].severidad, "alta");
-  assert.match(apagar[0].accion, /Apagar V3 y sustituirlo con anuncios del ángulo «Salud de la próstata» como V5 \(CPA \$4\.44\)/);
+  // La campaña va dentro de su tope: se apaga el que no vende, pero no se sube otro (reiniciaría el aprendizaje).
+  assert.equal(apagar[0].severidad, "media");
+  assert.match(apagar[0].accion, /^Apagar V3\. No subas otro todavía: la campaña va dentro de su tope/);
   assert.match(apagar[0].detalle, /pasó de \$12/);
+  // Con la campaña por encima del tope, sí se propone con qué sustituirlo.
+  const alta = sugerir({
+    hoy: "2026-11-23", serie: new Map(), videos: [],
+    campanas: [campana({ id: "c1", tope: 10, r: r({ gasto: 40, compras: 3 }) })],
+    anuncios: [anuncio("a3", "V3", 14.2, 0, "Caída del cabello"), anuncio("a5", "V5", 18, 3, "Salud de la próstata")],
+  }).find((x) => x.tipo === "anuncio_apagar")!;
+  assert.equal(alta.severidad, "alta");
+  assert.match(alta.accion, /Apagar V3 y sustituirlo con anuncios del ángulo «Salud de la próstata» como V5 \(CPA \$6\.00\)/);
 });
 
 import { claveDeHallazgo, limiteDeApagado, sugerenciasDeHallazgos } from "./sugerencias";
@@ -383,7 +392,11 @@ test("cerca del tope: agregar videos del que sostiene; sin vida: apagar aunque n
   });
   assert.deepEqual(s.map((x) => x.clave), ["apagar_campana:m", "sumar_videos:n"]);
   assert.match(s[0].accion, /^Apaga la campaña y sustitúyela: ya no tiene vida\. Su CPA de 7 días \(\$10\.50\) pasa del tope y su anuncio que más vende \(V7\) ya va en \$9\.80/);
-  assert.match(s[1].accion, /^Agrega 2 o 3 videos con el ángulo «Energía» \(V2 vende a \$7\.00 con 10 compras\) antes de que la campaña llegue a \$10\.00\./);
+  assert.match(s[1].accion, /^Ya no está bajando sola: agrega 2 o 3 videos con el ángulo «Energía» \(V2 vende a \$7\.00 con 10 compras\) antes de que la campaña pase de \$10\.00\./);
+  // La misma campaña, pero bajando en los últimos días: no se toca.
+  const bajando = sugerir({ hoy: "2026-11-25", videos: [], campanas: [cerca], anuncios: [anuncio("n", "V2", 70, 10, "Energía")], serie: new Map([["n", [dia("2026-11-24", 60, 8)]]]) });
+  assert.deepEqual(bajando.map((x) => `${x.tipo} ${x.prioridad}`), ["en_recuperacion observar"]);
+  assert.match(bajando[0].accion, /^No la toques todavía: en los últimos 4 días va en \$7\.50/);
   assert.deepEqual(s[1].cifras!.map((c) => `${c.etiqueta} ${c.valor} ${c.tono ?? ""}`.trim()), ["CPA 7 días $9.50 medio", "Últimos 3 días $10.00 medio", "CPA tope $10.00"]);
 });
 
@@ -393,5 +406,5 @@ test("un CPA que sube de golpe pero con 7 días lejos del tope queda en observac
   const s = sugerir({ hoy: "2026-11-25", videos: [], campanas: [c], serie: new Map([["o", [dia("2026-11-13", 100, 20), dia("2026-11-19", 60, 12), dia("2026-11-23", 45, 3), dia("2026-11-24", 15, 1)]]]) });
   assert.deepEqual(s.map((x) => `${x.tipo} ${x.prioridad}`), ["cpa_subiendo observar"]);
   assert.match(s[0].detalle, /Pasó de \$5\.00 .* a \$15\.00 en los últimos 3 días\. En 14 días: de \$5\.00 la semana anterior a \$8\.00 esta semana\./);
-  assert.match(s[0].accion, /^Solo observar: el CPA de 7 días \(\$8\.00\) no pasa del tope de \$10\.00 ni está cerca/);
+  assert.match(s[0].accion, /^No la toques: el CPA de 7 días \(\$8\.00\) va dentro del tope de \$10\.00, y agregar videos ahora reiniciaría su aprendizaje/);
 });

@@ -5,7 +5,7 @@ import { cortarEnPunto, leerInterpretacion, LIMITES_IA, pedidoInterpretacion, re
 import { sinResultados } from "./metricas";
 
 test("el pedido a la IA lleva las reglas (solo las cifras recibidas) y las estadísticas en JSON", () => {
-  const p: ProductoHist = { clave: "CORRECTOR", nombre: "Corrector", familia: "general", tope: 10, campanas: 2, total: { ...sinResultados(), gasto: 700, compras: 100 }, v: sinVentanas(), entrega: { nombre: "Corrector", entregadas: 48, devueltas: 52, canceladas: 3, enCamino: 1 } };
+  const p: ProductoHist = { clave: "CORRECTOR", nombre: "Corrector", familia: "general", tope: 6, topeBase: 10, campanas: 2, total: { ...sinResultados(), gasto: 700, compras: 100 }, v: sinVentanas(), entrega: { nombre: "Corrector", entregadas: 48, devueltas: 52, canceladas: 3, enCamino: 1 } };
   const a = analizarHistorico({ campanas: [], videos: [], productos: [p], desde: "2025-11-01", hasta: "2026-11-24" });
   const { instrucciones, texto } = pedidoInterpretacion(a);
   assert.match(instrucciones, /SOLO las cifras que recibes/);
@@ -15,7 +15,7 @@ test("el pedido a la IA lleva las reglas (solo las cifras recibidas) y las estad
   assert.equal(json.resumen.desde, "2025-11-01");
   assert.equal(json.entrega_por_producto[0].producto, "Corrector");
   assert.equal(json.entrega_por_producto[0].tasa_entrega, 0.48);
-  assert.ok(json.hallazgos.some((h: { titulo: string }) => /vende bien pero solo se entrega 48 %/.test(h.titulo)));
+  assert.ok(json.hallazgos.some((h: { titulo: string }) => /solo se entrega 48 % y pasa de su tope/.test(h.titulo)));
 });
 
 test("lo que contesta la IA se valida: JSON con resumen, textos recortados y límites de cantidad", () => {
