@@ -14,9 +14,9 @@ import { numeroTraslado } from "@/lib/wms/traslado";
 
 const MODULO_DESPACHO = "despacho-pedir-inventario";
 const MODULO_INVENTARIO = "inventario-pedidos-despacho";
-const RUTAS = ["/despacho-ciudad/pedir-inventario", "/inventario-pedidos-despacho"];
+const RUTAS = ["/inventario-despacho/solicitudes", "/inventario-pedidos-despacho"];
 const ES_UUID = (v: unknown): v is string => typeof v === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
-const SIN_MIGRACION = "Falta correr en Supabase la migración 0305 («Pedir a inventario»).";
+const SIN_MIGRACION = "Falta correr en Supabase la migración 0305 («Solicitud de inventario»).";
 const nombreDe = (u: UsuarioActual) => (u.nombre || u.email || "Alguien").trim();
 
 type Resultado = { ok: true; mensaje?: string } | { error: string };
@@ -192,7 +192,7 @@ export async function ponerEnProcesoPedido(id: string): Promise<Resultado> {
     const p = data?.[0];
     if (!p) return { error: "Ese pedido ya cambió de estado: recarga la página." };
     const items = (p.despacho_pedidos_inventario_items as unknown[] | null)?.length ?? 0;
-    await avisar(supabase, [p.pedido_por as string], u, avisoPedido({ numero: p.numero as number, items }, nombreDe(u), "en_proceso"), "/despacho-ciudad/pedir-inventario");
+    await avisar(supabase, [p.pedido_por as string], u, avisoPedido({ numero: p.numero as number, items }, nombreDe(u), "en_proceso"), "/inventario-despacho/solicitudes");
     return { ok: true, mensaje: `${numeroPedido(p.numero as number)} en proceso.` };
   });
 }
@@ -254,7 +254,7 @@ export async function enviarPedidoInventario(id: string, origenId: string, entre
       entidadId: creado.id,
       detalle: `${numTr}: ${lineas.length} ${lineas.length === 1 ? "producto" : "productos"}, ${unidades.toLocaleString("es-PA")} unidades · ${nota}`,
     });
-    await avisar(supabase, [p.pedido_por as string], u, avisoPedido({ numero: p.numero as number, items: items.length }, nombreDe(u), "enviado", numTr), "/despacho-ciudad/pedir-inventario");
+    await avisar(supabase, [p.pedido_por as string], u, avisoPedido({ numero: p.numero as number, items: items.length }, nombreDe(u), "enviado", numTr), "/inventario-despacho/solicitudes");
     revalidatePath("/inventario");
     revalidatePath("/inventario/traslados");
     return { ok: true, mensaje: `Enviado: se hizo el traslado ${numTr} a ${destino.nombre}.` };
@@ -279,7 +279,7 @@ export async function marcarEntregadoPedidoInventario(id: string): Promise<Resul
     if (!p) return { error: "Ese pedido no está enviado: recarga la página." };
     const items = (p.despacho_pedidos_inventario_items as unknown[] | null)?.length ?? 0;
     await registrarAuditoria({ accion: "entregar_pedido_inventario", entidad: "despacho_pedidos_inventario", entidadId: id, detalle: `${numeroPedido(p.numero as number)} marcado entregado desde inventario` });
-    await avisar(supabase, [p.pedido_por as string | null], u, avisoPedido({ numero: p.numero as number, items }, nombreDe(u), "entregado"), "/despacho-ciudad/pedir-inventario");
+    await avisar(supabase, [p.pedido_por as string | null], u, avisoPedido({ numero: p.numero as number, items }, nombreDe(u), "entregado"), "/inventario-despacho/solicitudes");
     return { ok: true, mensaje: `${numeroPedido(p.numero as number)} entregado.` };
   });
 }
@@ -303,7 +303,7 @@ export async function deshacerEntregaPedidoInventario(id: string): Promise<Resul
     const items = (p.despacho_pedidos_inventario_items as unknown[] | null)?.length ?? 0;
     await registrarAuditoria({ accion: "deshacer_entrega_pedido_inventario", entidad: "despacho_pedidos_inventario", entidadId: id, detalle: `${numeroPedido(p.numero as number)} volvió a Enviado (se había marcado entregado por error)` });
     const aviso = avisoPedido({ numero: p.numero as number, items }, nombreDe(u), "entrega_deshecha");
-    if (lado === "inventario") await avisar(supabase, [p.pedido_por as string | null], u, aviso, "/despacho-ciudad/pedir-inventario");
+    if (lado === "inventario") await avisar(supabase, [p.pedido_por as string | null], u, aviso, "/inventario-despacho/solicitudes");
     else await avisar(supabase, [p.responsable_id as string | null], u, aviso, "/inventario-pedidos-despacho");
     return { ok: true, mensaje: `${numeroPedido(p.numero as number)} volvió a «Enviado».` };
   };
@@ -396,7 +396,7 @@ export async function deshacerEnvioPedidoInventario(id: string): Promise<Resulta
         ? `${numeroPedido(p.numero as number)}: volvió a ${nombreAnterior}; ${numOriginal} ya estaba devuelto con otro traslado, así que no se hizo una segunda reversa`
         : `${numeroPedido(p.numero as number)}: volvió a ${nombreAnterior} con el traslado de reversa ${numRev} (${unidades.toLocaleString("es-PA")} unidades de vuelta a la bodega de origen; el original fue ${numOriginal})`,
     });
-    await avisar(supabase, [p.pedido_por as string], u, avisoPedido({ numero: p.numero as number, items: items.length }, nombreDe(u), "envio_deshecho", nombreAnterior), "/despacho-ciudad/pedir-inventario");
+    await avisar(supabase, [p.pedido_por as string], u, avisoPedido({ numero: p.numero as number, items: items.length }, nombreDe(u), "envio_deshecho", nombreAnterior), "/inventario-despacho/solicitudes");
     revalidatePath("/inventario");
     revalidatePath("/inventario/traslados");
     return {

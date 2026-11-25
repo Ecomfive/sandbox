@@ -19,7 +19,7 @@ const CABECERAS = [
 const nextConfig: NextConfig = {
   // El Catálogo maestro pasó a ser el módulo Producto.
   async redirects() {
-    // Gestión de tienda (17 nov 2026): los módulos sueltos pasaron a ser pestañas de Pedidos, Despacho ciudad y Tiendas Shopify. Las direcciones
+    // Gestión de tienda (17 nov 2026): los módulos sueltos pasaron a ser pestañas de Pedidos, Envíos Delivery y Tiendas Shopify. Las direcciones
     // viejas (favoritos, avisos «Para ti» ya guardados, enlaces copiados) siguen llevando a su pestaña.
     const movidas: [string, string][] = [
       ["/tienda-logistica", "/tienda-pedidos/logistica"],
@@ -27,8 +27,13 @@ const nextConfig: NextConfig = {
       ["/tienda-cuanto-hay", "/tienda-pedidos/cuanto-hay"],
       ["/despacho-devoluciones", "/despacho-ciudad/devoluciones"],
       ["/despacho-cambios", "/despacho-ciudad/cambios"],
-      ["/despacho-cuanto-hay", "/despacho-ciudad/cuanto-hay"],
-      ["/despacho-pedir-inventario", "/despacho-ciudad/pedir-inventario"],
+      // Inventario despacho salió de Envíos Delivery (25 nov 2026). El archivo va antes que la ruta que lo contiene.
+      ["/despacho-cuanto-hay", "/inventario-despacho"],
+      ["/despacho-pedir-inventario/archivo", "/inventario-despacho/archivo"],
+      ["/despacho-pedir-inventario", "/inventario-despacho/solicitudes"],
+      ["/despacho-ciudad/cuanto-hay", "/inventario-despacho"],
+      ["/despacho-ciudad/pedir-inventario/archivo", "/inventario-despacho/archivo"],
+      ["/despacho-ciudad/pedir-inventario", "/inventario-despacho/solicitudes"],
       ["/tienda-productos", "/tienda-tiendas/productos"],
     ];
     return [

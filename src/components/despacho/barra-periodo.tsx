@@ -17,7 +17,7 @@ export interface OpcionPeriodo {
 }
 
 /**
- * La barra de arriba de Despacho ciudad (24 nov 2026, pedido de despacho: menos botones sueltos, como Monday): el período en un solo botón con su menú (los
+ * La barra de arriba de Envíos Delivery (24 nov 2026, pedido de despacho: menos botones sueltos, como Monday): el período en un solo botón con su menú (los
  * atajos y «Del … al …») y lo demás (hoja del día, cuentas de repartidores, archivados) en «Más».
  */
 export function BarraPeriodo({ actual, opciones, desde, hasta, mas }: { actual: string; opciones: OpcionPeriodo[]; desde: string; hasta: string; mas: OpcionPeriodo[] }) {
@@ -74,7 +74,7 @@ export function BarraPeriodo({ actual, opciones, desde, hasta, mas }: { actual: 
         )}
       </MenuDesplegable>
       <MenuDesplegable
-        etiqueta="Más opciones de Despacho ciudad"
+        etiqueta="Más opciones de Envíos Delivery"
         alineacion="izquierda"
         claseMenu="w-60"
         claseBoton={botonBarra(mas.some((o) => o.activa))}

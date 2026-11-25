@@ -38,7 +38,7 @@ export default async function HojaDiaImprimirPage({ searchParams }: { searchPara
         <main key={g.nombre} className="mx-auto mb-6 flex w-full max-w-[1123px] flex-col gap-3 bg-white p-8 shadow break-after-page print:mb-0 print:max-w-none print:p-0 print:shadow-none">
           <header className="flex items-end justify-between border-b border-neutral-300 pb-2">
             <div className="flex flex-col">
-              <span className="text-[11px] font-semibold tracking-[0.06em] uppercase">Hoja del día · Despacho ciudad</span>
+              <span className="text-[11px] font-semibold tracking-[0.06em] uppercase">Hoja del día · Envíos Delivery</span>
               <span className="text-2xl font-bold">{g.nombre}</span>
             </div>
             <div className="flex flex-col items-end text-xs">
@@ -95,7 +95,7 @@ export default async function HojaDiaImprimirPage({ searchParams }: { searchPara
               </tr>
             </tfoot>
           </table>
-          <p className="m-0 text-[11px] text-neutral-700">Estado: ENTREGADO · FALLIDO · POSPUESTO · RECOLECTADO. Lo que se anote aquí se pasa a Despacho ciudad al volver la conexión.</p>
+          <p className="m-0 text-[11px] text-neutral-700">Estado: ENTREGADO · FALLIDO · POSPUESTO · RECOLECTADO. Lo que se anote aquí se pasa a Envíos Delivery al volver la conexión.</p>
         </main>
       ))}
     </div>

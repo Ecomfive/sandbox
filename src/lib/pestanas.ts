@@ -25,14 +25,17 @@ export const PESTANAS_POR_MODULO: Record<string, Pestana[]> = {
     { etiqueta: "Cuánto hay", href: "/inventario-pedidos-despacho/cuanto-hay" },
     { etiqueta: "Archivo de pedidos", href: "/inventario-pedidos-despacho/archivo" },
   ],
-  // Despacho ciudad, como el panel de Monday: el día de hoy y, al lado, devoluciones, cambios y reembolsos, y lo demás de despacho.
+  // Envíos Delivery: la gestión de los repartos; el día de hoy y, al lado, devoluciones, cambios y reembolsos.
   "/despacho-ciudad": [
     { etiqueta: "Hoy", href: "/despacho-ciudad" },
     { etiqueta: "Devoluciones", href: "/despacho-ciudad/devoluciones" },
     { etiqueta: "Cambios y reembolsos", href: "/despacho-ciudad/cambios" },
-    { etiqueta: "Cuánto hay", href: "/despacho-ciudad/cuanto-hay" },
-    { etiqueta: "Pedir a inventario", href: "/despacho-ciudad/pedir-inventario" },
-    { etiqueta: "Archivo de pedidos", href: "/despacho-ciudad/pedir-inventario/archivo" },
+  ],
+  // Inventario despacho (25 nov 2026): el stock de despacho, aparte de los envíos.
+  "/inventario-despacho": [
+    { etiqueta: "Mercancía existente", href: "/inventario-despacho" },
+    { etiqueta: "Solicitud de inventario", href: "/inventario-despacho/solicitudes" },
+    { etiqueta: "Archivos de solicitudes", href: "/inventario-despacho/archivo" },
   ],
   // Pedidos Dropi › Resumen (20 nov 2026, pedido de María José): la pestaña RESUMEN de su sheet «ECOMFIVE DROPI 2026», un mes por columna.
   "/pedidos-dropi": [

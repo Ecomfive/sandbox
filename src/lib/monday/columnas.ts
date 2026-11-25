@@ -25,7 +25,7 @@ export const CAMPOS_MONDAY = [
   // Cómo pagó el cliente y cuánto cobró el repartidor (14 nov 2026, migración 0295): la «FORMA DE PAGO» del Excel Matriz.
   { clave: "forma_pago", etiqueta: "Forma de pago (efectivo, Yappy…)", obligatorio: false },
   { clave: "monto_cobrado", etiqueta: "Monto cobrado", obligatorio: false },
-  // Las demás columnas de los tableros de Panamá (15 nov 2026, migración 0970: Despacho ciudad las muestra y las edita en el sistema).
+  // Las demás columnas de los tableros de Panamá (15 nov 2026, migración 0970: Envíos Delivery las muestra y las edita en el sistema).
   { clave: "edo_pago", etiqueta: "Estado del pago (Edo. Pago)", obligatorio: false },
   { clave: "por_cobrar", etiqueta: "$ Por cobrar", obligatorio: false },
   { clave: "coste_envio", etiqueta: "Coste de envío", obligatorio: false },

@@ -59,7 +59,7 @@ export function HojaDia({ dia, hoy, filas }: { dia: string; hoy: string; filas: 
             Descargar Excel
           </a>
           <Link href="/despacho-ciudad" className={`inline-flex min-h-10 items-center rounded-md border border-border bg-card px-3.5 text-sm ${anilloFoco}`}>
-            Volver a Despacho ciudad
+            Volver a Envíos Delivery
           </Link>
         </div>
       </div>

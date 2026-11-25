@@ -39,7 +39,7 @@ const SUBPAGINAS_AYUDA: [string, string][] = [
 
 /** Subpáginas fijas de un módulo (no dinámicas): cuelgan de su módulo y llevan este nombre. */
 const SUBPAGINAS: Record<string, string> = {
-  // Gestión de tienda (17 nov 2026): lo que antes eran módulos sueltos ahora son pestañas de Pedidos, Despacho ciudad y Tiendas Shopify.
+  // Gestión de tienda (17 nov 2026): lo que antes eran módulos sueltos ahora son pestañas de Pedidos, Envíos Delivery y Tiendas Shopify.
   "/tienda-pedidos/confirmacion": "Confirmación",
   "/tienda-pedidos/confirmacion/ia": "Confirmación con IA",
   "/tienda-pedidos/logistica": "Logística",
@@ -47,9 +47,8 @@ const SUBPAGINAS: Record<string, string> = {
   "/inventario-pedidos-despacho/cuanto-hay": "Preguntar cuánto hay",
   "/despacho-ciudad/devoluciones": "Devoluciones",
   "/despacho-ciudad/cambios": "Cambios y reembolsos",
-  "/despacho-ciudad/cuanto-hay": "Responder cuánto hay",
-  "/despacho-ciudad/pedir-inventario": "Pedir a inventario",
-  "/despacho-ciudad/pedir-inventario/archivo": "Archivo de pedidos",
+  "/inventario-despacho/solicitudes": "Solicitud de inventario",
+  "/inventario-despacho/archivo": "Archivos de solicitudes",
   "/inventario-pedidos-despacho/archivo": "Archivo de pedidos",
   "/tienda-tiendas/productos": "Productos de Shopify",
   "/pedidos-dropi/resumen": "Resumen",
@@ -215,6 +214,7 @@ function modulosDeNav(areas: NavSection[]): ModuloDeNav[] {
  */
 const PAGINA_PRINCIPAL: Record<string, string> = {
   "/inventario-pedidos-despacho": "Solicitudes de despacho",
+  "/inventario-despacho": "Mercancía existente",
 };
 
 function rutaDeModulo(modulo: ModuloDeNav, conEnlace: boolean): Miga[] {

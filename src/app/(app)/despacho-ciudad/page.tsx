@@ -10,7 +10,7 @@ import { cargarCierres } from "@/lib/despacho/cierres";
 import { esAdministrador } from "@/lib/permisos/acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 
-export const metadata = { title: "Despacho ciudad" };
+export const metadata = { title: "Envíos Delivery" };
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +21,7 @@ const RANGOS = [
 ] as const;
 
 /**
- * Gestión de tienda › Despacho ciudad (15 nov 2026): los repartos de ciudad de todas las tiendas, como el tablero de Monday «DELIVERY REPORTES DIARIOS» y
+ * Gestión de tienda › Envíos Delivery (15 nov 2026): los repartos de ciudad de todas las tiendas, como el tablero de Monday «DELIVERY REPORTES DIARIOS» y
  * los de cada repartidor, pero en el sistema. Se lee y se escribe en `mon_despachos` (migración 0970): lo que se anota aquí actualiza los pedidos igual
  * que antes lo hacía Monday. Muestra los días elegidos (y los dos siguientes, para lo programado).
  */
@@ -39,13 +39,13 @@ export default async function DespachoCiudadPage({ searchParams }: { searchParam
   const puedeEscribir = !usuario.modulosSoloLectura.includes("despacho-ciudad");
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-4">
-      <EncabezadoPagina titulo="Despacho ciudad" oculto>
+      <EncabezadoPagina titulo="Envíos Delivery" oculto>
         Los repartos de ciudad de todas las tiendas, como en Monday: toca un color para cambiarlo, escribe en las celdas, arrastra una fila a otro día y ábrela para
         comentar o subir el comprobante.
       </EncabezadoPagina>
       {faltaMigracion ? (
         <p role="alert" className="m-0 rounded-lg border border-border bg-card px-4 py-3 text-sm text-destructive">
-          Falta correr en Supabase las migraciones 0970 y 0971 (Despacho ciudad).
+          Falta correr en Supabase las migraciones 0970 y 0971 (Envíos Delivery).
         </p>
       ) : (
         <>

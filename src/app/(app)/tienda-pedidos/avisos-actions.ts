@@ -9,7 +9,7 @@ import { mismaTiendaUnidad } from "@/lib/tienda/ordenes-finanzas";
 
 // El aviso de «Nuevo pedido» (12 nov 2026, pedido de Hernán: «si cae un pedido, nos cae a nosotros en el sistema y nos da un aviso, como lo hace el de
 // Jorge»). El navegador pregunta cada 30 segundos por los pedidos que llegaron de Shopify desde la última vez; solo los de tiendas conectadas, de los
-// países que la persona puede ver y de hoy o ayer (lo que se trae de antes al conectar no avisa). Basta poder abrir Pedidos de tienda o Despacho ciudad
+// países que la persona puede ver y de hoy o ayer (lo que se trae de antes al conectar no avisa). Basta poder abrir Pedidos de tienda o Envíos Delivery
 // (desde el 16 nov 2026 el aviso es para despacho y sale solo en sus páginas).
 
 export interface PedidoNuevo {

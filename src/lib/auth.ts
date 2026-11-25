@@ -357,7 +357,7 @@ export async function requireModulo(clave: string): Promise<UsuarioActual> {
 }
 
 /**
- * La primera pestaña de un panel con pestañas (Pedidos de tienda, Despacho ciudad, Tiendas Shopify; 17 nov 2026): si la persona tiene el
+ * La primera pestaña de un panel con pestañas (Pedidos de tienda, Envíos Delivery, Tiendas Shopify; 17 nov 2026): si la persona tiene el
  * módulo de la pestaña principal, se queda; si solo tiene el de otra pestaña (por ejemplo, solo Devoluciones), la lleva a esa en vez de sacarla.
  */
 export async function requirePanel(href: string, clave: string): Promise<UsuarioActual> {

@@ -86,7 +86,7 @@ interface Linea {
   nota: string;
 }
 
-/** Despacho: «+ Nuevo pedido» abre las líneas (producto de la lista, cantidad y nota) y «Pedir a inventario» lo manda. */
+/** Despacho: «+ Nueva solicitud» abre las líneas (producto de la lista, cantidad y nota) y «Enviar solicitud» la manda a inventario. */
 export function NuevoPedido({ opciones, stock }: { opciones: OpcionSkuMaestro[]; stock: Record<string, StockInventario> }) {
   const [abierto, setAbierto] = useState(false);
   const [siguiente, setSiguiente] = useState(1);
@@ -108,7 +108,7 @@ export function NuevoPedido({ opciones, stock }: { opciones: OpcionSkuMaestro[];
   if (!abierto)
     return (
       <button type="button" onClick={() => setAbierto(true)} className={PRINCIPAL}>
-        + Nuevo pedido
+        + Nueva solicitud
       </button>
     );
   return (
@@ -119,7 +119,7 @@ export function NuevoPedido({ opciones, stock }: { opciones: OpcionSkuMaestro[];
         correr(() => crearPedidoInventario(lineas.map((l) => ({ skuId: l.sku?.id, cantidad: l.cantidad, nota: l.nota }))), reiniciar);
       }}
     >
-      <h2 className="m-0 text-sm font-semibold">Nuevo pedido a inventario</h2>
+      <h2 className="m-0 text-sm font-semibold">Nueva solicitud de inventario</h2>
       <ProveedorSkusMaestros opciones={opciones}>
         <div className="flex flex-col gap-2">
           {lineas.map((l, i) => (
@@ -165,7 +165,7 @@ export function NuevoPedido({ opciones, stock }: { opciones: OpcionSkuMaestro[];
             Cerrar
           </button>
           <button type="submit" disabled={ocupado || !listo} className={PRINCIPAL}>
-            {ocupado ? "Enviando…" : "Pedir a inventario"}
+            {ocupado ? "Enviando…" : "Enviar solicitud"}
           </button>
         </div>
       </div>

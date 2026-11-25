@@ -6,7 +6,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 export interface CuentaRepartidor {
   id: string;
   usuarioId: string;
-  /** Su nombre de repartidor en Despacho ciudad («JULY CALLE»): solo ve esas filas. */
+  /** Su nombre de repartidor en Envíos Delivery («JULY CALLE»): solo ve esas filas. */
   courier: string;
   nombre: string;
 }

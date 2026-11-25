@@ -1,4 +1,4 @@
-// Gestión de tienda › Despacho ciudad y Devoluciones (15 nov 2026, pedido de Hernán: «pasar Monday al sistema, que funcione igual que Monday»). Las
+// Gestión de tienda › Envíos Delivery y Devoluciones (15 nov 2026, pedido de Hernán: «pasar Monday al sistema, que funcione igual que Monday»). Las
 // etiquetas de cada columna con sus colores, tal como estaban en los tableros de Panamá de Monday, y las reglas puras del tablero: el nombre limpio del
 // repartidor, qué fila se muestra cuando un pedido está en el consolidado y en el tablero del repartidor, y las sumas del día. Sin base ni React.
 
@@ -203,11 +203,11 @@ export function diaIso(texto: string | null | undefined): string | null {
 /** El día como se lee en el tablero: «14/11/2026», como en Monday. */
 export const diaTexto = (iso: string | null) => (iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}` : "Sin día");
 
-/** Hasta cuántos días se pueden pedir de una vez en Despacho ciudad (un cierre de quincena o de mes cabe; más carga demasiado). */
+/** Hasta cuántos días se pueden pedir de una vez en Envíos Delivery (un cierre de quincena o de mes cabe; más carga demasiado). */
 export const MAX_DIAS_RANGO = 62;
 
 /**
- * El día o los días que se eligieron para mirar Despacho ciudad («Del … al …», 24 nov 2026, pedido de Soporte para los cierres de pago a los
+ * El día o los días que se eligieron para mirar Envíos Delivery («Del … al …», 24 nov 2026, pedido de Soporte para los cierres de pago a los
  * mensajeros), o null si no se eligió nada válido. Sin «hasta», es un solo día; al revés, se ordenan; más de `MAX_DIAS_RANGO` días, se corta.
  */
 export function rangoElegido(desde: unknown, hasta: unknown): { desde: string; hasta: string } | null {

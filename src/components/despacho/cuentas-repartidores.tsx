@@ -48,7 +48,7 @@ function ClaveTemporal({ nombre, clave, entrada, alCerrar }: { nombre: string; c
 }
 
 /**
- * Despacho ciudad › Cuentas de repartidores (24 nov 2026, solo administradores): una cuenta por delivery, unida a su nombre en Despacho ciudad, para entrar
+ * Envíos Delivery › Cuentas de repartidores (24 nov 2026, solo administradores): una cuenta por delivery, unida a su nombre en Envíos Delivery, para entrar
  * a su panel. Crear, dar una clave temporal nueva o desactivar.
  */
 export function CuentasRepartidores({ cuentas, repartidores, entrada }: { cuentas: CuentaRepartidorFila[]; repartidores: string[]; entrada: string }) {
@@ -82,7 +82,7 @@ export function CuentasRepartidores({ cuentas, repartidores, entrada }: { cuenta
         }}
       >
         <label className="flex flex-col gap-1">
-          <span className={labelClass}>Repartidor en Despacho ciudad</span>
+          <span className={labelClass}>Repartidor en Envíos Delivery</span>
           <select value={courier} onChange={(e) => setCourier(e.target.value)} className={fieldClass}>
             {repartidores.map((r) => (
               <option key={r} value={r}>

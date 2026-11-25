@@ -159,7 +159,7 @@ function HojaEntregado({ pedido, volver, alCerrar }: { pedido: PedidoRuta; volve
       )}
 
       <p className="m-0 rounded-[10px] bg-[#fafafa] px-2.5 py-2 text-xs text-[#636363]">
-        Se guardan solas la hora de la entrega y tu ubicación. En Despacho ciudad el pedido pasa a{" "}
+        Se guardan solas la hora de la entrega y tu ubicación. En Envíos Delivery el pedido pasa a{" "}
         <b>
           ENTREGADO · {FORMAS_PAGO.find((f) => f.id === forma)!.etiqueta.toUpperCase()} · PAGADO
         </b>{" "}
@@ -293,8 +293,8 @@ function HojaNoEntregado({ pedido, inicial, fechas, volver, alCerrar }: { pedido
 
       <p className="m-0 rounded-[10px] bg-[#fafafa] px-2.5 py-2 text-xs text-[#636363]">
         {tipo === "POSPUESTO"
-          ? `Queda en Despacho ciudad con tu motivo, para que Atención al cliente de ${pedido.tiendaTitulo} hable con el cliente. El pedido pasa al día que elegiste.`
-          : `Queda en Despacho ciudad con tu motivo y la evidencia, para que Atención al cliente de ${pedido.tiendaTitulo} hable con el cliente.`}
+          ? `Queda en Envíos Delivery con tu motivo, para que Atención al cliente de ${pedido.tiendaTitulo} hable con el cliente. El pedido pasa al día que elegiste.`
+          : `Queda en Envíos Delivery con tu motivo y la evidencia, para que Atención al cliente de ${pedido.tiendaTitulo} hable con el cliente.`}
       </p>
 
       <button type="button" onClick={guardar} disabled={enviando} className="min-h-[52px] rounded-xl bg-primario text-base font-bold text-white disabled:opacity-60">

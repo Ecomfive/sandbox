@@ -1,4 +1,4 @@
-// Gestión de tienda › Despacho ciudad y Devoluciones (migración 0970): lo que leen sus páginas de `mon_despachos`, la misma tabla que llenaba Monday y
+// Gestión de tienda › Envíos Delivery y Devoluciones (migración 0970): lo que leen sus páginas de `mon_despachos`, la misma tabla que llenaba Monday y
 // que leen las entregas de los pedidos, Logística y la ficha del pedido. Las etiquetas se muestran limpias (`etiquetaLimpia`) y un pedido que está en el
 // consolidado y en el tablero del repartidor sale una sola vez (`sinDuplicados`).
 
@@ -146,7 +146,7 @@ export async function cargarDevoluciones(supabase: SupabaseClient, archivados = 
 
 const diaPanama = (ms: number) => new Date(ms).toLocaleDateString("en-CA", { timeZone: "America/Panama" });
 
-/** Los días que muestra Despacho ciudad: los `dias` hasta hoy (en Panamá) y los dos siguientes, para lo programado. */
+/** Los días que muestra Envíos Delivery: los `dias` hasta hoy (en Panamá) y los dos siguientes, para lo programado. */
 export function rangoDespacho(dias: number, ahora = Date.now()): { desde: string; hasta: string; hoy: string } {
   return { desde: diaPanama(ahora - (dias - 1) * 86_400_000), hasta: diaPanama(ahora + 2 * 86_400_000), hoy: diaPanama(ahora) };
 }
