@@ -225,6 +225,14 @@ export async function procesarLecturaSiscore(
         leida_en: lectura.leido_en,
       };
     });
+    // Una guía a la que la lectura no le encuentra pedido conserva el que ya tenía (25 nov 2026): la que se unió a mano porque su factura venía mal
+    // escrita (la 7224151768 decía 1916 y era del #1619) no se suelta en la próxima lectura.
+    const sinPedido = filas.filter((f) => !f.orden_id).map((f) => f.guia);
+    for (let i = 0; i < sinPedido.length; i += 200) {
+      const { data } = await supabase.from("tienda_guias").select("guia, orden_id").in("guia", sinPedido.slice(i, i + 200)).not("orden_id", "is", null);
+      const ya = new Map((data ?? []).map((x) => [String(x.guia), String(x.orden_id)]));
+      for (const f of filas) if (!f.orden_id && ya.has(f.guia)) f.orden_id = ya.get(f.guia)!;
+    }
     // Las guías saltadas (ya cerradas, sin abrir su rastreo) se guardan sin lo del rastreo: su historial, visitas y recaudo quedan como estaban.
     const rastreadas = filas.filter((_, i) => !lectura.guias[i].saltada);
     const saltadas = filas.filter((_, i) => lectura.guias[i].saltada).map(sinLoDelRastreo);
