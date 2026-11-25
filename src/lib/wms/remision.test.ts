@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { agruparRemisiones, MAX_LINEAS_REMISION, numeroRemision, revisarLineasRemision, type LineaEnviada } from "./remision";
+import { agruparRemisiones, esRetiroDePlataforma, MAX_LINEAS_REMISION, numeroRemision, revisarLineasRemision, type LineaEnviada } from "./remision";
 
 const A = "0194f0a2-0000-7000-8000-000000000001";
 const B = "0194f0a2-0000-7000-8000-000000000002";
@@ -12,6 +12,13 @@ test("el número lleva ceros y crece sin cortarse", () => {
 
 test("acepta varios productos y convierte la cantidad", () => {
   assert.deepEqual(revisarLineasRemision([{ sku: A, cantidad: "200" }, { sku: B, cantidad: 5 }]), { lineas: [{ sku: A, cantidad: 200 }, { sku: B, cantidad: 5 }] });
+});
+
+test("un retiro es de una plataforma a una bodega propia", () => {
+  assert.equal(esRetiroDePlataforma("externa", "propia"), true);
+  assert.equal(esRetiroDePlataforma("externa", "externa"), false);
+  assert.equal(esRetiroDePlataforma("propia", "externa"), false);
+  assert.equal(esRetiroDePlataforma(undefined, null), false);
 });
 
 test("no acepta una remisión vacía, ni un producto repetido, ni cantidades malas", () => {

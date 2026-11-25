@@ -14,6 +14,7 @@ import { codigoLote } from "@/lib/wms/vencimiento";
 import { ETIQUETA_ACCION_DEFECTUOSO, revisarDefectuoso } from "@/lib/wms/defectuoso";
 import { compararOpciones, etiquetaTalla } from "@/lib/wms/talla";
 import type { VarianteConStock } from "@/lib/wms/stock-con-variantes";
+import { esRetiroDePlataforma } from "@/lib/wms/remision";
 
 const MODULO = "inventario";
 const ES_ID = (v: string) => /^[0-9a-fA-F-]{8,64}$/.test(v);
@@ -451,25 +452,34 @@ export async function remitirAExterna(formData: FormData): Promise<{ error?: str
 }
 
 /** El tercero (Dropi, Effi…) confirmó una remisión: cuántas unidades dice que llegaron. Si no son las enviadas, el motivo es obligatorio. */
-export async function recibirEnvioDropi(envioId: string, recibida: number, motivo: string): Promise<{ error?: string }> {
+export async function recibirEnvioDropi(envioId: string, recibida: number, motivo: string, vencimiento?: string): Promise<{ error?: string }> {
   const usuario = await requireModuloEscritura(MODULO);
   if (!ES_ID(envioId)) return { error: "Envío no válido." };
   if (!Number.isInteger(recibida) || recibida < 0 || recibida > 1_000_000) return { error: "Escribe cuántas unidades llegaron." };
+  // Solo la pide un retiro de plataforma de un producto con vencimiento (migración 0364).
+  if (vencimiento && !/^\d{4}-\d{2}-\d{2}$/.test(vencimiento)) return { error: "La fecha de vencimiento no es válida." };
   const nota = motivo.trim().slice(0, 500);
   const supabase = createServiceClient();
-  const { data: envio } = await supabase.from("wms_envios_dropi").select("sku_maestro_id, bodega_origen_id, enviada, skus_maestros(codigo)").eq("id", envioId).maybeSingle();
+  const { data: envio } = await supabase
+    .from("wms_envios_dropi")
+    .select("sku_maestro_id, bodega_origen_id, enviada, skus_maestros(codigo), origen:wms_bodegas!wms_envios_dropi_bodega_origen_id_fkey(tipo), destino:wms_bodegas!wms_envios_dropi_bodega_dropi_id_fkey(tipo, nombre)")
+    .eq("id", envioId)
+    .maybeSingle();
   if (!envio) return { error: "El envío no existe." };
   if (!(await puedeVerBodega(supabase, usuario.paisesPermitidos, envio.bodega_origen_id as string))) return { error: "No tienes acceso al país de ese envío." };
-  const { error } = await supabase.rpc("wms_recibir_envio_dropi", { p_envio: envioId, p_recibida: recibida, p_motivo: nota || null, p_usuario: usuario.id });
+  const { error } = await supabase.rpc("wms_recibir_envio_dropi", { p_envio: envioId, p_recibida: recibida, p_motivo: nota || null, p_usuario: usuario.id, ...(vencimiento ? { p_vencimiento: vencimiento } : {}) });
   if (error) return { error: errorDeBase(error.message, "No se pudo guardar la recepción.") };
   const m = envio.skus_maestros as { codigo: string } | { codigo: string }[] | null;
   const codigo = (Array.isArray(m) ? m[0] : m)?.codigo ?? "";
   const pais = await paisDeBodega(supabase, envio.bodega_origen_id as string);
+  const primera = <T,>(r: unknown) => (Array.isArray(r) ? (r[0] as T | undefined) : (r as T | null | undefined)) ?? null;
+  const destino = primera<{ tipo: string; nombre: string }>(envio.destino);
+  const retiro = esRetiroDePlataforma(primera<{ tipo: string }>(envio.origen)?.tipo, destino?.tipo);
   await registrarAuditoria({
     accion: "envio_dropi_recibido",
     entidad: "skus_maestros",
     entidadId: envio.sku_maestro_id as string,
-    detalle: `Recibieron ${recibida} de ${envio.enviada} de ${codigo}${recibida !== envio.enviada && nota ? `: ${nota}` : ""}${pais ? ` · ${pais}` : ""}`,
+    detalle: `Recibieron ${recibida} de ${envio.enviada} de ${codigo}${retiro && recibida > 0 ? ` (retiro de plataforma: entraron a ${destino?.nombre ?? "la bodega"})` : ""}${recibida !== envio.enviada && nota ? `: ${nota}` : ""}${pais ? ` · ${pais}` : ""}`,
   });
   revalidatePath("/inventario");
   revalidatePath("/inventario/remisiones");

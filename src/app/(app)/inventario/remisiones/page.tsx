@@ -8,6 +8,7 @@ import { textoCajasEnviadas, type CajaGuardada } from "@/lib/wms/cajas";
 import { textoCorreccion, type TipoCorreccion } from "@/lib/wms/correccion-remision";
 import { BODEGA_DE_PLATAFORMA } from "@/lib/wms/cuadro-plataformas";
 import { PAISES_SALIDA_CON_REMISION } from "@/lib/wms/recepcion";
+import { esRetiroDePlataforma } from "@/lib/wms/remision";
 import type { Plataforma } from "@/lib/wms/stock-plataformas";
 import { leerStockPlataformas } from "../datos-plataformas";
 import { puedeAnularSinAutorizacion } from "@/lib/permisos/anular-remision";
@@ -32,7 +33,7 @@ export default async function RemisionesPage() {
   const { data, error } = await supabase
     .from("wms_envios_dropi")
     .select(
-      "id, enviado_en, enviada, recibida, estado, referencia, motivo_diferencia, recibido_en, remision_id, bodega_origen_id, sku_maestro_id, wms_remisiones(notas), skus_maestros(codigo, nombre, foto_url, numero, codigo_barras), wms_bodegas!wms_envios_dropi_bodega_origen_id_fkey!inner(nombre, pais_id), destino:wms_bodegas!wms_envios_dropi_bodega_dropi_id_fkey(nombre)",
+      "id, enviado_en, enviada, recibida, estado, referencia, motivo_diferencia, recibido_en, remision_id, bodega_origen_id, sku_maestro_id, wms_remisiones(notas), skus_maestros(codigo, nombre, foto_url, numero, codigo_barras, maneja_vencimiento), wms_bodegas!wms_envios_dropi_bodega_origen_id_fkey!inner(nombre, pais_id, tipo), destino:wms_bodegas!wms_envios_dropi_bodega_dropi_id_fkey(nombre, tipo)",
     )
     .eq("wms_bodegas.pais_id", pais.id)
     .order("estado")
@@ -44,7 +45,10 @@ export default async function RemisionesPage() {
   const cajasDeLinea = new Map((conCajas ?? []).map((c) => [c.id as string, textoCajasEnviadas(c.cajas)]));
 
   const filas: FilaEnvio[] = (data ?? []).map((e) => {
-    const sku = uno(e.skus_maestros as { codigo: string; nombre: string; foto_url: string | null; numero: number | null; codigo_barras: string | null } | { codigo: string; nombre: string; foto_url: string | null; numero: number | null; codigo_barras: string | null }[] | null);
+    const sku = uno(e.skus_maestros as { codigo: string; nombre: string; foto_url: string | null; numero: number | null; codigo_barras: string | null; maneja_vencimiento: boolean } | { codigo: string; nombre: string; foto_url: string | null; numero: number | null; codigo_barras: string | null; maneja_vencimiento: boolean }[] | null);
+    const origen = uno(e.wms_bodegas as unknown as { tipo: string } | { tipo: string }[] | null);
+    const destino = uno(e.destino as unknown as { tipo: string } | { tipo: string }[] | null);
+    const retiro = esRetiroDePlataforma(origen?.tipo, destino?.tipo);
     return {
       id: e.id as string,
       codigo: sku?.codigo ?? "—",
@@ -65,6 +69,8 @@ export default async function RemisionesPage() {
       notas: uno(e.wms_remisiones as { notas: string | null } | { notas: string | null }[] | null)?.notas ?? null,
       motivo: (e.motivo_diferencia as string | null) ?? null,
       cajas: cajasDeLinea.get(e.id as string) ?? null,
+      retiro,
+      pideVencimiento: retiro && !!sku?.maneja_vencimiento,
     };
   });
 
@@ -113,8 +119,8 @@ export default async function RemisionesPage() {
         traerTodasConError<{ bodega_id: string; sku_maestro_id: string; disponible: number }>((d, h) =>
           supabase.from("wms_stock").select("bodega_id, sku_maestro_id, disponible").in("bodega_id", propias.map((b) => b.id)).gt("disponible", 0).order("sku_maestro_id").range(d, h),
         ),
-        traerTodasConError<{ id: string; codigo: string; nombre: string; estado: string; numero: number | null; foto_url: string | null; codigo_barras: string | null; padre_id: string | null }>((d, h) =>
-          supabase.from("skus_maestros").select("id, codigo, nombre, estado, numero, foto_url, codigo_barras, padre_id").neq("tipo", "combo").is("opciones_variantes", null).order("codigo").range(d, h),
+        traerTodasConError<{ id: string; codigo: string; nombre: string; estado: string; clase: string; numero: number | null; foto_url: string | null; codigo_barras: string | null; padre_id: string | null }>((d, h) =>
+          supabase.from("skus_maestros").select("id, codigo, nombre, estado, clase, numero, foto_url, codigo_barras, padre_id").neq("tipo", "combo").is("opciones_variantes", null).order("codigo").range(d, h),
         ),
       ])
     : [{ data: [] }, { data: [] }];
@@ -149,14 +155,17 @@ export default async function RemisionesPage() {
     ((cajas[c.bodega_id] ??= {})[c.sku_maestro_id] ??= []).push(caja);
   }
   for (const porSku of Object.values(cajas)) for (const lista of Object.values(porSku)) lista.sort((a, b) => a.ubicacion.localeCompare(b.ubicacion) || b.porCaja - a.porCaja);
-  const opciones = (productos.data ?? []).filter((p) => hay.has(p.id)).map((p) => ({ id: p.id, codigo: p.codigo, nombre: p.nombre, estado: p.estado, numero: p.numero, barras: p.codigo_barras, foto: p.foto_url, padreId: p.padre_id ?? null }));
+  const aOpcion = (p: NonNullable<typeof productos.data>[number]) => ({ id: p.id, codigo: p.codigo, nombre: p.nombre, estado: p.estado, numero: p.numero, barras: p.codigo_barras, foto: p.foto_url, padreId: p.padre_id ?? null });
+  const opciones = (productos.data ?? []).filter((p) => hay.has(p.id)).map(aOpcion);
+  // Un retiro de plataforma puede traer cualquier producto con stock propio: la lectura de la plataforma puede venir ya descontada.
+  const paraRetiro = plataformas.length > 0 ? (productos.data ?? []).filter((p) => p.clase !== "test").map(aOpcion) : [];
 
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-6">
       <EncabezadoPagina titulo="Remisiones" oculto />
       {puedeEscribir && (
         <div className="flex justify-end">
-          <NuevaRemision propias={propias} externas={externas} plataformas={plataformas} productos={opciones} stock={stock} cajas={cajas} />
+          <NuevaRemision propias={propias} externas={externas} plataformas={plataformas} productos={opciones} paraRetiro={paraRetiro} stock={stock} cajas={cajas} />
         </div>
       )}
       <CorreccionesPendientes pendientes={pendientes} />
@@ -165,7 +174,7 @@ export default async function RemisionesPage() {
           {/remision_id/.test(error.message) ? "Falta correr la migración 0233 en la base." : "No se pudieron cargar las remisiones."}
         </p>
       ) : (
-        <ListaEnvios filas={filas} productos={opciones} stock={stock} puedeEscribir={puedeEscribir} anularDirecto={puedeEscribir && puedeAnularSinAutorizacion(usuario)} codigoPais={pais.codigo} conPendiente={[...conPendiente]} resueltas={Object.fromEntries(ultimas)} />
+        <ListaEnvios filas={filas} productos={opciones} paraRetiro={paraRetiro} stock={stock} puedeEscribir={puedeEscribir} anularDirecto={puedeEscribir && puedeAnularSinAutorizacion(usuario)} codigoPais={pais.codigo} conPendiente={[...conPendiente]} resueltas={Object.fromEntries(ultimas)} />
       )}
     </Pagina>
   );

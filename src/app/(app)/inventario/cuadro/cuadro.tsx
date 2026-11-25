@@ -161,7 +161,7 @@ export function Cuadro({
                   <th scope="col" className={claseEncabezadoColumna}>Producto</th>
                   <th scope="col" className={`${claseEncabezadoColumna} text-right`}>Corte</th>
                   <th scope="col" className={`${claseEncabezadoColumna} text-right`}>Entró</th>
-                  <th scope="col" className={`${claseEncabezadoColumna} text-right`}>Salió a otra</th>
+                  <th scope="col" className={`${claseEncabezadoColumna} text-right`}>Salió</th>
                   {conVentas && <th scope="col" className={`${claseEncabezadoColumna} text-right`}>Vendido</th>}
                   <th scope="col" className={`${claseEncabezadoColumna} text-right`}>Bajas</th>
                   <th scope="col" className={`${claseEncabezadoColumna} text-right`}>Debería haber</th>

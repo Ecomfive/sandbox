@@ -19,6 +19,12 @@ export interface LineaRemision {
   cajas?: CajaElegida[];
 }
 
+/**
+ * Un retiro de plataforma (migración 0364): la remisión sale de una bodega externa y va a una propia. Al confirmar lo que llegó, entra al inventario; las demás
+ * remisiones entre plataformas son solo un documento.
+ */
+export const esRetiroDePlataforma = (tipoOrigen: string | null | undefined, tipoDestino: string | null | undefined) => tipoOrigen === "externa" && tipoDestino === "propia";
+
 /** «REM-0012»: el número que sale en el papel y en la lista. */
 export const numeroRemision = (n: number) => `REM-${String(n).padStart(4, "0")}`;
 

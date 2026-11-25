@@ -27,6 +27,7 @@ export function AgregarAremision({
   productos,
   stock,
   yaEstan,
+  retiro = false,
 }: {
   remisionId: string;
   numero: string;
@@ -34,6 +35,8 @@ export function AgregarAremision({
   productos: OpcionSkuMaestro[];
   stock: StockPorBodega;
   yaEstan: string[];
+  /** Un retiro de plataforma no tiene tope: la lectura de la plataforma puede venir ya descontada. */
+  retiro?: boolean;
 }) {
   const router = useRouter();
   const { mostrarToast } = useToast();
@@ -47,7 +50,7 @@ export function AgregarAremision({
   const disponibles = productos.filter((p) => !yaEstan.includes(p.id) && !lineas.some((l) => l.sku.id === p.id));
   const cantidad = (l: Linea) => (l.cantidad.trim() === "" ? NaN : Number(l.cantidad));
   const incompleta = lineas.some((l) => !Number.isInteger(cantidad(l)) || cantidad(l) <= 0);
-  const pasada = lineas.find((l) => cantidad(l) > hay(l.sku.id));
+  const pasada = retiro ? undefined : lineas.find((l) => cantidad(l) > hay(l.sku.id));
   const falta = lineas.length === 0 ? "Agrega al menos un producto." : incompleta ? "Escribe la cantidad de cada producto." : pasada ? `De ${pasada.sku.codigo} solo hay ${hay(pasada.sku.id).toLocaleString("es-PA")} en esa bodega.` : null;
   const unidades = lineas.reduce((t, l) => t + (Number.isInteger(cantidad(l)) ? cantidad(l) : 0), 0);
 
