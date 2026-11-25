@@ -5,6 +5,7 @@ import { getPaisActual } from "@/lib/pais";
 import { cargarAnunciosMeta, periodoValido, type DatosMeta } from "@/lib/meta-ads/datos";
 import { tokenDeMeta } from "@/lib/meta-ads/api";
 import { geminiConectado } from "@/lib/meta-ads/gemini-video";
+import { senalesVisibles } from "@/lib/meta-ads/senales-modulos";
 import { hoyEnPanama } from "@/lib/meta-ads/sincronizar";
 import { createServiceClient } from "@/lib/supabase/server";
 
@@ -19,7 +20,9 @@ export async function cargarPaginaMeta(searchParams: ParametrosMeta): Promise<{ 
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
   const datos = await cargarAnunciosMeta(supabase, { paisId: pais.id, cuentaId: uno(sp.cuenta) ?? null, periodo: periodoValido(uno(sp.periodo)), hoy: hoyEnPanama(), producto: uno(sp.producto) ?? null });
-  return { datos: { ...datos, iaConectada: geminiConectado() }, escribe: !usuario.modulosSoloLectura.includes("anuncios-meta"), pais: pais.nombre, paisId: pais.id, hayToken: tokenDeMeta() !== null };
+  // Las señales de otros módulos (inventario, precio, competencia, test) solo las ve quien puede abrir ese módulo.
+  const senales = datos.senales.map((s) => ({ ...s, otras: senalesVisibles(s.otras ?? [], usuario.modulos) }));
+  return { datos: { ...datos, senales, iaConectada: geminiConectado() }, escribe: !usuario.modulosSoloLectura.includes("anuncios-meta"), pais: pais.nombre, paisId: pais.id, hayToken: tokenDeMeta() !== null };
 }
 
 /**
