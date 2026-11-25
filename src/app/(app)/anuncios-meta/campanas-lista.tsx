@@ -6,6 +6,8 @@ import { ListaDatos } from "@/components/tabla/lista-datos";
 import { AnunciosIcon, ChevronRightIcon, EtiquetaIcon, EstadoIcon, MargenIcon, PersonaIcon, ProductoIcon, TiendaIcon, CalendarioIcon, FiltroIcon } from "@/lib/nav-icons";
 import { PRESETS_COLUMNAS, type ClaveColumna } from "@/lib/meta-ads/columnas";
 import { confiable, dolares } from "@/lib/meta-ads/metricas";
+import { ordenarPor } from "@/lib/meta-ads/orden";
+import { CRITERIOS_CAMPANAS, ORDEN_CAMPANAS } from "@/lib/meta-ads/orden-listas";
 import type { CuentaVista } from "@/lib/meta-ads/datos";
 import { faltanEtiquetas } from "@/lib/meta-ads/sugerencias";
 import type { AnuncioVista, CampanaVista } from "@/lib/meta-ads/vistas";
@@ -14,6 +16,7 @@ import { DEF_CAMPANAS, NOMBRE_VEREDICTO, veredictoDe } from "./def-campanas";
 import { BarraApilada, coloresDeAngulos } from "./graficas";
 import { FichaCampana } from "./ficha-campana";
 import { CeldasColumnas, EncabezadoColumnas, estiloRejilla, SelectorColumnasMeta, useColumnasMeta } from "./columnas-meta";
+import { BarraOrden, useOrdenMeta } from "./orden-meta";
 import { InsigniaEstructura, InsigniaEtapa, nombreEstado } from "./piezas";
 
 const NOMBRE: NombreFilas = { singular: "campaña", plural: "campañas" };
@@ -74,6 +77,8 @@ export function CampanasLista({ campanas: todas, anuncios, cuentas, productos, e
   const [orden, setOrden] = useState<string[]>([]);
   const [columnas, guardarColumnas, restablecerColumnas] = useColumnasMeta("campanas", COLUMNAS_CAMPANAS);
   const colores = useMemo(() => coloresDeAngulos(todas), [todas]);
+  const [ordenes, guardarOrdenes] = useOrdenMeta("campanas", CRITERIOS_CAMPANAS, ORDEN_CAMPANAS);
+  const ordenadas = ordenarPor(campanas, CRITERIOS_CAMPANAS, ordenes, (c) => c.r.gasto);
   // La ficha se dibuja en `<body>` (portal): con `?abrir=` arranca abierta, así que solo se monta ya en el navegador.
   const enNavegador = useSyncExternalStore(
     () => () => {},
@@ -95,12 +100,12 @@ export function CampanasLista({ campanas: todas, anuncios, cuentas, productos, e
           </button>
         </div>
       )}
-      <div className="flex justify-end">
+      <BarraOrden criterios={CRITERIOS_CAMPANAS} ordenes={ordenes} alCambiar={guardarOrdenes}>
         <SelectorColumnasMeta titulo="Campañas" columnas={columnas} alCambiar={guardarColumnas} alRestablecer={restablecerColumnas} />
-      </div>
+      </BarraOrden>
       <ListaDatos
         def={DEF_CAMPANAS}
-        filas={campanas}
+        filas={ordenadas}
         iconos={ICONOS}
         nombre={NOMBRE}
         claveFila={(c) => c.id}

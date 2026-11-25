@@ -4,18 +4,20 @@ import Link from "next/link";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import type { IconoComp } from "@/components/tabla/botones-vista";
 import { ListaDatos } from "@/components/tabla/lista-datos";
-import { fieldClassSm } from "@/components/ui/field";
 import { Seccion } from "@/components/ui/seccion-ficha";
 import { Ventana } from "@/components/ui/ventana";
 import { AnunciosIcon, ChevronRightIcon, EstadoIcon, FiltroIcon, MargenIcon, ProductoIcon } from "@/lib/nav-icons";
 import { CATALOGO_COLUMNAS, valorColumna, type ClaveColumna } from "@/lib/meta-ads/columnas";
-import { confiable, cpa, dolares, resultado } from "@/lib/meta-ads/metricas";
+import { confiable, cpa, dolares } from "@/lib/meta-ads/metricas";
+import { ordenarPor } from "@/lib/meta-ads/orden";
+import { CRITERIOS_PRODUCTOS, ORDEN_PRODUCTOS } from "@/lib/meta-ads/orden-listas";
 import { angulosDeProducto } from "@/lib/meta-ads/productos";
 import { claveDeProducto } from "@/lib/meta-ads/nombre";
 import type { CampanaVista, ProductoVista, VideoVista } from "@/lib/meta-ads/vistas";
 import type { NombreFilas } from "@/lib/tabla/pie";
 import { CeldasColumnas, EncabezadoColumnas, estiloRejilla, SelectorColumnasMeta, useColumnasMeta } from "./columnas-meta";
 import { DEF_PRODUCTOS } from "./def-productos";
+import { BarraOrden, useOrdenMeta } from "./orden-meta";
 import { AVISO_POCA_DATA, Cifra, InsigniaEtapa, MetricasEnLinea, Nivel } from "./piezas";
 import { entregaPorProductoMeta } from "./actions";
 
@@ -33,49 +35,6 @@ const ICONOS: Record<string, IconoComp> = { nombre: ProductoIcon, veredicto: Mar
 const COLUMNAS_PRODUCTOS: ClaveColumna[] = ["gasto", "compras", "cpa", "roas", "ctr", "hook", "cvr", "resultado"];
 
 const idDe = (p: ProductoVista) => p.clave || "sin-producto";
-
-type Criterio = "gasto" | "compras" | "cpa" | "roas" | "resultado" | "campanas" | "nombre";
-const CRITERIOS: { valor: Criterio; etiqueta: string; sentido: "asc" | "desc" }[] = [
-  { valor: "gasto", etiqueta: "Gasto", sentido: "desc" },
-  { valor: "compras", etiqueta: "Compras", sentido: "desc" },
-  { valor: "cpa", etiqueta: "CPA (el más bajo primero)", sentido: "asc" },
-  { valor: "roas", etiqueta: "ROAS", sentido: "desc" },
-  { valor: "resultado", etiqueta: "Resultado estimado", sentido: "desc" },
-  { valor: "campanas", etiqueta: "Campañas", sentido: "desc" },
-  { valor: "nombre", etiqueta: "Nombre", sentido: "asc" },
-];
-
-/** El valor por el que se ordena; null = sin dato (va siempre al final). */
-function claveDe(p: ProductoVista, c: Criterio): number | string | null {
-  switch (c) {
-    case "gasto":
-      return p.r.gasto;
-    case "compras":
-      return p.r.compras;
-    case "cpa":
-      return cpa(p.r);
-    case "roas":
-      return p.r.gasto > 0 && p.r.valor > 0 ? p.r.valor / p.r.gasto : null;
-    case "resultado":
-      return p.r.gasto > 0 ? resultado(p.r, p.tope) : null;
-    case "campanas":
-      return p.campanas;
-    case "nombre":
-      return p.nombre.toLocaleLowerCase("es");
-  }
-}
-
-function ordenar(lista: ProductoVista[], c: Criterio, sentido: "asc" | "desc"): ProductoVista[] {
-  const signo = sentido === "asc" ? 1 : -1;
-  return [...lista].sort((a, b) => {
-    const x = claveDe(a, c);
-    const y = claveDe(b, c);
-    if (x === null && y === null) return 0;
-    if (x === null) return 1;
-    if (y === null) return -1;
-    return (typeof x === "string" || typeof y === "string" ? String(x).localeCompare(String(y), "es") : x - y) * signo;
-  });
-}
 
 function FilaProducto({ p, columnas, alAbrir, entrega }: { p: ProductoVista; columnas: ClaveColumna[]; alAbrir: () => void; entrega: EntregasMeta | null }) {
   const ok = confiable(p.r);
@@ -230,7 +189,7 @@ function FichaProducto({ p, campanas, videos, alCerrar, entrega }: { p: Producto
   );
 }
 
-/** Todos los productos con lo que sumaron sus campañas en el periodo, con la barra común, un orden a elegir y las columnas que cada persona quiera ver. Tocar uno abre su ficha (`?abrir=<producto>`). */
+/** Todos los productos con lo que sumaron sus campañas en el periodo, con la barra común, el orden que cada persona elija y las columnas que cada persona quiera ver. Tocar uno abre su ficha (`?abrir=<producto>`). */
 export function ListaProductos({ productos, campanas, videos, abrirInicial }: { productos: ProductoVista[]; campanas: CampanaVista[]; videos: VideoVista[]; abrirInicial: string | null }) {
   const [columnas, guardarColumnas, restablecerColumnas] = useColumnasMeta("productos", COLUMNAS_PRODUCTOS);
   // La entrega sale de los pedidos y tarda unos segundos la primera vez: se pide después de abrir la lista, sin frenarla.
@@ -244,8 +203,7 @@ export function ListaProductos({ productos, campanas, videos, abrirInicial }: { 
       vivo = false;
     };
   }, []);
-  const [criterio, setCriterio] = useState<Criterio>("gasto");
-  const [sentido, setSentido] = useState<"asc" | "desc">("desc");
+  const [ordenes, guardarOrdenes] = useOrdenMeta("productos", CRITERIOS_PRODUCTOS, ORDEN_PRODUCTOS);
   const [abierto, setAbierto] = useState<string | null>(() => (abrirInicial && productos.some((p) => idDe(p) === abrirInicial) ? abrirInicial : null));
   useEffect(() => {
     const url = new URL(window.location.href);
@@ -259,42 +217,14 @@ export function ListaProductos({ productos, campanas, videos, abrirInicial }: { 
     () => true,
     () => false,
   );
-  const ordenados = useMemo(() => ordenar(productos, criterio, sentido), [productos, criterio, sentido]);
+  const ordenados = useMemo(() => ordenarPor(productos, CRITERIOS_PRODUCTOS, ordenes, (p) => p.r.gasto), [productos, ordenes]);
   const p = enNavegador ? productos.find((x) => idDe(x) === abierto) : undefined;
   const hayPocaData = productos.some((x) => x.r.gasto > 0 && !confiable(x.r));
   return (
     <>
-      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5">
-        <label className="flex items-center gap-2 text-sm">
-          <span className="text-xs font-medium text-muted-foreground">Ordenar por</span>
-          <select
-            value={criterio}
-            onChange={(e) => {
-              const c = e.target.value as Criterio;
-              setCriterio(c);
-              setSentido(CRITERIOS.find((x) => x.valor === c)?.sentido ?? "desc");
-            }}
-            className={`${fieldClassSm} w-auto min-w-[14rem]`}
-          >
-            {CRITERIOS.map((c) => (
-              <option key={c.valor} value={c.valor}>
-                {c.etiqueta}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button
-          type="button"
-          onClick={() => setSentido(sentido === "asc" ? "desc" : "asc")}
-          aria-label={`Cambiar el orden: ahora va de ${sentido === "asc" ? "menor a mayor" : "mayor a menor"}`}
-          className="min-h-8 rounded-md border border-border-control bg-card px-3 py-1 text-xs font-medium hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground"
-        >
-          {criterio === "nombre" ? (sentido === "asc" ? "A → Z" : "Z → A") : sentido === "asc" ? "De menor a mayor ↑" : "De mayor a menor ↓"}
-        </button>
-        <span className="ml-auto">
-          <SelectorColumnasMeta titulo="Productos" columnas={columnas} alCambiar={guardarColumnas} alRestablecer={restablecerColumnas} sinFrecuencia />
-        </span>
-      </div>
+      <BarraOrden criterios={CRITERIOS_PRODUCTOS} ordenes={ordenes} alCambiar={guardarOrdenes}>
+        <SelectorColumnasMeta titulo="Productos" columnas={columnas} alCambiar={guardarColumnas} alRestablecer={restablecerColumnas} sinFrecuencia />
+      </BarraOrden>
       <ListaDatos
         def={DEF_PRODUCTOS}
         filas={ordenados}
