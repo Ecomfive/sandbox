@@ -5,7 +5,10 @@ import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { AJUSTE_ANALISIS_AUTOMATICO } from "@/lib/meta-ads/ajustes";
 import { iasParaInterpretar, leerAnalisisGuardado } from "@/lib/meta-ads/analisis-guardado";
-import { LIMITES_CHAT, limpiarRespuesta, pedidoChat, revisarPregunta, sanitizarHistorial } from "@/lib/meta-ads/chat-ia";
+import { claveDeTema, ejecutarAnalisis, validarAnalisis, validarPrioridad, validarVigilancia, vigilanciaDeAnalisis, type Prioridad } from "@/lib/meta-ads/analisis-pedido";
+import { cargarBaseDias } from "@/lib/meta-ads/base-dias";
+import { interpretarRespuestaChat, LIMITES_CHAT, limpiarRespuesta, pedidoChat, pedidoConResultados, revisarPregunta, sanitizarHistorial } from "@/lib/meta-ads/chat-ia";
+import { cambiarVigilancia, crearVigilancia, DIAS_DE_INSISTENCIA, leerVigilancias, VECES_PARA_VIGILAR } from "@/lib/meta-ads/vigilancias";
 import { tieneHistorialSuficiente } from "@/lib/meta-ads/historico";
 import { cargarHistorico } from "@/lib/meta-ads/historico-datos";
 import { NOMBRE_PROVEEDOR, pedirIAEn, proveedoresConectados } from "@/lib/publicaciones/ia/proveedor";
@@ -423,7 +426,7 @@ export async function entregaPorProductoMeta(cuentaId: string | null): Promise<{
  * El chat de Hallazgos (24 nov 2026): una pregunta sobre el historial («¿qué producto funciona mejor?», «¿qué cambió más este mes?») que la IA contesta **solo con las estadísticas que el sistema ya calculó** (`chat-ia.ts`).
  * Basta poder abrir el módulo. Cada pregunta cuesta unos centavos de crédito de IA: hay un tope por persona cada 24 horas. Usa Claude si está conectado y, si no, OpenAI. Devuelve el error como valor.
  */
-export async function preguntarHallazgosMeta(pregunta: unknown, historial: unknown): Promise<{ respuesta?: string; proveedor?: string; error?: string; quedan?: number }> {
+export async function preguntarHallazgosMeta(pregunta: unknown, historial: unknown): Promise<{ respuesta?: string; proveedor?: string; error?: string; quedan?: number; analisisNuevos?: string[]; vigilancia?: { titulo: string; prioridad: Prioridad }; vigilanciaAutomatica?: string }> {
   const u = await requireModulo(MODULO);
   const revisada = revisarPregunta(pregunta);
   if ("error" in revisada) return { error: revisada.error };
@@ -443,9 +446,80 @@ export async function preguntarHallazgosMeta(pregunta: unknown, historial: unkno
   if (!tieneHistorialSuficiente(analisis)) return { error: "Todavía hay muy poco historial (menos de 8 campañas con gasto suficiente) para contestar con datos." };
   const { instrucciones, texto } = pedidoChat(analisis, tiendas, hoy, revisada.pregunta, sanitizarHistorial(historial));
   const proveedor = conectadas[0];
-  const r = await pedirIAEn(proveedor, { instrucciones, texto, imagenes: [] }, { operacion: "meta_chat", modulo: "anuncios-meta", usuario: { id: u.id, nombre: u.nombre ?? null, email: u.email }, referencia: revisada.pregunta.slice(0, 120) }, "analisis");
+  const quien = { id: u.id, nombre: u.nombre ?? null, email: u.email };
+  const quedan = Math.max(0, LIMITES_CHAT.porDia - usadas - 1);
+  const r = await pedirIAEn(proveedor, { instrucciones, texto, imagenes: [] }, { operacion: "meta_chat", modulo: "anuncios-meta", usuario: quien, referencia: revisada.pregunta.slice(0, 120) }, "analisis");
   if ("error" in r) return { error: r.error };
-  const respuesta = limpiarRespuesta(r.texto);
-  if (!respuesta) return { error: "La IA no devolvió una respuesta. Inténtalo de nuevo." };
-  return { respuesta, proveedor: NOMBRE_PROVEEDOR[proveedor], quedan: Math.max(0, LIMITES_CHAT.porDia - usadas - 1) };
+  const nombreIA = NOMBRE_PROVEEDOR[proveedor];
+  const que = interpretarRespuestaChat(r.texto);
+
+  // 1) Contestó con las estadísticas que ya estaban calculadas.
+  if (que.tipo === "texto") {
+    const respuesta = limpiarRespuesta(que.texto);
+    if (!respuesta) return { error: "La IA no devolvió una respuesta. Inténtalo de nuevo." };
+    return { respuesta, proveedor: nombreIA, quedan };
+  }
+
+  // 2) Pidió un análisis que no estaba hecho: se corre sobre los resultados por día y se le devuelve para que conteste con eso.
+  if (que.tipo === "analizar") {
+    const specs = que.analisis.map((a) => validarAnalisis(a, hoy)).filter((a): a is NonNullable<typeof a> => a !== null).slice(0, 2);
+    if (!specs.length) return { error: "No pude armar ese análisis con los datos que tengo. Prueba con otra pregunta, indicando las fechas o el producto." };
+    const base = await cargarBaseDias({ paisId: pais.id, cuentaId: null }, supabase);
+    if (!base) return { error: "No hay resultados por día de Meta para hacer ese análisis." };
+    const resultados = specs.map((spec) => ejecutarAnalisis(spec, base));
+    const tema = claveDeTema(specs[0]);
+    const r2 = await pedirIAEn(proveedor, { ...pedidoConResultados({ instrucciones, texto }, resultados), imagenes: [] }, { operacion: "meta_chat_analisis", modulo: "anuncios-meta", usuario: quien, referencia: `tema:${tema}|${specs[0].titulo}`.slice(0, 160) }, "analisis");
+    if ("error" in r2) return { error: r2.error };
+    const respuesta = limpiarRespuesta(r2.texto);
+    if (!respuesta) return { error: "La IA no devolvió una respuesta. Inténtalo de nuevo." };
+    const automatica = await vigilarSiInsisten(supabase, { paisId: pais.id, hoy, tema, spec: specs[0], pregunta: revisada.pregunta });
+    return { respuesta, proveedor: nombreIA, quedan, analisisNuevos: specs.map((x) => x.titulo), ...(automatica ? { vigilanciaAutomatica: automatica } : {}) };
+  }
+
+  // 3) Pidió que desde ahora se le indique algo: queda como una vigilancia con la prioridad que dijo. Hace falta poder modificar el módulo.
+  if (u.modulosSoloLectura.includes(MODULO)) return { respuesta: "Tu cuenta solo puede ver Anuncios Meta: para dejar una vigilancia hace falta poder modificar el módulo. Pídeselo a alguien con ese permiso.", proveedor: nombreIA, quedan };
+  const spec = validarVigilancia(que.vigilancia);
+  if (!spec) return { error: "No pude entender qué vigilar. Dime la métrica y a qué (por ejemplo: «vigila el CPA de cada producto, prioridad alta»)." };
+  const prioridad = validarPrioridad(que.prioridad);
+  const creada = await crearVigilancia(supabase, { paisId: pais.id, hoy, spec, prioridad, origen: "chat", quien: u.nombre ?? u.email ?? "—", pregunta: revisada.pregunta, tema: null });
+  if ("error" in creada) return { error: creada.error };
+  await registrarAuditoria({ accion: "crear_vigilancia_meta", entidad: "meta_ajustes", detalle: `${spec.titulo} · prioridad ${prioridad}${creada.yaExistia ? " (ya existía: se actualizó)" : ""}` });
+  revalidatePath("/anuncios-meta", "layout");
+  const base = `Listo: ${que.mensaje ?? `desde ahora vigilo «${spec.titulo}» con prioridad ${prioridad}.`}`;
+  return { respuesta: `${base}${creada.resultado ? ` Primera lectura: ${creada.resultado.resumen}` : ""} La verás en Hallazgos › Lo que estás vigilando y, si se pone mala, entre las sugerencias del Resumen.`, proveedor: nombreIA, quedan, vigilancia: { titulo: spec.titulo, prioridad } };
+}
+
+/**
+ * Si una misma pregunta (el mismo desglose, filtros y métrica) se hizo `VECES_PARA_VIGILAR` veces en las últimas semanas, el sistema empieza a vigilarla solo con prioridad media y se lo dice a quien preguntó. Se cuenta con las
+ * preguntas que ya dejó el chat en el consumo de IA (`referencia` = `tema:<llave>|…`), así que no necesita guardar nada más. Nunca lanza.
+ */
+async function vigilarSiInsisten(supabase: ReturnType<typeof createServiceClient>, o: { paisId: string; hoy: string; tema: string; spec: NonNullable<ReturnType<typeof validarAnalisis>>; pregunta: string }): Promise<string | null> {
+  try {
+    const desde = new Date(Date.now() - DIAS_DE_INSISTENCIA * 86_400_000).toISOString();
+    const { count } = await supabase.from("ia_consumo").select("id", { count: "exact", head: true }).eq("operacion", "meta_chat_analisis").like("referencia", `tema:${o.tema}|%`).gte("creado_en", desde);
+    if ((count ?? 0) < VECES_PARA_VIGILAR) return null;
+    if ((await leerVigilancias(supabase, o.paisId)).some((v) => v.tema === o.tema)) return null;
+    const creada = await crearVigilancia(supabase, { paisId: o.paisId, hoy: o.hoy, spec: vigilanciaDeAnalisis(o.spec), prioridad: "media", origen: "insistencia", quien: "Sistema (por las preguntas del chat)", pregunta: o.pregunta, tema: o.tema });
+    if ("error" in creada || creada.yaExistia) return null;
+    await registrarAuditoria({ accion: "crear_vigilancia_meta", entidad: "meta_ajustes", detalle: `${o.spec.titulo} · prioridad media (por insistencia: ${count} preguntas)` });
+    revalidatePath("/anuncios-meta", "layout");
+    return o.spec.titulo;
+  } catch {
+    return null;
+  }
+}
+
+/** Cambia la prioridad de una vigilancia, la pausa o la reanuda, o la quita. Hace falta poder modificar el módulo. */
+export async function cambiarVigilanciaMeta(id: unknown, cambio: { prioridad?: unknown; activa?: unknown; quitar?: unknown }): Promise<Resultado> {
+  const u = await requireModuloEscritura(MODULO);
+  if (typeof id !== "string" || id.length > 40) return { error: "Esa vigilancia no existe." };
+  const supabase = createServiceClient();
+  const pais = await getPaisActual(supabase);
+  if (!(await puedeVerPaisId(supabase, u.paisesPermitidos, pais.id))) return { error: "No tienes acceso a ese país." };
+  const prioridad: Prioridad | undefined = cambio.prioridad === undefined ? undefined : validarPrioridad(cambio.prioridad);
+  const r = await cambiarVigilancia(supabase, { paisId: pais.id, hoy: hoyEnPanama(), id, prioridad, activa: typeof cambio.activa === "boolean" ? cambio.activa : undefined, quitar: cambio.quitar === true, quien: u.nombre ?? u.email ?? "—" });
+  if ("error" in r) return { error: r.error };
+  await registrarAuditoria({ accion: "cambiar_vigilancia_meta", entidad: "meta_ajustes", detalle: cambio.quitar === true ? "Quitó una vigilancia" : `Cambió una vigilancia${prioridad ? ` · prioridad ${prioridad}` : ""}${typeof cambio.activa === "boolean" ? (cambio.activa ? " · reanudada" : " · pausada") : ""}` });
+  revalidatePath("/anuncios-meta", "layout");
+  return {};
 }

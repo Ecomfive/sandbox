@@ -9,6 +9,7 @@ import { tieneHistorialSuficiente, type AnalisisHistorico } from "./historico";
 import { calcularHistorico, type HistoricoCargado } from "./historico-datos";
 import { claveDeInterpretacion, leerInterpretacionGuardada, type OpinionIA } from "./interpretacion-guardada";
 import { leerInterpretacion, pedidoInterpretacion } from "./interpretar-ia";
+import { evaluarVigilanciasGuardadas } from "./vigilancias";
 
 export { analisisViejo, claveDeAnalisis, HORAS_ANALISIS_VIGENTE, type AnalisisGuardado } from "./analisis-tipos";
 const claveDeBloqueo = (paisId: string): string => `analisis_historico_bloqueo:${paisId}`;
@@ -87,6 +88,8 @@ export async function refrescarAnalisisMeta(supabase: SupabaseClient, o: { paisI
     if (h.vacio) return { analizado: false, interpretado: false, motivo: "Sin cuentas ni historial." };
     const valor: AnalisisGuardado = { generadoEn: new Date().toISOString(), analisis: compactarAnalisis(h.analisis), tiendas: h.tiendas, pedidos: h.pedidos };
     if (!(await guardar(supabase, claveDeAnalisis(o.paisId), valor, "Sistema"))) return { analizado: false, interpretado: false, motivo: "Falta la migración 0347 (meta_ajustes): no se puede guardar." };
+    // Las vigilancias que pidió la gente se evalúan con los mismos resultados (cada día y al abrir la pantalla si el análisis era viejo).
+    await evaluarVigilanciasGuardadas(supabase, { paisId: o.paisId, hoy: o.hoy });
     if (!o.interpretar) return { analizado: true, interpretado: false };
     if (!tieneHistorialSuficiente(h.analisis)) return { analizado: true, interpretado: false, motivo: "Poco historial para interpretar." };
     if (!proveedoresConectados().length) return { analizado: true, interpretado: false, motivo: "Ninguna IA de texto conectada." };

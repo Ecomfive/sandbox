@@ -227,10 +227,12 @@ const GASTO_URGENTE = 300;
 export function sugerenciasDeHallazgos(hallazgos: readonly Hallazgo[]): Sugerencia[] {
   // Solo lo que el sistema está seguro de que es real (24 nov 2026, pedido de Alcides: «las que sean firmes»): primero los firmes y, si faltan, los probables; la «poca data» nunca llega al Resumen.
   const rango = (h: Hallazgo) => (h.certeza === "firme" ? 0 : h.certeza === "probable" ? 1 : 2);
+  // Lo que la persona pidió vigilar manda: una vigilancia de prioridad alta va antes que cualquier hallazgo, la media entre los firmes y los probables, y la baja al final.
+  const prioridad = (h: Hallazgo) => (h.prioridad === "alta" ? 0 : h.prioridad === "media" ? 1.5 : h.prioridad === "baja" ? 2.5 : 1);
   const mejores = (tono: Hallazgo["tono"], cuantos: number) =>
     hallazgos
-      .filter((h) => h.tono === tono && h.certeza !== "poca")
-      .sort((a, b) => rango(a) - rango(b) || b.gasto - a.gasto)
+      .filter((h) => h.tono === tono && (h.certeza !== "poca" || h.prioridad === "alta"))
+      .sort((a, b) => prioridad(a) - prioridad(b) || rango(a) - rango(b) || b.gasto - a.gasto)
       .slice(0, cuantos);
   const atencion = mejores("alerta", HALLAZGOS_COMO_SUGERENCIA.atencion);
   const buenas = mejores("bueno", HALLAZGOS_COMO_SUGERENCIA.buenas);
