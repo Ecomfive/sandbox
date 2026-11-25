@@ -12,6 +12,8 @@ import { entero } from "./piezas";
 import { SeccionPlegable } from "./plegable";
 import { VigilanciasVista } from "./vigilancias-vista";
 import { SenalesCreativasVista } from "./senales-vista";
+import { RasgosDeGanadoresVista } from "./rasgos-vista";
+import type { RasgosDeGanadores } from "@/lib/meta-ads/rasgos-ganadores";
 import { ActualizarAnalisis } from "./actualizar-analisis";
 import type { SenalesCreativas } from "@/lib/meta-ads/senales-creativas";
 import type { ResultadoVigilancia } from "@/lib/meta-ads/analisis-pedido";
@@ -451,7 +453,7 @@ function SeccionBandas({ a }: { a: AnalisisHistorico }) {
  * tendencia, la interpretación con IA y los hallazgos como tarjetas; abajo el chat, el mes a mes con su gráfica, cómo va frente a antes y desde qué valor funciona. Todo se pliega y se despliega. La entrega por producto y «qué genera más ventas»
  * viven ahora en Productos, Campañas y Videos, junto a los hallazgos de cada una.
  */
-export function HallazgosVista({ analisis, interpretacion, iaConectada, preparando, vigilancias, senales, generadoEn, escribe }: { analisis: AnalisisHistorico; interpretacion: InterpretacionGuardada | null; iaConectada: boolean; preparando: boolean; vigilancias: ResultadoVigilancia[]; senales: SenalesCreativas[]; generadoEn: string | null; escribe: boolean }) {
+export function HallazgosVista({ analisis, interpretacion, iaConectada, preparando, vigilancias, senales, rasgos, generadoEn, escribe }: { analisis: AnalisisHistorico; interpretacion: InterpretacionGuardada | null; iaConectada: boolean; preparando: boolean; vigilancias: ResultadoVigilancia[]; senales: SenalesCreativas[]; rasgos: RasgosDeGanadores[]; generadoEn: string | null; escribe: boolean }) {
   const a = analisis;
   if (!tieneHistorialSuficiente(a)) {
     return <p className="m-0 rounded-xl border border-border bg-card px-4 py-6 text-sm text-muted-foreground">Todavía hay muy poco historial (menos de {UMBRALES_HISTORICO.minUnidades} campañas con gasto suficiente) para sacar conclusiones. Cuando haya más, este análisis aparece solo.</p>;
@@ -463,6 +465,7 @@ export function HallazgosVista({ analisis, interpretacion, iaConectada, preparan
       <VigilanciasVista vigilancias={vigilancias} escribe={escribe} />
       <InterpretacionVista guardada={interpretacion} preparando={preparando} />
       <SenalesCreativasVista senales={senales} />
+      <RasgosDeGanadoresVista rasgos={rasgos} />
       <SeccionHallazgos a={a} />
       <ChatHallazgos iaConectada={iaConectada} />
       <SeccionMeses a={a} />

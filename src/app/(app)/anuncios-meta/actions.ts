@@ -11,6 +11,7 @@ import { guardarInvestigacion, investigarProducto, leerInvestigaciones } from "@
 import { textoParaIA } from "@/lib/meta-ads/investigacion-entrega";
 import { leerValorSenales, claveDeSenales, senalesParaIA } from "@/lib/meta-ads/senales-creativas";
 import { senalesVisibles } from "@/lib/meta-ads/senales-modulos";
+import { claveDeRasgos, leerValorRasgos, rasgosParaIA } from "@/lib/meta-ads/rasgos-ganadores";
 import { interpretarRespuestaChat, LIMITES_CHAT, limpiarRespuesta, pedidoChat, pedidoConResultados, revisarPregunta, sanitizarHistorial } from "@/lib/meta-ads/chat-ia";
 import { cambiarVigilancia, crearVigilancia, DIAS_DE_INSISTENCIA, leerVigilancias, VECES_PARA_VIGILAR } from "@/lib/meta-ads/vigilancias";
 import { tieneHistorialSuficiente } from "@/lib/meta-ads/historico";
@@ -452,7 +453,9 @@ export async function preguntarHallazgosMeta(pregunta: unknown, historial: unkno
   const { data: filaSenales } = await supabase.from("meta_ajustes").select("valor").eq("clave", claveDeSenales(pais.id)).maybeSingle();
   // En el chat, cada persona solo recibe las señales de los módulos que puede abrir.
   const senales = (leerValorSenales(filaSenales?.valor)?.items ?? []).map((s) => ({ ...s, otras: senalesVisibles(s.otras ?? [], u.modulos) }));
-  const { instrucciones, texto } = pedidoChat(analisis, tiendas, hoy, revisada.pregunta, sanitizarHistorial(historial), investigadas.map(textoParaIA), senales.map(senalesParaIA));
+  const { data: filaRasgos } = await supabase.from("meta_ajustes").select("valor").eq("clave", claveDeRasgos(pais.id)).maybeSingle();
+  const rasgos = leerValorRasgos(filaRasgos?.valor)?.items ?? [];
+  const { instrucciones, texto } = pedidoChat(analisis, tiendas, hoy, revisada.pregunta, sanitizarHistorial(historial), investigadas.map(textoParaIA), senales.map(senalesParaIA), rasgos.map(rasgosParaIA));
   const proveedor = conectadas[0];
   const quien = { id: u.id, nombre: u.nombre ?? null, email: u.email };
   const quedan = Math.max(0, LIMITES_CHAT.porDia - usadas - 1);

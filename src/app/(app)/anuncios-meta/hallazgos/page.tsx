@@ -33,6 +33,7 @@ export default async function HallazgosMetaPage({ searchParams }: { searchParams
         preparando={datos.analisisPendiente}
         vigilancias={datos.vigilancias}
         senales={datos.senales}
+        rasgos={datos.rasgos}
         generadoEn={datos.analisisGeneradoEn}
         escribe={escribe}
       />
