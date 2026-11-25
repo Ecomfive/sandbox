@@ -245,13 +245,13 @@ export function productosConProblemaDeEntrega(a: AnalisisHistorico, max = 3): Fi
  * Lo que corre cada día con el análisis del historial: investiga (sin leer conversaciones: eso es a pedido) por qué no se entregan los productos con problema y lo guarda. Un producto investigado hace menos de 20 horas no se repite,
  * y lo que ya se leyó de sus conversaciones se conserva dos semanas. Nunca lanza.
  */
-export async function investigarProblemasDeEntrega(supabase: SupabaseClient, o: { paisId: string; hoy: string; analisis: AnalisisHistorico; tiendas: string[] }): Promise<InvestigacionProducto[]> {
+export async function investigarProblemasDeEntrega(supabase: SupabaseClient, o: { paisId: string; hoy: string; analisis: AnalisisHistorico; tiendas: string[]; forzar?: boolean }): Promise<InvestigacionProducto[]> {
   try {
     const previas = (await leerInvestigaciones(supabase, o.paisId))?.items ?? [];
     const resultado: InvestigacionProducto[] = [];
     for (const f of productosConProblemaDeEntrega(o.analisis)) {
       const previa = previas.find((i) => i.clave === f.clave);
-      if (previa && (Date.now() - Date.parse(previa.generadaEn)) / 3_600_000 < HORAS_VIGENTE) {
+      if (!o.forzar && previa && (Date.now() - Date.parse(previa.generadaEn)) / 3_600_000 < HORAS_VIGENTE) {
         resultado.push(previa);
         continue;
       }
