@@ -618,7 +618,7 @@ function hallazgosDeEntrega(filas: readonly FilaEntrega[], promedio: number | nu
         titulo: `${f.nombre}: vende bien pero solo se entrega ${pct(f.tasa)}`,
         detalle: `En Meta tiene un CPA de ${f.cpa === null ? "—" : dol(f.cpa)} (dentro de su tope de ${dol(f.tope)}), pero de ${entero(f.cerradas)} pedidos resueltos solo ${entero(f.entregadas)} se entregaron y ${entero(f.devueltas)} volvieron${promedio !== null ? ` (el promedio de todos los productos es ${pct(promedio)})` : ""}. Contando solo lo que llega al cliente, cada compra cuesta ${f.cpaEntregado === null ? "—" : dol(f.cpaEntregado)}.`,
         motivo: "Las ventas se ven bien en Meta, pero una parte no llega al cliente: el costo real por venta es más alto que el CPA.",
-        accion: "Antes de escalarlo, revisar por qué se devuelve (dirección, confirmación, producto, tiempos de entrega) y considerar un tope de CPA más bajo para este producto.",
+        accion: "Antes de escalarlo, mirar en qué zonas se entrega peor y bajar o excluir esas zonas de la segmentación, revisar que la promesa del anuncio y de la landing coincida con lo que recibe el cliente y considerar un tope de CPA más bajo para este producto.",
         certeza: f.cerradas >= 40 ? "firme" : "probable",
         gasto: f.gasto,
       });

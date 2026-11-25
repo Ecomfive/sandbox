@@ -319,19 +319,20 @@ export function concluir(i: { ordenes: readonly OrdenInv[]; tiendaEntrega: numbe
   if (tasa !== null && i.tiendaEntrega !== null && resumen.resueltos >= UMBRALES_INV.minResueltosProducto) {
     const dif = i.tiendaEntrega - tasa;
     if (dif >= 0.08) {
-      hallazgos.push({ tipo: "producto", titulo: `El producto entrega peor que el resto de la tienda: ${pct(tasa)} frente a ${pct(i.tiendaEntrega)}`, detalle: `De ${resumen.resueltos} pedidos resueltos, ${resumen.devueltos} volvieron. La tienda en conjunto entrega ${pct(i.tiendaEntrega)}: el problema es de este producto, no de toda la operación.`, fuerza: Math.round(dif * resumen.resueltos), accion: "Mirar cómo se vende (promesa del anuncio, precio, lo que dice la confirmación) y comparar lo que llega con lo que se esperaba." });
+      hallazgos.push({ tipo: "producto", titulo: `El producto entrega peor que el resto de la tienda: ${pct(tasa)} frente a ${pct(i.tiendaEntrega)}`, detalle: `De ${resumen.resueltos} pedidos resueltos, ${resumen.devueltos} volvieron. La tienda en conjunto entrega ${pct(i.tiendaEntrega)}: el problema es de este producto, no de toda la operación.`, fuerza: Math.round(dif * resumen.resueltos), accion: "Revisar la promesa del anuncio, el precio que se muestra y la landing: que lo que se ve coincida con lo que recibe el cliente, y probar ángulos que atraigan a compradores más decididos." });
     } else if (dif <= -0.03) {
-      hallazgos.push({ tipo: "producto", titulo: `Este producto entrega igual o mejor que la tienda: ${pct(tasa)} frente a ${pct(i.tiendaEntrega)}`, detalle: "Si la entrega de la tienda es baja, el problema no es de este producto sino de cómo se confirma o de las zonas que se atienden.", fuerza: 0, accion: "No cambiar el producto: revisar la operación (confirmación, zonas y transportadoras)." });
+      hallazgos.push({ tipo: "producto", titulo: `Este producto entrega igual o mejor que la tienda: ${pct(tasa)} frente a ${pct(i.tiendaEntrega)}`, detalle: "Si la entrega de la tienda es baja, el problema no es de este producto sino de cómo se confirma o de las zonas que se atienden.", fuerza: 0, accion: "No cambiar los anuncios de este producto por la entrega: lo que se devuelve viene de la operación, no de las campañas. Cuidar el CPA para que el costo por entrega no suba." });
     }
   }
   const accionDe: Record<DimensionInv, (g: GrupoInv, mejor?: GrupoInv) => string> = {
-    zona: (g) => (g.nombre === "Interior" ? "Pedir pago por adelantado o no vender este producto contra entrega en el interior; si se sigue vendiendo, confirmar la dirección y la zona antes de despachar." : "Revisar por qué los pedidos de la ciudad vuelven: confirmación y horario de entrega."),
-    provincia: (g) => `Revisar la cobertura y la transportadora en ${g.nombre}; si no se puede mejorar, pedir pago por adelantado ahí.`,
-    courier: (g) => `Comparar ${g.nombre} con las otras transportadoras en esos mismos pedidos: si devuelve más con el mismo producto y zona, cambiar la ruta o pedir una revisión de sus novedades.`,
-    pago: (g) => `Los pedidos pagados con «${g.nombre}» se devuelven más: ofrecer un cobro previo o confirmar que el cliente tiene el dinero.`,
-    confirmacion: (g) => (g.nombre.startsWith("Salió") ? "No despachar sin la confirmación registrada: es lo que más se asocia con que el pedido vuelva." : "Confirmar y aun así devuelven: revisar qué se le dice al cliente en la confirmación."),
-    tamano: (g) => `Los pedidos de ${g.nombre.toLowerCase()} se devuelven más: revisar el precio y la oferta que se le confirma al cliente.`,
-    otros_productos: (g) => `Los pedidos ${g.nombre.toLowerCase()} se devuelven más: revisar si el cliente entiende todo lo que pidió al confirmar.`,
+    // Solo acciones que están en manos de quien monta las campañas (segmentación, presupuesto, promesa del anuncio, landing); lo de confirmar, cobrar y despachar es de otras áreas y no se sugiere aquí.
+    zona: (g) => (g.nombre === "Interior" ? "Separar el interior en su propia campaña con menos presupuesto, o excluirlo de la segmentación, y mover ese dinero a la ciudad, que sí entrega." : "Revisar si los anuncios prometen una entrega o un horario que en la ciudad no se cumple, y ajustar la promesa del anuncio y de la landing."),
+    provincia: (g) => `Bajar el presupuesto o excluir ${g.nombre} de la segmentación de las campañas de este producto, y mover ese dinero a las zonas que sí entregan.`,
+    courier: (g) => `Los pedidos que lleva ${g.nombre} devuelven más: concentrar el presupuesto en las zonas con mejor entrega.`,
+    pago: (g) => `Los pedidos pagados con «${g.nombre}» se devuelven más: dejar claro en el anuncio y la landing cuánto se paga y cómo, para que llegue quien sí puede pagar.`,
+    confirmacion: (g) => (g.nombre.startsWith("Salió") ? "Dato para leer el resultado: los pedidos que salieron sin la confirmación registrada son los que más vuelven. No es de campañas; medir el CPA con lo que sí se entrega." : "Estos pedidos se confirmaron y aun así volvieron: reforzar en el anuncio y la landing lo que el cliente va a recibir y cuánto paga."),
+    tamano: (g) => `Los pedidos de ${g.nombre.toLowerCase()} se devuelven más: revisar la oferta que se muestra en el anuncio y la landing.`,
+    otros_productos: (g) => `Los pedidos ${g.nombre.toLowerCase()} se devuelven más: revisar que la oferta del anuncio deje claro todo lo que incluye el pedido.`,
   };
   for (const g of grupos.filter((x) => x.factor).slice(0, 4)) {
     hallazgos.push({
@@ -350,15 +351,15 @@ export function concluir(i: { ordenes: readonly OrdenInv[]; tiendaEntrega: numbe
       detalle: r.ejemplos.length ? `Por ejemplo: «${r.ejemplos.join("», «")}».` : "",
       fuerza: r.devoluciones,
       accion:
-        r.razon === "no_contesta" ? "Confirmar por llamada o WhatsApp el mismo día del despacho y no despachar si el cliente no responde." :
-        r.razon === "rechaza" ? "El cliente se arrepiente al recibir: revisar lo que se promete al confirmar y considerar un recordatorio antes de la entrega." :
-        r.razon === "sin_dinero" ? "Avisarle al cliente cuánto va a pagar y confirmar que lo tiene antes de despachar." :
-        r.razon === "direccion" ? "Completar la dirección con referencias antes de despachar y sacar de la ruta lo que está fuera de cobertura." :
-        r.razon === "ruta" ? "Servientrega no tenía ruta o no atiende fines de semana: no prometer entrega esos días y despachar los pedidos de esas zonas a inicios de semana." :
-        r.razon === "ausente" ? "Acordar un horario con el cliente al confirmar." :
-        r.razon === "reprogramar" ? "Dar la fecha de entrega que el cliente puede recibir desde la confirmación." :
-        r.razon === "producto" ? "Revisar el producto y lo que se promete de él: lo que llega no coincide con lo que se esperaba." :
-        "Revisar los pedidos repetidos en la confirmación.",
+        r.razon === "no_contesta" ? "Los clientes no contestan: atraer compradores más decididos con una promesa clara (precio, pago contra entrega y que se les va a llamar) y mover presupuesto a las zonas donde sí se entrega." :
+        r.razon === "rechaza" ? "El cliente se arrepiente al recibir: revisar que el anuncio y la landing no prometan más de lo que es el producto." :
+        r.razon === "sin_dinero" ? "Mostrar en el anuncio y la landing el precio total y que se paga contra entrega." :
+        r.razon === "direccion" ? "Excluir o bajar el presupuesto en las zonas que la transportadora no cubre bien." :
+        r.razon === "ruta" ? "La transportadora no tenía ruta o no atiende fines de semana: bajar el presupuesto de esas zonas." :
+        r.razon === "ausente" ? "Decir en la landing que hay que estar disponible para recibir el pedido." :
+        r.razon === "reprogramar" ? "Poner en la landing los tiempos de entrega, para que el cliente compre sabiendo cuándo le llega." :
+        r.razon === "producto" ? "Revisar la promesa del anuncio y de la landing frente al producto real: lo que llega no coincide con lo que se esperaba." :
+        "Revisar que la campaña no esté contando dos veces la misma compra (pedidos repetidos).",
     });
   }
   if (i.conversaciones && i.conversaciones.leidas > 0) {
@@ -370,13 +371,13 @@ export function concluir(i: { ordenes: readonly OrdenInv[]; tiendaEntrega: numbe
         detalle: i.conversaciones.ejemplos.filter((e) => e.razon === top.razon).slice(0, 2).map((e) => `«${e.evidencia}»`).join(" "),
         fuerza: top.cuantas,
         accion:
-          top.razon === "mala_confirmacion" ? "Cambiar lo que se le dice al cliente al confirmar: precio, producto y forma de pago, con todo explícito." :
+          top.razon === "mala_confirmacion" ? "Dejar en el anuncio y la landing el precio, el producto y la forma de pago bien explícitos, para que el cliente llegue a la confirmación sabiendo lo que compra." :
           top.razon === "se_arrepintio" ? "Revisar la promesa del anuncio frente a lo que recibe el cliente." :
-          top.razon === "sin_dinero" ? "Avisar el monto exacto al confirmar." :
+          top.razon === "sin_dinero" ? "Mostrar el precio total y el pago contra entrega en el anuncio y la landing." :
           top.razon === "no_era_lo_esperado" ? "El anuncio promete algo distinto a lo que es el producto: ajustar el creativo." :
-          top.razon === "no_respondio" ? "Seguimiento antes del despacho a quien no responde." :
-          top.razon === "direccion_o_zona" ? "Validar dirección y zona antes de despachar." :
-          "Hablarlo con quien confirma los pedidos.",
+          top.razon === "no_respondio" ? "Probar ángulos y ofertas que atraigan a compradores más decididos y mover presupuesto a lo que sí se entrega." :
+          top.razon === "direccion_o_zona" ? "Limitar la segmentación a las zonas que sí se entregan." :
+          "Usarlo para entender el resultado de las campañas: no hay una acción propia de campañas.",
       });
     }
   }
