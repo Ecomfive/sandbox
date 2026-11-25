@@ -53,6 +53,7 @@ test("las IA reciben la regla de qué recomendar: solo lo que controla quien mon
   assert.ok(instrucciones.includes(REGLA_ALCANCE_DE_CAMPANAS));
   assert.match(REGLA_ALCANCE_DE_CAMPANAS, /NO recomiendes nada que dependa de otras áreas/);
   assert.match(REGLA_ALCANCE_DE_CAMPANAS, /cobro previo/);
+  assert.match(REGLA_ALCANCE_DE_CAMPANAS, /precio que se muestra/, "el precio de la landing sí lo controlan: se puede sugerir probarlo cuando sea necesario");
 });
 
 test("una respuesta que no es JSON, sin resumen o vacía no se acepta", () => {
