@@ -39,11 +39,11 @@ export function EstadoConexion() {
 /** `?dia=` para los enlaces del panel cuando se mira otro día de la semana (vacío si es hoy). */
 export const consultaDia = (dia: string, hoy: string) => (dia === hoy ? "" : `?dia=${dia}`);
 
-/** La barra de abajo: «Mi ruta» y «Cierre del día» (del día que se está mirando). */
-export function NavRepartidor({ activa, consulta = "" }: { activa: "ruta" | "cierre"; consulta?: string }) {
+/** La barra de abajo: «Mi ruta» y «Cierre del día» (del día que se está mirando) y «Mis pagos» (25 nov 2026: la semana y el recibo para firmar). */
+export function NavRepartidor({ activa, consulta = "" }: { activa: "ruta" | "cierre" | "pagos"; consulta?: string }) {
   const clase = (a: boolean) => `flex min-h-14 items-center justify-center gap-1.5 text-[13px] no-underline ${a ? "font-semibold text-primario" : "font-medium text-[#636363]"}`;
   return (
-    <nav aria-label="Secciones" className="sticky bottom-0 z-10 grid grid-cols-2 border-t border-[#e3e3e3] bg-white">
+    <nav aria-label="Secciones" className="sticky bottom-0 z-10 grid grid-cols-3 border-t border-[#e3e3e3] bg-white">
       <Link href={`/repartidor${consulta}`} aria-current={activa === "ruta" ? "page" : undefined} className={clase(activa === "ruta")}>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M3 7h13l5 5v5h-2" />
@@ -59,6 +59,13 @@ export function NavRepartidor({ activa, consulta = "" }: { activa: "ruta" | "cie
           <path d="M8 8h8M8 12h8M8 16h5" />
         </svg>
         Cierre del día
+      </Link>
+      <Link href="/repartidor/pagos" aria-current={activa === "pagos" ? "page" : undefined} className={clase(activa === "pagos")}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <rect x="3" y="6" width="18" height="13" rx="2" />
+          <path d="M3 10h18M7 15h3" />
+        </svg>
+        Mis pagos
       </Link>
     </nav>
   );

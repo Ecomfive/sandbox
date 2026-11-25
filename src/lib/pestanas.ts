@@ -30,6 +30,9 @@ export const PESTANAS_POR_MODULO: Record<string, Pestana[]> = {
     { etiqueta: "Hoy", href: "/despacho-ciudad" },
     { etiqueta: "Devoluciones", href: "/despacho-ciudad/devoluciones" },
     { etiqueta: "Cambios y reembolsos", href: "/despacho-ciudad/cambios" },
+    // Cierres y Control de envíos (25 nov 2026, migración 0366): validar los depósitos de cada día y lo que se le paga a cada delivery en la semana.
+    { etiqueta: "Cierres", href: "/despacho-ciudad/cierres" },
+    { etiqueta: "Control de envíos", href: "/despacho-ciudad/control" },
   ],
   // Inventario despacho (25 nov 2026): el stock de despacho, aparte de los envíos.
   "/inventario-despacho": [

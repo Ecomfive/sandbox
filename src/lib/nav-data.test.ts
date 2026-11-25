@@ -212,7 +212,7 @@ test("Envíos Delivery y el inventario de despacho van aparte (25 nov 2026)", ()
   const entradas = areas.flatMap((a) => a.items);
   assert.equal(entradas.find((i) => i.href === "/despacho-ciudad")?.label, "Envíos Delivery");
   assert.equal(entradas.find((i) => i.href === "/inventario-despacho")?.label, "Inventario despacho");
-  assert.deepEqual(PESTANAS_POR_MODULO["/despacho-ciudad"].map((p) => p.etiqueta), ["Hoy", "Devoluciones", "Cambios y reembolsos"]);
+  assert.deepEqual(PESTANAS_POR_MODULO["/despacho-ciudad"].map((p) => p.etiqueta), ["Hoy", "Devoluciones", "Cambios y reembolsos", "Cierres", "Control de envíos"]);
   assert.deepEqual(PESTANAS_POR_MODULO["/inventario-despacho"].map((p) => p.etiqueta), ["Mercancía existente", "Solicitud de inventario", "Archivos de solicitudes"]);
   // Cada entrada sale con sus permisos y no arrastra la otra.
   assert.equal(puedeAbrirPagina(["despacho-ciudad"], "/inventario-despacho"), false);

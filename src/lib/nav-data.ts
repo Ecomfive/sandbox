@@ -299,6 +299,8 @@ export const PESTANAS_CON_MODULO: Record<string, { href: string; modulo: string 
     { href: "/despacho-ciudad", modulo: "despacho-ciudad" },
     { href: "/despacho-ciudad/devoluciones", modulo: "despacho-devoluciones" },
     { href: "/despacho-ciudad/cambios", modulo: "despacho-cambios" },
+    { href: "/despacho-ciudad/cierres", modulo: "despacho-ciudad" },
+    { href: "/despacho-ciudad/control", modulo: "despacho-ciudad" },
   ],
   "/inventario-despacho": [
     { href: "/inventario-despacho", modulo: "despacho-cuanto-hay" },

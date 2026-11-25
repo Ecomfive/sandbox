@@ -1,4 +1,4 @@
-import { CierresRepartidores } from "@/components/despacho/cierres-repartidores";
+import Link from "next/link";
 import { TableroDespacho } from "@/components/despacho/tablero-despacho";
 import { BarraPeriodo } from "@/components/despacho/barra-periodo";
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
@@ -36,7 +36,6 @@ export default async function DespachoCiudadPage({ searchParams }: { searchParam
   const supabase = createServiceClient();
   const archivados = sp.archivados === "1";
   const [{ filas, faltaMigracion }, cierres] = await Promise.all([cargarCiudad(supabase, desde, hasta, archivados), archivados ? Promise.resolve([]) : cargarCierres(supabase, desde, hasta)]);
-  const puedeEscribir = !usuario.modulosSoloLectura.includes("despacho-ciudad");
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-4">
       <EncabezadoPagina titulo="Envíos Delivery" oculto>
@@ -71,8 +70,15 @@ export default async function DespachoCiudadPage({ searchParams }: { searchParam
               filtros de abajo.
             </p>
           )}
-          {/* Los cierres que mandan los repartidores desde su panel (24 nov 2026), para validarlos. */}
-          <CierresRepartidores cierres={cierres} puedeEscribir={puedeEscribir} />
+          {/* Los cierres que mandan los repartidores desde su panel se validan en la pestaña Cierres (25 nov 2026); aquí solo el aviso. */}
+          {cierres.some((c) => c.estado === "enviado") && (
+            <p className="m-0 rounded-lg border border-border bg-card px-4 py-2.5 text-[13px]">
+              <b>{cierres.filter((c) => c.estado === "enviado").length} cierres por validar.</b>{" "}
+              <Link href="/despacho-ciudad/cierres" className="font-medium text-primario">
+                Ir a Cierres
+              </Link>
+            </p>
+          )}
           <TableroDespacho clase="ciudad" filas={filas} hoy={hoy} archivados={archivados} mostrarHoy={!elegido || (elegido.desde <= hoy && hoy <= elegido.hasta)} puedeEscribir={!usuario.modulosSoloLectura.includes("despacho-ciudad")} />
         </>
       )}
