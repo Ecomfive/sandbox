@@ -7,6 +7,8 @@ import { AJUSTE_ANALISIS_AUTOMATICO } from "@/lib/meta-ads/ajustes";
 import { iasParaInterpretar, leerAnalisisGuardado } from "@/lib/meta-ads/analisis-guardado";
 import { claveDeTema, ejecutarAnalisis, validarAnalisis, validarPrioridad, validarVigilancia, vigilanciaDeAnalisis, type Prioridad } from "@/lib/meta-ads/analisis-pedido";
 import { cargarBaseDias } from "@/lib/meta-ads/base-dias";
+import { guardarInvestigacion, investigarProducto, leerInvestigaciones, proveedorParaInvestigar } from "@/lib/meta-ads/investigacion-datos";
+import { textoParaIA } from "@/lib/meta-ads/investigacion-entrega";
 import { interpretarRespuestaChat, LIMITES_CHAT, limpiarRespuesta, pedidoChat, pedidoConResultados, revisarPregunta, sanitizarHistorial } from "@/lib/meta-ads/chat-ia";
 import { cambiarVigilancia, crearVigilancia, DIAS_DE_INSISTENCIA, leerVigilancias, VECES_PARA_VIGILAR } from "@/lib/meta-ads/vigilancias";
 import { tieneHistorialSuficiente } from "@/lib/meta-ads/historico";
@@ -444,7 +446,8 @@ export async function preguntarHallazgosMeta(pregunta: unknown, historial: unkno
   const analisis = guardado?.analisis ?? (await cargarHistorico({ paisId: pais.id, cuentaId: null, hoy }, supabase)).analisis;
   const tiendas = guardado?.tiendas ?? [];
   if (!tieneHistorialSuficiente(analisis)) return { error: "Todavía hay muy poco historial (menos de 8 campañas con gasto suficiente) para contestar con datos." };
-  const { instrucciones, texto } = pedidoChat(analisis, tiendas, hoy, revisada.pregunta, sanitizarHistorial(historial));
+  const investigadas = (await leerInvestigaciones(supabase, pais.id))?.items ?? [];
+  const { instrucciones, texto } = pedidoChat(analisis, tiendas, hoy, revisada.pregunta, sanitizarHistorial(historial), investigadas.map(textoParaIA));
   const proveedor = conectadas[0];
   const quien = { id: u.id, nombre: u.nombre ?? null, email: u.email };
   const quedan = Math.max(0, LIMITES_CHAT.porDia - usadas - 1);
@@ -458,6 +461,24 @@ export async function preguntarHallazgosMeta(pregunta: unknown, historial: unkno
     const respuesta = limpiarRespuesta(que.texto);
     if (!respuesta) return { error: "La IA no devolvió una respuesta. Inténtalo de nuevo." };
     return { respuesta, proveedor: nombreIA, quedan };
+  }
+
+  // 2b) Pidió ir a fondo con un producto: se cruzan sus pedidos con Servientrega, Monday, la confirmación y, leyendo las conversaciones de los pedidos devueltos, lo que dijeron los clientes.
+  if (que.tipo === "investigar") {
+    if (u.modulosSoloLectura.includes(MODULO)) return { respuesta: "Investigar a fondo lee conversaciones de clientes y gasta crédito de IA: hace falta poder modificar Anuncios Meta. Pídeselo a alguien con ese permiso.", proveedor: nombreIA, quedan };
+    const fila = buscarFilaDeEntrega(analisis.entrega, que.producto);
+    if (!fila?.enTienda) return { respuesta: `No encontré «${que.producto}» entre los productos con pedidos de la tienda. Dime el nombre como sale en la tabla de entrega de Productos.`, proveedor: nombreIA, quedan };
+    if (!tiendas.length) return { error: "No se encontró la tienda de las cuentas en los pedidos (anótala en Cuentas › Tienda)." };
+    const hecha = await investigarProducto(supabase, { paisId: pais.id, clave: fila.clave, producto: fila.nombre, productoEnTienda: fila.enTienda, tiendas, hoy, cpa: fila.cpa, aFondo: { proveedor, quien } });
+    if ("error" in hecha) return { error: hecha.error };
+    await guardarInvestigacion(supabase, pais.id, hecha.investigacion, u.nombre ?? u.email ?? "—");
+    await registrarAuditoria({ accion: "investigar_entrega_meta", entidad: "meta_ajustes", detalle: `${fila.nombre} · a fondo (por el chat)` });
+    revalidatePath("/anuncios-meta", "layout");
+    const r3 = await pedirIAEn(proveedor, { ...pedidoConResultados({ instrucciones, texto }, [textoParaIA(hecha.investigacion)]), imagenes: [] }, { operacion: "meta_chat_analisis", modulo: "anuncios-meta", usuario: quien, referencia: `investigar:${fila.clave}`.slice(0, 160) }, "analisis");
+    if ("error" in r3) return { error: r3.error };
+    const respuesta = limpiarRespuesta(r3.texto);
+    if (!respuesta) return { error: "La IA no devolvió una respuesta. Inténtalo de nuevo." };
+    return { respuesta: hecha.aviso ? `${respuesta}\n\nNota: ${hecha.aviso}` : respuesta, proveedor: nombreIA, quedan, analisisNuevos: [`Por qué no se entrega ${fila.nombre}`] };
   }
 
   // 2) Pidió un análisis que no estaba hecho: se corre sobre los resultados por día y se le devuelve para que conteste con eso.
@@ -522,4 +543,37 @@ export async function cambiarVigilanciaMeta(id: unknown, cambio: { prioridad?: u
   await registrarAuditoria({ accion: "cambiar_vigilancia_meta", entidad: "meta_ajustes", detalle: cambio.quitar === true ? "Quitó una vigilancia" : `Cambió una vigilancia${prioridad ? ` · prioridad ${prioridad}` : ""}${typeof cambio.activa === "boolean" ? (cambio.activa ? " · reanudada" : " · pausada") : ""}` });
   revalidatePath("/anuncios-meta", "layout");
   return {};
+}
+
+const sinTildes = (t: string) => t.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+
+/** El producto de la tabla de entrega que la persona nombró (por palabras, sin acentos); si hay varios, el que más gastó. */
+function buscarFilaDeEntrega<T extends { nombre: string; gasto: number; enTienda: string | null }>(filas: readonly T[], texto: string): T | null {
+  const palabras = sinTildes(texto).split(/\s+/).filter((p) => p.length >= 3);
+  if (!palabras.length) return null;
+  const coinciden = filas.filter((f) => palabras.every((p) => sinTildes(`${f.nombre} ${f.enTienda ?? ""}`).includes(p)));
+  return coinciden.sort((a, b) => b.gasto - a.gasto)[0] ?? null;
+}
+
+/**
+ * «Investigar a fondo» (botón de Productos y Hallazgos): lee las conversaciones de WhatsApp de los últimos pedidos devueltos de un producto y le pide a la IA el porqué de cada uno, y las suma a lo que ya se sabe de Servientrega, Monday, la zona y la
+ * confirmación. Lee conversaciones de clientes y gasta crédito de IA: hace falta poder modificar el módulo. Los teléfonos y correos se quitan antes de mandar nada a la IA.
+ */
+export async function investigarEntregaMeta(clave: unknown): Promise<{ error?: string; aviso?: string }> {
+  const u = await requireModuloEscritura(MODULO);
+  if (typeof clave !== "string" || clave.length > 200) return { error: "Ese producto no existe." };
+  const proveedor = proveedorParaInvestigar();
+  if (!proveedor) return { error: "Falta conectar una IA de texto (la clave OPENAI_API_KEY o ANTHROPIC_API_KEY en Vercel)." };
+  const supabase = createServiceClient();
+  const pais = await getPaisActual(supabase);
+  if (!(await puedeVerPaisId(supabase, u.paisesPermitidos, pais.id))) return { error: "No tienes acceso a ese país." };
+  const guardado = await leerAnalisisGuardado(supabase, pais.id);
+  const fila = guardado?.analisis.entrega.find((f) => f.clave === clave);
+  if (!guardado || !fila?.enTienda) return { error: "Ese producto no tiene pedidos de la tienda para investigar." };
+  const hecha = await investigarProducto(supabase, { paisId: pais.id, clave: fila.clave, producto: fila.nombre, productoEnTienda: fila.enTienda, tiendas: guardado.tiendas, hoy: hoyEnPanama(), cpa: fila.cpa, aFondo: { proveedor, quien: { id: u.id, nombre: u.nombre ?? null, email: u.email } } });
+  if ("error" in hecha) return { error: hecha.error };
+  await guardarInvestigacion(supabase, pais.id, hecha.investigacion, u.nombre ?? u.email ?? "—");
+  await registrarAuditoria({ accion: "investigar_entrega_meta", entidad: "meta_ajustes", detalle: `${fila.nombre} · a fondo` });
+  revalidatePath("/anuncios-meta", "layout");
+  return { aviso: hecha.aviso };
 }

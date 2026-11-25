@@ -1,6 +1,7 @@
 import { cargarPaginaMeta, type ParametrosMeta } from "../datos-pagina";
 import { HallazgosDeSeccion } from "../hallazgos-tarjetas";
 import { EntregaDeProductos, QueGeneraMasVentas } from "../historial-seccion";
+import { InvestigacionesDeEntrega } from "../investigaciones-vista";
 import { ListaProductos } from "../lista-productos";
 import { MarcoMeta } from "../marco-meta";
 import { ResumenProductos } from "../resumen-productos";
@@ -23,6 +24,7 @@ export default async function ProductosMetaPage({ searchParams }: { searchParams
       {datos.historial && (
         <div className="flex flex-col gap-3">
           <HallazgosDeSeccion titulo="Lo que dicen los datos de los productos" hallazgos={datos.historial.hallazgos.productos} />
+          <InvestigacionesDeEntrega investigaciones={datos.investigaciones} escribe={escribe} />
           <EntregaDeProductos historial={datos.historial} />
           <QueGeneraMasVentas historial={datos.historial} claves={["productos"]} />
         </div>
