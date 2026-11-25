@@ -24,7 +24,7 @@ export const LIMITES_IA = { resumen: 700, puntos: 6, titulo: 120, detalle: 420, 
 const r1 = (n: number | null) => (n === null ? null : Math.round(n * 100) / 100);
 
 /** El pedido: las reglas fijas y el resumen del análisis (solo lo necesario: lo más grande de cada tabla). Va todo en JSON para que la IA lea cifras, no frases. */
-export function pedidoInterpretacion(a: AnalisisHistorico, investigaciones: readonly unknown[] = [], senalesCreativas: readonly unknown[] = []): { instrucciones: string; texto: string } {
+export function pedidoInterpretacion(a: AnalisisHistorico, investigaciones: readonly unknown[] = [], senalesCreativas: readonly unknown[] = [], rasgos: readonly unknown[] = []): { instrucciones: string; texto: string } {
   const instrucciones = [
     "Eres analista de rendimiento de anuncios de Meta (Facebook e Instagram) para una operación de comercio electrónico con pago contra entrega en Panamá y Costa Rica.",
     "Recibes estadísticas ya calculadas por el sistema sobre el historial de campañas, anuncios y videos, la tasa de entrega de cada producto y las tendencias recientes.",
@@ -38,6 +38,9 @@ export function pedidoInterpretacion(a: AnalisisHistorico, investigaciones: read
     investigaciones.length
       ? "Recibes además «investigaciones_de_entrega»: por qué no se entregan los productos que más devuelven, buscado por el sistema en los pedidos, la zona, la transportadora, la confirmación, lo que escribieron Servientrega, Monday y los asesores y, a veces, las conversaciones de WhatsApp. NO recomiendes «revisa por qué vuelven los pedidos»: usa las causas encontradas (con sus números) y da la acción concreta; si la investigación no encontró una causa clara, dilo y di qué dato falta. Para cada producto con investigación, el costo por entrega objetivo es el que viene en el JSON."
       : "Si un producto vende bien pero entrega mal y no recibes la causa, no digas «revisa por qué vuelven»: di que todavía no se investigó y qué se necesita para saberlo.",
+    rasgos.length
+      ? "Recibes además «rasgos_de_ganadores»: por métrica (CTR, hook, clic a visita, conversión de la página), qué comparten los anuncios o las páginas que cayeron en la zona buena y funcionaron (lo que comparten) y qué casi nunca tienen, con cuántos de cuántos. Cuando recomiendes mejorar algo de esa métrica, di en concreto cómo parecerse a los que funcionaron (por ejemplo «los anuncios con CTR de 3 % o más empiezan con una pregunta: 6 de 8») y no solo «sube el CTR»; son asociaciones, no causas: dilo con «se asocia con»."
+      : "",
     senalesCreativas.length
       ? "Recibes además «senales_de_creativos»: por producto, si sus videos se están cansando, si el gasto depende de un solo video o de videos viejos, si hace días que no se sube nada nuevo y qué ángulo ha funcionado mejor. Cada producto puede traer «lo_que_paso_en_otros_modulos»: inventario agotado o bajo, cambio de precio de venta, margen bajo, competidores que venden lo mismo más barato y cómo rindió en su test. Si una de esas causas coincide con el empeoramiento, ponla primero: no tiene sentido pedir más creativos si el producto está agotado. Cuando un producto empeore, explica el porqué con estas señales (con sus números) y da la acción concreta; no digas solo «renueva los creativos»."
       : "",
@@ -69,7 +72,7 @@ export function pedidoInterpretacion(a: AnalisisHistorico, investigaciones: read
       .slice(0, 14)
       .map((t) => ({ nivel: t.nivel, nombre: t.nombre, ventana: t.ventana === "mes" ? "último mes contra el anterior" : "última semana contra las tres anteriores", sentido: t.cambio.sentido, cpa_antes: r1(t.cambio.cpaPrev), cpa_ahora: r1(t.cambio.cpaRec), motivo: t.cambio.motivo })),
   };
-  const investigado = (investigaciones.length ? `\n\nInvestigaciones de entrega (JSON):\n${JSON.stringify(investigaciones)}` : "") + (senalesCreativas.length ? `\n\nsenales_de_creativos (JSON):\n${JSON.stringify(senalesCreativas)}` : "");
+  const investigado = (investigaciones.length ? `\n\nInvestigaciones de entrega (JSON):\n${JSON.stringify(investigaciones)}` : "") + (senalesCreativas.length ? `\n\nsenales_de_creativos (JSON):\n${JSON.stringify(senalesCreativas)}` : "") + (rasgos.length ? `\n\nrasgos_de_ganadores (JSON):\n${JSON.stringify(rasgos)}` : "");
   return { instrucciones, texto: `Estadísticas del sistema (JSON):\n${JSON.stringify(datos)}${investigado}` };
 }
 

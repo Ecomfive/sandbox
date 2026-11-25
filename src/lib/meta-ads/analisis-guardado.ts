@@ -10,6 +10,8 @@ import { calcularHistorico, type HistoricoCargado } from "./historico-datos";
 import { claveDeInterpretacion, leerInterpretacionGuardada, type OpinionIA } from "./interpretacion-guardada";
 import { leerInterpretacion, pedidoInterpretacion } from "./interpretar-ia";
 import { investigarProblemasDeEntrega } from "./investigacion-datos";
+import { rasgosDelDia } from "./rasgos-datos";
+import { rasgosParaIA, type RasgosDeGanadores } from "./rasgos-ganadores";
 import { senalesCreativasDelDia } from "./senales-datos";
 import { senalesParaIA, type SenalesCreativas } from "./senales-creativas";
 import { textoParaIA, type InvestigacionProducto } from "./investigacion-entrega";
@@ -56,8 +58,8 @@ export function iasParaInterpretar(conectadas: readonly ProveedorIA[]): Proveedo
 }
 
 /** Pide la interpretación a cada IA conectada, a la vez; las que fallan se saltan. */
-async function interpretarConTodas(analisis: AnalisisHistorico, paisNombre: string, investigaciones: readonly InvestigacionProducto[], senales: readonly SenalesCreativas[]): Promise<OpinionIA[]> {
-  const { instrucciones, texto } = pedidoInterpretacion(analisis, investigaciones.map(textoParaIA), senales.map(senalesParaIA));
+async function interpretarConTodas(analisis: AnalisisHistorico, paisNombre: string, investigaciones: readonly InvestigacionProducto[], senales: readonly SenalesCreativas[], rasgos: readonly RasgosDeGanadores[]): Promise<OpinionIA[]> {
+  const { instrucciones, texto } = pedidoInterpretacion(analisis, investigaciones.map(textoParaIA), senales.map(senalesParaIA), rasgos.map(rasgosParaIA));
   const opiniones = await Promise.all(
     iasParaInterpretar(proveedoresConectados()).map(async (proveedor): Promise<OpinionIA | null> => {
       const r = await pedirIAEn(proveedor, { instrucciones, texto, imagenes: [] }, { operacion: "meta_interpretacion", modulo: "anuncios-meta", referencia: `Análisis automático · ${paisNombre}` }, "analisis");
@@ -101,12 +103,13 @@ export async function refrescarAnalisisMeta(supabase: SupabaseClient, o: { paisI
     // Por qué no se entregan los productos con problema y qué pasa con sus creativos y en otros módulos: solo lee la base y se guarda aparte, así que corre siempre (no depende de que toque interpretar).
     const investigaciones = await investigarProblemasDeEntrega(supabase, { paisId: o.paisId, hoy: o.hoy, analisis: h.analisis, tiendas: h.tiendas, forzar: o.forzar });
     const senales = await senalesCreativasDelDia(supabase, { paisId: o.paisId, hoy: o.hoy, analisis: h.analisis });
+    const rasgos = await rasgosDelDia(supabase, { paisId: o.paisId, hoy: o.hoy });
     const extras = { investigados: investigaciones.length, conSenales: senales.length };
     if (!o.interpretar) return { analizado: true, interpretado: false, ...extras };
     if (!proveedoresConectados().length) return { analizado: true, interpretado: false, motivo: "Ninguna IA de texto conectada.", ...extras };
     const previa = await leerInterpretacionGuardada(supabase, o.paisId);
     if (!o.forzar && previa && horasDesde(previa.generadaEn) < HORAS_ENTRE_INTERPRETACIONES) return { analizado: true, interpretado: false, motivo: "La interpretación de hoy ya está hecha.", ...extras };
-    const opiniones = await interpretarConTodas(h.analisis, o.paisNombre, investigaciones, senales);
+    const opiniones = await interpretarConTodas(h.analisis, o.paisNombre, investigaciones, senales, rasgos);
     if (!opiniones.length) return { analizado: true, interpretado: false, motivo: "Las IA no devolvieron una interpretación que sirva.", ...extras };
     await guardar(supabase, claveDeInterpretacion(o.paisId), { generadaEn: new Date().toISOString(), opiniones }, "Sistema");
     return { analizado: true, interpretado: true, ...extras };
