@@ -12,6 +12,8 @@ import { entero } from "./piezas";
 import { SeccionPlegable } from "./plegable";
 import { VigilanciasVista } from "./vigilancias-vista";
 import { InvestigacionesDeEntrega } from "./investigaciones-vista";
+import { SenalesCreativasVista } from "./senales-vista";
+import type { SenalesCreativas } from "@/lib/meta-ads/senales-creativas";
 import type { InvestigacionProducto } from "@/lib/meta-ads/investigacion-entrega";
 import type { ResultadoVigilancia } from "@/lib/meta-ads/analisis-pedido";
 
@@ -450,7 +452,7 @@ function SeccionBandas({ a }: { a: AnalisisHistorico }) {
  * tendencia, la interpretación con IA y los hallazgos como tarjetas; abajo el chat, el mes a mes con su gráfica, cómo va frente a antes y desde qué valor funciona. Todo se pliega y se despliega. La entrega por producto y «qué genera más ventas»
  * viven ahora en Productos, Campañas y Videos, junto a los hallazgos de cada una.
  */
-export function HallazgosVista({ analisis, interpretacion, iaConectada, preparando, vigilancias, investigaciones, escribe }: { analisis: AnalisisHistorico; interpretacion: InterpretacionGuardada | null; iaConectada: boolean; preparando: boolean; vigilancias: ResultadoVigilancia[]; investigaciones: InvestigacionProducto[]; escribe: boolean }) {
+export function HallazgosVista({ analisis, interpretacion, iaConectada, preparando, vigilancias, investigaciones, senales, escribe }: { analisis: AnalisisHistorico; interpretacion: InterpretacionGuardada | null; iaConectada: boolean; preparando: boolean; vigilancias: ResultadoVigilancia[]; investigaciones: InvestigacionProducto[]; senales: SenalesCreativas[]; escribe: boolean }) {
   const a = analisis;
   if (!tieneHistorialSuficiente(a)) {
     return <p className="m-0 rounded-xl border border-border bg-card px-4 py-6 text-sm text-muted-foreground">Todavía hay muy poco historial (menos de {UMBRALES_HISTORICO.minUnidades} campañas con gasto suficiente) para sacar conclusiones. Cuando haya más, este análisis aparece solo.</p>;
@@ -461,6 +463,7 @@ export function HallazgosVista({ analisis, interpretacion, iaConectada, preparan
       <VigilanciasVista vigilancias={vigilancias} escribe={escribe} />
       <InterpretacionVista guardada={interpretacion} preparando={preparando} />
       <InvestigacionesDeEntrega investigaciones={investigaciones} escribe={escribe} />
+      <SenalesCreativasVista senales={senales} />
       <SeccionHallazgos a={a} />
       <ChatHallazgos iaConectada={iaConectada} />
       <SeccionMeses a={a} />

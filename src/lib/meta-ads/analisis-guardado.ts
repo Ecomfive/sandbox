@@ -10,6 +10,8 @@ import { calcularHistorico, type HistoricoCargado } from "./historico-datos";
 import { claveDeInterpretacion, leerInterpretacionGuardada, type OpinionIA } from "./interpretacion-guardada";
 import { leerInterpretacion, pedidoInterpretacion } from "./interpretar-ia";
 import { investigarProblemasDeEntrega } from "./investigacion-datos";
+import { senalesCreativasDelDia } from "./senales-datos";
+import { senalesParaIA, type SenalesCreativas } from "./senales-creativas";
 import { textoParaIA, type InvestigacionProducto } from "./investigacion-entrega";
 import { evaluarVigilanciasGuardadas } from "./vigilancias";
 
@@ -54,8 +56,8 @@ export function iasParaInterpretar(conectadas: readonly ProveedorIA[]): Proveedo
 }
 
 /** Pide la interpretación a cada IA conectada, a la vez; las que fallan se saltan. */
-async function interpretarConTodas(analisis: AnalisisHistorico, paisNombre: string, investigaciones: readonly InvestigacionProducto[]): Promise<OpinionIA[]> {
-  const { instrucciones, texto } = pedidoInterpretacion(analisis, investigaciones.map(textoParaIA));
+async function interpretarConTodas(analisis: AnalisisHistorico, paisNombre: string, investigaciones: readonly InvestigacionProducto[], senales: readonly SenalesCreativas[]): Promise<OpinionIA[]> {
+  const { instrucciones, texto } = pedidoInterpretacion(analisis, investigaciones.map(textoParaIA), senales.map(senalesParaIA));
   const opiniones = await Promise.all(
     iasParaInterpretar(proveedoresConectados()).map(async (proveedor): Promise<OpinionIA | null> => {
       const r = await pedirIAEn(proveedor, { instrucciones, texto, imagenes: [] }, { operacion: "meta_interpretacion", modulo: "anuncios-meta", referencia: `Análisis automático · ${paisNombre}` }, "analisis");
@@ -99,7 +101,8 @@ export async function refrescarAnalisisMeta(supabase: SupabaseClient, o: { paisI
     if (previa && horasDesde(previa.generadaEn) < HORAS_ENTRE_INTERPRETACIONES) return { analizado: true, interpretado: false, motivo: "La interpretación de hoy ya está hecha." };
     // Antes de interpretar se investiga por qué no se entregan los productos con problema, para que las recomendaciones usen causas encontradas y no «revisa por qué».
     const investigaciones = await investigarProblemasDeEntrega(supabase, { paisId: o.paisId, hoy: o.hoy, analisis: h.analisis, tiendas: h.tiendas });
-    const opiniones = await interpretarConTodas(h.analisis, o.paisNombre, investigaciones);
+    const senales = await senalesCreativasDelDia(supabase, { paisId: o.paisId, hoy: o.hoy, analisis: h.analisis });
+    const opiniones = await interpretarConTodas(h.analisis, o.paisNombre, investigaciones, senales);
     if (!opiniones.length) return { analizado: true, interpretado: false, motivo: "Las IA no devolvieron una interpretación que sirva." };
     await guardar(supabase, claveDeInterpretacion(o.paisId), { generadaEn: new Date().toISOString(), opiniones }, "Sistema");
     return { analizado: true, interpretado: true };
