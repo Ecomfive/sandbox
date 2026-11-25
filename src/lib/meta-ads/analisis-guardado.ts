@@ -10,7 +10,8 @@ import { calcularHistorico, type HistoricoCargado } from "./historico-datos";
 import { claveDeInterpretacion, leerInterpretacionGuardada, type OpinionIA } from "./interpretacion-guardada";
 import { leerInterpretacion, pedidoInterpretacion } from "./interpretar-ia";
 import { investigarProblemasDeEntrega } from "./investigacion-datos";
-import { rasgosDelDia } from "./rasgos-datos";
+import { concretarHallazgos } from "./diagnostico-concreto";
+import { leerOfertasGuardadas, rasgosDelDia } from "./rasgos-datos";
 import { rasgosParaIA, type RasgosDeGanadores } from "./rasgos-ganadores";
 import { senalesCreativasDelDia } from "./senales-datos";
 import { senalesParaIA, type SenalesCreativas } from "./senales-creativas";
@@ -104,12 +105,15 @@ export async function refrescarAnalisisMeta(supabase: SupabaseClient, o: { paisI
     const investigaciones = await investigarProblemasDeEntrega(supabase, { paisId: o.paisId, hoy: o.hoy, analisis: h.analisis, tiendas: h.tiendas, forzar: o.forzar });
     const senales = await senalesCreativasDelDia(supabase, { paisId: o.paisId, hoy: o.hoy, analisis: h.analisis });
     const rasgos = await rasgosDelDia(supabase, { paisId: o.paisId, hoy: o.hoy });
+    // Con todo lo que se midió, el «Qué hacer» de los hallazgos deja de ser «revisa X» y dice qué zonas, qué promete el anuncio y qué le falta a la landing; se vuelve a guardar el análisis con esos textos.
+    const analisis = concretarHallazgos(h.analisis, { investigaciones, senales, rasgos, ofertas: await leerOfertasGuardadas(supabase, o.paisId) });
+    await guardar(supabase, claveDeAnalisis(o.paisId), { ...valor, analisis: compactarAnalisis(analisis) }, "Sistema");
     const extras = { investigados: investigaciones.length, conSenales: senales.length };
     if (!o.interpretar) return { analizado: true, interpretado: false, ...extras };
     if (!proveedoresConectados().length) return { analizado: true, interpretado: false, motivo: "Ninguna IA de texto conectada.", ...extras };
     const previa = await leerInterpretacionGuardada(supabase, o.paisId);
     if (!o.forzar && previa && horasDesde(previa.generadaEn) < HORAS_ENTRE_INTERPRETACIONES) return { analizado: true, interpretado: false, motivo: "La interpretación de hoy ya está hecha.", ...extras };
-    const opiniones = await interpretarConTodas(h.analisis, o.paisNombre, investigaciones, senales, rasgos);
+    const opiniones = await interpretarConTodas(analisis, o.paisNombre, investigaciones, senales, rasgos);
     if (!opiniones.length) return { analizado: true, interpretado: false, motivo: "Las IA no devolvieron una interpretación que sirva.", ...extras };
     await guardar(supabase, claveDeInterpretacion(o.paisId), { generadaEn: new Date().toISOString(), opiniones }, "Sistema");
     return { analizado: true, interpretado: true, ...extras };

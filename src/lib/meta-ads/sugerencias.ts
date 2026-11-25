@@ -3,6 +3,7 @@
 
 import { conversion, confiable, cpa, ctr, dolares, GASTO_MINIMO_CONFIABLE, hookRate, sinResultados, sumar, type Resultados } from "./metricas";
 import { decisionesDeAnuncios, NOMBRE_DECISION, UMBRALES_ANUNCIO, type AnuncioParaDecidir } from "./decision-anuncio";
+import { diagnosticoDeLanding } from "./diagnostico-concreto";
 import type { Hallazgo } from "./historico";
 import type { CampanaVista, VideoVista } from "./vistas";
 
@@ -83,9 +84,25 @@ export interface EntradaSugerencias {
   videos: VideoVista[];
   /** AAAA-MM-DD de hoy en Panamá. */
   hoy: string;
+  /** Las páginas de destino de cada campaña (la del anuncio con más gasto primero) con lo que se midió de ellas, para decir qué le falta a la landing en vez de «revísala». */
+  paginasPorCampana?: Map<string, { url: string; rasgos: string[] }[]>;
 }
 
 const ORDEN: Record<Severidad, number> = { alta: 0, media: 1, info: 2 };
+
+/** Qué hacer con una campaña que gastó sin comprar: si su landing ya se midió, dice qué le falta; si no, el texto de siempre. */
+function accionSinCompras(paginas: { url: string; rasgos: string[] }[] | undefined): string {
+  const d = diagnosticoDeLanding(paginas);
+  if (!d) return "Revisar el anuncio y la landing, o pausarla.";
+  return d.fallas.length ? `Pausarla o corregir su landing (${d.url}), que ${d.fallas.join(", ")}.` : `Su landing (${d.url}) ya dice lo básico (precio, pago contra entrega, garantía y reseñas): lo más probable es que falle el anuncio; cambiar su ángulo o su video, o pausarla.`;
+}
+
+/** Qué hacer cuando el anuncio atrae y la landing no convierte: lo que le falta a esa página, medido. */
+function accionLandingFloja(paginas: { url: string; rasgos: string[] }[] | undefined): string {
+  const d = diagnosticoDeLanding(paginas);
+  if (!d) return "Revisar la landing: oferta, velocidad, precio o confianza.";
+  return d.fallas.length ? `La landing ${d.url} ${d.fallas.join(", ")}: completarlo en ese orden.` : `La landing ${d.url} ya dice lo básico (precio, pago contra entrega, garantía y reseñas) y carga bien: probar otra oferta, otro precio mostrado o una versión más corta de la página.`;
+}
 
 export function sugerir(e: EntradaSugerencias): Sugerencia[] {
   const s: Sugerencia[] = [];
@@ -98,7 +115,7 @@ export function sugerir(e: EntradaSugerencias): Sugerencia[] {
     const producto = c.producto ?? "su producto";
 
     if (c.r.compras === 0 && gasto >= U.sinComprasVeces * c.tope) {
-      s.push({ clave: `sin_compras:${c.id}`, tipo: "sin_compras", severidad: "alta", positiva: false, titulo: `${c.nombre}: ${dolares(gasto)} sin ninguna compra`, detalle: `Ya gastó ${(gasto / c.tope).toFixed(1)} veces el CPA tope de ${producto} (${dolares(c.tope)}) en 7 días.`, accion: "Revisar el anuncio y la landing, o pausarla.", objeto: { tipo: "campana", id: c.id }, gasto });
+      s.push({ clave: `sin_compras:${c.id}`, tipo: "sin_compras", severidad: "alta", positiva: false, titulo: `${c.nombre}: ${dolares(gasto)} sin ninguna compra`, detalle: `Ya gastó ${(gasto / c.tope).toFixed(1)} veces el CPA tope de ${producto} (${dolares(c.tope)}) en 7 días.`, accion: accionSinCompras(e.paginasPorCampana?.get(c.id)), objeto: { tipo: "campana", id: c.id }, gasto });
       continue;
     }
     if (costo !== null && gasto >= U.cpaAltoGastoMinimo && costo > c.tope * U.cpaAltoFactor) {
@@ -107,7 +124,7 @@ export function sugerir(e: EntradaSugerencias): Sugerencia[] {
       const costoReciente = cpa(ultimos);
       if (!(costoReciente !== null && costoReciente <= c.tope)) {
         const reciente = costoReciente !== null ? ` y ${dolares(costoReciente)} en los últimos ${U.recuperandoDias}` : ultimos.gasto > 0 ? ` y sin compras en los últimos ${U.recuperandoDias} (gastó ${dolares(ultimos.gasto)})` : "";
-        s.push({ clave: `cpa_alto:${c.id}`, tipo: "cpa_alto", severidad: gasto >= 150 ? "alta" : "media", positiva: false, titulo: `${c.nombre}: CPA ${dolares(costo)} en 7 días${reciente}, con tope ${dolares(c.tope)}`, detalle: `${c.r.compras} compras por ${dolares(gasto)} en 7 días: cada compra cuesta ${dolares(costo - c.tope)} más de lo que deja. Pasarse del tope una semana no obliga a apagarla: puede ser un mal día.`, accion: `No la apagues todavía: mira sus anuncios y apaga los que ya pasaron de ${dolares(UMBRALES_ANUNCIO.cpaRojo)} sin vender (salen aparte). Pausarla solo si ninguno rinde o el CPA de los últimos ${U.recuperandoDias} días sigue arriba del tope.`, objeto: { tipo: "campana", id: c.id }, gasto });
+        s.push({ clave: `cpa_alto:${c.id}`, tipo: "cpa_alto", severidad: gasto >= 150 ? "alta" : "media", positiva: false, titulo: `${c.nombre}: CPA ${dolares(costo)} en 7 días${reciente}, con tope ${dolares(c.tope)}`, detalle: `${c.r.compras} compras por ${dolares(gasto)} en 7 días: cada compra cuesta ${dolares(costo - c.tope)} más de lo que deja. Pasarse del tope una semana no obliga a apagarla: puede ser un mal día.`, accion: `No la apagues todavía: apaga los anuncios que ya pasaron de ${dolares(UMBRALES_ANUNCIO.cpaRojo)} sin vender (salen aparte). Pausarla solo si ninguno rinde o el CPA de los últimos ${U.recuperandoDias} días sigue arriba del tope.`, objeto: { tipo: "campana", id: c.id }, gasto });
         continue;
       }
     }
@@ -131,7 +148,7 @@ export function sugerir(e: EntradaSugerencias): Sugerencia[] {
     const porClic = ctr(c.r);
     const conv = conversion(c.r);
     if (porClic !== null && conv !== null && c.r.clics >= U.landingClicsMinimos && porClic >= U.landingCtr && conv < U.landingConversion) {
-      s.push({ clave: `landing_floja:${c.id}`, tipo: "landing_floja", severidad: "media", positiva: false, titulo: `${c.nombre}: el anuncio atrae pero la landing no convierte`, detalle: `CTR ${porClic.toFixed(1)} % (bueno) y solo ${conv.toFixed(1)} % de las visitas compran.`, accion: "Revisar la landing: oferta, velocidad, precio o confianza.", objeto: { tipo: "campana", id: c.id }, gasto });
+      s.push({ clave: `landing_floja:${c.id}`, tipo: "landing_floja", severidad: "media", positiva: false, titulo: `${c.nombre}: el anuncio atrae pero la landing no convierte`, detalle: `CTR ${porClic.toFixed(1)} % (bueno) y solo ${conv.toFixed(1)} % de las visitas compran.`, accion: accionLandingFloja(e.paginasPorCampana?.get(c.id)), objeto: { tipo: "campana", id: c.id }, gasto });
     }
   }
 

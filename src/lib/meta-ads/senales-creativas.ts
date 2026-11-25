@@ -182,7 +182,7 @@ export function senalesDeProducto(base: BaseDias, producto: string, hoy: string)
       tipo: "nuevos_peores",
       titulo: `Los videos nuevos rinden peor que los viejos: CPA ${usd(cNuevos)} frente a ${usd(cViejos)}`,
       detalle: `${idsNuevos.size} ${idsNuevos.size === 1 ? "video nuevo gastó" : "videos nuevos gastaron"} ${usd(sumaNuevos.gasto)} en 14 días. El problema no es solo cansancio: lo nuevo que se sube no está funcionando.`,
-      accion: `Revisar el ángulo de lo nuevo frente a lo que ya funcionó. ${sugerencia}`,
+      accion: `Subir lo nuevo con el ángulo que ya funcionó en vez de probar otros. ${sugerencia}`,
       fuerza: sumaNuevos.gasto,
     });
   }

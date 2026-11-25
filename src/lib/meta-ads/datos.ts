@@ -14,6 +14,7 @@ import { decisionesDeAnuncios } from "./decision-anuncio";
 import { etapaEfectiva, indexarCatalogo, productoDeCampana, type IndiceCatalogo } from "./etapa-venta";
 import { pendientes, sugerenciasDeHallazgos, sugerir, type DecisionGuardada, type Sugerencia } from "./sugerencias";
 import { claveDeAnalisis, analisisViejo, seccionesDeAnalisis, type AnalisisGuardado, type HistorialSecciones } from "./analisis-tipos";
+import { claveDePaginasMedidas, leerValorPaginas } from "./diagnostico-concreto";
 import { hallazgoDeVigilancia, ordenarVigilancias, type ResultadoVigilancia } from "./analisis-pedido";
 import { claveDeRasgos, leerValorRasgos, type RasgosDeGanadores } from "./rasgos-ganadores";
 import { claveDeSenales, leerValorSenales, type SenalesCreativas } from "./senales-creativas";
@@ -175,7 +176,7 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
     supabase.from("meta_topes").select("producto_clave, producto, cpa_tope"),
     supabase.from("meta_decisiones").select("clave, estado, vigente_hasta"),
     // El análisis del historial y su interpretación con IA los prepara el sistema solo y se guardan aquí (sin la migración 0347 no hay nada y todo sigue como antes).
-    supabase.from("meta_ajustes").select("clave, valor").in("clave", [claveDeAnalisis(o.paisId), claveDeInterpretacion(o.paisId), claveDeResultados(o.paisId), claveDeSenales(o.paisId), claveDeRasgos(o.paisId)]),
+    supabase.from("meta_ajustes").select("clave, valor").in("clave", [claveDeAnalisis(o.paisId), claveDeInterpretacion(o.paisId), claveDeResultados(o.paisId), claveDeSenales(o.paisId), claveDeRasgos(o.paisId), claveDePaginasMedidas(o.paisId)]),
   ]);
   const valorDe = (clave: string) => (ajustesF ?? []).find((a) => a.clave === clave)?.valor ?? null;
   const analisisGuardado = valorDe(claveDeAnalisis(o.paisId)) as Partial<AnalisisGuardado> | null;
@@ -393,7 +394,17 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
     }
   }
   // Además de lo que ve en los últimos días, el sistema sugiere lo que dice el historial completo (entrega, tendencias, lo que nunca funcionó); se aceptan o rechazan igual.
-  const todas = [...sugerir({ campanas: campanas7, anuncios: anunciosSugerencia, serie, videos: videos30, hoy: o.hoy }), ...sugerenciasDeHallazgos([...(hallazgosGuardados?.analisis.hallazgos ?? []), ...vigilancias.map(hallazgoDeVigilancia).filter((h): h is NonNullable<typeof h> => h !== null)])];
+  // La landing de cada campaña, la de su anuncio con más gasto primero, con lo que se midió de ella (si ya se midió).
+  const paginasMedidas = leerValorPaginas(valorDe(claveDePaginasMedidas(o.paisId)));
+  const paginasPorCampana = new Map<string, { url: string; rasgos: string[] }[]>();
+  for (const a of [...anuncios].sort((x, y) => (porAnuncio30.get(y.id)?.gasto ?? 0) - (porAnuncio30.get(x.id)?.gasto ?? 0))) {
+    const url = landingLimpia(a.landing);
+    if (!url || !paginasMedidas[url]) continue;
+    const lista = paginasPorCampana.get(a.campanaId) ?? [];
+    if (!lista.some((x) => x.url === url)) lista.push({ url, rasgos: paginasMedidas[url] });
+    paginasPorCampana.set(a.campanaId, lista);
+  }
+  const todas = [...sugerir({ campanas: campanas7, anuncios: anunciosSugerencia, serie, videos: videos30, hoy: o.hoy, paginasPorCampana }), ...sugerenciasDeHallazgos([...(hallazgosGuardados?.analisis.hallazgos ?? []), ...vigilancias.map(hallazgoDeVigilancia).filter((h): h is NonNullable<typeof h> => h !== null)])];
   const sugerencias = pendientes(todas, decisiones, o.hoy);
 
   // Campañas montadas por día (14 días) y por persona.
