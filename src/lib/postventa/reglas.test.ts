@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { efectosDeEstado, etiquetaDe, ESTADOS, formaPagoDespacho, GRUPO_ABIERTOS, GRUPO_FINANZAS, GRUPO_REALIZADOS, grupoDe, grupoPorEstado, nombreSolicitud, reglasDelDia, textoSolicitud } from "./reglas";
+import { efectosDeEstado, etiquetaDe, ESTADOS, formaPagoDespacho, GRUPO_ABIERTOS, GRUPO_FINANZAS, GRUPO_REALIZADOS, grupoDe, grupoPorEstado, mensajeCliente, nombreSolicitud, reglasDelDia, textoSolicitud, whatsappDe } from "./reglas";
 
 test("cambios: el Estado mueve la solicitud de grupo, como en Monday", () => {
   assert.equal(grupoPorEstado("Hecho"), GRUPO_REALIZADOS);
@@ -60,4 +60,15 @@ test("cambios: el nombre y el texto de la solicitud, con el formato de siempre",
   assert.equal(formaPagoDespacho(["complemento"], true), "COMPLEMENTO");
   assert.equal(formaPagoDespacho(["cambio"], true), "CAMBIO");
   assert.equal(formaPagoDespacho(["reembolso", "retiro"], false), "RETIRO");
+});
+
+test("cambios: el WhatsApp del cliente y el mensaje con el comprobante", () => {
+  assert.equal(whatsappDe("6123-4567"), "50761234567");
+  assert.equal(whatsappDe("+507 6123 4567"), "50761234567");
+  assert.equal(whatsappDe("123"), null);
+  const m = mensajeCliente({ cliente: "Vanesa Velásquez", tienda: "OFERFY", numero: "#1466", tipos: ["reembolso"], reembolso: 32.98, enlace: "https://x/y" });
+  assert.match(m, /^Hola Vanesa, te escribimos de Oferfy\./);
+  assert.match(m, /reembolso de tu pedido #1466 por \$32\.98\./);
+  assert.match(m, /comprobante: https:\/\/x\/y/);
+  assert.match(mensajeCliente({ cliente: null, tienda: null, numero: "1916", tipos: ["cambio"], reembolso: null, enlace: null }), /^Hola, te escribimos de la tienda\.\n\nYa hicimos el cambio de tu pedido #1916\./);
 });

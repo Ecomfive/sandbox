@@ -10,17 +10,20 @@ import { enlazarOrden, unidadDeTexto, variantesPedido, type OrdenCandidata } fro
 import { archivosVisibles, copiarPendientes, type ArchivoVisible } from "@/lib/monday/comprobantes";
 import { hoyPanama } from "@/lib/postventa/datos";
 import {
+  CAUSAS,
   ESTADOS,
   esTipo,
   formaPagoDespacho,
   GRUPO_ABIERTOS,
   grupoDe,
   GRUPOS,
+  mensajeCliente,
   nombreSolicitud,
   NOTIFICAR,
   TIENDAS,
   TIPOS,
   textoSolicitud,
+  whatsappDe,
   type DatosSolicitud,
   type Linea,
 } from "@/lib/postventa/reglas";
@@ -113,6 +116,13 @@ export async function cambiarCaso(itemId: string, campo: string, valor: string):
     despues = v || null;
     set.notificar = despues;
     if (v === "Notificar") set.fecha_notificacion = hoyPanama();
+  } else if (campo === "causa") {
+    // «Responsable» (25 nov 2026): quién causó la solicitud, el cliente o la tienda.
+    if (v && !CAUSAS.some((e) => e.nombre === v)) return { error: "Esa opción no está en la lista." };
+    titulo = "Responsable";
+    antes = fila.causa;
+    despues = v || null;
+    set.causa = despues;
   } else if (campo === "tienda") {
     if (v && !TIENDAS.some((e) => e.nombre === v)) return { error: "Esa tienda no está en la lista." };
     titulo = "Tienda";
@@ -164,6 +174,8 @@ export async function cambiarCaso(itemId: string, campo: string, valor: string):
     antes = fila[NUMEROS[campo].columna];
     despues = n === null ? null : Math.round(n * 100) / 100;
     set[NUMEROS[campo].columna] = despues;
+    // El valor del envío de la tabla es lo que paga el cliente por el envío del cambio (25 nov 2026).
+    if (campo === "valor_envio" && despues !== null && !fila.envio_paga) set.envio_paga = "cliente";
   } else if (FECHAS[campo]) {
     if (v && !esDia(v)) return { error: "Fecha no válida." };
     titulo = FECHAS[campo].titulo;
@@ -174,13 +186,37 @@ export async function cambiarCaso(itemId: string, campo: string, valor: string):
   const igual = (antes ?? null) === null ? despues === null : despues !== null && String(antes) === String(despues);
   if (igual) return {};
   const { error } = await supabase.from("mon_postventa").update(set).eq("item_id", itemId);
-  if (error) return { error: "No se pudo guardar." };
+  if (error) return { error: campo === "causa" && /column/i.test(error.message) ? FALTA_0365 : "No se pudo guardar." };
   await registrarCaso(supabase, itemId, autor, `${titulo}: ${antes ?? "vacío"} → ${despues ?? "vacío"}`);
+  if (campo === "valor_envio" && fila.orden_id) await envioEnReporteria(supabase, String(fila.orden_id), despues as number | null, usuario);
   if (campo === "responsable" && set.responsable_id) {
     await avisarCaso(supabase, { ...fila, responsable_id: set.responsable_id }, [{ a: "responsable", titulo: `Te asignaron: ${fila.nombre}`, texto: "Quedaste como responsable de esta solicitud." }], autor);
   }
   revalidar();
   return {};
+}
+
+const FALTA_0365 = "Falta correr en Supabase la migración 0365 (Responsable y comprobante de Cambios y reembolsos).";
+
+/**
+ * El valor del envío de un cambio pasa solo a la Reportería de pedidos («Envío de cambio» del pedido, 25 nov 2026). Queda en sus Movimientos como
+ * cualquier edición, así actualizar desde la Matriz ya no lo pisa.
+ */
+async function envioEnReporteria(supabase: Supabase, ordenId: string, valor: number | null, usuario: UsuarioActual) {
+  const { data: o } = await supabase.from("ven_ordenes").select("cambio_envio").eq("id", ordenId).maybeSingle();
+  if (!o) return;
+  const antes = o.cambio_envio === null || o.cambio_envio === undefined ? null : Number(o.cambio_envio);
+  if (antes === valor) return;
+  const { error } = await supabase.from("ven_ordenes").update({ cambio_envio: valor, actualizado_en: new Date().toISOString() }).eq("id", ordenId);
+  if (error) return;
+  await supabase.from("ven_orden_ediciones").insert({
+    orden_id: ordenId,
+    campo: "cambio_envio",
+    antes: antes === null ? null : String(antes),
+    despues: valor === null ? null : String(valor),
+    usuario_id: usuario.id,
+    usuario_nombre: `${usuario.nombre || usuario.email} (Cambios y reembolsos)`.slice(0, 120),
+  });
 }
 
 /** Mueve la solicitud a otro grupo, como arrastrarla en Monday (el Estado no cambia). */
@@ -210,7 +246,10 @@ export async function comentarCaso(itemId: string, texto: string): Promise<Resul
 
 const TIPOS_ARCHIVO: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/heic": "heic", "application/pdf": "pdf" };
 
-/** Sube un adjunto (comprobante del reembolso, foto del producto…) al almacenamiento privado. */
+/**
+ * Sube un adjunto (comprobante del reembolso, foto del producto…) al almacenamiento privado. Con `comprobante=1` (la columna Adjunto de la tabla,
+ * 25 nov 2026) queda además como el comprobante que se le manda al cliente.
+ */
 export async function subirAdjuntoCaso(itemId: string, datos: FormData): Promise<Resultado> {
   const r = await casoConPermiso(itemId);
   if ("error" in r) return r;
@@ -223,10 +262,63 @@ export async function subirAdjuntoCaso(itemId: string, datos: FormData): Promise
   const { error } = await r.supabase.storage.from(BUCKET).upload(ruta, archivo, { contentType: archivo.type, upsert: false });
   if (error) return { error: "No se pudo subir el archivo." };
   const lista = [...((r.fila.adjuntos as string[] | null) ?? []), `storage:${ruta}`].slice(-20);
-  await r.supabase.from("mon_postventa").update({ adjuntos: lista, ...selloCaso(autorDe(r.usuario)) }).eq("item_id", itemId);
-  await registrarCaso(r.supabase, itemId, autorDe(r.usuario), "Subió un adjunto");
+  const esComprobante = datos.get("comprobante") === "1";
+  const { error: e2 } = await r.supabase
+    .from("mon_postventa")
+    .update({ adjuntos: lista, ...(esComprobante ? { comprobante: `storage:${ruta}` } : {}), ...selloCaso(autorDe(r.usuario)) })
+    .eq("item_id", itemId);
+  if (e2 && esComprobante) {
+    // Sin la 0365 el archivo queda como adjunto, pero todavía no como comprobante.
+    await r.supabase.from("mon_postventa").update({ adjuntos: lista, ...selloCaso(autorDe(r.usuario)) }).eq("item_id", itemId);
+    await registrarCaso(r.supabase, itemId, autorDe(r.usuario), "Subió un adjunto");
+    revalidar();
+    return { error: `El archivo quedó como adjunto. ${FALTA_0365}` };
+  }
+  if (e2) return { error: "No se pudo guardar el archivo." };
+  await registrarCaso(r.supabase, itemId, autorDe(r.usuario), esComprobante ? "Subió el comprobante para el cliente" : "Subió un adjunto");
   revalidar();
   return {};
+}
+
+/** Cuánto dura el enlace al comprobante que recibe el cliente. */
+const DIAS_ENLACE = 30;
+
+/**
+ * «Notificar al cliente» (25 nov 2026): arma el WhatsApp para el cliente con el enlace al comprobante (válido 30 días) y deja la solicitud notificada
+ * (Notificar al cliente en Hecho, con la fecha de hoy). Devuelve el enlace de WhatsApp que abre el navegador: el mensaje sale desde el WhatsApp de
+ * quien pulsa el botón (el sistema no tiene un número conectado para los clientes de las tiendas).
+ */
+export async function avisarClienteCaso(itemId: string): Promise<{ error: string } | { url: string }> {
+  const r = await casoConPermiso(itemId);
+  if ("error" in r) return r;
+  const { supabase, usuario, fila } = r;
+  const tipos = (fila.tipos as string[] | null) ?? [];
+  const comprobante = typeof fila.comprobante === "string" && fila.comprobante.startsWith("storage:") ? fila.comprobante.slice("storage:".length) : null;
+  if (tipos.includes("reembolso") && !comprobante) return { error: "Primero sube el comprobante en la columna Adjunto." };
+  if (!fila.orden_id) return { error: "La solicitud no está unida a un pedido: revisa el número de pedido y la tienda." };
+  const { data: cliente } = await supabase.from("ven_ordenes_clientes").select("nombre, telefono").eq("orden_id", fila.orden_id as string).maybeSingle();
+  const wa = whatsappDe((cliente?.telefono as string | null) ?? null);
+  if (!wa) return { error: "El pedido no tiene un teléfono del cliente." };
+  let enlace: string | null = null;
+  if (comprobante) {
+    const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(comprobante, DIAS_ENLACE * 86_400);
+    if (error || !data?.signedUrl) return { error: "No se pudo preparar el enlace al comprobante." };
+    enlace = data.signedUrl;
+  }
+  const texto = mensajeCliente({
+    cliente: (cliente?.nombre as string | null) ?? null,
+    tienda: (fila.tienda_texto as string | null)?.replace(/\s+O$/, "") ?? null,
+    numero: (fila.numero_pedido as string | null) ?? null,
+    tipos,
+    reembolso: fila.reembolso === null || fila.reembolso === undefined ? null : Number(fila.reembolso),
+    enlace,
+  });
+  const autor = autorDe(usuario);
+  const { error } = await supabase.from("mon_postventa").update({ notificar: "Hecho", fecha_notificacion: hoyPanama(), ...selloCaso(autor) }).eq("item_id", itemId);
+  if (error) return { error: "No se pudo guardar." };
+  await registrarCaso(supabase, itemId, autor, `Le mandó al cliente ${comprobante ? "el comprobante " : ""}por WhatsApp (tel. ••${wa.slice(-2)}); Notificar al cliente: ${fila.notificar ?? "vacío"} → Hecho`);
+  revalidar();
+  return { url: `https://wa.me/${wa}?text=${encodeURIComponent(texto)}` };
 }
 
 /** Guarda (o borra, con texto vacío) los datos para hacer el reembolso. Solo con el permiso «despacho-cambios-cuentas». */
@@ -411,6 +503,8 @@ export interface NuevaSolicitud {
   costoEnvio: number | null;
   envioPaga: "empresa" | "cliente";
   responsableId: string | null;
+  /** «Responsable»: quién causó la solicitud, Cliente o Tienda (migración 0365). */
+  causa?: string | null;
   fecha: string | null;
   cuenta: string | null;
   programar: boolean;
@@ -482,7 +576,10 @@ export async function crearSolicitud(d: NuevaSolicitud): Promise<Resultado & { i
     editado_por: usuario.id,
     leido_en: ahora,
   };
-  const { error } = await supabase.from("mon_postventa").insert(fila);
+  const causa = d.causa && CAUSAS.some((c) => c.nombre === d.causa) ? d.causa : null;
+  let { error } = await supabase.from("mon_postventa").insert(causa ? ({ ...fila, causa } as typeof fila) : fila);
+  // Sin la 0365 se crea igual, sin el Responsable.
+  if (error && causa && /causa/.test(error.message)) ({ error } = await supabase.from("mon_postventa").insert(fila));
   if (error) return { error: /column|relation/.test(error.message) ? "Falta correr en Supabase la migración 0972." : "No se pudo crear la solicitud." };
   await registrarCaso(supabase, itemId, autor, "Creada en el sistema");
   if (d.cuenta && puedeVerCuentas(usuario)) await supabase.from("postventa_cuentas").insert({ item_id: itemId, datos: String(d.cuenta).trim().slice(0, 1000), escrito_por: usuario.id });

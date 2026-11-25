@@ -7,7 +7,7 @@ import { anilloFoco, fieldClass } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { buscarPedido, crearSolicitud, type PedidoEncontrado } from "@/app/(app)/despacho-ciudad/cambios/actions";
 import type { Persona } from "@/lib/postventa/datos";
-import { formaPagoDespacho, nombreSolicitud, TIENDAS, TIPOS, textoSolicitud, type Linea } from "@/lib/postventa/reglas";
+import { CAUSAS, formaPagoDespacho, nombreSolicitud, TIENDAS, TIPOS, textoSolicitud, type Linea } from "@/lib/postventa/reglas";
 import type { TipoPostventa } from "@/lib/monday/postventa";
 
 const MOTIVOS = [
@@ -20,6 +20,16 @@ const MOTIVOS = [
   "El pedido no se pudo despachar",
   "Otro",
 ];
+
+/** El Responsable que sugiere cada motivo (se puede cambiar): lo que llegó mal es de la tienda; lo que el cliente decide, del cliente. */
+const CAUSA_DEL_MOTIVO: Record<string, string> = {
+  "El producto no funciona": "Tienda",
+  "Llegó roto o derramado": "Tienda",
+  "No le llegó el producto correcto": "Tienda",
+  "Pedido incompleto (falta un producto)": "Tienda",
+  "No es lo que esperaba": "Cliente",
+  "Quiere otra variante, talla o graduación": "Cliente",
+};
 
 const ESTADO_PEDIDO: Record<string, string> = { entregada: "entregado", devuelta: "devuelto", cancelada: "cancelado", en_transito: "en ruta", pendiente: "pendiente", no_gestionada: "sin gestionar" };
 
@@ -43,6 +53,8 @@ export function FormularioSolicitud({ personas, hoy, puedeCuentas, usuarioId }: 
   const [costo, setCosto] = useState("3.50");
   const [paga, setPaga] = useState<"empresa" | "cliente">("empresa");
   const [responsable, setResponsable] = useState(usuarioId);
+  const [causaElegida, setCausa] = useState<string | null>(null);
+  const causa = causaElegida ?? CAUSA_DEL_MOTIVO[motivo] ?? null;
   const [fecha, setFecha] = useState(hoy);
   const [programar, setProgramar] = useState(true);
   const [cuenta, setCuenta] = useState("");
@@ -93,6 +105,7 @@ export function FormularioSolicitud({ personas, hoy, puedeCuentas, usuarioId }: 
         costoEnvio: datos.costoEnvio,
         envioPaga: paga,
         responsableId: responsable || null,
+        causa,
         fecha: fecha || null,
         cuenta: puedeCuentas && t("reembolso") ? cuenta.trim() || null : null,
         programar: programar && conReparto,
@@ -295,10 +308,20 @@ export function FormularioSolicitud({ personas, hoy, puedeCuentas, usuarioId }: 
             </div>
           )}
           <div className="flex flex-wrap gap-3">
-            <label className={`${etiqueta} flex-1 basis-52`}>
+            <div className={`${etiqueta} flex-1 basis-52`}>
               Responsable
+              <div role="group" aria-label="Quién causó la solicitud" className="flex gap-1.5">
+                {CAUSAS.map((c) => (
+                  <button key={c.nombre} type="button" aria-pressed={causa === c.nombre} onClick={() => setCausa(causa === c.nombre ? "" : c.nombre)} className={chip(causa === c.nombre)}>
+                    {c.nombre === "Cliente" ? "Cliente (su decisión)" : "Tienda (se equivocó)"}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <label className={`${etiqueta} flex-1 basis-52`}>
+              Encargado
               <select value={responsable} onChange={(e) => setResponsable(e.target.value)} className={fieldClass}>
-                <option value="">Sin responsable</option>
+                <option value="">Sin encargado</option>
                 {personas.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.nombre}

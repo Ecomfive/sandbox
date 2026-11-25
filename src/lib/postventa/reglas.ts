@@ -38,6 +38,12 @@ export const TIENDAS: Etiqueta[] = [
   { nombre: "CLICKSI", color: "#ffcb00" },
 ];
 
+/** «Responsable» (25 nov 2026): quién causó la solicitud. Cliente = fue su decisión; Tienda = la tienda envió mal el producto. */
+export const CAUSAS: Etiqueta[] = [
+  { nombre: "Cliente", color: "#a25ddc" },
+  { nombre: "Tienda", color: "#e2445c" },
+];
+
 export const TIPOS: (Etiqueta & { clave: TipoPostventa })[] = [
   { clave: "cambio", nombre: "Cambio", color: "#5559df" },
   { clave: "reembolso", nombre: "Reembolso", color: "#784bd1" },
@@ -199,4 +205,37 @@ export function textoSolicitud(d: DatosSolicitud): string {
 export function formaPagoDespacho(tipos: string[], conEnviar: boolean): "COMPLEMENTO" | "CAMBIO" | "RETIRO" {
   if (tipos.includes("complemento") || tipos.includes("faltante")) return "COMPLEMENTO";
   return conEnviar ? "CAMBIO" : "RETIRO";
+}
+
+/** El número para WhatsApp (wa.me) de un teléfono de Panamá: 507 + 8 dígitos; con otro código de país, tal cual. Null si no parece un teléfono. */
+export function whatsappDe(telefono: string | null | undefined): string | null {
+  const d = (telefono ?? "").replace(/\D/g, "").replace(/^00/, "");
+  if (d.length === 7 || d.length === 8) return `507${d}`;
+  if (d.length >= 10 && d.length <= 15) return d;
+  return null;
+}
+
+/**
+ * El mensaje de WhatsApp para el cliente («Notificar al cliente», 25 nov 2026): qué se hizo con su pedido y, si hay, el enlace al comprobante.
+ */
+export function mensajeCliente(d: { cliente: string | null; tienda: string | null; numero: string | null; tipos: string[]; reembolso: number | null; enlace: string | null }): string {
+  const nombre = (d.cliente ?? "").trim().split(/\s+/)[0] ?? "";
+  const tienda = d.tienda ? (NOMBRE_TIENDA[d.tienda] ?? d.tienda) : null;
+  const pedido = d.numero ? ` #${numeroLimpio(d.numero)}` : "";
+  const t = (x: string) => d.tipos.includes(x);
+  const hecho = t("reembolso")
+    ? `Ya hicimos el reembolso de tu pedido${pedido}${d.reembolso !== null ? ` por ${plata(d.reembolso)}` : ""}.`
+    : t("cambio")
+      ? `Ya hicimos el cambio de tu pedido${pedido}.`
+      : t("complemento") || t("faltante")
+        ? `Ya te enviamos lo que faltaba de tu pedido${pedido}.`
+        : `Ya quedó resuelta tu solicitud del pedido${pedido}.`;
+  return [
+    `Hola${nombre ? ` ${nombre}` : ""}, te escribimos de ${tienda ?? "la tienda"}.`,
+    hecho,
+    d.enlace ? `Aquí puedes ver el comprobante: ${d.enlace}` : null,
+    "¡Gracias por tu paciencia!",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 }

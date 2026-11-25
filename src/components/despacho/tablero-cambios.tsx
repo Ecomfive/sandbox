@@ -7,6 +7,7 @@ import { anilloFoco, fieldClass } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import {
   archivarCaso,
+  avisarClienteCaso,
   cambiarCaso,
   comentarCaso,
   detalleCaso,
@@ -18,15 +19,14 @@ import {
   type DetalleCaso,
 } from "@/app/(app)/despacho-ciudad/cambios/actions";
 import type { FilaCaso, Persona } from "@/lib/postventa/datos";
-import { colorDe, ESTADOS, grupoPorEstado, GRUPOS, NOTIFICAR, TIENDAS, TIPOS, type Etiqueta } from "@/lib/postventa/reglas";
+import { CAUSAS, colorDe, ESTADOS, grupoPorEstado, GRUPOS, NOTIFICAR, TIENDAS, TIPOS, type Etiqueta } from "@/lib/postventa/reglas";
 import { textoSobre } from "@/lib/despacho/etiquetas";
 import { FechaHora } from "@/components/ui/fecha-hora";
 import { VisorArchivos } from "./visor-archivos";
 
-type Pill = "tienda" | "tipo" | "responsable" | "estado" | "notificar";
-type Celda = "nombre" | "seguimiento" | "valor_envio" | "reembolso" | "fecha" | "fecha_notificacion";
+type Pill = "tienda" | "tipo" | "causa" | "estado" | "notificar";
+type Celda = "numero" | "valor_envio" | "reembolso" | "fecha" | "fecha_notificacion";
 
-const COLOR_PERSONA = "#a25ddc";
 const plata = (n: number) => `$${n.toLocaleString("es-PA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const normal = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 const diaTexto = (iso: string | null) => (iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}` : "");
@@ -34,8 +34,7 @@ const th = "sticky top-0 z-[1] border-b border-border bg-muted px-2 py-2 text-le
 const td = "relative h-[38px] border-r border-b border-border/60 bg-card p-0 whitespace-nowrap";
 
 const VALOR: Record<Celda, keyof FilaCaso> = {
-  nombre: "nombre",
-  seguimiento: "seguimiento",
+  numero: "numero",
   valor_envio: "valorEnvio",
   reembolso: "reembolso",
   fecha: "fecha",
@@ -46,6 +45,8 @@ const VALOR: Record<Celda, keyof FilaCaso> = {
  * El tablero de Cambios y reembolsos (16 nov 2026), como «CAMBIOS Y REEMBOLSOS PANAMA» de Monday: sus tres grupos, las mismas columnas, etiquetas y
  * colores, filas que se arrastran de grupo y el panel de cada solicitud. El Estado aplica las automatizaciones de Monday (cambia de grupo solo, pone
  * Notificar al cliente y manda los avisos).
+ * 25 nov 2026 (pedido de Hernán): la primera columna es el número de pedido; «Tipo» se llama Solicitud; Responsable dice quién la causó (Cliente o
+ * Tienda; la persona del equipo pasa a «Encargado», en el panel); sin Seguimiento; Adjunto sube el comprobante y «Enviar» se lo manda al cliente.
  */
 export function TableroCambios({
   filas: iniciales,
@@ -77,7 +78,7 @@ export function TableroCambios({
   const [menu, setMenu] = useState<string | null>(null);
   const [sel, setSel] = useState<string | null>(casoInicial);
   const [arrastrando, setArrastrando] = useState<string | null>(null);
-  const opcionesPersona: Etiqueta[] = useMemo(() => personas.map((p) => ({ nombre: p.nombre, color: COLOR_PERSONA })), [personas]);
+  const [subiendo, setSubiendo] = useState<string | null>(null);
 
   const guardar = (itemId: string, local: Partial<FilaCaso>, accion: () => Promise<{ error?: string }>) => {
     setFilas((fs) => fs.map((f) => (f.itemId === itemId ? { ...f, ...local, editadoEn: new Date().toISOString() } : f)));
@@ -97,12 +98,48 @@ export function TableroCambios({
       if (nombre === "Hecho") local.notificar = "Notificar";
       return guardar(f.itemId, local, () => cambiarCaso(f.itemId, "estado", nombre));
     }
-    if (col === "responsable") {
-      const p = personas.find((x) => x.nombre === nombre);
-      return guardar(f.itemId, { responsable: p?.nombre ?? null, responsableId: p?.id ?? null }, () => cambiarCaso(f.itemId, "responsable", p?.id ?? ""));
-    }
-    const local: Partial<FilaCaso> = col === "tienda" ? { tienda: nombre || null } : col === "tipo" ? { tipo: nombre } : { notificar: nombre || null };
+    const local: Partial<FilaCaso> = col === "tienda" ? { tienda: nombre || null } : col === "tipo" ? { tipo: nombre } : col === "causa" ? { causa: nombre || null } : { notificar: nombre || null };
     guardar(f.itemId, local, () => cambiarCaso(f.itemId, col, nombre));
+  };
+
+  /** La columna Adjunto: sube el comprobante del pago (Finanzas) sin abrir el panel. */
+  const subirComprobante = (f: FilaCaso, archivo: File | undefined) => {
+    if (!archivo) return;
+    const datos = new FormData();
+    datos.set("archivo", archivo);
+    datos.set("comprobante", "1");
+    setSubiendo(f.itemId);
+    empezar(async () => {
+      const r = await subirAdjuntoCaso(f.itemId, datos);
+      setSubiendo(null);
+      if (r.error) mostrarToast(r.error, "destructive");
+      else {
+        mostrarToast("Comprobante subido.", "success");
+        setFilas((fs) => fs.map((x) => (x.itemId === f.itemId ? { ...x, comprobante: true, adjuntos: x.adjuntos + 1, editadoEn: new Date().toISOString() } : x)));
+      }
+      router.refresh();
+    });
+  };
+
+  /** «Enviar» en Notificar al cliente: abre WhatsApp con el mensaje y el enlace al comprobante, y deja la solicitud notificada con la fecha de hoy. */
+  const enviarAlCliente = (f: FilaCaso) => {
+    // La pestaña se abre en el clic (si se abre después de esperar al servidor, el navegador la bloquea).
+    const ventana = window.open("about:blank", "_blank");
+    empezar(async () => {
+      const r = await avisarClienteCaso(f.itemId);
+      if ("error" in r) {
+        ventana?.close();
+        mostrarToast(r.error, "destructive");
+        return;
+      }
+      if (ventana) {
+        ventana.opener = null;
+        ventana.location.href = r.url;
+      } else window.location.href = r.url;
+      setFilas((fs) => fs.map((x) => (x.itemId === f.itemId ? { ...x, notificar: "Hecho", fechaNotificacion: new Date().toLocaleDateString("en-CA", { timeZone: "America/Panama" }), editadoEn: new Date().toISOString() } : x)));
+      mostrarToast("Se abrió WhatsApp con el mensaje: pulsa Enviar allí.", "success");
+      router.refresh();
+    });
   };
 
   const visibles = useMemo(() => {
@@ -111,7 +148,7 @@ export function TableroCambios({
       (f) =>
         (tienda === "TODAS" || f.tienda === tienda) &&
         (tipo === "TODOS" || f.tipo === tipo) &&
-        (!q || normal(`${f.nombre} ${f.numero ?? ""} ${f.retirar ?? ""} ${f.enviar ?? ""} ${f.responsable ?? ""}`).includes(q)),
+        (!q || normal(`${f.nombre} ${f.numero ?? ""} ${f.retirar ?? ""} ${f.enviar ?? ""} ${f.responsable ?? ""} ${f.causa ?? ""}`).includes(q)),
     );
   }, [filas, tienda, tipo, busqueda]);
 
@@ -131,16 +168,16 @@ export function TableroCambios({
 
   const listas: Record<Pill, { titulo: string; opciones: Etiqueta[] }> = {
     tienda: { titulo: "Tienda", opciones: TIENDAS },
-    tipo: { titulo: "Tipo", opciones: TIPOS },
-    responsable: { titulo: "Responsable", opciones: opcionesPersona },
+    tipo: { titulo: "Solicitud", opciones: TIPOS },
+    causa: { titulo: "Responsable", opciones: CAUSAS },
     estado: { titulo: "Estado", opciones: ESTADOS },
     notificar: { titulo: "Notificar al cliente", opciones: NOTIFICAR },
   };
-  const valorPill = (f: FilaCaso, col: Pill) => (col === "tienda" ? f.tienda : col === "tipo" ? f.tipo : col === "responsable" ? f.responsable : col === "estado" ? f.estado : f.notificar);
+  const valorPill = (f: FilaCaso, col: Pill) => (col === "tienda" ? f.tienda : col === "tipo" ? f.tipo : col === "causa" ? f.causa : col === "estado" ? f.estado : f.notificar);
 
   const pill = (f: FilaCaso, col: Pill) => {
     const valor = valorPill(f, col);
-    const color = col === "responsable" ? (valor ? COLOR_PERSONA : null) : colorDe(listas[col].opciones, valor);
+    const color = colorDe(listas[col].opciones, valor);
     const abierto = menu === `${f.itemId}:${col}`;
     return (
       <>
@@ -174,7 +211,7 @@ export function TableroCambios({
     );
   };
 
-  const celda = (f: FilaCaso, campo: Celda, etiqueta: string, tipoInput: "text" | "decimal" | "date" = "text") => {
+  const celda = (f: FilaCaso, campo: Celda, etiqueta: string, tipoInput: "text" | "decimal" | "date" = "text", ayuda?: string) => {
     const actual = f[VALOR[campo]] as string | number | null;
     const texto = actual === null || actual === undefined ? "" : String(actual);
     return (
@@ -182,9 +219,10 @@ export function TableroCambios({
         key={`${f.itemId}:${campo}:${texto}`}
         type={tipoInput === "date" ? "date" : "text"}
         defaultValue={texto}
+        placeholder={puedeEscribir ? ayuda : undefined}
         readOnly={!puedeEscribir}
         inputMode={tipoInput === "decimal" ? "decimal" : undefined}
-        aria-label={`${etiqueta} de ${f.nombre}`}
+        aria-label={`${etiqueta} de ${f.numero ?? f.nombre}`}
         onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
         onBlur={(e) => {
           const v = e.target.value.trim();
@@ -192,7 +230,7 @@ export function TableroCambios({
           const local = { [VALOR[campo]]: tipoInput === "decimal" ? (v === "" ? null : Number(v.replace(",", "."))) : v || null } as Partial<FilaCaso>;
           guardar(f.itemId, local, () => cambiarCaso(f.itemId, campo, v));
         }}
-        className={`h-[38px] w-full border-0 bg-transparent px-2 text-[13px] focus:outline-2 focus:-outline-offset-2 focus:outline-primario ${tipoInput === "decimal" ? "text-right tabular-nums" : ""} ${campo === "nombre" ? "font-semibold" : ""}`}
+        className={`h-[38px] w-full border-0 bg-transparent px-2 text-[13px] focus:outline-2 focus:-outline-offset-2 focus:outline-primario placeholder:text-muted-foreground/70 ${tipoInput === "decimal" ? "text-right tabular-nums" : ""} ${campo === "numero" ? "font-semibold" : ""}`}
       />
     );
   };
@@ -210,7 +248,7 @@ export function TableroCambios({
             {t === "TODAS" ? "Todas las tiendas" : t}
           </button>
         ))}
-        <span className="ml-1 text-xs text-muted-foreground">Tipo:</span>
+        <span className="ml-1 text-xs text-muted-foreground">Solicitud:</span>
         {["TODOS", "Cambio", "Reembolso", "Complemento", "Retiro"].map((t) => (
           <button key={t} type="button" aria-pressed={tipo === t} onClick={() => setTipo(t)} className={chip(tipo === t)}>
             {t === "TODOS" ? "Todos" : t}
@@ -243,17 +281,16 @@ export function TableroCambios({
                     <table className="w-full border-separate border-spacing-0 text-[13px]">
                       <thead>
                         <tr>
-                          <th scope="col" className={`${th} min-w-72`}>Solicitud</th>
+                          <th scope="col" className={`${th} min-w-40`}>Número de pedido</th>
                           <th scope="col" className={`${th} min-w-24`}>Tienda</th>
-                          <th scope="col" className={`${th} min-w-28`}>Tipo</th>
-                          <th scope="col" className={`${th} min-w-36`}>Responsable</th>
+                          <th scope="col" className={`${th} min-w-28`}>Solicitud</th>
+                          <th scope="col" className={`${th} min-w-28`}>Responsable</th>
                           <th scope="col" className={`${th} min-w-52`}>Estado</th>
                           <th scope="col" className={`${th} min-w-32`}>Fecha</th>
-                          <th scope="col" className={`${th} min-w-44`}>Seguimiento</th>
-                          <th scope="col" className={`${th} min-w-24 text-right`}>Valor envío</th>
+                          <th scope="col" className={`${th} min-w-36 text-right`}>Valor envío</th>
                           <th scope="col" className={`${th} min-w-24 text-right`}>Valor reembolso</th>
-                          <th scope="col" className={`${th} min-w-20`}>Adjunto</th>
-                          <th scope="col" className={`${th} min-w-32`}>Notificar al cliente</th>
+                          <th scope="col" className={`${th} min-w-40`}>Adjunto</th>
+                          <th scope="col" className={`${th} min-w-48`}>Notificar al cliente</th>
                           <th scope="col" className={`${th} min-w-32`}>Fecha notificación</th>
                         </tr>
                       </thead>
@@ -267,7 +304,9 @@ export function TableroCambios({
                                     ⋮⋮
                                   </span>
                                 )}
-                                <div className="min-w-0 flex-1">{celda(f, "nombre", "Solicitud")}</div>
+                                <div className="min-w-0 flex-1" title={f.nombre}>
+                                  {celda(f, "numero", "Número de pedido", "text", "#0000")}
+                                </div>
                                 <button type="button" onClick={() => setSel(f.itemId)} className={`rounded px-1.5 py-1 text-xs font-medium text-primario hover:bg-primario-suave ${anilloFoco}`} aria-label={`Abrir ${f.nombre}`}>
                                   Abrir
                                 </button>
@@ -275,24 +314,60 @@ export function TableroCambios({
                             </td>
                             <td className={td}>{pill(f, "tienda")}</td>
                             <td className={td}>{pill(f, "tipo")}</td>
-                            <td className={td}>{pill(f, "responsable")}</td>
+                            <td className={td}>{pill(f, "causa")}</td>
                             <td className={td}>{pill(f, "estado")}</td>
                             <td className={td}>{celda(f, "fecha", "Fecha", "date")}</td>
-                            <td className={td}>{celda(f, "seguimiento", "Seguimiento")}</td>
-                            <td className={td}>{celda(f, "valor_envio", "Valor de envío", "decimal")}</td>
+                            <td className={td}>{celda(f, "valor_envio", "Valor de envío", "decimal", "Lo paga el cliente")}</td>
                             <td className={td}>{celda(f, "reembolso", "Valor reembolso", "decimal")}</td>
                             <td className={td}>
-                              <button type="button" onClick={() => setSel(f.itemId)} className={`h-[38px] w-full px-2 text-left text-xs ${f.adjuntos ? "font-semibold text-primario" : "text-muted-foreground"} ${anilloFoco}`}>
-                                {f.adjuntos ? `Ver (${f.adjuntos})` : puedeEscribir ? "+ Subir" : "—"}
-                              </button>
+                              {subiendo === f.itemId ? (
+                                <span className="block px-2 text-xs text-muted-foreground">Subiendo…</span>
+                              ) : f.comprobante ? (
+                                <button type="button" onClick={() => setSel(f.itemId)} className={`h-[38px] w-full px-2 text-left text-xs font-semibold text-primario ${anilloFoco}`}>
+                                  ✓ Comprobante
+                                </button>
+                              ) : puedeEscribir ? (
+                                <label className="flex h-[38px] w-full cursor-pointer items-center px-2 text-xs font-medium text-primario focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-primario hover:bg-primario-suave">
+                                  + Subir comprobante
+                                  <input
+                                    type="file"
+                                    accept="image/jpeg,image/png,image/webp,image/heic,application/pdf"
+                                    aria-label={`Subir el comprobante de ${f.numero ?? f.nombre}`}
+                                    className="sr-only"
+                                    onChange={(e) => {
+                                      subirComprobante(f, e.target.files?.[0]);
+                                      e.target.value = "";
+                                    }}
+                                  />
+                                </label>
+                              ) : (
+                                <button type="button" onClick={() => setSel(f.itemId)} className={`h-[38px] w-full px-2 text-left text-xs text-muted-foreground ${anilloFoco}`}>
+                                  {f.adjuntos ? `Ver (${f.adjuntos})` : "—"}
+                                </button>
+                              )}
                             </td>
-                            <td className={td}>{pill(f, "notificar")}</td>
+                            <td className={td}>
+                              <div className="flex h-[38px] items-stretch">
+                                <div className="relative min-w-0 flex-1">{pill(f, "notificar")}</div>
+                                {puedeEscribir && (
+                                  <button
+                                    type="button"
+                                    onClick={() => enviarAlCliente(f)}
+                                    disabled={f.tipos.includes("reembolso") && !f.comprobante}
+                                    title={f.tipos.includes("reembolso") && !f.comprobante ? "Primero sube el comprobante" : "Mandarle el comprobante al cliente por WhatsApp"}
+                                    className={`shrink-0 border-l border-border/60 px-2.5 text-xs font-semibold text-primario hover:bg-primario-suave disabled:cursor-not-allowed disabled:text-muted-foreground disabled:hover:bg-transparent ${anilloFoco}`}
+                                  >
+                                    Enviar
+                                  </button>
+                                )}
+                              </div>
+                            </td>
                             <td className={td}>{celda(f, "fecha_notificacion", "Fecha notificación", "date")}</td>
                           </tr>
                         ))}
                         {!g.filas.length && (
                           <tr>
-                            <td colSpan={12} className="px-3 py-4 text-center text-xs text-muted-foreground">
+                            <td colSpan={11} className="px-3 py-4 text-center text-xs text-muted-foreground">
                               Sin solicitudes.
                             </td>
                           </tr>
@@ -300,7 +375,7 @@ export function TableroCambios({
                       </tbody>
                       <tfoot>
                         <tr>
-                          <td colSpan={7} className="bg-muted px-3 py-2 text-xs text-muted-foreground">
+                          <td colSpan={6} className="bg-muted px-3 py-2 text-xs text-muted-foreground">
                             {g.filas.length} solicitud{g.filas.length === 1 ? "" : "es"}
                           </td>
                           <td className="bg-muted px-2 py-2 text-right text-xs font-semibold tabular-nums">{plata(envios)}</td>
@@ -315,7 +390,7 @@ export function TableroCambios({
             );
           })}
         </div>
-        {filaSel && <PanelCaso key={filaSel.itemId} fila={filaSel} puedeEscribir={puedeEscribir} puedeArchivar={puedeArchivar} archivada={archivados} alCerrar={() => setSel(null)} />}
+        {filaSel && <PanelCaso key={filaSel.itemId} fila={filaSel} personas={personas} puedeEscribir={puedeEscribir} puedeArchivar={puedeArchivar} archivada={archivados} alCerrar={() => setSel(null)} />}
       </div>
       {menu && <button type="button" aria-label="Cerrar la lista" onClick={() => setMenu(null)} className="fixed inset-0 z-20 cursor-default bg-transparent" />}
     </div>
@@ -328,7 +403,21 @@ const manana = () => {
 };
 
 /** El panel de una solicitud: lo que pidió el cliente, el reparto en Envíos Delivery, los datos del reembolso, adjuntos, actualizaciones y registro. */
-function PanelCaso({ fila, puedeEscribir, puedeArchivar, archivada, alCerrar }: { fila: FilaCaso; puedeEscribir: boolean; puedeArchivar: boolean; archivada: boolean; alCerrar: () => void }) {
+function PanelCaso({
+  fila,
+  personas,
+  puedeEscribir,
+  puedeArchivar,
+  archivada,
+  alCerrar,
+}: {
+  fila: FilaCaso;
+  personas: Persona[];
+  puedeEscribir: boolean;
+  puedeArchivar: boolean;
+  archivada: boolean;
+  alCerrar: () => void;
+}) {
   const { mostrarToast } = useToast();
   const router = useRouter();
   const [detalle, setDetalle] = useState<DetalleCaso | null>(null);
@@ -376,8 +465,25 @@ function PanelCaso({ fila, puedeEscribir, puedeArchivar, archivada, alCerrar }: 
           Cerrar
         </button>
       </div>
-      <p className="m-0 text-[13px] text-muted-foreground">{[fila.tienda, fila.tipos.join(" + ") || null, fila.estado ?? "sin estado", fila.responsable ? `responsable: ${fila.responsable}` : null].filter(Boolean).join(" · ")}</p>
+      <p className="m-0 text-[13px] text-muted-foreground">{[fila.tienda, fila.tipos.join(" + ") || null, fila.estado ?? "sin estado", fila.causa ? `responsable: ${fila.causa}` : null].filter(Boolean).join(" · ")}</p>
       {!fila.ordenId && fila.numero && <p className="m-0 rounded-md bg-warning-soft px-3 py-2 text-xs">No se encontró el pedido {fila.numero} en el sistema: revisa el número y la tienda.</p>}
+
+      <label className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+        Encargado
+        <select
+          value={fila.responsableId ?? ""}
+          disabled={!puedeEscribir || ocupado}
+          onChange={(e) => correr(() => cambiarCaso(fila.itemId, "responsable", e.target.value), "Encargado guardado.")}
+          className={`${fieldClass} flex-1 font-normal`}
+        >
+          <option value="">{fila.responsable && !fila.responsableId ? fila.responsable : "Sin encargado"}</option>
+          {personas.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.nombre}
+            </option>
+          ))}
+        </select>
+      </label>
 
       <section aria-label="La solicitud">
         {dato("Pedido", fila.numero)}
@@ -387,6 +493,7 @@ function PanelCaso({ fila, puedeEscribir, puedeArchivar, archivada, alCerrar }: 
         {dato("Motivo", fila.motivo)}
         {dato("Envío", fila.costoEnvio)}
         {dato("Observación", fila.observacion)}
+        {dato("Seguimiento", fila.seguimiento)}
       </section>
 
       {tieneReparto && (
