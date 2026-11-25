@@ -34,6 +34,10 @@ export interface FilaEnvio extends LineaEnviada {
   motivo: string | null;
   /** Las cajas que salieron, en palabras (migración 0236). */
   cajas: string | null;
+  /** Sale de una plataforma y va a una bodega propia: al confirmar entra al inventario (migración 0364). */
+  retiro: boolean;
+  /** Un retiro de un producto con vencimiento: pide la fecha al confirmar. */
+  pideVencimiento: boolean;
 }
 
 /** Anotar lo que el tercero dice que llegó de una remisión: arranca con lo enviado; si cambia, pide el motivo. */
@@ -43,10 +47,12 @@ function Recibir({ fila }: { fila: FilaEnvio }) {
   const [pendiente, startTransition] = useTransition();
   const [recibida, setRecibida] = useState(String(fila.enviada));
   const [motivo, setMotivo] = useState("");
+  const [vencimiento, setVencimiento] = useState("");
   const [error, setError] = useState<string | null>(null);
   const n = Number(recibida);
   const distinta = recibida.trim() !== "" && n !== fila.enviada;
-  const valida = recibida.trim() !== "" && Number.isInteger(n) && n >= 0 && (!distinta || motivo.trim() !== "");
+  const conFecha = fila.pideVencimiento && n > 0;
+  const valida = recibida.trim() !== "" && Number.isInteger(n) && n >= 0 && (!distinta || motivo.trim() !== "") && (!conFecha || vencimiento !== "");
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex flex-wrap items-center gap-1.5">
@@ -72,18 +78,25 @@ function Recibir({ fila }: { fila: FilaEnvio }) {
             className={`${fieldClassSm} w-56`}
           />
         )}
+        {conFecha && (
+          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            Vence
+            <input type="date" value={vencimiento} onChange={(e) => setVencimiento(e.target.value)} disabled={pendiente} aria-label={`Vence: fecha de vencimiento de ${fila.codigo}`} className={`${fieldClassSm} w-40`} />
+          </label>
+        )}
         <button
           type="button"
           disabled={!valida || pendiente}
           onClick={() => {
             setError(null);
             startTransition(async () => {
-              const r = await recibirEnvioDropi(fila.id, n, motivo);
+              const r = await recibirEnvioDropi(fila.id, n, motivo, conFecha ? vencimiento : undefined);
               if (r.error) {
                 setError(r.error);
                 return;
               }
-              mostrarToast(n === fila.enviada ? "Remisión recibida completa" : `Remisión recibida: llegaron ${n} de ${fila.enviada}`);
+              const entraron = fila.retiro && n > 0 ? ` · ${n} ${n === 1 ? "entró" : "entraron"} a ${fila.hacia}` : "";
+              mostrarToast(`${n === fila.enviada ? "Remisión recibida completa" : `Remisión recibida: llegaron ${n} de ${fila.enviada}`}${entraron}`);
               router.refresh();
             });
           }}
@@ -131,6 +144,7 @@ function VerPapel({ r, grande = false }: { r: RemisionAgrupada; grande?: boolean
 function FichaRemision({
   r,
   productos,
+  paraRetiro,
   stock,
   puedeEscribir,
   anularDirecto,
@@ -140,6 +154,7 @@ function FichaRemision({
 }: {
   r: RemisionAgrupada<FilaEnvio>;
   productos: OpcionSkuMaestro[];
+  paraRetiro: OpcionSkuMaestro[];
   stock: StockPorBodega;
   puedeEscribir: boolean;
   /** Puede anular lo que sigue en camino sin pedir autorización (módulo «Anular remisión», migración 0344). */
@@ -175,6 +190,7 @@ function FichaRemision({
           </div>
         )}
       </dl>
+      {r.lineas[0]?.retiro && r.porConfirmar > 0 && <p className="m-0 text-sm">Retiro de plataforma: lo que confirmes entra al inventario de {r.hacia}.</p>}
       <ContenedorTabla ariaLabel={`Productos de ${r.numero}`}>
         <table className="tabla-datos w-full min-w-[34rem] border-collapse text-sm">
           <thead>
@@ -186,7 +202,7 @@ function FichaRemision({
                 Enviadas
               </th>
               <th scope="col" className={claseEncabezadoColumna}>
-                Llegaron según la bodega
+                {r.lineas[0]?.retiro ? "Llegaron a la bodega" : "Llegaron según la bodega"}
               </th>
             </tr>
           </thead>
@@ -250,7 +266,8 @@ function FichaRemision({
           remisionId={r.remisionId}
           numero={r.numero}
           origenId={r.lineas[0].origenId}
-          productos={productos}
+          productos={r.lineas[0].retiro ? paraRetiro : productos}
+          retiro={r.lineas[0].retiro}
           stock={stock}
           yaEstan={r.lineas.filter((l) => l.estado !== "anulado").map((l) => l.skuId)}
         />
@@ -266,6 +283,7 @@ function FichaRemision({
 export function ListaEnvios({
   filas,
   productos,
+  paraRetiro,
   stock,
   puedeEscribir,
   anularDirecto,
@@ -276,6 +294,8 @@ export function ListaEnvios({
   filas: FilaEnvio[];
   /** Los productos que se pueden agregar a una remisión y cuánto hay de cada uno en cada bodega. */
   productos: OpcionSkuMaestro[];
+  /** Los que se pueden agregar a un retiro de plataforma (todos los que guardan stock). */
+  paraRetiro: OpcionSkuMaestro[];
   stock: StockPorBodega;
   puedeEscribir: boolean;
   anularDirecto: boolean;
@@ -352,7 +372,7 @@ export function ListaEnvios({
         </table>
       </ContenedorTabla>
       <Ventana abierto={!!elegida} alCerrar={() => setAbierta(null)} titulo={elegida?.numero ?? ""} lado="derecha" ancho="lg">
-        {elegida && <FichaRemision r={elegida} productos={productos} stock={stock} puedeEscribir={puedeEscribir} anularDirecto={anularDirecto} codigoPais={codigoPais} conPendiente={pendientes} resueltas={resueltas} />}
+        {elegida && <FichaRemision r={elegida} productos={productos} paraRetiro={paraRetiro} stock={stock} puedeEscribir={puedeEscribir} anularDirecto={anularDirecto} codigoPais={codigoPais} conPendiente={pendientes} resueltas={resueltas} />}
       </Ventana>
     </div>
   );
