@@ -68,7 +68,7 @@ export function senalesDeModulos(d: DatosModulos, o: { hoy: string; cpaActual: n
         tipo: "poco_stock",
         titulo: `Inventario para unos ${dias} ${dias === 1 ? "día" : "días"} al ritmo de salida de los últimos 30`,
         detalle: `Quedan ${d.stock.disponible} disponibles, salen unas ${ritmo.toFixed(1)} al día${d.stock.enCamino > 0 ? ` y vienen ${d.stock.enCamino} en camino` : " y no viene nada en camino"}.`,
-        accion: d.stock.enCamino > 0 ? "Cuidar el ritmo de gasto hasta que llegue lo que viene en camino." : "Reponer ya o bajar el gasto: si se agota, las campañas siguen gastando sin poder entregar.",
+        accion: d.stock.enCamino > 0 ? "Cuidar el ritmo de gasto hasta que llegue lo que viene en camino." : "Bajar el gasto o pausar las campañas del producto antes de que se agote: si se agota, siguen gastando sin poder entregar.",
         gravedad: d.stock.enCamino > 0 ? "media" : "alta",
       });
     }
@@ -83,7 +83,7 @@ export function senalesDeModulos(d: DatosModulos, o: { hoy: string; cpaActual: n
       tipo: "precio_cambio",
       titulo: `El precio de venta cambió hace ${dias} ${dias === 1 ? "día" : "días"} (hoy ${usd(p.precio)})`,
       detalle: "Un precio distinto cambia lo que ve el cliente y, con eso, el clic y la compra: la caída puede coincidir con ese cambio.",
-      accion: "Comparar el CPA y la conversión de antes y después de esa fecha; si empeoraron, probar con el precio anterior o con una oferta que justifique el nuevo.",
+      accion: "Comparar el CPA y la conversión de antes y después de esa fecha; si empeoraron, probar una oferta o una promesa en el anuncio y la landing que justifique el precio nuevo.",
       gravedad: "media",
     });
   }
@@ -95,7 +95,7 @@ export function senalesDeModulos(d: DatosModulos, o: { hoy: string; cpaActual: n
       tipo: "margen_bajo",
       titulo: `El precio de venta deja un margen de ${Math.round(p.margen! * 100)} %`,
       detalle: `Con ese margen, el CPA tope se queda corto: un CPA que parece bueno en Meta puede dejar poco o perder al contar el costo del producto.`,
-      accion: "Revisar el precio o el costo antes de seguir gastando para escalar.",
+      accion: "No escalar este producto mientras el margen sea bajo, y mantener el CPA muy por debajo del tope.",
       gravedad: p.margen! < 0 ? "alta" : "media",
     });
   }
@@ -107,7 +107,7 @@ export function senalesDeModulos(d: DatosModulos, o: { hoy: string; cpaActual: n
       tipo: "mas_baratos",
       titulo: `${m.competidores} ${m.competidores === 1 ? "competidor vende" : "competidores venden"} el mismo producto más barato (desde ${usd(m.minimo)} frente a nuestros ${usd(m.nuestro)})`,
       detalle: "Cuando el dropshipper compara, se queda con el más barato: eso encarece cada compra en Meta aunque el anuncio sea bueno.",
-      accion: "Ver en Análisis de competencia quién es y qué ofrece; decidir si bajar el precio, mejorar la oferta o dejar de empujar este producto.",
+      accion: "Ver en Análisis de competencia quién es y qué ofrece; mejorar la oferta y la promesa del anuncio y la landing, o dejar de empujar este producto.",
       gravedad: "media",
     });
   }

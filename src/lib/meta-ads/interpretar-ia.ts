@@ -19,9 +19,38 @@ export interface InterpretacionIA {
 }
 
 /** Cuánto se acepta de cada parte de la respuesta (para que una respuesta larga o rara no desborde la pantalla). */
-export const LIMITES_IA = { resumen: 700, puntos: 6, titulo: 120, detalle: 420, limites: 5, limite: 240 } as const;
+export const LIMITES_IA = { resumen: 1000, puntos: 6, titulo: 140, detalle: 900, limites: 5, limite: 320 } as const;
 
 const r1 = (n: number | null) => (n === null ? null : Math.round(n * 100) / 100);
+
+/**
+ * Lo que sí puede hacer o cambiar quien monta las campañas, y lo que no (24 nov 2026, pedido de Alcides: las recomendaciones traían «confirmar por llamada o WhatsApp el mismo día del despacho», «cobro previo»…, que ni Ariadne ni las personas que
+ * llevan las campañas pueden hacer). Se le dice a las dos IA (la que interpreta y la del chat); las acciones fijas del sistema ya van escritas con este mismo alcance.
+ */
+export const REGLA_ALCANCE_DE_CAMPANAS = [
+  "ALCANCE DE LAS RECOMENDACIONES: recomienda SOLO lo que puede hacer o cambiar quien monta las campañas: crear, duplicar, pausar o cambiar campañas, presupuestos, estructura (CBO o ABO) y puja; la segmentación (países, zonas y públicos); subir, rotar o quitar videos y anuncios; cambiar ángulos, ganchos, textos, ofertas y la promesa del anuncio; y cambiar o probar landings y páginas.",
+  "NO recomiendes nada que dependa de otras áreas: confirmar pedidos por llamada o WhatsApp, cobro previo o pago por adelantado, despachar o no despachar, transportadoras o rutas, inventario o compras, cambiar el precio del producto, ni «hablar con» o «pedir a» otra área.",
+  "Si la causa de un problema está en otra área (por ejemplo devoluciones porque los clientes no contestan), puedes nombrarla como dato para entender el resultado, pero la recomendación debe ser algo de campañas: mover presupuesto a las zonas o productos que sí se entregan, separar o excluir una zona con muchas devoluciones, o ajustar la promesa del anuncio y la landing para atraer a quien sí recibe el pedido.",
+  "La meta de costo por entrega es una referencia para medir, no una acción.",
+].join(" ");
+
+/**
+ * Deja un texto en una línea y, si se pasa del largo, lo corta en un punto natural (el final de una frase o, si no hay, el de una palabra, con «…») para que nunca quede una frase cortada a la mitad (24 nov 2026, pedido de Alcides: se leía «…verificar que el cliente t»).
+ */
+export function recortarTexto(v: unknown, max: number): string {
+  if (typeof v !== "string") return "";
+  return cortarEnPunto(v.replace(/\s+/g, " ").trim(), max);
+}
+
+/** Como `recortarTexto` pero respetando los saltos de línea (la respuesta del chat lleva listas). */
+export function cortarEnPunto(t: string, max: number): string {
+  if (t.length <= max) return t;
+  const corte = t.slice(0, max);
+  const fin = Math.max(corte.lastIndexOf(". "), corte.lastIndexOf("; "), corte.lastIndexOf("? "), corte.lastIndexOf("! "), corte.lastIndexOf("\n"));
+  if (fin >= max * 0.5) return corte.slice(0, fin + 1).trimEnd();
+  const espacio = Math.max(corte.lastIndexOf(" "), corte.lastIndexOf("\n"));
+  return `${(espacio > 0 ? corte.slice(0, espacio) : corte).replace(/[,;:\s]+$/, "")}…`;
+}
 
 /** El pedido: las reglas fijas y el resumen del análisis (solo lo necesario: lo más grande de cada tabla). Va todo en JSON para que la IA lea cifras, no frases. */
 export function pedidoInterpretacion(a: AnalisisHistorico, investigaciones: readonly unknown[] = [], senalesCreativas: readonly unknown[] = [], rasgos: readonly unknown[] = []): { instrucciones: string; texto: string } {
@@ -33,8 +62,10 @@ export function pedidoInterpretacion(a: AnalisisHistorico, investigaciones: read
     "El resultado «funcionó» significa que la campaña o el video tuvo gasto suficiente y su CPA quedó dentro del CPA tope de su producto; no hay cálculo de costos reales todavía.",
     "Da importancia a la tasa de entrega: un producto que vende bien en Meta pero entrega mal cuesta más por venta real.",
     "Escribe para quien monta las campañas, que no es analista: español claro, frases cortas, sin jerga. Cada punto lleva un título corto y un detalle con las cifras que lo respaldan y qué hacer.",
+    REGLA_ALCANCE_DE_CAMPANAS,
     'Responde SOLO con un JSON válido de esta forma: {"resumen": string, "patrones": [{"titulo": string, "detalle": string}], "riesgos": [{"titulo": string, "detalle": string}], "recomendaciones": [{"titulo": string, "detalle": string}], "limites": [string]}.',
     `Máximo ${LIMITES_IA.puntos} elementos en patrones, riesgos y recomendaciones, y ${LIMITES_IA.limites} en limites. «limites» = lo que los datos todavía no permiten concluir o lo que convendría empezar a medir.`,
+    "Largos: el resumen de hasta 600 caracteres y cada detalle de hasta 450; termina siempre las frases (nunca dejes una a medias): si no cabe todo, di menos y prioriza lo que más importa.",
     investigaciones.length
       ? "Recibes además «investigaciones_de_entrega»: por qué no se entregan los productos que más devuelven, buscado por el sistema en los pedidos, la zona, la transportadora, la confirmación, lo que escribieron Servientrega, Monday y los asesores y, a veces, las conversaciones de WhatsApp. NO recomiendes «revisa por qué vuelven los pedidos»: usa las causas encontradas (con sus números) y da la acción concreta; si la investigación no encontró una causa clara, dilo y di qué dato falta. Para cada producto con investigación, el costo por entrega objetivo es el que viene en el JSON."
       : "Si un producto vende bien pero entrega mal y no recibes la causa, no digas «revisa por qué vuelven»: di que todavía no se investigó y qué se necesita para saberlo.",
@@ -76,7 +107,7 @@ export function pedidoInterpretacion(a: AnalisisHistorico, investigaciones: read
   return { instrucciones, texto: `Estadísticas del sistema (JSON):\n${JSON.stringify(datos)}${investigado}` };
 }
 
-const texto = (v: unknown, max: number): string => (typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, max) : "");
+const texto = recortarTexto;
 
 function puntos(v: unknown): PuntoIA[] {
   if (!Array.isArray(v)) return [];

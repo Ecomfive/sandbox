@@ -5,6 +5,7 @@
 
 import { CLAVES_FILTRO, DIMENSIONES, METRICAS } from "./analisis-pedido";
 import { NOMBRE_CATEGORIA, type AnalisisHistorico, type FilaVentas } from "./historico";
+import { cortarEnPunto, recortarTexto, REGLA_ALCANCE_DE_CAMPANAS } from "./interpretar-ia";
 
 export const LIMITES_CHAT = {
   /** Largo máximo de una pregunta. */
@@ -94,6 +95,7 @@ export function pedidoChat(a: AnalisisHistorico, tiendas: readonly string[], hoy
     "Distingue lo comprobado (mucho gasto, certeza firme) de lo que apenas empieza a verse (poca data). Una correlación no es una causa: «se asocia con», no «causa».",
     "Contesta directo y en español claro: primero la respuesta, luego las cifras que la respaldan y, si ayuda, qué hacer. Frases cortas, sin jerga, máximo unas 250 palabras. Usa guiones para listas; no uses tablas ni formato Markdown (sin asteriscos ni almohadillas).",
     "Si la pregunta no tiene que ver con el rendimiento de las campañas, los productos, la entrega o el historial, di amablemente que solo puedes ayudar con eso.",
+    REGLA_ALCANCE_DE_CAMPANAS,
     `Puedes pedir un análisis nuevo: si para contestar con exactitud hace falta algo que NO está en el JSON (otro rango de fechas, otro desglose, un producto, ángulo o campaña concreto por día o por semana, comparar dos periodos, lo de «esta semana»…), no contestes todavía ni te disculpes: responde SOLO con este JSON, sin texto antes ni después: {"accion":"analizar","analisis":[{...}]} (hasta 2 análisis). Cada análisis lleva: "titulo" (corto), "agrupar" (uno de: ${DIMENSIONES.join(", ")}), "desde" y "hasta" (AAAA-MM-DD, hasta no pasa de hoy), "comparar" opcional ({"desde","hasta"} de otro periodo para ver el cambio), "filtros" opcional (texto que debe contener: ${CLAVES_FILTRO.join(", ")}), "orden" (una de: ${METRICAS.join(", ")}), "sentido" ("asc" o "desc"), "limite" (hasta 15) y "gasto_minimo" (dólares, para dejar fuera lo que casi no gastó). Si la respuesta ya está en el JSON del sistema, contesta directo en texto y no pidas análisis.`,
     `Si la pregunta es POR QUÉ un producto no se entrega o se devuelve (o qué hacer con su entrega), primero mira «investigaciones_de_entrega» del JSON: ya trae las causas que el sistema encontró cruzando pedidos, zona, transportadora, confirmación y lo que escribieron Servientrega, Monday y los asesores. Contesta con esas causas y sus números, sin decir «revisa por qué». Si el producto no está ahí o la persona pide ir más a fondo (leer las conversaciones de WhatsApp de los pedidos devueltos), responde SOLO con: {"accion":"investigar","producto":"nombre del producto como lo dice la persona"}.`,
     `Si la persona te pide que desde ahora le indiques, vigiles o le muestres algo («avísame cuando…», «a partir de ahora…», «vigila…», «quiero que me lo muestres siempre»), responde SOLO con este JSON: {"accion":"vigilar","vigilancia":{"titulo":"...","agrupar":"total|producto|campana|angulo|gancho|formato|cta|estructura|puja|etapa|familia","metrica":"una de: ${METRICAS.join(", ")}","ventana_dias":7|14|30,"umbral_pct":número entre 5 y 200,"gasto_minimo":número,"filtros":{}},"prioridad":"alta|media|baja","mensaje":"una frase que confirma qué vigilarás y con qué prioridad"}. Se compara lo de los últimos ventana_dias días con los anteriores y se marca lo que se mueva más que umbral_pct. La prioridad es la que la persona diga (urgente o muy importante = alta; normal = media; «cuando puedas» = baja); si no dice nada, media. Usa la conversación para saber a qué se refiere («eso», «lo de antes»).`,
@@ -104,14 +106,16 @@ export function pedidoChat(a: AnalisisHistorico, tiendas: readonly string[], hoy
 
 /** La respuesta lista para mostrar: sin formato Markdown que sobre, sin espacios de más y con tope de largo. */
 export function limpiarRespuesta(texto: string | null | undefined): string {
-  return (texto ?? "")
-    .replace(/\*\*(.+?)\*\*/g, "$1")
-    .replace(/^#{1,6}\s+/gm, "")
-    .replace(/^[ \t]*[*•][ \t]+/gm, "- ")
-    .replace(/[ \t]+\n/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim()
-    .slice(0, LIMITES_CHAT.respuesta);
+  return cortarEnPunto(
+    (texto ?? "")
+      .replace(/\*\*(.+?)\*\*/g, "$1")
+      .replace(/^#{1,6}\s+/gm, "")
+      .replace(/^[ \t]*[*•][ \t]+/gm, "- ")
+      .replace(/[ \t]+\n/g, "\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim(),
+    LIMITES_CHAT.respuesta,
+  );
 }
 
 /** Lo que devolvió la IA: una respuesta de texto, o un pedido para que el sistema corra análisis o deje una vigilancia (siempre JSON, que se valida aparte). */
@@ -125,7 +129,7 @@ export function interpretarRespuestaChat(texto: string | null | undefined): Resp
       const o = JSON.parse(sinCerca.slice(sinCerca.indexOf("{"), sinCerca.lastIndexOf("}") + 1)) as Record<string, unknown>;
       if (o.accion === "investigar" && typeof o.producto === "string" && o.producto.trim()) return { tipo: "investigar", producto: o.producto.replace(/\s+/g, " ").trim().slice(0, 80) };
       if (o.accion === "analizar" && Array.isArray(o.analisis)) return { tipo: "analizar", analisis: o.analisis.slice(0, 2) };
-      if (o.accion === "vigilar" && o.vigilancia && typeof o.vigilancia === "object") return { tipo: "vigilar", vigilancia: o.vigilancia, prioridad: o.prioridad, mensaje: typeof o.mensaje === "string" ? o.mensaje.replace(/\s+/g, " ").trim().slice(0, 400) : null };
+      if (o.accion === "vigilar" && o.vigilancia && typeof o.vigilancia === "object") return { tipo: "vigilar", vigilancia: o.vigilancia, prioridad: o.prioridad, mensaje: typeof o.mensaje === "string" ? recortarTexto(o.mensaje, 400) : null };
     } catch {
       // No era un JSON: se trata como texto.
     }

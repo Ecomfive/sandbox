@@ -68,7 +68,10 @@ test("la conclusión dice si es del producto o de toda la tienda, qué grupo dev
   assert.match(titulos, /Confirmación «Salió sin confirmación registrada»/);
   assert.match(titulos, /«Dirección mala o fuera de cobertura» en 10 de 12/);
   const zona = c.hallazgos.find((h) => h.tipo === "zona")!;
-  assert.match(zona.accion, /pago por adelantado/);
+  assert.match(zona.accion, /segmentación/, "la acción es de campañas: segmentación y presupuesto");
+  // Nada que dependa de otras áreas (24 nov 2026, pedido de Alcides): ni confirmar, cobrar por adelantado, despachar ni cambiar la transportadora.
+  const otrasAreas = /llamada|WhatsApp|cobro previo|pago por adelantado|despachar|antes del despacho|confirmar el mismo día/i;
+  for (const h of c.hallazgos) assert.ok(!otrasAreas.test(h.accion), `«${h.accion}» no es algo que controle quien monta las campañas`);
   // CPA $4 con 71 % de entrega = $5.60 por compra entregada; para quedar en $10 el CPA puede ser $7.14.
   assert.equal(c.costo!.costoPorEntrega, 5.6);
   assert.equal(c.costo!.cpaObjetivo, 7.14);

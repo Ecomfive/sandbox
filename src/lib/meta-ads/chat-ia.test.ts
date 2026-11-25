@@ -66,5 +66,8 @@ test("el pedido manda las reglas (solo el JSON), la conversación y la pregunta"
 test("la respuesta se limpia del formato que sobra y se recorta", () => {
   assert.equal(limpiarRespuesta("## Resumen\n\n**El corrector** empeoró.\n\n\n\n* Entrega 48 %\n• CPA $14  \n"), "Resumen\n\nEl corrector empeoró.\n\n- Entrega 48 %\n- CPA $14");
   assert.equal(limpiarRespuesta(null), "");
-  assert.equal(limpiarRespuesta("x".repeat(9000)).length, LIMITES_CHAT.respuesta);
+  assert.ok(limpiarRespuesta("x".repeat(9000)).length <= LIMITES_CHAT.respuesta + 1, "un texto sin cortes naturales se corta con «…»");
+  const frases = `${"Frase completa de la respuesta. ".repeat(200)}`;
+  assert.ok(limpiarRespuesta(frases).endsWith("."), "nunca queda una frase a medias");
+  assert.ok(limpiarRespuesta(frases).length <= LIMITES_CHAT.respuesta);
 });
