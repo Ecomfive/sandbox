@@ -7,7 +7,7 @@ import { AJUSTE_ANALISIS_AUTOMATICO } from "@/lib/meta-ads/ajustes";
 import { iasParaInterpretar, leerAnalisisGuardado, refrescarAnalisisMeta } from "@/lib/meta-ads/analisis-guardado";
 import { claveDeTema, ejecutarAnalisis, validarAnalisis, validarPrioridad, validarVigilancia, vigilanciaDeAnalisis, type Prioridad } from "@/lib/meta-ads/analisis-pedido";
 import { cargarBaseDias } from "@/lib/meta-ads/base-dias";
-import { guardarInvestigacion, investigarProducto, leerInvestigaciones, proveedorParaInvestigar } from "@/lib/meta-ads/investigacion-datos";
+import { guardarInvestigacion, investigarProducto, leerInvestigaciones } from "@/lib/meta-ads/investigacion-datos";
 import { textoParaIA } from "@/lib/meta-ads/investigacion-entrega";
 import { leerValorSenales, claveDeSenales, senalesParaIA } from "@/lib/meta-ads/senales-creativas";
 import { senalesVisibles } from "@/lib/meta-ads/senales-modulos";
@@ -560,28 +560,6 @@ function buscarFilaDeEntrega<T extends { nombre: string; gasto: number; enTienda
   return coinciden.sort((a, b) => b.gasto - a.gasto)[0] ?? null;
 }
 
-/**
- * «Investigar a fondo» (botón de Productos y Hallazgos): lee las conversaciones de WhatsApp de los últimos pedidos devueltos de un producto y le pide a la IA el porqué de cada uno, y las suma a lo que ya se sabe de Servientrega, Monday, la zona y la
- * confirmación. Lee conversaciones de clientes y gasta crédito de IA: hace falta poder modificar el módulo. Los teléfonos y correos se quitan antes de mandar nada a la IA.
- */
-export async function investigarEntregaMeta(clave: unknown): Promise<{ error?: string; aviso?: string }> {
-  const u = await requireModuloEscritura(MODULO);
-  if (typeof clave !== "string" || clave.length > 200) return { error: "Ese producto no existe." };
-  const proveedor = proveedorParaInvestigar();
-  if (!proveedor) return { error: "Falta conectar una IA de texto (la clave OPENAI_API_KEY o ANTHROPIC_API_KEY en Vercel)." };
-  const supabase = createServiceClient();
-  const pais = await getPaisActual(supabase);
-  if (!(await puedeVerPaisId(supabase, u.paisesPermitidos, pais.id))) return { error: "No tienes acceso a ese país." };
-  const guardado = await leerAnalisisGuardado(supabase, pais.id);
-  const fila = guardado?.analisis.entrega.find((f) => f.clave === clave);
-  if (!guardado || !fila?.enTienda) return { error: "Ese producto no tiene pedidos de la tienda para investigar." };
-  const hecha = await investigarProducto(supabase, { paisId: pais.id, clave: fila.clave, producto: fila.nombre, productoEnTienda: fila.enTienda, tiendas: guardado.tiendas, hoy: hoyEnPanama(), cpa: fila.cpa, aFondo: { proveedor, quien: { id: u.id, nombre: u.nombre ?? null, email: u.email } } });
-  if ("error" in hecha) return { error: hecha.error };
-  await guardarInvestigacion(supabase, pais.id, hecha.investigacion, u.nombre ?? u.email ?? "—");
-  await registrarAuditoria({ accion: "investigar_entrega_meta", entidad: "meta_ajustes", detalle: `${fila.nombre} · a fondo` });
-  revalidatePath("/anuncios-meta", "layout");
-  return { aviso: hecha.aviso };
-}
 
 /**
  * «Actualizar el análisis ahora» (Hallazgos): lo mismo que hace el sistema cada día —calcular todo el historial, evaluar las vigilancias, investigar por qué no se entregan los productos con problema, mirar los creativos y lo que pasó en otros módulos

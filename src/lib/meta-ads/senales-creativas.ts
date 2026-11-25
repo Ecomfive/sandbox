@@ -217,6 +217,9 @@ export function senalesParaIA(s: SenalesCreativas): unknown {
   };
 }
 
+/** ¿Este producto tiene algo que decir? Alguna causa en sus creativos o alguna señal de otros módulos. Si no, no se muestra. */
+export const tieneSenales = (s: Pick<SenalesCreativas, "causas" | "otras">): boolean => s.causas.length > 0 || (s.otras?.length ?? 0) > 0;
+
 export const claveDeSenales = (paisId: string) => `senales_creativas:${paisId}`;
 
 export interface SenalesGuardadas {

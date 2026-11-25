@@ -4,7 +4,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { cargarBaseDias } from "./base-dias";
 import type { AnalisisHistorico } from "./historico";
-import { claveDeSenales, senalesDeProducto, type SenalesCreativas } from "./senales-creativas";
+import { claveDeSenales, senalesDeProducto, tieneSenales, type SenalesCreativas } from "./senales-creativas";
 import { senalesDeModulos } from "./senales-modulos";
 import { leerDatosModulos } from "./senales-modulos-datos";
 
@@ -19,13 +19,15 @@ export async function senalesCreativasDelDia(supabase: SupabaseClient, o: { pais
   try {
     const base = await cargarBaseDias({ paisId: o.paisId, cuentaId: null }, supabase);
     if (!base) return [];
-    const items = productosParaMirar(o.analisis).map((p) => senalesDeProducto(base, p, o.hoy)).filter((s): s is SenalesCreativas => s !== null);
+    const todos = productosParaMirar(o.analisis).map((p) => senalesDeProducto(base, p, o.hoy)).filter((s): s is SenalesCreativas => s !== null);
     // Lo que pasó con cada producto en Inventario, Gestión de IDs Dropi, Análisis de competencia y Test productos.
-    const modulos = await leerDatosModulos(supabase, { paisId: o.paisId, productos: items.map((s) => s.producto), hoy: o.hoy });
-    for (const s of items) {
+    const modulos = await leerDatosModulos(supabase, { paisId: o.paisId, productos: todos.map((s) => s.producto), hoy: o.hoy });
+    for (const s of todos) {
       const d = modulos.get(s.producto);
       if (d) s.otras = senalesDeModulos(d, { hoy: o.hoy, cpaActual: s.cpa14 ?? null, gasto14: s.gasto14 });
     }
+    // Un producto sin nada que decir (creativos sanos y sin señales de otros módulos) no se guarda ni se muestra ni se le da a la IA.
+    const items = todos.filter(tieneSenales);
     await supabase.from("meta_ajustes").upsert({ clave: claveDeSenales(o.paisId), valor: { generadoEn: new Date().toISOString(), items }, actualizado_por_nombre: "Sistema", actualizado_en: new Date().toISOString() }, { onConflict: "clave" });
     return items;
   } catch {
