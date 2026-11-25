@@ -19,11 +19,11 @@ export const PESTANAS_POR_MODULO: Record<string, Pestana[]> = {
     { etiqueta: "Confirmación con IA", href: "/tienda-pedidos/confirmacion/ia" },
     { etiqueta: "Logística", href: "/tienda-pedidos/logistica" },
   ],
-  // Comunicación despacho (19 nov 2026, pedido de Hernán): lo que se le pide a despacho; «Preguntar cuánto hay» vino de Pedidos de tienda.
+  // Comunicación despacho (19 nov 2026, pedido de Hernán): lo que se le pide a despacho. Mismos nombres que «Inventario despacho» (25 nov 2026); «Mercancía existente» vino de Pedidos de tienda.
   "/inventario-pedidos-despacho": [
-    { etiqueta: "Solicitudes de despacho", href: "/inventario-pedidos-despacho" },
-    { etiqueta: "Cuánto hay", href: "/inventario-pedidos-despacho/cuanto-hay" },
-    { etiqueta: "Archivo de pedidos", href: "/inventario-pedidos-despacho/archivo" },
+    { etiqueta: "Solicitud de inventario", href: "/inventario-pedidos-despacho" },
+    { etiqueta: "Mercancía existente", href: "/inventario-pedidos-despacho/cuanto-hay" },
+    { etiqueta: "Archivos de solicitudes", href: "/inventario-pedidos-despacho/archivo" },
   ],
   // Envíos Delivery: la gestión de los repartos; el día de hoy y, al lado, devoluciones, cambios y reembolsos.
   "/despacho-ciudad": [

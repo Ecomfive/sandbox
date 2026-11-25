@@ -2041,14 +2041,14 @@ export const GUIAS: GuiaModulo[] = [
   },
   {
     modulo: "tienda-cuanto-hay",
-    titulo: "Preguntar cuánto hay",
+    titulo: "Mercancía existente (preguntar)",
     ruta: "/inventario-pedidos-despacho/cuanto-hay",
     resumen: "Para saber cuánto hay de un producto sin mandar mensajes: la tienda pregunta y Yiletsi responde con lo que contó despacho.",
     secciones: [
       {
         titulo: "Uso",
         pasos: [
-          "Está en Fulfillment › Comunicación despacho, pestaña «Cuánto hay» (antes estaba en Pedidos de tienda). La ve quien tiene el permiso «Preguntar cuánto hay», aunque no tenga Solicitudes de despacho.",
+          "Está en Fulfillment › Comunicación despacho, pestaña «Mercancía existente» (antes «Cuánto hay», y antes en Pedidos de tienda). La ve quien tiene el permiso «Mercancía existente: preguntar», aunque no tenga Solicitud de inventario.",
           "En «Producto» escribe parte del nombre, el SKU o el N.º y elige el producto (o la variante: color, talla) de la lista. Solo salen los productos del catálogo; los combos no, porque se cuenta cada producto.",
           "Si quieres, escribe una nota para despacho (por ejemplo, «es para un cambio, cliente esperando») y pulsa «Preguntar». En «Para» eliges de quién es la pregunta: Proveeduría (Gestión de IDs Dropi) o la tienda, si manejas más de una.",
           "Abajo están solo tus preguntas. «Cantidad» dice «Esperando a Yiletsi» hasta que responde; después sale el número, y en «Respondió», quién y cuándo. También te llega el aviso en «Para ti».",
@@ -2122,11 +2122,12 @@ export const GUIAS: GuiaModulo[] = [
     modulo: "inventario-pedidos-despacho",
     titulo: "Comunicación despacho",
     ruta: "/inventario-pedidos-despacho",
-    resumen: "Solicitudes de despacho: lo que despacho le pide a inventario. Se pone en proceso, se escribe cuánto se envía y «Enviar» hace el traslado a la bodega de despacho.",
+    resumen: "Solicitud de inventario: lo que despacho le pide a inventario. Se pone en proceso, se escribe cuánto se envía y «Enviar» hace el traslado a la bodega de despacho.",
     secciones: [
       {
         titulo: "Uso",
         pasos: [
+          "Sus pestañas se llaman igual que las de Inventario despacho: «Solicitud de inventario» (antes «Solicitudes de despacho»), «Mercancía existente» (antes «Cuánto hay») y «Archivos de solicitudes» (antes «Archivo de pedidos»).",
           "La tabla muestra el N.º de pedido con su fecha (una sola vez por pedido), código, producto, cantidad pedida, stock por bodega, cantidad entregada y observaciones; el estado del pedido va una sola vez, arriba de sus botones, a la derecha. Al tocar el nombre del producto se abre su ficha de stock (la de Inventario, solo para consultar) con cómo está repartido en cada bodega; hace falta el permiso de Inventario. Cada pedido trae «Descargar PDF» (arriba de sus botones, a la derecha): baja una hoja con el N.º, su estado y fechas, quién lo pidió y cada producto con lo pedido, lo entregado y las observaciones; lo puede usar cualquiera que abra la página.",
           "Cuando despacho hace un pedido te llega el aviso en «Para ti». Pulsa «Pasar a “En proceso”» para que sepan que lo estás preparando.",
           "En «Cantidad entregada» escribe cuánto envías de cada producto (viene con lo pedido; 0 si no hay) y, si hace falta, una observación (por ejemplo, «solo quedaban 12»). «Stock por bodega» muestra cuánto hay del producto en cada bodega de donde inventario envía: en negrita la bodega de donde sale el pedido y, si allí no alcanza, en rojo cuánto falta.",
@@ -2346,6 +2347,7 @@ export interface Novedad {
 
 /** Lo nuevo del sistema, de lo más reciente a lo más viejo. La tarea diaria del Centro de ayuda agrega aquí lo que se publica. */
 export const NOVEDADES: Novedad[] = [
+  { fecha: "2026-11-25", titulo: "Comunicación despacho: los mismos nombres que Inventario despacho", texto: "Las pestañas de Comunicación despacho ahora se llaman igual que las de Inventario despacho: «Solicitud de inventario» (antes «Solicitudes de despacho»), «Mercancía existente» (antes «Cuánto hay») y «Archivos de solicitudes» (antes «Archivo de pedidos»). En los permisos, «Mercancía existente» dice si es para preguntar o para responder. No cambia lo que se hace en cada pantalla ni quién tiene acceso.", modulo: "inventario-pedidos-despacho", href: "/inventario-pedidos-despacho" },
   { fecha: "2026-11-25", titulo: "Envíos Delivery e Inventario despacho, cada uno en su sección", texto: "«Despacho ciudad» ahora se llama «Envíos Delivery» y queda solo con lo de los repartos: Hoy, Devoluciones y Cambios y reembolsos. Lo del stock pasó a una sección aparte, «Inventario despacho», en Gestión de tienda: «Mercancía existente» (antes «Cuánto hay»), «Solicitud de inventario» (antes «Pedir a inventario») y «Archivos de solicitudes» (antes «Archivo de pedidos»). No cambia nada de lo que se hace en cada pantalla ni quién tiene acceso; los enlaces y avisos de antes llevan a la pantalla nueva.", modulo: "despacho-pedir-inventario", href: "/inventario-despacho/solicitudes" },
   { fecha: "2026-11-25", titulo: "Anuncios Meta: ordena Campañas, Productos y Videos por cualquier métrica", texto: "Además de agrupar y filtrar, ahora «Ordenar por» deja elegir cualquier métrica (CPA, gasto, compras, ROAS, CTR, hook, CVR…) de mayor a menor o al revés en Campañas, Productos y Videos, y encadenar hasta dos órdenes más con «+ Agregar otro orden» (por ejemplo, por CPA y luego por gasto). Cada persona queda con el orden que eligió. En «Qué funciona», toca el título de una columna de la tabla para ordenar por ella.", modulo: "anuncios-meta", href: "/anuncios-meta/campanas" },
   { fecha: "2026-11-24", titulo: "Anuncios Meta: el «Qué hacer» ahora trae la respuesta, no «revisa»", texto: "Antes, un hallazgo como «vende bien pero solo se entrega 63 %» decía «mira en qué zonas se entrega peor y revisa que la promesa del anuncio y la landing coincidan». Ahora el sistema hace esa revisión y lo dice: qué provincias bajar o excluir de la segmentación (con cuántos pedidos volvieron) y a cuáles mover el presupuesto; qué promete el anuncio que más gastó, a qué página lleva y qué le falta a esa landing (si no dice que se paga contra entrega, no muestra el precio, no tiene garantía ni reseñas, carga lenta…). Lo mismo en las tendencias que empeoran (con la causa de los videos cansados o del inventario), en lo que nunca funcionó (con lo que sí comparten los anuncios que funcionaron) y en las sugerencias de campañas sin compras o con landing floja. Pasa en todas las pestañas (Productos, Campañas, Videos y General), no solo en Productos: por ejemplo, una campaña que empeoró dice qué métrica cayó y qué hacer con ella, y lo que nunca funcionó dice qué videos o campañas lo usan hoy. Si todavía no hay datos medidos, se deja el texto de antes. Las páginas se miden unas pocas por corrida: pulsa «Actualizar el análisis ahora» un par de veces para que aparezcan.", modulo: "anuncios-meta", href: "/anuncios-meta/hallazgos" },
