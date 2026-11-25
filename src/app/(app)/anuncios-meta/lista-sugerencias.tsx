@@ -1,14 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
-import { useToast } from "@/components/ui/toast";
-import { fieldClassSm, labelClassSm } from "@/components/ui/field";
+import { useState } from "react";
 import { UMBRALES_ANUNCIO } from "@/lib/meta-ads/decision-anuncio";
-import { DIAS_DE_DECISION, PRIORIDADES, UMBRALES, type Prioridad, type Sugerencia } from "@/lib/meta-ads/sugerencias";
+import { PRIORIDADES, UMBRALES, type Prioridad, type Sugerencia } from "@/lib/meta-ads/sugerencias";
 import { ChevronRightIcon } from "@/lib/nav-icons";
-import { decidirSugerenciaMeta } from "./actions";
+import { BotonesDecidir } from "./decidir";
 import { CifrasEnLinea } from "./piezas";
 
 const TEXTO_SEVERIDAD = { alta: "Urgente", media: "Importante", info: "Para mirar" } as const;
@@ -56,9 +53,7 @@ function AnunciosPasados({ anuncios }: { anuncios: NonNullable<Sugerencia["anunc
   );
 }
 
-function Tarjeta({ s, escribe, ocupada, alDecidir }: { s: Sugerencia; escribe: boolean; ocupada: boolean; alDecidir: (clave: string, estado: "aceptada" | "rechazada" | "pospuesta", nota?: string) => void }) {
-  const [rechazando, setRechazando] = useState(false);
-  const [porque, setPorque] = useState("");
+function Tarjeta({ s }: { s: Sugerencia }) {
   const punto = s.positiva ? "bg-success" : s.severidad === "alta" ? "bg-destructive" : s.severidad === "media" ? "bg-warning" : "bg-muted-foreground";
   // «Campañas sin etiquetas» abre la lista de campañas ya recortada a las que faltan; una campaña o un video abre su ficha.
   const enlace = s.tipo === "hallazgo" ? "/anuncios-meta/hallazgos" : s.tipo === "etiquetas_faltan" ? "/anuncios-meta/campanas?faltan=1" : s.objeto.tipo === "campana" ? `/anuncios-meta/campanas?abrir=${s.objeto.id}` : s.objeto.tipo === "video" ? `/anuncios-meta/videos?abrir=${encodeURIComponent(s.objeto.id)}` : null;
@@ -89,46 +84,14 @@ function Tarjeta({ s, escribe, ocupada, alDecidir }: { s: Sugerencia; escribe: b
           </p>
           {s.anuncios && s.anuncios.length > 0 && <AnunciosPasados anuncios={s.anuncios} />}
         </div>
-        {escribe && !rechazando && (
-          <div className="flex w-full shrink-0 flex-wrap gap-1.5 pl-4 @3xl:w-auto @3xl:justify-end @3xl:pl-0">
-            <button type="button" disabled={ocupada} onClick={() => alDecidir(s.clave, "aceptada")} className="min-h-8 rounded-md border border-border-control bg-card px-2.5 py-1 text-xs font-medium hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground disabled:opacity-50">
-              Ya lo hice
-            </button>
-            <button type="button" disabled={ocupada} onClick={() => alDecidir(s.clave, "pospuesta")} className="min-h-8 rounded-md border border-border-control bg-card px-2.5 py-1 text-xs font-medium hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground disabled:opacity-50">
-              Dejar para después
-            </button>
-            <button type="button" disabled={ocupada} onClick={() => setRechazando(true)} className="min-h-8 rounded-md border border-border-control bg-card px-2.5 py-1 text-xs font-medium text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground disabled:opacity-50">
-              No aplica
-            </button>
-          </div>
-        )}
+        <BotonesDecidir clave={s.clave} titulo={s.titulo} className="w-full shrink-0 pl-4 @3xl:w-auto @3xl:max-w-[26rem] @3xl:justify-end @3xl:pl-0" />
       </div>
-      {escribe && rechazando && (
-        <form
-          className="ml-4 flex flex-wrap items-end gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            alDecidir(s.clave, "rechazada", porque);
-          }}
-        >
-          <label className="flex min-w-[14rem] flex-1 flex-col gap-1">
-            <span className={labelClassSm}>¿Por qué no aplica? (se recuerda {DIAS_DE_DECISION.rechazada} días)</span>
-            <input className={fieldClassSm} value={porque} onChange={(e) => setPorque(e.target.value)} maxLength={300} placeholder="Ej: es una prueba corta, todavía no se decide" autoFocus />
-          </label>
-          <button type="submit" disabled={ocupada || porque.trim().length < 3} className="min-h-8 rounded-md bg-foreground px-3 py-1 text-xs font-medium text-background disabled:opacity-50">
-            Guardar
-          </button>
-          <button type="button" onClick={() => setRechazando(false)} className="min-h-8 rounded-md border border-border-control px-3 py-1 text-xs font-medium hover:bg-muted">
-            Cancelar
-          </button>
-        </form>
-      )}
     </li>
   );
 }
 
 /** Un grupo de la lista: su título con cuántas hay, que se pliega y se despliega. */
-function Grupo({ prioridad, sugerencias, abierto, alAlternar, escribe, ocupada, alDecidir }: { prioridad: Prioridad; sugerencias: Sugerencia[]; abierto: boolean; alAlternar: () => void; escribe: boolean; ocupada: boolean; alDecidir: (clave: string, estado: "aceptada" | "rechazada" | "pospuesta", nota?: string) => void }) {
+function Grupo({ prioridad, sugerencias, abierto, alAlternar }: { prioridad: Prioridad; sugerencias: Sugerencia[]; abierto: boolean; alAlternar: () => void }) {
   const [todas, setTodas] = useState(false);
   const g = GRUPOS[prioridad];
   const visibles = todas ? sugerencias : sugerencias.slice(0, MAX_POR_GRUPO);
@@ -148,7 +111,7 @@ function Grupo({ prioridad, sugerencias, abierto, alAlternar, escribe, ocupada, 
         <div id={id} className="border-t border-border">
           <ul role="list" aria-label={g.titulo} className="m-0 flex list-none flex-col divide-y divide-border p-0">
             {visibles.map((s) => (
-              <Tarjeta key={s.clave} s={s} escribe={escribe} ocupada={ocupada} alDecidir={alDecidir} />
+              <Tarjeta key={s.clave} s={s} />
             ))}
           </ul>
           {sugerencias.length > MAX_POR_GRUPO && (
@@ -163,10 +126,7 @@ function Grupo({ prioridad, sugerencias, abierto, alAlternar, escribe, ocupada, 
 }
 
 /** «Para decidir hoy»: lo que el sistema ve en los números y propone hacer, agrupado por prioridad. Aceptar, dejar para después o rechazar (con porqué) se recuerda hasta que vence. No cambia nada en Meta. */
-export function ListaSugerencias({ sugerencias, decididas, escribe }: { sugerencias: Sugerencia[]; decididas: number; escribe: boolean }) {
-  const router = useRouter();
-  const { mostrarToast } = useToast();
-  const [ocupada, empezar] = useTransition();
+export function ListaSugerencias({ sugerencias, decididas }: { sugerencias: Sugerencia[]; decididas: number }) {
   const grupos = PRIORIDADES.map((p) => ({ prioridad: p, lista: sugerencias.filter((s) => s.prioridad === p) })).filter((g) => g.lista.length > 0);
   // Lo urgente abierto; si no hay nada urgente, el primer grupo que tenga algo.
   const [abiertos, setAbiertos] = useState<Set<Prioridad>>(() => {
@@ -178,15 +138,6 @@ export function ListaSugerencias({ sugerencias, decididas, escribe }: { sugerenc
       const nuevos = new Set(previos);
       if (!nuevos.delete(p)) nuevos.add(p);
       return nuevos;
-    });
-  const decidir = (clave: string, estado: "aceptada" | "rechazada" | "pospuesta", nota?: string) =>
-    empezar(async () => {
-      const r = await decidirSugerenciaMeta(clave, estado, nota);
-      if (r.error) mostrarToast(r.error, "destructive");
-      else {
-        mostrarToast(estado === "aceptada" ? "Anotado: no se vuelve a sugerir por 30 días." : estado === "pospuesta" ? "Queda para dentro de 7 días." : "Anotado: no se vuelve a sugerir por 90 días.");
-        router.refresh();
-      }
     });
   return (
     <section aria-labelledby="para-decidir" className="@container min-w-0 overflow-hidden rounded-xl border border-border bg-card">
@@ -201,7 +152,7 @@ export function ListaSugerencias({ sugerencias, decididas, escribe }: { sugerenc
           No hay nada que decidir con los números de los últimos 7 días.{decididas > 0 ? ` Hay ${decididas} ya decididas que no se repiten hasta que venzan.` : ""}
         </p>
       ) : (
-        grupos.map((g) => <Grupo key={g.prioridad} prioridad={g.prioridad} sugerencias={g.lista} abierto={abiertos.has(g.prioridad)} alAlternar={() => alternar(g.prioridad)} escribe={escribe} ocupada={ocupada} alDecidir={decidir} />)
+        grupos.map((g) => <Grupo key={g.prioridad} prioridad={g.prioridad} sugerencias={g.lista} abierto={abiertos.has(g.prioridad)} alAlternar={() => alternar(g.prioridad)} />)
       )}
       <details className="border-t border-border px-4 py-2 text-xs text-muted-foreground">
         <summary className="min-h-8 cursor-pointer content-center font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground">Cómo se decide</summary>
@@ -210,8 +161,9 @@ export function ListaSugerencias({ sugerencias, decididas, escribe }: { sugerenc
           <li>
             Apagar: sin compras tras {UMBRALES.sinComprasVeces} veces el CPA tope; CPA sobre ${UMBRALES_ANUNCIO.cpaRojo} (o el tope, si es más alto) que los últimos {UMBRALES.recuperandoDias} días no bajan; o sobre el tope sin ningún anuncio que venda por debajo del {Math.round(UMBRALES.cercaDelTope * 100)} % del tope.
           </li>
-          <li>Actuar hoy: sobre el tope pero con un anuncio que la sostiene, o desde el {Math.round(UMBRALES.cercaDelTope * 100)} % del tope (agregar videos antes de llegar).</li>
-          <li>En observación: el CPA subió pero los 7 días siguen lejos del tope, o ya se está recuperando.</li>
+          <li>Actuar hoy: sobre el tope pero con un anuncio que la sostiene, o desde el {Math.round(UMBRALES.cercaDelTope * 100)} % del tope si los últimos {UMBRALES.recuperandoDias} días no bajan (agregar videos antes de pasar).</li>
+          <li>En observación: va dentro del tope aunque haya subido, o ya se está acomodando sola. Dentro del tope no se agregan videos ni se cambia el presupuesto de golpe: eso reinicia el aprendizaje de Meta.</li>
+          <li>El CPA tope general baja en los productos que envían o entregan peor que la tienda (se ve en la ficha de cada uno y en Cuentas).</li>
           <li>Del historial: solo productos y campañas con campañas activas.</li>
         </ul>
       </details>

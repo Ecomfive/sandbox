@@ -1,4 +1,8 @@
+"use client";
+
 import { dolaresEnteros } from "@/lib/meta-ads/metricas";
+import { claveDeHallazgo } from "@/lib/meta-ads/sugerencias";
+import { BotonesDecidir, Omitidas, useDecisiones } from "./decidir";
 import { tieneSenales, type CausaCreativa, type SenalesCreativas, type VideoSenal } from "@/lib/meta-ads/senales-creativas";
 import { NOMBRE_MODULO_SENAL, type Gravedad, type SenalModulo } from "@/lib/meta-ads/senales-modulos";
 import { BarraProgreso } from "./graficas";
@@ -47,11 +51,15 @@ interface Fila {
   detalle: string;
   accion: string;
   modulo?: string;
+  /** La llave con la que se recuerda lo decidido sobre esta señal de este producto. */
+  decision: string;
 }
 
 function filasDe(s: SenalesCreativas): Fila[] {
-  const a: Fila[] = s.causas.map((c) => ({ clave: c.titulo, etiqueta: DE_CAUSA[c.tipo].etiqueta, tono: DE_CAUSA[c.tipo].tono, icono: DE_CAUSA[c.tipo].icono, titulo: c.titulo, detalle: c.detalle, accion: c.accion }));
-  const b: Fila[] = (s.otras ?? []).map((o) => ({ clave: o.titulo, etiqueta: ETIQUETA_OTRA[o.tipo], tono: TONO_GRAVEDAD[o.gravedad], icono: ICONO_OTRA[o.modulo], titulo: o.titulo, detalle: o.detalle, accion: o.accion, modulo: NOMBRE_MODULO_SENAL[o.modulo] }));
+  const llave = (tipo: string) => claveDeHallazgo(`senal:${s.producto}:${tipo}`);
+  // Lo que va dentro del tope queda «en espera», en azul: se prepara, pero todavía no se toca.
+  const a: Fila[] = s.causas.map((c) => ({ clave: c.titulo, etiqueta: c.enEspera ? `En espera · ${DE_CAUSA[c.tipo].etiqueta}` : DE_CAUSA[c.tipo].etiqueta, tono: c.enEspera ? "azul" : DE_CAUSA[c.tipo].tono, icono: DE_CAUSA[c.tipo].icono, titulo: c.titulo, detalle: c.detalle, accion: c.accion, decision: llave(c.tipo) }));
+  const b: Fila[] = (s.otras ?? []).map((o) => ({ clave: o.titulo, etiqueta: ETIQUETA_OTRA[o.tipo], tono: TONO_GRAVEDAD[o.gravedad], icono: ICONO_OTRA[o.modulo], titulo: o.titulo, detalle: o.detalle, accion: o.accion, modulo: NOMBRE_MODULO_SENAL[o.modulo], decision: llave(o.tipo) }));
   const peso = (f: Fila) => (f.tono === "rojo" ? 0 : f.tono === "ambar" ? 1 : 2);
   return [...a, ...b].sort((x, y) => peso(x) - peso(y));
 }
@@ -94,7 +102,8 @@ function Icono({ d, tono }: { d: string; tono: Tono }) {
 }
 
 function Producto({ s }: { s: SenalesCreativas }) {
-  const filas = filasDe(s);
+  const { ocultas } = useDecisiones();
+  const filas = filasDe(s).filter((f) => !ocultas.has(f.decision));
   const peor: Tono = filas[0]?.tono ?? "azul";
   const visibles = filas.slice(0, 4);
   return (
@@ -136,6 +145,7 @@ function Producto({ s }: { s: SenalesCreativas }) {
                     <span className="shrink-0 font-semibold text-success">Qué hacer</span>
                     <span>{f.accion}</span>
                   </p>
+                  <BotonesDecidir clave={f.decision} titulo={`${s.producto}: ${f.titulo}`} className="mt-2" />
                 </div>
               </li>
             ))}
@@ -161,10 +171,14 @@ function Producto({ s }: { s: SenalesCreativas }) {
  * rinde peor) y en otros módulos (inventario, precio, competencia, test), cada señal con su color, su etiqueta, su ícono y la acción concreta. Un producto sin ninguna señal no aparece: no hay nada que decir.
  */
 export function SenalesCreativasVista({ senales, abierta = true }: { senales: SenalesCreativas[]; abierta?: boolean }) {
-  const con = senales.filter(tieneSenales);
-  if (con.length === 0) return null;
-  const grado = (s: SenalesCreativas) => (filasDe(s)[0]?.tono === "rojo" ? 0 : filasDe(s)[0]?.tono === "ambar" ? 1 : 2);
-  const orden = [...con].sort((a, b) => grado(a) - grado(b) || filasDe(b).length - filasDe(a).length || b.gasto14 - a.gasto14);
+  const { ocultas } = useDecisiones();
+  const todas = senales.filter(tieneSenales);
+  if (todas.length === 0) return null;
+  const visibles = (s: SenalesCreativas) => filasDe(s).filter((f) => !ocultas.has(f.decision));
+  const con = todas.filter((s) => visibles(s).length > 0);
+  const omitidas = todas.flatMap((s) => filasDe(s).filter((f) => ocultas.has(f.decision)).map((f) => ({ clave: f.decision, titulo: `${s.producto}: ${f.titulo}` })));
+  const grado = (s: SenalesCreativas) => (visibles(s)[0]?.tono === "rojo" ? 0 : visibles(s)[0]?.tono === "ambar" ? 1 : 2);
+  const orden = [...con].sort((a, b) => grado(a) - grado(b) || visibles(b).length - visibles(a).length || b.gasto14 - a.gasto14);
   const graves = orden.filter((s) => grado(s) === 0).length;
   const avisos = orden.filter((s) => grado(s) === 1).length;
   return (
@@ -184,6 +198,10 @@ export function SenalesCreativasVista({ senales, abierta = true }: { senales: Se
           <Producto key={s.producto} s={s} />
         ))}
       </ul>
+      {orden.length === 0 && <p className="m-0 text-sm text-muted-foreground">Nada pendiente aquí.</p>}
+      <div className="mt-2">
+        <Omitidas items={omitidas} />
+      </div>
     </SeccionPlegable>
   );
 }

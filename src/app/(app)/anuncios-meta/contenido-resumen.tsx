@@ -14,7 +14,7 @@ import { TemasDeTacticas } from "./cuales";
 const COLOR_VEREDICTO: Record<Veredicto, string> = { deja: "var(--success)", pierde: "var(--destructive)", poca_data: "var(--warning)", sin_gasto: "var(--grafica-5)" };
 
 /** El contenido de la pestaña Resumen (separado de la página para poder armarlo con datos de ejemplo). */
-export function ContenidoResumen({ datos, escribe }: { datos: DatosMeta; escribe: boolean }) {
+export function ContenidoResumen({ datos }: { datos: DatosMeta }) {
   const t = datos.totales;
   const ant = datos.anteriores;
   const activas = datos.campanas.filter((c) => c.activa).length;
@@ -71,12 +71,12 @@ export function ContenidoResumen({ datos, escribe }: { datos: DatosMeta; escribe
       {sinTope.length > 0 && (
         <p className="-mt-3 text-xs text-muted-foreground">
           <span aria-hidden="true" className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-warning" />
-          {sinTope.length === 1 ? "1 producto usa" : `${sinTope.length} productos usan`} el CPA tope de {dolares(CPA_TOPE_PREDETERMINADO)} por defecto ({sinTope.slice(0, 4).join(", ")}
-          {sinTope.length > 4 ? "…" : ""}): defínelo en <Link href="/anuncios-meta/cuentas" className="underline underline-offset-2">Cuentas</Link> para que el resultado sea real.
+          {sinTope.length === 1 ? "1 producto usa" : `${sinTope.length} productos usan`} el CPA tope general de {dolares(CPA_TOPE_PREDETERMINADO)}, que baja en los que envían o entregan peor que la tienda ({sinTope.slice(0, 4).join(", ")}
+          {sinTope.length > 4 ? "…" : ""}). Si alguno necesita otro, ponlo en <Link href="/anuncios-meta/cuentas" className="underline underline-offset-2">Cuentas</Link>.
         </p>
       )}
 
-      <ListaSugerencias sugerencias={datos.sugerencias} decididas={datos.decididas} escribe={escribe} />
+      <ListaSugerencias sugerencias={datos.sugerencias} decididas={datos.decididas} />
 
       <InterpretacionVista guardada={datos.interpretacion} preparando={datos.analisisPendiente} enlace />
 

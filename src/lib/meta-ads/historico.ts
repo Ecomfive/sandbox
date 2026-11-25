@@ -6,11 +6,13 @@
 //   · qué genera más ventas en cada parte (campañas, videos, ángulos, ganchos, productos), con lo que de verdad se entrega.
 // Sin la calculadora de costos: «funcionó» = tuvo gasto suficiente para compararse y su CPA quedó dentro del CPA tope del producto. Lógica pura, con prueba; las lecturas están en `historico-datos.ts`.
 
+import { sumarPedidos, tasasDe } from "./costos-operacion";
+import { NO_TOCAR, zonaDe, zonaDeCpa, type Zona } from "./limite";
 import { detallesDe, enComun, temasDe, textoDeDetalles, type RasgoComun } from "./angulo-detalle";
 import { esAnguloTactico } from "./video-angulo";
 import { claveDeProducto } from "./nombre";
 import { calcularEnMarcha, type EnMarcha } from "./en-marcha";
-import { certezaDe, confiable, cpa, cpm, ctr, cvr, efectividad, GASTO_MINIMO_CONFIABLE, hookRate, sinResultados, sumar, type Certeza, type Resultados } from "./metricas";
+import { CPA_TOPE_PREDETERMINADO, certezaDe, confiable, cpa, cpm, ctr, cvr, efectividad, GASTO_MINIMO_CONFIABLE, hookRate, sinResultados, sumar, type Certeza, type Resultados } from "./metricas";
 
 export type Familia = "suplemento" | "belleza" | "general";
 export const NOMBRE_FAMILIA: Record<Familia, string> = { suplemento: "suplementos", belleza: "belleza", general: "productos generales" };
@@ -115,7 +117,10 @@ export interface ProductoHist {
   clave: string;
   nombre: string;
   familia: Familia;
+  /** El CPA tope que se usa (ajustado por su envío y entrega, si toca). */
   tope: number;
+  /** El tope sin ajustar. */
+  topeBase?: number;
   campanas: number;
   total: Resultados;
   v: Ventanas;
@@ -172,6 +177,10 @@ export interface FilaEntrega {
   compras: number;
   cpa: number | null;
   tope: number;
+  /** El tope sin ajustar (un análisis guardado antes no lo trae). */
+  topeBase?: number;
+  /** De los pedidos ya decididos, cuántos se envían. */
+  envio?: number | null;
   tasa: number | null;
   cerradas: number;
   entregadas: number;
@@ -197,12 +206,16 @@ export function filasDeEntrega(productos: readonly ProductoHist[]): FilaEntrega[
     .map((p): FilaEntrega => {
       const tasa = tasaDeEntrega(p.entrega);
       const c = cpa(p.total);
-      const comprasEntregadas = tasa === null ? null : p.total.compras * tasa;
+      const envio = tasasDe(p.entrega).envio;
+      const base = p.topeBase ?? p.tope;
+      // Las ventas que llegan: las que se envían (si se sabe) y de esas las que se entregan.
+      const comprasEntregadas = tasa === null ? null : p.total.compras * tasa * (envio ?? 1);
       const cpaEntregado = comprasEntregadas && comprasEntregadas > 0 ? p.total.gasto / comprasEntregadas : null;
       let veredicto: VeredictoEntrega;
       if (tasa === null) veredicto = "sin_entrega";
       else if (p.total.gasto < U.entregaGastoMinimo || p.total.compras < U.entregaComprasMinimas) veredicto = "poca_data";
-      else if (c !== null && c <= p.tope && (tasa <= U.entregaMala || (promedio !== null && tasa <= promedio - U.entregaBrecha) || (cpaEntregado !== null && cpaEntregado > p.tope * 1.3))) veredicto = "vende_pero_no_entrega";
+      // Se ve bien en Meta (dentro del tope general) pero no entrega, o no alcanza el tope que le queda con su entrega.
+      else if (c !== null && c <= base && (tasa <= U.entregaMala || (promedio !== null && tasa <= promedio - U.entregaBrecha) || c > p.tope)) veredicto = "vende_pero_no_entrega";
       else if (c !== null && c <= p.tope) veredicto = "vende_y_entrega";
       else veredicto = "no_funciona";
       const e = p.entrega;
@@ -213,6 +226,8 @@ export function filasDeEntrega(productos: readonly ProductoHist[]): FilaEntrega[
         compras: p.total.compras,
         cpa: c,
         tope: p.tope,
+        topeBase: base,
+        envio,
         tasa,
         cerradas: e ? e.entregadas + e.devueltas : 0,
         entregadas: e?.entregadas ?? 0,
@@ -248,6 +263,10 @@ export interface Hallazgo {
   gasto: number;
   /** Cuáles son: los videos y las campañas detrás del hallazgo, y lo que tienen en común. */
   quienes?: Quienes;
+  /** Dónde queda frente a su CPA tope (tendencias y entrega): dentro, cerca o sobre. */
+  zona?: Zona;
+  /** Dólares gastados por encima del tope (gasto − compras × tope): cuánto pesa lo que pasa. */
+  impacto?: number;
   /** Solo en lo que sale de una vigilancia: la prioridad que la persona le dio (manda sobre la certeza al ordenar las sugerencias). */
   prioridad?: "alta" | "media" | "baja";
 }
@@ -580,6 +599,8 @@ export interface FilaTendencia {
   comprasPrev: number;
   comprasRec: number;
   cambio: Cambio;
+  /** El CPA tope contra el que se mide (en un grupo, el de sus campañas según lo que gastó cada una). */
+  tope: number;
 }
 
 const TEXTO_VENTANA = { mes: "el último mes frente al mes anterior", semana: "la última semana frente a las tres anteriores" } as const;
@@ -588,10 +609,14 @@ const MIN_GASTO = { mes: UMBRALES_HISTORICO.gastoMes, semana: UMBRALES_HISTORICO
 /** Cómo va todo, cada producto, cada ángulo y las campañas activas más grandes: el último mes y la última semana contra lo anterior. */
 export function tendencias(campanas: readonly CampanaHist[], productos: readonly ProductoHist[]): FilaTendencia[] {
   const filas: FilaTendencia[] = [];
-  const poner = (nivel: NivelTendencia, nombre: string, v: Ventanas) => {
+  const topeDe = (suyas: readonly CampanaHist[], ventana: "mes" | "semana") => {
+    const gasto = suyas.reduce((t, c) => t + c.v[ventana].rec.gasto, 0);
+    return gasto > 0 ? Math.round((suyas.reduce((t, c) => t + c.v[ventana].rec.gasto * c.tope, 0) / gasto) * 100) / 100 : (suyas[0]?.tope ?? CPA_TOPE_PREDETERMINADO);
+  };
+  const poner = (nivel: NivelTendencia, nombre: string, v: Ventanas, suyas: readonly CampanaHist[], propio?: number) => {
     for (const ventana of ["mes", "semana"] as const) {
       const cambio = valorarCambio(v[ventana], MIN_GASTO[ventana]);
-      filas.push({ nivel, nombre, ventana, gastoRec: v[ventana].rec.gasto, comprasPrev: v[ventana].prev.compras, comprasRec: v[ventana].rec.compras, cambio });
+      filas.push({ nivel, nombre, ventana, gastoRec: v[ventana].rec.gasto, comprasPrev: v[ventana].prev.compras, comprasRec: v[ventana].rec.compras, cambio, tope: propio ?? topeDe(suyas, ventana) });
     }
   };
   const sumarVentanas = (lista: readonly Ventanas[]): Ventanas =>
@@ -599,34 +624,58 @@ export function tendencias(campanas: readonly CampanaHist[], productos: readonly
       (t, v) => ({ mes: { rec: sumar(t.mes.rec, v.mes.rec), prev: sumar(t.mes.prev, v.mes.prev) }, semana: { rec: sumar(t.semana.rec, v.semana.rec), prev: sumar(t.semana.prev, v.semana.prev) } }),
       sinVentanas(),
     );
-  poner("Todo", "Todas las campañas", sumarVentanas(campanas.map((c) => c.v)));
-  for (const p of productos) poner("Producto", p.nombre, p.v);
-  const porAngulo = new Map<string, Ventanas[]>();
-  for (const c of campanas) if (c.angulo) porAngulo.set(c.angulo, [...(porAngulo.get(c.angulo) ?? []), c.v]);
-  for (const [angulo, v] of porAngulo) poner("Ángulo", angulo, sumarVentanas(v));
-  for (const c of campanas.filter((x) => x.activa).sort((a, b) => b.v.semana.rec.gasto - a.v.semana.rec.gasto).slice(0, 15)) poner("Campaña", c.nombre, c.v);
+  poner("Todo", "Todas las campañas", sumarVentanas(campanas.map((c) => c.v)), campanas);
+  for (const p of productos) poner("Producto", p.nombre, p.v, [], p.tope);
+  const porAngulo = new Map<string, CampanaHist[]>();
+  for (const c of campanas) if (c.angulo) porAngulo.set(c.angulo, [...(porAngulo.get(c.angulo) ?? []), c]);
+  for (const [angulo, suyas] of porAngulo) poner("Ángulo", angulo, sumarVentanas(suyas.map((c) => c.v)), suyas);
+  for (const c of campanas.filter((x) => x.activa).sort((a, b) => b.v.semana.rec.gasto - a.v.semana.rec.gasto).slice(0, 15)) poner("Campaña", c.nombre, c.v, [], c.tope);
   return filas;
 }
 
 function hallazgosDeTendencias(filas: readonly FilaTendencia[]): Hallazgo[] {
   const out: Hallazgo[] = [];
+  const cifra = (n: number | null) => (n === null ? "sin ventas" : dol(n));
+  const igualEnLaOtra = (f: FilaTendencia, sentido: Cambio["sentido"]) => filas.find((x) => x.nivel === f.nivel && x.nombre === f.nombre && x.ventana !== f.ventana && x.cambio.sentido === sentido);
   for (const f of filas) {
     if (f.cambio.sentido !== "baja" && f.cambio.sentido !== "mejora") continue;
     const baja = f.cambio.sentido === "baja";
-    const { cpaPrev, cpaRec } = f.cambio;
-    const antes = cpaPrev === null ? "sin ventas" : dol(cpaPrev);
-    const ahora = cpaRec === null ? "sin ventas" : dol(cpaRec);
+    const igual = igualEnLaOtra(f, f.cambio.sentido);
+    // Lo mismo en la semana y en el mes es una sola cosa: queda la semana (lo más reciente), que nombra también el mes.
+    if (igual && f.ventana === "mes") continue;
+    const antes = cifra(f.cambio.cpaPrev);
+    const ahora = cifra(f.cambio.cpaRec);
     // El mismo nombre puede ir al revés en la otra ventana (mejor en el mes y peor en la semana): se dice para que no parezca una contradicción.
-    const otra = filas.find((x) => x.nivel === f.nivel && x.nombre === f.nombre && x.ventana !== f.ventana && x.cambio.sentido === (baja ? "mejora" : "baja"));
-    const contraste = otra ? ` En ${TEXTO_VENTANA[otra.ventana]}, en cambio, ${baja ? "mejoró" : "empeoró"} (${otra.cambio.cpaPrev === null ? "sin ventas" : dol(otra.cambio.cpaPrev)} → ${otra.cambio.cpaRec === null ? "sin ventas" : dol(otra.cambio.cpaRec)}).` : "";
+    const otra = igualEnLaOtra(f, baja ? "mejora" : "baja");
+    const contraste = otra
+      ? ` En ${TEXTO_VENTANA[otra.ventana]}, en cambio, ${baja ? "mejoró" : "empeoró"} (${cifra(otra.cambio.cpaPrev)} → ${cifra(otra.cambio.cpaRec)}).`
+      : igual
+        ? ` En ${TEXTO_VENTANA[igual.ventana]} también ${baja ? "empeoró" : "mejoró"} (${cifra(igual.cambio.cpaPrev)} → ${cifra(igual.cambio.cpaRec)}).`
+        : "";
+    // Que el CPA suba solo es un problema si llega a su tope: dentro de él no se toca nada.
+    const zona: Zona = f.cambio.cpaRec === null ? zonaDe({ gasto: f.gastoRec, compras: 0 }, f.tope) : zonaDeCpa(f.cambio.cpaRec, f.tope);
+    const dentro = zona === "dentro";
+    const cuando = f.ventana === "mes" ? "en el último mes" : "en la última semana";
+    const queCambio = !baja ? `el CPA mejoró ${cuando}` : dentro ? `el CPA subió ${cuando}, dentro del tope` : `el CPA empeoró ${cuando} y ${zona === "sobre" ? "pasa del tope" : "está cerca del tope"}`;
+    const accionDeBaja =
+      zona === "dentro"
+        ? NO_TOCAR
+        : zona === "cerca"
+          ? "Está cerca del tope: dale 4 días para que se acomode sola; si no baja, agrega 2 o 3 videos nuevos."
+          : f.nivel === "Campaña"
+            ? "Revisar sus anuncios: si el creativo se cansó, rotarlo antes de seguir gastando."
+            : "Mirar qué campañas de ahí bajaron y por qué motivo antes de seguir subiendo presupuesto.";
+    const accionDeMejora = zona === "sobre" ? "Mejora, pero todavía pasa del tope: no subir presupuesto hasta que quede por debajo." : "Mantenerlo sin tocar y, si sigue así, subir el presupuesto de a 20 % como mucho para no reiniciar el aprendizaje.";
     out.push({
       id: `tendencia:${f.nivel}:${f.nombre}:${f.ventana}`,
       categoria: "tendencia",
-      tono: baja ? "alerta" : "bueno",
-      titulo: `${f.nivel === "Todo" ? "Todas las campañas" : `${f.nivel} «${f.nombre}»`}: el CPA ${baja ? "empeoró" : "mejoró"} ${f.ventana === "mes" ? "en el último mes" : "en la última semana"} (${antes} → ${ahora})`,
+      tono: !baja ? "bueno" : dentro ? "info" : "alerta",
+      zona,
+      impacto: baja ? Math.max(0, f.gastoRec - f.comprasRec * f.tope) : undefined,
+      titulo: `${f.nivel === "Todo" ? "Todas las campañas" : `${f.nivel} «${f.nombre}»`}: ${queCambio} (${antes} → ${ahora}, tope ${dol(f.tope)})`,
       detalle: `En ${TEXTO_VENTANA[f.ventana]}, ${f.nivel === "Todo" ? "el conjunto" : `${f.nivel.toLowerCase()} «${f.nombre}»`} pasó de ${entero(f.comprasPrev)} a ${entero(f.comprasRec)} compras y su CPA de ${antes} a ${ahora}. En el periodo reciente gastó ${dol(f.gastoRec)}.${contraste}`,
       motivo: f.cambio.motivo ?? undefined,
-      accion: baja ? (f.nivel === "Campaña" ? "Revisar sus anuncios: si el creativo se cansó, rotarlo antes de seguir gastando." : "Mirar qué campañas de ahí bajaron y por qué motivo antes de seguir subiendo presupuesto.") : "Mantenerlo y, si el CPA sigue dentro del tope, escalar con cuidado.",
+      accion: baja ? accionDeBaja : accionDeMejora,
       certeza: f.gastoRec >= UMBRALES_HISTORICO.gastoMes * 3 ? "firme" : "probable",
       gasto: f.gastoRec,
     });
@@ -640,14 +689,19 @@ function hallazgosDeEntrega(filas: readonly FilaEntrega[], promedio: number | nu
   const out: Hallazgo[] = [];
   for (const f of filas) {
     if (f.veredicto === "vende_pero_no_entrega" && f.tasa !== null) {
+      const zona = f.cpa === null ? "sobre" : zonaDeCpa(f.cpa, f.tope);
+      const dentro = zona === "dentro";
+      const ajuste = f.topeBase !== undefined && f.tope < f.topeBase ? `su tope ajustado por envío y entrega es ${dol(f.tope)} (el general es ${dol(f.topeBase)})` : `su tope es ${dol(f.tope)}`;
       out.push({
         id: `entrega:${f.clave}:mala`,
         categoria: "entrega",
-        tono: "alerta",
-        titulo: `${f.nombre}: vende bien pero solo se entrega ${pct(f.tasa)}`,
-        detalle: `En Meta tiene un CPA de ${f.cpa === null ? "—" : dol(f.cpa)} (dentro de su tope de ${dol(f.tope)}), pero de ${entero(f.cerradas)} pedidos resueltos solo ${entero(f.entregadas)} se entregaron y ${entero(f.devueltas)} volvieron${promedio !== null ? ` (el promedio de todos los productos es ${pct(promedio)})` : ""}. Contando solo lo que llega al cliente, cada compra cuesta ${f.cpaEntregado === null ? "—" : dol(f.cpaEntregado)}.`,
-        motivo: "Las ventas se ven bien en Meta, pero una parte no llega al cliente: el costo real por venta es más alto que el CPA.",
-        accion: "Antes de escalarlo, mirar en qué zonas se entrega peor y bajar o excluir esas zonas de la segmentación, revisar que la promesa del anuncio y de la landing coincida con lo que recibe el cliente y considerar un tope de CPA más bajo para este producto.",
+        tono: dentro ? "info" : "alerta",
+        zona,
+        impacto: Math.max(0, f.gasto - f.compras * f.tope),
+        titulo: dentro ? `${f.nombre}: entrega baja (${pct(f.tasa)}), pero su CPA sigue dentro de su tope` : `${f.nombre}: vende en Meta pero solo se entrega ${pct(f.tasa)} y ${zona === "sobre" ? "pasa de su tope" : "está cerca de su tope"}`,
+        detalle: `En Meta tiene un CPA de ${f.cpa === null ? "—" : dol(f.cpa)} y ${ajuste}. De ${entero(f.cerradas)} pedidos resueltos se entregaron ${entero(f.entregadas)} y volvieron ${entero(f.devueltas)}${promedio !== null ? ` (el promedio de todos los productos es ${pct(promedio)})` : ""}. Contando lo cancelado y lo devuelto, cada venta que llega cuesta en anuncios ${f.cpaEntregado === null ? "—" : dol(f.cpaEntregado)}.`,
+        motivo: "Una parte de lo que Meta cuenta como compra no llega al cliente: el costo real por venta es más alto que el CPA.",
+        accion: dentro ? "No cambies la campaña mientras vaya dentro de su tope: la segmentación nueva reinicia el aprendizaje. Las zonas con muchas devoluciones se prueban en una campaña nueva." : "Antes de escalarlo, mirar en qué zonas se entrega peor y bajar o excluir esas zonas de la segmentación, y revisar que la promesa del anuncio y de la landing coincida con lo que recibe el cliente.",
         certeza: f.cerradas >= 40 ? "firme" : "probable",
         gasto: f.gasto,
       });
@@ -657,8 +711,8 @@ function hallazgosDeEntrega(filas: readonly FilaEntrega[], promedio: number | nu
         categoria: "entrega",
         tono: "bueno",
         titulo: `${f.nombre}: entrega mejor que el resto (${pct(f.tasa)})`,
-        detalle: `Se entrega ${pct(f.tasa)} de lo despachado (el promedio es ${pct(promedio)}) y su CPA es ${f.cpa === null ? "—" : dol(f.cpa)}: cada compra entregada cuesta ${f.cpaEntregado === null ? "—" : dol(f.cpaEntregado)}.`,
-        accion: "Es de los productos más seguros para escalar: lo que se vende se entrega.",
+        detalle: `Se entrega ${pct(f.tasa)} de lo despachado (el promedio es ${pct(promedio)}) y su CPA es ${f.cpa === null ? "—" : dol(f.cpa)} con un tope de ${dol(f.tope)}: cada venta que llega cuesta en anuncios ${f.cpaEntregado === null ? "—" : dol(f.cpaEntregado)}.`,
+        accion: "Es de los productos más seguros para escalar: lo que se vende se entrega. Subir el presupuesto de a 20 % como mucho, para no reiniciar el aprendizaje.",
         certeza: f.cerradas >= 40 ? "firme" : "probable",
         gasto: f.gasto,
       });
@@ -726,8 +780,15 @@ function rankear(items: readonly { nombre: string; r: Resultados; clave: string;
 }
 
 export function rankingsDeVentas(campanas: readonly CampanaHist[], videos: readonly VideoHist[], productos: readonly ProductoHist[]): Rankings {
-  const promedio = tasaPromedio(productos);
-  const tasaPorClave = new Map(productos.map((p) => [p.clave, tasaDeEntrega(p.entrega)]));
+  // De cada compra de Meta, la parte que llega: lo que se envía (si se sabe) y de eso lo que se entrega.
+  const llega = (p: ProductoHist) => {
+    const t = tasaDeEntrega(p.entrega);
+    return t === null ? null : t * (tasasDe(p.entrega).envio ?? 1);
+  };
+  const tienda = sumarPedidos(productos.map((p) => p.entrega));
+  const entregaTienda = tasaPromedio(productos);
+  const promedio = entregaTienda === null ? null : entregaTienda * (tasasDe(tienda).envio ?? 1);
+  const tasaPorClave = new Map(productos.map((p) => [p.clave, llega(p)]));
   const tasaDe = (clave: string) => tasaPorClave.get(clave) ?? null;
   const totalCompras = campanas.reduce((s, c) => s + c.total.compras, 0);
   const totalVideos = videos.reduce((s, v) => s + v.total.compras, 0);
@@ -805,10 +866,15 @@ export interface AnalisisHistorico {
 
 const ORDEN_CATEGORIA: CategoriaHallazgo[] = ["entrega", "tendencia", "no_funciona", "funciona"];
 const PESO_TONO: Record<TonoHallazgo, number> = { alerta: 0, info: 1, bueno: 2 };
+const PESO_CERTEZA: Record<Certeza, number> = { firme: 0, probable: 1, poca: 2 };
+/** Cuánto pesa un hallazgo: los dólares gastados por encima del tope; donde no se mide eso, una cuarta parte de lo gastado. */
+export const pesoDeHallazgo = (h: Pick<Hallazgo, "gasto" | "impacto">): number => h.impacto ?? h.gasto * 0.25;
 
 /** Ordena los hallazgos: primero los que piden atención (entrega, tendencias a la baja, lo que no funciona), después lo bueno; dentro de cada grupo, los de más gasto. */
 export function ordenarHallazgos(lista: readonly Hallazgo[]): Hallazgo[] {
-  return [...lista].sort((a, b) => PESO_TONO[a.tono] - PESO_TONO[b.tono] || ORDEN_CATEGORIA.indexOf(a.categoria) - ORDEN_CATEGORIA.indexOf(b.categoria) || b.gasto - a.gasto || a.id.localeCompare(b.id));
+  return [...lista].sort(
+    (a, b) => PESO_TONO[a.tono] - PESO_TONO[b.tono] || PESO_CERTEZA[a.certeza] - PESO_CERTEZA[b.certeza] || pesoDeHallazgo(b) - pesoDeHallazgo(a) || ORDEN_CATEGORIA.indexOf(a.categoria) - ORDEN_CATEGORIA.indexOf(b.categoria) || b.gasto - a.gasto || a.id.localeCompare(b.id),
+  );
 }
 
 // ───────────────────────── Del «revisa» a la respuesta: lo que se puede decir con las campañas y los videos ─────────────────────────
@@ -837,14 +903,17 @@ export function detallarConCampanas(hallazgos: readonly Hallazgo[], campanas: re
         const c = campanas.find((x) => x.nombre === nombre);
         if (!c) return h;
         const mov = masMovida(c.v[ventana].prev, c.v[ventana].rec, true);
-        return { ...h, accion: mov ? ACCION_POR_METRICA[mov.m.id] : ACCION_SIN_METRICA };
+        const hacer = mov ? ACCION_POR_METRICA[mov.m.id] : ACCION_SIN_METRICA;
+        return { ...h, accion: h.zona === "cerca" ? `Está cerca del tope: dale 4 días; si no baja: ${hacer.charAt(0).toLowerCase()}${hacer.slice(1)}` : hacer };
       }
       const filas = campanas
         .filter((c) => c.activa && (nivel === "Todo" || c.angulo === nombre) && c.v[ventana].rec.gasto >= 30)
         .map((c) => ({ c, prev: cpa(c.v[ventana].prev), rec: cpa(c.v[ventana].rec), gasto: c.v[ventana].rec.gasto, comprasRec: c.v[ventana].rec.compras }));
-      const peores = filas.filter((x) => (x.rec === null ? x.comprasRec === 0 && x.prev !== null : x.prev !== null && x.rec > x.prev * 1.15)).sort((a, b) => b.gasto - a.gasto).slice(0, 3);
+      const empeoraron = filas.filter((x) => (x.rec === null ? x.comprasRec === 0 && x.prev !== null : x.prev !== null && x.rec > x.prev * 1.15));
+      // Solo se tocan las que pasan de su tope o están cerca: las demás siguen aprendiendo.
+      const peores = empeoraron.filter((x) => zonaDe({ gasto: x.gasto, compras: x.comprasRec }, x.c.tope) !== "dentro").sort((a, b) => b.gasto - a.gasto).slice(0, 3);
       const mejores = filas.filter((x) => x.prev !== null && x.rec !== null && x.rec < x.prev * 0.85).sort((a, b) => b.gasto - a.gasto).slice(0, 2);
-      if (!peores.length) return h;
+      if (!peores.length) return empeoraron.length ? { ...h, accion: `Ninguna campaña de las que empeoraron pasa de su tope ni está cerca: no tocarlas (cambiar videos o presupuesto reinicia el aprendizaje). Mirarlas la próxima semana.` } : h;
       const de = (x: (typeof filas)[number]) => `${nombreCorto(x.c.nombre)} (CPA ${dol(x.prev!)} → ${x.rec === null ? "sin ventas" : dol(x.rec)}, ${dolR(x.gasto)} gastados)`;
       return { ...h, accion: `Bajar el presupuesto o rotar el creativo de lo que más empeoró: ${peores.map(de).join("; ")}${mejores.length ? `; y mover ese dinero a lo que mejoró: ${mejores.map(de).join("; ")}` : ""}.` };
     }

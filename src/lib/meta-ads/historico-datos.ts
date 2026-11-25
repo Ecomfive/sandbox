@@ -7,7 +7,8 @@ import { conTtl } from "@/lib/cache-ttl";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { anguloDominante, composicionDeAngulos } from "./atributos-video";
 import { indexarCatalogo, palabrasDeProducto, type IndiceCatalogo } from "./etapa-venta";
-import { sumarPedidos } from "./costos-operacion";
+import { leerCostos, sumarPedidos, tasasDe } from "./costos-operacion";
+import { topeDeProducto, type TopeProducto } from "./limite";
 import { analizarHistorico, sinVentanas, type AnalisisHistorico, type CampanaHist, type EntregaProducto, type MesHist, type ProductoHist, type VideoHist, type Ventanas } from "./historico";
 import { CPA_TOPE_PREDETERMINADO, sinResultados, sumar, type Resultados } from "./metricas";
 import { claveDeProducto } from "./nombre";
@@ -110,8 +111,45 @@ export async function calcularHistorico(o: { paisId: string; cuentaId: string | 
     supabase.from("meta_topes").select("producto_clave, cpa_tope"),
   ]);
   const topePorClave = new Map((topesF.data ?? []).map((t) => [t.producto_clave as string, num(t.cpa_tope)]));
-  const topeDe = (clave: string) => topePorClave.get(clave) ?? CPA_TOPE_PREDETERMINADO;
   const hoy = o.hoy;
+
+  // Los pedidos de las tiendas de las cuentas: qué se entrega de cada producto.
+  const { data: unidadesF } = await supabase.from("fin_unidades").select("id, nombre");
+  const unidades = unidadesDeTiendas((unidadesF ?? []).map((u) => ({ id: u.id as string, nombre: String(u.nombre ?? "") })), cuentas.map((c) => String(c.tienda ?? "")));
+  let entregas = new Map<string, EntregaProducto>();
+  let pedidos = 0;
+  if (unidades.length) {
+    const lineas = await traerTodasLasFilas<Record<string, unknown>>((a, b) =>
+      supabase
+        .from("ven_orden_lineas")
+        .select("producto, cantidad, es_servicio, ven_ordenes!inner(estado_entrega, fecha, unidad_id)")
+        .in("ven_ordenes.unidad_id", unidades.map((u) => u.id))
+        .gte("ven_ordenes.fecha", restar(hoy, DIAS_DE_ENTREGA))
+        .order("orden_id")
+        .order("linea")
+        .range(a, b),
+    ).catch((): Record<string, unknown>[] => []);
+    pedidos = lineas.length;
+    entregas = entregasPorProducto(
+      lineas.map((l) => {
+        const o2 = Array.isArray(l.ven_ordenes) ? (l.ven_ordenes as Record<string, unknown>[])[0] : (l.ven_ordenes as Record<string, unknown> | null);
+        return { producto: String(l.producto ?? ""), cantidad: num(l.cantidad), estado: (o2?.estado_entrega as string | null) ?? null, servicio: l.es_servicio === true };
+      }),
+    );
+  }
+  const indiceVentas = indexarCatalogo([...entregas.keys()].map((nombre) => ({ nombre, clase: "" })));
+
+  // El tope de cada producto: el general ($10) baja si envía o entrega peor que la tienda; uno escrito a mano se respeta.
+  const pedidosDeLaTienda = entregas.size ? sumarPedidos([...entregas.values()]) : null;
+  const { costos } = await leerCostos(supabase, o.paisId);
+  const tienda = tasasDe(pedidosDeLaTienda);
+  const nombreDeClave = new Map(camp.map((c) => [claveDeProducto(((c.producto as string | null) ?? "").trim() || null), ((c.producto as string | null) ?? "").trim()]));
+  const topes = new Map<string, TopeProducto>();
+  for (const [clave, nombre] of nombreDeClave) {
+    const enTienda = nombre ? productoEnVentas(nombre, indiceVentas) : null;
+    topes.set(clave, topeDeProducto(topePorClave.get(clave), enTienda ? entregas.get(enTienda) : null, tienda, costos));
+  }
+  const topeDe = (clave: string) => topes.get(clave)?.tope ?? topePorClave.get(clave) ?? CPA_TOPE_PREDETERMINADO;
   const f = { mesDesde: restar(hoy, 29), mesPrevDesde: restar(hoy, 59), semDesde: restar(hoy, 6), semPrevDesde: restar(hoy, 27) };
 
   const anuncioDe = new Map(anun.map((a) => [a.id as string, a]));
@@ -219,32 +257,6 @@ export async function calcularHistorico(o: { paisId: string; cuentaId: string | 
     };
   });
 
-  // Los pedidos de las tiendas de las cuentas: qué se entrega de cada producto.
-  const { data: unidadesF } = await supabase.from("fin_unidades").select("id, nombre");
-  const unidades = unidadesDeTiendas((unidadesF ?? []).map((u) => ({ id: u.id as string, nombre: String(u.nombre ?? "") })), cuentas.map((c) => String(c.tienda ?? "")));
-  let entregas = new Map<string, EntregaProducto>();
-  let pedidos = 0;
-  if (unidades.length) {
-    const lineas = await traerTodasLasFilas<Record<string, unknown>>((a, b) =>
-      supabase
-        .from("ven_orden_lineas")
-        .select("producto, cantidad, es_servicio, ven_ordenes!inner(estado_entrega, fecha, unidad_id)")
-        .in("ven_ordenes.unidad_id", unidades.map((u) => u.id))
-        .gte("ven_ordenes.fecha", restar(hoy, DIAS_DE_ENTREGA))
-        .order("orden_id")
-        .order("linea")
-        .range(a, b),
-    ).catch((): Record<string, unknown>[] => []);
-    pedidos = lineas.length;
-    entregas = entregasPorProducto(
-      lineas.map((l) => {
-        const o2 = Array.isArray(l.ven_ordenes) ? (l.ven_ordenes as Record<string, unknown>[])[0] : (l.ven_ordenes as Record<string, unknown> | null);
-        return { producto: String(l.producto ?? ""), cantidad: num(l.cantidad), estado: (o2?.estado_entrega as string | null) ?? null, servicio: l.es_servicio === true };
-      }),
-    );
-  }
-  const indiceVentas = indexarCatalogo([...entregas.keys()].map((nombre) => ({ nombre, clase: "" })));
-
   // Los productos de las campañas, cada uno con lo que sumaron y la entrega de su producto en la tienda (el que mejor lo nombra).
   const porClave = new Map<string, { nombre: string; campanas: CampanaHist[] }>();
   for (const c of campanas) {
@@ -264,6 +276,7 @@ export async function calcularHistorico(o: { paisId: string; cuentaId: string | 
       nombre: g.nombre,
       familia: familiaDeProducto(g.nombre, null),
       tope: topeDe(clave),
+      topeBase: topes.get(clave)?.base ?? topeDe(clave),
       campanas: g.campanas.length,
       total: g.campanas.reduce((t, c) => sumar(t, c.total), sinResultados()),
       v,
@@ -278,8 +291,6 @@ export async function calcularHistorico(o: { paisId: string; cuentaId: string | 
     for (const c of g.campanas) for (const [mes, r] of mesDeCampana.get(c.id) ?? []) meses.set(mes, sumar(meses.get(mes) ?? sinResultados(), r));
     return { clave, nombre: g.nombre, meses: [...meses].map(([mes, r]) => ({ mes, r })) };
   });
-  // Todos los pedidos de las tiendas juntos: los porcentajes de un producto con pocos pedidos.
-  const pedidosDeLaTienda = entregas.size ? sumarPedidos([...entregas.values()]) : null;
   return { analisis: analizarHistorico({ campanas, videos, productos, desde, hasta, mensual, mensualPorProducto, pedidosDeLaTienda }), tiendas: unidades.map((u) => u.nombre), pedidos, vacio: false };
 }
 

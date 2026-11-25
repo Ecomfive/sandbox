@@ -131,12 +131,20 @@ test("un producto con buen CPA y mala entrega se marca, y la compra entregada cu
   assert.ok(Math.abs(malo.cpaEntregado! - 700 / 48) < 1e-9);
   assert.equal(filas.find((f) => f.nombre === "Shilajit")!.veredicto, "vende_y_entrega");
   const a = analizarHistorico({ campanas: [], videos: [], productos, desde: null, hasta: null });
+  // Dentro de su tope: se dice, pero no pide tocar la campaña.
   const h = a.hallazgos.find((x) => x.id === "entrega:Corrector:mala");
-  assert.ok(h);
-  assert.equal(h!.tono, "alerta");
-  assert.match(h!.titulo, /vende bien pero solo se entrega 48 %/);
+  assert.equal(h!.tono, "info");
+  assert.match(h!.titulo, /entrega baja \(48 %\), pero su CPA sigue dentro de su tope/);
+  assert.match(h!.accion!, /No cambies la campaña/);
+  // Con su tope ajustado a $6, el mismo CPA de $7 ya pasa: eso sí pide atención.
+  const ajustados = analizarHistorico({ campanas: [], videos: [], productos: productos.map((p) => (p.nombre === "Corrector" ? { ...p, tope: 6, topeBase: 10 } : p)), desde: null, hasta: null });
+  const alto = ajustados.hallazgos.find((x) => x.id === "entrega:Corrector:mala")!;
+  assert.equal(alto.tono, "alerta");
+  assert.match(alto.titulo, /solo se entrega 48 % y pasa de su tope/);
+  assert.match(alto.detalle, /tope ajustado por envío y entrega es \$6\.00 \(el general es \$10\.00\)/);
+  assert.equal(ajustados.entrega.find((f) => f.nombre === "Corrector")!.veredicto, "vende_pero_no_entrega");
   // Lo alerta va antes que lo bueno.
-  assert.equal(a.hallazgos[0].tono, "alerta");
+  assert.equal(ajustados.hallazgos[0].tono, "alerta");
 });
 
 test("sin tasa de entrega todavía, el producto no se juzga por eso", () => {

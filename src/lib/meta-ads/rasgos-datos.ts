@@ -7,7 +7,8 @@ import { familiaDeProducto } from "@/lib/publicaciones/ia/fotos-base";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { descargarConDetalle } from "@/lib/seguridad/url-externa";
 import { landingLimpia } from "./agrupar";
-import { CPA_TOPE_PREDETERMINADO, sinResultados, sumar, type Resultados } from "./metricas";
+import { leerTopes } from "./limite-datos";
+import { sinResultados, sumar, type Resultados } from "./metricas";
 import { claveDeProducto } from "./nombre";
 import { claveDeOfertas, claveDePaginasMedidas, leerValorOfertas, type OfertasProducto } from "./diagnostico-concreto";
 import { cortarEnPunto } from "./interpretar-ia";
@@ -75,9 +76,8 @@ export async function rasgosDelDia(supabase: SupabaseClient, o: { paisId: string
         supabase.from("meta_resultados_dia").select("anuncio_id, fecha, gasto, impresiones, clics, video_3s, vio_landing, compras, valor").in("cuenta_id", ids).gte("fecha", desde).order("fecha").order("anuncio_id").range(a, b),
       ),
       traerTodasLasFilas<Record<string, unknown>>((a, b) => supabase.from("meta_video_analisis").select("video_id, angulo, angulo_detalle, gancho_tipo, formato, cta_tipo, duracion_s, cta_segundo, oferta, recursos").order("video_id").range(a, b)).catch(() => traerTodasLasFilas<Record<string, unknown>>((a, b) => supabase.from("meta_video_analisis").select("video_id, angulo, gancho_tipo, formato, cta_tipo, duracion_s, cta_segundo, oferta, recursos").order("video_id").range(a, b))).catch((): Record<string, unknown>[] => []),
-      supabase.from("meta_topes").select("producto_clave, cpa_tope"),
+      leerTopes(supabase, o.paisId),
     ]);
-    const tope = new Map((topesF.data ?? []).map((t) => [t.producto_clave as string, num(t.cpa_tope)]));
     const campanaDe = new Map(camp.map((c) => [c.id as string, c]));
     const videoDe = new Map(analisis.map((v) => [v.video_id as string, v]));
 
@@ -97,7 +97,7 @@ export async function rasgosDelDia(supabase: SupabaseClient, o: { paisId: string
       const c = campanaDe.get(a.campana_id as string);
       if (!c) continue;
       const producto = ((c.producto as string | null) ?? "").trim() || null;
-      const topeC = tope.get(claveDeProducto(producto)) ?? CPA_TOPE_PREDETERMINADO;
+      const topeC = topesF(claveDeProducto(producto)).tope;
       const familia = familiaDeProducto(producto ?? "", null);
       const v = a.video_id ? videoDe.get(a.video_id as string) : undefined;
       const rasgos = [

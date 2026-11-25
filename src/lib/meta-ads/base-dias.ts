@@ -6,7 +6,8 @@ import { conTtl } from "@/lib/cache-ttl";
 import { familiaDeProducto } from "@/lib/publicaciones/ia/fotos-base";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import type { BaseDias, CampanaBase, VideoBase } from "./analisis-pedido";
-import { CPA_TOPE_PREDETERMINADO, sinResultados, type Resultados } from "./metricas";
+import { leerTopes } from "./limite-datos";
+import { sinResultados, type Resultados } from "./metricas";
 import { claveDeProducto } from "./nombre";
 
 const num = (v: unknown) => Number(v ?? 0) || 0;
@@ -28,9 +29,8 @@ async function leerBase(o: { paisId: string; cuentaId: string | null }, supabase
         traerTodasLasFilas<Record<string, unknown>>((a, b) => supabase.from("meta_video_analisis").select("video_id, angulo, formato").order("video_id").range(a, b)).catch((): Record<string, unknown>[] => []),
       ),
     ),
-    supabase.from("meta_topes").select("producto_clave, cpa_tope"),
+    leerTopes(supabase, o.paisId),
   ]);
-  const topePorClave = new Map((topesF.data ?? []).map((t) => [t.producto_clave as string, num(t.cpa_tope)]));
   const analisisDe = new Map(analisis.map((h) => [h.video_id as string, h]));
   const anuncioDe = new Map(anun.map((a) => [a.id as string, a]));
 
@@ -45,7 +45,7 @@ async function leerBase(o: { paisId: string; cuentaId: string | null }, supabase
       etapa: (c.etapa as string | null) ?? null,
       estructura: (c.estructura as string | null) ?? null,
       puja: (c.puja as string | null) ?? null,
-      tope: topePorClave.get(claveDeProducto(producto)) ?? CPA_TOPE_PREDETERMINADO,
+      tope: topesF(claveDeProducto(producto)).tope,
     });
   }
   const nombreDeVideo = new Map<string, string>();

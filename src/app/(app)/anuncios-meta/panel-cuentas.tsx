@@ -227,7 +227,7 @@ function Cuentas({ cuentas, escribe, pais, borrador }: { cuentas: CuentaVista[];
   );
 }
 
-function Topes({ topes, productos, enMarcha, escribe }: { topes: TopeVista[]; productos: string[]; /** Llaves de los productos con campañas en marcha: van primero. */ enMarcha: string[]; escribe: boolean }) {
+function Topes({ topes, productos, enMarcha, escribe, calculados }: { topes: TopeVista[]; productos: string[]; /** Llaves de los productos con campañas en marcha: van primero. */ enMarcha: string[]; escribe: boolean; calculados: Record<string, { tope: number; texto: string | null }> }) {
   const anunciado = (producto: string) => enMarcha.includes(claveDeProducto(producto));
   const router = useRouter();
   const { mostrarToast } = useToast();
@@ -262,7 +262,7 @@ function Topes({ topes, productos, enMarcha, escribe }: { topes: TopeVista[]; pr
     });
   return (
     <Bloque id="topes" titulo="CPA tope por producto" plegado={plegado} alAlternar={() => setPlegado((x) => !x)} resumen={`${todas.filter((f) => f.tope !== null).length} de ${todas.length} definidos`}>
-      <p className="m-0 text-sm text-muted-foreground">Lo máximo que se puede pagar por una compra sin perder. Con él se calcula el resultado estimado de cada campaña. Hasta que se defina, se usa ${CPA_TOPE_PREDETERMINADO}.</p>
+      <p className="m-0 text-sm text-muted-foreground">Lo máximo que se puede pagar por una compra sin perder. Con él se juzga cada campaña. Si no se escribe uno, se usa ${CPA_TOPE_PREDETERMINADO}, que baja solo en los productos que envían o entregan peor que la tienda; uno escrito aquí se usa tal cual.</p>
       <div className="flex flex-wrap items-end gap-3">
         <label className="flex min-w-[14rem] flex-1 flex-col gap-1">
           <span className="text-xs font-medium text-muted-foreground">Buscar producto</span>
@@ -290,7 +290,8 @@ function Topes({ topes, productos, enMarcha, escribe }: { topes: TopeVista[]; pr
                 <span className="text-sm font-medium">
                   {f.producto}
                   {anunciado(f.producto) && <span className="ml-2 rounded-full bg-success-soft px-2 py-0.5 text-xs font-medium text-success">En marcha</span>}
-                  {f.tope === null && <span className="ml-2 text-xs font-normal text-muted-foreground">sin definir (usa ${CPA_TOPE_PREDETERMINADO})</span>}
+                  {f.tope === null && <span className="ml-2 text-xs font-normal text-muted-foreground">sin definir (usa ${calculados[claveDeProducto(f.producto)]?.tope ?? CPA_TOPE_PREDETERMINADO})</span>}
+                  {f.tope === null && calculados[claveDeProducto(f.producto)]?.texto && <span className="block max-w-xl text-xs font-normal text-muted-foreground">{calculados[claveDeProducto(f.producto)].texto}</span>}
                 </span>
                 {escribe ? (
                   <span className="flex items-center gap-2">
@@ -372,7 +373,7 @@ function ProbadorDeNombres() {
 }
 
 /** «Cuentas»: la conexión con Meta, las cuentas publicitarias que se leen, el CPA tope de cada producto y cómo se leen los nombres de las campañas. */
-export function PanelCuentas({ cuentas, topes, productos, enMarcha, escribe, hayToken, pais, hoy }: { cuentas: CuentaVista[]; topes: TopeVista[]; productos: string[]; enMarcha: string[]; escribe: boolean; hayToken: boolean; pais: string; hoy: string }) {
+export function PanelCuentas({ cuentas, topes, productos, enMarcha, escribe, hayToken, pais, hoy, calculados }: { calculados: Record<string, { tope: number; texto: string | null }>; cuentas: CuentaVista[]; topes: TopeVista[]; productos: string[]; enMarcha: string[]; escribe: boolean; hayToken: boolean; pais: string; hoy: string }) {
   const [borrador, setBorrador] = useState<{ id: string; nombre: string } | null>(null);
   const [versionCobertura, setVersionCobertura] = useState(0);
   return (
@@ -386,7 +387,7 @@ export function PanelCuentas({ cuentas, topes, productos, enMarcha, escribe, hay
           <CoberturaHistorial hoy={hoy} version={versionCobertura} />
         </Bloque>
       )}
-      <Topes topes={topes} productos={productos} enMarcha={enMarcha} escribe={escribe} />
+      <Topes topes={topes} productos={productos} enMarcha={enMarcha} escribe={escribe} calculados={calculados} />
       <ProbadorDeNombres />
     </div>
   );

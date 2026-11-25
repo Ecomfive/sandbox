@@ -8,7 +8,7 @@
 //   Opcionales (el equipo no los hace hoy, quedan por si ayudan): Rebalancear (un anuncio de una CBO se come más del 60 % del presupuesto con CPA de $11–12 mientras otro rinde mejor) y Rotar gancho (ganador que
 //   se desgasta: más de $35, la frecuencia pasa de 2.80, el CTR cae más de 25 % y el CPA de 48 h pasa de $12).
 
-import { cpa, ctr, dolares, hookRate, type Resultados } from "./metricas";
+import { CPA_TOPE_PREDETERMINADO, cpa, ctr, dolares, hookRate, type Resultados } from "./metricas";
 
 export type Decision = "cortar" | "mantener" | "observar" | "consolidar" | "rebalancear" | "rotar";
 
@@ -59,6 +59,16 @@ export interface EntradaDecision {
   hayOtroConCpaBajo: boolean;
   /** Veces que, en promedio, una persona vio el anuncio en los últimos 7 días; null si todavía no se lee de Meta. */
   frecuencia?: number | null;
+  /** Si el tope del producto se ajustó (por envío y entrega), qué parte del general es: los montos de la escalera bajan en la misma proporción. */
+  factor?: number;
+}
+
+/** Los umbrales con sus montos en la proporción del tope del producto (1 = los del documento). */
+export function umbralesDeAnuncio(factor = 1): Record<keyof typeof UMBRALES_ANUNCIO, number> {
+  const DE_DINERO: (keyof typeof UMBRALES_ANUNCIO)[] = ["cpaObjetivo", "cpaRojo", "ventanaInicio", "ventanaCorte", "observarCpaMaximo", "observarGastoMaximo", "consolidarGastoMinimo", "rebalancearGastoDia", "rebalancearCpaDesde", "rebalancearCpaHasta", "rebalancearOtroCpa", "rotarGastoMinimo"];
+  const u: Record<keyof typeof UMBRALES_ANUNCIO, number> = { ...UMBRALES_ANUNCIO };
+  if (factor !== 1) for (const k of DE_DINERO) u[k] = Math.round(UMBRALES_ANUNCIO[k] * factor * 100) / 100;
+  return u;
 }
 
 export interface ResultadoDecision {
@@ -71,7 +81,7 @@ const roas = (r: Resultados): number | null => (r.gasto > 0 && r.valor > 0 ? r.v
 
 /** La decisión que toca para un anuncio activo, o null si todavía no hay nada que decidir (poco gasto). */
 export function decisionDeAnuncio(e: EntradaDecision): ResultadoDecision | null {
-  const U = UMBRALES_ANUNCIO;
+  const U = umbralesDeAnuncio(e.factor);
   const a = e.acumulado;
   const costo = cpa(a);
   const porClic = ctr(a);
@@ -81,7 +91,7 @@ export function decisionDeAnuncio(e: EntradaDecision): ResultadoDecision | null 
     if (a.gasto >= U.ventanaCorte) return { decision: "cortar", motivo: `Gastó ${dolares(a.gasto)} sin una compra: pasó de ${dolares(U.ventanaCorte)}. Aunque los clics y el Hook estén bien, atrae tráfico curioso que no compra.` };
     if (a.gasto >= U.ventanaInicio) {
       if (porClic !== null && porClic < U.ctrCorte) return { decision: "cortar", motivo: `Gastó ${dolares(a.gasto)} sin compras y su CTR del enlace es ${porClic.toFixed(2)} % (menos de ${U.ctrCorte} %): hizo clics pero no genera intención de compra.` };
-      if (porClic !== null && porClic >= U.ctrBueno && hook !== null && hook >= U.hookBueno) return { decision: "mantener", motivo: `Sin compras todavía, pero con CTR ${porClic.toFixed(2)} % y Hook ${hook.toFixed(0)} %: hay intención real. Déjalo correr hasta ${dolares(U.ventanaCorte)}–${dolares(16)}.` };
+      if (porClic !== null && porClic >= U.ctrBueno && hook !== null && hook >= U.hookBueno) return { decision: "mantener", motivo: `Sin compras todavía, pero con CTR ${porClic.toFixed(2)} % y Hook ${hook.toFixed(0)} %: hay intención real. Déjalo correr hasta ${dolares(U.ventanaCorte)}–${dolares(U.observarCpaMaximo)}.` };
     }
     return null;
   }
@@ -132,14 +142,16 @@ export interface AnuncioParaDecidir {
 }
 
 /** La decisión de cada anuncio activo de las campañas activas (id del anuncio → decisión). */
-export function decisionesDeAnuncios(anuncios: AnuncioParaDecidir[], campanas: { id: string; activa: boolean; presupuestoDiario: number | null; estructura: string | null }[]): Map<string, ResultadoDecision> {
+export function decisionesDeAnuncios(anuncios: AnuncioParaDecidir[], campanas: { id: string; activa: boolean; presupuestoDiario: number | null; estructura: string | null; tope?: number; topeAjustado?: boolean }[]): Map<string, ResultadoDecision> {
   const salida = new Map<string, ResultadoDecision>();
   const activas = new Map(campanas.filter((c) => c.activa).map((c) => [c.id, c]));
   for (const a of anuncios) {
     const c = activas.get(a.campanaId);
     if (!c || !a.activo) continue;
-    const hayOtroConCpaBajo = anuncios.some((x) => x.id !== a.id && x.campanaId === a.campanaId && x.activo && x.r.compras > 0 && (cpa(x.r) ?? Infinity) < UMBRALES_ANUNCIO.rebalancearOtroCpa);
-    const d = decisionDeAnuncio({ acumulado: a.r, ultimos2: a.ultimos2, ultimoDia: a.ultimoDia, presupuestoCampana: c.presupuestoDiario, esCbo: c.estructura === "CBO", hayOtroConCpaBajo, frecuencia: a.frecuencia });
+    const factor = c.topeAjustado && c.tope ? c.tope / CPA_TOPE_PREDETERMINADO : 1;
+    const otroCpa = umbralesDeAnuncio(factor).rebalancearOtroCpa;
+    const hayOtroConCpaBajo = anuncios.some((x) => x.id !== a.id && x.campanaId === a.campanaId && x.activo && x.r.compras > 0 && (cpa(x.r) ?? Infinity) < otroCpa);
+    const d = decisionDeAnuncio({ acumulado: a.r, ultimos2: a.ultimos2, ultimoDia: a.ultimoDia, presupuestoCampana: c.presupuestoDiario, esCbo: c.estructura === "CBO", hayOtroConCpaBajo, frecuencia: a.frecuencia, factor });
     if (d) salida.set(a.id, d);
   }
   return salida;

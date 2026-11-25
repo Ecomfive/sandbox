@@ -1,10 +1,11 @@
 // Anuncios Meta › Sugerencias (18 nov 2026, pedido de Alcides: «como en Gestión de IDs, que nos sugiera»): lo que el sistema ve en los números y propone hacer. No toca Meta: avisa, y la persona acepta,
 // rechaza (con porqué) o pospone, como las recomendaciones de Gestión de IDs Dropi. Las reglas son simples a propósito, con umbrales a la vista, para que el equipo las entienda y las discuta. Lógica pura, con prueba.
 
-import { conversion, confiable, cpa, ctr, dolares, GASTO_MINIMO_CONFIABLE, hookRate, sinResultados, sumar, type Resultados } from "./metricas";
+import { conversion, confiable, CPA_TOPE_PREDETERMINADO, cpa, ctr, dolares, GASTO_MINIMO_CONFIABLE, hookRate, sinResultados, sumar, type Resultados } from "./metricas";
+import { CERCA_DEL_TOPE, zonaDe, zonaDeCpa } from "./limite";
 import { decisionesDeAnuncios, NOMBRE_DECISION, UMBRALES_ANUNCIO, type AnuncioParaDecidir } from "./decision-anuncio";
 import { diagnosticoDeLanding } from "./diagnostico-concreto";
-import type { Hallazgo } from "./historico";
+import { pesoDeHallazgo, type Hallazgo } from "./historico";
 import type { CampanaVista, VideoVista } from "./vistas";
 
 export type TipoSugerencia = "sin_compras" | "apagar_campana" | "cpa_alto" | "sumar_videos" | "en_recuperacion" | "escalar" | "cpa_subiendo" | "testing_sin_cierre" | "anuncio_apagar" | "anuncio_rotar" | "anuncio_rebalancear" | "video_ganador" | "video_hook_bajo" | "landing_floja" | "etiquetas_faltan" | "hallazgo";
@@ -66,7 +67,7 @@ export const UMBRALES = {
   /** Para saber si una campaña con el CPA alto se está recuperando se mira el CPA de estos últimos días. */
   recuperandoDias: 4,
   /** Desde esta parte del tope una campaña (o su anuncio que más vende) está «cerca del límite»: $9 con un tope de $10. */
-  cercaDelTope: 0.9,
+  cercaDelTope: CERCA_DEL_TOPE,
   /** Para contar como «el anuncio que la sostiene» tiene que haber vendido al menos esto en 7 días. */
   comprasDelQueSostiene: 2,
   /** Gasto mínimo de cada semana para decir que el CPA cambió de una semana a otra. */
@@ -85,9 +86,10 @@ export const UMBRALES = {
 
 /**
  * El CPA de una campaña a partir del cual deja de ser rentable (25 nov 2026, pedido de Alcides: «que diga cuándo sí debe apagarse porque el CPA a nivel de campaña ya pasa de $12»): $12, el CPA en rojo del documento «Métrica». Si el producto
- * tiene un CPA tope propio más alto (definido en Cuentas), manda ese.
+ * tiene un CPA tope propio más alto (definido en Cuentas), manda ese; si su tope se ajustó por envío y entrega, baja en la misma proporción (un tope de $7 se apaga desde $8.40).
  */
-export const limiteDeApagado = (c: { tope: number; topeDefinido?: boolean }): number => (c.topeDefinido && c.tope > UMBRALES_ANUNCIO.cpaRojo ? c.tope : UMBRALES_ANUNCIO.cpaRojo);
+export const limiteDeApagado = (c: { tope: number; topeDefinido?: boolean; topeAjustado?: boolean }): number =>
+  c.topeAjustado ? Math.round(c.tope * (UMBRALES_ANUNCIO.cpaRojo / CPA_TOPE_PREDETERMINADO) * 100) / 100 : c.topeDefinido && c.tope > UMBRALES_ANUNCIO.cpaRojo ? c.tope : UMBRALES_ANUNCIO.cpaRojo;
 
 /** Los anuncios activos de una campaña que ya pasaron del límite: los que hay que apagar y los que van caros con poco gasto, de más a menos gasto. */
 export function anunciosPasados(anuncios: readonly AnuncioSugerencia[], campanaId: string, decisiones: ReadonlyMap<string, { decision: string }>, limite: number): AnuncioEnSugerencia[] {
@@ -260,6 +262,10 @@ export function sugerir(e: EntradaSugerencias): Sugerencia[] {
           const hacer = pasos ? ` ${pasos[0].toUpperCase()}${pasos.slice(1)}.` : "";
           s.push({ ...base, clave: `cpa_alto:${c.id}`, tipo: "cpa_alto", severidad: gasto >= 150 ? "alta" : "media", prioridad: "actuar", titulo: `${c.nombre}: CPA ${dolares(costo)}, sobre el tope de ${dolares(c.tope)}`, detalle, accion: `No la apagues todavía: ${porQue}${vende}.${hacer} La campaña se apaga si su CPA pasa de ${dolares(limite)} y no baja en ${U.recuperandoDias} días${vivo ? `, o si ${nombreDe(vivo.anuncio)} llega a ${dolares(cerca)}` : ""}.` });
         }
+      } else if (hayAnuncios && costoReciente !== null && costoReciente < cerca) {
+        // Cerca del tope pero ya se está acomodando sola: tocarla ahora reiniciaría su aprendizaje.
+        conTarjeta = true;
+        s.push({ ...base, anuncios: undefined, clave: `en_recuperacion:${c.id}`, tipo: "en_recuperacion", severidad: "info", prioridad: "observar", titulo: `${c.nombre}: cerca del tope, pero ya está bajando`, detalle, accion: `No la toques todavía: en los últimos ${U.recuperandoDias} días va en ${dolares(costoReciente)}, por debajo de ${dolares(cerca)}. Agregar videos ahora reiniciaría su aprendizaje.` });
       } else if (hayAnuncios) {
         conTarjeta = true;
         conAnunciosListados.add(c.id);
@@ -267,13 +273,13 @@ export function sugerir(e: EntradaSugerencias): Sugerencia[] {
         const subiendo = costo3 !== null && costo3 > c.tope;
         const apagarMarcados = marcados ? " Apaga los anuncios marcados abajo." : "";
         const accion = vivo
-          ? `Agrega 2 o 3 videos ${conAngulo} (${nombreDe(vivo.anuncio)} vende a ${dolares(vivo.cpa)} con ${vivo.compras} compras) antes de que la campaña llegue a ${dolares(c.tope)}.${apagarMarcados}`
+          ? `Ya no está bajando sola: agrega 2 o 3 videos ${conAngulo} (${nombreDe(vivo.anuncio)} vende a ${dolares(vivo.cpa)} con ${vivo.compras} compras) antes de que la campaña pase de ${dolares(c.tope)}. Reinicia su aprendizaje, así que hazlo una sola vez.${apagarMarcados}`
           : `Prueba videos nuevos de otro ángulo ya: ${quePasa}.${apagarMarcados} Si pasa de ${dolares(c.tope)} sin un anuncio que venda más barato, apágala.`;
         s.push({ ...base, clave: `sumar_videos:${c.id}`, tipo: "sumar_videos", severidad: subiendo || !vivo ? "alta" : "media", prioridad: "actuar", titulo: `${c.nombre}: ${vivo ? "cerca del tope, agrégale videos" : "cerca del tope y sin un anuncio que la sostenga"}`, detalle, accion });
       }
     }
     if (c.etapa === "testing" && costo !== null && c.r.compras >= U.escalarCompras && confiable(c.r) && costo <= c.tope * U.escalarFactor) {
-      s.push({ clave: `escalar:${c.id}`, tipo: "escalar", severidad: "media", prioridad: "oportunidad", positiva: true, titulo: `${c.nombre}: lista para escalar`, detalle: `${c.r.compras} compras con CPA ${dolares(costo)} (tope ${dolares(c.tope)}) y ${dolares(gasto)} gastados en 7 días.`, accion: "Subir el presupuesto un 20 a 30 % o duplicarla en una campaña de escala.", objeto: { tipo: "campana", id: c.id }, gasto });
+      s.push({ clave: `escalar:${c.id}`, tipo: "escalar", severidad: "media", prioridad: "oportunidad", positiva: true, titulo: `${c.nombre}: lista para escalar`, detalle: `${c.r.compras} compras con CPA ${dolares(costo)} (tope ${dolares(c.tope)}) y ${dolares(gasto)} gastados en 7 días.`, accion: "Subir el presupuesto de a 20 % como mucho, o duplicarla en una campaña de escala sin tocar esta: un cambio grande reinicia su aprendizaje.", objeto: { tipo: "campana", id: c.id }, gasto });
     }
     // Una campaña de ventas se vigila como una de escala: si su CPA sube pero sigue lejos del tope, queda en observación (con la semana anterior para ver el cambio de los últimos 14 días).
     if (!conTarjeta && (c.etapa === "escala" || c.etapa === "venta")) {
@@ -288,7 +294,7 @@ export function sugerir(e: EntradaSugerencias): Sugerencia[] {
           enDosSemanas ? `En 14 días: de ${dolares(cp as number)} la semana anterior a ${dolares(costo as number)} esta semana.` : "",
         ].filter(Boolean).join(" ");
         const accion = costo !== null && costo < cerca
-          ? `Solo observar: el CPA de 7 días (${dolares(costo)}) no pasa del tope de ${dolares(c.tope)} ni está cerca. Si llega a ${dolares(cerca)}, agrega videos.`
+          ? `No la toques: el CPA de 7 días (${dolares(costo)}) va dentro del tope de ${dolares(c.tope)}, y agregar videos ahora reiniciaría su aprendizaje. Solo si llega a ${dolares(cerca)} y no baja en ${U.recuperandoDias} días, agrega videos.`
           : "Observarla unos días antes de mover presupuesto: todavía lleva poco gasto para decidir.";
         s.push({ clave: `cpa_subiendo:${c.id}`, tipo: "cpa_subiendo", severidad: "info", prioridad: "observar", positiva: false, titulo: `${c.nombre}: el CPA subió, en observación`, detalle: cambios, accion, objeto: { tipo: "campana", id: c.id }, gasto, cifras });
       }
@@ -300,7 +306,9 @@ export function sugerir(e: EntradaSugerencias): Sugerencia[] {
     const porClic = ctr(c.r);
     const conv = conversion(c.r);
     if (!apagadas.has(c.id) && porClic !== null && conv !== null && c.r.clics >= U.landingClicsMinimos && porClic >= U.landingCtr && conv < U.landingConversion) {
-      s.push({ clave: `landing_floja:${c.id}`, tipo: "landing_floja", severidad: "media", prioridad: "actuar", positiva: false, titulo: `${c.nombre}: el anuncio atrae pero la landing no convierte`, detalle: `CTR ${porClic.toFixed(1)} % (bueno) y solo ${conv.toFixed(1)} % de las visitas compran.`, accion: accionLandingFloja(e.paginasPorCampana?.get(c.id)), objeto: { tipo: "campana", id: c.id }, gasto });
+      const dentro = zonaDe(c.r, c.tope) === "dentro";
+      const mejorar = accionLandingFloja(e.paginasPorCampana?.get(c.id));
+      s.push({ clave: `landing_floja:${c.id}`, tipo: "landing_floja", severidad: "media", prioridad: dentro ? "observar" : "actuar", positiva: false, titulo: `${c.nombre}: el anuncio atrae pero la landing no convierte`, detalle: `CTR ${porClic.toFixed(1)} % (bueno) y solo ${conv.toFixed(1)} % de las visitas compran.`, accion: dentro ? `${mejorar} La campaña va dentro de su tope: cambia el contenido de la misma página, sin cambiar el enlace del anuncio (eso reinicia su aprendizaje).` : mejorar, objeto: { tipo: "campana", id: c.id }, gasto });
     }
   }
 
@@ -312,10 +320,11 @@ export function sugerir(e: EntradaSugerencias): Sugerencia[] {
     const c = activas.get(a.campanaId);
     if (!d || !c || apagadas.has(c.id)) continue;
     const etiqueta = a.numero ?? a.nombre;
+    const campanaDentro = zonaDe(c.r, c.tope) === "dentro";
     if (d.decision === "cortar") {
       if (conAnunciosListados.has(c.id)) continue;
       const costoCampana = cpa(c.r);
-      const campanaVaBien = costoCampana !== null && costoCampana <= c.tope;
+      const campanaVaBien = costoCampana !== null && zonaDeCpa(costoCampana, c.tope) !== "sobre";
       const ganador = todosAnuncios
         .filter((x) => x.campanaId === a.campanaId && x.id !== a.id && x.r.compras > 0 && (cpa(x.r) ?? Infinity) <= c.tope)
         .sort((x, y) => (cpa(x.r) ?? Infinity) - (cpa(y.r) ?? Infinity))[0];
@@ -323,16 +332,16 @@ export function sugerir(e: EntradaSugerencias): Sugerencia[] {
         ? ` y sustituirlo con anuncios ${ganador.angulo ? `del ángulo «${ganador.angulo}» ` : ""}como ${ganador.numero ?? ganador.nombre} (CPA ${dolares(cpa(ganador.r) ?? 0)})`
         : " y probar otro ángulo";
       s.push({
-        clave: `anuncio_apagar:${a.id}`, tipo: "anuncio_apagar", severidad: campanaVaBien ? "alta" : "media", prioridad: "actuar", positiva: false,
+        clave: `anuncio_apagar:${a.id}`, tipo: "anuncio_apagar", severidad: campanaDentro ? "media" : "alta", prioridad: "actuar", positiva: false,
         titulo: `${c.nombre}: apagar ${etiqueta} (${dolares(a.r.gasto)} gastados${a.r.compras === 0 ? " sin ventas" : ""})`,
         detalle: `${d.motivo}${campanaVaBien ? ` La campaña va bien (CPA ${dolares(costoCampana ?? 0)}, tope ${dolares(c.tope)}): este anuncio le está quitando presupuesto.` : ""}`,
-        accion: `Apagar ${etiqueta}${sustituir}.`,
+        accion: campanaDentro ? `Apagar ${etiqueta}. No subas otro todavía: la campaña va dentro de su tope y un video nuevo reiniciaría su aprendizaje.` : `Apagar ${etiqueta}${sustituir}.`,
         objeto: { tipo: "campana", id: c.id }, gasto: a.r.gasto,
       });
     } else if (d.decision === "rotar") {
-      s.push({ clave: `anuncio_rotar:${a.id}`, tipo: "anuncio_rotar", severidad: "media", prioridad: "actuar", positiva: false, titulo: `${c.nombre}: ${NOMBRE_DECISION.rotar.toLowerCase()} de ${etiqueta}`, detalle: d.motivo, accion: `Rotar el gancho de ${etiqueta}: 2 o 3 variantes con otros primeros 3 segundos.`, objeto: { tipo: "campana", id: c.id }, gasto: a.r.gasto });
+      s.push({ clave: `anuncio_rotar:${a.id}`, tipo: "anuncio_rotar", severidad: campanaDentro ? "info" : "media", prioridad: campanaDentro ? "observar" : "actuar", positiva: false, titulo: `${c.nombre}: ${NOMBRE_DECISION.rotar.toLowerCase()} de ${etiqueta}`, detalle: d.motivo, accion: campanaDentro ? `Todavía no: la campaña va dentro de su tope y un video nuevo reiniciaría su aprendizaje. Ten listas 2 o 3 variantes de ${etiqueta} (otros primeros 3 segundos) para cuando llegue a ${dolares(c.tope * U.cercaDelTope)}.` : `Rotar el gancho de ${etiqueta}: 2 o 3 variantes con otros primeros 3 segundos.`, objeto: { tipo: "campana", id: c.id }, gasto: a.r.gasto });
     } else if (d.decision === "rebalancear") {
-      s.push({ clave: `anuncio_rebalancear:${a.id}`, tipo: "anuncio_rebalancear", severidad: "info", prioridad: "observar", positiva: false, titulo: `${c.nombre}: ${etiqueta} se come la CBO (opcional)`, detalle: d.motivo, accion: `Apagar ${etiqueta} un rato para que la CBO reparta el presupuesto.`, objeto: { tipo: "campana", id: c.id }, gasto: a.r.gasto });
+      s.push({ clave: `anuncio_rebalancear:${a.id}`, tipo: "anuncio_rebalancear", severidad: "info", prioridad: "observar", positiva: false, titulo: `${c.nombre}: ${etiqueta} se come la CBO (opcional)`, detalle: d.motivo, accion: campanaDentro ? "Opcional, y mejor no tocarla: la campaña va dentro de su tope." : `Apagar ${etiqueta} un rato para que la CBO reparta el presupuesto.`, objeto: { tipo: "campana", id: c.id }, gasto: a.r.gasto });
     }
   }
 
@@ -340,9 +349,9 @@ export function sugerir(e: EntradaSugerencias): Sugerencia[] {
     const h = hookRate(v.r);
     const costo = cpa(v.r);
     if (confiable(v.r) && h !== null && h >= U.hookBueno && costo !== null && costo <= v.tope && v.campanas <= 1) {
-      s.push({ clave: `video_ganador:${v.id}`, tipo: "video_ganador", severidad: "media", prioridad: "oportunidad", positiva: true, titulo: `Video «${v.nombre}»: gana y solo se usa en una campaña`, detalle: `Hook ${h.toFixed(0)} % y CPA ${dolares(costo)} (tope ${dolares(v.tope)}) con ${dolares(v.r.gasto)} gastados.`, accion: `Usarlo en otras campañas o probar su ángulo${v.angulo ? ` («${v.angulo}»)` : ""} con otro producto.`, objeto: { tipo: "video", id: v.id }, gasto: v.r.gasto });
+      s.push({ clave: `video_ganador:${v.id}`, tipo: "video_ganador", severidad: "media", prioridad: "oportunidad", positiva: true, titulo: `Video «${v.nombre}»: gana y solo se usa en una campaña`, detalle: `Hook ${h.toFixed(0)} % y CPA ${dolares(costo)} (tope ${dolares(v.tope)}) con ${dolares(v.r.gasto)} gastados.`, accion: `Usarlo en una campaña nueva o en una que ya pasó su tope (no agregarlo a una que va bien: reinicia su aprendizaje), o probar su ángulo${v.angulo ? ` («${v.angulo}»)` : ""} con otro producto.`, objeto: { tipo: "video", id: v.id }, gasto: v.r.gasto });
     } else if (v.anunciosDetalle.some((a) => a.activo) && v.r.gasto >= GASTO_MINIMO_CONFIABLE && h !== null && h < U.hookMalo) {
-      s.push({ clave: `video_hook_bajo:${v.id}`, tipo: "video_hook_bajo", severidad: "media", prioridad: "observar", positiva: false, titulo: `Video «${v.nombre}»: casi nadie pasa los primeros 3 segundos`, detalle: `Hook ${h.toFixed(0)} % con ${dolares(v.r.gasto)} gastados (lo bueno es sobre ${U.hookBueno} %).`, accion: "Cambiar la apertura del video o dejar de usarlo.", objeto: { tipo: "video", id: v.id }, gasto: v.r.gasto });
+      s.push({ clave: `video_hook_bajo:${v.id}`, tipo: "video_hook_bajo", severidad: "media", prioridad: "observar", positiva: false, titulo: `Video «${v.nombre}»: casi nadie pasa los primeros 3 segundos`, detalle: `Hook ${h.toFixed(0)} % con ${dolares(v.r.gasto)} gastados (lo bueno es sobre ${U.hookBueno} %).`, accion: v.anunciosDetalle.filter((a) => a.activo).every((a) => { const c = activas.get(a.campanaId); return !!c && zonaDe(c.r, c.tope) === "dentro"; }) ? "Sus campañas van dentro del tope: no lo cambies ahí (reiniciaría el aprendizaje). Arregla la apertura antes de usarlo en una campaña nueva." : "Cambiar la apertura del video o dejar de usarlo.", objeto: { tipo: "video", id: v.id }, gasto: v.r.gasto });
     }
   }
 
@@ -382,6 +391,9 @@ export function claveDeHallazgo(id: string): string {
   return `hallazgo:${h.toString(16).padStart(8, "0")}`;
 }
 
+/** La llave con la que se recuerda lo decidido sobre un hallazgo. Lo que va «en observación» lleva otra: si después pasa a pedir atención, vuelve a salir. */
+export const claveDeDecision = (h: Pick<Hallazgo, "id" | "tono">): string => claveDeHallazgo(h.tono === "info" ? `${h.id}:observar` : h.id);
+
 /** Cuántos hallazgos se convierten en sugerencia: lo que pide atención (por gasto) y unas pocas buenas noticias; el resto se ve en Hallazgos. */
 export const HALLAZGOS_COMO_SUGERENCIA = { atencion: 8, buenas: 3 } as const;
 
@@ -400,12 +412,12 @@ export function sugerenciasDeHallazgos(hallazgos: readonly Hallazgo[]): Sugerenc
   const mejores = (tono: Hallazgo["tono"], cuantos: number) =>
     hallazgos
       .filter((h) => h.tono === tono && (h.certeza !== "poca" || h.prioridad === "alta"))
-      .sort((a, b) => prioridad(a) - prioridad(b) || rango(a) - rango(b) || b.gasto - a.gasto)
+      .sort((a, b) => prioridad(a) - prioridad(b) || rango(a) - rango(b) || pesoDeHallazgo(b) - pesoDeHallazgo(a))
       .slice(0, cuantos);
   const atencion = mejores("alerta", HALLAZGOS_COMO_SUGERENCIA.atencion);
   const buenas = mejores("bueno", HALLAZGOS_COMO_SUGERENCIA.buenas);
   return [...atencion, ...buenas].map((h): Sugerencia => ({
-    clave: claveDeHallazgo(h.id),
+    clave: claveDeDecision(h),
     tipo: "hallazgo",
     // Lo que la persona pidió vigilar sale con lo del día; lo demás del historial, aparte.
     prioridad: h.prioridad === "alta" ? "actuar" : h.prioridad === "media" ? "observar" : "historial",

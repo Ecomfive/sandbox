@@ -1,6 +1,7 @@
 // Anuncios Meta › por qué se puede ordenar cada lista (25 nov 2026, pedido de Alcides). Las métricas salen solas del catálogo de columnas; aquí solo va lo propio de cada lista. **Para agregar un orden nuevo se suma una línea aquí** (nombre, grupo, sentido y de dónde
 // sale el valor); para una métrica nueva, en `columnas.ts`, que la ofrece en todas. Lógica pura, con prueba.
 
+import { usoDelTope } from "./atributos-video";
 import { criterioMejor, criteriosDeMetricas, type CriterioOrden, type Orden, type ResultadosDeFila } from "./orden";
 import { ordenDePrioridad, type Pendiente } from "./prioridad";
 import type { CampanaVista, Grupo, ProductoVista, VideoVista } from "./vistas";
@@ -32,6 +33,7 @@ export const CRITERIOS_VIDEOS: CriterioOrden<VideoVista>[] = todos<VideoVista>(
 export const CRITERIOS_GRUPOS: CriterioOrden<Grupo>[] = [
   ...criteriosDeMetricas<Grupo>((g) => ({ r: g.r, ctx: { tope: 0, etapa: "venta" } }), true).filter((c) => c.valor !== "resultado"),
   { valor: "resultado", etiqueta: "Resultado estimado", grupo: "Resultados", sentido: "desc", de: (g) => (g.r.gasto > 0 ? g.resultado : null) },
+  { valor: "tope", etiqueta: "Frente a su tope", grupo: "Resultados", sentido: "asc", de: usoDelTope },
   cuenta<Grupo>("campanas", "Campañas", (g) => g.campanas),
   cuenta<Grupo>("videos", "Videos", (g) => g.videos),
   nombre<Grupo>((g) => g.nombre),

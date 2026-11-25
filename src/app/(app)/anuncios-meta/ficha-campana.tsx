@@ -233,8 +233,9 @@ export function FichaCampana({ campana: c, colores, anuncios, actId, productos, 
           <Seccion icono={MargenIcon} titulo="Cómo le va en el periodo">
             <p className="m-0 text-sm">
               <span className="font-medium">{NOMBRE_VEREDICTO[veredicto]}.</span> <Resultado r={r} tope={c.tope} /> estimado con un CPA tope de {dolares(c.tope)}
-              {c.topeDefinido ? "" : " (el de por defecto: defínelo en Cuentas)"}.
+              {c.topeDefinido || c.topeAjustado ? "" : " (el general; se puede cambiar en Cuentas)"}.
             </p>
+            {c.topeTexto && <p className="m-0 text-xs text-muted-foreground">{c.topeTexto}</p>}
             <div className="grid grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-2">
               {METRICAS_CAMPANA.map((m) => (
                 <Cifra key={m.clave} titulo={m.titulo} valor={textoMetrica(m.clave, r)} nivel={nivelesDeMetricas(r, c.etapa, c.tope)[m.clave]} apoyo={apoyoDeMetrica(m.clave, r)} />

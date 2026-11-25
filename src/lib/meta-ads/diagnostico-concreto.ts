@@ -159,13 +159,16 @@ export function concretarHallazgos(analisis: AnalisisHistorico, d: DatosParaConc
     if (entrega) {
       const clave = entrega[1];
       const accion = accionDeEntregaConcreta(d.investigaciones.find((i) => i.clave === clave), d.ofertas[clave]);
-      return accion ? { ...h, accion } : h;
+      if (!accion) return h;
+      // Dentro de su tope no se toca la campaña: lo encontrado queda para cuando pase, o para probar aparte.
+      return { ...h, accion: h.tono === "info" ? `Sin tocar la campaña actual (va dentro de su tope); para una campaña nueva o si pasa del tope: ${accion}` : accion };
     }
     const tendencia = /^tendencia:Producto:(.+):(mes|semana)$/.exec(h.id);
     if (tendencia && h.tono === "alerta") {
       const nombre = norm(tendencia[1]);
       const accion = accionDeTendenciaConcreta(d.senales.find((s) => norm(s.producto) === nombre));
-      return accion ? { ...h, accion } : h;
+      if (!accion) return h;
+      return { ...h, accion: h.zona === "cerca" ? `Está cerca del tope: dale 4 días; si no baja: ${accion.charAt(0).toLowerCase()}${accion.slice(1)}` : accion };
     }
     if (h.categoria === "no_funciona" && h.accion?.startsWith("Dejar de usar «") && ganadores) {
       return { ...h, accion: `${h.accion} ${ganadores}.` };

@@ -12,7 +12,7 @@ import { ordenarPor, type Orden } from "@/lib/meta-ads/orden";
 import { CRITERIOS_GRUPOS } from "@/lib/meta-ads/orden-listas";
 import { Tooltip } from "@/components/ui/tooltip";
 import { DIMENSIONES_ANUNCIO, DIMENSIONES_CAMPANA, type DimensionAnuncio, type DimensionCampana, type GruposMeta } from "@/lib/meta-ads/datos";
-import { DIMENSIONES_VIDEO, EXPLICACION_DIMENSION_VIDEO, esGanador, esPerdedor, mejorGrupo, MEZCLA_DE_ANGULOS, sumaDeGrupos, UMBRAL_DOMINANTE, ventajaDeCpa, type DimensionVideo, type GruposDeVideo } from "@/lib/meta-ads/atributos-video";
+import { DIMENSIONES_VIDEO, EXPLICACION_DIMENSION_VIDEO, esGanador, esPerdedor, mejorGrupo, MEZCLA_DE_ANGULOS, sumaDeGrupos, UMBRAL_DOMINANTE, usoDelTope, ventajaDeCpa, type DimensionVideo, type GruposDeVideo } from "@/lib/meta-ads/atributos-video";
 import { ctr, dolares, dolaresEnteros, hookRate, motivoDeCerteza, nivelDeCtr, nivelDeHook, type Resultados } from "@/lib/meta-ads/metricas";
 import type { Grupo } from "@/lib/meta-ads/vistas";
 import { ClasificarGanchos } from "./clasificar-ganchos";
@@ -279,6 +279,11 @@ function TarjetaConclusion({ c }: { c: Conclusion }) {
               </span>
             )}
           </div>
+          {usoDelTope(g) !== null && (
+            <p className="m-0 text-xs">
+              Cada compra cuesta el <UsoDelTope g={g} firme /> de su CPA tope.
+            </p>
+          )}
           <p className="m-0 mt-auto text-xs tabular-nums text-muted-foreground">
             {g.videos > 0 && c.unidad === "videos" ? `${g.videos} ${g.videos === 1 ? "video" : "videos"}` : `${g.campanas} ${g.campanas === 1 ? "campaña" : "campañas"}`} · {dolaresEnteros(g.r.gasto)} gastados
           </p>
@@ -327,6 +332,18 @@ function DetalleDeProducto({ nombre, grupo, gruposVideo, dimVideo, alElegirDimen
       )}
       <p className="m-0 text-xs text-muted-foreground">Cambia a Campañas o Anuncios arriba para ver lo mismo de este producto desde esas miradas.</p>
     </div>
+  );
+}
+
+/** Qué parte de su CPA tope cuesta cada compra: verde lejos, ámbar cerca, rojo por encima. */
+function UsoDelTope({ g, firme }: { g: Grupo; firme: boolean }) {
+  const uso = usoDelTope(g);
+  if (uso === null) return <>—</>;
+  const color = !firme ? "" : uso > 1 ? "font-medium text-destructive" : uso >= 0.9 ? "font-medium text-warning" : "font-medium text-success";
+  return (
+    <span className={`tabular-nums ${color}`}>
+      {Math.round(uso * 100)} %
+    </span>
   );
 }
 
@@ -407,7 +424,7 @@ function TablaDeGrupos({ grupos, filas, alElegir, dimension, unidad, sinDato, po
           </p>
         )}
         <div className="overflow-x-auto">
-          <table className="tabla-datos w-full min-w-[56rem] border-collapse text-sm">
+          <table className="tabla-datos w-full min-w-[62rem] border-collapse text-sm">
             <caption className="sr-only">Resultados por {dimension.toLowerCase()}</caption>
             <thead>
               <tr className="border-b border-border text-left text-xs text-muted-foreground">
@@ -419,6 +436,7 @@ function TablaDeGrupos({ grupos, filas, alElegir, dimension, unidad, sinDato, po
                 <th scope="col" className="px-3 py-2 text-right font-medium">Frente al promedio</th>
                 {columna("ctr", "CTR", "px-3 py-2 text-right")}
                 {columna("hook", "Hook", "px-3 py-2 text-right")}
+                {columna("tope", "De su tope", "px-3 py-2 text-right")}
                 {columna("resultado", "Resultado estimado", "px-3 py-2 text-right")}
                 <th scope="col" className="px-4 py-2 font-medium">Qué tan seguro</th>
               </tr>
@@ -450,6 +468,9 @@ function TablaDeGrupos({ grupos, filas, alElegir, dimension, unidad, sinDato, po
                     <td className="px-3 py-2.5 text-right tabular-nums">{ventaja === null ? "—" : <span className={!g.confiable ? "" : ventaja < 0 ? "font-medium text-success" : "font-medium text-destructive"}>{ventaja < 0 ? "−" : "+"}{Math.abs(ventaja).toFixed(0)} %</span>}</td>
                     <td className="px-3 py-2.5 text-right">{g.confiable ? <Nivel nivel={nivelDeCtr(ctr(g.r))}>{porcentaje(ctr(g.r))}</Nivel> : porcentaje(ctr(g.r))}</td>
                     <td className="px-3 py-2.5 text-right">{hookRate(g.r) === null ? "—" : g.confiable ? <Nivel nivel={nivelDeHook(hookRate(g.r))}>{porcentaje(hookRate(g.r), 0)}</Nivel> : porcentaje(hookRate(g.r), 0)}</td>
+                    <td className="px-3 py-2.5 text-right tabular-nums">
+                      <UsoDelTope g={g} firme={g.confiable} />
+                    </td>
                     <td className="px-3 py-2.5 text-right">
                       <Resultado r={g.r} tope={1} valor={g.resultado} />
                     </td>

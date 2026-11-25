@@ -74,7 +74,7 @@ test("la conclusión dice si es del producto o de toda la tienda, qué grupo dev
   for (const h of c.hallazgos) assert.ok(!otrasAreas.test(h.accion), `«${h.accion}» no es algo que controle quien monta las campañas`);
   // CPA $4 con 71 % de entrega = $5.60 por compra entregada; para quedar en $10 el CPA puede ser $7.14.
   assert.equal(c.costo!.costoPorEntrega, 5.6);
-  assert.equal(c.costo!.cpaObjetivo, 7.14);
+  assert.equal(c.costo!.cpaObjetivo, null, "sin el tope del producto no hay objetivo");
   // Si la tienda entera entrega igual de mal, el problema no es del producto.
   const igual = concluir({ ordenes, tiendaEntrega: 0.65, cpa: null, conversaciones: null });
   assert.match(igual.hallazgos.map((h) => h.titulo).join("|"), /igual o mejor que la tienda/);
@@ -96,7 +96,7 @@ test("las conversaciones leídas por la IA se validan: solo los pedidos pedidos,
 test("lo que se le da a la IA lleva las causas con sus números y el objetivo de costo", () => {
   const c = concluir({ ordenes: [...muchas(30, { estado: "entregada" }), ...muchas(10, { estado: "devuelta", zona: "interior", confirmada: false, motivos: ["no contesta"] })], tiendaEntrega: 0.8, cpa: 5, conversaciones: null });
   const t = textoParaIA({ clave: "x", producto: "Shilajit", productoEnTienda: "Shilajit en cápsulas", generadaEn: "2026-11-24", dias: 90, tiendas: ["Oferfy"], tiendaEntrega: 0.8, conversaciones: null, ...c, ...c.razones }) as Record<string, unknown>;
-  assert.equal(t.objetivo_costo_por_entrega_usd, 10);
+  assert.deepEqual(t.costo, { cpa: 5, costoPorEntrega: 6.67, cpaObjetivo: null }, "el objetivo es el tope del producto");
   assert.ok(Array.isArray(t.causas_encontradas));
   assert.equal(t.conversaciones_de_whatsapp, "no se han leído");
 });

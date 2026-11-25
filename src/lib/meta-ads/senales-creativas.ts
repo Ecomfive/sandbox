@@ -2,6 +2,7 @@
 // cansando (su CTR o su hook cae frente a la semana anterior), cuánto del gasto depende de videos viejos o de uno solo, si hace días que no se sube nada nuevo, si los videos nuevos rinden peor que los viejos y qué ángulo es el que mejor
 // ha funcionado con ese producto. Cada causa lleva su acción concreta y sus números. Lógica pura, con prueba; los datos son los de `base-dias.ts`. Solo lee.
 
+import { CERCA_DEL_TOPE, zonaDe } from "./limite";
 import { nombreDeAngulo } from "./angulo-detalle";
 import { esAnguloTactico } from "./video-angulo";
 import type { BaseDias } from "./analisis-pedido";
@@ -48,6 +49,8 @@ export interface CausaCreativa {
   accion: string;
   /** Gasto de los últimos 14 días que toca (para ordenar). */
   fuerza: number;
+  /** El producto va dentro de su tope: se prepara, pero todavía no se sube nada (reiniciaría el aprendizaje). */
+  enEspera?: boolean;
 }
 
 export interface SenalesCreativas {
@@ -198,6 +201,16 @@ export function senalesDeProducto(base: BaseDias, producto: string, hoy: string)
     });
   }
   causas.sort((a, b) => b.fuerza - a.fuerza);
+  // Si el producto va dentro de su tope en los últimos 7 días, cambiar videos ahora reiniciaría el aprendizaje: queda preparado para cuando haga falta.
+  const semana = [...rec7.values()].reduce((t, r) => sumar(t, r), sinResultados());
+  const tope = Math.min(...[...campanasDe].map((id) => base.campanas.get(id)!.tope));
+  if (semana.gasto > 0 && zonaDe(semana, tope) === "dentro") {
+    const cuanto = semana.compras > 0 ? `el CPA de 7 días (${usd(semana.gasto / semana.compras)}) va dentro del tope de ${usd(tope)}` : `lleva poco gasto en 7 días para decir que pasa del tope de ${usd(tope)}`;
+    for (const c of causas) {
+      c.enEspera = true;
+      c.accion = `Todavía no subas ni cambies videos: ${cuanto}, y hacerlo reiniciaría el aprendizaje. Déjalo preparado para cuando llegue a ${usd(tope * CERCA_DEL_TOPE)}: ${c.accion}`;
+    }
+  }
   return {
     producto,
     generadaEn: new Date().toISOString(),

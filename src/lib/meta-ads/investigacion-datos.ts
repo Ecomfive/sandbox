@@ -38,6 +38,8 @@ export interface OpcionesInvestigacion {
   tiendas: string[];
   hoy: string;
   cpa: number | null;
+  /** El CPA tope del producto (ya ajustado). */
+  tope?: number | null;
   dias?: number;
   /** Leer también las conversaciones de WhatsApp de los pedidos devueltos y pedirle a la IA el porqué. */
   aFondo?: { proveedor: ProveedorIA; quien: { id: string; nombre: string | null; email: string }; maxChats?: number };
@@ -137,7 +139,7 @@ export async function investigarProducto(supabase: SupabaseClient, o: OpcionesIn
       aviso = r.aviso;
     }
 
-    const c = concluir({ ordenes, tiendaEntrega, cpa: o.cpa, conversaciones });
+    const c = concluir({ ordenes, tiendaEntrega, cpa: o.cpa, tope: o.tope, conversaciones });
     const investigacion: InvestigacionProducto = {
       clave: o.clave,
       producto: o.producto,
@@ -258,7 +260,7 @@ export async function investigarProblemasDeEntrega(supabase: SupabaseClient, o: 
         resultado.push(previa);
         continue;
       }
-      const r = await investigarProducto(supabase, { paisId: o.paisId, clave: f.clave, producto: f.nombre, productoEnTienda: f.enTienda!, tiendas: o.tiendas, hoy: o.hoy, cpa: f.cpa });
+      const r = await investigarProducto(supabase, { paisId: o.paisId, clave: f.clave, producto: f.nombre, productoEnTienda: f.enTienda!, tiendas: o.tiendas, hoy: o.hoy, cpa: f.cpa, tope: f.tope });
       if ("error" in r) continue;
       // Las conversaciones leídas antes (a pedido) se conservan mientras sigan vigentes.
       const conv = previa?.conversaciones && (Date.now() - Date.parse(previa.conversaciones.generadaEn)) / 86_400_000 < DIAS_CONVERSACIONES_VIGENTES ? previa.conversaciones : null;

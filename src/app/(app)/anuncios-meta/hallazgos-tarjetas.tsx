@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { NOMBRE_CATEGORIA, seccionDeHallazgo, type Hallazgo, type SeccionHallazgo, type TonoHallazgo } from "@/lib/meta-ads/historico";
 import { dolares } from "@/lib/meta-ads/metricas";
+import { claveDeDecision } from "@/lib/meta-ads/sugerencias";
+import { BotonesDecidir, Omitidas, useDecisiones } from "./decidir";
 import { InsigniaCerteza } from "./graficas";
 import { SeccionPlegable } from "./plegable";
 import { Cuales } from "./cuales";
@@ -10,7 +12,7 @@ import { Cuales } from "./cuales";
 const TONO: Record<TonoHallazgo, { fondo: string; texto: string; etiqueta: string }> = {
   alerta: { fondo: "bg-destructive-soft", texto: "text-destructive", etiqueta: "Para atender" },
   bueno: { fondo: "bg-success-soft", texto: "text-success", etiqueta: "Buena noticia" },
-  info: { fondo: "bg-muted", texto: "text-muted-foreground", etiqueta: "Para mirar" },
+  info: { fondo: "bg-azul-soft", texto: "text-azul", etiqueta: "En observación" },
 };
 
 export const NOMBRE_SECCION: Record<SeccionHallazgo, string> = { productos: "Productos", campanas: "Campañas", videos: "Videos", general: "General" };
@@ -48,6 +50,7 @@ export function TarjetaHallazgo({ h, conSeccion = false }: { h: Hallazgo; conSec
               <span>{NOMBRE_CATEGORIA[h.categoria]}</span>
               {conSeccion && <span>· {NOMBRE_SECCION[seccionDeHallazgo(h)]}</span>}
               {h.gasto > 0 && <span className="tabular-nums">· {dolares(h.gasto)} gastados</span>}
+              {h.tono === "alerta" && h.impacto !== undefined && h.impacto >= 1 && <span className="font-medium tabular-nums text-destructive">· {dolares(h.impacto)} sobre el tope</span>}
             </span>
           </span>
           {hayMas && (
@@ -73,6 +76,7 @@ export function TarjetaHallazgo({ h, conSeccion = false }: { h: Hallazgo; conSec
           {h.quienes && <Cuales quienes={h.quienes} />}
         </div>
       </details>
+      <BotonesDecidir clave={claveDeDecision(h)} titulo={h.titulo} className="px-3 pb-2.5 sm:pl-14" />
     </li>
   );
 }
@@ -80,8 +84,17 @@ export function TarjetaHallazgo({ h, conSeccion = false }: { h: Hallazgo; conSec
 /** Una lista de hallazgos que muestra los primeros y se abre con «Ver los N restantes» (y se vuelve a cerrar). */
 export function ListaHallazgos({ hallazgos, vistos = 5, conSeccion = false, vacio }: { hallazgos: Hallazgo[]; vistos?: number; conSeccion?: boolean; vacio?: string }) {
   const [todos, setTodos] = useState(false);
-  if (hallazgos.length === 0) return vacio ? <p className="m-0 text-sm text-muted-foreground">{vacio}</p> : null;
-  const lista = todos ? hallazgos : hallazgos.slice(0, vistos);
+  const { ocultas } = useDecisiones();
+  const pendientes = hallazgos.filter((h) => !ocultas.has(claveDeDecision(h)));
+  const omitidos = hallazgos.filter((h) => ocultas.has(claveDeDecision(h))).map((h) => ({ clave: claveDeDecision(h), titulo: h.titulo }));
+  if (pendientes.length === 0)
+    return (
+      <div className="flex flex-col gap-2">
+        {(vacio || omitidos.length > 0) && <p className="m-0 text-sm text-muted-foreground">{vacio ?? "Nada pendiente aquí."}</p>}
+        <Omitidas items={omitidos} />
+      </div>
+    );
+  const lista = todos ? pendientes : pendientes.slice(0, vistos);
   return (
     <div className="flex flex-col gap-2">
       <ul className="m-0 flex list-none flex-col gap-2 p-0">
@@ -89,11 +102,12 @@ export function ListaHallazgos({ hallazgos, vistos = 5, conSeccion = false, vaci
           <TarjetaHallazgo key={h.id} h={h} conSeccion={conSeccion} />
         ))}
       </ul>
-      {hallazgos.length > vistos && (
+      {pendientes.length > vistos && (
         <button type="button" aria-expanded={todos} onClick={() => setTodos((v) => !v)} className="min-h-9 self-start rounded-md border border-border-control bg-card px-3 text-xs font-medium hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground">
-          {todos ? "Ver menos" : `Ver los ${hallazgos.length - vistos} restantes`}
+          {todos ? "Ver menos" : `Ver los ${pendientes.length - vistos} restantes`}
         </button>
       )}
+      <Omitidas items={omitidos} />
     </div>
   );
 }
@@ -102,17 +116,20 @@ export function ListaHallazgos({ hallazgos, vistos = 5, conSeccion = false, vaci
 export function resumenDeHallazgos(hallazgos: readonly Hallazgo[]): string {
   const atender = hallazgos.filter((h) => h.tono === "alerta").length;
   const buenas = hallazgos.filter((h) => h.tono === "bueno").length;
-  const partes = [atender ? `${atender} para atender` : "", buenas ? `${buenas} buena${buenas === 1 ? "" : "s"} noticia${buenas === 1 ? "" : "s"}` : ""].filter(Boolean);
-  return partes.join(" · ") || `${hallazgos.length} hallazgos`;
+  const mirando = hallazgos.filter((h) => h.tono === "info").length;
+  const partes = [atender ? `${atender} para atender` : "", mirando ? `${mirando} en observación` : "", buenas ? `${buenas} buena${buenas === 1 ? "" : "s"} noticia${buenas === 1 ? "" : "s"}` : ""].filter(Boolean);
+  return partes.join(" · ") || "Nada pendiente";
 }
 
 /**
  * Lo que dice el historial sobre una pantalla (Productos, Campañas o Videos): sus hallazgos como tarjetas plegables. Plegada deja una línea con cuántos piden atención. No se dibuja si no hay ninguno.
  */
 export function HallazgosDeSeccion({ titulo, hallazgos, abierta = true }: { titulo: string; hallazgos: Hallazgo[]; abierta?: boolean }) {
+  const { ocultas } = useDecisiones();
   if (hallazgos.length === 0) return null;
+  const pendientes = hallazgos.filter((h) => !ocultas.has(claveDeDecision(h)));
   return (
-    <SeccionPlegable titulo={titulo} abierta={abierta} resumen={resumenDeHallazgos(hallazgos)} derecha={`${hallazgos.length} hallazgo${hallazgos.length === 1 ? "" : "s"}`}>
+    <SeccionPlegable titulo={titulo} abierta={abierta} resumen={resumenDeHallazgos(pendientes)} derecha={`${pendientes.length} hallazgo${pendientes.length === 1 ? "" : "s"}`}>
       <ListaHallazgos hallazgos={hallazgos} />
     </SeccionPlegable>
   );

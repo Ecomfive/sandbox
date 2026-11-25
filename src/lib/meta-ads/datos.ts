@@ -6,6 +6,9 @@ import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { resumirEquipo, type CreacionDeCampana, type DatosActividad, type EventoDeActividad } from "./actividad-equipo";
 import { agrupar, copyLimpio, landingLimpia, type Elemento } from "./agrupar";
 import { anguloDominante, composicionDeAngulos, gruposDeVideos, type GruposDeVideo } from "./atributos-video";
+import { leerCostos } from "./costos-operacion";
+import { textoDeTope, zonaDe } from "./limite";
+import { calculadorDeTopes } from "./limite-datos";
 import { CPA_TOPE_PREDETERMINADO, sinResultados, sumar, type Resultados } from "./metricas";
 import { nombreDeAngulo, temasDe } from "./angulo-detalle";
 import { calcularEnMarcha, campanaEnMarcha, enLaVista, hallazgosEnVista, productoEnMarcha, type EnMarcha, type VistaActividad } from "./en-marcha";
@@ -91,6 +94,10 @@ export interface DatosMeta {
   productos: string[];
   sugerencias: Sugerencia[];
   decididas: number;
+  /** El tope que usa cada producto de las campañas (por su llave) y, si se ajustó, por qué. */
+  topesProductos: Record<string, { tope: number; texto: string | null }>;
+  /** Las llaves con una decisión vigente: lo que ya no se muestra como pendiente en ninguna pantalla. */
+  ocultas: string[];
   grupos: GruposMeta;
   /** Gasto y compras del periodo, día por día (o semana por semana con más de 90 días), con todos los días del periodo aunque no hayan gastado. */
   serie: PuntoSerie[];
@@ -130,7 +137,7 @@ export interface DatosMeta {
 }
 
 const vacios = (periodo: Periodo, hoy: string): DatosMeta => ({
-  faltaMigracion: false, cuentas: [], cuentaId: null, periodo, desde: hoy, hasta: hoy, campanas: [], videos: [], anuncios: [], totales: sinResultados(), anteriores: sinResultados(), topes: [], productos: [], sugerencias: [], decididas: 0,
+  faltaMigracion: false, cuentas: [], cuentaId: null, periodo, desde: hoy, hasta: hoy, campanas: [], videos: [], anuncios: [], totales: sinResultados(), anteriores: sinResultados(), topes: [], productos: [], sugerencias: [], decididas: 0, topesProductos: {}, ocultas: [],
   grupos: { campana: { "Ángulo": [], Estructura: [], Puja: [], Producto: [], Etapa: [] }, anuncio: { Copy: [], Landing: [] } }, serie: [], gruposVideo: gruposDeVideos([]), interpretacion: null, analisisGeneradoEn: null, analisisPendiente: false, vigilancias: [], senales: [], rasgos: [], historial: null, productosVista: [], enMarcha: { productos: [], campanas: [] }, creadasPorDia: [], creadasHoy: 0, actividad: resumirEquipo([], [], hoy), ganchosSinTipo: 0, videosSinAnalizar: 0, videosSinAngulo: 0, iaConectada: false, actividadDisponible: false,
 });
 
@@ -192,8 +199,12 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
   const vigilancias = ordenarVigilancias(leerValorResultados(valorDe(claveDeResultados(o.paisId)))?.resultados ?? []);
   const topes: TopeVista[] = (topesF ?? []).map((t) => ({ clave: t.producto_clave as string, producto: t.producto as string, tope: num(t.cpa_tope) }));
   const topePorClave = new Map(topes.map((t) => [t.clave, t.tope]));
+  // El tope de cada producto: el escrito a mano o el general, que baja si el producto envía o entrega peor que la tienda (la entrega sale del último análisis).
+  const { costos } = await leerCostos(supabase, o.paisId);
+  const topeDe = calculadorDeTopes(topePorClave, hallazgosGuardados?.analisis, costos);
   const decisiones: DecisionGuardada[] = (decisionesF ?? []).map((d) => ({ clave: d.clave as string, estado: d.estado as DecisionGuardada["estado"], vigenteHasta: d.vigente_hasta as string }));
-  if (!ids.length) return { ...base, cuentas, cuentaId, desde, hasta: o.hoy, topes };
+  const ocultas = decisiones.filter((d) => d.vigenteHasta >= o.hoy).map((d) => d.clave);
+  if (!ids.length) return { ...base, cuentas, cuentaId, desde, hasta: o.hoy, topes, ocultas };
 
   // El periodo anterior (para comparar) solo se carga hasta 3 meses; con 6 meses o 1 año se muestra solo el periodo.
   const desdeDatos = restar(o.hoy, (dias > 90 ? dias : Math.max(dias * 2, 30)) - 1);
@@ -302,7 +313,6 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
 
   const armar = (c: Record<string, unknown>, r: Resultados): CampanaVista => {
     const clave = claveDeProducto(c.producto as string | null);
-    const tope = topePorClave.get(clave);
     const mezcla = mezclaDe(c.id as string);
     const delVideo = anguloDominante(mezcla.angulos);
     const manual = ((c.manual as string[] | null) ?? []).includes("angulo");
@@ -321,7 +331,7 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
       personaMeta: (c.creada_por as string | null) ?? creaciones.get(c.meta_id as string) ?? null,
       mercado: (c.mercado as string | null) ?? null,
       videos: (c.videos as string | null) ?? null,
-      r, tope: tope ?? CPA_TOPE_PREDETERMINADO, topeDefinido: tope !== undefined, manual: (c.manual as string[] | null) ?? [],
+      r, tope: topeDe(clave).tope, topeDefinido: topeDe(clave).definido, topeAjustado: topeDe(clave).ajustado, topeTexto: textoDeTope(topeDe(clave)), manual: (c.manual as string[] | null) ?? [],
     };
   };
   const campanas = camp.map((c) => armar(c, porCampana.get(c.id as string) ?? sinResultados()));
@@ -410,11 +420,14 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
   };
   const anunciosSugerencia = anuncios.map((a) => ({ id: a.id, campanaId: a.campanaId, nombre: a.nombre, numero: a.numero, activo: a.activo, angulo: a.angulo, r: porAnuncio30.get(a.id) ?? sinResultados(), r7: porAnuncio7.get(a.id) ?? sinResultados(), ultimos2: porAnuncio2.get(a.id) ?? sinResultados(), ultimoDia: ultimoDiaDe(a.id), frecuencia: a.frecuencia }));
   const decisionesAnuncio = decisionesDeAnuncios(anunciosSugerencia, campanas);
+  const semanaDe = new Map(campanas7.map((c) => [c.id, c]));
   for (const a of anuncios) {
     const d = decisionesAnuncio.get(a.id);
     if (d) {
       a.decision = d.decision;
-      a.decisionMotivo = d.motivo;
+      const c = semanaDe.get(a.campanaId);
+      // Subir variantes reinicia el aprendizaje: con la campaña dentro de su tope, todavía no toca.
+      a.decisionMotivo = d.decision === "rotar" && c && zonaDe(c.r, c.tope) === "dentro" ? `${d.motivo} Todavía no: la campaña va dentro de su tope y un video nuevo reiniciaría su aprendizaje.` : d.motivo;
     }
   }
   // Además de lo que ve en los últimos días, el sistema sugiere lo que dice el historial completo (entrega, tendencias, lo que nunca funcionó); se aceptan o rechazan igual.
@@ -473,7 +486,7 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
   }
   const productos = [...new Set(camp.map((c) => (c.producto as string | null)?.trim()).filter((p): p is string => !!p))].sort((a, b) => a.localeCompare(b, "es"));
   return {
-    ...base, cuentas, cuentaId, desde, hasta: o.hoy, campanas: campanasConActividad, videos, anuncios, totales, anteriores, topes, productos, sugerencias, decididas: todas.length - sugerencias.length, grupos,
+    ...base, cuentas, cuentaId, desde, hasta: o.hoy, campanas: campanasConActividad, videos, anuncios, totales, anteriores, topes, productos, sugerencias, decididas: todas.length - sugerencias.length, ocultas, topesProductos: Object.fromEntries(productos.map((p) => { const t = topeDe(claveDeProducto(p)); return [claveDeProducto(p), { tope: t.tope, texto: textoDeTope(t) }]; })), grupos,
     interpretacion, analisisGeneradoEn: hallazgosGuardados?.generadoEn ?? null, analisisPendiente: analisisViejo(hallazgosGuardados), vigilancias, senales, rasgos, historial: hallazgosGuardados ? seccionesDeAnalisis(hallazgosGuardados) : null,
     serie: serieGlobal, gruposVideo, productosVista, enMarcha, creadasPorDia, creadasHoy: creadasPorDia[13]?.testing + creadasPorDia[13]?.venta + creadasPorDia[13]?.escala + creadasPorDia[13]?.retargeting + creadasPorDia[13]?.otras || 0, actividad, ganchosSinTipo, actividadDisponible: eventos.length > 0, videosSinAnalizar: videos.filter((v) => !v.analisis || v.analisis.estado !== "analizado" || v.analisis.version < VERSION_ANALISIS).length, videosSinAngulo, iaConectada: false,
   };

@@ -94,8 +94,6 @@ export const UMBRALES_INV = {
   minDevueltas: 3,
   /** Pedidos resueltos para decir algo del producto en conjunto. */
   minResueltosProducto: 15,
-  /** Cuánto cuesta como máximo una compra entregada (el objetivo del equipo). */
-  costoPorEntregaObjetivo: 10,
 } as const;
 
 export type DimensionInv = "zona" | "provincia" | "courier" | "pago" | "confirmacion" | "tamano" | "otros_productos";
@@ -308,9 +306,9 @@ const pct = (n: number) => `${Math.round(n * 100)} %`;
 
 /**
  * Arma la conclusión: ¿es del producto o de toda la tienda?, qué grupos devuelven de más (zona, provincia, transportadora, pago, confirmación), qué dicen Servientrega y Monday y qué dijeron las conversaciones; cada una con su acción
- * y sus números. Ordenado por cuántas devoluciones explica. `cpa` y `tope` dan el costo por entrega y el CPA objetivo para quedar en $10 por compra entregada.
+ * y sus números. Ordenado por cuántas devoluciones explica. `cpa` y `tope` dan el costo por entrega y el CPA objetivo (el tope del producto, ya ajustado por su envío y entrega).
  */
-export function concluir(i: { ordenes: readonly OrdenInv[]; tiendaEntrega: number | null; cpa: number | null; conversaciones: InvestigacionProducto["conversaciones"] }): { grupos: GrupoInv[]; razones: ReturnType<typeof razonesDeDevolucion>; hallazgos: HallazgoCausa[]; costo: InvestigacionProducto["costo"]; resumen: ResumenProductoInv } {
+export function concluir(i: { ordenes: readonly OrdenInv[]; tiendaEntrega: number | null; cpa: number | null; tope?: number | null; conversaciones: InvestigacionProducto["conversaciones"] }): { grupos: GrupoInv[]; razones: ReturnType<typeof razonesDeDevolucion>; hallazgos: HallazgoCausa[]; costo: InvestigacionProducto["costo"]; resumen: ResumenProductoInv } {
   const resumen = resumenDe(i.ordenes);
   const grupos = gruposDeDevolucion(i.ordenes);
   const razones = razonesDeDevolucion(i.ordenes);
@@ -384,7 +382,7 @@ export function concluir(i: { ordenes: readonly OrdenInv[]; tiendaEntrega: numbe
   hallazgos.sort((a, b) => b.fuerza - a.fuerza);
   const costo = i.cpa === null ? null : (() => {
     const costoPorEntrega = tasa && tasa > 0 ? i.cpa! / tasa : null;
-    return { cpa: Math.round(i.cpa! * 100) / 100, costoPorEntrega: costoPorEntrega === null ? null : Math.round(costoPorEntrega * 100) / 100, cpaObjetivo: tasa && tasa > 0 ? Math.round(UMBRALES_INV.costoPorEntregaObjetivo * tasa * 100) / 100 : null };
+    return { cpa: Math.round(i.cpa! * 100) / 100, costoPorEntrega: costoPorEntrega === null ? null : Math.round(costoPorEntrega * 100) / 100, cpaObjetivo: i.tope ?? null };
   })();
   return { grupos, razones, hallazgos, costo, resumen };
 }
@@ -401,7 +399,6 @@ export function textoParaIA(inv: InvestigacionProducto): unknown {
     tasa_entrega_del_producto: inv.resumen.tasaEntrega === null ? null : Math.round(inv.resumen.tasaEntrega * 100) / 100,
     tasa_entrega_de_la_tienda: inv.tiendaEntrega === null ? null : Math.round(inv.tiendaEntrega * 100) / 100,
     costo: inv.costo,
-    objetivo_costo_por_entrega_usd: UMBRALES_INV.costoPorEntregaObjetivo,
     causas_encontradas: inv.hallazgos.map((h) => ({ tipo: h.tipo, titulo: h.titulo, detalle: h.detalle, devoluciones_que_explica: h.fuerza, accion: h.accion })),
     grupos_que_devuelven_mas: inv.grupos.filter((g) => g.factor).slice(0, 6).map((g) => ({ dimension: NOMBRE_DIMENSION[g.dimension], grupo: g.nombre, pedidos: g.resueltos, devueltos: g.devueltos, tasa_devolucion: Math.round(g.tasaDevolucion * 100) / 100 })),
     motivos_escritos_por_servientrega_monday_y_asesores: { con_motivo: inv.conMotivo, sin_motivo: inv.sinMotivo, razones: inv.razones.map((r) => ({ razon: NOMBRE_RAZON[r.razon], devoluciones: r.devoluciones, ejemplos: r.ejemplos })) },

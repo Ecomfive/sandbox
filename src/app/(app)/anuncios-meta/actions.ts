@@ -224,6 +224,20 @@ export async function decidirSugerenciaMeta(clave: string, estado: "aceptada" | 
   return {};
 }
 
+/** Deshace una decisión: la sugerencia vuelve a mostrarse. */
+export async function quitarDecisionMeta(clave: string): Promise<Resultado> {
+  const acceso = await exigirAcceso({ modulo: MODULO, escritura: true });
+  if (acceso.error !== undefined) return { error: acceso.error };
+  const k = String(clave ?? "").trim();
+  if (!/^[a-z_]+:[A-Za-z0-9_.:-]{1,80}$/.test(k)) return { error: "Esa sugerencia no se reconoce." };
+  const supabase = createServiceClient();
+  const { error } = await supabase.from("meta_decisiones").delete().eq("clave", k);
+  if (error) return { error: sinMigracion(error.message) ? MIGRACION : error.message };
+  await registrarAuditoria({ accion: "decidir_sugerencia_meta", entidad: "meta_decisiones", entidadId: k, detalle: "volvió a mostrarse" });
+  revalidatePath("/anuncios-meta", "layout");
+  return {};
+}
+
 /** Lo que dice el registro de actividad de Meta sobre una campaña (la línea de tiempo de su ficha). */
 export async function obtenerActividadCampanaMeta(id: string): Promise<{ error?: string; eventos?: ActividadVista[] }> {
   const u = await requireModulo(MODULO);
@@ -506,7 +520,7 @@ export async function preguntarHallazgosMeta(pregunta: unknown, historial: unkno
     const fila = buscarFilaDeEntrega(analisis.entrega, que.producto);
     if (!fila?.enTienda) return { respuesta: `No encontré «${que.producto}» entre los productos con pedidos de la tienda. Dime el nombre como sale en la tabla de entrega de Productos.`, proveedor: nombreIA, quedan };
     if (!tiendas.length) return { error: "No se encontró la tienda de las cuentas en los pedidos (anótala en Cuentas › Tienda)." };
-    const hecha = await investigarProducto(supabase, { paisId: pais.id, clave: fila.clave, producto: fila.nombre, productoEnTienda: fila.enTienda, tiendas, hoy, cpa: fila.cpa, aFondo: { proveedor, quien } });
+    const hecha = await investigarProducto(supabase, { paisId: pais.id, clave: fila.clave, producto: fila.nombre, productoEnTienda: fila.enTienda, tiendas, hoy, cpa: fila.cpa, tope: fila.tope, aFondo: { proveedor, quien } });
     if ("error" in hecha) return { error: hecha.error };
     await guardarInvestigacion(supabase, pais.id, hecha.investigacion, u.nombre ?? u.email ?? "—");
     await registrarAuditoria({ accion: "investigar_entrega_meta", entidad: "meta_ajustes", detalle: `${fila.nombre} · a fondo (por el chat)` });

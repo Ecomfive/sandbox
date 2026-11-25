@@ -92,9 +92,9 @@ export function ResumenCampanas({ campanas }: { campanas: CampanaVista[] }) {
               <p className="m-0 flex items-start gap-2 text-xs text-muted-foreground">
                 <span aria-hidden="true" className="mt-1 h-2 w-2 shrink-0 rounded-full" style={{ background: "var(--warning)" }} />
                 <span>
-                  {sinTope} {sinTope === 1 ? "campaña usa" : "campañas usan"} el CPA tope de ${CPA_TOPE_PREDETERMINADO} porque su producto no tiene uno:{" "}
+                  {sinTope} {sinTope === 1 ? "campaña usa" : "campañas usan"} el CPA tope general de ${CPA_TOPE_PREDETERMINADO} (más bajo si su producto envía o entrega peor):{" "}
                   <Link href="/anuncios-meta/cuentas" className="font-medium text-foreground underline underline-offset-2">
-                    definir los CPA tope
+                    ver los CPA tope
                   </Link>
                 </span>
               </p>
