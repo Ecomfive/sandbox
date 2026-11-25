@@ -15,6 +15,7 @@ import { etapaEfectiva, indexarCatalogo, productoDeCampana, type IndiceCatalogo 
 import { pendientes, sugerenciasDeHallazgos, sugerir, type DecisionGuardada, type Sugerencia } from "./sugerencias";
 import { claveDeAnalisis, analisisViejo, seccionesDeAnalisis, type AnalisisGuardado, type HistorialSecciones } from "./analisis-tipos";
 import { hallazgoDeVigilancia, ordenarVigilancias, type ResultadoVigilancia } from "./analisis-pedido";
+import { claveDeSenales, leerValorSenales, type SenalesCreativas } from "./senales-creativas";
 import { claveDeInvestigaciones, leerValorInvestigaciones, type InvestigacionProducto } from "./investigacion-entrega";
 import { claveDeResultados, leerValorResultados } from "./vigilancias";
 import { claveDeInterpretacion, leerValorInterpretacion, type InterpretacionGuardada } from "./interpretacion-guardada";
@@ -114,6 +115,8 @@ export interface DatosMeta {
   vigilancias: ResultadoVigilancia[];
   /** Por qué no se entregan los productos que venden pero devuelven (la investigación que el sistema hace cada día y la que se pidió a fondo). */
   investigaciones: InvestigacionProducto[];
+  /** Los creativos de los productos que empeoran o más gastan, mirados por dentro (cansancio, dependencia de un video, falta de renovación). */
+  senales: SenalesCreativas[];
   /** Los hallazgos, la entrega y lo que genera más ventas del historial, repartidos por pantalla (Productos, Campañas, Videos). null si todavía no hay análisis guardado. */
   historial: HistorialSecciones | null;
   /** Lo pone la página (servidor): si Gemini está conectado. No se calcula aquí porque este archivo también lo importan componentes del navegador. */
@@ -122,7 +125,7 @@ export interface DatosMeta {
 
 const vacios = (periodo: Periodo, hoy: string): DatosMeta => ({
   faltaMigracion: false, cuentas: [], cuentaId: null, periodo, desde: hoy, hasta: hoy, campanas: [], videos: [], anuncios: [], totales: sinResultados(), anteriores: sinResultados(), topes: [], productos: [], sugerencias: [], decididas: 0,
-  grupos: { campana: { "Ángulo": [], Estructura: [], Puja: [], Producto: [], Etapa: [] }, anuncio: { Copy: [], Landing: [] } }, serie: [], gruposVideo: gruposDeVideos([]), interpretacion: null, analisisGeneradoEn: null, analisisPendiente: false, vigilancias: [], investigaciones: [], historial: null, productosVista: [], creadasPorDia: [], creadasHoy: 0, actividad: resumirEquipo([], [], hoy), ganchosSinTipo: 0, videosSinAnalizar: 0, videosSinAngulo: 0, iaConectada: false, actividadDisponible: false,
+  grupos: { campana: { "Ángulo": [], Estructura: [], Puja: [], Producto: [], Etapa: [] }, anuncio: { Copy: [], Landing: [] } }, serie: [], gruposVideo: gruposDeVideos([]), interpretacion: null, analisisGeneradoEn: null, analisisPendiente: false, vigilancias: [], investigaciones: [], senales: [], historial: null, productosVista: [], creadasPorDia: [], creadasHoy: 0, actividad: resumirEquipo([], [], hoy), ganchosSinTipo: 0, videosSinAnalizar: 0, videosSinAngulo: 0, iaConectada: false, actividadDisponible: false,
 });
 
 const restar = (fecha: string, n: number) => new Date(new Date(`${fecha}T00:00:00Z`).getTime() - n * 86_400_000).toISOString().slice(0, 10);
@@ -172,12 +175,13 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
     supabase.from("meta_topes").select("producto_clave, producto, cpa_tope"),
     supabase.from("meta_decisiones").select("clave, estado, vigente_hasta"),
     // El análisis del historial y su interpretación con IA los prepara el sistema solo y se guardan aquí (sin la migración 0347 no hay nada y todo sigue como antes).
-    supabase.from("meta_ajustes").select("clave, valor").in("clave", [claveDeAnalisis(o.paisId), claveDeInterpretacion(o.paisId), claveDeResultados(o.paisId), claveDeInvestigaciones(o.paisId)]),
+    supabase.from("meta_ajustes").select("clave, valor").in("clave", [claveDeAnalisis(o.paisId), claveDeInterpretacion(o.paisId), claveDeResultados(o.paisId), claveDeInvestigaciones(o.paisId), claveDeSenales(o.paisId)]),
   ]);
   const valorDe = (clave: string) => (ajustesF ?? []).find((a) => a.clave === clave)?.valor ?? null;
   const analisisGuardado = valorDe(claveDeAnalisis(o.paisId)) as Partial<AnalisisGuardado> | null;
   const hallazgosGuardados = analisisGuardado && typeof analisisGuardado.generadoEn === "string" && analisisGuardado.analisis && Array.isArray(analisisGuardado.analisis.hallazgos) ? (analisisGuardado as AnalisisGuardado) : null;
   const interpretacion = leerValorInterpretacion(valorDe(claveDeInterpretacion(o.paisId)));
+  const senales = leerValorSenales(valorDe(claveDeSenales(o.paisId)))?.items ?? [];
   const investigaciones = leerValorInvestigaciones(valorDe(claveDeInvestigaciones(o.paisId)))?.items ?? [];
   const vigilancias = ordenarVigilancias(leerValorResultados(valorDe(claveDeResultados(o.paisId)))?.resultados ?? []);
   const topes: TopeVista[] = (topesF ?? []).map((t) => ({ clave: t.producto_clave as string, producto: t.producto as string, tope: num(t.cpa_tope) }));
@@ -425,7 +429,7 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
   const productos = [...new Set(camp.map((c) => (c.producto as string | null)?.trim()).filter((p): p is string => !!p))].sort((a, b) => a.localeCompare(b, "es"));
   return {
     ...base, cuentas, cuentaId, desde, hasta: o.hoy, campanas: campanasConActividad, videos, anuncios, totales, anteriores, topes, productos, sugerencias, decididas: todas.length - sugerencias.length, grupos,
-    interpretacion, analisisGeneradoEn: hallazgosGuardados?.generadoEn ?? null, analisisPendiente: analisisViejo(hallazgosGuardados), vigilancias, investigaciones, historial: hallazgosGuardados ? seccionesDeAnalisis(hallazgosGuardados) : null,
+    interpretacion, analisisGeneradoEn: hallazgosGuardados?.generadoEn ?? null, analisisPendiente: analisisViejo(hallazgosGuardados), vigilancias, investigaciones, senales, historial: hallazgosGuardados ? seccionesDeAnalisis(hallazgosGuardados) : null,
     serie: serieGlobal, gruposVideo, productosVista: agruparProductos(campanasConActividad, videos), creadasPorDia, creadasHoy: creadasPorDia[13]?.testing + creadasPorDia[13]?.venta + creadasPorDia[13]?.escala + creadasPorDia[13]?.retargeting + creadasPorDia[13]?.otras || 0, actividad, ganchosSinTipo, actividadDisponible: eventos.length > 0, videosSinAnalizar: videos.filter((v) => !v.analisis || v.analisis.estado !== "analizado" || v.analisis.version < VERSION_ANALISIS).length, videosSinAngulo, iaConectada: false,
   };
 }

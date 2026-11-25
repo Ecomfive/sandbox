@@ -49,7 +49,7 @@ export function revisarPregunta(crudo: unknown): { pregunta: string } | { error:
 const r = (n: number | null) => (n === null ? null : Math.round(n * 100) / 100);
 
 /** Todas las estadísticas, en JSON compacto: lo único que la IA puede usar para contestar. */
-export function contextoDeChat(a: AnalisisHistorico, tiendas: readonly string[], hoy: string, investigaciones: readonly unknown[] = []): string {
+export function contextoDeChat(a: AnalisisHistorico, tiendas: readonly string[], hoy: string, investigaciones: readonly unknown[] = [], senales: readonly unknown[] = []): string {
   const datos = {
     hoy,
     mes_en_curso: hoy.slice(0, 7),
@@ -68,6 +68,7 @@ export function contextoDeChat(a: AnalisisHistorico, tiendas: readonly string[],
     },
     como_se_calcula: "«funcionó» = al menos $100 gastados, alguna compra y CPA dentro del CPA tope del producto. Tasa de entrega = entregados ÷ (entregados + devueltos) de los pedidos de 180 días. cpa_por_compra_entregada = gasto ÷ (compras × tasa de entrega).",
     ...(investigaciones.length ? { investigaciones_de_entrega: investigaciones } : {}),
+    ...(senales.length ? { senales_de_creativos: senales } : {}),
     mes_a_mes_todo: a.meses,
     mes_a_mes_por_producto: a.mesesPorProducto,
     hallazgos: a.hallazgos.slice(0, 60).map((h) => ({ tipo: NOMBRE_CATEGORIA[h.categoria], tono: h.tono, titulo: h.titulo, detalle: h.detalle, motivo: h.motivo ?? null, certeza: h.certeza })),
@@ -83,7 +84,7 @@ export function contextoDeChat(a: AnalisisHistorico, tiendas: readonly string[],
 }
 
 /** El pedido: las reglas fijas, la conversación hasta ahora, la pregunta y todas las estadísticas. */
-export function pedidoChat(a: AnalisisHistorico, tiendas: readonly string[], hoy: string, pregunta: string, historial: readonly MensajeChat[], investigaciones: readonly unknown[] = []): { instrucciones: string; texto: string } {
+export function pedidoChat(a: AnalisisHistorico, tiendas: readonly string[], hoy: string, pregunta: string, historial: readonly MensajeChat[], investigaciones: readonly unknown[] = [], senales: readonly unknown[] = []): { instrucciones: string; texto: string } {
   const instrucciones = [
     "Eres analista de rendimiento de anuncios de Meta (Facebook e Instagram) de una operación de comercio electrónico con pago contra entrega en Panamá y Costa Rica. Contestas preguntas de quien monta las campañas, que no es analista.",
     "Respondes SOLO con las estadísticas del sistema que recibes en el JSON. No tienes acceso a nada más: no inventes cifras, productos, fechas ni causas. Si el dato que piden no está en el JSON, dilo claramente («eso no está en las estadísticas») y di qué sí hay.",
@@ -97,7 +98,7 @@ export function pedidoChat(a: AnalisisHistorico, tiendas: readonly string[], hoy
     `Si la persona te pide que desde ahora le indiques, vigiles o le muestres algo («avísame cuando…», «a partir de ahora…», «vigila…», «quiero que me lo muestres siempre»), responde SOLO con este JSON: {"accion":"vigilar","vigilancia":{"titulo":"...","agrupar":"total|producto|campana|angulo|gancho|formato|cta|estructura|puja|etapa|familia","metrica":"una de: ${METRICAS.join(", ")}","ventana_dias":7|14|30,"umbral_pct":número entre 5 y 200,"gasto_minimo":número,"filtros":{}},"prioridad":"alta|media|baja","mensaje":"una frase que confirma qué vigilarás y con qué prioridad"}. Se compara lo de los últimos ventana_dias días con los anteriores y se marca lo que se mueva más que umbral_pct. La prioridad es la que la persona diga (urgente o muy importante = alta; normal = media; «cuando puedas» = baja); si no dice nada, media. Usa la conversación para saber a qué se refiere («eso», «lo de antes»).`,
   ].join("\n");
   const conversacion = historial.length ? `Conversación hasta ahora:\n${historial.map((m) => `${m.rol === "usuario" ? "Pregunta" : "Respuesta"}: ${m.texto}`).join("\n")}\n\n` : "";
-  return { instrucciones, texto: `${conversacion}Pregunta nueva: ${pregunta}\n\nEstadísticas del sistema (JSON):\n${contextoDeChat(a, tiendas, hoy, investigaciones)}` };
+  return { instrucciones, texto: `${conversacion}Pregunta nueva: ${pregunta}\n\nEstadísticas del sistema (JSON):\n${contextoDeChat(a, tiendas, hoy, investigaciones, senales)}` };
 }
 
 /** La respuesta lista para mostrar: sin formato Markdown que sobre, sin espacios de más y con tope de largo. */

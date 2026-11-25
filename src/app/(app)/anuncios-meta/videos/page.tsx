@@ -4,6 +4,7 @@ import { cargarPaginaMeta, type ParametrosMeta } from "../datos-pagina";
 import { HallazgosDeSeccion } from "../hallazgos-tarjetas";
 import { QueGeneraMasVentas } from "../historial-seccion";
 import { ListaVideos } from "../lista-videos";
+import { SenalesCreativasVista } from "../senales-vista";
 import { MarcoMeta } from "../marco-meta";
 import { ResumenVideos } from "../resumen-videos";
 
@@ -31,6 +32,7 @@ export default async function VideosMetaPage({ searchParams }: { searchParams: P
           <ResumenVideos videos={datos.videos} escribe={escribe} iaConectada={datos.iaConectada} />
           {datos.historial && (
             <div className="flex flex-col gap-3">
+              <SenalesCreativasVista senales={datos.senales} />
               <HallazgosDeSeccion titulo="Lo que dicen los datos de los videos" hallazgos={datos.historial.hallazgos.videos} />
               <QueGeneraMasVentas historial={datos.historial} claves={["videos", "angulos", "ganchos", "formatos"]} />
             </div>
