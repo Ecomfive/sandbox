@@ -22,9 +22,11 @@ async function leerBase(o: { paisId: string; cuentaId: string | null }, supabase
     traerTodasLasFilas<Record<string, unknown>>((a, b) =>
       supabase.from("meta_resultados_dia").select("anuncio_id, campana_id, fecha, gasto, impresiones, clics, video_3s, vio_landing, compras, valor").in("cuenta_id", ids).order("fecha").order("anuncio_id").range(a, b),
     ),
-    // Sin la migración 0338 no hay tipo de gancho, sin la 0326 no hay tipo de llamado: cada una cae a lo de antes.
-    traerTodasLasFilas<Record<string, unknown>>((a, b) => supabase.from("meta_video_analisis").select("video_id, angulo, gancho_tipo, formato, cta_tipo").order("video_id").range(a, b)).catch(() =>
-      traerTodasLasFilas<Record<string, unknown>>((a, b) => supabase.from("meta_video_analisis").select("video_id, angulo, formato").order("video_id").range(a, b)).catch((): Record<string, unknown>[] => []),
+    // Sin la migración 0357 no hay detalle del ángulo, sin la 0338 no hay tipo de gancho, sin la 0326 no hay tipo de llamado: cada una cae a lo de antes.
+    traerTodasLasFilas<Record<string, unknown>>((a, b) => supabase.from("meta_video_analisis").select("video_id, angulo, angulo_detalle, gancho_tipo, formato, cta_tipo").order("video_id").range(a, b)).catch(() =>
+      traerTodasLasFilas<Record<string, unknown>>((a, b) => supabase.from("meta_video_analisis").select("video_id, angulo, gancho_tipo, formato, cta_tipo").order("video_id").range(a, b)).catch(() =>
+        traerTodasLasFilas<Record<string, unknown>>((a, b) => supabase.from("meta_video_analisis").select("video_id, angulo, formato").order("video_id").range(a, b)).catch((): Record<string, unknown>[] => []),
+      ),
     ),
     supabase.from("meta_topes").select("producto_clave, cpa_tope"),
   ]);
@@ -54,7 +56,7 @@ async function leerBase(o: { paisId: string; cuentaId: string | null }, supabase
   const videos = new Map<string, VideoBase>();
   for (const [id, nombre] of nombreDeVideo) {
     const h = analisisDe.get(id);
-    videos.set(id, { id, nombre, angulo: (h?.angulo as string | null) || null, gancho: (h?.gancho_tipo as string | null) || null, formato: (h?.formato as string | null) || null, cta: (h?.cta_tipo as string | null) || null });
+    videos.set(id, { id, nombre, angulo: (h?.angulo as string | null) || null, detalle: (h?.angulo_detalle as string | null) || null, gancho: (h?.gancho_tipo as string | null) || null, formato: (h?.formato as string | null) || null, cta: (h?.cta_tipo as string | null) || null });
   }
   const dias = dia.map((f) => {
     const r: Resultados = { ...sinResultados(), gasto: num(f.gasto), impresiones: num(f.impresiones), clics: num(f.clics), video3s: num(f.video_3s), vioLanding: num(f.vio_landing), compras: num(f.compras), valor: num(f.valor) };

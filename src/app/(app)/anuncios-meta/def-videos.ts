@@ -5,6 +5,7 @@ import type { VideoVista } from "@/lib/meta-ads/vistas";
 import type { DefTabla } from "@/lib/tabla/motor";
 import { campoPrioridad } from "./def-prioridad";
 import { NOMBRE_VEREDICTO, veredictoDeResultados, type Veredicto } from "./def-campanas";
+import { nombreDeAngulo } from "@/lib/meta-ads/angulo-detalle";
 
 const SIN = "__sin_valor__";
 
@@ -28,6 +29,7 @@ export const DEF_VIDEOS: DefTabla<VideoVista> = {
     { id: "nombre", etiqueta: "Nombre del video", tipo: "texto", valor: (v) => `${v.numero ?? ""} ${v.nombre} ${v.producto ?? ""} ${anguloDeVideo(v) ?? ""}` },
     { id: "campanaTexto", etiqueta: "Nombre de la campaña", tipo: "texto", sinCsv: true, valor: (v) => campanasDeVideo(v).join(" ") },
     campoPrioridad<VideoVista>((v) => v.pendiente),
+    { id: "anguloDetalle", etiqueta: "Ángulo con su detalle", tipo: "seleccion", valores: (v) => [nombreDeAngulo(anguloDeVideo(v), v.analisis?.anguloDetalle) ?? SIN], etiquetaSinValor: "Sin ángulo", agrupable: true, sinCsv: true },
     { id: "angulo", etiqueta: "Ángulo", tipo: "seleccion", valores: (v) => [anguloDeVideo(v) ?? SIN], etiquetaSinValor: "Sin ángulo", agrupable: true },
     { id: "producto", etiqueta: "Producto", tipo: "seleccion", valores: (v) => [v.producto ?? SIN], etiquetaSinValor: "Sin producto", agrupable: true },
     { id: "campana", etiqueta: "Campaña donde se usa", tipo: "seleccion", valores: (v) => (campanasDeVideo(v).length ? campanasDeVideo(v) : [SIN]), etiquetaSinValor: "Sin campaña", agrupable: true },
@@ -53,6 +55,7 @@ export const DEF_VIDEOS: DefTabla<VideoVista> = {
   csvAntes: [
     { etiqueta: "Video", valor: (v) => v.nombre },
     { etiqueta: "Número", valor: (v) => v.numero },
+    { etiqueta: "Detalle del ángulo", valor: (v) => v.analisis?.anguloDetalle ?? null },
     { etiqueta: "Gasto del periodo", valor: (v) => Number(v.r.gasto.toFixed(2)) },
     { etiqueta: "Compras", valor: (v) => v.r.compras },
     { etiqueta: "CPA", valor: (v) => { const c = cpa(v.r); return c === null ? null : Number(c.toFixed(2)); } },

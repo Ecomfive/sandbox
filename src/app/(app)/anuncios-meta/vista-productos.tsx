@@ -1,9 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { HistorialSecciones } from "@/lib/meta-ads/analisis-tipos";
+import type { CostosGuardados, CostosOperacion, EntregasMeta } from "@/lib/meta-ads/costos-operacion";
 import { enLaVista, hallazgosEnVista, productoEnMarcha, type EnMarcha, type VistaActividad } from "@/lib/meta-ads/en-marcha";
 import type { CampanaVista, ProductoVista, VideoVista } from "@/lib/meta-ads/vistas";
+import { entregaPorProductoMeta } from "./actions";
+import { CalculadoraCostos } from "./calculadora-costos";
 import { HallazgosDeSeccion } from "./hallazgos-tarjetas";
 import { EntregaDeProductos, QueGeneraMasVentas } from "./historial-seccion";
 import { ListaProductos } from "./lista-productos";
@@ -27,7 +30,18 @@ function historialEnVista(h: HistorialSecciones, e: EnMarcha, vista: VistaActivi
  * Anuncios Meta › Productos (25 nov 2026, pedido de Alcides): arranca en los productos con campañas activas, que es sobre lo que hay algo que decidir. «Apagados» deja consultar cómo le fue a uno que ya no se anuncia (con el periodo
  * de arriba) y «Todos» los junta. Lo elegido manda sobre el resumen, los hallazgos, la entrega, lo que más vende y la lista.
  */
-export function VistaProductos({ productos, campanas, videos, historial, enMarcha, abrirInicial }: { productos: ProductoVista[]; campanas: CampanaVista[]; videos: VideoVista[]; historial: HistorialSecciones | null; enMarcha: EnMarcha; abrirInicial: string | null }) {
+export function VistaProductos({ productos, campanas, videos, historial, enMarcha, abrirInicial, calculadora, escribe }: { productos: ProductoVista[]; campanas: CampanaVista[]; videos: VideoVista[]; historial: HistorialSecciones | null; enMarcha: EnMarcha; abrirInicial: string | null; calculadora: { costos: CostosOperacion; guardados: CostosGuardados | null }; escribe: boolean }) {
+  // La entrega sale de los pedidos y tarda unos segundos la primera vez: se pide después de abrir la pantalla, sin frenarla.
+  const [entrega, setEntrega] = useState<EntregasMeta | null>(null);
+  useEffect(() => {
+    let vivo = true;
+    entregaPorProductoMeta(null)
+      .then((d) => vivo && setEntrega(d))
+      .catch(() => undefined);
+    return () => {
+      vivo = false;
+    };
+  }, []);
   // Si el enlace abre un producto apagado, se arranca viendo todos para que esté en la lista.
   const [vista, setVista] = useState<VistaActividad>(() => (abrirInicial && productos.some((p) => !p.enMarcha && (p.clave || "sin-producto") === abrirInicial) ? "todos" : "activos"));
   const visibles = productos.filter((p) => enLaVista(estadoDe(p), vista));
@@ -45,6 +59,7 @@ export function VistaProductos({ productos, campanas, videos, historial, enMarch
         </p>
       </div>
       <ResumenProductos productos={visibles} />
+      <CalculadoraCostos productos={visibles} entrega={entrega} costos={calculadora.costos} guardados={calculadora.guardados} escribe={escribe} />
       {h && (
         <div className="flex flex-col gap-3">
           <HallazgosDeSeccion key={`h-${vista}`} titulo="Lo que dicen los datos de los productos" hallazgos={h.hallazgos.productos} />
@@ -52,7 +67,7 @@ export function VistaProductos({ productos, campanas, videos, historial, enMarch
           <QueGeneraMasVentas key={`v-${vista}`} historial={h} claves={["productos"]} />
         </div>
       )}
-      <ListaProductos productos={visibles} campanas={campanas} videos={videos} abrirInicial={abrirInicial} />
+      <ListaProductos productos={visibles} campanas={campanas} videos={videos} abrirInicial={abrirInicial} entrega={entrega} costos={calculadora.costos} />
     </>
   );
 }

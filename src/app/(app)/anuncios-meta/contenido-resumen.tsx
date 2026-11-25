@@ -8,6 +8,8 @@ import { Anillo, BarraProgreso, ColumnasApiladas, Columnas, Leyenda, partesConCo
 import { InterpretacionVista } from "./interpretacion-vista";
 import { ListaSugerencias } from "./lista-sugerencias";
 import { Cifra, entero, InsigniaEtapa, porcentaje, Resultado, valorCpa } from "./piezas";
+import { temasPorTactica } from "@/lib/meta-ads/angulo-detalle";
+import { TemasDeTacticas } from "./cuales";
 
 const COLOR_VEREDICTO: Record<Veredicto, string> = { deja: "var(--success)", pierde: "var(--destructive)", poca_data: "var(--warning)", sin_gasto: "var(--grafica-5)" };
 
@@ -191,6 +193,9 @@ export function ContenidoResumen({ datos, escribe }: { datos: DatosMeta; escribe
                   </li>
                 ))}
               </ul>
+              <div className="w-full">
+                <TemasDeTacticas temas={temasPorTactica(datos.videos.filter((v) => v.r.gasto > 0))} />
+              </div>
             </div>
           )}
         </TarjetaMeta>

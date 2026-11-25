@@ -20,7 +20,7 @@ test("las entregas por producto cuentan unidades por estado y dejan fuera los se
     { producto: "Envío", cantidad: 1, estado: "entregada", servicio: true },
     { producto: "", cantidad: 1, estado: "entregada", servicio: false },
   ]);
-  assert.deepEqual(m.get("Shilajit"), { nombre: "Shilajit", entregadas: 2, devueltas: 1, canceladas: 2, enCamino: 3 });
+  assert.deepEqual(m.get("Shilajit"), { nombre: "Shilajit", entregadas: 2, devueltas: 1, canceladas: 2, enCamino: 3, sinEnviar: 0 });
   assert.equal(m.has("Envío"), false);
   assert.equal(m.size, 1);
 });

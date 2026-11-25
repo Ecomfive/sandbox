@@ -7,6 +7,7 @@ import { conTtl } from "@/lib/cache-ttl";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { anguloDominante, composicionDeAngulos } from "./atributos-video";
 import { indexarCatalogo, palabrasDeProducto, type IndiceCatalogo } from "./etapa-venta";
+import { sumarPedidos } from "./costos-operacion";
 import { analizarHistorico, sinVentanas, type AnalisisHistorico, type CampanaHist, type EntregaProducto, type MesHist, type ProductoHist, type VideoHist, type Ventanas } from "./historico";
 import { CPA_TOPE_PREDETERMINADO, sinResultados, sumar, type Resultados } from "./metricas";
 import { claveDeProducto } from "./nombre";
@@ -73,12 +74,15 @@ export function entregasPorProducto(lineas: { producto: string; cantidad: number
   const mapa = new Map<string, EntregaProducto>();
   for (const l of lineas) {
     if (l.servicio || !l.producto) continue;
-    const e = mapa.get(l.producto) ?? { nombre: l.producto, entregadas: 0, devueltas: 0, canceladas: 0, enCamino: 0 };
+    const e = mapa.get(l.producto) ?? { nombre: l.producto, entregadas: 0, devueltas: 0, canceladas: 0, enCamino: 0, sinEnviar: 0 };
     const n = Math.max(1, num(l.cantidad));
     if (l.estado === "entregada") e.entregadas += n;
     else if (l.estado === "devuelta") e.devueltas += n;
     else if (l.estado === "cancelada" || l.estado === "no_gestionada") e.canceladas += n;
-    else if (l.estado === "en_transito" || l.estado === "pendiente") e.enCamino += n;
+    else if (l.estado === "en_transito" || l.estado === "pendiente") {
+      e.enCamino += n;
+      if (l.estado === "pendiente") e.sinEnviar = (e.sinEnviar ?? 0) + n;
+    }
     mapa.set(l.producto, e);
   }
   return mapa;
@@ -97,8 +101,11 @@ export async function calcularHistorico(o: { paisId: string; cuentaId: string | 
     traerTodasLasFilas<Record<string, unknown>>((a, b) => supabase.from("meta_anuncios").select("id, campana_id, video_id, nombre, titulo").in("cuenta_id", ids).order("id").range(a, b)),
     traerTodasLasFilas<FilaDia>((a, b) => supabase.from("meta_resultados_dia").select("anuncio_id, campana_id, fecha, gasto, impresiones, clics, video_3s, vio_landing, compras, valor").in("cuenta_id", ids).order("fecha").order("anuncio_id").range(a, b)),
     // Sin la migración 0338 no hay tipo de gancho, sin la 0326 no hay tipo de llamado: cada una cae a lo de antes.
-    traerTodasLasFilas<Record<string, unknown>>((a, b) => supabase.from("meta_video_analisis").select("video_id, angulo, gancho_tipo, formato, cta_tipo").order("video_id").range(a, b)).catch(() =>
-      traerTodasLasFilas<Record<string, unknown>>((a, b) => supabase.from("meta_video_analisis").select("video_id, angulo, formato").order("video_id").range(a, b)).catch((): Record<string, unknown>[] => []),
+    // Sin la migración 0357 no hay detalle del ángulo; sin la 0338, ni gancho: cada una cae a lo de antes.
+    traerTodasLasFilas<Record<string, unknown>>((a, b) => supabase.from("meta_video_analisis").select("video_id, angulo, angulo_detalle, gancho_tipo, formato, cta_tipo").order("video_id").range(a, b)).catch(() =>
+      traerTodasLasFilas<Record<string, unknown>>((a, b) => supabase.from("meta_video_analisis").select("video_id, angulo, gancho_tipo, formato, cta_tipo").order("video_id").range(a, b)).catch(() =>
+        traerTodasLasFilas<Record<string, unknown>>((a, b) => supabase.from("meta_video_analisis").select("video_id, angulo, formato").order("video_id").range(a, b)).catch((): Record<string, unknown>[] => []),
+      ),
     ),
     supabase.from("meta_topes").select("producto_clave, cpa_tope"),
   ]);
@@ -113,6 +120,7 @@ export async function calcularHistorico(o: { paisId: string; cuentaId: string | 
   const ventCampana = new Map<string, Ventanas>();
   const totalAnuncio = new Map<string, Resultados>();
   const totalVideo = new Map<string, Resultados>();
+  const ventVideo = new Map<string, Ventanas>();
   const mesDeCampana = new Map<string, Map<string, Resultados>>();
   const mesGlobal = new Map<string, Resultados>();
   let desde: string | null = null;
@@ -129,7 +137,15 @@ export async function calcularHistorico(o: { paisId: string; cuentaId: string | 
     porMes.set(mes, sumar(porMes.get(mes) ?? sinResultados(), r));
     mesDeCampana.set(fila.campana_id, porMes);
     const vid = anuncioDe.get(fila.anuncio_id)?.video_id as string | undefined;
-    if (vid) totalVideo.set(vid, sumar(totalVideo.get(vid) ?? sinResultados(), r));
+    if (vid) {
+      totalVideo.set(vid, sumar(totalVideo.get(vid) ?? sinResultados(), r));
+      const w = ventVideo.get(vid) ?? sinVentanas();
+      if (fila.fecha >= f.mesDesde) w.mes.rec = sumar(w.mes.rec, r);
+      else if (fila.fecha >= f.mesPrevDesde) w.mes.prev = sumar(w.mes.prev, r);
+      if (fila.fecha >= f.semDesde) w.semana.rec = sumar(w.semana.rec, r);
+      else if (fila.fecha >= f.semPrevDesde) w.semana.prev = sumar(w.semana.prev, r);
+      ventVideo.set(vid, w);
+    }
     const v = ventCampana.get(fila.campana_id) ?? sinVentanas();
     if (fila.fecha >= f.mesDesde) v.mes.rec = sumar(v.mes.rec, r);
     else if (fila.fecha >= f.mesPrevDesde) v.mes.prev = sumar(v.mes.prev, r);
@@ -172,9 +188,11 @@ export async function calcularHistorico(o: { paisId: string; cuentaId: string | 
   // Los videos: lo que cada uno gastó y vendió en todo el historial, con lo que la IA vio en él y el producto de su campaña más frecuente.
   const productoDeVideo = new Map<string, { nombre: string | null; clave: string; n: number }>();
   const nombreDeVideo = new Map<string, string>();
+  const campanasDeVideo = new Map<string, Set<string>>();
   for (const a of anun) {
     const vid = (a.video_id as string | null) ?? "";
     if (!vid) continue;
+    campanasDeVideo.set(vid, (campanasDeVideo.get(vid) ?? new Set<string>()).add(a.campana_id as string));
     const p = productoDe.get(a.campana_id as string);
     if (p?.nombre && !productoDeVideo.has(vid)) productoDeVideo.set(vid, { ...p, n: 1 });
     if (!nombreDeVideo.has(vid)) nombreDeVideo.set(vid, String((a.titulo as string | null) || (a.nombre as string | null) || `Video …${vid.slice(-5)}`).slice(0, 80));
@@ -190,6 +208,9 @@ export async function calcularHistorico(o: { paisId: string; cuentaId: string | 
       clave,
       familia: familiaDeProducto(p?.nombre ?? "", null),
       angulo: (h?.angulo as string | null) || null,
+      detalle: (h?.angulo_detalle as string | null) || null,
+      v: ventVideo.get(id) ?? sinVentanas(),
+      campanas: [...(campanasDeVideo.get(id) ?? [])],
       ganchoTipo: (h?.gancho_tipo as string | null) || null,
       formato: (h?.formato as string | null) || null,
       ctaTipo: (h?.cta_tipo as string | null) || null,
@@ -257,7 +278,9 @@ export async function calcularHistorico(o: { paisId: string; cuentaId: string | 
     for (const c of g.campanas) for (const [mes, r] of mesDeCampana.get(c.id) ?? []) meses.set(mes, sumar(meses.get(mes) ?? sinResultados(), r));
     return { clave, nombre: g.nombre, meses: [...meses].map(([mes, r]) => ({ mes, r })) };
   });
-  return { analisis: analizarHistorico({ campanas, videos, productos, desde, hasta, mensual, mensualPorProducto }), tiendas: unidades.map((u) => u.nombre), pedidos, vacio: false };
+  // Todos los pedidos de las tiendas juntos: los porcentajes de un producto con pocos pedidos.
+  const pedidosDeLaTienda = entregas.size ? sumarPedidos([...entregas.values()]) : null;
+  return { analisis: analizarHistorico({ campanas, videos, productos, desde, hasta, mensual, mensualPorProducto, pedidosDeLaTienda }), tiendas: unidades.map((u) => u.nombre), pedidos, vacio: false };
 }
 
 /** Todo el historial analizado para un país (y una cuenta, o todas), guardado 10 minutos. */

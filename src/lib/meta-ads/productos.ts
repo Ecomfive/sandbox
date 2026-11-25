@@ -1,5 +1,6 @@
 // Anuncios Meta › vista por producto (23 nov 2026, pedido de Alcides): todo lo que se gastó y vendió de cada producto, sumando sus campañas, con sus ángulos y sus videos. Lógica pura, con prueba.
 
+import { temasDe } from "./angulo-detalle";
 import type { EnMarcha } from "./en-marcha";
 import { claveDeProducto } from "./nombre";
 import { sinResultados, sumar, type Resultados } from "./metricas";
@@ -29,6 +30,8 @@ export interface AnguloDeProducto {
   angulo: string;
   videos: number;
   r: Resultados;
+  /** En una táctica general, de qué son sus videos. */
+  deQue?: string;
 }
 
 /** Los ángulos que usa un producto en sus videos (los de los últimos 30 días), cada uno con lo que sumaron sus videos, de más a menos gasto. Un video sin ángulo va a «Sin ángulo». */
@@ -42,5 +45,11 @@ export function angulosDeProducto(videos: VideoVista[], clave: string): AnguloDe
     a.r = sumar(a.r, v.r);
     mapa.set(angulo, a);
   }
-  return [...mapa.values()].sort((a, b) => b.r.gasto - a.r.gasto);
+  const suyos = videos.filter((v) => claveDeProducto(v.producto) === clave).map((v) => ({ angulo: v.analisis?.angulo ?? v.angulo, detalle: v.analisis?.anguloDetalle, gasto: v.r.gasto, compras: v.r.compras }));
+  return [...mapa.values()]
+    .map((a) => {
+      const deQue = temasDe(a.angulo, suyos);
+      return deQue ? { ...a, deQue } : a;
+    })
+    .sort((a, b) => b.r.gasto - a.r.gasto);
 }

@@ -33,7 +33,10 @@ const horasDesde = (iso: string, ahora = Date.now()) => (ahora - Date.parse(iso)
 /** Recorta un análisis que se pasa de tamaño: quita lo que no cambia ninguna conclusión (tendencias estables o sin datos y hallazgos de más). */
 export function compactarAnalisis(a: AnalisisHistorico): AnalisisHistorico {
   if (JSON.stringify(a).length <= MAX_BYTES_ANALISIS) return a;
-  return { ...a, tendencias: a.tendencias.filter((t) => t.cambio.sentido === "baja" || t.cambio.sentido === "mejora"), hallazgos: a.hallazgos.slice(0, 80) };
+  const corto = { ...a, tendencias: a.tendencias.filter((t) => t.cambio.sentido === "baja" || t.cambio.sentido === "mejora"), hallazgos: a.hallazgos.slice(0, 80) };
+  if (JSON.stringify(corto).length <= MAX_BYTES_ANALISIS) return corto;
+  // Si ni así cabe, los hallazgos del final se quedan sin la lista de cuáles son.
+  return { ...corto, hallazgos: corto.hallazgos.map((h, i) => (i < 30 ? h : { ...h, quienes: undefined })) };
 }
 
 export async function leerAnalisisGuardado(supabase: SupabaseClient, paisId: string): Promise<AnalisisGuardado | null> {

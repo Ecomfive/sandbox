@@ -2,6 +2,8 @@ import { dolaresEnteros } from "@/lib/meta-ads/metricas";
 import type { VideoVista } from "@/lib/meta-ads/vistas";
 import { ParaRevisar } from "./para-revisar";
 import { Anillo, BarraApilada, Leyenda, partesConColor, TarjetaMeta } from "./graficas";
+import { temasPorTactica } from "@/lib/meta-ads/angulo-detalle";
+import { TemasDeTacticas } from "./cuales";
 
 type EstadoAnalisis = "analizado" | "provisional" | "error" | "sin_analizar";
 const NOMBRE: Record<EstadoAnalisis, string> = { analizado: "Analizado con el video", provisional: "Provisional (solo el texto)", error: "Con error", sin_analizar: "Sin analizar" };
@@ -67,7 +69,10 @@ export function ResumenVideos({ videos, escribe = false, iaConectada = false }: 
 
       <TarjetaMeta titulo="Dónde se gasta" derecha={`${dolaresEnteros(gasto)} en videos del periodo`} id="resumen-gasto">
         <div className="flex flex-col gap-5">
-          <Reparto titulo="Por ángulo" partes={angulos} vacio="Todavía no hay videos con ángulo." />
+          <div className="flex min-w-0 flex-col gap-2">
+            <Reparto titulo="Por ángulo" partes={angulos} vacio="Todavía no hay videos con ángulo." />
+            <TemasDeTacticas temas={temasPorTactica(videos)} />
+          </div>
           <div className="grid gap-5 md:grid-cols-2">
             <Reparto titulo="Por tipo de gancho" partes={ganchos} vacio="Todavía no hay ganchos clasificados (se hace en Qué funciona › Gancho)." />
             <Reparto titulo="Por formato" partes={formatos} vacio="Todavía no hay videos analizados." />

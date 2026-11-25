@@ -36,7 +36,7 @@ function FilaDeEntrega({ f, promedio }: { f: FilaEntrega; promedio: number | nul
           <span className="font-semibold tabular-nums" style={{ color: colorDeTasa(f.tasa) }}>
             {f.tasa === null ? "Sin tasa" : `${pct(f.tasa)} entregado`}
           </span>
-          {f.cpaEntregado !== null && <span className="tabular-nums text-muted-foreground">{dolares(f.cpaEntregado)} por entrega</span>}
+          {f.cpaEntregado !== null && <span className="tabular-nums text-muted-foreground">{dolares(f.cpaEntregado)} por entrega (sin contar canceladas)</span>}
         </div>
         <span className="relative block">
           <BarraProgreso valor={(f.tasa ?? 0) * 100} maximo={100} color={colorDeTasa(f.tasa)} alto={8} />
@@ -118,6 +118,7 @@ function BarrasDeVentas({ filas }: { filas: FilaVentas[] }) {
                 <span className="text-sm font-semibold text-foreground">{entero(f.compras)}</span> compras · {pct(f.parte)}
               </p>
             </div>
+            {f.deQue && <p className="m-0 text-xs">De qué son: {f.deQue}</p>}
             <div className="mt-1">
               <BarraProgreso valor={f.compras} maximo={maximo} color="var(--meta-1)" alto={7} />
             </div>
