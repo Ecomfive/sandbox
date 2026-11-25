@@ -5,10 +5,44 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { useToast } from "@/components/ui/toast";
 import { fieldClassSm, labelClassSm } from "@/components/ui/field";
+import { UMBRALES_ANUNCIO } from "@/lib/meta-ads/decision-anuncio";
 import { DIAS_DE_DECISION, UMBRALES, type Sugerencia } from "@/lib/meta-ads/sugerencias";
 import { decidirSugerenciaMeta } from "./actions";
 
 const TEXTO_SEVERIDAD = { alta: "Urgente", media: "Importante", info: "Para mirar" } as const;
+
+const GRUPOS_DE_ANUNCIOS = [
+  { grupo: "apagar", titulo: "Anuncios para apagar", color: "bg-destructive-soft text-destructive" },
+  { grupo: "vigilar", titulo: "Caros, pero con poco gasto todavía", color: "bg-warning-soft text-warning" },
+] as const;
+const MAX_ANUNCIOS = 8;
+
+/** Cuáles anuncios de la campaña pasaron del límite, con su cifra (de los últimos 30 días). */
+function AnunciosPasados({ anuncios }: { anuncios: NonNullable<Sugerencia["anuncios"]> }) {
+  return (
+    <div className="mt-1.5 flex flex-col gap-1.5">
+      {GRUPOS_DE_ANUNCIOS.map((g) => {
+        const lista = anuncios.filter((a) => a.grupo === g.grupo);
+        if (!lista.length) return null;
+        return (
+          <div key={g.grupo} className="flex flex-wrap items-center gap-1.5 text-xs">
+            <span className="font-medium">
+              {g.titulo} ({lista.length}):
+            </span>
+            <ul role="list" aria-label={`${g.titulo}, con lo de los últimos 30 días`} className="m-0 contents list-none p-0">
+              {lista.slice(0, MAX_ANUNCIOS).map((a) => (
+                <li key={a.id} className={`max-w-full break-words rounded-md px-2 py-0.5 tabular-nums ${g.color}`}>
+                  <span className="font-semibold">{a.nombre}</span> · {a.cifra}
+                </li>
+              ))}
+            </ul>
+            {lista.length > MAX_ANUNCIOS && <span className="text-muted-foreground">y {lista.length - MAX_ANUNCIOS} más</span>}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 function Tarjeta({ s, escribe, ocupada, alDecidir }: { s: Sugerencia; escribe: boolean; ocupada: boolean; alDecidir: (clave: string, estado: "aceptada" | "rechazada" | "pospuesta", nota?: string) => void }) {
   const [rechazando, setRechazando] = useState(false);
@@ -18,7 +52,7 @@ function Tarjeta({ s, escribe, ocupada, alDecidir }: { s: Sugerencia; escribe: b
   const enlace = s.tipo === "hallazgo" ? "/anuncios-meta/hallazgos" : s.tipo === "etiquetas_faltan" ? "/anuncios-meta/campanas?faltan=1" : s.objeto.tipo === "campana" ? `/anuncios-meta/campanas?abrir=${s.objeto.id}` : s.objeto.tipo === "video" ? `/anuncios-meta/videos?abrir=${encodeURIComponent(s.objeto.id)}` : null;
   return (
     <li className="flex flex-col gap-2 px-4 py-3">
-      <div className="flex items-start gap-2">
+      <div className="flex flex-wrap items-start gap-2 sm:flex-nowrap">
         <span aria-hidden="true" className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${punto}`} />
         <div className="min-w-0 flex-1">
           <p className="m-0 text-sm font-medium">
@@ -35,10 +69,11 @@ function Tarjeta({ s, escribe, ocupada, alDecidir }: { s: Sugerencia; escribe: b
             <span className="font-medium">Qué hacer: </span>
             {s.accion}
           </p>
+          {s.anuncios && s.anuncios.length > 0 && <AnunciosPasados anuncios={s.anuncios} />}
           <p className="m-0 mt-1 text-xs text-muted-foreground">{s.positiva ? "Buena noticia" : TEXTO_SEVERIDAD[s.severidad]}</p>
         </div>
         {escribe && !rechazando && (
-          <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
+          <div className="flex w-full shrink-0 flex-wrap gap-1.5 pl-4 sm:w-auto sm:justify-end sm:pl-0">
             <button type="button" disabled={ocupada} onClick={() => alDecidir(s.clave, "aceptada")} className="min-h-8 rounded-md border border-border-control bg-card px-2.5 py-1 text-xs font-medium hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground disabled:opacity-50">
               Ya lo hice
             </button>
@@ -112,7 +147,7 @@ export function ListaSugerencias({ sugerencias, decididas, escribe }: { sugerenc
       )}
       <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-4 py-2 text-xs text-muted-foreground">
         <span>
-          Las sugerencias solo avisan: no cambian nada en Meta. Se calculan con los últimos 7 días y esto: sin compras tras {UMBRALES.sinComprasVeces} veces el CPA tope, CPA más de {Math.round((UMBRALES.cpaAltoFactor - 1) * 100)} % sobre el tope, escalar con {UMBRALES.escalarCompras}+ compras.
+          Las sugerencias solo avisan: no cambian nada en Meta. Se calculan con los últimos 7 días y esto: sin compras tras {UMBRALES.sinComprasVeces} veces el CPA tope, CPA más de {Math.round((UMBRALES.cpaAltoFactor - 1) * 100)} % sobre el tope, escalar con {UMBRALES.escalarCompras}+ compras. Se propone apagar una campaña cuando su CPA pasa de ${UMBRALES_ANUNCIO.cpaRojo} (o de su tope, si es más alto) y los últimos {UMBRALES.recuperandoDias} días no lo bajan; los anuncios se miran con los últimos 30 días.
         </span>
         {sugerencias.length > 6 && (
           <button type="button" onClick={() => setTodas((v) => !v)} className="font-medium underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground">

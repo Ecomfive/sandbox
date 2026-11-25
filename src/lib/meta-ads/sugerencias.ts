@@ -7,7 +7,7 @@ import { diagnosticoDeLanding } from "./diagnostico-concreto";
 import type { Hallazgo } from "./historico";
 import type { CampanaVista, VideoVista } from "./vistas";
 
-export type TipoSugerencia = "sin_compras" | "cpa_alto" | "escalar" | "cpa_subiendo" | "testing_sin_cierre" | "anuncio_apagar" | "anuncio_rotar" | "anuncio_rebalancear" | "video_ganador" | "video_hook_bajo" | "landing_floja" | "etiquetas_faltan" | "hallazgo";
+export type TipoSugerencia = "sin_compras" | "apagar_campana" | "cpa_alto" | "escalar" | "cpa_subiendo" | "testing_sin_cierre" | "anuncio_apagar" | "anuncio_rotar" | "anuncio_rebalancear" | "video_ganador" | "video_hook_bajo" | "landing_floja" | "etiquetas_faltan" | "hallazgo";
 export type Severidad = "alta" | "media" | "info";
 
 export interface Sugerencia {
@@ -23,6 +23,18 @@ export interface Sugerencia {
   accion: string;
   objeto: { tipo: "campana" | "video" | "cuenta"; id: string };
   gasto: number;
+  /** Los anuncios de la campaña que ya pasaron del límite, con su cifra (para decir cuáles en vez de «los que pasaron»). */
+  anuncios?: AnuncioEnSugerencia[];
+}
+
+export interface AnuncioEnSugerencia {
+  id: string;
+  /** «V3» o el nombre del anuncio. */
+  nombre: string;
+  /** «$14.20 sin ventas» o «CPA $18.00 con 3 compras». */
+  cifra: string;
+  /** «apagar»: la escalera de decisiones dice cortarlo; «vigilar»: su CPA pasa del límite pero todavía lleva poco gasto. */
+  grupo: "apagar" | "vigilar";
 }
 
 /** Los umbrales, en un solo lugar y a la vista. */
@@ -51,6 +63,26 @@ export const UMBRALES = {
   landingConversion: 4,
   landingClicsMinimos: 200,
 } as const;
+
+/**
+ * El CPA de una campaña a partir del cual deja de ser rentable (25 nov 2026, pedido de Alcides: «que diga cuándo sí debe apagarse porque el CPA a nivel de campaña ya pasa de $12»): $12, el CPA en rojo del documento «Métrica». Si el producto
+ * tiene un CPA tope propio más alto (definido en Cuentas), manda ese.
+ */
+export const limiteDeApagado = (c: { tope: number; topeDefinido?: boolean }): number => (c.topeDefinido && c.tope > UMBRALES_ANUNCIO.cpaRojo ? c.tope : UMBRALES_ANUNCIO.cpaRojo);
+
+/** Los anuncios activos de una campaña que ya pasaron del límite: los que hay que apagar y los que van caros con poco gasto, de más a menos gasto. */
+export function anunciosPasados(anuncios: readonly AnuncioSugerencia[], campanaId: string, decisiones: ReadonlyMap<string, { decision: string }>, limite: number): AnuncioEnSugerencia[] {
+  const out: (AnuncioEnSugerencia & { gasto: number })[] = [];
+  for (const a of anuncios) {
+    if (a.campanaId !== campanaId || !a.activo) continue;
+    const costo = cpa(a.r);
+    const cortar = decisiones.get(a.id)?.decision === "cortar";
+    if (!cortar && !(costo !== null && costo > limite)) continue;
+    const cifra = a.r.compras === 0 ? `${dolares(a.r.gasto)} sin ventas` : `CPA ${dolares(costo ?? 0)} con ${a.r.compras} ${a.r.compras === 1 ? "compra" : "compras"}`;
+    out.push({ id: a.id, nombre: a.numero ?? a.nombre, cifra, grupo: cortar ? "apagar" : "vigilar", gasto: a.r.gasto });
+  }
+  return out.sort((x, y) => y.gasto - x.gasto).map(({ gasto: _gasto, ...x }) => (void _gasto, x));
+}
 
 /** Qué etiquetas le faltan a una campaña: el producto y la etapa. El ángulo no se pide aquí: se lee de cada video. */
 export function faltanEtiquetas(c: Pick<CampanaVista, "producto" | "etapa">): ("producto" | "etapa")[] {
@@ -107,6 +139,8 @@ function accionLandingFloja(paginas: { url: string; rasgos: string[] }[] | undef
 export function sugerir(e: EntradaSugerencias): Sugerencia[] {
   const s: Sugerencia[] = [];
   const U = UMBRALES;
+  const todosAnuncios = e.anuncios ?? [];
+  const decisiones = decisionesDeAnuncios(todosAnuncios, e.campanas);
 
   for (const c of e.campanas.filter((x) => x.activa)) {
     const gasto = c.r.gasto;
@@ -118,13 +152,32 @@ export function sugerir(e: EntradaSugerencias): Sugerencia[] {
       s.push({ clave: `sin_compras:${c.id}`, tipo: "sin_compras", severidad: "alta", positiva: false, titulo: `${c.nombre}: ${dolares(gasto)} sin ninguna compra`, detalle: `Ya gastó ${(gasto / c.tope).toFixed(1)} veces el CPA tope de ${producto} (${dolares(c.tope)}) en 7 días.`, accion: accionSinCompras(e.paginasPorCampana?.get(c.id)), objeto: { tipo: "campana", id: c.id }, gasto });
       continue;
     }
-    if (costo !== null && gasto >= U.cpaAltoGastoMinimo && costo > c.tope * U.cpaAltoFactor) {
+    const limite = limiteDeApagado(c);
+    if (costo !== null && gasto >= U.cpaAltoGastoMinimo && costo > Math.min(c.tope * U.cpaAltoFactor, limite)) {
       // Un CPA por encima del tope en la semana no siempre es para apagarla (23 nov 2026, indicado por Alcides): puede ser un mal día. Si en los últimos días el CPA ya está dentro del tope, se está recuperando y no se avisa.
       const ultimos = serie.filter((d) => diasEntre(d.fecha, e.hoy) < U.recuperandoDias).reduce((a, d) => sumar(a, d.r), sinResultados());
       const costoReciente = cpa(ultimos);
       if (!(costoReciente !== null && costoReciente <= c.tope)) {
         const reciente = costoReciente !== null ? ` y ${dolares(costoReciente)} en los últimos ${U.recuperandoDias}` : ultimos.gasto > 0 ? ` y sin compras en los últimos ${U.recuperandoDias} (gastó ${dolares(ultimos.gasto)})` : "";
-        s.push({ clave: `cpa_alto:${c.id}`, tipo: "cpa_alto", severidad: gasto >= 150 ? "alta" : "media", positiva: false, titulo: `${c.nombre}: CPA ${dolares(costo)} en 7 días${reciente}, con tope ${dolares(c.tope)}`, detalle: `${c.r.compras} compras por ${dolares(gasto)} en 7 días: cada compra cuesta ${dolares(costo - c.tope)} más de lo que deja. Pasarse del tope una semana no obliga a apagarla: puede ser un mal día.`, accion: `No la apagues todavía: apaga los anuncios que ya pasaron de ${dolares(UMBRALES_ANUNCIO.cpaRojo)} sin vender (salen aparte). Pausarla solo si ninguno rinde o el CPA de los últimos ${U.recuperandoDias} días sigue arriba del tope.`, objeto: { tipo: "campana", id: c.id }, gasto });
+        const anuncios = anunciosPasados(todosAnuncios, c.id, decisiones, limite);
+        const paraApagar = anuncios.some((a) => a.grupo === "apagar");
+        // Se apaga cuando el CPA de la campaña pasa del límite y los últimos días no lo han bajado de ahí (25 nov 2026, pedido de Alcides).
+        const apagar = costo > limite && !(costoReciente !== null && costoReciente <= limite);
+        const base = { positiva: false, objeto: { tipo: "campana" as const, id: c.id }, gasto, anuncios };
+        const cifras = `${c.r.compras} compras por ${dolares(gasto)}: CPA ${dolares(costo)} en 7 días${reciente}.`;
+        if (apagar) {
+          const ganador = todosAnuncios
+            .filter((x) => x.campanaId === c.id && x.r.compras > 0 && (cpa(x.r) ?? Infinity) <= c.tope)
+            .sort((x, y) => (cpa(x.r) ?? Infinity) - (cpa(y.r) ?? Infinity))[0];
+          const rescatar = ganador ? ` Lo que sí vende dentro del tope es ${ganador.numero ?? ganador.nombre} (CPA ${dolares(cpa(ganador.r) ?? 0)}${ganador.angulo ? `, ángulo «${ganador.angulo}»` : ""}): llévalo a una campaña nueva.` : "";
+          s.push({ ...base, clave: `apagar_campana:${c.id}`, tipo: "apagar_campana", severidad: "alta", titulo: `${c.nombre}: apagar la campaña (CPA ${dolares(costo)})`, detalle: `${cifras} Pasa de ${dolares(limite)}: así no es rentable.`, accion: `Apaga la campaña: su CPA de 7 días (${dolares(costo)}) pasa de ${dolares(limite)} y los últimos ${U.recuperandoDias} días no lo han bajado.${rescatar}` });
+        } else {
+          const porQue = costo > limite
+            ? `en los últimos ${U.recuperandoDias} días su CPA ya bajó a ${dolares(costoReciente ?? 0)}, dentro de ${dolares(limite)}`
+            : `su CPA de 7 días (${dolares(costo)}) todavía no pasa de ${dolares(limite)}${costoReciente !== null && costoReciente > limite ? `, pero en los últimos ${U.recuperandoDias} días va en ${dolares(costoReciente)}: si sigue así, hay que apagarla` : ""}`;
+          const anunciosTexto = paraApagar ? "Apaga los anuncios marcados abajo." : `Ningún anuncio activo pasó de ${dolares(UMBRALES_ANUNCIO.cpaRojo)} sin vender.`;
+          s.push({ ...base, clave: `cpa_alto:${c.id}`, tipo: "cpa_alto", severidad: gasto >= 150 ? "alta" : "media", titulo: `${c.nombre}: CPA ${dolares(costo)} en 7 días${reciente}, con tope ${dolares(c.tope)}`, detalle: cifras, accion: `No la apagues todavía: ${porQue}. ${anunciosTexto} La campaña se apaga si su CPA pasa de ${dolares(limite)} y no baja en los últimos ${U.recuperandoDias} días.` });
+        }
         continue;
       }
     }
@@ -155,8 +208,6 @@ export function sugerir(e: EntradaSugerencias): Sugerencia[] {
   // A nivel de anuncio (23 nov 2026, escalera del documento «Métrica» de Oferfy, ver `decision-anuncio.ts`): se apaga el que ya pasó de $12 sin una venta (sin importar su CTR ni su conversión) o no logró bajar el CPA a $12 con
   // $25; con más razón si su campaña va por debajo del tope (le quita presupuesto). La propuesta dice cuál apagar y con cuál ángulo sustituirlo: el del anuncio de la misma campaña que sí vende dentro del tope.
   const activas = new Map(e.campanas.filter((x) => x.activa).map((x) => [x.id, x]));
-  const todosAnuncios = e.anuncios ?? [];
-  const decisiones = decisionesDeAnuncios(todosAnuncios, e.campanas);
   for (const a of todosAnuncios) {
     const d = decisiones.get(a.id);
     const c = activas.get(a.campanaId);
