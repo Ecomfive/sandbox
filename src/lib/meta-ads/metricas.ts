@@ -187,7 +187,7 @@ export function nivelesDeMetricas(r: Resultados, etapa: string | null, tope: num
   const sinColor: Record<ClaveMetrica, NivelMetrica> = { cpm: "neutral", efectividad: "neutral", hook: "neutral", ctr: "neutral", cpa: "neutral", gasto: "neutral", compras: "neutral", cvr: "neutral" };
   const valor = <T extends number | null>(v: T, f: (n: number) => NivelMetrica): NivelMetrica => (v === null ? "neutral" : f(v));
   if (etapa === "venta") {
-    // El CPA se pinta contra el tope del producto: con un tope ajustado de $7, los cortes del documento bajan en la misma proporción.
+    // El CPA se pinta contra el tope del producto: con un tope ajustado de $9, los cortes del documento bajan en la misma proporción.
     const f = tope > 0 ? Math.min(1, tope / CPA_TOPE_PREDETERMINADO) : 1;
     return {
       cpm: valor(cpm(r), escalaVenta.cpm),

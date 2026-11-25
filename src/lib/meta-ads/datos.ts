@@ -6,7 +6,6 @@ import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { resumirEquipo, type CreacionDeCampana, type DatosActividad, type EventoDeActividad } from "./actividad-equipo";
 import { agrupar, copyLimpio, landingLimpia, type Elemento } from "./agrupar";
 import { anguloDominante, composicionDeAngulos, gruposDeVideos, type GruposDeVideo } from "./atributos-video";
-import { leerCostos } from "./costos-operacion";
 import { guiaDeTope, textoDeGuia, zonaDe, type GuiaDeTope } from "./limite";
 import { calculadorDeTopes } from "./limite-datos";
 import { CPA_TOPE_PREDETERMINADO, sinResultados, sumar, type Resultados } from "./metricas";
@@ -200,8 +199,7 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
   const topes: TopeVista[] = (topesF ?? []).map((t) => ({ clave: t.producto_clave as string, producto: t.producto as string, tope: num(t.cpa_tope) }));
   const topePorClave = new Map(topes.map((t) => [t.clave, t.tope]));
   // El tope de cada producto: el escrito a mano o el general, que baja si el producto envía o entrega peor que la tienda (la entrega sale del último análisis).
-  const { costos } = await leerCostos(supabase, o.paisId);
-  const topeDe = calculadorDeTopes(topePorClave, hallazgosGuardados?.analisis, costos);
+  const topeDe = calculadorDeTopes(topePorClave, hallazgosGuardados?.analisis);
   const decisiones: DecisionGuardada[] = (decisionesF ?? []).map((d) => ({ clave: d.clave as string, estado: d.estado as DecisionGuardada["estado"], vigenteHasta: d.vigente_hasta as string }));
   const ocultas = decisiones.filter((d) => d.vigenteHasta >= o.hoy).map((d) => d.clave);
   if (!ids.length) return { ...base, cuentas, cuentaId, desde, hasta: o.hoy, topes, ocultas };

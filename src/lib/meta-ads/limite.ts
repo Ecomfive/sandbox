@@ -1,20 +1,23 @@
 // Anuncios Meta › el CPA tope de cada producto y qué tan lejos está de él algo (25 nov 2026, decidido por Alcides). Dos reglas que usa todo el módulo:
 //
-// 1. **El tope general ($10) se ajusta por producto** según cuánto se envía y se entrega: un producto que envía o entrega peor que la tienda tiene un tope más bajo, para que cada venta que llega no cueste más que la de un producto
-//    promedio al tope general. Nunca sube el tope, y un tope escrito a mano en Cuentas se respeta tal cual.
+// 1. **El tope general ($10) se ajusta por producto, entre $9 y $10**, según cuánto se envía y se entrega: un producto que envía o entrega peor que la tienda tiene un tope un poco más bajo, tanto como menos ventas le lleguen. El precio
+//    de cada producto ya contempla un CPA de $10, así que el ajuste es corto (para probar cómo funciona). Nunca sube el tope, y un tope escrito a mano en Cuentas se respeta tal cual.
 // 2. **Dentro del tope no se toca.** Agregar videos, cambiar el presupuesto de golpe o la segmentación reinicia el aprendizaje de Meta y puede dañar una campaña que va bien: que el CPA suba de $5 a $7 no es motivo para tocarla.
 //    Solo se propone cuando pasa del tope, o está cerca y ya no baja sola.
 //
 // Lógica pura, con prueba.
 
-import { costoPorVenta, tasasDe, type CostosOperacion, type PedidosParaTasa, type Tasas } from "./costos-operacion";
+import { tasasDe, type PedidosParaTasa, type Tasas } from "./costos-operacion";
 import { CPA_TOPE_PREDETERMINADO, dolares } from "./metricas";
 
 /** Desde esta parte del tope algo está «cerca del límite»: $9 con un tope de $10. */
 export const CERCA_DEL_TOPE = 0.9;
+/** Lo más que puede bajar el tope por envío y entrega: de $10 a $9. */
+export const AJUSTE_MAXIMO = 1;
+/** El ajuste completo es para quien tiene esta parte menos de ventas entregadas que la tienda (o más); entre medio, en proporción. */
+export const CAIDA_PARA_EL_MAXIMO = 0.25;
 /** Un ajuste menor que esto no vale la pena: el tope queda en el general. */
 const AJUSTE_MINIMO = 0.25;
-const TOPE_MINIMO = 0.5;
 
 export interface TopeProducto {
   /** El CPA tope que se usa. */
@@ -32,27 +35,26 @@ export interface TopeProducto {
   tiendaEntrega: number | null;
 }
 
-/** El tope ajustado de un producto, o null si no hay que cambiar el general (sin datos propios, o envía y entrega igual o mejor que la tienda). */
-export function topeAjustado(base: number, propias: Tasas, tienda: Tasas, c: CostosOperacion): number | null {
+/**
+ * El tope ajustado de un producto, o null si no hay que cambiar el general (sin datos propios, o le llegan casi tantas ventas como a la tienda). Se compara cuántas compras terminan entregadas (envío × entrega) con las de la tienda:
+ * con un 25 % menos o peor baja $1; con la mitad de esa caída, $0.50.
+ */
+export function topeAjustado(base: number, propias: Tasas, tienda: Tasas): number | null {
   if (propias.envio === null && propias.entrega === null) return null;
   const envio = propias.envio ?? tienda.envio;
   const entrega = propias.entrega ?? tienda.entrega;
-  if (envio === null || entrega === null || envio <= 0 || entrega <= 0) return null;
-  // Lo que cuesta cada venta entregada de un producto promedio de la tienda que compra justo al tope general.
-  const referencia = costoPorVenta(base, tienda.envio, tienda.entrega, c);
-  if (!referencia) return null;
-  // El CPA de Meta con el que este producto llega a ese mismo costo.
-  const envios = c.envio + c.cod * entrega + (1 - entrega) * c.envio;
-  const tope = Math.round((referencia.total - envios - c.operativo) * envio * entrega * 10) / 10;
-  return tope <= base - AJUSTE_MINIMO ? Math.max(TOPE_MINIMO, tope) : null;
+  if (envio === null || entrega === null || !tienda.envio || !tienda.entrega) return null;
+  const caida = 1 - (envio * entrega) / (tienda.envio * tienda.entrega);
+  const ajuste = Math.min(AJUSTE_MAXIMO, (caida / CAIDA_PARA_EL_MAXIMO) * AJUSTE_MAXIMO);
+  return ajuste < AJUSTE_MINIMO ? null : Math.round((base - ajuste) * 10) / 10;
 }
 
 /** El tope de un producto: el escrito a mano; si no, el general, ajustado por sus pedidos cuando envía o entrega peor que la tienda. */
-export function topeDeProducto(manual: number | undefined, pedidos: PedidosParaTasa | null | undefined, tienda: Tasas, c: CostosOperacion): TopeProducto {
+export function topeDeProducto(manual: number | undefined, pedidos: PedidosParaTasa | null | undefined, tienda: Tasas): TopeProducto {
   const propias = tasasDe(pedidos);
   const datos = { envio: propias.envio, entrega: propias.entrega, tiendaEnvio: tienda.envio, tiendaEntrega: tienda.entrega };
   if (manual !== undefined) return { tope: manual, base: manual, definido: true, ajustado: false, ...datos };
-  const ajustado = topeAjustado(CPA_TOPE_PREDETERMINADO, propias, tienda, c);
+  const ajustado = topeAjustado(CPA_TOPE_PREDETERMINADO, propias, tienda);
   return { tope: ajustado ?? CPA_TOPE_PREDETERMINADO, base: CPA_TOPE_PREDETERMINADO, definido: false, ajustado: ajustado !== null, ...datos };
 }
 

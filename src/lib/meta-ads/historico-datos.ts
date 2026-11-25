@@ -7,7 +7,7 @@ import { conTtl } from "@/lib/cache-ttl";
 import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { anguloDominante, composicionDeAngulos } from "./atributos-video";
 import { indexarCatalogo, palabrasDeProducto, type IndiceCatalogo } from "./etapa-venta";
-import { leerCostos, sumarPedidos, tasasDe } from "./costos-operacion";
+import { sumarPedidos, tasasDe } from "./costos-operacion";
 import { guiaDeTope, topeDeProducto, type TopeProducto } from "./limite";
 import { analizarHistorico, sinVentanas, type AnalisisHistorico, type CampanaHist, type EntregaProducto, type MesHist, type ProductoHist, type VideoHist, type Ventanas } from "./historico";
 import { CPA_TOPE_PREDETERMINADO, sinResultados, sumar, type Resultados } from "./metricas";
@@ -141,13 +141,12 @@ export async function calcularHistorico(o: { paisId: string; cuentaId: string | 
 
   // El tope de cada producto: el general ($10) baja si envía o entrega peor que la tienda; uno escrito a mano se respeta.
   const pedidosDeLaTienda = entregas.size ? sumarPedidos([...entregas.values()]) : null;
-  const { costos } = await leerCostos(supabase, o.paisId);
   const tienda = tasasDe(pedidosDeLaTienda);
   const nombreDeClave = new Map(camp.map((c) => [claveDeProducto(((c.producto as string | null) ?? "").trim() || null), ((c.producto as string | null) ?? "").trim()]));
   const topes = new Map<string, TopeProducto>();
   for (const [clave, nombre] of nombreDeClave) {
     const enTienda = nombre ? productoEnVentas(nombre, indiceVentas) : null;
-    topes.set(clave, topeDeProducto(topePorClave.get(clave), enTienda ? entregas.get(enTienda) : null, tienda, costos));
+    topes.set(clave, topeDeProducto(topePorClave.get(clave), enTienda ? entregas.get(enTienda) : null, tienda));
   }
   const topeDe = (clave: string) => topes.get(clave)?.tope ?? topePorClave.get(clave) ?? CPA_TOPE_PREDETERMINADO;
   const guiaDe = (clave: string) => {
