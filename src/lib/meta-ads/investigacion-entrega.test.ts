@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { concluir, gruposDeDevolucion, leerConversacionesClasificadas, limpiarTexto, pedidoConversaciones, razonDeTexto, razonesDeDevolucion, textoParaIA, type OrdenInv } from "./investigacion-entrega";
+import { concluir, esGenerico, gruposDeDevolucion, leerConversacionesClasificadas, limpiarTexto, pedidoConversaciones, razonDeTexto, razonesDeDevolucion, textoParaIA, type OrdenInv } from "./investigacion-entrega";
 
 let n = 0;
 const orden = (o: Partial<OrdenInv>): OrdenInv => ({ numero: `#${++n}`, fecha: "2026-11-01", estado: "entregada", total: 30, unidades: 1, conOtros: false, pago: "efectivo", courier: "Servientrega", provincia: "Panamá", zona: "ciudad", confirmada: true, visitas: 0, motivos: [], ...o });
@@ -96,4 +96,19 @@ test("lo que se le da a la IA lleva las causas con sus números y el objetivo de
   assert.equal(t.objetivo_costo_por_entrega_usd, 10);
   assert.ok(Array.isArray(t.causas_encontradas));
   assert.equal(t.conversaciones_de_whatsapp, "no se han leído");
+});
+
+test("los textos reales de Servientrega, Monday y el pedido se clasifican bien y lo genérico no tapa lo específico", () => {
+  assert.equal(razonDeTexto("NO HAY QUIEN RECIBA EN DOMICILIO"), "ausente");
+  assert.equal(razonDeTexto("CLIENTE NO LOCALIZADO"), "no_contesta");
+  assert.equal(razonDeTexto("DESTINATARIO RECHAZA EL ENVIO"), "rechaza");
+  assert.equal(razonDeTexto("NO ASIGNADO A RUTA NO ATIENDEN FINES DE SEMANA"), "ruta");
+  assert.equal(razonDeTexto("No responde"), "no_contesta");
+  assert.equal(razonDeTexto("No desea"), "rechaza");
+  assert.equal(esGenerico("RECHAZADO"), true);
+  assert.equal(esGenerico("Destinatario rechaza el envío"), false);
+  // El pedido dice «RECHAZADO» (genérico) y Servientrega explica que no había quién recibiera: cuenta la explicación.
+  const r = razonesDeDevolucion([orden({ estado: "devuelta", motivos: ["RECHAZADO", "NO HAY QUIEN RECIBA EN DOMICILIO"] }), orden({ estado: "devuelta", motivos: ["RECHAZADO"] })]);
+  assert.equal(r.razones.find((x) => x.razon === "ausente")?.devoluciones, 1);
+  assert.equal(r.razones.find((x) => x.razon === "rechaza")?.devoluciones, 1, "solo «RECHAZADO» sigue contando como rechazo");
 });

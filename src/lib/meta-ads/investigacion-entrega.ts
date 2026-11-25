@@ -32,13 +32,14 @@ export interface OrdenInv {
 
 // ───────────────────────── Motivos escritos ─────────────────────────
 
-export const RAZONES = ["no_contesta", "rechaza", "sin_dinero", "direccion", "ausente", "reprogramar", "producto", "duplicado"] as const;
+export const RAZONES = ["no_contesta", "rechaza", "sin_dinero", "direccion", "ruta", "ausente", "reprogramar", "producto", "duplicado"] as const;
 export type Razon = (typeof RAZONES)[number] | "otro";
 export const NOMBRE_RAZON: Record<Razon, string> = {
   no_contesta: "No contestó o no se pudo contactar",
   rechaza: "No quiso el pedido o se arrepintió",
   sin_dinero: "No tenía el dinero",
   direccion: "Dirección mala o fuera de cobertura",
+  ruta: "Sin ruta asignada o no atienden ese día",
   ausente: "No estaba o estaba cerrado",
   reprogramar: "Pidió otro día",
   producto: "No era lo que esperaba o llegó mal",
@@ -52,12 +53,17 @@ const REGLAS: [Exclude<Razon, "otro">, RegExp][] = [
   ["no_contesta", /no (contest|respond|atend|se pudo (contactar|comunicar|ubicar por tel))|sin respuesta|no hay (contacto|respuesta)|telefono (apagado|no responde|errado|equivocado)|apagado|no localiz|sin contacto|numero (errado|equivocado)/],
   ["rechaza", /no (lo )?(quiere|quiso|desea|requiere|necesita)|rechaz|se arrepint|desisti|ya no (lo |la )?(quiere|necesita|desea)|cancel\w* (el|su) pedido|no (lo )?solicit|cliente no acepta|no acepta/],
   ["producto", /no (era|es|fue) lo que|diferente a|da[nñ]ad|defect|no le gust|calidad|talla|no sirve|incompleto|equivocad[oa] el producto|producto (errado|equivocado)/],
-  ["direccion", /direccion|no (se )?(ubic|encontr|halla)|zona (roja|dificil|de riesgo)|fuera de (cobertura|ruta|zona)|sin cobertura|no (hay|tiene) (entrega|cobertura)|referencias? (insuficiente|incompleta)|domicilio/],
+  ["ruta", /no asignad\w* a ruta|sin ruta|fines? de semana|no atienden|fuera de ruta|ruta no (cubre|atiende)/],
+  ["direccion", /direccion|no (se )?(ubic|encontr|halla)|zona (roja|dificil|de riesgo)|fuera de (cobertura|zona)|sin cobertura|no (hay|tiene) (entrega|cobertura)|referencias? (insuficiente|incompleta)/],
   ["reprogramar", /reprogram|pospus|aplaz|para (otro|otra|el) (d[ií]a|lunes|martes|miercoles|jueves|viernes|sabado|domingo)|otro dia|manana lo recibe/],
-  ["ausente", /ausente|no (estaba|se encontraba|hab[ií]a)|cerrad[oa]|nadie (en|recib|abri)|no (abri|recib)\w*/],
+  ["ausente", /ausente|no (estaba|se encontraba|hab[ií]a)|cerrad[oa]|nadie|no hay quien|no (abri|recib)\w*/],
 ];
 
 const sinTildes = (s: string) => s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+
+/** Una palabra de estado que no dice por qué («RECHAZADO», «CANCELADO», «DEVUELTO»): vale menos que cualquier explicación escrita. */
+const GENERICO = /^(rechazad[oa]|cancelad[oa]|devuelt[oa]|fallid[oa]|anulad[oa]|no entregad[oa]|desintegrad[oa])\.?$/;
+export const esGenerico = (texto: string): boolean => GENERICO.test(sinTildes(texto).trim());
 
 /** A qué razón corresponde lo que escribió un sistema o un asesor (la primera regla que calce, en orden de especificidad). */
 export function razonDeTexto(texto: string): Razon {
@@ -190,7 +196,8 @@ export function razonesDeDevolucion(ordenes: readonly OrdenInv[]): { razones: Ra
   let sinMotivo = 0;
   for (const o of ordenes) {
     if (o.estado !== "devuelta") continue;
-    const textos = o.motivos.map((t) => t.trim()).filter(Boolean);
+    // Lo que explica de verdad (la novedad de Servientrega, lo que anotó el asesor) va antes que una palabra de estado genérica del pedido.
+    const textos = o.motivos.map((t) => t.trim()).filter(Boolean).sort((a, b) => Number(esGenerico(a)) - Number(esGenerico(b)));
     if (!textos.length) {
       sinMotivo++;
       continue;
@@ -347,6 +354,7 @@ export function concluir(i: { ordenes: readonly OrdenInv[]; tiendaEntrega: numbe
         r.razon === "rechaza" ? "El cliente se arrepiente al recibir: revisar lo que se promete al confirmar y considerar un recordatorio antes de la entrega." :
         r.razon === "sin_dinero" ? "Avisarle al cliente cuánto va a pagar y confirmar que lo tiene antes de despachar." :
         r.razon === "direccion" ? "Completar la dirección con referencias antes de despachar y sacar de la ruta lo que está fuera de cobertura." :
+        r.razon === "ruta" ? "Servientrega no tenía ruta o no atiende fines de semana: no prometer entrega esos días y despachar los pedidos de esas zonas a inicios de semana." :
         r.razon === "ausente" ? "Acordar un horario con el cliente al confirmar." :
         r.razon === "reprogramar" ? "Dar la fecha de entrega que el cliente puede recibir desde la confirmación." :
         r.razon === "producto" ? "Revisar el producto y lo que se promete de él: lo que llega no coincide con lo que se esperaba." :
