@@ -7,6 +7,7 @@ import { resumirEquipo, type CreacionDeCampana, type DatosActividad, type Evento
 import { agrupar, copyLimpio, landingLimpia, type Elemento } from "./agrupar";
 import { anguloDominante, composicionDeAngulos, gruposDeVideos, type GruposDeVideo } from "./atributos-video";
 import { CPA_TOPE_PREDETERMINADO, sinResultados, sumar, type Resultados } from "./metricas";
+import { nombreDeAngulo, temasDe } from "./angulo-detalle";
 import { calcularEnMarcha, campanaEnMarcha, enLaVista, hallazgosEnVista, productoEnMarcha, type EnMarcha, type VistaActividad } from "./en-marcha";
 import { pendienteDeProducto, pendientesPorCampana, pendientesPorVideo } from "./prioridad";
 import { claveDeProducto, NOMBRE_ETAPA, NOMBRE_PUJA, numeroDeVideo, type Estructura, type Etapa, type Puja } from "./nombre";
@@ -289,12 +290,12 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
     analisisDe.set(h.video_id as string, { estado: h.estado as AnalisisVideoVista["estado"], origen: h.origen as AnalisisVideoVista["origen"], angulo: (h.angulo as string | null) ?? null, anguloDetalle: (h.angulo_detalle as string | null) || null, anguloManual: !!h.angulo_manual, promesa: (h.promesa as string | null) ?? null, gancho: (h.gancho as string | null) ?? null, ganchoTipo: (h.gancho_tipo as string | null) ?? null, resumen: (h.resumen as string | null) ?? null, transcripcion: (h.transcripcion as string | null) ?? null, publico: (h.publico as string | null) ?? null, formato: (h.formato as string | null) ?? null, duracionS: h.duracion_s === null || h.duracion_s === undefined ? null : num(h.duracion_s), error: (h.error as string | null) ?? null, analizadoEn: h.analizado_en as string, version: h.version === undefined || h.version === null ? 1 : num(h.version), cta: (h.cta as string | null) ?? null, ctaSegundo: h.cta_segundo === null || h.cta_segundo === undefined ? null : num(h.cta_segundo), ctaTipo: (h.cta_tipo as string | null) ?? null, oferta: (h.oferta as string | null) ?? null, recursos: Array.isArray(h.recursos) ? (h.recursos as unknown[]).filter((x): x is string => typeof x === "string") : [], estructura: estructuraDeBase(h.estructura) });
   }
   // De qué ángulos está hecha cada campaña: los de sus videos (cada video distinto, una vez), con lo que gastó cada anuncio en el periodo.
-  const videosPorCampana = new Map<string, { videoId: string; angulo: string | null; gasto: number }[]>();
+  const videosPorCampana = new Map<string, { videoId: string; angulo: string | null; detalle: string | null; gasto: number }[]>();
   for (const a of anun) {
     const vid = (a.video_id as string | null) ?? "";
     if (!vid) continue;
     const l = videosPorCampana.get(a.campana_id as string) ?? [];
-    l.push({ videoId: vid, angulo: analisisDe.get(vid)?.angulo ?? null, gasto: porAnuncio.get(a.id as string)?.gasto ?? 0 });
+    l.push({ videoId: vid, angulo: analisisDe.get(vid)?.angulo ?? null, detalle: analisisDe.get(vid)?.anguloDetalle ?? null, gasto: porAnuncio.get(a.id as string)?.gasto ?? 0 });
     videosPorCampana.set(a.campana_id as string, l);
   }
   const mezclaDe = (campanaId: string) => composicionDeAngulos(videosPorCampana.get(campanaId) ?? []);
@@ -328,7 +329,7 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
   const campanasConActividad = campanas.filter((c) => c.r.gasto > 0 || c.activa || (c.creadaEn ?? "") >= desde);
   const campanasDe = new Map(campanas.map((c) => [c.id, c]));
 
-  const anuncios: AnuncioVista[] = anun.map((a) => ({ id: a.id as string, campanaId: a.campana_id as string, nombre: a.nombre as string, activo: a.estado === "ACTIVE", videoId: (a.video_id as string | null) ?? null, miniatura: (a.miniatura as string | null) ?? null, copy: (a.copy as string | null) ?? null, titulo: (a.titulo as string | null) ?? null, landing: (a.landing as string | null) ?? null, numero: numeroDeVideo(String(a.nombre ?? "")), angulo: analisisDe.get(String(a.video_id ?? ""))?.angulo ?? null, decision: null, decisionMotivo: null, frecuencia: frecuenciaDe.get(`anuncio|${a.cuenta_id as string}|${a.meta_id as string}`) ?? null, r: porAnuncio.get(a.id as string) ?? sinResultados() }));
+  const anuncios: AnuncioVista[] = anun.map((a) => ({ id: a.id as string, campanaId: a.campana_id as string, nombre: a.nombre as string, activo: a.estado === "ACTIVE", videoId: (a.video_id as string | null) ?? null, miniatura: (a.miniatura as string | null) ?? null, copy: (a.copy as string | null) ?? null, titulo: (a.titulo as string | null) ?? null, landing: (a.landing as string | null) ?? null, numero: numeroDeVideo(String(a.nombre ?? "")), angulo: nombreDeAngulo(analisisDe.get(String(a.video_id ?? ""))?.angulo ?? null, analisisDe.get(String(a.video_id ?? ""))?.anguloDetalle), decision: null, decisionMotivo: null, frecuencia: frecuenciaDe.get(`anuncio|${a.cuenta_id as string}|${a.meta_id as string}`) ?? null, r: porAnuncio.get(a.id as string) ?? sinResultados() }));
 
   // Videos (30 días): el mismo video en varios anuncios es uno solo.
   const videosMapa = new Map<string, { nombre: string; miniatura: string | null; anuncios: number; campanas: Set<string>; angulos: Map<string, number>; productos: Map<string, number>; detalle: VideoVista["anunciosDetalle"]; numero: string | null }>();
@@ -385,7 +386,12 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
   const videosSinAngulo = gruposVideo.sinDato["Ángulo"];
   const grupos: GruposMeta = {
     campana: {
-      "Ángulo": agrupar(deCampana((c) => c.angulo)),
+      "Ángulo": agrupar(deCampana((c) => c.angulo)).map((g) => {
+        // De qué son los videos de las campañas clasificadas con esa táctica.
+        const suyos = new Map(conGasto.filter((c) => c.angulo === g.nombre).flatMap((c) => (videosPorCampana.get(c.id) ?? []).map((v) => [v.videoId, v] as const)));
+        const deQue = temasDe(g.nombre, [...suyos.values()].map((v) => ({ angulo: v.angulo, detalle: v.detalle, gasto: v.gasto, compras: 0 })));
+        return deQue ? { ...g, deQue } : g;
+      }),
       Estructura: agrupar(deCampana((c) => c.estructura)),
       Puja: agrupar(deCampana((c) => (c.puja ? NOMBRE_PUJA[c.puja] : null))),
       Producto: agrupar(deCampana((c) => c.producto)),
@@ -422,7 +428,8 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
     if (!lista.some((x) => x.url === url)) lista.push({ url, rasgos: paginasMedidas[url] });
     paginasPorCampana.set(a.campanaId, lista);
   }
-  const videosEnMarcha = videos30.filter((v) => productoEnMarcha(enMarcha, v.producto));
+  // En las sugerencias el ángulo va con su detalle, para que «antes y después» diga cuál.
+  const videosEnMarcha = videos30.filter((v) => productoEnMarcha(enMarcha, v.producto)).map((v) => ({ ...v, angulo: nombreDeAngulo(v.angulo, v.analisis?.anguloDetalle) }));
   const delHistorial = hallazgosEnVista(hallazgosGuardados?.analisis.hallazgos ?? [], enMarcha, "activos");
   const todas = [...sugerir({ campanas: campanas7, anuncios: anunciosSugerencia, serie, videos: videosEnMarcha, hoy: o.hoy, paginasPorCampana }), ...sugerenciasDeHallazgos([...delHistorial, ...vigilancias.map(hallazgoDeVigilancia).filter((h): h is NonNullable<typeof h> => h !== null)])];
   const sugerencias = pendientes(todas, decisiones, o.hoy);

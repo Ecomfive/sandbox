@@ -3,6 +3,7 @@
 // con rasgos concretos —de su video (ángulo, gancho, formato, duración, llamado, recursos), de su texto (largo, pregunta, precio, pago contra entrega, urgencia…), de su campaña y de su página (tipo, video, reseñas, precio, imágenes, peso,
 // velocidad)— y se compara con el resto: lo que aparece mucho más entre los que funcionaron es lo que hay que copiar, y lo que casi nunca aparece, lo que hay que evitar. Lógica pura, con prueba. Quien lee la base y las páginas está en `rasgos-datos.ts`.
 
+import { nombreConTemas, nombreDeAngulo } from "./angulo-detalle";
 import { cpa, cvr, ctr, efectividad, hookRate, type Resultados } from "./metricas";
 
 // ───────────────────────── Rasgos de cada cosa ─────────────────────────
@@ -34,6 +35,7 @@ export function rasgosDeCopy(copy: string | null | undefined, titulo?: string | 
 
 export interface VideoParaRasgos {
   angulo: string | null;
+  detalle?: string | null;
   ganchoTipo: string | null;
   formato: string | null;
   ctaTipo: string | null;
@@ -48,6 +50,9 @@ export function rasgosDeVideo(v: VideoParaRasgos | null | undefined): string[] {
   if (!v) return [];
   const out: string[] = [];
   if (v.angulo) out.push(rasgo("Ángulo", v.angulo));
+  // De qué es la táctica general (qué «antes y después»), como rasgo aparte.
+  const conDetalle = nombreDeAngulo(v.angulo, v.detalle);
+  if (conDetalle && conDetalle !== v.angulo) out.push(rasgo("Detalle del ángulo", conDetalle));
   if (v.ganchoTipo) out.push(rasgo("Gancho", v.ganchoTipo));
   if (v.formato) out.push(rasgo("Formato", v.formato));
   if (v.ctaTipo) out.push(rasgo("Llamado a la acción", v.ctaTipo));
@@ -166,6 +171,19 @@ const partir = (rasgo: string) => {
   return { dimension: rasgo.slice(0, i), valor: rasgo.slice(i + 2) };
 };
 
+/** «Antes y después» solo no dice nada: se le ponen los temas que tiene en el grupo del que se habla (los que funcionaron o los demás), del más repetido al menos. */
+function conSusTemas(x: RasgoComun, grupo: readonly Entidad[]): RasgoComun {
+  if (x.dimension !== "Ángulo") return x;
+  const inicio = rasgo("Detalle del ángulo", `${x.valor} · `);
+  const temas = new Map<string, number>();
+  for (const e of grupo) {
+    if (!e.rasgos.includes(x.rasgo)) continue;
+    for (const r of new Set(e.rasgos)) if (r.startsWith(inicio)) temas.set(r.slice(inicio.length), (temas.get(r.slice(inicio.length)) ?? 0) + 1);
+  }
+  const orden = [...temas].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "es")).map(([t]) => t);
+  return { ...x, valor: nombreConTemas(x.valor, orden, 3) };
+}
+
 /** Un anuncio o página «funcionó»: gastó lo suficiente y su CPA quedó dentro del tope. */
 export const funciono = (e: Entidad): boolean => e.r.gasto >= UMBRALES_RASGOS.gastoMinimo && e.r.compras > 0 && (cpa(e.r) ?? Infinity) <= e.tope;
 
@@ -202,8 +220,8 @@ export function compararGanadores(entidades: readonly Entidad[], metrica: Metric
   comunes.sort((x, y) => y.parteGanadores - y.parteResto - (x.parteGanadores - x.parteResto));
   evitar.sort((x, y) => y.parteResto - y.parteGanadores - (x.parteResto - x.parteGanadores));
   if (!comunes.length && !evitar.length) return null;
-  const top = comunes.slice(0, 6);
-  const malos = evitar.slice(0, 4);
+  const top = comunes.slice(0, 6).map((x) => conSusTemas(x, ganan));
+  const malos = evitar.slice(0, 4).map((x) => conSusTemas(x, resto));
   const ejemplos = [...ganan].sort((x, y) => (c.valor(y.r) ?? 0) - (c.valor(x.r) ?? 0)).slice(0, 3).map((e) => ({ nombre: e.nombre, valor: Math.round((c.valor(e.r) ?? 0) * 10) / 10 }));
   const de = c.sobre === "anuncios" ? "anuncios" : "páginas";
   const recomendaciones = [
@@ -226,7 +244,7 @@ export function compararGanadores(entidades: readonly Entidad[], metrica: Metric
 
 /** Lo que se le da a la IA. */
 export function rasgosParaIA(r: RasgosDeGanadores): unknown {
-  const f = (x: RasgoComun) => ({ rasgo: x.rasgo, en_ganadores: `${x.enGanadores} de ${r.ganadores}`, en_el_resto: `${x.enResto} de ${r.resto}` });
+  const f = (x: RasgoComun) => ({ rasgo: `${x.dimension}: ${x.valor}`, en_ganadores: `${x.enGanadores} de ${r.ganadores}`, en_el_resto: `${x.enResto} de ${r.resto}` });
   return { metrica: r.nombre, criterio_de_ganador: r.criterio, sobre: r.sobre, ganadores: r.ganadores, resto: r.resto, lo_que_comparten_los_ganadores: r.comunes.map(f), lo_que_casi_nunca_tienen: r.evitar.map(f), ejemplos_de_ganadores: r.ejemplos };
 }
 

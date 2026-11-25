@@ -340,7 +340,7 @@ export function sugerir(e: EntradaSugerencias): Sugerencia[] {
     const h = hookRate(v.r);
     const costo = cpa(v.r);
     if (confiable(v.r) && h !== null && h >= U.hookBueno && costo !== null && costo <= v.tope && v.campanas <= 1) {
-      s.push({ clave: `video_ganador:${v.id}`, tipo: "video_ganador", severidad: "media", prioridad: "oportunidad", positiva: true, titulo: `Video «${v.nombre}»: gana y solo se usa en una campaña`, detalle: `Hook ${h.toFixed(0)} % y CPA ${dolares(costo)} (tope ${dolares(v.tope)}) con ${dolares(v.r.gasto)} gastados.`, accion: "Usarlo en otras campañas o probar su ángulo con otro producto.", objeto: { tipo: "video", id: v.id }, gasto: v.r.gasto });
+      s.push({ clave: `video_ganador:${v.id}`, tipo: "video_ganador", severidad: "media", prioridad: "oportunidad", positiva: true, titulo: `Video «${v.nombre}»: gana y solo se usa en una campaña`, detalle: `Hook ${h.toFixed(0)} % y CPA ${dolares(costo)} (tope ${dolares(v.tope)}) con ${dolares(v.r.gasto)} gastados.`, accion: `Usarlo en otras campañas o probar su ángulo${v.angulo ? ` («${v.angulo}»)` : ""} con otro producto.`, objeto: { tipo: "video", id: v.id }, gasto: v.r.gasto });
     } else if (v.anunciosDetalle.some((a) => a.activo) && v.r.gasto >= GASTO_MINIMO_CONFIABLE && h !== null && h < U.hookMalo) {
       s.push({ clave: `video_hook_bajo:${v.id}`, tipo: "video_hook_bajo", severidad: "media", prioridad: "observar", positiva: false, titulo: `Video «${v.nombre}»: casi nadie pasa los primeros 3 segundos`, detalle: `Hook ${h.toFixed(0)} % con ${dolares(v.r.gasto)} gastados (lo bueno es sobre ${U.hookBueno} %).`, accion: "Cambiar la apertura del video o dejar de usarlo.", objeto: { tipo: "video", id: v.id }, gasto: v.r.gasto });
     }
@@ -412,7 +412,7 @@ export function sugerenciasDeHallazgos(hallazgos: readonly Hallazgo[]): Sugerenc
     severidad: h.tono === "bueno" ? "info" : (h.categoria === "entrega" || h.categoria === "tendencia") && h.gasto >= GASTO_URGENTE ? "alta" : "media",
     positiva: h.tono === "bueno",
     titulo: h.titulo,
-    detalle: h.motivo ? `${h.detalle} Por qué: ${h.motivo}` : h.detalle,
+    detalle: [h.detalle, h.quienes?.deQue, h.motivo ? `Por qué: ${h.motivo}` : ""].filter(Boolean).join(" "),
     accion: h.accion ?? "Revisar los detalles en Hallazgos.",
     objeto: { tipo: "cuenta", id: "historial" },
     gasto: h.gasto,

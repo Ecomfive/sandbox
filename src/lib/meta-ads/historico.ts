@@ -6,6 +6,9 @@
 //   · qué genera más ventas en cada parte (campañas, videos, ángulos, ganchos, productos), con lo que de verdad se entrega.
 // Sin la calculadora de costos: «funcionó» = tuvo gasto suficiente para compararse y su CPA quedó dentro del CPA tope del producto. Lógica pura, con prueba; las lecturas están en `historico-datos.ts`.
 
+import { detallesDe, enComun, temasDe, textoDeDetalles, type RasgoComun } from "./angulo-detalle";
+import { esAnguloTactico } from "./video-angulo";
+import { claveDeProducto } from "./nombre";
 import { calcularEnMarcha, type EnMarcha } from "./en-marcha";
 import { certezaDe, confiable, cpa, cpm, ctr, cvr, efectividad, GASTO_MINIMO_CONFIABLE, hookRate, sinResultados, sumar, type Certeza, type Resultados } from "./metricas";
 
@@ -84,11 +87,17 @@ export interface VideoHist {
   clave: string;
   familia: Familia;
   angulo: string | null;
+  /** De qué es, cuando el ángulo es una táctica general («Antes y después», «Testimonio de cliente», «Experto o autoridad»). */
+  detalle?: string | null;
   ganchoTipo: string | null;
   formato: string | null;
   ctaTipo: string | null;
   tope: number;
   total: Resultados;
+  /** Sus últimas semanas y meses (para decir cuáles empeoraron o mejoraron). */
+  v?: Ventanas;
+  /** Las campañas donde se usa. */
+  campanas?: string[];
 }
 
 /** Lo que dicen los pedidos de un producto en la tienda (lo que Meta no sabe): cuántos se entregaron y cuántos volvieron. */
@@ -98,6 +107,8 @@ export interface EntregaProducto {
   devueltas: number;
   canceladas: number;
   enCamino: number;
+  /** De lo que va en camino, lo que todavía está pendiente (ni enviado ni cancelado). Sin este dato (un análisis guardado antes), no se calcula el % de envío. */
+  sinEnviar?: number;
 }
 
 export interface ProductoHist {
@@ -124,6 +135,8 @@ export interface EntradaHistorico {
   /** Mes a mes de todas las campañas y de los productos con más gasto: para comparar un mes con otro. Opcional: sin esto no hay serie mensual. */
   mensual?: MesHist[];
   mensualPorProducto?: { clave: string; nombre: string; meses: MesHist[] }[];
+  /** Todos los pedidos de las tiendas juntos (no solo los de productos con campañas). */
+  pedidosDeLaTienda?: Omit<EntregaProducto, "nombre"> | null;
   /** Primer y último día con resultados leídos. */
   desde: string | null;
   hasta: string | null;
@@ -165,6 +178,7 @@ export interface FilaEntrega {
   devueltas: number;
   canceladas: number;
   enCamino: number;
+  sinEnviar?: number;
   /** Con qué producto de la tienda se calculó la entrega (el nombre de la línea del pedido). */
   enTienda: string | null;
   /** Compras de Meta × tasa de entrega: las que se espera que lleguen al cliente. */
@@ -205,6 +219,7 @@ export function filasDeEntrega(productos: readonly ProductoHist[]): FilaEntrega[
         devueltas: e?.devueltas ?? 0,
         canceladas: e?.canceladas ?? 0,
         enCamino: e?.enCamino ?? 0,
+        sinEnviar: e ? e.sinEnviar : 0,
         enTienda: e?.nombre ?? null,
         comprasEntregadas,
         cpaEntregado,
@@ -231,6 +246,8 @@ export interface Hallazgo {
   accion?: string;
   certeza: Certeza;
   gasto: number;
+  /** Cuáles son: los videos y las campañas detrás del hallazgo, y lo que tienen en común. */
+  quienes?: Quienes;
   /** Solo en lo que sale de una vigilancia: la prioridad que la persona le dio (manda sobre la certeza al ordenar las sugerencias). */
   prioridad?: "alta" | "media" | "baja";
 }
@@ -555,6 +572,8 @@ export type NivelTendencia = "Todo" | "Producto" | "Ángulo" | "Campaña";
 export interface FilaTendencia {
   nivel: NivelTendencia;
   nombre: string;
+  /** En un ángulo que es una táctica general, de qué son los videos que se movieron así. */
+  deQue?: string;
   /** «mes» (último mes contra el anterior) o «semana» (última semana contra las tres anteriores). */
   ventana: "mes" | "semana";
   gastoRec: number;
@@ -597,12 +616,15 @@ function hallazgosDeTendencias(filas: readonly FilaTendencia[]): Hallazgo[] {
     const { cpaPrev, cpaRec } = f.cambio;
     const antes = cpaPrev === null ? "sin ventas" : dol(cpaPrev);
     const ahora = cpaRec === null ? "sin ventas" : dol(cpaRec);
+    // El mismo nombre puede ir al revés en la otra ventana (mejor en el mes y peor en la semana): se dice para que no parezca una contradicción.
+    const otra = filas.find((x) => x.nivel === f.nivel && x.nombre === f.nombre && x.ventana !== f.ventana && x.cambio.sentido === (baja ? "mejora" : "baja"));
+    const contraste = otra ? ` En ${TEXTO_VENTANA[otra.ventana]}, en cambio, ${baja ? "mejoró" : "empeoró"} (${otra.cambio.cpaPrev === null ? "sin ventas" : dol(otra.cambio.cpaPrev)} → ${otra.cambio.cpaRec === null ? "sin ventas" : dol(otra.cambio.cpaRec)}).` : "";
     out.push({
       id: `tendencia:${f.nivel}:${f.nombre}:${f.ventana}`,
       categoria: "tendencia",
       tono: baja ? "alerta" : "bueno",
-      titulo: `${f.nivel === "Todo" ? "Todas las campañas" : `${f.nivel} «${f.nombre}»`}: el CPA ${baja ? "empeoró" : "mejoró"} (${antes} → ${ahora})`,
-      detalle: `En ${TEXTO_VENTANA[f.ventana]}, ${f.nivel === "Todo" ? "el conjunto" : `${f.nivel.toLowerCase()} «${f.nombre}»`} pasó de ${entero(f.comprasPrev)} a ${entero(f.comprasRec)} compras y su CPA de ${antes} a ${ahora}. En el periodo reciente gastó ${dol(f.gastoRec)}.`,
+      titulo: `${f.nivel === "Todo" ? "Todas las campañas" : `${f.nivel} «${f.nombre}»`}: el CPA ${baja ? "empeoró" : "mejoró"} ${f.ventana === "mes" ? "en el último mes" : "en la última semana"} (${antes} → ${ahora})`,
+      detalle: `En ${TEXTO_VENTANA[f.ventana]}, ${f.nivel === "Todo" ? "el conjunto" : `${f.nivel.toLowerCase()} «${f.nombre}»`} pasó de ${entero(f.comprasPrev)} a ${entero(f.comprasRec)} compras y su CPA de ${antes} a ${ahora}. En el periodo reciente gastó ${dol(f.gastoRec)}.${contraste}`,
       motivo: f.cambio.motivo ?? undefined,
       accion: baja ? (f.nivel === "Campaña" ? "Revisar sus anuncios: si el creativo se cansó, rotarlo antes de seguir gastando." : "Mirar qué campañas de ahí bajaron y por qué motivo antes de seguir subiendo presupuesto.") : "Mantenerlo y, si el CPA sigue dentro del tope, escalar con cuidado.",
       certeza: f.gastoRec >= UMBRALES_HISTORICO.gastoMes * 3 ? "firme" : "probable",
@@ -659,6 +681,8 @@ export interface FilaVentas {
   /** true = con la tasa del propio producto; false = con el promedio. */
   entregaReal: boolean;
   campanas?: number;
+  /** En un ángulo que es una táctica general, de qué son sus videos. */
+  deQue?: string;
 }
 
 export interface Rankings {
@@ -712,7 +736,10 @@ export function rankingsDeVentas(campanas: readonly CampanaHist[], videos: reado
     campanas: rankear(campanas.map((c) => ({ nombre: c.nombre, r: c.total, clave: c.clave, campana: c.id })), tasaDe, promedio, totalCompras),
     videos: rankear(videos.map((v) => ({ nombre: v.nombre, r: v.total, clave: v.clave })), tasaDe, promedio, totalVideos),
     productos: rankear(productos.map((p) => ({ nombre: p.nombre, r: p.total, clave: p.clave })), tasaDe, promedio, totalCompras),
-    angulos: rankear(deVideo((v) => v.angulo), tasaDe, promedio, totalVideos),
+    angulos: rankear(deVideo((v) => v.angulo), tasaDe, promedio, totalVideos).map((f) => {
+      const deQue = temasDe(f.nombre, videos.map((v) => ({ angulo: v.angulo, detalle: v.detalle, gasto: v.total.gasto, compras: v.total.compras })));
+      return deQue ? { ...f, deQue } : f;
+    }),
     ganchos: rankear(deVideo((v) => v.ganchoTipo), tasaDe, promedio, totalVideos),
     formatos: rankear(deVideo((v) => v.formato), tasaDe, promedio, totalVideos),
   };
@@ -766,6 +793,8 @@ export interface AnalisisHistorico {
   bandas: BandasMetrica[];
   tendencias: FilaTendencia[];
   entrega: FilaEntrega[];
+  /** Todos los pedidos de las tiendas juntos, para la calculadora de costos. Un análisis guardado antes no lo trae. */
+  pedidosDeLaTienda?: Omit<EntregaProducto, "nombre"> | null;
   rankings: Rankings;
   /** Lo que tenía campañas activas con gasto en la última semana al calcular el análisis (los análisis guardados antes no lo traen). */
   enMarcha?: EnMarcha;
@@ -837,6 +866,118 @@ export function detallarConCampanas(hallazgos: readonly Hallazgo[], campanas: re
   });
 }
 
+// ───────────────────────── Cuáles son ─────────────────────────
+
+/** Un video o una campaña detrás de un hallazgo. En una tendencia trae el CPA de antes y de ahora; en lo demás, solo el de todo el historial. */
+export interface QuienHallazgo {
+  id: string;
+  nombre: string;
+  /** De qué es (videos de una táctica general). */
+  detalle?: string;
+  antes?: number | null;
+  ahora: number | null;
+  gasto: number;
+  compras: number;
+}
+
+export interface Quienes {
+  /** En una táctica general, la frase que se ve sin abrir: de qué son. */
+  deQue?: string;
+  enComun: RasgoComun[];
+  videos: QuienHallazgo[];
+  campanas: QuienHallazgo[];
+  /** Cuántos hay en total (se guardan los primeros). */
+  totalVideos: number;
+  totalCampanas: number;
+}
+
+/** Cuántos videos y campañas se guardan por hallazgo. */
+export const MAX_QUIENES = 8;
+/** Lo mínimo gastado en el periodo reciente para decir que un video o una campaña se movió. */
+const GASTO_PARA_MOVERSE = 10;
+
+/** Si algo empeoró (`sentido` baja) o mejoró en una ventana: 15 % o más de diferencia en el CPA, dejar de vender o empezar a vender. */
+function seMovio(v: Ventana, sentido: "baja" | "mejora"): boolean {
+  if (v.rec.gasto < GASTO_PARA_MOVERSE) return false;
+  const antes = cpa(v.prev);
+  const ahora = cpa(v.rec);
+  if (sentido === "baja") return antes !== null && (ahora === null || ahora > antes * 1.15);
+  return ahora !== null && (antes === null ? v.prev.gasto > 0 : ahora < antes * 0.85);
+}
+
+const rasgosDe = (v: VideoHist) => ({ detalle: v.detalle, gancho: v.ganchoTipo, formato: v.formato, cta: v.ctaTipo });
+const comoConAngulo = (v: VideoHist, r: Resultados) => ({ angulo: v.angulo, detalle: v.detalle, gasto: r.gasto, compras: r.compras });
+const redondo = (n: number | null) => (n === null ? null : Math.round(n * 100) / 100);
+
+function armarQuienes(videos: { v: VideoHist; r: Resultados; antes?: Resultados }[], campanas: { c: CampanaHist; r: Resultados; antes?: Resultados }[], angulo: string | null, frase: string): Quienes | undefined {
+  if (!videos.length && !campanas.length) return undefined;
+  const tactico = !!angulo && esAnguloTactico(angulo);
+  const temas = tactico ? textoDeDetalles(detallesDe(videos.map((x) => comoConAngulo(x.v, x.r)))) : "";
+  const uno = (id: string, nombre: string, r: Resultados, antes: Resultados | undefined, detalle?: string | null): QuienHallazgo => ({
+    id,
+    nombre: nombre.slice(0, 80),
+    ...(detalle ? { detalle } : {}),
+    ...(antes ? { antes: redondo(cpa(antes)) } : {}),
+    ahora: redondo(cpa(r)),
+    gasto: Math.round(r.gasto * 100) / 100,
+    compras: r.compras,
+  });
+  return {
+    ...(temas ? { deQue: `${frase}: ${temas}.` } : {}),
+    enComun: enComun(videos.map((x) => rasgosDe(x.v)), { conTema: tactico }),
+    videos: videos.slice(0, MAX_QUIENES).map((x) => uno(x.v.id, x.v.nombre, x.r, x.antes, x.v.angulo && esAnguloTactico(x.v.angulo) ? x.v.detalle : null)),
+    campanas: campanas.slice(0, MAX_QUIENES).map((x) => uno(x.c.id, x.c.nombre, x.r, x.antes)),
+    totalVideos: videos.length,
+    totalCampanas: campanas.length,
+  };
+}
+
+/**
+ * A cada hallazgo de tendencia, de ángulo, gancho, formato, llamado, estructura o puja le pone **cuáles son** (25 nov 2026, pedido de Alcides: «no se entiende nada y al darle clic no se despliega cuáles»): en una tendencia, los videos y
+ * campañas del grupo que se movieron en ese sentido (si ninguno llega al umbral, los que más gastaron en ese periodo); en una característica, los que la usan. Con los videos, lo que tienen en común.
+ */
+export function ponerQuienes(hallazgos: readonly Hallazgo[], campanas: readonly CampanaHist[], videos: readonly VideoHist[]): Hallazgo[] {
+  return hallazgos.map((h): Hallazgo => {
+    const t = /^tendencia:(Todo|Producto|Ángulo|Campaña):(.+):(mes|semana)$/.exec(h.id);
+    if (t) {
+      const [, nivel, nombre, ventana] = t as unknown as [string, string, string, "mes" | "semana"];
+      const sentido = h.tono === "alerta" ? "baja" : "mejora";
+      const suCampana = nivel === "Campaña" ? campanas.find((c) => c.nombre === nombre) : undefined;
+      const deCampanas = campanas.filter((c) => (nivel === "Todo" ? true : nivel === "Producto" ? c.producto === nombre : nivel === "Ángulo" ? c.angulo === nombre : c === suCampana));
+      const deVideos = videos.filter((v) => (nivel === "Todo" ? true : nivel === "Producto" ? v.clave === claveDeProducto(nombre) : nivel === "Ángulo" ? v.angulo === nombre : !!suCampana && !!v.campanas?.includes(suCampana.id)));
+      const elegir = <X extends { v?: Ventanas }>(lista: readonly X[]): X[] => {
+        const conGasto = lista.filter((x) => (x.v?.[ventana].rec.gasto ?? 0) > 0);
+        const movidos = conGasto.filter((x) => seMovio(x.v![ventana], sentido));
+        return (movidos.length ? movidos : conGasto).sort((a, b) => b.v![ventana].rec.gasto - a.v![ventana].rec.gasto);
+      };
+      // `v` en una campaña son sus ventanas; en un video también.
+      const vids = elegir(deVideos).map((v) => ({ v, r: v.v![ventana].rec, antes: v.v![ventana].prev }));
+      const camps = nivel === "Campaña" ? [] : elegir(deCampanas).map((c) => ({ c, r: c.v[ventana].rec, antes: c.v[ventana].prev }));
+      const seMovieron = vids.some((x) => seMovio({ rec: x.r, prev: x.antes }, sentido));
+      const frase = seMovieron ? `De qué son los que ${sentido === "baja" ? "empeoraron" : "mejoraron"}` : "De qué son los que más gastaron";
+      const quienes = armarQuienes(vids, camps, nivel === "Ángulo" ? nombre : null, frase);
+      return quienes ? { ...h, quienes } : h;
+    }
+    const k = /^(angulo|gancho|formato|cta|estructura|puja)(?:@(\w+))?:(.+):(si|no)$/.exec(h.id);
+    if (k) {
+      const [, dim, familia, clave, que] = k;
+      if (dim === "estructura" || dim === "puja") {
+        const camps = campanas.filter((c) => c[dim] === clave && (!familia || c.familia === familia) && c.total.gasto > 0).sort((a, b) => (que === "si" ? Number(funciono(b.total, b.tope)) - Number(funciono(a.total, a.tope)) : 0) || b.total.gasto - a.total.gasto);
+        const quienes = armarQuienes([], camps.map((c) => ({ c, r: c.total })), null, "");
+        return quienes ? { ...h, quienes } : h;
+      }
+      const campo = dim === "angulo" ? "angulo" : dim === "gancho" ? "ganchoTipo" : dim === "formato" ? "formato" : "ctaTipo";
+      const usan = videos.filter((v) => v[campo] === clave && (!familia || v.familia === familia) && v.total.gasto > 0);
+      // En lo que funciona se enseñan (y se resumen) los que sí funcionaron; en lo que no, todos los que lo usan.
+      const buenos = que === "si" ? usan.filter((v) => funciono(v.total, v.tope)) : [];
+      const lista = (buenos.length ? buenos : usan).sort((a, b) => b.total.gasto - a.total.gasto);
+      const quienes = armarQuienes(lista.map((v) => ({ v, r: v.total })), [], dim === "angulo" ? clave : null, buenos.length ? "De qué son los que funcionaron" : "De qué son");
+      return quienes ? { ...h, quienes } : h;
+    }
+    return h;
+  });
+}
+
 export function analizarHistorico(e: EntradaHistorico): AnalisisHistorico {
   const bandas = bandasDeMetricas(e.campanas);
   const filasTendencia = tendencias(e.campanas, e.productos);
@@ -844,12 +985,12 @@ export function analizarHistorico(e: EntradaHistorico): AnalisisHistorico {
   const promedio = tasaPromedio(e.productos);
   const medibles = e.campanas.filter((c) => confiable(c.total));
   const total = e.campanas.reduce((r, c) => sumar(r, c.total), sinResultados());
-  const hallazgos = ordenarHallazgos(detallarConCampanas([
+  const hallazgos = ordenarHallazgos(ponerQuienes(detallarConCampanas([
     ...hallazgosDeEntrega(entrega, promedio),
     ...hallazgosDeTendencias(filasTendencia),
     ...hallazgosDeBandas(bandas),
     ...hallazgosDeCaracteristicas(e.campanas, e.videos),
-  ], e.campanas, e.videos));
+  ], e.campanas, e.videos), e.campanas, e.videos));
   return {
     resumen: {
       campanas: e.campanas.length,
@@ -864,8 +1005,13 @@ export function analizarHistorico(e: EntradaHistorico): AnalisisHistorico {
     },
     hallazgos,
     bandas,
-    tendencias: filasTendencia,
+    // En cada ángulo que es una táctica general, de qué son los videos que se movieron así.
+    tendencias: filasTendencia.map((f) => {
+      const deQue = f.nivel === "Ángulo" ? hallazgos.find((h) => h.id === `tendencia:${f.nivel}:${f.nombre}:${f.ventana}`)?.quienes?.deQue : undefined;
+      return deQue ? { ...f, deQue } : f;
+    }),
     entrega,
+    pedidosDeLaTienda: e.pedidosDeLaTienda ?? null,
     rankings: rankingsDeVentas(e.campanas, e.videos, e.productos),
     enMarcha: calcularEnMarcha(e.campanas.map((c) => ({ nombre: c.nombre, producto: c.producto, activa: c.activa, gasto7: c.v.semana.rec.gasto })), e.hasta ?? ""),
     meses: filasMensuales(e.mensual ?? []),

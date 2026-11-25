@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { seccionDeHallazgo, tieneHistorialSuficiente, UMBRALES_HISTORICO, type AnalisisHistorico, type BandasMetrica, type FilaMes, type FilaTendencia, type SeccionHallazgo } from "@/lib/meta-ads/historico";
+import { seccionDeHallazgo, tieneHistorialSuficiente, UMBRALES_HISTORICO, type AnalisisHistorico, type BandasMetrica, type FilaMes, type FilaTendencia, type Quienes, type SeccionHallazgo } from "@/lib/meta-ads/historico";
 import type { InterpretacionGuardada } from "@/lib/meta-ads/interpretacion-guardada";
 import { dolares } from "@/lib/meta-ads/metricas";
 import { enLaVista, estadoDeTendencia, hallazgosEnVista, productoEnMarcha, type EnMarcha, type VistaActividad } from "@/lib/meta-ads/en-marcha";
@@ -19,6 +19,7 @@ import type { RasgosDeGanadores } from "@/lib/meta-ads/rasgos-ganadores";
 import { ActualizarAnalisis } from "./actualizar-analisis";
 import type { SenalesCreativas } from "@/lib/meta-ads/senales-creativas";
 import type { ResultadoVigilancia } from "@/lib/meta-ads/analisis-pedido";
+import { Cuales } from "./cuales";
 
 const pct = (n: number | null) => (n === null ? "—" : `${Math.round(n * 100)} %`);
 const colorDeTasa = (t: number | null) => (t === null ? "var(--muted-foreground)" : t >= 0.7 ? "var(--success)" : t >= 0.55 ? "var(--warning)" : "var(--destructive)");
@@ -316,7 +317,7 @@ function SeccionMeses({ a }: { a: AnalisisHistorico }) {
 
 // ───────────────────────── Cómo va frente a antes ─────────────────────────
 
-function TarjetaTendencia({ f }: { f: FilaTendencia }) {
+function TarjetaTendencia({ f, quienes }: { f: FilaTendencia; quienes?: Quienes }) {
   const { cpaPrev, cpaRec } = f.cambio;
   return (
     <li className="flex flex-col gap-1.5 rounded-lg border border-border bg-card px-3 py-2.5">
@@ -331,12 +332,21 @@ function TarjetaTendencia({ f }: { f: FilaTendencia }) {
         <span>CPA {cpaPrev === null ? "—" : dolares(cpaPrev)} → <span className="font-semibold text-foreground">{cpaRec === null ? "—" : dolares(cpaRec)}</span></span>
         <span>Compras {entero(f.comprasPrev)} → <span className="font-semibold text-foreground">{entero(f.comprasRec)}</span></span>
       </p>
+      {f.deQue && <p className="m-0 text-xs">{f.deQue}</p>}
       {f.cambio.motivo && <p className="m-0 rounded-md bg-muted px-2 py-1 text-xs">{f.cambio.motivo}</p>}
+      {quienes && (
+        <details className="group">
+          <summary className="min-h-8 cursor-pointer content-center text-xs font-medium underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground">Ver cuáles son</summary>
+          <div className="mt-1.5">
+            <Cuales quienes={quienes} />
+          </div>
+        </details>
+      )}
     </li>
   );
 }
 
-function ColumnaTendencias({ titulo, filas, tono }: { titulo: string; filas: FilaTendencia[]; tono: "baja" | "mejora" }) {
+function ColumnaTendencias({ titulo, filas, tono, cuales }: { titulo: string; filas: FilaTendencia[]; tono: "baja" | "mejora"; cuales: Map<string, Quienes> }) {
   const [todos, setTodos] = useState(false);
   const lista = todos ? filas : filas.slice(0, 5);
   return (
@@ -352,7 +362,7 @@ function ColumnaTendencias({ titulo, filas, tono }: { titulo: string; filas: Fil
       ) : (
         <ul className="m-0 flex list-none flex-col gap-2 p-0">
           {lista.map((f) => (
-            <TarjetaTendencia key={`${f.nivel}:${f.nombre}`} f={f} />
+            <TarjetaTendencia key={`${f.nivel}:${f.nombre}:${f.ventana}`} f={f} quienes={cuales.get(`tendencia:${f.nivel}:${f.nombre}:${f.ventana}`)} />
           ))}
         </ul>
       )}
@@ -365,7 +375,9 @@ function ColumnaTendencias({ titulo, filas, tono }: { titulo: string; filas: Fil
   );
 }
 
-function SeccionTendencias({ filas }: { filas: FilaTendencia[] }) {
+function SeccionTendencias({ filas, hallazgos }: { filas: FilaTendencia[]; hallazgos: AnalisisHistorico["hallazgos"] }) {
+  // La lista de videos y campañas de cada tendencia viene en su hallazgo.
+  const cuales = new Map(hallazgos.flatMap((h) => (h.quienes ? [[h.id, h.quienes] as const] : [])));
   const [ventana, setVentana] = useState<"mes" | "semana">("mes");
   const delPeriodo = filas.filter((f) => f.ventana === ventana);
   const empeoran = delPeriodo.filter((f) => f.cambio.sentido === "baja").sort((a, b) => b.gastoRec - a.gastoRec);
@@ -390,8 +402,8 @@ function SeccionTendencias({ filas }: { filas: FilaTendencia[] }) {
           {ventana === "mes" ? "Último mes contra el anterior" : "Última semana contra las tres anteriores"} · desde {dolares(ventana === "mes" ? UMBRALES_HISTORICO.gastoMes : UMBRALES_HISTORICO.gastoSemana)} gastados en cada periodo.
         </p>
         <div className="grid gap-5 lg:grid-cols-2">
-          <ColumnaTendencias titulo="Empeoran" filas={empeoran} tono="baja" />
-          <ColumnaTendencias titulo="Mejoran" filas={mejoran} tono="mejora" />
+          <ColumnaTendencias titulo="Empeoran" filas={empeoran} tono="baja" cuales={cuales} />
+          <ColumnaTendencias titulo="Mejoran" filas={mejoran} tono="mejora" cuales={cuales} />
         </div>
       </div>
     </SeccionPlegable>
@@ -481,7 +493,7 @@ export function HallazgosVista({ analisis, interpretacion, iaConectada, preparan
       <SeccionHallazgos key={vista} a={{ ...a, hallazgos }} />
       <ChatHallazgos iaConectada={iaConectada} />
       <SeccionMeses a={a} />
-      <SeccionTendencias filas={a.tendencias.filter((t) => enLaVista(estadoDeTendencia(t, enMarcha), vista))} />
+      <SeccionTendencias filas={a.tendencias.filter((t) => enLaVista(estadoDeTendencia(t, enMarcha), vista))} hallazgos={a.hallazgos} />
       <SeccionBandas a={a} />
     </div>
   );

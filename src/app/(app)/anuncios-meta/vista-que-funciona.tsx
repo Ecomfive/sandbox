@@ -19,6 +19,7 @@ import { ClasificarGanchos } from "./clasificar-ganchos";
 import { BarraProgreso, InsigniaCerteza, TarjetaMeta } from "./graficas";
 import { AVISO_POCA_DATA, entero, Nivel, porcentaje, Resultado, valorCpa } from "./piezas";
 import { SeccionPlegable } from "./plegable";
+import { ColumnaOrdenable } from "./columna-ordenable";
 
 type Seccion = "videos" | "campanas" | "anuncios" | "productos";
 const SECCIONES: { id: Seccion; nombre: string; detalle: string }[] = [
@@ -269,6 +270,7 @@ function TarjetaConclusion({ c }: { c: Conclusion }) {
       {g ? (
         <>
           <p className="m-0 line-clamp-2 text-base font-semibold leading-snug">{g.nombre}</p>
+          {g.deQue && <p className="m-0 text-xs text-muted-foreground">De qué son: {g.deQue}</p>}
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-md bg-muted px-2 py-0.5 text-sm font-semibold tabular-nums">CPA {valorCpa(g.r)}</span>
             {ventaja !== null && Math.abs(ventaja) >= 1 && (
@@ -328,25 +330,6 @@ function DetalleDeProducto({ nombre, grupo, gruposVideo, dimVideo, alElegirDimen
   );
 }
 
-/** Un título de columna que ordena la tabla: primero con lo mejor arriba (el CPA, de menor a mayor) y, al tocarlo de nuevo, al revés. */
-function ColumnaOrdenable({ criterio, texto, clase, orden, alElegir }: { criterio: string; texto: string; clase: string; orden: Orden | null; alElegir: (o: Orden) => void }) {
-  const activa = orden?.criterio === criterio ? orden.sentido : null;
-  const natural = CRITERIOS_GRUPOS.find((c) => c.valor === criterio)?.sentido ?? "desc";
-  return (
-    <th scope="col" aria-sort={activa === null ? "none" : activa === "asc" ? "ascending" : "descending"} className={`${clase} font-medium`}>
-      <button
-        type="button"
-        onClick={() => alElegir({ criterio, sentido: activa === null ? natural : activa === "asc" ? "desc" : "asc" })}
-        title={`Ordenar por ${texto.toLowerCase()}`}
-        className={`inline-flex min-h-8 cursor-pointer items-center gap-1 rounded-md font-medium hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground ${activa ? "text-foreground" : ""}`}
-      >
-        {texto}
-        <span aria-hidden="true" className="w-3 text-center">{activa === "asc" ? "↑" : activa === "desc" ? "↓" : "↕"}</span>
-      </button>
-    </th>
-  );
-}
-
 /** Los grupos de una dimensión: la comparación de CPA con su promedio y la tabla completa. */
 function TablaDeGrupos({ grupos, filas, alElegir, dimension, unidad, sinDato, porVideo }: { grupos: Grupo[]; /** Las filas de la tabla si son menos que los grupos (una búsqueda): los promedios y las barras siguen midiendo todos. */ filas?: Grupo[]; /** Si viene, el nombre de cada fila se puede tocar (abre ese producto). */ alElegir?: (g: Grupo) => void; dimension: string; unidad: string; sinDato: number; porVideo: boolean }) {
   const total = sumaDeGrupos(grupos);
@@ -359,7 +342,7 @@ function TablaDeGrupos({ grupos, filas, alElegir, dimension, unidad, sinDato, po
   // Tocar el título de una columna ordena por ella (otra vez, al revés); sin elegir, el orden de siempre (primero lo que ya tiene datos, de menor a mayor CPA).
   const [orden, setOrden] = useState<Orden | null>(null);
   const filasOrdenadas = orden ? ordenarPor(filas ?? grupos, CRITERIOS_GRUPOS, [orden], (g) => g.r.gasto) : (filas ?? grupos);
-  const columna = (criterio: string, texto: string, clase: string) => <ColumnaOrdenable criterio={criterio} texto={texto} clase={clase} orden={orden} alElegir={setOrden} />;
+  const columna = (criterio: string, texto: string, clase: string) => <ColumnaOrdenable criterio={criterio} texto={texto} natural={CRITERIOS_GRUPOS.find((c) => c.valor === criterio)?.sentido} clase={clase} orden={orden} alElegir={setOrden} />;
   return (
     <div className="flex flex-col gap-6">
       {conCompras.length > 1 && promedio !== null && (
@@ -370,8 +353,11 @@ function TablaDeGrupos({ grupos, filas, alElegir, dimension, unidad, sinDato, po
               const color = !g.confiable ? "var(--grafica-5)" : c <= promedio ? "var(--success)" : c > promedio * 1.3 ? "var(--destructive)" : "var(--warning)";
               return (
                 <li key={g.nombre} className="grid grid-cols-[minmax(0,11rem)_1fr_auto] items-center gap-3 text-xs">
-                  <span className="truncate" title={g.nombre}>
-                    {g.nombre}
+                  <span className="min-w-0">
+                    <span className="block truncate" title={g.nombre}>
+                      {g.nombre}
+                    </span>
+                    {g.deQue && <span className="line-clamp-2 text-[11px] text-muted-foreground" title={g.deQue}>{g.deQue}</span>}
                   </span>
                   <span className="relative block h-3 overflow-hidden rounded-full bg-muted" aria-hidden="true">
                     <span className="block h-full rounded-full" style={{ width: `${Math.max(2, (c / maxCpa) * 100)}%`, background: color }} />
@@ -409,7 +395,7 @@ function TablaDeGrupos({ grupos, filas, alElegir, dimension, unidad, sinDato, po
       <SeccionPlegable titulo="Todas las cifras" sinRelleno abierta={!(conCompras.length > 1 && promedio !== null)} resumen={`${(filas ?? grupos).length} filas`} derecha={`${(filas ?? grupos).length} ${dimension.toLowerCase()}`}>
         {primera && (
           <p className="m-0 border-b border-border bg-muted px-4 py-2 text-xs text-muted-foreground">
-            Lo que mejor funciona en {dimension.toLowerCase()}: <span className="font-medium text-foreground">{primera.nombre}</span> con CPA {valorCpa(primera.r)} y {entero(primera.r.compras)} compras.
+            Lo que mejor funciona en {dimension.toLowerCase()}: <span className="font-medium text-foreground">{primera.nombre}</span> con CPA {valorCpa(primera.r)} y {entero(primera.r.compras)} compras.{primera.deQue ? ` De qué son: ${primera.deQue}.` : ""}
           </p>
         )}
         {orden && (
@@ -452,6 +438,7 @@ function TablaDeGrupos({ grupos, filas, alElegir, dimension, unidad, sinDato, po
                           {g.nombre}
                         </span>
                       )}
+                      {g.deQue && <span className="block whitespace-normal text-xs font-normal text-muted-foreground">De qué son: {g.deQue}</span>}
                       <span className="mt-1.5 block w-40 max-w-full">
                         <BarraProgreso valor={g.r.gasto} maximo={maxGasto} color={esGanador(g) ? "var(--success)" : esPerdedor(g) ? "var(--destructive)" : "var(--grafica-5)"} alto={4} />
                       </span>

@@ -18,6 +18,7 @@ import { FichaCampana } from "./ficha-campana";
 import { CeldasColumnas, EncabezadoColumnas, estiloRejilla, SelectorColumnasMeta, useColumnasMeta } from "./columnas-meta";
 import { BarraOrden, useOrdenMeta } from "./orden-meta";
 import { InsigniaEstructura, InsigniaEtapa, InsigniaPrioridad, nombreEstado } from "./piezas";
+import { textoDeMezcla } from "@/lib/meta-ads/atributos-video";
 
 const NOMBRE: NombreFilas = { singular: "campaña", plural: "campañas" };
 const ICONOS: Record<string, IconoComp> = { nombre: ProductoIcon, veredicto: MargenIcon, etapa: EtiquetaIcon, estado: EstadoIcon, estructura: FiltroIcon, puja: FiltroIcon, mercado: TiendaIcon, videos: AnunciosIcon, producto: ProductoIcon, angulo: EtiquetaIcon, cuenta: TiendaIcon, persona: PersonaIcon, meta: EstadoIcon, gasto: MargenIcon, compras: MargenIcon, creada: CalendarioIcon };
@@ -48,8 +49,8 @@ function FilaCampana({ c, alAbrir, colores, columnas }: { c: CampanaVista; alAbr
         </span>
         {c.angulos.length > 0 && (
           <span className="mt-0.5 flex min-w-0 flex-col gap-0.5">
-            <BarraApilada partes={c.angulos.map((a) => ({ nombre: a.angulo, valor: a.videos, color: colores.get(a.angulo) ?? "var(--grafica-5)" }))} alto={6} etiqueta={`Ángulos de sus videos: ${c.angulos.map((a) => `${a.angulo} ${a.pct} %`).join(", ")}`} />
-            <span className="truncate text-xs text-muted-foreground">{c.angulos.map((a) => `${a.angulo} ${a.pct} %`).join(" · ")}</span>
+            <BarraApilada partes={c.angulos.map((a) => ({ nombre: a.angulo, valor: a.videos, color: colores.get(a.angulo) ?? "var(--grafica-5)" }))} alto={6} etiqueta={`Ángulos de sus videos: ${textoDeMezcla(c.angulos)}`} />
+            <span className="line-clamp-2 text-xs text-muted-foreground">{textoDeMezcla(c.angulos)}</span>
           </span>
         )}
       </span>

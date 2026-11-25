@@ -5,6 +5,7 @@ import { NOMBRE_CATEGORIA, seccionDeHallazgo, type Hallazgo, type SeccionHallazg
 import { dolares } from "@/lib/meta-ads/metricas";
 import { InsigniaCerteza } from "./graficas";
 import { SeccionPlegable } from "./plegable";
+import { Cuales } from "./cuales";
 
 const TONO: Record<TonoHallazgo, { fondo: string; texto: string; etiqueta: string }> = {
   alerta: { fondo: "bg-destructive-soft", texto: "text-destructive", etiqueta: "Para atender" },
@@ -32,7 +33,7 @@ function IconoTono({ tono }: { tono: TonoHallazgo }) {
  */
 export function TarjetaHallazgo({ h, conSeccion = false }: { h: Hallazgo; conSeccion?: boolean }) {
   const t = TONO[h.tono];
-  const hayMas = Boolean(h.detalle || h.motivo || h.accion);
+  const hayMas = Boolean(h.detalle || h.motivo || h.accion || h.quienes);
   return (
     <li className="rounded-lg border border-border bg-card">
       <details className="group">
@@ -40,6 +41,7 @@ export function TarjetaHallazgo({ h, conSeccion = false }: { h: Hallazgo; conSec
           <IconoTono tono={h.tono} />
           <span className="min-w-0 flex-1">
             <span className="block text-sm font-medium leading-snug">{h.titulo}</span>
+            {h.quienes?.deQue && <span className="mt-1 block text-xs">{h.quienes.deQue}</span>}
             <span className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
               <InsigniaCerteza certeza={h.certeza} />
               <span className={`rounded-full px-2 py-0.5 font-medium ${t.fondo} ${t.texto}`}>{t.etiqueta}</span>
@@ -54,7 +56,7 @@ export function TarjetaHallazgo({ h, conSeccion = false }: { h: Hallazgo; conSec
             </svg>
           )}
         </summary>
-        <div className="flex flex-col gap-2 border-t border-border px-3 py-3 pl-14 text-sm">
+        <div className="flex flex-col gap-2 border-t border-border px-3 py-3 text-sm sm:pl-14">
           <p className="m-0 text-muted-foreground">{h.detalle}</p>
           {h.motivo && (
             <p className="m-0 flex gap-2 rounded-md bg-muted px-2.5 py-1.5 text-xs">
@@ -68,6 +70,7 @@ export function TarjetaHallazgo({ h, conSeccion = false }: { h: Hallazgo; conSec
               <span>{h.accion}</span>
             </p>
           )}
+          {h.quienes && <Cuales quienes={h.quienes} />}
         </div>
       </details>
     </li>

@@ -77,6 +77,8 @@ export interface ComposicionAngulo {
   videos: number;
   pct: number;
   gasto: number;
+  /** En una táctica general, de qué son sus videos (el más repetido primero). */
+  detalles?: string[];
 }
 
 export interface AnuncioVista {
@@ -158,6 +160,8 @@ export interface VideoVista {
 
 export interface Grupo {
   nombre: string;
+  /** En un ángulo que es una táctica general, de qué son sus videos. */
+  deQue?: string;
   campanas: number;
   /** Videos distintos del grupo (solo cuenta cuando el elemento trae su video: el ángulo). */
   videos: number;

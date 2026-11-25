@@ -6,6 +6,7 @@ import { NOMBRE_ETAPA, type Etapa } from "@/lib/meta-ads/nombre";
 import type { CampanaVista } from "@/lib/meta-ads/vistas";
 import { NOMBRE_VEREDICTO, veredictoDe, type Veredicto } from "./def-campanas";
 import { Anillo, BarraApilada, coloresDeAngulos, Leyenda, TarjetaMeta } from "./graficas";
+import { TemasDeTacticas } from "./cuales";
 
 const COLOR_VEREDICTO: Record<Veredicto, string> = { deja: "var(--success)", pierde: "var(--destructive)", poca_data: "var(--warning)", sin_gasto: "var(--grafica-5)" };
 const EXPLICA_VEREDICTO: Record<Veredicto, string> = {
@@ -40,6 +41,14 @@ export function ResumenCampanas({ campanas }: { campanas: CampanaVista[] }) {
     .map(([nombre, valor]) => ({ nombre, valor, color: colores.get(nombre) ?? "var(--grafica-5)" }));
   if (mezcla > 0) partesAngulo.push({ nombre: MEZCLA_DE_ANGULOS, valor: mezcla, color: "var(--grafica-5)" });
   const sinAngulo = campanas.filter((c) => !c.angulo).length;
+  // De qué son las campañas clasificadas con una táctica general: los temas de sus videos, con en cuántas campañas sale cada uno.
+  const temas = partesAngulo.flatMap((p) => {
+    const cuenta = new Map<string, number>();
+    for (const c of campanas) if (c.angulo === p.nombre) for (const d of c.angulos.find((a) => a.angulo === p.nombre)?.detalles ?? []) cuenta.set(d, (cuenta.get(d) ?? 0) + 1);
+    const lista = [...cuenta].sort((a, b) => b[1] - a[1]);
+    if (!lista.length) return [];
+    return [{ nombre: p.nombre, texto: `${lista.slice(0, 5).map(([d, n]) => `${d} (${n} ${n === 1 ? "campaña" : "campañas"})`).join(", ")}${lista.length > 5 ? ` y ${lista.length - 5} temas más` : ""}` }];
+  });
   if (campanas.length === 0) return null;
   const tipos = Object.keys(veredictos) as Veredicto[];
   return (
@@ -109,6 +118,7 @@ export function ResumenCampanas({ campanas }: { campanas: CampanaVista[] }) {
               <>
                 <BarraApilada partes={partesAngulo} alto={14} conPorcentaje etiqueta={`Campañas por ángulo: ${partesAngulo.map((p) => `${p.valor} ${p.nombre}`).join(", ")}`} />
                 <Leyenda partes={partesAngulo.map((p) => ({ nombre: p.nombre, color: p.color, texto: String(p.valor) }))} />
+                <TemasDeTacticas temas={temas} />
                 {sinAngulo > 0 && <p className="m-0 text-xs text-muted-foreground">{sinAngulo} {sinAngulo === 1 ? "campaña sin ángulo" : "campañas sin ángulo"} (sus videos todavía no se analizaron).</p>}
               </>
             )}

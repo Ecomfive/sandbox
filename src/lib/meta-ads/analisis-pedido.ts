@@ -3,6 +3,7 @@
 // cada día y se muestra en Hallazgos con la prioridad que se dijo. La IA nunca escribe consultas: solo llena los campos de un formulario cerrado (esquema), y todo lo que devuelve se valida aquí. Lógica pura, con prueba; los datos los
 // pasa quien llama (`BaseDias`, que lee `base-dias.ts`).
 
+import { nombreDeAngulo } from "./angulo-detalle";
 import type { Familia, Hallazgo } from "./historico";
 import { cpa, cpm, ctr, cvr, efectividad, hookRate, resultado as resultadoDe, sinResultados, sumar, type Resultados } from "./metricas";
 
@@ -35,6 +36,8 @@ export interface VideoBase {
   id: string;
   nombre: string;
   angulo: string | null;
+  /** De qué es, cuando el ángulo es una táctica general. */
+  detalle?: string | null;
   gancho: string | null;
   formato: string | null;
   cta: string | null;
@@ -163,7 +166,7 @@ function pasa(f: FilaDiaBase, base: BaseDias, filtros: Filtros): boolean {
   if (filtros.estructura && !contiene(c.estructura, filtros.estructura)) return false;
   if (filtros.puja && !contiene(c.puja, filtros.puja)) return false;
   if (filtros.familia && sinTildes(c.familia) !== sinTildes(filtros.familia)) return false;
-  if (filtros.angulo && !contiene(v?.angulo, filtros.angulo)) return false;
+  if (filtros.angulo && !contiene(v ? nombreDeAngulo(v.angulo, v.detalle) : null, filtros.angulo)) return false;
   if (filtros.gancho && !contiene(v?.gancho, filtros.gancho)) return false;
   if (filtros.formato && !contiene(v?.formato, filtros.formato)) return false;
   if (filtros.cta && !contiene(v?.cta, filtros.cta)) return false;
@@ -183,7 +186,8 @@ function claveDeGrupo(f: FilaDiaBase, base: BaseDias, agrupar: Dimension): strin
     case "producto": return c.producto ?? "Sin producto";
     case "campana": return c.nombre;
     case "video": return v ? v.nombre : null;
-    case "angulo": return v ? (v.angulo ?? "Sin ángulo") : null;
+    // Una táctica general se agrupa con su detalle: «antes y después» solo no dice cuál.
+    case "angulo": return v ? (nombreDeAngulo(v.angulo, v.detalle) ?? "Sin ángulo") : null;
     case "gancho": return v ? (v.gancho ?? "Sin tipo de gancho") : null;
     case "formato": return v ? (v.formato ?? "Sin formato") : null;
     case "cta": return v ? (v.cta ?? "Sin llamado a la acción") : null;

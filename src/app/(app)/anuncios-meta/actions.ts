@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { registrarAuditoria } from "@/lib/auditoria";
+import { claveDeCostos, revisarCostos, sumarPedidos, tasasDe, type EntregasMeta } from "@/lib/meta-ads/costos-operacion";
 import { AJUSTE_ANALISIS_AUTOMATICO } from "@/lib/meta-ads/ajustes";
 import { iasParaInterpretar, leerAnalisisGuardado, refrescarAnalisisMeta } from "@/lib/meta-ads/analisis-guardado";
 import { claveDeTema, ejecutarAnalisis, validarAnalisis, validarPrioridad, validarVigilancia, vigilanciaDeAnalisis, type Prioridad } from "@/lib/meta-ads/analisis-pedido";
@@ -32,6 +33,7 @@ import { esHostDeVideoMeta } from "@/lib/meta-ads/video-angulo";
 import type { ActividadVista } from "@/lib/meta-ads/vistas";
 import { getPaisActual } from "@/lib/pais";
 import { puedeVerPaisId } from "@/lib/seguridad/pais-acceso";
+import { exigirAcceso } from "@/lib/seguridad/exigir-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 
 const MODULO = "anuncios-meta";
@@ -412,19 +414,46 @@ export async function cambiarAnalisisAutomaticoMeta(activo: boolean): Promise<Re
 }
 
 /** La entrega de cada producto de las campañas (para la lista y la ficha de Productos): tasa, pedidos resueltos y la tasa de todos. Sale del análisis guardado (se prepara solo); sin él, se calcula. Nunca lanza. */
-export async function entregaPorProductoMeta(cuentaId: string | null): Promise<{ productos: Record<string, { tasa: number | null; cerradas: number; entregadas: number; devueltas: number }>; promedio: number | null }> {
+export async function entregaPorProductoMeta(cuentaId: string | null): Promise<EntregasMeta> {
   const u = await requireModulo(MODULO);
-  const vacio = { productos: {}, promedio: null };
+  const vacio: EntregasMeta = { productos: {}, promedio: null, tienda: { envio: null, entrega: null } };
   try {
     const supabase = createServiceClient();
     const pais = await getPaisActual(supabase);
     if (!(await puedeVerPaisId(supabase, u.paisesPermitidos, pais.id))) return vacio;
     const guardado = cuentaId ? null : await leerAnalisisGuardado(supabase, pais.id);
     const analisis = guardado?.analisis ?? (await cargarHistorico({ paisId: pais.id, cuentaId: cuentaId && UUID.test(cuentaId) ? cuentaId : null, hoy: hoyEnPanama() }, supabase)).analisis;
-    return { productos: Object.fromEntries(analisis.entrega.map((f) => [f.clave, { tasa: f.tasa, cerradas: f.cerradas, entregadas: f.entregadas, devueltas: f.devueltas }])), promedio: analisis.resumen.tasaEntrega };
+    return {
+      productos: Object.fromEntries(analisis.entrega.map((f) => [f.clave, { tasa: f.tasa, cerradas: f.cerradas, entregadas: f.entregadas, devueltas: f.devueltas, canceladas: f.canceladas, enCamino: f.enCamino, sinEnviar: f.sinEnviar }])),
+      promedio: analisis.resumen.tasaEntrega,
+      // Un análisis guardado antes de la calculadora no trae el total de la tienda: se suma el de los productos con campañas.
+      tienda: tasasDe(analisis.pedidosDeLaTienda ?? sumarPedidos(analisis.entrega)),
+    };
   } catch {
     return vacio;
   }
+}
+
+/** Guarda los costos de la calculadora (envío, comisión contra entrega y costo operativo) del país de la barra. Los ven todos los que abren Anuncios Meta; los cambia quien puede modificar el módulo. */
+export async function guardarCostosMeta(valores: unknown): Promise<Resultado> {
+  const supabase = createServiceClient();
+  const pais = await getPaisActual(supabase);
+  const acceso = await exigirAcceso({ modulo: MODULO, escritura: true, paisId: pais.id });
+  if (acceso.error !== undefined) return { error: acceso.error };
+  const u = acceso.usuario;
+  const revisados = revisarCostos(valores);
+  if ("error" in revisados) return revisados;
+  const clave = claveDeCostos(pais.id);
+  const { data: previo } = await supabase.from("meta_ajustes").select("valor").eq("clave", clave).maybeSingle();
+  const { error } = await supabase
+    .from("meta_ajustes")
+    .upsert({ clave, valor: revisados.costos, actualizado_por: u.id, actualizado_por_nombre: u.nombre ?? u.email ?? null, actualizado_en: new Date().toISOString() }, { onConflict: "clave" });
+  if (error) return { error: /meta_ajustes|schema cache|does not exist/i.test(error.message) ? "Falta correr la migración 0347 (ajustes de Anuncios Meta) en Supabase." : error.message };
+  const antes = revisarCostos(previo?.valor);
+  const texto = (c: { envio: number; cod: number; operativo: number }) => ({ Envío: `$${c.envio.toFixed(2)}`, "Comisión contra entrega": `$${c.cod.toFixed(2)}`, "Costo operativo": `$${c.operativo.toFixed(2)}` });
+  await registrarAuditoria({ accion: "guardar_costos_meta", entidad: "meta_ajustes", detalle: pais.nombre, antes: "costos" in antes ? texto(antes.costos) : undefined, despues: texto(revisados.costos) });
+  revalidatePath("/anuncios-meta", "layout");
+  return {};
 }
 
 /**

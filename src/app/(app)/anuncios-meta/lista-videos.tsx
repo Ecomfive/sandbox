@@ -31,6 +31,7 @@ import { EstructuraYLlamado } from "./estructura-video";
 import { ReproductorVideo } from "./reproductor-video";
 import { TarjetaVideo } from "./tarjeta-video";
 import { AVISO_POCA_DATA, Cifra, InsigniaEtapa, InsigniaPrioridad, MetricasEnLinea, QueHacer } from "./piezas";
+import { nombreDeAngulo } from "@/lib/meta-ads/angulo-detalle";
 
 const urlSegura = (u: string | null) => (u && /^https:\/\//i.test(u) ? u : null);
 
@@ -305,7 +306,7 @@ export function ListaVideos({ videos, escribe, iaConectada, sinAnalizar, abrirIn
             <Seccion icono={MargenIcon} titulo="Cómo le fue en el periodo">
               <p className="m-0 text-sm text-muted-foreground">
                 {v.producto ?? "Sin producto"}
-                {v.angulo ? ` · ángulo ${v.angulo}` : ""}
+                {v.angulo ? ` · ángulo ${nombreDeAngulo(v.angulo, v.analisis?.anguloDetalle)}` : ""}
               </p>
               <div className="grid grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-2">
                 {CATALOGO_COLUMNAS.filter((c) => c.clave !== "frecuencia").map((c) => {

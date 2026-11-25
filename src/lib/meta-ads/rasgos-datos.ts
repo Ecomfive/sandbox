@@ -74,7 +74,7 @@ export async function rasgosDelDia(supabase: SupabaseClient, o: { paisId: string
       traerTodasLasFilas<Record<string, unknown>>((a, b) =>
         supabase.from("meta_resultados_dia").select("anuncio_id, fecha, gasto, impresiones, clics, video_3s, vio_landing, compras, valor").in("cuenta_id", ids).gte("fecha", desde).order("fecha").order("anuncio_id").range(a, b),
       ),
-      traerTodasLasFilas<Record<string, unknown>>((a, b) => supabase.from("meta_video_analisis").select("video_id, angulo, gancho_tipo, formato, cta_tipo, duracion_s, cta_segundo, oferta, recursos").order("video_id").range(a, b)).catch((): Record<string, unknown>[] => []),
+      traerTodasLasFilas<Record<string, unknown>>((a, b) => supabase.from("meta_video_analisis").select("video_id, angulo, angulo_detalle, gancho_tipo, formato, cta_tipo, duracion_s, cta_segundo, oferta, recursos").order("video_id").range(a, b)).catch(() => traerTodasLasFilas<Record<string, unknown>>((a, b) => supabase.from("meta_video_analisis").select("video_id, angulo, gancho_tipo, formato, cta_tipo, duracion_s, cta_segundo, oferta, recursos").order("video_id").range(a, b))).catch((): Record<string, unknown>[] => []),
       supabase.from("meta_topes").select("producto_clave, cpa_tope"),
     ]);
     const tope = new Map((topesF.data ?? []).map((t) => [t.producto_clave as string, num(t.cpa_tope)]));
@@ -102,7 +102,7 @@ export async function rasgosDelDia(supabase: SupabaseClient, o: { paisId: string
       const v = a.video_id ? videoDe.get(a.video_id as string) : undefined;
       const rasgos = [
         ...rasgosDeCopy(a.copy as string | null, a.titulo as string | null),
-        ...rasgosDeVideo(v ? { angulo: (v.angulo as string | null) || null, ganchoTipo: (v.gancho_tipo as string | null) || null, formato: (v.formato as string | null) || null, ctaTipo: (v.cta_tipo as string | null) || null, duracionS: v.duracion_s === null || v.duracion_s === undefined ? null : num(v.duracion_s), ctaSegundo: v.cta_segundo === null || v.cta_segundo === undefined ? null : num(v.cta_segundo), oferta: (v.oferta as string | null) || null, recursos: Array.isArray(v.recursos) ? (v.recursos as unknown[]).map(String) : [] } : null),
+        ...rasgosDeVideo(v ? { angulo: (v.angulo as string | null) || null, detalle: (v.angulo_detalle as string | null) || null, ganchoTipo: (v.gancho_tipo as string | null) || null, formato: (v.formato as string | null) || null, ctaTipo: (v.cta_tipo as string | null) || null, duracionS: v.duracion_s === null || v.duracion_s === undefined ? null : num(v.duracion_s), ctaSegundo: v.cta_segundo === null || v.cta_segundo === undefined ? null : num(v.cta_segundo), oferta: (v.oferta as string | null) || null, recursos: Array.isArray(v.recursos) ? (v.recursos as unknown[]).map(String) : [] } : null),
         ...rasgosDeCampana({ estructura: (c.estructura as string | null) ?? null, puja: (c.puja as string | null) ?? null, familia }),
       ];
       anuncios.push({ id: a.id as string, nombre: String((a.titulo as string | null) || (a.nombre as string | null) || "Anuncio").slice(0, 70), rasgos, r, tope: topeC });

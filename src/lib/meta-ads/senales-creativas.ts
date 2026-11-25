@@ -2,6 +2,8 @@
 // cansando (su CTR o su hook cae frente a la semana anterior), cuánto del gasto depende de videos viejos o de uno solo, si hace días que no se sube nada nuevo, si los videos nuevos rinden peor que los viejos y qué ángulo es el que mejor
 // ha funcionado con ese producto. Cada causa lleva su acción concreta y sus números. Lógica pura, con prueba; los datos son los de `base-dias.ts`. Solo lee.
 
+import { nombreDeAngulo } from "./angulo-detalle";
+import { esAnguloTactico } from "./video-angulo";
 import type { BaseDias } from "./analisis-pedido";
 import { senalesModulosParaIA, type SenalModulo } from "./senales-modulos";
 import { cpa, ctr, hookRate, sinResultados, sumar, type Resultados } from "./metricas";
@@ -87,6 +89,8 @@ export function senalesDeProducto(base: BaseDias, producto: string, hoy: string)
   const prev7 = new Map<string, Resultados>();
   const ult14 = new Map<string, Resultados>();
   const angulos60 = new Map<string, Resultados>();
+  // Dentro de una táctica general, cuántas compras trajo cada detalle (para decir cuál).
+  const detalles60 = new Map<string, Map<string, number>>();
   const hace60 = sumarDias(hoy, -59);
   let total14 = sinResultados();
   for (const f of base.dias) {
@@ -101,6 +105,12 @@ export function senalesDeProducto(base: BaseDias, producto: string, hoy: string)
     if (f.fecha >= hace60) {
       const a = base.videos.get(v)?.angulo;
       if (a) angulos60.set(a, sumar(angulos60.get(a) ?? sinResultados(), f.r));
+      const d = base.videos.get(v)?.detalle?.trim();
+      if (a && d && esAnguloTactico(a)) {
+        const suyos = detalles60.get(a) ?? new Map<string, number>();
+        suyos.set(d, (suyos.get(d) ?? 0) + f.r.compras);
+        detalles60.set(a, suyos);
+      }
     }
   }
   if (total14.gasto <= 0) return null;
@@ -116,7 +126,7 @@ export function senalesDeProducto(base: BaseDias, producto: string, hoy: string)
     videos.push({
       id,
       nombre: base.videos.get(id)?.nombre ?? `Video …${id.slice(-5)}`,
-      angulo: base.videos.get(id)?.angulo ?? null,
+      angulo: nombreDeAngulo(base.videos.get(id)?.angulo ?? null, base.videos.get(id)?.detalle),
       edadDias: edad,
       gasto14: Math.round(r14.gasto * 100) / 100,
       parte: r14.gasto / total14.gasto,
@@ -138,7 +148,8 @@ export function senalesDeProducto(base: BaseDias, producto: string, hoy: string)
 
   // El ángulo que mejor ha funcionado en 60 días con este producto (con gasto y compras suficientes), para recomendarlo al renovar.
   const mejor = [...angulos60].filter(([, r]) => r.gasto >= U.gastoAngulo && r.compras >= 2 && cpa(r) !== null).sort((a, b) => cpa(a[1])! - cpa(b[1])!)[0];
-  const mejorAngulo = mejor ? { angulo: mejor[0], cpa: Math.round(cpa(mejor[1])! * 100) / 100, gasto: Math.round(mejor[1].gasto), compras: mejor[1].compras } : null;
+  const sobreTodo = mejor ? [...(detalles60.get(mejor[0]) ?? [])].sort((a, b) => b[1] - a[1]).slice(0, 2).map(([d]) => d.charAt(0).toLowerCase() + d.slice(1)) : [];
+  const mejorAngulo = mejor ? { angulo: sobreTodo.length ? `${mejor[0]} (sobre todo ${sobreTodo.join(" y ")})` : mejor[0], cpa: Math.round(cpa(mejor[1])! * 100) / 100, gasto: Math.round(mejor[1].gasto), compras: mejor[1].compras } : null;
   const sugerencia = mejorAngulo ? `El ángulo que mejor ha funcionado con este producto en 60 días es «${mejorAngulo.angulo}» (CPA ${usd(mejorAngulo.cpa)} con ${mejorAngulo.compras} compras): empieza por ahí.` : "Todavía ningún ángulo tiene datos suficientes con este producto: prueba 2 o 3 ángulos distintos.";
 
   const causas: CausaCreativa[] = [];

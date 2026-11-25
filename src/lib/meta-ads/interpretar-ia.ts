@@ -2,6 +2,7 @@
 // (`historico.ts`: estadística simple, a la vista y con prueba); la IA **no calcula ni inventa nada**: recibe esas cifras ya armadas y las interpreta para quien monta las campañas (qué patrones se ven,
 // qué riesgos hay, qué conviene probar y qué no se puede concluir todavía). Lógica pura, con prueba: cómo se arma el pedido y cómo se valida lo que contesta. La llamada vive en `actions.ts`.
 
+import { cualesParaIA } from "./angulo-detalle";
 import { hayAlgoEnMarcha, soloEnMarcha } from "./en-marcha";
 import { NOMBRE_CATEGORIA, type AnalisisHistorico } from "./historico";
 
@@ -54,6 +55,10 @@ export function cortarEnPunto(t: string, max: number): string {
 }
 
 /** El pedido: las reglas fijas y el resumen del análisis (solo lo necesario: lo más grande de cada tabla). Va todo en JSON para que la IA lea cifras, no frases. */
+/** La regla para las dos IA (interpretación y chat): una táctica general nunca se nombra sola. */
+export const REGLA_TACTICAS =
+  "«Antes y después», «Testimonio de cliente» y «Experto o autoridad» son tácticas generales: nunca las nombres solas. Cada vez que las menciones di de qué son (campos «de_que_son», «deQue» o «detalle»: por ejemplo «antes y después de manchas en la cara») y, si lo tienes, qué videos y campañas son y qué tienen en común. Si un dato dice que faltan detalles, dilo. Un mismo ángulo puede haber empeorado en la última semana y mejorado en el último mes: di siempre de qué periodo hablas.";
+
 export function pedidoInterpretacion(completo: AnalisisHistorico, investigaciones: readonly unknown[] = [], senalesCreativas: readonly unknown[] = [], rasgos: readonly unknown[] = []): { instrucciones: string; texto: string } {
   // La IA recibe los productos y campañas que siguen en marcha: sobre lo apagado no hay nada que recomendar.
   const a = soloEnMarcha(completo);
@@ -66,6 +71,7 @@ export function pedidoInterpretacion(completo: AnalisisHistorico, investigacione
     "Da importancia a la tasa de entrega: un producto que vende bien en Meta pero entrega mal cuesta más por venta real.",
     "Escribe para quien monta las campañas, que no es analista: español claro, frases cortas, sin jerga. Cada punto lleva un título corto y un detalle con las cifras que lo respaldan y qué hacer.",
     REGLA_ALCANCE_DE_CAMPANAS,
+    REGLA_TACTICAS,
     hayAlgoEnMarcha(a.enMarcha) ? "Los productos y las campañas que recibes son solo los que tienen campañas activas hoy: recomienda sobre ellos. Los ángulos, ganchos, formatos y bandas salen de todo el historial: úsalos como aprendizaje y no propongas volver a anunciar un producto que no esté en la lista." : "",
     'Responde SOLO con un JSON válido de esta forma: {"resumen": string, "patrones": [{"titulo": string, "detalle": string}], "riesgos": [{"titulo": string, "detalle": string}], "recomendaciones": [{"titulo": string, "detalle": string}], "limites": [string]}.',
     `Máximo ${LIMITES_IA.puntos} elementos en patrones, riesgos y recomendaciones, y ${LIMITES_IA.limites} en limites. «limites» = lo que los datos todavía no permiten concluir o lo que convendría empezar a medir.`,
@@ -93,12 +99,12 @@ export function pedidoInterpretacion(completo: AnalisisHistorico, investigacione
       campanas_medibles: a.resumen.campanasMedibles,
       porcentaje_que_funciono: r1(a.resumen.tasaFuncionaron),
     },
-    hallazgos: a.hallazgos.slice(0, 30).map((h) => ({ tipo: NOMBRE_CATEGORIA[h.categoria], tono: h.tono, titulo: h.titulo, detalle: h.detalle, motivo: h.motivo ?? null, certeza: h.certeza })),
+    hallazgos: a.hallazgos.slice(0, 30).map((h) => ({ tipo: NOMBRE_CATEGORIA[h.categoria], tono: h.tono, titulo: h.titulo, detalle: h.detalle, motivo: h.motivo ?? null, certeza: h.certeza, ...cualesParaIA(h) })),
     bandas: a.bandas.map((b) => ({ metrica: b.titulo, porcentaje_base_que_funciono: r1(b.tasaBase), bandas: b.filas.map((f) => ({ banda: f.etiqueta, campanas: f.campanas, funcionaron: f.funcionaron, cpa: r1(f.cpa) })) })),
     entrega_por_producto: a.entrega.slice(0, 15).map((f) => ({ producto: f.nombre, gasto_usd: Math.round(f.gasto), compras: f.compras, cpa: r1(f.cpa), cpa_tope: f.tope, tasa_entrega: r1(f.tasa), pedidos_resueltos: f.cerradas, cpa_por_compra_entregada: r1(f.cpaEntregado), veredicto: f.veredicto })),
     mas_ventas: {
       productos: a.rankings.productos.slice(0, 6).map((f) => ({ nombre: f.nombre, compras: f.compras, cpa: r1(f.cpa), entregadas_estimadas: r1(f.comprasEntregadas) })),
-      angulos: a.rankings.angulos.slice(0, 6).map((f) => ({ nombre: f.nombre, compras: f.compras, cpa: r1(f.cpa) })),
+      angulos: a.rankings.angulos.slice(0, 6).map((f) => ({ nombre: f.nombre, compras: f.compras, cpa: r1(f.cpa), ...(f.deQue ? { de_que_son: f.deQue } : {}) })),
       ganchos: a.rankings.ganchos.slice(0, 6).map((f) => ({ nombre: f.nombre, compras: f.compras, cpa: r1(f.cpa) })),
       formatos: a.rankings.formatos.slice(0, 5).map((f) => ({ nombre: f.nombre, compras: f.compras, cpa: r1(f.cpa) })),
     },

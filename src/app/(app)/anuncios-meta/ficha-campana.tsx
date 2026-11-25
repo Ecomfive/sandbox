@@ -19,6 +19,7 @@ import { corregirCampanaMeta, obtenerActividadCampanaMeta, soltarCorreccionMeta 
 import { NOMBRE_VEREDICTO, veredictoDe } from "./def-campanas";
 import { BarraApilada } from "./graficas";
 import { Cifra, entero, InsigniaEstructura, InsigniaEtapa, MetricasEnLinea, nombreEstado, porcentaje, QueHacer, Resultado, textoFrecuencia, textoMetrica, textoTiempo } from "./piezas";
+import { anguloDeLaCampana, textoDeMezcla } from "@/lib/meta-ads/atributos-video";
 
 /** El color de cada decisión: cortar en rojo, observar y rotar en ámbar, consolidar en verde. */
 const TONO_DECISION: Record<Decision, Tone> = { cortar: "destructive", mantener: "neutral", observar: "warning", consolidar: "success", rebalancear: "info", rotar: "warning" };
@@ -134,13 +135,16 @@ function MezclaDeAngulos({ c, colores }: { c: CampanaVista; colores: Map<string,
   }
   return (
     <div className="flex flex-col gap-3">
-      <BarraApilada partes={c.angulos.map((a) => ({ nombre: a.angulo, valor: a.videos, color: colores.get(a.angulo) ?? "var(--grafica-5)" }))} alto={18} conPorcentaje etiqueta={`Ángulos de la campaña: ${c.angulos.map((a) => `${a.angulo} ${a.pct} %`).join(", ")}`} />
+      <BarraApilada partes={c.angulos.map((a) => ({ nombre: a.angulo, valor: a.videos, color: colores.get(a.angulo) ?? "var(--grafica-5)" }))} alto={18} conPorcentaje etiqueta={`Ángulos de la campaña: ${textoDeMezcla(c.angulos)}`} />
       <ul role="list" className="m-0 flex list-none flex-col gap-1.5 p-0 text-sm">
         {c.angulos.map((a) => (
           <li key={a.angulo} className="flex items-center justify-between gap-3">
             <span className="inline-flex min-w-0 items-center gap-2">
               <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: colores.get(a.angulo) ?? "var(--grafica-5)" }} />
-              <span className="truncate">{a.angulo}</span>
+              <span className="min-w-0">
+                <span className="block truncate">{a.angulo}</span>
+                {a.detalles && <span className="block text-xs text-muted-foreground">{a.detalles.join(", ")}</span>}
+              </span>
             </span>
             <span className="shrink-0 tabular-nums">
               <span className="font-semibold">{a.pct} %</span>{" "}
@@ -153,7 +157,7 @@ function MezclaDeAngulos({ c, colores }: { c: CampanaVista; colores: Map<string,
       </ul>
       <p className="m-0 text-xs text-muted-foreground">
         {c.videosConAngulo} de {c.videosTotal} {c.videosTotal === 1 ? "video con ángulo" : "videos con ángulo"}
-        {sin > 0 ? `; ${sin} sin analizar no cuentan.` : "."} Se clasifica como «{c.angulo}»{c.anguloOrigen === "manual" ? " (corregido a mano)" : ""}.
+        {sin > 0 ? `; ${sin} sin analizar no cuentan.` : "."} Se clasifica como «{anguloDeLaCampana(c)}»{c.anguloOrigen === "manual" ? " (corregido a mano)" : ""}.
       </p>
     </div>
   );
@@ -286,7 +290,7 @@ export function FichaCampana({ campana: c, colores, anuncios, actId, productos, 
             ) : (
               <dl className="m-0 grid grid-cols-3 gap-3">
                 <Dato etiqueta="Producto">{c.producto ?? "—"}</Dato>
-                <Dato etiqueta="Ángulo">{c.angulo ?? "—"}</Dato>
+                <Dato etiqueta="Ángulo">{anguloDeLaCampana(c) ?? "—"}</Dato>
                 <Dato etiqueta="Etapa">{c.etapa ? NOMBRE_ETAPA[c.etapa] : "—"}</Dato>
               </dl>
             )}
