@@ -3,6 +3,7 @@
 // tendencias con su motivo, entrega por producto, rankings, bandas y mes a mes). No calcula sobre la base ni inventa: si el dato no está, lo dice. Lógica pura, con prueba: el contexto, el pedido, el historial de la conversación
 // y la limpieza de la respuesta. La llamada vive en `actions.ts`.
 
+import { CLAVES_FILTRO, DIMENSIONES, METRICAS } from "./analisis-pedido";
 import { NOMBRE_CATEGORIA, type AnalisisHistorico, type FilaVentas } from "./historico";
 
 export const LIMITES_CHAT = {
@@ -90,6 +91,8 @@ export function pedidoChat(a: AnalisisHistorico, tiendas: readonly string[], hoy
     "Distingue lo comprobado (mucho gasto, certeza firme) de lo que apenas empieza a verse (poca data). Una correlación no es una causa: «se asocia con», no «causa».",
     "Contesta directo y en español claro: primero la respuesta, luego las cifras que la respaldan y, si ayuda, qué hacer. Frases cortas, sin jerga, máximo unas 250 palabras. Usa guiones para listas; no uses tablas ni formato Markdown (sin asteriscos ni almohadillas).",
     "Si la pregunta no tiene que ver con el rendimiento de las campañas, los productos, la entrega o el historial, di amablemente que solo puedes ayudar con eso.",
+    `Puedes pedir un análisis nuevo: si para contestar con exactitud hace falta algo que NO está en el JSON (otro rango de fechas, otro desglose, un producto, ángulo o campaña concreto por día o por semana, comparar dos periodos, lo de «esta semana»…), no contestes todavía ni te disculpes: responde SOLO con este JSON, sin texto antes ni después: {"accion":"analizar","analisis":[{...}]} (hasta 2 análisis). Cada análisis lleva: "titulo" (corto), "agrupar" (uno de: ${DIMENSIONES.join(", ")}), "desde" y "hasta" (AAAA-MM-DD, hasta no pasa de hoy), "comparar" opcional ({"desde","hasta"} de otro periodo para ver el cambio), "filtros" opcional (texto que debe contener: ${CLAVES_FILTRO.join(", ")}), "orden" (una de: ${METRICAS.join(", ")}), "sentido" ("asc" o "desc"), "limite" (hasta 15) y "gasto_minimo" (dólares, para dejar fuera lo que casi no gastó). Si la respuesta ya está en el JSON del sistema, contesta directo en texto y no pidas análisis.`,
+    `Si la persona te pide que desde ahora le indiques, vigiles o le muestres algo («avísame cuando…», «a partir de ahora…», «vigila…», «quiero que me lo muestres siempre»), responde SOLO con este JSON: {"accion":"vigilar","vigilancia":{"titulo":"...","agrupar":"total|producto|campana|angulo|gancho|formato|cta|estructura|puja|etapa|familia","metrica":"una de: ${METRICAS.join(", ")}","ventana_dias":7|14|30,"umbral_pct":número entre 5 y 200,"gasto_minimo":número,"filtros":{}},"prioridad":"alta|media|baja","mensaje":"una frase que confirma qué vigilarás y con qué prioridad"}. Se compara lo de los últimos ventana_dias días con los anteriores y se marca lo que se mueva más que umbral_pct. La prioridad es la que la persona diga (urgente o muy importante = alta; normal = media; «cuando puedas» = baja); si no dice nada, media. Usa la conversación para saber a qué se refiere («eso», «lo de antes»).`,
   ].join("\n");
   const conversacion = historial.length ? `Conversación hasta ahora:\n${historial.map((m) => `${m.rol === "usuario" ? "Pregunta" : "Respuesta"}: ${m.texto}`).join("\n")}\n\n` : "";
   return { instrucciones, texto: `${conversacion}Pregunta nueva: ${pregunta}\n\nEstadísticas del sistema (JSON):\n${contextoDeChat(a, tiendas, hoy)}` };
@@ -105,4 +108,30 @@ export function limpiarRespuesta(texto: string | null | undefined): string {
     .replace(/\n{3,}/g, "\n\n")
     .trim()
     .slice(0, LIMITES_CHAT.respuesta);
+}
+
+/** Lo que devolvió la IA: una respuesta de texto, o un pedido para que el sistema corra análisis o deje una vigilancia (siempre JSON, que se valida aparte). */
+export type RespuestaChat = { tipo: "texto"; texto: string } | { tipo: "analizar"; analisis: unknown[] } | { tipo: "vigilar"; vigilancia: unknown; prioridad: unknown; mensaje: string | null };
+
+export function interpretarRespuestaChat(texto: string | null | undefined): RespuestaChat {
+  const t = (texto ?? "").trim();
+  const sinCerca = t.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
+  if (sinCerca.startsWith("{")) {
+    try {
+      const o = JSON.parse(sinCerca.slice(sinCerca.indexOf("{"), sinCerca.lastIndexOf("}") + 1)) as Record<string, unknown>;
+      if (o.accion === "analizar" && Array.isArray(o.analisis)) return { tipo: "analizar", analisis: o.analisis.slice(0, 2) };
+      if (o.accion === "vigilar" && o.vigilancia && typeof o.vigilancia === "object") return { tipo: "vigilar", vigilancia: o.vigilancia, prioridad: o.prioridad, mensaje: typeof o.mensaje === "string" ? o.mensaje.replace(/\s+/g, " ").trim().slice(0, 400) : null };
+    } catch {
+      // No era un JSON: se trata como texto.
+    }
+  }
+  return { tipo: "texto", texto: t };
+}
+
+/** El segundo pedido, cuando la IA pidió análisis: lo mismo de antes más los resultados que el sistema calculó, y la orden de contestar ya en texto. */
+export function pedidoConResultados(pedido: { instrucciones: string; texto: string }, resultados: unknown[]): { instrucciones: string; texto: string } {
+  return {
+    instrucciones: `${pedido.instrucciones}\nYa se corrieron los análisis que pediste: contesta ahora en texto, usando también sus resultados. No devuelvas JSON ni pidas más análisis. Di en una frase qué análisis nuevo se hizo (fechas y filtros).`,
+    texto: `${pedido.texto}\n\nResultados de los análisis nuevos que pediste (JSON, calculados por el sistema sobre los resultados por día):\n${JSON.stringify(resultados)}`,
+  };
 }

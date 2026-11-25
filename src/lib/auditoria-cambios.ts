@@ -214,6 +214,8 @@ export const ETIQUETA_ACCION: Record<string, string> = {
   ajustar_supuestos_unidad: "Cambió los supuestos de la unidad económica",
   importar_meta_ads: "Importó campañas de Meta Ads",
   analisis_automatico_meta: "Pausó o reanudó el análisis automático de videos de Meta",
+  crear_vigilancia_meta: "Dejó una vigilancia en Hallazgos de Anuncios Meta",
+  cambiar_vigilancia_meta: "Cambió o quitó una vigilancia de Anuncios Meta",
   crear_regla_meta: "Creó una regla de campañas de Meta",
   eliminar_regla_meta: "Eliminó una regla de campañas de Meta",
   conteo_inventario: "Cargó un conteo de inventario",

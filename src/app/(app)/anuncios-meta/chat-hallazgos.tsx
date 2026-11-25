@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 import { LIMITES_CHAT, type MensajeChat } from "@/lib/meta-ads/chat-ia";
 import { preguntarHallazgosMeta } from "./actions";
@@ -12,12 +13,20 @@ const EJEMPLOS = [
   "¿Qué empeoró este mes frente al pasado y por qué?",
   "¿Qué productos venden bien pero entregan mal?",
   "¿Qué ángulos funcionan mejor en suplementos?",
+  "Compara esta semana con la pasada, producto por producto",
+  "Avísame si el CPA de un producto sube más de 20 %, prioridad alta",
 ];
 
 interface Burbuja extends MensajeChat {
   /** Quién contestó (solo en las respuestas). */
   proveedor?: string;
   error?: boolean;
+  /** Los análisis nuevos que se hicieron para contestar. */
+  analisis?: string[];
+  /** Lo que quedó vigilado por esta pregunta (con la prioridad). */
+  vigilancia?: string;
+  /** Algo que el sistema empezó a vigilar solo porque se preguntaba seguido. */
+  automatica?: string;
 }
 
 /**
@@ -28,6 +37,7 @@ export function ChatHallazgos({ iaConectada }: { iaConectada: boolean }) {
   const [mensajes, setMensajes] = useState<Burbuja[]>([]);
   const [texto, setTexto] = useState("");
   const [quedan, setQuedan] = useState<number | null>(null);
+  const router = useRouter();
   const [pensando, empezar] = useTransition();
   const fin = useRef<HTMLDivElement>(null);
 
@@ -39,7 +49,14 @@ export function ChatHallazgos({ iaConectada }: { iaConectada: boolean }) {
     setTexto("");
     empezar(async () => {
       const r = await preguntarHallazgosMeta(p, historial);
-      setMensajes((ms) => [...ms, r.respuesta ? { rol: "ia", texto: r.respuesta, proveedor: r.proveedor } : { rol: "ia", texto: r.error ?? "No se pudo contestar. Inténtalo de nuevo.", error: true }]);
+      setMensajes((ms) => [
+        ...ms,
+        r.respuesta
+          ? { rol: "ia", texto: r.respuesta, proveedor: r.proveedor, analisis: r.analisisNuevos, vigilancia: r.vigilancia ? `${r.vigilancia.titulo} · prioridad ${r.vigilancia.prioridad}` : undefined, automatica: r.vigilanciaAutomatica }
+          : { rol: "ia", texto: r.error ?? "No se pudo contestar. Inténtalo de nuevo.", error: true },
+      ]);
+      // Si quedó una vigilancia (pedida o por insistencia), la lista de arriba se actualiza sola.
+      if (r.vigilancia || r.vigilanciaAutomatica) router.refresh();
       if (r.quedan !== undefined) setQuedan(r.quedan);
       requestAnimationFrame(() => fin.current?.scrollIntoView({ block: "nearest", behavior: "smooth" }));
     });
@@ -56,7 +73,7 @@ export function ChatHallazgos({ iaConectada }: { iaConectada: boolean }) {
               <div className="flex items-center gap-3">
                 <Avatar />
                 <p className="m-0 text-sm">
-                  <span className="font-semibold">Pregunta lo que quieras del historial.</span> <span className="text-muted-foreground">Contesto solo con las estadísticas del sistema.</span>
+                  <span className="font-semibold">Pregunta lo que quieras del historial.</span> <span className="text-muted-foreground">Contesto con las estadísticas del sistema, hago un análisis nuevo si hace falta y vigilo lo que me pidas.</span>
                 </p>
               </div>
               <ul role="list" aria-label="Preguntas de ejemplo" className="m-0 grid list-none gap-2 p-0 sm:grid-cols-2 xl:grid-cols-3">
@@ -79,6 +96,24 @@ export function ChatHallazgos({ iaConectada }: { iaConectada: boolean }) {
                   {m.rol === "ia" && <Avatar chico />}
                   <div className={`max-w-[88%] whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-sm ${m.rol === "usuario" ? "rounded-br-sm bg-foreground text-background" : m.error ? "rounded-bl-sm border border-destructive/40 bg-destructive-soft text-destructive" : "rounded-bl-sm bg-muted"}`}>
                     {m.texto}
+                    {m.analisis && m.analisis.length > 0 && (
+                      <span className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]">
+                        <span className="rounded-full bg-meta-1/15 px-2 py-0.5 font-medium text-meta-1">Análisis nuevo</span>
+                        <span className="text-muted-foreground">{m.analisis.join(" · ")}</span>
+                      </span>
+                    )}
+                    {m.vigilancia && (
+                      <span className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]">
+                        <span className="rounded-full bg-success-soft px-2 py-0.5 font-medium text-success">Vigilando desde ahora</span>
+                        <span className="text-muted-foreground">{m.vigilancia}</span>
+                      </span>
+                    )}
+                    {m.automatica && (
+                      <span className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]">
+                        <span className="rounded-full bg-warning-soft px-2 py-0.5 font-medium text-warning">Lo empecé a vigilar</span>
+                        <span className="text-muted-foreground">Preguntas seguido por «{m.automatica}»; lo verás en «Lo que estás vigilando» (puedes cambiarle la prioridad o quitarlo).</span>
+                      </span>
+                    )}
                     {m.proveedor && <span className="mt-1 block text-[11px] text-muted-foreground">{m.proveedor}</span>}
                   </div>
                 </li>

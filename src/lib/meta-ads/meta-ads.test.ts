@@ -324,3 +324,13 @@ test("cada hallazgo se reparte en la pantalla donde se explica mejor, según su 
   assert.equal(seccion("puja:Sin tope:si"), "campanas");
   assert.equal(seccion("otra-cosa"), "general");
 });
+
+test("una vigilancia con prioridad alta va primero entre las sugerencias aunque tenga menos gasto, y la baja después de los firmes", () => {
+  const lista = [
+    hallazgo("firme", { certeza: "firme", gasto: 900 }),
+    hallazgo("vig-baja", { certeza: "probable", gasto: 5000, prioridad: "baja" }),
+    hallazgo("vig-alta", { certeza: "poca", gasto: 20, prioridad: "alta" }),
+    hallazgo("vig-media", { certeza: "probable", gasto: 100, prioridad: "media" }),
+  ];
+  assert.deepEqual(sugerenciasDeHallazgos(lista).map((x) => x.titulo), ["T vig-alta", "T firme", "T vig-media", "T vig-baja"]);
+});

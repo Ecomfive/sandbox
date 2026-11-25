@@ -230,6 +230,8 @@ export interface Hallazgo {
   accion?: string;
   certeza: Certeza;
   gasto: number;
+  /** Solo en lo que sale de una vigilancia: la prioridad que la persona le dio (manda sobre la certeza al ordenar las sugerencias). */
+  prioridad?: "alta" | "media" | "baja";
 }
 
 /** En qué pantalla de Anuncios Meta se explica mejor un hallazgo (24 nov 2026): cada pestaña muestra los suyos y Hallazgos queda con lo general. */

@@ -31,6 +31,8 @@ export default async function HallazgosMetaPage({ searchParams }: { searchParams
         interpretacion={datos.interpretacion}
         iaConectada={datos.iaConectada}
         preparando={datos.analisisPendiente}
+        vigilancias={datos.vigilancias}
+        escribe={escribe}
       />
     </MarcoMeta>
   );
