@@ -44,12 +44,12 @@ const SUBPAGINAS: Record<string, string> = {
   "/tienda-pedidos/confirmacion/ia": "Confirmación con IA",
   "/tienda-pedidos/logistica": "Logística",
   "/tienda-pedidos/asesores": "Asesores",
-  "/inventario-pedidos-despacho/cuanto-hay": "Preguntar cuánto hay",
+  "/inventario-pedidos-despacho/cuanto-hay": "Mercancía existente",
   "/despacho-ciudad/devoluciones": "Devoluciones",
   "/despacho-ciudad/cambios": "Cambios y reembolsos",
   "/inventario-despacho/solicitudes": "Solicitud de inventario",
   "/inventario-despacho/archivo": "Archivos de solicitudes",
-  "/inventario-pedidos-despacho/archivo": "Archivo de pedidos",
+  "/inventario-pedidos-despacho/archivo": "Archivos de solicitudes",
   "/tienda-tiendas/productos": "Productos de Shopify",
   "/pedidos-dropi/resumen": "Resumen",
   "/retiros/cuentas": "Cuentas destino",
@@ -210,10 +210,10 @@ function modulosDeNav(areas: NavSection[]): ModuloDeNav[] {
 
 /**
  * El nombre de la página principal de un módulo cuando no es el mismo del menú (19 nov 2026, pedido de Hernán): el menú dice «Comunicación despacho» y
- * arriba se lee «Comunicación despacho › Solicitudes de despacho».
+ * arriba se lee «Comunicación despacho › Solicitud de inventario».
  */
 const PAGINA_PRINCIPAL: Record<string, string> = {
-  "/inventario-pedidos-despacho": "Solicitudes de despacho",
+  "/inventario-pedidos-despacho": "Solicitud de inventario",
   "/inventario-despacho": "Mercancía existente",
 };
 

@@ -8,12 +8,12 @@ import { cargarTiendasPermitidas } from "@/lib/finanzas/cargar-tiendas-permitida
 import { createServiceClient } from "@/lib/supabase/server";
 import { obtenerOpcionesSkuMaestro } from "@/lib/wms/skus-maestros";
 
-export const metadata = { title: "Preguntar cuánto hay" };
+export const metadata = { title: "Mercancía existente" };
 
 export const dynamic = "force-dynamic";
 
 /**
- * Comunicación despacho › Cuánto hay (antes en Pedidos de tienda; se movió el 19 nov 2026, pedido de Hernán). Preguntar cuánto hay (16 nov 2026, migración 0302; prototipo aprobado: https://claude.ai/artifact/BK449CDGnYApU2eQ9BqvxL).
+ * Comunicación despacho › Mercancía existente (antes «Cuánto hay», y antes en Pedidos de tienda; se movió el 19 nov 2026, pedido de Hernán). Preguntar cuánto hay (16 nov 2026, migración 0302; prototipo aprobado: https://claude.ai/artifact/BK449CDGnYApU2eQ9BqvxL).
  * La tienda elige un producto del catálogo, escribe una nota si quiere y pregunta; Yiletsi manda a contar a despacho y responde con la cantidad.
  */
 export default async function PreguntarCuantoHayPage() {
@@ -25,7 +25,7 @@ export default async function PreguntarCuantoHayPage() {
   const { preguntas, faltaMigracion } = await cargarPreguntasDeTienda(supabase, usuario.id, todas);
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-4">
-      <EncabezadoPagina titulo="Preguntar cuánto hay" oculto>
+      <EncabezadoPagina titulo="Mercancía existente" oculto>
         Elige el producto y pregunta: Yiletsi lo manda a contar a despacho y te responde con la cantidad (te llega en «Para ti»).
       </EncabezadoPagina>
       {faltaMigracion ? (
