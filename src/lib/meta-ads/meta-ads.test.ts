@@ -242,10 +242,11 @@ test("un CPA arriba del tope que ya se recuperó en los últimos 4 días no se a
   const recuperada = sugerir({ hoy: "2026-11-23", videos: [], campanas: [c], serie: new Map([["k", [dia("2026-11-19", 100, 4), dia("2026-11-21", 50, 8), dia("2026-11-22", 50, 8), dia("2026-11-23", 50, 8)]]]) });
   assert.equal(recuperada.some((x) => x.tipo === "cpa_alto"), false);
   const sigueAlto = sugerir({ hoy: "2026-11-23", videos: [], campanas: [c], serie: new Map([["k", [dia("2026-11-21", 60, 3), dia("2026-11-22", 60, 3), dia("2026-11-23", 60, 3)]]]) });
-  const alto = sigueAlto.find((x) => x.tipo === "cpa_alto");
-  assert.ok(alto);
-  assert.match(alto.titulo, /en los últimos 4/);
-  assert.doesNotMatch(alto.accion, /^Pausarla/);
+  // Sigue en $20 (sobre $12) y no se recupera: ahora sí se dice que se apague (25 nov 2026).
+  const apagar = sigueAlto.find((x) => x.tipo === "apagar_campana");
+  assert.ok(apagar);
+  assert.match(apagar.accion, /^Apaga la campaña/);
+  assert.match(apagar.detalle, /en los últimos 4/);
 });
 
 test("un anuncio activo que pasa de $12 sin ventas se apaga y se propone sustituirlo con el ángulo del que sí vende", () => {
@@ -262,7 +263,7 @@ test("un anuncio activo que pasa de $12 sin ventas se apaga y se propone sustitu
   assert.match(apagar[0].detalle, /pasó de \$12/);
 });
 
-import { claveDeHallazgo, sugerenciasDeHallazgos } from "./sugerencias";
+import { claveDeHallazgo, limiteDeApagado, sugerenciasDeHallazgos } from "./sugerencias";
 import { seccionDeHallazgo, type Hallazgo } from "./historico";
 
 const hallazgo = (id: string, o: Partial<Hallazgo> = {}): Hallazgo => ({ id, categoria: "entrega", tono: "alerta", titulo: `T ${id}`, detalle: "Detalle.", certeza: "firme", gasto: 500, ...o });
@@ -333,4 +334,35 @@ test("una vigilancia con prioridad alta va primero entre las sugerencias aunque 
     hallazgo("vig-media", { certeza: "probable", gasto: 100, prioridad: "media" }),
   ];
   assert.deepEqual(sugerenciasDeHallazgos(lista).map((x) => x.titulo), ["T vig-alta", "T firme", "T vig-media", "T vig-baja"]);
+});
+
+test("una campaña con el CPA sobre $12 que no se recupera se propone apagar y dice qué anuncios pasaron; si ya bajó, no", () => {
+  const dia = (fecha: string, gasto: number, compras: number) => ({ fecha, r: r({ gasto, compras }) });
+  const anuncio = (id: string, numero: string, gasto: number, compras: number, angulo: string | null = null) => ({ id, campanaId: "c9", nombre: `ARIANNY ${numero}`, numero, activo: true, angulo, r: r({ gasto, compras }), ultimos2: sinResultados(), ultimoDia: sinResultados() });
+  const c = campana({ id: "c9", tope: 10, topeDefinido: false, r: r({ gasto: 300, compras: 20 }) });
+  const anuncios = [anuncio("a1", "V1", 14, 0), anuncio("a2", "V2", 80, 10, "Postura"), anuncio("a3", "V3", 54, 3), anuncio("a4", "V4", 18, 1), anuncio("a5", "V5", 3, 0)];
+  const mala = sugerir({ hoy: "2026-11-25", videos: [], campanas: [c], anuncios, serie: new Map([["c9", [dia("2026-11-23", 60, 4), dia("2026-11-24", 60, 4)]]]) });
+  const apagar = mala.find((x) => x.tipo === "apagar_campana")!;
+  assert.equal(apagar.severidad, "alta");
+  assert.match(apagar.titulo, /apagar la campaña \(CPA \$15\.00\)/);
+  assert.match(apagar.accion, /^Apaga la campaña: su CPA de 7 días \(\$15\.00\) pasa de \$12\.00/);
+  assert.match(apagar.accion, /Lo que sí vende dentro del tope es V2 \(CPA \$8\.00, ángulo «Postura»\)/);
+  assert.deepEqual(apagar.anuncios!.map((a) => `${a.nombre} ${a.grupo} ${a.cifra}`), ["V3 apagar CPA $18.00 con 3 compras", "V4 vigilar CPA $18.00 con 1 compra", "V1 apagar $14.00 sin ventas"]);
+  // Si en los últimos 4 días ya bajó de $12, no se apaga: se dice por qué y cuáles anuncios sí.
+  const recupera = sugerir({ hoy: "2026-11-25", videos: [], campanas: [c], anuncios, serie: new Map([["c9", [dia("2026-11-23", 55, 5), dia("2026-11-24", 55, 5)]]]) });
+  assert.equal(recupera.some((x) => x.tipo === "apagar_campana"), false);
+  const alto = recupera.find((x) => x.tipo === "cpa_alto")!;
+  assert.match(alto.accion, /^No la apagues todavía: en los últimos 4 días su CPA ya bajó a \$11\.00, dentro de \$12\.00\. Apaga los anuncios marcados abajo\./);
+  assert.match(alto.accion, /se apaga si su CPA pasa de \$12\.00/);
+});
+
+test("el límite para apagar una campaña es $12, o el tope del producto si se definió más alto", () => {
+  assert.equal(limiteDeApagado({ tope: 10, topeDefinido: false }), 12);
+  assert.equal(limiteDeApagado({ tope: 8, topeDefinido: true }), 12);
+  assert.equal(limiteDeApagado({ tope: 20, topeDefinido: true }), 20);
+  const dia = (fecha: string, gasto: number, compras: number) => ({ fecha, r: r({ gasto, compras }) });
+  const serie = new Map([["t", [dia("2026-11-24", 100, 6)]]]);
+  const con = (topeDefinido: boolean, tope: number) => sugerir({ hoy: "2026-11-25", videos: [], serie, campanas: [campana({ id: "t", tope, topeDefinido, r: r({ gasto: 300, compras: 20 }) })] }).map((x) => x.tipo);
+  assert.ok(con(false, 10).includes("apagar_campana"), "$15 con el tope por defecto: se apaga");
+  assert.ok(!con(true, 20).includes("apagar_campana"), "$15 con un tope propio de $20: no");
 });
