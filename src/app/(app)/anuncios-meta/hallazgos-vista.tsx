@@ -4,7 +4,9 @@ import { useState, type ReactNode } from "react";
 import { seccionDeHallazgo, tieneHistorialSuficiente, UMBRALES_HISTORICO, type AnalisisHistorico, type BandasMetrica, type FilaMes, type FilaTendencia, type SeccionHallazgo } from "@/lib/meta-ads/historico";
 import type { InterpretacionGuardada } from "@/lib/meta-ads/interpretacion-guardada";
 import { dolares } from "@/lib/meta-ads/metricas";
+import { enLaVista, estadoDeTendencia, hallazgosEnVista, productoEnMarcha, type EnMarcha, type VistaActividad } from "@/lib/meta-ads/en-marcha";
 import { ChatHallazgos } from "./chat-hallazgos";
+import { SelectorActividad } from "./selector-actividad";
 import { Anillo, Columnas, Tendencia, Variacion } from "./graficas";
 import { ListaHallazgos, NOMBRE_SECCION } from "./hallazgos-tarjetas";
 import { InterpretacionVista } from "./interpretacion-vista";
@@ -453,8 +455,12 @@ function SeccionBandas({ a }: { a: AnalisisHistorico }) {
  * tendencia, la interpretación con IA y los hallazgos como tarjetas; abajo el chat, el mes a mes con su gráfica, cómo va frente a antes y desde qué valor funciona. Todo se pliega y se despliega. La entrega por producto y «qué genera más ventas»
  * viven ahora en Productos, Campañas y Videos, junto a los hallazgos de cada una.
  */
-export function HallazgosVista({ analisis, interpretacion, iaConectada, preparando, vigilancias, senales, rasgos, generadoEn, escribe }: { analisis: AnalisisHistorico; interpretacion: InterpretacionGuardada | null; iaConectada: boolean; preparando: boolean; vigilancias: ResultadoVigilancia[]; senales: SenalesCreativas[]; rasgos: RasgosDeGanadores[]; generadoEn: string | null; escribe: boolean }) {
+export function HallazgosVista({ analisis, interpretacion, iaConectada, preparando, vigilancias, senales, rasgos, enMarcha, generadoEn, escribe }: { analisis: AnalisisHistorico; interpretacion: InterpretacionGuardada | null; iaConectada: boolean; preparando: boolean; vigilancias: ResultadoVigilancia[]; senales: SenalesCreativas[]; rasgos: RasgosDeGanadores[]; enMarcha: EnMarcha; generadoEn: string | null; escribe: boolean }) {
   const a = analisis;
+  // Arranca en lo que está en marcha: lo apagado se consulta aparte.
+  const [vista, setVista] = useState<VistaActividad>("activos");
+  const hallazgos = hallazgosEnVista(a.hallazgos, enMarcha, vista);
+  const cuentas = { activos: hallazgosEnVista(a.hallazgos, enMarcha, "activos").length, apagados: hallazgosEnVista(a.hallazgos, enMarcha, "apagados").length, todos: a.hallazgos.length };
   if (!tieneHistorialSuficiente(a)) {
     return <p className="m-0 rounded-xl border border-border bg-card px-4 py-6 text-sm text-muted-foreground">Todavía hay muy poco historial (menos de {UMBRALES_HISTORICO.minUnidades} campañas con gasto suficiente) para sacar conclusiones. Cuando haya más, este análisis aparece solo.</p>;
   }
@@ -464,12 +470,18 @@ export function HallazgosVista({ analisis, interpretacion, iaConectada, preparan
       <CifrasDeArriba a={a} />
       <VigilanciasVista vigilancias={vigilancias} escribe={escribe} />
       <InterpretacionVista guardada={interpretacion} preparando={preparando} />
-      <SenalesCreativasVista senales={senales} />
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <SelectorActividad etiqueta="Qué productos y campañas ver" vista={vista} alCambiar={setVista} cuentas={cuentas} textos={{ activos: "En marcha", apagados: "Apagados", todos: "Todos" }} />
+        <p className="m-0 min-w-0 flex-1 basis-64 text-xs text-muted-foreground">
+          Recorta los hallazgos, las señales y cómo va frente a antes. {vista === "activos" ? "Lo de ángulos y métricas, que sirve para todo, también sale." : "Estos datos son de todo el historial."}
+        </p>
+      </div>
+      <SenalesCreativasVista senales={senales.filter((s) => enLaVista(productoEnMarcha(enMarcha, s.producto) ? "activo" : "apagado", vista))} />
       <RasgosDeGanadoresVista rasgos={rasgos} />
-      <SeccionHallazgos a={a} />
+      <SeccionHallazgos key={vista} a={{ ...a, hallazgos }} />
       <ChatHallazgos iaConectada={iaConectada} />
       <SeccionMeses a={a} />
-      <SeccionTendencias filas={a.tendencias} />
+      <SeccionTendencias filas={a.tendencias.filter((t) => enLaVista(estadoDeTendencia(t, enMarcha), vista))} />
       <SeccionBandas a={a} />
     </div>
   );

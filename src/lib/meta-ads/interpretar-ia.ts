@@ -2,6 +2,7 @@
 // (`historico.ts`: estadística simple, a la vista y con prueba); la IA **no calcula ni inventa nada**: recibe esas cifras ya armadas y las interpreta para quien monta las campañas (qué patrones se ven,
 // qué riesgos hay, qué conviene probar y qué no se puede concluir todavía). Lógica pura, con prueba: cómo se arma el pedido y cómo se valida lo que contesta. La llamada vive en `actions.ts`.
 
+import { hayAlgoEnMarcha, soloEnMarcha } from "./en-marcha";
 import { NOMBRE_CATEGORIA, type AnalisisHistorico } from "./historico";
 
 export interface PuntoIA {
@@ -53,7 +54,9 @@ export function cortarEnPunto(t: string, max: number): string {
 }
 
 /** El pedido: las reglas fijas y el resumen del análisis (solo lo necesario: lo más grande de cada tabla). Va todo en JSON para que la IA lea cifras, no frases. */
-export function pedidoInterpretacion(a: AnalisisHistorico, investigaciones: readonly unknown[] = [], senalesCreativas: readonly unknown[] = [], rasgos: readonly unknown[] = []): { instrucciones: string; texto: string } {
+export function pedidoInterpretacion(completo: AnalisisHistorico, investigaciones: readonly unknown[] = [], senalesCreativas: readonly unknown[] = [], rasgos: readonly unknown[] = []): { instrucciones: string; texto: string } {
+  // La IA recibe los productos y campañas que siguen en marcha: sobre lo apagado no hay nada que recomendar.
+  const a = soloEnMarcha(completo);
   const instrucciones = [
     "Eres analista de rendimiento de anuncios de Meta (Facebook e Instagram) para una operación de comercio electrónico con pago contra entrega en Panamá y Costa Rica.",
     "Recibes estadísticas ya calculadas por el sistema sobre el historial de campañas, anuncios y videos, la tasa de entrega de cada producto y las tendencias recientes.",
@@ -63,6 +66,7 @@ export function pedidoInterpretacion(a: AnalisisHistorico, investigaciones: read
     "Da importancia a la tasa de entrega: un producto que vende bien en Meta pero entrega mal cuesta más por venta real.",
     "Escribe para quien monta las campañas, que no es analista: español claro, frases cortas, sin jerga. Cada punto lleva un título corto y un detalle con las cifras que lo respaldan y qué hacer.",
     REGLA_ALCANCE_DE_CAMPANAS,
+    hayAlgoEnMarcha(a.enMarcha) ? "Los productos y las campañas que recibes son solo los que tienen campañas activas hoy: recomienda sobre ellos. Los ángulos, ganchos, formatos y bandas salen de todo el historial: úsalos como aprendizaje y no propongas volver a anunciar un producto que no esté en la lista." : "",
     'Responde SOLO con un JSON válido de esta forma: {"resumen": string, "patrones": [{"titulo": string, "detalle": string}], "riesgos": [{"titulo": string, "detalle": string}], "recomendaciones": [{"titulo": string, "detalle": string}], "limites": [string]}.',
     `Máximo ${LIMITES_IA.puntos} elementos en patrones, riesgos y recomendaciones, y ${LIMITES_IA.limites} en limites. «limites» = lo que los datos todavía no permiten concluir o lo que convendría empezar a medir.`,
     "Largos: el resumen de hasta 600 caracteres y cada detalle de hasta 450; termina siempre las frases (nunca dejes una a medias): si no cabe todo, di menos y prioriza lo que más importa.",

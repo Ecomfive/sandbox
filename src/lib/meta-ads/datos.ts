@@ -7,6 +7,8 @@ import { resumirEquipo, type CreacionDeCampana, type DatosActividad, type Evento
 import { agrupar, copyLimpio, landingLimpia, type Elemento } from "./agrupar";
 import { anguloDominante, composicionDeAngulos, gruposDeVideos, type GruposDeVideo } from "./atributos-video";
 import { CPA_TOPE_PREDETERMINADO, sinResultados, sumar, type Resultados } from "./metricas";
+import { calcularEnMarcha, campanaEnMarcha, enLaVista, hallazgosEnVista, productoEnMarcha, type EnMarcha, type VistaActividad } from "./en-marcha";
+import { pendienteDeProducto, pendientesPorCampana, pendientesPorVideo } from "./prioridad";
 import { claveDeProducto, NOMBRE_ETAPA, NOMBRE_PUJA, numeroDeVideo, type Estructura, type Etapa, type Puja } from "./nombre";
 import { detalleLegible, esCreacionDeCampana } from "./normalizar";
 import { estructuraValida, VERSION_ANALISIS } from "./video-angulo";
@@ -91,6 +93,8 @@ export interface DatosMeta {
   grupos: GruposMeta;
   /** Gasto y compras del periodo, día por día (o semana por semana con más de 90 días), con todos los días del periodo aunque no hayan gastado. */
   serie: PuntoSerie[];
+  /** Productos y campañas con una campaña activa que gastó en los últimos 7 días. */
+  enMarcha: EnMarcha;
   /** Todo lo que la IA sacó de los videos del periodo (ángulo, gancho, formato, llamado, recursos, estructura…), medido con lo que costó y vendió cada video. */
   gruposVideo: GruposDeVideo;
   /** Los productos con lo que sumaron sus campañas en el periodo. */
@@ -126,7 +130,7 @@ export interface DatosMeta {
 
 const vacios = (periodo: Periodo, hoy: string): DatosMeta => ({
   faltaMigracion: false, cuentas: [], cuentaId: null, periodo, desde: hoy, hasta: hoy, campanas: [], videos: [], anuncios: [], totales: sinResultados(), anteriores: sinResultados(), topes: [], productos: [], sugerencias: [], decididas: 0,
-  grupos: { campana: { "Ángulo": [], Estructura: [], Puja: [], Producto: [], Etapa: [] }, anuncio: { Copy: [], Landing: [] } }, serie: [], gruposVideo: gruposDeVideos([]), interpretacion: null, analisisGeneradoEn: null, analisisPendiente: false, vigilancias: [], senales: [], rasgos: [], historial: null, productosVista: [], creadasPorDia: [], creadasHoy: 0, actividad: resumirEquipo([], [], hoy), ganchosSinTipo: 0, videosSinAnalizar: 0, videosSinAngulo: 0, iaConectada: false, actividadDisponible: false,
+  grupos: { campana: { "Ángulo": [], Estructura: [], Puja: [], Producto: [], Etapa: [] }, anuncio: { Copy: [], Landing: [] } }, serie: [], gruposVideo: gruposDeVideos([]), interpretacion: null, analisisGeneradoEn: null, analisisPendiente: false, vigilancias: [], senales: [], rasgos: [], historial: null, productosVista: [], enMarcha: { productos: [], campanas: [] }, creadasPorDia: [], creadasHoy: 0, actividad: resumirEquipo([], [], hoy), ganchosSinTipo: 0, videosSinAnalizar: 0, videosSinAngulo: 0, iaConectada: false, actividadDisponible: false,
 });
 
 const restar = (fecha: string, n: number) => new Date(new Date(`${fecha}T00:00:00Z`).getTime() - n * 86_400_000).toISOString().slice(0, 10);
@@ -161,7 +165,7 @@ interface FilaDia {
 }
 const resultadosDe = (f: FilaDia): Resultados => ({ gasto: num(f.gasto), impresiones: num(f.impresiones), clics: num(f.clics), video3s: num(f.video_3s), video15s: num(f.video_15s), video25: num(f.video_25), video50: num(f.video_50), video75: num(f.video_75), video95: num(f.video_95), reproducciones: num(f.video_reproducciones), segundosVistos: num(f.video_segundos), vioLanding: num(f.vio_landing), carrito: num(f.carrito), pago: num(f.pago), compras: num(f.compras), valor: num(f.valor) });
 
-export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: string; cuentaId: string | null; periodo: Periodo; hoy: string; /** La llave de un producto (`claveDeProducto`): «Qué funciona» se calcula solo con sus campañas, anuncios y videos. */ producto?: string | null }): Promise<DatosMeta> {
+export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: string; cuentaId: string | null; periodo: Periodo; hoy: string; /** La llave de un producto (`claveDeProducto`): «Qué funciona» se calcula solo con sus campañas, anuncios y videos. */ producto?: string | null; /** «Qué funciona» solo con lo que está en marcha o solo con lo apagado (sin esto, todo). */ ver?: VistaActividad | null }): Promise<DatosMeta> {
   const base = vacios(o.periodo, o.hoy);
   const dias = PERIODOS.find((p) => p.valor === o.periodo)!.dias;
   const desde = restar(o.hoy, dias - 1);
@@ -227,6 +231,7 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
   const porVideo30 = new Map<string, Resultados>();
   const porVideoPeriodo = new Map<string, Resultados>();
   const porAnuncio30 = new Map<string, Resultados>();
+  const porAnuncio7 = new Map<string, Resultados>();
   const porAnuncio2 = new Map<string, Resultados>();
   const porAnuncioDia = new Map<string, Map<string, Resultados>>();
   let totales = sinResultados();
@@ -249,7 +254,10 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
       d.compras += r.compras;
       porDiaPeriodo.set(f.fecha, d);
     } else if (f.fecha >= anteriorDesde) anteriores = sumar(anteriores, r);
-    if (f.fecha >= desde7) porCampana7.set(f.campana_id, sumar(porCampana7.get(f.campana_id) ?? sinResultados(), r));
+    if (f.fecha >= desde7) {
+      porCampana7.set(f.campana_id, sumar(porCampana7.get(f.campana_id) ?? sinResultados(), r));
+      porAnuncio7.set(f.anuncio_id, sumar(porAnuncio7.get(f.anuncio_id) ?? sinResultados(), r));
+    }
     if (f.fecha >= desde2) porAnuncio2.set(f.anuncio_id, sumar(porAnuncio2.get(f.anuncio_id) ?? sinResultados(), r));
     if (f.fecha >= desde2) {
       const dias = porAnuncioDia.get(f.anuncio_id) ?? new Map<string, Resultados>();
@@ -354,15 +362,26 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
   const videos = armarVideos(porVideoPeriodo, porAnuncio);
   const videos30 = armarVideos(porVideo30, porAnuncio30);
 
+  // Sugerencias y «en marcha»: siempre con los últimos 7 días, sin importar el periodo que se mira.
+  const campanas7 = camp.map((c) => armar(c, porCampana7.get(c.id as string) ?? sinResultados()));
+  // Lo que está en marcha (campañas activas que gastaron en 7 días): sobre eso se recomienda; lo apagado queda para consultar (25 nov 2026, pedido de Alcides).
+  const enMarcha = calcularEnMarcha(campanas7.map((c) => ({ nombre: c.nombre, producto: c.producto, activa: c.activa, gasto7: c.r.gasto, creadaEn: c.creadaEn })), o.hoy);
+  const idsEnMarcha = new Set(campanas7.filter((c) => campanaEnMarcha({ activa: c.activa, gasto7: c.r.gasto, creadaEn: c.creadaEn }, o.hoy)).map((c) => c.id));
+  for (const c of campanas) c.enMarcha = idsEnMarcha.has(c.id);
+  const videoEnMarcha = (v: VideoVista) => v.anunciosDetalle.some((a) => a.activo && idsEnMarcha.has(a.campanaId));
+  for (const v of videos) v.enMarcha = videoEnMarcha(v);
+
   // Qué funciona: cada dimensión con las campañas (o anuncios) del periodo con gasto.
   // Con un producto elegido (`?producto=`), todo lo de «Qué funciona» sale solo de ese producto (23 nov 2026: los ángulos que funcionan dependen del producto).
-  const delProducto = (producto: string | null) => !o.producto || claveDeProducto(producto) === o.producto;
-  const conGasto = campanas.filter((c) => c.r.gasto > 0 && delProducto(c.producto));
+  // Con un producto elegido manda ese; si no, `ver` recorta a lo que está en marcha (o a lo apagado): de un producto que sigue anunciándose cuentan todas sus campañas.
+  const incluido = (producto: string | null, suyaEnMarcha: boolean) =>
+    o.producto ? claveDeProducto(producto) === o.producto : !o.ver || enLaVista(suyaEnMarcha || productoEnMarcha(enMarcha, producto) ? "activo" : "apagado", o.ver);
+  const conGasto = campanas.filter((c) => c.r.gasto > 0 && incluido(c.producto, !!c.enMarcha));
   const deCampana = (clave: (c: CampanaVista) => string | null): Elemento[] => conGasto.map((c) => ({ clave: clave(c), r: c.r, tope: c.tope, campana: c.id }));
   const deAnuncio = (clave: (a: AnuncioVista) => string | null): Elemento[] =>
-    anuncios.filter((a) => a.r.gasto > 0 && delProducto(campanasDe.get(a.campanaId)?.producto ?? null)).map((a) => ({ clave: clave(a), r: a.r, tope: campanasDe.get(a.campanaId)?.tope ?? CPA_TOPE_PREDETERMINADO, campana: a.campanaId, video: a.videoId }));
+    anuncios.filter((a) => a.r.gasto > 0 && incluido(campanasDe.get(a.campanaId)?.producto ?? null, !!campanasDe.get(a.campanaId)?.enMarcha)).map((a) => ({ clave: clave(a), r: a.r, tope: campanasDe.get(a.campanaId)?.tope ?? CPA_TOPE_PREDETERMINADO, campana: a.campanaId, video: a.videoId }));
   // Todo lo que la IA sacó de los videos se mide por video (lo que costó y vendió cada uno). El ángulo de una campaña es la mezcla de los de sus videos.
-  const gruposVideo = gruposDeVideos(o.producto ? videos.filter((v) => delProducto(v.producto)) : videos);
+  const gruposVideo = gruposDeVideos(videos.filter((v) => incluido(v.producto, !!v.enMarcha)));
   const videosSinAngulo = gruposVideo.sinDato["Ángulo"];
   const grupos: GruposMeta = {
     campana: {
@@ -376,7 +395,6 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
   };
 
   // Sugerencias: siempre con los últimos 7 días de las campañas y 30 de los videos, sin importar el periodo que se mira.
-  const campanas7 = camp.map((c) => armar(c, porCampana7.get(c.id as string) ?? sinResultados()));
   // La decisión de cada anuncio (escalera del documento «Métrica»): con lo acumulado en los últimos 30 días, las últimas 48 horas y el último día con datos.
   const ultimoDiaDe = (id: string): Resultados => {
     const dias = porAnuncioDia.get(id);
@@ -384,7 +402,7 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
     const fecha = [...dias.keys()].sort().pop();
     return fecha ? (dias.get(fecha) ?? sinResultados()) : sinResultados();
   };
-  const anunciosSugerencia = anuncios.map((a) => ({ id: a.id, campanaId: a.campanaId, nombre: a.nombre, numero: a.numero, activo: a.activo, angulo: a.angulo, r: porAnuncio30.get(a.id) ?? sinResultados(), ultimos2: porAnuncio2.get(a.id) ?? sinResultados(), ultimoDia: ultimoDiaDe(a.id), frecuencia: a.frecuencia }));
+  const anunciosSugerencia = anuncios.map((a) => ({ id: a.id, campanaId: a.campanaId, nombre: a.nombre, numero: a.numero, activo: a.activo, angulo: a.angulo, r: porAnuncio30.get(a.id) ?? sinResultados(), r7: porAnuncio7.get(a.id) ?? sinResultados(), ultimos2: porAnuncio2.get(a.id) ?? sinResultados(), ultimoDia: ultimoDiaDe(a.id), frecuencia: a.frecuencia }));
   const decisionesAnuncio = decisionesDeAnuncios(anunciosSugerencia, campanas);
   for (const a of anuncios) {
     const d = decisionesAnuncio.get(a.id);
@@ -404,8 +422,17 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
     if (!lista.some((x) => x.url === url)) lista.push({ url, rasgos: paginasMedidas[url] });
     paginasPorCampana.set(a.campanaId, lista);
   }
-  const todas = [...sugerir({ campanas: campanas7, anuncios: anunciosSugerencia, serie, videos: videos30, hoy: o.hoy, paginasPorCampana }), ...sugerenciasDeHallazgos([...(hallazgosGuardados?.analisis.hallazgos ?? []), ...vigilancias.map(hallazgoDeVigilancia).filter((h): h is NonNullable<typeof h> => h !== null)])];
+  const videosEnMarcha = videos30.filter((v) => productoEnMarcha(enMarcha, v.producto));
+  const delHistorial = hallazgosEnVista(hallazgosGuardados?.analisis.hallazgos ?? [], enMarcha, "activos");
+  const todas = [...sugerir({ campanas: campanas7, anuncios: anunciosSugerencia, serie, videos: videosEnMarcha, hoy: o.hoy, paginasPorCampana }), ...sugerenciasDeHallazgos([...delHistorial, ...vigilancias.map(hallazgoDeVigilancia).filter((h): h is NonNullable<typeof h> => h !== null)])];
   const sugerencias = pendientes(todas, decisiones, o.hoy);
+  // La misma prioridad en cada lista (25 nov 2026): lo más urgente de cada campaña, video y producto.
+  const dePorCampana = pendientesPorCampana(sugerencias);
+  for (const c of campanas) c.pendiente = dePorCampana.get(c.id) ?? null;
+  const dePorVideo = pendientesPorVideo(sugerencias, videos);
+  for (const v of videos) v.pendiente = dePorVideo.get(v.id) ?? null;
+  const productosVista = agruparProductos(campanasConActividad, videos, enMarcha);
+  for (const p of productosVista) p.pendiente = pendienteDeProducto(campanas.filter((c) => claveDeProducto(c.producto) === p.clave).map((c) => c.pendiente));
 
   // Campañas montadas por día (14 días) y por persona.
   const creadasPorDia = Array.from({ length: 14 }, (_, i) => ({ fecha: restar(o.hoy, 13 - i), testing: 0, venta: 0, escala: 0, retargeting: 0, otras: 0 }));
@@ -441,7 +468,7 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
   return {
     ...base, cuentas, cuentaId, desde, hasta: o.hoy, campanas: campanasConActividad, videos, anuncios, totales, anteriores, topes, productos, sugerencias, decididas: todas.length - sugerencias.length, grupos,
     interpretacion, analisisGeneradoEn: hallazgosGuardados?.generadoEn ?? null, analisisPendiente: analisisViejo(hallazgosGuardados), vigilancias, senales, rasgos, historial: hallazgosGuardados ? seccionesDeAnalisis(hallazgosGuardados) : null,
-    serie: serieGlobal, gruposVideo, productosVista: agruparProductos(campanasConActividad, videos), creadasPorDia, creadasHoy: creadasPorDia[13]?.testing + creadasPorDia[13]?.venta + creadasPorDia[13]?.escala + creadasPorDia[13]?.retargeting + creadasPorDia[13]?.otras || 0, actividad, ganchosSinTipo, actividadDisponible: eventos.length > 0, videosSinAnalizar: videos.filter((v) => !v.analisis || v.analisis.estado !== "analizado" || v.analisis.version < VERSION_ANALISIS).length, videosSinAngulo, iaConectada: false,
+    serie: serieGlobal, gruposVideo, productosVista, enMarcha, creadasPorDia, creadasHoy: creadasPorDia[13]?.testing + creadasPorDia[13]?.venta + creadasPorDia[13]?.escala + creadasPorDia[13]?.retargeting + creadasPorDia[13]?.otras || 0, actividad, ganchosSinTipo, actividadDisponible: eventos.length > 0, videosSinAnalizar: videos.filter((v) => !v.analisis || v.analisis.estado !== "analizado" || v.analisis.version < VERSION_ANALISIS).length, videosSinAngulo, iaConectada: false,
   };
 }
 

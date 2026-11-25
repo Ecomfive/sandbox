@@ -3,6 +3,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { cargarBaseDias } from "./base-dias";
+import { hayAlgoEnMarcha, productoEnMarcha } from "./en-marcha";
 import type { AnalisisHistorico } from "./historico";
 import { claveDeSenales, senalesDeProducto, tieneSenales, type SenalesCreativas } from "./senales-creativas";
 import { senalesDeModulos } from "./senales-modulos";
@@ -12,7 +13,8 @@ import { leerDatosModulos } from "./senales-modulos-datos";
 export function productosParaMirar(a: AnalisisHistorico, max = 5): string[] {
   const empeoran = a.tendencias.filter((t) => t.nivel === "Producto" && t.cambio.sentido === "baja").sort((x, y) => y.gastoRec - x.gastoRec).map((t) => t.nombre);
   const masGasto = [...a.entrega].sort((x, y) => y.gasto - x.gasto).map((f) => f.nombre);
-  return [...new Set([...empeoran, ...masGasto])].slice(0, max);
+  const e = a.enMarcha;
+  return [...new Set([...empeoran, ...masGasto])].filter((p) => !hayAlgoEnMarcha(e) || productoEnMarcha(e, p)).slice(0, max);
 }
 
 export async function senalesCreativasDelDia(supabase: SupabaseClient, o: { paisId: string; hoy: string; analisis: AnalisisHistorico }): Promise<SenalesCreativas[]> {

@@ -6,7 +6,7 @@ import { confiable, dolares } from "@/lib/meta-ads/metricas";
 import { formatoDuracion } from "@/lib/meta-ads/duracion";
 import type { VideoVista } from "@/lib/meta-ads/vistas";
 import { anguloDeVideo } from "./def-videos";
-import { Nivel } from "./piezas";
+import { InsigniaPrioridad, Nivel } from "./piezas";
 import { BotonPlay } from "./reproductor-video";
 
 const urlSegura = (u: string | null) => (u && /^https:\/\//i.test(u) ? u : null);
@@ -53,6 +53,7 @@ export function TarjetaVideo({ x, columnas, posicion, alAbrir, alReproducir }: {
       >
         <span className="line-clamp-2 text-sm font-semibold text-foreground">{x.nombre}</span>
         <span className="flex flex-wrap gap-1.5">
+          <InsigniaPrioridad pendiente={x.pendiente} />
           {x.numero && <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-medium">{x.numero}</span>}
           <span className="rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground">{angulo ? `${angulo}${x.analisis?.estado === "sin_archivo" ? " (provisional)" : ""}` : "Sin analizar"}</span>
           {x.analisis?.ganchoTipo && <span className="rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground">Gancho: {x.analisis.ganchoTipo}</span>}

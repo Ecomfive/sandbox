@@ -18,7 +18,8 @@ export function ContenidoResumen({ datos, escribe }: { datos: DatosMeta; escribe
   const activas = datos.campanas.filter((c) => c.activa).length;
   const resultadoTotal = datos.campanas.reduce((s, c) => s + resultado(c.r, c.tope), 0);
   const conGasto = datos.campanas.filter((c) => c.r.gasto > 0);
-  const confiables = conGasto.filter((c) => confiable(c.r)).sort((a, b) => resultado(b.r, b.tope) - resultado(a.r, a.tope));
+  // Cómo van y cuáles dejan o pierden: solo las que están en marcha (de una apagada no hay nada que decidir). Las cifras de arriba son de todo el periodo.
+  const confiables = conGasto.filter((c) => c.enMarcha && confiable(c.r)).sort((a, b) => resultado(b.r, b.tope) - resultado(a.r, a.tope));
   const mejores = confiables.filter((c) => resultado(c.r, c.tope) > 0).slice(0, 5);
   const peores = [...confiables].reverse().filter((c) => resultado(c.r, c.tope) < 0).slice(0, 5);
   const sinTope = [...new Set(conGasto.filter((c) => !c.topeDefinido).map((c) => c.producto ?? "sin producto"))];
@@ -32,7 +33,7 @@ export function ContenidoResumen({ datos, escribe }: { datos: DatosMeta; escribe
   ];
   const sinEmbudo = pasos.slice(1).every((p) => p.valor === 0);
   const veredictos: Record<Veredicto, number> = { deja: 0, pierde: 0, poca_data: 0, sin_gasto: 0 };
-  for (const c of datos.campanas.filter((x) => x.r.gasto > 0 || x.activa)) veredictos[veredictoDe(c)]++;
+  for (const c of datos.campanas.filter((x) => x.enMarcha)) veredictos[veredictoDe(c)]++;
   const totalVeredictos = Object.values(veredictos).reduce((s, n) => s + n, 0);
   const etapaDia = [
     { nombre: NOMBRE_ETAPA.testing, color: "var(--azul)" },
@@ -78,14 +79,14 @@ export function ContenidoResumen({ datos, escribe }: { datos: DatosMeta; escribe
       <InterpretacionVista guardada={datos.interpretacion} preparando={datos.analisisPendiente} enlace />
 
       <div className="grid min-w-0 gap-6 lg:grid-cols-2">
-        <ListaCampanas titulo="Las que más dejan" vacio="Ninguna campaña con más de $100 gastados deja ganancia todavía." campanas={mejores} color="var(--success)" />
-        <ListaCampanas titulo="Las que más pierden" vacio="Ninguna campaña con más de $100 gastados está perdiendo." campanas={peores} color="var(--destructive)" />
+        <ListaCampanas titulo="En marcha: las que más dejan" vacio="Ninguna campaña en marcha con más de $100 gastados en el periodo deja ganancia." campanas={mejores} color="var(--success)" />
+        <ListaCampanas titulo="En marcha: las que más pierden" vacio="Ninguna campaña en marcha con más de $100 gastados en el periodo está perdiendo." campanas={peores} color="var(--destructive)" />
       </div>
 
       <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
-        <TarjetaMeta titulo="Cómo van las campañas" derecha={`${totalVeredictos} con gasto o encendidas`} id="veredictos">
+        <TarjetaMeta titulo="Cómo van las campañas en marcha" derecha={`${totalVeredictos} en marcha`} id="veredictos">
           {totalVeredictos === 0 ? (
-            <p className="m-0 text-sm text-muted-foreground">Todavía no hay campañas con gasto en este periodo.</p>
+            <p className="m-0 text-sm text-muted-foreground">No hay campañas en marcha ahora mismo.</p>
           ) : (
             <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
               <Anillo

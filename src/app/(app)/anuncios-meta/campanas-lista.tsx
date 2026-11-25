@@ -17,7 +17,7 @@ import { BarraApilada, coloresDeAngulos } from "./graficas";
 import { FichaCampana } from "./ficha-campana";
 import { CeldasColumnas, EncabezadoColumnas, estiloRejilla, SelectorColumnasMeta, useColumnasMeta } from "./columnas-meta";
 import { BarraOrden, useOrdenMeta } from "./orden-meta";
-import { InsigniaEstructura, InsigniaEtapa, nombreEstado } from "./piezas";
+import { InsigniaEstructura, InsigniaEtapa, InsigniaPrioridad, nombreEstado } from "./piezas";
 
 const NOMBRE: NombreFilas = { singular: "campaña", plural: "campañas" };
 const ICONOS: Record<string, IconoComp> = { nombre: ProductoIcon, veredicto: MargenIcon, etapa: EtiquetaIcon, estado: EstadoIcon, estructura: FiltroIcon, puja: FiltroIcon, mercado: TiendaIcon, videos: AnunciosIcon, producto: ProductoIcon, angulo: EtiquetaIcon, cuenta: TiendaIcon, persona: PersonaIcon, meta: EstadoIcon, gasto: MargenIcon, compras: MargenIcon, creada: CalendarioIcon };
@@ -35,13 +35,16 @@ function FilaCampana({ c, alAbrir, colores, columnas }: { c: CampanaVista; alAbr
           <span role="img" aria-label={NOMBRE_VEREDICTO[v]} className={`h-2 w-2 shrink-0 rounded-full ${punto}`} />
           <span className="truncate text-sm font-medium">{c.nombre}</span>
         </span>
-        <span className="truncate text-xs text-muted-foreground">
-          {c.mercado ?? c.cuentaNombre}
-          {c.videos ? ` · ${c.videos}` : ""}
-          {c.persona ? ` · la montó ${c.persona}` : ""}
-          {c.creadaEn ? ` · ${c.creadaEn.slice(0, 10)}` : ""}
-          {c.activa ? "" : ` · ${nombreEstado(c.estado)}`}
-          {c.activa && faltanEtiquetas(c).length > 0 ? ` · falta ${faltanEtiquetas(c).join(" y ")}` : ""}
+        <span className="flex min-w-0 items-center gap-1.5">
+          <InsigniaPrioridad pendiente={c.pendiente} />
+          <span className="min-w-0 truncate text-xs text-muted-foreground">
+            {c.mercado ?? c.cuentaNombre}
+            {c.videos ? ` · ${c.videos}` : ""}
+            {c.persona ? ` · la montó ${c.persona}` : ""}
+            {c.creadaEn ? ` · ${c.creadaEn.slice(0, 10)}` : ""}
+            {c.activa ? "" : ` · ${nombreEstado(c.estado)}`}
+            {c.activa && faltanEtiquetas(c).length > 0 ? ` · falta ${faltanEtiquetas(c).join(" y ")}` : ""}
+          </span>
         </span>
         {c.angulos.length > 0 && (
           <span className="mt-0.5 flex min-w-0 flex-col gap-0.5">

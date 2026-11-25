@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { fieldClassSm } from "@/components/ui/field";
 import { filtrarProductos } from "@/lib/meta-ads/topes";
+import type { VistaActividad } from "@/lib/meta-ads/en-marcha";
 import { claveDeProducto } from "@/lib/meta-ads/nombre";
+import { SelectorActividad } from "./selector-actividad";
 import { ordenarPor, type Orden } from "@/lib/meta-ads/orden";
 import { CRITERIOS_GRUPOS } from "@/lib/meta-ads/orden-listas";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -54,7 +56,7 @@ function conclusion(etiqueta: string, dimension: string, grupos: Grupo[], unidad
  * «Qué funciona»: lo que ya se puede dar por cierto, arriba, y debajo cada forma de medir (los datos de los videos, cómo está montada la campaña, el texto y la landing) de mejor a peor CPA, con qué tan seguro es cada
  * resultado. El ángulo de una campaña es la mezcla de los ángulos de sus videos; el de un video lo saca la IA al verlo (o se corrige a mano en su ficha).
  */
-export function QueFunciona({ productos, productoActual, grupos, gruposVideo, videosSinAngulo, ganchosSinTipo, iaConectada, escribe }: { grupos: GruposMeta; gruposVideo: GruposDeVideo; videosSinAngulo: number; ganchosSinTipo: number; iaConectada: boolean; escribe: boolean; /** Los productos con campañas, para ver qué funciona de uno solo. */ productos: { clave: string; nombre: string }[]; productoActual: string | null }) {
+export function QueFunciona({ productos, productoActual, ver, grupos, gruposVideo, videosSinAngulo, ganchosSinTipo, iaConectada, escribe }: { grupos: GruposMeta; gruposVideo: GruposDeVideo; videosSinAngulo: number; ganchosSinTipo: number; iaConectada: boolean; escribe: boolean; /** Los productos con campañas (los que están en marcha primero), para ver qué funciona de uno solo. */ productos: { clave: string; nombre: string; enMarcha: boolean }[]; productoActual: string | null; /** De qué se está aprendiendo cuando no hay un producto elegido. */ ver: VistaActividad }) {
   const router = useRouter();
   const [seccion, setSeccion] = useState<Seccion>("videos");
   const [dimVideo, setDimVideo] = useState<DimensionVideo>("Ángulo");
@@ -96,9 +98,23 @@ export function QueFunciona({ productos, productoActual, grupos, gruposVideo, vi
     else url.searchParams.delete("producto");
     router.push(`${url.pathname}${url.search}`);
   };
+  const elegirVista = (v: VistaActividad) => {
+    const url = new URL(window.location.href);
+    if (v === "activos") url.searchParams.delete("ver");
+    else url.searchParams.set("ver", v);
+    router.push(`${url.pathname}${url.search}`);
+  };
   const nombreProducto = productos.find((p) => p.clave === productoActual)?.nombre ?? null;
   return (
     <div className="flex flex-col gap-6">
+      {!productoActual && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <SelectorActividad etiqueta="De qué productos aprender" vista={ver} alCambiar={elegirVista} textos={{ activos: "En marcha", apagados: "Apagados", todos: "Todo" }} />
+          <p className="m-0 min-w-0 flex-1 basis-64 text-xs text-muted-foreground">
+            {ver === "activos" ? "Lo que funciona en los productos que se están anunciando." : ver === "apagados" ? "Lo que pasó con los productos que ya no se anuncian, en el periodo elegido arriba." : "Todos los productos del periodo elegido arriba."}
+          </p>
+        </div>
+      )}
       <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card px-4 py-2.5">
         <label className="flex items-center gap-2 text-sm">
           <span className="text-xs font-medium text-muted-foreground">Ver por producto</span>
@@ -120,8 +136,8 @@ export function QueFunciona({ productos, productoActual, grupos, gruposVideo, vi
             className={`${fieldClassSm} w-[min(22rem,80vw)]`}
           />
           <datalist id="productos-que-funciona">
-            {filtrarProductos(productos.map((p) => ({ producto: p.nombre })), escrito ?? "").slice(0, 60).map((p) => (
-              <option key={p.producto} value={p.producto} />
+            {filtrarProductos(productos.map((p) => ({ producto: p.nombre, enMarcha: p.enMarcha })), escrito ?? "").slice(0, 60).map((p) => (
+              <option key={p.producto} value={p.producto} label={p.enMarcha ? "En marcha" : "Apagado"} />
             ))}
           </datalist>
         </label>

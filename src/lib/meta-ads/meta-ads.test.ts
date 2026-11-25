@@ -141,9 +141,10 @@ test("sugerencias de campañas: gasta sin comprar, CPA alto, lista para escalar"
       campana({ id: "e", activa: false, r: r({ gasto: 500, compras: 0 }) }),
     ],
   });
-  assert.deepEqual(s.map((x) => x.clave), ["sin_compras:a", "escalar:c", "cpa_alto:b"]);
+  assert.deepEqual(s.map((x) => x.clave), ["sin_compras:a", "cpa_alto:b", "escalar:c"]);
+  assert.deepEqual(s.map((x) => x.prioridad), ["apagar", "actuar", "oportunidad"]);
   assert.equal(s[0].severidad, "alta");
-  assert.equal(s[1].positiva, true);
+  assert.equal(s[2].positiva, true);
 });
 
 test("sugerencias: el CPA de una campaña en escala está subiendo", () => {
@@ -166,7 +167,8 @@ test("sugerencias de videos y de landing", () => {
     campanas: [campana({ id: "l", r: r({ gasto: 30, compras: 12, impresiones: 10000, clics: 300, vioLanding: 400 }) })],
     videos: [
       video({ id: "g", r: r({ gasto: 200, compras: 80, impresiones: 20000, video3s: 9000 }) }),
-      video({ id: "m", r: r({ gasto: 150, compras: 5, impresiones: 20000, video3s: 3000 }) }),
+      video({ id: "m", anunciosDetalle: [{ id: "am", nombre: "V1", activo: true, campanaId: "l", campanaNombre: "PA | X", etapa: "testing", r: sinResultados() }], r: r({ gasto: 150, compras: 5, impresiones: 20000, video3s: 3000 }) }),
+      video({ id: "apagado", r: r({ gasto: 150, compras: 5, impresiones: 20000, video3s: 3000 }) }),
       video({ id: "usado", campanas: 3, r: r({ gasto: 200, compras: 80, impresiones: 20000, video3s: 9000 }) }),
     ],
   });
@@ -352,7 +354,9 @@ test("una campaña con el CPA sobre $12 que no se recupera se propone apagar y d
   const recupera = sugerir({ hoy: "2026-11-25", videos: [], campanas: [c], anuncios, serie: new Map([["c9", [dia("2026-11-23", 55, 5), dia("2026-11-24", 55, 5)]]]) });
   assert.equal(recupera.some((x) => x.tipo === "apagar_campana"), false);
   const alto = recupera.find((x) => x.tipo === "cpa_alto")!;
-  assert.match(alto.accion, /^No la apagues todavía: en los últimos 4 días su CPA ya bajó a \$11\.00, dentro de \$12\.00\. Apaga los anuncios marcados abajo\./);
+  assert.match(alto.accion, /^No la apagues todavía: en los últimos 4 días su CPA ya bajó a \$11\.00, dentro de \$12\.00, y V2 todavía vende a \$8\.00 en 7 días\. Apaga los anuncios marcados abajo y agrega 2 o 3 videos con el ángulo «Postura»\./);
+  assert.deepEqual(recupera.filter((x) => x.tipo === "anuncio_apagar"), [], "los anuncios ya van listados en la tarjeta");
+  assert.deepEqual(mala.filter((x) => x.tipo.startsWith("anuncio_")), [], "una campaña que se apaga no repite sus anuncios");
   assert.match(alto.accion, /se apaga si su CPA pasa de \$12\.00/);
 });
 
@@ -365,4 +369,29 @@ test("el límite para apagar una campaña es $12, o el tope del producto si se d
   const con = (topeDefinido: boolean, tope: number) => sugerir({ hoy: "2026-11-25", videos: [], serie, campanas: [campana({ id: "t", tope, topeDefinido, r: r({ gasto: 300, compras: 20 }) })] }).map((x) => x.tipo);
   assert.ok(con(false, 10).includes("apagar_campana"), "$15 con el tope por defecto: se apaga");
   assert.ok(!con(true, 20).includes("apagar_campana"), "$15 con un tope propio de $20: no");
+});
+
+test("cerca del tope: agregar videos del que sostiene; sin vida: apagar aunque no pase de $12", () => {
+  const dia = (fecha: string, gasto: number, compras: number) => ({ fecha, r: r({ gasto, compras }) });
+  const anuncio = (campanaId: string, numero: string, gasto: number, compras: number, angulo: string | null) => ({ id: `${campanaId}-${numero}`, campanaId, nombre: numero, numero, activo: true, angulo, r: r({ gasto, compras }), r7: r({ gasto, compras }), ultimos2: sinResultados(), ultimoDia: sinResultados() });
+  const cerca = campana({ id: "n", tope: 10, r: r({ gasto: 190, compras: 20 }) });
+  const muerta = campana({ id: "m", tope: 10, r: r({ gasto: 168, compras: 16 }) });
+  const s = sugerir({
+    hoy: "2026-11-25", videos: [], campanas: [cerca, muerta],
+    anuncios: [anuncio("n", "V2", 70, 10, "Energía"), anuncio("m", "V7", 98, 10, "Postura")],
+    serie: new Map([["n", [dia("2026-11-24", 60, 6)]], ["m", [dia("2026-11-24", 60, 5)]]]),
+  });
+  assert.deepEqual(s.map((x) => x.clave), ["apagar_campana:m", "sumar_videos:n"]);
+  assert.match(s[0].accion, /^Apaga la campaña y sustitúyela: ya no tiene vida\. Su CPA de 7 días \(\$10\.50\) pasa del tope y su anuncio que más vende \(V7\) ya va en \$9\.80/);
+  assert.match(s[1].accion, /^Agrega 2 o 3 videos con el ángulo «Energía» \(V2 vende a \$7\.00 con 10 compras\) antes de que la campaña llegue a \$10\.00\./);
+  assert.deepEqual(s[1].cifras!.map((c) => `${c.etiqueta} ${c.valor} ${c.tono ?? ""}`.trim()), ["CPA 7 días $9.50 medio", "Últimos 3 días $10.00 medio", "CPA tope $10.00"]);
+});
+
+test("un CPA que sube de golpe pero con 7 días lejos del tope queda en observación, de último", () => {
+  const dia = (fecha: string, gasto: number, compras: number) => ({ fecha, r: r({ gasto, compras }) });
+  const c = campana({ id: "o", etapa: "venta", tope: 10, r: r({ gasto: 120, compras: 15 }) });
+  const s = sugerir({ hoy: "2026-11-25", videos: [], campanas: [c], serie: new Map([["o", [dia("2026-11-13", 100, 20), dia("2026-11-19", 60, 12), dia("2026-11-23", 45, 3), dia("2026-11-24", 15, 1)]]]) });
+  assert.deepEqual(s.map((x) => `${x.tipo} ${x.prioridad}`), ["cpa_subiendo observar"]);
+  assert.match(s[0].detalle, /Pasó de \$5\.00 .* a \$15\.00 en los últimos 3 días\. En 14 días: de \$5\.00 la semana anterior a \$8\.00 esta semana\./);
+  assert.match(s[0].accion, /^Solo observar: el CPA de 7 días \(\$8\.00\) no pasa del tope de \$10\.00 ni está cerca/);
 });

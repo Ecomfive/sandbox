@@ -1,15 +1,16 @@
 // Anuncios Meta › vista por producto (23 nov 2026, pedido de Alcides): todo lo que se gastó y vendió de cada producto, sumando sus campañas, con sus ángulos y sus videos. Lógica pura, con prueba.
 
+import type { EnMarcha } from "./en-marcha";
 import { claveDeProducto } from "./nombre";
 import { sinResultados, sumar, type Resultados } from "./metricas";
 import type { CampanaVista, ProductoVista, VideoVista } from "./vistas";
 
 /** Los productos de las campañas (sumadas las del periodo), de más a menos gasto. Una campaña sin producto cuenta como «Sin producto». */
-export function agruparProductos(campanas: CampanaVista[], videos: VideoVista[]): ProductoVista[] {
+export function agruparProductos(campanas: CampanaVista[], videos: VideoVista[], enMarcha?: EnMarcha): ProductoVista[] {
   const mapa = new Map<string, ProductoVista>();
   for (const c of campanas) {
     const clave = claveDeProducto(c.producto);
-    const p = mapa.get(clave) ?? { clave, nombre: c.producto?.trim() || "Sin producto", tope: c.tope, topeDefinido: c.topeDefinido, r: sinResultados(), campanas: 0, activas: 0, videos: 0, anuncios: 0 };
+    const p = mapa.get(clave) ?? { clave, nombre: c.producto?.trim() || "Sin producto", tope: c.tope, topeDefinido: c.topeDefinido, r: sinResultados(), campanas: 0, activas: 0, enMarcha: false, videos: 0, anuncios: 0 };
     p.r = sumar(p.r, c.r);
     p.campanas++;
     if (c.activa) p.activas++;
@@ -17,7 +18,10 @@ export function agruparProductos(campanas: CampanaVista[], videos: VideoVista[])
   }
   const videosDe = new Map<string, number>();
   for (const v of videos) videosDe.set(claveDeProducto(v.producto), (videosDe.get(claveDeProducto(v.producto)) ?? 0) + 1);
-  for (const p of mapa.values()) p.videos = videosDe.get(p.clave) ?? 0;
+  for (const p of mapa.values()) {
+    p.videos = videosDe.get(p.clave) ?? 0;
+    p.enMarcha = enMarcha ? enMarcha.productos.includes(p.clave) : p.activas > 0;
+  }
   return [...mapa.values()].sort((a, b) => b.r.gasto - a.r.gasto);
 }
 

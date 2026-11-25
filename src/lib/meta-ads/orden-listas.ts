@@ -2,11 +2,13 @@
 // sale el valor); para una métrica nueva, en `columnas.ts`, que la ofrece en todas. Lógica pura, con prueba.
 
 import { criterioMejor, criteriosDeMetricas, type CriterioOrden, type Orden, type ResultadosDeFila } from "./orden";
+import { ordenDePrioridad, type Pendiente } from "./prioridad";
 import type { CampanaVista, Grupo, ProductoVista, VideoVista } from "./vistas";
 
 const nombre = <F>(de: (f: F) => string): CriterioOrden<F> => ({ valor: "nombre", etiqueta: "Nombre", grupo: "Otros", sentido: "asc", de: (f) => de(f).toLocaleLowerCase("es") });
 const cuenta = <F>(valor: string, etiqueta: string, de: (f: F) => number | null): CriterioOrden<F> => ({ valor, etiqueta, grupo: "Otros", sentido: "desc", de });
-const todos = <F>(de: ResultadosDeFila<F>, propios: CriterioOrden<F>[], sinFrecuencia: boolean): CriterioOrden<F>[] => [criterioMejor(de), ...criteriosDeMetricas(de, sinFrecuencia), ...propios];
+const prioridad = <F extends { pendiente?: Pendiente | null }>(): CriterioOrden<F> => ({ valor: "prioridad", etiqueta: "Prioridad (lo que pide atención primero)", grupo: "Recomendado", sentido: "asc", de: (f) => ordenDePrioridad(f.pendiente) });
+const todos = <F extends { pendiente?: Pendiente | null }>(de: ResultadosDeFila<F>, propios: CriterioOrden<F>[], sinFrecuencia: boolean): CriterioOrden<F>[] => [prioridad<F>(), criterioMejor(de), ...criteriosDeMetricas(de, sinFrecuencia), ...propios];
 
 export const CRITERIOS_CAMPANAS: CriterioOrden<CampanaVista>[] = todos<CampanaVista>(
   (c) => ({ r: c.r, ctx: { tope: c.tope, etapa: c.etapa, frecuencia: c.frecuencia } }),
@@ -35,6 +37,6 @@ export const CRITERIOS_GRUPOS: CriterioOrden<Grupo>[] = [
   nombre<Grupo>((g) => g.nombre),
 ];
 
-export const ORDEN_CAMPANAS: Orden[] = [{ criterio: "gasto", sentido: "desc" }];
-export const ORDEN_PRODUCTOS: Orden[] = [{ criterio: "gasto", sentido: "desc" }];
-export const ORDEN_VIDEOS: Orden[] = [{ criterio: "mejor", sentido: "asc" }];
+export const ORDEN_CAMPANAS: Orden[] = [{ criterio: "prioridad", sentido: "asc" }, { criterio: "gasto", sentido: "desc" }];
+export const ORDEN_PRODUCTOS: Orden[] = [{ criterio: "prioridad", sentido: "asc" }, { criterio: "gasto", sentido: "desc" }];
+export const ORDEN_VIDEOS: Orden[] = [{ criterio: "prioridad", sentido: "asc" }, { criterio: "mejor", sentido: "asc" }];
