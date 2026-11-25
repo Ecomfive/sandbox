@@ -12,7 +12,7 @@ import type { CuentaRepartidorFila } from "../repartidores-actions";
 export const metadata = { title: "Cuentas de repartidores" };
 export const dynamic = "force-dynamic";
 
-/** Despacho ciudad › Cuentas de repartidores (24 nov 2026, migración 0362): solo administradores. */
+/** Envíos Delivery › Cuentas de repartidores (24 nov 2026, migración 0362): solo administradores. */
 export default async function CuentasRepartidoresPage() {
   const usuario = await requireModulo("despacho-ciudad");
   if (!esAdministrador(usuario)) notFound();
@@ -30,7 +30,7 @@ export default async function CuentasRepartidoresPage() {
     <Pagina ancho="ancha" className="flex flex-col gap-4">
       <EncabezadoPagina titulo="Cuentas de repartidores">
         Una cuenta por delivery para entrar a su panel desde el celular: ve solo su ruta del día y lo que marca (entregado, pospuesto o fallido, con el cobro y
-        las fotos) aparece al instante en Despacho ciudad. Entran por la misma página de inicio de sesión y llegan directo a su panel.
+        las fotos) aparece al instante en Envíos Delivery. Entran por la misma página de inicio de sesión y llegan directo a su panel.
       </EncabezadoPagina>
       {error ? (
         <p role="alert" className="m-0 rounded-lg border border-border bg-card px-4 py-3 text-sm text-destructive">

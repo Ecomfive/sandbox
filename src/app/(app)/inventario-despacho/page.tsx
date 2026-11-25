@@ -3,23 +3,24 @@ import { ResponderCuantoHay } from "@/components/cuanto-hay/responder";
 import { anilloFoco } from "@/components/ui/field";
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
-import { requireModulo } from "@/lib/auth";
+import { requirePanel } from "@/lib/auth";
 import { cargarPreguntasDespacho, cargarTiendasCuantoHay, contarAbiertas } from "@/lib/cuanto-hay/datos";
 import { PROVEEDURIA, agruparPorTienda, tiendasDePersona } from "@/lib/cuanto-hay/reglas";
 import { cargarTiendasPermitidas } from "@/lib/finanzas/cargar-tiendas-permitidas";
 import { createServiceClient } from "@/lib/supabase/server";
 
-export const metadata = { title: "Responder cuánto hay" };
+export const metadata = { title: "Mercancía existente" };
 
 export const dynamic = "force-dynamic";
 
 /**
- * Gestión de tienda › Responder cuánto hay (16 nov 2026, migración 0302; prototipo aprobado: https://claude.ai/artifact/BK449CDGnYApU2eQ9BqvxL).
+ * Inventario despacho › Mercancía existente (antes «Responder cuánto hay»; 16 nov 2026, migración 0302; prototipo aprobado: https://claude.ai/artifact/BK449CDGnYApU2eQ9BqvxL).
  * El panel de Yiletsi: las preguntas de todas las tiendas, agrupadas por tienda (botones para ver una sola); escribe la cantidad que contó
  * despacho y «Responder» se la manda a quien preguntó. «Respondidas» muestra las de los últimos 7 días.
  */
 export default async function ResponderCuantoHayPage({ searchParams }: { searchParams: Promise<{ [k: string]: string | string[] | undefined }> }) {
-  const usuario = await requireModulo("despacho-cuanto-hay");
+  // La entrada del menú junta tres pestañas: quien solo tiene las solicitudes cae en la suya en vez de quedar fuera.
+  const usuario = await requirePanel("/inventario-despacho", "despacho-cuanto-hay");
   const sp = await searchParams;
   const respondidas = sp.ver === "respondidas";
   const supabase = createServiceClient();
@@ -46,11 +47,11 @@ export default async function ResponderCuantoHayPage({ searchParams }: { searchP
     if (tienda) q.set("tienda", tienda);
     if (ver) q.set("ver", "respondidas");
     const s = q.toString();
-    return `/despacho-ciudad/cuanto-hay${s ? `?${s}` : ""}`;
+    return `/inventario-despacho${s ? `?${s}` : ""}`;
   };
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-4">
-      <EncabezadoPagina titulo="Responder cuánto hay" oculto>
+      <EncabezadoPagina titulo="Mercancía existente" oculto>
         Lo que preguntan las tiendas y Proveeduría: manda a contar a despacho, escribe la cantidad y responde. La respuesta le llega a quien preguntó y el inventario de Despacho queda en esa cantidad; si te equivocas, vuelve a responder con «Corregir».
       </EncabezadoPagina>
       {faltaMigracion ? (

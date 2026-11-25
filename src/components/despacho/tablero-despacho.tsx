@@ -67,7 +67,7 @@ const th = "sticky top-0 z-[1] border-b border-border bg-muted px-2 py-2 text-le
 const td = "relative h-[38px] border-r border-b border-border/60 bg-card p-0 whitespace-nowrap";
 
 /**
- * El tablero de Despacho ciudad o de Devoluciones (15 nov 2026), con las funciones de Monday: vista por repartidor (o por tienda en devoluciones), grupos
+ * El tablero de Envíos Delivery o de Devoluciones (15 nov 2026), con las funciones de Monday: vista por repartidor (o por tienda en devoluciones), grupos
  * que se abren y se cierran, etiquetas de colores que se cambian con un toque, celdas que se escriben, filas que se arrastran a otro día o grupo, sumas
  * al pie, búsqueda y filtros, y el panel de cada fila con sus actualizaciones, su actividad y el comprobante.
  */

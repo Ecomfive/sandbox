@@ -315,7 +315,7 @@ export function FormularioSolicitud({ personas, hoy, puedeCuentas, usuarioId }: 
             <label className="flex items-start gap-2.5 text-[13px]">
               <input type="checkbox" checked={programar} onChange={(e) => setProgramar(e.target.checked)} className="mt-1" />
               <span>
-                <b>Programarla ya en Despacho ciudad</b> para la fecha acordada (crea la fila del reparto con forma de pago {formaPagoDespacho(tipos, enviarElegido.length > 0)}). Al entregarse, la solicitud pasa a Hecho sola.
+                <b>Programarla ya en Envíos Delivery</b> para la fecha acordada (crea la fila del reparto con forma de pago {formaPagoDespacho(tipos, enviarElegido.length > 0)}). Al entregarse, la solicitud pasa a Hecho sola.
               </span>
             </label>
           )}

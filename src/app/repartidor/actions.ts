@@ -18,7 +18,7 @@ import { createAnonClient, createServiceClient, createSessionClient } from "@/li
 import { actualizarEntregas } from "@/lib/tienda/actualizar-entregas";
 
 // Panel del repartidor (24 nov 2026, prototipo aprobado https://claude.ai/artifact/TyFwhvTgvLJjsN6cM5GyEc). Lo que marca escribe en la misma fila de
-// Despacho ciudad (`mon_despachos`), con las mismas reglas que el tablero: ENTREGADO actualiza el pedido, el cobro y su solicitud de Cambios. Cada acción
+// Envíos Delivery (`mon_despachos`), con las mismas reglas que el tablero: ENTREGADO actualiza el pedido, el cobro y su solicitud de Cambios. Cada acción
 // vuelve a comprobar que la fila es suya (por su nombre de repartidor) y de hoy o de los dos días anteriores; nada se toma del navegador.
 
 type Resultado = { error?: string };
@@ -48,7 +48,7 @@ async function frenado(cuenta: CuentaRepartidor): Promise<boolean> {
   return !(await limitar(claveLimite("repartidor", cuenta.id, (await ipDeLaPeticion()) ?? "sin-ip"), LIMITES.mensajero));
 }
 
-/** La fila, solo si es del repartidor de la sesión, de Despacho ciudad, sin archivar y de un día permitido. */
+/** La fila, solo si es del repartidor de la sesión, de Envíos Delivery, sin archivar y de un día permitido. */
 async function filaDelRepartidor(itemId: string): Promise<{ supabase: Supabase; cuenta: CuentaRepartidor; fila: Record<string, unknown> } | { error: string }> {
   const cuenta = await conCuenta();
   if (!cuenta) return SIN_SESION as { error: string };
@@ -102,7 +102,7 @@ const sello = () => {
 
 function actualizarPedidosDespues(cuenta: CuentaRepartidor) {
   after(async () => {
-    await actualizarEntregas(createServiceClient(), `${quien(cuenta)} (Despacho ciudad)`, Date.now() + 25_000).catch(() => null);
+    await actualizarEntregas(createServiceClient(), `${quien(cuenta)} (Envíos Delivery)`, Date.now() + 25_000).catch(() => null);
   });
 }
 

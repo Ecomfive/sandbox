@@ -243,7 +243,7 @@ export async function guardarCuentaCaso(itemId: string, datos: string): Promise<
   return {};
 }
 
-/** Programa la solicitud en Despacho ciudad: crea la fila del reparto (forma de pago CAMBIO, RETIRO o COMPLEMENTO) para `dia`. */
+/** Programa la solicitud en Envíos Delivery: crea la fila del reparto (forma de pago CAMBIO, RETIRO o COMPLEMENTO) para `dia`. */
 export async function programarEnDespacho(itemId: string, dia: string): Promise<Resultado> {
   const r = await casoConPermiso(itemId);
   if ("error" in r) return r;
@@ -255,7 +255,7 @@ async function programar(supabase: Supabase, fila: Record<string, unknown>, dia:
   const itemId = String(fila.item_id);
   if (fila.despacho_item_id) {
     const { data: ya } = await supabase.from("mon_despachos").select("item_id, archivado_en").eq("item_id", fila.despacho_item_id as string).maybeSingle();
-    if (ya && !ya.archivado_en) return { error: "Ya está programada en Despacho ciudad." };
+    if (ya && !ya.archivado_en) return { error: "Ya está programada en Envíos Delivery." };
   }
   const tipos = (fila.tipos as string[] | null) ?? [];
   const forma = formaPagoDespacho(tipos, !!fila.enviar);
@@ -289,8 +289,8 @@ async function programar(supabase: Supabase, fila: Record<string, unknown>, dia:
   if (error) return { error: "No se pudo crear el reparto." };
   await supabase.from("despacho_actividad").insert({ item_id: despachoId, texto: `Creada desde Cambios y reembolsos: ${String(fila.nombre).slice(0, 300)}`, autor_id: autor.id, autor_nombre: autor.nombre });
   const diaTexto = `${dia.slice(8, 10)}/${dia.slice(5, 7)}`;
-  await supabase.from("mon_postventa").update({ despacho_item_id: despachoId, seguimiento: `Programado en Despacho ciudad ${diaTexto}`, ...selloCaso(autor) }).eq("item_id", itemId);
-  await registrarCaso(supabase, itemId, autor, `Programada en Despacho ciudad para el ${diaTexto}`);
+  await supabase.from("mon_postventa").update({ despacho_item_id: despachoId, seguimiento: `Programado en Envíos Delivery ${diaTexto}`, ...selloCaso(autor) }).eq("item_id", itemId);
+  await registrarCaso(supabase, itemId, autor, `Programada en Envíos Delivery para el ${diaTexto}`);
   revalidar();
   return {};
 }
@@ -422,7 +422,7 @@ const lineasLimpias = (l: unknown): Linea[] =>
     .filter((x) => x.producto && Number.isFinite(x.cantidad) && x.cantidad > 0 && x.cantidad < 1000)
     .slice(0, 20);
 
-/** Crea una solicitud con el formulario: arma el nombre y el texto de siempre, la enlaza al pedido y, si se pide, la programa en Despacho ciudad. */
+/** Crea una solicitud con el formulario: arma el nombre y el texto de siempre, la enlaza al pedido y, si se pide, la programa en Envíos Delivery. */
 export async function crearSolicitud(d: NuevaSolicitud): Promise<Resultado & { itemId?: string }> {
   const usuario = await requireModuloEscritura(MODULO);
   const autor = autorDe(usuario);
@@ -443,7 +443,7 @@ export async function crearSolicitud(d: NuevaSolicitud): Promise<Resultado & { i
   const envioPaga = d.envioPaga === "cliente" ? "cliente" : "empresa";
   if (d.fecha && !esDia(d.fecha)) return { error: "Fecha no válida." };
   if (d.responsableId && !esUuid(d.responsableId)) return { error: "Persona no válida." };
-  if (d.programar && !d.fecha) return { error: "Para programarla en Despacho ciudad, elige la fecha." };
+  if (d.programar && !d.fecha) return { error: "Para programarla en Envíos Delivery, elige la fecha." };
   const datos: DatosSolicitud = { tienda: d.tienda, numero, tipos, retirar, enviar, reembolso, reembolsoComo: d.reembolsoComo ? String(d.reembolsoComo).slice(0, 40) : null, motivo, detalle, costoEnvio, enviaPaga: envioPaga };
   const supabase = createServiceClient();
   const enlace = await enlazar(supabase, `#${numero}`, d.tienda);

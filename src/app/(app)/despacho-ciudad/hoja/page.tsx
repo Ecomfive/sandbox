@@ -12,7 +12,7 @@ export const metadata = { title: "Hoja del día" };
 export const dynamic = "force-dynamic";
 
 /**
- * Despacho ciudad › Hoja del día (16 nov 2026): los pedidos que Despacho cargó para un día, por repartidor, solo con las columnas del tablero de cada
+ * Envíos Delivery › Hoja del día (16 nov 2026): los pedidos que Despacho cargó para un día, por repartidor, solo con las columnas del tablero de cada
  * repartidor en Monday y los comprobantes (se ven aquí mismo). Se imprime o se baja en Excel, de respaldo si se cae la conexión.
  */
 export default async function HojaDiaPage({ searchParams }: { searchParams: Promise<{ [k: string]: string | string[] | undefined }> }) {
@@ -35,7 +35,7 @@ export default async function HojaDiaPage({ searchParams }: { searchParams: Prom
       </EncabezadoPagina>
       {faltaMigracion ? (
         <p role="alert" className="m-0 rounded-lg border border-border bg-card px-4 py-3 text-sm text-destructive">
-          Falta correr en Supabase la migración 0970 (Despacho ciudad).
+          Falta correr en Supabase la migración 0970 (Envíos Delivery).
         </p>
       ) : (
         <HojaDia

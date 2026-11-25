@@ -1,6 +1,6 @@
-// Panel del repartidor (24 nov 2026): lo que lee su ruta del día de `mon_despachos` (la misma fila de Despacho ciudad), con el cliente, la dirección,
+// Panel del repartidor (24 nov 2026): lo que lee su ruta del día de `mon_despachos` (la misma fila de Envíos Delivery), con el cliente, la dirección,
 // los productos y la última nota del equipo de cada pedido, y su cierre del día si ya lo envió. Solo servidor: quien llama ya tiene la cuenta
-// (`requireRepartidor`); el repartidor se filtra por su nombre en Despacho ciudad, nunca por lo que mande el navegador.
+// (`requireRepartidor`); el repartidor se filtra por su nombre en Envíos Delivery, nunca por lo que mande el navegador.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { aFila, COLUMNAS_DESPACHO, COLUMNAS_PANEL, tableroConsolidado } from "./datos";
@@ -46,7 +46,7 @@ export interface RutaDelDia {
   faltaMigracion: boolean;
 }
 
-/** La ruta del repartidor en un día (AAAA-MM-DD): sus filas de Despacho ciudad, sin archivadas ni repetidas (consolidado y su tablero). */
+/** La ruta del repartidor en un día (AAAA-MM-DD): sus filas de Envíos Delivery, sin archivadas ni repetidas (consolidado y su tablero). */
 export async function cargarRuta(supabase: SupabaseClient, cuenta: CuentaRepartidor, dia: string): Promise<RutaDelDia> {
   const { data, error } = await supabase
     .from("mon_despachos")

@@ -11,10 +11,10 @@ import { avisoTrasClaveNueva, avisoTrasSuspender, detalleSalida } from "@/lib/se
 import { bloquearIngreso, cerrarSesionesDe, sacarDelSistema } from "@/lib/seguridad/sesiones-cuenta";
 import { createServiceClient } from "@/lib/supabase/server";
 
-// Panel del repartidor (24 nov 2026, migración 0362), lo que hace Despacho ciudad:
+// Panel del repartidor (24 nov 2026, migración 0362), lo que hace Envíos Delivery:
 //   * Las cuentas de los repartidores (solo un administrador): crear con una clave temporal que se muestra una vez, darle una nueva o desactivarla,
-//     igual que las cuentas del portal del proveedor. Cada cuenta va unida a su nombre de repartidor en Despacho ciudad.
-//   * Los cierres del día: Soporte (edición de Despacho ciudad) valida o devuelve con una nota.
+//     igual que las cuentas del portal del proveedor. Cada cuenta va unida a su nombre de repartidor en Envíos Delivery.
+//   * Los cierres del día: Soporte (edición de Envíos Delivery) valida o devuelve con una nota.
 
 const ALFABETO = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
 const claveTemporal = (largo = 14) => Array.from({ length: largo }, () => ALFABETO[randomInt(ALFABETO.length)]).join("");
@@ -36,7 +36,7 @@ export interface CuentaRepartidorFila {
   ultimoIngreso: string | null;
 }
 
-/** Crea la cuenta de un repartidor (unida a su nombre en Despacho ciudad) y devuelve su clave temporal. */
+/** Crea la cuenta de un repartidor (unida a su nombre en Envíos Delivery) y devuelve su clave temporal. */
 export async function crearCuentaRepartidor(courier: string, nombre: string, email: string): Promise<{ error?: string; clave?: string; cuenta?: CuentaRepartidorFila }> {
   const admin = await exigirAdministrador();
   if (!admin) return { error: "Solo un administrador crea las cuentas de los repartidores." };

@@ -194,7 +194,7 @@ export function CierreDia({
         <button type="button" onClick={enviar} disabled={bloqueado || enviando} className="min-h-[52px] rounded-xl bg-primario text-base font-bold text-white disabled:opacity-50">
           {enviando ? "Enviando…" : validado ? "Cierre validado" : !seEnvia ? "Este día ya no se envía desde el panel" : cierre ? "Volver a enviar a Soporte" : "Enviar cierre a Soporte"}
         </button>
-        <span className="text-center text-xs text-[#636363]">Soporte lo valida en Despacho ciudad y te llega la confirmación.</span>
+        <span className="text-center text-xs text-[#636363]">Soporte lo valida en Envíos Delivery y te llega la confirmación.</span>
       </div>
       <NavRepartidor activa="cierre" consulta={consultaDia(dia, hoy)} />
     </div>

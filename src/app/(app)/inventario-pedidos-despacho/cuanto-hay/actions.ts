@@ -16,7 +16,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 
 const MODULO_TIENDA = "tienda-cuanto-hay";
 const MODULO_DESPACHO = "despacho-cuanto-hay";
-const RUTAS = ["/inventario-pedidos-despacho/cuanto-hay", "/despacho-ciudad/cuanto-hay"];
+const RUTAS = ["/inventario-pedidos-despacho/cuanto-hay", "/inventario-despacho"];
 const ES_UUID = (v: unknown): v is string => typeof v === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 const SIN_MIGRACION = "Falta correr en Supabase la migración 0302 («¿Cuánto hay?»).";
 const SIN_MIGRACION_FOTOS = "Falta correr en Supabase la migración 0342 (fotos reales en «Cuánto hay»).";
@@ -69,7 +69,7 @@ export async function preguntarCuantoHay(tiendaId: string, skuId: string, nota: 
     if (destinos.length)
       await supabase
         .from("notificaciones_usuario")
-        .insert(destinos.map((id) => ({ usuario_id: id, tipo: "tarea", titulo: aviso.titulo, texto: aviso.texto, href: "/despacho-ciudad/cuanto-hay", autor_id: u.id, autor_nombre: nombreDe(u) })));
+        .insert(destinos.map((id) => ({ usuario_id: id, tipo: "tarea", titulo: aviso.titulo, texto: aviso.texto, href: "/inventario-despacho", autor_id: u.id, autor_nombre: nombreDe(u) })));
     for (const r of RUTAS) revalidatePath(r);
     return { ok: true as const };
   });

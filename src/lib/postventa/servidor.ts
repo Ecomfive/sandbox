@@ -1,5 +1,5 @@
 // Cambios y reembolsos (migración 0972), del lado del servidor: aplicar un estado con sus automatizaciones (cambiar de grupo, Notificar al cliente,
-// borrar los datos del reembolso al terminar, avisos en la campana), pasar a Hecho la solicitud cuando su reparto se entrega en Despacho ciudad y las
+// borrar los datos del reembolso al terminar, avisos en la campana), pasar a Hecho la solicitud cuando su reparto se entrega en Envíos Delivery y las
 // reglas de cada mañana. Las decisiones son puras (`reglas.ts`); aquí solo se lee y se escribe.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -49,12 +49,12 @@ export async function aplicarEstado(supabase: SupabaseClient, fila: Record<strin
   return { set };
 }
 
-/** Cuando el reparto de una solicitud se marca ENTREGADO en Despacho ciudad, la solicitud pasa a Hecho (con sus automatizaciones). */
+/** Cuando el reparto de una solicitud se marca ENTREGADO en Envíos Delivery, la solicitud pasa a Hecho (con sus automatizaciones). */
 export async function hechoDesdeDespacho(supabase: SupabaseClient, despachoItemId: string, autor: Autor): Promise<void> {
   const { data } = await supabase.from("mon_postventa").select("*").eq("despacho_item_id", despachoItemId).is("archivado_en", null);
   for (const fila of (data ?? []) as Record<string, unknown>[]) {
     if (fila.estado === "Hecho") continue;
-    await aplicarEstado(supabase, fila, "Hecho", { ...autor, nombre: `${autor.nombre} (entregado en Despacho ciudad)` });
+    await aplicarEstado(supabase, fila, "Hecho", { ...autor, nombre: `${autor.nombre} (entregado en Envíos Delivery)` });
   }
 }
 

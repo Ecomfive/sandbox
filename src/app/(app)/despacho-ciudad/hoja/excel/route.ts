@@ -7,7 +7,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 
 /**
  * La hoja del día en Excel (`?dia=AAAA-MM-DD`, opcional `&repartidor=`): una hoja por repartidor con las columnas de Monday y sus totales. Solo para
- * quien tiene Despacho ciudad.
+ * quien tiene Envíos Delivery.
  */
 export async function GET(req: NextRequest) {
   const usuario = await getUsuarioActual();

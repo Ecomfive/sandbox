@@ -7,7 +7,7 @@ import { guardarTiendasUsuario, listarTiendasParaPermisos } from "./actions";
 /**
  * «Tiendas» en la ficha de una persona: todas o solo las marcadas. Con tiendas limitadas, el Estado de resultados, el Panel, Rentabilidad,
  * Ventas por tienda y el Libro solo muestran esas tiendas; desde el 17 nov 2026 también Gestión de tienda (Pedidos, Dashboard, Confirmación,
- * Logística, Productos), Despacho ciudad, Devoluciones y Cambios y reembolsos (la gente de una tienda cliente, como Nuvo). Se guarda al instante.
+ * Logística, Productos), Envíos Delivery, Devoluciones y Cambios y reembolsos (la gente de una tienda cliente, como Nuvo). Se guarda al instante.
  */
 export function TiendasPersona({ id, nombre, inicial }: { id: string; nombre: string; inicial: string[] | null | undefined }) {
   const { mostrarToast } = useToast();

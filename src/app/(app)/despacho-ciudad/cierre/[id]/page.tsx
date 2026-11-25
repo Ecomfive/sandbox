@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 const nombreBonito = (t: string) => t.toLowerCase().replace(/(^|\s)\p{L}/gu, (l) => l.toUpperCase());
 
 /**
- * Despacho ciudad › Reporte de pago de un repartidor (24 nov 2026): el cierre de su día con cada pedido, si se le paga (entregado o fallido con
+ * Envíos Delivery › Reporte de pago de un repartidor (24 nov 2026): el cierre de su día con cada pedido, si se le paga (entregado o fallido con
  * evidencia) y lo que deposita por tienda. Se imprime o se guarda en PDF.
  */
 export default async function ReportePagoPage({ params }: { params: Promise<{ id: string }> }) {
@@ -37,7 +37,7 @@ export default async function ReportePagoPage({ params }: { params: Promise<{ id
       </EncabezadoPagina>
       <div className="flex flex-wrap items-center gap-2 print:hidden">
         <Link href={`/despacho-ciudad?desde=${c.dia}&hasta=${c.dia}`} className="text-sm font-medium text-primario">
-          ← Volver a Despacho ciudad
+          ← Volver a Envíos Delivery
         </Link>
         <span className="ml-auto">
           <BotonImprimir />

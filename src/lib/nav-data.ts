@@ -120,12 +120,14 @@ const AREAS: NavSection[] = [
       { label: "Gestión de IDs Drop", href: "/publicaciones-drop", frente: "proveeduria" },
       { label: "Gestión de IDs Effi", href: "/publicaciones-effi", frente: "proveeduria" },
       { label: "Gestión de IDs Dunamixfy", href: "/publicaciones-dunamixfy", frente: "proveeduria" },
-      // Gestión de tienda (17 nov 2026, pedido de Hernán: «que no esté todo repartido»): tres entradas y lo demás son pestañas de ellas
-      // (`PESTANAS_POR_MODULO`). Pedidos: Confirmación, Con IA, Logística y Cuánto hay. Despacho ciudad, como el panel de Monday: Devoluciones,
-      // Cambios y reembolsos, Cuánto hay y Pedir a inventario. Tiendas Shopify: Productos. Cada pestaña sigue con su propio permiso.
+      // Gestión de tienda (17 nov 2026, pedido de Hernán: «que no esté todo repartido»): pocas entradas y lo demás son pestañas de ellas
+      // (`PESTANAS_POR_MODULO`). Pedidos: Confirmación, Con IA, Logística y Cuánto hay. Envíos Delivery, como el panel de Monday: Devoluciones y
+      // Cambios y reembolsos. Inventario despacho (aparte desde el 25 nov 2026): Mercancía existente, Solicitud de inventario y Archivos de solicitudes. Tiendas Shopify: Productos. Cada pestaña sigue con su propio permiso.
       { label: "Pedidos de tienda", href: "/tienda-pedidos", frente: "tienda" },
       { label: "Reportería de pedidos", href: "/tienda-reporteria", frente: "tienda" },
-      { label: "Despacho ciudad", href: "/despacho-ciudad", frente: "tienda" },
+      { label: "Envíos Delivery", href: "/despacho-ciudad", frente: "tienda" },
+      // Inventario despacho (25 nov 2026, pedido del equipo: «no es lo mismo que los envíos»): lo del stock de despacho, aparte.
+      { label: "Inventario despacho", href: "/inventario-despacho", frente: "tienda" },
       { label: "Tiendas Shopify", href: "/tienda-tiendas", frente: "tienda" },
       { label: "Alertas de inventario", href: "/alertas", dropi: true, frente: "fulfillment" },
       { label: "Inventario", href: "/inventario", dropi: true, frente: "fulfillment" },
@@ -267,8 +269,11 @@ export function paginaInicialDe(modulos: readonly string[], excluirModulo?: stri
 
 /** Clave de módulo (permisos) correspondiente a un href de navegación. */
 export function moduloDeHref(href: string): string {
-  return href === "/" ? "dashboard" : href.slice(1);
+  return href === "/" ? "dashboard" : (MODULO_DE_ENTRADA[href] ?? href.slice(1));
 }
+
+/** Entradas del menú cuyo nombre de ruta no es un módulo: «Inventario despacho» junta pestañas de dos permisos y su página principal pide el de «Mercancía existente». */
+const MODULO_DE_ENTRADA: Record<string, string> = { "/inventario-despacho": "despacho-cuanto-hay" };
 
 /**
  * Las entradas del menú que juntan varios módulos en pestañas (17 nov 2026): cada pestaña con el módulo que pide, en el orden de las pestañas.
@@ -294,9 +299,11 @@ export const PESTANAS_CON_MODULO: Record<string, { href: string; modulo: string 
     { href: "/despacho-ciudad", modulo: "despacho-ciudad" },
     { href: "/despacho-ciudad/devoluciones", modulo: "despacho-devoluciones" },
     { href: "/despacho-ciudad/cambios", modulo: "despacho-cambios" },
-    { href: "/despacho-ciudad/cuanto-hay", modulo: "despacho-cuanto-hay" },
-    { href: "/despacho-ciudad/pedir-inventario", modulo: "despacho-pedir-inventario" },
-    { href: "/despacho-ciudad/pedir-inventario/archivo", modulo: "despacho-pedir-inventario" },
+  ],
+  "/inventario-despacho": [
+    { href: "/inventario-despacho", modulo: "despacho-cuanto-hay" },
+    { href: "/inventario-despacho/solicitudes", modulo: "despacho-pedir-inventario" },
+    { href: "/inventario-despacho/archivo", modulo: "despacho-pedir-inventario" },
   ],
   "/tienda-tiendas": [
     { href: "/tienda-tiendas", modulo: "tienda-tiendas" },

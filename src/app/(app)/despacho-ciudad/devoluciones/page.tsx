@@ -31,7 +31,7 @@ export default async function DevolucionesPage({ searchParams }: { searchParams:
       </EncabezadoPagina>
       {faltaMigracion ? (
         <p role="alert" className="m-0 rounded-lg border border-border bg-card px-4 py-3 text-sm text-destructive">
-          Falta correr en Supabase las migraciones 0970 y 0971 (Despacho ciudad).
+          Falta correr en Supabase las migraciones 0970 y 0971 (Envíos Delivery).
         </p>
       ) : (
         <>

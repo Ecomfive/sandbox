@@ -1,5 +1,5 @@
 // Panel del repartidor: la sesión de una cuenta de repartidor. Toda página y acción del panel empieza con `requireRepartidor` o
-// `cuentaRepartidorActual`; el repartidor (y su nombre en Despacho ciudad) sale de la base, nunca de lo que mande el navegador. Solo servidor.
+// `cuentaRepartidorActual`; el repartidor (y su nombre en Envíos Delivery) sale de la base, nunca de lo que mande el navegador. Solo servidor.
 
 import { redirect } from "next/navigation";
 import { cache } from "react";

@@ -78,7 +78,7 @@ async function enlazar(supabase: Supabase, numero: string | null, tienda: string
 /** Tras un cambio que toca la entrega del pedido (estado, asesores, pago), se actualizan los pedidos después de responder. */
 function actualizarPedidosDespues(usuario: UsuarioActual) {
   after(async () => {
-    await actualizarEntregas(createServiceClient(), `${quien(usuario)} (Despacho ciudad)`, Date.now() + 25_000).catch(() => null);
+    await actualizarEntregas(createServiceClient(), `${quien(usuario)} (Envíos Delivery)`, Date.now() + 25_000).catch(() => null);
   });
 }
 

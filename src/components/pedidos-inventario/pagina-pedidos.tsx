@@ -9,13 +9,16 @@ import { obtenerOpcionesSkuMaestro } from "@/lib/wms/skus-maestros";
 import { LeyendaPedidos, NuevoPedido, TablaPedidos, TableroPedidos } from "./pedidos";
 
 /**
- * Las dos páginas de «Pedir a inventario» (16 nov 2026, migración 0305; prototipo aprobado https://claude.ai/artifact/ReVGwYZrBG11rmKFUT7V5T):
+ * Las páginas de «Solicitud de inventario» (despacho) y «Solicitudes de despacho» (inventario) (16 nov 2026, migración 0305; prototipo aprobado https://claude.ai/artifact/ReVGwYZrBG11rmKFUT7V5T):
  * los contadores por estado (filtran la tabla con `?estado=`), la tabla del Excel y la leyenda. Despacho además hace pedidos nuevos;
  * inventario ve lo que hay en la bodega de donde sale y envía.
  */
 export async function PaginaPedidos({ modo, usuario, estado, archivados = false }: { modo: "despacho" | "inventario"; usuario: UsuarioActual; estado: string | undefined; archivados?: boolean }) {
   const modulo = modo === "despacho" ? "despacho-pedir-inventario" : "inventario-pedidos-despacho";
-  const ruta = modo === "despacho" ? "/despacho-ciudad/pedir-inventario" : "/inventario-pedidos-despacho";
+  const ruta = modo === "despacho" ? "/inventario-despacho/solicitudes" : "/inventario-pedidos-despacho";
+  const rutaArchivo = modo === "despacho" ? "/inventario-despacho/archivo" : `${ruta}/archivo`;
+  // Despacho habla de «solicitudes»; inventario, de «pedidos».
+  const tituloArchivo = modo === "despacho" ? "Archivos de solicitudes" : "Archivo de pedidos";
   const puedeEscribir = !usuario.modulosSoloLectura.includes(modulo);
   const supabase = createServiceClient();
   const [{ pedidos, faltaMigracion, totalArchivados, sinArchivo }, bodegas] = await Promise.all([cargarPedidos(supabase, { archivados }), cargarBodegasPedido(supabase)]);
@@ -50,14 +53,14 @@ export async function PaginaPedidos({ modo, usuario, estado, archivados = false 
 
   return (
     <Pagina ancho="ancha" className="flex flex-col gap-4">
-      <EncabezadoPagina titulo={archivados ? "Archivo de pedidos" : modo === "despacho" ? "Pedir a inventario" : "Solicitudes de despacho"} oculto>
+      <EncabezadoPagina titulo={archivados ? tituloArchivo : modo === "despacho" ? "Solicitud de inventario" : "Solicitudes de despacho"} oculto>
         {modo === "despacho"
           ? "Pide a inventario lo que se agotó en despacho. Te avisa en «Para ti» cuando lo prepara y cuando lo envía; al llegar, márcalo «Recibido»."
           : "Lo que despacho le pide a inventario: ponlo en proceso, escribe cuánto envías, elige de qué bodega sale y «Enviar» hace el traslado a despacho. Cuando llega, «Marcar entregado» cierra el pedido."}
       </EncabezadoPagina>
       {faltaMigracion ? (
         <p role="alert" className="m-0 rounded-lg border border-border bg-card px-4 py-3 text-sm text-destructive">
-          Falta correr en Supabase la migración 0305 («Pedir a inventario»).
+          Falta correr en Supabase la migración 0305 («Solicitud de inventario»).
         </p>
       ) : (
         <>
@@ -74,10 +77,10 @@ export async function PaginaPedidos({ modo, usuario, estado, archivados = false 
           {archivados ? (
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-card px-4 py-3 text-sm">
               <span>
-                <span className="font-semibold">Archivo de pedidos</span> · {pedidos.length.toLocaleString("es-PA")} {pedidos.length === 1 ? "pedido" : "pedidos"}. Ya no salen en la lista de siempre; «Sacar del archivo» los devuelve.
+                <span className="font-semibold">{tituloArchivo}</span> · {pedidos.length.toLocaleString("es-PA")} {modo === "despacho" ? (pedidos.length === 1 ? "solicitud" : "solicitudes") : pedidos.length === 1 ? "pedido" : "pedidos"}. Ya no salen en la lista de siempre; «Sacar del archivo» {modo === "despacho" ? "las" : "los"} devuelve.
               </span>
               <Link href={ruta} className="font-medium text-primario underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
-                Volver a los pedidos
+                {modo === "despacho" ? "Volver a las solicitudes" : "Volver a los pedidos"}
               </Link>
             </div>
           ) : (
@@ -86,7 +89,7 @@ export async function PaginaPedidos({ modo, usuario, estado, archivados = false 
           <TablaPedidos pedidos={archivados ? pedidos : visibles} modo={modo} puedeEscribir={puedeEscribir} origenes={bodegas.origenes} stock={stock} fichas={fichas} fotos={fotos} opciones={opciones} hayEnInventario={hayEnInventario} />
           {!archivados && !sinArchivo && (
             <p className="m-0 text-sm">
-              <Link href={`${ruta}/archivo`} className="font-medium text-primario underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+              <Link href={rutaArchivo} className="font-medium text-primario underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
                 Ver archivados ({totalArchivados.toLocaleString("es-PA")})
               </Link>
             </p>

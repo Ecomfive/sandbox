@@ -327,7 +327,7 @@ const manana = () => {
   return d.toLocaleDateString("en-CA", { timeZone: "America/Panama" });
 };
 
-/** El panel de una solicitud: lo que pidió el cliente, el reparto en Despacho ciudad, los datos del reembolso, adjuntos, actualizaciones y registro. */
+/** El panel de una solicitud: lo que pidió el cliente, el reparto en Envíos Delivery, los datos del reembolso, adjuntos, actualizaciones y registro. */
 function PanelCaso({ fila, puedeEscribir, puedeArchivar, archivada, alCerrar }: { fila: FilaCaso; puedeEscribir: boolean; puedeArchivar: boolean; archivada: boolean; alCerrar: () => void }) {
   const { mostrarToast } = useToast();
   const router = useRouter();
@@ -392,14 +392,14 @@ function PanelCaso({ fila, puedeEscribir, puedeArchivar, archivada, alCerrar }: 
       {tieneReparto && (
         <section aria-labelledby="t-desp" className="flex flex-col gap-2 rounded-xl border border-primario/30 bg-primario-suave/40 p-3">
           <h3 id="t-desp" className="m-0 text-[13px] font-semibold">
-            Despacho ciudad
+            Envíos Delivery
           </h3>
           {detalle?.despacho ? (
             <p className="m-0 text-xs">
               Programada el {diaTexto(detalle.despacho.dia)}
               {detalle.despacho.courier ? ` con ${detalle.despacho.courier}` : ""} · {detalle.despacho.estado ?? "sin estado"}. Al marcarla ENTREGADO, esta solicitud pasa a Hecho sola.{" "}
               <Link href="/despacho-ciudad" className="font-medium text-primario underline underline-offset-2">
-                Ver en Despacho ciudad
+                Ver en Envíos Delivery
               </Link>
             </p>
           ) : puedeEscribir ? (
@@ -408,8 +408,8 @@ function PanelCaso({ fila, puedeEscribir, puedeArchivar, archivada, alCerrar }: 
                 Día del reparto
                 <input type="date" value={dia} onChange={(e) => setDia(e.target.value)} className={fieldClass} />
               </label>
-              <button type="button" disabled={ocupado || !dia} onClick={() => correr(() => programarEnDespacho(fila.itemId, dia), "Programada en Despacho ciudad.")} className={`boton-neon rounded-md px-3 py-2 text-xs font-medium text-white ${anilloFoco}`}>
-                Programar en Despacho ciudad
+              <button type="button" disabled={ocupado || !dia} onClick={() => correr(() => programarEnDespacho(fila.itemId, dia), "Programada en Envíos Delivery.")} className={`boton-neon rounded-md px-3 py-2 text-xs font-medium text-white ${anilloFoco}`}>
+                Programar en Envíos Delivery
               </button>
             </div>
           ) : (

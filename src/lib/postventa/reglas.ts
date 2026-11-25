@@ -195,7 +195,7 @@ export function textoSolicitud(d: DatosSolicitud): string {
   return lineas.join("\n");
 }
 
-/** La forma de pago de la fila en Despacho ciudad: COMPLEMENTO, CAMBIO (se entrega algo) o RETIRO (solo se retira). */
+/** La forma de pago de la fila en Envíos Delivery: COMPLEMENTO, CAMBIO (se entrega algo) o RETIRO (solo se retira). */
 export function formaPagoDespacho(tipos: string[], conEnviar: boolean): "COMPLEMENTO" | "CAMBIO" | "RETIRO" {
   if (tipos.includes("complemento") || tipos.includes("faltante")) return "COMPLEMENTO";
   return conEnviar ? "CAMBIO" : "RETIRO";

@@ -12,7 +12,7 @@ export function seccionDe(estado: string | null | undefined): Seccion {
   return "ruta";
 }
 
-/** Las formas de pago que elige el repartidor, con la etiqueta de Despacho ciudad que se guarda. */
+/** Las formas de pago que elige el repartidor, con la etiqueta de Envíos Delivery que se guarda. */
 export const FORMAS_PAGO = [
   { id: "efectivo", nombre: "Efectivo", etiqueta: "EFECTIVO" },
   { id: "yappy", nombre: "Yappy", etiqueta: "YAPPY" },
@@ -22,7 +22,7 @@ export const FORMAS_PAGO = [
 export type FormaPago = (typeof FORMAS_PAGO)[number]["id"];
 export const esFormaPago = (v: unknown): v is FormaPago => FORMAS_PAGO.some((f) => f.id === v);
 
-/** Los motivos de un pospuesto o fallido, de lo que los repartidores anotan hoy en Despacho ciudad. */
+/** Los motivos de un pospuesto o fallido, de lo que los repartidores anotan hoy en Envíos Delivery. */
 export const MOTIVOS = ["No responde", "Me deja en visto", "No está en casa", "Pidió otra fecha", "No lo quiso", "Dirección incompleta", "Producto equivocado"] as const;
 
 /** El nombre del repartidor sin espacios de más ni mayúsculas distintas («YOSELYN    VIAÑA» = «Yoselyn Viaña»). */

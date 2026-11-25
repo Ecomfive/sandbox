@@ -1,4 +1,4 @@
-// Despacho ciudad › cierres de los repartidores (24 nov 2026, migración 0362): los cierres del día que mandan desde su panel, para que Soporte los
+// Envíos Delivery › cierres de los repartidores (24 nov 2026, migración 0362): los cierres del día que mandan desde su panel, para que Soporte los
 // valide. Las fotos de los depósitos se ven con un enlace temporal del almacenamiento privado. Solo servidor; quien llama ya revisó el módulo.
 
 import type { SupabaseClient } from "@supabase/supabase-js";

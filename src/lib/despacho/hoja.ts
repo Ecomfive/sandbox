@@ -1,4 +1,4 @@
-// Despacho ciudad › Hoja del día (16 nov 2026, pedido de Hernán): los pedidos que Despacho cargó para un día, por repartidor, con las columnas que
+// Envíos Delivery › Hoja del día (16 nov 2026, pedido de Hernán): los pedidos que Despacho cargó para un día, por repartidor, con las columnas que
 // muestra Monday en el tablero de cada repartidor y nada más, para verla, imprimirla o bajarla en Excel (respaldo si se cae la conexión).
 
 import { ETIQUETAS, sumasGrupo } from "./etiquetas";
