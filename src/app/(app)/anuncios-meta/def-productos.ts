@@ -1,6 +1,7 @@
 import { confiable, cpa } from "@/lib/meta-ads/metricas";
 import type { ProductoVista } from "@/lib/meta-ads/vistas";
 import type { DefTabla } from "@/lib/tabla/motor";
+import { campoPrioridad } from "./def-prioridad";
 import { NOMBRE_VEREDICTO, veredictoDeResultados, type Veredicto } from "./def-campanas";
 
 /**
@@ -11,9 +12,10 @@ export const DEF_PRODUCTOS: DefTabla<ProductoVista> = {
   clave: "anuncios-meta-productos",
   campos: [
     { id: "nombre", etiqueta: "Nombre del producto", tipo: "texto", valor: (p) => p.nombre },
+    campoPrioridad<ProductoVista>((p) => p.pendiente),
     { id: "veredicto", etiqueta: "Cómo le va", tipo: "seleccion", valores: (p) => [veredictoDeResultados(p.r, p.tope)], opciones: () => (Object.keys(NOMBRE_VEREDICTO) as Veredicto[]).map((x) => ({ valor: x, etiqueta: NOMBRE_VEREDICTO[x] })), agrupable: true },
     { id: "datos", etiqueta: "Cantidad de datos", tipo: "seleccion", valores: (p) => [confiable(p.r) ? "suficiente" : "poca"], opciones: () => [{ valor: "suficiente", etiqueta: "Data suficiente" }, { valor: "poca", etiqueta: "Poca data" }], agrupable: true },
-    { id: "activas", etiqueta: "Campañas activas", tipo: "seleccion", valores: (p) => [p.activas > 0 ? "si" : "no"], opciones: () => [{ valor: "si", etiqueta: "Con campañas activas" }, { valor: "no", etiqueta: "Sin campañas activas" }], agrupable: true },
+    { id: "activas", etiqueta: "Campañas activas", tipo: "seleccion", valores: (p) => [p.enMarcha ? "si" : "no"], opciones: () => [{ valor: "si", etiqueta: "Con campañas activas" }, { valor: "no", etiqueta: "Sin campañas activas" }], agrupable: true },
     { id: "gasto", etiqueta: "Gasto", tipo: "numero", sinCsv: true, valor: (p) => p.r.gasto },
     { id: "compras", etiqueta: "Compras", tipo: "numero", sinCsv: true, valor: (p) => p.r.compras },
     { id: "cpa", etiqueta: "CPA", tipo: "numero", sinCsv: true, valor: (p) => cpa(p.r) },

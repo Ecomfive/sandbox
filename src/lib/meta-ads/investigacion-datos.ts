@@ -2,6 +2,7 @@
 // cliente (provincia), la guía de Servientrega (última novedad y visitas sin entregar), el despacho de Monday (causa de rechazo y lo que anotan los asesores), el historial de confirmación y, a fondo, las conversaciones de WhatsApp de los pedidos
 // devueltos (que la IA lee, sin teléfonos ni correos). El análisis es de `investigacion-entrega.ts`. Solo lee; nunca escribe en los pedidos, ni en Meta, ni le escribe a ningún cliente.
 
+import { hayAlgoEnMarcha } from "./en-marcha";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { conversacionParaJuez } from "@/lib/confirmacion-ia/chat-previo";
 import { pedirIAEn, proveedoresConectados, type ProveedorIA } from "@/lib/publicaciones/ia/proveedor";
@@ -236,6 +237,8 @@ export async function guardarInvestigacion(supabase: SupabaseClient, paisId: str
 export function productosConProblemaDeEntrega(a: AnalisisHistorico, max = 3): FilaEntrega[] {
   const promedio = a.resumen.tasaEntrega;
   return a.entrega
+    // Solo lo que sigue anunciándose: de un producto apagado no hay nada que decidir.
+    .filter((f) => !hayAlgoEnMarcha(a.enMarcha) || a.enMarcha.productos.includes(f.clave))
     .filter((f) => f.enTienda && (f.veredicto === "vende_pero_no_entrega" || (f.tasa !== null && promedio !== null && f.tasa < promedio - 0.12 && f.gasto >= 150)))
     .sort((x, y) => y.gasto - x.gasto)
     .slice(0, max);

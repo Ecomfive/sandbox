@@ -30,7 +30,7 @@ import { anguloDeVideo, DEF_VIDEOS } from "./def-videos";
 import { EstructuraYLlamado } from "./estructura-video";
 import { ReproductorVideo } from "./reproductor-video";
 import { TarjetaVideo } from "./tarjeta-video";
-import { AVISO_POCA_DATA, Cifra, InsigniaEtapa, MetricasEnLinea } from "./piezas";
+import { AVISO_POCA_DATA, Cifra, InsigniaEtapa, InsigniaPrioridad, MetricasEnLinea, QueHacer } from "./piezas";
 
 const urlSegura = (u: string | null) => (u && /^https:\/\//i.test(u) ? u : null);
 
@@ -60,6 +60,11 @@ function FilaVideo({ x, alAbrir, columnas }: { x: VideoVista; alAbrir: () => voi
             {x.numero && <span className="mr-1.5 rounded bg-muted px-1.5 py-0.5 text-xs font-semibold">{x.numero}</span>}
             {x.nombre}
           </span>
+          {x.pendiente && (
+            <span className="flex">
+              <InsigniaPrioridad pendiente={x.pendiente} />
+            </span>
+          )}
           <span className="truncate text-xs text-muted-foreground">
             {x.producto ?? "Sin producto"} · {angulo ? `Ángulo: ${angulo}${x.analisis?.anguloDetalle ? ` (${x.analisis.anguloDetalle})` : ""}${x.analisis?.estado === "sin_archivo" ? " (provisional)" : ""}` : "Ángulo sin analizar"}
           </span>
@@ -292,6 +297,11 @@ export function ListaVideos({ videos, escribe, iaConectada, sinAnalizar, abrirIn
             <div className="pb-5">
               <ReproductorVideo key={v.id} videoId={v.id} miniatura={v.miniatura} duracion={v.analisis?.duracionS ?? null} titulo={v.nombre} autoReproducir={reproducirAlAbrir} />
             </div>
+            {v.pendiente && (
+              <div className="py-5">
+                <QueHacer pendiente={v.pendiente} />
+              </div>
+            )}
             <Seccion icono={MargenIcon} titulo="Cómo le fue en el periodo">
               <p className="m-0 text-sm text-muted-foreground">
                 {v.producto ?? "Sin producto"}

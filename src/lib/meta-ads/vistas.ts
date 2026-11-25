@@ -2,6 +2,7 @@
 
 import type { Decision } from "./decision-anuncio";
 import type { Resultados } from "./metricas";
+import type { Pendiente } from "./prioridad";
 import type { Estructura, Etapa, Puja } from "./nombre";
 
 export interface CampanaVista {
@@ -13,6 +14,10 @@ export interface CampanaVista {
   estado: string;
   activa: boolean;
   etapa: Etapa | null;
+  /** Encendida y gastando en los últimos 7 días (o recién montada). */
+  enMarcha?: boolean;
+  /** Lo más urgente de «Para decidir hoy» sobre esta campaña. */
+  pendiente?: Pendiente | null;
   /** Por qué tiene esa etapa (lo que dice el nombre, el producto en Producto o lo corregido a mano). */
   etapaMotivo: string | null;
   /** Veces que, en promedio, una persona vio la campaña en los últimos 7 días (null si Meta todavía no se lo dijo al sistema). */
@@ -57,6 +62,10 @@ export interface ProductoVista {
   r: Resultados;
   campanas: number;
   activas: number;
+  /** Tiene una campaña activa que gastó en los últimos 7 días. */
+  enMarcha: boolean;
+  /** Lo más urgente entre sus campañas. */
+  pendiente?: Pendiente | null;
   /** Videos distintos de sus campañas (los últimos 30 días). */
   videos: number;
   anuncios: number;
@@ -135,6 +144,10 @@ export interface VideoVista {
   anuncios: number;
   /** «V3»: el número del video dentro de su tanda, si el nombre del anuncio lo dice. */
   numero: string | null;
+  /** Tiene un anuncio activo en una campaña en marcha. */
+  enMarcha?: boolean;
+  /** Lo más urgente de «Para decidir hoy» sobre este video o sus anuncios. */
+  pendiente?: Pendiente | null;
   /** El análisis de la IA, si ya se hizo. */
   analisis: AnalisisVideoVista | null;
   /** Los anuncios que usan este video y a qué campaña pertenece cada uno (últimos 30 días). */

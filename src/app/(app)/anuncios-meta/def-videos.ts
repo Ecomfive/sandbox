@@ -3,6 +3,7 @@ import { NOMBRE_ETAPA } from "@/lib/meta-ads/nombre";
 import { VERSION_ANALISIS } from "@/lib/meta-ads/video-angulo";
 import type { VideoVista } from "@/lib/meta-ads/vistas";
 import type { DefTabla } from "@/lib/tabla/motor";
+import { campoPrioridad } from "./def-prioridad";
 import { NOMBRE_VEREDICTO, veredictoDeResultados, type Veredicto } from "./def-campanas";
 
 const SIN = "__sin_valor__";
@@ -26,6 +27,7 @@ export const DEF_VIDEOS: DefTabla<VideoVista> = {
   campos: [
     { id: "nombre", etiqueta: "Nombre del video", tipo: "texto", valor: (v) => `${v.numero ?? ""} ${v.nombre} ${v.producto ?? ""} ${anguloDeVideo(v) ?? ""}` },
     { id: "campanaTexto", etiqueta: "Nombre de la campaña", tipo: "texto", sinCsv: true, valor: (v) => campanasDeVideo(v).join(" ") },
+    campoPrioridad<VideoVista>((v) => v.pendiente),
     { id: "angulo", etiqueta: "Ángulo", tipo: "seleccion", valores: (v) => [anguloDeVideo(v) ?? SIN], etiquetaSinValor: "Sin ángulo", agrupable: true },
     { id: "producto", etiqueta: "Producto", tipo: "seleccion", valores: (v) => [v.producto ?? SIN], etiquetaSinValor: "Sin producto", agrupable: true },
     { id: "campana", etiqueta: "Campaña donde se usa", tipo: "seleccion", valores: (v) => (campanasDeVideo(v).length ? campanasDeVideo(v) : [SIN]), etiquetaSinValor: "Sin campaña", agrupable: true },

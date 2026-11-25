@@ -3,6 +3,8 @@ import type { ReactNode } from "react";
 import { Badge, type Tone } from "@/components/ui/badge";
 import { claseMetrica, type NivelMetrica } from "@/lib/metricas-meta-ads";
 import { GASTO_MINIMO_CONFIABLE, METRICAS_CAMPANA, conSigno, confiable, cpa, cpm, ctr, cvr, dolares, efectividad, hookRate, nivelDeCpa, nivelDeCtr, nivelDeHook, nivelDeResultado, nivelesDeMetricas, nivelFrecuencia, nivelTiempo, resultado, tiempoPromedio, type ClaveMetrica, type Resultados } from "@/lib/meta-ads/metricas";
+import { NOMBRE_PRIORIDAD, type Pendiente } from "@/lib/meta-ads/prioridad";
+import type { CifraSugerencia, Prioridad } from "@/lib/meta-ads/sugerencias";
 import { NOMBRE_ETAPA, NOMBRE_PUJA, type Estructura, type Etapa, type Puja } from "@/lib/meta-ads/nombre";
 
 export const entero = (n: number) => n.toLocaleString("es-PA", { maximumFractionDigits: 0 });
@@ -14,6 +16,49 @@ export const valorCpa = (r: Resultados) => {
 };
 
 const TONO_ETAPA: Record<Etapa, Tone> = { testing: "azul", venta: "info", escala: "success", retargeting: "warning" };
+
+const TONO_PRIORIDAD: Record<Prioridad, Tone> = { apagar: "destructive", actuar: "warning", oportunidad: "success", observar: "azul", historial: "neutral" };
+
+/** Lo más urgente de una fila («Apagar», «Actuar hoy»…); con varias de lo mismo, cuántas. Sin nada pendiente no se dibuja. */
+export function InsigniaPrioridad({ pendiente }: { pendiente: Pendiente | null | undefined }) {
+  if (!pendiente) return null;
+  return (
+    <Badge tone={TONO_PRIORIDAD[pendiente.prioridad]}>
+      {NOMBRE_PRIORIDAD[pendiente.prioridad]}
+      {pendiente.cuantas > 1 ? ` · ${pendiente.cuantas}` : ""}
+    </Badge>
+  );
+}
+
+/** El «Qué hacer» de una fila, dentro de su ficha: la prioridad, las cifras que la explican y la acción. */
+export function QueHacer({ pendiente }: { pendiente: Pendiente }) {
+  return (
+    <section aria-label="Qué hacer" className="flex flex-col gap-2 rounded-lg border border-border p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className="m-0 text-sm font-semibold">Qué hacer</h3>
+        <InsigniaPrioridad pendiente={{ ...pendiente, cuantas: 1 }} />
+      </div>
+      {pendiente.cifras && pendiente.cifras.length > 0 && <CifrasEnLinea cifras={pendiente.cifras} />}
+      <p className="m-0 text-sm">{pendiente.accion}</p>
+    </section>
+  );
+}
+
+const TONO_CIFRA = { bueno: "bg-success-soft text-success", medio: "bg-warning-soft text-warning", malo: "bg-destructive-soft text-destructive" } as const;
+
+/** El CPA de una campaña de un vistazo (7 días, últimos 3, semana anterior y tope), coloreado frente al tope. */
+export function CifrasEnLinea({ cifras }: { cifras: CifraSugerencia[] }) {
+  return (
+    <dl className="m-0 flex flex-wrap gap-1.5">
+      {cifras.map((c) => (
+        <div key={c.etiqueta} className={`flex items-baseline gap-1.5 rounded-md px-2 py-1 text-xs ${c.tono ? TONO_CIFRA[c.tono] : "bg-muted text-foreground"}`}>
+          <dt>{c.etiqueta}</dt>
+          <dd className="m-0 font-semibold tabular-nums">{c.valor}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
 
 /** La etapa de una campaña; sin etapa en el nombre ni corregida a mano, «Sin etapa». */
 export function InsigniaEtapa({ etapa }: { etapa: Etapa | null }) {

@@ -18,7 +18,7 @@ import type { NombreFilas } from "@/lib/tabla/pie";
 import { CeldasColumnas, EncabezadoColumnas, estiloRejilla, SelectorColumnasMeta, useColumnasMeta } from "./columnas-meta";
 import { DEF_PRODUCTOS } from "./def-productos";
 import { BarraOrden, useOrdenMeta } from "./orden-meta";
-import { AVISO_POCA_DATA, Cifra, InsigniaEtapa, MetricasEnLinea, Nivel } from "./piezas";
+import { AVISO_POCA_DATA, Cifra, InsigniaEtapa, InsigniaPrioridad, MetricasEnLinea, Nivel } from "./piezas";
 import { entregaPorProductoMeta } from "./actions";
 
 /** Lo que se sabe de la entrega de un producto en la tienda (viene de los pedidos, aparte de Meta). */
@@ -42,7 +42,10 @@ function FilaProducto({ p, columnas, alAbrir, entrega }: { p: ProductoVista; col
   return (
     <button type="button" onClick={alAbrir} style={estiloRejilla(columnas.length)} className="grid w-full cursor-pointer grid-cols-1 items-center gap-x-3 gap-y-1.5 px-4 py-3 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-foreground xl:[grid-template-columns:var(--columnas-meta)]">
       <span className="flex min-w-0 flex-col gap-0.5">
-        <span className="truncate text-sm font-medium">{p.nombre}</span>
+        <span className="flex min-w-0 items-center gap-2">
+          <span className="truncate text-sm font-medium">{p.nombre}</span>
+          <InsigniaPrioridad pendiente={p.pendiente} />
+        </span>
         <span className="truncate text-xs text-muted-foreground">
           {p.campanas} {p.campanas === 1 ? "campaña" : "campañas"} ({p.activas} {p.activas === 1 ? "activa" : "activas"}) · {p.videos} {p.videos === 1 ? "video" : "videos"}
           {ok ? "" : " · poca data"}
@@ -157,6 +160,7 @@ function FichaProducto({ p, campanas, videos, alCerrar, entrega }: { p: Producto
                     {c.nombre}
                   </Link>
                   <p className="m-0 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    <InsigniaPrioridad pendiente={c.pendiente} />
                     <InsigniaEtapa etapa={c.etapa} />
                     {c.activa ? "Activa" : "Apagada"}
                     {c.angulo ? ` · ${c.angulo}` : ""}

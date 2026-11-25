@@ -13,7 +13,7 @@ const cache = new Map<string, { crudo: string; valor: Orden[] }>();
 function leer(lista: string, claves: readonly string[], porDefecto: Orden[]): Orden[] {
   let crudo: string | null = null;
   try {
-    crudo = window.localStorage.getItem(`${prefijo}${lista}-v1`);
+    crudo = window.localStorage.getItem(`${prefijo}${lista}-v2`);
   } catch {
     /* sin almacenamiento */
   }
@@ -48,7 +48,7 @@ export function useOrdenMeta<F>(lista: string, criterios: readonly CriterioOrden
     (nuevo: Orden[]) => {
       enMemoria.set(lista, nuevo);
       try {
-        window.localStorage.setItem(`${prefijo}${lista}-v1`, JSON.stringify(nuevo));
+        window.localStorage.setItem(`${prefijo}${lista}-v2`, JSON.stringify(nuevo));
       } catch {
         /* sin almacenamiento: queda en esta pestaña */
       }

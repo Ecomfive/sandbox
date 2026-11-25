@@ -227,7 +227,8 @@ function Cuentas({ cuentas, escribe, pais, borrador }: { cuentas: CuentaVista[];
   );
 }
 
-function Topes({ topes, productos, escribe }: { topes: TopeVista[]; productos: string[]; escribe: boolean }) {
+function Topes({ topes, productos, enMarcha, escribe }: { topes: TopeVista[]; productos: string[]; /** Llaves de los productos con campañas en marcha: van primero. */ enMarcha: string[]; escribe: boolean }) {
+  const anunciado = (producto: string) => enMarcha.includes(claveDeProducto(producto));
   const router = useRouter();
   const { mostrarToast } = useToast();
   const [guardando, empezar] = useTransition();
@@ -242,7 +243,7 @@ function Topes({ topes, productos, escribe }: { topes: TopeVista[]; productos: s
     const mapa = new Map<string, { producto: string; tope: number | null }>();
     for (const t of topes) mapa.set(t.clave, { producto: t.producto, tope: t.tope });
     for (const p of productos) if (!mapa.has(claveDeProducto(p))) mapa.set(claveDeProducto(p), { producto: p, tope: null });
-    return [...mapa.values()].sort((a, b) => a.producto.localeCompare(b.producto, "es"));
+    return [...mapa.values()].sort((a, b) => Number(anunciado(b.producto)) - Number(anunciado(a.producto)) || a.producto.localeCompare(b.producto, "es"));
   })();
   const filas = filtrarProductos(soloSinDefinir ? todas.filter((f) => f.tope === null) : todas, buscar);
   const guardar = (producto: string, texto: string) =>
@@ -288,6 +289,7 @@ function Topes({ topes, productos, escribe }: { topes: TopeVista[]; productos: s
               <li key={f.producto} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 py-2">
                 <span className="text-sm font-medium">
                   {f.producto}
+                  {anunciado(f.producto) && <span className="ml-2 rounded-full bg-success-soft px-2 py-0.5 text-xs font-medium text-success">En marcha</span>}
                   {f.tope === null && <span className="ml-2 text-xs font-normal text-muted-foreground">sin definir (usa ${CPA_TOPE_PREDETERMINADO})</span>}
                 </span>
                 {escribe ? (
@@ -370,7 +372,7 @@ function ProbadorDeNombres() {
 }
 
 /** «Cuentas»: la conexión con Meta, las cuentas publicitarias que se leen, el CPA tope de cada producto y cómo se leen los nombres de las campañas. */
-export function PanelCuentas({ cuentas, topes, productos, escribe, hayToken, pais, hoy }: { cuentas: CuentaVista[]; topes: TopeVista[]; productos: string[]; escribe: boolean; hayToken: boolean; pais: string; hoy: string }) {
+export function PanelCuentas({ cuentas, topes, productos, enMarcha, escribe, hayToken, pais, hoy }: { cuentas: CuentaVista[]; topes: TopeVista[]; productos: string[]; enMarcha: string[]; escribe: boolean; hayToken: boolean; pais: string; hoy: string }) {
   const [borrador, setBorrador] = useState<{ id: string; nombre: string } | null>(null);
   const [versionCobertura, setVersionCobertura] = useState(0);
   return (
@@ -384,7 +386,7 @@ export function PanelCuentas({ cuentas, topes, productos, escribe, hayToken, pai
           <CoberturaHistorial hoy={hoy} version={versionCobertura} />
         </Bloque>
       )}
-      <Topes topes={topes} productos={productos} escribe={escribe} />
+      <Topes topes={topes} productos={productos} enMarcha={enMarcha} escribe={escribe} />
       <ProbadorDeNombres />
     </div>
   );

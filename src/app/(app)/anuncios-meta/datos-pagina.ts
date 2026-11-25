@@ -4,6 +4,7 @@ import { refrescarAnalisisMeta } from "@/lib/meta-ads/analisis-guardado";
 import { getPaisActual } from "@/lib/pais";
 import { cargarAnunciosMeta, periodoValido, type DatosMeta } from "@/lib/meta-ads/datos";
 import { tokenDeMeta } from "@/lib/meta-ads/api";
+import type { VistaActividad } from "@/lib/meta-ads/en-marcha";
 import { geminiConectado } from "@/lib/meta-ads/gemini-video";
 import { senalesVisibles } from "@/lib/meta-ads/senales-modulos";
 import { hoyEnPanama } from "@/lib/meta-ads/sincronizar";
@@ -14,12 +15,12 @@ export type ParametrosMeta = Promise<{ [k: string]: string | string[] | undefine
 const uno = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
 /** Lo que necesita cada pestaña de Anuncios Meta: la persona, el país de la barra y todo lo armado para el periodo y la cuenta elegidos en la dirección (`?periodo=` y `?cuenta=`). */
-export async function cargarPaginaMeta(searchParams: ParametrosMeta): Promise<{ datos: DatosMeta; escribe: boolean; pais: string; paisId: string; hayToken: boolean }> {
+export async function cargarPaginaMeta(searchParams: ParametrosMeta, opciones: { ver?: VistaActividad } = {}): Promise<{ datos: DatosMeta; escribe: boolean; pais: string; paisId: string; hayToken: boolean }> {
   const usuario = await requireModulo("anuncios-meta");
   const sp = await searchParams;
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
-  const datos = await cargarAnunciosMeta(supabase, { paisId: pais.id, cuentaId: uno(sp.cuenta) ?? null, periodo: periodoValido(uno(sp.periodo)), hoy: hoyEnPanama(), producto: uno(sp.producto) ?? null });
+  const datos = await cargarAnunciosMeta(supabase, { paisId: pais.id, cuentaId: uno(sp.cuenta) ?? null, periodo: periodoValido(uno(sp.periodo)), hoy: hoyEnPanama(), producto: uno(sp.producto) ?? null, ver: opciones.ver ?? null });
   // Las señales de otros módulos (inventario, precio, competencia, test) solo las ve quien puede abrir ese módulo.
   const senales = datos.senales.map((s) => ({ ...s, otras: senalesVisibles(s.otras ?? [], usuario.modulos) }));
   return { datos: { ...datos, senales, iaConectada: geminiConectado() }, escribe: !usuario.modulosSoloLectura.includes("anuncios-meta"), pais: pais.nombre, paisId: pais.id, hayToken: tokenDeMeta() !== null };

@@ -6,6 +6,7 @@
 //   · qué genera más ventas en cada parte (campañas, videos, ángulos, ganchos, productos), con lo que de verdad se entrega.
 // Sin la calculadora de costos: «funcionó» = tuvo gasto suficiente para compararse y su CPA quedó dentro del CPA tope del producto. Lógica pura, con prueba; las lecturas están en `historico-datos.ts`.
 
+import { calcularEnMarcha, type EnMarcha } from "./en-marcha";
 import { certezaDe, confiable, cpa, cpm, ctr, cvr, efectividad, GASTO_MINIMO_CONFIABLE, hookRate, sinResultados, sumar, type Certeza, type Resultados } from "./metricas";
 
 export type Familia = "suplemento" | "belleza" | "general";
@@ -766,6 +767,8 @@ export interface AnalisisHistorico {
   tendencias: FilaTendencia[];
   entrega: FilaEntrega[];
   rankings: Rankings;
+  /** Lo que tenía campañas activas con gasto en la última semana al calcular el análisis (los análisis guardados antes no lo traen). */
+  enMarcha?: EnMarcha;
   /** Mes a mes de todas las campañas, y de los productos con más gasto. */
   meses: FilaMes[];
   mesesPorProducto: { nombre: string; filas: FilaMes[] }[];
@@ -864,6 +867,7 @@ export function analizarHistorico(e: EntradaHistorico): AnalisisHistorico {
     tendencias: filasTendencia,
     entrega,
     rankings: rankingsDeVentas(e.campanas, e.videos, e.productos),
+    enMarcha: calcularEnMarcha(e.campanas.map((c) => ({ nombre: c.nombre, producto: c.producto, activa: c.activa, gasto7: c.v.semana.rec.gasto })), e.hasta ?? ""),
     meses: filasMensuales(e.mensual ?? []),
     mesesPorProducto: (e.mensualPorProducto ?? [])
       .map((p) => ({ nombre: p.nombre, filas: filasMensuales(p.meses), gasto: p.meses.reduce((s, m) => s + m.r.gasto, 0) }))

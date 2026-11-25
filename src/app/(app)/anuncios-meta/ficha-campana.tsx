@@ -18,7 +18,7 @@ import type { ActividadVista, AnuncioVista, CampanaVista } from "@/lib/meta-ads/
 import { corregirCampanaMeta, obtenerActividadCampanaMeta, soltarCorreccionMeta } from "./actions";
 import { NOMBRE_VEREDICTO, veredictoDe } from "./def-campanas";
 import { BarraApilada } from "./graficas";
-import { Cifra, entero, InsigniaEstructura, InsigniaEtapa, MetricasEnLinea, nombreEstado, porcentaje, Resultado, textoFrecuencia, textoMetrica, textoTiempo } from "./piezas";
+import { Cifra, entero, InsigniaEstructura, InsigniaEtapa, MetricasEnLinea, nombreEstado, porcentaje, QueHacer, Resultado, textoFrecuencia, textoMetrica, textoTiempo } from "./piezas";
 
 /** El color de cada decisión: cortar en rojo, observar y rotar en ámbar, consolidar en verde. */
 const TONO_DECISION: Record<Decision, Tone> = { cortar: "destructive", mantener: "neutral", observar: "warning", consolidar: "success", rebalancear: "info", rotar: "warning" };
@@ -221,6 +221,11 @@ export function FichaCampana({ campana: c, colores, anuncios, actId, productos, 
     >
       {c && r && veredicto && (
         <div className="flex flex-col divide-y divide-border px-5 py-5">
+          {c.pendiente && (
+            <div className="pb-5">
+              <QueHacer pendiente={c.pendiente} />
+            </div>
+          )}
           <Seccion icono={MargenIcon} titulo="Cómo le va en el periodo">
             <p className="m-0 text-sm">
               <span className="font-medium">{NOMBRE_VEREDICTO[veredicto]}.</span> <Resultado r={r} tope={c.tope} /> estimado con un CPA tope de {dolares(c.tope)}

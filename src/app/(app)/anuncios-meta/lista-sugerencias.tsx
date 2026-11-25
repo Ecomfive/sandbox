@@ -6,10 +6,22 @@ import { useState, useTransition } from "react";
 import { useToast } from "@/components/ui/toast";
 import { fieldClassSm, labelClassSm } from "@/components/ui/field";
 import { UMBRALES_ANUNCIO } from "@/lib/meta-ads/decision-anuncio";
-import { DIAS_DE_DECISION, UMBRALES, type Sugerencia } from "@/lib/meta-ads/sugerencias";
+import { DIAS_DE_DECISION, PRIORIDADES, UMBRALES, type Prioridad, type Sugerencia } from "@/lib/meta-ads/sugerencias";
+import { ChevronRightIcon } from "@/lib/nav-icons";
 import { decidirSugerenciaMeta } from "./actions";
+import { CifrasEnLinea } from "./piezas";
 
 const TEXTO_SEVERIDAD = { alta: "Urgente", media: "Importante", info: "Para mirar" } as const;
+
+/** Los grupos de «Para decidir hoy», en el orden en que piden atención. Los dos primeros arrancan abiertos. */
+const GRUPOS: Record<Prioridad, { titulo: string; explicacion: string; punto: string; abierto: boolean }> = {
+  apagar: { titulo: "Apagar", explicacion: "Campañas que ya no son rentables", punto: "bg-destructive", abierto: true },
+  actuar: { titulo: "Actuar hoy", explicacion: "Sobre el tope o cerca, anuncios y landings por corregir", punto: "bg-warning", abierto: true },
+  oportunidad: { titulo: "Oportunidades", explicacion: "Lo que va bien y puede dar más", punto: "bg-success", abierto: false },
+  observar: { titulo: "En observación", explicacion: "Algo cambió, pero todavía no pide decidir", punto: "bg-azul", abierto: false },
+  historial: { titulo: "Del historial", explicacion: "Lo que dicen los datos de lo que está en marcha", punto: "bg-muted-foreground", abierto: false },
+};
+const MAX_POR_GRUPO = 5;
 
 const GRUPOS_DE_ANUNCIOS = [
   { grupo: "apagar", titulo: "Anuncios para apagar", color: "bg-destructive-soft text-destructive" },
@@ -52,10 +64,11 @@ function Tarjeta({ s, escribe, ocupada, alDecidir }: { s: Sugerencia; escribe: b
   const enlace = s.tipo === "hallazgo" ? "/anuncios-meta/hallazgos" : s.tipo === "etiquetas_faltan" ? "/anuncios-meta/campanas?faltan=1" : s.objeto.tipo === "campana" ? `/anuncios-meta/campanas?abrir=${s.objeto.id}` : s.objeto.tipo === "video" ? `/anuncios-meta/videos?abrir=${encodeURIComponent(s.objeto.id)}` : null;
   return (
     <li className="flex flex-col gap-2 px-4 py-3">
-      <div className="flex flex-wrap items-start gap-2 sm:flex-nowrap">
+      <div className="flex flex-wrap items-start gap-2 @3xl:flex-nowrap">
         <span aria-hidden="true" className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${punto}`} />
         <div className="min-w-0 flex-1">
           <p className="m-0 text-sm font-medium">
+            <span className="sr-only">{s.positiva ? "Buena noticia" : TEXTO_SEVERIDAD[s.severidad]}: </span>
             {enlace ? (
               <Link href={enlace} className="underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground">
                 {s.titulo}
@@ -64,16 +77,20 @@ function Tarjeta({ s, escribe, ocupada, alDecidir }: { s: Sugerencia; escribe: b
               s.titulo
             )}
           </p>
-          <p className="m-0 mt-0.5 text-xs text-muted-foreground">{s.detalle}</p>
+          {s.cifras && s.cifras.length > 0 && (
+            <div className="mt-1.5">
+              <CifrasEnLinea cifras={s.cifras} />
+            </div>
+          )}
+          <p className="m-0 mt-1 text-xs text-muted-foreground">{s.detalle}</p>
           <p className="m-0 mt-1 text-xs">
             <span className="font-medium">Qué hacer: </span>
             {s.accion}
           </p>
           {s.anuncios && s.anuncios.length > 0 && <AnunciosPasados anuncios={s.anuncios} />}
-          <p className="m-0 mt-1 text-xs text-muted-foreground">{s.positiva ? "Buena noticia" : TEXTO_SEVERIDAD[s.severidad]}</p>
         </div>
         {escribe && !rechazando && (
-          <div className="flex w-full shrink-0 flex-wrap gap-1.5 pl-4 sm:w-auto sm:justify-end sm:pl-0">
+          <div className="flex w-full shrink-0 flex-wrap gap-1.5 pl-4 @3xl:w-auto @3xl:justify-end @3xl:pl-0">
             <button type="button" disabled={ocupada} onClick={() => alDecidir(s.clave, "aceptada")} className="min-h-8 rounded-md border border-border-control bg-card px-2.5 py-1 text-xs font-medium hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground disabled:opacity-50">
               Ya lo hice
             </button>
@@ -110,13 +127,58 @@ function Tarjeta({ s, escribe, ocupada, alDecidir }: { s: Sugerencia; escribe: b
   );
 }
 
-/** «Para decidir hoy»: lo que el sistema ve en los números y propone hacer. Aceptar, dejar para después o rechazar (con porqué) se recuerda hasta que vence. No cambia nada en Meta. */
+/** Un grupo de la lista: su título con cuántas hay, que se pliega y se despliega. */
+function Grupo({ prioridad, sugerencias, abierto, alAlternar, escribe, ocupada, alDecidir }: { prioridad: Prioridad; sugerencias: Sugerencia[]; abierto: boolean; alAlternar: () => void; escribe: boolean; ocupada: boolean; alDecidir: (clave: string, estado: "aceptada" | "rechazada" | "pospuesta", nota?: string) => void }) {
+  const [todas, setTodas] = useState(false);
+  const g = GRUPOS[prioridad];
+  const visibles = todas ? sugerencias : sugerencias.slice(0, MAX_POR_GRUPO);
+  const id = `decidir-${prioridad}`;
+  return (
+    <div className="border-b border-border last:border-b-0">
+      <h3 className="m-0">
+        <button type="button" aria-expanded={abierto} aria-controls={id} onClick={alAlternar} className="flex min-h-11 w-full cursor-pointer items-center gap-2 px-4 py-2 text-left hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-foreground">
+          <span aria-hidden="true" className={`h-2.5 w-2.5 shrink-0 rounded-full ${g.punto}`} />
+          <span className="shrink-0 text-sm font-semibold">{g.titulo}</span>
+          <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs font-semibold tabular-nums">{sugerencias.length}</span>
+          <span className="min-w-0 flex-1 truncate text-xs font-normal text-muted-foreground">{g.explicacion}</span>
+          <ChevronRightIcon aria-hidden="true" className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform motion-reduce:transition-none ${abierto ? "rotate-90" : ""}`} />
+        </button>
+      </h3>
+      {abierto && (
+        <div id={id} className="border-t border-border">
+          <ul role="list" aria-label={g.titulo} className="m-0 flex list-none flex-col divide-y divide-border p-0">
+            {visibles.map((s) => (
+              <Tarjeta key={s.clave} s={s} escribe={escribe} ocupada={ocupada} alDecidir={alDecidir} />
+            ))}
+          </ul>
+          {sugerencias.length > MAX_POR_GRUPO && (
+            <button type="button" aria-expanded={todas} onClick={() => setTodas((v) => !v)} className="mx-4 mb-3 mt-1 min-h-9 rounded-md border border-border-control bg-card px-3 text-xs font-medium hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground">
+              {todas ? "Ver menos" : `Ver las ${sugerencias.length - MAX_POR_GRUPO} restantes`}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** «Para decidir hoy»: lo que el sistema ve en los números y propone hacer, agrupado por prioridad. Aceptar, dejar para después o rechazar (con porqué) se recuerda hasta que vence. No cambia nada en Meta. */
 export function ListaSugerencias({ sugerencias, decididas, escribe }: { sugerencias: Sugerencia[]; decididas: number; escribe: boolean }) {
   const router = useRouter();
   const { mostrarToast } = useToast();
   const [ocupada, empezar] = useTransition();
-  const [todas, setTodas] = useState(false);
-  const visibles = todas ? sugerencias : sugerencias.slice(0, 6);
+  const grupos = PRIORIDADES.map((p) => ({ prioridad: p, lista: sugerencias.filter((s) => s.prioridad === p) })).filter((g) => g.lista.length > 0);
+  // Lo urgente abierto; si no hay nada urgente, el primer grupo que tenga algo.
+  const [abiertos, setAbiertos] = useState<Set<Prioridad>>(() => {
+    const iniciales = grupos.filter((g) => GRUPOS[g.prioridad].abierto).map((g) => g.prioridad);
+    return new Set(iniciales.length ? iniciales : grupos.slice(0, 1).map((g) => g.prioridad));
+  });
+  const alternar = (p: Prioridad) =>
+    setAbiertos((previos) => {
+      const nuevos = new Set(previos);
+      if (!nuevos.delete(p)) nuevos.add(p);
+      return nuevos;
+    });
   const decidir = (clave: string, estado: "aceptada" | "rechazada" | "pospuesta", nota?: string) =>
     empezar(async () => {
       const r = await decidirSugerenciaMeta(clave, estado, nota);
@@ -127,10 +189,10 @@ export function ListaSugerencias({ sugerencias, decididas, escribe }: { sugerenc
       }
     });
   return (
-    <section aria-labelledby="para-decidir" className="min-w-0 overflow-hidden rounded-xl border border-border bg-card">
+    <section aria-labelledby="para-decidir" className="@container min-w-0 overflow-hidden rounded-xl border border-border bg-card">
       <div className="flex min-h-8 flex-wrap items-center justify-between gap-x-3 border-b border-border bg-muted px-4 py-1 text-xs font-medium text-muted-foreground">
         <h2 id="para-decidir" className="m-0 text-xs font-medium">
-          Para decidir hoy
+          Para decidir hoy, por prioridad
         </h2>
         <span>{sugerencias.length === 0 ? "Nada pendiente" : `${sugerencias.length} ${sugerencias.length === 1 ? "sugerencia" : "sugerencias"}`}</span>
       </div>
@@ -139,22 +201,20 @@ export function ListaSugerencias({ sugerencias, decididas, escribe }: { sugerenc
           No hay nada que decidir con los números de los últimos 7 días.{decididas > 0 ? ` Hay ${decididas} ya decididas que no se repiten hasta que venzan.` : ""}
         </p>
       ) : (
-        <ul role="list" className="m-0 flex list-none flex-col divide-y divide-border p-0">
-          {visibles.map((s) => (
-            <Tarjeta key={s.clave} s={s} escribe={escribe} ocupada={ocupada} alDecidir={decidir} />
-          ))}
-        </ul>
+        grupos.map((g) => <Grupo key={g.prioridad} prioridad={g.prioridad} sugerencias={g.lista} abierto={abiertos.has(g.prioridad)} alAlternar={() => alternar(g.prioridad)} escribe={escribe} ocupada={ocupada} alDecidir={decidir} />)
       )}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-4 py-2 text-xs text-muted-foreground">
-        <span>
-          Las sugerencias solo avisan: no cambian nada en Meta. Se calculan con los últimos 7 días y esto: sin compras tras {UMBRALES.sinComprasVeces} veces el CPA tope, CPA más de {Math.round((UMBRALES.cpaAltoFactor - 1) * 100)} % sobre el tope, escalar con {UMBRALES.escalarCompras}+ compras. Se propone apagar una campaña cuando su CPA pasa de ${UMBRALES_ANUNCIO.cpaRojo} (o de su tope, si es más alto) y los últimos {UMBRALES.recuperandoDias} días no lo bajan; los anuncios se miran con los últimos 30 días.
-        </span>
-        {sugerencias.length > 6 && (
-          <button type="button" onClick={() => setTodas((v) => !v)} className="font-medium underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground">
-            {todas ? "Ver menos" : `Ver las ${sugerencias.length}`}
-          </button>
-        )}
-      </div>
+      <details className="border-t border-border px-4 py-2 text-xs text-muted-foreground">
+        <summary className="min-h-8 cursor-pointer content-center font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground">Cómo se decide</summary>
+        <ul className="m-0 flex flex-col gap-1 pb-1 pl-4">
+          <li>Solo avisan: no cambian nada en Meta. Miran las campañas activas con los últimos 7 días.</li>
+          <li>
+            Apagar: sin compras tras {UMBRALES.sinComprasVeces} veces el CPA tope; CPA sobre ${UMBRALES_ANUNCIO.cpaRojo} (o el tope, si es más alto) que los últimos {UMBRALES.recuperandoDias} días no bajan; o sobre el tope sin ningún anuncio que venda por debajo del {Math.round(UMBRALES.cercaDelTope * 100)} % del tope.
+          </li>
+          <li>Actuar hoy: sobre el tope pero con un anuncio que la sostiene, o desde el {Math.round(UMBRALES.cercaDelTope * 100)} % del tope (agregar videos antes de llegar).</li>
+          <li>En observación: el CPA subió pero los 7 días siguen lejos del tope, o ya se está recuperando.</li>
+          <li>Del historial: solo productos y campañas con campañas activas.</li>
+        </ul>
+      </details>
     </section>
   );
 }
