@@ -7,7 +7,7 @@ import { resumirEquipo, type CreacionDeCampana, type DatosActividad, type Evento
 import { agrupar, copyLimpio, landingLimpia, type Elemento } from "./agrupar";
 import { anguloDominante, composicionDeAngulos, gruposDeVideos, type GruposDeVideo } from "./atributos-video";
 import { leerCostos } from "./costos-operacion";
-import { textoDeTope, zonaDe } from "./limite";
+import { guiaDeTope, textoDeGuia, zonaDe, type GuiaDeTope } from "./limite";
 import { calculadorDeTopes } from "./limite-datos";
 import { CPA_TOPE_PREDETERMINADO, sinResultados, sumar, type Resultados } from "./metricas";
 import { nombreDeAngulo, temasDe } from "./angulo-detalle";
@@ -95,7 +95,7 @@ export interface DatosMeta {
   sugerencias: Sugerencia[];
   decididas: number;
   /** El tope que usa cada producto de las campañas (por su llave) y, si se ajustó, por qué. */
-  topesProductos: Record<string, { tope: number; texto: string | null }>;
+  topesProductos: Record<string, { tope: number; texto: string | null; guia: GuiaDeTope | null }>;
   /** Las llaves con una decisión vigente: lo que ya no se muestra como pendiente en ninguna pantalla. */
   ocultas: string[];
   grupos: GruposMeta;
@@ -331,7 +331,7 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
       personaMeta: (c.creada_por as string | null) ?? creaciones.get(c.meta_id as string) ?? null,
       mercado: (c.mercado as string | null) ?? null,
       videos: (c.videos as string | null) ?? null,
-      r, tope: topeDe(clave).tope, topeDefinido: topeDe(clave).definido, topeAjustado: topeDe(clave).ajustado, topeTexto: textoDeTope(topeDe(clave)), manual: (c.manual as string[] | null) ?? [],
+      r, tope: topeDe(clave).tope, topeDefinido: topeDe(clave).definido, topeAjustado: topeDe(clave).ajustado, guiaTope: guiaDeTope(topeDe(clave)), manual: (c.manual as string[] | null) ?? [],
     };
   };
   const campanas = camp.map((c) => armar(c, porCampana.get(c.id as string) ?? sinResultados()));
@@ -486,7 +486,7 @@ export async function cargarAnunciosMeta(supabase: SupabaseClient, o: { paisId: 
   }
   const productos = [...new Set(camp.map((c) => (c.producto as string | null)?.trim()).filter((p): p is string => !!p))].sort((a, b) => a.localeCompare(b, "es"));
   return {
-    ...base, cuentas, cuentaId, desde, hasta: o.hoy, campanas: campanasConActividad, videos, anuncios, totales, anteriores, topes, productos, sugerencias, decididas: todas.length - sugerencias.length, ocultas, topesProductos: Object.fromEntries(productos.map((p) => { const t = topeDe(claveDeProducto(p)); return [claveDeProducto(p), { tope: t.tope, texto: textoDeTope(t) }]; })), grupos,
+    ...base, cuentas, cuentaId, desde, hasta: o.hoy, campanas: campanasConActividad, videos, anuncios, totales, anteriores, topes, productos, sugerencias, decididas: todas.length - sugerencias.length, ocultas, topesProductos: Object.fromEntries(productos.map((p) => { const t = topeDe(claveDeProducto(p)); const guia = guiaDeTope(t); return [claveDeProducto(p), { tope: t.tope, texto: guia ? textoDeGuia(guia) : null, guia }]; })), grupos,
     interpretacion, analisisGeneradoEn: hallazgosGuardados?.generadoEn ?? null, analisisPendiente: analisisViejo(hallazgosGuardados), vigilancias, senales, rasgos, historial: hallazgosGuardados ? seccionesDeAnalisis(hallazgosGuardados) : null,
     serie: serieGlobal, gruposVideo, productosVista, enMarcha, creadasPorDia, creadasHoy: creadasPorDia[13]?.testing + creadasPorDia[13]?.venta + creadasPorDia[13]?.escala + creadasPorDia[13]?.retargeting + creadasPorDia[13]?.otras || 0, actividad, ganchosSinTipo, actividadDisponible: eventos.length > 0, videosSinAnalizar: videos.filter((v) => !v.analisis || v.analisis.estado !== "analizado" || v.analisis.version < VERSION_ANALISIS).length, videosSinAngulo, iaConectada: false,
   };

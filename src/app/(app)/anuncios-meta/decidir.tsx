@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { createContext, useContext, useMemo, useState, useTransition, type ReactNode } from "react";
 import { fieldClassSm, labelClassSm } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
+import type { GuiaDeTope } from "@/lib/meta-ads/limite";
 import { DIAS_DE_DECISION } from "@/lib/meta-ads/sugerencias";
 import { decidirSugerenciaMeta, quitarDecisionMeta } from "./actions";
 
@@ -13,13 +14,17 @@ interface Decisiones {
   /** Las llaves con una decisión vigente. */
   ocultas: ReadonlySet<string>;
   escribe: boolean;
+  /** Los productos con el tope más bajo (por la llave de su nombre). */
+  guias: Readonly<Record<string, GuiaDeTope>>;
 }
 
-const Contexto = createContext<Decisiones>({ ocultas: new Set(), escribe: false });
+const Contexto = createContext<Decisiones>({ ocultas: new Set(), escribe: false, guias: {} });
 
-/** Lo decidido sobre las sugerencias y quién puede decidir, para todas las tarjetas de una pantalla de Anuncios Meta. */
-export function ProveedorDecisiones({ ocultas, escribe, children }: { ocultas: string[]; escribe: boolean; children: ReactNode }) {
-  const valor = useMemo(() => ({ ocultas: new Set(ocultas), escribe }), [ocultas, escribe]);
+const SIN_GUIAS: Record<string, GuiaDeTope> = {};
+
+/** Lo decidido sobre las sugerencias, quién puede decidir y los productos con el tope más bajo, para todas las tarjetas de una pantalla de Anuncios Meta. */
+export function ProveedorDecisiones({ ocultas, escribe, guias = SIN_GUIAS, children }: { ocultas: string[]; escribe: boolean; guias?: Record<string, GuiaDeTope>; children: ReactNode }) {
+  const valor = useMemo(() => ({ ocultas: new Set(ocultas), escribe, guias }), [ocultas, escribe, guias]);
   return <Contexto.Provider value={valor}>{children}</Contexto.Provider>;
 }
 

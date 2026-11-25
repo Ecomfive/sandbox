@@ -1,6 +1,7 @@
 // Anuncios Meta › la misma prioridad de «Para decidir hoy» en cada lista (25 nov 2026, pedido de Alcides: «que estos cambios de prioridad y relevancia se apliquen en todas las pestañas»). Sale de las sugerencias pendientes: cada campaña,
 // video y producto lleva la más urgente que tiene. Lo ya decidido no marca nada. Lógica pura, con prueba.
 
+import type { GuiaDeTope } from "./limite";
 import { PRIORIDADES, type CifraSugerencia, type Prioridad, type Severidad, type Sugerencia } from "./sugerencias";
 
 /** Lo más urgente que tiene una fila de una lista. */
@@ -11,6 +12,8 @@ export interface Pendiente {
   titulo: string;
   accion: string;
   cifras?: CifraSugerencia[];
+  /** Si su producto tiene el tope más bajo: desde cuánto vigilarlo y apagarlo. */
+  guia?: GuiaDeTope;
   /** Cuántas cosas (o campañas, en un producto) piden lo mismo. */
   cuantas: number;
 }
@@ -29,7 +32,7 @@ function agrupar(pares: readonly [string, Sugerencia][]): Map<string, Pendiente>
   const salida = new Map<string, Pendiente>();
   for (const [id, lista] of porId) {
     const s = [...lista].sort((a, b) => urgencia(a) - urgencia(b) || b.gasto - a.gasto)[0];
-    salida.set(id, { clave: s.clave, prioridad: s.prioridad, titulo: s.titulo, accion: s.accion, cifras: s.cifras, cuantas: lista.filter((x) => x.prioridad === s.prioridad).length });
+    salida.set(id, { clave: s.clave, prioridad: s.prioridad, titulo: s.titulo, accion: s.accion, cifras: s.cifras, guia: s.guia, cuantas: lista.filter((x) => x.prioridad === s.prioridad).length });
   }
   return salida;
 }

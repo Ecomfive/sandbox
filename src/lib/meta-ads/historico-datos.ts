@@ -8,7 +8,7 @@ import { traerTodasLasFilas } from "@/lib/supabase/paginar";
 import { anguloDominante, composicionDeAngulos } from "./atributos-video";
 import { indexarCatalogo, palabrasDeProducto, type IndiceCatalogo } from "./etapa-venta";
 import { leerCostos, sumarPedidos, tasasDe } from "./costos-operacion";
-import { topeDeProducto, type TopeProducto } from "./limite";
+import { guiaDeTope, topeDeProducto, type TopeProducto } from "./limite";
 import { analizarHistorico, sinVentanas, type AnalisisHistorico, type CampanaHist, type EntregaProducto, type MesHist, type ProductoHist, type VideoHist, type Ventanas } from "./historico";
 import { CPA_TOPE_PREDETERMINADO, sinResultados, sumar, type Resultados } from "./metricas";
 import { claveDeProducto } from "./nombre";
@@ -150,6 +150,11 @@ export async function calcularHistorico(o: { paisId: string; cuentaId: string | 
     topes.set(clave, topeDeProducto(topePorClave.get(clave), enTienda ? entregas.get(enTienda) : null, tienda, costos));
   }
   const topeDe = (clave: string) => topes.get(clave)?.tope ?? topePorClave.get(clave) ?? CPA_TOPE_PREDETERMINADO;
+  const guiaDe = (clave: string) => {
+    const t = topes.get(clave);
+    const g = t ? guiaDeTope(t) : null;
+    return g ? { guia: g } : {};
+  };
   const f = { mesDesde: restar(hoy, 29), mesPrevDesde: restar(hoy, 59), semDesde: restar(hoy, 6), semPrevDesde: restar(hoy, 27) };
 
   const anuncioDe = new Map(anun.map((a) => [a.id as string, a]));
@@ -218,6 +223,7 @@ export async function calcularHistorico(o: { paisId: string; cuentaId: string | 
       puja: (c.puja as string | null) ?? null,
       angulo: anguloDominante(composicionDeAngulos(videosDeCampana.get(c.id as string) ?? []).angulos),
       tope: topeDe(clave),
+      ...guiaDe(clave),
       total: totalCampana.get(c.id as string) ?? sinResultados(),
       v: ventCampana.get(c.id as string) ?? sinVentanas(),
     };
@@ -277,6 +283,7 @@ export async function calcularHistorico(o: { paisId: string; cuentaId: string | 
       familia: familiaDeProducto(g.nombre, null),
       tope: topeDe(clave),
       topeBase: topes.get(clave)?.base ?? topeDe(clave),
+      ...guiaDe(clave),
       campanas: g.campanas.length,
       total: g.campanas.reduce((t, c) => sumar(t, c.total), sinResultados()),
       v,

@@ -20,7 +20,7 @@ export function MarcoMeta({ titulo, datos, escribe, hayToken, pais, soloContenid
           {sinCuentas && soloContenidoSiHayCuentas ? (
             <SinCuentas pais={pais} puedeAgregar={escribe} />
           ) : (
-            <ProveedorDecisiones ocultas={datos.ocultas} escribe={escribe}>
+            <ProveedorDecisiones ocultas={datos.ocultas} escribe={escribe} guias={Object.fromEntries(Object.entries(datos.topesProductos).flatMap(([clave, t]) => (t.guia ? [[clave, t.guia]] : [])))}>
               {children}
             </ProveedorDecisiones>
           )}

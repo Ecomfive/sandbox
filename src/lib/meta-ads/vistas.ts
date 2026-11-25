@@ -1,5 +1,6 @@
 // Anuncios Meta: lo que las pantallas reciben ya armado (serializable: cruza de servidor a cliente).
 
+import type { GuiaDeTope } from "./limite";
 import type { Decision } from "./decision-anuncio";
 import type { Resultados } from "./metricas";
 import type { Pendiente } from "./prioridad";
@@ -50,7 +51,7 @@ export interface CampanaVista {
   topeDefinido: boolean;
   /** El tope se bajó del general por el envío y la entrega del producto, y por qué. */
   topeAjustado?: boolean;
-  topeTexto?: string | null;
+  guiaTope?: GuiaDeTope | null;
   /** Qué etiquetas se corrigieron a mano (la lectura de Meta no las pisa): `producto`, `angulo`, `etapa`. */
   manual: string[];
 }
@@ -63,7 +64,7 @@ export interface ProductoVista {
   tope: number;
   topeDefinido: boolean;
   topeAjustado?: boolean;
-  topeTexto?: string | null;
+  guiaTope?: GuiaDeTope | null;
   r: Resultados;
   campanas: number;
   activas: number;

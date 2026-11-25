@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { COSTOS_DE_LA_HOJA, costoPorVenta, tasasDe } from "./costos-operacion";
 import { decisionDeAnuncio, umbralesDeAnuncio } from "./decision-anuncio";
 import { analizarHistorico, type CampanaHist } from "./historico";
-import { topeAjustado, topeDeProducto, textoDeTope, zonaDe, zonaDeCpa } from "./limite";
+import { estadoFrenteAGuia, guiaDeTope, textoDeGuia, topeAjustado, topeDeProducto, zonaDe, zonaDeCpa } from "./limite";
 import { calculadorDeTopes } from "./limite-datos";
 import { nivelesDeMetricas, sinResultados, type Resultados } from "./metricas";
 import { claveDeDecision, limiteDeApagado, sugerir } from "./sugerencias";
@@ -30,10 +30,17 @@ test("el tope baja solo en el que envía o entrega peor, y cada venta que llega 
 
 test("un tope escrito a mano se respeta; el ajustado dice por qué", () => {
   const mano = topeDeProducto(12, peor, TIENDA, COSTOS_DE_LA_HOJA);
-  assert.deepEqual([mano.tope, mano.definido, mano.ajustado, textoDeTope(mano)], [12, true, false, null]);
+  assert.deepEqual([mano.tope, mano.definido, mano.ajustado, guiaDeTope(mano)], [12, true, false, null]);
   const solo = topeDeProducto(undefined, peor, TIENDA, COSTOS_DE_LA_HOJA);
   assert.deepEqual([solo.base, solo.definido, solo.ajustado], [10, false, true]);
-  assert.match(textoDeTope(solo)!, /^Tope ajustado a \$\d\.\d\d \(el general es \$10\.00\): este producto envía 57 % y entrega 75 %, y la tienda envía 64 % y entrega 85 %\.$/);
+  const g = guiaDeTope(solo)!;
+  assert.deepEqual([g.causa, g.motivo], ["Envía y entrega menos", "envía 57 % (la tienda 64 %) y entrega 75 % (la tienda 85 %)"]);
+  assert.deepEqual([g.vigilar, g.apagar, g.vigilarGeneral, g.apagarGeneral], [Math.round(solo.tope * 90) / 100, Math.round(solo.tope * 120) / 100, 9, 12]);
+  assert.equal(g.apagar, limiteDeApagado({ tope: solo.tope, topeAjustado: true }), "lo que se indica es lo que el sistema usa para apagar");
+  assert.match(textoDeGuia(g), /conviene empezar a vigilarlo desde un CPA de \$\d\.\d\d y apagarlo desde \$\d\.\d\d si en 4 días no baja \(con el tope general sería \$9\.00 y \$12\.00\)\.$/);
+  assert.deepEqual([estadoFrenteAGuia({ gasto: g.apagar * 10, compras: 10 }, g), estadoFrenteAGuia({ gasto: g.vigilar * 10, compras: 10 }, g), estadoFrenteAGuia({ gasto: 10, compras: 10 }, g), estadoFrenteAGuia({ gasto: 3, compras: 0 }, g)], ["apagar", "vigilar", "bien", "sin_compras"]);
+  // Solo entrega menos: lo dice así.
+  assert.equal(guiaDeTope(topeDeProducto(undefined, { entregadas: 50, devueltas: 50, canceladas: 55, enCamino: 0, sinEnviar: 0 }, TIENDA, COSTOS_DE_LA_HOJA))!.causa, "Entrega más baja");
   const de = calculadorDeTopes(new Map([["MANO", 8]]), { entrega: [{ clave: "PEOR", ...peor }], pedidosDeLaTienda: PEDIDOS_TIENDA }, COSTOS_DE_LA_HOJA);
   assert.equal(de("MANO").tope, 8);
   assert.equal(de("PEOR").tope, solo.tope);
