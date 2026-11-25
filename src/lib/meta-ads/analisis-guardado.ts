@@ -74,13 +74,16 @@ export interface ResultadoRefresco {
   interpretado: boolean;
   /** Por qué no se hizo algo, en palabras (para el registro del cron). */
   motivo?: string;
+  /** Cuántos productos se investigaron por su entrega y cuántos tienen señales de creativos y de otros módulos (lo que se guardó). */
+  investigados?: number;
+  conSenales?: number;
 }
 
 /**
  * Prepara el análisis del historial de un país: lo calcula, lo guarda y, si ya toca (una vez al día) y hay IA conectada, lo interpreta con todas las IA que tengan clave. Nunca lanza.
  * `bloqueo` evita que dos personas que abren la pantalla a la vez lancen dos cálculos; el cron no lo necesita.
  */
-export async function refrescarAnalisisMeta(supabase: SupabaseClient, o: { paisId: string; paisNombre: string; hoy: string; interpretar?: boolean; bloqueo?: boolean }): Promise<ResultadoRefresco> {
+export async function refrescarAnalisisMeta(supabase: SupabaseClient, o: { paisId: string; paisNombre: string; hoy: string; interpretar?: boolean; bloqueo?: boolean; forzar?: boolean }): Promise<ResultadoRefresco> {
   try {
     if (o.bloqueo) {
       const { data } = await supabase.from("meta_ajustes").select("valor").eq("clave", claveDeBloqueo(o.paisId)).maybeSingle();
@@ -94,18 +97,19 @@ export async function refrescarAnalisisMeta(supabase: SupabaseClient, o: { paisI
     if (!(await guardar(supabase, claveDeAnalisis(o.paisId), valor, "Sistema"))) return { analizado: false, interpretado: false, motivo: "Falta la migración 0347 (meta_ajustes): no se puede guardar." };
     // Las vigilancias que pidió la gente se evalúan con los mismos resultados (cada día y al abrir la pantalla si el análisis era viejo).
     await evaluarVigilanciasGuardadas(supabase, { paisId: o.paisId, hoy: o.hoy });
-    if (!o.interpretar) return { analizado: true, interpretado: false };
     if (!tieneHistorialSuficiente(h.analisis)) return { analizado: true, interpretado: false, motivo: "Poco historial para interpretar." };
-    if (!proveedoresConectados().length) return { analizado: true, interpretado: false, motivo: "Ninguna IA de texto conectada." };
-    const previa = await leerInterpretacionGuardada(supabase, o.paisId);
-    if (previa && horasDesde(previa.generadaEn) < HORAS_ENTRE_INTERPRETACIONES) return { analizado: true, interpretado: false, motivo: "La interpretación de hoy ya está hecha." };
-    // Antes de interpretar se investiga por qué no se entregan los productos con problema, para que las recomendaciones usen causas encontradas y no «revisa por qué».
-    const investigaciones = await investigarProblemasDeEntrega(supabase, { paisId: o.paisId, hoy: o.hoy, analisis: h.analisis, tiendas: h.tiendas });
+    // Por qué no se entregan los productos con problema y qué pasa con sus creativos y en otros módulos: solo lee la base y se guarda aparte, así que corre siempre (no depende de que toque interpretar).
+    const investigaciones = await investigarProblemasDeEntrega(supabase, { paisId: o.paisId, hoy: o.hoy, analisis: h.analisis, tiendas: h.tiendas, forzar: o.forzar });
     const senales = await senalesCreativasDelDia(supabase, { paisId: o.paisId, hoy: o.hoy, analisis: h.analisis });
+    const extras = { investigados: investigaciones.length, conSenales: senales.length };
+    if (!o.interpretar) return { analizado: true, interpretado: false, ...extras };
+    if (!proveedoresConectados().length) return { analizado: true, interpretado: false, motivo: "Ninguna IA de texto conectada.", ...extras };
+    const previa = await leerInterpretacionGuardada(supabase, o.paisId);
+    if (!o.forzar && previa && horasDesde(previa.generadaEn) < HORAS_ENTRE_INTERPRETACIONES) return { analizado: true, interpretado: false, motivo: "La interpretación de hoy ya está hecha.", ...extras };
     const opiniones = await interpretarConTodas(h.analisis, o.paisNombre, investigaciones, senales);
-    if (!opiniones.length) return { analizado: true, interpretado: false, motivo: "Las IA no devolvieron una interpretación que sirva." };
+    if (!opiniones.length) return { analizado: true, interpretado: false, motivo: "Las IA no devolvieron una interpretación que sirva.", ...extras };
     await guardar(supabase, claveDeInterpretacion(o.paisId), { generadaEn: new Date().toISOString(), opiniones }, "Sistema");
-    return { analizado: true, interpretado: true };
+    return { analizado: true, interpretado: true, ...extras };
   } catch (e) {
     return { analizado: false, interpretado: false, motivo: e instanceof Error ? e.message : "No se pudo preparar el análisis." };
   }

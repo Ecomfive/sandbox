@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { AJUSTE_ANALISIS_AUTOMATICO } from "@/lib/meta-ads/ajustes";
-import { iasParaInterpretar, leerAnalisisGuardado } from "@/lib/meta-ads/analisis-guardado";
+import { iasParaInterpretar, leerAnalisisGuardado, refrescarAnalisisMeta } from "@/lib/meta-ads/analisis-guardado";
 import { claveDeTema, ejecutarAnalisis, validarAnalisis, validarPrioridad, validarVigilancia, vigilanciaDeAnalisis, type Prioridad } from "@/lib/meta-ads/analisis-pedido";
 import { cargarBaseDias } from "@/lib/meta-ads/base-dias";
 import { guardarInvestigacion, investigarProducto, leerInvestigaciones, proveedorParaInvestigar } from "@/lib/meta-ads/investigacion-datos";
@@ -581,4 +581,26 @@ export async function investigarEntregaMeta(clave: unknown): Promise<{ error?: s
   await registrarAuditoria({ accion: "investigar_entrega_meta", entidad: "meta_ajustes", detalle: `${fila.nombre} · a fondo` });
   revalidatePath("/anuncios-meta", "layout");
   return { aviso: hecha.aviso };
+}
+
+/**
+ * «Actualizar el análisis ahora» (Hallazgos): lo mismo que hace el sistema cada día —calcular todo el historial, evaluar las vigilancias, investigar por qué no se entregan los productos con problema, mirar los creativos y lo que pasó en otros módulos
+ * e interpretar con las IA— pero ya, sin esperar a la próxima lectura. Gasta crédito de IA (la interpretación se vuelve a pedir) y tarda uno o dos minutos: hace falta poder modificar el módulo.
+ */
+export async function actualizarAnalisisMeta(): Promise<{ error?: string; mensaje?: string }> {
+  const u = await requireModuloEscritura(MODULO);
+  const supabase = createServiceClient();
+  const pais = await getPaisActual(supabase);
+  if (!(await puedeVerPaisId(supabase, u.paisesPermitidos, pais.id))) return { error: "No tienes acceso a ese país." };
+  const r = await refrescarAnalisisMeta(supabase, { paisId: pais.id, paisNombre: pais.nombre, hoy: hoyEnPanama(), interpretar: true, forzar: true, bloqueo: true });
+  await registrarAuditoria({ accion: "actualizar_analisis_meta", entidad: "meta_ajustes", detalle: `${pais.nombre} · ${r.analizado ? "listo" : (r.motivo ?? "no se pudo")}` });
+  revalidatePath("/anuncios-meta", "layout");
+  if (!r.analizado) return { error: r.motivo ?? "No se pudo actualizar el análisis." };
+  const partes = [
+    "Análisis del historial al día.",
+    `${r.investigados ?? 0} ${r.investigados === 1 ? "producto investigado" : "productos investigados"} por su entrega.`,
+    `${r.conSenales ?? 0} ${r.conSenales === 1 ? "producto" : "productos"} con señales de creativos y de otros módulos.`,
+    r.interpretado ? "Interpretación de la IA renovada." : `Interpretación: ${r.motivo ?? "no se renovó"}.`,
+  ];
+  return { mensaje: partes.join(" ") };
 }
