@@ -86,7 +86,7 @@ function Tarjeta({ s }: { s: Sugerencia }) {
           {s.guia && <GuiaEnLinea guia={s.guia} className="mt-1.5" />}
           {s.anuncios && s.anuncios.length > 0 && <AnunciosPasados anuncios={s.anuncios} />}
         </div>
-        <BotonesDecidir clave={s.clave} titulo={s.titulo} className="w-full shrink-0 pl-4 @3xl:w-auto @3xl:max-w-[26rem] @3xl:justify-end @3xl:pl-0" />
+        <BotonesDecidir clave={s.clave} titulo={s.titulo} accion={s.accion} className="w-full shrink-0 pl-4 @3xl:w-auto @3xl:max-w-[26rem] @3xl:justify-end @3xl:pl-0" />
       </div>
     </li>
   );

@@ -43,7 +43,7 @@ export function QueHacer({ pendiente }: { pendiente: Pendiente }) {
       {pendiente.cifras && pendiente.cifras.length > 0 && <CifrasEnLinea cifras={pendiente.cifras} />}
       <p className="m-0 text-sm">{pendiente.accion}</p>
       {pendiente.guia && <GuiaEnLinea guia={pendiente.guia} />}
-      {pendiente.clave && <BotonesDecidir clave={pendiente.clave} titulo={pendiente.titulo} />}
+      {pendiente.clave && <BotonesDecidir clave={pendiente.clave} titulo={pendiente.titulo} accion={pendiente.accion} />}
     </section>
   );
 }

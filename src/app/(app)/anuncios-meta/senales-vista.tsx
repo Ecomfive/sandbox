@@ -149,7 +149,7 @@ function Producto({ s }: { s: SenalesCreativas }) {
                     <span className="shrink-0 font-semibold text-success">Qué hacer</span>
                     <span>{f.accion}</span>
                   </p>
-                  <BotonesDecidir clave={f.decision} titulo={`${s.producto}: ${f.titulo}`} className="mt-2" />
+                  <BotonesDecidir clave={f.decision} titulo={`${s.producto}: ${f.titulo}`} accion={f.accion} className="mt-2" />
                 </div>
               </li>
             ))}

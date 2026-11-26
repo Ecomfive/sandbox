@@ -1,4 +1,5 @@
 import { AtajosTeclado } from "@/components/atajos-teclado";
+import { BotonNotasMeta } from "@/components/boton-notas-meta";
 import { BusquedaGlobal } from "@/components/busqueda-global";
 import { CampanaPendientes } from "@/components/campana-pendientes";
 import { EnLinea } from "@/components/en-linea";
@@ -54,6 +55,8 @@ export async function NavBar({
             </Suspense>
           )}
           <SelectorContexto pais={pais.codigo} plataforma={plataforma} plataformas={plataformasDePais(pais.codigo)} permitidos={usuario?.paisesPermitidos ?? null} />
+          {/* Solo en Anuncios Meta: muestra el botón de notas si se ocultó (26 nov 2026). */}
+          {usuario?.modulos.includes("anuncios-meta") && <BotonNotasMeta />}
           <MenuCrear acciones={accionesCrear} />
           {usuario?.modulos.includes("tareas") && <CampanaPendientes pendientes={pendientes} />}
           {/* Los atajos de teclado siguen activos; su ayuda se abre desde el menú de la persona. */}

@@ -5,6 +5,7 @@ import { createContext, useContext, useMemo, useState, useTransition, type React
 import { fieldClassSm, labelClassSm } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import type { GuiaDeTope } from "@/lib/meta-ads/limite";
+import { abrirNotas } from "@/lib/meta-ads/notas-eventos";
 import { DIAS_DE_DECISION } from "@/lib/meta-ads/sugerencias";
 import { decidirSugerenciaMeta, quitarDecisionMeta } from "./actions";
 
@@ -44,8 +45,9 @@ const boton = "min-h-8 cursor-pointer rounded-md border border-border-control bg
 /**
  * «Ya lo hice», «Dejar para después» y «No aplica» (25 nov 2026, pedido de Alcides: poder omitir cualquier sugerencia, en todas las pantallas donde sale). Lo decidido se recuerda hasta que vence y se oculta en todas partes; no
  * cambia nada en Meta. Quien solo mira no ve los botones. `titulo` distingue unos botones de otros para lectores de pantalla.
+ * «Anotar» (26 nov 2026, pedido de Hernán) abre las notas flotantes para rescatar algo de esta sugerencia para futuras campañas; `accion` (el «Qué hacer») queda en la nota como referencia.
  */
-export function BotonesDecidir({ clave, titulo, className = "" }: { clave: string; titulo: string; className?: string }) {
+export function BotonesDecidir({ clave, titulo, accion, className = "" }: { clave: string; titulo: string; accion?: string | null; className?: string }) {
   const { escribe } = useDecisiones();
   const router = useRouter();
   const { mostrarToast } = useToast();
@@ -103,6 +105,19 @@ export function BotonesDecidir({ clave, titulo, className = "" }: { clave: strin
       </button>
       <button type="button" disabled={ocupada} onClick={() => setRechazando(true)} className={`${boton} text-muted-foreground`}>
         No aplica
+      </button>
+      <button
+        type="button"
+        onClick={() => abrirNotas({ clave, texto: [titulo, accion].filter(Boolean).join(" — ").slice(0, 600) })}
+        aria-label={`Anotar algo de «${titulo}» para futuras campañas`}
+        className={`${boton} inline-flex items-center gap-1 border-primario/30 bg-primario-suave text-primario hover:bg-primario-suave hover:brightness-95`}
+      >
+        <svg aria-hidden="true" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M14.5 21H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10.5" />
+          <path d="M20 15.5 14.5 21v-4a1.5 1.5 0 0 1 1.5-1.5h4" />
+          <path d="M8 8h8M8 12h5" />
+        </svg>
+        Anotar
       </button>
     </div>
   );

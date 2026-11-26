@@ -78,7 +78,7 @@ export function TarjetaHallazgo({ h, conSeccion = false }: { h: Hallazgo; conSec
         </div>
       </details>
       {h.guia && <GuiaEnLinea guia={h.guia} className="px-3 pb-2 sm:pl-14" />}
-      <BotonesDecidir clave={claveDeDecision(h)} titulo={h.titulo} className="px-3 pb-2.5 sm:pl-14" />
+      <BotonesDecidir clave={claveDeDecision(h)} titulo={h.titulo} accion={h.accion} className="px-3 pb-2.5 sm:pl-14" />
     </li>
   );
 }
