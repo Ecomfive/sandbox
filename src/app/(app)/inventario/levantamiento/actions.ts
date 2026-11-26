@@ -22,14 +22,14 @@ const revisarLista = (lista: unknown): { items: ItemConteo[] } | { error: string
 const unidadesDe = (i: ItemConteo): number => ("cantidad" in i ? i.cantidad : i.lotes.reduce((t, l) => t + l.cantidad, 0));
 
 /**
- * El límite de existencia sobre todo un levantamiento: por producto, lo que sube con lo contado, lo añadido y lo restado. Devuelve el mensaje del primer producto que lo supere
+ * El límite de existencia sobre todo un levantamiento: por producto, lo que sube con lo contado y lo añadido (lo restado no compensa, ver `aumentoDeConteo`). Devuelve el mensaje del primer producto que lo supere
  * sin poder hacerlo, o `null`.
  */
 async function revisarLimiteDeConteo(
   supabase: ReturnType<typeof createServiceClient>,
   bodegaId: string,
   bodega: BodegaDeInventario,
-  d: { contados: ItemConteo[]; sumas: ItemConteo[]; restas: ItemConteo[]; aCargo: boolean; motivo: string },
+  d: { contados: ItemConteo[]; sumas: ItemConteo[]; aCargo: boolean; motivo: string },
 ): Promise<string | null> {
   if (!PAISES_CON_LIMITE.includes(bodega.pais ?? "") || (d.aCargo && d.motivo) || (!d.contados.length && !d.sumas.length)) return null;
   const { data: stock, error } = await traerTodasConError<{ sku_maestro_id: string; fisico: number }>((de, hasta) =>
@@ -39,9 +39,8 @@ async function revisarLimiteDeConteo(
   const enBodega = new Map(stock.map((s) => [s.sku_maestro_id, Number(s.fisico)]));
   const contado = new Map(d.contados.map((i) => [i.sku, unidadesDe(i)]));
   const sumar = new Map(d.sumas.map((i) => [i.sku, unidadesDe(i)]));
-  const restar = new Map(d.restas.map((i) => [i.sku, unidadesDe(i)]));
   const suben = [...new Set([...contado.keys(), ...sumar.keys()])]
-    .map((sku) => ({ sku, aumento: aumentoDeConteo({ enBodega: enBodega.get(sku) ?? 0, contado: contado.get(sku) ?? null, sumar: sumar.get(sku) ?? 0, restar: restar.get(sku) ?? 0 }) }))
+    .map((sku) => ({ sku, aumento: aumentoDeConteo({ enBodega: enBodega.get(sku) ?? 0, contado: contado.get(sku) ?? null, sumar: sumar.get(sku) ?? 0 }) }))
     .filter((x) => x.aumento > 0);
   if (!suben.length) return null;
   const primero = suben[0];
@@ -139,7 +138,7 @@ export async function guardarLevantamiento(
   const bloqueo = bloqueoDeBodega(alcance, bodega);
   if (bloqueo) return { error: bloqueo };
   if (porTrasladar.length && alcance !== "total") return { error: SOLO_A_CARGO };
-  const limite = await revisarLimiteDeConteo(supabase, bodegaId, bodega, { contados: revisado.items, sumas: porSumar, restas: porRestar, aCargo: estaACargoDelInventario(usuario), motivo: ref });
+  const limite = await revisarLimiteDeConteo(supabase, bodegaId, bodega, { contados: revisado.items, sumas: porSumar, aCargo: estaACargoDelInventario(usuario), motivo: ref });
   if (limite) return { error: limite };
 
   // Restar es una salida a mano: donde toda salida va con remisión (Costa Rica), es de un administrador y lleva motivo (la referencia).

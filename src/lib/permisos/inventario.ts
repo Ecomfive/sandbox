@@ -72,8 +72,9 @@ export function revisarLimite(p: {
 
 /**
  * Cuánto sube la existencia de un producto con lo escrito en un levantamiento de una bodega: lo contado reemplaza lo que había en esa bodega (sin contar, queda igual), más lo que se
- * añade, menos lo que se resta. Lo que se transfiere no cambia la existencia del país.
+ * añade. **Lo que se resta no compensa**: se guarda en un paso posterior que puede fallar, y el conteo más alto quedaría guardado sin haber pasado por el límite. Lo que se transfiere
+ * no cambia la existencia del país.
  */
-export function aumentoDeConteo(p: { enBodega: number; contado: number | null; sumar: number; restar: number }): number {
-  return (p.contado === null ? 0 : p.contado - p.enBodega) + p.sumar - p.restar;
+export function aumentoDeConteo(p: { enBodega: number; contado: number | null; sumar: number }): number {
+  return (p.contado === null ? 0 : p.contado - p.enBodega) + p.sumar;
 }

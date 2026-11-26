@@ -76,10 +76,10 @@ test("fuera de Panamá no hay límite", () => {
 });
 
 test("cuánto sube un levantamiento", () => {
-  assert.equal(aumentoDeConteo({ enBodega: 100, contado: 120, sumar: 0, restar: 0 }), 20);
-  assert.equal(aumentoDeConteo({ enBodega: 100, contado: 80, sumar: 0, restar: 0 }), -20);
-  assert.equal(aumentoDeConteo({ enBodega: 100, contado: null, sumar: 5, restar: 0 }), 5);
-  assert.equal(aumentoDeConteo({ enBodega: 100, contado: null, sumar: 0, restar: 5 }), -5);
-  assert.equal(aumentoDeConteo({ enBodega: 100, contado: 90, sumar: 10, restar: 0 }), 0);
-  assert.equal(aumentoDeConteo({ enBodega: -5, contado: 0, sumar: 0, restar: 0 }), 5);
+  assert.equal(aumentoDeConteo({ enBodega: 100, contado: 120, sumar: 0 }), 20);
+  assert.equal(aumentoDeConteo({ enBodega: 100, contado: 80, sumar: 0 }), -20);
+  assert.equal(aumentoDeConteo({ enBodega: 100, contado: null, sumar: 5 }), 5);
+  assert.equal(aumentoDeConteo({ enBodega: 100, contado: null, sumar: 0 }), 0);
+  assert.equal(aumentoDeConteo({ enBodega: 100, contado: 90, sumar: 10 }), 0);
+  assert.equal(aumentoDeConteo({ enBodega: -5, contado: 0, sumar: 0 }), 5);
 });
