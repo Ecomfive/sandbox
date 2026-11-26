@@ -6,6 +6,7 @@ import { anilloFoco, fieldClassSm } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { revisarReparto, type LineaReparto } from "@/lib/wms/reparto-variantes";
 import { dejarRepartoPendiente, obtenerRepartoVariantes, repartirStockVariantes, type DatosReparto } from "./reparto-actions";
+import { usePuedeAbrir } from "@/components/modulos-contexto";
 
 /** Un aviso con un punto ámbar (la alerta es un punto, no una caja de color). */
 function Aviso({ children }: { children: React.ReactNode }) {
@@ -39,8 +40,12 @@ export function AvisoRepartoEnVariante({ padre, alAbrir }: { padre: { id: string
  * En la ficha del producto principal, dentro de «Variantes»: si su stock está pendiente de repartir, lo dice y deja repartirlo; si no, deja pasar el stock que hoy tienen sus
  * variantes al stock general (para un reparto que fue solo provisional) y dejarlo pendiente.
  */
-export function RepartoStock({ id, codigo, pendiente, puedeEscribir, alCambiar }: { id: string; codigo: string; pendiente: boolean; puedeEscribir: boolean; alCambiar?: () => void }) {
+export function RepartoStock({ id, codigo, pendiente, puedeEscribir: puedeProducto, alCambiar }: { id: string; codigo: string; pendiente: boolean; puedeEscribir: boolean; alCambiar?: () => void }) {
   const { mostrarToast } = useToast();
+  // Repartir mueve inventario: es de la persona a cargo del inventario y de los administradores (26 nov 2026); el servidor lo vuelve a comprobar.
+  const encargado = usePuedeAbrir("encargado-inventario");
+  const administra = usePuedeAbrir("usuarios");
+  const puedeEscribir = puedeProducto && (encargado || administra);
   const [repartiendo, setRepartiendo] = useState(false);
   const [ocupado, empezar] = useTransition();
 

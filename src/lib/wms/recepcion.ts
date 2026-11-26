@@ -1,11 +1,25 @@
 /**
- * Recepción de compras y reglas de Costa Rica (6 nov 2026, pedido de Hernán, flujograma de Proveeduría Costa Rica). Lógica pura, con prueba.
+ * Recepción de compras (Costa Rica desde el 6 nov 2026, Panamá desde el 26 nov 2026) y reglas de Costa Rica (flujograma de Proveeduría Costa Rica). Lógica pura, con prueba.
  */
 import { ETAPAS_LLEGADA_PUERTO } from "@/lib/compras/etapas-puerto";
 import { codigoLote } from "./vencimiento";
 
-/** Los países donde se reciben compras desde Inventario. Por ahora Costa Rica: los demás siguen como estaban. */
+/** Los países con las pantallas de plataformas de Inventario (Cuadro y Novedades). Por ahora Costa Rica. */
 export const PAISES_CON_RECEPCION = ["CR"];
+
+/** Los países donde se reciben compras desde Inventario (pestaña Recepción). */
+export const PAISES_QUE_RECIBEN_COMPRAS = ["CR", "PA"];
+
+export interface ReglaRecepcion {
+  /** Las etapas de compra que salen por recibir. */
+  etapas: string[];
+  /** Además, las compras completadas desde este día (AAAA-MM-DD), o `null`: las de antes ya están contadas. */
+  completadasDesde: string | null;
+  /** La casilla «Llegaron» viene escrita con lo pedido y se corrige si llegó otra cosa. */
+  vieneEscrita: boolean;
+  /** Deja marcar una línea como recibida sin sumarla, porque ya se había contado a mano. */
+  admiteYaContadas: boolean;
+}
 
 /** Los países donde toda salida va con remisión: la salida a mano queda para un administrador o quien tenga el permiso «Salida a mano» (`autorizadaParaSalidaManual`), con motivo. */
 export const PAISES_SALIDA_CON_REMISION = ["CR"];
@@ -23,6 +37,19 @@ export const pideMotivo = (tipo: string, codigoPais: string | null | undefined) 
 
 /** Las etapas en que una compra se puede recibir: en camino o ya llegó. Las completadas quedaron dentro del levantamiento y recibirlas las contaría dos veces. */
 export const ETAPAS_POR_RECIBIR = ["tracking", ...ETAPAS_LLEGADA_PUERTO, "en_bodega"];
+
+/** Desde cuándo una compra completada de Panamá sin recibir todavía sale en Recepción (el día en que empezó allí). */
+export const COMPLETADAS_DE_PANAMA_DESDE = "2026-11-24";
+
+/**
+ * Cómo se recibe en cada país, o `null` si no se recibe desde Inventario. En Panamá (26 nov 2026, pedido de Dinora) sale lo que ya llegó a puerto o a bodega, con lo pedido ya escrito;
+ * en Costa Rica sigue como estaba.
+ */
+export function reglaDeRecepcion(codigoPais: string | null | undefined): ReglaRecepcion | null {
+  if (codigoPais === "CR") return { etapas: ETAPAS_POR_RECIBIR, completadasDesde: null, vieneEscrita: false, admiteYaContadas: false };
+  if (codigoPais === "PA") return { etapas: [...ETAPAS_LLEGADA_PUERTO, "en_bodega"], completadasDesde: COMPLETADAS_DE_PANAMA_DESDE, vieneEscrita: true, admiteYaContadas: true };
+  return null;
+}
 
 export interface LineaRecepcion {
   item: string;

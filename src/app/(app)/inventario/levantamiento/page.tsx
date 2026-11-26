@@ -1,6 +1,7 @@
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { requireModulo } from "@/lib/auth";
+import { alcanceInventario, esBodegaDeDespacho } from "@/lib/permisos/inventario";
 import { autorizadaParaSalidaManual } from "@/lib/permisos/salida-manual";
 import { pideMotivo, puedeMoverAMano } from "@/lib/wms/recepcion";
 import { getPaisActual } from "@/lib/pais";
@@ -30,13 +31,17 @@ export default async function LevantamientoPage({ searchParams }: { searchParams
 
   const { data: bodegasPais } = await supabase
     .from("wms_bodegas")
-    .select("id, nombre")
+    .select("id, nombre, codigo")
     .eq("pais_id", pais.id)
     .eq("tipo", "propia")
     .eq("activa", true)
     .order("orden")
     .order("nombre");
-  const bodegas = (bodegasPais ?? []).map((b) => ({ id: b.id as string, nombre: b.nombre as string }));
+  // Quien no está a cargo del inventario solo cuenta la bodega de despacho (26 nov 2026); en un país sin ella ve las demás sin poder guardar.
+  const alcance = alcanceInventario(usuario);
+  const suyas = (bodegasPais ?? []).filter((b) => alcance === "despacho" && esBodegaDeDespacho({ codigo: b.codigo as string, tipo: "propia", pais: pais.codigo }));
+  const bodegas = (suyas.length ? suyas : (bodegasPais ?? [])).map((b) => ({ id: b.id as string, nombre: b.nombre as string }));
+  const puedeGuardar = alcance === "total" || suyas.length > 0;
   const pedida = typeof bodega === "string" && ES_ID(bodega) ? bodega : "";
   const elegida = bodegas.some((b) => b.id === pedida) ? pedida : (bodegas[0]?.id ?? "");
 
@@ -126,7 +131,7 @@ export default async function LevantamientoPage({ searchParams }: { searchParams
           bodegaElegida={elegida}
           productos={filas}
           ultimo={ultimoConteo ? { fecha: ultimoConteo.creado_en, referencia: ultimoConteo.referencia, productos: ultimoConteo.productos } : null}
-          puedeEscribir={!usuario.modulosSoloLectura.includes("inventario")}
+          puedeEscribir={puedeGuardar}
           puedeRestar={puedeMoverAMano("salida", pais.codigo, autorizadaParaSalidaManual(usuario))}
           restarPideMotivo={pideMotivo("salida", pais.codigo)}
           codigoPais={pais.codigo}

@@ -24,6 +24,7 @@ import {
 import { PAIS_FINANZAS } from "@/lib/finanzas/cargar-inventario";
 import { paisDeOperacionActual } from "@/lib/finanzas/pais-servidor";
 import { sinAccesoTodaLaEmpresa } from "@/lib/finanzas/acceso-tienda";
+import { estaACargoDelInventario, SOLO_A_CARGO } from "@/lib/permisos/inventario";
 
 const MODULO = "rentabilidad";
 /** Un conteo mueve el stock del WMS: hace falta poder modificar Inventario. */
@@ -255,6 +256,8 @@ export async function resolverAjusteInventario(id: unknown, aprobar: unknown, mo
     const { data: s } = await supabase.from("fin_ajustes_inventario").select("id, archivo, soporte, filas, estado, solicitado_por").eq("id", id).maybeSingle();
     if (!s) return { error: "La solicitud ya no existe." };
     if (s.estado !== "pendiente") return { error: "La solicitud ya se resolvió." };
+    // Aprobar un conteo mueve el inventario (y puede subirlo): lo aprueba la persona a cargo del inventario o un administrador. El soporte del conteo es el motivo.
+    if (aprobar === true && !estaACargoDelInventario(usuario)) return { error: SOLO_A_CARGO };
     const esAdmin = usuario.modulos.includes("usuarios") && !usuario.modulosSoloLectura.includes("usuarios");
     if (s.solicitado_por === usuario.id && !esAdmin) return { error: "La aprueba o rechaza otra persona, no quien la pidió." };
     const ahora = new Date().toISOString();
