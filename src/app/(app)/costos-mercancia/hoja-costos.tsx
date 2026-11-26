@@ -22,33 +22,44 @@ import { fechaCorta } from "@/lib/af4/fecha";
 import { dinero, entero, SIN_DATO } from "@/lib/af4/formato";
 import { usd4 } from "./formato";
 import { numeroProducto } from "@/lib/wms/codigos-producto";
-import { COSTOS_ASOCIADOS, VARIACION_AVISO, calcularFila, type CampoAsociado, type ResumenProducto } from "@/lib/finanzas/hoja-costos";
+import { COSTOS_ASOCIADOS, ETIQUETA_FINANCIAMIENTO, VARIACION_AVISO, calcularFila, codigoComparable, pendienteDesglosar, pesoDeFila, repartirPorPeso, sinFinanciamiento, type CampoAsociado, type ResumenProducto } from "@/lib/finanzas/hoja-costos";
+import { KpiFiltro } from "@/components/ui/kpi-filtro";
+import { KpiGrid } from "@/components/ui/kpi-card";
+import { HistorialGenerico } from "@/components/ui/historial-generico";
 import type { FilaHojaVista, ProductoSinCosto } from "@/lib/finanzas/cargar-hoja-costos";
-import { AlertaIcon, CalendarioIcon, ComprasIcon, GastoIcon, LapizIcon, PapeleraIcon, ProductoIcon } from "@/lib/nav-icons";
+import { AlertaIcon, CalendarioIcon, CandadoIcon, ComprasIcon, GastoIcon, LapizIcon, PapeleraIcon, ProductoIcon } from "@/lib/nav-icons";
 import type { DefTabla } from "@/lib/tabla/motor";
 import type { NombreFilas } from "@/lib/tabla/pie";
-import { crearCostoManual, eliminarCostoManual, guardarCostoAsociado, guardarNotaYCostoFinal } from "./hoja-actions";
+import { buscarMovimientosCompra, crearCostoManual, eliminarCostoManual, guardarAsociadosCompra, guardarCostoAsociado, guardarNotaYCostoFinal, obtenerHistorialCostoFila, type MovimientoLibro } from "./hoja-actions";
 
 const usd = (v: number) => dinero(v, "USD");
 const usdU = usd4;
 
-type Edicion = Partial<Record<CampoAsociado, number>> & { costoTotal?: number; nota?: string | null; costoFinalManual?: number | null };
+type Edicion = Partial<Record<CampoAsociado, number>> & { costoTotal?: number; nota?: string | null; costoFinalManual?: number | null; costoFinalExcel?: boolean };
 
 interface Contexto {
   puedeEscribir: boolean;
+  esAdmin: boolean;
   editar: (id: string, cambio: Edicion) => void;
   abrirNota: (f: FilaHojaVista) => void;
+  abrirCompra: (f: FilaHojaVista) => void;
 }
 
-const estadoDe = (f: FilaHojaVista): "manual" | "porCompletar" | "completo" =>
-  f.costoFinalManual ? "manual" : COSTOS_ASOCIADOS.some((c) => f.asociados[c.id] > 0) ? "completo" : "porCompletar";
-const ETIQUETA_ESTADO = { manual: "Costo final manual", porCompletar: "Por completar", completo: "Con costos asociados" } as const;
+/** Se puede cambiar: con permiso, y si llegó en un mes ya cerrado, solo un administrador. */
+const editable = (f: FilaHojaVista, ctx: Contexto) => ctx.puedeEscribir && (!f.cerrada || ctx.esAdmin);
+
+const estadoDe = (f: FilaHojaVista): "desglosar" | "manual" | "porCompletar" | "completo" =>
+  pendienteDesglosar(f) ? "desglosar" : f.costoFinalManual ? "manual" : COSTOS_ASOCIADOS.some((c) => f.asociados[c.id] > 0) ? "completo" : "porCompletar";
+const ETIQUETA_ESTADO = { desglosar: "Pendiente de desglosar (Excel)", manual: "Costo final manual", porCompletar: "Por completar", completo: "Con costos asociados" } as const;
+const financiamientoDe = (f: FilaHojaVista) => (f.financiamientoTipo ? ETIQUETA_FINANCIAMIENTO[f.financiamientoTipo] : "No aplica (a mano o carga inicial)");
 
 const DEF: DefTabla<FilaHojaVista> = {
   clave: "costos-producto-hoja",
   campos: [
     { id: "producto", etiqueta: "Producto", tipo: "seleccion", valores: (f) => [`${numeroProducto(f.numero)} · ${f.producto}`], agrupable: true },
     { id: "estado", etiqueta: "Estado", tipo: "seleccion", valores: (f) => [ETIQUETA_ESTADO[estadoDe(f)]], agrupable: true },
+    { id: "financiamiento", etiqueta: "Financiamiento", tipo: "seleccion", valores: (f) => [financiamientoDe(f)], agrupable: true },
+    { id: "cierre", etiqueta: "Mes", tipo: "seleccion", valores: (f) => [f.cerrada ? "Llegó en un mes cerrado" : "Mes abierto"], agrupable: true },
     { id: "origen", etiqueta: "Origen", tipo: "seleccion", valores: (f) => [f.origen === "manual" ? "A mano" : f.origen === "carga_inicial" ? "Carga inicial sin compra" : "Compras"], agrupable: true },
     { id: "texto", etiqueta: "Buscar", tipo: "texto", valor: (f) => `${numeroProducto(f.numero)} ${f.numero ?? ""} ${f.sku} ${f.producto} ${f.codigoCompra}` },
     { id: "llegada", etiqueta: "Llegada", tipo: "fecha", valor: (f) => f.llegada ?? "" },
@@ -58,7 +69,7 @@ const DEF: DefTabla<FilaHojaVista> = {
   total: (f) => f.cantidad * f.costoTotal,
 };
 const NOMBRE: NombreFilas = { singular: "compra", plural: "compras" };
-const ICONOS: Record<string, IconoComp> = { producto: ProductoIcon, estado: AlertaIcon, origen: ComprasIcon, texto: ProductoIcon, llegada: CalendarioIcon, costoTotal: GastoIcon };
+const ICONOS: Record<string, IconoComp> = { producto: ProductoIcon, estado: AlertaIcon, financiamiento: GastoIcon, cierre: CalendarioIcon, origen: ComprasIcon, texto: ProductoIcon, llegada: CalendarioIcon, costoTotal: GastoIcon };
 
 /** Una celda de costo asociado: el total de esa compra en USD, editable con un clic. */
 function CeldaAsociado({ fila, campo, ctx }: { fila: FilaHojaVista; campo: CampoAsociado; ctx: Contexto }) {
@@ -70,7 +81,7 @@ function CeldaAsociado({ fila, campo, ctx }: { fila: FilaHojaVista; campo: Campo
   const etiqueta = COSTOS_ASOCIADOS.find((c) => c.id === campo)!;
   const cancelado = useRef(false);
 
-  if (!ctx.puedeEscribir) return <span className={`${claseCifra} ${valor > 0 ? "" : "text-muted-foreground"}`}>{valor > 0 ? usd(valor) : SIN_DATO}</span>;
+  if (!editable(fila, ctx)) return <span className={`${claseCifra} ${valor > 0 ? "" : "text-muted-foreground"}`}>{valor > 0 ? usd(valor) : SIN_DATO}</span>;
 
   const guardar = () => {
     setEditando(false);
@@ -136,9 +147,43 @@ const COLUMNAS: ColumnaTabla<FilaHojaVista, Contexto>[] = [
     ),
   },
   { id: "producto", label: "Producto", ocultable: true, clase: "max-w-60", render: (f) => <span className="line-clamp-2">{f.producto}</span> },
-  { id: "compra", label: "Código ECOM", ocultable: false, clase: "whitespace-nowrap", render: (f) => <span className={claseCifra}>{f.codigoCompra || SIN_DATO}</span> },
+  {
+    id: "compra",
+    label: "Código ECOM",
+    ocultable: false,
+    clase: "whitespace-nowrap",
+    render: (f, ctx) => (
+      <span className="inline-flex items-center gap-1.5">
+        {f.codigoCompra ? (
+          <Tooltip texto="Costos de toda la compra">
+            <button type="button" onClick={() => ctx.abrirCompra(f)} aria-label={`Costos de toda la compra ${f.codigoCompra}`} className={`rounded px-1 underline decoration-dotted underline-offset-2 hover:bg-accent ${claseCifra} ${anilloFoco}`}>
+              {f.codigoCompra}
+            </button>
+          </Tooltip>
+        ) : (
+          SIN_DATO
+        )}
+        {f.cerrada && (
+          <Tooltip texto="Llegó en un mes cerrado: solo un administrador la cambia">
+            <span tabIndex={0} role="img" aria-label="Llegó en un mes cerrado" className="text-muted-foreground">
+              <CandadoIcon className="h-3.5 w-3.5" aria-hidden="true" />
+            </span>
+          </Tooltip>
+        )}
+      </span>
+    ),
+  },
   { id: "llegada", label: "Llegada", ocultable: true, clase: `whitespace-nowrap ${claseCifra}`, render: (f) => (f.llegada ? fechaCorta(f.llegada) : SIN_DATO) },
-  { id: "cantidad", label: "Cantidad", ocultable: true, alinear: "derecha", clase: `text-right ${claseCifra}`, render: (f) => entero(f.cantidad) },
+  { id: "cantidad", label: "Cantidad", ocultable: true, alinear: "derecha", clase: `text-right ${claseCifra}`, render: (f) =>
+      f.cantidadPedida && f.cantidadPedida !== f.cantidad ? (
+        <span className="flex flex-col items-end">
+          <span>{entero(f.cantidad)}</span>
+          <span className="text-xs text-warning">de {entero(f.cantidadPedida)} pedidas</span>
+        </span>
+      ) : (
+        entero(f.cantidad)
+      ),
+  },
   { id: "unitario", label: "Costo compra (u.)", ocultable: true, alinear: "derecha", clase: `text-right text-muted-foreground ${claseCifra}`, render: (f) => usdU(f.costoUnitario) },
   ...COSTOS_ASOCIADOS.map(
     (c): ColumnaTabla<FilaHojaVista, Contexto> => ({
@@ -164,10 +209,20 @@ const COLUMNAS: ColumnaTabla<FilaHojaVista, Contexto>[] = [
     clase: `text-right ${claseCifra}`,
     render: (f) =>
       f.pctFinanciamiento && f.pctFinanciamiento > 0 ? (
-        <span className="flex flex-col items-end">
-          <span>{f.pctFinanciamiento.toLocaleString("es-PA", { maximumFractionDigits: 2 })} %</span>
-          <span className="text-xs text-muted-foreground">{usdU(f.financiamiento)} u.</span>
-        </span>
+        <Tooltip texto={f.financiamientoTipo === "estimado" ? `Estimado con la tasa del financista, congelado al llegar${f.financiamientoFijadoEn ? ` (${fechaCorta(f.financiamientoFijadoEn)})` : ""}` : f.financiamientoTipo === "real" ? "Lo que cobró el financista" : "Financiamiento"}>
+          <span tabIndex={0} className="flex flex-col items-end">
+            <span>{f.pctFinanciamiento.toLocaleString("es-PA", { maximumFractionDigits: 2 })} %</span>
+            <span className="text-xs text-muted-foreground">
+              {usdU(f.financiamiento)} u. · {f.financiamientoTipo === "real" ? "cobrado" : "estimado"}
+            </span>
+          </span>
+        </Tooltip>
+      ) : sinFinanciamiento(f) ? (
+        <Tooltip texto="Sin préstamo registrado en Préstamos del grupo con el código de esta compra">
+          <span tabIndex={0} className="inline-flex items-center gap-1.5 text-muted-foreground">
+            <span aria-hidden="true" className="h-2 w-2 rounded-full bg-warning" />0 %<span className="sr-only">, sin préstamo registrado</span>
+          </span>
+        </Tooltip>
       ) : (
         <span className="text-muted-foreground">0 %</span>
       ),
@@ -186,13 +241,11 @@ const COLUMNAS: ColumnaTabla<FilaHojaVista, Contexto>[] = [
           </Tooltip>
         ) : null}
         <span>{usdU(f.costoTotal)}</span>
-        {ctx.puedeEscribir && (
-          <Tooltip texto="Nota y costo final">
-            <button type="button" onClick={() => ctx.abrirNota(f)} aria-label={`Nota y costo final de ${f.producto}, compra ${f.codigoCompra}`} className={`rounded p-1 text-muted-foreground hover:bg-accent ${anilloFoco}`}>
-              <LapizIcon className="h-3.5 w-3.5" />
-            </button>
-          </Tooltip>
-        )}
+        <Tooltip texto={editable(f, ctx) ? "Detalle, nota y costo final" : "Ver detalle y actividad"}>
+          <button type="button" onClick={() => ctx.abrirNota(f)} aria-label={`Detalle de ${f.producto}, compra ${f.codigoCompra}`} className={`rounded p-1 text-muted-foreground hover:bg-accent ${anilloFoco}`}>
+            <LapizIcon className="h-3.5 w-3.5" />
+          </button>
+        </Tooltip>
       </span>
     ),
   },
@@ -206,7 +259,7 @@ const COLUMNAS: ColumnaTabla<FilaHojaVista, Contexto>[] = [
       return (
         <span className="flex flex-col gap-0.5">
           <span className="inline-flex items-center gap-1.5">
-            <span aria-hidden="true" className={`h-2 w-2 rounded-full ${e === "porCompletar" ? "bg-warning" : e === "manual" ? "bg-muted-foreground" : "bg-success"}`} />
+            <span aria-hidden="true" className={`h-2 w-2 rounded-full ${e === "porCompletar" || e === "desglosar" ? "bg-warning" : e === "manual" ? "bg-muted-foreground" : "bg-success"}`} />
             {ETIQUETA_ESTADO[e]}
           </span>
           {f.estatus?.startsWith("Revisar") && <span className="text-destructive">{f.estatus}</span>}
@@ -218,7 +271,7 @@ const COLUMNAS: ColumnaTabla<FilaHojaVista, Contexto>[] = [
 ];
 
 /** Nota de la fila y costo final manual (vacío = se calcula con los costos asociados). */
-function EditorNota({ fila, alCerrar, alGuardar }: { fila: FilaHojaVista; alCerrar: () => void; alGuardar: (e: Edicion) => void }) {
+function EditorNota({ fila, soloLectura, alCerrar, alGuardar }: { fila: FilaHojaVista; soloLectura: boolean; alCerrar: () => void; alGuardar: (e: Edicion) => void }) {
   const [nota, setNota] = useState(fila.nota ?? "");
   const [final, setFinal] = useState(fila.costoFinalManual ? String(fila.costoFinalManual) : "");
   const [error, setError] = useState<string | null>(null);
@@ -235,13 +288,27 @@ function EditorNota({ fila, alCerrar, alGuardar }: { fila: FilaHojaVista; alCerr
           start(async () => {
             const r = await guardarNotaYCostoFinal(fila.id, nota, final);
             if ("error" in r) return setError(r.error);
-            alGuardar({ nota: nota.trim() || null, costoFinalManual: final.trim() ? Number(final) : null, costoTotal: r.costoTotal });
+            const nuevoFinal = final.trim() ? Number(final) : null;
+            alGuardar({ nota: nota.trim() || null, costoFinalManual: nuevoFinal, costoTotal: r.costoTotal, ...(nuevoFinal !== fila.costoFinalManual ? { costoFinalExcel: false } : {}) });
             mostrarToast("Guardado", "success");
             alCerrar();
           });
         }}
       >
         <p className="text-sm">{fila.producto}</p>
+        {pendienteDesglosar(fila) && (
+          <p className="flex items-start gap-2 rounded-md border border-border px-3 py-2 text-xs">
+            <span aria-hidden="true" className="mt-1 h-2 w-2 shrink-0 rounded-full bg-warning" />
+            Este costo final viene del Excel de la carga inicial. Cuando cargues los costos asociados de la compra, bórralo para que el costo se calcule (hoy daría {usdU(fila.costoCalculado)}).
+          </p>
+        )}
+        {fila.cerrada && soloLectura && (
+          <p className="flex items-start gap-2 rounded-md border border-border px-3 py-2 text-xs">
+            <CandadoIcon className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            Llegó en un mes ya cerrado: ya costeó pedidos de ese mes. Solo un administrador la cambia.
+          </p>
+        )}
+        <fieldset disabled={soloLectura} className="flex flex-col gap-4">
         <Campo etiqueta="Costo final por unidad (opcional)" id="costo-final">
           <input id="costo-final" data-enfocar inputMode="decimal" className={fieldClass} value={final} placeholder={`Calculado: ${usdU(fila.costoCalculado)}`} onChange={(e) => setFinal(e.target.value)} />
         </Campo>
@@ -249,9 +316,10 @@ function EditorNota({ fila, alCerrar, alGuardar }: { fila: FilaHojaVista; alCerr
         <Campo etiqueta="Nota" id="nota-costo">
           <textarea id="nota-costo" rows={3} maxLength={500} className={fieldClass} value={nota} placeholder="Ej: factura 1234 del agente de carga" onChange={(e) => setNota(e.target.value)} />
         </Campo>
+        </fieldset>
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
         <div className="flex flex-wrap items-center justify-between gap-2">
-          {fila.origen === "manual" ? (
+          {fila.origen === "manual" && !soloLectura ? (
             <button
               type="button"
               disabled={pendiente}
@@ -272,12 +340,173 @@ function EditorNota({ fila, alCerrar, alGuardar }: { fila: FilaHojaVista; alCerr
           ) : (
             <span />
           )}
-          <button type="submit" disabled={pendiente} className={`rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-50 ${anilloFoco}`}>
-            {pendiente ? "Guardando…" : "Guardar"}
-          </button>
+          {!soloLectura && (
+            <button type="submit" disabled={pendiente} className={`rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-50 ${anilloFoco}`}>
+              {pendiente ? "Guardando…" : "Guardar"}
+            </button>
+          )}
         </div>
       </form>
+      <div className="mt-6 border-t border-border pt-4">
+        <HistorialGenerico id={fila.id} codigoPais="PA" titulo="Actividad de esta fila" obtener={obtenerHistorialCostoFila} />
+      </div>
     </Ventana>
+  );
+}
+
+/** Los costos asociados de toda una compra: se escriben una vez y se reparten entre sus productos por su costo de compra. */
+function VentanaCompra({ filas, soloLectura, alCerrar, alGuardar }: { filas: FilaHojaVista[]; soloLectura: boolean; alCerrar: () => void; alGuardar: (id: string, e: Edicion) => void }) {
+  const codigo = filas[0]?.codigoCompra ?? "";
+  const sumaDe = (c: CampoAsociado) => Math.round(filas.reduce((a, f) => a + (f.asociados[c] ?? 0), 0) * 100) / 100;
+  const [textos, setTextos] = useState<Record<string, string>>(() => Object.fromEntries(COSTOS_ASOCIADOS.map((c) => [c.id, sumaDe(c.id) > 0 ? String(sumaDe(c.id)) : ""])));
+  const [error, setError] = useState<string | null>(null);
+  const [pendiente, start] = useTransition();
+  const [movs, setMovs] = useState<MovimientoLibro[] | null | undefined>(undefined);
+  const { mostrarToast } = useToast();
+  const pesos = filas.map(pesoDeFila);
+  const total = (c: CampoAsociado) => {
+    const n = Number(String(textos[c] ?? "").replace(/,/g, ""));
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  };
+  const cargarLibro = () => {
+    setMovs(null);
+    void buscarMovimientosCompra(codigo).then((r) => setMovs("error" in r ? [] : r.movimientos));
+  };
+  const usar = (campo: CampoAsociado, monto: number) => setTextos((p) => ({ ...p, [campo]: String(Math.round((total(campo) + monto) * 100) / 100) }));
+
+  return (
+    <Ventana abierto alCerrar={alCerrar} titulo={`Costos de la compra ${codigo}`} ancho="lg">
+      <form
+        className="flex flex-col gap-5"
+        onSubmit={(e) => {
+          e.preventDefault();
+          setError(null);
+          start(async () => {
+            const r = await guardarAsociadosCompra(filas.map((f) => f.id), textos);
+            if ("error" in r) return setError(r.error);
+            for (const f of r.filas) alGuardar(f.id, { ...f.asociados, costoTotal: f.costoTotal });
+            mostrarToast("Costos de la compra repartidos", "success");
+            alCerrar();
+          });
+        }}
+      >
+        <p className="text-sm text-muted-foreground">
+          Escribe el total de cada costo para toda la compra (USD). Se reparte entre {filas.length === 1 ? "su producto" : `sus ${filas.length} productos`} por su costo de compra.
+        </p>
+        <fieldset disabled={soloLectura} className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {COSTOS_ASOCIADOS.map((c) => (
+            <Campo key={c.id} etiqueta={c.etiqueta} id={`compra-${c.id}`}>
+              <input id={`compra-${c.id}`} inputMode="decimal" className={fieldClass} placeholder="0.00" value={textos[c.id] ?? ""} onChange={(e) => setTextos((p) => ({ ...p, [c.id]: e.target.value }))} />
+            </Campo>
+          ))}
+        </fieldset>
+        {filas.length > 1 && (
+          <div className="overflow-x-auto rounded-md border border-border">
+            <table className="w-full text-sm">
+              <caption className="sr-only">Cómo se reparte entre los productos</caption>
+              <thead className="bg-muted text-xs text-muted-foreground">
+                <tr>
+                  <th scope="col" className="px-3 py-2 text-left font-medium">Producto</th>
+                  <th scope="col" className="px-3 py-2 text-right font-medium">Peso</th>
+                  <th scope="col" className="px-3 py-2 text-right font-medium">Le toca</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {filas.map((f, i) => {
+                  const suma = pesos.reduce((a, b) => a + b, 0);
+                  const leToca = COSTOS_ASOCIADOS.reduce((a, c) => a + (repartirPorPeso(total(c.id), pesos)[i] ?? 0), 0);
+                  return (
+                    <tr key={f.id}>
+                      <td className="px-3 py-2">
+                        {numeroProducto(f.numero)} · {f.producto}
+                      </td>
+                      <td className={`px-3 py-2 text-right ${claseCifra}`}>{suma > 0 ? `${((pesos[i] / suma) * 100).toFixed(1)} %` : SIN_DATO}</td>
+                      <td className={`px-3 py-2 text-right ${claseCifra}`}>{usd(leToca)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <section aria-labelledby="libro-compra" className="rounded-md border border-border">
+          <h3 id="libro-compra" className="flex items-center justify-between gap-2 border-b border-border px-3 py-2 text-sm font-semibold">
+            En el Libro de movimientos con «{codigo}»
+            {movs === undefined && (
+              <button type="button" onClick={cargarLibro} className={`rounded-md border border-border-control px-2.5 py-1 text-xs font-normal hover:bg-accent ${anilloFoco}`}>
+                Buscar
+              </button>
+            )}
+          </h3>
+          {movs === null && <p className="px-3 py-2 text-sm text-muted-foreground">Buscando…</p>}
+          {movs && movs.length === 0 && <p className="px-3 py-2 text-sm text-muted-foreground">No hay movimientos con ese código en la descripción ni en la factura.</p>}
+          {movs && movs.length > 0 && (
+            <ul className="divide-y divide-border text-sm">
+              {movs.map((m) => (
+                <li key={m.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
+                  <span className="flex min-w-0 flex-col">
+                    <span className="truncate">{m.descripcion || m.tipo}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {m.fecha ? fechaCorta(m.fecha) : SIN_DATO} · {m.tipo || "Sin tipo"}
+                      {m.comision ? " · parece comisión" : ""}
+                    </span>
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <span className={claseCifra}>{usd(m.monto)}</span>
+                    {!soloLectura && (
+                      <select
+                        aria-label={`Sumar ${usd(m.monto)} a un costo de la compra`}
+                        className={`${fieldClass} w-auto py-1 text-xs`}
+                        value=""
+                        onChange={(e) => e.target.value && usar(e.target.value as CampoAsociado, m.monto)}
+                      >
+                        <option value="">Sumar a…</option>
+                        {COSTOS_ASOCIADOS.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.etiqueta}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+        {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+        {!soloLectura && (
+          <div className="flex justify-end">
+            <button type="submit" disabled={pendiente} className={`rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-50 ${anilloFoco}`}>
+              {pendiente ? "Repartiendo…" : "Guardar y repartir"}
+            </button>
+          </div>
+        )}
+      </form>
+    </Ventana>
+  );
+}
+
+/** Las tarjetas que filtran la hoja: lo que falta por hacer. */
+function TarjetasHoja({ filas }: { filas: FilaHojaVista[] }) {
+  const tarjeta = (id: string, campo: string, valor: string, titulo: string, n: number, tono: "warning" | "neutral") => (
+    <KpiFiltro
+      key={id}
+      def={DEF}
+      compacta
+      atajo={{ id, etiqueta: titulo, ayuda: `Filtrar la hoja: ${titulo.toLowerCase()}`, filtro: { campo, valor: { tipo: "seleccion", valores: [valor] } } }}
+      titulo={titulo}
+      valor={entero(n)}
+      tono={n ? tono : "neutral"}
+    />
+  );
+  return (
+    <KpiGrid compacta>
+      {tarjeta("por-completar", "estado", ETIQUETA_ESTADO.porCompletar, "Por completar", filas.filter((f) => estadoDe(f) === "porCompletar").length, "warning")}
+      {tarjeta("desglosar", "estado", ETIQUETA_ESTADO.desglosar, "Pendientes de desglosar", filas.filter((f) => estadoDe(f) === "desglosar").length, "warning")}
+      {tarjeta("sin-fin", "financiamiento", ETIQUETA_FINANCIAMIENTO.ninguno, "Sin préstamo registrado", filas.filter(sinFinanciamiento).length, "warning")}
+      {tarjeta("cerrado", "cierre", "Llegó en un mes cerrado", "En meses cerrados", filas.filter((f) => f.cerrada).length, "neutral")}
+    </KpiGrid>
   );
 }
 
@@ -340,15 +569,18 @@ export function HojaCostos({
   sinCosto,
   opciones,
   puedeEscribir,
+  esAdmin,
 }: {
   filas: FilaHojaVista[];
   resumen: Record<string, ResumenProducto>;
   sinCosto: ProductoSinCosto[];
   opciones: OpcionSkuMaestro[];
   puedeEscribir: boolean;
+  esAdmin: boolean;
 }) {
   const [ediciones, setEdiciones] = useState<Record<string, Edicion>>({});
   const [nota, setNota] = useState<FilaHojaVista | null>(null);
+  const [compra, setCompra] = useState<FilaHojaVista | null>(null);
   const [skuManual, setSkuManual] = useState<string | null>(null);
   const abrirManual = useRef<() => void>(() => undefined);
 
@@ -359,7 +591,13 @@ export function HojaCostos({
         if (!e) return f;
         const asociados = { ...f.asociados };
         for (const c of COSTOS_ASOCIADOS) if (e[c.id] !== undefined) asociados[c.id] = e[c.id]!;
-        const base = { ...f, asociados, nota: e.nota !== undefined ? e.nota : f.nota, costoFinalManual: e.costoFinalManual !== undefined ? e.costoFinalManual : f.costoFinalManual };
+        const base = {
+          ...f,
+          asociados,
+          nota: e.nota !== undefined ? e.nota : f.nota,
+          costoFinalManual: e.costoFinalManual !== undefined ? e.costoFinalManual : f.costoFinalManual,
+          costoFinalExcel: e.costoFinalExcel !== undefined ? e.costoFinalExcel : f.costoFinalExcel,
+        };
         const calc = calcularFila(base);
         return { ...base, ...calc, costoTotal: e.costoTotal ?? calc.costoTotal };
       }),
@@ -367,9 +605,12 @@ export function HojaCostos({
   );
   const ctx: Contexto = {
     puedeEscribir,
+    esAdmin,
     editar: (id, cambio) => setEdiciones((p) => ({ ...p, [id]: { ...p[id], ...cambio } })),
     abrirNota: setNota,
+    abrirCompra: setCompra,
   };
+  const filasDeCompra = compra ? vistas.filter((v) => codigoComparable(v.codigoCompra) === codigoComparable(compra.codigoCompra)) : [];
 
   const manual = (sku: string | null) => {
     setSkuManual(sku);
@@ -407,6 +648,7 @@ export function HojaCostos({
           </ul>
         </section>
       )}
+      <TarjetasHoja filas={vistas} />
       <TablaDatos
         def={DEF}
         filas={vistas}
@@ -453,7 +695,13 @@ export function HojaCostos({
         }
         vacio="Todavía no hay compras en la hoja. Entran solas cuando una compra de Panamá pasa a En Bodega o Completado."
       />
-      {nota && <EditorNota fila={vistas.find((v) => v.id === nota.id) ?? nota} alCerrar={() => setNota(null)} alGuardar={(e) => ctx.editar(nota.id, e)} />}
+      {nota && (() => {
+        const f = vistas.find((v) => v.id === nota.id) ?? nota;
+        return <EditorNota fila={f} soloLectura={!editable(f, ctx)} alCerrar={() => setNota(null)} alGuardar={(e) => ctx.editar(nota.id, e)} />;
+      })()}
+      {compra && filasDeCompra.length > 0 && (
+        <VentanaCompra filas={filasDeCompra} soloLectura={!filasDeCompra.every((f) => editable(f, ctx))} alCerrar={() => setCompra(null)} alGuardar={(id, e) => ctx.editar(id, e)} />
+      )}
     </ProveedorSkusMaestros>
   );
 }

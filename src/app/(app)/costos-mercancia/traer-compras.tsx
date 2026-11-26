@@ -20,7 +20,7 @@ export function TraerCompras() {
         start(async () => {
           const r = await traerComprasAHoja();
           if ("error" in r) return mostrarToast(r.error, "destructive");
-          mostrarToast(`Compras al día: ${r.lotes} filas${r.quitados ? `, ${r.quitados} quitadas` : ""}`, "success");
+          mostrarToast(`Compras al día: ${r.lotes} filas${r.quitados ? `, ${r.quitados} quitadas` : ""}${r.unidas ? `, ${r.unidas} de la carga inicial unidas a su compra` : ""}`, "success");
           router.refresh();
         })
       }

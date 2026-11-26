@@ -4,13 +4,15 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { traerTodasConError } from "@/lib/supabase/paginar";
-import { COSTOS_ASOCIADOS, calcularFila, costoEn, productosSinCosto, resumirProductos, type CampoAsociado, type CatalogoCostos, type FilaHoja, type ResumenProducto } from "./hoja-costos";
+import { estaCerrado } from "@/lib/nomina/al-libro";
+import { hoyPanama } from "@/lib/af4/fecha";
+import { COSTOS_ASOCIADOS, calcularFila, cerradaPorCierre, costoEn, productosSinCosto, resumirProductos, type CampoAsociado, type CatalogoCostos, type FilaHoja, type ResumenProducto, type TipoFinanciamiento } from "./hoja-costos";
 import { PAIS_HOJA_COSTOS } from "./sincronizar-costos-compras";
 
 export const SIN_MIGRACION_HOJA = "Falta correr la migración 0992 (Costos de producto) en Supabase.";
 
 const COLUMNAS: string =
-  "id, sku_maestro_id, compra_id, linea, fecha_llegada, cantidad, costo_unitario, financiamiento, costo_total, costo_final_manual, asoc_nota, origen, estatus, costos_por_nombre, costos_en, creado_en, " +
+  "id, sku_maestro_id, compra_id, linea, fecha_llegada, cantidad, costo_unitario, financiamiento, costo_total, costo_final_manual, costo_final_excel, cantidad_pedida, financiamiento_tipo, financiamiento_fijado_en, asoc_nota, origen, estatus, costos_por_nombre, costos_en, creado_en, " +
   COSTOS_ASOCIADOS.map((c) => c.id).join(", ") +
   ", skus_maestros(numero, codigo, nombre)";
 
@@ -23,6 +25,10 @@ export interface FilaHojaVista extends FilaHoja {
   costoCalculado: number;
   costoTotal: number;
   estatus: string | null;
+  /** Llegó en o antes del último mes cerrado: solo un administrador la cambia. */
+  cerrada: boolean;
+  /** Desde cuándo está congelado el financiamiento estimado. */
+  financiamientoFijadoEn: string | null;
 }
 
 export interface ProductoSinCosto {
@@ -39,9 +45,11 @@ export interface DatosHojaCostos {
   filas: FilaHojaVista[];
   resumen: Map<string, ResumenProducto>;
   sinCosto: ProductoSinCosto[];
+  /** El último mes cerrado («AAAA-MM-01»), si hay. */
+  ultimoCerrado: string | null;
 }
 
-function aFila(r: Record<string, unknown>): FilaHojaVista {
+function aFila(r: Record<string, unknown>, ultimoCerrado: string | null): FilaHojaVista {
   const s = uno(r.skus_maestros as { numero: number | null; codigo: string; nombre: string } | null);
   const asociados = Object.fromEntries(COSTOS_ASOCIADOS.map((c) => [c.id, num(r[c.id])])) as Record<CampoAsociado, number>;
   const base: FilaHoja = {
@@ -59,11 +67,28 @@ function aFila(r: Record<string, unknown>): FilaHojaVista {
     nota: (r.asoc_nota as string | null) ?? null,
     financiamiento: num(r.financiamiento),
     costoFinalManual: r.costo_final_manual === null || r.costo_final_manual === undefined ? null : num(r.costo_final_manual),
+    costoFinalExcel: r.costo_final_excel === true,
+    cantidadPedida: r.cantidad_pedida === null || r.cantidad_pedida === undefined ? null : num(r.cantidad_pedida),
+    financiamientoTipo: (r.financiamiento_tipo as TipoFinanciamiento | null) ?? null,
     origen: String(r.origen ?? ""),
     editadoPor: (r.costos_por_nombre as string | null) ?? null,
     editadoEn: (r.costos_en as string | null) ?? (r.creado_en as string | null) ?? null,
   };
-  return { ...base, ...calcularFila(base), estatus: (r.estatus as string | null) ?? null };
+  return {
+    ...base,
+    ...calcularFila(base),
+    estatus: (r.estatus as string | null) ?? null,
+    cerrada: cerradaPorCierre(base.llegada, ultimoCerrado),
+    financiamientoFijadoEn: typeof r.financiamiento_fijado_en === "string" ? r.financiamiento_fijado_en.slice(0, 10) : null,
+  };
+}
+
+/** El último mes cerrado en el Cierre de mes (null si no hay o falta la tabla). */
+export async function ultimoMesCerrado(supabase: SupabaseClient): Promise<string | null> {
+  const { data, error } = await supabase.from("fin_cierres").select("*").order("periodo", { ascending: false }).limit(24);
+  if (error) return null;
+  const cerrado = (data ?? []).find((f) => estaCerrado(f as Record<string, unknown>));
+  return cerrado ? String((cerrado as Record<string, unknown>).periodo).slice(0, 10) : null;
 }
 
 async function idPais(supabase: SupabaseClient): Promise<string | null> {
@@ -72,11 +97,12 @@ async function idPais(supabase: SupabaseClient): Promise<string | null> {
 }
 
 export async function cargarHojaCostos(supabase: SupabaseClient): Promise<DatosHojaCostos | { error: string }> {
+  const ultimoCerrado = await ultimoMesCerrado(supabase);
   const filasR = await traerTodasConError<Record<string, unknown>>((d, h) =>
     supabase.from("fin_costos_lotes").select(COLUMNAS).eq("en_hoja_costos", true).order("id").range(d, h) as unknown as PromiseLike<{ data: Record<string, unknown>[] | null; error: unknown }>,
   );
   if (filasR.error) return { error: SIN_MIGRACION_HOJA };
-  const filas = (filasR.data ?? []).map(aFila).filter((f) => f.skuId);
+  const filas = (filasR.data ?? []).map((r) => aFila(r, ultimoCerrado)).filter((f) => f.skuId);
   filas.sort((a, b) => (a.numero ?? 999999) - (b.numero ?? 999999) || (b.llegada ?? "").localeCompare(a.llegada ?? ""));
 
   // Stock físico en las bodegas propias de Panamá, y la lista de la carga inicial sin compra vinculada.
@@ -107,7 +133,7 @@ export async function cargarHojaCostos(supabase: SupabaseClient): Promise<DatosH
     const { data } = await supabase.from("skus_maestros").select("id, padre_id").in("id", candidatos.slice(i, i + 200));
     for (const s of data ?? []) if (s.padre_id) cat.padre.set(String(s.id), String(s.padre_id));
   }
-  const hoy = new Date().toISOString().slice(0, 10);
+  const hoy = hoyPanama();
   for (const c of candidatos) if (costoEn(cat, c, hoy) === null) faltan.push(c);
   const sinCosto: ProductoSinCosto[] = [];
   for (let i = 0; i < faltan.length; i += 200) {
@@ -123,7 +149,7 @@ export async function cargarHojaCostos(supabase: SupabaseClient): Promise<DatosH
       });
   }
   sinCosto.sort((a, b) => (a.numero ?? 999999) - (b.numero ?? 999999));
-  return { filas, resumen: resumirProductos(filas), sinCosto };
+  return { filas, resumen: resumirProductos(filas), sinCosto, ultimoCerrado };
 }
 
 /**

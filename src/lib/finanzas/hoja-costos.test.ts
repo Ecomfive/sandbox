@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { calcularFila, compraVigente, costoEn, filasDesdeCompras, leerMontoAsociado, productosSinCosto, resumirProductos, type CatalogoCostos, type FilaHoja } from "./hoja-costos";
+import { calcularFila, cerradaPorCierre, compraVigente, costoEn, filasDesdeCompras, leerMontoAsociado, paresCargaInicial, pendienteDesglosar, productosSinCosto, repartirPorPeso, resumirProductos, sinFinanciamiento, type CatalogoCostos, type FilaHoja } from "./hoja-costos";
 import type { CostoPuesto } from "./compras-costos";
 
 const asoc = (p: Partial<FilaHoja["asociados"]> = {}): FilaHoja["asociados"] => ({
@@ -89,4 +89,47 @@ test("resumen por producto: vigente, promedio ponderado y lo que falta completar
 
 test("con stock y sin costo: también los de la lista sin compra vinculada", () => {
   assert.deepEqual(productosSinCosto(new Set(["a", "b"]), new Set(["a"]), new Set(["c"])).sort(), ["b", "c"]);
+});
+
+test("el costo por unidad se divide por lo recibido y dice de dónde sale el financiamiento", () => {
+  const base = { codigo: "ECOM01-0200", nombre: "X", proveedor: null, abierta: false, gastos: 0, gastosPorConcepto: {}, gastosPendientes: 0, total: 1000, unidades: 1000, unitarioReal: 1, unitarioVigente: null, diferencia: null, pesoGastos: 0, etapa: "en_bodega", fechaLlegada: "2026-11-01", fob: 1000 };
+  const linea = { skuId: "s1", codigo: "A", producto: "A", cantidad: 1000, recibida: 960, fob: 1000, gastos: 0, unitarioReal: 1, vigente: null, diferencia: null };
+  const [real] = filasDesdeCompras([{ ...base, compraId: "c1", lineas: [linea], financiamiento: { total: 96, real: 96 } }] as unknown as CostoPuesto[], new Map(), () => "A");
+  assert.equal(real.cantidad, 960);
+  assert.equal(real.cantidad_pedida, 1000);
+  assert.equal(real.costo_unitario, 1.041667);
+  assert.equal(real.financiamiento, 0.1);
+  assert.equal(real.financiamiento_tipo, "real");
+  const [est] = filasDesdeCompras([{ ...base, compraId: "c2", lineas: [{ ...linea, recibida: null }], financiamiento: { total: 50, real: 0 } }] as unknown as CostoPuesto[], new Map(), () => "A");
+  assert.equal(est.cantidad, 1000);
+  assert.equal(est.cantidad_pedida, null);
+  assert.equal(est.financiamiento_tipo, "estimado");
+  const [sin] = filasDesdeCompras([{ ...base, compraId: "c3", lineas: [linea] }] as unknown as CostoPuesto[], new Map(), () => "A");
+  assert.equal(sin.financiamiento_tipo, "ninguno");
+  assert.ok(sinFinanciamiento({ origen: "compras", financiamientoTipo: "ninguno" }));
+  assert.ok(!sinFinanciamiento({ origen: "manual", financiamientoTipo: "ninguno" }));
+});
+
+test("repartir un costo de toda la compra con los centavos exactos", () => {
+  assert.deepEqual(repartirPorPeso(100, [1, 1, 1]), [33.33, 33.34, 33.33]);
+  assert.deepEqual(repartirPorPeso(50, [300, 100]), [37.5, 12.5]);
+  assert.deepEqual(repartirPorPeso(10, [0, 5]), [5, 5]);
+  assert.equal(repartirPorPeso(123.45, [7, 11, 13]).reduce((a, b) => a + b, 0).toFixed(2), "123.45");
+});
+
+test("pendiente de desglosar y meses cerrados", () => {
+  assert.ok(pendienteDesglosar({ costoFinalManual: 1.4, costoFinalExcel: true, asociados: asoc() }));
+  assert.ok(!pendienteDesglosar({ costoFinalManual: 1.4, costoFinalExcel: true, asociados: asoc({ asoc_envio: 5 }) }));
+  assert.ok(!pendienteDesglosar({ costoFinalManual: 1.4, costoFinalExcel: false, asociados: asoc() }));
+  assert.ok(cerradaPorCierre("2026-10-31", "2026-10-01"));
+  assert.ok(!cerradaPorCierre("2026-11-01", "2026-10-01"));
+  assert.ok(!cerradaPorCierre("2026-01-01", null));
+});
+
+test("la carga inicial se une con su fila de Compras por producto y código", () => {
+  const pares = paresCargaInicial(
+    [{ id: "k1", skuId: "s", codigo: "ecom01-0412 " }, { id: "k2", skuId: "s", codigo: "ECOM01-0999" }],
+    [{ clave: "compra:c:s", skuId: "s", codigo: "ECOM01-0412" }, { clave: "compra:d:t", skuId: "t", codigo: "ECOM01-0999" }],
+  );
+  assert.deepEqual(pares.map((p) => [p.carga.id, p.compra.clave]), [["k1", "compra:c:s"]]);
 });

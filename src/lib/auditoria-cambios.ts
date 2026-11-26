@@ -17,6 +17,10 @@ export function calcularCambios(
 }
 
 export const ETIQUETA_ACCION: Record<string, string> = {
+  editar_costo_producto: "Cambió el costo",
+  crear_costo_producto: "Agregó un costo a mano",
+  eliminar_costo_producto: "Quitó un costo a mano",
+  traer_compras_costos: "Trajo las compras a la hoja de costos",
   aviso_inactividad: "Cambió el aviso de inactividad",
   deshacer_entrega_pedido_inventario: "Deshizo la entrega de un pedido a inventario",
   deshacer_envio_pedido_inventario: "Deshizo el envío de un pedido a inventario",

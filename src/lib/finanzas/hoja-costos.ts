@@ -51,9 +51,89 @@ export interface FilaHoja {
   /** Financiamiento por unidad (lo calcula el sistema desde Préstamos del grupo). */
   financiamiento: number;
   costoFinalManual: number | null;
+  /** El costo final vino del Excel de la carga inicial (falta desglosarlo en costos asociados). */
+  costoFinalExcel?: boolean;
+  /** Unidades pedidas, cuando lo recibido fue distinto (el costo se divide por lo recibido). */
+  cantidadPedida?: number | null;
+  /** De dónde sale el financiamiento: cobrado por el financista, estimado (congelado al llegar) o sin préstamo registrado. */
+  financiamientoTipo?: TipoFinanciamiento | null;
   origen: string;
   editadoPor: string | null;
   editadoEn: string | null;
+}
+
+export type TipoFinanciamiento = "real" | "estimado" | "ninguno";
+export const ETIQUETA_FINANCIAMIENTO: Record<TipoFinanciamiento, string> = {
+  real: "Cobrado por el financista",
+  estimado: "Estimado (congelado al llegar)",
+  ninguno: "Sin préstamo registrado",
+};
+
+/** Una fila con el costo final del Excel y sin ningún costo asociado: falta desglosarla. */
+export const pendienteDesglosar = (f: Pick<FilaHoja, "costoFinalManual" | "costoFinalExcel" | "asociados">): boolean =>
+  !!f.costoFinalExcel && !!f.costoFinalManual && COSTOS_ASOCIADOS.every((c) => !(f.asociados[c.id] > 0));
+
+/** Una fila de una compra sin préstamo registrado en Préstamos del grupo (su % por financiamiento sale en 0). */
+export const sinFinanciamiento = (f: Pick<FilaHoja, "origen" | "financiamientoTipo">): boolean => f.origen === ORIGEN_HOJA_COMPRAS && f.financiamientoTipo === "ninguno";
+
+/** El último día del mes de un período «AAAA-MM-01». */
+const finDeMes = (periodo: string) => {
+  const [a, m] = periodo.slice(0, 7).split("-").map(Number);
+  return new Date(Date.UTC(a, m, 0)).toISOString().slice(0, 10);
+};
+
+/**
+ * Una fila que llegó en o antes del último mes cerrado ya costeó pedidos de un mes cerrado: cambiarla no mueve ese mes (el
+ * costo de ventas cerrado no se recalcula), pero deja la hoja distinta de lo contabilizado. Solo un administrador la cambia.
+ */
+export function cerradaPorCierre(llegada: string | null, ultimoCerrado: string | null): boolean {
+  if (!ultimoCerrado) return false;
+  if (!llegada) return true;
+  return llegada <= finDeMes(ultimoCerrado);
+}
+
+/** Reparte `total` entre partes con estos pesos, con los centavos exactos (la última se lleva el redondeo). */
+export function repartirPorPeso(total: number, pesos: number[]): number[] {
+  if (!pesos.length) return [];
+  const usar = pesos.every((p) => p > 0) ? pesos : pesos.map(() => 1);
+  const suma = usar.reduce((a, b) => a + b, 0);
+  const cent = Math.round(total * 100);
+  let acum = 0;
+  let previo = 0;
+  return usar.map((p, i) => {
+    acum += p;
+    const hasta = i === usar.length - 1 ? cent : Math.round((cent * acum) / suma);
+    const v = (hasta - previo) / 100;
+    previo = hasta;
+    return v;
+  });
+}
+
+/** El peso de cada fila de una compra al repartir un costo de toda la compra: su costo de compra (FOB). */
+export const pesoDeFila = (f: Pick<FilaHoja, "cantidad" | "costoUnitario" | "cantidadPedida">) => (f.cantidadPedida ?? f.cantidad) * f.costoUnitario;
+
+/** Código de compra para comparar (sin espacios ni mayúsculas). */
+export const codigoComparable = (v: string | null | undefined) => String(v ?? "").trim().toUpperCase().replace(/\s+/g, "");
+
+/**
+ * Las filas de la carga inicial que no encontraron su compra y que ahora tienen una fila de Compras para el mismo producto y
+ * el mismo código de compra: se unen (la de Compras se queda con lo que María José ya cargó) para no contarla dos veces.
+ */
+export function paresCargaInicial<C extends { id: string; skuId: string; codigo: string }, P extends { clave: string; skuId: string; codigo: string }>(
+  carga: C[],
+  compras: P[],
+): { carga: C; compra: P }[] {
+  const por = new Map<string, P>();
+  for (const p of compras) {
+    const k = `${p.skuId}|${codigoComparable(p.codigo)}`;
+    if (codigoComparable(p.codigo) && !por.has(k)) por.set(k, p);
+  }
+  const salida: { carga: C; compra: P }[] = [];
+  for (const c of carga) {
+    const p = por.get(`${c.skuId}|${codigoComparable(c.codigo)}`);
+    if (p) salida.push({ carga: c, compra: p });
+  }
+  return salida;
 }
 
 export interface CalculoFila {
@@ -213,8 +293,10 @@ export interface FilaDesdeCompra {
   codigo: string | null;
   sku_maestro_id: string;
   cantidad: number;
+  cantidad_pedida: number | null;
   costo_unitario: number;
   financiamiento: number;
+  financiamiento_tipo: TipoFinanciamiento;
   costo_total: number;
   estatus: string;
   compra_id: string;
@@ -223,11 +305,12 @@ export interface FilaDesdeCompra {
 
 /**
  * Las filas de la hoja de las compras En Bodega o Completado. El costo unitario es el FOB de la línea ÷ sus unidades (sin
- * los gastos de importación: esos son los costos asociados que se llenan en la hoja). El financiamiento de la OC se reparte
+ * los gastos de importación: esos son los costos asociados que se llenan en la hoja) y se divide por lo recibido si
+ * Recepción lo anotó. El financiamiento de la OC se reparte
  * entre sus productos como su FOB. `fechaEtapa` da la fecha en que entró a la etapa, para las compras sin fecha de llegada.
  */
 export function filasDesdeCompras(
-  costos: (CostoPuesto & { financiamiento?: Pick<FinanciamientoOrden, "total"> | null })[],
+  costos: (CostoPuesto & { financiamiento?: Pick<FinanciamientoOrden, "total" | "real"> | null })[],
   fechaEtapa: Map<string, string>,
   claveDe: (skuId: string, producto: string) => string,
 ): FilaDesdeCompra[] {
@@ -235,11 +318,14 @@ export function filasDesdeCompras(
   for (const c of costos) {
     if (!ETAPAS_HOJA.has(c.etapa)) continue;
     const finTotal = c.financiamiento?.total ?? 0;
+    const tipo: TipoFinanciamiento = (c.financiamiento?.real ?? 0) > 0 ? "real" : finTotal > 0 ? "estimado" : "ninguno";
     for (const l of c.lineas) {
       if (!l.skuId || l.cantidad <= 0 || l.fob <= 0) continue;
       const finLinea = finTotal > 0 && c.fob > 0 ? (finTotal * l.fob) / c.fob : 0;
-      const costoUnitario = r6(l.fob / l.cantidad);
-      const financiamiento = r6(finLinea / l.cantidad);
+      // El costo por unidad se divide por lo que llegó (Recepción); si no se anotó, por lo pedido.
+      const unidades = l.recibida && l.recibida > 0 ? l.recibida : l.cantidad;
+      const costoUnitario = r6(l.fob / unidades);
+      const financiamiento = r6(finLinea / unidades);
       salida.push({
         origen_clave: `compra:${c.compraId}:${l.skuId}`,
         hoja: "Costos de producto",
@@ -251,9 +337,11 @@ export function filasDesdeCompras(
         producto_clave: claveDe(l.skuId, l.producto || c.nombre),
         codigo: l.codigo || null,
         sku_maestro_id: l.skuId,
-        cantidad: l.cantidad,
+        cantidad: unidades,
+        cantidad_pedida: unidades !== l.cantidad ? l.cantidad : null,
         costo_unitario: costoUnitario,
         financiamiento,
+        financiamiento_tipo: tipo,
         // El disparador lo vuelve a calcular con los costos asociados que ya tenga la fila.
         costo_total: r6(costoUnitario + financiamiento),
         estatus: c.etapa === "en_bodega" ? "En bodega" : "Completado",

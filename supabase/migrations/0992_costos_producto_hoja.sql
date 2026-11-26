@@ -29,7 +29,22 @@ alter table fin_costos_lotes
   add column if not exists costo_final_manual numeric(14, 6),
   add column if not exists costos_por uuid references auth.users(id) on delete set null,
   add column if not exists costos_por_nombre text,
-  add column if not exists costos_en timestamptz;
+  add column if not exists costos_en timestamptz,
+  -- Lo que vino del Excel de la carga inicial (falta desglosarlo en costos asociados).
+  add column if not exists costo_final_excel boolean not null default false,
+  -- Unidades pedidas cuando Recepción anotó otra cantidad: el costo por unidad se divide por lo recibido.
+  add column if not exists cantidad_pedida numeric(14, 2),
+  -- De dónde sale el financiamiento: cobrado por el financista, estimado (congelado al llegar la compra) o ninguno.
+  add column if not exists financiamiento_tipo text,
+  add column if not exists financiamiento_fijado_en date;
+
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'fin_costos_lotes_financiamiento_tipo') then
+    alter table fin_costos_lotes add constraint fin_costos_lotes_financiamiento_tipo
+      check (financiamiento_tipo is null or financiamiento_tipo in ('real', 'estimado', 'ninguno'));
+  end if;
+end $$;
 
 do $$
 begin
@@ -166,6 +181,189 @@ left join lateral (
 left join ven_productos_mapeo m on m.producto_clave = l.producto_clave
 left join fin_costo_vigente cm on cm.producto_clave = m.costo_clave
 left join fin_costo_vigente cd on cd.producto_clave = l.producto_clave;
+
+-- Unidad económica (Rentabilidad, planificación, precio de transferencia): la misma regla que la reportería y el Estado de
+-- resultados. Es la definición de 0934/0317 con el costo de la hoja primero.
+create or replace function fin_ue_lineas(p_desde date, p_hasta date, p_unidades uuid[] default null)
+returns table (
+  orden_id uuid,
+  unidad_id uuid,
+  periodo date,
+  numero text,
+  fecha date,
+  estado_entrega text,
+  metodo_pago text,
+  transportista text,
+  repartidor text,
+  zona text,
+  productos integer,
+  producto_clave text,
+  producto text,
+  unidades numeric,
+  peso numeric,
+  enviada boolean,
+  ventas numeric,
+  mercancia numeric,
+  envio numeric,
+  envio_supuesto boolean,
+  devolucion numeric,
+  comision numeric,
+  marketing numeric,
+  margen numeric
+)
+language sql stable
+set search_path = public
+-- Con los meses como parámetro Postgres cree que vienen unas 300 órdenes y elige bucles anidados que con decenas de miles
+-- tardan segundos; con uniones por hash es un orden de magnitud más rápido.
+set enable_nestloop = off
+as $$
+with cfg as (
+  select
+    coalesce((v->>'envio_por_orden')::numeric, 0) as envio_orden,
+    coalesce((v->>'envio_vuelta_factor')::numeric, 1) as vuelta,
+    coalesce((v->>'perdida_devolucion_pct')::numeric, 0) / 100 as perdida,
+    coalesce(v->'comision_pct', '{}'::jsonb) as comision
+  from (select coalesce((select valor from fin_config where clave = 'unidad_economica'), '{}'::jsonb) as v) x
+),
+o as (
+  select
+    o.id, o.unidad_id, o.periodo, o.numero, o.fecha, o.estado_entrega, o.metodo_pago, o.total, o.costo_envio,
+    nullif(btrim(o.transportista), '') as transportista,
+    coalesce(nullif(btrim(r.nombre), ''), nullif(btrim(o.transportista), '')) as repartidor,
+    coalesce(
+      nullif(btrim(regexp_replace(translate(upper(c.corregimiento), 'ÁÉÍÓÚÜÑ', 'AEIOUUN'), '\s+', ' ', 'g')), ''),
+      'SIN ZONA'
+    ) as zona,
+    o.estado_entrega in ('entregada', 'devuelta', 'en_transito') as enviada
+  from ven_ordenes o
+  left join ven_ordenes_clientes c on c.orden_id = o.id
+  left join del_transportistas t on t.transportista = o.transportista
+  left join del_repartidores r on r.id = t.repartidor_id
+  where o.periodo >= date_trunc('month', p_desde)::date
+    and o.periodo <= p_hasta
+    and (p_unidades is null or o.unidad_id = any (p_unidades))
+),
+-- El costo de cada línea, con la misma regla de `ven_lineas_costo` (0992: primero la hoja de Costos de producto; 0122): costo vigente por el mapeo o por el mismo
+-- nombre × cantidad; si no hay, el de la Matriz. Se arma aquí con el costo vigente leído una vez (por la vista, Postgres
+-- lo recalculaba por cada línea).
+cv as materialized (
+  select producto_clave, costo_vigente from fin_costo_vigente
+),
+l as (
+  select vl.orden_id,
+    coalesce(cm.producto_clave, cd.producto_clave, vl.producto_clave) as producto_clave,
+    vl.producto, vl.cantidad, vl.precio,
+    case
+      when h.costo is not null then round(vl.cantidad * h.costo, 2)
+      when coalesce(cm.costo_vigente, cd.costo_vigente) is not null then round(vl.cantidad * coalesce(cm.costo_vigente, cd.costo_vigente), 2)
+      else vl.costo_excel
+    end as costo
+  from ven_orden_lineas vl
+  join o on o.id = vl.orden_id
+  -- 0992: primero el costo de la hoja de Costos de producto (última compra llegada en o antes de la fecha del pedido).
+  left join lateral (select fin_costo_hoja_en(fin_producto_de_linea(vl.sku_maestro_id, vl.sku), o.fecha) as costo) h on true
+  left join ven_productos_mapeo m on m.producto_clave = vl.producto_clave
+  left join cv cm on cm.producto_clave = m.costo_clave
+  left join cv cd on cd.producto_clave = vl.producto_clave
+  where not vl.es_servicio
+),
+lb as (
+  select l.*,
+    case
+      when bool_and(l.precio is not null) over w then l.precio * l.cantidad
+      when bool_and(coalesce(l.costo, 0) > 0) over w then l.costo
+      else l.cantidad
+    end as base,
+    count(*) over w as n
+  from l
+  window w as (partition by l.orden_id)
+),
+lp as (
+  select lb.*, coalesce(lb.base / nullif(sum(lb.base) over (partition by lb.orden_id), 0), 1.0 / lb.n) as peso
+  from lb
+),
+x as (
+  select
+    o.*,
+    coalesce(lp.n, 0)::integer as productos,
+    coalesce(lp.producto_clave, '(sin producto)') as producto_clave,
+    coalesce(lp.producto, '(sin producto)') as producto,
+    coalesce(lp.cantidad, 0) as unidades,
+    coalesce(lp.costo, 0) as costo,
+    coalesce(lp.peso, 1) as peso,
+    case
+      when o.costo_envio > 0 then o.costo_envio
+      when o.enviada then cfg.envio_orden
+      else 0
+    end as envio_orden,
+    o.costo_envio = 0 and o.enviada and cfg.envio_orden > 0 as envio_supuesto,
+    cfg.vuelta, cfg.perdida,
+    coalesce((cfg.comision->>coalesce(o.metodo_pago, 'otro'))::numeric, 0) / 100 as tasa_comision
+  from o
+  cross join cfg
+  left join lp on lp.orden_id = o.id
+),
+y as (
+  select x.*,
+    case when x.estado_entrega = 'entregada' then x.total * x.peso else 0 end as l_ventas,
+    case when x.estado_entrega = 'entregada' then x.costo else 0 end as l_mercancia,
+    x.envio_orden * x.peso as l_envio,
+    case when x.estado_entrega = 'devuelta' then x.envio_orden * x.vuelta * x.peso + x.costo * x.perdida else 0 end as l_devolucion,
+    case when x.estado_entrega = 'entregada' then x.total * x.peso * x.tasa_comision else 0 end as l_comision,
+    -- Base de reparto del marketing: el valor de la orden (o su parte de una orden, si vale cero).
+    coalesce(nullif(x.total, 0), 1) * x.peso as base_mkt
+  from x
+),
+libro as (
+  select r.periodo, r.unidad_id, r.marketing
+  from fin_rentabilidad_libro r
+  where r.periodo >= date_trunc('month', p_desde)::date and r.periodo <= p_hasta
+),
+camp as (
+  select date_trunc('month', c.fecha)::date as periodo, c.unidad_id, c.producto_clave, sum(c.gasto) as gasto
+  from mkt_meta_campanas c
+  where c.unidad_id is not null
+    and c.fecha >= date_trunc('month', p_desde)::date
+    and c.fecha < (date_trunc('month', p_hasta) + interval '1 month')::date
+  group by 1, 2, 3
+),
+tm as (
+  select y.periodo, y.unidad_id, sum(y.base_mkt) as base
+  from y group by 1, 2
+),
+tmp as (
+  select y.periodo, y.unidad_id, y.producto_clave, sum(y.base_mkt) as base
+  from y group by 1, 2, 3
+),
+mkt as (
+  select tm.periodo, tm.unidad_id, tm.base,
+    greatest(coalesce(lb.marketing, 0), coalesce((select sum(c.gasto) from camp c where c.periodo = tm.periodo and c.unidad_id = tm.unidad_id), 0))
+      - coalesce((
+          select sum(c.gasto) from camp c
+          join tmp on tmp.periodo = c.periodo and tmp.unidad_id = c.unidad_id and tmp.producto_clave = c.producto_clave
+          where c.periodo = tm.periodo and c.unidad_id = tm.unidad_id and c.producto_clave is not null
+        ), 0) as resto
+  from tm
+  left join libro lb on lb.periodo = tm.periodo and lb.unidad_id = tm.unidad_id
+),
+z as (
+  select y.*,
+    coalesce(m.resto * y.base_mkt / nullif(m.base, 0), 0)
+      + coalesce(cp.gasto * y.base_mkt / nullif(tmp.base, 0), 0) as l_marketing
+  from y
+  left join mkt m on m.periodo = y.periodo and m.unidad_id = y.unidad_id
+  left join camp cp on cp.periodo = y.periodo and cp.unidad_id = y.unidad_id and cp.producto_clave = y.producto_clave
+  left join tmp on tmp.periodo = y.periodo and tmp.unidad_id = y.unidad_id and tmp.producto_clave = y.producto_clave
+)
+select
+  z.id, z.unidad_id, z.periodo, z.numero, z.fecha, z.estado_entrega, z.metodo_pago, z.transportista, z.repartidor, z.zona,
+  z.productos, z.producto_clave, z.producto, z.unidades, round(z.peso, 6), z.enviada,
+  round(z.l_ventas, 4), round(z.l_mercancia, 4), round(z.l_envio, 4), z.envio_supuesto, round(z.l_devolucion, 4),
+  round(z.l_comision, 4), round(z.l_marketing, 4),
+  round(z.l_ventas - z.l_mercancia - z.l_envio - z.l_devolucion - z.l_comision - z.l_marketing, 4)
+from z
+$$;
+
 
 -- Las compras del cálculo de antes (mejora 31: toda compra llegada de cualquier etapa) dejan su lugar a la hoja; la
 -- sincronización vuelve a crear, como filas de la hoja, las de Panamá que están En Bodega o Completado.
@@ -600,14 +798,14 @@ y as (
 )
 insert into fin_costos_lotes (
   hoja, fila, linea, fecha_llegada, producto, producto_clave, codigo, sku_maestro_id, cantidad, costo_unitario,
-  financiamiento, costo_total, estatus, origen, origen_clave, en_hoja_costos, compra_id, costo_final_manual, asoc_nota
+  financiamiento, costo_total, estatus, origen, origen_clave, en_hoja_costos, compra_id, costo_final_manual, costo_final_excel, asoc_nota
 )
 select 'Costos de producto', 0, y.ecom, y.llegada, y.nombre, coalesce(y.clave_previa, y.clave), y.sku_codigo, y.sku_id, y.unidades,
   round(coalesce(nullif(y.unitario_item, 0), nullif(y.unitario_compra, 0), y.final), 6),
   0, coalesce(y.final, round(coalesce(nullif(y.unitario_item, 0), nullif(y.unitario_compra, 0)), 6)),
   'Carga inicial', case when y.compra_id is null then 'carga_inicial' else 'compras' end,
   case when y.compra_id is null then 'carga:' || y.numero || ':' || y.ecom else 'compra:' || y.compra_id || ':' || y.sku_id end,
-  true, y.compra_id, y.final,
+  true, y.compra_id, y.final, y.final is not null,
   case when y.final is not null then 'Carga inicial: costo final del Excel de María José (26 nov 2026). Al desglosar los costos asociados, quitar el costo final.' end
 from y
 where coalesce(y.final, nullif(y.unitario_item, 0), nullif(y.unitario_compra, 0)) > 0
@@ -615,6 +813,7 @@ on conflict (origen_clave) do update set
   en_hoja_costos = true,
   compra_id = excluded.compra_id,
   costo_final_manual = coalesce(fin_costos_lotes.costo_final_manual, excluded.costo_final_manual),
+  costo_final_excel = fin_costos_lotes.costo_final_manual is null and excluded.costo_final_excel,
   asoc_nota = coalesce(fin_costos_lotes.asoc_nota, excluded.asoc_nota),
   estatus = coalesce(fin_costos_lotes.estatus, excluded.estatus)
   where not fin_costos_lotes.en_hoja_costos;
@@ -649,9 +848,23 @@ select 'costos_sin_compra', to_jsonb(array_agg(numero order by numero)) from (va
   (177, 'TRUE/FEM/BALANCE')) as s(numero, sku)
 on conflict (clave) do update set valor = excluded.valor;
 
+-- Quienes llenan la hoja (María José y Francis) pueden modificar Costos de producto, como permiso propio (si ya lo tenían de
+-- solo lectura, pasa a edición). Si su nombre no coincide, se les da en Usuarios y roles.
+insert into permisos_persona (perfil_id, modulo, nivel)
+select p.id, 'costos-mercancia', 'edicion' from perfiles p
+where p.activo and (
+  translate(lower(coalesce(p.nombre, '')), 'áéíóú', 'aeiou') like 'maria jose%'
+  or lower(coalesce(p.nombre, '')) like 'francis%'
+)
+on conflict (perfil_id, modulo) do update set nivel = 'edicion';
+
 -- Para revisar: lo que quedó en la hoja y lo que del Excel no se encontró (código único o compra).
 select count(*) filter (where en_hoja_costos) as filas_hoja,
        count(distinct sku_maestro_id) filter (where en_hoja_costos) as productos_hoja,
        count(*) filter (where en_hoja_costos and compra_id is null) as sin_compra_enlazada,
        count(*) filter (where en_hoja_costos and costo_final_manual is null) as sin_costo_final
 from fin_costos_lotes;
+
+-- Quién puede llenar la hoja (permiso propio de Costos de producto en edición).
+select coalesce(p.nombre, p.email) as edita_costos from permisos_persona pp join perfiles p on p.id = pp.perfil_id
+where pp.modulo = 'costos-mercancia' and pp.nivel = 'edicion';

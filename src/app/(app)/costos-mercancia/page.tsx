@@ -5,6 +5,7 @@ import { Pagina } from "@/components/ui/pagina";
 import { fechaCorta, inicioDeMes } from "@/lib/af4/fecha";
 import { entero } from "@/lib/af4/formato";
 import { requireModulo } from "@/lib/auth";
+import { esAdministrador } from "@/lib/permisos/acceso";
 import { cargarHojaCostos } from "@/lib/finanzas/cargar-hoja-costos";
 import { VARIACION_AVISO } from "@/lib/finanzas/hoja-costos";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -34,9 +35,8 @@ export default async function CostosProductoPage() {
       </Pagina>
     );
   }
-  const { filas, resumen, sinCosto } = r;
+  const { filas, resumen, sinCosto, ultimoCerrado } = r;
   const productos = resumen.size;
-  const porCompletar = filas.filter((f) => !f.costoFinalManual && f.asociadosUnidad === 0).length;
   const subieron = [...resumen.values()].filter((p) => p.compras > 1 && (p.variacion ?? 0) >= VARIACION_AVISO).length;
   const ultima = filas.map((f) => f.llegada).filter((x): x is string => !!x).sort().at(-1);
 
@@ -44,13 +44,12 @@ export default async function CostosProductoPage() {
     <Pagina ancho="ancha" className="flex flex-col gap-6">
       <EncabezadoAF4 titulo="Costos de producto" datosHasta={ultima ? inicioDeMes(ultima) : null} filtros={puedeEscribir ? <TraerCompras /> : undefined} imprimir={false} />
       <FilaKpiAF4>
-        <KpiAF4 titulo="Productos con costo" valor={entero(productos)} subtexto="Panamá" />
+        <KpiAF4 titulo="Productos con costo" valor={entero(productos)} subtexto={ultimoCerrado ? `Panamá · cerrado hasta ${ultimoCerrado.slice(0, 7)}` : "Panamá"} />
         <KpiAF4 titulo="Compras en la hoja" valor={entero(filas.length)} subtexto={ultima ? `Última llegada ${fechaCorta(ultima)}` : undefined} />
-        <KpiAF4 titulo="Por completar" tono={porCompletar ? "warning" : "neutral"} valor={entero(porCompletar)} subtexto="sin costos asociados ni costo final" />
         <KpiAF4 titulo="Con stock y sin costo" tono={sinCosto.length ? "destructive" : "neutral"} valor={entero(sinCosto.length)} subtexto="se marcan abajo" />
         <KpiAF4 titulo={`Última compra ${VARIACION_AVISO} % más cara`} tono={subieron ? "warning" : "neutral"} valor={entero(subieron)} subtexto="que su promedio" />
       </FilaKpiAF4>
-      <HojaCostos filas={filas} resumen={Object.fromEntries(resumen)} sinCosto={sinCosto} opciones={opciones} puedeEscribir={puedeEscribir} />
+      <HojaCostos filas={filas} resumen={Object.fromEntries(resumen)} sinCosto={sinCosto} opciones={opciones} puedeEscribir={puedeEscribir} esAdmin={esAdministrador(usuario)} />
     </Pagina>
   );
 }
