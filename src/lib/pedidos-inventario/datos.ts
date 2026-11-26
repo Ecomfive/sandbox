@@ -4,7 +4,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { traerTodasConError } from "@/lib/supabase/paginar";
 import { numeroTraslado } from "@/lib/wms/traslado";
-import { esEstado, type EstadoPedido, type PedidoInventario, type StockInventario } from "./reglas";
+import { esEstado, restarComprometido, type EstadoPedido, type PedidoInventario, type StockInventario, type StockPorBodegas } from "./reglas";
 
 export interface BodegaPedido {
   id: string;
@@ -36,9 +36,9 @@ export async function cargarStock(supabase: SupabaseClient, bodegas: string[], s
 
 /**
  * Lo disponible en inventario de cada producto (19 nov 2026), sumando las bodegas de donde inventario envía, con el detalle por bodega. Solo lo que tiene algo;
- * `skus` limita a esos productos (sin él, todos: lo que ve despacho al elegir el producto).
+ * `skus` limita a esos productos (sin él, todos: lo que ve despacho al elegir el producto). `comprometido` descuenta lo que va en camino en otros pedidos.
  */
-export async function stockInventario(supabase: SupabaseClient, origenes: BodegaPedido[], skus?: string[]): Promise<Record<string, StockInventario>> {
+export async function stockInventario(supabase: SupabaseClient, origenes: BodegaPedido[], skus?: string[], comprometido: StockPorBodegas = {}): Promise<Record<string, StockInventario>> {
   const fuera: Record<string, StockInventario> = {};
   if (!origenes.length || (skus && !skus.length)) return fuera;
   const nombreDe = new Map(origenes.map((b) => [b.id, b.nombre]));
@@ -49,7 +49,7 @@ export async function stockInventario(supabase: SupabaseClient, origenes: Bodega
       return (tanda ? q.in("sku_maestro_id", tanda) : q).order("sku_maestro_id").order("bodega_id").range(d, h);
     });
     for (const s of data ?? []) {
-      const n = Number(s.disponible) || 0;
+      const n = (Number(s.disponible) || 0) - (comprometido[s.bodega_id]?.[s.sku_maestro_id] ?? 0);
       if (n <= 0) continue;
       const x = (fuera[s.sku_maestro_id] ??= { total: 0, bodegas: [] });
       x.total += n;
@@ -58,6 +58,35 @@ export async function stockInventario(supabase: SupabaseClient, origenes: Bodega
   }
   for (const x of Object.values(fuera)) x.bodegas.sort((a, b) => b.disponible - a.disponible);
   return fuera;
+}
+
+/**
+ * Lo que va en camino en pedidos «Enviado» que despacho todavía no recibe (migración 0368), por bodega y producto: sigue en la bodega, pero ya está prometido.
+ * Sin la tabla (o si falla), nada.
+ */
+export async function cargarComprometido(supabase: SupabaseClient): Promise<StockPorBodegas> {
+  const fuera: StockPorBodegas = {};
+  const { data } = await traerTodasConError<{ bodega_id: string; cantidad_enviada: number; cantidad_recibida: number | null; item: unknown }>((d, h) =>
+    supabase
+      .from("despacho_pedidos_inventario_envios")
+      .select("id, bodega_id, cantidad_enviada, cantidad_recibida, item:despacho_pedidos_inventario_items!inner(sku_id), pedido:despacho_pedidos_inventario!inner(estado)")
+      .eq("pedido.estado", "enviado")
+      .order("id")
+      .range(d, h),
+  );
+  for (const e of data ?? []) {
+    const sku = uno(e.item as { sku_id: string } | { sku_id: string }[] | null)?.sku_id;
+    if (!sku) continue;
+    const porSku = (fuera[e.bodega_id] ??= {});
+    porSku[sku] = (porSku[sku] ?? 0) + Number(e.cantidad_recibida ?? e.cantidad_enviada);
+  }
+  return fuera;
+}
+
+/** Lo disponible de esos productos en esas bodegas, descontando lo que va en camino en otros pedidos. */
+export async function cargarStockLibre(supabase: SupabaseClient, bodegas: string[], skus: string[]): Promise<StockPorBodegas> {
+  const [stock, comprometido] = await Promise.all([cargarStock(supabase, bodegas, skus), cargarComprometido(supabase)]);
+  return restarComprometido(stock, comprometido);
 }
 
 /** La foto de cada producto de los pedidos (23 nov 2026: se ve en la tabla y se agranda al pasar el cursor). */
@@ -97,18 +126,22 @@ const uno = <T,>(r: T | T[] | null): T | null => (Array.isArray(r) ? (r[0] ?? nu
 
 /**
  * Los pedidos: todos los abiertos (Solicitud, En proceso, Enviado) y los cerrados de los últimos 30 días, el más nuevo arriba.
- * Si falta la migración 0305, `faltaMigracion`.
+ * Si falta la migración 0305, `faltaMigracion`; si falta la 0368, `sinConfirmacion`.
  */
 export async function cargarPedidos(
   supabase: SupabaseClient,
   opciones: { archivados?: boolean } = {},
-): Promise<{ pedidos: PedidoInventario[]; faltaMigracion: boolean; totalArchivados: number; sinArchivo: boolean }> {
+): Promise<{ pedidos: PedidoInventario[]; faltaMigracion: boolean; totalArchivados: number; sinArchivo: boolean; sinConfirmacion: boolean }> {
   const desde = new Date(Date.now() - 30 * 86_400_000).toISOString();
   const campos =
-    "id, numero, estado, pedido_por, pedido_por_nombre, creado_en, responsable_nombre, enviado_en, en_proceso_en, recibido_por_nombre, recibido_en, origen:wms_bodegas!despacho_pedidos_inventario_bodega_origen_id_fkey(nombre), traslado:wms_traslados(numero), despacho_pedidos_inventario_items(id, orden, sku_id, producto, codigo, cantidad_pedida, nota, cantidad_entregada, observacion)";
+    "id, numero, estado, pedido_por, pedido_por_nombre, creado_en, responsable_nombre, enviado_en, en_proceso_en, recibido_por_nombre, recibido_en, origen:wms_bodegas!despacho_pedidos_inventario_bodega_origen_id_fkey(nombre), traslado:wms_traslados!despacho_pedidos_inventario_traslado_id_fkey(numero), despacho_pedidos_inventario_items(id, orden, sku_id, producto, codigo, cantidad_pedida, nota, cantidad_entregada, observacion)";
+  // De qué bodega sale cada producto y lo confirmado (migración 0368).
+  const conEnvios = "solicitud_grupo, bodega_asignada_id, asignada:wms_bodegas!despacho_pedidos_inventario_bodega_asignada_id_fkey(nombre), despacho_pedidos_inventario_envios(id, item_id, bodega_id, cantidad_enviada, cantidad_recibida, nota, confirmado_por_nombre, bodega:wms_bodegas(nombre), traslado:wms_traslados(numero))";
+  let sinConfirmacion = false;
   // Los archivados (migración 0354, 23 nov 2026) salen de la lista de siempre y se ven aparte, sin el límite de 30 días.
   const consulta = (conArchivo: boolean) => {
-    const q = supabase.from("despacho_pedidos_inventario").select(conArchivo ? `${campos}, archivado_en` : campos);
+    const pedir = sinConfirmacion ? campos : `${campos}, ${conEnvios}`;
+    const q = supabase.from("despacho_pedidos_inventario").select(conArchivo ? `${pedir}, archivado_en` : pedir);
     if (!conArchivo) return q.or(`estado.in.(solicitud,en_proceso,enviado),creado_en.gte.${desde}`).order("creado_en", { ascending: false }).limit(500);
     return (opciones.archivados ? q.not("archivado_en", "is", null) : q.is("archivado_en", null).or(`estado.in.(solicitud,en_proceso,enviado),creado_en.gte.${desde}`))
       .order("creado_en", { ascending: false })
@@ -116,16 +149,37 @@ export async function cargarPedidos(
   };
   let sinArchivo = false;
   let { data, error } = await consulta(true);
+  if (error && /despacho_pedidos_inventario_envios|bodega_asignada|solicitud_grupo/.test(error.message)) {
+    sinConfirmacion = true;
+    ({ data, error } = await consulta(true));
+  }
   if (error && /archivado_en/.test(error.message)) {
     // Sin la migración 0354 todo carga como antes, sin archivar.
     sinArchivo = true;
     ({ data, error } = await consulta(false));
   }
-  if (error) return { pedidos: [], faltaMigracion: true, totalArchivados: 0, sinArchivo };
+  if (error) return { pedidos: [], faltaMigracion: true, totalArchivados: 0, sinArchivo, sinConfirmacion };
   const { count } = sinArchivo ? { count: 0 } : await supabase.from("despacho_pedidos_inventario").select("id", { count: "exact", head: true }).not("archivado_en", "is", null);
   const pedidos = ((data ?? []) as unknown as Record<string, unknown>[]).map((p) => {
     const items = ((p.despacho_pedidos_inventario_items as Record<string, unknown>[] | null) ?? []).sort((a, b) => Number(a.orden) - Number(b.orden));
     const traslado = uno(p.traslado as { numero: number } | { numero: number }[] | null);
+    const envios = ((p.despacho_pedidos_inventario_envios as Record<string, unknown>[] | null | undefined) ?? [])
+      .map((e) => {
+        const tr = uno(e.traslado as { numero: number } | { numero: number }[] | null);
+        return {
+          id: e.id as string,
+          itemId: e.item_id as string,
+          bodegaId: e.bodega_id as string,
+          bodega: uno(e.bodega as { nombre: string } | { nombre: string }[] | null)?.nombre ?? "Bodega",
+          cantidadEnviada: Number(e.cantidad_enviada),
+          cantidadRecibida: e.cantidad_recibida === null || e.cantidad_recibida === undefined ? null : Number(e.cantidad_recibida),
+          nota: (e.nota as string | null) ?? null,
+          confirmadoPorNombre: (e.confirmado_por_nombre as string | null) ?? null,
+          traslado: tr ? numeroTraslado(tr.numero) : null,
+        };
+      })
+      .sort((a, b) => a.bodega.localeCompare(b.bodega, "es"));
+    const traslados = [...new Set(envios.map((e) => e.traslado).filter((x): x is string => !!x))].sort();
     return {
       id: p.id as string,
       numero: Number(p.numero),
@@ -139,7 +193,10 @@ export async function cargarPedidos(
       recibidoPorNombre: (p.recibido_por_nombre as string | null) ?? null,
       recibidoEn: (p.recibido_en as string | null) ?? null,
       origen: uno(p.origen as { nombre: string } | { nombre: string }[] | null)?.nombre ?? null,
-      traslado: traslado ? numeroTraslado(traslado.numero) : null,
+      traslado: traslado ? numeroTraslado(traslado.numero) : traslados.join(", ") || null,
+      envios,
+      bodegaAsignada: p.bodega_asignada_id ? { id: p.bodega_asignada_id as string, nombre: uno(p.asignada as { nombre: string } | { nombre: string }[] | null)?.nombre ?? "Bodega" } : null,
+      grupo: (p.solicitud_grupo as string | null | undefined) ?? null,
       archivadoEn: (p.archivado_en as string | null | undefined) ?? null,
       items: items.map((it) => ({
         id: it.id as string,
@@ -153,5 +210,5 @@ export async function cargarPedidos(
       })),
     } satisfies PedidoInventario;
   });
-  return { pedidos, faltaMigracion: false, totalArchivados: count ?? 0, sinArchivo };
+  return { pedidos, faltaMigracion: false, totalArchivados: count ?? 0, sinArchivo, sinConfirmacion };
 }

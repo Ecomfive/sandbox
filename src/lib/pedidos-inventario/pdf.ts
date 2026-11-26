@@ -4,7 +4,7 @@
 
 import { PDFDocument, StandardFonts, rgb, type PDFPage } from "pdf-lib";
 import { partirEnLineas, textoPdf } from "@/lib/tabla/pdf";
-import { estadoDe, fechaCorta, numeroPedido, type PedidoInventario } from "./reglas";
+import { estadoDe, fechaCorta, numeroPedido, type GrupoBodega, type PedidoInventario } from "./reglas";
 
 const ANCHO = 595.28;
 const ALTO = 841.89;
@@ -32,15 +32,18 @@ const COLUMNAS = [
 
 const num = (n: number) => n.toLocaleString("es-PA");
 
-/** Las observaciones de cada línea (la nota de quien pidió, la de inventario y, en la última, el traslado), como en la tabla de la pantalla. */
+/** Las observaciones de cada línea (la nota de quien pidió, la de inventario, lo que anotó despacho y, en la última, el traslado), como en la tabla de la pantalla. */
 export function observacionesDeLineas(p: PedidoInventario): string[] {
-  return p.items.map((it, i) => [it.nota, it.observacion, i === p.items.length - 1 ? p.traslado : null].filter(Boolean).join(" · "));
+  return p.items.map((it, i) =>
+    [it.nota, it.observacion, ...(p.envios ?? []).filter((e) => e.itemId === it.id && e.nota).map((e) => `Despacho (${e.bodega}): ${e.nota}`), i === p.items.length - 1 ? p.traslado : null].filter(Boolean).join(" · "),
+  );
 }
 
 /** Los datos de la cabecera que tienen valor, en el orden en que se leen. */
 export function datosDelPedido(p: PedidoInventario): [string, string][] {
   const datos: [string, string | null][] = [
     ["Estado", estadoDe(p.estado).etiqueta],
+    ["Bodega", p.bodegaAsignada?.nombre ?? null],
     ["Fecha del pedido", fechaCorta(p.creadoEn)],
     ["Pedido por", p.pedidoPorNombre],
     ["Responsable de bodega", p.responsableNombre],
@@ -53,7 +56,7 @@ export function datosDelPedido(p: PedidoInventario): [string, string][] {
 /** «PED-0012.pdf». */
 export const nombreArchivoPedido = (p: Pick<PedidoInventario, "numero">) => `${numeroPedido(p.numero)}.pdf`;
 
-export async function pedidoAPdf(p: PedidoInventario, fecha = new Date()): Promise<Uint8Array> {
+export async function pedidoAPdf(p: PedidoInventario, fecha = new Date(), grupos: GrupoBodega[] = []): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   doc.setTitle(textoPdf(`Pedido ${numeroPedido(p.numero)}`));
   doc.setAuthor("Ecomfive");
@@ -120,6 +123,39 @@ export async function pedidoAPdf(p: PedidoInventario, fecha = new Date()): Promi
   const total = fila(["", "Total", num(totalPedida), totalEntregada === null ? "" : num(totalEntregada), ""], negrita, null);
   if (y - total.alto < MARGEN + 24) nuevaPagina();
   dibujar(total);
+
+  // Qué buscar en cada bodega (26 nov 2026): una lista por bodega, con una casilla para marcar lo que ya se tomó.
+  if (grupos.length) {
+    const escribir = (texto: string, x: number, f: typeof fuente, tam: number) => pagina.drawText(textoPdf(texto), { x, y: y - tam, size: tam, font: f, color: TEXTO });
+    const cabe = (alto: number) => {
+      if (y - alto >= MARGEN + 24) return;
+      pagina = doc.addPage([ANCHO, ALTO]);
+      paginas.push(pagina);
+      y = ALTO - MARGEN;
+    };
+    cabe(60);
+    y -= 22;
+    escribir("Qué buscar en cada bodega", MARGEN, negrita, 12);
+    y -= 22;
+    for (const g of grupos) {
+      cabe(40);
+      pagina.drawRectangle({ x: MARGEN, y: y - 18, width: UTIL, height: 18, color: CABECERA });
+      pagina.drawText(textoPdf(`${g.bodega} · ${g.lineas.length} ${g.lineas.length === 1 ? "producto" : "productos"} · ${num(g.unidades)} unidades`), { x: MARGEN + PADDING, y: y - 12.5, size: TAM, font: negrita, color: TEXTO });
+      y -= 18;
+      for (const l of g.lineas) {
+        const nombre = partirEnLineas(textoPdf([l.codigo, l.producto].filter(Boolean).join(" · ")), (x) => fuente.widthOfTextAtSize(x, TAM), UTIL - 90, 2);
+        const alto = nombre.length * LINEA + PADDING * 2 - 2;
+        cabe(alto);
+        pagina.drawRectangle({ x: MARGEN + PADDING, y: y - PADDING - TAM + 1, width: 8, height: 8, borderColor: GRIS, borderWidth: 0.7 });
+        nombre.forEach((linea, j) => pagina.drawText(linea, { x: MARGEN + 20, y: y - PADDING - TAM - j * LINEA + 1, size: TAM, font: fuente, color: TEXTO }));
+        const cantidad = num(l.cantidad);
+        pagina.drawText(cantidad, { x: MARGEN + UTIL - PADDING - negrita.widthOfTextAtSize(cantidad, TAM), y: y - PADDING - TAM + 1, size: TAM, font: negrita, color: TEXTO });
+        y -= alto;
+        pagina.drawLine({ start: { x: MARGEN, y }, end: { x: MARGEN + UTIL, y }, thickness: 0.4, color: BORDE });
+      }
+      y -= 10;
+    }
+  }
 
   paginas.forEach((pg, i) => {
     pg.drawText("Ecomfive", { x: MARGEN, y: MARGEN - 14, size: 7.5, font: fuente, color: GRIS });
