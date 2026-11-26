@@ -21,14 +21,14 @@ export function ContadorMenu({ cantidad, href }: { cantidad: number; href?: stri
   );
 }
 
-/** La del riel negro del menú: rosa, en la esquina de arriba a la derecha del ícono, con un borde negro que la separa de él. */
-export function ContadorSobreIcono({ cantidad }: { cantidad: number }) {
+/** La del riel negro del menú: rosa, en la esquina de arriba a la derecha del ícono, con un borde negro que la separa de él. Sobre un botón en rojo (`claro`) va blanca. */
+export function ContadorSobreIcono({ cantidad, claro = false }: { cantidad: number; claro?: boolean }) {
   if (cantidad <= 0) return null;
   return (
     <>
       <span
         aria-hidden="true"
-        className="absolute -top-2 left-1/2 ml-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-aviso px-1 text-[0.6rem] leading-none font-semibold text-white tabular-nums ring-2 ring-riel"
+        className={`absolute -top-2 left-1/2 ml-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[0.6rem] leading-none font-semibold tabular-nums ring-2 ${claro ? "bg-white text-riel-alerta ring-riel-alerta" : "bg-aviso text-white ring-riel"}`}
       >
         {textoContador(cantidad)}
       </span>

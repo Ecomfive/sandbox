@@ -36,6 +36,7 @@ import { obtenerFavoritos } from "@/lib/favoritos";
 import { cargarTiendasPermitidas } from "@/lib/finanzas/cargar-tiendas-permitidas";
 import { modulosSegunTiendas } from "@/lib/finanzas/tiendas-permitidas";
 import { obtenerPendientesHoy } from "@/lib/pendientes-hoy";
+import { leerUrgentes, SIN_URGENTES } from "@/lib/avisos-urgentes";
 import { contarParaTi } from "@/lib/menciones";
 import {
   SIN_PENDIENTES,
@@ -70,7 +71,9 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
               supabase.from("tareas_equipo").select("id", { count: "exact", head: true }).eq("responsable_id", u.id).not("estado", "in", "(hecho,archivado)"),
             ).then((r) => (r.error ? 0 : (r.count ?? 0)), () => 0)
           : 0,
-      ]).then(([menu, paraTi, novedades, tareasMias]) => conParaTi(menu, paraTi, novedades, tareasMias))
+        // Pedidos y mercancía en puerto sin ver: ponen el menú en rojo.
+        u ? leerUrgentes(supabase, u.id).catch(() => SIN_URGENTES) : SIN_URGENTES,
+      ]).then(([menu, paraTi, novedades, tareasMias, urgentes]) => conParaTi(menu, paraTi, novedades, tareasMias, urgentes))
     )
     .catch(() => SIN_PENDIENTES);
   const [plataformasPais, favoritosDeSesion, usuario, permitidas, paisActual, avisoInactividad] = await Promise.all([

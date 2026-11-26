@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { ETAPAS_COMPRA } from "../../app/(app)/compras/def-compras";
 import { ETAPAS_LLEGADA_PUERTO, esLlegadaPuerto } from "./etapas-puerto";
-import { agruparEnLotes, nombreDeLote, armarAviso, pendientesDeRecibir, yaArchivadas, desdeDeLista, diasDeLista, llegadaDeEtapa, unaPorCompra, pagadoTrasSegundoPago, revisarPago, textoProductos, totalesDeLlegada, filaSinMontos, type FilaLlegada } from "./llegadas-avisos";
+import { agruparEnLotes, hrefDeListaPuerto, nombreDeLote, armarAviso, pendientesDeRecibir, yaArchivadas, desdeDeLista, diasDeLista, llegadaDeEtapa, unaPorCompra, pagadoTrasSegundoPago, revisarPago, textoProductos, totalesDeLlegada, filaSinMontos, type FilaLlegada } from "./llegadas-avisos";
 
 const fila = (o: Partial<FilaLlegada> = {}): FilaLlegada => ({
   compraId: "c1",
@@ -170,4 +170,12 @@ test("el nombre del lote dice el día y la hora de Panamá", () => {
   assert.match(nombreDeLote("2026-11-24T12:14:10Z", "2026-11-24T12:14:50Z"), /^24 nov(\.)? 2026 · 7:14\s?a\.\s?m\.$/);
   assert.match(nombreDeLote("2026-11-24T12:14:10Z", "2026-11-24T12:15:40Z"), /7:14\s?a\.\s?m\. – 7:15\s?a\.\s?m\./);
   assert.equal(nombreDeLote("", ""), "Sin fecha");
+});
+
+test("el enlace a la lista usa el periodo que alcanza a todo lo que sigue por recibir", () => {
+  const hoy = "2026-11-26";
+  assert.equal(hrefDeListaPuerto(hoy, []), "/llegadas?tipo=puerto&dias=7");
+  assert.equal(hrefDeListaPuerto(hoy, [fila({ llegadaEn: "2026-11-24T12:00:00Z" })]), "/llegadas?tipo=puerto&dias=7");
+  assert.equal(hrefDeListaPuerto(hoy, [fila({ llegadaEn: "2026-11-24T12:00:00Z" }), fila({ llegadaEn: "2026-11-10T12:00:00Z" })]), "/llegadas?tipo=puerto&dias=30");
+  assert.equal(hrefDeListaPuerto(hoy, [fila({ llegadaEn: "2026-01-02T12:00:00Z" })]), "/llegadas?tipo=puerto&dias=90");
 });

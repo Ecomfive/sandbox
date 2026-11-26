@@ -3,7 +3,7 @@ import { Pagina } from "@/components/ui/pagina";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getUsuarioActual } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { esAvisoDePuerto, filaSinMontos, hrefDeAviso, pendientesDeRecibir, yaArchivadas } from "@/lib/compras/llegadas-avisos";
+import { esAvisoDePuerto, hrefDeAviso, hrefDeListaPuerto, pendientesDeRecibir, totalesDeLlegada } from "@/lib/compras/llegadas-avisos";
 import { cargarFilasDeLlegadas } from "@/lib/compras/llegadas-servidor";
 import { motivoSinAccesoAPuerto } from "../llegadas/acceso-llegadas";
 import type { LlegadasEnAvisos } from "./llegadas-puerto-aviso";
@@ -51,12 +51,17 @@ export default async function NotificacionesPage() {
     const todas = await cargarFilasDeLlegadas(supabase, "puerto", new Date(Date.parse(masViejo) - 3_600_000).toISOString());
     const sinAcceso = todas.length > 0 && (await motivoSinAccesoAPuerto(supabase, usuario, todas.map((f) => f.compraId)));
     if (!sinAcceso) {
+      const porRecibir = pendientesDeRecibir(todas);
+      const t = totalesDeLlegada(porRecibir);
       llegadas = {
         avisoIds: avisosPuerto.map((a) => a.id),
         sinLeer: avisosPuerto.filter((a) => !a.leida).length,
         creadoEn: avisosPuerto.reduce((m, a) => (a.creadoEn > m ? a.creadoEn : m), avisosPuerto[0].creadoEn),
-        filas: pendientesDeRecibir(todas).map(filaSinMontos),
-        archivadas: yaArchivadas(todas).length,
+        compras: t.compras,
+        unidades: t.unidades,
+        cajas: t.cajas,
+        sinCajas: t.sinCajas,
+        href: hrefDeListaPuerto(hoyPanama(), porRecibir),
       };
     }
   }
