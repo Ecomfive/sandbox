@@ -137,7 +137,7 @@ export const AREAS_ACCESO: AreaAcceso[] = [
       { clave: "cierre-mes", etiqueta: "Cierre de mes" },
       { clave: "libro-movimientos", etiqueta: "Libro de movimientos" },
       { clave: "balance-general", etiqueta: "Balance general" },
-      { clave: "costos-mercancia", etiqueta: "Costos de mercancía" },
+      { clave: "costos-mercancia", etiqueta: "Costos de producto" },
       { clave: "bienes-de-uso", etiqueta: "Bienes de uso" },
       { clave: "ventas-tiendas", etiqueta: "Ventas por tienda" },
       { clave: "clientes-marketing", etiqueta: "Clientes y marketing" },

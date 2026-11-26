@@ -42,9 +42,9 @@ export interface FilaReporteria {
   formaPago: string | null;
   mesCobro: string | null;
   pagadoDelivery: number | null;
-  /** «COSTO PRODUCTO» de la Matriz; si no lo trae, el de Compras (`costoFuente` lo dice). */
+  /** El costo de la hoja de Costos de producto (0992); si el producto no está en ella, el «COSTO PRODUCTO» de la Matriz; si no, el de Compras (`costoFuente` lo dice). */
   costo: number | null;
-  costoFuente: "matriz" | "compras" | null;
+  costoFuente: "hoja" | "matriz" | "compras" | null;
   montoEnvio: number | null;
   montoEnvioSe: number | null;
   devueltosSe: string | null;

@@ -9,7 +9,8 @@ import { cuantasCajas, textoCaja, unidadesDeCajas } from "@/lib/wms/cajas";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Ventana } from "@/components/ui/ventana";
 import { FechaHora } from "@/components/ui/fecha-hora";
-import { CalendarioIcon, ComprasIcon, EnvioIcon, HistorialIcon, InventarioIcon } from "@/lib/nav-icons";
+import { CalendarioIcon, ComprasIcon, EnvioIcon, GastoIcon, HistorialIcon, InventarioIcon } from "@/lib/nav-icons";
+import { CostoProductoBloque } from "@/components/costos/costo-producto";
 import { pideMotivo, puedeMoverAMano } from "@/lib/wms/recepcion";
 import { ETIQUETA_PLATAFORMA, type Plataforma } from "@/lib/wms/stock-plataformas";
 import { juntarConVariantes, sumarCubetas, type Cubetas } from "@/lib/wms/stock-con-variantes";
@@ -506,6 +507,11 @@ export function FichaStock({
                 </div>
               </Seccion>
             )}
+
+            {/* El costo viene de la hoja de Costos de producto (0992): aquí solo se ve, no se edita. */}
+            <Seccion icono={GastoIcon} titulo="Costo">
+              <CostoProductoBloque key={sku.id} skuId={sku.id} />
+            </Seccion>
 
             {!esCombo && (
               <Seccion icono={ComprasIcon} titulo="Compras">

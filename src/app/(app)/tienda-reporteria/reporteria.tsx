@@ -204,7 +204,7 @@ const COLUMNAS: Col[] = [
     label: "Costo producto",
     alinear: "derecha",
     clase: "tabular-nums whitespace-nowrap",
-    render: (f, c) => (f.costo === null ? vacio : <span className={f.costoFuente === "compras" ? "text-muted-foreground" : ""} title={f.costoFuente === "compras" ? "La Matriz no lo trae: es el costo de Compras" : undefined}>{formatearMoneda(f.costo, c.codigoPais)}</span>),
+    render: (f, c) => (f.costo === null ? vacio : <span className={f.costoFuente === "compras" ? "text-muted-foreground" : ""} title={f.costoFuente === "hoja" ? "De Costos de producto (última compra antes del pedido)" : f.costoFuente === "compras" ? "La Matriz no lo trae: es el costo de Compras" : undefined}>{formatearMoneda(f.costo, c.codigoPais)}</span>),
     total: (fs) => formatearMoneda(fs.reduce((a, f) => a + (f.costo ?? 0), 0), "PA"),
   }),
   col("costos", "mano", { id: "montoEnvio", label: "Monto envío", alinear: "derecha", render: celdaEditable("monto_envio") }),

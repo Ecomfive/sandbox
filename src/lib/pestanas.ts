@@ -211,10 +211,9 @@ export const PESTANAS_POR_MODULO: Record<string, Pestana[]> = {
     { etiqueta: "Importar Excel", href: "/bienes-de-uso/importar" },
   ],
   "/costos-mercancia": [
-    { etiqueta: "Productos", href: "/costos-mercancia" },
-    { etiqueta: "Lotes", href: "/costos-mercancia/lotes" },
+    { etiqueta: "Costos de producto", href: "/costos-mercancia" },
+    { etiqueta: "Histórico (Excel)", href: "/costos-mercancia/lotes" },
     { etiqueta: "Mapeo con Dropi", href: "/costos-mercancia/mapeo" },
-    { etiqueta: "Importar Excel", href: "/costos-mercancia/importar" },
   ],
   "/libro-movimientos": [
     { etiqueta: "Movimientos", href: "/libro-movimientos" },

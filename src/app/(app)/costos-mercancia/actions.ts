@@ -11,6 +11,7 @@ import { normalizar } from "@/lib/finanzas/clasificacion";
 import { sinAccesoTodaLaEmpresa } from "@/lib/finanzas/acceso-tienda";
 
 const MODULO = "costos-mercancia";
+const IMPORTAR_DESACTIVADO = true;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CLAVE = /^[0-9a-f]{24}#\d{1,5}$/;
 
@@ -18,6 +19,9 @@ const CLAVE = /^[0-9a-f]{24}#\d{1,5}$/;
 export async function importarLotesCosto(archivo: string, filas: unknown[]): Promise<{ error: string } | { guardados: number; rechazados: number }> {
   try {
     await requireModuloEscritura(MODULO);
+    // Desde la hoja de Costos de producto (0992, pedido de María José) los costos no se importan de Excel: el Excel queda
+    // como histórico y cada costo se carga en la hoja (o «Agregar a mano»).
+    if (IMPORTAR_DESACTIVADO) return { error: "Los costos ya no se importan desde Excel: se cargan en Finanzas › Costos de producto." };
     if (!Array.isArray(filas) || !filas.length || filas.length > 400) return { error: "Lote inválido." };
     const buenos = filas.map(validarLote).filter((l): l is LoteCosto => l !== null);
     const guardados = await guardarLotes(createServiceClient(), origenDeArchivo(String(archivo ?? "")), buenos);
