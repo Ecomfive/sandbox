@@ -77,31 +77,79 @@ export function RepartoBodegas({ item, partes, alCambiar, bodegas, stock }: { it
   );
 }
 
-/** «Qué buscar en cada bodega»: los productos del pedido agrupados por la bodega de donde salen. */
-export function PorBodega({ grupos, titulo = true }: { grupos: GrupoBodega[]; titulo?: boolean }) {
+/** Qué productos van en este envío (26 nov 2026, pedido de Hernán): los que no se marcan quedan pendientes en otro pedido. */
+export interface Seleccion {
+  va: (itemId: string) => boolean;
+  marcar: (itemIds: string[], valor: boolean) => void;
+}
+
+const CASILLA = "h-4 w-4 shrink-0 accent-primario";
+
+/** «Qué buscar en cada bodega»: los productos del pedido agrupados por la bodega de donde salen. Con `seleccion`, cada producto y cada bodega llevan su casilla de «va ahora». */
+export function PorBodega({ grupos, titulo = true, seleccion }: { grupos: GrupoBodega[]; titulo?: boolean; seleccion?: Seleccion }) {
   if (!grupos.length) return <p className="m-0 text-xs text-muted-foreground">Todavía no hay cantidades que sacar de ninguna bodega.</p>;
   return (
     <div className="flex flex-col gap-2">
-      {titulo && <h3 className="m-0 text-xs font-semibold text-foreground">Qué buscar en cada bodega</h3>}
+      {titulo && (
+        <h3 className="m-0 text-xs font-semibold text-foreground">
+          Qué buscar en cada bodega
+          {seleccion && <span className="font-normal text-muted-foreground"> · marca lo que envías ahora; lo que no, queda pendiente en otro pedido</span>}
+        </h3>
+      )}
       <div className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(18rem,1fr))]">
-        {grupos.map((g) => (
-          <section key={g.bodegaId} className="overflow-hidden rounded-lg border border-border bg-card" aria-label={g.bodega}>
-            <p className="m-0 flex flex-wrap items-baseline justify-between gap-x-2 bg-muted px-3 py-1.5 text-xs">
-              <span className="font-semibold text-foreground">{g.bodega}</span>
-              <span className="text-muted-foreground">
-                {num(g.lineas.length)} {g.lineas.length === 1 ? "producto" : "productos"} · {num(g.unidades)} u.
-              </span>
-            </p>
-            <ul className="m-0 flex list-none flex-col divide-y divide-border p-0 text-xs">
-              {g.lineas.map((l, i) => (
-                <li key={i} className="flex items-start justify-between gap-3 px-3 py-1.5">
-                  <span className="min-w-0 text-foreground">{l.producto}</span>
-                  <span className="font-semibold text-foreground tabular-nums">{num(l.cantidad)}</span>
-                </li>
-              ))}
-            </ul>
-          </section>
-        ))}
+        {grupos.map((g) => {
+          const ids = [...new Set(g.lineas.flatMap((l) => (l.itemId ? [l.itemId] : [])))];
+          const marcados = seleccion ? ids.filter((x) => seleccion.va(x)).length : ids.length;
+          return (
+            <section key={g.bodegaId} className="overflow-hidden rounded-lg border border-border bg-card" aria-label={g.bodega}>
+              <p className="m-0 flex flex-wrap items-center justify-between gap-x-2 bg-muted px-3 py-1.5 text-xs">
+                {seleccion && ids.length ? (
+                  <label className="flex cursor-pointer items-center gap-2 font-semibold text-foreground">
+                    <input
+                      type="checkbox"
+                      checked={marcados === ids.length}
+                      ref={(el) => {
+                        if (el) el.indeterminate = marcados > 0 && marcados < ids.length;
+                      }}
+                      onChange={(e) => seleccion.marcar(ids, e.target.checked)}
+                      aria-label={`Enviar ahora todo lo de ${g.bodega}`}
+                      className={CASILLA}
+                    />
+                    {g.bodega}
+                  </label>
+                ) : (
+                  <span className="font-semibold text-foreground">{g.bodega}</span>
+                )}
+                <span className="text-muted-foreground">
+                  {seleccion && marcados < ids.length ? `${num(marcados)} de ${num(ids.length)} van ahora` : `${num(g.lineas.length)} ${g.lineas.length === 1 ? "producto" : "productos"} · ${num(g.unidades)} u.`}
+                </span>
+              </p>
+              <ul className="m-0 flex list-none flex-col divide-y divide-border p-0 text-xs">
+                {g.lineas.map((l, i) => {
+                  const va = !seleccion || !l.itemId || seleccion.va(l.itemId);
+                  const fila = (
+                    <>
+                      <span className={`min-w-0 flex-1 ${va ? "text-foreground" : "text-muted-foreground line-through"}`}>{l.producto}</span>
+                      <span className={`font-semibold tabular-nums ${va ? "text-foreground" : "text-muted-foreground"}`}>{va ? num(l.cantidad) : "Pendiente"}</span>
+                    </>
+                  );
+                  return (
+                    <li key={i}>
+                      {seleccion && l.itemId ? (
+                        <label className="flex cursor-pointer items-start gap-2 px-3 py-1.5 hover:bg-muted/60">
+                          <input type="checkbox" checked={va} onChange={(e) => seleccion.marcar([l.itemId!], e.target.checked)} aria-label={`Enviar ahora ${l.producto} desde ${g.bodega}`} className={`${CASILLA} mt-px`} />
+                          {fila}
+                        </label>
+                      ) : (
+                        <span className="flex items-start justify-between gap-3 px-3 py-1.5">{fila}</span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          );
+        })}
       </div>
     </div>
   );

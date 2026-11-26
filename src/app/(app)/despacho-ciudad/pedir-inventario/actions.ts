@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModuloEscritura, type UsuarioActual } from "@/lib/auth";
 import { cargarBodegasPedido, cargarComprometido, cargarStock, cargarStockLibre, stockInventario } from "@/lib/pedidos-inventario/datos";
-import { avisoEdicion, avisoPedido, cambiosDeEdicion, diferenciasDeEnvio, numeroPedido, estadoAntesDeEnviar, partirPorBodega, puedeArchivar, puedeDeshacerEnvio, puedeEditar, revisarConfirmacion, revisarEdicion, revisarEnvio, revisarLineas, revisarStockPedido, type EstadoPedido } from "@/lib/pedidos-inventario/reglas";
+import { avisoEdicion, avisoPedido, cambiosDeEdicion, diferenciasDeEnvio, numeroPedido, estadoAntesDeEnviar, partirPorBodega, puedeArchivar, puedeDeshacerEnvio, puedeEditar, revisarConfirmacion, revisarEdicion, revisarEnvio, revisarLineas, revisarQuedan, revisarStockPedido, type EstadoPedido } from "@/lib/pedidos-inventario/reglas";
 import { puedeVerBodega } from "@/lib/seguridad/pais-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 import { numeroTraslado } from "@/lib/wms/traslado";
@@ -214,8 +214,9 @@ export async function ponerEnProcesoPedido(id: string): Promise<Resultado> {
 /**
  * Inventario envía: anota de qué bodega sale cada producto (puede repartirlo entre varias) y cuánto. **No mueve inventario** (26 nov 2026): eso pasa cuando despacho confirma y recibe.
  * Primero marca el pedido como enviado (así un segundo clic no anota dos veces); si algo falla, lo devuelve al estado que tenía.
+ * `quedan` (26 nov 2026, pedido de Hernán): los productos que no van en este envío. Pasan a un pedido nuevo de la misma lista, en el estado que tenía, para enviarlos después.
  */
-export async function enviarPedidoInventario(id: string, entregas: unknown): Promise<Resultado> {
+export async function enviarPedidoInventario(id: string, entregas: unknown, quedan?: unknown): Promise<Resultado> {
   return conPermiso(MODULO_INVENTARIO, async (u) => {
     if (!ES_UUID(id)) return { error: "Pedido no válido." };
     const supabase = createServiceClient();
@@ -223,13 +224,18 @@ export async function enviarPedidoInventario(id: string, entregas: unknown): Pro
     if (!destino || !origenes.length) return { error: "No encontré las bodegas de Panamá para enviar a despacho." };
     const { data: p } = await supabase
       .from("despacho_pedidos_inventario")
-      .select("id, numero, estado, pedido_por, responsable_id, responsable_nombre, en_proceso_en, despacho_pedidos_inventario_items(id, sku_id, producto)")
+      .select("id, numero, estado, pedido_por, pedido_por_nombre, creado_en, bodega_destino_id, bodega_asignada_id, solicitud_grupo, responsable_id, responsable_nombre, en_proceso_en, despacho_pedidos_inventario_items(id, sku_id, producto)")
       .eq("id", id)
       .maybeSingle();
     if (!p) return { error: "Ese pedido ya no existe." };
     const estadoAntes = p.estado as string;
     if (estadoAntes !== "solicitud" && estadoAntes !== "en_proceso") return { error: "Ese pedido ya fue enviado o cerrado: recarga la página." };
-    const items = ((p.despacho_pedidos_inventario_items as { id: string; sku_id: string; producto: string }[] | null) ?? []).map((it) => ({ id: it.id, skuId: it.sku_id, producto: it.producto }));
+    const todos = ((p.despacho_pedidos_inventario_items as { id: string; sku_id: string; producto: string }[] | null) ?? []).map((it) => ({ id: it.id, skuId: it.sku_id, producto: it.producto }));
+    const pendientes = revisarQuedan(todos, quedan);
+    if ("error" in pendientes) return pendientes;
+    const aparte = new Set(pendientes.quedan);
+    // Lo que va en este envío; lo demás queda para después.
+    const items = todos.filter((it) => !aparte.has(it.id));
     const skus = items.map((it) => it.skuId);
     // Lo disponible, descontando lo que ya va en camino en otros pedidos.
     const stock = await cargarStockLibre(supabase, origenes.map((b) => b.id), skus);
@@ -258,9 +264,51 @@ export async function enviarPedidoInventario(id: string, entregas: unknown): Pro
         .update({ estado: estadoAntes, enviado_en: null, bodega_origen_id: null, responsable_id: p.responsable_id, responsable_nombre: p.responsable_nombre, en_proceso_en: p.en_proceso_en })
         .eq("id", id);
 
+    // Lo que no va ahora pasa a un pedido nuevo de la misma lista, con el estado, la fecha y quién lo pidió del original.
+    let resto: { id: string; numero: number } | null = null;
+    if (aparte.size) {
+      const grupo = (p.solicitud_grupo as string | null) ?? crypto.randomUUID();
+      const { data: nuevo, error: eNuevo } = await supabase
+        .from("despacho_pedidos_inventario")
+        .insert({
+          estado: estadoAntes,
+          bodega_destino_id: p.bodega_destino_id,
+          bodega_asignada_id: p.bodega_asignada_id,
+          solicitud_grupo: grupo,
+          pedido_por: p.pedido_por,
+          pedido_por_nombre: p.pedido_por_nombre,
+          creado_en: p.creado_en,
+          responsable_id: p.responsable_id,
+          responsable_nombre: p.responsable_nombre,
+          en_proceso_en: p.en_proceso_en,
+        })
+        .select("id, numero")
+        .single();
+      if (eNuevo || !nuevo) {
+        await volver();
+        return { error: errorDeBase(eNuevo?.message, "No se pudo separar lo que queda pendiente.") };
+      }
+      resto = { id: nuevo.id as string, numero: nuevo.numero as number };
+      const { data: movidos, error: eMover } = await supabase.from("despacho_pedidos_inventario_items").update({ pedido_id: resto.id }).eq("pedido_id", id).in("id", [...aparte]).select("id");
+      if (eMover || (movidos?.length ?? 0) !== aparte.size) {
+        await supabase.from("despacho_pedidos_inventario_items").update({ pedido_id: id }).eq("pedido_id", resto.id);
+        await supabase.from("despacho_pedidos_inventario").delete().eq("id", resto.id);
+        await volver();
+        return { error: "No se pudo separar lo que queda pendiente. Recarga la página y vuelve a intentarlo." };
+      }
+      if (!p.solicitud_grupo) await supabase.from("despacho_pedidos_inventario").update({ solicitud_grupo: grupo }).eq("id", id);
+    }
+    /** Si el envío no se guarda, lo separado vuelve al pedido original. */
+    const juntar = async () => {
+      if (!resto) return;
+      await supabase.from("despacho_pedidos_inventario_items").update({ pedido_id: id }).eq("pedido_id", resto.id);
+      await supabase.from("despacho_pedidos_inventario").delete().eq("id", resto.id);
+    };
+
     await supabase.from("despacho_pedidos_inventario_envios").delete().eq("pedido_id", id);
     const { error } = await supabase.from("despacho_pedidos_inventario_envios").insert(revisadas.envios.map((e) => ({ pedido_id: id, item_id: e.itemId, bodega_id: e.bodegaId, cantidad_enviada: e.cantidad })));
     if (error) {
+      await juntar();
       await volver();
       return { error: errorDeBase(error.message, "No se pudo guardar el envío.") };
     }
@@ -275,9 +323,10 @@ export async function enviarPedidoInventario(id: string, entregas: unknown): Pro
     const unidades = revisadas.envios.reduce((t, e) => t + e.cantidad, 0);
     const nombres = usadas.map((b) => origenes.find((o) => o.id === b)?.nombre ?? "bodega").join(", ");
     const n = numeroPedido(p.numero as number);
-    await registrarAuditoria({ accion: "enviar_pedido_inventario", entidad: "despacho_pedidos_inventario", entidadId: id, detalle: `${n}: ${unidades.toLocaleString("es-PA")} unidades desde ${nombres}; falta que despacho confirme` });
-    await avisar(supabase, [p.pedido_por as string], u, avisoPedido({ numero: p.numero as number, items: items.length }, nombreDe(u), "enviado", `desde ${nombres}`), "/inventario-despacho/solicitudes");
-    return { ok: true, mensaje: `${n} enviado. El inventario se mueve cuando despacho confirme lo que llegó.` };
+    const quedanTexto = resto ? `${aparte.size} ${aparte.size === 1 ? "producto queda pendiente" : "productos quedan pendientes"} en ${numeroPedido(resto.numero)}` : "";
+    await registrarAuditoria({ accion: "enviar_pedido_inventario", entidad: "despacho_pedidos_inventario", entidadId: id, detalle: `${n}: ${unidades.toLocaleString("es-PA")} unidades desde ${nombres}; falta que despacho confirme${quedanTexto ? `; ${quedanTexto}` : ""}` });
+    await avisar(supabase, [p.pedido_por as string], u, avisoPedido({ numero: p.numero as number, items: items.length }, nombreDe(u), "enviado", `desde ${nombres}${quedanTexto ? `; ${quedanTexto}` : ""}`), "/inventario-despacho/solicitudes");
+    return { ok: true, mensaje: `${n} enviado${quedanTexto ? ` (${quedanTexto})` : ""}. El inventario se mueve cuando despacho confirme lo que llegó.` };
   });
 }
 

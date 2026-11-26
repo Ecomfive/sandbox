@@ -212,19 +212,34 @@ export function revisarEnvio(
   return { envios, observaciones };
 }
 
+/**
+ * Enviar solo una parte del pedido (26 nov 2026, pedido de Hernán: «envié una parte de una bodega y la otra está por enviarse»): los productos que inventario deja sin marcar
+ * quedan pendientes y pasan a un pedido nuevo, en el estado que tenía. Revisa que sean productos del pedido y que al menos uno se envíe ahora.
+ */
+export function revisarQuedan(items: { id: string }[], entrada: unknown): { quedan: string[] } | { error: string } {
+  if (entrada === undefined || entrada === null) return { quedan: [] };
+  if (!Array.isArray(entrada)) return { error: "Revisa qué productos envías ahora." };
+  const ids = new Set(items.map((it) => it.id));
+  const quedan = [...new Set(entrada)];
+  if (quedan.some((x) => typeof x !== "string" || !ids.has(x))) return { error: "Un producto ya no está en el pedido: recarga la página." };
+  if (quedan.length >= items.length) return { error: "Marca al menos un producto para enviar ahora." };
+  return { quedan: quedan as string[] };
+}
+
 /** Lo que hay que buscar en cada bodega: sus productos y cantidades, en el orden de las bodegas. */
 export interface GrupoBodega {
   bodegaId: string;
   bodega: string;
   unidades: number;
-  lineas: { producto: string; codigo: string | null; cantidad: number }[];
+  /** `itemId`: el producto del pedido (para marcar qué se envía ahora). */
+  lineas: { producto: string; codigo: string | null; cantidad: number; itemId?: string }[];
 }
 
 export function agruparPorBodega(items: { id: string; producto: string; codigo: string | null }[], partes: { itemId: string; bodegaId: string; cantidad: number }[], bodegas: { id: string; nombre: string }[]): GrupoBodega[] {
   const porId = new Map(items.map((it) => [it.id, it]));
   return bodegas.flatMap((b) => {
     const lineas = items.flatMap((it) =>
-      partes.filter((p) => p.itemId === it.id && p.bodegaId === b.id && p.cantidad > 0).map((p) => ({ producto: porId.get(it.id)!.producto, codigo: porId.get(it.id)!.codigo, cantidad: p.cantidad })),
+      partes.filter((p) => p.itemId === it.id && p.bodegaId === b.id && p.cantidad > 0).map((p) => ({ producto: porId.get(it.id)!.producto, codigo: porId.get(it.id)!.codigo, cantidad: p.cantidad, itemId: it.id })),
     );
     return lineas.length ? [{ bodegaId: b.id, bodega: b.nombre, unidades: lineas.reduce((t, l) => t + l.cantidad, 0), lineas }] : [];
   });
