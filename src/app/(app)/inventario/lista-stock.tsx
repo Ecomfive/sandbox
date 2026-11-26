@@ -83,6 +83,7 @@ export function ListaStock({
   lecturas,
   lecturasFallaron,
   esAdmin,
+  soloEnBodegas = null,
 }: {
   filas: FilaStock[];
   bodegas: { id: string; nombre: string; externa: boolean }[];
@@ -97,6 +98,8 @@ export function ListaStock({
   lecturas: LecturasPlataformas | null;
   lecturasFallaron: boolean;
   esAdmin: boolean;
+  /** Las únicas bodegas que la persona puede modificar, o `null` si todas (ver `FichaStock`). */
+  soloEnBodegas?: string[] | null;
 }) {
   const router = useRouter();
   const { descendente } = useOrdenVariantes();
@@ -192,6 +195,7 @@ export function ListaStock({
         bodegasExternas={bodegasExternas}
         conPlataformas={conPlataformas}
         esAdmin={esAdmin}
+        soloEnBodegas={soloEnBodegas}
         alCerrar={() => setAbierto(null)}
         alCambiar={() => router.refresh()}
       />

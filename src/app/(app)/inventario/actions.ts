@@ -6,6 +6,7 @@ import { parseExtracto } from "@/lib/extractos/parse";
 import { mapearMovimientosInventario, type MapeoColumnasInventario } from "@/lib/inventario/parse";
 import { requireModuloEscritura } from "@/lib/auth";
 import { puedeVerPaisId } from "@/lib/seguridad/pais-acceso";
+import { alcanceInventario, SOLO_A_CARGO } from "@/lib/permisos/inventario";
 
 export interface ImportarInventarioState {
   status: "idle" | "success" | "error";
@@ -23,6 +24,7 @@ export async function importarInventario(
   } catch (error) {
     return { status: "error", mensaje: error instanceof Error ? error.message : "Sin permiso." };
   }
+  if (alcanceInventario(usuario) !== "total") return { status: "error", mensaje: SOLO_A_CARGO };
   const archivo = formData.get("archivo") as File | null;
   const paisId = formData.get("pais_id") as string | null;
   const mapeoRaw = formData.get("mapeo") as string | null;

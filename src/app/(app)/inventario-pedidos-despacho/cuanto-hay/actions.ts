@@ -7,6 +7,8 @@ import { registrarAuditoria } from "@/lib/auditoria";
 import { BUCKET_FOTOS_CUANTO_HAY, MAX_FOTOS_POR_PEDIDO, MAX_FOTOS_POR_SUBIDA, PROVEEDURIA, avisoFotos, avisoPregunta, avisoRespuesta, decidirConteoDespacho, leerCantidad, leerTipo, limpiarNota, motivoConteoDespacho, rutasDeFotosValidas, tiendasDePersona } from "@/lib/cuanto-hay/reglas";
 import { SIN_ACCESO_TIENDA } from "@/lib/finanzas/acceso-tienda";
 import { cargarTiendasPermitidas } from "@/lib/finanzas/cargar-tiendas-permitidas";
+import { alcanceInventario, estaACargoDelInventario, revisarLimite } from "@/lib/permisos/inventario";
+import { existenciasEnPais, NO_SE_PUDO_COMPROBAR } from "@/lib/wms/existencia-servidor";
 import { getPaisActual } from "@/lib/pais";
 import { detectarImagen } from "@/lib/seguridad/imagen";
 import { nombreArchivoSeguro } from "@/lib/seguridad/ruta-almacen";
@@ -116,6 +118,7 @@ export async function responderCuantoHay(id: string, cantidadCruda: string): Pro
 
 /**
  * Deja el stock físico del producto en la bodega «Despacho» de Panamá (código `despacho`, la propia y activa) en la cantidad que contó Yiletsi, con un ajuste que lleva el motivo en el historial.
+ * Desde el 26 nov 2026 solo lo baja (o lo deja igual): subir una existencia pasa por Recepción o por una corrección con motivo de quien está a cargo; y solo si quien responde puede modificar Inventario.
  * Nunca lanza ni deshace la respuesta: devuelve el resultado en palabras. Los productos con vencimiento, con variantes, compuestos o de prueba no se ajustan (ver `decidirConteoDespacho`).
  */
 async function ajustarInventarioDeDespacho(
@@ -125,7 +128,9 @@ async function ajustarInventarioDeDespacho(
   const NO = (texto: string): EstadoInventario => ({ ok: false, texto: `La respuesta quedó guardada, pero el inventario no se actualizó: ${texto}.` });
   try {
     if (!d.skuId) return NO("la pregunta no tiene un producto del catálogo");
-    const { data: bodega } = await supabase.from("wms_bodegas").select("id, nombre, paises!inner(codigo)").eq("codigo", "despacho").eq("tipo", "propia").eq("activa", true).eq("paises.codigo", "PA").maybeSingle();
+    // Responder no basta para mover el inventario: hay que poder modificarlo (26 nov 2026).
+    if (alcanceInventario(d.u) === "lectura") return NO("tu usuario solo puede ver el inventario");
+    const { data: bodega } = await supabase.from("wms_bodegas").select("id, nombre, pais_id, paises!inner(codigo)").eq("codigo", "despacho").eq("tipo", "propia").eq("activa", true).eq("paises.codigo", "PA").maybeSingle();
     if (!bodega) return NO("no se encontró la bodega Despacho de Panamá");
     const [{ data: sku }, { data: hijas }, { data: fila }] = await Promise.all([
       supabase.from("skus_maestros").select("codigo, tipo, clase, maneja_vencimiento").eq("id", d.skuId).maybeSingle(),
@@ -137,6 +142,13 @@ async function ajustarInventarioDeDespacho(
     const decision = decidirConteoDespacho({ actual, cantidad: d.cantidad, tipo: String(sku.tipo), clase: String(sku.clase ?? "fisico"), manejaVencimiento: sku.maneja_vencimiento === true, conVariantes: (hijas ?? []).length > 0 });
     if (decision.tipo === "no") return NO(decision.motivo);
     if (decision.tipo === "igual") return { ok: true, texto: `El inventario de ${bodega.nombre} ya decía ${d.cantidad.toLocaleString("es-PA")}.` };
+    // Una respuesta nunca sube la existencia: no lleva motivo. Si el conteo encontró más, lo corrige en Inventario la persona a cargo.
+    if (decision.diferencia > 0) {
+      const existencias = await existenciasEnPais(supabase, [d.skuId], bodega.pais_id as string);
+      if (!existencias) return { ok: false, texto: `La respuesta quedó guardada, pero el inventario no se actualizó. ${NO_SE_PUDO_COMPROBAR}` };
+      const limite = revisarLimite({ pais: "PA", existencia: existencias.get(d.skuId) ?? 0, aumento: decision.diferencia, aCargo: estaACargoDelInventario(d.u), motivo: null, dondeVaElMotivo: "al corregirlo en Inventario" });
+      if (limite) return { ok: false, texto: `La respuesta quedó guardada, pero el inventario no se actualizó. ${limite}` };
+    }
     const { error } = await supabase.rpc("wms_registrar_movimiento", {
       p_sku: d.skuId,
       p_bodega: bodega.id,

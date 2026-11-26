@@ -2,6 +2,7 @@ import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { requireModulo } from "@/lib/auth";
 import { getPaisActual } from "@/lib/pais";
+import { alcanceInventario } from "@/lib/permisos/inventario";
 import { traerTodasConError } from "@/lib/supabase/paginar";
 import { createServiceClient } from "@/lib/supabase/server";
 import type { CajaGuardada } from "@/lib/wms/cajas";
@@ -20,7 +21,8 @@ export default async function TrasladosPage() {
   const usuario = await requireModulo("inventario");
   const supabase = createServiceClient();
   const pais = await getPaisActual(supabase);
-  const puedeEscribir = !usuario.modulosSoloLectura.includes("inventario");
+  // Transferir es de la persona a cargo del inventario y de los administradores.
+  const puedeEscribir = alcanceInventario(usuario) === "total";
 
   const { data: bodegas } = await supabase.from("wms_bodegas").select("id, nombre").eq("pais_id", pais.id).eq("tipo", "propia").eq("activa", true).order("orden").order("nombre");
   const propias = (bodegas ?? []).map((b) => ({ id: b.id as string, nombre: b.nombre as string }));

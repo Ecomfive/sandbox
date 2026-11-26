@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModuloEscritura } from "@/lib/auth";
+import { alcanceInventario, SOLO_A_CARGO } from "@/lib/permisos/inventario";
 import { puedeVerBodega } from "@/lib/seguridad/pais-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 import { MAX_NOTA_TRASLADO, numeroTraslado, revisarLineasTraslado } from "@/lib/wms/traslado";
@@ -13,6 +14,7 @@ const RUTA = "/inventario/traslados";
 /** Crea un traslado entre dos bodegas propias del país (`wms_crear_traslado`, migraciones 0235 y 0238): todos sus productos y cajas se mueven o ninguno. Devuelve el error como valor. */
 export async function crearTraslado(datos: { desde: unknown; hacia: unknown; notas: unknown; lineas: unknown }): Promise<{ error: string } | { numero: string }> {
   const usuario = await requireModuloEscritura("inventario");
+  if (alcanceInventario(usuario) !== "total") return { error: SOLO_A_CARGO };
   if (!ES_ID(datos.desde)) return { error: "Elige de qué bodega sale." };
   if (!ES_ID(datos.hacia)) return { error: "Elige a qué bodega va." };
   if (datos.desde === datos.hacia) return { error: "La bodega de origen y la de destino son la misma." };
@@ -45,6 +47,7 @@ export async function crearTraslado(datos: { desde: unknown; hacia: unknown; not
 /** Cambia la nota de un traslado: qué traslado fue, en qué fecha, con qué número. La nota no mueve nada. */
 export async function guardarNotaTraslado(id: string, nota: unknown): Promise<{ error?: string }> {
   const usuario = await requireModuloEscritura("inventario");
+  if (alcanceInventario(usuario) !== "total") return { error: SOLO_A_CARGO };
   if (!ES_ID(id)) return { error: "Traslado no válido." };
   const texto = typeof nota === "string" ? nota.trim().slice(0, MAX_NOTA_TRASLADO) : "";
   const supabase = createServiceClient();

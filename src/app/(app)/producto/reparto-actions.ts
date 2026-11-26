@@ -4,25 +4,27 @@ import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireAlgunModulo, type UsuarioActual } from "@/lib/auth";
 import { esAdministrador } from "@/lib/permisos/acceso";
+import { estaACargoDelInventario } from "@/lib/permisos/inventario";
 import { puedeVerBodega } from "@/lib/seguridad/pais-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 import { mensajeErrorReparto, revisarReparto, type LineaReparto, type StockGeneral } from "@/lib/wms/reparto-variantes";
 
-// Repartir el stock general de un producto entre sus variantes (11 nov 2026, pedido de Jhokser; migración 0273). Mueven inventario; desde el 19 nov 2026 las puede hacer quien modifique Inventario
-// **o Producto**: el botón sale en la ficha de Producto (donde se crean las variantes) y quien las crea tiene que poder repartirlas. Antes pedían solo Inventario y a quien editaba Producto sin
-// poder escribir en Inventario (Dinora) el servidor le fallaba con un error genérico aunque la pantalla le dejaba intentarlo.
+// Repartir el stock general de un producto entre sus variantes (11 nov 2026, pedido de Jhokser; migración 0273). El botón sale en la ficha de Producto (donde se crean las variantes) y en la de
+// Inventario. Como mueve inventario, desde el 26 nov 2026 lo hace la persona a cargo del inventario o un administrador (`estaACargoDelInventario`).
 const MODULOS_REPARTO = ["inventario", "producto"];
 /**
  * El error que la base devolvió, para quien administra el sistema o está en «Ver así» (19 nov 2026: Dinora no podía repartir y el aviso genérico no decía por qué). A los demás no se les
  * enseña: es texto de la base. Va entre paréntesis, con el código de Postgres, al final del mensaje.
  */
 const detalleTecnico = (usuario: UsuarioActual, error: { code?: string; message: string }): string => (esAdministrador(usuario) || usuario.vistaPrevia ? ` (${error.code ? `${error.code}: ` : ""}${error.message.slice(0, 220)})` : "");
-const SIN_PERMISO = "Para repartir el stock hace falta poder modificar Producto o Inventario. Pídelo a quien administra los permisos.";
+const SIN_PERMISO = "Repartir el stock solo lo puede hacer la persona a cargo del inventario o un administrador.";
 
 /** Quien puede repartir (modificar Inventario o Producto), o el error dicho en palabras: en producción Next.js oculta el mensaje de una excepción. */
 async function quienReparte(): Promise<{ usuario: UsuarioActual } | { error: string }> {
   try {
-    return { usuario: await requireAlgunModulo(MODULOS_REPARTO, true) };
+    const usuario = await requireAlgunModulo(MODULOS_REPARTO, true);
+    // Repartir mueve inventario: desde el 26 nov 2026 es de la persona a cargo del inventario y de los administradores.
+    return estaACargoDelInventario(usuario) ? { usuario } : { error: SIN_PERMISO };
   } catch {
     return { error: SIN_PERMISO };
   }

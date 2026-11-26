@@ -21,7 +21,7 @@ import { getDosPasos, getUsuarioActual, getUsuarioIdSesion, getUsuarioSesion, ir
 import { AvisoDosPasos } from "@/components/cuenta/aviso-dos-pasos";
 import { tieneContrasenaTemporal } from "@/lib/cuenta/contrasena";
 import { getPaisActual } from "@/lib/pais";
-import { PAISES_CON_RECEPCION } from "@/lib/wms/recepcion";
+import { PAISES_CON_RECEPCION, PAISES_QUE_RECIBEN_COMPRAS } from "@/lib/wms/recepcion";
 import { obtenerPlataformasPais } from "@/lib/pais-plataformas";
 import { colapsarGestionDeIds, construirAreas, pestanasSinModulo } from "@/lib/nav-data";
 import { getPlataformaActual } from "@/lib/plataforma-actual";
@@ -112,7 +112,8 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         ...(esAdministrador(usuario) ? [] : PESTANAS_SOLO_ADMIN),
         ...(usuario.modulos.includes("uso-sistema") ? [] : PESTANAS_USO_SISTEMA),
         ...(usuario.modulos.includes("compras-por-pais") ? [] : PESTANAS_POR_PAIS),
-        ...(PAISES_CON_RECEPCION.includes(paisActual.codigo) ? [] : ["/inventario/recepcion", "/inventario/cuadro", "/inventario/novedades"]),
+        ...(PAISES_QUE_RECIBEN_COMPRAS.includes(paisActual.codigo) ? [] : ["/inventario/recepcion"]),
+        ...(PAISES_CON_RECEPCION.includes(paisActual.codigo) ? [] : ["/inventario/cuadro", "/inventario/novedades"]),
         // Los KPIs de atención y el panel de Dirección ya no son pestañas: desde el 30 oct 2026 son la Bandeja de Dirección.
       ]
     : [];

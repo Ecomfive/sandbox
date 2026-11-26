@@ -41,6 +41,7 @@ export const MODULOS: Modulo[] = [
   { clave: "analisis-competencia", etiqueta: "Análisis de competencia" },
   { clave: "producto", etiqueta: "Producto" },
   { clave: "unir-productos", etiqueta: "Unir productos duplicados (Producto)" },
+  { clave: "encargado-inventario", etiqueta: "A cargo del inventario: todas las bodegas, transferir y recibir (Inventario)" },
   { clave: "salida-manual", etiqueta: "Salida a mano donde va con remisión (Inventario)" },
   { clave: "anular-remision", etiqueta: "Anular una remisión en camino sin autorización (Inventario)" },
   { clave: "wms-bodegas", etiqueta: "Bodegas (WMS)" },

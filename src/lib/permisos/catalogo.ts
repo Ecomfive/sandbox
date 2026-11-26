@@ -76,6 +76,7 @@ export const AREAS_ACCESO: AreaAcceso[] = [
       { clave: "pedidos-dropi-resumen", etiqueta: "Resumen mensual de Dropi" },
       { clave: "alertas", etiqueta: "Alertas de inventario" },
       { clave: "inventario", etiqueta: "Inventario" },
+      { clave: "encargado-inventario", etiqueta: "A cargo del inventario (todas las bodegas, transferir y recibir)" },
       { clave: "salida-manual", etiqueta: "Salida a mano donde va con remisión" },
       { clave: "anular-remision", etiqueta: "Anular una remisión en camino sin autorización" },
       { clave: "wms-bodegas", etiqueta: "Bodegas" },
@@ -163,7 +164,7 @@ export const MODULOS_ACCESO: ModuloAcceso[] = AREAS_ACCESO.flatMap((a) => a.modu
 export const etiquetaDeModulo = (clave: string): string => MODULOS_ACCESO.find((m) => m.clave === clave)?.etiqueta ?? clave;
 
 /** Los módulos con datos sensibles (nómina, bancos, retiros, márgenes) y los que dan poder de administración: llevan su marca en la matriz. */
-export const MODULOS_SENSIBLES: ReadonlySet<string> = new Set(["retiros", "conciliaciones", "extractos", "productos", "usuarios", "configuracion", "rendimiento", "unir-productos", "salida-manual", "anular-remision", "nomina", "utilidades", "tesoreria", "conciliacion-bancaria", "libro-movimientos"]);
+export const MODULOS_SENSIBLES: ReadonlySet<string> = new Set(["retiros", "conciliaciones", "extractos", "productos", "usuarios", "configuracion", "rendimiento", "unir-productos", "encargado-inventario", "salida-manual", "anular-remision", "nomina", "utilidades", "tesoreria", "conciliacion-bancaria", "libro-movimientos"]);
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Lo que se puede afinar dentro de un módulo

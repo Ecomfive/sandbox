@@ -3,12 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
+import { alcanceInventario, aumentoDeConteo, bloqueoDeBodega, estaACargoDelInventario, PAISES_CON_LIMITE, revisarLimite, SOLO_A_CARGO } from "@/lib/permisos/inventario";
 import { autorizadaParaSalidaManual } from "@/lib/permisos/salida-manual";
 import { puedeVerBodega } from "@/lib/seguridad/pais-acceso";
 import { createServiceClient } from "@/lib/supabase/server";
 import { indexar, parecidos, todasLasCoincidencias } from "@/lib/scraping/cruces";
 import { traerTodasConError } from "@/lib/supabase/paginar";
 import { revisarCajas } from "@/lib/wms/cajas";
+import { existenciasEnPais, leerBodega, NO_SE_PUDO_COMPROBAR, type BodegaDeInventario } from "@/lib/wms/existencia-servidor";
 import { pideMotivo, puedeMoverAMano, SOLO_ADMIN_MOVIMIENTO } from "@/lib/wms/recepcion";
 import { numeroTraslado } from "@/lib/wms/traslado";
 import { itemsParaSumar, MAX_LINEAS_IMPORTADAS, revisarConteo, revisarTransferencias, varianteDeLinea, type ItemConteo } from "@/lib/wms/levantamiento";
@@ -16,6 +18,48 @@ import { itemsParaSumar, MAX_LINEAS_IMPORTADAS, revisarConteo, revisarTransferen
 const ES_ID = /^[0-9a-fA-F-]{8,64}$/;
 
 const revisarLista = (lista: unknown): { items: ItemConteo[] } | { error: string } => (Array.isArray(lista) && lista.length === 0 ? { items: [] } : revisarConteo(lista));
+
+const unidadesDe = (i: ItemConteo): number => ("cantidad" in i ? i.cantidad : i.lotes.reduce((t, l) => t + l.cantidad, 0));
+
+/**
+ * El límite de existencia sobre todo un levantamiento: por producto, lo que sube con lo contado y lo añadido (lo restado no compensa, ver `aumentoDeConteo`). Devuelve el mensaje del primer producto que lo supere
+ * sin poder hacerlo, o `null`.
+ */
+async function revisarLimiteDeConteo(
+  supabase: ReturnType<typeof createServiceClient>,
+  bodegaId: string,
+  bodega: BodegaDeInventario,
+  d: { contados: ItemConteo[]; sumas: ItemConteo[]; aCargo: boolean; motivo: string },
+): Promise<string | null> {
+  if (!PAISES_CON_LIMITE.includes(bodega.pais ?? "") || (d.aCargo && d.motivo) || (!d.contados.length && !d.sumas.length)) return null;
+  const { data: stock, error } = await traerTodasConError<{ sku_maestro_id: string; fisico: number }>((de, hasta) =>
+    supabase.from("wms_stock").select("sku_maestro_id, fisico").eq("bodega_id", bodegaId).order("sku_maestro_id").range(de, hasta),
+  );
+  if (error || !stock) return NO_SE_PUDO_COMPROBAR;
+  const enBodega = new Map(stock.map((s) => [s.sku_maestro_id, Number(s.fisico)]));
+  const contado = new Map(d.contados.map((i) => [i.sku, unidadesDe(i)]));
+  const sumar = new Map(d.sumas.map((i) => [i.sku, unidadesDe(i)]));
+  const suben = [...new Set([...contado.keys(), ...sumar.keys()])]
+    .map((sku) => ({ sku, aumento: aumentoDeConteo({ enBodega: enBodega.get(sku) ?? 0, contado: contado.get(sku) ?? null, sumar: sumar.get(sku) ?? 0 }) }))
+    .filter((x) => x.aumento > 0);
+  if (!suben.length) return null;
+  const primero = suben[0];
+  const [existencias, { data: producto }] = await Promise.all([
+    existenciasEnPais(supabase, [primero.sku], bodega.paisId),
+    supabase.from("skus_maestros").select("codigo").eq("id", primero.sku).maybeSingle(),
+  ]);
+  if (!existencias) return NO_SE_PUDO_COMPROBAR;
+  const mensaje = revisarLimite({
+    pais: bodega.pais,
+    existencia: existencias.get(primero.sku) ?? 0,
+    aumento: primero.aumento,
+    aCargo: d.aCargo,
+    motivo: d.motivo,
+    dondeVaElMotivo: "en «Referencia»",
+    producto: (producto?.codigo as string | undefined) ?? undefined,
+  });
+  return mensaje && suben.length > 1 ? `${mensaje} Hay ${suben.length - 1} más en la misma situación.` : mensaje;
+}
 
 const refrescar = () => {
   revalidatePath("/inventario");
@@ -87,13 +131,20 @@ export async function guardarLevantamiento(
   const conConteo = conCajas || revisado.items.length > 0;
   if (!conConteo && !porSumar.length && !porRestar.length && !porTrasladar.length) return { error: "No hay nada que guardar." };
 
+  // Quien no está a cargo del inventario solo cuenta la bodega de despacho y no transfiere; y una existencia no sube a mano sin más (26 nov 2026).
+  const bodega = await leerBodega(supabase, bodegaId);
+  if (!bodega) return { error: "La bodega no existe." };
+  const alcance = alcanceInventario(usuario);
+  const bloqueo = bloqueoDeBodega(alcance, bodega);
+  if (bloqueo) return { error: bloqueo };
+  if (porTrasladar.length && alcance !== "total") return { error: SOLO_A_CARGO };
+  const limite = await revisarLimiteDeConteo(supabase, bodegaId, bodega, { contados: revisado.items, sumas: porSumar, aCargo: estaACargoDelInventario(usuario), motivo: ref });
+  if (limite) return { error: limite };
+
   // Restar es una salida a mano: donde toda salida va con remisión (Costa Rica), es de un administrador y lleva motivo (la referencia).
   if (porRestar.length) {
-    const { data: bodegaFila } = await supabase.from("wms_bodegas").select("paises(codigo)").eq("id", bodegaId).maybeSingle();
-    const pais = bodegaFila?.paises as { codigo: string } | { codigo: string }[] | null | undefined;
-    const codigoPais = (Array.isArray(pais) ? pais[0] : pais)?.codigo;
-    if (!puedeMoverAMano("salida", codigoPais, autorizadaParaSalidaManual(usuario))) return { error: SOLO_ADMIN_MOVIMIENTO };
-    if (pideMotivo("salida", codigoPais) && !ref) return { error: "Para restar, escribe el motivo en «Referencia»." };
+    if (!puedeMoverAMano("salida", bodega.pais, autorizadaParaSalidaManual(usuario))) return { error: SOLO_ADMIN_MOVIMIENTO };
+    if (pideMotivo("salida", bodega.pais) && !ref) return { error: "Para restar, escribe el motivo en «Referencia»." };
   }
 
   const hecho: HechoLevantamiento = { contados: false, sumas: false, restas: false, trasladados: [] };
