@@ -299,7 +299,18 @@ async function guiaSinCargarDeOrden(supabase: SupabaseClient, id: string): Promi
 async function entregaDeOrden(supabase: SupabaseClient, id: string): Promise<EntregaOrden | null> {
   const [g, m] = await Promise.all([
     supabase.from("tienda_guias").select("guia, estado, estado_grupo, fecha_estado, fecha_emision, ultimo_motivo, visitas_sin_entregar, destino, historial").eq("orden_id", id).order("fecha_emision", { ascending: false }).limit(1),
-    supabase.from("mon_despachos").select("estado, estado_grupo, courier, causa_rechazo, fecha_despacho, fecha_entrega, actualizado_monday").eq("orden_id", id).order("actualizado_monday", { ascending: false }).limit(1),
+    // También la fila con varios pedidos que lo nombra (`otras_ordenes`, 0369); sin la migración, solo la suya.
+    supabase
+      .from("mon_despachos")
+      .select("estado, estado_grupo, courier, causa_rechazo, fecha_despacho, fecha_entrega, actualizado_monday")
+      .or(`orden_id.eq.${id},otras_ordenes.cs.{${id}}`)
+      .order("actualizado_monday", { ascending: false })
+      .limit(1)
+      .then((r) =>
+        r.error && /otras_ordenes/.test(r.error.message)
+          ? supabase.from("mon_despachos").select("estado, estado_grupo, courier, causa_rechazo, fecha_despacho, fecha_entrega, actualizado_monday").eq("orden_id", id).order("actualizado_monday", { ascending: false }).limit(1)
+          : r,
+      ),
   ]);
   const guia = g.error ? null : (g.data?.[0] as Record<string, unknown> | undefined);
   if (guia) {

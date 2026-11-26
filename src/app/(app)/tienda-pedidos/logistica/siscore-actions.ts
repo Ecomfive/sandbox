@@ -3,9 +3,8 @@
 import { soloSinLimite } from "@/lib/tienda/acceso";
 import { revalidatePath } from "next/cache";
 import { requireModulo, requireModuloEscritura } from "@/lib/auth";
-import { getPaisActual } from "@/lib/pais";
 import { createServiceClient } from "@/lib/supabase/server";
-import { cargarTiendas } from "@/lib/tienda/datos";
+import { cargarTiendas, type Tienda } from "@/lib/tienda/datos";
 import { fuenteFinanzas } from "@/lib/tienda/datos-finanzas";
 import { tiendaDeClienteSiscore } from "@/lib/tienda/siscore";
 import { grupoDeEstadoGuia, guiaAntesDelPedido, leerLecturaSiscore, momentoEntrega, pedidoDeFactura, sinLoDelRastreo, visitasSinEntregar } from "@/lib/tienda/siscore";
@@ -35,6 +34,21 @@ export interface LecturaEnCurso {
 }
 
 const porcentaje = (hechos: number, total: number) => (total > 0 ? Math.min(99, Math.floor((hechos / total) * 100)) : 0);
+
+/**
+ * Las tiendas de todos los países, con el código de su país. La cuenta de SISCORE es de una tienda, no del país elegido arriba: con Costa Rica
+ * elegido, desde el 25 nov 2026 las lecturas de Kenku, Oferfy y Nuvo quedaban sin tienda (las guías nuevas sin pedido, nada entraba en Shopify y
+ * la tienda de las guías leídas se borraba).
+ */
+async function tiendasDeTodosLosPaises(supabase: ReturnType<typeof createServiceClient>): Promise<{ tienda: Tienda; codigoPais: string }[]> {
+  const { data: paises } = await supabase.from("paises").select("id, codigo");
+  const todas: { tienda: Tienda; codigoPais: string }[] = [];
+  for (const p of paises ?? []) {
+    const { tiendas } = await cargarTiendas(supabase, p.id as string);
+    for (const t of tiendas) todas.push({ tienda: t, codigoPais: String(p.codigo) });
+  }
+  return todas;
+}
 
 /** Las lecturas de SISCORE que siguen avanzando (de cualquier tienda), para mostrar su porcentaje. Las que dejaron de avanzar se cierran. */
 async function lecturasVivas(supabase: ReturnType<typeof createServiceClient>): Promise<LecturaEnCurso[] | null> {
@@ -94,8 +108,7 @@ export async function empezarLecturaSiscore(
     return { error: "Tu rol solo puede ver Logística." };
   }
   const supabase = createServiceClient();
-  const pais = await getPaisActual(supabase);
-  const { tiendas } = await cargarTiendas(supabase, pais.id);
+  const tiendas = (await tiendasDeTodosLosPaises(supabase)).map((x) => x.tienda);
   const deSesion = clienteSesion ? tiendaDeClienteSiscore(clienteSesion, tiendas) : null;
   const elegida = tiendaElegida && UUID.test(tiendaElegida) ? (tiendas.find((t) => t.id === tiendaElegida) ?? null) : null;
   if (elegida && clienteSesion && deSesion?.id !== elegida.id)
@@ -187,10 +200,14 @@ export async function procesarLecturaSiscore(
   if (!lectura) return fallar("La lectura de SISCORE llegó vacía o con otro formato.");
   try {
     // La tienda del cliente de SISCORE y su unidad de Finanzas (donde están sus órdenes).
-    const pais = await getPaisActual(supabase);
-    const { tiendas } = await cargarTiendas(supabase, pais.id);
-    const tienda = tiendaDeClienteSiscore(lectura.cliente, tiendas);
-    const unidad = tienda ? ((await fuenteFinanzas(supabase, [tienda], pais.codigo)).unidadDe.get(tienda.id) ?? null) : null;
+    const todas = await tiendasDeTodosLosPaises(supabase);
+    // La del cliente de la sesión de SISCORE y, si no se reconoce, la que se eligió al empezar la lectura.
+    const { data: inicio } = await supabase.from("tienda_guias_lecturas").select("tienda_id").eq("id", id).maybeSingle();
+    const tienda = tiendaDeClienteSiscore(lectura.cliente, todas.map((x) => x.tienda)) ?? todas.find((x) => x.tienda.id === inicio?.tienda_id)?.tienda ?? null;
+    // Sin tienda no se guarda nada: guardar borraría la tienda de las guías y dejaría las nuevas sin su pedido.
+    if (!tienda) return fallar(`No se reconoció la tienda de la cuenta «${lectura.cliente}» de SISCORE: no se guardó nada. Avísale a Hernán.`);
+    const codigoPais = todas.find((x) => x.tienda.id === tienda.id)?.codigoPais ?? "PA";
+    const unidad = (await fuenteFinanzas(supabase, [tienda], codigoPais)).unidadDe.get(tienda.id) ?? null;
     // Los pedidos de esas guías, por su número en esa unidad.
     const numeros = [...new Set(lectura.guias.map((g) => pedidoDeFactura(g.factura)).filter((n): n is string => !!n))];
     const ordenDe = new Map<string, { id: string; fecha: string | null }>();

@@ -275,3 +275,74 @@ export async function marcarPagadoEnShopify(app: AppTienda, numero: string): Pro
   const errores = d.orderMarkAsPaid?.userErrors ?? [];
   if (errores.length) throw new Error(`Shopify no lo marcó como pagado: ${errores[0].message}`);
 }
+
+// ── Avisos de atención al cliente (26 nov 2026): cambiar la dirección del pedido y dejar «En espera» los pedidos nuevos.
+
+/**
+ * Cambia la dirección de envío del pedido: «Dirección exacta» (`address1`) y «Corregimiento» (`address2`). El bot todavía no entiende las direcciones
+ * enredadas que escribe el cliente y la asesora la arregla al confirmar. `orderUpdate` reemplaza la dirección entera, así que se leen los demás datos
+ * (nombre, teléfono, ciudad, provincia, país) y se mandan igual. Pide `write_orders`. Lanza el error en palabras; si lanza, no cambió nada.
+ */
+export async function cambiarDireccionEnShopify(app: AppTienda, numero: string, cambio: { direccion: string; corregimiento: string }): Promise<void> {
+  const token = await tokenConEscritura(app);
+  const pedido = await buscarPedido(app, token, numero);
+  const d = await graphql<{
+    order: {
+      cancelledAt: string | null;
+      shippingAddress: Record<"firstName" | "lastName" | "company" | "city" | "provinceCode" | "zip" | "phone" | "countryCodeV2", string | null> | null;
+    } | null;
+  }>(app, token, "query($id: ID!) { order(id: $id) { cancelledAt shippingAddress { firstName lastName company city provinceCode zip phone countryCodeV2 } } }", { id: pedido.id });
+  if (d.order?.cancelledAt) throw new Error("El pedido está anulado en Shopify: no se cambia la dirección.");
+  const a = d.order?.shippingAddress;
+  if (!a) throw new Error("El pedido no tiene dirección de envío en Shopify (por ejemplo, retiro en tienda): no hay dirección que cambiar.");
+  const entrada: Record<string, string | null> = {
+    firstName: a.firstName,
+    lastName: a.lastName,
+    company: a.company,
+    address1: cambio.direccion,
+    address2: cambio.corregimiento || null,
+    city: a.city,
+    provinceCode: a.provinceCode,
+    zip: a.zip,
+    phone: a.phone,
+    countryCode: a.countryCodeV2,
+  };
+  const limpia = Object.fromEntries(Object.entries(entrada).filter(([k, v]) => v !== null || k === "address2"));
+  const r = await graphql<{ orderUpdate: { userErrors: { message: string }[] } | null }>(
+    app,
+    token,
+    "mutation($input: OrderInput!) { orderUpdate(input: $input) { userErrors { message } } }",
+    { input: { id: pedido.id, shippingAddress: limpia } },
+  );
+  const errores = r.orderUpdate?.userErrors ?? [];
+  if (errores.length) throw new Error(`Shopify no cambió la dirección: ${errores[0].message}`);
+}
+
+/**
+ * Deja «En espera» los envíos abiertos del pedido (manual ATC: despacho no lo prepara hasta que la asesora confirma los datos; al confirmar desde el
+ * sistema se levanta con `liberarEsperaEnShopify`). Pide el permiso de los envíos de la tienda. Devuelve cuántos envíos quedaron en espera (0 si ya
+ * lo estaban o si el pedido ya salió).
+ */
+export async function ponerEnEsperaEnShopify(app: AppTienda, numero: string): Promise<number> {
+  const token = await tokenCon(app, PERMISO_GUIA, "dejar los pedidos nuevos en espera");
+  const pedido = await buscarPedido(app, token, numero);
+  const d = await graphql<{ order: { fulfillmentOrders: { nodes: { id: string; status: string }[] } } | null }>(
+    app,
+    token,
+    "query($id: ID!) { order(id: $id) { fulfillmentOrders(first: 10) { nodes { id status } } } }",
+    { id: pedido.id },
+  );
+  let puestas = 0;
+  for (const fo of (d.order?.fulfillmentOrders.nodes ?? []).filter((x) => x.status === "OPEN")) {
+    const r = await graphql<{ fulfillmentOrderHold: { userErrors: { message: string }[] } | null }>(
+      app,
+      token,
+      "mutation($id: ID!, $hold: FulfillmentOrderHoldInput!) { fulfillmentOrderHold(id: $id, fulfillmentHold: $hold) { userErrors { message } } }",
+      { id: fo.id, hold: { reason: "OTHER", reasonNotes: "Por confirmar datos: la asesora lo confirma desde el sistema." } },
+    );
+    const errores = r.fulfillmentOrderHold?.userErrors ?? [];
+    if (errores.length) throw new Error(`Shopify no dejó el pedido en espera: ${errores[0].message}`);
+    puestas++;
+  }
+  return puestas;
+}
