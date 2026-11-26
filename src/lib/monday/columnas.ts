@@ -424,10 +424,58 @@ export function enlazarOrden(numero: string | null, unidadId: string | null, can
   return mismas.length === 1 ? mismas[0] : null;
 }
 
-/** Las formas del número que se buscan en `ven_ordenes.numero` («#1001» y «1001»). */
-export function variantesPedido(numero: string | null): string[] {
-  const t = (numero ?? "").trim().toUpperCase();
+/**
+ * Los números de una fila con varios pedidos («44387 / CS19295», «147712 / 147708»; 26 nov 2026, aviso de atención al cliente): el cliente pidió en
+ * dos tiendas (o dos veces) y despacho lleva los pedidos juntos en una sola fila, con la tienda de uno solo. Con un solo número, el texto tal cual.
+ */
+export function numerosDePedido(texto: string | null | undefined): string[] {
+  const t = (texto ?? "").trim();
   if (!t) return [];
-  const sin = t.replace(/^#/, "");
-  return [...new Set([t, sin, `#${sin}`])];
+  const partes = t
+    .split(/\s*(?:\/|,|;|&|\+|\by\b)\s*/i)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (partes.length < 2 || !partes.every((p) => /^#?[A-Z]{0,4}\d{3,8}$/i.test(p))) return [t];
+  return [...new Set(partes)];
+}
+
+/** Las formas del número que se buscan en `ven_ordenes.numero` («#1001» y «1001»); de cada uno, si la fila trae varios. */
+export function variantesPedido(numero: string | null): string[] {
+  return [
+    ...new Set(
+      numerosDePedido(numero).flatMap((n) => {
+        const t = n.toUpperCase();
+        const sin = t.replace(/^#/, "");
+        return [t, sin, `#${sin}`];
+      }),
+    ),
+  ];
+}
+
+const mesDe = (fecha: string) => Number(fecha.slice(0, 4)) * 12 + Number(fecha.slice(5, 7));
+
+/**
+ * Los pedidos de una fila de despacho: el principal (`orden_id`) y, si la fila trae varios números, los demás (`otras_ordenes`, migración 0369). Con un
+ * solo número, como siempre (`enlazarOrden`). Con varios, cada número se busca primero en la tienda de la fila y, si no es de ella, en las demás: vale
+ * si hay uno solo de un mes cercano al reparto (el #1921 de Kenku en una fila de ClickSi). El principal es el de la tienda de la fila.
+ */
+export function enlazarOrdenes(
+  numero: string | null,
+  unidadId: string | null,
+  candidatas: OrdenCandidata[],
+  fecha: string | null = null,
+): { principal: OrdenCandidata | null; otras: OrdenCandidata[] } {
+  const numeros = numerosDePedido(numero);
+  if (numeros.length < 2) return { principal: enlazarOrden(numero, unidadId, candidatas), otras: [] };
+  const cerca = (c: OrdenCandidata) => !fecha || !c.periodo || Math.abs(mesDe(c.periodo) - mesDe(fecha)) <= 2;
+  const halladas: OrdenCandidata[] = [];
+  for (const n of numeros) {
+    const k = normalizarPedido(n);
+    const mismas = candidatas.filter((c) => normalizarPedido(c.numero) === k && cerca(c));
+    const propia = unidadId ? mismas.find((c) => c.unidad_id === unidadId) : undefined;
+    const orden = propia ?? (mismas.length === 1 ? mismas[0] : null);
+    if (orden && !halladas.some((h) => h.id === orden.id)) halladas.push(orden);
+  }
+  const principal = halladas.find((h) => h.unidad_id === unidadId) ?? halladas[0] ?? null;
+  return { principal, otras: halladas.filter((h) => h !== principal) };
 }

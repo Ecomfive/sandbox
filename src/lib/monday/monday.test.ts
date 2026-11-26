@@ -8,6 +8,8 @@ import {
   CONSULTA_PRIMERA,
   despachoDeItem,
   enlazarOrden,
+  enlazarOrdenes,
+  numerosDePedido,
   errorMonday,
   esDesintegrado,
   fechaDeColumna,
@@ -139,6 +141,23 @@ test("lectura incremental y enlace con la orden", () => {
   assert.equal(enlazarOrden("1001", "u2", cand)?.id, "b");
   assert.equal(enlazarOrden("1001", null, cand), null);
   assert.equal(enlazarOrden("2002", null, cand)?.id, "c");
+  // Una fila con dos pedidos de tiendas distintas (26 nov 2026): se une a los dos; el principal es el de la tienda de la fila.
+  assert.deepEqual(numerosDePedido("CS19288   /   1921"), ["CS19288", "1921"]);
+  assert.deepEqual(numerosDePedido("#1001"), ["#1001"]);
+  assert.deepEqual(numerosDePedido("Pedido 1001 / pendiente"), ["Pedido 1001 / pendiente"]);
+  assert.deepEqual(variantesPedido("44387 / CS19295"), ["44387", "#44387", "CS19295", "#CS19295"]);
+  const dos = [
+    { id: "k", unidad_id: "kenku", numero: "#1921", periodo: "2026-11-01" },
+    { id: "k-vieja", unidad_id: "oferfy", numero: "#1921", periodo: "2026-04-01" },
+    { id: "cs", unidad_id: "clicksi", numero: "#CS19288", periodo: "2026-11-01" },
+  ];
+  const r = enlazarOrdenes("CS19288 / 1921", "clicksi", dos, "2026-11-25");
+  assert.equal(r.principal?.id, "cs");
+  assert.deepEqual(r.otras.map((o) => o.id), ["k"]);
+  // Sin fecha que las distinga, un número que está en dos tiendas no se une a ninguna.
+  assert.deepEqual(enlazarOrdenes("CS19288 / 1921", "clicksi", dos, null).otras, []);
+  // Un solo número: como siempre.
+  assert.deepEqual(enlazarOrdenes("1921", "kenku", dos, "2026-11-25"), { principal: dos[0], otras: [] });
   const unidades = [{ id: "u1", nombre: "TIENDA UNO" }, { id: "u2", nombre: "OFERFY" }];
   assert.equal(unidadDeTexto("Tienda uno", unidades), "u1");
   assert.equal(unidadDeTexto("Oferfy Panamá", unidades), "u2");
