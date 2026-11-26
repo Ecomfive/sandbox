@@ -325,6 +325,8 @@ export async function deshacerEntregaPedidoInventario(id: string): Promise<Resul
     let detalle: string;
     if (conEnvios?.length) {
       if (lado !== "inventario") return { error: "Esa recepción movió inventario: solo la puede deshacer la persona a cargo del inventario." };
+      const { data: destino } = await supabase.from("despacho_pedidos_inventario").select("bodega_destino_id").eq("id", id).maybeSingle();
+      if (!destino || !(await puedeVerBodega(supabase, u.paisesPermitidos, destino.bodega_destino_id as string))) return { error: "No tienes acceso al país de ese pedido." };
       const { data, error } = await supabase.rpc("despacho_deshacer_recepcion", { p_pedido: id, p_usuario: u.id, p_nombre: nombreDe(u) });
       if (error) return { error: errorDeBase(error.message, "No se pudo deshacer la recepción.") };
       const { data: p } = await supabase.from("despacho_pedidos_inventario").select("numero, pedido_por, responsable_id, despacho_pedidos_inventario_items(id)").eq("id", id).maybeSingle();
