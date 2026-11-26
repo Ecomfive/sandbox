@@ -51,7 +51,7 @@ import {
   type StockInventario,
 } from "@/lib/pedidos-inventario/reglas";
 import { BOTON_PEDIDO, useAccion } from "./comun";
-import { ConfirmarRecepcion, PorBodega, RepartoBodegas } from "./envio";
+import { ConfirmarRecepcion, PorBodega, RepartoBodegas, type Seleccion } from "./envio";
 
 // Pedir a inventario (16 nov 2026, migración 0305; prototipo aprobado https://claude.ai/artifact/ReVGwYZrBG11rmKFUT7V5T): la tabla
 // del Excel que reemplaza (N.º, código, producto, cantidades, fecha, quién, estado, observaciones), con los botones de cada lado.
@@ -426,9 +426,29 @@ function FilasPedido({
     repartirSugerido(p.items.map((it) => ({ id: it.id, skuId: it.skuId, cantidad: it.cantidadPedida })), origenes.map((b) => b.id), stock, p.bodegaAsignada?.id ?? null),
   );
   const [observaciones, setObservaciones] = useState<Record<string, string>>({});
+  // Qué productos van en este envío (26 nov 2026, pedido de Hernán): los no marcados pasan a otro pedido, pendientes.
+  const [quedan, setQuedan] = useState<Set<string>>(() => new Set());
+  const n = p.items.length;
+  const seleccion: Seleccion | undefined =
+    editable && n > 1
+      ? {
+          va: (itemId) => !quedan.has(itemId),
+          marcar: (ids, valor) =>
+            setQuedan((q) => {
+              const x = new Set(q);
+              for (const id of ids) {
+                if (valor) x.delete(id);
+                else x.add(id);
+              }
+              return x;
+            }),
+        }
+      : undefined;
+  const vanAhora = p.items.filter((it) => !quedan.has(it.id));
+  const pendientes = n - vanAhora.length;
   const partesDe = (itemId: string) => (reparto[itemId] ?? []).map((x) => ({ bodegaId: x.bodegaId, cantidad: Math.max(0, Math.floor(Number(x.cantidad) || 0)) }));
-  const noAlcanza = editable && p.items.some((it) => partesDe(it.id).some((x) => x.cantidad > Math.max(0, stock[x.bodegaId]?.[it.skuId] ?? 0)));
-  const nadaQueEnviar = editable && p.items.every((it) => partesDe(it.id).every((x) => x.cantidad === 0));
+  const noAlcanza = editable && vanAhora.some((it) => partesDe(it.id).some((x) => x.cantidad > Math.max(0, stock[x.bodegaId]?.[it.skuId] ?? 0)));
+  const nadaQueEnviar = editable && vanAhora.every((it) => partesDe(it.id).every((x) => x.cantidad === 0));
   const envios = p.envios ?? [];
   /** Enviado con confirmación pendiente (sin traslado todavía): lo de antes del 26 nov 2026 no tiene envíos. */
   const porConfirmar = envios.length > 0;
@@ -440,8 +460,9 @@ function FilasPedido({
     origenes,
   );
   const conGrupos = enInventario && (editable || porConfirmar);
+  // El PDF lleva solo lo que va en este envío.
+  const gruposPdf = vanAhora.length < n ? agruparPorBodega(vanAhora, vanAhora.flatMap((it) => partesDe(it.id).map((x) => ({ itemId: it.id, ...x }))), origenes) : grupos;
   const estado = estadoDe(p.estado);
-  const n = p.items.length;
   // «Deshacer entrega»: dos pasos (pulsar y confirmar) para que no se repita el error de marcarlo sin querer.
   const [deshaciendo, setDeshaciendo] = useState(false);
   // «Deshacer envío»: también en dos pasos, porque devuelve el inventario con un traslado de reversa.
@@ -454,7 +475,7 @@ function FilasPedido({
       <span className="mb-0.5">
         <Badge tone={estado.tono}>{estado.etiqueta}</Badge>
       </span>
-      <BotonPdfPedido p={p} grupos={enInventario ? grupos : []} />
+      <BotonPdfPedido p={p} grupos={enInventario ? gruposPdf : []} />
       {!puedeEscribir ? null : enInventario ? (
         <>
           {puedeEnProceso(p.estado) && (
@@ -471,12 +492,27 @@ function FilasPedido({
               )}
               <button
                 type="button"
-                disabled={ocupado || noAlcanza || nadaQueEnviar || sinConfirmacion}
-                onClick={() => correr(() => enviarPedidoInventario(p.id, p.items.map((it) => ({ id: it.id, partes: partesDe(it.id), observacion: observaciones[it.id] ?? "" }))))}
+                disabled={ocupado || noAlcanza || nadaQueEnviar || sinConfirmacion || vanAhora.length === 0}
+                onClick={() =>
+                  correr(() =>
+                    enviarPedidoInventario(
+                      p.id,
+                      vanAhora.map((it) => ({ id: it.id, partes: partesDe(it.id), observacion: observaciones[it.id] ?? "" })),
+                      p.items.filter((it) => quedan.has(it.id)).map((it) => it.id),
+                    ),
+                  )
+                }
                 className={PRINCIPAL}
               >
-                {ocupado ? "Enviando…" : "Enviar"}
+                {ocupado ? "Enviando…" : pendientes ? `Enviar ${vanAhora.length} de ${n}` : "Enviar"}
               </button>
+              {pendientes > 0 && (
+                <span className="max-w-[12rem] text-xs text-muted-foreground" aria-live="polite">
+                  {vanAhora.length === 0
+                    ? "Marca al menos un producto para enviar."
+                    : `${pendientes === 1 ? "El otro producto queda pendiente" : `Los otros ${pendientes} quedan pendientes`} en un pedido nuevo de la misma lista, en «${estado.etiqueta}».`}
+                </span>
+              )}
             </>
           )}
           {puedeVolverASolicitud(p.estado) && (
@@ -685,8 +721,16 @@ function FilasPedido({
             )}
             <td className={`${borde} text-right tabular-nums`}>
               {editable ? (
-                <div className="flex justify-end text-left">
-                  <RepartoBodegas item={it} partes={(reparto[it.id] ?? []) as { bodegaId: string; cantidad: number }[]} alCambiar={(partes) => setReparto((x) => ({ ...x, [it.id]: partes }))} bodegas={origenes} stock={stock} />
+                <div className="flex flex-col items-end gap-1 text-left">
+                  {seleccion && (
+                    <label className="flex cursor-pointer items-center gap-1.5 text-xs font-medium text-foreground">
+                      <input type="checkbox" checked={seleccion.va(it.id)} onChange={(e) => seleccion.marcar([it.id], e.target.checked)} className="h-4 w-4 accent-primario" />
+                      {seleccion.va(it.id) ? "Va en este envío" : "Queda pendiente"}
+                    </label>
+                  )}
+                  <div className={quedan.has(it.id) ? "pointer-events-none opacity-40" : undefined} inert={quedan.has(it.id) || undefined}>
+                    <RepartoBodegas item={it} partes={(reparto[it.id] ?? []) as { bodegaId: string; cantidad: number }[]} alCambiar={(partes) => setReparto((x) => ({ ...x, [it.id]: partes }))} bodegas={origenes} stock={stock} />
+                  </div>
                 </div>
               ) : p.estado === "enviado" && porConfirmar ? (
                 suyos.length ? (
@@ -743,7 +787,7 @@ function FilasPedido({
       {conGrupos && (
         <tr>
           <td colSpan={Math.max(1, columnas - 2)} className={TD_FIN}>
-            <PorBodega grupos={grupos} />
+            <PorBodega grupos={grupos} seleccion={seleccion} />
           </td>
           <td className={`${TD_FIN} px-3`} />
         </tr>

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { avisoPedido, contarPorEstado, fechaCorta, leerCantidad, numeroPedido, puedeArchivar, puedeDeshacerEntrega, puedeDeshacerEnvio, estadoAntesDeEnviar, puedeReabrir, puedeVolverASolicitud, puedeEnviar, puedeRecibir, revisarLineas, revisarStockPedido, repartirSugerido, revisarEnvio, agruparPorBodega, revisarConfirmacion, diferenciasDeEnvio, restarComprometido, partirPorBodega } from "./reglas";
+import { avisoPedido, contarPorEstado, fechaCorta, leerCantidad, numeroPedido, puedeArchivar, puedeDeshacerEntrega, puedeDeshacerEnvio, estadoAntesDeEnviar, puedeReabrir, puedeVolverASolicitud, puedeEnviar, puedeRecibir, revisarLineas, revisarStockPedido, repartirSugerido, revisarEnvio, agruparPorBodega, revisarConfirmacion, diferenciasDeEnvio, restarComprometido, partirPorBodega, revisarQuedan } from "./reglas";
 
 const A = "11111111-1111-4111-8111-111111111111";
 const B = "22222222-2222-4222-8222-222222222222";
@@ -105,6 +105,17 @@ test("un envío no pasa de lo que hay, no repite bodega, no usa una bodega ajena
 test("qué buscar en cada bodega", () => {
   const g = agruparPorBodega(ITEMS, [{ itemId: "i2", bodegaId: "ofi", cantidad: 1 }, { itemId: "i1", bodegaId: "dep", cantidad: 40 }, { itemId: "i1", bodegaId: "ofi", cantidad: 5 }, { itemId: "i2", bodegaId: "ist", cantidad: 0 }], BODEGAS);
   assert.deepEqual(g.map((x) => [x.bodega, x.unidades, x.lineas.map((l) => l.producto)]), [["Deposito Externo", 40, ["Faja"]], ["Oficina Ancón", 6, ["Faja", "Bolsas"]]]);
+});
+
+test("enviar una parte: lo que queda sin marcar pasa a otro pedido", () => {
+  const items = [{ id: "i1" }, { id: "i2" }, { id: "i3" }];
+  assert.deepEqual(revisarQuedan(items, undefined), { quedan: [] });
+  assert.deepEqual(revisarQuedan(items, []), { quedan: [] });
+  assert.deepEqual(revisarQuedan(items, ["i2", "i3", "i2"]), { quedan: ["i2", "i3"] });
+  assert.ok("error" in revisarQuedan(items, ["i1", "i2", "i3"]));
+  assert.ok("error" in revisarQuedan(items, ["otro"]));
+  assert.ok("error" in revisarQuedan(items, [3]));
+  assert.ok("error" in revisarQuedan(items, "i1"));
 });
 
 test("confirmar: si llega otra cantidad hay que decir por qué", () => {
