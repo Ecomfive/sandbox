@@ -127,6 +127,13 @@ export function desdeDeLista(hoy: string, dias: number): string {
   return `${d.toISOString().slice(0, 10)}T00:00:00-05:00`;
 }
 
+/** La dirección de «Llegadas a puerto» con el periodo más corto que alcanza a todo lo que sigue por recibir (si algo es más viejo que el más largo, el más largo). */
+export function hrefDeListaPuerto(hoy: string, pendientes: readonly { llegadaEn?: string }[]): string {
+  const alcanza = (dias: number) => pendientes.every((f) => !f.llegadaEn || Date.parse(f.llegadaEn) >= Date.parse(desdeDeLista(hoy, dias)));
+  const dias = pendientes.length ? (DIAS_LISTA_LLEGADAS.find((d) => d >= DIAS_LISTA_PREDETERMINADO && alcanza(d)) ?? DIAS_LISTA_LLEGADAS[DIAS_LISTA_LLEGADAS.length - 1]) : DIAS_LISTA_PREDETERMINADO;
+  return `${RUTA_LISTA_PUERTO}&dias=${dias}`;
+}
+
 /** Una compra puede estar en dos llegadas (si se movió de etapa y volvió): en la lista de todas cuenta una vez, con su llegada más reciente (las filas vienen de la más nueva a la más vieja). */
 export function unaPorCompra<T extends { compraId: string }>(filas: readonly T[]): T[] {
   const vistas = new Set<string>();

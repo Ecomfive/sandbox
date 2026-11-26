@@ -1,3 +1,4 @@
+import { SIN_URGENTES, type Urgentes } from "./avisos-urgentes";
 import { moduloDeHref } from "./nav-data";
 import type { PendientesHoy } from "./pendientes-hoy";
 
@@ -14,13 +15,15 @@ export interface PendientesMenu {
   novedades: number;
   /** Las tareas del equipo asignadas a la persona y sin cerrar: el número de la campana, que es personal (11 nov 2026, pedido de Hernán). */
   tareasMias: number;
+  /** Pedidos y mercancía en puerto sin ver: ponen en rojo «Avisos» y su entrada del menú. */
+  urgentes: Urgentes;
 }
 
-export const SIN_PENDIENTES: PendientesMenu = { contadores: {}, total: 0, paraTi: 0, novedades: 0, tareasMias: 0 };
+export const SIN_PENDIENTES: PendientesMenu = { contadores: {}, total: 0, paraTi: 0, novedades: 0, tareasMias: 0, urgentes: SIN_URGENTES };
 
 /** Suma al total de Avisos los avisos «Para ti» sin leer y las actualizaciones del sistema sin ver. */
-export function conParaTi(p: PendientesMenu, paraTi: number, novedades = 0, tareasMias = 0): PendientesMenu {
-  return { ...p, total: p.total + paraTi + novedades, paraTi, novedades, tareasMias };
+export function conParaTi(p: PendientesMenu, paraTi: number, novedades = 0, tareasMias = 0, urgentes: Urgentes = SIN_URGENTES): PendientesMenu {
+  return { ...p, total: p.total + paraTi + novedades, paraTi, novedades, tareasMias, urgentes };
 }
 
 /** Páginas del menú que muestran un contador; el resto no cuenta nada. */
@@ -67,7 +70,7 @@ export function calcularPendientesMenu(pendientes: PendientesHoy, modulos: strin
       pendientes.sinStockPorRevisar +
       pendientes.cierreAtrasado
     : 0;
-  return { contadores, total, paraTi: 0, novedades: 0, tareasMias: 0 };
+  return { contadores, total, paraTi: 0, novedades: 0, tareasMias: 0, urgentes: SIN_URGENTES };
 }
 
 /**

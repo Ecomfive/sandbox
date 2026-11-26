@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { AvisosVistos } from "@/components/avisos-vistos";
 import { PaginaPedidos } from "@/components/pedidos-inventario/pagina-pedidos";
 import { requireModulo } from "@/lib/auth";
 
@@ -12,5 +13,10 @@ export default async function PedirInventarioPage({ searchParams }: { searchPara
   const sp = await searchParams;
   // El enlace viejo «?archivados=1» ahora es la sección «Archivos de solicitudes».
   if (sp.archivados === "1") redirect("/inventario-despacho/archivo");
-  return <PaginaPedidos modo="despacho" usuario={usuario} estado={typeof sp.estado === "string" ? sp.estado : undefined} />;
+  return (
+    <>
+      <AvisosVistos seccion="solicitudes" />
+      <PaginaPedidos modo="despacho" usuario={usuario} estado={typeof sp.estado === "string" ? sp.estado : undefined} />
+    </>
+  );
 }

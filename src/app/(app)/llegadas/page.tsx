@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AvisosVistos } from "@/components/avisos-vistos";
 import { EncabezadoPagina } from "@/components/ui/encabezado-pagina";
 import { Pagina } from "@/components/ui/pagina";
 import { irAlInicio } from "@/lib/auth";
@@ -54,6 +55,7 @@ export default async function LlegadasPage({ searchParams }: { searchParams: Pro
   return (
     <Pagina ancho="media" className="flex flex-col gap-6">
       <EncabezadoPagina titulo="Llegadas a puerto" oculto />
+      <AvisosVistos seccion="llegadas" />
       <nav aria-label="Periodo" className="flex flex-wrap gap-2">
         {DIAS_LISTA_LLEGADAS.map((d) => (
           <Link key={d} href={`/llegadas?tipo=puerto&dias=${d}${vista === "archivadas" ? "&vista=archivadas" : ""}`} aria-current={d === dias ? "page" : undefined} className={claseOpcion(d === dias)}>

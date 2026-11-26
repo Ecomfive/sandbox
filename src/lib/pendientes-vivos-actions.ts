@@ -1,6 +1,7 @@
 "use server";
 
 import { getUsuarioActual } from "@/lib/auth";
+import { leerUrgentes, SIN_URGENTES } from "@/lib/avisos-urgentes";
 import { contarParaTi } from "@/lib/menciones";
 import type { PendientesPersonales } from "@/lib/pendientes-vivos";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -14,7 +15,7 @@ export async function pendientesPersonales(): Promise<PendientesPersonales | nul
     const u = await getUsuarioActual();
     if (!u) return null;
     const supabase = createServiceClient();
-    const [paraTi, tareasMias] = await Promise.all([
+    const [paraTi, tareasMias, urgentes] = await Promise.all([
       contarParaTi(u.id).catch(() => 0),
       u.modulos.includes("tareas")
         ? Promise.resolve(supabase.from("tareas_equipo").select("id", { count: "exact", head: true }).eq("responsable_id", u.id).not("estado", "in", "(hecho,archivado)")).then(
@@ -22,8 +23,9 @@ export async function pendientesPersonales(): Promise<PendientesPersonales | nul
             () => 0,
           )
         : 0,
+      leerUrgentes(supabase, u.id).catch(() => SIN_URGENTES),
     ]);
-    return { paraTi, tareasMias };
+    return { paraTi, tareasMias, urgentes };
   } catch {
     return null;
   }

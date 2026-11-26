@@ -11,6 +11,7 @@ import { FavoritoToggle } from "@/components/favorito-toggle";
 import { anilloFoco } from "@/components/ui/field";
 import { Tooltip } from "@/components/ui/tooltip";
 import { usePendientesVivos } from "@/components/pendientes-vivos";
+import { hayUrgentes, textoDeUrgentes, urgentesDeMenu } from "@/lib/avisos-urgentes";
 import { SIN_PENDIENTES, type PendientesMenu } from "@/lib/contadores-menu";
 import { conPendientesVivos } from "@/lib/pendientes-vivos";
 import { FRENTES, PRONTO_NAV, agruparPaginas, encontrarSeccionActiva, moduloDeHref, puedeAbrirPagina, type NavItem, type NavSection } from "@/lib/nav-data";
@@ -94,18 +95,20 @@ function ItemPagina({
   const href = (item.rutas ?? []).find((r) => esActiva(pathname, r)) ?? item.href;
   const activo = esActiva(pathname, href);
   const Icono = ICONOS_PAGINA[href];
+  // En rojo mientras haya un pedido o mercancía en puerto sin ver en esa entrada.
+  const nuevos = urgentesDeMenu(pendientes.urgentes, item.href);
   return (
     <div className="flex items-center gap-0.5">
       <Link
         href={href}
         onClick={alNavegar}
         aria-current={activo ? "page" : undefined}
-        className={`flex flex-1 items-center justify-between gap-2 rounded-md px-3 py-1.5 text-[13px] ${anilloFoco} ${
-          activo ? "bg-accent font-medium text-accent-foreground" : "text-foreground transition-colors hover:bg-muted"
+        className={`relative flex flex-1 items-center justify-between gap-2 rounded-md px-3 py-1.5 text-[13px] ${anilloFoco} ${
+          nuevos ? "bg-riel-alerta text-white" : activo ? "bg-accent font-medium text-accent-foreground" : "text-foreground transition-colors hover:bg-muted"
         }`}
       >
         <span className="flex min-w-0 items-center gap-2">
-          {Icono && <Icono className={`h-4 w-4 shrink-0 ${activo ? "" : "text-muted-foreground"}`} />}
+          {Icono && <Icono className={`h-4 w-4 shrink-0 ${activo || nuevos ? "" : "text-muted-foreground"}`} />}
           {item.lineasMenu ? (
             <span className="flex min-w-0 flex-col leading-tight">
               <span className="truncate">{item.lineasMenu[0]}</span>
@@ -115,10 +118,20 @@ function ItemPagina({
             <span className="truncate">{item.label}</span>
           )}
         </span>
-        <ContadorMenu cantidad={cantidadDe({ ...item, href }, pendientes)} href={href} />
+        {nuevos ? <MarcaNuevo cantidad={nuevos} /> : <ContadorMenu cantidad={cantidadDe({ ...item, href }, pendientes)} href={href} />}
       </Link>
       <FavoritoToggle href={href} activo={favoritos.includes(href)} />
     </div>
+  );
+}
+
+/** La marca de una entrada en rojo: un punto blanco (no depende solo del color) y, para un lector de pantalla, cuántos hay sin ver. */
+function MarcaNuevo({ cantidad }: { cantidad: number }) {
+  return (
+    <>
+      <span aria-hidden="true" className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-white" />
+      <span className="sr-only">, {cantidad === 1 ? "1 aviso nuevo" : `${cantidad} avisos nuevos`}</span>
+    </>
   );
 }
 
@@ -255,12 +268,12 @@ const claseRielBoton = `flex w-full flex-col items-center gap-1.5 rounded-lg px-
 const claseRiel = (seleccionada: boolean) => `${claseRielBoton} ${seleccionada ? "font-semibold text-white" : "text-riel-texto hover:bg-riel-hover hover:text-white"}`;
 
 /** El ícono de un botón del riel, con el halo de color si es el elegido y la pastilla de pendientes en su esquina. */
-function IconoRiel({ Icono, seleccionada, cantidad = 0, punto = false }: { Icono: (typeof SECTION_ICONS)[string]; seleccionada: boolean; cantidad?: number; punto?: boolean }) {
+function IconoRiel({ Icono, seleccionada, cantidad = 0, punto = false, enRojo = false }: { Icono: (typeof SECTION_ICONS)[string]; seleccionada: boolean; cantidad?: number; punto?: boolean; enRojo?: boolean }) {
   return (
     <span className="relative inline-flex">
-      {seleccionada && <span aria-hidden="true" className="brillo-riel" />}
+      {seleccionada && !enRojo && <span aria-hidden="true" className="brillo-riel" />}
       <Icono className="relative h-5 w-5" />
-      <ContadorSobreIcono cantidad={cantidad} />
+      <ContadorSobreIcono cantidad={cantidad} claro={enRojo} />
       {punto && !cantidad && <span aria-hidden="true" className="absolute -top-0.5 -right-1 h-2 w-2 rounded-full bg-primario ring-2 ring-riel" />}
     </span>
   );
@@ -310,6 +323,7 @@ function RielYPanel({
   // Avisos lo ve todo el mundo: ahí están las actualizaciones del sistema y los avisos «Para ti» (31 oct 2026).
   const puedeVerAvisos = true;
   const cambiosNuevos = pendientes.novedades > 0;
+  const urgente = hayUrgentes(pendientes.urgentes);
 
   function elegir(nombre: string) {
     setElegida({ ruta: pathname, titulo: nombre });
@@ -351,6 +365,25 @@ function RielYPanel({
           </button>
         </Tooltip>
         </div>
+        {/* «Avisos» va arriba (26 nov 2026: abajo pasaba desapercibido) y se pone rojo con un pedido o mercancía en puerto. */}
+        {puedeVerAvisos && (
+          <Link
+            href="/notificaciones"
+            aria-current={pathname === "/notificaciones" ? "page" : undefined}
+            className={urgente ? `${claseRielBoton} bg-riel-alerta font-semibold text-white` : claseRiel(pathname === "/notificaciones")}
+          >
+            <IconoRiel Icono={AvisosIcon} seleccionada={pathname === "/notificaciones"} cantidad={pendientes.total} enRojo={urgente} />
+            <span>Avisos</span>
+            {urgente && (
+              <>
+                <span aria-hidden="true" className="rounded bg-white px-1 text-[0.6rem] font-semibold text-riel-alerta">
+                  Nuevo
+                </span>
+                <span className="sr-only">. {textoDeUrgentes(pendientes.urgentes)}</span>
+              </>
+            )}
+          </Link>
+        )}
         {delRiel.map((v, i) => {
           const Icono = SECTION_ICONS[v.area.title] ?? DashboardIcon;
           const boton = botonRiel(v.area.title, !verFavoritos && !verYoda && !verAyuda && v.area.title === mostrada?.area.title, Icono);
@@ -376,16 +409,6 @@ function RielYPanel({
             >
               <IconoRiel Icono={ActualizarIcon} seleccionada={pathname === "/actualizar-datos"} />
               <span>Datos</span>
-            </Link>
-          )}
-          {puedeVerAvisos && (
-            <Link
-              href="/notificaciones"
-              aria-current={pathname === "/notificaciones" ? "page" : undefined}
-              className={claseRiel(pathname === "/notificaciones")}
-            >
-              <IconoRiel Icono={AvisosIcon} seleccionada={pathname === "/notificaciones"} cantidad={pendientes.total} />
-              <span>Avisos</span>
             </Link>
           )}
           {verActualizaciones && (
@@ -474,8 +497,30 @@ function ListaMovil({
   const visibles = areasVisibles(areas, modulosPermitidos);
   const limitado = tieneAccesoLimitado(areas, modulosPermitidos);
   const cambiosNuevos = pendientes.novedades > 0;
+  const urgente = hayUrgentes(pendientes.urgentes);
   return (
     <nav aria-label="Menú principal" className="flex flex-1 flex-col gap-4 overflow-y-auto p-2.5">
+      <section aria-label="Avisos">
+        <Titulo>Avisos</Titulo>
+        <Link
+          href="/notificaciones"
+          onClick={alNavegar}
+          aria-current={pathname === "/notificaciones" ? "page" : undefined}
+          className={`flex items-center justify-between gap-2 rounded-md px-3 py-1.5 text-[13px] ${anilloFoco} ${urgente ? "bg-riel-alerta font-semibold text-white" : pathname === "/notificaciones" ? "bg-accent font-medium text-accent-foreground" : "hover:bg-muted"}`}
+        >
+          Centro de notificaciones
+          {urgente ? (
+            <>
+              <span aria-hidden="true" className="rounded-full bg-white px-1.5 py-0.5 text-xs leading-none font-semibold text-riel-alerta">
+                Nuevo
+              </span>
+              <span className="sr-only">. {textoDeUrgentes(pendientes.urgentes)}</span>
+            </>
+          ) : (
+            <ContadorMenu cantidad={pendientes.total} />
+          )}
+        </Link>
+      </section>
       <Favoritos areas={visibles} favoritos={favoritos} pathname={pathname} pendientes={pendientes} alNavegar={alNavegar} />
       {visibles
         .filter((v) => !v.area.oculta)
@@ -496,20 +541,6 @@ function ListaMovil({
           >
             <ActualizarIcon className="h-4 w-4 text-muted-foreground" />
             Actualizar datos
-          </Link>
-        </section>
-      )}
-      {(
-        <section aria-label="Avisos">
-          <Titulo>Avisos</Titulo>
-          <Link
-            href="/notificaciones"
-            onClick={alNavegar}
-            aria-current={pathname === "/notificaciones" ? "page" : undefined}
-            className={`flex items-center justify-between gap-2 rounded-md px-3 py-1.5 text-[13px] ${anilloFoco} ${pathname === "/notificaciones" ? "bg-accent font-medium text-accent-foreground" : "hover:bg-muted"}`}
-          >
-            Centro de notificaciones
-            <ContadorMenu cantidad={pendientes.total} />
           </Link>
         </section>
       )}
@@ -612,17 +643,24 @@ export function Sidebar({
       </aside>
 
       {/* Botón hamburguesa — móvil */}
-      <button
-        type="button"
-        aria-label="Abrir menú"
-        data-sin-imprimir
-        onClick={() => setMovilAbierto(true)}
-        className={`fixed top-3 left-3 z-40 rounded-md bg-card p-2 text-muted-foreground shadow-sm hover:bg-muted hover:text-foreground transition-colors md:hidden ${anilloFoco}`}
-      >
-        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" d="M4 6h16M4 12h16M4 18h16" />
-        </svg>
-      </button>
+      <ConPendientes pendientes={pendientes}>
+        {(p) => {
+          const urgente = hayUrgentes(p.urgentes);
+          return (
+            <button
+              type="button"
+              aria-label={urgente ? `Abrir menú. ${textoDeUrgentes(p.urgentes)}` : "Abrir menú"}
+              data-sin-imprimir
+              onClick={() => setMovilAbierto(true)}
+              className={`fixed top-3 left-3 z-40 rounded-md p-2 shadow-sm transition-colors md:hidden ${urgente ? "bg-riel-alerta text-white" : "bg-card text-muted-foreground hover:bg-muted hover:text-foreground"} ${anilloFoco}`}
+            >
+              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+          );
+        }}
+      </ConPendientes>
 
       {/* Cajón — móvil */}
       {movilAbierto && (

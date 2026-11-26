@@ -36,6 +36,13 @@ export function ParaTi({ avisos, llegadas }: { avisos: AvisoParaTi[]; llegadas?:
     });
   }
 
+  function abrirLlegadas(l: LlegadasEnAvisos) {
+    start(async () => {
+      if (l.sinLeer > 0) await Promise.all(l.avisoIds.map((id) => marcarAvisoLeido(id)));
+      router.push(l.href);
+    });
+  }
+
   return (
     <section aria-labelledby="titulo-para-ti" className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -49,7 +56,7 @@ export function ParaTi({ avisos, llegadas }: { avisos: AvisoParaTi[]; llegadas?:
           </BotonBarra>
         )}
       </div>
-      {llegadas && <LlegadasPuertoAviso datos={llegadas} />}
+      {llegadas && <LlegadasPuertoAviso datos={llegadas} pendiente={pendiente} alAbrir={() => abrirLlegadas(llegadas)} />}
       {avisos.length === 0 && !llegadas ? (
         <p className="m-0 text-sm text-muted-foreground">Cuando alguien te etiquete con @ en un comentario o una nota, te avisamos aquí.</p>
       ) : avisos.length > 0 ? (
