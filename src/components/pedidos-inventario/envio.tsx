@@ -85,24 +85,58 @@ export interface Seleccion {
 
 const CASILLA = "h-4 w-4 shrink-0 accent-primario";
 
-/** «Qué buscar en cada bodega»: los productos del pedido agrupados por la bodega de donde salen. Con `seleccion`, cada producto y cada bodega llevan su casilla de «va ahora». */
-export function PorBodega({ grupos, titulo = true, seleccion }: { grupos: GrupoBodega[]; titulo?: boolean; seleccion?: Seleccion }) {
+/** «En proceso» por producto (27 nov 2026, pedido de Hernán): lo que ya se está preparando se oculta de lo pendiente. */
+export interface EnProceso {
+  esta: (itemId: string) => boolean;
+  marcar: (itemIds: string[], valor: boolean) => void;
+  /** «Ver pedido completo»: se muestra también lo que está en proceso. */
+  completo: boolean;
+  ocupado: boolean;
+}
+
+const BOTON_CHICO = `inline-flex min-h-7 items-center rounded-md border px-2 text-[11px] font-semibold whitespace-nowrap disabled:opacity-50 ${anilloFoco}`;
+const EN_PROCESO = `${BOTON_CHICO} border-primario/30 bg-primario-suave text-primario hover:brightness-95`;
+const A_PENDIENTE = `${BOTON_CHICO} border-border-control bg-card text-muted-foreground hover:bg-muted`;
+const ENLACE = `w-full border-t border-border px-3 py-1.5 text-left text-[11px] font-medium text-primario hover:bg-muted ${anilloFoco}`;
+
+/**
+ * «Qué buscar en cada bodega»: los productos del pedido agrupados por la bodega de donde salen. Con `seleccion`, cada producto y cada bodega llevan su casilla de «va ahora».
+ * Con `enProceso`, cada bodega y cada producto tienen «En proceso»: lo que ya se está preparando se oculta (salvo con «Ver pedido completo»), y una bodega toda en proceso queda
+ * plegada y se despliega con «Mostrar».
+ */
+export function PorBodega({ grupos, titulo = true, seleccion, enProceso }: { grupos: GrupoBodega[]; titulo?: boolean; seleccion?: Seleccion; enProceso?: EnProceso }) {
+  const [desplegadas, setDesplegadas] = useState<Set<string>>(() => new Set());
   if (!grupos.length) return <p className="m-0 text-xs text-muted-foreground">Todavía no hay cantidades que sacar de ninguna bodega.</p>;
+  const alternar = (bodegaId: string) =>
+    setDesplegadas((x) => {
+      const y = new Set(x);
+      if (y.has(bodegaId)) y.delete(bodegaId);
+      else y.add(bodegaId);
+      return y;
+    });
   return (
     <div className="flex flex-col gap-2">
       {titulo && (
         <h3 className="m-0 text-xs font-semibold text-foreground">
           Qué buscar en cada bodega
           {seleccion && <span className="font-normal text-muted-foreground"> · marca lo que envías ahora; lo que no, queda pendiente en otro pedido</span>}
+          {enProceso && <span className="font-normal text-muted-foreground"> · «En proceso» oculta lo que ya se está preparando</span>}
         </h3>
       )}
       <div className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(18rem,1fr))]">
         {grupos.map((g) => {
           const ids = [...new Set(g.lineas.flatMap((l) => (l.itemId ? [l.itemId] : [])))];
+          const enCurso = enProceso ? ids.filter((x) => enProceso.esta(x)) : [];
+          const porHacer = ids.filter((x) => !enCurso.includes(x));
+          const todaEnProceso = ids.length > 0 && porHacer.length === 0;
+          const abierta = !enProceso || enProceso.completo || desplegadas.has(g.bodegaId);
+          // Las líneas que se ven: desplegada (o «Ver pedido completo»), todas; si no, solo las pendientes.
+          const lineas = abierta ? g.lineas : g.lineas.filter((l) => !l.itemId || !enCurso.includes(l.itemId));
+          const ocultas = g.lineas.length - lineas.length;
           const marcados = seleccion ? ids.filter((x) => seleccion.va(x)).length : ids.length;
           return (
-            <section key={g.bodegaId} className="overflow-hidden rounded-lg border border-border bg-card" aria-label={g.bodega}>
-              <p className="m-0 flex flex-wrap items-center justify-between gap-x-2 bg-muted px-3 py-1.5 text-xs">
+            <section key={g.bodegaId} className={`overflow-hidden rounded-lg border bg-card ${todaEnProceso ? "border-primario/30" : "border-border"}`} aria-label={g.bodega}>
+              <div className={`flex flex-wrap items-center justify-between gap-x-2 gap-y-1 px-3 py-1.5 text-xs ${todaEnProceso ? "bg-primario-suave" : "bg-muted"}`}>
                 {seleccion && ids.length ? (
                   <label className="flex cursor-pointer items-center gap-2 font-semibold text-foreground">
                     <input
@@ -121,32 +155,80 @@ export function PorBodega({ grupos, titulo = true, seleccion }: { grupos: GrupoB
                   <span className="font-semibold text-foreground">{g.bodega}</span>
                 )}
                 <span className="text-muted-foreground">
-                  {seleccion && marcados < ids.length ? `${num(marcados)} de ${num(ids.length)} van ahora` : `${num(g.lineas.length)} ${g.lineas.length === 1 ? "producto" : "productos"} · ${num(g.unidades)} u.`}
+                  {todaEnProceso
+                    ? `En proceso · ${num(ids.length)} ${ids.length === 1 ? "producto" : "productos"}`
+                    : seleccion && marcados < ids.length
+                      ? `${num(marcados)} de ${num(ids.length)} van ahora`
+                      : `${num(g.lineas.length)} ${g.lineas.length === 1 ? "producto" : "productos"} · ${num(g.unidades)} u.`}
                 </span>
-              </p>
-              <ul className="m-0 flex list-none flex-col divide-y divide-border p-0 text-xs">
-                {g.lineas.map((l, i) => {
-                  const va = !seleccion || !l.itemId || seleccion.va(l.itemId);
-                  const fila = (
-                    <>
-                      <span className={`min-w-0 flex-1 ${va ? "text-foreground" : "text-muted-foreground line-through"}`}>{l.producto}</span>
-                      <span className={`font-semibold tabular-nums ${va ? "text-foreground" : "text-muted-foreground"}`}>{va ? num(l.cantidad) : "Pendiente"}</span>
-                    </>
-                  );
-                  return (
-                    <li key={i}>
-                      {seleccion && l.itemId ? (
-                        <label className="flex cursor-pointer items-start gap-2 px-3 py-1.5 hover:bg-muted/60">
-                          <input type="checkbox" checked={va} onChange={(e) => seleccion.marcar([l.itemId!], e.target.checked)} aria-label={`Enviar ahora ${l.producto} desde ${g.bodega}`} className={`${CASILLA} mt-px`} />
-                          {fila}
-                        </label>
-                      ) : (
-                        <span className="flex items-start justify-between gap-3 px-3 py-1.5">{fila}</span>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
+                {enProceso && ids.length > 0 && (
+                  <span className="flex basis-full flex-wrap items-center gap-1.5">
+                    {porHacer.length > 0 && (
+                      <button type="button" disabled={enProceso.ocupado} onClick={() => enProceso.marcar(porHacer, true)} className={EN_PROCESO}>
+                        {porHacer.length === ids.length ? "Pasar la bodega a «En proceso»" : `Pasar ${num(porHacer.length)} pendientes a «En proceso»`}
+                      </button>
+                    )}
+                    {todaEnProceso && !enProceso.completo && (
+                      <button type="button" onClick={() => alternar(g.bodegaId)} aria-expanded={abierta} className={A_PENDIENTE}>
+                        {abierta ? "Ocultar" : "Mostrar"}
+                      </button>
+                    )}
+                    {todaEnProceso && abierta && (
+                      <button type="button" disabled={enProceso.ocupado} onClick={() => enProceso.marcar(ids, false)} className={A_PENDIENTE}>
+                        Volver la bodega a pendiente
+                      </button>
+                    )}
+                  </span>
+                )}
+              </div>
+              {lineas.length > 0 && (
+                <ul className="m-0 flex list-none flex-col divide-y divide-border p-0 text-xs">
+                  {lineas.map((l, i) => {
+                    const va = !seleccion || !l.itemId || seleccion.va(l.itemId);
+                    const curso = !!(enProceso && l.itemId && enCurso.includes(l.itemId));
+                    const fila = (
+                      <>
+                        <span className={`min-w-0 flex-1 ${va ? (curso ? "text-muted-foreground" : "text-foreground") : "text-muted-foreground line-through"}`}>{l.producto}</span>
+                        <span className={`font-semibold tabular-nums ${va && !curso ? "text-foreground" : "text-muted-foreground"}`}>{va ? num(l.cantidad) : "Pendiente"}</span>
+                      </>
+                    );
+                    return (
+                      <li key={i} className={`flex items-start gap-1 pr-2 ${curso ? "bg-primario-suave/40" : ""}`}>
+                        {seleccion && l.itemId ? (
+                          <label className="flex min-w-0 flex-1 cursor-pointer items-start gap-2 py-1.5 pl-3 hover:bg-muted/60">
+                            <input type="checkbox" checked={va} onChange={(e) => seleccion.marcar([l.itemId!], e.target.checked)} aria-label={`Enviar ahora ${l.producto} desde ${g.bodega}`} className={`${CASILLA} mt-px`} />
+                            {fila}
+                          </label>
+                        ) : (
+                          <span className="flex min-w-0 flex-1 items-start justify-between gap-3 py-1.5 pl-3">{fila}</span>
+                        )}
+                        {enProceso && l.itemId && (
+                          <button
+                            type="button"
+                            disabled={enProceso.ocupado}
+                            onClick={() => enProceso.marcar([l.itemId!], !curso)}
+                            aria-label={curso ? `Volver ${l.producto} a pendiente` : `Pasar ${l.producto} a «En proceso»`}
+                            title={curso ? "Volver a pendiente" : "Pasar a «En proceso»"}
+                            className={`mt-1 ${curso ? A_PENDIENTE : EN_PROCESO}`}
+                          >
+                            {curso ? "En proceso ✓" : "En proceso"}
+                          </button>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+              {ocultas > 0 && !todaEnProceso && (
+                <button type="button" onClick={() => alternar(g.bodegaId)} className={ENLACE}>
+                  + {num(ocultas)} en proceso (mostrar)
+                </button>
+              )}
+              {!enProceso?.completo && desplegadas.has(g.bodegaId) && !todaEnProceso && enCurso.length > 0 && (
+                <button type="button" onClick={() => alternar(g.bodegaId)} className={ENLACE}>
+                  Ocultar lo que está en proceso
+                </button>
+              )}
             </section>
           );
         })}

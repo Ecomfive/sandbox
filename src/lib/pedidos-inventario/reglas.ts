@@ -32,6 +32,9 @@ export interface ItemPedido {
   nota: string | null;
   cantidadEntregada: number | null;
   observacion: string | null;
+  /** Ya se está preparando (27 nov 2026, migración 0371): cuándo y quién lo marcó; null = pendiente. */
+  enProcesoEn?: string | null;
+  enProcesoPorNombre?: string | null;
 }
 
 /** Lo que inventario manda de un producto desde una bodega y lo que despacho confirma que llegó (migración 0368). */

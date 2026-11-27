@@ -426,6 +426,7 @@ export const ETIQUETA_ACCION: Record<string, string> = {
   editar_pedido_inventario: "Editó un pedido a inventario",
   entregar_pedido_inventario: "Marcó un pedido a inventario como entregado",
   enviar_pedido_inventario: "Envió un pedido a despacho (queda por confirmar)",
+  en_proceso_productos_pedido: "Marcó productos de un pedido de despacho en proceso (o los volvió a pendientes)",
   recibir_pedido_inventario: "Despacho recibió un pedido y se hizo el traslado",
   traslado_nota: "Cambió la nota de un traslado",
   levantamiento_inventario: "Registró un levantamiento de inventario",
