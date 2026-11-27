@@ -5,8 +5,10 @@ import {
   archivarPedidoInventario,
   cancelarPedidoInventario,
   crearPedidoInventario,
+  deshacerEntregaItemPedido,
   deshacerEntregaPedidoInventario,
   deshacerEnvioPedidoInventario,
+  entregarItemPedido,
   reabrirPedidoInventario,
   volverASolicitudPedido,
   editarPedidoInventario,
@@ -46,7 +48,9 @@ import {
   puedeRecibir,
   puedeVolverASolicitud,
   estadoAntesDeEnviar,
+  estadoItem,
   type EstadoPedido,
+  type ItemPedido,
   type GrupoBodega,
   type PedidoInventario,
   type StockInventario,
@@ -213,7 +217,7 @@ interface LineaEdicion {
  * Despacho edita su pedido (20 nov 2026, pedido de Jhokser): quita productos, cambia cantidades o notas y agrega productos mientras inventario no lo haya enviado. Lo que se sube de cantidad o se agrega se compara con
  * lo que hay en inventario, como al hacer un pedido; lo que no cambia no. Un pedido no puede quedar vacío: para quitarlo todo se cancela.
  */
-function EditarPedido({ p, opciones, stock }: { p: PedidoInventario; opciones: OpcionSkuMaestro[]; stock: Record<string, StockInventario> }) {
+function EditarPedido({ p, opciones, stock, etiqueta = "Editar" }: { p: PedidoInventario; opciones: OpcionSkuMaestro[]; stock: Record<string, StockInventario>; etiqueta?: string }) {
   const desdeElPedido = (): LineaEdicion[] => p.items.map((it, i) => ({ clave: i, id: it.id, sku: null, skuId: it.skuId, nombre: it.producto, cantidad: String(it.cantidadPedida), nota: it.nota ?? "" }));
   const [abierto, setAbierto] = useState(false);
   const [lineas, setLineas] = useState<LineaEdicion[]>(desdeElPedido);
@@ -248,7 +252,7 @@ function EditarPedido({ p, opciones, stock }: { p: PedidoInventario; opciones: O
   return (
     <>
       <button type="button" onClick={abrir} aria-haspopup="dialog" className={SECUNDARIO}>
-        Editar
+        {etiqueta}
       </button>
       <Ventana abierto={abierto} alCerrar={() => setAbierto(false)} titulo={`Editar ${numeroPedido(p.numero)}`} ancho="lg">
         <form
@@ -585,14 +589,17 @@ function FilasPedido({
       ) : (
         <>
           {puedeEditar(p.estado) && <EditarPedido p={p} opciones={opciones} stock={hayEnInventario} />}
-          {puedeRecibir(p.estado) &&
-            (porConfirmar ? (
-              <ConfirmarRecepcion p={p} fotos={fotos} />
-            ) : (
+          {/* Desde el 27 nov 2026 despacho confirma lo que inventario marcó entregado, aunque el pedido siga abierto; al recibirlo se hace el traslado. */}
+          {envios.some((e) => !e.traslado) && p.estado !== "cancelado" && p.estado !== "recibido" ? (
+            <ConfirmarRecepcion p={p} fotos={fotos} />
+          ) : (
+            puedeRecibir(p.estado) &&
+            !porConfirmar && (
               <button type="button" disabled={ocupado} onClick={() => correr(() => recibirPedidoInventario(p.id))} className={PRINCIPAL}>
                 Recibido
               </button>
-            ))}
+            )
+          )}
           {puedeCancelar(p.estado) && (
             <button type="button" disabled={ocupado} onClick={() => correr(() => cancelarPedidoInventario(p.id))} className={SECUNDARIO}>
               Cancelar
@@ -733,7 +740,6 @@ function FilasPedido({
         return (
           <tr key={it.id} className={estaEnProceso(it) ? "bg-primario-suave/30" : undefined}>
             {i === 0 && celdaNumero(filas.length + (conGrupos ? 1 : 0))}
-            <td className={`${borde} font-mono text-xs text-muted-foreground`}>{it.codigo ?? "—"}</td>
             <td className={`${borde} font-medium`}>
               <span className="flex items-start gap-2">
                 <MiniaturaFoto url={fotos[it.skuId] ?? null} nombre={it.producto} />
@@ -786,7 +792,7 @@ function FilasPedido({
                       </button>
                     ))}
                 </div>
-              ) : p.estado === "enviado" && porConfirmar ? (
+              ) : suyos.some((e) => !e.traslado) ? (
                 suyos.length ? (
                   <ul className="m-0 flex list-none flex-col gap-1 p-0">
                     {suyos.map((e) => (
@@ -867,6 +873,374 @@ function FilasPedido({
   );
 }
 
+/**
+ * Comunicación despacho, lado de inventario (27 nov 2026, pedido de Hernán; prototipo aprobado https://claude.ai/artifact/4LWfh9jjXdp12BUdwcEXg3): una fila por producto, sin código, con su propio estado.
+ * La flecha ↶ lo vuelve al estado anterior y el botón morado lo pasa al siguiente: pendiente → «En proceso» → «Entregado». «Entregado» hace el traslado a despacho en ese momento (llega el mismo día:
+ * ya no hay «Enviado»). A la derecha, solo «Descargar PDF» y «Editar pedido» (o «Archivar pedido» cuando ya se entregó todo).
+ * `reducida` (tarjetas «En proceso» y «Entregado»): solo N.º, producto, cantidad pedida, de qué bodega sale y el estado.
+ */
+function FilasInventario({
+  p,
+  puedeEscribir,
+  origenes,
+  stock,
+  abrirFicha,
+  opciones,
+  hayEnInventario,
+  fotos,
+  sinEnProceso,
+  reducida,
+  obsAbierta,
+  columnas,
+  hermanos,
+}: {
+  p: PedidoInventario;
+  puedeEscribir: boolean;
+  origenes: { id: string; nombre: string }[];
+  stock: Record<string, Record<string, number>>;
+  abrirFicha: ((skuId: string) => void) | null;
+  opciones: OpcionSkuMaestro[];
+  hayEnInventario: Record<string, StockInventario>;
+  fotos: Record<string, string>;
+  sinEnProceso: boolean;
+  reducida: boolean;
+  /** «Observaciones ›» desplegada: se ven las notas completas y el campo para escribir. */
+  obsAbierta: boolean;
+  columnas: number;
+  hermanos: string[];
+}) {
+  const { ocupado, correr } = useAccion();
+  const abierto = puedeEnviar(p.estado);
+  // Se pueden mover los productos de un pedido abierto, o devolver uno entregado mientras el pedido no esté archivado.
+  const activo = puedeEscribir && !p.archivadoEn && !sinEnProceso && (abierto || p.estado === "recibido");
+  const asignada = p.bodegaAsignada?.id ?? null;
+  const sugerido = useMemo(
+    () => repartirSugerido(p.items.map((it) => ({ id: it.id, skuId: it.skuId, cantidad: it.cantidadPedida })), origenes.map((b) => b.id), stock, asignada),
+    [p.items, origenes, stock, asignada],
+  );
+  const [reparto, setReparto] = useState<Record<string, { bodegaId: string; cantidad: number | string }[]>>({});
+  const [observaciones, setObservaciones] = useState<Record<string, string>>({});
+  const [quedan, setQuedan] = useState<Set<string>>(() => new Set());
+  // Devolver un producto entregado mueve inventario: se confirma con un segundo toque.
+  const [devolviendo, setDevolviendo] = useState<string | null>(null);
+  const [plegado, alternarPlegado] = usePlegado(`pedido-inventario:${p.id}`);
+  const n = p.items.length;
+  const envios = p.envios ?? [];
+  const estadoDeItem = (it: ItemPedido) => estadoItem(it, p.estado, envios);
+  const yaSalio = (it: ItemPedido) => ["entregado", "recibido"].includes(estadoDeItem(it));
+  const partesDe = (itemId: string) => (reparto[itemId] ?? sugerido[itemId] ?? []).map((x) => ({ bodegaId: x.bodegaId, cantidad: Math.max(0, Math.floor(Number(x.cantidad) || 0)) }));
+  const noAlcanzaEn = (it: ItemPedido) => partesDe(it.id).some((x) => x.cantidad > Math.max(0, stock[x.bodegaId]?.[it.skuId] ?? 0));
+  const cuenta = { pendiente: 0, en_proceso: 0, entregado: 0, recibido: 0 };
+  for (const it of p.items) cuenta[estadoDeItem(it)]++;
+  // «En proceso» reducida: lo que se está llevando y lo entregado que despacho no ha confirmado.
+  // Vista de todos (27 nov 2026, pedido de Hernán): lo que ya está en proceso (o entregado) se oculta de lo pendiente; «Ver pedido completo» lo muestra todo.
+  const [completo, setCompleto] = useState(false);
+  const ocultaAvanzados = !reducida && abierto && !completo;
+  const filas = reducida && p.estado !== "recibido"
+    ? cuenta.en_proceso + cuenta.entregado
+      ? p.items.filter((it) => ["en_proceso", "entregado"].includes(estadoDeItem(it)))
+      : p.items.filter((it) => estadoDeItem(it) !== "recibido")
+    : ocultaAvanzados
+      ? p.items.filter((it) => estadoDeItem(it) === "pendiente")
+      : p.items;
+  // «Qué buscar en cada bodega» debajo del pedido: lo que falta llevar, agrupado por la bodega de donde sale.
+  const conGrupos = !reducida && activo && abierto;
+  const porLlevar = p.items.filter((it) => !yaSalio(it));
+  const gruposBodega = conGrupos ? agruparPorBodega(porLlevar, porLlevar.flatMap((it) => partesDe(it.id).map((x) => ({ itemId: it.id, ...x }))), origenes) : [];
+  // El PDF: lo entregado (de donde salió) y lo que falta y va en este envío (de donde se va a sacar).
+  const vanAhora = p.items.filter((it) => !yaSalio(it) && !quedan.has(it.id));
+  const gruposPdf = agruparPorBodega(
+    p.items.filter((it) => yaSalio(it) || !quedan.has(it.id)),
+    [
+      ...envios.filter((e) => p.items.some((it) => it.id === e.itemId && yaSalio(it))).map((e) => ({ itemId: e.itemId, bodegaId: e.bodegaId, cantidad: e.cantidadRecibida ?? e.cantidadEnviada })),
+      ...(abierto ? vanAhora.flatMap((it) => partesDe(it.id).map((x) => ({ itemId: it.id, ...x }))) : []),
+    ],
+    origenes,
+  );
+  const estado = estadoDe(p.estado);
+  const nombreBodega = (id: string) => origenes.find((b) => b.id === id)?.nombre ?? "Bodega";
+
+  const acciones = (
+    <div className="flex flex-col items-stretch gap-1.5">
+      <BotonPdfPedido p={p} grupos={gruposPdf} />
+      {puedeEscribir && puedeEditar(p.estado) && <EditarPedido p={p} opciones={opciones} stock={hayEnInventario} etiqueta="Editar pedido" />}
+      {puedeEscribir && puedeArchivar(p.estado) && (
+        <button type="button" disabled={ocupado} onClick={() => correr(() => archivarPedidoInventario(p.id, !p.archivadoEn))} className={ARCHIVO}>
+          {p.archivadoEn ? "Sacar del archivo" : "Archivar pedido"}
+        </button>
+      )}
+    </div>
+  );
+
+  const alternar = (
+    <button
+      type="button"
+      onClick={alternarPlegado}
+      aria-expanded={!plegado}
+      aria-label={`${plegado ? "Desplegar" : "Ocultar"} el pedido ${numeroPedido(p.numero)}`}
+      className={`mt-1 inline-flex items-center gap-1 rounded text-xs font-medium text-primario underline-offset-2 hover:underline ${anilloFoco}`}
+    >
+      {plegado ? <FlechaAbajoIcon className="h-3.5 w-3.5" aria-hidden="true" /> : <FlechaArribaIcon className="h-3.5 w-3.5" aria-hidden="true" />}
+      {plegado ? "Desplegar" : "Ocultar"}
+    </button>
+  );
+
+  const celdaNumero = (filasQueAbarca: number) => (
+    <td rowSpan={filasQueAbarca} className={`${TD_FIN} bg-primario-suave px-3`}>
+      <span className="block font-semibold whitespace-nowrap text-primario">{numeroPedido(p.numero)}</span>
+      <span className="block text-xs font-normal text-muted-foreground">{fechaCorta(p.creadoEn)}</span>
+      <BodegaDelPedido p={p} hermanos={hermanos} />
+      {!reducida && alternar}
+      {!reducida && abierto && cuenta.pendiente < n && (
+        <button type="button" onClick={() => setCompleto((c) => !c)} aria-pressed={completo} className={`mt-2 block rounded text-left text-xs font-medium text-primario underline-offset-2 hover:underline ${anilloFoco}`}>
+          {completo ? "Ver solo pendientes" : "Ver pedido completo"}
+        </button>
+      )}
+      {!reducida && n > 1 && (
+        <span className="mt-2 block border-t border-primario/20 pt-2 text-xs text-muted-foreground">
+          {(["pendiente", "en_proceso", "entregado", "recibido"] as const)
+            .filter((k) => cuenta[k] > 0)
+            .map((k) => `${cuenta[k].toLocaleString("es-PA")} ${k === "pendiente" ? (cuenta[k] === 1 ? "pendiente" : "pendientes") : k === "en_proceso" ? "en proceso" : k === "entregado" ? (cuenta[k] === 1 ? "entregado sin confirmar" : "entregados sin confirmar") : cuenta[k] === 1 ? "recibido" : "recibidos"}`)
+            .join(" · ")}
+        </span>
+      )}
+    </td>
+  );
+
+  /** El estado del producto: su insignia, la flecha ↶ (al anterior) y el botón al siguiente. */
+  const celdaEstado = (it: ItemPedido) => {
+    const e = estadoDeItem(it);
+    const etiqueta = ESTADO_ITEM[e];
+    const va = !quedan.has(it.id);
+    const anterior = e === "en_proceso" ? "Solicitud" : e === "entregado" || e === "recibido" ? "En proceso" : null;
+    const suyos = envios.filter((x) => x.itemId === it.id);
+    return (
+      <div className="flex flex-col items-start gap-1.5">
+        <Badge tone={etiqueta.tono}>{etiqueta.texto}</Badge>
+        {e === "entregado" && <span className="text-xs text-muted-foreground">Falta que despacho confirme</span>}
+        {e === "recibido" && suyos.some((x) => x.traslado) && <span className="text-xs text-muted-foreground">{[...new Set(suyos.map((x) => x.traslado).filter(Boolean))].join(", ")}</span>}
+        {activo && (
+          devolviendo === it.id ? (
+            <span className="flex flex-col gap-1 rounded-md bg-muted p-1.5 text-xs">
+              ¿Devolver lo recibido a su bodega?
+              <span className="flex gap-1">
+                <button type="button" disabled={ocupado} onClick={() => { setDevolviendo(null); correr(() => deshacerEntregaItemPedido(p.id, it.id)); }} className={`${PRINCIPAL} min-h-7 px-2 text-xs`}>
+                  Sí, devolver
+                </button>
+                <button type="button" disabled={ocupado} onClick={() => setDevolviendo(null)} className={`${SECUNDARIO} min-h-7 px-2 text-xs`}>
+                  No
+                </button>
+              </span>
+            </span>
+          ) : (
+            <span className="flex items-center gap-1">
+              <button
+                type="button"
+                disabled={ocupado || !anterior}
+                onClick={() => (e === "recibido" ? setDevolviendo(it.id) : e === "entregado" ? correr(() => deshacerEntregaItemPedido(p.id, it.id)) : correr(() => marcarEnProcesoItems(p.id, [it.id], false)))}
+                title={anterior ? `Volver a «${anterior}»` : "Ya está en el primer estado"}
+                aria-label={anterior ? `Volver ${it.producto} a «${anterior}»` : `${it.producto} ya está en el primer estado`}
+                className={`inline-flex min-h-8 min-w-8 items-center justify-center rounded-md border border-primario/30 bg-card text-base text-primario hover:bg-primario-suave disabled:opacity-35 ${anilloFoco}`}
+              >
+                ↶
+              </button>
+              {e === "pendiente" && abierto && (
+                <button type="button" disabled={ocupado} onClick={() => correr(() => marcarEnProcesoItems(p.id, [it.id], true))} className={`${PRINCIPAL} min-h-8 px-2.5 text-xs`}>
+                  En proceso
+                </button>
+              )}
+              {e === "en_proceso" && abierto && (
+                <button
+                  type="button"
+                  disabled={ocupado || !va || noAlcanzaEn(it) || partesDe(it.id).every((x) => x.cantidad === 0)}
+                  title={!va ? "Marcado para después: no va en este envío" : noAlcanzaEn(it) ? "En una bodega no alcanza" : "Lo llevaste a despacho: el traslado se hace cuando despacho confirme lo que llegó"}
+                  onClick={() => correr(() => entregarItemPedido(p.id, it.id, partesDe(it.id), observaciones[it.id] ?? ""))}
+                  className={`${PRINCIPAL} min-h-8 px-2.5 text-xs`}
+                >
+                  Entregado
+                </button>
+              )}
+            </span>
+          )
+        )}
+      </div>
+    );
+  };
+
+  /** De dónde sale (lo que falta) o de dónde salió (lo entregado). */
+  const salidas = (it: ItemPedido) => {
+    if (yaSalio(it)) {
+      const suyos = envios.filter((e) => e.itemId === it.id);
+      return suyos.length ? suyos.map((e) => ({ bodega: e.bodega, cantidad: e.cantidadRecibida ?? e.cantidadEnviada })) : [{ bodega: p.origen ?? "—", cantidad: it.cantidadEntregada ?? 0 }];
+    }
+    return partesDe(it.id).filter((x) => x.cantidad > 0).map((x) => ({ bodega: nombreBodega(x.bodegaId), cantidad: x.cantidad }));
+  };
+
+  const celdaProducto = (it: ItemPedido, borde: string) => (
+    <td className={`${borde} font-medium`}>
+      <span className="flex items-start gap-2">
+        <MiniaturaFoto url={fotos[it.skuId] ?? null} nombre={it.producto} />
+        {abrirFicha && it.skuId ? (
+          <button type="button" onClick={() => abrirFicha(it.skuId)} title={it.producto} className={`line-clamp-2 rounded text-left font-medium text-primario underline-offset-2 hover:underline ${anilloFoco}`}>
+            {it.producto}
+          </button>
+        ) : (
+          <span title={it.producto} className="line-clamp-2">
+            {it.producto}
+          </span>
+        )}
+      </span>
+    </td>
+  );
+
+  if (plegado && !reducida) {
+    const unidades = p.items.reduce((t, it) => t + it.cantidadPedida, 0);
+    return (
+      <tr>
+        <td className={`${TD_FIN} bg-primario-suave px-3`}>
+          <span className="block font-semibold whitespace-nowrap text-primario">{numeroPedido(p.numero)}</span>
+          <span className="block text-xs font-normal text-muted-foreground">{fechaCorta(p.creadoEn)}</span>
+          {alternar}
+        </td>
+        <td colSpan={Math.max(1, columnas - 2)} className={`${TD_FIN} text-muted-foreground`}>
+          <p className="m-0">
+            {n.toLocaleString("es-PA")} {n === 1 ? "producto" : "productos"} · {unidades.toLocaleString("es-PA")} unidades pedidas · <Badge tone={estado.tono}>{estado.etiqueta}</Badge>
+          </p>
+          <p className="m-0 mt-1 line-clamp-2 text-xs">{p.items.map((it) => `${it.producto} (${it.cantidadPedida.toLocaleString("es-PA")})`).join(" · ")}</p>
+        </td>
+        <td className={`${TD_FIN} px-3`}>{acciones}</td>
+      </tr>
+    );
+  }
+
+  return (
+    <>
+      {filas.map((it, i) => {
+        const borde = i === filas.length - 1 && !conGrupos ? TD_FIN : TD;
+        const e = estadoDeItem(it);
+        const editableItem = activo && abierto && (e === "pendiente" || e === "en_proceso");
+        if (reducida)
+          return (
+            <tr key={it.id}>
+              {i === 0 && celdaNumero(filas.length + (conGrupos ? 1 : 0))}
+              {celdaProducto(it, borde)}
+              <td className={`${borde} text-right tabular-nums`}>{it.cantidadPedida.toLocaleString("es-PA")}</td>
+              <td className={`${borde} text-xs`}>
+                <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
+                  {salidas(it).map((s, j) => (
+                    <li key={j} className="font-semibold text-foreground">
+                      {s.bodega}
+                      {salidas(it).length > 1 || s.cantidad !== it.cantidadPedida ? <span className="font-normal text-muted-foreground"> · {s.cantidad.toLocaleString("es-PA")}</span> : null}
+                    </li>
+                  ))}
+                  {!salidas(it).length && <li className="text-muted-foreground">Sin elegir</li>}
+                </ul>
+              </td>
+              <td className={borde}>{celdaEstado(it)}</td>
+            </tr>
+          );
+        const obs = [it.nota, it.observacion, ...notasDeDespacho(p, it.id)].filter(Boolean).join(" · ");
+        return (
+          <tr key={it.id}>
+            {i === 0 && celdaNumero(filas.length + (conGrupos ? 1 : 0))}
+            {celdaProducto(it, borde)}
+            <td className={`${borde} text-right tabular-nums`}>{it.cantidadPedida.toLocaleString("es-PA")}</td>
+            <td className={`${borde} text-xs`}>
+              <StockPorBodega skuId={it.skuId} usadas={new Set(!editableItem ? envios.filter((x) => x.itemId === it.id).map((x) => x.bodegaId) : partesDe(it.id).filter((x) => x.cantidad > 0).map((x) => x.bodegaId))} origenes={origenes} stock={stock} soloLectura={!editableItem} />
+            </td>
+            <td className={borde}>
+              {editableItem ? (
+                <div className="flex flex-col gap-1">
+                  {n > 1 && (
+                    <label className="flex cursor-pointer items-center gap-1.5 text-xs font-medium text-foreground">
+                      <input type="checkbox" checked={!quedan.has(it.id)} onChange={(ev) => setQuedan((q) => { const x = new Set(q); if (ev.target.checked) x.delete(it.id); else x.add(it.id); return x; })} className="h-4 w-4 accent-primario" />
+                      {quedan.has(it.id) ? "Queda pendiente" : "Va en este envío"}
+                    </label>
+                  )}
+                  <div className={quedan.has(it.id) ? "pointer-events-none opacity-40" : undefined} inert={quedan.has(it.id) || undefined}>
+                    <RepartoBodegas item={it} partes={(reparto[it.id] ?? sugerido[it.id] ?? []) as { bodegaId: string; cantidad: number }[]} alCambiar={(partes) => setReparto((x) => ({ ...x, [it.id]: partes }))} bodegas={origenes} stock={stock} />
+                  </div>
+                </div>
+              ) : (
+                <ul className="m-0 flex list-none flex-col gap-0.5 p-0 text-xs">
+                  {salidas(it).map((s, j) => (
+                    <li key={j}>
+                      <span className="font-semibold text-foreground">{s.bodega}</span> · <span className="tabular-nums">{s.cantidad.toLocaleString("es-PA")}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </td>
+            <td className={borde}>{celdaEstado(it)}</td>
+            <td className={`${borde} text-muted-foreground`}>
+              {obsAbierta ? (
+                <div className="flex flex-col gap-1">
+                  {obs && <span className="break-words">{obs}</span>}
+                  {editableItem && (
+                    <label>
+                      <span className="sr-only">Observaciones de {it.producto}</span>
+                      <input type="text" maxLength={300} placeholder="Observación" value={observaciones[it.id] ?? ""} onChange={(ev) => setObservaciones((x) => ({ ...x, [it.id]: ev.target.value }))} className={fieldClass} />
+                    </label>
+                  )}
+                </div>
+              ) : (
+                obs && (
+                  <span title={obs} className="block truncate text-xs">
+                    {obs}
+                  </span>
+                )
+              )}
+            </td>
+            {i === 0 && (
+              <td rowSpan={filas.length} className={`${TD_FIN} px-3`}>
+                {acciones}
+              </td>
+            )}
+          </tr>
+        );
+      })}
+      {filas.length === 0 && (
+        <tr>
+          {celdaNumero(1 + (conGrupos ? 1 : 0))}
+          <td colSpan={Math.max(1, columnas - 2)} className={`${conGrupos ? TD : TD_FIN} text-sm text-muted-foreground`}>
+            {ocultaAvanzados ? (
+              <>
+                No queda nada pendiente: todo está en proceso o entregado.{" "}
+                <button type="button" onClick={() => setCompleto(true)} className={`rounded font-medium text-primario underline-offset-2 hover:underline ${anilloFoco}`}>
+                  Ver pedido completo
+                </button>
+              </>
+            ) : (
+              "No hay productos en este estado."
+            )}
+          </td>
+          <td className={`${conGrupos ? TD : TD_FIN} px-3`}>{reducida ? null : acciones}</td>
+        </tr>
+      )}
+      {conGrupos && (
+        <tr>
+          <td colSpan={Math.max(1, columnas - 2)} className={TD_FIN}>
+            <PorBodega
+              grupos={gruposBodega}
+              seleccion={n > 1 ? { va: (id) => !quedan.has(id), marcar: (ids, valor) => setQuedan((q) => { const x = new Set(q); for (const id of ids) { if (valor) x.delete(id); else x.add(id); } return x; }) } : undefined}
+              enProceso={sinEnProceso ? undefined : { esta: (id) => estadoDeItem(p.items.find((x) => x.id === id)!) === "en_proceso", marcar: (ids, valor) => correr(() => marcarEnProcesoItems(p.id, ids, valor)), completo, ocupado }}
+            />
+          </td>
+          <td className={`${TD_FIN} px-3`} />
+        </tr>
+      )}
+    </>
+  );
+}
+
+/** Cómo se ve el estado de un producto. */
+const ESTADO_ITEM = {
+  pendiente: { texto: "Solicitud", tono: "neutral" },
+  en_proceso: { texto: "En proceso", tono: "warning" },
+  entregado: { texto: "Entregado", tono: "azul" },
+  recibido: { texto: "Recibido", tono: "success" },
+} as const;
+
 /** Lo que despacho anotó al confirmar un producto. */
 const notasDeDespacho = (p: PedidoInventario, itemId: string): string[] => (p.envios ?? []).filter((e) => e.itemId === itemId && e.nota).map((e) => `Despacho (${e.bodega}): ${e.nota}`);
 
@@ -876,7 +1250,7 @@ const TARJETA_ESTADO = {
   solicitud: { icono: PedidoIcon, color: "violeta", detalle: "pedidos que inventario no ha tomado" },
   en_proceso: { icono: CalendarioIcon, color: "ambar", detalle: "inventario los está preparando" },
   enviado: { icono: EnvioIcon, color: "azul", detalle: "en camino a despacho" },
-  recibido: { icono: CheckIcon, color: "verde", detalle: "ya llegaron a despacho" },
+  recibido: { icono: CheckIcon, color: "verde", detalle: "entregados a despacho" },
 } as const;
 
 /** El tablero de arriba: el total y un contador por estado; cada tarjeta pone (o quita) el filtro `?estado=` de la dirección. */
@@ -897,7 +1271,7 @@ export function TableroPedidos({
   return (
     <TableroIndicadores etiqueta="Pedidos por estado">
       <Indicador titulo="Total pedidos" icono={InventarioIcon} color="violeta" valor={num(total)} detalle="abiertos y cerrados de 30 días" href={ruta} activo={elegido === null} />
-      {ESTADOS.filter((e) => e.clave !== "cancelado").map((e) => {
+      {ESTADOS.filter((e) => e.clave !== "cancelado" && (e.clave !== "enviado" || cuenta.enviado > 0)).map((e) => {
         const t = TARJETA_ESTADO[e.clave as keyof typeof TARJETA_ESTADO];
         const n = cuenta[e.clave];
         return (
@@ -931,7 +1305,10 @@ export function TablaPedidos({
   sinConfirmacion = false,
   sinEnProceso = false,
   soloEnProceso = false,
+  reducida = false,
 }: {
+  /** Tarjetas «En proceso» y «Entregado» en inventario (27 nov 2026): solo N.º, producto, cantidad pedida, de qué bodega sale y el estado. */
+  reducida?: boolean;
   pedidos: PedidoInventario[];
   modo: "despacho" | "inventario";
   puedeEscribir: boolean;
@@ -952,22 +1329,110 @@ export function TablaPedidos({
   soloEnProceso?: boolean;
 }) {
   const [ficha, setFicha] = useState<string | null>(null);
-  const columnas = modo === "inventario" ? 8 : 9;
+  // «Observaciones ›» oculta o despliega la columna (27 nov 2026, pedido de Hernán).
+  const [obsAbierta, setObsAbierta] = useState(false);
+  const enInventario = modo === "inventario";
+  const columnas = enInventario ? (reducida ? 5 : 8) : 8;
   const th = "px-2 py-2.5 font-semibold";
   const vacios = pedidos.length === 0;
+  const abrirFicha = fichas ? (id: string) => fichas[id] && setFicha(id) : null;
+  const hermanosDe = (p: PedidoInventario) => (p.grupo ? pedidos.filter((x) => x.grupo === p.grupo && x.id !== p.id).map((x) => numeroPedido(x.numero)) : []);
+  const fichaStock = fichas && (
+    // Solo para consultar cómo está repartido el stock: los movimientos se hacen en Inventario.
+    <FichaStock
+      sku={ficha ? fichas[ficha] : undefined}
+      bodegasPropias={[]}
+      bodegasExternas={[]}
+      ubicaciones={[]}
+      puedeEscribir={false}
+      puedeComentar={false}
+      codigoPais="PA"
+      alCerrar={() => setFicha(null)}
+      alCambiar={() => undefined}
+    />
+  );
+  // Inventario (27 nov 2026, prototipo aprobado https://claude.ai/artifact/4LWfh9jjXdp12BUdwcEXg3): todo cabe en el recuadro, sin moverse a los lados en una pantalla de escritorio.
+  if (enInventario)
+    return (
+      <div className="overflow-x-auto rounded-lg border border-border bg-card">
+        <table className={`w-full table-fixed border-collapse text-sm ${reducida ? "min-w-[640px]" : "min-w-[980px]"}`}>
+          {reducida ? (
+            <colgroup>
+              <col className="w-[16%]" />
+              <col className="w-[36%]" />
+              <col className="w-[12%]" />
+              <col className="w-[18%]" />
+              <col className="w-[18%]" />
+            </colgroup>
+          ) : (
+            <colgroup>
+              <col className="w-[10%]" />
+              <col className="w-[19%]" />
+              <col className="w-[7%]" />
+              <col className="w-[13%]" />
+              <col className="w-[19%]" />
+              <col className="w-[12%]" />
+              <col className={obsAbierta ? "w-[14%]" : "w-[8%]"} />
+              <col className="w-[11%]" />
+            </colgroup>
+          )}
+          <thead>
+            <tr className="bg-muted text-left align-bottom text-foreground">
+              <th className={`${th} px-3`}>N.º pedido y fecha</th>
+              <th className={th}>Producto</th>
+              <th className={`${th} text-right`}>Cantidad pedida</th>
+              {reducida ? (
+                <th className={th}>Salió de bodega</th>
+              ) : (
+                <>
+                  <th className={th}>Stock por bodega</th>
+                  <th className={th}>Sale de y cantidad</th>
+                </>
+              )}
+              <th className={th}>Estado</th>
+              {!reducida && (
+                <>
+                  <th className={th}>
+                    <button type="button" onClick={() => setObsAbierta((x) => !x)} aria-expanded={obsAbierta} className={`inline-flex items-center gap-1 rounded font-semibold ${anilloFoco}`}>
+                      Observaciones <span aria-hidden="true" className={`inline-block text-primario transition-transform ${obsAbierta ? "rotate-180" : ""}`}>›</span>
+                      <span className="sr-only">{obsAbierta ? "(ocultar)" : "(desplegar)"}</span>
+                    </button>
+                  </th>
+                  <th className={th}>
+                    <span className="sr-only">Acciones</span>
+                  </th>
+                </>
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            {vacios ? (
+              <tr>
+                <td colSpan={columnas} className="px-4 py-8 text-center text-muted-foreground">
+                  No hay pedidos aquí.
+                </td>
+              </tr>
+            ) : (
+              pedidos.map((p) => (
+                <FilasInventario key={p.id} p={p} puedeEscribir={puedeEscribir} origenes={origenes} stock={stock} abrirFicha={abrirFicha} opciones={opciones} hayEnInventario={hayEnInventario} fotos={fotos} sinEnProceso={sinEnProceso} reducida={reducida} obsAbierta={obsAbierta} columnas={columnas} hermanos={hermanosDe(p)} />
+              ))
+            )}
+          </tbody>
+        </table>
+        {fichaStock}
+      </div>
+    );
   return (
     <div className="overflow-x-auto rounded-lg border border-border bg-card">
-      <table className={`w-full border-collapse text-sm ${modo === "inventario" ? "min-w-[1200px]" : "min-w-[1100px]"}`}>
+      <table className="w-full min-w-[1000px] border-collapse text-sm">
         <thead>
           <tr className="bg-muted text-left text-foreground">
             <th className={`${th} px-3`}>N.º pedido y fecha</th>
-            <th className={th}>Código</th>
             <th className={th}>Producto</th>
             <th className={`${th} text-right`}>Cantidad pedida</th>
-            {modo !== "inventario" && <th className={th}>Pedido por</th>}
-            {modo !== "inventario" && <th className={th}>Responsable bodega</th>}
-            {modo === "inventario" && <th className={th}>Stock por bodega</th>}
-            <th className={`${th} text-right`}>{modo === "inventario" ? "Sale de y cantidad" : "Cantidad entregada"}</th>
+            <th className={th}>Pedido por</th>
+            <th className={th}>Responsable bodega</th>
+            <th className={`${th} text-right`}>Cantidad entregada</th>
             <th className={th}>Observaciones</th>
             <th className={`${th} px-3`}>Estado</th>
           </tr>
@@ -982,26 +1447,13 @@ export function TablaPedidos({
           ) : (
             pedidos.map((p) => (
               <Fragment key={p.id}>
-                <FilasPedido p={p} modo={modo} puedeEscribir={puedeEscribir} origenes={origenes} stock={stock} abrirFicha={fichas ? (id) => fichas[id] && setFicha(id) : null} opciones={opciones} hayEnInventario={hayEnInventario} columnas={columnas} fotos={fotos} sinConfirmacion={sinConfirmacion} sinEnProceso={sinEnProceso} soloEnProceso={soloEnProceso} hermanos={p.grupo ? pedidos.filter((x) => x.grupo === p.grupo && x.id !== p.id).map((x) => numeroPedido(x.numero)) : []} />
+                <FilasPedido p={p} modo={modo} puedeEscribir={puedeEscribir} origenes={origenes} stock={stock} abrirFicha={abrirFicha} opciones={opciones} hayEnInventario={hayEnInventario} columnas={columnas} fotos={fotos} sinConfirmacion={sinConfirmacion} sinEnProceso={sinEnProceso} soloEnProceso={soloEnProceso} hermanos={hermanosDe(p)} />
               </Fragment>
             ))
           )}
         </tbody>
       </table>
-      {fichas && (
-        // Solo para consultar cómo está repartido el stock: los movimientos se hacen en Inventario.
-        <FichaStock
-          sku={ficha ? fichas[ficha] : undefined}
-          bodegasPropias={[]}
-          bodegasExternas={[]}
-          ubicaciones={[]}
-          puedeEscribir={false}
-          puedeComentar={false}
-          codigoPais="PA"
-          alCerrar={() => setFicha(null)}
-          alCambiar={() => undefined}
-        />
-      )}
+      {fichaStock}
     </div>
   );
 }
@@ -1013,7 +1465,7 @@ export function LeyendaPedidos() {
       <section className="flex flex-col gap-2 rounded-lg border border-border bg-card px-4 py-3 text-sm">
         <h2 className="m-0 text-sm font-semibold">Estados</h2>
         <dl className="m-0 grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-1.5">
-          {ESTADOS.filter((e) => e.clave !== "cancelado").map((e) => (
+          {ESTADOS.filter((e) => e.clave !== "cancelado" && e.clave !== "enviado").map((e) => (
             <Fragment key={e.clave}>
               <dt>
                 <Badge tone={e.tono}>{e.etiqueta}</Badge>
@@ -1026,9 +1478,8 @@ export function LeyendaPedidos() {
       <section className="flex flex-col gap-1.5 rounded-lg border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
         <h2 className="m-0 text-sm font-semibold text-foreground">Avisos automáticos («Para ti»)</h2>
         <p className="m-0">A inventario, cuando despacho hace un pedido (o lo cancela).</p>
-        <p className="m-0">A quien pidió, cuando inventario lo pone en proceso y cuando lo envía.</p>
-        <p className="m-0">A quien envió, cuando despacho recibe el pedido (con las diferencias, si las hay).</p>
-        <p className="m-0">«Enviar» no mueve inventario. Cuando despacho confirma cada producto y pulsa «Recibir y transferir», se hace un traslado por cada bodega: no hay que hacerlo aparte en Inventario › Traslados.</p>
+        <p className="m-0">A quien pidió, cuando inventario lo pone en proceso y cuando le entrega productos para confirmar. A inventario, cuando despacho los recibe (con las diferencias, si las hay).</p>
+        <p className="m-0">Cada producto tiene su estado: la flecha ↶ lo vuelve al anterior y el botón lo pasa al siguiente. «Entregado» no mueve inventario: el traslado de cada bodega a despacho se hace cuando despacho confirma lo que llegó y pulsa «Recibir y transferir». No hay que hacerlo aparte en Inventario › Traslados.</p>
       </section>
     </div>
   );

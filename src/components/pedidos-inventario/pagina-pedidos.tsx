@@ -57,8 +57,8 @@ export async function PaginaPedidos({ modo, usuario, estado, archivados = false 
     <Pagina ancho="ancha" className="flex flex-col gap-4">
       <EncabezadoPagina titulo={archivados ? "Archivos de solicitudes" : "Solicitud de inventario"} oculto>
         {modo === "despacho"
-          ? "Pide a inventario lo que se agotó en despacho. Te avisa en «Para ti» cuando lo prepara y cuando lo envía; al llegar, confirma producto por producto y recíbelo."
-          : "Lo que despacho le pide a inventario: ponlo en proceso, di de qué bodega sale cada producto y «Enviar». El inventario se mueve cuando despacho confirma lo que llegó y lo recibe."}
+          ? "Pide a inventario lo que se agotó en despacho. Te avisa en «Para ti» cuando lo prepara y cuando te entrega productos: confirma lo que llegó y recíbelo; ahí se mueve el inventario."
+          : "Lo que despacho le pide a inventario: pasa cada producto a «En proceso», di de qué bodega sale y márcalo «Entregado» al llevarlo. El traslado se hace cuando despacho confirma lo que llegó."}
       </EncabezadoPagina>
       {faltaMigracion ? (
         <p role="alert" className="m-0 rounded-lg border border-border bg-card px-4 py-3 text-sm text-destructive">
@@ -88,7 +88,7 @@ export async function PaginaPedidos({ modo, usuario, estado, archivados = false 
           ) : (
             <TableroPedidos modo={modo} ruta={ruta} cuenta={cuenta} total={pedidos.length} elegido={elegido} />
           )}
-          <TablaPedidos pedidos={archivados ? pedidos : visibles} modo={modo} puedeEscribir={puedeEscribir} origenes={bodegas.origenes} stock={stock} fichas={fichas} fotos={fotos} opciones={opciones} hayEnInventario={hayEnInventario} sinConfirmacion={sinConfirmacion} sinEnProceso={sinEnProceso} soloEnProceso={!archivados && elegido === "en_proceso"} />
+          <TablaPedidos pedidos={archivados ? pedidos : visibles} modo={modo} puedeEscribir={puedeEscribir} origenes={bodegas.origenes} stock={stock} fichas={fichas} fotos={fotos} opciones={opciones} hayEnInventario={hayEnInventario} sinConfirmacion={sinConfirmacion} sinEnProceso={sinEnProceso} soloEnProceso={!archivados && elegido === "en_proceso"} reducida={modo === "inventario" && !archivados && (elegido === "en_proceso" || elegido === "recibido")} />
           {!archivados && !sinArchivo && (
             <p className="m-0 text-sm">
               <Link href={rutaArchivo} className="font-medium text-primario underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">

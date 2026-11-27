@@ -23,13 +23,13 @@ export function RepartoBodegas({ item, partes, alCambiar, bodegas, stock }: { it
   const total = partes.reduce((t, p) => t + (Number(p.cantidad) || 0), 0);
   const cambiar = (i: number, c: Partial<{ bodegaId: string; cantidad: number | string }>) => alCambiar(partes.map((p, j) => (j === i ? { ...p, ...c } : p)));
   return (
-    <div className="flex flex-col items-start gap-1">
+    <div className="flex w-full flex-col items-start gap-1">
       {partes.map((p, i) => {
         const pasa = (Number(p.cantidad) || 0) > hay(p.bodegaId);
         return (
-          <div key={i} className="flex flex-col gap-0.5">
-            <div className="flex items-center gap-1">
-              <select value={p.bodegaId} onChange={(e) => cambiar(i, { bodegaId: e.target.value })} aria-label={`Bodega de donde sale ${item.producto}${partes.length > 1 ? `, parte ${i + 1}` : ""}`} className={`${fieldClassSm} w-44`}>
+          <div key={i} className="flex w-full flex-col gap-0.5">
+            <div className="flex w-full items-center gap-1">
+              <select value={p.bodegaId} onChange={(e) => cambiar(i, { bodegaId: e.target.value })} aria-label={`Bodega de donde sale ${item.producto}${partes.length > 1 ? `, parte ${i + 1}` : ""}`} className={`${fieldClassSm} w-full min-w-0`}>
                 {bodegas
                   .filter((b) => b.id === p.bodegaId || !usadas.has(b.id))
                   .map((b) => (
@@ -47,7 +47,7 @@ export function RepartoBodegas({ item, partes, alCambiar, bodegas, stock }: { it
                 onChange={(e) => cambiar(i, { cantidad: e.target.value as unknown as number })}
                 aria-label={`Cantidad de ${item.producto} desde ${bodegas.find((b) => b.id === p.bodegaId)?.nombre ?? "la bodega"}`}
                 aria-invalid={pasa || undefined}
-                className={`${fieldClassSm} w-20 text-right tabular-nums`}
+                className={`${fieldClassSm} w-16 shrink-0 text-right tabular-nums`}
               />
               {partes.length > 1 && (
                 <button type="button" onClick={() => alCambiar(partes.filter((_, j) => j !== i))} aria-label={`Quitar esa bodega de ${item.producto}`} className={`min-h-8 min-w-8 rounded-md text-muted-foreground hover:bg-muted ${anilloFoco}`}>
@@ -65,7 +65,7 @@ export function RepartoBodegas({ item, partes, alCambiar, bodegas, stock }: { it
       })}
       {libres.length > 0 && (
         <button type="button" onClick={() => alCambiar([...partes, { bodegaId: libres[0].id, cantidad: Math.max(0, Math.min(item.cantidadPedida - total, hay(libres[0].id))) }])} className={`rounded text-xs font-medium text-primario underline-offset-2 hover:underline ${anilloFoco}`}>
-          + Sacar también de otra bodega
+          + Sacar de otra bodega
         </button>
       )}
       {total !== item.cantidadPedida && (
@@ -258,7 +258,7 @@ function FilaConfirmar({ envio, item, foto }: { envio: EnvioPedido; item: ItemPe
         <div className="min-w-0 flex-1">
           <p className="m-0 text-sm font-medium">{item.producto}</p>
           <p className="m-0 text-xs text-muted-foreground">
-            Enviado: <span className="font-semibold text-foreground tabular-nums">{num(envio.cantidadEnviada)}</span>
+            Entregado: <span className="font-semibold text-foreground tabular-nums">{num(envio.cantidadEnviada)}</span>
             {item.codigo ? ` · ${item.codigo}` : ""}
           </p>
         </div>
@@ -313,11 +313,12 @@ function FilaConfirmar({ envio, item, foto }: { envio: EnvioPedido; item: ItemPe
 export function ConfirmarRecepcion({ p, fotos }: { p: PedidoInventario; fotos: Record<string, string> }) {
   const [abierto, setAbierto] = useState(false);
   const { ocupado, correr } = useAccion();
-  const envios = p.envios ?? [];
+  // Solo lo entregado que todavía no se recibe (lo ya recibido tiene su traslado).
+  const envios = (p.envios ?? []).filter((e) => !e.traslado);
   const items = new Map(p.items.map((it) => [it.id, it]));
   const confirmados = envios.filter((e) => e.cantidadRecibida !== null).length;
   const bodegas = [...new Set(envios.map((e) => e.bodega))];
-  const sinEnviar = p.items.filter((it) => !envios.some((e) => e.itemId === it.id));
+  const sinEnviar = p.items.filter((it) => !(p.envios ?? []).some((e) => e.itemId === it.id));
   return (
     <>
       <button type="button" onClick={() => setAbierto(true)} aria-haspopup="dialog" className={`${BOTON_PEDIDO.principal} min-h-11`}>
@@ -339,7 +340,7 @@ export function ConfirmarRecepcion({ p, fotos }: { p: PedidoInventario; fotos: R
           ))}
           {sinEnviar.length > 0 && (
             <p className="m-0 text-xs text-muted-foreground">
-              No vienen en este envío: {sinEnviar.map((it) => `${it.producto}${it.observacion ? ` (${it.observacion})` : ""}`).join("; ")}.
+              Inventario todavía no los entrega: {sinEnviar.map((it) => `${it.producto}${it.observacion ? ` (${it.observacion})` : ""}`).join("; ")}.
             </p>
           )}
           <div className="sticky bottom-0 flex flex-wrap items-center justify-between gap-2 border-t border-border bg-card py-3">

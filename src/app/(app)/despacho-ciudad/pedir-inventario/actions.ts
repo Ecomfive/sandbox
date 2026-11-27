@@ -116,7 +116,7 @@ export async function editarPedidoInventario(id: string, lineas: unknown): Promi
     const supabase = createServiceClient();
     const { data: p } = await supabase
       .from("despacho_pedidos_inventario")
-      .select("id, numero, estado, pedido_por, despacho_pedidos_inventario_items(id, sku_id, producto, cantidad_pedida, nota)")
+      .select("id, numero, estado, pedido_por, despacho_pedidos_inventario_items(id, sku_id, producto, cantidad_pedida, nota, cantidad_entregada)")
       .eq("id", id)
       .maybeSingle();
     if (!p) return { error: "Ese pedido ya no existe." };
@@ -138,6 +138,10 @@ export async function editarPedidoInventario(id: string, lineas: unknown): Promi
     const nombres: Record<string, string> = { ...Object.fromEntries(items.map((it) => [it.skuId, it.producto])), ...Object.fromEntries([...porId].map(([k, s]) => [k, s.nombre])) };
     const cambios = cambiosDeEdicion(items, revisadas.lineas, nombres);
     if (!cambios.resumen.length) return { ok: true, mensaje: "No cambiaste nada." };
+    // Lo ya entregado (27 nov 2026) movió inventario: no se quita ni se cambia desde aquí.
+    const entregados = new Map(((p.despacho_pedidos_inventario_items as { id: string; producto: string; cantidad_entregada: number | null }[] | null) ?? []).filter((it) => it.cantidad_entregada !== null).map((it) => [it.id, it.producto]));
+    const tocaEntregado = [...cambios.quitar, ...cambios.cambiar.map((l) => l.id!)].find((x) => entregados.has(x));
+    if (tocaEntregado) return { error: `«${entregados.get(tocaEntregado)}» ya se entregó: vuélvelo a «En proceso» con ↶ antes de cambiarlo.` };
 
     // Solo lo nuevo o lo que sube de cantidad se compara con lo que hay en inventario.
     const previas = new Map(items.map((it) => [it.id, it]));
@@ -201,10 +205,16 @@ export async function marcarEnProcesoItems(id: string, itemIds: unknown, enProce
       .update(enProceso ? { en_proceso_en: ahora, en_proceso_por: u.id, en_proceso_por_nombre: nombreDe(u) } : { en_proceso_en: null, en_proceso_por: null, en_proceso_por_nombre: null })
       .eq("pedido_id", id)
       .in("id", itemIds as string[])
+      .is("cantidad_entregada", null)
       .select("id");
     if (error) return { error: /en_proceso_(en|por)/.test(error.message) ? "Falta correr en Supabase la migración 0371 (en proceso por producto)." : "No se pudo guardar." };
-    if (!cambiados?.length) return { error: "Esos productos ya no están en el pedido: recarga la página." };
+    if (!cambiados?.length) return { error: "Esos productos ya no están pendientes en el pedido (o ya se entregaron): recarga la página." };
     const n = numeroPedido(p.numero as number);
+    // Sin nada en proceso ni entregado (27 nov 2026: la flecha ↶ de cada producto), el pedido vuelve a «Solicitud».
+    if (!enProceso && p.estado === "en_proceso") {
+      const { data: siguen } = await supabase.from("despacho_pedidos_inventario_items").select("id").eq("pedido_id", id).or("en_proceso_en.not.is.null,cantidad_entregada.not.is.null").limit(1);
+      if (!siguen?.length) await supabase.from("despacho_pedidos_inventario").update({ estado: "solicitud", en_proceso_en: null, responsable_id: null, responsable_nombre: null }).eq("id", id).eq("estado", "en_proceso");
+    }
     // El primer producto en proceso pone el pedido «En proceso».
     if (enProceso && p.estado === "solicitud") {
       const { data: tomado } = await supabase
@@ -222,6 +232,197 @@ export async function marcarEnProcesoItems(id: string, itemIds: unknown, enProce
     await registrarAuditoria({ accion: "en_proceso_productos_pedido", entidad: "despacho_pedidos_inventario", entidadId: id, detalle: `${n}: ${cuantos} ${cuantos === 1 ? "producto" : "productos"} ${enProceso ? "en proceso" : "vuelven a pendientes"}` });
     return { ok: true, mensaje: enProceso ? `${cuantos === 1 ? "1 producto" : `${cuantos} productos`} en proceso en ${n}.` : `${cuantos === 1 ? "1 producto vuelve" : `${cuantos} productos vuelven`} a pendientes.` };
   });
+}
+
+/**
+ * Inventario marca un producto «Entregado» (27 nov 2026, pedido de Hernán; prototipo aprobado https://claude.ai/artifact/4LWfh9jjXdp12BUdwcEXg3): lo llevó a despacho. Anota de qué bodega sale y cuánto,
+ * pero **no mueve inventario**: el traslado se hace cuando despacho confirma lo que llegó y lo recibe («Recibir y transferir»). Solo un producto ya «En proceso».
+ * Primero se aparta el producto (`cantidad_entregada` de null a lo entregado: un segundo clic no lo anota dos veces). Mientras despacho no confirma, lo entregado no se puede prometer en otro pedido.
+ */
+export async function entregarItemPedido(id: string, itemId: string, partes: unknown, observacion: unknown): Promise<Resultado> {
+  return conPermiso(MODULO_INVENTARIO, async (u) => {
+    if (!ES_UUID(id) || !ES_UUID(itemId)) return { error: "Producto no válido." };
+    const supabase = createServiceClient();
+    const { destino, origenes } = await cargarBodegasPedido(supabase);
+    if (!destino || !origenes.length) return { error: "No encontré las bodegas de Panamá para entregar a despacho." };
+    const { data: p } = await supabase
+      .from("despacho_pedidos_inventario")
+      .select("id, numero, estado, pedido_por, archivado_en, bodega_destino_id, despacho_pedidos_inventario_items(id, sku_id, producto, cantidad_entregada, en_proceso_en)")
+      .eq("id", id)
+      .maybeSingle();
+    if (!p) return { error: "Ese pedido ya no existe." };
+    if ((p.estado !== "solicitud" && p.estado !== "en_proceso") || p.archivado_en) return { error: "Ese pedido ya está cerrado: recarga la página." };
+    const items = (p.despacho_pedidos_inventario_items as { id: string; sku_id: string; producto: string; cantidad_entregada: number | null; en_proceso_en: string | null }[] | null) ?? [];
+    const it = items.find((x) => x.id === itemId);
+    if (!it) return { error: "Ese producto ya no está en el pedido: recarga la página." };
+    if (it.cantidad_entregada !== null) return { error: `«${it.producto}» ya está entregado: recarga la página.` };
+    if (!it.en_proceso_en) return { error: `Pasa «${it.producto}» a «En proceso» antes de entregarlo.` };
+    if (!(await puedeVerBodega(supabase, u.paisesPermitidos, p.bodega_destino_id as string))) return { error: "No tienes acceso al país de ese pedido." };
+
+    const stock = await cargarStockLibre(supabase, origenes.map((b) => b.id), [it.sku_id]);
+    const revisadas = revisarEnvio([{ id: it.id, skuId: it.sku_id, producto: it.producto }], [{ id: it.id, partes, observacion }], origenes, stock);
+    if ("error" in revisadas) return revisadas;
+    const usadas = [...new Set(revisadas.envios.map((e) => e.bodegaId))];
+    for (const b of usadas) if (!(await puedeVerBodega(supabase, u.paisesPermitidos, b))) return { error: "No tienes acceso al país de esa bodega." };
+    const { data: enCajas } = await supabase.from("wms_cajas").select("bodega_id").in("bodega_id", usadas).eq("sku_maestro_id", it.sku_id).limit(1);
+    if (enCajas?.length) return { error: `«${it.producto}» está guardado por cajas en esa bodega: pásalo con «Nuevo traslado».` };
+
+    // ¿Ya había algo entregado sin confirmar? Entonces despacho ya tiene el aviso.
+    const { data: yaHabia } = await supabase.from("despacho_pedidos_inventario_envios").select("id").eq("pedido_id", id).is("traslado_id", null).limit(1);
+    const total = revisadas.envios.reduce((t, e) => t + e.cantidad, 0);
+    const { data: apartado } = await supabase
+      .from("despacho_pedidos_inventario_items")
+      .update({ cantidad_entregada: total, observacion: revisadas.observaciones[it.id] ?? null })
+      .eq("id", it.id)
+      .eq("pedido_id", id)
+      .is("cantidad_entregada", null)
+      .select("id");
+    if (!apartado?.length) return { error: `«${it.producto}» ya está entregado: recarga la página.` };
+    await supabase.from("despacho_pedidos_inventario_envios").delete().eq("item_id", it.id).is("traslado_id", null);
+    const { error } = await supabase.from("despacho_pedidos_inventario_envios").insert(revisadas.envios.map((e) => ({ pedido_id: id, item_id: it.id, bodega_id: e.bodegaId, cantidad_enviada: e.cantidad })));
+    if (error) {
+      await supabase.from("despacho_pedidos_inventario_items").update({ cantidad_entregada: null }).eq("id", it.id);
+      return { error: errorDeBase(error.message, "No se pudo guardar la entrega.") };
+    }
+    const n = numeroPedido(p.numero as number);
+    const nombres = usadas.map((b) => origenes.find((o) => o.id === b)?.nombre ?? "bodega").join(", ");
+    await registrarAuditoria({ accion: "entregar_producto_pedido_inventario", entidad: "despacho_pedidos_inventario", entidadId: id, detalle: `${n}: «${it.producto}» entregado, ${total.toLocaleString("es-PA")} desde ${nombres}; falta que despacho confirme` });
+    if (!yaHabia?.length) await avisar(supabase, [p.pedido_por as string], u, avisoPedido({ numero: p.numero as number, items: 1 }, nombreDe(u), "entregado", it.producto), "/inventario-despacho/solicitudes");
+    return { ok: true, mensaje: `«${it.producto}» entregado. El inventario se mueve cuando despacho confirme lo que llegó.` };
+  });
+}
+
+/**
+ * La flecha ↶ de un producto entregado (27 nov 2026). Si despacho todavía no lo recibió, solo se borra la entrega (no se había movido inventario) y vuelve a «En proceso».
+ * Si ya lo recibió, lo entregado regresa a su bodega con un traslado de reversa por cada bodega (despacho tiene que tener todavía esas unidades) y, si el pedido estaba cerrado, vuelve a «En proceso».
+ */
+export async function deshacerEntregaItemPedido(id: string, itemId: string): Promise<Resultado> {
+  return conPermiso(MODULO_INVENTARIO, async (u) => {
+    if (!ES_UUID(id) || !ES_UUID(itemId)) return { error: "Producto no válido." };
+    const supabase = createServiceClient();
+    const { data: p } = await supabase
+      .from("despacho_pedidos_inventario")
+      .select("id, numero, estado, pedido_por, archivado_en, bodega_destino_id, despacho_pedidos_inventario_items(id, sku_id, producto, cantidad_entregada)")
+      .eq("id", id)
+      .maybeSingle();
+    if (!p) return { error: "Ese pedido ya no existe." };
+    if (p.archivado_en) return { error: "Ese pedido está archivado: sácalo del archivo primero." };
+    if (p.estado !== "en_proceso" && p.estado !== "recibido" && p.estado !== "solicitud") return { error: "Ese pedido no se puede cambiar así: recarga la página." };
+    const it = ((p.despacho_pedidos_inventario_items as { id: string; sku_id: string; producto: string; cantidad_entregada: number | null }[] | null) ?? []).find((x) => x.id === itemId);
+    if (!it || it.cantidad_entregada === null) return { error: "Ese producto ya no está entregado: recarga la página." };
+    const destinoId = p.bodega_destino_id as string;
+    if (!(await puedeVerBodega(supabase, u.paisesPermitidos, destinoId))) return { error: "No tienes acceso al país de ese pedido." };
+    const n = numeroPedido(p.numero as number);
+    const { data: todos } = await supabase.from("despacho_pedidos_inventario_envios").select("id, bodega_id, cantidad_recibida, traslado_id, traslado:wms_traslados(numero)").eq("item_id", it.id);
+    const sinRecibir = (todos ?? []).filter((e) => !e.traslado_id);
+    if (sinRecibir.length && p.estado !== "recibido") {
+      const { data: tomado } = await supabase.from("despacho_pedidos_inventario_items").update({ cantidad_entregada: null }).eq("id", it.id).not("cantidad_entregada", "is", null).select("id");
+      if (!tomado?.length) return { error: "Ese producto ya no está entregado: recarga la página." };
+      await supabase.from("despacho_pedidos_inventario_envios").delete().in("id", sinRecibir.map((e) => e.id as string));
+      await registrarAuditoria({ accion: "deshacer_entrega_producto_pedido_inventario", entidad: "despacho_pedidos_inventario", entidadId: id, detalle: `${n}: «${it.producto}» volvió a En proceso (despacho aún no lo recibía: no se movió inventario)` });
+      return { ok: true, mensaje: `«${it.producto}» volvió a «En proceso». El inventario no se había movido.` };
+    }
+    const lineas = (todos ?? []).filter((e) => e.traslado_id && Number(e.cantidad_recibida ?? 0) > 0);
+    if (!lineas.length) return { error: `«${it.producto}» se recibió con el sistema anterior: corrígelo desde Inventario › Traslados.` };
+    for (const e of lineas) if (!(await puedeVerBodega(supabase, u.paisesPermitidos, e.bodega_id as string))) return { error: "No tienes acceso al país de esa bodega." };
+    const total = lineas.reduce((t, e) => t + Number(e.cantidad_recibida), 0);
+    const hay = (await cargarStock(supabase, [destinoId], [it.sku_id]))[destinoId]?.[it.sku_id] ?? 0;
+    if (hay < total) return { error: `Despacho ya no tiene lo recibido de «${it.producto}» (recibió ${total.toLocaleString("es-PA")}, hay ${hay.toLocaleString("es-PA")}): no se puede devolver.` };
+
+    const { data: tomado } = await supabase.from("despacho_pedidos_inventario_items").update({ cantidad_entregada: null }).eq("id", it.id).not("cantidad_entregada", "is", null).select("id");
+    if (!tomado?.length) return { error: "Ese producto ya no está entregado: recarga la página." };
+    const reversas: string[] = [];
+    for (const [i, e] of lineas.entries()) {
+      const tr = (Array.isArray(e.traslado) ? e.traslado[0] : e.traslado) as { numero: number } | null;
+      const original = tr ? numeroTraslado(tr.numero) : "el traslado";
+      const { data: rev, error } = await supabase.rpc("wms_crear_traslado", { p_desde: destinoId, p_hacia: e.bodega_id, p_items: [{ sku: it.sku_id, cantidad: Number(e.cantidad_recibida) }], p_notas: `Reversa de ${original} · ${n} (entrega deshecha)`, p_usuario: u.id, p_nombre: nombreDe(u) });
+      if (error || !rev) {
+        // Lo que ya se devolvió queda devuelto; el producto sigue recibido con lo que falta devolver.
+        await supabase.from("despacho_pedidos_inventario_items").update({ cantidad_entregada: lineas.slice(i).reduce((t, x) => t + Number(x.cantidad_recibida), 0) }).eq("id", it.id);
+        const msg = error?.message ?? "";
+        return { error: msg && msg.length < 220 && !/wms_crear_traslado/.test(msg) ? `No se pudo devolver: ${msg}` : "No se pudo hacer el traslado de reversa." };
+      }
+      reversas.push(numeroTraslado((rev as { numero: number }).numero));
+      await supabase.from("despacho_pedidos_inventario_envios").delete().eq("id", e.id as string);
+    }
+    let reabierto = false;
+    if (p.estado !== "en_proceso") {
+      const { data: c } = await supabase
+        .from("despacho_pedidos_inventario")
+        .update({ estado: "en_proceso", recibido_en: null, recibido_por: null, recibido_por_nombre: null })
+        .eq("id", id)
+        .in("estado", ["recibido", "solicitud"])
+        .select("id");
+      reabierto = p.estado === "recibido" && !!c?.length;
+    }
+    await registrarAuditoria({ accion: "deshacer_entrega_producto_pedido_inventario", entidad: "despacho_pedidos_inventario", entidadId: id, detalle: `${n}: «${it.producto}» volvió a En proceso; ${total.toLocaleString("es-PA")} de vuelta a su bodega (${reversas.join(", ")})` });
+    if (reabierto) await avisar(supabase, [p.pedido_por as string], u, avisoPedido({ numero: p.numero as number, items: 1 }, nombreDe(u), "entrega_reabierta", it.producto), "/inventario-despacho/solicitudes");
+    revalidatePath("/inventario");
+    revalidatePath("/inventario/traslados");
+    return { ok: true, mensaje: `«${it.producto}» volvió a «En proceso»: ${reversas.join(", ")} lo devolvió a su bodega.` };
+  });
+}
+
+/**
+ * Despacho recibe lo que inventario marcó entregado y ya confirmó producto por producto (27 nov 2026): un traslado por cada bodega con lo que llegó, hacia la de despacho. Lo que llegó en 0 se borra
+ * (el producto vuelve a «En proceso» para entregarlo otra vez). Si un traslado falla, los ya hechos se devuelven. Cuando ya se recibió todo el pedido, queda «Entregado» (cerrado).
+ */
+async function recibirEntregados(supabase: Supa, u: UsuarioActual, p: { id: string; numero: number; responsable_id: string | null; bodega_destino_id: string; items: { id: string; sku_id: string; producto: string }[] }): Promise<Resultado> {
+  const id = p.id;
+  const n = numeroPedido(p.numero);
+  const { data: filas } = await supabase.from("despacho_pedidos_inventario_envios").select("id, item_id, bodega_id, cantidad_enviada, cantidad_recibida, nota, bodega:wms_bodegas(nombre)").eq("pedido_id", id).is("traslado_id", null);
+  const pendientes = (filas ?? []) as { id: string; item_id: string; bodega_id: string; cantidad_enviada: number; cantidad_recibida: number | null; nota: string | null; bodega: unknown }[];
+  if (!pendientes.length) return { error: "No hay nada entregado por recibir: recarga la página." };
+  if (pendientes.some((e) => e.cantidad_recibida === null)) return { error: "Faltan productos por confirmar." };
+  const skuDe = new Map(p.items.map((it) => [it.id, it]));
+  const bodegas = [...new Set(pendientes.filter((e) => Number(e.cantidad_recibida) > 0).map((e) => e.bodega_id))];
+  for (const b of bodegas) if (!(await puedeVerBodega(supabase, u.paisesPermitidos, b))) return { error: "No tienes acceso al país de esa bodega." };
+  const hechos: { bodegaId: string; id: string; numero: number; lineas: { sku: string; cantidad: number }[] }[] = [];
+  for (const b of bodegas) {
+    const porSku = new Map<string, number>();
+    for (const e of pendientes.filter((x) => x.bodega_id === b && Number(x.cantidad_recibida) > 0)) {
+      const sku = skuDe.get(e.item_id)?.sku_id;
+      if (sku) porSku.set(sku, (porSku.get(sku) ?? 0) + Number(e.cantidad_recibida));
+    }
+    const lineas = [...porSku].map(([sku, cantidad]) => ({ sku, cantidad }));
+    const { data: tr, error } = await supabase.rpc("wms_crear_traslado", { p_desde: b, p_hacia: p.bodega_destino_id, p_items: lineas, p_notas: `${n} · pedido de despacho, recibido y confirmado`, p_usuario: u.id, p_nombre: nombreDe(u) });
+    if (error || !tr) {
+      for (const h of hechos) await supabase.rpc("wms_crear_traslado", { p_desde: p.bodega_destino_id, p_hacia: h.bodegaId, p_items: h.lineas, p_notas: `Reversa de ${numeroTraslado(h.numero)} · ${n} (no se pudo recibir)`, p_usuario: u.id, p_nombre: nombreDe(u) });
+      const msg = error?.message ?? "";
+      return { error: msg && msg.length < 220 && !/wms_crear_traslado/.test(msg) ? `No se pudo recibir: ${msg}. Avisa a inventario.` : "No se pudo hacer el traslado. Avisa a inventario." };
+    }
+    const hecho = tr as { id: string; numero: number };
+    hechos.push({ bodegaId: b, id: hecho.id, numero: hecho.numero, lineas });
+    await supabase.from("despacho_pedidos_inventario_envios").update({ traslado_id: hecho.id }).in("id", pendientes.filter((x) => x.bodega_id === b && Number(x.cantidad_recibida) > 0).map((x) => x.id));
+  }
+  // Lo que no llegó (0) se borra; cada producto queda con lo que de verdad recibió despacho.
+  const enCero = pendientes.filter((e) => Number(e.cantidad_recibida) === 0).map((e) => e.id);
+  if (enCero.length) await supabase.from("despacho_pedidos_inventario_envios").delete().in("id", enCero);
+  const tocados = [...new Set(pendientes.map((e) => e.item_id))];
+  const { data: quedan } = await supabase.from("despacho_pedidos_inventario_envios").select("item_id, cantidad_recibida").in("item_id", tocados);
+  for (const itemId of tocados) {
+    const suyos = (quedan ?? []).filter((e) => e.item_id === itemId);
+    await supabase.from("despacho_pedidos_inventario_items").update({ cantidad_entregada: suyos.length ? suyos.reduce((t, e) => t + Number(e.cantidad_recibida ?? 0), 0) : null }).eq("id", itemId);
+  }
+  const diferencias = diferenciasDeEnvio(
+    p.items,
+    pendientes.map((e) => ({ itemId: e.item_id, bodega: ((Array.isArray(e.bodega) ? e.bodega[0] : e.bodega) as { nombre: string } | null)?.nombre ?? "bodega", cantidadEnviada: Number(e.cantidad_enviada), cantidadRecibida: Number(e.cantidad_recibida), nota: e.nota })),
+  );
+  // ¿Ya se recibió todo? Entonces el pedido se cierra.
+  const { data: abiertos } = await supabase.from("despacho_pedidos_inventario_items").select("id").eq("pedido_id", id).is("cantidad_entregada", null).limit(1);
+  let cerrado = false;
+  if (!abiertos?.length) {
+    const { data: c } = await supabase.from("despacho_pedidos_inventario").update({ estado: "recibido", recibido_en: new Date().toISOString(), recibido_por: u.id, recibido_por_nombre: nombreDe(u) }).eq("id", id).in("estado", ["solicitud", "en_proceso"]).select("id");
+    cerrado = !!c?.length;
+  }
+  const traslados = hechos.map((h) => numeroTraslado(h.numero));
+  const unidades = hechos.reduce((t, h) => t + h.lineas.reduce((s, l) => s + l.cantidad, 0), 0);
+  await registrarAuditoria({ accion: "recibir_pedido_inventario", entidad: "despacho_pedidos_inventario", entidadId: id, detalle: `${n}: ${unidades.toLocaleString("es-PA")} unidades recibidas${traslados.length ? ` (${traslados.join(", ")})` : ""}${diferencias.length ? ` · Diferencias: ${diferencias.join("; ")}` : ""}`.slice(0, 1000) });
+  for (const h of hechos) await registrarAuditoria({ accion: "traslado_inventario", entidad: "wms_traslados", entidadId: h.id, detalle: `${numeroTraslado(h.numero)}: ${n} · pedido de despacho, recibido y confirmado` });
+  await avisar(supabase, [p.responsable_id, ...(await quienesAtienden(supabase))], u, avisoPedido({ numero: p.numero, items: tocados.length }, nombreDe(u), "recibido", diferencias.length ? `Diferencias: ${diferencias.join("; ")}` : undefined), "/inventario-pedidos-despacho");
+  revalidatePath("/inventario");
+  revalidatePath("/inventario/traslados");
+  return { ok: true, mensaje: `Recibido${traslados.length ? `: se hizo ${traslados.length === 1 ? "el traslado" : "los traslados"} ${traslados.join(", ")}` : ""}.${cerrado ? ` ${n} quedó entregado completo.` : ""}` };
 }
 
 /** Despacho cancela un pedido que inventario todavía no tomó. */
@@ -394,7 +595,8 @@ export async function confirmarLineaPedido(envioId: string, recibida: unknown, n
     if (eLeer) return { error: errorDeBase(eLeer.message, "No se pudo leer el pedido.") };
     if (!e) return { error: "Ese producto ya no está en el envío: recarga la página." };
     const pedido = (Array.isArray(e.pedido) ? e.pedido[0] : e.pedido) as { estado: string; bodega_destino_id: string };
-    if (pedido.estado !== "enviado") return { error: "Ese pedido ya no está por recibir: recarga la página." };
+    // Desde el 27 nov 2026 lo entregado se confirma mientras el pedido sigue abierto (ya no pasa por «Enviado»).
+    if (!["enviado", "solicitud", "en_proceso"].includes(pedido.estado)) return { error: "Ese pedido ya no está por recibir: recarga la página." };
     if (!(await puedeVerBodega(supabase, u.paisesPermitidos, pedido.bodega_destino_id))) return { error: "No tienes acceso al país de ese pedido." };
     const r = revisarConfirmacion(Number(e.cantidad_enviada), recibida, nota);
     if ("error" in r) return r;
@@ -644,10 +846,22 @@ export async function recibirPedidoInventario(id: string): Promise<Resultado> {
     const supabase = createServiceClient();
     const { data: p } = await supabase
       .from("despacho_pedidos_inventario")
-      .select("numero, estado, traslado_id, responsable_id, bodega_destino_id, despacho_pedidos_inventario_items(id, producto)")
+      .select("numero, estado, traslado_id, responsable_id, bodega_destino_id, despacho_pedidos_inventario_items(id, sku_id, producto)")
       .eq("id", id)
       .maybeSingle();
-    if (!p || p.estado !== "enviado") return { error: "Ese pedido no está enviado: recarga la página." };
+    if (!p) return { error: "Ese pedido ya no existe." };
+    // Desde el 27 nov 2026: se recibe lo que inventario marcó entregado, producto por producto, sin pasar por «Enviado».
+    if (p.estado === "solicitud" || p.estado === "en_proceso") {
+      if (!(await puedeVerBodega(supabase, u.paisesPermitidos, p.bodega_destino_id as string))) return { error: "No tienes acceso al país de ese pedido." };
+      return recibirEntregados(supabase, u, {
+        id,
+        numero: p.numero as number,
+        responsable_id: (p.responsable_id as string | null) ?? null,
+        bodega_destino_id: p.bodega_destino_id as string,
+        items: (p.despacho_pedidos_inventario_items as { id: string; sku_id: string; producto: string }[] | null) ?? [],
+      });
+    }
+    if (p.estado !== "enviado") return { error: "Ese pedido no está por recibir: recarga la página." };
     if (!(await puedeVerBodega(supabase, u.paisesPermitidos, p.bodega_destino_id as string))) return { error: "No tienes acceso al país de ese pedido." };
     const items = (p.despacho_pedidos_inventario_items as { id: string; producto: string }[] | null) ?? [];
     const n = numeroPedido(p.numero as number);

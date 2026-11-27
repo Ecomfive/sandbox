@@ -11,14 +11,27 @@ export type EstadoPedido = "solicitud" | "en_proceso" | "enviado" | "recibido" |
 /** Los estados, en el orden del Excel que reemplaza, con su nombre y el color de insignia del sistema. */
 export const ESTADOS: { clave: EstadoPedido; etiqueta: string; tono: Tone; explica: string }[] = [
   { clave: "solicitud", etiqueta: "Solicitud", tono: "neutral", explica: "Pedido registrado: inventario todavía no lo toma." },
-  { clave: "en_proceso", etiqueta: "En proceso", tono: "warning", explica: "Inventario está preparando el pedido." },
+  { clave: "en_proceso", etiqueta: "En proceso", tono: "warning", explica: "Inventario lo está llevando a despacho: cada producto pasa a «Entregado» al llevarlo, y despacho confirma lo que llegó." },
   { clave: "enviado", etiqueta: "Enviado", tono: "azul", explica: "Va en camino a despacho. El inventario se mueve cuando despacho confirma lo que llegó." },
-  { clave: "recibido", etiqueta: "Entregado", tono: "success", explica: "Despacho confirmó lo que llegó y se hizo el traslado: el pedido queda cerrado." },
+  { clave: "recibido", etiqueta: "Entregado", tono: "success", explica: "Despacho confirmó todo lo que llegó y se hizo el traslado: el pedido queda cerrado." },
   { clave: "cancelado", etiqueta: "Cancelado", tono: "destructive", explica: "Despacho lo canceló antes de que inventario lo tomara." },
 ];
 
 export const estadoDe = (clave: string) => ESTADOS.find((e) => e.clave === clave) ?? ESTADOS[0];
 export const esEstado = (v: unknown): v is EstadoPedido => typeof v === "string" && ESTADOS.some((e) => e.clave === v);
+
+/**
+ * El estado de un producto (27 nov 2026, pedido de Hernán): pendiente («Solicitud») → en proceso (lo están llevando) → entregado (inventario lo llevó; falta que despacho confirme)
+ * → recibido (despacho confirmó y se hizo el traslado).
+ */
+export type EstadoItem = "pendiente" | "en_proceso" | "entregado" | "recibido";
+export function estadoItem(it: { id: string; cantidadEntregada: number | null; enProcesoEn?: string | null }, estadoPedido: EstadoPedido, envios: { itemId: string; traslado: string | null }[] = []): EstadoItem {
+  if (estadoPedido === "recibido") return "recibido";
+  const suyos = envios.filter((e) => e.itemId === it.id);
+  if (suyos.length && suyos.every((e) => e.traslado)) return "recibido";
+  if (suyos.length || it.cantidadEntregada !== null) return "entregado";
+  return it.enProcesoEn ? "en_proceso" : "pendiente";
+}
 
 /** «PED-0012»: el número de un pedido. */
 export const numeroPedido = (n: number) => `PED-${String(n).padStart(4, "0")}`;
@@ -400,7 +413,7 @@ export function fechaCorta(iso: string): string {
 }
 
 /** Los avisos «Para ti» de cada paso. */
-export function avisoPedido(p: { numero: number; items: number }, quien: string, paso: "nuevo" | "en_proceso" | "enviado" | "recibido" | "cancelado" | "entrega_deshecha" | "envio_deshecho" | "reabierto", extra?: string): { titulo: string; texto: string } {
+export function avisoPedido(p: { numero: number; items: number }, quien: string, paso: "nuevo" | "en_proceso" | "enviado" | "recibido" | "entregado" | "entrega_reabierta" | "cancelado" | "entrega_deshecha" | "envio_deshecho" | "reabierto", extra?: string): { titulo: string; texto: string } {
   const n = numeroPedido(p.numero);
   const prods = `${p.items} ${p.items === 1 ? "producto" : "productos"}`;
   const t = {
@@ -408,6 +421,8 @@ export function avisoPedido(p: { numero: number; items: number }, quien: string,
     en_proceso: [`${n} está en proceso`, `${quien} está preparando tu pedido.`],
     enviado: [`${n} fue enviado`, `${quien} lo envió${extra ? ` (${extra})` : ""}. Cuando llegue, confirma producto por producto lo que recibiste.`],
     recibido: [extra ? `${n} fue recibido con diferencias` : `${n} fue recibido`, extra ? `${quien} lo recibió. ${extra}` : `${quien} confirmó que llegó todo: el traslado quedó hecho.`],
+    entregado: [`${n}: inventario entregó productos`, `${quien} marcó entregado «${extra ?? "un producto"}». Confirma lo que llegó y pulsa «Recibir y transferir»: ahí se hace el traslado.`],
+    entrega_reabierta: [`${n} volvió a «En proceso»`, `${quien} devolvió «${extra ?? "un producto"}» a su bodega (se había recibido por error).`],
     cancelado: [`${n} fue cancelado`, `${quien} canceló el pedido.`],
     envio_deshecho: [`${n} volvió a «${extra ?? "En proceso"}»`, `${quien} deshizo el envío (se había enviado por error). Te avisará cuando lo envíe de nuevo.`],
     reabierto: [`${n} fue reabierto`, `${quien} reabrió el pedido que estaba cancelado: vuelve a estar en «Solicitud».`],

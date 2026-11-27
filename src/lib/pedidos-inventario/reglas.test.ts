@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { avisoPedido, contarPorEstado, fechaCorta, leerCantidad, numeroPedido, puedeArchivar, puedeDeshacerEntrega, puedeDeshacerEnvio, estadoAntesDeEnviar, puedeReabrir, puedeVolverASolicitud, puedeEnviar, puedeRecibir, revisarLineas, revisarStockPedido, repartirSugerido, revisarEnvio, agruparPorBodega, revisarConfirmacion, diferenciasDeEnvio, restarComprometido, partirPorBodega, revisarQuedan } from "./reglas";
+import { avisoPedido, contarPorEstado, fechaCorta, leerCantidad, numeroPedido, puedeArchivar, puedeDeshacerEntrega, puedeDeshacerEnvio, estadoAntesDeEnviar, puedeReabrir, puedeVolverASolicitud, puedeEnviar, puedeRecibir, revisarLineas, revisarStockPedido, repartirSugerido, revisarEnvio, agruparPorBodega, revisarConfirmacion, diferenciasDeEnvio, restarComprometido, partirPorBodega, revisarQuedan, estadoItem } from "./reglas";
 
 const A = "11111111-1111-4111-8111-111111111111";
 const B = "22222222-2222-4222-8222-222222222222";
@@ -236,4 +236,16 @@ test("volver atrás: en proceso vuelve a solicitud y un cancelado se reabre", ()
   for (const e of ["solicitud", "enviado", "recibido", "cancelado"] as const) assert.equal(puedeVolverASolicitud(e), false);
   assert.equal(puedeReabrir("cancelado"), true);
   for (const e of ["solicitud", "en_proceso", "enviado", "recibido"] as const) assert.equal(puedeReabrir(e), false);
+});
+
+test("estadoItem: pendiente, en proceso, entregado y recibido (27 nov 2026)", () => {
+  const it = (cantidadEntregada: number | null, enProcesoEn: string | null = null) => ({ id: "a", cantidadEntregada, enProcesoEn });
+  assert.equal(estadoItem(it(null), "solicitud"), "pendiente");
+  assert.equal(estadoItem(it(null, "2026-11-27T10:00:00Z"), "en_proceso"), "en_proceso");
+  // Inventario lo entregó: falta que despacho confirme.
+  assert.equal(estadoItem(it(40, "2026-11-27T10:00:00Z"), "en_proceso", [{ itemId: "a", traslado: null }]), "entregado");
+  // Despacho lo recibió: hay traslado en todas sus partes.
+  assert.equal(estadoItem(it(40, "2026-11-27T10:00:00Z"), "en_proceso", [{ itemId: "a", traslado: "TRA-0001" }, { itemId: "b", traslado: null }]), "recibido");
+  assert.equal(estadoItem(it(40), "en_proceso", [{ itemId: "a", traslado: "TRA-0001" }, { itemId: "a", traslado: null }]), "entregado");
+  assert.equal(estadoItem(it(null), "recibido"), "recibido");
 });

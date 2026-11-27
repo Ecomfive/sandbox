@@ -70,7 +70,9 @@ export async function cargarComprometido(supabase: SupabaseClient): Promise<Stoc
     supabase
       .from("despacho_pedidos_inventario_envios")
       .select("id, bodega_id, cantidad_enviada, cantidad_recibida, item:despacho_pedidos_inventario_items!inner(sku_id), pedido:despacho_pedidos_inventario!inner(estado)")
-      .eq("pedido.estado", "enviado")
+      // Lo entregado que despacho todavía no recibe (27 nov 2026: con el pedido abierto; antes, «Enviado»).
+      .in("pedido.estado", ["enviado", "solicitud", "en_proceso"])
+      .is("traslado_id", null)
       .order("id")
       .range(d, h),
   );
